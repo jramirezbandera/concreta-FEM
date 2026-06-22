@@ -101,8 +101,10 @@ function useSnapActivo(): boolean {
 // Hay un tramo donde colocar pilares (grupo activo con plantas, o planta activa).
 // Reacciona a cambios del modelo y del ambito activo. Reusa el helper PURO
 // tramoColocable (misma logica que ColocacionPilar usa al colocar): una sola fuente
-// de verdad para decidir si la colocacion es posible.
-function usePuedeColocarPilar(): boolean {
+// de verdad para decidir si la colocacion es posible. Exportado como costura de test
+// (la reactividad merece red; mismo patron que borrarSeleccion en Menubar).
+// eslint-disable-next-line react-refresh/only-export-components
+export function usePuedeColocarPilar(): boolean {
   const calcular = () =>
     tramoColocable(
       modeloStore.getState().getModelo(),

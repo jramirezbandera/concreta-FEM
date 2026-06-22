@@ -63,6 +63,25 @@ describe("CampoNumero (primitiva compartida)", () => {
     expect(screen.getByLabelText("Ángulo")).toHaveValue(90);
   });
 
+  it("aplica la clase numérica (mono tabular alineado a la derecha, Spec §1.5/§5)", () => {
+    render(<CampoNumero etiqueta="Cota" valor={0} onCommit={() => {}} />);
+    expect(screen.getByLabelText("Cota")).toHaveClass("cx-input--num");
+  });
+
+  it("fusiona la clase numérica con la className del llamante", () => {
+    render(
+      <CampoNumero
+        etiqueta="Cota"
+        valor={0}
+        onCommit={() => {}}
+        className="cx-gyp__campo-num"
+      />,
+    );
+    const input = screen.getByLabelText("Cota");
+    expect(input).toHaveClass("cx-input--num");
+    expect(input).toHaveClass("cx-gyp__campo-num");
+  });
+
   it("muestra el mensaje de error y el sufijo cuando se proveen", () => {
     render(
       <CampoNumero

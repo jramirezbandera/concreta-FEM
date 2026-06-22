@@ -32,7 +32,9 @@ export default defineConfig({
         test: {
           name: "jsdom",
           environment: "jsdom",
-          include: ["src/ui/**/*.test.{ts,tsx}"],
+          // src/ui/** y los componentes raíz (App.tsx y su test). node solo coge
+          // *.test.ts, así que los *.test.tsx raíz caen aquí sin doble ejecución.
+          include: ["src/ui/**/*.test.{ts,tsx}", "src/*.test.tsx"],
           // Matchers jest-dom + cleanup de RTL (sin test.globals; ver setup-ui.ts).
           setupFiles: ["src/test/setup-ui.ts"],
         },

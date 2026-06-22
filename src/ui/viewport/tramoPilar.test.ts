@@ -58,20 +58,30 @@ describe("tramoColocable", () => {
     });
   });
 
-  it("grupo sin plantas pero con planta activa: cae a la planta activa para ambos extremos", () => {
-    const m = modeloCon([grupo("g1")], []);
+  it("grupo sin plantas pero con planta activa existente: cae a la planta activa", () => {
+    // La planta activa pertenece a otro grupo (g2); g1 no tiene plantas, asi que el
+    // fallback usa la planta activa, que SI existe en el modelo.
+    const m = modeloCon([grupo("g1"), grupo("g2")], [planta("pAct", "g2", 0)]);
     expect(tramoColocable(m, "g1", "pAct")).toEqual({
       plantaInicial: "pAct",
       plantaFinal: "pAct",
     });
   });
 
-  it("sin grupo pero con planta activa: usa la planta activa", () => {
-    const m = modeloCon([], []);
+  it("sin grupo pero con planta activa existente: usa la planta activa", () => {
+    const m = modeloCon([grupo("g1")], [planta("pAct", "g1", 0)]);
     expect(tramoColocable(m, null, "pAct")).toEqual({
       plantaInicial: "pAct",
       plantaFinal: "pAct",
     });
+  });
+
+  it("planta activa OBSOLETA (no existe en el modelo): null, no colocable", () => {
+    // Endurecimiento: un plantaActivaId que ya no existe (planta borrada) no debe
+    // dar luz verde a colocar un pilar contra una planta inexistente.
+    const m = modeloCon([], []);
+    expect(tramoColocable(m, null, "pBorrada")).toBeNull();
+    expect(tramoColocable(m, "g1", "pBorrada")).toBeNull();
   });
 
   it("sin grupo ni planta activos: null (no hay donde colocar)", () => {

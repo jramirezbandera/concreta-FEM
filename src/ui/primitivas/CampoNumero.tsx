@@ -34,6 +34,9 @@ export function CampoNumero({
   useEffect(() => {
     setLocal(String(valor));
   }, [valor]);
+  // Dato numerico -> mono tabular alineado a la derecha (Spec Diseno UI §1.5/§5).
+  // Se fusiona con la clase del llamante (p. ej. anchos del dialogo).
+  const clases = ["cx-input--num", className].filter(Boolean).join(" ");
   return (
     <Campo
       etiqueta={etiqueta}
@@ -42,7 +45,7 @@ export function CampoNumero({
       value={local}
       error={error}
       sufijo={sufijo}
-      className={className}
+      className={clases}
       onChange={(e) => setLocal(e.target.value)}
       onBlur={() => onCommit(local.trim() === "" ? NaN : Number(local))}
     />

@@ -3,7 +3,7 @@
 // modelo. Es UNA SOLA fuente de verdad, usada por ColocacionPilar (al colocar por
 // clic) y por App (para la guia de la barra de estado): si no hay tramo colocable,
 // la barra avisa ANTES de que el clic caiga en vacio (endurecimiento del review).
-import { plantasDeGrupo } from "../../dominio";
+import { plantasDeGrupo, plantaPorId } from "../../dominio";
 import type { Modelo } from "../../dominio";
 
 export interface TramoPilar {
@@ -31,7 +31,11 @@ export function tramoColocable(
       };
     }
   }
-  if (plantaActivaId) {
+  // Fallback a la planta activa SOLO si existe en el modelo: un `plantaActivaId`
+  // obsoleto (planta borrada, aún no reparado por resolverVistaActiva) no debe
+  // dar luz verde a colocar un pilar contra una planta inexistente (el discretizador
+  // lo rechazaría aguas abajo). Endurecimiento del review de ingenieria.
+  if (plantaActivaId && plantaPorId(modelo, plantaActivaId) !== undefined) {
     return { plantaInicial: plantaActivaId, plantaFinal: plantaActivaId };
   }
   return null;

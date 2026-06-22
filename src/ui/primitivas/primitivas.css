@@ -290,6 +290,15 @@
 .cx-input--error {
   border-color: var(--danger);
 }
+/* Input NUMERICO: mono tabular alineado a la derecha (Spec Diseno UI §1.5/§5 —
+   "todo dato numerico/tecnico" en mono tabular; el campo numerico va alineado a la
+   derecha junto a su caja de unidad). Solo CampoNumero aplica esta clase; los campos
+   de texto (nombres) siguen en sans alineados a la izquierda. */
+.cx-input--num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
 
 /* --- Select (.cx-select): trigger 30 px + content/items (Radix Select) --- */
 .cx-select {
