@@ -34,7 +34,13 @@ function pyodideAssets(): Plugin {
 
 // Config base (feature-1) + solver (feature-5). El worker de Pyodide/PyNite se
 // carga como modulo ESM y el runtime se sirve autohospedado desde /pyodide/.
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // GitHub Pages sirve el sitio bajo un subpath con el nombre del repo
+  // (https://jramirezbandera.github.io/concreta-FEM/). En build fijamos ese base
+  // para que los assets y el runtime de Pyodide resuelvan bien; en dev queda en
+  // "/" para no entorpecer el servidor local. INDEX_URL (solver/config.ts) deriva
+  // de import.meta.env.BASE_URL, asi que /pyodide/ sigue al base automaticamente.
+  base: command === "build" ? "/concreta-FEM/" : "/",
   plugins: [react(), tailwindcss(), pyodideAssets()],
   // El worker del solver es un modulo ES (usa import de Comlink/pyodide).
   worker: {
@@ -45,4 +51,4 @@ export default defineConfig({
     // optimizador de esbuild lo rompe. Se importa tal cual desde el worker.
     exclude: ["pyodide"],
   },
-});
+}));

@@ -1,0 +1,54 @@
+name: Deploy a GitHub Pages
+
+# GitHub Pages esta configurado en modo "GitHub Actions" (build_type: workflow).
+# Este workflow construye el sitio con Vite y lo publica. Sin el, Pages no sirve
+# nada (no hay despliegue que ejecutar).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Permisos minimos para que deploy-pages publique via OIDC.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez; cancela builds en cola pero deja terminar el activo.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # postinstall copia el runtime de Pyodide a public/pyodide/.
+      - run: npm ci
+
+      # tsc --noEmit + vite build (base /concreta-FEM/ en produccion).
+      - run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

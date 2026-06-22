@@ -48,11 +48,13 @@ export const VERSIONES = {
 // Los assets de Pyodide (pyodide.js/.mjs, .wasm, pyodide-lock.json y los wheels
 // de numpy/scipy/micropip) se copian de node_modules/pyodide a public/pyodide/
 // por scripts/copy-pyodide-assets.mjs (postinstall + buildStart de Vite). Vite
-// sirve public/ en la raiz, asi que el indexURL en runtime es "/pyodide/".
+// publica public/ bajo el base configurado, asi que el indexURL en runtime es
+// `${BASE_URL}pyodide/`: "/pyodide/" en dev y "/concreta-FEM/pyodide/" en el
+// build de GitHub Pages (subpath del repo).
 //
 // Pyodide resuelve los wheels de loadPackage()/micropip con rutas RELATIVAS a
-// este indexURL, por eso debe terminar en "/".
-export const INDEX_URL = "/pyodide/";
+// este indexURL, por eso debe terminar en "/" (BASE_URL siempre lo garantiza).
+export const INDEX_URL = `${import.meta.env.BASE_URL}pyodide/`;
 
 // -----------------------------------------------------------------------------
 // PLAN DE INSTALACION (hallazgo #10 — sin matplotlib/vtk/pyvista/pdfkit)
