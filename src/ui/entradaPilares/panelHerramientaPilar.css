@@ -1,0 +1,33 @@
+/* PanelHerramientaPilar (feature-11, T4.1): panel flotante de defaults del pilar
+   en colocacion. Posicion canonica: arriba-IZQUIERDA del lienzo (no choca con el
+   InspectorPilar, que va arriba-derecha). Estilado solo con tokens; reusa
+   .cx-float / .cx-campo de las primitivas. */
+
+.cx-herramienta-pilar {
+  position: absolute;
+  top: var(--space-3, 12px);
+  left: var(--space-3, 12px);
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.cx-herramienta-pilar .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Bloque etiqueta + control (Arranque, Vinculación) en columna. */
+.cx-herramienta-pilar__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.cx-herramienta-pilar__acciones {
+  margin-top: var(--space-1, 4px);
+  display: flex;
+  justify-content: flex-end;
+}

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Tipos de entorno: node para los configs de build/test */
+    "types": ["node"],
+
+    /* Strict (CLAUDE.md §9: sin any salvo justificacion) */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  /* tsconfig unico: el typecheck cubre app, tests y los configs de build */
+  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "eslint.config.js"]
+}

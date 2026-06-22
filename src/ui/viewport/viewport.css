@@ -1,0 +1,139 @@
+/*
+ * Estilos del viewport (feature-9): contenedor del lienzo + posiciones del HUD
+ * glass. Estilado SOLO con tokens semanticos (styles/tokens.css); sin colores
+ * hardcodeados. Importar una vez en src/index.css.
+ * Referencia: Concreta_Estructuras_Spec_Diseno_UI.md §4.2 (HUD glass).
+ */
+
+/* Contenedor: el Canvas ocupa todo; el HUD se posiciona absoluto encima. */
+.cx-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--canvas);
+}
+.cx-viewport canvas {
+  display: block;
+}
+
+/* Capa HUD: no captura el puntero (deja pasar al canvas); los paneles si. */
+.cx-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.cx-hud > * {
+  pointer-events: auto;
+}
+
+/* Posiciones canonicas (Spec §4.2). */
+.cx-float--top-left {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+}
+.cx-float--top-right {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.cx-float--bottom-right {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+}
+.cx-float--center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Variante "bare": glass sin cabecera/cuerpo de PanelFlotante (segmented, zoom). */
+.cx-float--bare {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--glass-bd);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-float);
+}
+
+/* GroupRibbon: fila cota + navegacion de planta. */
+.cx-ribbon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 160px;
+}
+.cx-ribbon-cota {
+  color: var(--text-2);
+  font-size: 12px;
+}
+.cx-ribbon-nav {
+  display: inline-flex;
+  gap: 2px;
+}
+/* Botones compactos de navegacion de planta. */
+.cx-ribbon-nav .cx-btn {
+  min-width: 26px;
+  padding: 0 6px;
+}
+
+/* Zoom: botones cuadrados. */
+.cx-zoom .cx-btn {
+  min-width: 30px;
+  padding: 0 6px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Estado vacio / primer uso: guia de arranque sobre el lienzo vacio. Glass por
+   tokens, calido y centrado. No captura el puntero: deja libres los controles
+   del HUD (grupo/planta, modo de vista, zoom). */
+.cx-empty {
+  pointer-events: none;
+  max-width: 320px;
+  padding: 18px 22px;
+  text-align: center;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--glass-bd);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-float);
+  z-index: 1;
+}
+.cx-empty__titulo {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.cx-empty__texto {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+/* Aviso de mosaico (placeholder F1). */
+.cx-mosaico-aviso {
+  pointer-events: none;
+  padding: 10px 16px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--glass-bd);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-float);
+  color: var(--text-2);
+  z-index: 3;
+}

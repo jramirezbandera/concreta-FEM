@@ -1,0 +1,111 @@
+/*
+ * Design tokens de Concreta · Estructuras — set "Light CAD" completo.
+ * Fuente de verdad del tema: estos tokens semanticos son las CSS custom
+ * properties que consumen TANTO las clases .cx-* (componentes) COMO el mapeo
+ * @theme de Tailwind v4 (ver src/index.css). Estetica cerrada con el usuario:
+ * lienzo claro tipo papel CAD, acentos azul Concreta, datos en mono tabular.
+ * Referencia: Concreta_Estructuras_Spec_Diseno_UI.md §1 (tokens) y §5 (.cx-*).
+ *
+ * CONVENCION DE NOMBRES: tokens semanticos SIN prefijo --color- (p. ej.
+ * --canvas, --text, --accent, --pilar). El prefijo --color-* se reserva al
+ * bloque @theme de Tailwind (index.css), que reexpone estos mismos valores como
+ * utilidades (bg-canvas, text-text-3, border-border, ...). Asi un unico cambio
+ * de valor aqui se propaga a clases .cx-* y a utilidades Tailwind.
+ */
+:root {
+  /* --- Superficies y lienzo (§1.1) --- */
+  --canvas: #eef1f6; /* fondo del area de trabajo (papel CAD) */
+  --canvas-2: #ffffff; /* relieve de cotas/ejes sobre lienzo */
+  --canvas-grid: #cdd6e2; /* malla de puntos (0,5 m) */
+  --canvas-grid-2: #aab8d0; /* plantilla DXF / malla secundaria */
+  --canvas-axis: #7a90b6; /* ejes de replanteo */
+  --surface: #ffffff; /* paneles, sidebar, barras */
+  --surface-muted: #f5f7fa; /* fondos secundarios, pies de dialogo */
+  --surface-sunken: #eef1f5; /* segmented, hundidos */
+  --border: #e2e7ee;
+  --border-2: #d2d9e2;
+  --border-strong: #b9c2cf;
+
+  /* --- Texto e identidad (§1.2) --- */
+  --text: #1b2533; /* primario */
+  --text-2: #5a6678; /* secundario */
+  --text-3: #6b7585; /* terciario (>=4.5:1 sobre surface: AA en texto pequeno con significado: estados vacios, sufijos de unidad) */
+  --accent: #2563eb; /* azul Concreta: accion, seleccion, foco */
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eaf0fe;
+  --accent-line: #4f86f0; /* acento sobre lienzo (etiquetas seleccionadas) */
+  --on-accent: #ffffff;
+
+  /* --- Semantica de elementos estructurales (§1.3, canonica) --- */
+  --pilar: #9db2ce;
+  --pilar-line: #b6c7dd;
+  --viga: #c9a66b;
+  --viga-line: #ddbd87;
+  --muro: #7c8aa3;
+  --support: #22c55e; /* apoyos / arranques */
+  --load: #f97316; /* cargas (naranja) */
+  --moment: #a855f7; /* releases / momentos */
+  --deformed: #38bdf8; /* deformada / flecha */
+  --node: #c07d12; /* nudos FEM (Capa 2) */
+
+  /* --- Estados (§1.3) --- */
+  --danger: #dc2626;
+  --warning: #f59e0b;
+  --success: #16a34a;
+
+  /* --- Rampa de isovalores / deformada (§1.4, 5 paradas) --- */
+  --ramp-0: #2563eb; /* min (azul) */
+  --ramp-1: #38bdf8; /* cian */
+  --ramp-2: #22c55e; /* verde */
+  --ramp-3: #f59e0b; /* ambar */
+  --ramp-4: #dc2626; /* max (rojo) */
+
+  /* --- Glass HUD (§4.2) --- */
+  --glass: rgba(255, 255, 255, 0.82);
+  --glass-bd: rgba(185, 194, 207, 0.6);
+  --scrim: rgba(11, 16, 28, 0.42); /* fondo de dialogo modal (§5) */
+
+  /* --- Sombras (§1.6) --- */
+  --shadow-panel: 0 1px 2px rgba(20, 30, 48, 0.04);
+  --shadow-float:
+    0 12px 32px -10px rgba(20, 30, 48, 0.22), 0 2px 8px -2px rgba(20, 30, 48, 0.12);
+  --shadow-dialog:
+    0 24px 60px -16px rgba(20, 30, 48, 0.3), 0 4px 14px -4px rgba(20, 30, 48, 0.16);
+
+  /* --- Radios (§1.6) --- */
+  --radius-chip: 6px; /* chips de barra 5-7 px */
+  --radius-pill: 5px;
+  --radius-panel: 10px;
+  --radius-dialog: 14px;
+  --radius-toggle: 11px; /* capsula */
+
+  /* --- Tipografia (§1.5) --- */
+  /* Geist (UI) y Geist Mono (datos numericos). Sin woff2 vendorizados todavia:
+     se usa un fallback de sistema; al aterrizar los woff2 (public/fonts) basta
+     con anadir las @font-face y "Geist"/"Geist Mono" ya estan al frente del stack. */
+  --font-sans:
+    "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* --- Dimensiones del scaffold (§2, densidad CAD) --- */
+  --h-brandbar: 40px;
+  --h-menubar: 34px;
+  --w-sidebar: 236px;
+  --w-tools: 52px;
+  --h-status: 26px;
+  --h-tabs: 34px;
+}
+
+/* ALIAS de compatibilidad con el tema oscuro provisional (feature-1).
+   App.tsx y posibles referencias previas usaban --color-texto-tenue, etc.
+   Se reescriben en la Fase 2 del shell; mientras tanto evitamos referencias
+   rotas mapeandolos a los tokens light equivalentes. RETIRAR tras F9. */
+:root {
+  --color-lienzo: var(--canvas);
+  --color-panel: var(--surface);
+  --color-borde: var(--border);
+  --color-texto: var(--text);
+  --color-texto-tenue: var(--text-3);
+  --color-accent: var(--accent);
+}

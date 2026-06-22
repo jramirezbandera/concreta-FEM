@@ -1,0 +1,368 @@
+/*
+ * Estilos de las primitivas UI (clases .cx-*) de Concreta · Estructuras.
+ * Referencia: Concreta_Estructuras_Spec_Diseno_UI.md §5 (inventario) y §1
+ * (tokens). REGLA: solo se consumen tokens via var(--...); cero colores
+ * hardcodeados. Importado una sola vez desde src/index.css.
+ */
+
+/* --- Boton (.cx-btn): primary / ghost, alto 30 px --- */
+.cx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-chip);
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.cx-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cx-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cx-btn--primary {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.cx-btn--primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+.cx-btn--ghost {
+  background-color: var(--surface);
+  border-color: var(--border-2);
+  color: var(--text);
+  font-weight: 500;
+}
+.cx-btn--ghost:hover:not(:disabled) {
+  background-color: var(--surface-muted);
+  border-color: var(--border-strong);
+}
+
+/* --- Segmentado (.cx-seg): grupo exclusivo, activo en surface + shadow --- */
+.cx-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-toggle);
+}
+.cx-seg__item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: calc(var(--radius-toggle) - 3px);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+.cx-seg__item:hover {
+  color: var(--text);
+}
+.cx-seg__item[data-state="on"] {
+  background-color: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-panel);
+}
+.cx-seg__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* --- Panel flotante (.cx-float) + cabecera (.cx-panel-head) --- */
+.cx-float {
+  background-color: var(--glass);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--glass-bd);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+  overflow: hidden;
+}
+.cx-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.cx-panel-head__icon {
+  display: inline-flex;
+  color: var(--accent);
+}
+.cx-panel-head__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cx-panel-head__tag {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.cx-float__body {
+  padding: 10px;
+}
+
+/* --- Chip (.cx-chip, toggle) y Pill (.cx-pill, info) --- */
+.cx-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-2);
+  background-color: var(--surface);
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+.cx-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.cx-chip--on {
+  background-color: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+.cx-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cx-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+/* --- Fila de arbol (.cx-row): 26 px, swatch 9 px + label + contador --- */
+/* Base comun a la variante pulsable (.cx-row--btn, <button>) y a la inerte
+   (.cx-row--label, <div>). La afordancia de pulsado (hover/cursor/foco/seleccion)
+   vive SOLO en la variante interactiva. */
+.cx-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: var(--text);
+  user-select: none;
+  /* Reset de los defaults de <button> (la variante interactiva es un boton). */
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+/* Variante interactiva: parece (y es) pulsable. */
+.cx-row--btn {
+  cursor: pointer;
+}
+.cx-row--btn:hover {
+  background-color: var(--surface-muted);
+}
+.cx-row--btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.cx-row--sel {
+  background-color: var(--accent-soft);
+  color: var(--accent-hover);
+}
+/* Variante etiqueta/cabecera/dato: inerte, sin afordancia de pulsado. */
+.cx-row--label {
+  cursor: default;
+}
+.cx-row__swatch {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+.cx-row__label {
+  flex: 1 1 auto;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-row__count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* --- Campo de formulario (.cx-campo): label + input + error + sufijo --- */
+.cx-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-campo__label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.cx-campo__control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cx-campo__sufijo {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-3);
+}
+.cx-campo__error {
+  font-size: 11.5px;
+  color: var(--danger);
+}
+
+/* --- Input (.cx-input): alto 30 px (densidad CAD, como .cx-btn) --- */
+.cx-input {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--border-2);
+  background-color: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.cx-input::placeholder {
+  color: var(--text-3);
+}
+.cx-input:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+.cx-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cx-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cx-input--error {
+  border-color: var(--danger);
+}
+
+/* --- Select (.cx-select): trigger 30 px + content/items (Radix Select) --- */
+.cx-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  appearance: none;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--border-2);
+  background-color: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+.cx-select:hover {
+  border-color: var(--border-strong);
+}
+.cx-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cx-select__icon {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: 11px;
+}
+.cx-select-content {
+  min-width: var(--radix-select-trigger-width);
+  padding: 4px;
+  background-color: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-float);
+  z-index: 50;
+}
+.cx-select-viewport {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cx-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.cx-select-item[data-highlighted] {
+  background-color: var(--surface-muted);
+}
+.cx-select-item[data-state="checked"] {
+  background-color: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.cx-select-item__check {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 12px;
+}

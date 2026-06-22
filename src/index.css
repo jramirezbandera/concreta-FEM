@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+@import "./ui/primitivas/primitivas.css";
+@import "./ui/viewport/viewport.css";
+
+/*
+ * Mapeo de los tokens semanticos (styles/tokens.css) al @theme de Tailwind v4.
+ * Tailwind v4 deriva utilidades de las variables --color-* / --font-* dentro de
+ * @theme: --color-canvas -> bg-canvas / text-canvas / border-canvas, etc.
+ * Reexponemos cada token apuntando a su var() de tokens.css (fuente de verdad),
+ * de modo que el tema sigue siendo unico y cambiable en un solo sitio.
+ */
+@theme {
+  /* Superficies */
+  --color-canvas: var(--canvas);
+  --color-canvas-2: var(--canvas-2);
+  --color-canvas-grid: var(--canvas-grid);
+  --color-canvas-grid-2: var(--canvas-grid-2);
+  --color-canvas-axis: var(--canvas-axis);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-2: var(--border-2);
+  --color-border-strong: var(--border-strong);
+
+  /* Texto e identidad */
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-on-accent: var(--on-accent);
+
+  /* Semantica de elementos */
+  --color-pilar: var(--pilar);
+  --color-pilar-line: var(--pilar-line);
+  --color-viga: var(--viga);
+  --color-viga-line: var(--viga-line);
+  --color-muro: var(--muro);
+  --color-support: var(--support);
+  --color-load: var(--load);
+  --color-moment: var(--moment);
+  --color-deformed: var(--deformed);
+  --color-node: var(--node);
+
+  /* Estados */
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+
+  /* Rampa isovalores */
+  --color-ramp-0: var(--ramp-0);
+  --color-ramp-1: var(--ramp-1);
+  --color-ramp-2: var(--ramp-2);
+  --color-ramp-3: var(--ramp-3);
+  --color-ramp-4: var(--ramp-4);
+
+  /* Tipografias */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* Radios (utilidades rounded-chip, rounded-panel, ...) */
+  --radius-chip: var(--radius-chip);
+  --radius-pill: var(--radius-pill);
+  --radius-panel: var(--radius-panel);
+  --radius-dialog: var(--radius-dialog);
+  --radius-toggle: var(--radius-toggle);
+
+  /* Sombras (utilidades shadow-panel, shadow-float, shadow-dialog) */
+  --shadow-panel: var(--shadow-panel);
+  --shadow-float: var(--shadow-float);
+  --shadow-dialog: var(--shadow-dialog);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-sans);
+  /* Densidad CAD: 13 px base del shell (§2). */
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- Foco visible (a11y) ---
+   Anillo de foco coherente con el acento Concreta. Red de seguridad para
+   cualquier control interactivo (boton, enlace, control de formulario, o
+   elemento con tabindex) que no traiga su propia regla :focus-visible mas
+   especifica (las primitivas .cx-* la definen ya con su offset propio).
+   Se usa :focus-visible (NO :focus) para no mostrar anillo al click de raton. */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Utilidades tipograficas (§1.5) --- */
+/* Todo dato numerico/tecnico en mono tabular: columnas alineadas, lectura de
+   ingenieria. .mono cubre coordenadas/cotas/secciones/esfuerzos; .tnum solo
+   activa cifras tabulares sobre cualquier fuente; .caps para cabeceras. */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+.caps {
+  text-transform: uppercase;
+  letter-spacing: 0.085em;
+}

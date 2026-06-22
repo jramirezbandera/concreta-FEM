@@ -1,0 +1,131 @@
+/*
+ * Estilos de los dialogos (clases .cx-dialog__*) de Concreta · Estructuras.
+ * Referencia: Concreta_Estructuras_Spec_Diseno_UI.md §5. REGLA: solo se consumen
+ * tokens via var(--...); cero colores hardcodeados. Importado desde Dialogo.tsx
+ * (igual que Shell importa shell.css).
+ */
+
+/* --- Overlay (scrim modal) --- */
+.cx-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  background-color: var(--scrim);
+  animation: cx-dialog-fade 0.12s ease;
+}
+
+/* --- Contenido: tarjeta centrada, surface + radius + shadow --- */
+.cx-dialog__content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  background-color: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-dialog);
+  color: var(--text);
+  overflow: hidden;
+  animation: cx-dialog-pop 0.12s ease;
+}
+.cx-dialog__content:focus {
+  outline: none;
+}
+
+/* --- Header --- */
+.cx-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.cx-dialog__title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cx-dialog__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+.cx-dialog__close:hover {
+  background-color: var(--surface-muted);
+  color: var(--text);
+}
+.cx-dialog__close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* --- Body: scroll interno --- */
+.cx-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* --- Footer: pie de acciones --- */
+.cx-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background-color: var(--surface-muted);
+}
+
+/* --- Utilidad: oculto visualmente pero accesible (Dialog.Description) --- */
+.cx-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes cx-dialog-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes cx-dialog-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

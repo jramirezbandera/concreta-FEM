@@ -1,0 +1,217 @@
+/*
+ * Estilos del DialogoGruposYPlantas (feature-10) de Concreta · Estructuras.
+ * Layout maestro-detalle (lista de grupos | detalle del grupo activo).
+ * REGLA: solo tokens via var(--...); cero colores hardcodeados. Importado desde
+ * DialogoGruposYPlantas.tsx. Convive con dialogos.css (clases .cx-dialog__*).
+ */
+
+/* --- Rejilla de dos columnas: maestro (lista) | detalle --- */
+.cx-gyp {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 14px;
+  min-height: 360px;
+}
+
+/* --- Maestro: columna de grupos --- */
+.cx-gyp__maestro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  padding-right: 14px;
+}
+.cx-gyp__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.cx-gyp__item {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 8px;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+.cx-gyp__item:hover {
+  background-color: var(--surface-muted);
+}
+.cx-gyp__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.cx-gyp__item--sel {
+  background-color: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-soft);
+  font-weight: 600;
+}
+
+/* --- Detalle: columna del grupo activo --- */
+.cx-gyp__detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.cx-gyp__grupo-campos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.cx-gyp__grupo-campos > .cx-gyp__campo-ancho {
+  grid-column: 1 / -1;
+}
+
+/* --- Encabezado de seccion (Plantas) con accion a la derecha --- */
+.cx-gyp__seccion-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.cx-gyp__seccion-titulo {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* --- Lista de plantas: fila compacta con campos en linea --- */
+.cx-gyp__plantas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cx-gyp__planta {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: end;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background-color: var(--surface);
+}
+.cx-gyp__planta--sel {
+  border-color: var(--accent);
+  background-color: var(--accent-soft);
+}
+.cx-gyp__planta-sel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  margin-bottom: 8px;
+  padding: 0;
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.cx-gyp__planta--sel .cx-gyp__planta-sel-btn {
+  border-color: var(--accent);
+  background-color: var(--accent);
+}
+.cx-gyp__planta-sel-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Campo numerico compacto dentro de una fila de planta */
+.cx-gyp__campo-num {
+  width: 80px;
+}
+
+/* --- Estado vacio amable --- */
+.cx-gyp__vacio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Boton de borrar discreto (texto peligro) */
+.cx-gyp__borrar {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-pill);
+}
+.cx-gyp__borrar:hover {
+  background-color: var(--surface-muted);
+}
+.cx-gyp__borrar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Cabecera del maestro: titulo + boton nuevo */
+.cx-gyp__maestro-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* --- Confirmacion de borrado (dialogo anidado) --- */
+.cx-gyp__confirmar-texto {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+/* Boton destructivo solido para confirmar el borrado (relleno peligro). */
+.cx-gyp__btn-peligro {
+  height: 30px;
+  padding: 0 14px;
+  appearance: none;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-chip);
+  background-color: var(--danger);
+  color: var(--on-accent);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+.cx-gyp__btn-peligro:hover {
+  filter: brightness(0.95);
+}
+.cx-gyp__btn-peligro:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

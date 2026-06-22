@@ -1,0 +1,45 @@
+/* InspectorPilar (feature-11, T3.2): panel flotante de propiedades del pilar
+   seleccionado. Posicion canonica: arriba-derecha del lienzo (el llamante en el
+   viewport puede sobrescribir con otra clase). Estilado solo con tokens; reusa
+   .cx-float / .cx-campo / .cx-input de las primitivas. */
+
+.cx-inspector-pilar {
+  position: absolute;
+  top: var(--space-3, 12px);
+  right: var(--space-3, 12px);
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.cx-inspector-pilar .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Dos campos en una fila (X/Y, plantas). */
+.cx-inspector-pilar__fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2, 8px);
+}
+
+/* Bloque etiqueta + control (Arranque, Vinculación) en columna. */
+.cx-inspector-pilar__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.cx-inspector-pilar__acciones {
+  margin-top: var(--space-1, 4px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cx-inspector-pilar__confirmar-texto {
+  margin: 0;
+  line-height: 1.4;
+}
