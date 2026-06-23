@@ -195,6 +195,39 @@ describe("validarModelo", () => {
     sinJergaFEM(e!);
   });
 
+  it("VIGA_DEGENERADA: ambos extremos en la misma celda de rejilla", () => {
+    // Red para vias no-UI (import .json, cargas F13): dos nudos en la misma celda
+    // colapsarian en un unico nodo FEM => barra de longitud cero. Se mueve n2 a 0.4mm
+    // de n1 (round(0.4)=0 => misma celda) y se comprueba el bloqueo en lenguaje de obra.
+    const m = modeloValido();
+    m.nudos[1] = { id: "n2", x: 0.0004, y: 0 };
+    const errores = validarModelo(m);
+    const e = errores.find((x) => x.codigo === "VIGA_DEGENERADA");
+    expect(e).toBeDefined();
+    expect(e!.severidad).toBe("error");
+    expect(e!.elementoId).toBe("v1");
+    expect(e!.elementoTipo).toBe("viga");
+    sinJergaFEM(e!);
+  });
+
+  it("VIGA_DEGENERADA: caso diagonal que colapsa por clave de rejilla (no por euclideo)", () => {
+    // Dos puntos en diagonal a (-0.49mm,-0.49mm) y (0.49mm,0.49mm): su distancia
+    // euclidea (~1.39mm) es > TOL_NODO, pero ambos cuantizan a la MISMA celda de
+    // rejilla (round(±0.49)=0) => mismo nodo FEM. El criterio correcto (clavePosicion)
+    // lo bloquea; uno euclideo lo dejaria pasar (regresion que cazo la voz externa).
+    const m = modeloValido();
+    m.nudos[0] = { id: "n1", x: -0.00049, y: -0.00049 };
+    m.nudos[1] = { id: "n2", x: 0.00049, y: 0.00049 };
+    const e = validarModelo(m).find((x) => x.codigo === "VIGA_DEGENERADA");
+    expect(e).toBeDefined();
+    expect(e!.elementoId).toBe("v1");
+  });
+
+  it("VIGA_DEGENERADA: no se dispara para una viga con longitud normal", () => {
+    // El modelo valido (n1=(0,0), n2=(5,0)) no debe marcar la viga como degenerada.
+    expect(codigos(validarModelo(modeloValido()))).not.toContain("VIGA_DEGENERADA");
+  });
+
   it("REF_AMBITO: carga sobre un elemento inexistente", () => {
     const m = modeloValido();
     m.cargas[0].ambito = "ELEMENTO_BORRADO";

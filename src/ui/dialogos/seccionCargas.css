@@ -1,0 +1,91 @@
+/*
+ * Estilos de SeccionCargas (feature-13, T3.1): bloque de cargas reutilizable por
+ * los inspectores de viga y pilar. Lista de cargas + formulario "Añadir carga".
+ * REGLA: solo tokens via var(--...); cero colores hardcodeados. Convive con las
+ * clases .cx-campo/.cx-input/.cx-select de las primitivas.
+ */
+
+.cx-cargas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  padding-top: var(--space-2, 8px);
+  border-top: 1px solid var(--border);
+}
+
+.cx-cargas__titulo {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* --- Lista de cargas del elemento --- */
+.cx-cargas__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+.cx-cargas__vacio {
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+.cx-cargas__fila {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background-color: var(--surface);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+.cx-cargas__tipo {
+  color: var(--text-2);
+}
+.cx-cargas__valor {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.cx-cargas__hip {
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-cargas__borrar {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-pill);
+}
+.cx-cargas__borrar:hover {
+  background-color: var(--surface-muted);
+}
+.cx-cargas__borrar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* --- Formulario "Añadir carga" --- */
+.cx-cargas__anadir {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+.cx-cargas__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}

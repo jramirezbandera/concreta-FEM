@@ -22,6 +22,20 @@ export type {
   EntradaSeccion,
   TipoSeccionCatalogo,
 } from "./tipos";
+export type { EntradaCategoriaUso } from "./acciones";
+
+// --- Re-export de la tabla normativa de acciones (feature-13 T1.1) ------------
+// Sobrecargas de uso (qk) y coef. de simultaneidad (psi) por categoria, mas los
+// coef. parciales gamma. Tabla de datos aislada y verificable (CTE DB-SE/DB-SE-AE).
+export {
+  categoriaUso,
+  listarCategoriasUso,
+  GAMMA_G_DESFAV,
+  GAMMA_G_FAV,
+  GAMMA_Q_DESFAV,
+  GAMMA_Q_FAV,
+  GAMMA_ELS,
+} from "./acciones";
 
 // --- Re-export de catalogos y helpers -----------------------------------------
 export { ACEROS } from "./aceros";

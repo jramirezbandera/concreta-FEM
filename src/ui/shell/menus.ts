@@ -8,7 +8,9 @@ import type { Pestana } from "../../estado";
 // activen mas menus se anaden valores aqui (p. ej. "abrirCargas", "calcular").
 export type AccionMenu =
   | "abrirGruposPlantas"
+  | "abrirHipotesis"
   | "activarHerramientaPilar"
+  | "activarHerramientaViga"
   | "borrarSeleccion";
 
 // Un item de menu es, o bien un string inerte (placeholder, igual que en F9),
@@ -92,10 +94,27 @@ export const MENUS_POR_PESTANA: Record<Pestana, MenuDef[]> = {
   entradaVigas: [
     ARCHIVO,
     OBRA,
-    { etiqueta: "Vigas", items: ["Viga", "Cambiar sección", "Articular extremo"] },
+    {
+      etiqueta: "Vigas",
+      items: [
+        { etiqueta: "Viga", accion: "activarHerramientaViga" },
+        "Cambiar sección",
+        "Articular extremo",
+      ],
+    },
     { etiqueta: "Muros", items: ["Muro (disponible en fase posterior)"] },
     { etiqueta: "Paños", items: ["Paño (disponible en fase posterior)"] },
-    { etiqueta: "Cargas", items: ["Carga lineal", "Carga superficial", "Hipótesis"] },
+    {
+      etiqueta: "Cargas",
+      // "Hipótesis…" abre su dialogo (feature-13). La introduccion de cargas en si
+      // vive en el Inspector del elemento, no en el menu (de ahi que "Carga lineal"
+      // / "Carga superficial" sigan siendo placeholders por ahora).
+      items: [
+        "Carga lineal",
+        "Carga superficial",
+        { etiqueta: "Hipótesis…", accion: "abrirHipotesis" },
+      ],
+    },
     { etiqueta: "Calcular", strong: true, items: ["Calcular obra", "Opciones de análisis"] },
     GRUPOS,
     VISTAS,

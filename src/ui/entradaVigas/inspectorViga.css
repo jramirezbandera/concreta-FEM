@@ -1,0 +1,46 @@
+/* InspectorViga (feature-12, T2.2): panel flotante de propiedades de la viga
+   seleccionada. SOLO-PROPIEDADES (sin geometria). Posicion canonica: arriba-derecha
+   del lienzo (el llamante en el viewport puede sobrescribir con otra clase).
+   Estilado solo con tokens; reusa .cx-float / .cx-campo / .cx-input de las
+   primitivas. Espejo de inspectorPilar.css. */
+
+.cx-inspector-viga {
+  position: absolute;
+  top: var(--space-3, 12px);
+  right: var(--space-3, 12px);
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.cx-inspector-viga .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Dos campos en una fila (Extremo I / Extremo J). */
+.cx-inspector-viga__fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2, 8px);
+}
+
+/* Bloque etiqueta + control (Extremo, Tirante) en columna. */
+.cx-inspector-viga__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.cx-inspector-viga__acciones {
+  margin-top: var(--space-1, 4px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cx-inspector-viga__confirmar-texto {
+  margin: 0;
+  line-height: 1.4;
+}

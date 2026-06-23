@@ -402,6 +402,92 @@ describe("vistaStore: introduccion grafica de pilares (feature-11)", () => {
   });
 });
 
+// --- feature-12 · herramienta "viga" + defaults de viga -----------------------
+
+describe("vistaStore: introduccion grafica de vigas (feature-12)", () => {
+  // Reset de los campos nuevos (los beforeEach globales no los tocan).
+  beforeEach(() => {
+    vistaStore.getState().setHerramienta("seleccion");
+    vistaStore.getState().setDefaultsViga({
+      seccionId: null,
+      materialId: null,
+      extremoI: "empotrado",
+      extremoJ: "empotrado",
+      tirante: false,
+    });
+  });
+
+  it("valor inicial de defaultsViga coincide con el contrato", () => {
+    expect(vistaStore.getState().defaultsViga).toEqual({
+      seccionId: null,
+      materialId: null,
+      extremoI: "empotrado",
+      extremoJ: "empotrado",
+      tirante: false,
+    });
+  });
+
+  it('la herramienta admite el modo "viga"', () => {
+    vistaStore.getState().setHerramienta("viga");
+    expect(vistaStore.getState().herramienta).toBe("viga");
+  });
+
+  it("setDefaultsViga hace merge parcial sin borrar los demas campos", () => {
+    vistaStore
+      .getState()
+      .setDefaultsViga({ seccionId: "s1", extremoJ: "articulado", tirante: true });
+
+    const s = vistaStore.getState();
+    expect(s.defaultsViga).toEqual({
+      seccionId: "s1",
+      materialId: null,
+      extremoI: "empotrado",
+      extremoJ: "articulado",
+      tirante: true,
+    });
+  });
+});
+
+// --- feature-13 · diálogo de hipótesis + defaults de carga --------------------
+
+describe("vistaStore: andamiaje de cargas/hipótesis (feature-13)", () => {
+  // Reset de los campos nuevos (los beforeEach globales no los tocan).
+  beforeEach(() => {
+    vistaStore.getState().cerrarDialogo();
+    vistaStore.getState().setDefaultsCarga({
+      tipo: "lineal",
+      valor: 0,
+      hipotesisId: null,
+    });
+  });
+
+  it("valor inicial de defaultsCarga coincide con el contrato", () => {
+    expect(vistaStore.getState().defaultsCarga).toEqual({
+      tipo: "lineal",
+      valor: 0,
+      hipotesisId: null,
+    });
+  });
+
+  it('abrirDialogo admite el diálogo "hipotesis"', () => {
+    vistaStore.getState().abrirDialogo("hipotesis");
+    expect(vistaStore.getState().dialogoActivo).toBe("hipotesis");
+    vistaStore.getState().cerrarDialogo();
+    expect(vistaStore.getState().dialogoActivo).toBeNull();
+  });
+
+  it("setDefaultsCarga hace merge parcial sin borrar los demas campos", () => {
+    vistaStore.getState().setDefaultsCarga({ valor: 5, hipotesisId: "h1" });
+
+    const s = vistaStore.getState();
+    expect(s.defaultsCarga).toEqual({
+      tipo: "lineal",
+      valor: 5,
+      hipotesisId: "h1",
+    });
+  });
+});
+
 // --- D2 · siguienteNombre / crearPilar tras borrados --------------------------
 
 describe("siguienteNombre: deriva del mayor numero en uso, no del recuento", () => {

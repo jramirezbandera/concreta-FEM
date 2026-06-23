@@ -6,7 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { ToolsRail } from "./ToolsRail";
 import { StatusBar, type StatusBarProps } from "./StatusBar";
 import { BottomTabs } from "./BottomTabs";
-import { DialogoGruposYPlantas } from "../dialogos";
+import { DialogoGruposYPlantas, DialogoHipotesis } from "../dialogos";
 
 // Shell: cromo completo de la interfaz (Spec Diseno UI §2). Compone las regiones
 // fijas (brandbar, menubar, body=sidebar|work|tools, status, tabs) y deja el
@@ -57,6 +57,7 @@ export function Shell({ children, nombreObra, status }: ShellProps) {
       {/* Dialogos modales de la app, montados una sola vez como hermanos del
           layout. Autocontrolados: se abren/cierran segun vistaStore.dialogoActivo. */}
       <DialogoGruposYPlantas />
+      <DialogoHipotesis />
     </div>
   );
 }

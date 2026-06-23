@@ -15,6 +15,7 @@
 import type { Modelo, Pilar, Viga, Carga } from "../dominio";
 import { plantaPorId, nudoPorId, seccionPorId } from "../dominio";
 import { getMaterial, getSeccion } from "../biblioteca";
+import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
 
 // Error de obra: contrato estable consumido por la UI (resaltado del elemento) y
 // por los tests (assert de `codigo` + `elementoId`).
@@ -174,6 +175,29 @@ function validarRefsViga(v: Viga, modelo: Modelo, errores: ErrorObra[]): void {
       elementoId: v.id,
       elementoTipo: "viga",
     });
+  }
+  // Viga degenerada: ambos extremos colapsarian en el MISMO nodo FEM => barra de
+  // longitud cero (el solver fallaria). El criterio debe ser EXACTAMENTE el del
+  // discretizador: clave de rejilla (clavePosicion), no distancia euclidea — dos
+  // puntos a >TOL_NODO en euclideo pueden caer en la misma celda (caso diagonal) y
+  // colapsar igual. La UI ya lo evita, pero esta red protege CUALQUIER via (import
+  // .json de F8, cargas de F13, edicion futura). Solo si ambos nudos y la planta
+  // existen (si no, ya hay REF_NUDO/REF_PLANTA arriba).
+  const nI = nudoPorId(modelo, v.nudoI);
+  const nJ = nudoPorId(modelo, v.nudoJ);
+  const planta = plantaPorId(modelo, v.plantaId);
+  if (nI !== undefined && nJ !== undefined && planta !== undefined) {
+    const claveI = clavePosicion(mapearEjes(nI.x, nI.y, planta.cota), TOL_NODO);
+    const claveJ = clavePosicion(mapearEjes(nJ.x, nJ.y, planta.cota), TOL_NODO);
+    if (claveI === claveJ) {
+      errores.push({
+        codigo: "VIGA_DEGENERADA",
+        severidad: "error",
+        mensaje: `La viga "${v.nombre}" tiene sus dos extremos en el mismo punto.`,
+        elementoId: v.id,
+        elementoTipo: "viga",
+      });
+    }
   }
 }
 

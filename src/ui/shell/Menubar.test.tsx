@@ -16,15 +16,16 @@ import {
   crearGrupo,
   crearPlanta,
   crearPilar,
+  crearViga,
 } from "../../estado";
 import { crearModeloVacio, plantasDeGrupo } from "../../dominio";
 import { listarSecciones, listarMateriales } from "../../biblioteca";
 
 const modelo = () => modeloStore.getState().getModelo();
 
-// Siembra un grupo + una planta + un pilar con los comandos reales. Devuelve el id
-// del pilar creado.
-function sembrarPilar(): string {
+// Siembra un grupo + una planta con los comandos reales. Devuelve el id de la
+// planta creada (raiz comun de sembrarPilar/sembrarViga).
+function sembrarGrupoPlanta(): string {
   modeloStore
     .getState()
     .ejecutar(
@@ -34,7 +35,12 @@ function sembrarPilar(): string {
   modeloStore
     .getState()
     .ejecutar(crearPlanta(modelo(), { cota: 0, altura: 3, grupoId }));
-  const plantaId = plantasDeGrupo(modelo(), grupoId)[0]!.id;
+  return plantasDeGrupo(modelo(), grupoId)[0]!.id;
+}
+
+// Siembra un grupo + una planta + un pilar. Devuelve el id del pilar creado.
+function sembrarPilar(): string {
+  const plantaId = sembrarGrupoPlanta();
   modeloStore.getState().ejecutar(
     crearPilar(modelo(), {
       x: 0,
@@ -51,6 +57,24 @@ function sembrarPilar(): string {
   return modelo().pilares[0]!.id;
 }
 
+// Siembra un grupo + una planta + una viga. Devuelve el id de la viga creada.
+function sembrarViga(): string {
+  const plantaId = sembrarGrupoPlanta();
+  modeloStore.getState().ejecutar(
+    crearViga(modelo(), {
+      plantaId,
+      i: { x: 0, y: 0 },
+      j: { x: 5, y: 0 },
+      seccionId: listarSecciones()[0]!.id,
+      materialId: listarMateriales()[0]!.id,
+      extremoI: "empotrado",
+      extremoJ: "empotrado",
+      tirante: false,
+    }),
+  );
+  return modelo().vigas[0]!.id;
+}
+
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   seleccionStore.getState().limpiar();
@@ -63,6 +87,14 @@ describe("Menubar · borrarSeleccion", () => {
     seleccionStore.getState().seleccionar([pilarId]);
     borrarSeleccion();
     expect(modelo().pilares).toHaveLength(0);
+    expect(seleccionStore.getState().seleccion).toHaveLength(0);
+  });
+
+  it("borra la viga seleccionada y limpia la selección", () => {
+    const vigaId = sembrarViga();
+    seleccionStore.getState().seleccionar([vigaId]);
+    borrarSeleccion();
+    expect(modelo().vigas).toHaveLength(0);
     expect(seleccionStore.getState().seleccion).toHaveLength(0);
   });
 
@@ -97,7 +129,20 @@ describe("Menubar · DISPATCH", () => {
     expect(vistaStore.getState().herramienta).toBe("pilar");
   });
 
+  it("activarHerramientaViga conmuta la herramienta a 'viga'", () => {
+    expect(vistaStore.getState().herramienta).toBe("seleccion");
+    DISPATCH.activarHerramientaViga();
+    expect(vistaStore.getState().herramienta).toBe("viga");
+  });
+
   it("cablea borrarSeleccion en el mapa de acciones", () => {
     expect(DISPATCH.borrarSeleccion).toBe(borrarSeleccion);
+  });
+
+  it('abrirHipotesis abre el diálogo "hipotesis"', () => {
+    expect(vistaStore.getState().dialogoActivo).toBeNull();
+    DISPATCH.abrirHipotesis();
+    expect(vistaStore.getState().dialogoActivo).toBe("hipotesis");
+    vistaStore.getState().cerrarDialogo();
   });
 });

@@ -7,7 +7,12 @@ export { modeloStore } from "./modeloStore";
 export { seleccionStore } from "./seleccionStore";
 export { vistaStore } from "./vistaStore";
 export type { Pestana, ModoVista, DialogoActivo } from "./vistaStore";
-export type { Herramienta, DefaultsPilar } from "./vistaStore";
+export type {
+  Herramienta,
+  DefaultsPilar,
+  DefaultsViga,
+  DefaultsCarga,
+} from "./vistaStore";
 export { resultadosStore } from "./resultadosStore";
 
 // --- Nucleo Command + IDs ----------------------------------------------------
@@ -27,15 +32,28 @@ export {
   eliminarPilar,
   moverPilar,
   moverNudo,
+  crearViga,
+  editarViga,
+  eliminarViga,
   crearGrupo,
   editarGrupo,
   eliminarGrupo,
   crearPlanta,
   editarPlanta,
   eliminarPlanta,
+  crearCarga,
+  editarCarga,
+  eliminarCarga,
+  crearHipotesis,
+  editarHipotesis,
+  eliminarHipotesis,
 } from "./comandos/comandosModelo";
 export type {
   DatosPilar,
+  DatosViga,
+  ExtremoViga,
   DatosGrupo,
   DatosPlanta,
+  DatosCarga,
+  DatosHipotesis,
 } from "./comandos/comandosModelo";

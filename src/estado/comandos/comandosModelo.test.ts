@@ -15,10 +15,25 @@ import {
   editarPilar,
   eliminarPilar,
   moverPilar,
+  crearViga,
+  editarViga,
+  eliminarViga,
+  crearCarga,
+  editarCarga,
+  eliminarCarga,
+  crearHipotesis,
+  editarHipotesis,
+  eliminarHipotesis,
 } from "../index";
+import type { DatosViga } from "./comandosModelo";
 import { crearModeloVacio } from "../../dominio";
 import type { CategoriaUso } from "../../dominio";
-import type { DatosGrupo, DatosPlanta } from "./comandosModelo";
+import type {
+  DatosGrupo,
+  DatosPlanta,
+  DatosCarga,
+  DatosHipotesis,
+} from "./comandosModelo";
 
 // Datos minimos de prueba (sin id/nombre, los genera el comando).
 const datosGrupo: DatosGrupo = {
@@ -407,5 +422,397 @@ describe("moverPilar", () => {
     modeloStore.getState().deshacer();
     expect(m().pilares.find((p) => p.id === "pil2")).toMatchObject({ x: 5, y: 0 });
     expect(m().pilares.find((p) => p.id === "pil1")).toMatchObject({ x: 1, y: 1 });
+  });
+});
+
+// --- Comandos de viga (feature-12, T1.1) -------------------------------------
+// Modelo con dos plantas y un nudo preexistente (para probar reuso por id y por
+// tolerancia), mas una viga ya colocada para probar la numeracion V{n} y la purga.
+
+function modeloConVigas() {
+  const base = crearModeloVacio();
+  base.grupos = [
+    { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+  ];
+  base.plantas = [
+    { id: "p1", nombre: "Planta 1", cota: 0, altura: 3, grupoId: "g1" },
+    { id: "p2", nombre: "Planta 2", cota: 3, altura: 3, grupoId: "g1" },
+  ];
+  // Un nudo preexistente en (0,0) para probar el reuso por tolerancia.
+  base.nudos = [{ id: "n1", x: 0, y: 0 }];
+  return base;
+}
+
+// Datos base de viga: extremos resueltos por el test segun el caso.
+const datosVigaBase = {
+  plantaId: "p1",
+  seccionId: "s1",
+  materialId: "m1",
+  extremoI: "empotrado" as const,
+  extremoJ: "empotrado" as const,
+  tirante: false,
+};
+
+describe("crearViga", () => {
+  it("reusa un nudo existente cuando el extremo cae a < TOL_NODO (no crea nudo)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    // Extremo I a 0.5 mm del nudo n1 (0,0): dentro de TOL_NODO (1 mm) => reusa n1.
+    const datos: DatosViga = {
+      ...datosVigaBase,
+      i: { x: 0.0005, y: 0 },
+      j: { x: 5, y: 0 },
+    };
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+
+    // Solo se crea un nudo nuevo (el extremo J); I reusa n1.
+    expect(m().nudos).toHaveLength(2);
+    const viga = m().vigas[0];
+    expect(viga.nudoI).toBe("n1");
+    expect(viga.nudoJ).not.toBe("n1");
+  });
+
+  it("crea nudos nuevos cuando no hay ninguno cercano", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    // Ambos extremos lejos del nudo n1 (0,0): dos nudos nuevos.
+    const datos: DatosViga = {
+      ...datosVigaBase,
+      i: { x: 2, y: 2 },
+      j: { x: 8, y: 2 },
+    };
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+
+    expect(m().nudos).toHaveLength(3); // n1 + dos nuevos
+    const viga = m().vigas[0];
+    expect(viga.nudoI).not.toBe("n1");
+    expect(viga.nudoJ).not.toBe("n1");
+    expect(viga.nudoI).not.toBe(viga.nudoJ);
+  });
+
+  it("respeta un extremo dado como {nudoId} (no crea ni busca nudo)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const datos: DatosViga = {
+      ...datosVigaBase,
+      i: { nudoId: "n1" },
+      j: { x: 5, y: 0 },
+    };
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+
+    const viga = m().vigas[0];
+    expect(viga.nudoI).toBe("n1");
+    expect(m().nudos).toHaveLength(2); // n1 + el de J
+  });
+
+  it("dos extremos en el mismo punto nuevo comparten un solo nudo creado", () => {
+    // Caso degenerado de geometria (lo evita el llamante); aqui solo verificamos
+    // que el segundo extremo reusa el nudo creado por el primero en la misma receta.
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const datos: DatosViga = {
+      ...datosVigaBase,
+      i: { x: 3, y: 3 },
+      j: { x: 3, y: 3 },
+    };
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+
+    expect(m().nudos).toHaveLength(2); // n1 + un solo nudo nuevo compartido
+    const viga = m().vigas[0];
+    expect(viga.nudoI).toBe(viga.nudoJ);
+  });
+
+  it("deshacer borra viga Y nudos creados juntos (un solo paso de undo)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const previo = structuredClone(m());
+    const datos: DatosViga = {
+      ...datosVigaBase,
+      i: { x: 2, y: 2 },
+      j: { x: 8, y: 2 },
+    };
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+    expect(m().vigas).toHaveLength(1);
+    expect(m().nudos).toHaveLength(3);
+
+    // Un solo deshacer revierte la viga y los dos nudos creados (deep-equal previo).
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(previo);
+    expect(modeloStore.getState().puedeDeshacer).toBe(false);
+  });
+
+  it("numera V1, V2 por el mayor sufijo en uso", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const datos: DatosViga = {
+      ...datosVigaBase,
+      i: { nudoId: "n1" },
+      j: { x: 5, y: 0 },
+    };
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+    expect(m().vigas.map((v) => v.nombre)).toEqual(["V1", "V2"]);
+  });
+
+  it("tras borrar V1, la siguiente NO colisiona (usa el mayor sufijo)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const datos: DatosViga = {
+      ...datosVigaBase,
+      i: { nudoId: "n1" },
+      j: { x: 5, y: 0 },
+    };
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+    const idV1 = m().vigas.find((v) => v.nombre === "V1")!.id;
+
+    modeloStore.getState().ejecutar(eliminarViga(m(), idV1));
+    modeloStore.getState().ejecutar(crearViga(m(), datos));
+    const nombres = m().vigas.map((v) => v.nombre);
+    expect(nombres).toContain("V2");
+    expect(nombres).toContain("V3"); // max+1, no reusa "V1"
+    expect(nombres).not.toContain("V1");
+  });
+});
+
+describe("editarViga", () => {
+  it("aplica un merge superficial; deshacer revierte; no toca nombre", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    modeloStore.getState().ejecutar(
+      crearViga(m(), { ...datosVigaBase, i: { nudoId: "n1" }, j: { x: 5, y: 0 } }),
+    );
+    const vigaId = m().vigas[0].id;
+    const conViga = structuredClone(m());
+
+    modeloStore
+      .getState()
+      .ejecutar(editarViga(m(), vigaId, { seccionId: "s2", extremoJ: "articulado", tirante: true }));
+    const v = m().vigas.find((x) => x.id === vigaId)!;
+    expect(v).toMatchObject({ seccionId: "s2", extremoJ: "articulado", tirante: true });
+    // Campos no incluidos intactos (merge superficial).
+    expect(v).toMatchObject({ materialId: "m1", extremoI: "empotrado", nombre: "V1" });
+
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(conViga);
+  });
+
+  it("editar una viga inexistente es no-op (no lanza, no cambia)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(editarViga(m(), "no-existe", { tirante: true }));
+    expect(m()).toEqual(antes);
+  });
+});
+
+describe("eliminarViga", () => {
+  it("quita la viga y purga sus cargas (ambito=vigaId) en un solo paso de undo", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    modeloStore.getState().ejecutar(
+      crearViga(m(), { ...datosVigaBase, i: { nudoId: "n1" }, j: { x: 5, y: 0 } }),
+    );
+    const vigaId = m().vigas[0].id;
+    // Dos cargas: una sobre esta viga (cae), otra sobre otro ambito (sobrevive).
+    modeloStore.getState().cargarModelo({
+      ...m(),
+      cargas: [
+        { id: "c1", tipo: "lineal", ambito: vigaId, valor: 5, hipotesisId: "h1" },
+        { id: "c2", tipo: "lineal", ambito: "otro", valor: 3, hipotesisId: "h1" },
+      ],
+      hipotesis: [{ id: "h1", nombre: "G", tipo: "permanente" }],
+    });
+    const conTodo = structuredClone(m());
+
+    modeloStore.getState().ejecutar(eliminarViga(m(), vigaId));
+    expect(m().vigas).toHaveLength(0);
+    expect(m().cargas.map((c) => c.id)).toEqual(["c2"]); // c1 (sobre la viga) cae
+    expect(m().nudos).toEqual(conTodo.nudos); // nudos no se tocan
+
+    // Un solo deshacer restaura viga + carga (purga = un paso).
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(conTodo);
+  });
+
+  it("eliminar una viga inexistente no afecta a vigas ni cargas", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(eliminarViga(m(), "no-existe"));
+    expect(m()).toEqual(antes);
+  });
+});
+
+// --- Comandos de carga e hipotesis (feature-13, T1.2) ------------------------
+// Modelo con dos hipotesis y unas cargas explicitas (ids fijos) para probar la
+// purga en cascada de eliminarHipotesis y el resto del CRUD. Partimos del modelo
+// vacio (que ya siembra dos hipotesis) y lo sustituimos por uno controlado.
+
+function modeloConCargas() {
+  const base = crearModeloVacio();
+  base.hipotesis = [
+    { id: "h1", nombre: "Cargas muertas", tipo: "permanente" },
+    { id: "h2", nombre: "Sobrecarga de uso", tipo: "variable" },
+  ];
+  base.cargas = [
+    { id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" },
+    { id: "c2", tipo: "lineal", ambito: "v2", valor: -5, hipotesisId: "h1" },
+    { id: "c3", tipo: "puntual", ambito: "pil1", valor: 8, hipotesisId: "h2" },
+  ];
+  return base;
+}
+
+const datosCargaBase: DatosCarga = {
+  tipo: "lineal",
+  ambito: "v1",
+  valor: -7,
+  hipotesisId: "h1",
+};
+
+describe("crearCarga", () => {
+  it("anade una carga con id propio; deshacer la quita y rehacer la repone", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const previo = structuredClone(m());
+
+    modeloStore.getState().ejecutar(crearCarga(m(), datosCargaBase));
+    expect(m().cargas).toHaveLength(4);
+    const nueva = m().cargas[3];
+    expect(nueva).toMatchObject(datosCargaBase);
+    expect(nueva.id).toMatch(/[0-9a-f-]{36}/);
+    const conCarga = structuredClone(m());
+
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(previo);
+
+    modeloStore.getState().rehacer();
+    expect(m()).toEqual(conCarga);
+  });
+});
+
+describe("editarCarga", () => {
+  it("merge superficial de los cambios; deshacer revierte", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const conCargas = structuredClone(m());
+
+    modeloStore
+      .getState()
+      .ejecutar(editarCarga(m(), "c1", { valor: -20, hipotesisId: "h2" }));
+    const c1 = m().cargas.find((c) => c.id === "c1")!;
+    expect(c1).toMatchObject({ valor: -20, hipotesisId: "h2" });
+    // Campos no incluidos intactos.
+    expect(c1).toMatchObject({ tipo: "lineal", ambito: "v1" });
+
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(conCargas);
+  });
+
+  it("editar una carga inexistente es no-op (no lanza, no cambia)", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(editarCarga(m(), "no-existe", { valor: 99 }));
+    expect(m()).toEqual(antes);
+  });
+});
+
+describe("eliminarCarga", () => {
+  it("quita solo esa carga; deshacer la restaura", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const conTodo = structuredClone(m());
+
+    modeloStore.getState().ejecutar(eliminarCarga(m(), "c2"));
+    expect(m().cargas.map((c) => c.id)).toEqual(["c1", "c3"]);
+
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(conTodo);
+  });
+});
+
+describe("crearHipotesis", () => {
+  it("respeta el nombre dado", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const datos: DatosHipotesis = { nombre: "Nieve", tipo: "variable" };
+    modeloStore.getState().ejecutar(crearHipotesis(m(), datos));
+    const nueva = m().hipotesis.find((h) => h.nombre === "Nieve")!;
+    expect(nueva).toMatchObject({ nombre: "Nieve", tipo: "variable" });
+    expect(nueva.id).toMatch(/[0-9a-f-]{36}/);
+  });
+
+  it("deriva 'Hipotesis {n}' cuando el nombre viene vacio", () => {
+    // Partimos de un modelo SIN hipotesis "Hipotesis n" previas.
+    const base = crearModeloVacio();
+    base.hipotesis = [];
+    modeloStore.getState().cargarModelo(base);
+    modeloStore
+      .getState()
+      .ejecutar(crearHipotesis(m(), { nombre: "", tipo: "permanente" }));
+    modeloStore
+      .getState()
+      .ejecutar(crearHipotesis(m(), { nombre: "   ", tipo: "variable" }));
+    expect(m().hipotesis.map((h) => h.nombre)).toEqual([
+      "Hipotesis 1",
+      "Hipotesis 2",
+    ]);
+  });
+
+  it("deshacer/rehacer un crear con nombre derivado", () => {
+    const base = crearModeloVacio();
+    base.hipotesis = [];
+    modeloStore.getState().cargarModelo(base);
+    const previo = structuredClone(m());
+
+    modeloStore
+      .getState()
+      .ejecutar(crearHipotesis(m(), { nombre: "", tipo: "permanente" }));
+    const conHip = structuredClone(m());
+
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(previo);
+    modeloStore.getState().rehacer();
+    expect(m()).toEqual(conHip);
+  });
+});
+
+describe("editarHipotesis", () => {
+  it("merge superficial; deshacer revierte", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const conHip = structuredClone(m());
+
+    modeloStore
+      .getState()
+      .ejecutar(editarHipotesis(m(), "h1", { nombre: "Peso propio", tipo: "permanente" }));
+    expect(m().hipotesis.find((h) => h.id === "h1")).toMatchObject({
+      nombre: "Peso propio",
+    });
+
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(conHip);
+  });
+
+  it("editar una hipotesis inexistente es no-op", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const antes = structuredClone(m());
+    modeloStore
+      .getState()
+      .ejecutar(editarHipotesis(m(), "no-existe", { nombre: "X" }));
+    expect(m()).toEqual(antes);
+  });
+});
+
+describe("eliminarHipotesis (cascada a cargas)", () => {
+  it("quita la hipotesis y purga sus cargas en un solo paso de undo", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const conTodo = structuredClone(m());
+
+    modeloStore.getState().ejecutar(eliminarHipotesis(m(), "h1"));
+
+    // h1 desaparece; sobrevive h2.
+    expect(m().hipotesis.map((h) => h.id)).toEqual(["h2"]);
+    // c1 y c2 (hipotesisId=h1) caen; c3 (h2) sobrevive.
+    expect(m().cargas.map((c) => c.id)).toEqual(["c3"]);
+
+    // Un solo deshacer restaura hipotesis + sus cargas (cascada = un paso).
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(conTodo);
+
+    modeloStore.getState().rehacer();
+    expect(m().hipotesis.map((h) => h.id)).toEqual(["h2"]);
+    expect(m().cargas.map((c) => c.id)).toEqual(["c3"]);
+  });
+
+  it("eliminar una hipotesis inexistente no afecta a hipotesis ni cargas", () => {
+    modeloStore.getState().cargarModelo(modeloConCargas());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(eliminarHipotesis(m(), "no-existe"));
+    expect(m()).toEqual(antes);
   });
 });

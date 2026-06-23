@@ -105,6 +105,24 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
+## T-vigas-2 · Memoizar los candidatos del imán en ColocacionViga.onMove
+
+- **Qué:** [src/ui/viewport/ColocacionViga.tsx](src/ui/viewport/ColocacionViga.tsx) (`onMove`,
+  ~línea 204) llama `getModelo()` y `resolverPunto()` en CADA `pointermove`; `resolverPunto`
+  ([src/ui/viewport/imanViga.ts](src/ui/viewport/imanViga.ts)) reconstruye la lista de candidatos
+  de enganche (nudos de la planta + cabezas de pilar) — O(nudos+pilares) por frame de ratón.
+- **Por qué:** A escala F1 (pocos elementos) es invisible. En un modelo real con cientos de
+  nudos/pilares, mover el cursor durante la colocación de vigas hará O(n) por evento y el imán
+  puede ir a tirones. Mismo espíritu que `useGeometriaModelo` (memoiza la geometría y recomputa
+  solo al cambiar el modelo/grupo/planta), aquí no aplicado.
+- **Cómo retomar:** memoizar los candidatos por `plantaId` (p. ej. `useMemo`/ref) y recomputar
+  solo cuando cambie el modelo o la planta colocable, en vez de en cada `onMove`. `resolverPunto`
+  pasaría a recibir los candidatos ya construidos.
+- **Depende de / bloquea:** nada. Se aprovecha junto a T-vigas-1 (instancing) si se tocan a la vez.
+- **Coste:** CC ~20 min. **Origen:** Revisión de ingeniería F12 (Performance, #2; P3).
+
+---
+
 ## T-dialogo-3 · SelectUso sin etiqueta visible
 
 - **Qué:** [src/ui/primitivas/SelectUso.tsx](src/ui/primitivas/SelectUso.tsx) usa `etiqueta` solo

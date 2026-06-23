@@ -4,6 +4,7 @@ import {
   modeloStore,
   seleccionStore,
   eliminarPilar,
+  eliminarViga,
 } from "../../estado";
 import {
   MENUS_POR_PESTANA,
@@ -18,20 +19,25 @@ import {
 // accion) o accionables (objeto con `accion`); estos ultimos disparan un
 // handler y cierran el Popover. Vocabulario CYPECAD.
 
-// Borra el elemento seleccionado desde el menu "Edición". En F11 el unico
-// elemento borrable es un pilar: se exige EXACTAMENTE uno seleccionado y que sea
-// un pilar del modelo. Se lee el modelo con getModelo() JUSTO antes de construir
-// el comando (invariante del `base`, CLAUDE.md §10). Si no aplica, no-op silencioso.
-// Se exporta como costura de test (el clic real pasa por un Popover de Radix,
-// inestable en jsdom); mismo patron que clicSeleccionPilar en GeometriaModelo.
+// Borra el elemento seleccionado desde el menu "Edición". En F11/F12 los elementos
+// borrables son pilar y viga: se exige EXACTAMENTE uno seleccionado y que sea un
+// pilar o una viga del modelo. Se lee el modelo con getModelo() JUSTO antes de
+// construir el comando (invariante del `base`, CLAUDE.md §10). Si no aplica, no-op
+// silencioso. Se exporta como costura de test (el clic real pasa por un Popover de
+// Radix, inestable en jsdom); mismo patron que clicSeleccionPilar en GeometriaModelo.
 // eslint-disable-next-line react-refresh/only-export-components
 export function borrarSeleccion(): void {
   const ids = seleccionStore.getState().seleccion;
   if (ids.length !== 1) return;
   const base = modeloStore.getState().getModelo();
-  const pilarId = ids[0]!;
-  if (!base.pilares.some((p) => p.id === pilarId)) return;
-  modeloStore.getState().ejecutar(eliminarPilar(base, pilarId));
+  const id = ids[0]!;
+  if (base.pilares.some((p) => p.id === id)) {
+    modeloStore.getState().ejecutar(eliminarPilar(base, id));
+  } else if (base.vigas.some((v) => v.id === id)) {
+    modeloStore.getState().ejecutar(eliminarViga(base, id));
+  } else {
+    return;
+  }
   seleccionStore.getState().limpiar();
 }
 
@@ -41,7 +47,9 @@ export function borrarSeleccion(): void {
 // eslint-disable-next-line react-refresh/only-export-components
 export const DISPATCH: Record<AccionMenu, () => void> = {
   abrirGruposPlantas: () => vistaStore.getState().abrirDialogo("gruposPlantas"),
+  abrirHipotesis: () => vistaStore.getState().abrirDialogo("hipotesis"),
   activarHerramientaPilar: () => vistaStore.getState().setHerramienta("pilar"),
+  activarHerramientaViga: () => vistaStore.getState().setHerramienta("viga"),
   borrarSeleccion,
 };
 

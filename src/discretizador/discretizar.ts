@@ -39,10 +39,10 @@ import {
   type CargaNodoFEM,
   type CargaDistFEM,
   type CargaPuntualFEM,
-  type ComboFEM,
   type AnalisisFEM,
 } from "./contratoFEM";
 import { validarModelo, type ErrorObra } from "./validaciones";
+import { generarCombos } from "./combinaciones";
 
 // Resultado del discretizador. NO lanza. Tres canales en lenguaje de obra:
 //  - ok:true + modeloFEM   => Capa 2 valida lista para el solver.
@@ -57,39 +57,13 @@ export type ResultadoDiscretizacion =
   | { ok: true; modeloFEM: ModeloFEM; avisos: ErrorObra[] }
   | { ok: false; errores: ErrorObra[] };
 
-// Tolerancia de snapping geometrico de nodos (m). Dos puntos a <= TOL_NODO se
-// consideran el mismo nudo (comparten geometria). Explicita y nombrada para que el
-// determinismo de la numeracion sea auditable.
-export const TOL_NODO = 1e-3; // m
-
-// --- Helpers puros (exportados para test unitario aislado) -------------------
-
-// Coordenada FEM global de un punto. #18 (Y vertical): la planta (x,y) que el
-// arquitecto dibuja va al plano horizontal global (X,Z); la cota/altura es la
-// vertical global Y. Convencion de uso fijada aqui y blindada con test.
-export function mapearEjes(
-  xPlanta: number,
-  yPlanta: number,
-  cota: number,
-): [number, number, number] {
-  return [xPlanta, cota, yPlanta]; // [X, Y, Z]
-}
-
-// Clave determinista de un punto para snapping. Cuantiza cada coordenada a la
-// rejilla de TOL_NODO (round(c/tol)) y la usa como clave de igualdad. Dos puntos
-// dentro de una celda comparten clave => mismo nudo. La clave es estable e
-// independiente del orden de insercion (clave por geometria, no por id de dominio).
-export function clavePosicion(
-  [x, y, z]: [number, number, number],
-  tol: number,
-): string {
-  // Math.round(0) evita la clave "-0" para coordenadas negativas pequeñas.
-  const q = (c: number): number => {
-    const r = Math.round(c / tol);
-    return r === 0 ? 0 : r;
-  };
-  return `${q(x)}|${q(y)}|${q(z)}`;
-}
+// Geometria de snapping (TOL_NODO + mapearEjes + clavePosicion) definida en
+// ./geometria (modulo hoja, fuente unica del criterio "mismo nodo") y re-exportada
+// aqui para no romper los imports existentes (`from ".../discretizar"` en index.ts
+// y los tests). validaciones.ts las toma de ./geometria para evitar el ciclo
+// discretizar<->validaciones. Se importan ademas para uso interno (snapping).
+import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
+export { TOL_NODO, mapearEjes, clavePosicion };
 
 // Releases canonicos (#8) en el orden EXACTO de def_releases:
 // [Dxi,Dyi,Dzi,Rxi,Ryi,Rzi, Dxj,Dyj,Dzj,Rxj,Ryj,Rzj].
@@ -497,21 +471,13 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
     }
   }
 
-  // --- Paso 7: combos basicas PROVISIONALES -----------------------------------
-  // ELU = 1.35·permanentes + 1.5·variables; ELS = 1.0·todas. Provisionales: la
-  // normativizacion completa (coeficientes ψ, compatibilidad, envolventes) es de
-  // feature-13. permanente/variable se deriva de Hipotesis.tipo. No se depende del
-  // "Combo 1" implicito de PyNite: se declaran explicitamente.
-  const factoresELU: Record<string, number> = {};
-  const factoresELS: Record<string, number> = {};
-  for (const h of modelo.hipotesis) {
-    factoresELU[h.id] = h.tipo === "permanente" ? 1.35 : 1.5;
-    factoresELS[h.id] = 1.0;
-  }
-  const combos: ComboFEM[] = [
-    { name: "ELU", factors: factoresELU, combo_tags: ["ELU"] },
-    { name: "ELS", factors: factoresELS, combo_tags: ["ELS"] },
-  ];
+  // --- Paso 7: combinaciones (delegado a ./combinaciones) ----------------------
+  // ELU persistente = 1,35·permanentes + 1,50·variables; ELS caracteristica =
+  // 1,00·todas. Los coeficientes gamma provienen de la biblioteca (CTE DB-SE Tabla
+  // 4.1, verificada) y la logica vive en `generarCombos` (modulo puro, testeable en
+  // aislamiento). En F1 hay una unica variable dominante, sin termino psi0 (eso es
+  // F2). Ver `combinaciones.ts` para la justificacion normativa (CTE DB-SE §4.2.2).
+  const combos = generarCombos(modelo);
 
   // --- Paso 8: analisis -------------------------------------------------------
   const analysis: AnalisisFEM = {

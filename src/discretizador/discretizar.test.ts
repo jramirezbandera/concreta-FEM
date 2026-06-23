@@ -184,7 +184,9 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
     expect(nodoApoyo.y).toBe(0);
   });
 
-  it("combos provisionales: ELU (1.35 perm) y ELS (1.0) con sus tags", () => {
+  it("combos normativizados: ELU (1.35 perm) y ELS (1.0) con sus tags", () => {
+    // Los combos los genera ./combinaciones (gamma desde biblioteca, CTE DB-SE
+    // Tabla 4.1); aqui se verifica que discretizar() los integra sin alterarlos.
     const fem = discretizarOk(modeloPortico());
     const elu = fem.combos.find((cb) => cb.name === "ELU")!;
     const els = fem.combos.find((cb) => cb.name === "ELS")!;

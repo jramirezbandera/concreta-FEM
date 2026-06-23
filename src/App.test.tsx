@@ -5,7 +5,7 @@
 // ni el Canvas R3F: el hook solo lee/suscribe stores).
 import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { usePuedeColocarPilar } from "./App";
+import { usePuedeColocarPilar, usePuedeColocarViga } from "./App";
 import {
   modeloStore,
   vistaStore,
@@ -20,6 +20,8 @@ beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
+  // Resetea los defaults de viga (seccion/material): usePuedeColocarViga los exige.
+  vistaStore.getState().setDefaultsViga({ seccionId: null, materialId: null });
 });
 
 // Crea un grupo con una planta y lo deja como grupo activo (como haria la Sidebar).
@@ -71,6 +73,67 @@ describe("usePuedeColocarPilar", () => {
     const { result } = renderHook(() => usePuedeColocarPilar());
     act(() => {
       vistaStore.getState().setPlantaActiva("p-borrada");
+    });
+    expect(result.current).toBe(false);
+  });
+});
+
+// Da seccion/material por defecto a la viga (como haria el PanelHerramientaViga al
+// elegirlos): es la SEGUNDA condicion que usePuedeColocarViga exige, ademas de la
+// planta colocable.
+function fijarDefaultsViga(): void {
+  act(() => {
+    vistaStore
+      .getState()
+      .setDefaultsViga({ seccionId: "s-1", materialId: "m-1" });
+  });
+}
+
+describe("usePuedeColocarViga", () => {
+  it("false con modelo vacío, sin ámbito ni defaults", () => {
+    const { result } = renderHook(() => usePuedeColocarViga());
+    expect(result.current).toBe(false);
+  });
+
+  it("false si hay planta colocable pero faltan sección/material", () => {
+    const { result } = renderHook(() => usePuedeColocarViga());
+    prepararGrupoConPlanta();
+    // Hay planta, pero sin defaults de viga no se puede tender una viga valida.
+    expect(result.current).toBe(false);
+  });
+
+  it("false si hay sección/material pero no hay planta colocable", () => {
+    const { result } = renderHook(() => usePuedeColocarViga());
+    fijarDefaultsViga();
+    expect(result.current).toBe(false);
+  });
+
+  it("true cuando hay planta colocable Y sección/material", () => {
+    const { result } = renderHook(() => usePuedeColocarViga());
+    prepararGrupoConPlanta();
+    fijarDefaultsViga();
+    expect(result.current).toBe(true);
+  });
+
+  it("vuelve a false si se retira el ámbito activo", () => {
+    const { result } = renderHook(() => usePuedeColocarViga());
+    prepararGrupoConPlanta();
+    fijarDefaultsViga();
+    expect(result.current).toBe(true);
+    act(() => {
+      vistaStore.getState().setGrupoActivo(null);
+      vistaStore.getState().setPlantaActiva(null);
+    });
+    expect(result.current).toBe(false);
+  });
+
+  it("reacciona al cambio de defaults: false al limpiar la sección", () => {
+    const { result } = renderHook(() => usePuedeColocarViga());
+    prepararGrupoConPlanta();
+    fijarDefaultsViga();
+    expect(result.current).toBe(true);
+    act(() => {
+      vistaStore.getState().setDefaultsViga({ seccionId: null });
     });
     expect(result.current).toBe(false);
   });

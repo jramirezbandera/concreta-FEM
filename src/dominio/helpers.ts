@@ -48,6 +48,10 @@ export function cargasDeHipotesis(modelo: Modelo, hipotesisId: string): Carga[] 
 }
 
 // Factoria de un Modelo valido vacio: punto de partida para un proyecto nuevo.
+// Trae sembradas las dos hipotesis basicas de F1 (cargas muertas permanentes y
+// sobrecarga de uso variable), con ids ASCII fijos y deterministas: el modelo
+// vacio es siempre identico, lo que mantiene estables tests y golden. El resto de
+// hipotesis las anade el usuario via los comandos de F13.
 export function crearModeloVacio(): Modelo {
   return {
     unidades: "kN-m",
@@ -61,7 +65,10 @@ export function crearModeloVacio(): Modelo {
     panos: [],
     muros: [],
     cargas: [],
-    hipotesis: [],
+    hipotesis: [
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+      { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable" },
+    ],
     analisis: { tipo: "lineal", comprobarEstatica: true },
   };
 }

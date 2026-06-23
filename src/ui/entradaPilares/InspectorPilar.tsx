@@ -8,6 +8,7 @@ import {
 } from "../primitivas";
 import { CampoArranque, CampoVinculacion } from "./camposPilar";
 import { Dialogo } from "../dialogos/Dialogo";
+import { SeccionCargas } from "../dialogos";
 import {
   validarPilar,
   type DatosPilarUI,
@@ -286,6 +287,8 @@ export function InspectorPilar() {
           onValor={(v) => commit([], {}, { vinculacionExterior: v })}
         />
 
+        <SeccionCargas elementoId={pilar.id} />
+
         <div className="cx-inspector-pilar__acciones">
           <Boton variante="ghost" onClick={borrar}>
             Eliminar pilar
@@ -307,7 +310,7 @@ export function InspectorPilar() {
               Cancelar
             </Boton>
             <Boton
-              variante="primary"
+              variante="danger"
               onClick={() => {
                 confirmacion?.onConfirmar();
                 setConfirmacion(null);

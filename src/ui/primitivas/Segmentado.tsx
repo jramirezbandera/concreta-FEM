@@ -20,6 +20,9 @@ export interface SegmentadoProps<T extends string> {
   onValor: (valor: T) => void;
   "aria-label": string;
   className?: string;
+  // Deshabilita todo el grupo (no editable). Uso: extremos de un tirante, que el
+  // discretizador fuerza articulados (la UI los muestra fijos, no los oculta).
+  disabled?: boolean;
 }
 
 export function Segmentado<T extends string>({
@@ -28,12 +31,16 @@ export function Segmentado<T extends string>({
   onValor,
   className,
   "aria-label": ariaLabel,
+  disabled = false,
 }: SegmentadoProps<T>) {
-  const clases = ["cx-seg", className].filter(Boolean).join(" ");
+  const clases = ["cx-seg", disabled && "cx-seg--disabled", className]
+    .filter(Boolean)
+    .join(" ");
   return (
     <ToggleGroup.Root
       type="single"
       value={valor}
+      disabled={disabled}
       // Radix emite "" si se intenta deseleccionar; ignoramos para mantener
       // siempre una opcion activa (semantica de segmented exclusivo).
       onValueChange={(v) => {

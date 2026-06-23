@@ -31,3 +31,6 @@ export type { SelectSeccionProps } from "./SelectSeccion";
 
 export { SelectMaterial } from "./SelectMaterial";
 export type { SelectMaterialProps } from "./SelectMaterial";
+
+export { SelectHipotesis } from "./SelectHipotesis";
+export type { SelectHipotesisProps } from "./SelectHipotesis";

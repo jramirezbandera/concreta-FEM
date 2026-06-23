@@ -13,8 +13,11 @@ import { Shell } from "./ui/shell";
 import { Viewport } from "./ui/viewport";
 import { suscribirCoords, leerCoords } from "./ui/viewport";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
+import { ColocacionViga } from "./ui/viewport/ColocacionViga";
 import { tramoColocable } from "./ui/viewport/tramoPilar";
+import { plantaColocableViga } from "./ui/viewport/tramoViga";
 import { InspectorPilar, PanelHerramientaPilar } from "./ui/entradaPilares";
+import { InspectorViga, PanelHerramientaViga } from "./ui/entradaVigas";
 import {
   modeloStore,
   vistaStore,
@@ -74,6 +77,19 @@ const MENSAJE_HERRAMIENTA_PILAR =
 const MENSAJE_PILAR_SIN_TRAMO =
   "Crea o selecciona una planta para colocar pilares";
 
+// Guia contextual mientras la herramienta "viga" esta activa (prioriza sobre el
+// mensaje de pestana). Una viga se tiende entre dos puntos: dos clics. Lenguaje
+// de obra, sin jerga FEM.
+const MENSAJE_HERRAMIENTA_VIGA =
+  "Haz clic en dos puntos para tender una viga (Esc termina)";
+
+// Cuando la herramienta "viga" esta activa pero NO se puede colocar (sin planta
+// donde caer, o sin seccion/material por defecto elegidos en el panel), la barra
+// avisa ANTES de que el clic caiga en vacio (seria un no-op silencioso). Espejo
+// del aviso de pilares; cubre las dos causas con un mensaje en lenguaje de obra.
+const MENSAJE_VIGA_SIN_TRAMO =
+  "Crea o selecciona una planta y elige sección y material para tender vigas";
+
 function usePestanaActiva(): Pestana {
   return useSyncExternalStore(
     (cb) => vistaStore.subscribe((s) => s.pestanaActiva, cb),
@@ -127,6 +143,45 @@ export function usePuedeColocarPilar(): boolean {
   return puede;
 }
 
+// Se puede tender una viga: hay planta donde caer (plantaColocableViga !== null) Y
+// hay seccion/material por defecto elegidos en el panel. Mismas DOS condiciones que
+// ColocacionViga comprueba antes de crear la viga (una sola fuente de verdad para la
+// luz verde): si falta alguna, la barra guia en vez de dejar fallar el clic en
+// silencio. Reacciona al modelo, al ambito activo y a los defaults de viga.
+// Exportado como costura de test (la reactividad merece red; espejo de
+// usePuedeColocarPilar).
+// eslint-disable-next-line react-refresh/only-export-components
+export function usePuedeColocarViga(): boolean {
+  const calcular = () => {
+    const { grupoActivoId, plantaActivaId, defaultsViga } = vistaStore.getState();
+    return (
+      plantaColocableViga(
+        modeloStore.getState().getModelo(),
+        grupoActivoId,
+        plantaActivaId,
+      ) !== null &&
+      defaultsViga.seccionId !== null &&
+      defaultsViga.materialId !== null
+    );
+  };
+  const [puede, setPuede] = useState(calcular);
+  useEffect(() => {
+    const recompute = () => setPuede(calcular());
+    const desuscribir = [
+      modeloStore.subscribe((s) => s.modelo, recompute),
+      vistaStore.subscribe((s) => s.grupoActivoId, recompute),
+      vistaStore.subscribe((s) => s.plantaActivaId, recompute),
+      vistaStore.subscribe((s) => s.defaultsViga, recompute),
+    ];
+    recompute();
+    return () => desuscribir.forEach((u) => u());
+    // calcular solo lee getState(); las suscripciones se montan una vez (deps vacias)
+    // y disparan recompute en cada cambio relevante del modelo, del ambito o de los
+    // defaults de viga (seccion/material).
+  }, []);
+  return puede;
+}
+
 // --- T-D1 · Coords vivas viewport -> barra de estado (throttle rAF) -----------
 
 // Se suscribe al coordsBus y refresca el estado local a lo sumo una vez por
@@ -164,6 +219,7 @@ export default function App() {
   const herramienta = useHerramienta();
   const snapActivo = useSnapActivo();
   const puedeColocar = usePuedeColocarPilar();
+  const puedeColocarViga = usePuedeColocarViga();
   const coords = useCoordsThrottled();
 
   // Introduccion grafica de pilares: solo tiene sentido en la pestana de pilares.
@@ -172,15 +228,25 @@ export default function App() {
   // montarlos solo aqui mantiene limpia la composicion de las demas pestanas.
   const enPilares = pestana === "entradaPilares";
 
+  // Espejo para vigas: los overlays de viga solo se montan en su pestana (igual que
+  // los de pilar). Tambien se autoocultan segun herramienta/seleccion, pero acotar
+  // el montaje mantiene limpias las demas pestanas.
+  const enVigas = pestana === "entradaVigas";
+
   // El mensaje de la herramienta activa prioriza sobre el de la pestana. Si la
   // herramienta esta activa pero no hay donde colocar, se guia a crear/elegir planta
-  // (en vez de dejar que el clic falle en silencio).
+  // (en vez de dejar que el clic falle en silencio). Pilares y vigas siguen el mismo
+  // patron; cada pestana solo consulta su propia herramienta.
   const mensaje =
     enPilares && herramienta === "pilar"
       ? puedeColocar
         ? MENSAJE_HERRAMIENTA_PILAR
         : MENSAJE_PILAR_SIN_TRAMO
-      : MENSAJE_PESTANA[pestana];
+      : enVigas && herramienta === "viga"
+        ? puedeColocarViga
+          ? MENSAJE_HERRAMIENTA_VIGA
+          : MENSAJE_VIGA_SIN_TRAMO
+        : MENSAJE_PESTANA[pestana];
 
   return (
     <Shell
@@ -202,7 +268,17 @@ export default function App() {
                 </>
               ),
             }
-          : {})}
+          : enVigas
+            ? {
+                sceneOverlays: <ColocacionViga />,
+                hudOverlays: (
+                  <>
+                    <InspectorViga />
+                    <PanelHerramientaViga />
+                  </>
+                ),
+              }
+            : {})}
       />
     </Shell>
   );

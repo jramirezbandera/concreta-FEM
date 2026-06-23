@@ -3,10 +3,20 @@
 // comandos por pestana llegan en feature-10..13. Cada funcion devuelve un Comando
 // listo para modeloStore.ejecutar(). Reciben el `base` (modelo actual) para
 // calcular el delta; el store es quien lo aplica.
-import type { Modelo, Pilar, Grupo, Planta } from "../../dominio";
+import type {
+  Modelo,
+  Pilar,
+  Viga,
+  Nudo,
+  Grupo,
+  Planta,
+  Carga,
+  Hipotesis,
+} from "../../dominio";
 import { crearComandoParches } from "./comando";
 import type { Comando } from "./comando";
 import { nuevoId } from "../ids";
+import { TOL_NODO } from "../../discretizador/discretizar";
 
 // Datos del pilar que aporta el llamante: todo Pilar salvo id (interno, lo genera
 // el comando) y nombre (visible CYPECAD "P{n}", derivado del nº de pilares).
@@ -93,6 +103,209 @@ export function moverPilar(
       }
     },
     `moverPilar:${pilarId}`,
+  );
+  return comando;
+}
+
+// --- Vigas (feature-12, entrada de vigas) ------------------------------------
+
+// Datos de la viga que aporta el llamante: todo Viga salvo id (interno) y nombre
+// (visible "V{n}"), y con los extremos dados como ExtremoViga (nudo existente o
+// coordenadas a resolver) en vez de los ids nudoI/nudoJ ya resueltos.
+export type DatosViga = {
+  plantaId: string;
+  i: ExtremoViga;
+  j: ExtremoViga;
+  seccionId: string;
+  materialId: string;
+  extremoI: "empotrado" | "articulado";
+  extremoJ: "empotrado" | "articulado";
+  tirante: boolean;
+};
+
+// Extremo de viga: o un nudo ya existente (por id) o un punto en planta (x,y) que
+// el comando resolvera reusando un nudo cercano o creando uno nuevo. Permite que el
+// llamante (introduccion grafica) trabaje en coordenadas sin gestionar nudos.
+export type ExtremoViga = { nudoId: string } | { x: number; y: number };
+
+// Resuelve un extremo a un id de nudo SOBRE el borrador Immer (misma receta que la
+// viga => un solo paso de undo). Si viene como {nudoId} se usa tal cual. Si viene
+// como {x,y}: se reusa el primer nudo a distancia euclidea < TOL_NODO (la misma
+// tolerancia de snapping del discretizador, importada para no divergir); si no hay
+// ninguno, se hace push de un Nudo nuevo. Los nudos recien creados en esta misma
+// receta ya estan en borrador.nudos, de modo que un segundo extremo en el mismo
+// punto reusa el del primero (coherencia I/J sin crear duplicados).
+function resolverExtremo(borrador: Modelo, extremo: ExtremoViga): string {
+  if ("nudoId" in extremo) return extremo.nudoId;
+  const { x, y } = extremo;
+  const existente = borrador.nudos.find(
+    (n) => Math.hypot(n.x - x, n.y - y) < TOL_NODO,
+  );
+  if (existente) return existente.id;
+  const nudo: Nudo = { id: nuevoId(), x, y };
+  borrador.nudos.push(nudo);
+  return nudo.id;
+}
+
+export function crearViga(base: Modelo, datos: DatosViga): Comando {
+  // id/nombre fijados AQUI (igual que crearPilar): se reutilizan en redo via el
+  // delta. nombre visible "V{n}" por el mayor sufijo en uso (no el recuento).
+  const id = nuevoId();
+  const nombre = siguienteNombre("V", base.vigas);
+
+  // Una sola receta: resolver/crear los nudos de los extremos Y empujar la viga.
+  // Asi crear nudos + viga es UN unico paso de undo (deshacer borra ambos).
+  const { comando } = crearComandoParches(
+    base,
+    `Crear viga ${nombre}`,
+    (borrador) => {
+      const nudoI = resolverExtremo(borrador, datos.i);
+      const nudoJ = resolverExtremo(borrador, datos.j);
+      const viga: Viga = {
+        id,
+        nombre,
+        plantaId: datos.plantaId,
+        nudoI,
+        nudoJ,
+        seccionId: datos.seccionId,
+        materialId: datos.materialId,
+        extremoI: datos.extremoI,
+        extremoJ: datos.extremoJ,
+        tirante: datos.tirante,
+      };
+      borrador.vigas.push(viga);
+    },
+  );
+  return comando;
+}
+
+// Edita propiedades de una viga (merge superficial de `cambios`). No toca id ni
+// nombre. Viga inexistente => no-op (espejo de editarPilar). El delta solo recoge
+// los campos que cambian.
+export function editarViga(
+  base: Modelo,
+  vigaId: string,
+  cambios: Partial<Omit<Viga, "id" | "nombre">>,
+): Comando {
+  const { comando } = crearComandoParches(base, "Editar viga", (borrador) => {
+    const viga = borrador.vigas.find((v) => v.id === vigaId);
+    if (viga) Object.assign(viga, cambios);
+  });
+  return comando;
+}
+
+// Elimina una viga y, en la MISMA receta (un solo paso de undo), purga las cargas
+// cuyo ambito apunta a esa viga (espejo de eliminarPilar). Los NUDOS no se tocan:
+// son geometria compartida (otras vigas pueden usarlos) y un nudo no referenciado
+// es inocuo; el discretizador hace su propio snapping.
+export function eliminarViga(base: Modelo, vigaId: string): Comando {
+  const { comando } = crearComandoParches(base, "Eliminar viga", (borrador) => {
+    borrador.vigas = borrador.vigas.filter((v) => v.id !== vigaId);
+    borrador.cargas = borrador.cargas.filter((c) => c.ambito !== vigaId);
+  });
+  return comando;
+}
+
+// --- Cargas e Hipotesis (feature-13, cargas/hipotesis/combinaciones) ---------
+
+// Datos de la carga que aporta el llamante: todo Carga salvo id (interno, lo
+// genera el comando). La carga referencia su hipotesis (hipotesisId) y su ambito
+// (id del elemento sobre el que actua); la integridad la garantiza el llamante.
+export type DatosCarga = Omit<Carga, "id">;
+
+export function crearCarga(base: Modelo, datos: DatosCarga): Comando {
+  // id opaco fijado AQUI (se reutiliza en redo via el delta). Las cargas no tienen
+  // nombre visible: se listan por su ambito/hipotesis, no por un identificador.
+  const id = nuevoId();
+  const carga: Carga = { id, ...datos };
+
+  const { comando } = crearComandoParches(base, "Crear carga", (borrador) => {
+    borrador.cargas.push(carga);
+  });
+  return comando;
+}
+
+// Edita propiedades de una carga (merge superficial de `cambios`). No toca id.
+// Carga inexistente => no-op (espejo de editarPilar/editarViga). El delta solo
+// recoge los campos que cambian.
+export function editarCarga(
+  base: Modelo,
+  cargaId: string,
+  cambios: Partial<Omit<Carga, "id">>,
+): Comando {
+  const { comando } = crearComandoParches(base, "Editar carga", (borrador) => {
+    const carga = borrador.cargas.find((c) => c.id === cargaId);
+    if (carga) Object.assign(carga, cambios);
+  });
+  return comando;
+}
+
+export function eliminarCarga(base: Modelo, cargaId: string): Comando {
+  const { comando } = crearComandoParches(base, "Eliminar carga", (borrador) => {
+    borrador.cargas = borrador.cargas.filter((c) => c.id !== cargaId);
+  });
+  return comando;
+}
+
+// Datos de la hipotesis que aporta el llamante: todo Hipotesis salvo id (interno).
+// El nombre puede venir vacio: en ese caso se deriva "Hipotesis {n}" del mayor
+// sufijo en uso (mismo criterio que grupos/pilares); si viene con nombre, se respeta.
+export type DatosHipotesis = Omit<Hipotesis, "id">;
+
+export function crearHipotesis(base: Modelo, datos: DatosHipotesis): Comando {
+  const id = nuevoId();
+  // Nombre vacio => derivamos "Hipotesis {n}" por el mayor sufijo en uso (no el
+  // recuento), igual que crearGrupo/crearPilar. Con nombre dado, se respeta.
+  const nombre = datos.nombre.trim()
+    ? datos.nombre
+    : siguienteNombre("Hipotesis ", base.hipotesis);
+  const hipotesis: Hipotesis = { ...datos, id, nombre };
+
+  const { comando } = crearComandoParches(
+    base,
+    `Crear hipotesis ${nombre}`,
+    (borrador) => {
+      borrador.hipotesis.push(hipotesis);
+    },
+  );
+  return comando;
+}
+
+// Edita propiedades de una hipotesis (merge superficial de `cambios`). No toca id.
+// Hipotesis inexistente => no-op. El delta solo recoge los campos que cambian.
+export function editarHipotesis(
+  base: Modelo,
+  hipotesisId: string,
+  cambios: Partial<Omit<Hipotesis, "id">>,
+): Comando {
+  const { comando } = crearComandoParches(
+    base,
+    "Editar hipotesis",
+    (borrador) => {
+      const hipotesis = borrador.hipotesis.find((h) => h.id === hipotesisId);
+      if (hipotesis) Object.assign(hipotesis, cambios);
+    },
+  );
+  return comando;
+}
+
+// Elimina una hipotesis y, en la MISMA receta (un solo paso de undo), purga las
+// cargas que la referencian (hipotesisId). Espejo de como eliminarPilar/eliminarViga
+// purgan cargas por ambito: sin esto quedarian cargas huerfanas que reventarian
+// aguas abajo en el discretizador. Las combinaciones que referencien la hipotesis
+// llegan en una tarea posterior de F13.
+export function eliminarHipotesis(base: Modelo, hipotesisId: string): Comando {
+  const { comando } = crearComandoParches(
+    base,
+    "Eliminar hipotesis",
+    (borrador) => {
+      borrador.hipotesis = borrador.hipotesis.filter(
+        (h) => h.id !== hipotesisId,
+      );
+      borrador.cargas = borrador.cargas.filter(
+        (c) => c.hipotesisId !== hipotesisId,
+      );
+    },
   );
   return comando;
 }

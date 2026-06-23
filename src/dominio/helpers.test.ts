@@ -84,6 +84,18 @@ describe("helpers de consulta del dominio", () => {
     expect(ModeloSchema.safeParse(crearModeloVacio()).success).toBe(true);
   });
 
+  it("crearModeloVacio siembra las 2 hipotesis basicas de F1", () => {
+    const vacio = crearModeloVacio();
+    expect(vacio.hipotesis).toEqual([
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+      { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable" },
+    ]);
+    // El resto del modelo vacio sigue sin elementos de obra.
+    expect(vacio.cargas).toEqual([]);
+    expect(vacio.pilares).toEqual([]);
+    expect(vacio.vigas).toEqual([]);
+  });
+
   it("grupoPorId", () => {
     expect(grupoPorId(m, "g1")?.nombre).toBe("G1");
     expect(grupoPorId(m, "nope")).toBeUndefined();

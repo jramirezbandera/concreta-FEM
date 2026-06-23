@@ -12,9 +12,9 @@
 //  - Geometria reconstruida SOLO al cambiar modelo/grupo/planta (useGeometriaModelo
 //    via useSyncExternalStore), nunca por frame.
 //  - Hover/seleccion mutan refs (colores de instancia) sin setState por frame.
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { invalidate, type ThreeEvent } from "@react-three/fiber";
-import { Bvh } from "@react-three/drei";
+import { Bvh, Line } from "@react-three/drei";
 import {
   Color,
   InstancedMesh,
@@ -26,7 +26,7 @@ import {
   Float32BufferAttribute,
 } from "three";
 import { seleccionStore, vistaStore } from "../../estado";
-import { colorToken } from "./colores";
+import { colorToken, hexToken } from "./colores";
 import {
   useGeometriaModelo,
   type GeometriaModelo as GeoModelo,
@@ -43,18 +43,28 @@ function clicSeleccion(id: string, shift: boolean): void {
   invalidate();
 }
 
-// Clic sobre un pilar: respeta la herramienta activa (feature-11). Se lee con
+// Clic sobre un pilar: respeta la herramienta activa (feature-11/12). Se lee con
 // getState() y NO como prop reactiva, para que cambiar de herramienta no
 // reconstruya la geometria (regla #11: cero re-render del lienzo por estado de UI).
-//  - herramienta "pilar": la colocacion tiene prioridad; NO seleccionamos (el
-//    clic lo gestiona ColocacionPilar via el plano Z=0).
 //  - herramienta "seleccion": seleccion unica (`seleccionar([id])`); shift
 //    alterna para multiseleccion explicita. seleccion[0] alimenta el inspector.
+//  - cualquier otra herramienta de introduccion ("pilar"/"viga"): la colocacion
+//    tiene prioridad; NO seleccionamos (el clic lo gestiona la herramienta via el
+//    plano Z=0). Gating por `!== "seleccion"` para que colocar vigas tampoco
+//    dispare seleccion de pilares (feature-12, T3.1).
 // Export usado por el test del gating por herramienta (no es un componente; el
 // modulo no participa en Fast Refresh de forma significativa).
 // eslint-disable-next-line react-refresh/only-export-components
 export function clicSeleccionPilar(id: string, shift: boolean): void {
-  if (vistaStore.getState().herramienta === "pilar") return;
+  if (vistaStore.getState().herramienta !== "seleccion") return;
+  clicSeleccion(id, shift);
+}
+
+// Clic sobre una viga: espejo de `clicSeleccionPilar`. Solo selecciona en modo
+// "seleccion"; durante la colocacion de pilares o vigas el clic NO selecciona.
+// eslint-disable-next-line react-refresh/only-export-components
+export function clicSeleccionViga(id: string, shift: boolean): void {
+  if (vistaStore.getState().herramienta !== "seleccion") return;
   clicSeleccion(id, shift);
 }
 
@@ -149,6 +159,70 @@ function PilaresInstanciados({ pilares }: { pilares: GeoModelo["pilares"] }) {
         <meshBasicMaterial toneMapped={false} />
       </instancedMesh>
     </Bvh>
+  );
+}
+
+// --- Halo de seleccion del pilar (Spec Diseno UI §6.2) -----------------------
+
+// Margen del halo respecto al medio lado del pilar (m) y epsilon en Z para que el
+// cuadrado punteado quede SOBRE la cara superior (visible en planta cenital, no
+// ocluido por la caja). Patron de dash en metros.
+const HALO_MARGEN = 0.08;
+const HALO_Z_EPS = 0.03;
+const HALO_DASH = 0.06;
+const HALO_GAP = 0.05;
+
+// Id del pilar seleccionado cuando hay EXACTAMENTE uno (si no, null). Suscripcion
+// ligera: re-render solo al cambiar la seleccion (accion del usuario, no por frame).
+function useSeleccionUnica(): string | null {
+  return useSyncExternalStore(
+    (cb) => seleccionStore.subscribe((s) => s.seleccion, cb),
+    () => {
+      const s = seleccionStore.getState().seleccion;
+      return s.length === 1 ? s[0]! : null;
+    },
+    () => null,
+  );
+}
+
+// Cuadrado punteado en acento alrededor del pilar seleccionado (Spec §6.2: "halo
+// punteado"). Sigue la posicion/giro/tamaño del pilar; se oculta si no hay un unico
+// pilar seleccionado. Cero coste por frame: solo se reconstruye al cambiar la
+// seleccion o la geometria.
+function HaloPilarSeleccionado({ pilares }: { pilares: GeoModelo["pilares"] }) {
+  const selId = useSeleccionUnica();
+  const color = useMemo(() => hexToken("accent"), []);
+  const pilar = selId ? pilares.find((p) => p.id === selId) ?? null : null;
+  // Pinta un frame al cambiar de seleccion/geometria (frameloop="demand").
+  useEffect(() => {
+    invalidate();
+  }, [selId, pilares]);
+
+  if (!pilar) return null;
+  const m = pilar.lado / 2 + HALO_MARGEN;
+  const z = pilar.cz + pilar.alto / 2 + HALO_Z_EPS;
+  // Cuadrado cerrado centrado en el origen (lo posiciona/gira el group).
+  const puntos: [number, number, number][] = [
+    [-m, -m, 0],
+    [m, -m, 0],
+    [m, m, 0],
+    [-m, m, 0],
+    [-m, -m, 0],
+  ];
+  return (
+    <group
+      position={[pilar.cx, pilar.cy, z]}
+      rotation={[0, 0, (pilar.angulo * Math.PI) / 180]}
+    >
+      <Line
+        points={puntos}
+        color={color}
+        lineWidth={1.5}
+        dashed
+        dashSize={HALO_DASH}
+        gapSize={HALO_GAP}
+      />
+    </group>
   );
 }
 
@@ -261,7 +335,7 @@ function VigaPickable({
       onPointerOut={() => salirHover(viga.id)}
       onClick={(e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation();
-        clicSeleccion(viga.id, e.shiftKey);
+        clicSeleccionViga(viga.id, e.shiftKey);
       }}
     >
       {/* Radio generoso para facilitar el picking; el halo visible usa el material. */}
@@ -285,6 +359,7 @@ export function GeometriaModelo() {
   return (
     <group>
       <PilaresInstanciados pilares={pilares} />
+      <HaloPilarSeleccionado pilares={pilares} />
       <VigasLineas vigas={vigas} />
     </group>
   );

@@ -15,13 +15,15 @@ export type Pestana =
 
 export type ModoVista = "planta" | "3d" | "mosaico";
 
-// Dialogos modales de la app. De momento solo el de Plantas y grupos (feature-10);
-// los siguientes (biblioteca de secciones, cargas...) se anaden a esta union.
-export type DialogoActivo = "gruposPlantas";
+// Dialogos modales de la app: Plantas y grupos (feature-10) e Hipotesis
+// (feature-13). La introduccion de CARGAS no necesita dialogo propio: vive en el
+// Inspector del elemento. Los siguientes (biblioteca de secciones...) se anaden aqui.
+export type DialogoActivo = "gruposPlantas" | "hipotesis";
 
-// Herramienta activa de introduccion grafica (feature-11). "seleccion" es el modo
-// por defecto (picking/edicion); "pilar" coloca pilares con clic. Estado de UI.
-export type Herramienta = "seleccion" | "pilar";
+// Herramienta activa de introduccion grafica (feature-11/12). "seleccion" es el
+// modo por defecto (picking/edicion); "pilar" coloca pilares con clic; "viga"
+// coloca vigas con clic. Estado de UI.
+export type Herramienta = "seleccion" | "pilar" | "viga";
 
 // Valores por defecto del pilar que se introduce con la herramienta "pilar". La UI
 // los preselecciona (seccion/material elegidos en el panel) y los aplica a cada
@@ -32,6 +34,27 @@ export interface DefaultsPilar {
   arranque: "empotrado" | "articulado" | "elastico";
   vinculacionExterior: boolean;
   angulo: number;
+}
+
+// Valores por defecto de la viga que se introduce con la herramienta "viga"
+// (feature-12). Espejo de DefaultsPilar: la UI los preselecciona (seccion/material
+// y vinculos de extremos) y los aplica a cada viga nueva. No es estado de obra.
+export interface DefaultsViga {
+  seccionId: string | null;
+  materialId: string | null;
+  extremoI: "empotrado" | "articulado";
+  extremoJ: "empotrado" | "articulado";
+  tirante: boolean;
+}
+
+// Valores por defecto de la carga que se introduce desde el Inspector del elemento
+// (feature-13). Espejo de DefaultsPilar/DefaultsViga: la UI los preselecciona (tipo,
+// valor e hipotesis elegidos) y los aplica a cada carga nueva. No es estado de obra:
+// viaja en vistaStore, no en undo.
+export interface DefaultsCarga {
+  tipo: "lineal" | "puntual";
+  valor: number;
+  hipotesisId: string | null;
 }
 
 interface VistaState {
@@ -51,6 +74,8 @@ interface VistaState {
   // aqui: es seleccionStore.seleccion[0]; aqui solo el modo y los defaults.
   herramienta: Herramienta;
   defaultsPilar: DefaultsPilar;
+  defaultsViga: DefaultsViga;
+  defaultsCarga: DefaultsCarga;
   snapActivo: boolean;
   setPestanaActiva(p: Pestana): void;
   setGrupoActivo(id: string | null): void;
@@ -61,6 +86,8 @@ interface VistaState {
   cerrarDialogo(): void;
   setHerramienta(h: Herramienta): void;
   setDefaultsPilar(p: Partial<DefaultsPilar>): void; // merge superficial
+  setDefaultsViga(p: Partial<DefaultsViga>): void; // merge superficial
+  setDefaultsCarga(p: Partial<DefaultsCarga>): void; // merge superficial
   setSnapActivo(b: boolean): void;
 }
 
@@ -82,6 +109,18 @@ export const vistaStore = create<VistaState>()(
       vinculacionExterior: true,
       angulo: 0,
     },
+    defaultsViga: {
+      seccionId: null,
+      materialId: null,
+      extremoI: "empotrado",
+      extremoJ: "empotrado",
+      tirante: false,
+    },
+    defaultsCarga: {
+      tipo: "lineal",
+      valor: 0,
+      hipotesisId: null,
+    },
     snapActivo: true,
     setPestanaActiva: (p) => set({ pestanaActiva: p }),
     setGrupoActivo: (id) => set({ grupoActivoId: id }),
@@ -93,6 +132,10 @@ export const vistaStore = create<VistaState>()(
     setHerramienta: (h) => set({ herramienta: h }),
     setDefaultsPilar: (p) =>
       set((estado) => ({ defaultsPilar: { ...estado.defaultsPilar, ...p } })),
+    setDefaultsViga: (p) =>
+      set((estado) => ({ defaultsViga: { ...estado.defaultsViga, ...p } })),
+    setDefaultsCarga: (p) =>
+      set((estado) => ({ defaultsCarga: { ...estado.defaultsCarga, ...p } })),
     setSnapActivo: (b) => set({ snapActivo: b }),
   })),
 );
