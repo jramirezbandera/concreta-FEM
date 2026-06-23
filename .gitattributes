@@ -1,0 +1,18 @@
+# Normalizacion de fines de linea. El repositorio guarda SIEMPRE LF; cada quien
+# checkoutea segun su plataforma sin que git reescriba a CRLF (acalla los avisos
+# "LF will be replaced by CRLF" en Windows y mantiene diffs limpios entre SO).
+* text=auto eol=lf
+
+# Binarios: nunca tratar como texto ni convertir.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.pdf  binary
+*.whl  binary
