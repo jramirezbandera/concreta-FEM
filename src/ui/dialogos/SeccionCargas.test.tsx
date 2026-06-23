@@ -97,15 +97,24 @@ describe("SeccionCargas (via InspectorViga)", () => {
     expect(c.hipotesisId).toBe("hip-cargas-muertas");
   });
 
-  it("no anade una carga con valor cero y muestra el error", async () => {
+  it("el boton Añadir carga esta deshabilitado con valor 0 y se habilita al teclear un valor > 0", async () => {
     const user = userEvent.setup();
     renderConViga();
 
-    // El valor arranca en 0 (defaultsCarga). Anadir sin tocarlo debe bloquearse.
-    await user.click(screen.getByRole("button", { name: "Añadir carga" }));
+    // El valor arranca en 0 (defaultsCarga): el boton esta deshabilitado para no
+    // presentar una accion que validarCarga rechazaria con seguridad.
+    const boton = screen.getByRole("button", { name: "Añadir carga" });
+    expect(boton).toBeDisabled();
 
+    // Al teclear un valor > 0 (commit en blur) el boton se habilita.
+    const valor = screen.getByLabelText("Valor");
+    await user.clear(valor);
+    await user.type(valor, "5");
+    await user.tab();
+    expect(boton).toBeEnabled();
+
+    // Y no se ha creado ninguna carga por el mero hecho de teclear.
     expect(cargas()).toHaveLength(0);
-    expect(screen.getByText("El valor de la carga debe ser mayor que cero.")).toBeInTheDocument();
   });
 
   it("usa la 1ª hipotesis disponible cuando el defaultsCarga.hipotesisId apunta a una hipotesis ya borrada (regresion Q2)", async () => {
@@ -143,9 +152,14 @@ describe("SeccionCargas (via InspectorViga)", () => {
     render(<InspectorViga />);
 
     const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
-    expect(within(lista).getByText("Lineal")).toBeInTheDocument();
+    // En F1 la fila NO muestra una columna de tipo (siempre "Lineal"): valor primero,
+    // luego hipotesis. El tipo sigue en el aria-label del boton de borrar.
+    expect(within(lista).queryByText("Lineal")).toBeNull();
     expect(within(lista).getByText("8 kN/m")).toBeInTheDocument();
     expect(within(lista).getByText("Sobrecarga de uso")).toBeInTheDocument();
+    expect(
+      within(lista).getByRole("button", { name: /Eliminar carga Lineal 8/ }),
+    ).toBeInTheDocument();
   });
 
   it("eliminar una carga la quita del modelo (commit en vivo, reversible)", async () => {

@@ -46,6 +46,23 @@ describe("DialogoHipotesis: montaje", () => {
     expect(within(dialogo).getByText("Sobrecarga de uso")).toBeInTheDocument();
   });
 
+  it("cada hipotesis muestra su tag de tipo: Perm. para permanente, Var. para variable", () => {
+    const dialogo = renderAbierto();
+    const lista = dialogo.querySelector(".cx-gyp__lista") as HTMLElement;
+    // "Cargas muertas" es permanente -> Perm.; "Sobrecarga de uso" es variable -> Var.
+    // Una de cada en la lista sembrada.
+    expect(within(lista).getByText("Perm.")).toBeInTheDocument();
+    expect(within(lista).getByText("Var.")).toBeInTheDocument();
+    // El nombre accesible del boton sigue siendo solo el nombre (el tag va aria-hidden):
+    // los queries por nombre del resto de tests no se rompen.
+    expect(
+      within(lista).getByRole("button", { name: "Cargas muertas" }),
+    ).toBeInTheDocument();
+    expect(
+      within(lista).getByRole("button", { name: "Sobrecarga de uso" }),
+    ).toBeInTheDocument();
+  });
+
   it("no se renderiza contenido si el dialogo esta cerrado", () => {
     render(<DialogoHipotesis />);
     expect(screen.queryByRole("dialog")).toBeNull();

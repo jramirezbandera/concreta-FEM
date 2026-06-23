@@ -59,6 +59,28 @@
   border-color: var(--accent-soft);
   font-weight: 600;
 }
+/* Variante con tag de tipo a la derecha (DialogoHipotesis): empuja el tag al borde.
+   No se toca el .cx-gyp__item global para no descolocar los items de grupos/plantas
+   (sin tag) en el DialogoGruposYPlantas, que comparte la clase base. */
+.cx-gyp__item--con-tag {
+  justify-content: space-between;
+  gap: 8px;
+}
+.cx-gyp__item-nombre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cx-gyp__item-tag {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+.cx-gyp__item--sel .cx-gyp__item-tag {
+  color: var(--accent);
+}
 
 /* --- Detalle: columna del grupo activo --- */
 .cx-gyp__detalle {

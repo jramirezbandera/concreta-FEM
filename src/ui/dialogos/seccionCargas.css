@@ -33,9 +33,12 @@
   font-family: var(--font-sans);
   font-size: 12px;
 }
+/* Fila: valor | hipótesis | × (la columna de tipo se omite en F1; ver SeccionCargas).
+   valor = ancho natural; hipótesis = 1fr (crece y permite el ellipsis de .cx-cargas__hip);
+   × = auto. */
 .cx-cargas__fila {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--space-2, 8px);
   padding: 4px 6px;
@@ -44,9 +47,6 @@
   background-color: var(--surface);
   font-family: var(--font-sans);
   font-size: 12px;
-}
-.cx-cargas__tipo {
-  color: var(--text-2);
 }
 .cx-cargas__valor {
   font-family: var(--font-mono);

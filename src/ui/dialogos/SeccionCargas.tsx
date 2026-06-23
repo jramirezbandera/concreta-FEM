@@ -170,8 +170,13 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
           <div className="cx-cargas__vacio">Sin cargas.</div>
         ) : (
           cargasDelElemento.map((c) => (
+            // Fila: valor | hipótesis | ×. En F1 el tipo es SIEMPRE "Lineal", asi que
+            // la columna de tipo seria ruido (identica en toda fila) y se omite del
+            // render; el valor —el dato que importa— va primero. La columna de tipo se
+            // reintroducira cuando F3 anada cargas puntual/superficial (varios tipos
+            // conviviendo). El tipo se conserva en el aria-label del boton × (contexto
+            // para lectores de pantalla).
             <div key={c.id} className="cx-cargas__fila">
-              <span className="cx-cargas__tipo">{etiquetaTipo(c.tipo)}</span>
               <span className="cx-cargas__valor">
                 {c.valor} {SUFIJO_POR_TIPO[c.tipo]}
               </span>
@@ -211,7 +216,10 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
             </div>
           ) : null}
         </div>
-        <Boton variante="primary" onClick={anadir}>
+        {/* Deshabilitado con valor <= 0: no presentamos una accion que validarCarga
+            rechazaria con seguridad ("El valor de la carga debe ser mayor que cero").
+            El resto de validaciones (hipotesis) siguen en `anadir`/validarCarga. */}
+        <Boton variante="primary" onClick={anadir} disabled={!(valorNuevo > 0)}>
           Añadir carga
         </Boton>
       </div>

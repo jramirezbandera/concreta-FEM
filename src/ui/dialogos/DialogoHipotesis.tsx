@@ -211,22 +211,35 @@ export function DialogoHipotesis() {
                 hipotesis.map((h) => {
                   const clases = [
                     "cx-gyp__item",
+                    "cx-gyp__item--con-tag",
                     h.id === activa?.id && "cx-gyp__item--sel",
                   ]
                     .filter(Boolean)
                     .join(" ");
+                  // Tag tenue de tipo a la derecha del nombre: distingue permanente
+                  // de variable sin tener que seleccionar la hipotesis. El tag visual
+                  // va aria-hidden (asi el nombre accesible del boton sigue siendo solo
+                  // h.nombre, sin "Cargas muertas Perm." confuso); el `title` da el tipo
+                  // legible al pasar el raton. Modificador --con-tag para no alterar el
+                  // .cx-gyp__item que comparte el dialogo de Grupos/Plantas (sin tag).
+                  const tipoLegible =
+                    h.tipo === "permanente" ? "Permanente" : "Variable";
                   return (
                     <button
                       key={h.id}
                       type="button"
                       className={clases}
+                      title={`${h.nombre} · ${tipoLegible}`}
                       aria-pressed={h.id === activa?.id}
                       onClick={() => {
                         setActivaId(h.id);
                         setErrores([]);
                       }}
                     >
-                      {h.nombre}
+                      <span className="cx-gyp__item-nombre">{h.nombre}</span>
+                      <span className="cx-gyp__item-tag" aria-hidden="true">
+                        {h.tipo === "permanente" ? "Perm." : "Var."}
+                      </span>
                     </button>
                   );
                 })
