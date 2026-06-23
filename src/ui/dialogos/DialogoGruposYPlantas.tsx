@@ -538,16 +538,15 @@ export function DialogoGruposYPlantas() {
           <Boton variante="ghost" onClick={() => setConfirmacion(null)}>
             Cancelar
           </Boton>
-          <button
-            type="button"
-            className="cx-gyp__btn-peligro"
+          <Boton
+            variante="danger"
             onClick={() => {
               confirmacion?.onConfirmar();
               setConfirmacion(null);
             }}
           >
             Eliminar
-          </button>
+          </Boton>
         </>
       }
     >

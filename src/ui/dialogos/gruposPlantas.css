@@ -193,25 +193,5 @@
   line-height: 1.5;
   color: var(--text);
 }
-/* Boton destructivo solido para confirmar el borrado (relleno peligro). */
-.cx-gyp__btn-peligro {
-  height: 30px;
-  padding: 0 14px;
-  appearance: none;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-chip);
-  background-color: var(--danger);
-  color: var(--on-accent);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: filter 0.12s ease;
-}
-.cx-gyp__btn-peligro:hover {
-  filter: brightness(0.95);
-}
-.cx-gyp__btn-peligro:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
+/* El boton destructivo solido vive ahora en la primitiva Boton (variante "danger",
+   .cx-btn--danger en primitivas.css); el antiguo .cx-gyp__btn-peligro se retiro. */

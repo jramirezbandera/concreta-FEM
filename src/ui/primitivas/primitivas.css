@@ -51,6 +51,17 @@
   background-color: var(--surface-muted);
   border-color: var(--border-strong);
 }
+/* Variante destructiva (relleno --danger): confirmar borrado. Lo destructivo debe
+   parecerlo (principio de confianza). Reemplaza el antiguo .cx-gyp__btn-peligro. */
+.cx-btn--danger {
+  background-color: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.cx-btn--danger:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
 
 /* --- Segmentado (.cx-seg): grupo exclusivo, activo en surface + shadow --- */
 .cx-seg {
@@ -87,6 +98,14 @@
 .cx-seg__item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+/* Grupo deshabilitado (p. ej. extremos de un tirante, forzados articulados): se
+   muestra fijo y atenuado, sin cursor de edicion. La opcion activa sigue legible. */
+.cx-seg--disabled {
+  opacity: 0.55;
+}
+.cx-seg--disabled .cx-seg__item {
+  cursor: default;
 }
 
 /* --- Panel flotante (.cx-float) + cabecera (.cx-panel-head) --- */
