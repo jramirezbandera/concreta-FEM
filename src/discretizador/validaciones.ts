@@ -285,6 +285,38 @@ function validarHipotesisConCargas(modelo: Modelo, errores: ErrorObra[]): void {
   }
 }
 
+// 4b. Concomitancia de varias acciones variables (red para la via de IMPORT .json).
+//
+// CONTEXTO: `generarCombos` (combinaciones.ts) construye el ELU poniendo TODAS las
+// hipotesis `variable` a su coeficiente pleno (1,50), porque el alcance F1 asume UNA
+// unica accion variable dominante (no hay concomitancia con coeficiente de
+// simultaneidad psi0 todavia; eso es F2). La UI ya restringe a una sola hipotesis
+// variable, pero un proyecto importado (.json, feature-8) puede traer 2+ y saltarse
+// esa validacion de UI. "Todo dato que entra se valida" (CLAUDE.md regla de oro 8).
+//
+// SEVERIDAD = "aviso" (NO bloquea): mayorar todas las variables a 1,50 a la vez es
+// CONSERVADOR (mas carga => del lado de la seguridad), asi que el calculo puede
+// proceder; solo se informa de que aun no es psi0-correcto.
+//
+// CRITERIO: solo cuentan las variables CON al menos una carga asociada. Una variable
+// vacia no entra en ningun esfuerzo (sus factores no mueven nada en el combo), asi
+// que no genera concomitancia real; ademas ya la avisa COMBO_SIN_CARGAS. Asi el
+// aviso aparece exactamente cuando hay >1 variable que de verdad suma esfuerzo.
+function validarVariablesConcomitantes(modelo: Modelo, errores: ErrorObra[]): void {
+  const variablesConCarga = modelo.hipotesis.filter(
+    (h) => h.tipo === "variable" && modelo.cargas.some((c) => c.hipotesisId === h.id),
+  );
+  if (variablesConCarga.length > 1) {
+    errores.push({
+      codigo: "VARIAS_VARIABLES",
+      severidad: "aviso", // conservador (todas a 1,50): no impide calcular
+      mensaje:
+        "Hay más de una acción variable con cargas. En esta fase se combinan todas con su coeficiente pleno (resultado del lado de la seguridad); la combinación con coeficientes de simultaneidad llegará en una fase posterior.",
+      elementoTipo: "modelo", // es un aviso de modelo, no de un elemento concreto
+    });
+  }
+}
+
 // 5. Nudos huerfanos: un punto de la obra que ninguna viga usa como extremo. Suele
 // ser un resto de una edicion (se borro la viga pero quedo el punto). Heuristica
 // ligera; no impide calcular, pero ensucia el modelo. Aviso, no bloqueo.
@@ -315,6 +347,7 @@ export function validarModelo(modelo: Modelo): ErrorObra[] {
   validarReferencias(modelo, errores);
   validarSujecion(modelo, errores);
   validarHipotesisConCargas(modelo, errores);
+  validarVariablesConcomitantes(modelo, errores);
   validarNudosFlotantes(modelo, errores);
   return errores;
 }

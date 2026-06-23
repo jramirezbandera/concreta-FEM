@@ -20,6 +20,7 @@ import {
   eliminarViga,
 } from "../../estado";
 import type { Modelo, Viga } from "../../dominio";
+import { cargasDeAmbito } from "../../dominio";
 import "./inspectorViga.css";
 
 // InspectorViga (feature-12, Tarea 2.2): panel flotante sobre el lienzo que edita
@@ -67,7 +68,7 @@ function datosDesde(viga: Viga, cambios: Partial<DatosVigaUI>): DatosVigaUI {
 // cargas cuyo ambito apunta a la viga). Sirve para avisar del alcance antes de
 // confirmar el borrado (diseno para la confianza, igual que F10/F11).
 function contarCargasDeLaViga(modelo: Modelo, vigaId: string): number {
-  return modelo.cargas.filter((c) => c.ambito === vigaId).length;
+  return cargasDeAmbito(modelo, vigaId).length;
 }
 
 export function InspectorViga() {

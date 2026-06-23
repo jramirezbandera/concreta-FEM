@@ -17,8 +17,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DialogoGruposYPlantas } from "./DialogoGruposYPlantas";
-import { modeloStore, vistaStore } from "../../estado";
+import { modeloStore, vistaStore, editarGrupo } from "../../estado";
 import { crearModeloVacio, plantasDeGrupo } from "../../dominio";
+import type { CategoriaUso } from "../../dominio";
+import { categoriaUso } from "../../biblioteca";
 
 beforeEach(() => {
   // Reset de los stores singleton a un estado limpio y reproducible.
@@ -247,8 +249,9 @@ describe("DialogoGruposYPlantas: validacion en vivo y reasignacion", () => {
     await user.tab();
 
     expect(within(detalle).getByText("Introduce un número válido.")).toBeInTheDocument();
-    // El valor por defecto (2) se conserva: vaciar NO guarda 0 en silencio.
-    expect(grupos()[0].sobrecargaUso).toBe(2);
+    // El valor por defecto se conserva: vaciar NO guarda 0 en silencio. El default
+    // esta cableado al qk de la categoria por defecto (A), no a un numero magico.
+    expect(grupos()[0].sobrecargaUso).toBe(categoriaUso("A").qk);
   });
 
   it("eliminar el grupo activo reasigna el activo al primer grupo restante", async () => {
@@ -265,6 +268,91 @@ describe("DialogoGruposYPlantas: validacion en vivo y reasignacion", () => {
 
     expect(grupos().map((g) => g.nombre)).toEqual(["G1"]);
     expect(vistaStore.getState().grupoActivoId).toBe(g1.id);
+  });
+});
+
+describe("DialogoGruposYPlantas: categoria de uso -> sobrecarga (qk CTE)", () => {
+  // Criterio de aceptacion de feature-13: "Seleccionar categoria de uso en el grupo
+  // asigna qk". El SelectUso (Radix) es inestable en jsdom para abrir el listbox
+  // (ver cabecera del archivo), asi que NO se conduce por el Select. Se cubre:
+  //   1) el VALOR POR DEFECTO al crear: cableado al qk de la categoria por defecto.
+  //   2) el CABLEADO categoria -> sobrecargaUso por VARIAS categorias, ejerciendo el
+  //      MISMO comando que el handler editarCategoria construye (table -> editarGrupo,
+  //      ambos campos en una sola edicion / un solo undo).
+
+  it("crear grupo: la sobrecarga por defecto es el qk de la categoria por defecto (A=2)", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+
+    const g = grupos()[0];
+    // No hardcodear 2: se ata a la tabla CTE para que un cambio normativo no mienta.
+    expect(g.categoriaUso).toBe("A");
+    expect(g.sobrecargaUso).toBe(categoriaUso("A").qk);
+    expect(g.sobrecargaUso).toBe(2);
+  });
+
+  it("cambiar la categoria asigna el qk normativo a sobrecargaUso (A=2, B=2, C=5, D=5, E=2, F=1, G=1)", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+    const grupoId = grupos()[0].id;
+
+    // Tabla esperada de qk por categoria (CTE DB-SE-AE Tabla 3.1, via acciones.ts).
+    const esperado: Record<CategoriaUso, number> = {
+      A: 2,
+      B: 2,
+      C: 5,
+      D: 5,
+      E: 2,
+      F: 1,
+      G: 1,
+    };
+
+    for (const cat of Object.keys(esperado) as CategoriaUso[]) {
+      // Mismo cableado que el handler editarCategoria: categoria + qk en UNA edicion.
+      const m = modelo();
+      modeloStore
+        .getState()
+        .ejecutar(
+          editarGrupo(m, grupoId, {
+            categoriaUso: cat,
+            sobrecargaUso: categoriaUso(cat).qk,
+          }),
+        );
+      const g = grupos().find((x) => x.id === grupoId)!;
+      expect(g.categoriaUso).toBe(cat);
+      expect(g.sobrecargaUso).toBe(esperado[cat]);
+      expect(g.sobrecargaUso).toBe(categoriaUso(cat).qk);
+    }
+  });
+
+  it("el override manual de sobrecargaUso persiste hasta el SIGUIENTE cambio de categoria", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+    const grupoId = grupos()[0].id;
+
+    // Override manual de la sobrecarga (campo numerico estable, mismo onCommit-en-blur).
+    const detalle = dialogo.querySelector(".cx-gyp__detalle") as HTMLElement;
+    const inputSobre = within(detalle).getByLabelText(/Sobrecarga de uso/);
+    await user.clear(inputSobre);
+    await user.type(inputSobre, "3.5");
+    await user.tab();
+    expect(grupos()[0].sobrecargaUso).toBe(3.5); // override permitido (CYPECAD)
+
+    // Un cambio de categoria RE-ASIGNA al qk normativo (pisa el override), como CYPECAD.
+    const m = modelo();
+    modeloStore
+      .getState()
+      .ejecutar(
+        editarGrupo(m, grupoId, {
+          categoriaUso: "C",
+          sobrecargaUso: categoriaUso("C").qk,
+        }),
+      );
+    expect(grupos()[0].categoriaUso).toBe("C");
+    expect(grupos()[0].sobrecargaUso).toBe(5); // qk de C, no el 3,5 manual previo
   });
 });
 

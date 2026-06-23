@@ -50,15 +50,16 @@ export function validarCarga(
 ): ErrorCampo[] {
   const errores: ErrorCampo[] = [];
 
-  // 1. Valor: numero finito y distinto de cero. Un valor no numerico (NaN tras
-  // Number("")) no es introducible; un valor cero no aporta carga alguna, asi que
-  // crear una carga nula es seguramente un error del usuario y se bloquea.
-  if (!Number.isFinite(datos.valor)) {
-    errores.push({ campo: "valor", mensaje: "Introduce un número válido." });
-  } else if (datos.valor === 0) {
+  // 1. Valor: numero finito y ESTRICTAMENTE POSITIVO. En F1 solo se modela la
+  // gravedad: el discretizador emite la carga como signo*Math.abs(valor), de modo
+  // que un valor negativo (p.ej. -5) se MOSTRARIA como -5 pero se CALCULARIA hacia
+  // abajo igual que +5 (dato mostrado != dato calculado). Para que la entrada sea
+  // siempre coherente con el calculo, se exige valor > 0; el sentido (gravedad) lo
+  // fija el discretizador, no el signo que teclea el usuario.
+  if (!Number.isFinite(datos.valor) || datos.valor <= 0) {
     errores.push({
       campo: "valor",
-      mensaje: "El valor de la carga no puede ser cero.",
+      mensaje: "El valor de la carga debe ser mayor que cero.",
     });
   }
 

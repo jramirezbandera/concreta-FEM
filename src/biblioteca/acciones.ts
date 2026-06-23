@@ -32,9 +32,16 @@ import type { CategoriaUso } from "../dominio/categoria";
 
 // Una entrada de la tabla por categoria de uso: sobrecarga de uso caracteristica
 // (qk) y los tres coeficientes de simultaneidad (psi0 combinacion, psi1 frecuente,
-// psi2 casi permanente). El discretizador (feature-13 T-combos) consultara esta
-// tabla por `grupo.categoriaUso` para inyectar qk en la hipotesis de sobrecarga y
-// los psi en los combos ELU/ELS.
+// psi2 casi permanente).
+//
+// CONSUMIDOR REAL del `qk` (feature-13): el DIALOGO de grupos y plantas
+// (`DialogoGruposYPlantas`). Al elegir la categoria de uso de un grupo, asigna
+// `grupo.sobrecargaUso = categoriaUso(cat).qk` (override manual permitido despues),
+// y el discretizador toma ese `sobrecargaUso` ya resuelto. El `qk` NO se consulta
+// dentro del discretizador: la categoria se "cablea" a la sobrecarga en la UI.
+// Los `psi` aun NO los usa nadie: son PREPARATORIOS para los combos ELS de F2
+// (caracteristica/frecuente/casi permanente). Hoy F1 solo emite ELU/ELS con
+// gamma; los psi entraran cuando se modelen esas situaciones.
 export interface EntradaCategoriaUso {
   categoria: CategoriaUso; // letra del enum del dominio (A..G)
   descripcion: string; // etiqueta legible para UI (espanol con tildes)
@@ -192,11 +199,12 @@ export const GAMMA_ELS = 1.0;
 // Devuelve la entrada normativa (qk + psi) de una categoria de uso. La categoria
 // es un enum cerrado del dominio, asi que SIEMPRE existe en la tabla (no devuelve
 // undefined): el compilador garantiza la exhaustividad de `TABLA_CATEGORIAS`.
+// El consumidor del `qk` es el dialogo de grupos (ver cabecera de EntradaCategoriaUso).
 export function categoriaUso(cat: CategoriaUso): EntradaCategoriaUso {
   return TABLA_CATEGORIAS[cat];
 }
 
-// Listado completo (para UI futura: selector de categoria con qk por defecto).
+// Listado completo (para UI: selector de categoria con qk por defecto).
 // Devuelve copia para que el consumidor no pueda mutar la tabla interna.
 export function listarCategoriasUso(): EntradaCategoriaUso[] {
   return Object.values(TABLA_CATEGORIAS).map((e) => ({ ...e }));

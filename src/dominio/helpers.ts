@@ -47,6 +47,13 @@ export function cargasDeHipotesis(modelo: Modelo, hipotesisId: string): Carga[] 
   return modelo.cargas.filter((c) => c.hipotesisId === hipotesisId);
 }
 
+// Espejo de cargasDeHipotesis, pero filtra por AMBITO (id del elemento sobre el que
+// actua la carga: viga/pilar/nudo). Punto unico de lectura para listar/contar las
+// cargas de un elemento (SeccionCargas, inspectores), en vez de filtrar a mano.
+export function cargasDeAmbito(modelo: Modelo, ambito: string): Carga[] {
+  return modelo.cargas.filter((c) => c.ambito === ambito);
+}
+
 // Factoria de un Modelo valido vacio: punto de partida para un proyecto nuevo.
 // Trae sembradas las dos hipotesis basicas de F1 (cargas muertas permanentes y
 // sobrecarga de uso variable), con ids ASCII fijos y deterministas: el modelo

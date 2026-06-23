@@ -142,6 +142,13 @@ export function DialogoHipotesis() {
     if (!activa) return;
     if (tipo === activa.tipo) return; // no-op
     const m = leerModelo();
+    // Validamos el CONJUNTO (nombre actual + nuevo tipo): en F1 solo se admite una
+    // hipotesis variable, asi que pasar una 2ª a variable se bloquea aqui y se muestra
+    // el error junto al Segmentado de tipo, sin despachar el comando.
+    const errs = validarHipotesis(m, activa.id, { nombre: activa.nombre, tipo });
+    const errTipo = errs.filter((e) => e.campo === "tipo");
+    setErrores((prev) => [...prev.filter((e) => e.campo !== "tipo"), ...errTipo]);
+    if (errTipo.length > 0) return;
     modeloStore.getState().ejecutar(editarHipotesis(m, activa.id, { tipo }));
   };
 
@@ -250,6 +257,11 @@ export function DialogoHipotesis() {
                       valor={activa.tipo}
                       onValor={editarTipo}
                     />
+                    {errorDe(errores, "tipo") ? (
+                      <div className="cx-campo__error" role="alert">
+                        {errorDe(errores, "tipo")}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 

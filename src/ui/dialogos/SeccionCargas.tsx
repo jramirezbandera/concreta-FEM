@@ -13,6 +13,7 @@ import {
   eliminarCarga,
 } from "../../estado";
 import type { Carga } from "../../dominio";
+import { cargasDeAmbito } from "../../dominio";
 import "./seccionCargas.css";
 
 // SeccionCargas (feature-13, T3.1): bloque de gestion de CARGAS de un elemento,
@@ -74,9 +75,10 @@ export interface SeccionCargasProps {
 }
 
 export function SeccionCargas({ elementoId }: SeccionCargasProps) {
-  // Lectura reactiva: cargas e hipotesis del modelo. No esta en el bucle del
-  // viewport (#11): un re-render al editar es aceptable.
-  const cargas = modeloStore((s) => s.modelo.cargas);
+  // Lectura reactiva: el modelo. No esta en el bucle del viewport (#11): un
+  // re-render al editar es aceptable. Suscribirse al modelo (no solo a cargas)
+  // permite filtrar con el helper de dominio cargasDeAmbito sin perder reactividad.
+  const modelo = modeloStore((s) => s.modelo);
   const defaultsCarga = vistaStore((s) => s.defaultsCarga);
   const setDefaultsCarga = vistaStore((s) => s.setDefaultsCarga);
 
@@ -93,15 +95,23 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
     setErrores([]);
   }, [elementoId]);
 
-  // Cargas de ESTE elemento (filtro por ambito). El dominio no expone un helper por
-  // ambito (cargasDeHipotesis filtra por hipotesis), asi que filtramos aqui.
-  const cargasDelElemento = cargas.filter((c) => c.ambito === elementoId);
+  // Cargas de ESTE elemento (filtro por ambito), via el helper de dominio.
+  const cargasDelElemento = cargasDeAmbito(modelo, elementoId);
 
   // En F1 el tipo es siempre lineal (ver cabecera). La hipotesis nueva arranca del
-  // ultimo elegido (defaultsCarga.hipotesisId) o de la primera hipotesis del modelo.
+  // ultimo elegido (defaultsCarga.hipotesisId) SOLO si ESA hipotesis sigue existiendo;
+  // si se borro (defaultsCarga retiene un id obsoleto), cae a la primera del modelo.
+  // Sin esta comprobacion, un id huerfano pasa el `??` (es non-null) y validarCarga lo
+  // rechaza por hipotesis inexistente, bloqueando anadir cargas aunque haya hipotesis
+  // validas disponibles.
   const tipoNuevo: DatosCargaUI["tipo"] = "lineal";
-  const hipotesisNueva =
-    defaultsCarga.hipotesisId ?? leerModelo().hipotesis[0]?.id ?? null;
+  const hipotesisGuardada = defaultsCarga.hipotesisId;
+  const hipotesisGuardadaExiste =
+    hipotesisGuardada !== null &&
+    modelo.hipotesis.some((h) => h.id === hipotesisGuardada);
+  const hipotesisNueva = hipotesisGuardadaExiste
+    ? hipotesisGuardada
+    : (modelo.hipotesis[0]?.id ?? null);
 
   const anadir = () => {
     const m = leerModelo();

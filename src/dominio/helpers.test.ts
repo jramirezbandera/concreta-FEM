@@ -8,6 +8,7 @@ import {
   pilaresDePlanta,
   vigasDePlanta,
   cargasDeHipotesis,
+  cargasDeAmbito,
   crearModeloVacio,
 } from "./helpers";
 import { ModeloSchema, type Modelo } from "./modelo";
@@ -140,5 +141,12 @@ describe("helpers de consulta del dominio", () => {
     expect(cargasDeHipotesis(m, "h1").map((c) => c.id)).toEqual(["c1", "c2"]);
     expect(cargasDeHipotesis(m, "h2").map((c) => c.id)).toEqual(["c3"]);
     expect(cargasDeHipotesis(m, "nope")).toEqual([]);
+  });
+
+  it("cargasDeAmbito", () => {
+    // v1 arrastra c1 (lineal) y c3 (puntual); v2 solo c2.
+    expect(cargasDeAmbito(m, "v1").map((c) => c.id)).toEqual(["c1", "c3"]);
+    expect(cargasDeAmbito(m, "v2").map((c) => c.id)).toEqual(["c2"]);
+    expect(cargasDeAmbito(m, "nope")).toEqual([]);
   });
 });

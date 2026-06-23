@@ -107,9 +107,23 @@ describe("DialogoHipotesis: editar", () => {
     expect(within(detalle).getByRole("alert")).toHaveTextContent(/Ya existe/);
   });
 
+  // Modelo de un solo grupo de hipotesis permanentes: sin variable previa, para que
+  // convertir una a variable sea VALIDO (en F1 solo se admite una variable; el modelo
+  // vacio ya siembra "Sobrecarga de uso" variable, que aqui se reemplaza).
+  function modeloSinVariable(): Modelo {
+    const m = crearModeloVacio();
+    m.hipotesis = [
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+    ];
+    return m;
+  }
+
   it("editar el tipo en vivo (Segmentado) despacha el cambio", async () => {
     const user = userEvent.setup();
-    const dialogo = renderAbierto();
+    modeloStore.getState().cargarModelo(modeloSinVariable());
+    vistaStore.getState().abrirDialogo("hipotesis");
+    render(<DialogoHipotesis />);
+    const dialogo = screen.getByRole("dialog");
     await user.click(within(dialogo).getByRole("button", { name: "Cargas muertas" }));
 
     const grupoTipo = within(dialogo).getByRole("radiogroup", { name: "Tipo" });
@@ -122,7 +136,10 @@ describe("DialogoHipotesis: editar", () => {
 
   it("deshacer revierte la edicion del tipo", async () => {
     const user = userEvent.setup();
-    const dialogo = renderAbierto();
+    modeloStore.getState().cargarModelo(modeloSinVariable());
+    vistaStore.getState().abrirDialogo("hipotesis");
+    render(<DialogoHipotesis />);
+    const dialogo = screen.getByRole("dialog");
     await user.click(within(dialogo).getByRole("button", { name: "Cargas muertas" }));
 
     const grupoTipo = within(dialogo).getByRole("radiogroup", { name: "Tipo" });
@@ -134,6 +151,25 @@ describe("DialogoHipotesis: editar", () => {
     modeloStore.getState().deshacer();
     expect(hipotesis().find((h) => h.id === "hip-cargas-muertas")!.tipo).toBe(
       "permanente",
+    );
+  });
+
+  it("bloquea convertir una 2ª hipotesis a variable y muestra el error (A1)", async () => {
+    const user = userEvent.setup();
+    // Modelo vacio: "Cargas muertas" (permanente) + "Sobrecarga de uso" (variable).
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Cargas muertas" }));
+
+    const grupoTipo = within(dialogo).getByRole("radiogroup", { name: "Tipo" });
+    await user.click(within(grupoTipo).getByRole("radio", { name: "Variable" }));
+
+    // No se despacha: la hipotesis conserva su tipo permanente y aparece el error.
+    expect(hipotesis().find((h) => h.id === "hip-cargas-muertas")!.tipo).toBe(
+      "permanente",
+    );
+    const detalle = dialogo.querySelector(".cx-gyp__detalle") as HTMLElement;
+    expect(within(detalle).getByRole("alert")).toHaveTextContent(
+      /solo se admite una hipótesis variable/,
     );
   });
 });

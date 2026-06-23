@@ -21,6 +21,7 @@ import {
   eliminarPilar,
 } from "../../estado";
 import type { Modelo, Pilar } from "../../dominio";
+import { cargasDeAmbito } from "../../dominio";
 import "./inspectorPilar.css";
 
 // InspectorPilar (feature-11, Tarea 3.2): panel flotante sobre el lienzo que edita
@@ -67,7 +68,7 @@ function datosDesde(pilar: Pilar, cambios: Partial<DatosPilarUI>): DatosPilarUI 
 // eliminarPilar: cargas cuyo ambito apunta al pilar). Sirve para avisar del alcance
 // antes de confirmar el borrado (diseno para la confianza, igual que F10).
 function contarCargasDelPilar(modelo: Modelo, pilarId: string): number {
-  return modelo.cargas.filter((c) => c.ambito === pilarId).length;
+  return cargasDeAmbito(modelo, pilarId).length;
 }
 
 // --- Subcomponente: selector simple de PLANTA ----------------------------------

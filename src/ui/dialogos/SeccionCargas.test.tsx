@@ -105,7 +105,28 @@ describe("SeccionCargas (via InspectorViga)", () => {
     await user.click(screen.getByRole("button", { name: "Añadir carga" }));
 
     expect(cargas()).toHaveLength(0);
-    expect(screen.getByText("El valor de la carga no puede ser cero.")).toBeInTheDocument();
+    expect(screen.getByText("El valor de la carga debe ser mayor que cero.")).toBeInTheDocument();
+  });
+
+  it("usa la 1ª hipotesis disponible cuando el defaultsCarga.hipotesisId apunta a una hipotesis ya borrada (regresion Q2)", async () => {
+    const user = userEvent.setup();
+    // defaultsCarga retiene un id de hipotesis que NO existe en el modelo (se borro):
+    // sin el fix, el `??` lo conservaria y validarCarga rechazaria la carga.
+    vistaStore
+      .getState()
+      .setDefaultsCarga({ tipo: "lineal", valor: 0, hipotesisId: "hip-borrada" });
+    renderConViga();
+
+    const valor = screen.getByLabelText("Valor");
+    await user.clear(valor);
+    await user.type(valor, "7");
+    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Añadir carga" }));
+
+    // La carga se crea contra la 1ª hipotesis valida del modelo (hip-cargas-muertas),
+    // NO contra el id obsoleto.
+    expect(cargas()).toHaveLength(1);
+    expect(cargas()[0].hipotesisId).toBe("hip-cargas-muertas");
   });
 
   it("lista una carga existente con su valor, sufijo e hipotesis", () => {

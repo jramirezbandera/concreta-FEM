@@ -19,6 +19,7 @@ import {
 } from "../../estado";
 import { plantasDeGrupo } from "../../dominio";
 import type { CategoriaUso, Modelo } from "../../dominio";
+import { categoriaUso } from "../../biblioteca";
 import "./dialogos.css";
 import "./gruposPlantas.css";
 
@@ -33,9 +34,13 @@ import "./gruposPlantas.css";
 // dentro de cada handler y no la copia del render.
 
 // Datos por defecto de un grupo nuevo (razonables para uso residencial).
+// `sobrecargaUso` arranca cableada al qk normativo de la categoria por defecto
+// (CTE DB-SE-AE Tabla 3.1 via biblioteca/acciones), igual que al cambiar la
+// categoria en vivo: no hay numero magico que pueda divergir de la tabla.
+const CATEGORIA_DEFECTO: CategoriaUso = "A";
 const GRUPO_DEFECTO = {
-  categoriaUso: "A" as CategoriaUso,
-  sobrecargaUso: 2,
+  categoriaUso: CATEGORIA_DEFECTO,
+  sobrecargaUso: categoriaUso(CATEGORIA_DEFECTO).qk,
   cargasMuertas: 1,
 };
 
@@ -221,13 +226,24 @@ export function DialogoGruposYPlantas() {
     modeloStore.getState().ejecutar(editarGrupo(m, grupoActivo.id, { nombre }));
   };
 
-  const editarCategoria = (categoriaUso: CategoriaUso) => {
+  // Cambiar la categoria de uso RE-ASIGNA la sobrecarga al qk normativo de esa
+  // categoria (CTE DB-SE-AE Tabla 3.1, via biblioteca/acciones), como CYPECAD:
+  // ambos campos van en la MISMA edicion (un solo comando, un solo undo). Las
+  // ediciones manuales posteriores de `sobrecargaUso` persisten hasta el siguiente
+  // cambio de categoria (override manual permitido).
+  const editarCategoria = (categoria: CategoriaUso) => {
     if (!grupoActivo) return;
-    if (categoriaUso === grupoActivo.categoriaUso) return; // no-op
+    if (categoria === grupoActivo.categoriaUso) return; // no-op
     const m = leerModelo();
+    const sobrecargaUso = categoriaUso(categoria).qk;
     modeloStore
       .getState()
-      .ejecutar(editarGrupo(m, grupoActivo.id, { categoriaUso }));
+      .ejecutar(
+        editarGrupo(m, grupoActivo.id, { categoriaUso: categoria, sobrecargaUso }),
+      );
+    // El campo de sobrecarga acaba de cambiar por debajo: limpia un posible error
+    // previo de ese campo (el qk normativo es siempre valido).
+    setErroresGrupo((prev) => prev.filter((e) => e.campo !== "sobrecargaUso"));
   };
 
   // Commit de un campo numerico del grupo (sobrecargaUso | cargasMuertas). La

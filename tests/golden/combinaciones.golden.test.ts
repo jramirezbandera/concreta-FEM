@@ -20,8 +20,11 @@
 //    momento que devuelve PyNite.
 //  - acciones.test.ts ya verifica `categoriaUso(cat).qk` exhaustivamente por
 //    categoria. AQUI NO se duplica: solo se anade el angulo "pipeline/combo" (que
-//    un qk de categoria, cableado como sobrecarga variable, se mayora por 1,50 en
-//    ELU a traves del generarCombos REAL).
+//    una sobrecarga variable de magnitud qk se mayora por 1,50 en ELU a traves del
+//    generarCombos REAL). OJO: el CABLEADO categoria -> grupo.sobrecargaUso NO vive
+//    en el pipeline, sino en el dialogo de grupos (DialogoGruposYPlantas); esa parte
+//    se prueba en su test de componente, no aqui. Este golden solo ejercita los
+//    FACTORES de combinacion (que es lo unico que el pipeline decide).
 //
 // PIRAMIDE (igual que el resto de golden):
 //  - CAPA A (SIEMPRE, sin Pyodide): estructura de los combos generados + factores
@@ -192,13 +195,18 @@ describe("combinaciones golden · CAPA A (discretizador puro, sin motor)", () =>
   });
 
   // -------------------------------------------------------------------------
-  // ANGULO PIPELINE/COMBO de "categoria de uso -> qk" (spec T3.2 punto 3). El
+  // ANGULO PIPELINE/COMBO: una sobrecarga VARIABLE de magnitud qk se mayora por
+  // 1,50 en ELU a traves del generarCombos REAL (qk * factor_variable_ELU). El
   // valor de qk por categoria y los gamma ya estan blindados EXHAUSTIVAMENTE en
-  // src/biblioteca/acciones.test.ts; NO se duplican. Aqui solo se cierra el lazo:
-  // un qk de catalogo, cableado como sobrecarga VARIABLE, queda mayorado por 1,50
-  // en ELU a traves del generarCombos REAL (qk * factor_variable_ELU).
+  // src/biblioteca/acciones.test.ts; NO se duplican.
+  //
+  // HONESTIDAD DEL LIMITE: aqui NO se afirma que el discretizador "cablee" la
+  // categoria a la sobrecarga. Ese cableado (categoria -> grupo.sobrecargaUso)
+  // vive en el dialogo de grupos y se prueba en DialogoGruposYPlantas.test.tsx.
+  // Este caso solo verifica lo que el PIPELINE decide: el factor variable de ELU
+  // (1,50) y su producto por un dato de catalogo, que es lo que llega al solver.
   // -------------------------------------------------------------------------
-  it("qk de categoria (C=5, A=2) cableado como variable se mayora x1,50 en ELU (qk·1,50)", () => {
+  it("una sobrecarga variable de magnitud qk se mayora x1,50 en ELU (qk·1,50)", () => {
     const fem = discretizarOExplotar(
       // q = qk de categoria C (5 kN/m² -> aqui kN/m sobre la viga, magnitud).
       fixtureBiapoyadaDosHipotesis({ L: 6, g: 0, q: categoriaUso("C").qk }),

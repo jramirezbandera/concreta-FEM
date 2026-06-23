@@ -282,6 +282,56 @@ describe("validarModelo", () => {
     sinJergaFEM(e!);
   });
 
+  it("VARIAS_VARIABLES: 2 hipotesis variables con cargas -> 1 aviso no bloqueante", () => {
+    // Red para la via de import .json: la UI restringe a 1 variable, pero un proyecto
+    // importado puede traer 2+. Se anaden dos variables, cada una con su carga.
+    const m = modeloValido();
+    m.hipotesis = [
+      { id: "h1", nombre: "Peso propio", tipo: "permanente" },
+      { id: "h2", nombre: "Sobrecarga", tipo: "variable" },
+      { id: "h3", nombre: "Nieve", tipo: "variable" },
+    ];
+    m.cargas = [
+      { id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" },
+      { id: "c2", tipo: "lineal", ambito: "v1", valor: -5, hipotesisId: "h2" },
+      { id: "c3", tipo: "lineal", ambito: "v1", valor: -3, hipotesisId: "h3" },
+    ];
+    const avisos = validarModelo(m).filter((e) => e.codigo === "VARIAS_VARIABLES");
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0].severidad).toBe("aviso"); // no bloquea: ok:true
+    expect(avisos[0].elementoTipo).toBe("modelo");
+    sinJergaFEM(avisos[0]);
+  });
+
+  it("VARIAS_VARIABLES: 1 sola hipotesis variable con cargas -> sin aviso", () => {
+    const m = modeloValido();
+    m.hipotesis = [
+      { id: "h1", nombre: "Peso propio", tipo: "permanente" },
+      { id: "h2", nombre: "Sobrecarga", tipo: "variable" },
+    ];
+    m.cargas = [
+      { id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" },
+      { id: "c2", tipo: "lineal", ambito: "v1", valor: -5, hipotesisId: "h2" },
+    ];
+    expect(codigos(validarModelo(m))).not.toContain("VARIAS_VARIABLES");
+  });
+
+  it("VARIAS_VARIABLES: 2 variables pero una sin cargas -> sin aviso (solo cuentan las que suman esfuerzo)", () => {
+    // Criterio documentado: una variable vacia no genera concomitancia real (ya la
+    // avisa COMBO_SIN_CARGAS). Solo cuenta como variable la que tiene >=1 carga.
+    const m = modeloValido();
+    m.hipotesis = [
+      { id: "h1", nombre: "Peso propio", tipo: "permanente" },
+      { id: "h2", nombre: "Sobrecarga", tipo: "variable" },
+      { id: "h3", nombre: "Nieve", tipo: "variable" }, // sin cargas
+    ];
+    m.cargas = [
+      { id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" },
+      { id: "c2", tipo: "lineal", ambito: "v1", valor: -5, hipotesisId: "h2" },
+    ];
+    expect(codigos(validarModelo(m))).not.toContain("VARIAS_VARIABLES");
+  });
+
   it("acumula varios errores independientes a la vez", () => {
     const m = modeloValido();
     m.pilares[0].materialId = "NO_EXISTE";

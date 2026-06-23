@@ -56,11 +56,24 @@ describe("validarCarga", () => {
     expect(esValido(errores)).toBe(true);
   });
 
+  it("valor positivo es valido", () => {
+    const errores = validarCarga(modeloBase(), null, datosOK({ valor: 5 }));
+    expect(esValido(errores)).toBe(true);
+  });
+
   it("valor cero da error de valor", () => {
     const errores = validarCarga(modeloBase(), null, datosOK({ valor: 0 }));
     expect(errores).toContainEqual({
       campo: "valor",
-      mensaje: "El valor de la carga no puede ser cero.",
+      mensaje: "El valor de la carga debe ser mayor que cero.",
+    });
+  });
+
+  it("valor negativo da error de valor (en F1 el sentido lo fija el discretizador)", () => {
+    const errores = validarCarga(modeloBase(), null, datosOK({ valor: -5 }));
+    expect(errores).toContainEqual({
+      campo: "valor",
+      mensaje: "El valor de la carga debe ser mayor que cero.",
     });
   });
 

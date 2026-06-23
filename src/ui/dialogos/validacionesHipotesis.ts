@@ -66,6 +66,23 @@ export function validarHipotesis(
       campo: "tipo",
       mensaje: "El tipo de la hipótesis debe ser permanente o variable.",
     });
+  } else if (datos.tipo === "variable") {
+    // 3. Una sola hipotesis variable en F1. El discretizador genera la ELU poniendo
+    // TODAS las variables a 1,50 (asume una unica variable dominante, sin coeficientes
+    // de simultaneidad ψ0). Con dos o mas variables produciria combinaciones que las
+    // sobre-mayoran. Restringir la ENTRADA a una variable mantiene el modelo correcto
+    // por construccion; las acciones variables simultaneas (viento, nieve) llegan en
+    // una fase posterior, cuando se introduzcan los ψ0.
+    const otraVariable = modelo.hipotesis.some(
+      (h) => h.id !== hipotesisId && h.tipo === "variable",
+    );
+    if (otraVariable) {
+      errores.push({
+        campo: "tipo",
+        mensaje:
+          "En esta fase solo se admite una hipótesis variable (sobrecarga de uso). Las acciones variables simultáneas (viento, nieve) llegan en una fase posterior.",
+      });
+    }
   }
 
   return errores;
