@@ -6,7 +6,12 @@
 export { modeloStore } from "./modeloStore";
 export { seleccionStore } from "./seleccionStore";
 export { vistaStore } from "./vistaStore";
-export type { Pestana, ModoVista, DialogoActivo } from "./vistaStore";
+export type {
+  Pestana,
+  ModoVista,
+  DialogoActivo,
+  MagnitudDiagrama,
+} from "./vistaStore";
 export type {
   Herramienta,
   DefaultsPilar,

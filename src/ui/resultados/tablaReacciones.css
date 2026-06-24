@@ -1,0 +1,118 @@
+/* TablaReacciones (feature-14, T2.3): tabla de reacciones por apoyo, hudOverlay.
+   Panel flotante glass; reusa .cx-float de las primitivas. Datos numericos en mono
+   tabular (clase global .mono) alineados a la derecha. Posicion canonica:
+   abajo-derecha del lienzo de Resultados; el llamante (App.tsx, Tarea 3.1) puede
+   sobrescribir con otra clase. Solo tokens. */
+
+.cx-reacciones {
+  position: absolute;
+  bottom: var(--space-3, 12px);
+  right: var(--space-3, 12px);
+  width: 380px;
+}
+
+.cx-reacciones .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Estado obsoleto (vigente=false): atenua la tabla para comunicar que los valores
+   ya no corresponden a la obra actual, sin ocultarlos (se ven en gris). */
+.cx-reacciones--obsoleto .cx-reacciones__tabla {
+  opacity: 0.55;
+}
+
+.cx-reacciones__vacio {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+
+/* Aviso de obsolescencia: acento de advertencia sin alarmar. */
+.cx-reacciones__aviso {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--warning);
+}
+
+/* Scroll vertical acotado: con muchos apoyos la tabla no desborda el lienzo. */
+.cx-reacciones__scroll {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.cx-reacciones__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+/* Cabecera de columna: eje arriba, unidad debajo en tenue. */
+.cx-reacciones__th-num,
+.cx-reacciones__th-apoyo {
+  position: sticky;
+  top: 0;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border-2);
+  padding: 4px 6px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.cx-reacciones__th-apoyo {
+  text-align: left;
+}
+
+.cx-reacciones__th-num {
+  text-align: right;
+}
+
+.cx-reacciones__col-eje {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-reacciones__col-ud {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+/* Etiqueta de fila (nombre del pilar de arranque): texto de obra, no numerico. */
+.cx-reacciones__td-apoyo {
+  text-align: left;
+  padding: 3px 6px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Celda numerica: mono tabular (clase .mono aporta familia + tabular-nums),
+   alineada a la derecha para comparar magnitudes columna a columna. */
+.cx-reacciones__td-num {
+  text-align: right;
+  padding: 3px 6px;
+  color: var(--text);
+}
+
+.cx-reacciones__tabla tbody tr:nth-child(even) {
+  background-color: var(--surface-muted);
+}
+
+/* Fila resumen (ΣFY): separada del cuerpo, etiqueta tenue. */
+.cx-reacciones__resumen th,
+.cx-reacciones__resumen td {
+  border-top: 1px solid var(--border-2);
+  padding-top: 5px;
+}
+
+.cx-reacciones__resumen-nota {
+  text-align: left;
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 400;
+}

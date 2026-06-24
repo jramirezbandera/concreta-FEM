@@ -241,6 +241,48 @@ def _ejes_locales_globales(m, member_name):
     return ex, ey, ez
 
 
+def _deformada_global(m, member_name, combo, n_points):
+    """Desplazamiento GLOBAL de la barra por estacion uniforme a lo largo de su eje.
+
+    Devuelve una lista (3, n) = [[DX_0..DX_{n-1}], [DY..], [DZ..]] en el MISMO
+    sistema global que nodos[].disp (ejes FEM, Y-up). n = n_points (igual que los
+    *_array). Sirve para que el render dibuje la flecha del vano (curva), no una
+    recta entre nudos.
+
+    COMO: PyNite expone la flecha LOCAL por estacion via
+    member.deflection_array('dx'|'dy'|'dz', n_points, combo) -> (2, n): fila 1 son
+    los valores. Esa flecha es el desplazamiento LOCAL TOTAL del punto (incluye el
+    movimiento de cuerpo rigido de los nudos, NO la flecha relativa a la cuerda ->
+    esa seria rel_deflection). Por tanto en x=0 vale el desplazamiento local del
+    nudo i y en x=L el del nudo j. La pasamos a GLOBAL con la MISMA triada
+    local->global que ya usa el glue para proyectar cargas (_ejes_locales_globales =
+    Member3D.T()), consistente con como PyNite integra todo lo demas:
+        disp_global = ex*dloc_x + ey*dloc_y + ez*dloc_z
+    Invariante (verificado por el golden): estacion 0 == disp del nudo i,
+    estacion n-1 == disp del nudo j (continuidad con nodos[].disp).
+
+    Usamos deflection_array (vectorizado, 3 llamadas) en vez de deflection() escalar
+    3*n veces: mismo muestreo uniforme [0, L] que defl_y y mucho mas barato en WASM.
+    """
+    member = m.members[member_name]
+    ex, ey, ez = _ejes_locales_globales(m, member_name)
+
+    # Flecha local por estacion (fila 1 del (2,n)); mismo grid que los demas *_array.
+    dxl = member.deflection_array("dx", n_points, combo)[1]
+    dyl = member.deflection_array("dy", n_points, combo)[1]
+    dzl = member.deflection_array("dz", n_points, combo)[1]
+
+    dxg, dyg, dzg = [], [], []
+    for k in range(len(dxl)):
+        lx, ly, lz = float(dxl[k]), float(dyl[k]), float(dzl[k])
+        # Proyeccion local -> global con la triada REAL de PyNite (T()).
+        dxg.append(ex[0] * lx + ey[0] * ly + ez[0] * lz)
+        dyg.append(ex[1] * lx + ey[1] * ly + ez[1] * lz)
+        dzg.append(ex[2] * lx + ey[2] * ly + ez[2] * lz)
+
+    return [dxg, dyg, dzg]
+
+
 def _resultante_carga_barra(m, ctx, ld, factor):
     """Resultante global (Fx,Fy,Fz, Mx,My,Mz respecto al origen) de una carga de
     barra (dist o pt) multiplicada por `factor` de combo.
@@ -418,6 +460,11 @@ def _check_statics(m, payload, combos):
 def serialize_results(m, combos, n_points, tipo_analisis, check_statics):
     """Produce el dict ResultadosCalculo a partir del modelo ya analizado."""
 
+    # Normaliza n_points UNA sola vez: todos los *_array, la deformada y la metadata
+    # (`analysis.n_points`) comparten este valor, asi que no pueden divergir. Minimo 2
+    # (un diagrama necesita 2 estaciones; solverClient ya fuerza >=2, esto es la red).
+    n_points = max(int(n_points), 2)
+
     # --- Nodos: por combo, disp=[DX..RZ] (6) y rxn=[FX..MZ] (6) ---------------
     nodos = {}
     for name, nd in m.nodes.items():
@@ -446,6 +493,10 @@ def serialize_results(m, combos, n_points, tipo_analisis, check_statics):
                 "shear_y": mb.shear_array("Fy", n_points, c).tolist(),
                 "moment_z": mb.moment_array("Mz", n_points, c).tolist(),
                 "defl_y": mb.deflection_array("dy", n_points, c).tolist(),
+                # Deformada GLOBAL (3, n_points): DX/DY/DZ por estacion a lo largo
+                # de la barra, mismo sistema que nodos[].disp. La consume el render
+                # para dibujar la flecha del vano (no una recta entre nudos).
+                "deformada_global": _deformada_global(m, name, c, n_points),
                 # Extremos para etiquetar picos sin recorrer el array en la UI.
                 "max_moment_z": float(mb.max_moment("Mz", c)),
                 "min_moment_z": float(mb.min_moment("Mz", c)),

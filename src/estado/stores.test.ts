@@ -17,6 +17,7 @@ import type { DatosPilar } from "./comandos/comandosModelo";
 import { siguienteNombre } from "./comandos/comandosModelo";
 import type { Pilar } from "../dominio";
 import type { ResultadosCalculo } from "../solver";
+import type { ModeloFEM, Trazabilidad } from "../discretizador";
 
 // --- Datos de prueba ---------------------------------------------------------
 
@@ -49,6 +50,33 @@ function resultadosMinimos(): ResultadosCalculo {
     nodos: {},
     barras: {},
     check_statics: null,
+  };
+}
+
+// ModeloFEM minimo vacio: setResultados exige el trio (resultados + FEM + traza)
+// porque los tres provienen del mismo calculo (feature-14, tarea 0.3).
+function modeloFEMMinimo(): ModeloFEM {
+  return {
+    units: "kN-m",
+    nodes: [],
+    materials: [],
+    sections: [],
+    members: [],
+    supports: [],
+    node_loads: [],
+    dist_loads: [],
+    pt_loads: [],
+    combos: [],
+    analysis: { type: "linear", check_statics: false },
+  };
+}
+
+function trazabilidadMinima(): Trazabilidad {
+  return {
+    pilarAMembers: {},
+    vigaAMember: {},
+    pilarANodoArranque: {},
+    nudoANodo: {},
   };
 }
 
@@ -208,7 +236,7 @@ describe("Coalescing: rafaga de moverNudo del mismo nudo = un paso de undo", () 
 
 describe("Invalidacion: editar Capa 1 marca no vigente PERO conserva resultados (D5)", () => {
   it("ejecutar un comando pone vigente=false pero conserva los resultados", () => {
-    resultadosStore.getState().setResultados(resultadosMinimos());
+    resultadosStore.getState().setResultados(resultadosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
     expect(resultadosStore.getState().vigente).toBe(true);
     expect(resultadosStore.getState().resultados).not.toBeNull();
 
@@ -224,19 +252,19 @@ describe("Invalidacion: editar Capa 1 marca no vigente PERO conserva resultados 
     const cmd = crearPilar(modeloStore.getState().getModelo(), datosPilar);
     modeloStore.getState().ejecutar(cmd);
 
-    resultadosStore.getState().setResultados(resultadosMinimos());
+    resultadosStore.getState().setResultados(resultadosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
     modeloStore.getState().deshacer();
     expect(resultadosStore.getState().vigente).toBe(false);
     expect(resultadosStore.getState().resultados).not.toBeNull();
 
-    resultadosStore.getState().setResultados(resultadosMinimos());
+    resultadosStore.getState().setResultados(resultadosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
     modeloStore.getState().rehacer();
     expect(resultadosStore.getState().vigente).toBe(false);
     expect(resultadosStore.getState().resultados).not.toBeNull();
   });
 
   it("cargarModelo DESCARTA los resultados del todo (reset al cambiar de obra)", () => {
-    resultadosStore.getState().setResultados(resultadosMinimos());
+    resultadosStore.getState().setResultados(resultadosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
     modeloStore.getState().cargarModelo(crearModeloVacio());
     expect(resultadosStore.getState().vigente).toBe(false);
     expect(resultadosStore.getState().resultados).toBeNull();
@@ -485,6 +513,93 @@ describe("vistaStore: andamiaje de cargas/hipótesis (feature-13)", () => {
       valor: 5,
       hipotesisId: "h1",
     });
+  });
+});
+
+// --- feature-14 · controles de visualizacion de resultados --------------------
+
+describe("vistaStore: visualizacion de resultados (feature-14)", () => {
+  // Reset de los campos nuevos a su valor por defecto (los beforeEach globales no
+  // los tocan): escala 1, sin animar, magnitud "momento".
+  beforeEach(() => {
+    vistaStore.getState().setDeformadaEscala(1);
+    vistaStore.getState().setAnimando(false);
+    vistaStore.getState().setMagnitudDiagrama("momento");
+  });
+
+  it("valores iniciales por defecto del bloque de resultados", () => {
+    const s = vistaStore.getState();
+    expect(s.deformadaEscala).toBe(1);
+    expect(s.animando).toBe(false);
+    expect(s.magnitudDiagrama).toBe("momento");
+  });
+
+  it("setDeformadaEscala / setAnimando / setMagnitudDiagrama cambian su campo", () => {
+    vistaStore.getState().setDeformadaEscala(250);
+    vistaStore.getState().setAnimando(true);
+    vistaStore.getState().setMagnitudDiagrama("flecha");
+
+    const s = vistaStore.getState();
+    expect(s.deformadaEscala).toBe(250);
+    expect(s.animando).toBe(true);
+    expect(s.magnitudDiagrama).toBe("flecha");
+  });
+
+  it("el selector de escala ignora cambios de magnitud (subscribeWithSelector)", () => {
+    const cb = vi.fn();
+    const unsub = vistaStore.subscribe((s) => s.deformadaEscala, cb);
+
+    vistaStore.getState().setMagnitudDiagrama("cortante");
+    expect(cb).not.toHaveBeenCalled();
+
+    vistaStore.getState().setDeformadaEscala(2);
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith(2, 1);
+    unsub();
+  });
+});
+
+// --- feature-14 · resultadosStore: trio + vigente/limpiar/descartar -----------
+
+describe("resultadosStore: trio de calculo + semantica vigente/limpiar/descartar", () => {
+  it("setResultados guarda los TRES (resultados, modeloFEM, trazabilidad) y vigente=true", () => {
+    const r = resultadosMinimos();
+    const fem = modeloFEMMinimo();
+    const traza = trazabilidadMinima();
+    resultadosStore.getState().setResultados(r, fem, traza);
+
+    const s = resultadosStore.getState();
+    expect(s.resultados).toBe(r);
+    expect(s.modeloFEM).toBe(fem);
+    expect(s.trazabilidad).toBe(traza);
+    expect(s.vigente).toBe(true);
+  });
+
+  it("limpiar baja la bandera vigente PERO conserva el trio (deformada obsoleta)", () => {
+    resultadosStore
+      .getState()
+      .setResultados(resultadosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    resultadosStore.getState().limpiar();
+
+    const s = resultadosStore.getState();
+    expect(s.vigente).toBe(false);
+    // El trio sigue disponible: F14 pinta la deformada en gris con aviso.
+    expect(s.resultados).not.toBeNull();
+    expect(s.modeloFEM).not.toBeNull();
+    expect(s.trazabilidad).not.toBeNull();
+  });
+
+  it("descartar resetea el trio entero a null (cambio de obra)", () => {
+    resultadosStore
+      .getState()
+      .setResultados(resultadosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    resultadosStore.getState().descartar();
+
+    const s = resultadosStore.getState();
+    expect(s.vigente).toBe(false);
+    expect(s.resultados).toBeNull();
+    expect(s.modeloFEM).toBeNull();
+    expect(s.trazabilidad).toBeNull();
   });
 });
 

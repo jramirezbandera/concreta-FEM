@@ -133,3 +133,129 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 - **Cómo retomar:** envolver `SelectUso` con la misma estructura `.cx-campo__label` que `Campo`
   (o un wrapper común) y mostrar `etiqueta` encima del trigger.
 - **Depende de / bloquea:** nada. **Coste:** CC ~10 min. **Origen:** Revisión de ingeniería F10 (outside voice Codex, LOW).
+
+---
+
+## T-deformada-flecha · Deformada con flecha del vano (no solo cuerda entre nudos) — RESUELTO
+
+- **Estado:** RESUELTO. El glue (`_deformada_global` en [src/solver/pynite_glue.py](src/solver/pynite_glue.py))
+  emite, por barra y combinación, el desplazamiento GLOBAL por estación (`deformada_global`, forma (3,n))
+  vía `member.deflection('dx'/'dy'/'dz',x,combo)` transformado con la triada real de PyNite
+  (`_ejes_locales_globales`/`T()`). El render dibuja una polilínea por barra:
+  [deformadaGeometria.ts](src/ui/resultados/deformadaGeometria.ts) (polilínea, base por lerp de los nudos
+  de la barra recta) y [deformadaBuffers.ts](src/ui/resultados/deformadaBuffers.ts) (expande a `2·(n-1)`
+  vértices para `lineSegments`). Una viga que flecta se ve CURVADA. Golden (Capa B) asevera continuidad
+  estación-extremo == `nodos[].disp` y flecha del vano biapoyada ≈ `5qL⁴/384EIz`. Guardian APTO, 731 tests.
+- **Origen:** Revisión de ingeniería F14 (D4, outside voice Codex, HIGH). Resuelto en sesión posterior.
+
+---
+
+## T-glue-barra-degenerada · Guardar el glue ante barras de longitud cero
+
+- **Qué:** `_ejes_locales_globales` ([src/solver/pynite_glue.py](src/solver/pynite_glue.py) ~225) y los
+  consumidores que normalizan por `member.L()` (proyección de cargas, `_deformada_global`) NO comprueban
+  L>0 antes de dividir. Una barra con nudos coincidentes (L=0) daría NaN/crash al serializar resultados.
+- **Por qué:** El discretizador YA bloquea barras degeneradas (criterio `TOL_NODO`, feature-12), así que
+  no ocurre en el flujo normal. Pero el glue acepta payloads Capa 2 crudos (p. ej. un proyecto importado
+  o un test): un member coincidente reventaría el cálculo en vez de fallar limpio. Es defensa en
+  profundidad, NO un bug del flujo actual. Pre-existente (no lo introdujo T-deformada-flecha).
+- **Cómo retomar:** validar L>0 al construir/serializar (o en el schema Capa 2) y devolver un ErrorMotor
+  legible ("dos nudos coinciden") en vez de NaN. **Coste:** CC ~20 min. **Depende de / bloquea:** nada.
+- **Origen:** Revisión de ingeniería T-deformada-flecha (outside voice Codex, LOW; pre-existente).
+
+---
+
+## ~~T-discretizar-nudo-orden~~ · RESUELTO · localizarNodoDeNudo orden-dependiente y ambiguo entre plantas
+
+- **Qué (era):** [src/discretizador/discretizar.ts](src/discretizador/discretizar.ts) (`localizarNodoDeNudo`)
+  elegía la PRIMERA viga de `modelo.vigas` (orden de inserción, no `vigasOrdenadas`) que usa un
+  nudo. Rompía el determinismo byte-a-byte (CLAUDE.md §7) en `node_loads` y `trazabilidad.nudoANodo`,
+  y dejaba arbitraria la planta cuando un nudo se compartía entre plantas distintas.
+- **Resuelto:** `localizarNodoDeNudo` itera ahora `vigasOrdenadas` (orden total por id) en lugar de
+  `modelo.vigas` → resultado independiente del orden de entrada. **Desempate documentado** para el
+  nudo compartido entre plantas: la PRIMERA viga por `id` (orden canónico del discretizador) fija la
+  cota; no se bloquea ni se avisa (una carga sobre `ambito=nudoId` no porta planta en el dominio, así
+  que es un input ambiguo; F1 prima determinismo + comportamiento estable y documentado). El caso
+  común (nudo en una sola planta) se resuelve igual que antes. Golden añadidos en
+  [tests/golden/discretizador.casos.test.ts](tests/golden/discretizador.casos.test.ts): determinismo
+  bajo reordenado (deep-equal de Capa 2 + `nudoANodo`) y nudo compartido entre dos plantas.
+- **Origen:** Revisión de ingeniería F14 (outside voice Codex, HIGH).
+
+---
+
+## T-reacciones-ejes · La tabla de reacciones expone el eje FEM (FY vertical) sobre escena Z-up
+
+- **Qué:** [src/ui/resultados/TablaReacciones.tsx](src/ui/resultados/TablaReacciones.tsx) rotula FX/FY/FZ y ΣFY
+  con FY=vertical (eje FEM Y-up), pero la escena del viewport es Z-up. Mezcla convención interna
+  con presentación (CLAUDE.md §14 "convertir en los bordes" aplica también a ejes).
+- **Por qué:** Coherencia de ejes y menos jerga de implementación visible al arquitecto.
+- **Cómo retomar:** decidir nomenclatura de presentación (p. ej. H1/H2/V o "Horizontal/Vertical")
+  y mapear las componentes de `rxn` a esa convención en el borde de la tabla.
+- **Depende de / bloquea:** nada. **Coste:** CC ~20 min. **Origen:** Revisión de ingeniería F14 (outside voice Codex, MEDIUM).
+
+---
+
+## T-diagramas-plano · Diagramas solo Fy/Mz/dy con etiqueta genérica (asunción in-plane)
+
+- **Qué:** `pynite_glue.py` (~446-448) serializa solo `Fy`/`Mz`/`dy`; [src/ui/resultados/PanelDiagramas.tsx](src/ui/resultados/PanelDiagramas.tsx)
+  los rotula genéricos "V/M/Flecha". En 3D es una asunción de plano (2D) no declarada.
+- **Por qué:** Para F1 (cargas gravitatorias planas) el plano dominante es el correcto, pero
+  conviene declarar la limitación y prever la otra dirección (Fz/My/dz) en F2.
+- **Cómo retomar:** documentar la asunción en el panel; cuando F2 añada cargas fuera de plano,
+  emitir también la otra componente y dar selector de plano/eje.
+- **Depende de / bloquea:** F2 (cargas no gravitatorias). **Coste:** CC ~30 min (cuando aplique).
+- **Origen:** Revisión de ingeniería F14 (outside voice Codex, MEDIUM).
+
+---
+
+## T-diagramas-pilar-tramos · Diagrama de pilar muestra solo el tramo de pie (tramos[0])
+
+- **Qué:** [src/ui/resultados/PanelDiagramas.tsx](src/ui/resultados/PanelDiagramas.tsx) (~111) muestra solo
+  `pilarAMembers[id][0]` para un pilar pasante (varias plantas). No es "el diagrama del pilar",
+  es solo su tramo inferior; hay una nota al usuario pero no resuelve el feature.
+- **Por qué:** Un pilar de varias plantas tiene un esfuerzo por tramo; mostrar solo uno es parcial.
+- **Cómo retomar:** concatenar los diagramas de todos los tramos del pilar a lo largo de su altura,
+  o un selector de tramo. Usa `trazabilidad.pilarAMembers` (ya tiene todos los members).
+- **Depende de / bloquea:** nada. **Coste:** CC ~30-40 min. **Origen:** Revisión de ingeniería F14 (outside voice Codex, MEDIUM).
+
+---
+
+## T-calcular-menu-sink · "Calcular obra" del menú no refleja estado/errores en el botón
+
+- **Qué:** El menú (entradaVigas) dispara `calcularObra()` fire-and-forget sin sink
+  ([src/ui/shell/Menubar.tsx](src/ui/shell/Menubar.tsx) ~65); `BotonCalcular` solo sondea estado
+  cuando su propio estado ya es transitorio, así que un cálculo lanzado desde el menú puede no
+  reflejarse (estado/errores de obra) hasta otro refresh.
+- **Por qué:** El usuario podría no ver "Calculando…" ni los errores de obra de un cálculo de menú.
+  (El guard de reentrada a nivel de módulo SÍ evita el doble cálculo, así que no es un bug de datos.)
+- **Cómo retomar:** que el camino de menú comparta un sink/observador (p. ej. un store ligero de
+  estado de cálculo) que el botón consuma, o que `usePrecargaMotor`/un store de cálculo dispare el
+  sondeo al iniciarse cualquier cálculo. **Coste:** CC ~30 min.
+- **Depende de / bloquea:** nada. **Origen:** Revisión de ingeniería F14 (outside voice Codex, MEDIUM).
+
+---
+
+## T-stale-labels · Resultados obsoletos (gris) resuelven etiquetas del modelo VIVO
+
+- **Qué:** Tras editar la obra, `resultadosStore.limpiar()` conserva `modeloFEM`/`trazabilidad`
+  viejos (para mostrar la deformada obsoleta en gris), pero `TablaReacciones` resuelve los nombres
+  de pilar desde `modeloStore` ACTUAL. Si se renombró/movió un pilar, las reacciones viejas se
+  muestran bajo nombres nuevos. (El race de marcar-vigente ya se cerró en D3; esto es solo el
+  desajuste de etiquetas en el estado obsoleto explícito.)
+- **Por qué:** Coherencia de los datos obsoletos en gris.
+- **Cómo retomar:** resolver las etiquetas desde el `modeloFEM`/snapshot guardado con los resultados,
+  no desde el modelo vivo; o no mostrar etiquetas resolubles cuando `!vigente`. **Coste:** CC ~20 min.
+- **Depende de / bloquea:** nada. **Origen:** Revisión de ingeniería F14 (outside voice Codex, MEDIUM).
+
+---
+
+## T-trazabilidad-zod · Trazabilidad no se valida con Zod (a diferencia de ModeloFEM/Resultados)
+
+- **Qué:** `Trazabilidad` ([src/discretizador/contratoFEM.ts](src/discretizador/contratoFEM.ts) ~139) es solo
+  un `interface`; `ModeloFEM` y `ResultadosCalculo` sí se validan con Zod. Una traza rota degrada
+  en silencio (diagramas/etiquetas vacíos o erróneos).
+- **Por qué:** Salida derivada interna (riesgo bajo), pero un esquema daría red ante regresiones del
+  discretizador.
+- **Cómo retomar:** schema Zod para `Trazabilidad` y `safeParse` en el borde (o aserción en dev).
+  **Coste:** CC ~15 min. **Depende de / bloquea:** nada.
+- **Origen:** Revisión de ingeniería F14 (outside voice Codex, LOW).

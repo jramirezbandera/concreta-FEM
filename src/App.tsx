@@ -19,6 +19,15 @@ import { plantaColocableViga } from "./ui/viewport/tramoViga";
 import { InspectorPilar, PanelHerramientaPilar } from "./ui/entradaPilares";
 import { InspectorViga, PanelHerramientaViga } from "./ui/entradaVigas";
 import {
+  DeformadaOverlay,
+  BotonCalcular,
+  ComboSelector,
+  TablaReacciones,
+  PanelDiagramas,
+  LeyendaEscala,
+  usePrecargaMotor,
+} from "./ui/resultados";
+import {
   modeloStore,
   vistaStore,
   type Pestana,
@@ -215,6 +224,11 @@ function useCoordsThrottled(): { x: number; y: number } | null {
 
 export default function App() {
   useInicializarVistaActiva();
+  // Precarga del motor FEM en segundo plano (CLAUDE.md §8): se dispara UNA vez al
+  // montar la app (idempotente, no bloquea el hilo), para que "Calcular" este listo
+  // cuanto antes mientras el arquitecto modela. No consumimos el estado aqui: el
+  // indicador "cargando motor" vive en BotonCalcular (su propio useCalcular).
+  usePrecargaMotor();
   const pestana = usePestanaActiva();
   const herramienta = useHerramienta();
   const snapActivo = useSnapActivo();
@@ -232,6 +246,11 @@ export default function App() {
   // los de pilar). Tambien se autoocultan segun herramienta/seleccion, pero acotar
   // el montaje mantiene limpias las demas pestanas.
   const enVigas = pestana === "entradaVigas";
+
+  // Resultados: monta la deformada (sceneOverlay) y el dock de paneles HUD (calculo,
+  // combinacion, reacciones, diagramas, leyenda). Cada panel se autooculta sin
+  // resultados; acotar el montaje a su pestana mantiene limpias las demas.
+  const enResultados = pestana === "resultados";
 
   // El mensaje de la herramienta activa prioriza sobre el de la pestana. Si la
   // herramienta esta activa pero no hay donde colocar, se guia a crear/elegir planta
@@ -278,7 +297,20 @@ export default function App() {
                   </>
                 ),
               }
-            : {})}
+            : enResultados
+              ? {
+                  sceneOverlays: <DeformadaOverlay />,
+                  hudOverlays: (
+                    <>
+                      <BotonCalcular />
+                      <ComboSelector />
+                      <TablaReacciones />
+                      <PanelDiagramas />
+                      <LeyendaEscala />
+                    </>
+                  ),
+                }
+              : {})}
       />
     </Shell>
   );

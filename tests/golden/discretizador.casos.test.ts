@@ -34,6 +34,19 @@ import {
   SECCION_GOLDEN,
 } from "./_arnes";
 import { ModeloFEMSchema, type ModeloFEM } from "../../src/discretizador/contratoFEM";
+import { discretizar } from "../../src/discretizador/discretizar";
+import type { Trazabilidad } from "../../src/discretizador/contratoFEM";
+import type { Modelo } from "../../src/dominio";
+import { SCHEMA_VERSION } from "../../src/dominio";
+
+// Discretiza y devuelve la trazabilidad (campo aditivo de ok:true), o explota si la
+// obra del fixture quedara invalida (mismo contrato que discretizarOExplotar). La
+// trazabilidad es la fuente unica que la UI de Resultados (feature-14) consume.
+function trazabilidadDe(modelo: Modelo): Trazabilidad {
+  const res = discretizar(modelo);
+  if (!res.ok) throw new Error(`fixture golden invalido: ${JSON.stringify(res.errores)}`);
+  return res.trazabilidad;
+}
 
 // --- Helpers de assert reutilizables -----------------------------------------
 
@@ -154,6 +167,21 @@ describe("golden discretizador · biapoyada UDL", () => {
     expect(els.factors.G).toBe(1.0);
     expect(els.combo_tags).toEqual(["ELS"]);
   });
+
+  it("trazabilidad: cada pilar -> 1 barra; viga -> 1 barra; arranques en los pies", () => {
+    const t = trazabilidadDe(fixtureBiapoyadaUDL({ L: 6, q: 10, cota: 3 }));
+    // Pilares de un solo tramo (no pasantes): un member cada uno, el que apunta al pie.
+    expect(t.pilarAMembers).toEqual({ api: ["M1"], apj: ["M2"] });
+    expect(t.vigaAMember).toEqual({ viga: "M3" });
+    // Ambos pilares tienen vinculacionExterior: su arranque es el nodo del pie (N1,N2).
+    expect(t.pilarANodoArranque).toEqual({ api: "N1", apj: "N2" });
+    // Coincide con los nodos de apoyo (Paso 4).
+    expect(Object.values(t.pilarANodoArranque).sort()).toEqual(
+      fem.supports.map((s) => s.node).sort(),
+    );
+    // Los nudos de la viga se localizan en las cabezas (N3, N4).
+    expect(t.nudoANodo).toEqual({ ni: "N3", nj: "N4" });
+  });
 });
 
 // =============================================================================
@@ -214,6 +242,16 @@ describe("golden discretizador · voladizo con carga puntual", () => {
     expect(nl.direction).toBe("FY"); // GLOBAL vertical
     expect(nl.P).toBe(-20); // gravedad: -P
     expect(nl.case).toBe("G");
+  });
+
+  it("trazabilidad: 1 pilar empotrado bajo el extremo j; nudo libre y empotrado mapeados", () => {
+    const t = trazabilidadDe(fixtureVoladizoPuntual({ L: 3, P: 20, cota: 3 }));
+    expect(t.pilarAMembers).toEqual({ apemp: ["M1"] });
+    expect(t.vigaAMember).toEqual({ viga: "M2" });
+    // El pilar empotrado arranca en el pie (N1).
+    expect(t.pilarANodoArranque).toEqual({ apemp: "N1" });
+    // Nudo libre -> extremo libre (N2); nudo empotrado -> cabeza del pilar (N3).
+    expect(t.nudoANodo).toEqual({ nlibre: "N2", nemp: "N3" });
   });
 });
 
@@ -294,6 +332,16 @@ describe("golden discretizador · biapoyada con carga puntual centrada", () => {
     expect(nl.P).toBe(-40); // gravedad: -P
     expect(nl.case).toBe("G");
   });
+
+  it("trazabilidad: 2 pilares + 2 vigas (cada viga a su member); nudo central mapeado", () => {
+    const t = trazabilidadDe(fixtureBiapoyadaPuntualCentro({ L: 8, P: 40, cota: 3 }));
+    expect(t.pilarAMembers).toEqual({ api: ["M1"], apj: ["M2"] });
+    // Dos vigas: vder (id menor) -> M3, vizq -> M4 (orden de barras: por id).
+    expect(t.vigaAMember).toEqual({ vder: "M3", vizq: "M4" });
+    expect(t.pilarANodoArranque).toEqual({ api: "N1", apj: "N2" });
+    // Nudos de obra: apoyos (N3,N5) y el central compartido por ambas vigas (N4).
+    expect(t.nudoANodo).toEqual({ ni: "N3", nc: "N4", nj: "N5" });
+  });
 });
 
 // =============================================================================
@@ -349,6 +397,20 @@ describe("golden discretizador · portico simple (uniones rigidas)", () => {
     expect([dl.x1, dl.x2]).toEqual([null, null]);
     expect(dl.case).toBe("G");
   });
+
+  it("trazabilidad: cada pilar -> 1 member; dintel -> 1 member; arranques en los pies", () => {
+    const t = trazabilidadDe(fixturePorticoSimple({ B: 5, H: 3, q: 12 }));
+    // Orden de barras: pilares por id ("pder" < "pizq") -> pder=M1, pizq=M2.
+    expect(t.pilarAMembers).toEqual({ pder: ["M1"], pizq: ["M2"] });
+    expect(t.vigaAMember).toEqual({ dintel: "M3" });
+    // pilarANodoArranque apunta a los nodos de apoyo (los pies): pder en (5,0,0)=N2,
+    // pizq en (0,0,0)=N1.
+    expect(t.pilarANodoArranque).toEqual({ pder: "N2", pizq: "N1" });
+    expect(Object.values(t.pilarANodoArranque).sort()).toEqual(
+      fem.supports.map((s) => s.node).sort(),
+    );
+    expect(t.nudoANodo).toEqual({ nizq: "N3", nder: "N4" });
+  });
 });
 
 // =============================================================================
@@ -369,5 +431,135 @@ describe("golden discretizador · determinismo byte a byte de los casos de libro
     const a = JSON.stringify(discretizarOExplotar(base));
     const b = JSON.stringify(discretizarOExplotar(reordenado));
     expect(b).toBe(a);
+  });
+});
+
+// =============================================================================
+// NUDO COMPARTIDO ENTRE PLANTAS (T-discretizar-nudo-orden).
+//
+// Un Nudo de Capa 1 es {id,x,y} en planta, SIN cota (dominio/nudo.ts): la cota la
+// aporta la PLANTA de la viga que lo usa. Por eso el MISMO nudoId puede ser usado
+// por vigas en plantas distintas -> cotas distintas -> nodos FEM distintos. Y una
+// Carga sobre `ambito=nudoId` no porta planta. Este fixture monta ese caso ambiguo
+// para blindar: (a) que `localizarNodoDeNudo` itere por id (determinismo, no orden
+// de insercion) y (b) el desempate documentado (primera viga por id).
+//
+// Geometria: dos pilares pasantes en (0,0) y (5,0) que suben de cota 0 a cota 6
+// atravesando la planta intermedia (cota 3) -> troceados, generan nodo FEM a cota 3
+// y a cota 6. Vigas en cada nivel uniendo las cabezas/tramos de pilar; ambas usan el
+// nudo compartido `nc` (id "nc") en (0,0). Bases empotradas (estructura estable).
+// Carga puntual sobre `nc`.
+// =============================================================================
+
+// Ids de viga elegidos para fijar el orden total por id: "v-alta" < "v-baja".
+// La viga de id menor ("v-alta") vive en la planta ALTA (cota 6); el desempate
+// documentado (primera viga por id) debe atar el nudo `nc` a la cota 6 (nodo alto),
+// NO a la planta baja. Asi el test distingue "primera por id" de cualquier criterio
+// de cota (menor/mayor) o de orden de insercion.
+function fixtureNudoCompartidoEntrePlantas(): Modelo {
+  const seccion = {
+    id: SECCION_GOLDEN,
+    nombre: "IPE 300",
+    tipo: "perfilMetalico" as const,
+    perfilId: "IPE300",
+  };
+  const pilarPasante = (id: string, x: number) => ({
+    id,
+    nombre: id.toUpperCase(),
+    x,
+    y: 0,
+    plantaInicial: "p0", // cota 0
+    plantaFinal: "p2", // cota 6, atraviesa p1 (cota 3)
+    seccionId: SECCION_GOLDEN,
+    materialId: MATERIAL_GOLDEN,
+    angulo: 0,
+    vinculacionExterior: true,
+    arranque: "empotrado" as const,
+  });
+  const viga = (id: string, plantaId: string) => ({
+    id,
+    nombre: id.toUpperCase(),
+    plantaId,
+    nudoI: "nc", // nudo COMPARTIDO entre las dos plantas (en (0,0))
+    nudoJ: "nd", // extremo opuesto (en (5,0)); tambien compartido, simetrico
+    seccionId: SECCION_GOLDEN,
+    materialId: MATERIAL_GOLDEN,
+    extremoI: "empotrado" as const,
+    extremoJ: "empotrado" as const,
+    tirante: false,
+  });
+  return {
+    unidades: "kN-m",
+    schemaVersion: SCHEMA_VERSION,
+    grupos: [
+      {
+        id: "g1",
+        nombre: "Grupo",
+        categoriaUso: "A" as const,
+        sobrecargaUso: 2,
+        cargasMuertas: 1,
+      },
+    ],
+    plantas: [
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
+      { id: "p1", nombre: "Planta baja", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p2", nombre: "Planta alta", cota: 6, altura: 3, grupoId: "g1" },
+    ],
+    secciones: [seccion],
+    nudos: [
+      { id: "nc", x: 0, y: 0 },
+      { id: "nd", x: 5, y: 0 },
+    ],
+    pilares: [pilarPasante("pa", 0), pilarPasante("pb", 5)],
+    // Orden de insercion DELIBERADAMENTE distinto al orden por id: la viga baja
+    // (cota 3) se inserta PRIMERO. Con el bug original ("primera de modelo.vigas")
+    // el nudo se ataria a la cota 3; con el fix ("primera por id") va a "v-alta"=cota 6.
+    vigas: [viga("v-baja", "p1"), viga("v-alta", "p2")],
+    panos: [],
+    muros: [],
+    cargas: [{ id: "P", tipo: "puntual", ambito: "nc", valor: 30, hipotesisId: "G" }],
+    hipotesis: [{ id: "G", nombre: "Permanente", tipo: "permanente" as const }],
+    analisis: { tipo: "lineal", comprobarEstatica: true },
+  };
+}
+
+describe("golden discretizador · localizarNodoDeNudo: determinismo y nudo compartido entre plantas", () => {
+  it("determinismo: barajar modelo.vigas/cargas NO cambia node_loads ni trazabilidad.nudoANodo", () => {
+    const base = fixtureNudoCompartidoEntrePlantas();
+    // Reordena las colecciones que alimentan localizarNodoDeNudo (vigas) y el orden
+    // de cargas. El resultado debe ser identico (deep equal byte a byte).
+    const reordenado: Modelo = {
+      ...base,
+      vigas: [...base.vigas].reverse(),
+      cargas: [...base.cargas].reverse(),
+      nudos: [...base.nudos].reverse(),
+      pilares: [...base.pilares].reverse(),
+    };
+    const a = discretizarOExplotar(base);
+    const b = discretizarOExplotar(reordenado);
+    // node_loads y la Capa 2 entera, byte a byte.
+    expect(JSON.stringify(b)).toBe(JSON.stringify(a));
+    // trazabilidad.nudoANodo, byte a byte (canal aditivo, no parte del ModeloFEM).
+    expect(trazabilidadDe(reordenado).nudoANodo).toEqual(
+      trazabilidadDe(base).nudoANodo,
+    );
+  });
+
+  it("desempate documentado: el nudo compartido se ata a la PRIMERA viga por id (cota 6), estable", () => {
+    const fem = discretizarOExplotar(fixtureNudoCompartidoEntrePlantas());
+    const t = trazabilidadDe(fixtureNudoCompartidoEntrePlantas());
+    // "v-alta" < "v-baja" por id -> el desempate elige la planta alta (cota 6).
+    // El nodo FEM de `nc` debe estar a Y=6, NO a Y=3 (planta baja) ni depender del
+    // orden de insercion (que mete la viga baja primero).
+    const nodoNc = t.nudoANodo["nc"];
+    expect(nodoNc).toBeDefined();
+    expect(coordDe(fem, nodoNc)).toEqual([0, 6, 0]); // cota 6 (planta alta)
+    // La carga puntual sobre `nc` cae sobre ESE mismo nodo (cota 6).
+    expect(fem.node_loads).toHaveLength(1);
+    expect(fem.node_loads[0].node).toBe(nodoNc);
+    expect(fem.node_loads[0].direction).toBe("FY");
+    expect(fem.node_loads[0].P).toBe(-30); // gravedad descendente
+    // `nd` (extremo opuesto, tambien compartido) se ata igualmente a la cota 6.
+    expect(coordDe(fem, t.nudoANodo["nd"])).toEqual([5, 6, 0]);
   });
 });

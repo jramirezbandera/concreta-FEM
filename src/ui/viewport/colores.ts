@@ -23,6 +23,7 @@ const FALLBACK = {
   viga: "#c9a66b",
   vigaLine: "#ddbd87",
   node: "#c07d12",
+  deformed: "#38bdf8",
   onAccent: "#ffffff",
 } as const;
 
@@ -39,6 +40,7 @@ const VAR_NAME: Record<keyof typeof FALLBACK, string> = {
   viga: "viga",
   vigaLine: "viga-line",
   node: "node",
+  deformed: "deformed",
   onAccent: "on-accent",
 };
 
@@ -74,4 +76,37 @@ export function colorToken(nombre: NombreColor): Color {
 // GizmoViewport axisColors o el background del Canvas).
 export function hexToken(nombre: NombreColor): string {
   return resolverHex(nombre);
+}
+
+// --- Rampa de isovalores (Spec Diseno UI §1.4: azul -> cian -> verde -> ambar ->
+// rojo, 5 paradas --ramp-0..4) ------------------------------------------------
+// La consume la deformada (feature-14) para colorear por magnitud de desplazamiento
+// y la pestana Isovalores (F3). Aditiva sobre este modulo: misma estrategia (CSS var
+// en runtime + fallback del Spec) para no hardcodear hex en los componentes.
+
+// Fallback de las 5 paradas (DEBE coincidir con tokens.css --ramp-0..4).
+const RAMPA_FALLBACK = ["#2563eb", "#38bdf8", "#22c55e", "#f59e0b", "#dc2626"] as const;
+
+// Resuelve las 5 paradas a THREE.Color (cacheadas: las CSS vars no cambian en F1).
+let rampaCache: Color[] | null = null;
+function rampaParadas(): Color[] {
+  if (rampaCache) return rampaCache;
+  rampaCache = RAMPA_FALLBACK.map((fb, i) => {
+    const v = leerVar(`ramp-${i}`);
+    return new Color(v || fb);
+  });
+  return rampaCache;
+}
+
+// Color para un valor normalizado t en [0,1] interpolando linealmente entre las 5
+// paradas de la rampa. Escribe en `destino` (reutilizable: evita asignar un Color
+// por segmento al construir la geometria). t fuera de rango se acota.
+export function rampaIsovalores(t: number, destino: Color): Color {
+  const paradas = rampaParadas();
+  const ultima = paradas.length - 1; // 4
+  const tc = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  const escalado = tc * ultima; // posicion en [0, 4]
+  const i = Math.min(Math.floor(escalado), ultima - 1);
+  const f = escalado - i; // fraccion dentro del tramo [i, i+1]
+  return destino.copy(paradas[i]!).lerp(paradas[i + 1]!, f);
 }

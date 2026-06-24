@@ -1,0 +1,21 @@
+/* ComboSelector (feature-14, T2.3): selector de combinacion activa, hudOverlay.
+   Panel flotante glass; reusa .cx-float / .cx-select de las primitivas. Posicion
+   canonica: arriba-derecha del lienzo de Resultados (junto a la deformada); el
+   llamante (App.tsx, Tarea 3.1) puede sobrescribir con otra clase. Solo tokens. */
+
+.cx-combo {
+  position: absolute;
+  top: var(--space-3, 12px);
+  right: var(--space-3, 12px);
+  width: 220px;
+}
+
+.cx-combo .cx-float__body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* El trigger ocupa el ancho del panel: es el unico control. */
+.cx-combo__trigger {
+  width: 100%;
+}

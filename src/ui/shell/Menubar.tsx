@@ -12,6 +12,15 @@ import {
   type MenuDef,
   type MenuItem as MenuItemDef,
 } from "./menus";
+// CONTRATO CON TAREA 1.1 (useCalcular.ts): la accion "calcular" del menu necesita la
+// orquestacion del calculo, pero el DISPATCH es un mapa IMPERATIVO (no es un componente,
+// no puede usar hooks). Para resolverlo igual que `borrarSeleccion` (funcion plana que
+// habla con los stores/servicios), se importa `calcularObra()`: la MISMA logica de calculo
+// que usa el hook `useCalcular`, factorizada SIN hooks. El boton (BotonCalcular) usa el
+// hook (estado reactivo para la UI); el menu usa esta funcion imperativa. Ambos disparan
+// el mismo corte vertical. Si por la carrera el modulo aun no exporta `calcularObra`, el
+// import queda correcto y se reconcilia al integrar.
+import { calcularObra } from "../resultados/useCalcular";
 
 // Menubar (Spec Diseno UI §2 / §3.2): menus contextuales que cambian con la
 // pestana activa (criterio de aceptacion de feature-9). Cada menu abre un
@@ -51,6 +60,9 @@ export const DISPATCH: Record<AccionMenu, () => void> = {
   activarHerramientaPilar: () => vistaStore.getState().setHerramienta("pilar"),
   activarHerramientaViga: () => vistaStore.getState().setHerramienta("viga"),
   borrarSeleccion,
+  // El calculo es asincrono (CLAUDE.md §7): se dispara y olvida (la UI refleja el progreso
+  // por el estado del motor en BotonCalcular). `void` descarta la promesa deliberadamente.
+  calcular: () => void calcularObra(),
 };
 
 // Etiqueta visible de un item, sea string inerte u objeto accionable. Sirve de

@@ -38,6 +38,7 @@ import { resultadosStore } from "../estado/resultadosStore";
 import { crearPilar, type DatosPilar } from "../estado";
 import { crearModeloVacio } from "../dominio";
 import type { ResultadosCalculo } from "../solver";
+import type { ModeloFEM, Trazabilidad } from "../discretizador";
 
 // Datos de un pilar valido (DatosPilar = Pilar sin id/nombre): produce una edicion
 // real de la Capa 1 a traves de un comando del estado.
@@ -76,6 +77,30 @@ const RESULTADOS_FALSOS: ResultadosCalculo = {
   nodos: {},
   barras: {},
   check_statics: null,
+};
+
+// setResultados exige el trio (resultados + ModeloFEM + trazabilidad) desde
+// feature-14: este test solo comprueba que NADA de eso se persiste, asi que el
+// FEM y la traza son minimos vacios (su contenido es irrelevante aqui).
+const MODELO_FEM_FALSO: ModeloFEM = {
+  units: "kN-m",
+  nodes: [],
+  materials: [],
+  sections: [],
+  members: [],
+  supports: [],
+  node_loads: [],
+  dist_loads: [],
+  pt_loads: [],
+  combos: [],
+  analysis: { type: "linear", check_statics: false },
+};
+
+const TRAZABILIDAD_FALSA: Trazabilidad = {
+  pilarAMembers: {},
+  vigaAMember: {},
+  pilarANodoArranque: {},
+  nudoANodo: {},
 };
 
 beforeEach(() => {
@@ -254,7 +279,9 @@ describe("invariante: SOLO la Capa 1 se persiste", () => {
 
     try {
       // Simulamos un calculo: poblamos resultadosStore (Capa 2/derivados).
-      resultadosStore.getState().setResultados(RESULTADOS_FALSOS);
+      resultadosStore
+        .getState()
+        .setResultados(RESULTADOS_FALSOS, MODELO_FEM_FALSO, TRAZABILIDAD_FALSA);
       expect(resultadosStore.getState().resultados).not.toBeNull();
 
       // Y editamos la obra para disparar el autosave (poblar resultados no cambia

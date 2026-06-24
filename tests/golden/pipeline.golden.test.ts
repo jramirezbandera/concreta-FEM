@@ -173,6 +173,15 @@ function maxCortanteAbs(res: ResultadosCalculo, combo: string): number {
   return v;
 }
 
+// Nudos extremo (i, j) de una barra leidos de la Capa 2 (ModeloFEM). Necesarios
+// para el invariante de continuidad de la deformada global (estacion 0 == disp del
+// nudo i; estacion n-1 == disp del nudo j).
+function nodosBarra(modeloFEM: ModeloFEM, member: string): { i: string; j: string } {
+  const mb = modeloFEM.members.find((x) => x.name === member);
+  if (!mb) throw new Error(`Barra ${member} no esta en el ModeloFEM`);
+  return { i: mb.i, j: mb.j };
+}
+
 // Reaccion vertical FY (kN, positiva hacia arriba) de un nudo apoyado.
 function fyReaccion(res: ResultadosCalculo, nodo: string, combo: string): number {
   const n = res.nodos[nodo]?.[combo];
@@ -291,6 +300,143 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
         .filter((r) => Math.abs(r) > 1e-6);
       expect(reaccionesELU.length, "ELU: dos apoyos con reaccion vertical").toBe(2);
       for (const r of reaccionesELU) assertOk(compararReaccion(r, G_ELU * Rteo), "biapoyada ELU R=1.35·qL/2");
+    },
+    TIMEOUT_ARRANQUE,
+  );
+
+  // ---------------------------------------------------------------------------
+  // D1) DEFORMADA GLOBAL — CONTINUIDAD con los nudos (T-deformada-flecha, fase 1).
+  //    El glue emite, por barra y combo, `deformada_global` (3, n_points) = DX/DY/DZ
+  //    por estacion a lo largo de la barra, en el MISMO sistema global que
+  //    nodos[].disp. INVARIANTE: la estacion 0 debe coincidir con el disp del nudo i
+  //    y la estacion n-1 con el del nudo j (la deformada empalma con los nudos).
+  //    Si fallara, la transformacion local->global o el uso de deflection() estarian
+  //    mal. Tolerancia de FLECHA (1%). Reusa la biapoyada UDL (vano que flecta).
+  // ---------------------------------------------------------------------------
+  it(
+    "deformada global: estacion 0/n-1 coinciden con disp de los nudos i/j (continuidad)",
+    () => {
+      const corrida = correrConFEM(fixtureBiapoyadaUDL({ L: 6, q: 10 }));
+      if (!corrida) return;
+      const { res, fem } = corrida;
+      const combo = "ELS";
+
+      // Verificamos la continuidad en TODAS las barras del modelo (vigas y pilares):
+      // la deformada de cada barra debe empalmar con sus nudos extremos.
+      for (const [name, porCombo] of Object.entries(res.barras)) {
+        const v = porCombo[combo];
+        if (!v) continue;
+        const dg = v.deformada_global;
+        // Forma (3, n): tres filas (DX, DY, DZ) de igual longitud >= 2.
+        expect(dg.length, `${name}: deformada_global con 3 filas`).toBe(3);
+        const n = dg[0].length;
+        expect(n, `${name}: al menos 2 estaciones`).toBeGreaterThanOrEqual(2);
+        expect(dg[1].length, `${name}: filas alineadas`).toBe(n);
+        expect(dg[2].length, `${name}: filas alineadas`).toBe(n);
+
+        const { i, j } = nodosBarra(fem, name);
+        const dispI = res.nodos[i]?.[combo]?.disp;
+        const dispJ = res.nodos[j]?.[combo]?.disp;
+        expect(dispI, `${name}: disp del nudo ${i}`).toBeDefined();
+        expect(dispJ, `${name}: disp del nudo ${j}`).toBeDefined();
+
+        // Estacion 0 == disp[0:3] del nudo i ; estacion n-1 == disp[0:3] del nudo j.
+        for (let comp = 0; comp < 3; comp++) {
+          assertOk(
+            compararFlecha(dg[comp][0], dispI![comp]),
+            `${name}: deformada estacion 0 comp ${comp} == disp nudo i`,
+          );
+          assertOk(
+            compararFlecha(dg[comp][n - 1], dispJ![comp]),
+            `${name}: deformada estacion n-1 comp ${comp} == disp nudo j`,
+          );
+        }
+      }
+    },
+    TIMEOUT_ARRANQUE,
+  );
+
+  // ---------------------------------------------------------------------------
+  // D2) DEFORMADA GLOBAL — FLECHA DEL VANO (biapoyada UDL).  La DY (fila 1) de la
+  //    estacion CENTRAL de la viga debe ser claramente MAS NEGATIVA (mayor descenso)
+  //    que la de los extremos: el vano flecta como una curva, no como una recta
+  //    entre nudos (que es lo que daria una interpolacion lineal naive). Ademas el
+  //    descenso central debe igualar 5qL⁴/384EIz (tolerancia de flecha 1%).
+  // ---------------------------------------------------------------------------
+  it(
+    "deformada global: la DY central del vano (biapoyada UDL) flecta = 5qL⁴/384EIz",
+    () => {
+      const L = 6;
+      const q = 10;
+      const corrida = correrConFEM(fixtureBiapoyadaUDL({ L, q }));
+      if (!corrida) return;
+      const { res, fem } = corrida;
+      const combo = "ELS";
+      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * IZ_IPE300);
+
+      // La viga horizontal (vano cargado), por geometria.
+      const name = nombreVigaHorizontal(fem);
+      const dg = res.barras[name]?.[combo]?.deformada_global;
+      expect(dg, `deformada_global de la viga ${name}`).toBeDefined();
+      const dy = dg![1]; // fila 1 = DY global (vertical, Y-up)
+      const n = dy.length;
+      const centro = dy[Math.floor((n - 1) / 2)];
+      const extremoI = dy[0];
+      const extremoJ = dy[n - 1];
+
+      // El vano flecta: el centro desciende mucho mas que los extremos (apoyos ~0).
+      expect(centro, "DY central debe ser negativa (descenso del vano)").toBeLessThan(0);
+      expect(
+        centro,
+        "DY central claramente mas negativa que el extremo i (curva, no recta)",
+      ).toBeLessThan(extremoI - flechaTeo / 2);
+      expect(
+        centro,
+        "DY central claramente mas negativa que el extremo j (curva, no recta)",
+      ).toBeLessThan(extremoJ - flechaTeo / 2);
+
+      // El descenso central iguala la flecha teorica de libro (tolerancia 1%).
+      assertOk(compararFlecha(Math.abs(centro), flechaTeo), "deformada DY centro = 5qL⁴/384EIz");
+    },
+    TIMEOUT_ARRANQUE,
+  );
+
+  // ---------------------------------------------------------------------------
+  // D3) DEFORMADA GLOBAL — VOLADIZO: el descenso |DY| crece MONOTONO hacia el
+  //    extremo libre. La viga del voladizo tiene su extremo LIBRE en el nudo i
+  //    (x=0) y el EMPOTRADO en el nudo j (x=L) — ver fixtureVoladizoPuntual. Por
+  //    tanto |DY| es maximo en la estacion 0 y decrece hacia la n-1; recorremos las
+  //    estaciones desde el extremo libre y exigimos descenso monotono no creciente.
+  // ---------------------------------------------------------------------------
+  it(
+    "deformada global: voladizo, |DY| crece monotono hacia el extremo libre",
+    () => {
+      const corrida = correrConFEM(fixtureVoladizoPuntual({ L: 3, P: 20 }));
+      if (!corrida) return;
+      const { res, fem } = corrida;
+      const combo = "ELS";
+
+      const name = nombreVigaHorizontal(fem); // el dintel/voladizo (horizontal)
+      const dg = res.barras[name]?.[combo]?.deformada_global;
+      expect(dg, `deformada_global del voladizo ${name}`).toBeDefined();
+      const dy = dg![1];
+      const n = dy.length;
+
+      // El nudo i es el extremo LIBRE (mayor |DY|); el j el empotrado (menor). El
+      // descenso |DY| debe DECRECER monotono del extremo libre (estacion 0) al
+      // empotrado (estacion n-1). Tolerancia: cada paso no debe AUMENTAR |DY|.
+      const eps = 1e-12;
+      for (let k = 1; k < n; k++) {
+        expect(
+          Math.abs(dy[k]),
+          `|DY| no debe crecer del extremo libre al empotrado (estacion ${k})`,
+        ).toBeLessThanOrEqual(Math.abs(dy[k - 1]) + eps);
+      }
+      // Y el extremo libre debe tener un descenso claramente mayor que el empotrado.
+      expect(
+        Math.abs(dy[0]),
+        "extremo libre con descenso mucho mayor que el empotrado",
+      ).toBeGreaterThan(Math.abs(dy[n - 1]) + 1e-4);
     },
     TIMEOUT_ARRANQUE,
   );

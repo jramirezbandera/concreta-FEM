@@ -128,6 +128,27 @@ export const AnalisisFEMSchema = z.object({
 });
 export type AnalisisFEM = z.infer<typeof AnalisisFEMSchema>;
 
+// --- Trazabilidad obra (Capa 1) <-> ids FEM (Capa 2) -------------------------
+// Mapa derivado por discretizar() junto al ModeloFEM. Es la FUENTE UNICA que la UI
+// de Resultados (feature-14) usa para (a) dibujar la deformada sobre la obra y (b)
+// mapear el elemento de obra seleccionado a su `member` FEM para los diagramas.
+// NO es entrada que validar (es salida derivada del propio discretizador, ya
+// determinista), por eso es un `interface` puro y no un schema Zod: sigue el
+// patron del fichero (tipos puros) sin pagar el coste de una validacion de algo
+// que el codigo construye con invariantes propias. PURA: sin React/IO/Pyodide.
+export interface Trazabilidad {
+  // pilar (obra) -> sus barras FEM en orden pie->cabeza. Un pilar pasante por varias
+  // plantas se trocea en varios `member`; el array los lista de menor a mayor cota.
+  pilarAMembers: Record<string, string[]>;
+  // viga (obra) -> su barra FEM. En F1 una viga = un solo member.
+  vigaAMember: Record<string, string>;
+  // pilar con vinculacionExterior -> nodo FEM de su arranque (el pie, cota menor).
+  // Solo aparecen los pilares que generan apoyo; util para dibujar reacciones.
+  pilarANodoArranque: Record<string, string>;
+  // nudo de obra (usado por alguna viga) -> nodo FEM donde se localiza.
+  nudoANodo: Record<string, string>;
+}
+
 // --- Modelo FEM completo (salida del discretizador) --------------------------
 export const ModeloFEMSchema = z.object({
   units: z.literal("kN-m"),

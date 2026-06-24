@@ -30,9 +30,11 @@
     "comlink": "^4.4.2",
     "dexie": "^4.4.4",
     "immer": "^10.1.1",
+    "plotly.js-basic-dist-min": "^3.6.0",
     "pyodide": "0.28.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-plotly.js": "^4.0.0",
     "three": "^0.180.0",
     "three-mesh-bvh": "^0.9.10",
     "zod": "^3.24.1",
@@ -47,6 +49,7 @@
     "@types/node": "^22.10.5",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@types/react-plotly.js": "^2.6.4",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^9.18.0",
     "eslint-plugin-react-hooks": "^5.1.0",
@@ -61,5 +64,5 @@
     "vite": "^6.0.7",
     "vitest": "^3.0.0"
   },
-  "//": "Dependencias diferidas restantes (NO instalar aun): react-plotly.js + plotly.js (F14, diagramas N/V/M; lazy por peso ~1 MB gzip), @playwright/test (F16, E2E). Instaladas en F9: three + @react-three/fiber + @react-three/drei + three-mesh-bvh (viewport R3F), @radix-ui/* tabs/dialog/popover/collapsible/toggle-group/select (primitivas UI), @testing-library/react+jest-dom+user-event (tests de componente). Instaladas en F5 (solver): pyodide + comlink. pyodide pineado EXACTO (0.28.3) por acoplamiento ABI con PyNiteFEA 2.0.2 (numpy 2.2.5/scipy 1.14.1); ver src/solver/config.ts."
+  "//": "Dependencias diferidas restantes (NO instalar aun): @playwright/test (F16, E2E). Instaladas en F14 (diagramas N/V/M/flecha): react-plotly.js + plotly.js-basic-dist-min (+ @types/react-plotly.js); se usa el bundle basic-dist-min (scatter/line, suficiente; sin types propios -> ambient en src/ui/resultados/plotly-basic-dist-min.d.ts) y se carga LAZY por peso ~1 MB gzip (src/ui/resultados/diagramaLazy.ts; Plotly aislado tras <DiagramaBarra>, puerta a uPlot). Instaladas en F9: three + @react-three/fiber + @react-three/drei + three-mesh-bvh (viewport R3F), @radix-ui/* tabs/dialog/popover/collapsible/toggle-group/select (primitivas UI), @testing-library/react+jest-dom+user-event (tests de componente). Instaladas en F5 (solver): pyodide + comlink. pyodide pineado EXACTO (0.28.3) por acoplamiento ABI con PyNiteFEA 2.0.2 (numpy 2.2.5/scipy 1.14.1); ver src/solver/config.ts."
 }

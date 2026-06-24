@@ -13,6 +13,7 @@ export type { SolverClient } from "./solverClient";
 // la validacion de borde ya la hace solverClient; la UI consume datos ya validados.
 export type {
   ResultadosCalculo,
+  EstadoMiembroCombo,
   EstadoMotor,
   ErrorMotor,
 } from "./resultados";

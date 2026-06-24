@@ -40,6 +40,7 @@ import {
   type CargaDistFEM,
   type CargaPuntualFEM,
   type AnalisisFEM,
+  type Trazabilidad,
 } from "./contratoFEM";
 import { validarModelo, type ErrorObra } from "./validaciones";
 import { generarCombos } from "./combinaciones";
@@ -53,8 +54,12 @@ import { generarCombos } from "./combinaciones";
 //  - ok:false + errores[]   => no se construye Capa 2. Errores bloqueantes:
 //    los de `validarModelo` (refs, sujecion, nombres dup) y los de traduccion que
 //    descartarian carga real silenciosamente (carga superficial/no aplicable en F1).
+// `trazabilidad` (campo ADITIVO en ok:true): mapa obra<->FEM derivado por el propio
+// discretizar() reusando sus mapas internos (sin recalcular geometria). La UI de
+// Resultados (feature-14) lo usa para dibujar la deformada y mapear el elemento de
+// obra seleccionado a su `member` FEM. No altera el ModeloFEM ni su validacion.
 export type ResultadoDiscretizacion =
-  | { ok: true; modeloFEM: ModeloFEM; avisos: ErrorObra[] }
+  | { ok: true; modeloFEM: ModeloFEM; avisos: ErrorObra[]; trazabilidad: Trazabilidad }
   | { ok: false; errores: ErrorObra[] };
 
 // Geometria de snapping (TOL_NODO + mapearEjes + clavePosicion) definida en
@@ -271,6 +276,13 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
   // divergir en silencio.
   const barraPorAmbito = new Map<string, string>();
 
+  // TRAZABILIDAD (campo aditivo): mapas obra<->FEM construidos MIENTRAS se generan
+  // las barras, reusando los mapas internos sin recalcular geometria. A diferencia de
+  // `barraPorAmbito` (que para un pilar pasante solo guarda el primer tramo, por la
+  // atribucion de cargas), `pilarAMembers` acumula TODOS los tramos del pilar.
+  const pilarAMembers: Record<string, string[]> = {};
+  const vigaAMember: Record<string, string> = {};
+
   // Pilares: troceados por cota; cada tramo consecutivo es una barra pie->cabeza.
   const pilaresOrdenados = [...modelo.pilares].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   // Vigas en orden por id para el segundo bloque de la numeracion.
@@ -279,9 +291,11 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
   let contador = 0;
   for (const p of pilaresOrdenados) {
     const claves = clavesPilar.get(p.id)!; // por cota ascendente (pie->cabeza)
+    const tramos: string[] = []; // todas las barras de ESTE pilar, pie->cabeza
     for (let k = 0; k < claves.length - 1; k++) {
       contador += 1;
       const name = `M${contador}`;
+      tramos.push(name);
       // El primer tramo (k===0, pie) es la barra asociada al ambito del pilar.
       if (k === 0) barraPorAmbito.set(p.id, name);
       members.push({
@@ -296,11 +310,13 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
         releases: null, // F1: los pilares no liberan giros (extremos empotrados)
       });
     }
+    pilarAMembers[p.id] = tramos;
   }
   for (const v of vigasOrdenadas) {
     contador += 1;
     const name = `M${contador}`;
     barraPorAmbito.set(v.id, name);
+    vigaAMember[v.id] = name;
     const [ci, cj] = clavesViga.get(v.id)!;
     const release = releasesDeExtremo(v.extremoI, v.extremoJ, v.tirante);
     members.push({
@@ -369,11 +385,26 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
 
   const hipById = new Map<string, Hipotesis>(modelo.hipotesis.map((h) => [h.id, h]));
 
-  // Localiza el nodo FEM de un nudo de dominio: la viga que lo usa aporta la cota.
+  // Localiza el nodo FEM de un nudo de dominio: la viga que lo usa aporta la cota
+  // (un Nudo de Capa 1 es {id,x,y} en planta, SIN cota; la cota la pone la planta de
+  // la viga, ver dominio/nudo.ts). Itera `vigasOrdenadas` (orden total por id), NO
+  // `modelo.vigas` (orden de insercion), para que el resultado sea INDEPENDIENTE del
+  // orden de entrada del modelo (determinismo byte a byte, CLAUDE.md §7): afecta a
+  // node_loads (carga puntual sobre nudo) y a trazabilidad.nudoANodo (feature-14).
+  //
+  // DESEMPATE nudo compartido entre plantas: un mismo nudoId puede ser usado por
+  // vigas en plantas DISTINTAS (cotas distintas => nodos FEM distintos), y una Carga
+  // sobre `ambito=nudoId` no porta planta (el dominio no la modela): es entonces un
+  // input ambiguo. Se elige de forma DETERMINISTA y documentada la PRIMERA viga por
+  // `id` (orden canonico del discretizador) que use el nudo, y su cota fija el nodo.
+  // No se bloquea ni se avisa: en F1 prima determinismo + comportamiento estable y
+  // documentado; el caso comun (nudo en UNA sola planta) se resuelve igual que antes
+  // (la unica viga que lo usa). Si el dominio modelara la planta del ambito en una
+  // fase futura, este desempate dejaria de ser necesario.
   const localizarNodoDeNudo = (nudoId: string): string | undefined => {
     const n = nudoPorId(modelo, nudoId);
     if (n === undefined) return undefined;
-    for (const v of modelo.vigas) {
+    for (const v of vigasOrdenadas) {
       if (v.nudoI === nudoId || v.nudoJ === nudoId) {
         const planta = plantaPorId(modelo, v.plantaId) as Planta;
         const clave = clavePosicion(mapearEjes(n.x, n.y, planta.cota), TOL_NODO);
@@ -492,6 +523,34 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
     return { ok: false, errores: erroresTraduccion };
   }
 
+  // --- Trazabilidad (campo aditivo): completar los mapas que dependen de nodos --
+  // pilarAMembers y vigaAMember ya se llenaron en el Paso 3. Aqui se anaden los dos
+  // que mapean a NODOS, reusando datos ya calculados (clavesPilar, localizarNodoDeNudo).
+  // Orden de insercion determinista: se recorren las colecciones YA ordenadas por id
+  // (pilaresOrdenados/vigasOrdenadas), no `modelo.pilares`/`modelo.vigas`, de modo que
+  // un modelo reordenado produce la misma trazabilidad byte a byte.
+  const pilarANodoArranque: Record<string, string> = {};
+  for (const p of pilaresOrdenados) {
+    if (!p.vinculacionExterior) continue;
+    // Mismo nodo de arranque que el Paso 4 (apoyos): pie = clave de cota menor.
+    const claveArranque = clavesPilar.get(p.id)![0];
+    pilarANodoArranque[p.id] = nodoNombre(claveArranque);
+  }
+  const nudoANodo: Record<string, string> = {};
+  for (const v of vigasOrdenadas) {
+    for (const nudoId of [v.nudoI, v.nudoJ]) {
+      if (nudoANodo[nudoId] !== undefined) continue; // ya localizado por otra viga
+      const nodo = localizarNodoDeNudo(nudoId);
+      if (nodo !== undefined) nudoANodo[nudoId] = nodo;
+    }
+  }
+  const trazabilidad: Trazabilidad = {
+    pilarAMembers,
+    vigaAMember,
+    pilarANodoArranque,
+    nudoANodo,
+  };
+
   const modeloFEM: ModeloFEM = {
     units: "kN-m",
     nodes,
@@ -510,7 +569,7 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
   // Si esto lanza, es un BUG INTERNO del discretizador (no un error de obra): la
   // Capa 2 que construimos no cumple su propio contrato. Se deja propagar.
   const validado = ModeloFEMSchema.parse(modeloFEM);
-  return { ok: true, modeloFEM: validado, avisos };
+  return { ok: true, modeloFEM: validado, avisos, trazabilidad };
 }
 
 // Re-export de conveniencia para el llamante.

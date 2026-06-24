@@ -1,0 +1,68 @@
+/* BotonCalcular (feature-14, Tarea 1.2): panel flotante con el boton "Calcular",
+   el estado del motor (tag de cabecera) y el reporte de errores/avisos de obra.
+   Estilado SOLO con tokens (var(--...)); reusa .cx-float de las primitivas.
+   Posicion canonica arriba-izquierda del lienzo de Resultados; el llamante (App.tsx,
+   Tarea 3.1) puede sobrescribir la posicion con otra clase. */
+
+.cx-calcular {
+  position: absolute;
+  top: var(--space-3, 12px);
+  left: var(--space-3, 12px);
+  width: 240px;
+}
+
+.cx-calcular .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* El boton ocupa el ancho del panel: es la accion primaria de la pestana. */
+.cx-calcular .cx-btn {
+  width: 100%;
+}
+
+.cx-calcular__reporte {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Mensaje de fallo del motor (carga/calculo): destaca como error sin ser alarmante. */
+.cx-calcular__motor-error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+
+.cx-calcular__lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+/* Una fila de mensaje de obra: barra de color a la izquierda segun severidad. */
+.cx-calcular__msg {
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 4px 8px;
+  border-left: 2px solid var(--border-2);
+  border-radius: 3px;
+  background-color: var(--surface-muted);
+  color: var(--text-2);
+}
+
+/* Error bloqueante: impide calcular hasta corregirlo. */
+.cx-calcular__msg--error {
+  border-left-color: var(--danger);
+  color: var(--text);
+}
+
+/* Aviso no bloqueante: informa pero el calculo sigue (acento, no peligro). */
+.cx-calcular__msg--aviso {
+  border-left-color: var(--accent);
+}

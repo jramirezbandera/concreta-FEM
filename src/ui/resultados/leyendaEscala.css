@@ -1,0 +1,75 @@
+/* LeyendaEscala (feature-14, Tarea 2.1): panel glass de la deformada con rampa de
+   color, rotulos min/max del desplazamiento y controles de amplificacion/animacion.
+   Estilado SOLO con tokens semanticos (styles/tokens.css); reusa .cx-float y la
+   posicion canonica abajo-derecha. Sin colores hardcodeados (la rampa usa las CSS
+   vars --ramp-0..4 inline desde el TSX). */
+
+.cx-leyenda {
+  width: 200px;
+}
+
+.cx-leyenda .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Fila de la rampa: limite izquierdo (min), barra de color, limite derecho (max). */
+.cx-leyenda__rampa-fila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cx-leyenda__rampa {
+  flex: 1;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glass-bd);
+}
+
+.cx-leyenda__lim {
+  font-size: 11px;
+  color: var(--text-2);
+  min-width: 34px;
+}
+.cx-leyenda__rampa-fila .cx-leyenda__lim:last-child {
+  text-align: right;
+}
+
+.cx-leyenda__unidad {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+
+/* Control del factor de amplificacion (slider). */
+.cx-leyenda__control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-leyenda__etq {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.cx-leyenda__control input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* Toggle de animacion. */
+.cx-leyenda__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cx-leyenda__toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+}

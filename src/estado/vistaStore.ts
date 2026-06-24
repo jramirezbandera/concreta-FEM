@@ -25,6 +25,11 @@ export type DialogoActivo = "gruposPlantas" | "hipotesis";
 // coloca vigas con clic. Estado de UI.
 export type Herramienta = "seleccion" | "pilar" | "viga";
 
+// Magnitud que pinta el diagrama por barra en la pestana Resultados (feature-14).
+// Mapea a los `*_array()` de PyNite: axil N, cortante Vy, flector Mz, flecha dy.
+// Identificadores en ingles tecnico; las etiquetas visibles las pone la UI.
+export type MagnitudDiagrama = "axil" | "cortante" | "momento" | "flecha";
+
 // Valores por defecto del pilar que se introduce con la herramienta "pilar". La UI
 // los preselecciona (seccion/material elegidos en el panel) y los aplica a cada
 // pilar nuevo. No es estado de obra: viaja en vistaStore, no en undo.
@@ -77,6 +82,15 @@ interface VistaState {
   defaultsViga: DefaultsViga;
   defaultsCarga: DefaultsCarga;
   snapActivo: boolean;
+  // Visualizacion de resultados (feature-14). Estado de UI puro: NO participa en
+  // undo. La inicializacion de `combinacionActiva` a la primera combo al fijar
+  // resultados la hace el hook useCalcular; aqui solo viven los controles de vista.
+  // Factor de amplificacion de la deformada (la real es imperceptible: m sobre m).
+  deformadaEscala: number;
+  // true mientras se anima la deformada (oscilacion 0->1->0). Lo conmuta la UI.
+  animando: boolean;
+  // Magnitud que pinta el diagrama por barra seleccionada.
+  magnitudDiagrama: MagnitudDiagrama;
   setPestanaActiva(p: Pestana): void;
   setGrupoActivo(id: string | null): void;
   setPlantaActiva(id: string | null): void;
@@ -89,6 +103,9 @@ interface VistaState {
   setDefaultsViga(p: Partial<DefaultsViga>): void; // merge superficial
   setDefaultsCarga(p: Partial<DefaultsCarga>): void; // merge superficial
   setSnapActivo(b: boolean): void;
+  setDeformadaEscala(e: number): void;
+  setAnimando(b: boolean): void;
+  setMagnitudDiagrama(m: MagnitudDiagrama): void;
 }
 
 export const vistaStore = create<VistaState>()(
@@ -122,6 +139,9 @@ export const vistaStore = create<VistaState>()(
       hipotesisId: null,
     },
     snapActivo: true,
+    deformadaEscala: 1,
+    animando: false,
+    magnitudDiagrama: "momento",
     setPestanaActiva: (p) => set({ pestanaActiva: p }),
     setGrupoActivo: (id) => set({ grupoActivoId: id }),
     setPlantaActiva: (id) => set({ plantaActivaId: id }),
@@ -137,5 +157,8 @@ export const vistaStore = create<VistaState>()(
     setDefaultsCarga: (p) =>
       set((estado) => ({ defaultsCarga: { ...estado.defaultsCarga, ...p } })),
     setSnapActivo: (b) => set({ snapActivo: b }),
+    setDeformadaEscala: (e) => set({ deformadaEscala: e }),
+    setAnimando: (b) => set({ animando: b }),
+    setMagnitudDiagrama: (m) => set({ magnitudDiagrama: m }),
   })),
 );
