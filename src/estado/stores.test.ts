@@ -18,6 +18,7 @@ import { siguienteNombre } from "./comandos/comandosModelo";
 import type { Pilar } from "../dominio";
 import type { ResultadosCalculo } from "../solver";
 import type { ModeloFEM, Trazabilidad } from "../discretizador";
+import type { Plantilla } from "../ui/viewport/dxf/tiposDxf";
 
 // --- Datos de prueba ---------------------------------------------------------
 
@@ -600,6 +601,106 @@ describe("resultadosStore: trio de calculo + semantica vigente/limpiar/descartar
     expect(s.resultados).toBeNull();
     expect(s.modeloFEM).toBeNull();
     expect(s.trazabilidad).toBeNull();
+  });
+});
+
+// --- feature-15 · plantillas DXF en vistaStore --------------------------------
+
+// Plantilla minima valida (geometria vacia: el store no inspecciona entidades).
+// `id` parametrizable para cubrir varias en lista; el resto son valores neutros.
+function plantillaMinima(id: string): Plantilla {
+  return {
+    id,
+    nombre: id,
+    nombreArchivo: `${id}.dxf`,
+    plantaId: "p1",
+    entidades: [],
+    transform: { x: 0, y: 0, escala: 1, rotacion: 0, opacidad: 0.5 },
+    visible: true,
+    bloqueado: false,
+    creadaEn: 0,
+  };
+}
+
+describe("vistaStore: plantillas DXF (feature-15)", () => {
+  // Reset de los campos nuevos (los beforeEach globales no los tocan).
+  beforeEach(() => {
+    vistaStore.getState().setPlantillas([]);
+    vistaStore.getState().setPlantillaActiva(null);
+  });
+
+  it("valores iniciales: lista vacia y sin plantilla activa", () => {
+    const s = vistaStore.getState();
+    expect(s.plantillas).toEqual([]);
+    expect(s.plantillaActivaId).toBeNull();
+  });
+
+  it("setPlantillas reemplaza la lista; addPlantilla hace append", () => {
+    vistaStore.getState().setPlantillas([plantillaMinima("a")]);
+    expect(vistaStore.getState().plantillas.map((p) => p.id)).toEqual(["a"]);
+
+    vistaStore.getState().addPlantilla(plantillaMinima("b"));
+    expect(vistaStore.getState().plantillas.map((p) => p.id)).toEqual(["a", "b"]);
+  });
+
+  it("quitarPlantilla filtra por id", () => {
+    vistaStore
+      .getState()
+      .setPlantillas([plantillaMinima("a"), plantillaMinima("b")]);
+    vistaStore.getState().quitarPlantilla("a");
+    expect(vistaStore.getState().plantillas.map((p) => p.id)).toEqual(["b"]);
+  });
+
+  it("quitar la plantilla activa limpia plantillaActivaId", () => {
+    vistaStore
+      .getState()
+      .setPlantillas([plantillaMinima("a"), plantillaMinima("b")]);
+    vistaStore.getState().setPlantillaActiva("a");
+    vistaStore.getState().quitarPlantilla("a");
+
+    const s = vistaStore.getState();
+    expect(s.plantillas.map((p) => p.id)).toEqual(["b"]);
+    expect(s.plantillaActivaId).toBeNull();
+  });
+
+  it("quitar una plantilla que NO es la activa conserva plantillaActivaId", () => {
+    vistaStore
+      .getState()
+      .setPlantillas([plantillaMinima("a"), plantillaMinima("b")]);
+    vistaStore.getState().setPlantillaActiva("b");
+    vistaStore.getState().quitarPlantilla("a");
+    expect(vistaStore.getState().plantillaActivaId).toBe("b");
+  });
+
+  it("actualizarPlantilla hace merge superficial de nivel 1 sobre la plantilla por id", () => {
+    vistaStore
+      .getState()
+      .setPlantillas([plantillaMinima("a"), plantillaMinima("b")]);
+    vistaStore.getState().actualizarPlantilla("a", { visible: false });
+
+    const a = vistaStore.getState().plantillas.find((p) => p.id === "a");
+    expect(a?.visible).toBe(false);
+    // No toca otros campos ni otras plantillas.
+    expect(a?.nombre).toBe("a");
+    expect(vistaStore.getState().plantillas.find((p) => p.id === "b")?.visible).toBe(
+      true,
+    );
+  });
+
+  it("actualizarPlantilla con parche.transform PARCIAL mergea transform (no lo reemplaza)", () => {
+    vistaStore.getState().setPlantillas([plantillaMinima("a")]);
+    // La UI manda solo { transform: { escala } }: x/y/rotacion/opacidad se conservan.
+    vistaStore.getState().actualizarPlantilla("a", { transform: { escala: 2 } });
+
+    const t = vistaStore.getState().plantillas.find((p) => p.id === "a")?.transform;
+    expect(t).toEqual({ x: 0, y: 0, escala: 2, rotacion: 0, opacidad: 0.5 });
+  });
+
+  it("setPlantillaActiva fija y borra el id activo", () => {
+    vistaStore.getState().setPlantillaActiva("a");
+    expect(vistaStore.getState().plantillaActivaId).toBe("a");
+    vistaStore.getState().setPlantillaActiva(null);
+    expect(vistaStore.getState().plantillaActivaId).toBeNull();
   });
 });
 

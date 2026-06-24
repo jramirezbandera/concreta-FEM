@@ -17,3 +17,7 @@ export { BottomTabs } from "./BottomTabs";
 
 export { MENUS_POR_PESTANA } from "./menus";
 export type { MenuDef } from "./menus";
+
+// Arranque de persistencia (feature-15): rehidrata y autosalva Modelo + plantillas
+// del proyecto activo. Lo invoca App una vez al montar.
+export { useArranquePersistencia } from "./useArranquePersistencia";

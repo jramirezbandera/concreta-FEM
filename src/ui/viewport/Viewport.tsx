@@ -89,7 +89,9 @@ export function Viewport({ sceneOverlays, hudOverlays, className }: ViewportProp
       <Canvas
         frameloop="demand"
         // Color de fondo del lienzo = token --canvas (papel CAD, Spec §1.1).
-        gl={{ antialias: true }}
+        // preserveDrawingBuffer: deja el framebuffer legible tras pintar para que
+        // la captura PNG (F3, ControlCaptura) pueda hacer toDataURL del canvas.
+        gl={{ antialias: true, preserveDrawingBuffer: true }}
         onCreated={({ gl }) => gl.setClearColor(hexToken("canvas"))}
         // dpr acotado: nitidez sin coste excesivo en pantallas HiDPI.
         dpr={[1, 2]}

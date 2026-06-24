@@ -26,6 +26,8 @@ export type {
 // features que inyectan geometria mantengan una sola fuente de color).
 export { Viewport, colorToken, hexToken } from "./viewport";
 export type { ViewportProps, NombreColor } from "./viewport";
+// Captura PNG del viewport (F3): la dispara el boton de la barra de herramientas.
+export { capturarViewport } from "./viewport";
 
 // --- Primitivas UI (Radix-skinned, solo tokens) ------------------------------
 export {

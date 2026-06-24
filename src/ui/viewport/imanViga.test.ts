@@ -152,4 +152,58 @@ describe("resolverPunto (iman de vigas)", () => {
       resolverPunto(m, "p0", 5.1, 5.05, { snapRejilla: false }),
     ).toEqual({ nudoId: "n1" });
   });
+
+  // --- Iman a entidades DXF (feature-15): obra > DXF > rejilla ----------------
+
+  it("engancha a un punto DXF dentro del radio cuando no hay obra cerca", () => {
+    // Sin nudos/pilares; un punto de calco en (3,3); clic en (3.1,2.95) en radio.
+    const m = modeloCon({});
+    expect(
+      resolverPunto(m, "p0", 3.1, 2.95, { puntosSnapExtra: [{ x: 3, y: 3 }] }),
+    ).toEqual({ x: 3, y: 3 });
+  });
+
+  it("la obra GANA al DXF cuando ambos estan en radio", () => {
+    // Nudo de obra en (5,5) y punto DXF en (5.3,5); clic en (5.1,5). Ambos dentro
+    // del radio (0.6) pero la obra tiene prioridad: engancha al nudo por id.
+    const m = modeloCon({
+      nudos: [nudo("n1", 5, 5), nudo("n2", 8, 5)],
+      vigas: [viga("v1", "p0", "n1", "n2")],
+    });
+    expect(
+      resolverPunto(m, "p0", 5.1, 5, { puntosSnapExtra: [{ x: 5.3, y: 5 }] }),
+    ).toEqual({ nudoId: "n1" });
+  });
+
+  it("DXF fuera del radio: cae a la rejilla", () => {
+    // Punto DXF en (3,3) pero clic en (5.1,5.1): >0.6 del DXF y sin obra -> rejilla.
+    const m = modeloCon({});
+    expect(
+      resolverPunto(m, "p0", 5.1, 5.1, { puntosSnapExtra: [{ x: 3, y: 3 }] }),
+    ).toEqual({ x: 5, y: 5 });
+  });
+
+  it("elige el punto DXF MAS cercano entre varios en radio", () => {
+    const m = modeloCon({});
+    expect(
+      resolverPunto(m, "p0", 3, 3, {
+        puntosSnapExtra: [
+          { x: 3.4, y: 3 },
+          { x: 3.1, y: 3 },
+        ],
+      }),
+    ).toEqual({ x: 3.1, y: 3 });
+  });
+
+  it("snapRejilla=false: NO engancha al DXF (el calco va con el interruptor de snap)", () => {
+    // Con snap off, ni rejilla ni DXF: coords crudas. (El osnap a OBRA sigue activo,
+    // pero aqui no hay obra.)
+    const m = modeloCon({});
+    expect(
+      resolverPunto(m, "p0", 3.1, 2.95, {
+        snapRejilla: false,
+        puntosSnapExtra: [{ x: 3, y: 3 }],
+      }),
+    ).toEqual({ x: 3.1, y: 2.95 });
+  });
 });

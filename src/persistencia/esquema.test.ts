@@ -38,7 +38,13 @@ function proyectoDe(id: string, nombre: string, ts: number): ProyectoGuardado {
 it("abre la DB y declara las tablas tipadas", async () => {
   await db.open();
   expect(db.isOpen()).toBe(true);
-  expect(db.tables.map((t) => t.name).sort()).toEqual(["meta", "proyectos"]);
+  // v2 (feature-15) anade `plantillas` (persistencia-referencia DXF) junto a las
+  // tablas v1; el upgrade es incremental y no destructivo (ver esquema.ts).
+  expect(db.tables.map((t) => t.name).sort()).toEqual([
+    "meta",
+    "plantillas",
+    "proyectos",
+  ]);
 });
 
 it("hace put/get de un ProyectoGuardado con un Modelo real", async () => {
@@ -88,6 +94,7 @@ describe("ciclo de vida de la DB (singleton, T4)", () => {
     if (!dbSingleton.isOpen()) await dbSingleton.open();
     await dbSingleton.proyectos.clear();
     await dbSingleton.meta.clear();
+    await dbSingleton.plantillas.clear();
   });
 
   it("abrirDB devuelve ok en el entorno de test (fake-indexeddb disponible)", async () => {

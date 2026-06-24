@@ -31,6 +31,9 @@ import {
 } from "../../estado";
 import { colorToken } from "./colores";
 import { snapARejilla } from "./snap";
+import { puntosSnapDePlantillas, engancharAPuntoExtra } from "./dxf/snapDxf";
+import type { Plantilla, PuntoXY } from "./dxf/tiposDxf";
+import { RADIO_IMAN_M } from "./imanViga";
 import { tramoColocable } from "./tramoPilar";
 
 // Semibrazo de la cruz y medio lado del cuadrado del marcador (m). Z ligeramente
@@ -112,6 +115,34 @@ function ColocacionActiva() {
   const refPlano = useRef<Mesh>(null);
   const refMarcador = useRef<Group>(null);
 
+  // Cache de los puntos de snap del calco DXF (feature-15, T6). Mismo patron que
+  // ColocacionViga: `puntosSnapDePlantillas` transforma TODAS las entidades de TODAS
+  // las plantillas visibles; con un DXF grande, invocarlo en CADA pointermove pone el
+  // cursor a tirones. `plantillas`/`plantaActivaId` (vistaStore) son referencias
+  // estables entre ediciones: solo cambian al editar una plantilla, lo que rompe el
+  // === y fuerza recalculo (la memoizacion vive aqui; snapDxf sigue puro).
+  const cacheSnap = useRef<{
+    plantillas: readonly Plantilla[];
+    plantaActivaId: string | null;
+    puntos: PuntoXY[];
+  } | null>(null);
+  function puntosSnapMemo(
+    plantillas: readonly Plantilla[],
+    plantaActivaId: string | null,
+  ): PuntoXY[] {
+    const c = cacheSnap.current;
+    if (
+      c !== null &&
+      c.plantillas === plantillas &&
+      c.plantaActivaId === plantaActivaId
+    ) {
+      return c.puntos;
+    }
+    const puntos = puntosSnapDePlantillas(plantillas, plantaActivaId);
+    cacheSnap.current = { plantillas, plantaActivaId, puntos };
+    return puntos;
+  }
+
   // Coloca el marcador en la posicion (snap) del cursor mutando el ref del grupo.
   function moverMarcador(x: number, y: number): void {
     const g = refMarcador.current;
@@ -120,10 +151,21 @@ function ColocacionActiva() {
     invalidate();
   }
 
+  // Resuelve la posicion de colocacion con prioridad DXF > rejilla (los pilares no
+  // enganchan a otra obra: se colocan libres). Si el snap esta off, no engancha a
+  // nada (ni calco ni rejilla): coords crudas. El iman al calco usa el mismo radio
+  // que el de vigas (RADIO_IMAN_M) para una sensacion consistente.
   function aplicarSnap(px: number, py: number): { x: number; y: number } {
-    return vistaStore.getState().snapActivo
-      ? snapARejilla(px, py)
-      : { x: px, y: py };
+    const { snapActivo, plantillas, plantaActivaId } = vistaStore.getState();
+    if (!snapActivo) return { x: px, y: py };
+
+    // (1) DXF: punto notable del calco visible de la planta activa dentro del radio.
+    const puntosDxf = puntosSnapMemo(plantillas, plantaActivaId);
+    const p = engancharAPuntoExtra(px, py, puntosDxf, RADIO_IMAN_M);
+    if (p !== null) return { x: p.x, y: p.y };
+
+    // (2) Rejilla.
+    return snapARejilla(px, py);
   }
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {

@@ -15,12 +15,35 @@ import {
   renombrarProyecto,
   setProyectoActivoId,
 } from "./repositorio";
+import {
+  cargarPlantillasDeProyecto,
+  guardarPlantillasDeProyecto,
+} from "./plantillas/repositorioPlantillas";
+import type { Plantilla } from "../ui/viewport/dxf/tiposDxf";
 
 afterEach(async () => {
   // Vaciar deja la DB limpia entre tests sin cerrar/recrear el singleton.
   await db.proyectos.clear();
   await db.meta.clear();
+  await db.plantillas.clear();
 });
+
+// Factoria de una Plantilla valida (cumple PlantillaSchema), para los tests que
+// verifican que borrar un proyecto arrastra tambien sus plantillas DXF.
+function plantillaValida(overrides: Partial<Plantilla> = {}): Plantilla {
+  return {
+    id: "pl-1",
+    nombre: "Planta baja",
+    nombreArchivo: "planta.dxf",
+    plantaId: "p1",
+    entidades: [{ tipo: "linea", x1: 0, y1: 0, x2: 1, y2: 1 }],
+    transform: { x: 0, y: 0, escala: 1, rotacion: 0, opacidad: 0.5 },
+    visible: true,
+    bloqueado: false,
+    creadaEn: 1000,
+    ...overrides,
+  };
+}
 
 it("crear -> cargar hace round-trip de todos los campos", async () => {
   const creado = await crearProyecto("Edificio A");
@@ -83,6 +106,28 @@ it("borrar limpia el puntero activo si era el activo", async () => {
 
   await borrarProyecto(creado.id);
   expect(await getProyectoActivoId()).toBeUndefined();
+});
+
+it("borrar arrastra las plantillas del proyecto (no deja huerfanas)", async () => {
+  const creado = await crearProyecto("Con plantillas");
+  await guardarPlantillasDeProyecto(creado.id, [plantillaValida()]);
+  // Otro proyecto con plantillas: NO debe verse afectado por el borrado.
+  const otro = await crearProyecto("Otro");
+  await guardarPlantillasDeProyecto(otro.id, [plantillaValida({ id: "pl-otro" })]);
+
+  await borrarProyecto(creado.id);
+
+  // Las plantillas del borrado desaparecen; las del otro proyecto se conservan.
+  expect(await cargarPlantillasDeProyecto(creado.id)).toEqual([]);
+  expect((await cargarPlantillasDeProyecto(otro.id)).map((p) => p.id)).toEqual([
+    "pl-otro",
+  ]);
+});
+
+it("borrar un proyecto SIN plantillas no lanza", async () => {
+  const creado = await crearProyecto("Sin plantillas");
+  await expect(borrarProyecto(creado.id)).resolves.toBeUndefined();
+  expect(await cargarPlantillasDeProyecto(creado.id)).toEqual([]);
 });
 
 it("borrar no toca el puntero si el activo era otro", async () => {

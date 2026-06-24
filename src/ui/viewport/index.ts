@@ -9,7 +9,17 @@ export type { ViewportProps } from "./Viewport";
 export { colorToken, hexToken } from "./colores";
 export type { NombreColor } from "./colores";
 
+// Calco de plantillas DXF (feature-15): sceneOverlay R3F que dibuja las plantillas
+// visibles de la planta activa como fondo no interactivo. Lo monta App via
+// `sceneOverlays` (cableado en otra tarea).
+export { OverlayPlantillas } from "./OverlayPlantillas";
+
 // Canal de coordenadas vivas del cursor (viewport -> barra de estado). El shell
 // se suscribe y throttlea; lo reutiliza F11 para el replanteo en planta.
 export { suscribirCoords, leerCoords, emitirCoords } from "./hooks/coordsBus";
 export type { Coords } from "./hooks/coordsBus";
+
+// Captura PNG del viewport (feature-15, F3): API publica que dispara la descarga
+// de la vista actual. La ejecuta ControlCaptura dentro de la escena. Lo cablea el
+// boton F3 de la barra de herramientas (otra tarea).
+export { capturarViewport, descargarPng } from "./capturarPng";

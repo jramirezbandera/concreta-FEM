@@ -52,6 +52,8 @@ import {
 } from "../../estado";
 import { colorToken } from "./colores";
 import { resolverPunto } from "./imanViga";
+import { puntosSnapDePlantillas } from "./dxf/snapDxf";
+import type { Plantilla, PuntoXY } from "./dxf/tiposDxf";
 import { plantaColocableViga } from "./tramoViga";
 // Logica pura del flujo de dos clics en su propio modulo (este fichero solo
 // exporta componentes -> react-refresh/only-export-components).
@@ -137,6 +139,35 @@ function ColocacionActiva() {
   // re-render (regla #11); su efecto visual se aplica mutando los refs de la escena.
   const pendienteI = useRef<ExtremoViga | null>(null);
 
+  // Cache de los puntos de snap del calco DXF (feature-15, T6). `puntosSnapDePlantillas`
+  // transforma TODAS las entidades de TODAS las plantillas visibles; con un DXF grande
+  // eso es caro y se invocaba en CADA pointermove -> cursor a tirones. `plantillas` y
+  // `plantaActivaId` (vistaStore) son referencias estables entre ediciones: solo cambian
+  // al anadir/quitar/editar una plantilla, lo que rompe el `===` y fuerza recalculo (la
+  // memoizacion vive aqui, en el componente; snapDxf sigue puro).
+  const cacheSnap = useRef<{
+    plantillas: readonly Plantilla[];
+    plantaActivaId: string | null;
+    puntos: PuntoXY[];
+  } | null>(null);
+
+  function puntosSnapMemo(
+    plantillas: readonly Plantilla[],
+    plantaActivaId: string | null,
+  ): PuntoXY[] {
+    const c = cacheSnap.current;
+    if (
+      c !== null &&
+      c.plantillas === plantillas &&
+      c.plantaActivaId === plantaActivaId
+    ) {
+      return c.puntos;
+    }
+    const puntos = puntosSnapDePlantillas(plantillas, plantaActivaId);
+    cacheSnap.current = { plantillas, plantaActivaId, puntos };
+    return puntos;
+  }
+
   // Geometria de la linea elastica: dos vertices que se mutan en cada move.
   const geoLinea = useMemo(() => {
     const g = new BufferGeometry();
@@ -205,12 +236,18 @@ function ColocacionActiva() {
     const z = cotaColocable();
     if (z === null) return;
     const modelo = modeloStore.getState().getModelo();
-    const { grupoActivoId, plantaActivaId, snapActivo } = vistaStore.getState();
+    const { grupoActivoId, plantaActivaId, snapActivo, plantillas } =
+      vistaStore.getState();
     const plantaId = plantaColocableViga(modelo, grupoActivoId, plantaActivaId);
     if (plantaId === null) return;
 
+    // Puntos notables del calco DXF visible de la planta activa (feature-15): se
+    // pasan como candidatos de prioridad media (obra > DXF > rejilla) al iman.
+    // Memoizado: solo recalcula si cambian plantillas/plantaActivaId (T6).
+    const puntosSnapExtra = puntosSnapMemo(plantillas, plantaActivaId);
     const extremo = resolverPunto(modelo, plantaId, e.point.x, e.point.y, {
       snapRejilla: snapActivo,
+      puntosSnapExtra,
     });
     const pos = posicionExtremo(modelo, extremo);
     if (pos === null) return;
@@ -233,7 +270,7 @@ function ColocacionActiva() {
     e.stopPropagation();
 
     const modelo = modeloStore.getState().getModelo();
-    const { grupoActivoId, plantaActivaId, defaultsViga, snapActivo } =
+    const { grupoActivoId, plantaActivaId, defaultsViga, snapActivo, plantillas } =
       vistaStore.getState();
     const plantaId = plantaColocableViga(modelo, grupoActivoId, plantaActivaId);
 
@@ -255,8 +292,11 @@ function ColocacionActiva() {
     const planta = modelo.plantas.find((p) => p.id === plantaId);
     const z = planta ? planta.cota : 0;
 
+    // Mismos candidatos DXF que en onMove (obra > DXF > rejilla); via la cache.
+    const puntosSnapExtra = puntosSnapMemo(plantillas, plantaActivaId);
     const extremo = resolverPunto(modelo, plantaId, e.point.x, e.point.y, {
       snapRejilla: snapActivo,
+      puntosSnapExtra,
     });
     const accion = procesarClicViga(
       pendienteI.current,

@@ -9,11 +9,13 @@
 // null cuando hay algo que seleccionar, ni quedar apuntando a un grupo/planta de
 // una obra anterior tras restaurar autosave o cambiar de proyecto).
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Shell } from "./ui/shell";
+import { Shell, useArranquePersistencia } from "./ui/shell";
 import { Viewport } from "./ui/viewport";
 import { suscribirCoords, leerCoords } from "./ui/viewport";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
+import { OverlayPlantillas } from "./ui/viewport/OverlayPlantillas";
+import { PanelPlantillas } from "./ui/plantillas";
 import { tramoColocable } from "./ui/viewport/tramoPilar";
 import { plantaColocableViga } from "./ui/viewport/tramoViga";
 import { InspectorPilar, PanelHerramientaPilar } from "./ui/entradaPilares";
@@ -224,6 +226,10 @@ function useCoordsThrottled(): { x: number; y: number } | null {
 
 export default function App() {
   useInicializarVistaActiva();
+  // Arranque de persistencia (feature-15): rehidrata Modelo + plantillas del proyecto
+  // activo desde IndexedDB y arranca ambos autosaves. Defensivo: si no hay IndexedDB,
+  // la app sigue en memoria. Cierra el hueco que F9 dejo (autosave sin cablear).
+  useArranquePersistencia();
   // Precarga del motor FEM en segundo plano (CLAUDE.md §8): se dispara UNA vez al
   // montar la app (idempotente, no bloquea el hilo), para que "Calcular" este listo
   // cuanto antes mientras el arquitecto modela. No consumimos el estado aqui: el
@@ -279,21 +285,38 @@ export default function App() {
       <Viewport
         {...(enPilares
           ? {
-              sceneOverlays: <ColocacionPilar />,
+              // OverlayPlantillas (calco DXF de fondo) y PanelPlantillas (F4) van en
+              // las pestanas de PLANTA: el calco solo tiene sentido al introducir la
+              // obra. Se componen JUNTO a los overlays de herramienta (no los
+              // sustituyen): OverlayPlantillas no es interactivo (no estorba al
+              // picking) y PanelPlantillas se autooculta si F4 esta cerrado.
+              sceneOverlays: (
+                <>
+                  <OverlayPlantillas />
+                  <ColocacionPilar />
+                </>
+              ),
               hudOverlays: (
                 <>
                   <InspectorPilar />
                   <PanelHerramientaPilar />
+                  <PanelPlantillas />
                 </>
               ),
             }
           : enVigas
             ? {
-                sceneOverlays: <ColocacionViga />,
+                sceneOverlays: (
+                  <>
+                    <OverlayPlantillas />
+                    <ColocacionViga />
+                  </>
+                ),
                 hudOverlays: (
                   <>
                     <InspectorViga />
                     <PanelHerramientaViga />
+                    <PanelPlantillas />
                   </>
                 ),
               }

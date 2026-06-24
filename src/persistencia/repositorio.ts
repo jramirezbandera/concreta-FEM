@@ -105,12 +105,17 @@ export async function listarProyectos(): Promise<ProyectoGuardado[]> {
   return db.proyectos.orderBy("actualizadoEn").reverse().toArray();
 }
 
-// Borra un proyecto. Si era el activo, limpia el puntero para no dejar una
-// referencia colgante. Ambas escrituras en una transaccion: no debe quedar el
-// puntero apuntando a un proyecto ya borrado.
+// Borra un proyecto y TODO lo colgado de el: su fila en `proyectos`, el puntero
+// activo si era el activo (no dejar referencia colgante) y su fila de plantillas
+// DXF (persistencia-referencia, feature-15) para no dejar huerfanas. Las tres
+// escrituras van en UNA transaccion (atomico: o se borra todo o nada). Borramos
+// `db.plantillas` aqui directamente en vez de invocar borrarPlantillasDeProyecto
+// (que abre su propia transaccion): Dexie no permite anidar transacciones limpio,
+// y la tabla ya esta en el alcance de esta. `delete` es no-op si no hay fila.
 export async function borrarProyecto(id: string): Promise<void> {
-  await db.transaction("rw", db.proyectos, db.meta, async () => {
+  await db.transaction("rw", db.proyectos, db.meta, db.plantillas, async () => {
     await db.proyectos.delete(id);
+    await db.plantillas.delete(id);
     const activo = await leerActivo();
     if (activo === id) await escribirActivo(undefined);
   });

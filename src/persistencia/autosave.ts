@@ -13,6 +13,10 @@ import {
   guardarModeloDeProyecto,
   setProyectoActivoId,
 } from "./repositorio";
+import {
+  crearAutosaveDebounced,
+  type AutosaveDebounceHandle,
+} from "./autosaveDebounce";
 
 // Error de conflicto de concurrencia optimista (T1). Forma discriminada y legible
 // para que F9 lo distinga de otros fallos (cuota, DB cerrada) en el callback
@@ -27,15 +31,15 @@ export interface ErrorConflictoAutosave {
   id: string;
 }
 
-// Promesa del ultimo guardado en vuelo. El autosave es fire-and-forget (no se
-// puede await desde un listener sincrono de Zustand), pero los tests necesitan
-// saber cuando un guardado disparado por el debounce ha tocado realmente Dexie.
-// Sirve ademas como CADENA de serializacion (T1): cada guardado se encola sobre
-// el anterior para que dos guardados solapados no escriban fuera de orden.
-// Exportada solo para tests: en produccion nadie la observa.
-let _guardadoEnVuelo: Promise<void> = Promise.resolve();
+// Handle del autosave en curso (singleton de modulo): aporta el debounce, la cadena
+// de serializacion y el hook de espera (crearAutosaveDebounced, T4). `null` mientras
+// no haya autosave activo (cadena ya resuelta).
+let handle: AutosaveDebounceHandle | null = null;
+
+// Espera al ultimo guardado en vuelo (solo tests; en produccion nadie la observa).
+// Delega en el handle activo; si no hay autosave en marcha, la cadena esta resuelta.
 export function _esperarGuardadoAutosave(): Promise<void> {
-  return _guardadoEnVuelo;
+  return handle?.esperarGuardado() ?? Promise.resolve();
 }
 
 // Baseline de concurrencia optimista a nivel de modulo (T1): el `actualizadoEn`
@@ -47,16 +51,10 @@ export function _esperarGuardadoAutosave(): Promise<void> {
 // `null` = no hay baseline util: se guarda sin comprobar conflicto.
 let baseline: { id: string; actualizadoEn: number } | null = null;
 
-// Canceller del timer de debounce pendiente, a nivel de modulo (T5). Permite que
-// la carga de un proyecto cancele un timer que pertenecia a la edicion anterior,
-// para que no escriba el modelo recien cargado en el proyecto previo. La baja de
-// iniciarAutosave lo limpia solo si sigue siendo el suyo (no pisa a otro autosave).
-let cancelarTimerPendiente: (() => void) | null = null;
-
-// Debounce por defecto: ventana corta tras la ultima edicion. Debounce (NO
-// throttle): re-arranca el reloj en cada cambio para que una rafaga de comandos
-// (arrastres, tecleo) acabe en UN solo guardado del estado final, no en N.
-const DEBOUNCE_MS_DEFECTO = 800;
+// La coordinacion load-vs-timer (cancelar el timer de una edicion anterior cuando se
+// carga otro proyecto, para que no escriba el modelo recien cargado en el proyecto
+// previo) usa `handle.cancelarTimer` (ver cargarProyectoEnStore). El valor de debounce
+// por defecto vive en autosaveDebounce.ts (DEBOUNCE_MS_DEFECTO), unica fuente.
 
 interface OpcionesAutosave {
   // Configurable sobre todo para tests (timers cortos / falsos).
@@ -80,21 +78,7 @@ interface OpcionesAutosave {
 // de un store que quiza ya cambio de duenno. Si en el futuro hace falta "guardar
 // ya" (p. ej. al cerrar pestana), se anadira un `flush()` explicito y separado.
 export function iniciarAutosave(opciones?: OpcionesAutosave): () => void {
-  const debounceMs = opciones?.debounceMs ?? DEBOUNCE_MS_DEFECTO;
   const onError = opciones?.onError;
-
-  // Timer a nivel de cierre: el debounce se implementa a mano (sin lodash) con
-  // setTimeout global, para que vi.useFakeTimers() lo intercepte en los tests.
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  // Cancela el timer de debounce local. Se expone a nivel de modulo via
-  // cancelarTimerPendiente para que cargarProyectoEnStore pueda abortarlo (T5).
-  const cancelarTimer = (): void => {
-    if (timer !== undefined) {
-      clearTimeout(timer);
-      timer = undefined;
-    }
-  };
 
   // El guardado efectivo: lee el proyecto activo y persiste el modelo actual.
   // Es async pero el listener no lo espera (fire-and-forget): no debe bloquear.
@@ -134,34 +118,22 @@ export function iniciarAutosave(opciones?: OpcionesAutosave): () => void {
     }
   };
 
-  // Suscripcion al modelo (Capa 1): subscribeWithSelector dispara el listener solo
-  // cuando cambia la referencia de `s.modelo`. Cada cambio re-arma el debounce.
-  const unsubscribe = modeloStore.subscribe(
-    (s) => s.modelo,
-    () => {
-      cancelarTimer();
-      timer = setTimeout(() => {
-        timer = undefined;
-        // Serializa las escrituras (T1): encadena sobre el ultimo guardado en
-        // vuelo (ignorando su posible rechazo) para que dos guardados solapados
-        // no se entrelacen y escriban fuera de orden; gana el ultimo estado.
-        _guardadoEnVuelo = _guardadoEnVuelo.catch(() => {}).then(guardar);
-      }, debounceMs);
-    },
-  );
+  // Debounce + serializacion + hook de espera: los aporta el helper compartido (T4).
+  // La concurrencia optimista (baseline) y la coordinacion load-vs-timer se quedan
+  // aqui (especificas del Modelo). Suscribe a la Capa 1 (`s.modelo`).
+  const h = crearAutosaveDebounced({
+    subscribe: (onCambio) => modeloStore.subscribe((s) => s.modelo, onCambio),
+    guardar,
+    debounceMs: opciones?.debounceMs,
+  });
+  handle = h;
 
-  // Registra el canceller del timer a nivel de modulo para que la carga de un
-  // proyecto pueda abortar un timer de la edicion anterior (T5).
-  cancelarTimerPendiente = cancelarTimer;
-
-  // Baja: cancela el debounce pendiente (no quedan guardados que disparen despues)
-  // y desuscribe del store. Sin flush (ver decision arriba).
+  // Baja: teardown del helper (cancela el debounce pendiente y desuscribe, sin flush)
+  // y limpia el handle de modulo SOLO si sigue siendo el nuestro (no pisa a otro
+  // autosave que pudiera haberse iniciado despues).
   return () => {
-    cancelarTimer();
-    // Limpia el canceller de modulo SOLO si sigue siendo el nuestro (no pisar a
-    // otro autosave que pudiera haberse iniciado despues).
-    if (cancelarTimerPendiente === cancelarTimer) cancelarTimerPendiente = null;
-    unsubscribe();
+    h.teardown();
+    if (handle === h) handle = null;
   };
 }
 
@@ -189,7 +161,7 @@ export async function cargarProyectoEnStore(
   // recien cargado en el proyecto PREVIO) y fija el puntero activo al nuevo
   // proyecto. Reordenamos: setProyectoActivoId ANTES de cargarModelo, de modo que
   // si un timer dispara justo tras el load, escriba en el proyecto correcto.
-  cancelarTimerPendiente?.();
+  handle?.cancelarTimer();
   await setProyectoActivoId(id);
 
   // Baseline de concurrencia (T1): partimos del timestamp del registro cargado.

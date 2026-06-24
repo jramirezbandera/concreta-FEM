@@ -4,6 +4,17 @@
 // suscriben a campos sueltos sin re-render global).
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+// Plantilla DXF (feature-15): ayuda de dibujo (calco), NO Capa 1. Vive en este
+// store de UI; su contrato de datos puro esta en el modulo viewport/dxf.
+import type { Plantilla, TransformPlantilla } from "../ui/viewport/dxf/tiposDxf";
+
+// Parche de actualizacion de plantilla. Es `Partial<Plantilla>` pero con `transform`
+// relajado a parcial: la UI puede mandar solo { transform: { escala } } (un solo
+// control) sin reenviar x/y/rotacion/opacidad. Un parche con transform COMPLETO
+// (que es Partial valido) sigue encajando, asi que no rompe a ningun llamador.
+export type ParchePlantilla = Partial<Omit<Plantilla, "transform">> & {
+  transform?: Partial<TransformPlantilla>;
+};
 
 // Las 4 pestanas CYPECAD (CLAUDE.md §11). Identificadores en ingles tecnico;
 // las etiquetas visibles ("Entrada de pilares"...) las pone la UI.
@@ -71,9 +82,24 @@ interface VistaState {
   // Dialogo modal abierto, o null si ninguno. Estado de UI puro: NO participa en
   // undo (coherente con el resto de vistaStore; ver cabecera del fichero).
   dialogoActivo: DialogoActivo | null;
-  // Slots de plantillas DXF y capturas; se rellenan en feature-15. Tipos laxos
-  // aqui a proposito (la forma la define F15); de momento son listas vacias.
-  plantillas: unknown[];
+  // Plantillas DXF importadas (feature-15): ayuda de dibujo (calco), fuera de
+  // Capa 1 y fuera del undo. La persistencia-referencia (Dexie) las hidrata via
+  // setPlantillas al abrir proyecto; la edicion (mover/escalar/ocultar) es set directo.
+  plantillas: Plantilla[];
+  // Plantilla seleccionada en el panel F4 (la que reciben los controles de
+  // transform), o null si ninguna. No afecta a que plantillas se dibujan (eso lo
+  // gobierna `visible` + planta activa), solo a cual se esta editando.
+  plantillaActivaId: string | null;
+  // Apertura del panel flotante de plantillas (herramienta F4). El boton F4 del
+  // ToolsRail (T4.1) lo conmuta; el PanelPlantillas se muestra/oculta segun este
+  // flag. Estado de UI puro: NO participa en undo.
+  panelPlantillasAbierto: boolean;
+  // Hidratacion de la persistencia completa (feature-15, T3). false hasta que
+  // useArranquePersistencia termina de cargar Modelo + plantillas (o decide no
+  // persistir). La importacion de DXF se gatea con esto: importar antes de que la
+  // hidratacion asincrona resuelva podria perder el import (setPlantillas lo pisaria).
+  persistenciaLista: boolean;
+  // Slot de capturas; la captura PNG (T3.2) no necesita estado por ahora.
   capturas: unknown[];
   // Introduccion grafica de pilares (feature-11). El pilar seleccionado NO vive
   // aqui: es seleccionStore.seleccion[0]; aqui solo el modo y los defaults.
@@ -106,6 +132,17 @@ interface VistaState {
   setDeformadaEscala(e: number): void;
   setAnimando(b: boolean): void;
   setMagnitudDiagrama(m: MagnitudDiagrama): void;
+  // --- Plantillas DXF (feature-15) ---
+  setPlantillas(p: Plantilla[]): void;
+  addPlantilla(p: Plantilla): void;
+  quitarPlantilla(id: string): void;
+  // Merge superficial sobre la plantilla con ese id; si `parche.transform` viene,
+  // se mergea tambien superficialmente (la UI manda solo { transform: { escala } }).
+  actualizarPlantilla(id: string, parche: ParchePlantilla): void;
+  setPlantillaActiva(id: string | null): void;
+  setPanelPlantillas(b: boolean): void;
+  togglePanelPlantillas(): void;
+  setPersistenciaLista(b: boolean): void;
 }
 
 export const vistaStore = create<VistaState>()(
@@ -117,6 +154,9 @@ export const vistaStore = create<VistaState>()(
     combinacionActiva: null,
     dialogoActivo: null,
     plantillas: [],
+    plantillaActivaId: null,
+    panelPlantillasAbierto: false,
+    persistenciaLista: false,
     capturas: [],
     herramienta: "seleccion",
     defaultsPilar: {
@@ -160,5 +200,39 @@ export const vistaStore = create<VistaState>()(
     setDeformadaEscala: (e) => set({ deformadaEscala: e }),
     setAnimando: (b) => set({ animando: b }),
     setMagnitudDiagrama: (m) => set({ magnitudDiagrama: m }),
+    // --- Plantillas DXF (feature-15). Set directo: fuera del undo, como el resto
+    // del store. Sin Immer aqui (vistaStore no usa el middleware): copias nuevas. ---
+    setPlantillas: (p) => set({ plantillas: p }),
+    addPlantilla: (p) =>
+      set((estado) => ({ plantillas: [...estado.plantillas, p] })),
+    quitarPlantilla: (id) =>
+      set((estado) => ({
+        plantillas: estado.plantillas.filter((pl) => pl.id !== id),
+        // Si se quita la activa, deja de haber plantilla en edicion.
+        plantillaActivaId:
+          estado.plantillaActivaId === id ? null : estado.plantillaActivaId,
+      })),
+    actualizarPlantilla: (id, parche) =>
+      set((estado) => ({
+        plantillas: estado.plantillas.map((pl) =>
+          pl.id === id
+            ? {
+                ...pl,
+                ...parche,
+                // `transform` es un objeto anidado: si el parche lo trae, mergea
+                // superficialmente (asi la UI puede mandar solo { transform: { escala } }
+                // sin tener que reenviar x/y/rotacion/opacidad). Si no, conserva el actual.
+                transform: parche.transform
+                  ? { ...pl.transform, ...parche.transform }
+                  : pl.transform,
+              }
+            : pl,
+        ),
+      })),
+    setPlantillaActiva: (id) => set({ plantillaActivaId: id }),
+    setPanelPlantillas: (b) => set({ panelPlantillasAbierto: b }),
+    togglePanelPlantillas: () =>
+      set((estado) => ({ panelPlantillasAbierto: !estado.panelPlantillasAbierto })),
+    setPersistenciaLista: (b) => set({ persistenciaLista: b }),
   })),
 );

@@ -40,3 +40,17 @@ export type { ResultadoImportArchivo } from "./serializacion";
 export { iniciarAutosave, cargarProyectoEnStore } from "./autosave";
 // Error de conflicto de concurrencia optimista que el autosave surfacea por onError.
 export type { ErrorConflictoAutosave } from "./autosave";
+
+// Persistencia-REFERENCIA de plantillas DXF (feature-15): store Dexie separado,
+// keyed por proyectoId, FUERA de la Capa 1 (no toca Modelo ni ProyectoGuardado).
+// Las plantillas son ayuda de dibujo (calco), no geometria de calculo (CLAUDE.md §3).
+// Al abrir proyecto: cargarPlantillasEnStore(id) + iniciarAutosavePlantillas(id),
+// INDEPENDIENTES del autosave del Modelo. NO entran en el .json export/import del
+// proyecto (no son Capa 1; ver decision en plantillas/repositorioPlantillas.ts).
+export {
+  guardarPlantillasDeProyecto,
+  cargarPlantillasDeProyecto,
+  borrarPlantillasDeProyecto,
+  iniciarAutosavePlantillas,
+  cargarPlantillasEnStore,
+} from "./plantillas";

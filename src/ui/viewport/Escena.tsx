@@ -26,6 +26,8 @@ import { hexToken } from "./colores";
 import { GeometriaModelo } from "./GeometriaModelo";
 import { suscribirZoom } from "./hooks/zoomBus";
 import { emitirCoords } from "./hooks/coordsBus";
+import { suscribirCaptura } from "./hooks/capturaBus";
+import { descargarPng } from "./capturarPng";
 
 export interface EscenaProps {
   modoVista: ModoVista;
@@ -118,6 +120,34 @@ function ControlZoom() {
   return null;
 }
 
+// Ejecuta la captura PNG del viewport al recibir el evento del capturaBus. Con
+// frameloop="demand" la escena no pinta cada frame, asi que leer el canvas sin un
+// render reciente da una imagen vacia/negra. Por eso forzamos un render explicito
+// (gl.render) justo antes de toDataURL; el Canvas lleva preserveDrawingBuffer para
+// que el framebuffer siga legible tras pintar. Mismo patron que ControlZoom.
+function ControlCaptura() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  useEffect(() => {
+    return suscribirCaptura((nombre) => {
+      try {
+        gl.render(scene, camera);
+        const dataUrl = gl.domElement.toDataURL("image/png");
+        // toDataURL puede devolver "data:," con un canvas vacio: no descargar nada.
+        if (dataUrl && dataUrl !== "data:,") descargarPng(dataUrl, nombre);
+      } catch (e) {
+        // toDataURL es sincrono y puede LANZAR (canvas "tainted", contexto WebGL
+        // perdido, OOM al asignar el base64). No rompemos la escena: log defensivo.
+        if (import.meta.env.DEV) {
+          console.error("[captura] fallo al generar PNG:", e);
+        }
+      }
+    });
+  }, [gl, scene, camera]);
+  return null;
+}
+
 // Plano de lectura de coordenadas: una superficie invisible en el suelo (Z=0)
 // que, en onPointerMove, emite la interseccion cursor->suelo por el coordsBus.
 // NO programa setState (regla #11): solo empuja al bus, que el shell throttlea.
@@ -179,6 +209,7 @@ export function Escena({ modoVista, overlays }: EscenaProps) {
       <Ejes />
 
       <ControlZoom />
+      <ControlCaptura />
       <PlanoCoords />
       <GeometriaModelo />
       {overlays}

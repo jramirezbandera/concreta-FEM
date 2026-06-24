@@ -29,6 +29,7 @@
     "@react-three/fiber": "^9.6.1",
     "comlink": "^4.4.2",
     "dexie": "^4.4.4",
+    "dxf-parser": "^1.1.2",
     "immer": "^10.1.1",
     "plotly.js-basic-dist-min": "^3.6.0",
     "pyodide": "0.28.3",

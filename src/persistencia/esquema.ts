@@ -25,6 +25,24 @@ export type MetaEntry = {
   valor: string;
 };
 
+// Registro de plantillas DXF de un proyecto (feature-15). Persistencia-REFERENCIA:
+// las plantillas son ayuda de dibujo (calco), NO Capa 1, NO geometria de calculo.
+// Por eso viven en su PROPIA tabla, keyed por `proyectoId`, fuera de
+// `ProyectoGuardado` y SIN tocar `Modelo`/`SCHEMA_VERSION` (CLAUDE.md §3, §12).
+//
+// Diseno: UNA fila por proyecto con TODAS sus plantillas como bloque. Mas simple
+// que fila-por-plantilla: el put es atomico (la coleccion entera se reemplaza de
+// golpe, igual que el autosave del Modelo), no hay que sincronizar altas/bajas
+// individuales, y el llamador (vistaStore) ya maneja `plantillas` como array unico.
+// El tipo del array es `unknown[]`: lo que entra a Dexie no se valida (no es un
+// borde de confianza); la VALIDACION Zod ocurre AL LEER (cargarPlantillasDeProyecto),
+// que es donde un IndexedDB manipulado podria intentar romper la app.
+export type RegistroPlantillas = {
+  proyectoId: string;
+  plantillas: unknown[];
+  actualizadoEn: number;
+};
+
 // Clave del puntero al proyecto activo dentro de la tabla `meta`.
 export const CLAVE_PROYECTO_ACTIVO = "proyectoActivoId";
 
@@ -33,6 +51,10 @@ export class ConcretaDB extends Dexie {
   // como blob en el registro, no indexado (no se consulta por su contenido).
   proyectos!: Table<ProyectoGuardado, string>;
   meta!: Table<MetaEntry, string>;
+  // `plantillas`: persistencia-referencia (feature-15), fila por proyecto. PK
+  // `proyectoId`. Las `Plantilla[]` viajan como blob no indexado (no se consultan
+  // por contenido), como el `modelo` de `proyectos`.
+  plantillas!: Table<RegistroPlantillas, string>;
 
   constructor() {
     super("concreta-estructuras");
@@ -40,6 +62,16 @@ export class ConcretaDB extends Dexie {
     this.version(1).stores({
       proyectos: "id, actualizadoEn",
       meta: "clave",
+    });
+    // v2 (feature-15): anade la tabla `plantillas` SIN tocar las existentes. Dexie
+    // aplica el upgrade de forma incremental y NO destructiva: crea el nuevo object
+    // store y conserva intactos `proyectos`/`meta` (no hace falta funcion de
+    // migracion al solo ANADIR una tabla). Las tablas no mencionadas en una version
+    // se heredan; aqui las re-declaramos por claridad del esquema vigente.
+    this.version(2).stores({
+      proyectos: "id, actualizadoEn",
+      meta: "clave",
+      plantillas: "proyectoId",
     });
   }
 }

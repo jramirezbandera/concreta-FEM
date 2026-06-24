@@ -13,6 +13,8 @@
 // cabezas de pilar por su (x,y) cuando su tramo (cota plantaInicial..plantaFinal)
 // incluye la cota de la planta de destino.
 import { snapARejilla } from "./snap";
+import { engancharAPuntoExtra } from "./dxf/snapDxf";
+import type { PuntoXY } from "./dxf/tiposDxf";
 import { nudoPorId, plantaPorId, vigasDePlanta } from "../../dominio";
 import type { Modelo } from "../../dominio";
 // Misma tolerancia de fusion de nudos que usa el discretizador (feature-4) y
@@ -43,6 +45,14 @@ export interface OpcionesImanViga {
   // iman a nudos/pilares NO depende de esto: es osnap y siempre engancha. Default
   // true (comportamiento previo).
   snapRejilla?: boolean;
+  // Puntos notables de las plantillas DXF visibles de la planta activa (feature-15),
+  // ya transformados a coords de obra (m) por el LLAMADOR (ColocacionViga, desde
+  // vistaStore: asi imanViga sigue puro). Son candidatos de PRIORIDAD MEDIA: la obra
+  // (nudos/cabezas de pilar) gana siempre; el DXF solo engancha si no hay obra mas
+  // cerca; la rejilla es el ultimo recurso. Se ignoran si snapRejilla=false (el calco
+  // es ayuda de dibujo, sujeta al mismo interruptor de snap que la rejilla). Default
+  // [] (sin plantillas -> comportamiento previo).
+  puntosSnapExtra?: PuntoXY[];
 }
 
 // Un candidato de enganche ya resuelto a su representacion ExtremoViga, con sus
@@ -111,11 +121,15 @@ function candidatos(modelo: Modelo, plantaId: string): Candidato[] {
   return lista;
 }
 
-// Resuelve el extremo de una viga para un clic en (x,y) sobre `plantaId`:
-//  - si el candidato de enganche mas cercano cae dentro de `radioIman`, devuelve
-//    ese candidato (nudo existente por id, o coords de una cabeza de pilar sin
-//    nudo aun);
-//  - si no, devuelve { x, y } ajustado a la rejilla.
+// Resuelve el extremo de una viga para un clic en (x,y) sobre `plantaId`, con
+// PRIORIDAD obra > DXF > rejilla:
+//  1. obra: si el nudo/cabeza de pilar mas cercano cae dentro de `radioIman`,
+//     devuelve ese candidato (nudo existente por id, o coords de una cabeza de pilar
+//     sin nudo aun). La obra real no la roba la plantilla.
+//  2. DXF: si no hay obra en radio, engancha al punto notable de plantilla mas
+//     cercano dentro de `radioIman` (devuelto como coords { x, y }). Solo si el snap
+//     esta activo (snapRejilla): el calco es ayuda de dibujo, sujeta al mismo snap.
+//  3. rejilla: si no hay nada, { x, y } ajustado a rejilla (o crudo si snap off).
 export function resolverPunto(
   modelo: Modelo,
   plantaId: string,
@@ -127,6 +141,7 @@ export function resolverPunto(
   const pasoRejilla = opts.pasoRejilla ?? PASO_REJILLA_M;
   const snapRejilla = opts.snapRejilla ?? true;
 
+  // (1) Obra: nudos/cabezas de pilar. Maxima prioridad (geometria real).
   let mejor: Candidato | null = null;
   let mejorDist2 = Infinity;
   const radio2 = radioIman * radioIman;
@@ -139,9 +154,14 @@ export function resolverPunto(
       mejorDist2 = dist2;
     }
   }
-
   if (mejor !== null) return mejor.extremo;
 
-  // Sin enganche: punto libre. Ajustado a rejilla solo si snap activo; si no, crudo.
+  // (2) DXF: solo si el snap esta activo y no hubo candidato de obra mas cercano.
+  if (snapRejilla && opts.puntosSnapExtra && opts.puntosSnapExtra.length > 0) {
+    const p = engancharAPuntoExtra(x, y, opts.puntosSnapExtra, radioIman);
+    if (p !== null) return { x: p.x, y: p.y };
+  }
+
+  // (3) Rejilla: punto libre. Ajustado a rejilla solo si snap activo; si no, crudo.
   return snapRejilla ? snapARejilla(x, y, pasoRejilla) : { x, y };
 }
