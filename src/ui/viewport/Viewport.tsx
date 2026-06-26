@@ -14,6 +14,7 @@
 import { Canvas } from "@react-three/fiber";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { modeloStore, vistaStore, type ModoVista } from "../../estado";
+import { Boton } from "../primitivas/Boton";
 import { hexToken } from "./colores";
 import { Escena } from "./Escena";
 import { Hud } from "./Hud";
@@ -52,8 +53,11 @@ function useObraVacia(): boolean {
 }
 
 // Overlay HTML de primer uso: guia de arranque cuando la obra esta vacia.
-// Lenguaje de obra (CLAUDE.md §17, sin jerga FEM); glass por tokens. No captura
-// el puntero (pointer-events: none en CSS) para no tapar los controles del HUD.
+// Lenguaje de obra (CLAUDE.md §17, sin jerga FEM); glass por tokens. La tarjeta
+// no captura el puntero (pointer-events: none en CSS) para no tapar los controles
+// del HUD; solo el boton de accion lo recupera (.cx-empty__accion). El boton hace
+// obvio el siguiente paso (Krug, "no me hagas pensar"): abre Grupos/Plantas en vez
+// de obligar a buscar la accion en el menu/sidebar.
 function EstadoVacio() {
   return (
     <div className="cx-empty cx-float--center" role="note" aria-label="Primeros pasos">
@@ -61,6 +65,14 @@ function EstadoVacio() {
       <p className="cx-empty__texto">
         Crea un grupo y una planta para empezar a introducir la estructura.
       </p>
+      <div className="cx-empty__accion">
+        <Boton
+          variante="primary"
+          onClick={() => vistaStore.getState().abrirDialogo("gruposPlantas")}
+        >
+          Crear grupo y planta
+        </Boton>
+      </div>
     </div>
   );
 }
