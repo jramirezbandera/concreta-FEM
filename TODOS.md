@@ -293,3 +293,35 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   vigilar la fragilidad ante zoom/tamaño de viewport (fijar tamaño de viewport y cámara conocida).
 - **Depende de / bloquea:** requiere F16. **Coste:** CC ~30 min.
 - **Origen:** Revisión de ingeniería F16 (outside voice Codex #1+#2, D10).
+
+---
+
+## T-hud-layout · Sistema de slots del HUD: los paneles flotantes se solapan
+
+- **Qué:** Los paneles flotantes del viewport colisionan en las esquinas. El HUD
+  siempre-presente ([Hud.tsx](src/ui/viewport/Hud.tsx)) pinta GroupRibbon (arriba-izq),
+  SelectorModo (arriba-der) y ControlesZoom (abajo-der); y los `hudOverlays` que inyecta
+  [App.tsx](src/App.tsx) (InspectorPilar/Viga + PanelPlantillas arriba-der; PanelHerramienta
+  arriba-izq; BotonCalcular arriba-izq; ComboSelector arriba-der; docks de Resultados abajo)
+  se anclan TODOS a la MISMA esquina con `position:absolute; top/left:12px`
+  ([viewport.css](src/ui/viewport/viewport.css) `.cx-float--*`), sin reserva de espacio. Son
+  hermanos planos dentro de `.cx-viewport`, solo apilados por orden DOM (z-index del HUD 2).
+- **Síntomas (verificados en /design-review F16):** GroupRibbon tapa el título del diálogo
+  (ya mitigado: el modal sube a `--z-dialog`) y la cabecera del panel de herramienta; el
+  SelectorModo tapa el inspector y el ComboSelector ("Combina[ción]" recortado); el zoom tapa
+  el dock de esfuerzos; y el ↓/↑ del GroupRibbon **intercepta el clic del botón Calcular** (por
+  eso los specs E2E usan `dispatchEvent` en vez de `.click()`).
+- **Por qué no se arregló en /design-review:** es estructural (cambia el contrato de
+  `hudOverlays` de Viewport, la composición Hud/Viewport, ~8 CSS de panel y borra el parche
+  [resultadosLayout.css](src/ui/resultados/resultadosLayout.css)), y exige re-verificar el E2E.
+  Hacerlo a vuelapluma arriesgaba el trabajo verificado de F16.
+- **Cómo retomar (diseño propuesto, outside-voice):** convertir el HUD en una rejilla con
+  slots por zona (8 zonas canónicas §4.2). Los paneles declaran su zona (`grid-area`) en vez
+  de `top/left:12px`; varios paneles en la misma zona **se apilan en columna** (flex + gap) en
+  vez de solaparse. Eliminar `resultadosLayout.css` y su hack de orden de import. Definir una
+  escala de z-index (ya añadida: `--z-canvas/hud/float/dialog`). Tras el refactor, **quitar los
+  `dispatchEvent` de los specs E2E** (volver a `.click()`) y re-correr `npm run e2e` + `npm test`.
+- **Depende de / bloquea:** nada técnico, pero conviene hacerlo en su propia tarea con
+  experto-frontend-cad + re-verificación E2E. **Coste:** CC ~60-90 min.
+- **Origen:** Revisión de diseño /design-review F16 (hallazgo nº1, crítico; outside voice
+  Claude subagent confirmó la causa raíz).
