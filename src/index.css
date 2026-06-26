@@ -117,3 +117,18 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.085em;
 }
+
+/* --- Motion: respeta la preferencia del sistema (a11y) ---
+   Quien tenga "reducir movimiento" activado no debe sufrir el pop del dialogo,
+   transiciones de hover ni (en el futuro) la animacion de la deformada. Se
+   neutralizan animaciones/transiciones casi por completo sin romper el layout. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
