@@ -63,15 +63,16 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-design-2 · Hospedar las fuentes Geist (woff2)
+## T-design-2 · Hospedar las fuentes Geist (woff2) — RESUELTO
 
-- **Qué:** [src/styles/tokens.css](src/styles/tokens.css) declara `"Geist"`/`"Geist Mono"` al
-  frente del stack pero sin `@font-face`; se usa el fallback de sistema.
-- **Por qué:** La "firma de ingeniería" del Spec (datos numéricos en mono tabular) se renderiza
-  en una mono genérica hasta que aterricen los woff2. Fidelidad del sistema de diseño.
-- **Cómo retomar:** vendorizar Geist Sans + Geist Mono woff2 en `public/fonts/` y añadir las
-  reglas `@font-face` con `font-display: swap`. No hay que tocar el stack (ya prioriza Geist).
-- **Depende de / bloquea:** nada. **Coste:** CC ~15 min. **Origen:** Revisión de diseño F9 (Pass 5).
+- **Estado:** RESUELTO (revisión de diseño /design-review, feature-16). Geist y Geist Mono
+  (fuentes VARIABLES, un woff2 por familia) vendorizadas en [src/styles/fonts/](src/styles/fonts/)
+  (no `public/`: así Vite fingerprintea y rebasea la `url()` con el base `/concreta-FEM/`, que una
+  ruta absoluta a public no respeta). `@font-face` con `font-display: swap` en
+  [src/styles/fonts.css](src/styles/fonts.css), importado el primero en `index.css`. Licencia OFL
+  incluida. Verificado en navegador: `document.fonts.check('14px Geist')` y `'Geist Mono'` = true;
+  toda la UI y las cifras (mono tabular) renderizan ya con la tipografía de marca.
+- **Origen:** Revisión de diseño F9 (Pass 5); cerrado en /design-review F16.
 
 ---
 

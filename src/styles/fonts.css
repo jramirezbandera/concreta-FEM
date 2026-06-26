@@ -1,0 +1,25 @@
+/*
+ * Tipografia de marca self-hosted (Spec Diseno UI §1.5 / §8): Geist (UI) y Geist
+ * Mono (datos numericos/tecnicos en tabular). Fuentes VARIABLES (un woff2 por
+ * familia cubre los pesos 100-900; la UI usa 400/500/600). Vendorizadas bajo
+ * src/styles/fonts/ (NO public/) a proposito: Vite procesa, fingerprintea y
+ * REBASEA la url() con el base de despliegue (/concreta-FEM/); una ruta absoluta
+ * a public/ en CSS no respeta el base. Licencia: OFL (src/styles/fonts/LICENSE.txt).
+ *
+ * font-display: swap -> texto visible ya con el fallback de sistema y cambia a
+ * Geist al cargar (sin bloqueo). Cierra la deuda T-design-2.
+ */
+@font-face {
+  font-family: "Geist";
+  src: url("./fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("./fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
