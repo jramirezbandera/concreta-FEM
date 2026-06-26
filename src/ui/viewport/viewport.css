@@ -58,8 +58,8 @@
   gap: 4px;
   padding: 4px;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-bd);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-float);
@@ -104,8 +104,8 @@
   padding: 18px 22px;
   text-align: center;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-bd);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-float);
@@ -115,7 +115,7 @@
   margin: 0 0 6px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-1);
+  color: var(--text);
 }
 .cx-empty__texto {
   margin: 0;
@@ -129,8 +129,8 @@
   pointer-events: none;
   padding: 10px 16px;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-bd);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-float);
