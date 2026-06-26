@@ -9,6 +9,11 @@
 .cx-dialog__overlay {
   position: fixed;
   inset: 0;
+  /* Por encima del HUD glass (--z-hud) del viewport: sin esto, las cintas
+     flotantes (GroupRibbon, modo de vista) se pintaban SOBRE el dialogo y
+     tapaban su titulo. El dialogo se porta a body (Radix) pero el HUD tiene
+     z-index propio, asi que el modal necesita el suyo, mayor. */
+  z-index: var(--z-dialog);
   background-color: var(--scrim);
   animation: cx-dialog-fade 0.12s ease;
 }
@@ -19,6 +24,9 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  /* Sobre el scrim (mismo nivel que el overlay; el orden DOM lo deja encima) y
+     por encima del HUD del viewport (--z-hud). */
+  z-index: var(--z-dialog);
   display: flex;
   flex-direction: column;
   width: min(560px, calc(100vw - 32px));

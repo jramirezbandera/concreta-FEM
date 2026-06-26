@@ -63,7 +63,17 @@
   /* --- Glass HUD (§4.2) --- */
   --glass: rgba(255, 255, 255, 0.82);
   --glass-bd: rgba(185, 194, 207, 0.6);
+  --glass-blur: 6px; /* radio de desenfoque del HUD glass (§4.2) */
   --scrim: rgba(11, 16, 28, 0.42); /* fondo de dialogo modal (§5) */
+
+  /* --- Capas (z-index): escala unica de apilado. El lienzo y el HUD glass
+     viven dentro de .cx-viewport; el dialogo modal se porta a body (Radix) y
+     debe quedar SIEMPRE por encima del HUD (si no, las cintas glass tapan el
+     dialogo). --z-float reservado para una futura coordinacion de paneles. */
+  --z-canvas: 0;
+  --z-hud: 2;
+  --z-float: 4;
+  --z-dialog: 100;
 
   /* --- Sombras (§1.6) --- */
   --shadow-panel: 0 1px 2px rgba(20, 30, 48, 0.04);
