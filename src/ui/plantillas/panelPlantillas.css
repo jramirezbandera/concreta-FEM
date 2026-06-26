@@ -1,23 +1,24 @@
 /* PanelPlantillas (feature-15, T3.1): panel flotante de la herramienta F4 para
    importar y gestionar plantillas DXF (calco). Posicion canonica: arriba-DERECHA
    del lienzo (junto al ToolsRail F4). Estilado solo con tokens; reusa
-   .cx-float / .cx-campo de las primitivas. NO tapa el centro del viewport. */
+   .cx-float / .cx-campo de las primitivas. NO tapa el centro del viewport.
+   REGLA (como el resto de .cx-*): solo tokens via var(--...), cero hex/fallback. */
 
 .cx-panel-plantillas {
   position: absolute;
-  top: var(--space-3, 12px);
-  right: var(--space-3, 12px);
+  top: var(--space-3);
+  right: var(--space-3);
   width: 260px;
-  max-height: calc(100% - var(--space-6, 48px));
+  max-height: calc(100% - var(--space-6));
   display: flex;
   flex-direction: column;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
 }
 
 .cx-panel-plantillas .cx-float__body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
   overflow-y: auto;
 }
 
@@ -25,9 +26,9 @@
 .cx-panel-plantillas__avisos {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1, 4px);
+  gap: var(--space-1);
   font-size: 12px;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-3);
 }
 
 .cx-panel-plantillas__aviso {
@@ -38,7 +39,7 @@
 .cx-panel-plantillas__lista {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1, 4px);
+  gap: var(--space-1);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -47,17 +48,17 @@
 .cx-panel-plantillas__fila {
   display: flex;
   align-items: center;
-  gap: var(--space-1, 4px);
-  padding: var(--space-1, 4px);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: var(--radius-1, 4px);
-  background: var(--surface, #fff);
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
   cursor: pointer;
 }
 
 .cx-panel-plantillas__fila--activa {
-  border-color: var(--accent, #2563eb);
-  box-shadow: 0 0 0 1px var(--accent, #2563eb);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .cx-panel-plantillas__nombre {
@@ -84,35 +85,35 @@
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: var(--radius-1, 4px);
+  border-radius: var(--radius-pill);
   background: none;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-3);
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
 }
 
 .cx-panel-plantillas__icono:hover {
-  border-color: var(--border, #e5e7eb);
-  color: var(--text, #111827);
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .cx-panel-plantillas__icono--activo {
-  color: var(--accent, #2563eb);
+  color: var(--accent);
 }
 
 /* Bloque de controles de transform de la plantilla activa. */
 .cx-panel-plantillas__transform {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2, 8px);
-  padding-top: var(--space-2, 8px);
-  border-top: 1px solid var(--border, #e5e7eb);
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
 }
 
 .cx-panel-plantillas__fila-doble {
   display: flex;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
 }
 
 .cx-panel-plantillas__fila-doble > * {
@@ -122,12 +123,12 @@
 
 .cx-panel-plantillas__vacio {
   font-size: 12px;
-  color: var(--text-muted, #6b7280);
+  color: var(--text-3);
 }
 
 .cx-panel-plantillas__acciones {
-  margin-top: var(--space-1, 4px);
+  margin-top: var(--space-1);
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
 }

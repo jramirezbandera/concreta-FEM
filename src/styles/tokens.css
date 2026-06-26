@@ -88,6 +88,18 @@
   --radius-panel: 10px;
   --radius-dialog: 14px;
   --radius-toggle: 11px; /* capsula */
+  --radius-control: 6px; /* inputs/selects (26px alto, §5) */
+
+  /* --- Espaciado (escala 4px, §1.6 ritmo) ---
+     Definidos aqui para que `var(--space-N)` de los paneles deje de depender de
+     un fallback literal repetido en cada call site (la escala era una ficcion).
+     Valores = los fallbacks previos, asi que NO hay cambio visual. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 48px;
 
   /* --- Tipografia (§1.5) --- */
   /* Geist (UI) y Geist Mono (datos numericos). Sin woff2 vendorizados todavia:
