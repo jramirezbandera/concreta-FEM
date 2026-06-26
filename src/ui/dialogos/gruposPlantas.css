@@ -126,7 +126,9 @@
 }
 .cx-gyp__planta {
   display: grid;
-  grid-template-columns: auto 1fr auto auto auto;
+  /* La columna del Nombre garantiza un minimo legible (antes 1fr colapsaba a
+     ~46px con Cota/Altura/Eliminar fijos y "Planta 2" se recortaba a "Plan"). */
+  grid-template-columns: auto minmax(76px, 1fr) auto auto auto;
   align-items: end;
   gap: 8px;
   padding: 6px 8px;
@@ -161,9 +163,10 @@
   outline-offset: 1px;
 }
 
-/* Campo numerico compacto dentro de una fila de planta */
+/* Campo numerico compacto dentro de una fila de planta (Cota/Altura + caja de
+   unidad "m"). 64px basta para 1-2 cifras + sufijo y deja sitio al Nombre. */
 .cx-gyp__campo-num {
-  width: 80px;
+  width: 64px;
 }
 
 /* --- Estado vacio amable --- */
