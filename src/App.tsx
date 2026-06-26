@@ -10,7 +10,7 @@
 // una obra anterior tras restaurar autosave o cambiar de proyecto).
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Shell, useArranquePersistencia } from "./ui/shell";
-import { Viewport } from "./ui/viewport";
+import { Viewport, Slot } from "./ui/viewport";
 import { suscribirCoords, leerCoords } from "./ui/viewport";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
@@ -315,9 +315,15 @@ export default function App() {
               ),
               hudOverlays: (
                 <>
-                  <InspectorPilar />
-                  <PanelHerramientaPilar />
-                  <PanelPlantillas />
+                  <Slot zona="mid-right">
+                    <InspectorPilar />
+                  </Slot>
+                  <Slot zona="top-left">
+                    <PanelHerramientaPilar />
+                  </Slot>
+                  <Slot zona="top-right">
+                    <PanelPlantillas />
+                  </Slot>
                 </>
               ),
             }
@@ -331,9 +337,15 @@ export default function App() {
                 ),
                 hudOverlays: (
                   <>
-                    <InspectorViga />
-                    <PanelHerramientaViga />
-                    <PanelPlantillas />
+                    <Slot zona="mid-right">
+                      <InspectorViga />
+                    </Slot>
+                    <Slot zona="top-left">
+                      <PanelHerramientaViga />
+                    </Slot>
+                    <Slot zona="top-right">
+                      <PanelPlantillas />
+                    </Slot>
                   </>
                 ),
               }
@@ -342,11 +354,21 @@ export default function App() {
                   sceneOverlays: <DeformadaOverlay />,
                   hudOverlays: (
                     <>
-                      <BotonCalcular />
-                      <ComboSelector />
-                      <TablaReacciones />
-                      <PanelDiagramas />
-                      <LeyendaEscala />
+                      <Slot zona="top-center">
+                        <BotonCalcular />
+                      </Slot>
+                      <Slot zona="top-right">
+                        <ComboSelector />
+                      </Slot>
+                      <Slot zona="bottom-left">
+                        <TablaReacciones />
+                      </Slot>
+                      <Slot zona="bottom-right">
+                        <PanelDiagramas />
+                      </Slot>
+                      <Slot zona="bottom-center">
+                        <LeyendaEscala />
+                      </Slot>
                     </>
                   ),
                 }

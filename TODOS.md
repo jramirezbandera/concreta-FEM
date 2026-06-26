@@ -48,18 +48,13 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-design-1 · Estado del motor visible (spec §6.3)
+## T-design-1 · Estado del motor visible (spec §6.3) — RESUELTO (feature-17)
 
-- **Qué:** El botón `Calcular obra` ([src/ui/shell/Brandbar.tsx](src/ui/shell/Brandbar.tsx)) está
-  deshabilitado con un tooltip, pero no hay indicador del estado del motor.
-- **Por qué:** El Spec Diseño UI §6.3 quiere un estado visible "● PyNite · Pyodide ready"
-  (verde) + datos del worker. Sin él, el usuario no sabe cuándo el motor está listo y el
-  botón parece muerto. Diseño para la confianza.
-- **Cómo retomar:** al cablear el solver a la UI (feature del motor), añadir un indicador de
-  estado del worker (cargando motor / listo / calculando) en la brandbar o un panel "Motor",
-  y habilitar `Calcular obra` solo cuando esté listo. Reutiliza `solverClient`.
-- **Depende de / bloquea:** integración del solver en la UI (no fijada a F9).
-- **Coste:** CC ~25 min. **Origen:** Revisión de diseño F9 (Pass 7).
+- **Estado:** RESUELTO en feature-17. La [Brandbar](src/ui/shell/Brandbar.tsx) muestra un
+  indicador "● motor listo / preparando / calculando / con error" (lenguaje de obra) leído del
+  nuevo `calculoStore`, y el botón "▶ Calcular obra" se **habilita** solo cuando el motor está
+  listo (o en error, para reintentar) y no hay cálculo en curso; cableado a `calcularObra()`.
+- **Origen:** Revisión de diseño F9 (Pass 7); cerrado en feature-17.
 
 ---
 
@@ -221,18 +216,14 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-calcular-menu-sink · "Calcular obra" del menú no refleja estado/errores en el botón
+## T-calcular-menu-sink · "Calcular obra" del menú no refleja estado/errores — RESUELTO (feature-17)
 
-- **Qué:** El menú (entradaVigas) dispara `calcularObra()` fire-and-forget sin sink
-  ([src/ui/shell/Menubar.tsx](src/ui/shell/Menubar.tsx) ~65); `BotonCalcular` solo sondea estado
-  cuando su propio estado ya es transitorio, así que un cálculo lanzado desde el menú puede no
-  reflejarse (estado/errores de obra) hasta otro refresh.
-- **Por qué:** El usuario podría no ver "Calculando…" ni los errores de obra de un cálculo de menú.
-  (El guard de reentrada a nivel de módulo SÍ evita el doble cálculo, así que no es un bug de datos.)
-- **Cómo retomar:** que el camino de menú comparta un sink/observador (p. ej. un store ligero de
-  estado de cálculo) que el botón consuma, o que `usePrecargaMotor`/un store de cálculo dispare el
-  sondeo al iniciarse cualquier cálculo. **Coste:** CC ~30 min.
-- **Depende de / bloquea:** nada. **Origen:** Revisión de ingeniería F14 (outside voice Codex, MEDIUM).
+- **Estado:** RESUELTO en feature-17. Se creó `src/estado/calculoStore.ts` (Zustand, fuera de
+  undo) y `calcularObra()` escribe SIEMPRE en él por un sink por defecto, así que el cálculo
+  lanzado desde el menú ([Menubar.tsx](src/ui/shell/Menubar.tsx)) refleja estado/errores en
+  todos los consumidores del store (botón del panel y brandbar). El menú deshabilita su item
+  según `estadoMotor`. El guard de reentrada `calculoEnVuelo` se conserva.
+- **Origen:** Revisión de ingeniería F14 (outside voice Codex, MEDIUM); cerrado en feature-17.
 
 ---
 
@@ -296,7 +287,21 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-hud-layout · Sistema de slots del HUD: los paneles flotantes se solapan
+## T-hud-layout · Sistema de slots del HUD: los paneles flotantes se solapan — RESUELTO (feature-17)
+
+- **Estado:** RESUELTO en feature-17. El HUD pasó a una capa `.cx-hud` con **8 zonas**
+  (`.cx-zone--*`, flex-column) y un componente [Slot.tsx](src/ui/viewport/Slot.tsx)
+  (`createPortal` al contenedor de zona); [Viewport.tsx](src/ui/viewport/Viewport.tsx) monta las
+  zonas + provee el contexto, y [Hud.tsx](src/ui/viewport/Hud.tsx) + [App.tsx](src/App.tsx)
+  envuelven cada panel en `<Slot zona>`. Paneles de orígenes distintos (HUD persistente + overlays)
+  se **apilan en columna** en la misma zona; BotonCalcular se movió a `top-center` (fin del solape
+  con el GroupRibbon). Se eliminó el parche `resultadosLayout.css`, las anclas absolutas co-locadas
+  de cada panel y las clases `.cx-float--top-left/top-right/bottom-right`. Los specs E2E vuelven a
+  `.click()` (se quitó el `dispatchEvent`). Gotcha resuelto: bucle de render en `CapaHud` por
+  callback-ref inline → refs estables con `useMemo([])`.
+- **Origen:** Revisión de diseño /design-review F16 (hallazgo nº1, crítico); cerrado en feature-17.
+
+<details><summary>Contexto histórico (pre-resolución)</summary>
 
 - **Qué:** Los paneles flotantes del viewport colisionan en las esquinas. El HUD
   siempre-presente ([Hud.tsx](src/ui/viewport/Hud.tsx)) pinta GroupRibbon (arriba-izq),
@@ -325,3 +330,21 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   experto-frontend-cad + re-verificación E2E. **Coste:** CC ~60-90 min.
 - **Origen:** Revisión de diseño /design-review F16 (hallazgo nº1, crítico; outside voice
   Claude subagent confirmó la causa raíz).
+
+</details>
+
+---
+
+## T-estado-motor-helpers · DRY de los helpers de estado del motor
+
+- **Qué:** La lógica etiqueta/habilitación/tag por `EstadoMotor` está triplicada:
+  `etiquetaBoton`/`botonHabilitado`/`tagEstadoMotor` en [BotonCalcular.tsx](src/ui/resultados/BotonCalcular.tsx),
+  y réplicas en [Brandbar.tsx](src/ui/shell/Brandbar.tsx) (`rotuloMotor`/`tonoMotor`/
+  `botonCalculoHabilitado`) y en el criterio de habilitación de [Menubar.tsx](src/ui/shell/Menubar.tsx).
+- **Por qué:** Duplicación consciente introducida en feature-17 (aislamiento de tareas paralelas:
+  los consumidores no podían tocar `/src/ui/resultados`). Tres copias del mismo criterio
+  "listo|error y no calculando" pueden divergir al evolucionar.
+- **Cómo retomar:** extraer los helpers a un módulo compartido (p. ej.
+  `src/ui/resultados/estadoMotorUI.ts`) y consumirlo desde BotonCalcular, Brandbar y Menubar.
+- **Depende de / bloquea:** nada. **Coste:** CC ~15-20 min.
+- **Origen:** Auditoría de arquitectura feature-17 (guardián, MENOR).

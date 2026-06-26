@@ -10,6 +10,7 @@
 import { useSyncExternalStore } from "react";
 import { modeloStore, vistaStore, type ModoVista } from "../../estado";
 import { Segmentado, type OpcionSegmento, PanelFlotante, Boton } from "../primitivas";
+import { Slot } from "./Slot";
 import { plantasDeGrupo } from "./hooks/useGeometriaModelo";
 import { emitirZoom } from "./hooks/zoomBus";
 
@@ -111,11 +112,7 @@ function cambiarPlanta(direccion: 1 | -1): void {
 function GroupRibbon() {
   const { grupoNombre, plantaNombre, cota, hayAnterior, haySiguiente } = useRibbonData();
   return (
-    <PanelFlotante
-      className="cx-float--top-left"
-      titulo={grupoNombre ?? "Sin grupo"}
-      tag={plantaNombre ?? "—"}
-    >
+    <PanelFlotante titulo={grupoNombre ?? "Sin grupo"} tag={plantaNombre ?? "—"}>
       <div className="cx-ribbon-row">
         <span className="mono cx-ribbon-cota">
           {cota !== null ? `${cota.toFixed(2)} m` : "—"}
@@ -146,7 +143,7 @@ function GroupRibbon() {
 function SelectorModo() {
   const modoVista = useVista((s) => s.modoVista);
   return (
-    <div className="cx-float cx-float--top-right cx-float--bare">
+    <div className="cx-float cx-float--bare">
       <Segmentado<ModoVista>
         aria-label="Modo de vista"
         opciones={OPCIONES_MODO}
@@ -159,7 +156,7 @@ function SelectorModo() {
 
 function ControlesZoom() {
   return (
-    <div className="cx-float cx-float--bottom-right cx-float--bare cx-zoom">
+    <div className="cx-float cx-float--bare cx-zoom">
       <Boton variante="ghost" aria-label="Acercar" onClick={() => emitirZoom("in")}>
         +
       </Boton>
@@ -171,11 +168,19 @@ function ControlesZoom() {
 }
 
 export function Hud() {
+  // Cada control se porta (Slot) a su zona; el apilado en columna lo da la zona, ya
+  // no la clase de ancla de esquina (.cx-float--*). La capa .cx-hud vive en Viewport.
   return (
-    <div className="cx-hud">
-      <GroupRibbon />
-      <SelectorModo />
-      <ControlesZoom />
-    </div>
+    <>
+      <Slot zona="top-left">
+        <GroupRibbon />
+      </Slot>
+      <Slot zona="top-right">
+        <SelectorModo />
+      </Slot>
+      <Slot zona="bottom-right">
+        <ControlesZoom />
+      </Slot>
+    </>
   );
 }

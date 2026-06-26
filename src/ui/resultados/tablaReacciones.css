@@ -5,9 +5,6 @@
    sobrescribir con otra clase. Solo tokens. */
 
 .cx-reacciones {
-  position: absolute;
-  bottom: var(--space-3, 12px);
-  right: var(--space-3, 12px);
   width: 380px;
 }
 

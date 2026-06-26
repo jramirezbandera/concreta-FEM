@@ -12,12 +12,66 @@
 //     flotantes adicionales: RampLegend, ComboRibbon, dock de esfuerzos F14).
 // Las features de UI consumen este contrato sin modificar Escena/Hud/Geometria.
 import { Canvas } from "@react-three/fiber";
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { modeloStore, vistaStore, type ModoVista } from "../../estado";
 import { Boton } from "../primitivas/Boton";
 import { hexToken } from "./colores";
 import { Escena } from "./Escena";
 import { Hud } from "./Hud";
+import { ProveedorHud, type ContenedoresHud, type ZonaHud } from "./Slot";
+
+// Las 8 bandas-zona de la capa HUD (flex-column). El orden no importa: cada zona se
+// ancla por su clase .cx-zone--*. Slot porta a estos contenedores (ver Slot.tsx).
+const ZONAS_HUD: readonly ZonaHud[] = [
+  "top-left",
+  "top-center",
+  "top-right",
+  "mid-left",
+  "mid-right",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+];
+
+// Capa HUD: 8 contenedores de zona absolutos en flex-column. No captura el puntero
+// (solo los paneles, via .cx-zone > *). Publica sus <div> por callback ref en estado
+// para que los Slot descendientes re-rendericen al montarse (tolera el target null
+// del primer render). Cero re-render por frame: el estado solo cambia al montar/
+// desmontar la capa, nunca durante la interaccion del lienzo.
+function CapaHud({ children }: { children: ReactNode }) {
+  const [contenedores, setContenedores] = useState<ContenedoresHud>({});
+  // Un callback ref ESTABLE por zona (creado una sola vez). Si se creara inline en el
+  // render (refZona(zona) devolviendo una nueva funcion cada vez), React detectaria una
+  // ref distinta en cada commit y la desengancharia/reengancharia (null -> nodo) sin
+  // parar, disparando setContenedores en bucle. Con identidades fijas, cada ref solo se
+  // invoca al montar/desmontar su <div>: cero re-render por frame (regla #11).
+  const refsZona = useMemo(
+    () =>
+      ZONAS_HUD.reduce(
+        (refs, zona) => {
+          refs[zona] = (el: HTMLDivElement | null) => {
+            setContenedores((prev) => {
+              if (prev[zona] === el) return prev;
+              return { ...prev, [zona]: el };
+            });
+          };
+          return refs;
+        },
+        {} as Record<ZonaHud, (el: HTMLDivElement | null) => void>,
+      ),
+    [],
+  );
+  return (
+    <>
+      <div className="cx-hud">
+        {ZONAS_HUD.map((zona) => (
+          <div key={zona} ref={refsZona[zona]} className={`cx-zone cx-zone--${zona}`} />
+        ))}
+      </div>
+      <ProveedorHud contenedores={contenedores}>{children}</ProveedorHud>
+    </>
+  );
+}
 
 export interface ViewportProps {
   /** Objetos R3F inyectados DENTRO de la escena (F11/12/14), tras la geometria base. */
@@ -115,8 +169,13 @@ export function Viewport({ sceneOverlays, hudOverlays, className }: ViewportProp
         <Escena modoVista={modoEscena} overlays={sceneOverlays} />
       </Canvas>
 
-      <Hud />
-      {hudOverlays}
+      {/* HUD persistente + overlays inyectados portan a las zonas (apilado en
+          columna). EstadoVacio/MosaicoPlaceholder quedan FUERA de la rejilla
+          (centrados, .cx-float--center). */}
+      <CapaHud>
+        <Hud />
+        {hudOverlays}
+      </CapaHud>
       {obraVacia && <EstadoVacio />}
       {modoVista === "mosaico" && <MosaicoPlaceholder />}
     </div>

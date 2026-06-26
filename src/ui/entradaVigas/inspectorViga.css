@@ -5,9 +5,6 @@
    primitivas. Espejo de inspectorPilar.css. */
 
 .cx-inspector-viga {
-  position: absolute;
-  top: var(--space-3, 12px);
-  right: var(--space-3, 12px);
   width: 260px;
   display: flex;
   flex-direction: column;

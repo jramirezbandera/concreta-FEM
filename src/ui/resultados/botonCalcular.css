@@ -5,9 +5,6 @@
    Tarea 3.1) puede sobrescribir la posicion con otra clase. */
 
 .cx-calcular {
-  position: absolute;
-  top: var(--space-3, 12px);
-  left: var(--space-3, 12px);
   width: 240px;
 }
 

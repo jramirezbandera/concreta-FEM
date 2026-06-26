@@ -121,7 +121,7 @@ export function LeyendaEscala() {
 
   return (
     <PanelFlotante
-      className="cx-leyenda cx-float--bottom-right"
+      className="cx-leyenda"
       titulo="Deformada"
       tag={entradas.vigente ? undefined : "obsoleta"}
     >

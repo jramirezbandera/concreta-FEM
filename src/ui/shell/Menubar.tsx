@@ -3,6 +3,7 @@ import {
   vistaStore,
   modeloStore,
   seleccionStore,
+  calculoStore,
   eliminarPilar,
   eliminarViga,
 } from "../../estado";
@@ -12,14 +13,14 @@ import {
   type MenuDef,
   type MenuItem as MenuItemDef,
 } from "./menus";
-// CONTRATO CON TAREA 1.1 (useCalcular.ts): la accion "calcular" del menu necesita la
-// orquestacion del calculo, pero el DISPATCH es un mapa IMPERATIVO (no es un componente,
-// no puede usar hooks). Para resolverlo igual que `borrarSeleccion` (funcion plana que
-// habla con los stores/servicios), se importa `calcularObra()`: la MISMA logica de calculo
-// que usa el hook `useCalcular`, factorizada SIN hooks. El boton (BotonCalcular) usa el
-// hook (estado reactivo para la UI); el menu usa esta funcion imperativa. Ambos disparan
-// el mismo corte vertical. Si por la carrera el modulo aun no exporta `calcularObra`, el
-// import queda correcto y se reconcilia al integrar.
+// La accion "calcular" del menu necesita la orquestacion del calculo, pero el DISPATCH es
+// un mapa IMPERATIVO (no es un componente, no puede usar hooks). Igual que `borrarSeleccion`
+// (funcion plana que habla con los stores/servicios), se importa `calcularObra()`: la MISMA
+// logica de calculo que usa el hook `useCalcular`, factorizada SIN hooks. `calcularObra()`
+// vuelca SIEMPRE el progreso/errores al `calculoStore` por su sink por defecto, asi que el
+// estado del menu queda reflejado en cualquier consumidor del store (boton del panel y
+// brandbar) sin que aqui haga falta sink alguno. Boton y menu disparan el mismo corte
+// vertical y convergen en el mismo estado.
 import { calcularObra } from "../resultados/useCalcular";
 
 // Menubar (Spec Diseno UI §2 / §3.2): menus contextuales que cambian con la
@@ -60,8 +61,10 @@ export const DISPATCH: Record<AccionMenu, () => void> = {
   activarHerramientaPilar: () => vistaStore.getState().setHerramienta("pilar"),
   activarHerramientaViga: () => vistaStore.getState().setHerramienta("viga"),
   borrarSeleccion,
-  // El calculo es asincrono (CLAUDE.md §7): se dispara y olvida (la UI refleja el progreso
-  // por el estado del motor en BotonCalcular). `void` descarta la promesa deliberadamente.
+  // El calculo es asincrono (CLAUDE.md §7): el menu lanza el pipeline y NO espera la promesa
+  // (`void` la descarta deliberadamente). No es un "disparar y olvidar" ciego: `calcularObra()`
+  // alimenta el `calculoStore`, asi que el progreso/errores quedan reflejados en cualquier
+  // consumidor del store (boton del panel y brandbar), sin que el menu pase ningun sink.
   calcular: () => void calcularObra(),
 };
 
@@ -71,11 +74,26 @@ function etiquetaDe(item: MenuItemDef): string {
   return typeof item === "string" ? item : item.etiqueta;
 }
 
+// Disponibilidad del item "Calcular obra" segun el estado del calculo (calculoStore,
+// fuente unica). Mismo criterio que el boton del panel (BotonCalcular): solo se admite
+// lanzar el calculo con el motor "listo" (o "error", para reintentar) y sin un calculo en
+// curso. Mientras se prepara el motor o se calcula, el item del menu queda deshabilitado.
+// Hook minimo y local: solo el item "calcular" se suscribe al store; los placeholders no.
+function useCalcularDeshabilitado(): boolean {
+  return calculoStore(
+    (s) =>
+      s.calculando || !(s.estadoMotor === "listo" || s.estadoMotor === "error"),
+  );
+}
+
 // Un item del desplegable. String -> fila inerte (placeholder, como en F9).
 // Objeto -> boton accionable que dispara el handler y cierra el Popover. Se
 // envuelve en Popover.Close (asChild) para que Radix gestione el cierre y el
 // foco de forma accesible sin estado controlado manual.
 function Item({ item }: { item: MenuItemDef }) {
+  // Se lee SIEMPRE (Reglas de Hooks); solo el item "calcular" lo usa para deshabilitarse.
+  // El resto de items accionables/placeholders ignoran este flag (no se ven afectados).
+  const calcularDeshabilitado = useCalcularDeshabilitado();
   if (typeof item === "string") {
     return (
       <div className="cx-menu-empty" role="menuitem">
@@ -83,6 +101,10 @@ function Item({ item }: { item: MenuItemDef }) {
       </div>
     );
   }
+  // El item "Calcular obra" se deshabilita mientras se prepara el motor o hay un calculo en
+  // curso (mismo criterio que el boton del panel). Deshabilitado: ni dispara la accion ni
+  // cierra el Popover (Radix respeta el `disabled` del boton envuelto en Popover.Close).
+  const deshabilitado = item.accion === "calcular" && calcularDeshabilitado;
   return (
     <Popover.Close asChild>
       <button
@@ -90,6 +112,7 @@ function Item({ item }: { item: MenuItemDef }) {
         role="menuitem"
         className="cx-menu-item"
         onClick={DISPATCH[item.accion]}
+        disabled={deshabilitado}
       >
         {item.etiqueta}
       </button>

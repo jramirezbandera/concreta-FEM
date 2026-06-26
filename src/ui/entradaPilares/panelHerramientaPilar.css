@@ -4,9 +4,6 @@
    .cx-float / .cx-campo de las primitivas. */
 
 .cx-herramienta-pilar {
-  position: absolute;
-  top: var(--space-3, 12px);
-  left: var(--space-3, 12px);
   width: 240px;
   display: flex;
   flex-direction: column;

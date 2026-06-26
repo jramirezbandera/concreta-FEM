@@ -4,9 +4,6 @@
    tokens; reusa .cx-float de PanelFlotante. Coherente con inspectorViga.css. */
 
 .cx-panel-diagramas {
-  position: absolute;
-  right: var(--space-3, 12px);
-  bottom: var(--space-3, 12px);
   width: 360px;
   display: flex;
   flex-direction: column;

@@ -15,7 +15,7 @@
 // `mensaje` (texto en espanol, no el `detalle` tecnico).
 // =============================================================================
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import {
   discretizar,
@@ -23,6 +23,7 @@ import {
   type ModeloFEM,
   type Trazabilidad,
 } from "../../discretizador";
+import { calculoStore } from "../../estado/calculoStore";
 import { modeloStore } from "../../estado/modeloStore";
 import { resultadosStore } from "../../estado/resultadosStore";
 import { vistaStore } from "../../estado/vistaStore";
@@ -85,12 +86,80 @@ export interface CalculoSink {
   onRefrescarEstado?: () => void;
 }
 
+// -----------------------------------------------------------------------------
+// refrescarEstadoMotor(): consulta puntual a solverClient.estado() y vuelca el
+// EstadoMotor al calculoStore (fuente unica). A nivel de modulo (no hook) para que
+// lo compartan el sondeo (useEstadoMotor.refrescar), la precarga y el `sink` por
+// defecto de calcularObra sin duplicar logica. Escribir en el store tras desmontar
+// es inocuo (Zustand no usa setState de React): no necesita guard de montaje.
+// -----------------------------------------------------------------------------
+function refrescarEstadoMotor(): void {
+  void solverClient
+    .estado()
+    .then((e) => {
+      // set con el mismo valor no notifica a los suscriptores: barato e idempotente.
+      if (calculoStore.getState().estadoMotor !== e) {
+        calculoStore.getState().setEstadoMotor(e);
+      }
+    })
+    .catch(() => {
+      // estado() es un passthrough que no deberia rechazar; si lo hace, no tocamos
+      // el estado (lo refrescara la proxima transicion disparada).
+    });
+}
+
+// -----------------------------------------------------------------------------
+// sinkAlStore: el `sink` por defecto que vuelca el progreso del pipeline al
+// calculoStore (fuente UNICA de verdad del estado de calculo). Asi tanto el boton
+// (via useCalcular) como el menu (sin sink) acaban reflejados en el mismo store.
+// `onRefrescarEstado` reconsulta el EstadoMotor real (lanzar/fin de calculo).
+// -----------------------------------------------------------------------------
+const sinkAlStore: CalculoSink = {
+  onCalculando: (v) => calculoStore.getState().setCalculando(v),
+  onErrores: (e) => calculoStore.getState().setErrores(e),
+  onAvisos: (a) => calculoStore.getState().setAvisos(a),
+  onErrorMotor: (e) => calculoStore.getState().setUltimoError(e),
+  onRefrescarEstado: () => refrescarEstadoMotor(),
+};
+
+// Combina el sink por defecto (al store) con el del llamante: cada callback escribe
+// SIEMPRE en el store y, ademas, invoca el del llamante si lo trae. Asi el camino
+// reactivo de useCalcular (que ya lee del store) y el menu (sin sink) convergen, sin
+// perder a ningun consumidor que pase su propio sink.
+function combinarConStore(sink: CalculoSink): CalculoSink {
+  return {
+    onCalculando: (v) => {
+      sinkAlStore.onCalculando?.(v);
+      sink.onCalculando?.(v);
+    },
+    onErrores: (e) => {
+      sinkAlStore.onErrores?.(e);
+      sink.onErrores?.(e);
+    },
+    onAvisos: (a) => {
+      sinkAlStore.onAvisos?.(a);
+      sink.onAvisos?.(a);
+    },
+    onErrorMotor: (e) => {
+      sinkAlStore.onErrorMotor?.(e);
+      sink.onErrorMotor?.(e);
+    },
+    onRefrescarEstado: () => {
+      sinkAlStore.onRefrescarEstado?.();
+      sink.onRefrescarEstado?.();
+    },
+  };
+}
+
 // Guard de reentrada a nivel de modulo: sincrono, robusto a doble disparo desde
 // distintos origenes (boton del componente y menu comparten este flag).
 let calculoEnVuelo = false;
 
-export async function calcularObra(sink: CalculoSink = {}): Promise<void> {
+export async function calcularObra(sinkLlamante: CalculoSink = {}): Promise<void> {
   if (calculoEnVuelo) return; // ya hay un calculo en curso: no relanzar.
+  // El pipeline escribe SIEMPRE al calculoStore (fuente unica) y, si el llamante trajo
+  // su propio sink, tambien a el. Boton (useCalcular) y menu (sin sink) convergen.
+  const sink = combinarConStore(sinkLlamante);
   calculoEnVuelo = true;
   sink.onCalculando?.(true);
   sink.onErrorMotor?.(null);
@@ -184,39 +253,21 @@ export async function calcularObra(sink: CalculoSink = {}): Promise<void> {
 // -----------------------------------------------------------------------------
 const INTERVALO_SONDEO_MS = 400;
 
+// useEstadoMotor: sondea el EstadoMotor y lo vuelca al calculoStore (fuente unica);
+// el resto de la UI LEE del store (no duplica timers). Idealmente lo monta UN solo
+// componente (App, via usePrecargaMotor): ese es el unico que sondea y escribe.
+// Devuelve el estado leyendolo del store (reactivo) + refrescar() puntual.
 function useEstadoMotor(): {
   estadoMotor: EstadoMotor;
   refrescar: () => void;
 } {
-  const [estadoMotor, setEstadoMotor] = useState<EstadoMotor>("descargado");
-  // Guardamos el ultimo estado en una ref para que el efecto de polling decida si
-  // seguir sondeando sin recrearse en cada cambio (evita reinstalar el interval).
-  const estadoRef = useRef<EstadoMotor>("descargado");
-  // Evita actualizar estado tras desmontar (consulta async en vuelo).
-  const montadoRef = useRef(true);
+  // Lectura reactiva desde el store: la escritura la hace refrescarEstadoMotor().
+  const estadoMotor = calculoStore((s) => s.estadoMotor);
 
-  useEffect(() => {
-    montadoRef.current = true;
-    return () => {
-      montadoRef.current = false;
-    };
-  }, []);
-
-  // Consulta puntual al solver y publica el estado si cambio (evita renders
-  // redundantes: setState con el mismo valor no re-renderiza, pero ademas asi el
-  // efecto de polling lee siempre un valor coherente via la ref).
+  // Consulta puntual al solver -> store. A nivel de modulo (sin closures de React):
+  // escribir en el store tras desmontar es inocuo (no es setState de React).
   const refrescar = useCallback(() => {
-    void solverClient
-      .estado()
-      .then((e) => {
-        if (!montadoRef.current) return;
-        estadoRef.current = e;
-        setEstadoMotor((prev) => (prev === e ? prev : e));
-      })
-      .catch(() => {
-        // estado() es un passthrough que no deberia rechazar; si lo hace, no
-        // tocamos el estado (lo refrescara la proxima transicion).
-      });
+    refrescarEstadoMotor();
   }, []);
 
   // Refresco al montar.
@@ -225,8 +276,8 @@ function useEstadoMotor(): {
   }, [refrescar]);
 
   // Polling acotado: solo activo mientras el estado sea transitorio. Se reevalua
-  // cuando cambia `estadoMotor`; si pasa a estable, el efecto limpia su interval y
-  // no instala otro (queda en reposo hasta la proxima transicion disparada).
+  // cuando cambia `estadoMotor` (leido del store); si pasa a estable, el efecto
+  // limpia su interval y no instala otro (en reposo hasta la proxima transicion).
   useEffect(() => {
     const transitorio =
       estadoMotor === "cargando" || estadoMotor === "calculando";
@@ -275,27 +326,31 @@ export function usePrecargaMotor(): { estadoMotor: EstadoMotor } {
 
 // -----------------------------------------------------------------------------
 // useCalcular: el hook de orquestacion principal.
+//
+// LEE todo el estado de calculo del calculoStore (fuente UNICA), no de estado local
+// React: asi boton, menu y brandbar comparten exactamente el mismo estado. NO monta
+// su propio sondeo del EstadoMotor: el poller canonico es usePrecargaMotor (montado
+// en App), que sondea y escribe; este hook solo se suscribe. calcular() delega en
+// calcularObra(), que ya vuelca al store por el sink por defecto (no pasa sink).
+// La firma publica (UseCalcular) NO cambia: BotonCalcular la consume tal cual.
 // -----------------------------------------------------------------------------
 export function useCalcular(): UseCalcular {
-  const { estadoMotor, refrescar } = useEstadoMotor();
-  const [calculando, setCalculando] = useState(false);
-  const [errores, setErrores] = useState<ErrorObra[]>([]);
-  const [avisos, setAvisos] = useState<ErrorObra[]>([]);
-  const [ultimoError, setUltimoError] = useState<ErrorCalculo | null>(null);
+  // Suscripciones por campo al calculoStore (selectores: re-render solo si cambia el
+  // campo, no por cualquier cambio del store; subscribeWithSelector lo permite).
+  const estadoMotor = calculoStore((s) => s.estadoMotor);
+  const calculando = calculoStore((s) => s.calculando);
+  const errores = calculoStore((s) => s.errores);
+  const avisos = calculoStore((s) => s.avisos);
+  const ultimoError = calculoStore((s) => s.ultimoError);
 
-  // El camino reactivo delega en calcularObra() (fuente unica del pipeline) y le
-  // pasa sus setters por el `sink`: asi el boton y el menu disparan la MISMA logica
-  // sin duplicarla. El guard de reentrada vive dentro de calcularObra() (a nivel de
-  // modulo), robusto a doble disparo desde distintos origenes.
+  // El camino reactivo delega en calcularObra() (fuente unica del pipeline). Esta ya
+  // vuelca el progreso/errores al calculoStore por su sink por defecto, asi que aqui
+  // no pasamos sink: el boton, el menu y la brandbar convergen en el mismo store. El
+  // guard de reentrada vive dentro de calcularObra() (a nivel de modulo), robusto a
+  // doble disparo desde distintos origenes.
   const calcular = useCallback(async (): Promise<void> => {
-    await calcularObra({
-      onCalculando: setCalculando,
-      onErrores: setErrores,
-      onAvisos: setAvisos,
-      onErrorMotor: setUltimoError,
-      onRefrescarEstado: refrescar,
-    });
-  }, [refrescar]);
+    await calcularObra();
+  }, []);
 
   return { calcular, estadoMotor, calculando, errores, avisos, ultimoError };
 }

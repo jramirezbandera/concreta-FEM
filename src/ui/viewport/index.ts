@@ -4,6 +4,11 @@
 export { Viewport } from "./Viewport";
 export type { ViewportProps } from "./Viewport";
 
+// Mecanismo de slots del HUD (feature-17): los consumidores (Hud, overlays de App)
+// envuelven sus paneles en <Slot zona="..."> para apilarlos en columna por zona.
+export { Slot } from "./Slot";
+export type { ZonaHud } from "./Slot";
+
 // Helpers de color derivados de tokens, por si una feature de UI necesita el mismo
 // mapeo token->hex/THREE.Color para su propia geometria (mantiene una sola fuente).
 export { colorToken, hexToken } from "./colores";

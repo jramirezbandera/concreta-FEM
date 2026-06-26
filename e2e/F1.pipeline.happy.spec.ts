@@ -134,26 +134,27 @@ test("F1 happy: obra -> Calcular (boton) -> deformada + diagramas + reacciones",
   expect(resumen).toEqual({ pilares: 2, vigas: 1, cargas: 1 });
 
   // ---------------------------------------------------------------------------
-  // 4) Ir a Resultados y CALCULAR POR EL BOTON (no el menu: el menu no alimenta el
-  // sink y el estado/errores no se reflejarian — T-calcular-menu-sink).
+  // 4) Ir a Resultados y CALCULAR POR EL BOTON (por claridad/aislamiento; tras
+  // feature-17 el menu/brandbar tambien alimentan el calculoStore — cerrando
+  // T-calcular-menu-sink —, pero aqui leemos el estado por el panel de Resultados).
   // ---------------------------------------------------------------------------
   await page.getByRole("tab", { name: "Resultados" }).click();
 
-  // El BOTON de calculo (BotonCalcular) — NO el disparador del menu "▶ Calcular obra"
-  // (placeholder deshabilitado que no alimenta el sink). El nombre accesible del boton
-  // real es EXACTAMENTE su etiqueta de estado ("Calcular"/"Calculando…"/"Reintentar"/
-  // "Cargando motor…"); anclamos el regex para excluir "Calcular obra".
+  // El BOTON de calculo (BotonCalcular) — NO el disparador de brandbar "▶ Calcular
+  // obra" (que tras feature-17 ya esta habilitado y comparte calculoStore). El nombre
+  // accesible del boton real es EXACTAMENTE su etiqueta de estado ("Calcular"/
+  // "Calculando…"/"Reintentar"/"Cargando motor…"); anclamos el regex para excluir
+  // "Calcular obra".
   const botonCalcular = page.getByRole("button", {
     name: /^(Calcular|Calculando…|Reintentar|Cargando motor…)$/,
   });
   await expect(botonCalcular).toBeEnabled(); // el mock reporta el motor "listo"
-  // dispatchEvent en vez de click(): el boton es visible/enabled, pero otro panel
-  // flotante del HUD (control de plantas "↓") se solapa en el layout glass e
-  // intercepta el puntero, lo que haria fallar el chequeo de actionability de click().
-  // No es un problema de la app (ambos paneles son operables por el usuario real, sin
-  // un puntero de 1px). dispatchEvent envia el evento DIRECTO al target ya verificado
-  // (React lo recibe via su listener sintetico) sin pelear por el z-order.
-  await botonCalcular.dispatchEvent("click");
+  // .click() real: tras el refactor de zonas del HUD (feature-17), BotonCalcular esta
+  // en la zona top-center y el control de plantas del GroupRibbon en top-left, asi que
+  // ya no se solapan en el layout glass y el hit-test del click aterriza limpio sobre
+  // el boton (antes un panel flotante interceptaba el puntero y obligaba a dispatchEvent
+  // para esquivar el z-order).
+  await botonCalcular.click();
 
   // ESTADO TRANSITORIO (D5): el mock deja calcular() PENDIENTE hasta resolver(). El
   // boton refleja "Calculando…" y aria-busy=true mientras tanto. Lo aseveramos

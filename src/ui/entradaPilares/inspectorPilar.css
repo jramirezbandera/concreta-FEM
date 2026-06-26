@@ -4,9 +4,6 @@
    .cx-float / .cx-campo / .cx-input de las primitivas. */
 
 .cx-inspector-pilar {
-  position: absolute;
-  top: var(--space-3, 12px);
-  right: var(--space-3, 12px);
   width: 260px;
   display: flex;
   flex-direction: column;

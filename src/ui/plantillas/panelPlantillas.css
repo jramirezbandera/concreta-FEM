@@ -5,9 +5,6 @@
    REGLA (como el resto de .cx-*): solo tokens via var(--...), cero hex/fallback. */
 
 .cx-panel-plantillas {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
   width: 260px;
   max-height: calc(100% - var(--space-6));
   display: flex;

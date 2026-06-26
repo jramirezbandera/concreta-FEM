@@ -126,8 +126,9 @@ test("humo de integracion: el worker real (Pyodide+PyNite) resuelve una biapoyad
   });
   expect(info.vigaId).toBeTruthy();
 
-  // 3) Ir a Resultados y Calcular POR EL BOTON (no por el menu: solo el boton
-  //    alimenta el estado/errores de useCalcular). El motor real puede estar aun
+  // 3) Ir a Resultados y Calcular POR EL BOTON (por claridad y aislamiento; tras
+  //    feature-17 el menu tambien alimenta el calculoStore, pero aqui leemos el
+  //    estado por el panel de Resultados). El motor real puede estar aun
   //    "Cargando motor…": se espera a que el boton quede habilitado ("Calcular").
   //    La pestana Radix se selecciona por su NOMBRE accesible ("3 Resultados"): el
   //    trigger NO emite un atributo `value` en el DOM, asi que el rol+nombre es el
@@ -136,19 +137,20 @@ test("humo de integracion: el worker real (Pyodide+PyNite) resuelve una biapoyad
 
   // El boton de la pestana Resultados (BotonCalcular) vive en el panel ".cx-calcular"
   // y es el UNICO boton de ese panel. Se acota a el para NO confundirlo con el item
-  // de menubar "▶ Calcular obra" (que no alimenta el sink de useCalcular y esta
-  // deshabilitado): ambos comparten la clase primary, de ahi el alcance al panel.
+  // de brandbar "▶ Calcular obra" (que tras feature-17 tambien dispara el calculo y
+  // esta habilitado): ambos comparten la clase primary, de ahi el alcance al panel.
   const boton = page.locator(".cx-calcular").getByRole("button");
   // Esperar a que el motor real termine de cargar: el boton pasa de "Cargando
   // motor…" a "Calcular" (habilitado). Margen amplio para la instanciacion WASM.
   await expect(boton).toHaveText("Calcular", { timeout: TIMEOUT_MOTOR });
   await expect(boton).toBeEnabled();
 
-  // Disparar el click via dispatchEvent (no .click()): en el HUD de Resultados otros
-  // paneles flotantes (el control de planta "↓") se solapan con el boton y el click
-  // por coordenadas aterrizaba en el overlay (no llegaba el onClick). dispatchEvent
-  // entrega el evento DIRECTO al boton correcto, sin depender de la geometria del HUD.
-  await boton.dispatchEvent("click");
+  // Disparar el click con .click() real: tras el refactor de zonas del HUD
+  // (feature-17) BotonCalcular esta en la zona top-center y el control de planta del
+  // GroupRibbon en top-left, asi que ya no se solapan y el hit-test aterriza limpio
+  // sobre el boton (antes un overlay flotante interceptaba el puntero y obligaba a
+  // dispatchEvent para esquivar el z-order).
+  await boton.click();
 
   // 4) Esperar a que el motor REAL resuelva y la salida llegue a la UI. La senal
   //    fiable de exito es que la tabla de reacciones se PUEBLA (tbody con filas): el

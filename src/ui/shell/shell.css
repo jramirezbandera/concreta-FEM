@@ -58,6 +58,36 @@
   gap: 6px;
 }
 
+/* Indicador del estado del motor (junto a las acciones): punto + rotulo de obra.
+   El color del punto sale del token segun data-tono (neutro/listo/calculando/error);
+   asi el estado se lee de un vistazo sin jerga FEM. */
+.cx-motor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  font-size: 11.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+  user-select: none;
+}
+.cx-motor__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--text-3);
+  flex: 0 0 auto;
+}
+.cx-motor[data-tono="listo"] .cx-motor__dot {
+  background-color: var(--success);
+}
+.cx-motor[data-tono="calculando"] .cx-motor__dot {
+  background-color: var(--warning);
+}
+.cx-motor[data-tono="error"] .cx-motor__dot {
+  background-color: var(--danger);
+}
+
 /* Boton-icono compacto reutilizado en brandbar (undo/redo) y tools rail. */
 .cx-iconbtn {
   display: inline-flex;

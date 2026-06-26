@@ -14,10 +14,11 @@ import { abrirApp, bridge } from "./fixtures";
 //      > 0 y el test rojo.
 //
 // Ambos casos modelan obra INVALIDA por la costura `window.__concreta` y disparan
-// Calcular por el BOTON (no el menu: el menu no alimenta el `sink` de errores,
-// no se reflejaria nada — req del plan). El mock del solver se instala en el
-// arranque (abrirApp con mock:true) para que el worker real (Pyodide) nunca
-// arranque y el contador sea fiable.
+// Calcular por el BOTON. Tanto el boton como el menu "Calcular obra" alimentan hoy
+// el mismo `calculoStore` (feature-17), pero calculamos por el BOTON por claridad y
+// aislamiento: es el panel de Resultados quien renderiza el status con el error de
+// obra que aseveramos. El mock del solver se instala en el arranque (abrirApp con
+// mock:true) para que el worker real (Pyodide) nunca arranque y el contador sea fiable.
 //
 // `role=status` ACOTADO (#17): la pestana Resultados tiene VARIAS live-regions
 // (PanelDiagramas, TablaReacciones, aviso de mosaico del Viewport...). Un
@@ -43,16 +44,14 @@ async function irAResultados(page: Page): Promise<void> {
   await page.getByRole("tab", { name: "Resultados" }).click();
 }
 
-// Pulsa el boton "Calcular" del panel de Calculo. Usamos dispatchEvent('click')
-// en vez de .click() porque los paneles flotantes del HUD de Resultados se solapan
-// en el viewport por defecto: un boton vecino deshabilitado ("Planta inferior", ↓)
-// cubre la zona de impacto. Un .click() (incluso con force) entrega el evento al
-// elemento que esta ENCIMA en esa coordenada, no a "Calcular"; dispatchEvent lo
-// despacha DIRECTAMENTE sobre el boton, disparando su onClick de React de forma
-// determinista. El objetivo del test es el corte de validacion + el contador del
-// motor, no el hit-testing del boton (eso lo cubren los component tests de F14).
+// Pulsa el boton "Calcular" del panel de Calculo con un .click() real. Tras el
+// refactor de zonas del HUD (feature-17), BotonCalcular vive en la zona top-center
+// y el control de plantas del GroupRibbon en top-left: ya NO se solapan, asi que el
+// hit-test del click aterriza limpio sobre "Calcular" (antes un boton vecino del HUD
+// cubria la zona de impacto y obligaba a usar dispatchEvent para esquivar el z-order).
+// El objetivo del test es el corte de validacion + el contador del motor.
 async function pulsarCalcular(panel: Locator): Promise<void> {
-  await panel.getByRole("button", { name: "Calcular" }).dispatchEvent("click");
+  await panel.getByRole("button", { name: "Calcular" }).click();
 }
 
 // Crea UN grupo y UNA planta por el DIALOGO REAL (Obra -> Plantas y grupos) y
@@ -62,7 +61,7 @@ async function pulsarCalcular(panel: Locator): Promise<void> {
 // via paralela: la creacion de obra-base pasa por donde pasa el usuario.
 async function crearPlantaPorDialogo(page: Page): Promise<string> {
   // Abrir el menu "Obra" (Popover de Radix) y elegir "Plantas y grupos". `exact`
-  // para no casar el boton deshabilitado "▶ Calcular obra" (contiene "obra").
+  // para no casar el boton "▶ Calcular obra" de la brandbar (contiene "obra").
   await page.getByRole("button", { name: "Obra", exact: true }).click();
   await page.getByRole("menuitem", { name: "Plantas y grupos" }).click();
 
@@ -141,8 +140,9 @@ test("estructura no sujeta (mecanismo): error en lenguaje de obra y el motor NO 
   const resumen = await (await bridge(page)).evaluate((c) => c.resumenModelo());
   expect(resumen).toMatchObject({ pilares: 0, vigas: 1 });
 
-  // A Resultados y CALCULAR POR EL BOTON (no el menu: solo el boton alimenta el
-  // `sink` de errores via useCalcular).
+  // A Resultados y CALCULAR POR EL BOTON. El error se renderiza en el panel de
+  // Calculo (status acotado a `.cx-calcular`), de ahi que disparemos por el boton y
+  // no por el menu, aunque ambos compartan el `calculoStore` (feature-17).
   await irAResultados(page);
   const panel = panelCalculo(page);
   await expect(panel).toBeVisible();

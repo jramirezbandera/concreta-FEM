@@ -13,10 +13,10 @@
 //
 // COMO (D10, costura pura): la obra se construye por `window.__concreta` (comandos
 // de dominio ya existentes) + el DIALOGO REAL de Plantas/Grupos (UI). El calculo se
-// dispara por el BOTON "Calcular" (no el menu: el menu no alimenta el sink, los
-// errores/estado no se reflejarian) con el mock del solver controlable
-// (usarMockSolver().resolver()). No se toca el canvas R3F (eso lo cubren los
-// component tests, D10).
+// dispara por el BOTON "Calcular" (por claridad/aislamiento; tras feature-17 el menu
+// tambien alimenta el calculoStore, pero el estado obsoleto se lee por los paneles
+// de Resultados) con el mock del solver controlable (usarMockSolver().resolver()).
+// No se toca el canvas R3F (eso lo cubren los component tests, D10).
 //
 // AISLAMIENTO (D6): `abrirApp` limpia IndexedDB ANTES de navegar y espera app-ready;
 // cada test corre en un contexto fresco (playwright.config.ts, fullyParallel).
@@ -187,19 +187,20 @@ test("editar la obra tras calcular deja los resultados OBSOLETOS pero PRESENTES 
     window.__concreta!.usarMockSolver();
   });
 
-  // --- Calcular por el BOTON (no el menu): el boton alimenta el sink/estado ---
+  // --- Calcular por el BOTON (por claridad/aislamiento; el menu tambien alimenta
+  //     el calculoStore tras feature-17, pero leemos el estado por los paneles) ---
   await activarPestana(page, /Resultados/);
   // El motor mock reporta "listo": el boton muestra "Calcular" y esta habilitado.
-  // exact:true para no chocar con el disparador del menu ("▶ Calcular obra", stub
-  // deshabilitado): el calculo DEBE ir por el BotonCalcular (alimenta el sink/estado).
+  // exact:true para anclar al BotonCalcular del panel y no casar "▶ Calcular obra"
+  // de la brandbar (que tras feature-17 tambien dispara el calculo via calculoStore).
   const botonCalcular = page.getByRole("button", { name: "Calcular", exact: true });
   await expect(botonCalcular).toBeEnabled();
-  // Disparamos con dispatchEvent('click') en vez de .click(): el gizmo de navegacion
-  // de plantas del HUD ("↓ Planta inferior") se solapa con el panel de calculo y
-  // intercepta el click de raton por z-order. dispatchEvent va al boton EXACTO ya
-  // resuelto y dispara el onClick de React (delegado en la raiz) sin depender de la
-  // geometria del HUD. El estado/sink siguen yendo por el BotonCalcular (no el menu).
-  await botonCalcular.dispatchEvent("click");
+  // Disparamos con .click() real: tras el refactor de zonas del HUD (feature-17),
+  // BotonCalcular (zona top-center) y el gizmo de navegacion de plantas del
+  // GroupRibbon (zona top-left) ya no se solapan, asi que el hit-test del click
+  // aterriza limpio sobre el boton (antes el gizmo lo interceptaba por z-order y
+  // obligaba a dispatchEvent). Calculamos por el BOTON por claridad/aislamiento.
+  await botonCalcular.click();
 
   // El mock deja la promesa PENDIENTE: el boton pasa a "Calculando…" / aria-busy.
   const botonCalculando = page.getByRole("button", { name: "Calculando…" });

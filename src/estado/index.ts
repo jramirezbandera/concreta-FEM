@@ -19,6 +19,10 @@ export type {
   DefaultsCarga,
 } from "./vistaStore";
 export { resultadosStore } from "./resultadosStore";
+// calculoStore (feature-17): estado del calculo (estado del motor + progreso/errores).
+// Fuera de undo, como vistaStore/resultadosStore. Lo alimenta useCalcular/calcularObra
+// y lo consumen Brandbar/Menubar/BotonCalcular.
+export { calculoStore } from "./calculoStore";
 
 // --- Nucleo Command + IDs ----------------------------------------------------
 export { PilaUndo } from "./comandos/pilaUndo";

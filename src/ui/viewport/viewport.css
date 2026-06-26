@@ -17,33 +17,79 @@
   display: block;
 }
 
-/* Capa HUD: no captura el puntero (deja pasar al canvas); los paneles si. */
+/* Capa HUD: rejilla de zonas sobre el lienzo. No captura el puntero (deja pasar al
+   canvas); solo los paneles de cada zona lo recuperan (.cx-zone > *). */
 .cx-hud {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 2;
+  z-index: var(--z-hud);
 }
-.cx-hud > * {
+
+/* Banda-zona: contenedor flex-column donde Slot apila los paneles de la zona. No
+   captura el puntero; lo acotamos a media pantalla de ancho y al alto util para que
+   paneles anchos/altos (tabla, diagramas) no se salgan del viewport. */
+.cx-zone {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  pointer-events: none;
+  max-width: calc(50vw - 2 * var(--space-3));
+  max-height: calc(100% - 2 * var(--space-3));
+}
+.cx-zone > * {
   pointer-events: auto;
 }
 
-/* Posiciones canonicas (Spec §4.2). */
-.cx-float--top-left {
-  position: absolute;
-  top: 12px;
-  left: 12px;
+/* Anclajes de las 8 zonas (padding --space-3 desde los bordes; Spec §4.2). Los
+   -center se centran en horizontal; los -right alinean su columna a la derecha; los
+   mid-* se centran en vertical. */
+.cx-zone--top-left {
+  top: var(--space-3);
+  left: var(--space-3);
 }
-.cx-float--top-right {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+.cx-zone--top-center {
+  top: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
 }
-.cx-float--bottom-right {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
+.cx-zone--top-right {
+  top: var(--space-3);
+  right: var(--space-3);
+  align-items: flex-end;
 }
+.cx-zone--mid-left {
+  top: 50%;
+  left: var(--space-3);
+  transform: translateY(-50%);
+}
+.cx-zone--mid-right {
+  top: 50%;
+  right: var(--space-3);
+  transform: translateY(-50%);
+  align-items: flex-end;
+}
+.cx-zone--bottom-left {
+  bottom: var(--space-3);
+  left: var(--space-3);
+}
+.cx-zone--bottom-center {
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  align-items: center;
+}
+.cx-zone--bottom-right {
+  bottom: var(--space-3);
+  right: var(--space-3);
+  align-items: flex-end;
+}
+
+/* Centrado libre (fuera de la rejilla de zonas): lo usan EstadoVacio y
+   MosaicoPlaceholder. Las anclas de esquina (.cx-float--top-left/-top-right/
+   -bottom-right) se eliminaron al migrar el HUD a <Slot zona> (feature-17). */
 .cx-float--center {
   position: absolute;
   top: 50%;
