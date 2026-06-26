@@ -67,6 +67,11 @@ function PanelActivo() {
       className="cx-herramienta-viga"
       titulo="Nueva viga"
       tag="viga"
+      // data-testid para E2E (feature-16): panel glass sin rol (es un <div .cx-float>);
+      // marca que la herramienta de viga esta activa. Sus controles internos
+      // (Sección, Material, Extremos, Tirante) se localizan por etiqueta/rol; el panel
+      // da el gancho estable para afirmar el modo de introduccion.
+      data-testid="panel-herramienta-viga"
     >
       <SelectSeccion
         etiqueta="Sección"

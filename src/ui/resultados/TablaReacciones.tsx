@@ -72,7 +72,15 @@ export function TablaReacciones() {
   // Estados guia (sin resultados o sin combo valido): panel con mensaje, sin tabla.
   if (!resultados || !modeloFEM) {
     return (
-      <PanelFlotante className="cx-reacciones" titulo="Reacciones" tag="apoyos">
+      // data-testid para E2E (feature-16): panel glass sin rol (es un <div .cx-float>);
+      // mismo gancho en todos los estados del panel de reacciones para que el E2E
+      // localice la tabla y acote sus aserciones sin depender del estado guia.
+      <PanelFlotante
+        className="cx-reacciones"
+        titulo="Reacciones"
+        tag="apoyos"
+        data-testid="tabla-reacciones"
+      >
         <p className="cx-reacciones__vacio">
           Calcula la obra para ver las reacciones en los apoyos.
         </p>
@@ -87,7 +95,12 @@ export function TablaReacciones() {
 
   if (combo === null) {
     return (
-      <PanelFlotante className="cx-reacciones" titulo="Reacciones" tag="apoyos">
+      <PanelFlotante
+        className="cx-reacciones"
+        titulo="Reacciones"
+        tag="apoyos"
+        data-testid="tabla-reacciones"
+      >
         <p className="cx-reacciones__vacio">
           Elige una combinación para ver las reacciones.
         </p>
@@ -121,6 +134,7 @@ export function TablaReacciones() {
       // El combo activo como tag mono mantiene visible a que combinacion pertenecen
       // los valores sin ocupar mas cromo.
       tag={combo}
+      data-testid="tabla-reacciones"
     >
       {!vigente && (
         <p className="cx-reacciones__aviso" role="status">

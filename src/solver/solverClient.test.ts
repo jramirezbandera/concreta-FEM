@@ -25,58 +25,33 @@ import {
   esErrorMotor,
   __setFabricaWorker,
   __resetWorker,
-  type ParWorker,
 } from "./solverClient";
+// D4 (feature-16): RESULTADOS_OK y el doble del par worker se comparten con el mock
+// E2E desde un modulo NO-test. Aqui solo se reusan; la logica de los 20 tests no
+// cambia.
+import {
+  RESULTADOS_OK,
+  crearParMock,
+  type MetodosProxyMock,
+} from "./fixturesResultados";
 import type { ModeloFEM } from "../discretizador/contratoFEM";
 import type { ResultadosCalculo } from "./resultados";
 
 // -----------------------------------------------------------------------------
-// Utilidades de test: doble del par worker+proxy.
+// Utilidades de test: doble del par worker+proxy (en ./fixturesResultados).
 // -----------------------------------------------------------------------------
+
+// `crearPar`: envoltorio local de `crearParMock` que inyecta `terminate: vi.fn()`
+// por defecto, para que los tests de timeout (F5-3/F5-5) puedan asertar
+// `worker.terminate` como espia (el fixture compartido no depende de vitest, asi que
+// no puede crear el spy por si mismo). El resto de la firma/uso no cambia.
+function crearPar(metodos: MetodosProxyMock) {
+  return crearParMock({ terminate: vi.fn(), ...metodos });
+}
 
 // ModeloFEM minimo VALIDO en forma (no se calcula nada: el proxy esta mockeado).
 // Basta con que tenga la forma; la validacion de ModeloFEM no ocurre en el cliente.
 const MODELO_FEM = {} as unknown as ModeloFEM;
-
-// Salida VALIDA contra ResultadosCalculoSchema (la minima que el esquema acepta).
-const RESULTADOS_OK: ResultadosCalculo = {
-  units: "kN-m",
-  analysis: { type: "linear", n_points: 11 },
-  combos: ["ELU"],
-  nodos: {},
-  barras: {},
-  check_statics: null,
-};
-
-/** Doble de worker: registra cuantas veces se llamo terminate() y guarda onerror. */
-interface DobleWorker {
-  terminate: ReturnType<typeof vi.fn>;
-  onerror: ((ev: unknown) => void) | null;
-  onmessageerror: ((ev: unknown) => void) | null;
-}
-
-/** Crea un par { worker, proxy } doble con los metodos de proxy que se le pasen. */
-function crearPar(metodosProxy: {
-  calcular?: ReturnType<typeof vi.fn>;
-  precargar?: ReturnType<typeof vi.fn>;
-  estado?: ReturnType<typeof vi.fn>;
-  error?: ReturnType<typeof vi.fn>;
-}): { par: ParWorker; worker: DobleWorker } {
-  const worker: DobleWorker = {
-    terminate: vi.fn(),
-    onerror: null,
-    onmessageerror: null,
-  };
-  const proxy = {
-    calcular: metodosProxy.calcular ?? vi.fn(),
-    precargar: metodosProxy.precargar ?? vi.fn(async () => undefined),
-    estado: metodosProxy.estado ?? vi.fn(async () => "listo"),
-    error: metodosProxy.error ?? vi.fn(async () => null),
-  };
-  // El cliente solo usa worker.terminate y asigna worker.onerror/onmessageerror;
-  // el proxy se usa como objeto de metodos asincronos. El cast es seguro para test.
-  return { par: { worker, proxy } as unknown as ParWorker, worker };
-}
 
 beforeEach(() => {
   // Cada test parte de un singleton limpio y restaura la fabrica al final.

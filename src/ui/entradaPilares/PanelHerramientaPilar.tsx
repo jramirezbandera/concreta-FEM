@@ -68,6 +68,11 @@ function PanelActivo() {
       className="cx-herramienta-pilar"
       titulo="Nuevo pilar"
       tag="pilar"
+      // data-testid para E2E (feature-16): panel glass sin rol (es un <div .cx-float>);
+      // marca que la herramienta de pilar esta activa. Sus controles internos
+      // (Sección, Material, Ángulo) se localizan por etiqueta/rol; el panel da el
+      // gancho estable para afirmar el modo de introduccion.
+      data-testid="panel-herramienta-pilar"
     >
       <SelectSeccion
         etiqueta="Sección"

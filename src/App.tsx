@@ -125,6 +125,18 @@ function useSnapActivo(): boolean {
   );
 }
 
+// Señal de hidratacion para E2E (feature-16, D6): true cuando useArranquePersistencia
+// ha terminado de rehidratar el Modelo desde IndexedDB (o ha decidido no persistir).
+// App pinta un nodo data-testid="app-ready" cuando es true; los specs esperan por el
+// antes de actuar, asi una creacion temprana no la pisa el autosave inicial.
+function usePersistenciaLista(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.persistenciaLista, cb),
+    () => vistaStore.getState().persistenciaLista,
+    () => vistaStore.getState().persistenciaLista,
+  );
+}
+
 // Hay un tramo donde colocar pilares (grupo activo con plantas, o planta activa).
 // Reacciona a cambios del modelo y del ambito activo. Reusa el helper PURO
 // tramoColocable (misma logica que ColocacionPilar usa al colocar): una sola fuente
@@ -241,6 +253,7 @@ export default function App() {
   const puedeColocar = usePuedeColocarPilar();
   const puedeColocarViga = usePuedeColocarViga();
   const coords = useCoordsThrottled();
+  const persistenciaLista = usePersistenciaLista();
 
   // Introduccion grafica de pilares: solo tiene sentido en la pestana de pilares.
   // Aunque los overlays se autoocultan (ColocacionPilar/PanelHerramientaPilar
@@ -282,6 +295,10 @@ export default function App() {
         ...(coords ? { coords } : {}),
       }}
     >
+      {/* Señal de hidratacion (feature-16, D6): aparece cuando la persistencia ha
+          rehidratado el Modelo (o decidido no persistir). Los specs E2E esperan por
+          este nodo antes de actuar. `hidden`: no afecta al layout ni es visible. */}
+      {persistenciaLista && <div data-testid="app-ready" hidden />}
       <Viewport
         {...(enPilares
           ? {

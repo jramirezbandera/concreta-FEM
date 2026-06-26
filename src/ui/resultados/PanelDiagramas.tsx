@@ -173,6 +173,10 @@ export function PanelDiagramas() {
     <PanelFlotante
       className="cx-panel-diagramas"
       titulo="Esfuerzos en la barra"
+      // data-testid para E2E (feature-16): panel glass sin rol (es un <div .cx-float>);
+      // el selector de magnitud (radiogroup) y los textos guia se localizan por rol,
+      // pero el contenedor necesita un gancho estable para acotar las asercion del E2E.
+      data-testid="panel-diagramas"
     >
       <Segmentado<MagnitudDiagrama>
         className="cx-panel-diagramas__seg"

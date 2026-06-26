@@ -24,6 +24,14 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  /* tsconfig unico: el typecheck cubre app, tests y los configs de build */
-  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "eslint.config.js"]
+  /* tsconfig unico: el typecheck cubre app, tests, E2E y los configs de build */
+  "include": [
+    "src",
+    "tests",
+    "e2e",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "eslint.config.js"
+  ]
 }

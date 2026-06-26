@@ -88,6 +88,10 @@ export function Viewport({ sceneOverlays, hudOverlays, className }: ViewportProp
     <div className={clases}>
       <Canvas
         frameloop="demand"
+        // data-testid para E2E (feature-16): el lienzo es un <canvas> WebGL sin rol
+        // accesible; R3F reenvia esta prop DOM al <canvas> que crea. Unico gancho
+        // estable para que Playwright espere/afirme la presencia del viewport.
+        data-testid="viewport-canvas"
         // Color de fondo del lienzo = token --canvas (papel CAD, Spec §1.1).
         // preserveDrawingBuffer: deja el framebuffer legible tras pintar para que
         // la captura PNG (F3, ControlCaptura) pueda hacer toDataURL del canvas.

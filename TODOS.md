@@ -259,3 +259,36 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 - **Cómo retomar:** schema Zod para `Trazabilidad` y `safeParse` en el borde (o aserción en dev).
   **Coste:** CC ~15 min. **Depende de / bloquea:** nada.
 - **Origen:** Revisión de ingeniería F14 (outside voice Codex, LOW).
+
+---
+
+## T-f16-ci · Integrar el E2E mock en CI (instalación de navegadores)
+
+- **Qué:** Añadir a [.github/workflows/deploy.yml](.github/workflows/deploy.yml) un job que ejecute
+  `npm test` (Vitest) + el E2E mock (`npm run e2e`), instalando Chromium con
+  `npx playwright install --with-deps chromium`. El `e2e:real` (golden-real, lento/gateado)
+  queda FUERA de CI por defecto.
+- **Por qué:** En F16 se difirió CI por decisión explícita. Un suite E2E que solo corre en local
+  se pudre: nadie lo ejecuta y deja de proteger (Codex #18, revisión de ingeniería F16). El E2E
+  mock es barato (Chromium headless, pocos segundos) y cabe bien en el pipeline.
+- **Cómo retomar:** job `test` en el workflow (Node 24, `npm ci`, instalar Chromium, `npm test`,
+  `npm run e2e`); subir `playwright-report/` como artifact en fallo. Hoy `deploy.yml` solo hace
+  build+deploy, sin tests.
+- **Depende de / bloquea:** requiere F16 (el andamiaje Playwright) hecho. **Coste:** CC ~25 min.
+- **Origen:** Revisión de ingeniería F16 (decisión CI diferida; Codex #18).
+
+---
+
+## T-f16-canvas-smoke · Humo E2E de canvas real (raycaster/picking)
+
+- **Qué:** Un spec E2E que coloca un pilar con `page.mouse.click` sobre el canvas R3F en planta
+  (mapeando mundo→pantalla con la cámara ortográfica) y asevera que aparece en el árbol de obra,
+  ejercitando el raycaster y el picking reales.
+- **Por qué:** En F16 (D10) se eligió **costura pura** (`window.__concreta` despacha comandos),
+  que NO pasa por el ratón-sobre-el-lienzo: la colocación/picking/inspector-al-seleccionar quedan
+  sin cobertura E2E. Esa UX sí tiene component tests ([flujoEntradaPilares.test.tsx](src/ui/entradaPilares/flujoEntradaPilares.test.tsx),
+  [ColocacionViga.test.ts](src/ui/viewport/ColocacionViga.test.ts)), pero no a nivel E2E.
+- **Cómo retomar:** un único spec con helper `mundoAPantalla(x,y, camara)` y `page.mouse.click`;
+  vigilar la fragilidad ante zoom/tamaño de viewport (fijar tamaño de viewport y cámara conocida).
+- **Depende de / bloquea:** requiere F16. **Coste:** CC ~30 min.
+- **Origen:** Revisión de ingeniería F16 (outside voice Codex #1+#2, D10).

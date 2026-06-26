@@ -28,5 +28,10 @@ dist-ssr
 coverage
 .vitest
 
+# E2E (Playwright, F16)
+playwright-report/
+test-results/
+
 # Cache de Pyodide (se anade en F5)
 .pyodide-cache
+.gstack/

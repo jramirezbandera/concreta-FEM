@@ -12,7 +12,8 @@
     "test:golden": "vitest run --project node tests/golden",
     "test:golden:discretizador": "vitest run --project node tests/golden/discretizador.casos.test.ts",
     "test:golden:pipeline": "vitest run --project node tests/golden/pipeline.golden.test.ts",
-    "e2e": "node -e \"console.error('Playwright se configura en feature-16'); process.exit(1)\"",
+    "e2e": "playwright test --project=e2e-mock",
+    "e2e:real": "cross-env E2E_REAL=1 playwright test --project=e2e-real",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "copy-pyodide": "node scripts/copy-pyodide-assets.mjs",
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -52,6 +54,7 @@
     "@types/react-dom": "^19.1.0",
     "@types/react-plotly.js": "^2.6.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "cross-env": "^10.1.0",
     "eslint": "^9.18.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.18",
@@ -65,5 +68,5 @@
     "vite": "^6.0.7",
     "vitest": "^3.0.0"
   },
-  "//": "Dependencias diferidas restantes (NO instalar aun): @playwright/test (F16, E2E). Instaladas en F14 (diagramas N/V/M/flecha): react-plotly.js + plotly.js-basic-dist-min (+ @types/react-plotly.js); se usa el bundle basic-dist-min (scatter/line, suficiente; sin types propios -> ambient en src/ui/resultados/plotly-basic-dist-min.d.ts) y se carga LAZY por peso ~1 MB gzip (src/ui/resultados/diagramaLazy.ts; Plotly aislado tras <DiagramaBarra>, puerta a uPlot). Instaladas en F9: three + @react-three/fiber + @react-three/drei + three-mesh-bvh (viewport R3F), @radix-ui/* tabs/dialog/popover/collapsible/toggle-group/select (primitivas UI), @testing-library/react+jest-dom+user-event (tests de componente). Instaladas en F5 (solver): pyodide + comlink. pyodide pineado EXACTO (0.28.3) por acoplamiento ABI con PyNiteFEA 2.0.2 (numpy 2.2.5/scipy 1.14.1); ver src/solver/config.ts."
+  "//": "Dependencias diferidas restantes: ninguna (todas instaladas). Instaladas en F16 (E2E): @playwright/test + cross-env (scripts e2e/e2e:real; navegador via `npx playwright install chromium`, en CI `--with-deps`). Instaladas en F14 (diagramas N/V/M/flecha): react-plotly.js + plotly.js-basic-dist-min (+ @types/react-plotly.js); se usa el bundle basic-dist-min (scatter/line, suficiente; sin types propios -> ambient en src/ui/resultados/plotly-basic-dist-min.d.ts) y se carga LAZY por peso ~1 MB gzip (src/ui/resultados/diagramaLazy.ts; Plotly aislado tras <DiagramaBarra>, puerta a uPlot). Instaladas en F9: three + @react-three/fiber + @react-three/drei + three-mesh-bvh (viewport R3F), @radix-ui/* tabs/dialog/popover/collapsible/toggle-group/select (primitivas UI), @testing-library/react+jest-dom+user-event (tests de componente). Instaladas en F5 (solver): pyodide + comlink. pyodide pineado EXACTO (0.28.3) por acoplamiento ABI con PyNiteFEA 2.0.2 (numpy 2.2.5/scipy 1.14.1); ver src/solver/config.ts."
 }
