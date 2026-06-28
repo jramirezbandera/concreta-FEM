@@ -93,7 +93,7 @@ export interface CalculoSink {
 // defecto de calcularObra sin duplicar logica. Escribir en el store tras desmontar
 // es inocuo (Zustand no usa setState de React): no necesita guard de montaje.
 // -----------------------------------------------------------------------------
-function refrescarEstadoMotor(): void {
+export function refrescarEstadoMotor(): void {
   void solverClient
     .estado()
     .then((e) => {

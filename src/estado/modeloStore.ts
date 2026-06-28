@@ -12,6 +12,7 @@ import { PilaUndo } from "./comandos/pilaUndo";
 import { applyPatches } from "./comandos/comando";
 import type { Comando, AplicadorParches } from "./comandos/comando";
 import { resultadosStore } from "./resultadosStore";
+import { modalStore } from "./modalStore";
 
 // Una sola pila para toda la vida del store (modulo, no estado React): el
 // historial es infraestructura, no dato serializable de la obra.
@@ -45,9 +46,14 @@ export const modeloStore = create<ModeloState>()(
 
       // Editar el modelo invalida los resultados (deformada/esfuerzos dejan de ser
       // vigentes hasta recalcular) pero los CONSERVA: limpiar() solo baja la bandera
-      // (F14 los muestra obsoletos en gris). Cambiar de obra usa descartar() (reset
-      // total). Import unidireccional modeloStore->resultadosStore.
-      const invalidarResultados = () => resultadosStore.getState().limpiar();
+      // (F14 los muestra obsoletos en gris). Las formas modales (modalStore, F2b)
+      // siguen el MISMO patron: editar baja su `vigente`, cambiar de obra las descarta.
+      // Cambiar de obra usa descartar() (reset total). Import unidireccional
+      // modeloStore->resultadosStore/modalStore (ninguno de los dos importa modeloStore).
+      const invalidarResultados = () => {
+        resultadosStore.getState().limpiar();
+        modalStore.getState().limpiar();
+      };
 
       // Refleja en el store el estado de la pila tras cualquier cambio de
       // historial. Mantener juntos modelo y banderas evita estados intermedios
@@ -74,6 +80,7 @@ export const modeloStore = create<ModeloState>()(
           });
           sincronizarPila();
           resultadosStore.getState().descartar();
+          modalStore.getState().descartar();
         },
 
         ejecutar: (comando) => {

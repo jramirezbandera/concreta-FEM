@@ -807,11 +807,15 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
   // T2) ERROR-PATH del motor.  El closure `calcular` del arnes LANZA (throw) cuando
   //    el glue devuelve {ok:false} (motor.ts). Se verifica que el motor PROPAGA un
   //    error claro ante un payload INVALIDO, en lugar de devolver basura silenciosa.
-  //    Dos sub-casos: (a) analysis modal -> ValueError del glue; (b) Capa 2 rota
-  //    (barra que referencia un nodo inexistente -> KeyError/excepcion en build_model).
+  //    Caso: Capa 2 rota (barra que referencia un nodo inexistente -> KeyError /
+  //    excepcion en build_model). NOTA (F2b): antes habia aqui un sub-caso (a) que
+  //    asumia que el camino MODAL estaba diferido y `run_analysis` lanzaba ValueError;
+  //    ya NO es cierto (modal funciona, F2b). La cobertura modal vive ahora en los
+  //    goldens propios (modal.golden.test.ts): f1 Capa B, acotado de modos y el
+  //    error-path modal real (masa nula -> ErrorMotor legible), no en este aserto.
   // ---------------------------------------------------------------------------
   it(
-    "error-path: payload invalido (modal y barra con nodo inexistente) hace lanzar a calcular",
+    "error-path: payload invalido (barra con nodo inexistente) hace lanzar a calcular",
     () => {
       if (!arranque || !arranque.ok) {
         console.warn(`[GOLDEN][SKIP] ${arranque?.motivo ?? "arranque no ejecutado"}`);
@@ -851,13 +855,8 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
         analysis: { type: "linear" as const, check_statics: false },
       };
 
-      // (a) ANALISIS MODAL -> run_analysis lanza ValueError ("modal ... F2") -> glue
-      //     {ok:false} -> el closure calcular lanza. El mensaje debe mencionar modal.
-      const modal = { ...base, analysis: { type: "modal" as const, check_statics: false } };
-      expect(() => motor.calcular(modal), "modal debe propagar error del glue").toThrow(/modal/i);
-
-      // (b) BARRA QUE REFERENCIA UN NODO INEXISTENTE -> build_model revienta al
-      //     llamar add_member con un nodo que no existe -> glue {ok:false} -> throw.
+      // BARRA QUE REFERENCIA UN NODO INEXISTENTE -> build_model revienta al llamar
+      // add_member con un nodo que no existe -> glue {ok:false} -> throw del closure.
       const nodoRoto = {
         ...base,
         members: [{ ...base.members[0], j: "NO_EXISTE" }],

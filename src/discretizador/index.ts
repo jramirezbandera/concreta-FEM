@@ -10,14 +10,14 @@ export {
   resolverSeccion,
   signoGravitatorio,
 } from "./discretizar";
-export type { ResultadoDiscretizacion } from "./discretizar";
+export type { ResultadoDiscretizacion, DiscretizarOpts } from "./discretizar";
 
 // Contrato de la Capa 2 (schemas Zod + tipos via z.infer).
 export * from "./contratoFEM";
 
 // Validaciones previas en lenguaje de obra.
 export { validarModelo } from "./validaciones";
-export type { ErrorObra } from "./validaciones";
+export type { ErrorObra, ContextoModal } from "./validaciones";
 
 // Centro de masas por planta (F2.1, calculo PURO; lo consume la UI de F2.4).
 export { calcularCentroMasaPlanta } from "./centros";

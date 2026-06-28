@@ -30,6 +30,7 @@ import {
   type VersionesRuntime,
 } from "./pyodideNode";
 import type { ResultadosCalculo } from "../../../src/solver/resultados";
+import type { ResultadosModales } from "../../../src/solver/resultadosModales";
 import type { ModeloFEM } from "../../../src/discretizador/contratoFEM";
 
 // Re-export: T1.1/T1.2 importan VersionesRuntime y el timeout desde el arnes.
@@ -41,6 +42,12 @@ export { TIMEOUT_ARRANQUE, type VersionesRuntime };
 export type MotorGolden = {
   /** Llama al glue calcular(modeloFEM) y devuelve ResultadosCalculo VALIDADO. */
   calcular(modeloFEM: ModeloFEM): ResultadosCalculo;
+  /**
+   * Camino MODAL: llama al glue (analysis.type:"modal") y devuelve ResultadosModales
+   * VALIDADO contra ResultadosModalesSchema (no contra el por-combo). El golden modal
+   * (Capa B) lo usa para asertar f1 ≈ analitico sin acoplarse al smoke de src/solver.
+   */
+  calcularModal(modeloFEM: ModeloFEM): ResultadosModales;
   /** Versiones reales del runtime (re-asercion del par; CLAUDE.md §18). */
   versiones: VersionesRuntime;
 };
@@ -79,10 +86,14 @@ async function arrancar(): Promise<ArranqueMotor> {
       e instanceof ErrorArranquePyodide ? e.message : descr(e);
     return { ok: false, motivo };
   }
-  // Exponemos SOLO {calcular, versiones} (la instancia py cruda no es parte del
-  // contrato del arnes golden).
+  // Exponemos {calcular, calcularModal, versiones} (la instancia py cruda no es
+  // parte del contrato del arnes golden).
   return {
     ok: true,
-    motor: { calcular: motor.calcular, versiones: motor.versiones },
+    motor: {
+      calcular: motor.calcular,
+      calcularModal: motor.calcularModal,
+      versiones: motor.versiones,
+    },
   };
 }

@@ -16,6 +16,7 @@ import type { Modelo, Pilar, Viga, Carga } from "../dominio";
 import { plantaPorId, nudoPorId, seccionPorId, esHipotesisAutomatica } from "../dominio";
 import { getMaterial, getSeccion } from "../biblioteca";
 import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
+import { materialAportaMasa } from "./propiedadesBarra";
 
 // Error de obra: contrato estable consumido por la UI (resaltado del elemento) y
 // por los tests (assert de `codigo` + `elementoId`).
@@ -384,9 +385,59 @@ function validarNudosFlotantes(modelo: Modelo, errores: ErrorObra[]): void {
   }
 }
 
+// --- Validaciones EXCLUSIVAS del camino modal (F2b) --------------------------
+// El analisis modal es un camino de calculo SEPARADO (no un OpcionesAnalisis.tipo):
+// se invoca con `discretizar(modelo, { modal: { numModos } })`. Estas dos guardas
+// SOLO se ejecutan en ese camino (la orquestacion les pasa el contexto modal); en el
+// calculo estatico no aplican. Fallan RAPIDO en lenguaje de obra, antes del motor:
+// el spike confirmo que sin masa el motor lanza "massless" (jerga inutil para el
+// arquitecto) y que numModos invalido produce errores tecnicos opacos.
+
+// Contexto modal que la orquestacion (discretizar) pasa a las validaciones cuando el
+// calculo es modal. `undefined`/ausente => calculo estatico, las guardas no corren.
+export type ContextoModal = { numModos: number };
+
+// M1 (MODAL_NUM_MODOS): el nº de modos pedido debe ser un entero > 0. Un 0 o negativo
+// no tiene sentido fisico y el motor lo rechazaria con un error tecnico. BLOQUEA.
+function validarModalNumModos(modal: ContextoModal, errores: ErrorObra[]): void {
+  if (!Number.isInteger(modal.numModos) || modal.numModos <= 0) {
+    errores.push({
+      codigo: "MODAL_NUM_MODOS",
+      severidad: "error",
+      mensaje: "El número de modos a calcular debe ser mayor que cero.",
+      elementoTipo: "modelo",
+    });
+  }
+}
+
+// M2 (MODAL_SIN_MASA): el analisis modal necesita masa para vibrar. La masa la deriva
+// el motor del peso propio (`rho` del material) de las barras, asi que debe existir al
+// menos un pilar o viga con material de `rho>0`. Si no, el motor lanzaria "massless"
+// (jerga). Esta red lo atrapa antes, en lenguaje de obra. Se lee `rho` via
+// `materialAportaMasa` (A-dry, throw-safe: una ref de material rota no aporta masa y
+// ya la cazo REF_MATERIAL). BLOQUEA.
+function validarModalConMasa(modelo: Modelo, errores: ErrorObra[]): void {
+  const hayMasa =
+    modelo.pilares.some((p) => materialAportaMasa(p.materialId)) ||
+    modelo.vigas.some((v) => materialAportaMasa(v.materialId));
+  if (!hayMasa) {
+    errores.push({
+      codigo: "MODAL_SIN_MASA",
+      severidad: "error",
+      mensaje:
+        "El análisis modal necesita masa: el modelo no tiene elementos estructurales con peso.",
+      elementoTipo: "modelo",
+    });
+  }
+}
+
 // Punto de entrada: ejecuta todas las validaciones y devuelve la lista de errores.
 // `[]` significa modelo valido (apto para discretizar). PURO: no muta el modelo.
-export function validarModelo(modelo: Modelo): ErrorObra[] {
+//
+// `modal` (opcional): si se pasa, el calculo es MODAL y se aplican ademas las dos
+// guardas exclusivas del camino modal (MODAL_NUM_MODOS, MODAL_SIN_MASA). Ausente =>
+// calculo estatico, identico a antes (las guardas modales no corren): sin regresion.
+export function validarModelo(modelo: Modelo, modal?: ContextoModal): ErrorObra[] {
   const errores: ErrorObra[] = [];
   validarNombresUnicos(modelo, errores);
   validarReferencias(modelo, errores);
@@ -395,5 +446,9 @@ export function validarModelo(modelo: Modelo): ErrorObra[] {
   validarHipotesisConCargas(modelo, errores);
   validarVariablesConcomitantes(modelo, errores);
   validarNudosFlotantes(modelo, errores);
+  if (modal !== undefined) {
+    validarModalNumModos(modal, errores);
+    validarModalConMasa(modelo, errores);
+  }
   return errores;
 }

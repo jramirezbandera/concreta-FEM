@@ -40,7 +40,7 @@ import {
   type AnalisisFEM,
   type Trazabilidad,
 } from "./contratoFEM";
-import { validarModelo, type ErrorObra } from "./validaciones";
+import { validarModelo, type ErrorObra, type ContextoModal } from "./validaciones";
 import { generarCombos } from "./combinaciones";
 // resolverSeccion y las propiedades de barra viven en el modulo hoja
 // ./propiedadesBarra (A-dry): el discretizador las consume, no las define. Se
@@ -68,6 +68,21 @@ export { resolverSeccion };
 export type ResultadoDiscretizacion =
   | { ok: true; modeloFEM: ModeloFEM; avisos: ErrorObra[]; trazabilidad: Trazabilidad }
   | { ok: false; errores: ErrorObra[] };
+
+// Opciones de calculo TRANSITORIAS de discretizar(). NO se persisten (no son parte
+// del Modelo de Capa 1): son parametros del calculo en curso, como `nPoints` de los
+// diagramas. Hoy solo portan el camino MODAL (F2b).
+//
+// `modal`: cuando esta presente, el calculo es un ANALISIS MODAL (camino separado del
+// estatico). El Paso 8 emite `analysis.type:"modal"` con `num_modes = modal.numModos`,
+// IGNORANDO `modelo.analisis.tipo` (lineal/general/pDelta solo gobiernan el estatico).
+// La masa modal NO se emite en Capa 2: la fabrica el glue (add_member_self_weight +
+// gravity=9.81), por eso `generarCombos` NO cambia y aqui no hay combo de masa. El
+// numero de modos NO se persiste en el Modelo: llega por aqui y se valida (guardas
+// MODAL_NUM_MODOS / MODAL_SIN_MASA).
+export type DiscretizarOpts = {
+  modal?: { numModos: number };
+};
 
 // Geometria de snapping (TOL_NODO + mapearEjes + clavePosicion) definida en
 // ./geometria (modulo hoja, fuente unica del criterio "mismo nodo") y re-exportada
@@ -126,12 +141,19 @@ function materialFEM(id: string): MaterialFEM | undefined {
 
 // --- discretizador -----------------------------------------------------------
 
-export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
+export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDiscretizacion {
+  // Camino modal (F2b): `opts.modal` => analisis MODAL, separado del estatico. Las
+  // validaciones reciben el contexto modal para correr las guardas exclusivas
+  // (MODAL_NUM_MODOS, MODAL_SIN_MASA); sin `opts.modal` el comportamiento es identico
+  // al estatico (sin regresion). Funcion PURA y determinista en ambos caminos.
+  const contextoModal: ContextoModal | undefined =
+    opts?.modal !== undefined ? { numModos: opts.modal.numModos } : undefined;
+
   // Paso 0: validaciones previas, repartidas por SEVERIDAD. Los "error" bloquean
   // (referencias rotas, sin sujecion, nombres dup): no se construye nada. Los
   // "aviso" (hipotesis vacia, nudo flotante) NO impiden calcular: se acumulan en el
   // canal `avisos` del ok:true para no negar el calculo por una limpieza pendiente.
-  const erroresPrevios = validarModelo(modelo);
+  const erroresPrevios = validarModelo(modelo, contextoModal);
   const bloqueantesPrevios = erroresPrevios.filter((e) => e.severidad === "error");
   if (bloqueantesPrevios.length > 0) {
     return { ok: false, errores: bloqueantesPrevios };
@@ -536,23 +558,39 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
   const combos = generarCombos(modelo);
 
   // --- Paso 8: analisis -------------------------------------------------------
-  // Mapeo `tipo` (Capa 1) -> AnalisisFEM.type (Capa 2), 3 ramas:
+  // Camino MODAL (F2b): si `opts.modal` esta presente, el analisis es modal,
+  // IGNORANDO `modelo.analisis.tipo` (lineal/general/pDelta gobiernan solo el camino
+  // estatico). Se emite `type:"modal"` + `num_modes` (de opts.modal.numModos, ya
+  // validado >0). `check_statics:false`: el analisis modal no comprueba equilibrio
+  // por combo (no hay combo estatico que comprobar). La masa NO se emite en Capa 2:
+  // la fabrica el glue (add_member_self_weight + gravity=9.81); no hay combo de masa.
+  //
+  // Camino ESTATICO (sin opts.modal): mapeo `tipo` (Capa 1) -> AnalisisFEM.type, 3 ramas:
   //   lineal -> linear   (analisis lineal de primer orden)
   //   general -> analyze (analisis general; geometria de primer orden)
   //   pDelta -> PDelta   (P-Delta de balanceo a nivel nudo; lo ejecuta el glue con
   //                       analyze_PDelta). En P-Delta el glue ignora check_statics
   //                       (no hace comprobacion de equilibrio); el forzado a false
   //                       bajo P-Delta vive en el glue (F2.2/E6), no aqui.
-  const tipoAnalisis: AnalisisFEM["type"] =
-    modelo.analisis.tipo === "lineal"
-      ? "linear"
-      : modelo.analisis.tipo === "general"
-        ? "analyze"
-        : "PDelta";
-  const analysis: AnalisisFEM = {
-    type: tipoAnalisis,
-    check_statics: modelo.analisis.comprobarEstatica,
-  };
+  let analysis: AnalisisFEM;
+  if (contextoModal !== undefined) {
+    analysis = {
+      type: "modal",
+      check_statics: false,
+      num_modes: contextoModal.numModos,
+    };
+  } else {
+    const tipoAnalisis: AnalisisFEM["type"] =
+      modelo.analisis.tipo === "lineal"
+        ? "linear"
+        : modelo.analisis.tipo === "general"
+          ? "analyze"
+          : "PDelta";
+    analysis = {
+      type: tipoAnalisis,
+      check_statics: modelo.analisis.comprobarEstatica,
+    };
+  }
 
   // Si la traduccion encontro errores BLOQUEANTES (carga superficial/no aplicable),
   // se devuelven como errores de obra (ok:false). El arquitecto los ve en lenguaje

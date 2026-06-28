@@ -13,7 +13,8 @@ export type AccionMenu =
   | "activarHerramientaPilar"
   | "activarHerramientaViga"
   | "borrarSeleccion"
-  | "calcular";
+  | "calcular"
+  | "calcularModos";
 
 // Un item de menu es, o bien un string inerte (placeholder, igual que en F9),
 // o bien un item accionable con etiqueta + accion. Retrocompatible: los menus
@@ -121,11 +122,13 @@ export const MENUS_POR_PESTANA: Record<Pestana, MenuDef[]> = {
       etiqueta: "Calcular",
       strong: true,
       // "Calcular obra" dispara el corte vertical F1 (obra -> discretizar -> solver ->
-      // resultados) via la accion "calcular". "Opciones de cálculo…" abre el dialogo
-      // de Opciones de analisis (F2.4, spec §3.2): tipo de analisis, peso propio,
-      // comprobar estatica.
+      // resultados) via la accion "calcular". "Calcular modos" dispara el ANALISIS MODAL
+      // (F2b, camino independiente): frecuencias propias + formas de vibracion.
+      // "Opciones de cálculo…" abre el dialogo de Opciones de analisis (F2.4, spec §3.2):
+      // tipo de analisis, peso propio, comprobar estatica.
       items: [
         { etiqueta: "Calcular obra", accion: "calcular" },
+        { etiqueta: "Calcular modos", accion: "calcularModos" },
         { etiqueta: "Opciones de cálculo…", accion: "abrirOpcionesAnalisis" },
       ],
     },

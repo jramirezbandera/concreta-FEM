@@ -18,5 +18,10 @@ export type {
   ErrorMotor,
 } from "./resultados";
 
+// Contrato de salida del analisis MODAL (camino independiente del por-combo, F2b).
+// Solo el tipo: el *Schema (ResultadosModalesSchema) es interno al borde, igual que
+// ResultadosCalculoSchema; la validacion la hace solverClient.calcularModal().
+export type { ResultadosModales, Modo } from "./resultadosModales";
+
 // DELIBERADAMENTE FUERA: worker.ts (SolverWorkerAPI), config.ts, pynite_glue.py y
 // los *Schema de Zod. Son detalle de implementacion del solver, no API publica.

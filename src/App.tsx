@@ -27,6 +27,8 @@ import {
   TablaReacciones,
   PanelDiagramas,
   LeyendaEscala,
+  ModoOverlay,
+  PanelFrecuencias,
   usePrecargaMotor,
 } from "./ui/resultados";
 import {
@@ -356,6 +358,9 @@ export default function App() {
                   sceneOverlays: (
                     <>
                       <DeformadaOverlay />
+                      {/* Forma modal (F2b): se autooculta sin modos o fuera de 3D. NO
+                          reutiliza datos de la deformada (lee del modalStore). */}
+                      <ModoOverlay />
                       <CentroMasaOverlay />
                     </>
                   ),
@@ -366,6 +371,11 @@ export default function App() {
                       </Slot>
                       <Slot zona="top-right">
                         <ComboSelector />
+                      </Slot>
+                      {/* Panel de frecuencias / modos de vibracion (F2b). mid-right
+                          queda libre en Resultados (no hay inspector aqui). */}
+                      <Slot zona="mid-right">
+                        <PanelFrecuencias />
                       </Slot>
                       <Slot zona="bottom-left">
                         <TablaReacciones />

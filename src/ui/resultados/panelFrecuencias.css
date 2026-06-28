@@ -1,0 +1,152 @@
+/* PanelFrecuencias (F2b): panel glass del analisis modal con lista de frecuencias,
+   selector de modo, control de nº de modos y controles de amplitud/animacion. Estilado
+   SOLO con tokens semanticos (styles/tokens.css); reusa .cx-float. Sin colores
+   hardcodeados. Espejo de leyendaEscala.css. */
+
+.cx-frecuencias {
+  width: 220px;
+}
+
+.cx-frecuencias .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Fila de lanzamiento: input nº de modos + boton "Calcular modos". */
+.cx-frecuencias__lanzar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2, 8px);
+}
+
+.cx-frecuencias__num {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.cx-frecuencias__num input[type="number"] {
+  width: 100%;
+  background: var(--glass-bg, transparent);
+  border: 1px solid var(--glass-bd);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--text-1);
+  padding: 4px 6px;
+  font-size: 13px;
+}
+
+.cx-frecuencias__etq {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* Reporte de errores de obra / fallo del motor. */
+.cx-frecuencias__reporte {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-frecuencias__motor-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger, #c0392b);
+}
+.cx-frecuencias__errores {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cx-frecuencias__errores li {
+  font-size: 12px;
+  color: var(--danger, #c0392b);
+}
+
+/* Lista de frecuencias (modo seleccionable). */
+.cx-frecuencias__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.cx-frecuencias__modo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+.cx-frecuencias__modo:hover {
+  background: var(--glass-bd);
+}
+.cx-frecuencias__modo--activo {
+  border-color: var(--accent);
+  color: var(--text-1);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.cx-frecuencias__modo-f {
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+/* Control de amplificacion (slider). */
+.cx-frecuencias__control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-frecuencias__control .cx-frecuencias__etq {
+  display: flex;
+  justify-content: space-between;
+}
+.cx-frecuencias__control input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* Toggle de animacion. */
+.cx-frecuencias__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cx-frecuencias__toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+/* Estado vacio. */
+.cx-frecuencias__vacio {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+
+/* Aviso de acotado de modos (informativo, no error). */
+.cx-frecuencias__nota {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.4;
+}

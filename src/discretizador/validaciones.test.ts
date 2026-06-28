@@ -397,4 +397,61 @@ describe("validarModelo", () => {
     );
     expect(avisoAuto).toBe(false);
   });
+
+  // --- Guardas EXCLUSIVAS del camino modal (F2b) ------------------------------
+  // Solo corren cuando validarModelo recibe el contexto modal (2.º parametro). En el
+  // calculo estatico NO deben aparecer nunca (no regresion).
+
+  it("modal: el modelo valido base SIN contexto modal no genera guardas modales", () => {
+    // Sanidad de no-regresion: sin el 2.º parametro, ninguna guarda modal corre.
+    const cods = codigos(validarModelo(modeloValido()));
+    expect(cods).not.toContain("MODAL_NUM_MODOS");
+    expect(cods).not.toContain("MODAL_SIN_MASA");
+  });
+
+  it("modal: el modelo valido base CON contexto modal valido no genera guardas", () => {
+    // El portico base tiene pilar+viga de acero (rho>0) y numModos>0: ambas guardas OK.
+    const cods = codigos(validarModelo(modeloValido(), { numModos: 6 }));
+    expect(cods).not.toContain("MODAL_NUM_MODOS");
+    expect(cods).not.toContain("MODAL_SIN_MASA");
+  });
+
+  it("MODAL_NUM_MODOS: numModos 0 -> error bloqueante en lenguaje de obra", () => {
+    const e = validarModelo(modeloValido(), { numModos: 0 }).find(
+      (x) => x.codigo === "MODAL_NUM_MODOS",
+    );
+    expect(e).toBeDefined();
+    expect(e!.severidad).toBe("error");
+    expect(e!.elementoTipo).toBe("modelo");
+    sinJergaFEM(e!);
+  });
+
+  it("MODAL_NUM_MODOS: numModos -1 (y no entero) -> error", () => {
+    expect(
+      codigos(validarModelo(modeloValido(), { numModos: -1 })),
+    ).toContain("MODAL_NUM_MODOS");
+    expect(
+      codigos(validarModelo(modeloValido(), { numModos: 2.5 })),
+    ).toContain("MODAL_NUM_MODOS");
+  });
+
+  it("MODAL_SIN_MASA: modelo sin pilares ni vigas -> error bloqueante", () => {
+    // Sin elementos estructurales no hay masa que vibrar: el motor lanzaria 'massless';
+    // esta red lo atrapa antes en lenguaje de obra.
+    const m = modeloValido();
+    m.pilares = [];
+    m.vigas = [];
+    m.cargas = []; // las cargas referenciaban v1 (ya borrada): se limpian para aislar
+    const e = validarModelo(m, { numModos: 6 }).find((x) => x.codigo === "MODAL_SIN_MASA");
+    expect(e).toBeDefined();
+    expect(e!.severidad).toBe("error");
+    expect(e!.elementoTipo).toBe("modelo");
+    sinJergaFEM(e!);
+  });
+
+  it("MODAL_SIN_MASA: con al menos un pilar de material con peso -> sin error", () => {
+    // El acero S275 del catalogo tiene peso>0: basta un pilar para tener masa.
+    const cods = codigos(validarModelo(modeloValido(), { numModos: 6 }));
+    expect(cods).not.toContain("MODAL_SIN_MASA");
+  });
 });

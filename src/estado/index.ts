@@ -19,6 +19,11 @@ export type {
   DefaultsCarga,
 } from "./vistaStore";
 export { resultadosStore } from "./resultadosStore";
+// modalStore (F2b): resultados del analisis MODAL (frecuencias + formas de vibracion).
+// Espejo de resultadosStore para el camino modal (independiente del estatico); fuera
+// de undo, se invalida al editar la obra desde modeloStore. Lo alimenta calcularModos
+// y lo consumen ModoOverlay/PanelFrecuencias.
+export { modalStore } from "./modalStore";
 // calculoStore (feature-17): estado del calculo (estado del motor + progreso/errores).
 // Fuera de undo, como vistaStore/resultadosStore. Lo alimenta useCalcular/calcularObra
 // y lo consumen Brandbar/Menubar/BotonCalcular.

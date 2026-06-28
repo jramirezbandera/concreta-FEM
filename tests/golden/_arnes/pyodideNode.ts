@@ -49,6 +49,10 @@ import {
   ResultadosCalculoSchema,
   type ResultadosCalculo,
 } from "../../../src/solver/resultados";
+import {
+  ResultadosModalesSchema,
+  type ResultadosModales,
+} from "../../../src/solver/resultadosModales";
 import type { ModeloFEM } from "../../../src/discretizador/contratoFEM";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -75,6 +79,13 @@ export type VersionesRuntime = {
 export type MotorArrancado = {
   /** Llama al glue calcular(modeloFEM) y devuelve ResultadosCalculo VALIDADO. */
   calcular(modeloFEM: ModeloFEM): ResultadosCalculo;
+  /**
+   * Llama al glue calcular(modeloFEM) por el CAMINO MODAL (analysis.type:"modal")
+   * y valida la salida con ResultadosModalesSchema (NO con el por-combo). El glue
+   * enruta modal por `analysis.type`; aqui solo cambia el SCHEMA del borde. Lanza
+   * con mensaje claro si el glue devuelve {ok:false} o si el borde Zod falla.
+   */
+  calcularModal(modeloFEM: ModeloFEM): ResultadosModales;
   /** Versiones reales del runtime (re-asercion del par; CLAUDE.md §18). */
   versiones: VersionesRuntime;
   /** Instancia Pyodide cruda (para usos avanzados del smoke; no la reinstancies). */
@@ -206,17 +217,28 @@ json.dumps({
     );
   }
 
+  // Invoca el glue `calcular(modeloFEMJson)` y devuelve el dict {ok|error} bruto,
+  // liberando los PyProxy en cualquier caso (sin fugas). El glue enruta estatico vs
+  // modal por `analysis.type`; este helper es agnostico al schema de salida.
+  const invocarGlue = (modeloFEM: ModeloFEM):
+    | { ok: true; resultados: unknown }
+    | { ok: false; error: { mensaje?: string; detalle?: string } } => {
+    const fnCalcular = py.globals.get("calcular");
+    const proxy = fnCalcular(JSON.stringify(modeloFEM));
+    try {
+      return proxy.toJs({ dict_converter: Object.fromEntries }) as
+        | { ok: true; resultados: unknown }
+        | { ok: false; error: { mensaje?: string; detalle?: string } };
+    } finally {
+      proxy.destroy?.();
+      fnCalcular.destroy?.();
+    }
+  };
+
   // Construye el closure `calcular`: serializa el ModeloFEM, llama al glue y
   // valida la salida con safeParse (borde Python<->TS, CLAUDE.md §8, #15).
   const calcular = (modeloFEM: ModeloFEM): ResultadosCalculo => {
-    const fnCalcular = py.globals.get("calcular");
-    const proxy = fnCalcular(JSON.stringify(modeloFEM));
-    const raw = proxy.toJs({ dict_converter: Object.fromEntries }) as
-      | { ok: true; resultados: unknown }
-      | { ok: false; error: { mensaje?: string; detalle?: string } };
-    proxy.destroy?.();
-    fnCalcular.destroy?.();
-
+    const raw = invocarGlue(modeloFEM);
     if (!raw.ok) {
       throw new Error(
         `El glue devolvio error:\n  mensaje: ${raw.error.mensaje}\n  detalle:\n${raw.error.detalle}`,
@@ -233,5 +255,25 @@ json.dumps({
     return parsed.data;
   };
 
-  return { calcular, versiones, py };
+  // Closure MODAL: mismo glue, pero el borde valida con ResultadosModalesSchema (la
+  // salida modal NO es por-combo, ver resultadosModales.ts). El glue enruta modal
+  // por `analysis.type:"modal"`. Igual que `calcular`, propaga {ok:false} como throw
+  // (asi el golden puede asertar el ErrorMotor del error-path con .toThrow).
+  const calcularModal = (modeloFEM: ModeloFEM): ResultadosModales => {
+    const raw = invocarGlue(modeloFEM);
+    if (!raw.ok) {
+      throw new Error(
+        `El glue (modal) devolvio error:\n  mensaje: ${raw.error.mensaje}\n  detalle:\n${raw.error.detalle}`,
+      );
+    }
+    const parsed = ResultadosModalesSchema.safeParse(raw.resultados);
+    if (!parsed.success) {
+      throw new Error(
+        `ResultadosModalesSchema.safeParse FALLO:\n${JSON.stringify(parsed.error.issues, null, 2)}`,
+      );
+    }
+    return parsed.data;
+  };
+
+  return { calcular, calcularModal, versiones, py };
 }

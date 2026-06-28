@@ -16,6 +16,7 @@
 # =============================================================================
 
 import json
+import math
 import sys
 import traceback
 import types
@@ -46,6 +47,27 @@ from Pynite import FEModel3D
 # sugerido en la guia (§13.4) - suficiente para dibujar y barato en WASM.
 # -----------------------------------------------------------------------------
 N_POINTS_DEFAULT = 20
+
+# -----------------------------------------------------------------------------
+# ANALISIS MODAL (F2b) - constantes de FABRICACION DE MASA y gravedad.
+#
+# La Capa 2 NO emite combo de masa (decision F2.2): el glue lo FABRICA aqui con
+# add_member_self_weight (masa CONSISTENTE, no lumped) + un combo de masa propio.
+# El spike F2b confirmo, ejecutando el motor real:
+#   - El camino consistente (add_member_self_weight) reproduce la f1 analitica de una
+#     biapoyada con error 0.002%; el camino lumped (reusar las dist loads de peso
+#     propio de F2a) da -15%. Por eso modal FABRICA su propia masa consistente.
+#   - La masa consistente = combo_factor * rho * L * A / gravity. Como nuestro `rho`
+#     es PESO especifico (kN/m^3, NO masa), hay que DIVIDIR por g para obtener masa:
+#     gravity = 9.81 m/s^2. Con gravity=1.0 las frecuencias salen *sqrt(g)
+#     (plausibles pero erroneas: el "error sutil" del modal).
+#
+# Nombres con doble guion bajo para que NUNCA colisionen con hipotesis/combos de
+# obra (que el discretizador genera con ids de dominio sin ese prefijo).
+_CASO_MASA_MODAL = "__masa_modal__"   # case del self-weight que alimenta la masa
+_COMBO_MASA_MODAL = "__MASA_MODAL__"  # combo de masa pasado a analyze_modal
+_G_FISICO = 9.81  # m/s^2 - convierte PESO (rho) -> masa. NO usar 1.0 (daria *sqrt(g)).
+_NUM_MODES_DEFAULT = 6  # si analysis.num_modes no viene (la UI usa 6 por defecto)
 
 # Tolerancias de equilibrio para check_statics (residuo global ~0). En kN-m;
 # valores holgados porque el residuo viene de redondeos de punto flotante del
@@ -165,6 +187,28 @@ class MotorInestablePDelta(Exception):
     """La estructura no se sostiene bajo P-Delta (inestable o no convergente)."""
 
 
+# -----------------------------------------------------------------------------
+# Errores de dominio del analisis MODAL (F2b). Igual que MotorInestablePDelta,
+# envuelven un fallo del solver para que `calcular()` lo distinga del catch-all y
+# emita un mensaje en lenguaje de obra. El spike F2b confirmo los mensajes crudos:
+#   - masa nula  -> Exception("...massless.") / Exception("No mass terms found...")
+#   - inestable  -> RuntimeError("Factor is exactly singular") (marcador "singular")
+#   - num_modes>=GDL -> TypeError("...eigh for sparse A with k >= N...") (lo EVITAMOS
+#     acotando num_modes; no deberia llegar, pero si llegara se reclasifica aqui).
+# -----------------------------------------------------------------------------
+class MotorModalSinMasa(Exception):
+    """El modelo no tiene masa para vibrar (sin peso propio ni material con rho)."""
+
+
+class MotorInestableModal(Exception):
+    """La estructura es inestable para el analisis modal (matriz singular)."""
+
+
+# Marcadores (minuscula) del mensaje de "sin masa" del solver modal (spike F2b):
+# "massless" (M() vacio) y "no mass terms" (M11.nnz==0 en analyze_modal).
+_MARCADORES_SIN_MASA = ("massless", "no mass terms", "no mass")
+
+
 # Marcadores (en minuscula) de los mensajes de inestabilidad/no-convergencia de
 # PyNite. Detectamos por contenido porque PyNite usa ValueError y Exception
 # genericas (no una clase propia). Cualquiera de estos en el camino P-Delta = la
@@ -178,10 +222,10 @@ _MARCADORES_INESTABLE = ("singular", "unstable", "diverged", "diverge")
 def run_analysis(m, analysis):
     """Ejecuta el analisis del tipo pedido. Devuelve (tipo_ejecutado, aviso|None).
 
-    Soporta 'linear', 'analyze' y 'PDelta' (F2a) de primera clase. 'modal' se
-    DIFIERE a F2b: no produce esfuerzos por combo -> no encaja en
-    ResultadosCalculo; se rechaza con error controlado en lugar de devolver una
-    salida incoherente.
+    Soporta 'linear', 'analyze', 'PDelta' (F2a) y 'modal' (F2b). El camino modal
+    es DISTINTO: no produce esfuerzos por combo, sino frecuencias propias + formas
+    de vibracion. NO se serializa con serialize_results (por-combo) sino con
+    serialize_results_modal; calcular() enruta segun el tipo.
     """
     tipo = analysis.get("type", "analyze")
     cs = analysis.get("check_statics", False)
@@ -208,15 +252,107 @@ def run_analysis(m, analysis):
             # propaga al catch-all generico de calcular() sin disfrazarlo.
             raise
     elif tipo == "modal":
-        # Modal no devuelve esfuerzos/desplazamientos por combinacion -> el
-        # contrato ResultadosCalculo no lo representa. Se difiere a F2b.
-        raise ValueError(
-            "El analisis modal aun no esta disponible (previsto para F2)."
-        )
+        # Modal (F2b): frecuencias propias + formas de vibracion. Fabrica su propia
+        # masa consistente y reclasifica los fallos del solver a errores de obra. La
+        # serializacion la hace serialize_results_modal (NO la por-combo); calcular()
+        # enruta segun el tipo, asi que aqui solo ejecutamos el analisis.
+        _run_modal(m, analysis)
     else:  # "analyze" (general, itera no linealidades tension/comp-only)
         m.analyze(check_statics=cs, sparse=True)
 
     return tipo, None
+
+
+# =============================================================================
+# 2b) ANALISIS MODAL (F2b)  - fabricacion de masa + acotado de modos + reclasif.
+# =============================================================================
+def _contar_gdl_libres(m):
+    """Cuenta los GDL LIBRES del modelo = 6*nudos - GDL restringidos por apoyo.
+
+    Lee los flags support_DX..support_RZ que def_support fijo en cada Node3D (los
+    pone build_model). Es el N de la matriz K11 particionada que ve eigsh: el numero
+    de modos pedidos debe ser ESTRICTAMENTE menor que N (eigsh exige k < N), si no
+    PyNite lanza TypeError("...eigh for sparse A with k >= N..."). Acotamos con esto.
+    """
+    restringidos = 0
+    for nd in m.nodes.values():
+        for flag in (
+            nd.support_DX, nd.support_DY, nd.support_DZ,
+            nd.support_RX, nd.support_RY, nd.support_RZ,
+        ):
+            if flag:
+                restringidos += 1
+    return len(m.nodes) * 6 - restringidos
+
+
+def _run_modal(m, analysis):
+    """Ejecuta analyze_modal sobre `m` con masa CONSISTENTE fabricada por el glue.
+
+    Receta (confirmada por el spike F2b ejecutando el motor real):
+      1) Fabricar masa CONSISTENTE: add_member_self_weight('FY', -1, case) crea las
+         dist loads self_weight=True que el camino consistent_m suma como
+         combo_factor*rho*L*A/gravity; add_load_combo(combo, {case: 1.0}) las activa.
+         (El camino lumped -reusar dist loads normales- daria -15% en f1.)
+      2) Acotar num_modes a (GDL_libres - 1) para no superar el k<N de eigsh.
+      3) analyze_modal(num_modes, mass_combo_name=combo, gravity=9.81). NO se pasa
+         `sparse` ni `check_statics`: la firma real de 2.0.2 no los acepta (siempre
+         dispersa internamente). gravity=9.81 porque rho es PESO (kN/m^3): masa=peso/g.
+
+    No devuelve nada: deja m.frequencies y los combos internos "Mode N". La lectura
+    la hace serialize_results_modal. Reclasifica los fallos a errores de obra.
+    """
+    # Nº de modos pedido (la UI usa 6 por defecto; AnalisisFEM.num_modes es opcional).
+    # OJO: distinguir AUSENTE (None -> default 6) de un 0/negativo explicito. Un
+    # `or _NUM_MODES_DEFAULT` convertiria 0 en 6 silenciosamente (trampa falsy-cero);
+    # el 0 es un payload invalido (Capa 1 ya lo bloquea con MODAL_NUM_MODOS) y aqui,
+    # como defensa, lo acotamos a 1 en vez de inventar 6.
+    pedido = analysis.get("num_modes")
+    if pedido is None:
+        pedido = _NUM_MODES_DEFAULT
+    pedido = max(1, int(pedido))
+
+    # 1) Masa consistente fabricada por el glue (la Capa 2 no emite combo de masa).
+    m.add_member_self_weight("FY", -1.0, case=_CASO_MASA_MODAL)
+    m.add_load_combo(_COMBO_MASA_MODAL, {_CASO_MASA_MODAL: 1.0})
+
+    # 2) Acotar num_modes < GDL libres (eigsh exige k < N). Para calcular >=1 modo
+    #    hacen falta >=2 GDL libres (k=1 < N=2). Con 0 o 1 la estructura esta total o
+    #    casi totalmente coartada y no puede vibrar -> error de obra. (Antes el caso
+    #    gdl_libres==1 forzaba num_modes=1 y eigsh lanzaba "k >= N", reclasificado a un
+    #    "sin masa" enganoso; ahora se trata como falta de GDL, su causa real.)
+    gdl_libres = _contar_gdl_libres(m)
+    if gdl_libres < 2:
+        raise MotorInestableModal(
+            "La estructura no tiene grados de libertad suficientes para vibrar: "
+            "revise los apoyos (nudos demasiado coartados)."
+        )
+    # eigsh requiere k < N: como mucho gdl_libres-1 modos. Tomamos el minimo entre lo
+    # pedido y ese tope (nunca fallamos por pedir de mas; el nº real saldra de
+    # len(m.frequencies)). Garantizado >=1 porque gdl_libres>=2.
+    num_modes = min(pedido, gdl_libres - 1)
+
+    # 3) Resolver el problema de autovalores. NO pasar sparse/check_statics (firma 2.0.2).
+    try:
+        m.analyze_modal(
+            num_modes=num_modes,
+            mass_combo_name=_COMBO_MASA_MODAL,
+            mass_direction="Y",  # irrelevante para masa consistente (spike); default
+            gravity=_G_FISICO,
+        )
+    except Exception as e:  # noqa: BLE001 - se reclasifica, no se traga.
+        msg = str(e).lower()
+        if any(marca in msg for marca in _MARCADORES_SIN_MASA):
+            raise MotorModalSinMasa(str(e)) from e
+        if any(marca in msg for marca in _MARCADORES_INESTABLE):
+            raise MotorInestableModal(str(e)) from e
+        # "k >= N": no deberia ocurrir (acotamos arriba), pero si la malla degenerase
+        # lo tratamos como "se pidieron mas modos de los que la estructura admite".
+        if "k >= n" in msg or ("eigh" in msg and "sparse" in msg):
+            raise MotorModalSinMasa(
+                "La estructura admite menos modos de vibracion de los solicitados."
+            ) from e
+        # Otro fallo (dato incoherente, bug): se propaga al catch-all sin disfrazarlo.
+        raise
 
 
 def _es_inestabilidad_pdelta(exc):
@@ -567,6 +703,76 @@ def serialize_results(m, combos, n_points, tipo_analisis, check_statics):
 
 
 # =============================================================================
+# 4b) SERIALIZACION MODAL  (forma EXACTA de ResultadosModales, resultadosModales.ts)
+#
+# Camino INDEPENDIENTE del por-combo: el analisis modal no produce esfuerzos ni
+# reacciones, sino frecuencias propias + formas de vibracion por nudo. El spike F2b
+# confirmo (ejecutando el motor):
+#   - m.frequencies es un ndarray YA en Hz (sqrt(lambda)/2pi), orden ascendente.
+#   - cada modo i (1-indexado) queda como combo interno "Mode i"; los
+#     desplazamientos por nudo se leen como cualquier combo: nd.DX["Mode 1"], etc.
+#   - NO hay reacciones por modo (nd.RxnFY["Mode 1"] lanza KeyError) -> no se emiten.
+# Se itera f"Mode {i+1}" (NO sobre m.load_combos, que incluye el combo de masa).
+# =============================================================================
+def serialize_results_modal(m):
+    """Produce el dict ResultadosModales a partir del modelo ya analizado en modal.
+
+    Materializa los ndarrays a tipos nativos (float(...)) antes de cruzar Comlink.
+    `num_modes` es el nº REAL de modos resueltos (len(m.frequencies)), que puede ser
+    menor que el pedido si la estructura tiene menos GDL.
+    """
+    brutas = [float(x) for x in m.frequencies]
+
+    # Saneo de NO FINITOS (NaN/Inf): un autovalor negativo por redondeo (modo de
+    # cuerpo rigido / cuasi-mecanismo) da sqrt(neg)=NaN, y un GDL con masa ~0 puede dar
+    # Inf. float() los propaga sin lanzar y cruzarian Comlink: el borde Zod rechaza NaN
+    # (-> "formato inesperado" opaco) y ACEPTA Inf (-> "infinito Hz" como modo espurio).
+    # Filtramos esos modos AQUI, donde se conoce el contexto fisico. Se renumera 1..N
+    # de forma contigua para conservar el invariante modos[k] <-> frecuencias[k] y
+    # frecuencia == frecuencias[numero-1].
+    modos = []
+    frecuencias = []
+    for i, f in enumerate(brutas):
+        if not math.isfinite(f):
+            continue
+        combo = "Mode %d" % (i + 1)  # combo interno que PyNite creo por modo
+        nodos = {}
+        gdl_no_finito = False
+        for name, nd in m.nodes.items():
+            seis = [
+                float(nd.DX[combo]), float(nd.DY[combo]), float(nd.DZ[combo]),
+                float(nd.RX[combo]), float(nd.RY[combo]), float(nd.RZ[combo]),
+            ]
+            if not all(math.isfinite(v) for v in seis):
+                gdl_no_finito = True
+                break
+            nodos[name] = seis
+        if gdl_no_finito:
+            continue
+        frecuencias.append(f)
+        modos.append({
+            "numero": len(modos) + 1,         # 1-indexado contiguo tras el filtro
+            "frecuencia": f,                  # Hz; == frecuencias[numero-1]
+            "nodos": nodos,                   # nombre -> [DX,DY,DZ,RX,RY,RZ]
+        })
+
+    # Si NINGUN modo salio finito, el problema de autovalores esta mal condicionado
+    # (mecanismo interno / GDL sin masa): error de obra, no una salida vacia muda.
+    if not modos:
+        raise MotorInestableModal(
+            "No se pudo calcular ningun modo de vibracion valido: revise apoyos, "
+            "rigidez y masa del modelo."
+        )
+
+    return {
+        "units": "kN-m",
+        "analysis": {"type": "modal", "num_modes": len(modos)},
+        "frecuencias": frecuencias,
+        "modos": modos,
+    }
+
+
+# =============================================================================
 # 5) ORQUESTADOR  (entrada limpia que llama el worker via Comlink)
 # =============================================================================
 def calcular(payload, n_points=N_POINTS_DEFAULT):
@@ -591,6 +797,12 @@ def calcular(payload, n_points=N_POINTS_DEFAULT):
         analysis = payload.get("analysis", {"type": "analyze", "check_statics": False})
         tipo, _aviso = run_analysis(m, analysis)
 
+        # MODAL: camino INDEPENDIENTE. No produce esfuerzos/reacciones por combo, asi
+        # que NO se serializa con serialize_results (por-combo) ni se calcula
+        # check_statics: se devuelve la forma ResultadosModales y se sale aqui.
+        if tipo == "modal":
+            return {"ok": True, "resultados": serialize_results_modal(m)}
+
         # Combos realmente definidos; si el modelo no define ninguno PyNite usa
         # 'Combo 1' por defecto (guia §3.5). Filtramos a los existentes.
         combos = list(m.load_combos.keys()) or ["Combo 1"]
@@ -608,6 +820,36 @@ def calcular(payload, n_points=N_POINTS_DEFAULT):
 
         resultados = serialize_results(m, combos, n_points, tipo, check)
         return {"ok": True, "resultados": resultados}
+
+    except MotorModalSinMasa as e:
+        # El modelo no tiene masa para vibrar (sin peso propio ni material con rho, o
+        # estructura totalmente coartada). Mensaje de obra; `detalle` guarda el crudo.
+        return {
+            "ok": False,
+            "error": {
+                "mensaje": (
+                    "El modelo no tiene masa para calcular sus modos de vibracion: "
+                    "active el peso propio o anada cargas permanentes."
+                ),
+                "detalle": "Modal: " + (str(e) or e.__class__.__name__)
+                + "\n" + traceback.format_exc(),
+            },
+        }
+
+    except MotorInestableModal as e:
+        # Estructura inestable para el analisis modal (matriz singular). Mensaje de
+        # obra distinto del de "sin masa"; mismo tono que el de P-Delta.
+        return {
+            "ok": False,
+            "error": {
+                "mensaje": (
+                    "La estructura es inestable: revise apoyos, rigidez o "
+                    "arriostramiento antes de calcular los modos."
+                ),
+                "detalle": "Modal: " + (str(e) or e.__class__.__name__)
+                + "\n" + traceback.format_exc(),
+            },
+        }
 
     except MotorInestablePDelta as e:
         # Inestabilidad / no-convergencia bajo P-Delta -> mensaje de obra claro,

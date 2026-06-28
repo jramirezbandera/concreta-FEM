@@ -218,6 +218,76 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
     expect(discretizarOk(mPDelta).analysis.type).toBe("PDelta");
   });
 
+  describe("analisis MODAL (F2b: camino separado por opts, no un OpcionesAnalisis.tipo)", () => {
+    // discretizarOk acepta opts: el camino modal se invoca con el 2.º parametro.
+    function discretizarModalOk(m: Modelo, numModos: number) {
+      const res = discretizar(m, { modal: { numModos } });
+      if (!res.ok) {
+        throw new Error("esperaba ok:true, errores: " + JSON.stringify(res.errores));
+      }
+      return res.modeloFEM;
+    }
+
+    it("opts.modal -> analysis.type:'modal', num_modes, check_statics:false", () => {
+      const fem = discretizarModalOk(modeloPortico(), 6);
+      expect(fem.analysis.type).toBe("modal");
+      expect(fem.analysis.num_modes).toBe(6);
+      expect(fem.analysis.check_statics).toBe(false);
+    });
+
+    it("opts.modal IGNORA modelo.analisis.tipo (pDelta -> sigue siendo 'modal')", () => {
+      // El tipo estatico no debe gobernar el camino modal: aunque el modelo pida
+      // pDelta, con opts.modal el analisis emitido es modal.
+      const m = modeloPortico();
+      m.analisis.tipo = "pDelta";
+      const fem = discretizarModalOk(m, 4);
+      expect(fem.analysis.type).toBe("modal");
+      expect(fem.analysis.num_modes).toBe(4);
+    });
+
+    it("salida modal valida contra ModeloFEMSchema", () => {
+      const fem = discretizarModalOk(modeloPortico(), 6);
+      expect(ModeloFEMSchema.safeParse(fem).success).toBe(true);
+    });
+
+    it("SIN opts.modal: num_modes ausente y type estatico (no regresion)", () => {
+      // El camino por defecto no debe verse afectado: sin num_modes y type estatico.
+      const fem = discretizarOk(modeloPortico());
+      expect(fem.analysis.type).toBe("linear");
+      expect(fem.analysis.num_modes).toBeUndefined();
+    });
+
+    it("opts.modal NO cambia combos (la masa la fabrica el glue, no hay combo de masa)", () => {
+      // generarCombos inalterado: el camino modal produce EXACTAMENTE los mismos combos
+      // que el estatico (ELU/ELS) — el glue usa la masa que fabrica, no un combo Capa 2.
+      const estatico = discretizarOk(modeloPortico());
+      const modal = discretizarModalOk(modeloPortico(), 6);
+      expect(modal.combos).toEqual(estatico.combos);
+    });
+
+    it("pureza/determinismo: dos llamadas modales identicas dan el mismo JSON", () => {
+      const a = JSON.stringify(discretizarModalOk(modeloPortico(), 6));
+      const b = JSON.stringify(discretizarModalOk(modeloPortico(), 6));
+      expect(a).toBe(b);
+    });
+
+    it("guard MODAL_NUM_MODOS: numModos 0 -> ok:false (lenguaje de obra)", () => {
+      const res = discretizar(modeloPortico(), { modal: { numModos: 0 } });
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errores.some((e) => e.codigo === "MODAL_NUM_MODOS")).toBe(true);
+      }
+    });
+
+    it("guard MODAL_NUM_MODOS: numModos -1 -> ok:false", () => {
+      const res = discretizar(modeloPortico(), { modal: { numModos: -1 } });
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errores.some((e) => e.codigo === "MODAL_NUM_MODOS")).toBe(true);
+      }
+    });
+  });
+
   it("salida valida contra ModeloFEMSchema", () => {
     const fem = discretizarOk(modeloPortico());
     expect(ModeloFEMSchema.safeParse(fem).success).toBe(true);

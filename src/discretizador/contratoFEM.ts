@@ -125,6 +125,12 @@ export type ComboFEM = z.infer<typeof ComboFEMSchema>;
 export const AnalisisFEMSchema = z.object({
   type: z.enum(["linear", "analyze", "PDelta", "modal"]),
   check_statics: z.boolean(),
+  // num_modes: nº de modos propios a calcular. SOLO aplica con type:"modal" (el glue
+  // lo pasa a analyze_modal); en los demas analisis se omite. Opcional para no romper
+  // el contrato de los analisis estaticos (linear/analyze/PDelta) que no lo llevan.
+  // La masa modal la FABRICA el glue (add_member_self_weight + gravity=9.81), por eso
+  // NO hay aqui mass_combo/mass_direction: no se emite ningun combo de masa en Capa 2.
+  num_modes: z.number().int().positive().optional(),
 });
 export type AnalisisFEM = z.infer<typeof AnalisisFEMSchema>;
 

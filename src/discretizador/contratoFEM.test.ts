@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ModeloFEMSchema, type ModeloFEM } from "./contratoFEM";
+import { ModeloFEMSchema, AnalisisFEMSchema, type ModeloFEM } from "./contratoFEM";
 
 // Capa 2 bien formada: portico minimo de F1 (1 barra biapoyada con carga
 // distribuida vertical global hacia abajo + apoyo + combo CTE).
@@ -86,5 +86,26 @@ describe("ModeloFEMSchema", () => {
     const m = modeloFEMValido() as Partial<ModeloFEM>;
     delete m.members;
     expect(() => ModeloFEMSchema.parse(m)).toThrow();
+  });
+});
+
+describe("AnalisisFEMSchema (num_modes, F2b)", () => {
+  it("acepta el analisis estatico SIN num_modes (campo opcional)", () => {
+    expect(() =>
+      AnalisisFEMSchema.parse({ type: "linear", check_statics: true }),
+    ).not.toThrow();
+  });
+
+  it("acepta el analisis modal con num_modes entero positivo", () => {
+    const a = AnalisisFEMSchema.parse({ type: "modal", check_statics: false, num_modes: 6 });
+    expect(a.num_modes).toBe(6);
+  });
+
+  it("rechaza num_modes 0 / negativo / no entero", () => {
+    for (const n of [0, -1, 2.5]) {
+      expect(() =>
+        AnalisisFEMSchema.parse({ type: "modal", check_statics: false, num_modes: n }),
+      ).toThrow();
+    }
   });
 });

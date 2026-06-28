@@ -31,11 +31,22 @@ interface CalculoState {
   errores: ErrorObra[];
   avisos: ErrorObra[];
   ultimoError: ErrorCalculo | null;
+  // CANALES PROPIOS del camino MODAL ("Calcular modos"): el estado del MOTOR
+  // (estadoMotor/calculando) SI es compartido -es el mismo motor-, pero los
+  // errores/fallos son RESULTADO de un calculo concreto y NO deben mezclarse: el panel
+  // estatico (BotonCalcular) y el modal (PanelFrecuencias) estan montados a la vez en
+  // Resultados; sin canales separados, un "Calcular modos" fallido mostraria su error
+  // bajo "Calcular obra" (y viceversa), y un modal con exito borraria los errores de
+  // obra del estatico. Cada panel lee su propio canal.
+  erroresModal: ErrorObra[];
+  ultimoErrorModal: ErrorCalculo | null;
   setEstadoMotor(e: EstadoMotor): void;
   setCalculando(b: boolean): void;
   setErrores(e: ErrorObra[]): void;
   setAvisos(a: ErrorObra[]): void;
   setUltimoError(e: ErrorCalculo | null): void;
+  setErroresModal(e: ErrorObra[]): void;
+  setUltimoErrorModal(e: ErrorCalculo | null): void;
   // Merge superficial de varios campos a la vez (lo usa el sink por defecto de
   // calcularObra para reflejar transiciones sin encadenar setters sueltos).
   aplicar(parcial: Partial<CalculoEstadoDatos>): void;
@@ -54,11 +65,15 @@ export const calculoStore = create<CalculoState>()(
     errores: [],
     avisos: [],
     ultimoError: null,
+    erroresModal: [],
+    ultimoErrorModal: null,
     setEstadoMotor: (e) => set({ estadoMotor: e }),
     setCalculando: (b) => set({ calculando: b }),
     setErrores: (e) => set({ errores: e }),
     setAvisos: (a) => set({ avisos: a }),
     setUltimoError: (e) => set({ ultimoError: e }),
+    setErroresModal: (e) => set({ erroresModal: e }),
+    setUltimoErrorModal: (e) => set({ ultimoErrorModal: e }),
     aplicar: (parcial) => set(parcial),
   })),
 );

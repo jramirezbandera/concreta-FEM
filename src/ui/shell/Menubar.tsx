@@ -22,6 +22,10 @@ import {
 // brandbar) sin que aqui haga falta sink alguno. Boton y menu disparan el mismo corte
 // vertical y convergen en el mismo estado.
 import { calcularObra } from "../resultados/useCalcular";
+// "Calcular modos" (F2b): dispara el camino MODAL. Espejo de calcularObra() pero sin
+// hooks (DISPATCH es un mapa imperativo): lee el nº de modos del vistaStore y vuelca el
+// estado al calculoStore (igual ciclo de vida del motor que el estatico).
+import { calcularModos } from "../resultados/useSolicitarModos";
 import { calculoHabilitado } from "../resultados/estadoMotorUI";
 
 // Menubar (Spec Diseno UI §2 / §3.2): menus contextuales que cambian con la
@@ -69,6 +73,11 @@ export const DISPATCH: Record<AccionMenu, () => void> = {
   // alimenta el `calculoStore`, asi que el progreso/errores quedan reflejados en cualquier
   // consumidor del store (boton del panel y brandbar), sin que el menu pase ningun sink.
   calcular: () => void calcularObra(),
+  // "Calcular modos" (F2b): camino MODAL independiente. Lee el nº de modos del vistaStore
+  // (transitorio, default 6; lo ajusta el PanelFrecuencias) y dispara calcularModos(),
+  // que vuelca el progreso al calculoStore como hace calcularObra. Asincrono: `void`.
+  calcularModos: () =>
+    void calcularModos(vistaStore.getState().numModos),
 };
 
 // Etiqueta visible de un item, sea string inerte u objeto accionable. Sirve de
@@ -101,10 +110,13 @@ function Item({ item }: { item: MenuItemDef }) {
       </div>
     );
   }
-  // El item "Calcular obra" se deshabilita mientras se prepara el motor o hay un calculo en
-  // curso (mismo criterio que el boton del panel). Deshabilitado: ni dispara la accion ni
-  // cierra el Popover (Radix respeta el `disabled` del boton envuelto en Popover.Close).
-  const deshabilitado = item.accion === "calcular" && calcularDeshabilitado;
+  // Los items que disparan el motor ("Calcular obra" y "Calcular modos") se deshabilitan
+  // mientras se prepara el motor o hay un calculo en curso (mismo criterio que el boton del
+  // panel; ambos caminos comparten el mismo motor/ciclo de vida). Deshabilitado: ni dispara
+  // la accion ni cierra el Popover (Radix respeta el `disabled` del boton en Popover.Close).
+  const deshabilitado =
+    (item.accion === "calcular" || item.accion === "calcularModos") &&
+    calcularDeshabilitado;
   return (
     <Popover.Close asChild>
       <button

@@ -547,3 +547,86 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   diálogo; la UI solo deshabilita+explica el checkbox bajo P-Δ sin tocar el valor del modelo.
 - **Depende de / bloquea:** nada. **Coste:** CC ~20-30 min.
 - **Origen:** Code-review F2a (high) #8. Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+
+---
+
+## T-modal-nummodos-persist · Persistir el nº de modos (y dirección de masa) en el modelo
+
+- **Qué:** En F2b el nº de modos (`numModos`) es un parámetro **transitorio**: vive en `vistaStore`
+  (UI, fuera de undo, default 6) y se pasa a `discretizar(modelo,{modal:{numModos}})`; no se persiste.
+  Al recargar el proyecto vuelve al default. Promoverlo a `OpcionesAnalisis` (Capa 1, persistido) si
+  el usuario quiere que las opciones modales sobrevivan al reload.
+- **Por qué:** decisión de alcance de F2b (modal mínimo): se evitó el bump de schema + migración
+  tratando `numModos` como `nPoints` de los diagramas (transitorio). Es deliberado, no un bug.
+- **Cómo retomar:** añadir `numModos` (y, si se decide exponerla, una preferencia de dirección de masa)
+  a `OpcionesAnalisisSchema` con bump de `SCHEMA_VERSION` + `MIGRACIONES` (default 6 a proyectos viejos);
+  `discretizar` leería de `modelo.analisis` en vez de `opts`; la UI escribiría por comando reversible.
+- **Depende de / bloquea:** nada. **Coste:** CC ~30-45 min (schema + migración + comando + tests).
+- **Origen:** Decisión de alcance F2b (modal transitorio por mínimo). Plan: `vamos-a-hacer-f2b-lazy-blossom.md`.
+
+---
+
+## T-modal-masa-participante · Masa participante / % de masa movilizada por modo
+
+- **Qué:** El modal de F2b entrega frecuencias + formas modales, **sin** la masa participante (% de
+  masa movilizada por cada modo). Añadirla como paso hacia la combinación sísmica (NCSE-02).
+- **Por qué:** se acotó F2b a "modal mínimo" (frecuencias + animación). La participación de masa es un
+  concepto aparte (factores de participación, masa efectiva acumulada) que no se quiso mezclar al
+  contrato `ResultadosModales` ni a la UI mínima.
+- **Cómo retomar:** junto a la fase sísmica. Calcular en el glue los factores de participación (PyNite
+  los deriva del autovector y la matriz de masa) y extender `ResultadosModales` + panel con la masa
+  efectiva por modo y acumulada; decidir el criterio de nº de modos por % de masa objetivo.
+- **Depende de / bloquea:** prerrequisito de la combinación sísmica (NCSE-02). **Coste:** CC ~varias horas.
+- **Origen:** Decisión de alcance F2b (mínimo: frecuencias + formas). Plan: `vamos-a-hacer-f2b-lazy-blossom.md`.
+
+---
+
+## T-modal-overlay-dedup · Factorizar ModoOverlay/DeformadaOverlay (y sus buffers/geometría)
+
+- **Qué:** `ModoOverlay`/`modalBuffers`/`modalGeometria` duplican casi 1:1 a `DeformadaOverlay`/
+  `deformadaBuffers`/`deformadaGeometria` (patrón `useSyncExternalStore`+`useFrame`, empaquetado
+  base/delta/color a lineSegments, y la transformación de ejes FEM(Y-up)→escena(Z-up) `[x,z,y]`/`[DX,DZ,DY]`).
+  Igual `calcularModos` (useSolicitarModos) reimplementa el esqueleto de `calcularObra` (guard de reentrada,
+  sink, guard de identidad de modelo, auto-switch de pestaña).
+- **Por qué:** un bug del patrón hay que arreglarlo en los DOS. Evidencia concreta: el bug de "parar la
+  animación deja la forma a amplitud intermedia" (code-review F2b) hubo que corregirlo a mano en
+  `ModoOverlay` Y en `DeformadaOverlay` por separado; el gotcha de ejes está escrito dos veces.
+- **Cómo retomar:** extraer (a) un hook `useAnimacionBuffers(base, delta, escala, animando)` o un
+  componente `OverlayLineas`; (b) un `proyectarFEMaEscena(base, [6 GDL])` compartido; (c) un runner
+  `ejecutarPipeline({discretizar, calcular, alExito, sink})` que `calcularObra`/`calcularModos` parametricen.
+- **Depende de / bloquea:** nada. **Coste:** CC ~1-1.5 h. **Origen:** Code-review F2b (reuse/altitud).
+
+---
+
+## T-modal-overlay-perf · ModoOverlay recrea el BufferGeometry al arrastrar el slider de amplitud
+
+- **Qué:** En `ModoOverlay` (y su espejo `DeformadaOverlay`), el `useMemo` de `geom` lleva `entradas.escala`
+  en las deps → cada `onChange` del slider de amplitud crea un `BufferGeometry` nuevo (alloc + `dispose`) en
+  vez de mutar el atributo de posiciones in situ; el `useMemo` de `buffers` va atado al objeto `entradas`
+  entero → togglear animación o cambiar de vista reconstruye los buffers con dos pasadas de geometría.
+- **Por qué:** jank al ajustar amplitud en obras grandes (regla #11 de rendimiento del lienzo). La animación
+  ya muta las posiciones in situ en `useFrame`; el reescalado por slider debería hacer lo mismo.
+- **Cómo retomar:** sacar `escala` de las deps de `geom` y reescalar el atributo existente en un efecto
+  (mutación in situ + `needsUpdate` + `invalidate`); memoizar `buffers` sobre `[modeloFEM, modos, modoActivo]`.
+- **Depende de / bloquea:** se hace junto a T-modal-overlay-dedup. **Coste:** CC ~30 min. **Origen:** Code-review F2b (eficiencia).
+
+---
+
+## T-modal-masa-altitud · La masa modal se fabrica en el glue, divergente del peso propio del discretizador
+
+- **Qué:** La masa modal la fabrica el glue (`add_member_self_weight` + `gravity=9.81`, masa consistente) como
+  segundo mecanismo para `A·ρ`, que el discretizador ya ensambla como peso propio (dist_loads, F2a). La masa
+  modal ignora las cargas muertas/permanentes y el toggle `incluirPesoPropio`, y la masa que vibra es invisible
+  a "Ver modelo de cálculo" (vive en Python). Además `g=9.81` está duplicado a mano en los tests
+  (`modal.golden.test.ts`/`modal.smoke.test.ts`) además de `_G_FISICO` en el glue.
+- **Por qué:** el día que el peso propio del discretizador cambie (densidades, cargas de forjado), la masa
+  modal seguirá usando solo `A·ρ` y dará frecuencias incoherentes con la deformada estática del mismo modelo.
+  *Cuidado:* el camino lumped de la Capa 2 es −15% erróneo (spike F2b), así que emitir masa consistente desde
+  la Capa 2 requeriría un primitivo "self-weight" en el contrato, no es trivial.
+- **Cómo retomar:** decidir si el discretizador emite la masa (combo/case de masa con flag self-weight en el
+  contrato) para que el glue solo la consuma y "Ver modelo de cálculo" la muestre; y centralizar `g` (en
+  `/src/unidades` o una constante que glue y tests importen) en vez de literales sueltos.
+- **Depende de / bloquea:** se cruza con T-modal-masa-participante y un futuro sísmico. **Coste:** CC ~varias horas.
+- **Origen:** Code-review F2b (altitud). Detección de errores del motor por substring de mensajes ingleses
+  (`_MARCADORES_SIN_MASA`/`_MARCADORES_INESTABLE`/"k >= n") comparte la fragilidad ya anotada en
+  [T-pdelta-deteccion-inestable].

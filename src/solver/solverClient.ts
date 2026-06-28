@@ -33,6 +33,10 @@ import {
   type EstadoMotor,
   type ErrorMotor,
 } from "./resultados";
+import {
+  ResultadosModalesSchema,
+  type ResultadosModales,
+} from "./resultadosModales";
 import type { SolverWorkerAPI } from "./worker";
 
 // -----------------------------------------------------------------------------
@@ -302,6 +306,64 @@ export const solverClient = {
       // detalle Zod en `detalle` (para diagnostico en modo avanzado, no para el arquitecto).
       throw errorCalculo(
         "El motor devolvio resultados con un formato inesperado. " +
+          "Es un fallo interno del calculo; revisa el modelo o reporta la incidencia.",
+        parseado.error.message,
+      );
+    }
+
+    return parseado.data;
+  },
+
+  /**
+   * Calcula el ANALISIS MODAL (F2b) de un ModeloFEM (Capa 2, con
+   * analysis.type==="modal") y devuelve ResultadosModales VALIDADO con Zod
+   * (frecuencias en Hz + formas de vibracion por nudo). Camino INDEPENDIENTE de
+   * calcular(): NO usa nPoints (modal no muestrea diagramas) y valida con
+   * ResultadosModalesSchema (no ResultadosCalculoSchema).
+   *
+   * Comparte la fontaneria de calcular(): mismo singleton recuperable, mismo
+   * TIMEOUT (F5-3, termina el worker y recrea el singleton si vence), y safeParse en
+   * el borde (#8). Contrato de error IDENTICO: rechaza con ErrorMotor {fase:"carga"}
+   * si no arranco el motor, {fase:"calculo"} si fallo el analisis (p. ej. modelo sin
+   * masa, estructura inestable), la validacion o por timeout. Usa esErrorMotor()/
+   * error.fase para cazarlo. Exito -> ResultadosModales.
+   *
+   * @param modeloFEM contrato de Capa 2 con analysis.type==="modal" y num_modes.
+   * @param timeoutMs presupuesto de tiempo del calculo (opcional; 60 s por defecto).
+   */
+  async calcularModal(
+    modeloFEM: ModeloFEM,
+    timeoutMs: number = TIMEOUT_CALCULO_MS_DEFAULT,
+  ): Promise<ResultadosModales> {
+    // --- F5-3: calcular contra un timeout (mismo patron que calcular) --------
+    const proxy = obtenerProxy();
+
+    let temporizador: ReturnType<typeof setTimeout> | undefined;
+    const promesaTimeout = new Promise<never>((_, reject) => {
+      temporizador = setTimeout(() => {
+        resetWorker();
+        reject(
+          errorCalculo(
+            "El calculo de modos tardo demasiado y se ha cancelado. Revisa el " +
+              "modelo y vuelve a intentarlo.",
+            `Timeout de ${timeoutMs} ms en calcularModal().`,
+          ),
+        );
+      }, timeoutMs);
+    });
+
+    let bruto: unknown;
+    try {
+      bruto = await Promise.race([proxy.calcularModal(modeloFEM), promesaTimeout]);
+    } finally {
+      if (temporizador !== undefined) clearTimeout(temporizador);
+    }
+
+    // --- safeParse en el borde con el contrato MODAL (#8) --------------------
+    const parseado = ResultadosModalesSchema.safeParse(bruto);
+    if (!parseado.success) {
+      throw errorCalculo(
+        "El motor devolvio los modos con un formato inesperado. " +
           "Es un fallo interno del calculo; revisa el modelo o reporta la incidencia.",
         parseado.error.message,
       );

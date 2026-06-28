@@ -52,6 +52,7 @@ import type {
   ErrorMotor,
   ResultadosCalculo,
 } from "./resultados";
+import type { ResultadosModales } from "./resultadosModales";
 
 // -----------------------------------------------------------------------------
 // Estado interno del worker (privado; la UI solo lo lee via estado()).
@@ -76,6 +77,13 @@ let promesaPrecarga: Promise<void> | null = null;
 // -----------------------------------------------------------------------------
 type RespuestaGlue =
   | { ok: true; resultados: ResultadosCalculo }
+  | { ok: false; error: { mensaje: string; detalle?: string } };
+
+// El glue `calcular(payload)` enruta MODAL internamente segun analysis.type:
+// devuelve {ok, resultados:ResultadosModales} con la forma modal (frecuencias +
+// formas de vibracion), NO la por-combo. Mismo sobre {ok}/{error}.
+type RespuestaGlueModal =
+  | { ok: true; resultados: ResultadosModales }
   | { ok: false; error: { mensaje: string; detalle?: string } };
 
 // =============================================================================
@@ -262,6 +270,75 @@ const api = {
       throw {
         fase: "calculo",
         mensaje: "Fallo inesperado durante el calculo.",
+        detalle: e instanceof Error ? (e.stack ?? e.message) : String(e),
+      } satisfies ErrorMotor;
+    }
+  },
+
+  /**
+   * Ejecuta el ANALISIS MODAL (F2b) de un ModeloFEM (con analysis.type==="modal")
+   * y devuelve ResultadosModales como objeto JS PLANO (frecuencias Hz + formas de
+   * vibracion por nudo). Camino INDEPENDIENTE del por-combo: el glue `calcular`
+   * enruta modal internamente segun analysis.type, asi que aqui reusamos la MISMA
+   * funcion Python; solo cambia la FORMA del resultado (sin nPoints, sin combos).
+   *
+   * Mismo ciclo de vida y contrato de error que calcular(): asegura motor listo,
+   * libera los PyProxy en finally (FIX F5-2), y relanza los fallos del glue como
+   * ErrorMotor{fase:"calculo"} (modelo sin masa, estructura inestable...). La
+   * validacion Zod (ResultadosModalesSchema) la hace el cliente, no aqui.
+   *
+   * @param modeloFEM contrato de Capa 2 con analysis.type==="modal" y num_modes.
+   */
+  async calcularModal(modeloFEM: ModeloFEM): Promise<ResultadosModales> {
+    // Asegurar motor listo (igual que calcular; api.precargar por el binding de this).
+    if (estadoActual !== "listo") {
+      await api.precargar();
+    }
+    if (!pyodide) {
+      throw {
+        fase: "calculo",
+        mensaje: "El motor de calculo no esta disponible.",
+        detalle: "pyodide es null tras precargar().",
+      } satisfies ErrorMotor;
+    }
+
+    estadoActual = "calculando";
+    try {
+      // El glue `calcular` enruta modal por analysis.type. nPoints NO aplica en
+      // modal (se ignora): llamamos posicional simple con solo el payload JSON.
+      const calcularPy = pyodide.globals.get("calcular");
+      let respuesta: RespuestaGlueModal;
+      try {
+        const payloadJson = JSON.stringify(modeloFEM);
+        const respuestaProxy = calcularPy(payloadJson);
+        try {
+          respuesta = respuestaProxy.toJs({
+            dict_converter: Object.fromEntries,
+          }) as RespuestaGlueModal;
+        } finally {
+          respuestaProxy.destroy?.();
+        }
+      } finally {
+        calcularPy.destroy?.();
+      }
+
+      if (!respuesta.ok) {
+        estadoActual = "listo";
+        throw {
+          fase: "calculo",
+          mensaje: respuesta.error.mensaje,
+          detalle: respuesta.error.detalle,
+        } satisfies ErrorMotor;
+      }
+
+      estadoActual = "listo";
+      return respuesta.resultados;
+    } catch (e) {
+      if (estadoActual === "calculando") estadoActual = "listo";
+      if (esErrorMotor(e)) throw e;
+      throw {
+        fase: "calculo",
+        mensaje: "Fallo inesperado durante el calculo modal.",
         detalle: e instanceof Error ? (e.stack ?? e.message) : String(e),
       } satisfies ErrorMotor;
     }

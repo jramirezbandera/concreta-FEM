@@ -12,3 +12,15 @@ export { ComboSelector } from "./ComboSelector";
 export { BotonCalcular } from "./BotonCalcular";
 export { useCalcular, usePrecargaMotor, calcularObra } from "./useCalcular";
 export type { UseCalcular, ErrorCalculo, CalculoSink } from "./useCalcular";
+
+// --- Analisis modal (F2b) ----------------------------------------------------
+// Overlay de la forma modal (sceneOverlay), panel de frecuencias (hudOverlay) y la
+// orquestacion del camino modal. ModoOverlay/PanelFrecuencias los monta App.tsx en la
+// pestana Resultados; calcularModos lo dispara tambien el menu "Calcular modos".
+export { ModoOverlay } from "./ModoOverlay";
+export { PanelFrecuencias } from "./PanelFrecuencias";
+export {
+  useSolicitarModos,
+  calcularModos,
+} from "./useSolicitarModos";
+export type { UseSolicitarModos } from "./useSolicitarModos";

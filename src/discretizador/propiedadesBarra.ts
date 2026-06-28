@@ -122,3 +122,16 @@ export function propiedadesDePilar(modelo: Modelo, p: Pilar): PropiedadesBarra {
 export function propiedadesDeViga(modelo: Modelo, v: Viga): PropiedadesBarra {
   return propiedadesComunes(modelo, v.seccionId, v.materialId, longitudViga(modelo, v));
 }
+
+// ¿El material de una barra aporta masa? `rho` (peso especifico, kN/m³) es la unica
+// magnitud que determina si una barra puede vibrar. Se lee SOLO el material (no se
+// resuelve la seccion), de modo que es THROW-SAFE: a diferencia de
+// `propiedadesDePilar/Viga`, no lanza si la referencia esta rota — devuelve `false`,
+// porque sin material valido no hay masa. Lo consume la validacion modal MODAL_SIN_MASA
+// para fallar rapido en lenguaje de obra antes de que el motor lance "massless". Vive
+// aqui (no en validaciones.ts) para que la lectura de `rho` por barra tenga una sola
+// fuente de verdad (A-dry), igual que el resto de propiedades de masa.
+export function materialAportaMasa(materialId: string): boolean {
+  const material = getMaterial(materialId);
+  return material !== undefined && material.peso > 0;
+}

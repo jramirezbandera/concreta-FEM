@@ -8,9 +8,11 @@ import {
   seleccionStore,
   vistaStore,
   resultadosStore,
+  modalStore,
   crearPilar,
   moverNudo,
 } from "./index";
+import type { ResultadosModales } from "../solver";
 import { crearModeloVacio } from "../dominio";
 import type { Modelo } from "../dominio";
 import type { DatosPilar } from "./comandos/comandosModelo";
@@ -81,6 +83,21 @@ function trazabilidadMinima(): Trazabilidad {
   };
 }
 
+// ResultadosModales minimos pero validos: 2 modos con frecuencias ascendentes y forma
+// modal por nudo (6 GDL). Se construye real (no cast) para que la invalidacion y el
+// reanclaje de modoActivo arranquen de un estado "vigente" autentico.
+function modosMinimos(): ResultadosModales {
+  return {
+    units: "kN-m",
+    analysis: { type: "modal", num_modes: 2 },
+    frecuencias: [3.2, 7.8],
+    modos: [
+      { numero: 1, frecuencia: 3.2, nodos: { N1: [0, 0, 0, 0, 0, 0] } },
+      { numero: 2, frecuencia: 7.8, nodos: { N1: [0, 1, 0, 0, 0, 0] } },
+    ],
+  };
+}
+
 // Reset completo de los cuatro stores antes de cada test.
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
@@ -94,6 +111,8 @@ beforeEach(() => {
   // descartar (no limpiar): reset TOTAL de resultados para aislar cada test, ya que
   // limpiar() solo baja la bandera y conserva los resultados (D5).
   resultadosStore.getState().descartar();
+  // Espejo modal (F2b): reset total entre tests.
+  modalStore.getState().descartar();
 });
 
 // --- 1 · Init ----------------------------------------------------------------
@@ -754,5 +773,187 @@ describe("ejecutar: guard de dev del invariante de base", () => {
   it("no lanza si el comando se despacha de inmediato (base == modelo actual)", () => {
     const cmd = crearPilar(modeloStore.getState().getModelo(), datosPilar);
     expect(() => modeloStore.getState().ejecutar(cmd)).not.toThrow();
+  });
+});
+
+// --- F2b · modalStore: trio + vigente/limpiar/descartar + modoActivo ----------
+
+describe("modalStore: trio modal + semantica vigente/limpiar/descartar/modoActivo", () => {
+  it("valores iniciales: todo null/false, modoActivo=1", () => {
+    const s = modalStore.getState();
+    expect(s.modos).toBeNull();
+    expect(s.modeloFEM).toBeNull();
+    expect(s.trazabilidad).toBeNull();
+    expect(s.vigente).toBe(false);
+    expect(s.modoActivo).toBe(1);
+  });
+
+  it("modalStore NO participa en undo (sin pila como resultadosStore)", () => {
+    expect("puedeDeshacer" in modalStore.getState()).toBe(false);
+  });
+
+  it("setModos guarda el trio (modos+FEM+traza), vigente=true y reancla modoActivo=1", () => {
+    // Partimos de un modoActivo distinto de 1 para comprobar el reanclaje.
+    modalStore.getState().setModoActivo(2);
+    const modos = modosMinimos();
+    const fem = modeloFEMMinimo();
+    const traza = trazabilidadMinima();
+    modalStore.getState().setModos(modos, fem, traza);
+
+    const s = modalStore.getState();
+    expect(s.modos).toBe(modos);
+    expect(s.modeloFEM).toBe(fem);
+    expect(s.trazabilidad).toBe(traza);
+    expect(s.vigente).toBe(true);
+    // Reanclaje: el calculo anterior pudo tener mas modos; arrancamos en el primero.
+    expect(s.modoActivo).toBe(1);
+  });
+
+  it("setModoActivo cambia el modo seleccionado sin tocar el trio", () => {
+    modalStore
+      .getState()
+      .setModos(modosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    modalStore.getState().setModoActivo(2);
+
+    const s = modalStore.getState();
+    expect(s.modoActivo).toBe(2);
+    expect(s.modos).not.toBeNull();
+    expect(s.vigente).toBe(true);
+  });
+
+  it("limpiar baja vigente PERO conserva el trio (forma modal obsoleta)", () => {
+    modalStore
+      .getState()
+      .setModos(modosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    modalStore.getState().limpiar();
+
+    const s = modalStore.getState();
+    expect(s.vigente).toBe(false);
+    expect(s.modos).not.toBeNull();
+    expect(s.modeloFEM).not.toBeNull();
+    expect(s.trazabilidad).not.toBeNull();
+  });
+
+  it("descartar resetea el trio entero a null y modoActivo=1 (cambio de obra)", () => {
+    modalStore.getState().setModoActivo(2);
+    modalStore
+      .getState()
+      .setModos(modosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    modalStore.getState().descartar();
+
+    const s = modalStore.getState();
+    expect(s.vigente).toBe(false);
+    expect(s.modos).toBeNull();
+    expect(s.modeloFEM).toBeNull();
+    expect(s.trazabilidad).toBeNull();
+    expect(s.modoActivo).toBe(1);
+  });
+
+  it("el selector de modoActivo dispara solo al cambiar ese slice (subscribeWithSelector)", () => {
+    const cb = vi.fn();
+    const unsub = modalStore.subscribe((s) => s.modoActivo, cb);
+
+    // Cambiar otro slice (vigente, via limpiar) no debe disparar el cb de modoActivo.
+    modalStore.getState().limpiar();
+    expect(cb).not.toHaveBeenCalled();
+
+    modalStore.getState().setModoActivo(3);
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith(3, 1);
+    unsub();
+  });
+});
+
+// --- F2b · invalidacion de modalStore al editar la obra (espejo de resultados) -
+
+describe("Invalidacion modal: editar Capa 1 baja modal.vigente (conservando modos)", () => {
+  it("ejecutar un comando pone modal.vigente=false pero conserva los modos", () => {
+    modalStore
+      .getState()
+      .setModos(modosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    expect(modalStore.getState().vigente).toBe(true);
+
+    const cmd = crearPilar(modeloStore.getState().getModelo(), datosPilar);
+    modeloStore.getState().ejecutar(cmd);
+
+    // El overlay puede seguir mostrando la forma hasta recalcular (igual que deformada).
+    expect(modalStore.getState().vigente).toBe(false);
+    expect(modalStore.getState().modos).not.toBeNull();
+  });
+
+  it("deshacer y rehacer tambien bajan modal.vigente (conservando modos)", () => {
+    const cmd = crearPilar(modeloStore.getState().getModelo(), datosPilar);
+    modeloStore.getState().ejecutar(cmd);
+
+    modalStore
+      .getState()
+      .setModos(modosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    modeloStore.getState().deshacer();
+    expect(modalStore.getState().vigente).toBe(false);
+    expect(modalStore.getState().modos).not.toBeNull();
+
+    modalStore
+      .getState()
+      .setModos(modosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    modeloStore.getState().rehacer();
+    expect(modalStore.getState().vigente).toBe(false);
+    expect(modalStore.getState().modos).not.toBeNull();
+  });
+
+  it("cargarModelo DESCARTA los modos del todo (reset al cambiar de obra)", () => {
+    modalStore
+      .getState()
+      .setModos(modosMinimos(), modeloFEMMinimo(), trazabilidadMinima());
+    modeloStore.getState().cargarModelo(crearModeloVacio());
+    expect(modalStore.getState().vigente).toBe(false);
+    expect(modalStore.getState().modos).toBeNull();
+  });
+});
+
+// --- F2b · vistaStore: controles modales (numModos / escala / animar) ---------
+
+describe("vistaStore: controles del analisis modal (F2b)", () => {
+  beforeEach(() => {
+    vistaStore.getState().setNumModos(6);
+    vistaStore.getState().setModalEscala(1);
+    vistaStore.getState().setModalAnimando(false);
+  });
+
+  it("valores por defecto: numModos=6, modalEscala=1, modalAnimando=false", () => {
+    const s = vistaStore.getState();
+    expect(s.numModos).toBe(6);
+    expect(s.modalEscala).toBe(1);
+    expect(s.modalAnimando).toBe(false);
+  });
+
+  it("setNumModos / setModalEscala / setModalAnimando cambian su campo", () => {
+    vistaStore.getState().setNumModos(10);
+    vistaStore.getState().setModalEscala(2.5);
+    vistaStore.getState().setModalAnimando(true);
+
+    const s = vistaStore.getState();
+    expect(s.numModos).toBe(10);
+    expect(s.modalEscala).toBe(2.5);
+    expect(s.modalAnimando).toBe(true);
+  });
+
+  it("modalEscala es un CANAL DISTINTO de deformadaEscala (no se pisan)", () => {
+    vistaStore.getState().setDeformadaEscala(300);
+    vistaStore.getState().setModalEscala(2);
+    expect(vistaStore.getState().deformadaEscala).toBe(300);
+    expect(vistaStore.getState().modalEscala).toBe(2);
+  });
+
+  it("el selector de numModos ignora cambios de modalEscala (subscribeWithSelector)", () => {
+    const cb = vi.fn();
+    const unsub = vistaStore.subscribe((s) => s.numModos, cb);
+
+    vistaStore.getState().setModalEscala(3);
+    expect(cb).not.toHaveBeenCalled();
+
+    vistaStore.getState().setNumModos(8);
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith(8, 6);
+    unsub();
   });
 });

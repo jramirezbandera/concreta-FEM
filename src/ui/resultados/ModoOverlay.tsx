@@ -1,58 +1,55 @@
-// DeformadaOverlay: dibuja la deformada (Capa 2, ya calculada) como sceneOverlay
-// del viewport, superpuesta a la obra. Colorea por magnitud de desplazamiento con
-// la rampa de isovalores y anima el factor de amplificacion.
+// ModoOverlay: dibuja la FORMA MODAL activa (Capa 2, ya calculada) como sceneOverlay
+// del viewport, superpuesta a la obra, y la ANIMA. Espejo de DeformadaOverlay pero para
+// el camino MODAL (F2b): lee del modalStore (NO del resultadosStore: la forma modal y la
+// deformada son datos distintos), del modo activo y de los controles modales del vistaStore.
 //
-// RENDIMIENTO (reglas #11, igual que GeometriaModelo):
-//  - Los resultados/modeloFEM NO entran como prop reactiva por frame: se leen con
-//    getState()/subscribe (subscribeWithSelector) y la geometria se RECONSTRUYE solo
-//    cuando cambian resultados, modeloFEM, vigente, combinacion o escala. Nunca por
-//    frame (useSyncExternalStore -> useMemo).
+// RENDIMIENTO (reglas #11, igual que DeformadaOverlay):
+//  - modos/modeloFEM NO entran como prop reactiva por frame: se leen con
+//    getState()/subscribe (subscribeWithSelector) y la geometria se RECONSTRUYE solo al
+//    cambiar modos, modeloFEM, modo activo o escala. Nunca por frame (useSyncExternalStore
+//    -> useMemo).
 //  - La ANIMACION no usa setState: muta el array de posiciones del BufferGeometry en
 //    useFrame e invalida (frameloop="demand"). Cero render de React por frame.
-//  - Un solo lineSegments con color por vertice (la linea base de la obra ya da el
-//    contexto; aqui el feedback es el color por magnitud).
+//  - Un solo lineSegments con color por vertice.
 //
-// SIN jerga FEM en lo visible: este overlay no rotula nodos ni members; solo dibuja.
+// SIN jerga FEM en lo visible: no rotula nodos ni members; solo dibuja la forma de vibracion.
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { invalidate, useFrame } from "@react-three/fiber";
 import { BufferGeometry, Float32BufferAttribute, type LineSegments } from "three";
-import { resultadosStore, vistaStore } from "../../estado";
+import { modalStore, vistaStore } from "../../estado";
 import type { ModoVista } from "../../estado";
 import type { ModeloFEM } from "../../discretizador";
-import type { ResultadosCalculo } from "../../solver";
-import { construirBuffers } from "./deformadaBuffers";
+import type { ResultadosModales } from "../../solver";
+import { construirBuffersModal } from "./modalBuffers";
 
-// Velocidad de la oscilacion de la animacion (rad/s). El factor de amplificacion
-// oscila como (1 - cos)/2 in [0,1] para arrancar y volver en reposo sin tirones.
+// Velocidad de la oscilacion de la animacion (rad/s). El factor oscila como
+// (1 - cos)/2 in [0,1] para arrancar y volver en reposo sin tirones. Igual que la
+// deformada para que ambas animaciones tengan el mismo "ritmo".
 const VELOCIDAD_ANIM = 2.2;
 
 // Entradas que disparan la reconstruccion de la geometria (no por frame).
 interface Entradas {
-  resultados: ResultadosCalculo | null;
+  modos: ResultadosModales | null;
   modeloFEM: ModeloFEM | null;
-  vigente: boolean;
-  combo: string | null;
+  modoActivo: number;
   escala: number;
   animando: boolean;
-  // Modo de vista del viewport. La deformada es conceptualmente 3D (spec §6,
-  // "Deformada 3D"): en planta/mosaico la deformada del edificio entero se
-  // superpondria descuadrada a la geometria filtrada por planta, asi que SOLO se
-  // dibuja en modo "3d". (eng-review D1.)
+  // Modo de vista del viewport. La forma modal es conceptualmente 3D (igual que la
+  // deformada): en planta/mosaico la forma del edificio entero se descuadraria sobre la
+  // geometria filtrada por planta, asi que SOLO se dibuja en modo "3d".
   modoVista: ModoVista;
 }
 
-// Snapshot estable de las entradas: tupla cacheada para useSyncExternalStore.
 let snapCache: Entradas = leerEntradas();
 function leerEntradas(): Entradas {
-  const r = resultadosStore.getState();
+  const m = modalStore.getState();
   const v = vistaStore.getState();
   return {
-    resultados: r.resultados,
-    modeloFEM: r.modeloFEM,
-    vigente: r.vigente,
-    combo: v.combinacionActiva,
-    escala: v.deformadaEscala,
-    animando: v.animando,
+    modos: m.modos,
+    modeloFEM: m.modeloFEM,
+    modoActivo: m.modoActivo,
+    escala: v.modalEscala,
+    animando: v.modalAnimando,
     modoVista: v.modoVista,
   };
 }
@@ -60,10 +57,9 @@ function getSnapshot(): Entradas {
   const a = leerEntradas();
   const c = snapCache;
   if (
-    a.resultados === c.resultados &&
+    a.modos === c.modos &&
     a.modeloFEM === c.modeloFEM &&
-    a.vigente === c.vigente &&
-    a.combo === c.combo &&
+    a.modoActivo === c.modoActivo &&
     a.escala === c.escala &&
     a.animando === c.animando &&
     a.modoVista === c.modoVista
@@ -74,21 +70,19 @@ function getSnapshot(): Entradas {
   return a;
 }
 function suscribir(cb: () => void): () => void {
-  const offR = resultadosStore.subscribe((s) => s.resultados, cb);
-  const offM = resultadosStore.subscribe((s) => s.modeloFEM, cb);
-  const offV = resultadosStore.subscribe((s) => s.vigente, cb);
-  const offCombo = vistaStore.subscribe((s) => s.combinacionActiva, cb);
-  const offEsc = vistaStore.subscribe((s) => s.deformadaEscala, cb);
-  const offAnim = vistaStore.subscribe((s) => s.animando, cb);
-  const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
+  const offModos = modalStore.subscribe((s) => s.modos, cb);
+  const offFem = modalStore.subscribe((s) => s.modeloFEM, cb);
+  const offActivo = modalStore.subscribe((s) => s.modoActivo, cb);
+  const offEsc = vistaStore.subscribe((s) => s.modalEscala, cb);
+  const offAnim = vistaStore.subscribe((s) => s.modalAnimando, cb);
+  const offModoVista = vistaStore.subscribe((s) => s.modoVista, cb);
   return () => {
-    offR();
-    offM();
-    offV();
-    offCombo();
+    offModos();
+    offFem();
+    offActivo();
     offEsc();
     offAnim();
-    offModo();
+    offModoVista();
   };
 }
 
@@ -96,19 +90,18 @@ function useEntradas(): Entradas {
   return useSyncExternalStore(suscribir, getSnapshot, getSnapshot);
 }
 
-export function DeformadaOverlay() {
+export function ModoOverlay() {
   const entradas = useEntradas();
   const lineRef = useRef<LineSegments>(null);
 
   // Buffers reconstruidos SOLO al cambiar las entradas (no por frame). La derivacion
-  // pura (base/delta/color) vive en deformadaBuffers.ts (testeable sin R3F).
+  // pura (base/delta/color) vive en modalBuffers.ts (testeable sin R3F).
   const buffers = useMemo(
     () =>
-      construirBuffers({
+      construirBuffersModal({
         modeloFEM: entradas.modeloFEM,
-        resultados: entradas.resultados,
-        combo: entradas.combo,
-        vigente: entradas.vigente,
+        modos: entradas.modos,
+        numeroModo: entradas.modoActivo,
       }),
     [entradas],
   );
@@ -117,7 +110,7 @@ export function DeformadaOverlay() {
   const geom = useMemo(() => {
     if (!buffers) return null;
     const g = new BufferGeometry();
-    // Posiciones iniciales = base + delta*escala (estado en reposo al factor actual).
+    // Posiciones iniciales = base + delta*escala (forma al factor actual, sin animar).
     const pos = new Float32Array(buffers.base.length);
     for (let i = 0; i < pos.length; i++) {
       pos[i] = buffers.base[i]! + buffers.delta[i]! * entradas.escala;
@@ -125,7 +118,6 @@ export function DeformadaOverlay() {
     g.setAttribute("position", new Float32BufferAttribute(pos, 3));
     g.setAttribute("color", new Float32BufferAttribute(buffers.color, 3));
     return g;
-    // `entradas.escala` se incluye: al cambiar el factor (sin animar) reposicionamos.
   }, [buffers, entradas.escala]);
 
   // Pinta un frame al reconstruir/cambiar el factor (frameloop="demand").
@@ -135,8 +127,8 @@ export function DeformadaOverlay() {
   }, [geom]);
 
   // Animacion: muta las posiciones del BufferGeometry en cada frame (factor oscila
-  // 0->escala->0) e invalida. Cero setState por frame (regla #11). Cuando no se
-  // anima, useFrame no toca nada; la recolocacion al reposo la hace el useEffect de abajo.
+  // 0->escala->0) e invalida. Cero setState por frame (regla #11). Cuando no se anima,
+  // useFrame no toca nada; la recolocacion al reposo la hace el useEffect de abajo.
   const tRef = useRef(0);
   useFrame((_state, dt) => {
     if (!entradas.animando || !buffers || !geom) return;
@@ -155,8 +147,9 @@ export function DeformadaOverlay() {
 
   // Al ARRANCAR la animacion, reinicia la fase (evita saltar a mitad de onda). Al
   // PARARLA, RECOLOCA las posiciones a la amplitud estatica base + delta*escala: si no,
-  // useFrame las dejaba congeladas en el ultimo factor de oscilacion (una amplitud
-  // intermedia que no se corresponde con la "×escala" indicada).
+  // useFrame las dejo congeladas en el ultimo factor de oscilacion (una amplitud
+  // intermedia arbitraria), de modo que el modo quedaba dibujado a una amplitud que no
+  // se corresponde con la "×escala" indicada en el panel.
   useEffect(() => {
     if (!geom || !buffers) return;
     if (entradas.animando) {
@@ -173,12 +166,12 @@ export function DeformadaOverlay() {
     invalidate();
   }, [entradas.animando, entradas.escala, geom, buffers]);
 
-  // La deformada solo se dibuja en modo 3D (D1): en planta/mosaico la geometria base
-  // esta filtrada por planta y la deformada del edificio entero se descuadraria.
+  // La forma modal solo se dibuja en modo 3D: en planta/mosaico la geometria base esta
+  // filtrada por planta y la forma del edificio entero se descuadraria.
   if (!geom || entradas.modoVista !== "3d") return null;
   return (
     <lineSegments ref={lineRef} geometry={geom}>
-      {/* vertexColors: el color va en el atributo `color` (rampa o gris). */}
+      {/* vertexColors: el color va en el atributo `color` (rampa por magnitud). */}
       <lineBasicMaterial vertexColors toneMapped={false} />
     </lineSegments>
   );

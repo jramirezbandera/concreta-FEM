@@ -125,6 +125,20 @@ interface VistaState {
   animando: boolean;
   // Magnitud que pinta el diagrama por barra seleccionada.
   magnitudDiagrama: MagnitudDiagrama;
+  // --- Analisis modal (F2b) -------------------------------------------------
+  // Nº de modos de vibracion a calcular. Parametro de calculo TRANSITORIO (como
+  // nPoints de los diagramas), NO una propiedad persistida del Modelo: vive aqui (UI,
+  // fuera de undo) y se pasa a discretizar(modelo, { modal: { numModos } }). Default 6.
+  numModos: number;
+  // Factor de amplificacion de la forma modal dibujada. CANAL DISTINTO de
+  // deformadaEscala (la deformada por-combo y la forma modal son visualizaciones
+  // separadas): no se comparte para que ajustar una no descuadre la otra. Las
+  // amplitudes modales son adimensionales (normalizadas a masa unitaria, signo
+  // arbitrario): el overlay las renormaliza y este factor escala la vista.
+  modalEscala: number;
+  // true mientras se anima la forma modal (oscilacion 0->1->0). Lo conmuta la UI.
+  // CANAL DISTINTO de `animando` (la deformada): se anima independientemente.
+  modalAnimando: boolean;
   setPestanaActiva(p: Pestana): void;
   setGrupoActivo(id: string | null): void;
   setPlantaActiva(id: string | null): void;
@@ -142,6 +156,10 @@ interface VistaState {
   setDeformadaEscala(e: number): void;
   setAnimando(b: boolean): void;
   setMagnitudDiagrama(m: MagnitudDiagrama): void;
+  // --- Analisis modal (F2b) ---
+  setNumModos(n: number): void;
+  setModalEscala(e: number): void;
+  setModalAnimando(b: boolean): void;
   // --- Plantillas DXF (feature-15) ---
   setPlantillas(p: Plantilla[]): void;
   addPlantilla(p: Plantilla): void;
@@ -193,6 +211,11 @@ export const vistaStore = create<VistaState>()(
     deformadaEscala: 1,
     animando: false,
     magnitudDiagrama: "momento",
+    // Analisis modal (F2b): default 6 modos (decision de alcance del plan), escala 1,
+    // sin animar.
+    numModos: 6,
+    modalEscala: 1,
+    modalAnimando: false,
     setPestanaActiva: (p) => set({ pestanaActiva: p }),
     setGrupoActivo: (id) => set({ grupoActivoId: id }),
     setPlantaActiva: (id) => set({ plantaActivaId: id }),
@@ -214,6 +237,9 @@ export const vistaStore = create<VistaState>()(
     setDeformadaEscala: (e) => set({ deformadaEscala: e }),
     setAnimando: (b) => set({ animando: b }),
     setMagnitudDiagrama: (m) => set({ magnitudDiagrama: m }),
+    setNumModos: (n) => set({ numModos: n }),
+    setModalEscala: (e) => set({ modalEscala: e }),
+    setModalAnimando: (b) => set({ modalAnimando: b }),
     // --- Plantillas DXF (feature-15). Set directo: fuera del undo, como el resto
     // del store. Sin Immer aqui (vistaStore no usa el middleware): copias nuevas. ---
     setPlantillas: (p) => set({ plantillas: p }),
