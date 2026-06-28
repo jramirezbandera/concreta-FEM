@@ -35,3 +35,7 @@ test-results/
 # Cache de Pyodide (se anade en F5)
 .pyodide-cache
 .gstack/
+
+# Bytecode de Python (el glue corre via Pyodide; el .pyc es artefacto de build local)
+__pycache__/
+*.pyc
