@@ -676,6 +676,22 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
+## T-3d-toolsrail-gating · La barra de herramientas (derecha) muestra herramientas 2D en 3D
+
+- **Qué:** En vista 3D, la `ToolsRail` del shell sigue mostrando herramientas que solo
+  tienen sentido en introducción 2D: snap (⌖), modo orto (∟), rejilla (▤) y el botón F4
+  (plantillas DXF/DWG ▦). La colocación está inhabilitada en 3D y el panel de plantillas
+  ya no se monta (F2c gating en App), así que el botón F4 queda inerte en 3D.
+- **Por qué:** Inconsistencia menor de coherencia: ofrecer afordancias inertes en 3D
+  confunde (un botón que no hace nada). F2c acotó el gating al HUD/overlays/App, no a la
+  `ToolsRail` del shell (pre-existente, fuera del alcance de F2c). Hallazgo /design-review.
+- **Cómo retomar:** en la `ToolsRail` del shell, ocultar o deshabilitar las herramientas
+  2D (snap/orto/rejilla/F4) cuando `modoVista !== "planta"`; F3 (capturas ▣) sí tiene
+  sentido en 3D y debe permanecer. **Coste:** CC ~20 min. **Depende de / bloquea:** nada.
+- **Origen:** /design-review de F2c (hallazgo menor, shell-scope).
+
+---
+
 ## T-modelo-calculo-6dof · Glifos fieles de apoyos (6 GDL) y releases por GDL/extremo
 
 - **Qué:** El overlay "Ver modelo de cálculo" (F2c) dibuja apoyos en **vista simplificada**
