@@ -115,36 +115,40 @@ function cambiarPlanta(direccion: 1 | -1): void {
 function GroupRibbon() {
   const { grupoNombre, plantaNombre, cota, hayAnterior, haySiguiente } = useRibbonData();
   // En 3D/mosaico se ve TODO el edificio (3D pleno, F2c): el tag lo comunica en lenguaje
-  // de obra. Las flechas siguen moviendo el contexto (planta activa) dentro del grupo.
+  // de obra. La cota y las flechas de planta pertenecen a la navegacion 2D por plantas;
+  // en 3D pleno se ocultan (mostrar la cota de UNA planta junto a "Edificio completo"
+  // se contradice, hallazgo /design-review). El contexto de planta lo fija el picking.
   const enPleno = useVista((s) => s.modoVista) !== "planta";
   return (
     <PanelFlotante
       titulo={grupoNombre ?? "Sin grupo"}
       tag={enPleno ? "Edificio completo" : (plantaNombre ?? "—")}
     >
-      <div className="cx-ribbon-row">
-        <span className="mono cx-ribbon-cota">
-          {cota !== null ? `${cota.toFixed(2)} m` : "—"}
-        </span>
-        <div className="cx-ribbon-nav">
-          <Boton
-            variante="ghost"
-            aria-label="Planta inferior"
-            disabled={!hayAnterior}
-            onClick={() => cambiarPlanta(-1)}
-          >
-            ↓
-          </Boton>
-          <Boton
-            variante="ghost"
-            aria-label="Planta superior"
-            disabled={!haySiguiente}
-            onClick={() => cambiarPlanta(1)}
-          >
-            ↑
-          </Boton>
+      {!enPleno && (
+        <div className="cx-ribbon-row">
+          <span className="mono cx-ribbon-cota">
+            {cota !== null ? `${cota.toFixed(2)} m` : "—"}
+          </span>
+          <div className="cx-ribbon-nav">
+            <Boton
+              variante="ghost"
+              aria-label="Planta inferior"
+              disabled={!hayAnterior}
+              onClick={() => cambiarPlanta(-1)}
+            >
+              ↓
+            </Boton>
+            <Boton
+              variante="ghost"
+              aria-label="Planta superior"
+              disabled={!haySiguiente}
+              onClick={() => cambiarPlanta(1)}
+            >
+              ↑
+            </Boton>
+          </div>
         </div>
-      </div>
+      )}
     </PanelFlotante>
   );
 }
