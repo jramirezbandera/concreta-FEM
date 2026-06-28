@@ -9,6 +9,7 @@ import {
 } from "./migracion";
 import { crearModeloVacio } from "../dominio/helpers";
 import { SCHEMA_VERSION } from "../dominio/comunes";
+import type { Modelo } from "../dominio/modelo";
 import type { Pilar } from "../dominio/pilar";
 
 // Helper: estrecha el resultado a ok:false y devuelve sus errores.
@@ -134,13 +135,9 @@ describe("migrarYValidar — campo invalido apunta al campo", () => {
   });
 });
 
-// Verifica que la CADENA de migraciones se aplica. No existe v2 real todavia,
-// asi que se simula registrando una migracion temporal via override del modulo.
-// Como el registro es privado, comprobamos en su lugar el comportamiento
-// observable: un proyecto en la version VIGENTE no produce aviso de migracion
-// (la cadena no se ejecuta). El test de aplicacion real de la cadena llegara
-// con la primera v2 (cuando SCHEMA_VERSION suba). Se documenta aqui el limite.
-describe("migrarYValidar — cadena de migraciones (v1)", () => {
+// Verifica que un proyecto ya en la version vigente NO se re-migra: la cadena no
+// corre y no hay aviso de actualizacion (la migracion v1->v2 real se prueba abajo).
+describe("migrarYValidar — cadena de migraciones (version vigente)", () => {
   it("no aplica migracion cuando ya esta en la version vigente (sin avisos)", () => {
     const r = migrarYValidar(crearModeloVacio());
     expect(r.ok).toBe(true);
@@ -149,27 +146,215 @@ describe("migrarYValidar — cadena de migraciones (v1)", () => {
   });
 });
 
-// Ejercita la CADENA real (migracion.ts:81-94) inyectando un registro de
-// migraciones sintetico (T3). Como SCHEMA_VERSION real es 1, partimos de un raw con
-// schemaVersion=0 (MENOR que el objetivo): el bucle 0 -> 1 corre de verdad, aplica
-// la migracion inyectada y emite el aviso. No tocamos el comportamiento de
-// produccion: el registro real sigue vacio y el default no cambia.
+// ---------------------------------------------------------------------------
+// Migracion REAL de model-schema v1 -> v2 (F2.3 / E7). Construye proyectos v1
+// crudos (sin los campos de F2a) y verifica el sembrado del peso propio, los
+// defaults, la idempotencia, la colision de nombre y el reclamo silencioso.
+// ---------------------------------------------------------------------------
+
+const ID_AUTO = "hip-peso-propio";
+
+// Estrecha el resultado a ok:true y devuelve el modelo migrado/validado.
+function ok(r: ResultadoImport) {
+  expect(r.ok).toBe(true);
+  if (!r.ok) throw new Error("se esperaba ok:true");
+  return r;
+}
+
+// Localiza la hipotesis automatica (id canonico) en un modelo migrado.
+function autoDe(modelo: Modelo) {
+  return modelo.hipotesis.filter((h) => h.id === ID_AUTO && h.automatica);
+}
+
+// Fabrica un proyecto v1 valido (forma de Modelo anterior a F2a): schemaVersion:1,
+// `analisis` SIN `incluirPesoPropio`, hipotesis SIN `automatica`, sin la automatica.
+function proyectoV1(
+  hipotesis: { id: string; nombre: string; tipo: "permanente" | "variable" }[] = [
+    { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+    { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable" },
+  ],
+  analisis: Record<string, unknown> = { tipo: "lineal", comprobarEstatica: true },
+): Record<string, unknown> {
+  return {
+    unidades: "kN-m",
+    schemaVersion: 1,
+    grupos: [],
+    plantas: [],
+    secciones: [],
+    nudos: [],
+    pilares: [],
+    vigas: [],
+    panos: [],
+    muros: [],
+    cargas: [],
+    hipotesis,
+    analisis,
+  };
+}
+
+describe("migrarYValidar — v1 -> v2: sembrado y defaults", () => {
+  it("migra un v1 sin campos nuevos: siembra la automatica + defaults", () => {
+    const r = ok(migrarYValidar(proyectoV1()));
+    // Aviso de actualizacion de esquema.
+    expect(r.avisos.some((a) => /actualiz/i.test(a))).toBe(true);
+    // Quedo en la version vigente.
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    // Default nuevo del analisis.
+    expect(r.modelo.analisis.incluirPesoPropio).toBe(true);
+    // tipo previo preservado.
+    expect(r.modelo.analisis.tipo).toBe("lineal");
+    // Exactamente UNA automatica valida, "Peso propio", permanente.
+    const autos = autoDe(r.modelo);
+    expect(autos).toHaveLength(1);
+    expect(autos[0]).toMatchObject({
+      id: ID_AUTO,
+      nombre: "Peso propio",
+      tipo: "permanente",
+      automatica: true,
+    });
+    // Las hipotesis de usuario reciben automatica:false.
+    const muertas = r.modelo.hipotesis.find((h) => h.id === "hip-cargas-muertas");
+    expect(muertas?.automatica).toBe(false);
+  });
+
+  it("preserva tipo 'general' previo", () => {
+    const r = ok(
+      migrarYValidar(
+        proyectoV1(undefined, { tipo: "general", comprobarEstatica: false }),
+      ),
+    );
+    expect(r.modelo.analisis.tipo).toBe("general");
+  });
+
+  it("es idempotente: migrar dos veces = una", () => {
+    const r1 = ok(migrarYValidar(proyectoV1()));
+    // El resultado ya es v2: re-pasarlo no debe re-migrar ni duplicar la automatica.
+    const r2 = ok(migrarYValidar(r1.modelo));
+    expect(r2.avisos).toEqual([]); // no corre la cadena
+    expect(autoDe(r2.modelo)).toHaveLength(1);
+    expect(r2.modelo).toEqual(r1.modelo);
+  });
+});
+
+describe("migrarYValidar — v1 -> v2: colision de nombre (CV4-2)", () => {
+  it("'Peso propio' ya ocupado por el usuario -> nombre seguro + aviso, datos intactos", () => {
+    const v1 = proyectoV1([
+      { id: "hip-usuario", nombre: "Peso propio", tipo: "variable" },
+    ]);
+    const r = ok(migrarYValidar(v1));
+    // La hipotesis del usuario queda intacta (id, nombre y tipo).
+    const usuario = r.modelo.hipotesis.find((h) => h.id === "hip-usuario");
+    expect(usuario).toMatchObject({
+      id: "hip-usuario",
+      nombre: "Peso propio",
+      tipo: "variable",
+      automatica: false,
+    });
+    // La automatica se siembra con nombre seguro distinto.
+    const autos = autoDe(r.modelo);
+    expect(autos).toHaveLength(1);
+    expect(autos[0].nombre).toBe("Peso propio (automatico)");
+    // Aviso de posible duplicacion en lenguaje de obra.
+    expect(r.avisos.some((a) => /posible duplicación/i.test(a))).toBe(true);
+  });
+
+  it("'Peso propio' y 'Peso propio (automatico)' ocupados -> sufijo libre", () => {
+    const v1 = proyectoV1([
+      { id: "h1", nombre: "Peso propio", tipo: "variable" },
+      { id: "h2", nombre: "Peso propio (automatico)", tipo: "variable" },
+    ]);
+    const r = ok(migrarYValidar(v1));
+    const autos = autoDe(r.modelo);
+    expect(autos).toHaveLength(1);
+    expect(autos[0].nombre).toBe("Peso propio (automatico) (2)");
+    // Datos de usuario intactos.
+    expect(r.modelo.hipotesis.find((h) => h.id === "h1")?.nombre).toBe(
+      "Peso propio",
+    );
+    expect(r.modelo.hipotesis.find((h) => h.id === "h2")?.nombre).toBe(
+      "Peso propio (automatico)",
+    );
+  });
+});
+
+describe("migrarYValidar — v1 -> v2: reclamo silencioso (CV4-2)", () => {
+  it("id=hip-peso-propio con datos NO automaticos -> no se reclama, se reasigna", () => {
+    // Un proyecto de usuario que casualmente uso ese id para una hipotesis suya.
+    const v1 = proyectoV1([
+      {
+        id: ID_AUTO,
+        nombre: "Mi hipotesis especial",
+        tipo: "variable",
+      },
+    ]);
+    const r = ok(migrarYValidar(v1));
+    // Los datos de usuario sobreviven (nombre y tipo), aunque con id reasignado.
+    const usuario = r.modelo.hipotesis.find(
+      (h) => h.nombre === "Mi hipotesis especial",
+    );
+    expect(usuario).toBeDefined();
+    expect(usuario?.id).not.toBe(ID_AUTO); // id reasignado, no adoptado
+    expect(usuario?.tipo).toBe("variable");
+    expect(usuario?.automatica).toBe(false);
+    // Y existe EXACTAMENTE una automatica valida con el id canonico.
+    const autos = autoDe(r.modelo);
+    expect(autos).toHaveLength(1);
+    expect(autos[0].nombre).toBe("Peso propio");
+    // Aviso de que el id se conservo con identificador nuevo.
+    expect(r.avisos.some((a) => /identificador nuevo/i.test(a))).toBe(true);
+  });
+
+  it("id=hip-peso-propio YA automatica valida -> idempotente, no se duplica", () => {
+    // Un v1 que (atipicamente) ya trae la automatica: no debe duplicarse.
+    const v1 = proyectoV1([
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+    ]);
+    (v1.hipotesis as unknown[]).push({
+      id: ID_AUTO,
+      nombre: "Peso propio",
+      tipo: "permanente",
+      automatica: true,
+    });
+    const r = ok(migrarYValidar(v1));
+    expect(autoDe(r.modelo)).toHaveLength(1);
+  });
+});
+
+describe("migrarYValidar — v2 nativo no se re-migra", () => {
+  it("un Modelo v2 valido (crearModeloVacio) pasa sin migrar y sigue valido", () => {
+    const modelo = crearModeloVacio();
+    const r = ok(migrarYValidar(modelo));
+    expect(r.avisos).toEqual([]);
+    expect(r.modelo).toEqual(modelo);
+    // Sigue habiendo exactamente una automatica.
+    expect(autoDe(r.modelo)).toHaveLength(1);
+  });
+});
+
+// Ejercita la CADENA real (migracion.ts) inyectando un registro de migraciones
+// sintetico (T3). Partimos de un raw con schemaVersion=0 (MENOR que el objetivo) y
+// registramos una migracion por CADA paso 0 -> 1 -> ... -> SCHEMA_VERSION, de modo
+// que el bucle corra de verdad y emita el aviso. Las migraciones inyectadas solo
+// reetiquetan la version (la forma del modelo vacio ya es valida en la version
+// vigente). No tocamos el comportamiento de produccion: el registro real (la
+// migracion v1->v2 real) es F2.3; aqui solo se prueba el MECANISMO de la cadena.
 describe("migrarYValidar — cadena de migraciones inyectada (T3)", () => {
-  it("aplica una migracion 0 -> 1 inyectada: avanza la version y emite aviso", () => {
+  it("aplica la cadena 0 -> ... -> SCHEMA_VERSION inyectada: avanza la version y avisa", () => {
     // Modelo valido pero etiquetado en una version anterior a la vigente.
     const raw = { ...crearModeloVacio(), schemaVersion: 0 };
-    // Migracion 0 -> 1: reetiqueta a la version vigente (forma ya valida).
-    const migraciones: Record<number, Migracion> = {
-      0: (datos) => ({
+    // Una migracion sintetica por cada salto (v -> v+1); todas reetiquetan a v+1.
+    const migraciones: Record<number, Migracion> = {};
+    for (let v = 0; v < SCHEMA_VERSION; v++) {
+      migraciones[v] = (datos) => ({
         ...(datos as Record<string, unknown>),
-        schemaVersion: SCHEMA_VERSION,
-      }),
-    };
+        schemaVersion: v + 1,
+      });
+    }
 
     const r = migrarYValidar(raw, migraciones);
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("se esperaba ok:true");
-    // Aviso de actualizacion de esquema (rama 95-99 + cuerpo del bucle 81-94).
+    // Aviso de actualizacion de esquema (la cadena corrio al menos un paso).
     expect(r.avisos).toHaveLength(1);
     expect(r.avisos[0]).toMatch(/actualiz/i);
     // El modelo resultante quedo en la version vigente.

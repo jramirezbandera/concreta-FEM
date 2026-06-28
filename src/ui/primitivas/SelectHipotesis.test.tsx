@@ -67,12 +67,51 @@ describe("SelectHipotesis", () => {
     await user.keyboard("{Enter}");
 
     const listbox = await screen.findByRole("listbox");
+    // E2(b): las hipotesis ASIGNABLES (no automaticas) aparecen; la automatica de
+    // peso propio se OCULTA (no es asignable como ambito de una carga de usuario).
     for (const h of modeloStore.getState().getModelo().hipotesis) {
+      if (h.automatica) continue;
       expect(within(listbox).getByText(h.nombre)).toBeInTheDocument();
     }
 
     // Elegir "Cargas muertas": onCambio se dispara con su id.
     await user.click(within(listbox).getByText("Cargas muertas"));
     expect(onCambio).toHaveBeenCalledWith("hip-cargas-muertas");
+  });
+
+  it("FIX#2: con valor en la hipotesis automatica muestra su nombre marcado, no el placeholder", () => {
+    // Una carga heredada/importada puede colgar de la AUTOMATICA (pasa Zod, solo se
+    // bloquea al calcular). La automatica no esta entre las opciones asignables: sin
+    // el fix Radix mostraria el placeholder y ocultaria la asignacion incorrecta.
+    render(<SelectHipotesis valor="hip-peso-propio" onCambio={() => {}} />);
+    // El trigger muestra el nombre real (marcado "no asignable"), NO el placeholder.
+    expect(screen.getByRole("combobox")).toHaveTextContent(
+      "Peso propio (no asignable)",
+    );
+    expect(screen.queryByText("Hipótesis…")).toBeNull();
+  });
+
+  it("FIX#2: con valor que no existe en la obra muestra '(hipótesis desconocida)'", () => {
+    render(<SelectHipotesis valor="hip-inexistente" onCambio={() => {}} />);
+    expect(screen.getByRole("combobox")).toHaveTextContent(
+      "(hipótesis desconocida)",
+    );
+    expect(screen.queryByText("Hipótesis…")).toBeNull();
+  });
+
+  it("E2(b): oculta la hipotesis automatica de peso propio (no asignable)", async () => {
+    const user = userEvent.setup();
+    render(<SelectHipotesis valor={null} onCambio={() => {}} />);
+
+    screen.getByRole("combobox").focus();
+    await user.keyboard("{Enter}");
+
+    const listbox = await screen.findByRole("listbox");
+    // El modelo vacio siembra la automatica "Peso propio" (automatica:true): no debe
+    // ofrecerse como opcion del selector.
+    expect(within(listbox).queryByText("Peso propio")).toBeNull();
+    // Las dos asignables sembradas si estan.
+    expect(within(listbox).getByText("Cargas muertas")).toBeInTheDocument();
+    expect(within(listbox).getByText("Sobrecarga de uso")).toBeInTheDocument();
   });
 });

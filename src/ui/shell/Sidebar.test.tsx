@@ -45,7 +45,7 @@ function modeloPrueba(): Modelo {
     muros: [],
     cargas: [],
     hipotesis: [],
-    analisis: { tipo: "lineal", comprobarEstatica: true },
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: true },
   };
 }
 

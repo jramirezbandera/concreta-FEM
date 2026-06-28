@@ -9,6 +9,7 @@ import type { Pestana } from "../../estado";
 export type AccionMenu =
   | "abrirGruposPlantas"
   | "abrirHipotesis"
+  | "abrirOpcionesAnalisis"
   | "activarHerramientaPilar"
   | "activarHerramientaViga"
   | "borrarSeleccion"
@@ -120,8 +121,13 @@ export const MENUS_POR_PESTANA: Record<Pestana, MenuDef[]> = {
       etiqueta: "Calcular",
       strong: true,
       // "Calcular obra" dispara el corte vertical F1 (obra -> discretizar -> solver ->
-      // resultados) via la accion "calcular". "Opciones de análisis" sigue placeholder.
-      items: [{ etiqueta: "Calcular obra", accion: "calcular" }, "Opciones de análisis"],
+      // resultados) via la accion "calcular". "Opciones de cálculo…" abre el dialogo
+      // de Opciones de analisis (F2.4, spec §3.2): tipo de analisis, peso propio,
+      // comprobar estatica.
+      items: [
+        { etiqueta: "Calcular obra", accion: "calcular" },
+        { etiqueta: "Opciones de cálculo…", accion: "abrirOpcionesAnalisis" },
+      ],
     },
     GRUPOS,
     VISTAS,

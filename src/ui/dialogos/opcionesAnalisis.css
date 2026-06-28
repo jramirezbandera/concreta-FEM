@@ -1,0 +1,68 @@
+/*
+ * Estilos del DialogoOpcionesAnalisis (F2.4) de Concreta · Estructuras. Layout
+ * vertical de tres bloques (tipo de analisis | peso propio | comprobar estatica),
+ * jerarquia descendente (D-diseño-3). REGLA: solo tokens via var(--...); cero hex.
+ * Importado desde DialogoOpcionesAnalisis.tsx. Convive con dialogos.css.
+ */
+
+/* --- Cuerpo: columna de bloques con separacion clara --- */
+.cx-opc {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Cada bloque: etiqueta (caps) + control + (nota contextual) --- */
+.cx-opc__bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cx-opc__label {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.cx-opc__ayuda {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* --- Fila de checkbox: control nativo + etiqueta clicable --- */
+.cx-opc__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text);
+}
+.cx-opc__check input {
+  margin: 0;
+  /* El check se alinea con la primera linea del texto. */
+  margin-top: 1px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+/* Estado deshabilitado (check_statics bajo P-Δ): atenuado, sin cursor de accion.
+   La explicacion la da la cx-note adjunta (aria-describedby), no solo el color. */
+.cx-opc__check--disabled,
+.cx-opc__check--disabled input {
+  cursor: not-allowed;
+  color: var(--text-3);
+}
+.cx-opc__check-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cx-opc__check-titulo {
+  line-height: 1.3;
+}

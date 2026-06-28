@@ -22,6 +22,7 @@ import {
 // brandbar) sin que aqui haga falta sink alguno. Boton y menu disparan el mismo corte
 // vertical y convergen en el mismo estado.
 import { calcularObra } from "../resultados/useCalcular";
+import { calculoHabilitado } from "../resultados/estadoMotorUI";
 
 // Menubar (Spec Diseno UI §2 / §3.2): menus contextuales que cambian con la
 // pestana activa (criterio de aceptacion de feature-9). Cada menu abre un
@@ -58,6 +59,8 @@ export function borrarSeleccion(): void {
 export const DISPATCH: Record<AccionMenu, () => void> = {
   abrirGruposPlantas: () => vistaStore.getState().abrirDialogo("gruposPlantas"),
   abrirHipotesis: () => vistaStore.getState().abrirDialogo("hipotesis"),
+  abrirOpcionesAnalisis: () =>
+    vistaStore.getState().abrirDialogo("opcionesAnalisis"),
   activarHerramientaPilar: () => vistaStore.getState().setHerramienta("pilar"),
   activarHerramientaViga: () => vistaStore.getState().setHerramienta("viga"),
   borrarSeleccion,
@@ -75,15 +78,12 @@ function etiquetaDe(item: MenuItemDef): string {
 }
 
 // Disponibilidad del item "Calcular obra" segun el estado del calculo (calculoStore,
-// fuente unica). Mismo criterio que el boton del panel (BotonCalcular): solo se admite
-// lanzar el calculo con el motor "listo" (o "error", para reintentar) y sin un calculo en
-// curso. Mientras se prepara el motor o se calcula, el item del menu queda deshabilitado.
-// Hook minimo y local: solo el item "calcular" se suscribe al store; los placeholders no.
+// fuente unica). Mismo criterio que el boton del panel y la brandbar: el helper
+// compartido `calculoHabilitado` (estadoMotorUI.ts) decide; aqui solo se invierte para
+// obtener "deshabilitado". Hook minimo y local: solo el item "calcular" se suscribe al
+// store; los placeholders no.
 function useCalcularDeshabilitado(): boolean {
-  return calculoStore(
-    (s) =>
-      s.calculando || !(s.estadoMotor === "listo" || s.estadoMotor === "error"),
-  );
+  return calculoStore((s) => !calculoHabilitado(s.estadoMotor, s.calculando));
 }
 
 // Un item del desplegable. String -> fila inerte (placeholder, como en F9).

@@ -11,6 +11,7 @@ import { useSyncExternalStore } from "react";
 import { modeloStore, vistaStore, type ModoVista } from "../../estado";
 import { Segmentado, type OpcionSegmento, PanelFlotante, Boton } from "../primitivas";
 import { Slot } from "./Slot";
+import { CentroMasa } from "./CentroMasa";
 import { plantasDeGrupo } from "./hooks/useGeometriaModelo";
 import { emitirZoom } from "./hooks/zoomBus";
 
@@ -177,6 +178,12 @@ export function Hud() {
       </Slot>
       <Slot zona="top-right">
         <SelectorModo />
+      </Slot>
+      {/* Control del Centro de masas (F2.4): toggle + panel de datos. En mid-left
+          (zona reservada hasta ahora) para no competir con GroupRibbon (top-left) ni
+          con los inspectores (mid-right). Se autooculta fuera de vista planta. */}
+      <Slot zona="mid-left">
+        <CentroMasa />
       </Slot>
       <Slot zona="bottom-right">
         <ControlesZoom />

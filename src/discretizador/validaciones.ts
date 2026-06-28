@@ -13,7 +13,7 @@
 // veredicto exacto de estabilidad/mecanismo que dara `check_stability` del solver
 // (feature-5/6). Aqui se atrapa lo evidente en lenguaje del arquitecto.
 import type { Modelo, Pilar, Viga, Carga } from "../dominio";
-import { plantaPorId, nudoPorId, seccionPorId } from "../dominio";
+import { plantaPorId, nudoPorId, seccionPorId, esHipotesisAutomatica } from "../dominio";
 import { getMaterial, getSeccion } from "../biblioteca";
 import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
 
@@ -226,6 +226,47 @@ function validarRefsCarga(
       elementoTipo: "carga",
     });
   }
+  // E2(a): ninguna carga de usuario puede pertenecer a la hipotesis AUTOMATICA. Sus
+  // cargas las genera el discretizador (peso propio del modelo); una carga de usuario
+  // ahi seria doble cómputo del peso propio. Los comandos ya lo impiden, pero esta
+  // red protege el borde de import (.json) que se salta los comandos. BLOQUEA. Se
+  // identifica la automatica por su FLAG (predicado), no por el id, para que no
+  // diverjan: se busca la hipotesis destino y se comprueba el predicado.
+  const hipDestino = modelo.hipotesis.find((h) => h.id === c.hipotesisId);
+  if (hipDestino !== undefined && esHipotesisAutomatica(hipDestino)) {
+    errores.push({
+      codigo: "CARGA_EN_AUTOMATICA",
+      severidad: "error",
+      mensaje: `Una carga está asignada a la hipótesis de peso propio, que el sistema calcula automáticamente. Asígnala a otra hipótesis.`,
+      elementoId: c.id,
+      elementoTipo: "carga",
+    });
+  }
+}
+
+// 2d. Sincronizacion de la hipotesis automatica de peso propio (E1, guard de
+// desincronizacion). Si `incluirPesoPropio` esta activo, el discretizador emitira
+// cargas en la hipotesis `hip-peso-propio` y `generarCombos` la clasificara: ambos
+// asumen que la hipotesis EXISTE. Un modelo importado o mal migrado podria tener el
+// flag activo SIN la hipotesis (p.ej. un .json antiguo sin migrar). Sin esta red, el
+// `hipById.get(...)!` del discretizador devolveria undefined y el calculo fallaria
+// con un error tecnico opaco. BLOQUEA en lenguaje de obra. El recipro (flag OFF) no
+// es error: simplemente no se computa peso propio.
+function validarHipotesisPesoPropio(modelo: Modelo, errores: ErrorObra[]): void {
+  if (!modelo.analisis.incluirPesoPropio) return;
+  // Existencia por el FLAG (predicado), no por el id: el discretizador emite el peso
+  // propio en la hipotesis hallada por `esHipotesisAutomatica`, asi que E1 debe
+  // comprobar lo mismo (id y flag no pueden divergir).
+  const existe = modelo.hipotesis.some(esHipotesisAutomatica);
+  if (!existe) {
+    errores.push({
+      codigo: "FALTA_PESO_PROPIO",
+      severidad: "error",
+      mensaje:
+        "Falta la hipótesis de peso propio: está activado el cálculo del peso propio pero el proyecto no la tiene. Vuelve a abrir el proyecto o desactiva el peso propio.",
+      elementoTipo: "modelo",
+    });
+  }
 }
 
 // 2. Integridad referencial de todos los elementos.
@@ -272,6 +313,10 @@ function validarSujecion(modelo: Modelo, errores: ErrorObra[]): void {
 // lo que F1 permite: que cada hipotesis tenga al menos una carga.)
 function validarHipotesisConCargas(modelo: Modelo, errores: ErrorObra[]): void {
   for (const h of modelo.hipotesis) {
+    // E3: la hipotesis AUTOMATICA (peso propio) nunca tiene cargas en modelo.cargas
+    // (las genera el discretizador a partir de la geometria), asi que jamas debe
+    // avisarse de que esta "vacia": no es un olvido del usuario, es por diseno.
+    if (h.automatica) continue;
     const tieneCargas = modelo.cargas.some((c) => c.hipotesisId === h.id);
     if (!tieneCargas) {
       errores.push({
@@ -345,6 +390,7 @@ export function validarModelo(modelo: Modelo): ErrorObra[] {
   const errores: ErrorObra[] = [];
   validarNombresUnicos(modelo, errores);
   validarReferencias(modelo, errores);
+  validarHipotesisPesoPropio(modelo, errores); // E1: guard de desincronizacion
   validarSujecion(modelo, errores);
   validarHipotesisConCargas(modelo, errores);
   validarVariablesConcomitantes(modelo, errores);

@@ -81,6 +81,15 @@
 .cx-gyp__item--sel .cx-gyp__item-tag {
   color: var(--accent);
 }
+/* Tag "auto" (candado) de la hipotesis automatica de peso propio (D-diseño-4):
+   distinguible por forma (🔒) + texto. Acento sutil para senalar que es especial
+   (gestionada por el sistema), sin competir con la seleccion. */
+.cx-gyp__item-tag--auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-2);
+}
 
 /* --- Detalle: columna del grupo activo --- */
 .cx-gyp__detalle {

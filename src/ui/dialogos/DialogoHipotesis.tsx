@@ -6,6 +6,8 @@ import {
 } from "./validacionesHipotesis";
 import { type ErrorCampo } from "./validacionesDialogo";
 import { Campo, Segmentado, Boton } from "../primitivas";
+// Campo se usa tanto en el CampoTexto editable (commit en blur) como en el campo
+// read-only del detalle de la hipotesis automatica (D-diseño-4).
 import {
   modeloStore,
   vistaStore,
@@ -222,14 +224,21 @@ export function DialogoHipotesis() {
                   // h.nombre, sin "Cargas muertas Perm." confuso); el `title` da el tipo
                   // legible al pasar el raton. Modificador --con-tag para no alterar el
                   // .cx-gyp__item que comparte el dialogo de Grupos/Plantas (sin tag).
+                  //
+                  // D-diseño-4: la hipotesis AUTOMATICA (peso propio) lleva un tag "auto"
+                  // + glifo de candado (🔒) en vez de Perm./Var.: se distingue por FORMA y
+                  // texto, no solo color. El title la rotula como automatica.
                   const tipoLegible =
                     h.tipo === "permanente" ? "Permanente" : "Variable";
+                  const title = h.automatica
+                    ? `${h.nombre} · Automática (peso propio)`
+                    : `${h.nombre} · ${tipoLegible}`;
                   return (
                     <button
                       key={h.id}
                       type="button"
                       className={clases}
-                      title={`${h.nombre} · ${tipoLegible}`}
+                      title={title}
                       aria-pressed={h.id === activa?.id}
                       onClick={() => {
                         setActivaId(h.id);
@@ -237,9 +246,18 @@ export function DialogoHipotesis() {
                       }}
                     >
                       <span className="cx-gyp__item-nombre">{h.nombre}</span>
-                      <span className="cx-gyp__item-tag" aria-hidden="true">
-                        {h.tipo === "permanente" ? "Perm." : "Var."}
-                      </span>
+                      {h.automatica ? (
+                        <span
+                          className="cx-gyp__item-tag cx-gyp__item-tag--auto"
+                          aria-hidden="true"
+                        >
+                          🔒 auto
+                        </span>
+                      ) : (
+                        <span className="cx-gyp__item-tag" aria-hidden="true">
+                          {h.tipo === "permanente" ? "Perm." : "Var."}
+                        </span>
+                      )}
                     </button>
                   );
                 })
@@ -251,6 +269,39 @@ export function DialogoHipotesis() {
           <div className="cx-gyp__detalle">
             {!activa ? (
               <div className="cx-gyp__vacio">Crea una hipótesis para empezar.</div>
+            ) : activa.automatica ? (
+              // D-diseño-4: la hipotesis AUTOMATICA (peso propio) es READ-ONLY. Sus
+              // datos los define el sistema (el discretizador genera sus cargas); ni
+              // se edita ni se elimina. Campos disabled, SIN boton "Eliminar", + nota
+              // que lo explica (mata el riesgo de doble computo del peso propio).
+              <>
+                <div className="cx-gyp__grupo-campos">
+                  <div className="cx-gyp__campo-ancho">
+                    <Campo
+                      etiqueta="Nombre"
+                      value={activa.nombre}
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                  <div className="cx-gyp__campo-ancho">
+                    <span className="cx-campo__label">Tipo</span>
+                    <Segmentado
+                      aria-label="Tipo"
+                      opciones={OPCIONES_TIPO}
+                      valor={activa.tipo}
+                      // No se puede cambiar: el tipo lo fija el sistema. onValor es
+                      // no-op; el Segmentado disabled no lo invoca de todos modos.
+                      onValor={() => {}}
+                      disabled
+                    />
+                  </div>
+                </div>
+                <p className="cx-note" role="note">
+                  Hipótesis automática: el peso propio se calcula del modelo. No se
+                  edita ni se elimina.
+                </p>
+              </>
             ) : (
               <>
                 <div className="cx-gyp__grupo-campos">

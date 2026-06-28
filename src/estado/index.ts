@@ -56,6 +56,7 @@ export {
   crearHipotesis,
   editarHipotesis,
   eliminarHipotesis,
+  editarAnalisis,
 } from "./comandos/comandosModelo";
 export type {
   DatosPilar,

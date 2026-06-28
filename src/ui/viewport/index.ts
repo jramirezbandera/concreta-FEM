@@ -19,6 +19,11 @@ export type { NombreColor } from "./colores";
 // `sceneOverlays` (cableado en otra tarea).
 export { OverlayPlantillas } from "./OverlayPlantillas";
 
+// Centro de masas (F2.4): sceneOverlay R3F con el marcador ⊕ del CM de la planta
+// activa. Lo monta App via `sceneOverlays` en las pestanas con vista planta (entrada
+// + resultados). El toggle + panel (CentroMasa) viven en el Hud persistente.
+export { CentroMasaOverlay } from "./CentroMasaOverlay";
+
 // Canal de coordenadas vivas del cursor (viewport -> barra de estado). El shell
 // se suscribe y throttlea; lo reutiliza F11 para el replanteo en planta.
 export { suscribirCoords, leerCoords, emitirCoords } from "./hooks/coordsBus";

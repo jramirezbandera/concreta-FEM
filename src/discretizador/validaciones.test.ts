@@ -53,8 +53,11 @@ function modeloValido(): Modelo {
     panos: [],
     muros: [],
     cargas: [{ id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" }],
-    hipotesis: [{ id: "h1", nombre: "Peso propio", tipo: "permanente" }],
-    analisis: { tipo: "lineal", comprobarEstatica: true },
+    hipotesis: [{ id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false }],
+    // incluirPesoPropio:false en la base: estos tests no siembran la automatica, y
+    // con el flag activo dispararia E1 (FALTA_PESO_PROPIO). Los tests propios de E1
+    // lo activan explicitamente.
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: false },
   };
 }
 
@@ -93,7 +96,7 @@ describe("validarModelo", () => {
       extremoI: "empotrado", extremoJ: "empotrado", tirante: false,
     });
     // aviso: hipotesis sin cargas (COMBO_SIN_CARGAS) + nudo flotante (FLOTANTE).
-    m.hipotesis.push({ id: "h2", nombre: "Nieve", tipo: "variable" });
+    m.hipotesis.push({ id: "h2", nombre: "Nieve", tipo: "variable", automatica: false });
     m.nudos.push({ id: "n9", x: 99, y: 99 });
 
     const sevPorCodigo = new Map<string, ErrorObra["severidad"]>();
@@ -262,7 +265,7 @@ describe("validarModelo", () => {
 
   it("COMBO_SIN_CARGAS: hipotesis sin ninguna carga asociada", () => {
     const m = modeloValido();
-    m.hipotesis.push({ id: "h2", nombre: "Nieve", tipo: "variable" });
+    m.hipotesis.push({ id: "h2", nombre: "Nieve", tipo: "variable", automatica: false });
     const errores = validarModelo(m);
     const e = errores.find((x) => x.codigo === "COMBO_SIN_CARGAS");
     expect(e).toBeDefined();
@@ -287,9 +290,9 @@ describe("validarModelo", () => {
     // importado puede traer 2+. Se anaden dos variables, cada una con su carga.
     const m = modeloValido();
     m.hipotesis = [
-      { id: "h1", nombre: "Peso propio", tipo: "permanente" },
-      { id: "h2", nombre: "Sobrecarga", tipo: "variable" },
-      { id: "h3", nombre: "Nieve", tipo: "variable" },
+      { id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false },
+      { id: "h2", nombre: "Sobrecarga", tipo: "variable", automatica: false },
+      { id: "h3", nombre: "Nieve", tipo: "variable", automatica: false },
     ];
     m.cargas = [
       { id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" },
@@ -306,8 +309,8 @@ describe("validarModelo", () => {
   it("VARIAS_VARIABLES: 1 sola hipotesis variable con cargas -> sin aviso", () => {
     const m = modeloValido();
     m.hipotesis = [
-      { id: "h1", nombre: "Peso propio", tipo: "permanente" },
-      { id: "h2", nombre: "Sobrecarga", tipo: "variable" },
+      { id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false },
+      { id: "h2", nombre: "Sobrecarga", tipo: "variable", automatica: false },
     ];
     m.cargas = [
       { id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" },
@@ -321,9 +324,9 @@ describe("validarModelo", () => {
     // avisa COMBO_SIN_CARGAS). Solo cuenta como variable la que tiene >=1 carga.
     const m = modeloValido();
     m.hipotesis = [
-      { id: "h1", nombre: "Peso propio", tipo: "permanente" },
-      { id: "h2", nombre: "Sobrecarga", tipo: "variable" },
-      { id: "h3", nombre: "Nieve", tipo: "variable" }, // sin cargas
+      { id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false },
+      { id: "h2", nombre: "Sobrecarga", tipo: "variable", automatica: false },
+      { id: "h3", nombre: "Nieve", tipo: "variable", automatica: false }, // sin cargas
     ];
     m.cargas = [
       { id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" },
@@ -339,5 +342,59 @@ describe("validarModelo", () => {
     const cods = codigos(validarModelo(m));
     expect(cods).toContain("REF_MATERIAL");
     expect(cods).toContain("SIN_SUJECION");
+  });
+
+  // --- Peso propio automatico (F2a, E1/E2/E3) ---------------------------------
+
+  it("E1 FALTA_PESO_PROPIO: flag ON sin hip-peso-propio -> error bloqueante", () => {
+    const m = modeloValido();
+    m.analisis.incluirPesoPropio = true; // ON, pero la base NO siembra la automatica
+    const e = validarModelo(m).find((x) => x.codigo === "FALTA_PESO_PROPIO");
+    expect(e).toBeDefined();
+    expect(e!.severidad).toBe("error");
+    expect(e!.elementoTipo).toBe("modelo");
+    sinJergaFEM(e!);
+  });
+
+  it("E1: flag ON CON hip-peso-propio sembrada -> sin error", () => {
+    const m = modeloValido();
+    m.analisis.incluirPesoPropio = true;
+    m.hipotesis.push({
+      id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true,
+    });
+    expect(codigos(validarModelo(m))).not.toContain("FALTA_PESO_PROPIO");
+  });
+
+  it("E1: flag OFF sin hip-peso-propio -> sin error (no se computa peso propio)", () => {
+    const m = modeloValido();
+    m.analisis.incluirPesoPropio = false;
+    expect(codigos(validarModelo(m))).not.toContain("FALTA_PESO_PROPIO");
+  });
+
+  it("E2 CARGA_EN_AUTOMATICA: una carga asignada a hip-peso-propio -> error", () => {
+    const m = modeloValido();
+    m.hipotesis.push({
+      id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true,
+    });
+    m.cargas.push({
+      id: "cX", tipo: "lineal", ambito: "v1", valor: -3, hipotesisId: "hip-peso-propio",
+    });
+    const e = validarModelo(m).find((x) => x.codigo === "CARGA_EN_AUTOMATICA");
+    expect(e).toBeDefined();
+    expect(e!.severidad).toBe("error");
+    expect(e!.elementoId).toBe("cX");
+    sinJergaFEM(e!);
+  });
+
+  it("E3: la hipotesis automatica SIN cargas no genera COMBO_SIN_CARGAS", () => {
+    const m = modeloValido();
+    m.hipotesis.push({
+      id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true,
+    });
+    // No tiene cargas en modelo.cargas (las genera el discretizador): no debe avisarse.
+    const avisoAuto = validarModelo(m).some(
+      (x) => x.codigo === "COMBO_SIN_CARGAS" && x.elementoId === "hip-peso-propio",
+    );
+    expect(avisoAuto).toBe(false);
   });
 });

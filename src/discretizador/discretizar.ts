@@ -22,12 +22,10 @@ import type {
   Pilar,
   Carga,
   Hipotesis,
-  Seccion,
   Planta,
 } from "../dominio";
-import { plantaPorId, nudoPorId, seccionPorId } from "../dominio";
-import { getMaterial, seccionRectangular, seccionCircular, getSeccion } from "../biblioteca";
-import { mToMm } from "../unidades";
+import { plantaPorId, nudoPorId, seccionPorId, hipotesisAutomatica } from "../dominio";
+import { getMaterial } from "../biblioteca";
 import {
   ModeloFEMSchema,
   type ModeloFEM,
@@ -44,6 +42,15 @@ import {
 } from "./contratoFEM";
 import { validarModelo, type ErrorObra } from "./validaciones";
 import { generarCombos } from "./combinaciones";
+// resolverSeccion y las propiedades de barra viven en el modulo hoja
+// ./propiedadesBarra (A-dry): el discretizador las consume, no las define. Se
+// re-exporta resolverSeccion para no romper imports existentes (index.ts, tests).
+import {
+  resolverSeccion,
+  propiedadesDePilar,
+  propiedadesDeViga,
+} from "./propiedadesBarra";
+export { resolverSeccion };
 
 // Resultado del discretizador. NO lanza. Tres canales en lenguaje de obra:
 //  - ok:true + modeloFEM   => Capa 2 valida lista para el solver.
@@ -99,38 +106,6 @@ export function releasesDeExtremo(
 // unico punto, no la captura de datos, evitando el error nº1 de doble signo.
 export function signoGravitatorio(_carga: Carga, _hipotesis: Hipotesis): number {
   return -1;
-}
-
-// Resuelve las propiedades de calculo (A,Iy,Iz,J) de una seccion de obra. Es el
-// UNICO lugar donde ocurre la conversion de borde m->mm: el dominio persiste
-// dimensiones en m, pero `seccionRectangular`/`seccionCircular` de la biblioteca
-// reciben mm. Se convierte aqui con `mToMm`, justo al cruzar el borde, y en ningun
-// otro sitio de la logica.
-export function resolverSeccion(seccion: Seccion): SeccionFEM {
-  switch (seccion.tipo) {
-    case "perfilMetalico": {
-      const perfil = getSeccion(seccion.perfilId);
-      if (perfil === undefined) {
-        // No deberia ocurrir: validaciones (REF_SECCION) ya garantiza que el
-        // perfilId existe en el catalogo antes de llegar aqui. Si pasa, es un bug
-        // interno, no un error de obra.
-        throw new Error(`Perfil de catalogo inexistente: ${seccion.perfilId}`);
-      }
-      return { name: seccion.id, A: perfil.A, Iy: perfil.Iy, Iz: perfil.Iz, J: perfil.J };
-    }
-    case "hormigonRectangular": {
-      // Borde m->mm: la biblioteca espera mm y convierte a m internamente.
-      const e = seccionRectangular(mToMm(seccion.b), mToMm(seccion.h));
-      return { name: seccion.id, A: e.A, Iy: e.Iy, Iz: e.Iz, J: e.J };
-    }
-    case "hormigonCircular": {
-      const e = seccionCircular(mToMm(seccion.d));
-      return { name: seccion.id, A: e.A, Iy: e.Iy, Iz: e.Iz, J: e.J };
-    }
-    case "generico":
-      // Propiedades directas en m (sistema interno), sin biblioteca ni conversion.
-      return { name: seccion.id, A: seccion.A, Iy: seccion.Iy, Iz: seccion.Iz, J: seccion.J };
-  }
 }
 
 // --- Estructuras internas del algoritmo --------------------------------------
@@ -502,6 +477,56 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
     }
   }
 
+  // --- Paso 6b: peso propio automatico (F2a) ----------------------------------
+  // Si `incluirPesoPropio` esta activo, se emite el peso propio de cada barra como
+  // carga distribuida en la hipotesis automatica `hip-peso-propio` (#3, #18):
+  //   w = A·rho (kN/m), direccion GLOBAL FY NEGATIVA (gravedad, vertical Y).
+  // Es ENSAMBLADO DE CARGA (no `add_member_self_weight` del solver): puro,
+  // golden-testable y visible en "Ver modelo de calculo". PyNite integra w sobre la
+  // longitud real de cada barra, de modo que para una viga horizontal produce
+  // flexion y para un pilar vertical produce axil (la carga global se proyecta sobre
+  // el eje de la barra): es correcto, no hace falta distinguir aqui.
+  //
+  // Se emite UNA carga por CADA member (todos los tramos de un pilar pasante, no solo
+  // el pie): el peso es de toda la barra. Orden determinista: pilares ordenados por
+  // id (con sus tramos pie->cabeza) y luego vigas ordenadas por id, el mismo orden de
+  // numeracion de `members`, de modo que la salida es byte a byte estable.
+  // El `case` es el id de la hipotesis AUTOMATICA hallada por su flag (no el literal
+  // ID_HIP_PESO_PROPIO): asi id y flag no pueden desincronizarse. Guard E1
+  // (validaciones.ts) garantiza que existe cuando el flag esta activo; aqui solo se
+  // consume (en modelos sembrados normalmente su id ES ID_HIP_PESO_PROPIO).
+  if (modelo.analisis.incluirPesoPropio) {
+    const casePesoPropio = hipotesisAutomatica(modelo)!.id;
+    for (const p of pilaresOrdenados) {
+      const props = propiedadesDePilar(modelo, p);
+      const w = -(props.A * props.rho); // w=A·rho; signo negativo = gravedad (FY-)
+      for (const member of pilarAMembers[p.id]) {
+        dist_loads.push({
+          member,
+          direction: "FY",
+          w1: w,
+          w2: w,
+          x1: null,
+          x2: null,
+          case: casePesoPropio,
+        });
+      }
+    }
+    for (const v of vigasOrdenadas) {
+      const props = propiedadesDeViga(modelo, v);
+      const w = -(props.A * props.rho);
+      dist_loads.push({
+        member: vigaAMember[v.id],
+        direction: "FY",
+        w1: w,
+        w2: w,
+        x1: null,
+        x2: null,
+        case: casePesoPropio,
+      });
+    }
+  }
+
   // --- Paso 7: combinaciones (delegado a ./combinaciones) ----------------------
   // ELU persistente = 1,35·permanentes + 1,50·variables; ELS caracteristica =
   // 1,00·todas. Los coeficientes gamma provienen de la biblioteca (CTE DB-SE Tabla
@@ -511,8 +536,21 @@ export function discretizar(modelo: Modelo): ResultadoDiscretizacion {
   const combos = generarCombos(modelo);
 
   // --- Paso 8: analisis -------------------------------------------------------
+  // Mapeo `tipo` (Capa 1) -> AnalisisFEM.type (Capa 2), 3 ramas:
+  //   lineal -> linear   (analisis lineal de primer orden)
+  //   general -> analyze (analisis general; geometria de primer orden)
+  //   pDelta -> PDelta   (P-Delta de balanceo a nivel nudo; lo ejecuta el glue con
+  //                       analyze_PDelta). En P-Delta el glue ignora check_statics
+  //                       (no hace comprobacion de equilibrio); el forzado a false
+  //                       bajo P-Delta vive en el glue (F2.2/E6), no aqui.
+  const tipoAnalisis: AnalisisFEM["type"] =
+    modelo.analisis.tipo === "lineal"
+      ? "linear"
+      : modelo.analisis.tipo === "general"
+        ? "analyze"
+        : "PDelta";
   const analysis: AnalisisFEM = {
-    type: modelo.analisis.tipo === "lineal" ? "linear" : "analyze",
+    type: tipoAnalisis,
     check_statics: modelo.analisis.comprobarEstatica,
   };
 

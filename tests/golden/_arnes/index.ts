@@ -21,6 +21,11 @@ export {
   fixtureVoladizoPuntual,
   fixtureBiapoyadaPuntualCentro,
   fixturePorticoSimple,
+  // Peso propio (F2a / F3.1): viga, pilar y toggle ON/OFF.
+  fixturePesoPropioVigaBiapoyada,
+  fixturePesoPropioPilar,
+  conPesoPropioOff,
+  RHO_ACERO,
   MATERIAL_GOLDEN,
   PERFIL_GOLDEN,
   SECCION_GOLDEN,
@@ -28,6 +33,8 @@ export {
   type ParamsVoladizoP,
   type ParamsBiapoyadaP,
   type ParamsPortico,
+  type ParamsPesoPropioViga,
+  type ParamsPesoPropioPilar,
 } from "./fixtures";
 
 // Politica de tolerancias + formato del caso golden.

@@ -348,3 +348,202 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   `src/ui/resultados/estadoMotorUI.ts`) y consumirlo desde BotonCalcular, Brandbar y Menubar.
 - **Depende de / bloquea:** nada. **Coste:** CC ~15-20 min.
 - **Origen:** Auditoría de arquitectura feature-17 (guardián, MENOR).
+
+---
+
+## T-cr-fem-exacto · Centro de rigidez vía solver (FEM-exacto), no analítico
+
+- **Qué:** Calcular el centro de rigidez (CR) por planta usando PyNite, no a mano. Aplicar un
+  cortante unitario por planta (con hipótesis de diafragma rígido) y derivar el CR de los
+  desplazamientos resultantes. F2a entrega el centro de MASAS; el CR quedó fuera.
+- **Por qué:** En la revisión de F2 se descartó el CR analítico `12EI/h³`: ignora vigas, releases,
+  torsión, flexibilidad de bases y el acoplamiento entre plantas, y monta un **segundo solver
+  simplificado** que choca con la regla de oro #1 (PyNite es la única fuente del cálculo). Un CR
+  con pinta de fiable pero engañoso induce decisiones de torsión erróneas en el arquitecto.
+- **Cómo retomar:** tras F2a (el módulo `src/discretizador/centros.ts` ya da el CM). Definir la
+  hipótesis de diafragma rígido por planta; añadir corridas FEM auxiliares en el glue (cortante
+  unitario por dirección/planta) y leer los desplazamientos para localizar el CR; extender el
+  contrato de centros/resultados. Golden con un caso de simetría conocida (CR≡CM en planta simétrica).
+- **Depende de / bloquea:** requiere F2a (CM) hecho. Comparte la hipótesis de masa/diafragma con el
+  modal (F2b) y con un futuro sísmico.
+- **Coste:** CC ~varias horas (corridas FEM auxiliares + contrato + golden).
+- **Origen:** Revisión de ingeniería F2 (Tensión-3, outside voice Codex; revierte la decisión D1 de
+  hacer el CR analítico). Plan: `vamos-a-planificar-la-effervescent-newt.md`.
+
+---
+
+## T-pdelta-subdivision · Subdividir barras para el P-δ (curvatura), no solo P-Δ de balanceo
+
+- **Qué:** Subdividir cada pilar/viga en N elementos de cálculo para captar el efecto **P-δ**
+  (curvatura de la propia barra), no solo el **P-Δ** de balanceo (nivel nudo) que entrega F2a.
+- **Por qué:** F2a habilita `analyze_PDelta` sobre el mallado actual (un elemento de pilar por
+  planta): capta el desplazamiento lateral de planta (P-Δ) pero **no** la amplificación por curvatura
+  del elemento (P-δ). La guía de PyNite recomienda subdividir barras para el P-δ local; sin
+  subdivisión el efecto de segundo orden es parcial.
+- **Cómo retomar:** añadir subdivisión por longitud en el discretizador (nudos/members intermedios).
+  **Cuidado:** toca el núcleo del discretizador, la `trazabilidad` (`pilarAMembers` ya contempla
+  varios members) y la concatenación de diagramas por barra. Decidir el criterio de subdivisión
+  (nº fijo de tramos vs por esbeltez). Se aprovecha junto a T-diagramas-pilar-tramos.
+- **Depende de / bloquea:** requiere F2a (P-Δ de balanceo) hecho.
+- **Coste:** CC ~varias horas.
+- **Origen:** Revisión de ingeniería F2 (Tensión-5, outside voice Codex #8). Plan:
+  `vamos-a-planificar-la-effervescent-newt.md`.
+
+---
+
+## T-3dpleno-ux · Semántica de selección/edición cross-planta en 3D pleno
+
+- **Qué:** Fijar qué pasa al pickear un elemento de una planta que NO es la activa en la vista 3D
+  pleno: ¿cambia `plantaActivaId` a la del elemento, se mantiene, o hay "selección fuera de contexto"?
+- **Por qué:** El 3D pleno (F2c) muestra todas las plantas/grupos a la vez. Sin una decisión clara, el
+  sidebar, los inspectores, las plantillas DXF, los comandos de colocación y el HUD (todos ligados a
+  `grupoActivoId`/`plantaActivaId`) pueden contradecirse al editar un elemento de otra planta.
+- **Cómo retomar:** resolver al planificar F2c. Opciones: (a) seleccionar cambia `plantaActivaId` a la
+  del elemento; (b) selección fuera de contexto sin cambiar la planta activa; (c) modo "edición 3D"
+  explícito. Alinear sidebar/inspector/plantillas/HUD con la elección. El picking-resuelve-planta se
+  implementa como función pura con test de componente (el E2E de lienzo real sigue en T-f16-canvas-smoke).
+- **Depende de / bloquea:** bloquea `C-pick` (edición cross-planta) de F2c; depende de `C-render`.
+- **Coste:** decisión UX + CC ~variable.
+- **Origen:** Revisión de ingeniería F2 (outside voice Codex #15/#16). Plan:
+  `vamos-a-planificar-la-effervescent-newt.md`.
+
+---
+
+## T-cm-cargas-muertas · Incluir cargas muertas de grupo en el centro de masas (requiere paños)
+
+- **Qué:** Extender `src/discretizador/centros.ts` para incluir `Grupo.cargasMuertas` (kN/m²) en el
+  cálculo del centro de masas, una vez que los paños (F3) aporten el **área tributaria** por elemento.
+- **Por qué:** F2a omite deliberadamente las cargas muertas de grupo en el CM: son kN/m² y no hay
+  superficie de forjado a la que aplicarlas hasta que existan paños. El CM de F2a usa solo lo
+  computable (peso propio `A·ρ·L` + cargas lineales sobre vigas + cargas nodales). Cuando lleguen los
+  paños, el CM debe completarse para reflejar la masa permanente real.
+- **Cómo retomar:** tras F3 (paños). Definir el área tributaria por elemento y sumar
+  `cargasMuertas·área` a los términos del CM; retirar la nota de omisión del panel; golden que compare
+  CM con/sin cargas muertas en una planta con paño conocido.
+- **Depende de / bloquea:** requiere F3 (paños / área de forjado). La omisión está documentada en E5 del
+  plan F2a.
+- **Coste:** CC ~30-45 min (cálculo + golden), una vez exista el área.
+- **Origen:** Revisión de ingeniería F2a (outside voice Codex). Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+
+---
+
+## T-pdelta-imperfeccion · Imperfección nocional / carga lateral para que el P-Δ tenga efecto
+
+- **Qué:** Generar una **imperfección nocional** (fuerza horizontal equivalente / desplome inicial,
+  estilo normativo) para que el análisis P-Δ produzca efectos de segundo orden reales en pórticos
+  solo-gravedad y simétricos.
+- **Por qué:** F2a entrega el *pipeline* P-Δ (`analyze_PDelta` expuesto), pero sin carga lateral ni
+  imperfección el P-Δ es prácticamente **inerte** (no hay sway que amplificar). Los códigos exigen P-Δ
+  con imperfecciones nocionales: ése es el trabajo que convierte el pipeline en una función útil.
+- **Cómo retomar:** junto a la fase de **viento/sísmico** (donde también aparecen los casos de carga
+  lateral). Decidir magnitud/dirección por código (p. ej. desplome H/n o fuerza nocional), aplicarla
+  como caso de carga, y un golden que demuestre amplificación frente al análisis lineal.
+- **Depende de / bloquea:** requiere casos de carga lateral (fase viento/sísmico). El alcance "solo
+  pipeline, inerte hasta carga lateral" está documentado en la nota CV2 del plan F2a.
+- **Coste:** CC ~varias horas (reglas normativas + casos de carga + golden).
+- **Origen:** Revisión de ingeniería F2a (outside voice Codex). Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+
+---
+
+## T-cm-pilar-pasante · CM: repartir la masa de pilares pasantes a las plantas intermedias
+
+- **Qué:** En `src/discretizador/centros.ts`, el peso de un pilar se reparte **medio a `plantaInicial` y
+  medio a `plantaFinal`**. Un pilar pasante que atraviesa una planta **intermedia** no aporta masa a esa
+  planta intermedia, aunque físicamente la atraviesa (y el discretizador sí le pone un tramo allí).
+- **Por qué:** En edificios con plantas técnicas/entreplantas el CM de la planta intermedia
+  **subestima** la masa de pilares. Es comportamiento *especificado* en el plan F2a ("medio pilar a cada
+  forjado que conecta"), no un bug, pero el reparto a forjados intermedios sería más fiel.
+- **Cómo retomar:** decidir el criterio (¿el pilar "conecta" también los forjados intermedios que
+  atraviesa? reparto por tramos del troceo del discretizador, `cotasDePilar`). Actualizar el comentario
+  de `centros.ts:96-104` (hoy describe solo pilares de un tramo) y añadir golden de pilar pasante.
+- **Depende de / bloquea:** nada. **Coste:** CC ~30-45 min.
+- **Origen:** Auditoría guardián F2a (M1, MENOR). Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+
+---
+
+## T-dedup-planta-de-nudo · Factorizar la regla "primera viga por id" (CM ↔ discretizador)
+
+- **Qué:** La regla de desempate "la primera viga por orden de id fija la planta/cota de un nudo" está
+  **duplicada**: `plantaDeNudo` en `centros.ts` y `localizarNodoDeNudo` en `discretizar.ts`. Hoy
+  coinciden (ambas ordenan por id), pero son dos implementaciones independientes.
+- **Por qué:** Si se toca una y no la otra, el CM atribuiría una carga nodal a una planta distinta de la
+  que el solver asigna a su nodo, **en silencio**. Deuda de DRY entre módulos (regla de oro: DRY).
+- **Cómo retomar:** extraer el desempate a un helper puro compartido (junto al A-dry en
+  `propiedadesBarra.ts` o en `geometria.ts`) y consumirlo desde ambos; o, como mínimo, un golden que
+  compare ambas atribuciones para detectar deriva.
+- **Depende de / bloquea:** nada. **Coste:** CC ~20-30 min.
+- **Origen:** Auditoría guardián F2a (M2, MENOR). Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+
+---
+
+## T-cm-overlay-recompute · El overlay del CM recalcula oculto y por duplicado
+
+- **Qué:** `CentroMasaOverlay` llama a `useCentroMasa()` (cálculo) ANTES de la guarda de
+  visibilidad (`if (!visible) return null`), y el panel también lo llama, así que
+  `calcularCentroMasaPlanta` se ejecuta (a) aun con el toggle APAGADO y (b) DOS veces cuando
+  está encendido (un `useMemo` por instancia, no compartido).
+- **Por qué:** el overlay está montado en las tres pestañas y se suscribe a `s.modelo`, así que
+  cada edición de obra (colocar/mover pilar = camino caliente) recalcula el CM de un marcador
+  oculto; con el panel abierto, el doble. La cabecera del hook afirma "no recomputar dos veces":
+  hoy es falso. (Regla #11 de rendimiento del lienzo.)
+- **Cómo retomar:** NO se puede `return null` antes de llamar al hook (reglas de hooks). Pasar
+  `visible` al hook y cortocircuitar el cálculo dentro del `useMemo` cuando no es visible; y
+  compartir UN solo resultado entre overlay y panel (p. ej. memoizar a nivel de módulo sobre
+  `(modelo, plantaActivaId)` o exponer un único snapshot). Acotar también la suscripción para no
+  recomputar ante ediciones de otra planta.
+- **Depende de / bloquea:** nada. **Coste:** CC ~30-45 min.
+- **Origen:** Code-review F2a (high) #4. Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+
+---
+
+## T-pdelta-deteccion-inestable · Clasificar la inestabilidad P-Δ sin depender del texto de PyNite
+
+- **Qué:** El glue (`pynite_glue.py`, `_MARCADORES_INESTABLE`) detecta la inestabilidad P-Δ por
+  coincidencia de subcadenas en los mensajes de excepción de PyNite en inglés
+  (singular/unstable/diverged), que usa `ValueError`/`Exception` genéricos.
+- **Por qué:** CLAUDE.md §8 obliga a pinear PyNite y avisa de que cambia entre versiones. Una
+  actualización que reformule (o localice) los mensajes rompe el clasificador en silencio: una
+  estructura realmente inestable cae al catch-all y muestra un traceback crudo en vez del mensaje
+  de obra ("La estructura es inestable bajo P-Δ…") — justo lo opaco que este código evitaba.
+- **Cómo retomar:** detección más robusta que el string: inspeccionar el estado/flag de
+  estabilidad del propio solver, o acotar el catch al punto de llamada concreto, o pinear un
+  contrato verificado por versión. Cubrir con un golden de inestabilidad que falle si el mensaje
+  deja de mapearse.
+- **Depende de / bloquea:** nada. **Coste:** CC ~30-60 min (requiere motor real para verificar).
+- **Origen:** Code-review F2a (high) #5. Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+
+---
+
+## T-migracion-id-usurpadora · Reasignación de id "usurpadora" sin chequeo de colisión ni re-apuntar cargas
+
+- **Qué:** En la migración v1→v2, la rama "usurpadora" (un import trae `id=hip-peso-propio` con
+  datos NO automáticos) reasigna a un id FIJO `hip-peso-propio-usuario` sin comprobar que esté
+  libre, y NO re-apunta las cargas que referenciaban el id antiguo. Zod valida unicidad de
+  NOMBRES, no de ids.
+- **Por qué:** un .json importado a mano/heredado con ese id (o con `hip-peso-propio-usuario` ya
+  ocupado) produce ids duplicados (una hipótesis sombrea a otra y su carga desaparece) o cargas
+  huérfanas → rotura aguas abajo. Raro en v1 real (ids opacos/UUID) pero es el **borde de import**
+  ("importar nunca debe romper la app", §2.8).
+- **Cómo retomar:** reutilizar la misma búsqueda de hueco libre que ya hace el nombre
+  (`elegirNombrePesoPropio`) para elegir un id no ocupado, y re-apuntar `modelo.cargas[].hipotesisId`
+  del id viejo al reasignado. Tests del borde con ambos ids ocupados y con cargas colgando.
+- **Depende de / bloquea:** nada. **Coste:** CC ~30 min.
+- **Origen:** Code-review F2a (high) #6. Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+
+---
+
+## T-opciones-comprobar-previo · "Comprobar estática" pierde el valor previo al salir de P-Δ
+
+- **Qué:** En `DialogoOpcionesAnalisis`, `comprobarPrevio` (useRef) captura `comprobarEstatica`
+  una sola vez al montar. Si el diálogo se abre con el análisis YA en P-Δ (donde
+  `comprobarEstatica` está forzado a false), el ref captura false; al volver a lineal/general se
+  "restaura" false, perdiendo un true previo.
+- **Por qué:** UX/correctness: abrir un proyecto en P-Δ y cambiar a Lineal deja "Comprobar
+  estática" apagada aunque estuviera encendida antes. El estado de restauración vive solo mientras
+  el diálogo está montado.
+- **Cómo retomar:** arreglo de fondo (elimina el ref frágil): que el MODELO conserve
+  `comprobarEstatica` intacto siempre y que el discretizador/glue lo IGNOREN bajo P-Δ (el glue ya
+  lo fuerza a false, E6). Así la restauración es automática y no depende del ciclo de vida del
+  diálogo; la UI solo deshabilita+explica el checkbox bajo P-Δ sin tocar el valor del modelo.
+- **Depende de / bloquea:** nada. **Coste:** CC ~20-30 min.
+- **Origen:** Code-review F2a (high) #8. Plan: `vamos-a-empezar-a-hidden-quokka.md`.

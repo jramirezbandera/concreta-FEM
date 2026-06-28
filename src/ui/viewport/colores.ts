@@ -24,6 +24,7 @@ const FALLBACK = {
   vigaLine: "#ddbd87",
   node: "#c07d12",
   deformed: "#38bdf8",
+  centroMasa: "#d6336c",
   onAccent: "#ffffff",
 } as const;
 
@@ -41,6 +42,7 @@ const VAR_NAME: Record<keyof typeof FALLBACK, string> = {
   vigaLine: "viga-line",
   node: "node",
   deformed: "deformed",
+  centroMasa: "centro-masa",
   onAccent: "on-accent",
 };
 

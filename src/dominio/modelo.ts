@@ -32,10 +32,21 @@ export const PlantaSchema = z.object({
 });
 export type Planta = z.infer<typeof PlantaSchema>;
 
-// Opciones del analisis (CLAUDE.md §15: lineal en F1, general/P-Delta en F2).
+// Opciones del analisis (CLAUDE.md §15: lineal en F1; general y P-Delta en F2).
+//  - `tipo`: el discretizador lo mapea a AnalisisFEM.type (lineal->linear,
+//    general->analyze, pDelta->PDelta). "pDelta" es nuevo en F2a (P-Delta de
+//    balanceo a nivel nudo, exponiendo el analyze_PDelta del glue).
+//  - `comprobarEstatica`: la UI lo deshabilita/explica cuando tipo==="pDelta"
+//    (el P-Delta no realiza comprobacion de equilibrio); el glue lo fuerza a false
+//    bajo P-Delta (Fase 2, F2.2/E6).
+//  - `incluirPesoPropio`: si esta activo, el discretizador emite el peso propio
+//    (w=A·rho, FY global negativa) como hipotesis automatica `hip-peso-propio`.
+//    Default true (el modelo vacio lo siembra a true). Es un campo REQUERIDO del
+//    schema: la migracion v1->v2 (Fase 2) lo aporta a proyectos antiguos.
 export const OpcionesAnalisisSchema = z.object({
-  tipo: z.enum(["lineal", "general"]),
+  tipo: z.enum(["lineal", "general", "pDelta"]),
   comprobarEstatica: z.boolean(),
+  incluirPesoPropio: z.boolean(),
 });
 export type OpcionesAnalisis = z.infer<typeof OpcionesAnalisisSchema>;
 

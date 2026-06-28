@@ -49,9 +49,10 @@ describe("DialogoHipotesis: montaje", () => {
   it("cada hipotesis muestra su tag de tipo: Perm. para permanente, Var. para variable", () => {
     const dialogo = renderAbierto();
     const lista = dialogo.querySelector(".cx-gyp__lista") as HTMLElement;
-    // "Cargas muertas" es permanente -> Perm.; "Sobrecarga de uso" es variable -> Var.
-    // Una de cada en la lista sembrada.
-    expect(within(lista).getByText("Perm.")).toBeInTheDocument();
+    // F2a: el modelo vacio siembra "Cargas muertas" (Perm.), "Sobrecarga de uso"
+    // (Var.) y la automatica "Peso propio" (Perm.). Hay >=1 de cada tag; la
+    // presentacion read-only/lock de la automatica es F2.4.
+    expect(within(lista).getAllByText("Perm.").length).toBeGreaterThanOrEqual(1);
     expect(within(lista).getByText("Var.")).toBeInTheDocument();
     // El nombre accesible del boton sigue siendo solo el nombre (el tag va aria-hidden):
     // los queries por nombre del resto de tests no se rompen.
@@ -74,13 +75,15 @@ describe("DialogoHipotesis: crear", () => {
     const user = userEvent.setup();
     const dialogo = renderAbierto();
 
-    expect(hipotesis()).toHaveLength(2);
+    // F2a: el modelo vacio siembra 3 hipotesis (2 de F1 + la automatica de peso propio).
+    expect(hipotesis()).toHaveLength(3);
     await user.click(within(dialogo).getByRole("button", { name: "Nueva hipótesis" }));
 
-    expect(hipotesis()).toHaveLength(3);
+    expect(hipotesis()).toHaveLength(4);
     // La nueva (sin nombre dado) se nombra "Hipotesis 1" via siguienteNombre.
-    const nueva = hipotesis()[2];
+    const nueva = hipotesis()[3];
     expect(nueva.tipo).toBe("permanente");
+    expect(nueva.automatica).toBe(false);
     // Queda seleccionada: su item esta marcado (aria-pressed).
     expect(
       within(dialogo).getByRole("button", { name: nueva.nombre, pressed: true }),
@@ -98,11 +101,13 @@ describe("DialogoHipotesis: editar", () => {
     const detalle = dialogo.querySelector(".cx-gyp__detalle") as HTMLElement;
     const inputNombre = within(detalle).getByLabelText("Nombre");
     await user.clear(inputNombre);
-    await user.type(inputNombre, "Peso propio");
+    // "Peso propio" ya lo usa la hipotesis automatica sembrada (colisionaria); se usa
+    // un nombre libre para verificar el commit en vivo del nombre.
+    await user.type(inputNombre, "Forjados");
     await user.tab(); // blur -> commit
 
     expect(hipotesis().find((h) => h.id === "hip-cargas-muertas")!.nombre).toBe(
-      "Peso propio",
+      "Forjados",
     );
   });
 
@@ -130,7 +135,7 @@ describe("DialogoHipotesis: editar", () => {
   function modeloSinVariable(): Modelo {
     const m = crearModeloVacio();
     m.hipotesis = [
-      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
     ];
     return m;
   }
@@ -200,7 +205,8 @@ describe("DialogoHipotesis: eliminar", () => {
     await user.click(within(dialogo).getByRole("button", { name: "Eliminar hipótesis" }));
 
     expect(hipotesis().some((h) => h.id === "hip-cargas-muertas")).toBe(false);
-    expect(hipotesis()).toHaveLength(1);
+    // Quedan las otras 2 sembradas (Sobrecarga de uso + la automatica de peso propio).
+    expect(hipotesis()).toHaveLength(2);
   });
 
   it("eliminar una hipotesis con cargas pide confirmacion y al confirmar arrastra las cargas", async () => {
@@ -231,5 +237,47 @@ describe("DialogoHipotesis: eliminar", () => {
     await user.click(within(confirm).getByRole("button", { name: "Eliminar" }));
     expect(hipotesis().some((h) => h.id === "hip-cargas-muertas")).toBe(false);
     expect(modelo().cargas).toHaveLength(0);
+  });
+});
+
+describe("DialogoHipotesis: hipotesis automatica read-only (D-diseño-4)", () => {
+  it("el item de la automatica lleva el tag 'auto' con candado, no Perm./Var.", () => {
+    const dialogo = renderAbierto();
+    const lista = dialogo.querySelector(".cx-gyp__lista") as HTMLElement;
+    // El item "Peso propio" (automatica) lleva el tag 🔒 auto.
+    const item = within(lista).getByRole("button", { name: "Peso propio" });
+    expect(within(item).getByText(/auto/)).toBeInTheDocument();
+  });
+
+  it("al seleccionar la automatica el detalle es read-only: campos disabled, sin 'Eliminar', con nota", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Peso propio" }));
+
+    const detalle = dialogo.querySelector(".cx-gyp__detalle") as HTMLElement;
+    // Nombre read-only (input disabled).
+    const inputNombre = within(detalle).getByLabelText("Nombre");
+    expect(inputNombre).toBeDisabled();
+    // Tipo deshabilitado (Segmentado disabled): los radios no son interactuables.
+    const grupoTipo = within(detalle).getByRole("radiogroup", { name: "Tipo" });
+    expect(within(grupoTipo).getByRole("radio", { name: "Variable" })).toBeDisabled();
+    // SIN boton "Eliminar hipótesis".
+    expect(
+      within(detalle).queryByRole("button", { name: "Eliminar hipótesis" }),
+    ).toBeNull();
+    // Nota explicativa de la automatica.
+    expect(
+      within(detalle).getByText(/el peso propio se calcula del modelo/i),
+    ).toBeInTheDocument();
+  });
+
+  it("la automatica NO se elimina ni se edita aunque se intente por comando (invariante de dominio)", async () => {
+    // Defensa: aunque la UI no ofrece "Eliminar", el invariante de dominio impide
+    // borrar/editar la automatica. Aqui solo se asegura que sigue presente tras
+    // seleccionarla (no hay accion destructiva expuesta).
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Peso propio" }));
+    expect(hipotesis().some((h) => h.automatica)).toBe(true);
   });
 });

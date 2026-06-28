@@ -6,7 +6,7 @@ import type { Seccion } from "./seccion";
 import type { Nudo } from "./nudo";
 import type { Pilar } from "./pilar";
 import type { Viga } from "./viga";
-import type { Carga } from "./carga";
+import type { Carga, Hipotesis } from "./carga";
 
 export function grupoPorId(modelo: Modelo, id: string): Grupo | undefined {
   return modelo.grupos.find((g) => g.id === id);
@@ -54,11 +54,44 @@ export function cargasDeAmbito(modelo: Modelo, ambito: string): Carga[] {
   return modelo.cargas.filter((c) => c.ambito === ambito);
 }
 
+// Id fijo de la hipotesis automatica de peso propio. SOLO para SEMBRAR: es el id
+// canonico que se asigna al CREAR la automatica (crearModeloVacio) y el que la
+// migracion v1->v2 (F2.3) siembra en proyectos antiguos (idempotente por id).
+// La IDENTIFICACION de "¿es ESTA la automatica?" NO se hace por id sino por el flag
+// `automatica` (ver `esHipotesisAutomatica`): asi id y flag no pueden desincronizarse.
+export const ID_HIP_PESO_PROPIO = "hip-peso-propio";
+
+// Predicado UNICO de "hipotesis automatica" (la del sistema, p.ej. peso propio). El
+// FLAG `automatica` es la fuente de verdad, NO el id: el discretizador, los combos,
+// las validaciones y los comandos identifican la automatica por aqui para que id y
+// flag jamas diverjan (un .json con automatica:true en un id no canonico se trata
+// igual de automatico, y uno con el id canonico pero automatica:false, no).
+export function esHipotesisAutomatica(h: Hipotesis): boolean {
+  return h.automatica === true;
+}
+
+// Busca la (primera) hipotesis automatica del modelo, si existe. Atajo para los
+// call sites que necesitan SU id (p.ej. el `case` del peso propio en el discretizador)
+// sin reimplementar el filtro por el predicado.
+export function hipotesisAutomatica(modelo: Modelo): Hipotesis | undefined {
+  return modelo.hipotesis.find(esHipotesisAutomatica);
+}
+
 // Factoria de un Modelo valido vacio: punto de partida para un proyecto nuevo.
-// Trae sembradas las dos hipotesis basicas de F1 (cargas muertas permanentes y
-// sobrecarga de uso variable), con ids ASCII fijos y deterministas: el modelo
-// vacio es siempre identico, lo que mantiene estables tests y golden. El resto de
-// hipotesis las anade el usuario via los comandos de F13.
+// Trae sembradas las hipotesis basicas: las dos de F1 (cargas muertas permanentes y
+// sobrecarga de uso variable, en cabeza) y la AUTOMATICA de peso propio al FINAL
+// (estilo CYPECAD; el discretizador genera sus cargas, automatica:true). Ids ASCII
+// fijos y deterministas: el modelo vacio es siempre identico, lo que mantiene
+// estables tests y golden. El resto de hipotesis las anade el usuario via comandos
+// (F13). `incluirPesoPropio: true` por defecto (F2a): el peso propio se computa salvo
+// que el usuario lo desactive.
+//
+// ORDEN: la automatica va la ULTIMA a proposito. El orden del array NO afecta a la
+// Capa 2 (discretizador y `generarCombos` ordenan por id), pero el unico consumidor
+// del orden en F1 es el fallback "primera hipotesis" de la UI de cargas
+// (SeccionCargas): la primera debe ser ASIGNABLE (no la automatica, a la que no se
+// pueden anadir cargas de usuario, E2). El filtro explicito de la automatica en
+// SelectHipotesis / su presentacion read-only en DialogoHipotesis llegan en F2.4.
 export function crearModeloVacio(): Modelo {
   return {
     unidades: "kN-m",
@@ -73,9 +106,10 @@ export function crearModeloVacio(): Modelo {
     muros: [],
     cargas: [],
     hipotesis: [
-      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
-      { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable" },
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
+      { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable", automatica: false },
+      { id: ID_HIP_PESO_PROPIO, nombre: "Peso propio", tipo: "permanente", automatica: true },
     ],
-    analisis: { tipo: "lineal", comprobarEstatica: true },
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: true },
   };
 }

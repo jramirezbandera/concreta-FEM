@@ -21,6 +21,7 @@
 // de modo que una correccion normativa sea un cambio de UN dato y no de codigo.
 
 import type { Modelo } from "../dominio";
+import { esHipotesisAutomatica } from "../dominio";
 import { GAMMA_G_DESFAV, GAMMA_Q_DESFAV, GAMMA_ELS } from "../biblioteca";
 import type { ComboFEM } from "./contratoFEM";
 
@@ -52,6 +53,16 @@ export function generarCombos(modelo: Modelo): ComboFEM[] {
   const factoresELU: Record<string, number> = {};
   const factoresELS: Record<string, number> = {};
   for (const h of hipotesisOrdenadas) {
+    // E4 (sin combo fantasma): la hipotesis AUTOMATICA de peso propio se persiste
+    // SIEMPRE en el modelo, pero el discretizador solo emite sus cargas si
+    // `incluirPesoPropio` esta activo. Con el flag OFF no genera carga alguna, asi
+    // que su factor en los combos multiplicaria cero esfuerzo: es un termino inutil
+    // que ensucia la Capa 2. Se EXCLUYE del combo cuando esta desactivada. Se
+    // identifica por el predicado (flag), no por el id, para que no diverjan. La
+    // hipotesis se factoriza como cualquier PERMANENTE (gamma_G) cuando si aporta.
+    if (esHipotesisAutomatica(h) && !modelo.analisis.incluirPesoPropio) {
+      continue;
+    }
     factoresELU[h.id] = factorELU(h.tipo);
     factoresELS[h.id] = GAMMA_ELS;
   }

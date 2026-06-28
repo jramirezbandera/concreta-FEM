@@ -58,8 +58,11 @@ function modeloPortico(): Modelo {
     panos: [],
     muros: [],
     cargas: [{ id: "c1", tipo: "lineal", ambito: "v1", valor: 10, hipotesisId: "h1" }],
-    hipotesis: [{ id: "h1", nombre: "Peso propio", tipo: "permanente" }],
-    analisis: { tipo: "lineal", comprobarEstatica: true },
+    hipotesis: [{ id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false }],
+    // Por defecto SIN peso propio: estos tests verifican la traduccion de cargas de
+    // usuario y cuentan dist_loads/combos sin la carga automatica. Los tests propios
+    // del peso propio (mas abajo) lo activan con la hipotesis automatica sembrada.
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: false },
   };
 }
 
@@ -198,18 +201,21 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
 
   it("combos: hipotesis variable lleva 1.5 en ELU", () => {
     const m = modeloPortico();
-    m.hipotesis.push({ id: "h2", nombre: "Uso", tipo: "variable" });
+    m.hipotesis.push({ id: "h2", nombre: "Uso", tipo: "variable", automatica: false });
     m.cargas.push({ id: "c2", tipo: "lineal", ambito: "v1", valor: 5, hipotesisId: "h2" });
     const fem = discretizarOk(m);
     const elu = fem.combos.find((cb) => cb.name === "ELU")!;
     expect(elu.factors.h2).toBe(1.5);
   });
 
-  it("analisis: lineal -> 'linear'; general -> 'analyze'", () => {
+  it("analisis (3 ramas): lineal->'linear', general->'analyze', pDelta->'PDelta'", () => {
     expect(discretizarOk(modeloPortico()).analysis.type).toBe("linear");
-    const m = modeloPortico();
-    m.analisis.tipo = "general";
-    expect(discretizarOk(m).analysis.type).toBe("analyze");
+    const mGeneral = modeloPortico();
+    mGeneral.analisis.tipo = "general";
+    expect(discretizarOk(mGeneral).analysis.type).toBe("analyze");
+    const mPDelta = modeloPortico();
+    mPDelta.analisis.tipo = "pDelta";
+    expect(discretizarOk(mPDelta).analysis.type).toBe("PDelta");
   });
 
   it("salida valida contra ModeloFEMSchema", () => {
@@ -239,7 +245,7 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       // Modelo con varios pilares, vigas y cargas para que el orden de cada array de
       // entrada pueda importar (y comprobar que NO altera la Capa 2).
       const base = modeloPortico();
-      base.hipotesis.push({ id: "h2", nombre: "Uso", tipo: "variable" });
+      base.hipotesis.push({ id: "h2", nombre: "Uso", tipo: "variable", automatica: false });
       // Segundo pilar sujeto en otra columna, y segunda viga que lo conecta, para que
       // barajar `pilares`/`vigas` sea un reordenamiento real (no un no-op).
       base.nudos.push({ id: "n3", x: 12, y: 5 });
@@ -317,7 +323,7 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
     it("hipotesis sin cargas (COMBO_SIN_CARGAS) -> ok:true con aviso (NO bloquea)", () => {
       // Severidad aviso: una hipotesis vacia no impide calcular, solo no aporta.
       const m = modeloPortico();
-      m.hipotesis.push({ id: "h2", nombre: "Nieve", tipo: "variable" }); // sin cargas
+      m.hipotesis.push({ id: "h2", nombre: "Nieve", tipo: "variable", automatica: false }); // sin cargas
       const res = discretizar(m);
       expect(res.ok).toBe(true);
       if (res.ok) {
@@ -410,6 +416,136 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
         return n.x === 2 && n.y === 0 && n.z === 5;
       });
       expect(apoyosEnPie).toHaveLength(1);
+    });
+  });
+
+  // --- Peso propio automatico (F2a, A-core paso 4 + E1/E3/E4) ------------------
+  describe("peso propio automatico (#3 direccion FY-, w=A·rho)", () => {
+    // Portico con la hipotesis automatica sembrada y el flag ON. Seccion de hormigon
+    // de dimensiones conocidas para verificar w=A·rho con numeros cerrados.
+    function modeloConPesoPropio(): Modelo {
+      const m = modeloPortico();
+      // Hipotesis automatica de peso propio + las de usuario.
+      m.hipotesis = [
+        { id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true },
+        { id: "h1", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
+      ];
+      m.analisis.incluirPesoPropio = true;
+      // Seccion rectangular 0.3x0.5 m (A=0.15 m²) de hormigon HA-25 (rho=25 kN/m³).
+      m.secciones = [
+        { id: SECCION, nombre: "30x50", tipo: "hormigonRectangular", b: 0.3, h: 0.5 },
+      ];
+      m.pilares[0].materialId = "HA-25";
+      m.vigas[0].materialId = "HA-25";
+      return m;
+    }
+
+    it("emite carga distribuida FY NEGATIVA (gravedad) con case=hip-peso-propio", () => {
+      const fem = discretizarOk(modeloConPesoPropio());
+      const pp = fem.dist_loads.filter((dl) => dl.case === "hip-peso-propio");
+      // Una viga (1 barra) + un pilar (1 tramo) => 2 cargas de peso propio.
+      expect(pp).toHaveLength(2);
+      for (const dl of pp) {
+        expect(dl.direction).toBe("FY"); // GLOBAL, vertical (#18)
+        expect(dl.w1).toBeLessThan(0); // NEGATIVA = descendente (#3): caza la inversion
+        expect(dl.w1).toBe(dl.w2); // uniforme
+      }
+    });
+
+    it("w = -(A·rho): 0.15 m² · 25 kN/m³ = -3.75 kN/m", () => {
+      const fem = discretizarOk(modeloConPesoPropio());
+      const pp = fem.dist_loads.filter((dl) => dl.case === "hip-peso-propio");
+      for (const dl of pp) expect(dl.w1).toBeCloseTo(-(0.15 * 25), 9);
+    });
+
+    it("flag OFF -> NO emite ninguna carga de peso propio", () => {
+      const m = modeloConPesoPropio();
+      m.analisis.incluirPesoPropio = false;
+      const fem = discretizarOk(m);
+      expect(fem.dist_loads.filter((dl) => dl.case === "hip-peso-propio")).toHaveLength(0);
+    });
+
+    it("pilar pasante -> peso propio en CADA tramo del pilar", () => {
+      const m = modeloConPesoPropio();
+      // p0(0)-p1(3)-p2(6); pilar de p0 a p2 => 2 tramos.
+      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+      m.pilares[0].plantaFinal = "p2";
+      const fem = discretizarOk(m);
+      // Barras del pilar (vertical) que llevan peso propio.
+      const pilarMembers = fem.members
+        .filter((mm) => {
+          const ni = fem.nodes.find((n) => n.name === mm.i)!;
+          const nj = fem.nodes.find((n) => n.name === mm.j)!;
+          return ni.x === 2 && ni.z === 5 && nj.x === 2 && nj.z === 5;
+        })
+        .map((mm) => mm.name);
+      const ppPilar = fem.dist_loads.filter(
+        (dl) => dl.case === "hip-peso-propio" && pilarMembers.includes(dl.member),
+      );
+      expect(ppPilar).toHaveLength(2); // un peso propio por cada tramo
+    });
+
+    it("E1 desync: flag ON sin hip-peso-propio -> ok:false con FALTA_PESO_PROPIO", () => {
+      const m = modeloConPesoPropio();
+      // Quita la automatica pero deja el flag activo (estado desincronizado).
+      m.hipotesis = m.hipotesis.filter((h) => h.id !== "hip-peso-propio");
+      const res = discretizar(m);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errores.some((e) => e.codigo === "FALTA_PESO_PROPIO")).toBe(true);
+      }
+    });
+
+    it("E4 sin combo fantasma: flag OFF -> la automatica NO entra en los combos", () => {
+      const m = modeloConPesoPropio();
+      m.analisis.incluirPesoPropio = false;
+      const fem = discretizarOk(m);
+      const elu = fem.combos.find((cb) => cb.name === "ELU")!;
+      const els = fem.combos.find((cb) => cb.name === "ELS")!;
+      expect(elu.factors["hip-peso-propio"]).toBeUndefined();
+      expect(els.factors["hip-peso-propio"]).toBeUndefined();
+      // La hipotesis de usuario si esta presente.
+      expect(elu.factors.h1).toBe(1.35);
+    });
+
+    it("flag ON: la automatica entra en los combos como PERMANENTE (1.35 / 1.0)", () => {
+      const fem = discretizarOk(modeloConPesoPropio());
+      const elu = fem.combos.find((cb) => cb.name === "ELU")!;
+      const els = fem.combos.find((cb) => cb.name === "ELS")!;
+      expect(elu.factors["hip-peso-propio"]).toBe(1.35);
+      expect(els.factors["hip-peso-propio"]).toBe(1.0);
+    });
+
+    it("E2 saneado en discretizador: carga de usuario en la automatica -> ok:false", () => {
+      const m = modeloConPesoPropio();
+      m.cargas.push({
+        id: "cX", tipo: "lineal", ambito: "v1", valor: 5, hipotesisId: "hip-peso-propio",
+      });
+      const res = discretizar(m);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errores.some((e) => e.codigo === "CARGA_EN_AUTOMATICA")).toBe(true);
+      }
+    });
+
+    it("E3 sin aviso de vacia: la automatica sin cargas NO genera COMBO_SIN_CARGAS", () => {
+      // La automatica no tiene cargas en modelo.cargas (las genera el discretizador):
+      // no debe avisarse como hipotesis vacia.
+      const m = modeloConPesoPropio();
+      const res = discretizar(m);
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        const avisoAuto = res.avisos.some(
+          (e) => e.codigo === "COMBO_SIN_CARGAS" && e.elementoId === "hip-peso-propio",
+        );
+        expect(avisoAuto).toBe(false);
+      }
+    });
+
+    it("determinismo: peso propio emitido es byte a byte estable", () => {
+      const a = JSON.stringify(discretizarOk(modeloConPesoPropio()));
+      const b = JSON.stringify(discretizarOk(modeloConPesoPropio()));
+      expect(a).toBe(b);
     });
   });
 });

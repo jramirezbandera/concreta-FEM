@@ -12,11 +12,13 @@ import type {
   Planta,
   Carga,
   Hipotesis,
+  OpcionesAnalisis,
 } from "../../dominio";
 import { crearComandoParches } from "./comando";
 import type { Comando } from "./comando";
 import { nuevoId } from "../ids";
 import { TOL_NODO } from "../../discretizador/discretizar";
+import { esHipotesisAutomatica } from "../../dominio";
 
 // Datos del pilar que aporta el llamante: todo Pilar salvo id (interno, lo genera
 // el comando) y nombre (visible CYPECAD "P{n}", derivado del nº de pilares).
@@ -220,6 +222,13 @@ export function crearCarga(base: Modelo, datos: DatosCarga): Comando {
   const carga: Carga = { id, ...datos };
 
   const { comando } = crearComandoParches(base, "Crear carga", (borrador) => {
+    // E2(b): una carga de usuario NUNCA puede vivir en una hipotesis AUTOMATICA (seria
+    // doble cómputo: el discretizador ya genera ese peso). No-op seguro, mismo patron
+    // que editar/eliminar inexistente. La UI no la ofrece, pero el comando lo blinda;
+    // el discretizador y el import (.json) tienen su propia red. Se identifica la
+    // automatica por su FLAG (predicado sobre la hipotesis destino), no por el id.
+    const destino = borrador.hipotesis.find((h) => h.id === carga.hipotesisId);
+    if (destino !== undefined && esHipotesisAutomatica(destino)) return;
     borrador.cargas.push(carga);
   });
   return comando;
@@ -235,7 +244,24 @@ export function editarCarga(
 ): Comando {
   const { comando } = crearComandoParches(base, "Editar carga", (borrador) => {
     const carga = borrador.cargas.find((c) => c.id === cargaId);
-    if (carga) Object.assign(carga, cambios);
+    if (!carga) return;
+    // E2(b): no permitir reasignar una carga a una hipotesis AUTOMATICA (peso propio).
+    // Si `cambios` intenta apuntar ahi, se descarta SOLO ese campo (`hipotesisId`) y
+    // se aplica el resto del lote (valor/tipo): un edit batcheado no pierde su valor
+    // por venir con una reasignacion invalida. La automatica se identifica por su FLAG
+    // (predicado sobre la hipotesis destino), no por el id. Si tras quitarlo no queda
+    // ningun cambio, no-op seguro.
+    let efectivos = cambios;
+    if (cambios.hipotesisId !== undefined) {
+      const destino = borrador.hipotesis.find((h) => h.id === cambios.hipotesisId);
+      if (destino !== undefined && esHipotesisAutomatica(destino)) {
+        const resto = { ...cambios };
+        delete resto.hipotesisId;
+        efectivos = resto;
+      }
+    }
+    if (Object.keys(efectivos).length === 0) return;
+    Object.assign(carga, efectivos);
   });
   return comando;
 }
@@ -247,10 +273,12 @@ export function eliminarCarga(base: Modelo, cargaId: string): Comando {
   return comando;
 }
 
-// Datos de la hipotesis que aporta el llamante: todo Hipotesis salvo id (interno).
-// El nombre puede venir vacio: en ese caso se deriva "Hipotesis {n}" del mayor
-// sufijo en uso (mismo criterio que grupos/pilares); si viene con nombre, se respeta.
-export type DatosHipotesis = Omit<Hipotesis, "id">;
+// Datos de la hipotesis que aporta el llamante: todo Hipotesis salvo id (interno) y
+// `automatica` (una hipotesis creada por el usuario NUNCA es automatica: solo el
+// sistema siembra la automatica `hip-peso-propio`). El nombre puede venir vacio: en
+// ese caso se deriva "Hipotesis {n}" del mayor sufijo en uso (mismo criterio que
+// grupos/pilares); si viene con nombre, se respeta.
+export type DatosHipotesis = Omit<Hipotesis, "id" | "automatica">;
 
 export function crearHipotesis(base: Modelo, datos: DatosHipotesis): Comando {
   const id = nuevoId();
@@ -259,7 +287,8 @@ export function crearHipotesis(base: Modelo, datos: DatosHipotesis): Comando {
   const nombre = datos.nombre.trim()
     ? datos.nombre
     : siguienteNombre("Hipotesis ", base.hipotesis);
-  const hipotesis: Hipotesis = { ...datos, id, nombre };
+  // automatica:false SIEMPRE: el usuario no puede crear una hipotesis automatica.
+  const hipotesis: Hipotesis = { ...datos, id, nombre, automatica: false };
 
   const { comando } = crearComandoParches(
     base,
@@ -273,17 +302,25 @@ export function crearHipotesis(base: Modelo, datos: DatosHipotesis): Comando {
 
 // Edita propiedades de una hipotesis (merge superficial de `cambios`). No toca id.
 // Hipotesis inexistente => no-op. El delta solo recoge los campos que cambian.
+//
+// INVARIANTE DE DOMINIO (F2a): la hipotesis AUTOMATICA (`automatica:true`, peso
+// propio) no se edita: sus datos los define el sistema. Si el id apunta a una
+// automatica, no-op seguro (mismo patron que editar inexistente). Ademas `automatica`
+// nunca se cambia desde aqui (no esta en los `cambios` aceptados por la UI; si
+// llegara por otra via, se respeta el del modelo).
 export function editarHipotesis(
   base: Modelo,
   hipotesisId: string,
-  cambios: Partial<Omit<Hipotesis, "id">>,
+  cambios: Partial<Omit<Hipotesis, "id" | "automatica">>,
 ): Comando {
   const { comando } = crearComandoParches(
     base,
     "Editar hipotesis",
     (borrador) => {
       const hipotesis = borrador.hipotesis.find((h) => h.id === hipotesisId);
-      if (hipotesis) Object.assign(hipotesis, cambios);
+      if (!hipotesis) return;
+      if (esHipotesisAutomatica(hipotesis)) return; // invariante: la automatica no se edita
+      Object.assign(hipotesis, cambios);
     },
   );
   return comando;
@@ -292,19 +329,48 @@ export function editarHipotesis(
 // Elimina una hipotesis y, en la MISMA receta (un solo paso de undo), purga las
 // cargas que la referencian (hipotesisId). Espejo de como eliminarPilar/eliminarViga
 // purgan cargas por ambito: sin esto quedarian cargas huerfanas que reventarian
-// aguas abajo en el discretizador. Las combinaciones que referencien la hipotesis
-// llegan en una tarea posterior de F13.
+// aguas abajo en el discretizador.
+//
+// INVARIANTE DE DOMINIO (F2a, regresion critica): la hipotesis AUTOMATICA de peso
+// propio NO se elimina (la genera el sistema; borrarla con el flag activo dejaria el
+// modelo desincronizado, que E1 bloquearia). Si el id apunta a una automatica, no-op
+// seguro: no se toca el modelo.
 export function eliminarHipotesis(base: Modelo, hipotesisId: string): Comando {
   const { comando } = crearComandoParches(
     base,
     "Eliminar hipotesis",
     (borrador) => {
+      const hipotesis = borrador.hipotesis.find((h) => h.id === hipotesisId);
+      if (!hipotesis || esHipotesisAutomatica(hipotesis)) return; // invariante: no borrar la automatica
       borrador.hipotesis = borrador.hipotesis.filter(
         (h) => h.id !== hipotesisId,
       );
       borrador.cargas = borrador.cargas.filter(
         (c) => c.hipotesisId !== hipotesisId,
       );
+    },
+  );
+  return comando;
+}
+
+// --- Opciones de analisis (feature-F2.4, dialogo "Opciones de análisis") -----
+
+// Edita las opciones de analisis de la obra (merge superficial de `cambios`: tipo
+// de analisis, comprobarEstatica, incluirPesoPropio). Es estado de OBRA (Capa 1,
+// `modelo.analisis`), asi que su edicion es un comando reversible (undo/redo) y,
+// como cualquier edicion del modelo, invalida los resultados vigentes (lo hace
+// modeloStore.ejecutar via resultadosStore.limpiar). El delta solo recoge los
+// campos que cambian; un cambio identico produce parches vacios (no ensucia el undo
+// si el llamante ya filtra no-ops, como hace el dialogo).
+export function editarAnalisis(
+  base: Modelo,
+  cambios: Partial<OpcionesAnalisis>,
+): Comando {
+  const { comando } = crearComandoParches(
+    base,
+    "Editar opciones de análisis",
+    (borrador) => {
+      Object.assign(borrador.analisis, cambios);
     },
   );
   return comando;

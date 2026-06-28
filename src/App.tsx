@@ -10,7 +10,7 @@
 // una obra anterior tras restaurar autosave o cambiar de proyecto).
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Shell, useArranquePersistencia } from "./ui/shell";
-import { Viewport, Slot } from "./ui/viewport";
+import { Viewport, Slot, CentroMasaOverlay } from "./ui/viewport";
 import { suscribirCoords, leerCoords } from "./ui/viewport";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
@@ -310,6 +310,7 @@ export default function App() {
               sceneOverlays: (
                 <>
                   <OverlayPlantillas />
+                  <CentroMasaOverlay />
                   <ColocacionPilar />
                 </>
               ),
@@ -332,6 +333,7 @@ export default function App() {
                 sceneOverlays: (
                   <>
                     <OverlayPlantillas />
+                    <CentroMasaOverlay />
                     <ColocacionViga />
                   </>
                 ),
@@ -351,7 +353,12 @@ export default function App() {
               }
             : enResultados
               ? {
-                  sceneOverlays: <DeformadaOverlay />,
+                  sceneOverlays: (
+                    <>
+                      <DeformadaOverlay />
+                      <CentroMasaOverlay />
+                    </>
+                  ),
                   hudOverlays: (
                     <>
                       <Slot zona="top-center">

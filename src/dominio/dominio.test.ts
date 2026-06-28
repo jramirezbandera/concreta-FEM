@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { ModeloSchema, type Modelo } from "./modelo";
+import { ModeloSchema, OpcionesAnalisisSchema, type Modelo } from "./modelo";
 import { NudoSchema } from "./nudo";
 import { SeccionSchema } from "./seccion";
+import { HipotesisSchema } from "./carga";
 import { crearModeloVacio } from "./helpers";
 import { SCHEMA_VERSION } from "./comunes";
 
@@ -70,8 +71,8 @@ function modeloPorticoMinimo(): Modelo {
         hipotesisId: "h1",
       },
     ],
-    hipotesis: [{ id: "h1", nombre: "Peso propio", tipo: "permanente" }],
-    analisis: { tipo: "lineal", comprobarEstatica: true },
+    hipotesis: [{ id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false }],
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: true },
   };
 }
 
@@ -238,5 +239,46 @@ describe("SeccionSchema (union discriminada por tipo)", () => {
         id: "s2", nombre: "x", tipo: "hormigonRectangular", b: 0, h: 0.5,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("OpcionesAnalisisSchema (shape F2a)", () => {
+  it("acepta los 3 tipos de analisis (lineal / general / pDelta)", () => {
+    for (const tipo of ["lineal", "general", "pDelta"] as const) {
+      const res = OpcionesAnalisisSchema.safeParse({
+        tipo, comprobarEstatica: true, incluirPesoPropio: true,
+      });
+      expect(res.success, `tipo ${tipo}`).toBe(true);
+    }
+  });
+
+  it("rechaza un tipo desconocido", () => {
+    expect(
+      OpcionesAnalisisSchema.safeParse({
+        tipo: "modal", comprobarEstatica: true, incluirPesoPropio: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("incluirPesoPropio es obligatorio (forma del contrato)", () => {
+    const res = OpcionesAnalisisSchema.safeParse({ tipo: "lineal", comprobarEstatica: true });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.error.issues.some((i) => i.path.join(".") === "incluirPesoPropio")).toBe(true);
+    }
+  });
+});
+
+describe("HipotesisSchema (shape F2a: automatica)", () => {
+  it("aplica automatica:false por defecto cuando no se aporta", () => {
+    const res = HipotesisSchema.parse({ id: "h1", nombre: "Uso", tipo: "variable" });
+    expect(res.automatica).toBe(false);
+  });
+
+  it("respeta automatica:true cuando se aporta (la automatica)", () => {
+    const res = HipotesisSchema.parse({
+      id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true,
+    });
+    expect(res.automatica).toBe(true);
   });
 });

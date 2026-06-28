@@ -5,6 +5,7 @@
 // devuelve un resultado discriminado en lenguaje legible para el usuario.
 import { SCHEMA_VERSION } from "../dominio/comunes";
 import { ModeloSchema, type Modelo } from "../dominio/modelo";
+import { ID_HIP_PESO_PROPIO } from "../dominio/helpers";
 import type { ZodIssue } from "zod";
 
 // Resultado espejo de `ResultadoDiscretizacion` (feature-4): mismo patron
@@ -19,18 +20,196 @@ export type ResultadoImport =
 // Una migracion lleva un proyecto de la version `v` a `v+1`. Recibe y devuelve
 // datos crudos (`unknown`): aun no estan validados, solo reestructurados. La
 // validacion final con Zod ocurre una sola vez, tras toda la cadena.
-export type Migracion = (datos: unknown) => unknown;
+//
+// Para poder superficiar avisos en lenguaje de obra (p. ej. una colision de
+// nombre al sembrar una hipotesis automatica), una migracion puede devolver, en
+// vez del raw a secas, un ENVOLTORIO `{ datos, avisos }`. La cadena recoge esos
+// avisos y los anade al canal `avisos` de `migrarYValidar`. Devolver el raw
+// directamente sigue siendo valido (sin avisos): retrocompatible con migraciones
+// que no necesitan avisar (y con el registro sintetico de los tests).
+export type ResultadoMigracion = { datos: unknown; avisos?: string[] };
+export type Migracion = (datos: unknown) => unknown | ResultadoMigracion;
+
+// Normaliza la salida de una migracion al envoltorio comun. Distingue el
+// envoltorio `{ datos, avisos }` de un Modelo crudo: un Modelo nunca tiene un
+// campo `datos`, asi que la presencia de `datos` (con `avisos` array u omitido)
+// es la firma inequivoca del envoltorio.
+function normalizarSalida(salida: unknown): ResultadoMigracion {
+  if (
+    typeof salida === "object" &&
+    salida !== null &&
+    "datos" in salida &&
+    (!("avisos" in salida) ||
+      Array.isArray((salida as Record<string, unknown>).avisos))
+  ) {
+    const env = salida as { datos: unknown; avisos?: unknown };
+    return {
+      datos: env.datos,
+      avisos: Array.isArray(env.avisos) ? (env.avisos as string[]) : undefined,
+    };
+  }
+  return { datos: salida };
+}
+
+// Tipos de forma para leer un raw v1 sin validarlo todavia (aun no paso Zod).
+// Solo describen los campos que la migracion toca; el resto viaja intacto.
+type HipotesisCruda = {
+  id?: unknown;
+  nombre?: unknown;
+  tipo?: unknown;
+  automatica?: unknown;
+};
+
+// Nombre canonico de la hipotesis automatica de peso propio (estilo CYPECAD).
+// El modelo vacio (helpers.ts) la siembra con este mismo nombre.
+const NOMBRE_PESO_PROPIO = "Peso propio";
+// Nombre seguro de respaldo cuando "Peso propio" ya lo ocupa una hipotesis de
+// usuario: no se machaca el dato del usuario, se siembra la automatica aparte.
+const NOMBRE_PESO_PROPIO_AUTO = "Peso propio (automatico)";
+
+// Elige un nombre libre para la hipotesis automatica sin colisionar con los
+// nombres ya tomados por hipotesis de usuario. Prueba "Peso propio", luego
+// "Peso propio (automatico)" y, si tambien estan ocupados, sufija con un contador
+// hasta encontrar uno libre. Devuelve tambien si hubo colision (para avisar).
+function elegirNombrePesoPropio(nombresTomados: Set<string>): {
+  nombre: string;
+  colision: boolean;
+} {
+  if (!nombresTomados.has(NOMBRE_PESO_PROPIO)) {
+    return { nombre: NOMBRE_PESO_PROPIO, colision: false };
+  }
+  if (!nombresTomados.has(NOMBRE_PESO_PROPIO_AUTO)) {
+    return { nombre: NOMBRE_PESO_PROPIO_AUTO, colision: true };
+  }
+  let n = 2;
+  // Sufija hasta libre: "Peso propio (automatico) (2)", "(3)", ...
+  let candidato = `${NOMBRE_PESO_PROPIO_AUTO} (${n})`;
+  while (nombresTomados.has(candidato)) {
+    n += 1;
+    candidato = `${NOMBRE_PESO_PROPIO_AUTO} (${n})`;
+  }
+  return { nombre: candidato, colision: true };
+}
+
+// Migracion de model-schema v1 -> v2 (F2a / E7). OJO terminologia: es la version
+// de la FORMA del Modelo persistido (Capa 1), DISTINTA de la version de la base
+// Dexie/IndexedDB (ya en 2 por las plantillas de F15). v2 introduce el peso propio
+// automatico:
+//   - `analisis.incluirPesoPropio = true` (default nuevo; el discretizador emite
+//     w=A·rho salvo que el usuario lo desactive).
+//   - cada hipotesis existente recibe `automatica: false` (eran todas de usuario).
+//   - se siembra la hipotesis automatica `hip-peso-propio` (idempotente por id).
+//   - `analisis.tipo` previo (lineal/general) se mantiene (no habia pDelta en v1).
+//
+// Invariante objetivo en el borde de import: tras migrar+validar existe EXACTAMENTE
+// una hipotesis automatica valida (id=hip-peso-propio, automatica:true) y el modelo
+// pasa ModeloSchema. La validacion Zod (con sus `.default`) ocurre despues, una sola
+// vez, al final de la cadena.
+function migrarV1aV2(datos: unknown): ResultadoMigracion {
+  // Si el raw no es un objeto, no reestructuramos: dejamos que la validacion Zod
+  // final lo rechace con una ruta legible (no es trabajo de la migracion validar).
+  if (typeof datos !== "object" || datos === null) {
+    return { datos: { ...(datos as object), schemaVersion: 2 } };
+  }
+  const obj = { ...(datos as Record<string, unknown>) };
+  const avisos: string[] = [];
+
+  // --- Hipotesis: defaults + sembrado idempotente de la automatica ---
+  const hipotesisOriginal: HipotesisCruda[] = Array.isArray(obj.hipotesis)
+    ? (obj.hipotesis as HipotesisCruda[])
+    : [];
+
+  // Reclamo silencioso (CV4-2): si ya existe una hipotesis con id=hip-peso-propio
+  // pero con datos NO automaticos (automatica ausente/false, o nombre/tipo
+  // distintos de la automatica canonica), NO la adoptamos como automatica: son
+  // datos de usuario que casualmente reusan el id. Le reasignamos un id nuevo y
+  // sembramos la automatica aparte, para no reclamar/mutilar datos de usuario.
+  const usurpadora = hipotesisOriginal.find(
+    (h) => h.id === ID_HIP_PESO_PROPIO && h.automatica !== true,
+  );
+
+  // Nombres ya tomados por hipotesis de usuario (para evitar colision de nombre).
+  const nombresTomados = new Set<string>();
+  for (const h of hipotesisOriginal) {
+    if (typeof h.nombre === "string") nombresTomados.add(h.nombre);
+  }
+
+  // Reescribe cada hipotesis existente: automatica:false (eran de usuario) salvo
+  // que ya viniera marcada automatica:true con el id correcto (idempotencia).
+  const hipotesisMigradas = hipotesisOriginal.map((h) => {
+    if (h === usurpadora) {
+      // Reasigna id para no chocar con la automatica que vamos a sembrar; el
+      // nombre del usuario se respeta (ya esta en nombresTomados).
+      avisos.push(
+        `La hipótesis con identificador '${ID_HIP_PESO_PROPIO}' no era la de peso propio automático; se conservó con un identificador nuevo para no perder sus datos.`,
+      );
+      nombresTomados.delete(
+        typeof h.nombre === "string" ? h.nombre : "",
+      );
+      return { ...h, id: `${ID_HIP_PESO_PROPIO}-usuario`, automatica: false };
+    }
+    // Idempotencia: una automatica ya correcta no se duplica ni se degrada.
+    if (h.id === ID_HIP_PESO_PROPIO && h.automatica === true) {
+      return { ...h, automatica: true };
+    }
+    return { ...h, automatica: false };
+  });
+
+  // Recalcula nombres tomados tras el renombrado de id (la usurpadora vuelve a
+  // contar con su nombre de usuario para que la automatica no choque con el).
+  nombresTomados.clear();
+  for (const h of hipotesisMigradas) {
+    if (typeof h.nombre === "string") nombresTomados.add(h.nombre);
+  }
+
+  // Sembrado idempotente por id: si ya hay una automatica valida, no se duplica.
+  const yaTieneAutomatica = hipotesisMigradas.some(
+    (h) => h.id === ID_HIP_PESO_PROPIO && h.automatica === true,
+  );
+  if (!yaTieneAutomatica) {
+    const { nombre, colision } = elegirNombrePesoPropio(nombresTomados);
+    if (colision) {
+      avisos.push(
+        `Ya existía una hipótesis 'Peso propio'; revise posible duplicación.`,
+      );
+    }
+    hipotesisMigradas.push({
+      id: ID_HIP_PESO_PROPIO,
+      nombre,
+      tipo: "permanente",
+      automatica: true,
+    });
+  }
+  obj.hipotesis = hipotesisMigradas;
+
+  // --- Analisis: default incluirPesoPropio + tipo previo preservado ---
+  const analisisOriginal =
+    typeof obj.analisis === "object" && obj.analisis !== null
+      ? (obj.analisis as Record<string, unknown>)
+      : {};
+  // `tipo` previo se mantiene tal cual (lineal/general). No habia pDelta en v1;
+  // si faltara o fuera invalido, la validacion Zod final lo senalara con su ruta.
+  obj.analisis = {
+    ...analisisOriginal,
+    incluirPesoPropio:
+      typeof analisisOriginal.incluirPesoPropio === "boolean"
+        ? analisisOriginal.incluirPesoPropio
+        : true,
+  };
+
+  return { datos: { ...obj, schemaVersion: 2 }, avisos };
+}
 
 // Registro indexado por version de origen: `MIGRACIONES[v]` transforma v -> v+1.
-// En v1 esta VACIO (no hay version anterior que migrar). Listo para crecer.
+// `MIGRACIONES[1]` lleva v1 -> v2 (F2a, model-schema). Listo para crecer.
 //
-// Para anadir una migracion v1 -> v2 en el futuro:
-//   1. Subir SCHEMA_VERSION a 2 en src/dominio/comunes.ts (y el esquema nuevo).
-//   2. Registrar aqui:  1: (datos) => { ...transforma forma v1 en forma v2...;
-//                                        return { ...datos, schemaVersion: 2 }; }
-//   3. La cadena de abajo aplicara 1->2 automaticamente a proyectos antiguos.
+// Para anadir una migracion v2 -> v3 en el futuro:
+//   1. Subir SCHEMA_VERSION a 3 en src/dominio/comunes.ts (y el esquema nuevo).
+//   2. Registrar aqui:  2: (datos) => { ...transforma forma v2 en forma v3...;
+//                                        return { datos: { ...obj, schemaVersion: 3 } }; }
+//   3. La cadena de abajo aplicara 2->3 automaticamente a proyectos antiguos.
 const MIGRACIONES: Record<number, Migracion> = {
-  // v1: sin migraciones (es la version inicial).
+  1: migrarV1aV2,
 };
 
 // Lee `schemaVersion` de forma defensiva: `raw` es `unknown` y puede no ser un
@@ -100,7 +279,9 @@ export function migrarYValidar(
         ],
       };
     }
-    datos = migracion(datos);
+    const salida = normalizarSalida(migracion(datos));
+    datos = salida.datos;
+    if (salida.avisos) avisos.push(...salida.avisos);
     versionActual += 1;
   }
   if (versionActual !== version) {

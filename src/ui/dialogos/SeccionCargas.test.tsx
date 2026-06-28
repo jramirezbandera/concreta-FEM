@@ -93,7 +93,10 @@ describe("SeccionCargas (via InspectorViga)", () => {
     expect(c.ambito).toBe("V-1");
     expect(c.tipo).toBe("lineal");
     expect(c.valor).toBe(12);
-    // Hipotesis por defecto = primera del modelo (hip-cargas-muertas).
+    // Hipotesis por defecto = primera ASIGNABLE del modelo (hip-cargas-muertas). La
+    // automatica de peso propio se siembra al FINAL (no es la primera), de modo que
+    // el fallback "primera hipotesis" de F1 cae en una asignable. El filtro explicito
+    // de la automatica en SelectHipotesis llega en F2.4.
     expect(c.hipotesisId).toBe("hip-cargas-muertas");
   });
 
@@ -136,6 +139,60 @@ describe("SeccionCargas (via InspectorViga)", () => {
     // NO contra el id obsoleto.
     expect(cargas()).toHaveLength(1);
     expect(cargas()[0].hipotesisId).toBe("hip-cargas-muertas");
+  });
+
+  it("E2(b): el fallback excluye la automatica aunque sea la PRIMERA del array", async () => {
+    const user = userEvent.setup();
+    // Modelo con la AUTOMATICA reordenada al frente (robustez: no depender de que se
+    // siembre la ultima). El fallback de SeccionCargas filtra por !automatica, asi que
+    // la carga NUNCA recae sobre el peso propio (doble computo).
+    const m = modeloConViga();
+    const auto = m.hipotesis.find((h) => h.automatica)!;
+    m.hipotesis = [auto, ...m.hipotesis.filter((h) => !h.automatica)];
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["V-1"]);
+    render(<InspectorViga />);
+
+    const valor = screen.getByLabelText("Valor");
+    await user.clear(valor);
+    await user.type(valor, "9");
+    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Añadir carga" }));
+
+    expect(cargas()).toHaveLength(1);
+    // No la automatica: cae en la primera ASIGNABLE (hip-cargas-muertas).
+    expect(cargas()[0].hipotesisId).not.toBe("hip-peso-propio");
+    expect(cargas()[0].hipotesisId).toBe("hip-cargas-muertas");
+  });
+
+  it("FIX#10: si solo queda la hipotesis automatica, avisa que no hay hipotesis asignables (no 'crea una hipótesis')", async () => {
+    const user = userEvent.setup();
+    // El usuario borro las dos basicas; queda SOLO la automatica de peso propio (a la
+    // que no se cuelgan cargas de usuario). La lista de hipotesis NO esta vacia, pero
+    // ninguna es asignable: el mensaje debe reflejarlo en vez de "crea una hipótesis".
+    const m = modeloConViga();
+    m.hipotesis = m.hipotesis.filter((h) => h.automatica);
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["V-1"]);
+    render(<InspectorViga />);
+
+    const valor = screen.getByLabelText("Valor");
+    await user.clear(valor);
+    await user.type(valor, "5");
+    await user.tab();
+    await user.click(screen.getByRole("button", { name: "Añadir carga" }));
+
+    // Mensaje especifico (FIX#10), no el de obra sin hipotesis.
+    expect(
+      screen.getByText(
+        "No hay hipótesis a las que asignar la carga. Crea una hipótesis de cargas.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Crea una hipótesis antes de añadir la carga."),
+    ).toBeNull();
+    // No se ha creado ninguna carga.
+    expect(cargas()).toHaveLength(0);
   });
 
   it("lista una carga existente con su valor, sufijo e hipotesis", () => {

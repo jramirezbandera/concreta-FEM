@@ -1,8 +1,10 @@
 import { PanelFlotante, Boton } from "../primitivas";
-// CONTRATO CON TAREA 1.1 (useCalcular.ts, en desarrollo en paralelo): este componente
-// se programa CONTRA la interfaz acordada del hook. Si por la carrera el fichero aun no
-// exporta exactamente `useCalcular`, el import queda correcto y se reconcilia al integrar.
 import { useCalcular } from "./useCalcular";
+import {
+  etiquetaBotonCalcular,
+  calculoHabilitado,
+  rotuloEstadoMotor,
+} from "./estadoMotorUI";
 import type { ErrorObra } from "../../discretizador";
 import "./botonCalcular.css";
 
@@ -14,38 +16,9 @@ import "./botonCalcular.css";
 // El componente NO sabe que detras hay Python/Pyodide: solo consume `useCalcular()`, que
 // refleja el `EstadoMotor` del solverClient y orquesta el calculo asincrono (CLAUDE.md §7,
 // el hilo principal nunca se bloquea). El estado del motor decide habilitacion y etiqueta;
-// los errores de discretizacion / del motor se muestran como panel no intrusivo.
-
-// Texto del boton segun el estado del motor. "Cargando motor…" y "Calculando…" son los
-// estados visibles que exige el spec (feature-14); el resto cae en "Calcular".
-function etiquetaBoton(estadoMotor: string, calculando: boolean): string {
-  if (calculando || estadoMotor === "calculando") return "Calculando…";
-  if (estadoMotor === "descargado" || estadoMotor === "cargando") return "Cargando motor…";
-  if (estadoMotor === "error") return "Reintentar";
-  return "Calcular";
-}
-
-// El boton solo admite pulsacion cuando el motor esta "listo" (o en "error", para
-// reintentar) y no hay un calculo en curso. Mientras carga el motor o calcula, deshabilitado.
-function botonHabilitado(estadoMotor: string, calculando: boolean): boolean {
-  if (calculando) return false;
-  return estadoMotor === "listo" || estadoMotor === "error";
-}
-
-// Rotulo del estado del motor en lenguaje de obra (no se expone el estado tecnico crudo
-// como "descargado"). Tag compacto en la cabecera del panel; sin jerga FEM.
-function tagEstadoMotor(estadoMotor: string): string {
-  switch (estadoMotor) {
-    case "listo":
-      return "motor listo";
-    case "calculando":
-      return "calculando";
-    case "error":
-      return "motor con error";
-    default: // "descargado" | "cargando"
-      return "preparando motor";
-  }
-}
+// los errores de discretizacion / del motor se muestran como panel no intrusivo. Los
+// helpers de presentacion del estado del motor viven en estadoMotorUI.ts (compartidos
+// con la Brandbar y el Menubar; cerro T-estado-motor-helpers).
 
 // Una fila de mensaje de obra (error bloqueante o aviso no bloqueante). Texto tal cual lo
 // produce el discretizador (espanol con tildes, sin jerga FEM); el `codigo` no se muestra.
@@ -66,8 +39,8 @@ function FilaMensaje({ obra }: { obra: ErrorObra }) {
 export function BotonCalcular() {
   const { calcular, estadoMotor, calculando, errores, avisos, ultimoError } = useCalcular();
 
-  const habilitado = botonHabilitado(estadoMotor, calculando);
-  const etiqueta = etiquetaBoton(estadoMotor, calculando);
+  const habilitado = calculoHabilitado(estadoMotor, calculando);
+  const etiqueta = etiquetaBotonCalcular(estadoMotor, calculando);
 
   // Hay algo que reportar si la discretizacion devolvio errores/avisos de obra o si el
   // motor fallo (carga/calculo). Se muestra debajo del boton, sin bloquear la UI.
@@ -82,7 +55,7 @@ export function BotonCalcular() {
       // El "estado del motor" como tag mono en la cabecera mantiene visible si el motor
       // esta cargando/listo/calculando sin ocupar mas cromo (Spec feature-14).
       titulo="Cálculo"
-      tag={tagEstadoMotor(estadoMotor)}
+      tag={rotuloEstadoMotor(estadoMotor, calculando)}
     >
       <Boton
         variante="primary"

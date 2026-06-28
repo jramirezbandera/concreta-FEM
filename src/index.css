@@ -46,6 +46,7 @@
   --color-moment: var(--moment);
   --color-deformed: var(--deformed);
   --color-node: var(--node);
+  --color-centro-masa: var(--centro-masa);
 
   /* Estados */
   --color-danger: var(--danger);

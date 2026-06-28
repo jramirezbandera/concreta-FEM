@@ -6,7 +6,11 @@ import { Sidebar } from "./Sidebar";
 import { ToolsRail } from "./ToolsRail";
 import { StatusBar, type StatusBarProps } from "./StatusBar";
 import { BottomTabs } from "./BottomTabs";
-import { DialogoGruposYPlantas, DialogoHipotesis } from "../dialogos";
+import {
+  DialogoGruposYPlantas,
+  DialogoHipotesis,
+  DialogoOpcionesAnalisis,
+} from "../dialogos";
 
 // Shell: cromo completo de la interfaz (Spec Diseno UI §2). Compone las regiones
 // fijas (brandbar, menubar, body=sidebar|work|tools, status, tabs) y deja el
@@ -58,6 +62,7 @@ export function Shell({ children, nombreObra, status }: ShellProps) {
           layout. Autocontrolados: se abren/cierran segun vistaStore.dialogoActivo. */}
       <DialogoGruposYPlantas />
       <DialogoHipotesis />
+      <DialogoOpcionesAnalisis />
     </div>
   );
 }

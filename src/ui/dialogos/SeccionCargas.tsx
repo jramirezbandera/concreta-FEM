@@ -99,30 +99,47 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
   const cargasDelElemento = cargasDeAmbito(modelo, elementoId);
 
   // En F1 el tipo es siempre lineal (ver cabecera). La hipotesis nueva arranca del
-  // ultimo elegido (defaultsCarga.hipotesisId) SOLO si ESA hipotesis sigue existiendo;
-  // si se borro (defaultsCarga retiene un id obsoleto), cae a la primera del modelo.
-  // Sin esta comprobacion, un id huerfano pasa el `??` (es non-null) y validarCarga lo
-  // rechaza por hipotesis inexistente, bloqueando anadir cargas aunque haya hipotesis
-  // validas disponibles.
+  // ultimo elegido (defaultsCarga.hipotesisId) SOLO si ESA hipotesis sigue existiendo
+  // Y NO es la automatica; si se borro (id obsoleto) o apunta a la automatica, cae a
+  // la primera hipotesis ASIGNABLE del modelo. Sin esta comprobacion, un id huerfano
+  // pasa el `??` (es non-null) y validarCarga lo rechaza, bloqueando anadir cargas
+  // aunque haya hipotesis validas disponibles.
+  //
+  // E2(b): una carga de usuario NUNCA puede vivir en la hipotesis automatica de peso
+  // propio (doble computo). El fallback se hace EXPLICITO/robusto filtrando por
+  // `!automatica` en vez de confiar en que el modelo vacio la siembre la ultima: la
+  // primera ASIGNABLE es la que recibe la carga, y un defaultsCarga que apunte a la
+  // automatica se ignora.
   const tipoNuevo: DatosCargaUI["tipo"] = "lineal";
+  const asignables = modelo.hipotesis.filter((h) => !h.automatica);
   const hipotesisGuardada = defaultsCarga.hipotesisId;
-  const hipotesisGuardadaExiste =
+  const hipotesisGuardadaAsignable =
     hipotesisGuardada !== null &&
-    modelo.hipotesis.some((h) => h.id === hipotesisGuardada);
-  const hipotesisNueva = hipotesisGuardadaExiste
+    asignables.some((h) => h.id === hipotesisGuardada);
+  const hipotesisNueva = hipotesisGuardadaAsignable
     ? hipotesisGuardada
-    : (modelo.hipotesis[0]?.id ?? null);
+    : (asignables[0]?.id ?? null);
 
   const anadir = () => {
     const m = leerModelo();
     const hipotesisId = hipotesisNueva;
     // Sin hipotesis disponible no se puede crear (no deberia ocurrir: el modelo
     // vacio siembra dos). Reflejamos el error en el campo de hipotesis.
+    //
+    // FIX#10: distinguir los dos estados. Si la obra NO tiene hipotesis -> hay que
+    // crearlas. Si SI tiene pero ninguna es ASIGNABLE (el usuario borro las basicas y
+    // solo queda la automatica de peso propio, a la que no se cuelgan cargas de
+    // usuario) -> el mensaje "Crea una hipótesis antes de añadir la carga" enganaba
+    // (las hipotesis existen). Mensaje especifico para ese caso.
     if (hipotesisId === null) {
+      const mensaje =
+        m.hipotesis.length > 0
+          ? "No hay hipótesis a las que asignar la carga. Crea una hipótesis de cargas."
+          : "Crea una hipótesis antes de añadir la carga.";
       setErrores([
         {
           campo: "hipotesisId",
-          mensaje: "Crea una hipótesis antes de añadir la carga.",
+          mensaje,
         },
       ]);
       return;

@@ -9,9 +9,17 @@ import { type Modelo, type Hipotesis, SCHEMA_VERSION } from "../dominio";
 // coeficientes gamma de la biblioteca (no numeros a mano). Cubre: factores por
 // tipo, nombres/tags de los dos combos, determinismo del orden y modelo vacio.
 
-// Modelo minimo: solo lo que `generarCombos` consulta (modelo.hipotesis). El resto
-// va vacio; generarCombos no toca geometria, cargas ni materiales.
-function modeloConHipotesis(hipotesis: Hipotesis[]): Modelo {
+// Hipotesis "ligera" sin `automatica` (la mayoria de los tests no la fijan): el
+// helper la normaliza a false. Asi los literales `{id,nombre,tipo}` siguen siendo
+// concisos y solo los tests de la automatica (E4) la marcan explicitamente.
+type HipotesisLite = Omit<Hipotesis, "automatica"> & { automatica?: boolean };
+
+// Modelo minimo: solo lo que `generarCombos` consulta (modelo.hipotesis + el flag
+// incluirPesoPropio). El resto va vacio; generarCombos no toca geometria/cargas.
+function modeloConHipotesis(
+  hipotesis: HipotesisLite[],
+  incluirPesoPropio = false,
+): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
@@ -24,8 +32,8 @@ function modeloConHipotesis(hipotesis: Hipotesis[]): Modelo {
     panos: [],
     muros: [],
     cargas: [],
-    hipotesis,
-    analisis: { tipo: "lineal", comprobarEstatica: true },
+    hipotesis: hipotesis.map((h) => ({ ...h, automatica: h.automatica ?? false })),
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio },
   };
 }
 
@@ -113,7 +121,7 @@ describe("generarCombos - modelo sin hipotesis", () => {
 
 describe("generarCombos - determinismo del orden (CLAUDE.md §2)", () => {
   it("el orden de modelo.hipotesis NO altera la salida (orden por id)", () => {
-    const hips: Hipotesis[] = [
+    const hips: HipotesisLite[] = [
       { id: "h1", nombre: "G", tipo: "permanente" },
       { id: "h2", nombre: "Q", tipo: "variable" },
       { id: "h3", nombre: "N", tipo: "variable" },
@@ -134,5 +142,33 @@ describe("generarCombos - determinismo del orden (CLAUDE.md §2)", () => {
     );
     const elu = combos.find((cb) => cb.name === "ELU")!;
     expect(Object.keys(elu.factors)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("generarCombos - hipotesis automatica de peso propio (E4)", () => {
+  const hipAuto: HipotesisLite = {
+    id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true,
+  };
+
+  it("flag ON: la automatica se factoriza como PERMANENTE (1.35 ELU / 1.0 ELS)", () => {
+    const combos = generarCombos(
+      modeloConHipotesis([hipAuto, { id: "h1", nombre: "Uso", tipo: "variable" }], true),
+    );
+    const elu = combos.find((c) => c.name === "ELU")!;
+    const els = combos.find((c) => c.name === "ELS")!;
+    expect(elu.factors["hip-peso-propio"]).toBe(1.35);
+    expect(els.factors["hip-peso-propio"]).toBe(1.0);
+  });
+
+  it("E4 flag OFF: la automatica NO aparece en los combos (sin termino fantasma)", () => {
+    const combos = generarCombos(
+      modeloConHipotesis([hipAuto, { id: "h1", nombre: "Uso", tipo: "variable" }], false),
+    );
+    const elu = combos.find((c) => c.name === "ELU")!;
+    const els = combos.find((c) => c.name === "ELS")!;
+    expect(elu.factors["hip-peso-propio"]).toBeUndefined();
+    expect(els.factors["hip-peso-propio"]).toBeUndefined();
+    // El resto de hipotesis NO se ve afectado.
+    expect(elu.factors.h1).toBe(1.5);
   });
 });

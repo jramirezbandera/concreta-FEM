@@ -66,8 +66,8 @@ const IZ_IPE300 = 6.038e-5; // m⁴
 // Ids de hipotesis REALES sembradas por crearModeloVacio() (src/dominio/helpers):
 // la permanente "cargas muertas" (factor 1,35 en ELU) y la variable "sobrecarga de
 // uso" (factor 1,50 en ELU). Usar los ids reales ata el golden al modelo de produccion.
-const HIP_PERMANENTE = { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" as const };
-const HIP_VARIABLE = { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable" as const };
+const HIP_PERMANENTE = { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" as const, automatica: false };
+const HIP_VARIABLE = { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable" as const, automatica: false };
 
 // -----------------------------------------------------------------------------
 // FIXTURE local: biapoyada con DOS cargas lineales sobre la MISMA viga, una en la

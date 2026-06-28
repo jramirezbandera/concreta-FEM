@@ -1,0 +1,65 @@
+/*
+ * Estilos del control de Centro de masas (F2.4) de Concreta · Estructuras. Panel HUD
+ * glass con toggle + datos (coords mono + peso). REGLA: solo tokens via var(--...);
+ * cero hex. Importado desde CentroMasa.tsx. El --centro-masa tinta el glifo ⊕ para
+ * atar el panel al marcador de la escena (misma semantica de color).
+ */
+
+.cx-cm {
+  /* Ancho contenido: suficiente para "−12.34 m" sin estirar el HUD. */
+  width: 184px;
+}
+
+/* Glifo ⊕ de la cabecera, en el color del CM (ata panel <-> marcador). */
+.cx-cm__glifo {
+  color: var(--centro-masa);
+  font-weight: 600;
+}
+
+/* Fila del toggle: checkbox + etiqueta clicable. */
+.cx-cm__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text);
+}
+.cx-cm__toggle input {
+  margin: 0;
+  accent-color: var(--centro-masa);
+  cursor: pointer;
+}
+
+/* Detalle (coords/peso o estado vacio): separado del toggle por un filete. */
+.cx-cm__detalle {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-cm__fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cx-cm__clave {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.cx-cm__valor {
+  font-size: 12px;
+  color: var(--text);
+}
+.cx-cm__sin-masa {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-3);
+}

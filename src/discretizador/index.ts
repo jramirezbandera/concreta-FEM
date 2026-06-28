@@ -18,3 +18,7 @@ export * from "./contratoFEM";
 // Validaciones previas en lenguaje de obra.
 export { validarModelo } from "./validaciones";
 export type { ErrorObra } from "./validaciones";
+
+// Centro de masas por planta (F2.1, calculo PURO; lo consume la UI de F2.4).
+export { calcularCentroMasaPlanta } from "./centros";
+export type { CentroMasaPlanta } from "./centros";

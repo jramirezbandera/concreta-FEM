@@ -24,6 +24,7 @@ import {
   crearHipotesis,
   editarHipotesis,
   eliminarHipotesis,
+  editarAnalisis,
 } from "../index";
 import type { DatosViga } from "./comandosModelo";
 import { crearModeloVacio } from "../../dominio";
@@ -247,7 +248,7 @@ function modeloConDependientes() {
     { id: "c2", tipo: "superficial", ambito: "p1", valor: 2, hipotesisId: "h1" }, // sobre p1: cae
     { id: "c3", tipo: "lineal", ambito: "v2", valor: 5, hipotesisId: "h1" }, // sobre v2: sobrevive
   ];
-  base.hipotesis = [{ id: "h1", nombre: "G", tipo: "permanente" }];
+  base.hipotesis = [{ id: "h1", nombre: "G", tipo: "permanente", automatica: false }];
   return base;
 }
 
@@ -312,7 +313,7 @@ function modeloConPilares() {
     { id: "c1", tipo: "puntual", ambito: "pil1", valor: 10, hipotesisId: "h1" },
     { id: "c2", tipo: "puntual", ambito: "pil2", valor: 7, hipotesisId: "h1" },
   ];
-  base.hipotesis = [{ id: "h1", nombre: "G", tipo: "permanente" }];
+  base.hipotesis = [{ id: "h1", nombre: "G", tipo: "permanente", automatica: false }];
   return base;
 }
 
@@ -611,7 +612,7 @@ describe("eliminarViga", () => {
         { id: "c1", tipo: "lineal", ambito: vigaId, valor: 5, hipotesisId: "h1" },
         { id: "c2", tipo: "lineal", ambito: "otro", valor: 3, hipotesisId: "h1" },
       ],
-      hipotesis: [{ id: "h1", nombre: "G", tipo: "permanente" }],
+      hipotesis: [{ id: "h1", nombre: "G", tipo: "permanente", automatica: false }],
     });
     const conTodo = structuredClone(m());
 
@@ -641,8 +642,8 @@ describe("eliminarViga", () => {
 function modeloConCargas() {
   const base = crearModeloVacio();
   base.hipotesis = [
-    { id: "h1", nombre: "Cargas muertas", tipo: "permanente" },
-    { id: "h2", nombre: "Sobrecarga de uso", tipo: "variable" },
+    { id: "h1", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
+    { id: "h2", nombre: "Sobrecarga de uso", tipo: "variable", automatica: false },
   ];
   base.cargas = [
     { id: "c1", tipo: "lineal", ambito: "v1", valor: -10, hipotesisId: "h1" },
@@ -814,5 +815,163 @@ describe("eliminarHipotesis (cascada a cargas)", () => {
     const antes = structuredClone(m());
     modeloStore.getState().ejecutar(eliminarHipotesis(m(), "no-existe"));
     expect(m()).toEqual(antes);
+  });
+});
+
+// --- Invariante de dominio: hipotesis AUTOMATICA de peso propio (F2a) ---------
+// El modelo vacio (crearModeloVacio) ya siembra `hip-peso-propio` (automatica:true).
+describe("invariante: la hipotesis automatica de peso propio es intocable", () => {
+  it("REGRESION CRITICA: eliminarHipotesis NO borra hip-peso-propio (no-op)", () => {
+    modeloStore.getState().cargarModelo(crearModeloVacio());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(eliminarHipotesis(m(), "hip-peso-propio"));
+    // La automatica sigue ahi; el modelo no cambia.
+    expect(m().hipotesis.some((h) => h.id === "hip-peso-propio")).toBe(true);
+    expect(m()).toEqual(antes);
+  });
+
+  it("editarHipotesis NO modifica hip-peso-propio (no-op)", () => {
+    modeloStore.getState().cargarModelo(crearModeloVacio());
+    const antes = structuredClone(m());
+    modeloStore
+      .getState()
+      .ejecutar(editarHipotesis(m(), "hip-peso-propio", { nombre: "Hackeada", tipo: "variable" }));
+    const auto = m().hipotesis.find((h) => h.id === "hip-peso-propio")!;
+    expect(auto.nombre).toBe("Peso propio"); // intacta
+    expect(auto.tipo).toBe("permanente");
+    expect(m()).toEqual(antes);
+  });
+
+  it("editarHipotesis SI edita una hipotesis de usuario normal", () => {
+    modeloStore.getState().cargarModelo(crearModeloVacio());
+    modeloStore
+      .getState()
+      .ejecutar(editarHipotesis(m(), "hip-sobrecarga-uso", { nombre: "Nieve" }));
+    expect(m().hipotesis.find((h) => h.id === "hip-sobrecarga-uso")!.nombre).toBe("Nieve");
+  });
+
+  it("crearHipotesis siempre crea hipotesis NO automaticas", () => {
+    modeloStore.getState().cargarModelo(crearModeloVacio());
+    modeloStore.getState().ejecutar(crearHipotesis(m(), { nombre: "Viento", tipo: "variable" }));
+    const nueva = m().hipotesis.find((h) => h.nombre === "Viento")!;
+    expect(nueva.automatica).toBe(false);
+  });
+
+  it("E2: crearCarga sobre hip-peso-propio es no-op (no se anade la carga)", () => {
+    modeloStore.getState().cargarModelo(crearModeloVacio());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(
+      crearCarga(m(), { tipo: "lineal", ambito: "v1", valor: 5, hipotesisId: "hip-peso-propio" }),
+    );
+    expect(m().cargas).toHaveLength(0);
+    expect(m()).toEqual(antes);
+  });
+
+  it("E2: crearCarga sobre una hipotesis normal SI anade la carga", () => {
+    modeloStore.getState().cargarModelo(crearModeloVacio());
+    modeloStore.getState().ejecutar(
+      crearCarga(m(), { tipo: "lineal", ambito: "v1", valor: 5, hipotesisId: "hip-cargas-muertas" }),
+    );
+    expect(m().cargas).toHaveLength(1);
+  });
+
+  it("E2: editarCarga NO permite reasignar una carga a hip-peso-propio (no-op)", () => {
+    const base = crearModeloVacio();
+    base.cargas = [
+      { id: "c1", tipo: "lineal", ambito: "v1", valor: 5, hipotesisId: "hip-cargas-muertas" },
+    ];
+    modeloStore.getState().cargarModelo(base);
+    const antes = structuredClone(m());
+    modeloStore
+      .getState()
+      .ejecutar(editarCarga(m(), "c1", { hipotesisId: "hip-peso-propio" }));
+    // La carga conserva su hipotesis original; el modelo no cambia.
+    expect(m().cargas[0].hipotesisId).toBe("hip-cargas-muertas");
+    expect(m()).toEqual(antes);
+  });
+
+  // FIX #3b: un edit BATCHEADO que ademas trae una reasignacion invalida no debe
+  // descartar el lote entero: se aplica todo MENOS el hipotesisId malo.
+  it("FIX #3b: editarCarga con {hipotesisId:auto, valor:12} aplica valor=12 y descarta solo la reasignacion", () => {
+    const base = crearModeloVacio();
+    base.cargas = [
+      { id: "c1", tipo: "lineal", ambito: "v1", valor: 5, hipotesisId: "hip-cargas-muertas" },
+    ];
+    modeloStore.getState().cargarModelo(base);
+    modeloStore
+      .getState()
+      .ejecutar(editarCarga(m(), "c1", { hipotesisId: "hip-peso-propio", valor: 12 }));
+    const c1 = m().cargas[0];
+    expect(c1.valor).toBe(12); // el valor SI se aplica
+    expect(c1.hipotesisId).toBe("hip-cargas-muertas"); // la reasignacion invalida se ignora
+  });
+
+  // FIX #3: la automatica se identifica por su FLAG, no por el id. Una hipotesis
+  // automatica con id NO canonico tambien bloquea la asignacion de cargas.
+  it("FIX #3: crearCarga sobre una automatica de id NO canonico tambien es no-op", () => {
+    const base = crearModeloVacio();
+    // Hipotesis automatica con un id distinto del canonico (caso desincronizado).
+    base.hipotesis = [
+      ...base.hipotesis,
+      { id: "auto-rara", nombre: "Auto", tipo: "permanente", automatica: true },
+    ];
+    modeloStore.getState().cargarModelo(base);
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(
+      crearCarga(m(), { tipo: "lineal", ambito: "v1", valor: 5, hipotesisId: "auto-rara" }),
+    );
+    expect(m().cargas).toHaveLength(0); // bloqueada por el FLAG, no por el id
+    expect(m()).toEqual(antes);
+  });
+});
+
+// --- editarAnalisis (F2.4): comando reversible de OpcionesAnalisis ------------
+describe("editarAnalisis (comando reversible)", () => {
+  beforeEach(() => {
+    modeloStore.getState().cargarModelo(crearModeloVacio());
+  });
+
+  it("edita el tipo de analisis y deshacer/rehacer lo revierte (delta)", () => {
+    // El modelo vacio arranca en "lineal".
+    expect(m().analisis.tipo).toBe("lineal");
+    modeloStore.getState().ejecutar(editarAnalisis(m(), { tipo: "pDelta" }));
+    expect(m().analisis.tipo).toBe("pDelta");
+
+    modeloStore.getState().deshacer();
+    expect(m().analisis.tipo).toBe("lineal");
+
+    modeloStore.getState().rehacer();
+    expect(m().analisis.tipo).toBe("pDelta");
+  });
+
+  it("edita varios campos a la vez en un solo comando (un paso de undo)", () => {
+    modeloStore.getState().ejecutar(
+      editarAnalisis(m(), {
+        tipo: "pDelta",
+        comprobarEstatica: false,
+        incluirPesoPropio: false,
+      }),
+    );
+    expect(m().analisis).toEqual({
+      tipo: "pDelta",
+      comprobarEstatica: false,
+      incluirPesoPropio: false,
+    });
+
+    // Un solo deshacer revierte los tres campos (un comando).
+    modeloStore.getState().deshacer();
+    expect(m().analisis).toEqual({
+      tipo: "lineal",
+      comprobarEstatica: true,
+      incluirPesoPropio: true,
+    });
+  });
+
+  it("editar el analisis invalida los resultados vigentes (patron de obra)", () => {
+    // Tras un cambio de obra, los resultados dejan de ser vigentes (modeloStore lo
+    // hace via resultadosStore.limpiar). No hay resultados aqui, pero el comando no
+    // debe lanzar y el flag debe quedar no-vigente (idempotente sin resultados).
+    modeloStore.getState().ejecutar(editarAnalisis(m(), { incluirPesoPropio: false }));
+    expect(m().analisis.incluirPesoPropio).toBe(false);
   });
 });

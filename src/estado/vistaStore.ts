@@ -26,10 +26,11 @@ export type Pestana =
 
 export type ModoVista = "planta" | "3d" | "mosaico";
 
-// Dialogos modales de la app: Plantas y grupos (feature-10) e Hipotesis
-// (feature-13). La introduccion de CARGAS no necesita dialogo propio: vive en el
-// Inspector del elemento. Los siguientes (biblioteca de secciones...) se anaden aqui.
-export type DialogoActivo = "gruposPlantas" | "hipotesis";
+// Dialogos modales de la app: Plantas y grupos (feature-10), Hipotesis
+// (feature-13) y Opciones de analisis (F2.4). La introduccion de CARGAS no necesita
+// dialogo propio: vive en el Inspector del elemento. Los siguientes (biblioteca de
+// secciones...) se anaden aqui.
+export type DialogoActivo = "gruposPlantas" | "hipotesis" | "opcionesAnalisis";
 
 // Herramienta activa de introduccion grafica (feature-11/12). "seleccion" es el
 // modo por defecto (picking/edicion); "pilar" coloca pilares con clic; "viga"
@@ -108,6 +109,13 @@ interface VistaState {
   defaultsViga: DefaultsViga;
   defaultsCarga: DefaultsCarga;
   snapActivo: boolean;
+  // Overlay de CENTRO DE MASAS (F2.4, D-diseño-1). Toggle de ayuda de modelado:
+  // dibuja el marcador ⊕ del CM de la planta activa + un panel HUD con coords/peso.
+  // Apagado por defecto (regla de subtraccion: nunca siempre-visible). Disponible en
+  // vista PLANTA tanto en pestanas de entrada como en Resultados; el CM se calcula
+  // puro (sin solver), asi que es valido aunque no haya resultados. Estado de UI: NO
+  // participa en undo (coherente con el resto de vistaStore).
+  mostrarCentroMasa: boolean;
   // Visualizacion de resultados (feature-14). Estado de UI puro: NO participa en
   // undo. La inicializacion de `combinacionActiva` a la primera combo al fijar
   // resultados la hace el hook useCalcular; aqui solo viven los controles de vista.
@@ -129,6 +137,8 @@ interface VistaState {
   setDefaultsViga(p: Partial<DefaultsViga>): void; // merge superficial
   setDefaultsCarga(p: Partial<DefaultsCarga>): void; // merge superficial
   setSnapActivo(b: boolean): void;
+  setMostrarCentroMasa(b: boolean): void;
+  toggleCentroMasa(): void;
   setDeformadaEscala(e: number): void;
   setAnimando(b: boolean): void;
   setMagnitudDiagrama(m: MagnitudDiagrama): void;
@@ -179,6 +189,7 @@ export const vistaStore = create<VistaState>()(
       hipotesisId: null,
     },
     snapActivo: true,
+    mostrarCentroMasa: false,
     deformadaEscala: 1,
     animando: false,
     magnitudDiagrama: "momento",
@@ -197,6 +208,9 @@ export const vistaStore = create<VistaState>()(
     setDefaultsCarga: (p) =>
       set((estado) => ({ defaultsCarga: { ...estado.defaultsCarga, ...p } })),
     setSnapActivo: (b) => set({ snapActivo: b }),
+    setMostrarCentroMasa: (b) => set({ mostrarCentroMasa: b }),
+    toggleCentroMasa: () =>
+      set((estado) => ({ mostrarCentroMasa: !estado.mostrarCentroMasa })),
     setDeformadaEscala: (e) => set({ deformadaEscala: e }),
     setAnimando: (b) => set({ animando: b }),
     setMagnitudDiagrama: (m) => set({ magnitudDiagrama: m }),

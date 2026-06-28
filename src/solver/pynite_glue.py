@@ -145,16 +145,43 @@ def build_model(payload):
     return m
 
 
+# -----------------------------------------------------------------------------
+# Error de dominio: estructura INESTABLE / no convergente bajo P-Delta.
+#
+# analyze_PDelta(check_stability=True) lanza, en el camino de inestabilidad o
+# no-convergencia (Pynite/Analysis.py, PyNiteFEA 2.0.2):
+#   - ValueError("The stiffness matrix is singular, which indicates that the
+#                 structure is unstable.")                       (pivote singular)
+#   - ValueError("The structure is unstable. Unable to proceed any further ...")
+#   - Exception("Unstable node(s). See console output for details.")  (GDL sin
+#                 rigidez detectado por _check_stability)
+#   - Exception("- Model diverged during tension/compression-only analysis")
+# El detalle util (que nodo/direccion) lo IMPRIME a stdout, no lo expone. Aqui no
+# parseamos stdout: detectamos el fallo por la EXCEPCION y lo elevamos a un error
+# de obra legible. Lo envolvemos en una excepcion propia para que `calcular()` lo
+# distinga del catch-all generico y emita el mensaje en lenguaje de obra correcto.
+# -----------------------------------------------------------------------------
+class MotorInestablePDelta(Exception):
+    """La estructura no se sostiene bajo P-Delta (inestable o no convergente)."""
+
+
+# Marcadores (en minuscula) de los mensajes de inestabilidad/no-convergencia de
+# PyNite. Detectamos por contenido porque PyNite usa ValueError y Exception
+# genericas (no una clase propia). Cualquiera de estos en el camino P-Delta = la
+# estructura no se sostiene de 2.º orden.
+_MARCADORES_INESTABLE = ("singular", "unstable", "diverged", "diverge")
+
+
 # =============================================================================
 # 2) ANALISIS  (seleccion segun analysis.type, guia §6)
 # =============================================================================
 def run_analysis(m, analysis):
     """Ejecuta el analisis del tipo pedido. Devuelve (tipo_ejecutado, aviso|None).
 
-    F1 soporta 'linear' y 'analyze'. 'PDelta' es F2 pero se ejecuta si llega
-    (analyze_PDelta no admite check_statics). 'modal' se DIFIERE a F2: no produce
-    esfuerzos por combo -> no encaja en ResultadosCalculo; se rechaza con error
-    controlado en lugar de devolver una salida incoherente.
+    Soporta 'linear', 'analyze' y 'PDelta' (F2a) de primera clase. 'modal' se
+    DIFIERE a F2b: no produce esfuerzos por combo -> no encaja en
+    ResultadosCalculo; se rechaza con error controlado en lugar de devolver una
+    salida incoherente.
     """
     tipo = analysis.get("type", "analyze")
     cs = analysis.get("check_statics", False)
@@ -165,11 +192,24 @@ def run_analysis(m, analysis):
     if tipo == "linear":
         m.analyze_linear(check_statics=cs, sparse=True)
     elif tipo == "PDelta":
-        # analyze_PDelta no acepta check_statics en su firma (guia §6).
-        m.analyze_PDelta(sparse=True)
+        # P-Delta (2.º orden, balanceo a nivel nudo). analyze_PDelta NO admite
+        # check_statics en su firma (guia §6): la comprobacion de equilibrio se
+        # FUERZA a false en este camino (ver calcular(): no se ejecuta
+        # _check_statics aunque el payload traiga el flag en true). check_stability
+        # queda en su default True: si la estructura es inestable de 2.º orden
+        # (pivote singular, GDL sin rigidez, no convergencia), PyNite lanza; lo
+        # traducimos a un error de obra legible en vez de un traceback crudo.
+        try:
+            m.analyze_PDelta(sparse=True)
+        except Exception as e:  # noqa: BLE001 - se reclasifica, no se traga.
+            if _es_inestabilidad_pdelta(e):
+                raise MotorInestablePDelta(str(e)) from e
+            # Otro fallo del solver bajo P-Delta (p. ej. dato incoherente): se
+            # propaga al catch-all generico de calcular() sin disfrazarlo.
+            raise
     elif tipo == "modal":
         # Modal no devuelve esfuerzos/desplazamientos por combinacion -> el
-        # contrato ResultadosCalculo no lo representa. Se difiere a F2.
+        # contrato ResultadosCalculo no lo representa. Se difiere a F2b.
         raise ValueError(
             "El analisis modal aun no esta disponible (previsto para F2)."
         )
@@ -177,6 +217,18 @@ def run_analysis(m, analysis):
         m.analyze(check_statics=cs, sparse=True)
 
     return tipo, None
+
+
+def _es_inestabilidad_pdelta(exc):
+    """True si la excepcion de analyze_PDelta indica inestabilidad/no-convergencia.
+
+    PyNite no usa una clase de excepcion propia: lanza ValueError/Exception con un
+    mensaje. Reconocemos el fallo por sus marcadores ("singular"/"unstable"/
+    "diverged"). Cualquier otra excepcion (bug, dato malo) NO se confunde con una
+    estructura inestable: se deja propagar tal cual.
+    """
+    msg = str(exc).lower()
+    return any(marca in msg for marca in _MARCADORES_INESTABLE)
 
 
 # =============================================================================
@@ -543,14 +595,35 @@ def calcular(payload, n_points=N_POINTS_DEFAULT):
         # 'Combo 1' por defecto (guia §3.5). Filtramos a los existentes.
         combos = list(m.load_combos.keys()) or ["Combo 1"]
 
-        # check_statics: solo si el analisis se pidio con la bandera y el residuo
-        # es calculable (no en modal/PDelta sin reacciones coherentes).
+        # check_statics: solo si el analisis se pidio con la bandera Y el tipo lo
+        # admite. Bajo P-Delta se FUERZA a false aunque el payload traiga el flag
+        # en true (E6): analyze_PDelta no acepta check_statics y la comprobacion de
+        # equilibrio de 1.º orden no aplica al estado deformado de 2.º orden. La UI
+        # ya deshabilita el flag para P-Delta, pero un payload importado/obsoleto
+        # podria traerlo en true; esta guardia en el glue es la red real (no basta
+        # con la UI). Modal tampoco tiene reacciones coherentes -> tambien fuera.
         check = None
-        if analysis.get("check_statics", False):
+        if tipo not in ("PDelta", "modal") and analysis.get("check_statics", False):
             check = _check_statics(m, payload, combos)
 
         resultados = serialize_results(m, combos, n_points, tipo, check)
         return {"ok": True, "resultados": resultados}
+
+    except MotorInestablePDelta as e:
+        # Inestabilidad / no-convergencia bajo P-Delta -> mensaje de obra claro,
+        # distinto de un fallo generico del solver. `detalle` conserva el mensaje
+        # crudo de PyNite (que nodo/direccion lo imprime a stdout, no lo expone).
+        return {
+            "ok": False,
+            "error": {
+                "mensaje": (
+                    "La estructura es inestable bajo P-Δ: revise rigidez o "
+                    "arriostramiento."
+                ),
+                "detalle": "P-Delta: " + (str(e) or e.__class__.__name__)
+                + "\n" + traceback.format_exc(),
+            },
+        }
 
     except Exception as e:  # noqa: BLE001 - frontera: todo error se vuelve dato.
         return {

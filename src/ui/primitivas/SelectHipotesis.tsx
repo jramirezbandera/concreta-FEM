@@ -23,6 +23,27 @@ export function SelectHipotesis({ valor, onCambio, etiqueta }: SelectHipotesisPr
   // hipotesis de la obra. No entra en el bucle de render del viewport.
   const hipotesis = modeloStore((s) => s.modelo.hipotesis);
 
+  // E2(b): la hipotesis AUTOMATICA (peso propio) NO es asignable como ambito de una
+  // carga de usuario (seria doble computo: el discretizador ya genera ese peso). Se
+  // OCULTA del selector (invariante de dominio reforzado en la UI). El comando
+  // crearCarga/editarCarga ya la rechaza como red ultima.
+  const asignables = hipotesis.filter((h) => !h.automatica);
+
+  // FIX#2: el `valor` actual puede apuntar a una hipotesis que NO esta entre las
+  // ASIGNABLES (p. ej. una carga importada/heredada que cuelga de la automatica:
+  // pasa el Zod y solo se bloquea al calcular). Si Radix recibe un value que no
+  // coincide con ningun Item renderizado, muestra el PLACEHOLDER y oculta la
+  // asignacion incorrecta. Para que el usuario VEA el valor real, anadimos un item
+  // extra —deshabilitado y marcado— con la hipotesis referida cuando no este ya en
+  // la lista asignable. Si el id no existe en ninguna hipotesis de la obra, se
+  // muestra "(hipótesis desconocida)" en vez de quedar en blanco.
+  const referidaNoAsignable =
+    valor !== null && !asignables.some((h) => h.id === valor) ? valor : null;
+  const hipotesisReferida =
+    referidaNoAsignable !== null
+      ? hipotesis.find((h) => h.id === referidaNoAsignable)
+      : undefined;
+
   return (
     <Select.Root
       // Radix usa "" como "sin valor" para mostrar el placeholder; nuestro contrato
@@ -37,7 +58,7 @@ export function SelectHipotesis({ valor, onCambio, etiqueta }: SelectHipotesisPr
       <Select.Portal>
         <Select.Content className="cx-select-content" position="popper" sideOffset={4}>
           <Select.Viewport className="cx-select-viewport">
-            {hipotesis.map((h) => (
+            {asignables.map((h) => (
               <Select.Item key={h.id} value={h.id} className="cx-select-item">
                 <Select.ItemText>{h.nombre}</Select.ItemText>
                 <Select.ItemIndicator className="cx-select-item__check">
@@ -45,6 +66,23 @@ export function SelectHipotesis({ valor, onCambio, etiqueta }: SelectHipotesisPr
                 </Select.ItemIndicator>
               </Select.Item>
             ))}
+            {/* FIX#2: item solo-lectura del valor actual cuando no es asignable, para
+                que el Select muestre la asignacion real en vez del placeholder. Se
+                renderiza `disabled`: visible pero no re-seleccionable. */}
+            {referidaNoAsignable !== null ? (
+              <Select.Item
+                key={referidaNoAsignable}
+                value={referidaNoAsignable}
+                disabled
+                className="cx-select-item"
+              >
+                <Select.ItemText>
+                  {hipotesisReferida
+                    ? `${hipotesisReferida.nombre} (no asignable)`
+                    : "(hipótesis desconocida)"}
+                </Select.ItemText>
+              </Select.Item>
+            ) : null}
           </Select.Viewport>
         </Select.Content>
       </Select.Portal>

@@ -11,6 +11,9 @@ export { DialogoGruposYPlantas } from "./DialogoGruposYPlantas";
 // Dialogo concreto de Hipotesis (feature-13).
 export { DialogoHipotesis } from "./DialogoHipotesis";
 
+// Dialogo concreto de Opciones de analisis (F2.4).
+export { DialogoOpcionesAnalisis } from "./DialogoOpcionesAnalisis";
+
 // Seccion de cargas reutilizable por los inspectores de viga/pilar (feature-13).
 export { SeccionCargas } from "./SeccionCargas";
 export type { SeccionCargasProps } from "./SeccionCargas";

@@ -518,8 +518,8 @@ function fixtureNudoCompartidoEntrePlantas(): Modelo {
     panos: [],
     muros: [],
     cargas: [{ id: "P", tipo: "puntual", ambito: "nc", valor: 30, hipotesisId: "G" }],
-    hipotesis: [{ id: "G", nombre: "Permanente", tipo: "permanente" as const }],
-    analisis: { tipo: "lineal", comprobarEstatica: true },
+    hipotesis: [{ id: "G", nombre: "Permanente", tipo: "permanente" as const, automatica: false }],
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: false },
   };
 }
 

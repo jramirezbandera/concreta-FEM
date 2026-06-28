@@ -157,7 +157,15 @@ export const ResultadosCalculoSchema = z.object({
   combos: z.array(z.string()).nonempty(), // combos calculados, en orden de emision
   nodos: z.record(z.string(), ResultadoNodoSchema), // "N1" -> resultados por combo
   barras: z.record(z.string(), ResultadoMiembroSchema), // "M1" -> resultados por combo
-  // null cuando el analisis no se lanzo con check_statics (no se ejecuto la comprobacion).
-  check_statics: CheckStaticsSchema.nullable(),
+  // null cuando el analisis no ejecuto la comprobacion: porque el payload no pidio
+  // check_statics, o porque el tipo no la admite (P-Δ/modal; el glue la FUERZA a
+  // false ahi, E6). El glue emite Python `None` en ese caso, que Pyodide
+  // materializa como `undefined` (la clave llega ausente al cruzar `toJs`), NO como
+  // `null`. Por eso aceptamos null/undefined/ausente con `.nullish()` y NORMALIZAMOS
+  // a `null` con el transform: el resto de la app (feature-14) siempre ve
+  // `CheckStatics | null`, nunca `undefined`. Sin esto, cualquier calculo con
+  // comprobarEstatica=false fallaria el safeParse en el borde (bug latente que el
+  // camino P-Δ -donde check_statics es SIEMPRE None- destapó).
+  check_statics: CheckStaticsSchema.nullish().transform((v) => v ?? null),
 });
 export type ResultadosCalculo = z.infer<typeof ResultadosCalculoSchema>;
