@@ -11,6 +11,7 @@
 // logica de dominio/calculo: solo proyeccion geometrica m -> escena.
 import { useMemo, useSyncExternalStore } from "react";
 import { modeloStore, vistaStore } from "../../../estado";
+import type { ModoVista } from "../../../estado";
 import type { Modelo, Grupo, Planta, Seccion } from "../../../dominio";
 
 // Un pilar listo para instanciar: centro del tramo (x, y, z) en metros, alto del
@@ -138,33 +139,50 @@ export function derivar(
   return { pilares, vigas };
 }
 
-// Suscripcion transient que bumpea un "tick" cuando cambia cualquiera de las tres
-// entradas relevantes. useSyncExternalStore re-renderiza el componente SOLO ante
-// ese cambio (no por frame), y entonces el useMemo recomputa la geometria.
+// Suscripcion transient que bumpea un "tick" cuando cambia cualquiera de las entradas
+// relevantes. useSyncExternalStore re-renderiza el componente SOLO ante un cambio del
+// snapshot (no por frame), y entonces el useMemo recomputa la geometria. Se suscribe
+// tambien a `modoVista`: conmutar planta<->3D cambia los ids EFECTIVOS (ver abajo).
 function suscribirEntradas(cb: () => void): () => void {
   const offModelo = modeloStore.subscribe((s) => s.modelo, cb);
   const offGrupo = vistaStore.subscribe((s) => s.grupoActivoId, cb);
   const offPlanta = vistaStore.subscribe((s) => s.plantaActivaId, cb);
+  const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
   return () => {
     offModelo();
     offGrupo();
     offPlanta();
+    offModo();
   };
 }
 
-// Snapshot estable: una tupla de las tres referencias/ids. useSyncExternalStore
-// usa identidad para decidir si notificar; modelo es inmutable (Immer) asi que su
-// referencia cambia solo al editar la obra.
+// Snapshot estable: una tupla [modelo, grupoEfectivo, plantaEfectivo]. Los ids son los
+// EFECTIVOS (F2c): en cualquier vista que NO sea "planta" (3D y mosaico, que comparten
+// la escena 3D del Viewport) se colapsan a null para mostrar TODO el edificio reusando
+// la rama "sin filtro" de `derivar`. Esto ademas BLINDA el anti-bucle: al pickear en 3D
+// se sincroniza grupo/planta activos (F1.3), pero como aqui ya valen null, el snapshot
+// no cambia de referencia -> ni re-render ni recompute de geometria. modoVista NO entra
+// en la tupla: el colapso ya lo codifica (conmutar de modo SI cambia los ids efectivos).
+// Ids EFECTIVOS para la geometria segun el modo de vista (PURA, exportada para test):
+// en "planta" se respetan grupo/planta activos; en cualquier otra vista (3D/mosaico)
+// se colapsan a null para mostrar todo el edificio.
+export function idsEfectivos(
+  modoVista: ModoVista,
+  grupoActivoId: string | null,
+  plantaActivaId: string | null,
+): readonly [string | null, string | null] {
+  if (modoVista !== "planta") return [null, null];
+  return [grupoActivoId, plantaActivaId];
+}
+
 function leerSnapshot(): readonly [Modelo, string | null, string | null] {
-  return [
-    modeloStore.getState().modelo,
-    vistaStore.getState().grupoActivoId,
-    vistaStore.getState().plantaActivaId,
-  ] as const;
+  const { grupoActivoId, plantaActivaId, modoVista } = vistaStore.getState();
+  const [g, p] = idsEfectivos(modoVista, grupoActivoId, plantaActivaId);
+  return [modeloStore.getState().modelo, g, p] as const;
 }
 
 // Cache de la tupla para que getSnapshot devuelva una referencia estable mientras
-// las tres entradas no cambien (requisito de useSyncExternalStore).
+// las entradas efectivas no cambien (requisito de useSyncExternalStore).
 let snapCache = leerSnapshot();
 function getSnapshotEstable(): readonly [Modelo, string | null, string | null] {
   const actual = leerSnapshot();
@@ -180,14 +198,14 @@ function getSnapshotEstable(): readonly [Modelo, string | null, string | null] {
 }
 
 export function useGeometriaModelo(): GeometriaModelo {
-  const [modelo, grupoActivoId, plantaActivaId] = useSyncExternalStore(
+  const [modelo, grupoEfectivo, plantaEfectivo] = useSyncExternalStore(
     suscribirEntradas,
     getSnapshotEstable,
     getSnapshotEstable,
   );
   return useMemo(
-    () => derivar(modelo, grupoActivoId, plantaActivaId),
-    [modelo, grupoActivoId, plantaActivaId],
+    () => derivar(modelo, grupoEfectivo, plantaEfectivo),
+    [modelo, grupoEfectivo, plantaEfectivo],
   );
 }
 

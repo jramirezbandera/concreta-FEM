@@ -1,0 +1,70 @@
+/*
+ * Estilos del control "Ver modelo de cálculo" (F2c). Panel HUD glass con toggle +
+ * conteos (nudos/barras/apoyos) o el motivo si la obra no se puede calcular. REGLA:
+ * solo tokens via var(--...); cero hex. Importado desde ModeloCalculo.tsx.
+ */
+
+.cx-mc {
+  width: 200px;
+}
+
+/* Glifo de la cabecera, en el color de las barras del modelo de cálculo. */
+.cx-mc__glifo {
+  color: var(--barra-calc);
+  font-weight: 600;
+}
+
+.cx-mc__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text);
+}
+.cx-mc__toggle input {
+  margin: 0;
+  accent-color: var(--barra-calc);
+  cursor: pointer;
+}
+
+.cx-mc__detalle {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-mc__fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cx-mc__clave {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.cx-mc__valor {
+  font-size: 12px;
+  color: var(--text);
+}
+/* Nota "vista simplificada": el overlay no representa los 6 GDL fielmente (Issue 7-B). */
+.cx-mc__nota {
+  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-3);
+}
+/* Estado no-calculable: motivo en lenguaje de obra (el toggle no parece roto). */
+.cx-mc__aviso {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-3);
+}

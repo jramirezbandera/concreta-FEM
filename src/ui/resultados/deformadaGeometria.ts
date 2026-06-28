@@ -1,19 +1,9 @@
 // deformadaGeometria: proyeccion PURA de la deformada (una POLILINEA flectada por
 // member) al espacio de ESCENA del viewport. SIN React/R3F/three: testeable en Node.
 //
-// CONVENCION DE EJES (critica para que la deformada se superponga a la obra):
-//  - El discretizador escribe los nodos FEM con mapearEjes(xPlanta,yPlanta,cota) =
-//    [X, Y, Z] = [xPlanta, cota, yPlanta]  (FEM es Y-up: la vertical es Y).
-//  - PERO el viewport (GeometriaModelo) dibuja Z-up: la planta (x,y) va a la escena
-//    (x,y) y la cota va a la escena z (ver memoria feature-9: "ejes XY=suelo, Z=cota";
-//    los pilares se colocan en pos.set(p.cx, p.cy, p.cz) con cz = cota).
-//  - Por tanto, para llevar un nodo FEM a la escena hay que DESHACER mapearEjes:
-//        escena = [FEM.x, FEM.z, FEM.y]   (intercambia Y<->Z)
-//    y el desplazamiento [DX,DY,DZ] (mismo sistema FEM) sigue el mismo intercambio:
-//        dispEscena = [DX, DZ, DY]
-//  Esta es la transformacion que aplicamos aqui; NO usamos mapearEjes a ciegas (ese
-//  helper va de planta->FEM, no de FEM->escena). Blindado con comentario por ser el
-//  error tipico (deformada girada 90 grados o "tumbada").
+// CONVENCION DE EJES (critica para que la deformada se superponga a la obra): FEM es
+// Y-up y la escena Z-up; la transformacion FEM->escena (intercambio Y<->Z, en posicion
+// y en desplazamiento) vive centralizada en ../viewport/ejesEscena (helper compartido).
 //
 // FLECHA DEL VANO (feature-14 Fase 2): el motor devuelve, por barra y combo, el
 // desplazamiento GLOBAL en N estaciones uniformes (`deformada_global`, ejes FEM,
@@ -28,6 +18,7 @@
 // (modulo del desplazamiento por estacion, en m).
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosCalculo } from "../../solver";
+import { puntoFemDesplazadoAEscena } from "../viewport/ejesEscena";
 
 // Un punto en coordenadas de ESCENA (Z-up), listo para three.js.
 export type PuntoEscena = [number, number, number];
@@ -62,11 +53,7 @@ function puntoDesplazado(
   // Magnitud fisica del desplazamiento (m), independiente del factor de dibujo.
   const mag = Math.hypot(dx, dy, dz);
   // FEM (Y-up) -> escena (Z-up): intercambio Y<->Z, tanto en posicion como en disp.
-  const p: PuntoEscena = [
-    baseX + dx * escala,
-    baseZ + dz * escala,
-    baseY + dy * escala,
-  ];
+  const p = puntoFemDesplazadoAEscena(baseX, baseY, baseZ, dx, dy, dz, escala);
   return { p, mag };
 }
 

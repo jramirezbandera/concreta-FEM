@@ -25,12 +25,14 @@ import {
   BufferGeometry,
   Float32BufferAttribute,
 } from "three";
-import { seleccionStore, vistaStore } from "../../estado";
+import { modeloStore, seleccionStore, vistaStore } from "../../estado";
+import type { Pestana } from "../../estado";
 import { colorToken, hexToken } from "./colores";
 import {
   useGeometriaModelo,
   type GeometriaModelo as GeoModelo,
 } from "./hooks/useGeometriaModelo";
+import { resolverContextoElemento } from "./hooks/resolverContextoElemento";
 import { useResaltadoSeleccion, aplicarTinte } from "./hooks/usePickingRef";
 
 // --- Picking helpers ---------------------------------------------------------
@@ -41,6 +43,28 @@ function clicSeleccion(id: string, shift: boolean): void {
   if (shift) sel.alternar(id);
   else sel.seleccionar([id]);
   invalidate();
+}
+
+// SINCRONIZAR CONTEXTO al pickear en 3D pleno (F2c). En cualquier vista que NO sea
+// "planta", la geometria muestra todo el edificio; pickear un elemento de otra planta
+// debe mover el contexto activo (grupo/planta) al suyo para que sidebar, inspector,
+// GroupRibbon y plantillas queden coherentes (T-3dpleno-ux). Ademas se cambia a la
+// PESTANA del tipo (pilar->entradaPilares, viga->entradaVigas) para que el inspector
+// correcto este montado (Issue 5-C) -- pero SOLO si ya estamos en una pestana de
+// entrada (en Resultados/Isovalores la seleccion alimenta diagramas; no saltamos).
+// En "planta" el contexto lo gobierna el sidebar; no se toca. En shift-multiseleccion
+// no se mueve nada (Issue 6-A): no tiene sentido saltar de planta/pestana acumulando.
+function sincronizarContexto3D(id: string, shift: boolean, pestanaTipo: Pestana): void {
+  if (shift) return;
+  const v = vistaStore.getState();
+  if (v.modoVista === "planta") return;
+  const ctx = resolverContextoElemento(modeloStore.getState().modelo, id);
+  if (!ctx) return;
+  v.setGrupoActivo(ctx.grupoActivoId);
+  v.setPlantaActiva(ctx.plantaActivaId);
+  if (v.pestanaActiva === "entradaPilares" || v.pestanaActiva === "entradaVigas") {
+    v.setPestanaActiva(pestanaTipo);
+  }
 }
 
 // Clic sobre un pilar: respeta la herramienta activa (feature-11/12). Se lee con
@@ -58,6 +82,7 @@ function clicSeleccion(id: string, shift: boolean): void {
 export function clicSeleccionPilar(id: string, shift: boolean): void {
   if (vistaStore.getState().herramienta !== "seleccion") return;
   clicSeleccion(id, shift);
+  sincronizarContexto3D(id, shift, "entradaPilares");
 }
 
 // Clic sobre una viga: espejo de `clicSeleccionPilar`. Solo selecciona en modo
@@ -66,6 +91,7 @@ export function clicSeleccionPilar(id: string, shift: boolean): void {
 export function clicSeleccionViga(id: string, shift: boolean): void {
   if (vistaStore.getState().herramienta !== "seleccion") return;
   clicSeleccion(id, shift);
+  sincronizarContexto3D(id, shift, "entradaVigas");
 }
 
 function entrarHover(id: string): void {
@@ -226,17 +252,33 @@ function HaloPilarSeleccionado({ pilares }: { pilares: GeoModelo["pilares"] }) {
   );
 }
 
-// --- Vigas (lineas visibles + meshes finos de picking) -----------------------
+// --- Vigas (linea visible con color por-barra + InstancedMesh de picking) -----
+//
+// RENDIMIENTO (T-vigas-1, resuelto en F2c): antes cada viga era un <mesh> cilindro +
+// DOS suscripciones a seleccionStore. En 3D pleno (todas las plantas a la vez) eso es
+// O(N) mallas + 2N suscripciones, y cada hover dispara las 2N. Ahora:
+//  - La linea visible es UN lineSegments con atributo de COLOR por vertice; hover y
+//    seleccion recolorean la barra MUTANDO ese buffer (sin setState), con UNA sola
+//    pareja de suscripciones para TODAS las vigas (como los pilares mutan instanceColor).
+//  - El picking es UN InstancedMesh de cilindros finos transparentes (raycast robusto:
+//    las lineas no raycastean con tolerancia), con un mapa instanceId->id de dominio.
+// Coste O(1) en mallas/suscripciones, igual que los pilares.
 
-function VigasLineas({ vigas }: { vigas: GeoModelo["vigas"] }) {
+const VIGA_PICK_RADIO = 0.08; // radio del cilindro de picking (m)
+
+function Vigas({ vigas }: { vigas: GeoModelo["vigas"] }) {
   const colBase = useMemo(() => colorToken("viga"), []);
   const colSel = useMemo(() => colorToken("accent"), []);
   const colHover = useMemo(() => colorToken("accentLine"), []);
 
-  // Geometria de lineas: dos vertices por viga.
+  // Mapa indice -> id de dominio (estable por reconstruccion): picking y recoloreado.
+  const idPorIndice = useMemo(() => vigas.map((v) => v.id), [vigas]);
+
+  // Geometria de lineas: 2 vertices por viga (position) + color por vertice (init base).
   const geom = useMemo(() => {
     const g = new BufferGeometry();
     const pos = new Float32Array(vigas.length * 2 * 3);
+    const col = new Float32Array(vigas.length * 2 * 3);
     vigas.forEach((v, i) => {
       const o = i * 6;
       pos[o] = v.ax;
@@ -245,110 +287,125 @@ function VigasLineas({ vigas }: { vigas: GeoModelo["vigas"] }) {
       pos[o + 3] = v.bx;
       pos[o + 4] = v.by;
       pos[o + 5] = v.z;
+      for (let k = 0; k < 6; k += 3) {
+        col[o + k] = colBase.r;
+        col[o + k + 1] = colBase.g;
+        col[o + k + 2] = colBase.b;
+      }
     });
     g.setAttribute("position", new Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new Float32BufferAttribute(col, 3));
     return g;
-  }, [vigas]);
+  }, [vigas, colBase]);
 
   useEffect(() => {
     invalidate();
     return () => geom.dispose();
   }, [geom]);
 
-  // Nota de diseno: la linea base se deja en color de viga; el feedback fuerte de
-  // hover/seleccion lo da el halo (cilindro transparente) sobre cada viga. El color
-  // por-viga sobre la linea llegara con instancing de tubos en F11/14.
+  // Recoloreado hover/seleccion mutando el atributo de color (sin setState/frame). UNA
+  // sola pareja de suscripciones para todas las vigas. Repinta todas segun el estado.
+  useEffect(() => {
+    const colorAttr = geom.getAttribute("color") as Float32BufferAttribute;
+    const aplicar = () => {
+      const { seleccion, hoverId } = seleccionStore.getState();
+      idPorIndice.forEach((id, i) => {
+        const c = seleccion.includes(id)
+          ? colSel
+          : id === hoverId && hoverId !== null
+            ? colHover
+            : colBase;
+        colorAttr.setXYZ(2 * i, c.r, c.g, c.b);
+        colorAttr.setXYZ(2 * i + 1, c.r, c.g, c.b);
+      });
+      colorAttr.needsUpdate = true;
+      invalidate();
+    };
+    aplicar();
+    const offH = seleccionStore.subscribe((s) => s.hoverId, aplicar);
+    const offS = seleccionStore.subscribe((s) => s.seleccion, aplicar);
+    return () => {
+      offH();
+      offS();
+    };
+  }, [geom, idPorIndice, colBase, colHover, colSel]);
 
   if (vigas.length === 0) return null;
   return (
     <group>
       <lineSegments geometry={geom}>
-        <lineBasicMaterial color={colBase} toneMapped={false} />
+        <lineBasicMaterial vertexColors toneMapped={false} />
       </lineSegments>
-      {/* Meshes finos invisibles para el picking robusto de cada viga (las lineas
-          no raycastean con tolerancia). Envueltos en Bvh. */}
-      <Bvh firstHitOnly>
-        {vigas.map((v) => (
-          <VigaPickable key={v.id} viga={v} hover={colHover} sel={colSel} />
-        ))}
-      </Bvh>
+      <VigasPicking vigas={vigas} idPorIndice={idPorIndice} />
     </group>
   );
 }
 
-function VigaPickable({
-  viga,
-  hover,
-  sel,
+// InstancedMesh UNICO de cilindros finos transparentes: blanco de picking de TODAS las
+// vigas (sin suscripciones; el resaltado lo da la linea). Un cilindro unitario en Y,
+// escalado a la longitud de la viga y orientado del nudo I al J.
+function VigasPicking({
+  vigas,
+  idPorIndice,
 }: {
-  viga: GeoModelo["vigas"][number];
-  hover: Color;
-  sel: Color;
+  vigas: GeoModelo["vigas"];
+  idPorIndice: readonly string[];
 }) {
-  // Cilindro fino orientado del nudo I al J, a la cota de la planta. Transparente:
-  // solo sirve de blanco de picking y de halo al seleccionar/hover.
   const ref = useRef<InstancedMesh>(null);
-  const { pos, quat, largo } = useMemo(() => {
-    const a = new Vector3(viga.ax, viga.ay, viga.z);
-    const b = new Vector3(viga.bx, viga.by, viga.z);
-    const dir = new Vector3().subVectors(b, a);
-    const l = Math.max(dir.length(), 0.001);
-    const centro = new Vector3().addVectors(a, b).multiplyScalar(0.5);
-    // Cilindro por defecto a lo largo de Y; rotar Y -> dir.
-    const q = new Quaternion().setFromUnitVectors(
-      new Vector3(0, 1, 0),
-      dir.clone().normalize(),
-    );
-    return { pos: centro, quat: q, largo: l };
-  }, [viga]);
 
-  // Opacidad del halo segun seleccion/hover (mutado por ref, sin setState/frame).
-  const matRef = useRef<{ opacity: number; color: Color } | null>(null);
   useEffect(() => {
-    const repintar = () => {
-      const m = matRef.current;
-      if (!m) return;
-      const seleccionado = seleccionStore.getState().seleccion.includes(viga.id);
-      const enHover = seleccionStore.getState().hoverId === viga.id;
-      m.opacity = seleccionado ? 0.9 : enHover ? 0.5 : 0;
-      m.color = seleccionado ? sel : hover;
-      invalidate();
-    };
-    repintar();
-    const offH = seleccionStore.subscribe((s) => s.hoverId, repintar);
-    const offS = seleccionStore.subscribe((s) => s.seleccion, repintar);
-    return () => {
-      offH();
-      offS();
-    };
-  }, [viga.id, hover, sel]);
+    const malla = ref.current;
+    if (!malla) return;
+    const m = new Matrix4();
+    const q = new Quaternion();
+    const pos = new Vector3();
+    const esc = new Vector3();
+    const a = new Vector3();
+    const b = new Vector3();
+    const dir = new Vector3();
+    const yUp = new Vector3(0, 1, 0);
+    vigas.forEach((v, i) => {
+      a.set(v.ax, v.ay, v.z);
+      b.set(v.bx, v.by, v.z);
+      dir.subVectors(b, a);
+      const largo = Math.max(dir.length(), 0.001);
+      pos.addVectors(a, b).multiplyScalar(0.5);
+      q.setFromUnitVectors(yUp, dir.normalize()); // dir ya capturado en `largo`
+      esc.set(1, largo, 1); // cilindro unitario en Y -> largo de la viga
+      m.compose(pos, q, esc);
+      malla.setMatrixAt(i, m);
+    });
+    malla.count = vigas.length;
+    malla.instanceMatrix.needsUpdate = true;
+    malla.computeBoundingSphere();
+    invalidate();
+  }, [vigas]);
 
+  if (vigas.length === 0) return null;
   return (
-    <mesh
-      ref={ref as never}
-      position={pos}
-      quaternion={quat}
-      onPointerMove={(e: ThreeEvent<PointerEvent>) => {
-        e.stopPropagation();
-        entrarHover(viga.id);
-      }}
-      onPointerOut={() => salirHover(viga.id)}
-      onClick={(e: ThreeEvent<MouseEvent>) => {
-        e.stopPropagation();
-        clicSeleccionViga(viga.id, e.shiftKey);
-      }}
-    >
-      {/* Radio generoso para facilitar el picking; el halo visible usa el material. */}
-      <cylinderGeometry args={[0.08, 0.08, largo, 6]} />
-      <meshBasicMaterial
-        ref={(m) => {
-          matRef.current = m as unknown as { opacity: number; color: Color };
+    <Bvh firstHitOnly>
+      <instancedMesh
+        ref={ref}
+        args={[undefined, undefined, Math.max(vigas.length, 1)]}
+        onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+          e.stopPropagation();
+          const id = idPorIndice[e.instanceId ?? -1];
+          if (id) entrarHover(id);
         }}
-        transparent
-        opacity={0}
-        toneMapped={false}
-      />
-    </mesh>
+        onPointerOut={(e: ThreeEvent<PointerEvent>) => {
+          const id = idPorIndice[e.instanceId ?? -1];
+          if (id) salirHover(id);
+        }}
+        onClick={(e: ThreeEvent<MouseEvent>) => {
+          e.stopPropagation();
+          const id = idPorIndice[e.instanceId ?? -1];
+          if (id) clicSeleccionViga(id, e.shiftKey);
+        }}
+      >
+        <cylinderGeometry args={[VIGA_PICK_RADIO, VIGA_PICK_RADIO, 1, 6]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </instancedMesh>
+    </Bvh>
   );
 }
 
@@ -360,7 +417,7 @@ export function GeometriaModelo() {
     <group>
       <PilaresInstanciados pilares={pilares} />
       <HaloPilarSeleccionado pilares={pilares} />
-      <VigasLineas vigas={vigas} />
+      <Vigas vigas={vigas} />
     </group>
   );
 }

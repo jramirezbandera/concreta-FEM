@@ -20,10 +20,11 @@ import {
   Grid,
 } from "@react-three/drei";
 import { invalidate, useThree } from "@react-three/fiber";
-import { OrthographicCamera as OrthoCam } from "three";
+import { OrthographicCamera as OrthoCam, Vector3 } from "three";
 import type { ModoVista } from "../../estado";
 import { hexToken } from "./colores";
 import { GeometriaModelo } from "./GeometriaModelo";
+import { AjusteCamara3D } from "./AjusteCamara3D";
 import { suscribirZoom } from "./hooks/zoomBus";
 import { emitirCoords } from "./hooks/coordsBus";
 import { suscribirCaptura } from "./hooks/capturaBus";
@@ -103,20 +104,30 @@ function Ejes() {
 // camara hacia/desde el origen. invalidate() pinta el frame (frameloop demand).
 function ControlZoom() {
   const camera = useThree((s) => s.camera);
+  // Controles activos (OrbitControls en 3D via makeDefault): el dolly es RELATIVO a su
+  // target, no al origen (ver abajo). null en planta o antes de montar los controles.
+  const controls = useThree((s) => s.controls) as
+    | { target: Vector3; update?: () => void }
+    | null;
   useEffect(() => {
     const FACTOR = 1.2;
     return suscribirZoom((dir) => {
-      const k = dir === "in" ? FACTOR : 1 / FACTOR;
       if (camera instanceof OrthoCam) {
-        camera.zoom *= k;
+        camera.zoom *= dir === "in" ? FACTOR : 1 / FACTOR;
         camera.updateProjectionMatrix();
       } else {
-        // Dolly: acerca/aleja la camara a lo largo de su vector de vista.
-        camera.position.multiplyScalar(dir === "in" ? 1 / FACTOR : FACTOR);
+        // Dolly RELATIVO al target de los controles (no al origen): tras el encuadre
+        // (AjusteCamara3D) el target se recentra en el edificio; escalar la posicion
+        // respecto al origen desviaria la vista. Acercamos/alejamos la camara al target.
+        const target = controls?.target ?? new Vector3(0, 0, 0);
+        const offset = camera.position.clone().sub(target);
+        offset.multiplyScalar(dir === "in" ? 1 / FACTOR : FACTOR);
+        camera.position.copy(target).add(offset);
+        controls?.update?.();
       }
       invalidate();
     });
-  }, [camera]);
+  }, [camera, controls]);
   return null;
 }
 
@@ -201,6 +212,10 @@ export function Escena({ modoVista, overlays }: EscenaProps) {
       ) : (
         <OrbitControls key="ctrl-3d" makeDefault onChange={() => invalidate()} />
       )}
+
+      {/* Encuadre de la camara al edificio completo (F2c). Solo en 3D: se monta al
+          entrar en 3D y reacciona al boton "Encuadrar". */}
+      {!esPlanta && <AjusteCamara3D />}
 
       <ambientLight intensity={0.9} />
       <directionalLight position={[10, -10, 20]} intensity={0.4} />

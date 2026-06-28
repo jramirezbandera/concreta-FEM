@@ -116,6 +116,12 @@ interface VistaState {
   // puro (sin solver), asi que es valido aunque no haya resultados. Estado de UI: NO
   // participa en undo (coherente con el resto de vistaStore).
   mostrarCentroMasa: boolean;
+  // Overlay "Ver modelo de calculo" (F2c). Toggle de ayuda/docencia: dibuja la Capa 2
+  // (nudos/barras/releases/apoyos) semitransparente sobre la obra. UNICO sitio donde se
+  // permite jerga FEM en la UI (CLAUDE.md Â§2/Â§3). Apagado por defecto; solo se muestra en
+  // vista 3D (el modelo de calculo se aprecia sobre el edificio completo). Estado de UI:
+  // NO participa en undo.
+  mostrarModeloCalculo: boolean;
   // Visualizacion de resultados (feature-14). Estado de UI puro: NO participa en
   // undo. La inicializacion de `combinacionActiva` a la primera combo al fijar
   // resultados la hace el hook useCalcular; aqui solo viven los controles de vista.
@@ -153,6 +159,8 @@ interface VistaState {
   setSnapActivo(b: boolean): void;
   setMostrarCentroMasa(b: boolean): void;
   toggleCentroMasa(): void;
+  setMostrarModeloCalculo(b: boolean): void;
+  toggleModeloCalculo(): void;
   setDeformadaEscala(e: number): void;
   setAnimando(b: boolean): void;
   setMagnitudDiagrama(m: MagnitudDiagrama): void;
@@ -208,6 +216,7 @@ export const vistaStore = create<VistaState>()(
     },
     snapActivo: true,
     mostrarCentroMasa: false,
+    mostrarModeloCalculo: false,
     deformadaEscala: 1,
     animando: false,
     magnitudDiagrama: "momento",
@@ -234,6 +243,9 @@ export const vistaStore = create<VistaState>()(
     setMostrarCentroMasa: (b) => set({ mostrarCentroMasa: b }),
     toggleCentroMasa: () =>
       set((estado) => ({ mostrarCentroMasa: !estado.mostrarCentroMasa })),
+    setMostrarModeloCalculo: (b) => set({ mostrarModeloCalculo: b }),
+    toggleModeloCalculo: () =>
+      set((estado) => ({ mostrarModeloCalculo: !estado.mostrarModeloCalculo })),
     setDeformadaEscala: (e) => set({ deformadaEscala: e }),
     setAnimando: (b) => set({ animando: b }),
     setMagnitudDiagrama: (m) => set({ magnitudDiagrama: m }),

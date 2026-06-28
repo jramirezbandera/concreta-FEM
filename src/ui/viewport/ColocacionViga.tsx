@@ -394,10 +394,21 @@ function ColocacionActiva() {
   );
 }
 
-// Raiz: monta la interaccion solo en modo "viga". El cambio de herramienta es el
-// unico disparador de (des)montaje; nunca se re-renderiza por frame.
+// True solo en vista planta. La introduccion grafica es 2D (F2c, decision #3).
+function useEnPlanta(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.modoVista, cb),
+    () => vistaStore.getState().modoVista === "planta",
+    () => vistaStore.getState().modoVista === "planta",
+  );
+}
+
+// Raiz: monta la interaccion solo en modo "viga" Y vista planta. Defensa en
+// profundidad (F2c): en 3D el SelectorModo fuerza "seleccion" y App no monta la
+// colocacion; este guard evita montar plano/iman/listeners fuera de planta.
 export function ColocacionViga() {
   const activo = useHerramientaViga();
-  if (!activo) return null;
+  const enPlanta = useEnPlanta();
+  if (!activo || !enPlanta) return null;
   return <ColocacionActiva />;
 }
