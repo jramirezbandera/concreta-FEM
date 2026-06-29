@@ -10,7 +10,13 @@
 // una obra anterior tras restaurar autosave o cambiar de proyecto).
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Shell, useArranquePersistencia } from "./ui/shell";
-import { Viewport, Slot, CentroMasaOverlay, ModeloCalculoOverlay } from "./ui/viewport";
+import {
+  Viewport,
+  Slot,
+  CentroMasaOverlay,
+  CentroRigidezOverlay,
+  ModeloCalculoOverlay,
+} from "./ui/viewport";
 import { suscribirCoords, leerCoords } from "./ui/viewport";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
@@ -335,6 +341,7 @@ export default function App() {
                 <>
                   {!enPleno && <OverlayPlantillas />}
                   <CentroMasaOverlay />
+                  <CentroRigidezOverlay />
                   {!enPleno && <ColocacionPilar />}
                   <ModeloCalculoOverlay />
                 </>
@@ -363,6 +370,7 @@ export default function App() {
                   <>
                     {!enPleno && <OverlayPlantillas />}
                     <CentroMasaOverlay />
+                    <CentroRigidezOverlay />
                     {!enPleno && <ColocacionViga />}
                     <ModeloCalculoOverlay />
                   </>
@@ -394,6 +402,7 @@ export default function App() {
                           reutiliza datos de la deformada (lee del modalStore). */}
                       <ModoOverlay />
                       <CentroMasaOverlay />
+                      <CentroRigidezOverlay />
                       {/* "Ver modelo de calculo" (F2c): tambien en Resultados (3D). */}
                       <ModeloCalculoOverlay />
                     </>

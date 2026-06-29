@@ -24,11 +24,11 @@ import {
   type Trazabilidad,
 } from "../../discretizador";
 import { calculoStore } from "../../estado/calculoStore";
-import { modeloStore } from "../../estado/modeloStore";
 import { resultadosStore } from "../../estado/resultadosStore";
 import { vistaStore } from "../../estado/vistaStore";
-import { esErrorMotor, solverClient } from "../../solver";
-import type { EstadoMotor, ErrorMotor } from "../../solver";
+import { solverClient } from "../../solver";
+import type { EstadoMotor, ErrorMotor, ResultadosCalculo } from "../../solver";
+import { ejecutarPipelineAuxiliar } from "./ejecutarPipelineAuxiliar";
 
 // -----------------------------------------------------------------------------
 // Error de motor enriquecido con la fase, listo para que la UI lo muestre. La UI
@@ -155,88 +155,61 @@ function combinarConStore(sink: CalculoSink): CalculoSink {
 // distintos origenes (boton del componente y menu comparten este flag).
 let calculoEnVuelo = false;
 
+// Payload de la fase pura del camino estatico: el ModeloFEM + la trazabilidad que el
+// resultadosStore guarda junto a los resultados (mismo origen, deben casar).
+interface PayloadEstatico {
+  modeloFEM: ModeloFEM;
+  trazabilidad: Trazabilidad;
+}
+
 export async function calcularObra(sinkLlamante: CalculoSink = {}): Promise<void> {
-  if (calculoEnVuelo) return; // ya hay un calculo en curso: no relanzar.
   // El pipeline escribe SIEMPRE al calculoStore (fuente unica) y, si el llamante trajo
   // su propio sink, tambien a el. Boton (useCalcular) y menu (sin sink) convergen.
   const sink = combinarConStore(sinkLlamante);
-  calculoEnVuelo = true;
-  sink.onCalculando?.(true);
-  sink.onErrorMotor?.(null);
+  // El esqueleto (guard de reentrada, onCalculando/onErrorMotor, discretizar->corte,
+  // guard de identidad, auto-switch, catch/finally) lo lleva el runner compartido
+  // (4A). Aqui solo parametrizamos lo propio del camino estatico.
+  await ejecutarPipelineAuxiliar<PayloadEstatico, ResultadosCalculo>({
+    estaEnVuelo: () => calculoEnVuelo,
+    marcarEnVuelo: (v) => {
+      calculoEnVuelo = v;
+    },
+    preparar: (modelo) => {
+      const disc = discretizar(modelo);
+      // ok:false => limpiamos los avisos del intento anterior (avisos=[]), igual que
+      // antes; el runner los volcara con onAvisos (canal propio del estatico).
+      if (!disc.ok) return { ok: false, errores: disc.errores, avisos: [] };
+      // ok:true => guardamos avisos (no bloquean): el runner los volcara con onAvisos.
+      return {
+        ok: true,
+        payload: { modeloFEM: disc.modeloFEM, trazabilidad: disc.trazabilidad },
+        avisos: disc.avisos,
+      };
+    },
+    // solverClient asegura el motor listo (precarga si hace falta), valida la salida
+    // con Zod y aplica timeout.
+    ejecutar: ({ modeloFEM }) => solverClient.calcular(modeloFEM),
+    alExito: (resultados, { modeloFEM, trazabilidad }) => {
+      // Fijar resultados (con el ModeloFEM y la trazabilidad que los generaron: el
+      // resultadosStore los recibe juntos a proposito).
+      resultadosStore.getState().setResultados(resultados, modeloFEM, trazabilidad);
 
-  try {
-    // a. Modelo actual de obra (Capa 1).
-    const modelo = modeloStore.getState().getModelo();
-
-    // b. Discretizar (puro). ok:false => errores de obra, no llamamos al motor.
-    const resultadoDisc = discretizar(modelo);
-    if (!resultadoDisc.ok) {
-      sink.onErrores?.(resultadoDisc.errores);
-      sink.onAvisos?.([]);
-      return; // Cortamos antes del motor: la obra no esta lista.
-    }
-    // ok:true => guardamos avisos (no bloquean) y limpiamos errores previos.
-    sink.onErrores?.([]);
-    sink.onAvisos?.(resultadoDisc.avisos);
-
-    const modeloFEM: ModeloFEM = resultadoDisc.modeloFEM;
-    const trazabilidad: Trazabilidad = resultadoDisc.trazabilidad;
-
-    // c. Calcular en el motor. solverClient asegura el motor listo (precarga si
-    // hace falta), valida la salida con Zod y aplica timeout. Refrescamos el
-    // estado del motor en cuanto lanzamos para reflejar "cargando"/"calculando".
-    sink.onRefrescarEstado?.();
-    const resultados = await solverClient.calcular(modeloFEM);
-
-    // c.bis Guard de carrera (eng-review D3): si la obra cambio MIENTRAS calculabamos,
-    // estos resultados corresponden al modelo VIEJO. modeloStore usa Immer: cualquier
-    // edicion (ejecutar/deshacer/cargar) reemplaza la referencia del modelo, asi que
-    // basta comparar identidad. Si cambio, NO comprometemos los resultados como
-    // vigentes (el editar ya disparo limpiar()): evita mostrar datos que no
-    // corresponden a la obra actual marcados como validos, y no cambiamos de pestana.
-    if (modeloStore.getState().getModelo() !== modelo) {
-      return;
-    }
-
-    // d. Exito: fijar resultados (con el ModeloFEM y la trazabilidad que los
-    // generaron: el resultadosStore los recibe juntos a proposito).
-    resultadosStore.getState().setResultados(resultados, modeloFEM, trazabilidad);
-
-    // Inicializar la combinacion activa SOLO si la actual no aplica: null o no
-    // presente entre las combos calculadas. Si ya hay una valida (recalculo del
-    // mismo modelo), se respeta la eleccion del usuario.
-    const combinacionActiva = vistaStore.getState().combinacionActiva;
-    if (combinacionActiva === null || !resultados.combos.includes(combinacionActiva)) {
-      vistaStore.getState().setCombinacionActiva(resultados.combos[0] ?? null);
-    }
-
-    // Auto-switch a la pestana Resultados (confirmado por el usuario).
-    vistaStore.getState().setPestanaActiva("resultados");
-  } catch (e) {
-    // e. Fallo del motor (carga o calculo). No relanzamos para no romper la UI:
-    // dejamos el error consultable. esErrorMotor distingue el ErrorMotor plano del
-    // worker; su `mensaje` ya viene en lenguaje de obra y `fase` permite matizar.
-    if (esErrorMotor(e)) {
-      sink.onErrorMotor?.(e);
-    } else {
-      // Cualquier otra excepcion (no deberia ocurrir: el cliente normaliza a
-      // ErrorMotor). La envolvemos en un mensaje legible y la marcamos como fallo
-      // de calculo para no exponer jerga tecnica al arquitecto.
-      sink.onErrorMotor?.({
-        fase: "calculo",
-        mensaje:
-          "No se pudo completar el calculo por un fallo inesperado. " +
-          "Vuelve a intentarlo; si persiste, reporta la incidencia.",
-        detalle: e instanceof Error ? e.message : String(e),
-      });
-    }
-  } finally {
-    calculoEnVuelo = false;
-    sink.onCalculando?.(false);
-    // Refresco final: el motor vuelve a "listo" tras un calculo (o a "error" tras
-    // un fallo de carga); que la UI lo refleje cuanto antes.
-    sink.onRefrescarEstado?.();
-  }
+      // Inicializar la combinacion activa SOLO si la actual no aplica: null o no
+      // presente entre las combos calculadas. Si ya hay una valida (recalculo del
+      // mismo modelo), se respeta la eleccion del usuario.
+      const combinacionActiva = vistaStore.getState().combinacionActiva;
+      if (
+        combinacionActiva === null ||
+        !resultados.combos.includes(combinacionActiva)
+      ) {
+        vistaStore.getState().setCombinacionActiva(resultados.combos[0] ?? null);
+      }
+    },
+    mensajeFalloInesperado:
+      "No se pudo completar el calculo por un fallo inesperado. " +
+      "Vuelve a intentarlo; si persiste, reporta la incidencia.",
+    sink,
+  });
 }
 
 // -----------------------------------------------------------------------------

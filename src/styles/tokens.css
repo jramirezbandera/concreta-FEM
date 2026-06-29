@@ -65,10 +65,13 @@
      ninguno y legible sobre el lienzo claro. El marcador ademas se distingue por
      FORMA (cruz-en-circulo) y etiqueta mono, no solo por color (colorblind-safe). */
   --centro-masa: #d6336c; /* centro de masas (cerise) */
-  /* Reservado para el CENTRO DE RIGIDEZ (CR), diferido a fase futura (FEM-exacto,
-     T-cr-fem-exacto). Se deja el nombre canonico aqui para que cuando llegue el CR
-     consuma su token desde el mismo mapa, con hue distinto del CM (p. ej. teal). */
-  /* --centro-rigidez: #0d9488; */
+  /* Centro de rigidez (CR, F2 FEM-exacto): hue DISTINTO del CM (cerise) para que la
+     excentricidad CM<->CR se lea de un vistazo. Teal intenso (Tailwind teal-600): no
+     colisiona con el mapa semantico de elementos (azul-gris/ocre/naranja/ambar/violeta)
+     y, aunque --apoyo-calc es un teal-verde proximo, NUNCA coinciden en pantalla (el CR
+     es solo vista PLANTA; el modelo de calculo solo 3D). El marcador ademas se distingue
+     por FORMA (rombo ◇, frente al ⊕ del CM): legible sin color (colorblind-safe). */
+  --centro-rigidez: #0d9488; /* centro de rigidez (teal) */
 
   /* --- Estados (§1.3) --- */
   --danger: #dc2626;

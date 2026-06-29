@@ -43,7 +43,7 @@ function femVacio(): ModeloFEM {
   };
 }
 function trazaVacia(): Trazabilidad {
-  return { pilarAMembers: {}, vigaAMember: {}, pilarANodoArranque: {}, nudoANodo: {} };
+  return { pilarAMembers: {}, vigaAMember: {}, pilarANodoArranque: {}, nudoANodo: {}, nodoFEMAPlanta: {} };
 }
 
 function resultadosCon(combos: [string, ...string[]]): ResultadosCalculo {

@@ -62,7 +62,7 @@ function modeloFEMMinimo(): ModeloFEM {
   };
 }
 function trazaMinima(): Trazabilidad {
-  return { pilarAMembers: {}, vigaAMember: {}, pilarANodoArranque: {}, nudoANodo: {} };
+  return { pilarAMembers: {}, vigaAMember: {}, pilarANodoArranque: {}, nudoANodo: {}, nodoFEMAPlanta: {} };
 }
 function modosDe(frecuencias: number[]): ResultadosModales {
   return {

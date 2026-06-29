@@ -1,0 +1,117 @@
+/*
+ * Estilos del control de Centro de rigidez (F2) de Concreta · Estructuras. Panel HUD
+ * glass con toggle + disparador (Calcular) + datos (X/Y mono + excentricidad) + nota de
+ * hipotesis. REGLA: solo tokens via var(--...); cero hex. Importado desde CentroRigidez.tsx.
+ * El --centro-rigidez tinta el glifo ◇ para atar el panel al marcador de la escena (misma
+ * semantica de color). Calcado de centroMasa.css; reusa el patron del panel de frecuencias
+ * para el disparador.
+ */
+
+.cx-cr {
+  /* Algo mas ancho que el CM: cabe el boton "Calcular centro de rigidez". */
+  width: 208px;
+}
+
+/* Glifo ◇ de la cabecera, en el color del CR (ata panel <-> marcador). */
+.cx-cr__glifo {
+  color: var(--centro-rigidez);
+  font-weight: 600;
+}
+
+/* Fila del toggle: checkbox + etiqueta clicable. */
+.cx-cr__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text);
+}
+.cx-cr__toggle input {
+  margin: 0;
+  accent-color: var(--centro-rigidez);
+  cursor: pointer;
+}
+
+/* Bloque del disparador (boton + reporte de errores), separado del toggle por un filete. */
+.cx-cr__lanzar {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* Reporte de errores de obra / fallo del motor (lenguaje de obra). */
+.cx-cr__reporte {
+  margin-top: 6px;
+}
+.cx-cr__motor-error {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--danger);
+}
+.cx-cr__errores {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--danger);
+}
+
+/* Detalle (coords/excentricidad o estados), separado por un filete. */
+.cx-cr__detalle {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-cr__fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cx-cr__clave {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.cx-cr__valor {
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* Subgrupo de la excentricidad: etiqueta de seccion + sus dos filas. */
+.cx-cr__seccion {
+  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* Estado vacio / no determinable (texto en lenguaje de obra). */
+.cx-cr__vacio,
+.cx-cr__indeterminable {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* Nota de HIPOTESIS (siempre visible con el panel abierto): el CR supone diafragma
+ * rigido por planta. Tono atenuado, cursiva sutil; no es un error. */
+.cx-cr__hipotesis {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-3);
+}

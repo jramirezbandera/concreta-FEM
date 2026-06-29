@@ -563,3 +563,142 @@ describe("golden discretizador · localizarNodoDeNudo: determinismo y nudo compa
     expect(coordDe(fem, t.nudoANodo["nd"])).toEqual([5, 6, 0]);
   });
 });
+
+// =============================================================================
+// nodoFEMAPlanta (F0.2): asignacion AUTORITATIVA de cada nudo FEM a su planta, por
+// CONTEXTO DE CREACION (decision 1A). NO es el heuristico de cargas: los nudos de
+// pilar van a la planta de su cota; los de viga, a su planta DECLARADA. TODO nudo de
+// `nodes` debe mapear. Lo consume F2 (centro de rigidez) para el diafragma por planta.
+// =============================================================================
+
+// Fixture de CONFLICTO de snap: dos GRUPOS con una planta a la MISMA cota (3) y un
+// pilar por grupo, ambos en (0,0). Sus cabezas snapean al MISMO nudo FEM (mismo X,Z y
+// misma cota) pero lo reclaman dos plantas (pa1 de g1, pa2 de g2). El desempate
+// determinista (primera planta por id) debe elegir SIEMPRE la de id menor, sin NaN ni
+// no-determinismo. Estructura estable: cada pilar empotrado en su base (cota 0).
+function fixtureConflictoSnapDosGrupos(): Modelo {
+  const seccion = {
+    id: SECCION_GOLDEN,
+    nombre: "IPE 300",
+    tipo: "perfilMetalico" as const,
+    perfilId: "IPE300",
+  };
+  const grupo = (id: string) => ({
+    id,
+    nombre: id,
+    categoriaUso: "A" as const,
+    sobrecargaUso: 2,
+    cargasMuertas: 1,
+  });
+  // Pilar de g{n}: sube de su base (cota 0) a su planta de techo (cota 3), en (0,0).
+  const pilar = (id: string, plantaInicial: string, plantaFinal: string) => ({
+    id,
+    nombre: id.toUpperCase(),
+    x: 0,
+    y: 0,
+    plantaInicial,
+    plantaFinal,
+    seccionId: SECCION_GOLDEN,
+    materialId: MATERIAL_GOLDEN,
+    angulo: 0,
+    vinculacionExterior: true,
+    arranque: "empotrado" as const,
+  });
+  return {
+    unidades: "kN-m",
+    schemaVersion: SCHEMA_VERSION,
+    grupos: [grupo("g1"), grupo("g2")],
+    plantas: [
+      // Bases (cota 0): distintas por grupo (no colisionan; pilares distintos en x?
+      // no: ambos en (0,0) y cota 0 tambien colisionan -> tambien es conflicto, mismo
+      // desempate). Techos: AMBOS a cota 3 -> el nudo de cabeza es el conflicto clave.
+      { id: "p0a", nombre: "Base g1", cota: 0, altura: 3, grupoId: "g1" },
+      { id: "p0b", nombre: "Base g2", cota: 0, altura: 3, grupoId: "g2" },
+      { id: "p1a", nombre: "Techo g1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p1b", nombre: "Techo g2", cota: 3, altura: 3, grupoId: "g2" },
+    ],
+    secciones: [seccion],
+    nudos: [],
+    pilares: [pilar("pa1", "p0a", "p1a"), pilar("pa2", "p0b", "p1b")],
+    vigas: [],
+    panos: [],
+    muros: [],
+    cargas: [],
+    hipotesis: [
+      { id: "G", nombre: "Permanente", tipo: "permanente" as const, automatica: false },
+    ],
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: false },
+  };
+}
+
+describe("golden discretizador · nodoFEMAPlanta (asignacion autoritativa por planta)", () => {
+  it("portico de 1 planta: cada nudo FEM mapea a su planta (pies p0, cabezas/viga p1)", () => {
+    const modelo = fixtureBiapoyadaUDL({ L: 6, q: 10, cota: 3 });
+    const fem = discretizarOExplotar(modelo);
+    const t = trazabilidadDe(modelo);
+    // TODO nudo de nodes tiene entrada (invariante del discretizador).
+    expect(Object.keys(t.nodoFEMAPlanta).sort()).toEqual(
+      fem.nodes.map((n) => n.name).sort(),
+    );
+    // Pies (Y=0) -> planta de cimentacion p0; cabezas + extremos de viga (Y=3) -> p1.
+    for (const n of fem.nodes) {
+      const plantaEsperada = n.y === 0 ? "p0" : "p1";
+      expect(t.nodoFEMAPlanta[n.name]).toBe(plantaEsperada);
+    }
+  });
+
+  it("pilar pasante 2 plantas: el nudo de cada cota mapea a la planta de ESA cota", () => {
+    // Pilares pasantes p0(0)->p2(6) atravesando p1(3); vigas en p1 y p2.
+    const modelo = fixtureNudoCompartidoEntrePlantas();
+    const fem = discretizarOExplotar(modelo);
+    const t = trazabilidadDe(modelo);
+    // Cobertura total: todo nudo mapeado.
+    expect(Object.keys(t.nodoFEMAPlanta).sort()).toEqual(
+      fem.nodes.map((n) => n.name).sort(),
+    );
+    // La planta de cada nudo se deduce de su cota (Y): 0->p0, 3->p1 (intermedia del
+    // troceo, nudo de viga "v-baja"), 6->p2 (cabezas + nudo de viga "v-alta").
+    const plantaPorCota: Record<number, string> = { 0: "p0", 3: "p1", 6: "p2" };
+    for (const n of fem.nodes) {
+      expect(t.nodoFEMAPlanta[n.name]).toBe(plantaPorCota[n.y]);
+    }
+  });
+
+  it("nudo de viga -> v.plantaId (planta declarada, no la cota por casualidad)", () => {
+    // En el fixture pasante, los extremos de "v-alta" (p2) estan a cota 6; su mapeo es
+    // p2 por DECLARACION (coincide con el pilar). Para aislar la regla "planta
+    // declarada", basta verificar que el nudo de la viga de p1 (cota 3) -> p1.
+    const modelo = fixtureNudoCompartidoEntrePlantas();
+    const fem = discretizarOExplotar(modelo);
+    const t = trazabilidadDe(modelo);
+    const nudoCota3 = fem.nodes.find((n) => n.y === 3 && n.x === 0)!; // extremo de v-baja
+    expect(t.nodoFEMAPlanta[nudoCota3.name]).toBe("p1");
+  });
+
+  it("conflicto de snap entre grupos: desempate determinista (planta de id menor)", () => {
+    const modelo = fixtureConflictoSnapDosGrupos();
+    const fem = discretizarOExplotar(modelo);
+    const t = trazabilidadDe(modelo);
+    // 2 nudos: base comun (0,0,0) y cabeza comun (0,3,0) — ambos compartidos por los
+    // dos pilares de grupos distintos (snapping geometrico colapsa a 1 nudo cada uno).
+    expect(fem.nodes).toHaveLength(2);
+    // Cobertura total + desempate: base -> p0a (< p0b), cabeza -> p1a (< p1b).
+    const base = fem.nodes.find((n) => n.y === 0)!;
+    const cabeza = fem.nodes.find((n) => n.y === 3)!;
+    expect(t.nodoFEMAPlanta[base.name]).toBe("p0a");
+    expect(t.nodoFEMAPlanta[cabeza.name]).toBe("p1a");
+  });
+
+  it("determinismo: barajar plantas/grupos/pilares NO cambia nodoFEMAPlanta", () => {
+    const base = fixtureConflictoSnapDosGrupos();
+    const reordenado: Modelo = {
+      ...base,
+      plantas: [...base.plantas].reverse(),
+      grupos: [...base.grupos].reverse(),
+      pilares: [...base.pilares].reverse(),
+    };
+    expect(trazabilidadDe(reordenado).nodoFEMAPlanta).toEqual(
+      trazabilidadDe(base).nodoFEMAPlanta,
+    );
+  });
+});

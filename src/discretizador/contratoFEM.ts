@@ -153,6 +153,15 @@ export interface Trazabilidad {
   pilarANodoArranque: Record<string, string>;
   // nudo de obra (usado por alguna viga) -> nodo FEM donde se localiza.
   nudoANodo: Record<string, string>;
+  // nombre de nudo FEM (p.ej. "N3") -> plantaId al que pertenece. Mapea TODOS los
+  // nudos FEM estructurales (cabezas/pies de pilar, nudos intermedios de troceo y
+  // extremos de viga), no solo los extremos de viga: TODO nudo de `nodes` tiene
+  // entrada. Es la asignacion AUTORITATIVA derivada del CONTEXTO DE CREACION de cada
+  // nudo (la planta declarada de la viga; la planta de la cota para los nudos de
+  // pilar), NO el heuristico de cargas `localizarNodoDeNudo` (que es nodoFEM->load,
+  // por primera viga). La consume F2 (centro de rigidez) para construir el diafragma
+  // rigido POR PLANTA: agrupa los nudos de cada planta para atarlos a su nudo maestro.
+  nodoFEMAPlanta: Record<string, string>;
 }
 
 // --- Modelo FEM completo (salida del discretizador) --------------------------

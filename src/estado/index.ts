@@ -24,6 +24,11 @@ export { resultadosStore } from "./resultadosStore";
 // de undo, se invalida al editar la obra desde modeloStore. Lo alimenta calcularModos
 // y lo consumen ModoOverlay/PanelFrecuencias.
 export { modalStore } from "./modalStore";
+// crStore (F2, T-cr-fem-exacto): resultados del CENTRO DE RIGIDEZ (cr_por_planta).
+// Espejo de modalStore para el camino del CR (independiente del estatico/modal); fuera
+// de undo, se invalida al editar la obra desde modeloStore. Lo alimenta calcularCR y lo
+// consumen CentroRigidezOverlay/CentroRigidez.
+export { crStore } from "./crStore";
 // calculoStore (feature-17): estado del calculo (estado del motor + progreso/errores).
 // Fuera de undo, como vistaStore/resultadosStore. Lo alimenta useCalcular/calcularObra
 // y lo consumen Brandbar/Menubar/BotonCalcular.

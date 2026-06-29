@@ -101,6 +101,7 @@ const TRAZABILIDAD_FALSA: Trazabilidad = {
   vigaAMember: {},
   pilarANodoArranque: {},
   nudoANodo: {},
+  nodoFEMAPlanta: {},
 };
 
 beforeEach(() => {

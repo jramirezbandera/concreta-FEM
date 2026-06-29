@@ -58,6 +58,7 @@ function traza(): Trazabilidad {
     vigaAMember: { v1: "M3" },
     pilarANodoArranque: { p1: "N1" },
     nudoANodo: {},
+    nodoFEMAPlanta: {},
   };
 }
 

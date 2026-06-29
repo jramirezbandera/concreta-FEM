@@ -27,6 +27,7 @@
 import * as Comlink from "comlink";
 
 import type { ModeloFEM } from "../discretizador/contratoFEM";
+import type { PlantaInfoCR } from "../discretizador";
 import {
   ResultadosCalculoSchema,
   type ResultadosCalculo,
@@ -37,6 +38,7 @@ import {
   ResultadosModalesSchema,
   type ResultadosModales,
 } from "./resultadosModales";
+import { CRGlueSchema, type CRGlue } from "./resultadosCR";
 import type { SolverWorkerAPI } from "./worker";
 
 // -----------------------------------------------------------------------------
@@ -364,6 +366,68 @@ export const solverClient = {
     if (!parseado.success) {
       throw errorCalculo(
         "El motor devolvio los modos con un formato inesperado. " +
+          "Es un fallo interno del calculo; revisa el modelo o reporta la incidencia.",
+        parseado.error.message,
+      );
+    }
+
+    return parseado.data;
+  },
+
+  /**
+   * Calcula el CENTRO DE RIGIDEZ por planta (F2, T-cr-fem-exacto) y devuelve la salida
+   * CRUDA del glue VALIDADA con Zod (CRGlueSchema): x/y por planta (coords de obra por
+   * identidad), SIN ex/ey. El llamador (el runner de F2.1) anade ex/ey con
+   * `ensamblarResultadosCR(crGlue, modelo)` para obtener el ResultadosCR final; aqui no
+   * se hace porque el cliente es Capa-2-only (no conoce el Modelo de Capa 1 ni el CM).
+   *
+   * Camino INDEPENDIENTE (decision 8A): usa el metodo separado del worker `calcularCR`
+   * (no `calcular`), sin nPoints. Comparte la fontaneria de calcular()/calcularModal():
+   * mismo singleton recuperable, mismo TIMEOUT (F5-3, termina+recrea el worker si vence)
+   * y safeParse en el borde (#8). Contrato de error IDENTICO: rechaza con ErrorMotor
+   * {fase:"carga"} si no arranco el motor, {fase:"calculo"} si fallo (modelo base
+   * inestable), la validacion o por timeout. Usa esErrorMotor()/error.fase para cazarlo.
+   *
+   * @param modeloFEM  ModeloFEM BASE (de prepararModeloCR): geometria+rigidez, sin cargas.
+   * @param plantasInfo diafragma por planta { plantaId, nodos, maestro{x,y,z} }.
+   * @param timeoutMs  presupuesto de tiempo del calculo (opcional; 60 s por defecto).
+   */
+  async calcularCR(
+    modeloFEM: ModeloFEM,
+    plantasInfo: PlantaInfoCR[],
+    timeoutMs: number = TIMEOUT_CALCULO_MS_DEFAULT,
+  ): Promise<CRGlue> {
+    const proxy = obtenerProxy();
+
+    let temporizador: ReturnType<typeof setTimeout> | undefined;
+    const promesaTimeout = new Promise<never>((_, reject) => {
+      temporizador = setTimeout(() => {
+        resetWorker();
+        reject(
+          errorCalculo(
+            "El calculo del centro de rigidez tardo demasiado y se ha cancelado. " +
+              "Revisa el modelo y vuelve a intentarlo.",
+            `Timeout de ${timeoutMs} ms en calcularCR().`,
+          ),
+        );
+      }, timeoutMs);
+    });
+
+    let bruto: unknown;
+    try {
+      bruto = await Promise.race([
+        proxy.calcularCR(modeloFEM, plantasInfo),
+        promesaTimeout,
+      ]);
+    } finally {
+      if (temporizador !== undefined) clearTimeout(temporizador);
+    }
+
+    // --- safeParse en el borde con el contrato CRUDO del CR (#8) -------------
+    const parseado = CRGlueSchema.safeParse(bruto);
+    if (!parseado.success) {
+      throw errorCalculo(
+        "El motor devolvio el centro de rigidez con un formato inesperado. " +
           "Es un fallo interno del calculo; revisa el modelo o reporta la incidencia.",
         parseado.error.message,
       );

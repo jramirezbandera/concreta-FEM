@@ -47,12 +47,14 @@ import { INDEX_URL } from "./config";
 // navegador: el indexURL "/pyodide/", la URL de cada wheel y el glue por ?raw.
 import { instalarMotorPyodide } from "./arranquePyodide";
 import type { ModeloFEM } from "../discretizador/contratoFEM";
+import type { PlantaInfoCR } from "../discretizador";
 import type {
   EstadoMotor,
   ErrorMotor,
   ResultadosCalculo,
 } from "./resultados";
 import type { ResultadosModales } from "./resultadosModales";
+import type { CRGlue } from "./resultadosCR";
 
 // -----------------------------------------------------------------------------
 // Estado interno del worker (privado; la UI solo lo lee via estado()).
@@ -84,6 +86,13 @@ type RespuestaGlue =
 // formas de vibracion), NO la por-combo. Mismo sobre {ok}/{error}.
 type RespuestaGlueModal =
   | { ok: true; resultados: ResultadosModales }
+  | { ok: false; error: { mensaje: string; detalle?: string } };
+
+// El glue `calcular_cr(payload, plantas_info)` es un camino SEPARADO (decision 8A):
+// NO se enruta por analysis.type. Devuelve la salida CRUDA del CR (x/y por planta, sin
+// ex/ey: los anade el lado TS). Mismo sobre {ok}/{error} que el resto del glue.
+type RespuestaGlueCR =
+  | { ok: true; resultados: CRGlue }
   | { ok: false; error: { mensaje: string; detalle?: string } };
 
 // =============================================================================
@@ -339,6 +348,78 @@ const api = {
       throw {
         fase: "calculo",
         mensaje: "Fallo inesperado durante el calculo modal.",
+        detalle: e instanceof Error ? (e.stack ?? e.message) : String(e),
+      } satisfies ErrorMotor;
+    }
+  },
+
+  /**
+   * Calcula el CENTRO DE RIGIDEZ por planta (F2, T-cr-fem-exacto). Camino SEPARADO
+   * (decision 8A): llama a la funcion del glue `calcular_cr(payload, plantas_info)`,
+   * NO al `calcular` por analysis.type. Devuelve la salida CRUDA (x/y por planta, en
+   * coords de obra por identidad; sin ex/ey). El lado TS (solverClient + ensamblar)
+   * valida y anade ex/ey desde el centro de masas.
+   *
+   * Mismo ciclo de vida y contrato de error que calcular()/calcularModal(): asegura
+   * motor listo, libera los PyProxy en finally (FIX F5-2), relanza fallos del glue
+   * (modelo base inestable) como ErrorMotor{fase:"calculo"}. Una planta degenerada NO
+   * es error: viene como x/y null en el resultado.
+   *
+   * @param modeloFEM ModeloFEM BASE (de prepararModeloCR): geometria+rigidez, sin cargas.
+   * @param plantasInfo diafragma por planta: { plantaId, nodos, maestro{x,y,z} }.
+   */
+  async calcularCR(
+    modeloFEM: ModeloFEM,
+    plantasInfo: PlantaInfoCR[],
+  ): Promise<CRGlue> {
+    if (estadoActual !== "listo") {
+      await api.precargar();
+    }
+    if (!pyodide) {
+      throw {
+        fase: "calculo",
+        mensaje: "El motor de calculo no esta disponible.",
+        detalle: "pyodide es null tras precargar().",
+      } satisfies ErrorMotor;
+    }
+
+    estadoActual = "calculando";
+    try {
+      const calcularCrPy = pyodide.globals.get("calcular_cr");
+      let respuesta: RespuestaGlueCR;
+      try {
+        // Dos strings JSON (via robusta, guia §12.4): el glue hace json.loads de cada uno.
+        const payloadJson = JSON.stringify(modeloFEM);
+        const plantasJson = JSON.stringify(plantasInfo);
+        const respuestaProxy = calcularCrPy(payloadJson, plantasJson);
+        try {
+          respuesta = respuestaProxy.toJs({
+            dict_converter: Object.fromEntries,
+          }) as RespuestaGlueCR;
+        } finally {
+          respuestaProxy.destroy?.();
+        }
+      } finally {
+        calcularCrPy.destroy?.();
+      }
+
+      if (!respuesta.ok) {
+        estadoActual = "listo";
+        throw {
+          fase: "calculo",
+          mensaje: respuesta.error.mensaje,
+          detalle: respuesta.error.detalle,
+        } satisfies ErrorMotor;
+      }
+
+      estadoActual = "listo";
+      return respuesta.resultados;
+    } catch (e) {
+      if (estadoActual === "calculando") estadoActual = "listo";
+      if (esErrorMotor(e)) throw e;
+      throw {
+        fase: "calculo",
+        mensaje: "Fallo inesperado durante el calculo del centro de rigidez.",
         detalle: e instanceof Error ? (e.stack ?? e.message) : String(e),
       } satisfies ErrorMotor;
     }
