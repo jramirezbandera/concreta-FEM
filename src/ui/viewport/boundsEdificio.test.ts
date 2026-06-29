@@ -65,6 +65,28 @@ describe("boundsEdificio", () => {
     expect(b.radio).toBeGreaterThanOrEqual(0.5);
   });
 
+  it("ignora coordenadas no finitas (NaN): no envenena el radio (sin cámara NaN)", () => {
+    const modelo: Modelo = {
+      ...base(),
+      pilares: [
+        pilar("ok", 0, 0, "p0", "p1"),
+        pilar("nan", NaN, 2, "p0", "p1"), // coordenada corrupta: se ignora
+      ],
+    };
+    const b = boundsEdificio(modelo)!;
+    expect(b).not.toBeNull();
+    expect(Number.isFinite(b.radio)).toBe(true);
+    expect(Number.isFinite(b.centro[0])).toBe(true);
+    // Solo el pilar válido cuenta: bbox en x = [0,0].
+    expect(b.min[0]).toBe(0);
+    expect(b.max[0]).toBe(0);
+  });
+
+  it("todas las coordenadas no finitas -> null (nada que encuadrar)", () => {
+    const modelo: Modelo = { ...base(), pilares: [pilar("nan", NaN, NaN, "p0", "p1")] };
+    expect(boundsEdificio(modelo)).toBeNull();
+  });
+
   it("nudos colineales (vigas en linea, misma cota) -> radio finito, sin NaN", () => {
     const modelo: Modelo = {
       ...base(),

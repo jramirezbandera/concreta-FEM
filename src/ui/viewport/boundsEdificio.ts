@@ -33,6 +33,10 @@ export function boundsEdificio(modelo: Modelo): BoundsEdificio | null {
   let hay = false;
 
   const acumular = (x: number, y: number, z: number): void => {
+    // Defensa: una coordenada no finita (NaN/Infinity de un modelo corrupto que se
+    // colara) envenenaria min/max -> centro/radio NaN -> camara en NaN (3D en blanco
+    // silencioso, sin que el guard `if (!b)` lo atrape). Se ignora ese punto.
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
     hay = true;
     if (x < minX) minX = x;
     if (y < minY) minY = y;
