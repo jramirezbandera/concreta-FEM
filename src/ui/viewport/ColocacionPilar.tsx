@@ -252,10 +252,23 @@ function ColocacionActiva() {
   );
 }
 
-// Raiz: monta la interaccion solo en modo "pilar". El cambio de herramienta es el
-// unico disparador de (des)montaje; nunca se re-renderiza por frame.
+// True solo en vista planta. La introduccion grafica es 2D (F2c, decision #3).
+function useEnPlanta(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.modoVista, cb),
+    () => vistaStore.getState().modoVista === "planta",
+    () => vistaStore.getState().modoVista === "planta",
+  );
+}
+
+// Raiz: monta la interaccion solo en modo "pilar" Y vista planta. El cambio de
+// herramienta o de modo es el unico disparador de (des)montaje; nunca por frame.
+// Defensa en profundidad (F2c): en 3D el SelectorModo ya fuerza "seleccion" y App no
+// monta la colocacion, pero este guard evita montar plano/marcador/listeners si la
+// herramienta quedara en "pilar" fuera de planta.
 export function ColocacionPilar() {
   const activo = useHerramientaPilar();
-  if (!activo) return null;
+  const enPlanta = useEnPlanta();
+  if (!activo || !enPlanta) return null;
   return <ColocacionActiva />;
 }

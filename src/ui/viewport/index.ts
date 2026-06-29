@@ -24,6 +24,12 @@ export { OverlayPlantillas } from "./OverlayPlantillas";
 // + resultados). El toggle + panel (CentroMasa) viven en el Hud persistente.
 export { CentroMasaOverlay } from "./CentroMasaOverlay";
 
+// "Ver modelo de calculo" (F2c): overlay R3F de la Capa 2 (nudos/barras/releases/apoyos)
+// semitransparente sobre la obra. Lo monta App via `sceneOverlays`; el toggle + panel
+// (ModeloCalculo) viven en el Hud persistente (disponible en todas las pestanas, 3D).
+export { ModeloCalculoOverlay } from "./ModeloCalculoOverlay";
+export { ModeloCalculo } from "./ModeloCalculo";
+
 // Canal de coordenadas vivas del cursor (viewport -> barra de estado). El shell
 // se suscribe y throttlea; lo reutiliza F11 para el replanteo en planta.
 export { suscribirCoords, leerCoords, emitirCoords } from "./hooks/coordsBus";

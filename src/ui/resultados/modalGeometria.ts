@@ -4,15 +4,8 @@
 // estacion de barra): cada barra es una recta i->j que se desplaza con la forma modal
 // de sus dos nudos del modo activo.
 //
-// CONVENCION DE EJES (identica a deformadaGeometria, critica para superponer a la obra):
-//  - El discretizador escribe los nodos FEM con mapearEjes(xPlanta,yPlanta,cota) = [X,Y,Z]
-//    = [xPlanta, cota, yPlanta]  (FEM es Y-up: la vertical es Y).
-//  - El viewport dibuja Z-up: la planta (x,y) va a la escena (x,y) y la cota va a la
-//    escena z. Para llevar un nodo FEM a la escena hay que DESHACER mapearEjes:
-//        escena = [FEM.x, FEM.z, FEM.y]   (intercambia Y<->Z)
-//    y el desplazamiento [DX,DY,DZ] (mismo sistema FEM) sigue el mismo intercambio:
-//        dispEscena = [DX, DZ, DY]
-//  Blindado con comentario por ser el error tipico (forma girada 90 grados / "tumbada").
+// CONVENCION DE EJES (identica a deformadaGeometria): FEM Y-up -> escena Z-up; la
+// transformacion (intercambio Y<->Z) vive en ../viewport/ejesEscena (helper compartido).
 //
 // NORMALIZACION (clave del camino modal, lo distingue de la deformada):
 //  - Las amplitudes modales vienen normalizadas a masa modal unitaria, con ESCALA y
@@ -28,6 +21,7 @@
 // lee del contrato modal (ResultadosModales).
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosModales, Modo } from "../../solver";
+import { puntoFemDesplazadoAEscena } from "../viewport/ejesEscena";
 
 // Un punto en coordenadas de ESCENA (Z-up), listo para three.js.
 export type PuntoEscena = [number, number, number];
@@ -83,11 +77,7 @@ function nudoDesplazado(
   const dz = gdl[2] / norm;
   const mag = Math.hypot(dx, dy, dz); // [0,1] tras renormalizar
   // FEM (Y-up) -> escena (Z-up): intercambio Y<->Z, tanto en posicion como en disp.
-  const p: PuntoEscena = [
-    base.x + dx * escala,
-    base.z + dz * escala,
-    base.y + dy * escala,
-  ];
+  const p = puntoFemDesplazadoAEscena(base.x, base.y, base.z, dx, dy, dz, escala);
   return { p, mag };
 }
 

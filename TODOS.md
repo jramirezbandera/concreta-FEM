@@ -26,7 +26,19 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-vigas-1 · Instanciar las vigas (InstancedMesh) y unificar el resaltado por refs
+## T-vigas-1 · Instanciar las vigas (InstancedMesh) y unificar el resaltado por refs — RESUELTO (F2c)
+
+- **Estado:** RESUELTO en F2c (3D pleno lo disparaba: pinta todas las vigas de todas las
+  plantas a la vez). En [GeometriaModelo.tsx](src/ui/viewport/GeometriaModelo.tsx) las vigas
+  ya NO son N `<mesh>` + 2N suscripciones: el picking es UN `InstancedMesh` de cilindros
+  (`VigasPicking`) y el resaltado hover/seleccion se hace MUTANDO el atributo de color
+  por-vertice de la linea visible (`lineSegments`) con UNA sola pareja de suscripciones a
+  `seleccionStore` para todas las vigas. La linea visible (ya unica) se conserva. Coste O(1)
+  en mallas/suscripciones, igual que los pilares.
+- **Origen:** Revisión de ingeniería F9 (Issue 4); cerrado en F2c (outside-voice #10 reorientó
+  el refactor al camino de picking/halo, no a la representacion visible).
+
+<details><summary>Contexto histórico (pre-resolución)</summary>
 
 - **Qué:** Las vigas no están instanciadas. [src/ui/viewport/GeometriaModelo.tsx](src/ui/viewport/GeometriaModelo.tsx)
   (~líneas 182-184, 218-235) crea un `<mesh>` + `cylinderGeometry` y DOS suscripciones a
@@ -45,6 +57,8 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   habrá un bajón de rendimiento temporal.
 - **Coste:** CC ~40 min.
 - **Origen:** Revisión de ingeniería F9 (Issue 4).
+
+</details>
 
 ---
 
@@ -391,21 +405,19 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-3dpleno-ux · Semántica de selección/edición cross-planta en 3D pleno
+## T-3dpleno-ux · Semántica de selección/edición cross-planta en 3D pleno — RESUELTO (F2c)
 
-- **Qué:** Fijar qué pasa al pickear un elemento de una planta que NO es la activa en la vista 3D
-  pleno: ¿cambia `plantaActivaId` a la del elemento, se mantiene, o hay "selección fuera de contexto"?
-- **Por qué:** El 3D pleno (F2c) muestra todas las plantas/grupos a la vez. Sin una decisión clara, el
-  sidebar, los inspectores, las plantillas DXF, los comandos de colocación y el HUD (todos ligados a
-  `grupoActivoId`/`plantaActivaId`) pueden contradecirse al editar un elemento de otra planta.
-- **Cómo retomar:** resolver al planificar F2c. Opciones: (a) seleccionar cambia `plantaActivaId` a la
-  del elemento; (b) selección fuera de contexto sin cambiar la planta activa; (c) modo "edición 3D"
-  explícito. Alinear sidebar/inspector/plantillas/HUD con la elección. El picking-resuelve-planta se
-  implementa como función pura con test de componente (el E2E de lienzo real sigue en T-f16-canvas-smoke).
-- **Depende de / bloquea:** bloquea `C-pick` (edición cross-planta) de F2c; depende de `C-render`.
-- **Coste:** decisión UX + CC ~variable.
-- **Origen:** Revisión de ingeniería F2 (outside voice Codex #15/#16). Plan:
-  `vamos-a-planificar-la-effervescent-newt.md`.
+- **Estado:** RESUELTO en F2c con la opción (a) **sincronizar contexto**: al pickear un elemento
+  en 3D (clic simple, sin shift) se fija `grupoActivoId`/`plantaActivaId` a los suyos vía el helper
+  puro [resolverContextoElemento.ts](src/ui/viewport/hooks/resolverContextoElemento.ts) (pilar → planta
+  del PIE) y se cambia a la pestaña del tipo (pilar→`entradaPilares`, viga→`entradaVigas`) para montar
+  el inspector correcto; la geometría 3D no se oculta. shift-multiselección NO mueve contexto ni pestaña.
+  Sidebar/inspector/GroupRibbon/plantillas quedan coherentes reusando el acoplamiento existente. La
+  colocación gráfica se inhabilita en 3D (SelectorModo fuerza "seleccion"; App no monta paneles/DXF).
+  Tests de componente en [GeometriaModelo.test.tsx](src/ui/viewport/GeometriaModelo.test.tsx).
+- **Deuda derivada:** la planta del pilar PASANTE se resuelve por el pie (no por la altura del clic) →
+  ver [T-3dpleno-pick-altura]; "Ver modelo de cálculo" sólo en 3D → ver [T-modelo-calculo-planta].
+- **Origen:** Revisión de ingeniería F2 (outside voice Codex #15/#16); cerrado en F2c.
 
 ---
 
@@ -630,3 +642,66 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 - **Origen:** Code-review F2b (altitud). Detección de errores del motor por substring de mensajes ingleses
   (`_MARCADORES_SIN_MASA`/`_MARCADORES_INESTABLE`/"k >= n") comparte la fragilidad ya anotada en
   [T-pdelta-deteccion-inestable].
+
+---
+
+## T-modelo-calculo-planta · "Ver modelo de cálculo" también en 2D planta
+
+- **Qué:** El overlay "Ver modelo de cálculo" (F2c) solo se muestra en vista 3D
+  ([ModeloCalculoOverlay.tsx](src/ui/viewport/ModeloCalculoOverlay.tsx) y el control
+  [ModeloCalculo.tsx](src/ui/viewport/ModeloCalculo.tsx) se restringen a `modoVista==="3d"`).
+  Extenderlo a 2D planta, filtrando la Capa 2 a la planta activa.
+- **Por qué:** CLAUDE.md §3 lo describe "sobre la obra… útil para docencia", sin atarlo a 3D. En la
+  introducción en planta (estilo CYPECAD), ver los nudos/releases/apoyos de la planta activa sobre el
+  plano es un apoyo didáctico clásico. Se acotó a 3D en F2c por coherencia con el bundle (Issue 2).
+- **Cómo retomar:** quitar la restricción a "3d" en la visibilidad y, en planta, filtrar la geometría
+  Capa 2 a los nudos/barras de la planta activa (la Capa 2 no porta planta directamente: cruzar por
+  `trazabilidad` o por cota de nudo). Cuidar la densidad visual del lienzo 2D. **Coste:** CC ~45-60 min.
+- **Depende de / bloquea:** nada. **Origen:** Revisión de ingeniería F2c (Issue 2, alcance acotado).
+
+---
+
+## T-3dpleno-pick-altura · Resolver la planta de un pilar pasante por la altura del clic
+
+- **Qué:** Al pickear un pilar en 3D, [resolverContextoElemento.ts](src/ui/viewport/hooks/resolverContextoElemento.ts)
+  sincroniza el contexto a la planta del **pie** (cota menor). Un pilar pasante (varias plantas) se dibuja
+  como UNA instancia, así que clicar arriba salta igualmente al pie.
+- **Por qué:** En edificios con pilares pasantes el salto al pie es contraintuitivo (esperarías la planta
+  donde clicaste). Se eligió el pie en F2c por simplicidad (Issue 6-A): el `instanceId` no aporta la cota.
+- **Cómo retomar:** usar la Z del punto de impacto del raycast (`e.point.z` ya disponible en el `onClick`
+  del pilar) para elegir la planta más cercana por cota; pasar esa Z a `resolverContextoElemento` (o un
+  helper "plantaMásCercana(modelo, grupo, z)"). Cubrir con test el caso pasante + clic por encima de la
+  última planta. **Coste:** CC ~20-30 min.
+- **Depende de / bloquea:** nada. **Origen:** Revisión de ingeniería F2c (Issue 6-A) + auto-decisión del plan.
+
+---
+
+## T-3d-toolsrail-gating · La barra de herramientas (derecha) muestra herramientas 2D en 3D
+
+- **Qué:** En vista 3D, la `ToolsRail` del shell sigue mostrando herramientas que solo
+  tienen sentido en introducción 2D: snap (⌖), modo orto (∟), rejilla (▤) y el botón F4
+  (plantillas DXF/DWG ▦). La colocación está inhabilitada en 3D y el panel de plantillas
+  ya no se monta (F2c gating en App), así que el botón F4 queda inerte en 3D.
+- **Por qué:** Inconsistencia menor de coherencia: ofrecer afordancias inertes en 3D
+  confunde (un botón que no hace nada). F2c acotó el gating al HUD/overlays/App, no a la
+  `ToolsRail` del shell (pre-existente, fuera del alcance de F2c). Hallazgo /design-review.
+- **Cómo retomar:** en la `ToolsRail` del shell, ocultar o deshabilitar las herramientas
+  2D (snap/orto/rejilla/F4) cuando `modoVista !== "planta"`; F3 (capturas ▣) sí tiene
+  sentido en 3D y debe permanecer. **Coste:** CC ~20 min. **Depende de / bloquea:** nada.
+- **Origen:** /design-review de F2c (hallazgo menor, shell-scope).
+
+---
+
+## T-modelo-calculo-6dof · Glifos fieles de apoyos (6 GDL) y releases por GDL/extremo
+
+- **Qué:** El overlay "Ver modelo de cálculo" (F2c) dibuja apoyos en **vista simplificada**
+  ([modeloCalculoGeometria.ts](src/ui/viewport/modeloCalculoGeometria.ts) `clasificarApoyo`):
+  empotrado / articulado / "otro" (cualquier combinación atípica de los 6 GDL cae en "otro"), y los
+  releases como una marca genérica en el extremo liberado. El panel lo rotula "vista simplificada".
+- **Por qué:** un apoyo puede restringir cualquier combinación de 6 GDL (rodillo, empotramiento parcial…)
+  y un release puede liberar GDL concretos en uno o ambos extremos; los glifos actuales no lo distinguen.
+  Como es herramienta de docencia/verificación, conviene no inducir a error en casos atípicos (Issue 7-B).
+- **Cómo retomar:** diseñar glifos que codifiquen el patrón real de GDL restringidos del apoyo (y una
+  insignia para combinaciones atípicas) y marcadores de release por GDL/extremo; quitar la etiqueta "vista
+  simplificada" cuando sea fiel. **Coste:** CC ~45-60 min (diseño de glifos + leyenda + tests).
+- **Depende de / bloquea:** nada. **Origen:** Revisión de ingeniería F2c (Issue 7-B, alcance acotado).

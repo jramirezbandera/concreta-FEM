@@ -10,7 +10,7 @@
 // una obra anterior tras restaurar autosave o cambiar de proyecto).
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Shell, useArranquePersistencia } from "./ui/shell";
-import { Viewport, Slot, CentroMasaOverlay } from "./ui/viewport";
+import { Viewport, Slot, CentroMasaOverlay, ModeloCalculoOverlay } from "./ui/viewport";
 import { suscribirCoords, leerCoords } from "./ui/viewport";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
@@ -103,6 +103,10 @@ const MENSAJE_HERRAMIENTA_VIGA =
 const MENSAJE_VIGA_SIN_TRAMO =
   "Crea o selecciona una planta y elige sección y material para tender vigas";
 
+// Vista 3D pleno (F2c): la introduccion grafica es solo 2D, asi que el mensaje guia a
+// seleccionar/inspeccionar en vez de a colocar. Lenguaje de obra, sin jerga FEM.
+const MENSAJE_3D = "Vista 3D del edificio: selecciona un elemento para inspeccionarlo";
+
 function usePestanaActiva(): Pestana {
   return useSyncExternalStore(
     (cb) => vistaStore.subscribe((s) => s.pestanaActiva, cb),
@@ -124,6 +128,16 @@ function useSnapActivo(): boolean {
     (cb) => vistaStore.subscribe((s) => s.snapActivo, cb),
     () => vistaStore.getState().snapActivo,
     () => vistaStore.getState().snapActivo,
+  );
+}
+
+// Vista 3D pleno (modoVista distinto de "planta"). Gobierna el gating de la
+// introduccion grafica y de las ayudas 2D (calco DXF, paneles de herramienta) en 3D.
+function useEnPleno(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.modoVista, cb),
+    () => vistaStore.getState().modoVista !== "planta",
+    () => false,
   );
 }
 
@@ -256,6 +270,9 @@ export default function App() {
   const puedeColocarViga = usePuedeColocarViga();
   const coords = useCoordsThrottled();
   const persistenciaLista = usePersistenciaLista();
+  // En 3D pleno se inhabilita la introduccion grafica y las ayudas 2D (calco DXF,
+  // paneles de herramienta): se inspecciona, no se introduce (F2c, decision #3).
+  const enPleno = useEnPleno();
 
   // Introduccion grafica de pilares: solo tiene sentido en la pestana de pilares.
   // Aunque los overlays se autoocultan (ColocacionPilar/PanelHerramientaPilar
@@ -277,8 +294,9 @@ export default function App() {
   // herramienta esta activa pero no hay donde colocar, se guia a crear/elegir planta
   // (en vez de dejar que el clic falle en silencio). Pilares y vigas siguen el mismo
   // patron; cada pestana solo consulta su propia herramienta.
-  const mensaje =
-    enPilares && herramienta === "pilar"
+  const mensaje = enPleno
+    ? MENSAJE_3D
+    : enPilares && herramienta === "pilar"
       ? puedeColocar
         ? MENSAJE_HERRAMIENTA_PILAR
         : MENSAJE_PILAR_SIN_TRAMO
@@ -309,11 +327,16 @@ export default function App() {
               // obra. Se componen JUNTO a los overlays de herramienta (no los
               // sustituyen): OverlayPlantillas no es interactivo (no estorba al
               // picking) y PanelPlantillas se autooculta si F4 esta cerrado.
+              // En 3D pleno se ocultan las ayudas 2D (calco DXF) y la colocacion
+              // (auto-guardada); el overlay del modelo de calculo va en todas las
+              // pestanas (se autooculta salvo 3D + toggle). El inspector permanece:
+              // en 3D se selecciona y se edita (F2c).
               sceneOverlays: (
                 <>
-                  <OverlayPlantillas />
+                  {!enPleno && <OverlayPlantillas />}
                   <CentroMasaOverlay />
-                  <ColocacionPilar />
+                  {!enPleno && <ColocacionPilar />}
+                  <ModeloCalculoOverlay />
                 </>
               ),
               hudOverlays: (
@@ -321,12 +344,16 @@ export default function App() {
                   <Slot zona="mid-right">
                     <InspectorPilar />
                   </Slot>
-                  <Slot zona="top-left">
-                    <PanelHerramientaPilar />
-                  </Slot>
-                  <Slot zona="top-right">
-                    <PanelPlantillas />
-                  </Slot>
+                  {!enPleno && (
+                    <Slot zona="top-left">
+                      <PanelHerramientaPilar />
+                    </Slot>
+                  )}
+                  {!enPleno && (
+                    <Slot zona="top-right">
+                      <PanelPlantillas />
+                    </Slot>
+                  )}
                 </>
               ),
             }
@@ -334,9 +361,10 @@ export default function App() {
             ? {
                 sceneOverlays: (
                   <>
-                    <OverlayPlantillas />
+                    {!enPleno && <OverlayPlantillas />}
                     <CentroMasaOverlay />
-                    <ColocacionViga />
+                    {!enPleno && <ColocacionViga />}
+                    <ModeloCalculoOverlay />
                   </>
                 ),
                 hudOverlays: (
@@ -344,12 +372,16 @@ export default function App() {
                     <Slot zona="mid-right">
                       <InspectorViga />
                     </Slot>
-                    <Slot zona="top-left">
-                      <PanelHerramientaViga />
-                    </Slot>
-                    <Slot zona="top-right">
-                      <PanelPlantillas />
-                    </Slot>
+                    {!enPleno && (
+                      <Slot zona="top-left">
+                        <PanelHerramientaViga />
+                      </Slot>
+                    )}
+                    {!enPleno && (
+                      <Slot zona="top-right">
+                        <PanelPlantillas />
+                      </Slot>
+                    )}
                   </>
                 ),
               }
@@ -362,6 +394,8 @@ export default function App() {
                           reutiliza datos de la deformada (lee del modalStore). */}
                       <ModoOverlay />
                       <CentroMasaOverlay />
+                      {/* "Ver modelo de calculo" (F2c): tambien en Resultados (3D). */}
+                      <ModeloCalculoOverlay />
                     </>
                   ),
                   hudOverlays: (

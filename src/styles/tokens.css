@@ -48,6 +48,16 @@
   --deformed: #38bdf8; /* deformada / flecha */
   --node: #c07d12; /* nudos FEM (Capa 2) */
 
+  /* --- "Ver modelo de cálculo" (F2c) ---
+     Capa 2 (nudos/barras/releases/apoyos) semitransparente sobre la obra, en tonos
+     "azulado técnico" distintos de la obra (--pilar/--viga) para leerse como un calco
+     del modelo de cálculo. Apoyos y releases se distinguen además por FORMA, no solo
+     color (colorblind-safe). */
+  --barra-calc: #5b7a99; /* barras del modelo de cálculo */
+  --nodo-calc: #33506e; /* nudos del modelo de cálculo */
+  --apoyo-calc: #1f9e89; /* apoyos (glifo por GDL restringidos) */
+  --release-calc: #e0863a; /* extremo liberado (release) */
+
   /* --- Centros del forjado (F2a, D-diseño-5) ---
      Centro de masas: ayuda de modelado (overlay ⊕ + panel). Hue DISTINTO del mapa
      semantico de elementos (--pilar azul-gris / --viga ocre / --load naranja /

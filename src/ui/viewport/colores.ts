@@ -26,6 +26,13 @@ const FALLBACK = {
   deformed: "#38bdf8",
   centroMasa: "#d6336c",
   onAccent: "#ffffff",
+  // "Ver modelo de calculo" (F2c): capa de Capa 2 (nudos/barras/releases/apoyos) en
+  // tonos "azulado tecnico" distintos de la obra, semitransparente. DEBE coincidir con
+  // tokens.css (--barra-calc...).
+  barraCalc: "#5b7a99",
+  nodoCalc: "#33506e",
+  apoyoCalc: "#1f9e89",
+  releaseCalc: "#e0863a",
 } as const;
 
 // Mapa nombre logico -> nombre de la CSS custom property (sin el prefijo --).
@@ -44,6 +51,10 @@ const VAR_NAME: Record<keyof typeof FALLBACK, string> = {
   deformed: "deformed",
   centroMasa: "centro-masa",
   onAccent: "on-accent",
+  barraCalc: "barra-calc",
+  nodoCalc: "nodo-calc",
+  apoyoCalc: "apoyo-calc",
+  releaseCalc: "release-calc",
 };
 
 export type NombreColor = keyof typeof FALLBACK;

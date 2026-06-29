@@ -5,7 +5,7 @@
 // como `derivar` es pura, el entorno es indiferente. Cubre todas las ramas:
 // filtrado por grupo/planta, referencias rotas, ladoSeccion y cota del tramo.
 import { describe, it, expect } from "vitest";
-import { derivar } from "./useGeometriaModelo";
+import { derivar, idsEfectivos } from "./useGeometriaModelo";
 import { crearModeloVacio } from "../../../dominio";
 import type {
   Modelo,
@@ -212,6 +212,41 @@ describe("derivar: lado de seccion proyectada en planta", () => {
       pilares: [pilar("p", 0, 0, "p0", "p1", "perfil")],
     };
     expect(derivar(modelo, null, null).pilares[0].lado).toBe(0.3);
+  });
+});
+
+// --- idsEfectivos: colapso del filtro segun modo de vista (F2c / 3D pleno) ----
+
+describe("idsEfectivos: 3D pleno colapsa el filtro de grupo/planta", () => {
+  it('modo "planta" respeta grupo y planta activos', () => {
+    expect(idsEfectivos("planta", "gA", "p1")).toEqual(["gA", "p1"]);
+  });
+
+  it('modo "3d" ignora grupo/planta (todo el edificio)', () => {
+    expect(idsEfectivos("3d", "gA", "p1")).toEqual([null, null]);
+  });
+
+  it('modo "mosaico" tambien colapsa (comparte la escena 3D del Viewport)', () => {
+    expect(idsEfectivos("mosaico", "gA", "p1")).toEqual([null, null]);
+  });
+
+  it("G1 anti-bucle: en 3D un pick que cambia grupo/planta NO cambia los ids efectivos", () => {
+    // Pickear en 3D sincroniza el contexto (F1.3), pero los ids efectivos siguen
+    // siendo [null,null] -> los deps del useMemo no cambian -> no se recomputa derivar.
+    expect(idsEfectivos("3d", "gA", "p1")).toEqual(idsEfectivos("3d", "gB", "p2"));
+  });
+
+  it("en 3D la geometria via ids efectivos muestra todos los grupos", () => {
+    const modelo: Modelo = {
+      ...modeloBase(),
+      pilares: [pilar("pa", 0, 0, "p0", "p1"), pilar("pb", 0, 0, "p2", "p2")],
+      vigas: [viga("va", "p1", "n1", "n2"), viga("vb", "p2", "n1", "n2")],
+    };
+    // Aunque haya grupo/planta activos, en 3D los ids efectivos son null,null.
+    const [g, p] = idsEfectivos("3d", "gA", "p1");
+    const geo = derivar(modelo, g, p);
+    expect(geo.pilares.map((x) => x.id).sort()).toEqual(["pa", "pb"]);
+    expect(geo.vigas.map((x) => x.id).sort()).toEqual(["va", "vb"]);
   });
 });
 
