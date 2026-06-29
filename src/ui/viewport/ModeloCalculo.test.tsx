@@ -59,6 +59,14 @@ describe("ModeloCalculo: visibilidad", () => {
     expect(screen.getByRole("checkbox", { name: "Ver modelo de cálculo" })).not.toBeChecked();
   });
 
+  it("tambien se muestra en mosaico (pleno !== planta), no solo en 3D", () => {
+    // Mosaico comparte la escena 3D y App lo trata como pleno; el control debe aparecer
+    // (antes se ocultaba por gating === "3d", dejando mosaico incoherente).
+    vistaStore.getState().setModoVista("mosaico");
+    render(<ModeloCalculo />);
+    expect(screen.getByText("Ver modelo de cálculo")).toBeInTheDocument();
+  });
+
   it("el toggle escribe en vistaStore (compartido con el overlay)", async () => {
     const user = userEvent.setup();
     render(<ModeloCalculo />);

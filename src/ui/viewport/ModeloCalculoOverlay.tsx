@@ -3,8 +3,9 @@
 // calculo no vibra) inyectado por sceneOverlays. Espejo del patron de CentroMasaOverlay:
 // useSyncExternalStore + useMemo (derivacion pura) + invalidate() (frameloop="demand").
 //
-// VISIBILIDAD: solo con el toggle `mostrarModeloCalculo` encendido Y en vista 3D (el
-// modelo de calculo se aprecia sobre el edificio completo; en planta se descuadraria).
+// VISIBILIDAD: solo con el toggle `mostrarModeloCalculo` encendido Y en vista pleno
+// (3D o mosaico, `!== "planta"`: el modelo de calculo se aprecia sobre el edificio
+// completo; en planta se descuadraria). Mismo criterio que el control y el gating de App.
 // La fuente del ModeloFEM (resultados vigentes o discretizar puro) la decide
 // useFuenteModeloCalculo, que SOLO discretiza cuando el overlay esta activo.
 //
@@ -47,7 +48,10 @@ function useModeloCalculoVisible(): boolean {
     },
     () => {
       const s = vistaStore.getState();
-      return s.mostrarModeloCalculo && s.modoVista === "3d";
+      // "pleno" = cualquier vista que NO sea planta (3D y mosaico comparten la escena
+      // 3D); mismo criterio que el control y el gating de App, para que mosaico no quede
+      // como un 3D-pleno sin overlay.
+      return s.mostrarModeloCalculo && s.modoVista !== "planta";
     },
     () => false,
   );

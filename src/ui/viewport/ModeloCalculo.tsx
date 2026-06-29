@@ -15,12 +15,15 @@ import { useFuenteModeloCalculo } from "./modeloCalculoFuente";
 import type { ModeloFEM } from "../../discretizador";
 import "./modeloCalculo.css";
 
-// Vista 3D? El control (y el overlay) solo se ofrecen en 3D.
-function useEn3D(): boolean {
+// Vista 3D pleno? El control (y el overlay) se ofrecen en cualquier vista que NO sea
+// planta (3D y mosaico comparten la escena 3D y muestran el edificio completo: el mismo
+// criterio `!== "planta"` que usan el colapso de geometria y el gating de App). Antes
+// usaba `=== "3d"`, lo que dejaba mosaico como un 3D-pleno SIN el toggle (incoherente).
+function useEnPleno(): boolean {
   return useSyncExternalStore(
     (cb) => vistaStore.subscribe((s) => s.modoVista, cb),
-    () => vistaStore.getState().modoVista === "3d",
-    () => false,
+    () => vistaStore.getState().modoVista !== "planta",
+    () => vistaStore.getState().modoVista !== "planta",
   );
 }
 
@@ -43,13 +46,13 @@ function conteos(fem: ModeloFEM): { nudos: number; barras: number; apoyos: numbe
 }
 
 export function ModeloCalculo() {
-  const en3d = useEn3D();
+  const enPleno = useEnPleno();
   const mostrar = useMostrar();
-  // Mismo `activo` que el overlay (mostrar && 3D): comparte el memo de fuente (un solo
-  // discretizar). Se llama SIEMPRE (reglas de hooks); con !en3d el control no se pinta.
-  const fuente = useFuenteModeloCalculo(mostrar && en3d);
+  // Mismo `activo` que el overlay (mostrar && pleno): comparte el memo de fuente (un solo
+  // discretizar). Se llama SIEMPRE (reglas de hooks); fuera de pleno el control no se pinta.
+  const fuente = useFuenteModeloCalculo(mostrar && enPleno);
 
-  if (!en3d) return null;
+  if (!enPleno) return null;
 
   const toggle = () => vistaStore.getState().toggleModeloCalculo();
 
