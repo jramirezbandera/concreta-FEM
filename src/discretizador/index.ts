@@ -22,3 +22,9 @@ export type { ErrorObra, ContextoModal } from "./validaciones";
 // Centro de masas por planta (F2.1, calculo PURO; lo consume la UI de F2.4).
 export { calcularCentroMasaPlanta } from "./centros";
 export type { CentroMasaPlanta } from "./centros";
+
+// Preparacion del modelo para el CENTRO DE RIGIDEZ (F1.1, calculo PURO). Base FEM
+// (geometria+rigidez, sin cargas) + plantasInfo (diafragma por planta). Lo consume el
+// worker/cliente `calcularCR` (F1.3).
+export { prepararModeloCR } from "./modeloCR";
+export type { PlantaInfoCR, ResultadoPrepararCR } from "./modeloCR";

@@ -13,6 +13,7 @@ import { applyPatches } from "./comandos/comando";
 import type { Comando, AplicadorParches } from "./comandos/comando";
 import { resultadosStore } from "./resultadosStore";
 import { modalStore } from "./modalStore";
+import { crStore } from "./crStore";
 
 // Una sola pila para toda la vida del store (modulo, no estado React): el
 // historial es infraestructura, no dato serializable de la obra.
@@ -49,10 +50,13 @@ export const modeloStore = create<ModeloState>()(
       // (F14 los muestra obsoletos en gris). Las formas modales (modalStore, F2b)
       // siguen el MISMO patron: editar baja su `vigente`, cambiar de obra las descarta.
       // Cambiar de obra usa descartar() (reset total). Import unidireccional
-      // modeloStore->resultadosStore/modalStore (ninguno de los dos importa modeloStore).
+      // modeloStore->resultadosStore/modalStore/crStore (ninguno importa modeloStore).
+      // El centro de rigidez (crStore, F2) sigue el MISMO patron: editar baja su
+      // `vigente`, cambiar de obra lo descarta.
       const invalidarResultados = () => {
         resultadosStore.getState().limpiar();
         modalStore.getState().limpiar();
+        crStore.getState().limpiar();
       };
 
       // Refleja en el store el estado de la pila tras cualquier cambio de
@@ -81,6 +85,7 @@ export const modeloStore = create<ModeloState>()(
           sincronizarPila();
           resultadosStore.getState().descartar();
           modalStore.getState().descartar();
+          crStore.getState().descartar();
         },
 
         ejecutar: (comando) => {

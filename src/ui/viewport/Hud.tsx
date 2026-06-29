@@ -12,6 +12,7 @@ import { modeloStore, vistaStore, type ModoVista } from "../../estado";
 import { Segmentado, type OpcionSegmento, PanelFlotante, Boton } from "../primitivas";
 import { Slot } from "./Slot";
 import { CentroMasa } from "./CentroMasa";
+import { CentroRigidez } from "./CentroRigidez";
 import { ModeloCalculo } from "./ModeloCalculo";
 import { plantasDeGrupo } from "./hooks/useGeometriaModelo";
 import { emitirZoom } from "./hooks/zoomBus";
@@ -213,10 +214,14 @@ export function Hud() {
       {/* Control del Centro de masas (F2.4): toggle + panel de datos. En mid-left
           (zona reservada hasta ahora) para no competir con GroupRibbon (top-left) ni
           con los inspectores (mid-right). Se autooculta fuera de vista planta. */}
-      {/* Centro de masas (vista planta) y "Ver modelo de cálculo" (vista 3D) comparten
-          la zona mid-left; cada uno se autooculta segun el modo, asi nunca coinciden. */}
+      {/* Centro de masas y centro de rigidez (vista planta) y "Ver modelo de cálculo"
+          (vista 3D) comparten la zona mid-left; cada uno se autooculta segun el modo (CM
+          y CR solo en planta, modelo de calculo solo en 3D), asi nunca coinciden todos a
+          la vez. CM y CR SI conviven en planta (apilados): son ayudas complementarias y
+          su excentricidad es el valor que el arquitecto compara. */}
       <Slot zona="mid-left">
         <CentroMasa />
+        <CentroRigidez />
         <ModeloCalculo />
       </Slot>
       <Slot zona="bottom-right">

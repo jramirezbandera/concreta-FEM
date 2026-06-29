@@ -27,13 +27,12 @@ import {
   type Trazabilidad,
 } from "../../discretizador";
 import { calculoStore } from "../../estado/calculoStore";
-import { modeloStore } from "../../estado/modeloStore";
 import { modalStore } from "../../estado/modalStore";
-import { vistaStore } from "../../estado/vistaStore";
-import { esErrorMotor, solverClient } from "../../solver";
-import type { EstadoMotor } from "../../solver";
+import { solverClient } from "../../solver";
+import type { EstadoMotor, ResultadosModales } from "../../solver";
 import type { ErrorCalculo, CalculoSink } from "./useCalcular";
 import { refrescarEstadoMotor } from "./useCalcular";
+import { ejecutarPipelineAuxiliar } from "./ejecutarPipelineAuxiliar";
 
 // API publica de useSolicitarModos(). El panel de frecuencias (PanelFrecuencias) y el
 // boton/menu la consumen. Reusa el ciclo de vida del motor que comparte calculoStore.
@@ -75,87 +74,54 @@ const sinkAlStore: CalculoSink = {
 // doble disparo (boton del panel + item de menu comparten este flag).
 let modalEnVuelo = false;
 
+// Payload de la fase pura del camino modal: el ModeloFEM modal + la trazabilidad que el
+// modalStore guarda junto a los modos (mismo origen, deben casar).
+interface PayloadModal {
+  modeloFEM: ModeloFEM;
+  trazabilidad: Trazabilidad;
+}
+
 // -----------------------------------------------------------------------------
 // calcularModos(): pipeline IMPERATIVO obra -> FEM modal -> frecuencias/formas, SIN
 // hooks. Fuente UNICA del camino modal. La consumen el hook useSolicitarModos() (camino
 // reactivo de la UI) y el DISPATCH del menu "Calcular modos" (Menubar.tsx, imperativo).
 //
-// El guard de reentrada es a nivel de modulo: dos disparos solapados (doble clic, o
-// boton + menu a la vez) no lanzan dos calculos modales. Comparte el calculoStore con
-// el estatico para reflejar el estado del motor.
+// El esqueleto (guard de reentrada, onCalculando/onErrorMotor, discretizar->corte,
+// guard de identidad, auto-switch a Resultados, catch/finally) lo lleva el runner
+// compartido (4A); aqui parametrizamos lo propio del camino modal. Comparte el
+// calculoStore con el estatico para reflejar el estado del motor.
 // -----------------------------------------------------------------------------
 export async function calcularModos(numModos: number): Promise<void> {
-  if (modalEnVuelo) return; // ya hay un calculo modal en curso: no relanzar.
-  modalEnVuelo = true;
-  sinkAlStore.onCalculando?.(true);
-  sinkAlStore.onErrorMotor?.(null);
-
-  try {
-    // a. Modelo actual de obra (Capa 1).
-    const modelo = modeloStore.getState().getModelo();
-
-    // b. Discretizar en MODO MODAL (puro). opts.modal => analysis.type:"modal" +
-    // num_modes; corre las guardas modales (MODAL_NUM_MODOS / MODAL_SIN_MASA). ok:false
-    // => errores de obra (en lenguaje de obra), no llamamos al motor.
-    const resultadoDisc = discretizar(modelo, { modal: { numModos } });
-    if (!resultadoDisc.ok) {
-      sinkAlStore.onErrores?.(resultadoDisc.errores);
-      return; // Cortamos antes del motor: la obra no esta lista para modal.
-    }
-    // ok:true => limpiamos errores previos.
-    sinkAlStore.onErrores?.([]);
-
-    const modeloFEM: ModeloFEM = resultadoDisc.modeloFEM;
-    const trazabilidad: Trazabilidad = resultadoDisc.trazabilidad;
-
-    // c. Calcular los modos en el motor. solverClient.calcularModal asegura el motor
-    // listo (precarga si hace falta), valida la salida con Zod y aplica timeout.
-    // Refrescamos el estado del motor en cuanto lanzamos para reflejar "cargando"/"calculando".
-    sinkAlStore.onRefrescarEstado?.();
-    const modos = await solverClient.calcularModal(modeloFEM);
-
-    // c.bis Guard de carrera (igual que calcularObra): si la obra cambio MIENTRAS
-    // calculabamos, estos modos corresponden al modelo VIEJO. modeloStore usa Immer:
-    // cualquier edicion reemplaza la referencia, basta comparar identidad. Si cambio,
-    // NO los comprometemos como vigentes (el editar ya disparo limpiar() en modalStore).
-    if (modeloStore.getState().getModelo() !== modelo) {
-      return;
-    }
-
-    // d. Exito: fijar los modos (con el ModeloFEM y la trazabilidad que los generaron:
-    // el modalStore los recibe juntos a proposito). setModos reancla modoActivo=1.
-    modalStore.getState().setModos(modos, modeloFEM, trazabilidad);
-
-    // Auto-switch a la pestana Resultados (espejo de calcularObra, hallazgo D2): el
-    // PanelFrecuencias y el ModoOverlay SOLO se montan en Resultados, asi que lanzar
-    // "Calcular modos" desde el menu en otra pestana ejecutaria el motor sin que el
-    // usuario viera nada. Tras el guard de identidad (no navegar si la obra cambio
-    // durante el await) y tras fijar los modos, llevamos al usuario a verlos. NO
-    // forzamos modo 3D (igual que calcularObra con la deformada): el usuario conmuta a
-    // 3D con sus controles cuando quiere ver la forma animada.
-    vistaStore.getState().setPestanaActiva("resultados");
-  } catch (e) {
-    // e. Fallo del motor (carga o calculo modal). No relanzamos: dejamos el error
-    // consultable. esErrorMotor distingue el ErrorMotor plano del worker; su `mensaje`
-    // ya viene en lenguaje de obra.
-    if (esErrorMotor(e)) {
-      sinkAlStore.onErrorMotor?.(e);
-    } else {
-      sinkAlStore.onErrorMotor?.({
-        fase: "calculo",
-        mensaje:
-          "No se pudieron calcular los modos de vibracion por un fallo inesperado. " +
-          "Vuelve a intentarlo; si persiste, reporta la incidencia.",
-        detalle: e instanceof Error ? e.message : String(e),
-      });
-    }
-  } finally {
-    modalEnVuelo = false;
-    sinkAlStore.onCalculando?.(false);
-    // Refresco final: el motor vuelve a "listo" tras un calculo (o a "error"); que la
-    // UI lo refleje cuanto antes.
-    sinkAlStore.onRefrescarEstado?.();
-  }
+  await ejecutarPipelineAuxiliar<PayloadModal, ResultadosModales>({
+    estaEnVuelo: () => modalEnVuelo,
+    marcarEnVuelo: (v) => {
+      modalEnVuelo = v;
+    },
+    preparar: (modelo) => {
+      // Discretizar en MODO MODAL: opts.modal => analysis.type:"modal" + num_modes;
+      // corre las guardas modales (MODAL_NUM_MODOS / MODAL_SIN_MASA). El modal NO tiene
+      // canal de avisos: no devolvemos `avisos` (el runner no llamara a onAvisos).
+      const disc = discretizar(modelo, { modal: { numModos } });
+      if (!disc.ok) return { ok: false, errores: disc.errores };
+      return {
+        ok: true,
+        payload: { modeloFEM: disc.modeloFEM, trazabilidad: disc.trazabilidad },
+      };
+    },
+    // solverClient.calcularModal asegura el motor listo, valida con Zod y aplica timeout.
+    ejecutar: ({ modeloFEM }) => solverClient.calcularModal(modeloFEM),
+    // Fijar los modos (con el ModeloFEM y la trazabilidad que los generaron: el
+    // modalStore los recibe juntos a proposito). setModos reancla modoActivo=1. El
+    // auto-switch a Resultados (hallazgo D2: PanelFrecuencias/ModoOverlay solo se montan
+    // ahi) lo hace el runner tras el guard de identidad.
+    alExito: (modos, { modeloFEM, trazabilidad }) => {
+      modalStore.getState().setModos(modos, modeloFEM, trazabilidad);
+    },
+    mensajeFalloInesperado:
+      "No se pudieron calcular los modos de vibracion por un fallo inesperado. " +
+      "Vuelve a intentarlo; si persiste, reporta la incidencia.",
+    sink: sinkAlStore,
+  });
 }
 
 // -----------------------------------------------------------------------------

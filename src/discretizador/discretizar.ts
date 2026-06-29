@@ -139,36 +139,41 @@ function materialFEM(id: string): MaterialFEM | undefined {
   return base;
 }
 
-// --- discretizador -----------------------------------------------------------
+// --- Base FEM: geometria + rigidez (factorizada de discretizar) --------------
+// Capa 2 BASE = nodos, materiales, secciones, barras, apoyos, releases + la
+// trazabilidad completa. Es la parte INDEPENDIENTE de las cargas/combos/analisis:
+// `discretizar` la completa con los Pasos 6-8 (cargas de usuario, peso propio, combos,
+// analysis); `prepararModeloCR` (F1.1) la reusa SIN cargas (el CR solo necesita
+// geometria+rigidez; sus cargas unitarias las fabrica el glue). Factorizar aqui (no
+// envolver discretizar) es lo que permite que el CR NO quede bloqueado por validaciones
+// de CARGA que no le afectan (Codex #15): este builder no traduce ni valida cargas.
+//
+// PRESUPONE que las validaciones previas de REFERENCIAS y SUJECION ya pasaron (el
+// llamante corre `validarModelo` antes): los `!`/`as Planta`/throw internos son bugs
+// internos si fallan, no errores de obra. Es PURO y DETERMINISTA (byte a byte).
+//
+// `avisosBase` porta los avisos que nacen al construir la base (hoy solo el arranque
+// elastico tratado como empotrado): el llamante decide si los expone (discretizar si;
+// el CR los ignora). Los artefactos internos (barraPorAmbito, localizarNodoDeNudo,
+// nombrePorClave, vigasOrdenadas/pilaresOrdenados) se devuelven para que discretizar
+// emita las cargas SIN recalcular geometria.
+export type BaseFEM = {
+  materials: MaterialFEM[];
+  sections: SeccionFEM[];
+  nodes: NodoFEM[];
+  members: MiembroFEM[];
+  supports: ApoyoFEM[];
+  trazabilidad: Trazabilidad;
+  avisosBase: ErrorObra[];
+  // Artefactos internos para el Paso 6/6b (cargas) de discretizar:
+  barraPorAmbito: Map<string, string>;
+  localizarNodoDeNudo: (nudoId: string) => string | undefined;
+  pilaresOrdenados: Pilar[];
+  vigasOrdenadas: Modelo["vigas"];
+};
 
-export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDiscretizacion {
-  // Camino modal (F2b): `opts.modal` => analisis MODAL, separado del estatico. Las
-  // validaciones reciben el contexto modal para correr las guardas exclusivas
-  // (MODAL_NUM_MODOS, MODAL_SIN_MASA); sin `opts.modal` el comportamiento es identico
-  // al estatico (sin regresion). Funcion PURA y determinista en ambos caminos.
-  const contextoModal: ContextoModal | undefined =
-    opts?.modal !== undefined ? { numModos: opts.modal.numModos } : undefined;
-
-  // Paso 0: validaciones previas, repartidas por SEVERIDAD. Los "error" bloquean
-  // (referencias rotas, sin sujecion, nombres dup): no se construye nada. Los
-  // "aviso" (hipotesis vacia, nudo flotante) NO impiden calcular: se acumulan en el
-  // canal `avisos` del ok:true para no negar el calculo por una limpieza pendiente.
-  const erroresPrevios = validarModelo(modelo, contextoModal);
-  const bloqueantesPrevios = erroresPrevios.filter((e) => e.severidad === "error");
-  if (bloqueantesPrevios.length > 0) {
-    return { ok: false, errores: bloqueantesPrevios };
-  }
-
-  // Avisos NO bloqueantes: limitaciones que el codigo trata de forma segura (p.ej.
-  // arranque elastico -> empotrado) y avisos previos de modelo (COMBO_SIN_CARGAS,
-  // FLOTANTE). Se acumulan y se devuelven con ok:true. Distintos de
-  // `erroresTraduccion` (bloqueantes, mas abajo).
-  const avisos: ErrorObra[] = erroresPrevios.filter((e) => e.severidad === "aviso");
-
-  // Errores BLOQUEANTES de la traduccion: limitaciones que, de ignorarse,
-  // descartarian carga real sin que el arquitecto lo sepa (carga superficial/no
-  // aplicable en F1). Es mas seguro bloquear el calculo que dar menos carga.
-  const erroresTraduccion: ErrorObra[] = [];
+export function construirBaseFEM(modelo: Modelo): BaseFEM {
+  const avisosBase: ErrorObra[] = [];
 
   // --- Paso 1: materiales y secciones usados (dedup por id, mapeo directo) ----
   const materialIds = new Set<string>();
@@ -224,12 +229,68 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     return [...cotas].sort((a, b) => a - b);
   };
 
+  // Planta a la que pertenece una cota de un pilar, para etiquetar el nudo FEM de esa
+  // cota con su planta (trazabilidad `nodoFEMAPlanta`, F0.2, asignacion AUTORITATIVA
+  // por contexto de creacion, decision 1A). Reglas:
+  //  - Se buscan las plantas cuya `cota` coincide con `c` (la cota deriva de
+  //    modelo.plantas via cotasDePilar, asi que SIEMPRE existe al menos una).
+  //  - Se PREFIERE una planta del MISMO grupo que el pilar (su grupo lo definen
+  //    plantaInicial/plantaFinal): el arranque y la cabeza del pilar, y por extension
+  //    sus cotas intermedias dentro del tramo, pertenecen a ese grupo.
+  //  - DESEMPATE determinista (mismo grupo o no): la PRIMERA planta por orden canonico
+  //    de `id` (min). Independiente del orden de modelo.plantas (determinismo byte a
+  //    byte, CLAUDE.md §7).
+  // No puede devolver undefined para una cota de pilar (la cota proviene de una planta
+  // real); si lo hiciera seria un bug interno y el Paso 1b/validacion lo detecta.
+  const gruposDelPilar = (p: Pilar): Set<string> => {
+    const grupos = new Set<string>();
+    const pi = plantaPorId(modelo, p.plantaInicial);
+    const pf = plantaPorId(modelo, p.plantaFinal);
+    if (pi !== undefined) grupos.add(pi.grupoId);
+    if (pf !== undefined) grupos.add(pf.grupoId);
+    return grupos;
+  };
+  const plantaDeCotaPilar = (p: Pilar, c: number): string | undefined => {
+    const grupos = gruposDelPilar(p);
+    const enCota = modelo.plantas.filter((pl) => pl.cota === c);
+    if (enCota.length === 0) return undefined;
+    const preferidas = enCota.filter((pl) => grupos.has(pl.grupoId));
+    const candidatas = preferidas.length > 0 ? preferidas : enCota;
+    // Min por id (orden canonico) = desempate estable e independiente del orden.
+    return candidatas.reduce((min, pl) => (pl.id < min ? pl.id : min), candidatas[0].id);
+  };
+
+  // Candidatos de planta por clave de nodo (F0.2): clave de snapping -> conjunto de
+  // plantaIds que reclaman ese nudo FEM. Se rellena en las MISMAS pasadas que
+  // registran los puntos (pilares y vigas), por su CONTEXTO DE CREACION (la planta de
+  // la cota para nudos de pilar; la planta declarada de la viga para sus extremos).
+  // Es un Set de candidatos (no una asignacion directa) para resolver de forma
+  // determinista el CONFLICTO DE SNAP: dos elementos de plantas DISTINTAS con misma
+  // clave (mismo X,Z y misma cota) comparten un unico nudo FEM pero lo reclaman dos
+  // plantas. El desempate se aplica DESPUES (min por id), independiente del orden de
+  // recorrido => byte a byte estable.
+  const candidatosPlantaPorClave = new Map<string, Set<string>>();
+  const anotarPlanta = (clave: string, plantaId: string | undefined): void => {
+    if (plantaId === undefined) return;
+    let set = candidatosPlantaPorClave.get(clave);
+    if (set === undefined) {
+      set = new Set<string>();
+      candidatosPlantaPorClave.set(clave, set);
+    }
+    set.add(plantaId);
+  };
+
   // Asocia a cada elemento sus claves de nodo (en el orden de la barra) para el
   // paso 3, evitando recalcular geometria.
   const clavesPilar = new Map<string, string[]>(); // pilarId -> claves por cota asc
   for (const p of modelo.pilares) {
     const cotas = cotasDePilar(p);
-    const claves = cotas.map((c) => registrarPunto(mapearEjes(p.x, p.y, c)));
+    const claves = cotas.map((c) => {
+      const clave = registrarPunto(mapearEjes(p.x, p.y, c));
+      // Cada nudo del pilar (pie, cabeza e intermedios de troceo) -> planta de su cota.
+      anotarPlanta(clave, plantaDeCotaPilar(p, c));
+      return clave;
+    });
     clavesPilar.set(p.id, claves);
   }
   const clavesViga = new Map<string, [string, string]>(); // vigaId -> [claveI, claveJ]
@@ -239,6 +300,9 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     const nj = nudoPorId(modelo, v.nudoJ)!;
     const ci = registrarPunto(mapearEjes(ni.x, ni.y, planta.cota));
     const cj = registrarPunto(mapearEjes(nj.x, nj.y, planta.cota));
+    // Ambos extremos de la viga -> su planta DECLARADA (autoritativa, v.plantaId).
+    anotarPlanta(ci, v.plantaId);
+    anotarPlanta(cj, v.plantaId);
     clavesViga.set(v.id, [ci, cj]);
   }
 
@@ -348,7 +412,7 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
       // empotrado y elastico -> empotrado (6 GDL).
       apoyo = { node, DX: true, DY: true, DZ: true, RX: true, RY: true, RZ: true };
       if (p.arranque === "elastico") {
-        avisos.push({
+        avisosBase.push({
           codigo: "ELASTICO_NO_SOPORTADO",
           severidad: "aviso",
           mensaje: `El arranque elástico del pilar "${p.nombre}" aún no se modela: se calcula como empotrado.`,
@@ -364,23 +428,6 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   const supports: ApoyoFEM[] = [...supportsPorNodo.values()].sort((a, b) =>
     a.node < b.node ? -1 : a.node > b.node ? 1 : 0,
   );
-
-  // --- Paso 6: cargas (case = hipotesisId) ------------------------------------
-  // (El paso 5, releases, ya quedo resuelto en el paso 3 por barra.)
-  // La barra de una carga sobre viga/pilar se lee de `barraPorAmbito` (FUENTE UNICA,
-  // construida en el Paso 3): en F1 una viga es una sola barra; un pilar puede ser
-  // varias (pasante) y la carga va a su primer tramo (pie). Cargas sobre nudo van a
-  // node_loads.
-  const node_loads: CargaNodoFEM[] = [];
-  const dist_loads: CargaDistFEM[] = [];
-  // pt_loads: F1 NO emite cargas puntuales sobre barra. El dominio no tiene posicion
-  // para una puntual sobre viga (una puntual en el apoyo no produce flexion y se
-  // perderia en silencio), asi que ese caso se BLOQUEA (CARGA_PUNTUAL_SIN_POSICION)
-  // mas abajo. CargaPuntualFEM/pt_loads permanecen en el contrato para una fase
-  // futura que aporte posicion; aqui se emite siempre vacio.
-  const pt_loads: CargaPuntualFEM[] = [];
-
-  const hipById = new Map<string, Hipotesis>(modelo.hipotesis.map((h) => [h.id, h]));
 
   // Localiza el nodo FEM de un nudo de dominio: la viga que lo usa aporta la cota
   // (un Nudo de Capa 1 es {id,x,y} en planta, SIN cota; la cota la pone la planta de
@@ -411,6 +458,138 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     }
     return undefined;
   };
+
+  // --- Trazabilidad (campo aditivo): completar los mapas que dependen de nodos --
+  // pilarAMembers y vigaAMember ya se llenaron en el Paso 3. Aqui se anaden los dos
+  // que mapean a NODOS, reusando datos ya calculados (clavesPilar, localizarNodoDeNudo).
+  // Orden de insercion determinista: se recorren las colecciones YA ordenadas por id
+  // (pilaresOrdenados/vigasOrdenadas), no `modelo.pilares`/`modelo.vigas`, de modo que
+  // un modelo reordenado produce la misma trazabilidad byte a byte.
+  const pilarANodoArranque: Record<string, string> = {};
+  for (const p of pilaresOrdenados) {
+    if (!p.vinculacionExterior) continue;
+    // Mismo nodo de arranque que el Paso 4 (apoyos): pie = clave de cota menor.
+    const claveArranque = clavesPilar.get(p.id)![0];
+    pilarANodoArranque[p.id] = nodoNombre(claveArranque);
+  }
+  const nudoANodo: Record<string, string> = {};
+  for (const v of vigasOrdenadas) {
+    for (const nudoId of [v.nudoI, v.nudoJ]) {
+      if (nudoANodo[nudoId] !== undefined) continue; // ya localizado por otra viga
+      const nodo = localizarNodoDeNudo(nudoId);
+      if (nodo !== undefined) nudoANodo[nudoId] = nodo;
+    }
+  }
+
+  // nodoFEMAPlanta (F0.2): nombre de nudo FEM -> plantaId, asignacion AUTORITATIVA por
+  // contexto de creacion (decision 1A). Se resuelve cada clave a UNA planta aplicando
+  // el desempate del conflicto de snap: la PRIMERA por orden canonico de id (min) entre
+  // sus candidatos. Se recorren los nodos YA ordenados (puntosOrdenados, por (Y,X,Z))
+  // para un orden de insercion determinista, byte a byte estable e independiente del
+  // orden de modelo.pilares/vigas/plantas. Todo nudo de `nodes` DEBE tener candidato:
+  // si no, es un BUG INTERNO del discretizador (un nudo se creo sin contexto de planta),
+  // no un error de obra; se deja propagar como los otros throw del Paso 1.
+  const nodoFEMAPlanta: Record<string, string> = {};
+  for (const pt of puntosOrdenados) {
+    const candidatos = candidatosPlantaPorClave.get(pt.clave);
+    const nombre = nodoNombre(pt.clave);
+    if (candidatos === undefined || candidatos.size === 0) {
+      throw new Error(`Nudo FEM sin planta asignada (bug interno): ${nombre}`);
+    }
+    // Min por id = desempate determinista del conflicto de snap (plantas distintas que
+    // comparten el mismo nudo). En el caso comun el set tiene un unico candidato.
+    let plantaId: string | undefined;
+    for (const id of candidatos) {
+      if (plantaId === undefined || id < plantaId) plantaId = id;
+    }
+    nodoFEMAPlanta[nombre] = plantaId!;
+  }
+
+  const trazabilidad: Trazabilidad = {
+    pilarAMembers,
+    vigaAMember,
+    pilarANodoArranque,
+    nudoANodo,
+    nodoFEMAPlanta,
+  };
+
+  return {
+    materials,
+    sections,
+    nodes,
+    members,
+    supports,
+    trazabilidad,
+    avisosBase,
+    barraPorAmbito,
+    localizarNodoDeNudo,
+    pilaresOrdenados,
+    vigasOrdenadas,
+  };
+}
+
+// --- discretizador -----------------------------------------------------------
+
+export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDiscretizacion {
+  // Camino modal (F2b): `opts.modal` => analisis MODAL, separado del estatico. Las
+  // validaciones reciben el contexto modal para correr las guardas exclusivas
+  // (MODAL_NUM_MODOS, MODAL_SIN_MASA); sin `opts.modal` el comportamiento es identico
+  // al estatico (sin regresion). Funcion PURA y determinista en ambos caminos.
+  const contextoModal: ContextoModal | undefined =
+    opts?.modal !== undefined ? { numModos: opts.modal.numModos } : undefined;
+
+  // Paso 0: validaciones previas, repartidas por SEVERIDAD. Los "error" bloquean
+  // (referencias rotas, sin sujecion, nombres dup): no se construye nada. Los
+  // "aviso" (hipotesis vacia, nudo flotante) NO impiden calcular: se acumulan en el
+  // canal `avisos` del ok:true para no negar el calculo por una limpieza pendiente.
+  const erroresPrevios = validarModelo(modelo, contextoModal);
+  const bloqueantesPrevios = erroresPrevios.filter((e) => e.severidad === "error");
+  if (bloqueantesPrevios.length > 0) {
+    return { ok: false, errores: bloqueantesPrevios };
+  }
+
+  // Avisos NO bloqueantes: limitaciones que el codigo trata de forma segura (p.ej.
+  // arranque elastico -> empotrado) y avisos previos de modelo (COMBO_SIN_CARGAS,
+  // FLOTANTE). Se acumulan y se devuelven con ok:true. Distintos de
+  // `erroresTraduccion` (bloqueantes, mas abajo).
+  const avisos: ErrorObra[] = erroresPrevios.filter((e) => e.severidad === "aviso");
+
+  // Errores BLOQUEANTES de la traduccion: limitaciones que, de ignorarse,
+  // descartarian carga real sin que el arquitecto lo sepa (carga superficial/no
+  // aplicable en F1). Es mas seguro bloquear el calculo que dar menos carga.
+  const erroresTraduccion: ErrorObra[] = [];
+
+  // --- Pasos 1-5: base FEM (geometria + rigidez + trazabilidad) ---------------
+  // Factorizada en `construirBaseFEM`: nodos, materiales, secciones, barras, apoyos,
+  // releases y la trazabilidad completa. La parte INDEPENDIENTE de las cargas. El CR
+  // (prepararModeloCR) reusa esta misma base sin cargas. Aqui se completa con los
+  // Pasos 6-8 (cargas de usuario + peso propio + combos + analysis).
+  const base = construirBaseFEM(modelo);
+  const { materials, sections, nodes, members, supports, barraPorAmbito } = base;
+  const { localizarNodoDeNudo, pilaresOrdenados, vigasOrdenadas } = base;
+  const { pilarAMembers, vigaAMember } = base.trazabilidad;
+  // Avisos nacidos al construir la base (hoy: arranque elastico -> empotrado).
+  avisos.push(...base.avisosBase);
+
+  // --- Paso 6: cargas (case = hipotesisId) ------------------------------------
+  // (El paso 5, releases, ya quedo resuelto en el paso 3 por barra.)
+  // La barra de una carga sobre viga/pilar se lee de `barraPorAmbito` (FUENTE UNICA,
+  // construida en el Paso 3): en F1 una viga es una sola barra; un pilar puede ser
+  // varias (pasante) y la carga va a su primer tramo (pie). Cargas sobre nudo van a
+  // node_loads.
+  const node_loads: CargaNodoFEM[] = [];
+  const dist_loads: CargaDistFEM[] = [];
+  // pt_loads: F1 NO emite cargas puntuales sobre barra. El dominio no tiene posicion
+  // para una puntual sobre viga (una puntual en el apoyo no produce flexion y se
+  // perderia en silencio), asi que ese caso se BLOQUEA (CARGA_PUNTUAL_SIN_POSICION)
+  // mas abajo. CargaPuntualFEM/pt_loads permanecen en el contrato para una fase
+  // futura que aporte posicion; aqui se emite siempre vacio.
+  const pt_loads: CargaPuntualFEM[] = [];
+
+  const hipById = new Map<string, Hipotesis>(modelo.hipotesis.map((h) => [h.id, h]));
+  // `localizarNodoDeNudo` viene de la base (Pasos 1-5): mismo desempate documentado
+  // (primera viga por id) que usa la trazabilidad. Se consume aqui para las cargas
+  // nodales sin recalcular geometria.
 
   // Determinismo byte a byte: emitir las cargas FEM en orden estable, independiente
   // del orden de `modelo.cargas`. Clave de orden = `id` (unico por Carga, garantiza
@@ -599,33 +778,10 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     return { ok: false, errores: erroresTraduccion };
   }
 
-  // --- Trazabilidad (campo aditivo): completar los mapas que dependen de nodos --
-  // pilarAMembers y vigaAMember ya se llenaron en el Paso 3. Aqui se anaden los dos
-  // que mapean a NODOS, reusando datos ya calculados (clavesPilar, localizarNodoDeNudo).
-  // Orden de insercion determinista: se recorren las colecciones YA ordenadas por id
-  // (pilaresOrdenados/vigasOrdenadas), no `modelo.pilares`/`modelo.vigas`, de modo que
-  // un modelo reordenado produce la misma trazabilidad byte a byte.
-  const pilarANodoArranque: Record<string, string> = {};
-  for (const p of pilaresOrdenados) {
-    if (!p.vinculacionExterior) continue;
-    // Mismo nodo de arranque que el Paso 4 (apoyos): pie = clave de cota menor.
-    const claveArranque = clavesPilar.get(p.id)![0];
-    pilarANodoArranque[p.id] = nodoNombre(claveArranque);
-  }
-  const nudoANodo: Record<string, string> = {};
-  for (const v of vigasOrdenadas) {
-    for (const nudoId of [v.nudoI, v.nudoJ]) {
-      if (nudoANodo[nudoId] !== undefined) continue; // ya localizado por otra viga
-      const nodo = localizarNodoDeNudo(nudoId);
-      if (nodo !== undefined) nudoANodo[nudoId] = nodo;
-    }
-  }
-  const trazabilidad: Trazabilidad = {
-    pilarAMembers,
-    vigaAMember,
-    pilarANodoArranque,
-    nudoANodo,
-  };
+  // --- Trazabilidad (campo aditivo): la construye `construirBaseFEM` (Pasos 1-5),
+  // independiente de las cargas. Se reusa tal cual (pilarAMembers/vigaAMember +
+  // pilarANodoArranque/nudoANodo + nodoFEMAPlanta). PURA y determinista.
+  const trazabilidad: Trazabilidad = base.trazabilidad;
 
   const modeloFEM: ModeloFEM = {
     units: "kN-m",

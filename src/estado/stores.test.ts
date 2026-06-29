@@ -80,6 +80,7 @@ function trazabilidadMinima(): Trazabilidad {
     vigaAMember: {},
     pilarANodoArranque: {},
     nudoANodo: {},
+    nodoFEMAPlanta: {},
   };
 }
 

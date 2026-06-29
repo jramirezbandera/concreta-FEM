@@ -1,0 +1,37 @@
+{
+  "descripcion": "Planta simetrica 5x5 m, 4 pilares 30x30 empotrados (H=3 m) + vigas de atado perimetrales. Mecanismo 2 (desplazamiento de cuerpo rigido impuesto). CR esperado = centroide = (0,0).",
+  "convencion": "FEM Y-up; forjado X-Z; giro RY; CR en coords de OBRA (x=X, y=Z).",
+  "mecanismo": "desplazamiento_impuesto",
+  "centroide": [
+    0.0,
+    0.0
+  ],
+  "maestro": [
+    0.0,
+    0.0
+  ],
+  "K_diafragma": [
+    [
+      19584.414384,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      19584.414384,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      251873.359693
+    ]
+  ],
+  "cond_K": 12.860908,
+  "cr_obra": [
+    0.0,
+    0.0
+  ],
+  "formula": "x_cr = xm + K[1,2]/K[1,1] ; z_cr = zm - K[0,2]/K[0,0]",
+  "cond_max_degenerado": 1000000000000.0
+}

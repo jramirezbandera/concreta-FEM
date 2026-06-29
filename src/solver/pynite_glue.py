@@ -773,6 +773,279 @@ def serialize_results_modal(m):
 
 
 # =============================================================================
+# 4c) CENTRO DE RIGIDEZ (CR) FEM-exacto (F1.2) - diafragma rigido FABRICADO.
+#
+# Camino INDEPENDIENTE del por-combo y del modal (decision 8A): punto de entrada
+# propio `calcular_cr`, NO enrutado por `analysis.type`. PyNite 2.0.2 no tiene
+# diafragma rigido nativo; el spike F0.1 (src/solver/spikes/cr_diafragma_spike.py +
+# .md, veredicto GO) eligio el mecanismo de DESPLAZAMIENTO DE CUERPO RIGIDO
+# IMPUESTO, que se porta aqui EXACTAMENTE.
+#
+# CONVENCION FEM Y-up (geometria.ts: obra (x,y)+cota -> FEM [x,cota,y]=[X,Y,Z]):
+#   plano del forjado = X-Z ; vertical = Y ; giro de diafragma = RY. El CR (x,y)
+#   que emitimos es (FEM X, FEM Z), que == obra (x,y) por la IDENTIDAD de mapearEjes.
+#
+# MECANISMO (por planta, sobre sus `nodos` y su `maestro`=(xm,_,zm)):
+#   Para cada uno de los 3 campos de cuerpo rigido unitarios (ux,uz,theta) =
+#   (1,0,0),(0,1,0),(0,0,1): sobre CADA nudo de la planta se IMPONE el campo
+#       DX_n = ux - theta*(z_n - zm) ;  DZ_n = uz + theta*(x_n - xm)
+#   con def_node_disp Y se marca DX,DZ como apoyo (def_support). GOTCHA CENTRAL
+#   (verificado en el codigo de PyNite, Analysis._calc_reactions): Rxn* SOLO se
+#   calcula en GDL flagueados como support; por eso support(DX,DZ)+node_disp JUNTOS.
+#   Los GDL fuera de plano (DY vertical, RX, RY, RZ) quedan LIBRES -> ni se
+#   sobre-restringe el eje vertical ni se esclaviza ningun giro (el RY del diafragma
+#   no es artefacto: no se lee ningun giro de maestro). analyze_linear UNA VEZ POR
+#   CAMPO (opcion A, 6A relajado: reconstruimos el modelo base entre campos/plantas,
+#   como el spike; la optimizacion multi-RHS/una factorizacion = T-cr-una-factorizacion).
+#   K[:,col] = (Fx, Fz, My) con Fx=ΣRxnFX, Fz=ΣRxnFZ,
+#              My = Σ[(x_n-xm)*RxnFZ_n - (z_n-zm)*RxnFX_n]   (torsor respecto al maestro).
+#   CR:  x_cr = xm + K[1,2]/K[1,1] ;  z_cr = zm - K[0,2]/K[0,0].
+#   DEGENERACION (1 pilar / colineales / sin rigidez torsional determinable):
+#   cond(K) > COND_MAX_CR -> planta NO determinable -> {x:None, y:None}. NO es error
+#   (es x/y None), a diferencia de un modelo base inestable (eso si es error de obra).
+# =============================================================================
+
+# Umbral de condicionamiento de la 3x3 del diafragma por encima del cual la planta
+# se declara NO determinable (CR null). El spike midio cond~4-60 en casos sanos y
+# inf/~1e17 en degenerados (1 pilar), asi que 1e12 separa con holgura. Es el criterio
+# ROBUSTO (no Cθθ≈0: pilares colineales dan Ktt≠0 por su GJ pese a ser degenerados).
+COND_MAX_CR = 1.0e12
+
+# Campos de cuerpo rigido unitarios (ux, uz, theta) que generan las 3 columnas de K.
+_CAMPOS_CR = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+
+
+class MotorInestableCR(Exception):
+    """El modelo BASE del CR es inestable/irresoluble (no una planta degenerada)."""
+
+
+def _cond3x3(K):
+    """Numero de condicion (norma 2) de una matriz 3x3, via numpy. Es algebra
+    trivial sobre la salida de PyNite (las reacciones); la regla de oro #1 queda
+    intacta (PyNite sigue siendo la unica fuente del calculo). numpy esta siempre
+    cargado (PyNite lo usa).
+
+    FIX #3 (robustez): una K con NaN/Inf (p.ej. una planta numericamente mala) hace
+    que numpy.linalg.cond lance LinAlgError ("SVD did not converge"). Lo atrapamos y
+    devolvemos inf -> la planta se marca NO determinable (null), en vez de propagar y
+    abortar TODO el CR. Solo un modelo BASE inestable es error global; una planta mala
+    es null. Asi un fallo numerico de UNA planta no tumba las demas."""
+    import numpy as _np
+
+    try:
+        return float(_np.linalg.cond(_np.asarray(K, dtype=float)))
+    except _np.linalg.LinAlgError:
+        return float("inf")
+
+
+# Flags de apoyo (6 GDL) por nombre de nudo, leidos del payload BASE. Default todo
+# False (nudo sin apoyo). Lo usa el diafragma para FUSIONAR (no sobrescribir) los
+# apoyos: al imponer DX,DZ conserva el resto de la sujecion del modelo base.
+def _apoyos_base(payload):
+    apoyos = {}
+    for sp in payload.get("supports", []):
+        apoyos[sp["node"]] = (
+            bool(sp.get("DX", False)), bool(sp.get("DY", False)),
+            bool(sp.get("DZ", False)), bool(sp.get("RX", False)),
+            bool(sp.get("RY", False)), bool(sp.get("RZ", False)),
+        )
+    return apoyos
+
+
+def _rigidez_diafragma_planta(payload, nodos, xm, zm, apoyos_base):
+    """Ensambla la matriz de rigidez 3x3 del diafragma de UNA planta respecto al
+    maestro (xm,zm), imponiendo los 3 campos de cuerpo rigido unitarios y leyendo
+    la resultante de reacciones en los nudos de la planta.
+
+    Reconstruye el modelo base (build_model) POR CAMPO para que los apoyos/enforced
+    del diafragma no se arrastren entre campos ni entre plantas (opcion A del spike).
+    El resto del modelo (otras plantas, cimentacion) permanece, asi que la rigidez
+    medida incluye el acoplamiento con el resto del edificio (convencion del plan:
+    una planta a la vez con todos los diafragmas presentes).
+
+    FIX #1 (BUG ship-blocker): def_support de PyNite ASIGNA los 6 flags (no fusiona).
+    Si un nudo de la planta tiene apoyo en el modelo base (p.ej. un PIE de pilar de
+    cimentacion empotrado, que `nodoFEMAPlanta` etiqueta a la planta mas baja), llamar
+    def_support(name, True, False, True, False, False, False) le BORRABA DY/RX/RY/RZ
+    -> el modelo perdia su sujecion vertical/rotacional -> modo de cuerpo rigido ->
+    analyze_linear lanzaba inestabilidad -> TODO el CR caia a {ok:False} aunque el
+    modelo base fuera estable. FIX: FUSIONAR -> conservar los flags de apoyo del base y
+    solo FORZAR DX,DZ=True. Un nudo de cimentacion (todo True) sigue empotrado
+    (DY/RX/RY/RZ=True); un cabeza de pilar libre queda DX,DZ=True / resto False, igual
+    que validaba el spike (las cabezas libres no cambian de valor).
+    """
+    # Coords FEM de cada nudo de la planta (del payload, sin internals de PyNite).
+    coord = {n["name"]: (n["x"], n["y"], n["z"]) for n in payload.get("nodes", [])}
+    K = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+
+    for col, (ux, uz, th) in enumerate(_CAMPOS_CR):
+        m = build_model(payload)
+        for name in nodos:
+            x, _y, z = coord[name]
+            dx = ux - th * (z - zm)
+            dz = uz + th * (x - xm)
+            # FUSION (FIX #1): conservar DY/RX/RY/RZ del apoyo base; forzar DX,DZ=True
+            # (para que PyNite calcule Rxn en esos GDL). Sin apoyo base -> resto False
+            # (comportamiento del spike para cabezas libres, INTACTO).
+            _bdx, bdy, _bdz, brx, bry, brz = apoyos_base.get(
+                name, (False, False, False, False, False, False)
+            )
+            m.def_support(name, True, bdy, True, brx, bry, brz)
+            m.def_node_disp(name, "DX", dx)
+            m.def_node_disp(name, "DZ", dz)
+        # sparse=True (ruta de produccion, CLAUDE.md §8). check_stability default
+        # True: si el modelo BASE es inestable, lanza -> lo clasificamos como error
+        # de obra (MotorInestableCR), no como planta degenerada.
+        try:
+            m.analyze_linear(check_statics=False, sparse=True)
+        except Exception as e:  # noqa: BLE001 - se reclasifica, no se traga.
+            if _es_inestabilidad_pdelta(e):  # reusa los marcadores singular/unstable
+                raise MotorInestableCR(str(e)) from e
+            raise
+
+        fx = fz = my = 0.0
+        for name in nodos:
+            x, _y, z = coord[name]
+            # "Combo 1" = combo implicito por defecto de PyNite (guia §3.5): el
+            # ModeloFEM base del CR llega con combos:[] (prepararModeloCR no emite
+            # combos de usuario), asi que PyNite usa este unico combo. No hardcodeamos
+            # un combo del payload; leemos el unico que existe en el analisis del CR.
+            rfx = float(m.nodes[name].RxnFX["Combo 1"])
+            rfz = float(m.nodes[name].RxnFZ["Combo 1"])
+            fx += rfx
+            fz += rfz
+            my += (x - xm) * rfz - (z - zm) * rfx
+        K[0][col] = fx
+        K[1][col] = fz
+        K[2][col] = my
+    return K
+
+
+def _cr_de_rigidez(K, xm, zm):
+    """(x_cr, z_cr) en coords FEM/obra desde la rigidez 3x3, o (None, None) si la
+    planta es degenerada (cond(K) > COND_MAX_CR o no finito).
+
+    Fórmula (signos confirmados por el spike, formulacion de RIGIDEZ del Mecanismo 2):
+        x_cr = xm + K[1][2]/K[1][1]   z_cr = zm - K[0][2]/K[0][0]
+    OJO: NO es la formula de flexibilidad Cθz/Cθθ (esa es del mecanismo arana,
+    descartado, y es master-dependiente con este mecanismo).
+    """
+    cond = _cond3x3(K)
+    if not math.isfinite(cond) or cond > COND_MAX_CR:
+        return None, None
+    # Guardia extra: una division por ~0 en la diagonal (no deberia pasar si cond es
+    # bueno) tambien marca no determinable, sin propagar ZeroDivision/NaN.
+    if K[1][1] == 0.0 or K[0][0] == 0.0:
+        return None, None
+    x_cr = xm + K[1][2] / K[1][1]
+    z_cr = zm - K[0][2] / K[0][0]
+    if not (math.isfinite(x_cr) and math.isfinite(z_cr)):
+        return None, None
+    return x_cr, z_cr
+
+
+def calcular_cr(payload, plantas_info):
+    """Punto de entrada del CENTRO DE RIGIDEZ (F1.2). Lo invoca el worker (F1.3) con
+    DOS strings JSON: el ModeloFEM base y la lista plantasInfo.
+
+    `payload`       : ModeloFEM base (geometria+rigidez, SIN cargas/combos de usuario),
+                      como str JSON o dict/proxy. Reusa build_model.
+    `plantas_info`  : lista de {plantaId, nodos:[...], maestro:{x,y,z}} (str JSON o
+                      proxy). El maestro es el punto de referencia (xm=maestro.x,
+                      zm=maestro.z); NO un nudo fisico (la cota maestro.y es indiferente
+                      al CR en plano).
+
+    Devuelve SIEMPRE una de dos formas (igual disciplina que `calcular`):
+      - exito: {"ok": True, "resultados": {
+                  "units": "kN-m",
+                  "analysis": {"type": "centroRigidez"},
+                  "cr_por_planta": { "<plantaId>": {"x": float|None, "y": float|None}, ... }}}
+                x = CR en FEM X, y = CR en FEM Z (== obra x,y). SIEMPRE hay clave por
+                planta; x/y son None cuando la planta es degenerada (no es error). NO
+                se emite ex/ey (los rellena el lado TS desde el centro de masas).
+      - error: {"ok": False, "error": {"mensaje": <obra>, "detalle": str}}  SOLO para
+                un fallo REAL (modelo base inestable/irresoluble), no para una planta
+                degenerada.
+    """
+    try:
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+        elif hasattr(payload, "to_py"):
+            payload = payload.to_py()
+        if isinstance(plantas_info, str):
+            plantas_info = json.loads(plantas_info)
+        elif hasattr(plantas_info, "to_py"):
+            plantas_info = plantas_info.to_py()
+
+        # Apoyos del modelo BASE por nudo (FIX #1): el diafragma los FUSIONA en vez de
+        # sobrescribirlos. Se calcula UNA vez (no por planta/campo).
+        apoyos_base = _apoyos_base(payload)
+
+        cr_por_planta = {}
+        for info in plantas_info:
+            planta_id = info["plantaId"]
+            nodos = list(info.get("nodos", []))
+            maestro = info["maestro"]
+            xm = float(maestro["x"])
+            zm = float(maestro["z"])
+
+            # Planta sin nudos o con un solo nudo: no hay diafragma con rigidez
+            # torsional determinable -> null (no determinable). Evita construir/
+            # analizar de mas.
+            if len(nodos) < 2:
+                cr_por_planta[planta_id] = {"x": None, "y": None}
+                continue
+
+            # CIMENTACION (FIX #2): una planta cuyos nudos estan TODOS totalmente
+            # empotrados en el base (los 6 GDL True) NO es un forjado-diafragma, es el
+            # nivel de cimentacion (los PIES de pilar, que `nodoFEMAPlanta` etiqueta a
+            # la planta mas baja). Imponer un diafragma ahi no tiene sentido fisico (no
+            # se desplaza: ya esta coartado en todo) y, tras el FIX #1, daria un CR
+            # ESPURIO con cond bajo (un punto fijo) en vez de un forjado. Lo marcamos
+            # null "no determinable" SIN analizar. La decision se confirmo empiricamente
+            # con el motor real (ver el golden de integracion prepararModeloCR->calcularCR).
+            if all(apoyos_base.get(n) == (True, True, True, True, True, True) for n in nodos):
+                cr_por_planta[planta_id] = {"x": None, "y": None}
+                continue
+
+            K = _rigidez_diafragma_planta(payload, nodos, xm, zm, apoyos_base)
+            x_cr, z_cr = _cr_de_rigidez(K, xm, zm)
+            # x = FEM X (obra x), y = FEM Z (obra y). None = no determinable.
+            cr_por_planta[planta_id] = {"x": x_cr, "y": z_cr}
+
+        return {
+            "ok": True,
+            "resultados": {
+                "units": "kN-m",
+                "analysis": {"type": "centroRigidez"},
+                "cr_por_planta": cr_por_planta,
+            },
+        }
+
+    except MotorInestableCR as e:
+        return {
+            "ok": False,
+            "error": {
+                "mensaje": (
+                    "La estructura es inestable: revise apoyos, rigidez o "
+                    "arriostramiento antes de calcular el centro de rigidez."
+                ),
+                "detalle": "CR: " + (str(e) or e.__class__.__name__)
+                + "\n" + traceback.format_exc(),
+            },
+        }
+
+    except Exception as e:  # noqa: BLE001 - frontera: todo error se vuelve dato.
+        return {
+            "ok": False,
+            "error": {
+                "mensaje": str(e) or e.__class__.__name__,
+                "detalle": traceback.format_exc(),
+            },
+        }
+
+
+# =============================================================================
 # 5) ORQUESTADOR  (entrada limpia que llama el worker via Comlink)
 # =============================================================================
 def calcular(payload, n_points=N_POINTS_DEFAULT):

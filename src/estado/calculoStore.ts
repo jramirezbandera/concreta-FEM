@@ -40,6 +40,12 @@ interface CalculoState {
   // obra del estatico. Cada panel lee su propio canal.
   erroresModal: ErrorObra[];
   ultimoErrorModal: ErrorCalculo | null;
+  // CANALES PROPIOS del camino CENTRO DE RIGIDEZ ("Calcular centro de rigidez", F2):
+  // mismo razonamiento que el modal. El estado del MOTOR (estadoMotor/calculando) es
+  // compartido (un solo motor), pero los errores/fallos del CR no deben mezclarse con
+  // los del estatico ni con los del modal: el panel del CR (CentroRigidez) lee SU canal.
+  erroresCR: ErrorObra[];
+  ultimoErrorCR: ErrorCalculo | null;
   setEstadoMotor(e: EstadoMotor): void;
   setCalculando(b: boolean): void;
   setErrores(e: ErrorObra[]): void;
@@ -47,6 +53,8 @@ interface CalculoState {
   setUltimoError(e: ErrorCalculo | null): void;
   setErroresModal(e: ErrorObra[]): void;
   setUltimoErrorModal(e: ErrorCalculo | null): void;
+  setErroresCR(e: ErrorObra[]): void;
+  setUltimoErrorCR(e: ErrorCalculo | null): void;
   // Merge superficial de varios campos a la vez (lo usa el sink por defecto de
   // calcularObra para reflejar transiciones sin encadenar setters sueltos).
   aplicar(parcial: Partial<CalculoEstadoDatos>): void;
@@ -67,6 +75,8 @@ export const calculoStore = create<CalculoState>()(
     ultimoError: null,
     erroresModal: [],
     ultimoErrorModal: null,
+    erroresCR: [],
+    ultimoErrorCR: null,
     setEstadoMotor: (e) => set({ estadoMotor: e }),
     setCalculando: (b) => set({ calculando: b }),
     setErrores: (e) => set({ errores: e }),
@@ -74,6 +84,8 @@ export const calculoStore = create<CalculoState>()(
     setUltimoError: (e) => set({ ultimoError: e }),
     setErroresModal: (e) => set({ erroresModal: e }),
     setUltimoErrorModal: (e) => set({ ultimoErrorModal: e }),
+    setErroresCR: (e) => set({ erroresCR: e }),
+    setUltimoErrorCR: (e) => set({ ultimoErrorCR: e }),
     aplicar: (parcial) => set(parcial),
   })),
 );

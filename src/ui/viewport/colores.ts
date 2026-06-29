@@ -25,6 +25,9 @@ const FALLBACK = {
   node: "#c07d12",
   deformed: "#38bdf8",
   centroMasa: "#d6336c",
+  // Centro de rigidez (F2): teal, hue distinto del cerise del CM. DEBE coincidir con
+  // tokens.css (--centro-rigidez).
+  centroRigidez: "#0d9488",
   onAccent: "#ffffff",
   // "Ver modelo de calculo" (F2c): capa de Capa 2 (nudos/barras/releases/apoyos) en
   // tonos "azulado tecnico" distintos de la obra, semitransparente. DEBE coincidir con
@@ -50,6 +53,7 @@ const VAR_NAME: Record<keyof typeof FALLBACK, string> = {
   node: "node",
   deformed: "deformed",
   centroMasa: "centro-masa",
+  centroRigidez: "centro-rigidez",
   onAccent: "on-accent",
   barraCalc: "barra-calc",
   nodoCalc: "nodo-calc",

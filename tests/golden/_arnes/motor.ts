@@ -31,7 +31,9 @@ import {
 } from "./pyodideNode";
 import type { ResultadosCalculo } from "../../../src/solver/resultados";
 import type { ResultadosModales } from "../../../src/solver/resultadosModales";
+import type { ResultadosCR } from "../../../src/solver/resultadosCR";
 import type { ModeloFEM } from "../../../src/discretizador/contratoFEM";
+import type { PlantaInfoCR } from "../../../src/discretizador/modeloCR";
 
 // Re-export: T1.1/T1.2 importan VersionesRuntime y el timeout desde el arnes.
 export { TIMEOUT_ARRANQUE, type VersionesRuntime };
@@ -48,6 +50,12 @@ export type MotorGolden = {
    * (Capa B) lo usa para asertar f1 ≈ analitico sin acoplarse al smoke de src/solver.
    */
   calcularModal(modeloFEM: ModeloFEM): ResultadosModales;
+  /**
+   * Camino CENTRO DE RIGIDEZ (F1.2): llama al glue `calcular_cr(payload, plantasInfo)`
+   * y devuelve ResultadosCR VALIDADO con ResultadosCRSchema (salida cruda del glue:
+   * solo {x,y} por planta; ex/ey null). Lo usa el golden del CR (F3.1, el GATE).
+   */
+  calcularCR(modeloFEM: ModeloFEM, plantasInfo: PlantaInfoCR[]): ResultadosCR;
   /** Versiones reales del runtime (re-asercion del par; CLAUDE.md §18). */
   versiones: VersionesRuntime;
 };
@@ -86,13 +94,14 @@ async function arrancar(): Promise<ArranqueMotor> {
       e instanceof ErrorArranquePyodide ? e.message : descr(e);
     return { ok: false, motivo };
   }
-  // Exponemos {calcular, calcularModal, versiones} (la instancia py cruda no es
-  // parte del contrato del arnes golden).
+  // Exponemos {calcular, calcularModal, calcularCR, versiones} (la instancia py cruda
+  // no es parte del contrato del arnes golden).
   return {
     ok: true,
     motor: {
       calcular: motor.calcular,
       calcularModal: motor.calcularModal,
+      calcularCR: motor.calcularCR,
       versiones: motor.versiones,
     },
   };

@@ -53,7 +53,17 @@ import {
   ResultadosModalesSchema,
   type ResultadosModales,
 } from "../../../src/solver/resultadosModales";
+// Centro de rigidez (F1.2/F3.1): el glue `calcular_cr` emite SOLO {x,y} por planta
+// (ex/ey los rellena el lado TS). Para el golden validamos la salida CRUDA del glue
+// con un schema acotado (units + analysis + cr_por_planta {x,y}); ex/ey es opcional
+// en ResultadosCRSchema (.nullish()) y aqui no se ensambla (eso es F1.3, fuera del
+// golden). Reutilizar ResultadosCRSchema directamente tambien funciona (ex/ey -> null).
+import {
+  ResultadosCRSchema,
+  type ResultadosCR,
+} from "../../../src/solver/resultadosCR";
 import type { ModeloFEM } from "../../../src/discretizador/contratoFEM";
+import type { PlantaInfoCR } from "../../../src/discretizador/modeloCR";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // node_modules/pyodide (pyodide-lock.json + .wasm + los 15 wheels WASM:
@@ -86,6 +96,13 @@ export type MotorArrancado = {
    * con mensaje claro si el glue devuelve {ok:false} o si el borde Zod falla.
    */
   calcularModal(modeloFEM: ModeloFEM): ResultadosModales;
+  /**
+   * Llama al glue `calcular_cr(payloadJson, plantasInfoJson)` (CENTRO DE RIGIDEZ,
+   * F1.2) y valida la salida CRUDA con ResultadosCRSchema. El glue emite solo {x,y}
+   * por planta; ex/ey quedan null (los rellena F1.3, no el golden). Lanza con mensaje
+   * claro si el glue devuelve {ok:false} (modelo base inestable) o si el borde Zod falla.
+   */
+  calcularCR(modeloFEM: ModeloFEM, plantasInfo: PlantaInfoCR[]): ResultadosCR;
   /** Versiones reales del runtime (re-asercion del par; CLAUDE.md §18). */
   versiones: VersionesRuntime;
   /** Instancia Pyodide cruda (para usos avanzados del smoke; no la reinstancies). */
@@ -275,5 +292,39 @@ json.dumps({
     return parsed.data;
   };
 
-  return { calcular, calcularModal, versiones, py };
+  // Closure CENTRO DE RIGIDEZ (F1.2/F3.1): invoca `calcular_cr` con DOS strings JSON
+  // (el ModeloFEM base y plantasInfo) y valida la salida cruda con ResultadosCRSchema.
+  // El glue emite solo {x,y} por planta; ex/ey -> null por el .nullish() del schema
+  // (los rellena F1.3 desde el CM, fuera del golden). Igual que las demas, propaga
+  // {ok:false} como throw (para asertar el error-path del modelo base inestable).
+  const calcularCR = (
+    modeloFEM: ModeloFEM,
+    plantasInfo: PlantaInfoCR[],
+  ): ResultadosCR => {
+    const fn = py.globals.get("calcular_cr");
+    const proxy = fn(JSON.stringify(modeloFEM), JSON.stringify(plantasInfo));
+    let raw:
+      | { ok: true; resultados: unknown }
+      | { ok: false; error: { mensaje?: string; detalle?: string } };
+    try {
+      raw = proxy.toJs({ dict_converter: Object.fromEntries }) as typeof raw;
+    } finally {
+      proxy.destroy?.();
+      fn.destroy?.();
+    }
+    if (!raw.ok) {
+      throw new Error(
+        `El glue (CR) devolvio error:\n  mensaje: ${raw.error.mensaje}\n  detalle:\n${raw.error.detalle}`,
+      );
+    }
+    const parsed = ResultadosCRSchema.safeParse(raw.resultados);
+    if (!parsed.success) {
+      throw new Error(
+        `ResultadosCRSchema.safeParse FALLO:\n${JSON.stringify(parsed.error.issues, null, 2)}`,
+      );
+    }
+    return parsed.data;
+  };
+
+  return { calcular, calcularModal, calcularCR, versiones, py };
 }

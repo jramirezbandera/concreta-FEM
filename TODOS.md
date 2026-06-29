@@ -705,3 +705,103 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   insignia para combinaciones atípicas) y marcadores de release por GDL/extremo; quitar la etiqueta "vista
   simplificada" cuando sea fiel. **Coste:** CC ~45-60 min (diseño de glifos + leyenda + tests).
 - **Depende de / bloquea:** nada. **Origen:** Revisión de ingeniería F2c (Issue 7-B, alcance acotado).
+
+---
+
+## T-cr-una-factorizacion · CR: optimizar a una sola factorización (multi-RHS), no 3·nPlantas `analyze()`
+
+- **Qué:** `calcular_cr` ([src/solver/pynite_glue.py](src/solver/pynite_glue.py)) resuelve el CR con la
+  **opción A** del spike F0.1: por cada planta y cada uno de los 3 campos de cuerpo rígido unitarios,
+  **reconstruye el modelo base** (`build_model`) e invoca `analyze_linear` → `3·nPlantas` factorizaciones.
+- **Por qué:** `def_node_disp` es una propiedad del **modelo**, no del combo (no toma `case`), así que
+  tres campos distintos por planta NO caben en un único `analyze()` con combos. La opción A es la que el
+  spike validó (física correcta) y es suficiente para F2 (pocas plantas), pero re-factoriza la misma K
+  geométrica/rigidez `3·nPlantas` veces. En un edificio grande es coste evitable.
+- **Cómo retomar:** opción B de la nota del spike ([cr_diafragma_spike.md](src/solver/spikes/cr_diafragma_spike.md)):
+  construir el campo de carga **equivalente** (cargas nodales por planta) en vez de desplazamientos
+  prescritos, usar `add_load_combo` con `3·nPlantas` combos dedicados y `analyze_linear` UNA vez
+  (una factorización, multi-RHS). **Requiere RE-VALIDAR contra la fixture** (`cr_diafragma_fixture.json`)
+  y el golden del CR ([tests/golden/cr.golden.test.ts](tests/golden/cr.golden.test.ts)): la equivalencia
+  carga↔desplazamiento debe reproducir CR, cond y K. Cuidado con un modelo de N plantas + diafragmas
+  simultáneos (el campo de una planta no debe contaminar a otra).
+- **Depende de / bloquea:** nada (optimización; la opción A es correcta). **Coste:** CC ~1-1.5 h
+  (reformulación + re-validación del golden + la fixture).
+- **Origen:** Spike F0.1 (nota de diseño, "Una sola factorización"/6A); diferido conscientemente en F1.2.
+
+---
+
+## T-cr-nodo-compartido-plantas · CR: un nudo FEM compartido entre plantas cae en una sola
+
+- **Qué:** `nodoFEMAPlanta` ([modeloCR.ts](src/discretizador/modeloCR.ts)/[discretizar.ts](src/discretizador/discretizar.ts))
+  etiqueta cada nudo FEM a UNA planta con desempate `min(id)`. Si dos plantas comparten físicamente un
+  nudo FEM (mismo X,Z y misma cota, p.ej. grupos distintos a igual cota), el nudo va al diafragma de la
+  planta "ganadora" y falta en el de la "perdedora" → el diafragma de esa planta queda con un nudo menos.
+- **Por qué:** Exótico (requiere dos plantas a la MISMA cota compartiendo geometría). En el flujo F1/F2
+  normal (plantas a cotas distintas) no ocurre. El desempate es determinista (no rompe el cálculo), solo
+  el reparto es discutible. No es un ship-blocker.
+- **Cómo retomar:** decidir si un nudo compartido debe pertenecer a AMBOS diafragmas (cada planta lo
+  incluye en su `plantasInfo.nodos`) o mantener el desempate; si lo primero, `prepararModeloCR` emitiría
+  el nudo en varias plantas. Cubrir con un caso de dos plantas a igual cota. **Coste:** CC ~30-45 min.
+- **Depende de / bloquea:** nada. **Origen:** /code-review F1.2 (xhigh) hallazgo #4 (menor, exótico).
+
+---
+
+## T-cr-bases-elasticas · El CR no capta la flexibilidad de bases (arranque elástico = empotrado)
+
+- **Qué:** El centro de rigidez (F2) es tan fiel como el modelo de apoyos actual. Hoy
+  `arranque:"elastico"` se trata como **empotrado-con-aviso** ([discretizar.ts](src/discretizador/discretizar.ts)
+  `ELASTICO_NO_SOPORTADO`); no hay muelles de apoyo. Así que el CR **no** refleja la flexibilidad de
+  bases todavía, aunque la revisión de F2 la citó como algo que el analítico ignora.
+- **Por qué:** un CR que se anuncie como "incluye flexibilidad de bases" sin implementarla sería
+  engañoso (el espíritu del propio `T-cr-fem-exacto`). El plan F2-CR corrigió el texto para ser honesto
+  y difirió esto.
+- **Cómo retomar:** cablear `arranque:"elastico"` a `def_support_spring` de PyNite (que existe) en el
+  discretizador/glue (rigidez del muelle por GDL), con su propio golden. El CR entonces lo reflejará
+  automáticamente (usa la misma Capa 2 base). **Coste:** CC ~varias horas (dominio rigidez de muelle +
+  discretizador + glue + golden). **Depende de / bloquea:** nada.
+- **Origen:** Revisión de ingeniería F2-CR (cross-model 9A, Codex #8).
+
+---
+
+## T-cr-acoplamiento-multiplanta · CR riguroso de plantas intermedias (dependencia del patrón de carga)
+
+- **Qué:** El CR (F2) se define por planta cargando **una planta a la vez** con todos los diafragmas
+  presentes (`calcular_cr`, [pynite_glue.py](src/solver/pynite_glue.py)). Para edificios de varias
+  plantas, el CR riguroso de las plantas intermedias **depende del patrón de carga** (Cheung–Tso): el
+  resultado actual es la **convención** estándar, no una propiedad única.
+- **Por qué:** "centro de rigidez" multi-planta no es un invariante geométrico como el de una sola
+  planta; conviene no sobrevenderlo (ni como "exacto" multi-planta ni como listo para sísmico) hasta
+  formalizar el criterio. El panel ya etiqueta la hipótesis de diafragma rígido.
+- **Cómo retomar:** junto a la fase sísmica (donde aparece el patrón de carga real). Decidir el criterio
+  (CR por modos / por patrón normativo) y documentar la diferencia con la convención actual.
+- **Depende de / bloquea:** se cruza con sísmico. **Coste:** CC ~varias horas.
+- **Origen:** Revisión de ingeniería F2-CR (NOT-in-scope; Codex #11).
+
+---
+
+## T-cr-diafragma-pano · Derivar el diafragma rígido del forjado real (paños) en vez de imponerlo
+
+- **Qué:** El CR (F2) impone un **diafragma rígido por planta** como HIPÓTESIS (no hay paños/forjados
+  todavía). El panel lo etiqueta explícitamente ("supone diafragma rígido por planta"). Cuando F3 aporte
+  paños, el diafragma podrá derivarse del forjado real (rígido/semirrígido/flexible según el paño).
+- **Por qué:** hoy es una hipótesis que el usuario no definió; con paños, la condición de diafragma sería
+  una propiedad del modelo, no una suposición global del CR.
+- **Cómo retomar:** tras F3 (paños). Que `prepararModeloCR` ([modeloCR.ts](src/discretizador/modeloCR.ts))
+  derive la condición de diafragma del paño de cada planta (y soporte diafragma flexible: sin
+  `def_node_disp`, o rigidez de membrana real). Quitar la etiqueta de hipótesis cuando proceda.
+- **Depende de / bloquea:** requiere F3 (paños). **Coste:** CC ~varias horas.
+- **Origen:** Revisión de ingeniería F2-CR (NOT-in-scope; Codex #18).
+
+---
+
+## T-cr-cosmeticos · Pulidos cosméticos del CR (etiqueta de ejes + nombre de helper)
+
+- **Qué:** Dos pulidos menores de la auditoría del guardián (no bloqueantes): (1) en
+  [CentroRigidez.tsx](src/ui/viewport/CentroRigidez.tsx) las coords se rotulan "X"/"Y" sin sufijo de
+  replanteo (un arquitecto podría confundir la "Y" de planta con la cota) — aclarar a "X (replanteo)"/
+  "Y (replanteo)", **alineado con `CentroMasa`** (cambiar ambos a la vez por coherencia); (2)
+  `_es_inestabilidad_pdelta` ([pynite_glue.py](src/solver/pynite_glue.py)) lo comparten ahora P-Δ y CR —
+  renombrar a algo genérico (`_es_inestabilidad_solver`) es más honesto.
+- **Por qué:** claridad/coherencia; ninguno afecta a la corrección.
+- **Cómo retomar:** trivial; hacerlo junto a otro toque de esos archivos. **Coste:** CC ~10-15 min.
+- **Origen:** Auditoría guardián F2-CR (observaciones menores, verdes).

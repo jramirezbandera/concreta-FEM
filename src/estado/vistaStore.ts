@@ -116,6 +116,11 @@ interface VistaState {
   // puro (sin solver), asi que es valido aunque no haya resultados. Estado de UI: NO
   // participa en undo (coherente con el resto de vistaStore).
   mostrarCentroMasa: boolean;
+  // Overlay de CENTRO DE RIGIDEZ (F2, T-cr-fem-exacto). Hermano del CM, pero el CR NO es
+  // puro: lo calcula PyNite (diafragma rigido + cargas unitarias por planta) y el resultado
+  // vive en crStore. Este toggle solo controla la VISIBILIDAD del marcador/panel (la planta
+  // activa) en vista PLANTA. Apagado por defecto; fuera de undo (estado de UI).
+  mostrarCentroRigidez: boolean;
   // Overlay "Ver modelo de calculo" (F2c). Toggle de ayuda/docencia: dibuja la Capa 2
   // (nudos/barras/releases/apoyos) semitransparente sobre la obra. UNICO sitio donde se
   // permite jerga FEM en la UI (CLAUDE.md Â§2/Â§3). Apagado por defecto; solo se muestra en
@@ -159,6 +164,8 @@ interface VistaState {
   setSnapActivo(b: boolean): void;
   setMostrarCentroMasa(b: boolean): void;
   toggleCentroMasa(): void;
+  setMostrarCentroRigidez(b: boolean): void;
+  toggleCentroRigidez(): void;
   setMostrarModeloCalculo(b: boolean): void;
   toggleModeloCalculo(): void;
   setDeformadaEscala(e: number): void;
@@ -216,6 +223,7 @@ export const vistaStore = create<VistaState>()(
     },
     snapActivo: true,
     mostrarCentroMasa: false,
+    mostrarCentroRigidez: false,
     mostrarModeloCalculo: false,
     deformadaEscala: 1,
     animando: false,
@@ -243,6 +251,9 @@ export const vistaStore = create<VistaState>()(
     setMostrarCentroMasa: (b) => set({ mostrarCentroMasa: b }),
     toggleCentroMasa: () =>
       set((estado) => ({ mostrarCentroMasa: !estado.mostrarCentroMasa })),
+    setMostrarCentroRigidez: (b) => set({ mostrarCentroRigidez: b }),
+    toggleCentroRigidez: () =>
+      set((estado) => ({ mostrarCentroRigidez: !estado.mostrarCentroRigidez })),
     setMostrarModeloCalculo: (b) => set({ mostrarModeloCalculo: b }),
     toggleModeloCalculo: () =>
       set((estado) => ({ mostrarModeloCalculo: !estado.mostrarModeloCalculo })),
