@@ -5,9 +5,11 @@
 //     planta) y el resultado vive en crStore (no se recomputa al editar; queda obsoleto
 //     hasta recalcular, como la deformada). Aqui solo LEEMOS el crStore + el Modelo (para
 //     resolver la cota de la planta y, opcionalmente, el CM para el segmento de excentricidad).
-//  2) El CM si es puro (calcularCentroMasaPlanta) y lo derivamos aqui para dibujar el
-//     segmento CM<->CR (el valor visual de la feature). El ex/ey del crStore ya viene
-//     ensamblado contra ese mismo CM (ensamblarResultadosCR), asi que no recalculamos ex/ey.
+//  2) El segmento CM<->CR (valor visual) NO recalcula el CM aqui: el ex/ey del crStore ya
+//     viene ensamblado contra el CM del MOMENTO DEL CALCULO (ensamblarResultadosCR), asi que
+//     el CM "horneado" se reconstruye en el overlay como CR+(ex,ey). Recalcular el CM vivo
+//     aqui descuadraria el segmento dibujado de los numeros ex/ey del panel tras una edicion
+//     (CR obsoleto, CM vivo): por eso NO se deriva el CM en este hook.
 //
 // RENDIMIENTO (regla #11): lectura via subscribeWithSelector (useSyncExternalStore) +
 // useMemo; se recomputa SOLO al cambiar el CR calculado, el modelo o la planta activa,
@@ -18,7 +20,6 @@
 // activa se anade para situar el marcador en Z, igual que useCentroMasa.
 import { useMemo, useSyncExternalStore } from "react";
 import { crStore, modeloStore, vistaStore } from "../../estado";
-import { calcularCentroMasaPlanta } from "../../discretizador";
 import type { Modelo } from "../../dominio";
 import type { ResultadosCR } from "../../solver/resultadosCR";
 
@@ -38,9 +39,6 @@ export interface CentroRigidezUI {
    *  determinable devuelve { x:null, y:null, ... } (NO null): la UI distingue
    *  "no calculado" (cr===null) de "no determinable" (cr.x===null). */
   cr: CRPlantaUI | null;
-  /** Centro de masas de la planta activa (coords de obra), para el segmento CM<->CR.
-   *  null si no hay masa. */
-  cm: { x: number; y: number } | null;
   /** Cota de la planta activa (m), para situar el marcador en Z. null si no hay planta. */
   cota: number | null;
   /** Nombre de la planta activa (lenguaje de obra), o null. */
@@ -105,7 +103,6 @@ export function useCentroRigidez(): CentroRigidezUI {
     if (plantaActivaId === null) {
       return {
         cr: null,
-        cm: null,
         cota: null,
         nombrePlanta: null,
         plantaActivaId: null,
@@ -119,11 +116,8 @@ export function useCentroRigidez(): CentroRigidezUI {
       entrada === null
         ? null
         : { x: entrada.x, y: entrada.y, ex: entrada.ex, ey: entrada.ey };
-    // CM puro de la planta (para el segmento CM<->CR). Solo (x,y); el peso no se usa aqui.
-    const cmPlanta = calcularCentroMasaPlanta(modelo, plantaActivaId);
     return {
       cr: crPlanta,
-      cm: cmPlanta === null ? null : { x: cmPlanta.x, y: cmPlanta.y },
       cota: planta?.cota ?? null,
       nombrePlanta: planta?.nombre ?? null,
       plantaActivaId,

@@ -107,11 +107,15 @@ function DetalleCentroRigidez() {
         <>
           <span className="cx-cr__seccion">Excentricidad al centro de masas</span>
           <div className="cx-cr__fila">
-            <span className="cx-cr__clave">eₓ</span>
+            <span className="cx-cr__clave">
+              e<sub>x</sub>
+            </span>
             <span className="cx-cr__valor mono tnum">{fmtM(cr.ex as number)}</span>
           </div>
           <div className="cx-cr__fila">
-            <span className="cx-cr__clave">e_y</span>
+            <span className="cx-cr__clave">
+              e<sub>y</sub>
+            </span>
             <span className="cx-cr__valor mono tnum">{fmtM(cr.ey as number)}</span>
           </div>
         </>

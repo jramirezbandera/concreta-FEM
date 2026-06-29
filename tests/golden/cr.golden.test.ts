@@ -30,7 +30,11 @@ import { describe, it, expect, beforeAll } from "vitest";
 
 import { obtenerMotor, TIMEOUT_ARRANQUE, type ArranqueMotor } from "./_arnes";
 import type { ModeloFEM } from "../../src/discretizador/contratoFEM";
+import { prepararModeloCR } from "../../src/discretizador";
 import type { PlantaInfoCR } from "../../src/discretizador/modeloCR";
+import type { Modelo } from "../../src/dominio";
+import { SCHEMA_VERSION } from "../../src/dominio";
+import { MATERIAL_GOLDEN, SECCION_GOLDEN, PERFIL_GOLDEN } from "./_arnes";
 
 // --- Parametros del caso canonico (identicos al spike F0.1) ------------------
 const E = 2.7e7; // kN/m2 (~27 GPa, hormigon)
@@ -369,6 +373,169 @@ describe("golden CR (motor real PyNite) — diafragma rigido / centro de rigidez
           `${id}: CR.y ≈ 0 (real=${cr.y})`,
         ).toBeLessThan(TOL_SIMETRICO);
       }
+    },
+    TIMEOUT_ARRANQUE,
+  );
+});
+
+// =============================================================================
+// INTEGRACION: flujo REAL prepararModeloCR (Capa 1) -> calcularCR (motor real).
+//
+// Este bloque cierra el HUECO DE TEST que dejo pasar el BUG ship-blocker del
+// def_support: los tests de arriba montan `plantasInfo` A MANO (solo cabezas,
+// Y=H), nunca los PIES de cimentacion. En el flujo real, prepararModeloCR
+// construye plantasInfo desde `nodoFEMAPlanta`, que etiqueta los PIES de pilar
+// (Y=0, apoyo de cimentacion EMPOTRADO) a la planta mas baja. Al procesar esa
+// planta, el def_support del diafragma BORRABA la sujecion de cimentacion (PyNite
+// ASIGNA los 6 flags, no fusiona) -> modo de cuerpo rigido -> analyze lanzaba ->
+// TODO el CR caia a {ok:false} "inestable" pese a ser un modelo base estable.
+//
+// El FIX (glue): (1) FUSIONAR apoyos (conservar DY/RX/RY/RZ del base, forzar
+// DX,DZ=True); (2) la planta cuyos nudos estan TODOS empotrados en el base = la
+// CIMENTACION (no un forjado-diafragma) -> {x:null,y:null} sin analizar (confirmado
+// empiricamente: incluso sin la guarda, cond ~3e14 > 1e12 daria null, pero la guarda
+// es explicita y no depende de un margen incidental de condicionamiento).
+//
+// Aserciones: (a) NO hay error global (ok, no "inestable"); (b) la planta ELEVADA
+// tiene CR determinable ≈ centroide (simetrico); (c) la CIMENTACION = null, sin
+// reventar. Es el test que habria cazado el bug.
+// =============================================================================
+
+// Obra de Capa 1: 4 pilares empotrados (vinculacionExterior) en las 4 esquinas de
+// una planta 5x5, subiendo de Cimentacion (cota 0) a Planta 1 (cota 3), con 4 vigas
+// de atado perimetrales en Planta 1. Material/seccion del catalogo (S275/IPE300):
+// el CR es invariante a su magnitud (planta simetrica -> CR == centroide).
+function obraSimetrica4Pilares(): Modelo {
+  const esquinas: ReadonlyArray<readonly [string, number, number]> = [
+    ["c0", SEMI, SEMI],
+    ["c1", SEMI, -SEMI],
+    ["c2", -SEMI, SEMI],
+    ["c3", -SEMI, -SEMI],
+  ];
+  const nudos = esquinas.map(([id, x, y]) => ({ id, x, y }));
+  const pilares = esquinas.map(([id, x, y]) => ({
+    id: `pil-${id}`,
+    nombre: id.toUpperCase(),
+    x, y,
+    plantaInicial: "p0",
+    plantaFinal: "p1",
+    seccionId: SECCION_GOLDEN,
+    materialId: MATERIAL_GOLDEN,
+    angulo: 0,
+    vinculacionExterior: true,
+    arranque: "empotrado" as const,
+  }));
+  // Vigas de atado perimetrales en Planta 1 (entre las cabezas de pilar, que
+  // comparten nudo con los `nudos` por snapping). Perimetro: c0-c1, c1-c3, c3-c2, c2-c0.
+  const aristas: ReadonlyArray<readonly [string, string]> = [
+    ["c0", "c1"], ["c1", "c3"], ["c3", "c2"], ["c2", "c0"],
+  ];
+  const vigas = aristas.map(([i, j], k) => ({
+    id: `viga-${k}`,
+    nombre: `V${k}`,
+    plantaId: "p1",
+    nudoI: i,
+    nudoJ: j,
+    seccionId: SECCION_GOLDEN,
+    materialId: MATERIAL_GOLDEN,
+    extremoI: "empotrado" as const,
+    extremoJ: "empotrado" as const,
+    tirante: false,
+  }));
+  return {
+    unidades: "kN-m",
+    schemaVersion: SCHEMA_VERSION,
+    grupos: [
+      {
+        id: "g1",
+        nombre: "Grupo",
+        categoriaUso: "A",
+        sobrecargaUso: 2,
+        cargasMuertas: 1,
+      },
+    ],
+    plantas: [
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: H, grupoId: "g1" },
+      { id: "p1", nombre: "Planta 1", cota: H, altura: 3, grupoId: "g1" },
+    ],
+    secciones: [
+      { id: SECCION_GOLDEN, nombre: "IPE 300", tipo: "perfilMetalico", perfilId: PERFIL_GOLDEN },
+    ],
+    nudos,
+    pilares,
+    vigas,
+    panos: [],
+    muros: [],
+    cargas: [],
+    hipotesis: [],
+    analisis: { tipo: "lineal", comprobarEstatica: false, incluirPesoPropio: false },
+  };
+}
+
+describe("golden CR INTEGRACION (prepararModeloCR -> calcularCR, motor real)", () => {
+  let arranque: ArranqueMotor | null = null;
+
+  beforeAll(async () => {
+    arranque = await obtenerMotor();
+    if (!arranque.ok) console.warn(`\n[GOLDEN-CR-INT][SKIP] ${arranque.motivo}\n`);
+  }, TIMEOUT_ARRANQUE);
+
+  it(
+    "flujo real: cimentacion -> null, planta elevada -> CR≈centroide, SIN error global",
+    () => {
+      if (!arranque || !arranque.ok) {
+        console.warn(`[GOLDEN-CR-INT][SKIP] ${arranque?.motivo ?? "arranque no ejecutado"}`);
+        return;
+      }
+      // Capa 1 -> Capa 2 base + plantasInfo por el camino REAL (incluye los PIES de
+      // cimentacion etiquetados a la planta mas baja, que disparaban el bug).
+      const prep = prepararModeloCR(obraSimetrica4Pilares());
+      expect(prep.ok, "prepararModeloCR debe producir un modelo CR ok").toBe(true);
+      if (!prep.ok) return;
+
+      // Sanity: hay al menos una planta de cimentacion (todos sus nudos son pies de
+      // apoyo) y una planta elevada. plantasInfo viene de nodoFEMAPlanta.
+      const idsPlanta = prep.plantasInfo.map((p) => p.plantaId).sort();
+      expect(idsPlanta.length, "al menos 2 plantas (cimentacion + elevada)").toBeGreaterThanOrEqual(2);
+
+      // El camino REAL: NO debe lanzar (modelo base estable). Antes del fix esto
+      // tiraba {ok:false} "inestable" -> calcularCR lanzaba aqui.
+      const motor = arranque.motor;
+      expect(
+        () => motor.calcularCR(prep.modeloFEM, prep.plantasInfo),
+        "calcularCR NO debe fallar con un modelo base estable (regresion del bug #1)",
+      ).not.toThrow();
+      const r = motor.calcularCR(prep.modeloFEM, prep.plantasInfo);
+      console.warn(
+        `\n[GOLDEN-CR-INT] cr_por_planta=${JSON.stringify(r.cr_por_planta)}\n`,
+      );
+
+      expect(r.analysis.type).toBe("centroRigidez");
+      // TODA planta tiene su clave (cimentacion incluida).
+      for (const id of idsPlanta) {
+        expect(r.cr_por_planta[id], `clave ${id} presente`).toBeDefined();
+      }
+
+      // La planta de CIMENTACION (todos sus nudos empotrados) -> null, sin reventar.
+      // La identificamos como la planta cuyo CR es null Y que es de cota 0 (p0).
+      const crCim = r.cr_por_planta["p0"];
+      expect(crCim, "clave de cimentacion presente").toBeDefined();
+      expect(crCim.x, "CR.x de cimentacion = null").toBeNull();
+      expect(crCim.y, "CR.y de cimentacion = null").toBeNull();
+
+      // La planta ELEVADA (p1) -> CR determinable ≈ centroide (simetrica -> (0,0)).
+      const crElev = r.cr_por_planta["p1"];
+      expect(crElev, "clave de planta elevada presente").toBeDefined();
+      expect(crElev.x, "CR.x de planta elevada NO null (determinable)").not.toBeNull();
+      expect(crElev.y, "CR.y de planta elevada NO null (determinable)").not.toBeNull();
+      expect(
+        Math.abs(crElev.x!),
+        `planta elevada simetrica: CR.x ≈ centroide 0 (real=${crElev.x})`,
+      ).toBeLessThan(1e-4);
+      expect(
+        Math.abs(crElev.y!),
+        `planta elevada simetrica: CR.y ≈ centroide 0 (real=${crElev.y})`,
+      ).toBeLessThan(1e-4);
     },
     TIMEOUT_ARRANQUE,
   );

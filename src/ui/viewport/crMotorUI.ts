@@ -10,10 +10,6 @@
 import type { EstadoMotor } from "../../solver";
 import { calculoHabilitado } from "../resultados/estadoMotorUI";
 
-// Reexport de la habilitacion compartida: el CR se lanza con el motor "listo" (o en
-// "error" para reintentar) y sin calculo en curso, igual que "Calcular obra"/"Calcular modos".
-export { calculoHabilitado } from "../resultados/estadoMotorUI";
-
 // Texto del boton "Calcular centro de rigidez" segun el estado del motor. Reusa los
 // estados visibles del motor ("Cargando motor…") pero con copy propio en reposo/curso.
 export function etiquetaBotonCR(

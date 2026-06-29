@@ -730,6 +730,22 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
+## T-cr-nodo-compartido-plantas · CR: un nudo FEM compartido entre plantas cae en una sola
+
+- **Qué:** `nodoFEMAPlanta` ([modeloCR.ts](src/discretizador/modeloCR.ts)/[discretizar.ts](src/discretizador/discretizar.ts))
+  etiqueta cada nudo FEM a UNA planta con desempate `min(id)`. Si dos plantas comparten físicamente un
+  nudo FEM (mismo X,Z y misma cota, p.ej. grupos distintos a igual cota), el nudo va al diafragma de la
+  planta "ganadora" y falta en el de la "perdedora" → el diafragma de esa planta queda con un nudo menos.
+- **Por qué:** Exótico (requiere dos plantas a la MISMA cota compartiendo geometría). En el flujo F1/F2
+  normal (plantas a cotas distintas) no ocurre. El desempate es determinista (no rompe el cálculo), solo
+  el reparto es discutible. No es un ship-blocker.
+- **Cómo retomar:** decidir si un nudo compartido debe pertenecer a AMBOS diafragmas (cada planta lo
+  incluye en su `plantasInfo.nodos`) o mantener el desempate; si lo primero, `prepararModeloCR` emitiría
+  el nudo en varias plantas. Cubrir con un caso de dos plantas a igual cota. **Coste:** CC ~30-45 min.
+- **Depende de / bloquea:** nada. **Origen:** /code-review F1.2 (xhigh) hallazgo #4 (menor, exótico).
+
+---
+
 ## T-cr-bases-elasticas · El CR no capta la flexibilidad de bases (arranque elástico = empotrado)
 
 - **Qué:** El centro de rigidez (F2) es tan fiel como el modelo de apoyos actual. Hoy

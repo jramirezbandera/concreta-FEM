@@ -68,6 +68,11 @@ export interface PipelineAuxiliar<P, R> {
   alExito: (resultado: R, payload: P) => void;
   /** Copy de obra para una excepcion que NO es ErrorMotor (fallo inesperado). */
   mensajeFalloInesperado: string;
+  /** Si tras el exito se navega a la pestana "Resultados". Default true (estatico/modal:
+   *  sus paneles viven en Resultados). El CR lo pone FALSE: su marcador/panel son ayuda de
+   *  PLANTA (planta-only), asi que calcular el CR NO debe sacar al usuario de la vista
+   *  planta (donde ve el marcador) hacia Resultados (donde no se dibuja). */
+  autoSwitchResultados?: boolean;
   /** Sink (callbacks de progreso). El llamador combina con su sink al store. */
   sink: CalculoSink;
 }
@@ -115,9 +120,14 @@ export async function ejecutarPipelineAuxiliar<P, R>(
       return;
     }
 
-    // d. Exito: el llamador escribe en su store; el auto-switch a Resultados es comun.
+    // d. Exito: el llamador escribe en su store. El auto-switch a Resultados es comun a
+    // los caminos cuyo panel vive ahi (estatico/modal). El CR (autoSwitchResultados:false)
+    // se ve EN PLANTA: navegar a Resultados lo sacaria de donde esta su marcador, asi que
+    // no navega.
     cfg.alExito(resultado, prep.payload);
-    vistaStore.getState().setPestanaActiva("resultados");
+    if (cfg.autoSwitchResultados !== false) {
+      vistaStore.getState().setPestanaActiva("resultados");
+    }
   } catch (e) {
     // e. Fallo del motor (carga o calculo). No relanzamos: dejamos el error
     // consultable. esErrorMotor distingue el ErrorMotor plano del worker.

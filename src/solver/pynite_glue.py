@@ -823,13 +823,36 @@ def _cond3x3(K):
     """Numero de condicion (norma 2) de una matriz 3x3, via numpy. Es algebra
     trivial sobre la salida de PyNite (las reacciones); la regla de oro #1 queda
     intacta (PyNite sigue siendo la unica fuente del calculo). numpy esta siempre
-    cargado (PyNite lo usa)."""
+    cargado (PyNite lo usa).
+
+    FIX #3 (robustez): una K con NaN/Inf (p.ej. una planta numericamente mala) hace
+    que numpy.linalg.cond lance LinAlgError ("SVD did not converge"). Lo atrapamos y
+    devolvemos inf -> la planta se marca NO determinable (null), en vez de propagar y
+    abortar TODO el CR. Solo un modelo BASE inestable es error global; una planta mala
+    es null. Asi un fallo numerico de UNA planta no tumba las demas."""
     import numpy as _np
 
-    return float(_np.linalg.cond(_np.asarray(K, dtype=float)))
+    try:
+        return float(_np.linalg.cond(_np.asarray(K, dtype=float)))
+    except _np.linalg.LinAlgError:
+        return float("inf")
 
 
-def _rigidez_diafragma_planta(payload, nodos, xm, zm):
+# Flags de apoyo (6 GDL) por nombre de nudo, leidos del payload BASE. Default todo
+# False (nudo sin apoyo). Lo usa el diafragma para FUSIONAR (no sobrescribir) los
+# apoyos: al imponer DX,DZ conserva el resto de la sujecion del modelo base.
+def _apoyos_base(payload):
+    apoyos = {}
+    for sp in payload.get("supports", []):
+        apoyos[sp["node"]] = (
+            bool(sp.get("DX", False)), bool(sp.get("DY", False)),
+            bool(sp.get("DZ", False)), bool(sp.get("RX", False)),
+            bool(sp.get("RY", False)), bool(sp.get("RZ", False)),
+        )
+    return apoyos
+
+
+def _rigidez_diafragma_planta(payload, nodos, xm, zm, apoyos_base):
     """Ensambla la matriz de rigidez 3x3 del diafragma de UNA planta respecto al
     maestro (xm,zm), imponiendo los 3 campos de cuerpo rigido unitarios y leyendo
     la resultante de reacciones en los nudos de la planta.
@@ -839,6 +862,17 @@ def _rigidez_diafragma_planta(payload, nodos, xm, zm):
     El resto del modelo (otras plantas, cimentacion) permanece, asi que la rigidez
     medida incluye el acoplamiento con el resto del edificio (convencion del plan:
     una planta a la vez con todos los diafragmas presentes).
+
+    FIX #1 (BUG ship-blocker): def_support de PyNite ASIGNA los 6 flags (no fusiona).
+    Si un nudo de la planta tiene apoyo en el modelo base (p.ej. un PIE de pilar de
+    cimentacion empotrado, que `nodoFEMAPlanta` etiqueta a la planta mas baja), llamar
+    def_support(name, True, False, True, False, False, False) le BORRABA DY/RX/RY/RZ
+    -> el modelo perdia su sujecion vertical/rotacional -> modo de cuerpo rigido ->
+    analyze_linear lanzaba inestabilidad -> TODO el CR caia a {ok:False} aunque el
+    modelo base fuera estable. FIX: FUSIONAR -> conservar los flags de apoyo del base y
+    solo FORZAR DX,DZ=True. Un nudo de cimentacion (todo True) sigue empotrado
+    (DY/RX/RY/RZ=True); un cabeza de pilar libre queda DX,DZ=True / resto False, igual
+    que validaba el spike (las cabezas libres no cambian de valor).
     """
     # Coords FEM de cada nudo de la planta (del payload, sin internals de PyNite).
     coord = {n["name"]: (n["x"], n["y"], n["z"]) for n in payload.get("nodes", [])}
@@ -850,8 +884,13 @@ def _rigidez_diafragma_planta(payload, nodos, xm, zm):
             x, _y, z = coord[name]
             dx = ux - th * (z - zm)
             dz = uz + th * (x - xm)
-            # support(DX,DZ) -> PyNite calcula Rxn en esos GDL; DY/RX/RY/RZ libres.
-            m.def_support(name, True, False, True, False, False, False)
+            # FUSION (FIX #1): conservar DY/RX/RY/RZ del apoyo base; forzar DX,DZ=True
+            # (para que PyNite calcule Rxn en esos GDL). Sin apoyo base -> resto False
+            # (comportamiento del spike para cabezas libres, INTACTO).
+            _bdx, bdy, _bdz, brx, bry, brz = apoyos_base.get(
+                name, (False, False, False, False, False, False)
+            )
+            m.def_support(name, True, bdy, True, brx, bry, brz)
             m.def_node_disp(name, "DX", dx)
             m.def_node_disp(name, "DZ", dz)
         # sparse=True (ruta de produccion, CLAUDE.md §8). check_stability default
@@ -867,6 +906,10 @@ def _rigidez_diafragma_planta(payload, nodos, xm, zm):
         fx = fz = my = 0.0
         for name in nodos:
             x, _y, z = coord[name]
+            # "Combo 1" = combo implicito por defecto de PyNite (guia §3.5): el
+            # ModeloFEM base del CR llega con combos:[] (prepararModeloCR no emite
+            # combos de usuario), asi que PyNite usa este unico combo. No hardcodeamos
+            # un combo del payload; leemos el unico que existe en el analisis del CR.
             rfx = float(m.nodes[name].RxnFX["Combo 1"])
             rfz = float(m.nodes[name].RxnFZ["Combo 1"])
             fx += rfx
@@ -934,6 +977,10 @@ def calcular_cr(payload, plantas_info):
         elif hasattr(plantas_info, "to_py"):
             plantas_info = plantas_info.to_py()
 
+        # Apoyos del modelo BASE por nudo (FIX #1): el diafragma los FUSIONA en vez de
+        # sobrescribirlos. Se calcula UNA vez (no por planta/campo).
+        apoyos_base = _apoyos_base(payload)
+
         cr_por_planta = {}
         for info in plantas_info:
             planta_id = info["plantaId"]
@@ -944,13 +991,24 @@ def calcular_cr(payload, plantas_info):
 
             # Planta sin nudos o con un solo nudo: no hay diafragma con rigidez
             # torsional determinable -> null (no determinable). Evita construir/
-            # analizar de mas y es el caso limite "nudos de cimentacion" (1 nivel
-            # base coartado) tratado con gracia.
+            # analizar de mas.
             if len(nodos) < 2:
                 cr_por_planta[planta_id] = {"x": None, "y": None}
                 continue
 
-            K = _rigidez_diafragma_planta(payload, nodos, xm, zm)
+            # CIMENTACION (FIX #2): una planta cuyos nudos estan TODOS totalmente
+            # empotrados en el base (los 6 GDL True) NO es un forjado-diafragma, es el
+            # nivel de cimentacion (los PIES de pilar, que `nodoFEMAPlanta` etiqueta a
+            # la planta mas baja). Imponer un diafragma ahi no tiene sentido fisico (no
+            # se desplaza: ya esta coartado en todo) y, tras el FIX #1, daria un CR
+            # ESPURIO con cond bajo (un punto fijo) en vez de un forjado. Lo marcamos
+            # null "no determinable" SIN analizar. La decision se confirmo empiricamente
+            # con el motor real (ver el golden de integracion prepararModeloCR->calcularCR).
+            if all(apoyos_base.get(n) == (True, True, True, True, True, True) for n in nodos):
+                cr_por_planta[planta_id] = {"x": None, "y": None}
+                continue
+
+            K = _rigidez_diafragma_planta(payload, nodos, xm, zm, apoyos_base)
             x_cr, z_cr = _cr_de_rigidez(K, xm, zm)
             # x = FEM X (obra x), y = FEM Z (obra y). None = no determinable.
             cr_por_planta[planta_id] = {"x": x_cr, "y": z_cr}

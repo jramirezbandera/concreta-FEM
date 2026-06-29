@@ -120,6 +120,9 @@ export async function calcularCR(): Promise<void> {
     mensajeFalloInesperado:
       "No se pudo calcular el centro de rigidez por un fallo inesperado. " +
       "Vuelve a intentarlo; si persiste, reporta la incidencia.",
+    // El CR se ve EN PLANTA (marcador/panel planta-only): no navegamos a Resultados al
+    // calcular (a diferencia del estatico/modal), o sacariamos al usuario de su vista.
+    autoSwitchResultados: false,
     sink: sinkAlStore,
   });
 }
