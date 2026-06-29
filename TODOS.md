@@ -705,3 +705,25 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   insignia para combinaciones atípicas) y marcadores de release por GDL/extremo; quitar la etiqueta "vista
   simplificada" cuando sea fiel. **Coste:** CC ~45-60 min (diseño de glifos + leyenda + tests).
 - **Depende de / bloquea:** nada. **Origen:** Revisión de ingeniería F2c (Issue 7-B, alcance acotado).
+
+---
+
+## T-cr-una-factorizacion · CR: optimizar a una sola factorización (multi-RHS), no 3·nPlantas `analyze()`
+
+- **Qué:** `calcular_cr` ([src/solver/pynite_glue.py](src/solver/pynite_glue.py)) resuelve el CR con la
+  **opción A** del spike F0.1: por cada planta y cada uno de los 3 campos de cuerpo rígido unitarios,
+  **reconstruye el modelo base** (`build_model`) e invoca `analyze_linear` → `3·nPlantas` factorizaciones.
+- **Por qué:** `def_node_disp` es una propiedad del **modelo**, no del combo (no toma `case`), así que
+  tres campos distintos por planta NO caben en un único `analyze()` con combos. La opción A es la que el
+  spike validó (física correcta) y es suficiente para F2 (pocas plantas), pero re-factoriza la misma K
+  geométrica/rigidez `3·nPlantas` veces. En un edificio grande es coste evitable.
+- **Cómo retomar:** opción B de la nota del spike ([cr_diafragma_spike.md](src/solver/spikes/cr_diafragma_spike.md)):
+  construir el campo de carga **equivalente** (cargas nodales por planta) en vez de desplazamientos
+  prescritos, usar `add_load_combo` con `3·nPlantas` combos dedicados y `analyze_linear` UNA vez
+  (una factorización, multi-RHS). **Requiere RE-VALIDAR contra la fixture** (`cr_diafragma_fixture.json`)
+  y el golden del CR ([tests/golden/cr.golden.test.ts](tests/golden/cr.golden.test.ts)): la equivalencia
+  carga↔desplazamiento debe reproducir CR, cond y K. Cuidado con un modelo de N plantas + diafragmas
+  simultáneos (el campo de una planta no debe contaminar a otra).
+- **Depende de / bloquea:** nada (optimización; la opción A es correcta). **Coste:** CC ~1-1.5 h
+  (reformulación + re-validación del golden + la fixture).
+- **Origen:** Spike F0.1 (nota de diseño, "Una sola factorización"/6A); diferido conscientemente en F1.2.
