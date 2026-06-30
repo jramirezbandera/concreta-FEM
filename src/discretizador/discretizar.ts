@@ -634,9 +634,12 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
       // F3: una carga superficial sobre un PAÑO LOSA SE TRADUCE a presion en sus quads
       // (ya no bloquea: el bloqueo PANO_NO_SOPORTADO de F1 se levanta aqui). El reparto
       // a los quads ocurre en el Paso de paños (necesita la malla). SIGNO: la presion de
-      // quad NO usa `valor` (que lleva el signo FY-negativo de las barras): con el orden
-      // de nudos i→j→m→n CCW una presion POSITIVA empuja hacia ABAJO (gravedad), opuesto
-      // a la convencion de barras. Se emite POSITIVA = magnitud de la carga gravitatoria.
+      // quad es `-valor` (el MISMO `valor` con signo de `signoGravitatorio` que usan las
+      // barras, NEGADO): con el orden de nudos i→j→m→n CCW una presion POSITIVA empuja
+      // hacia ABAJO (gravedad), convencion OPUESTA a la FY de barras (donde gravedad = FY
+      // negativa). Acoplar al MISMO `valor` (en vez de `Math.abs`) mantiene barra y placa
+      // en sincronia: si una hipotesis futura no fuese gravitatoria (signoGravitatorio=+1),
+      // barra y losa cargarian en sentidos coherentes en vez de divergir.
       const pano = panoById.get(c.ambito);
       if (pano === undefined) {
         // Carga superficial sobre algo que NO es un paño (p.ej. una viga): no aplicable.
@@ -650,7 +653,7 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
         });
         continue;
       }
-      presionesPorPano.push({ panoId: pano.id, presion: Math.abs(c.valor), case: caseName });
+      presionesPorPano.push({ panoId: pano.id, presion: -valor, case: caseName });
       continue;
     }
 

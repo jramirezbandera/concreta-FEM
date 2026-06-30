@@ -931,3 +931,80 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   no-rectángulos (junto a `T-f3-pano-poligonal`).
 - **Depende de / bloquea:** `T-f3-pano-poligonal`. **Coste:** CC ~15-20 min.
 - **Origen:** Auditoría guardián F3 (hallazgo menor).
+
+---
+
+## T-f3-sujecion-componentes · validarSujecion no detecta componentes desconectados
+
+- **Qué:** `validarSujecion` ([validaciones.ts](src/discretizador/validaciones.ts)) es un heurístico de
+  "¿hay ALGUNA sujeción?" (≥1 pilar con vinculación exterior, y ahora ≥1 paño con `bordeApoyo≠"libre"`),
+  NO un análisis de componentes conexos. Un modelo con una losa apoyada (sujeción OK) MÁS un pórtico
+  desconectado y sin vinculación exterior pasa la validación, pero ese pórtico es un mecanismo flotante.
+- **Por qué:** F3 NO introdujo el fallo (el heurístico nunca verificó conexión a tierra por componente; un
+  pórtico desconectado con otro pilar sujeto en el modelo ya se colaba), pero la rama del paño lo ENSANCHA:
+  ahora la losa aporta sujeción global aunque el pórtico flote. Bajo `sparse` el solver no lanza (devuelve
+  desplazamientos basura) en vez de un error de obra claro.
+- **Cómo retomar:** análisis de componentes conexos del grafo nudo↔barra/quad; cada componente debe tener
+  su propia sujeción (apoyo). Error de obra por componente ("el pórtico de la zona X no está sujeto").
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~2-3 h.
+- **Origen:** /code-review F3 corte 1 (finder correctness, severidad media; pre-existente, ensanchado).
+
+---
+
+## T-f3-isovalores-rango-panel · PanelIsovalores reconstruye toda la malla solo para el min/max
+
+- **Qué:** `PanelIsovalores.tsx` llama a `construirBuffersIsovalores` (posiciones+índices+color por vértice)
+  solo para leer `valorMin`/`valorMax` de la leyenda, descartando el resto; `IsovaloresOverlay` construye
+  los MISMOS buffers aparte → doble build por recálculo (memoizado, no por frame).
+- **Por qué:** desperdicia ~2 Float32Array(nVert·3) + el bucle de rampa por vértice en cada cambio de
+  combo/magnitud (control que el usuario pulsa a menudo). No es bug (correcto y memoizado), solo eficiencia.
+- **Cómo retomar:** extraer `rangoIsovalores(entradas)` que haga solo la pasada `valorPorNudo` → {min,max}
+  para el panel; o compartir un único resultado memoizado entre overlay y panel.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~20-30 min.
+- **Origen:** /code-review F3 corte 1 (finders cleanup + cross-file, eficiencia).
+
+---
+
+## T-f3-seccion-carga-superficial-fork · SeccionCargaSuperficial es un fork de SeccionCargas
+
+- **Qué:** `src/ui/entradaPanos/SeccionCargaSuperficial.tsx` es ~90% copia de
+  `src/ui/dialogos/SeccionCargas.tsx` (mismos hooks, añadir/eliminar, branching de hipótesis-null/automática,
+  markup, CSS). Solo difieren `tipo:"superficial"` fijo y el sufijo "kN/m²" (que `SeccionCargas` ya mapea en
+  `SUFIJO_POR_TIPO`). `avisoSuperficial` ([validacionesCarga.ts](src/ui/dialogos/validacionesCarga.ts)) quedó
+  como código muerto (devuelve `null` siempre, sin caller en producción).
+- **Por qué:** un arreglo al flujo de añadir carga (p.ej. el fix de hipótesis-null/automática, que YA fue un
+  bug documentado) habría que aplicarlo en dos sitios → riesgo de divergencia silenciosa.
+- **Cómo retomar:** unificar en un componente parametrizado por `tipo`+`ambito` (lookup `SUFIJO_POR_TIPO`);
+  eliminar `avisoSuperficial` muerto + su test.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~30-45 min.
+- **Origen:** /code-review F3 corte 1 (finder cleanup).
+
+---
+
+## T-f3-pano-huella-instancing · PanoHuella duplica el resaltado y escala con suscripciones por paño
+
+- **Qué:** `PanoHuella` ([GeometriaModelo.tsx](src/ui/viewport/GeometriaModelo.tsx)) reimplementa el
+  hover/selección inline (un `useEffect` con SU PROPIO par de `seleccionStore.subscribe` POR paño) en vez de
+  reusar `useResaltadoSeleccion`; como cada paño es un `Mesh` aparte (no `InstancedMesh`), el helper no es
+  drop-in. Escala como 2N suscripciones para N paños + lógica de tinte duplicada en 3 sitios.
+- **Por qué:** en corte 1 hay pocos paños por planta (impacto bajo), pero la duplicación y el escalado son
+  deuda; alinear con el patrón instanciado de vigas (T-vigas-1, ya resuelto para vigas).
+- **Cómo retomar:** instanciar los paños (InstancedMesh) + color/tinte por-instancia con un par único de
+  suscripciones (espejo de las vigas en F2c).
+- **Depende de / bloquea:** se relaciona con el render de huella de paño. **Coste:** CC ~1-2 h.
+- **Origen:** /code-review F3 corte 1 (finder cleanup/altitud).
+
+---
+
+## T-f3-herramienta-pano-fuera-de-pestana · La herramienta "pano" queda colgada al cambiar de pestaña
+
+- **Qué:** La herramienta `"pano"` solo se puede USAR en la pestaña Entrada de vigas (ahí se monta
+  `ColocacionPano`); si el usuario la activa y cambia a Isovalores, `vistaStore.herramienta` sigue `"pano"`
+  pero no hay placement montado ni guía en la barra de estado ([App.tsx](src/App.tsx) ~línea 368). Clics sin
+  efecto, sin pista. No es crash; estado de herramienta colgada. (Patrón general "la herramienta persiste
+  entre pestañas", no exclusivo de paños.)
+- **Por qué:** confunde; el usuario no entiende por qué no pasa nada.
+- **Cómo retomar:** resetear `herramienta` a `"seleccion"` al cambiar de pestaña (decisión general para
+  todas las herramientas), o gatear el mensaje/placement de cada herramienta a las pestañas donde aplica.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~20 min.
+- **Origen:** /code-review F3 corte 1 (finder cross-file/UX).

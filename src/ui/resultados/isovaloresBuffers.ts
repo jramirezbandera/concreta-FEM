@@ -156,7 +156,9 @@ export function construirBuffersIsovalores(
     posiciones[k * 3 + 1] = ey;
     posiciones[k * 3 + 2] = ez;
     valores[k] = v;
-    const t = rango > 0 ? (v - valorMin) / rango : 0;
+    // Campo uniforme (rango 0): t=0.5 -> color NEUTRO de mitad de rampa, no el extremo
+    // frio (t=0) que leeria enganosamente como "minimo en todas partes".
+    const t = rango > 0 ? (v - valorMin) / rango : 0.5;
     rampaIsovalores(t, aux);
     color[k * 3] = aux.r;
     color[k * 3 + 1] = aux.g;
