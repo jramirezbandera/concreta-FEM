@@ -6,6 +6,7 @@ import type { Seccion } from "./seccion";
 import type { Nudo } from "./nudo";
 import type { Pilar } from "./pilar";
 import type { Viga } from "./viga";
+import type { Pano } from "./pano";
 import type { Carga, Hipotesis } from "./carga";
 
 export function grupoPorId(modelo: Modelo, id: string): Grupo | undefined {
@@ -41,6 +42,11 @@ export function pilaresDePlanta(modelo: Modelo, plantaId: string): Pilar[] {
 
 export function vigasDePlanta(modelo: Modelo, plantaId: string): Viga[] {
   return modelo.vigas.filter((v) => v.plantaId === plantaId);
+}
+
+// Paños (forjados) de una planta (F3). Mismo criterio directo que vigasDePlanta.
+export function panosDePlanta(modelo: Modelo, plantaId: string): Pano[] {
+  return modelo.panos.filter((p) => p.plantaId === plantaId);
 }
 
 export function cargasDeHipotesis(modelo: Modelo, hipotesisId: string): Carga[] {

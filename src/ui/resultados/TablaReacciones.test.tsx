@@ -150,3 +150,95 @@ describe("TablaReacciones · tabla por apoyo", () => {
     expect(screen.getByText(/resultados obsoletos/i)).toBeInTheDocument();
   });
 });
+
+// --- F2.4: filtrado/agregado de apoyos de borde de la malla ------------------
+// Fixture SINTETICO (sin discretizar): un apoyo estructural (pilar) + dos de malla, con
+// la procedencia marcada en trazabilidad.apoyosDeMalla. Verifica que la losa no inunda la
+// tabla (sus apoyos se AGREGAN en una fila "Losa (borde)") y que el ΣFY sigue cerrando.
+
+// Apoyo FEM minimo (solo DY vertical apoyado).
+function apoyoFEM(node: string): ModeloFEM["supports"][number] {
+  return { node, DX: false, DY: true, DZ: false, RX: false, RY: false, RZ: false };
+}
+
+function femConMalla(): ModeloFEM {
+  return {
+    units: "kN-m",
+    nodes: [],
+    materials: [],
+    sections: [],
+    members: [],
+    supports: [apoyoFEM("Npilar"), apoyoFEM("Nmalla1"), apoyoFEM("Nmalla2")],
+    node_loads: [],
+    dist_loads: [],
+    pt_loads: [],
+    combos: [{ name: "ELU", factors: {} }],
+    analysis: { type: "linear", check_statics: false },
+  };
+}
+
+function trazaConMalla(): Trazabilidad {
+  // pilarANodoArranque etiqueta Npilar como el pilar "pil1"; los Nmalla* proceden de malla.
+  return {
+    pilarAMembers: {},
+    vigaAMember: {},
+    pilarANodoArranque: { pil1: "Npilar" },
+    nudoANodo: {},
+    nodoFEMAPlanta: {},
+    panoAQuads: {},
+    quadAPano: {},
+    quadANodos: {},
+    nodosDeMalla: ["Nmalla1", "Nmalla2"],
+    apoyosDeMalla: ["Nmalla1", "Nmalla2"],
+  };
+}
+
+describe("TablaReacciones · filtrado de apoyos de malla (F2.4)", () => {
+  beforeEach(() => {
+    // Un pilar "P1" para que la fila estructural se etiquete con su nombre de obra.
+    modeloStore.getState().cargarModelo({
+      ...modeloStore.getState().getModelo(),
+      pilares: [
+        {
+          id: "pil1",
+          nombre: "P1",
+          x: 0,
+          y: 0,
+          plantaInicial: "p1",
+          plantaFinal: "p1",
+          seccionId: "s1",
+          materialId: "m1",
+          angulo: 0,
+          vinculacionExterior: true,
+          arranque: "empotrado",
+        },
+      ],
+    });
+    // Pilar reacciona 100 en FY; cada apoyo de malla 10 (agregado = 20).
+    resultadosStore.getState().setResultados(
+      resultadosConReacciones({
+        Npilar: [0, 100, 0, 0, 0, 0],
+        Nmalla1: [0, 10, 0, 0, 0, 0],
+        Nmalla2: [0, 10, 0, 0, 0, 0],
+      }),
+      femConMalla(),
+      trazaConMalla(),
+    );
+    vistaStore.getState().setCombinacionActiva("ELU");
+  });
+
+  it("agrega los apoyos de malla en una fila 'Losa (borde)' (no los lista uno a uno)", () => {
+    render(<TablaReacciones />);
+    const tabla = screen.getByRole("table");
+    expect(within(tabla).getByText("P1")).toBeInTheDocument();
+    const filaLosa = within(tabla).getByText("Losa (borde)").closest("tr")!;
+    // El agregado suma 10+10 = 20 en FY.
+    expect(within(filaLosa).getByText("20.00")).toBeInTheDocument();
+  });
+
+  it("ΣFY incluye el agregado de la losa (100 pilar + 20 losa = 120)", () => {
+    render(<TablaReacciones />);
+    const filaSuma = screen.getByRole("rowheader", { name: "ΣFY" }).closest("tr")!;
+    expect(within(filaSuma).getByText("120.00")).toBeInTheDocument();
+  });
+});

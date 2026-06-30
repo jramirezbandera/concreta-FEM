@@ -162,19 +162,102 @@ export interface Trazabilidad {
   // por primera viga). La consume F2 (centro de rigidez) para construir el diafragma
   // rigido POR PLANTA: agrupa los nudos de cada planta para atarlos a su nudo maestro.
   nodoFEMAPlanta: Record<string, string>;
+
+  // --- Procedencia de la MALLA de paños (F3, decision 2A) --------------------
+  // Mapas que marcan que parte de la Capa 2 NACE de la malla de un paño (losa), para
+  // que las vistas de resultados (F2.4) NO se inunden con los nudos/apoyos/quads de
+  // borde de la malla: la TablaReacciones agrega o filtra los apoyos de malla, y los
+  // overlays nodales ignoran sus nudos. Son SALIDA derivada (no entrada que validar),
+  // por eso son campos del interface, no schema Zod. Vacios cuando no hay paños (un
+  // portico de barras no toca nada de esto: regresion byte-a-byte de la Capa 2).
+
+  // pano (obra) -> nombres de sus quads FEM (en el orden determinista del mallado).
+  panoAQuads: Record<string, string[]>;
+  // quad FEM (p.ej. "PQ0-Q3") -> el pano de obra que lo genero (mapa inverso).
+  quadAPano: Record<string, string>;
+  // quad FEM -> sus 4 nudos en orden canonico [i,j,m,n] (CCW desde +Y). La UI de
+  // isovalores promedia el valor por-quad a los nudos usando este mapa.
+  quadANodos: Record<string, [string, string, string, string]>;
+  // Nombres de nudos FEM creados por la MALLA de algun paño (NO estructurales: no son
+  // cabezas/pies de pilar ni extremos de viga). La UI los excluye de las vistas nodales.
+  nodosDeMalla: string[];
+  // Nombres de nudos FEM que tienen un apoyo PROCEDENTE de la malla (borde del paño o
+  // estabilizacion en el plano). La TablaReacciones (F2.4) los agrega/oculta para no
+  // inundar la tabla con las reacciones de borde de la losa.
+  apoyosDeMalla: string[];
 }
 
+// Trazabilidad VACIA (todos los mapas/listas a su valor neutro). Factoria canonica
+// para los call sites que necesitan una `Trazabilidad` valida sin datos (tests, y la
+// base FEM antes de poblar). Tenerla aqui evita que cada literal tenga que enumerar
+// los campos (y se rompa al anadir uno nuevo, como ocurrio con la procedencia de
+// malla de F3). PURA.
+export function trazabilidadVacia(): Trazabilidad {
+  return {
+    pilarAMembers: {},
+    vigaAMember: {},
+    pilarANodoArranque: {},
+    nudoANodo: {},
+    nodoFEMAPlanta: {},
+    panoAQuads: {},
+    quadAPano: {},
+    quadANodos: {},
+    nodosDeMalla: [],
+    apoyosDeMalla: [],
+  };
+}
+
+// --- Placas (F3): cuadrilatero de losa ---------------------------------------
+// QuadFEM: placa cuadrilatera de 4 nudos en orden CANONICO i->j->m->n en sentido
+// ANTIHORARIO visto desde +Y (la vertical). PyNite la crea con
+// add_quad(name, i, j, m, n, t, material). EL ORDEN DE NUDOS FIJA LOS EJES LOCALES de la
+// placa: es la fuente de consistencia de Mx/My entre quads adyacentes (imprescindible para
+// promediar a nudos en los isovalores). `t` = espesor (m). El material se referencia por
+// nombre (mismo catalogo E/G/nu/rho que las barras): el espesor va en el quad, no en
+// SeccionFEM (que es 1D).
+export const QuadFEMSchema = z.object({
+  name: z.string().min(1),
+  i: z.string().min(1),
+  j: z.string().min(1),
+  m: z.string().min(1),
+  n: z.string().min(1),
+  t: z.number().positive(), // espesor (m)
+  material: z.string().min(1),
+});
+export type QuadFEM = z.infer<typeof QuadFEMSchema>;
+
+// Carga de presion superficial sobre un quad (F3). `presion` en kN/m2, PERPENDICULAR a la
+// placa. SIGNO (verificado contra el motor real, OPUESTO a la FY de barras): con el orden de
+// nudos i->j->m->n CCW, una presion POSITIVA empuja la placa hacia ABAJO (gravedad: presion
+// +q -> DY_centro < 0). Por eso el peso propio y las cargas gravitatorias se emiten con signo
+// POSITIVO. Esto, con el orden de nudos canonico, evita que Mx/My se inviertan. PyNite:
+// add_quad_surface_pressure(quad, presion, case).
+export const CargaQuadFEMSchema = z.object({
+  quad: z.string().min(1),
+  presion: z.number(), // kN/m2 (perpendicular a la placa; gravedad = POSITIVA hacia abajo)
+  case: z.string().min(1),
+});
+export type CargaQuadFEM = z.infer<typeof CargaQuadFEMSchema>;
+
 // --- Modelo FEM completo (salida del discretizador) --------------------------
+// `quads`/`quad_loads` son OPCIONALES (F3): el discretizador los emite SOLO cuando hay
+// paños. Un modelo de barras (sin paños) NO lleva esas claves -> la Capa 2 de un portico es
+// IDENTICA a antes (regresion: byte-a-byte sin claves nuevas), y los sitios que construyen
+// un `ModeloFEM` sin placas siguen tipando (no es `.default`, que volveria la clave
+// obligatoria en el tipo de salida y romperia esos literales). Los consumidores leen
+// `quads ?? []`.
 export const ModeloFEMSchema = z.object({
   units: z.literal("kN-m"),
   nodes: z.array(NodoFEMSchema),
   materials: z.array(MaterialFEMSchema),
   sections: z.array(SeccionFEMSchema),
   members: z.array(MiembroFEMSchema),
+  quads: z.array(QuadFEMSchema).optional(),
   supports: z.array(ApoyoFEMSchema),
   node_loads: z.array(CargaNodoFEMSchema),
   dist_loads: z.array(CargaDistFEMSchema),
   pt_loads: z.array(CargaPuntualFEMSchema),
+  quad_loads: z.array(CargaQuadFEMSchema).optional(),
   combos: z.array(ComboFEMSchema),
   analysis: AnalisisFEMSchema,
 });

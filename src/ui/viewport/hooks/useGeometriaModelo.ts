@@ -26,8 +26,9 @@ export interface PilarDibujo {
   angulo: number; // giro en grados
 }
 
-// Una viga lista para dibujar como segmento entre sus dos nudos, a la cota de su
-// planta. Mantiene el id de dominio para el picking.
+// Una viga lista para dibujar como barra 3D entre sus dos nudos, a la cota de su
+// planta. Mantiene el id de dominio para el picking. ancho/canto dan volumen a la
+// barra (caja orientada I->J) para que se vea como los pilares en 3D, no como una linea.
 export interface VigaDibujo {
   id: string;
   ax: number; // nudo I (m)
@@ -35,11 +36,23 @@ export interface VigaDibujo {
   bx: number; // nudo J (m)
   by: number;
   z: number; // cota de la planta de la viga (m)
+  ancho: number; // ancho de la seccion (m), eje horizontal perpendicular a la viga
+  canto: number; // canto de la seccion (m), eje vertical
+}
+
+// Un paño (losa) listo para dibujar su HUELLA: el contorno (poligono cerrado) en planta
+// a la cota de su planta. Mantiene el id de dominio para el picking. Corte 1: rectangulo
+// de 4 nudos, pero `contorno` admite N puntos por si el perimetro crece.
+export interface PanoDibujo {
+  id: string;
+  contorno: { x: number; y: number }[]; // nudos del perimetro (m), en orden de recorrido
+  z: number; // cota de la planta del paño (m)
 }
 
 export interface GeometriaModelo {
   pilares: PilarDibujo[];
   vigas: VigaDibujo[];
+  panos: PanoDibujo[];
 }
 
 // Lado por defecto de la caja de un pilar cuando la seccion no aporta dimensiones
@@ -53,6 +66,19 @@ function ladoSeccion(sec: Seccion | undefined): number {
   if (sec.tipo === "hormigonRectangular") return Math.max(sec.b, sec.h);
   if (sec.tipo === "hormigonCircular") return sec.d;
   return LADO_PILAR_DEFECTO;
+}
+
+// Ancho y canto proyectados de una viga a partir de su seccion (m). Hormigon usa sus
+// dimensiones reales (b=ancho, h=canto; d para circular); para perfiles metalicos o
+// secciones genericas la geometria no vive en la seccion (la biblioteca solo tabula
+// A/Iy/Iz/J), asi que se usa una caja por defecto legible. La fidelidad de perfil
+// (canto real del IPE/HEB) exigiria tabular geometria en src/biblioteca: mejora futura.
+const ANCHO_VIGA_DEFECTO = 0.2;
+const CANTO_VIGA_DEFECTO = 0.3;
+function dimsViga(sec: Seccion | undefined): { ancho: number; canto: number } {
+  if (sec?.tipo === "hormigonRectangular") return { ancho: sec.b, canto: sec.h };
+  if (sec?.tipo === "hormigonCircular") return { ancho: sec.d, canto: sec.d };
+  return { ancho: ANCHO_VIGA_DEFECTO, canto: CANTO_VIGA_DEFECTO };
 }
 
 // Cota base de una planta (m) a partir del Map id->cota. El tramo de pilar va de la
@@ -126,6 +152,7 @@ export function derivar(
     const ni = nudoPorId.get(viga.nudoI);
     const nj = nudoPorId.get(viga.nudoJ);
     if (!ni || !nj) continue; // referencia rota: la valida feature-4, aqui se omite
+    const dims = dimsViga(seccionPorId.get(viga.seccionId));
     vigas.push({
       id: viga.id,
       ax: ni.x,
@@ -133,10 +160,40 @@ export function derivar(
       bx: nj.x,
       by: nj.y,
       z: cotaPlanta(viga.plantaId, cotaPorPlanta),
+      ancho: dims.ancho,
+      canto: dims.canto,
     });
   }
 
-  return { pilares, vigas };
+  // Paños (F3): misma logica de filtro por planta/grupo que las vigas. El contorno se
+  // resuelve por id de nudo (los 4 nudos PROPIOS del perimetro). Referencia rota -> se
+  // omite (la valida feature-4; aqui no rompemos el render).
+  const panos: PanoDibujo[] = [];
+  for (const pano of modelo.panos) {
+    if (plantaActivaId) {
+      if (pano.plantaId !== plantaActivaId) continue;
+    } else if (grupoActivoId && !idsVisibles.has(pano.plantaId)) {
+      continue;
+    }
+    const contorno: { x: number; y: number }[] = [];
+    let roto = false;
+    for (const nudoId of pano.perimetro) {
+      const n = nudoPorId.get(nudoId);
+      if (!n) {
+        roto = true;
+        break;
+      }
+      contorno.push({ x: n.x, y: n.y });
+    }
+    if (roto || contorno.length < 3) continue;
+    panos.push({
+      id: pano.id,
+      contorno,
+      z: cotaPlanta(pano.plantaId, cotaPorPlanta),
+    });
+  }
+
+  return { pilares, vigas, panos };
 }
 
 // Suscripcion transient que bumpea un "tick" cuando cambia cualquiera de las entradas

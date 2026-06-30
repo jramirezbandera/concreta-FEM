@@ -1,0 +1,35 @@
+/* InspectorPano (F3): panel flotante de propiedades del paño seleccionado.
+   SOLO-PROPIEDADES (sin geometria). Posicion canonica: arriba-derecha del lienzo (el
+   llamante en el viewport puede sobrescribir con otra clase). Estilado solo con tokens;
+   reusa .cx-float / .cx-campo / .cx-input de las primitivas. Espejo de inspectorViga.css. */
+
+.cx-inspector-pano {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.cx-inspector-pano .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Bloque etiqueta + control (Apoyo de borde) en columna. */
+.cx-inspector-pano__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.cx-inspector-pano__acciones {
+  margin-top: var(--space-1, 4px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cx-inspector-pano__confirmar-texto {
+  margin: 0;
+  line-height: 1.4;
+}

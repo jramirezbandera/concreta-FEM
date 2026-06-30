@@ -124,6 +124,24 @@ export type EstadoMiembroCombo = z.infer<typeof EstadoMiembroComboSchema>;
 export const ResultadoMiembroSchema = z.record(z.string(), EstadoMiembroComboSchema);
 export type ResultadoMiembro = z.infer<typeof ResultadoMiembroSchema>;
 
+// --- Resultados de PLACA (F3): por quad, por combinacion ---------------------
+// PyNite NO da resultados NODALES de placa: se muestrean POR ELEMENTO en las 4 ESQUINAS
+// del quad (orden i,j,m,n), en EJES LOCALES de la placa (consistentes entre quads por el
+// orden de nudos del contrato Capa 2, lo que permite promediar a nudos en los isovalores
+// sin saltos). UNIDADES (distintas de las barras, §14): Mx/My/Mxy = kN·m/m (momento POR
+// UNIDAD DE ANCHO); Qx/Qy = kN/m. La FLECHA de la losa NO va aqui: es NODAL (nodos[].disp DY
+// de los nudos de malla), igual que cualquier desplazamiento de nudo.
+const MomentosEsquinaSchema = z.tuple([z.number(), z.number(), z.number()]); // [Mx,My,Mxy] kN·m/m
+const CortantesEsquinaSchema = z.tuple([z.number(), z.number()]); // [Qx,Qy] kN/m
+export const EstadoQuadComboSchema = z.object({
+  moments: z.array(MomentosEsquinaSchema).length(4), // 4 esquinas, orden i,j,m,n
+  shears: z.array(CortantesEsquinaSchema).length(4),
+});
+export type EstadoQuadCombo = z.infer<typeof EstadoQuadComboSchema>;
+// Resultados de un quad indexados por nombre de combinacion (igual que barras/nodos).
+export const ResultadoQuadSchema = z.record(z.string(), EstadoQuadComboSchema);
+export type ResultadoQuad = z.infer<typeof ResultadoQuadSchema>;
+
 // --- Comprobacion de equilibrio (check_statics) ------------------------------
 // Solo presente si el analisis se lanzo con check_statics=true (guia §6, §13.5).
 // PyNite imprime el balance; el glue lo resume a un flag + residuos por combo para
@@ -157,6 +175,10 @@ export const ResultadosCalculoSchema = z.object({
   combos: z.array(z.string()).nonempty(), // combos calculados, en orden de emision
   nodos: z.record(z.string(), ResultadoNodoSchema), // "N1" -> resultados por combo
   barras: z.record(z.string(), ResultadoMiembroSchema), // "M1" -> resultados por combo
+  // Resultados de placa por quad (F3), por combinacion. OPCIONAL: el glue lo emite SOLO si
+  // hay placas, asi un modelo de barras devuelve resultados IDENTICOS a antes (sin clave
+  // nueva). "Q1" -> resultados por combo. Los consumidores leen `quads ?? {}`.
+  quads: z.record(z.string(), ResultadoQuadSchema).optional(),
   // null cuando el analisis no ejecuto la comprobacion: porque el payload no pidio
   // check_statics, o porque el tipo no la admite (P-Δ/modal; el glue la FUERZA a
   // false ahi, E6). El glue emite Python `None` en ese caso, que Pyodide

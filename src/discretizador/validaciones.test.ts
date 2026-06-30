@@ -153,6 +153,19 @@ describe("validarModelo", () => {
     sinJergaFEM(e!);
   });
 
+  it("REF_SECCION: un perfil de catalogo referenciado DIRECTAMENTE por id es valido (como los materiales)", () => {
+    const m = modeloValido();
+    // Reproduce lo que produce el SelectSeccion al elegir un IPE/HEB: pilar y viga
+    // referencian el id del perfil de catalogo ("IPE300"), y la obra puede no tener
+    // esa seccion en modelo.secciones. No debe dar REF_SECCION (la UI ya lo da por
+    // valido en validacionesPilar/Viga; el discretizador debe coincidir).
+    m.secciones = [];
+    m.pilares[0].seccionId = PERFIL_OK;
+    m.vigas[0].seccionId = PERFIL_OK;
+    const errores = validarModelo(m);
+    expect(errores.filter((e) => e.codigo === "REF_SECCION")).toHaveLength(0);
+  });
+
   it("REF_SECCION: seccion de obra perfilMetalico con perfilId inexistente en el catalogo", () => {
     const m = modeloValido();
     // La seccion existe en la obra, pero su perfil no esta en el catalogo PERFILES.

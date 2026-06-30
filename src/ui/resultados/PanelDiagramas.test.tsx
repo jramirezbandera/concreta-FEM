@@ -59,6 +59,11 @@ function traza(): Trazabilidad {
     pilarANodoArranque: { p1: "N1" },
     nudoANodo: {},
     nodoFEMAPlanta: {},
+    panoAQuads: {},
+    quadAPano: {},
+    quadANodos: {},
+    nodosDeMalla: [],
+    apoyosDeMalla: [],
   };
 }
 

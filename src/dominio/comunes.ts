@@ -11,4 +11,8 @@ export const NombreSchema = z.string().min(1);
 // de la base Dexie/IndexedDB (ya en 2 por las plantillas de F15); esta versiona la
 // FORMA del Modelo. v2 (F2a) introduce `OpcionesAnalisis.incluirPesoPropio`,
 // `Hipotesis.automatica` y la hipotesis automatica `hip-peso-propio`.
-export const SCHEMA_VERSION = 2;
+// v3 (F3, corte 1) expande `Pano` de stub `{id}` a la forma completa de LOSA
+// (nombre/tipo/plantaId/perimetro/espesor/materialId/tamMalla/bordeApoyo). La
+// migracion v2->v3 DESCARTA los paños-stub heredados (sin geometria) y sus cargas
+// superficiales (no se pueden completar a la forma de losa).
+export const SCHEMA_VERSION = 3;

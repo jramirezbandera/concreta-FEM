@@ -160,6 +160,28 @@ def build_model(payload):
             ld["member"], ld["direction"], ld["P"], ld["x"], case=ld["case"]
         )
 
+    # --- Placas/quads (F3): add_quad(name, i, j, m, n, t, material) ----------
+    # Cuadrilatero de 4 nudos en orden CANONICO i->j->m->n CCW visto desde +Y
+    # (contratoFEM.ts QuadFEMSchema). El orden FIJA los ejes locales de la placa
+    # (Quad3D: x_local = i->j ; z_local = (i->j) x (i->m) ; y_local = z x x), de modo
+    # que Mx/My son consistentes entre quads adyacentes (imprescindible para promediar
+    # a nudos en los isovalores). El espesor `t` va en el quad (no en SeccionFEM, 1D);
+    # el material se referencia por nombre (mismo catalogo E/G/nu/rho que las barras).
+    # Default [] -> un modelo de barras NO crea quads (Capa 2 identica a antes).
+    for q in payload.get("quads", []):
+        m.add_quad(q["name"], q["i"], q["j"], q["m"], q["n"], q["t"], q["material"])
+
+    # --- Cargas de presion en quad: add_quad_surface_pressure(quad, presion, case) -
+    # SIGNO CANONICO (confirmado empiricamente con el motor real, spike F1.3): con el
+    # orden de nudos i->j->m->n que el discretizador emite (recorrido X+ luego Z+ en el
+    # plano FEM X-Z), una presion POSITIVA produce flecha NEGATIVA (hacia -Y, abajo) =
+    # GRAVEDAD. Es decir: peso propio/cargas gravitatorias -> `presion` POSITIVA. (En el
+    # codigo de PyNite, Quad3D.fer acumula `p -= factor*pressure`, y el eje z local de la
+    # placa con este orden apunta hacia -Y; el neto es que presion>0 carga hacia abajo.)
+    # El discretizador YA emite con este signo; el glue solo lo pasa tal cual.
+    for ld in payload.get("quad_loads", []):
+        m.add_quad_surface_pressure(ld["quad"], ld["presion"], case=ld["case"])
+
     # --- Combinaciones: add_load_combo(name, factors, combo_tags=None) -------
     for c in payload.get("combos", []):
         m.add_load_combo(c["name"], c["factors"], combo_tags=c.get("combo_tags"))
@@ -204,6 +226,22 @@ class MotorInestableModal(Exception):
     """La estructura es inestable para el analisis modal (matriz singular)."""
 
 
+# -----------------------------------------------------------------------------
+# Error de dominio: analisis NO compatible con placas (F3, decision 6A del plan).
+#
+# El analisis modal y el P-Delta requieren la MASA del modelo. Hoy la masa modal se
+# fabrica con add_member_self_weight (solo BARRAS): la masa de los PAnos (placas) NO
+# se modela todavia (T-f3-masa-placa). Permitir modal/P-Delta con quads daria
+# frecuencias/efectos de 2.º orden FALSOS (masa de la losa ignorada), un error
+# silencioso peor que no calcular. Por eso, si el modelo tiene quads y el analisis es
+# modal o P-Delta, lo BLOQUEAMOS con un mensaje en lenguaje de obra. El estatico
+# (linear/analyze) SI corre con placas (no necesita masa). Lo envolvemos en una
+# excepcion propia para que calcular() emita el ErrorMotor legible correcto.
+# -----------------------------------------------------------------------------
+class MotorAnalisisConPanos(Exception):
+    """El analisis pedido (modal/P-Delta) aun no soporta la masa de los panos."""
+
+
 # Marcadores (minuscula) del mensaje de "sin masa" del solver modal (spike F2b):
 # "massless" (M() vacio) y "no mass terms" (M11.nnz==0 en analyze_modal).
 _MARCADORES_SIN_MASA = ("massless", "no mass terms", "no mass")
@@ -229,6 +267,18 @@ def run_analysis(m, analysis):
     """
     tipo = analysis.get("type", "analyze")
     cs = analysis.get("check_statics", False)
+
+    # BLOQUEO modal/P-Delta con PLACAS (decision 6A del plan F3): la masa de los panos
+    # no se modela aun (la masa modal = add_member_self_weight, solo barras), asi que un
+    # modal o un P-Delta con quads daria resultados FALSOS (masa de la losa ignorada).
+    # Se rechaza con error de obra ANTES de analizar. El estatico (linear/analyze) SI
+    # corre con placas. `m.quads` lo pobla build_model desde payload["quads"].
+    if tipo in ("modal", "PDelta") and len(m.quads) > 0:
+        raise MotorAnalisisConPanos(
+            "El analisis %s aun no incluye la masa de los panos (losas): "
+            "retira los panos del modelo o usa el analisis estatico."
+            % ("modal" if tipo == "modal" else "P-Δ")
+        )
 
     # sparse=True (default de PyNite) usa el solver disperso de scipy: la ruta
     # esperada (CLAUDE.md §8). check_statics solo IMPRIME el balance; el residuo
@@ -550,6 +600,67 @@ def _resultante_carga_barra(m, ctx, ld, factor):
     return (fx, fy, fz, mx, my, mz)
 
 
+def _area_centroide_quad(ctx, quad):
+    """Area y centroide global de un quad cuadrilatero plano (4 nudos i,j,m,n).
+
+    Area por triangulacion (i,j,m)+(i,m,n): media de los modulos de los productos
+    cruzados de los lados -> exacta para cualquier cuadrilatero PLANO (y para los
+    rectangulos de la malla de losa del corte 1). Centroide = media de los 4 vertices
+    (exacto para paralelogramos/rectangulos; buena aproximacion para cuadrilateros
+    casi-rectangulares). Solo se usa para el residuo de equilibrio (check_statics):
+    la resultante VERTICAL de una presion uniforme depende solo del area, que es
+    exacta; el centroide solo afecta al balance de momentos.
+    """
+    ni = ctx["nodes"][quad["i"]]
+    nj = ctx["nodes"][quad["j"]]
+    nm = ctx["nodes"][quad["m"]]
+    nn = ctx["nodes"][quad["n"]]
+    p = [(ni["x"], ni["y"], ni["z"]), (nj["x"], nj["y"], nj["z"]),
+         (nm["x"], nm["y"], nm["z"]), (nn["x"], nn["y"], nn["z"])]
+
+    def _cruz_area(a, b, c):
+        # 1/2 |(b-a) x (c-a)| = area del triangulo abc
+        ux, uy, uz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
+        vx, vy, vz = c[0] - a[0], c[1] - a[1], c[2] - a[2]
+        cx = uy * vz - uz * vy
+        cy = uz * vx - ux * vz
+        cz = ux * vy - uy * vx
+        return 0.5 * (cx * cx + cy * cy + cz * cz) ** 0.5
+
+    area = _cruz_area(p[0], p[1], p[2]) + _cruz_area(p[0], p[2], p[3])
+    cx = (p[0][0] + p[1][0] + p[2][0] + p[3][0]) / 4.0
+    cy = (p[0][1] + p[1][1] + p[2][1] + p[3][1]) / 4.0
+    cz = (p[0][2] + p[1][2] + p[2][2] + p[3][2]) / 4.0
+    return area, (cx, cy, cz)
+
+
+def _resultante_carga_quad(ctx, ld, factor):
+    """Resultante global (Fx,Fy,Fz, Mx,My,Mz respecto al origen) de una presion de
+    quad multiplicada por `factor` de combo.
+
+    SIGNO (confirmado con el motor real, spike F1.3): con el orden de nudos canonico
+    i->j->m->n del discretizador (plano FEM X-Z, vertical Y), una presion POSITIVA
+    carga hacia ABAJO (-Y global) = gravedad. Por tanto la resultante de fuerza es
+    Fy = -presion*area*factor (negativa hacia abajo cuando presion>0). El momento
+    respecto al origen es r x F con r = centroide del quad. Sin esta contribucion el
+    equilibrio daria "ok" FALSO con placas (las reacciones SI equilibran la presion,
+    pero el termino de carga externa estaria ausente -> residuo = Sigma reacciones != 0).
+    """
+    quad = ctx["quads"][ld["quad"]]
+    area, (cx, cy, cz) = _area_centroide_quad(ctx, quad)
+    P = ld["presion"] * factor
+    # Fuerza vertical: presion>0 -> hacia -Y (abajo). El plano de losa es X-Z, asi que
+    # la perpendicular es Y. (Corte 1 = losa horizontal; una placa inclinada exigiria
+    # proyectar segun la normal real del quad -> diferido, no aplica al corte 1.)
+    fy = -P * area
+    fx = fz = 0.0
+    # Momento respecto al origen: r x F, con r = centroide y F = (0, fy, 0).
+    mx = cy * fz - cz * fy
+    my = cz * fx - cx * fz
+    mz = cx * fy - cy * fx
+    return (fx, fy, fz, mx, my, mz)
+
+
 def _check_statics(m, payload, combos):
     """Calcula el residuo global de equilibrio por combo y decide equilibrio_ok.
 
@@ -560,10 +671,12 @@ def _check_statics(m, payload, combos):
     ctx = {
         "nodes": {n["name"]: n for n in payload.get("nodes", [])},
         "members": {mb["name"]: mb for mb in payload.get("members", [])},
+        "quads": {q["name"]: q for q in payload.get("quads", [])},
     }
     node_loads = payload.get("node_loads", [])
     dist_loads = payload.get("dist_loads", [])
     pt_loads = payload.get("pt_loads", [])
+    quad_loads = payload.get("quad_loads", [])
 
     residuos = {}
     equilibrio_ok = True
@@ -617,6 +730,17 @@ def _check_statics(m, payload, combos):
             if f == 0.0:
                 continue
             rfx, rfy, rfz, rmx, rmy, rmz = _resultante_carga_barra(m, ctx, ld, f)
+            lfx += rfx; lfy += rfy; lfz += rfz
+            lmx += rmx; lmy += rmy; lmz += rmz
+
+        # Cargas de presion en quad (F3): SIN esto el equilibrio daria "ok" FALSO con
+        # placas (las reacciones equilibran la presion, pero el termino de carga externa
+        # estaria ausente). Resultante vertical = -presion*area en FY (presion>0 = abajo).
+        for ld in quad_loads:
+            f = factors.get(ld["case"], 0.0)
+            if f == 0.0:
+                continue
+            rfx, rfy, rfz, rmx, rmy, rmz = _resultante_carga_quad(ctx, ld, f)
             lfx += rfx; lfy += rfy; lfz += rfz
             lmx += rmx; lmy += rmy; lmz += rmz
 
@@ -692,7 +816,37 @@ def serialize_results(m, combos, n_points, tipo_analisis, check_statics):
             }
         barras[name] = por_combo
 
-    return {
+    # --- Placas/quads (F3): por combo, momentos y cortantes en las 4 ESQUINAS -----
+    # PyNite NO da resultados nodales de placa: se muestrean POR ELEMENTO en
+    # coordenadas naturales (xi,eta) in [-1,1]. Las 4 esquinas, en el ORDEN i,j,m,n del
+    # contrato (resultados.ts), corresponden a (xi,eta) = (-1,-1),(1,-1),(1,1),(-1,1)
+    # (confirmado leyendo las funciones de forma N_i de Quad3D 2.0.2: N1=i en (-1,-1),
+    # N2=j en (1,-1), N3=m en (1,1), N4=n en (-1,1)). local=True -> ejes locales de la
+    # placa, CONSISTENTES entre quads por el orden de nudos canonico (clave para
+    # promediar a nudos en los isovalores sin saltos). UNIDADES: q.moment -> [Mx,My,Mxy]
+    # en kN*m/m ; q.shear -> [Qx,Qy] en kN/m (POR UNIDAD DE ANCHO; distinto de barras).
+    # SOLO se emite la clave `quads` si el modelo tiene placas: un modelo de barras
+    # devuelve resultados IDENTICOS a antes (sin clave nueva), regresion sin-quads.
+    _ESQUINAS_NAT = ((-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0))  # i,j,m,n
+    quads = {}
+    for name, q in m.quads.items():
+        por_combo = {}
+        for c in combos:
+            momentos = []
+            cortantes = []
+            for xi, eta in _ESQUINAS_NAT:
+                # q.moment(local=True) -> np.array([Mx,My,Mxy]) de forma (3,1) (cada
+                # componente es un array columna en el codigo de Quad3D 2.0.2); q.shear
+                # -> (2,1). .flatten() materializa a 3/2 escalares sin el
+                # DeprecationWarning de float(array_1d) (numpy 1.25+).
+                mom = q.moment(xi, eta, local=True, combo_name=c).flatten()
+                sh = q.shear(xi, eta, local=True, combo_name=c).flatten()
+                momentos.append([float(mom[0]), float(mom[1]), float(mom[2])])
+                cortantes.append([float(sh[0]), float(sh[1])])
+            por_combo[c] = {"moments": momentos, "shears": cortantes}
+        quads[name] = por_combo
+
+    resultado = {
         "units": "kN-m",
         "analysis": {"type": tipo_analisis, "n_points": n_points},
         "combos": combos,
@@ -700,6 +854,12 @@ def serialize_results(m, combos, n_points, tipo_analisis, check_statics):
         "barras": barras,
         "check_statics": check_statics,
     }
+    # `quads` OPCIONAL (regla de oro #regresion): solo presente si hay placas, asi un
+    # modelo de barras emite la MISMA forma que antes (sin la clave). El borde Zod
+    # (ResultadosCalculoSchema) lo valida con .optional() -> {quads ?? {}} en la UI.
+    if quads:
+        resultado["quads"] = quads
+    return resultado
 
 
 # =============================================================================
@@ -1093,6 +1253,19 @@ def calcular(payload, n_points=N_POINTS_DEFAULT):
 
         resultados = serialize_results(m, combos, n_points, tipo, check)
         return {"ok": True, "resultados": resultados}
+
+    except MotorAnalisisConPanos as e:
+        # Analisis modal/P-Delta pedido sobre un modelo con placas (F3, 6A): la masa de
+        # los panos no se modela aun. Mensaje de obra directo (el mensaje de la excepcion
+        # YA esta en lenguaje de obra); `detalle` conserva el crudo para modo avanzado.
+        return {
+            "ok": False,
+            "error": {
+                "mensaje": str(e),
+                "detalle": "Panos+analisis: " + (str(e) or e.__class__.__name__)
+                + "\n" + traceback.format_exc(),
+            },
+        }
 
     except MotorModalSinMasa as e:
         # El modelo no tiene masa para vibrar (sin peso propio ni material con rho, o

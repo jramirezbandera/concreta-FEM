@@ -98,6 +98,10 @@
   --z-canvas: 0;
   --z-hud: 2;
   --z-float: 4;
+  /* Desplegables de la barra de menus (Radix Popover, portados a body): por encima
+     del HUD glass del viewport, por debajo de los dialogos modales. Sin esto el menu
+     queda detras de los paneles glass (mismo bug ya resuelto para los dialogos). */
+  --z-popover: 90;
   --z-dialog: 100;
 
   /* --- Sombras (§1.6) --- */

@@ -805,3 +805,206 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 - **Por qué:** claridad/coherencia; ninguno afecta a la corrección.
 - **Cómo retomar:** trivial; hacerlo junto a otro toque de esos archivos. **Coste:** CC ~10-15 min.
 - **Origen:** Auditoría guardián F2-CR (observaciones menores, verdes).
+
+---
+
+## T-f3-pano-acople · Acoplar la malla del paño al pórtico (compartir nudos / transferir carga)
+
+- **Qué:** En F3 corte 1 la losa es **AISLADA** (decisión 5A): su malla tiene nudos PROPIOS y NO
+  comparte nudos con pilares/vigas, así que **no transfiere su carga al pórtico**. El acoplamiento real
+  (la losa descarga en las vigas/pilares de su contorno) está diferido.
+- **Por qué:** compartir nudos malla↔barra ES acoplamiento estructural (cambia los esfuerzos del pórtico);
+  hacerlo bien (compatibilidad de GDL, snapping malla→nudos de obra, reparto de rigidez) es un corte en sí
+  mismo. Aislar primero permitió cerrar el cálculo de placa de punta a punta sin arrastrar esa complejidad.
+- **Cómo retomar:** que `mallado.ts`/`discretizar` snapeen los nudos de borde del paño a los nudos FEM del
+  pórtico coincidentes (reusar `clavePosicion`/`TOL_NODO`) en vez de crear nudos propios; validar
+  compatibilidad de apoyos. Golden: losa sobre vigas → las vigas reciben la reacción de borde de la losa.
+- **Depende de / bloquea:** corte 1 (hecho). **Coste:** CC ~varias horas.
+- **Origen:** Plan F3 corte 1 (NOT-in-scope; decisión 5A, Codex outside-voice).
+
+---
+
+## T-f3-pano-poligonal · Paños poligonales / con huecos (no solo rectángulo)
+
+- **Qué:** El corte 1 solo malla **rectángulos** alineados a ejes (4 nudos); `mallarPano` rechaza lo demás
+  (`PANO_NO_RECTANGULAR`/`PANO_DEGENERADO`). Faltan polígonos arbitrarios y huecos (patios, escaleras).
+- **Por qué:** una malla estructurada NxM rectangular es trivial y determinista; mallar un polígono con
+  huecos exige un mallador no estructurado (Delaunay/quad-dominante), otro nivel de complejidad.
+- **Cómo retomar:** mallador de polígono (triángulos o quads) en `mallado.ts`; el resto del pipeline
+  (quads en Capa 2, isovalores) ya es agnóstico al número de quads.
+- **Depende de / bloquea:** corte 1. **Coste:** CC ~1 día.
+- **Origen:** Plan F3 corte 1 (NOT-in-scope).
+
+---
+
+## T-f3-pano-reticular · Forjado reticular (casetones / nervios)
+
+- **Qué:** `tipo:"reticular"` se RECHAZA hoy con error de obra (`PANO_TIPO_NO_SOPORTADO`). Falta su modelo
+  (malla de nervios + capa de compresión, o placa ortótropa equivalente).
+- **Por qué:** su rigidez no es la de una losa maciza homogénea; modelarlo bien (ortotropía o nervios
+  explícitos) es trabajo propio.
+- **Cómo retomar:** decidir modelo (placa ortótropa vs nervios como barras + losa superior); levantar el
+  rechazo en `validaciones.ts`.
+- **Depende de / bloquea:** corte 1 (losa maciza). **Coste:** CC ~1 día.
+- **Origen:** Plan F3 corte 1 (NOT-in-scope).
+
+---
+
+## T-f3-pano-unidireccional · Forjado unidireccional (viguetas en una dirección)
+
+- **Qué:** `tipo:"unidireccional"` se RECHAZA hoy (`PANO_TIPO_NO_SOPORTADO`). Falta su modelo (viguetas
+  paralelas + reparto unidireccional de carga).
+- **Por qué:** reparte la carga en UNA dirección (no bidireccional como la losa); su discretización y sus
+  esfuerzos son distintos.
+- **Cómo retomar:** modelar como conjunto de barras (viguetas) en la dirección de canto, o placa muy
+  ortótropa; levantar el rechazo.
+- **Depende de / bloquea:** corte 1. **Coste:** CC ~1 día.
+- **Origen:** Plan F3 corte 1 (NOT-in-scope).
+
+---
+
+## T-f3-muros · Muros y pantallas (placas verticales)
+
+- **Qué:** F3 (epic) incluye muros/pantallas como elementos de superficie verticales (rigidez lateral).
+  El corte 1 solo hizo la losa horizontal. Los muros usan el mismo motor de quads pero en vertical y se
+  cruzan con el centro de rigidez (aportan rigidez lateral real).
+- **Por qué:** los muros cambian el reparto lateral y el CR; encadenarlos con la losa habría ensanchado
+  demasiado el corte. El motor de placa (quads) ya está, así que el muro reutiliza F1.3.
+- **Cómo retomar:** `Muro` (hoy stub) → Capa 1 análogo a `Pano` pero vertical; discretizar a quads en el
+  plano del muro; integrar con el CR (cruza con `T-cr-diafragma-pano`).
+- **Depende de / bloquea:** corte 1 (motor de placa). Se cruza con F2-CR. **Coste:** CC ~1-2 días.
+- **Origen:** Plan F3 (epic; NOT-in-scope del corte 1).
+
+---
+
+## T-f3-masa-placa · Masa de los paños en modal / P-Δ (hoy bloqueado)
+
+- **Qué:** El análisis modal y P-Δ se **BLOQUEAN** si el modelo tiene quads (la masa de los paños no se
+  modela aún): el glue lanza `MotorAnalisisConPanos` → error de obra (`pynite_glue.py`). Falta añadir la
+  masa de placa (consistente, vía la densidad del quad) al modal/P-Δ.
+- **Por qué:** la masa modal hoy se fabrica solo con `add_member_self_weight` (barras); ignorar la masa de
+  la losa daría frecuencias falsas. Bloquear con aviso honesto es más seguro que un resultado erróneo.
+- **Cómo retomar:** añadir la masa de placa al camino modal (PyNite: masa consistente del quad) y levantar
+  el bloqueo. **Mejora menor (guardián):** duplicar el bloqueo como guarda TS de fallo-rápido en
+  `validaciones.ts` (p. ej. `ANALISIS_CON_PANOS` cuando modal/P-Δ y `panos.length>0`), manteniendo el glue
+  como red final, para no viajar al worker por algo detectable en TS.
+- **Depende de / bloquea:** corte 1. **Coste:** CC ~medio día (masa) + ~15 min (guarda TS).
+- **Origen:** Plan F3 corte 1 (decisión 6A) + auditoría guardián F3 (hallazgo menor).
+
+---
+
+## T-f3-isolineas · Isolíneas y promediado avanzado de isovalores
+
+- **Qué:** Los Isovalores del corte 1 colorean por vértice (Mx/My promediados a nudos, flecha nodal).
+  Faltan **isolíneas/contornos** (curvas de nivel) y un promediado más fino (p. ej. extrapolación de puntos
+  de Gauss, suavizado, discontinuidades en bordes de material).
+- **Por qué:** el color por vértice cubre el MVP de Isovalores; las isolíneas y el promediado avanzado son
+  refinamiento de presentación.
+- **Cómo retomar:** marching squares sobre la malla para contornos en `isovaloresBuffers.ts`/overlay.
+- **Depende de / bloquea:** corte 1. **Coste:** CC ~medio día.
+- **Origen:** Plan F3 corte 1 (NOT-in-scope).
+
+---
+
+## T-f3-convergencia · Documentar la convergencia de malla de la placa
+
+- **Qué:** El golden de placa usa tolerancia de malla del 8% (DKMQ 8×8 da +1.5% flecha / +2.5% Mx vs
+  Navier). Falta un estudio de convergencia documentado (error vs tamMalla) y, quizá, una recomendación de
+  `tamMalla` por luz en la UI.
+- **Por qué:** el usuario elige `tamMalla` a ciegas; un mapa error↔malla daría una guía y justificaría el
+  cap de quads. No bloquea el cálculo.
+- **Cómo retomar:** barrido de mallas en un golden/spike; documentar; opcional: sugerir tamMalla en
+  `PanelHerramientaPano`.
+- **Depende de / bloquea:** corte 1. **Coste:** CC ~2-3 h.
+- **Origen:** Plan F3 corte 1 (NOT-in-scope) + tolerancia documentada en `placa.golden.test.ts`.
+
+---
+
+## T-f3-quad-centroide-norectangular · Centroide del quad en check_statics para cuadriláteros no rectangulares
+
+- **Qué:** `_resultante_carga_quad` (`pynite_glue.py`) usa el **centroide aritmético** (media de los 4
+  vértices) para el balance de momentos de `check_statics`. Es **exacto para rectángulos** (único caso del
+  corte 1) pero no para un cuadrilátero general.
+- **Por qué:** afecta solo al residuo de MOMENTO del check de estática (no a los esfuerzos); con rectángulos
+  es correcto. Se vuelve relevante solo con paños poligonales/no rectangulares.
+- **Cómo retomar:** usar el centroide real del cuadrilátero (descomposición en triángulos) cuando F3 admita
+  no-rectángulos (junto a `T-f3-pano-poligonal`).
+- **Depende de / bloquea:** `T-f3-pano-poligonal`. **Coste:** CC ~15-20 min.
+- **Origen:** Auditoría guardián F3 (hallazgo menor).
+
+---
+
+## T-f3-sujecion-componentes · validarSujecion no detecta componentes desconectados
+
+- **Qué:** `validarSujecion` ([validaciones.ts](src/discretizador/validaciones.ts)) es un heurístico de
+  "¿hay ALGUNA sujeción?" (≥1 pilar con vinculación exterior, y ahora ≥1 paño con `bordeApoyo≠"libre"`),
+  NO un análisis de componentes conexos. Un modelo con una losa apoyada (sujeción OK) MÁS un pórtico
+  desconectado y sin vinculación exterior pasa la validación, pero ese pórtico es un mecanismo flotante.
+- **Por qué:** F3 NO introdujo el fallo (el heurístico nunca verificó conexión a tierra por componente; un
+  pórtico desconectado con otro pilar sujeto en el modelo ya se colaba), pero la rama del paño lo ENSANCHA:
+  ahora la losa aporta sujeción global aunque el pórtico flote. Bajo `sparse` el solver no lanza (devuelve
+  desplazamientos basura) en vez de un error de obra claro.
+- **Cómo retomar:** análisis de componentes conexos del grafo nudo↔barra/quad; cada componente debe tener
+  su propia sujeción (apoyo). Error de obra por componente ("el pórtico de la zona X no está sujeto").
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~2-3 h.
+- **Origen:** /code-review F3 corte 1 (finder correctness, severidad media; pre-existente, ensanchado).
+
+---
+
+## T-f3-isovalores-rango-panel · PanelIsovalores reconstruye toda la malla solo para el min/max
+
+- **Qué:** `PanelIsovalores.tsx` llama a `construirBuffersIsovalores` (posiciones+índices+color por vértice)
+  solo para leer `valorMin`/`valorMax` de la leyenda, descartando el resto; `IsovaloresOverlay` construye
+  los MISMOS buffers aparte → doble build por recálculo (memoizado, no por frame).
+- **Por qué:** desperdicia ~2 Float32Array(nVert·3) + el bucle de rampa por vértice en cada cambio de
+  combo/magnitud (control que el usuario pulsa a menudo). No es bug (correcto y memoizado), solo eficiencia.
+- **Cómo retomar:** extraer `rangoIsovalores(entradas)` que haga solo la pasada `valorPorNudo` → {min,max}
+  para el panel; o compartir un único resultado memoizado entre overlay y panel.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~20-30 min.
+- **Origen:** /code-review F3 corte 1 (finders cleanup + cross-file, eficiencia).
+
+---
+
+## T-f3-seccion-carga-superficial-fork · SeccionCargaSuperficial es un fork de SeccionCargas
+
+- **Qué:** `src/ui/entradaPanos/SeccionCargaSuperficial.tsx` es ~90% copia de
+  `src/ui/dialogos/SeccionCargas.tsx` (mismos hooks, añadir/eliminar, branching de hipótesis-null/automática,
+  markup, CSS). Solo difieren `tipo:"superficial"` fijo y el sufijo "kN/m²" (que `SeccionCargas` ya mapea en
+  `SUFIJO_POR_TIPO`). `avisoSuperficial` ([validacionesCarga.ts](src/ui/dialogos/validacionesCarga.ts)) quedó
+  como código muerto (devuelve `null` siempre, sin caller en producción).
+- **Por qué:** un arreglo al flujo de añadir carga (p.ej. el fix de hipótesis-null/automática, que YA fue un
+  bug documentado) habría que aplicarlo en dos sitios → riesgo de divergencia silenciosa.
+- **Cómo retomar:** unificar en un componente parametrizado por `tipo`+`ambito` (lookup `SUFIJO_POR_TIPO`);
+  eliminar `avisoSuperficial` muerto + su test.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~30-45 min.
+- **Origen:** /code-review F3 corte 1 (finder cleanup).
+
+---
+
+## T-f3-pano-huella-instancing · PanoHuella duplica el resaltado y escala con suscripciones por paño
+
+- **Qué:** `PanoHuella` ([GeometriaModelo.tsx](src/ui/viewport/GeometriaModelo.tsx)) reimplementa el
+  hover/selección inline (un `useEffect` con SU PROPIO par de `seleccionStore.subscribe` POR paño) en vez de
+  reusar `useResaltadoSeleccion`; como cada paño es un `Mesh` aparte (no `InstancedMesh`), el helper no es
+  drop-in. Escala como 2N suscripciones para N paños + lógica de tinte duplicada en 3 sitios.
+- **Por qué:** en corte 1 hay pocos paños por planta (impacto bajo), pero la duplicación y el escalado son
+  deuda; alinear con el patrón instanciado de vigas (T-vigas-1, ya resuelto para vigas).
+- **Cómo retomar:** instanciar los paños (InstancedMesh) + color/tinte por-instancia con un par único de
+  suscripciones (espejo de las vigas en F2c).
+- **Depende de / bloquea:** se relaciona con el render de huella de paño. **Coste:** CC ~1-2 h.
+- **Origen:** /code-review F3 corte 1 (finder cleanup/altitud).
+
+---
+
+## T-f3-herramienta-pano-fuera-de-pestana · La herramienta "pano" queda colgada al cambiar de pestaña
+
+- **Qué:** La herramienta `"pano"` solo se puede USAR en la pestaña Entrada de vigas (ahí se monta
+  `ColocacionPano`); si el usuario la activa y cambia a Isovalores, `vistaStore.herramienta` sigue `"pano"`
+  pero no hay placement montado ni guía en la barra de estado ([App.tsx](src/App.tsx) ~línea 368). Clics sin
+  efecto, sin pista. No es crash; estado de herramienta colgada. (Patrón general "la herramienta persiste
+  entre pestañas", no exclusivo de paños.)
+- **Por qué:** confunde; el usuario no entiende por qué no pasa nada.
+- **Cómo retomar:** resetear `herramienta` a `"seleccion"` al cambiar de pestaña (decisión general para
+  todas las herramientas), o gatear el mensaje/placement de cada herramienta a las pestañas donde aplica.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~20 min.
+- **Origen:** /code-review F3 corte 1 (finder cross-file/UX).

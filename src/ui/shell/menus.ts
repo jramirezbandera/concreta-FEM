@@ -12,6 +12,7 @@ export type AccionMenu =
   | "abrirOpcionesAnalisis"
   | "activarHerramientaPilar"
   | "activarHerramientaViga"
+  | "activarHerramientaPano"
   | "borrarSeleccion"
   | "calcular"
   | "calcularModos";
@@ -106,7 +107,13 @@ export const MENUS_POR_PESTANA: Record<Pestana, MenuDef[]> = {
       ],
     },
     { etiqueta: "Muros", items: ["Muro (disponible en fase posterior)"] },
-    { etiqueta: "Paños", items: ["Paño (disponible en fase posterior)"] },
+    {
+      etiqueta: "Paños",
+      // "Paño" activa la herramienta de introduccion de losa por dos clics (F3 corte 1).
+      // Los tipos reticular/unidireccional siguen reservados (el discretizador los
+      // rechaza); aqui solo se introduce la losa maciza.
+      items: [{ etiqueta: "Paño (losa)", accion: "activarHerramientaPano" }],
+    },
     {
       etiqueta: "Cargas",
       // "Hipótesis…" abre su dialogo (feature-13). La introduccion de cargas en si

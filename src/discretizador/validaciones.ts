@@ -12,11 +12,12 @@
 // Estas comprobaciones son HEURISTICAS BARATAS, complementarias (no sustitutas) del
 // veredicto exacto de estabilidad/mecanismo que dara `check_stability` del solver
 // (feature-5/6). Aqui se atrapa lo evidente en lenguaje del arquitecto.
-import type { Modelo, Pilar, Viga, Carga } from "../dominio";
+import type { Modelo, Pilar, Viga, Carga, Pano } from "../dominio";
 import { plantaPorId, nudoPorId, seccionPorId, esHipotesisAutomatica } from "../dominio";
 import { getMaterial, getSeccion } from "../biblioteca";
 import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
 import { materialAportaMasa } from "./propiedadesBarra";
+import { mallarPano, type PuntoPlano } from "./mallado";
 
 // Error de obra: contrato estable consumido por la UI (resaltado del elemento) y
 // por los tests (assert de `codigo` + `elementoId`).
@@ -33,27 +34,30 @@ export type ErrorObra = {
   codigo: string; // estable para tests: "REF_SECCION", "SIN_SUJECION", ...
   severidad: "error" | "aviso"; // error = bloquea; aviso = informa, no bloquea
   mensaje: string; // espanol con tildes, SIN jerga FEM (es texto de UI)
-  elementoId?: string; // id del Pilar/Viga/Nudo/Carga/... culpable
-  elementoTipo?: "pilar" | "viga" | "nudo" | "carga" | "hipotesis" | "planta" | "modelo";
+  elementoId?: string; // id del Pilar/Viga/Nudo/Carga/Pano/... culpable
+  elementoTipo?: "pilar" | "viga" | "nudo" | "carga" | "pano" | "hipotesis" | "planta" | "modelo";
 };
 
 // Resuelve si la seccion referenciada por `seccionId` existe y es construible.
 //
-// DECISION (cierre de hueco, Fase 2): el `Modelo` ya PERSISTE `modelo.secciones`
-// (union discriminada por `tipo`). La seccion se resuelve contra ese almacen de
-// obra con `seccionPorId`, no contra el catalogo. Reglas por variante:
-//   - perfilMetalico: ademas de existir en la obra, su `perfilId` debe apuntar a
-//     una entrada real del catalogo de perfiles (PERFILES via `getSeccion`).
-//   - hormigonRectangular / hormigonCircular / generico: se autoabastecen de sus
-//     propias dimensiones/propiedades (b/h, d, o A/Iy/Iz/J), no dependen del
-//     catalogo; basta con que la seccion exista en la obra.
+// DOS fuentes validas (misma regla que la UI: validacionesPilar/Viga y SelectSeccion):
+//   1. Seccion de OBRA (`modelo.secciones`, union discriminada): hormigon parametrico
+//      (b/h, d) o generico (A/Iy/Iz/J), que se autoabastecen; o un perfilMetalico, cuyo
+//      `perfilId` debe apuntar a una entrada real del catalogo (PERFILES via getSeccion).
+//   2. Un PERFIL del catalogo referenciado DIRECTAMENTE por su id (igual que los
+//      materiales, que son catalogo fijo por id). Esto es lo que produce el SelectSeccion
+//      al elegir un IPE/HEB; sin esta rama el discretizador rechazaba ("la sección no
+//      existe en la obra") perfiles que la propia UI da por validos.
 function seccionResoluble(modelo: Modelo, seccionId: string): boolean {
   const seccion = seccionPorId(modelo, seccionId);
-  if (seccion === undefined) return false;
-  if (seccion.tipo === "perfilMetalico") {
-    return getSeccion(seccion.perfilId) !== undefined;
+  if (seccion !== undefined) {
+    if (seccion.tipo === "perfilMetalico") {
+      return getSeccion(seccion.perfilId) !== undefined;
+    }
+    return true;
   }
-  return true;
+  // No es seccion de obra: ¿es un perfil del catalogo referenciado por id?
+  return getSeccion(seccionId) !== undefined;
 }
 
 // Anade un error de "nombre duplicado" por cada elemento cuyo `nombre` colisiona.
@@ -202,6 +206,110 @@ function validarRefsViga(v: Viga, modelo: Modelo, errores: ErrorObra[]): void {
   }
 }
 
+// 2b-bis. Referencias y geometria de un Paño LOSA (F3 corte 1). Rechaza en lenguaje de
+// obra: material/planta inexistentes, tamMalla no positivo, perimetro != 4 nudos
+// existentes, geometria no rectangular o sin area, y tipo != "losa" (reticular /
+// unidireccional aun no se calculan). El mallado real (mallado.ts) es la FUENTE UNICA
+// del criterio geometrico (rectangulo / area ~0): aqui se invoca para no duplicarlo.
+function validarRefsPano(pano: Pano, modelo: Modelo, errores: ErrorObra[]): void {
+  // Solo la LOSA se calcula en el corte 1. Reticular/unidireccional se rechazan (NO se
+  // mallan como losa, que daria un calculo fisicamente erroneo en silencio).
+  if (pano.tipo !== "losa") {
+    errores.push({
+      codigo: "PANO_TIPO_NO_SOPORTADO",
+      severidad: "error",
+      mensaje: `El forjado "${pano.nombre}" es ${
+        pano.tipo === "reticular" ? "reticular" : "unidireccional"
+      } y aún no se calcula en esta fase. Usa una losa maciza.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+    return; // sin tipo soportado no tiene sentido validar el resto de su geometria
+  }
+
+  if (getMaterial(pano.materialId) === undefined) {
+    errores.push({
+      codigo: "REF_MATERIAL",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" usa un material que no existe en la biblioteca.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+  const planta = plantaPorId(modelo, pano.plantaId);
+  if (planta === undefined) {
+    errores.push({
+      codigo: "REF_PLANTA",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" pertenece a una planta que no existe.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+  if (!(pano.tamMalla > 0)) {
+    errores.push({
+      codigo: "PANO_TAM_MALLA",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" tiene un tamaño de malla no válido.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+
+  // Perimetro: corte 1 = rectangulo de 4 nudos PROPIOS existentes. El schema admite
+  // >=3 (un poligono generico futuro); aqui se exige exactamente 4 para la losa.
+  if (pano.perimetro.length !== 4) {
+    errores.push({
+      codigo: "PANO_PERIMETRO",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" debe tener cuatro esquinas (un rectángulo).`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+    return; // sin 4 nudos no se puede comprobar la geometria
+  }
+  const puntos: PuntoPlano[] = [];
+  let faltaNudo = false;
+  for (const nudoId of pano.perimetro) {
+    const n = nudoPorId(modelo, nudoId);
+    if (n === undefined) {
+      faltaNudo = true;
+      break;
+    }
+    puntos.push({ x: n.x, y: n.y });
+  }
+  if (faltaNudo) {
+    errores.push({
+      codigo: "REF_NUDO",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" tiene una esquina en un punto que no existe en la obra.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+    return;
+  }
+  // Geometria: la FUENTE UNICA del criterio (rectangulo alineado / area > 0) es el
+  // propio mallado. Se invoca con la cota de la planta (0 si aun falta: el error de
+  // planta ya se reporto arriba). Si el mallado rechaza la geometria, se traduce su
+  // motivo a un ErrorObra con el id del paño culpable.
+  const cota = planta !== undefined ? planta.cota : 0;
+  const res = mallarPano({
+    perimetro: puntos as [PuntoPlano, PuntoPlano, PuntoPlano, PuntoPlano],
+    cota,
+    tamMalla: pano.tamMalla > 0 ? pano.tamMalla : 1, // tam invalido ya reportado; evita div/0
+    indicePano: 0,
+  });
+  if (!res.ok) {
+    errores.push({
+      codigo: res.error.codigo, // PANO_NO_RECTANGULAR | PANO_DEGENERADO
+      severidad: "error",
+      mensaje: res.error.mensaje,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+}
+
 // 2c. Referencias de una Carga: ambito (elemento existente) e hipotesis.
 function validarRefsCarga(
   c: Carga,
@@ -274,6 +382,7 @@ function validarHipotesisPesoPropio(modelo: Modelo, errores: ErrorObra[]): void 
 function validarReferencias(modelo: Modelo, errores: ErrorObra[]): void {
   for (const p of modelo.pilares) validarRefsPilar(p, modelo, errores);
   for (const v of modelo.vigas) validarRefsViga(v, modelo, errores);
+  for (const pano of modelo.panos) validarRefsPano(pano, modelo, errores);
 
   // Ambito de carga: el id de cualquier elemento sobre el que puede actuar una
   // carga en F1 (viga, pilar, nudo o pano). Se precomputa un Set para O(1).
@@ -292,11 +401,27 @@ function validarReferencias(modelo: Modelo, errores: ErrorObra[]): void {
 // "flota" y el calculo no tendria solucion. El veredicto exacto de mecanismo lo
 // dara `check_stability` del solver (feature-5/6); aqui se atrapa el caso obvio.
 function validarSujecion(modelo: Modelo, errores: ErrorObra[]): void {
-  // Si no hay elementos estructurales, no hay nada que sujetar (no es un error de
-  // sujecion: un modelo vacio es valido como punto de partida).
-  if (modelo.pilares.length === 0 && modelo.vigas.length === 0) return;
+  // Si no hay elementos estructurales (barras NI paños), no hay nada que sujetar (no es
+  // un error de sujecion: un modelo vacio es valido como punto de partida).
+  if (
+    modelo.pilares.length === 0 &&
+    modelo.vigas.length === 0 &&
+    modelo.panos.length === 0
+  ) {
+    return;
+  }
 
-  const haySujecion = modelo.pilares.some((p) => p.vinculacionExterior);
+  // Sujecion suficiente F3: un pilar con vinculacion exterior (su arranque sujeta la
+  // obra al terreno) O un paño LOSA cuyo borde apoya (bordeApoyo != "libre"): el apoyo
+  // de borde de la losa la sujeta (el discretizador emite supports de borde +
+  // estabilizacion en el plano). Una losa "libre" no sujeta (es un voladizo que apoyaria
+  // en otro elemento, no soportado en el corte 1 aislado). El veredicto exacto de
+  // mecanismo lo da check_stability del solver; aqui se atrapa el caso obvio.
+  const haySujecionPilar = modelo.pilares.some((p) => p.vinculacionExterior);
+  const haySujecionPano = modelo.panos.some(
+    (pano) => pano.tipo === "losa" && pano.bordeApoyo !== "libre",
+  );
+  const haySujecion = haySujecionPilar || haySujecionPano;
   if (!haySujecion) {
     errores.push({
       codigo: "SIN_SUJECION",

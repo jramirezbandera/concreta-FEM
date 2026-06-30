@@ -23,6 +23,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 8px);
+  /* El reporte no puede crecer sin limite y tapar el modelo: se acota en alto y
+     se hace scrollable. Con muchos mensajes el panel se queda compacto en vez de
+     ocupar media pantalla (hallazgo de usuario: el panel de calculo tapaba el modelo). */
+  max-height: 38vh;
+  overflow-y: auto;
+}
+
+/* Conteo de mensajes agrupados ("(×N)"): atenuado, mono, no compite con el texto. */
+.cx-calcular__conteo {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Mensaje de fallo del motor (carga/calculo): destaca como error sin ser alarmante. */

@@ -2,9 +2,9 @@ import * as Tabs from "@radix-ui/react-tabs";
 import { vistaStore, type Pestana } from "../../estado";
 
 // Bottom tabs (Spec Diseno UI §2 / §3.1): la firma CYPECAD. 4 solapas tipo
-// carpeta cableadas a vistaStore.pestanaActiva. Isovalores deshabilitada (F1).
-// A la derecha, badge normativo: la norma vigente es el Codigo Estructural
-// (RD 470/2021), NO EHE-08 (ver MEMORY del proyecto). Etiquetas en espanol.
+// carpeta cableadas a vistaStore.pestanaActiva. Isovalores se habilita en F3 (mapa de
+// color de la losa). A la derecha, badge normativo: la norma vigente es el Codigo
+// Estructural (RD 470/2021), NO EHE-08 (ver MEMORY del proyecto). Etiquetas en espanol.
 
 interface TabDef {
   valor: Pestana;
@@ -22,8 +22,7 @@ const TABS: TabDef[] = [
     valor: "isovalores",
     num: "4",
     etiqueta: "Isovalores",
-    deshabilitada: true,
-    title: "Disponible en fase posterior",
+    title: "Mapa de color de la losa (flecha, Mx, My)",
   },
 ];
 

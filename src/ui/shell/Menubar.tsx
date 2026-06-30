@@ -6,6 +6,7 @@ import {
   calculoStore,
   eliminarPilar,
   eliminarViga,
+  eliminarPano,
 } from "../../estado";
 import {
   MENUS_POR_PESTANA,
@@ -34,12 +35,11 @@ import { calculoHabilitado } from "../resultados/estadoMotorUI";
 // accion) o accionables (objeto con `accion`); estos ultimos disparan un
 // handler y cierran el Popover. Vocabulario CYPECAD.
 
-// Borra el elemento seleccionado desde el menu "Edición". En F11/F12 los elementos
-// borrables son pilar y viga: se exige EXACTAMENTE uno seleccionado y que sea un
-// pilar o una viga del modelo. Se lee el modelo con getModelo() JUSTO antes de
-// construir el comando (invariante del `base`, CLAUDE.md §10). Si no aplica, no-op
-// silencioso. Se exporta como costura de test (el clic real pasa por un Popover de
-// Radix, inestable en jsdom); mismo patron que clicSeleccionPilar en GeometriaModelo.
+// Borra el elemento seleccionado desde el menu "Edición". Los elementos borrables son
+// pilar, viga y PAÑO (F3): se exige EXACTAMENTE uno seleccionado y que sea uno de esos
+// tipos del modelo. Se lee el modelo con getModelo() JUSTO antes de construir el comando
+// (invariante del `base`, CLAUDE.md §10). Si no aplica, no-op silencioso. Se exporta como
+// costura de test (el clic real pasa por un Popover de Radix, inestable en jsdom).
 // eslint-disable-next-line react-refresh/only-export-components
 export function borrarSeleccion(): void {
   const ids = seleccionStore.getState().seleccion;
@@ -50,6 +50,8 @@ export function borrarSeleccion(): void {
     modeloStore.getState().ejecutar(eliminarPilar(base, id));
   } else if (base.vigas.some((v) => v.id === id)) {
     modeloStore.getState().ejecutar(eliminarViga(base, id));
+  } else if (base.panos.some((pa) => pa.id === id)) {
+    modeloStore.getState().ejecutar(eliminarPano(base, id));
   } else {
     return;
   }
@@ -67,6 +69,7 @@ export const DISPATCH: Record<AccionMenu, () => void> = {
     vistaStore.getState().abrirDialogo("opcionesAnalisis"),
   activarHerramientaPilar: () => vistaStore.getState().setHerramienta("pilar"),
   activarHerramientaViga: () => vistaStore.getState().setHerramienta("viga"),
+  activarHerramientaPano: () => vistaStore.getState().setHerramienta("pano"),
   borrarSeleccion,
   // El calculo es asincrono (CLAUDE.md §7): el menu lanza el pipeline y NO espera la promesa
   // (`void` la descarta deliberadamente). No es un "disparar y olvidar" ciego: `calcularObra()`

@@ -7,10 +7,12 @@ import {
   type Migracion,
   type ResultadoImport,
 } from "./migracion";
+import { exportarProyectoComoTexto, importarProyecto } from "./serializacion";
 import { crearModeloVacio } from "../dominio/helpers";
 import { SCHEMA_VERSION } from "../dominio/comunes";
 import type { Modelo } from "../dominio/modelo";
 import type { Pilar } from "../dominio/pilar";
+import type { Pano } from "../dominio/pano";
 
 // Helper: estrecha el resultado a ok:false y devuelve sus errores.
 function errores(r: ResultadoImport): string[] {
@@ -320,14 +322,158 @@ describe("migrarYValidar — v1 -> v2: reclamo silencioso (CV4-2)", () => {
   });
 });
 
-describe("migrarYValidar — v2 nativo no se re-migra", () => {
-  it("un Modelo v2 valido (crearModeloVacio) pasa sin migrar y sigue valido", () => {
+describe("migrarYValidar — version vigente nativa no se re-migra", () => {
+  it("un Modelo de la version vigente (crearModeloVacio) pasa sin migrar y sigue valido", () => {
     const modelo = crearModeloVacio();
     const r = ok(migrarYValidar(modelo));
     expect(r.avisos).toEqual([]);
     expect(r.modelo).toEqual(modelo);
     // Sigue habiendo exactamente una automatica.
     expect(autoDe(r.modelo)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Migracion REAL de model-schema v2 -> v3 (F3 corte 1). En v1/v2 un `Pano` era un
+// STUB reservado (solo `{id}`, sin geometria): NO se puede completar a la forma de
+// LOSA de v3, asi que la migracion lo DESCARTA junto con sus cargas superficiales,
+// dejando un AVISO (no rompe el import). Un proyecto v2 real tenia `panos: []`
+// (no-op), pero la migracion debe ser robusta ante un .json heredado con stubs.
+// ---------------------------------------------------------------------------
+
+// Fabrica un proyecto v2 valido (forma de Modelo de F2a: schemaVersion:2, peso
+// propio ya presente, hipotesis con `automatica`), parametrizando `panos`/`cargas`
+// para ejercitar el descarte de stubs. Por defecto `panos: []` (el caso v2 real).
+function proyectoV2(
+  panos: unknown[] = [],
+  cargas: unknown[] = [],
+): Record<string, unknown> {
+  return {
+    unidades: "kN-m",
+    schemaVersion: 2,
+    grupos: [],
+    plantas: [],
+    secciones: [],
+    nudos: [],
+    pilares: [],
+    vigas: [],
+    panos,
+    muros: [],
+    cargas,
+    hipotesis: [
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
+      { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable", automatica: false },
+      { id: ID_AUTO, nombre: "Peso propio", tipo: "permanente", automatica: true },
+    ],
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: true },
+  };
+}
+
+describe("migrarYValidar — v2 -> v3: descarta paños-stub", () => {
+  it("v2 con panos:[] -> no-op, valida sin aviso de descarte", () => {
+    const r = ok(migrarYValidar(proyectoV2()));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(r.modelo.panos).toEqual([]);
+    // No hay aviso de descarte de paños (solo, en su caso, el de actualizacion).
+    expect(r.avisos.some((a) => /descartaron .* paño/i.test(a))).toBe(false);
+    // El aviso de actualizacion de esquema si esta (la cadena corrio v2->v3).
+    expect(r.avisos.some((a) => /actualiz/i.test(a))).toBe(true);
+  });
+
+  it("v2 con un paño-stub {id} + su carga superficial -> descarta ambos con aviso, valida", () => {
+    const v2 = proyectoV2(
+      [{ id: "p1" }],
+      [
+        { id: "c1", tipo: "superficial", ambito: "p1", valor: 5, hipotesisId: "hip-cargas-muertas" },
+      ],
+    );
+    const r = ok(migrarYValidar(v2));
+    // El paño-stub desaparece.
+    expect(r.modelo.panos).toEqual([]);
+    // Su carga superficial tambien (referencia colgante).
+    expect(r.modelo.cargas).toEqual([]);
+    // Aviso explicito en lenguaje de obra (1 paño descartado).
+    expect(
+      r.avisos.some((a) => /se descartaron 1 paño sin geometría/i.test(a)),
+    ).toBe(true);
+    // Quedo en la version vigente y valida (lo garantiza ok()).
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+  });
+
+  it("descarta solo las superficiales del paño-stub; conserva el resto de cargas", () => {
+    const v2 = proyectoV2(
+      [{ id: "p1" }, { id: "p2" }],
+      [
+        // Superficial sobre paño descartado p1 -> se purga.
+        { id: "c1", tipo: "superficial", ambito: "p1", valor: 5, hipotesisId: "hip-cargas-muertas" },
+        // Superficial sobre paño descartado p2 -> se purga.
+        { id: "c2", tipo: "superficial", ambito: "p2", valor: 3, hipotesisId: "hip-cargas-muertas" },
+        // Lineal sobre una viga -> se conserva (no es superficial).
+        { id: "c3", tipo: "lineal", ambito: "v1", valor: 10, hipotesisId: "hip-cargas-muertas" },
+        // Superficial sobre un ambito que NO es paño descartado -> se conserva.
+        { id: "c4", tipo: "superficial", ambito: "otro", valor: 2, hipotesisId: "hip-cargas-muertas" },
+      ],
+    );
+    const r = ok(migrarYValidar(v2));
+    expect(r.modelo.panos).toEqual([]);
+    // Solo c3 (lineal) y c4 (superficial sobre otro ambito) sobreviven.
+    expect(r.modelo.cargas.map((c) => c.id).sort()).toEqual(["c3", "c4"]);
+    // Aviso plural (2 paños descartados).
+    expect(
+      r.avisos.some((a) => /se descartaron 2 paños sin geometría/i.test(a)),
+    ).toBe(true);
+  });
+
+  it("conserva un paño con forma de LOSA v3 completa (no es stub)", () => {
+    const losa = {
+      id: "pano-losa",
+      nombre: "Forjado 1",
+      tipo: "losa",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      espesor: 0.25,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+    };
+    const r = ok(migrarYValidar(proyectoV2([losa])));
+    // El paño losa sobrevive intacto y valida contra PanoSchema v3.
+    expect(r.modelo.panos).toHaveLength(1);
+    expect(r.modelo.panos[0]).toMatchObject(losa);
+    // Sin aviso de descarte (no habia stubs).
+    expect(r.avisos.some((a) => /descartaron .* paño/i.test(a))).toBe(false);
+  });
+});
+
+// Round-trip de un Modelo v3 nativo con un paño losa: export a texto -> import.
+// La frontera Zod (migrarYValidar via importarProyecto) lo acepta y el paño losa
+// sobrevive estable (no se descarta: ya esta en la forma v3).
+describe("v3 con paño losa: round-trip export/import estable", () => {
+  it("exportar e importar un Modelo con un Pano losa preserva el paño", () => {
+    const modelo = crearModeloVacio();
+    const losa: Pano = {
+      id: "pano-losa",
+      nombre: "Forjado 1",
+      tipo: "losa",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      espesor: 0.25,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "empotrado",
+    };
+    modelo.panos.push(losa);
+
+    const texto = exportarProyectoComoTexto("Proyecto con losa", modelo);
+    const r = importarProyecto(texto);
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("se esperaba ok:true");
+    expect(r.nombre).toBe("Proyecto con losa");
+    // El paño losa viaja intacto por la frontera (no se descarta: es forma v3).
+    expect(r.modelo.panos).toHaveLength(1);
+    expect(r.modelo.panos[0]).toEqual(losa);
+    // Round-trip estable: el modelo importado es identico al original.
+    expect(r.modelo).toEqual(modelo);
   });
 });
 

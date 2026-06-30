@@ -100,6 +100,13 @@
   background-color: var(--surface-muted);
 }
 
+/* Fila AGREGADA de los apoyos de borde de la losa (F2.4): la etiqueta en cursiva tenue la
+   distingue de un apoyo de pilar individual (es una suma, no un nudo). */
+.cx-reacciones__agregado .cx-reacciones__td-apoyo {
+  font-style: italic;
+  color: var(--text-2);
+}
+
 /* Fila resumen (ΣFY): separada del cuerpo, etiqueta tenue. */
 .cx-reacciones__resumen th,
 .cx-reacciones__resumen td {

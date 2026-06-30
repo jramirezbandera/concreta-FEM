@@ -1,0 +1,29 @@
+/* PanelHerramientaPano (F3): panel flotante de defaults del paño en colocacion.
+   Espejo de panelHerramientaViga.css: arriba-IZQUIERDA del lienzo. Estilado solo con
+   tokens; reusa .cx-float / .cx-campo de las primitivas. */
+
+.cx-herramienta-pano {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+.cx-herramienta-pano .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Bloque etiqueta + control (Apoyo de borde) en columna. */
+.cx-herramienta-pano__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+}
+
+.cx-herramienta-pano__acciones {
+  margin-top: var(--space-1, 4px);
+  display: flex;
+  justify-content: flex-end;
+}

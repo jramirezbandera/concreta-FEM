@@ -35,6 +35,14 @@ function useMostrar(): boolean {
   );
 }
 
+function useSolo(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.soloModeloCalculo, cb),
+    () => vistaStore.getState().soloModeloCalculo,
+    () => vistaStore.getState().soloModeloCalculo,
+  );
+}
+
 // Conteos directos del ModeloFEM (sin reconstruir la geometria del overlay: el panel
 // solo necesita los totales).
 function conteos(fem: ModeloFEM): { nudos: number; barras: number; apoyos: number } {
@@ -48,6 +56,7 @@ function conteos(fem: ModeloFEM): { nudos: number; barras: number; apoyos: numbe
 export function ModeloCalculo() {
   const enPleno = useEnPleno();
   const mostrar = useMostrar();
+  const solo = useSolo();
   // Mismo `activo` que el overlay (mostrar && pleno): comparte el memo de fuente (un solo
   // discretizar). Se llama SIEMPRE (reglas de hooks); fuera de pleno el control no se pinta.
   const fuente = useFuenteModeloCalculo(mostrar && enPleno);
@@ -55,6 +64,7 @@ export function ModeloCalculo() {
   if (!enPleno) return null;
 
   const toggle = () => vistaStore.getState().toggleModeloCalculo();
+  const toggleSolo = () => vistaStore.getState().toggleSoloModeloCalculo();
 
   return (
     <PanelFlotante
@@ -75,6 +85,19 @@ export function ModeloCalculo() {
         />
         <span>Mostrar sobre la obra</span>
       </label>
+      {/* "Ver solo el modelo": oculta la obra solida (pilares/vigas) para que el modelo de
+          calculo no quede tapado/solapado por ella. Solo aplica con "Mostrar" activo. */}
+      {mostrar ? (
+        <label className="cx-mc__toggle">
+          <input
+            type="checkbox"
+            checked={solo}
+            onChange={toggleSolo}
+            aria-label="Ver solo el modelo de cálculo (ocultar la obra)"
+          />
+          <span>Ocultar la obra (ver solo el modelo)</span>
+        </label>
+      ) : null}
       {mostrar ? <Detalle fuente={fuente} /> : null}
     </PanelFlotante>
   );

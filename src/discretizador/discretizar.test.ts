@@ -376,17 +376,48 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       if (res.ok) expect(res.avisos).toEqual([]);
     });
 
-    it("carga superficial -> ok:false con PANO_NO_SOPORTADO (bloquea)", () => {
-      // BLOQUEA: descartar una carga de paño daria un calculo con menos carga real
-      // sin que el arquitecto lo sepa. Mas seguro bloquear hasta F3.
+    it("carga superficial sobre paño losa -> ok:true y SE TRADUCE a quad_loads (F3, ya NO bloquea)", () => {
+      // F3 corte 1: el bloqueo PANO_NO_SOPORTADO de F1 SE LEVANTA. Una carga superficial
+      // sobre una losa bien formada se malla y se reparte como presion a TODOS sus quads.
       const m = modeloPortico();
-      // Pano (F3) es solo { id }; basta para que REF_AMBITO de la carga resuelva.
-      m.panos.push({ id: "pano1" });
+      // Paño losa rectangular (4 nudos PROPIOS, malla aislada): hormigon HA-25, en p1.
+      m.nudos.push(
+        { id: "q1", x: 0, y: 0 },
+        { id: "q2", x: 4, y: 0 },
+        { id: "q3", x: 4, y: 2 },
+        { id: "q4", x: 0, y: 2 },
+      );
+      m.panos.push({
+        id: "pano1",
+        nombre: "Losa 1",
+        tipo: "losa",
+        plantaId: "p1",
+        perimetro: ["q1", "q2", "q3", "q4"],
+        espesor: 0.25,
+        materialId: "HA-25",
+        tamMalla: 1,
+        bordeApoyo: "simple",
+      });
       m.cargas.push({ id: "c2", tipo: "superficial", ambito: "pano1", valor: 4, hipotesisId: "h1" });
       const res = discretizar(m);
-      expect(res.ok).toBe(false);
-      if (!res.ok) {
-        expect(res.errores.some((e) => e.codigo === "PANO_NO_SOPORTADO")).toBe(true);
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        const fem = res.modeloFEM;
+        // Se emiten quads y quad_loads (solo porque hay paño).
+        expect(fem.quads).toBeDefined();
+        expect(fem.quad_loads).toBeDefined();
+        // 4x2 = 8 quads; una carga superficial uniforme => un quad_load por quad.
+        expect(fem.quads).toHaveLength(8);
+        expect(fem.quad_loads).toHaveLength(8);
+        // Presion con signo canonico de gravedad: POSITIVA = hacia abajo en quads
+        // (opuesto a la FY de barras; verificado contra el motor real, #3).
+        for (const ql of fem.quad_loads!) {
+          expect(ql.presion).toBe(4);
+          expect(ql.case).toBe("h1");
+        }
+        // Procedencia (2A): trazabilidad mapea el paño a sus quads.
+        expect(res.trazabilidad.panoAQuads["pano1"]).toHaveLength(8);
+        expect(res.trazabilidad.nodosDeMalla.length).toBeGreaterThan(0);
       }
     });
 
@@ -616,6 +647,171 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       const a = JSON.stringify(discretizarOk(modeloConPesoPropio()));
       const b = JSON.stringify(discretizarOk(modeloConPesoPropio()));
       expect(a).toBe(b);
+    });
+  });
+
+  // --- F3 corte 1: paños LOSA (mallado AISLADO, quads, apoyos de borde) --------
+  describe("paños LOSA (F3 corte 1)", () => {
+    // Portico minimo + un paño losa rectangular 4x2 m en p1, con 4 nudos PROPIOS.
+    // bordeApoyo configurable. tamMalla 1 m -> 4x2 = 8 quads, 5x3 = 15 nudos.
+    function modeloConLosa(
+      over: { bordeApoyo?: "simple" | "empotrado" | "libre"; pesoPropio?: boolean } = {},
+    ): Modelo {
+      const m = modeloPortico();
+      // Material hormigon para el paño (rho=25 kN/m³): el portico ya usa S275/IPE.
+      m.nudos.push(
+        { id: "q1", x: 0, y: 0 },
+        { id: "q2", x: 4, y: 0 },
+        { id: "q3", x: 4, y: 2 },
+        { id: "q4", x: 0, y: 2 },
+      );
+      m.panos.push({
+        id: "pano1",
+        nombre: "Losa 1",
+        tipo: "losa",
+        plantaId: "p1",
+        perimetro: ["q1", "q2", "q3", "q4"],
+        espesor: 0.25,
+        materialId: "HA-25",
+        tamMalla: 1,
+        bordeApoyo: over.bordeApoyo ?? "simple",
+      });
+      if (over.pesoPropio) {
+        m.hipotesis = [
+          { id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true },
+          { id: "h1", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
+        ];
+        m.analisis.incluirPesoPropio = true;
+      }
+      return m;
+    }
+
+    it("REGRESION: un modelo SIN paños produce Capa 2 SIN claves quads/quad_loads (byte-identica)", () => {
+      const fem = discretizarOk(modeloPortico());
+      expect("quads" in fem).toBe(false);
+      expect("quad_loads" in fem).toBe(false);
+      // El JSON no contiene esas claves (regresion byte-a-byte).
+      expect(JSON.stringify(fem)).not.toContain("quads");
+      expect(JSON.stringify(fem)).not.toContain("quad_loads");
+    });
+
+    it("losa -> emite quads (4x2=8) con espesor y material del paño + nudos propios", () => {
+      const fem = discretizarOk(modeloConLosa());
+      expect(fem.quads).toHaveLength(8);
+      for (const q of fem.quads!) {
+        expect(q.t).toBe(0.25);
+        expect(q.material).toBe("HA-25");
+        // Nudos propios del paño (prefijo PQ0), no nudos del portico (N..).
+        for (const nodo of [q.i, q.j, q.m, q.n]) expect(nodo.startsWith("PQ0-N")).toBe(true);
+      }
+      // El material del paño se anade a `materials` (PyNite lo resuelve por nombre).
+      expect(fem.materials.some((mat) => mat.name === "HA-25")).toBe(true);
+      // Los nudos de malla se anaden a `nodes` (detras de los estructurales).
+      expect(fem.nodes.filter((n) => n.name.startsWith("PQ0-N"))).toHaveLength(15);
+    });
+
+    it("bordeApoyo 'simple' -> apoyos de borde solo DY (impide la flecha)", () => {
+      const fem = discretizarOk(modeloConLosa({ bordeApoyo: "simple" }));
+      const apoyosMalla = fem.supports.filter((s) => s.node.startsWith("PQ0-N"));
+      expect(apoyosMalla.length).toBeGreaterThan(0);
+      // Cada apoyo de borde (no de estabilizacion) tiene DY, sin giros de placa.
+      const soloDY = apoyosMalla.filter((s) => s.DY && !s.RX && !s.RZ);
+      expect(soloDY.length).toBeGreaterThan(0);
+      // Ningun apoyo de malla restringe giros con bordeApoyo simple.
+      expect(apoyosMalla.every((s) => !s.RX && !s.RZ)).toBe(true);
+    });
+
+    it("bordeApoyo 'empotrado' -> apoyos de borde DY + giros de placa (RX,RZ)", () => {
+      const fem = discretizarOk(modeloConLosa({ bordeApoyo: "empotrado" }));
+      const apoyosMalla = fem.supports.filter((s) => s.node.startsWith("PQ0-N"));
+      // Al menos un nudo de borde con DY + RX + RZ (encastre); RY nunca (drilling).
+      const empotrados = apoyosMalla.filter((s) => s.DY && s.RX && s.RZ && !s.RY);
+      expect(empotrados.length).toBeGreaterThan(0);
+    });
+
+    it("bordeApoyo 'libre' -> sin apoyos de borde, PERO estabilizacion en el plano (DX/DZ)", () => {
+      // Una losa "libre" sola NO esta sujeta verticalmente (validarSujecion lo bloquea),
+      // asi que se anade un pilar que la sujeta y se comprueba que el paño no aporta DY.
+      const m = modeloConLosa({ bordeApoyo: "libre" });
+      const fem = discretizarOk(m);
+      const apoyosMalla = fem.supports.filter((s) => s.node.startsWith("PQ0-N"));
+      // Sin apoyo de borde => ningun nudo de malla restringe DY (la flecha).
+      expect(apoyosMalla.every((s) => !s.DY)).toBe(true);
+      // Pero SI hay estabilizacion en el plano (DX/DZ) para no quedar singular en X-Z.
+      const conPlano = apoyosMalla.filter((s) => s.DX || s.DZ);
+      expect(conPlano.length).toBeGreaterThan(0);
+    });
+
+    it("estabilizacion en el plano: SIEMPRE presente (DX/DZ en 2 nudos de borde)", () => {
+      const fem = discretizarOk(modeloConLosa({ bordeApoyo: "simple" }));
+      const apoyosMalla = fem.supports.filter((s) => s.node.startsWith("PQ0-N"));
+      // Total de restricciones DX en el plano = 1 (una esquina); DZ = 2 (par anti-giro).
+      const totalDX = apoyosMalla.filter((s) => s.DX).length;
+      const totalDZ = apoyosMalla.filter((s) => s.DZ).length;
+      expect(totalDX).toBe(1);
+      expect(totalDZ).toBe(2);
+    });
+
+    it("peso propio de la losa -> presion ρ·t (kN/m²) hacia abajo en hip-peso-propio", () => {
+      const fem = discretizarOk(modeloConLosa({ pesoPropio: true }));
+      const pp = fem.quad_loads!.filter((ql) => ql.case === "hip-peso-propio");
+      // Un quad_load de peso propio por cada quad (8).
+      expect(pp).toHaveLength(8);
+      // ρ (HA-25) = 25 kN/m³; t = 0.25 m => presion = +25*0.25 = +6.25 kN/m². En quads la
+      // presion POSITIVA es hacia abajo (opuesto a la FY de barras; verificado con el motor).
+      for (const ql of pp) {
+        expect(ql.presion).toBeCloseTo(6.25, 9);
+      }
+    });
+
+    it("tipo != losa (reticular) -> ok:false con PANO_TIPO_NO_SOPORTADO (no se malla)", () => {
+      const m = modeloConLosa();
+      m.panos[0].tipo = "reticular";
+      const res = discretizar(m);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errores.some((e) => e.codigo === "PANO_TIPO_NO_SOPORTADO")).toBe(true);
+      }
+    });
+
+    it("validarSujecion: una losa con bordeApoyo != libre NO da SIN_SUJECION (sin pilares)", () => {
+      // Modelo SOLO con una losa apoyada: el apoyo de borde la sujeta.
+      const m = modeloConLosa({ bordeApoyo: "simple" });
+      m.pilares = [];
+      m.vigas = [];
+      m.cargas = []; // sin la carga lineal sobre la viga eliminada
+      // La losa queda como unico elemento; debe poder discretizarse (sujeta por su borde).
+      const res = discretizar(m);
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(res.modeloFEM.quads).toHaveLength(8);
+      }
+    });
+
+    it("losa rectangular degenerada (3 nudos colineales) -> error de obra", () => {
+      const m = modeloConLosa();
+      // Mueve q3 para que q1,q2,q3,q4 dejen de ser rectangulo alineado (q3 colineal).
+      m.nudos = m.nudos.map((n) => (n.id === "q3" ? { ...n, x: 8, y: 0 } : n));
+      const res = discretizar(m);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(
+          res.errores.some(
+            (e) => e.codigo === "PANO_NO_RECTANGULAR" || e.codigo === "PANO_DEGENERADO",
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it("determinismo byte a byte: una losa produce la misma Capa 2 en dos llamadas", () => {
+      const a = JSON.stringify(discretizarOk(modeloConLosa({ pesoPropio: true })));
+      const b = JSON.stringify(discretizarOk(modeloConLosa({ pesoPropio: true })));
+      expect(a).toBe(b);
+    });
+
+    it("Capa 2 con paño valida contra ModeloFEMSchema (quads/quad_loads incluidos)", () => {
+      const fem = discretizarOk(modeloConLosa({ pesoPropio: true }));
+      expect(() => ModeloFEMSchema.parse(fem)).not.toThrow();
     });
   });
 });

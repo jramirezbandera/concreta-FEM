@@ -32,15 +32,22 @@ export type ModoVista = "planta" | "3d" | "mosaico";
 // secciones...) se anaden aqui.
 export type DialogoActivo = "gruposPlantas" | "hipotesis" | "opcionesAnalisis";
 
-// Herramienta activa de introduccion grafica (feature-11/12). "seleccion" es el
-// modo por defecto (picking/edicion); "pilar" coloca pilares con clic; "viga"
-// coloca vigas con clic. Estado de UI.
-export type Herramienta = "seleccion" | "pilar" | "viga";
+// Herramienta activa de introduccion grafica (feature-11/12/F3). "seleccion" es el
+// modo por defecto (picking/edicion); "pilar" coloca pilares con clic; "viga" coloca
+// vigas con clic; "pano" coloca losas por DOS clics (rectangulo) en planta. Estado de UI.
+export type Herramienta = "seleccion" | "pilar" | "viga" | "pano";
 
 // Magnitud que pinta el diagrama por barra en la pestana Resultados (feature-14).
 // Mapea a los `*_array()` de PyNite: axil N, cortante Vy, flector Mz, flecha dy.
 // Identificadores en ingles tecnico; las etiquetas visibles las pone la UI.
 export type MagnitudDiagrama = "axil" | "cortante" | "momento" | "flecha";
+
+// Magnitud que pinta el mapa de ISOVALORES de la losa en la pestana Isovalores (F3).
+// "flecha" = desplazamiento vertical NODAL (DY de los nudos de malla); "momentoX"/
+// "momentoY" = momento de placa Mx/My (kN·m/m, por-quad promediado a nudos). Identifi-
+// cadores en ingles tecnico; las etiquetas visibles ("Flecha", "Momento Mx"...) las
+// pone la UI.
+export type MagnitudIsovalores = "flecha" | "momentoX" | "momentoY";
 
 // Valores por defecto del pilar que se introduce con la herramienta "pilar". La UI
 // los preselecciona (seccion/material elegidos en el panel) y los aplica a cada
@@ -72,6 +79,18 @@ export interface DefaultsCarga {
   tipo: "lineal" | "puntual";
   valor: number;
   hipotesisId: string | null;
+}
+
+// Valores por defecto del paño (losa) que se introduce con la herramienta "pano"
+// (F3). Espejo de DefaultsViga: la UI los preselecciona (espesor/material/tamMalla/
+// apoyo de borde) y los aplica a cada paño nuevo. UNIDADES (CLAUDE.md §14): espesor y
+// tamMalla viajan AQUI en METROS (sistema interno); la UI convierte mm<->m solo en el
+// borde de sus campos. No es estado de obra: viaja en vistaStore, no en undo.
+export interface DefaultsPano {
+  espesor: number; // m
+  materialId: string | null;
+  tamMalla: number; // m
+  bordeApoyo: "simple" | "empotrado" | "libre";
 }
 
 interface VistaState {
@@ -108,6 +127,7 @@ interface VistaState {
   defaultsPilar: DefaultsPilar;
   defaultsViga: DefaultsViga;
   defaultsCarga: DefaultsCarga;
+  defaultsPano: DefaultsPano;
   snapActivo: boolean;
   // Overlay de CENTRO DE MASAS (F2.4, D-diseño-1). Toggle de ayuda de modelado:
   // dibuja el marcador ⊕ del CM de la planta activa + un panel HUD con coords/peso.
@@ -127,6 +147,10 @@ interface VistaState {
   // vista 3D (el modelo de calculo se aprecia sobre el edificio completo). Estado de UI:
   // NO participa en undo.
   mostrarModeloCalculo: boolean;
+  // Dentro de "Ver modelo de calculo": ocultar la obra (pilares/vigas solidos) para ver
+  // SOLO el modelo de calculo (Capa 2), sin que la obra solida se solape con el. Solo
+  // tiene efecto con mostrarModeloCalculo activo y en 3D. Estado de UI: NO participa en undo.
+  soloModeloCalculo: boolean;
   // Visualizacion de resultados (feature-14). Estado de UI puro: NO participa en
   // undo. La inicializacion de `combinacionActiva` a la primera combo al fijar
   // resultados la hace el hook useCalcular; aqui solo viven los controles de vista.
@@ -136,6 +160,10 @@ interface VistaState {
   animando: boolean;
   // Magnitud que pinta el diagrama por barra seleccionada.
   magnitudDiagrama: MagnitudDiagrama;
+  // Magnitud que pinta el mapa de isovalores de la losa (F3): flecha / Mx / My.
+  // Estado de UI puro: NO participa en undo. Default "flecha" (la lectura natural de
+  // una losa). El overlay solo se muestra si hay resultados de placa (quads).
+  magnitudIsovalores: MagnitudIsovalores;
   // --- Analisis modal (F2b) -------------------------------------------------
   // Nº de modos de vibracion a calcular. Parametro de calculo TRANSITORIO (como
   // nPoints de los diagramas), NO una propiedad persistida del Modelo: vive aqui (UI,
@@ -161,6 +189,7 @@ interface VistaState {
   setDefaultsPilar(p: Partial<DefaultsPilar>): void; // merge superficial
   setDefaultsViga(p: Partial<DefaultsViga>): void; // merge superficial
   setDefaultsCarga(p: Partial<DefaultsCarga>): void; // merge superficial
+  setDefaultsPano(p: Partial<DefaultsPano>): void; // merge superficial
   setSnapActivo(b: boolean): void;
   setMostrarCentroMasa(b: boolean): void;
   toggleCentroMasa(): void;
@@ -168,9 +197,12 @@ interface VistaState {
   toggleCentroRigidez(): void;
   setMostrarModeloCalculo(b: boolean): void;
   toggleModeloCalculo(): void;
+  setSoloModeloCalculo(b: boolean): void;
+  toggleSoloModeloCalculo(): void;
   setDeformadaEscala(e: number): void;
   setAnimando(b: boolean): void;
   setMagnitudDiagrama(m: MagnitudDiagrama): void;
+  setMagnitudIsovalores(m: MagnitudIsovalores): void;
   // --- Analisis modal (F2b) ---
   setNumModos(n: number): void;
   setModalEscala(e: number): void;
@@ -221,13 +253,24 @@ export const vistaStore = create<VistaState>()(
       valor: 0,
       hipotesisId: null,
     },
+    // Paño losa (F3): espesor 0.25 m (losa de hormigon tipica), malla 0.5 m (coincide
+    // con la rejilla del lienzo), borde simplemente apoyado. UNIDADES internas en m
+    // (la UI los muestra en mm). Material: la UI preselecciona el primero del catalogo.
+    defaultsPano: {
+      espesor: 0.25,
+      materialId: null,
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+    },
     snapActivo: true,
     mostrarCentroMasa: false,
     mostrarCentroRigidez: false,
     mostrarModeloCalculo: false,
+    soloModeloCalculo: false,
     deformadaEscala: 1,
     animando: false,
     magnitudDiagrama: "momento",
+    magnitudIsovalores: "flecha",
     // Analisis modal (F2b): default 6 modos (decision de alcance del plan), escala 1,
     // sin animar.
     numModos: 6,
@@ -247,6 +290,8 @@ export const vistaStore = create<VistaState>()(
       set((estado) => ({ defaultsViga: { ...estado.defaultsViga, ...p } })),
     setDefaultsCarga: (p) =>
       set((estado) => ({ defaultsCarga: { ...estado.defaultsCarga, ...p } })),
+    setDefaultsPano: (p) =>
+      set((estado) => ({ defaultsPano: { ...estado.defaultsPano, ...p } })),
     setSnapActivo: (b) => set({ snapActivo: b }),
     setMostrarCentroMasa: (b) => set({ mostrarCentroMasa: b }),
     toggleCentroMasa: () =>
@@ -257,9 +302,13 @@ export const vistaStore = create<VistaState>()(
     setMostrarModeloCalculo: (b) => set({ mostrarModeloCalculo: b }),
     toggleModeloCalculo: () =>
       set((estado) => ({ mostrarModeloCalculo: !estado.mostrarModeloCalculo })),
+    setSoloModeloCalculo: (b) => set({ soloModeloCalculo: b }),
+    toggleSoloModeloCalculo: () =>
+      set((estado) => ({ soloModeloCalculo: !estado.soloModeloCalculo })),
     setDeformadaEscala: (e) => set({ deformadaEscala: e }),
     setAnimando: (b) => set({ animando: b }),
     setMagnitudDiagrama: (m) => set({ magnitudDiagrama: m }),
+    setMagnitudIsovalores: (m) => set({ magnitudIsovalores: m }),
     setNumModos: (n) => set({ numModos: n }),
     setModalEscala: (e) => set({ modalEscala: e }),
     setModalAnimando: (b) => set({ modalAnimando: b }),

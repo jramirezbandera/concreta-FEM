@@ -176,6 +176,9 @@
   border: 1px solid var(--border-2);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-float);
+  /* Sobre el HUD glass del viewport (si no, los paneles flotantes del HUD tapan el
+     menu desplegado). Mismo patron que .cx-dialog__content. */
+  z-index: var(--z-popover);
 }
 .cx-menu-empty {
   padding: 8px 10px;

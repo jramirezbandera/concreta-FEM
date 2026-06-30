@@ -52,6 +52,29 @@ export function resolverSeccion(seccion: Seccion): SeccionFEM {
   }
 }
 
+// Resuelve una SeccionFEM por id aceptando las DOS fuentes, igual que ya hacen las
+// validaciones de UI (validacionesPilar/Viga) y el SelectSeccion: una seccion de OBRA
+// (modelo.secciones; hormigon parametrico o perfil materializado) o un PERFIL del
+// catalogo referenciado directamente por su id (igual que los materiales, que son
+// catalogo fijo por id). Devuelve undefined si el id no resuelve en ninguna. Esta es
+// la UNICA fuente de verdad de "id de seccion -> propiedades FEM": la usan el
+// discretizador (array `sections`), el peso propio y los centros, de modo que ninguno
+// diverja de las validaciones (antes el discretizador solo miraba la obra y rechazaba
+// los perfiles de catalogo que la UI si aceptaba: causa del falso "la sección no
+// existe en la obra").
+export function resolverSeccionFEMPorId(
+  modelo: Modelo,
+  seccionId: string,
+): SeccionFEM | undefined {
+  const seccion = seccionPorId(modelo, seccionId);
+  if (seccion !== undefined) return resolverSeccion(seccion);
+  const perfil = getSeccion(seccionId);
+  if (perfil !== undefined) {
+    return { name: seccionId, A: perfil.A, Iy: perfil.Iy, Iz: perfil.Iz, J: perfil.J };
+  }
+  return undefined;
+}
+
 // Propiedades de calculo de UNA barra de obra (pilar o viga), en sistema interno:
 //   - A (m²), Iy/Iz/J (m⁴): de la seccion resuelta.
 //   - E (kN/m²), rho (kN/m³, peso especifico): del material de catalogo.
@@ -82,15 +105,14 @@ function propiedadesComunes(
   materialId: string,
   L: number,
 ): PropiedadesBarra {
-  const seccion = seccionPorId(modelo, seccionId);
-  if (seccion === undefined) {
-    throw new Error(`Seccion de obra inexistente tras validar: ${seccionId}`);
+  const s = resolverSeccionFEMPorId(modelo, seccionId);
+  if (s === undefined) {
+    throw new Error(`Seccion inexistente tras validar: ${seccionId}`);
   }
   const material = getMaterial(materialId);
   if (material === undefined) {
     throw new Error(`Material inexistente tras validar: ${materialId}`);
   }
-  const s = resolverSeccion(seccion);
   return { A: s.A, Iy: s.Iy, Iz: s.Iz, J: s.J, rho: material.peso, E: material.E, L };
 }
 
