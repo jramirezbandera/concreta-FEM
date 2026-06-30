@@ -200,16 +200,119 @@ function migrarV1aV2(datos: unknown): ResultadoMigracion {
   return { datos: { ...obj, schemaVersion: 2 }, avisos };
 }
 
-// Registro indexado por version de origen: `MIGRACIONES[v]` transforma v -> v+1.
-// `MIGRACIONES[1]` lleva v1 -> v2 (F2a, model-schema). Listo para crecer.
+// Tipo de forma para leer un `Pano` crudo v2 sin validarlo todavia. En v1/v2 un
+// `Pano` era un STUB reservado: solo `{ id }` (nunca tuvo geometria de obra). v3
+// (F3 corte 1) lo expande a la forma de LOSA. Solo describimos los campos que la
+// migracion inspecciona para decidir si el paño es completable a v3 o un stub.
+type PanoCrudo = {
+  id?: unknown;
+  tipo?: unknown;
+  plantaId?: unknown;
+  perimetro?: unknown;
+  espesor?: unknown;
+  materialId?: unknown;
+  tamMalla?: unknown;
+  bordeApoyo?: unknown;
+};
+
+// Tipo de forma para leer una `Carga` cruda v2 (solo el `tipo` y el `ambito`, para
+// localizar las superficiales que apuntan a un paño descartado).
+type CargaCruda = {
+  tipo?: unknown;
+  ambito?: unknown;
+};
+
+// ¿Tiene este `Pano` crudo la GEOMETRIA minima de la forma de losa v3? Un stub
+// `{id}` (v1/v2) carece de `perimetro`/`espesor`/etc., asi que NO se puede completar
+// a losa: nunca tuvo geometria. Comprobamos la presencia de los campos de geometria
+// que distinguen una losa real de un stub reservado; la VALIDACION Zod estricta de
+// cada campo la hace `PanoSchema` despues (esto solo separa stub de no-stub). Si
+// faltan campos de geometria, es un stub y se descarta.
+function panoTieneGeometriaV3(pano: PanoCrudo): boolean {
+  return (
+    Array.isArray(pano.perimetro) &&
+    typeof pano.espesor === "number" &&
+    typeof pano.plantaId === "string" &&
+    typeof pano.materialId === "string" &&
+    typeof pano.tamMalla === "number" &&
+    typeof pano.bordeApoyo === "string"
+  );
+}
+
+// Migracion de model-schema v2 -> v3 (F3 corte 1). v3 expande `Pano` de stub `{id}`
+// a la forma completa de LOSA. Un `Pano` v1/v2 era un STUB reservado (solo `{id}`):
+// NO se puede completar a la forma de losa porque NUNCA tuvo geometria de obra
+// (perimetro, espesor, material, malla, apoyo de borde). Por eso la migracion
+// DESCARTA todo paño que no cumpla la forma v3 (los stubs) Y sus cargas superficiales
+// (las `cargas` con `tipo:"superficial"` y `ambito` = id de un paño descartado), con
+// un AVISO en lenguaje de obra. NO rompe el import.
 //
-// Para anadir una migracion v2 -> v3 en el futuro:
-//   1. Subir SCHEMA_VERSION a 3 en src/dominio/comunes.ts (y el esquema nuevo).
-//   2. Registrar aqui:  2: (datos) => { ...transforma forma v2 en forma v3...;
-//                                        return { datos: { ...obj, schemaVersion: 3 } }; }
-//   3. La cadena de abajo aplicara 2->3 automaticamente a proyectos antiguos.
+// En la practica esto es un NO-OP: un proyecto v2 real tenia `panos: []` (la entrada
+// de paños llega en F3; nunca se crearon stubs). Pero la migracion debe ser robusta
+// y explicita ante un .json HEREDADO que llevara paños-stub.
+//
+// Lo demas del modelo (incluida la forma v2 de hipotesis/analisis ya migrada) viaja
+// intacto: la validacion Zod final (ModeloSchema v3) ocurre una sola vez al final.
+function migrarV2aV3(datos: unknown): ResultadoMigracion {
+  // Si el raw no es un objeto, no reestructuramos: la validacion Zod final lo
+  // rechazara con una ruta legible (no es trabajo de la migracion validar).
+  if (typeof datos !== "object" || datos === null) {
+    return { datos: { ...(datos as object), schemaVersion: 3 } };
+  }
+  const obj = { ...(datos as Record<string, unknown>) };
+  const avisos: string[] = [];
+
+  const panosOriginal: PanoCrudo[] = Array.isArray(obj.panos)
+    ? (obj.panos as PanoCrudo[])
+    : [];
+
+  // Particiona en paños completables a losa (forma v3) vs stubs a descartar.
+  const panosConservados: PanoCrudo[] = [];
+  const idsDescartados = new Set<string>();
+  for (const pano of panosOriginal) {
+    if (panoTieneGeometriaV3(pano)) {
+      panosConservados.push(pano);
+    } else {
+      // Solo registramos el id (string) para purgar sus cargas; un stub sin id
+      // usable igualmente se descarta (no aporta nada).
+      if (typeof pano.id === "string") idsDescartados.add(pano.id);
+    }
+  }
+
+  obj.panos = panosConservados;
+
+  // Purga las cargas superficiales que apuntaban a un paño descartado: sin paño que
+  // las soporte serian referencias colgantes (y el discretizador las bloquearia).
+  // Solo se descartan las `superficial` sobre paños descartados; el resto de cargas
+  // (puntual/lineal, o superficiales sobre paños conservados) viaja intacto.
+  if (idsDescartados.size > 0) {
+    const cargasOriginal: CargaCruda[] = Array.isArray(obj.cargas)
+      ? (obj.cargas as CargaCruda[])
+      : [];
+    obj.cargas = cargasOriginal.filter(
+      (c) =>
+        !(
+          c.tipo === "superficial" &&
+          typeof c.ambito === "string" &&
+          idsDescartados.has(c.ambito)
+        ),
+    );
+    const n = idsDescartados.size;
+    avisos.push(
+      `Se descartaron ${n} paño${n === 1 ? "" : "s"} sin geometría de una versión anterior y sus cargas superficiales.`,
+    );
+  }
+
+  return { datos: { ...obj, schemaVersion: 3 }, avisos };
+}
+
+// Registro indexado por version de origen: `MIGRACIONES[v]` transforma v -> v+1.
+// `MIGRACIONES[1]` lleva v1 -> v2 (F2a, model-schema); `MIGRACIONES[2]` lleva
+// v2 -> v3 (F3 corte 1, paño losa). La cadena de `migrarYValidar` los aplica en
+// orden ascendente hasta `SCHEMA_VERSION`.
 const MIGRACIONES: Record<number, Migracion> = {
   1: migrarV1aV2,
+  2: migrarV2aV3,
 };
 
 // Lee `schemaVersion` de forma defensiva: `raw` es `unknown` y puede no ser un

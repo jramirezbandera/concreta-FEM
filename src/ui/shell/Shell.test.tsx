@@ -111,16 +111,20 @@ describe("Shell: conmutacion de pestanas", () => {
 });
 
 describe("Shell: estados deshabilitados", () => {
-  it("la solapa 'Isovalores' esta deshabilitada", () => {
+  it("las cuatro solapas (incluida 'Isovalores', F3) estan operativas", async () => {
+    const user = userEvent.setup();
     render(
       <Shell>
         <div />
       </Shell>,
     );
-    expect(tab(TAB_ISOVALORES)).toBeDisabled();
-    // Las operativas no lo estan.
+    // Isovalores se habilito en F3 (mapa de color de la losa): ya no esta deshabilitada.
+    expect(tab(TAB_ISOVALORES)).toBeEnabled();
     expect(tab(TAB_PILARES)).toBeEnabled();
     expect(tab(TAB_VIGAS)).toBeEnabled();
+    // Y se puede navegar a ella (conmuta la pestana activa en vistaStore).
+    await user.click(tab(TAB_ISOVALORES));
+    expect(vistaStore.getState().pestanaActiva).toBe("isovalores");
   });
 
   it("undo/redo deshabilitados con modelo vacio (sin historial)", () => {

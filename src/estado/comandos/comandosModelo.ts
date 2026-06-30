@@ -8,6 +8,7 @@ import type {
   Pilar,
   Viga,
   Nudo,
+  Pano,
   Grupo,
   Planta,
   Carga,
@@ -196,14 +197,138 @@ export function editarViga(
   return comando;
 }
 
+// Fuente UNICA de "¿este nudo lo usa ALGUIEN?" sobre un modelo (o borrador Immer): lo
+// referencia una viga (nudoI/nudoJ) o un paño (perimetro). Un Pilar se posiciona por
+// x/y y NO referencia nudos, asi que no entra. Centraliza la DEPENDENCIA INVERSA de
+// nudos para que eliminarViga y eliminarPano no borren un nudo que el otro tipo usa
+// (la guarda eliminarViga<->paño que F3 exige): un solo sitio que enumere los duenos.
+function nudoEnUso(modelo: Modelo, nudoId: string): boolean {
+  for (const v of modelo.vigas) {
+    if (v.nudoI === nudoId || v.nudoJ === nudoId) return true;
+  }
+  for (const p of modelo.panos) {
+    if (p.perimetro.includes(nudoId)) return true;
+  }
+  return false;
+}
+
 // Elimina una viga y, en la MISMA receta (un solo paso de undo), purga las cargas
-// cuyo ambito apunta a esa viga (espejo de eliminarPilar). Los NUDOS no se tocan:
-// son geometria compartida (otras vigas pueden usarlos) y un nudo no referenciado
-// es inocuo; el discretizador hace su propio snapping.
+// cuyo ambito apunta a esa viga (espejo de eliminarPilar) Y los nudos que queden
+// HUERFANOS (ni una viga ni un PAÑO restante los usa). En este modelo los nudos solo
+// nacen de vigas/paños (el Pilar se posiciona por x/y, no referencia nudos), asi que
+// un nudo que nadie usa es un "punto suelto" puro: inocuo para el calculo pero ruido
+// que se acumula al editar. Se limpia AQUI, en la misma receta (un solo undo restaura
+// viga + cargas + nudos). GUARDA eliminarViga<->paño (F3): la dependencia inversa la
+// resuelve `nudoEnUso`, que tambien cuenta los nudos del perimetro de los paños, de
+// modo que borrar una viga NUNCA orfana un nudo que un paño referencia.
 export function eliminarViga(base: Modelo, vigaId: string): Comando {
   const { comando } = crearComandoParches(base, "Eliminar viga", (borrador) => {
-    borrador.vigas = borrador.vigas.filter((v) => v.id !== vigaId);
+    const i = borrador.vigas.findIndex((v) => v.id === vigaId);
+    if (i === -1) return; // viga inexistente: no-op (no toca nudos ni cargas)
+    borrador.vigas.splice(i, 1);
     borrador.cargas = borrador.cargas.filter((c) => c.ambito !== vigaId);
+    borrador.nudos = borrador.nudos.filter((n) => nudoEnUso(borrador, n.id));
+  });
+  return comando;
+}
+
+// --- Paños losa (F3 corte 1, entrada de losa maciza) -------------------------
+
+// Datos del paño que aporta el llamante: todo Pano salvo id (interno) y nombre
+// (visible "F{n}", forjado), y con el perimetro dado como puntos (x,y) a resolver en
+// nudos PROPIOS en vez de ids ya resueltos. Espejo de DatosViga: la introduccion
+// grafica trabaja en coordenadas; el comando crea los nudos. UNIDADES internas en m.
+export type DatosPano = {
+  tipo: Pano["tipo"];
+  plantaId: string;
+  // Perimetro del paño como puntos en planta (m). Corte 1: 4 esquinas (rectangulo).
+  perimetro: { x: number; y: number }[];
+  espesor: number; // m
+  materialId: string;
+  tamMalla: number; // m
+  bordeApoyo: Pano["bordeApoyo"];
+};
+
+// Resuelve un punto del perimetro a un id de nudo SOBRE el borrador Immer (misma receta
+// que el paño => un solo paso de undo). Espejo de resolverExtremo de vigas: reusa un
+// nudo a <TOL_NODO o crea uno nuevo. Aunque corte 1 es AISLADO (la malla no comparte
+// con el portico), el paño SI tiene nudos propios de OBRA en sus esquinas y dos esquinas
+// que cayeran en el mismo punto deben compartir nudo (coherencia: nunca dos nudos a la
+// misma posicion en una misma receta).
+function resolverPuntoPerimetro(borrador: Modelo, punto: { x: number; y: number }): string {
+  const { x, y } = punto;
+  const existente = borrador.nudos.find(
+    (n) => Math.hypot(n.x - x, n.y - y) < TOL_NODO,
+  );
+  if (existente) return existente.id;
+  const nudo: Nudo = { id: nuevoId(), x, y };
+  borrador.nudos.push(nudo);
+  return nudo.id;
+}
+
+export function crearPano(base: Modelo, datos: DatosPano): Comando {
+  // id/nombre fijados AQUI (se reutilizan en redo via el delta). Nombre visible "F{n}"
+  // (forjado, estilo CYPECAD) por el mayor sufijo en uso (no el recuento).
+  const id = nuevoId();
+  const nombre = siguienteNombre("F", base.panos);
+
+  // Una sola receta: resolver/crear los nudos del perimetro Y empujar el paño. Asi
+  // crear nudos + paño es UN unico paso de undo (deshacer borra ambos).
+  const { comando } = crearComandoParches(
+    base,
+    `Crear paño ${nombre}`,
+    (borrador) => {
+      const perimetro = datos.perimetro.map((p) =>
+        resolverPuntoPerimetro(borrador, p),
+      );
+      const pano: Pano = {
+        id,
+        nombre,
+        tipo: datos.tipo,
+        plantaId: datos.plantaId,
+        perimetro,
+        espesor: datos.espesor,
+        materialId: datos.materialId,
+        tamMalla: datos.tamMalla,
+        bordeApoyo: datos.bordeApoyo,
+      };
+      borrador.panos.push(pano);
+    },
+  );
+  return comando;
+}
+
+// Edita propiedades de un paño (merge superficial de `cambios`). No toca id, nombre ni
+// perimetro (la geometria la fija la introduccion grafica, no el inspector, espejo de
+// editarViga). Paño inexistente => no-op. El delta solo recoge los campos que cambian.
+export function editarPano(
+  base: Modelo,
+  panoId: string,
+  cambios: Partial<Omit<Pano, "id" | "nombre" | "perimetro">>,
+): Comando {
+  const { comando } = crearComandoParches(base, "Editar paño", (borrador) => {
+    const pano = borrador.panos.find((p) => p.id === panoId);
+    if (pano) Object.assign(pano, cambios);
+  });
+  return comando;
+}
+
+// Elimina un paño y, en la MISMA receta (un solo paso de undo), purga las cargas cuyo
+// ambito apunta a ese paño (cargas superficiales) Y los nudos del perimetro que queden
+// HUERFANOS (ninguna viga ni otro paño restante los usa). Espejo de eliminarViga: los
+// nudos compartidos (con una viga, o con otro paño) se conservan; solo se borran los
+// puntos sueltos que solo este paño usaba.
+export function eliminarPano(base: Modelo, panoId: string): Comando {
+  const { comando } = crearComandoParches(base, "Eliminar paño", (borrador) => {
+    const i = borrador.panos.findIndex((p) => p.id === panoId);
+    if (i === -1) return; // paño inexistente: no-op (no toca nudos ni cargas)
+    borrador.panos.splice(i, 1);
+    borrador.cargas = borrador.cargas.filter((c) => c.ambito !== panoId);
+    // Nudos que siguen en uso por ALGUNA viga o paño superviviente. Solo se purgan los
+    // que ya no usa nadie (espejo de eliminarViga, ahora con dependencia de paño).
+    borrador.nudos = borrador.nudos.filter((n) =>
+      nudoEnUso(borrador, n.id),
+    );
   });
   return comando;
 }
@@ -437,11 +562,20 @@ function purgarPlantas(borrador: Modelo, plantaIds: Set<string>): void {
     if (fuera) vigasFuera.add(v.id);
     return !fuera;
   });
+  // Paños (F3): un paño pertenece a una planta; eliminar la planta arrastra sus paños
+  // (y, abajo, sus cargas superficiales). Mismo criterio que vigas.
+  const panosFuera = new Set<string>();
+  borrador.panos = borrador.panos.filter((pa) => {
+    const fuera = plantaIds.has(pa.plantaId);
+    if (fuera) panosFuera.add(pa.id);
+    return !fuera;
+  });
   borrador.cargas = borrador.cargas.filter(
     (c) =>
       !plantaIds.has(c.ambito) &&
       !pilaresFuera.has(c.ambito) &&
-      !vigasFuera.has(c.ambito),
+      !vigasFuera.has(c.ambito) &&
+      !panosFuera.has(c.ambito),
   );
   borrador.plantas = borrador.plantas.filter((p) => !plantaIds.has(p.id));
 }

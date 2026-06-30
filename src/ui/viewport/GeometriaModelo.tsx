@@ -5,10 +5,9 @@
 //  - Pilares como InstancedMesh DIRECTO (no <Instances> de drei: menos overhead
 //    CPU, correccion de verificacion del spec). Un mapa instanceId->id de dominio
 //    da el picking.
-//  - Vigas como LineSegments con BufferGeometry (un par de vertices por viga);
-//    para el picking, meshes finos invisibles envueltos en <Bvh> (las lineas no
-//    raycastean bien con grosor). En F1 el volumen es bajo; si crece, migrar a
-//    instancing de cilindros.
+//  - Vigas como InstancedMesh de cajas (ancho x largo x canto) orientadas nudo I->J,
+//    igual que los pilares: volumen 3D real (no una linea) y el mismo mesh sirve de
+//    blanco de picking. instanceColor da hover/seleccion (una sola pareja de subs).
 //  - Geometria reconstruida SOLO al cambiar modelo/grupo/planta (useGeometriaModelo
 //    via useSyncExternalStore), nunca por frame.
 //  - Hover/seleccion mutan refs (colores de instancia) sin setState por frame.
@@ -18,12 +17,13 @@ import { Bvh, Line } from "@react-three/drei";
 import {
   Color,
   InstancedMesh,
+  Mesh,
   Matrix4,
   Euler,
   Quaternion,
   Vector3,
-  BufferGeometry,
-  Float32BufferAttribute,
+  Shape,
+  ShapeGeometry,
 } from "three";
 import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import type { Pestana } from "../../estado";
@@ -36,6 +36,19 @@ import { resolverContextoElemento } from "./hooks/resolverContextoElemento";
 import { useResaltadoSeleccion, aplicarTinte } from "./hooks/usePickingRef";
 
 // --- Picking helpers ---------------------------------------------------------
+
+// Durante la introduccion (herramienta "pilar"/"viga") la geometria NO debe capturar
+// el puntero: el evento debe ATRAVESAR hasta el plano de colocacion (snap/iman en
+// ColocacionPilar/ColocacionViga, un plano en Z=0). Si la geometria hace
+// stopPropagation() PRIMERO, el clic sobre una cabeza de pilar -justo donde el iman
+// quiere enganchar- nunca llega al plano y la viga no se crea: ese es el bug del snap
+// que falla y del "segundo clic" perdido (el 2.o clic tambien cae sobre otro pilar).
+// Por eso cada manejador comprueba ESTO antes de stopPropagation(). Se lee con
+// getState() (no prop reactiva) para no reconstruir el lienzo al cambiar de herramienta
+// (regla #11).
+function modoSeleccionActivo(): boolean {
+  return vistaStore.getState().herramienta === "seleccion";
+}
 
 // Aplica seleccion al hacer clic: shift alterna, clic normal reemplaza.
 function clicSeleccion(id: string, shift: boolean): void {
@@ -89,6 +102,17 @@ export function clicSeleccionPilar(id: string, shift: boolean): void {
 // "seleccion"; durante la colocacion de pilares o vigas el clic NO selecciona.
 // eslint-disable-next-line react-refresh/only-export-components
 export function clicSeleccionViga(id: string, shift: boolean): void {
+  if (vistaStore.getState().herramienta !== "seleccion") return;
+  clicSeleccion(id, shift);
+  sincronizarContexto3D(id, shift, "entradaVigas");
+}
+
+// Clic sobre la huella de un paño (F3): espejo de `clicSeleccionViga`. Solo selecciona
+// en modo "seleccion"; durante cualquier colocacion el clic NO selecciona. El paño se
+// introduce/edita en la pestana de vigas (donde vive el menu "Paños"), asi que el
+// auto-switch de contexto 3D apunta a "entradaVigas".
+// eslint-disable-next-line react-refresh/only-export-components
+export function clicSeleccionPano(id: string, shift: boolean): void {
   if (vistaStore.getState().herramienta !== "seleccion") return;
   clicSeleccion(id, shift);
   sincronizarContexto3D(id, shift, "entradaVigas");
@@ -167,6 +191,7 @@ function PilaresInstanciados({ pilares }: { pilares: GeoModelo["pilares"] }) {
         // args[2] = capacidad inicial; usamos length actual (se recrea al cambiar).
         args={[undefined, undefined, Math.max(pilares.length, 1)]}
         onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+          if (!modoSeleccionActivo()) return; // deja pasar el evento a la colocacion
           e.stopPropagation();
           const id = idPorInstancia[e.instanceId ?? -1];
           if (id) entrarHover(id);
@@ -176,6 +201,7 @@ function PilaresInstanciados({ pilares }: { pilares: GeoModelo["pilares"] }) {
           if (id) salirHover(id);
         }}
         onClick={(e: ThreeEvent<MouseEvent>) => {
+          if (!modoSeleccionActivo()) return; // el clic debe llegar al plano (snap/iman)
           e.stopPropagation();
           const id = idPorInstancia[e.instanceId ?? -1];
           if (id) clicSeleccionPilar(id, e.shiftKey);
@@ -252,107 +278,32 @@ function HaloPilarSeleccionado({ pilares }: { pilares: GeoModelo["pilares"] }) {
   );
 }
 
-// --- Vigas (linea visible con color por-barra + InstancedMesh de picking) -----
+// --- Vigas (InstancedMesh de cajas, igual que los pilares) -------------------
 //
-// RENDIMIENTO (T-vigas-1, resuelto en F2c): antes cada viga era un <mesh> cilindro +
-// DOS suscripciones a seleccionStore. En 3D pleno (todas las plantas a la vez) eso es
-// O(N) mallas + 2N suscripciones, y cada hover dispara las 2N. Ahora:
-//  - La linea visible es UN lineSegments con atributo de COLOR por vertice; hover y
-//    seleccion recolorean la barra MUTANDO ese buffer (sin setState), con UNA sola
-//    pareja de suscripciones para TODAS las vigas (como los pilares mutan instanceColor).
-//  - El picking es UN InstancedMesh de cilindros finos transparentes (raycast robusto:
-//    las lineas no raycastean con tolerancia), con un mapa instanceId->id de dominio.
-// Coste O(1) en mallas/suscripciones, igual que los pilares.
+// RENDIMIENTO (T-vigas-1, F2c; volumen 3D anadido despues): UN solo InstancedMesh de
+// cajas para TODAS las vigas, con instanceColor para hover/seleccion mutado por
+// `useResaltadoSeleccion` (una sola pareja de suscripciones, como los pilares). Antes
+// la viga era una linea fina + un cilindro de picking invisible: en 3D se veia como un
+// hilo, no como una barra. Ahora cada viga es una caja (ancho x largo x canto) orientada
+// del nudo I al J: se lee como volumen igual que un pilar y el mismo mesh sirve de
+// blanco de picking (sin cilindro aparte). Coste O(1) en mallas/suscripciones.
 
-const VIGA_PICK_RADIO = 0.08; // radio del cilindro de picking (m)
-
-function Vigas({ vigas }: { vigas: GeoModelo["vigas"] }) {
-  const colBase = useMemo(() => colorToken("viga"), []);
-  const colSel = useMemo(() => colorToken("accent"), []);
-  const colHover = useMemo(() => colorToken("accentLine"), []);
-
-  // Mapa indice -> id de dominio (estable por reconstruccion): picking y recoloreado.
-  const idPorIndice = useMemo(() => vigas.map((v) => v.id), [vigas]);
-
-  // Geometria de lineas: 2 vertices por viga (position) + color por vertice (init base).
-  const geom = useMemo(() => {
-    const g = new BufferGeometry();
-    const pos = new Float32Array(vigas.length * 2 * 3);
-    const col = new Float32Array(vigas.length * 2 * 3);
-    vigas.forEach((v, i) => {
-      const o = i * 6;
-      pos[o] = v.ax;
-      pos[o + 1] = v.ay;
-      pos[o + 2] = v.z;
-      pos[o + 3] = v.bx;
-      pos[o + 4] = v.by;
-      pos[o + 5] = v.z;
-      for (let k = 0; k < 6; k += 3) {
-        col[o + k] = colBase.r;
-        col[o + k + 1] = colBase.g;
-        col[o + k + 2] = colBase.b;
-      }
-    });
-    g.setAttribute("position", new Float32BufferAttribute(pos, 3));
-    g.setAttribute("color", new Float32BufferAttribute(col, 3));
-    return g;
-  }, [vigas, colBase]);
-
-  useEffect(() => {
-    invalidate();
-    return () => geom.dispose();
-  }, [geom]);
-
-  // Recoloreado hover/seleccion mutando el atributo de color (sin setState/frame). UNA
-  // sola pareja de suscripciones para todas las vigas. Repinta todas segun el estado.
-  useEffect(() => {
-    const colorAttr = geom.getAttribute("color") as Float32BufferAttribute;
-    const aplicar = () => {
-      const { seleccion, hoverId } = seleccionStore.getState();
-      idPorIndice.forEach((id, i) => {
-        const c = seleccion.includes(id)
-          ? colSel
-          : id === hoverId && hoverId !== null
-            ? colHover
-            : colBase;
-        colorAttr.setXYZ(2 * i, c.r, c.g, c.b);
-        colorAttr.setXYZ(2 * i + 1, c.r, c.g, c.b);
-      });
-      colorAttr.needsUpdate = true;
-      invalidate();
-    };
-    aplicar();
-    const offH = seleccionStore.subscribe((s) => s.hoverId, aplicar);
-    const offS = seleccionStore.subscribe((s) => s.seleccion, aplicar);
-    return () => {
-      offH();
-      offS();
-    };
-  }, [geom, idPorIndice, colBase, colHover, colSel]);
-
-  if (vigas.length === 0) return null;
-  return (
-    <group>
-      <lineSegments geometry={geom}>
-        <lineBasicMaterial vertexColors toneMapped={false} />
-      </lineSegments>
-      <VigasPicking vigas={vigas} idPorIndice={idPorIndice} />
-    </group>
-  );
-}
-
-// InstancedMesh UNICO de cilindros finos transparentes: blanco de picking de TODAS las
-// vigas (sin suscripciones; el resaltado lo da la linea). Un cilindro unitario en Y,
-// escalado a la longitud de la viga y orientado del nudo I al J.
-function VigasPicking({
-  vigas,
-  idPorIndice,
-}: {
-  vigas: GeoModelo["vigas"];
-  idPorIndice: readonly string[];
-}) {
+function VigasInstanciadas({ vigas }: { vigas: GeoModelo["vigas"] }) {
   const ref = useRef<InstancedMesh>(null);
 
+  // Mapa instanceId -> id de dominio (estable por reconstruccion): picking y resaltado.
+  const idPorInstancia = useMemo(() => vigas.map((v) => v.id), [vigas]);
+
+  const colBase = useMemo(() => colorToken("viga"), []);
+  const colHover = useMemo(() => colorToken("accentLine"), []);
+  const colSel = useMemo(() => colorToken("accent"), []);
+
+  // Coloca cada instancia (matriz de transformacion) cuando cambia la geometria. La caja
+  // unitaria se escala a (ancho, largo, canto) y se orienta con el eje local Y a lo largo
+  // de la viga (nudo I->J); para vigas horizontales esa rotacion es pura sobre Z, asi el
+  // eje local Z queda vertical y el canto es la altura. Se baja media altura
+  // (pos.z -= canto/2) para que la barra cuelgue BAJO la cota de la planta y no atraviese
+  // el forjado.
   useEffect(() => {
     const malla = ref.current;
     if (!malla) return;
@@ -364,22 +315,36 @@ function VigasPicking({
     const b = new Vector3();
     const dir = new Vector3();
     const yUp = new Vector3(0, 1, 0);
+    const aux = new Color();
     vigas.forEach((v, i) => {
       a.set(v.ax, v.ay, v.z);
       b.set(v.bx, v.by, v.z);
       dir.subVectors(b, a);
       const largo = Math.max(dir.length(), 0.001);
       pos.addVectors(a, b).multiplyScalar(0.5);
+      pos.z -= v.canto / 2; // la viga cuelga bajo la cota de la planta
       q.setFromUnitVectors(yUp, dir.normalize()); // dir ya capturado en `largo`
-      esc.set(1, largo, 1); // cilindro unitario en Y -> largo de la viga
+      esc.set(v.ancho, largo, v.canto); // caja: ancho (X) x largo (Y->dir) x canto (Z)
       m.compose(pos, q, esc);
       malla.setMatrixAt(i, m);
+      malla.setColorAt(i, aux.copy(colBase));
     });
     malla.count = vigas.length;
     malla.instanceMatrix.needsUpdate = true;
+    if (malla.instanceColor) malla.instanceColor.needsUpdate = true;
     malla.computeBoundingSphere();
     invalidate();
-  }, [vigas]);
+  }, [vigas, colBase]);
+
+  // Resaltado hover/seleccion via mutacion de colores de instancia (sin setState),
+  // identico a los pilares: una sola pareja de suscripciones para todas las vigas.
+  const aux = useMemo(() => new Color(), []);
+  useResaltadoSeleccion(ref, idPorInstancia, {
+    pintar: (i, modo) => {
+      aplicarTinte(aux, colBase, colHover, colSel, modo);
+      ref.current?.setColorAt(i, aux);
+    },
+  });
 
   if (vigas.length === 0) return null;
   return (
@@ -388,36 +353,166 @@ function VigasPicking({
         ref={ref}
         args={[undefined, undefined, Math.max(vigas.length, 1)]}
         onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+          if (!modoSeleccionActivo()) return; // deja pasar el evento a la colocacion
           e.stopPropagation();
-          const id = idPorIndice[e.instanceId ?? -1];
+          const id = idPorInstancia[e.instanceId ?? -1];
           if (id) entrarHover(id);
         }}
         onPointerOut={(e: ThreeEvent<PointerEvent>) => {
-          const id = idPorIndice[e.instanceId ?? -1];
+          const id = idPorInstancia[e.instanceId ?? -1];
           if (id) salirHover(id);
         }}
         onClick={(e: ThreeEvent<MouseEvent>) => {
+          if (!modoSeleccionActivo()) return; // el clic debe llegar al plano (snap/iman)
           e.stopPropagation();
-          const id = idPorIndice[e.instanceId ?? -1];
+          const id = idPorInstancia[e.instanceId ?? -1];
           if (id) clicSeleccionViga(id, e.shiftKey);
         }}
       >
-        <cylinderGeometry args={[VIGA_PICK_RADIO, VIGA_PICK_RADIO, 1, 6]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} toneMapped={false} />
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial toneMapped={false} />
       </instancedMesh>
     </Bvh>
   );
 }
 
-// --- Raiz de geometria -------------------------------------------------------
+// --- Paños (huella de losa: poligono relleno semitransparente) ---------------
+//
+// RENDIMIENTO (regla #11): cada paño es una mesh con geometria propia (ShapeGeometry del
+// contorno), reconstruida SOLO al cambiar la geometria. El hover/seleccion mutan el color
+// del MATERIAL por ref en respuesta a transient updates de seleccionStore (subscribe), sin
+// setState por frame. El numero de paños por planta es bajo (no necesita instancing); el
+// blanco de picking es la propia huella. El relleno es semitransparente (la rejilla y la
+// obra se ven a traves) y `depthWrite={false}` evita que tape lo que hay debajo.
 
-export function GeometriaModelo() {
-  const { pilares, vigas } = useGeometriaModelo();
+// Elevacion de la huella sobre la cota (anti z-fight con la rejilla; bajo el forjado real
+// pero sobre el plano de coords).
+const PANO_Z_EPS = 0.01;
+
+function PanoHuella({ pano }: { pano: GeoModelo["panos"][number] }) {
+  const ref = useRef<Mesh>(null);
+  const colBase = useMemo(() => colorToken("pilar"), []);
+  const colHover = useMemo(() => colorToken("accentLine"), []);
+  const colSel = useMemo(() => colorToken("accent"), []);
+
+  // Geometria del poligono relleno (Shape en el plano XY). Se posiciona luego a z=cota.
+  const geom = useMemo(() => {
+    const shape = new Shape();
+    const c = pano.contorno;
+    shape.moveTo(c[0]!.x, c[0]!.y);
+    for (let i = 1; i < c.length; i++) shape.lineTo(c[i]!.x, c[i]!.y);
+    shape.closePath();
+    return new ShapeGeometry(shape);
+  }, [pano.contorno]);
+  useEffect(() => () => geom.dispose(), [geom]);
+
+  // Color del relleno via mutacion del material (hover/seleccion), sin setState por frame.
+  const aux = useMemo(() => new Color(), []);
+  useEffect(() => {
+    const aplicar = () => {
+      const m = ref.current;
+      if (!m) return;
+      const { seleccion, hoverId } = seleccionStore.getState();
+      const sel = seleccion.includes(pano.id);
+      const hov = hoverId === pano.id;
+      aplicarTinte(aux, colBase, colHover, colSel, sel ? "seleccion" : hov ? "hover" : "base");
+      const mat = m.material as { color?: Color };
+      if (mat.color) mat.color.copy(aux);
+      invalidate();
+    };
+    aplicar();
+    const offHover = seleccionStore.subscribe((s) => s.hoverId, aplicar);
+    const offSel = seleccionStore.subscribe((s) => s.seleccion, aplicar);
+    return () => {
+      offHover();
+      offSel();
+    };
+  }, [pano.id, aux, colBase, colHover, colSel]);
+
+  return (
+    <Bvh firstHitOnly>
+      <mesh
+        ref={ref}
+        geometry={geom}
+        position={[0, 0, pano.z + PANO_Z_EPS]}
+        onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+          if (!modoSeleccionActivo()) return; // deja pasar el evento a la colocacion
+          e.stopPropagation();
+          entrarHover(pano.id);
+        }}
+        onPointerOut={() => salirHover(pano.id)}
+        onClick={(e: ThreeEvent<MouseEvent>) => {
+          if (!modoSeleccionActivo()) return; // el clic debe llegar al plano (colocacion)
+          e.stopPropagation();
+          clicSeleccionPano(pano.id, e.shiftKey);
+        }}
+      >
+        <meshBasicMaterial
+          transparent
+          opacity={0.3}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </Bvh>
+  );
+}
+
+function PanosHuella({ panos }: { panos: GeoModelo["panos"] }) {
+  useEffect(() => {
+    invalidate();
+  }, [panos]);
+  if (panos.length === 0) return null;
   return (
     <group>
+      {panos.map((p) => (
+        <PanoHuella key={p.id} pano={p} />
+      ))}
+    </group>
+  );
+}
+
+// --- Raiz de geometria -------------------------------------------------------
+
+// La obra solida (pilares/vigas) se OCULTA cuando el usuario pide ver SOLO el modelo de
+// calculo (3D + "Ver modelo de calculo" + "Ocultar la obra"): asi el modelo de calculo
+// (overlay de Capa 2) no queda tapado por la obra solida. Suscripcion ligera (3 flags de
+// vista), nunca por frame. Fuera de ese caso, la obra se ve normal.
+function useObraOculta(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
+      const offMostrar = vistaStore.subscribe((s) => s.mostrarModeloCalculo, cb);
+      const offSolo = vistaStore.subscribe((s) => s.soloModeloCalculo, cb);
+      return () => {
+        offModo();
+        offMostrar();
+        offSolo();
+      };
+    },
+    () => {
+      const s = vistaStore.getState();
+      return s.modoVista !== "planta" && s.mostrarModeloCalculo && s.soloModeloCalculo;
+    },
+    () => false,
+  );
+}
+
+export function GeometriaModelo() {
+  const { pilares, vigas, panos } = useGeometriaModelo();
+  const obraOculta = useObraOculta();
+  // Repinta al ocultar/mostrar la obra (frameloop="demand": montar/desmontar la
+  // geometria no programa frame por si solo).
+  useEffect(() => {
+    invalidate();
+  }, [obraOculta]);
+  if (obraOculta) return null;
+  return (
+    <group>
+      <PanosHuella panos={panos} />
       <PilaresInstanciados pilares={pilares} />
       <HaloPilarSeleccionado pilares={pilares} />
-      <Vigas vigas={vigas} />
+      <VigasInstanciadas vigas={vigas} />
     </group>
   );
 }

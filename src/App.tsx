@@ -20,12 +20,14 @@ import {
 import { suscribirCoords, leerCoords } from "./ui/viewport";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
+import { ColocacionPano } from "./ui/viewport/ColocacionPano";
 import { OverlayPlantillas } from "./ui/viewport/OverlayPlantillas";
 import { PanelPlantillas } from "./ui/plantillas";
 import { tramoColocable } from "./ui/viewport/tramoPilar";
 import { plantaColocableViga } from "./ui/viewport/tramoViga";
 import { InspectorPilar, PanelHerramientaPilar } from "./ui/entradaPilares";
 import { InspectorViga, PanelHerramientaViga } from "./ui/entradaVigas";
+import { InspectorPano, PanelHerramientaPano } from "./ui/entradaPanos";
 import {
   DeformadaOverlay,
   BotonCalcular,
@@ -35,6 +37,8 @@ import {
   LeyendaEscala,
   ModoOverlay,
   PanelFrecuencias,
+  IsovaloresOverlay,
+  PanelIsovalores,
   usePrecargaMotor,
 } from "./ui/resultados";
 import {
@@ -108,6 +112,18 @@ const MENSAJE_HERRAMIENTA_VIGA =
 // del aviso de pilares; cubre las dos causas con un mensaje en lenguaje de obra.
 const MENSAJE_VIGA_SIN_TRAMO =
   "Crea o selecciona una planta y elige sección y material para tender vigas";
+
+// Guia contextual mientras la herramienta "pano" esta activa (prioriza sobre el mensaje
+// de pestana). Una losa se define por dos esquinas: dos clics. Lenguaje de obra, sin
+// jerga FEM (nada de "malla"/"quad": eso es Capa 2).
+const MENSAJE_HERRAMIENTA_PANO =
+  "Haz clic en dos esquinas para introducir una losa (Esc termina)";
+
+// Cuando la herramienta "pano" esta activa pero NO se puede colocar (sin planta donde
+// caer, o sin material por defecto elegido en el panel), la barra avisa ANTES de que el
+// clic caiga en vacio. Espejo del aviso de vigas, en lenguaje de obra.
+const MENSAJE_PANO_SIN_TRAMO =
+  "Crea o selecciona una planta y elige un material para introducir una losa";
 
 // Vista 3D pleno (F2c): la introduccion grafica es solo 2D, asi que el mensaje guia a
 // seleccionar/inspeccionar en vez de a colocar. Lenguaje de obra, sin jerga FEM.
@@ -227,6 +243,39 @@ export function usePuedeColocarViga(): boolean {
   return puede;
 }
 
+// Se puede introducir una losa: hay planta donde caer (plantaColocableViga !== null) Y
+// hay material por defecto elegido en el panel. Mismas DOS condiciones que ColocacionPano
+// comprueba antes de crear el paño (una sola fuente de verdad para la luz verde): si
+// falta alguna, la barra guia en vez de dejar fallar el clic en silencio. Reacciona al
+// modelo, al ambito activo y a los defaults de paño. Exportado como costura de test
+// (espejo de usePuedeColocarViga).
+// eslint-disable-next-line react-refresh/only-export-components
+export function usePuedeColocarPano(): boolean {
+  const calcular = () => {
+    const { grupoActivoId, plantaActivaId, defaultsPano } = vistaStore.getState();
+    return (
+      plantaColocableViga(
+        modeloStore.getState().getModelo(),
+        grupoActivoId,
+        plantaActivaId,
+      ) !== null && defaultsPano.materialId !== null
+    );
+  };
+  const [puede, setPuede] = useState(calcular);
+  useEffect(() => {
+    const recompute = () => setPuede(calcular());
+    const desuscribir = [
+      modeloStore.subscribe((s) => s.modelo, recompute),
+      vistaStore.subscribe((s) => s.grupoActivoId, recompute),
+      vistaStore.subscribe((s) => s.plantaActivaId, recompute),
+      vistaStore.subscribe((s) => s.defaultsPano, recompute),
+    ];
+    recompute();
+    return () => desuscribir.forEach((u) => u());
+  }, []);
+  return puede;
+}
+
 // --- T-D1 · Coords vivas viewport -> barra de estado (throttle rAF) -----------
 
 // Se suscribe al coordsBus y refresca el estado local a lo sumo una vez por
@@ -274,6 +323,7 @@ export default function App() {
   const snapActivo = useSnapActivo();
   const puedeColocar = usePuedeColocarPilar();
   const puedeColocarViga = usePuedeColocarViga();
+  const puedeColocarPano = usePuedeColocarPano();
   const coords = useCoordsThrottled();
   const persistenciaLista = usePersistenciaLista();
   // En 3D pleno se inhabilita la introduccion grafica y las ayudas 2D (calco DXF,
@@ -296,6 +346,11 @@ export default function App() {
   // resultados; acotar el montaje a su pestana mantiene limpias las demas.
   const enResultados = pestana === "resultados";
 
+  // Isovalores (F3): monta el mapa de color de la losa (sceneOverlay) + el panel con
+  // selector de magnitud y leyenda. Comparte la combinacion activa con Resultados. El
+  // overlay/panel se autoocultan si no hay resultados de placa (un portico sin losa).
+  const enIsovalores = pestana === "isovalores";
+
   // El mensaje de la herramienta activa prioriza sobre el de la pestana. Si la
   // herramienta esta activa pero no hay donde colocar, se guia a crear/elegir planta
   // (en vez de dejar que el clic falle en silencio). Pilares y vigas siguen el mismo
@@ -310,7 +365,11 @@ export default function App() {
         ? puedeColocarViga
           ? MENSAJE_HERRAMIENTA_VIGA
           : MENSAJE_VIGA_SIN_TRAMO
-        : MENSAJE_PESTANA[pestana];
+        : enVigas && herramienta === "pano"
+          ? puedeColocarPano
+            ? MENSAJE_HERRAMIENTA_PANO
+            : MENSAJE_PANO_SIN_TRAMO
+          : MENSAJE_PESTANA[pestana];
 
   return (
     <Shell
@@ -372,17 +431,32 @@ export default function App() {
                     <CentroMasaOverlay />
                     <CentroRigidezOverlay />
                     {!enPleno && <ColocacionViga />}
+                    {/* Colocacion de paños (F3): losa rectangular por dos clics. Misma
+                        pestana que vigas (donde vive el menu "Paños"). Se autooculta
+                        salvo herramienta "pano" + vista planta. */}
+                    {!enPleno && <ColocacionPano />}
                     <ModeloCalculoOverlay />
                   </>
                 ),
                 hudOverlays: (
                   <>
+                    {/* Inspectores de viga y de paño comparten la pestana: cada uno se
+                        autooculta si la seleccion no es de su tipo. Solo uno se muestra
+                        a la vez (la seleccion es de un unico elemento). */}
                     <Slot zona="mid-right">
                       <InspectorViga />
+                    </Slot>
+                    <Slot zona="mid-right">
+                      <InspectorPano />
                     </Slot>
                     {!enPleno && (
                       <Slot zona="top-left">
                         <PanelHerramientaViga />
+                      </Slot>
+                    )}
+                    {!enPleno && (
+                      <Slot zona="top-left">
+                        <PanelHerramientaPano />
                       </Slot>
                     )}
                     {!enPleno && (
@@ -415,9 +489,14 @@ export default function App() {
                       <Slot zona="top-right">
                         <ComboSelector />
                       </Slot>
-                      {/* Panel de frecuencias / modos de vibracion (F2b). mid-right
-                          queda libre en Resultados (no hay inspector aqui). */}
-                      <Slot zona="mid-right">
+                      {/* Panel de frecuencias / modos de vibracion (F2b). Va en top-right,
+                          apilado bajo el modo de vista (2D/3D) y la combinacion: asi NINGUN
+                          panel queda en una zona "mid" (centrada), que es la que se solapa
+                          con las pilas de arriba y de abajo. Reparto sin solapes en
+                          Resultados -> izquierda: grupo (arriba) + reacciones (abajo);
+                          derecha: vista/combinacion/modos (arriba) + diagramas (abajo);
+                          centro: calculo (arriba) + deformada/leyenda (abajo). */}
+                      <Slot zona="top-right">
                         <PanelFrecuencias />
                       </Slot>
                       <Slot zona="bottom-left">
@@ -432,7 +511,39 @@ export default function App() {
                     </>
                   ),
                 }
-              : {})}
+              : enIsovalores
+                ? {
+                    sceneOverlays: (
+                      <>
+                        {/* Mapa de color de la losa. Se autooculta sin resultados de
+                            placa (quads). No necesita la deformada ni el modelo de
+                            calculo: los isovalores son la lectura propia de F3. */}
+                        <IsovaloresOverlay />
+                      </>
+                    ),
+                    hudOverlays: (
+                      <>
+                        {/* Calcular y elegir combinacion desde la propia pestana (la
+                            losa se calcula con el resto de la obra). El panel de
+                            isovalores (selector + leyenda) se autooculta sin placa. */}
+                        <Slot zona="top-center">
+                          <BotonCalcular />
+                        </Slot>
+                        <Slot zona="top-right">
+                          <ComboSelector />
+                        </Slot>
+                        <Slot zona="bottom-center">
+                          <PanelIsovalores />
+                        </Slot>
+                        {/* El inspector del paño permite ajustar la losa sin salir de
+                            Isovalores (editar invalida resultados; se recalcula). */}
+                        <Slot zona="mid-right">
+                          <InspectorPano />
+                        </Slot>
+                      </>
+                    ),
+                  }
+                : {})}
       />
     </Shell>
   );

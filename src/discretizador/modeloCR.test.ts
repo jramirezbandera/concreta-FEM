@@ -188,23 +188,24 @@ describe("prepararModeloCR", () => {
     expect(ids).toEqual([...ids].sort());
   });
 
-  it("FACTORING (Codex #15): carga superficial bloquea discretizar pero NO el CR", () => {
+  it("FACTORING (Codex #15): una carga que bloquea discretizar NO bloquea el CR", () => {
     const m = fixturePortico1Planta();
-    // Carga superficial sobre un pano inexistente como ambito: pero para que pase
-    // validarReferencias necesita un ambito valido. Se aplica sobre la viga v1 (ambito
-    // valido) con tipo "superficial": discretizar la BLOQUEA (PANO_NO_SOPORTADO) en su
-    // Paso 6 de traduccion de cargas.
+    // Carga superficial sobre la viga v1 (ambito valido, pero NO un paño): F3 levanta el
+    // bloqueo PANO_NO_SOPORTADO para superficiales sobre LOSA, pero una superficial sobre
+    // algo que no es un paño sigue siendo no aplicable -> discretizar la BLOQUEA
+    // (CARGA_NO_APLICABLE) en su Paso 6 de traduccion de cargas. Sirve igual para
+    // demostrar que el CR (que no traduce cargas) NO queda bloqueado por una carga.
     const conSuperficial: Modelo = {
       ...m,
       cargas: [
         { id: "qs", tipo: "superficial", ambito: "v1", valor: 5, hipotesisId: "G" },
       ],
     };
-    // discretizar BLOQUEA por la carga superficial.
+    // discretizar BLOQUEA por la carga superficial mal aplicada.
     const dis = discretizar(conSuperficial);
     expect(dis.ok).toBe(false);
     if (!dis.ok) {
-      expect(dis.errores.some((e) => e.codigo === "PANO_NO_SOPORTADO")).toBe(true);
+      expect(dis.errores.some((e) => e.codigo === "CARGA_NO_APLICABLE")).toBe(true);
     }
     // El CR NO se bloquea: la carga no afecta a la geometria+rigidez.
     const cr = prepararModeloCR(conSuperficial);

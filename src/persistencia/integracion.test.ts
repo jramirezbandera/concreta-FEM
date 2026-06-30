@@ -102,6 +102,12 @@ const TRAZABILIDAD_FALSA: Trazabilidad = {
   pilarANodoArranque: {},
   nudoANodo: {},
   nodoFEMAPlanta: {},
+  // Campos de malla de paños (F3): vacios aqui (este test no persiste traza).
+  panoAQuads: {},
+  quadAPano: {},
+  quadANodos: {},
+  nodosDeMalla: [],
+  apoyosDeMalla: [],
 };
 
 beforeEach(() => {

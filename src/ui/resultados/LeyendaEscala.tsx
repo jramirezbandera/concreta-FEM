@@ -13,12 +13,8 @@ import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosCalculo } from "../../solver";
 import { mToMm } from "../../unidades";
 import { deformadaGeometria } from "./deformadaGeometria";
+import { LeyendaRampa } from "./LeyendaRampa";
 import "./leyendaEscala.css";
-
-// Rampa de la leyenda como gradiente CSS sobre las mismas 5 paradas de tokens.css
-// (--ramp-0..4): una sola fuente de verdad del color (no se duplica hex aqui).
-const GRADIENTE_RAMPA =
-  "linear-gradient(90deg, var(--ramp-0), var(--ramp-1), var(--ramp-2), var(--ramp-3), var(--ramp-4))";
 
 // Rango del slider de amplificacion. El desplazamiento real es imperceptible (m
 // sobre m), de ahi el factor: 1x..500x cubre desde "real" hasta deformadas muy
@@ -125,18 +121,15 @@ export function LeyendaEscala() {
       titulo="Deformada"
       tag={entradas.vigente ? undefined : "obsoleta"}
     >
-      {/* Rampa de color con rotulos min/max del desplazamiento (mm). */}
-      <div className="cx-leyenda__rampa-fila">
-        <span className="cx-leyenda__lim mono tnum">{fmtMm(rango.min)}</span>
-        <div
-          className="cx-leyenda__rampa"
-          style={{ background: GRADIENTE_RAMPA }}
-          role="img"
-          aria-label={`Desplazamiento de ${fmtMm(rango.min)} a ${fmtMm(rango.max)} milimetros`}
-        />
-        <span className="cx-leyenda__lim mono tnum">{fmtMm(rango.max)}</span>
-      </div>
-      <p className="cx-leyenda__unidad caps">desplazamiento (mm)</p>
+      {/* Rampa de color con rotulos min/max del desplazamiento (mm). La rampa generica
+          (color + min/max + unidad) la pinta LeyendaRampa; aqui se le pasan los limites
+          YA en mm (conversion en el borde, fmtMm via mToMm). */}
+      <LeyendaRampa
+        min={mToMm(rango.min)}
+        max={mToMm(rango.max)}
+        unidad="desplazamiento (mm)"
+        ariaLabel={`Desplazamiento de ${fmtMm(rango.min)} a ${fmtMm(rango.max)} milimetros`}
+      />
 
       {/* Control del factor de amplificacion. */}
       <label className="cx-leyenda__control">

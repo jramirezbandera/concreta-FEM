@@ -11,12 +11,14 @@ export type {
   ModoVista,
   DialogoActivo,
   MagnitudDiagrama,
+  MagnitudIsovalores,
 } from "./vistaStore";
 export type {
   Herramienta,
   DefaultsPilar,
   DefaultsViga,
   DefaultsCarga,
+  DefaultsPano,
 } from "./vistaStore";
 export { resultadosStore } from "./resultadosStore";
 // modalStore (F2b): resultados del analisis MODAL (frecuencias + formas de vibracion).
@@ -54,6 +56,9 @@ export {
   crearViga,
   editarViga,
   eliminarViga,
+  crearPano,
+  editarPano,
+  eliminarPano,
   crearGrupo,
   editarGrupo,
   eliminarGrupo,
@@ -72,6 +77,7 @@ export type {
   DatosPilar,
   DatosViga,
   ExtremoViga,
+  DatosPano,
   DatosGrupo,
   DatosPlanta,
   DatosCarga,

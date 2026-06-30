@@ -18,6 +18,9 @@ import {
   crearViga,
   editarViga,
   eliminarViga,
+  crearPano,
+  editarPano,
+  eliminarPano,
   crearCarga,
   editarCarga,
   eliminarCarga,
@@ -26,7 +29,7 @@ import {
   eliminarHipotesis,
   editarAnalisis,
 } from "../index";
-import type { DatosViga } from "./comandosModelo";
+import type { DatosViga, DatosPano } from "./comandosModelo";
 import { crearModeloVacio } from "../../dominio";
 import type { CategoriaUso } from "../../dominio";
 import type {
@@ -619,11 +622,35 @@ describe("eliminarViga", () => {
     modeloStore.getState().ejecutar(eliminarViga(m(), vigaId));
     expect(m().vigas).toHaveLength(0);
     expect(m().cargas.map((c) => c.id)).toEqual(["c2"]); // c1 (sobre la viga) cae
-    expect(m().nudos).toEqual(conTodo.nudos); // nudos no se tocan
+    // Sus dos nudos quedan huerfanos (ninguna viga los usa) -> se purgan en la MISMA
+    // receta. Antes se conservaban; ahora se limpian para no acumular "puntos sueltos".
+    expect(m().nudos).toHaveLength(0);
 
-    // Un solo deshacer restaura viga + carga (purga = un paso).
+    // Un solo deshacer restaura viga + carga + nudos (purga = un paso).
     modeloStore.getState().deshacer();
     expect(m()).toEqual(conTodo);
+  });
+
+  it("conserva los nudos que otra viga sigue usando (solo purga los huerfanos)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    // Dos vigas que COMPARTEN el nudo n1; cada una tiene ademas un extremo propio.
+    modeloStore.getState().ejecutar(
+      crearViga(m(), { ...datosVigaBase, i: { nudoId: "n1" }, j: { x: 5, y: 0 } }),
+    );
+    modeloStore.getState().ejecutar(
+      crearViga(m(), { ...datosVigaBase, i: { nudoId: "n1" }, j: { x: 0, y: 5 } }),
+    );
+    expect(m().nudos).toHaveLength(3); // n1 + (5,0) + (0,5)
+    const idV1 = m().vigas[0].id;
+
+    // Al borrar la 1.a viga: su extremo propio (5,0) queda huerfano (se purga); n1
+    // sigue en uso por la 2.a viga (se conserva), igual que (0,5).
+    modeloStore.getState().ejecutar(eliminarViga(m(), idV1));
+    expect(m().vigas).toHaveLength(1);
+    expect(m().nudos.map((n) => n.id).sort()).toEqual(
+      [...new Set([m().vigas[0].nudoI, m().vigas[0].nudoJ])].sort(),
+    );
+    expect(m().nudos.some((n) => n.id === "n1")).toBe(true); // compartido: intacto
   });
 
   it("eliminar una viga inexistente no afecta a vigas ni cargas", () => {
@@ -631,6 +658,148 @@ describe("eliminarViga", () => {
     const antes = structuredClone(m());
     modeloStore.getState().ejecutar(eliminarViga(m(), "no-existe"));
     expect(m()).toEqual(antes);
+  });
+});
+
+// --- Comandos de paño losa (F3 corte 1) --------------------------------------
+
+// Perimetro rectangular de 4 esquinas (CCW), como lo emite ColocacionPano.
+const datosPanoBase: Omit<DatosPano, "perimetro"> = {
+  tipo: "losa",
+  plantaId: "p1",
+  espesor: 0.25,
+  materialId: "m1",
+  tamMalla: 0.5,
+  bordeApoyo: "simple",
+};
+const perimetroRect: DatosPano["perimetro"] = [
+  { x: 0, y: 0 },
+  { x: 4, y: 0 },
+  { x: 4, y: 3 },
+  { x: 0, y: 3 },
+];
+
+describe("crearPano", () => {
+  it("crea los 4 nudos del perimetro + el paño en un solo paso de undo", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas()); // tiene g1/p1 y un nudo n1 en (0,0)
+    const previo = structuredClone(m());
+    modeloStore.getState().ejecutar(
+      crearPano(m(), { ...datosPanoBase, perimetro: perimetroRect }),
+    );
+    expect(m().panos).toHaveLength(1);
+    const pano = m().panos[0];
+    expect(pano.nombre).toBe("F1");
+    expect(pano.tipo).toBe("losa");
+    expect(pano.perimetro).toHaveLength(4);
+    // La esquina (0,0) REUSA el nudo n1 preexistente (a <TOL_NODO); las otras 3 son nuevas.
+    expect(pano.perimetro[0]).toBe("n1");
+    // 4 nudos en total: n1 (reusado) + 3 nuevos.
+    expect(m().nudos).toHaveLength(4);
+
+    // Un solo deshacer restaura todo (paño + nudos nuevos).
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(previo);
+    // Rehacer repone el paño con los mismos ids (delta).
+    modeloStore.getState().rehacer();
+    expect(m().panos).toHaveLength(1);
+  });
+
+  it("nombres correlativos por el mayor sufijo en uso (F1, F2...)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    modeloStore.getState().ejecutar(crearPano(m(), { ...datosPanoBase, perimetro: perimetroRect }));
+    modeloStore.getState().ejecutar(
+      crearPano(m(), {
+        ...datosPanoBase,
+        perimetro: [
+          { x: 10, y: 0 },
+          { x: 14, y: 0 },
+          { x: 14, y: 3 },
+          { x: 10, y: 3 },
+        ],
+      }),
+    );
+    expect(m().panos.map((p) => p.nombre)).toEqual(["F1", "F2"]);
+  });
+});
+
+describe("editarPano", () => {
+  it("edita propiedades (espesor/material/malla/borde); deshacer revierte", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    modeloStore.getState().ejecutar(crearPano(m(), { ...datosPanoBase, perimetro: perimetroRect }));
+    const id = m().panos[0].id;
+    modeloStore.getState().ejecutar(
+      editarPano(m(), id, { espesor: 0.3, bordeApoyo: "empotrado" }),
+    );
+    expect(m().panos[0].espesor).toBeCloseTo(0.3, 6);
+    expect(m().panos[0].bordeApoyo).toBe("empotrado");
+    modeloStore.getState().deshacer();
+    expect(m().panos[0].espesor).toBeCloseTo(0.25, 6);
+    expect(m().panos[0].bordeApoyo).toBe("simple");
+  });
+
+  it("paño inexistente -> no-op", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(editarPano(m(), "no-existe", { espesor: 1 }));
+    expect(m()).toEqual(antes);
+  });
+});
+
+describe("eliminarPano (cascada)", () => {
+  it("quita el paño, purga sus cargas superficiales y los nudos huerfanos en un undo", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    modeloStore.getState().ejecutar(crearPano(m(), { ...datosPanoBase, perimetro: perimetroRect }));
+    const panoId = m().panos[0].id;
+    // Carga superficial sobre el paño (cae) + otra sobre otro ambito (sobrevive).
+    modeloStore.getState().cargarModelo({
+      ...m(),
+      cargas: [
+        { id: "cs", tipo: "superficial", ambito: panoId, valor: 5, hipotesisId: "h1" },
+        { id: "cl", tipo: "lineal", ambito: "otro", valor: 3, hipotesisId: "h1" },
+      ],
+      hipotesis: [{ id: "h1", nombre: "G", tipo: "permanente", automatica: false }],
+    });
+    const conTodo = structuredClone(m());
+
+    modeloStore.getState().ejecutar(eliminarPano(m(), panoId));
+    expect(m().panos).toHaveLength(0);
+    expect(m().cargas.map((c) => c.id)).toEqual(["cl"]); // la superficial cae
+    // n1 (reusado por el perimetro) y los 3 nuevos quedan huerfanos -> se purgan.
+    expect(m().nudos).toHaveLength(0);
+
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(conTodo);
+  });
+
+  it("paño inexistente -> no-op", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(eliminarPano(m(), "no-existe"));
+    expect(m()).toEqual(antes);
+  });
+});
+
+describe("guarda eliminarViga <-> paño (dependencia inversa de nudos)", () => {
+  it("eliminarViga NO orfana un nudo que un paño referencia", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    // Una viga del nudo n1 (0,0) a (4,0).
+    modeloStore.getState().ejecutar(
+      crearViga(m(), { ...datosVigaBase, i: { nudoId: "n1" }, j: { x: 4, y: 0 } }),
+    );
+    // Un paño cuyo perimetro incluye (0,0) y (4,0): COMPARTE n1 y el nudo (4,0) con la viga.
+    modeloStore.getState().ejecutar(crearPano(m(), { ...datosPanoBase, perimetro: perimetroRect }));
+    const vigaId = m().vigas[0].id;
+    const nudosAntes = m().nudos.length;
+
+    // Al borrar la viga, sus dos nudos siguen en uso por el paño -> NO se purgan.
+    modeloStore.getState().ejecutar(eliminarViga(m(), vigaId));
+    expect(m().vigas).toHaveLength(0);
+    expect(m().panos).toHaveLength(1);
+    // El paño sigue referenciando sus 4 nudos: ninguno se orfana al borrar la viga.
+    expect(m().nudos).toHaveLength(nudosAntes);
+    for (const nudoId of m().panos[0].perimetro) {
+      expect(m().nudos.some((n) => n.id === nudoId)).toBe(true);
+    }
   });
 });
 

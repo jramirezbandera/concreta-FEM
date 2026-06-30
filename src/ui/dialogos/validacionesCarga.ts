@@ -27,15 +27,15 @@ export interface DatosCargaUI {
   hipotesisId: string;
 }
 
-// Conjunto de ids de elementos sobre los que puede actuar una carga en F1: viga,
-// pilar o nudo. Mismo criterio que el discretizador (validarRefsCarga), salvo paños
-// (F3): una carga superficial sobre paño se atrapa aparte con `avisoSuperficial`,
-// porque en F1 aun no se calcula (el discretizador la bloquea con PANO_NO_SOPORTADO).
+// Conjunto de ids de elementos sobre los que puede actuar una carga: viga, pilar, nudo
+// o PAÑO (F3: la carga superficial recae sobre un paño losa, que el discretizador ya
+// malla y calcula). Mismo criterio que el discretizador (validarRefsCarga).
 function ambitoExiste(modelo: Modelo, ambito: string): boolean {
   return (
     modelo.vigas.some((v) => v.id === ambito) ||
     modelo.pilares.some((p) => p.id === ambito) ||
-    modelo.nudos.some((n) => n.id === ambito)
+    modelo.nudos.some((n) => n.id === ambito) ||
+    modelo.panos.some((pa) => pa.id === ambito)
   );
 }
 
@@ -84,17 +84,14 @@ export function validarCarga(
   return errores;
 }
 
-// DECISION (aviso de carga superficial): NO se modela como un ErrorCampo dentro de
-// `validarCarga`, porque `esValido` trata cualquier ErrorCampo como bloqueante y el
-// aviso de superficial NO debe impedir editar/guardar la carga (solo advertir de que
-// no se calculara en F1). Se expone aparte, como un ErrorCampo informativo opcional,
-// replicando la separacion del discretizador entre `errores` (bloqueantes) y `avisos`
-// (no bloqueantes). La UI lo muestra como nota junto al campo "tipo" sin deshabilitar
-// el guardado; al calcular, el discretizador es quien bloquea (PANO_NO_SOPORTADO).
-export function avisoSuperficial(datos: DatosCargaUI): ErrorCampo | null {
-  if (datos.tipo !== "superficial") return null;
-  return {
-    campo: "tipo",
-    mensaje: "Las cargas de superficie (paños) aún no se calculan en esta fase.",
-  };
+// DECISION (aviso de carga superficial): en F1 la carga superficial sobre paño NO se
+// calculaba (el discretizador la bloqueaba con PANO_NO_SOPORTADO) y este aviso lo
+// advertia. En F3 corte 1 la LOSA ya se malla y calcula, asi que la carga superficial
+// sobre un paño losa SI se computa: este aviso ya NO aplica al caso losa. Se conserva
+// el helper (devuelve null en F3: ningun caso superficial pendiente) por si reaparece
+// un tipo de paño aun no soportado (reticular/unidireccional), que el discretizador
+// rechaza con su propio error de obra; en ese caso la guia vive en la entrada del paño,
+// no aqui. Sin consumidor de produccion hoy.
+export function avisoSuperficial(_datos: DatosCargaUI): ErrorCampo | null {
+  return null;
 }

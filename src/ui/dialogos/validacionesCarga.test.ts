@@ -109,11 +109,10 @@ describe("avisoSuperficial", () => {
     expect(avisoSuperficial(datosOK({ tipo: "puntual" }))).toBeNull();
   });
 
-  it("devuelve un aviso (no bloqueante) para cargas superficiales", () => {
-    const aviso = avisoSuperficial(datosOK({ tipo: "superficial" }));
-    expect(aviso).not.toBeNull();
-    expect(aviso?.campo).toBe("tipo");
-    expect(aviso?.mensaje).toContain("aún no se calculan");
+  it("ya NO avisa para cargas superficiales (F3: la losa se calcula)", () => {
+    // En F1 la carga superficial sobre paño no se calculaba y este aviso advertia. En
+    // F3 corte 1 la losa ya se malla y calcula, asi que el caso losa ya no genera aviso.
+    expect(avisoSuperficial(datosOK({ tipo: "superficial" }))).toBeNull();
   });
 
   it("una carga superficial NO es bloqueante en validarCarga (solo el aviso advierte)", () => {

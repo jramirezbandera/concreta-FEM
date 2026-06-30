@@ -20,11 +20,12 @@
 import type {
   Modelo,
   Pilar,
+  Pano,
   Carga,
   Hipotesis,
   Planta,
 } from "../dominio";
-import { plantaPorId, nudoPorId, seccionPorId, hipotesisAutomatica } from "../dominio";
+import { plantaPorId, nudoPorId, hipotesisAutomatica } from "../dominio";
 import { getMaterial } from "../biblioteca";
 import {
   ModeloFEMSchema,
@@ -34,12 +35,15 @@ import {
   type SeccionFEM,
   type MiembroFEM,
   type ApoyoFEM,
+  type QuadFEM,
   type CargaNodoFEM,
   type CargaDistFEM,
   type CargaPuntualFEM,
+  type CargaQuadFEM,
   type AnalisisFEM,
   type Trazabilidad,
 } from "./contratoFEM";
+import { mallarPano, type PuntoPlano } from "./mallado";
 import { validarModelo, type ErrorObra, type ContextoModal } from "./validaciones";
 import { generarCombos } from "./combinaciones";
 // resolverSeccion y las propiedades de barra viven en el modulo hoja
@@ -47,6 +51,7 @@ import { generarCombos } from "./combinaciones";
 // re-exporta resolverSeccion para no romper imports existentes (index.ts, tests).
 import {
   resolverSeccion,
+  resolverSeccionFEMPorId,
   propiedadesDePilar,
   propiedadesDeViga,
 } from "./propiedadesBarra";
@@ -197,9 +202,11 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
   const sections: SeccionFEM[] = [...seccionIds]
     .sort()
     .map((id) => {
-      const s = seccionPorId(modelo, id);
+      // Resuelve por id desde la obra O el catalogo de perfiles (misma regla que las
+      // validaciones de UI): un perfil de catalogo referenciado por id es valido.
+      const s = resolverSeccionFEMPorId(modelo, id);
       if (s === undefined) throw new Error(`Seccion inexistente tras validar: ${id}`);
-      return resolverSeccion(s);
+      return s;
     });
 
   // --- Paso 2: nodos por snapping determinista --------------------------------
@@ -505,12 +512,20 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
     nodoFEMAPlanta[nombre] = plantaId!;
   }
 
+  // La trazabilidad de la BASE NO conoce paños (3A: la malla se añade en `discretizar`,
+  // DESPUES de `construirBaseFEM`, para que el CR no la vea). Los campos de procedencia
+  // de malla nacen vacios aqui; `discretizar` los rellena al mallar los paños.
   const trazabilidad: Trazabilidad = {
     pilarAMembers,
     vigaAMember,
     pilarANodoArranque,
     nudoANodo,
     nodoFEMAPlanta,
+    panoAQuads: {},
+    quadAPano: {},
+    quadANodos: {},
+    nodosDeMalla: [],
+    apoyosDeMalla: [],
   };
 
   return {
@@ -586,6 +601,16 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   // futura que aporte posicion; aqui se emite siempre vacio.
   const pt_loads: CargaPuntualFEM[] = [];
 
+  // Cargas de presion superficial sobre PAÑOS, recolectadas en el Paso 6 y consumidas
+  // por el Paso de paños (mas abajo): { panoId, presion (con signo), case }. La presion
+  // se reparte a TODOS los quads del paño (presion uniforme por quad). Se separa del
+  // bucle de cargas porque el reparto necesita la malla, que se genera despues de los
+  // combos. Determinista: se rellena recorriendo `cargasOrdenadas` (por id).
+  type PresionPano = { panoId: string; presion: number; case: string };
+  const presionesPorPano: PresionPano[] = [];
+  // Indice de paños por id para clasificar el ambito de una carga superficial.
+  const panoById = new Map<string, Pano>(modelo.panos.map((pano) => [pano.id, pano]));
+
   const hipById = new Map<string, Hipotesis>(modelo.hipotesis.map((h) => [h.id, h]));
   // `localizarNodoDeNudo` viene de la base (Pasos 1-5): mismo desempate documentado
   // (primera viga por id) que usa la trazabilidad. Se consume aqui para las cargas
@@ -606,15 +631,26 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     const caseName = c.hipotesisId;
 
     if (c.tipo === "superficial") {
-      // Paños (reparto de areas tributarias) son F3; en F1 no se traduce. BLOQUEA:
-      // descartarla silenciosamente daria un calculo con menos carga de la real.
-      erroresTraduccion.push({
-        codigo: "PANO_NO_SOPORTADO",
-        severidad: "error",
-        mensaje: `Las cargas de superficie (paños) aún no se calculan en esta fase.`,
-        elementoId: c.id,
-        elementoTipo: "carga",
-      });
+      // F3: una carga superficial sobre un PAÑO LOSA SE TRADUCE a presion en sus quads
+      // (ya no bloquea: el bloqueo PANO_NO_SOPORTADO de F1 se levanta aqui). El reparto
+      // a los quads ocurre en el Paso de paños (necesita la malla). SIGNO: la presion de
+      // quad NO usa `valor` (que lleva el signo FY-negativo de las barras): con el orden
+      // de nudos i→j→m→n CCW una presion POSITIVA empuja hacia ABAJO (gravedad), opuesto
+      // a la convencion de barras. Se emite POSITIVA = magnitud de la carga gravitatoria.
+      const pano = panoById.get(c.ambito);
+      if (pano === undefined) {
+        // Carga superficial sobre algo que NO es un paño (p.ej. una viga): no aplicable.
+        // BLOQUEA: ignorarla quitaria carga real del calculo sin avisar.
+        erroresTraduccion.push({
+          codigo: "CARGA_NO_APLICABLE",
+          severidad: "error",
+          mensaje: `Una carga de superficie está aplicada sobre un elemento que no es un paño.`,
+          elementoId: c.id,
+          elementoTipo: "carga",
+        });
+        continue;
+      }
+      presionesPorPano.push({ panoId: pano.id, presion: Math.abs(c.valor), case: caseName });
       continue;
     }
 
@@ -728,6 +764,175 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     }
   }
 
+  // --- Paso 6c: paños LOSA (F3, mallado AISLADO) ------------------------------
+  // DESPUES de `construirBaseFEM` (decision 3A): la malla NO entra en la base, de modo
+  // que el centro de rigidez (que reusa `construirBaseFEM` via `prepararModeloCR`) NO ve
+  // los quads. Por cada paño tipo "losa" se malla (mallado.ts, AISLADO: nudos PROPIOS,
+  // sin snapping al portico), y se acumulan en arrays SEPARADOS: nudos de malla, quads,
+  // apoyos de borde + estabilizacion, y cargas de presion (superficial de usuario +
+  // peso propio de la losa). Solo se emiten en la Capa 2 SI hay quads (regresion: un
+  // portico de barras no lleva claves quads/quad_loads). Determinista: paños ordenados
+  // por id; cada paño numera sus nudos/quads con un prefijo propio (PQ<idx>).
+  //
+  // Las validaciones previas (validarRefsPano) ya garantizaron tipo "losa", material/
+  // planta/nudos validos, tamMalla>0 y geometria rectangular: aqui el mallado no puede
+  // fallar por obra (un { ok:false } seria un bug interno, se deja propagar como throw).
+  const meshNodes: NodoFEM[] = [];
+  const quads: QuadFEM[] = [];
+  const meshSupportsPorNodo = new Map<string, ApoyoFEM>();
+  const quad_loads: CargaQuadFEM[] = [];
+  const panoAQuads: Record<string, string[]> = {};
+  const quadAPano: Record<string, string> = {};
+  const quadANodos: Record<string, [string, string, string, string]> = {};
+  const nodosDeMalla: string[] = [];
+  const apoyosDeMalla = new Set<string>();
+  const avisosPano: ErrorObra[] = [];
+  // Materiales de paños que el portico NO referencia: deben anadirse a `materials`
+  // (PyNite resuelve el material del quad por nombre). El espesor va en el quad (`t`),
+  // no en una SeccionFEM (que es 1D), asi que NO se anaden secciones por paño.
+  const materialIdsPano = new Set<string>();
+
+  // Paños ordenados por id: el indice posicional fija el prefijo de nombres (PQ<idx>),
+  // independiente del orden de entrada (determinismo byte a byte, CLAUDE.md §7).
+  const panosOrdenados = [...modelo.panos].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
+  // Presiones de usuario agrupadas por paño (mantienen el orden de cargasOrdenadas).
+  const presionesDePano = (panoId: string): PresionPano[] =>
+    presionesPorPano.filter((pp) => pp.panoId === panoId);
+  // Hipotesis automatica (peso propio): mismo `case` que el peso propio de barras.
+  const casePesoPropioPano =
+    modelo.analisis.incluirPesoPropio ? hipotesisAutomatica(modelo)!.id : undefined;
+
+  panosOrdenados.forEach((pano, indicePano) => {
+    if (pano.tipo !== "losa") return; // reticular/unidireccional ya bloqueados en validaciones
+    materialIdsPano.add(pano.materialId);
+    const planta = plantaPorId(modelo, pano.plantaId) as Planta;
+    const puntos: PuntoPlano[] = pano.perimetro.map((nudoId) => {
+      const n = nudoPorId(modelo, nudoId)!;
+      return { x: n.x, y: n.y };
+    });
+    const res = mallarPano({
+      perimetro: puntos as [PuntoPlano, PuntoPlano, PuntoPlano, PuntoPlano],
+      cota: planta.cota,
+      tamMalla: pano.tamMalla,
+      indicePano,
+    });
+    if (!res.ok) {
+      // Bug interno: las validaciones previas garantizan geometria mallable. Propaga.
+      throw new Error(`Mallado de paño fallo tras validar: ${pano.id} (${res.error.codigo})`);
+    }
+    const malla = res.malla;
+
+    // Aviso de cap (4A): si el mallado engroso la malla para respetar el limite de quads.
+    if (malla.capAplicado) {
+      avisosPano.push({
+        codigo: "PANO_MALLA_LIMITADA",
+        severidad: "aviso",
+        mensaje: `El paño "${pano.nombre}" se ha mallado con elementos más grandes de lo pedido para no exceder el límite de cálculo.`,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+    }
+
+    // Nudos PROPIOS del paño -> nodes (y marca de procedencia para la UI).
+    for (const nd of malla.nodos) {
+      meshNodes.push({ name: nd.name, x: nd.x, y: nd.y, z: nd.z });
+      nodosDeMalla.push(nd.name);
+    }
+
+    // Quads + trazabilidad (panoAQuads / quadAPano / quadANodos).
+    const quadNames: string[] = [];
+    for (const q of malla.quads) {
+      quads.push({
+        name: q.name,
+        i: q.i,
+        j: q.j,
+        m: q.m,
+        n: q.n,
+        t: pano.espesor,
+        material: pano.materialId,
+      });
+      quadNames.push(q.name);
+      quadAPano[q.name] = pano.id;
+      quadANodos[q.name] = [q.i, q.j, q.m, q.n];
+    }
+    panoAQuads[pano.id] = quadNames;
+
+    // Apoyos de borde segun bordeApoyo (propiedad de OBRA, no jerga FEM):
+    //   simple    -> DY (impide la flecha vertical): losa simplemente apoyada.
+    //   empotrado -> DY + giros de placa (RX,RZ, en el plano horizontal): encastre.
+    //                NO se restringe RY (giro alrededor de la vertical): es el GDL
+    //                "drilling" del quad, sin rigidez fisica; restringirlo no aporta.
+    //   libre     -> sin apoyo de borde (voladizo / apoyado en otros bordes).
+    const acumularApoyo = (node: string, gdl: Partial<ApoyoFEM>): void => {
+      const previo = meshSupportsPorNodo.get(node);
+      const base0: ApoyoFEM = previo ?? {
+        node,
+        DX: false,
+        DY: false,
+        DZ: false,
+        RX: false,
+        RY: false,
+        RZ: false,
+      };
+      meshSupportsPorNodo.set(node, {
+        node,
+        DX: base0.DX || gdl.DX === true,
+        DY: base0.DY || gdl.DY === true,
+        DZ: base0.DZ || gdl.DZ === true,
+        RX: base0.RX || gdl.RX === true,
+        RY: base0.RY || gdl.RY === true,
+        RZ: base0.RZ || gdl.RZ === true,
+      });
+      apoyosDeMalla.add(node);
+    };
+    if (pano.bordeApoyo !== "libre") {
+      for (const node of malla.nodosBorde) {
+        if (pano.bordeApoyo === "empotrado") {
+          acumularApoyo(node, { DY: true, RX: true, RZ: true });
+        } else {
+          acumularApoyo(node, { DY: true }); // simple
+        }
+      }
+    }
+    // Estabilizacion en el plano (anti-singular): DX/DZ en 2 nudos NO colineales del
+    // borde. SIEMPRE (independiente de bordeApoyo): una losa apoyada solo en vertical
+    // tiene 3 modos de cuerpo rigido en el plano X-Z (la matriz seria singular). NO
+    // contamina la flexion (no toca DY ni RX/RZ). Acumula sobre el apoyo de borde del
+    // mismo nudo si lo hubiera.
+    for (const e of malla.estabilizacion) {
+      acumularApoyo(e.node, { DX: e.DX, DZ: e.DZ });
+    }
+
+    // Cargas de presion del paño -> quad_loads (presion uniforme repartida a TODOS sus
+    // quads). Orden determinista: por carga (presionesDePano respeta cargasOrdenadas) y
+    // dentro de cada carga por quad (orden del mallado). Peso propio al final.
+    for (const pp of presionesDePano(pano.id)) {
+      for (const q of malla.quads) {
+        quad_loads.push({ quad: q.name, presion: pp.presion, case: pp.case });
+      }
+    }
+    // Peso propio de la losa (F2a, espejo del peso propio de barras): presion ρ·t
+    // (kN/m²) hacia ABAJO en la hipotesis automatica. ρ = peso especifico del material
+    // (kN/m³), t = espesor (m). SIGNO: la presion de quad sigue la convencion OPUESTA a
+    // la FY de barras (alli gravedad = FY negativa); con el orden de nudos i→j→m→n CCW,
+    // una presion POSITIVA empuja la placa hacia ABAJO (verificado contra el motor real:
+    // presion +q → DY_centro < 0). Por eso el peso propio es +ρ·t, NO −ρ·t.
+    if (casePesoPropioPano !== undefined) {
+      const material = getMaterial(pano.materialId);
+      if (material === undefined) {
+        throw new Error(`Material de paño inexistente tras validar: ${pano.materialId}`);
+      }
+      const presionPP = material.peso * pano.espesor; // ρ·t, POSITIVA = hacia abajo
+      for (const q of malla.quads) {
+        quad_loads.push({ quad: q.name, presion: presionPP, case: casePesoPropioPano });
+      }
+    }
+  });
+
+  avisos.push(...avisosPano);
+
   // --- Paso 7: combinaciones (delegado a ./combinaciones) ----------------------
   // ELU persistente = 1,35·permanentes + 1,50·variables; ELS caracteristica =
   // 1,00·todas. Los coeficientes gamma provienen de la biblioteca (CTE DB-SE Tabla
@@ -778,24 +983,71 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     return { ok: false, errores: erroresTraduccion };
   }
 
-  // --- Trazabilidad (campo aditivo): la construye `construirBaseFEM` (Pasos 1-5),
-  // independiente de las cargas. Se reusa tal cual (pilarAMembers/vigaAMember +
-  // pilarANodoArranque/nudoANodo + nodoFEMAPlanta). PURA y determinista.
-  const trazabilidad: Trazabilidad = base.trazabilidad;
+  // --- Trazabilidad (campo aditivo): la base la construye `construirBaseFEM` (Pasos
+  // 1-5), independiente de las cargas. Aqui se COMPLETA con la procedencia de la malla
+  // de paños (2A): panoAQuads/quadAPano/quadANodos + nodosDeMalla/apoyosDeMalla, que la
+  // base dejo vacios (la malla nace en este Paso 6c, fuera de la base). PURA y
+  // determinista. `apoyosDeMalla` se ordena para una salida estable.
+  const trazabilidad: Trazabilidad = {
+    ...base.trazabilidad,
+    panoAQuads,
+    quadAPano,
+    quadANodos,
+    nodosDeMalla,
+    apoyosDeMalla: [...apoyosDeMalla].sort(),
+  };
+
+  // Nudos y apoyos finales: primero los ESTRUCTURALES (portico, ya ordenados de forma
+  // determinista por construirBaseFEM) y DESPUES los de la MALLA de paños (en su orden
+  // determinista: paño por id, nudos del mallado). Asi un modelo SIN paños produce
+  // exactamente los mismos `nodes`/`supports` que antes (regresion byte-a-byte) y la
+  // malla queda claramente segregada al final.
+  // Materiales finales: los del portico (base) MAS los de paños que no estuvieran ya
+  // referenciados por barras (PyNite resuelve el material del quad por nombre, asi que
+  // debe existir en `materials`). Determinista: se anaden por orden alfabetico de id,
+  // detras de los del portico, sin duplicar. Si no hay material de paño nuevo, es el
+  // mismo array que antes (regresion byte-a-byte de la Capa 2 de un portico).
+  const materialIdsBase = new Set(materials.map((m) => m.name));
+  const materialesPanoNuevos: MaterialFEM[] = [...materialIdsPano]
+    .filter((id) => !materialIdsBase.has(id))
+    .sort()
+    .map((id) => {
+      const m = materialFEM(id);
+      if (m === undefined) throw new Error(`Material de paño inexistente tras validar: ${id}`);
+      return m;
+    });
+  const materialsFinal: MaterialFEM[] =
+    materialesPanoNuevos.length > 0 ? [...materials, ...materialesPanoNuevos] : materials;
+
+  const nodesFinal: NodoFEM[] = meshNodes.length > 0 ? [...nodes, ...meshNodes] : nodes;
+  const meshSupports = [...meshSupportsPorNodo.values()].sort((a, b) =>
+    a.node < b.node ? -1 : a.node > b.node ? 1 : 0,
+  );
+  const supportsFinal: ApoyoFEM[] =
+    meshSupports.length > 0 ? [...supports, ...meshSupports] : supports;
 
   const modeloFEM: ModeloFEM = {
     units: "kN-m",
-    nodes,
-    materials,
+    nodes: nodesFinal,
+    materials: materialsFinal,
     sections,
     members,
-    supports,
+    supports: supportsFinal,
     node_loads,
     dist_loads,
     pt_loads,
     combos,
     analysis,
   };
+  // quads / quad_loads SOLO si hay paños (decision: claves OPCIONALES). Un portico de
+  // barras NO lleva esas claves -> Capa 2 byte-identica a antes (regresion). Los
+  // consumidores leen `quads ?? []`.
+  if (quads.length > 0) {
+    modeloFEM.quads = quads;
+  }
+  if (quad_loads.length > 0) {
+    modeloFEM.quad_loads = quad_loads;
+  }
 
   // --- Paso 9: validacion de salida -------------------------------------------
   // Si esto lanza, es un BUG INTERNO del discretizador (no un error de obra): la

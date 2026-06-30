@@ -6,12 +6,20 @@
 // diagramaLazy.ts y solo lo consume PanelDiagramas (aislamiento de Plotly, #21).
 export { DeformadaOverlay } from "./DeformadaOverlay";
 export { LeyendaEscala } from "./LeyendaEscala";
+export { LeyendaRampa } from "./LeyendaRampa";
 export { PanelDiagramas } from "./PanelDiagramas";
 export { TablaReacciones } from "./TablaReacciones";
 export { ComboSelector } from "./ComboSelector";
 export { BotonCalcular } from "./BotonCalcular";
 export { useCalcular, usePrecargaMotor, calcularObra } from "./useCalcular";
 export type { UseCalcular, ErrorCalculo, CalculoSink } from "./useCalcular";
+
+// --- Isovalores (F3 corte 1, losa maciza) ------------------------------------
+// Overlay del mapa de color de la losa (sceneOverlay) + panel con selector de magnitud y
+// leyenda (hudOverlay). Los monta App.tsx en la pestana Isovalores. Solo se muestran si
+// hay resultados de placa (quads) para la combinacion activa.
+export { IsovaloresOverlay } from "./IsovaloresOverlay";
+export { PanelIsovalores } from "./PanelIsovalores";
 
 // --- Analisis modal (F2b) ----------------------------------------------------
 // Overlay de la forma modal (sceneOverlay), panel de frecuencias (hudOverlay) y la

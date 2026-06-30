@@ -81,6 +81,11 @@ function trazabilidadMinima(): Trazabilidad {
     pilarANodoArranque: {},
     nudoANodo: {},
     nodoFEMAPlanta: {},
+    panoAQuads: {},
+    quadAPano: {},
+    quadANodos: {},
+    nodosDeMalla: [],
+    apoyosDeMalla: [],
   };
 }
 

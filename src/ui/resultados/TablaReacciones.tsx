@@ -16,6 +16,16 @@ import "./tablaReacciones.css";
 // id FEM del nodo ("N3"). Si un apoyo no corresponde a ningun pilar, etiqueta
 // neutra ("Apoyo") sin exponer el nombre tecnico.
 //
+// FILTRADO POR PROCEDENCIA DE MALLA (F2.4, decision 2A): una losa genera DECENAS o
+// CENTENARES de apoyos de borde (uno por nudo de malla del perimetro apoyado). Si se
+// listaran uno a uno, inundarian la tabla y ahogarian los pilares (el dato que el
+// arquitecto busca). Por eso los apoyos PROCEDENTES de la malla (trazabilidad.apoyosDeMalla)
+// NO se listan individualmente: se AGREGAN en una unica fila resumen "Losa (borde)" con la
+// SUMA de sus reacciones. Asi introducir una losa no degrada la vista de reacciones del
+// portico. (El mapeo apoyo->paño concreto se difiere: una fila por losa exigiria cruzar
+// panoAQuads/quadANodos; una sola fila agregada basta para no inundar y mantiene el ΣFY
+// total correcto.)
+//
 // UNIDADES (CLAUDE.md §14): las reacciones ya vienen en el sistema interno
 // (FX/FY/FZ en kN, MX/MY/MZ en kN·m). Se muestran TAL CUAL con su unidad en la
 // cabecera; no hay conversion aqui (no es un borde de entrada/salida con cambio
@@ -108,10 +118,15 @@ export function TablaReacciones() {
     );
   }
 
-  // Filas = apoyos del modelo de calculo. Para cada uno, la reaccion del combo
-  // activo; si el nodo no tiene resultado (no deberia: un apoyo siempre reacciona),
-  // se omite la fila silenciosamente en vez de mostrar ceros falsos.
+  // Conjunto de nudos cuyo apoyo PROCEDE de la malla de un paño (F2.4): se AGREGAN, no se
+  // listan uno a uno. Vacio en un portico sin losa (la tabla queda identica a antes).
+  const apoyosDeMalla = new Set(trazabilidad?.apoyosDeMalla ?? []);
+
+  // Filas individuales = apoyos ESTRUCTURALES del modelo (pilares); los de malla se
+  // excluyen aqui y se agregan abajo. Para cada uno, la reaccion del combo activo; si el
+  // nodo no tiene resultado (no deberia: un apoyo siempre reacciona), se omite la fila.
   const filas = modeloFEM.supports
+    .filter((apoyo) => !apoyosDeMalla.has(apoyo.node))
     .map((apoyo) => {
       const rxn = resultados.nodos[apoyo.node]?.[combo]?.rxn;
       if (!rxn) return null;
@@ -123,9 +138,29 @@ export function TablaReacciones() {
     })
     .filter((f): f is { node: string; etiqueta: string; rxn: number[] } => f !== null);
 
-  // Suma de reacciones verticales (ΣFY): ayuda de lectura para verificar equilibrio
-  // (debe igualar la carga vertical total). Index 1 = FY (vertical del sistema).
-  const sumaFY = filas.reduce((acc, f) => acc + (f.rxn[1] ?? 0), 0);
+  // Agregado de los apoyos de borde de la losa (F2.4): una sola fila con la SUMA de las
+  // reacciones de todos los nudos de malla apoyados. `null` si no hay losa (no se pinta la
+  // fila). Recorre las 6 componentes para sumar fuerzas y momentos por igual.
+  let filaMalla: { etiqueta: string; rxn: number[] } | null = null;
+  if (apoyosDeMalla.size > 0) {
+    const suma = [0, 0, 0, 0, 0, 0];
+    let conReaccion = false;
+    for (const apoyo of modeloFEM.supports) {
+      if (!apoyosDeMalla.has(apoyo.node)) continue;
+      const rxn = resultados.nodos[apoyo.node]?.[combo]?.rxn;
+      if (!rxn) continue;
+      conReaccion = true;
+      for (let c = 0; c < 6; c++) suma[c]! += rxn[c] ?? 0;
+    }
+    if (conReaccion) filaMalla = { etiqueta: "Losa (borde)", rxn: suma };
+  }
+
+  // Suma de reacciones verticales (ΣFY): ayuda de lectura para verificar equilibrio (debe
+  // igualar la carga vertical total). Incluye el agregado de la losa, asi el total cierra
+  // aunque las reacciones de borde no se listen una a una. Index 1 = FY (vertical).
+  const sumaFY =
+    filas.reduce((acc, f) => acc + (f.rxn[1] ?? 0), 0) +
+    (filaMalla ? (filaMalla.rxn[1] ?? 0) : 0);
 
   return (
     <PanelFlotante
@@ -142,7 +177,7 @@ export function TablaReacciones() {
         </p>
       )}
 
-      {filas.length === 0 ? (
+      {filas.length === 0 && filaMalla === null ? (
         <p className="cx-reacciones__vacio">No hay apoyos con reacción que mostrar.</p>
       ) : (
         <div className="cx-reacciones__scroll">
@@ -176,6 +211,20 @@ export function TablaReacciones() {
                   ))}
                 </tr>
               ))}
+              {/* Fila AGREGADA de los apoyos de borde de la losa (F2.4): una sola fila con
+                  la suma, en vez de inundar la tabla con un apoyo por nudo de malla. */}
+              {filaMalla && (
+                <tr className="cx-reacciones__agregado">
+                  <th scope="row" className="cx-reacciones__td-apoyo">
+                    {filaMalla.etiqueta}
+                  </th>
+                  {COLUMNAS.map((c) => (
+                    <td key={c.etiqueta} className="cx-reacciones__td-num mono">
+                      {fmt(filaMalla!.rxn[c.indice] ?? 0)}
+                    </td>
+                  ))}
+                </tr>
+              )}
             </tbody>
             <tfoot>
               {/* Resumen de equilibrio: suma de reacciones verticales (ΣFY). El valor
