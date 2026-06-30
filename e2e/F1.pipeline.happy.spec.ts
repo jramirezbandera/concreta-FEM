@@ -149,11 +149,11 @@ test("F1 happy: obra -> Calcular (boton) -> deformada + diagramas + reacciones",
     name: /^(Calcular|Calculando…|Reintentar|Cargando motor…)$/,
   });
   await expect(botonCalcular).toBeEnabled(); // el mock reporta el motor "listo"
-  // .click() real: tras el refactor de zonas del HUD (feature-17), BotonCalcular esta
-  // en la zona top-center y el control de plantas del GroupRibbon en top-left, asi que
-  // ya no se solapan en el layout glass y el hit-test del click aterriza limpio sobre
-  // el boton (antes un panel flotante interceptaba el puntero y obligaba a dispatchEvent
-  // para esquivar el z-order).
+  // .click() real: tras el refactor "dock de paneles" (PR1), BotonCalcular vive en la
+  // region DOCK acoplada del Shell (<aside "Panel de datos">), que empuja el lienzo en
+  // vez de flotar sobre el, asi que ya no hay capa glass del HUD encima y el hit-test
+  // del click aterriza limpio sobre el boton (antes un panel flotante interceptaba el
+  // puntero y obligaba a dispatchEvent para esquivar el z-order).
   await botonCalcular.click();
 
   // ESTADO TRANSITORIO (D5): el mock deja calcular() PENDIENTE hasta resolver(). El

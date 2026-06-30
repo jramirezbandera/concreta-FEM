@@ -24,9 +24,9 @@ import {
 // sin breakpoints responsive. No implementar layouts moviles.
 //
 // LANDMARKS ARIA: <header> (Brandbar) · <nav> (Menubar) · <aside> (Sidebar) ·
-// <main> (work canvas, aqui) · <footer> (StatusBar). Las solapas inferiores son
-// un tablist Radix (role=tablist), no un landmark de navegacion: evitamos asi
-// duplicar el <nav> de la menubar.
+// <main> (work canvas, aqui) · <aside> (dock de datos) · <footer> (StatusBar). Las
+// solapas inferiores son un tablist Radix (role=tablist), no un landmark de
+// navegacion: evitamos asi duplicar el <nav> de la menubar.
 
 export interface ShellProps {
   /** Contenido del work canvas (el <Viewport/> lo inyecta la Fase 2). */
@@ -35,9 +35,16 @@ export interface ShellProps {
   nombreObra?: string;
   /** Estado de la barra de estado: mensaje, coords, escala, snap. */
   status?: StatusBarProps;
+  /**
+   * Dock de paneles de DATOS (refactor "dock de paneles", PR1): region acoplada al
+   * borde derecho de la ventana que EMPUJA el lienzo (no flota sobre el). La compone
+   * App.tsx por pestana (inspector, herramienta, reacciones, diagramas, plantillas…).
+   * Si no hay contenido, la region NO se renderiza (el lienzo ocupa todo el ancho).
+   */
+  dock?: ReactNode;
 }
 
-export function Shell({ children, nombreObra, status }: ShellProps) {
+export function Shell({ children, nombreObra, status, dock }: ShellProps) {
   return (
     <div className="cx-app">
       <Brandbar nombreObra={nombreObra} />
@@ -53,6 +60,14 @@ export function Shell({ children, nombreObra, status }: ShellProps) {
           )}
         </main>
         <ToolsRail />
+        {/* Dock al borde de ventana (tools queda pegado al lienzo). Solo se monta si
+            App compuso contenido para la pestana activa: las pestanas sin paneles de
+            datos dejan el lienzo a ancho completo. */}
+        {dock != null && dock !== false && (
+          <aside className="cx-dock" aria-label="Panel de datos">
+            {dock}
+          </aside>
+        )}
       </div>
 
       <StatusBar {...status} />

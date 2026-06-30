@@ -195,11 +195,12 @@ test("editar la obra tras calcular deja los resultados OBSOLETOS pero PRESENTES 
   // de la brandbar (que tras feature-17 tambien dispara el calculo via calculoStore).
   const botonCalcular = page.getByRole("button", { name: "Calcular", exact: true });
   await expect(botonCalcular).toBeEnabled();
-  // Disparamos con .click() real: tras el refactor de zonas del HUD (feature-17),
-  // BotonCalcular (zona top-center) y el gizmo de navegacion de plantas del
-  // GroupRibbon (zona top-left) ya no se solapan, asi que el hit-test del click
-  // aterriza limpio sobre el boton (antes el gizmo lo interceptaba por z-order y
-  // obligaba a dispatchEvent). Calculamos por el BOTON por claridad/aislamiento.
+  // Disparamos con .click() real: tras el refactor "dock de paneles" (PR1),
+  // BotonCalcular vive en la region DOCK acoplada del Shell (<aside "Panel de datos">),
+  // que empuja el lienzo en vez de flotar sobre el, asi que ya no hay capa glass del HUD
+  // encima y el hit-test del click aterriza limpio sobre el boton (antes el gizmo del
+  // GroupRibbon lo interceptaba por z-order y obligaba a dispatchEvent). Calculamos por
+  // el BOTON por claridad/aislamiento.
   await botonCalcular.click();
 
   // El mock deja la promesa PENDIENTE: el boton pasa a "Calculando…" / aria-busy.

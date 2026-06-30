@@ -45,11 +45,12 @@ async function irAResultados(page: Page): Promise<void> {
 }
 
 // Pulsa el boton "Calcular" del panel de Calculo con un .click() real. Tras el
-// refactor de zonas del HUD (feature-17), BotonCalcular vive en la zona top-center
-// y el control de plantas del GroupRibbon en top-left: ya NO se solapan, asi que el
-// hit-test del click aterriza limpio sobre "Calcular" (antes un boton vecino del HUD
-// cubria la zona de impacto y obligaba a usar dispatchEvent para esquivar el z-order).
-// El objetivo del test es el corte de validacion + el contador del motor.
+// refactor "dock de paneles" (PR1), BotonCalcular vive en la region DOCK acoplada del
+// Shell (<aside "Panel de datos">), que empuja el lienzo en vez de flotar sobre el: ya
+// no hay capa glass del HUD encima del boton, asi que el hit-test del click aterriza
+// limpio sobre "Calcular" (antes un control vecino del HUD cubria la zona de impacto y
+// obligaba a usar dispatchEvent para esquivar el z-order). El objetivo del test es el
+// corte de validacion + el contador del motor.
 async function pulsarCalcular(panel: Locator): Promise<void> {
   await panel.getByRole("button", { name: "Calcular" }).click();
 }

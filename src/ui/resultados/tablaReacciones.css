@@ -4,11 +4,16 @@
    abajo-derecha del lienzo de Resultados; el llamante (App.tsx, Tarea 3.1) puede
    sobrescribir con otra clase. Solo tokens. */
 
+/* Ancho del panel en GLASS (sobre el lienzo). En el DOCK lo sobreescribe
+   `.cx-dock .cx-dock-sec { width:100% }` (PR2): la tabla llena el ancho del dock y, si
+   sus 7 columnas no caben, scrollea HORIZONTAL dentro de .cx-reacciones__scroll (no del
+   dock entero). */
 .cx-reacciones {
   width: 380px;
 }
 
-.cx-reacciones .cx-float__body {
+.cx-reacciones .cx-float__body,
+.cx-reacciones .cx-dock-sec__body {
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 8px);
@@ -35,13 +40,19 @@
   color: var(--warning);
 }
 
-/* Scroll vertical acotado: con muchos apoyos la tabla no desborda el lienzo. */
+/* Scroll acotado de la tabla: VERTICAL (muchos apoyos) y HORIZONTAL (7 columnas en un
+   dock estrecho). El scroll horizontal vive AQUI, en la seccion de la tabla, no en el
+   dock entero (regla del PR2: el dock nunca scrollea en horizontal). */
 .cx-reacciones__scroll {
   max-height: 280px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 
 .cx-reacciones__tabla {
+  /* min-width: la tabla no se comprime por debajo de lo legible; si no cabe, su wrapper
+     (__scroll) la scrollea en horizontal. En glass (panel 380px) cabe holgada. */
+  min-width: max-content;
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;

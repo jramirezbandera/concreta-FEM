@@ -11,9 +11,6 @@ import { useSyncExternalStore } from "react";
 import { modeloStore, vistaStore, type ModoVista } from "../../estado";
 import { Segmentado, type OpcionSegmento, PanelFlotante, Boton } from "../primitivas";
 import { Slot } from "./Slot";
-import { CentroMasa } from "./CentroMasa";
-import { CentroRigidez } from "./CentroRigidez";
-import { ModeloCalculo } from "./ModeloCalculo";
 import { plantasDeGrupo } from "./hooks/useGeometriaModelo";
 import { emitirZoom } from "./hooks/zoomBus";
 import { emitirEncuadre } from "./hooks/encuadreBus";
@@ -211,21 +208,12 @@ export function Hud() {
       <Slot zona="top-right">
         <SelectorModo />
       </Slot>
-      {/* Centro de masas y centro de rigidez (vista planta) y "Ver modelo de cálculo"
-          (vista 3D) comparten la zona bottom-left; cada uno se autooculta segun el modo
-          (CM y CR solo en planta, modelo de calculo solo en 3D), asi nunca coinciden
-          todos a la vez. CM y CR SI conviven en planta (apilados): son ayudas
-          complementarias y su excentricidad es el valor que el arquitecto compara.
-          NO van en mid-left: esa zona se solapa con el panel de herramienta (alto) que
-          App monta en top-left (PanelHerramientaPilar/Viga), porque ambas anclan a la
-          izquierda y el panel de herramienta crece hacia abajo hasta el centro. bottom-
-          left esta libre en las pestanas de entrada y solo convive (apilado, sin solape)
-          con la tabla de reacciones en Resultados. */}
-      <Slot zona="bottom-left">
-        <CentroMasa />
-        <CentroRigidez />
-        <ModeloCalculo />
-      </Slot>
+      {/* Los CONTROLES de Centro de masas / Centro de rigidez / "Ver modelo de cálculo"
+          ya NO viven en el HUD glass: pasaron a la seccion "Ayudas" del DOCK (refactor
+          "dock de paneles", PR2), para no flotar paneles de datos sobre el modelo. Sus
+          MARCADORES de escena (CentroMasaOverlay/CentroRigidezOverlay/ModeloCalculoOverlay)
+          siguen como sceneOverlays (no se tocan): control en el dock, marcador en la
+          escena, comunicados solo por vistaStore (mostrarCentroMasa, …). */}
       <Slot zona="bottom-right">
         <ControlesZoom />
       </Slot>

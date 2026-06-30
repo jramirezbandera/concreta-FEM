@@ -146,6 +146,11 @@
   --w-tools: 52px;
   --h-status: 26px;
   --h-tabs: 34px;
+  /* Dock de paneles de datos (refactor "dock de paneles", PR1/PR2): region acoplada a
+     la derecha del work canvas que EMPUJA el lienzo (hermana flex de .cx-body, junto a
+     sidebar/tools). 400px comodo: en PR2 las secciones llenan el ancho (no anchos fijos)
+     y la tabla de Reacciones (7 col) scrollea dentro de SU seccion, no del dock. */
+  --w-dock: 400px;
 }
 
 /* ALIAS de compatibilidad con el tema oscuro provisional (feature-1).

@@ -8,8 +8,8 @@ export type { BotonProps, VarianteBoton } from "./Boton";
 export { Segmentado } from "./Segmentado";
 export type { SegmentadoProps, OpcionSegmento } from "./Segmentado";
 
-export { PanelFlotante } from "./PanelFlotante";
-export type { PanelFlotanteProps } from "./PanelFlotante";
+export { PanelFlotante, ProveedorModoPanel } from "./PanelFlotante";
+export type { PanelFlotanteProps, ModoPanel } from "./PanelFlotante";
 
 export { Chip, Pill } from "./Chip";
 export type { ChipProps, PillProps } from "./Chip";

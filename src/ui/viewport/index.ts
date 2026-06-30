@@ -21,19 +21,22 @@ export { OverlayPlantillas } from "./OverlayPlantillas";
 
 // Centro de masas (F2.4): sceneOverlay R3F con el marcador ⊕ del CM de la planta
 // activa. Lo monta App via `sceneOverlays` en las pestanas con vista planta (entrada
-// + resultados). El toggle + panel (CentroMasa) viven en el Hud persistente.
+// + resultados). El toggle + panel (CentroMasa) viven en la seccion "Ayudas" del dock
+// (PR2; antes en el Hud persistente).
 export { CentroMasaOverlay } from "./CentroMasaOverlay";
+export { CentroMasa } from "./CentroMasa";
 
 // Centro de rigidez (F2): sceneOverlay R3F con el marcador ◇ del CR de la planta activa
 // (+ segmento CM<->CR de excentricidad). Lo monta App via `sceneOverlays` en las pestanas
-// con vista planta. El toggle + disparador + panel (CentroRigidez) viven en el Hud
-// persistente. Espejo del centro de masas, pero el CR lo calcula PyNite (crStore).
+// con vista planta. El toggle + disparador + panel (CentroRigidez) viven en la seccion
+// "Ayudas" del dock (PR2). Espejo del centro de masas, pero el CR lo calcula PyNite (crStore).
 export { CentroRigidezOverlay } from "./CentroRigidezOverlay";
 export { CentroRigidez } from "./CentroRigidez";
 
 // "Ver modelo de calculo" (F2c): overlay R3F de la Capa 2 (nudos/barras/releases/apoyos)
 // semitransparente sobre la obra. Lo monta App via `sceneOverlays`; el toggle + panel
-// (ModeloCalculo) viven en el Hud persistente (disponible en todas las pestanas, 3D).
+// (ModeloCalculo) viven en la seccion "Ayudas" del dock (PR2; disponible en todas las
+// pestanas, se autooculta fuera de 3D).
 export { ModeloCalculoOverlay } from "./ModeloCalculoOverlay";
 export { ModeloCalculo } from "./ModeloCalculo";
 

@@ -145,11 +145,11 @@ test("humo de integracion: el worker real (Pyodide+PyNite) resuelve una biapoyad
   await expect(boton).toHaveText("Calcular", { timeout: TIMEOUT_MOTOR });
   await expect(boton).toBeEnabled();
 
-  // Disparar el click con .click() real: tras el refactor de zonas del HUD
-  // (feature-17) BotonCalcular esta en la zona top-center y el control de planta del
-  // GroupRibbon en top-left, asi que ya no se solapan y el hit-test aterriza limpio
-  // sobre el boton (antes un overlay flotante interceptaba el puntero y obligaba a
-  // dispatchEvent para esquivar el z-order).
+  // Disparar el click con .click() real: tras el refactor "dock de paneles" (PR1),
+  // BotonCalcular vive en la region DOCK acoplada del Shell (<aside "Panel de datos">),
+  // que empuja el lienzo en vez de flotar sobre el, asi que ya no hay capa glass del HUD
+  // encima y el hit-test aterriza limpio sobre el boton (antes un overlay flotante
+  // interceptaba el puntero y obligaba a dispatchEvent para esquivar el z-order).
   await boton.click();
 
   // 4) Esperar a que el motor REAL resuelva y la salida llegue a la UI. La senal

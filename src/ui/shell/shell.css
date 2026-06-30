@@ -307,6 +307,43 @@
   margin: 2px 0;
 }
 
+/* --- Dock de paneles de datos (refactor "dock de paneles", PR1/PR2) ---
+   Region acoplada al borde derecho que EMPUJA el lienzo (hermana flex de .cx-body,
+   junto a sidebar/tools). Ancho fijo (--w-dock) + scroll vertical propio: los
+   paneles de datos (reacciones, diagramas, inspector, herramienta, plantillas…) se
+   apilan como SECCIONES PLANAS (PR2: ProveedorModoPanel modo="plano") y, si desbordan,
+   scrollean DENTRO del dock en vez de recortarse sobre el lienzo. */
+.cx-dock {
+  flex: 0 0 var(--w-dock);
+  width: var(--w-dock);
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-3);
+  border-left: 1px solid var(--border);
+  background-color: var(--surface);
+  /* Un solo scroll VERTICAL del dock; NUNCA horizontal. El contenido intrinsecamente
+     ancho (la tabla de Reacciones, 7 col) scrollea dentro de SU seccion, no del dock
+     entero. overflow-x:hidden mata la barra horizontal global que aparecia en PR1. */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Las secciones del dock LLENAN el ancho (no anchos fijos 380/360/240px): asi ni el
+   select de Combinacion se recorta ni la tabla fuerza scroll horizontal del dock. El
+   ancestro .cx-dock gana en especificidad a los anchos fijos por-panel (0-2-0 > 0-1-0)
+   sin tener que editar 12 CSS de panel. min-width:0 deja que un hijo ancho (la tabla)
+   se contenga y scrollee DENTRO en vez de empujar el dock. */
+.cx-dock .cx-dock-sec,
+.cx-dock .cx-float {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+/* La ultima seccion no necesita filete inferior (el borde inferior del body lo cierra). */
+.cx-dock .cx-dock-sec:last-child {
+  border-bottom: 0;
+}
+
 /* --- Status bar (§2): mensaje acento + coords/escala/snap (mono) --- */
 .cx-status {
   display: flex;

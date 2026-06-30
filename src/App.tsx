@@ -8,7 +8,7 @@
 // grupos/plantas, el grupo y la planta activos sean coherentes (no quedar en
 // null cuando hay algo que seleccionar, ni quedar apuntando a un grupo/planta de
 // una obra anterior tras restaurar autosave o cambiar de proyecto).
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Shell, useArranquePersistencia } from "./ui/shell";
 import {
   Viewport,
@@ -16,8 +16,12 @@ import {
   CentroMasaOverlay,
   CentroRigidezOverlay,
   ModeloCalculoOverlay,
+  CentroMasa,
+  CentroRigidez,
+  ModeloCalculo,
 } from "./ui/viewport";
 import { suscribirCoords, leerCoords } from "./ui/viewport";
+import { ProveedorModoPanel } from "./ui/primitivas";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
 import { ColocacionPano } from "./ui/viewport/ColocacionPano";
@@ -307,6 +311,175 @@ function useCoordsThrottled(): { x: number; y: number } | null {
   return coords;
 }
 
+// --- Composicion por pestana (refactor "dock de paneles", PR1/PR2) ------------
+
+// Lo que App inyecta en el Viewport (sceneOverlays/hudOverlays) y en el Shell (dock)
+// para la pestana activa. Tres piezas separadas, una sola fuente de las condiciones:
+//  - sceneOverlays: objetos R3F DENTRO de la escena (deformada, modal, CM/CR, modelo
+//    de calculo, colocacion, calco DXF). NO cambian.
+//  - hudOverlays: controles de LIENZO en glass sobre el canvas (Slot/zonas). Solo queda
+//    aqui la leyenda de escala (lee contra los colores del modelo); el resto del Hud
+//    persistente (ribbon/modo/zoom) lo monta el propio Viewport.
+//  - panelesDock: paneles de DATOS de la pestana (inspector, herramienta, plantillas,
+//    reacciones, diagramas, combinacion, frecuencias, isovalores). El call site les
+//    aplica cromo PLANO (ProveedorModoPanel) y les añade la seccion "Ayudas" (CM/CR/
+//    modelo de calculo) comun a todas las pestanas.
+interface ComposicionPestana {
+  sceneOverlays: ReactNode;
+  hudOverlays: ReactNode;
+  panelesDock: ReactNode;
+}
+
+// Seccion "Ayudas" del dock (PR2): los CONTROLES de Centro de masas, Centro de rigidez y
+// "Ver modelo de cálculo". Comun a TODAS las pestanas (como cuando vivian en el Hud
+// persistente). Cada control se autooculta por modo de vista (CM/CR solo en planta,
+// modelo de calculo solo en 3D), asi el dock no muestra ayudas sin sentido. Sus
+// MARCADORES de escena siguen en sceneOverlays; control y marcador hablan solo por
+// vistaStore (mostrarCentroMasa, …).
+function AyudasDock() {
+  return (
+    <>
+      <CentroMasa />
+      <CentroRigidez />
+      <ModeloCalculo />
+    </>
+  );
+}
+
+// Envuelve los paneles de la pestana + las Ayudas en el cromo PLANO del dock
+// (ProveedorModoPanel modo="plano"): asi el dock se lee como UN panel con secciones, no
+// como una pila de tarjetas glass. Si no hay ningun panel de datos, el call site no monta
+// el dock (la region no aparece y el lienzo ocupa todo el ancho).
+function dockDePestana(panelesDock: ReactNode): ReactNode {
+  return (
+    <ProveedorModoPanel modo="plano">
+      {panelesDock}
+      <AyudasDock />
+    </ProveedorModoPanel>
+  );
+}
+
+// Compone las tres piezas para la pestana activa. PURA: solo depende de `pestana` y
+// `enPleno` (3D pleno gatea la introduccion grafica y las ayudas 2D). Cada panel se
+// autooculta segun seleccion/resultados; acotar el montaje a su pestana mantiene
+// limpias las demas (igual que antes del dock). Sin duplicar condiciones.
+function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPestana {
+  switch (pestana) {
+    case "entradaPilares":
+      return {
+        // OverlayPlantillas (calco DXF de fondo) y la colocacion solo tienen sentido
+        // en 2D planta; el overlay del modelo de calculo y los centros van en todas
+        // las pestanas con planta (se autoocultan segun modo/datos).
+        sceneOverlays: (
+          <>
+            {!enPleno && <OverlayPlantillas />}
+            <CentroMasaOverlay />
+            <CentroRigidezOverlay />
+            {!enPleno && <ColocacionPilar />}
+            <ModeloCalculoOverlay />
+          </>
+        ),
+        hudOverlays: null,
+        // Paneles de datos al dock (flujo normal de la region, sin Slot). El inspector
+        // permanece tambien en 3D (se selecciona y se edita, F2c); la herramienta y el
+        // calco DXF son ayudas 2D y se ocultan en 3D pleno.
+        panelesDock: (
+          <>
+            <InspectorPilar />
+            {!enPleno && <PanelHerramientaPilar />}
+            {!enPleno && <PanelPlantillas />}
+          </>
+        ),
+      };
+    case "entradaVigas":
+      return {
+        sceneOverlays: (
+          <>
+            {!enPleno && <OverlayPlantillas />}
+            <CentroMasaOverlay />
+            <CentroRigidezOverlay />
+            {!enPleno && <ColocacionViga />}
+            {/* Colocacion de paños (F3): losa rectangular por dos clics. Misma pestana
+                que vigas (donde vive el menu "Paños"). Se autooculta salvo herramienta
+                "pano" + vista planta. */}
+            {!enPleno && <ColocacionPano />}
+            <ModeloCalculoOverlay />
+          </>
+        ),
+        hudOverlays: null,
+        // Inspectores de viga y de paño comparten la pestana: cada uno se autooculta si
+        // la seleccion no es de su tipo (solo uno se muestra a la vez). Herramientas y
+        // calco DXF: ayudas 2D, ocultas en 3D pleno.
+        panelesDock: (
+          <>
+            <InspectorViga />
+            <InspectorPano />
+            {!enPleno && <PanelHerramientaViga />}
+            {!enPleno && <PanelHerramientaPano />}
+            {!enPleno && <PanelPlantillas />}
+          </>
+        ),
+      };
+    case "resultados":
+      return {
+        sceneOverlays: (
+          <>
+            <DeformadaOverlay />
+            {/* Forma modal (F2b): se autooculta sin modos o fuera de 3D. NO reutiliza
+                datos de la deformada (lee del modalStore). */}
+            <ModoOverlay />
+            <CentroMasaOverlay />
+            <CentroRigidezOverlay />
+            {/* "Ver modelo de calculo" (F2c): tambien en Resultados (3D). */}
+            <ModeloCalculoOverlay />
+          </>
+        ),
+        // La leyenda de escala se QUEDA en el lienzo (control de lienzo: lee contra los
+        // colores de la deformada). El resto de paneles de datos van al dock.
+        hudOverlays: (
+          <Slot zona="bottom-center">
+            <LeyendaEscala />
+          </Slot>
+        ),
+        // Calcular + estado del motor, combinacion activa, frecuencias/modos, tabla de
+        // reacciones y diagramas: todos paneles de DATOS -> dock (secciones planas, con
+        // scroll propio si desbordan).
+        panelesDock: (
+          <>
+            <BotonCalcular />
+            <ComboSelector />
+            <PanelFrecuencias />
+            <TablaReacciones />
+            <PanelDiagramas />
+          </>
+        ),
+      };
+    case "isovalores":
+      return {
+        sceneOverlays: (
+          <>
+            {/* Mapa de color de la losa. Se autooculta sin resultados de placa (quads).
+                No necesita la deformada ni el modelo de calculo: los isovalores son la
+                lectura propia de F3. */}
+            <IsovaloresOverlay />
+          </>
+        ),
+        hudOverlays: null,
+        // Calcular y elegir combinacion desde la propia pestana (la losa se calcula con
+        // el resto de la obra), el panel de isovalores (selector + leyenda) y el
+        // inspector del paño: paneles de datos -> dock.
+        panelesDock: (
+          <>
+            <BotonCalcular />
+            <ComboSelector />
+            <PanelIsovalores />
+            <InspectorPano />
+          </>
+        ),
+      };
+  }
+}
+
 export default function App() {
   useInicializarVistaActiva();
   // Arranque de persistencia (feature-15): rehidrata Modelo + plantillas del proyecto
@@ -341,15 +514,12 @@ export default function App() {
   // el montaje mantiene limpias las demas pestanas.
   const enVigas = pestana === "entradaVigas";
 
-  // Resultados: monta la deformada (sceneOverlay) y el dock de paneles HUD (calculo,
-  // combinacion, reacciones, diagramas, leyenda). Cada panel se autooculta sin
-  // resultados; acotar el montaje a su pestana mantiene limpias las demas.
-  const enResultados = pestana === "resultados";
-
-  // Isovalores (F3): monta el mapa de color de la losa (sceneOverlay) + el panel con
-  // selector de magnitud y leyenda. Comparte la combinacion activa con Resultados. El
-  // overlay/panel se autoocultan si no hay resultados de placa (un portico sin losa).
-  const enIsovalores = pestana === "isovalores";
+  // Composicion por pestana (refactor "dock de paneles", PR1/PR2): una sola fuente de las
+  // condiciones. Devuelve los overlays de escena/HUD (al Viewport) y los paneles de datos
+  // de la pestana; dockDePestana les da cromo plano + añade la seccion "Ayudas" (CM/CR/
+  // modelo de calculo) comun, y produce el `dock` que el Shell acopla y empuja el lienzo.
+  const { sceneOverlays, hudOverlays, panelesDock } = composicionPestana(pestana, enPleno);
+  const dock = dockDePestana(panelesDock);
 
   // El mensaje de la herramienta activa prioriza sobre el de la pestana. Si la
   // herramienta esta activa pero no hay donde colocar, se guia a crear/elegir planta
@@ -379,172 +549,13 @@ export default function App() {
         snapActivo,
         ...(coords ? { coords } : {}),
       }}
+      dock={dock}
     >
       {/* Señal de hidratacion (feature-16, D6): aparece cuando la persistencia ha
           rehidratado el Modelo (o decidido no persistir). Los specs E2E esperan por
           este nodo antes de actuar. `hidden`: no afecta al layout ni es visible. */}
       {persistenciaLista && <div data-testid="app-ready" hidden />}
-      <Viewport
-        {...(enPilares
-          ? {
-              // OverlayPlantillas (calco DXF de fondo) y PanelPlantillas (F4) van en
-              // las pestanas de PLANTA: el calco solo tiene sentido al introducir la
-              // obra. Se componen JUNTO a los overlays de herramienta (no los
-              // sustituyen): OverlayPlantillas no es interactivo (no estorba al
-              // picking) y PanelPlantillas se autooculta si F4 esta cerrado.
-              // En 3D pleno se ocultan las ayudas 2D (calco DXF) y la colocacion
-              // (auto-guardada); el overlay del modelo de calculo va en todas las
-              // pestanas (se autooculta salvo 3D + toggle). El inspector permanece:
-              // en 3D se selecciona y se edita (F2c).
-              sceneOverlays: (
-                <>
-                  {!enPleno && <OverlayPlantillas />}
-                  <CentroMasaOverlay />
-                  <CentroRigidezOverlay />
-                  {!enPleno && <ColocacionPilar />}
-                  <ModeloCalculoOverlay />
-                </>
-              ),
-              hudOverlays: (
-                <>
-                  <Slot zona="mid-right">
-                    <InspectorPilar />
-                  </Slot>
-                  {!enPleno && (
-                    <Slot zona="top-left">
-                      <PanelHerramientaPilar />
-                    </Slot>
-                  )}
-                  {!enPleno && (
-                    <Slot zona="top-right">
-                      <PanelPlantillas />
-                    </Slot>
-                  )}
-                </>
-              ),
-            }
-          : enVigas
-            ? {
-                sceneOverlays: (
-                  <>
-                    {!enPleno && <OverlayPlantillas />}
-                    <CentroMasaOverlay />
-                    <CentroRigidezOverlay />
-                    {!enPleno && <ColocacionViga />}
-                    {/* Colocacion de paños (F3): losa rectangular por dos clics. Misma
-                        pestana que vigas (donde vive el menu "Paños"). Se autooculta
-                        salvo herramienta "pano" + vista planta. */}
-                    {!enPleno && <ColocacionPano />}
-                    <ModeloCalculoOverlay />
-                  </>
-                ),
-                hudOverlays: (
-                  <>
-                    {/* Inspectores de viga y de paño comparten la pestana: cada uno se
-                        autooculta si la seleccion no es de su tipo. Solo uno se muestra
-                        a la vez (la seleccion es de un unico elemento). */}
-                    <Slot zona="mid-right">
-                      <InspectorViga />
-                    </Slot>
-                    <Slot zona="mid-right">
-                      <InspectorPano />
-                    </Slot>
-                    {!enPleno && (
-                      <Slot zona="top-left">
-                        <PanelHerramientaViga />
-                      </Slot>
-                    )}
-                    {!enPleno && (
-                      <Slot zona="top-left">
-                        <PanelHerramientaPano />
-                      </Slot>
-                    )}
-                    {!enPleno && (
-                      <Slot zona="top-right">
-                        <PanelPlantillas />
-                      </Slot>
-                    )}
-                  </>
-                ),
-              }
-            : enResultados
-              ? {
-                  sceneOverlays: (
-                    <>
-                      <DeformadaOverlay />
-                      {/* Forma modal (F2b): se autooculta sin modos o fuera de 3D. NO
-                          reutiliza datos de la deformada (lee del modalStore). */}
-                      <ModoOverlay />
-                      <CentroMasaOverlay />
-                      <CentroRigidezOverlay />
-                      {/* "Ver modelo de calculo" (F2c): tambien en Resultados (3D). */}
-                      <ModeloCalculoOverlay />
-                    </>
-                  ),
-                  hudOverlays: (
-                    <>
-                      <Slot zona="top-center">
-                        <BotonCalcular />
-                      </Slot>
-                      <Slot zona="top-right">
-                        <ComboSelector />
-                      </Slot>
-                      {/* Panel de frecuencias / modos de vibracion (F2b). Va en top-right,
-                          apilado bajo el modo de vista (2D/3D) y la combinacion: asi NINGUN
-                          panel queda en una zona "mid" (centrada), que es la que se solapa
-                          con las pilas de arriba y de abajo. Reparto sin solapes en
-                          Resultados -> izquierda: grupo (arriba) + reacciones (abajo);
-                          derecha: vista/combinacion/modos (arriba) + diagramas (abajo);
-                          centro: calculo (arriba) + deformada/leyenda (abajo). */}
-                      <Slot zona="top-right">
-                        <PanelFrecuencias />
-                      </Slot>
-                      <Slot zona="bottom-left">
-                        <TablaReacciones />
-                      </Slot>
-                      <Slot zona="bottom-right">
-                        <PanelDiagramas />
-                      </Slot>
-                      <Slot zona="bottom-center">
-                        <LeyendaEscala />
-                      </Slot>
-                    </>
-                  ),
-                }
-              : enIsovalores
-                ? {
-                    sceneOverlays: (
-                      <>
-                        {/* Mapa de color de la losa. Se autooculta sin resultados de
-                            placa (quads). No necesita la deformada ni el modelo de
-                            calculo: los isovalores son la lectura propia de F3. */}
-                        <IsovaloresOverlay />
-                      </>
-                    ),
-                    hudOverlays: (
-                      <>
-                        {/* Calcular y elegir combinacion desde la propia pestana (la
-                            losa se calcula con el resto de la obra). El panel de
-                            isovalores (selector + leyenda) se autooculta sin placa. */}
-                        <Slot zona="top-center">
-                          <BotonCalcular />
-                        </Slot>
-                        <Slot zona="top-right">
-                          <ComboSelector />
-                        </Slot>
-                        <Slot zona="bottom-center">
-                          <PanelIsovalores />
-                        </Slot>
-                        {/* El inspector del paño permite ajustar la losa sin salir de
-                            Isovalores (editar invalida resultados; se recalcula). */}
-                        <Slot zona="mid-right">
-                          <InspectorPano />
-                        </Slot>
-                      </>
-                    ),
-                  }
-                : {})}
-      />
+      <Viewport sceneOverlays={sceneOverlays} hudOverlays={hudOverlays} />
     </Shell>
   );
 }
