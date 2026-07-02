@@ -241,4 +241,29 @@ describe("TablaReacciones · filtrado de apoyos de malla (F2.4)", () => {
     const filaSuma = screen.getByRole("rowheader", { name: "ΣFY" }).closest("tr")!;
     expect(within(filaSuma).getByText("120.00")).toBeInTheDocument();
   });
+
+  it("[AUDITORIA B-1] los momentos del agregado se muestran como '—' (no son resultante sin r×F)", () => {
+    // Borde EMPOTRADO: los nudos de malla tienen momentos de reaccion NO nulos.
+    // Sumarlos en crudo (nudos en posiciones distintas, cada momento respecto de su
+    // propio nudo) no es el momento resultante de la losa respecto de ningun punto:
+    // la celda debe mostrar "—", no un numero sin sentido fisico.
+    resultadosStore.getState().setResultados(
+      resultadosConReacciones({
+        Npilar: [0, 100, 0, 0, 0, 0],
+        Nmalla1: [0, 10, 0, 5, 0, 3],
+        Nmalla2: [0, 10, 0, -2, 0, 4],
+      }),
+      femConMalla(),
+      trazaConMalla(),
+    );
+    render(<TablaReacciones />);
+    const tabla = screen.getByRole("table");
+    const filaLosa = within(tabla).getByText("Losa (borde)").closest("tr")!;
+    // Fuerzas: agregadas (FY = 20). Momentos: guion en las 3 columnas MX/MY/MZ.
+    expect(within(filaLosa).getByText("20.00")).toBeInTheDocument();
+    expect(within(filaLosa).getAllByText("—")).toHaveLength(3);
+    // Ni la suma cruda de MX (3.00) ni la de MZ (7.00) deben aparecer.
+    expect(within(filaLosa).queryByText("3.00")).toBeNull();
+    expect(within(filaLosa).queryByText("7.00")).toBeNull();
+  });
 });

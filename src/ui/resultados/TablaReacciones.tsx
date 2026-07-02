@@ -140,17 +140,22 @@ export function TablaReacciones() {
 
   // Agregado de los apoyos de borde de la losa (F2.4): una sola fila con la SUMA de las
   // reacciones de todos los nudos de malla apoyados. `null` si no hay losa (no se pinta la
-  // fila). Recorre las 6 componentes para sumar fuerzas y momentos por igual.
-  let filaMalla: { etiqueta: string; rxn: number[] } | null = null;
+  // fila). [AUDITORIA B-1] Se suman SOLO las FUERZAS (FX/FY/FZ, indices 0-2): son una
+  // resultante trasladable. Los MOMENTOS de nudos en posiciones distintas NO se pueden
+  // sumar sin su termino r×F (la suma cruda no es el momento resultante respecto de
+  // ningun punto): con borde EMPOTRADO (RX/RZ restringidos, momentos de reaccion no
+  // nulos) la celda mostraba un numero sin sentido fisico que el arquitecto podia leer
+  // como "el momento de empotramiento de la losa". Se muestran como "—" (null).
+  let filaMalla: { etiqueta: string; rxn: (number | null)[] } | null = null;
   if (apoyosDeMalla.size > 0) {
-    const suma = [0, 0, 0, 0, 0, 0];
+    const suma: (number | null)[] = [0, 0, 0, null, null, null];
     let conReaccion = false;
     for (const apoyo of modeloFEM.supports) {
       if (!apoyosDeMalla.has(apoyo.node)) continue;
       const rxn = resultados.nodos[apoyo.node]?.[combo]?.rxn;
       if (!rxn) continue;
       conReaccion = true;
-      for (let c = 0; c < 6; c++) suma[c]! += rxn[c] ?? 0;
+      for (let c = 0; c < 3; c++) suma[c] = (suma[c] ?? 0) + (rxn[c] ?? 0);
     }
     if (conReaccion) filaMalla = { etiqueta: "Losa (borde)", rxn: suma };
   }
@@ -220,7 +225,10 @@ export function TablaReacciones() {
                   </th>
                   {COLUMNAS.map((c) => (
                     <td key={c.etiqueta} className="cx-reacciones__td-num mono">
-                      {fmt(filaMalla!.rxn[c.indice] ?? 0)}
+                      {/* [B-1] Momentos del agregado: "—" (no son resultante sin r×F). */}
+                      {filaMalla!.rxn[c.indice] === null
+                        ? "—"
+                        : fmt(filaMalla!.rxn[c.indice] ?? 0)}
                     </td>
                   ))}
                 </tr>

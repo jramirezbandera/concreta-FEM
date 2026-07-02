@@ -21,7 +21,7 @@
 
 import { Suspense, useMemo } from "react";
 
-import { PanelFlotante, Segmentado } from "../primitivas";
+import { PanelFlotante, Segmentado, ErrorBoundary } from "../primitivas";
 import type { OpcionSegmento } from "../primitivas";
 import { seleccionStore, resultadosStore, vistaStore } from "../../estado";
 import type { MagnitudDiagrama } from "../../estado";
@@ -204,18 +204,24 @@ export function PanelDiagramas() {
 
       <div className="cx-panel-diagramas__lienzo">
         {datos.estado === "ok" ? (
-          <Suspense
-            fallback={
-              <p className="cx-panel-diagramas__guia">Dibujando diagrama…</p>
-            }
-          >
-            <DiagramaBarraLazy
-              posiciones={datos.posiciones}
-              valores={datos.valores}
-              etiquetaY={meta.etiquetaEje}
-              color={meta.color}
-            />
-          </Suspense>
+          // [AUDITORIA M-6] <Suspense> solo cubre el *pending* del lazy; si el
+          // chunk de Plotly no carga (offline tras redeploy, 404 del hash) la
+          // promesa RECHAZADA tumbaria el arbol entero. El boundary contiene el
+          // fallo en este panel y el resto de la UI sigue viva.
+          <ErrorBoundary mensaje="No se pudo cargar el diagrama. Comprueba la conexión y recarga la página.">
+            <Suspense
+              fallback={
+                <p className="cx-panel-diagramas__guia">Dibujando diagrama…</p>
+              }
+            >
+              <DiagramaBarraLazy
+                posiciones={datos.posiciones}
+                valores={datos.valores}
+                etiquetaY={meta.etiquetaEje}
+                color={meta.color}
+              />
+            </Suspense>
+          </ErrorBoundary>
         ) : (
           <p className="cx-panel-diagramas__guia">{mensajeGuia(datos.estado)}</p>
         )}
