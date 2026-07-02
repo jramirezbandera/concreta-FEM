@@ -112,17 +112,19 @@ export const HORMIGONES: EntradaMaterialHormigon[] = [
 // usuario; el dominio guardara las dimensiones y estas funciones derivan la
 // EntradaSeccion equivalente para el discretizador.
 //
-// CONVENCION DE EJES DE LA APP (AUDITORIA C-1 — corregida):
+// CONVENCION DE EJES DE LA APP (AUDITORIA C-1 — corregida; decision de usuario
+// 2026-07-02):
 //   - `Iy` = inercia del eje FUERTE con la seccion "de pie" (b·h³/12, el canto h
-//     gobierna): la que debe regir la flexion VERTICAL de una VIGA. Es la misma
-//     convencion de los catalogos europeos (EN 10365: Iy fuerte).
+//     gobierna). Es la misma convencion de los catalogos europeos (EN 10365).
 //   - `Iz` = inercia del eje debil (h·b³/12, el ancho b gobierna).
-//   OJO: NO es un mapeo 1:1 a add_section de PyNite para vigas. PyNite flecta una
-//   barra HORIZONTAL con su campo `Iz` (eje local y = vertical global, Member3D
-//   2.0.2); el DISCRETIZADOR intercambia Iy/Iz al emitir la seccion de una viga
-//   (seccionFEMParaViga, sufijo "~viga"). El PILAR (vertical) mapea directo. La
-//   premisa anterior de este comentario ("eje local y = horizontal de la seccion")
-//   era falsa para vigas y producia flechas (h/b)² veces mayores (eje debil).
+//   El EJE FUERTE gobierna: la flexion VERTICAL de una VIGA y la flexion en el
+//   plano X de un PILAR con angulo=0 (`angulo` gira la seccion; 90 => fuerte
+//   segun obra-y). NO es un mapeo 1:1 a add_section de PyNite: PyNite gobierna la
+//   flexion del plano local x-y con su campo `Iz` (Member3D 2.0.2), asi que el
+//   DISCRETIZADOR intercambia Iy/Iz al emitir TODA seccion (seccionFEMParaPyNite,
+//   intercambio uniforme). La premisa anterior de este comentario ("eje local y =
+//   horizontal de la seccion") era falsa para vigas y producia flechas (h/b)²
+//   veces mayores (eje debil).
 //
 // UNIDADES DE LOS PARAMETROS: milimetros (mm), tal como los introduce la UI.
 // Cada funcion convierte a metros con `mmToM` ANTES de operar, devolviendo

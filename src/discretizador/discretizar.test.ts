@@ -316,10 +316,13 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
     m.secciones[0] = { id: SECCION, nombre: "30x50", tipo: "hormigonRectangular", b: 0.3, h: 0.5 };
     const fem = discretizarOk(m);
     const sec = fem.sections.find((s) => s.name === SECCION)!;
-    // A = 0.3*0.5 = 0.15 m²; Iy = b·h³/12 = 0.3·0.125/12 = 0.003125 m⁴.
+    // A = 0.3*0.5 = 0.15 m². [AUDITORIA C-1, convenio uniforme]: la Capa 2 emite
+    // Iy/Iz INTERCAMBIADOS respecto al catalogo (seccionFEMParaPyNite): el eje
+    // FUERTE (b·h³/12, catalogo Iy) aterriza en el campo Iz de PyNite (que gobierna
+    // la flexion vertical de la viga y la flexion en X del pilar con angulo=0).
     expect(sec.A).toBeCloseTo(0.15, 9);
-    expect(sec.Iy).toBeCloseTo((0.3 * 0.5 ** 3) / 12, 9);
-    expect(sec.Iz).toBeCloseTo((0.5 * 0.3 ** 3) / 12, 9);
+    expect(sec.Iz).toBeCloseTo((0.3 * 0.5 ** 3) / 12, 9); // fuerte -> campo Iz
+    expect(sec.Iy).toBeCloseTo((0.5 * 0.3 ** 3) / 12, 9); // debil  -> campo Iy
   });
 
   describe("DETERMINISMO byte a byte (CLAUDE.md §2)", () => {

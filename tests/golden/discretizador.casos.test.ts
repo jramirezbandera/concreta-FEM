@@ -32,9 +32,11 @@ import {
   fixturePorticoSimple,
   MATERIAL_GOLDEN,
   SECCION_GOLDEN,
+  PERFIL_GOLDEN,
 } from "./_arnes";
 import { ModeloFEMSchema, type ModeloFEM } from "../../src/discretizador/contratoFEM";
-import { discretizar, SUFIJO_SECCION_VIGA } from "../../src/discretizador/discretizar";
+import { discretizar } from "../../src/discretizador/discretizar";
+import { getSeccion } from "../../src/biblioteca";
 import type { Trazabilidad } from "../../src/discretizador/contratoFEM";
 import type { Modelo } from "../../src/dominio";
 import { SCHEMA_VERSION } from "../../src/dominio";
@@ -74,29 +76,27 @@ function assertContratoValido(fem: ModeloFEM): void {
 
 // El material/seccion de obra de los fixtures deben aparecer mapeados por id (el
 // glue Python los casa directo por name; ver feature-4-enmiendas-dominio).
-// [AUDITORIA C-1]: las VIGAS referencian la variante "~viga" de su seccion (Iy/Iz
-// intercambiados: el eje fuerte del catalogo aterriza en el campo Iz que PyNite usa
-// para la flexion vertical de una barra horizontal); los PILARES la seccion tal
-// cual (miembro vertical: mapeo directo correcto). Se verifica ademas el INTERCAMBIO
-// de valores entre ambas variantes, no solo los nombres.
+// [AUDITORIA C-1, convenio uniforme]: TODA seccion se emite con Iy/Iz
+// INTERCAMBIADOS respecto al catalogo (seccionFEMParaPyNite): el eje FUERTE del
+// catalogo (Iy) aterriza en el campo Iz que PyNite usa para la flexion del plano
+// local x-y (vertical en vigas; plano X en pilares con angulo=0 — decision de
+// usuario 2026-07-02). Se verifica el intercambio CONTRA EL CATALOGO REAL
+// (getSeccion del perfil), no contra la propia salida (anti-tautologia).
 function assertMaterialYSeccion(fem: ModeloFEM): void {
   expect(fem.materials.map((m) => m.name)).toContain(MATERIAL_GOLDEN);
   const nombres = fem.sections.map((s) => s.name);
   expect(nombres).toContain(SECCION_GOLDEN);
-  expect(nombres).toContain(SECCION_GOLDEN + SUFIJO_SECCION_VIGA);
-  const base = fem.sections.find((s) => s.name === SECCION_GOLDEN)!;
-  const deViga = fem.sections.find((s) => s.name === SECCION_GOLDEN + SUFIJO_SECCION_VIGA)!;
-  expect(deViga.Iy).toBe(base.Iz); // intercambio Iy<->Iz (C-1)
-  expect(deViga.Iz).toBe(base.Iy);
-  expect(deViga.A).toBe(base.A);
-  expect(deViga.J).toBe(base.J);
-  // Barras: material comun; los pilares (verticales) usan la seccion base y las
-  // vigas (horizontales) la variante "~viga". La verticalidad se lee de la Capa 2.
-  const coordY = new Map(fem.nodes.map((n) => [n.name, n.y] as const));
+  const emitida = fem.sections.find((s) => s.name === SECCION_GOLDEN)!;
+  const catalogo = getSeccion(PERFIL_GOLDEN)!;
+  expect(catalogo).toBeDefined();
+  expect(emitida.Iy).toBe(catalogo.Iz); // intercambio Iy<->Iz (C-1, uniforme)
+  expect(emitida.Iz).toBe(catalogo.Iy); // el eje fuerte cae en el campo Iz de PyNite
+  expect(emitida.A).toBe(catalogo.A);
+  expect(emitida.J).toBe(catalogo.J);
+  // Todas las barras referencian el material y la seccion de obra del fixture.
   for (const m of fem.members) {
     expect(m.material).toBe(MATERIAL_GOLDEN);
-    const esVertical = coordY.get(m.i) !== coordY.get(m.j);
-    expect(m.section).toBe(esVertical ? SECCION_GOLDEN : SECCION_GOLDEN + SUFIJO_SECCION_VIGA);
+    expect(m.section).toBe(SECCION_GOLDEN);
   }
 }
 

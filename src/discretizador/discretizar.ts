@@ -54,10 +54,9 @@ import {
   resolverSeccionFEMPorId,
   propiedadesDePilar,
   propiedadesDeViga,
-  seccionFEMParaViga,
-  SUFIJO_SECCION_VIGA,
+  seccionFEMParaPyNite,
 } from "./propiedadesBarra";
-export { resolverSeccion, SUFIJO_SECCION_VIGA };
+export { resolverSeccion };
 
 // Resultado del discretizador. NO lanza. Tres canales en lenguaje de obra:
 //  - ok:true + modeloFEM   => Capa 2 valida lista para el solver.
@@ -182,25 +181,25 @@ export type BaseFEM = {
 export function construirBaseFEM(modelo: Modelo): BaseFEM {
   const avisosBase: ErrorObra[] = [];
 
-  // --- Paso 1: materiales y secciones usados (dedup por id) -------------------
-  // [AUDITORIA C-1] Las secciones se emiten POR USO: la que consume un PILAR va tal
-  // cual (miembro vertical: el mapeo directo ya es correcto con angulo=0); la que
-  // consume una VIGA va en una VARIANTE con Iy/Iz INTERCAMBIADOS y sufijo "~viga"
-  // (`seccionFEMParaViga`): PyNite flecta la barra horizontal con el campo Iz
-  // (12·E·Iz/L³ del plano local x-y, con y = vertical global), asi que el eje
-  // FUERTE del catalogo (Iy) debe aterrizar en ese campo. Sin el intercambio la
-  // viga se calcula "acostada" (eje debil; flecha (h/b)² veces mayor). Un id usado
-  // por pilares Y vigas emite AMBAS variantes. Ver propiedadesBarra.ts [C-1].
+  // --- Paso 1: materiales y secciones usados (dedup por id, mapeo directo) ----
+  // [AUDITORIA C-1] TODA seccion se emite con Iy/Iz INTERCAMBIADOS
+  // (`seccionFEMParaPyNite`): PyNite gobierna la flexion del plano local x-y con el
+  // campo Iz (12·E·Iz/L³), asi que el eje FUERTE del catalogo (Iy) debe aterrizar
+  // ahi. Para la VIGA (local y = vertical) eso es la flexion vertical (sin el
+  // intercambio se calculaba "acostada": flecha (h/b)² veces mayor); para el PILAR
+  // (local y = X global) es la flexion en X, que por DECISION de convencion
+  // (usuario, 2026-07-02) resiste el eje fuerte con angulo=0 (`angulo` gira la
+  // seccion). Intercambio UNIFORME => una sola seccion por id, en este unico punto
+  // de emision. Ver propiedadesBarra.ts [C-1].
   const materialIds = new Set<string>();
-  const seccionIdsPilar = new Set<string>();
-  const seccionIdsViga = new Set<string>();
+  const seccionIds = new Set<string>();
   for (const p of modelo.pilares) {
     materialIds.add(p.materialId);
-    seccionIdsPilar.add(p.seccionId);
+    seccionIds.add(p.seccionId);
   }
   for (const v of modelo.vigas) {
     materialIds.add(v.materialId);
-    seccionIdsViga.add(v.seccionId);
+    seccionIds.add(v.seccionId);
   }
   // Orden alfabetico de ids para salida determinista.
   const materials: MaterialFEM[] = [...materialIds]
@@ -210,16 +209,15 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
       if (m === undefined) throw new Error(`Material inexistente tras validar: ${id}`);
       return m;
     });
-  // Por cada id (orden alfabetico): variante de pilar primero, de viga despues
-  // (orden determinista byte a byte). Resuelve por id desde la obra O el catalogo
-  // de perfiles (misma regla que las validaciones de UI).
-  const sections: SeccionFEM[] = [];
-  for (const id of [...new Set([...seccionIdsPilar, ...seccionIdsViga])].sort()) {
-    const s = resolverSeccionFEMPorId(modelo, id);
-    if (s === undefined) throw new Error(`Seccion inexistente tras validar: ${id}`);
-    if (seccionIdsPilar.has(id)) sections.push(s);
-    if (seccionIdsViga.has(id)) sections.push(seccionFEMParaViga(s));
-  }
+  const sections: SeccionFEM[] = [...seccionIds]
+    .sort()
+    .map((id) => {
+      // Resuelve por id desde la obra O el catalogo de perfiles (misma regla que las
+      // validaciones de UI); el intercambio Iy/Iz a convenio PyNite ocurre AQUI.
+      const s = resolverSeccionFEMPorId(modelo, id);
+      if (s === undefined) throw new Error(`Seccion inexistente tras validar: ${id}`);
+      return seccionFEMParaPyNite(s);
+    });
 
   // --- Paso 2: nodos por snapping determinista --------------------------------
   // Recolecta puntos candidatos (clave + coord) de pilares y vigas, colapsa por
@@ -405,10 +403,9 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
       i: nodoNombre(ci),
       j: nodoNombre(cj),
       material: v.materialId,
-      // [C-1] La viga referencia la VARIANTE con Iy/Iz intercambiados (ver Paso 1):
-      // el eje fuerte del catalogo aterriza en el campo Iz que PyNite usa para la
-      // flexion vertical de una barra horizontal.
-      section: v.seccionId + SUFIJO_SECCION_VIGA,
+      // [C-1] La seccion ya se emite con Iy/Iz intercambiados en el Paso 1 (uniforme
+      // para toda barra): el eje fuerte del catalogo gobierna la flexion vertical.
+      section: v.seccionId,
       rotation: 0,
       tension_only: v.tirante, // tirante = barra que solo trabaja a traccion
       comp_only: false,

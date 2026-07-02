@@ -496,20 +496,20 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       }
       assertOk(compararReaccion(Math.abs(rmomMax), RmomTeo), "voladizo R_mom=PL");
 
-      // FLECHA: cuasi-analitica (AUDITORIA [C-1]). El descenso del extremo se
-      // descompone en dos terminos con forma cerrada:
+      // FLECHA: cuasi-analitica (AUDITORIA [C-1], convenio uniforme). El descenso
+      // del extremo se descompone en dos terminos con forma cerrada:
       //   (1) GIRO de la cabeza del pilar de empotramiento: el momento M=PL en la
       //       cabeza de un pilar empotrado en base gira la cabeza θ=M·H/(E·I_pilar)
-      //       y arrastra el extremo θ·L. El pilar flecta EN EL PLANO con su campo
-      //       Iz = Iz de catalogo (convencion de pilar, sin intercambio):
-      //       θ·L = PL·H·L/(E·Iz_cat) = 60·3·3/(2.1e8·6.038e-6) ≈ 0.4259 m.
-      //   (2) Flecha propia de la viga (eje FUERTE tras [C-1]): PL³/3EI ≈ 0.0103 m.
-      // Total teorico ≈ 0.4362 m; el motor da 0.43619 (coincidencia <0.1%, que
-      // VALIDA de paso el intercambio de ejes viga/pilar). Tolerancia de flecha 1%.
-      const IZ_CAT_IPE300 = 6.038e-6; // m⁴ (Iz catalogo: eje debil, plano del pilar)
+      //       y arrastra el extremo θ·L. Con el intercambio UNIFORME de ejes
+      //       (decision de usuario: el eje FUERTE resiste X con angulo=0), el pilar
+      //       flecta en el plano X con el Iy de catalogo (fuerte):
+      //       θ·L = PL·H·L/(E·Iy_cat) = 60·3·3/(2.1e8·8.356e-5) ≈ 0.0308 m.
+      //   (2) Flecha propia de la viga (eje FUERTE): PL³/3EI ≈ 0.0103 m.
+      // Total teorico ≈ 0.0410 m. La coincidencia con el motor VALIDA a la vez el
+      // intercambio en viga y pilar. Tolerancia de flecha 1%.
       const H_PILAR = 3; // m (cota por defecto del fixture: pilar de p0 a p1)
       const flechaPuroTeo = (P * L ** 3) / (3 * E_ACERO * I_VIGA_IPE300); // viga sola
-      const giroPilar = (P * L * H_PILAR * L) / (E_ACERO * IZ_CAT_IPE300); // θ·L
+      const giroPilar = (P * L * H_PILAR * L) / (E_ACERO * I_VIGA_IPE300); // θ·L (eje fuerte)
       const flechaTeo = giroPilar + flechaPuroTeo;
       const flechaReal = Math.abs(flechaMaxDescenso(res, combo));
       assertOk(compararFlecha(flechaReal, flechaTeo), "voladizo flecha = giro pilar + viga");
@@ -618,19 +618,19 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       // (no aflojar el golden). Valores medidos en T1.2 con el par de versiones fijado.
       // El dintel se identifica por GEOMETRIA (la barra horizontal a la cota H),
       // no por magnitud: blinda contra empates con el flector de los pilares.
-      // RECAPTURA AUDITORIA [C-2]+[C-1] (2026-07): el snapshot original (19.18949 /
-      // -18.31051 / 9.56493) se midio con la serie IPE 10x inflada Y las vigas
-      // flectando con el eje debil. Con el catalogo EN 10365 y el intercambio de
-      // ejes de viga ([C-1]) el dintel es ~14x mas rigido en el plano que los
-      // pilares: el reparto hiperestatico cambia (mas momento al centro del vano,
-      // menos a los nudos). Numeros re-medidos con el par de versiones fijado.
-      // Invariante fisico que los valida: |min| + |max| = qB²/8 = 37,5 exacto
-      // (momento isostatico total del vano). Convencion PyNite: sagging NEGATIVO
-      // (centro del vano en min_moment_z), hogging positivo (nudos en max).
+      // RECAPTURA AUDITORIA [C-2]+[C-1 uniforme] (2026-07): el snapshot original
+      // (19.18949 / -18.31051 / 9.56493) se midio con la serie IPE 10x inflada y el
+      // mapeo de ejes previo. Con el catalogo EN 10365 y el intercambio UNIFORME
+      // (viga Y pilar con el eje fuerte en el plano, decision de usuario) los
+      // COCIENTES de rigidez viga/pilar quedan casi como los originales: el reparto
+      // hiperestatico vuelve a ~los numeros primeros (la diferencia residual ~0,1%
+      // viene de la interaccion EA/EI: EA no se escalo con EI). Invariante fisico
+      // que los valida: |min| + |max| = qB²/8 = 37,5 exacto (momento isostatico
+      // total del vano). Convencion PyNite: sagging NEGATIVO, hogging positivo.
       const dintel = barraViga(res, fem, combo);
-      assertOk(compararEsfuerzo(dintel.max_moment_z, 4.84911), "portico REG M nudos (hogging)");
-      assertOk(compararEsfuerzo(dintel.min_moment_z, -32.65089), "portico REG M centro (sagging)");
-      assertOk(compararReaccion(Math.abs(basesHoriz[0]), 2.42380), "portico REG empuje horizontal");
+      assertOk(compararEsfuerzo(dintel.max_moment_z, 19.17376), "portico REG M nudos (hogging)");
+      assertOk(compararEsfuerzo(dintel.min_moment_z, -18.32624), "portico REG M centro (sagging)");
+      assertOk(compararReaccion(Math.abs(basesHoriz[0]), 9.54570), "portico REG empuje horizontal");
     },
     TIMEOUT_ARRANQUE,
   );
