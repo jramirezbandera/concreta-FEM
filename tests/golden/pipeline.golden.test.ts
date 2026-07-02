@@ -31,7 +31,7 @@
 //  X a altura Y=cota. La carga gravitatoria es FY global NEGATIVA. Para un miembro
 //  horizontal en X, PyNite pone el eje local y = Y global (vertical): la flexion
 //  vertical usa Iz (eje local z) y la flecha es dy local. Por eso la INERCIA QUE
-//  GOBIERNA la flecha de estas vigas es Iz (IPE300: 6038 cm⁴), NO Iy.
+//  GOBIERNA la flecha de estas vigas es Iz (IPE300: 603.8 cm⁴ tras el fix C-2), NO Iy.
 // =============================================================================
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -57,9 +57,14 @@ import type { ResultadosCalculo } from "../../src/solver/resultados";
 // Se necesitan para calcular las flechas teoricas. Valores INTERNOS (kN-m), los
 // mismos que el discretizador inyecta en la Capa 2 (verificado en el dump T1.2):
 //   E (S275) = 210000 MPa = 2.1e8 kN/m²   (aceros.ts)
-//   Iz (IPE300, eje debil = flexion vertical de estas vigas) = 6038 cm⁴ = 6.038e-5 m⁴
+//   Iz (IPE300, eje debil = flexion vertical de estas vigas) = 603.8 cm⁴ = 6.038e-6 m⁴
+//   AUDITORIA [C-2]: la tabla IPE estaba 10x inflada (guardaba 6038 cm⁴); corregida
+//   a EN 10365. Esta constante refleja lo que la Capa 2 inyecta HOY (el campo Iz del
+//   catalogo): la flecha teorica y el motor comparten el mismo valor.
+//   OJO [C-1, pendiente]: fisicamente una viga IPE300 de pie deberia flectar con su
+//   eje FUERTE (Iy=8356 cm⁴); que use Iz es el hallazgo de ejes de la auditoria.
 const E_ACERO = 2.1e8; // kN/m²
-const IZ_IPE300 = 6.038e-5; // m⁴ (eje que gobierna la flexion vertical, ver cabecera)
+const IZ_IPE300 = 6.038e-6; // m⁴ (eje que gobierna la flexion vertical, ver cabecera)
 
 // Helper de assert: usa el detalle de la comparacion para un mensaje "real vs
 // teorico" claro. NO afloja la tolerancia: si falla, el bug es del pipeline.
@@ -489,15 +494,20 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       assertOk(compararReaccion(Math.abs(rmomMax), RmomTeo), "voladizo R_mom=PL");
 
       // FLECHA: regresion (afectada por la flexibilidad del pilar de empotramiento).
-      // Se comprueba que es un descenso de orden de magnitud razonable (cm) y se
-      // documenta que NO es la formula del voladizo puro PL³/3EI (~1.42 cm), sino
-      // mayor por el desplome del pilar (~5.68 cm medido). No es validacion analitica.
+      // Se comprueba que el descenso queda ENTRE la flecha del voladizo puro PL³/3EI
+      // (cota inferior: el empotramiento real es MAS flexible que el ideal) y un
+      // multiplo sano de esa referencia (el desplome del pilar la infla ~4x, se
+      // admite hasta 6x). Cotas RELATIVAS a EI para que el golden no se rompa al
+      // corregir el catalogo (AUDITORIA [C-2]: con la IPE 10x inflada la cota
+      // absoluta anterior de 0,5 m escondia que la flecha real era 10x mayor).
       const flechaPuroTeo = (P * L ** 3) / (3 * E_ACERO * IZ_IPE300); // referencia (NO esperada)
       const flechaReal = Math.abs(flechaMaxDescenso(res, combo));
       expect(flechaReal, "voladizo: descenso > flecha de voladizo puro (pilar flexible)").toBeGreaterThan(
         flechaPuroTeo,
       );
-      expect(flechaReal, "voladizo: descenso en rango sano (< 0.5 m)").toBeLessThan(0.5);
+      expect(flechaReal, "voladizo: descenso < 6x voladizo puro (rango sano)").toBeLessThan(
+        6 * flechaPuroTeo,
+      );
       console.warn(
         `[GOLDEN][voladizo flecha REGRESION] real=${flechaReal.toExponential(4)} m ` +
           `(voladizo puro PL³/3EI=${flechaPuroTeo.toExponential(4)} m, inflada por desplome del pilar)`,
@@ -603,10 +613,16 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       // (no aflojar el golden). Valores medidos en T1.2 con el par de versiones fijado.
       // El dintel se identifica por GEOMETRIA (la barra horizontal a la cota H),
       // no por magnitud: blinda contra empates con el flector de los pilares.
+      // RECAPTURA AUDITORIA [C-2] (2026-07): el snapshot anterior (19.18949 /
+      // -18.31051 / 9.56493) se midio con la serie IPE 10x inflada. Al corregir el
+      // catalogo a EN 10365 la rigidez EI del portico baja 10x con EA intacta, y el
+      // reparto hiperestatico se mueve ~0,2%. Numeros re-medidos con el par de
+      // versiones fijado. Invariante fisico que los valida: M+ - M- = qB²/8 = 37,5
+      // exacto (momento isostatico total del vano).
       const dintel = barraViga(res, fem, combo);
-      assertOk(compararEsfuerzo(dintel.max_moment_z, 19.18949), "portico REG M+ dintel (centro)");
-      assertOk(compararEsfuerzo(dintel.min_moment_z, -18.31051), "portico REG M- dintel (apoyos)");
-      assertOk(compararReaccion(Math.abs(basesHoriz[0]), 9.56493), "portico REG empuje horizontal");
+      assertOk(compararEsfuerzo(dintel.max_moment_z, 19.22662), "portico REG M+ dintel (centro)");
+      assertOk(compararEsfuerzo(dintel.min_moment_z, -18.27338), "portico REG M- dintel (apoyos)");
+      assertOk(compararReaccion(Math.abs(basesHoriz[0]), 9.61032), "portico REG empuje horizontal");
     },
     TIMEOUT_ARRANQUE,
   );

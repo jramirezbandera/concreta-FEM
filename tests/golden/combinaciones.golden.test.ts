@@ -59,9 +59,10 @@ import { categoriaUso } from "../../src/biblioteca";
 
 // --- Constantes de material/seccion del fixture (S275 + IPE300), ver pipeline --
 // E (S275) = 2.1e8 kN/m²; Iz (IPE300, eje que gobierna la flexion vertical de
-// estas vigas) = 6.038e-5 m⁴. Necesarias para la flecha caracteristica (ELS).
+// estas vigas) = 6.038e-6 m⁴ (603.8 cm⁴, EN 10365; AUDITORIA [C-2]: la tabla IPE
+// estaba 10x inflada y esta constante lo arrastraba). Ver nota [C-1] en pipeline.
 const E_ACERO = 2.1e8; // kN/m²
-const IZ_IPE300 = 6.038e-5; // m⁴
+const IZ_IPE300 = 6.038e-6; // m⁴
 
 // Ids de hipotesis REALES sembradas por crearModeloVacio() (src/dominio/helpers):
 // la permanente "cargas muertas" (factor 1,35 en ELU) y la variable "sobrecarga de

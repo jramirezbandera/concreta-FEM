@@ -34,26 +34,31 @@ type PerfilCrudo = [
 
 // IPE (perfiles I de alas estrechas y paralelas).
 // Fuente: EN 10365 (T1.2), eurocodeapplied/ArcelorMittal.
-// VERIFICAR It (J) contra EN 10365
+// CORRECCION AUDITORIA [C-2] (2026-07): la tabla original almacenaba Iy/Iz/It en
+// mm⁴/1000 (= cm⁴ × 10) en vez de cm⁴ — TODA la serie estaba 10× inflada (IPE 300
+// guardaba Iy=83560 cm⁴; el oficial EN 10365 es 8356 cm⁴, ya verificado por la
+// propia I+D en investigacion/verificacion/04-verif-normativa.md:199). `A_cm2`
+// estaba bien. Valores re-cotejados 1:1 contra EN 10365; blindado por
+// perfiles.oficial.test.ts (valores oficiales independientes, no tautologicos).
 const IPE_CRUDO: PerfilCrudo[] = [
-  ["IPE 80", 7.64, 801.4, 84.89, 6.727],
-  ["IPE 100", 10.32, 1710, 159.2, 11.53],
-  ["IPE 120", 13.21, 3178, 276.7, 16.89],
-  ["IPE 140", 16.43, 5412, 449.2, 24.01],
-  ["IPE 160", 20.09, 8693, 683.1, 35.3],
-  ["IPE 180", 23.95, 13170, 1009, 47.23],
-  ["IPE 200", 28.48, 19430, 1424, 68.46],
-  ["IPE 220", 33.37, 27720, 2049, 89.82],
-  ["IPE 240", 39.12, 38920, 2836, 127.4],
-  ["IPE 270", 45.95, 57900, 4199, 157.1],
-  ["IPE 300", 53.81, 83560, 6038, 197.5],
-  ["IPE 330", 62.61, 117700, 7881, 275.9],
-  ["IPE 360", 72.73, 162700, 10430, 370.8],
-  ["IPE 400", 84.46, 231300, 13180, 504.1],
-  ["IPE 450", 98.82, 337400, 16760, 660.5],
-  ["IPE 500", 115.52, 482000, 21420, 886.2],
-  ["IPE 550", 134.42, 671200, 26680, 1217],
-  ["IPE 600", 155.98, 920800, 33870, 1646],
+  ["IPE 80", 7.64, 80.14, 8.489, 0.6727],
+  ["IPE 100", 10.32, 171.0, 15.92, 1.153],
+  ["IPE 120", 13.21, 317.8, 27.67, 1.689],
+  ["IPE 140", 16.43, 541.2, 44.92, 2.401],
+  ["IPE 160", 20.09, 869.3, 68.31, 3.53],
+  ["IPE 180", 23.95, 1317, 100.9, 4.723],
+  ["IPE 200", 28.48, 1943, 142.4, 6.846],
+  ["IPE 220", 33.37, 2772, 204.9, 8.982],
+  ["IPE 240", 39.12, 3892, 283.6, 12.74],
+  ["IPE 270", 45.95, 5790, 419.9, 15.71],
+  ["IPE 300", 53.81, 8356, 603.8, 19.75],
+  ["IPE 330", 62.61, 11770, 788.1, 27.59],
+  ["IPE 360", 72.73, 16270, 1043, 37.08],
+  ["IPE 400", 84.46, 23130, 1318, 50.41],
+  ["IPE 450", 98.82, 33740, 1676, 66.05],
+  ["IPE 500", 115.52, 48200, 2142, 88.62],
+  ["IPE 550", 134.42, 67120, 2668, 121.7],
+  ["IPE 600", 155.98, 92080, 3387, 164.6],
 ];
 
 // HEB (serie europea de alas anchas, variante B).

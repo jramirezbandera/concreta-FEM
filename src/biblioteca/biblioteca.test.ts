@@ -220,11 +220,15 @@ describe("Catalogo F1 completo (IPE 18 + HEB 19) y consultables por id", () => {
     const s = getSeccion("IPE200");
     expect(s).toBeDefined();
     if (s) {
-      // Valores de catalogo (cm², cm⁴) convertidos con la MISMA cadena de borde.
+      // Valores OFICIALES EN 10365 (cm², cm⁴) convertidos con la cadena de borde.
+      // AUDITORIA [C-2]: antes este test usaba el dato crudo de la propia tabla
+      // (19430, que estaba 10x inflado) como esperado — era tautologico. Ahora los
+      // literales son independientes; la verificacion sistematica de toda la serie
+      // vive en perfiles.oficial.test.ts.
       expect(s.A).toBeCloseTo(cm2ToM2(28.48), 12);
-      expect(s.Iy).toBeCloseTo(cm4ToM4(19430), 12);
-      expect(s.Iz).toBeCloseTo(cm4ToM4(1424), 12);
-      expect(s.J).toBeCloseTo(cm4ToM4(68.46), 12);
+      expect(s.Iy).toBeCloseTo(cm4ToM4(1943), 12);
+      expect(s.Iz).toBeCloseTo(cm4ToM4(142.4), 12);
+      expect(s.J).toBeCloseTo(cm4ToM4(6.846), 12);
     }
   });
 
@@ -235,7 +239,7 @@ describe("Catalogo F1 completo (IPE 18 + HEB 19) y consultables por id", () => {
     if (s) {
       const polar = s.Iy + s.Iz; // lo que J NO debe ser
       expect(s.J).toBeLessThan(polar);
-      // It (68.46 cm⁴) es mucho menor que Ip (~20854 cm⁴): ratio > 100.
+      // It (6.846 cm⁴) es mucho menor que Ip (~2085 cm⁴): ratio > 100.
       expect(polar / s.J).toBeGreaterThan(100);
     }
   });
