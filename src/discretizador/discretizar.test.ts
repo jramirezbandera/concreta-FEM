@@ -518,6 +518,39 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       });
       expect(apoyosEnPie).toHaveLength(1);
     });
+
+    // [AUDITORIA A-1] La carga lineal del usuario sobre un PILAR PASANTE es del
+    // ELEMENTO entero: debe emitirse en TODOS sus tramos (espejo del peso propio,
+    // Paso 6b). Antes solo el tramo del pie la recibia (`barraPorAmbito` mapea el
+    // primer tramo): un pilar de 2 plantas con w=10 kN/m recibia 30 kN en vez de
+    // 60, y ademas mal ubicados — esfuerzos MENORES que los reales presentados
+    // como validos, sin error ni aviso (check_statics no lo caza: las cargas
+    // aplicadas son autoconsistentes, solo que son menos de las pedidas).
+    it("AUDITORIA A-1: carga lineal sobre pilar pasante llega a TODOS los tramos", () => {
+      const m = modeloPortico();
+      // p0(0) - p1(3) - p2(6); el pilar pasa de p0 a p2 (2 tramos).
+      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+      m.pilares[0].plantaFinal = "p2";
+      // La unica carga: lineal de 10 kN/m sobre EL PILAR (no la viga).
+      m.cargas = [{ id: "c1", tipo: "lineal", ambito: "pil1", valor: 10, hipotesisId: "h1" }];
+      const fem = discretizarOk(m);
+
+      // El pilar son 2 tramos verticales (la viga de p1 es la 3a barra).
+      const coordY = new Map(fem.nodes.map((n) => [n.name, n.y] as const));
+      const tramosPilar = fem.members
+        .filter((mm) => coordY.get(mm.i) !== coordY.get(mm.j))
+        .map((mm) => mm.name);
+      expect(tramosPilar).toHaveLength(2);
+
+      // La carga de usuario (case h1) debe cubrir AMBOS tramos con w=-10 (FY, #3).
+      const cargasPilar = fem.dist_loads.filter((dl) => dl.case === "h1");
+      expect(cargasPilar.map((dl) => dl.member).sort()).toEqual([...tramosPilar].sort());
+      for (const dl of cargasPilar) {
+        expect(dl.direction).toBe("FY");
+        expect(dl.w1).toBe(-10);
+        expect(dl.w2).toBe(-10);
+      }
+    });
   });
 
   // --- Peso propio automatico (F2a, A-core paso 4 + E1/E3/E4) ------------------
