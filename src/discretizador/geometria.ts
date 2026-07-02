@@ -44,3 +44,21 @@ export function clavePosicion(
   };
   return `${q(x)}|${q(y)}|${q(z)}`;
 }
+
+// [AUDITORIA M-4] Igualdad de nudo EN PLANTA con el criterio REAL del snapping
+// (clave de rejilla), para UI/comandos. Antes comandosModelo/imanViga/
+// colocacionVigaLogica replicaban el predicado con DISTANCIA EUCLIDEA < TOL_NODO,
+// que diverge de la clave en la frontera de celda (dos puntos a <TOL en celdas
+// distintas NO colapsan en el FEM; a >TOL en la misma celda SI): la UI podia
+// creer "unido" lo que el solver separa (mecanismo silencioso) o viceversa. Este
+// helper es el UNICO predicado valido de "mismo nudo" fuera del discretizador.
+// La cota es irrelevante para la igualdad en planta (se compara a cota 0).
+export function mismaPosicionEnPlanta(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): boolean {
+  return (
+    clavePosicion(mapearEjes(a.x, a.y, 0), TOL_NODO) ===
+    clavePosicion(mapearEjes(b.x, b.y, 0), TOL_NODO)
+  );
+}

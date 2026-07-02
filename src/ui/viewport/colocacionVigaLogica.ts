@@ -6,9 +6,10 @@
 import type { DatosViga, ExtremoViga } from "../../estado";
 import { nudoPorId } from "../../dominio";
 import type { Modelo } from "../../dominio";
-// Misma tolerancia de fusion de nudos que el discretizador (feature-4) y crearViga:
-// dos extremos a <1 mm son "el mismo punto" -> viga degenerada. Fuente unica.
-import { TOL_NODO } from "../../discretizador/discretizar";
+// [AUDITORIA M-4] MISMO criterio de fusion que el discretizador y crearViga: la
+// CLAVE DE REJILLA (mismaPosicionEnPlanta), no distancia euclidea (que diverge en
+// la frontera de celda). Dos extremos en la misma celda -> viga degenerada.
+import { mismaPosicionEnPlanta } from "../../discretizador/geometria";
 
 // Posicion de dibujo (x,y) de un extremo ya resuelto: {nudoId} se busca en el
 // modelo; {x,y} se usa tal cual. null si la referencia de nudo esta rota (no
@@ -25,10 +26,10 @@ export function posicionExtremo(
 }
 
 // True si dos extremos resuelven al MISMO punto (una viga con I===J es degenerada y
-// no se crea). Con `modelo`, compara por POSICION fisica con tolerancia TOL_NODO
-// (mismo criterio que el discretizador): cubre el caso id-vs-coords y los floats
-// casi iguales, no solo la igualdad exacta. Sin `modelo`, cae al chequeo barato por
-// id/coords exactas (suficiente para los casos del mismo tipo).
+// no se crea). Con `modelo`, compara por POSICION fisica con la CLAVE DE REJILLA
+// (mismaPosicionEnPlanta, el criterio del discretizador — [M-4]): cubre el caso
+// id-vs-coords y los floats casi iguales, no solo la igualdad exacta. Sin `modelo`,
+// cae al chequeo barato por id/coords exactas (suficiente para los del mismo tipo).
 export function extremosCoinciden(
   a: ExtremoViga,
   b: ExtremoViga,
@@ -38,7 +39,7 @@ export function extremosCoinciden(
     const pa = posicionExtremo(modelo, a);
     const pb = posicionExtremo(modelo, b);
     if (pa !== null && pb !== null) {
-      return Math.hypot(pa.x - pb.x, pa.y - pb.y) < TOL_NODO;
+      return mismaPosicionEnPlanta(pa, pb);
     }
     // Si alguna referencia esta rota, cae al chequeo exacto de abajo.
   }

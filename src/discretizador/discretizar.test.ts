@@ -6,6 +6,7 @@ import {
   clavePosicion,
   releasesDeExtremo,
 } from "./discretizar";
+import { mismaPosicionEnPlanta } from "./geometria";
 import { ModeloFEMSchema } from "./contratoFEM";
 import { type Modelo } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
@@ -76,6 +77,23 @@ describe("helpers puros", () => {
   it("mapearEjes (#18 Y vertical): planta (x,y) + cota -> [x, cota, y]", () => {
     expect(mapearEjes(2, 5, 0)).toEqual([2, 0, 5]);
     expect(mapearEjes(2, 5, 3)).toEqual([2, 3, 5]);
+  });
+
+  it("mismaPosicionEnPlanta usa la CLAVE de rejilla, no distancia euclidea ([M-4])", () => {
+    // Frontera de celda: dos puntos a 0.02 mm (<< TOL) pero en CELDAS distintas
+    // (0.00049 -> celda 0; 0.00051 -> celda 1). El euclideo los fusionaria; el
+    // criterio real del snapping NO. UI y solver deben decidir IGUAL: si esto
+    // divergiera, la UI podria creer "unido" lo que el FEM separa (mecanismo).
+    expect(
+      mismaPosicionEnPlanta({ x: 0.00049, y: 0 }, { x: 0.00051, y: 0 }),
+    ).toBe(false);
+    // Misma celda aunque euclideo > TOL en diagonal (0.85 mm en x e y: 1.2 mm de
+    // distancia): el snapping los colapsa -> la UI debe tratarlos como el mismo.
+    expect(
+      mismaPosicionEnPlanta({ x: 0.0008, y: 0.0008 }, { x: 0.0012, y: 0.0012 }),
+    ).toBe(true);
+    // Caso comun: coordenadas identicas -> mismo nudo.
+    expect(mismaPosicionEnPlanta({ x: 2.5, y: 7 }, { x: 2.5, y: 7 })).toBe(true);
   });
 
   it("clavePosicion cuantiza a la rejilla de TOL_NODO (snapping determinista)", () => {

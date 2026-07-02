@@ -18,7 +18,10 @@ import type {
 import { crearComandoParches } from "./comando";
 import type { Comando } from "./comando";
 import { nuevoId } from "../ids";
-import { TOL_NODO } from "../../discretizador/discretizar";
+// [AUDITORIA M-4] mismaPosicionEnPlanta = criterio REAL del snapping (clave de
+// rejilla, geometria.ts), no distancia euclidea: UI y solver deciden "mismo
+// nudo" con el MISMO predicado y no pueden divergir en la frontera de celda.
+import { mismaPosicionEnPlanta } from "../../discretizador/geometria";
 import { esHipotesisAutomatica } from "../../dominio";
 
 // Datos del pilar que aporta el llamante: todo Pilar salvo id (interno, lo genera
@@ -133,17 +136,18 @@ export type ExtremoViga = { nudoId: string } | { x: number; y: number };
 
 // Resuelve un extremo a un id de nudo SOBRE el borrador Immer (misma receta que la
 // viga => un solo paso de undo). Si viene como {nudoId} se usa tal cual. Si viene
-// como {x,y}: se reusa el primer nudo a distancia euclidea < TOL_NODO (la misma
-// tolerancia de snapping del discretizador, importada para no divergir); si no hay
-// ninguno, se hace push de un Nudo nuevo. Los nudos recien creados en esta misma
+// como {x,y}: se reusa el primer nudo que comparte CELDA de rejilla
+// (mismaPosicionEnPlanta, el criterio REAL del snapping del discretizador; antes
+// se usaba distancia euclidea, que diverge en la frontera de celda — [M-4]); si no
+// hay ninguno, se hace push de un Nudo nuevo. Los nudos recien creados en esta misma
 // receta ya estan en borrador.nudos, de modo que un segundo extremo en el mismo
 // punto reusa el del primero (coherencia I/J sin crear duplicados).
 function resolverExtremo(borrador: Modelo, extremo: ExtremoViga): string {
   if ("nudoId" in extremo) return extremo.nudoId;
   const { x, y } = extremo;
-  const existente = borrador.nudos.find(
-    (n) => Math.hypot(n.x - x, n.y - y) < TOL_NODO,
-  );
+  // [M-4] Criterio de rejilla (el del discretizador), NO euclideo: si dos puntos
+  // comparten celda, el FEM los colapsara a un nodo -> deben compartir Nudo aqui.
+  const existente = borrador.nudos.find((n) => mismaPosicionEnPlanta(n, { x, y }));
   if (existente) return existente.id;
   const nudo: Nudo = { id: nuevoId(), x, y };
   borrador.nudos.push(nudo);
@@ -257,9 +261,8 @@ export type DatosPano = {
 // misma posicion en una misma receta).
 function resolverPuntoPerimetro(borrador: Modelo, punto: { x: number; y: number }): string {
   const { x, y } = punto;
-  const existente = borrador.nudos.find(
-    (n) => Math.hypot(n.x - x, n.y - y) < TOL_NODO,
-  );
+  // [M-4] Criterio de rejilla (ver resolverExtremo).
+  const existente = borrador.nudos.find((n) => mismaPosicionEnPlanta(n, punto));
   if (existente) return existente.id;
   const nudo: Nudo = { id: nuevoId(), x, y };
   borrador.nudos.push(nudo);

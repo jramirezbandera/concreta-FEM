@@ -102,7 +102,15 @@ describe("AUDITORIA A-3: ModeloFEMSchema (Capa 2) rechaza ±Infinity", () => {
     expect(ModeloFEMSchema.safeParse(femMinimo()).success).toBe(true);
   });
 
-  const casos: Array<[string, (fem: any) => void]> = [
+  // Tipo estructural minimo de las rutas que mutan los casos (sin `any`).
+  type FemMut = {
+    nodes: { x: number }[];
+    materials: { E: number }[];
+    sections: { Iz: number }[];
+    dist_loads: { w1: number }[];
+    combos: { factors: Record<string, number> }[];
+  };
+  const casos: Array<[string, (fem: FemMut) => void]> = [
     ["node.x = Infinity", (f) => { f.nodes[0].x = Infinity; }],
     ["material.E = Infinity", (f) => { f.materials[0].E = Infinity; }],
     ["section.Iz = Infinity", (f) => { f.sections[0].Iz = Infinity; }],
@@ -111,7 +119,7 @@ describe("AUDITORIA A-3: ModeloFEMSchema (Capa 2) rechaza ±Infinity", () => {
   ];
   it.each(casos)("rechaza %s", (_titulo, mutar) => {
     const fem = femMinimo();
-    mutar(fem);
+    mutar(fem as FemMut);
     expect(ModeloFEMSchema.safeParse(fem).success).toBe(false);
   });
 });
@@ -145,7 +153,15 @@ describe("AUDITORIA M-2: ResultadosCalculoSchema rechaza ±Infinity", () => {
     expect(ResultadosCalculoSchema.safeParse(resultadosMinimos()).success).toBe(true);
   });
 
-  const casos: Array<[string, (r: any) => void]> = [
+  // Tipo estructural minimo de las rutas que mutan los casos (sin `any`).
+  type ResMut = {
+    nodos: Record<string, Record<string, { disp: number[]; rxn: number[] }>>;
+    barras: Record<
+      string,
+      Record<string, { moment_z: number[][]; min_moment_z: number; deformada_global: number[][] }>
+    >;
+  };
+  const casos: Array<[string, (r: ResMut) => void]> = [
     ["rxn FY = Infinity", (r) => { r.nodos.N1.ELS.rxn[1] = Infinity; }],
     ["disp DY = -Infinity", (r) => { r.nodos.N1.ELS.disp[1] = -Infinity; }],
     ["moment_z[1][1] = Infinity", (r) => { r.barras.M1.ELS.moment_z[1][1] = Infinity; }],
@@ -154,7 +170,7 @@ describe("AUDITORIA M-2: ResultadosCalculoSchema rechaza ±Infinity", () => {
   ];
   it.each(casos)("rechaza %s", (_titulo, mutar) => {
     const res = resultadosMinimos();
-    mutar(res);
+    mutar(res as ResMut);
     expect(ResultadosCalculoSchema.safeParse(res).success).toBe(false);
   });
 });

@@ -458,12 +458,16 @@ const datosVigaBase = {
 };
 
 describe("crearViga", () => {
-  it("reusa un nudo existente cuando el extremo cae a < TOL_NODO (no crea nudo)", () => {
+  it("reusa un nudo existente cuando el extremo cae en su MISMA celda de rejilla ([M-4])", () => {
     modeloStore.getState().cargarModelo(modeloConVigas());
-    // Extremo I a 0.5 mm del nudo n1 (0,0): dentro de TOL_NODO (1 mm) => reusa n1.
+    // Extremo I a 0.4 mm del nudo n1 (0,0): MISMA celda de rejilla (round(0.4)=0)
+    // => reusa n1. [AUDITORIA M-4] El criterio es la CLAVE de rejilla del
+    // discretizador (mismaPosicionEnPlanta), no distancia euclidea: el valor
+    // anterior del test (0.5 mm) caia en la celda VECINA (round(0.5)=1) — el FEM
+    // lo habria separado de n1 pese a que el euclideo lo llamaba "el mismo".
     const datos: DatosViga = {
       ...datosVigaBase,
-      i: { x: 0.0005, y: 0 },
+      i: { x: 0.0004, y: 0 },
       j: { x: 5, y: 0 },
     };
     modeloStore.getState().ejecutar(crearViga(m(), datos));
