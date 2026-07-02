@@ -89,6 +89,16 @@ export async function ejecutarPipelineAuxiliar<P, R>(
   sink.onCalculando?.(true);
   sink.onErrorMotor?.(null);
 
+  // Navega a "Resultados" salvo en el camino CR (autoSwitchResultados:false, su panel
+  // vive en PLANTA). Se usa tanto en EXITO como en FALLO (validacion o motor): asi un
+  // error de calculo lanzado desde otra pestana es VISIBLE (la tabla de errores/el
+  // BotonCalcular viven en Resultados) en vez de quedar invisible (auditoria UX-L2).
+  const irAResultados = (): void => {
+    if (cfg.autoSwitchResultados !== false) {
+      vistaStore.getState().setPestanaActiva("resultados");
+    }
+  };
+
   try {
     // a. Modelo actual de obra (Capa 1). Capturamos la referencia para el guard de
     // identidad: modeloStore usa Immer, cualquier edicion la reemplaza.
@@ -101,6 +111,10 @@ export async function ejecutarPipelineAuxiliar<P, R>(
       // Solo el camino estatico tiene canal de avisos; lo limpia con avisos=[] (el modal
       // nunca llamaba a onAvisos). No introducimos la llamada salvo que el preparado la traiga.
       if (prep.avisos !== undefined) sink.onAvisos?.(prep.avisos);
+      // UX-L2: navegar a Resultados tambien en el fallo de validacion, para que el
+      // arquitecto VEA los errores (viven en el panel de Resultados) aunque el calculo
+      // se dispare desde otra pestana. El camino CR no navega (autoSwitchResultados:false).
+      irAResultados();
       return;
     }
     // ok:true => limpiamos errores previos; avisos solo si el camino los aporta.
@@ -115,8 +129,14 @@ export async function ejecutarPipelineAuxiliar<P, R>(
     // c.bis Guard de identidad (eng-review D3): si la obra cambio MIENTRAS calculabamos,
     // este resultado corresponde al modelo VIEJO. Comparar identidad basta (Immer
     // reemplaza la referencia en cada edicion). Si cambio, NO lo comprometemos ni
-    // navegamos (el editar ya disparo limpiar() en el store correspondiente).
+    // navegamos (el editar ya disparo limpiar() en el store correspondiente). Antes esto
+    // era un return MUDO: el arquitecto se quedaba sin resultados y sin explicacion
+    // (auditoria UX-L5). Ahora se publica un aviso de obra que el BotonCalcular muestra.
     if (modeloStore.getState().getModelo() !== modelo) {
+      sink.onErrorMotor?.({
+        fase: "calculo",
+        mensaje: "La obra cambió durante el cálculo: vuelve a calcular.",
+      });
       return;
     }
 
@@ -125,9 +145,7 @@ export async function ejecutarPipelineAuxiliar<P, R>(
     // se ve EN PLANTA: navegar a Resultados lo sacaria de donde esta su marcador, asi que
     // no navega.
     cfg.alExito(resultado, prep.payload);
-    if (cfg.autoSwitchResultados !== false) {
-      vistaStore.getState().setPestanaActiva("resultados");
-    }
+    irAResultados();
   } catch (e) {
     // e. Fallo del motor (carga o calculo). No relanzamos: dejamos el error
     // consultable. esErrorMotor distingue el ErrorMotor plano del worker.
@@ -141,6 +159,9 @@ export async function ejecutarPipelineAuxiliar<P, R>(
       };
       sink.onErrorMotor?.(fallo);
     }
+    // UX-L2: el fallo del motor tambien debe ser VISIBLE -> navegar a Resultados (donde
+    // el BotonCalcular muestra ultimoError). El CR no navega (su error se pinta en planta).
+    irAResultados();
   } finally {
     cfg.marcarEnVuelo(false);
     sink.onCalculando?.(false);

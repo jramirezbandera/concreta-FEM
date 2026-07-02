@@ -920,7 +920,7 @@ def serialize_results_modal(m):
     # (mecanismo interno / GDL sin masa): error de obra, no una salida vacia muda.
     if not modos:
         raise MotorInestableModal(
-            "No se pudo calcular ningun modo de vibracion valido: revise apoyos, "
+            "No se pudo calcular ningún modo de vibración válido: revise apoyos, "
             "rigidez y masa del modelo."
         )
 
@@ -1284,8 +1284,8 @@ def calcular(payload, n_points=N_POINTS_DEFAULT):
             "ok": False,
             "error": {
                 "mensaje": (
-                    "El modelo no tiene masa para calcular sus modos de vibracion: "
-                    "active el peso propio o anada cargas permanentes."
+                    "El modelo no tiene masa para calcular sus modos de vibración: "
+                    "active el peso propio o añada cargas permanentes."
                 ),
                 "detalle": "Modal: " + (str(e) or e.__class__.__name__)
                 + "\n" + traceback.format_exc(),

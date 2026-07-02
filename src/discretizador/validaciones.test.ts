@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validarModelo, type ErrorObra } from "./validaciones";
-import { ModeloSchema, type Modelo } from "../dominio";
+import { ModeloSchema, type Modelo, crearModeloVacio } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
 
 // Tests de las validaciones previas (feature-4, T1.2). Proyecto `node` (sin DOM):
@@ -573,6 +573,32 @@ describe("validarModelo", () => {
         espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
       });
       expect(codigos(validarModelo(m))).not.toContain("PANO_SIN_APOYO");
+    });
+  });
+
+  describe("AUDITORIA UX-VACIA: obra sin elementos bloquea el calculo", () => {
+    it("obra vacia (sin pilares/vigas/panos) -> error OBRA_VACIA", () => {
+      // El modelo vacio de partida (crearModeloVacio) trae hipotesis pero NINGUN elemento
+      // estructural: calcular no tendria nada que resolver. Antes procedia en silencio
+      // (validarSujecion hace early-return con obra vacia). Ahora se bloquea en lenguaje
+      // de obra ANTES del motor.
+      const e = validarModelo(crearModeloVacio()).find((x) => x.codigo === "OBRA_VACIA");
+      expect(e).toBeDefined();
+      expect(e!.severidad).toBe("error");
+      expect(e!.elementoTipo).toBe("modelo");
+      sinJergaFEM(e!);
+    });
+
+    it("obra con al menos un elemento NO dispara OBRA_VACIA", () => {
+      // El modelo valido de base tiene pilar + viga: nunca es "obra vacia".
+      expect(codigos(validarModelo(modeloValido()))).not.toContain("OBRA_VACIA");
+    });
+
+    it("obra con solo un pilar (sin vigas ni paños) NO dispara OBRA_VACIA", () => {
+      const m = modeloValido();
+      m.vigas = [];
+      m.cargas = []; // la carga colgaba de la viga eliminada
+      expect(codigos(validarModelo(m))).not.toContain("OBRA_VACIA");
     });
   });
 });

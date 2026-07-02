@@ -171,9 +171,13 @@ const api = {
         ultimoError = {
           fase: "carga",
           mensaje:
-            "No se pudo arrancar el motor de calculo (Pyodide/PyNite). " +
-            "Revisa la conexion y vuelve a intentarlo.",
-          detalle: e instanceof Error ? (e.stack ?? e.message) : String(e),
+            "No se pudo arrancar el motor de cálculo. " +
+            "Revisa la conexión y vuelve a intentarlo.",
+          // El detalle tecnico (motor Pyodide/PyNite) queda fuera del mensaje al
+          // arquitecto: solo para modo avanzado/log.
+          detalle:
+            "Pyodide/PyNite: " +
+            (e instanceof Error ? (e.stack ?? e.message) : String(e)),
         };
         promesaPrecarga = null; // permite reintentar precargar()
         throw ultimoError;
@@ -212,7 +216,7 @@ const api = {
       // Salvaguarda: precargar() deberia haber dejado pyodide; si no, es un bug.
       throw {
         fase: "calculo",
-        mensaje: "El motor de calculo no esta disponible.",
+        mensaje: "El motor de cálculo no está disponible.",
         detalle: "pyodide es null tras precargar().",
       } satisfies ErrorMotor;
     }
@@ -278,7 +282,7 @@ const api = {
       // Fallo inesperado en la frontera (no del glue): envolver como ErrorMotor.
       throw {
         fase: "calculo",
-        mensaje: "Fallo inesperado durante el calculo.",
+        mensaje: "Fallo inesperado durante el cálculo.",
         detalle: e instanceof Error ? (e.stack ?? e.message) : String(e),
       } satisfies ErrorMotor;
     }
@@ -306,7 +310,7 @@ const api = {
     if (!pyodide) {
       throw {
         fase: "calculo",
-        mensaje: "El motor de calculo no esta disponible.",
+        mensaje: "El motor de cálculo no está disponible.",
         detalle: "pyodide es null tras precargar().",
       } satisfies ErrorMotor;
     }
@@ -347,7 +351,7 @@ const api = {
       if (esErrorMotor(e)) throw e;
       throw {
         fase: "calculo",
-        mensaje: "Fallo inesperado durante el calculo modal.",
+        mensaje: "Fallo inesperado durante el cálculo modal.",
         detalle: e instanceof Error ? (e.stack ?? e.message) : String(e),
       } satisfies ErrorMotor;
     }
@@ -378,7 +382,7 @@ const api = {
     if (!pyodide) {
       throw {
         fase: "calculo",
-        mensaje: "El motor de calculo no esta disponible.",
+        mensaje: "El motor de cálculo no está disponible.",
         detalle: "pyodide es null tras precargar().",
       } satisfies ErrorMotor;
     }
@@ -419,7 +423,7 @@ const api = {
       if (esErrorMotor(e)) throw e;
       throw {
         fase: "calculo",
-        mensaje: "Fallo inesperado durante el calculo del centro de rigidez.",
+        mensaje: "Fallo inesperado durante el cálculo del centro de rigidez.",
         detalle: e instanceof Error ? (e.stack ?? e.message) : String(e),
       } satisfies ErrorMotor;
     }

@@ -474,6 +474,28 @@ function validarReferencias(modelo: Modelo, errores: ErrorObra[]): void {
   for (const c of modelo.cargas) validarRefsCarga(c, modelo, errores, ambitosValidos);
 }
 
+// 2e. [AUDITORIA UX-VACIA] Obra vacia: sin NINGUN elemento estructural (pilares, vigas
+// ni paños) no hay nada que calcular. `validarSujecion` hace early-return con obra vacia
+// (un modelo vacio es un punto de partida valido, no un error de sujecion), asi que el
+// calculo procederia hasta el motor y devolveria "resultados" vacios sin aviso. Esta
+// guarda BLOQUEA antes, en lenguaje de obra, para que "Calcular" con la obra vacia guie
+// al arquitecto en vez de fallar en silencio. Error de MODELO (no de un elemento).
+function validarObraVacia(modelo: Modelo, errores: ErrorObra[]): void {
+  if (
+    modelo.pilares.length === 0 &&
+    modelo.vigas.length === 0 &&
+    modelo.panos.length === 0
+  ) {
+    errores.push({
+      codigo: "OBRA_VACIA",
+      severidad: "error",
+      mensaje:
+        "La obra está vacía: introduce pilares o vigas antes de calcular.",
+      elementoTipo: "modelo",
+    });
+  }
+}
+
 // 3. Sujecion suficiente (6 GDL de solido rigido) ANTES del solver.
 // HEURISTICA F1: la estructura debe tener al menos un pilar con vinculacion
 // exterior (su arranque sujeta la obra al terreno). Sin ninguno, la estructura
@@ -648,6 +670,7 @@ export function validarModelo(modelo: Modelo, modal?: ContextoModal): ErrorObra[
   validarPilaresDegenerados(modelo, errores); // [M-3] pilar de longitud 0
   validarReferencias(modelo, errores);
   validarHipotesisPesoPropio(modelo, errores); // E1: guard de desincronizacion
+  validarObraVacia(modelo, errores); // UX-VACIA: sin elementos no hay nada que calcular
   validarSujecion(modelo, errores);
   validarHipotesisConCargas(modelo, errores);
   validarVariablesConcomitantes(modelo, errores);
