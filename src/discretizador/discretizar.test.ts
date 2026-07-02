@@ -762,17 +762,20 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       expect(empotrados.length).toBeGreaterThan(0);
     });
 
-    it("bordeApoyo 'libre' -> sin apoyos de borde, PERO estabilizacion en el plano (DX/DZ)", () => {
-      // Una losa "libre" sola NO esta sujeta verticalmente (validarSujecion lo bloquea),
-      // asi que se anade un pilar que la sujeta y se comprueba que el paño no aporta DY.
+    it("bordeApoyo 'libre' -> BLOQUEA con PANO_SIN_APOYO ([AUDITORIA M-5])", () => {
+      // ANTES este test verificaba la traduccion de 'libre' (sin DY de borde +
+      // estabilizacion DX/DZ). La auditoria M-5 comprobo con el MOTOR REAL que una
+      // losa 'libre' AISLADA (corte 1: sin acople al portico) es SIEMPRE inestable
+      // (PyNite lanza con mensaje tecnico): ahora se bloquea antes, en lenguaje de
+      // obra. La traduccion de 'libre' (sin DY + estabilizacion) sigue en el codigo
+      // para el acople futuro (T-f3-pano-acople); al relajar este bloqueo, recuperar
+      // el assert original.
       const m = modeloConLosa({ bordeApoyo: "libre" });
-      const fem = discretizarOk(m);
-      const apoyosMalla = fem.supports.filter((s) => s.node.startsWith("PQ0-N"));
-      // Sin apoyo de borde => ningun nudo de malla restringe DY (la flecha).
-      expect(apoyosMalla.every((s) => !s.DY)).toBe(true);
-      // Pero SI hay estabilizacion en el plano (DX/DZ) para no quedar singular en X-Z.
-      const conPlano = apoyosMalla.filter((s) => s.DX || s.DZ);
-      expect(conPlano.length).toBeGreaterThan(0);
+      const res = discretizar(m);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errores.map((e) => e.codigo)).toContain("PANO_SIN_APOYO");
+      }
     });
 
     it("estabilizacion en el plano: SIEMPRE presente (DX/DZ en 2 nudos de borde)", () => {

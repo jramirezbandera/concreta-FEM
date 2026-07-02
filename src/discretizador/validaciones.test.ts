@@ -529,4 +529,50 @@ describe("validarModelo", () => {
       expect(codigos(validarModelo(modeloValido()))).not.toContain("PILAR_DEGENERADO");
     });
   });
+
+  // ============================================================================
+  // [AUDITORIA M-5] LOSA con bordeApoyo="libre": en el corte 1 los paños son
+  // AISLADOS (sin acople al portico), asi que una losa con todos los bordes
+  // libres no tiene sujecion vertical POSIBLE: el motor siempre lanza inestable
+  // (verificado con el motor real: PyNite _check_stability caza los GDL sin
+  // rigidez), con un mensaje tecnico. Mejor bloquear ANTES en lenguaje de obra.
+  // ============================================================================
+  describe("AUDITORIA M-5: losa con borde libre (aislada) bloquea", () => {
+    it("pano losa con bordeApoyo libre -> error PANO_SIN_APOYO", () => {
+      const m = modeloValido();
+      m.nudos.push(
+        { id: "q1", x: 10, y: 10 },
+        { id: "q2", x: 14, y: 10 },
+        { id: "q3", x: 14, y: 13 },
+        { id: "q4", x: 10, y: 13 },
+      );
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["q1", "q2", "q3", "q4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "libre",
+      });
+      const errores = validarModelo(m);
+      const e = errores.filter((x) => x.codigo === "PANO_SIN_APOYO");
+      expect(e.length).toBe(1);
+      expect(e[0].severidad).toBe("error");
+      expect(e[0].elementoId).toBe("pano1");
+      sinJergaFEM(e[0]);
+    });
+
+    it("pano losa con borde simple/empotrado NO dispara PANO_SIN_APOYO", () => {
+      const m = modeloValido();
+      m.nudos.push(
+        { id: "q1", x: 10, y: 10 },
+        { id: "q2", x: 14, y: 10 },
+        { id: "q3", x: 14, y: 13 },
+        { id: "q4", x: 10, y: 13 },
+      );
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["q1", "q2", "q3", "q4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      });
+      expect(codigos(validarModelo(m))).not.toContain("PANO_SIN_APOYO");
+    });
+  });
 });

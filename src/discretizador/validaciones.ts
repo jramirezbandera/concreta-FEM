@@ -319,6 +319,22 @@ function validarRefsPano(pano: Pano, modelo: Modelo, errores: ErrorObra[]): void
     });
   }
 
+  // [AUDITORIA M-5] Losa con TODOS los bordes libres: en el corte 1 los paños son
+  // AISLADOS (sin acople al portico), asi que sin apoyo de borde no hay sujecion
+  // vertical POSIBLE y el motor siempre lanza inestable (verificado con el motor
+  // real; el mensaje crudo de PyNite es jerga tecnica). Se bloquea AQUI en lenguaje
+  // de obra. Cuando exista el acople malla<->portico (T-f3-pano-acople) este bloqueo
+  // debera relajarse para losas apoyadas en vigas.
+  if (pano.bordeApoyo === "libre") {
+    errores.push({
+      codigo: "PANO_SIN_APOYO",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" tiene todos los bordes libres: sin apoyo no se sostiene. Elige borde apoyado o empotrado.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+
   // Perimetro: corte 1 = rectangulo de 4 nudos PROPIOS existentes. El schema admite
   // >=3 (un poligono generico futuro); aqui se exige exactamente 4 para la losa.
   if (pano.perimetro.length !== 4) {
