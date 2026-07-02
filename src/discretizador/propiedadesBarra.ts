@@ -52,6 +52,32 @@ export function resolverSeccion(seccion: Seccion): SeccionFEM {
   }
 }
 
+// --- [AUDITORIA C-1] Seccion FEM para VIGA: intercambio Iy<->Iz ----------------
+// CONVENCION DE LA APP (catalogos y dominio): `Iy` es la inercia del eje FUERTE de
+// la seccion tal como la tabulan los catalogos europeos (EN 10365) y la derivan las
+// parametricas (`Iy = b·h³/12`, el canto gobierna): la que debe gobernar la flexion
+// VERTICAL de una viga con la seccion "de pie".
+//
+// REALIDAD DE PYNITE (verificada contra el fuente de PyNiteFEA 2.0.2, Member3D):
+//  - k(): la flexion en el plano local x-y usa el campo `Iz` (12·E·Iz/L³); la del
+//    plano local x-z usa `Iy`.
+//  - T(): para una barra HORIZONTAL el eje local y es el VERTICAL global ([0,1,0]).
+//  => la flexion VERTICAL de una viga la gobierna el campo `Iz` de add_section.
+//
+// Por eso una VIGA debe emitirse con los campos INTERCAMBIADOS (FEM Iz := Iy de
+// catalogo; FEM Iy := Iz de catalogo). Un PILAR NO: para un miembro VERTICAL
+// PyNite fija y=[-1,0,0], z=[0,0,1], y con `angulo=0` el mapeo directo ya orienta
+// b segun obra-x y h segun obra-y (correcto). El intercambio se aplica en el
+// discretizador SOLO a las secciones que consumen vigas (variante con sufijo).
+//
+// Antes de este fix las vigas flectaban con el eje DEBIL (flecha (h/b)² veces
+// mayor en rectangulares; reproducido por el golden "AUDITORIA C-1" del pipeline).
+export const SUFIJO_SECCION_VIGA = "~viga";
+
+export function seccionFEMParaViga(s: SeccionFEM): SeccionFEM {
+  return { name: s.name + SUFIJO_SECCION_VIGA, A: s.A, Iy: s.Iz, Iz: s.Iy, J: s.J };
+}
+
 // Resuelve una SeccionFEM por id aceptando las DOS fuentes, igual que ya hacen las
 // validaciones de UI (validacionesPilar/Viga) y el SelectSeccion: una seccion de OBRA
 // (modelo.secciones; hormigon parametrico o perfil materializado) o un PERFIL del

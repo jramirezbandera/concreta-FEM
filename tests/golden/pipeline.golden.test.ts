@@ -30,8 +30,9 @@
 //  La planta (x,y) -> global (X,Z); la cota -> Y vertical. Una viga corre en global
 //  X a altura Y=cota. La carga gravitatoria es FY global NEGATIVA. Para un miembro
 //  horizontal en X, PyNite pone el eje local y = Y global (vertical): la flexion
-//  vertical usa Iz (eje local z) y la flecha es dy local. Por eso la INERCIA QUE
-//  GOBIERNA la flecha de estas vigas es Iz (IPE300: 603.8 cm⁴ tras el fix C-2), NO Iy.
+//  vertical usa el CAMPO Iz de add_section y la flecha es dy local. Tras el fix
+//  [C-1] el discretizador pone el eje FUERTE del catalogo (Iy, IPE300: 8356 cm⁴)
+//  en ese campo al emitir la seccion de una viga (variante "~viga").
 // =============================================================================
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -58,14 +59,15 @@ import { getMaterial } from "../../src/biblioteca";
 // Se necesitan para calcular las flechas teoricas. Valores INTERNOS (kN-m), los
 // mismos que el discretizador inyecta en la Capa 2 (verificado en el dump T1.2):
 //   E (S275) = 210000 MPa = 2.1e8 kN/m²   (aceros.ts)
-//   Iz (IPE300, eje debil = flexion vertical de estas vigas) = 603.8 cm⁴ = 6.038e-6 m⁴
-//   AUDITORIA [C-2]: la tabla IPE estaba 10x inflada (guardaba 6038 cm⁴); corregida
-//   a EN 10365. Esta constante refleja lo que la Capa 2 inyecta HOY (el campo Iz del
-//   catalogo): la flecha teorica y el motor comparten el mismo valor.
-//   OJO [C-1, pendiente]: fisicamente una viga IPE300 de pie deberia flectar con su
-//   eje FUERTE (Iy=8356 cm⁴); que use Iz es el hallazgo de ejes de la auditoria.
+//   I de flexion vertical de la VIGA IPE300 = eje FUERTE Iy = 8356 cm⁴ = 8.356e-5 m⁴
+//   AUDITORIA [C-2]+[C-1]: la tabla IPE estaba 10x inflada (corregida a EN 10365) y
+//   las vigas flectaban con el eje DEBIL. El discretizador emite ahora la seccion de
+//   viga con Iy/Iz intercambiados (sufijo "~viga", seccionFEMParaViga) para que el
+//   eje fuerte del catalogo aterrice en el campo Iz que PyNite usa en la flexion
+//   vertical de una barra horizontal. La referencia teorica de la flecha usa por
+//   tanto el Iy de catalogo (eje fuerte).
 const E_ACERO = 2.1e8; // kN/m²
-const IZ_IPE300 = 6.038e-6; // m⁴ (eje que gobierna la flexion vertical, ver cabecera)
+const I_VIGA_IPE300 = 8.356e-5; // m⁴ (Iy catalogo, eje fuerte: gobierna la flexion vertical)
 
 // Helper de assert: usa el detalle de la comparacion para un mensaje "real vs
 // teorico" claro. NO afloja la tolerancia: si falla, el bug es del pipeline.
@@ -254,7 +256,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       const Mteo = (q * L * L) / 8; // 45 kN·m (magnitud del pico)
       const Vteo = (q * L) / 2; // 30 kN
       const Rteo = (q * L) / 2; // 30 kN por apoyo
-      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * IZ_IPE300); // m (descenso)
+      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * I_VIGA_IPE300); // m (descenso)
 
       const viga = barraViga(res, fem, combo);
 
@@ -378,7 +380,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       if (!corrida) return;
       const { res, fem } = corrida;
       const combo = "ELS";
-      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * IZ_IPE300);
+      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * I_VIGA_IPE300);
 
       // La viga horizontal (vano cargado), por geometria.
       const name = nombreVigaHorizontal(fem);
@@ -494,21 +496,23 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       }
       assertOk(compararReaccion(Math.abs(rmomMax), RmomTeo), "voladizo R_mom=PL");
 
-      // FLECHA: regresion (afectada por la flexibilidad del pilar de empotramiento).
-      // Se comprueba que el descenso queda ENTRE la flecha del voladizo puro PL³/3EI
-      // (cota inferior: el empotramiento real es MAS flexible que el ideal) y un
-      // multiplo sano de esa referencia (el desplome del pilar la infla ~4x, se
-      // admite hasta 6x). Cotas RELATIVAS a EI para que el golden no se rompa al
-      // corregir el catalogo (AUDITORIA [C-2]: con la IPE 10x inflada la cota
-      // absoluta anterior de 0,5 m escondia que la flecha real era 10x mayor).
-      const flechaPuroTeo = (P * L ** 3) / (3 * E_ACERO * IZ_IPE300); // referencia (NO esperada)
+      // FLECHA: cuasi-analitica (AUDITORIA [C-1]). El descenso del extremo se
+      // descompone en dos terminos con forma cerrada:
+      //   (1) GIRO de la cabeza del pilar de empotramiento: el momento M=PL en la
+      //       cabeza de un pilar empotrado en base gira la cabeza θ=M·H/(E·I_pilar)
+      //       y arrastra el extremo θ·L. El pilar flecta EN EL PLANO con su campo
+      //       Iz = Iz de catalogo (convencion de pilar, sin intercambio):
+      //       θ·L = PL·H·L/(E·Iz_cat) = 60·3·3/(2.1e8·6.038e-6) ≈ 0.4259 m.
+      //   (2) Flecha propia de la viga (eje FUERTE tras [C-1]): PL³/3EI ≈ 0.0103 m.
+      // Total teorico ≈ 0.4362 m; el motor da 0.43619 (coincidencia <0.1%, que
+      // VALIDA de paso el intercambio de ejes viga/pilar). Tolerancia de flecha 1%.
+      const IZ_CAT_IPE300 = 6.038e-6; // m⁴ (Iz catalogo: eje debil, plano del pilar)
+      const H_PILAR = 3; // m (cota por defecto del fixture: pilar de p0 a p1)
+      const flechaPuroTeo = (P * L ** 3) / (3 * E_ACERO * I_VIGA_IPE300); // viga sola
+      const giroPilar = (P * L * H_PILAR * L) / (E_ACERO * IZ_CAT_IPE300); // θ·L
+      const flechaTeo = giroPilar + flechaPuroTeo;
       const flechaReal = Math.abs(flechaMaxDescenso(res, combo));
-      expect(flechaReal, "voladizo: descenso > flecha de voladizo puro (pilar flexible)").toBeGreaterThan(
-        flechaPuroTeo,
-      );
-      expect(flechaReal, "voladizo: descenso < 6x voladizo puro (rango sano)").toBeLessThan(
-        6 * flechaPuroTeo,
-      );
+      assertOk(compararFlecha(flechaReal, flechaTeo), "voladizo flecha = giro pilar + viga");
       console.warn(
         `[GOLDEN][voladizo flecha REGRESION] real=${flechaReal.toExponential(4)} m ` +
           `(voladizo puro PL³/3EI=${flechaPuroTeo.toExponential(4)} m, inflada por desplome del pilar)`,
@@ -535,7 +539,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       const combo = "ELS";
       const Mteo = (P * L) / 4; // 80 kN·m
       const Rteo = P / 2; // 20 kN por apoyo
-      const flechaTeo = (P * L ** 3) / (48 * E_ACERO * IZ_IPE300); // m (descenso centro)
+      const flechaTeo = (P * L ** 3) / (48 * E_ACERO * I_VIGA_IPE300); // m (descenso centro)
 
       // Dos vanos horizontales (vizq/vder); ambos alcanzan -PL/4 en el centro. Se
       // toma la viga horizontal mas flectada (nunca un pilar).
@@ -614,16 +618,19 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       // (no aflojar el golden). Valores medidos en T1.2 con el par de versiones fijado.
       // El dintel se identifica por GEOMETRIA (la barra horizontal a la cota H),
       // no por magnitud: blinda contra empates con el flector de los pilares.
-      // RECAPTURA AUDITORIA [C-2] (2026-07): el snapshot anterior (19.18949 /
-      // -18.31051 / 9.56493) se midio con la serie IPE 10x inflada. Al corregir el
-      // catalogo a EN 10365 la rigidez EI del portico baja 10x con EA intacta, y el
-      // reparto hiperestatico se mueve ~0,2%. Numeros re-medidos con el par de
-      // versiones fijado. Invariante fisico que los valida: M+ - M- = qB²/8 = 37,5
-      // exacto (momento isostatico total del vano).
+      // RECAPTURA AUDITORIA [C-2]+[C-1] (2026-07): el snapshot original (19.18949 /
+      // -18.31051 / 9.56493) se midio con la serie IPE 10x inflada Y las vigas
+      // flectando con el eje debil. Con el catalogo EN 10365 y el intercambio de
+      // ejes de viga ([C-1]) el dintel es ~14x mas rigido en el plano que los
+      // pilares: el reparto hiperestatico cambia (mas momento al centro del vano,
+      // menos a los nudos). Numeros re-medidos con el par de versiones fijado.
+      // Invariante fisico que los valida: |min| + |max| = qB²/8 = 37,5 exacto
+      // (momento isostatico total del vano). Convencion PyNite: sagging NEGATIVO
+      // (centro del vano en min_moment_z), hogging positivo (nudos en max).
       const dintel = barraViga(res, fem, combo);
-      assertOk(compararEsfuerzo(dintel.max_moment_z, 19.22662), "portico REG M+ dintel (centro)");
-      assertOk(compararEsfuerzo(dintel.min_moment_z, -18.27338), "portico REG M- dintel (apoyos)");
-      assertOk(compararReaccion(Math.abs(basesHoriz[0]), 9.61032), "portico REG empuje horizontal");
+      assertOk(compararEsfuerzo(dintel.max_moment_z, 4.84911), "portico REG M nudos (hogging)");
+      assertOk(compararEsfuerzo(dintel.min_moment_z, -32.65089), "portico REG M centro (sagging)");
+      assertOk(compararReaccion(Math.abs(basesHoriz[0]), 2.42380), "portico REG empuje horizontal");
     },
     TIMEOUT_ARRANQUE,
   );
@@ -656,7 +663,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
           { name: "N2", x: 4, y: 0, z: 0 },
         ],
         materials: [{ name: "AC", E: E_ACERO, G: 8.077e7, nu: 0.3, rho: 78.5 }],
-        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: IZ_IPE300, J: 1e-7 }],
+        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: I_VIGA_IPE300, J: 1e-7 }],
         members: [
           {
             name: "M1",
@@ -721,7 +728,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
           { name: "N2", x: 0, y: 3, z: 0 },
         ],
         materials: [{ name: "AC", E: E_ACERO, G: 8.077e7, nu: 0.3, rho: 78.5 }],
-        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: IZ_IPE300, J: 1e-7 }],
+        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: I_VIGA_IPE300, J: 1e-7 }],
         members: [
           {
             name: "M1",
@@ -782,7 +789,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
           { name: "N2", x: 4, y: 0, z: 0 },
         ],
         materials: [{ name: "AC", E: E_ACERO, G: 8.077e7, nu: 0.3, rho: 78.5 }],
-        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: IZ_IPE300, J: 1e-7 }],
+        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: I_VIGA_IPE300, J: 1e-7 }],
         members: [
           {
             name: "M1",
@@ -848,7 +855,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
           { name: "N2", x: 4, y: 0, z: 0 },
         ],
         materials: [{ name: "AC", E: E_ACERO, G: 8.077e7, nu: 0.3, rho: 78.5 }],
-        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: IZ_IPE300, J: 1e-7 }],
+        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: I_VIGA_IPE300, J: 1e-7 }],
         members: [
           {
             name: "M1",

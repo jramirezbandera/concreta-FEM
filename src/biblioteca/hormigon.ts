@@ -112,10 +112,17 @@ export const HORMIGONES: EntradaMaterialHormigon[] = [
 // usuario; el dominio guardara las dimensiones y estas funciones derivan la
 // EntradaSeccion equivalente para el discretizador.
 //
-// CONVENCION DE EJES (coherente con add_section de PyNite):
-//   - eje local y: horizontal de la seccion (asociado a `b` en rectangular).
-//   - eje local z: vertical de la seccion   (asociado a `h` en rectangular).
-//   Iy = inercia respecto al eje y;  Iz = inercia respecto al eje z.
+// CONVENCION DE EJES DE LA APP (AUDITORIA C-1 — corregida):
+//   - `Iy` = inercia del eje FUERTE con la seccion "de pie" (b·h³/12, el canto h
+//     gobierna): la que debe regir la flexion VERTICAL de una VIGA. Es la misma
+//     convencion de los catalogos europeos (EN 10365: Iy fuerte).
+//   - `Iz` = inercia del eje debil (h·b³/12, el ancho b gobierna).
+//   OJO: NO es un mapeo 1:1 a add_section de PyNite para vigas. PyNite flecta una
+//   barra HORIZONTAL con su campo `Iz` (eje local y = vertical global, Member3D
+//   2.0.2); el DISCRETIZADOR intercambia Iy/Iz al emitir la seccion de una viga
+//   (seccionFEMParaViga, sufijo "~viga"). El PILAR (vertical) mapea directo. La
+//   premisa anterior de este comentario ("eje local y = horizontal de la seccion")
+//   era falsa para vigas y producia flechas (h/b)² veces mayores (eje debil).
 //
 // UNIDADES DE LOS PARAMETROS: milimetros (mm), tal como los introduce la UI.
 // Cada funcion convierte a metros con `mmToM` ANTES de operar, devolviendo

@@ -34,7 +34,7 @@ import {
   SECCION_GOLDEN,
 } from "./_arnes";
 import { ModeloFEMSchema, type ModeloFEM } from "../../src/discretizador/contratoFEM";
-import { discretizar } from "../../src/discretizador/discretizar";
+import { discretizar, SUFIJO_SECCION_VIGA } from "../../src/discretizador/discretizar";
 import type { Trazabilidad } from "../../src/discretizador/contratoFEM";
 import type { Modelo } from "../../src/dominio";
 import { SCHEMA_VERSION } from "../../src/dominio";
@@ -74,13 +74,29 @@ function assertContratoValido(fem: ModeloFEM): void {
 
 // El material/seccion de obra de los fixtures deben aparecer mapeados por id (el
 // glue Python los casa directo por name; ver feature-4-enmiendas-dominio).
+// [AUDITORIA C-1]: las VIGAS referencian la variante "~viga" de su seccion (Iy/Iz
+// intercambiados: el eje fuerte del catalogo aterriza en el campo Iz que PyNite usa
+// para la flexion vertical de una barra horizontal); los PILARES la seccion tal
+// cual (miembro vertical: mapeo directo correcto). Se verifica ademas el INTERCAMBIO
+// de valores entre ambas variantes, no solo los nombres.
 function assertMaterialYSeccion(fem: ModeloFEM): void {
   expect(fem.materials.map((m) => m.name)).toContain(MATERIAL_GOLDEN);
-  expect(fem.sections.map((s) => s.name)).toContain(SECCION_GOLDEN);
-  // Todas las barras referencian el material y la seccion de obra del fixture.
+  const nombres = fem.sections.map((s) => s.name);
+  expect(nombres).toContain(SECCION_GOLDEN);
+  expect(nombres).toContain(SECCION_GOLDEN + SUFIJO_SECCION_VIGA);
+  const base = fem.sections.find((s) => s.name === SECCION_GOLDEN)!;
+  const deViga = fem.sections.find((s) => s.name === SECCION_GOLDEN + SUFIJO_SECCION_VIGA)!;
+  expect(deViga.Iy).toBe(base.Iz); // intercambio Iy<->Iz (C-1)
+  expect(deViga.Iz).toBe(base.Iy);
+  expect(deViga.A).toBe(base.A);
+  expect(deViga.J).toBe(base.J);
+  // Barras: material comun; los pilares (verticales) usan la seccion base y las
+  // vigas (horizontales) la variante "~viga". La verticalidad se lee de la Capa 2.
+  const coordY = new Map(fem.nodes.map((n) => [n.name, n.y] as const));
   for (const m of fem.members) {
     expect(m.material).toBe(MATERIAL_GOLDEN);
-    expect(m.section).toBe(SECCION_GOLDEN);
+    const esVertical = coordY.get(m.i) !== coordY.get(m.j);
+    expect(m.section).toBe(esVertical ? SECCION_GOLDEN : SECCION_GOLDEN + SUFIJO_SECCION_VIGA);
   }
 }
 

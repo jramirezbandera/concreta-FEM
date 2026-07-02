@@ -44,13 +44,17 @@ export const SeccionHormigonCircularSchema = z.object({
 });
 
 // Generico: propiedades de calculo directas (m², m⁴), sin biblioteca. Util para
-// secciones a medida o importadas. Mapea 1:1 a add_section de PyNite.
+// secciones a medida o importadas.
+// CONVENCION [AUDITORIA C-1]: `Iy` = inercia del eje FUERTE con la seccion "de pie"
+// (la que gobierna la flexion VERTICAL si la seccion se usa en una VIGA), igual que
+// los catalogos europeos. El discretizador traduce al campo real de PyNite segun el
+// tipo de barra (viga: intercambio Iy/Iz, ver seccionFEMParaViga; pilar: directo).
 export const SeccionGenericoSchema = z.object({
   ...baseSeccion,
   tipo: z.literal("generico"),
   A: z.number().positive(), // area, m²
-  Iy: z.number().positive(), // inercia eje local y, m⁴
-  Iz: z.number().positive(), // inercia eje local z, m⁴
+  Iy: z.number().positive(), // inercia eje FUERTE (gobierna flexion vertical de viga), m⁴
+  Iz: z.number().positive(), // inercia eje debil, m⁴
   J: z.number().positive(), // constante de torsion (St. Venant, NO polar), m⁴
 });
 
