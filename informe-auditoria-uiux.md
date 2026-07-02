@@ -13,7 +13,7 @@
 **2 Críticos · 16 Altos · 33 Medios · 23 Bajos.**
 
 **Se aplicaron 43 fixes seguros (rojo→verde)** en 6 commits, todos con tests de regresión.
-Suite final: **lint ✓ · typecheck ✓ · 1353 tests en verde** (desde 1252: +101 tests nuevos).
+Suite final: **lint ✓ · typecheck ✓ · 1359 tests en verde** (desde 1252: +107 tests nuevos) · **E2E 5/5 ✓**.
 Los fixes sensibles pasaron por `guardian-arquitectura` antes de codificarse (6 validados: 4 APTO, 2 APTO CON CONDICIONES — condiciones incorporadas).
 
 **Los 5 temas de mayor impacto:**
@@ -264,7 +264,7 @@ La implementación de tokens es **notablemente fiel**: superficies, texto, semá
 - **Multiselección con Shift** y arrastre de plantillas se verificaron solo en código.
 - El dogfooding usó **clics sintéticos** (PointerEvent) por limitación del navegador headless; el tacto fino del imán (C-2/C-3) merece prueba manual del autor.
 - **Rendimiento con obras grandes** (cientos de barras) fuera de alcance: la obra de prueba fue 4 pilares + 4 vigas + 1 losa.
-- Los **E2E** de Playwright corren aparte (ver estado en el mensaje de cierre de la sesión); la suite unitaria/componente completa quedó en verde (1353).
+- Los **E2E** de Playwright (5/5, proyecto e2e-mock) quedaron en verde; la suite unitaria/componente completa quedó en verde (1359). El E2E con motor real no se ejecutó en esta sesión.
 - `matplotlib` cargándose en Pyodide (N-5) se observó pero **no se diagnosticó** (¿dependencia transitiva del wheel de PyNiteFEA?): abrir T-solver-matplotlib antes de tocar nada del solver.
 
 ---
