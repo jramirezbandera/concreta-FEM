@@ -467,4 +467,66 @@ describe("validarModelo", () => {
     const cods = codigos(validarModelo(modeloValido(), { numModos: 6 }));
     expect(cods).not.toContain("MODAL_SIN_MASA");
   });
+
+  // ============================================================================
+  // [AUDITORIA M-1] IDS DUPLICADOS. El borde Zod no valida unicidad de ids y los
+  // lookups del dominio son `.find()` (primer match): dos nudos con el mismo id y
+  // posiciones DISTINTAS producian geometria silenciosamente erronea (la viga usa
+  // el primero e ignora el segundo, ok:true). Un .json manipulado/corrupto no debe
+  // poder calcular con geometria equivocada: BLOQUEA con ID_DUP.
+  // ============================================================================
+  describe("AUDITORIA M-1: ids duplicados bloquean", () => {
+    it("dos nudos con el mismo id (posiciones distintas) -> error ID_DUP", () => {
+      const m = modeloValido();
+      m.nudos.push({ id: "n1", x: 99, y: 0 }); // colisiona con n1 en (0,0)
+      const errores = validarModelo(m);
+      const dup = errores.filter((e) => e.codigo === "ID_DUP");
+      expect(dup.length).toBeGreaterThan(0);
+      expect(dup[0].severidad).toBe("error");
+      for (const e of dup) sinJergaFEM(e);
+    });
+
+    it("dos plantas con el mismo id -> error ID_DUP", () => {
+      const m = modeloValido();
+      m.plantas.push({ id: "p1", nombre: "Planta 1 bis", cota: 6, altura: 3, grupoId: "g1" });
+      expect(codigos(validarModelo(m))).toContain("ID_DUP");
+    });
+
+    it("dos cargas con el mismo id -> error ID_DUP", () => {
+      const m = modeloValido();
+      m.cargas.push({ id: "c1", tipo: "lineal", ambito: "v1", valor: -5, hipotesisId: "h1" });
+      expect(codigos(validarModelo(m))).toContain("ID_DUP");
+    });
+  });
+
+  // ============================================================================
+  // [AUDITORIA M-3] PILAR DEGENERADO (longitud 0). Un pilar con plantaInicial ===
+  // plantaFinal (o dos plantas a la misma cota) no produce NINGUNA barra (el
+  // troceo por cotas emite 0 tramos) pero SI emite su support de arranque: apoyo
+  // fantasma sin barra que ademas cuenta como sujecion valida (haySujecionPilar).
+  // Simetrico de VIGA_DEGENERADA: BLOQUEA con PILAR_DEGENERADO.
+  // ============================================================================
+  describe("AUDITORIA M-3: pilar degenerado (longitud 0) bloquea", () => {
+    it("pilar con plantaInicial === plantaFinal -> error PILAR_DEGENERADO", () => {
+      const m = modeloValido();
+      m.pilares[0].plantaFinal = "p0"; // arranca y termina en cota 0: L=0
+      const errores = validarModelo(m);
+      const deg = errores.filter((e) => e.codigo === "PILAR_DEGENERADO");
+      expect(deg.length).toBe(1);
+      expect(deg[0].severidad).toBe("error");
+      expect(deg[0].elementoId).toBe("pil1");
+      sinJergaFEM(deg[0]);
+    });
+
+    it("pilar entre dos plantas DISTINTAS a la misma cota -> error PILAR_DEGENERADO", () => {
+      const m = modeloValido();
+      m.plantas.push({ id: "p0bis", nombre: "Cota cero bis", cota: 0, altura: 3, grupoId: "g1" });
+      m.pilares[0].plantaFinal = "p0bis"; // p0(0) -> p0bis(0): L=0
+      expect(codigos(validarModelo(m))).toContain("PILAR_DEGENERADO");
+    });
+
+    it("un pilar normal NO dispara PILAR_DEGENERADO", () => {
+      expect(codigos(validarModelo(modeloValido()))).not.toContain("PILAR_DEGENERADO");
+    });
+  });
 });
