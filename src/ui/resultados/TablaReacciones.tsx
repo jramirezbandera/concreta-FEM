@@ -53,6 +53,16 @@ function fmt(v: number): string {
   return r === `-${(0).toFixed(DECIMALES)}` ? (0).toFixed(DECIMALES) : r;
 }
 
+// Explicacion del "—" de los momentos del agregado de losa (B-1): la suma cruda de
+// momentos de nudos distintos no es una resultante sin el termino r×F. Se muestra en el
+// `title` de la celda y como nota al pie (UX-H8: antes el "—" no se explicaba).
+const NOTA_MOMENTOS_LOSA =
+  "Los momentos de los apoyos del borde de losa no se agregan: su suma no es una resultante.";
+
+// Comparador NATURAL de nombres de apoyo (UX-ORDEN): ordena "P2" antes que "P10" (no
+// alfabetico puro, que daria P1, P10, P2...). Intl.Collator con numeric agrupa los digitos.
+const collator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
+
 export function TablaReacciones() {
   // Lectura reactiva del trio de calculo y la combinacion activa. La tabla NO esta
   // en el bucle del viewport; re-render al recalcular/cambiar de combo es aceptable.
@@ -136,7 +146,10 @@ export function TablaReacciones() {
         rxn,
       };
     })
-    .filter((f): f is { node: string; etiqueta: string; rxn: number[] } => f !== null);
+    .filter((f): f is { node: string; etiqueta: string; rxn: number[] } => f !== null)
+    // Orden natural por etiqueta de apoyo (UX-ORDEN): P1, P2, P3, P4 (no P1, P4, P2, P3).
+    // El agregado "Losa (borde)" no entra aqui: se renderiza siempre despues de estas filas.
+    .sort((a, b) => collator.compare(a.etiqueta, b.etiqueta));
 
   // Agregado de los apoyos de borde de la losa (F2.4): una sola fila con la SUMA de las
   // reacciones de todos los nudos de malla apoyados. `null` si no hay losa (no se pinta la
@@ -223,14 +236,21 @@ export function TablaReacciones() {
                   <th scope="row" className="cx-reacciones__td-apoyo">
                     {filaMalla.etiqueta}
                   </th>
-                  {COLUMNAS.map((c) => (
-                    <td key={c.etiqueta} className="cx-reacciones__td-num mono">
-                      {/* [B-1] Momentos del agregado: "—" (no son resultante sin r×F). */}
-                      {filaMalla!.rxn[c.indice] === null
-                        ? "—"
-                        : fmt(filaMalla!.rxn[c.indice] ?? 0)}
-                    </td>
-                  ))}
+                  {COLUMNAS.map((c) => {
+                    const esGuion = filaMalla!.rxn[c.indice] === null;
+                    return (
+                      <td
+                        key={c.etiqueta}
+                        className="cx-reacciones__td-num mono"
+                        // El "—" se explica al pasar el raton (UX-H8); la nota al pie lo
+                        // repite para quien no usa el hover.
+                        title={esGuion ? NOTA_MOMENTOS_LOSA : undefined}
+                      >
+                        {/* [B-1] Momentos del agregado: "—" (no son resultante sin r×F). */}
+                        {esGuion ? "—" : fmt(filaMalla!.rxn[c.indice] ?? 0)}
+                      </td>
+                    );
+                  })}
                 </tr>
               )}
             </tbody>
@@ -247,6 +267,15 @@ export function TablaReacciones() {
                   suma de reacciones verticales (kN)
                 </td>
               </tr>
+              {/* Nota al pie del "—" de los momentos de la losa (UX-H8): explica por que no
+                  se agregan, en lenguaje de obra. Solo cuando hay fila de losa. */}
+              {filaMalla && (
+                <tr className="cx-reacciones__pie">
+                  <td colSpan={7} className="cx-reacciones__pie-nota">
+                    — {NOTA_MOMENTOS_LOSA}
+                  </td>
+                </tr>
+              )}
             </tfoot>
           </table>
         </div>

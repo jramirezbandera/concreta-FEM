@@ -21,6 +21,7 @@ import type { ModoVista } from "../../estado";
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosModales } from "../../solver";
 import { construirBuffersModal } from "./modalBuffers";
+import { prefersReducedMotion } from "./reducedMotion";
 
 // Velocidad de la oscilacion de la animacion (rad/s). El factor oscila como
 // (1 - cos)/2 in [0,1] para arrancar y volver en reposo sin tirones. Igual que la
@@ -32,11 +33,14 @@ interface Entradas {
   modos: ResultadosModales | null;
   modeloFEM: ModeloFEM | null;
   modoActivo: number;
+  vigente: boolean;
   escala: number;
   animando: boolean;
   // Modo de vista del viewport. La forma modal es conceptualmente 3D (igual que la
-  // deformada): en planta/mosaico la forma del edificio entero se descuadraria sobre la
-  // geometria filtrada por planta, asi que SOLO se dibuja en modo "3d".
+  // deformada): en planta la forma del edificio entero se descuadraria sobre la geometria
+  // filtrada por planta, asi que NO se dibuja en planta. Se dibuja en cualquier vista
+  // pleno (`!== "planta"`): 3D y MOSAICO (que renderiza 3D). Antes `=== "3d"` la ocultaba
+  // en mosaico (UX-H9), incoherente con el overlay de modelo de calculo (!== "planta").
   modoVista: ModoVista;
 }
 
@@ -48,6 +52,7 @@ function leerEntradas(): Entradas {
     modos: m.modos,
     modeloFEM: m.modeloFEM,
     modoActivo: m.modoActivo,
+    vigente: m.vigente,
     escala: v.modalEscala,
     animando: v.modalAnimando,
     modoVista: v.modoVista,
@@ -60,6 +65,7 @@ function getSnapshot(): Entradas {
     a.modos === c.modos &&
     a.modeloFEM === c.modeloFEM &&
     a.modoActivo === c.modoActivo &&
+    a.vigente === c.vigente &&
     a.escala === c.escala &&
     a.animando === c.animando &&
     a.modoVista === c.modoVista
@@ -73,6 +79,7 @@ function suscribir(cb: () => void): () => void {
   const offModos = modalStore.subscribe((s) => s.modos, cb);
   const offFem = modalStore.subscribe((s) => s.modeloFEM, cb);
   const offActivo = modalStore.subscribe((s) => s.modoActivo, cb);
+  const offVig = modalStore.subscribe((s) => s.vigente, cb);
   const offEsc = vistaStore.subscribe((s) => s.modalEscala, cb);
   const offAnim = vistaStore.subscribe((s) => s.modalAnimando, cb);
   const offModoVista = vistaStore.subscribe((s) => s.modoVista, cb);
@@ -80,6 +87,7 @@ function suscribir(cb: () => void): () => void {
     offModos();
     offFem();
     offActivo();
+    offVig();
     offEsc();
     offAnim();
     offModoVista();
@@ -93,6 +101,9 @@ function useEntradas(): Entradas {
 export function ModoOverlay() {
   const entradas = useEntradas();
   const lineRef = useRef<LineSegments>(null);
+  // Preferencia "reducir movimiento": se consulta UNA vez (no por frame). Si esta activa,
+  // la animacion no avanza y se muestra la amplitud estatica maxima.
+  const reducir = useMemo(() => prefersReducedMotion(), []);
 
   // Buffers reconstruidos SOLO al cambiar las entradas (no por frame). La derivacion
   // pura (base/delta/color) vive en modalBuffers.ts (testeable sin R3F).
@@ -102,6 +113,7 @@ export function ModoOverlay() {
         modeloFEM: entradas.modeloFEM,
         modos: entradas.modos,
         numeroModo: entradas.modoActivo,
+        vigente: entradas.vigente,
       }),
     [entradas],
   );
@@ -131,7 +143,9 @@ export function ModoOverlay() {
   // useFrame no toca nada; la recolocacion al reposo la hace el useEffect de abajo.
   const tRef = useRef(0);
   useFrame((_state, dt) => {
-    if (!entradas.animando || !buffers || !geom) return;
+    // reducir: con prefers-reduced-motion no avanzamos la animacion (queda estatica a la
+    // amplitud maxima, recolocada por el useEffect de abajo).
+    if (reducir || !entradas.animando || !buffers || !geom) return;
     tRef.current += dt * VELOCIDAD_ANIM;
     // Factor in [0, escala] con arranque/retorno suave: (1 - cos)/2.
     const factor = ((1 - Math.cos(tRef.current)) / 2) * entradas.escala;
@@ -152,7 +166,9 @@ export function ModoOverlay() {
   // se corresponde con la "×escala" indicada en el panel.
   useEffect(() => {
     if (!geom || !buffers) return;
-    if (entradas.animando) {
+    // Con reducir=true tratamos "animar" como estatico: no oscila, se muestra la amplitud
+    // maxima (base + delta*escala), igual que al parar la animacion.
+    if (entradas.animando && !reducir) {
       tRef.current = 0;
     } else {
       const attr = geom.getAttribute("position") as Float32BufferAttribute;
@@ -164,11 +180,12 @@ export function ModoOverlay() {
       attr.needsUpdate = true;
     }
     invalidate();
-  }, [entradas.animando, entradas.escala, geom, buffers]);
+  }, [entradas.animando, entradas.escala, geom, buffers, reducir]);
 
-  // La forma modal solo se dibuja en modo 3D: en planta/mosaico la geometria base esta
-  // filtrada por planta y la forma del edificio entero se descuadraria.
-  if (!geom || entradas.modoVista !== "3d") return null;
+  // La forma modal se dibuja en cualquier vista pleno (`!== "planta"`): 3D y mosaico
+  // comparten la escena 3D del edificio completo. En planta se descuadraria sobre la
+  // geometria filtrada por planta. (UX-H9: antes `=== "3d"` la ocultaba en mosaico.)
+  if (!geom || entradas.modoVista === "planta") return null;
   return (
     <lineSegments ref={lineRef} geometry={geom}>
       {/* vertexColors: el color va en el atributo `color` (rampa por magnitud). */}

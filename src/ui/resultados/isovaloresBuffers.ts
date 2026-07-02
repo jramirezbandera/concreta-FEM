@@ -30,6 +30,7 @@ import type { ResultadosCalculo } from "../../solver";
 import { rampaIsovalores } from "../viewport/colores";
 import { femAEscena } from "../viewport/ejesEscena";
 import type { MagnitudIsovalores } from "../../estado";
+import { COLOR_OBSOLETO } from "./deformadaBuffers";
 
 // Buffers de la malla coloreada: posiciones (x,y,z escena por vertice), indices de
 // triangulos (2 por quad) y color por vertice (rampa). `valores` lleva el valor escalar
@@ -52,6 +53,10 @@ export interface EntradasIsovalores {
   resultados: ResultadosCalculo | null;
   combo: string | null;
   magnitud: MagnitudIsovalores;
+  // Si false, la malla se colorea en GRIS obsoleto (espejo de la deformada): los resultados
+  // ya no corresponden al modelo. Default true (compatibilidad con llamantes previos: el
+  // rango min/max no cambia, solo el color). El panel muestra ademas el tag/aviso.
+  vigente?: boolean;
 }
 
 // Extrae el valor escalar de una ESQUINA de quad para la magnitud de momento elegida.
@@ -74,6 +79,7 @@ export function construirBuffersIsovalores(
   e: EntradasIsovalores,
 ): BuffersIsovalores | null {
   const { modeloFEM, trazabilidad, resultados, combo, magnitud } = e;
+  const vigente = e.vigente ?? true;
   if (!modeloFEM || !trazabilidad || !resultados || !combo) return null;
   const quads = modeloFEM.quads ?? [];
   if (quads.length === 0) return null;
@@ -156,13 +162,21 @@ export function construirBuffersIsovalores(
     posiciones[k * 3 + 1] = ey;
     posiciones[k * 3 + 2] = ez;
     valores[k] = v;
-    // Campo uniforme (rango 0): t=0.5 -> color NEUTRO de mitad de rampa, no el extremo
-    // frio (t=0) que leeria enganosamente como "minimo en todas partes".
-    const t = rango > 0 ? (v - valorMin) / rango : 0.5;
-    rampaIsovalores(t, aux);
-    color[k * 3] = aux.r;
-    color[k * 3 + 1] = aux.g;
-    color[k * 3 + 2] = aux.b;
+    if (vigente) {
+      // Campo uniforme (rango 0): t=0.5 -> color NEUTRO de mitad de rampa, no el extremo
+      // frio (t=0) que leeria enganosamente como "minimo en todas partes".
+      const t = rango > 0 ? (v - valorMin) / rango : 0.5;
+      rampaIsovalores(t, aux);
+      color[k * 3] = aux.r;
+      color[k * 3 + 1] = aux.g;
+      color[k * 3 + 2] = aux.b;
+    } else {
+      // Obsoleto: gris atenuado (mismo criterio que la deformada) — los resultados ya no
+      // corresponden al modelo. El rango/valores no se tocan (la leyenda los sigue usando).
+      color[k * 3] = COLOR_OBSOLETO.r;
+      color[k * 3 + 1] = COLOR_OBSOLETO.g;
+      color[k * 3 + 2] = COLOR_OBSOLETO.b;
+    }
   });
 
   // --- Indices de triangulos: 2 por quad (i,j,m) + (i,m,n) ------------------

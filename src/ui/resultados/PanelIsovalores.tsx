@@ -45,6 +45,7 @@ interface Entradas {
   modeloFEM: ModeloFEM | null;
   trazabilidad: Trazabilidad | null;
   resultados: ResultadosCalculo | null;
+  vigente: boolean;
   combo: string | null;
   magnitud: MagnitudIsovalores;
 }
@@ -57,6 +58,7 @@ function leerEntradas(): Entradas {
     modeloFEM: r.modeloFEM,
     trazabilidad: r.trazabilidad,
     resultados: r.resultados,
+    vigente: r.vigente,
     combo: v.combinacionActiva,
     magnitud: v.magnitudIsovalores,
   };
@@ -68,6 +70,7 @@ function getSnapshot(): Entradas {
     a.modeloFEM === c.modeloFEM &&
     a.trazabilidad === c.trazabilidad &&
     a.resultados === c.resultados &&
+    a.vigente === c.vigente &&
     a.combo === c.combo &&
     a.magnitud === c.magnitud
   ) {
@@ -80,12 +83,14 @@ function suscribir(cb: () => void): () => void {
   const offM = resultadosStore.subscribe((s) => s.modeloFEM, cb);
   const offT = resultadosStore.subscribe((s) => s.trazabilidad, cb);
   const offR = resultadosStore.subscribe((s) => s.resultados, cb);
+  const offV = resultadosStore.subscribe((s) => s.vigente, cb);
   const offCombo = vistaStore.subscribe((s) => s.combinacionActiva, cb);
   const offMag = vistaStore.subscribe((s) => s.magnitudIsovalores, cb);
   return () => {
     offM();
     offT();
     offR();
+    offV();
     offCombo();
     offMag();
   };
@@ -112,9 +117,19 @@ export function PanelIsovalores() {
     return { min: b.valorMin, max: b.valorMax };
   }, [entradas]);
 
-  // Sin resultados de placa: no mostramos el panel (un portico sin losa no tiene
-  // isovalores). El overlay tambien se autooculta.
-  if (!rango) return null;
+  // Sin resultados de placa: ESTADO VACIO GUIA (UX-I1). Antes se ocultaba el panel entero
+  // (return null), dejando la pestana Isovalores sin explicar por que esta en blanco.
+  // Ahora la seccion se muestra y guia al usuario a introducir un paño y calcular.
+  if (!rango) {
+    return (
+      <PanelFlotante className="cx-isovalores" titulo="Isovalores" tag="losa">
+        <p className="cx-isovalores__vacio">
+          No hay losas calculadas. Introduce un paño (Entrada de vigas → Paños) y calcula
+          la obra.
+        </p>
+      </PanelFlotante>
+    );
+  }
 
   // Conversion de presentacion SOLO en el borde: la flecha (m interno) -> mm; Mx/My ya
   // estan en kN·m/m (identidad).
@@ -123,7 +138,20 @@ export function PanelIsovalores() {
   const max = esFlecha ? mToMm(rango.max) : rango.max;
 
   return (
-    <PanelFlotante className="cx-isovalores" titulo="Isovalores" tag="losa">
+    <PanelFlotante
+      className="cx-isovalores"
+      titulo="Isovalores"
+      // Espejo de la deformada/reacciones: cuando la obra cambio tras calcular, el mapa ya
+      // no corresponde al modelo (el overlay se agrisa). El tag lo comunica en --warning.
+      tag={entradas.vigente ? "losa" : "obsoletos"}
+      tagVariante={entradas.vigente ? "neutro" : "warning"}
+    >
+      {!entradas.vigente && (
+        <p className="cx-isovalores__aviso" role="status">
+          Resultados obsoletos: la obra cambió desde el último cálculo.
+        </p>
+      )}
+
       <div className="cx-isovalores__selector">
         <span className="cx-campo__label">Magnitud</span>
         <Segmentado<MagnitudIsovalores>

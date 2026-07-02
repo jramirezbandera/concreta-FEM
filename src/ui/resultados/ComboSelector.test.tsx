@@ -96,4 +96,19 @@ describe("ComboSelector", () => {
     // El value que se escribe en el store es el nombre tecnico del solver ("ELS").
     expect(vistaStore.getState().combinacionActiva).toBe("ELS");
   });
+
+  it("[UX-H11] el desplegable muestra la formula de cada combinacion (coeficientes reales)", async () => {
+    resultadosStore.getState().setResultados(resultadosCon(["ELU", "ELS"]), femVacio(), trazaVacia());
+    vistaStore.getState().setCombinacionActiva("ELU");
+    const user = userEvent.setup();
+    render(<ComboSelector />);
+
+    screen.getByRole("combobox").focus();
+    await user.keyboard("{Enter}");
+
+    const listbox = await screen.findByRole("listbox");
+    // Formulas reales de generarCombos (CTE DB-SE): ELU 1,35·G+1,50·Q, ELS 1,00·G+1,00·Q.
+    expect(within(listbox).getByText("1,35·G + 1,50·Q")).toBeInTheDocument();
+    expect(within(listbox).getByText("1,00·G + 1,00·Q")).toBeInTheDocument();
+  });
 });

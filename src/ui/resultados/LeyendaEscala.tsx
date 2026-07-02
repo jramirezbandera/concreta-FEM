@@ -9,6 +9,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { PanelFlotante } from "../primitivas";
 import { resultadosStore, vistaStore } from "../../estado";
+import type { ModoVista } from "../../estado";
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosCalculo } from "../../solver";
 import { mToMm } from "../../unidades";
@@ -29,16 +30,19 @@ interface EntradasLeyenda {
   modeloFEM: ModeloFEM | null;
   vigente: boolean;
   combo: string | null;
+  modoVista: ModoVista;
 }
 
 let snapCache: EntradasLeyenda = leerEntradas();
 function leerEntradas(): EntradasLeyenda {
   const r = resultadosStore.getState();
+  const v = vistaStore.getState();
   return {
     resultados: r.resultados,
     modeloFEM: r.modeloFEM,
     vigente: r.vigente,
-    combo: vistaStore.getState().combinacionActiva,
+    combo: v.combinacionActiva,
+    modoVista: v.modoVista,
   };
 }
 function getSnapshot(): EntradasLeyenda {
@@ -48,7 +52,8 @@ function getSnapshot(): EntradasLeyenda {
     a.resultados === c.resultados &&
     a.modeloFEM === c.modeloFEM &&
     a.vigente === c.vigente &&
-    a.combo === c.combo
+    a.combo === c.combo &&
+    a.modoVista === c.modoVista
   ) {
     return c;
   }
@@ -60,11 +65,13 @@ function suscribir(cb: () => void): () => void {
   const offM = resultadosStore.subscribe((s) => s.modeloFEM, cb);
   const offV = resultadosStore.subscribe((s) => s.vigente, cb);
   const offCombo = vistaStore.subscribe((s) => s.combinacionActiva, cb);
+  const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
   return () => {
     offR();
     offM();
     offV();
     offCombo();
+    offModo();
   };
 }
 function useEntradasLeyenda(): EntradasLeyenda {
@@ -115,11 +122,17 @@ export function LeyendaEscala() {
   // resultados ya guia al usuario a calcular). Evita una leyenda vacia.
   if (!rango.hay) return null;
 
+  // La deformada solo se dibuja en pleno (3D/mosaico); en planta el overlay no aparece
+  // (DeformadaOverlay), asi que el slider y "Animar" no harian nada. Lo comunicamos y los
+  // dejamos atenuados/inertes en vez de ofrecer controles muertos (UX-H1).
+  const soloEnPlanta = entradas.modoVista === "planta";
+
   return (
     <PanelFlotante
       className="cx-leyenda"
       titulo="Deformada"
       tag={entradas.vigente ? undefined : "obsoleta"}
+      tagVariante={entradas.vigente ? "neutro" : "warning"}
     >
       {/* Rampa de color con rotulos min/max del desplazamiento (mm). La rampa generica
           (color + min/max + unidad) la pinta LeyendaRampa; aqui se le pasan los limites
@@ -131,8 +144,21 @@ export function LeyendaEscala() {
         ariaLabel={`Desplazamiento de ${fmtMm(rango.min)} a ${fmtMm(rango.max)} milimetros`}
       />
 
-      {/* Control del factor de amplificacion. */}
-      <label className="cx-leyenda__control">
+      {/* Guia cuando estamos en planta: la deformada se ve en 3D; el slider y "Animar"
+          quedan atenuados/inertes (UX-H1). */}
+      {soloEnPlanta && (
+        <p className="cx-leyenda__guia" role="note">
+          La deformada se muestra en la vista 3D.
+        </p>
+      )}
+
+      {/* Control del factor de amplificacion. Deshabilitado en planta (no hay deformada
+          que amplificar en esa vista). */}
+      <label
+        className={
+          soloEnPlanta ? "cx-leyenda__control cx-leyenda__control--off" : "cx-leyenda__control"
+        }
+      >
         <span className="cx-leyenda__etq">
           Amplificación <span className="mono tnum">×{Math.round(escala)}</span>
         </span>
@@ -142,6 +168,7 @@ export function LeyendaEscala() {
           max={ESCALA_MAX}
           step={1}
           value={escala}
+          disabled={soloEnPlanta}
           onChange={(e) =>
             vistaStore.getState().setDeformadaEscala(Number(e.target.value))
           }
@@ -149,11 +176,16 @@ export function LeyendaEscala() {
         />
       </label>
 
-      {/* Toggle de animacion. */}
-      <label className="cx-leyenda__toggle">
+      {/* Toggle de animacion. Deshabilitado en planta (no anima nada alli). */}
+      <label
+        className={
+          soloEnPlanta ? "cx-leyenda__toggle cx-leyenda__toggle--off" : "cx-leyenda__toggle"
+        }
+      >
         <input
           type="checkbox"
           checked={animando}
+          disabled={soloEnPlanta}
           onChange={(e) => vistaStore.getState().setAnimando(e.target.checked)}
         />
         <span>Animar deformada</span>

@@ -167,6 +167,7 @@ export function PanelFrecuencias() {
       titulo="Modos de vibración"
       // Marca la lista como obsoleta cuando la obra cambio tras calcular (vigente=false).
       tag={hayModos && !entradas.vigente ? "obsoletos" : undefined}
+      tagVariante={hayModos && !entradas.vigente ? "warning" : "neutro"}
     >
       {/* Control del nº de modos a calcular + boton "Calcular modos". */}
       <div className="cx-frecuencias__lanzar">
@@ -213,31 +214,36 @@ export function PanelFrecuencias() {
       {/* Lista de frecuencias o estado vacio. */}
       {hayModos ? (
         <>
-          <ul className="cx-frecuencias__lista" role="listbox" aria-label="Modos de vibración">
+          {/* Lista de botones seleccionables con aria-pressed (UX-L16): un listbox exige
+              opciones role="option" hijas directas gestionando foco/flechas; aqui basta
+              un grupo de botones toggle, semantica correcta y simple. */}
+          <div
+            className="cx-frecuencias__lista"
+            role="group"
+            aria-label="Modos de vibración"
+          >
             {lista.map((m) => {
               const activo = m.numero === entradas.modoActivo;
               return (
-                <li key={m.numero}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={activo}
-                    className={
-                      activo
-                        ? "cx-frecuencias__modo cx-frecuencias__modo--activo"
-                        : "cx-frecuencias__modo"
-                    }
-                    onClick={() => modalStore.getState().setModoActivo(m.numero)}
-                  >
-                    <span className="cx-frecuencias__modo-n">Modo {m.numero}</span>
-                    <span className="cx-frecuencias__modo-f mono tnum">
-                      {fmtHz(m.frecuencia)} Hz
-                    </span>
-                  </button>
-                </li>
+                <button
+                  key={m.numero}
+                  type="button"
+                  aria-pressed={activo}
+                  className={
+                    activo
+                      ? "cx-frecuencias__modo cx-frecuencias__modo--activo"
+                      : "cx-frecuencias__modo"
+                  }
+                  onClick={() => modalStore.getState().setModoActivo(m.numero)}
+                >
+                  <span className="cx-frecuencias__modo-n">Modo {m.numero}</span>
+                  <span className="cx-frecuencias__modo-f mono tnum">
+                    {fmtHz(m.frecuencia)} Hz
+                  </span>
+                </button>
               );
             })}
-          </ul>
+          </div>
 
           {/* Aviso si el motor calculo menos modos de los pedidos (estructura con pocos
               GDL): que el usuario no lo lea como un fallo. */}
@@ -248,10 +254,13 @@ export function PanelFrecuencias() {
             </p>
           )}
 
-          {/* Control de amplificacion de la forma modal. */}
+          {/* Control de amplitud de dibujo de la forma modal. NO es un multiplicador (la
+              forma modal es adimensional): es la amplitud absoluta de dibujo (0.1..5),
+              distinta de la "Amplificación ×N" de la deformada. De ahi la etiqueta clara y
+              el valor SIN "×" (UX-J1). */}
           <label className="cx-frecuencias__control">
             <span className="cx-frecuencias__etq">
-              Amplitud <span className="mono tnum">×{escala.toFixed(1)}</span>
+              Amplitud de dibujo <span className="mono tnum">{escala.toFixed(1)}</span>
             </span>
             <input
               type="range"

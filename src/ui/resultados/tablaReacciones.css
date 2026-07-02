@@ -131,3 +131,13 @@
   color: var(--text-3);
   font-weight: 400;
 }
+
+/* Nota al pie explicando el "—" de los momentos de la losa (UX-H8). */
+.cx-reacciones__pie-nota {
+  text-align: left;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--text-3);
+  font-weight: 400;
+  padding-top: 4px;
+}

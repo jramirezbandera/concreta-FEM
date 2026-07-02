@@ -12,6 +12,7 @@ import { useSyncExternalStore } from "react";
 import { vistaStore } from "../../estado";
 import { PanelFlotante } from "../primitivas";
 import { useFuenteModeloCalculo } from "./modeloCalculoFuente";
+import { hexToken } from "./colores";
 import type { ModeloFEM } from "../../discretizador";
 import "./modeloCalculo.css";
 
@@ -127,7 +128,35 @@ function Detalle({ fuente }: { fuente: ReturnType<typeof useFuenteModeloCalculo>
         <span className="cx-mc__clave">Apoyos</span>
         <span className="cx-mc__valor mono">{c.apoyos}</span>
       </div>
+      <LeyendaGlifos />
       <span className="cx-mc__nota">Vista simplificada del modelo</span>
     </div>
+  );
+}
+
+// Mini-leyenda textual de los glifos del overlay (UX-K1): cuadrado/triangulo/circulo de
+// apoyo y circulo pequeño de extremo articulado, con su significado en lenguaje de obra.
+// Usa los MISMOS tokens de color que ModeloCalculoOverlay (apoyoCalc/releaseCalc) para que
+// glifo y overlay coincidan. Los glifos son caracteres unicode (■▲●○): fieles a la FORMA
+// de los del lienzo sin duplicar geometria.
+const GLIFOS: ReadonlyArray<{ glifo: string; texto: string; token: "apoyoCalc" | "releaseCalc" }> = [
+  { glifo: "■", texto: "Arranque empotrado", token: "apoyoCalc" },
+  { glifo: "▲", texto: "Arranque articulado", token: "apoyoCalc" },
+  { glifo: "●", texto: "Otro apoyo", token: "apoyoCalc" },
+  { glifo: "○", texto: "Extremo articulado", token: "releaseCalc" },
+];
+
+function LeyendaGlifos() {
+  return (
+    <ul className="cx-mc__leyenda" aria-label="Leyenda de símbolos del modelo de cálculo">
+      {GLIFOS.map((g) => (
+        <li key={g.texto} className="cx-mc__leyenda-item">
+          <span className="cx-mc__glifo-leyenda" aria-hidden="true" style={{ color: hexToken(g.token) }}>
+            {g.glifo}
+          </span>
+          <span className="cx-mc__leyenda-txt">{g.texto}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

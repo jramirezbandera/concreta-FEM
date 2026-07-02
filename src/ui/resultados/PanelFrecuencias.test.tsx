@@ -99,7 +99,10 @@ describe("PanelFrecuencias · estado vacio", () => {
   it("sin modos calculados muestra el estado vacio y NO la lista", () => {
     render(<PanelFrecuencias />);
     expect(screen.getByText(/Sin modos calculados/i)).toBeInTheDocument();
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    // La lista de modos es un grupo de botones (UX-L16); sin modos no aparece.
+    expect(
+      screen.queryByRole("group", { name: /modos de vibración/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("el boton lleva la etiqueta 'Calcular modos' con el motor listo", () => {
@@ -128,26 +131,28 @@ function montarConModos(frecuencias: number[]) {
 }
 
 describe("PanelFrecuencias · lista de frecuencias + selector de modo", () => {
-  it("lista una opcion por modo con su frecuencia en Hz", () => {
+  it("lista un boton por modo con su frecuencia en Hz", () => {
     montarConModos([3.21, 7.84, 12.5]);
-    const listbox = screen.getByRole("listbox");
-    const opciones = within(listbox).getAllByRole("option");
-    expect(opciones).toHaveLength(3);
-    expect(within(listbox).getByText(/Modo 1/)).toBeInTheDocument();
-    expect(within(listbox).getByText(/3\.21 Hz/)).toBeInTheDocument();
-    expect(within(listbox).getByText(/7\.84 Hz/)).toBeInTheDocument();
+    // La lista es un grupo de botones toggle (UX-L16), no un listbox.
+    const grupo = screen.getByRole("group", { name: /modos de vibración/i });
+    const botones = within(grupo).getAllByRole("button");
+    expect(botones).toHaveLength(3);
+    expect(within(grupo).getByText(/Modo 1/)).toBeInTheDocument();
+    expect(within(grupo).getByText(/3\.21 Hz/)).toBeInTheDocument();
+    expect(within(grupo).getByText(/7\.84 Hz/)).toBeInTheDocument();
   });
 
-  it("el modo activo (1 por defecto) esta marcado aria-selected", () => {
+  it("el modo activo (1 por defecto) esta marcado aria-pressed", () => {
     montarConModos([3.2, 7.8]);
-    const opciones = screen.getAllByRole("option");
-    expect(opciones[0]).toHaveAttribute("aria-selected", "true");
-    expect(opciones[1]).toHaveAttribute("aria-selected", "false");
+    const grupo = screen.getByRole("group", { name: /modos de vibración/i });
+    const botones = within(grupo).getAllByRole("button");
+    expect(botones[0]).toHaveAttribute("aria-pressed", "true");
+    expect(botones[1]).toHaveAttribute("aria-pressed", "false");
   });
 
   it("seleccionar otro modo lo fija en modalStore.modoActivo", () => {
     montarConModos([3.2, 7.8, 12.5]);
-    fireEvent.click(screen.getByRole("option", { name: /Modo 3/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Modo 3/i }));
     expect(modalStore.getState().modoActivo).toBe(3);
   });
 
@@ -158,6 +163,16 @@ describe("PanelFrecuencias · lista de frecuencias + selector de modo", () => {
     modalStore.getState().limpiar();
     rerender(<PanelFrecuencias />);
     expect(screen.getByText(/obsoletos/i)).toBeInTheDocument();
+  });
+
+  it("[UX-J1] la etiqueta de amplitud es 'Amplitud de dibujo' y el valor no lleva '×'", () => {
+    vistaStore.getState().setModalEscala(1);
+    montarConModos([3.2, 7.8]);
+    // Etiqueta clara (no el ambiguo "Amplitud ×N" que se confunde con la Amplificacion).
+    expect(screen.getByText(/Amplitud de dibujo/i)).toBeInTheDocument();
+    // El valor va sin "×"; con escala 1 se muestra "1.0" (no "×1.0").
+    expect(screen.getByText("1.0")).toBeInTheDocument();
+    expect(screen.queryByText("×1.0")).not.toBeInTheDocument();
   });
 });
 

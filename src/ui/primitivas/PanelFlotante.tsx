@@ -40,6 +40,12 @@ export interface PanelFlotanteProps extends HTMLAttributes<HTMLDivElement> {
   icono?: ReactNode;
   /** Etiqueta mono a la derecha de la cabecera (p. ej. "V·nueva", "auto"). */
   tag?: ReactNode;
+  /**
+   * Semantica del tag. Por defecto es neutro (--text-3). "warning" lo tiñe de --warning:
+   * lo usan los estados de AVISO (resultados obsoletos), donde el tag comunica un estado
+   * que requiere atencion (Spec §1: --warning para avisos), no una simple etiqueta.
+   */
+  tagVariante?: "neutro" | "warning";
   children?: ReactNode;
 }
 
@@ -47,6 +53,7 @@ export function PanelFlotante({
   titulo,
   icono,
   tag,
+  tagVariante = "neutro",
   children,
   className,
   ...rest
@@ -65,7 +72,17 @@ export function PanelFlotante({
         <div className={claseCabecera}>
           {icono && <span className="cx-panel-head__icon">{icono}</span>}
           <span className="cx-panel-head__title">{titulo}</span>
-          {tag !== undefined && <span className="cx-panel-head__tag mono">{tag}</span>}
+          {tag !== undefined && (
+            <span
+              className={
+                tagVariante === "warning"
+                  ? "cx-panel-head__tag cx-panel-head__tag--warning mono"
+                  : "cx-panel-head__tag mono"
+              }
+            >
+              {tag}
+            </span>
+          )}
         </div>
       )}
       <div className={claseCuerpo}>{children}</div>

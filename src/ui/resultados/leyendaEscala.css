@@ -46,3 +46,19 @@
 .cx-leyenda__toggle input[type="checkbox"] {
   accent-color: var(--accent);
 }
+
+/* Guia "la deformada se ve en 3D" (visible solo en planta): texto secundario. */
+.cx-leyenda__guia {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+
+/* Controles atenuados en planta (no operan alli): se ven pero inertes, sin cursor de
+   edicion, para no ofrecer afordancias muertas. */
+.cx-leyenda__control--off,
+.cx-leyenda__toggle--off {
+  opacity: 0.5;
+  cursor: default;
+}

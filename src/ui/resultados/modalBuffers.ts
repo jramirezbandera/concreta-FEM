@@ -12,6 +12,7 @@ import { Color } from "three";
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosModales } from "../../solver";
 import { rampaIsovalores } from "../viewport/colores";
+import { COLOR_OBSOLETO } from "./deformadaBuffers";
 import { modalGeometria } from "./modalGeometria";
 
 // Posiciones BASE (sin desplazar) y DELTA (desplazamiento ya en escena, a escala 1) por
@@ -29,6 +30,9 @@ export interface EntradasBuffersModal {
   modeloFEM: ModeloFEM | null;
   modos: ResultadosModales | null;
   numeroModo: number;
+  // Si false, la forma se colorea en GRIS obsoleto (espejo de la deformada/CR): la obra
+  // cambio tras calcular los modos. Default true. El panel muestra ademas el tag.
+  vigente?: boolean;
 }
 
 // Construye los buffers desde la geometria modal pura. Pide la geometria a escala 1
@@ -39,6 +43,7 @@ export interface EntradasBuffersModal {
 // <lineSegments> dibuja PARES de vertices: cada barra modal es UN segmento (nudo i ->
 // nudo j) = 2 vertices. El total de vertices es 2 * nº de segmentos.
 export function construirBuffersModal(e: EntradasBuffersModal): BuffersModal | null {
+  const vigente = e.vigente ?? true;
   // Geometria a escala unidad: delta crudo (forma normalizada, amplitud ~1).
   const geo1 = modalGeometria(e.modeloFEM, e.modos, e.numeroModo, 1);
   if (geo1.segmentos.length === 0) return null;
@@ -69,13 +74,20 @@ export function construirBuffersModal(e: EntradasBuffersModal): BuffersModal | n
     delta[o] = p1[0] - p0[0];
     delta[o + 1] = p1[1] - p0[1];
     delta[o + 2] = p1[2] - p0[2];
-    // Color por magnitud normalizada (rampa). Siempre la rampa: la forma modal es
-    // relativa (no hay version "fisica obsoleta" que pintar en gris).
-    const t = rango > 0 ? (s.mags[idx] - geo1.magMin) / rango : 0;
-    rampaIsovalores(t, aux);
-    color[o] = aux.r;
-    color[o + 1] = aux.g;
-    color[o + 2] = aux.b;
+    if (vigente) {
+      // Color por magnitud normalizada (rampa). La forma modal es relativa (amplitud ~1).
+      const t = rango > 0 ? (s.mags[idx] - geo1.magMin) / rango : 0;
+      rampaIsovalores(t, aux);
+      color[o] = aux.r;
+      color[o + 1] = aux.g;
+      color[o + 2] = aux.b;
+    } else {
+      // Obsoleto: gris atenuado (espejo de la deformada) — la obra cambio tras calcular los
+      // modos. El overlay ya no representa el modelo actual.
+      color[o] = COLOR_OBSOLETO.r;
+      color[o + 1] = COLOR_OBSOLETO.g;
+      color[o + 2] = COLOR_OBSOLETO.b;
+    }
   };
 
   // El indice de segmento coincide entre geo1 y geo0 (mismo modeloFEM, mismo orden de

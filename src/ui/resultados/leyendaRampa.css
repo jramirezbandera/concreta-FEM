@@ -37,3 +37,9 @@
   letter-spacing: 0.04em;
   color: var(--text-3);
 }
+/* La unidad entre parentesis conserva su caja (mm != MM): el .caps del texto NO la
+   alcanza porque va en un span propio sin text-transform. Mono para la unidad tecnica. */
+.cx-leyenda-rampa__ud {
+  font-family: var(--font-mono);
+  text-transform: none;
+}

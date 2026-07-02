@@ -5,6 +5,7 @@
 // (FEM Y-up -> escena Z-up) e indices de triangulos (2 por quad).
 import { describe, it, expect } from "vitest";
 import { construirBuffersIsovalores } from "./isovaloresBuffers";
+import { COLOR_OBSOLETO } from "./deformadaBuffers";
 import type { ModeloFEM, Trazabilidad } from "../../discretizador";
 import { trazabilidadVacia } from "../../discretizador";
 import type { ResultadosCalculo } from "../../solver";
@@ -152,6 +153,34 @@ describe("construirBuffersIsovalores · flecha", () => {
     expect([buffers.posiciones[0], buffers.posiciones[1], buffers.posiciones[2]]).toEqual([
       0, 0, 3,
     ]);
+  });
+
+  it("vigente=false pinta TODOS los vertices con el gris de obsoleto (UX-H4)", () => {
+    const buffers = construirBuffersIsovalores({
+      modeloFEM: modeloUnQuad(),
+      trazabilidad: trazaUnQuad(),
+      resultados: resultadosUnQuad({
+        dy: { Q0: 0, Q1: -0.01, Q2: -0.02, Q3: -0.01 },
+        moments: [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
+      }),
+      combo: "ELS",
+      magnitud: "flecha",
+      vigente: false,
+    })!;
+    const gris = [COLOR_OBSOLETO.r, COLOR_OBSOLETO.g, COLOR_OBSOLETO.b];
+    for (let v = 0; v < buffers.vertices; v++) {
+      for (let k = 0; k < 3; k++) {
+        expect(buffers.color[v * 3 + k]).toBeCloseTo(gris[k]!, 5);
+      }
+    }
+    // El rango/valores NO se agrisan: la leyenda los sigue usando.
+    expect(buffers.valorMin).toBeCloseTo(-0.02, 6);
+    expect(buffers.valorMax).toBeCloseTo(0, 6);
   });
 });
 

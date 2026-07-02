@@ -105,11 +105,17 @@ beforeEach(() => {
 });
 
 describe("PanelIsovalores", () => {
-  it("oculto sin resultados de placa (un portico sin losa)", () => {
+  it("sin resultados de placa muestra el estado vacio guia (UX-I1), no se oculta", () => {
     resultadosStore.getState().setResultados(resultadosSinPlaca(), femSinQuad(), traza());
     vistaStore.getState().setCombinacionActiva("ELS");
-    const { container } = render(<PanelIsovalores />);
-    expect(container).toBeEmptyDOMElement();
+    render(<PanelIsovalores />);
+    // Antes se ocultaba el panel (container vacio); ahora guia a introducir un paño.
+    expect(screen.getByText(/no hay losas calculadas/i)).toBeInTheDocument();
+    expect(screen.getByText(/entrada de vigas/i)).toBeInTheDocument();
+    // El selector de magnitud NO se muestra en el estado vacio (no hay nada que colorear).
+    expect(
+      screen.queryByRole("radiogroup", { name: "Magnitud de isovalores" }),
+    ).not.toBeInTheDocument();
   });
 
   it("visible con resultados de placa, con la unidad de la flecha (mm)", () => {
@@ -117,8 +123,10 @@ describe("PanelIsovalores", () => {
     vistaStore.getState().setCombinacionActiva("ELS");
     render(<PanelIsovalores />);
     expect(screen.getByRole("radiogroup", { name: "Magnitud de isovalores" })).toBeInTheDocument();
-    // Etiqueta de unidad de la flecha.
-    expect(screen.getByText("flecha (mm)")).toBeInTheDocument();
+    // Etiqueta de unidad de la flecha. Tras UX-MM el texto y la unidad van en spans
+    // separados ("flecha" + "(mm)") para que "mm" no se transforme a MAYUSCULAS.
+    expect(screen.getByText("flecha")).toBeInTheDocument();
+    expect(screen.getByText("(mm)")).toBeInTheDocument();
   });
 
   it("elegir Mx actualiza vistaStore.magnitudIsovalores y la unidad pasa a kN·m/m", async () => {
@@ -131,6 +139,27 @@ describe("PanelIsovalores", () => {
     await user.click(within(grupo).getByRole("radio", { name: "Mx" }));
 
     expect(vistaStore.getState().magnitudIsovalores).toBe("momentoX");
-    expect(screen.getByText("momento Mx (kN·m/m)")).toBeInTheDocument();
+    // Unidad partida (UX-MM): "momento Mx" (texto) + "(kN·m/m)" (unidad sin transformar).
+    expect(screen.getByText("momento Mx")).toBeInTheDocument();
+    expect(screen.getByText("(kN·m/m)")).toBeInTheDocument();
+  });
+
+  it("no avisa de obsoletos mientras los resultados son vigentes (UX-H4)", () => {
+    resultadosStore.getState().setResultados(resultadosConPlaca(), femConQuad(), traza());
+    vistaStore.getState().setCombinacionActiva("ELS");
+    render(<PanelIsovalores />);
+    expect(screen.queryByText(/resultados obsoletos/i)).not.toBeInTheDocument();
+    // El tag es "losa" mientras es vigente.
+    expect(screen.getByText("losa")).toBeInTheDocument();
+  });
+
+  it("con la obra editada tras calcular muestra tag 'obsoletos' y aviso (UX-H4)", () => {
+    resultadosStore.getState().setResultados(resultadosConPlaca(), femConQuad(), traza());
+    vistaStore.getState().setCombinacionActiva("ELS");
+    // Editar la obra baja la bandera vigente conservando resultados (modeloStore.limpiar).
+    resultadosStore.getState().limpiar();
+    render(<PanelIsovalores />);
+    expect(screen.getByText(/resultados obsoletos/i)).toBeInTheDocument();
+    expect(screen.getByText("obsoletos")).toBeInTheDocument();
   });
 });

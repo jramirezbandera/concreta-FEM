@@ -16,3 +16,21 @@
 .cx-combo__trigger {
   width: 100%;
 }
+
+/* Opcion del desplegable con etiqueta + formula apiladas (UX-H11). El item mantiene
+   space-between (etiqueta a la izquierda, check a la derecha); la formula es un subtitulo
+   tenue mono bajo la etiqueta. Da mas alto al item que un item de una sola linea. */
+.cx-combo__item {
+  height: auto;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.cx-combo__item-txt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cx-combo__formula {
+  font-size: 10.5px;
+  color: var(--text-3);
+}

@@ -54,6 +54,35 @@
   font-size: 12px;
   color: var(--text);
 }
+/* Mini-leyenda de glifos (UX-K1): cada simbolo con su significado en lenguaje de obra.
+   El color del glifo lo pone el TSX (hexToken, mismos tokens que el overlay). */
+.cx-mc__leyenda {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cx-mc__leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.cx-mc__glifo-leyenda {
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1;
+}
+.cx-mc__leyenda-txt {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
 /* Nota "vista simplificada": el overlay no representa los 6 GDL fielmente (Issue 7-B). */
 .cx-mc__nota {
   margin-top: 2px;
