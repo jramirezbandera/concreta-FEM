@@ -19,7 +19,13 @@ import {
   type DatosPanoUI,
   type ErrorCampo,
 } from "../dialogos/validacionesPano";
-import { modeloStore, seleccionStore, editarPano, eliminarPano } from "../../estado";
+import {
+  modeloStore,
+  seleccionStore,
+  vistaStore,
+  editarPano,
+  eliminarPano,
+} from "../../estado";
 import type { Modelo, Pano } from "../../dominio";
 import { cargasDeAmbito } from "../../dominio";
 import "./inspectorPano.css";
@@ -51,9 +57,28 @@ function contarCargasDelPano(modelo: Modelo, panoId: string): number {
   return cargasDeAmbito(modelo, panoId).length;
 }
 
+// Estado vacio del inspector (auditoria UX-C6): en la pestana de Isovalores (donde el
+// paño es el editor principal) con la herramienta "seleccion" y sin paño seleccionado,
+// el dock mostraba solo "Ayudas" sin guiar a que seleccionar un paño abre su editor.
+// En vez de desaparecer (return null), rinde una seccion de estado vacio en el cromo
+// plano del dock (patron de PanelDiagramas / InspectorPilar). En la pestana de vigas el
+// paño acompaña a la viga (editor principal), asi que alli NO muestra estado vacio: lo
+// cubre el de InspectorViga y dos "Selecciona…" apilados serian ruido.
+function EstadoVacioPano({ mensaje }: { mensaje: string }) {
+  return (
+    <PanelFlotante className="cx-inspector-pano" titulo="Propiedades">
+      <p className="cx-inspector-vacio">{mensaje}</p>
+    </PanelFlotante>
+  );
+}
+
 export function InspectorPano() {
   const seleccion = seleccionStore((s) => s.seleccion);
   const panos = modeloStore((s) => s.modelo.panos);
+  // Contexto de UI para el estado vacio: solo en Isovalores (editor principal del paño)
+  // y con la herramienta de seleccion.
+  const pestanaActiva = vistaStore((s) => s.pestanaActiva);
+  const herramienta = vistaStore((s) => s.herramienta);
 
   const [errores, setErrores] = useState<ErrorCampo[]>([]);
   const [confirmacion, setConfirmacion] = useState<{
@@ -70,8 +95,20 @@ export function InspectorPano() {
     setErrores([]);
   }, [panoId]);
 
-  // 0 o >1 seleccionados, o el id no es un paño del modelo: no se renderiza.
-  if (!pano) return null;
+  // Sin un paño aplicable (0 seleccionados, multiseleccion, o id no-paño): el
+  // inspector no edita nada. En Isovalores con herramienta "seleccion" muestra un
+  // estado vacio que guia (UX-C6); en cualquier otro contexto se repliega a null
+  // (en la pestana de vigas el editor principal es la viga).
+  if (!pano) {
+    if (pestanaActiva === "isovalores" && herramienta === "seleccion") {
+      const mensaje =
+        seleccion.length > 1
+          ? `${seleccion.length} elementos seleccionados. Edítalos de uno en uno.`
+          : "Selecciona un paño para editar sus propiedades.";
+      return <EstadoVacioPano mensaje={mensaje} />;
+    }
+    return null;
+  }
 
   // Commit generico de un campo: construye DatosPanoUI con el parche, valida, refleja
   // solo los errores de los campos tocados y despacha si pasan. No-op si no cambia.

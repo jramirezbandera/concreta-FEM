@@ -33,3 +33,13 @@
   margin: 0;
   line-height: 1.4;
 }
+
+/* Estado vacio (UX-C6): texto guia cuando no hay elemento seleccionado. Terciario,
+   en lenguaje de obra, sin caja (a diferencia de .cx-note): es un rotulo dentro de la
+   seccion del dock, no un callout. Espejo de inspectorPilar.css. */
+.cx-inspector-vacio {
+  margin: 0;
+  padding: var(--space-1, 4px) 0;
+  color: var(--text-3, #6b7585);
+  line-height: 1.4;
+}

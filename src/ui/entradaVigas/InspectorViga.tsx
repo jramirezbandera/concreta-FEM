@@ -16,6 +16,7 @@ import {
 import {
   modeloStore,
   seleccionStore,
+  vistaStore,
   editarViga,
   eliminarViga,
 } from "../../estado";
@@ -71,12 +72,30 @@ function contarCargasDeLaViga(modelo: Modelo, vigaId: string): number {
   return cargasDeAmbito(modelo, vigaId).length;
 }
 
+// Estado vacio del inspector (auditoria UX-C6): en la pestana de vigas con la
+// herramienta "seleccion" activa y sin viga seleccionada, el dock mostraba solo
+// "Ayudas" sin guiar a que seleccionar una viga abre su editor. En vez de
+// desaparecer (return null), rinde una seccion de estado vacio en el cromo plano del
+// dock (patron de PanelDiagramas / InspectorPilar). Solo con herramienta "seleccion":
+// con la herramienta de colocacion, el panel-herramienta ya ocupa el dock.
+function EstadoVacioViga({ mensaje }: { mensaje: string }) {
+  return (
+    <PanelFlotante className="cx-inspector-viga" titulo="Propiedades">
+      <p className="cx-inspector-vacio">{mensaje}</p>
+    </PanelFlotante>
+  );
+}
+
 export function InspectorViga() {
   // Lectura reactiva: la seleccion y las vigas. El inspector NO esta en el bucle del
   // viewport; un re-render al seleccionar/editar es aceptable (#11: lo que no puede
   // entrar en el render loop es el viewport, no este panel de propiedades).
   const seleccion = seleccionStore((s) => s.seleccion);
   const vigas = modeloStore((s) => s.modelo.vigas);
+  // Contexto de UI para el estado vacio: solo en la pestana de vigas y con la
+  // herramienta de seleccion (colocacion tiene su propio panel-herramienta).
+  const pestanaActiva = vistaStore((s) => s.pestanaActiva);
+  const herramienta = vistaStore((s) => s.herramienta);
 
   // Errores de validacion campo a campo. Se actualizan en cada commit; NO bloquean
   // el teclear (el estado local de cada control es libre).
@@ -99,8 +118,20 @@ export function InspectorViga() {
     setErrores([]);
   }, [vigaId]);
 
-  // 0 o >1 seleccionadas, o el id no es una viga del modelo: no se renderiza.
-  if (!viga) return null;
+  // Sin una viga aplicable (0 seleccionadas, multiseleccion, o id no-viga): el
+  // inspector no edita nada. En la pestana de vigas con herramienta "seleccion"
+  // muestra un estado vacio que guia (UX-C6); en cualquier otro contexto se repliega
+  // a null (la viga solo es el editor principal de esta pestana).
+  if (!viga) {
+    if (pestanaActiva === "entradaVigas" && herramienta === "seleccion") {
+      const mensaje =
+        seleccion.length > 1
+          ? `${seleccion.length} elementos seleccionados. Edítalos de uno en uno.`
+          : "Selecciona una viga para editar sus propiedades.";
+      return <EstadoVacioViga mensaje={mensaje} />;
+    }
+    return null;
+  }
 
   // Commit generico de un campo. Construye los DatosVigaUI con el parche, valida,
   // refleja SOLO los errores de los campos tocados y despacha si pasan. No-op si el

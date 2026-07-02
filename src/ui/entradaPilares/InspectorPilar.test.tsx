@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InspectorPilar } from "./InspectorPilar";
-import { modeloStore, seleccionStore } from "../../estado";
+import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import { crearModeloVacio } from "../../dominio";
 import type { Modelo } from "../../dominio";
 
@@ -52,6 +52,11 @@ function modeloConPilar(): Modelo {
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   seleccionStore.getState().limpiar();
+  // El estado vacio (UX-C6) depende del contexto de vista: pestana de pilares +
+  // herramienta "seleccion". Fijamos ese contexto por defecto (= defaults del store)
+  // para no depender del orden de otros tests que muten vistaStore.
+  vistaStore.getState().setPestanaActiva("entradaPilares");
+  vistaStore.getState().setHerramienta("seleccion");
 });
 
 const modelo = () => modeloStore.getState().getModelo();
@@ -65,22 +70,48 @@ function renderConPilarSeleccionado() {
 }
 
 describe("InspectorPilar: visibilidad", () => {
-  it("no se renderiza sin seleccion", () => {
+  it("sin seleccion muestra el estado vacio que guia a seleccionar (UX-C6)", () => {
     modeloStore.getState().cargarModelo(modeloConPilar());
-    const { container } = render(<InspectorPilar />);
-    expect(container.querySelector(".cx-inspector-pilar")).toBeNull();
+    render(<InspectorPilar />);
+    // El panel se renderiza (mismo cromo, titulo "Propiedades") con el texto guia,
+    // en vez de desaparecer (antes era return null y el dock quedaba mudo).
+    expect(screen.getByText("Propiedades")).toBeInTheDocument();
+    expect(
+      screen.getByText("Selecciona un pilar para editar sus propiedades."),
+    ).toBeInTheDocument();
   });
 
-  it("no se renderiza con seleccion multiple", () => {
+  it("con seleccion multiple guia a editar de uno en uno (UX-C6)", () => {
     modeloStore.getState().cargarModelo(modeloConPilar());
     seleccionStore.getState().seleccionar(["P-1", "otro"]);
+    render(<InspectorPilar />);
+    expect(
+      screen.getByText("2 elementos seleccionados. Edítalos de uno en uno."),
+    ).toBeInTheDocument();
+  });
+
+  it("con id seleccionado que no es un pilar, muestra el estado vacio (no editor)", () => {
+    modeloStore.getState().cargarModelo(modeloConPilar());
+    seleccionStore.getState().seleccionar(["no-existe"]);
+    render(<InspectorPilar />);
+    // Un solo id que no resuelve a pilar: no hay nada que editar -> estado vacio.
+    expect(
+      screen.getByText("Selecciona un pilar para editar sus propiedades."),
+    ).toBeInTheDocument();
+    // No se pinta la cabecera del editor de un pilar concreto.
+    expect(screen.queryByText(/^Pilar /)).toBeNull();
+  });
+
+  it("no se renderiza con una herramienta de colocacion activa (el panel-herramienta ocupa el dock)", () => {
+    modeloStore.getState().cargarModelo(modeloConPilar());
+    vistaStore.getState().setHerramienta("pilar");
     const { container } = render(<InspectorPilar />);
     expect(container.querySelector(".cx-inspector-pilar")).toBeNull();
   });
 
-  it("no se renderiza si el id seleccionado no es un pilar del modelo", () => {
+  it("no se renderiza fuera de la pestana de pilares", () => {
     modeloStore.getState().cargarModelo(modeloConPilar());
-    seleccionStore.getState().seleccionar(["no-existe"]);
+    vistaStore.getState().setPestanaActiva("resultados");
     const { container } = render(<InspectorPilar />);
     expect(container.querySelector(".cx-inspector-pilar")).toBeNull();
   });

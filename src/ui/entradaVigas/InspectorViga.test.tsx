@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InspectorViga } from "./InspectorViga";
-import { modeloStore, seleccionStore } from "../../estado";
+import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import { crearModeloVacio } from "../../dominio";
 import type { Modelo } from "../../dominio";
 
@@ -63,6 +63,11 @@ function modeloConViga(): Modelo {
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   seleccionStore.getState().limpiar();
+  // El estado vacio (UX-C6) depende del contexto: pestana de vigas + herramienta
+  // "seleccion". La pestana por defecto del store es la de pilares, asi que aqui la
+  // fijamos explicitamente (la viga es el editor principal de su pestana).
+  vistaStore.getState().setPestanaActiva("entradaVigas");
+  vistaStore.getState().setHerramienta("seleccion");
 });
 
 const modelo = () => modeloStore.getState().getModelo();
@@ -76,22 +81,44 @@ function renderConVigaSeleccionada() {
 }
 
 describe("InspectorViga: visibilidad", () => {
-  it("no se renderiza sin seleccion", () => {
+  it("sin seleccion muestra el estado vacio que guia a seleccionar (UX-C6)", () => {
     modeloStore.getState().cargarModelo(modeloConViga());
-    const { container } = render(<InspectorViga />);
-    expect(container.querySelector(".cx-inspector-viga")).toBeNull();
+    render(<InspectorViga />);
+    expect(screen.getByText("Propiedades")).toBeInTheDocument();
+    expect(
+      screen.getByText("Selecciona una viga para editar sus propiedades."),
+    ).toBeInTheDocument();
   });
 
-  it("no se renderiza con seleccion multiple", () => {
+  it("con seleccion multiple guia a editar de uno en uno (UX-C6)", () => {
     modeloStore.getState().cargarModelo(modeloConViga());
     seleccionStore.getState().seleccionar(["V-1", "otro"]);
+    render(<InspectorViga />);
+    expect(
+      screen.getByText("2 elementos seleccionados. Edítalos de uno en uno."),
+    ).toBeInTheDocument();
+  });
+
+  it("con id seleccionado que no es una viga, muestra el estado vacio (no editor)", () => {
+    modeloStore.getState().cargarModelo(modeloConViga());
+    seleccionStore.getState().seleccionar(["no-existe"]);
+    render(<InspectorViga />);
+    expect(
+      screen.getByText("Selecciona una viga para editar sus propiedades."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Viga /)).toBeNull();
+  });
+
+  it("no se renderiza con una herramienta de colocacion activa (el panel-herramienta ocupa el dock)", () => {
+    modeloStore.getState().cargarModelo(modeloConViga());
+    vistaStore.getState().setHerramienta("viga");
     const { container } = render(<InspectorViga />);
     expect(container.querySelector(".cx-inspector-viga")).toBeNull();
   });
 
-  it("no se renderiza si el id seleccionado no es una viga del modelo", () => {
+  it("no se renderiza fuera de la pestana de vigas", () => {
     modeloStore.getState().cargarModelo(modeloConViga());
-    seleccionStore.getState().seleccionar(["no-existe"]);
+    vistaStore.getState().setPestanaActiva("entradaPilares");
     const { container } = render(<InspectorViga />);
     expect(container.querySelector(".cx-inspector-viga")).toBeNull();
   });

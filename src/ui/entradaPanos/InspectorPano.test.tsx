@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InspectorPano } from "./InspectorPano";
-import { modeloStore, seleccionStore } from "../../estado";
+import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import { crearModeloVacio } from "../../dominio";
 import type { Modelo } from "../../dominio";
 import { listarMateriales } from "../../biblioteca";
@@ -56,6 +56,11 @@ function modeloConPano(): Modelo {
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   seleccionStore.getState().limpiar();
+  // El estado vacio (UX-C6) del paño solo aparece en Isovalores (su editor principal;
+  // en la pestana de vigas acompaña a la viga y no muestra estado vacio) con la
+  // herramienta "seleccion". Fijamos ese contexto explicitamente.
+  vistaStore.getState().setPestanaActiva("isovalores");
+  vistaStore.getState().setHerramienta("seleccion");
 });
 
 const modelo = () => modeloStore.getState().getModelo();
@@ -68,15 +73,39 @@ function renderConPanoSeleccionado() {
 }
 
 describe("InspectorPano: visibilidad", () => {
-  it("no se renderiza sin seleccion", () => {
+  it("sin seleccion (en Isovalores) muestra el estado vacio que guia a seleccionar (UX-C6)", () => {
     modeloStore.getState().cargarModelo(modeloConPano());
-    const { container } = render(<InspectorPano />);
-    expect(container.querySelector(".cx-inspector-pano")).toBeNull();
+    render(<InspectorPano />);
+    expect(screen.getByText("Propiedades")).toBeInTheDocument();
+    expect(
+      screen.getByText("Selecciona un paño para editar sus propiedades."),
+    ).toBeInTheDocument();
   });
 
-  it("no se renderiza si el id seleccionado no es un paño", () => {
+  it("con seleccion multiple guia a editar de uno en uno (UX-C6)", () => {
+    modeloStore.getState().cargarModelo(modeloConPano());
+    seleccionStore.getState().seleccionar(["F-1", "otro"]);
+    render(<InspectorPano />);
+    expect(
+      screen.getByText("2 elementos seleccionados. Edítalos de uno en uno."),
+    ).toBeInTheDocument();
+  });
+
+  it("con id seleccionado que no es un paño, muestra el estado vacio (no editor)", () => {
     modeloStore.getState().cargarModelo(modeloConPano());
     seleccionStore.getState().seleccionar(["no-existe"]);
+    render(<InspectorPano />);
+    expect(
+      screen.getByText("Selecciona un paño para editar sus propiedades."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Paño /)).toBeNull();
+  });
+
+  it("no muestra estado vacio en la pestana de vigas (alli acompaña a la viga)", () => {
+    // El paño se monta tambien en la pestana de vigas, pero alli el editor principal es
+    // la viga: el estado vacio del paño se replegaria a null para no apilar dos guias.
+    modeloStore.getState().cargarModelo(modeloConPano());
+    vistaStore.getState().setPestanaActiva("entradaVigas");
     const { container } = render(<InspectorPano />);
     expect(container.querySelector(".cx-inspector-pano")).toBeNull();
   });
