@@ -52,6 +52,7 @@ import {
 import type { Modelo } from "../../src/dominio";
 import type { ModeloFEM } from "../../src/discretizador/contratoFEM";
 import type { ResultadosCalculo } from "../../src/solver/resultados";
+import { getMaterial } from "../../src/biblioteca";
 
 // --- Constantes de material/seccion del fixture (S275 + IPE300) --------------
 // Se necesitan para calcular las flechas teoricas. Valores INTERNOS (kN-m), los
@@ -878,6 +879,64 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
         members: [{ ...base.members[0], j: "NO_EXISTE" }],
       };
       expect(() => motor.calcular(nodoRoto), "nodo inexistente debe propagar error").toThrow();
+    },
+    TIMEOUT_ARRANQUE,
+  );
+
+  // ---------------------------------------------------------------------------
+  // AUDITORIA [C-1]) EJES DE FLEXION de una viga rectangular.  Una viga de hormigon
+  //    30x60 (ancho b=0,30 HORIZONTAL, canto h=0,60 VERTICAL) biapoyada debe
+  //    flectar con su eje FUERTE: I = b·h³/12 = 5,4e-3 m⁴ y δ = 5qL⁴/384EI.
+  //
+  //    POR QUE ESTE GOLDEN NO EXISTIA: todos los golden de flecha previos calculan
+  //    la referencia teorica con la MISMA constante de catalogo que consume PyNite
+  //    (autoconsistentes) o usan secciones CUADRADAS (Iy=Iz, insensibles al eje).
+  //    Este caso usa una seccion RECTANGULAR (h/b=2) y la referencia teorica se
+  //    deriva de la GEOMETRIA (b·h³/12), independiente del mapeo de la biblioteca:
+  //    si el mapeo pone el eje debil en el campo que PyNite usa para la flexion
+  //    vertical (Iz, ver cabecera), la flecha sale (h/b)² = 4x y este test lo caza.
+  //
+  //    Los pilares llevan una seccion GENERICA muy rigida (A=10, I=10) para que el
+  //    asiento axial del apoyo no contamine la flecha de la viga (<0,01%): el test
+  //    aisla el EJE de flexion, no la flexibilidad del apoyo.
+  // ---------------------------------------------------------------------------
+  it(
+    "AUDITORIA C-1: viga hormigon 30x60 biapoyada flecta con su eje FUERTE (b·h³/12)",
+    () => {
+      const L = 6;
+      const q = 10;
+      const b = 0.3; // m (ancho, horizontal)
+      const h = 0.6; // m (canto, VERTICAL)
+
+      const modelo = fixtureBiapoyadaUDL({ L, q });
+      // Viga: seccion rectangular de hormigon 30x60 (mismo id que la del fixture
+      // para no tocar referencias); material HA-25 del catalogo.
+      modelo.secciones = [
+        { id: modelo.secciones[0].id, nombre: "30x60", tipo: "hormigonRectangular", b, h },
+        { id: "sec-pilar-rigido", nombre: "apoyo rigido", tipo: "generico", A: 10, Iy: 10, Iz: 10, J: 10 },
+      ];
+      for (const v of modelo.vigas) v.materialId = "HA-25";
+      // Pilares: apoyo casi rigido (generico) para aislar la flecha de la viga.
+      for (const p of modelo.pilares) {
+        p.seccionId = "sec-pilar-rigido";
+        p.materialId = "HA-25";
+      }
+
+      const corrida = correrConFEM(modelo);
+      if (!corrida) return;
+      const { res } = corrida;
+
+      const combo = "ELS";
+      // E del catalogo (Ecm de HA-25, verificado contra el Codigo Estructural en
+      // biblioteca.test.ts): el test NO depende de su valor exacto, solo del EJE.
+      const E = getMaterial("HA-25")!.E; // kN/m²
+      const I_FUERTE = (b * h ** 3) / 12; // 5,4e-3 m⁴ — derivado de la GEOMETRIA
+      const flechaTeo = (5 * q * L ** 4) / (384 * E * I_FUERTE); // m (descenso)
+
+      const flechaReal = Math.abs(flechaMaxDescenso(res, combo));
+      // Si los ejes estan intercambiados, flechaReal ≈ (h/b)²·flechaTeo = 4x y el
+      // comparador de flecha (tolerancia 1%) falla con errRel ≈ 300%.
+      assertOk(compararFlecha(flechaReal, flechaTeo), "viga 30x60: flecha con eje FUERTE b·h³/12");
     },
     TIMEOUT_ARRANQUE,
   );
