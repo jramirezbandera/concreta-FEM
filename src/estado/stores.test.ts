@@ -390,6 +390,19 @@ describe("vistaStore: setters", () => {
     expect(s.plantaActivaId).toBe("p1");
     expect(s.combinacionActiva).toBe("ELU");
   });
+
+  // UX-A4: la rejilla es un flag transitorio (fuera de undo, patron de snapActivo).
+  it("rejillaVisible arranca en true y toggleRejilla lo conmuta", () => {
+    expect(vistaStore.getState().rejillaVisible).toBe(true);
+    vistaStore.getState().toggleRejilla();
+    expect(vistaStore.getState().rejillaVisible).toBe(false);
+    vistaStore.getState().toggleRejilla();
+    expect(vistaStore.getState().rejillaVisible).toBe(true);
+    // setter directo tambien disponible.
+    vistaStore.getState().setRejillaVisible(false);
+    expect(vistaStore.getState().rejillaVisible).toBe(false);
+    vistaStore.getState().setRejillaVisible(true);
+  });
 });
 
 // --- feature-11 · herramienta activa + defaults de pilar ----------------------

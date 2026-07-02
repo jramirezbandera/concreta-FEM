@@ -6,6 +6,8 @@ import { Sidebar } from "./Sidebar";
 import { ToolsRail } from "./ToolsRail";
 import { StatusBar, type StatusBarProps } from "./StatusBar";
 import { BottomTabs } from "./BottomTabs";
+import { AvisoPersistencia } from "./AvisoPersistencia";
+import type { EstadoArranquePersistencia } from "./useArranquePersistencia";
 import {
   DialogoGruposYPlantas,
   DialogoHipotesis,
@@ -42,13 +44,27 @@ export interface ShellProps {
    * Si no hay contenido, la region NO se renderiza (el lienzo ocupa todo el ancho).
    */
   dock?: ReactNode;
+  /**
+   * Estado del arranque de persistencia (auditoria UX-L1). Si es "carga-fallida" (o
+   * "sin-indexeddb") el Shell muestra un aviso bajo la menubar. "ok" no muestra nada.
+   */
+  avisoPersistencia?: EstadoArranquePersistencia;
 }
 
-export function Shell({ children, nombreObra, status, dock }: ShellProps) {
+export function Shell({
+  children,
+  nombreObra,
+  status,
+  dock,
+  avisoPersistencia,
+}: ShellProps) {
   return (
     <div className="cx-app">
       <Brandbar nombreObra={nombreObra} />
       <Menubar />
+      {avisoPersistencia !== undefined && (
+        <AvisoPersistencia estado={avisoPersistencia} />
+      )}
 
       <div className="cx-body">
         <Sidebar />

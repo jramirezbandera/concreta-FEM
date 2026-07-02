@@ -185,6 +185,38 @@ describe("useArranquePersistencia · (3) cleanup da de baja ambos autosaves", ()
   });
 });
 
+describe("useArranquePersistencia · (6) estado para el banner (UX-L1)", () => {
+  it("camino feliz -> estado 'ok' (sin banner)", async () => {
+    const { result } = renderHook(() => useArranquePersistencia());
+    await waitFor(() => {
+      expect(iniciarAutosavePlantillasMock).toHaveBeenCalled();
+    });
+    expect(result.current).toBe("ok");
+  });
+
+  it("DB no disponible -> estado 'sin-indexeddb'", async () => {
+    abrirDBMock.mockImplementation(async () => {
+      ordenLlamadas.push("abrirDB");
+      return { ok: false, motivo: "IndexedDB no disponible" };
+    });
+    const { result } = renderHook(() => useArranquePersistencia());
+    await waitFor(() => {
+      expect(result.current).toBe("sin-indexeddb");
+    });
+  });
+
+  it("carga de proyecto fallida -> estado 'carga-fallida' (banner de alerta)", async () => {
+    cargarProyectoEnStoreMock.mockImplementation(async (id: string) => {
+      ordenLlamadas.push(`cargarProyectoEnStore:${id}`);
+      return { ok: false, errores: ["modelo corrupto"] };
+    });
+    const { result } = renderHook(() => useArranquePersistencia());
+    await waitFor(() => {
+      expect(result.current).toBe("carga-fallida");
+    });
+  });
+});
+
 describe("useArranquePersistencia · (4) proyecto activo: reutilizar vs crear", () => {
   it("reutiliza el proyecto activo existente (no crea uno nuevo)", async () => {
     getProyectoActivoIdMock.mockImplementation(async () => {

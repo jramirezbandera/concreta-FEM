@@ -21,3 +21,8 @@ export type { MenuDef } from "./menus";
 // Arranque de persistencia (feature-15): rehidrata y autosalva Modelo + plantillas
 // del proyecto activo. Lo invoca App una vez al montar.
 export { useArranquePersistencia } from "./useArranquePersistencia";
+
+// Atajos de teclado globales (auditoria UX-A3/UX-A5): Ctrl+Z/Y undo/redo, F3/F4
+// captura/plantillas. Lo monta App una vez.
+export { useAtajosGlobales } from "./useAtajosGlobales";
+export type { EstadoArranquePersistencia } from "./useArranquePersistencia";

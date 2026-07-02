@@ -129,6 +129,11 @@ interface VistaState {
   defaultsCarga: DefaultsCarga;
   defaultsPano: DefaultsPano;
   snapActivo: boolean;
+  // Visibilidad de la rejilla del lienzo (ayuda de dibujo CAD). Toggle transitorio de
+  // vista, MISMO patron que snapActivo: estado de UI puro, NO participa en undo. La
+  // Escena monta la Rejilla() solo si este flag esta activo; el ToolsRail lo refleja y
+  // conmuta. Encendida por defecto (la rejilla es la referencia visual del replanteo).
+  rejillaVisible: boolean;
   // Overlay de CENTRO DE MASAS (F2.4, D-diseño-1). Toggle de ayuda de modelado:
   // dibuja el marcador ⊕ del CM de la planta activa + un panel HUD con coords/peso.
   // Apagado por defecto (regla de subtraccion: nunca siempre-visible). Disponible en
@@ -191,6 +196,8 @@ interface VistaState {
   setDefaultsCarga(p: Partial<DefaultsCarga>): void; // merge superficial
   setDefaultsPano(p: Partial<DefaultsPano>): void; // merge superficial
   setSnapActivo(b: boolean): void;
+  setRejillaVisible(b: boolean): void;
+  toggleRejilla(): void;
   setMostrarCentroMasa(b: boolean): void;
   toggleCentroMasa(): void;
   setMostrarCentroRigidez(b: boolean): void;
@@ -263,6 +270,7 @@ export const vistaStore = create<VistaState>()(
       bordeApoyo: "simple",
     },
     snapActivo: true,
+    rejillaVisible: true,
     mostrarCentroMasa: false,
     mostrarCentroRigidez: false,
     mostrarModeloCalculo: false,
@@ -293,6 +301,9 @@ export const vistaStore = create<VistaState>()(
     setDefaultsPano: (p) =>
       set((estado) => ({ defaultsPano: { ...estado.defaultsPano, ...p } })),
     setSnapActivo: (b) => set({ snapActivo: b }),
+    setRejillaVisible: (b) => set({ rejillaVisible: b }),
+    toggleRejilla: () =>
+      set((estado) => ({ rejillaVisible: !estado.rejillaVisible })),
     setMostrarCentroMasa: (b) => set({ mostrarCentroMasa: b }),
     toggleCentroMasa: () =>
       set((estado) => ({ mostrarCentroMasa: !estado.mostrarCentroMasa })),

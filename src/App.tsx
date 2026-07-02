@@ -9,7 +9,7 @@
 // null cuando hay algo que seleccionar, ni quedar apuntando a un grupo/planta de
 // una obra anterior tras restaurar autosave o cambiar de proyecto).
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Shell, useArranquePersistencia } from "./ui/shell";
+import { Shell, useArranquePersistencia, useAtajosGlobales } from "./ui/shell";
 import {
   Viewport,
   Slot,
@@ -48,6 +48,7 @@ import {
 import {
   modeloStore,
   vistaStore,
+  calculoStore,
   type Pestana,
   type Herramienta,
 } from "./estado";
@@ -85,10 +86,15 @@ function useInicializarVistaActiva(): void {
 // --- T-D1 · Guia contextual por pestana ---------------------------------------
 
 // Mensaje de la barra de estado segun la pestana activa. Lenguaje de obra,
-// nunca jerga FEM (CLAUDE.md §17).
+// nunca jerga FEM (CLAUDE.md §17). Para pilares/vigas, este mensaje se muestra con la
+// herramienta de SELECCION activa: por eso guia a activar la herramienta de
+// introduccion (el clic en la planta NO coloca nada en modo seleccion; el mensaje
+// anterior "Introduce pilares..." era engañoso — auditoria UX-N2).
 const MENSAJE_PESTANA: Record<Pestana, string> = {
-  entradaPilares: "Introduce pilares haciendo clic en la planta",
-  entradaVigas: "Une nudos para introducir vigas en la planta",
+  entradaPilares:
+    "Activa Introducción → Pilar para colocar pilares, o selecciona uno para editarlo.",
+  entradaVigas:
+    "Activa Vigas → Viga para trazar vigas, o selecciona una para editarla.",
   resultados: "Selecciona una barra para ver sus esfuerzos",
   isovalores: "Elige un mapa de isovalores para revisar el paño",
 };
@@ -106,9 +112,9 @@ const MENSAJE_PILAR_SIN_TRAMO =
 
 // Guia contextual mientras la herramienta "viga" esta activa (prioriza sobre el
 // mensaje de pestana). Una viga se tiende entre dos puntos: dos clics. Lenguaje
-// de obra, sin jerga FEM.
+// de obra, sin jerga FEM (nada de "nudos": eso es Capa 2).
 const MENSAJE_HERRAMIENTA_VIGA =
-  "Haz clic en dos puntos para tender una viga (Esc termina)";
+  "Haz clic en dos puntos (pilares o extremos) para tender una viga (Esc termina)";
 
 // Cuando la herramienta "viga" esta activa pero NO se puede colocar (sin planta
 // donde caer, o sin seccion/material por defecto elegidos en el panel), la barra
@@ -133,6 +139,13 @@ const MENSAJE_PANO_SIN_TRAMO =
 // seleccionar/inspeccionar en vez de a colocar. Lenguaje de obra, sin jerga FEM.
 const MENSAJE_3D = "Vista 3D del edificio: selecciona un elemento para inspeccionarlo";
 
+// Feedback de calculo en la barra de estado (auditoria UX-L6). Prioriza sobre todo lo
+// demas mientras el motor trabaja; al terminar, se restaura el mensaje contextual.
+// Lenguaje de obra: nada de "Pyodide"/"solver" (la UI no sabe que existe Python).
+// Exportados como costura de test (evita duplicar los literales en el test).
+export const MENSAJE_CALCULANDO = "Calculando obra…";
+export const MENSAJE_MOTOR_CARGANDO = "Preparando el motor de cálculo…";
+
 function usePestanaActiva(): Pestana {
   return useSyncExternalStore(
     (cb) => vistaStore.subscribe((s) => s.pestanaActiva, cb),
@@ -155,6 +168,20 @@ function useSnapActivo(): boolean {
     () => vistaStore.getState().snapActivo,
     () => vistaStore.getState().snapActivo,
   );
+}
+
+// Mensaje de calculo activo (auditoria UX-L6), o null si el motor no esta trabajando.
+// Devuelve "Calculando obra…" mientras hay un calculo en vuelo, "Preparando el motor…"
+// mientras se carga el motor, y null en reposo (para que gane el mensaje contextual).
+// Prioridad: calculando > cargando (un calculo en vuelo ya implica el motor listo).
+// Exportado como costura de test (mismo patron que usePuedeColocarPilar).
+// eslint-disable-next-line react-refresh/only-export-components
+export function useMensajeCalculo(): string | null {
+  const calculando = calculoStore((s) => s.calculando);
+  const cargandoMotor = calculoStore((s) => s.estadoMotor === "cargando");
+  if (calculando) return MENSAJE_CALCULANDO;
+  if (cargandoMotor) return MENSAJE_MOTOR_CARGANDO;
+  return null;
 }
 
 // Vista 3D pleno (modoVista distinto de "planta"). Gobierna el gating de la
@@ -484,8 +511,11 @@ export default function App() {
   useInicializarVistaActiva();
   // Arranque de persistencia (feature-15): rehidrata Modelo + plantillas del proyecto
   // activo desde IndexedDB y arranca ambos autosaves. Defensivo: si no hay IndexedDB,
-  // la app sigue en memoria. Cierra el hueco que F9 dejo (autosave sin cablear).
-  useArranquePersistencia();
+  // la app sigue en memoria. Cierra el hueco que F9 dejo (autosave sin cablear). El
+  // estado que devuelve alimenta el aviso del Shell (auditoria UX-L1).
+  const avisoPersistencia = useArranquePersistencia();
+  // Atajos de teclado globales (auditoria UX-A3/UX-A5): Ctrl+Z/Y undo/redo, F3/F4.
+  useAtajosGlobales();
   // Precarga del motor FEM en segundo plano (CLAUDE.md §8): se dispara UNA vez al
   // montar la app (idempotente, no bloquea el hilo), para que "Calcular" este listo
   // cuanto antes mientras el arquitecto modela. No consumimos el estado aqui: el
@@ -499,6 +529,9 @@ export default function App() {
   const puedeColocarPano = usePuedeColocarPano();
   const coords = useCoordsThrottled();
   const persistenciaLista = usePersistenciaLista();
+  // Feedback de calculo (auditoria UX-L6): mientras el motor trabaja, prioriza sobre el
+  // mensaje contextual; null en reposo.
+  const mensajeCalculo = useMensajeCalculo();
   // En 3D pleno se inhabilita la introduccion grafica y las ayudas 2D (calco DXF,
   // paneles de herramienta): se inspecciona, no se introduce (F2c, decision #3).
   const enPleno = useEnPleno();
@@ -521,25 +554,28 @@ export default function App() {
   const { sceneOverlays, hudOverlays, panelesDock } = composicionPestana(pestana, enPleno);
   const dock = dockDePestana(panelesDock);
 
-  // El mensaje de la herramienta activa prioriza sobre el de la pestana. Si la
-  // herramienta esta activa pero no hay donde colocar, se guia a crear/elegir planta
-  // (en vez de dejar que el clic falle en silencio). Pilares y vigas siguen el mismo
-  // patron; cada pestana solo consulta su propia herramienta.
-  const mensaje = enPleno
-    ? MENSAJE_3D
-    : enPilares && herramienta === "pilar"
-      ? puedeColocar
-        ? MENSAJE_HERRAMIENTA_PILAR
-        : MENSAJE_PILAR_SIN_TRAMO
-      : enVigas && herramienta === "viga"
-        ? puedeColocarViga
-          ? MENSAJE_HERRAMIENTA_VIGA
-          : MENSAJE_VIGA_SIN_TRAMO
-        : enVigas && herramienta === "pano"
-          ? puedeColocarPano
-            ? MENSAJE_HERRAMIENTA_PANO
-            : MENSAJE_PANO_SIN_TRAMO
-          : MENSAJE_PESTANA[pestana];
+  // El mensaje de calculo (motor trabajando) gana sobre todo lo demas; al terminar,
+  // se restaura el contextual. Luego el mensaje de la herramienta activa prioriza sobre
+  // el de la pestana. Si la herramienta esta activa pero no hay donde colocar, se guia a
+  // crear/elegir planta (en vez de dejar que el clic falle en silencio). Pilares y vigas
+  // siguen el mismo patron; cada pestana solo consulta su propia herramienta.
+  const mensaje = mensajeCalculo
+    ? mensajeCalculo
+    : enPleno
+      ? MENSAJE_3D
+      : enPilares && herramienta === "pilar"
+        ? puedeColocar
+          ? MENSAJE_HERRAMIENTA_PILAR
+          : MENSAJE_PILAR_SIN_TRAMO
+        : enVigas && herramienta === "viga"
+          ? puedeColocarViga
+            ? MENSAJE_HERRAMIENTA_VIGA
+            : MENSAJE_VIGA_SIN_TRAMO
+          : enVigas && herramienta === "pano"
+            ? puedeColocarPano
+              ? MENSAJE_HERRAMIENTA_PANO
+              : MENSAJE_PANO_SIN_TRAMO
+            : MENSAJE_PESTANA[pestana];
 
   return (
     <Shell
@@ -550,6 +586,7 @@ export default function App() {
         ...(coords ? { coords } : {}),
       }}
       dock={dock}
+      avisoPersistencia={avisoPersistencia}
     >
       {/* Señal de hidratacion (feature-16, D6): aparece cuando la persistencia ha
           rehidratado el Modelo (o decidido no persistir). Los specs E2E esperan por

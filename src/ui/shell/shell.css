@@ -199,13 +199,38 @@
   border-radius: var(--radius-control, 4px);
   cursor: pointer;
 }
-.cx-menu-item:hover {
+.cx-menu-item:hover:not(:disabled) {
   background-color: var(--surface-muted);
   color: var(--text);
 }
 .cx-menu-item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+/* Item deshabilitado (placeholder "próximamente" o accion no disponible ahora):
+   atenuado + cursor not-allowed, sin afordancia de hover. Mantiene el mapa mental
+   CYPECAD del menu sin fingir que el clic hace algo (auditoria UX-A1). */
+.cx-menu-item:disabled {
+  color: var(--text-3);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --- Aviso de persistencia (§UX-L1): banner bajo la menubar --- */
+.cx-aviso {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface-muted);
+  color: var(--text-2);
+  font-size: 12px;
+}
+/* Fallo grave de recuperacion: tono danger SUAVE (fondo tenue + borde/texto danger),
+   sin gritar en rojo pleno. Los tokens danger-* salen de tokens.css. */
+.cx-aviso--danger {
+  background-color: var(--danger-soft, color-mix(in srgb, var(--danger) 12%, transparent));
+  border-bottom-color: var(--danger);
+  color: var(--danger);
 }
 
 /* --- Body: sidebar | work canvas | tools rail (§2) --- */

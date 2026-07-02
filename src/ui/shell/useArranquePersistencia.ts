@@ -14,7 +14,7 @@
 // fuera de la Capa 1). Defensivo: si IndexedDB no esta disponible (modo privado,
 // almacenamiento denegado, entorno de test sin IndexedDB) la app sigue funcionando
 // en memoria, sin persistir.
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { vistaStore } from "../../estado";
 import {
   abrirDB,
@@ -25,6 +25,16 @@ import {
   cargarPlantillasEnStore,
   iniciarAutosavePlantillas,
 } from "../../persistencia";
+
+// Estado del arranque de persistencia que la UI (banner del Shell) necesita conocer:
+//   - "ok": persistencia operativa (o aun en curso, sin fallo conocido). Sin aviso.
+//   - "sin-indexeddb": el navegador no permite IndexedDB (modo privado, denegado). Es
+//     esperado; aviso DISCRETO no alarmista (los cambios no se guardan, pero nada se
+//     perdio: es de partida).
+//   - "carga-fallida": habia un proyecto guardado y NO se pudo recuperar (corrupto). Es
+//     GRAVE: el autosave no arranco para no machacar el registro bueno, asi que esta
+//     sesion no se esta guardando. Banner persistente role="alert".
+export type EstadoArranquePersistencia = "ok" | "sin-indexeddb" | "carga-fallida";
 
 // Nombre del proyecto inicial cuando la biblioteca esta vacia. Coincide con el
 // rotulo "Obra sin título" del Brandbar; cuando exista UI de proyectos (F2+) se
@@ -43,8 +53,10 @@ async function asegurarProyectoActivo(): Promise<string> {
 
 // Hook de arranque: rehidrata y arranca el autosave del Modelo y de las plantillas,
 // atados al proyecto activo. Se ejecuta UNA vez al montar (idempotente por deps
-// vacias); el cleanup da de baja ambos autosaves al desmontar.
-export function useArranquePersistencia(): void {
+// vacias); el cleanup da de baja ambos autosaves al desmontar. Devuelve el estado de
+// la persistencia para que el Shell muestre (o no) el aviso correspondiente.
+export function useArranquePersistencia(): EstadoArranquePersistencia {
+  const [estado, setEstado] = useState<EstadoArranquePersistencia>("ok");
   useEffect(() => {
     // Bajas de los autosaves, registradas en cuanto arrancan. El cleanup las
     // invoca aunque el efecto se desmonte antes de terminar la fase async.
@@ -61,12 +73,20 @@ export function useArranquePersistencia(): void {
       if (!cancelado) vistaStore.getState().setPersistenciaLista(true);
     };
 
+    // Fija el estado de la persistencia (para el banner del Shell) salvo que el efecto
+    // ya se haya desmontado (no hacer setState tras desmontar).
+    const fijarEstado = (e: EstadoArranquePersistencia): void => {
+      if (!cancelado) setEstado(e);
+    };
+
     const arrancar = async (): Promise<void> => {
       // Puerta defensiva: si la DB no abre (modo privado, sin IndexedDB en test),
       // no persistimos. La app sigue en memoria, igual que antes de F8/F15.
       const apertura = await abrirDB();
       if (cancelado) return;
       if (!apertura.ok) {
+        // IndexedDB no disponible: la app sigue en memoria. Aviso discreto (esperado).
+        fijarEstado("sin-indexeddb");
         marcarLista();
         return;
       }
@@ -91,6 +111,9 @@ export function useArranquePersistencia(): void {
             resultado.errores,
           );
         }
+        // Proyecto guardado no recuperable: el autosave NO arranca (para no machacar el
+        // registro bueno). GRAVE: esta sesion no se esta guardando -> banner de alerta.
+        fijarEstado("carga-fallida");
         marcarLista();
         return;
       }
@@ -116,4 +139,5 @@ export function useArranquePersistencia(): void {
     // proyecto todavia). Cuando exista (F2+), re-arrancar carga+autosave de Modelo
     // y plantillas con el nuevo proyectoId sera responsabilidad de esa UI.
   }, []);
+  return estado;
 }

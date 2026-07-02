@@ -9,6 +9,7 @@
 // cualquier otro caso) y el cableado de `activarHerramientaPilar`.
 import { describe, it, expect, beforeEach } from "vitest";
 import { borrarSeleccion, DISPATCH } from "./Menubar";
+import { MENUS_POR_PESTANA, type MenuDef, type MenuItem } from "./menus";
 import {
   modeloStore,
   seleccionStore,
@@ -144,5 +145,50 @@ describe("Menubar · DISPATCH", () => {
     DISPATCH.abrirHipotesis();
     expect(vistaStore.getState().dialogoActivo).toBe("hipotesis");
     vistaStore.getState().cerrarDialogo();
+  });
+
+  it("deshacer revierte la última edición de obra (undo del modeloStore)", () => {
+    // Un pilar creado y luego deshecho: el modelo vuelve a estar sin pilares (UX-A3).
+    sembrarPilar();
+    expect(modelo().pilares).toHaveLength(1);
+    DISPATCH.deshacer();
+    expect(modelo().pilares).toHaveLength(0);
+  });
+
+  it("rehacer reaplica la edición deshecha (redo del modeloStore)", () => {
+    sembrarPilar();
+    DISPATCH.deshacer();
+    expect(modelo().pilares).toHaveLength(0);
+    DISPATCH.rehacer();
+    expect(modelo().pilares).toHaveLength(1);
+  });
+});
+
+// Estructura del mapa de menus (menus.ts): el menu Edicion (con Deshacer/Rehacer
+// cableados) debe existir en las dos pestanas de introduccion (auditoria UX-A11).
+describe("menus.ts · estructura", () => {
+  // Aplana los items accionables de un menu con esa etiqueta (o [] si no existe).
+  function accionesDeMenu(menus: MenuDef[], etiqueta: string): MenuItem[] {
+    const menu = menus.find((m) => m.etiqueta === etiqueta);
+    return menu ? menu.items : [];
+  }
+  function tieneAccion(items: MenuItem[], accion: string): boolean {
+    return items.some((it) => typeof it !== "string" && it.accion === accion);
+  }
+
+  it("Edición con Deshacer/Rehacer cableados está en pilares Y en vigas", () => {
+    for (const pestana of ["entradaPilares", "entradaVigas"] as const) {
+      const edicion = accionesDeMenu(MENUS_POR_PESTANA[pestana], "Edición");
+      expect(edicion.length, `${pestana} debe tener menú Edición`).toBeGreaterThan(0);
+      expect(tieneAccion(edicion, "deshacer")).toBe(true);
+      expect(tieneAccion(edicion, "rehacer")).toBe(true);
+      expect(tieneAccion(edicion, "borrarSeleccion")).toBe(true);
+    }
+  });
+
+  it("Copiar/Pegar siguen siendo placeholders (strings, sin acción)", () => {
+    const edicion = accionesDeMenu(MENUS_POR_PESTANA.entradaPilares, "Edición");
+    expect(edicion).toContain("Copiar");
+    expect(edicion).toContain("Pegar");
   });
 });

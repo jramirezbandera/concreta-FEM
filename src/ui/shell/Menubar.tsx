@@ -81,6 +81,10 @@ export const DISPATCH: Record<AccionMenu, () => void> = {
   // que vuelca el progreso al calculoStore como hace calcularObra. Asincrono: `void`.
   calcularModos: () =>
     void calcularModos(vistaStore.getState().numModos),
+  // Undo/redo del modeloStore (misma logica que el Brandbar). El menu los deshabilita
+  // segun puedeDeshacer/puedeRehacer, asi que aqui solo se invoca la accion.
+  deshacer: () => modeloStore.getState().deshacer(),
+  rehacer: () => modeloStore.getState().rehacer(),
 };
 
 // Etiqueta visible de un item, sea string inerte u objeto accionable. Sirve de
@@ -88,6 +92,11 @@ export const DISPATCH: Record<AccionMenu, () => void> = {
 function etiquetaDe(item: MenuItemDef): string {
   return typeof item === "string" ? item : item.etiqueta;
 }
+
+// Copy unico para los items de menu sin destino todavia (placeholders). Honesto: la
+// accion llegara; hoy no hace nada, asi que el item se pinta DESHABILITADO en vez de
+// como un clic muerto que no cierra el popover (auditoria UX-A1).
+const PROXIMAMENTE = "Disponible próximamente";
 
 // Disponibilidad del item "Calcular obra" segun el estado del calculo (calculoStore,
 // fuente unica). Mismo criterio que el boton del panel y la brandbar: el helper
@@ -98,28 +107,49 @@ function useCalcularDeshabilitado(): boolean {
   return calculoStore((s) => !calculoHabilitado(s.estadoMotor, s.calculando));
 }
 
-// Un item del desplegable. String -> fila inerte (placeholder, como en F9).
-// Objeto -> boton accionable que dispara el handler y cierra el Popover. Se
-// envuelve en Popover.Close (asChild) para que Radix gestione el cierre y el
-// foco de forma accesible sin estado controlado manual.
+// Disponibilidad de undo/redo (patron del Brandbar): se leen SIEMPRE (Reglas de Hooks),
+// pero solo los items "deshacer"/"rehacer" los consumen. La pila del modeloStore es la
+// fuente unica; cualquier cambio de historial re-evalua estos booleanos.
+function usePuedeDeshacer(): boolean {
+  return modeloStore((s) => s.puedeDeshacer);
+}
+function usePuedeRehacer(): boolean {
+  return modeloStore((s) => s.puedeRehacer);
+}
+
+// Un item del desplegable. String -> placeholder (accion aun no cableada): se pinta
+// como boton DESHABILITADO con title "próximamente", NO como un div inerte con clic
+// muerto (auditoria UX-A1). Objeto -> boton accionable que dispara el handler y cierra
+// el Popover (Popover.Close gestiona cierre y foco accesibles).
 function Item({ item }: { item: MenuItemDef }) {
-  // Se lee SIEMPRE (Reglas de Hooks); solo el item "calcular" lo usa para deshabilitarse.
-  // El resto de items accionables/placeholders ignoran este flag (no se ven afectados).
+  // Se leen SIEMPRE (Reglas de Hooks); solo los items correspondientes los usan.
   const calcularDeshabilitado = useCalcularDeshabilitado();
+  const puedeDeshacer = usePuedeDeshacer();
+  const puedeRehacer = usePuedeRehacer();
   if (typeof item === "string") {
+    // Placeholder: boton deshabilitado (afordancia clara de "aun no", cursor not-allowed
+    // via .cx-menu-item:disabled). aria-disabled para lectores; sin onClick.
     return (
-      <div className="cx-menu-empty" role="menuitem">
+      <button
+        type="button"
+        className="cx-menu-item cx-menu-item--placeholder"
+        disabled
+        aria-disabled="true"
+        title={PROXIMAMENTE}
+      >
         {item}
-      </div>
+      </button>
     );
   }
-  // Los items que disparan el motor ("Calcular obra" y "Calcular modos") se deshabilitan
-  // mientras se prepara el motor o hay un calculo en curso (mismo criterio que el boton del
-  // panel; ambos caminos comparten el mismo motor/ciclo de vida). Deshabilitado: ni dispara
-  // la accion ni cierra el Popover (Radix respeta el `disabled` del boton en Popover.Close).
+  // Items que dependen del estado: los del motor ("Calcular obra"/"Calcular modos") se
+  // deshabilitan mientras se prepara el motor o hay un calculo en curso; "Deshacer"/
+  // "Rehacer" segun la pila de undo. Deshabilitado: ni dispara la accion ni cierra el
+  // Popover (Radix respeta el `disabled` del boton en Popover.Close).
   const deshabilitado =
-    (item.accion === "calcular" || item.accion === "calcularModos") &&
-    calcularDeshabilitado;
+    ((item.accion === "calcular" || item.accion === "calcularModos") &&
+      calcularDeshabilitado) ||
+    (item.accion === "deshacer" && !puedeDeshacer) ||
+    (item.accion === "rehacer" && !puedeRehacer);
   return (
     <Popover.Close asChild>
       <button

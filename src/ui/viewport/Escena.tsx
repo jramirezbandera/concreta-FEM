@@ -7,7 +7,7 @@
 // se les pone una `key` distinta por modo. Eso fuerza el remount de la camara y de
 // los controles, que vuelven a anclarse a la nueva camara default. Asi no quedan
 // controles apuntando a una camara que ya no es la activa.
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
 import type { Mesh } from "three";
 import {
@@ -21,8 +21,8 @@ import {
 } from "@react-three/drei";
 import { invalidate, useThree } from "@react-three/fiber";
 import { OrthographicCamera as OrthoCam, Vector3 } from "three";
-import type { ModoVista } from "../../estado";
-import { hexToken } from "./colores";
+import { vistaStore, type ModoVista } from "../../estado";
+import { colorToken, hexToken } from "./colores";
 import { GeometriaModelo } from "./GeometriaModelo";
 import { AjusteCamara3D } from "./AjusteCamara3D";
 import { suscribirZoom } from "./hooks/zoomBus";
@@ -91,12 +91,31 @@ function Rejilla() {
   );
 }
 
-// Ejes de replanteo X/Y/Z. axesHelper colorea X rojo, Y verde, Z azul; lo
-// recoloreamos a tono CAD via material no es directo, asi que dejamos el helper
-// nativo a baja escala como referencia de origen.
+// Ejes de replanteo X/Y en el origen (2 m). El axesHelper nativo colorea X rojo /
+// Y verde, que colisionan con la semantica del Spec (danger/success): en su lugar
+// dibujamos dos segmentos con el token --canvas-axis (mismo tono neutro que la
+// rejilla). Pasivos: <line> no raycastea, no estorban al picking.
+const PUNTOS_EJE_X = new Float32Array([0, 0, 0, 2, 0, 0]);
+const PUNTOS_EJE_Y = new Float32Array([0, 0, 0, 0, 2, 0]);
+
 function Ejes() {
-  // 2 m de ejes en el origen. axesHelper es pasivo (no raycastea por defecto).
-  return <axesHelper args={[2]} />;
+  const color = useMemo(() => colorToken("canvasAxis"), []);
+  return (
+    <>
+      <line>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[PUNTOS_EJE_X, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial color={color} />
+      </line>
+      <line>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[PUNTOS_EJE_Y, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial color={color} />
+      </line>
+    </>
+  );
 }
 
 // Aplica los eventos de zoom del HUD a la camara activa mutando refs (no
@@ -180,8 +199,20 @@ function PlanoCoords() {
   );
 }
 
+// Visibilidad de la rejilla desde vistaStore (toggle del ToolsRail). Suscripcion fina:
+// el toggle es esporadico (accion manual del usuario), NO alta frecuencia, asi que un
+// re-render de la Escena al conmutarlo es aceptable (mismo caracter que modoVista).
+function useRejillaVisible(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.rejillaVisible, cb),
+    () => vistaStore.getState().rejillaVisible,
+    () => vistaStore.getState().rejillaVisible,
+  );
+}
+
 export function Escena({ modoVista, overlays }: EscenaProps) {
   const esPlanta = modoVista === "planta";
+  const rejillaVisible = useRejillaVisible();
 
   // Color de los ejes del gizmo desde tokens.
   const ejeColor = useMemo(
@@ -220,7 +251,7 @@ export function Escena({ modoVista, overlays }: EscenaProps) {
       <ambientLight intensity={0.9} />
       <directionalLight position={[10, -10, 20]} intensity={0.4} />
 
-      <Rejilla />
+      {rejillaVisible && <Rejilla />}
       <Ejes />
 
       <ControlZoom />
