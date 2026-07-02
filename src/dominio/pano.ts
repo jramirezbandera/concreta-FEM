@@ -14,7 +14,7 @@
 // UNIDADES (CLAUDE.md §14): espesor y tamMalla en METROS (sistema interno); la UI los
 // muestra en mm y convierte SOLO en el borde de entrada/salida.
 import { z } from "zod";
-import { IdSchema, NombreSchema } from "./comunes";
+import { IdSchema, NombreSchema, NumeroFinitoSchema } from "./comunes";
 
 export const TipoPanoSchema = z.enum(["losa", "reticular", "unidireccional"]);
 export type TipoPano = z.infer<typeof TipoPanoSchema>;
@@ -31,9 +31,10 @@ export const PanoSchema = z.object({
   // >=3 a nivel de schema (un poligono necesita 3); la geometria concreta (rectangular,
   // no degenerado) la valida el discretizador.
   perimetro: z.array(IdSchema).min(3),
-  espesor: z.number().positive(), // m
+  // [A-3] finito+positivo: .positive() solo NO basta (Infinity es positivo).
+  espesor: NumeroFinitoSchema.positive(), // m
   materialId: IdSchema,
-  tamMalla: z.number().positive(), // m, tamano objetivo de elemento de malla
+  tamMalla: NumeroFinitoSchema.positive(), // m, tamano objetivo de elemento de malla
   bordeApoyo: BordeApoyoSchema,
 });
 export type Pano = z.infer<typeof PanoSchema>;

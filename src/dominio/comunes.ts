@@ -6,6 +6,13 @@ import { z } from "zod";
 export const IdSchema = z.string().min(1);
 export const NombreSchema = z.string().min(1);
 
+// [AUDITORIA A-3] Magnitud fisica FINITA. Un `z.number()` pelado ACEPTA ±Infinity
+// (solo rechaza NaN): un Infinity que entre por el borde de persistencia (el blob
+// de IndexedDB cruza por structured clone, que SI preserva Infinity, a diferencia
+// de JSON.parse) llegaria hasta PyNite como geometria/carga basura sin aviso.
+// Toda coordenada, cota, dimension o valor de carga del dominio usa este schema.
+export const NumeroFinitoSchema = z.number().finite();
+
 // Version del esquema del MODELO persistido (Capa 1). La migracion (feature-8 +
 // F2.3) la usa para actualizar proyectos antiguos. OJO: es distinta de la version
 // de la base Dexie/IndexedDB (ya en 2 por las plantillas de F15); esta versiona la

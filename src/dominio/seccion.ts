@@ -10,7 +10,7 @@
 // `biblioteca/hormigon.ts` reciben mm; el borde de UI hara m -> mm al invocarlas, o
 // se adaptaran segun la convencion de feature-3; el dominio solo persiste m.)
 import { z } from "zod";
-import { IdSchema, NombreSchema } from "./comunes";
+import { IdSchema, NombreSchema, NumeroFinitoSchema } from "./comunes";
 
 // Campos comunes a toda seccion (identidad + etiqueta de UI).
 const baseSeccion = {
@@ -31,8 +31,9 @@ export const SeccionPerfilMetalicoSchema = z.object({
 export const SeccionHormigonRectangularSchema = z.object({
   ...baseSeccion,
   tipo: z.literal("hormigonRectangular"),
-  b: z.number().positive(), // ancho, m (interno); conversion mm->m en src/unidades
-  h: z.number().positive(), // canto, m (interno); conversion mm->m en src/unidades
+  // [A-3] finito+positivo: .positive() solo NO basta (Infinity es positivo).
+  b: NumeroFinitoSchema.positive(), // ancho, m (interno); conversion mm->m en src/unidades
+  h: NumeroFinitoSchema.positive(), // canto, m (interno); conversion mm->m en src/unidades
 });
 
 // Hormigon circular: diametro `d` en METROS (interno). El discretizador deriva
@@ -40,7 +41,7 @@ export const SeccionHormigonRectangularSchema = z.object({
 export const SeccionHormigonCircularSchema = z.object({
   ...baseSeccion,
   tipo: z.literal("hormigonCircular"),
-  d: z.number().positive(), // diametro, m (interno); conversion mm->m en src/unidades
+  d: NumeroFinitoSchema.positive(), // diametro, m (interno); conversion mm->m en src/unidades
 });
 
 // Generico: propiedades de calculo directas (m², m⁴), sin biblioteca. Util para
@@ -52,10 +53,10 @@ export const SeccionHormigonCircularSchema = z.object({
 export const SeccionGenericoSchema = z.object({
   ...baseSeccion,
   tipo: z.literal("generico"),
-  A: z.number().positive(), // area, m²
-  Iy: z.number().positive(), // inercia eje FUERTE (gobierna flexion vertical de viga), m⁴
-  Iz: z.number().positive(), // inercia eje debil, m⁴
-  J: z.number().positive(), // constante de torsion (St. Venant, NO polar), m⁴
+  A: NumeroFinitoSchema.positive(), // area, m²
+  Iy: NumeroFinitoSchema.positive(), // inercia eje FUERTE (gobierna flexion vertical de viga), m⁴
+  Iz: NumeroFinitoSchema.positive(), // inercia eje debil, m⁴
+  J: NumeroFinitoSchema.positive(), // constante de torsion (St. Venant, NO polar), m⁴
 });
 
 // Seccion del dominio: discriminada por `tipo` (mismo patron que EntradaMaterial
