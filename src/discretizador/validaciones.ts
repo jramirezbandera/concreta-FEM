@@ -94,6 +94,69 @@ function validarNombresUnicos(modelo: Modelo, errores: ErrorObra[]): void {
   comprobarNombresUnicos(errores, modelo.grupos, "modelo", "grupo");
 }
 
+// 1b. [AUDITORIA M-1] IDS unicos por coleccion. El borde Zod valida solo forma
+// (delega la integridad aqui) y TODOS los lookups del dominio son `.find()`
+// (primer match): dos elementos con el mismo id hacen que el segundo se IGNORE en
+// silencio (p.ej. dos nudos con el mismo id y posiciones distintas -> la viga usa
+// el primero -> geometria erronea con ok:true). Los comandos de la UI generan ids
+// unicos (nuevoId), asi que esta red protege el borde de import/persistencia.
+// BLOQUEA: un proyecto con ids duplicados esta dañado y no debe calcular.
+function comprobarIdsUnicos(
+  errores: ErrorObra[],
+  elementos: ReadonlyArray<{ id: string }>,
+  tipo: ErrorObra["elementoTipo"],
+  etiqueta: string, // "punto", "planta", "carga"... para el mensaje de obra
+): void {
+  const vistos = new Set<string>();
+  for (const el of elementos) {
+    if (vistos.has(el.id)) {
+      errores.push({
+        codigo: "ID_DUP",
+        severidad: "error",
+        mensaje: `Hay más de un ${etiqueta} con el mismo identificador interno: el proyecto está dañado. Vuelve a importarlo o elimina el elemento repetido.`,
+        elementoId: el.id,
+        elementoTipo: tipo,
+      });
+    }
+    vistos.add(el.id);
+  }
+}
+
+function validarIdsUnicos(modelo: Modelo, errores: ErrorObra[]): void {
+  comprobarIdsUnicos(errores, modelo.grupos, "modelo", "grupo");
+  comprobarIdsUnicos(errores, modelo.plantas, "planta", "planta");
+  comprobarIdsUnicos(errores, modelo.secciones, "modelo", "sección");
+  comprobarIdsUnicos(errores, modelo.nudos, "modelo", "punto");
+  comprobarIdsUnicos(errores, modelo.pilares, "pilar", "pilar");
+  comprobarIdsUnicos(errores, modelo.vigas, "viga", "viga");
+  comprobarIdsUnicos(errores, modelo.panos, "pano", "paño");
+  comprobarIdsUnicos(errores, modelo.cargas, "carga", "carga");
+  comprobarIdsUnicos(errores, modelo.hipotesis, "hipotesis", "hipótesis");
+}
+
+// 1c. [AUDITORIA M-3] Pilar DEGENERADO (longitud ~0): plantaInicial === plantaFinal
+// o dos plantas a la misma cota. El troceo por cotas no emite NINGUNA barra para el
+// pilar, pero su support de arranque SI se emitia: un apoyo fantasma sin barra que
+// ademas contaba como sujecion valida (haySujecionPilar). Simetrico de
+// VIGA_DEGENERADA. Se comparan las COTAS (no los ids): dos plantas distintas a la
+// misma cota tambien degeneran. Umbral TOL_NODO, el criterio geometrico unico.
+function validarPilaresDegenerados(modelo: Modelo, errores: ErrorObra[]): void {
+  for (const p of modelo.pilares) {
+    const pi = plantaPorId(modelo, p.plantaInicial);
+    const pf = plantaPorId(modelo, p.plantaFinal);
+    if (pi === undefined || pf === undefined) continue; // REF_PLANTA ya bloquea
+    if (Math.abs(pf.cota - pi.cota) <= TOL_NODO) {
+      errores.push({
+        codigo: "PILAR_DEGENERADO",
+        severidad: "error",
+        mensaje: `El pilar "${p.nombre}" arranca y termina a la misma altura: no tiene longitud. Revisa sus plantas inicial y final.`,
+        elementoId: p.id,
+        elementoTipo: "pilar",
+      });
+    }
+  }
+}
+
 // 2a. Referencias de un Pilar: material, seccion, plantas.
 function validarRefsPilar(p: Pilar, modelo: Modelo, errores: ErrorObra[]): void {
   if (getMaterial(p.materialId) === undefined) {
@@ -565,6 +628,8 @@ function validarModalConMasa(modelo: Modelo, errores: ErrorObra[]): void {
 export function validarModelo(modelo: Modelo, modal?: ContextoModal): ErrorObra[] {
   const errores: ErrorObra[] = [];
   validarNombresUnicos(modelo, errores);
+  validarIdsUnicos(modelo, errores); // [M-1] ids duplicados = proyecto dañado
+  validarPilaresDegenerados(modelo, errores); // [M-3] pilar de longitud 0
   validarReferencias(modelo, errores);
   validarHipotesisPesoPropio(modelo, errores); // E1: guard de desincronizacion
   validarSujecion(modelo, errores);
