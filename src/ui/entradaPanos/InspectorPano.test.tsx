@@ -86,6 +86,13 @@ describe("InspectorPano: visibilidad", () => {
     expect(screen.getByText("Paño F1")).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Apoyo de borde del paño" })).toBeInTheDocument();
   });
+
+  it("UX-C9: comunica que la losa se calcula aislada (no transfiere carga al portico)", () => {
+    renderConPanoSeleccionado();
+    expect(
+      screen.getByText(/su carga no se transmite a pilares ni vigas/i),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("InspectorPano: commit en vivo", () => {
@@ -120,6 +127,13 @@ describe("InspectorPano: commit en vivo", () => {
 });
 
 describe("InspectorPano: carga superficial", () => {
+  it("UX-E3: comunica el sentido de la carga (positivo = hacia abajo)", () => {
+    renderConPanoSeleccionado();
+    expect(
+      screen.getByText(/Valor en positivo: la carga actúa hacia abajo/i),
+    ).toBeInTheDocument();
+  });
+
   it("añadir una carga superficial (kN/m²) la crea sobre el paño", async () => {
     const user = userEvent.setup();
     renderConPanoSeleccionado();

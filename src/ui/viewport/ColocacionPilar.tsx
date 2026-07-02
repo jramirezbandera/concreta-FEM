@@ -35,6 +35,7 @@ import { puntosSnapDePlantillas, engancharAPuntoExtra } from "./dxf/snapDxf";
 import type { Plantilla, PuntoXY } from "./dxf/tiposDxf";
 import { RADIO_IMAN_M } from "./imanViga";
 import { tramoColocable } from "./tramoPilar";
+import { debeIgnorarEscColocacion } from "./escColocacion";
 
 // Semibrazo de la cruz y medio lado del cuadrado del marcador (m). Z ligeramente
 // sobre el suelo para no z-fightear con la rejilla.
@@ -228,11 +229,15 @@ function ColocacionActiva() {
   }, []);
 
   // Esc termina la herramienta. Listener vivo solo mientras el modo esta activo.
+  // UX-C11: coordina con los dialogos (ver debeIgnorarEscColocacion): ignora el Esc si
+  // otro handler ya lo consumio (defaultPrevented: p. ej. CampoNumero/CampoTexto
+  // revirtiendo su edicion) o si hay un dialogo abierto (dialogoActivo).
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") {
-        vistaStore.getState().setHerramienta("seleccion");
-      }
+      if (ev.key !== "Escape") return;
+      if (debeIgnorarEscColocacion(ev.defaultPrevented, vistaStore.getState().dialogoActivo))
+        return;
+      vistaStore.getState().setHerramienta("seleccion");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

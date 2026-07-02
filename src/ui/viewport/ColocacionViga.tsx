@@ -58,6 +58,7 @@ import { plantaColocableViga } from "./tramoViga";
 // Logica pura del flujo de dos clics en su propio modulo (este fichero solo
 // exporta componentes -> react-refresh/only-export-components).
 import { posicionExtremo, procesarClicViga } from "./colocacionVigaLogica";
+import { debeIgnorarEscColocacion } from "./escColocacion";
 
 // Semibrazo de la cruz / medio lado del cuadrado del marcador (m). Z (sobre la cota)
 // ligeramente elevado para no z-fightear con la rejilla y la propia viga.
@@ -346,9 +347,14 @@ function ColocacionActiva() {
   }, []);
 
   // Esc: si hay extremo I pendiente, lo cancela (sin salir); si no, sale a seleccion.
+  // UX-C11: coordina con los dialogos (ver debeIgnorarEscColocacion): ignora el Esc si
+  // otro handler ya lo consumio (defaultPrevented) o si hay un dialogo abierto
+  // (dialogoActivo), para no cancelar el extremo pendiente ni salir de la herramienta.
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key !== "Escape") return;
+      if (debeIgnorarEscColocacion(ev.defaultPrevented, vistaStore.getState().dialogoActivo))
+        return;
       if (pendienteI.current !== null) {
         pendienteI.current = null;
         ocultarAnclaYLinea();

@@ -52,6 +52,22 @@ describe("SelectSeccion", () => {
     ).toBeInTheDocument();
   });
 
+  it("UX-C7: muestra un rotulo VISIBLE (cx-campo__label), no solo aria-label", () => {
+    const { container } = render(
+      <SelectSeccion valor={null} onCambio={() => {}} etiqueta="Sección" />,
+    );
+    const label = container.querySelector(".cx-campo__label");
+    expect(label).not.toBeNull();
+    expect(label).toHaveTextContent("Sección");
+    // El rotulo VISIBLE tambien nombra al combobox (aria-labelledby).
+    expect(screen.getByRole("combobox", { name: "Sección" })).toBeInTheDocument();
+  });
+
+  it("UX-F4: el trigger de seccion va en mono tabular (cx-select--mono)", () => {
+    render(<SelectSeccion valor={null} onCambio={() => {}} />);
+    expect(screen.getByRole("combobox")).toHaveClass("cx-select--mono");
+  });
+
   it("al abrir lista las opciones del catalogo (perfiles) y onCambio recibe el id", async () => {
     const user = userEvent.setup();
     const onCambio = vi.fn();

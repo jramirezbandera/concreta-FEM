@@ -90,4 +90,12 @@ describe("PanelHerramientaPano", () => {
     expect(vistaStore.getState().herramienta).toBe("seleccion");
     expect(screen.queryByText("Nuevo paño")).not.toBeInTheDocument();
   });
+
+  it("UX-C9: comunica que la losa se calcula aislada (no transfiere carga al portico)", () => {
+    vistaStore.getState().setHerramienta("pano");
+    render(<PanelHerramientaPano />);
+    expect(
+      screen.getByText(/su carga no se transmite a pilares ni vigas/i),
+    ).toBeInTheDocument();
+  });
 });

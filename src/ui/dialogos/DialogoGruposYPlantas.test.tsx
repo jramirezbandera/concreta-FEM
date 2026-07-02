@@ -356,6 +356,63 @@ describe("DialogoGruposYPlantas: categoria de uso -> sobrecarga (qk CTE)", () =>
   });
 });
 
+describe("DialogoGruposYPlantas: notas de honestidad (UX-D1/D2)", () => {
+  it("UX-D1: avisa de que sobrecarga/cargas muertas aún no se aplican al cálculo", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+    expect(
+      within(dialogo).getByText(/Estos valores aún no se aplican al cálculo/i),
+    ).toBeInTheDocument();
+  });
+
+  it("UX-D2: muestra bajo la categoría el qk normativo que fija (CTE DB-SE-AE)", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+    // Grupo por defecto = categoria A -> qk 2,0 kN/m² (coma decimal es-ES).
+    expect(
+      within(dialogo).getByText(/La categoría A fija 2,0 kN\/m² \(CTE DB-SE-AE\)/),
+    ).toBeInTheDocument();
+  });
+
+  it("UX-C8: Escape en un campo de texto revierte lo tecleado sin commit", async () => {
+    // NOTA: Radix Dialog intercepta Escape en la fase de CAPTURA sobre `document`,
+    // antes de que el handler (bubble) del campo pueda pararlo; por eso el dialogo
+    // puede cerrarse igualmente (comportamiento estandar). Lo que SI garantiza este
+    // fix, y es lo que protege al usuario, es que el valor tecleado NO se commitea al
+    // revertir con Esc (antes el blur commiteaba). La coordinacion con la herramienta
+    // de introduccion la cubre ademas el guard `dialogoActivo` de UX-C11.
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+    const nombreOriginal = grupos()[0].nombre;
+
+    const detalle = dialogo.querySelector(".cx-gyp__detalle") as HTMLElement;
+    const inputNombre = within(detalle).getByLabelText(/Nombre/);
+    await user.clear(inputNombre);
+    await user.type(inputNombre, "Descartado");
+    await user.keyboard("{Escape}");
+
+    // El nombre NO cambió: Esc revierte lo tecleado, sin commit.
+    expect(grupos()[0].nombre).toBe(nombreOriginal);
+  });
+
+  it("UX-C8: Enter en un campo de texto confirma (commit del valor tecleado)", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+
+    const detalle = dialogo.querySelector(".cx-gyp__detalle") as HTMLElement;
+    const inputNombre = within(detalle).getByLabelText(/Nombre/);
+    await user.clear(inputNombre);
+    await user.type(inputNombre, "Forjado 1");
+    await user.keyboard("{Enter}");
+
+    expect(grupos()[0].nombre).toBe("Forjado 1");
+  });
+});
+
 describe("DialogoGruposYPlantas: undo", () => {
   it("deshacer revierte la creacion de un grupo", async () => {
     const user = userEvent.setup();

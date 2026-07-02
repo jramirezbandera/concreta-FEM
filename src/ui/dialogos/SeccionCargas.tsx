@@ -220,6 +220,11 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
           onCommit={(v) => setValorNuevo(v)}
           error={errorDe(errores, "valor")}
         />
+        {/* UX-E3: el sentido de la carga no era comunicado (solo saltaba al teclear un
+            negativo). Ayuda corta y permanente: el signo lo fija el discretizador. */}
+        <p className="cx-cargas__ayuda">
+          Valor en positivo: la carga actúa hacia abajo (gravitatoria).
+        </p>
         <div className="cx-cargas__campo">
           <span className="cx-campo__label">Hipótesis</span>
           <SelectHipotesis

@@ -26,6 +26,8 @@ export type { CampoNumeroProps } from "./CampoNumero";
 export { SelectUso } from "./SelectUso";
 export type { SelectUsoProps } from "./SelectUso";
 
+export { formatearQk } from "./formatoNumero";
+
 export { SelectSeccion } from "./SelectSeccion";
 export type { SelectSeccionProps } from "./SelectSeccion";
 

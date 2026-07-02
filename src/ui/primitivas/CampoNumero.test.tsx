@@ -53,6 +53,49 @@ describe("CampoNumero (primitiva compartida)", () => {
     expect(onCommit).toHaveBeenCalledWith(-2.5);
   });
 
+  it("UX-C8: Enter confirma (blur -> commit del valor tecleado)", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    render(<CampoNumero etiqueta="X" valor={0} onCommit={onCommit} />);
+    const input = screen.getByLabelText("X");
+    await user.clear(input);
+    await user.type(input, "12");
+    // Enter dispara el blur, que commitea; no hace falta tabular fuera.
+    await user.keyboard("{Enter}");
+    expect(onCommit).toHaveBeenCalledWith(12);
+  });
+
+  it("UX-C8: Escape revierte (no commit; el input vuelve al valor del modelo)", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    render(<CampoNumero etiqueta="X" valor={7} onCommit={onCommit} />);
+    const input = screen.getByLabelText("X");
+    await user.clear(input);
+    await user.type(input, "99");
+    await user.keyboard("{Escape}");
+    // Esc NO commitea (revierte lo tecleado)...
+    expect(onCommit).not.toHaveBeenCalled();
+    // ...y el input vuelve a mostrar el valor del modelo, no el "99" descartado.
+    expect(input).toHaveValue(7);
+  });
+
+  it("UX-C8: Escape detiene la propagacion (no cierra dialogo ni cancela herramienta)", async () => {
+    const user = userEvent.setup();
+    const onCommit = vi.fn();
+    // Listener global (como el de ColocacionPilar/dialogo): NO debe verse el Esc del campo.
+    const escGlobal = vi.fn();
+    window.addEventListener("keydown", escGlobal);
+    try {
+      render(<CampoNumero etiqueta="X" valor={7} onCommit={onCommit} />);
+      const input = screen.getByLabelText("X");
+      input.focus();
+      await user.keyboard("{Escape}");
+      expect(escGlobal).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("keydown", escGlobal);
+    }
+  });
+
   it("se resincroniza cuando el valor entrante cambia desde fuera (undo/redo)", () => {
     const { rerender } = render(
       <CampoNumero etiqueta="Ángulo" valor={30} onCommit={() => {}} />,

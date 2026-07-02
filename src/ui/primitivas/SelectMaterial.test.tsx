@@ -47,6 +47,22 @@ describe("SelectMaterial", () => {
     ).toBeInTheDocument();
   });
 
+  it("UX-C7: muestra un rotulo VISIBLE (cx-campo__label), no solo aria-label", () => {
+    const { container } = render(
+      <SelectMaterial valor={null} onCambio={() => {}} etiqueta="Material" />,
+    );
+    const label = container.querySelector(".cx-campo__label");
+    expect(label).not.toBeNull();
+    expect(label).toHaveTextContent("Material");
+    // El rotulo VISIBLE tambien nombra al combobox (aria-labelledby).
+    expect(screen.getByRole("combobox", { name: "Material" })).toBeInTheDocument();
+  });
+
+  it("UX-F4: el trigger de material va en mono tabular (cx-select--mono)", () => {
+    render(<SelectMaterial valor="S275" onCambio={() => {}} />);
+    expect(screen.getByRole("combobox")).toHaveClass("cx-select--mono");
+  });
+
   it("al abrir lista todas las opciones del catalogo y onCambio recibe el id", async () => {
     const user = userEvent.setup();
     const onCambio = vi.fn();

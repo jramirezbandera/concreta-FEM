@@ -154,3 +154,13 @@
     transform: translate(-50%, -50%) scale(1);
   }
 }
+
+/* UX-D5: respeta la preferencia del sistema de reducir movimiento (accesibilidad,
+   Spec §5). Si el usuario la activa, el scrim y la tarjeta aparecen sin fundido ni
+   "pop": mismo estado final, sin animacion. */
+@media (prefers-reduced-motion: reduce) {
+  .cx-dialog__overlay,
+  .cx-dialog__content {
+    animation: none;
+  }
+}

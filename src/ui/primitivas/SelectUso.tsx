@@ -1,5 +1,7 @@
 import * as Select from "@radix-ui/react-select";
 import type { CategoriaUso } from "../../dominio";
+import { categoriaUso } from "../../biblioteca";
+import { formatearQk } from "./formatoNumero";
 
 // SelectUso (Spec Diseno UI §5): selector de la categoria de uso (CTE DB-SE-AE /
 // Codigo Estructural) de un grupo de plantas. Radix Select accesible, estilado
@@ -8,7 +10,7 @@ import type { CategoriaUso } from "../../dominio";
 // Portal, Content).
 
 // Etiquetas legibles por categoria. El orden del array define el orden visual.
-const OPCIONES: ReadonlyArray<{ valor: CategoriaUso; etiqueta: string }> = [
+const DESCRIPCIONES: ReadonlyArray<{ valor: CategoriaUso; etiqueta: string }> = [
   { valor: "A", etiqueta: "A · Zonas residenciales" },
   { valor: "B", etiqueta: "B · Zonas administrativas" },
   { valor: "C", etiqueta: "C · Zonas de pública concurrencia" },
@@ -17,6 +19,15 @@ const OPCIONES: ReadonlyArray<{ valor: CategoriaUso; etiqueta: string }> = [
   { valor: "F", etiqueta: "F · Cubiertas transitables" },
   { valor: "G", etiqueta: "G · Cubiertas accesibles solo para conservación" },
 ];
+
+// UX-D2: cada opcion muestra tambien el qk normativo que fijara al elegirla, para
+// que el usuario NO cambie la categoria sin ver que reasigna la sobrecarga (el qk
+// sale de la tabla CTE DB-SE-AE via biblioteca; no hay numero magico aqui).
+const OPCIONES: ReadonlyArray<{ valor: CategoriaUso; etiqueta: string }> =
+  DESCRIPCIONES.map((d) => ({
+    valor: d.valor,
+    etiqueta: `${d.etiqueta} — ${formatearQk(categoriaUso(d.valor).qk)} kN/m²`,
+  }));
 
 export interface SelectUsoProps {
   valor: CategoriaUso;

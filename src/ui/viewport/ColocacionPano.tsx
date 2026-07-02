@@ -41,6 +41,7 @@ import { snapARejilla } from "./snap";
 import { PASO_REJILLA_M } from "./imanViga";
 import { plantaColocableViga } from "./tramoViga";
 import { procesarClicPano, type PuntoPano } from "./colocacionPanoLogica";
+import { debeIgnorarEscColocacion } from "./escColocacion";
 
 // Semibrazo de la cruz del marcador (m) y elevacion sobre la cota (anti z-fight).
 const MARCA_R = 0.18;
@@ -270,9 +271,14 @@ function ColocacionActiva() {
   }, []);
 
   // Esc: si hay esquina A pendiente, la cancela (sin salir); si no, sale a seleccion.
+  // UX-C11: coordina con los dialogos (ver debeIgnorarEscColocacion): ignora el Esc si
+  // otro handler ya lo consumio (defaultPrevented) o si hay un dialogo abierto
+  // (dialogoActivo), para no cancelar la esquina pendiente ni salir de la herramienta.
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key !== "Escape") return;
+      if (debeIgnorarEscColocacion(ev.defaultPrevented, vistaStore.getState().dialogoActivo))
+        return;
       if (pendienteA.current !== null) {
         pendienteA.current = null;
         ocultarRectangulo();

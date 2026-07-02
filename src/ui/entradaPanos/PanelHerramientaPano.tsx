@@ -81,6 +81,14 @@ function PanelActivo() {
         onValor={(v) => setDefaults({ bordeApoyo: v })}
       />
 
+      {/* UX-C9: la losa se calcula AISLADA en esta fase (nudos propios, sin
+          transferir carga al portico). Se comunica en lenguaje de obra para que el
+          usuario no crea que la carga del paño llega a pilares/vigas. */}
+      <p className="cx-note">
+        En esta fase, la losa se calcula apoyada en su borde, de forma aislada: su
+        carga no se transmite a pilares ni vigas.
+      </p>
+
       <div className="cx-herramienta-pano__acciones">
         <Boton variante="ghost" onClick={terminar}>
           Terminar

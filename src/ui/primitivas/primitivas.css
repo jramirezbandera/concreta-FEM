@@ -139,6 +139,11 @@
   font-size: 11px;
   color: var(--text-3);
 }
+/* Tag de AVISO (p. ej. "obsoletos"): --warning en vez del gris neutro, para que un estado
+   que requiere atencion se lea como tal (Spec §1). Solo el tag de aviso, no todos. */
+.cx-panel-head__tag--warning {
+  color: var(--warning);
+}
 .cx-float__body {
   padding: 10px;
 }
@@ -175,6 +180,11 @@
   margin-left: auto;
   font-size: 10.5px;
   color: var(--text-3);
+}
+/* En el dock, el tag de aviso tambien va en --warning (gana en especificidad al gris de
+   arriba por incluir la clase modificadora dentro del contexto .cx-dock-sec__head). */
+.cx-dock-sec__head .cx-panel-head__tag--warning {
+  color: var(--warning);
 }
 .cx-dock-sec__body {
   padding: 2px 2px 10px;
@@ -430,4 +440,18 @@
   flex: 0 0 auto;
   color: var(--accent);
   font-size: 12px;
+}
+
+/* UX-F4: selects de dato TECNICO (seccion "IPE 300", material "S235") en mono
+   tabular, no en sans (Spec Diseno UI §1.5/§5: "todo dato numerico/tecnico" en
+   mono). Modificador aplicado SOLO por SelectSeccion/SelectMaterial; el resto de
+   selects (categoria de uso, hipotesis) siguen en sans. Cubre el valor del trigger
+   y las opciones del listbox para que la denominacion se lea igual en ambos. */
+.cx-select--mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.cx-select-item--mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
