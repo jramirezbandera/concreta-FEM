@@ -416,3 +416,94 @@ describe("AUDITORIA M-7: pilar pasante y masa tributaria por planta", () => {
     expect(cm1!.pesoTotal).toBeCloseTo(1.1775, 10);
   });
 });
+
+// ============================================================================
+// F3.2 · Termino 4: PAÑOS LOSA en el CM (cierra T-cm-cargas-muertas). Con el
+// acople la masa de la losa existe de verdad: peso propio rho·t·A + cargas
+// muertas del GRUPO·A (fuente unica, solo permanente) + superficiales
+// PERMANENTES de usuario·A, en el centroide del rectangulo.
+// ============================================================================
+describe("centro de masas · paños losa (F3.2, T-cm-cargas-muertas)", () => {
+  // Paño 4x2 en p1 con esquinas (0,0)-(4,0)-(4,2)-(0,2): area 8 m², centroide (2,1).
+  function conLosa(m: Modelo, extra?: Partial<Modelo["panos"][number]>): Modelo {
+    m.nudos.push(
+      { id: "q1", x: 0, y: 0 },
+      { id: "q2", x: 4, y: 0 },
+      { id: "q3", x: 4, y: 2 },
+      { id: "q4", x: 0, y: 2 },
+    );
+    m.panos.push({
+      id: "f1", nombre: "F1", tipo: "losa", plantaId: "p1",
+      perimetro: ["q1", "q2", "q3", "q4"],
+      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      ...extra,
+    });
+    return m;
+  }
+  const AREA = 8; // m²
+  const PP_LOSA = 25 * 0.2 * AREA; // rho HA-25 · espesor · area = 40 kN
+
+  it("losa sola: CM en el centroide del rectangulo con peso rho·t·A + CM_grupo·A", () => {
+    const m = conLosa(modeloBase());
+    m.grupos = [{ ...m.grupos[0], cargasMuertas: 1.5 }]; // 1.5·8 = 12 kN
+    const cm = calcularCentroMasaPlanta(m, "p1");
+    expect(cm).not.toBeNull();
+    expect(cm!.x).toBeCloseTo(2, 10);
+    expect(cm!.y).toBeCloseTo(1, 10);
+    expect(cm!.pesoTotal).toBeCloseTo(PP_LOSA + 12, 10);
+  });
+
+  it("la SOBRECARGA DE USO del grupo NO entra (el CM cuenta solo permanentes)", () => {
+    const base = conLosa(modeloBase());
+    const conUso = calcularCentroMasaPlanta(
+      { ...base, grupos: [{ ...base.grupos[0], sobrecargaUso: 5 }] },
+      "p1",
+    );
+    const sinUso = calcularCentroMasaPlanta(
+      { ...base, grupos: [{ ...base.grupos[0], sobrecargaUso: 0 }] },
+      "p1",
+    );
+    expect(conUso!.pesoTotal).toBeCloseTo(sinUso!.pesoTotal, 12);
+  });
+
+  it("superficial PERMANENTE de usuario suma q·A; la VARIABLE no", () => {
+    const m = conLosa(modeloBase());
+    m.cargas.push(
+      { id: "cp", tipo: "superficial", ambito: "f1", valor: 3, hipotesisId: "hip-perm" },
+      { id: "cv", tipo: "superficial", ambito: "f1", valor: 9, hipotesisId: "hip-var" },
+    );
+    const cm = calcularCentroMasaPlanta(m, "p1");
+    // pp losa (40) + 3·8 = 64; la variable (9·8) NO aparece.
+    expect(cm!.pesoTotal).toBeCloseTo(PP_LOSA + 24, 10);
+  });
+
+  it("el peso de la losa entra SIEMPRE, tambien con incluirPesoPropio OFF (masa fisica, E5)", () => {
+    const m = conLosa(modeloBase());
+    m.analisis = { ...m.analisis, incluirPesoPropio: false };
+    expect(calcularCentroMasaPlanta(m, "p1")!.pesoTotal).toBeCloseTo(PP_LOSA, 10);
+  });
+
+  it("el paño de OTRA planta no contamina; geometria irresoluble se omite sin lanzar", () => {
+    const m = conLosa(modeloBase());
+    // El paño esta en p1: p0 sigue sin masa.
+    expect(calcularCentroMasaPlanta(m, "p0")).toBeNull();
+    // Perimetro roto: se omite la contribucion (CM de p1 vuelve a null), sin lanzar.
+    m.panos[0] = { ...m.panos[0], perimetro: ["q1", "q2", "q3", "NO_EXISTE"] };
+    expect(() => calcularCentroMasaPlanta(m, "p1")).not.toThrow();
+    expect(calcularCentroMasaPlanta(m, "p1")).toBeNull();
+  });
+
+  it("losa + pilar: el CM pondera ambos pesos (se mueve del pilar hacia la losa)", () => {
+    const m = conLosa(modeloBase());
+    m.secciones.push(secGenerica("s1", 0.01));
+    // Pilar en (10, 0): tributaria en p1 = mitad del tramo = 1.5 m -> 0.01·78.5·1.5.
+    m.pilares.push(pilar("pA", 10, 0, "s1"));
+    const wPilar = 0.01 * RHO * 1.5;
+    const cm = calcularCentroMasaPlanta(m, "p1");
+    const esperadoX = (PP_LOSA * 2 + wPilar * 10) / (PP_LOSA + wPilar);
+    const esperadoY = (PP_LOSA * 1 + wPilar * 0) / (PP_LOSA + wPilar);
+    expect(cm!.x).toBeCloseTo(esperadoX, 10);
+    expect(cm!.y).toBeCloseTo(esperadoY, 10);
+    expect(cm!.pesoTotal).toBeCloseTo(PP_LOSA + wPilar, 10);
+  });
+});

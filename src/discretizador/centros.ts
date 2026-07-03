@@ -18,14 +18,19 @@
 // (verticales) aportan en su (x,y), vigas/cargas en sus (x,y) de planta. Esto evita
 // arrastrar la convencion de ejes #18 (que es del solver) hasta la UI.
 
-import type { Modelo, Viga, Carga, Hipotesis } from "../dominio";
+import type { Modelo, Viga, Carga, Hipotesis, Pano } from "../dominio";
 import {
   plantaPorId,
   nudoPorId,
   vigasDePlanta,
 } from "../dominio";
+import { getMaterial } from "../biblioteca";
 import { propiedadesDePilar, propiedadesDeViga } from "./propiedadesBarra";
 import type { PropiedadesBarra } from "./propiedadesBarra";
+// Paños (F3.2, cierra T-cm-cargas-muertas): bbox del rectangulo por la FUENTE UNICA
+// del mallado, y cargas de grupo por la MISMA fuente que el discretizador [2A].
+import { limitesRectangulo, type PuntoPlano } from "./mallado";
+import { CASE_CM_GRUPO, cargasGrupoDePano } from "./cargasGrupo";
 
 // El CM corre sobre el modelo VIVO (sin la pasada de validaciones que precede al
 // discretizador). Si una barra tiene seccion/material/planta no resolubles
@@ -112,10 +117,11 @@ function plantaDeNudo(modelo: Modelo, nudoId: string): string | undefined {
 // Si plantaInicial===plantaFinal (pilar degenerado de una planta), el pilar entero
 // (las dos mitades) cae en esa planta. El (x,y) del pilar es constante en planta.
 //
-// OMISION DELIBERADA — `Grupo.cargasMuertas` (kN/m²): NO se incluye. Sin paños (F3) no
-// hay area tributaria con la que convertir kN/m² en peso, asi que no se puede ubicar
-// ni ponderar. Cuando existan paños el CM las repartira por area. Ver TODO
-// `T-cm-cargas-muertas`.
+//  4) PAÑOS LOSA de la planta (F3.2, cierra T-cm-cargas-muertas): peso propio de la
+//     losa (rho·t·A) + cargas muertas del GRUPO (kN/m²·A, misma fuente unica que el
+//     discretizador, solo el case permanente) + cargas superficiales PERMANENTES de
+//     usuario (|q|·A), todo en el CENTROIDE del rectangulo del paño. La sobrecarga
+//     de uso NO entra (el CM cuenta solo permanentes, como el resto de terminos).
 export function calcularCentroMasaPlanta(
   modelo: Modelo,
   plantaId: string,
@@ -189,6 +195,32 @@ export function calcularCentroMasaPlanta(
     acumular(acc, Math.abs(c.valor), nudo.x, nudo.y);
   }
 
+  // --- 4) PAÑOS LOSA de la planta (F3.2, cierra T-cm-cargas-muertas) ---------------
+  // La masa de la losa existe de verdad en el calculo desde el acople: peso propio
+  // SIEMPRE (como las barras: la masa es fisica, E5, independiente del flag), cargas
+  // muertas del grupo por la fuente unica [2A] (solo el case PERMANENTE: la
+  // sobrecarga de uso es variable y el CM cuenta permanentes) y superficiales
+  // permanentes de usuario. Ubicado en el centroide del rectangulo (fuente unica
+  // limitesRectangulo). Geometria/material no resolubles => se OMITE (el CM no lanza).
+  for (const pano of modelo.panos) {
+    if (pano.tipo !== "losa" || pano.plantaId !== plantaId) continue;
+    const geo = geometriaDePano(modelo, pano);
+    if (geo === null) continue;
+    const material = getMaterial(pano.materialId);
+    if (material !== undefined) {
+      acumular(acc, material.peso * pano.espesor * geo.area, geo.cx, geo.cy);
+    }
+    for (const cg of cargasGrupoDePano(modelo, pano)) {
+      if (cg.case !== CASE_CM_GRUPO) continue; // solo permanentes (uso = variable)
+      acumular(acc, cg.presion * geo.area, geo.cx, geo.cy);
+    }
+    for (const c of modelo.cargas) {
+      if (c.tipo !== "superficial" || c.ambito !== pano.id) continue;
+      if (!esPermanente(c, hipById)) continue;
+      acumular(acc, Math.abs(c.valor) * geo.area, geo.cx, geo.cy);
+    }
+  }
+
   // Sin masa permanente en la planta => null (sin division por cero). El llamante
   // (panel de UI) lo presenta como "Sin masa en esta planta".
   if (acc.w <= 0) return null;
@@ -198,6 +230,30 @@ export function calcularCentroMasaPlanta(
     x: acc.wx / acc.w,
     y: acc.wy / acc.w,
     pesoTotal: acc.w,
+  };
+}
+
+// Area y centroide del rectangulo de un paño en coordenadas de OBRA, por la FUENTE
+// UNICA del criterio geometrico (limitesRectangulo del mallado). null si el perimetro
+// no resuelve o la geometria no es un rectangulo valido: el CM omite la contribucion
+// (no lanza), igual que con una barra de seccion irresoluble.
+function geometriaDePano(
+  modelo: Modelo,
+  pano: Pano,
+): { area: number; cx: number; cy: number } | null {
+  if (pano.perimetro.length !== 4) return null;
+  const puntos: PuntoPlano[] = [];
+  for (const nudoId of pano.perimetro) {
+    const n = nudoPorId(modelo, nudoId);
+    if (n === undefined) return null;
+    puntos.push({ x: n.x, y: n.y });
+  }
+  const l = limitesRectangulo(puntos);
+  if ("codigo" in l) return null;
+  return {
+    area: (l.xMax - l.xMin) * (l.yMax - l.yMin),
+    cx: (l.xMin + l.xMax) / 2,
+    cy: (l.yMin + l.yMax) / 2,
   };
 }
 
