@@ -45,6 +45,7 @@ import {
 } from "./contratoFEM";
 import { type PuntoPlano } from "./mallado";
 import { calcularAcoples } from "./acople";
+import { cargasGrupoDePano } from "./cargasGrupo";
 import { validarModelo, type ErrorObra, type ContextoModal } from "./validaciones";
 import { generarCombos } from "./combinaciones";
 // resolverSeccion y las propiedades de barra viven en el modulo hoja
@@ -1062,6 +1063,17 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
       const presionPP = material.peso * pano.espesor; // ρ·t, POSITIVA = hacia abajo
       for (const q of malla.quads) {
         quad_loads.push({ quad: q.name, presion: presionPP, case: casePesoPropioPano });
+      }
+    }
+    // Cargas AUTOMATICAS de grupo (F3.2, D-1): cargasMuertas (G) y sobrecargaUso (Q)
+    // del grupo de la planta del paño, como presion uniforme en cases SINTETICOS
+    // (auto-grupo-cm / auto-grupo-uso). La fuente unica `cargasGrupoDePano` [2A] es
+    // la MISMA que consulta generarCombos para poner sus factores: no pueden
+    // divergir. Presion POSITIVA = hacia abajo (mismo idioma sintetico que el peso
+    // propio de losa). Orden determinista por paño: usuario → pp → CM → uso.
+    for (const cg of cargasGrupoDePano(modelo, pano)) {
+      for (const q of malla.quads) {
+        quad_loads.push({ quad: q.name, presion: cg.presion, case: cg.case });
       }
     }
   });

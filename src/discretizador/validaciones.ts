@@ -28,6 +28,12 @@ import {
   vigasInterioresBajoPano,
   type ResultadoAcoples,
 } from "./acople";
+import {
+  CASE_CM_GRUPO,
+  CASE_USO_GRUPO,
+  cargasGrupoDePano,
+  gruposConValorNegativo,
+} from "./cargasGrupo";
 
 // Error de obra: contrato estable consumido por la UI (resaltado del elemento) y
 // por los tests (assert de `codigo` + `elementoId`).
@@ -762,6 +768,62 @@ function validarAvisosAcople(
   }
 }
 
+// 8. Cargas AUTOMATICAS de grupo (F3.2, D-1): red del borde y gestion de expectativas.
+function validarCargasGrupo(modelo: Modelo, errores: ErrorObra[]): void {
+  // ID_RESERVADO (red defensiva FINAL): la frontera de import ya SANEA la colision
+  // renombrando la hipotesis intrusa [OV-4]; si aun asi llega una hipotesis con un
+  // id sintetico (p.ej. creada programaticamente saltandose la frontera), se
+  // bloquea: su `case` colisionaria en el solver con la carga automatica de grupo
+  // y se sumarian esfuerzos en silencio.
+  for (const h of modelo.hipotesis) {
+    if (h.id === CASE_CM_GRUPO || h.id === CASE_USO_GRUPO) {
+      errores.push({
+        codigo: "ID_RESERVADO",
+        severidad: "error",
+        mensaje: `La hipótesis "${h.nombre}" usa un identificador reservado para las cargas automáticas de grupo. Vuelve a importar el proyecto o recrea la hipótesis.`,
+        elementoId: h.id,
+        elementoTipo: "hipotesis",
+      });
+    }
+  }
+  // GRUPO_VALOR_NEGATIVO (aviso, [2A]): un valor negativo NO se aplica (una carga
+  // "muerta" ascendente es un error de tecleo casi seguro); callarlo haria creer al
+  // usuario que esa carga existe. Solo avisa si el grupo tiene paños que la
+  // recibirian (si no, el valor es inerte y ya lo dice la nota del dialogo).
+  for (const g of gruposConValorNegativo(modelo)) {
+    errores.push({
+      codigo: "GRUPO_VALOR_NEGATIVO",
+      severidad: "aviso",
+      mensaje: `El grupo "${g.nombre}" tiene un valor negativo en ${
+        g.campo === "cargasMuertas" ? "cargas muertas" : "la sobrecarga de uso"
+      }: no se aplica a sus paños. Revisa el dato en Plantas y grupos.`,
+      elementoTipo: "modelo",
+    });
+  }
+  // GRUPO_Y_SUPERFICIAL (aviso, [OV-1]): un paño con carga superficial MANUAL y
+  // ademas cargas automaticas de grupo puede estar contando la misma accion dos
+  // veces (proyectos anteriores a F3.2 metian a mano lo que el grupo no aplicaba).
+  // Coexistir es legitimo (p.ej. tabiqueria manual + uso del grupo): NO bloquea.
+  const panosOrdenados = [...modelo.panos].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
+  for (const pano of panosOrdenados) {
+    if (cargasGrupoDePano(modelo, pano).length === 0) continue;
+    const tieneSuperficialManual = modelo.cargas.some(
+      (c) => c.tipo === "superficial" && c.ambito === pano.id,
+    );
+    if (tieneSuperficialManual) {
+      errores.push({
+        codigo: "GRUPO_Y_SUPERFICIAL",
+        severidad: "aviso",
+        mensaje: `El paño "${pano.nombre}" recibe cargas superficiales introducidas a mano además de las automáticas de su grupo: revisa que no estén duplicadas.`,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+    }
+  }
+}
+
 // --- Validaciones EXCLUSIVAS del camino modal (F2b) --------------------------
 // El analisis modal es un camino de calculo SEPARADO (no un OpcionesAnalisis.tipo):
 // se invoca con `discretizar(modelo, { modal: { numModos } })`. Estas dos guardas
@@ -836,6 +898,7 @@ export function validarModelo(
   validarSujecion(modelo, errores, acoplesReales);
   validarElementosInterioresPano(modelo, errores); // [OV-5/TODO-2] pilar/viga interior
   validarAvisosAcople(modelo, errores, acoplesReales); // [OV-2] parcial/insuficiente
+  validarCargasGrupo(modelo, errores); // [D-1] id reservado + negativo + duplicidad
   validarHipotesisConCargas(modelo, errores);
   validarVariablesConcomitantes(modelo, errores);
   validarNudosFlotantes(modelo, errores);

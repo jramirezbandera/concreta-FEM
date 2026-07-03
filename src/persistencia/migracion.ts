@@ -6,6 +6,10 @@
 import { SCHEMA_VERSION } from "../dominio/comunes";
 import { ModeloSchema, type Modelo } from "../dominio/modelo";
 import { ID_HIP_PESO_PROPIO } from "../dominio/helpers";
+// Ids RESERVADOS de los cases sinteticos de cargas de grupo (F3.2, [OV-4]). Import
+// directo al modulo HOJA (puro, solo depende de ../dominio): no arrastra el resto
+// del discretizador a la frontera de persistencia.
+import { CASE_CM_GRUPO, CASE_USO_GRUPO } from "../discretizador/cargasGrupo";
 import type { ZodIssue } from "zod";
 
 // Resultado espejo de `ResultadoDiscretizacion` (feature-4): mismo patron
@@ -402,5 +406,57 @@ export function migrarYValidar(
     };
   }
 
-  return { ok: true, modelo: parsed.data, avisos };
+  // [OV-4] SANEO de ids reservados (F3.2): una hipotesis cuyo id colisione con los
+  // cases sinteticos de cargas de grupo se RENOMBRA aqui (y sus cargas se
+  // re-apuntan), en vez de dejar que el calculo la bloquee con un error que el
+  // usuario no puede arreglar (los ids no se editan desde la UI). "Importar nunca
+  // debe romper la app" (§2.8). Mismo patron que la rama usurpadora del peso
+  // propio (F2a): busqueda de hueco libre + re-apuntado. Sin migracion de esquema:
+  // es saneo independiente de la version.
+  const saneado = sanearIdsReservados(parsed.data);
+  return { ok: true, modelo: saneado.modelo, avisos: [...avisos, ...saneado.avisos] };
+}
+
+// Renombra las hipotesis cuyo id es un case sintetico reservado (auto-grupo-cm /
+// auto-grupo-uso) a un id libre y re-apunta `modelo.cargas[].hipotesisId`. La
+// colision es casi imposible con ids generados por la app (opacos), pero un .json
+// editado a mano es justo el borde que esta frontera protege. PURA (no muta la
+// entrada).
+function sanearIdsReservados(modelo: Modelo): { modelo: Modelo; avisos: string[] } {
+  const reservados = new Set<string>([CASE_CM_GRUPO, CASE_USO_GRUPO]);
+  const intrusas = modelo.hipotesis.filter((h) => reservados.has(h.id));
+  if (intrusas.length === 0) return { modelo, avisos: [] };
+
+  const avisos: string[] = [];
+  const ocupados = new Set(modelo.hipotesis.map((h) => h.id));
+  const renombres = new Map<string, string>();
+  for (const h of intrusas) {
+    // Hueco libre determinista: "<id>-usuario", "-usuario-2", ... (espejo de
+    // elegirNombrePesoPropio, aqui sobre ids).
+    let candidato = `${h.id}-usuario`;
+    let k = 2;
+    while (ocupados.has(candidato)) {
+      candidato = `${h.id}-usuario-${k}`;
+      k += 1;
+    }
+    ocupados.add(candidato);
+    renombres.set(h.id, candidato);
+    avisos.push(
+      `La hipótesis "${h.nombre}" usaba un identificador reservado para las cargas automáticas de grupo y se ha ajustado internamente; sus cargas se conservan.`,
+    );
+  }
+  return {
+    modelo: {
+      ...modelo,
+      hipotesis: modelo.hipotesis.map((h) =>
+        renombres.has(h.id) ? { ...h, id: renombres.get(h.id)! } : h,
+      ),
+      cargas: modelo.cargas.map((c) =>
+        renombres.has(c.hipotesisId)
+          ? { ...c, hipotesisId: renombres.get(c.hipotesisId)! }
+          : c,
+      ),
+    },
+    avisos,
+  };
 }

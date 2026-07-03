@@ -429,15 +429,21 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
         // Se emiten quads y quad_loads (solo porque hay paño).
         expect(fem.quads).toBeDefined();
         expect(fem.quad_loads).toBeDefined();
-        // 4x2 = 8 quads; una carga superficial uniforme => un quad_load por quad.
+        // 4x2 = 8 quads. quad_loads (F3.2, D-1): la carga superficial de USUARIO
+        // (8, case h1) MAS las cargas automaticas del grupo del fixture
+        // (cargasMuertas=1 -> 8 en auto-grupo-cm; sobrecargaUso=2 -> 8 en
+        // auto-grupo-uso) = 24. Los campos del grupo por fin tienen consumidor.
         expect(fem.quads).toHaveLength(8);
-        expect(fem.quad_loads).toHaveLength(8);
+        expect(fem.quad_loads).toHaveLength(24);
         // Presion con signo canonico de gravedad: POSITIVA = hacia abajo en quads
         // (opuesto a la FY de barras; verificado contra el motor real, #3).
-        for (const ql of fem.quad_loads!) {
-          expect(ql.presion).toBe(4);
-          expect(ql.case).toBe("h1");
-        }
+        const porCase = (c: string) => fem.quad_loads!.filter((ql) => ql.case === c);
+        expect(porCase("h1")).toHaveLength(8);
+        for (const ql of porCase("h1")) expect(ql.presion).toBe(4);
+        expect(porCase("auto-grupo-cm")).toHaveLength(8);
+        for (const ql of porCase("auto-grupo-cm")) expect(ql.presion).toBe(1);
+        expect(porCase("auto-grupo-uso")).toHaveLength(8);
+        for (const ql of porCase("auto-grupo-uso")) expect(ql.presion).toBe(2);
         // Procedencia (2A): trazabilidad mapea el paño a sus quads.
         expect(res.trazabilidad.panoAQuads["pano1"]).toHaveLength(8);
         expect(res.trazabilidad.nodosDeMalla.length).toBeGreaterThan(0);

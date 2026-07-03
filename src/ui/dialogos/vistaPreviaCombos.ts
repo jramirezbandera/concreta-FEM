@@ -15,6 +15,10 @@ import type { Modelo } from "../../dominio";
 // Import directo al modulo puro (no al barrel del discretizador, que arrastra el resto
 // de la Capa 2): solo necesitamos generarCombos, que es puro y ligero.
 import { generarCombos } from "../../discretizador/combinaciones";
+// Cases SINTETICOS de las cargas de grupo (F3.2, D-1): no son Hipotesis del modelo,
+// asi que se les inyecta su tipo aqui para que la formula los recoja (sin esto,
+// formularCombo los ignoraria y la vista previa MENTIRIA por omision).
+import { CASE_CM_GRUPO, CASE_USO_GRUPO } from "../../discretizador/cargasGrupo";
 
 // Una linea de la vista previa: nombre largo legible + formula ya formateada.
 export interface LineaCombo {
@@ -93,6 +97,12 @@ export function vistaPreviaCombos(modelo: Modelo): LineaCombo[] {
   const tipoPorHipotesis = new Map<string, "permanente" | "variable">(
     modelo.hipotesis.map((h) => [h.id, h.tipo]),
   );
+  // Cases sinteticos de grupo (F3.2): cargasMuertas = G, sobrecargaUso = Q. Solo
+  // aparecen en `factors` cuando algun paño los consume (generarCombos); aqui basta
+  // con saber su tipo. Se colapsan con el resto de terminos del mismo (simbolo,
+  // factor): la formula sigue leyendo "1,35·G + 1,50·Q".
+  tipoPorHipotesis.set(CASE_CM_GRUPO, "permanente");
+  tipoPorHipotesis.set(CASE_USO_GRUPO, "variable");
   return generarCombos(modelo).map((combo) => ({
     nombre: combo.name,
     etiqueta: etiquetaCombo(combo.name),

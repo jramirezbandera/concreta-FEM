@@ -517,3 +517,61 @@ describe("migrarYValidar — cadena de migraciones inyectada (T3)", () => {
     expect(r.errores[0]).toContain("v0");
   });
 });
+
+// ============================================================================
+// F3.2 [OV-4]: SANEO de ids reservados (cases sinteticos de cargas de grupo).
+// Un .json editado a mano con una hipotesis cuyo id sea "auto-grupo-cm"/"-uso"
+// pasaria de valido a INCALCULABLE (el id no se edita desde la UI): la frontera
+// lo renombra a un hueco libre y re-apunta sus cargas — importar nunca rompe.
+// ============================================================================
+describe("migrarYValidar · saneo de ids reservados (F3.2, OV-4)", () => {
+  function modeloConIntrusa(id: string): Modelo {
+    const m = crearModeloVacio();
+    m.hipotesis = [
+      ...m.hipotesis,
+      { id, nombre: "Sobrecarga manual", tipo: "variable", automatica: false },
+    ];
+    m.cargas = [
+      // Carga colgando de la intrusa: debe RE-APUNTARSE al id saneado.
+      { id: "c1", tipo: "puntual", ambito: "nx", valor: 5, hipotesisId: id },
+    ];
+    m.nudos = [{ id: "nx", x: 0, y: 0 }];
+    return m;
+  }
+
+  it("renombra la hipotesis intrusa, re-apunta sus cargas y avisa", () => {
+    const r = migrarYValidar(modeloConIntrusa("auto-grupo-cm"));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Ya no queda ninguna hipotesis con el id reservado.
+    expect(r.modelo.hipotesis.some((h) => h.id === "auto-grupo-cm")).toBe(false);
+    // La intrusa conserva nombre y tipo bajo su id saneado...
+    const saneada = r.modelo.hipotesis.find((h) => h.nombre === "Sobrecarga manual")!;
+    expect(saneada.id).toBe("auto-grupo-cm-usuario");
+    // ...y su carga la sigue: no queda huerfana ni desaparece.
+    expect(r.modelo.cargas[0].hipotesisId).toBe("auto-grupo-cm-usuario");
+    expect(r.avisos.some((a) => /reservado/i.test(a))).toBe(true);
+  });
+
+  it("con el hueco '-usuario' ya OCUPADO busca el siguiente (-usuario-2)", () => {
+    const m = modeloConIntrusa("auto-grupo-uso");
+    m.hipotesis.push({
+      id: "auto-grupo-uso-usuario", nombre: "Ocupante", tipo: "variable", automatica: false,
+    });
+    const r = migrarYValidar(m);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const saneada = r.modelo.hipotesis.find((h) => h.nombre === "Sobrecarga manual")!;
+    expect(saneada.id).toBe("auto-grupo-uso-usuario-2");
+    expect(r.modelo.cargas[0].hipotesisId).toBe("auto-grupo-uso-usuario-2");
+    // El ocupante legitimo no se toca.
+    expect(r.modelo.hipotesis.some((h) => h.id === "auto-grupo-uso-usuario")).toBe(true);
+  });
+
+  it("sin colision no hay saneo ni avisos extra (regresion)", () => {
+    const r = migrarYValidar(crearModeloVacio());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.avisos.filter((a) => /reservado/i.test(a))).toHaveLength(0);
+  });
+});

@@ -814,4 +814,56 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
       expect(conParametro).toEqual(sinParametro);
     });
   });
+
+  describe("cargas de grupo (D-1): red del borde y expectativas", () => {
+    it("[GAP-C] valor NEGATIVO en el grupo con paños -> aviso GRUPO_VALOR_NEGATIVO (no se aplica en silencio)", () => {
+      const m = conPanoSobreViga("simple");
+      m.grupos = [{ ...m.grupos[0], cargasMuertas: -1 }];
+      const e = validarModelo(m).filter((x) => x.codigo === "GRUPO_VALOR_NEGATIVO");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("aviso");
+      expect(e[0].mensaje).toContain(m.grupos[0].nombre);
+      sinJergaFEM(e[0]);
+    });
+
+    it("valor negativo SIN paños que lo reciban -> sin aviso (el dato es inerte)", () => {
+      const m = modeloValido();
+      m.grupos = [{ ...m.grupos[0], sobrecargaUso: -2 }];
+      expect(codigos(validarModelo(m))).not.toContain("GRUPO_VALOR_NEGATIVO");
+    });
+
+    it("[OV-1] paño con carga superficial MANUAL + cargas de grupo -> aviso de posible duplicidad", () => {
+      const m = conPanoSobreViga("simple"); // grupo del fixture: qk=2, CM=1 (>0)
+      m.cargas.push({ id: "c9", tipo: "superficial", ambito: "pano1", valor: 2, hipotesisId: "h1" });
+      const e = validarModelo(m).filter((x) => x.codigo === "GRUPO_Y_SUPERFICIAL");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("aviso");
+      expect(e[0].elementoId).toBe("pano1");
+      sinJergaFEM(e[0]);
+    });
+
+    it("[OV-1] sin carga manual (solo grupo) o grupo a cero -> sin aviso de duplicidad", () => {
+      // Solo grupo: sin duplicidad posible.
+      expect(codigos(validarModelo(conPanoSobreViga("simple")))).not.toContain(
+        "GRUPO_Y_SUPERFICIAL",
+      );
+      // Grupo a cero + carga manual: tampoco (no hay carga automatica que duplicar).
+      const m = conPanoSobreViga("simple");
+      m.grupos = [{ ...m.grupos[0], sobrecargaUso: 0, cargasMuertas: 0 }];
+      m.cargas.push({ id: "c9", tipo: "superficial", ambito: "pano1", valor: 2, hipotesisId: "h1" });
+      expect(codigos(validarModelo(m))).not.toContain("GRUPO_Y_SUPERFICIAL");
+    });
+
+    it("hipotesis con id RESERVADO (case sintetico) -> error ID_RESERVADO (red tras el saneo de import)", () => {
+      const m = modeloValido();
+      m.hipotesis.push({
+        id: "auto-grupo-cm", nombre: "Intrusa", tipo: "permanente", automatica: false,
+      });
+      const e = validarModelo(m).filter((x) => x.codigo === "ID_RESERVADO");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("error");
+      expect(e[0].elementoId).toBe("auto-grupo-cm");
+      sinJergaFEM(e[0]);
+    });
+  });
 });

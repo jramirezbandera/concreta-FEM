@@ -46,4 +46,60 @@ describe("vistaPreviaCombos", () => {
     const lineas = vistaPreviaCombos(m);
     expect(lineas.map((l) => l.formula)).toEqual(["—", "—"]);
   });
+
+  // F3.2 (D-1): las cargas automaticas de grupo viajan en cases SINTETICOS que no son
+  // hipotesis del modelo. La vista previa debe RECOGERLOS (CM=G, uso=Q) sin que la
+  // formula cambie de forma: colapsan con el resto de terminos del mismo gamma.
+  it("con un paño y cargas de grupo activas la formula sigue colapsada (sin terminos fantasma)", () => {
+    const m: Modelo = crearModeloVacio();
+    m.grupos = [
+      { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    ];
+    m.plantas = [{ id: "p1", nombre: "P1", cota: 3, altura: 3, grupoId: "g1" }];
+    m.nudos = [
+      { id: "q1", x: 0, y: 0 },
+      { id: "q2", x: 4, y: 0 },
+      { id: "q3", x: 4, y: 3 },
+      { id: "q4", x: 0, y: 3 },
+    ];
+    m.panos = [
+      {
+        id: "f1", nombre: "F1", tipo: "losa", plantaId: "p1",
+        perimetro: ["q1", "q2", "q3", "q4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      },
+    ];
+    const lineas = vistaPreviaCombos(m);
+    // Los cases sinteticos (G y Q) colapsan con las hipotesis sembradas del mismo
+    // gamma: la formula NO gana terminos nuevos ni pierde los de grupo.
+    expect(lineas[0].formula).toBe("1,35·G + 1,50·Q");
+    expect(lineas[1].formula).toBe("1,00·G + 1,00·Q");
+  });
+
+  it("SOLO cargas de grupo (sin hipotesis del modelo): la formula las refleja igualmente", () => {
+    const m: Modelo = crearModeloVacio();
+    m.hipotesis = []; // sin hipotesis de usuario NI automatica
+    m.analisis = { ...m.analisis, incluirPesoPropio: false };
+    m.grupos = [
+      { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    ];
+    m.plantas = [{ id: "p1", nombre: "P1", cota: 3, altura: 3, grupoId: "g1" }];
+    m.nudos = [
+      { id: "q1", x: 0, y: 0 },
+      { id: "q2", x: 4, y: 0 },
+      { id: "q3", x: 4, y: 3 },
+      { id: "q4", x: 0, y: 3 },
+    ];
+    m.panos = [
+      {
+        id: "f1", nombre: "F1", tipo: "losa", plantaId: "p1",
+        perimetro: ["q1", "q2", "q3", "q4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      },
+    ];
+    const lineas = vistaPreviaCombos(m);
+    // Antes del fix, formularCombo IGNORABA los ids sinteticos y mostraria "—":
+    // la vista previa mentiria por omision.
+    expect(lineas[0].formula).toBe("1,35·G + 1,50·Q");
+  });
 });

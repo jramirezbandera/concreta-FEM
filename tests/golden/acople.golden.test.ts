@@ -168,6 +168,23 @@ describe("golden A · losa acoplada a la crujia (4 vigas + 4 pilares)", () => {
     }
   });
 
+  it("D-1: las cargas del GRUPO bajan a los quads en cases sinteticos y entran en los combos", () => {
+    const m = crujia();
+    m.grupos = [{ ...m.grupos[0], cargasMuertas: 1.5, sobrecargaUso: 2 }];
+    const res = ok(discretizar(m));
+    const fem = res.modeloFEM;
+    // 12 (usuario h1) + 12 (auto-grupo-cm) + 12 (auto-grupo-uso) = 36 quad_loads.
+    expect(fem.quad_loads).toHaveLength(36);
+    const porCase = (c: string) => fem.quad_loads!.filter((ql) => ql.case === c);
+    expect(porCase("auto-grupo-cm").every((ql) => ql.presion === 1.5)).toBe(true);
+    expect(porCase("auto-grupo-uso").every((ql) => ql.presion === 2)).toBe(true);
+    // Y los combos les aplican su gamma (CM = G 1,35; uso = Q 1,50) — misma fuente
+    // que la emision [2A]: sin termino fantasma ni carga sin factor.
+    const elu = fem.combos.find((c) => c.name === "ELU")!;
+    expect(elu.factors["auto-grupo-cm"]).toBe(1.35);
+    expect(elu.factors["auto-grupo-uso"]).toBe(1.5);
+  });
+
   it("determinismo: reordenar paños/vigas/pilares/nudos de entrada produce la MISMA Capa 2", () => {
     const a = ok(discretizar(crujia()));
     const m = crujia();
