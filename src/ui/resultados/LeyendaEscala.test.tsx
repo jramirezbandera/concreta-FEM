@@ -3,7 +3,7 @@
 // slider de amplificacion y el toggle "Animar" deshabilitados (no operan en planta, donde
 // el overlay 3D no se dibuja); en 3D los controles estan operativos.
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 import { LeyendaEscala } from "./LeyendaEscala";
 import { resultadosStore } from "../../estado/resultadosStore";
@@ -68,6 +68,7 @@ function trazaMinima(): Trazabilidad {
 beforeEach(() => {
   resultadosStore.getState().descartar();
   vistaStore.getState().setCombinacionActiva(null);
+  vistaStore.getState().setOverlayResultados("deformada");
 });
 
 function montar() {
@@ -99,5 +100,60 @@ describe("LeyendaEscala · guia en planta (UX-H1)", () => {
       screen.getByLabelText(/factor de amplificación de la deformada/i),
     ).toBeEnabled();
     expect(screen.getByRole("checkbox")).toBeEnabled();
+  });
+});
+
+describe("LeyendaEscala · exclusion con la forma modal (D9)", () => {
+  it("se muestra con la deformada activa y se OCULTA con la forma modal activa", () => {
+    vistaStore.getState().setModoVista("3d");
+    // Deformada activa: la leyenda (rampa + control) se muestra.
+    vistaStore.getState().setOverlayResultados("deformada");
+    const { unmount } = montar();
+    expect(
+      screen.getByLabelText(/factor de amplificación de la deformada/i),
+    ).toBeInTheDocument();
+    unmount();
+
+    // Forma modal activa: la leyenda de la deformada NO se muestra (exclusion mutua).
+    vistaStore.getState().setOverlayResultados("modal");
+    montar();
+    expect(
+      screen.queryByLabelText(/factor de amplificación de la deformada/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("LeyendaEscala · slider logaritmico (D6)", () => {
+  it("el slider recorre [0..1000] (posicion), no [1..500] (escala): mapeo log", () => {
+    vistaStore.getState().setModoVista("3d");
+    vistaStore.getState().setDeformadaEscala(1);
+    montar();
+    const slider = screen.getByLabelText(
+      /factor de amplificación de la deformada/i,
+    ) as HTMLInputElement;
+    // El input es la POSICION log (0..1000), no la escala directa.
+    expect(slider.min).toBe("0");
+    expect(slider.max).toBe("1000");
+    // Con escala 1 (minimo), la posicion es 0.
+    expect(slider.value).toBe("0");
+  });
+
+  it("la mitad del recorrido cae en la media GEOMETRICA (√500 ≈ 22), no la aritmetica (250)", () => {
+    vistaStore.getState().setModoVista("3d");
+    montar();
+    const slider = screen.getByLabelText(/factor de amplificación de la deformada/i);
+    // Posicion 500/1000 = mitad -> escala = exp((ln1+ln500)/2) = √500 ≈ 22.36 -> 22.
+    fireEvent.change(slider, { target: { value: "500" } });
+    const escala = vistaStore.getState().deformadaEscala;
+    expect(escala).toBeGreaterThan(18);
+    expect(escala).toBeLessThan(26); // NO 250 (seria el mapeo lineal roto)
+  });
+
+  it("el maximo del recorrido mapea a ×500 (tope)", () => {
+    vistaStore.getState().setModoVista("3d");
+    montar();
+    const slider = screen.getByLabelText(/factor de amplificación de la deformada/i);
+    fireEvent.change(slider, { target: { value: "1000" } });
+    expect(vistaStore.getState().deformadaEscala).toBe(500);
   });
 });

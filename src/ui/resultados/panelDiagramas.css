@@ -21,6 +21,13 @@
   width: 100%;
 }
 
+/* [D20] Selector de tramo (pilar de varias plantas): rotulo + segmentado a lo ancho. */
+.cx-panel-diagramas__tramo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* Lienzo del diagrama: alto fijo para que Plotly tenga caja estable que medir
    (autosize/useResizeHandler). El ancho lo da el panel. */
 .cx-panel-diagramas__lienzo {

@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { invalidate, useFrame } from "@react-three/fiber";
 import { BufferGeometry, Float32BufferAttribute, type LineSegments } from "three";
 import { resultadosStore, vistaStore } from "../../estado";
-import type { ModoVista } from "../../estado";
+import type { ModoVista, OverlayResultados } from "../../estado";
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosCalculo } from "../../solver";
 import { construirBuffers } from "./deformadaBuffers";
@@ -42,6 +42,9 @@ interface Entradas {
   // 3D). Antes usaba `=== "3d"`, dejando el mosaico sin deformada con la leyenda
   // visible (incoherente con el overlay de modelo de calculo, ya alineado a !=="planta").
   modoVista: ModoVista;
+  // [D9] Overlay de resultados activo: la deformada SOLO se dibuja si es "deformada" (la
+  // forma modal la dibuja ModoOverlay cuando es "modal"). Exclusion mutua: nunca ambas.
+  overlay: OverlayResultados;
 }
 
 // Snapshot estable de las entradas: tupla cacheada para useSyncExternalStore.
@@ -57,6 +60,7 @@ function leerEntradas(): Entradas {
     escala: v.deformadaEscala,
     animando: v.animando,
     modoVista: v.modoVista,
+    overlay: v.overlayResultados,
   };
 }
 function getSnapshot(): Entradas {
@@ -69,7 +73,8 @@ function getSnapshot(): Entradas {
     a.combo === c.combo &&
     a.escala === c.escala &&
     a.animando === c.animando &&
-    a.modoVista === c.modoVista
+    a.modoVista === c.modoVista &&
+    a.overlay === c.overlay
   ) {
     return c;
   }
@@ -84,6 +89,7 @@ function suscribir(cb: () => void): () => void {
   const offEsc = vistaStore.subscribe((s) => s.deformadaEscala, cb);
   const offAnim = vistaStore.subscribe((s) => s.animando, cb);
   const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
+  const offOverlay = vistaStore.subscribe((s) => s.overlayResultados, cb);
   return () => {
     offR();
     offM();
@@ -92,6 +98,7 @@ function suscribir(cb: () => void): () => void {
     offEsc();
     offAnim();
     offModo();
+    offOverlay();
   };
 }
 
@@ -187,7 +194,10 @@ export function DeformadaOverlay() {
   // comparten la escena 3D del edificio completo. En planta la geometria base esta
   // filtrada por planta y la deformada del edificio entero se descuadraria. (UX-H9:
   // antes `=== "3d"` la ocultaba en mosaico con la leyenda visible.)
-  if (!geom || entradas.modoVista === "planta") return null;
+  // [D9] Exclusion mutua: si el overlay activo es la FORMA MODAL, la deformada NO se dibuja
+  // (evita superponer dos magnitudes sobre la misma rampa; la escena queda legible).
+  if (!geom || entradas.modoVista === "planta" || entradas.overlay !== "deformada")
+    return null;
   return (
     <lineSegments ref={lineRef} geometry={geom}>
       {/* vertexColors: el color va en el atributo `color` (rampa o gris). */}

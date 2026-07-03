@@ -40,12 +40,11 @@
   color: var(--warning);
 }
 
-/* Scroll acotado de la tabla: VERTICAL (muchos apoyos) y HORIZONTAL (7 columnas en un
-   dock estrecho). El scroll horizontal vive AQUI, en la seccion de la tabla, no en el
-   dock entero (regla del PR2: el dock nunca scrollea en horizontal). */
+/* [D14 · PR3] Scroll de la tabla: SOLO HORIZONTAL (7 columnas en un dock estrecho). El
+   scroll VERTICAL interno se ELIMINA — el dock tiene un único scroll vertical (anatomía C):
+   duplicarlo aquí generaba un scroll anidado. El horizontal se queda: vive AQUI, en la
+   sección de la tabla, no en el dock (que nunca scrollea en horizontal). */
 .cx-reacciones__scroll {
-  max-height: 280px;
-  overflow-y: auto;
   overflow-x: auto;
 }
 

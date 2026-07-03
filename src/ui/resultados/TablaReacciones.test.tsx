@@ -1,6 +1,7 @@
 // Componente (RTL, project jsdom) de TablaReacciones (feature-14, Tarea 2.3/3.2).
 // Verifica: una fila por apoyo, etiqueta con el NOMBRE del pilar de obra (no el id
-// FEM "N1"), las 6 componentes en mono y el resumen ΣFY; ademas los estados guia
+// FEM "N1"), las 6 componentes en EJES DE OBRA (V/Hx/Hy/Mx/My/Mv, D5) y el resumen ΣV;
+// ademas los estados guia
 // (sin resultados / sin combo) y el aviso de obsoletos. NO arranca el solver: los
 // resultados son sinteticos y el modeloFEM/trazabilidad se derivan de discretizar()
 // para que apoyos y arranques casen con la obra real.
@@ -107,15 +108,28 @@ describe("TablaReacciones · tabla por apoyo", () => {
     expect(screen.queryByText("N2")).not.toBeInTheDocument();
   });
 
-  it("muestra las 6 componentes de cada apoyo y el resumen ΣFY", () => {
+  it("muestra las 6 componentes de cada apoyo y el resumen ΣV (ejes de obra, D5)", () => {
     render(<TablaReacciones />);
-    // Fila del apoyo API: FY = 60.00.
+    // Fila del apoyo API: V (vertical = FY fem) = 60.00; Hx (= FX fem) = 1.00.
     const filaApi = screen.getByRole("rowheader", { name: "API" }).closest("tr")!;
     expect(within(filaApi).getByText("60.00")).toBeInTheDocument();
-    expect(within(filaApi).getByText("1.00")).toBeInTheDocument(); // FX
-    // Resumen de equilibrio: ΣFY = 60 + 60 = 120.
-    const filaSuma = screen.getByRole("rowheader", { name: "ΣFY" }).closest("tr")!;
+    expect(within(filaApi).getByText("1.00")).toBeInTheDocument(); // Hx (FX fem)
+    // Resumen de equilibrio: ΣV = 60 + 60 = 120 (suma de reacciones verticales).
+    const filaSuma = screen.getByRole("rowheader", { name: "ΣV" }).closest("tr")!;
     expect(within(filaSuma).getByText("120.00")).toBeInTheDocument();
+  });
+
+  it("[D5] las cabeceras estan en ejes de obra (V/Hx/Hy, no FX/FY/FZ) con nota de convenio", () => {
+    render(<TablaReacciones />);
+    // Columnas de obra visibles; nada de "FY" (que se leeria como horizontal en la planta).
+    expect(screen.getByRole("columnheader", { name: /^V/ })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^Hx/ })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^Hy/ })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: /^FY/ })).not.toBeInTheDocument();
+    // Nota de convenio al pie.
+    expect(
+      screen.getByText(/componentes en ejes de obra \(v = vertical\)/i),
+    ).toBeInTheDocument();
   });
 
   it("normaliza el residuo '-0.00' del solver a '0.00'", () => {
@@ -236,9 +250,9 @@ describe("TablaReacciones · filtrado de apoyos de malla (F2.4)", () => {
     expect(within(filaLosa).getByText("20.00")).toBeInTheDocument();
   });
 
-  it("ΣFY incluye el agregado de la losa (100 pilar + 20 losa = 120)", () => {
+  it("ΣV incluye el agregado de la losa (100 pilar + 20 losa = 120)", () => {
     render(<TablaReacciones />);
-    const filaSuma = screen.getByRole("rowheader", { name: "ΣFY" }).closest("tr")!;
+    const filaSuma = screen.getByRole("rowheader", { name: "ΣV" }).closest("tr")!;
     expect(within(filaSuma).getByText("120.00")).toBeInTheDocument();
   });
 

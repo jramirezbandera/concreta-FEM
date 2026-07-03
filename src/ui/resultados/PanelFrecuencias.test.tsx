@@ -93,6 +93,7 @@ beforeEach(() => {
   vistaStore.getState().setNumModos(6);
   vistaStore.getState().setModalEscala(1);
   vistaStore.getState().setModalAnimando(false);
+  vistaStore.getState().setOverlayResultados("deformada");
 });
 
 describe("PanelFrecuencias · estado vacio", () => {
@@ -142,7 +143,19 @@ describe("PanelFrecuencias · lista de frecuencias + selector de modo", () => {
     expect(within(grupo).getByText(/7\.84 Hz/)).toBeInTheDocument();
   });
 
-  it("el modo activo (1 por defecto) esta marcado aria-pressed", () => {
+  it("[D9] con la deformada activa ningun modo esta marcado (nada modal en escena)", () => {
+    // Overlay por defecto = deformada: aunque modoActivo sea 1, no se dibuja forma modal,
+    // asi que ningun boton de modo aparece "activo".
+    vistaStore.getState().setOverlayResultados("deformada");
+    montarConModos([3.2, 7.8]);
+    const grupo = screen.getByRole("group", { name: /modos de vibración/i });
+    const botones = within(grupo).getAllByRole("button");
+    expect(botones[0]).toHaveAttribute("aria-pressed", "false");
+    expect(botones[1]).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("[D9] con la forma modal activa, el modo activo (1) esta marcado aria-pressed", () => {
+    vistaStore.getState().setOverlayResultados("modal");
     montarConModos([3.2, 7.8]);
     const grupo = screen.getByRole("group", { name: /modos de vibración/i });
     const botones = within(grupo).getAllByRole("button");
@@ -150,10 +163,12 @@ describe("PanelFrecuencias · lista de frecuencias + selector de modo", () => {
     expect(botones[1]).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("seleccionar otro modo lo fija en modalStore.modoActivo", () => {
+  it("seleccionar un modo lo fija en modalStore.modoActivo y activa el overlay modal (D9)", () => {
     montarConModos([3.2, 7.8, 12.5]);
     fireEvent.click(screen.getByRole("button", { name: /Modo 3/i }));
     expect(modalStore.getState().modoActivo).toBe(3);
+    // D9: seleccionar un modo pasa a mostrar SOLO la forma modal (exclusion mutua).
+    expect(vistaStore.getState().overlayResultados).toBe("modal");
   });
 
   it("muestra la etiqueta 'obsoletos' cuando la obra cambio tras calcular", () => {
@@ -173,6 +188,34 @@ describe("PanelFrecuencias · lista de frecuencias + selector de modo", () => {
     // El valor va sin "×"; con escala 1 se muestra "1.0" (no "×1.0").
     expect(screen.getByText("1.0")).toBeInTheDocument();
     expect(screen.queryByText("×1.0")).not.toBeInTheDocument();
+  });
+});
+
+describe("PanelFrecuencias · exclusion deformada/modal (D9)", () => {
+  it("con la deformada activa indica que se ve la deformada (sin boton 'Ver deformada')", () => {
+    vistaStore.getState().setOverlayResultados("deformada");
+    montarConModos([3.2, 7.8]);
+    expect(screen.getByText(/viendo la deformada/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /ver deformada/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("con la forma modal activa muestra 'Ver deformada' y volver activa la deformada", () => {
+    vistaStore.getState().setOverlayResultados("modal");
+    montarConModos([3.2, 7.8]);
+    expect(screen.getByText(/viendo la forma del modo/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /ver deformada/i }));
+    expect(vistaStore.getState().overlayResultados).toBe("deformada");
+  });
+
+  it("pulsar el modo YA activo estando en modal deselecciona -> vuelve a la deformada", () => {
+    vistaStore.getState().setOverlayResultados("modal");
+    modalStore.getState().setModos(modosDe([3.2, 7.8]), modeloFEMMinimo(), trazaMinima());
+    // modoActivo = 1 tras setModos; pulsarlo estando en modal debe volver a la deformada.
+    render(<PanelFrecuencias />);
+    fireEvent.click(screen.getByRole("button", { name: /Modo 1/i }));
+    expect(vistaStore.getState().overlayResultados).toBe("deformada");
   });
 });
 

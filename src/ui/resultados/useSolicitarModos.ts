@@ -28,6 +28,7 @@ import {
 } from "../../discretizador";
 import { calculoStore } from "../../estado/calculoStore";
 import { modalStore } from "../../estado/modalStore";
+import { vistaStore } from "../../estado/vistaStore";
 import { solverClient } from "../../solver";
 import type { EstadoMotor, ResultadosModales } from "../../solver";
 import type { ErrorCalculo, CalculoSink } from "./useCalcular";
@@ -116,6 +117,10 @@ export async function calcularModos(numModos: number): Promise<void> {
     // ahi) lo hace el runner tras el guard de identidad.
     alExito: (modos, { modeloFEM, trazabilidad }) => {
       modalStore.getState().setModos(modos, modeloFEM, trazabilidad);
+      // [D9] Al terminar "Calcular modos" se muestra SOLO la forma modal (exclusion mutua
+      // con la deformada): ambas comparten rampa y superpuestas hacen ilegible la escena.
+      // El usuario vuelve a la deformada con "Ver deformada" o deseleccionando el modo.
+      vistaStore.getState().setOverlayResultados("modal");
     },
     mensajeFalloInesperado:
       "No se pudieron calcular los modos de vibracion por un fallo inesperado. " +

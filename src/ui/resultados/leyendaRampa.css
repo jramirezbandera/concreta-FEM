@@ -43,3 +43,22 @@
   font-family: var(--font-mono);
   text-transform: none;
 }
+
+/* [D10] Variante VERTICAL (Spec §4.2): barra alta con MAX arriba / MIN abajo, rotulos de
+   limite a la izquierda alineados a los extremos. La usan las leyendas ancladas a la
+   derecha del lienzo (Slot mid-right). El gradiente va a 0deg (definido en el TSX). */
+.cx-leyenda-rampa--vertical .cx-leyenda-rampa__fila {
+  align-items: stretch;
+}
+.cx-leyenda-rampa--vertical .cx-leyenda-rampa__barra {
+  flex: none;
+  width: 12px;
+  height: 120px;
+}
+/* Rotulos min/max repartidos a lo alto (max arriba, min abajo). */
+.cx-leyenda-rampa--vertical .cx-leyenda-rampa__lims {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: right;
+}

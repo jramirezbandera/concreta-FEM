@@ -1,7 +1,7 @@
 // Componente (RTL, project jsdom) de PanelIsovalores (F3, T3.2): selector de magnitud
-// (Flecha/Mx/My) + leyenda de rampa generica. Verifica: OCULTO sin resultados de placa
-// (un portico sin losa), VISIBLE con quads, etiqueta de unidad por magnitud, y que elegir
-// otra magnitud actualiza vistaStore.magnitudIsovalores.
+// (Flecha/Mx/My) + estados guia + aviso de obsoleto. [AUDITORIA D10] la RAMPA ya no vive
+// aqui (se mudo a LeyendaIsovalores): estos tests verifican el estado vacio, el selector, la
+// escritura a vistaStore.magnitudIsovalores y el aviso de obsoleto, NO la rampa/unidad.
 //
 // GOTCHA Radix en jsdom (memoria feature-11): el Segmentado es un ToggleGroup que depende
 // de PointerCapture; se rellenan los stubs. Los items son role="radio".
@@ -118,18 +118,17 @@ describe("PanelIsovalores", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("visible con resultados de placa, con la unidad de la flecha (mm)", () => {
+  it("visible con resultados de placa: muestra el selector de magnitud (sin rampa, D10)", () => {
     resultadosStore.getState().setResultados(resultadosConPlaca(), femConQuad(), traza());
     vistaStore.getState().setCombinacionActiva("ELS");
     render(<PanelIsovalores />);
     expect(screen.getByRole("radiogroup", { name: "Magnitud de isovalores" })).toBeInTheDocument();
-    // Etiqueta de unidad de la flecha. Tras UX-MM el texto y la unidad van en spans
-    // separados ("flecha" + "(mm)") para que "mm" no se transforme a MAYUSCULAS.
-    expect(screen.getByText("flecha")).toBeInTheDocument();
-    expect(screen.getByText("(mm)")).toBeInTheDocument();
+    // [D10] La rampa (con su rotulo de unidad) ya no vive en este panel: vive en
+    // LeyendaIsovalores. El panel no muestra la unidad.
+    expect(screen.queryByText("(mm)")).not.toBeInTheDocument();
   });
 
-  it("elegir Mx actualiza vistaStore.magnitudIsovalores y la unidad pasa a kN·m/m", async () => {
+  it("elegir Mx actualiza vistaStore.magnitudIsovalores (D10: la unidad la lleva la leyenda)", async () => {
     resultadosStore.getState().setResultados(resultadosConPlaca(), femConQuad(), traza());
     vistaStore.getState().setCombinacionActiva("ELS");
     const user = userEvent.setup();
@@ -139,9 +138,8 @@ describe("PanelIsovalores", () => {
     await user.click(within(grupo).getByRole("radio", { name: "Mx" }));
 
     expect(vistaStore.getState().magnitudIsovalores).toBe("momentoX");
-    // Unidad partida (UX-MM): "momento Mx" (texto) + "(kN·m/m)" (unidad sin transformar).
-    expect(screen.getByText("momento Mx")).toBeInTheDocument();
-    expect(screen.getByText("(kN·m/m)")).toBeInTheDocument();
+    // La unidad (kN·m/m) la muestra LeyendaIsovalores, no este panel.
+    expect(screen.queryByText("(kN·m/m)")).not.toBeInTheDocument();
   });
 
   it("no avisa de obsoletos mientras los resultados son vigentes (UX-H4)", () => {

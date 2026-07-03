@@ -29,6 +29,25 @@ describe("LeyendaRampa · unidad (UX-MM)", () => {
   });
 });
 
+describe("LeyendaRampa · orientacion vertical (D10)", () => {
+  it("por defecto es horizontal (sin la clase --vertical)", () => {
+    const { container } = render(<LeyendaRampa min={0} max={1} unidad="flecha (mm)" />);
+    expect(container.querySelector(".cx-leyenda-rampa--vertical")).toBeNull();
+    // La barra sigue presente (rampa de color).
+    expect(container.querySelector(".cx-leyenda-rampa__barra")).not.toBeNull();
+  });
+
+  it("orientacion='vertical' aplica la variante y muestra los MISMOS min/max", () => {
+    const { container } = render(
+      <LeyendaRampa min={0} max={10} unidad="flecha (mm)" orientacion="vertical" />,
+    );
+    expect(container.querySelector(".cx-leyenda-rampa--vertical")).not.toBeNull();
+    // Los rotulos de limite se siguen mostrando (max arriba, min abajo).
+    expect(screen.getByText("0.0")).toBeInTheDocument();
+    expect(screen.getByText("10.0")).toBeInTheDocument();
+  });
+});
+
 describe("LeyendaRampa · formato de rango (UX-RANGO)", () => {
   it("con rango diminuto sube la precision (no colapsa a -0.0 … 0.0)", () => {
     render(<LeyendaRampa min={-0.004} max={0.002} unidad="flecha (mm)" decimales={1} />);

@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { invalidate, useFrame } from "@react-three/fiber";
 import { BufferGeometry, Float32BufferAttribute, type LineSegments } from "three";
 import { modalStore, vistaStore } from "../../estado";
-import type { ModoVista } from "../../estado";
+import type { ModoVista, OverlayResultados } from "../../estado";
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosModales } from "../../solver";
 import { construirBuffersModal } from "./modalBuffers";
@@ -42,6 +42,9 @@ interface Entradas {
   // pleno (`!== "planta"`): 3D y MOSAICO (que renderiza 3D). Antes `=== "3d"` la ocultaba
   // en mosaico (UX-H9), incoherente con el overlay de modelo de calculo (!== "planta").
   modoVista: ModoVista;
+  // [D9] Overlay de resultados activo: la forma modal SOLO se dibuja si es "modal" (la
+  // deformada la dibuja DeformadaOverlay cuando es "deformada"). Exclusion mutua.
+  overlay: OverlayResultados;
 }
 
 let snapCache: Entradas = leerEntradas();
@@ -56,6 +59,7 @@ function leerEntradas(): Entradas {
     escala: v.modalEscala,
     animando: v.modalAnimando,
     modoVista: v.modoVista,
+    overlay: v.overlayResultados,
   };
 }
 function getSnapshot(): Entradas {
@@ -68,7 +72,8 @@ function getSnapshot(): Entradas {
     a.vigente === c.vigente &&
     a.escala === c.escala &&
     a.animando === c.animando &&
-    a.modoVista === c.modoVista
+    a.modoVista === c.modoVista &&
+    a.overlay === c.overlay
   ) {
     return c;
   }
@@ -83,6 +88,7 @@ function suscribir(cb: () => void): () => void {
   const offEsc = vistaStore.subscribe((s) => s.modalEscala, cb);
   const offAnim = vistaStore.subscribe((s) => s.modalAnimando, cb);
   const offModoVista = vistaStore.subscribe((s) => s.modoVista, cb);
+  const offOverlay = vistaStore.subscribe((s) => s.overlayResultados, cb);
   return () => {
     offModos();
     offFem();
@@ -91,6 +97,7 @@ function suscribir(cb: () => void): () => void {
     offEsc();
     offAnim();
     offModoVista();
+    offOverlay();
   };
 }
 
@@ -185,7 +192,10 @@ export function ModoOverlay() {
   // La forma modal se dibuja en cualquier vista pleno (`!== "planta"`): 3D y mosaico
   // comparten la escena 3D del edificio completo. En planta se descuadraria sobre la
   // geometria filtrada por planta. (UX-H9: antes `=== "3d"` la ocultaba en mosaico.)
-  if (!geom || entradas.modoVista === "planta") return null;
+  // [D9] Exclusion mutua: la forma modal SOLO se dibuja si el overlay activo es "modal"
+  // (si no, se ve la deformada). Nunca las dos a la vez sobre la misma rampa.
+  if (!geom || entradas.modoVista === "planta" || entradas.overlay !== "modal")
+    return null;
   return (
     <lineSegments ref={lineRef} geometry={geom}>
       {/* vertexColors: el color va en el atributo `color` (rampa por magnitud). */}

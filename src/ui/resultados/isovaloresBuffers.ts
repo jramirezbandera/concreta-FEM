@@ -16,8 +16,12 @@
 // ../viewport/ejesEscena (femAEscena). NO usar mapearEjes (ese va planta->FEM).
 //
 // MAGNITUDES:
-//  - "flecha"  = desplazamiento vertical NODAL: nodos[nudoMalla][combo].disp[1] (DY). Es
-//    un valor por NUDO directo (no hay promediado).
+//  - "flecha"  = MAGNITUD (|DY|) del desplazamiento vertical NODAL: |nodos[nudoMalla][combo]
+//    .disp[1]|. Valor por NUDO directo (no hay promediado). [AUDITORIA D10] Se toma el VALOR
+//    ABSOLUTO a proposito: con el signo (DY negativa hacia abajo) el rojo de la rampa caia en
+//    el MINIMO (0, sin flecha) y el azul en el maximo movimiento, invirtiendo la lectura
+//    respecto de la deformada. Con |flecha|, rojo = MAXIMO movimiento, coherente con la
+//    deformada. Mx/My conservan el SIGNO (el signo del momento es informacion fisica).
 //  - "momentoX"/"momentoY" = momento de placa Mx/My (kN·m/m), que el motor da POR QUAD en
 //    sus 4 esquinas (orden i,j,m,n). Como PyNite NO da valores nodales de placa, se PROMEDIA
 //    a los nudos: cada nudo recibe la MEDIA de los valores de esquina de todos los quads que
@@ -94,11 +98,12 @@ export function construirBuffersIsovalores(
   const valorPorNudo = new Map<string, number>();
 
   if (magnitud === "flecha") {
-    // DY nodal de cada nudo de malla en el combo activo. Solo nudos de malla
-    // (trazabilidad.nodosDeMalla) para no mezclar con nudos estructurales.
+    // |DY| nodal de cada nudo de malla en el combo activo (magnitud, no signo: D10). Solo
+    // nudos de malla (trazabilidad.nodosDeMalla) para no mezclar con nudos estructurales.
     for (const nudo of trazabilidad.nodosDeMalla) {
       const dy = resultados.nodos[nudo]?.[combo]?.disp[1];
-      if (typeof dy === "number") valorPorNudo.set(nudo, dy);
+      // Valor ABSOLUTO: rojo = maximo movimiento (igual que la deformada), no el signo.
+      if (typeof dy === "number") valorPorNudo.set(nudo, Math.abs(dy));
     }
   } else {
     // Mx/My: promediar las esquinas de todos los quads a sus nudos. idxComponente: Mx=0,

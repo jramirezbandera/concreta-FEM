@@ -104,6 +104,15 @@ function useModalAnimando(): boolean {
     () => vistaStore.getState().modalAnimando,
   );
 }
+// [D9] Overlay de resultados activo (deformada | modal): el panel indica cual se ve y
+// ofrece "Ver deformada" para volver desde la forma modal.
+function useOverlayResultados() {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.overlayResultados, cb),
+    () => vistaStore.getState().overlayResultados,
+    () => vistaStore.getState().overlayResultados,
+  );
+}
 
 // Formatea una frecuencia (Hz) con dos decimales para la lista.
 function fmtHz(hz: number): string {
@@ -122,8 +131,26 @@ export function PanelFrecuencias() {
   const numModos = useNumModos();
   const escala = useModalEscala();
   const animando = useModalAnimando();
+  const overlay = useOverlayResultados();
   const { calcularModos, estadoMotor, calculando, errores, ultimoError } =
     useSolicitarModos();
+
+  // [D9] Ver la forma modal del modo `numero`: lo selecciona y activa el overlay modal
+  // (exclusion mutua con la deformada). Si se pulsa el modo YA activo estando en modal,
+  // se DESELECCIONA -> se vuelve a la deformada (control simetrico, sin boton aparte).
+  const verModo = (numero: number): void => {
+    const yaActivo = numero === entradas.modoActivo && overlay === "modal";
+    if (yaActivo) {
+      vistaStore.getState().setOverlayResultados("deformada");
+      return;
+    }
+    modalStore.getState().setModoActivo(numero);
+    vistaStore.getState().setOverlayResultados("modal");
+  };
+
+  // [D9] Volver a la deformada desde la forma modal (control explicito y visible).
+  const verDeformada = (): void =>
+    vistaStore.getState().setOverlayResultados("deformada");
 
   const habilitado = modosHabilitado(estadoMotor, calculando);
   const etiqueta = etiquetaBotonModos(estadoMotor, calculando);
@@ -214,16 +241,42 @@ export function PanelFrecuencias() {
       {/* Lista de frecuencias o estado vacio. */}
       {hayModos ? (
         <>
+          {/* [D9] Indicador de que se esta viendo (deformada vs forma modal): la escena solo
+              dibuja UNA (exclusion mutua). Con la deformada activa, el enlace "Ver modo" no
+              hace falta (basta pulsar un modo); con la modal activa, ofrece "Ver deformada". */}
+          <div className="cx-frecuencias__overlay" role="status" aria-live="polite">
+            {overlay === "modal" ? (
+              <>
+                <span className="cx-frecuencias__overlay-txt">
+                  Viendo la forma del modo {entradas.modoActivo}
+                </span>
+                <button
+                  type="button"
+                  className="cx-frecuencias__ver-deformada"
+                  onClick={verDeformada}
+                >
+                  Ver deformada
+                </button>
+              </>
+            ) : (
+              <span className="cx-frecuencias__overlay-txt">
+                Viendo la deformada. Elige un modo para ver su forma.
+              </span>
+            )}
+          </div>
+
           {/* Lista de botones seleccionables con aria-pressed (UX-L16): un listbox exige
               opciones role="option" hijas directas gestionando foco/flechas; aqui basta
-              un grupo de botones toggle, semantica correcta y simple. */}
+              un grupo de botones toggle, semantica correcta y simple. `activo` = este modo
+              es el que se DIBUJA (seleccionado Y overlay modal): con la deformada activa
+              ninguno se marca (nada modal en escena). */}
           <div
             className="cx-frecuencias__lista"
             role="group"
             aria-label="Modos de vibración"
           >
             {lista.map((m) => {
-              const activo = m.numero === entradas.modoActivo;
+              const activo = m.numero === entradas.modoActivo && overlay === "modal";
               return (
                 <button
                   key={m.numero}
@@ -234,7 +287,7 @@ export function PanelFrecuencias() {
                       ? "cx-frecuencias__modo cx-frecuencias__modo--activo"
                       : "cx-frecuencias__modo"
                   }
-                  onClick={() => modalStore.getState().setModoActivo(m.numero)}
+                  onClick={() => verModo(m.numero)}
                 >
                   <span className="cx-frecuencias__modo-n">Modo {m.numero}</span>
                   <span className="cx-frecuencias__modo-f mono tnum">

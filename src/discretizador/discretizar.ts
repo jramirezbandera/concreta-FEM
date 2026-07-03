@@ -96,7 +96,8 @@ export type DiscretizarOpts = {
 // y los tests). validaciones.ts las toma de ./geometria para evitar el ciclo
 // discretizar<->validaciones. Se importan ademas para uso interno (snapping).
 import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
-export { TOL_NODO, mapearEjes, clavePosicion };
+export { TOL_NODO, mapearEjes, clavePosicion, mapearReaccionAObra } from "./geometria";
+export type { ReaccionObra } from "./geometria";
 
 // Releases canonicos (#8) en el orden EXACTO de def_releases:
 // [Dxi,Dyi,Dzi,Rxi,Ryi,Rzi, Dxj,Dyj,Dzj,Rxj,Ryj,Rzj].

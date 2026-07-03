@@ -34,6 +34,16 @@ vi.mock("../../solver", () => ({
       (e as { fase: unknown }).fase === "calculo"),
 }));
 
+// [D6] Mock del helper de escala inicial de la deformada para asertar el CABLEADO (que
+// calcularObra lo invoca al llegar resultados nuevos y escribe su valor en vistaStore) sin
+// depender de los nombres de nudo FEM del fixture. Devuelve un centinela por defecto.
+const escalaInicialMock = vi.fn(() => 42);
+vi.mock("./deformadaEscala", () => ({
+  calcularEscalaInicial: (...args: unknown[]) => escalaInicialMock(...(args as [])),
+  ESCALA_MIN: 1,
+  ESCALA_MAX: 500,
+}));
+
 import { calcularObra } from "./useCalcular";
 import type { CalculoSink } from "./useCalcular";
 import { modeloStore } from "../../estado/modeloStore";
@@ -99,10 +109,13 @@ beforeEach(() => {
   estadoMock.mockReset();
   estadoMock.mockResolvedValue("listo");
   precargarMock.mockReset();
+  escalaInicialMock.mockClear();
+  escalaInicialMock.mockReturnValue(42);
   // Reset de los stores (singletons de modulo).
   modeloStore.getState().cargarModelo(crearModeloVacio());
   vistaStore.getState().setPestanaActiva("entradaPilares");
   vistaStore.getState().setCombinacionActiva(null);
+  vistaStore.getState().setDeformadaEscala(1);
   resultadosStore.getState().descartar();
 });
 
@@ -182,6 +195,36 @@ describe("calcularObra · (b) calcular OK", () => {
     await calcularObra();
 
     expect(vistaStore.getState().combinacionActiva).toBe("ELU");
+  });
+});
+
+describe("calcularObra · (b') escala inicial de la deformada (D6)", () => {
+  it("al llegar resultados NUEVOS fija la escala inicial (helper puro) en vistaStore", async () => {
+    modeloStore.getState().cargarModelo(obraValida());
+    calcularMock.mockResolvedValue(resultadosFalsos(["ELU", "ELS"]));
+    // La escala arranca en 1 (imperceptible); D6 la eleva al llegar resultados.
+    expect(vistaStore.getState().deformadaEscala).toBe(1);
+
+    await calcularObra();
+
+    // El helper se invoco UNA vez (resultados nuevos) y su valor se escribio.
+    expect(escalaInicialMock).toHaveBeenCalledTimes(1);
+    expect(vistaStore.getState().deformadaEscala).toBe(42);
+  });
+
+  it("NO se re-impone al leer el estado despues (solo aplica al llegar resultados)", async () => {
+    modeloStore.getState().cargarModelo(obraValida());
+    calcularMock.mockResolvedValue(resultadosFalsos(["ELU"]));
+    await calcularObra();
+    expect(vistaStore.getState().deformadaEscala).toBe(42);
+
+    // El usuario mueve el slider: leer/re-render del estado NO vuelve a imponer la inicial.
+    vistaStore.getState().setDeformadaEscala(7);
+    // Simula lecturas posteriores (re-render): la escala se mantiene en la del usuario.
+    void vistaStore.getState().deformadaEscala;
+    expect(vistaStore.getState().deformadaEscala).toBe(7);
+    // El helper no se llamo de nuevo (no hubo resultados nuevos).
+    expect(escalaInicialMock).toHaveBeenCalledTimes(1);
   });
 });
 
