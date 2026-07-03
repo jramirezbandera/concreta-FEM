@@ -257,4 +257,50 @@ describe("prepararModeloCR", () => {
     expect(JSON.stringify(b.modeloFEM)).toBe(JSON.stringify(a.modeloFEM));
     expect(JSON.stringify(b.plantasInfo)).toBe(JSON.stringify(a.plantasInfo));
   });
+
+  // [OV-3] Sujecion del CR contra SU base: la base del CR no lleva malla de paños
+  // (3A), asi que una losa como UNICA sujecion del modelo dejaria la base mecanismo
+  // y el CR saldria "no determinable" (null opaco por cond). Se exige un pilar
+  // anclado, con error de obra CLARO.
+  it("[OV-3] losa como unica sujecion -> error CR_SIN_PILARES en lenguaje de obra", () => {
+    const m = fixturePortico1Planta();
+    // Ningun pilar vinculado; la losa (bordeApoyo simple, aislada) es la unica
+    // sujecion del modelo: validarModelo la ACEPTA (el calculo normal emite sus
+    // apoyos de malla) pero la base del CR no los tiene.
+    m.pilares = m.pilares.map((p) => ({ ...p, vinculacionExterior: false }));
+    m.panos = [
+      {
+        id: "f1", nombre: "F1", tipo: "losa", plantaId: "p1",
+        perimetro: ["na", "nb", "nc", "nd"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      },
+    ];
+    const res = prepararModeloCR(m);
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      const e = res.errores.find((x) => x.codigo === "CR_SIN_PILARES");
+      expect(e).toBeDefined();
+      expect(e!.severidad).toBe("error");
+      // Lenguaje de obra: habla de pilares y losa, no de mecanismos ni matrices.
+      expect(e!.mensaje).toMatch(/pilar/i);
+    }
+  });
+
+  it("[OV-3] con al menos un pilar anclado el CR procede aunque haya losa", () => {
+    const m = fixturePortico1Planta();
+    m.panos = [
+      {
+        id: "f1", nombre: "F1", tipo: "losa", plantaId: "p1",
+        perimetro: ["na", "nb", "nc", "nd"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      },
+    ];
+    const res = prepararModeloCR(m);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      // La base del CR sigue SIN malla (3A): ni quads ni nudos PQ*.
+      expect(res.modeloFEM.quads).toBeUndefined();
+      expect(res.modeloFEM.nodes.every((n) => !n.name.startsWith("PQ"))).toBe(true);
+    }
+  });
 });

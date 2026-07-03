@@ -322,3 +322,54 @@ describe("construirBuffersIsovalores · promediado de Mx/My a nudos", () => {
     expect(buffers.valorMax).toBeCloseTo(400, 6);
   });
 });
+
+// --- F3.2: losa ACOPLADA (nudos de borde estructurales N*) ---------------------
+// Con el acople paño<->portico los nudos de BORDE remapean a N* y ya NO figuran en
+// trazabilidad.nodosDeMalla. La rama "flecha" debe iterar la UNION de nudos de
+// quadANodos (los vertices reales de la malla), no nodosDeMalla: si no, el anillo
+// de borde queda sin valor y sus quads se omiten (AGUJEROS en el mapa).
+describe("construirBuffersIsovalores · losa acoplada (F3.2, sin agujeros de borde)", () => {
+  it("pinta el quad aunque sus nudos de borde sean estructurales (fuera de nodosDeMalla)", () => {
+    const m = modeloUnQuad();
+    // El quad referencia dos nudos ESTRUCTURALES (N5, N6: borde acoplado a una viga)
+    // y dos de malla (Q2, Q3: interiores).
+    m.nodes = [
+      { name: "N5", x: 0, y: 3, z: 0 },
+      { name: "N6", x: 1, y: 3, z: 0 },
+      { name: "Q2", x: 1, y: 3, z: 1 },
+      { name: "Q3", x: 0, y: 3, z: 1 },
+    ];
+    m.quads = [{ name: "PQ0", i: "N5", j: "N6", m: "Q2", n: "Q3", t: 0.2, material: "h" }];
+    const traza: Trazabilidad = {
+      ...trazabilidadVacia(),
+      panoAQuads: { pano1: ["PQ0"] },
+      quadAPano: { PQ0: "pano1" },
+      quadANodos: { PQ0: ["N5", "N6", "Q2", "Q3"] },
+      nodosDeMalla: ["Q2", "Q3"], // los N* acoplados NO estan aqui (son del portico)
+      apoyosDeMalla: [],
+    };
+    const r = resultadosUnQuad({
+      dy: { N5: -0.001, N6: -0.001, Q2: -0.004, Q3: -0.004 },
+      moments: [
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+      ],
+    });
+    const buffers = construirBuffersIsovalores({
+      modeloFEM: m,
+      trazabilidad: traza,
+      resultados: r,
+      combo: "ELS",
+      magnitud: "flecha",
+    });
+    // Sin el fix: N5/N6 sin valor -> quad omitido -> null (agujero). Con el fix: los
+    // 4 vertices se pintan y el quad emite sus 2 triangulos.
+    expect(buffers).not.toBeNull();
+    expect(buffers!.vertices).toBe(4);
+    expect(buffers!.indices).toHaveLength(6);
+    expect(buffers!.valorMin).toBeCloseTo(0.001, 9);
+    expect(buffers!.valorMax).toBeCloseTo(0.004, 9);
+  });
+});

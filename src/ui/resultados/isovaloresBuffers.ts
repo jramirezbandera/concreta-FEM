@@ -98,9 +98,19 @@ export function construirBuffersIsovalores(
   const valorPorNudo = new Map<string, number>();
 
   if (magnitud === "flecha") {
-    // |DY| nodal de cada nudo de malla en el combo activo (magnitud, no signo: D10). Solo
-    // nudos de malla (trazabilidad.nodosDeMalla) para no mezclar con nudos estructurales.
-    for (const nudo of trazabilidad.nodosDeMalla) {
+    // |DY| nodal de cada nudo DE LOS QUADS en el combo activo (magnitud, no signo:
+    // D10). FUENTE (F3.2): la UNION de nudos de `quadANodos`, NO `nodosDeMalla` —
+    // con el acople paño<->portico los nudos de BORDE acoplados son estructurales
+    // (N*) y ya no figuran en nodosDeMalla; iterar solo esa lista dejaria el anillo
+    // de borde sin vertice y los quads del borde se omitirian (agujeros en el mapa).
+    // La union de quadANodos son exactamente los vertices que la malla pinta.
+    const nudosDeQuads = new Set<string>();
+    for (const quad of quads) {
+      const nudos = trazabilidad.quadANodos[quad.name];
+      if (!nudos) continue;
+      for (const n of nudos) nudosDeQuads.add(n);
+    }
+    for (const nudo of nudosDeQuads) {
       const dy = resultados.nodos[nudo]?.[combo]?.disp[1];
       // Valor ABSOLUTO: rojo = maximo movimiento (igual que la deformada), no el signo.
       if (typeof dy === "number") valorPorNudo.set(nudo, Math.abs(dy));

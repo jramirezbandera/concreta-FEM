@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validarModelo, type ErrorObra } from "./validaciones";
+import { calcularAcoples } from "./acople";
 import { ModeloSchema, type Modelo, crearModeloVacio } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
 
@@ -637,6 +638,180 @@ describe("validarModelo", () => {
       m.vigas = [];
       m.cargas = []; // la carga colgaba de la viga eliminada
       expect(codigos(validarModelo(m))).not.toContain("OBRA_VACIA");
+    });
+  });
+});
+
+// ============================================================================
+// F3.2 · Validaciones del ACOPLE paño<->portico: relajacion de PANO_SIN_APOYO
+// por borde COMPLETO [OV-2], avisos de acople parcial/insuficiente, errores de
+// pilar/viga INTERIOR [OV-5/TODO-2], sujecion exacta respecto a lo emitido y
+// equivalencia del parametro `acoples` [1A].
+// ============================================================================
+describe("F3.2 · validaciones del acople paño<->portico", () => {
+  // Paño 5x3 sobre la viga v1 del fixture (n1(0,0)->n2(5,0), p1 cota 3): la arista
+  // inferior queda ENTERA sobre v1. q3/q4 completan el rectangulo.
+  function conPanoSobreViga(bordeApoyo: "libre" | "simple" | "empotrado"): Modelo {
+    const m = modeloValido();
+    m.nudos.push({ id: "q3", x: 5, y: 3 }, { id: "q4", x: 0, y: 3 });
+    m.panos.push({
+      id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+      perimetro: ["n1", "n2", "q3", "q4"],
+      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo,
+    });
+    return m;
+  }
+
+  describe("PANO_SIN_APOYO relajado por borde completo [OV-2]", () => {
+    it("losa LIBRE con un borde entero sobre una viga NO bloquea", () => {
+      expect(codigos(validarModelo(conPanoSobreViga("libre")))).not.toContain(
+        "PANO_SIN_APOYO",
+      );
+    });
+
+    it("losa LIBRE tocando el portico solo en DOS ESQUINAS sueltas SI bloquea", () => {
+      // Dos vigas cortas que cubren solo las esquinas (0,0) y (5,0): hay >=2 nudos
+      // acoplados (acople activo) pero NINGUN borde completo -> dos puntos no son
+      // un apoyo (la losa colgaria con flechas absurdas).
+      const m = modeloValido();
+      m.nudos.push(
+        { id: "q3", x: 5, y: 3 },
+        { id: "q4", x: 0, y: 3 },
+        { id: "qa", x: 0.4, y: 0 },
+        { id: "qb", x: 4.6, y: 0 },
+      );
+      m.vigas = [
+        { ...m.vigas[0], id: "v-esq1", nudoI: "n1", nudoJ: "qa" }, // 0..0.4
+        { ...m.vigas[0], id: "v-esq2", nudoI: "qb", nudoJ: "n2" }, // 4.6..5
+      ];
+      m.cargas = []; // la carga colgaba de v1
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["n1", "n2", "q3", "q4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "libre",
+      });
+      const e = validarModelo(m).filter((x) => x.codigo === "PANO_SIN_APOYO");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("error");
+      sinJergaFEM(e[0]);
+    });
+  });
+
+  describe("avisos del estado del acople [OV-2]", () => {
+    it("acople PARCIAL con bordeApoyo elegido -> aviso PANO_BORDE_PARCIAL (no bloquea)", () => {
+      // Solo la arista inferior sobre viga; el resto usa el apoyo simple.
+      const e = validarModelo(conPanoSobreViga("simple")).filter(
+        (x) => x.codigo === "PANO_BORDE_PARCIAL",
+      );
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("aviso");
+      expect(e[0].elementoId).toBe("pano1");
+      sinJergaFEM(e[0]);
+    });
+
+    it("UN solo nudo tocando el portico -> aviso PANO_ACOPLE_INSUFICIENTE (degradado a aislado)", () => {
+      const m = modeloValido();
+      m.nudos.push(
+        { id: "q3", x: 5, y: 3 },
+        { id: "q4", x: 0, y: 3 },
+        { id: "qa", x: 0.4, y: 0 },
+      );
+      // Una unica viga corta que cubre SOLO la esquina (0,0).
+      m.vigas = [{ ...m.vigas[0], id: "v-esq", nudoI: "n1", nudoJ: "qa" }];
+      m.cargas = [];
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["n1", "n2", "q3", "q4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      });
+      const e = validarModelo(m).filter((x) => x.codigo === "PANO_ACOPLE_INSUFICIENTE");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("aviso");
+      sinJergaFEM(e[0]);
+    });
+
+    it("acople TOTAL (contorno completo) no emite avisos de borde", () => {
+      // Contorno completo de vigas alrededor del paño.
+      const m = conPanoSobreViga("simple");
+      m.vigas.push(
+        { ...m.vigas[0], id: "v-der", nudoI: "n2", nudoJ: "q3" },
+        { ...m.vigas[0], id: "v-sup", nudoI: "q3", nudoJ: "q4" },
+        { ...m.vigas[0], id: "v-izq", nudoI: "q4", nudoJ: "n1" },
+      );
+      const cods = codigos(validarModelo(m));
+      expect(cods).not.toContain("PANO_BORDE_PARCIAL");
+      expect(cods).not.toContain("PANO_ACOPLE_INSUFICIENTE");
+    });
+  });
+
+  describe("elementos INTERIORES bajo la losa bloquean [OV-5 + TODO-2]", () => {
+    it("pilar estrictamente dentro del paño -> error PANO_PILAR_INTERIOR navegable al pilar", () => {
+      const m = conPanoSobreViga("simple");
+      m.pilares.push({
+        id: "pil-int", nombre: "P9", x: 2.5, y: 1.5,
+        plantaInicial: "p0", plantaFinal: "p1",
+        seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
+        vinculacionExterior: true, arranque: "empotrado",
+      });
+      const e = validarModelo(m).filter((x) => x.codigo === "PANO_PILAR_INTERIOR");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("error");
+      expect(e[0].elementoId).toBe("pil-int");
+      expect(e[0].posicion).toEqual({ x: 2.5, y: 1.5 });
+      sinJergaFEM(e[0]);
+    });
+
+    it("viga que cruza el paño por dentro -> error PANO_VIGA_INTERIOR; el contorno no dispara", () => {
+      const m = conPanoSobreViga("simple");
+      m.nudos.push({ id: "qm1", x: 0, y: 1.5 }, { id: "qm2", x: 5, y: 1.5 });
+      m.vigas.push({ ...m.vigas[0], id: "v-mid", nudoI: "qm1", nudoJ: "qm2" });
+      const e = validarModelo(m).filter((x) => x.codigo === "PANO_VIGA_INTERIOR");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("error");
+      expect(e[0].elementoId).toBe("v-mid"); // la culpable es la embrochalada, no v1
+      sinJergaFEM(e[0]);
+    });
+
+    it("pilar en la ESQUINA o en el borde del paño no es interior (no bloquea)", () => {
+      const m = conPanoSobreViga("simple"); // pil1 del fixture esta en (0,0) = esquina
+      expect(codigos(validarModelo(m))).not.toContain("PANO_PILAR_INTERIOR");
+    });
+  });
+
+  describe("sujecion exacta respecto a lo que emite el discretizador", () => {
+    it("paño TOTALMENTE acoplado sin ningun pilar vinculado -> SIN_SUJECION", () => {
+      // Contorno completo (el paño descarga en el portico, no emite apoyos propios)
+      // pero el portico entero flota: nadie lo ancla al terreno.
+      const m = conPanoSobreViga("simple");
+      m.vigas.push(
+        { ...m.vigas[0], id: "v-der", nudoI: "n2", nudoJ: "q3" },
+        { ...m.vigas[0], id: "v-sup", nudoI: "q3", nudoJ: "q4" },
+        { ...m.vigas[0], id: "v-izq", nudoI: "q4", nudoJ: "n1" },
+      );
+      m.pilares = m.pilares.map((p) => ({ ...p, vinculacionExterior: false }));
+      expect(codigos(validarModelo(m))).toContain("SIN_SUJECION");
+    });
+
+    it("paño PARCIALMENTE acoplado con bordeApoyo simple sigue contando como sujecion", () => {
+      // Emite apoyos propios en los nudos sin viga: sujeta (comportamiento corte 1).
+      const m = conPanoSobreViga("simple");
+      m.pilares = m.pilares.map((p) => ({ ...p, vinculacionExterior: false }));
+      expect(codigos(validarModelo(m))).not.toContain("SIN_SUJECION");
+    });
+  });
+
+  describe("[1A] el parametro `acoples` es equivalente al fallback interno", () => {
+    it("validarModelo(m) === validarModelo(m, undefined, calcularAcoples(m))", () => {
+      const m = conPanoSobreViga("simple");
+      m.pilares.push({
+        id: "pil-int", nombre: "P9", x: 2.5, y: 1.5,
+        plantaInicial: "p0", plantaFinal: "p1",
+        seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
+        vinculacionExterior: true, arranque: "empotrado",
+      });
+      const sinParametro = validarModelo(m);
+      const conParametro = validarModelo(m, undefined, calcularAcoples(m));
+      expect(conParametro).toEqual(sinParametro);
     });
   });
 });

@@ -62,6 +62,32 @@ export function prepararModeloCR(modelo: Modelo): ResultadoPrepararCR {
     return { ok: false, errores: bloqueantes };
   }
 
+  // [OV-3] Sujecion del CR contra SU PROPIA base: esta base NO lleva la malla de
+  // paños (decision 3A), asi que los apoyos de borde de una losa NO existen aqui.
+  // `validarModelo` puede aceptar la losa como sujecion del modelo (valido para el
+  // calculo normal, donde la malla SI se emite), pero si esa fuera la UNICA
+  // sujecion, la base del CR seria un mecanismo y el resultado saldria "no
+  // determinable" (guarda cond>1e12) sin explicacion — un null opaco. Se exige lo
+  // que la base SI puede cumplir: al menos un pilar anclado al terreno. (Un modelo
+  // VACIO no entra aqui: sin elementos no hay CR que medir y plantasInfo sale
+  // vacia, comportamiento previo intacto.)
+  const hayElementos =
+    modelo.pilares.length > 0 || modelo.vigas.length > 0 || modelo.panos.length > 0;
+  if (hayElementos && !modelo.pilares.some((p) => p.vinculacionExterior)) {
+    return {
+      ok: false,
+      errores: [
+        {
+          codigo: "CR_SIN_PILARES",
+          severidad: "error",
+          mensaje:
+            "El centro de rigidez necesita al menos un pilar anclado al terreno; el apoyo del borde de una losa no basta para medirlo.",
+          elementoTipo: "modelo",
+        },
+      ],
+    };
+  }
+
   // 2) Base FEM (geometria + rigidez + trazabilidad), SIN cargas. Misma factorizacion
   // que usa `discretizar`: no se duplica logica FEM. Tras validar, sus throw internos
   // son bugs internos, no errores de obra.

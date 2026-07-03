@@ -43,7 +43,8 @@ import {
   type AnalisisFEM,
   type Trazabilidad,
 } from "./contratoFEM";
-import { mallarPano, type PuntoPlano } from "./mallado";
+import { type PuntoPlano } from "./mallado";
+import { calcularAcoples } from "./acople";
 import { validarModelo, type ErrorObra, type ContextoModal } from "./validaciones";
 import { generarCombos } from "./combinaciones";
 // resolverSeccion y las propiedades de barra viven en el modulo hoja
@@ -640,11 +641,17 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   const contextoModal: ContextoModal | undefined =
     opts?.modal !== undefined ? { numModos: opts.modal.numModos } : undefined;
 
+  // Pre-pase de ACOPLE paño<->portico (F3.2, [1A]): se computa UNA sola vez y se
+  // comparte con las validaciones (relajacion de PANO_SIN_APOYO, sujecion, avisos)
+  // y con la base/Paso 6c (subdivisiones de viga, remap de nudos de borde, mallas ya
+  // computadas). Un modelo sin paños produce acoples vacios y NADA cambia.
+  const acoples = calcularAcoples(modelo);
+
   // Paso 0: validaciones previas, repartidas por SEVERIDAD. Los "error" bloquean
   // (referencias rotas, sin sujecion, nombres dup): no se construye nada. Los
   // "aviso" (hipotesis vacia, nudo flotante) NO impiden calcular: se acumulan en el
   // canal `avisos` del ok:true para no negar el calculo por una limpieza pendiente.
-  const erroresPrevios = validarModelo(modelo, contextoModal);
+  const erroresPrevios = validarModelo(modelo, contextoModal, acoples);
   const bloqueantesPrevios = erroresPrevios.filter((e) => e.severidad === "error");
   if (bloqueantesPrevios.length > 0) {
     return { ok: false, errores: bloqueantesPrevios };
@@ -664,9 +671,11 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   // --- Pasos 1-5: base FEM (geometria + rigidez + trazabilidad) ---------------
   // Factorizada en `construirBaseFEM`: nodos, materiales, secciones, barras, apoyos,
   // releases y la trazabilidad completa. La parte INDEPENDIENTE de las cargas. El CR
-  // (prepararModeloCR) reusa esta misma base sin cargas. Aqui se completa con los
-  // Pasos 6-8 (cargas de usuario + peso propio + combos + analysis).
-  const base = construirBaseFEM(modelo);
+  // (prepararModeloCR) reusa esta misma base SIN opciones (no ve la malla, 3A). Aqui
+  // se pasa la subdivision del acople (F3.2): las vigas de contorno de los paños
+  // acoplados se trocean en los puntos de la malla para que exista un nudo N* en
+  // cada posicion que el Paso 6c remapea. Se completa con los Pasos 6-8.
+  const base = construirBaseFEM(modelo, { subdivisionesViga: acoples.subdivisionesViga });
   const { materials, sections, nodes, members, supports, barraPorAmbito } = base;
   const { localizarNodoDeNudo, pilaresOrdenados, vigasOrdenadas } = base;
   const { pilarAMembers, vigaAMembers } = base.trazabilidad;
@@ -842,19 +851,30 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     }
   }
 
-  // --- Paso 6c: paños LOSA (F3, mallado AISLADO) ------------------------------
+  // --- Paso 6c: paños LOSA (F3.2, malla ACOPLADA al portico) -------------------
   // DESPUES de `construirBaseFEM` (decision 3A): la malla NO entra en la base, de modo
   // que el centro de rigidez (que reusa `construirBaseFEM` via `prepararModeloCR`) NO ve
-  // los quads. Por cada paño tipo "losa" se malla (mallado.ts, AISLADO: nudos PROPIOS,
-  // sin snapping al portico), y se acumulan en arrays SEPARADOS: nudos de malla, quads,
-  // apoyos de borde + estabilizacion, y cargas de presion (superficial de usuario +
-  // peso propio de la losa). Solo se emiten en la Capa 2 SI hay quads (regresion: un
-  // portico de barras no lleva claves quads/quad_loads). Determinista: paños ordenados
-  // por id; cada paño numera sus nudos/quads con un prefijo propio (PQ<idx>).
+  // los quads. Cada paño "losa" consume su malla YA computada por el pre-pase
+  // `calcularAcoples` (no se malla dos veces, [1A]) y se emite asi:
+  //   - Nudos de BORDE ACOPLADOS (sobre vigas de contorno, acople activo): NO se
+  //     emiten como nudos propios; sus quads REFERENCIAN el nodo estructural N* de la
+  //     misma celda (nombrePorClave). La viga se subdividio en la base justo ahi:
+  //     compartir nudo = acople FEM (PyNite ensambla K global por nudo). Union
+  //     monolitica (hormigon in situ): sin liberaciones de placa.
+  //   - Resto de nudos (interiores y borde sin viga): nudos PROPIOS PQ<idx>-N* como
+  //     en el corte 1.
+  //   - Apoyos de bordeApoyo: POR NUDO, solo en los nudos de borde NO acoplados (el
+  //     borde acoplado descarga en el portico, no en un apoyo artificial).
+  //   - Estabilizacion de plano: SOLO si el paño quedo AISLADO (sin acople activo).
+  //     Con acople, el portico ya sujeta la losa en su plano; dejarla robaria carga
+  //     horizontal (reacciones espurias).
+  // Solo se emiten claves quads/quad_loads SI hay paños (regresion byte a byte).
+  // Determinista: paños ordenados por id; prefijo PQ<idx> por posicion ordinal (el
+  // MISMO indice con el que el pre-pase mallo, contrato de calcularAcoples).
   //
   // Las validaciones previas (validarRefsPano) ya garantizaron tipo "losa", material/
-  // planta/nudos validos, tamMalla>0 y geometria rectangular: aqui el mallado no puede
-  // fallar por obra (un { ok:false } seria un bug interno, se deja propagar como throw).
+  // planta/nudos validos, tamMalla>0 y geometria rectangular: aqui el acople no puede
+  // faltar (un paño ausente de porPano seria un bug interno; se deja propagar).
   const meshNodes: NodoFEM[] = [];
   const quads: QuadFEM[] = [];
   const meshSupportsPorNodo = new Map<string, ApoyoFEM>();
@@ -885,22 +905,39 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   panosOrdenados.forEach((pano, indicePano) => {
     if (pano.tipo !== "losa") return; // reticular/unidireccional ya bloqueados en validaciones
     materialIdsPano.add(pano.materialId);
-    const planta = plantaPorId(modelo, pano.plantaId) as Planta;
-    const puntos: PuntoPlano[] = pano.perimetro.map((nudoId) => {
-      const n = nudoPorId(modelo, nudoId)!;
-      return { x: n.x, y: n.y };
-    });
-    const res = mallarPano({
-      perimetro: puntos as [PuntoPlano, PuntoPlano, PuntoPlano, PuntoPlano],
-      cota: planta.cota,
-      tamMalla: pano.tamMalla,
-      indicePano,
-    });
-    if (!res.ok) {
-      // Bug interno: las validaciones previas garantizan geometria mallable. Propaga.
-      throw new Error(`Mallado de paño fallo tras validar: ${pano.id} (${res.error.codigo})`);
+    // Malla YA computada por el pre-pase (calcularAcoples, [1A]). Tras validar, un
+    // paño losa SIN acople registrado o con indice desalineado es un bug interno.
+    const acople = acoples.porPano.get(pano.id);
+    if (acople === undefined) {
+      throw new Error(`Acople de paño ausente tras validar: ${pano.id}`);
     }
-    const malla = res.malla;
+    if (acople.indicePano !== indicePano) {
+      throw new Error(
+        `Indice de paño desalineado (bug interno): ${pano.id} (${acople.indicePano} != ${indicePano})`,
+      );
+    }
+    const malla = acople.malla;
+
+    // Remap de nudos ACOPLADOS a su nodo estructural N* (misma celda de rejilla).
+    // Los NO acoplados conservan su nombre propio PQ<idx>-N*. El mapa se construye
+    // por nudo ANTES de emitir nada (quads y apoyos lo consultan).
+    const remapea = acople.acopleActivo ? acople.nodosAcoplados : undefined;
+    const nombreFinalPorNudo = new Map<string, string>();
+    for (const nd of malla.nodos) {
+      if (remapea !== undefined && remapea.has(nd.name)) {
+        const clave = clavePosicion([nd.x, nd.y, nd.z], TOL_NODO);
+        const estructural = base.nombrePorClave.get(clave);
+        if (estructural === undefined) {
+          // La subdivision de la base nace de las MISMAS coordenadas de la malla:
+          // una celda sin nodo estructural aqui es un bug interno, no un error de obra.
+          throw new Error(`Nudo acoplado sin nodo estructural (bug interno): ${nd.name}`);
+        }
+        nombreFinalPorNudo.set(nd.name, estructural);
+      } else {
+        nombreFinalPorNudo.set(nd.name, nd.name);
+      }
+    }
+    const nombreFinal = (name: string): string => nombreFinalPorNudo.get(name)!;
 
     // Aviso de cap (4A): si el mallado engroso la malla para respetar el limite de quads.
     if (malla.capAplicado) {
@@ -913,27 +950,38 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
       });
     }
 
-    // Nudos PROPIOS del paño -> nodes (y marca de procedencia para la UI).
+    // Nudos PROPIOS del paño -> nodes (y marca de procedencia para la UI). Los
+    // nudos REMAPEADOS no se emiten (ya existen como N* en la base) ni entran en
+    // `nodosDeMalla` (no son nudos de malla: son estructurales compartidos).
     for (const nd of malla.nodos) {
+      if (nombreFinal(nd.name) !== nd.name) continue; // remapeado a N*
       meshNodes.push({ name: nd.name, x: nd.x, y: nd.y, z: nd.z });
       nodosDeMalla.push(nd.name);
     }
 
-    // Quads + trazabilidad (panoAQuads / quadAPano / quadANodos).
+    // Quads + trazabilidad (panoAQuads / quadAPano / quadANodos), con los nombres
+    // FINALES (un quad de borde acoplado referencia nudos N* del portico). El remap
+    // SOLO renombra: el orden canonico i,j,m,n (ejes locales) no se altera.
     const quadNames: string[] = [];
     for (const q of malla.quads) {
+      const [qi, qj, qm, qn] = [
+        nombreFinal(q.i),
+        nombreFinal(q.j),
+        nombreFinal(q.m),
+        nombreFinal(q.n),
+      ];
       quads.push({
         name: q.name,
-        i: q.i,
-        j: q.j,
-        m: q.m,
-        n: q.n,
+        i: qi,
+        j: qj,
+        m: qm,
+        n: qn,
         t: pano.espesor,
         material: pano.materialId,
       });
       quadNames.push(q.name);
       quadAPano[q.name] = pano.id;
-      quadANodos[q.name] = [q.i, q.j, q.m, q.n];
+      quadANodos[q.name] = [qi, qj, qm, qn];
     }
     panoAQuads[pano.id] = quadNames;
 
@@ -965,8 +1013,14 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
       });
       apoyosDeMalla.add(node);
     };
+    // bordeApoyo POR NUDO (F3.2): solo los nudos de borde NO acoplados reciben el
+    // apoyo artificial ("otra cosa sostiene ese borde": un muro futuro, un apoyo
+    // real). El borde acoplado descarga en el portico a traves del nudo compartido;
+    // jamas se emite un apoyo de malla sobre un nudo remapeado (invariante: robaria
+    // la reaccion que debe bajar por los pilares).
     if (pano.bordeApoyo !== "libre") {
       for (const node of malla.nodosBorde) {
+        if (nombreFinal(node) !== node) continue; // acoplado: apoya en el portico
         if (pano.bordeApoyo === "empotrado") {
           acumularApoyo(node, { DY: true, RX: true, RZ: true });
         } else {
@@ -974,13 +1028,16 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
         }
       }
     }
-    // Estabilizacion en el plano (anti-singular): DX/DZ en 2 nudos NO colineales del
-    // borde. SIEMPRE (independiente de bordeApoyo): una losa apoyada solo en vertical
-    // tiene 3 modos de cuerpo rigido en el plano X-Z (la matriz seria singular). NO
-    // contamina la flexion (no toca DY ni RX/RZ). Acumula sobre el apoyo de borde del
-    // mismo nudo si lo hubiera.
-    for (const e of malla.estabilizacion) {
-      acumularApoyo(e.node, { DX: e.DX, DZ: e.DZ });
+    // Estabilizacion en el plano (anti-singular): SOLO para el paño AISLADO (sin
+    // acople activo). Una losa apoyada solo en vertical tiene 3 modos de cuerpo
+    // rigido en el plano X-Z (la matriz seria singular); pero si esta ACOPLADA, el
+    // portico (sujeto por sus pilares) ya elimina esos modos a traves de los >=2
+    // nudos compartidos, y el apoyo artificial DX/DZ robaria carga horizontal
+    // (reacciones espurias). NO contamina la flexion (no toca DY ni RX/RZ).
+    if (!acople.acopleActivo) {
+      for (const e of malla.estabilizacion) {
+        acumularApoyo(e.node, { DX: e.DX, DZ: e.DZ });
+      }
     }
 
     // Cargas de presion del paño -> quad_loads (presion uniforme repartida a TODOS sus

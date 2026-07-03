@@ -18,6 +18,16 @@ import { getMaterial, getSeccion } from "../biblioteca";
 import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
 import { materialAportaMasa } from "./propiedadesBarra";
 import { mallarPano, type PuntoPlano } from "./mallado";
+// [1A] El acople paño<->portico (F3.2) se computa UNA vez por discretizacion:
+// `discretizar` lo pasa como parametro; el fallback interno cubre a los llamantes
+// que no lo tienen (prepararModeloCR, tests). Sus resultados gobiernan la
+// relajacion de PANO_SIN_APOYO [OV-2], la sujecion y los avisos/errores de acople.
+import {
+  calcularAcoples,
+  pilaresInterioresBajoPano,
+  vigasInterioresBajoPano,
+  type ResultadoAcoples,
+} from "./acople";
 
 // Error de obra: contrato estable consumido por la UI (resaltado del elemento) y
 // por los tests (assert de `codigo` + `elementoId`).
@@ -297,8 +307,15 @@ function validarRefsViga(v: Viga, modelo: Modelo, errores: ErrorObra[]): void {
 // obra: material/planta inexistentes, tamMalla no positivo, perimetro != 4 nudos
 // existentes, geometria no rectangular o sin area, y tipo != "losa" (reticular /
 // unidireccional aun no se calculan). El mallado real (mallado.ts) es la FUENTE UNICA
-// del criterio geometrico (rectangulo / area ~0): aqui se invoca para no duplicarlo.
-function validarRefsPano(pano: Pano, modelo: Modelo, errores: ErrorObra[]): void {
+// del criterio geometrico (rectangulo / area ~0): si el acople YA mallo el paño
+// (esta en `acoples.porPano`) la geometria es valida por construccion y NO se
+// re-malla [1A]; solo se re-malla para EXPLICAR el motivo de un rechazo.
+function validarRefsPano(
+  pano: Pano,
+  modelo: Modelo,
+  errores: ErrorObra[],
+  acoples: ResultadoAcoples,
+): void {
   // Solo la LOSA se calcula en el corte 1. Reticular/unidireccional se rechazan (NO se
   // mallan como losa, que daria un calculo fisicamente erroneo en silencio).
   if (pano.tipo !== "losa") {
@@ -343,17 +360,18 @@ function validarRefsPano(pano: Pano, modelo: Modelo, errores: ErrorObra[]): void
     });
   }
 
-  // [AUDITORIA M-5] Losa con TODOS los bordes libres: en el corte 1 los paños son
-  // AISLADOS (sin acople al portico), asi que sin apoyo de borde no hay sujecion
-  // vertical POSIBLE y el motor siempre lanza inestable (verificado con el motor
-  // real; el mensaje crudo de PyNite es jerga tecnica). Se bloquea AQUI en lenguaje
-  // de obra. Cuando exista el acople malla<->portico (T-f3-pano-acople) este bloqueo
-  // debera relajarse para losas apoyadas en vigas.
-  if (pano.bordeApoyo === "libre") {
+  // [AUDITORIA M-5, relajado en F3.2/OV-2] Losa con TODOS los bordes libres: sin
+  // apoyo de borde solo se sostiene si DESCANSA en el portico, y dos esquinas
+  // sueltas NO son un apoyo — se exige al menos un BORDE COMPLETO del rectangulo
+  // sobre vigas (bordesCompletos >= 1, criterio del acople). Sin eso el motor
+  // lanzaria inestable con jerga tecnica (verificado con el motor real en M-5) o,
+  // peor, calcularia una losa colgada de dos puntos con flechas absurdas.
+  const acople = acoples.porPano.get(pano.id);
+  if (pano.bordeApoyo === "libre" && (acople === undefined || acople.bordesCompletos === 0)) {
     errores.push({
       codigo: "PANO_SIN_APOYO",
       severidad: "error",
-      mensaje: `El paño "${pano.nombre}" tiene todos los bordes libres: sin apoyo no se sostiene. Elige borde apoyado o empotrado.`,
+      mensaje: `El paño "${pano.nombre}" tiene todos los bordes libres y ningún borde descansa entero sobre vigas: no se sostiene. Elige borde apoyado o empotrado, o dibuja vigas bajo su contorno.`,
       elementoId: pano.id,
       elementoTipo: "pano",
     });
@@ -392,9 +410,13 @@ function validarRefsPano(pano: Pano, modelo: Modelo, errores: ErrorObra[]): void
     return;
   }
   // Geometria: la FUENTE UNICA del criterio (rectangulo alineado / area > 0) es el
-  // propio mallado. Se invoca con la cota de la planta (0 si aun falta: el error de
-  // planta ya se reporto arriba). Si el mallado rechaza la geometria, se traduce su
-  // motivo a un ErrorObra con el id del paño culpable.
+  // propio mallado. [1A] Si el acople ya mallo este paño, la geometria es valida por
+  // construccion: no se re-malla (el camino feliz malla UNA sola vez, en acople.ts).
+  if (acople !== undefined) return;
+  // Solo se re-malla para EXPLICAR el motivo del rechazo. Se invoca con la cota de
+  // la planta (0 si aun falta: el error de planta ya se reporto arriba). Si el
+  // mallado rechaza la geometria, se traduce su motivo a un ErrorObra con el id del
+  // paño culpable.
   const cota = planta !== undefined ? planta.cota : 0;
   const res = mallarPano({
     perimetro: puntos as [PuntoPlano, PuntoPlano, PuntoPlano, PuntoPlano],
@@ -488,10 +510,14 @@ function validarHipotesisPesoPropio(modelo: Modelo, errores: ErrorObra[]): void 
 }
 
 // 2. Integridad referencial de todos los elementos.
-function validarReferencias(modelo: Modelo, errores: ErrorObra[]): void {
+function validarReferencias(
+  modelo: Modelo,
+  errores: ErrorObra[],
+  acoples: ResultadoAcoples,
+): void {
   for (const p of modelo.pilares) validarRefsPilar(p, modelo, errores);
   for (const v of modelo.vigas) validarRefsViga(v, modelo, errores);
-  for (const pano of modelo.panos) validarRefsPano(pano, modelo, errores);
+  for (const pano of modelo.panos) validarRefsPano(pano, modelo, errores, acoples);
 
   // Ambito de carga: el id de cualquier elemento sobre el que puede actuar una
   // carga en F1 (viga, pilar, nudo o pano). Se precomputa un Set para O(1).
@@ -531,7 +557,11 @@ function validarObraVacia(modelo: Modelo, errores: ErrorObra[]): void {
 // exterior (su arranque sujeta la obra al terreno). Sin ninguno, la estructura
 // "flota" y el calculo no tendria solucion. El veredicto exacto de mecanismo lo
 // dara `check_stability` del solver (feature-5/6); aqui se atrapa el caso obvio.
-function validarSujecion(modelo: Modelo, errores: ErrorObra[]): void {
+function validarSujecion(
+  modelo: Modelo,
+  errores: ErrorObra[],
+  acoples: ResultadoAcoples,
+): void {
   // Si no hay elementos estructurales (barras NI paños), no hay nada que sujetar (no es
   // un error de sujecion: un modelo vacio es valido como punto de partida).
   if (
@@ -542,16 +572,25 @@ function validarSujecion(modelo: Modelo, errores: ErrorObra[]): void {
     return;
   }
 
-  // Sujecion suficiente F3: un pilar con vinculacion exterior (su arranque sujeta la
-  // obra al terreno) O un paño LOSA cuyo borde apoya (bordeApoyo != "libre"): el apoyo
-  // de borde de la losa la sujeta (el discretizador emite supports de borde +
-  // estabilizacion en el plano). Una losa "libre" no sujeta (es un voladizo que apoyaria
-  // en otro elemento, no soportado en el corte 1 aislado). El veredicto exacto de
-  // mecanismo lo da check_stability del solver; aqui se atrapa el caso obvio.
+  // Sujecion suficiente F3.2: un pilar con vinculacion exterior (su arranque sujeta la
+  // obra al terreno) O un paño LOSA que EMITIRA apoyos de borde propios: bordeApoyo !=
+  // "libre" Y algun nudo de borde SIN acoplar (el Paso 6c solo pone el apoyo de borde
+  // en los nudos no acoplados). Un paño TOTALMENTE acoplado al portico ya no aporta
+  // apoyos: descarga en las vigas, y la sujecion debe venir de los pilares — si no la
+  // hay, la estructura entera flota y este error lo dice [OV-2 no empeora
+  // T-f3-sujecion-componentes: sigue siendo un heuristico global, pero ahora es
+  // EXACTO respecto a lo que el discretizador emite]. El veredicto final de mecanismo
+  // lo da el solver; aqui se atrapa el caso obvio.
   const haySujecionPilar = modelo.pilares.some((p) => p.vinculacionExterior);
-  const haySujecionPano = modelo.panos.some(
-    (pano) => pano.tipo === "losa" && pano.bordeApoyo !== "libre",
-  );
+  const haySujecionPano = modelo.panos.some((pano) => {
+    if (pano.tipo !== "losa" || pano.bordeApoyo === "libre") return false;
+    const acople = acoples.porPano.get(pano.id);
+    // Paño no mallable (refs rotas): se cuenta como antes (bordeApoyo != libre); el
+    // bloqueo real llegara por sus errores de referencia/geometria.
+    if (acople === undefined) return true;
+    const acoplados = acople.acopleActivo ? acople.nodosAcoplados.size : 0;
+    return acoplados < acople.malla.nodosBorde.length; // queda algun apoyo propio
+  });
   const haySujecion = haySujecionPilar || haySujecionPano;
   if (!haySujecion) {
     errores.push({
@@ -645,6 +684,84 @@ function validarNudosFlotantes(modelo: Modelo, errores: ErrorObra[]): void {
   }
 }
 
+// --- Validaciones del ACOPLE paño<->portico (F3.2) ----------------------------
+
+// 6. Elementos que ATRAVIESAN el paño por dentro sin acoplarse [OV-5 + TODO-2].
+// Un pilar estrictamente interior que alcanza la cota del paño, o una viga cuyo
+// tramo pasa por dentro del rectangulo, NO se conectan a la losa en esta fase: el
+// calculo los ignoraria como apoyo y el reparto de cargas seria falso pero
+// verosimil (las vigas de contorno se llevarian TODO). Precedente M-5: BLOQUEAR
+// con mensaje de obra y salida clara es mas seguro que calcular basura plausible.
+// La losa plana (pilar interior acoplado con lineas de control de malla) llegara
+// en un corte futuro (T-f3-losa-plana).
+function validarElementosInterioresPano(modelo: Modelo, errores: ErrorObra[]): void {
+  // Orden por id de paño (determinista); dentro, los helpers ya ordenan por id.
+  const panosOrdenados = [...modelo.panos].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
+  for (const pano of panosOrdenados) {
+    for (const pilar of pilaresInterioresBajoPano(modelo, pano)) {
+      errores.push({
+        codigo: "PANO_PILAR_INTERIOR",
+        severidad: "error",
+        mensaje: `El pilar "${pilar.nombre}" atraviesa el paño "${pano.nombre}" por dentro y aún no puede recogerlo. Lleva vigas hasta el pilar (partiendo el paño en crujías) o retíralo; la losa apoyada directamente en pilares llegará en una fase posterior.`,
+        elementoId: pilar.id,
+        elementoTipo: "pilar",
+        posicion: { x: pilar.x, y: pilar.y },
+      });
+    }
+    for (const viga of vigasInterioresBajoPano(modelo, pano)) {
+      errores.push({
+        codigo: "PANO_VIGA_INTERIOR",
+        severidad: "error",
+        mensaje: `La viga "${viga.nombre}" pasa por dentro del paño "${pano.nombre}" y aún no puede recogerlo. Parte el paño en crujías siguiendo la viga o retírala.`,
+        elementoId: viga.id,
+        elementoTipo: "viga",
+      });
+    }
+  }
+}
+
+// 7. Avisos del estado del acople [OV-2]: comunican COMO va a apoyar la losa sin
+// bloquear (el calculo es correcto en ambos casos; se gestiona la expectativa).
+function validarAvisosAcople(
+  modelo: Modelo,
+  errores: ErrorObra[],
+  acoples: ResultadoAcoples,
+): void {
+  const panosOrdenados = [...modelo.panos].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
+  for (const pano of panosOrdenados) {
+    const acople = acoples.porPano.get(pano.id);
+    if (acople === undefined) continue;
+    // Un UNICO nudo compartido con el portico: el acople se degrada a aislado (con
+    // un punto no se puede sujetar la losa en su plano a traves del portico). El
+    // usuario probablemente ESPERABA que apoyara en esa viga: se le avisa.
+    if (!acople.acopleActivo && acople.nodosAcoplados.size === 1) {
+      errores.push({
+        codigo: "PANO_ACOPLE_INSUFICIENTE",
+        severidad: "aviso",
+        mensaje: `El paño "${pano.nombre}" solo toca el pórtico en un punto: se calcula aislado (no descarga en las vigas). Prolonga las vigas bajo su contorno para acoplarlo.`,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+    }
+    // Acople PARCIAL con apoyo de borde elegido: parte del borde descansa en vigas
+    // (acoplado) y el resto usa el bordeApoyo. Es legitimo (p.ej. un borde futuro
+    // sobre muro) pero conviene decirlo: el reparto no es simetrico.
+    if (acople.acopleActivo && acople.bordeParcial && pano.bordeApoyo !== "libre") {
+      errores.push({
+        codigo: "PANO_BORDE_PARCIAL",
+        severidad: "aviso",
+        mensaje: `El paño "${pano.nombre}" descarga en vigas solo en parte de su contorno; el resto del borde usa el apoyo elegido (${pano.bordeApoyo === "simple" ? "apoyado" : "empotrado"}).`,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+    }
+  }
+}
+
 // --- Validaciones EXCLUSIVAS del camino modal (F2b) --------------------------
 // El analisis modal es un camino de calculo SEPARADO (no un OpcionesAnalisis.tipo):
 // se invoca con `discretizar(modelo, { modal: { numModos } })`. Estas dos guardas
@@ -697,15 +814,28 @@ function validarModalConMasa(modelo: Modelo, errores: ErrorObra[]): void {
 // `modal` (opcional): si se pasa, el calculo es MODAL y se aplican ademas las dos
 // guardas exclusivas del camino modal (MODAL_NUM_MODOS, MODAL_SIN_MASA). Ausente =>
 // calculo estatico, identico a antes (las guardas modales no corren): sin regresion.
-export function validarModelo(modelo: Modelo, modal?: ContextoModal): ErrorObra[] {
+//
+// `acoples` (opcional, [1A]): resultado de `calcularAcoples(modelo)` YA computado por
+// el llamante. `discretizar` lo pasa (computa UNA vez y lo comparte con su Paso 6c);
+// sin el, se computa aqui (fallback para prepararModeloCR y llamantes directos). Por
+// ser una funcion PURA del modelo, pasado o computado el resultado es identico: las
+// validaciones y lo que el discretizador emite no pueden divergir.
+export function validarModelo(
+  modelo: Modelo,
+  modal?: ContextoModal,
+  acoples?: ResultadoAcoples,
+): ErrorObra[] {
   const errores: ErrorObra[] = [];
+  const acoplesReales = acoples ?? calcularAcoples(modelo);
   validarNombresUnicos(modelo, errores);
   validarIdsUnicos(modelo, errores); // [M-1] ids duplicados = proyecto dañado
   validarPilaresDegenerados(modelo, errores); // [M-3] pilar de longitud 0
-  validarReferencias(modelo, errores);
+  validarReferencias(modelo, errores, acoplesReales);
   validarHipotesisPesoPropio(modelo, errores); // E1: guard de desincronizacion
   validarObraVacia(modelo, errores); // UX-VACIA: sin elementos no hay nada que calcular
-  validarSujecion(modelo, errores);
+  validarSujecion(modelo, errores, acoplesReales);
+  validarElementosInterioresPano(modelo, errores); // [OV-5/TODO-2] pilar/viga interior
+  validarAvisosAcople(modelo, errores, acoplesReales); // [OV-2] parcial/insuficiente
   validarHipotesisConCargas(modelo, errores);
   validarVariablesConcomitantes(modelo, errores);
   validarNudosFlotantes(modelo, errores);
