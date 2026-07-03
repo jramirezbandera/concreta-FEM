@@ -58,6 +58,23 @@ export function mapearReaccionAObra(
   return { V: FY, Hx: FX, Hy: FZ, Mx: MX, My: MZ, Mv: MY };
 }
 
+// Cuantizacion de UNA coordenada a la celda de la rejilla de snapping: el atomo
+// del criterio de igualdad geometrica (clavePosicion lo compone por eje). Publica
+// para que el acople paño<->portico (F3.2, acople.ts) compare cotas y coordenadas
+// de arista con EXACTAMENTE el mismo criterio de celda que el snapping de nodos
+// (nunca |Δ|<TOL, que diverge en la frontera de celda, [AUDITORIA M-4]).
+export function cuantizar(c: number, tol: number = TOL_NODO): number {
+  const r = Math.round(c / tol);
+  return r === 0 ? 0 : r; // evita el -0 para coordenadas negativas pequeñas
+}
+
+// Igualdad de UNA coordenada (cota, x o y de obra) por celda de rejilla. Espejo
+// escalar de `mismaPosicionEnPlanta`: el UNICO predicado valido de "misma
+// coordenada" fuera del discretizador (no duplicar con |a-b|<TOL).
+export function mismaCoordenada(a: number, b: number): boolean {
+  return cuantizar(a) === cuantizar(b);
+}
+
 // Clave determinista de un punto para snapping. Cuantiza cada coordenada a la
 // rejilla de TOL_NODO (round(c/tol)) y la usa como clave de igualdad. Dos puntos
 // dentro de una celda comparten clave => mismo nudo. La clave es estable e
@@ -66,12 +83,7 @@ export function clavePosicion(
   [x, y, z]: [number, number, number],
   tol: number,
 ): string {
-  // Math.round(0) evita la clave "-0" para coordenadas negativas pequeñas.
-  const q = (c: number): number => {
-    const r = Math.round(c / tol);
-    return r === 0 ? 0 : r;
-  };
-  return `${q(x)}|${q(y)}|${q(z)}`;
+  return `${cuantizar(x, tol)}|${cuantizar(y, tol)}|${cuantizar(z, tol)}`;
 }
 
 // [AUDITORIA M-4] Igualdad de nudo EN PLANTA con el criterio REAL del snapping

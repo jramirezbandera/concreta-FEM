@@ -3,7 +3,40 @@
 // (D5): el mapeo FEM->obra de reacciones debe ser el inverso exacto de la construccion de
 // ejes FEM de mapearEjes, para que la UI (TablaReacciones) no diverja del discretizador.
 import { describe, it, expect } from "vitest";
-import { mapearEjes, mapearReaccionAObra } from "./geometria";
+import {
+  mapearEjes,
+  mapearReaccionAObra,
+  cuantizar,
+  mismaCoordenada,
+  clavePosicion,
+  TOL_NODO,
+} from "./geometria";
+
+// --- cuantizar / mismaCoordenada (F3.2): el atomo escalar del criterio de celda ---
+// El acople paño<->portico compara cotas y coordenadas de arista con ESTE criterio;
+// debe coincidir exactamente con el de clavePosicion (misma celda <=> misma clave).
+describe("cuantizar / mismaCoordenada (criterio de celda, F3.2)", () => {
+  it("dos coordenadas en la misma celda son 'la misma'; en celdas vecinas no", () => {
+    // 3.0001 y 3.0004 redondean a la celda 3000; 3.0006 cae en la 3001.
+    expect(mismaCoordenada(3.0001, 3.0004)).toBe(true);
+    expect(mismaCoordenada(3.0004, 3.0006)).toBe(false);
+    // El criterio NO es |Δ|<TOL: 2.9994 y 3.0003 distan 0.9 mm (< TOL_NODO) pero
+    // caen en celdas distintas, 2999 vs 3000 (frontera de celda, [AUDITORIA M-4]).
+    expect(mismaCoordenada(2.9994, 3.0003)).toBe(false);
+  });
+
+  it("coincide con clavePosicion componente a componente (no pueden divergir)", () => {
+    const a: [number, number, number] = [1.2345, -0.0004, 7.7776];
+    expect(clavePosicion(a, TOL_NODO)).toBe(
+      `${cuantizar(a[0])}|${cuantizar(a[1])}|${cuantizar(a[2])}`,
+    );
+  });
+
+  it("normaliza el -0 (una coordenada negativa minuscula no crea celda '-0')", () => {
+    expect(Object.is(cuantizar(-0.0001), 0)).toBe(true);
+    expect(mismaCoordenada(-0.0001, 0.0001)).toBe(true);
+  });
+});
 
 describe("mapearEjes (convencion Y-up)", () => {
   it("planta (x,y) + cota -> [x, cota, y] (X horiz, Y vertical, Z horiz)", () => {

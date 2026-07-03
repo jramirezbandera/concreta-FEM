@@ -150,6 +150,10 @@ export type ParametrosMallado = {
 
 // --- Implementacion -----------------------------------------------------------
 
+// Limites del rectangulo de un paño. Tipo nombrado porque lo consumen tambien el
+// acople paño<->portico (acople.ts, F3.2) y el centro de masas (centros.ts, Fase 8).
+export type LimitesRectangulo = { xMin: number; xMax: number; yMin: number; yMax: number };
+
 // Comprueba que los 4 puntos forman un rectangulo ALINEADO con los ejes de obra y
 // devuelve sus limites (xMin,xMax,yMin,yMax). Criterio (corte 1, AISLADO):
 //   - bounding box no degenerado: ancho y alto > TOL_GEOM (area > 0).
@@ -157,9 +161,11 @@ export type ParametrosMallado = {
 //     bounding box: garantiza rectangulo alineado, sin puntos repetidos ni rotacion.
 // No exige un orden de recorrido concreto del perimetro (acepta CW o CCW de entrada):
 // la malla SIEMPRE se emite en el orden canonico interno, independiente del de entrada.
-function limitesRectangulo(
+// EXPORTADA (F3.2): es la FUENTE UNICA del bbox de un paño; el acople (aristas/vigas
+// de contorno) y el CM de paños la consumen para no duplicar el criterio geometrico.
+export function limitesRectangulo(
   pts: readonly PuntoPlano[],
-): { xMin: number; xMax: number; yMin: number; yMax: number } | ErrorMallado {
+): LimitesRectangulo | ErrorMallado {
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
   const xMin = Math.min(...xs);
