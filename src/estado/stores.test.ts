@@ -77,7 +77,7 @@ function modeloFEMMinimo(): ModeloFEM {
 function trazabilidadMinima(): Trazabilidad {
   return {
     pilarAMembers: {},
-    vigaAMember: {},
+    vigaAMembers: {},
     pilarANodoArranque: {},
     nudoANodo: {},
     nodoFEMAPlanta: {},

@@ -361,7 +361,7 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
   // `barraPorAmbito` (que para un pilar pasante solo guarda el primer tramo, por la
   // atribucion de cargas), `pilarAMembers` acumula TODOS los tramos del pilar.
   const pilarAMembers: Record<string, string[]> = {};
-  const vigaAMember: Record<string, string> = {};
+  const vigaAMembers: Record<string, string[]> = {};
 
   // Pilares: troceados por cota; cada tramo consecutivo es una barra pie->cabeza.
   const pilaresOrdenados = [...modelo.pilares].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -396,7 +396,9 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
     contador += 1;
     const name = `M${contador}`;
     barraPorAmbito.set(v.id, name);
-    vigaAMember[v.id] = name;
+    // F1: una viga = un member (array de longitud 1). La subdivision por acople de
+    // paños (F3.2, Fase 3) añade tramos aqui manteniendo el orden i->j.
+    vigaAMembers[v.id] = [name];
     const [ci, cj] = clavesViga.get(v.id)!;
     const release = releasesDeExtremo(v.extremoI, v.extremoJ, v.tirante);
     members.push({
@@ -481,7 +483,7 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
   };
 
   // --- Trazabilidad (campo aditivo): completar los mapas que dependen de nodos --
-  // pilarAMembers y vigaAMember ya se llenaron en el Paso 3. Aqui se anaden los dos
+  // pilarAMembers y vigaAMembers ya se llenaron en el Paso 3. Aqui se anaden los dos
   // que mapean a NODOS, reusando datos ya calculados (clavesPilar, localizarNodoDeNudo).
   // Orden de insercion determinista: se recorren las colecciones YA ordenadas por id
   // (pilaresOrdenados/vigasOrdenadas), no `modelo.pilares`/`modelo.vigas`, de modo que
@@ -531,7 +533,7 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
   // de malla nacen vacios aqui; `discretizar` los rellena al mallar los paños.
   const trazabilidad: Trazabilidad = {
     pilarAMembers,
-    vigaAMember,
+    vigaAMembers,
     pilarANodoArranque,
     nudoANodo,
     nodoFEMAPlanta,
@@ -596,7 +598,7 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   const base = construirBaseFEM(modelo);
   const { materials, sections, nodes, members, supports, barraPorAmbito } = base;
   const { localizarNodoDeNudo, pilaresOrdenados, vigasOrdenadas } = base;
-  const { pilarAMembers, vigaAMember } = base.trazabilidad;
+  const { pilarAMembers, vigaAMembers } = base.trazabilidad;
   // Avisos nacidos al construir la base (hoy: arranque elastico -> empotrado).
   avisos.push(...base.avisosBase);
 
@@ -789,15 +791,19 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     for (const v of vigasOrdenadas) {
       const props = propiedadesDeViga(modelo, v);
       const w = -(props.A * props.rho);
-      dist_loads.push({
-        member: vigaAMember[v.id],
-        direction: "FY",
-        w1: w,
-        w2: w,
-        x1: null,
-        x2: null,
-        case: casePesoPropio,
-      });
+      // El peso es de TODA la viga: una viga subdividida por el acople (F3.2) lo
+      // recibe en cada tramo (espejo del pilar pasante de arriba).
+      for (const member of vigaAMembers[v.id]) {
+        dist_loads.push({
+          member,
+          direction: "FY",
+          w1: w,
+          w2: w,
+          x1: null,
+          x2: null,
+          case: casePesoPropio,
+        });
+      }
     }
   }
 

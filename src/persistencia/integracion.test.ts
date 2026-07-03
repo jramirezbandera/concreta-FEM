@@ -98,7 +98,7 @@ const MODELO_FEM_FALSO: ModeloFEM = {
 
 const TRAZABILIDAD_FALSA: Trazabilidad = {
   pilarAMembers: {},
-  vigaAMember: {},
+  vigaAMembers: {},
   pilarANodoArranque: {},
   nudoANodo: {},
   nodoFEMAPlanta: {},

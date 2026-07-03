@@ -194,7 +194,7 @@ test("F1 happy: obra -> Calcular (boton) -> deformada + diagramas + reacciones",
   await expect(radioM).toHaveAttribute("aria-checked", "true");
 
   // 5.d EL DATO FLUYE A DIAGRAMAS: con la VIGA seleccionada, el panel resuelve su
-  // barra (trazabilidad.vigaAMember -> member real del mock) y dibuja, NO muestra
+  // barra (trazabilidad.vigaAMembers -> member real del mock) y dibuja, NO muestra
   // los textos guia "sin barra"/"sin seleccion". Seleccionar abre el inspector y
   // alimenta PanelDiagramas (reacciona a seleccionStore).
   await c.evaluate((api, id) => api.seleccionar([id]), vigaId);

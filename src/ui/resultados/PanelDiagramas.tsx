@@ -32,6 +32,7 @@ import type { Modelo } from "../../dominio";
 import { mToMm } from "../../unidades";
 
 import { DiagramaBarraLazy } from "./diagramaLazy";
+import { serieVigaTramos } from "./serieVigaTramos";
 import "./panelDiagramas.css";
 
 // Metadatos de presentacion por magnitud: campo del contrato del solver, etiqueta
@@ -92,8 +93,9 @@ const OPCIONES_MAGNITUD: ReadonlyArray<OpcionSegmento<MagnitudDiagrama>> = (
 }));
 
 // Un tramo del elemento seleccionado, con su barra FEM y la etiqueta de PLANTA en lenguaje
-// de obra (nunca "member M7"). Para una viga hay un unico tramo (sin planta explicita); para
-// un pilar pasante, uno por planta que atraviesa (pie->cabeza).
+// de obra (nunca "member M7"). Para una viga los tramos NO se exponen (su diagrama se
+// CONCATENA en una unica serie continua, F3.2); para un pilar pasante, uno por planta que
+// atraviesa (pie->cabeza), con selector (D20).
 interface TramoBarra {
   memberName: string;
   etiqueta: string; // "Planta 1", "Cubierta"... (nombre de la planta que alcanza el tramo)
@@ -135,10 +137,15 @@ function resolverBarra(
 ): ResolucionBarra | null {
   if (seleccion.length !== 1) return null;
   const id = seleccion[0];
-  // Viga: mapeo 1:1 (un solo tramo, sin planta explicita en la etiqueta).
-  const member = trazabilidad.vigaAMember[id];
-  if (member !== undefined) {
-    return { tramos: [{ memberName: member, etiqueta: "" }], esPilar: false };
+  // Viga: TODOS sus members en orden i->j (una viga sin acople es un array de 1; una
+  // viga de contorno subdividida por el acople paño<->portico, F3.2, son N). Sin
+  // etiqueta de planta: la viga es UNA para el arquitecto y su serie se concatena.
+  const membersViga = trazabilidad.vigaAMembers[id];
+  if (membersViga !== undefined && membersViga.length > 0) {
+    return {
+      tramos: membersViga.map((memberName) => ({ memberName, etiqueta: "" })),
+      esPilar: false,
+    };
   }
   // Pilar: array de tramos en orden pie->cabeza; cada tramo se etiqueta con su planta.
   const tramos = trazabilidad.pilarAMembers[id];
@@ -208,11 +215,31 @@ export function PanelDiagramas() {
     setTramoActivo(0);
   }, [seleccionKey]);
 
-  // Serie a dibujar del tramo activo, para la combinacion y magnitud actuales.
+  // Serie a dibujar, para la combinacion y magnitud actuales. VIGA: una unica serie
+  // CONTINUA concatenando todos sus tramos (F3.2: una viga subdividida por el acople
+  // sigue siendo UNA viga; el salto de cortante en los nudos compartidos es fisico y
+  // se conserva). PILAR: la serie del tramo activo del selector (D20).
   const datos = useMemo(() => {
     if (!resultados || !trazabilidad) return { estado: "sin-resultados" as const };
     if (!resolucion) return { estado: "sin-seleccion" as const };
     if (combinacionActiva === null) return { estado: "sin-combo" as const };
+    const meta = META[magnitud];
+    if (!resolucion.esPilar && modeloFEM) {
+      const serie = serieVigaTramos(
+        resolucion.tramos.map((t) => t.memberName),
+        resultados,
+        modeloFEM,
+        combinacionActiva,
+        meta.campo,
+      );
+      if (serie.estado !== "ok") return { estado: serie.estado };
+      // Conversion de presentacion en el borde (solo la flecha: m -> mm), igual que
+      // extraerSerie para el pilar.
+      const valores = meta.convertir
+        ? serie.valores.map(meta.convertir)
+        : serie.valores;
+      return { estado: "ok" as const, posiciones: serie.posiciones, valores };
+    }
     const tramo = resolucion.tramos[idxTramo] ?? resolucion.tramos[0]!;
     const porCombo = resultados.barras[tramo.memberName];
     // member inexistente en los resultados (no deberia pasar si trazabilidad y
@@ -223,7 +250,7 @@ export function PanelDiagramas() {
     if (estadoBarra === undefined) return { estado: "sin-combo" as const };
     const serie = extraerSerie(estadoBarra, magnitud);
     return { estado: "ok" as const, ...serie };
-  }, [resultados, trazabilidad, resolucion, idxTramo, combinacionActiva, magnitud]);
+  }, [resultados, trazabilidad, resolucion, idxTramo, combinacionActiva, magnitud, modeloFEM]);
 
   // [D20] Opciones del selector de tramo: una por tramo del pilar, etiquetada con su planta.
   // El Segmentado exige valores STRING (T extends string): usamos el indice como cadena y lo

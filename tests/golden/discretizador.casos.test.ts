@@ -188,7 +188,7 @@ describe("golden discretizador · biapoyada UDL", () => {
     const t = trazabilidadDe(fixtureBiapoyadaUDL({ L: 6, q: 10, cota: 3 }));
     // Pilares de un solo tramo (no pasantes): un member cada uno, el que apunta al pie.
     expect(t.pilarAMembers).toEqual({ api: ["M1"], apj: ["M2"] });
-    expect(t.vigaAMember).toEqual({ viga: "M3" });
+    expect(t.vigaAMembers).toEqual({ viga: ["M3"] });
     // Ambos pilares tienen vinculacionExterior: su arranque es el nodo del pie (N1,N2).
     expect(t.pilarANodoArranque).toEqual({ api: "N1", apj: "N2" });
     // Coincide con los nodos de apoyo (Paso 4).
@@ -263,7 +263,7 @@ describe("golden discretizador · voladizo con carga puntual", () => {
   it("trazabilidad: 1 pilar empotrado bajo el extremo j; nudo libre y empotrado mapeados", () => {
     const t = trazabilidadDe(fixtureVoladizoPuntual({ L: 3, P: 20, cota: 3 }));
     expect(t.pilarAMembers).toEqual({ apemp: ["M1"] });
-    expect(t.vigaAMember).toEqual({ viga: "M2" });
+    expect(t.vigaAMembers).toEqual({ viga: ["M2"] });
     // El pilar empotrado arranca en el pie (N1).
     expect(t.pilarANodoArranque).toEqual({ apemp: "N1" });
     // Nudo libre -> extremo libre (N2); nudo empotrado -> cabeza del pilar (N3).
@@ -353,7 +353,7 @@ describe("golden discretizador · biapoyada con carga puntual centrada", () => {
     const t = trazabilidadDe(fixtureBiapoyadaPuntualCentro({ L: 8, P: 40, cota: 3 }));
     expect(t.pilarAMembers).toEqual({ api: ["M1"], apj: ["M2"] });
     // Dos vigas: vder (id menor) -> M3, vizq -> M4 (orden de barras: por id).
-    expect(t.vigaAMember).toEqual({ vder: "M3", vizq: "M4" });
+    expect(t.vigaAMembers).toEqual({ vder: ["M3"], vizq: ["M4"] });
     expect(t.pilarANodoArranque).toEqual({ api: "N1", apj: "N2" });
     // Nudos de obra: apoyos (N3,N5) y el central compartido por ambas vigas (N4).
     expect(t.nudoANodo).toEqual({ ni: "N3", nc: "N4", nj: "N5" });
@@ -418,7 +418,7 @@ describe("golden discretizador · portico simple (uniones rigidas)", () => {
     const t = trazabilidadDe(fixturePorticoSimple({ B: 5, H: 3, q: 12 }));
     // Orden de barras: pilares por id ("pder" < "pizq") -> pder=M1, pizq=M2.
     expect(t.pilarAMembers).toEqual({ pder: ["M1"], pizq: ["M2"] });
-    expect(t.vigaAMember).toEqual({ dintel: "M3" });
+    expect(t.vigaAMembers).toEqual({ dintel: ["M3"] });
     // pilarANodoArranque apunta a los nodos de apoyo (los pies): pder en (5,0,0)=N2,
     // pizq en (0,0,0)=N1.
     expect(t.pilarANodoArranque).toEqual({ pder: "N2", pizq: "N1" });

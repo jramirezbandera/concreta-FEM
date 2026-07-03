@@ -152,8 +152,11 @@ export interface Trazabilidad {
   // pilar (obra) -> sus barras FEM en orden pie->cabeza. Un pilar pasante por varias
   // plantas se trocea en varios `member`; el array los lista de menor a mayor cota.
   pilarAMembers: Record<string, string[]>;
-  // viga (obra) -> su barra FEM. En F1 una viga = un solo member.
-  vigaAMember: Record<string, string>;
+  // viga (obra) -> sus barras FEM en orden i->j. Una viga sin paños acoplados es un
+  // solo member (array de longitud 1); una viga de CONTORNO subdividida por el
+  // acople paño<->portico (F3.2) es N members consecutivos. Espejo de
+  // `pilarAMembers` (alli el troceo es por plantas; aqui por nudos de malla).
+  vigaAMembers: Record<string, string[]>;
   // pilar con vinculacionExterior -> nodo FEM de su arranque (el pie, cota menor).
   // Solo aparecen los pilares que generan apoyo; util para dibujar reacciones.
   pilarANodoArranque: Record<string, string>;
@@ -201,7 +204,7 @@ export interface Trazabilidad {
 export function trazabilidadVacia(): Trazabilidad {
   return {
     pilarAMembers: {},
-    vigaAMember: {},
+    vigaAMembers: {},
     pilarANodoArranque: {},
     nudoANodo: {},
     nodoFEMAPlanta: {},

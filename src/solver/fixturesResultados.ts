@@ -21,7 +21,7 @@
 //  - `construirResultadosDesdeModeloFEM`: constructor CONSCIENTE DEL MODELO que LEE
 //    members/nodes/supports/combos del ModeloFEM recibido y sintetiza un
 //    ResultadosCalculo VALIDO con ESOS nombres reales, para que PanelDiagramas
-//    (resuelve via trazabilidad.vigaAMember/pilarAMembers) y TablaReacciones (usa
+//    (resuelve via trazabilidad.vigaAMembers/pilarAMembers) y TablaReacciones (usa
 //    modeloFEM.supports + nombres de nodo) RESUELVAN de verdad en los specs E2E.
 //
 // AISLAMIENTO: este modulo NO arranca Pyodide ni habla con el worker; solo fabrica
@@ -256,7 +256,7 @@ export function construirResultadosDesdeModeloFEM(
   );
 
   // --- Barras: una entrada por cada member.name, por combo -------------------
-  // Asi resolverBarra() de PanelDiagramas (via trazabilidad.vigaAMember /
+  // Asi resolverBarra() de PanelDiagramas (via trazabilidad.vigaAMembers /
   // pilarAMembers, que apuntan a member.name) SIEMPRE encuentra su barra.
   const barras: ResultadosCalculo["barras"] = {};
   for (const mb of modeloFEM.members) {

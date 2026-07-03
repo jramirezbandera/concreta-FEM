@@ -1,6 +1,6 @@
 // Componente (RTL, project jsdom) de PanelDiagramas (feature-14, Tarea 2.2/3.2).
 // Verifica el comportamiento del PANEL (no el render de Plotly): mensajes guia
-// segun el estado, mapeo seleccion->member via trazabilidad (viga -> vigaAMember;
+// segun el estado, mapeo seleccion->member via trazabilidad (viga -> vigaAMembers;
 // pilar -> pilarAMembers[0]) y el selector de magnitud. NO carga Plotly en jsdom:
 // se mockea la frontera lazy (./diagramaLazy) con un stub que expone sus props.
 import { describe, it, expect, beforeEach, beforeAll, vi } from "vitest";
@@ -90,7 +90,7 @@ function femConMembers(): ModeloFEM {
 function traza(): Trazabilidad {
   return {
     pilarAMembers: { p1: ["M1", "M2"] },
-    vigaAMember: { v1: "M3" },
+    vigaAMembers: { v1: ["M3"] },
     pilarANodoArranque: { p1: "N1" },
     nudoANodo: {},
     nodoFEMAPlanta: { N2: "pl1", N3: "pl2", N4: "pl1" },
@@ -190,7 +190,7 @@ describe("PanelDiagramas · mensajes guia (lenguaje de obra, sin jerga FEM)", ()
 });
 
 describe("PanelDiagramas · mapeo seleccion -> member via trazabilidad", () => {
-  it("seleccionar la VIGA v1 dibuja la serie del member M3 (vigaAMember)", () => {
+  it("seleccionar la VIGA v1 dibuja la serie del member M3 (vigaAMembers)", () => {
     resultadosStore.getState().setResultados(resultadosConBarra("M3"), femConMembers(), traza());
     vistaStore.getState().setCombinacionActiva("ELU");
     seleccionStore.getState().seleccionar(["v1"]); // viga
@@ -306,5 +306,97 @@ describe("PanelDiagramas · selector de tramo del pilar (D20)", () => {
       "data-valores",
       JSON.stringify([0, 90]),
     );
+  });
+});
+
+// --- Viga SUBDIVIDIDA por el acople paño<->portico (F3.2) -----------------------
+// La viga sigue siendo UNA para el arquitecto: su serie se dibuja CONCATENADA a lo
+// largo de toda la viga (offset x por longitud geometrica de cada tramo) y SIN
+// selector de tramo (los tramos son un artefacto del calculo, no plantas de obra).
+describe("PanelDiagramas · viga subdividida: serie concatenada (F3.2)", () => {
+  // ModeloFEM con la viga v2 en DOS members colineales: M10 (0..3 m) y M11 (3..8 m).
+  function femVigaSubdividida(): ModeloFEM {
+    return {
+      units: "kN-m",
+      nodes: [
+        { name: "NA", x: 0, y: 3, z: 0 },
+        { name: "NB", x: 3, y: 3, z: 0 },
+        { name: "NC", x: 8, y: 3, z: 0 },
+      ],
+      materials: [],
+      sections: [],
+      members: [memberFEM("M10", "NA", "NB"), memberFEM("M11", "NB", "NC")],
+      supports: [],
+      node_loads: [],
+      dist_loads: [],
+      pt_loads: [],
+      combos: [],
+      analysis: { type: "linear", check_statics: false },
+    };
+  }
+  function trazaVigaSubdividida(): Trazabilidad {
+    return { ...traza(), pilarAMembers: {}, vigaAMembers: { v2: ["M10", "M11"] } };
+  }
+  // Cortante con SALTO en el nudo compartido (x=3): +7 al final de M10, -2 al
+  // principio de M11 (la carga de la losa entra por ese nudo). Momento continuo.
+  function estadoTramo(
+    L: number,
+    m: [number, number],
+    v: [number, number],
+  ): EstadoMiembroCombo {
+    return {
+      ...estadoBarra(),
+      moment_z: [[0, L], m],
+      shear_y: [[0, L], v],
+    };
+  }
+  function resultadosVigaSubdividida(): ResultadosCalculo {
+    return {
+      units: "kN-m",
+      analysis: { type: "linear", n_points: 2 },
+      combos: ["ELU"],
+      nodos: {},
+      barras: {
+        M10: { ELU: estadoTramo(3, [0, 12], [7, 7]) },
+        M11: { ELU: estadoTramo(5, [12, 0], [-2, -2]) },
+      },
+      check_statics: null,
+    };
+  }
+
+  it("dibuja UNA serie continua con offset x acumulado y conserva el salto de cortante", async () => {
+    const user = userEvent.setup();
+    resultadosStore
+      .getState()
+      .setResultados(resultadosVigaSubdividida(), femVigaSubdividida(), trazaVigaSubdividida());
+    vistaStore.getState().setCombinacionActiva("ELU");
+    seleccionStore.getState().seleccionar(["v2"]);
+    render(<PanelDiagramas />);
+
+    // Momento (por defecto): posiciones concatenadas [0,3, 3,8] (el punto x=3 se
+    // DUPLICA: fin de M10 e inicio de M11), valores [0,12, 12,0].
+    const stub = screen.getByTestId("diagrama-stub");
+    expect(stub).toHaveAttribute("data-posiciones", JSON.stringify([0, 3, 3, 8]));
+    expect(stub).toHaveAttribute("data-valores", JSON.stringify([0, 12, 12, 0]));
+
+    // Cortante: el SALTO fisico en x=3 (7 -> -2) se conserva, no se suaviza.
+    await user.click(screen.getByRole("radio", { name: "V" }));
+    expect(screen.getByTestId("diagrama-stub")).toHaveAttribute(
+      "data-valores",
+      JSON.stringify([7, 7, -2, -2]),
+    );
+  });
+
+  it("una viga de varios tramos NO muestra selector de tramo (no es un pilar)", () => {
+    resultadosStore
+      .getState()
+      .setResultados(resultadosVigaSubdividida(), femVigaSubdividida(), trazaVigaSubdividida());
+    vistaStore.getState().setCombinacionActiva("ELU");
+    seleccionStore.getState().seleccionar(["v2"]);
+    render(<PanelDiagramas />);
+    expect(
+      screen.queryByRole("radiogroup", { name: "Tramo del pilar" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("diagrama-stub")).toBeInTheDocument();
   });
 });

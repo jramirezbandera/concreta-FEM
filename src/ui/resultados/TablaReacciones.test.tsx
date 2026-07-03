@@ -195,7 +195,7 @@ function trazaConMalla(): Trazabilidad {
   // pilarANodoArranque etiqueta Npilar como el pilar "pil1"; los Nmalla* proceden de malla.
   return {
     pilarAMembers: {},
-    vigaAMember: {},
+    vigaAMembers: {},
     pilarANodoArranque: { pil1: "Npilar" },
     nudoANodo: {},
     nodoFEMAPlanta: {},
@@ -327,7 +327,7 @@ describe("TablaReacciones · orden de filas (UX-ORDEN)", () => {
   function trazaTresPilares(): Trazabilidad {
     return {
       pilarAMembers: {},
-      vigaAMember: {},
+      vigaAMembers: {},
       pilarANodoArranque: { p1: "N1", p2: "N2", p10: "N10" },
       nudoANodo: {},
       nodoFEMAPlanta: {},
