@@ -177,10 +177,27 @@ export type BaseFEM = {
   localizarNodoDeNudo: (nudoId: string) => string | undefined;
   pilaresOrdenados: Pilar[];
   vigasOrdenadas: Modelo["vigas"];
+  // clave de snapping -> nombre de nodo FEM (N1..). El Paso 6c (F3.2) lo usa para
+  // REMAPEAR los nudos de borde acoplados de la malla de un paño a su nodo
+  // estructural (misma celda de rejilla = mismo nudo).
+  nombrePorClave: ReadonlyMap<string, string>;
 };
 
-export function construirBaseFEM(modelo: Modelo): BaseFEM {
+// Opciones de construccion de la base FEM (F3.2). `subdivisionesViga` es la salida
+// de calcularAcoples (acople.ts): vigaId -> puntos (x,y de obra) donde la viga se
+// SUBDIVIDE en members consecutivos, ORDENADOS por distancia a nudoI (contrato del
+// acople). Cada punto genera un nodo estructural N* en la cota de la planta de la
+// viga; los nudos de borde de la malla del paño remapean a esos nodos (misma celda).
+// Sin opciones (o mapa vacio) la base es BYTE-IDENTICA a la de siempre: la
+// subdivision solo existe si hay paños acoplados. `prepararModeloCR` llama SIN
+// opciones (el CR no ve la malla, decision 3A).
+export type OpcionesBaseFEM = {
+  subdivisionesViga?: ReadonlyMap<string, readonly PuntoPlano[]>;
+};
+
+export function construirBaseFEM(modelo: Modelo, opts?: OpcionesBaseFEM): BaseFEM {
   const avisosBase: ErrorObra[] = [];
+  const subdivisionesViga = opts?.subdivisionesViga;
 
   // --- Paso 1: materiales y secciones usados (dedup por id, mapeo directo) ----
   // [AUDITORIA C-1] TODA seccion se emite con Iy/Iz INTERCAMBIADOS
@@ -311,17 +328,31 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
     });
     clavesPilar.set(p.id, claves);
   }
-  const clavesViga = new Map<string, [string, string]>(); // vigaId -> [claveI, claveJ]
+  // Claves de nodo de cada viga EN ORDEN i->j: [claveI, ...intermedias, claveJ].
+  // Sin subdivisiones (F1 y toda viga sin paño acoplado) son exactamente 2 claves
+  // (byte-identico a antes). Con subdivisiones (F3.2), cada punto intermedio del
+  // acople genera un nodo estructural en la MISMA celda que el nudo de borde de la
+  // malla (las coordenadas provienen de mallarPano via calcularAcoples): el Paso 6c
+  // remapea por `nombrePorClave` y los quads comparten nudo con la viga.
+  const clavesViga = new Map<string, string[]>(); // vigaId -> claves i->j
   for (const v of modelo.vigas) {
     const planta = plantaPorId(modelo, v.plantaId) as Planta;
     const ni = nudoPorId(modelo, v.nudoI)!;
     const nj = nudoPorId(modelo, v.nudoJ)!;
-    const ci = registrarPunto(mapearEjes(ni.x, ni.y, planta.cota));
-    const cj = registrarPunto(mapearEjes(nj.x, nj.y, planta.cota));
-    // Ambos extremos de la viga -> su planta DECLARADA (autoritativa, v.plantaId).
-    anotarPlanta(ci, v.plantaId);
-    anotarPlanta(cj, v.plantaId);
-    clavesViga.set(v.id, [ci, cj]);
+    const claves: string[] = [];
+    const anotar = (x: number, y: number): void => {
+      const clave = registrarPunto(mapearEjes(x, y, planta.cota));
+      // Todo nudo de la viga (extremos e intermedios de subdivision) -> su planta
+      // DECLARADA (autoritativa, v.plantaId).
+      anotarPlanta(clave, v.plantaId);
+      claves.push(clave);
+    };
+    anotar(ni.x, ni.y);
+    for (const p of subdivisionesViga?.get(v.id) ?? []) {
+      anotar(p.x, p.y);
+    }
+    anotar(nj.x, nj.y);
+    clavesViga.set(v.id, claves);
   }
 
   // Numeracion determinista: ordena claves unicas por (Y,X,Z) -> N1,N2,...
@@ -393,27 +424,40 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
     pilarAMembers[p.id] = tramos;
   }
   for (const v of vigasOrdenadas) {
-    contador += 1;
-    const name = `M${contador}`;
-    barraPorAmbito.set(v.id, name);
-    // F1: una viga = un member (array de longitud 1). La subdivision por acople de
-    // paños (F3.2, Fase 3) añade tramos aqui manteniendo el orden i->j.
-    vigaAMembers[v.id] = [name];
-    const [ci, cj] = clavesViga.get(v.id)!;
-    const release = releasesDeExtremo(v.extremoI, v.extremoJ, v.tirante);
-    members.push({
-      name,
-      i: nodoNombre(ci),
-      j: nodoNombre(cj),
-      material: v.materialId,
-      // [C-1] La seccion ya se emite con Iy/Iz intercambiados en el Paso 1 (uniforme
-      // para toda barra): el eje fuerte del catalogo gobierna la flexion vertical.
-      section: v.seccionId,
-      rotation: 0,
-      tension_only: v.tirante, // tirante = barra que solo trabaja a traccion
-      comp_only: false,
-      releases: release,
-    });
+    const claves = clavesViga.get(v.id)!; // [i, ...subdivisiones, j] en orden i->j
+    const tramos: string[] = [];
+    for (let k = 0; k < claves.length - 1; k++) {
+      contador += 1;
+      const name = `M${contador}`;
+      tramos.push(name);
+      // El primer tramo (k===0, lado i) es la barra asociada al ambito de la viga.
+      if (k === 0) barraPorAmbito.set(v.id, name);
+      const esUltimo = k === claves.length - 2;
+      // Releases por EXTREMO DE VIGA, no por tramo: `extremoI` solo libera el lado i
+      // del PRIMER tramo y `extremoJ` el lado j del ULTIMO; los nudos interiores de
+      // subdivision son continuidad (union monolitica, jamas rotula). Un tirante
+      // nunca se subdivide (acople.ts lo excluye), asi que su unico tramo conserva
+      // el biarticulado canonico de releasesDeExtremo.
+      const release = releasesDeExtremo(
+        k === 0 ? v.extremoI : "empotrado",
+        esUltimo ? v.extremoJ : "empotrado",
+        v.tirante,
+      );
+      members.push({
+        name,
+        i: nodoNombre(claves[k]),
+        j: nodoNombre(claves[k + 1]),
+        material: v.materialId,
+        // [C-1] La seccion ya se emite con Iy/Iz intercambiados en el Paso 1 (uniforme
+        // para toda barra): el eje fuerte del catalogo gobierna la flexion vertical.
+        section: v.seccionId,
+        rotation: 0,
+        tension_only: v.tirante, // tirante = barra que solo trabaja a traccion
+        comp_only: false,
+        releases: release,
+      });
+    }
+    vigaAMembers[v.id] = tramos;
   }
 
   // --- Paso 4: apoyos ---------------------------------------------------------
@@ -556,7 +600,34 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
     localizarNodoDeNudo,
     pilaresOrdenados,
     vigasOrdenadas,
+    nombrePorClave,
   };
+}
+
+// [3A] Emision de una carga distribuida UNIFORME de ELEMENTO COMPLETO a todos sus
+// tramos FEM (pilar pasante troceado por plantas, viga subdividida por el acople de
+// paños). Punto UNICO del patron "misma w a cada tramo" que antes vivia en 4 bucles
+// (carga lineal de pilar [A-1], carga lineal de viga, peso propio 6b de ambos).
+// [TODO-6] VALIDO SOLO PARA CARGA DE BARRA COMPLETA (w1=w2, x1=x2=null): una futura
+// carga lineal CON RANGO de posicion (F4+) no puede pasar por aqui tal cual — debera
+// repartirse por el SOLAPE tramo∩rango o se duplicaria carga en silencio.
+function emitirDistribuidaEnTramos(
+  dist_loads: CargaDistFEM[],
+  members: readonly string[],
+  w: number,
+  caseName: string,
+): void {
+  for (const member of members) {
+    dist_loads.push({
+      member,
+      direction: "FY",
+      w1: w,
+      w2: w,
+      x1: null,
+      x2: null,
+      case: caseName,
+    });
+  }
 }
 
 // --- discretizador -----------------------------------------------------------
@@ -676,47 +747,31 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     // El ambito puede ser una viga, un pilar (barra) o un nudo.
     const member = barraPorAmbito.get(c.ambito);
     if (c.tipo === "lineal") {
-      // [AUDITORIA A-1] PILAR PASANTE: la carga lineal es del ELEMENTO entero; un
-      // pilar troceado por plantas intermedias la recibe en TODOS sus tramos
-      // (espejo del peso propio, Paso 6b). Antes solo el tramo del pie la recibia
+      // [AUDITORIA A-1] La carga lineal es del ELEMENTO entero: un pilar pasante
+      // (troceado por plantas) o una viga subdividida por el acople de paños (F3.2)
+      // la reciben en TODOS sus tramos via emitirDistribuidaEnTramos [3A] (espejo
+      // del peso propio, Paso 6b). Antes el pilar solo la recibia en el pie
       // (`barraPorAmbito` mapea el primer tramo): se aplicaba MENOS carga de la
-      // pedida sin error ni aviso. Orden determinista: tramos pie->cabeza.
+      // pedida sin error ni aviso. Orden determinista: tramos i->j / pie->cabeza.
+      // Gravedad: direccion GLOBAL FY (#3, #18). Toda la barra (x1=x2=null).
       const tramosPilar = pilarAMembers[c.ambito];
       if (tramosPilar !== undefined) {
-        for (const tramo of tramosPilar) {
-          dist_loads.push({
-            member: tramo,
-            direction: "FY",
-            w1: valor,
-            w2: valor,
-            x1: null,
-            x2: null,
-            case: caseName,
-          });
-        }
+        emitirDistribuidaEnTramos(dist_loads, tramosPilar, valor, caseName);
         continue;
       }
-      if (member === undefined) {
-        // Carga lineal sobre algo que no es barra (p.ej. un nudo): no aplicable.
-        // BLOQUEA: ignorarla quitaria carga real del calculo sin avisar.
-        erroresTraduccion.push({
-          codigo: "CARGA_NO_APLICABLE",
-          severidad: "error",
-          mensaje: `Una carga lineal está aplicada sobre un elemento que no es una barra.`,
-          elementoId: c.id,
-          elementoTipo: "carga",
-        });
+      const tramosViga = vigaAMembers[c.ambito];
+      if (tramosViga !== undefined) {
+        emitirDistribuidaEnTramos(dist_loads, tramosViga, valor, caseName);
         continue;
       }
-      // Gravedad: direccion GLOBAL FY (#3, #18). Toda la barra (x1=x2=null).
-      dist_loads.push({
-        member,
-        direction: "FY",
-        w1: valor,
-        w2: valor,
-        x1: null,
-        x2: null,
-        case: caseName,
+      // Carga lineal sobre algo que no es barra (p.ej. un nudo): no aplicable.
+      // BLOQUEA: ignorarla quitaria carga real del calculo sin avisar.
+      erroresTraduccion.push({
+        codigo: "CARGA_NO_APLICABLE",
+        severidad: "error",
+        mensaje: `Una carga lineal está aplicada sobre un elemento que no es una barra.`,
+        elementoId: c.id,
+        elementoTipo: "carga",
       });
     } else {
       // puntual
@@ -776,34 +831,14 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     for (const p of pilaresOrdenados) {
       const props = propiedadesDePilar(modelo, p);
       const w = -(props.A * props.rho); // w=A·rho; signo negativo = gravedad (FY-)
-      for (const member of pilarAMembers[p.id]) {
-        dist_loads.push({
-          member,
-          direction: "FY",
-          w1: w,
-          w2: w,
-          x1: null,
-          x2: null,
-          case: casePesoPropio,
-        });
-      }
+      emitirDistribuidaEnTramos(dist_loads, pilarAMembers[p.id], w, casePesoPropio);
     }
     for (const v of vigasOrdenadas) {
       const props = propiedadesDeViga(modelo, v);
       const w = -(props.A * props.rho);
       // El peso es de TODA la viga: una viga subdividida por el acople (F3.2) lo
       // recibe en cada tramo (espejo del pilar pasante de arriba).
-      for (const member of vigaAMembers[v.id]) {
-        dist_loads.push({
-          member,
-          direction: "FY",
-          w1: w,
-          w2: w,
-          x1: null,
-          x2: null,
-          case: casePesoPropio,
-        });
-      }
+      emitirDistribuidaEnTramos(dist_loads, vigaAMembers[v.id], w, casePesoPropio);
     }
   }
 

@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   discretizar,
+  construirBaseFEM,
   TOL_NODO,
   mapearEjes,
   clavePosicion,
   releasesDeExtremo,
 } from "./discretizar";
+import type { PuntoPlano } from "./mallado";
 import { mismaPosicionEnPlanta } from "./geometria";
 import { ModeloFEMSchema } from "./contratoFEM";
 import { type Modelo } from "../dominio";
@@ -870,5 +872,108 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       const fem = discretizarOk(modeloConLosa({ pesoPropio: true }));
       expect(() => ModeloFEMSchema.parse(fem)).not.toThrow();
     });
+  });
+});
+
+// --- F3.2 Fase 3: SUBDIVISION de vigas en construirBaseFEM (sin wire-up) --------
+// La subdivision se pasa a mano (mapa manual, como hara discretizar en la Fase 4 via
+// calcularAcoples). Se prueba la BASE: nº de members, numeracion determinista,
+// releases por extremo de VIGA (no por tramo), vigaAMembers i->j, nodoFEMAPlanta de
+// los nudos nuevos y regresion byte a byte sin opciones.
+describe("construirBaseFEM · subdivision de vigas (F3.2)", () => {
+  // Viga v1 de n1(2,5) a n2(7,5) en p1 (cota 3), extremoI empotrado / extremoJ
+  // articulado (del fixture modeloPortico). Subdivisiones en x=4 y x=6.
+  const SUBS: ReadonlyMap<string, readonly PuntoPlano[]> = new Map([
+    ["v1", [{ x: 4, y: 5 }, { x: 6, y: 5 }]],
+  ]);
+
+  it("una viga con 2 puntos de subdivision produce 3 members consecutivos i->j", () => {
+    const base = construirBaseFEM(modeloPortico(), { subdivisionesViga: SUBS });
+    // Numeracion: pilares primero (pil1 = M1), luego los tramos de la viga.
+    expect(base.trazabilidad.pilarAMembers).toEqual({ pil1: ["M1"] });
+    expect(base.trazabilidad.vigaAMembers).toEqual({ v1: ["M2", "M3", "M4"] });
+    // Los tramos encadenan: j de cada uno = i del siguiente.
+    const tramos = base.members.filter((m) => ["M2", "M3", "M4"].includes(m.name));
+    expect(tramos[0].j).toBe(tramos[1].i);
+    expect(tramos[1].j).toBe(tramos[2].i);
+    // Los nudos intermedios existen en la base con las coordenadas del punto
+    // (x=4 y x=6 a la cota 3 de p1; obra y=5 -> FEM z=5).
+    const coords = base.nodes.map((n) => [n.x, n.y, n.z]);
+    expect(coords).toContainEqual([4, 3, 5]);
+    expect(coords).toContainEqual([6, 3, 5]);
+  });
+
+  it("releases por EXTREMO DE VIGA: extremoI en el primer tramo, extremoJ en el ultimo, interiores continuos", () => {
+    const base = construirBaseFEM(modeloPortico(), { subdivisionesViga: SUBS });
+    const porNombre = new Map(base.members.map((m) => [m.name, m]));
+    // extremoI = empotrado -> el primer tramo NO libera su lado i; extremoJ =
+    // articulado -> SOLO el ultimo tramo libera Ry,Rz de su lado j.
+    expect(porNombre.get("M2")!.releases).toBeNull();
+    expect(porNombre.get("M3")!.releases).toBeNull(); // interior: continuidad
+    expect(porNombre.get("M4")!.releases).toEqual([
+      false, false, false, false, false, false, // lado i: nada
+      false, false, false, false, true, true, // lado j: Ryj,Rzj (articulado)
+    ]);
+  });
+
+  it("extremoI articulado libera SOLO el lado i del primer tramo", () => {
+    const m = modeloPortico();
+    m.vigas[0].extremoI = "articulado";
+    m.vigas[0].extremoJ = "empotrado";
+    const base = construirBaseFEM(m, { subdivisionesViga: SUBS });
+    const porNombre = new Map(base.members.map((mm) => [mm.name, mm]));
+    expect(porNombre.get("M2")!.releases).toEqual([
+      false, false, false, false, true, true, // lado i: Ryi,Rzi
+      false, false, false, false, false, false,
+    ]);
+    expect(porNombre.get("M3")!.releases).toBeNull();
+    expect(porNombre.get("M4")!.releases).toBeNull();
+  });
+
+  it("nodoFEMAPlanta etiqueta los nudos de subdivision con la planta DECLARADA de la viga", () => {
+    const base = construirBaseFEM(modeloPortico(), { subdivisionesViga: SUBS });
+    // Nudos intermedios: los que estan en x=4 y x=6 (cota 3).
+    const intermedios = base.nodes.filter((n) => (n.x === 4 || n.x === 6) && n.y === 3);
+    expect(intermedios).toHaveLength(2);
+    for (const n of intermedios) {
+      expect(base.trazabilidad.nodoFEMAPlanta[n.name]).toBe("p1");
+    }
+  });
+
+  it("barraPorAmbito de la viga apunta al PRIMER tramo (espejo del pilar pasante)", () => {
+    const base = construirBaseFEM(modeloPortico(), { subdivisionesViga: SUBS });
+    expect(base.barraPorAmbito.get("v1")).toBe("M2");
+  });
+
+  it("regresion byte a byte: sin opciones, con opciones vacias o mapa vacio, la base es identica", () => {
+    const sin = construirBaseFEM(modeloPortico());
+    const conVacio = construirBaseFEM(modeloPortico(), {});
+    const conMapaVacio = construirBaseFEM(modeloPortico(), { subdivisionesViga: new Map() });
+    for (const base of [conVacio, conMapaVacio]) {
+      expect(JSON.stringify(base.nodes)).toBe(JSON.stringify(sin.nodes));
+      expect(JSON.stringify(base.members)).toBe(JSON.stringify(sin.members));
+      expect(JSON.stringify(base.supports)).toBe(JSON.stringify(sin.supports));
+      expect(JSON.stringify(base.trazabilidad)).toBe(JSON.stringify(sin.trazabilidad));
+    }
+  });
+
+  it("la carga lineal de usuario sobre la viga subdividida llega a TODOS los tramos con la MISMA w (conservacion)", () => {
+    // GAP-B (revision 4A): via discretizar aun SIN wire-up no hay subdivision, asi
+    // que se comprueba el mecanismo con la base manual + el camino del Paso 6
+    // simulado por el peso propio en la Fase 4. Aqui se asegura la parte de la BASE:
+    // vigaAMembers tiene los 3 tramos que el Paso 6 recorrera con la misma w
+    // (emitirDistribuidaEnTramos, probado end-to-end en el golden de la Fase 4).
+    const base = construirBaseFEM(modeloPortico(), { subdivisionesViga: SUBS });
+    expect(base.trazabilidad.vigaAMembers["v1"]).toHaveLength(3);
+    // Longitudes de los tramos: 2+2+1 = 5 (la viga entera), sin solapes ni huecos.
+    const porNombre = new Map(base.nodes.map((n) => [n.name, n]));
+    const tramos = base.members.filter((m) => ["M2", "M3", "M4"].includes(m.name));
+    const longitud = (mm: (typeof tramos)[number]): number => {
+      const ni = porNombre.get(mm.i)!;
+      const nj = porNombre.get(mm.j)!;
+      return Math.hypot(nj.x - ni.x, nj.y - ni.y, nj.z - ni.z);
+    };
+    const total = tramos.reduce((acc, mm) => acc + longitud(mm), 0);
+    expect(total).toBeCloseTo(5, 12); // = longitud de la viga n1(2,5)->n2(7,5)
   });
 });
