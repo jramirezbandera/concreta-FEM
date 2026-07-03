@@ -357,13 +357,15 @@ describe("DialogoGruposYPlantas: categoria de uso -> sobrecarga (qk CTE)", () =>
 });
 
 describe("DialogoGruposYPlantas: notas de honestidad (UX-D1/D2)", () => {
-  it("UX-D1: avisa de que sobrecarga/cargas muertas aún no se aplican al cálculo", async () => {
+  it("UX-D1 (cerrada en F3.2): afirma que sobrecarga/cargas muertas se aplican a los paños del grupo", async () => {
     const user = userEvent.setup();
     const dialogo = renderAbierto();
     await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
     expect(
-      within(dialogo).getByText(/Estos valores aún no se aplican al cálculo/i),
+      within(dialogo).getByText(/se aplican automáticamente como carga superficial/i),
     ).toBeInTheDocument();
+    // La nota vieja ("aún no se aplican") mentiria tras D-1: no debe quedar rastro.
+    expect(within(dialogo).queryByText(/aún no se aplican/i)).toBeNull();
   });
 
   it("UX-D2: muestra bajo la categoría el qk normativo que fija (CTE DB-SE-AE)", async () => {

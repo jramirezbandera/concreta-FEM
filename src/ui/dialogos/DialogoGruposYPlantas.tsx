@@ -501,14 +501,15 @@ export function DialogoGruposYPlantas() {
                   onCommit={(v) => editarNumeroGrupo("cargasMuertas", v)}
                   error={errorDe(erroresGrupo, "cargasMuertas")}
                 />
-                {/* UX-D1: honestidad. En F1 el discretizador NO convierte estos dos
-                    valores del grupo en cargas (deuda de feature-13): se usaran al
-                    repartir los paños sobre las vigas en F3. Sin esta nota, el usuario
-                    creeria que influyen en el calculo y no lo hacen. */}
+                {/* UX-D1 (cerrada en F3.2): estos valores POR FIN tienen consumidor —
+                    el discretizador los aplica como carga superficial automatica
+                    sobre los paños de las plantas del grupo (cargas muertas como
+                    permanente, sobrecarga de uso como variable). La nota pasa de
+                    "aun no se aplican" a AFIRMATIVA. */}
                 <p className="cx-note cx-gyp__campo-ancho">
-                  Estos valores aún no se aplican al cálculo: se usarán al repartir los
-                  paños sobre las vigas (fase 3). Las cargas que introduzcas en vigas y
-                  paños sí se calculan.
+                  Estos valores se aplican automáticamente como carga superficial
+                  sobre los paños de las plantas del grupo (las cargas muertas como
+                  permanente y la sobrecarga de uso como variable).
                 </p>
               </div>
 

@@ -369,6 +369,30 @@ describe("TablaReacciones · orden de filas (UX-ORDEN)", () => {
     expect(rowheaders).toEqual(["P1", "P2", "P10"]);
   });
 
+  it("F3.2: con la losa TOTALMENTE acoplada (sin apoyos de malla) NO hay fila 'Losa (borde)'", () => {
+    // El acople elimina los apoyos artificiales del borde: apoyosDeMalla queda []
+    // aunque el modelo tenga quads. Las reacciones estan en los pilares y la tabla
+    // no debe inventar una fila agregada vacia.
+    const fem = femTresPilares();
+    fem.quads = [
+      { name: "PQ0-Q1", i: "N1", j: "N2", m: "N10", n: "N1", t: 0.2, material: "m" },
+    ];
+    const traza = trazaTresPilares(); // apoyosDeMalla: []
+    resultadosStore.getState().setResultados(
+      resultadosConReacciones({
+        N1: [0, 1, 0, 0, 0, 0],
+        N2: [0, 2, 0, 0, 0, 0],
+        N10: [0, 10, 0, 0, 0, 0],
+      }),
+      fem,
+      traza,
+    );
+    render(<TablaReacciones />);
+    expect(screen.queryByText("Losa (borde)")).toBeNull();
+    // Los pilares siguen listados uno a uno.
+    expect(screen.getByText("P1")).toBeInTheDocument();
+  });
+
   it("la fila 'Losa (borde)' va al final, tras los pilares ordenados", () => {
     // Añade dos apoyos de malla para que aparezca el agregado.
     const fem = femTresPilares();

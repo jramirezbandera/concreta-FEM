@@ -80,12 +80,13 @@ function PanelActivo() {
         onValor={(v) => setDefaults({ bordeApoyo: v })}
       />
 
-      {/* UX-C9: la losa se calcula AISLADA en esta fase (nudos propios, sin
-          transferir carga al portico). Se comunica en lenguaje de obra para que el
-          usuario no crea que la carga del paño llega a pilares/vigas. */}
+      {/* UX-C9 (reescrita en F3.2): la losa DESCARGA en el portico cuando su
+          contorno coincide con vigas; el bordeApoyo queda como fallback de los
+          bordes sin viga. Se comunica ANTES de colocar para fijar la expectativa:
+          dibujarla entre vigas = acoplada. */}
       <p className="cx-note">
-        En esta fase, la losa se calcula apoyada en su borde, de forma aislada: su
-        carga no se transmite a pilares ni vigas.
+        La losa descarga en las vigas y pilares de su contorno cuando los comparte;
+        en los bordes sin viga se usa el apoyo de borde elegido.
       </p>
 
       <div className="cx-herramienta-pano__acciones">

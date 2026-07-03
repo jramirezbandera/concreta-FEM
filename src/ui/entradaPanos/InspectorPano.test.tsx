@@ -116,11 +116,32 @@ describe("InspectorPano: visibilidad", () => {
     expect(screen.getByRole("radiogroup", { name: "Apoyo de borde del paño" })).toBeInTheDocument();
   });
 
-  it("UX-C9: comunica que la losa se calcula aislada (no transfiere carga al portico)", () => {
+  it("UX-C9 (F3.2): comunica que la losa DESCARGA en el portico cuando comparte contorno", () => {
     renderConPanoSeleccionado();
     expect(
-      screen.getByText(/su carga no se transmite a pilares ni vigas/i),
+      screen.getByText(/descarga en las vigas y pilares de su contorno/i),
     ).toBeInTheDocument();
+    // El texto viejo (losa aislada) ya no debe existir: mentiria tras el acople.
+    expect(screen.queryByText(/no se transmite a pilares ni vigas/i)).toBeNull();
+  });
+
+  it("D-1: muestra las cargas automaticas del grupo con los valores reales (fuente unica)", () => {
+    // El grupo del fixture: cargasMuertas=1, sobrecargaUso=2 (kN/m²).
+    renderConPanoSeleccionado();
+    const linea = screen.getByText(/recibe además, del grupo de su planta/i);
+    expect(linea.textContent).toContain("1,00 kN/m² de cargas muertas");
+    expect(linea.textContent).toContain("2,00 kN/m² de sobrecarga de uso");
+  });
+
+  it("D-1 [GAP-H]: con el grupo a CERO no muestra la linea de cargas de grupo (estado vacio)", () => {
+    const m = modeloConPano();
+    m.grupos = m.grupos.map((g) =>
+      g.id === "g1" ? { ...g, sobrecargaUso: 0, cargasMuertas: 0 } : g,
+    );
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+    expect(screen.queryByText(/recibe además, del grupo de su planta/i)).toBeNull();
   });
 });
 

@@ -28,6 +28,10 @@ import {
 } from "../../estado";
 import type { Modelo, Pano, Nudo } from "../../dominio";
 import { cargasDeAmbito } from "../../dominio";
+// FUENTE UNICA [2A] de las cargas automaticas de grupo (F3.2, D-1): la MISMA que
+// usa el discretizador para emitirlas. La linea informativa del inspector no puede
+// divergir de lo que el calculo aplica.
+import { cargasGrupoDePano, CASE_CM_GRUPO } from "../../discretizador/cargasGrupo";
 import "./inspectorPano.css";
 
 function leerModelo() {
@@ -84,6 +88,15 @@ function fmt2(v: number): string {
   return v.toFixed(2);
 }
 
+// Formatea una presion (kN/m²) con coma decimal es-ES y 2 decimales fijos, como el
+// resto de cifras normativas de la UI ("1,35", "2,00").
+function fmtCarga(v: number): string {
+  return v.toLocaleString("es-ES", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 // Estado vacio del inspector (auditoria UX-C6): en la pestana de Isovalores (donde el
 // paño es el editor principal) con la herramienta "seleccion" y sin paño seleccionado,
 // el dock mostraba solo "Ayudas" sin guiar a que seleccionar un paño abre su editor.
@@ -104,6 +117,10 @@ export function InspectorPano() {
   const panos = modeloStore((s) => s.modelo.panos);
   // Nudos del perimetro: para el bloque de dimensiones D8b. Suscripcion ligera.
   const nudos = modeloStore((s) => s.modelo.nudos);
+  // Modelo completo para la linea de cargas de grupo (F3.2, D-1): la fuente unica
+  // `cargasGrupoDePano` necesita plantas+grupos. Re-render por edicion de obra:
+  // aceptable (cromo HUD visible solo con un paño seleccionado, fuera del lienzo).
+  const modelo = modeloStore((s) => s.modelo);
   // Contexto de UI para el estado vacio: solo en Isovalores (editor principal del paño)
   // y con la herramienta de seleccion.
   const pestanaActiva = vistaStore((s) => s.pestanaActiva);
@@ -118,6 +135,10 @@ export function InspectorPano() {
 
   const panoId = seleccion.length === 1 ? seleccion[0] : null;
   const pano = panoId ? panos.find((p) => p.id === panoId) ?? null : null;
+
+  // Cargas automaticas del grupo que este paño recibira (F3.2, D-1), con la misma
+  // fuente que el discretizador. [] si el grupo no aporta (linea ausente, GAP-H).
+  const cargasGrupo = pano ? cargasGrupoDePano(modelo, pano) : [];
 
   // Al cambiar de paño seleccionado, limpia los errores de la anterior.
   useEffect(() => {
@@ -239,13 +260,32 @@ export function InspectorPano() {
           onValor={(v) => commit([], { bordeApoyo: v }, { bordeApoyo: v })}
         />
 
-        {/* UX-C9: la losa se calcula AISLADA en esta fase (nudos propios, sin
-            transferir carga al portico). Se comunica en lenguaje de obra para que el
-            usuario no crea que la carga del paño llega a pilares/vigas. */}
+        {/* UX-C9 (reescrita en F3.2): la losa ya DESCARGA en el portico cuando su
+            contorno coincide con vigas; el bordeApoyo queda como fallback de los
+            bordes sin viga. Lenguaje de obra, sin sobre-prometer (el acople exige
+            vigas debajo). */}
         <p className="cx-note">
-          En esta fase, la losa se calcula apoyada en su borde, de forma aislada: su
-          carga no se transmite a pilares ni vigas.
+          La losa descarga en las vigas y pilares de su contorno cuando los comparte;
+          en los bordes sin viga se usa el apoyo de borde elegido.
         </p>
+
+        {/* Linea informativa de cargas de GRUPO (F3.2, D-1): lo que este paño recibe
+            automaticamente de su grupo, con la MISMA fuente que el calculo
+            (cargasGrupoDePano). Ausente si el grupo no aporta (valores a 0). */}
+        {cargasGrupo.length > 0 ? (
+          <p className="cx-note cx-inspector-pano__grupo">
+            Recibe además, del grupo de su planta:{" "}
+            {cargasGrupo
+              .map(
+                (cg) =>
+                  `${fmtCarga(cg.presion)} kN/m² de ${
+                    cg.case === CASE_CM_GRUPO ? "cargas muertas" : "sobrecarga de uso"
+                  }`,
+              )
+              .join(" y ")}
+            .
+          </p>
+        ) : null}
 
         <SeccionCargaSuperficial panoId={pano.id} />
 
