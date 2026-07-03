@@ -421,21 +421,14 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-cm-cargas-muertas · Incluir cargas muertas de grupo en el centro de masas (requiere paños)
+## T-cm-cargas-muertas · Incluir cargas muertas de grupo en el centro de masas — RESUELTO (F3.2)
 
-- **Qué:** Extender `src/discretizador/centros.ts` para incluir `Grupo.cargasMuertas` (kN/m²) en el
-  cálculo del centro de masas, una vez que los paños (F3) aporten el **área tributaria** por elemento.
-- **Por qué:** F2a omite deliberadamente las cargas muertas de grupo en el CM: son kN/m² y no hay
-  superficie de forjado a la que aplicarlas hasta que existan paños. El CM de F2a usa solo lo
-  computable (peso propio `A·ρ·L` + cargas lineales sobre vigas + cargas nodales). Cuando lleguen los
-  paños, el CM debe completarse para reflejar la masa permanente real.
-- **Cómo retomar:** tras F3 (paños). Definir el área tributaria por elemento y sumar
-  `cargasMuertas·área` a los términos del CM; retirar la nota de omisión del panel; golden que compare
-  CM con/sin cargas muertas en una planta con paño conocido.
-- **Depende de / bloquea:** requiere F3 (paños / área de forjado). La omisión está documentada en E5 del
-  plan F2a.
-- **Coste:** CC ~30-45 min (cálculo + golden), una vez exista el área.
-- **Origen:** Revisión de ingeniería F2a (outside voice Codex). Plan: `vamos-a-empezar-a-hidden-quokka.md`.
+- **Estado:** RESUELTO en F3 corte 2 (Fase 8). `centros.ts` gana el término 4 (paños losa):
+  peso propio de losa ρ·t·A (siempre, masa física E5) + `Grupo.cargasMuertas`·A (por la
+  fuente única `cargasGrupoDePano`, solo el case permanente) + superficiales PERMANENTES de
+  usuario·A, en el centroide del rectángulo (`limitesRectangulo`, fuente única del bbox).
+  La sobrecarga de uso NO entra (variable). La nota "OMISION DELIBERADA" se retiró.
+- **Origen:** Revisión de ingeniería F2a (outside voice Codex); cerrado en F3.2.
 
 ---
 
@@ -808,19 +801,25 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-f3-pano-acople · Acoplar la malla del paño al pórtico (compartir nudos / transferir carga)
+## T-f3-pano-acople · Acoplar la malla del paño al pórtico — RESUELTO (F3.2)
 
-- **Qué:** En F3 corte 1 la losa es **AISLADA** (decisión 5A): su malla tiene nudos PROPIOS y NO
-  comparte nudos con pilares/vigas, así que **no transfiere su carga al pórtico**. El acoplamiento real
-  (la losa descarga en las vigas/pilares de su contorno) está diferido.
-- **Por qué:** compartir nudos malla↔barra ES acoplamiento estructural (cambia los esfuerzos del pórtico);
-  hacerlo bien (compatibilidad de GDL, snapping malla→nudos de obra, reparto de rigidez) es un corte en sí
-  mismo. Aislar primero permitió cerrar el cálculo de placa de punta a punta sin arrastrar esa complejidad.
-- **Cómo retomar:** que `mallado.ts`/`discretizar` snapeen los nudos de borde del paño a los nudos FEM del
-  pórtico coincidentes (reusar `clavePosicion`/`TOL_NODO`) en vez de crear nudos propios; validar
-  compatibilidad de apoyos. Golden: losa sobre vigas → las vigas reciben la reacción de borde de la losa.
-- **Depende de / bloquea:** corte 1 (hecho). **Coste:** CC ~varias horas.
-- **Origen:** Plan F3 corte 1 (NOT-in-scope; decisión 5A, Codex outside-voice).
+- **Estado:** RESUELTO en F3 corte 2 (rama feat/f3-acople). La losa DESCARGA en el pórtico:
+  [acople.ts](src/discretizador/acople.ts) (puro, hoja) detecta las vigas de contorno por
+  cuantización de celda (fuente única `cuantizar`/`clavePosicion`) y deriva (a) los nudos de
+  borde ACOPLADOS y (b) las SUBDIVISIONES por viga (unión multi-paño, dedup por celda);
+  `construirBaseFEM(modelo, {subdivisionesViga})` trocea las vigas de contorno
+  (`vigaAMembers: string[]`, espejo de `pilarAMembers`; releases por extremo de VIGA) y el
+  Paso 6c REMAPEA los nudos de borde a su nodo estructural `N*` (nombrePorClave): quads y
+  members comparten nudo = acople FEM (K global por nudo). `bordeApoyo` queda como fallback
+  POR NUDO de los bordes sin viga; la estabilización de plano solo en paño aislado.
+  Reglas de producto: PANO_SIN_APOYO relajado por borde COMPLETO (dos esquinas sueltas no
+  son apoyo), PANO_PILAR_INTERIOR/PANO_VIGA_INTERIOR bloquean (elemento atravesando el paño
+  sin acoplarse = reparto falso plausible, precedente M-5), sujeción exacta respecto a lo
+  emitido, sujeción del CR contra SU base (CR_SIN_PILARES). Verificado con motor real
+  (placa-acoplada.golden.test.ts): convergencia a Navier con vigas rígidas J~0, ΣV en pies
+  de pilar = peso total a mano, vigas con momento tributario. Incluye D-1 (cargas de grupo,
+  ver historial del corte) y T-cm-cargas-muertas.
+- **Origen:** Plan F3 corte 1 (NOT-in-scope; decisión 5A); cerrado en F3.2.
 
 ---
 
@@ -1008,3 +1007,90 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   todas las herramientas), o gatear el mensaje/placement de cada herramienta a las pestañas donde aplica.
 - **Depende de / bloquea:** ninguno. **Coste:** CC ~20 min.
 - **Origen:** /code-review F3 corte 1 (finder cross-file/UX).
+
+---
+
+## T-f3-losa-plana · Losa maciza sobre pilares (líneas de control de malla) — PRIORIDAD SUBIDA
+
+- **Qué:** Mallar el paño con divisiones FORZADAS en la x/y de cada pilar interior (rejilla no
+  uniforme con "líneas de control") para que un nudo de malla caiga en su cabeza y el pilar se
+  acople — levantando el error `PANO_PILAR_INTERIOR` de F3.2.
+- **Por qué:** la losa plana sobre pilares es tipología común en España, y desde F3.2 un pilar
+  interior bajo el paño **BLOQUEA el cálculo** (decisión OV-5: un apoyo ignorado producía un
+  reparto de cargas falso pero verosímil; precedente M-5, bloquear > calcular basura). Ese error
+  convierte esta deuda en la puerta de una tipología entera: su prioridad de producto SUBE.
+- **Cómo retomar:** `ParametrosMallado` gana puntos de control (x[]/y[] de pilares interiores);
+  `calcularSubdivisiones` inserta esas divisiones (rejilla no uniforme, revisar el cap);
+  `calcularAcoples` acopla también las cabezas de pilar interiores (mismo remap por celda que el
+  borde). Los goldens de malla uniforme deben conservarse (control points vacíos = camino actual).
+  A futuro exigirá punzonamiento para ser honesto (F4).
+- **Depende de / bloquea:** F3.2 (hecho). **Coste:** CC ~1 día (malla no uniforme + goldens).
+- **Origen:** Decisión de alcance F3.2 (usuario: diferir) + escalado a ERROR en la revisión (OV-5).
+
+---
+
+## T-pano-borde-apoyo-por-borde · bordeApoyo POR BORDE del paño (no global)
+
+- **Qué:** Hoy `Pano.bordeApoyo` es UNO para los cuatro bordes. Con el acople, el caso real de un
+  paño perimetral mezcla: bordes sobre vigas (acoplados) + un borde sobre muro (apoyado) + un
+  borde libre (voladizo). El fallback global + aviso `PANO_BORDE_PARCIAL` es el COMPROMISO de
+  F3.2, no el estado final.
+- **Por qué:** la revisión de F3.2 (outside voice, OV-2) señaló la ambigüedad física: un apoyo
+  artificial global en nudos sin viga puede desviar carga que el usuario esperaba en el pórtico.
+  El modelado por-arista elimina el aviso-compromiso y refleja la obra real.
+- **Cómo retomar:** `Pano.bordeApoyo` → por-arista (p. ej. `bordesApoyo: [B,B,B,B]` en orden de
+  perímetro) con bump de `SCHEMA_VERSION` (v3→v4) + migración (replicar el global a las 4);
+  selector por borde en `InspectorPano` (UI de picking de arista); el Paso 6c ya aplica apoyos
+  POR NUDO, solo cambia de dónde lee el tipo por arista.
+- **Depende de / bloquea:** F3.2 (hecho). **Coste:** CC ~medio día (schema + migración + UI).
+- **Origen:** Revisión F3.2 (OV-2, opción D diferida).
+
+---
+
+## T-pano-acople-tirantes · Tirantes bajo el borde del paño (excluidos del acople)
+
+- **Qué:** Una viga `tirante:true` bajo el borde del paño se EXCLUYE del acople (no se subdivide
+  ni acopla): si es la única "viga" de ese borde, el borde no se acopla (fallback bordeApoyo +
+  aviso parcial), sin ninguna señal específica de que el tirante fue ignorado.
+- **Por qué físico:** subdividir un biarticulado tension-only crearía tramos con rótulas en nudos
+  interiores (mecanismo). Soportarlo exige decidir el modelo (¿tramos tension-only encadenados
+  comparten un solo par de rótulas en los extremos REALES? ¿prohibir con error de obra?).
+- **Cómo retomar:** como mínimo, un aviso específico ("la losa no puede apoyar en un tirante")
+  cuando un tirante sea la única viga bajo un borde — el disparador vive en `calcularAcoples`
+  (hoy simplemente lo salta). El modelo completo, solo si aparece el caso real (raro en
+  edificación de hormigón).
+- **Depende de / bloquea:** F3.2 (hecho). **Coste:** CC ~30 min (aviso) / ~medio día (modelo).
+- **Origen:** Diseño de calcularAcoples (D-C, exclusión documentada; TODO-4 de la revisión).
+
+---
+
+## T-pano-vista-borde-inspector · Vista por-borde del acople en InspectorPano
+
+- **Qué:** El inspector muestra la nota genérica C-9 ("descarga en las vigas… cuando los
+  comparte") y el aviso `PANO_BORDE_PARCIAL` dice QUE hay bordes sin viga, pero no CUÁLES. Falta
+  el estado por borde: "Norte: acoplado a V3 · Sur: apoyo simple · Este: libre…".
+- **Por qué:** con acople parcial, el usuario no ve qué bordes descargan en vigas y cuáles usan
+  el fallback; la transparencia por-arista es el espejo natural del modo "Ver modelo de cálculo".
+- **Cómo retomar:** la información YA existe en `calcularAcoples` (`nodosAcoplados` +
+  `bordesCompletos`); falta proyectarla por-arista (¿qué aristas están completas/parciales y qué
+  vigas las cubren, con sus nombres de obra?) y una línea por borde en el inspector (lenguaje de
+  obra, nombres reales de viga).
+- **Depende de / bloquea:** F3.2 (hecho); casa bien con `T-pano-borde-apoyo-por-borde`.
+- **Coste:** CC ~45-60 min. **Origen:** Fase 7 de F3.2 (diferido; TODO-5 de la revisión).
+
+---
+
+## T-cargas-parciales-subdivision · Cargas lineales con RANGO vs subdivisión de barras (mina futura)
+
+- **Qué:** NOTA PREVENTIVA (hoy NO hay nada que arreglar). El helper
+  `emitirDistribuidaEnTramos` ([discretizar.ts](src/discretizador/discretizar.ts)) reparte "la
+  misma w a TODOS los tramos" de un pilar pasante o una viga subdividida — válido SOLO porque
+  toda carga lineal del dominio es de BARRA COMPLETA (la `Carga` no tiene posición/rango).
+- **Por qué:** si una fase futura (F4, muros, cargas de tabique parcial) añade cargas lineales
+  con rango de posición, pasarlas por este helper tal cual DUPLICARÍA carga en silencio (cada
+  tramo recibiría el rango entero). El comentario [TODO-6] en el propio helper es la primera
+  línea de defensa; esta entrada es la segunda.
+- **Cómo retomar:** cuando exista `Carga` con rango: repartir por el SOLAPE tramo∩rango
+  (coordenada local por tramo), con un golden de conservación (Σ por tramos = carga pedida).
+- **Depende de / bloquea:** ninguna hoy; DISPARADOR = añadir posición/rango a `Carga`.
+- **Coste:** CC ~30-45 min cuando aplique. **Origen:** Revisión F3.2 (outside voice #12; TODO-6).
