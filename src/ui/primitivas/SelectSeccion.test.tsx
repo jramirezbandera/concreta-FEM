@@ -14,7 +14,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SelectSeccion } from "./SelectSeccion";
 import { listarSecciones } from "../../biblioteca";
-import { modeloStore } from "../../estado";
+import { modeloStore, vistaStore } from "../../estado";
 import { crearModeloVacio, type Seccion } from "../../dominio";
 
 // jsdom no implementa la PointerCapture API ni scrollIntoView, de las que depende
@@ -134,5 +134,22 @@ describe("SelectSeccion", () => {
 
     const listbox = await screen.findByRole("listbox");
     expect(within(listbox).getByText("Circular Ø400")).toBeInTheDocument();
+  });
+
+  it("D3: 'Nueva sección…' abre el dialogo de seccion personalizada y cierra el select", async () => {
+    const user = userEvent.setup();
+    vistaStore.getState().cerrarDialogo();
+    render(<SelectSeccion valor={null} onCambio={() => {}} />);
+
+    screen.getByRole("combobox").focus();
+    await user.keyboard("{Enter}");
+
+    // El pie del listado ofrece la accion de crear una seccion a medida.
+    const accion = await screen.findByRole("button", { name: /Nueva sección/ });
+    await user.click(accion);
+
+    // Abre el dialogo (el orquestador lo monta) y el listbox se cierra.
+    expect(vistaStore.getState().dialogoActivo).toBe("seccionPersonalizada");
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
 });

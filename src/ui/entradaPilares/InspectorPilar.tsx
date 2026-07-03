@@ -23,6 +23,7 @@ import {
 } from "../../estado";
 import type { Modelo, Pilar } from "../../dominio";
 import { cargasDeAmbito } from "../../dominio";
+import { esCombinacionIncoherentePorId, mensajeCoherencia } from "../../biblioteca";
 import "./inspectorPilar.css";
 
 // InspectorPilar (feature-11, Tarea 3.2): panel flotante sobre el lienzo que edita
@@ -125,6 +126,9 @@ export function InspectorPilar() {
   const seleccion = seleccionStore((s) => s.seleccion);
   const pilares = modeloStore((s) => s.modelo.pilares);
   const plantas = modeloStore((s) => s.modelo.plantas);
+  // Secciones de obra: para el aviso de coherencia D15 (resolver la familia de la
+  // seccion del pilar, sea de obra o un perfil de catalogo por id).
+  const secciones = modeloStore((s) => s.modelo.secciones);
   // Contexto de UI para decidir el estado vacio: solo en la pestana de pilares y con
   // la herramienta de seleccion (una herramienta de colocacion tiene su propio panel).
   const pestanaActiva = vistaStore((s) => s.pestanaActiva);
@@ -217,6 +221,12 @@ export function InspectorPilar() {
     });
   };
 
+  // D15: aviso NO bloqueante si la seccion (perfil metalico / hormigon) no casa con
+  // la familia del material (acero / hormigon). Puro; mensaje en lenguaje de obra.
+  const avisoCoherencia = mensajeCoherencia(
+    esCombinacionIncoherentePorId(pilar.seccionId, pilar.materialId, secciones),
+  );
+
   return (
     <>
       <PanelFlotante
@@ -261,6 +271,14 @@ export function InspectorPilar() {
           <div className="cx-campo__error" role="alert">
             {errorDe(errores, "materialId")}
           </div>
+        ) : null}
+
+        {/* D15: aviso de mezcla incoherente seccion<->material. NO bloquea la
+            edicion; solo advierte (--warning, role=status). */}
+        {avisoCoherencia ? (
+          <p className="cx-aviso-coherencia" role="status">
+            {avisoCoherencia}
+          </p>
         ) : null}
 
         <CampoNumero

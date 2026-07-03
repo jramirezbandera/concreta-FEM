@@ -14,6 +14,15 @@ export { DialogoHipotesis } from "./DialogoHipotesis";
 // Dialogo concreto de Opciones de analisis (F2.4).
 export { DialogoOpcionesAnalisis } from "./DialogoOpcionesAnalisis";
 
+// Dialogo concreto de Seccion personalizada (auditoria UI/UX D3): crear seccion de
+// obra de hormigon a medida. AUTO-GATEADO (lee dialogoActivo); el orquestador lo monta.
+export { DialogoSeccionPersonalizada } from "./DialogoSeccionPersonalizada";
+
+// Dialogo concreto de Datos generales (auditoria UI/UX D13): nombre de la obra. Recibe el
+// id/nombre del proyecto activo por props (metadato de persistencia, no Capa 1); App lo monta.
+export { DialogoDatosGenerales } from "./DialogoDatosGenerales";
+export type { DialogoDatosGeneralesProps } from "./DialogoDatosGenerales";
+
 // Seccion de cargas reutilizable por los inspectores de viga/pilar (feature-13).
 export { SeccionCargas } from "./SeccionCargas";
 export type { SeccionCargasProps } from "./SeccionCargas";

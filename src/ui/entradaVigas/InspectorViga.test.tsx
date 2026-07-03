@@ -239,3 +239,35 @@ describe("InspectorViga: borrado", () => {
     expect(seleccionStore.getState().seleccion).toEqual([]);
   });
 });
+
+describe("InspectorViga: geometria (D8b) y coherencia (D15)", () => {
+  it("muestra la longitud (m) y las coordenadas de los extremos I/J (solo lectura)", () => {
+    // El fixture tiene n1(0,0) y n2(5,0): longitud 5.00 m.
+    renderConVigaSeleccionada();
+    expect(screen.getByText("Longitud")).toBeInTheDocument();
+    expect(screen.getByText("5.00 m")).toBeInTheDocument();
+    // Coordenadas de extremos "(0.00, 0.00) → (5.00, 0.00)".
+    expect(
+      screen.getByText("(0.00, 0.00) → (5.00, 0.00)"),
+    ).toBeInTheDocument();
+  });
+
+  it("no avisa de coherencia con perfil metalico + acero (combinacion valida)", () => {
+    // El fixture usa IPE200 (perfil) + S275 (acero): coherente, sin aviso.
+    renderConVigaSeleccionada();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("avisa (role=status) si la viga es perfil metalico con material de hormigon (D15)", () => {
+    const m = modeloConViga();
+    // Cambia el material a hormigon manteniendo la seccion de perfil: incoherente.
+    m.vigas[0].materialId = "HA-25";
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["V-1"]);
+    render(<InspectorViga />);
+    const aviso = screen.getByRole("status");
+    expect(aviso).toHaveTextContent(
+      "Sección de perfil metálico con material de hormigón: revisa la combinación.",
+    );
+  });
+});

@@ -14,6 +14,7 @@ import type {
   Carga,
   Hipotesis,
   OpcionesAnalisis,
+  Seccion,
 } from "../../dominio";
 import { crearComandoParches } from "./comando";
 import type { Comando } from "./comando";
@@ -109,6 +110,52 @@ export function moverPilar(
       }
     },
     `moverPilar:${pilarId}`,
+  );
+  return comando;
+}
+
+// --- Secciones de obra (auditoria UI/UX D3+D4, "Sección personalizada") ------
+
+// Datos de la seccion de obra que aporta el llamante: hormigon rectangular (b×h) o
+// circular (Ø), con `nombre` legible ya compuesto por el borde de UI ("HA 30×30").
+// UNIDADES: las dimensiones llegan en METROS (sistema interno): la UI convierte
+// mm->m en el borde (src/unidades) ANTES de invocar el comando. Aqui NO se convierte.
+// SOLO se persisten DIMENSIONES: jamas A/Iy/Iz calculados (la unica fuente de las
+// propiedades de calculo es resolverSeccion, biblioteca; ver hormigon.ts / C-1b).
+export type DatosSeccion =
+  | { clase: "rectangular"; nombre: string; b: number; h: number } // b,h en m
+  | { clase: "circular"; nombre: string; d: number }; // d en m
+
+// Crea una Seccion de obra (Capa 1) con id OPACO (nuevoId), NUNCA semantico tipo
+// "HR-300x500": un id semantico ensombreceria el catalogo en resolverSeccionFEMPorId
+// (una seccion de obra con id "IPE300" pisaria el perfil de catalogo). El nombre
+// legible va en `nombre`; el id es interno y estable (se reutiliza en redo via el
+// delta, igual que crearPilar). Sin material: la seccion NO lo lleva (el elemento lo
+// referencia por su lado).
+export function crearSeccion(base: Modelo, datos: DatosSeccion): Comando {
+  const id = nuevoId();
+  const seccion: Seccion =
+    datos.clase === "rectangular"
+      ? {
+          id,
+          nombre: datos.nombre,
+          tipo: "hormigonRectangular",
+          b: datos.b,
+          h: datos.h,
+        }
+      : {
+          id,
+          nombre: datos.nombre,
+          tipo: "hormigonCircular",
+          d: datos.d,
+        };
+
+  const { comando } = crearComandoParches(
+    base,
+    `Crear sección ${datos.nombre}`,
+    (borrador) => {
+      borrador.secciones.push(seccion);
+    },
   );
   return comando;
 }

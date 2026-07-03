@@ -111,6 +111,39 @@ describe("helpers de consulta del dominio", () => {
     expect(crearModeloVacio().analisis.incluirPesoPropio).toBe(true);
   });
 
+  it("crearModeloVacio: siembra las 2 secciones de obra default (pilar 30×30, viga 30×50)", () => {
+    // Auditoria UI/UX D4+D5: el modelo vacio trae sembradas las secciones default para
+    // que el primer elemento colocado tenga seccion resoluble. Dimensiones en METROS
+    // (300 mm -> 0.3 m). Ids OPACOS y FIJOS (deterministas), no semanticos tipo HR-*.
+    const vacio = crearModeloVacio();
+    expect(vacio.secciones).toEqual([
+      {
+        id: "sec-default-pilar",
+        nombre: "HA 30×30",
+        tipo: "hormigonRectangular",
+        b: 0.3,
+        h: 0.3,
+      },
+      {
+        id: "sec-default-viga",
+        nombre: "HA 30×50",
+        tipo: "hormigonRectangular",
+        b: 0.3,
+        h: 0.5,
+      },
+    ]);
+    // Ids no semanticos: no parecen catalogo (no ensombrecen resolverSeccionFEMPorId).
+    for (const s of vacio.secciones) {
+      expect(s.id).not.toMatch(/HR-|HC-|IPE|HEB/);
+    }
+  });
+
+  it("crearModeloVacio es DETERMINISTA (dos llamadas producen secciones identicas)", () => {
+    // Los ids de las secciones sembradas son FIJOS (no nuevoId): el modelo vacio es
+    // siempre identico (golden/serializacion dependen de ello).
+    expect(crearModeloVacio().secciones).toEqual(crearModeloVacio().secciones);
+  });
+
   it("crearModeloVacio: schemaVersion = SCHEMA_VERSION (v2)", () => {
     expect(crearModeloVacio().schemaVersion).toBe(SCHEMA_VERSION);
   });

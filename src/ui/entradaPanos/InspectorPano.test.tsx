@@ -178,6 +178,61 @@ describe("InspectorPano: carga superficial", () => {
     expect(cargas[0]!.tipo).toBe("superficial");
     expect(cargas[0]!.valor).toBe(5);
   });
+
+  it("D17: editar el VALOR de una carga superficial existente inline es reversible", async () => {
+    const user = userEvent.setup();
+    const m = modeloConPano();
+    m.cargas.push({
+      id: "cs1",
+      tipo: "superficial",
+      ambito: "F-1",
+      valor: 5,
+      hipotesisId: "hip-cargas-muertas",
+    });
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+
+    // El campo de valor de la FILA (no el de "Añadir carga") lleva su propio aria-label.
+    const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
+    const valorFila = within(lista).getByLabelText("Valor de la carga superficial");
+    await user.clear(valorFila);
+    await user.type(valorFila, "9");
+    await user.tab();
+
+    const cargas = () => modelo().cargas.filter((c) => c.ambito === "F-1");
+    expect(cargas()[0]!.valor).toBe(9);
+    expect(cargas()[0]!.id).toBe("cs1"); // editada, no borrada+creada
+
+    modeloStore.getState().deshacer();
+    expect(cargas()[0]!.valor).toBe(5);
+  });
+
+  it("D17: un valor invalido (0) en la fila de carga superficial NO comitea", async () => {
+    const user = userEvent.setup();
+    const m = modeloConPano();
+    m.cargas.push({
+      id: "cs1",
+      tipo: "superficial",
+      ambito: "F-1",
+      valor: 5,
+      hipotesisId: "hip-cargas-muertas",
+    });
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+
+    const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
+    const valorFila = within(lista).getByLabelText("Valor de la carga superficial");
+    await user.clear(valorFila);
+    await user.type(valorFila, "0");
+    await user.tab();
+
+    expect(modelo().cargas.find((c) => c.id === "cs1")!.valor).toBe(5);
+    expect(
+      within(lista).getByText(/El valor de la carga debe ser mayor que cero/),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("InspectorPano: borrado", () => {
@@ -212,5 +267,14 @@ describe("InspectorPano: borrado", () => {
     expect(modelo().panos).toHaveLength(0);
     expect(modelo().cargas).toHaveLength(0);
     expect(seleccionStore.getState().seleccion).toEqual([]);
+  });
+});
+
+describe("InspectorPano: dimensiones (D8b)", () => {
+  it("muestra las dimensiones ancho × alto en m (solo lectura)", () => {
+    // El fixture tiene un rectangulo 0..4 (X) × 0..3 (Y): 4.00 × 3.00 m.
+    renderConPanoSeleccionado();
+    expect(screen.getByText("Dimensiones")).toBeInTheDocument();
+    expect(screen.getByText("4.00 × 3.00 m")).toBeInTheDocument();
   });
 });

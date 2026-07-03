@@ -67,6 +67,18 @@ export function cargasDeAmbito(modelo: Modelo, ambito: string): Carga[] {
 // `automatica` (ver `esHipotesisAutomatica`): asi id y flag no pueden desincronizarse.
 export const ID_HIP_PESO_PROPIO = "hip-peso-propio";
 
+// Ids fijos de las secciones de obra por defecto sembradas (auditoria UI/UX D4+D5).
+// Son OPACOS (no semanticos): "sec-default-*" no colisiona con el catalogo (perfiles
+// "IPE300"...) ni parece "HR-300x500", asi que NO ensombrecen resolverSeccionFEMPorId
+// (condicion del guardian D3.2). Son FIJOS (no nuevoId) A PROPOSITO: crearModeloVacio
+// es una factoria DETERMINISTA (los golden y los tests de serializacion dependen de
+// que el modelo vacio sea siempre identico, igual que las hipotesis sembradas con id
+// fijo). Un id aleatorio aqui romperia esa estabilidad; el requisito real ("id opaco")
+// se cumple con un ASCII fijo no semantico. Las secciones que el USUARIO crea desde el
+// dialogo si llevan nuevoId() (crearSeccion): alli no hay contrato de determinismo.
+export const ID_SECCION_DEFAULT_PILAR = "sec-default-pilar";
+export const ID_SECCION_DEFAULT_VIGA = "sec-default-viga";
+
 // Predicado UNICO de "hipotesis automatica" (la del sistema, p.ej. peso propio). El
 // FLAG `automatica` es la fuente de verdad, NO el id: el discretizador, los combos,
 // las validaciones y los comandos identifican la automatica por aqui para que id y
@@ -104,12 +116,35 @@ export function crearModeloVacio(): Modelo {
     schemaVersion: SCHEMA_VERSION,
     grupos: [],
     plantas: [],
-    secciones: [],
     nudos: [],
     pilares: [],
     vigas: [],
     panos: [],
     muros: [],
+    // Secciones de obra por defecto sembradas (auditoria UI/UX D4+D5): pilar HA 30×30
+    // y viga HA 30×50, para que el PRIMER elemento colocado tenga seccion resoluble
+    // sin que el usuario cree una a mano. DIMENSIONES en METROS (sistema interno §14):
+    // 300 mm -> 0.3 m, 500 mm -> 0.5 m (equivalen a los presets DEFAULT_SECCION_* de
+    // biblioteca/defaults.ts, en mm; NO se importan de alli para no crear un ciclo
+    // dominio<-biblioteca — el dominio es la capa baja). Ids OPACOS y FIJOS (ver la nota
+    // de ID_SECCION_DEFAULT_*). Convencion C-1b (eje fuerte Iy) la aplica el discretizador
+    // al emitir; aqui solo persisten b/h, nunca A/Iy/Iz.
+    secciones: [
+      {
+        id: ID_SECCION_DEFAULT_PILAR,
+        nombre: "HA 30×30",
+        tipo: "hormigonRectangular",
+        b: 0.3,
+        h: 0.3,
+      },
+      {
+        id: ID_SECCION_DEFAULT_VIGA,
+        nombre: "HA 30×50",
+        tipo: "hormigonRectangular",
+        b: 0.3,
+        h: 0.5,
+      },
+    ],
     cargas: [],
     hipotesis: [
       { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente", automatica: false },

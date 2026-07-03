@@ -1,7 +1,7 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import * as Select from "@radix-ui/react-select";
 import { listarSecciones } from "../../biblioteca";
-import { modeloStore } from "../../estado";
+import { modeloStore, vistaStore } from "../../estado";
 import type { Seccion } from "../../dominio";
 
 // SelectSeccion (feature-11, T3.1): selector de la seccion de un pilar. Las opciones
@@ -48,6 +48,9 @@ export function SelectSeccion({ valor, onCambio, etiqueta }: SelectSeccionProps)
   // Suscripcion ligera: re-render solo si cambia la referencia del array de
   // secciones de la obra. No entra en el bucle de render del viewport.
   const seccionesObra = modeloStore((s) => s.modelo.secciones);
+  // Apertura CONTROLADA (D3): el pie "Nueva sección…" debe CERRAR el listbox al
+  // abrir el dialogo. Con Radix no controlado no podriamos cerrarlo desde el boton.
+  const [abierto, setAbierto] = useState(false);
   // UX-C7: rotulo VISIBLE (no solo aria-label). El trigger de Radix es un <button>
   // (combobox), asi que no puede envolverse en <label>; se asocia por aria-labelledby
   // a un <span .cx-campo__label> visible, calcando SelectPlanta/SelectHipotesis para
@@ -56,12 +59,24 @@ export function SelectSeccion({ valor, onCambio, etiqueta }: SelectSeccionProps)
   const labelId = useId();
   const texto = etiqueta ?? "Sección";
 
+  // D3: abre el dialogo "Sección personalizada" y cierra el listbox. El ToolsRail lo
+  // cablea por otro sitio; aqui es el punto de entrada desde el propio selector.
+  const nuevaSeccion = () => {
+    setAbierto(false);
+    vistaStore.getState().abrirDialogo("seccionPersonalizada");
+  };
+
   return (
     <div className="cx-campo">
       <span className="cx-campo__label" id={labelId}>
         {texto}
       </span>
-      <Select.Root value={valor ?? undefined} onValueChange={(v) => onCambio(v)}>
+      <Select.Root
+        open={abierto}
+        onOpenChange={setAbierto}
+        value={valor ?? undefined}
+        onValueChange={(v) => onCambio(v)}
+      >
         <Select.Trigger className="cx-select cx-select--mono" aria-labelledby={labelId}>
           <Select.Value placeholder="Sección…" />
           <Select.Icon className="cx-select__icon">▾</Select.Icon>
@@ -94,6 +109,20 @@ export function SelectSeccion({ valor, onCambio, etiqueta }: SelectSeccionProps)
                 </Select.Item>
               ))}
             </Select.Viewport>
+            {/* D3: acceso a crear una seccion a medida, al PIE del listado. NO es un
+                Select.Item (no tiene value): es un boton de accion que abre el dialogo
+                y cierra el select. onPointerDown detiene la propagacion para que Radix
+                no lo trate como seleccion de item. */}
+            <div className="cx-select-footer">
+              <button
+                type="button"
+                className="cx-select-footer__accion"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={nuevaSeccion}
+              >
+                + Nueva sección…
+              </button>
+            </div>
           </Select.Content>
         </Select.Portal>
       </Select.Root>

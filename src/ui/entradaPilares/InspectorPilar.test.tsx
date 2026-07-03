@@ -275,3 +275,43 @@ describe("InspectorPilar: undo", () => {
     expect(pilar()!.angulo).toBe(0);
   });
 });
+
+describe("InspectorPilar: coherencia seccion-material (D15)", () => {
+  it("no avisa con perfil metalico + acero (combinacion valida)", () => {
+    // El fixture usa IPE200 (perfil) + S275 (acero): coherente, sin aviso.
+    renderConPilarSeleccionado();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("avisa (role=status) si el pilar es perfil metalico con material de hormigon", () => {
+    const m = modeloConPilar();
+    m.pilares[0].materialId = "HA-25"; // hormigon con seccion de perfil: incoherente
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["P-1"]);
+    render(<InspectorPilar />);
+    const aviso = screen.getByRole("status");
+    expect(aviso).toHaveTextContent(
+      "Sección de perfil metálico con material de hormigón: revisa la combinación.",
+    );
+  });
+
+  it("avisa si el pilar es de hormigón (seccion de obra) con material de acero", () => {
+    const m = modeloConPilar();
+    // Seccion de obra de hormigon + material de acero: la inversa.
+    m.secciones.push({
+      id: "sec-h",
+      nombre: "HA 30×30",
+      tipo: "hormigonRectangular",
+      b: 0.3,
+      h: 0.3,
+    });
+    m.pilares[0].seccionId = "sec-h";
+    m.pilares[0].materialId = "S275";
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["P-1"]);
+    render(<InspectorPilar />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Sección de hormigón con material de acero: revisa la combinación.",
+    );
+  });
+});

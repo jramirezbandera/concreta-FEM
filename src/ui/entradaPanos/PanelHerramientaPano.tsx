@@ -13,10 +13,8 @@ import { useEffect, useSyncExternalStore } from "react";
 import { PanelFlotante, Boton, SelectMaterial } from "../primitivas";
 import { CampoBordeApoyo, CampoLongitudMm } from "./camposPano";
 import { vistaStore, type DefaultsPano } from "../../estado";
-import { listarMateriales } from "../../biblioteca";
+import { DEFAULT_MATERIAL_ID } from "../../biblioteca";
 import "./panelHerramientaPano.css";
-
-const PRIMER_MATERIAL = listarMateriales()[0]?.id ?? null;
 
 // True solo en modo "pano". subscribeWithSelector -> re-render solo al conmutar.
 function useHerramientaPano(): boolean {
@@ -40,12 +38,13 @@ function PanelActivo() {
   const setDefaults = vistaStore.getState().setDefaultsPano;
   const terminar = () => vistaStore.getState().setHerramienta("seleccion");
 
-  // UX: al activar la herramienta sin material fijado, preselecciona el primero del
-  // catalogo para que el primer dibujo pueda crear de inmediato (la ColocacionPano ignora
-  // el clic si falta material). Solo rellena lo vacio.
+  // UX (D4+D5): al activar la herramienta sin material fijado, preselecciona el
+  // material por defecto (HA-25; la losa default pasa a hormigon, coherente con el MVP;
+  // antes cogia el primero del catalogo). Solo rellena lo vacio. La ColocacionPano ignora
+  // el clic si falta material.
   useEffect(() => {
-    if (!defaults.materialId && PRIMER_MATERIAL) {
-      setDefaults({ materialId: PRIMER_MATERIAL });
+    if (!defaults.materialId) {
+      setDefaults({ materialId: DEFAULT_MATERIAL_ID });
     }
   }, [defaults.materialId, setDefaults]);
 

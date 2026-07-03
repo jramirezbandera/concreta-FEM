@@ -43,3 +43,30 @@
   color: var(--text-3, #6b7585);
   line-height: 1.4;
 }
+
+/* --- D8b: bloque de dimensiones (solo lectura) --- */
+/* Ancho × alto del paño. Dato numerico en mono tabular (Spec Diseno UI §1.5/§5). Caja
+   hundida neutra para leerse como informacion, no como control. Espejo del geom de
+   inspectorViga.css. Solo tokens. */
+.cx-inspector-pano__geom {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2, 8px);
+  padding: var(--space-2, 8px) var(--space-2, 10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-muted);
+}
+.cx-inspector-pano__geom-etq {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+.cx-inspector-pano__geom-val {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  text-align: right;
+}

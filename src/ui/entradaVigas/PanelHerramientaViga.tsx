@@ -6,8 +6,14 @@ import {
   SelectMaterial,
 } from "../primitivas";
 import { CampoExtremo, CampoTirante } from "./camposViga";
-import { vistaStore, type DefaultsViga } from "../../estado";
-import { listarSecciones, listarMateriales } from "../../biblioteca";
+import { vistaStore, modeloStore, type DefaultsViga } from "../../estado";
+import {
+  DEFAULT_MATERIAL_ID,
+  DEFAULT_SECCION_VIGA,
+  resolverSeccionDefault,
+  esCombinacionIncoherentePorId,
+  mensajeCoherencia,
+} from "../../biblioteca";
 import "./panelHerramientaViga.css";
 
 // PanelHerramientaViga (feature-12, Tarea 2.1): panel flotante ligero visible SOLO
@@ -21,10 +27,6 @@ import "./panelHerramientaViga.css";
 //
 // UNIDADES (CLAUDE.md §14): la seccion y el material solo se eligen por id; los
 // extremos y el tirante son del dominio. No hay conversion aqui.
-
-// Catalogos inmutables: se listan una vez fuera del render (igual que los Select*).
-const PRIMERA_SECCION = listarSecciones()[0]?.id ?? null;
-const PRIMER_MATERIAL = listarMateriales()[0]?.id ?? null;
 
 // True solo en modo "viga". subscribeWithSelector -> re-render solo al conmutar.
 function useHerramientaViga(): boolean {
@@ -48,19 +50,30 @@ function PanelActivo() {
   const defaults = useDefaultsViga();
   const setDefaults = vistaStore.getState().setDefaultsViga;
   const terminar = () => vistaStore.getState().setHerramienta("seleccion");
+  // Secciones de obra (Capa 1): para resolver el default de obra (hormigon sembrado)
+  // y para el aviso de coherencia D15. Suscripcion ligera (referencia estable via Immer).
+  const seccionesObra = modeloStore((s) => s.modelo.secciones);
 
-  // UX: al activar la herramienta sin seccion/material fijados, preselecciona el
-  // primero del catalogo para que el primer clic pueda colocar de inmediato (la
-  // ColocacionViga ignora el clic si faltan seccion/material). Solo rellena lo
-  // vacio: respeta lo que el usuario ya hubiera elegido en sesiones previas.
+  // UX (D4+D5): al activar la herramienta sin seccion/material fijados, preselecciona
+  // la seccion de obra por defecto (hormigon HA 30×50 sembrado; antes cogia el primer
+  // PERFIL del catalogo, IPE) y el material por defecto (HA-25). Solo rellena lo vacio.
   useEffect(() => {
     const parche: Partial<DefaultsViga> = {};
-    if (!defaults.seccionId && PRIMERA_SECCION) parche.seccionId = PRIMERA_SECCION;
-    if (!defaults.materialId && PRIMER_MATERIAL) parche.materialId = PRIMER_MATERIAL;
+    if (!defaults.seccionId) {
+      const id = resolverSeccionDefault(DEFAULT_SECCION_VIGA.nombre, seccionesObra);
+      if (id) parche.seccionId = id;
+    }
+    if (!defaults.materialId) parche.materialId = DEFAULT_MATERIAL_ID;
     if (Object.keys(parche).length > 0) setDefaults(parche);
     // Se ejecuta al montar (entrada en modo viga); las dependencias evitan
     // re-disparar tras rellenar (los ids ya no son null).
-  }, [defaults.seccionId, defaults.materialId, setDefaults]);
+  }, [defaults.seccionId, defaults.materialId, seccionesObra, setDefaults]);
+
+  // D15: aviso NO bloqueante si la seccion (perfil metalico / hormigon) no casa con
+  // la familia del material (acero / hormigon).
+  const avisoCoherencia = mensajeCoherencia(
+    esCombinacionIncoherentePorId(defaults.seccionId, defaults.materialId, seccionesObra),
+  );
 
   return (
     <PanelFlotante
@@ -83,6 +96,14 @@ function PanelActivo() {
         valor={defaults.materialId}
         onCambio={(id) => setDefaults({ materialId: id })}
       />
+
+      {/* D15: aviso de mezcla incoherente seccion<->material. NO bloquea la
+          colocacion; solo advierte (--warning, role=status). */}
+      {avisoCoherencia ? (
+        <p className="cx-aviso-coherencia" role="status">
+          {avisoCoherencia}
+        </p>
+      ) : null}
 
       {/* Tirante => biarticulado: el discretizador fuerza ambos extremos articulados.
           Se muestran fijos en "Articulado" (no se ocultan) para no ignorar en silencio. */}

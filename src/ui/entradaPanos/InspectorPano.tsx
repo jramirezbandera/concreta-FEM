@@ -26,7 +26,7 @@ import {
   editarPano,
   eliminarPano,
 } from "../../estado";
-import type { Modelo, Pano } from "../../dominio";
+import type { Modelo, Pano, Nudo } from "../../dominio";
 import { cargasDeAmbito } from "../../dominio";
 import "./inspectorPano.css";
 
@@ -57,6 +57,33 @@ function contarCargasDelPano(modelo: Modelo, panoId: string): number {
   return cargasDeAmbito(modelo, panoId).length;
 }
 
+// Dimensiones del paño para el bloque solo-lectura D8b: ancho × alto (m) del rectangulo
+// que envuelve su perimetro (bounding box de los nudos del contorno). En el corte 1 el
+// paño ES un rectangulo de ejes, asi que ancho/alto del bounding box son sus dimensiones
+// reales. UNIDADES internas en m (sin conversion: las coordenadas van en m). Devuelve
+// null si el perimetro no resuelve a nudos suficientes (import inconsistente).
+interface DimensionesPano {
+  ancho: number; // m (extension en X)
+  alto: number; // m (extension en Y)
+}
+
+function dimensionesDePano(nudos: Nudo[], pano: Pano): DimensionesPano | null {
+  const puntos = pano.perimetro
+    .map((id) => nudos.find((n) => n.id === id))
+    .filter((n): n is Nudo => n !== undefined);
+  if (puntos.length < 2) return null;
+  const xs = puntos.map((p) => p.x);
+  const ys = puntos.map((p) => p.y);
+  const ancho = Math.max(...xs) - Math.min(...xs);
+  const alto = Math.max(...ys) - Math.min(...ys);
+  return { ancho, alto };
+}
+
+// Formatea un valor en metros a 2 decimales (bloque geometrico D8b, mono tabular).
+function fmt2(v: number): string {
+  return v.toFixed(2);
+}
+
 // Estado vacio del inspector (auditoria UX-C6): en la pestana de Isovalores (donde el
 // paño es el editor principal) con la herramienta "seleccion" y sin paño seleccionado,
 // el dock mostraba solo "Ayudas" sin guiar a que seleccionar un paño abre su editor.
@@ -75,6 +102,8 @@ function EstadoVacioPano({ mensaje }: { mensaje: string }) {
 export function InspectorPano() {
   const seleccion = seleccionStore((s) => s.seleccion);
   const panos = modeloStore((s) => s.modelo.panos);
+  // Nudos del perimetro: para el bloque de dimensiones D8b. Suscripcion ligera.
+  const nudos = modeloStore((s) => s.modelo.nudos);
   // Contexto de UI para el estado vacio: solo en Isovalores (editor principal del paño)
   // y con la herramienta de seleccion.
   const pestanaActiva = vistaStore((s) => s.pestanaActiva);
@@ -157,6 +186,10 @@ export function InspectorPano() {
     });
   };
 
+  // D8b: dimensiones del paño (ancho × alto, solo lectura). Del bounding box de su
+  // perimetro (modelo.nudos). El bloque no se pinta si el perimetro no resuelve.
+  const dimensiones = dimensionesDePano(nudos, pano);
+
   return (
     <>
       <PanelFlotante
@@ -164,6 +197,17 @@ export function InspectorPano() {
         titulo={`Paño ${pano.nombre}`}
         tag="losa"
       >
+        {/* D8b: dimensiones del paño (solo lectura). Ancho × alto en m (2 decimales,
+            mono). Derivadas de la geometria en planta; no se editan aqui. */}
+        {dimensiones ? (
+          <div className="cx-inspector-pano__geom">
+            <span className="cx-inspector-pano__geom-etq">Dimensiones</span>
+            <span className="cx-inspector-pano__geom-val">
+              {fmt2(dimensiones.ancho)} × {fmt2(dimensiones.alto)} m
+            </span>
+          </div>
+        ) : null}
+
         <CampoLongitudMm
           etiqueta="Espesor"
           valorM={pano.espesor}
