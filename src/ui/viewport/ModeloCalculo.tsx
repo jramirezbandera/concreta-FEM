@@ -62,9 +62,39 @@ export function ModeloCalculo() {
   // discretizar). Se llama SIEMPRE (reglas de hooks); fuera de pleno el control no se pinta.
   const fuente = useFuenteModeloCalculo(mostrar && enPleno);
 
-  if (!enPleno) return null;
-
   const toggle = () => vistaStore.getState().toggleModeloCalculo();
+
+  // [D11/K-2] Fuera de la vista 3D el control NO desaparece del dock (antes return
+  // null): se muestra DESHABILITADO con una nota corta. El overlay de escena sigue
+  // gateado (solo en 3D).
+  if (!enPleno) {
+    return (
+      <PanelFlotante
+        className="cx-mc"
+        icono={
+          <span className="cx-mc__glifo" aria-hidden="true">
+            ◫
+          </span>
+        }
+        titulo="Ver modelo de cálculo"
+      >
+        <label className="cx-mc__toggle cx-mc__toggle--disabled">
+          <input
+            type="checkbox"
+            checked={mostrar}
+            onChange={toggle}
+            disabled
+            aria-disabled
+            aria-label="Ver modelo de cálculo"
+          />
+          <span>Mostrar sobre la obra</span>
+        </label>
+        <p className="cx-mc__nota" role="note">
+          Disponible en la vista 3D.
+        </p>
+      </PanelFlotante>
+    );
+  }
   const toggleSolo = () => vistaStore.getState().toggleSoloModeloCalculo();
 
   return (

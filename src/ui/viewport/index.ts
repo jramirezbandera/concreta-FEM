@@ -45,6 +45,12 @@ export { ModeloCalculo } from "./ModeloCalculo";
 export { suscribirCoords, leerCoords, emitirCoords } from "./hooks/coordsBus";
 export type { Coords } from "./hooks/coordsBus";
 
+// Canal de cota viva de la banda elastica (D8a): la herramienta de colocacion emite
+// longitud+angulo (viga) o dimensiones (paño); CotaVivaOverlay (montado por el Viewport)
+// la materializa junto al cursor. Se expone por si un test o una futura herramienta lo usa.
+export { suscribirCota, leerCota, emitirCota, limpiarCota } from "./hooks/cotaBus";
+export type { CotaViva } from "./hooks/cotaBus";
+
 // Captura PNG del viewport (feature-15, F3): API publica que dispara la descarga
 // de la vista actual. La ejecuta ControlCaptura dentro de la escena. Lo cablea el
 // boton F3 de la barra de herramientas (otra tarea).

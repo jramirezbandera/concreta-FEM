@@ -42,6 +42,8 @@ import { PASO_REJILLA_M } from "./imanViga";
 import { plantaColocableViga } from "./tramoViga";
 import { procesarClicPano, type PuntoPano } from "./colocacionPanoLogica";
 import { debeIgnorarEscColocacion } from "./escColocacion";
+import { emitirCota, limpiarCota } from "./hooks/cotaBus";
+import { cotaRectangulo } from "./formateo";
 
 // Semibrazo de la cruz del marcador (m) y elevacion sobre la cota (anti z-fight).
 const MARCA_R = 0.18;
@@ -86,9 +88,10 @@ function Marcador({
   refGrupo: RefObject<Group | null>;
   visible: boolean;
 }) {
-  // Color token "accent" (los paños no tienen token propio aun; el acento marca la
-  // introduccion activa, coherente con el halo de seleccion).
-  const color = useMemo(() => colorToken("accent"), []);
+  // Color token "pano" (UX-G12): el overlay de introduccion usa el token DEL ELEMENTO,
+  // coherente con pilar/viga (que colocan con su propio token, no con el acento). Antes
+  // el paño colocaba en acento -> incoherencia entre herramientas.
+  const color = useMemo(() => colorToken("pano"), []);
   const geoCruz = useMemo(() => crearGeoCruz(), []);
   useEffect(() => () => geoCruz.dispose(), [geoCruz]);
   return (
@@ -134,7 +137,9 @@ function ColocacionActiva() {
     return g;
   }, []);
   useEffect(() => () => geoRect.dispose(), [geoRect]);
-  const colorRect = useMemo(() => colorToken("accentLine"), []);
+  // Contorno elastico en --pano-line (UX-G12): el contorno del elemento paño, no el
+  // acento; espejo de la linea elastica de la viga (--viga-line).
+  const colorRect = useMemo(() => colorToken("panoLine"), []);
 
   // Planta donde caera el paño (misma logica que la viga: una sola planta).
   function plantaColocable(): string | null {
@@ -212,6 +217,12 @@ function ColocacionActiva() {
     if (a !== null) {
       estirarRectangulo(a.x, a.y, punto.x, punto.y, z);
       if (refRectangulo.current) refRectangulo.current.visible = true;
+      // Cota viva del rectangulo (ancho × alto) por cotaBus (D8a), sin setState.
+      emitirCota({
+        texto: cotaRectangulo(punto.x - a.x, punto.y - a.y),
+        px: e.nativeEvent.offsetX,
+        py: e.nativeEvent.offsetY,
+      });
     }
     invalidate();
   };
@@ -261,6 +272,7 @@ function ColocacionActiva() {
     // Reset del ciclo: listo para el siguiente paño (la herramienta sigue activa).
     pendienteA.current = null;
     ocultarRectangulo();
+    limpiarCota(); // rectangulo fijado -> retira la etiqueta viva (D8a)
     invalidate();
   };
 
@@ -282,6 +294,7 @@ function ColocacionActiva() {
       if (pendienteA.current !== null) {
         pendienteA.current = null;
         ocultarRectangulo();
+        limpiarCota(); // Esc cancela el rectangulo -> retira la etiqueta viva (D8a)
         invalidate();
         return;
       }
@@ -290,6 +303,9 @@ function ColocacionActiva() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Al desmontar la herramienta, retira cualquier cota viva colgada (D8a).
+  useEffect(() => () => limpiarCota(), []);
 
   return (
     <group>

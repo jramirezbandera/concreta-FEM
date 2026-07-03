@@ -16,12 +16,22 @@ const FALLBACK = {
   canvasGrid: "#cdd6e2",
   canvasGrid2: "#aab8d0",
   canvasAxis: "#7a90b6",
+  // Texto sobre el lienzo (D7a, etiquetas de elemento): --text-2 en reposo. DEBE
+  // coincidir con tokens.css. Se usa como color de rotulo troika (hexToken).
+  text2: "#5a6678",
   accent: "#2563eb",
   accentLine: "#4f86f0",
   pilar: "#9db2ce",
   pilarLine: "#b6c7dd",
   viga: "#c9a66b",
   vigaLine: "#ddbd87",
+  // Paño / losa (F3, UX-C13/G11): token propio del elemento, ampliacion del mapa
+  // §1.3. DEBE coincidir con tokens.css (--pano / --pano-line). Sage (verde-azulado
+  // apagado), hue distinto de pilar/viga/muro/support/load/centro-rigidez.
+  pano: "#8fb5a3",
+  panoLine: "#a7c8bb",
+  // Cargas dibujadas (D7b): --load (naranja). DEBE coincidir con tokens.css.
+  load: "#f97316",
   node: "#c07d12",
   deformed: "#38bdf8",
   centroMasa: "#d6336c",
@@ -44,12 +54,16 @@ const VAR_NAME: Record<keyof typeof FALLBACK, string> = {
   canvasGrid: "canvas-grid",
   canvasGrid2: "canvas-grid-2",
   canvasAxis: "canvas-axis",
+  text2: "text-2",
   accent: "accent",
   accentLine: "accent-line",
   pilar: "pilar",
   pilarLine: "pilar-line",
   viga: "viga",
   vigaLine: "viga-line",
+  pano: "pano",
+  panoLine: "pano-line",
+  load: "load",
   node: "node",
   deformed: "deformed",
   centroMasa: "centro-masa",

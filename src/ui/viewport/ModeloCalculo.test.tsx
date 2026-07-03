@@ -47,10 +47,15 @@ beforeEach(() => {
 });
 
 describe("ModeloCalculo: visibilidad", () => {
-  it("no se renderiza fuera de 3D (en planta)", () => {
+  // [D11/K-2] Fuera de la vista 3D el control NO desaparece del dock: se muestra
+  // DESHABILITADO con una nota corta (antes hacia return null).
+  it("fuera de 3D (en planta) muestra el control DESHABILITADO con nota", () => {
     vistaStore.getState().setModoVista("planta");
     render(<ModeloCalculo />);
-    expect(screen.queryByText("Ver modelo de cálculo")).toBeNull();
+    expect(screen.getByText("Ver modelo de cálculo")).toBeInTheDocument();
+    const toggle = screen.getByRole("checkbox", { name: "Ver modelo de cálculo" });
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText("Disponible en la vista 3D.")).toBeInTheDocument();
   });
 
   it("en 3D muestra el control con el toggle apagado por defecto", () => {

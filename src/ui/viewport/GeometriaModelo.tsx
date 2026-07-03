@@ -34,6 +34,8 @@ import {
 } from "./hooks/useGeometriaModelo";
 import { resolverContextoElemento } from "./hooks/resolverContextoElemento";
 import { useResaltadoSeleccion, aplicarTinte } from "./hooks/usePickingRef";
+import { RotulosElemento } from "./RotulosElemento";
+import { CargasDibujadas } from "./CargasDibujadas";
 
 // --- Picking helpers ---------------------------------------------------------
 
@@ -391,7 +393,10 @@ const PANO_Z_EPS = 0.01;
 
 function PanoHuella({ pano }: { pano: GeoModelo["panos"][number] }) {
   const ref = useRef<Mesh>(null);
-  const colBase = useMemo(() => colorToken("pilar"), []);
+  // Token propio del paño (UX-C13/G11): la huella usaba `colorToken("pilar")`, lo que
+  // rompia el mapa color->elemento (§1.3). Ahora usa --pano (sage) como los pilares
+  // usan --pilar y las vigas --viga.
+  const colBase = useMemo(() => colorToken("pano"), []);
   const colHover = useMemo(() => colorToken("accentLine"), []);
   const colSel = useMemo(() => colorToken("accent"), []);
 
@@ -513,6 +518,12 @@ export function GeometriaModelo() {
       <PilaresInstanciados pilares={pilares} />
       <HaloPilarSeleccionado pilares={pilares} />
       <VigasInstanciadas vigas={vigas} />
+      {/* Cargas dibujadas (D7b) y rotulos de elemento (D7a): ambos SOLO en planta; cada
+          componente se autooculta en 3D y deriva su geometria junto a la del modelo, nunca
+          por frame (regla #11). Se montan aqui (bajo `obraOculta`) para desaparecer con la
+          obra cuando se pide "solo modelo de calculo". */}
+      <CargasDibujadas />
+      <RotulosElemento />
     </group>
   );
 }

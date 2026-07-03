@@ -95,10 +95,19 @@ beforeEach(() => {
 });
 
 describe("CentroRigidez · visibilidad del control", () => {
-  it("no se renderiza fuera de vista planta (3D)", () => {
+  // [D11/K-2] Fuera de la vista de planta el control NO desaparece del dock: se
+  // muestra DESHABILITADO con una nota corta (antes hacia return null).
+  it("fuera de vista planta (3D) muestra el control DESHABILITADO con nota", () => {
     vistaStore.getState().setModoVista("3d");
     render(<CentroRigidez />);
-    expect(screen.queryByText("Centro de rigidez")).toBeNull();
+    expect(screen.getByText("Centro de rigidez")).toBeInTheDocument();
+    const toggle = screen.getByRole("checkbox", { name: "Mostrar centro de rigidez" });
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText("Disponible en la vista de planta.")).toBeInTheDocument();
+    // El disparador de calculo NO se ofrece deshabilitado (control fuera de contexto).
+    expect(
+      screen.queryByRole("button", { name: /Calcular centro de rigidez/i }),
+    ).toBeNull();
   });
 
   it("en vista planta muestra el control con el toggle APAGADO por defecto", () => {

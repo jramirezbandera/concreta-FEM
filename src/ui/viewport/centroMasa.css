@@ -31,6 +31,21 @@
   accent-color: var(--centro-masa);
   cursor: pointer;
 }
+/* [D11/K-2] Control deshabilitado fuera de la vista de planta: atenuado, sin cursor. */
+.cx-cm__toggle--disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+.cx-cm__toggle--disabled input {
+  cursor: not-allowed;
+}
+/* Nota corta cuando el control esta deshabilitado por la vista activa. */
+.cx-cm__nota {
+  margin: 6px 0 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--text-3);
+}
 
 /* Detalle (coords/peso o estado vacio): separado del toggle por un filete. */
 .cx-cm__detalle {

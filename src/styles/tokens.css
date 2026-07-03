@@ -42,6 +42,15 @@
   --viga: #c9a66b;
   --viga-line: #ddbd87;
   --muro: #7c8aa3;
+  /* Paño / losa (F3, UX-C13/G11): AMPLIACION del mapa semantico §1.3 (igual que se
+     hizo con --centro-masa/--centro-rigidez). El paño usaba el token del pilar
+     (huella) y el acento (colocacion), rompiendo el mapa color->elemento. Verde-azulado
+     apagado (sage): hue propio que NO colisiona con --pilar (azul-gris) ni --viga (ocre)
+     ni --muro (azul-gris) ni --support (verde vivo) ni --load (naranja) ni --centro-rigidez
+     (teal intenso). Se lee como "superficie de forjado", tono papel-verde tenue sobre el
+     lienzo claro. */
+  --pano: #8fb5a3; /* huella de losa (sage) */
+  --pano-line: #a7c8bb; /* contorno / colocacion del paño */
   --support: #22c55e; /* apoyos / arranques */
   --load: #f97316; /* cargas (naranja) */
   --moment: #a855f7; /* releases / momentos */

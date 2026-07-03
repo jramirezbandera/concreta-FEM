@@ -131,8 +131,37 @@ export function CentroRigidez() {
   const { calcularCR, estadoMotor, calculando, errores, ultimoError } =
     useSolicitarCR();
 
-  // El control solo se ofrece en vista planta (espejo del CM).
-  if (!enPlanta) return null;
+  // [D11/K-2] Fuera de la vista de planta el control NO desaparece del dock (antes
+  // return null): se muestra DESHABILITADO con una nota corta. El marcador de escena
+  // sigue gateado (solo en planta).
+  if (!enPlanta) {
+    return (
+      <PanelFlotante
+        className="cx-cr"
+        icono={
+          <span className="cx-cr__glifo" aria-hidden="true">
+            ◇
+          </span>
+        }
+        titulo="Centro de rigidez"
+      >
+        <label className="cx-cr__toggle cx-cr__toggle--disabled">
+          <input
+            type="checkbox"
+            checked={mostrar}
+            onChange={toggle}
+            disabled
+            aria-disabled
+            aria-label="Mostrar centro de rigidez"
+          />
+          <span>Mostrar en planta</span>
+        </label>
+        <p className="cx-cr__nota" role="note">
+          Disponible en la vista de planta.
+        </p>
+      </PanelFlotante>
+    );
+  }
 
   const habilitado = crHabilitado(estadoMotor, calculando);
   const etiqueta = etiquetaBotonCR(estadoMotor, calculando);

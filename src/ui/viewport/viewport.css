@@ -189,3 +189,35 @@
   color: var(--text-2);
   z-index: 3;
 }
+
+/* Cota viva de la banda elastica (D8a, spec §6.1): etiqueta glass junto al cursor con la
+   longitud+angulo (viga) o dimensiones (paño) del tendido en curso. Se posiciona por
+   `transform` (mutado por ref desde cotaBus+rAF): top/left en 0 para que el translate sea
+   absoluto respecto al viewport. No captura el puntero (no estorba a la colocacion). Texto
+   en acento (dato activo) y mono tabular (la clase .mono la aporta el JSX). */
+.cx-cota-viva {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  padding: 2px 7px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-bd);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-panel);
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  z-index: var(--z-float);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* La etiqueta se reposiciona por transform en rAF; no hay transicion CSS que suprimir,
+     pero se documenta la intencion (sin animacion de aparicion). */
+  .cx-cota-viva {
+    transition: none;
+  }
+}

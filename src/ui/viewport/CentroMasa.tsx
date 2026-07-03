@@ -75,9 +75,6 @@ export function CentroMasa() {
   const mostrar = useMostrarCM();
   const toggle = () => vistaStore.getState().toggleCentroMasa();
 
-  // El control solo se ofrece en vista planta (D-diseño-1).
-  if (!enPlanta) return null;
-
   return (
     <PanelFlotante
       className="cx-cm"
@@ -85,16 +82,32 @@ export function CentroMasa() {
       icono={<span className="cx-cm__glifo" aria-hidden="true">⊕</span>}
       titulo="Centro de masas"
     >
-      <label className="cx-cm__toggle">
+      {/* [D11/K-2] Fuera de la vista de planta el control NO desaparece del dock (antes
+          hacia return null y la seccion se esfumaba sin rastro): se muestra DESHABILITADO
+          con una nota corta. El marcador de escena sigue gateado como estaba (solo se
+          dibuja en planta). */}
+      <label
+        className={
+          enPlanta ? "cx-cm__toggle" : "cx-cm__toggle cx-cm__toggle--disabled"
+        }
+      >
         <input
           type="checkbox"
           checked={mostrar}
           onChange={toggle}
+          disabled={!enPlanta}
+          aria-disabled={!enPlanta}
           aria-label="Mostrar centro de masas"
         />
         <span>Mostrar en planta</span>
       </label>
-      {mostrar ? <DetalleCentroMasa /> : null}
+      {!enPlanta ? (
+        <p className="cx-cm__nota" role="note">
+          Disponible en la vista de planta.
+        </p>
+      ) : mostrar ? (
+        <DetalleCentroMasa />
+      ) : null}
     </PanelFlotante>
   );
 }
