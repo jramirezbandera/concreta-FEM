@@ -266,6 +266,30 @@ describe("validarModelo", () => {
     sinJergaFEM(e!);
   });
 
+  // [D22a] El mensaje NOMBRA el ámbito de la carga cuando resuelve a un elemento del
+  // modelo ("la carga sobre la viga V1…"): la carga c1 apunta a la viga v1, que existe.
+  it("REF_HIPOTESIS: el mensaje nombra el ámbito si resuelve (viga V1)", () => {
+    const m = modeloValido();
+    m.cargas[0].hipotesisId = "HIP_X";
+    const e = validarModelo(m).find((x) => x.codigo === "REF_HIPOTESIS");
+    expect(e).toBeDefined();
+    expect(e!.mensaje).toContain('la viga "V1"');
+    sinJergaFEM(e!);
+  });
+
+  // Si el ámbito NO resuelve (elemento borrado), el mensaje se queda genérico: nunca
+  // inventa un nombre. Aquí la carga apunta a un ámbito inexistente y a una hipótesis
+  // inexistente: REF_HIPOTESIS sale sin nombrar el ámbito.
+  it("REF_HIPOTESIS: mensaje genérico si el ámbito no resuelve", () => {
+    const m = modeloValido();
+    m.cargas[0].ambito = "borrado-x";
+    m.cargas[0].hipotesisId = "HIP_X";
+    const e = validarModelo(m).find((x) => x.codigo === "REF_HIPOTESIS");
+    expect(e).toBeDefined();
+    expect(e!.mensaje).not.toContain(" sobre ");
+    sinJergaFEM(e!);
+  });
+
   it("SIN_SUJECION: ningun pilar con vinculacion exterior", () => {
     const m = modeloValido();
     m.pilares[0].vinculacionExterior = false;
@@ -295,6 +319,18 @@ describe("validarModelo", () => {
     expect(e).toBeDefined();
     expect(e!.elementoId).toBe("n9");
     expect(e!.elementoTipo).toBe("nudo");
+    sinJergaFEM(e!);
+  });
+
+  // [D22a] FLOTANTE navegable: mensaje con la posición de obra + campo `posicion`
+  // estructurado (coords de OBRA, no FEM) para que la UI pueda encuadrar/mostrarla.
+  it("FLOTANTE: mensaje con la posición y campo posicion estructurado", () => {
+    const m = modeloValido();
+    m.nudos.push({ id: "n9", x: 4, y: 3 });
+    const e = validarModelo(m).find((x) => x.codigo === "FLOTANTE");
+    expect(e).toBeDefined();
+    expect(e!.mensaje).toContain("(4.00, 3.00)");
+    expect(e!.posicion).toEqual({ x: 4, y: 3 });
     sinJergaFEM(e!);
   });
 
@@ -396,6 +432,8 @@ describe("validarModelo", () => {
     expect(e).toBeDefined();
     expect(e!.severidad).toBe("error");
     expect(e!.elementoId).toBe("cX");
+    // [D22a] El mensaje nombra el ámbito si resuelve (la carga cX apunta a la viga v1).
+    expect(e!.mensaje).toContain('la viga "V1"');
     sinJergaFEM(e!);
   });
 

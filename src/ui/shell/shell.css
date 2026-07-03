@@ -128,15 +128,20 @@
 }
 
 /* --- Menubar (§2 / §3.2): menus que cambian por solapa --- */
+/* [D12] El <nav> exterior lleva la métrica/borde de la barra (landmark de navegación);
+   el Menubar.Root de Radix (role="menubar") es la fila flex interior. */
+.cx-menubar-nav {
+  flex: 0 0 var(--h-menubar);
+  height: var(--h-menubar);
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface);
+}
 .cx-menubar {
   display: flex;
   align-items: center;
   gap: 2px;
-  flex: 0 0 var(--h-menubar);
-  height: var(--h-menubar);
+  height: 100%;
   padding: 0 8px;
-  border-bottom: 1px solid var(--border);
-  background-color: var(--surface);
 }
 .cx-menu {
   appearance: none;
@@ -346,11 +351,41 @@
   padding: 0 var(--space-3);
   border-left: 1px solid var(--border);
   background-color: var(--surface);
-  /* Un solo scroll VERTICAL del dock; NUNCA horizontal. El contenido intrinsecamente
-     ancho (la tabla de Reacciones, 7 col) scrollea dentro de SU seccion, no del dock
-     entero. overflow-x:hidden mata la barra horizontal global que aparecia en PR1. */
+  /* [D14 · PR3] Anatomía C: el dock NO scrollea entero. La cabecera PINNED (.cx-dock__fijo)
+     queda fija arriba; el resto scrollea en .cx-dock__scroll. min-height:0 permite que el
+     hijo scrollable se contenga en vez de empujar el dock. */
+  overflow: hidden;
+  min-height: 0;
+}
+/* Cabecera PINNED (anatomía C): Cálculo + Combinación en Resultados/Isovalores. Fija arriba
+   (no colapsa); un filete la separa de las secciones de abajo. Acotada en alto: si el
+   reporte de errores es largo, la cabecera scrollea COMO BLOQUE (no cada panel por dentro),
+   sin comerse la región scrollable de secciones. */
+.cx-dock__fijo {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  max-height: 55%;
+  overflow-y: auto;
+}
+/* Región scrollable: las secciones colapsables + Ayudas. Un ÚNICO scroll VERTICAL; NUNCA
+   horizontal (el contenido ancho —la tabla de Reacciones, 7 col— scrollea dentro de SU
+   sección, no del dock). overflow-x:hidden mata la barra horizontal global. */
+.cx-dock__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+}
+/* Las secciones del scroll y del pinned LLENAN el ancho (no anchos fijos por-panel). */
+.cx-dock__fijo > .cx-dock-sec,
+.cx-dock__fijo > .cx-float,
+.cx-dock__scroll .cx-dock-sec,
+.cx-dock__scroll .cx-float {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Las secciones del dock LLENAN el ancho (no anchos fijos 380/360/240px): asi ni el

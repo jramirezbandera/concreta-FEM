@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import "./shell.css";
 import { Brandbar } from "./Brandbar";
 import { Menubar } from "./Menubar";
@@ -8,6 +8,7 @@ import { StatusBar, type StatusBarProps } from "./StatusBar";
 import { BottomTabs } from "./BottomTabs";
 import { AvisoPersistencia } from "./AvisoPersistencia";
 import type { EstadoArranquePersistencia } from "./useArranquePersistencia";
+import { vistaStore } from "../../estado";
 import {
   DialogoGruposYPlantas,
   DialogoHipotesis,
@@ -51,6 +52,17 @@ export interface ShellProps {
   avisoPersistencia?: EstadoArranquePersistencia;
 }
 
+// [D14 · PR3] Colapso del dock entero: cuando está colapsado, la región del dock no se
+// monta y el lienzo recupera su ancho. Suscripción fina (el shell no está en el bucle del
+// viewport; solo re-renderiza al conmutar el colapso).
+function useDockColapsado(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.dockUI.dockColapsado, cb),
+    () => vistaStore.getState().dockUI.dockColapsado,
+    () => vistaStore.getState().dockUI.dockColapsado,
+  );
+}
+
 export function Shell({
   children,
   nombreObra,
@@ -58,6 +70,7 @@ export function Shell({
   dock,
   avisoPersistencia,
 }: ShellProps) {
+  const dockColapsado = useDockColapsado();
   return (
     <div className="cx-app">
       <Brandbar nombreObra={nombreObra} />
@@ -76,10 +89,10 @@ export function Shell({
           )}
         </main>
         <ToolsRail />
-        {/* Dock al borde de ventana (tools queda pegado al lienzo). Solo se monta si
-            App compuso contenido para la pestana activa: las pestanas sin paneles de
-            datos dejan el lienzo a ancho completo. */}
-        {dock != null && dock !== false && (
+        {/* Dock al borde de ventana (tools queda pegado al lienzo). Solo se monta si App
+            compuso contenido para la pestana activa Y el dock no está colapsado (D14e): al
+            colapsarlo, la región desaparece y el lienzo recupera su ancho. */}
+        {dock != null && dock !== false && !dockColapsado && (
           <aside className="cx-dock" aria-label="Panel de datos">
             {dock}
           </aside>

@@ -1,4 +1,5 @@
 import { createContext, useContext, type HTMLAttributes, type ReactNode } from "react";
+import * as Collapsible from "@radix-ui/react-collapsible";
 
 // Panel "envoltura" reutilizado por TODOS los paneles de la app (inspector,
 // herramienta, reacciones, diagramas, plantillas, CM/CR, modelo de cálculo…). Tiene
@@ -33,6 +34,31 @@ export function ProveedorModoPanel({
   );
 }
 
+// [D14 · PR3] Contexto de sección colapsable del dock. Un `DockSeccion` (Shell) lo provee
+// alrededor de CADA panel del dock: el PanelFlotante interior lee este contexto y se pinta
+// como sección colapsable (cabecera-trigger + cuerpo colapsable) SIN que el call site de
+// cada panel cambie. `null` = no hay sección colapsable (uso glass o dock no colapsable).
+export interface ConfigDockSeccion {
+  abierta: boolean;
+  onAbiertaChange: (abierta: boolean) => void;
+}
+const ContextoDockSeccion = createContext<ConfigDockSeccion | null>(null);
+
+/** Envuelve UN panel del dock para hacerlo colapsable (el panel lee esto por contexto). */
+export function ProveedorDockSeccion({
+  config,
+  children,
+}: {
+  config: ConfigDockSeccion;
+  children: ReactNode;
+}) {
+  return (
+    <ContextoDockSeccion.Provider value={config}>
+      {children}
+    </ContextoDockSeccion.Provider>
+  );
+}
+
 export interface PanelFlotanteProps extends HTMLAttributes<HTMLDivElement> {
   /** Titulo de la cabecera. Si se omite, no se renderiza cabecera. */
   titulo?: ReactNode;
@@ -59,6 +85,12 @@ export function PanelFlotante({
   ...rest
 }: PanelFlotanteProps) {
   const modo = useContext(ContextoModoPanel);
+  // [D14 · PR3] Config de sección colapsable inyectada por DockSeccion (o null). Cuando el
+  // panel se monta dentro de un DockSeccion en modo "plano", se pinta colapsable.
+  const dockSeccion = useContext(ContextoDockSeccion);
+  const colapsable = dockSeccion !== null && modo === "plano";
+  const abierta = dockSeccion?.abierta ?? true;
+  const onAbiertaChange = dockSeccion?.onAbiertaChange;
   // En "plano" el panel es una seccion del dock (sin cromo glass); en "glass" mantiene
   // .cx-float (vidrio + sombra). La clase del consumidor (className) se respeta en ambos
   // para que sus reglas propias (anchos, layout del cuerpo) sigan aplicando.
@@ -66,23 +98,60 @@ export function PanelFlotante({
   const clases = [base, className].filter(Boolean).join(" ");
   const claseCabecera = modo === "plano" ? "cx-dock-sec__head" : "cx-panel-head";
   const claseCuerpo = modo === "plano" ? "cx-dock-sec__body" : "cx-float__body";
+
+  const tagEl =
+    tag !== undefined ? (
+      <span
+        className={
+          tagVariante === "warning"
+            ? "cx-panel-head__tag cx-panel-head__tag--warning mono"
+            : "cx-panel-head__tag mono"
+        }
+      >
+        {tag}
+      </span>
+    ) : null;
+
+  // [D14] Sección colapsable del dock: cabecera-trigger + cuerpo colapsable. Solo cuando
+  // el panel está dentro de un DockSeccion (contexto) en modo "plano" y hay título (sin
+  // cabecera no hay trigger). El chevron a la izquierda comunica el estado; el resto de la
+  // cabecera (icono/título/tag) se conserva.
+  if (colapsable && titulo !== undefined) {
+    return (
+      <Collapsible.Root
+        className={clases}
+        open={abierta}
+        onOpenChange={(o) => onAbiertaChange?.(o)}
+        {...rest}
+      >
+        <Collapsible.Trigger asChild>
+          <button
+            type="button"
+            className={`${claseCabecera} cx-dock-sec__head--trigger`}
+            data-state={abierta ? "open" : "closed"}
+          >
+            <span className="cx-dock-sec__chevron" aria-hidden="true">
+              ▶
+            </span>
+            {icono && <span className="cx-panel-head__icon">{icono}</span>}
+            <span className="cx-panel-head__title">{titulo}</span>
+            {tagEl}
+          </button>
+        </Collapsible.Trigger>
+        <Collapsible.Content className={claseCuerpo}>
+          {children}
+        </Collapsible.Content>
+      </Collapsible.Root>
+    );
+  }
+
   return (
     <div className={clases} {...rest}>
       {titulo !== undefined && (
         <div className={claseCabecera}>
           {icono && <span className="cx-panel-head__icon">{icono}</span>}
           <span className="cx-panel-head__title">{titulo}</span>
-          {tag !== undefined && (
-            <span
-              className={
-                tagVariante === "warning"
-                  ? "cx-panel-head__tag cx-panel-head__tag--warning mono"
-                  : "cx-panel-head__tag mono"
-              }
-            >
-              {tag}
-            </span>
-          )}
+          {tagEl}
         </div>
       )}
       <div className={claseCuerpo}>{children}</div>

@@ -1,6 +1,4 @@
-import { useState, type ReactNode } from "react";
-import * as Collapsible from "@radix-ui/react-collapsible";
-import { FilaArbol } from "../primitivas";
+import { FilaArbol, SeccionColapsable } from "../primitivas";
 import { modeloStore, vistaStore } from "../../estado";
 import {
   pilaresDePlanta,
@@ -9,43 +7,14 @@ import {
   plantasDeGrupo,
 } from "../../dominio";
 
-// Sidebar / arbol de obra (Spec Diseno UI §3.3). Secciones colapsables
-// (Radix Collapsible). Lenguaje de obra SIEMPRE: nada de nodos/members (CLAUDE
-// §17). Solo lectura del modelo + setters de vistaStore. El shell usa estado
-// reactivo normal (no esta en el bucle de render del viewport).
+// Sidebar / arbol de obra (Spec Diseno UI §3.3). Secciones colapsables via la primitiva
+// compartida SeccionColapsable (D14 · PR3: DRY — antes tenia un `Seccion` local con Radix
+// Collapsible duplicado). Lenguaje de obra SIEMPRE: nada de nodos/members (CLAUDE §17).
+// Solo lectura del modelo + setters de vistaStore. El shell usa estado reactivo normal
+// (no esta en el bucle de render del viewport).
 
-interface SeccionProps {
-  titulo: string;
-  defaultAbierta?: boolean;
-  children: ReactNode;
-}
-
-function Seccion({ titulo, defaultAbierta = true, children }: SeccionProps) {
-  const [abierta, setAbierta] = useState(defaultAbierta);
-  return (
-    <Collapsible.Root
-      className="cx-side-sec"
-      open={abierta}
-      onOpenChange={setAbierta}
-    >
-      <Collapsible.Trigger asChild>
-        <button
-          type="button"
-          className="cx-side-sec__head caps"
-          data-state={abierta ? "open" : "closed"}
-        >
-          <span className="cx-side-sec__chevron" aria-hidden="true">
-            ▶
-          </span>
-          <span className="cx-side-sec__title">{titulo}</span>
-        </button>
-      </Collapsible.Trigger>
-      <Collapsible.Content className="cx-side-sec__body">
-        {children}
-      </Collapsible.Content>
-    </Collapsible.Root>
-  );
-}
+// Alias fino para conservar el JSX legible (<Seccion titulo=…>) tras adoptar la primitiva.
+const Seccion = SeccionColapsable;
 
 export function Sidebar() {
   // Lectura del modelo: campos sueltos via selectores. El arbol re-renderiza al
@@ -62,6 +31,12 @@ export function Sidebar() {
   const setGrupoActivo = vistaStore((s) => s.setGrupoActivo);
   const setPlantaActiva = vistaStore((s) => s.setPlantaActiva);
   const abrirDialogo = vistaStore((s) => s.abrirDialogo);
+  // [D11a] Conmutacion de vista desde el arbol (espejo del selector 2D/3D del HUD).
+  // "Planta de grupo" -> modoVista "planta"; "Vista 3D" -> "3d". La fila activa se
+  // resalta (patron FilaArbol `seleccionada`). Mosaico NO se ofrece aqui (sigue
+  // "próximamente" en el HUD).
+  const modoVista = vistaStore((s) => s.modoVista);
+  const setModoVista = vistaStore((s) => s.setModoVista);
 
   // Contador de un tipo de elemento en el AMBITO activo (lenguaje de obra, Spec Diseno
   // UI §3.3): planta activa si la hay; si no, todo el grupo activo (elementos DISTINTOS
@@ -134,9 +109,19 @@ export function Sidebar() {
       </Seccion>
 
       <Seccion titulo="Vistas" defaultAbierta={false}>
-        {/* Sin accion en F9: la conmutacion de vista llega con feature posterior. */}
-        <FilaArbol label="Planta de grupo" interactiva={false} />
-        <FilaArbol label="Vista 3D" interactiva={false} />
+        {/* [D11a] Filas accionables: espejo de setModoVista. La activa se resalta
+            (patron FilaArbol `seleccionada`). Mosaico no se ofrece (sigue en el HUD
+            como "próximamente"). */}
+        <FilaArbol
+          label="Planta de grupo"
+          seleccionada={modoVista === "planta"}
+          onClick={() => setModoVista("planta")}
+        />
+        <FilaArbol
+          label="Vista 3D"
+          seleccionada={modoVista === "3d"}
+          onClick={() => setModoVista("3d")}
+        />
       </Seccion>
 
       <Seccion titulo="Elementos propios">

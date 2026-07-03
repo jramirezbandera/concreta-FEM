@@ -1,0 +1,10 @@
+/* DialogoDatosGenerales (D13): datos generales de la obra (en F1, solo el nombre).
+   Estilado solo con tokens. El Campo aporta su propio estilo (.cx-campo/.cx-input);
+   aquí solo el espaciado del cuerpo. */
+
+.cx-datos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  min-width: 320px;
+}

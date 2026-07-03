@@ -7,6 +7,7 @@ import type { Pestana } from "../../estado";
 // Accion que dispara un item de menu. Union ampliable: a medida que F11..F15
 // activen mas menus se anaden valores aqui (p. ej. "abrirCargas", "calcular").
 export type AccionMenu =
+  | "abrirDatosGenerales"
   | "abrirGruposPlantas"
   | "abrirHipotesis"
   | "abrirOpcionesAnalisis"
@@ -41,7 +42,9 @@ const ARCHIVO: MenuDef = {
 const OBRA: MenuDef = {
   etiqueta: "Obra",
   items: [
-    "Datos generales",
+    // "Datos generales" abre el diálogo del nombre de la obra (D13). "Materiales" sigue
+    // como placeholder (sin destino todavía).
+    { etiqueta: "Datos generales", accion: "abrirDatosGenerales" },
     { etiqueta: "Plantas y grupos", accion: "abrirGruposPlantas" },
     "Materiales",
   ],

@@ -169,6 +169,39 @@
   padding: 7px 2px;
   color: var(--text-2);
 }
+/* [D14 · PR3] Cabecera-trigger de sección colapsable del dock: es un <button> full-width
+   (reset del estilo nativo) con el chevron a la izquierda. El resto de la cabecera
+   (icono/título/tag) se conserva. */
+.cx-dock-sec__head--trigger {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cx-dock-sec__head--trigger:hover {
+  color: var(--text);
+}
+.cx-dock-sec__head--trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.cx-dock-sec__chevron {
+  flex: 0 0 auto;
+  font-size: 9px;
+  color: var(--text-3);
+  transition: transform 0.12s ease;
+}
+.cx-dock-sec__head--trigger[data-state="open"] .cx-dock-sec__chevron {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cx-dock-sec__chevron {
+    transition: none;
+  }
+}
 .cx-dock-sec__head .cx-panel-head__title {
   font-size: 11px;
   font-weight: 600;
@@ -454,4 +487,103 @@
 .cx-select-item--mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* --- D3: pie del listado de secciones con la accion "Nueva sección…" --- */
+/* Separado del listado por un borde superior; el boton ocupa el ancho y usa el
+   acento (es una accion, no un dato). Solo tokens. */
+.cx-select-footer {
+  border-top: 1px solid var(--border);
+  padding: var(--space-1, 4px);
+}
+.cx-select-footer__accion {
+  width: 100%;
+  padding: var(--space-1, 6px) var(--space-2, 8px);
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.cx-select-footer__accion:hover,
+.cx-select-footer__accion:focus-visible {
+  background-color: var(--surface-muted);
+  outline: none;
+}
+
+/* --- Aviso de coherencia seccion<->material (auditoria UI/UX D15) ---
+   Aviso NO bloqueante cuando la seccion (perfil metalico / hormigon) no casa con la
+   familia del material (acero / hormigon). role=status en el TSX. Discreto: caja
+   hundida neutra con borde y texto en --warning, para que se lea como aviso (no
+   error, no accion). Mismo lenguaje visual que .cx-gyp__aviso-cota. Compartido por
+   los paneles-herramienta e inspectores de pilar/viga. Solo tokens. */
+.cx-aviso-coherencia {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-muted);
+  color: var(--warning);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --- SeccionColapsable (.cx-colapsable): cabecera-trigger + contenido colapsable
+   (D14 · PR3). Sobre Radix Collapsible; reemplaza los `Seccion` locales del Sidebar y
+   del dock. Estilo calcado del arbol de obra (.cx-side-sec) para coherencia visual. --- */
+.cx-colapsable {
+  margin-bottom: 4px;
+}
+.cx-colapsable__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.cx-colapsable__head:hover {
+  background-color: var(--surface-muted);
+  color: var(--text-2);
+}
+.cx-colapsable__head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.cx-colapsable__chevron {
+  font-size: 9px;
+  transition: transform 0.12s ease;
+}
+.cx-colapsable__head[data-state="open"] .cx-colapsable__chevron {
+  transform: rotate(90deg);
+}
+.cx-colapsable__title {
+  flex: 1 1 auto;
+  text-align: left;
+}
+/* Accesorio a la derecha de la cabecera (contador/tag): mono, atenuado. */
+.cx-colapsable__accesorio {
+  flex: 0 0 auto;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-3);
+}
+.cx-colapsable__body {
+  padding: 2px 0 4px;
+}
+/* Respeta prefers-reduced-motion: sin transicion del chevron. */
+@media (prefers-reduced-motion: reduce) {
+  .cx-colapsable__chevron {
+    transition: none;
+  }
 }

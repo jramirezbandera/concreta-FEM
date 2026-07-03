@@ -4,6 +4,7 @@
 // contador del AMBITO activo (planta activa, si no grupo activo, si no la obra).
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import { modeloStore, vistaStore } from "../../estado";
 import { crearModeloVacio, type Modelo } from "../../dominio";
@@ -77,6 +78,7 @@ beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
+  vistaStore.getState().setModoVista("planta");
 });
 
 // Localiza la fila de un elemento por su etiqueta y devuelve su contador.
@@ -168,5 +170,52 @@ describe("Sidebar: filas Vigas y Paños por ambito (UX-A8)", () => {
     render(<Sidebar />);
     const fila = screen.getByText("Paños").closest(".cx-row") as HTMLElement;
     expect(fila.querySelector(".cx-row__swatch")).toBeTruthy();
+  });
+});
+
+// [D11a] Seccion "Vistas": filas accionables (espejo de setModoVista), la activa
+// resaltada; Mosaico NO se ofrece aqui. La seccion arranca colapsada -> se abre antes
+// de tocar las filas (Radix Collapsible no monta el contenido cerrado).
+describe("Sidebar: seccion Vistas (D11a)", () => {
+  async function abrirVistas(user: ReturnType<typeof userEvent.setup>) {
+    // La cabecera-trigger de la seccion "Vistas" la despliega.
+    await user.click(screen.getByRole("button", { name: /Vistas/i }));
+  }
+
+  it("las filas Planta de grupo / Vista 3D son pulsables y conmutan el modo", async () => {
+    const user = userEvent.setup();
+    render(<Sidebar />);
+    await abrirVistas(user);
+
+    const fila3d = screen.getByText("Vista 3D").closest(".cx-row") as HTMLElement;
+    expect(fila3d.tagName).toBe("BUTTON");
+    await user.click(fila3d);
+    expect(vistaStore.getState().modoVista).toBe("3d");
+
+    const filaPlanta = screen
+      .getByText("Planta de grupo")
+      .closest(".cx-row") as HTMLElement;
+    await user.click(filaPlanta);
+    expect(vistaStore.getState().modoVista).toBe("planta");
+  });
+
+  it("resalta la fila del modo activo (aria-pressed)", async () => {
+    const user = userEvent.setup();
+    vistaStore.getState().setModoVista("3d");
+    render(<Sidebar />);
+    await abrirVistas(user);
+    const fila3d = screen.getByText("Vista 3D").closest(".cx-row") as HTMLElement;
+    expect(fila3d.getAttribute("aria-pressed")).toBe("true");
+    const filaPlanta = screen
+      .getByText("Planta de grupo")
+      .closest(".cx-row") as HTMLElement;
+    expect(filaPlanta.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("no ofrece Mosaico (sigue como 'próximamente' en el HUD)", async () => {
+    const user = userEvent.setup();
+    render(<Sidebar />);
+    await abrirVistas(user);
+    expect(screen.queryByText("Mosaico")).toBeNull();
   });
 });

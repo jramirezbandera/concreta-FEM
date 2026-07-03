@@ -14,10 +14,11 @@
 // fuera de la Capa 1). Defensivo: si IndexedDB no esta disponible (modo privado,
 // almacenamiento denegado, entorno de test sin IndexedDB) la app sigue funcionando
 // en memoria, sin persistir.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { vistaStore } from "../../estado";
 import {
   abrirDB,
+  cargarProyecto,
   cargarProyectoEnStore,
   crearProyecto,
   getProyectoActivoId,
@@ -36,9 +37,23 @@ import {
 //     sesion no se esta guardando. Banner persistente role="alert".
 export type EstadoArranquePersistencia = "ok" | "sin-indexeddb" | "carga-fallida";
 
+// [D13] Estado que el arranque de persistencia devuelve a la UI. Ademas del `aviso` del
+// banner, expone el NOMBRE real del proyecto activo (metadato de persistencia, NO Capa 1,
+// NO undo) para el Brandbar, el `proyectoActivoId` (el diálogo Datos generales lo necesita
+// para renombrar) y `refrescarNombre` (relee el nombre del registro tras renombrar).
+export interface ArranquePersistencia {
+  aviso: EstadoArranquePersistencia;
+  /** Nombre del proyecto activo (o el rótulo inicial si aún no hay id). */
+  nombreObra: string;
+  /** Id del proyecto activo, o null si no hay persistencia (sin IndexedDB / fallo). */
+  proyectoActivoId: string | null;
+  /** Relee el nombre del registro activo (tras renombrar) y refresca el Brandbar. */
+  refrescarNombre: () => void;
+}
+
 // Nombre del proyecto inicial cuando la biblioteca esta vacia. Coincide con el
-// rotulo "Obra sin título" del Brandbar; cuando exista UI de proyectos (F2+) se
-// podra renombrar.
+// rotulo "Obra sin título" del Brandbar; el diálogo Datos generales (D13) permite
+// renombrar el proyecto activo.
 const NOMBRE_OBRA_INICIAL = "Obra sin título";
 
 // Asegura un proyecto activo: devuelve el id del activo o, si no hay ninguno, crea
@@ -55,8 +70,24 @@ async function asegurarProyectoActivo(): Promise<string> {
 // atados al proyecto activo. Se ejecuta UNA vez al montar (idempotente por deps
 // vacias); el cleanup da de baja ambos autosaves al desmontar. Devuelve el estado de
 // la persistencia para que el Shell muestre (o no) el aviso correspondiente.
-export function useArranquePersistencia(): EstadoArranquePersistencia {
+export function useArranquePersistencia(): ArranquePersistencia {
   const [estado, setEstado] = useState<EstadoArranquePersistencia>("ok");
+  // [D13a] Nombre e id del proyecto activo. El nombre alimenta el Brandbar; el id lo usa
+  // el diálogo Datos generales para renombrar. Ambos son metadato de persistencia (NO
+  // Capa 1, NO undo): viven aquí, no en el Modelo.
+  const [nombreObra, setNombreObra] = useState<string>(NOMBRE_OBRA_INICIAL);
+  const [proyectoActivoId, setProyectoActivoId] = useState<string | null>(null);
+
+  // [D13a] Relee el nombre del registro activo (tras renombrar) y refresca el Brandbar.
+  // Defensivo: sin id (sin persistencia) es no-op; si el proyecto ya no existe, conserva
+  // el nombre actual. Lee del repositorio (fuente de verdad del nombre), no del store.
+  const refrescarNombre = useCallback(() => {
+    if (proyectoActivoId === null) return;
+    void cargarProyecto(proyectoActivoId).then((registro) => {
+      if (registro !== undefined) setNombreObra(registro.nombre);
+    });
+  }, [proyectoActivoId]);
+
   useEffect(() => {
     // Bajas de los autosaves, registradas en cuanto arrancan. El cleanup las
     // invoca aunque el efecto se desmonte antes de terminar la fase async.
@@ -93,6 +124,13 @@ export function useArranquePersistencia(): EstadoArranquePersistencia {
 
       const proyectoId = await asegurarProyectoActivo();
       if (cancelado) return;
+      // [D13a] Fija el id activo para el diálogo Datos generales y lee el nombre real del
+      // registro (el Brandbar deja de mostrar el rótulo fijo). Si el registro no carga,
+      // se queda con el nombre inicial.
+      if (!cancelado) setProyectoActivoId(proyectoId);
+      const registro = await cargarProyecto(proyectoId);
+      if (cancelado) return;
+      if (registro !== undefined) setNombreObra(registro.nombre);
 
       // Carga PRIMERO (rehidrata stores), luego arranca autosave: asi el primer
       // guardado no dispara por la propia carga inicial. cargarProyectoEnStore fija
@@ -118,6 +156,11 @@ export function useArranquePersistencia(): EstadoArranquePersistencia {
         return;
       }
 
+      // [D14 · PR3] Al cargar (cambiar de) obra, resetea el estado de UI del dock (colapso
+      // entero + por sección): la obra nueva empieza con el dock abierto y sus secciones
+      // abiertas (patrón resolverVistaActiva/snapActivo, estado de vista transitorio).
+      vistaStore.getState().resetDockUI();
+
       // cargarPlantillasEnStore valida las plantillas (Zod) al leer de IndexedDB.
       await cargarPlantillasEnStore(proyectoId);
       if (cancelado) return;
@@ -139,5 +182,5 @@ export function useArranquePersistencia(): EstadoArranquePersistencia {
     // proyecto todavia). Cuando exista (F2+), re-arrancar carga+autosave de Modelo
     // y plantillas con el nuevo proyectoId sera responsabilidad de esa UI.
   }, []);
-  return estado;
+  return { aviso: estado, nombreObra, proyectoActivoId, refrescarNombre };
 }

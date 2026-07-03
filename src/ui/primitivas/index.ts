@@ -8,14 +8,17 @@ export type { BotonProps, VarianteBoton } from "./Boton";
 export { Segmentado } from "./Segmentado";
 export type { SegmentadoProps, OpcionSegmento } from "./Segmentado";
 
-export { PanelFlotante, ProveedorModoPanel } from "./PanelFlotante";
-export type { PanelFlotanteProps, ModoPanel } from "./PanelFlotante";
+export { PanelFlotante, ProveedorModoPanel, ProveedorDockSeccion } from "./PanelFlotante";
+export type { PanelFlotanteProps, ModoPanel, ConfigDockSeccion } from "./PanelFlotante";
 
 export { Chip, Pill } from "./Chip";
 export type { ChipProps, PillProps } from "./Chip";
 
 export { FilaArbol } from "./FilaArbol";
 export type { FilaArbolProps } from "./FilaArbol";
+
+export { SeccionColapsable } from "./SeccionColapsable";
+export type { SeccionColapsableProps } from "./SeccionColapsable";
 
 export { Campo } from "./Campo";
 export type { CampoProps } from "./Campo";

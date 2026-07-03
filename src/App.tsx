@@ -9,7 +9,12 @@
 // null cuando hay algo que seleccionar, ni quedar apuntando a un grupo/planta de
 // una obra anterior tras restaurar autosave o cambiar de proyecto).
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Shell, useArranquePersistencia, useAtajosGlobales } from "./ui/shell";
+import {
+  Shell,
+  DockSeccion,
+  useArranquePersistencia,
+  useAtajosGlobales,
+} from "./ui/shell";
 import {
   Viewport,
   Slot,
@@ -33,6 +38,10 @@ import { InspectorPilar, PanelHerramientaPilar } from "./ui/entradaPilares";
 import { InspectorViga, PanelHerramientaViga } from "./ui/entradaVigas";
 import { InspectorPano, PanelHerramientaPano } from "./ui/entradaPanos";
 import {
+  DialogoDatosGenerales,
+  DialogoSeccionPersonalizada,
+} from "./ui/dialogos";
+import {
   DeformadaOverlay,
   BotonCalcular,
   ComboSelector,
@@ -43,6 +52,7 @@ import {
   PanelFrecuencias,
   IsovaloresOverlay,
   PanelIsovalores,
+  LeyendaIsovalores,
   usePrecargaMotor,
 } from "./ui/resultados";
 import {
@@ -354,42 +364,57 @@ function useCoordsThrottled(): { x: number; y: number } | null {
 interface ComposicionPestana {
   sceneOverlays: ReactNode;
   hudOverlays: ReactNode;
+  // [D14 · PR3] Cabecera PINNED del dock (anatomía C): controles que quedan FIJOS arriba
+  // del dock y NO scrollean ni colapsan (Resultados: Cálculo + Combinación). null si la
+  // pestaña no tiene cabecera pinned.
+  dockFijo: ReactNode;
+  // Secciones COLAPSABLES del dock (scroll debajo de la cabecera pinned). Cada una envuelta
+  // en DockSeccion (cablea el colapso a DockUIState).
   panelesDock: ReactNode;
 }
 
-// Seccion "Ayudas" del dock (PR2): los CONTROLES de Centro de masas, Centro de rigidez y
-// "Ver modelo de cálculo". Comun a TODAS las pestanas (como cuando vivian en el Hud
-// persistente). Cada control se autooculta por modo de vista (CM/CR solo en planta,
-// modelo de calculo solo en 3D), asi el dock no muestra ayudas sin sentido. Sus
-// MARCADORES de escena siguen en sceneOverlays; control y marcador hablan solo por
-// vistaStore (mostrarCentroMasa, …).
-function AyudasDock() {
+// Seccion "Ayudas" del dock (PR2/PR3): los CONTROLES de Centro de masas, Centro de rigidez
+// y "Ver modelo de cálculo". Comun a TODAS las pestanas. Cada uno es una sección colapsable
+// propia (DockSeccion); ya no hacen return null fuera de su vista (D11/K-2), así que la
+// sección persiste y el colapso guardado no se pierde al cambiar de vista.
+function AyudasDock({ pestana }: { pestana: Pestana }) {
   return (
     <>
-      <CentroMasa />
-      <CentroRigidez />
-      <ModeloCalculo />
+      <DockSeccion pestana={pestana} seccion="centroMasa">
+        <CentroMasa />
+      </DockSeccion>
+      <DockSeccion pestana={pestana} seccion="centroRigidez">
+        <CentroRigidez />
+      </DockSeccion>
+      <DockSeccion pestana={pestana} seccion="modeloCalculo">
+        <ModeloCalculo />
+      </DockSeccion>
     </>
   );
 }
 
-// Envuelve los paneles de la pestana + las Ayudas en el cromo PLANO del dock
-// (ProveedorModoPanel modo="plano"): asi el dock se lee como UN panel con secciones, no
-// como una pila de tarjetas glass. Si no hay ningun panel de datos, el call site no monta
-// el dock (la region no aparece y el lienzo ocupa todo el ancho).
-function dockDePestana(panelesDock: ReactNode): ReactNode {
+// Envuelve un panel del dock en una sección COLAPSABLE (DockSeccion). Azúcar para no repetir
+// pestaña+clave en cada panel de la composición.
+function Sec({
+  pestana,
+  seccion,
+  children,
+}: {
+  pestana: Pestana;
+  seccion: string;
+  children: ReactNode;
+}): ReactNode {
   return (
-    <ProveedorModoPanel modo="plano">
-      {panelesDock}
-      <AyudasDock />
-    </ProveedorModoPanel>
+    <DockSeccion pestana={pestana} seccion={seccion}>
+      {children}
+    </DockSeccion>
   );
 }
 
-// Compone las tres piezas para la pestana activa. PURA: solo depende de `pestana` y
+// Compone las cuatro piezas para la pestana activa. PURA: solo depende de `pestana` y
 // `enPleno` (3D pleno gatea la introduccion grafica y las ayudas 2D). Cada panel se
 // autooculta segun seleccion/resultados; acotar el montaje a su pestana mantiene
-// limpias las demas (igual que antes del dock). Sin duplicar condiciones.
+// limpias las demas. Sin duplicar condiciones.
 function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPestana {
   switch (pestana) {
     case "entradaPilares":
@@ -407,14 +432,21 @@ function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPest
           </>
         ),
         hudOverlays: null,
-        // Paneles de datos al dock (flujo normal de la region, sin Slot). El inspector
+        dockFijo: null,
+        // Paneles de datos al dock, cada uno como SECCIÓN COLAPSABLE. El inspector
         // permanece tambien en 3D (se selecciona y se edita, F2c); la herramienta y el
         // calco DXF son ayudas 2D y se ocultan en 3D pleno.
         panelesDock: (
           <>
-            <InspectorPilar />
-            {!enPleno && <PanelHerramientaPilar />}
-            {!enPleno && <PanelPlantillas />}
+            <Sec pestana={pestana} seccion="herramienta">
+              {!enPleno && <PanelHerramientaPilar />}
+            </Sec>
+            <Sec pestana={pestana} seccion="inspector">
+              <InspectorPilar />
+            </Sec>
+            <Sec pestana={pestana} seccion="plantillas">
+              {!enPleno && <PanelPlantillas />}
+            </Sec>
           </>
         ),
       };
@@ -434,16 +466,27 @@ function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPest
           </>
         ),
         hudOverlays: null,
+        dockFijo: null,
         // Inspectores de viga y de paño comparten la pestana: cada uno se autooculta si
         // la seleccion no es de su tipo (solo uno se muestra a la vez). Herramientas y
         // calco DXF: ayudas 2D, ocultas en 3D pleno.
         panelesDock: (
           <>
-            <InspectorViga />
-            <InspectorPano />
-            {!enPleno && <PanelHerramientaViga />}
-            {!enPleno && <PanelHerramientaPano />}
-            {!enPleno && <PanelPlantillas />}
+            <Sec pestana={pestana} seccion="herramienta">
+              {!enPleno && <PanelHerramientaViga />}
+            </Sec>
+            <Sec pestana={pestana} seccion="herramientaPano">
+              {!enPleno && <PanelHerramientaPano />}
+            </Sec>
+            <Sec pestana={pestana} seccion="inspector">
+              <InspectorViga />
+            </Sec>
+            <Sec pestana={pestana} seccion="inspectorPano">
+              <InspectorPano />
+            </Sec>
+            <Sec pestana={pestana} seccion="plantillas">
+              {!enPleno && <PanelPlantillas />}
+            </Sec>
           </>
         ),
       };
@@ -462,22 +505,34 @@ function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPest
           </>
         ),
         // La leyenda de escala se QUEDA en el lienzo (control de lienzo: lee contra los
-        // colores de la deformada). El resto de paneles de datos van al dock.
+        // colores de la deformada). El resto de paneles de datos van al dock. [D10] Anclada
+        // a la DERECHA del lienzo (Slot mid-right, vertical): misma ubicacion que la rampa de
+        // isovalores. Se autooculta si el overlay activo es la forma modal (D9).
         hudOverlays: (
-          <Slot zona="bottom-center">
+          <Slot zona="mid-right">
             <LeyendaEscala />
           </Slot>
         ),
-        // Calcular + estado del motor, combinacion activa, frecuencias/modos, tabla de
-        // reacciones y diagramas: todos paneles de DATOS -> dock (secciones planas, con
-        // scroll propio si desbordan).
-        panelesDock: (
+        // [D14 · PR3] Anatomía C: "Cálculo" (BotonCalcular) + "Combinación" (ComboSelector)
+        // van PINNED arriba del dock (no colapsan ni scrollean). El resto scrollea debajo.
+        dockFijo: (
           <>
             <BotonCalcular />
             <ComboSelector />
-            <PanelFrecuencias />
-            <TablaReacciones />
-            <PanelDiagramas />
+          </>
+        ),
+        // Frecuencias/modos, tabla de reacciones y diagramas: secciones colapsables.
+        panelesDock: (
+          <>
+            <Sec pestana={pestana} seccion="frecuencias">
+              <PanelFrecuencias />
+            </Sec>
+            <Sec pestana={pestana} seccion="reacciones">
+              <TablaReacciones />
+            </Sec>
+            <Sec pestana={pestana} seccion="diagramas">
+              <PanelDiagramas />
+            </Sec>
           </>
         ),
       };
@@ -491,16 +546,30 @@ function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPest
             <IsovaloresOverlay />
           </>
         ),
-        hudOverlays: null,
-        // Calcular y elegir combinacion desde la propia pestana (la losa se calcula con
-        // el resto de la obra), el panel de isovalores (selector + leyenda) y el
-        // inspector del paño: paneles de datos -> dock.
-        panelesDock: (
+        // [D10] La RAMPA de color de los isovalores va en glass junto al lienzo (Slot
+        // mid-right, vertical): misma ubicacion/orientacion que la leyenda de la deformada.
+        // Se autooculta sin resultados de placa.
+        hudOverlays: (
+          <Slot zona="mid-right">
+            <LeyendaIsovalores />
+          </Slot>
+        ),
+        // Calcular + Combinación PINNED (como en Resultados: la losa se calcula con el resto
+        // de la obra). El panel de isovalores y el inspector del paño: secciones colapsables.
+        dockFijo: (
           <>
             <BotonCalcular />
             <ComboSelector />
-            <PanelIsovalores />
-            <InspectorPano />
+          </>
+        ),
+        panelesDock: (
+          <>
+            <Sec pestana={pestana} seccion="isovalores">
+              <PanelIsovalores />
+            </Sec>
+            <Sec pestana={pestana} seccion="inspectorPano">
+              <InspectorPano />
+            </Sec>
           </>
         ),
       };
@@ -513,8 +582,13 @@ export default function App() {
   // activo desde IndexedDB y arranca ambos autosaves. Defensivo: si no hay IndexedDB,
   // la app sigue en memoria. Cierra el hueco que F9 dejo (autosave sin cablear). El
   // estado que devuelve alimenta el aviso del Shell (auditoria UX-L1).
-  const avisoPersistencia = useArranquePersistencia();
-  // Atajos de teclado globales (auditoria UX-A3/UX-A5): Ctrl+Z/Y undo/redo, F3/F4.
+  // [D13] Devuelve además el nombre real del proyecto activo (para el Brandbar), el id
+  // activo (para el diálogo Datos generales) y `refrescarNombre` (relee el nombre tras
+  // renombrar). El nombre es metadato de persistencia (NO Capa 1, NO undo).
+  const { aviso, nombreObra, proyectoActivoId, refrescarNombre } =
+    useArranquePersistencia();
+  // Atajos de teclado globales (auditoria UX-A3/UX-A5 + D23): Ctrl+Z/Y undo/redo, F3/F4,
+  // Supr/Delete borrar selección, 1-4 cambiar de pestaña.
   useAtajosGlobales();
   // Precarga del motor FEM en segundo plano (CLAUDE.md §8): se dispara UNA vez al
   // montar la app (idempotente, no bloquea el hilo), para que "Calcular" este listo
@@ -547,12 +621,27 @@ export default function App() {
   // el montaje mantiene limpias las demas pestanas.
   const enVigas = pestana === "entradaVigas";
 
-  // Composicion por pestana (refactor "dock de paneles", PR1/PR2): una sola fuente de las
-  // condiciones. Devuelve los overlays de escena/HUD (al Viewport) y los paneles de datos
-  // de la pestana; dockDePestana les da cromo plano + añade la seccion "Ayudas" (CM/CR/
-  // modelo de calculo) comun, y produce el `dock` que el Shell acopla y empuja el lienzo.
-  const { sceneOverlays, hudOverlays, panelesDock } = composicionPestana(pestana, enPleno);
-  const dock = dockDePestana(panelesDock);
+  // Composicion por pestana (refactor "dock de paneles", PR1/PR2/PR3): una sola fuente de
+  // las condiciones. Devuelve los overlays de escena/HUD (al Viewport) y las piezas del dock
+  // de la pestana. [D14 · PR3] El dock se estructura en dos regiones: una cabecera PINNED
+  // (dockFijo, anatomía C: Cálculo + Combinación en Resultados/Isovalores) que no scrollea,
+  // y las secciones COLAPSABLES (panelesDock + Ayudas comunes) que scrollean debajo. Todo en
+  // cromo PLANO (ProveedorModoPanel). El Shell acopla el dock y empuja el lienzo.
+  const { sceneOverlays, hudOverlays, dockFijo, panelesDock } = composicionPestana(
+    pestana,
+    enPleno,
+  );
+  const dock = (
+    <ProveedorModoPanel modo="plano">
+      {dockFijo != null && dockFijo !== false && (
+        <div className="cx-dock__fijo">{dockFijo}</div>
+      )}
+      <div className="cx-dock__scroll">
+        {panelesDock}
+        <AyudasDock pestana={pestana} />
+      </div>
+    </ProveedorModoPanel>
+  );
 
   // El mensaje de calculo (motor trabajando) gana sobre todo lo demas; al terminar,
   // se restaura el contextual. Luego el mensaje de la herramienta activa prioriza sobre
@@ -579,20 +668,31 @@ export default function App() {
 
   return (
     <Shell
-      nombreObra="Obra sin título"
+      nombreObra={nombreObra}
       status={{
         mensaje,
         snapActivo,
         ...(coords ? { coords } : {}),
       }}
       dock={dock}
-      avisoPersistencia={avisoPersistencia}
+      avisoPersistencia={aviso}
     >
       {/* Señal de hidratacion (feature-16, D6): aparece cuando la persistencia ha
           rehidratado el Modelo (o decidido no persistir). Los specs E2E esperan por
           este nodo antes de actuar. `hidden`: no afecta al layout ni es visible. */}
       {persistenciaLista && <div data-testid="app-ready" hidden />}
       <Viewport sceneOverlays={sceneOverlays} hudOverlays={hudOverlays} />
+      {/* [D13d] Diálogos montados una vez (auto-gateados por dialogoActivo). Radix Dialog
+          portalea a body, así que su ubicación en el árbol no afecta al layout. Datos
+          generales recibe el id/nombre del proyecto activo (metadato de persistencia) y el
+          refresco del Brandbar tras renombrar. Sección personalizada (D3, otro agente) se
+          monta aquí porque su fichero ya existe. */}
+      <DialogoDatosGenerales
+        proyectoActivoId={proyectoActivoId}
+        nombreActual={nombreObra}
+        onRenombrado={refrescarNombre}
+      />
+      <DialogoSeccionPersonalizada />
     </Shell>
   );
 }

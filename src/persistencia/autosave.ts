@@ -51,6 +51,19 @@ export function _esperarGuardadoAutosave(): Promise<void> {
 // `null` = no hay baseline util: se guarda sin comprobar conflicto.
 let baseline: { id: string; actualizadoEn: number } | null = null;
 
+// [D13b] Reancla la baseline de concurrencia optimista tras una escritura que NO pasa por
+// el autosave del Modelo pero SI bumpea `actualizadoEn` del registro: el renombrado
+// (renombrarProyecto refresca actualizadoEn). Sin esto, la baseline conocida por esta
+// pestana quedaria por DEBAJO del registro en disco y el PROXIMO guardado del modelo veria
+// un falso `conflicto` (edicion silenciosamente no persistida). Solo reancla si la baseline
+// es de ESTE proyecto (misma guarda que `guardar`): un renombrado de otro proyecto no toca
+// la baseline del activo. Idempotente y barato; no arranca ni detiene el autosave.
+export function reanclarBaselineAutosave(id: string, actualizadoEn: number): void {
+  if (baseline !== null && baseline.id === id) {
+    baseline = { id, actualizadoEn };
+  }
+}
+
 // La coordinacion load-vs-timer (cancelar el timer de una edicion anterior cuando se
 // carga otro proyecto, para que no escriba el modelo recien cargado en el proyecto
 // previo) usa `handle.cancelarTimer` (ver cargarProyectoEnStore). El valor de debounce

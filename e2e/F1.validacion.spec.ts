@@ -61,9 +61,9 @@ async function pulsarCalcular(panel: Locator): Promise<void> {
 // colgarse. Conducimos UI real (menu Radix + dialogo Radix) para no inventar una
 // via paralela: la creacion de obra-base pasa por donde pasa el usuario.
 async function crearPlantaPorDialogo(page: Page): Promise<string> {
-  // Abrir el menu "Obra" (Popover de Radix) y elegir "Plantas y grupos". `exact`
-  // para no casar el boton "▶ Calcular obra" de la brandbar (contiene "obra").
-  await page.getByRole("button", { name: "Obra", exact: true }).click();
+  // Abrir el menu "Obra" (Radix Menubar tras D12: el trigger es role=menuitem, no
+  // button) y elegir "Plantas y grupos". `exact` para no casar otros textos con "obra".
+  await page.getByRole("menuitem", { name: "Obra", exact: true }).click();
   await page.getByRole("menuitem", { name: "Plantas y grupos" }).click();
 
   // El dialogo es modal (role=dialog); acotamos las acciones a el.

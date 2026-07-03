@@ -1,12 +1,8 @@
-import * as Popover from "@radix-ui/react-popover";
+import * as Menubar_ from "@radix-ui/react-menubar";
 import {
   vistaStore,
   modeloStore,
-  seleccionStore,
   calculoStore,
-  eliminarPilar,
-  eliminarViga,
-  eliminarPano,
 } from "../../estado";
 import {
   MENUS_POR_PESTANA,
@@ -14,6 +10,10 @@ import {
   type MenuDef,
   type MenuItem as MenuItemDef,
 } from "./menus";
+// [D23] borrarSeleccion vive ahora en un helper compartido (mismo flujo para el menú
+// Edición y el atajo Supr/Delete). Se re-exporta desde aquí para no romper la costura de
+// test existente (Menubar.test.tsx importa `borrarSeleccion` de `./Menubar`).
+import { borrarSeleccion } from "./borrarSeleccion";
 // La accion "calcular" del menu necesita la orquestacion del calculo, pero el DISPATCH es
 // un mapa IMPERATIVO (no es un componente, no puede usar hooks). Igual que `borrarSeleccion`
 // (funcion plana que habla con los stores/servicios), se importa `calcularObra()`: la MISMA
@@ -29,40 +29,25 @@ import { calcularObra } from "../resultados/useCalcular";
 import { calcularModos } from "../resultados/useSolicitarModos";
 import { calculoHabilitado } from "../resultados/estadoMotorUI";
 
-// Menubar (Spec Diseno UI §2 / §3.2): menus contextuales que cambian con la
-// pestana activa (criterio de aceptacion de feature-9). Cada menu abre un
-// Popover (Radix, accesible). Los items pueden ser placeholders (string, sin
-// accion) o accionables (objeto con `accion`); estos ultimos disparan un
-// handler y cierran el Popover. Vocabulario CYPECAD.
+// Menubar (Spec Diseno UI §2 / §3.2): menus contextuales que cambian con la pestana activa
+// (criterio de aceptacion de feature-9). [D12] Migrada de Popover a **Radix Menubar**: gana
+// roles ARIA correctos (menubar/menu/menuitem), navegación con flechas y typeahead, sin
+// reimplementar nada. Los items pueden ser placeholders (string, sin acción -> disabled) o
+// accionables (objeto con `accion`); estos últimos disparan su handler vía onSelect y Radix
+// cierra el menú. El DISPATCH y `borrarSeleccion` NO cambian (contratos de acción estables;
+// costura de test intacta). Vocabulario CYPECAD.
 
-// Borra el elemento seleccionado desde el menu "Edición". Los elementos borrables son
-// pilar, viga y PAÑO (F3): se exige EXACTAMENTE uno seleccionado y que sea uno de esos
-// tipos del modelo. Se lee el modelo con getModelo() JUSTO antes de construir el comando
-// (invariante del `base`, CLAUDE.md §10). Si no aplica, no-op silencioso. Se exporta como
-// costura de test (el clic real pasa por un Popover de Radix, inestable en jsdom).
+// Se re-exporta la costura de test existente (Menubar.test.tsx importa `borrarSeleccion`
+// de `./Menubar`); la lógica vive en el helper compartido (D23).
 // eslint-disable-next-line react-refresh/only-export-components
-export function borrarSeleccion(): void {
-  const ids = seleccionStore.getState().seleccion;
-  if (ids.length !== 1) return;
-  const base = modeloStore.getState().getModelo();
-  const id = ids[0]!;
-  if (base.pilares.some((p) => p.id === id)) {
-    modeloStore.getState().ejecutar(eliminarPilar(base, id));
-  } else if (base.vigas.some((v) => v.id === id)) {
-    modeloStore.getState().ejecutar(eliminarViga(base, id));
-  } else if (base.panos.some((pa) => pa.id === id)) {
-    modeloStore.getState().ejecutar(eliminarPano(base, id));
-  } else {
-    return;
-  }
-  seleccionStore.getState().limpiar();
-}
+export { borrarSeleccion };
 
 // Mapa accion -> handler. Centralizado para no hardcodear el dispatch inline y
 // para que crezca de forma ordenada al activarse mas menus (F11..F15). Exportado
 // como costura de test (ver borrarSeleccion).
 // eslint-disable-next-line react-refresh/only-export-components
 export const DISPATCH: Record<AccionMenu, () => void> = {
+  abrirDatosGenerales: () => vistaStore.getState().abrirDialogo("datosGenerales"),
   abrirGruposPlantas: () => vistaStore.getState().abrirDialogo("gruposPlantas"),
   abrirHipotesis: () => vistaStore.getState().abrirDialogo("hipotesis"),
   abrirOpcionesAnalisis: () =>
@@ -117,69 +102,59 @@ function usePuedeRehacer(): boolean {
   return modeloStore((s) => s.puedeRehacer);
 }
 
-// Un item del desplegable. String -> placeholder (accion aun no cableada): se pinta
-// como boton DESHABILITADO con title "próximamente", NO como un div inerte con clic
-// muerto (auditoria UX-A1). Objeto -> boton accionable que dispara el handler y cierra
-// el Popover (Popover.Close gestiona cierre y foco accesibles).
+// Un item del desplegable (Radix Menubar.Item). String -> placeholder (acción aún no
+// cableada): Item DESHABILITADO con title "próximamente", NO un clic muerto (auditoría
+// UX-A1). Objeto -> Item accionable que dispara su handler vía onSelect (Radix cierra el
+// menú y gestiona el foco). Radix da role="menuitem", flechas y typeahead sin código extra.
 function Item({ item }: { item: MenuItemDef }) {
   // Se leen SIEMPRE (Reglas de Hooks); solo los items correspondientes los usan.
   const calcularDeshabilitado = useCalcularDeshabilitado();
   const puedeDeshacer = usePuedeDeshacer();
   const puedeRehacer = usePuedeRehacer();
   if (typeof item === "string") {
-    // Placeholder: boton deshabilitado (afordancia clara de "aun no", cursor not-allowed
-    // via .cx-menu-item:disabled). aria-disabled para lectores; sin onClick.
+    // Placeholder: Item deshabilitado (afordancia clara de "aún no"). Radix marca
+    // data-disabled y aria-disabled; el copy "próximamente" va en el title.
     return (
-      <button
-        type="button"
+      <Menubar_.Item
         className="cx-menu-item cx-menu-item--placeholder"
         disabled
-        aria-disabled="true"
         title={PROXIMAMENTE}
       >
         {item}
-      </button>
+      </Menubar_.Item>
     );
   }
   // Items que dependen del estado: los del motor ("Calcular obra"/"Calcular modos") se
-  // deshabilitan mientras se prepara el motor o hay un calculo en curso; "Deshacer"/
-  // "Rehacer" segun la pila de undo. Deshabilitado: ni dispara la accion ni cierra el
-  // Popover (Radix respeta el `disabled` del boton en Popover.Close).
+  // deshabilitan mientras se prepara el motor o hay un cálculo en curso; "Deshacer"/
+  // "Rehacer" según la pila de undo. Radix no dispara onSelect en un Item disabled.
   const deshabilitado =
     ((item.accion === "calcular" || item.accion === "calcularModos") &&
       calcularDeshabilitado) ||
     (item.accion === "deshacer" && !puedeDeshacer) ||
     (item.accion === "rehacer" && !puedeRehacer);
   return (
-    <Popover.Close asChild>
-      <button
-        type="button"
-        role="menuitem"
-        className="cx-menu-item"
-        onClick={DISPATCH[item.accion]}
-        disabled={deshabilitado}
-      >
-        {item.etiqueta}
-      </button>
-    </Popover.Close>
+    <Menubar_.Item
+      className="cx-menu-item"
+      disabled={deshabilitado}
+      onSelect={DISPATCH[item.accion]}
+    >
+      {item.etiqueta}
+    </Menubar_.Item>
   );
 }
 
 function MenuItem({ def }: { def: MenuDef }) {
   return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className={["cx-menu", def.strong && "cx-menu--strong"]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          {def.etiqueta}
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
+    <Menubar_.Menu>
+      <Menubar_.Trigger
+        className={["cx-menu", def.strong && "cx-menu--strong"]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {def.etiqueta}
+      </Menubar_.Trigger>
+      <Menubar_.Portal>
+        <Menubar_.Content
           className="cx-menu-content"
           align="start"
           sideOffset={4}
@@ -189,9 +164,9 @@ function MenuItem({ def }: { def: MenuDef }) {
           ) : (
             def.items.map((item) => <Item key={etiquetaDe(item)} item={item} />)
           )}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+        </Menubar_.Content>
+      </Menubar_.Portal>
+    </Menubar_.Menu>
   );
 }
 
@@ -199,11 +174,17 @@ export function Menubar() {
   const pestana = vistaStore((s) => s.pestanaActiva);
   const menus = MENUS_POR_PESTANA[pestana];
 
+  // El <nav aria-label="Menú principal"> se conserva como LANDMARK de navegación del Shell
+  // (Shell.test lo localiza por ese role/nombre). Dentro, Radix Menubar.Root aporta
+  // role="menubar" + navegación entre menús con flechas/typeahead. Un nav que envuelve un
+  // menubar es válido: dos afordancias (landmark de página + widget de menú).
   return (
-    <nav className="cx-menubar" aria-label="Menú principal">
-      {menus.map((def) => (
-        <MenuItem key={def.etiqueta} def={def} />
-      ))}
+    <nav className="cx-menubar-nav" aria-label="Menú principal">
+      <Menubar_.Root className="cx-menubar">
+        {menus.map((def) => (
+          <MenuItem key={def.etiqueta} def={def} />
+        ))}
+      </Menubar_.Root>
     </nav>
   );
 }

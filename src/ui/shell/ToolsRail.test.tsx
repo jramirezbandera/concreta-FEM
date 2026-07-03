@@ -12,6 +12,7 @@ import { vistaStore } from "../../estado";
 beforeEach(() => {
   vistaStore.getState().setRejillaVisible(true);
   vistaStore.getState().setSnapActivo(true);
+  vistaStore.getState().resetDockUI();
 });
 
 // Localiza un boton del rail por su aria-label (title == aria-label salvo placeholders).
@@ -58,13 +59,49 @@ describe("ToolsRail · placeholders deshabilitados (UX-A4/UX-A6)", () => {
     expect(orto).not.toHaveAttribute("aria-pressed");
   });
 
-  it("Biblioteca/Configuración/Ayuda están deshabilitados (no clic muerto)", () => {
+  it("Configuración/Ayuda están deshabilitados (no clic muerto)", () => {
     render(<ToolsRail />);
-    for (const label of ["Biblioteca de secciones", "Configuración", "Ayuda"]) {
+    for (const label of ["Configuración", "Ayuda"]) {
       const b = boton(label);
       expect(b, label).toBeDisabled();
       expect(b).toHaveAttribute("title", "Disponible próximamente");
     }
+  });
+});
+
+// [D14e] Botón de colapsar/expandir el dock entero: refleja dockUI.dockColapsado y lo
+// conmuta (aria-pressed + title según estado).
+describe("ToolsRail · colapso del dock (D14e)", () => {
+  it("conmuta dockUI.dockColapsado y refleja aria-pressed", async () => {
+    const user = userEvent.setup();
+    render(<ToolsRail />);
+    // aria-label estable "Ocultar el panel de datos" (title = aria-label cuando abierto).
+    const btn = boton("Ocultar el panel de datos");
+    expect(btn).toHaveAttribute("aria-pressed", "false");
+    await user.click(btn);
+    expect(vistaStore.getState().dockUI.dockColapsado).toBe(true);
+    // Colapsado: el botón cambia su etiqueta a "Mostrar el panel de datos" y aria-pressed.
+    const btn2 = boton("Mostrar el panel de datos");
+    expect(btn2).toHaveAttribute("aria-pressed", "true");
+    await user.click(btn2);
+    expect(vistaStore.getState().dockUI.dockColapsado).toBe(false);
+  });
+});
+
+// [D13e] "Biblioteca de secciones" pasa de deshabilitada a accionable: abre el diálogo
+// de sección personalizada (crear sección de obra a medida).
+describe("ToolsRail · Biblioteca de secciones accionable (D13e)", () => {
+  beforeEach(() => {
+    vistaStore.getState().cerrarDialogo();
+  });
+
+  it("abre el diálogo de sección personalizada al pulsar", async () => {
+    const user = userEvent.setup();
+    render(<ToolsRail />);
+    const biblioteca = boton("Biblioteca de secciones");
+    expect(biblioteca).not.toBeDisabled();
+    await user.click(biblioteca);
+    expect(vistaStore.getState().dialogoActivo).toBe("seccionPersonalizada");
   });
 });
 

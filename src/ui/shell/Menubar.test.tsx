@@ -8,7 +8,9 @@
 // comportamiento con guardas de `borrarSeleccion` (solo borra un pilar; no-op en
 // cualquier otro caso) y el cableado de `activarHerramientaPilar`.
 import { describe, it, expect, beforeEach } from "vitest";
-import { borrarSeleccion, DISPATCH } from "./Menubar";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { borrarSeleccion, DISPATCH, Menubar } from "./Menubar";
 import { MENUS_POR_PESTANA, type MenuDef, type MenuItem } from "./menus";
 import {
   modeloStore,
@@ -147,6 +149,13 @@ describe("Menubar · DISPATCH", () => {
     vistaStore.getState().cerrarDialogo();
   });
 
+  it('abrirDatosGenerales abre el diálogo "datosGenerales" (D13c)', () => {
+    expect(vistaStore.getState().dialogoActivo).toBeNull();
+    DISPATCH.abrirDatosGenerales();
+    expect(vistaStore.getState().dialogoActivo).toBe("datosGenerales");
+    vistaStore.getState().cerrarDialogo();
+  });
+
   it("deshacer revierte la última edición de obra (undo del modeloStore)", () => {
     // Un pilar creado y luego deshecho: el modelo vuelve a estar sin pilares (UX-A3).
     sembrarPilar();
@@ -190,5 +199,44 @@ describe("menus.ts · estructura", () => {
     const edicion = accionesDeMenu(MENUS_POR_PESTANA.entradaPilares, "Edición");
     expect(edicion).toContain("Copiar");
     expect(edicion).toContain("Pegar");
+  });
+});
+
+// [D12] La migración a Radix Menubar aporta roles ARIA correctos y navegación con teclado.
+// Se prueba el render (role="menubar" + landmark <nav> + triggers) y la apertura de un
+// menú con teclado (más estable que el clic en jsdom; gotcha Radix jsdom de feature-11).
+describe("Menubar · Radix Menubar (D12)", () => {
+  it("renderiza un landmark <nav> con role=menubar dentro", () => {
+    render(<Menubar />);
+    // Landmark de navegación (Shell) + widget menubar (Radix): dos afordancias.
+    expect(
+      screen.getByRole("navigation", { name: "Menú principal" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("menubar")).toBeInTheDocument();
+  });
+
+  it("los menús de la pestaña son triggers accesibles (Archivo, Obra, Edición…)", () => {
+    vistaStore.getState().setPestanaActiva("entradaPilares");
+    render(<Menubar />);
+    // Los triggers de menú de Radix se anuncian con role="menuitem" en la barra.
+    for (const etiqueta of ["Archivo", "Obra", "Edición"]) {
+      expect(
+        screen.getByRole("menuitem", { name: etiqueta }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("abrir un menú con teclado muestra sus items con role=menuitem", async () => {
+    const user = userEvent.setup();
+    vistaStore.getState().setPestanaActiva("entradaPilares");
+    render(<Menubar />);
+    const obra = screen.getByRole("menuitem", { name: "Obra" });
+    obra.focus();
+    // Enter/flecha abajo despliega el menú (navegación de teclado que da Radix Menubar).
+    await user.keyboard("{Enter}");
+    // "Datos generales" (accionable, D13) aparece como item del desplegable.
+    expect(
+      await screen.findByRole("menuitem", { name: "Datos generales" }),
+    ).toBeInTheDocument();
   });
 });

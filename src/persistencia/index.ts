@@ -40,6 +40,9 @@ export type { ResultadoImportArchivo } from "./serializacion";
 export { iniciarAutosave, cargarProyectoEnStore } from "./autosave";
 // Error de conflicto de concurrencia optimista que el autosave surfacea por onError.
 export type { ErrorConflictoAutosave } from "./autosave";
+// [D13b] Reancla la baseline optimista tras un renombrado (bumpea actualizadoEn sin pasar
+// por el autosave del Modelo): evita un falso conflicto en el siguiente guardado del modelo.
+export { reanclarBaselineAutosave } from "./autosave";
 
 // Persistencia-REFERENCIA de plantillas DXF (feature-15): store Dexie separado,
 // keyed por proyectoId, FUERA de la Capa 1 (no toca Modelo ni ProyectoGuardado).

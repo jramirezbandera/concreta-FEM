@@ -24,6 +24,8 @@ const getProyectoActivoIdMock = vi.fn();
 const crearProyectoMock = vi.fn();
 const cargarProyectoEnStoreMock = vi.fn();
 const cargarPlantillasEnStoreMock = vi.fn();
+// [D13] El hook ahora lee el nombre real del registro (cargarProyecto) para el Brandbar.
+const cargarProyectoMock = vi.fn();
 // Las bajas que devuelven los iniciar* — el cleanup debe invocarlas ambas.
 const bajaModeloMock = vi.fn();
 const bajaPlantillasMock = vi.fn();
@@ -34,6 +36,7 @@ vi.mock("../../persistencia", () => ({
   abrirDB: () => abrirDBMock(),
   getProyectoActivoId: () => getProyectoActivoIdMock(),
   crearProyecto: (n: string) => crearProyectoMock(n),
+  cargarProyecto: (id: string) => cargarProyectoMock(id),
   cargarProyectoEnStore: (id: string) => cargarProyectoEnStoreMock(id),
   cargarPlantillasEnStore: (id: string) => cargarPlantillasEnStoreMock(id),
   iniciarAutosave: () => iniciarAutosaveMock(),
@@ -62,6 +65,10 @@ beforeEach(() => {
   cargarProyectoEnStoreMock.mockReset().mockImplementation(async (id: string) => {
     ordenLlamadas.push(`cargarProyectoEnStore:${id}`);
     return { ok: true };
+  });
+  cargarProyectoMock.mockReset().mockImplementation(async (id: string) => {
+    ordenLlamadas.push(`cargarProyecto:${id}`);
+    return { id, nombre: "Mi obra", actualizadoEn: 1000 };
   });
   cargarPlantillasEnStoreMock
     .mockReset()
@@ -186,33 +193,69 @@ describe("useArranquePersistencia · (3) cleanup da de baja ambos autosaves", ()
 });
 
 describe("useArranquePersistencia · (6) estado para el banner (UX-L1)", () => {
-  it("camino feliz -> estado 'ok' (sin banner)", async () => {
+  // [D13] El hook devuelve ahora un objeto { aviso, nombreObra, proyectoActivoId,
+  // refrescarNombre }; el banner lee `aviso`.
+  it("camino feliz -> aviso 'ok' (sin banner)", async () => {
     const { result } = renderHook(() => useArranquePersistencia());
     await waitFor(() => {
       expect(iniciarAutosavePlantillasMock).toHaveBeenCalled();
     });
-    expect(result.current).toBe("ok");
+    expect(result.current.aviso).toBe("ok");
   });
 
-  it("DB no disponible -> estado 'sin-indexeddb'", async () => {
+  it("DB no disponible -> aviso 'sin-indexeddb'", async () => {
     abrirDBMock.mockImplementation(async () => {
       ordenLlamadas.push("abrirDB");
       return { ok: false, motivo: "IndexedDB no disponible" };
     });
     const { result } = renderHook(() => useArranquePersistencia());
     await waitFor(() => {
-      expect(result.current).toBe("sin-indexeddb");
+      expect(result.current.aviso).toBe("sin-indexeddb");
     });
   });
 
-  it("carga de proyecto fallida -> estado 'carga-fallida' (banner de alerta)", async () => {
+  it("carga de proyecto fallida -> aviso 'carga-fallida' (banner de alerta)", async () => {
     cargarProyectoEnStoreMock.mockImplementation(async (id: string) => {
       ordenLlamadas.push(`cargarProyectoEnStore:${id}`);
       return { ok: false, errores: ["modelo corrupto"] };
     });
     const { result } = renderHook(() => useArranquePersistencia());
     await waitFor(() => {
-      expect(result.current).toBe("carga-fallida");
+      expect(result.current.aviso).toBe("carga-fallida");
+    });
+  });
+});
+
+// [D13a] El hook expone el nombre real del proyecto activo (para el Brandbar) y el id
+// (para el diálogo Datos generales), leídos del registro con cargarProyecto.
+describe("useArranquePersistencia · (7) nombre e id del proyecto (D13)", () => {
+  it("expone el nombre real y el id del proyecto activo", async () => {
+    cargarProyectoMock.mockImplementation(async (id: string) => ({
+      id,
+      nombre: "Edificio Sur",
+      actualizadoEn: 2000,
+    }));
+    const { result } = renderHook(() => useArranquePersistencia());
+    await waitFor(() => {
+      expect(result.current.nombreObra).toBe("Edificio Sur");
+    });
+    expect(result.current.proyectoActivoId).toBe("proy-existente");
+  });
+
+  it("refrescarNombre relee el nombre del registro (tras renombrar)", async () => {
+    const { result } = renderHook(() => useArranquePersistencia());
+    await waitFor(() => {
+      expect(result.current.nombreObra).toBe("Mi obra");
+    });
+    // Simula el renombrado: el registro ahora tiene otro nombre.
+    cargarProyectoMock.mockImplementation(async (id: string) => ({
+      id,
+      nombre: "Obra renombrada",
+      actualizadoEn: 3000,
+    }));
+    result.current.refrescarNombre();
+    await waitFor(() => {
+      expect(result.current.nombreObra).toBe("Obra renombrada");
     });
   });
 });

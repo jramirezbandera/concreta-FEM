@@ -26,11 +26,44 @@ export type Pestana =
 
 export type ModoVista = "planta" | "3d" | "mosaico";
 
+// [D14 · PR3] Estado de UI del DOCK de paneles de datos. TRANSITORIO: estado de vista puro
+// (como snapActivo/rejillaVisible), NO participa en undo y se RESETEA al cambiar de obra
+// (patron resolverVistaActiva/snapActivo). Dos ejes:
+//   - `dockColapsado`: colapso del dock ENTERO (D14e, botón del ToolsRail). El lienzo
+//     recupera el ancho.
+//   - `seccionesColapsadas`: colapso POR SECCIÓN y POR PESTAÑA. Clave compuesta
+//     `${pestana}:${seccion}` -> true si esa sección está colapsada. Un mapa plano (no
+//     anidado) simplifica el merge/reset. Ausencia de clave = sección ABIERTA (default).
+// El identificador de sección es una etiqueta estable en inglés técnico (p. ej. "calculo",
+// "reacciones"); la cabecera visible la pone la UI (español con tildes).
+export interface DockUIState {
+  dockColapsado: boolean;
+  seccionesColapsadas: Record<string, boolean>;
+}
+
+// Estado inicial del dock: nada colapsado (dock abierto, todas las secciones abiertas).
+function dockUIInicial(): DockUIState {
+  return { dockColapsado: false, seccionesColapsadas: {} };
+}
+
+// Clave compuesta pestaña:sección para `seccionesColapsadas` (evita que el colapso de una
+// sección homónima en otra pestaña interfiera; el colapso es POR pestaña).
+export function claveSeccionDock(pestana: Pestana, seccion: string): string {
+  return `${pestana}:${seccion}`;
+}
+
 // Dialogos modales de la app: Plantas y grupos (feature-10), Hipotesis
 // (feature-13) y Opciones de analisis (F2.4). La introduccion de CARGAS no necesita
 // dialogo propio: vive en el Inspector del elemento. Los siguientes (biblioteca de
 // secciones...) se anaden aqui.
-export type DialogoActivo = "gruposPlantas" | "hipotesis" | "opcionesAnalisis";
+// "seccionPersonalizada" (D3, seccion de hormigon a medida) y "datosGenerales"
+// (D13, nombre de la obra) se anaden en la tanda de decisiones de la auditoria UI/UX.
+export type DialogoActivo =
+  | "gruposPlantas"
+  | "hipotesis"
+  | "opcionesAnalisis"
+  | "seccionPersonalizada"
+  | "datosGenerales";
 
 // Herramienta activa de introduccion grafica (feature-11/12/F3). "seleccion" es el
 // modo por defecto (picking/edicion); "pilar" coloca pilares con clic; "viga" coloca
@@ -41,6 +74,15 @@ export type Herramienta = "seleccion" | "pilar" | "viga" | "pano";
 // Mapea a los `*_array()` de PyNite: axil N, cortante Vy, flector Mz, flecha dy.
 // Identificadores en ingles tecnico; las etiquetas visibles las pone la UI.
 export type MagnitudDiagrama = "axil" | "cortante" | "momento" | "flecha";
+
+// [AUDITORIA D9] Overlay de resultados 3D ACTIVO en la pestana Resultados: la DEFORMADA
+// (por combo) o la FORMA MODAL (por modo). Son dos magnitudes DISTINTAS que comparten la
+// misma rampa de color: dibujarlas superpuestas hace la escena ilegible. Discriminante de
+// EXCLUSION MUTUA: solo una se dibuja a la vez. Default "deformada" (la lectura estatica es
+// la primaria). Lo conmutan: "Calcular modos" / seleccionar un modo -> "modal"; volver a la
+// deformada (boton "Ver deformada", deseleccionar el modo activo, o llegar resultados
+// estaticos nuevos) -> "deformada". Estado de UI puro: NO participa en undo.
+export type OverlayResultados = "deformada" | "modal";
 
 // Magnitud que pinta el mapa de ISOVALORES de la losa en la pestana Isovalores (F3).
 // "flecha" = desplazamiento vertical NODAL (DY de los nudos de malla); "momentoX"/
@@ -121,6 +163,9 @@ interface VistaState {
   persistenciaLista: boolean;
   // Slot de capturas; la captura PNG (T3.2) no necesita estado por ahora.
   capturas: unknown[];
+  // [D14 · PR3] Estado de UI del dock (colapso entero + por sección/pestaña). Transitorio,
+  // fuera de undo; se resetea al cambiar de obra (resetDockUI, invocado por App al cargar).
+  dockUI: DockUIState;
   // Introduccion grafica de pilares (feature-11). El pilar seleccionado NO vive
   // aqui: es seleccionStore.seleccion[0]; aqui solo el modo y los defaults.
   herramienta: Herramienta;
@@ -159,6 +204,10 @@ interface VistaState {
   // Visualizacion de resultados (feature-14). Estado de UI puro: NO participa en
   // undo. La inicializacion de `combinacionActiva` a la primera combo al fijar
   // resultados la hace el hook useCalcular; aqui solo viven los controles de vista.
+  // Overlay de resultados 3D activo (D9): "deformada" | "modal" (exclusion mutua). Ver
+  // OverlayResultados. Los overlays (DeformadaOverlay/ModoOverlay) y la LeyendaEscala se
+  // gatean con esto para que nunca convivan dos magnitudes sobre la misma rampa.
+  overlayResultados: OverlayResultados;
   // Factor de amplificacion de la deformada (la real es imperceptible: m sobre m).
   deformadaEscala: number;
   // true mientras se anima la deformada (oscilacion 0->1->0). Lo conmuta la UI.
@@ -198,6 +247,16 @@ interface VistaState {
   setSnapActivo(b: boolean): void;
   setRejillaVisible(b: boolean): void;
   toggleRejilla(): void;
+  // --- Dock UI (D14 · PR3) ---
+  // Colapso del dock entero (D14e). setDockColapsado fija; toggleDockColapsado conmuta.
+  setDockColapsado(b: boolean): void;
+  toggleDockColapsado(): void;
+  // Colapso de UNA sección (por pestaña). setSeccionDockColapsada(pestana, seccion, bool);
+  // toggleSeccionDock conmuta el estado actual (default abierta).
+  setSeccionDockColapsada(pestana: Pestana, seccion: string, colapsada: boolean): void;
+  toggleSeccionDock(pestana: Pestana, seccion: string): void;
+  // Reset del estado del dock (al cambiar de obra): dock abierto, secciones abiertas.
+  resetDockUI(): void;
   setMostrarCentroMasa(b: boolean): void;
   toggleCentroMasa(): void;
   setMostrarCentroRigidez(b: boolean): void;
@@ -206,6 +265,7 @@ interface VistaState {
   toggleModeloCalculo(): void;
   setSoloModeloCalculo(b: boolean): void;
   toggleSoloModeloCalculo(): void;
+  setOverlayResultados(o: OverlayResultados): void;
   setDeformadaEscala(e: number): void;
   setAnimando(b: boolean): void;
   setMagnitudDiagrama(m: MagnitudDiagrama): void;
@@ -271,10 +331,12 @@ export const vistaStore = create<VistaState>()(
     },
     snapActivo: true,
     rejillaVisible: true,
+    dockUI: dockUIInicial(),
     mostrarCentroMasa: false,
     mostrarCentroRigidez: false,
     mostrarModeloCalculo: false,
     soloModeloCalculo: false,
+    overlayResultados: "deformada",
     deformadaEscala: 1,
     animando: false,
     magnitudDiagrama: "momento",
@@ -304,6 +366,38 @@ export const vistaStore = create<VistaState>()(
     setRejillaVisible: (b) => set({ rejillaVisible: b }),
     toggleRejilla: () =>
       set((estado) => ({ rejillaVisible: !estado.rejillaVisible })),
+    // --- Dock UI (D14 · PR3) ---
+    setDockColapsado: (b) =>
+      set((estado) => ({ dockUI: { ...estado.dockUI, dockColapsado: b } })),
+    toggleDockColapsado: () =>
+      set((estado) => ({
+        dockUI: { ...estado.dockUI, dockColapsado: !estado.dockUI.dockColapsado },
+      })),
+    setSeccionDockColapsada: (pestana, seccion, colapsada) =>
+      set((estado) => ({
+        dockUI: {
+          ...estado.dockUI,
+          seccionesColapsadas: {
+            ...estado.dockUI.seccionesColapsadas,
+            [claveSeccionDock(pestana, seccion)]: colapsada,
+          },
+        },
+      })),
+    toggleSeccionDock: (pestana, seccion) =>
+      set((estado) => {
+        const clave = claveSeccionDock(pestana, seccion);
+        const colapsadaAhora = estado.dockUI.seccionesColapsadas[clave] === true;
+        return {
+          dockUI: {
+            ...estado.dockUI,
+            seccionesColapsadas: {
+              ...estado.dockUI.seccionesColapsadas,
+              [clave]: !colapsadaAhora,
+            },
+          },
+        };
+      }),
+    resetDockUI: () => set({ dockUI: dockUIInicial() }),
     setMostrarCentroMasa: (b) => set({ mostrarCentroMasa: b }),
     toggleCentroMasa: () =>
       set((estado) => ({ mostrarCentroMasa: !estado.mostrarCentroMasa })),
@@ -316,6 +410,7 @@ export const vistaStore = create<VistaState>()(
     setSoloModeloCalculo: (b) => set({ soloModeloCalculo: b }),
     toggleSoloModeloCalculo: () =>
       set((estado) => ({ soloModeloCalculo: !estado.soloModeloCalculo })),
+    setOverlayResultados: (o) => set({ overlayResultados: o }),
     setDeformadaEscala: (e) => set({ deformadaEscala: e }),
     setAnimando: (b) => set({ animando: b }),
     setMagnitudDiagrama: (m) => set({ magnitudDiagrama: m }),

@@ -15,6 +15,10 @@ export { StatusBar } from "./StatusBar";
 export type { StatusBarProps } from "./StatusBar";
 export { BottomTabs } from "./BottomTabs";
 
+// [D14 · PR3] Envoltorio de sección colapsable del dock (cablea el colapso a DockUIState).
+export { DockSeccion } from "./DockSeccion";
+export type { DockSeccionProps } from "./DockSeccion";
+
 export { MENUS_POR_PESTANA } from "./menus";
 export type { MenuDef } from "./menus";
 
@@ -25,4 +29,7 @@ export { useArranquePersistencia } from "./useArranquePersistencia";
 // Atajos de teclado globales (auditoria UX-A3/UX-A5): Ctrl+Z/Y undo/redo, F3/F4
 // captura/plantillas. Lo monta App una vez.
 export { useAtajosGlobales } from "./useAtajosGlobales";
-export type { EstadoArranquePersistencia } from "./useArranquePersistencia";
+export type {
+  EstadoArranquePersistencia,
+  ArranquePersistencia,
+} from "./useArranquePersistencia";

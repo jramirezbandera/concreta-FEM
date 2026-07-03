@@ -28,8 +28,16 @@ interface HerramientaIcono {
   deshabilitado?: boolean;
 }
 
+// [D13e] "Biblioteca de secciones" pasa a accionable: abre el diálogo de sección
+// personalizada (crear sección de obra a medida, D3). config/ayuda siguen como
+// placeholders (sin destino todavía).
 const FINALES: HerramientaIcono[] = [
-  { clave: "biblioteca", glifo: "≣", title: "Biblioteca de secciones", deshabilitado: true },
+  {
+    clave: "biblioteca",
+    glifo: "≣",
+    title: "Biblioteca de secciones",
+    onClick: () => vistaStore.getState().abrirDialogo("seccionPersonalizada"),
+  },
   { clave: "config", glifo: "⚙", title: "Configuración", deshabilitado: true },
   { clave: "ayuda", glifo: "?", title: "Ayuda", deshabilitado: true },
 ];
@@ -62,6 +70,15 @@ function useRejillaVisible(): boolean {
   );
 }
 
+// [D14 · PR3] Suscripcion fina: el boton de colapsar el dock refleja dockUI.dockColapsado.
+function useDockColapsado(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.dockUI.dockColapsado, cb),
+    () => vistaStore.getState().dockUI.dockColapsado,
+    () => vistaStore.getState().dockUI.dockColapsado,
+  );
+}
+
 export function ToolsRail() {
   // F4 abre/cierra el PanelPlantillas; su estado activo lo gobierna el store.
   const panelPlantillasAbierto = usePanelPlantillasAbierto();
@@ -70,6 +87,17 @@ export function ToolsRail() {
   const snapActivo = useSnapActivo();
   // rejilla refleja vistaStore.rejillaVisible y lo conmuta al pulsar.
   const rejillaVisible = useRejillaVisible();
+  // [D14 · PR3] colapso del dock entero: refleja dockUI.dockColapsado y lo conmuta.
+  const dockColapsado = useDockColapsado();
+  // Botón de colapsar/expandir el dock (recupera/entrega los ~400px al lienzo). aria-pressed
+  // = colapsado; title cambia según estado (afordancia clara de la acción disponible).
+  const DOCK: HerramientaIcono = {
+    clave: "dock",
+    glifo: dockColapsado ? "◧" : "◨",
+    title: dockColapsado ? "Mostrar el panel de datos" : "Ocultar el panel de datos",
+    onClick: () => vistaStore.getState().toggleDockColapsado(),
+    activoExterno: dockColapsado,
+  };
   const SNAP: HerramientaIcono = {
     clave: "snap",
     glifo: "⌖",
@@ -140,6 +168,8 @@ export function ToolsRail() {
   return (
     <div className="cx-tools" role="toolbar" aria-label="Herramientas de dibujo">
       {ANTES.map(boton)}
+      {/* [D14 · PR3] Colapsar/expandir el dock de datos (recupera el ancho al lienzo). */}
+      {boton(DOCK)}
       <span className="cx-tools__sep" aria-hidden="true" />
       {/* snap (cableado) + orto (placeholder) + rejilla (cableada al store). */}
       {AYUDAS.map(boton)}

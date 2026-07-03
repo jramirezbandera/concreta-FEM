@@ -16,6 +16,7 @@ import { useAtajosGlobales } from "./useAtajosGlobales";
 import {
   modeloStore,
   vistaStore,
+  seleccionStore,
   crearGrupo,
   crearPlanta,
   crearPilar,
@@ -25,9 +26,8 @@ import { listarSecciones, listarMateriales } from "../../biblioteca";
 
 const modelo = () => modeloStore.getState().getModelo();
 
-// Siembra un pilar (una edicion en la pila de undo). Devuelve nada; basta con que la
-// pila tenga un comando reversible.
-function sembrarPilar(): void {
+// Siembra un pilar (una edicion en la pila de undo). Devuelve el id del pilar creado.
+function sembrarPilar(): string {
   modeloStore
     .getState()
     .ejecutar(
@@ -43,6 +43,7 @@ function sembrarPilar(): void {
       angulo: 0, vinculacionExterior: true, arranque: "empotrado",
     }),
   );
+  return modelo().pilares[0]!.id;
 }
 
 // Dispara un keydown en window con las teclas dadas. Devuelve el evento (para inspeccionar
@@ -69,6 +70,8 @@ beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   vistaStore.getState().cerrarDialogo();
   vistaStore.getState().setPanelPlantillas(false);
+  vistaStore.getState().setPestanaActiva("entradaPilares");
+  seleccionStore.getState().limpiar();
   // Foco fuera de cualquier campo editable.
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   document.body.innerHTML = "";
@@ -149,5 +152,77 @@ describe("useAtajosGlobales · F3/F4 (UX-A5)", () => {
     const ev = pulsar("F3");
     expect(capturarViewportMock).toHaveBeenCalledTimes(1);
     expect(ev.defaultPrevented).toBe(true);
+  });
+});
+
+describe("useAtajosGlobales · Supr/Delete borra la selección (D23)", () => {
+  it("Delete borra el elemento seleccionado (mismo flujo del menú Edición)", () => {
+    renderHook(() => useAtajosGlobales());
+    const pilarId = sembrarPilar();
+    seleccionStore.getState().seleccionar([pilarId]);
+    const ev = pulsar("Delete");
+    expect(modelo().pilares).toHaveLength(0);
+    expect(seleccionStore.getState().seleccion).toHaveLength(0);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it("es no-op sin selección (no toca el modelo)", () => {
+    renderHook(() => useAtajosGlobales());
+    sembrarPilar();
+    pulsar("Delete");
+    expect(modelo().pilares).toHaveLength(1);
+  });
+
+  it("IGNORA Delete con el foco en un input (borra texto, no la obra)", () => {
+    renderHook(() => useAtajosGlobales());
+    const pilarId = sembrarPilar();
+    seleccionStore.getState().seleccionar([pilarId]);
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    const ev = pulsar("Delete");
+    expect(modelo().pilares).toHaveLength(1); // no borró la obra
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("IGNORA Delete con un diálogo modal abierto", () => {
+    renderHook(() => useAtajosGlobales());
+    const pilarId = sembrarPilar();
+    seleccionStore.getState().seleccionar([pilarId]);
+    vistaStore.getState().abrirDialogo("gruposPlantas");
+    pulsar("Delete");
+    expect(modelo().pilares).toHaveLength(1);
+  });
+});
+
+describe("useAtajosGlobales · 1-4 cambian de pestaña (D23)", () => {
+  it("1/2/3/4 saltan a pilares/vigas/resultados/isovalores", () => {
+    renderHook(() => useAtajosGlobales());
+    const ev2 = pulsar("2");
+    expect(vistaStore.getState().pestanaActiva).toBe("entradaVigas");
+    expect(ev2.defaultPrevented).toBe(true);
+    pulsar("3");
+    expect(vistaStore.getState().pestanaActiva).toBe("resultados");
+    pulsar("4");
+    expect(vistaStore.getState().pestanaActiva).toBe("isovalores");
+    pulsar("1");
+    expect(vistaStore.getState().pestanaActiva).toBe("entradaPilares");
+  });
+
+  it("IGNORA 1-4 con el foco en un input (escribe dígitos)", () => {
+    renderHook(() => useAtajosGlobales());
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    const ev = pulsar("2");
+    expect(vistaStore.getState().pestanaActiva).toBe("entradaPilares"); // no saltó
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("IGNORA 1-4 con un diálogo modal abierto", () => {
+    renderHook(() => useAtajosGlobales());
+    vistaStore.getState().abrirDialogo("gruposPlantas");
+    pulsar("3");
+    expect(vistaStore.getState().pestanaActiva).toBe("entradaPilares");
   });
 });
