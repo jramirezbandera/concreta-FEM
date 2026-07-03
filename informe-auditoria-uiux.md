@@ -13,7 +13,17 @@
 **2 Críticos · 16 Altos · 33 Medios · 23 Bajos.**
 
 **Se aplicaron 43 fixes seguros (rojo→verde)** en 6 commits, todos con tests de regresión.
-Suite final: **lint ✓ · typecheck ✓ · 1359 tests en verde** (desde 1252: +107 tests nuevos) · **E2E 5/5 ✓**.
+Suite tras la primera tanda: **lint ✓ · typecheck ✓ · 1359 tests en verde** (desde 1252: +107 tests nuevos) · **E2E 5/5 ✓**.
+
+> **Adenda (segunda tanda, 2026-07-03):** el usuario aprobó ejecutar **todo el registro D1–D23** con las
+> opciones recomendadas y fijó el **material del MVP = hormigón**. Se implementaron las 20 decisiones
+> accionables (D1 queda en su mitigación: el reparto tributario es del próximo corte de F3; D21 ya estaba
+> resuelto) en 5 commits `ux(D…)` adicionales, con validación previa del guardián (D3/D4, D5, D13, D22 —
+> condiciones incorporadas: presets de hormigón como plantillas materializadas en secciones de obra con ids
+> opacos, `mapearReaccionAObra` junto a `mapearEjes` con golden de identidad, nombre de obra como metadato
+> de persistencia, errores individualizados con `posicion` estructurada). Ver §5 (estados) y §8 (detalle).
+> Suite final: **lint ✓ · typecheck ✓ · 1555 tests (+303 desde el inicio de la auditoría) · E2E 5/5 ✓**
+> (E2E actualizados al nuevo contrato: menubar Radix con `role="menuitem"`, fila `ΣV`).
 Los fixes sensibles pasaron por `guardian-arquitectura` antes de codificarse (6 validados: 4 APTO, 2 APTO CON CONDICIONES — condiciones incorporadas).
 
 **Los 5 temas de mayor impacto:**
@@ -226,7 +236,16 @@ La implementación de tokens es **notablemente fiel**: superficies, texto, semá
 
 ---
 
-## 5 · Registro de decisiones opinables (esperan tu criterio)
+## 5 · Registro de decisiones opinables — **RESUELTO (2026-07-03)**
+
+> El usuario aprobó **todas** las recomendaciones (columna "Recomendación") y fijó **material del MVP =
+> hormigón** (cierra el placeholder del CLAUDE.md §18). Estados finales: **D2–D20, D22, D23 → APLICADOS**
+> (commits `ux(D…)`); **D1** → mitigación en producción y el reparto tributario a vigas programado para el
+> siguiente corte de F3 (lo absorbe T-f3-pano-acople); **D21** → ya estaba resuelto (statusbar + botón).
+> D2 en detalle: Exportar descarga la obra como `.json` (nombre saneado + fecha); Importar valida por la
+> frontera Zod, pide confirmación explícita y materializa la obra como **proyecto nuevo** de Dexie (la
+> actual se conserva como registro propio); una importación no es reversible (limpia undo e invalida
+> resultados por el flujo normal del store).
 
 | ID | Decisión | Opciones | Recomendación | Impacto | Esfuerzo |
 |---|---|---|---|---|---|

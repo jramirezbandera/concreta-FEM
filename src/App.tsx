@@ -12,6 +12,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import {
   Shell,
   DockSeccion,
+  ArchivoIO,
   useArranquePersistencia,
   useAtajosGlobales,
 } from "./ui/shell";
@@ -692,6 +693,10 @@ export default function App() {
         nombreActual={nombreObra}
         onRenombrado={refrescarNombre}
       />
+      {/* D2 · Importar del menú Archivo: file picker + confirmación + aviso de error.
+          Recibe el nombre de la obra actual (texto de la confirmación) y refresca el
+          Brandbar tras importar (el proyecto activo pasa a ser el importado). */}
+      <ArchivoIO nombreObraActual={nombreObra} onImportado={refrescarNombre} />
       <DialogoSeccionPersonalizada />
     </Shell>
   );

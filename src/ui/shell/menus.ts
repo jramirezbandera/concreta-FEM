@@ -18,6 +18,8 @@ export type AccionMenu =
   | "calcular"
   | "calcularModos"
   | "deshacer"
+  | "exportarObra"
+  | "importarObra"
   | "rehacer";
 
 // Un item de menu es, o bien un string inerte (placeholder, igual que en F9),
@@ -37,7 +39,17 @@ export interface MenuDef {
 // Items comunes (placeholders). Sin jerga FEM (CLAUDE.md §17).
 const ARCHIVO: MenuDef = {
   etiqueta: "Archivo",
-  items: ["Nueva obra", "Abrir...", "Guardar", "Exportar...", "Importar..."],
+  // "Exportar…"/"Importar…" cablean el .json propio de Concreta (D2): la lógica de
+  // persistencia (serializacion + frontera Zod) ya existe; el menú solo la invoca.
+  // "Nueva obra"/"Abrir…"/"Guardar" siguen como placeholders (el autosave ya guarda en
+  // continuo; "Abrir…" espera a la UI de biblioteca multi-proyecto).
+  items: [
+    "Nueva obra",
+    "Abrir...",
+    "Guardar",
+    { etiqueta: "Exportar...", accion: "exportarObra" },
+    { etiqueta: "Importar...", accion: "importarObra" },
+  ],
 };
 const OBRA: MenuDef = {
   etiqueta: "Obra",

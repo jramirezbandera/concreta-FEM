@@ -8,6 +8,7 @@ import {
   borrarProyecto,
   cargarProyecto,
   crearProyecto,
+  crearProyectoConModelo,
   getProyectoActivoId,
   guardarModeloDeProyecto,
   guardarProyecto,
@@ -15,6 +16,7 @@ import {
   renombrarProyecto,
   setProyectoActivoId,
 } from "./repositorio";
+import { crearModeloVacio } from "../dominio";
 import {
   cargarPlantillasDeProyecto,
   guardarPlantillasDeProyecto,
@@ -62,6 +64,36 @@ it("crear -> cargar hace round-trip de todos los campos", async () => {
 
 it("cargar devuelve undefined si el id no existe", async () => {
   expect(await cargarProyecto("inexistente")).toBeUndefined();
+});
+
+it("crearProyectoConModelo siembra el modelo dado, lo persiste y lo deja activo (D2)", async () => {
+  const modelo = crearModeloVacio();
+  // Marca el modelo para distinguirlo de uno recién creado por crearProyecto.
+  modelo.pilares.push({
+    id: "pilar-import",
+    nombre: "P1",
+    x: 1,
+    y: 2,
+    plantaInicial: "px",
+    plantaFinal: "px",
+    seccionId: "s",
+    materialId: "m",
+    angulo: 0,
+    vinculacionExterior: true,
+    arranque: "empotrado",
+  });
+
+  const creado = await crearProyectoConModelo("Obra importada", modelo);
+
+  expect(creado.nombre).toBe("Obra importada");
+  expect(creado.schemaVersion).toBe(modelo.schemaVersion);
+  expect(creado.actualizadoEn).toBe(creado.creadoEn);
+  // El modelo persistido es EXACTAMENTE el dado (no el vacío de crearProyecto).
+  const leido = await cargarProyecto(creado.id);
+  expect(leido!.modelo.pilares).toHaveLength(1);
+  expect(leido!.modelo.pilares[0]!.id).toBe("pilar-import");
+  // Deja el puntero activo apuntando al nuevo proyecto (como crearProyecto).
+  expect(await getProyectoActivoId()).toBe(creado.id);
 });
 
 it("listar ordena por actualizadoEn descendente", async () => {

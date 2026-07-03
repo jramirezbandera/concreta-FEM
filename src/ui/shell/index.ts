@@ -22,6 +22,11 @@ export type { DockSeccionProps } from "./DockSeccion";
 export { MENUS_POR_PESTANA } from "./menus";
 export type { MenuDef } from "./menus";
 
+// D2 · Exportar/Importar del menú Archivo: ArchivoIO monta la UI de importación (file
+// picker, confirmación, aviso). Lo monta App una vez, como los diálogos.
+export { ArchivoIO } from "./ArchivoIO";
+export type { ArchivoIOProps } from "./ArchivoIO";
+
 // Arranque de persistencia (feature-15): rehidrata y autosalva Modelo + plantillas
 // del proyecto activo. Lo invoca App una vez al montar.
 export { useArranquePersistencia } from "./useArranquePersistencia";

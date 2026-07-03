@@ -38,6 +38,36 @@ export async function crearProyecto(
   return proyecto;
 }
 
+// Crea un proyecto nuevo SEMBRADO con un `modelo` ya existente (a diferencia de
+// crearProyecto, que arranca vacio). Lo usa la IMPORTACION (D2): un .json importado
+// se materializa como un proyecto propio de la biblioteca en vez de machacar el
+// registro activo, de modo que la obra actual se conserva. Mismo contrato atomico
+// que crearProyecto: put del registro + fijar el puntero activo en una transaccion
+// (no dejar el puntero apuntando a un proyecto a medio crear). El `modelo` ya viene
+// validado por la frontera Zod (migrarYValidar) antes de llegar aqui; el repositorio
+// no revalida (CLAUDE.md: la validacion vive en el borde de import).
+export async function crearProyectoConModelo(
+  nombre: string,
+  modelo: Modelo,
+): Promise<ProyectoGuardado> {
+  const ahora = Date.now();
+  const proyecto: ProyectoGuardado = {
+    id: nuevoId(),
+    nombre,
+    modelo,
+    // El schemaVersion del registro sigue al del modelo importado (ya migrado a la
+    // version vigente por la frontera): coherente con crearProyecto (SCHEMA_VERSION).
+    schemaVersion: modelo.schemaVersion,
+    creadoEn: ahora,
+    actualizadoEn: ahora,
+  };
+  await db.transaction("rw", db.proyectos, db.meta, async () => {
+    await db.proyectos.put(proyecto);
+    await escribirActivo(proyecto.id);
+  });
+  return proyecto;
+}
+
 // Persiste un proyecto refrescando `actualizadoEn`. No muta el argumento: escribe
 // una copia con el nuevo timestamp, asi quien llama conserva su objeto intacto.
 export async function guardarProyecto(

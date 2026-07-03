@@ -144,6 +144,12 @@ interface VistaState {
   // Dialogo modal abierto, o null si ninguno. Estado de UI puro: NO participa en
   // undo (coherente con el resto de vistaStore; ver cabecera del fichero).
   dialogoActivo: DialogoActivo | null;
+  // Señal transitoria de "Importar…" del menú Archivo (D2). El menú la enciende;
+  // ArchivoIO abre el file picker y la apaga (resetImportarSolicitado). Es un DISPARO
+  // puntual, no un modo persistente ni un diálogo: por eso no va en DialogoActivo (la
+  // confirmación de import es UI local de ArchivoIO, no un modal global de la app).
+  // Estado de UI puro: NO participa en undo.
+  importarSolicitado: boolean;
   // Plantillas DXF importadas (feature-15): ayuda de dibujo (calco), fuera de
   // Capa 1 y fuera del undo. La persistencia-referencia (Dexie) las hidrata via
   // setPlantillas al abrir proyecto; la edicion (mover/escalar/ocultar) es set directo.
@@ -239,6 +245,10 @@ interface VistaState {
   setCombinacionActiva(c: string | null): void;
   abrirDialogo(d: DialogoActivo): void;
   cerrarDialogo(): void;
+  // Señal "Importar…" del menú Archivo (D2): solicitarImport la enciende (el menú),
+  // resetImportarSolicitado la apaga (ArchivoIO, tras abrir el file picker).
+  solicitarImport(): void;
+  resetImportarSolicitado(): void;
   setHerramienta(h: Herramienta): void;
   setDefaultsPilar(p: Partial<DefaultsPilar>): void; // merge superficial
   setDefaultsViga(p: Partial<DefaultsViga>): void; // merge superficial
@@ -295,6 +305,7 @@ export const vistaStore = create<VistaState>()(
     modoVista: "planta",
     combinacionActiva: null,
     dialogoActivo: null,
+    importarSolicitado: false,
     plantillas: [],
     plantillaActivaId: null,
     panelPlantillasAbierto: false,
@@ -353,6 +364,8 @@ export const vistaStore = create<VistaState>()(
     setCombinacionActiva: (c) => set({ combinacionActiva: c }),
     abrirDialogo: (d) => set({ dialogoActivo: d }),
     cerrarDialogo: () => set({ dialogoActivo: null }),
+    solicitarImport: () => set({ importarSolicitado: true }),
+    resetImportarSolicitado: () => set({ importarSolicitado: false }),
     setHerramienta: (h) => set({ herramienta: h }),
     setDefaultsPilar: (p) =>
       set((estado) => ({ defaultsPilar: { ...estado.defaultsPilar, ...p } })),

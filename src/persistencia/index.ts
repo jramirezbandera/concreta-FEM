@@ -18,6 +18,7 @@ export { abrirDB } from "./esquema";
 // Repositorio: biblioteca multi-proyecto sobre IndexedDB + puntero al activo.
 export {
   crearProyecto,
+  crearProyectoConModelo,
   guardarProyecto,
   guardarModeloDeProyecto,
   cargarProyecto,

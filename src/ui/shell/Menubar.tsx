@@ -28,6 +28,11 @@ import { calcularObra } from "../resultados/useCalcular";
 // estado al calculoStore (igual ciclo de vida del motor que el estatico).
 import { calcularModos } from "../resultados/useSolicitarModos";
 import { calculoHabilitado } from "../resultados/estadoMotorUI";
+// D2 · Archivo → Exportar/Importar. Exportar es un efecto autocontenido (serializa la obra
+// actual + descarga el .json), así que vive en el DISPATCH imperativo. Importar necesita UI
+// (file picker + confirmación + aviso): el DISPATCH solo enciende una señal transitoria del
+// vistaStore que el componente ArchivoIO (montado en App) consume para abrir el selector.
+import { exportarObraActual } from "./exportarObra";
 
 // Menubar (Spec Diseno UI §2 / §3.2): menus contextuales que cambian con la pestana activa
 // (criterio de aceptacion de feature-9). [D12] Migrada de Popover a **Radix Menubar**: gana
@@ -70,6 +75,14 @@ export const DISPATCH: Record<AccionMenu, () => void> = {
   // segun puedeDeshacer/puedeRehacer, asi que aqui solo se invoca la accion.
   deshacer: () => modeloStore.getState().deshacer(),
   rehacer: () => modeloStore.getState().rehacer(),
+  // D2: exporta la obra actual como .json descargable. Async (lee el nombre del proyecto
+  // activo de IndexedDB); `void` descarta la promesa (la descarga es fire-and-forget, no
+  // hay estado que reflejar). El fallback del nombre coincide con el rótulo del Brandbar
+  // por si no hay persistencia (obra en memoria).
+  exportarObra: () => void exportarObraActual("Obra sin título"),
+  // D2: enciende la señal de importación; ArchivoIO abre el file picker y lleva el flujo
+  // (validar → confirmar → sustituir). No async: solo conmuta el store.
+  importarObra: () => vistaStore.getState().solicitarImport(),
 };
 
 // Etiqueta visible de un item, sea string inerte u objeto accionable. Sirve de
