@@ -413,6 +413,61 @@ describe("DialogoGruposYPlantas: notas de honestidad (UX-D1/D2)", () => {
   });
 });
 
+describe("DialogoGruposYPlantas: D16 coherencia cotas/alturas", () => {
+  // Carga un modelo con UN grupo y sus plantas, deja el grupo activo y abre el dialogo.
+  // Asi controlamos las cotas/alturas exactas sin conducir campos numericos (estable).
+  function renderConPlantas(
+    plantas: { id: string; nombre: string; cota: number; altura: number }[],
+  ) {
+    const m = crearModeloVacio();
+    m.grupos.push({
+      id: "g1",
+      nombre: "G1",
+      categoriaUso: "A",
+      sobrecargaUso: 2,
+      cargasMuertas: 1,
+    });
+    for (const p of plantas) m.plantas.push({ ...p, grupoId: "g1" });
+    modeloStore.getState().cargarModelo(m);
+    vistaStore.getState().setGrupoActivo("g1");
+    vistaStore.getState().abrirDialogo("gruposPlantas");
+    render(<DialogoGruposYPlantas />);
+    return screen.getByRole("dialog");
+  }
+
+  it("plantas coherentes (cabeza_i == arranque_i+1): NO muestra ningun aviso", () => {
+    const dialogo = renderConPlantas([
+      { id: "p1", nombre: "Planta 1", cota: 0, altura: 3 },
+      { id: "p2", nombre: "Planta 2", cota: 3, altura: 3 },
+    ]);
+    expect(within(dialogo).queryByText(/revisa cotas y alturas/)).toBeNull();
+    expect(dialogo.querySelector(".cx-gyp__avisos-cotas")).toBeNull();
+  });
+
+  it("hueco entre plantas: muestra un aviso NO bloqueante (role=status) con el texto de obra", () => {
+    const dialogo = renderConPlantas([
+      { id: "p1", nombre: "Planta 1", cota: 0, altura: 3 },
+      { id: "p2", nombre: "Planta 2", cota: 4, altura: 3 },
+    ]);
+    const aviso = within(dialogo).getByText(
+      'La planta "Planta 1" termina a +3.00 m pero "Planta 2" arranca a +4.00 m: revisa cotas y alturas.',
+    );
+    expect(aviso).toBeInTheDocument();
+    // Contenedor role=status (aviso, no error): el borrado/edicion sigue disponible.
+    const status = within(dialogo).getByRole("status");
+    expect(status).toContainElement(aviso);
+  });
+
+  it("un solo aviso POR PAR: dos huecos consecutivos -> dos avisos", () => {
+    const dialogo = renderConPlantas([
+      { id: "p1", nombre: "Planta 1", cota: 0, altura: 3 },
+      { id: "p2", nombre: "Planta 2", cota: 4, altura: 3 },
+      { id: "p3", nombre: "Planta 3", cota: 8, altura: 3 },
+    ]);
+    expect(within(dialogo).getAllByText(/revisa cotas y alturas/)).toHaveLength(2);
+  });
+});
+
 describe("DialogoGruposYPlantas: undo", () => {
   it("deshacer revierte la creacion de un grupo", async () => {
     const user = userEvent.setup();

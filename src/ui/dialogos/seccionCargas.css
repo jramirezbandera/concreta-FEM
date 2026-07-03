@@ -53,6 +53,31 @@
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
+
+/* D17: fila EDITABLE inline (valor + hipótesis a la izquierda, × a la derecha). A
+   diferencia de la fila read-only (grid de spans), aqui van dos CONTROLES que crecen y
+   pueden apilar su propio error; por eso una fila flex con align-items:flex-start (el ×
+   no se centra respecto a un campo con error mas alto) y align-items:end normal via el
+   bloque de campos. */
+.cx-cargas__fila--edit {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2, 8px);
+}
+/* Bloque valor + hipótesis: crece (1fr equivalente) y alinea ambos por su base. El
+   CampoNumero de valor no debe acaparar todo el ancho; la hipótesis toma el resto. */
+.cx-cargas__fila-campos {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(84px, auto) 1fr;
+  align-items: end;
+  gap: var(--space-2, 8px);
+}
+/* CampoNumero de valor compacto dentro de la fila (analogo a .cx-gyp__campo-num). */
+.cx-cargas__fila-valor {
+  width: 84px;
+}
 .cx-cargas__hip {
   color: var(--text-2);
   overflow: hidden;
@@ -94,6 +119,17 @@
    convenido (positivo = gravitatoria hacia abajo). Secundario y discreto: es una guia,
    no un error (el error usa .cx-campo__error, en --danger). Solo tokens. */
 .cx-cargas__ayuda {
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+/* D19 (UX-E4): nota terciaria al pie que gestiona la expectativa de la carga puntual
+   (diferida a fase posterior). Texto en --text-3 (terciario, mas apagado que la ayuda
+   del signo): informa sin competir con los controles activos. */
+.cx-cargas__nota-futura {
+  margin: 0;
   color: var(--text-3);
   font-family: var(--font-sans);
   font-size: 11.5px;

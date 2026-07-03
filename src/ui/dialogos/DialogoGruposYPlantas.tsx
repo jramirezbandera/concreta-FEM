@@ -7,6 +7,7 @@ import {
   type ErrorCampo,
 } from "./validacionesDialogo";
 import { Campo, CampoNumero, SelectUso, Boton, formatearQk } from "../primitivas";
+import { detectarIncoherenciasCotas } from "./coherenciaCotas";
 import {
   modeloStore,
   vistaStore,
@@ -390,6 +391,16 @@ export function DialogoGruposYPlantas() {
         .sort((a, b) => b.cota - a.cota)
     : [];
 
+  // UX-D3 (D16): avisos NO bloqueantes de incoherencia cota/altura entre plantas
+  // consecutivas del grupo activo (hueco o solape: cota_i + altura_i != cota de la
+  // siguiente). El helper es puro y ordena por cota ascendente por su cuenta; le
+  // pasamos las plantas del grupo (el orden de entrada es indiferente). Informativo,
+  // no impide editar ni calcular: cotas y alturas son campos independientes a
+  // proposito (retranqueos, dobles alturas).
+  const avisosCotas = grupoActivo
+    ? detectarIncoherenciasCotas(plantasGrupo)
+    : [];
+
   const pie = (
     <Boton variante="ghost" onClick={cerrarDialogo}>
       Cerrar
@@ -567,6 +578,19 @@ export function DialogoGruposYPlantas() {
                   })
                 )}
               </div>
+
+              {/* UX-D3 (D16): avisos de coherencia cota/altura. NO bloqueantes
+                  (role=status, --warning): informan de huecos/solapes entre plantas
+                  consecutivas sin impedir editar ni calcular. Uno por par incoherente. */}
+              {avisosCotas.length > 0 ? (
+                <div className="cx-gyp__avisos-cotas" role="status">
+                  {avisosCotas.map((a) => (
+                    <p key={a.plantaInferiorId} className="cx-gyp__aviso-cota">
+                      {a.mensaje}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
 
               {/* Eliminar el grupo activo (al pie del detalle). */}
               <div>

@@ -3,6 +3,7 @@ import { Dialogo } from "./Dialogo";
 import { Segmentado, Boton } from "../primitivas";
 import { modeloStore, vistaStore, editarAnalisis } from "../../estado";
 import type { OpcionesAnalisis } from "../../dominio";
+import { vistaPreviaCombos } from "./vistaPreviaCombos";
 import "./opcionesAnalisis.css";
 
 // DialogoOpcionesAnalisis (F2.4): configura el analisis de la obra (Capa 1,
@@ -46,6 +47,11 @@ export function DialogoOpcionesAnalisis() {
   // Lectura reactiva de las opciones de analisis (el dialogo no esta en el bucle del
   // viewport; re-render al editar es aceptable). Selector sobre el sub-objeto analisis.
   const analisis = modeloStore((s) => s.modelo.analisis);
+  // D18: el modelo completo, para derivar la vista previa de combinaciones (depende de
+  // las hipotesis y de incluirPesoPropio). Suscripcion ligera al modelo (referencia
+  // estable via Immer): re-render solo al editar la obra, nunca por frame (#11).
+  const modelo = modeloStore((s) => s.modelo);
+  const combos = vistaPreviaCombos(modelo);
 
   const dialogoActivo = vistaStore((s) => s.dialogoActivo);
   const cerrarDialogo = vistaStore((s) => s.cerrarDialogo);
@@ -172,6 +178,24 @@ export function DialogoOpcionesAnalisis() {
               {NOTA_PDELTA}
             </p>
           ) : null}
+        </div>
+
+        {/* (4) D18: vista previa SOLO-LECTURA de las combinaciones que generara el
+            calculo. Las lineas salen de generarCombos con las hipotesis reales del
+            modelo (via vistaPreviaCombos): los coeficientes NO estan escritos a mano.
+            Da verificabilidad normativa antes de calcular (UX-E2/UX-H11). Formato mono,
+            discreto: informa, no es un control. */}
+        <div className="cx-opc__bloque">
+          <span className="cx-opc__label">Combinaciones que se generarán</span>
+          <ul className="cx-opc__combos">
+            {combos.map((c) => (
+              <li key={c.nombre} className="cx-opc__combo">
+                <span className="cx-opc__combo-nombre">{c.etiqueta}</span>
+                <span className="cx-opc__combo-sep"> · </span>
+                <span className="cx-opc__combo-formula mono">{c.formula}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </Dialogo>
