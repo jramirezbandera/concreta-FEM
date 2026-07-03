@@ -17,11 +17,12 @@ import { engancharAPuntoExtra } from "./dxf/snapDxf";
 import type { PuntoXY } from "./dxf/tiposDxf";
 import { nudoPorId, plantaPorId, vigasDePlanta } from "../../dominio";
 import type { Modelo } from "../../dominio";
-// Misma tolerancia de fusion de nudos que usa el discretizador (feature-4) y
-// crearViga (resolverExtremo): localizar el nudo de la cabeza de pilar por
-// proximidad, no por igualdad exacta de floats, para no divergir del criterio
-// unico (un nudo a <1 mm de la cabeza es "el mismo punto").
-import { TOL_NODO } from "../../discretizador/discretizar";
+// [AUDITORIA M-4] MISMO criterio de fusion de nudos que el discretizador y
+// crearViga: la CLAVE DE REJILLA (mismaPosicionEnPlanta), no distancia euclidea.
+// El comentario anterior afirmaba "misma tolerancia" pero el criterio era otro
+// (euclideo), y diverge en la frontera de celda: la UI podia creer "unido" lo que
+// el solver separa. Fuente unica: geometria.ts.
+import { mismaPosicionEnPlanta } from "../../discretizador/geometria";
 // ExtremoViga lo define la tarea T1.1 en src/estado/comandos/comandosModelo.ts y
 // se reexporta por el barrel src/estado. Importado desde el barrel (no del modulo
 // concreto) para no acoplarse a su ruta interna.
@@ -100,10 +101,9 @@ function candidatos(modelo: Modelo, plantaId: string): Candidato[] {
       const cMax = Math.max(c0, c1);
       if (cota < cMin || cota > cMax) continue; // el tramo no llega a esta cota
 
-      // Hay nudo en (x,y) del pilar (a <TOL_NODO)? entonces enganchar a ese id.
-      const nudoEnPilar = modelo.nudos.find(
-        (n) => Math.hypot(n.x - pilar.x, n.y - pilar.y) < TOL_NODO,
-      );
+      // Hay nudo en la MISMA celda de rejilla que el pilar? enganchar a ese id
+      // ([M-4]: mismo predicado que el snapping del discretizador).
+      const nudoEnPilar = modelo.nudos.find((n) => mismaPosicionEnPlanta(n, pilar));
       if (nudoEnPilar !== undefined) {
         if (vistos.has(nudoEnPilar.id)) continue; // ya contado como nudo de viga
         vistos.add(nudoEnPilar.id);

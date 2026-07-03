@@ -16,12 +16,22 @@ const FALLBACK = {
   canvasGrid: "#cdd6e2",
   canvasGrid2: "#aab8d0",
   canvasAxis: "#7a90b6",
+  // Texto sobre el lienzo (D7a, etiquetas de elemento): --text-2 en reposo. DEBE
+  // coincidir con tokens.css. Se usa como color de rotulo troika (hexToken).
+  text2: "#5a6678",
   accent: "#2563eb",
   accentLine: "#4f86f0",
   pilar: "#9db2ce",
   pilarLine: "#b6c7dd",
   viga: "#c9a66b",
   vigaLine: "#ddbd87",
+  // Paño / losa (F3, UX-C13/G11): token propio del elemento, ampliacion del mapa
+  // §1.3. DEBE coincidir con tokens.css (--pano / --pano-line). Sage (verde-azulado
+  // apagado), hue distinto de pilar/viga/muro/support/load/centro-rigidez.
+  pano: "#8fb5a3",
+  panoLine: "#a7c8bb",
+  // Cargas dibujadas (D7b): --load (naranja). DEBE coincidir con tokens.css.
+  load: "#f97316",
   node: "#c07d12",
   deformed: "#38bdf8",
   centroMasa: "#d6336c",
@@ -44,12 +54,16 @@ const VAR_NAME: Record<keyof typeof FALLBACK, string> = {
   canvasGrid: "canvas-grid",
   canvasGrid2: "canvas-grid-2",
   canvasAxis: "canvas-axis",
+  text2: "text-2",
   accent: "accent",
   accentLine: "accent-line",
   pilar: "pilar",
   pilarLine: "pilar-line",
   viga: "viga",
   vigaLine: "viga-line",
+  pano: "pano",
+  panoLine: "pano-line",
+  load: "load",
   node: "node",
   deformed: "deformed",
   centroMasa: "centro-masa",
@@ -104,6 +118,12 @@ export function hexToken(nombre: NombreColor): string {
 // Fallback de las 5 paradas (DEBE coincidir con tokens.css --ramp-0..4).
 const RAMPA_FALLBACK = ["#2563eb", "#38bdf8", "#22c55e", "#f59e0b", "#dc2626"] as const;
 
+// Posiciones de las 5 paradas en [0,1] (Spec Diseno UI §1.4). NO son equidistantes: el
+// diseno concentra la transicion en la zona media (0.28/0.52/0.74) para dar mas resolucion
+// cromatica en los valores intermedios. Exportadas para que la leyenda CSS (LeyendaRampa)
+// pinte el MISMO gradiente que el lienzo 3D (una sola fuente de verdad de las paradas).
+export const RAMPA_PARADAS_POS = [0, 0.28, 0.52, 0.74, 1.0] as const;
+
 // Resuelve las 5 paradas a THREE.Color (cacheadas: las CSS vars no cambian en F1).
 let rampaCache: Color[] | null = null;
 function rampaParadas(): Color[] {
@@ -115,15 +135,21 @@ function rampaParadas(): Color[] {
   return rampaCache;
 }
 
-// Color para un valor normalizado t en [0,1] interpolando linealmente entre las 5
-// paradas de la rampa. Escribe en `destino` (reutilizable: evita asignar un Color
-// por segmento al construir la geometria). t fuera de rango se acota.
+// Color para un valor normalizado t en [0,1] interpolando linealmente entre las 5 paradas
+// de la rampa segun sus posiciones RAMPA_PARADAS_POS (no equidistantes). Escribe en
+// `destino` (reutilizable: evita asignar un Color por segmento al construir la geometria).
+// t fuera de rango se acota.
 export function rampaIsovalores(t: number, destino: Color): Color {
   const paradas = rampaParadas();
+  const pos = RAMPA_PARADAS_POS;
   const ultima = paradas.length - 1; // 4
   const tc = t <= 0 ? 0 : t >= 1 ? 1 : t;
-  const escalado = tc * ultima; // posicion en [0, 4]
-  const i = Math.min(Math.floor(escalado), ultima - 1);
-  const f = escalado - i; // fraccion dentro del tramo [i, i+1]
+  // Localiza el tramo [i, i+1] cuyas posiciones envuelven a tc y lerpa dentro de el.
+  let i = 0;
+  while (i < ultima - 1 && tc > pos[i + 1]!) i++;
+  const p0 = pos[i]!;
+  const p1 = pos[i + 1]!;
+  const span = p1 - p0;
+  const f = span > 0 ? (tc - p0) / span : 0; // fraccion dentro del tramo
   return destino.copy(paradas[i]!).lerp(paradas[i + 1]!, f);
 }

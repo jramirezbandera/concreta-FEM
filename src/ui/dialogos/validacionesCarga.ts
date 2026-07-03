@@ -59,7 +59,10 @@ export function validarCarga(
   if (!Number.isFinite(datos.valor) || datos.valor <= 0) {
     errores.push({
       campo: "valor",
-      mensaje: "El valor de la carga debe ser mayor que cero.",
+      // UX-E3: el mensaje repite el sentido convenido (positivo = hacia abajo) para
+      // que el usuario entienda POR QUE se rechaza el negativo, no solo que se rechaza.
+      mensaje:
+        "El valor de la carga debe ser mayor que cero. Introdúcelo en positivo: la carga actúa hacia abajo (gravitatoria).",
     });
   }
 

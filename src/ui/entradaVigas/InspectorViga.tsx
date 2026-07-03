@@ -16,11 +16,13 @@ import {
 import {
   modeloStore,
   seleccionStore,
+  vistaStore,
   editarViga,
   eliminarViga,
 } from "../../estado";
-import type { Modelo, Viga } from "../../dominio";
+import type { Modelo, Viga, Nudo } from "../../dominio";
 import { cargasDeAmbito } from "../../dominio";
+import { esCombinacionIncoherentePorId, mensajeCoherencia } from "../../biblioteca";
 import "./inspectorViga.css";
 
 // InspectorViga (feature-12, Tarea 2.2): panel flotante sobre el lienzo que edita
@@ -71,12 +73,64 @@ function contarCargasDeLaViga(modelo: Modelo, vigaId: string): number {
   return cargasDeAmbito(modelo, vigaId).length;
 }
 
+// Geometria de la viga para el bloque solo-lectura D8b: longitud (m) y coordenadas de
+// los extremos I/J. Los datos salen de modelo.nudos via los ids de la viga (nudoI/nudoJ),
+// UNIDADES internas en m (no hay conversion: coordenadas y longitud van en m). La
+// longitud es la distancia en planta entre los dos nudos (misma cota: la viga vive en
+// una sola planta), = distancia euclidea 2D. Devuelve null si algun nudo no resuelve
+// (viga a medio construir / import inconsistente): el bloque no se pinta.
+interface GeometriaViga {
+  longitud: number; // m
+  xi: number;
+  yi: number;
+  xj: number;
+  yj: number;
+}
+
+function geometriaDeViga(nudos: Nudo[], viga: Viga): GeometriaViga | null {
+  const ni = nudos.find((n) => n.id === viga.nudoI);
+  const nj = nudos.find((n) => n.id === viga.nudoJ);
+  if (ni === undefined || nj === undefined) return null;
+  // La viga es horizontal en su planta: la longitud es la distancia 2D en planta
+  // (misma cota en ambos extremos). Coincide con la longitud 3D del discretizador.
+  const longitud = Math.hypot(nj.x - ni.x, nj.y - ni.y);
+  return { longitud, xi: ni.x, yi: ni.y, xj: nj.x, yj: nj.y };
+}
+
+// Formatea un valor en metros a 2 decimales (bloque geometrico D8b, mono tabular).
+function fmt2(v: number): string {
+  return v.toFixed(2);
+}
+
+// Estado vacio del inspector (auditoria UX-C6): en la pestana de vigas con la
+// herramienta "seleccion" activa y sin viga seleccionada, el dock mostraba solo
+// "Ayudas" sin guiar a que seleccionar una viga abre su editor. En vez de
+// desaparecer (return null), rinde una seccion de estado vacio en el cromo plano del
+// dock (patron de PanelDiagramas / InspectorPilar). Solo con herramienta "seleccion":
+// con la herramienta de colocacion, el panel-herramienta ya ocupa el dock.
+function EstadoVacioViga({ mensaje }: { mensaje: string }) {
+  return (
+    <PanelFlotante className="cx-inspector-viga" titulo="Propiedades">
+      <p className="cx-inspector-vacio">{mensaje}</p>
+    </PanelFlotante>
+  );
+}
+
 export function InspectorViga() {
   // Lectura reactiva: la seleccion y las vigas. El inspector NO esta en el bucle del
   // viewport; un re-render al seleccionar/editar es aceptable (#11: lo que no puede
   // entrar en el render loop es el viewport, no este panel de propiedades).
   const seleccion = seleccionStore((s) => s.seleccion);
   const vigas = modeloStore((s) => s.modelo.vigas);
+  // Nudos y secciones de obra: para el bloque de geometria D8b (coords de extremos) y
+  // el aviso de coherencia D15 (familia de la seccion). Suscripcion ligera (referencia
+  // estable via Immer): re-render solo si cambian, no por frame.
+  const nudos = modeloStore((s) => s.modelo.nudos);
+  const secciones = modeloStore((s) => s.modelo.secciones);
+  // Contexto de UI para el estado vacio: solo en la pestana de vigas y con la
+  // herramienta de seleccion (colocacion tiene su propio panel-herramienta).
+  const pestanaActiva = vistaStore((s) => s.pestanaActiva);
+  const herramienta = vistaStore((s) => s.herramienta);
 
   // Errores de validacion campo a campo. Se actualizan en cada commit; NO bloquean
   // el teclear (el estado local de cada control es libre).
@@ -99,8 +153,20 @@ export function InspectorViga() {
     setErrores([]);
   }, [vigaId]);
 
-  // 0 o >1 seleccionadas, o el id no es una viga del modelo: no se renderiza.
-  if (!viga) return null;
+  // Sin una viga aplicable (0 seleccionadas, multiseleccion, o id no-viga): el
+  // inspector no edita nada. En la pestana de vigas con herramienta "seleccion"
+  // muestra un estado vacio que guia (UX-C6); en cualquier otro contexto se repliega
+  // a null (la viga solo es el editor principal de esta pestana).
+  if (!viga) {
+    if (pestanaActiva === "entradaVigas" && herramienta === "seleccion") {
+      const mensaje =
+        seleccion.length > 1
+          ? `${seleccion.length} elementos seleccionados. Edítalos de uno en uno.`
+          : "Selecciona una viga para editar sus propiedades.";
+      return <EstadoVacioViga mensaje={mensaje} />;
+    }
+    return null;
+  }
 
   // Commit generico de un campo. Construye los DatosVigaUI con el parche, valida,
   // refleja SOLO los errores de los campos tocados y despacha si pasan. No-op si el
@@ -153,6 +219,17 @@ export function InspectorViga() {
     });
   };
 
+  // D8b: geometria de la viga (longitud + coordenadas de extremos), solo lectura. Se
+  // lee de modelo.nudos (los ids de la viga). El bloque no se pinta si algun nudo no
+  // resuelve.
+  const geometria = geometriaDeViga(nudos, viga);
+
+  // D15: aviso NO bloqueante si la seccion (perfil metalico / hormigon) no casa con
+  // la familia del material (acero / hormigon).
+  const avisoCoherencia = mensajeCoherencia(
+    esCombinacionIncoherentePorId(viga.seccionId, viga.materialId, secciones),
+  );
+
   return (
     <>
       <PanelFlotante
@@ -160,6 +237,27 @@ export function InspectorViga() {
         titulo={`Viga ${viga.nombre}`}
         tag="viga"
       >
+        {/* D8b: geometria de la viga (solo lectura). Longitud (m, 2 decimales, mono) y
+            coordenadas de los extremos I/J. Datos derivados de la geometria en planta;
+            no se editan aqui (la geometria la fija la introduccion grafica). */}
+        {geometria ? (
+          <div className="cx-inspector-viga__geom">
+            <div className="cx-inspector-viga__geom-fila">
+              <span className="cx-inspector-viga__geom-etq">Longitud</span>
+              <span className="cx-inspector-viga__geom-val">
+                {fmt2(geometria.longitud)} m
+              </span>
+            </div>
+            <div className="cx-inspector-viga__geom-fila">
+              <span className="cx-inspector-viga__geom-etq">Extremos</span>
+              <span className="cx-inspector-viga__geom-val">
+                ({fmt2(geometria.xi)}, {fmt2(geometria.yi)}) → (
+                {fmt2(geometria.xj)}, {fmt2(geometria.yj)})
+              </span>
+            </div>
+          </div>
+        ) : null}
+
         <SelectSeccion
           etiqueta="Sección"
           valor={viga.seccionId}
@@ -180,6 +278,14 @@ export function InspectorViga() {
           <div className="cx-campo__error" role="alert">
             {errorDe(errores, "materialId")}
           </div>
+        ) : null}
+
+        {/* D15: aviso de mezcla incoherente seccion<->material. NO bloquea la
+            edicion; solo advierte (--warning, role=status). */}
+        {avisoCoherencia ? (
+          <p className="cx-aviso-coherencia" role="status">
+            {avisoCoherencia}
+          </p>
         ) : null}
 
         {/* Un tirante trabaja biarticulado: el discretizador fuerza ambos extremos

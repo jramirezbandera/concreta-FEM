@@ -5,10 +5,17 @@
 // ni el Canvas R3F: el hook solo lee/suscribe stores).
 import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { usePuedeColocarPilar, usePuedeColocarViga } from "./App";
+import {
+  usePuedeColocarPilar,
+  usePuedeColocarViga,
+  useMensajeCalculo,
+  MENSAJE_CALCULANDO,
+  MENSAJE_MOTOR_CARGANDO,
+} from "./App";
 import {
   modeloStore,
   vistaStore,
+  calculoStore,
   crearGrupo,
   crearPlanta,
 } from "./estado";
@@ -136,5 +143,56 @@ describe("usePuedeColocarViga", () => {
       vistaStore.getState().setDefaultsViga({ seccionId: null });
     });
     expect(result.current).toBe(false);
+  });
+});
+
+// UX-L6: la barra de estado refleja el trabajo del motor mientras calcula.
+describe("useMensajeCalculo", () => {
+  beforeEach(() => {
+    calculoStore.getState().setCalculando(false);
+    calculoStore.getState().setEstadoMotor("listo");
+  });
+
+  it("null en reposo (deja ganar al mensaje contextual)", () => {
+    const { result } = renderHook(() => useMensajeCalculo());
+    expect(result.current).toBeNull();
+  });
+
+  it("'Calculando obra…' mientras hay un cálculo en vuelo", () => {
+    const { result } = renderHook(() => useMensajeCalculo());
+    act(() => {
+      calculoStore.getState().setCalculando(true);
+    });
+    expect(result.current).toBe(MENSAJE_CALCULANDO);
+  });
+
+  it("'Preparando el motor…' mientras el motor carga (y no hay cálculo)", () => {
+    const { result } = renderHook(() => useMensajeCalculo());
+    act(() => {
+      calculoStore.getState().setEstadoMotor("cargando");
+    });
+    expect(result.current).toBe(MENSAJE_MOTOR_CARGANDO);
+  });
+
+  it("el cálculo en vuelo prioriza sobre la carga del motor", () => {
+    const { result } = renderHook(() => useMensajeCalculo());
+    act(() => {
+      calculoStore.getState().setEstadoMotor("cargando");
+      calculoStore.getState().setCalculando(true);
+    });
+    expect(result.current).toBe(MENSAJE_CALCULANDO);
+  });
+
+  it("vuelve a null al terminar (restaura el contextual)", () => {
+    const { result } = renderHook(() => useMensajeCalculo());
+    act(() => {
+      calculoStore.getState().setCalculando(true);
+    });
+    expect(result.current).toBe(MENSAJE_CALCULANDO);
+    act(() => {
+      calculoStore.getState().setCalculando(false);
+      calculoStore.getState().setEstadoMotor("listo");
+    });
+    expect(result.current).toBeNull();
   });
 });

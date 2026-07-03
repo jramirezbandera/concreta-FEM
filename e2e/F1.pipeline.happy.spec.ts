@@ -149,11 +149,11 @@ test("F1 happy: obra -> Calcular (boton) -> deformada + diagramas + reacciones",
     name: /^(Calcular|Calculando…|Reintentar|Cargando motor…)$/,
   });
   await expect(botonCalcular).toBeEnabled(); // el mock reporta el motor "listo"
-  // .click() real: tras el refactor de zonas del HUD (feature-17), BotonCalcular esta
-  // en la zona top-center y el control de plantas del GroupRibbon en top-left, asi que
-  // ya no se solapan en el layout glass y el hit-test del click aterriza limpio sobre
-  // el boton (antes un panel flotante interceptaba el puntero y obligaba a dispatchEvent
-  // para esquivar el z-order).
+  // .click() real: tras el refactor "dock de paneles" (PR1), BotonCalcular vive en la
+  // region DOCK acoplada del Shell (<aside "Panel de datos">), que empuja el lienzo en
+  // vez de flotar sobre el, asi que ya no hay capa glass del HUD encima y el hit-test
+  // del click aterriza limpio sobre el boton (antes un panel flotante interceptaba el
+  // puntero y obligaba a dispatchEvent para esquivar el z-order).
   await botonCalcular.click();
 
   // ESTADO TRANSITORIO (D5): el mock deja calcular() PENDIENTE hasta resolver(). El
@@ -211,22 +211,23 @@ test("F1 happy: obra -> Calcular (boton) -> deformada + diagramas + reacciones",
     panelDiagramas.getByText("Calcula la obra para ver los esfuerzos."),
   ).toHaveCount(0);
 
-  // 5.e EL DATO FLUYE A REACCIONES: la fila ΣFY de la tabla de reacciones suma
+  // 5.e EL DATO FLUYE A REACCIONES: la fila ΣV de la tabla de reacciones suma
   // +100 kN (mock consciente del modelo, D7). Acotamos a la tabla y leemos la fila
-  // de resumen (su scope=row es "ΣFY"); su celda numerica FY debe ser ~+100.
+  // de resumen (su scope=row es "ΣV"; convenio de obra tras la decisión D5 de la
+  // auditoría UI/UX: V = reaccion vertical = FY del FEM).
   const tablaReacciones = page.getByTestId("tabla-reacciones");
   await expect(tablaReacciones).toBeVisible();
 
-  // Fila de resumen: <tr> que contiene la cabecera de fila "ΣFY". Leemos su valor
-  // numerico (la celda mono bajo la columna FY) y comprobamos ≈ +100 kN.
-  const filaSigma = tablaReacciones.getByRole("row", { name: /ΣFY/ });
+  // Fila de resumen: <tr> que contiene la cabecera de fila "ΣV". Leemos su valor
+  // numerico (la celda mono bajo la columna V) y comprobamos ≈ +100 kN.
+  const filaSigma = tablaReacciones.getByRole("row", { name: /ΣV/ });
   await expect(filaSigma).toBeVisible();
 
   const textoSigma = await filaSigma.textContent();
-  // La fila contiene "ΣFY", la celda FY (~100.00) y la nota "suma de reacciones
+  // La fila contiene "ΣV", la celda V (~100.00) y la nota "suma de reacciones
   // verticales (kN)". Extraemos el primer numero con signo de la celda numerica.
   const match = textoSigma?.match(/-?\d+(?:[.,]\d+)?/);
-  expect(match, `fila ΣFY sin numero legible: ${textoSigma ?? "<vacio>"}`).not.toBeNull();
+  expect(match, `fila ΣV sin numero legible: ${textoSigma ?? "<vacio>"}`).not.toBeNull();
   const valorSigma = Number(match![0].replace(",", "."));
   expect(valorSigma).toBeCloseTo(SIGMA_FY_ESPERADA, 1); // ≈ +100 kN, signo correcto
 });

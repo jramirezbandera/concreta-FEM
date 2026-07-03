@@ -178,6 +178,27 @@
   width: 64px;
 }
 
+/* --- UX-D3 (D16): avisos de coherencia cota/altura --- */
+/* Contenedor de los avisos NO bloqueantes (huecos/solapes entre plantas). role=status
+   en el TSX. Discreto: caja hundida neutra con borde en --warning y texto en --warning,
+   para que se lea como aviso (no error, no accion). Solo tokens. */
+.cx-gyp__avisos-cotas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-gyp__aviso-cota {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-muted);
+  color: var(--warning);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* --- Estado vacio amable --- */
 .cx-gyp__vacio {
   display: flex;

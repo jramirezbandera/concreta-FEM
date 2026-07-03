@@ -16,8 +16,12 @@
 // ../viewport/ejesEscena (femAEscena). NO usar mapearEjes (ese va planta->FEM).
 //
 // MAGNITUDES:
-//  - "flecha"  = desplazamiento vertical NODAL: nodos[nudoMalla][combo].disp[1] (DY). Es
-//    un valor por NUDO directo (no hay promediado).
+//  - "flecha"  = MAGNITUD (|DY|) del desplazamiento vertical NODAL: |nodos[nudoMalla][combo]
+//    .disp[1]|. Valor por NUDO directo (no hay promediado). [AUDITORIA D10] Se toma el VALOR
+//    ABSOLUTO a proposito: con el signo (DY negativa hacia abajo) el rojo de la rampa caia en
+//    el MINIMO (0, sin flecha) y el azul en el maximo movimiento, invirtiendo la lectura
+//    respecto de la deformada. Con |flecha|, rojo = MAXIMO movimiento, coherente con la
+//    deformada. Mx/My conservan el SIGNO (el signo del momento es informacion fisica).
 //  - "momentoX"/"momentoY" = momento de placa Mx/My (kN·m/m), que el motor da POR QUAD en
 //    sus 4 esquinas (orden i,j,m,n). Como PyNite NO da valores nodales de placa, se PROMEDIA
 //    a los nudos: cada nudo recibe la MEDIA de los valores de esquina de todos los quads que
@@ -30,6 +34,7 @@ import type { ResultadosCalculo } from "../../solver";
 import { rampaIsovalores } from "../viewport/colores";
 import { femAEscena } from "../viewport/ejesEscena";
 import type { MagnitudIsovalores } from "../../estado";
+import { COLOR_OBSOLETO } from "./deformadaBuffers";
 
 // Buffers de la malla coloreada: posiciones (x,y,z escena por vertice), indices de
 // triangulos (2 por quad) y color por vertice (rampa). `valores` lleva el valor escalar
@@ -52,6 +57,10 @@ export interface EntradasIsovalores {
   resultados: ResultadosCalculo | null;
   combo: string | null;
   magnitud: MagnitudIsovalores;
+  // Si false, la malla se colorea en GRIS obsoleto (espejo de la deformada): los resultados
+  // ya no corresponden al modelo. Default true (compatibilidad con llamantes previos: el
+  // rango min/max no cambia, solo el color). El panel muestra ademas el tag/aviso.
+  vigente?: boolean;
 }
 
 // Extrae el valor escalar de una ESQUINA de quad para la magnitud de momento elegida.
@@ -74,6 +83,7 @@ export function construirBuffersIsovalores(
   e: EntradasIsovalores,
 ): BuffersIsovalores | null {
   const { modeloFEM, trazabilidad, resultados, combo, magnitud } = e;
+  const vigente = e.vigente ?? true;
   if (!modeloFEM || !trazabilidad || !resultados || !combo) return null;
   const quads = modeloFEM.quads ?? [];
   if (quads.length === 0) return null;
@@ -88,11 +98,12 @@ export function construirBuffersIsovalores(
   const valorPorNudo = new Map<string, number>();
 
   if (magnitud === "flecha") {
-    // DY nodal de cada nudo de malla en el combo activo. Solo nudos de malla
-    // (trazabilidad.nodosDeMalla) para no mezclar con nudos estructurales.
+    // |DY| nodal de cada nudo de malla en el combo activo (magnitud, no signo: D10). Solo
+    // nudos de malla (trazabilidad.nodosDeMalla) para no mezclar con nudos estructurales.
     for (const nudo of trazabilidad.nodosDeMalla) {
       const dy = resultados.nodos[nudo]?.[combo]?.disp[1];
-      if (typeof dy === "number") valorPorNudo.set(nudo, dy);
+      // Valor ABSOLUTO: rojo = maximo movimiento (igual que la deformada), no el signo.
+      if (typeof dy === "number") valorPorNudo.set(nudo, Math.abs(dy));
     }
   } else {
     // Mx/My: promediar las esquinas de todos los quads a sus nudos. idxComponente: Mx=0,
@@ -156,13 +167,21 @@ export function construirBuffersIsovalores(
     posiciones[k * 3 + 1] = ey;
     posiciones[k * 3 + 2] = ez;
     valores[k] = v;
-    // Campo uniforme (rango 0): t=0.5 -> color NEUTRO de mitad de rampa, no el extremo
-    // frio (t=0) que leeria enganosamente como "minimo en todas partes".
-    const t = rango > 0 ? (v - valorMin) / rango : 0.5;
-    rampaIsovalores(t, aux);
-    color[k * 3] = aux.r;
-    color[k * 3 + 1] = aux.g;
-    color[k * 3 + 2] = aux.b;
+    if (vigente) {
+      // Campo uniforme (rango 0): t=0.5 -> color NEUTRO de mitad de rampa, no el extremo
+      // frio (t=0) que leeria enganosamente como "minimo en todas partes".
+      const t = rango > 0 ? (v - valorMin) / rango : 0.5;
+      rampaIsovalores(t, aux);
+      color[k * 3] = aux.r;
+      color[k * 3 + 1] = aux.g;
+      color[k * 3 + 2] = aux.b;
+    } else {
+      // Obsoleto: gris atenuado (mismo criterio que la deformada) — los resultados ya no
+      // corresponden al modelo. El rango/valores no se tocan (la leyenda los sigue usando).
+      color[k * 3] = COLOR_OBSOLETO.r;
+      color[k * 3 + 1] = COLOR_OBSOLETO.g;
+      color[k * 3 + 2] = COLOR_OBSOLETO.b;
+    }
   });
 
   // --- Indices de triangulos: 2 por quad (i,j,m) + (i,m,n) ------------------

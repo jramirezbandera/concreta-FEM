@@ -2,7 +2,7 @@
 // forma/tipos/enums; la integridad referencial (que un plantaId exista, sujecion
 // suficiente, etc.) es responsabilidad del discretizador (feature-4).
 import { z } from "zod";
-import { IdSchema, NombreSchema } from "./comunes";
+import { IdSchema, NombreSchema, NumeroFinitoSchema } from "./comunes";
 import { CategoriaUsoSchema } from "./categoria";
 import { SeccionSchema } from "./seccion";
 import { NudoSchema } from "./nudo";
@@ -17,8 +17,8 @@ export const GrupoSchema = z.object({
   id: IdSchema,
   nombre: NombreSchema,
   categoriaUso: CategoriaUsoSchema,
-  sobrecargaUso: z.number(),
-  cargasMuertas: z.number(),
+  sobrecargaUso: NumeroFinitoSchema, // [A-3] finito: Infinity aqui = carga basura
+  cargasMuertas: NumeroFinitoSchema,
 });
 export type Grupo = z.infer<typeof GrupoSchema>;
 
@@ -26,8 +26,8 @@ export type Grupo = z.infer<typeof GrupoSchema>;
 export const PlantaSchema = z.object({
   id: IdSchema,
   nombre: NombreSchema,
-  cota: z.number(),
-  altura: z.number(),
+  cota: NumeroFinitoSchema, // [A-3] finito: la cota entra en la geometria FEM
+  altura: NumeroFinitoSchema,
   grupoId: IdSchema,
 });
 export type Planta = z.infer<typeof PlantaSchema>;

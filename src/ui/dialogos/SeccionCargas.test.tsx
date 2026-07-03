@@ -195,7 +195,7 @@ describe("SeccionCargas (via InspectorViga)", () => {
     expect(cargas()).toHaveLength(0);
   });
 
-  it("lista una carga existente con su valor, sufijo e hipotesis", () => {
+  it("lista una carga existente con su valor e hipotesis en controles EDITABLES (D17)", () => {
     const m = modeloConViga();
     m.cargas.push({
       id: "c1",
@@ -209,13 +209,111 @@ describe("SeccionCargas (via InspectorViga)", () => {
     render(<InspectorViga />);
 
     const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
-    // En F1 la fila NO muestra una columna de tipo (siempre "Lineal"): valor primero,
-    // luego hipotesis. El tipo sigue en el aria-label del boton de borrar.
+    // D17: la fila es EDITABLE. El valor se muestra en un campo (value "8"), la
+    // hipotesis en un Select (trigger con su nombre). El tipo sigue en el aria-label
+    // del boton de borrar. Sigue sin mostrarse una columna de tipo (siempre "Lineal").
     expect(within(lista).queryByText("Lineal")).toBeNull();
-    expect(within(lista).getByText("8 kN/m")).toBeInTheDocument();
-    expect(within(lista).getByText("Sobrecarga de uso")).toBeInTheDocument();
+    const valorFila = within(lista).getByLabelText("Valor de la carga Lineal");
+    expect(valorFila).toHaveValue(8);
+    expect(
+      within(lista).getByRole("combobox", { name: "Hipótesis de la carga Lineal" }),
+    ).toHaveTextContent("Sobrecarga de uso");
     expect(
       within(lista).getByRole("button", { name: /Eliminar carga Lineal 8/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("D17: editar el VALOR inline comitea con editarCarga y es reversible (undo)", async () => {
+    const user = userEvent.setup();
+    const m = modeloConViga();
+    m.cargas.push({
+      id: "c1",
+      tipo: "lineal",
+      ambito: "V-1",
+      valor: 8,
+      hipotesisId: "hip-cargas-muertas",
+    });
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["V-1"]);
+    render(<InspectorViga />);
+
+    // El campo de valor de la FILA (no el de "Añadir carga") lleva aria-label con el tipo.
+    const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
+    const valorFila = within(lista).getByLabelText("Valor de la carga Lineal");
+    await user.clear(valorFila);
+    await user.type(valorFila, "15");
+    await user.tab(); // commit en blur
+
+    expect(cargas()).toHaveLength(1);
+    expect(cargas()[0].valor).toBe(15);
+    expect(cargas()[0].id).toBe("c1"); // misma carga, editada (no borrada+creada)
+
+    // Reversible: undo restaura el valor original.
+    modeloStore.getState().deshacer();
+    expect(cargas()[0].valor).toBe(8);
+  });
+
+  it("D17: editar la HIPOTESIS inline reasigna la carga con editarCarga", async () => {
+    const user = userEvent.setup();
+    const m = modeloConViga();
+    m.cargas.push({
+      id: "c1",
+      tipo: "lineal",
+      ambito: "V-1",
+      valor: 8,
+      hipotesisId: "hip-cargas-muertas",
+    });
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["V-1"]);
+    render(<InspectorViga />);
+
+    // Abre el Select de hipotesis de la FILA por teclado (estable en jsdom con los
+    // polyfills de PointerCapture; el trigger lleva aria-label con el tipo).
+    const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
+    const trigger = within(lista).getByRole("combobox", {
+      name: "Hipótesis de la carga Lineal",
+    });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    const listbox = await screen.findByRole("listbox");
+    await user.click(within(listbox).getByText("Sobrecarga de uso"));
+
+    expect(cargas()).toHaveLength(1);
+    expect(cargas()[0].hipotesisId).toBe("hip-sobrecarga-uso");
+    expect(cargas()[0].id).toBe("c1");
+  });
+
+  it("D17: un valor invalido (0) en la fila NO comitea y muestra el error del sentido gravitatorio", async () => {
+    const user = userEvent.setup();
+    const m = modeloConViga();
+    m.cargas.push({
+      id: "c1",
+      tipo: "lineal",
+      ambito: "V-1",
+      valor: 8,
+      hipotesisId: "hip-cargas-muertas",
+    });
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["V-1"]);
+    render(<InspectorViga />);
+
+    const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
+    const valorFila = within(lista).getByLabelText("Valor de la carga Lineal");
+    await user.clear(valorFila);
+    await user.type(valorFila, "0");
+    await user.tab();
+
+    // No commitea (el valor sigue siendo 8) y aparece el error de validacion en la fila.
+    expect(cargas()[0].valor).toBe(8);
+    expect(
+      within(lista).getByText(/El valor de la carga debe ser mayor que cero/),
+    ).toBeInTheDocument();
+  });
+
+  it("D19: nota discreta de que la carga puntual llega en una fase posterior", () => {
+    renderConViga();
+    expect(
+      screen.getByText("Cargas puntuales: disponibles en una fase posterior."),
     ).toBeInTheDocument();
   });
 

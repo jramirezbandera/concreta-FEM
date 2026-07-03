@@ -46,7 +46,15 @@ export type ErrorMotor = z.infer<typeof ErrorMotorSchema>;
 // cruzar Comlink como typed-array-friendly y mapear 1:1 a las tablas de la UI.
 //   disp = [DX, DY, DZ, RX, RY, RZ]   (m, m, m, rad, rad, rad)
 //   rxn  = [FX, FY, FZ, MX, MY, MZ]   (kN, kN, kN, kN·m, kN·m, kN·m)
-const SeisComponentesSchema = z.array(z.number()).length(6);
+//
+// [AUDITORIA M-2] `.finite()`: un `z.number()` pelado ACEPTA ±Infinity (solo
+// rechaza NaN). Un resultado no finito del solver (modelo cuasi-singular) debe
+// FALLAR limpio en este borde — no mostrarse como "Inf" valido en tablas y
+// diagramas. Misma politica que resultadosModales.ts / resultadosCR.ts, que ya
+// la aplicaban con el comentario de "defensa de borde"; este camino (estatico)
+// era el unico sin blindar.
+const numFinito = z.number().finite();
+const SeisComponentesSchema = z.array(numFinito).length(6);
 
 // Resultado de UN nodo en UNA combinacion. El glue emite un objeto de estos por
 // cada combo calculado (ver indexacion por combo en ResultadoNodo).
@@ -73,7 +81,7 @@ export type ResultadoNodo = z.infer<typeof ResultadoNodoSchema>;
 // alineadas, que es la invariante de los `*_array()` de PyNite. n_points es
 // variable (de ahi number[][] y no tupla fija).
 const DiagramaSchema = z
-  .array(z.array(z.number()))
+  .array(z.array(numFinito))
   .length(2) // exactamente [posiciones_x, valores]
   .refine(([xs, vs]) => xs.length === vs.length, {
     message: "Las dos filas del diagrama (posiciones x y valores) deben tener igual longitud",
@@ -90,7 +98,7 @@ const DiagramaSchema = z
 // filas (DX/DY/DZ) y el `.refine()` que las tres tengan igual longitud (n puntos).
 // n es variable (de ahi number[][] y no tupla fija).
 const DeformadaSchema = z
-  .array(z.array(z.number()))
+  .array(z.array(numFinito))
   .length(3) // exactamente [DX[], DY[], DZ[]]
   .refine(
     ([dx, dy, dz]) =>
@@ -114,9 +122,9 @@ export const EstadoMiembroComboSchema = z.object({
   // Desplazamiento GLOBAL [DX[],DY[],DZ[]] por estacion (3, n_points). Mismo
   // sistema que nodos[].disp; estacion 0/n-1 coinciden con disp de los nudos i/j.
   deformada_global: DeformadaSchema,
-  max_moment_z: z.number(), // pico positivo de Mz, kN·m
-  min_moment_z: z.number(), // pico negativo de Mz, kN·m
-  max_shear_y: z.number(), // pico positivo de Vy, kN
+  max_moment_z: numFinito, // pico positivo de Mz, kN·m
+  min_moment_z: numFinito, // pico negativo de Mz, kN·m
+  max_shear_y: numFinito, // pico positivo de Vy, kN
 });
 export type EstadoMiembroCombo = z.infer<typeof EstadoMiembroComboSchema>;
 
@@ -131,8 +139,8 @@ export type ResultadoMiembro = z.infer<typeof ResultadoMiembroSchema>;
 // sin saltos). UNIDADES (distintas de las barras, §14): Mx/My/Mxy = kN·m/m (momento POR
 // UNIDAD DE ANCHO); Qx/Qy = kN/m. La FLECHA de la losa NO va aqui: es NODAL (nodos[].disp DY
 // de los nudos de malla), igual que cualquier desplazamiento de nudo.
-const MomentosEsquinaSchema = z.tuple([z.number(), z.number(), z.number()]); // [Mx,My,Mxy] kN·m/m
-const CortantesEsquinaSchema = z.tuple([z.number(), z.number()]); // [Qx,Qy] kN/m
+const MomentosEsquinaSchema = z.tuple([numFinito, numFinito, numFinito]); // [Mx,My,Mxy] kN·m/m
+const CortantesEsquinaSchema = z.tuple([numFinito, numFinito]); // [Qx,Qy] kN/m
 export const EstadoQuadComboSchema = z.object({
   moments: z.array(MomentosEsquinaSchema).length(4), // 4 esquinas, orden i,j,m,n
   shears: z.array(CortantesEsquinaSchema).length(4),
@@ -154,8 +162,8 @@ export const CheckStaticsSchema = z.object({
   residuos: z.record(
     z.string(),
     z.object({
-      max_fuerza: z.number(), // mayor desbalance de fuerza, kN
-      max_momento: z.number(), // mayor desbalance de momento, kN·m
+      max_fuerza: numFinito, // mayor desbalance de fuerza, kN
+      max_momento: numFinito, // mayor desbalance de momento, kN·m
     }),
   ),
 });

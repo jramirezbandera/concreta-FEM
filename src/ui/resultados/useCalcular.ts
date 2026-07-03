@@ -29,6 +29,7 @@ import { vistaStore } from "../../estado/vistaStore";
 import { solverClient } from "../../solver";
 import type { EstadoMotor, ErrorMotor, ResultadosCalculo } from "../../solver";
 import { ejecutarPipelineAuxiliar } from "./ejecutarPipelineAuxiliar";
+import { calcularEscalaInicial } from "./deformadaEscala";
 
 // -----------------------------------------------------------------------------
 // Error de motor enriquecido con la fase, listo para que la UI lo muestre. La UI
@@ -198,12 +199,26 @@ export async function calcularObra(sinkLlamante: CalculoSink = {}): Promise<void
       // presente entre las combos calculadas. Si ya hay una valida (recalculo del
       // mismo modelo), se respeta la eleccion del usuario.
       const combinacionActiva = vistaStore.getState().combinacionActiva;
-      if (
-        combinacionActiva === null ||
-        !resultados.combos.includes(combinacionActiva)
-      ) {
-        vistaStore.getState().setCombinacionActiva(resultados.combos[0] ?? null);
+      const comboFinal =
+        combinacionActiva !== null && resultados.combos.includes(combinacionActiva)
+          ? combinacionActiva
+          : (resultados.combos[0] ?? null);
+      if (comboFinal !== combinacionActiva) {
+        vistaStore.getState().setCombinacionActiva(comboFinal);
       }
+
+      // [AUDITORIA D6] Amplificacion INICIAL legible de la deformada. La flecha real es
+      // imperceptible a ×1 (m sobre m); aqui, SOLO al llegar resultados nuevos y vigentes,
+      // fijamos un factor que lleve el desplazamiento maximo a ~5% del bbox (helper puro,
+      // acotado a [1,500]). Es un ARRANQUE: el usuario puede mover el slider despues (no se
+      // re-impone en re-render, solo en este momento de resultados nuevos).
+      const escalaInicial = calcularEscalaInicial(modeloFEM, resultados, comboFinal);
+      vistaStore.getState().setDeformadaEscala(escalaInicial);
+
+      // [AUDITORIA D9] Al llegar resultados ESTATICOS nuevos se muestra la DEFORMADA (no la
+      // forma modal): la deformada es la lectura primaria del calculo estatico. Exclusion
+      // mutua con la forma modal (que se activa desde "Calcular modos" / seleccionar modo).
+      vistaStore.getState().setOverlayResultados("deformada");
     },
     mensajeFalloInesperado:
       "No se pudo completar el calculo por un fallo inesperado. " +

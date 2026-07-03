@@ -28,31 +28,37 @@ const DireccionPuntualSchema = z.enum([
 
 // --- Entidades de la Capa 2 --------------------------------------------------
 
+// [AUDITORIA A-3] Toda magnitud fisica del contrato exige numero FINITO: un
+// `z.number()` pelado ACEPTA ±Infinity (solo rechaza NaN) y un Infinity que cruce
+// esta frontera produce rigidez/geometria basura en PyNite sin aviso. Misma
+// politica que tiposDxf.ts / resultadosModales.ts / resultadosCR.ts.
+const numFinito = z.number().finite();
+
 export const NodoFEMSchema = z.object({
   name: z.string().min(1),
-  x: z.number(),
-  y: z.number(),
-  z: z.number(),
+  x: numFinito,
+  y: numFinito,
+  z: numFinito,
 });
 export type NodoFEM = z.infer<typeof NodoFEMSchema>;
 
 export const MaterialFEMSchema = z.object({
   name: z.string().min(1),
-  E: z.number(),
-  G: z.number(),
-  nu: z.number(),
-  rho: z.number(),
+  E: numFinito,
+  G: numFinito,
+  nu: numFinito,
+  rho: numFinito,
   // fy opcional: PyNite lo acepta como None si no se aporta (guia §11.2).
-  fy: z.number().optional(),
+  fy: numFinito.optional(),
 });
 export type MaterialFEM = z.infer<typeof MaterialFEMSchema>;
 
 export const SeccionFEMSchema = z.object({
   name: z.string().min(1),
-  A: z.number(),
-  Iy: z.number(),
-  Iz: z.number(),
-  J: z.number(),
+  A: numFinito,
+  Iy: numFinito,
+  Iz: numFinito,
+  J: numFinito,
 });
 export type SeccionFEM = z.infer<typeof SeccionFEMSchema>;
 
@@ -66,7 +72,7 @@ export const MiembroFEMSchema = z.object({
   j: z.string().min(1),
   material: z.string().min(1),
   section: z.string().min(1),
-  rotation: z.number(),
+  rotation: numFinito,
   tension_only: z.boolean(),
   comp_only: z.boolean(),
   releases: ReleasesSchema,
@@ -87,7 +93,7 @@ export type ApoyoFEM = z.infer<typeof ApoyoFEMSchema>;
 export const CargaNodoFEMSchema = z.object({
   node: z.string().min(1),
   direction: DireccionNodoSchema,
-  P: z.number(),
+  P: numFinito,
   case: z.string().min(1),
 });
 export type CargaNodoFEM = z.infer<typeof CargaNodoFEMSchema>;
@@ -95,11 +101,11 @@ export type CargaNodoFEM = z.infer<typeof CargaNodoFEMSchema>;
 export const CargaDistFEMSchema = z.object({
   member: z.string().min(1),
   direction: DireccionDistSchema,
-  w1: z.number(),
-  w2: z.number(),
+  w1: numFinito,
+  w2: numFinito,
   // x1/x2 = null -> toda la barra (guia §5.4: x1=None, x2=None por defecto).
-  x1: z.number().nullable(),
-  x2: z.number().nullable(),
+  x1: numFinito.nullable(),
+  x2: numFinito.nullable(),
   case: z.string().min(1),
 });
 export type CargaDistFEM = z.infer<typeof CargaDistFEMSchema>;
@@ -107,8 +113,8 @@ export type CargaDistFEM = z.infer<typeof CargaDistFEMSchema>;
 export const CargaPuntualFEMSchema = z.object({
   member: z.string().min(1),
   direction: DireccionPuntualSchema,
-  P: z.number(),
-  x: z.number(), // distancia local desde el extremo i
+  P: numFinito,
+  x: numFinito, // distancia local desde el extremo i
   case: z.string().min(1),
 });
 export type CargaPuntualFEM = z.infer<typeof CargaPuntualFEMSchema>;
@@ -116,7 +122,7 @@ export type CargaPuntualFEM = z.infer<typeof CargaPuntualFEMSchema>;
 export const ComboFEMSchema = z.object({
   name: z.string().min(1),
   // factores por hipotesis, p. ej. { D: 1.35, Q: 1.5 } (guia §5.5 add_load_combo).
-  factors: z.record(z.string(), z.number()),
+  factors: z.record(z.string(), numFinito),
   // combo_tags opcional: agrupa combinaciones para filtrar en el analisis.
   combo_tags: z.array(z.string()).optional(),
 });
@@ -221,7 +227,7 @@ export const QuadFEMSchema = z.object({
   j: z.string().min(1),
   m: z.string().min(1),
   n: z.string().min(1),
-  t: z.number().positive(), // espesor (m)
+  t: numFinito.positive(), // espesor (m) — .positive() solo no basta: Infinity es positivo
   material: z.string().min(1),
 });
 export type QuadFEM = z.infer<typeof QuadFEMSchema>;
@@ -234,7 +240,7 @@ export type QuadFEM = z.infer<typeof QuadFEMSchema>;
 // add_quad_surface_pressure(quad, presion, case).
 export const CargaQuadFEMSchema = z.object({
   quad: z.string().min(1),
-  presion: z.number(), // kN/m2 (perpendicular a la placa; gravedad = POSITIVA hacia abajo)
+  presion: numFinito, // kN/m2 (perpendicular a la placa; gravedad = POSITIVA hacia abajo)
   case: z.string().min(1),
 });
 export type CargaQuadFEM = z.infer<typeof CargaQuadFEMSchema>;

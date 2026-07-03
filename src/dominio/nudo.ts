@@ -9,11 +9,11 @@
 // jerga FEM filtrada a la Capa 1. El discretizador (feature-4) generara los nodos
 // FEM por snapping geometrico, independiente de estos ids de dominio.
 import { z } from "zod";
-import { IdSchema } from "./comunes";
+import { IdSchema, NumeroFinitoSchema } from "./comunes";
 
 export const NudoSchema = z.object({
   id: IdSchema,
-  x: z.number(), // posicion en planta, eje X (m, interno kN-m)
-  y: z.number(), // posicion en planta, eje Y (m, interno kN-m)
+  x: NumeroFinitoSchema, // posicion en planta, eje X (m, interno kN-m)
+  y: NumeroFinitoSchema, // posicion en planta, eje Y (m, interno kN-m)
 });
 export type Nudo = z.infer<typeof NudoSchema>;

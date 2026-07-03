@@ -9,6 +9,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { PanelFlotante } from "../primitivas";
 import { resultadosStore, vistaStore } from "../../estado";
+import type { ModoVista, OverlayResultados } from "../../estado";
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosCalculo } from "../../solver";
 import { mToMm } from "../../unidades";
@@ -16,11 +17,35 @@ import { deformadaGeometria } from "./deformadaGeometria";
 import { LeyendaRampa } from "./LeyendaRampa";
 import "./leyendaEscala.css";
 
-// Rango del slider de amplificacion. El desplazamiento real es imperceptible (m
-// sobre m), de ahi el factor: 1x..500x cubre desde "real" hasta deformadas muy
-// visibles en estructuras rigidas. Paso fino al inicio.
+// Rango del factor de amplificacion. El desplazamiento real es imperceptible (m sobre m),
+// de ahi el factor: 1x..500x cubre desde "real" hasta deformadas muy visibles en
+// estructuras rigidas.
 const ESCALA_MIN = 1;
 const ESCALA_MAX = 500;
+
+// [AUDITORIA D6] Slider LOGARITMICO. Con un slider LINEAL [1..500] el rango util (×1..×20,
+// donde vive casi toda la lectura) ocupaba el ~2% del recorrido: inservible. Se mapea la
+// posicion lineal del <input> ([0..PASOS_SLIDER]) a la escala por una ley log, de modo que
+// cada tramo del slider multiplica por un factor constante (mas resolucion en los factores
+// bajos). El estado (deformadaEscala) sigue siendo el factor ×N real; solo el input usa la
+// posicion. La etiqueta sigue siendo "Amplificación ×N".
+const PASOS_SLIDER = 1000; // resolucion del recorrido (entero: 0..1000)
+const LN_MIN = Math.log(ESCALA_MIN);
+const LN_MAX = Math.log(ESCALA_MAX);
+
+// Posicion del slider (0..PASOS_SLIDER) -> factor de escala (log). Acota a [MIN,MAX].
+function posicionAEscala(pos: number): number {
+  const t = Math.min(1, Math.max(0, pos / PASOS_SLIDER));
+  return Math.exp(LN_MIN + t * (LN_MAX - LN_MIN));
+}
+
+// Factor de escala -> posicion del slider (0..PASOS_SLIDER), inverso de posicionAEscala.
+// Para reflejar en el slider una escala fijada por otro camino (p. ej. la inicial de D6).
+function escalaAPosicion(escala: number): number {
+  const e = Math.min(ESCALA_MAX, Math.max(ESCALA_MIN, escala));
+  const t = (Math.log(e) - LN_MIN) / (LN_MAX - LN_MIN);
+  return Math.round(t * PASOS_SLIDER);
+}
 
 // --- Lectura reactiva (fuera del bucle de render) ----------------------------
 
@@ -29,16 +54,21 @@ interface EntradasLeyenda {
   modeloFEM: ModeloFEM | null;
   vigente: boolean;
   combo: string | null;
+  modoVista: ModoVista;
+  overlay: OverlayResultados;
 }
 
 let snapCache: EntradasLeyenda = leerEntradas();
 function leerEntradas(): EntradasLeyenda {
   const r = resultadosStore.getState();
+  const v = vistaStore.getState();
   return {
     resultados: r.resultados,
     modeloFEM: r.modeloFEM,
     vigente: r.vigente,
-    combo: vistaStore.getState().combinacionActiva,
+    combo: v.combinacionActiva,
+    modoVista: v.modoVista,
+    overlay: v.overlayResultados,
   };
 }
 function getSnapshot(): EntradasLeyenda {
@@ -48,7 +78,9 @@ function getSnapshot(): EntradasLeyenda {
     a.resultados === c.resultados &&
     a.modeloFEM === c.modeloFEM &&
     a.vigente === c.vigente &&
-    a.combo === c.combo
+    a.combo === c.combo &&
+    a.modoVista === c.modoVista &&
+    a.overlay === c.overlay
   ) {
     return c;
   }
@@ -60,11 +92,15 @@ function suscribir(cb: () => void): () => void {
   const offM = resultadosStore.subscribe((s) => s.modeloFEM, cb);
   const offV = resultadosStore.subscribe((s) => s.vigente, cb);
   const offCombo = vistaStore.subscribe((s) => s.combinacionActiva, cb);
+  const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
+  const offOverlay = vistaStore.subscribe((s) => s.overlayResultados, cb);
   return () => {
     offR();
     offM();
     offV();
     offCombo();
+    offModo();
+    offOverlay();
   };
 }
 function useEntradasLeyenda(): EntradasLeyenda {
@@ -115,11 +151,23 @@ export function LeyendaEscala() {
   // resultados ya guia al usuario a calcular). Evita una leyenda vacia.
   if (!rango.hay) return null;
 
+  // [AUDITORIA D9] La LeyendaEscala es la leyenda de la DEFORMADA: solo se muestra cuando la
+  // deformada es el overlay activo. Con la forma modal activa, la escena no dibuja la
+  // deformada, asi que su leyenda no tiene nada que rotular (la vuelta se hace desde
+  // PanelFrecuencias con "Ver deformada"). Exclusion mutua: nunca las dos leyendas/overlays.
+  if (entradas.overlay !== "deformada") return null;
+
+  // La deformada solo se dibuja en pleno (3D/mosaico); en planta el overlay no aparece
+  // (DeformadaOverlay), asi que el slider y "Animar" no harian nada. Lo comunicamos y los
+  // dejamos atenuados/inertes en vez de ofrecer controles muertos (UX-H1).
+  const soloEnPlanta = entradas.modoVista === "planta";
+
   return (
     <PanelFlotante
       className="cx-leyenda"
       titulo="Deformada"
       tag={entradas.vigente ? undefined : "obsoleta"}
+      tagVariante={entradas.vigente ? "neutro" : "warning"}
     >
       {/* Rampa de color con rotulos min/max del desplazamiento (mm). La rampa generica
           (color + min/max + unidad) la pinta LeyendaRampa; aqui se le pasan los limites
@@ -128,32 +176,58 @@ export function LeyendaEscala() {
         min={mToMm(rango.min)}
         max={mToMm(rango.max)}
         unidad="desplazamiento (mm)"
+        // [D10] Rampa VERTICAL (anclada a la derecha del lienzo, Slot mid-right): max arriba,
+        // min abajo (Spec §4.2), misma ubicacion que la rampa de isovalores.
+        orientacion="vertical"
         ariaLabel={`Desplazamiento de ${fmtMm(rango.min)} a ${fmtMm(rango.max)} milimetros`}
       />
 
-      {/* Control del factor de amplificacion. */}
-      <label className="cx-leyenda__control">
+      {/* Guia cuando estamos en planta: la deformada se ve en 3D; el slider y "Animar"
+          quedan atenuados/inertes (UX-H1). */}
+      {soloEnPlanta && (
+        <p className="cx-leyenda__guia" role="note">
+          La deformada se muestra en la vista 3D.
+        </p>
+      )}
+
+      {/* Control del factor de amplificacion. Deshabilitado en planta (no hay deformada
+          que amplificar en esa vista). */}
+      <label
+        className={
+          soloEnPlanta ? "cx-leyenda__control cx-leyenda__control--off" : "cx-leyenda__control"
+        }
+      >
         <span className="cx-leyenda__etq">
           Amplificación <span className="mono tnum">×{Math.round(escala)}</span>
         </span>
         <input
           type="range"
-          min={ESCALA_MIN}
-          max={ESCALA_MAX}
+          // Recorrido LINEAL del input [0..PASOS_SLIDER]; el valor se mapea a la escala por
+          // ley LOG (D6). `value` refleja la escala actual convertida a posicion.
+          min={0}
+          max={PASOS_SLIDER}
           step={1}
-          value={escala}
+          value={escalaAPosicion(escala)}
+          disabled={soloEnPlanta}
           onChange={(e) =>
-            vistaStore.getState().setDeformadaEscala(Number(e.target.value))
+            vistaStore
+              .getState()
+              .setDeformadaEscala(Math.round(posicionAEscala(Number(e.target.value))))
           }
           aria-label="Factor de amplificación de la deformada"
         />
       </label>
 
-      {/* Toggle de animacion. */}
-      <label className="cx-leyenda__toggle">
+      {/* Toggle de animacion. Deshabilitado en planta (no anima nada alli). */}
+      <label
+        className={
+          soloEnPlanta ? "cx-leyenda__toggle cx-leyenda__toggle--off" : "cx-leyenda__toggle"
+        }
+      >
         <input
           type="checkbox"
           checked={animando}
+          disabled={soloEnPlanta}
           onChange={(e) => vistaStore.getState().setAnimando(e.target.checked)}
         />
         <span>Animar deformada</span>

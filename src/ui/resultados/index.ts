@@ -20,6 +20,10 @@ export type { UseCalcular, ErrorCalculo, CalculoSink } from "./useCalcular";
 // hay resultados de placa (quads) para la combinacion activa.
 export { IsovaloresOverlay } from "./IsovaloresOverlay";
 export { PanelIsovalores } from "./PanelIsovalores";
+// [D10] Rampa de color de los isovalores como leyenda de LIENZO (glass, vertical, Slot
+// mid-right): misma ubicacion/orientacion que la leyenda de la deformada. La monta App.tsx
+// en la pestana Isovalores (hudOverlays).
+export { LeyendaIsovalores } from "./LeyendaIsovalores";
 
 // --- Analisis modal (F2b) ----------------------------------------------------
 // Overlay de la forma modal (sceneOverlay), panel de frecuencias (hudOverlay) y la

@@ -58,10 +58,11 @@ import { generarCombos } from "../../src/discretizador/combinaciones";
 import { categoriaUso } from "../../src/biblioteca";
 
 // --- Constantes de material/seccion del fixture (S275 + IPE300), ver pipeline --
-// E (S275) = 2.1e8 kN/m²; Iz (IPE300, eje que gobierna la flexion vertical de
-// estas vigas) = 6.038e-5 m⁴. Necesarias para la flecha caracteristica (ELS).
+// E (S275) = 2.1e8 kN/m²; I de flexion vertical de la VIGA IPE300 = eje FUERTE
+// Iy = 8.356e-5 m⁴ (8356 cm⁴, EN 10365). AUDITORIA [C-2]+[C-1]: la tabla IPE
+// estaba 10x inflada y las vigas flectaban con el eje debil; ver notas en pipeline.
 const E_ACERO = 2.1e8; // kN/m²
-const IZ_IPE300 = 6.038e-5; // m⁴
+const I_VIGA_IPE300 = 8.356e-5; // m⁴ (Iy catalogo, eje fuerte)
 
 // Ids de hipotesis REALES sembradas por crearModeloVacio() (src/dominio/helpers):
 // la permanente "cargas muertas" (factor 1,35 en ELU) y la variable "sobrecarga de
@@ -304,7 +305,7 @@ describe("combinaciones golden · CAPA B (motor real PyNite)", () => {
 
       const wELS = g + q; // 18 kN/m (sin mayorar)
       const Mteo = (wELS * L * L) / 8; // 18 · 36 / 8 = 81 kN·m
-      const flechaTeo = (5 * wELS * L ** 4) / (384 * E_ACERO * IZ_IPE300); // m (descenso)
+      const flechaTeo = (5 * wELS * L ** 4) / (384 * E_ACERO * I_VIGA_IPE300); // m (descenso)
 
       const Mreal = picoMomentoNegativo(res, "ELS");
       assertOk(compararEsfuerzo(Mreal, Mteo), "ELS |M|=(g+q)L²/8");

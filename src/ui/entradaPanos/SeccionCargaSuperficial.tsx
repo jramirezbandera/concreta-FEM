@@ -22,7 +22,13 @@ import {
   type ErrorCampo,
 } from "../dialogos/validacionesCarga";
 import { CampoNumero, SelectHipotesis, Boton } from "../primitivas";
-import { modeloStore, vistaStore, crearCarga, eliminarCarga } from "../../estado";
+import {
+  modeloStore,
+  vistaStore,
+  crearCarga,
+  editarCarga,
+  eliminarCarga,
+} from "../../estado";
 import { cargasDeAmbito } from "../../dominio";
 import "../dialogos/seccionCargas.css";
 
@@ -54,10 +60,13 @@ export function SeccionCargaSuperficial({ panoId }: SeccionCargaSuperficialProps
   // Estado LOCAL del valor que se esta tecleando (number; CampoNumero gestiona el string).
   const [valorNuevo, setValorNuevo] = useState<number>(defaultsCarga.valor);
   const [errores, setErrores] = useState<ErrorCampo[]>([]);
+  // D17: error de la EDICION inline de una carga existente, indexado por id de carga.
+  const [erroresFila, setErroresFila] = useState<Record<string, ErrorCampo[]>>({});
 
   // Al cambiar de paño, limpia los errores del formulario anterior.
   useEffect(() => {
     setErrores([]);
+    setErroresFila({});
   }, [panoId]);
 
   // Cargas de ESTE paño (filtro por ambito).
@@ -112,8 +121,29 @@ export function SeccionCargaSuperficial({ panoId }: SeccionCargaSuperficialProps
     modeloStore.getState().ejecutar(eliminarCarga(leerModelo(), cargaId));
   };
 
-  const nombreHipotesis = (hipotesisId: string): string =>
-    leerModelo().hipotesis.find((h) => h.id === hipotesisId)?.nombre ?? "—";
+  // D17: edicion INLINE de una carga superficial existente (espejo de SeccionCargas).
+  // Valida el CONJUNTO con validarCarga (valor > 0, mensaje del sentido gravitatorio),
+  // comitea reversible via editarCarga y refleja el error solo en ESA fila. No-op si el
+  // campo no cambia (no ensucia el undo); una edicion invalida NO comitea.
+  const editar = (cargaId: string, cambios: { valor?: number; hipotesisId?: string }) => {
+    const m = leerModelo();
+    const carga = m.cargas.find((c) => c.id === cargaId);
+    if (!carga) return;
+    const datos: DatosCargaUI = {
+      tipo: carga.tipo,
+      ambito: carga.ambito,
+      valor: cambios.valor ?? carga.valor,
+      hipotesisId: cambios.hipotesisId ?? carga.hipotesisId,
+    };
+    const errs = validarCarga(m, cargaId, datos);
+    setErroresFila((prev) => ({ ...prev, [cargaId]: errs }));
+    if (!esValido(errs)) return;
+    const sinCambio =
+      (cambios.valor === undefined || cambios.valor === carga.valor) &&
+      (cambios.hipotesisId === undefined || cambios.hipotesisId === carga.hipotesisId);
+    if (sinCambio) return;
+    modeloStore.getState().ejecutar(editarCarga(m, cargaId, cambios));
+  };
 
   return (
     <div className="cx-cargas">
@@ -124,11 +154,25 @@ export function SeccionCargaSuperficial({ panoId }: SeccionCargaSuperficialProps
           <div className="cx-cargas__vacio">Sin cargas.</div>
         ) : (
           cargasDelPano.map((c) => (
-            <div key={c.id} className="cx-cargas__fila">
-              <span className="cx-cargas__valor">
-                {c.valor} {SUFIJO}
-              </span>
-              <span className="cx-cargas__hip">{nombreHipotesis(c.hipotesisId)}</span>
+            // D17: fila EDITABLE inline (espejo de SeccionCargas): valor (kN/m²) |
+            // hipótesis | ×. Cada campo comitea con editarCarga (commit en vivo,
+            // reversible); su error de validacion se muestra bajo la fila.
+            <div key={c.id} className="cx-cargas__fila cx-cargas__fila--edit">
+              <div className="cx-cargas__fila-campos">
+                <CampoNumero
+                  etiqueta="Valor de la carga superficial"
+                  sufijo={SUFIJO}
+                  className="cx-cargas__fila-valor"
+                  valor={c.valor}
+                  onCommit={(v) => editar(c.id, { valor: v })}
+                  error={errorDe(erroresFila[c.id] ?? [], "valor")}
+                />
+                <SelectHipotesis
+                  etiqueta="Hipótesis de la carga superficial"
+                  valor={c.hipotesisId}
+                  onCambio={(id) => editar(c.id, { hipotesisId: id })}
+                />
+              </div>
               <button
                 type="button"
                 className="cx-cargas__borrar"
@@ -150,6 +194,11 @@ export function SeccionCargaSuperficial({ panoId }: SeccionCargaSuperficialProps
           onCommit={(v) => setValorNuevo(v)}
           error={errorDe(errores, "valor")}
         />
+        {/* UX-E3: el sentido de la carga no era comunicado (solo saltaba al teclear un
+            negativo). Ayuda corta y permanente: el signo lo fija el discretizador. */}
+        <p className="cx-cargas__ayuda">
+          Valor en positivo: la carga actúa hacia abajo (gravitatoria).
+        </p>
         <div className="cx-cargas__campo">
           <span className="cx-campo__label">Hipótesis</span>
           <SelectHipotesis

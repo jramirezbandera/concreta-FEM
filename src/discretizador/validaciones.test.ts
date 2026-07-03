@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validarModelo, type ErrorObra } from "./validaciones";
-import { ModeloSchema, type Modelo } from "../dominio";
+import { ModeloSchema, type Modelo, crearModeloVacio } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
 
 // Tests de las validaciones previas (feature-4, T1.2). Proyecto `node` (sin DOM):
@@ -266,6 +266,30 @@ describe("validarModelo", () => {
     sinJergaFEM(e!);
   });
 
+  // [D22a] El mensaje NOMBRA el ámbito de la carga cuando resuelve a un elemento del
+  // modelo ("la carga sobre la viga V1…"): la carga c1 apunta a la viga v1, que existe.
+  it("REF_HIPOTESIS: el mensaje nombra el ámbito si resuelve (viga V1)", () => {
+    const m = modeloValido();
+    m.cargas[0].hipotesisId = "HIP_X";
+    const e = validarModelo(m).find((x) => x.codigo === "REF_HIPOTESIS");
+    expect(e).toBeDefined();
+    expect(e!.mensaje).toContain('la viga "V1"');
+    sinJergaFEM(e!);
+  });
+
+  // Si el ámbito NO resuelve (elemento borrado), el mensaje se queda genérico: nunca
+  // inventa un nombre. Aquí la carga apunta a un ámbito inexistente y a una hipótesis
+  // inexistente: REF_HIPOTESIS sale sin nombrar el ámbito.
+  it("REF_HIPOTESIS: mensaje genérico si el ámbito no resuelve", () => {
+    const m = modeloValido();
+    m.cargas[0].ambito = "borrado-x";
+    m.cargas[0].hipotesisId = "HIP_X";
+    const e = validarModelo(m).find((x) => x.codigo === "REF_HIPOTESIS");
+    expect(e).toBeDefined();
+    expect(e!.mensaje).not.toContain(" sobre ");
+    sinJergaFEM(e!);
+  });
+
   it("SIN_SUJECION: ningun pilar con vinculacion exterior", () => {
     const m = modeloValido();
     m.pilares[0].vinculacionExterior = false;
@@ -295,6 +319,18 @@ describe("validarModelo", () => {
     expect(e).toBeDefined();
     expect(e!.elementoId).toBe("n9");
     expect(e!.elementoTipo).toBe("nudo");
+    sinJergaFEM(e!);
+  });
+
+  // [D22a] FLOTANTE navegable: mensaje con la posición de obra + campo `posicion`
+  // estructurado (coords de OBRA, no FEM) para que la UI pueda encuadrar/mostrarla.
+  it("FLOTANTE: mensaje con la posición y campo posicion estructurado", () => {
+    const m = modeloValido();
+    m.nudos.push({ id: "n9", x: 4, y: 3 });
+    const e = validarModelo(m).find((x) => x.codigo === "FLOTANTE");
+    expect(e).toBeDefined();
+    expect(e!.mensaje).toContain("(4.00, 3.00)");
+    expect(e!.posicion).toEqual({ x: 4, y: 3 });
     sinJergaFEM(e!);
   });
 
@@ -396,6 +432,8 @@ describe("validarModelo", () => {
     expect(e).toBeDefined();
     expect(e!.severidad).toBe("error");
     expect(e!.elementoId).toBe("cX");
+    // [D22a] El mensaje nombra el ámbito si resuelve (la carga cX apunta a la viga v1).
+    expect(e!.mensaje).toContain('la viga "V1"');
     sinJergaFEM(e!);
   });
 
@@ -466,5 +504,139 @@ describe("validarModelo", () => {
     // El acero S275 del catalogo tiene peso>0: basta un pilar para tener masa.
     const cods = codigos(validarModelo(modeloValido(), { numModos: 6 }));
     expect(cods).not.toContain("MODAL_SIN_MASA");
+  });
+
+  // ============================================================================
+  // [AUDITORIA M-1] IDS DUPLICADOS. El borde Zod no valida unicidad de ids y los
+  // lookups del dominio son `.find()` (primer match): dos nudos con el mismo id y
+  // posiciones DISTINTAS producian geometria silenciosamente erronea (la viga usa
+  // el primero e ignora el segundo, ok:true). Un .json manipulado/corrupto no debe
+  // poder calcular con geometria equivocada: BLOQUEA con ID_DUP.
+  // ============================================================================
+  describe("AUDITORIA M-1: ids duplicados bloquean", () => {
+    it("dos nudos con el mismo id (posiciones distintas) -> error ID_DUP", () => {
+      const m = modeloValido();
+      m.nudos.push({ id: "n1", x: 99, y: 0 }); // colisiona con n1 en (0,0)
+      const errores = validarModelo(m);
+      const dup = errores.filter((e) => e.codigo === "ID_DUP");
+      expect(dup.length).toBeGreaterThan(0);
+      expect(dup[0].severidad).toBe("error");
+      for (const e of dup) sinJergaFEM(e);
+    });
+
+    it("dos plantas con el mismo id -> error ID_DUP", () => {
+      const m = modeloValido();
+      m.plantas.push({ id: "p1", nombre: "Planta 1 bis", cota: 6, altura: 3, grupoId: "g1" });
+      expect(codigos(validarModelo(m))).toContain("ID_DUP");
+    });
+
+    it("dos cargas con el mismo id -> error ID_DUP", () => {
+      const m = modeloValido();
+      m.cargas.push({ id: "c1", tipo: "lineal", ambito: "v1", valor: -5, hipotesisId: "h1" });
+      expect(codigos(validarModelo(m))).toContain("ID_DUP");
+    });
+  });
+
+  // ============================================================================
+  // [AUDITORIA M-3] PILAR DEGENERADO (longitud 0). Un pilar con plantaInicial ===
+  // plantaFinal (o dos plantas a la misma cota) no produce NINGUNA barra (el
+  // troceo por cotas emite 0 tramos) pero SI emite su support de arranque: apoyo
+  // fantasma sin barra que ademas cuenta como sujecion valida (haySujecionPilar).
+  // Simetrico de VIGA_DEGENERADA: BLOQUEA con PILAR_DEGENERADO.
+  // ============================================================================
+  describe("AUDITORIA M-3: pilar degenerado (longitud 0) bloquea", () => {
+    it("pilar con plantaInicial === plantaFinal -> error PILAR_DEGENERADO", () => {
+      const m = modeloValido();
+      m.pilares[0].plantaFinal = "p0"; // arranca y termina en cota 0: L=0
+      const errores = validarModelo(m);
+      const deg = errores.filter((e) => e.codigo === "PILAR_DEGENERADO");
+      expect(deg.length).toBe(1);
+      expect(deg[0].severidad).toBe("error");
+      expect(deg[0].elementoId).toBe("pil1");
+      sinJergaFEM(deg[0]);
+    });
+
+    it("pilar entre dos plantas DISTINTAS a la misma cota -> error PILAR_DEGENERADO", () => {
+      const m = modeloValido();
+      m.plantas.push({ id: "p0bis", nombre: "Cota cero bis", cota: 0, altura: 3, grupoId: "g1" });
+      m.pilares[0].plantaFinal = "p0bis"; // p0(0) -> p0bis(0): L=0
+      expect(codigos(validarModelo(m))).toContain("PILAR_DEGENERADO");
+    });
+
+    it("un pilar normal NO dispara PILAR_DEGENERADO", () => {
+      expect(codigos(validarModelo(modeloValido()))).not.toContain("PILAR_DEGENERADO");
+    });
+  });
+
+  // ============================================================================
+  // [AUDITORIA M-5] LOSA con bordeApoyo="libre": en el corte 1 los paños son
+  // AISLADOS (sin acople al portico), asi que una losa con todos los bordes
+  // libres no tiene sujecion vertical POSIBLE: el motor siempre lanza inestable
+  // (verificado con el motor real: PyNite _check_stability caza los GDL sin
+  // rigidez), con un mensaje tecnico. Mejor bloquear ANTES en lenguaje de obra.
+  // ============================================================================
+  describe("AUDITORIA M-5: losa con borde libre (aislada) bloquea", () => {
+    it("pano losa con bordeApoyo libre -> error PANO_SIN_APOYO", () => {
+      const m = modeloValido();
+      m.nudos.push(
+        { id: "q1", x: 10, y: 10 },
+        { id: "q2", x: 14, y: 10 },
+        { id: "q3", x: 14, y: 13 },
+        { id: "q4", x: 10, y: 13 },
+      );
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["q1", "q2", "q3", "q4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "libre",
+      });
+      const errores = validarModelo(m);
+      const e = errores.filter((x) => x.codigo === "PANO_SIN_APOYO");
+      expect(e.length).toBe(1);
+      expect(e[0].severidad).toBe("error");
+      expect(e[0].elementoId).toBe("pano1");
+      sinJergaFEM(e[0]);
+    });
+
+    it("pano losa con borde simple/empotrado NO dispara PANO_SIN_APOYO", () => {
+      const m = modeloValido();
+      m.nudos.push(
+        { id: "q1", x: 10, y: 10 },
+        { id: "q2", x: 14, y: 10 },
+        { id: "q3", x: 14, y: 13 },
+        { id: "q4", x: 10, y: 13 },
+      );
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["q1", "q2", "q3", "q4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      });
+      expect(codigos(validarModelo(m))).not.toContain("PANO_SIN_APOYO");
+    });
+  });
+
+  describe("AUDITORIA UX-VACIA: obra sin elementos bloquea el calculo", () => {
+    it("obra vacia (sin pilares/vigas/panos) -> error OBRA_VACIA", () => {
+      // El modelo vacio de partida (crearModeloVacio) trae hipotesis pero NINGUN elemento
+      // estructural: calcular no tendria nada que resolver. Antes procedia en silencio
+      // (validarSujecion hace early-return con obra vacia). Ahora se bloquea en lenguaje
+      // de obra ANTES del motor.
+      const e = validarModelo(crearModeloVacio()).find((x) => x.codigo === "OBRA_VACIA");
+      expect(e).toBeDefined();
+      expect(e!.severidad).toBe("error");
+      expect(e!.elementoTipo).toBe("modelo");
+      sinJergaFEM(e!);
+    });
+
+    it("obra con al menos un elemento NO dispara OBRA_VACIA", () => {
+      // El modelo valido de base tiene pilar + viga: nunca es "obra vacia".
+      expect(codigos(validarModelo(modeloValido()))).not.toContain("OBRA_VACIA");
+    });
+
+    it("obra con solo un pilar (sin vigas ni paños) NO dispara OBRA_VACIA", () => {
+      const m = modeloValido();
+      m.vigas = [];
+      m.cargas = []; // la carga colgaba de la viga eliminada
+      expect(codigos(validarModelo(m))).not.toContain("OBRA_VACIA");
+    });
   });
 });

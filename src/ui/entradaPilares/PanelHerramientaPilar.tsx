@@ -7,8 +7,14 @@ import {
   SelectMaterial,
 } from "../primitivas";
 import { CampoArranque, CampoVinculacion } from "./camposPilar";
-import { vistaStore, type DefaultsPilar } from "../../estado";
-import { listarSecciones, listarMateriales } from "../../biblioteca";
+import { vistaStore, modeloStore, type DefaultsPilar } from "../../estado";
+import {
+  DEFAULT_MATERIAL_ID,
+  DEFAULT_SECCION_PILAR,
+  resolverSeccionDefault,
+  esCombinacionIncoherentePorId,
+  mensajeCoherencia,
+} from "../../biblioteca";
 import "./panelHerramientaPilar.css";
 
 // PanelHerramientaPilar (feature-11, Tarea 4.1): panel flotante ligero visible
@@ -22,10 +28,6 @@ import "./panelHerramientaPilar.css";
 //
 // UNIDADES (CLAUDE.md §14): el angulo se edita en grados (= interno); la seccion y
 // el material solo se eligen por id. No hay conversion aqui.
-
-// Catalogos inmutables: se listan una vez fuera del render (igual que los Select*).
-const PRIMERA_SECCION = listarSecciones()[0]?.id ?? null;
-const PRIMER_MATERIAL = listarMateriales()[0]?.id ?? null;
 
 // True solo en modo "pilar". subscribeWithSelector -> re-render solo al conmutar.
 function useHerramientaPilar(): boolean {
@@ -49,19 +51,32 @@ function PanelActivo() {
   const defaults = useDefaultsPilar();
   const setDefaults = vistaStore.getState().setDefaultsPilar;
   const terminar = () => vistaStore.getState().setHerramienta("seleccion");
+  // Secciones de obra (Capa 1): re-render solo si cambia la referencia del array
+  // (Immer la preserva si no se tocan). Necesarias para resolver el default de obra
+  // (hormigon sembrado) y para el aviso de coherencia D15.
+  const seccionesObra = modeloStore((s) => s.modelo.secciones);
 
-  // UX: al activar la herramienta sin seccion/material fijados, preselecciona el
-  // primero del catalogo para que el primer clic pueda colocar de inmediato (la
-  // ColocacionPilar ignora el clic si faltan seccion/material). Solo rellena lo
-  // vacio: respeta lo que el usuario ya hubiera elegido en sesiones previas.
+  // UX (D4+D5): al activar la herramienta sin seccion/material fijados, preselecciona
+  // la seccion de obra por defecto (hormigon HA 30×30 sembrado; antes cogia el primer
+  // PERFIL del catalogo, IPE, incoherente con el MVP de hormigon) y el material por
+  // defecto (HA-25). Solo rellena lo vacio: respeta lo que el usuario ya hubiera elegido.
   useEffect(() => {
     const parche: Partial<DefaultsPilar> = {};
-    if (!defaults.seccionId && PRIMERA_SECCION) parche.seccionId = PRIMERA_SECCION;
-    if (!defaults.materialId && PRIMER_MATERIAL) parche.materialId = PRIMER_MATERIAL;
+    if (!defaults.seccionId) {
+      const id = resolverSeccionDefault(DEFAULT_SECCION_PILAR.nombre, seccionesObra);
+      if (id) parche.seccionId = id;
+    }
+    if (!defaults.materialId) parche.materialId = DEFAULT_MATERIAL_ID;
     if (Object.keys(parche).length > 0) setDefaults(parche);
     // Se ejecuta al montar (entrada en modo pilar); las dependencias evitan
     // re-disparar tras rellenar (los ids ya no son null).
-  }, [defaults.seccionId, defaults.materialId, setDefaults]);
+  }, [defaults.seccionId, defaults.materialId, seccionesObra, setDefaults]);
+
+  // D15: aviso NO bloqueante si la seccion (perfil metalico / hormigon) no casa con
+  // la familia del material (acero / hormigon). Puro; el mensaje va en lenguaje de obra.
+  const avisoCoherencia = mensajeCoherencia(
+    esCombinacionIncoherentePorId(defaults.seccionId, defaults.materialId, seccionesObra),
+  );
 
   return (
     <PanelFlotante
@@ -84,6 +99,14 @@ function PanelActivo() {
         valor={defaults.materialId}
         onCambio={(id) => setDefaults({ materialId: id })}
       />
+
+      {/* D15: aviso de mezcla incoherente seccion<->material. NO bloquea la
+          colocacion; solo advierte (--warning, role=status). */}
+      {avisoCoherencia ? (
+        <p className="cx-aviso-coherencia" role="status">
+          {avisoCoherencia}
+        </p>
+      ) : null}
 
       <CampoNumero
         etiqueta="Ángulo"

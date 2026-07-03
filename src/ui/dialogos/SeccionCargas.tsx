@@ -10,6 +10,7 @@ import {
   modeloStore,
   vistaStore,
   crearCarga,
+  editarCarga,
   eliminarCarga,
 } from "../../estado";
 import type { Carga } from "../../dominio";
@@ -89,10 +90,15 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
   // Errores de validacion del formulario de "Añadir carga" (no de las cargas ya
   // creadas). Se limpian al cambiar de elemento.
   const [errores, setErrores] = useState<ErrorCampo[]>([]);
+  // D17: error de validacion de la EDICION inline de una carga existente, indexado por
+  // id de carga (una fila puede tener su propio error de valor sin afectar a las demas
+  // ni al formulario de "Añadir carga"). Se limpia al cambiar de elemento.
+  const [erroresFila, setErroresFila] = useState<Record<string, ErrorCampo[]>>({});
 
   // Al cambiar de elemento seleccionado, limpia los errores del formulario anterior.
   useEffect(() => {
     setErrores([]);
+    setErroresFila({});
   }, [elementoId]);
 
   // Cargas de ESTE elemento (filtro por ambito), via el helper de dominio.
@@ -169,10 +175,32 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
     modeloStore.getState().ejecutar(eliminarCarga(leerModelo(), cargaId));
   };
 
-  // Nombre legible de la hipotesis (lenguaje de obra). Si no se encuentra (carga
-  // huerfana, no deberia pasar), se muestra un guion.
-  const nombreHipotesis = (hipotesisId: string): string =>
-    leerModelo().hipotesis.find((h) => h.id === hipotesisId)?.nombre ?? "—";
+  // D17: edicion INLINE de una carga existente. `cambios` es el parcial editado en la
+  // fila (valor O hipotesisId); el resto de campos se toma de la carga actual para
+  // validar el CONJUNTO con el mismo criterio que crear (validarCarga: valor > 0, con
+  // el mensaje del sentido gravitatorio). Commit reversible via el comando editarCarga.
+  // Si el campo no cambia de valor, no-op (no ensucia el undo). El error se refleja solo
+  // en ESA fila (erroresFila[cargaId]); una edicion invalida NO comitea.
+  const editar = (cargaId: string, cambios: { valor?: number; hipotesisId?: string }) => {
+    const m = leerModelo();
+    const carga = m.cargas.find((c) => c.id === cargaId);
+    if (!carga) return;
+    const datos: DatosCargaUI = {
+      tipo: carga.tipo,
+      ambito: carga.ambito,
+      valor: cambios.valor ?? carga.valor,
+      hipotesisId: cambios.hipotesisId ?? carga.hipotesisId,
+    };
+    const errs = validarCarga(m, cargaId, datos);
+    setErroresFila((prev) => ({ ...prev, [cargaId]: errs }));
+    if (!esValido(errs)) return;
+    // No-op si el campo editado ya tiene ese valor (no ensucia el undo).
+    const sinCambio =
+      (cambios.valor === undefined || cambios.valor === carga.valor) &&
+      (cambios.hipotesisId === undefined || cambios.hipotesisId === carga.hipotesisId);
+    if (sinCambio) return;
+    modeloStore.getState().ejecutar(editarCarga(m, cargaId, cambios));
+  };
 
   // En F1 viga/pilar solo introducen carga lineal (ver cabecera), por lo que no hay
   // aviso de carga superficial que mostrar aqui; `avisoSuperficial` (validacionesCarga)
@@ -187,17 +215,29 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
           <div className="cx-cargas__vacio">Sin cargas.</div>
         ) : (
           cargasDelElemento.map((c) => (
-            // Fila: valor | hipótesis | ×. En F1 el tipo es SIEMPRE "Lineal", asi que
-            // la columna de tipo seria ruido (identica en toda fila) y se omite del
-            // render; el valor —el dato que importa— va primero. La columna de tipo se
-            // reintroducira cuando F3 anada cargas puntual/superficial (varios tipos
-            // conviviendo). El tipo se conserva en el aria-label del boton × (contexto
-            // para lectores de pantalla).
-            <div key={c.id} className="cx-cargas__fila">
-              <span className="cx-cargas__valor">
-                {c.valor} {SUFIJO_POR_TIPO[c.tipo]}
-              </span>
-              <span className="cx-cargas__hip">{nombreHipotesis(c.hipotesisId)}</span>
+            // D17: fila EDITABLE inline: valor (CampoNumero compacto con unidad) |
+            // hipótesis (SelectHipotesis) | ×. En F1 el tipo es SIEMPRE "Lineal", asi
+            // que la columna de tipo seria ruido (identica en toda fila) y se omite del
+            // render; el valor —el dato que importa— va primero. El tipo se conserva en
+            // el aria-label del boton × (contexto para lectores de pantalla). Cada campo
+            // comitea con editarCarga (commit en vivo, reversible); su error de
+            // validacion (si el valor deja de ser > 0) se muestra bajo la fila.
+            <div key={c.id} className="cx-cargas__fila cx-cargas__fila--edit">
+              <div className="cx-cargas__fila-campos">
+                <CampoNumero
+                  etiqueta={`Valor de la carga ${etiquetaTipo(c.tipo)}`}
+                  sufijo={SUFIJO_POR_TIPO[c.tipo]}
+                  className="cx-cargas__fila-valor"
+                  valor={c.valor}
+                  onCommit={(v) => editar(c.id, { valor: v })}
+                  error={errorDe(erroresFila[c.id] ?? [], "valor")}
+                />
+                <SelectHipotesis
+                  etiqueta={`Hipótesis de la carga ${etiquetaTipo(c.tipo)}`}
+                  valor={c.hipotesisId}
+                  onCambio={(id) => editar(c.id, { hipotesisId: id })}
+                />
+              </div>
               <button
                 type="button"
                 className="cx-cargas__borrar"
@@ -220,6 +260,11 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
           onCommit={(v) => setValorNuevo(v)}
           error={errorDe(errores, "valor")}
         />
+        {/* UX-E3: el sentido de la carga no era comunicado (solo saltaba al teclear un
+            negativo). Ayuda corta y permanente: el signo lo fija el discretizador. */}
+        <p className="cx-cargas__ayuda">
+          Valor en positivo: la carga actúa hacia abajo (gravitatoria).
+        </p>
         <div className="cx-cargas__campo">
           <span className="cx-campo__label">Hipótesis</span>
           <SelectHipotesis
@@ -240,6 +285,14 @@ export function SeccionCargas({ elementoId }: SeccionCargasProps) {
           Añadir carga
         </Boton>
       </div>
+
+      {/* D19 (UX-E4): expectativa gestionada. En F1 la UI de viga/pilar solo introduce
+          carga LINEAL (ver cabecera): la puntual sobre barra requiere trabajo de Capa 2
+          y se difiere. Nota terciaria y discreta para que el vacio sea intencional y no
+          leido como carencia. */}
+      <p className="cx-cargas__nota-futura">
+        Cargas puntuales: disponibles en una fase posterior.
+      </p>
     </div>
   );
 }

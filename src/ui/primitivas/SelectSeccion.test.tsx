@@ -14,7 +14,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SelectSeccion } from "./SelectSeccion";
 import { listarSecciones } from "../../biblioteca";
-import { modeloStore } from "../../estado";
+import { modeloStore, vistaStore } from "../../estado";
 import { crearModeloVacio, type Seccion } from "../../dominio";
 
 // jsdom no implementa la PointerCapture API ni scrollIntoView, de las que depende
@@ -50,6 +50,22 @@ describe("SelectSeccion", () => {
     expect(
       screen.getByRole("combobox", { name: "Sección del pilar" }),
     ).toBeInTheDocument();
+  });
+
+  it("UX-C7: muestra un rotulo VISIBLE (cx-campo__label), no solo aria-label", () => {
+    const { container } = render(
+      <SelectSeccion valor={null} onCambio={() => {}} etiqueta="Sección" />,
+    );
+    const label = container.querySelector(".cx-campo__label");
+    expect(label).not.toBeNull();
+    expect(label).toHaveTextContent("Sección");
+    // El rotulo VISIBLE tambien nombra al combobox (aria-labelledby).
+    expect(screen.getByRole("combobox", { name: "Sección" })).toBeInTheDocument();
+  });
+
+  it("UX-F4: el trigger de seccion va en mono tabular (cx-select--mono)", () => {
+    render(<SelectSeccion valor={null} onCambio={() => {}} />);
+    expect(screen.getByRole("combobox")).toHaveClass("cx-select--mono");
   });
 
   it("al abrir lista las opciones del catalogo (perfiles) y onCambio recibe el id", async () => {
@@ -118,5 +134,22 @@ describe("SelectSeccion", () => {
 
     const listbox = await screen.findByRole("listbox");
     expect(within(listbox).getByText("Circular Ø400")).toBeInTheDocument();
+  });
+
+  it("D3: 'Nueva sección…' abre el dialogo de seccion personalizada y cierra el select", async () => {
+    const user = userEvent.setup();
+    vistaStore.getState().cerrarDialogo();
+    render(<SelectSeccion valor={null} onCambio={() => {}} />);
+
+    screen.getByRole("combobox").focus();
+    await user.keyboard("{Enter}");
+
+    // El pie del listado ofrece la accion de crear una seccion a medida.
+    const accion = await screen.findByRole("button", { name: /Nueva sección/ });
+    await user.click(accion);
+
+    // Abre el dialogo (el orquestador lo monta) y el listbox se cierra.
+    expect(vistaStore.getState().dialogoActivo).toBe("seccionPersonalizada");
+    expect(screen.queryByRole("listbox")).toBeNull();
   });
 });

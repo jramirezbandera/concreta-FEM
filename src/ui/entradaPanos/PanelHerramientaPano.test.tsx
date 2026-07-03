@@ -8,9 +8,11 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PanelHerramientaPano } from "./PanelHerramientaPano";
 import { vistaStore } from "../../estado";
-import { listarMateriales } from "../../biblioteca";
+import { DEFAULT_MATERIAL_ID } from "../../biblioteca";
 
-const PRIMER_MATERIAL = listarMateriales()[0]!.id;
+// D4+D5: el material default de la losa pasa a HA-25 (hormigon, coherente con el MVP),
+// no el primer material del catalogo (S235).
+const PRIMER_MATERIAL = DEFAULT_MATERIAL_ID;
 
 beforeAll(() => {
   Element.prototype.hasPointerCapture = () => false;
@@ -49,7 +51,7 @@ describe("PanelHerramientaPano", () => {
     expect(screen.getByText("Nuevo paño")).toBeInTheDocument();
   });
 
-  it("preselecciona el primer material del catalogo al activarse (material vacio)", () => {
+  it("preselecciona el material por defecto HA-25 al activarse (material vacio) (D4)", () => {
     vistaStore.getState().setHerramienta("pano");
     render(<PanelHerramientaPano />);
     expect(vistaStore.getState().defaultsPano.materialId).toBe(PRIMER_MATERIAL);
@@ -89,5 +91,13 @@ describe("PanelHerramientaPano", () => {
     await user.click(screen.getByRole("button", { name: "Terminar" }));
     expect(vistaStore.getState().herramienta).toBe("seleccion");
     expect(screen.queryByText("Nuevo paño")).not.toBeInTheDocument();
+  });
+
+  it("UX-C9: comunica que la losa se calcula aislada (no transfiere carga al portico)", () => {
+    vistaStore.getState().setHerramienta("pano");
+    render(<PanelHerramientaPano />);
+    expect(
+      screen.getByText(/su carga no se transmite a pilares ni vigas/i),
+    ).toBeInTheDocument();
   });
 });

@@ -8,14 +8,17 @@ export type { BotonProps, VarianteBoton } from "./Boton";
 export { Segmentado } from "./Segmentado";
 export type { SegmentadoProps, OpcionSegmento } from "./Segmentado";
 
-export { PanelFlotante } from "./PanelFlotante";
-export type { PanelFlotanteProps } from "./PanelFlotante";
+export { PanelFlotante, ProveedorModoPanel, ProveedorDockSeccion } from "./PanelFlotante";
+export type { PanelFlotanteProps, ModoPanel, ConfigDockSeccion } from "./PanelFlotante";
 
 export { Chip, Pill } from "./Chip";
 export type { ChipProps, PillProps } from "./Chip";
 
 export { FilaArbol } from "./FilaArbol";
 export type { FilaArbolProps } from "./FilaArbol";
+
+export { SeccionColapsable } from "./SeccionColapsable";
+export type { SeccionColapsableProps } from "./SeccionColapsable";
 
 export { Campo } from "./Campo";
 export type { CampoProps } from "./Campo";
@@ -26,6 +29,8 @@ export type { CampoNumeroProps } from "./CampoNumero";
 export { SelectUso } from "./SelectUso";
 export type { SelectUsoProps } from "./SelectUso";
 
+export { formatearQk } from "./formatoNumero";
+
 export { SelectSeccion } from "./SelectSeccion";
 export type { SelectSeccionProps } from "./SelectSeccion";
 
@@ -34,3 +39,5 @@ export type { SelectMaterialProps } from "./SelectMaterial";
 
 export { SelectHipotesis } from "./SelectHipotesis";
 export type { SelectHipotesisProps } from "./SelectHipotesis";
+
+export { ErrorBoundary } from "./ErrorBoundary";

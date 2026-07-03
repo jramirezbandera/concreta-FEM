@@ -14,11 +14,15 @@ import type {
   Carga,
   Hipotesis,
   OpcionesAnalisis,
+  Seccion,
 } from "../../dominio";
 import { crearComandoParches } from "./comando";
 import type { Comando } from "./comando";
 import { nuevoId } from "../ids";
-import { TOL_NODO } from "../../discretizador/discretizar";
+// [AUDITORIA M-4] mismaPosicionEnPlanta = criterio REAL del snapping (clave de
+// rejilla, geometria.ts), no distancia euclidea: UI y solver deciden "mismo
+// nudo" con el MISMO predicado y no pueden divergir en la frontera de celda.
+import { mismaPosicionEnPlanta } from "../../discretizador/geometria";
 import { esHipotesisAutomatica } from "../../dominio";
 
 // Datos del pilar que aporta el llamante: todo Pilar salvo id (interno, lo genera
@@ -110,6 +114,52 @@ export function moverPilar(
   return comando;
 }
 
+// --- Secciones de obra (auditoria UI/UX D3+D4, "Sección personalizada") ------
+
+// Datos de la seccion de obra que aporta el llamante: hormigon rectangular (b×h) o
+// circular (Ø), con `nombre` legible ya compuesto por el borde de UI ("HA 30×30").
+// UNIDADES: las dimensiones llegan en METROS (sistema interno): la UI convierte
+// mm->m en el borde (src/unidades) ANTES de invocar el comando. Aqui NO se convierte.
+// SOLO se persisten DIMENSIONES: jamas A/Iy/Iz calculados (la unica fuente de las
+// propiedades de calculo es resolverSeccion, biblioteca; ver hormigon.ts / C-1b).
+export type DatosSeccion =
+  | { clase: "rectangular"; nombre: string; b: number; h: number } // b,h en m
+  | { clase: "circular"; nombre: string; d: number }; // d en m
+
+// Crea una Seccion de obra (Capa 1) con id OPACO (nuevoId), NUNCA semantico tipo
+// "HR-300x500": un id semantico ensombreceria el catalogo en resolverSeccionFEMPorId
+// (una seccion de obra con id "IPE300" pisaria el perfil de catalogo). El nombre
+// legible va en `nombre`; el id es interno y estable (se reutiliza en redo via el
+// delta, igual que crearPilar). Sin material: la seccion NO lo lleva (el elemento lo
+// referencia por su lado).
+export function crearSeccion(base: Modelo, datos: DatosSeccion): Comando {
+  const id = nuevoId();
+  const seccion: Seccion =
+    datos.clase === "rectangular"
+      ? {
+          id,
+          nombre: datos.nombre,
+          tipo: "hormigonRectangular",
+          b: datos.b,
+          h: datos.h,
+        }
+      : {
+          id,
+          nombre: datos.nombre,
+          tipo: "hormigonCircular",
+          d: datos.d,
+        };
+
+  const { comando } = crearComandoParches(
+    base,
+    `Crear sección ${datos.nombre}`,
+    (borrador) => {
+      borrador.secciones.push(seccion);
+    },
+  );
+  return comando;
+}
+
 // --- Vigas (feature-12, entrada de vigas) ------------------------------------
 
 // Datos de la viga que aporta el llamante: todo Viga salvo id (interno) y nombre
@@ -133,17 +183,18 @@ export type ExtremoViga = { nudoId: string } | { x: number; y: number };
 
 // Resuelve un extremo a un id de nudo SOBRE el borrador Immer (misma receta que la
 // viga => un solo paso de undo). Si viene como {nudoId} se usa tal cual. Si viene
-// como {x,y}: se reusa el primer nudo a distancia euclidea < TOL_NODO (la misma
-// tolerancia de snapping del discretizador, importada para no divergir); si no hay
-// ninguno, se hace push de un Nudo nuevo. Los nudos recien creados en esta misma
+// como {x,y}: se reusa el primer nudo que comparte CELDA de rejilla
+// (mismaPosicionEnPlanta, el criterio REAL del snapping del discretizador; antes
+// se usaba distancia euclidea, que diverge en la frontera de celda — [M-4]); si no
+// hay ninguno, se hace push de un Nudo nuevo. Los nudos recien creados en esta misma
 // receta ya estan en borrador.nudos, de modo que un segundo extremo en el mismo
 // punto reusa el del primero (coherencia I/J sin crear duplicados).
 function resolverExtremo(borrador: Modelo, extremo: ExtremoViga): string {
   if ("nudoId" in extremo) return extremo.nudoId;
   const { x, y } = extremo;
-  const existente = borrador.nudos.find(
-    (n) => Math.hypot(n.x - x, n.y - y) < TOL_NODO,
-  );
+  // [M-4] Criterio de rejilla (el del discretizador), NO euclideo: si dos puntos
+  // comparten celda, el FEM los colapsara a un nodo -> deben compartir Nudo aqui.
+  const existente = borrador.nudos.find((n) => mismaPosicionEnPlanta(n, { x, y }));
   if (existente) return existente.id;
   const nudo: Nudo = { id: nuevoId(), x, y };
   borrador.nudos.push(nudo);
@@ -257,9 +308,8 @@ export type DatosPano = {
 // misma posicion en una misma receta).
 function resolverPuntoPerimetro(borrador: Modelo, punto: { x: number; y: number }): string {
   const { x, y } = punto;
-  const existente = borrador.nudos.find(
-    (n) => Math.hypot(n.x - x, n.y - y) < TOL_NODO,
-  );
+  // [M-4] Criterio de rejilla (ver resolverExtremo).
+  const existente = borrador.nudos.find((n) => mismaPosicionEnPlanta(n, punto));
   if (existente) return existente.id;
   const nudo: Nudo = { id: nuevoId(), x, y };
   borrador.nudos.push(nudo);

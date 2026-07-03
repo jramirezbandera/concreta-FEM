@@ -1,46 +1,20 @@
-import { useState, type ReactNode } from "react";
-import * as Collapsible from "@radix-ui/react-collapsible";
-import { FilaArbol } from "../primitivas";
+import { FilaArbol, SeccionColapsable } from "../primitivas";
 import { modeloStore, vistaStore } from "../../estado";
-import { pilaresDePlanta, plantasDeGrupo } from "../../dominio";
+import {
+  pilaresDePlanta,
+  vigasDePlanta,
+  panosDePlanta,
+  plantasDeGrupo,
+} from "../../dominio";
 
-// Sidebar / arbol de obra (Spec Diseno UI §3.3). Secciones colapsables
-// (Radix Collapsible). Lenguaje de obra SIEMPRE: nada de nodos/members (CLAUDE
-// §17). Solo lectura del modelo + setters de vistaStore. El shell usa estado
-// reactivo normal (no esta en el bucle de render del viewport).
+// Sidebar / arbol de obra (Spec Diseno UI §3.3). Secciones colapsables via la primitiva
+// compartida SeccionColapsable (D14 · PR3: DRY — antes tenia un `Seccion` local con Radix
+// Collapsible duplicado). Lenguaje de obra SIEMPRE: nada de nodos/members (CLAUDE §17).
+// Solo lectura del modelo + setters de vistaStore. El shell usa estado reactivo normal
+// (no esta en el bucle de render del viewport).
 
-interface SeccionProps {
-  titulo: string;
-  defaultAbierta?: boolean;
-  children: ReactNode;
-}
-
-function Seccion({ titulo, defaultAbierta = true, children }: SeccionProps) {
-  const [abierta, setAbierta] = useState(defaultAbierta);
-  return (
-    <Collapsible.Root
-      className="cx-side-sec"
-      open={abierta}
-      onOpenChange={setAbierta}
-    >
-      <Collapsible.Trigger asChild>
-        <button
-          type="button"
-          className="cx-side-sec__head caps"
-          data-state={abierta ? "open" : "closed"}
-        >
-          <span className="cx-side-sec__chevron" aria-hidden="true">
-            ▶
-          </span>
-          <span className="cx-side-sec__title">{titulo}</span>
-        </button>
-      </Collapsible.Trigger>
-      <Collapsible.Content className="cx-side-sec__body">
-        {children}
-      </Collapsible.Content>
-    </Collapsible.Root>
-  );
-}
+// Alias fino para conservar el JSX legible (<Seccion titulo=…>) tras adoptar la primitiva.
+const Seccion = SeccionColapsable;
 
 export function Sidebar() {
   // Lectura del modelo: campos sueltos via selectores. El arbol re-renderiza al
@@ -51,34 +25,45 @@ export function Sidebar() {
   const modelo = modeloStore((s) => s.modelo);
   const grupos = modelo.grupos;
   const plantas = modelo.plantas;
-  const numVigas = modelo.vigas.length;
 
   const grupoActivoId = vistaStore((s) => s.grupoActivoId);
   const plantaActivaId = vistaStore((s) => s.plantaActivaId);
   const setGrupoActivo = vistaStore((s) => s.setGrupoActivo);
   const setPlantaActiva = vistaStore((s) => s.setPlantaActiva);
   const abrirDialogo = vistaStore((s) => s.abrirDialogo);
+  // [D11a] Conmutacion de vista desde el arbol (espejo del selector 2D/3D del HUD).
+  // "Planta de grupo" -> modoVista "planta"; "Vista 3D" -> "3d". La fila activa se
+  // resalta (patron FilaArbol `seleccionada`). Mosaico NO se ofrece aqui (sigue
+  // "próximamente" en el HUD).
+  const modoVista = vistaStore((s) => s.modoVista);
+  const setModoVista = vistaStore((s) => s.setModoVista);
 
-  // Contador de pilares del AMBITO activo (lenguaje de obra, Spec Diseno UI §3.3):
-  // planta activa si la hay; si no, todo el grupo activo (pilares distintos, para no
-  // contar dos veces un pilar pasante que arranca y termina en plantas del grupo);
-  // si tampoco hay grupo, el total de la obra. Conteo derivado en render: barato y
-  // siempre coherente con el modelo (no es estado nuevo, no toca el viewport).
-  const numPilares = (() => {
+  // Contador de un tipo de elemento en el AMBITO activo (lenguaje de obra, Spec Diseno
+  // UI §3.3): planta activa si la hay; si no, todo el grupo activo (elementos DISTINTOS
+  // por id, para no contar dos veces un pilar pasante que arranca y termina en plantas
+  // del grupo); si tampoco hay grupo, el total de la obra. UN solo criterio para pilares,
+  // vigas y paños (auditoria UX-A8: antes las vigas mostraban el total, incoherente).
+  // Conteo derivado en render: barato y siempre coherente con el modelo.
+  const contarEnAmbito = (
+    porPlanta: (m: typeof modelo, plantaId: string) => Array<{ id: string }>,
+    totalObra: number,
+  ): number => {
     if (plantaActivaId) {
-      return pilaresDePlanta(modelo, plantaActivaId).length;
+      return porPlanta(modelo, plantaActivaId).length;
     }
     if (grupoActivoId) {
-      const idsPilares = new Set<string>();
+      const ids = new Set<string>();
       for (const planta of plantasDeGrupo(modelo, grupoActivoId)) {
-        for (const pilar of pilaresDePlanta(modelo, planta.id)) {
-          idsPilares.add(pilar.id);
-        }
+        for (const el of porPlanta(modelo, planta.id)) ids.add(el.id);
       }
-      return idsPilares.size;
+      return ids.size;
     }
-    return modelo.pilares.length;
-  })();
+    return totalObra;
+  };
+
+  const numPilares = contarEnAmbito(pilaresDePlanta, modelo.pilares.length);
+  const numVigas = contarEnAmbito(vigasDePlanta, modelo.vigas.length);
+  const numPanos = contarEnAmbito(panosDePlanta, modelo.panos.length);
 
   const seleccionarPlanta = (grupoId: string, plantaId: string) => {
     setGrupoActivo(grupoId);
@@ -124,9 +109,19 @@ export function Sidebar() {
       </Seccion>
 
       <Seccion titulo="Vistas" defaultAbierta={false}>
-        {/* Sin accion en F9: la conmutacion de vista llega con feature posterior. */}
-        <FilaArbol label="Planta de grupo" interactiva={false} />
-        <FilaArbol label="Vista 3D" interactiva={false} />
+        {/* [D11a] Filas accionables: espejo de setModoVista. La activa se resalta
+            (patron FilaArbol `seleccionada`). Mosaico no se ofrece (sigue en el HUD
+            como "próximamente"). */}
+        <FilaArbol
+          label="Planta de grupo"
+          seleccionada={modoVista === "planta"}
+          onClick={() => setModoVista("planta")}
+        />
+        <FilaArbol
+          label="Vista 3D"
+          seleccionada={modoVista === "3d"}
+          onClick={() => setModoVista("3d")}
+        />
       </Seccion>
 
       <Seccion titulo="Elementos propios">
@@ -141,6 +136,15 @@ export function Sidebar() {
           label="Vigas"
           swatch="var(--viga)"
           contador={numVigas}
+          interactiva={false}
+        />
+        {/* Paños (forjados, F3): mismo criterio de ambito que pilares/vigas. Swatch
+            con el token del pilar (no hay --pano dedicado; PanoHuella pinta la huella
+            con --pilar, asi el arbol es coherente con el lienzo). */}
+        <FilaArbol
+          label="Paños"
+          swatch="var(--pilar)"
+          contador={numPanos}
           interactiva={false}
         />
       </Seccion>

@@ -20,14 +20,23 @@ import "./comboSelector.css";
 // Etiqueta larga legible para los combos conocidos del MVP (generarCombos de
 // feature-13 emite "ELU"/"ELS"). Para cualquier otro nombre futuro se muestra el
 // propio nombre sin inventar copy. El value SIEMPRE es el nombre del solver.
-function etiquetaCombo(nombre: string): string {
+//
+// La FORMULA (coeficientes) se añade como subtitulo (UX-H11): sin ella la opcion no
+// dice como se pondera G y Q. Los coeficientes son los REALES de generarCombos
+// (src/discretizador/combinaciones.ts, biblioteca/acciones.ts): ELU 1,35·G + 1,50·Q
+// (CTE DB-SE §4.2.2, gamma_G/gamma_Q desfavorables), ELS 1,00·G + 1,00·Q (§4.3.2).
+interface OpcionCombo {
+  etiqueta: string;
+  formula: string | null;
+}
+function opcionCombo(nombre: string): OpcionCombo {
   switch (nombre) {
     case "ELU":
-      return "E.L.U. (resistencia)";
+      return { etiqueta: "E.L.U. (resistencia)", formula: "1,35·G + 1,50·Q" };
     case "ELS":
-      return "E.L.S. (servicio)";
+      return { etiqueta: "E.L.S. (servicio)", formula: "1,00·G + 1,00·Q" };
     default:
-      return nombre;
+      return { etiqueta: nombre, formula: null };
   }
 }
 
@@ -60,14 +69,25 @@ export function ComboSelector() {
         <Select.Portal>
           <Select.Content className="cx-select-content" position="popper" sideOffset={4}>
             <Select.Viewport className="cx-select-viewport">
-              {combos.map((nombre) => (
-                <Select.Item key={nombre} value={nombre} className="cx-select-item">
-                  <Select.ItemText>{etiquetaCombo(nombre)}</Select.ItemText>
-                  <Select.ItemIndicator className="cx-select-item__check">
-                    ✓
-                  </Select.ItemIndicator>
-                </Select.Item>
-              ))}
+              {combos.map((nombre) => {
+                const { etiqueta, formula } = opcionCombo(nombre);
+                return (
+                  <Select.Item key={nombre} value={nombre} className="cx-select-item cx-combo__item">
+                    {/* ItemText = lo que refleja el trigger (etiqueta corta). La formula va
+                        FUERA del ItemText: se muestra en el desplegable pero no ensucia el
+                        trigger (UX-H11). */}
+                    <span className="cx-combo__item-txt">
+                      <Select.ItemText>{etiqueta}</Select.ItemText>
+                      {formula !== null && (
+                        <span className="cx-combo__formula mono">{formula}</span>
+                      )}
+                    </span>
+                    <Select.ItemIndicator className="cx-select-item__check">
+                      ✓
+                    </Select.ItemIndicator>
+                  </Select.Item>
+                );
+              })}
             </Select.Viewport>
           </Select.Content>
         </Select.Portal>

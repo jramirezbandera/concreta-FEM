@@ -539,4 +539,51 @@ describe("golden CR INTEGRACION (prepararModeloCR -> calcularCR, motor real)", (
     },
     TIMEOUT_ARRANQUE,
   );
+
+  // ---------------------------------------------------------------------------
+  // [AUDITORIA A-2] CIMENTACION con arranque ARTICULADO -> CR debe ser null.
+  //
+  // La guarda de cimentacion del glue (FIX #2) identifica la planta de pies por la
+  // firma exacta "los 6 GDL True" (empotramiento). Un arranque ARTICULADO (opcion
+  // real de la UI) emite {DX,DY,DZ:true, RX,RY,RZ:false}: NO casa la firma, la
+  // planta de pies NO se filtra, y el diafragma se impone sobre nudos que YA estan
+  // DX/DZ-fijos en el base -> las reacciones incrementales son ~0 -> K es RUIDO de
+  // redondeo con cond BAJO (pasa el umbral 1e12) y diagonales no nulas -> sale un
+  // CR FINITO Y ESPURIO presentado como valido. Este test lo caza: la cimentacion
+  // articulada debe dar null exactamente igual que la empotrada.
+  // ---------------------------------------------------------------------------
+  it(
+    "AUDITORIA A-2: cimentacion ARTICULADA -> CR null (no un numero espurio)",
+    () => {
+      if (!arranque || !arranque.ok) {
+        console.warn(`[GOLDEN-CR-INT][SKIP] ${arranque?.motivo ?? "arranque no ejecutado"}`);
+        return;
+      }
+      const obra = obraSimetrica4Pilares();
+      for (const p of obra.pilares) p.arranque = "articulado";
+      const prep = prepararModeloCR(obra);
+      expect(prep.ok, "prepararModeloCR debe producir un modelo CR ok").toBe(true);
+      if (!prep.ok) return;
+
+      const r = arranque.motor.calcularCR(prep.modeloFEM, prep.plantasInfo);
+      console.warn(
+        `\n[GOLDEN-CR-INT][A-2] cr_por_planta=${JSON.stringify(r.cr_por_planta)}\n`,
+      );
+
+      // Cimentacion (pies articulados, p0): null, NO un numero.
+      const crCim = r.cr_por_planta["p0"];
+      expect(crCim, "clave de cimentacion presente").toBeDefined();
+      expect(crCim.x, "CR.x de cimentacion articulada = null (hoy: espurio)").toBeNull();
+      expect(crCim.y, "CR.y de cimentacion articulada = null (hoy: espurio)").toBeNull();
+
+      // La planta elevada sigue siendo determinable y simetrica (el fix NO debe
+      // marcar null un forjado real: sus cabezas estan libres en DX/DZ).
+      const crElev = r.cr_por_planta["p1"];
+      expect(crElev.x, "planta elevada determinable").not.toBeNull();
+      expect(crElev.y, "planta elevada determinable").not.toBeNull();
+      expect(Math.abs(crElev.x!), `CR.x ≈ 0 (real=${crElev.x})`).toBeLessThan(1e-4);
+      expect(Math.abs(crElev.y!), `CR.y ≈ 0 (real=${crElev.y})`).toBeLessThan(1e-4);
+    },
+    TIMEOUT_ARRANQUE,
+  );
 });

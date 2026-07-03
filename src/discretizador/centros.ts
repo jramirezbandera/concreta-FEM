@@ -126,25 +126,23 @@ export function calcularCentroMasaPlanta(
   const acc: Acumulador = { wx: 0, wy: 0, w: 0 };
   const hipById = new Map<string, Hipotesis>(modelo.hipotesis.map((h) => [h.id, h]));
 
-  // --- 1a) Peso propio de PILARES (medio pilar a cada forjado que conecta) ---------
+  // --- 1a) Peso propio de PILARES: masa TRIBUTARIA por planta -----------------------
+  // [AUDITORIA M-7] Un pilar PASANTE (3+ plantas) se trocea por cada planta intermedia
+  // que atraviesa (mismo criterio que `cotasDePilar` del discretizador): cada planta
+  // que el pilar toca recibe LA MITAD DE CADA TRAMO ADYACENTE (masa tributaria). El
+  // reparto anterior (medio pilar ENTERO a plantaInicial y medio a plantaFinal) daba
+  // CERO a las intermedias y sobrepesaba los extremos: CM por planta (y excentricidad
+  // CM<->CR) distorsionados. Para un pilar de UNA planta el resultado es identico al
+  // anterior (un tramo: mitad a cada extremo). La suma por plantas conserva A·rho·L.
+  // El (x,y) del pilar es su posicion en planta (vertical: constante en cota).
   for (const p of modelo.pilares) {
-    const conectaInicial = p.plantaInicial === plantaId;
-    const conectaFinal = p.plantaFinal === plantaId;
-    if (!conectaInicial && !conectaFinal) continue;
-    // Peso total del pilar (A·rho·L de todo el elemento, no de un tramo). El helper
-    // resuelve seccion+material+longitud completa (arranque->cabeza). Si no resuelve
-    // (seccion/material/planta colgando), se OMITE su contribucion (el CM no lanza).
+    // Si seccion/material/planta no resuelven, se OMITE su contribucion (el CM no lanza).
     const props = propsSeguras(() => propiedadesDePilar(modelo, p));
     if (props === null) continue;
-    const { A, rho, L } = props;
-    const pesoTotalPilar = A * rho * L;
-    // Medio a cada forjado conectado. Si arranca y termina en la MISMA planta
-    // (degenerado), ambas mitades caen aqui => el pilar entero. El (x,y) del pilar es
-    // su posicion en planta (vertical: constante en cota).
-    let fraccion = 0;
-    if (conectaInicial) fraccion += 0.5;
-    if (conectaFinal) fraccion += 0.5;
-    acumular(acc, pesoTotalPilar * fraccion, p.x, p.y);
+    const { A, rho } = props;
+    const longitudTributaria = tributariaDePilarEnPlanta(modelo, p, planta);
+    if (longitudTributaria <= 0) continue;
+    acumular(acc, A * rho * longitudTributaria, p.x, p.y);
   }
 
   // --- 1b) Peso propio de VIGAS de la planta --------------------------------------
@@ -211,4 +209,58 @@ function centroDeViga(modelo: Modelo, v: Viga): { x: number; y: number } | null 
   const nj = nudoPorId(modelo, v.nudoJ);
   if (ni === undefined || nj === undefined) return null;
   return { x: (ni.x + nj.x) / 2, y: (ni.y + nj.y) / 2 };
+}
+
+// --- [AUDITORIA M-7] Masa tributaria de un pilar en una planta --------------------
+// Longitud del pilar `p` que tributa a `planta`: la mitad de cada TRAMO adyacente a
+// la cota de la planta. Los tramos son los del troceo del discretizador (una cota por
+// cada planta cuya cota cae dentro de [cMin, cMax] del pilar, espejo de
+// `cotasDePilar` en discretizar.ts): asi el CM reparte la masa por los MISMOS tramos
+// que el solver usa para las barras.
+//
+// DESEMPATE de cotas compartidas (dos plantas a la MISMA cota): la tributaria de una
+// cota se atribuye a UNA sola planta — la misma que elegiria `plantaDeCotaPilar` del
+// discretizador (preferencia por el grupo del pilar; min por id) — para no contarla
+// dos veces y para que el CM atribuya como `nodoFEMAPlanta`. Devuelve 0 si `planta`
+// no toca el pilar o pierde el desempate.
+function tributariaDePilarEnPlanta(
+  modelo: Modelo,
+  p: Modelo["pilares"][number],
+  planta: { id: string; cota: number; grupoId: string },
+): number {
+  const pi = plantaPorId(modelo, p.plantaInicial);
+  const pf = plantaPorId(modelo, p.plantaFinal);
+  if (pi === undefined || pf === undefined) return 0;
+  const cMin = Math.min(pi.cota, pf.cota);
+  const cMax = Math.max(pi.cota, pf.cota);
+  const c = planta.cota;
+  if (c < cMin || c > cMax) return 0;
+
+  // Cotas del troceo (espejo de cotasDePilar): extremos + intermedias, ascendentes.
+  const cotasSet = new Set<number>([cMin, cMax]);
+  for (const pl of modelo.plantas) {
+    if (pl.cota > cMin && pl.cota < cMax) cotasSet.add(pl.cota);
+  }
+  const cotas = [...cotasSet].sort((a, b) => a - b);
+  const idx = cotas.indexOf(c);
+  if (idx === -1) return 0; // la planta no aporta cota al troceo de este pilar
+
+  // Desempate: entre las plantas a la cota `c`, gana la preferida por el grupo del
+  // pilar y, dentro, la de menor id (mismo criterio que plantaDeCotaPilar).
+  const grupos = new Set<string>();
+  if (pi !== undefined) grupos.add(pi.grupoId);
+  if (pf !== undefined) grupos.add(pf.grupoId);
+  const enCota = modelo.plantas.filter((pl) => pl.cota === c);
+  const preferidas = enCota.filter((pl) => grupos.has(pl.grupoId));
+  const candidatas = preferidas.length > 0 ? preferidas : enCota;
+  const ganadora = candidatas.reduce(
+    (min, pl) => (pl.id < min ? pl.id : min),
+    candidatas[0]?.id ?? planta.id,
+  );
+  if (ganadora !== planta.id) return 0;
+
+  // Mitad del tramo inferior + mitad del superior (si existen).
+  const abajo = idx > 0 ? (c - cotas[idx - 1]) / 2 : 0;
+  const arriba = idx < cotas.length - 1 ? (cotas[idx + 1] - c) / 2 : 0;
+  return abajo + arriba;
 }

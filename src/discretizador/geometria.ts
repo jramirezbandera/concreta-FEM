@@ -29,6 +29,35 @@ export function mapearEjes(
   return [xPlanta, cota, yPlanta]; // [X, Y, Z]
 }
 
+// Vector de reaccion (o de cualquier magnitud de 6 GDL) en EJES DE OBRA. Espejo EXACTO
+// de `mapearEjes` para las componentes de fuerza/momento: es su INVERSO sobre los 3 ejes.
+// El solver entrega la reaccion en ejes FEM (Y-up) como
+//   rxnFem = [FX, FY, FZ, MX, MY, MZ]
+// y mapearEjes fija FEM (X,Y,Z) = (x_obra, cota_vertical, y_obra). Por tanto, en ejes de
+// obra (mismo intercambio que mapearEjes, aplicado por separado a fuerzas y momentos):
+//   FUERZAS:  V  (vertical)   = FY   ·  Hx (obra x) = FX   ·  Hy (obra y) = FZ
+//   MOMENTOS: Mx (vuelco s/obra-x) = MX  ·  My (vuelco s/obra-y) = MZ  ·  Mv (torsor
+//             vertical) = MY
+// Es SOLO permutacion (sin conversion de unidades): la fuente UNICA del mapeo FEM->obra de
+// reacciones. La UI (TablaReacciones) lo consume y solo etiqueta; asi no diverge del mapeo
+// de posiciones. `mapearReaccionAObra` compuesto con la construccion de ejes de mapearEjes
+// es la identidad (test de identidad-inversa en geometria.test.ts).
+export interface ReaccionObra {
+  V: number; // vertical (= FY fem)
+  Hx: number; // horizontal obra-X (= FX fem)
+  Hy: number; // horizontal obra-Y (= FZ fem)
+  Mx: number; // vuelco sobre obra-x (= MX fem)
+  My: number; // vuelco sobre obra-y (= MZ fem)
+  Mv: number; // torsor sobre el eje vertical (= MY fem)
+}
+
+export function mapearReaccionAObra(
+  rxnFem: readonly number[],
+): ReaccionObra {
+  const [FX = 0, FY = 0, FZ = 0, MX = 0, MY = 0, MZ = 0] = rxnFem;
+  return { V: FY, Hx: FX, Hy: FZ, Mx: MX, My: MZ, Mv: MY };
+}
+
 // Clave determinista de un punto para snapping. Cuantiza cada coordenada a la
 // rejilla de TOL_NODO (round(c/tol)) y la usa como clave de igualdad. Dos puntos
 // dentro de una celda comparten clave => mismo nudo. La clave es estable e
@@ -43,4 +72,22 @@ export function clavePosicion(
     return r === 0 ? 0 : r;
   };
   return `${q(x)}|${q(y)}|${q(z)}`;
+}
+
+// [AUDITORIA M-4] Igualdad de nudo EN PLANTA con el criterio REAL del snapping
+// (clave de rejilla), para UI/comandos. Antes comandosModelo/imanViga/
+// colocacionVigaLogica replicaban el predicado con DISTANCIA EUCLIDEA < TOL_NODO,
+// que diverge de la clave en la frontera de celda (dos puntos a <TOL en celdas
+// distintas NO colapsan en el FEM; a >TOL en la misma celda SI): la UI podia
+// creer "unido" lo que el solver separa (mecanismo silencioso) o viceversa. Este
+// helper es el UNICO predicado valido de "mismo nudo" fuera del discretizador.
+// La cota es irrelevante para la igualdad en planta (se compara a cota 0).
+export function mismaPosicionEnPlanta(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): boolean {
+  return (
+    clavePosicion(mapearEjes(a.x, a.y, 0), TOL_NODO) ===
+    clavePosicion(mapearEjes(b.x, b.y, 0), TOL_NODO)
+  );
 }

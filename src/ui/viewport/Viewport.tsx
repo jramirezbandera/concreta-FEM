@@ -18,6 +18,7 @@ import { Boton } from "../primitivas/Boton";
 import { hexToken } from "./colores";
 import { Escena } from "./Escena";
 import { Hud } from "./Hud";
+import { CotaVivaOverlay } from "./CotaVivaOverlay";
 import { ProveedorHud, type ContenedoresHud, type ZonaHud } from "./Slot";
 
 // Las 8 bandas-zona de la capa HUD (flex-column). El orden no importa: cada zona se
@@ -176,6 +177,10 @@ export function Viewport({ sceneOverlays, hudOverlays, className }: ViewportProp
         <Hud />
         {hudOverlays}
       </CapaHud>
+      {/* Cota viva de la banda elastica (D8a): etiqueta HTML junto al cursor durante el
+          tendido de viga/paño. Se posiciona por ref (cotaBus + rAF), fuera de la rejilla
+          de zonas del HUD; pointer-events:none (no estorba a la colocacion). */}
+      <CotaVivaOverlay />
       {obraVacia && <EstadoVacio />}
       {modoVista === "mosaico" && <MosaicoPlaceholder />}
     </div>

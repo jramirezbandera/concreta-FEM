@@ -15,9 +15,26 @@ export { StatusBar } from "./StatusBar";
 export type { StatusBarProps } from "./StatusBar";
 export { BottomTabs } from "./BottomTabs";
 
+// [D14 · PR3] Envoltorio de sección colapsable del dock (cablea el colapso a DockUIState).
+export { DockSeccion } from "./DockSeccion";
+export type { DockSeccionProps } from "./DockSeccion";
+
 export { MENUS_POR_PESTANA } from "./menus";
 export type { MenuDef } from "./menus";
+
+// D2 · Exportar/Importar del menú Archivo: ArchivoIO monta la UI de importación (file
+// picker, confirmación, aviso). Lo monta App una vez, como los diálogos.
+export { ArchivoIO } from "./ArchivoIO";
+export type { ArchivoIOProps } from "./ArchivoIO";
 
 // Arranque de persistencia (feature-15): rehidrata y autosalva Modelo + plantillas
 // del proyecto activo. Lo invoca App una vez al montar.
 export { useArranquePersistencia } from "./useArranquePersistencia";
+
+// Atajos de teclado globales (auditoria UX-A3/UX-A5): Ctrl+Z/Y undo/redo, F3/F4
+// captura/plantillas. Lo monta App una vez.
+export { useAtajosGlobales } from "./useAtajosGlobales";
+export type {
+  EstadoArranquePersistencia,
+  ArranquePersistencia,
+} from "./useArranquePersistencia";

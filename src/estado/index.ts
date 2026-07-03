@@ -12,7 +12,11 @@ export type {
   DialogoActivo,
   MagnitudDiagrama,
   MagnitudIsovalores,
+  OverlayResultados,
+  DockUIState,
 } from "./vistaStore";
+// [D14 · PR3] Clave compuesta pestaña:sección del colapso del dock.
+export { claveSeccionDock } from "./vistaStore";
 export type {
   Herramienta,
   DefaultsPilar,
@@ -53,6 +57,7 @@ export {
   eliminarPilar,
   moverPilar,
   moverNudo,
+  crearSeccion,
   crearViga,
   editarViga,
   eliminarViga,
@@ -82,4 +87,5 @@ export type {
   DatosPlanta,
   DatosCarga,
   DatosHipotesis,
+  DatosSeccion,
 } from "./comandos/comandosModelo";

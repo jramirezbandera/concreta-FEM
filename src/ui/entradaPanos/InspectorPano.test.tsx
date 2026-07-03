@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InspectorPano } from "./InspectorPano";
-import { modeloStore, seleccionStore } from "../../estado";
+import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import { crearModeloVacio } from "../../dominio";
 import type { Modelo } from "../../dominio";
 import { listarMateriales } from "../../biblioteca";
@@ -56,6 +56,11 @@ function modeloConPano(): Modelo {
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   seleccionStore.getState().limpiar();
+  // El estado vacio (UX-C6) del paño solo aparece en Isovalores (su editor principal;
+  // en la pestana de vigas acompaña a la viga y no muestra estado vacio) con la
+  // herramienta "seleccion". Fijamos ese contexto explicitamente.
+  vistaStore.getState().setPestanaActiva("isovalores");
+  vistaStore.getState().setHerramienta("seleccion");
 });
 
 const modelo = () => modeloStore.getState().getModelo();
@@ -68,15 +73,39 @@ function renderConPanoSeleccionado() {
 }
 
 describe("InspectorPano: visibilidad", () => {
-  it("no se renderiza sin seleccion", () => {
+  it("sin seleccion (en Isovalores) muestra el estado vacio que guia a seleccionar (UX-C6)", () => {
     modeloStore.getState().cargarModelo(modeloConPano());
-    const { container } = render(<InspectorPano />);
-    expect(container.querySelector(".cx-inspector-pano")).toBeNull();
+    render(<InspectorPano />);
+    expect(screen.getByText("Propiedades")).toBeInTheDocument();
+    expect(
+      screen.getByText("Selecciona un paño para editar sus propiedades."),
+    ).toBeInTheDocument();
   });
 
-  it("no se renderiza si el id seleccionado no es un paño", () => {
+  it("con seleccion multiple guia a editar de uno en uno (UX-C6)", () => {
+    modeloStore.getState().cargarModelo(modeloConPano());
+    seleccionStore.getState().seleccionar(["F-1", "otro"]);
+    render(<InspectorPano />);
+    expect(
+      screen.getByText("2 elementos seleccionados. Edítalos de uno en uno."),
+    ).toBeInTheDocument();
+  });
+
+  it("con id seleccionado que no es un paño, muestra el estado vacio (no editor)", () => {
     modeloStore.getState().cargarModelo(modeloConPano());
     seleccionStore.getState().seleccionar(["no-existe"]);
+    render(<InspectorPano />);
+    expect(
+      screen.getByText("Selecciona un paño para editar sus propiedades."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Paño /)).toBeNull();
+  });
+
+  it("no muestra estado vacio en la pestana de vigas (alli acompaña a la viga)", () => {
+    // El paño se monta tambien en la pestana de vigas, pero alli el editor principal es
+    // la viga: el estado vacio del paño se replegaria a null para no apilar dos guias.
+    modeloStore.getState().cargarModelo(modeloConPano());
+    vistaStore.getState().setPestanaActiva("entradaVigas");
     const { container } = render(<InspectorPano />);
     expect(container.querySelector(".cx-inspector-pano")).toBeNull();
   });
@@ -85,6 +114,13 @@ describe("InspectorPano: visibilidad", () => {
     renderConPanoSeleccionado();
     expect(screen.getByText("Paño F1")).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Apoyo de borde del paño" })).toBeInTheDocument();
+  });
+
+  it("UX-C9: comunica que la losa se calcula aislada (no transfiere carga al portico)", () => {
+    renderConPanoSeleccionado();
+    expect(
+      screen.getByText(/su carga no se transmite a pilares ni vigas/i),
+    ).toBeInTheDocument();
   });
 });
 
@@ -120,6 +156,13 @@ describe("InspectorPano: commit en vivo", () => {
 });
 
 describe("InspectorPano: carga superficial", () => {
+  it("UX-E3: comunica el sentido de la carga (positivo = hacia abajo)", () => {
+    renderConPanoSeleccionado();
+    expect(
+      screen.getByText(/Valor en positivo: la carga actúa hacia abajo/i),
+    ).toBeInTheDocument();
+  });
+
   it("añadir una carga superficial (kN/m²) la crea sobre el paño", async () => {
     const user = userEvent.setup();
     renderConPanoSeleccionado();
@@ -134,6 +177,61 @@ describe("InspectorPano: carga superficial", () => {
     expect(cargas).toHaveLength(1);
     expect(cargas[0]!.tipo).toBe("superficial");
     expect(cargas[0]!.valor).toBe(5);
+  });
+
+  it("D17: editar el VALOR de una carga superficial existente inline es reversible", async () => {
+    const user = userEvent.setup();
+    const m = modeloConPano();
+    m.cargas.push({
+      id: "cs1",
+      tipo: "superficial",
+      ambito: "F-1",
+      valor: 5,
+      hipotesisId: "hip-cargas-muertas",
+    });
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+
+    // El campo de valor de la FILA (no el de "Añadir carga") lleva su propio aria-label.
+    const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
+    const valorFila = within(lista).getByLabelText("Valor de la carga superficial");
+    await user.clear(valorFila);
+    await user.type(valorFila, "9");
+    await user.tab();
+
+    const cargas = () => modelo().cargas.filter((c) => c.ambito === "F-1");
+    expect(cargas()[0]!.valor).toBe(9);
+    expect(cargas()[0]!.id).toBe("cs1"); // editada, no borrada+creada
+
+    modeloStore.getState().deshacer();
+    expect(cargas()[0]!.valor).toBe(5);
+  });
+
+  it("D17: un valor invalido (0) en la fila de carga superficial NO comitea", async () => {
+    const user = userEvent.setup();
+    const m = modeloConPano();
+    m.cargas.push({
+      id: "cs1",
+      tipo: "superficial",
+      ambito: "F-1",
+      valor: 5,
+      hipotesisId: "hip-cargas-muertas",
+    });
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+
+    const lista = document.querySelector(".cx-cargas__lista") as HTMLElement;
+    const valorFila = within(lista).getByLabelText("Valor de la carga superficial");
+    await user.clear(valorFila);
+    await user.type(valorFila, "0");
+    await user.tab();
+
+    expect(modelo().cargas.find((c) => c.id === "cs1")!.valor).toBe(5);
+    expect(
+      within(lista).getByText(/El valor de la carga debe ser mayor que cero/),
+    ).toBeInTheDocument();
   });
 });
 
@@ -169,5 +267,14 @@ describe("InspectorPano: borrado", () => {
     expect(modelo().panos).toHaveLength(0);
     expect(modelo().cargas).toHaveLength(0);
     expect(seleccionStore.getState().seleccion).toEqual([]);
+  });
+});
+
+describe("InspectorPano: dimensiones (D8b)", () => {
+  it("muestra las dimensiones ancho × alto en m (solo lectura)", () => {
+    // El fixture tiene un rectangulo 0..4 (X) × 0..3 (Y): 4.00 × 3.00 m.
+    renderConPanoSeleccionado();
+    expect(screen.getByText("Dimensiones")).toBeInTheDocument();
+    expect(screen.getByText("4.00 × 3.00 m")).toBeInTheDocument();
   });
 });

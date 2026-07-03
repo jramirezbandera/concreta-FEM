@@ -2,7 +2,7 @@
 // id) y actua sobre un ambito (id del elemento al que se aplica). El reparto y la
 // direccion FEM son responsabilidad del discretizador (feature-4).
 import { z } from "zod";
-import { IdSchema, NombreSchema } from "./comunes";
+import { IdSchema, NombreSchema, NumeroFinitoSchema } from "./comunes";
 
 // `automatica`: marca la hipotesis generada por el sistema (no por el usuario). En
 // F2a la unica automatica es `hip-peso-propio` (peso propio, sembrada con
@@ -22,7 +22,7 @@ export const CargaSchema = z.object({
   id: IdSchema,
   tipo: z.enum(["puntual", "lineal", "superficial"]),
   ambito: IdSchema,
-  valor: z.number(),
+  valor: NumeroFinitoSchema, // [A-3] finito: un Infinity seria carga basura en el FEM
   hipotesisId: IdSchema,
 });
 export type Carga = z.infer<typeof CargaSchema>;

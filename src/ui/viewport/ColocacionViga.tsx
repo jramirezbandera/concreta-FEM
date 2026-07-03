@@ -58,6 +58,9 @@ import { plantaColocableViga } from "./tramoViga";
 // Logica pura del flujo de dos clics en su propio modulo (este fichero solo
 // exporta componentes -> react-refresh/only-export-components).
 import { posicionExtremo, procesarClicViga } from "./colocacionVigaLogica";
+import { debeIgnorarEscColocacion } from "./escColocacion";
+import { emitirCota, limpiarCota } from "./hooks/cotaBus";
+import { cotaBanda } from "./formateo";
 
 // Semibrazo de la cruz / medio lado del cuadrado del marcador (m). Z (sobre la cota)
 // ligeramente elevado para no z-fightear con la rejilla y la propia viga.
@@ -254,13 +257,22 @@ function ColocacionActiva() {
 
     moverCursor(pos.x, pos.y, z);
 
-    // Si hay extremo I pendiente, estira la linea elastica desde el (I) hasta aqui.
+    // Si hay extremo I pendiente, estira la linea elastica desde el (I) hasta aqui y
+    // EMITE la cota viva (longitud + angulo) por cotaBus (D8a): la etiqueta HTML junto al
+    // cursor la materializa CotaVivaOverlay. Si no hay I, no hay banda -> nada que rotular.
     const i = pendienteI.current;
     if (i !== null) {
       const posI = posicionExtremo(modelo, i);
       if (posI !== null) {
         estirarLinea(posI.x, posI.y, pos.x, pos.y, z);
         if (refLinea.current) refLinea.current.visible = true;
+        // Cota en el mismo move (sin setState): texto formateado + pixeles del cursor
+        // relativos al canvas (== al contenedor del viewport; el overlay vive en el HUD).
+        emitirCota({
+          texto: cotaBanda(pos.x - posI.x, pos.y - posI.y),
+          px: e.nativeEvent.offsetX,
+          py: e.nativeEvent.offsetY,
+        });
       }
     }
     invalidate();
@@ -336,6 +348,7 @@ function ColocacionActiva() {
     // Reset del ciclo: lista para la siguiente viga (la herramienta sigue activa).
     pendienteI.current = null;
     ocultarAnclaYLinea();
+    limpiarCota(); // banda fijada -> se retira la etiqueta viva (D8a)
     invalidate();
   };
 
@@ -346,12 +359,18 @@ function ColocacionActiva() {
   }, []);
 
   // Esc: si hay extremo I pendiente, lo cancela (sin salir); si no, sale a seleccion.
+  // UX-C11: coordina con los dialogos (ver debeIgnorarEscColocacion): ignora el Esc si
+  // otro handler ya lo consumio (defaultPrevented) o si hay un dialogo abierto
+  // (dialogoActivo), para no cancelar el extremo pendiente ni salir de la herramienta.
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key !== "Escape") return;
+      if (debeIgnorarEscColocacion(ev.defaultPrevented, vistaStore.getState().dialogoActivo))
+        return;
       if (pendienteI.current !== null) {
         pendienteI.current = null;
         ocultarAnclaYLinea();
+        limpiarCota(); // Esc cancela la banda -> retira la etiqueta viva (D8a)
         invalidate();
         return;
       }
@@ -360,6 +379,11 @@ function ColocacionActiva() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Al desmontar la herramienta (cambio de modo/vista), retira cualquier cota viva
+  // colgada (D8a): si el usuario sale de "viga" con un extremo I pendiente, la etiqueta
+  // no debe quedar visible.
+  useEffect(() => () => limpiarCota(), []);
 
   return (
     <group>

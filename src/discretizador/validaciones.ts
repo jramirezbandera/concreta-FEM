@@ -36,7 +36,31 @@ export type ErrorObra = {
   mensaje: string; // espanol con tildes, SIN jerga FEM (es texto de UI)
   elementoId?: string; // id del Pilar/Viga/Nudo/Carga/Pano/... culpable
   elementoTipo?: "pilar" | "viga" | "nudo" | "carga" | "pano" | "hipotesis" | "planta" | "modelo";
+  // [D22a] Coordenadas de OBRA (no FEM: x=Este, y=Norte en m, ejes del plano de planta)
+  // del elemento culpable, cuando aportan navegabilidad. Hoy solo lo rellena FLOTANTE
+  // (posicion del nudo suelto): el reporte puede mostrar "en (4.00, 3.00)" y la UI puede
+  // encuadrar ahi. OPCIONAL: la inmensa mayoria de errores no la necesita (el elementoId
+  // basta para navegar). NUNCA son coordenadas de nudo FEM.
+  posicion?: { x: number; y: number };
 };
+
+// Nombre de obra del elemento sobre el que actua una carga, SOLO si resuelve a una viga,
+// pilar o paño del modelo (los ambitos de F1). Si el ambito no resuelve (elemento
+// borrado, nudo, id desconocido) devuelve null y el llamador cae al mensaje generico:
+// asi el mensaje enriquecido nunca miente ("la carga sobre la viga V3…") ni inventa un
+// nombre. Lenguaje de obra; sin jerga FEM.
+function nombreDeAmbito(
+  modelo: Modelo,
+  ambito: string,
+): { etiqueta: string; nombre: string } | null {
+  const viga = modelo.vigas.find((v) => v.id === ambito);
+  if (viga !== undefined) return { etiqueta: "la viga", nombre: viga.nombre };
+  const pilar = modelo.pilares.find((p) => p.id === ambito);
+  if (pilar !== undefined) return { etiqueta: "el pilar", nombre: pilar.nombre };
+  const pano = modelo.panos.find((pa) => pa.id === ambito);
+  if (pano !== undefined) return { etiqueta: "el paño", nombre: pano.nombre };
+  return null;
+}
 
 // Resuelve si la seccion referenciada por `seccionId` existe y es construible.
 //
@@ -92,6 +116,69 @@ function validarNombresUnicos(modelo: Modelo, errores: ErrorObra[]): void {
   comprobarNombresUnicos(errores, modelo.plantas, "planta", "planta");
   // Grupos tambien se nombran; un grupo duplicado confunde el arbol de obra.
   comprobarNombresUnicos(errores, modelo.grupos, "modelo", "grupo");
+}
+
+// 1b. [AUDITORIA M-1] IDS unicos por coleccion. El borde Zod valida solo forma
+// (delega la integridad aqui) y TODOS los lookups del dominio son `.find()`
+// (primer match): dos elementos con el mismo id hacen que el segundo se IGNORE en
+// silencio (p.ej. dos nudos con el mismo id y posiciones distintas -> la viga usa
+// el primero -> geometria erronea con ok:true). Los comandos de la UI generan ids
+// unicos (nuevoId), asi que esta red protege el borde de import/persistencia.
+// BLOQUEA: un proyecto con ids duplicados esta dañado y no debe calcular.
+function comprobarIdsUnicos(
+  errores: ErrorObra[],
+  elementos: ReadonlyArray<{ id: string }>,
+  tipo: ErrorObra["elementoTipo"],
+  etiqueta: string, // "punto", "planta", "carga"... para el mensaje de obra
+): void {
+  const vistos = new Set<string>();
+  for (const el of elementos) {
+    if (vistos.has(el.id)) {
+      errores.push({
+        codigo: "ID_DUP",
+        severidad: "error",
+        mensaje: `Hay más de un ${etiqueta} con el mismo identificador interno: el proyecto está dañado. Vuelve a importarlo o elimina el elemento repetido.`,
+        elementoId: el.id,
+        elementoTipo: tipo,
+      });
+    }
+    vistos.add(el.id);
+  }
+}
+
+function validarIdsUnicos(modelo: Modelo, errores: ErrorObra[]): void {
+  comprobarIdsUnicos(errores, modelo.grupos, "modelo", "grupo");
+  comprobarIdsUnicos(errores, modelo.plantas, "planta", "planta");
+  comprobarIdsUnicos(errores, modelo.secciones, "modelo", "sección");
+  comprobarIdsUnicos(errores, modelo.nudos, "modelo", "punto");
+  comprobarIdsUnicos(errores, modelo.pilares, "pilar", "pilar");
+  comprobarIdsUnicos(errores, modelo.vigas, "viga", "viga");
+  comprobarIdsUnicos(errores, modelo.panos, "pano", "paño");
+  comprobarIdsUnicos(errores, modelo.cargas, "carga", "carga");
+  comprobarIdsUnicos(errores, modelo.hipotesis, "hipotesis", "hipótesis");
+}
+
+// 1c. [AUDITORIA M-3] Pilar DEGENERADO (longitud ~0): plantaInicial === plantaFinal
+// o dos plantas a la misma cota. El troceo por cotas no emite NINGUNA barra para el
+// pilar, pero su support de arranque SI se emitia: un apoyo fantasma sin barra que
+// ademas contaba como sujecion valida (haySujecionPilar). Simetrico de
+// VIGA_DEGENERADA. Se comparan las COTAS (no los ids): dos plantas distintas a la
+// misma cota tambien degeneran. Umbral TOL_NODO, el criterio geometrico unico.
+function validarPilaresDegenerados(modelo: Modelo, errores: ErrorObra[]): void {
+  for (const p of modelo.pilares) {
+    const pi = plantaPorId(modelo, p.plantaInicial);
+    const pf = plantaPorId(modelo, p.plantaFinal);
+    if (pi === undefined || pf === undefined) continue; // REF_PLANTA ya bloquea
+    if (Math.abs(pf.cota - pi.cota) <= TOL_NODO) {
+      errores.push({
+        codigo: "PILAR_DEGENERADO",
+        severidad: "error",
+        mensaje: `El pilar "${p.nombre}" arranca y termina a la misma altura: no tiene longitud. Revisa sus plantas inicial y final.`,
+        elementoId: p.id,
+        elementoTipo: "pilar",
+      });
+    }
+  }
 }
 
 // 2a. Referencias de un Pilar: material, seccion, plantas.
@@ -256,6 +343,22 @@ function validarRefsPano(pano: Pano, modelo: Modelo, errores: ErrorObra[]): void
     });
   }
 
+  // [AUDITORIA M-5] Losa con TODOS los bordes libres: en el corte 1 los paños son
+  // AISLADOS (sin acople al portico), asi que sin apoyo de borde no hay sujecion
+  // vertical POSIBLE y el motor siempre lanza inestable (verificado con el motor
+  // real; el mensaje crudo de PyNite es jerga tecnica). Se bloquea AQUI en lenguaje
+  // de obra. Cuando exista el acople malla<->portico (T-f3-pano-acople) este bloqueo
+  // debera relajarse para losas apoyadas en vigas.
+  if (pano.bordeApoyo === "libre") {
+    errores.push({
+      codigo: "PANO_SIN_APOYO",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" tiene todos los bordes libres: sin apoyo no se sostiene. Elige borde apoyado o empotrado.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+
   // Perimetro: corte 1 = rectangulo de 4 nudos PROPIOS existentes. El schema admite
   // >=3 (un poligono generico futuro); aqui se exige exactamente 4 para la losa.
   if (pano.perimetro.length !== 4) {
@@ -317,6 +420,12 @@ function validarRefsCarga(
   errores: ErrorObra[],
   ambitosValidos: ReadonlySet<string>,
 ): void {
+  // [D22a] Nombra el ámbito de la carga SOLO si resuelve a un elemento del modelo:
+  // "la carga sobre la viga V3…". Si no resuelve (elemento borrado, etc.) se cae al
+  // mensaje genérico actual (nunca inventa un nombre). Para REF_AMBITO el ámbito por
+  // definición NO existe, así que `ambito` será null y el mensaje queda genérico.
+  const ambito = nombreDeAmbito(modelo, c.ambito);
+  const sufijoAmbito = ambito ? ` sobre ${ambito.etiqueta} "${ambito.nombre}"` : "";
   if (!ambitosValidos.has(c.ambito)) {
     errores.push({
       codigo: "REF_AMBITO",
@@ -330,7 +439,7 @@ function validarRefsCarga(
     errores.push({
       codigo: "REF_HIPOTESIS",
       severidad: "error",
-      mensaje: `Una carga pertenece a una hipótesis que no existe.`,
+      mensaje: `Una carga${sufijoAmbito} pertenece a una hipótesis que no existe.`,
       elementoId: c.id,
       elementoTipo: "carga",
     });
@@ -346,7 +455,7 @@ function validarRefsCarga(
     errores.push({
       codigo: "CARGA_EN_AUTOMATICA",
       severidad: "error",
-      mensaje: `Una carga está asignada a la hipótesis de peso propio, que el sistema calcula automáticamente. Asígnala a otra hipótesis.`,
+      mensaje: `Una carga${sufijoAmbito} está asignada a la hipótesis de peso propio, que el sistema calcula automáticamente. Asígnala a otra hipótesis.`,
       elementoId: c.id,
       elementoTipo: "carga",
     });
@@ -393,6 +502,28 @@ function validarReferencias(modelo: Modelo, errores: ErrorObra[]): void {
   for (const pano of modelo.panos) ambitosValidos.add(pano.id);
 
   for (const c of modelo.cargas) validarRefsCarga(c, modelo, errores, ambitosValidos);
+}
+
+// 2e. [AUDITORIA UX-VACIA] Obra vacia: sin NINGUN elemento estructural (pilares, vigas
+// ni paños) no hay nada que calcular. `validarSujecion` hace early-return con obra vacia
+// (un modelo vacio es un punto de partida valido, no un error de sujecion), asi que el
+// calculo procederia hasta el motor y devolveria "resultados" vacios sin aviso. Esta
+// guarda BLOQUEA antes, en lenguaje de obra, para que "Calcular" con la obra vacia guie
+// al arquitecto en vez de fallar en silencio. Error de MODELO (no de un elemento).
+function validarObraVacia(modelo: Modelo, errores: ErrorObra[]): void {
+  if (
+    modelo.pilares.length === 0 &&
+    modelo.vigas.length === 0 &&
+    modelo.panos.length === 0
+  ) {
+    errores.push({
+      codigo: "OBRA_VACIA",
+      severidad: "error",
+      mensaje:
+        "La obra está vacía: introduce pilares o vigas antes de calcular.",
+      elementoTipo: "modelo",
+    });
+  }
 }
 
 // 3. Sujecion suficiente (6 GDL de solido rigido) ANTES del solver.
@@ -502,9 +633,13 @@ function validarNudosFlotantes(modelo: Modelo, errores: ErrorObra[]): void {
       errores.push({
         codigo: "FLOTANTE",
         severidad: "aviso", // no impide calcular: solo ensucia el modelo
-        mensaje: `Hay un punto en la obra que no conecta con ninguna viga.`,
+        // [D22a] Mensaje NAVEGABLE: nombra la posicion de obra del punto suelto para que
+        // el usuario lo localice ("Hay un punto en (4.00, 3.00)…"). La `posicion` va
+        // ademas estructurada para que la UI pueda encuadrar/mostrar la coordenada.
+        mensaje: `Hay un punto en (${n.x.toFixed(2)}, ${n.y.toFixed(2)}) que no conecta con ninguna viga.`,
         elementoId: n.id,
         elementoTipo: "nudo",
+        posicion: { x: n.x, y: n.y },
       });
     }
   }
@@ -565,8 +700,11 @@ function validarModalConMasa(modelo: Modelo, errores: ErrorObra[]): void {
 export function validarModelo(modelo: Modelo, modal?: ContextoModal): ErrorObra[] {
   const errores: ErrorObra[] = [];
   validarNombresUnicos(modelo, errores);
+  validarIdsUnicos(modelo, errores); // [M-1] ids duplicados = proyecto dañado
+  validarPilaresDegenerados(modelo, errores); // [M-3] pilar de longitud 0
   validarReferencias(modelo, errores);
   validarHipotesisPesoPropio(modelo, errores); // E1: guard de desincronizacion
+  validarObraVacia(modelo, errores); // UX-VACIA: sin elementos no hay nada que calcular
   validarSujecion(modelo, errores);
   validarHipotesisConCargas(modelo, errores);
   validarVariablesConcomitantes(modelo, errores);

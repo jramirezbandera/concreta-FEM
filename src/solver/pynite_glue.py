@@ -920,7 +920,7 @@ def serialize_results_modal(m):
     # (mecanismo interno / GDL sin masa): error de obra, no una salida vacia muda.
     if not modos:
         raise MotorInestableModal(
-            "No se pudo calcular ningun modo de vibracion valido: revise apoyos, "
+            "No se pudo calcular ningún modo de vibración válido: revise apoyos, "
             "rigidez y masa del modelo."
         )
 
@@ -1156,15 +1156,25 @@ def calcular_cr(payload, plantas_info):
                 cr_por_planta[planta_id] = {"x": None, "y": None}
                 continue
 
-            # CIMENTACION (FIX #2): una planta cuyos nudos estan TODOS totalmente
-            # empotrados en el base (los 6 GDL True) NO es un forjado-diafragma, es el
-            # nivel de cimentacion (los PIES de pilar, que `nodoFEMAPlanta` etiqueta a
-            # la planta mas baja). Imponer un diafragma ahi no tiene sentido fisico (no
-            # se desplaza: ya esta coartado en todo) y, tras el FIX #1, daria un CR
-            # ESPURIO con cond bajo (un punto fijo) en vez de un forjado. Lo marcamos
-            # null "no determinable" SIN analizar. La decision se confirmo empiricamente
-            # con el motor real (ver el golden de integracion prepararModeloCR->calcularCR).
-            if all(apoyos_base.get(n) == (True, True, True, True, True, True) for n in nodos):
+            # CIMENTACION (FIX #2, ampliado por AUDITORIA A-2): una planta cuyos nudos
+            # tienen TODOS las traslaciones del plano del diafragma (DX y DZ) ya
+            # restringidas en el base NO es un forjado-diafragma: es el nivel de
+            # cimentacion (los PIES de pilar, que `nodoFEMAPlanta` etiqueta a la planta
+            # mas baja), sea el arranque EMPOTRADO (6 GDL True) o ARTICULADO
+            # (DX,DY,DZ True / RX,RY,RZ False). Imponer el diafragma sobre nudos ya
+            # DX/DZ-fijos no produce rigidez fisica: las reacciones incrementales son
+            # ~0 y K queda dominada por RUIDO de redondeo con cond BAJO (pasa el umbral
+            # COND_MAX_CR) y diagonales no nulas -> un CR FINITO Y ESPURIO presentado
+            # como valido (reproducido con el motor real: la firma anterior, que solo
+            # reconocia los 6 True, dejaba pasar el arranque articulado). Se marca null
+            # "no determinable" SIN analizar. Un forjado REAL nunca casa este criterio:
+            # sus cabezas de pilar estan libres en DX/DZ (lo blindan los golden de
+            # integracion: planta elevada sigue determinable).
+            _SIN_APOYO = (False, False, False, False, False, False)
+            if all(
+                apoyos_base.get(n, _SIN_APOYO)[0] and apoyos_base.get(n, _SIN_APOYO)[2]
+                for n in nodos
+            ):
                 cr_por_planta[planta_id] = {"x": None, "y": None}
                 continue
 
@@ -1274,8 +1284,8 @@ def calcular(payload, n_points=N_POINTS_DEFAULT):
             "ok": False,
             "error": {
                 "mensaje": (
-                    "El modelo no tiene masa para calcular sus modos de vibracion: "
-                    "active el peso propio o anada cargas permanentes."
+                    "El modelo no tiene masa para calcular sus modos de vibración: "
+                    "active el peso propio o añada cargas permanentes."
                 ),
                 "detalle": "Modal: " + (str(e) or e.__class__.__name__)
                 + "\n" + traceback.format_exc(),

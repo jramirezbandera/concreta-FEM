@@ -5,7 +5,7 @@
 // El overlay R3F no se testea aqui (jsdom no hace WebGL): su geometria pura ya tiene
 // tests (modeloCalculoGeometria/Buffers).
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ModeloCalculo } from "./ModeloCalculo";
 import { modeloStore, vistaStore, resultadosStore } from "../../estado";
@@ -47,10 +47,15 @@ beforeEach(() => {
 });
 
 describe("ModeloCalculo: visibilidad", () => {
-  it("no se renderiza fuera de 3D (en planta)", () => {
+  // [D11/K-2] Fuera de la vista 3D el control NO desaparece del dock: se muestra
+  // DESHABILITADO con una nota corta (antes hacia return null).
+  it("fuera de 3D (en planta) muestra el control DESHABILITADO con nota", () => {
     vistaStore.getState().setModoVista("planta");
     render(<ModeloCalculo />);
-    expect(screen.queryByText("Ver modelo de cálculo")).toBeNull();
+    expect(screen.getByText("Ver modelo de cálculo")).toBeInTheDocument();
+    const toggle = screen.getByRole("checkbox", { name: "Ver modelo de cálculo" });
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText("Disponible en la vista 3D.")).toBeInTheDocument();
   });
 
   it("en 3D muestra el control con el toggle apagado por defecto", () => {
@@ -94,6 +99,26 @@ describe("ModeloCalculo: panel", () => {
     expect(screen.getByText("Apoyos")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText(/Vista simplificada/)).toBeInTheDocument();
+  });
+
+  it("[UX-K1] con el panel abierto muestra la mini-leyenda de glifos (lenguaje de obra)", async () => {
+    const user = userEvent.setup();
+    resultadosStore.getState().setResultados(
+      {} as unknown as ResultadosCalculo,
+      FEM_3_2_1,
+      {} as unknown as Trazabilidad,
+    );
+    render(<ModeloCalculo />);
+    await user.click(screen.getByRole("checkbox", { name: "Ver modelo de cálculo" }));
+
+    const leyenda = screen.getByRole("list", {
+      name: /leyenda de símbolos del modelo de cálculo/i,
+    });
+    // Los 4 significados en lenguaje de obra (sin jerga FEM cruda tipo "release"/"support").
+    expect(within(leyenda).getByText("Arranque empotrado")).toBeInTheDocument();
+    expect(within(leyenda).getByText("Arranque articulado")).toBeInTheDocument();
+    expect(within(leyenda).getByText("Otro apoyo")).toBeInTheDocument();
+    expect(within(leyenda).getByText("Extremo articulado")).toBeInTheDocument();
   });
 
   it("con toggle ON y obra no calculable muestra el motivo (no parece roto)", async () => {

@@ -6,6 +6,7 @@ import {
   clavePosicion,
   releasesDeExtremo,
 } from "./discretizar";
+import { mismaPosicionEnPlanta } from "./geometria";
 import { ModeloFEMSchema } from "./contratoFEM";
 import { type Modelo } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
@@ -76,6 +77,23 @@ describe("helpers puros", () => {
   it("mapearEjes (#18 Y vertical): planta (x,y) + cota -> [x, cota, y]", () => {
     expect(mapearEjes(2, 5, 0)).toEqual([2, 0, 5]);
     expect(mapearEjes(2, 5, 3)).toEqual([2, 3, 5]);
+  });
+
+  it("mismaPosicionEnPlanta usa la CLAVE de rejilla, no distancia euclidea ([M-4])", () => {
+    // Frontera de celda: dos puntos a 0.02 mm (<< TOL) pero en CELDAS distintas
+    // (0.00049 -> celda 0; 0.00051 -> celda 1). El euclideo los fusionaria; el
+    // criterio real del snapping NO. UI y solver deben decidir IGUAL: si esto
+    // divergiera, la UI podria creer "unido" lo que el FEM separa (mecanismo).
+    expect(
+      mismaPosicionEnPlanta({ x: 0.00049, y: 0 }, { x: 0.00051, y: 0 }),
+    ).toBe(false);
+    // Misma celda aunque euclideo > TOL en diagonal (0.85 mm en x e y: 1.2 mm de
+    // distancia): el snapping los colapsa -> la UI debe tratarlos como el mismo.
+    expect(
+      mismaPosicionEnPlanta({ x: 0.0008, y: 0.0008 }, { x: 0.0012, y: 0.0012 }),
+    ).toBe(true);
+    // Caso comun: coordenadas identicas -> mismo nudo.
+    expect(mismaPosicionEnPlanta({ x: 2.5, y: 7 }, { x: 2.5, y: 7 })).toBe(true);
   });
 
   it("clavePosicion cuantiza a la rejilla de TOL_NODO (snapping determinista)", () => {
@@ -298,10 +316,13 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
     m.secciones[0] = { id: SECCION, nombre: "30x50", tipo: "hormigonRectangular", b: 0.3, h: 0.5 };
     const fem = discretizarOk(m);
     const sec = fem.sections.find((s) => s.name === SECCION)!;
-    // A = 0.3*0.5 = 0.15 m²; Iy = b·h³/12 = 0.3·0.125/12 = 0.003125 m⁴.
+    // A = 0.3*0.5 = 0.15 m². [AUDITORIA C-1, convenio uniforme]: la Capa 2 emite
+    // Iy/Iz INTERCAMBIADOS respecto al catalogo (seccionFEMParaPyNite): el eje
+    // FUERTE (b·h³/12, catalogo Iy) aterriza en el campo Iz de PyNite (que gobierna
+    // la flexion vertical de la viga y la flexion en X del pilar con angulo=0).
     expect(sec.A).toBeCloseTo(0.15, 9);
-    expect(sec.Iy).toBeCloseTo((0.3 * 0.5 ** 3) / 12, 9);
-    expect(sec.Iz).toBeCloseTo((0.5 * 0.3 ** 3) / 12, 9);
+    expect(sec.Iz).toBeCloseTo((0.3 * 0.5 ** 3) / 12, 9); // fuerte -> campo Iz
+    expect(sec.Iy).toBeCloseTo((0.5 * 0.3 ** 3) / 12, 9); // debil  -> campo Iy
   });
 
   describe("DETERMINISMO byte a byte (CLAUDE.md §2)", () => {
@@ -518,6 +539,39 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       });
       expect(apoyosEnPie).toHaveLength(1);
     });
+
+    // [AUDITORIA A-1] La carga lineal del usuario sobre un PILAR PASANTE es del
+    // ELEMENTO entero: debe emitirse en TODOS sus tramos (espejo del peso propio,
+    // Paso 6b). Antes solo el tramo del pie la recibia (`barraPorAmbito` mapea el
+    // primer tramo): un pilar de 2 plantas con w=10 kN/m recibia 30 kN en vez de
+    // 60, y ademas mal ubicados — esfuerzos MENORES que los reales presentados
+    // como validos, sin error ni aviso (check_statics no lo caza: las cargas
+    // aplicadas son autoconsistentes, solo que son menos de las pedidas).
+    it("AUDITORIA A-1: carga lineal sobre pilar pasante llega a TODOS los tramos", () => {
+      const m = modeloPortico();
+      // p0(0) - p1(3) - p2(6); el pilar pasa de p0 a p2 (2 tramos).
+      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+      m.pilares[0].plantaFinal = "p2";
+      // La unica carga: lineal de 10 kN/m sobre EL PILAR (no la viga).
+      m.cargas = [{ id: "c1", tipo: "lineal", ambito: "pil1", valor: 10, hipotesisId: "h1" }];
+      const fem = discretizarOk(m);
+
+      // El pilar son 2 tramos verticales (la viga de p1 es la 3a barra).
+      const coordY = new Map(fem.nodes.map((n) => [n.name, n.y] as const));
+      const tramosPilar = fem.members
+        .filter((mm) => coordY.get(mm.i) !== coordY.get(mm.j))
+        .map((mm) => mm.name);
+      expect(tramosPilar).toHaveLength(2);
+
+      // La carga de usuario (case h1) debe cubrir AMBOS tramos con w=-10 (FY, #3).
+      const cargasPilar = fem.dist_loads.filter((dl) => dl.case === "h1");
+      expect(cargasPilar.map((dl) => dl.member).sort()).toEqual([...tramosPilar].sort());
+      for (const dl of cargasPilar) {
+        expect(dl.direction).toBe("FY");
+        expect(dl.w1).toBe(-10);
+        expect(dl.w2).toBe(-10);
+      }
+    });
   });
 
   // --- Peso propio automatico (F2a, A-core paso 4 + E1/E3/E4) ------------------
@@ -729,17 +783,20 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       expect(empotrados.length).toBeGreaterThan(0);
     });
 
-    it("bordeApoyo 'libre' -> sin apoyos de borde, PERO estabilizacion en el plano (DX/DZ)", () => {
-      // Una losa "libre" sola NO esta sujeta verticalmente (validarSujecion lo bloquea),
-      // asi que se anade un pilar que la sujeta y se comprueba que el paño no aporta DY.
+    it("bordeApoyo 'libre' -> BLOQUEA con PANO_SIN_APOYO ([AUDITORIA M-5])", () => {
+      // ANTES este test verificaba la traduccion de 'libre' (sin DY de borde +
+      // estabilizacion DX/DZ). La auditoria M-5 comprobo con el MOTOR REAL que una
+      // losa 'libre' AISLADA (corte 1: sin acople al portico) es SIEMPRE inestable
+      // (PyNite lanza con mensaje tecnico): ahora se bloquea antes, en lenguaje de
+      // obra. La traduccion de 'libre' (sin DY + estabilizacion) sigue en el codigo
+      // para el acople futuro (T-f3-pano-acople); al relajar este bloqueo, recuperar
+      // el assert original.
       const m = modeloConLosa({ bordeApoyo: "libre" });
-      const fem = discretizarOk(m);
-      const apoyosMalla = fem.supports.filter((s) => s.node.startsWith("PQ0-N"));
-      // Sin apoyo de borde => ningun nudo de malla restringe DY (la flecha).
-      expect(apoyosMalla.every((s) => !s.DY)).toBe(true);
-      // Pero SI hay estabilizacion en el plano (DX/DZ) para no quedar singular en X-Z.
-      const conPlano = apoyosMalla.filter((s) => s.DX || s.DZ);
-      expect(conPlano.length).toBeGreaterThan(0);
+      const res = discretizar(m);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errores.map((e) => e.codigo)).toContain("PANO_SIN_APOYO");
+      }
     });
 
     it("estabilizacion en el plano: SIEMPRE presente (DX/DZ en 2 nudos de borde)", () => {

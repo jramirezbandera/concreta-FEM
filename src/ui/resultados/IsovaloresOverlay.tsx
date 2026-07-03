@@ -29,6 +29,7 @@ interface Entradas {
   modeloFEM: ModeloFEM | null;
   trazabilidad: Trazabilidad | null;
   resultados: ResultadosCalculo | null;
+  vigente: boolean;
   combo: string | null;
   magnitud: MagnitudIsovalores;
   // La losa se introduce en planta, pero la malla coloreada se aprecia mejor en planta
@@ -46,6 +47,7 @@ function leerEntradas(): Entradas {
     modeloFEM: r.modeloFEM,
     trazabilidad: r.trazabilidad,
     resultados: r.resultados,
+    vigente: r.vigente,
     combo: v.combinacionActiva,
     magnitud: v.magnitudIsovalores,
     modoVista: v.modoVista,
@@ -58,6 +60,7 @@ function getSnapshot(): Entradas {
     a.modeloFEM === c.modeloFEM &&
     a.trazabilidad === c.trazabilidad &&
     a.resultados === c.resultados &&
+    a.vigente === c.vigente &&
     a.combo === c.combo &&
     a.magnitud === c.magnitud &&
     a.modoVista === c.modoVista
@@ -71,6 +74,7 @@ function suscribir(cb: () => void): () => void {
   const offM = resultadosStore.subscribe((s) => s.modeloFEM, cb);
   const offT = resultadosStore.subscribe((s) => s.trazabilidad, cb);
   const offR = resultadosStore.subscribe((s) => s.resultados, cb);
+  const offV = resultadosStore.subscribe((s) => s.vigente, cb);
   const offCombo = vistaStore.subscribe((s) => s.combinacionActiva, cb);
   const offMag = vistaStore.subscribe((s) => s.magnitudIsovalores, cb);
   const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
@@ -78,6 +82,7 @@ function suscribir(cb: () => void): () => void {
     offM();
     offT();
     offR();
+    offV();
     offCombo();
     offMag();
     offModo();
@@ -100,6 +105,7 @@ export function IsovaloresOverlay() {
         resultados: entradas.resultados,
         combo: entradas.combo,
         magnitud: entradas.magnitud,
+        vigente: entradas.vigente,
       }),
     [entradas],
   );

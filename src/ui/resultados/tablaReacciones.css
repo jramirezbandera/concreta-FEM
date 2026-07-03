@@ -4,11 +4,16 @@
    abajo-derecha del lienzo de Resultados; el llamante (App.tsx, Tarea 3.1) puede
    sobrescribir con otra clase. Solo tokens. */
 
+/* Ancho del panel en GLASS (sobre el lienzo). En el DOCK lo sobreescribe
+   `.cx-dock .cx-dock-sec { width:100% }` (PR2): la tabla llena el ancho del dock y, si
+   sus 7 columnas no caben, scrollea HORIZONTAL dentro de .cx-reacciones__scroll (no del
+   dock entero). */
 .cx-reacciones {
   width: 380px;
 }
 
-.cx-reacciones .cx-float__body {
+.cx-reacciones .cx-float__body,
+.cx-reacciones .cx-dock-sec__body {
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 8px);
@@ -35,13 +40,18 @@
   color: var(--warning);
 }
 
-/* Scroll vertical acotado: con muchos apoyos la tabla no desborda el lienzo. */
+/* [D14 · PR3] Scroll de la tabla: SOLO HORIZONTAL (7 columnas en un dock estrecho). El
+   scroll VERTICAL interno se ELIMINA — el dock tiene un único scroll vertical (anatomía C):
+   duplicarlo aquí generaba un scroll anidado. El horizontal se queda: vive AQUI, en la
+   sección de la tabla, no en el dock (que nunca scrollea en horizontal). */
 .cx-reacciones__scroll {
-  max-height: 280px;
-  overflow-y: auto;
+  overflow-x: auto;
 }
 
 .cx-reacciones__tabla {
+  /* min-width: la tabla no se comprime por debajo de lo legible; si no cabe, su wrapper
+     (__scroll) la scrollea en horizontal. En glass (panel 380px) cabe holgada. */
+  min-width: max-content;
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
@@ -119,4 +129,14 @@
   font-size: 10px;
   color: var(--text-3);
   font-weight: 400;
+}
+
+/* Nota al pie explicando el "—" de los momentos de la losa (UX-H8). */
+.cx-reacciones__pie-nota {
+  text-align: left;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--text-3);
+  font-weight: 400;
+  padding-top: 4px;
 }

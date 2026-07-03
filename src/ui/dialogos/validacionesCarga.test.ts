@@ -63,18 +63,18 @@ describe("validarCarga", () => {
 
   it("valor cero da error de valor", () => {
     const errores = validarCarga(modeloBase(), null, datosOK({ valor: 0 }));
-    expect(errores).toContainEqual({
-      campo: "valor",
-      mensaje: "El valor de la carga debe ser mayor que cero.",
-    });
+    const err = errores.find((e) => e.campo === "valor");
+    expect(err).toBeDefined();
+    expect(err!.mensaje).toContain("debe ser mayor que cero");
   });
 
   it("valor negativo da error de valor (en F1 el sentido lo fija el discretizador)", () => {
     const errores = validarCarga(modeloBase(), null, datosOK({ valor: -5 }));
-    expect(errores).toContainEqual({
-      campo: "valor",
-      mensaje: "El valor de la carga debe ser mayor que cero.",
-    });
+    const err = errores.find((e) => e.campo === "valor");
+    expect(err).toBeDefined();
+    expect(err!.mensaje).toContain("debe ser mayor que cero");
+    // UX-E3: el mensaje comunica ademas el sentido convenido (positivo = hacia abajo).
+    expect(err!.mensaje).toContain("hacia abajo");
   });
 
   it("valor no finito (NaN) da error de valor", () => {

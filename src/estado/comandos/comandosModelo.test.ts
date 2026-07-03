@@ -28,8 +28,9 @@ import {
   editarHipotesis,
   eliminarHipotesis,
   editarAnalisis,
+  crearSeccion,
 } from "../index";
-import type { DatosViga, DatosPano } from "./comandosModelo";
+import type { DatosViga, DatosPano, DatosSeccion } from "./comandosModelo";
 import { crearModeloVacio } from "../../dominio";
 import type { CategoriaUso } from "../../dominio";
 import type {
@@ -458,12 +459,16 @@ const datosVigaBase = {
 };
 
 describe("crearViga", () => {
-  it("reusa un nudo existente cuando el extremo cae a < TOL_NODO (no crea nudo)", () => {
+  it("reusa un nudo existente cuando el extremo cae en su MISMA celda de rejilla ([M-4])", () => {
     modeloStore.getState().cargarModelo(modeloConVigas());
-    // Extremo I a 0.5 mm del nudo n1 (0,0): dentro de TOL_NODO (1 mm) => reusa n1.
+    // Extremo I a 0.4 mm del nudo n1 (0,0): MISMA celda de rejilla (round(0.4)=0)
+    // => reusa n1. [AUDITORIA M-4] El criterio es la CLAVE de rejilla del
+    // discretizador (mismaPosicionEnPlanta), no distancia euclidea: el valor
+    // anterior del test (0.5 mm) caia en la celda VECINA (round(0.5)=1) — el FEM
+    // lo habria separado de n1 pese a que el euclideo lo llamaba "el mismo".
     const datos: DatosViga = {
       ...datosVigaBase,
-      i: { x: 0.0005, y: 0 },
+      i: { x: 0.0004, y: 0 },
       j: { x: 5, y: 0 },
     };
     modeloStore.getState().ejecutar(crearViga(m(), datos));
@@ -1142,5 +1147,63 @@ describe("editarAnalisis (comando reversible)", () => {
     // debe lanzar y el flag debe quedar no-vigente (idempotente sin resultados).
     modeloStore.getState().ejecutar(editarAnalisis(m(), { incluirPesoPropio: false }));
     expect(m().analisis.incluirPesoPropio).toBe(false);
+  });
+});
+
+// --- crearSeccion: seccion de obra a medida (auditoria UI/UX D3) -------------
+
+describe("crearSeccion", () => {
+  it("crea una seccion de obra rectangular con id OPACO y nombre legible", () => {
+    const datos: DatosSeccion = {
+      clase: "rectangular",
+      nombre: "HA 30×30",
+      b: 0.3,
+      h: 0.3,
+    };
+    // crearModeloVacio ya siembra 2 secciones default; medimos el delta.
+    const previas = m().secciones.length;
+    modeloStore.getState().ejecutar(crearSeccion(m(), datos));
+    expect(m().secciones).toHaveLength(previas + 1);
+    const creada = m().secciones[m().secciones.length - 1];
+    expect(creada.nombre).toBe("HA 30×30");
+    expect(creada.tipo).toBe("hormigonRectangular");
+    // Id OPACO (UUID), NO semantico tipo "HR-300x500": no ensombrece el catalogo.
+    expect(creada.id).toMatch(/[0-9a-f-]{36}/);
+    expect(creada.id).not.toMatch(/HR-|HC-|IPE|HEB/);
+  });
+
+  it("persiste SOLO dimensiones (b/h), nunca A/Iy/Iz", () => {
+    modeloStore.getState().ejecutar(
+      crearSeccion(m(), { clase: "rectangular", nombre: "S", b: 0.4, h: 0.6 }),
+    );
+    const creada = m().secciones[m().secciones.length - 1];
+    expect(creada).toMatchObject({ tipo: "hormigonRectangular", b: 0.4, h: 0.6 });
+    // No debe llevar propiedades de calculo derivadas.
+    expect("A" in creada).toBe(false);
+    expect("Iy" in creada).toBe(false);
+    expect("Iz" in creada).toBe(false);
+  });
+
+  it("crea una seccion circular con diametro d", () => {
+    modeloStore.getState().ejecutar(
+      crearSeccion(m(), { clase: "circular", nombre: "HA Ø40", d: 0.4 }),
+    );
+    const creada = m().secciones[m().secciones.length - 1];
+    expect(creada.tipo).toBe("hormigonCircular");
+    expect(creada).toMatchObject({ d: 0.4 });
+  });
+
+  it("es reversible: deshacer quita la seccion, rehacer la restaura (mismo id)", () => {
+    const previas = m().secciones.length;
+    modeloStore.getState().ejecutar(
+      crearSeccion(m(), { clase: "rectangular", nombre: "S", b: 0.3, h: 0.3 }),
+    );
+    const idCreado = m().secciones[m().secciones.length - 1].id;
+    modeloStore.getState().deshacer();
+    expect(m().secciones).toHaveLength(previas);
+    modeloStore.getState().rehacer();
+    expect(m().secciones).toHaveLength(previas + 1);
+    // El id se reutiliza en redo (delta, no snapshot).
+    expect(m().secciones[m().secciones.length - 1].id).toBe(idCreado);
   });
 });

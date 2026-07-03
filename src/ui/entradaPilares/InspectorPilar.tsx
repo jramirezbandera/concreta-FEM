@@ -17,11 +17,13 @@ import {
 import {
   modeloStore,
   seleccionStore,
+  vistaStore,
   editarPilar,
   eliminarPilar,
 } from "../../estado";
 import type { Modelo, Pilar } from "../../dominio";
 import { cargasDeAmbito } from "../../dominio";
+import { esCombinacionIncoherentePorId, mensajeCoherencia } from "../../biblioteca";
 import "./inspectorPilar.css";
 
 // InspectorPilar (feature-11, Tarea 3.2): panel flotante sobre el lienzo que edita
@@ -102,6 +104,21 @@ function SelectPlanta({ etiqueta, plantas, valor, onCambio }: SelectPlantaProps)
   );
 }
 
+// Estado vacio del inspector (auditoria UX-C6): en la pestana de pilares con la
+// herramienta "seleccion" activa y sin un pilar seleccionado, el dock mostraba solo
+// "Ayudas" y nada guiaba a que seleccionar un pilar abre su editor. En vez de
+// desaparecer (return null), el inspector rinde una seccion de estado vacio en el
+// mismo cromo plano del dock (patron de PanelDiagramas). Se muestra SOLO con
+// herramienta "seleccion": con una herramienta de colocacion el panel-herramienta ya
+// ocupa el dock y el estado vacio seria ruido.
+function EstadoVacioPilar({ mensaje }: { mensaje: string }) {
+  return (
+    <PanelFlotante className="cx-inspector-pilar" titulo="Propiedades">
+      <p className="cx-inspector-vacio">{mensaje}</p>
+    </PanelFlotante>
+  );
+}
+
 export function InspectorPilar() {
   // Lectura reactiva: la seleccion y el modelo. El inspector NO esta en el bucle
   // del viewport; un re-render al seleccionar/editar es aceptable (#11: lo que no
@@ -109,6 +126,13 @@ export function InspectorPilar() {
   const seleccion = seleccionStore((s) => s.seleccion);
   const pilares = modeloStore((s) => s.modelo.pilares);
   const plantas = modeloStore((s) => s.modelo.plantas);
+  // Secciones de obra: para el aviso de coherencia D15 (resolver la familia de la
+  // seccion del pilar, sea de obra o un perfil de catalogo por id).
+  const secciones = modeloStore((s) => s.modelo.secciones);
+  // Contexto de UI para decidir el estado vacio: solo en la pestana de pilares y con
+  // la herramienta de seleccion (una herramienta de colocacion tiene su propio panel).
+  const pestanaActiva = vistaStore((s) => s.pestanaActiva);
+  const herramienta = vistaStore((s) => s.herramienta);
 
   // Errores de validacion campo a campo. Se actualizan en cada commit; NO bloquean
   // el teclear (el estado local de cada input es libre).
@@ -131,8 +155,20 @@ export function InspectorPilar() {
     setErrores([]);
   }, [pilarId]);
 
-  // 0 o >1 seleccionados, o el id no es un pilar del modelo: no se renderiza.
-  if (!pilar) return null;
+  // Sin un pilar aplicable (0 seleccionados, multiseleccion, o id no-pilar): el
+  // inspector no edita nada. En la pestana de pilares con herramienta "seleccion"
+  // muestra un estado vacio que guia (UX-C6); en cualquier otro contexto (otra
+  // herramienta u otra pestana) se repliega a null para no ensuciar el dock.
+  if (!pilar) {
+    if (pestanaActiva === "entradaPilares" && herramienta === "seleccion") {
+      const mensaje =
+        seleccion.length > 1
+          ? `${seleccion.length} elementos seleccionados. Edítalos de uno en uno.`
+          : "Selecciona un pilar para editar sus propiedades.";
+      return <EstadoVacioPilar mensaje={mensaje} />;
+    }
+    return null;
+  }
 
   // Commit generico de un campo. Construye los DatosPilarUI con el parche, valida,
   // refleja SOLO los errores de los campos tocados y despacha si pasan. No-op si el
@@ -185,6 +221,12 @@ export function InspectorPilar() {
     });
   };
 
+  // D15: aviso NO bloqueante si la seccion (perfil metalico / hormigon) no casa con
+  // la familia del material (acero / hormigon). Puro; mensaje en lenguaje de obra.
+  const avisoCoherencia = mensajeCoherencia(
+    esCombinacionIncoherentePorId(pilar.seccionId, pilar.materialId, secciones),
+  );
+
   return (
     <>
       <PanelFlotante
@@ -229,6 +271,14 @@ export function InspectorPilar() {
           <div className="cx-campo__error" role="alert">
             {errorDe(errores, "materialId")}
           </div>
+        ) : null}
+
+        {/* D15: aviso de mezcla incoherente seccion<->material. NO bloquea la
+            edicion; solo advierte (--warning, role=status). */}
+        {avisoCoherencia ? (
+          <p className="cx-aviso-coherencia" role="status">
+            {avisoCoherencia}
+          </p>
         ) : null}
 
         <CampoNumero

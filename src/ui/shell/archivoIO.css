@@ -1,0 +1,22 @@
+/* Estilos de la UI de Importar (D2). Solo tokens; el diálogo lo aporta Dialogo. */
+
+.cx-archivo-io__texto {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.cx-archivo-io__error {
+  color: var(--danger, #b42318);
+}
+
+.cx-archivo-io__error p {
+  margin: 0 0 0.5rem;
+}
+
+.cx-archivo-io__errores {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+  line-height: 1.5;
+}

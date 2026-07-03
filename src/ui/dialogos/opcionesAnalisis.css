@@ -66,3 +66,37 @@
 .cx-opc__check-titulo {
   line-height: 1.3;
 }
+
+/* --- D18: vista previa SOLO-LECTURA de las combinaciones --- */
+/* Lista discreta: nombre legible + formula mono. No es un control (sin foco, sin
+   accion); informa de como se pondera G y Q antes de calcular. Solo tokens. */
+.cx-opc__combos {
+  margin: 0;
+  padding: 8px 10px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-muted);
+}
+.cx-opc__combo {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.cx-opc__combo-nombre {
+  color: var(--text);
+}
+.cx-opc__combo-sep {
+  color: var(--text-3);
+}
+.cx-opc__combo-formula {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}

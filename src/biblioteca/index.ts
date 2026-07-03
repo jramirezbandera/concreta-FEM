@@ -42,6 +42,40 @@ export { ACEROS } from "./aceros";
 export { HORMIGONES, derivarEcm, seccionRectangular, seccionCircular } from "./hormigon";
 export { PERFILES, IPE, HEB } from "./perfiles";
 
+// --- Defaults y plantillas de hormigon (auditoria UI/UX D3+D4) ---------------
+// Material por defecto (HA-25), presets de dimensiones (b×h/Ø en mm) y las
+// secciones de obra por defecto por elemento (pilar 30×30, viga 30×50). PLANTILLAS,
+// no catalogo: se materializan como secciones de OBRA con id opaco (ver defaults.ts).
+export {
+  DEFAULT_MATERIAL_ID,
+  PRESETS_PILAR,
+  PRESETS_VIGA,
+  PRESETS_HORMIGON,
+  DEFAULT_SECCION_PILAR,
+  DEFAULT_SECCION_VIGA,
+} from "./defaults";
+export type {
+  PresetHormigon,
+  PresetRectangular,
+  PresetCircular,
+  DefaultSeccion,
+} from "./defaults";
+
+// --- Coherencia seccion <-> material (auditoria UI/UX D15) -------------------
+// Aviso NO bloqueante cuando la seccion (perfil metalico / hormigon) no casa con la
+// familia del material (acero / hormigon). Helper puro + redaccion del mensaje.
+export {
+  esCombinacionIncoherente,
+  esCombinacionIncoherentePorId,
+  mensajeCoherencia,
+} from "./coherencia";
+export type { ResultadoCoherencia } from "./coherencia";
+
+// --- Resolucion de la seccion de obra por defecto (auditoria UI/UX D4+D5) -----
+// Los paneles-herramienta resuelven su seccion default contra las secciones de OBRA
+// del modelo (hormigon sembrado), no contra el catalogo (perfiles). Ver resolverDefaults.ts.
+export { resolverSeccionDefault } from "./resolverDefaults";
+
 // --- Catalogo combinado de materiales -----------------------------------------
 // Union de todos los materiales del catalogo. El tipo es `EntradaMaterial[]`
 // (union discriminada por `tipo`), de modo que el consumidor distingue hormigon

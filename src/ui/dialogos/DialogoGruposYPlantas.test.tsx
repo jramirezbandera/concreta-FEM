@@ -356,6 +356,118 @@ describe("DialogoGruposYPlantas: categoria de uso -> sobrecarga (qk CTE)", () =>
   });
 });
 
+describe("DialogoGruposYPlantas: notas de honestidad (UX-D1/D2)", () => {
+  it("UX-D1: avisa de que sobrecarga/cargas muertas aún no se aplican al cálculo", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+    expect(
+      within(dialogo).getByText(/Estos valores aún no se aplican al cálculo/i),
+    ).toBeInTheDocument();
+  });
+
+  it("UX-D2: muestra bajo la categoría el qk normativo que fija (CTE DB-SE-AE)", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+    // Grupo por defecto = categoria A -> qk 2,0 kN/m² (coma decimal es-ES).
+    expect(
+      within(dialogo).getByText(/La categoría A fija 2,0 kN\/m² \(CTE DB-SE-AE\)/),
+    ).toBeInTheDocument();
+  });
+
+  it("UX-C8: Escape en un campo de texto revierte lo tecleado sin commit", async () => {
+    // NOTA: Radix Dialog intercepta Escape en la fase de CAPTURA sobre `document`,
+    // antes de que el handler (bubble) del campo pueda pararlo; por eso el dialogo
+    // puede cerrarse igualmente (comportamiento estandar). Lo que SI garantiza este
+    // fix, y es lo que protege al usuario, es que el valor tecleado NO se commitea al
+    // revertir con Esc (antes el blur commiteaba). La coordinacion con la herramienta
+    // de introduccion la cubre ademas el guard `dialogoActivo` de UX-C11.
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+    const nombreOriginal = grupos()[0].nombre;
+
+    const detalle = dialogo.querySelector(".cx-gyp__detalle") as HTMLElement;
+    const inputNombre = within(detalle).getByLabelText(/Nombre/);
+    await user.clear(inputNombre);
+    await user.type(inputNombre, "Descartado");
+    await user.keyboard("{Escape}");
+
+    // El nombre NO cambió: Esc revierte lo tecleado, sin commit.
+    expect(grupos()[0].nombre).toBe(nombreOriginal);
+  });
+
+  it("UX-C8: Enter en un campo de texto confirma (commit del valor tecleado)", async () => {
+    const user = userEvent.setup();
+    const dialogo = renderAbierto();
+    await user.click(within(dialogo).getByRole("button", { name: "Nuevo grupo" }));
+
+    const detalle = dialogo.querySelector(".cx-gyp__detalle") as HTMLElement;
+    const inputNombre = within(detalle).getByLabelText(/Nombre/);
+    await user.clear(inputNombre);
+    await user.type(inputNombre, "Forjado 1");
+    await user.keyboard("{Enter}");
+
+    expect(grupos()[0].nombre).toBe("Forjado 1");
+  });
+});
+
+describe("DialogoGruposYPlantas: D16 coherencia cotas/alturas", () => {
+  // Carga un modelo con UN grupo y sus plantas, deja el grupo activo y abre el dialogo.
+  // Asi controlamos las cotas/alturas exactas sin conducir campos numericos (estable).
+  function renderConPlantas(
+    plantas: { id: string; nombre: string; cota: number; altura: number }[],
+  ) {
+    const m = crearModeloVacio();
+    m.grupos.push({
+      id: "g1",
+      nombre: "G1",
+      categoriaUso: "A",
+      sobrecargaUso: 2,
+      cargasMuertas: 1,
+    });
+    for (const p of plantas) m.plantas.push({ ...p, grupoId: "g1" });
+    modeloStore.getState().cargarModelo(m);
+    vistaStore.getState().setGrupoActivo("g1");
+    vistaStore.getState().abrirDialogo("gruposPlantas");
+    render(<DialogoGruposYPlantas />);
+    return screen.getByRole("dialog");
+  }
+
+  it("plantas coherentes (cabeza_i == arranque_i+1): NO muestra ningun aviso", () => {
+    const dialogo = renderConPlantas([
+      { id: "p1", nombre: "Planta 1", cota: 0, altura: 3 },
+      { id: "p2", nombre: "Planta 2", cota: 3, altura: 3 },
+    ]);
+    expect(within(dialogo).queryByText(/revisa cotas y alturas/)).toBeNull();
+    expect(dialogo.querySelector(".cx-gyp__avisos-cotas")).toBeNull();
+  });
+
+  it("hueco entre plantas: muestra un aviso NO bloqueante (role=status) con el texto de obra", () => {
+    const dialogo = renderConPlantas([
+      { id: "p1", nombre: "Planta 1", cota: 0, altura: 3 },
+      { id: "p2", nombre: "Planta 2", cota: 4, altura: 3 },
+    ]);
+    const aviso = within(dialogo).getByText(
+      'La planta "Planta 1" termina a +3.00 m pero "Planta 2" arranca a +4.00 m: revisa cotas y alturas.',
+    );
+    expect(aviso).toBeInTheDocument();
+    // Contenedor role=status (aviso, no error): el borrado/edicion sigue disponible.
+    const status = within(dialogo).getByRole("status");
+    expect(status).toContainElement(aviso);
+  });
+
+  it("un solo aviso POR PAR: dos huecos consecutivos -> dos avisos", () => {
+    const dialogo = renderConPlantas([
+      { id: "p1", nombre: "Planta 1", cota: 0, altura: 3 },
+      { id: "p2", nombre: "Planta 2", cota: 4, altura: 3 },
+      { id: "p3", nombre: "Planta 3", cota: 8, altura: 3 },
+    ]);
+    expect(within(dialogo).getAllByText(/revisa cotas y alturas/)).toHaveLength(2);
+  });
+});
+
 describe("DialogoGruposYPlantas: undo", () => {
   it("deshacer revierte la creacion de un grupo", async () => {
     const user = userEvent.setup();

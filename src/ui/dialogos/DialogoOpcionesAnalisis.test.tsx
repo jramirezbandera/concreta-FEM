@@ -150,6 +150,36 @@ describe("DialogoOpcionesAnalisis: D-diseño-3 (check_statics bajo P-Δ)", () =>
   });
 });
 
+describe("DialogoOpcionesAnalisis: D18 vista previa de combinaciones", () => {
+  it("muestra la seccion 'Combinaciones que se generarán' con ELU y ELS", () => {
+    const dialogo = renderAbierto();
+    expect(
+      within(dialogo).getByText("Combinaciones que se generarán"),
+    ).toBeInTheDocument();
+    // Etiquetas largas legibles (no jerga).
+    expect(within(dialogo).getByText("E.L.U. (resistencia)")).toBeInTheDocument();
+    expect(within(dialogo).getByText("E.L.S. (servicio)")).toBeInTheDocument();
+  });
+
+  it("las formulas salen de las hipotesis reales (modelo vacio: 1,35·G + 1,50·Q / 1,00·G + 1,00·Q)", () => {
+    const dialogo = renderAbierto();
+    // Coeficientes derivados de generarCombos (biblioteca gamma), NO escritos en la UI.
+    expect(within(dialogo).getByText("1,35·G + 1,50·Q")).toBeInTheDocument();
+    expect(within(dialogo).getByText("1,00·G + 1,00·Q")).toBeInTheDocument();
+  });
+
+  it("refleja el modelo real: sin hipotesis variables, ELU no muestra termino Q", () => {
+    // Modelo con solo permanentes: la vista previa NO inventa una Q.
+    const m = crearModeloVacio();
+    m.hipotesis = m.hipotesis.filter((h) => h.tipo === "permanente");
+    modeloStore.getState().cargarModelo(m);
+    const dialogo = renderAbierto();
+    expect(within(dialogo).getByText("1,35·G")).toBeInTheDocument();
+    // No debe existir la formula con Q del modelo vacio.
+    expect(within(dialogo).queryByText("1,35·G + 1,50·Q")).toBeNull();
+  });
+});
+
 describe("DialogoOpcionesAnalisis: undo/redo", () => {
   it("deshacer revierte el cambio de tipo", async () => {
     const user = userEvent.setup();

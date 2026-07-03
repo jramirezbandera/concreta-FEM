@@ -137,11 +137,14 @@ describe("extremosCoinciden", () => {
   it("nudoId vs coords sin modelo se tratan como distintos", () => {
     expect(extremosCoinciden({ nudoId: "n1" }, { x: 1, y: 2 })).toBe(false);
   });
-  it("con modelo, nudoId y coords del mismo punto (a <TOL_NODO) coinciden", () => {
+  it("con modelo, nudoId y coords en la MISMA celda de rejilla coinciden ([M-4])", () => {
     const m = modeloCon({ nudos: [nudo("n1", 3, 7)] });
     expect(extremosCoinciden({ nudoId: "n1" }, { x: 3, y: 7 }, m)).toBe(true);
-    // 0.5 mm < TOL_NODO (1 mm): mismo punto fisico.
-    expect(extremosCoinciden({ nudoId: "n1" }, { x: 3.0005, y: 7 }, m)).toBe(true);
+    // 0.4 mm: misma celda de rejilla (round(3000.4)=3000) => mismo nudo FEM.
+    // [AUDITORIA M-4] El criterio es la CLAVE de rejilla del discretizador; el
+    // valor anterior (3.0005) caia en la celda vecina (round(3000.5)=3001): el
+    // FEM lo separaba pese a que el euclideo del test lo llamaba "el mismo".
+    expect(extremosCoinciden({ nudoId: "n1" }, { x: 3.0004, y: 7 }, m)).toBe(true);
   });
   it("con modelo, nudoId y coords de puntos distintos no coinciden", () => {
     const m = modeloCon({ nudos: [nudo("n1", 3, 7)] });

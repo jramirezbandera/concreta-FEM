@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialogo } from "./Dialogo";
 import {
   validarGrupo,
@@ -6,7 +6,8 @@ import {
   esValido,
   type ErrorCampo,
 } from "./validacionesDialogo";
-import { Campo, CampoNumero, SelectUso, Boton } from "../primitivas";
+import { Campo, CampoNumero, SelectUso, Boton, formatearQk } from "../primitivas";
+import { detectarIncoherenciasCotas } from "./coherenciaCotas";
 import {
   modeloStore,
   vistaStore,
@@ -68,13 +69,38 @@ function CampoTexto({ etiqueta, valor, onCommit, error }: CampoTextoProps) {
   useEffect(() => {
     setLocal(valor);
   }, [valor]);
+  // UX-C8: bandera para que el blur que dispara Escape NO commitee (mismo motivo que
+  // en CampoNumero: al hacer blur() se dispararia onBlur con el `local` aun sin
+  // resincronizar). Escape revierte sin guardar.
+  const revirtiendo = useRef(false);
   return (
     <Campo
       etiqueta={etiqueta}
       value={local}
       error={error}
       onChange={(e) => setLocal(e.target.value)}
-      onBlur={() => onCommit(local)}
+      onBlur={() => {
+        if (revirtiendo.current) {
+          revirtiendo.current = false;
+          return;
+        }
+        onCommit(local);
+      }}
+      // UX-C8: mismo contrato de teclado que CampoNumero. Enter -> blur (commit en
+      // onBlur). Escape -> descarta lo tecleado (resincroniza con el valor del
+      // modelo) y hace blur SIN commit; detiene la propagacion para que ESE Esc no
+      // cierre el dialogo (Radix cierra con Escape en el contenido).
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          revirtiendo.current = true;
+          setLocal(valor);
+          e.preventDefault();
+          e.stopPropagation();
+          e.currentTarget.blur();
+        }
+      }}
     />
   );
 }
@@ -365,6 +391,16 @@ export function DialogoGruposYPlantas() {
         .sort((a, b) => b.cota - a.cota)
     : [];
 
+  // UX-D3 (D16): avisos NO bloqueantes de incoherencia cota/altura entre plantas
+  // consecutivas del grupo activo (hueco o solape: cota_i + altura_i != cota de la
+  // siguiente). El helper es puro y ordena por cota ascendente por su cuenta; le
+  // pasamos las plantas del grupo (el orden de entrada es indiferente). Informativo,
+  // no impide editar ni calcular: cotas y alturas son campos independientes a
+  // proposito (retranqueos, dobles alturas).
+  const avisosCotas = grupoActivo
+    ? detectarIncoherenciasCotas(plantasGrupo)
+    : [];
+
   const pie = (
     <Boton variante="ghost" onClick={cerrarDialogo}>
       Cerrar
@@ -441,6 +477,15 @@ export function DialogoGruposYPlantas() {
                     valor={grupoActivo.categoriaUso}
                     onCambio={editarCategoria}
                   />
+                  {/* UX-D2: nota contextual bajo el selector. Cambiar la categoria
+                      reasigna la sobrecarga al qk normativo (editarCategoria): sin
+                      esta linea el override se hacia en silencio. No cambia el
+                      comportamiento de sincronizacion, solo lo hace visible. */}
+                  <p className="cx-note">
+                    La categoría {grupoActivo.categoriaUso} fija{" "}
+                    {formatearQk(categoriaUso(grupoActivo.categoriaUso).qk)} kN/m² (CTE
+                    DB-SE-AE).
+                  </p>
                 </div>
                 <CampoNumero
                   etiqueta="Sobrecarga de uso"
@@ -456,6 +501,15 @@ export function DialogoGruposYPlantas() {
                   onCommit={(v) => editarNumeroGrupo("cargasMuertas", v)}
                   error={errorDe(erroresGrupo, "cargasMuertas")}
                 />
+                {/* UX-D1: honestidad. En F1 el discretizador NO convierte estos dos
+                    valores del grupo en cargas (deuda de feature-13): se usaran al
+                    repartir los paños sobre las vigas en F3. Sin esta nota, el usuario
+                    creeria que influyen en el calculo y no lo hacen. */}
+                <p className="cx-note cx-gyp__campo-ancho">
+                  Estos valores aún no se aplican al cálculo: se usarán al repartir los
+                  paños sobre las vigas (fase 3). Las cargas que introduzcas en vigas y
+                  paños sí se calculan.
+                </p>
               </div>
 
               {/* --- Plantas del grupo --- */}
@@ -524,6 +578,19 @@ export function DialogoGruposYPlantas() {
                   })
                 )}
               </div>
+
+              {/* UX-D3 (D16): avisos de coherencia cota/altura. NO bloqueantes
+                  (role=status, --warning): informan de huecos/solapes entre plantas
+                  consecutivas sin impedir editar ni calcular. Uno por par incoherente. */}
+              {avisosCotas.length > 0 ? (
+                <div className="cx-gyp__avisos-cotas" role="status">
+                  {avisosCotas.map((a) => (
+                    <p key={a.plantaInferiorId} className="cx-gyp__aviso-cota">
+                      {a.mensaje}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
 
               {/* Eliminar el grupo activo (al pie del detalle). */}
               <div>

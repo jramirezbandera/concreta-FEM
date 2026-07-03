@@ -54,6 +54,7 @@ import {
   resolverSeccionFEMPorId,
   propiedadesDePilar,
   propiedadesDeViga,
+  seccionFEMParaPyNite,
 } from "./propiedadesBarra";
 export { resolverSeccion };
 
@@ -95,7 +96,8 @@ export type DiscretizarOpts = {
 // y los tests). validaciones.ts las toma de ./geometria para evitar el ciclo
 // discretizar<->validaciones. Se importan ademas para uso interno (snapping).
 import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
-export { TOL_NODO, mapearEjes, clavePosicion };
+export { TOL_NODO, mapearEjes, clavePosicion, mapearReaccionAObra } from "./geometria";
+export type { ReaccionObra } from "./geometria";
 
 // Releases canonicos (#8) en el orden EXACTO de def_releases:
 // [Dxi,Dyi,Dzi,Rxi,Ryi,Rzi, Dxj,Dyj,Dzj,Rxj,Ryj,Rzj].
@@ -181,6 +183,15 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
   const avisosBase: ErrorObra[] = [];
 
   // --- Paso 1: materiales y secciones usados (dedup por id, mapeo directo) ----
+  // [AUDITORIA C-1] TODA seccion se emite con Iy/Iz INTERCAMBIADOS
+  // (`seccionFEMParaPyNite`): PyNite gobierna la flexion del plano local x-y con el
+  // campo Iz (12·E·Iz/L³), asi que el eje FUERTE del catalogo (Iy) debe aterrizar
+  // ahi. Para la VIGA (local y = vertical) eso es la flexion vertical (sin el
+  // intercambio se calculaba "acostada": flecha (h/b)² veces mayor); para el PILAR
+  // (local y = X global) es la flexion en X, que por DECISION de convencion
+  // (usuario, 2026-07-02) resiste el eje fuerte con angulo=0 (`angulo` gira la
+  // seccion). Intercambio UNIFORME => una sola seccion por id, en este unico punto
+  // de emision. Ver propiedadesBarra.ts [C-1].
   const materialIds = new Set<string>();
   const seccionIds = new Set<string>();
   for (const p of modelo.pilares) {
@@ -203,10 +214,10 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
     .sort()
     .map((id) => {
       // Resuelve por id desde la obra O el catalogo de perfiles (misma regla que las
-      // validaciones de UI): un perfil de catalogo referenciado por id es valido.
+      // validaciones de UI); el intercambio Iy/Iz a convenio PyNite ocurre AQUI.
       const s = resolverSeccionFEMPorId(modelo, id);
       if (s === undefined) throw new Error(`Seccion inexistente tras validar: ${id}`);
-      return s;
+      return seccionFEMParaPyNite(s);
     });
 
   // --- Paso 2: nodos por snapping determinista --------------------------------
@@ -338,10 +349,11 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
 
   // FUENTE UNICA de la numeracion de barras: se rellena MIENTRAS se construyen las
   // barras, no se recomputa despues. ambitoId (vigaId / pilarId) -> nombre de barra.
-  // Para un pilar pasante (varios tramos), se mapea su PRIMER tramo (pie): la carga
-  // sobre pilar va a ese tramo (comportamiento estable de F1). El Paso 6 lee de aqui,
-  // de modo que el orden/troceado de barras y la atribucion de cargas no pueden
-  // divergir en silencio.
+  // Para un pilar pasante (varios tramos) se mapea su PRIMER tramo (pie), pero la
+  // CARGA de usuario sobre un pilar NO se lee de aqui: va a TODOS sus tramos via
+  // `pilarAMembers` ([AUDITORIA A-1]; antes solo el pie la recibia y se perdia
+  // carga real en silencio). El Paso 6 usa este mapa para el ambito de VIGA y para
+  // clasificar el ambito; el troceado y la atribucion no pueden divergir.
   const barraPorAmbito = new Map<string, string>();
 
   // TRAZABILIDAD (campo aditivo): mapas obra<->FEM construidos MIENTRAS se generan
@@ -392,6 +404,8 @@ export function construirBaseFEM(modelo: Modelo): BaseFEM {
       i: nodoNombre(ci),
       j: nodoNombre(cj),
       material: v.materialId,
+      // [C-1] La seccion ya se emite con Iy/Iz intercambiados en el Paso 1 (uniforme
+      // para toda barra): el eje fuerte del catalogo gobierna la flexion vertical.
       section: v.seccionId,
       rotation: 0,
       tension_only: v.tirante, // tirante = barra que solo trabaja a traccion
@@ -588,10 +602,10 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
 
   // --- Paso 6: cargas (case = hipotesisId) ------------------------------------
   // (El paso 5, releases, ya quedo resuelto en el paso 3 por barra.)
-  // La barra de una carga sobre viga/pilar se lee de `barraPorAmbito` (FUENTE UNICA,
-  // construida en el Paso 3): en F1 una viga es una sola barra; un pilar puede ser
-  // varias (pasante) y la carga va a su primer tramo (pie). Cargas sobre nudo van a
-  // node_loads.
+  // La barra de una carga sobre VIGA se lee de `barraPorAmbito` (FUENTE UNICA,
+  // construida en el Paso 3): en F1 una viga es una sola barra. Un PILAR puede ser
+  // varias (pasante): su carga lineal va a TODOS sus tramos via `pilarAMembers`
+  // ([AUDITORIA A-1], espejo del peso propio). Cargas sobre nudo van a node_loads.
   const node_loads: CargaNodoFEM[] = [];
   const dist_loads: CargaDistFEM[] = [];
   // pt_loads: F1 NO emite cargas puntuales sobre barra. El dominio no tiene posicion
@@ -660,6 +674,26 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     // El ambito puede ser una viga, un pilar (barra) o un nudo.
     const member = barraPorAmbito.get(c.ambito);
     if (c.tipo === "lineal") {
+      // [AUDITORIA A-1] PILAR PASANTE: la carga lineal es del ELEMENTO entero; un
+      // pilar troceado por plantas intermedias la recibe en TODOS sus tramos
+      // (espejo del peso propio, Paso 6b). Antes solo el tramo del pie la recibia
+      // (`barraPorAmbito` mapea el primer tramo): se aplicaba MENOS carga de la
+      // pedida sin error ni aviso. Orden determinista: tramos pie->cabeza.
+      const tramosPilar = pilarAMembers[c.ambito];
+      if (tramosPilar !== undefined) {
+        for (const tramo of tramosPilar) {
+          dist_loads.push({
+            member: tramo,
+            direction: "FY",
+            w1: valor,
+            w2: valor,
+            x1: null,
+            x2: null,
+            case: caseName,
+          });
+        }
+        continue;
+      }
       if (member === undefined) {
         // Carga lineal sobre algo que no es barra (p.ej. un nudo): no aplicable.
         // BLOQUEA: ignorarla quitaria carga real del calculo sin avisar.

@@ -41,3 +41,45 @@
   margin: 0;
   line-height: 1.4;
 }
+
+/* Estado vacio (UX-C6): texto guia cuando no hay elemento seleccionado. Terciario,
+   en lenguaje de obra, sin caja (a diferencia de .cx-note): es un rotulo dentro de la
+   seccion del dock, no un callout. Espejo de inspectorPilar.css. */
+.cx-inspector-vacio {
+  margin: 0;
+  padding: var(--space-1, 4px) 0;
+  color: var(--text-3, #6b7585);
+  line-height: 1.4;
+}
+
+/* --- D8b: bloque de geometria (solo lectura) --- */
+/* Longitud + coordenadas de extremos. Datos numericos en mono tabular (Spec Diseno UI
+   §1.5/§5). Caja hundida neutra (surface-muted) para leerse como informacion, no como
+   control editable. Solo tokens. */
+.cx-inspector-viga__geom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 4px);
+  padding: var(--space-2, 8px) var(--space-2, 10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-muted);
+}
+.cx-inspector-viga__geom-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2, 8px);
+}
+.cx-inspector-viga__geom-etq {
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+.cx-inspector-viga__geom-val {
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  text-align: right;
+}

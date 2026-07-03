@@ -5,6 +5,7 @@
 // (FEM Y-up -> escena Z-up) e indices de triangulos (2 por quad).
 import { describe, it, expect } from "vitest";
 import { construirBuffersIsovalores } from "./isovaloresBuffers";
+import { COLOR_OBSOLETO } from "./deformadaBuffers";
 import type { ModeloFEM, Trazabilidad } from "../../discretizador";
 import { trazabilidadVacia } from "../../discretizador";
 import type { ResultadosCalculo } from "../../solver";
@@ -124,7 +125,7 @@ describe("construirBuffersIsovalores · bordes", () => {
 // --- Flecha (DY nodal) -------------------------------------------------------
 
 describe("construirBuffersIsovalores · flecha", () => {
-  it("toma el DY nodal de cada nudo de malla y mapea ejes FEM->escena (Y<->Z)", () => {
+  it("toma |DY| nodal (magnitud, D10) y mapea ejes FEM->escena (Y<->Z)", () => {
     const buffers = construirBuffersIsovalores({
       modeloFEM: modeloUnQuad(),
       trazabilidad: trazaUnQuad(),
@@ -144,14 +145,67 @@ describe("construirBuffersIsovalores · flecha", () => {
     expect(buffers.vertices).toBe(4); // 4 nudos de malla
     // 1 quad -> 2 triangulos -> 6 indices.
     expect(buffers.indices.length).toBe(6);
-    // Rango del valor = [min DY, max DY] = [-0.02, 0].
-    expect(buffers.valorMin).toBeCloseTo(-0.02, 6);
-    expect(buffers.valorMax).toBeCloseTo(0, 6);
+    // [D10] Rango del valor = [min |DY|, max |DY|] = [0, 0.02]: rojo = maximo movimiento
+    // (antes con signo era [-0.02, 0] y el rojo caia en la ausencia de flecha).
+    expect(buffers.valorMin).toBeCloseTo(0, 6);
+    expect(buffers.valorMax).toBeCloseTo(0.02, 6);
     // Gotcha de ejes: Q0 FEM (x=0,y=3,z=0) -> escena femAEscena = [x, z, y] = [0,0,3].
     // El primer vertice corresponde al primer nudo con valor (orden de insercion = Q0..Q3).
     expect([buffers.posiciones[0], buffers.posiciones[1], buffers.posiciones[2]]).toEqual([
       0, 0, 3,
     ]);
+  });
+
+  it("[D10] el valor de flecha es SIEMPRE >= 0 (magnitud), tambien con DY positivo", () => {
+    // Mezcla de flechas hacia abajo (negativas) y una hacia arriba (positiva): todas se
+    // toman en valor absoluto, asi que el rango es [0, max|DY|].
+    const buffers = construirBuffersIsovalores({
+      modeloFEM: modeloUnQuad(),
+      trazabilidad: trazaUnQuad(),
+      resultados: resultadosUnQuad({
+        dy: { Q0: 0.03, Q1: -0.01, Q2: -0.05, Q3: 0.02 },
+        moments: [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
+      }),
+      combo: "ELS",
+      magnitud: "flecha",
+    })!;
+    for (const v of buffers.valores) expect(v).toBeGreaterThanOrEqual(0);
+    expect(buffers.valorMin).toBeCloseTo(0.01, 6); // min |DY| = |−0.01|
+    expect(buffers.valorMax).toBeCloseTo(0.05, 6); // max |DY| = |−0.05|
+  });
+
+  it("vigente=false pinta TODOS los vertices con el gris de obsoleto (UX-H4)", () => {
+    const buffers = construirBuffersIsovalores({
+      modeloFEM: modeloUnQuad(),
+      trazabilidad: trazaUnQuad(),
+      resultados: resultadosUnQuad({
+        dy: { Q0: 0, Q1: -0.01, Q2: -0.02, Q3: -0.01 },
+        moments: [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
+      }),
+      combo: "ELS",
+      magnitud: "flecha",
+      vigente: false,
+    })!;
+    const gris = [COLOR_OBSOLETO.r, COLOR_OBSOLETO.g, COLOR_OBSOLETO.b];
+    for (let v = 0; v < buffers.vertices; v++) {
+      for (let k = 0; k < 3; k++) {
+        expect(buffers.color[v * 3 + k]).toBeCloseTo(gris[k]!, 5);
+      }
+    }
+    // El rango/valores NO se agrisan: la leyenda los sigue usando. [D10] flecha = |DY| ->
+    // rango [0, 0.02] (antes con signo era [-0.02, 0]).
+    expect(buffers.valorMin).toBeCloseTo(0, 6);
+    expect(buffers.valorMax).toBeCloseTo(0.02, 6);
   });
 });
 

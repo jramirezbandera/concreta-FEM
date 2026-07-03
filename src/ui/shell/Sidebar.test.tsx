@@ -4,6 +4,7 @@
 // contador del AMBITO activo (planta activa, si no grupo activo, si no la obra).
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import { modeloStore, vistaStore } from "../../estado";
 import { crearModeloVacio, type Modelo } from "../../dominio";
@@ -25,7 +26,12 @@ function modeloPrueba(): Modelo {
       { id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g2" },
     ],
     secciones: [{ id: "s1", nombre: "IPE 300", tipo: "perfilMetalico", perfilId: "IPE300" }],
-    nudos: [],
+    nudos: [
+      { id: "n1", x: 0, y: 0 },
+      { id: "n2", x: 5, y: 0 },
+      { id: "n3", x: 5, y: 5 },
+      { id: "n4", x: 0, y: 5 },
+    ],
     pilares: [
       {
         id: "pil1", nombre: "P1", x: 0, y: 0,
@@ -40,8 +46,27 @@ function modeloPrueba(): Modelo {
         vinculacionExterior: false, arranque: "articulado",
       },
     ],
-    vigas: [],
-    panos: [],
+    // Una viga en p1 (grupo g1) y otra en p2 (grupo g2): el conteo por ambito difiere.
+    vigas: [
+      {
+        id: "vg1", nombre: "V1", plantaId: "p1", nudoI: "n1", nudoJ: "n2",
+        seccionId: "s1", materialId: "m1",
+        extremoI: "empotrado", extremoJ: "empotrado", tirante: false,
+      },
+      {
+        id: "vg2", nombre: "V2", plantaId: "p2", nudoI: "n2", nudoJ: "n3",
+        seccionId: "s1", materialId: "m1",
+        extremoI: "empotrado", extremoJ: "empotrado", tirante: false,
+      },
+    ],
+    // Un paño en p1 (grupo g1).
+    panos: [
+      {
+        id: "pa1", nombre: "Losa 1", tipo: "losa", plantaId: "p1",
+        perimetro: ["n1", "n2", "n3", "n4"], materialId: "m1",
+        espesor: 0.25, tamMalla: 0.5, bordeApoyo: "simple",
+      },
+    ],
     muros: [],
     cargas: [],
     hipotesis: [],
@@ -53,13 +78,17 @@ beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
+  vistaStore.getState().setModoVista("planta");
 });
 
-// Localiza la fila "Pilares" y devuelve su contador (texto del .cx-row__count).
-function contadorPilares(): string {
-  const fila = screen.getByText("Pilares").closest(".cx-row") as HTMLElement;
+// Localiza la fila de un elemento por su etiqueta y devuelve su contador.
+function contadorDe(label: string): string {
+  const fila = screen.getByText(label).closest(".cx-row") as HTMLElement;
   const count = fila.querySelector(".cx-row__count") as HTMLElement;
   return count.textContent ?? "";
+}
+function contadorPilares(): string {
+  return contadorDe("Pilares");
 }
 
 describe("Sidebar: fila Pilares (Elementos propios)", () => {
@@ -104,5 +133,89 @@ describe("Sidebar: fila Pilares (Elementos propios)", () => {
     expect(fila.tagName).toBe("DIV");
     expect(fila.classList.contains("cx-row--label")).toBe(true);
     expect(within(fila).queryByRole("button")).toBeNull();
+  });
+});
+
+// UX-A8: vigas y paños deben usar el MISMO criterio de ambito que pilares (antes las
+// vigas mostraban el total de la obra siempre, incoherente).
+describe("Sidebar: filas Vigas y Paños por ambito (UX-A8)", () => {
+  it("sin ambito activo muestran el total de la obra", () => {
+    modeloStore.getState().cargarModelo(modeloPrueba());
+    render(<Sidebar />);
+    expect(contadorDe("Vigas")).toBe("2"); // vg1 + vg2
+    expect(contadorDe("Paños")).toBe("1"); // pa1
+  });
+
+  it("filtran por grupo activo", () => {
+    modeloStore.getState().cargarModelo(modeloPrueba());
+    vistaStore.getState().setGrupoActivo("g1"); // plantas p0,p1
+    render(<Sidebar />);
+    // g1: vg1 (p1) y pa1 (p1); vg2 esta en p2 (g2) -> fuera.
+    expect(contadorDe("Vigas")).toBe("1");
+    expect(contadorDe("Paños")).toBe("1");
+  });
+
+  it("filtran por planta activa", () => {
+    modeloStore.getState().cargarModelo(modeloPrueba());
+    vistaStore.getState().setGrupoActivo("g2");
+    vistaStore.getState().setPlantaActiva("p2");
+    render(<Sidebar />);
+    // p2: solo vg2; ningun paño.
+    expect(contadorDe("Vigas")).toBe("1");
+    expect(contadorDe("Paños")).toBe("0");
+  });
+
+  it("la fila Paños existe con swatch semantico", () => {
+    modeloStore.getState().cargarModelo(modeloPrueba());
+    render(<Sidebar />);
+    const fila = screen.getByText("Paños").closest(".cx-row") as HTMLElement;
+    expect(fila.querySelector(".cx-row__swatch")).toBeTruthy();
+  });
+});
+
+// [D11a] Seccion "Vistas": filas accionables (espejo de setModoVista), la activa
+// resaltada; Mosaico NO se ofrece aqui. La seccion arranca colapsada -> se abre antes
+// de tocar las filas (Radix Collapsible no monta el contenido cerrado).
+describe("Sidebar: seccion Vistas (D11a)", () => {
+  async function abrirVistas(user: ReturnType<typeof userEvent.setup>) {
+    // La cabecera-trigger de la seccion "Vistas" la despliega.
+    await user.click(screen.getByRole("button", { name: /Vistas/i }));
+  }
+
+  it("las filas Planta de grupo / Vista 3D son pulsables y conmutan el modo", async () => {
+    const user = userEvent.setup();
+    render(<Sidebar />);
+    await abrirVistas(user);
+
+    const fila3d = screen.getByText("Vista 3D").closest(".cx-row") as HTMLElement;
+    expect(fila3d.tagName).toBe("BUTTON");
+    await user.click(fila3d);
+    expect(vistaStore.getState().modoVista).toBe("3d");
+
+    const filaPlanta = screen
+      .getByText("Planta de grupo")
+      .closest(".cx-row") as HTMLElement;
+    await user.click(filaPlanta);
+    expect(vistaStore.getState().modoVista).toBe("planta");
+  });
+
+  it("resalta la fila del modo activo (aria-pressed)", async () => {
+    const user = userEvent.setup();
+    vistaStore.getState().setModoVista("3d");
+    render(<Sidebar />);
+    await abrirVistas(user);
+    const fila3d = screen.getByText("Vista 3D").closest(".cx-row") as HTMLElement;
+    expect(fila3d.getAttribute("aria-pressed")).toBe("true");
+    const filaPlanta = screen
+      .getByText("Planta de grupo")
+      .closest(".cx-row") as HTMLElement;
+    expect(filaPlanta.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("no ofrece Mosaico (sigue como 'próximamente' en el HUD)", async () => {
+    const user = userEvent.setup();
+    render(<Sidebar />);
+    await abrirVistas(user);
+    expect(screen.queryByText("Mosaico")).toBeNull();
   });
 });

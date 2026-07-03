@@ -24,6 +24,7 @@ beforeEach(() => {
   vistaStore.getState().setModoVista("planta");
   vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
+  vistaStore.getState().resetDockUI();
 });
 
 // Localiza el trigger (boton/role tab) de una solapa por su etiqueta visible.
@@ -135,5 +136,32 @@ describe("Shell: estados deshabilitados", () => {
     );
     expect(screen.getByRole("button", { name: "Deshacer" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Rehacer" })).toBeDisabled();
+  });
+});
+
+// [D14e] Colapso del dock entero: cuando dockUI.dockColapsado, la región del dock
+// (<aside "Panel de datos">) no se monta y el lienzo recupera su ancho.
+describe("Shell: colapso del dock (D14e)", () => {
+  it("con dock y sin colapsar, la región del dock se muestra", () => {
+    render(
+      <Shell dock={<div>datos</div>}>
+        <div />
+      </Shell>,
+    );
+    expect(
+      screen.getByRole("complementary", { name: "Panel de datos" }),
+    ).toBeInTheDocument();
+  });
+
+  it("al colapsar el dock, la región desaparece", () => {
+    vistaStore.getState().setDockColapsado(true);
+    render(
+      <Shell dock={<div>datos</div>}>
+        <div />
+      </Shell>,
+    );
+    expect(
+      screen.queryByRole("complementary", { name: "Panel de datos" }),
+    ).toBeNull();
   });
 });

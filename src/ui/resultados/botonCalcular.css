@@ -23,11 +23,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 8px);
-  /* El reporte no puede crecer sin limite y tapar el modelo: se acota en alto y
-     se hace scrollable. Con muchos mensajes el panel se queda compacto en vez de
-     ocupar media pantalla (hallazgo de usuario: el panel de calculo tapaba el modelo). */
-  max-height: 38vh;
-  overflow-y: auto;
+  /* [D14 · PR3] Sin scroll VERTICAL interno propio: BotonCalcular vive en la cabecera
+     PINNED del dock (anatomía C), que aporta su propio límite/scroll (.cx-dock__fijo). Un
+     scroll aquí anidaba scrolls. El reporte fluye; si la lista es larga, scrollea la
+     cabecera pinned como bloque. */
 }
 
 /* Conteo de mensajes agrupados ("(×N)"): atenuado, mono, no compite con el texto. */
@@ -73,4 +72,25 @@
 /* Aviso no bloqueante: informa pero el calculo sigue (acento, no peligro). */
 .cx-calcular__msg--aviso {
   border-left-color: var(--accent);
+}
+
+/* [D22b] Fila NAVEGABLE (botón): lleva al elemento culpable. Se lee como una fila más
+   (hereda .cx-calcular__msg) pero con afordancia de clic: cursor, hover y foco. Es un
+   <button> full-width alineado a la izquierda, sin estilo de botón nativo. */
+button.cx-calcular__msg--nav {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  /* Reafirma el fondo/color heredados de .cx-calcular__msg (el reset de botón los pisa). */
+  background-color: var(--surface-muted);
+}
+button.cx-calcular__msg--nav:hover {
+  background-color: var(--surface);
+  border-left-width: 3px;
+}
+button.cx-calcular__msg--nav:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }

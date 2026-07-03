@@ -52,6 +52,33 @@ export function resolverSeccion(seccion: Seccion): SeccionFEM {
   }
 }
 
+// --- [AUDITORIA C-1] Seccion FEM para PyNite: intercambio Iy<->Iz UNIFORME -----
+// CONVENCION DE LA APP (catalogos y dominio): `Iy` es la inercia del eje FUERTE de
+// la seccion tal como la tabulan los catalogos europeos (EN 10365) y la derivan las
+// parametricas (`Iy = b·h³/12`, el canto gobierna).
+//
+// REALIDAD DE PYNITE (verificada contra el fuente de PyNiteFEA 2.0.2, Member3D):
+//  - k(): la flexion en el plano local x-y usa el campo `Iz` (12·E·Iz/L³); la del
+//    plano local x-z usa `Iy`.
+//  - T(): barra HORIZONTAL -> eje local y = VERTICAL global ([0,1,0]);
+//         barra VERTICAL   -> eje local y = [-1,0,0] (global X), z = [0,0,1].
+//
+// DECISION DE CONVENCION (usuario, 2026-07-02, cierre de la nota de diseño C-1):
+// el eje FUERTE del catalogo gobierna, con el MISMO intercambio para TODA barra:
+//  - VIGA: la flexion VERTICAL la gobierna el campo Iz => FEM Iz := Iy catalogo.
+//    (Sin esto la viga se calculaba "acostada": flecha (h/b)² veces mayor.)
+//  - PILAR con angulo=0: la flexion en el plano X (local y) la gobierna el campo
+//    Iz => con el intercambio, el eje FUERTE resiste X (antes resistia obra-y).
+//    Para una rectangular b×h significa canto h segun obra-x a angulo 0; `angulo`
+//    gira la seccion (90 => fuerte segun obra-y). La huella en planta se dibuja
+//    como cuadrado max(b,h) (useGeometriaModelo), asi que el render no contradice
+//    la orientacion mecanica.
+// El intercambio es UNIFORME => una sola seccion FEM por id (sin variantes por
+// uso), aplicado en el UNICO punto de emision de la Capa 2 (discretizar Paso 1).
+export function seccionFEMParaPyNite(s: SeccionFEM): SeccionFEM {
+  return { name: s.name, A: s.A, Iy: s.Iz, Iz: s.Iy, J: s.J };
+}
+
 // Resuelve una SeccionFEM por id aceptando las DOS fuentes, igual que ya hacen las
 // validaciones de UI (validacionesPilar/Viga) y el SelectSeccion: una seccion de OBRA
 // (modelo.secciones; hormigon parametrico o perfil materializado) o un PERFIL del

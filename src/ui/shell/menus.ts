@@ -7,6 +7,7 @@ import type { Pestana } from "../../estado";
 // Accion que dispara un item de menu. Union ampliable: a medida que F11..F15
 // activen mas menus se anaden valores aqui (p. ej. "abrirCargas", "calcular").
 export type AccionMenu =
+  | "abrirDatosGenerales"
   | "abrirGruposPlantas"
   | "abrirHipotesis"
   | "abrirOpcionesAnalisis"
@@ -15,7 +16,11 @@ export type AccionMenu =
   | "activarHerramientaPano"
   | "borrarSeleccion"
   | "calcular"
-  | "calcularModos";
+  | "calcularModos"
+  | "deshacer"
+  | "exportarObra"
+  | "importarObra"
+  | "rehacer";
 
 // Un item de menu es, o bien un string inerte (placeholder, igual que en F9),
 // o bien un item accionable con etiqueta + accion. Retrocompatible: los menus
@@ -34,24 +39,38 @@ export interface MenuDef {
 // Items comunes (placeholders). Sin jerga FEM (CLAUDE.md §17).
 const ARCHIVO: MenuDef = {
   etiqueta: "Archivo",
-  items: ["Nueva obra", "Abrir...", "Guardar", "Exportar...", "Importar..."],
+  // "Exportar…"/"Importar…" cablean el .json propio de Concreta (D2): la lógica de
+  // persistencia (serializacion + frontera Zod) ya existe; el menú solo la invoca.
+  // "Nueva obra"/"Abrir…"/"Guardar" siguen como placeholders (el autosave ya guarda en
+  // continuo; "Abrir…" espera a la UI de biblioteca multi-proyecto).
+  items: [
+    "Nueva obra",
+    "Abrir...",
+    "Guardar",
+    { etiqueta: "Exportar...", accion: "exportarObra" },
+    { etiqueta: "Importar...", accion: "importarObra" },
+  ],
 };
 const OBRA: MenuDef = {
   etiqueta: "Obra",
   items: [
-    "Datos generales",
+    // "Datos generales" abre el diálogo del nombre de la obra (D13). "Materiales" sigue
+    // como placeholder (sin destino todavía).
+    { etiqueta: "Datos generales", accion: "abrirDatosGenerales" },
     { etiqueta: "Plantas y grupos", accion: "abrirGruposPlantas" },
     "Materiales",
   ],
 };
 const EDICION: MenuDef = {
   etiqueta: "Edición",
-  // "Eliminar" es accionable: borra el elemento seleccionado (en F11, un pilar).
-  // El handler es seguro: no-op si no hay nada borrable, asi que compartir este
-  // menu entre pestanas no introduce efectos no deseados.
+  // "Deshacer"/"Rehacer" cablean el undo/redo del modeloStore (Menubar los deshabilita
+  // segun puedeDeshacer/puedeRehacer, patron del Brandbar). "Eliminar" borra el elemento
+  // seleccionado (pilar, viga o paño); su handler es seguro (no-op si no hay nada
+  // borrable), asi que compartir este menu entre pestanas no introduce efectos no
+  // deseados. "Copiar"/"Pegar" siguen como placeholders (sin destino todavia).
   items: [
-    "Deshacer",
-    "Rehacer",
+    { etiqueta: "Deshacer", accion: "deshacer" },
+    { etiqueta: "Rehacer", accion: "rehacer" },
     "Copiar",
     "Pegar",
     { etiqueta: "Eliminar", accion: "borrarSeleccion" },
@@ -114,6 +133,9 @@ export const MENUS_POR_PESTANA: Record<Pestana, MenuDef[]> = {
       // rechaza); aqui solo se introduce la losa maciza.
       items: [{ etiqueta: "Paño (losa)", accion: "activarHerramientaPano" }],
     },
+    // Edicion tambien en Vigas: undo/redo + Eliminar (el handler borrarSeleccion ya
+    // soporta viga y paño). Antes solo existia en Entrada de pilares (auditoria UX-A11).
+    EDICION,
     {
       etiqueta: "Cargas",
       // "Hipótesis…" abre su dialogo (feature-13). La introduccion de cargas en si

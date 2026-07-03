@@ -93,13 +93,17 @@ beforeEach(() => {
   vistaStore.getState().setNumModos(6);
   vistaStore.getState().setModalEscala(1);
   vistaStore.getState().setModalAnimando(false);
+  vistaStore.getState().setOverlayResultados("deformada");
 });
 
 describe("PanelFrecuencias · estado vacio", () => {
   it("sin modos calculados muestra el estado vacio y NO la lista", () => {
     render(<PanelFrecuencias />);
     expect(screen.getByText(/Sin modos calculados/i)).toBeInTheDocument();
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    // La lista de modos es un grupo de botones (UX-L16); sin modos no aparece.
+    expect(
+      screen.queryByRole("group", { name: /modos de vibración/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("el boton lleva la etiqueta 'Calcular modos' con el motor listo", () => {
@@ -128,27 +132,43 @@ function montarConModos(frecuencias: number[]) {
 }
 
 describe("PanelFrecuencias · lista de frecuencias + selector de modo", () => {
-  it("lista una opcion por modo con su frecuencia en Hz", () => {
+  it("lista un boton por modo con su frecuencia en Hz", () => {
     montarConModos([3.21, 7.84, 12.5]);
-    const listbox = screen.getByRole("listbox");
-    const opciones = within(listbox).getAllByRole("option");
-    expect(opciones).toHaveLength(3);
-    expect(within(listbox).getByText(/Modo 1/)).toBeInTheDocument();
-    expect(within(listbox).getByText(/3\.21 Hz/)).toBeInTheDocument();
-    expect(within(listbox).getByText(/7\.84 Hz/)).toBeInTheDocument();
+    // La lista es un grupo de botones toggle (UX-L16), no un listbox.
+    const grupo = screen.getByRole("group", { name: /modos de vibración/i });
+    const botones = within(grupo).getAllByRole("button");
+    expect(botones).toHaveLength(3);
+    expect(within(grupo).getByText(/Modo 1/)).toBeInTheDocument();
+    expect(within(grupo).getByText(/3\.21 Hz/)).toBeInTheDocument();
+    expect(within(grupo).getByText(/7\.84 Hz/)).toBeInTheDocument();
   });
 
-  it("el modo activo (1 por defecto) esta marcado aria-selected", () => {
+  it("[D9] con la deformada activa ningun modo esta marcado (nada modal en escena)", () => {
+    // Overlay por defecto = deformada: aunque modoActivo sea 1, no se dibuja forma modal,
+    // asi que ningun boton de modo aparece "activo".
+    vistaStore.getState().setOverlayResultados("deformada");
     montarConModos([3.2, 7.8]);
-    const opciones = screen.getAllByRole("option");
-    expect(opciones[0]).toHaveAttribute("aria-selected", "true");
-    expect(opciones[1]).toHaveAttribute("aria-selected", "false");
+    const grupo = screen.getByRole("group", { name: /modos de vibración/i });
+    const botones = within(grupo).getAllByRole("button");
+    expect(botones[0]).toHaveAttribute("aria-pressed", "false");
+    expect(botones[1]).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("seleccionar otro modo lo fija en modalStore.modoActivo", () => {
+  it("[D9] con la forma modal activa, el modo activo (1) esta marcado aria-pressed", () => {
+    vistaStore.getState().setOverlayResultados("modal");
+    montarConModos([3.2, 7.8]);
+    const grupo = screen.getByRole("group", { name: /modos de vibración/i });
+    const botones = within(grupo).getAllByRole("button");
+    expect(botones[0]).toHaveAttribute("aria-pressed", "true");
+    expect(botones[1]).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("seleccionar un modo lo fija en modalStore.modoActivo y activa el overlay modal (D9)", () => {
     montarConModos([3.2, 7.8, 12.5]);
-    fireEvent.click(screen.getByRole("option", { name: /Modo 3/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Modo 3/i }));
     expect(modalStore.getState().modoActivo).toBe(3);
+    // D9: seleccionar un modo pasa a mostrar SOLO la forma modal (exclusion mutua).
+    expect(vistaStore.getState().overlayResultados).toBe("modal");
   });
 
   it("muestra la etiqueta 'obsoletos' cuando la obra cambio tras calcular", () => {
@@ -158,6 +178,44 @@ describe("PanelFrecuencias · lista de frecuencias + selector de modo", () => {
     modalStore.getState().limpiar();
     rerender(<PanelFrecuencias />);
     expect(screen.getByText(/obsoletos/i)).toBeInTheDocument();
+  });
+
+  it("[UX-J1] la etiqueta de amplitud es 'Amplitud de dibujo' y el valor no lleva '×'", () => {
+    vistaStore.getState().setModalEscala(1);
+    montarConModos([3.2, 7.8]);
+    // Etiqueta clara (no el ambiguo "Amplitud ×N" que se confunde con la Amplificacion).
+    expect(screen.getByText(/Amplitud de dibujo/i)).toBeInTheDocument();
+    // El valor va sin "×"; con escala 1 se muestra "1.0" (no "×1.0").
+    expect(screen.getByText("1.0")).toBeInTheDocument();
+    expect(screen.queryByText("×1.0")).not.toBeInTheDocument();
+  });
+});
+
+describe("PanelFrecuencias · exclusion deformada/modal (D9)", () => {
+  it("con la deformada activa indica que se ve la deformada (sin boton 'Ver deformada')", () => {
+    vistaStore.getState().setOverlayResultados("deformada");
+    montarConModos([3.2, 7.8]);
+    expect(screen.getByText(/viendo la deformada/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /ver deformada/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("con la forma modal activa muestra 'Ver deformada' y volver activa la deformada", () => {
+    vistaStore.getState().setOverlayResultados("modal");
+    montarConModos([3.2, 7.8]);
+    expect(screen.getByText(/viendo la forma del modo/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /ver deformada/i }));
+    expect(vistaStore.getState().overlayResultados).toBe("deformada");
+  });
+
+  it("pulsar el modo YA activo estando en modal deselecciona -> vuelve a la deformada", () => {
+    vistaStore.getState().setOverlayResultados("modal");
+    modalStore.getState().setModos(modosDe([3.2, 7.8]), modeloFEMMinimo(), trazaMinima());
+    // modoActivo = 1 tras setModos; pulsarlo estando en modal debe volver a la deformada.
+    render(<PanelFrecuencias />);
+    fireEvent.click(screen.getByRole("button", { name: /Modo 1/i }));
+    expect(vistaStore.getState().overlayResultados).toBe("deformada");
   });
 });
 

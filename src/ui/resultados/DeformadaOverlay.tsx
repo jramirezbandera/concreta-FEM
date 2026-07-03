@@ -17,10 +17,11 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { invalidate, useFrame } from "@react-three/fiber";
 import { BufferGeometry, Float32BufferAttribute, type LineSegments } from "three";
 import { resultadosStore, vistaStore } from "../../estado";
-import type { ModoVista } from "../../estado";
+import type { ModoVista, OverlayResultados } from "../../estado";
 import type { ModeloFEM } from "../../discretizador";
 import type { ResultadosCalculo } from "../../solver";
 import { construirBuffers } from "./deformadaBuffers";
+import { prefersReducedMotion } from "./reducedMotion";
 
 // Velocidad de la oscilacion de la animacion (rad/s). El factor de amplificacion
 // oscila como (1 - cos)/2 in [0,1] para arrancar y volver en reposo sin tirones.
@@ -35,10 +36,15 @@ interface Entradas {
   escala: number;
   animando: boolean;
   // Modo de vista del viewport. La deformada es conceptualmente 3D (spec §6,
-  // "Deformada 3D"): en planta/mosaico la deformada del edificio entero se
-  // superpondria descuadrada a la geometria filtrada por planta, asi que SOLO se
-  // dibuja en modo "3d". (eng-review D1.)
+  // "Deformada 3D"): en planta la deformada del edificio entero se superpondria
+  // descuadrada a la geometria filtrada por planta, asi que NO se dibuja en planta.
+  // Se dibuja en cualquier vista pleno (`!== "planta"`): 3D y MOSAICO (que renderiza
+  // 3D). Antes usaba `=== "3d"`, dejando el mosaico sin deformada con la leyenda
+  // visible (incoherente con el overlay de modelo de calculo, ya alineado a !=="planta").
   modoVista: ModoVista;
+  // [D9] Overlay de resultados activo: la deformada SOLO se dibuja si es "deformada" (la
+  // forma modal la dibuja ModoOverlay cuando es "modal"). Exclusion mutua: nunca ambas.
+  overlay: OverlayResultados;
 }
 
 // Snapshot estable de las entradas: tupla cacheada para useSyncExternalStore.
@@ -54,6 +60,7 @@ function leerEntradas(): Entradas {
     escala: v.deformadaEscala,
     animando: v.animando,
     modoVista: v.modoVista,
+    overlay: v.overlayResultados,
   };
 }
 function getSnapshot(): Entradas {
@@ -66,7 +73,8 @@ function getSnapshot(): Entradas {
     a.combo === c.combo &&
     a.escala === c.escala &&
     a.animando === c.animando &&
-    a.modoVista === c.modoVista
+    a.modoVista === c.modoVista &&
+    a.overlay === c.overlay
   ) {
     return c;
   }
@@ -81,6 +89,7 @@ function suscribir(cb: () => void): () => void {
   const offEsc = vistaStore.subscribe((s) => s.deformadaEscala, cb);
   const offAnim = vistaStore.subscribe((s) => s.animando, cb);
   const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
+  const offOverlay = vistaStore.subscribe((s) => s.overlayResultados, cb);
   return () => {
     offR();
     offM();
@@ -89,6 +98,7 @@ function suscribir(cb: () => void): () => void {
     offEsc();
     offAnim();
     offModo();
+    offOverlay();
   };
 }
 
@@ -99,6 +109,9 @@ function useEntradas(): Entradas {
 export function DeformadaOverlay() {
   const entradas = useEntradas();
   const lineRef = useRef<LineSegments>(null);
+  // Preferencia "reducir movimiento": se consulta UNA vez (no por frame). Si esta activa,
+  // la animacion no avanza y se muestra la amplitud estatica maxima (base + delta*escala).
+  const reducir = useMemo(() => prefersReducedMotion(), []);
 
   // Buffers reconstruidos SOLO al cambiar las entradas (no por frame). La derivacion
   // pura (base/delta/color) vive en deformadaBuffers.ts (testeable sin R3F).
@@ -139,7 +152,9 @@ export function DeformadaOverlay() {
   // anima, useFrame no toca nada; la recolocacion al reposo la hace el useEffect de abajo.
   const tRef = useRef(0);
   useFrame((_state, dt) => {
-    if (!entradas.animando || !buffers || !geom) return;
+    // reducir: con prefers-reduced-motion no avanzamos la animacion (queda estatica a la
+    // amplitud maxima, recolocada por el useEffect de abajo).
+    if (reducir || !entradas.animando || !buffers || !geom) return;
     tRef.current += dt * VELOCIDAD_ANIM;
     // Factor in [0, escala] con arranque/retorno suave: (1 - cos)/2.
     const factor = ((1 - Math.cos(tRef.current)) / 2) * entradas.escala;
@@ -159,7 +174,9 @@ export function DeformadaOverlay() {
   // intermedia que no se corresponde con la "×escala" indicada).
   useEffect(() => {
     if (!geom || !buffers) return;
-    if (entradas.animando) {
+    // Con reducir=true tratamos "animar" como estatico: no oscila, se muestra la amplitud
+    // maxima (base + delta*escala), igual que al parar la animacion.
+    if (entradas.animando && !reducir) {
       tRef.current = 0;
     } else {
       const attr = geom.getAttribute("position") as Float32BufferAttribute;
@@ -171,11 +188,16 @@ export function DeformadaOverlay() {
       attr.needsUpdate = true;
     }
     invalidate();
-  }, [entradas.animando, entradas.escala, geom, buffers]);
+  }, [entradas.animando, entradas.escala, geom, buffers, reducir]);
 
-  // La deformada solo se dibuja en modo 3D (D1): en planta/mosaico la geometria base
-  // esta filtrada por planta y la deformada del edificio entero se descuadraria.
-  if (!geom || entradas.modoVista !== "3d") return null;
+  // La deformada se dibuja en cualquier vista pleno (`!== "planta"`): 3D y mosaico
+  // comparten la escena 3D del edificio completo. En planta la geometria base esta
+  // filtrada por planta y la deformada del edificio entero se descuadraria. (UX-H9:
+  // antes `=== "3d"` la ocultaba en mosaico con la leyenda visible.)
+  // [D9] Exclusion mutua: si el overlay activo es la FORMA MODAL, la deformada NO se dibuja
+  // (evita superponer dos magnitudes sobre la misma rampa; la escena queda legible).
+  if (!geom || entradas.modoVista === "planta" || entradas.overlay !== "deformada")
+    return null;
   return (
     <lineSegments ref={lineRef} geometry={geom}>
       {/* vertexColors: el color va en el atributo `color` (rampa o gris). */}

@@ -12,6 +12,7 @@ import { useSyncExternalStore } from "react";
 import { vistaStore } from "../../estado";
 import { PanelFlotante } from "../primitivas";
 import { useFuenteModeloCalculo } from "./modeloCalculoFuente";
+import { hexToken } from "./colores";
 import type { ModeloFEM } from "../../discretizador";
 import "./modeloCalculo.css";
 
@@ -61,9 +62,39 @@ export function ModeloCalculo() {
   // discretizar). Se llama SIEMPRE (reglas de hooks); fuera de pleno el control no se pinta.
   const fuente = useFuenteModeloCalculo(mostrar && enPleno);
 
-  if (!enPleno) return null;
-
   const toggle = () => vistaStore.getState().toggleModeloCalculo();
+
+  // [D11/K-2] Fuera de la vista 3D el control NO desaparece del dock (antes return
+  // null): se muestra DESHABILITADO con una nota corta. El overlay de escena sigue
+  // gateado (solo en 3D).
+  if (!enPleno) {
+    return (
+      <PanelFlotante
+        className="cx-mc"
+        icono={
+          <span className="cx-mc__glifo" aria-hidden="true">
+            ◫
+          </span>
+        }
+        titulo="Ver modelo de cálculo"
+      >
+        <label className="cx-mc__toggle cx-mc__toggle--disabled">
+          <input
+            type="checkbox"
+            checked={mostrar}
+            onChange={toggle}
+            disabled
+            aria-disabled
+            aria-label="Ver modelo de cálculo"
+          />
+          <span>Mostrar sobre la obra</span>
+        </label>
+        <p className="cx-mc__nota" role="note">
+          Disponible en la vista 3D.
+        </p>
+      </PanelFlotante>
+    );
+  }
   const toggleSolo = () => vistaStore.getState().toggleSoloModeloCalculo();
 
   return (
@@ -127,7 +158,35 @@ function Detalle({ fuente }: { fuente: ReturnType<typeof useFuenteModeloCalculo>
         <span className="cx-mc__clave">Apoyos</span>
         <span className="cx-mc__valor mono">{c.apoyos}</span>
       </div>
+      <LeyendaGlifos />
       <span className="cx-mc__nota">Vista simplificada del modelo</span>
     </div>
+  );
+}
+
+// Mini-leyenda textual de los glifos del overlay (UX-K1): cuadrado/triangulo/circulo de
+// apoyo y circulo pequeño de extremo articulado, con su significado en lenguaje de obra.
+// Usa los MISMOS tokens de color que ModeloCalculoOverlay (apoyoCalc/releaseCalc) para que
+// glifo y overlay coincidan. Los glifos son caracteres unicode (■▲●○): fieles a la FORMA
+// de los del lienzo sin duplicar geometria.
+const GLIFOS: ReadonlyArray<{ glifo: string; texto: string; token: "apoyoCalc" | "releaseCalc" }> = [
+  { glifo: "■", texto: "Arranque empotrado", token: "apoyoCalc" },
+  { glifo: "▲", texto: "Arranque articulado", token: "apoyoCalc" },
+  { glifo: "●", texto: "Otro apoyo", token: "apoyoCalc" },
+  { glifo: "○", texto: "Extremo articulado", token: "releaseCalc" },
+];
+
+function LeyendaGlifos() {
+  return (
+    <ul className="cx-mc__leyenda" aria-label="Leyenda de símbolos del modelo de cálculo">
+      {GLIFOS.map((g) => (
+        <li key={g.texto} className="cx-mc__leyenda-item">
+          <span className="cx-mc__glifo-leyenda" aria-hidden="true" style={{ color: hexToken(g.token) }}>
+            {g.glifo}
+          </span>
+          <span className="cx-mc__leyenda-txt">{g.texto}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -357,3 +357,62 @@ describe("calcularCentroMasaPlanta - robustez sobre modelo vivo no validado (FIX
     expect(cm!).toBeNull(); // su contribucion se omite, no queda mas masa
   });
 });
+
+// ==============================================================================
+// [AUDITORIA M-7] PILAR PASANTE de 3+ plantas: la planta INTERMEDIA debe recibir
+// su masa tributaria. El reparto anterior (medio pilar a plantaInicial, medio a
+// plantaFinal) daba CERO a las plantas intermedias que el pilar atraviesa y
+// SOBREPESABA los extremos: el CM por planta (y la excentricidad CM<->CR que se
+// muestra al usuario) salia distorsionado. Criterio correcto (tributario): cada
+// planta que el pilar toca recibe la mitad de cada tramo adyacente.
+// ==============================================================================
+describe("AUDITORIA M-7: pilar pasante y masa tributaria por planta", () => {
+  // p0(0) - p1(3) - p2(6); pilar pasante de p0 a p2 con A=0.01, rho=78.5.
+  // Peso total = A·rho·L = 0.01·78.5·6 = 4.71 kN. Tributario:
+  //   p0 (extremo):    medio tramo inferior  = 1.5 m -> 1.1775 kN
+  //   p1 (intermedia): medio+medio            = 3.0 m -> 2.355 kN
+  //   p2 (extremo):    medio tramo superior  = 1.5 m -> 1.1775 kN
+  function modeloPasante(): Modelo {
+    const m = modeloBase();
+    m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+    m.secciones = [secGenerica("s1", 0.01)];
+    m.pilares = [pilar("pas", 4, 7, "s1", "p0", "p2")];
+    return m;
+  }
+
+  it("la planta intermedia recibe la masa tributaria del pilar (antes: 0 -> null)", () => {
+    const cm = calcularCentroMasaPlanta(modeloPasante(), "p1");
+    expect(cm, "p1 debe tener masa (el pilar la atraviesa)").not.toBeNull();
+    expect(cm!.x).toBeCloseTo(4, 10);
+    expect(cm!.y).toBeCloseTo(7, 10);
+    expect(cm!.pesoTotal).toBeCloseTo(0.01 * RHO * 3.0, 10); // 2.355 kN
+  });
+
+  it("los extremos reciben solo su medio tramo adyacente (no medio pilar ENTERO)", () => {
+    const m = modeloPasante();
+    const cm0 = calcularCentroMasaPlanta(m, "p0");
+    const cm2 = calcularCentroMasaPlanta(m, "p2");
+    expect(cm0!.pesoTotal).toBeCloseTo(0.01 * RHO * 1.5, 10); // 1.1775 kN
+    expect(cm2!.pesoTotal).toBeCloseTo(0.01 * RHO * 1.5, 10);
+  });
+
+  it("conservacion: la suma por plantas = peso total del pilar A·rho·L", () => {
+    const m = modeloPasante();
+    const total =
+      (calcularCentroMasaPlanta(m, "p0")?.pesoTotal ?? 0) +
+      (calcularCentroMasaPlanta(m, "p1")?.pesoTotal ?? 0) +
+      (calcularCentroMasaPlanta(m, "p2")?.pesoTotal ?? 0);
+    expect(total).toBeCloseTo(0.01 * RHO * 6, 10); // 4.71 kN
+  });
+
+  it("regresion: pilar de UNA planta (p0->p1) reparte mitad y mitad como antes", () => {
+    const m = modeloBase();
+    m.secciones = [secGenerica("s1", 0.01)];
+    m.pilares = [pilar("simple", 2, 3, "s1", "p0", "p1")];
+    const cm0 = calcularCentroMasaPlanta(m, "p0");
+    const cm1 = calcularCentroMasaPlanta(m, "p1");
+    // Peso total = 0.01·78.5·3 = 2.355; mitad a cada forjado = 1.1775.
+    expect(cm0!.pesoTotal).toBeCloseTo(1.1775, 10);
+    expect(cm1!.pesoTotal).toBeCloseTo(1.1775, 10);
+  });
+});

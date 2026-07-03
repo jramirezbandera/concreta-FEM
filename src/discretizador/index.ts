@@ -5,12 +5,17 @@ export {
   discretizar,
   TOL_NODO,
   mapearEjes,
+  mapearReaccionAObra,
   clavePosicion,
   releasesDeExtremo,
   resolverSeccion,
   signoGravitatorio,
 } from "./discretizar";
-export type { ResultadoDiscretizacion, DiscretizarOpts } from "./discretizar";
+export type {
+  ResultadoDiscretizacion,
+  DiscretizarOpts,
+  ReaccionObra,
+} from "./discretizar";
 
 // Contrato de la Capa 2 (schemas Zod + tipos via z.infer).
 export * from "./contratoFEM";

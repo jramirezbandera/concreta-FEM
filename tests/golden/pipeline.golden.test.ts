@@ -30,8 +30,9 @@
 //  La planta (x,y) -> global (X,Z); la cota -> Y vertical. Una viga corre en global
 //  X a altura Y=cota. La carga gravitatoria es FY global NEGATIVA. Para un miembro
 //  horizontal en X, PyNite pone el eje local y = Y global (vertical): la flexion
-//  vertical usa Iz (eje local z) y la flecha es dy local. Por eso la INERCIA QUE
-//  GOBIERNA la flecha de estas vigas es Iz (IPE300: 6038 cm⁴), NO Iy.
+//  vertical usa el CAMPO Iz de add_section y la flecha es dy local. Tras el fix
+//  [C-1] el discretizador pone el eje FUERTE del catalogo (Iy, IPE300: 8356 cm⁴)
+//  en ese campo al emitir la seccion de una viga (variante "~viga").
 // =============================================================================
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -52,14 +53,21 @@ import {
 import type { Modelo } from "../../src/dominio";
 import type { ModeloFEM } from "../../src/discretizador/contratoFEM";
 import type { ResultadosCalculo } from "../../src/solver/resultados";
+import { getMaterial } from "../../src/biblioteca";
 
 // --- Constantes de material/seccion del fixture (S275 + IPE300) --------------
 // Se necesitan para calcular las flechas teoricas. Valores INTERNOS (kN-m), los
 // mismos que el discretizador inyecta en la Capa 2 (verificado en el dump T1.2):
 //   E (S275) = 210000 MPa = 2.1e8 kN/m²   (aceros.ts)
-//   Iz (IPE300, eje debil = flexion vertical de estas vigas) = 6038 cm⁴ = 6.038e-5 m⁴
+//   I de flexion vertical de la VIGA IPE300 = eje FUERTE Iy = 8356 cm⁴ = 8.356e-5 m⁴
+//   AUDITORIA [C-2]+[C-1]: la tabla IPE estaba 10x inflada (corregida a EN 10365) y
+//   las vigas flectaban con el eje DEBIL. El discretizador emite ahora la seccion de
+//   viga con Iy/Iz intercambiados (sufijo "~viga", seccionFEMParaViga) para que el
+//   eje fuerte del catalogo aterrice en el campo Iz que PyNite usa en la flexion
+//   vertical de una barra horizontal. La referencia teorica de la flecha usa por
+//   tanto el Iy de catalogo (eje fuerte).
 const E_ACERO = 2.1e8; // kN/m²
-const IZ_IPE300 = 6.038e-5; // m⁴ (eje que gobierna la flexion vertical, ver cabecera)
+const I_VIGA_IPE300 = 8.356e-5; // m⁴ (Iy catalogo, eje fuerte: gobierna la flexion vertical)
 
 // Helper de assert: usa el detalle de la comparacion para un mensaje "real vs
 // teorico" claro. NO afloja la tolerancia: si falla, el bug es del pipeline.
@@ -248,7 +256,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       const Mteo = (q * L * L) / 8; // 45 kN·m (magnitud del pico)
       const Vteo = (q * L) / 2; // 30 kN
       const Rteo = (q * L) / 2; // 30 kN por apoyo
-      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * IZ_IPE300); // m (descenso)
+      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * I_VIGA_IPE300); // m (descenso)
 
       const viga = barraViga(res, fem, combo);
 
@@ -372,7 +380,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       if (!corrida) return;
       const { res, fem } = corrida;
       const combo = "ELS";
-      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * IZ_IPE300);
+      const flechaTeo = (5 * q * L ** 4) / (384 * E_ACERO * I_VIGA_IPE300);
 
       // La viga horizontal (vano cargado), por geometria.
       const name = nombreVigaHorizontal(fem);
@@ -488,16 +496,23 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       }
       assertOk(compararReaccion(Math.abs(rmomMax), RmomTeo), "voladizo R_mom=PL");
 
-      // FLECHA: regresion (afectada por la flexibilidad del pilar de empotramiento).
-      // Se comprueba que es un descenso de orden de magnitud razonable (cm) y se
-      // documenta que NO es la formula del voladizo puro PL³/3EI (~1.42 cm), sino
-      // mayor por el desplome del pilar (~5.68 cm medido). No es validacion analitica.
-      const flechaPuroTeo = (P * L ** 3) / (3 * E_ACERO * IZ_IPE300); // referencia (NO esperada)
+      // FLECHA: cuasi-analitica (AUDITORIA [C-1], convenio uniforme). El descenso
+      // del extremo se descompone en dos terminos con forma cerrada:
+      //   (1) GIRO de la cabeza del pilar de empotramiento: el momento M=PL en la
+      //       cabeza de un pilar empotrado en base gira la cabeza θ=M·H/(E·I_pilar)
+      //       y arrastra el extremo θ·L. Con el intercambio UNIFORME de ejes
+      //       (decision de usuario: el eje FUERTE resiste X con angulo=0), el pilar
+      //       flecta en el plano X con el Iy de catalogo (fuerte):
+      //       θ·L = PL·H·L/(E·Iy_cat) = 60·3·3/(2.1e8·8.356e-5) ≈ 0.0308 m.
+      //   (2) Flecha propia de la viga (eje FUERTE): PL³/3EI ≈ 0.0103 m.
+      // Total teorico ≈ 0.0410 m. La coincidencia con el motor VALIDA a la vez el
+      // intercambio en viga y pilar. Tolerancia de flecha 1%.
+      const H_PILAR = 3; // m (cota por defecto del fixture: pilar de p0 a p1)
+      const flechaPuroTeo = (P * L ** 3) / (3 * E_ACERO * I_VIGA_IPE300); // viga sola
+      const giroPilar = (P * L * H_PILAR * L) / (E_ACERO * I_VIGA_IPE300); // θ·L (eje fuerte)
+      const flechaTeo = giroPilar + flechaPuroTeo;
       const flechaReal = Math.abs(flechaMaxDescenso(res, combo));
-      expect(flechaReal, "voladizo: descenso > flecha de voladizo puro (pilar flexible)").toBeGreaterThan(
-        flechaPuroTeo,
-      );
-      expect(flechaReal, "voladizo: descenso en rango sano (< 0.5 m)").toBeLessThan(0.5);
+      assertOk(compararFlecha(flechaReal, flechaTeo), "voladizo flecha = giro pilar + viga");
       console.warn(
         `[GOLDEN][voladizo flecha REGRESION] real=${flechaReal.toExponential(4)} m ` +
           `(voladizo puro PL³/3EI=${flechaPuroTeo.toExponential(4)} m, inflada por desplome del pilar)`,
@@ -524,7 +539,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       const combo = "ELS";
       const Mteo = (P * L) / 4; // 80 kN·m
       const Rteo = P / 2; // 20 kN por apoyo
-      const flechaTeo = (P * L ** 3) / (48 * E_ACERO * IZ_IPE300); // m (descenso centro)
+      const flechaTeo = (P * L ** 3) / (48 * E_ACERO * I_VIGA_IPE300); // m (descenso centro)
 
       // Dos vanos horizontales (vizq/vder); ambos alcanzan -PL/4 en el centro. Se
       // toma la viga horizontal mas flectada (nunca un pilar).
@@ -603,10 +618,19 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
       // (no aflojar el golden). Valores medidos en T1.2 con el par de versiones fijado.
       // El dintel se identifica por GEOMETRIA (la barra horizontal a la cota H),
       // no por magnitud: blinda contra empates con el flector de los pilares.
+      // RECAPTURA AUDITORIA [C-2]+[C-1 uniforme] (2026-07): el snapshot original
+      // (19.18949 / -18.31051 / 9.56493) se midio con la serie IPE 10x inflada y el
+      // mapeo de ejes previo. Con el catalogo EN 10365 y el intercambio UNIFORME
+      // (viga Y pilar con el eje fuerte en el plano, decision de usuario) los
+      // COCIENTES de rigidez viga/pilar quedan casi como los originales: el reparto
+      // hiperestatico vuelve a ~los numeros primeros (la diferencia residual ~0,1%
+      // viene de la interaccion EA/EI: EA no se escalo con EI). Invariante fisico
+      // que los valida: |min| + |max| = qB²/8 = 37,5 exacto (momento isostatico
+      // total del vano). Convencion PyNite: sagging NEGATIVO, hogging positivo.
       const dintel = barraViga(res, fem, combo);
-      assertOk(compararEsfuerzo(dintel.max_moment_z, 19.18949), "portico REG M+ dintel (centro)");
-      assertOk(compararEsfuerzo(dintel.min_moment_z, -18.31051), "portico REG M- dintel (apoyos)");
-      assertOk(compararReaccion(Math.abs(basesHoriz[0]), 9.56493), "portico REG empuje horizontal");
+      assertOk(compararEsfuerzo(dintel.max_moment_z, 19.17376), "portico REG M nudos (hogging)");
+      assertOk(compararEsfuerzo(dintel.min_moment_z, -18.32624), "portico REG M centro (sagging)");
+      assertOk(compararReaccion(Math.abs(basesHoriz[0]), 9.54570), "portico REG empuje horizontal");
     },
     TIMEOUT_ARRANQUE,
   );
@@ -639,7 +663,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
           { name: "N2", x: 4, y: 0, z: 0 },
         ],
         materials: [{ name: "AC", E: E_ACERO, G: 8.077e7, nu: 0.3, rho: 78.5 }],
-        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: IZ_IPE300, J: 1e-7 }],
+        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: I_VIGA_IPE300, J: 1e-7 }],
         members: [
           {
             name: "M1",
@@ -704,7 +728,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
           { name: "N2", x: 0, y: 3, z: 0 },
         ],
         materials: [{ name: "AC", E: E_ACERO, G: 8.077e7, nu: 0.3, rho: 78.5 }],
-        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: IZ_IPE300, J: 1e-7 }],
+        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: I_VIGA_IPE300, J: 1e-7 }],
         members: [
           {
             name: "M1",
@@ -765,7 +789,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
           { name: "N2", x: 4, y: 0, z: 0 },
         ],
         materials: [{ name: "AC", E: E_ACERO, G: 8.077e7, nu: 0.3, rho: 78.5 }],
-        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: IZ_IPE300, J: 1e-7 }],
+        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: I_VIGA_IPE300, J: 1e-7 }],
         members: [
           {
             name: "M1",
@@ -831,7 +855,7 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
           { name: "N2", x: 4, y: 0, z: 0 },
         ],
         materials: [{ name: "AC", E: E_ACERO, G: 8.077e7, nu: 0.3, rho: 78.5 }],
-        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: IZ_IPE300, J: 1e-7 }],
+        sections: [{ name: "S", A: 5.3e-3, Iy: 8.36e-6, Iz: I_VIGA_IPE300, J: 1e-7 }],
         members: [
           {
             name: "M1",
@@ -862,6 +886,64 @@ describe("golden pipeline E2E (motor real PyNite)", () => {
         members: [{ ...base.members[0], j: "NO_EXISTE" }],
       };
       expect(() => motor.calcular(nodoRoto), "nodo inexistente debe propagar error").toThrow();
+    },
+    TIMEOUT_ARRANQUE,
+  );
+
+  // ---------------------------------------------------------------------------
+  // AUDITORIA [C-1]) EJES DE FLEXION de una viga rectangular.  Una viga de hormigon
+  //    30x60 (ancho b=0,30 HORIZONTAL, canto h=0,60 VERTICAL) biapoyada debe
+  //    flectar con su eje FUERTE: I = b·h³/12 = 5,4e-3 m⁴ y δ = 5qL⁴/384EI.
+  //
+  //    POR QUE ESTE GOLDEN NO EXISTIA: todos los golden de flecha previos calculan
+  //    la referencia teorica con la MISMA constante de catalogo que consume PyNite
+  //    (autoconsistentes) o usan secciones CUADRADAS (Iy=Iz, insensibles al eje).
+  //    Este caso usa una seccion RECTANGULAR (h/b=2) y la referencia teorica se
+  //    deriva de la GEOMETRIA (b·h³/12), independiente del mapeo de la biblioteca:
+  //    si el mapeo pone el eje debil en el campo que PyNite usa para la flexion
+  //    vertical (Iz, ver cabecera), la flecha sale (h/b)² = 4x y este test lo caza.
+  //
+  //    Los pilares llevan una seccion GENERICA muy rigida (A=10, I=10) para que el
+  //    asiento axial del apoyo no contamine la flecha de la viga (<0,01%): el test
+  //    aisla el EJE de flexion, no la flexibilidad del apoyo.
+  // ---------------------------------------------------------------------------
+  it(
+    "AUDITORIA C-1: viga hormigon 30x60 biapoyada flecta con su eje FUERTE (b·h³/12)",
+    () => {
+      const L = 6;
+      const q = 10;
+      const b = 0.3; // m (ancho, horizontal)
+      const h = 0.6; // m (canto, VERTICAL)
+
+      const modelo = fixtureBiapoyadaUDL({ L, q });
+      // Viga: seccion rectangular de hormigon 30x60 (mismo id que la del fixture
+      // para no tocar referencias); material HA-25 del catalogo.
+      modelo.secciones = [
+        { id: modelo.secciones[0].id, nombre: "30x60", tipo: "hormigonRectangular", b, h },
+        { id: "sec-pilar-rigido", nombre: "apoyo rigido", tipo: "generico", A: 10, Iy: 10, Iz: 10, J: 10 },
+      ];
+      for (const v of modelo.vigas) v.materialId = "HA-25";
+      // Pilares: apoyo casi rigido (generico) para aislar la flecha de la viga.
+      for (const p of modelo.pilares) {
+        p.seccionId = "sec-pilar-rigido";
+        p.materialId = "HA-25";
+      }
+
+      const corrida = correrConFEM(modelo);
+      if (!corrida) return;
+      const { res } = corrida;
+
+      const combo = "ELS";
+      // E del catalogo (Ecm de HA-25, verificado contra el Codigo Estructural en
+      // biblioteca.test.ts): el test NO depende de su valor exacto, solo del EJE.
+      const E = getMaterial("HA-25")!.E; // kN/m²
+      const I_FUERTE = (b * h ** 3) / 12; // 5,4e-3 m⁴ — derivado de la GEOMETRIA
+      const flechaTeo = (5 * q * L ** 4) / (384 * E * I_FUERTE); // m (descenso)
+
+      const flechaReal = Math.abs(flechaMaxDescenso(res, combo));
+      // Si los ejes estan intercambiados, flechaReal ≈ (h/b)²·flechaTeo = 4x y el
+      // comparador de flecha (tolerancia 1%) falla con errRel ≈ 300%.
+      assertOk(compararFlecha(flechaReal, flechaTeo), "viga 30x60: flecha con eje FUERTE b·h³/12");
     },
     TIMEOUT_ARRANQUE,
   );

@@ -16,7 +16,13 @@ import createPlotlyComponent from "react-plotly.js/factory";
 // El bundle reducido trae lo justo para scatter/line (suficiente para N/V/M/flecha).
 // Su .d.ts ambient (plotly-basic-dist-min.d.ts) reexpone los tipos de plotly.js.
 import Plotly from "plotly.js-basic-dist-min";
-import type { Layout, Config, Data } from "plotly.js";
+import type { Layout, Config, Data, Annotations } from "plotly.js";
+import {
+  extraerUnidad,
+  calcularExtremos,
+  anotacionesExtremos,
+  type AnotacionExtremo,
+} from "./diagramaAnotaciones";
 
 // react-plotly.js/factory NO publica tipos para el factory en si (solo para el
 // componente por defecto); el cast acotado evita un `any` mas ancho. Construir el
@@ -42,6 +48,18 @@ export default function DiagramaBarra({
   etiquetaY,
   color,
 }: PropiedadesDiagramaBarra) {
+  // Unidad de la magnitud, derivada del texto entre parentesis de la etiqueta del eje
+  // ("Momento (kN·m)" -> "kN·m"). Se usa en el hover y en las anotaciones de extremos;
+  // asi la interfaz publica del componente no cambia (la unidad llega ya en etiquetaY).
+  const unidad = useMemo(() => extraerUnidad(etiquetaY), [etiquetaY]);
+
+  // Extremos (maximo y minimo) del diagrama, con su posicion, para anotarlos: es el dato
+  // que el arquitecto busca (donde y cuanto vale el pico del esfuerzo). Solo si hay serie.
+  const extremos = useMemo(
+    () => calcularExtremos(posiciones, valores),
+    [posiciones, valores],
+  );
+
   // Memoizamos las estructuras que Plotly consume para no recrearlas en cada
   // render (evita re-dibujos innecesarios; el panel re-renderiza al cambiar
   // seleccion/combo/magnitud, pero si los arrays no cambian no rehacemos el plot).
@@ -57,15 +75,24 @@ export default function DiagramaBarra({
         // la curva). "tozeroy" sombrea entre la curva y y=0, respetando el signo.
         fill: "tozeroy",
         fillcolor: aClaro(color),
-        hovertemplate: "x = %{x:.2f} m<br>%{y:.3g}<extra></extra>",
+        // La unidad se añade al hover (antes solo el numero, sin unidad): "M = 45.0 kN·m".
+        hovertemplate: `x = %{x:.2f} m<br>%{y:.3g} ${unidad}<extra></extra>`,
       },
     ],
-    [posiciones, valores, color],
+    [posiciones, valores, color, unidad],
+  );
+
+  // Anotaciones de maximo y minimo sobre la traza: valor + unidad en mono, ancladas al
+  // punto del extremo. Se omiten si max y min coinciden (diagrama plano: una sola marca).
+  const anotaciones = useMemo<Partial<Annotations>[]>(
+    () => anotacionesExtremos(extremos, unidad).map(aAnotacionPlotly),
+    [extremos, unidad],
   );
 
   const layout = useMemo<Partial<Layout>>(
     () => ({
       autosize: true,
+      annotations: anotaciones,
       margin: { l: 52, r: 12, t: 8, b: 36 },
       // Transparente: el diagrama se integra en el panel glass (toma su fondo).
       paper_bgcolor: "rgba(0,0,0,0)",
@@ -98,7 +125,7 @@ export default function DiagramaBarra({
         ticklen: 3,
       },
     }),
-    [etiquetaY],
+    [etiquetaY, anotaciones],
   );
 
   const config = useMemo<Partial<Config>>(
@@ -132,4 +159,25 @@ export default function DiagramaBarra({
 // helper para no repetir la cadena y dejar un unico punto si cambia el criterio.
 function aClaro(color: string): string {
   return `color-mix(in srgb, ${color} 16%, transparent)`;
+}
+
+// Mapea una anotacion neutra (diagramaAnotaciones) a la forma de Plotly. El texto va en
+// mono (coherente con el tema CAD, todo dato numerico en mono); el anclaje decide si la
+// etiqueta va encima (max) o debajo (min) del punto para no tapar la traza.
+function aAnotacionPlotly(a: AnotacionExtremo): Partial<Annotations> {
+  const arriba = a.anclaje === "top";
+  return {
+    x: a.x,
+    y: a.y,
+    text: a.texto,
+    showarrow: false,
+    yanchor: arriba ? "bottom" : "top",
+    yshift: arriba ? 4 : -4,
+    font: {
+      family:
+        "Geist Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+      size: 10,
+      color: "var(--text, #1a2230)",
+    },
+  };
 }

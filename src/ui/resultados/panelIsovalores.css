@@ -17,3 +17,20 @@
   flex-direction: column;
   gap: var(--space-1, 4px);
 }
+
+/* Estado vacio guia (sin losa calculada): explica por que la pestana esta en blanco. */
+.cx-isovalores__vacio {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+
+/* Aviso de resultados obsoletos (la obra cambio tras calcular): --warning como en la
+   deformada y las reacciones. */
+.cx-isovalores__aviso {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--warning);
+}

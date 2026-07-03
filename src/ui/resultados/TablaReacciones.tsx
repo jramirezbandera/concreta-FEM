@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { modeloStore } from "../../estado/modeloStore";
 import { resultadosStore } from "../../estado/resultadosStore";
 import { vistaStore } from "../../estado/vistaStore";
+import { mapearReaccionAObra, type ReaccionObra } from "../../discretizador";
 import { PanelFlotante } from "../primitivas";
 import "./tablaReacciones.css";
 
@@ -30,20 +31,35 @@ import "./tablaReacciones.css";
 // (FX/FY/FZ en kN, MX/MY/MZ en kN·m). Se muestran TAL CUAL con su unidad en la
 // cabecera; no hay conversion aqui (no es un borde de entrada/salida con cambio
 // de sistema, solo presentacion del valor interno).
+//
+// [AUDITORIA D5] EJES DE OBRA, NO EJES FEM. El vector rxn del solver esta en ejes FEM
+// (Y-up): rxn = [FX,FY,FZ, MX,MY,MZ]. Pero en el RESTO de la UI "Y" es el eje HORIZONTAL
+// de la planta, asi que rotular la reaccion vertical como "FY" invita a leerla como una
+// horizontal (lectura falsa). El remapeo FEM->obra NO se hace aqui como una permutacion
+// suelta (divergiria de `mapearEjes`): lo hace el helper UNICO `mapearReaccionAObra` del
+// discretizador (junto a `mapearEjes`, su inverso exacto). Este componente SOLO etiqueta
+// las columnas y lee del objeto ReaccionObra que devuelve el helper. Sin conversion de
+// unidades (solo permutacion): las reacciones ya vienen en el sistema interno (kN, kN·m).
 
 // Decimales de presentacion: 2 da resolucion suficiente para verificar equilibrio
 // sin ruido. Sistema interno kN/kN·m (valores tipicos de decenas a centenas).
 const DECIMALES = 2;
 
-// Las 6 componentes en el orden FIJO de rxn = [FX,FY,FZ,MX,MY,MZ] (resultados.ts).
-// FY es la VERTICAL del sistema interno (eje Y arriba): de ahi el resumen de ΣFY.
-const COLUMNAS: ReadonlyArray<{ etiqueta: string; indice: number }> = [
-  { etiqueta: "FX", indice: 0 },
-  { etiqueta: "FY", indice: 1 },
-  { etiqueta: "FZ", indice: 2 },
-  { etiqueta: "MX", indice: 3 },
-  { etiqueta: "MY", indice: 4 },
-  { etiqueta: "MZ", indice: 5 },
+// Columnas en EJES DE OBRA (D5). `campo` es la clave de ReaccionObra (fuente unica del
+// mapeo, en el discretizador); `etiqueta` es el nombre visible. V (vertical) va primero
+// (es lo que el arquitecto busca), luego las horizontales y los momentos. El resumen de
+// equilibrio es "ΣV" (sumatorio de la componente V). `esMomento` decide la unidad.
+const COLUMNAS: ReadonlyArray<{
+  etiqueta: string;
+  campo: keyof ReaccionObra;
+  esMomento: boolean;
+}> = [
+  { etiqueta: "V", campo: "V", esMomento: false },
+  { etiqueta: "Hx", campo: "Hx", esMomento: false },
+  { etiqueta: "Hy", campo: "Hy", esMomento: false },
+  { etiqueta: "Mx", campo: "Mx", esMomento: true },
+  { etiqueta: "My", campo: "My", esMomento: true },
+  { etiqueta: "Mv", campo: "Mv", esMomento: true },
 ];
 
 // Formatea un valor a mono tabular con signo coherente. Redondea a DECIMALES y
@@ -52,6 +68,16 @@ function fmt(v: number): string {
   const r = v.toFixed(DECIMALES);
   return r === `-${(0).toFixed(DECIMALES)}` ? (0).toFixed(DECIMALES) : r;
 }
+
+// Explicacion del "—" de los momentos del agregado de losa (B-1): la suma cruda de
+// momentos de nudos distintos no es una resultante sin el termino r×F. Se muestra en el
+// `title` de la celda y como nota al pie (UX-H8: antes el "—" no se explicaba).
+const NOTA_MOMENTOS_LOSA =
+  "Los momentos de los apoyos del borde de losa no se agregan: su suma no es una resultante.";
+
+// Comparador NATURAL de nombres de apoyo (UX-ORDEN): ordena "P2" antes que "P10" (no
+// alfabetico puro, que daria P1, P10, P2...). Intl.Collator con numeric agrupa los digitos.
+const collator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
 
 export function TablaReacciones() {
   // Lectura reactiva del trio de calculo y la combinacion activa. La tabla NO esta
@@ -133,34 +159,54 @@ export function TablaReacciones() {
       return {
         node: apoyo.node,
         etiqueta: nodoAEtiqueta[apoyo.node] ?? "Apoyo",
-        rxn,
+        // Remapeo FEM->obra en el BORDE via el helper UNICO (D5): la fila lleva ya las
+        // componentes de obra (V/Hx/Hy/Mx/My/Mv), sin exponer el orden FEM.
+        obra: mapearReaccionAObra(rxn),
       };
     })
-    .filter((f): f is { node: string; etiqueta: string; rxn: number[] } => f !== null);
+    .filter(
+      (f): f is { node: string; etiqueta: string; obra: ReaccionObra } => f !== null,
+    )
+    // Orden natural por etiqueta de apoyo (UX-ORDEN): P1, P2, P3, P4 (no P1, P4, P2, P3).
+    // El agregado "Losa (borde)" no entra aqui: se renderiza siempre despues de estas filas.
+    .sort((a, b) => collator.compare(a.etiqueta, b.etiqueta));
 
   // Agregado de los apoyos de borde de la losa (F2.4): una sola fila con la SUMA de las
   // reacciones de todos los nudos de malla apoyados. `null` si no hay losa (no se pinta la
-  // fila). Recorre las 6 componentes para sumar fuerzas y momentos por igual.
-  let filaMalla: { etiqueta: string; rxn: number[] } | null = null;
+  // fila). [AUDITORIA B-1] Se suman SOLO las FUERZAS (V/Hx/Hy): son una resultante
+  // trasladable. Los MOMENTOS de nudos en posiciones distintas NO se pueden sumar sin su
+  // termino r×F (la suma cruda no es el momento resultante respecto de ningun punto): con
+  // borde EMPOTRADO (momentos de reaccion no nulos) la celda mostraba un numero sin sentido
+  // fisico que el arquitecto podia leer como "el momento de empotramiento de la losa". Por
+  // eso `filaMalla.obra` solo lleva las 3 FUERZAS; las 3 columnas de momento se pintan como
+  // "—" (esMomento en COLUMNAS). Se suma en ejes FEM y se remapea una vez (equivalente a
+  // sumar componente a componente en obra: la permutacion es lineal).
+  let filaMalla: {
+    etiqueta: string;
+    obra: Pick<ReaccionObra, "V" | "Hx" | "Hy">;
+  } | null = null;
   if (apoyosDeMalla.size > 0) {
-    const suma = [0, 0, 0, 0, 0, 0];
+    const sumaFem = [0, 0, 0, 0, 0, 0];
     let conReaccion = false;
     for (const apoyo of modeloFEM.supports) {
       if (!apoyosDeMalla.has(apoyo.node)) continue;
       const rxn = resultados.nodos[apoyo.node]?.[combo]?.rxn;
       if (!rxn) continue;
       conReaccion = true;
-      for (let c = 0; c < 6; c++) suma[c]! += rxn[c] ?? 0;
+      // Solo las 3 fuerzas (FX,FY,FZ, indices 0-2); los momentos no se agregan.
+      for (let c = 0; c < 3; c++) sumaFem[c] = (sumaFem[c] ?? 0) + (rxn[c] ?? 0);
     }
-    if (conReaccion) filaMalla = { etiqueta: "Losa (borde)", rxn: suma };
+    if (conReaccion) {
+      const o = mapearReaccionAObra(sumaFem);
+      filaMalla = { etiqueta: "Losa (borde)", obra: { V: o.V, Hx: o.Hx, Hy: o.Hy } };
+    }
   }
 
-  // Suma de reacciones verticales (ΣFY): ayuda de lectura para verificar equilibrio (debe
+  // Suma de reacciones VERTICALES (ΣV): ayuda de lectura para verificar equilibrio (debe
   // igualar la carga vertical total). Incluye el agregado de la losa, asi el total cierra
-  // aunque las reacciones de borde no se listen una a una. Index 1 = FY (vertical).
-  const sumaFY =
-    filas.reduce((acc, f) => acc + (f.rxn[1] ?? 0), 0) +
-    (filaMalla ? (filaMalla.rxn[1] ?? 0) : 0);
+  // aunque las reacciones de borde no se listen una a una. La componente vertical es `.V`.
+  const sumaV =
+    filas.reduce((acc, f) => acc + f.obra.V, 0) + (filaMalla ? filaMalla.obra.V : 0);
 
   return (
     <PanelFlotante
@@ -190,9 +236,9 @@ export function TablaReacciones() {
                 {COLUMNAS.map((c) => (
                   <th key={c.etiqueta} scope="col" className="cx-reacciones__th-num">
                     <span className="cx-reacciones__col-eje">{c.etiqueta}</span>
-                    {/* Unidad por columna: fuerzas (FX/FY/FZ) kN, momentos (MX/MY/MZ) kN·m. */}
+                    {/* Unidad por columna: fuerzas (V/Hx/Hy) kN, momentos (Mx/My/Mv) kN·m. */}
                     <span className="cx-reacciones__col-ud">
-                      {c.indice < 3 ? "kN" : "kN·m"}
+                      {c.esMomento ? "kN·m" : "kN"}
                     </span>
                   </th>
                 ))}
@@ -206,7 +252,7 @@ export function TablaReacciones() {
                   </th>
                   {COLUMNAS.map((c) => (
                     <td key={c.etiqueta} className="cx-reacciones__td-num mono">
-                      {fmt(f.rxn[c.indice] ?? 0)}
+                      {fmt(f.obra[c.campo])}
                     </td>
                   ))}
                 </tr>
@@ -218,25 +264,54 @@ export function TablaReacciones() {
                   <th scope="row" className="cx-reacciones__td-apoyo">
                     {filaMalla.etiqueta}
                   </th>
-                  {COLUMNAS.map((c) => (
-                    <td key={c.etiqueta} className="cx-reacciones__td-num mono">
-                      {fmt(filaMalla!.rxn[c.indice] ?? 0)}
-                    </td>
-                  ))}
+                  {COLUMNAS.map((c) => {
+                    // Solo las FUERZAS del agregado se muestran; los MOMENTOS van "—" (B-1).
+                    const esGuion = c.esMomento;
+                    const valor = esGuion
+                      ? null
+                      : filaMalla!.obra[c.campo as "V" | "Hx" | "Hy"];
+                    return (
+                      <td
+                        key={c.etiqueta}
+                        className="cx-reacciones__td-num mono"
+                        // El "—" se explica al pasar el raton (UX-H8); la nota al pie lo
+                        // repite para quien no usa el hover.
+                        title={esGuion ? NOTA_MOMENTOS_LOSA : undefined}
+                      >
+                        {/* [B-1] Momentos del agregado: "—" (no son resultante sin r×F). */}
+                        {valor === null ? "—" : fmt(valor)}
+                      </td>
+                    );
+                  })}
                 </tr>
               )}
             </tbody>
             <tfoot>
-              {/* Resumen de equilibrio: suma de reacciones verticales (ΣFY). El valor
-                  cae bajo la columna FY (vacia la de FX) para alinear con su columna. */}
+              {/* Resumen de equilibrio: suma de reacciones verticales (ΣV). La columna V es
+                  ahora la PRIMERA numerica (D5), asi el valor cae bajo su propia columna. */}
               <tr className="cx-reacciones__resumen">
                 <th scope="row" className="cx-reacciones__td-apoyo">
-                  ΣFY
+                  ΣV
                 </th>
-                <td className="cx-reacciones__td-num" aria-hidden="true" />
-                <td className="cx-reacciones__td-num mono">{fmt(sumaFY)}</td>
-                <td colSpan={4} className="cx-reacciones__resumen-nota">
+                <td className="cx-reacciones__td-num mono">{fmt(sumaV)}</td>
+                <td colSpan={5} className="cx-reacciones__resumen-nota">
                   suma de reacciones verticales (kN)
+                </td>
+              </tr>
+              {/* Nota al pie del "—" de los momentos de la losa (UX-H8): explica por que no
+                  se agregan, en lenguaje de obra. Solo cuando hay fila de losa. */}
+              {filaMalla && (
+                <tr className="cx-reacciones__pie">
+                  <td colSpan={7} className="cx-reacciones__pie-nota">
+                    — {NOTA_MOMENTOS_LOSA}
+                  </td>
+                </tr>
+              )}
+              {/* Nota de convenio de ejes (D5): recuerda que las columnas estan en ejes de
+                  OBRA (no FEM), con V = reaccion vertical. Evita la lectura falsa de "FY". */}
+              <tr className="cx-reacciones__pie">
+                <td colSpan={7} className="cx-reacciones__pie-nota">
+                  Componentes en ejes de obra (V = vertical).
                 </td>
               </tr>
             </tfoot>

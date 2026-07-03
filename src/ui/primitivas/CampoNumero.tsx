@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Campo } from "./Campo";
 
 // Input NUMERICO controlado-local con commit en blur. Primitiva compartida
@@ -34,6 +34,11 @@ export function CampoNumero({
   useEffect(() => {
     setLocal(String(valor));
   }, [valor]);
+  // UX-C8: bandera para que el blur que dispara Escape NO commitee. Escape revierte
+  // (sin guardar); pero al hacer blur() se dispararia onBlur y commitearia el valor
+  // (ademas el `local` recien reseteado aun no se ha aplicado en ese tick). Un ref
+  // evita ese commit espurio sin acoplar el timing de setState.
+  const revirtiendo = useRef(false);
   // Dato numerico -> mono tabular alineado a la derecha (Spec Diseno UI §1.5/§5).
   // Se fusiona con la clase del llamante (p. ej. anchos del dialogo).
   const clases = ["cx-input--num", className].filter(Boolean).join(" ");
@@ -47,7 +52,31 @@ export function CampoNumero({
       sufijo={sufijo}
       className={clases}
       onChange={(e) => setLocal(e.target.value)}
-      onBlur={() => onCommit(local.trim() === "" ? NaN : Number(local))}
+      onBlur={() => {
+        if (revirtiendo.current) {
+          // Blur provocado por Escape: se descarta (ya se resincronizo el local).
+          revirtiendo.current = false;
+          return;
+        }
+        onCommit(local.trim() === "" ? NaN : Number(local));
+      }}
+      // UX-C8: teclado explicito. Enter -> blur (dispara el commit en onBlur ya
+      // existente, sin duplicar la logica). Escape -> descarta lo tecleado
+      // resincronizando el estado local con el valor del modelo y hace blur SIN
+      // commit; ademas detiene la propagacion para que ESE Esc no cierre el dialogo
+      // ni cancele la herramienta de introduccion (el listener global veria el
+      // defaultPrevented). Sin esto, editar un numero y pulsar Esc cerraba el panel.
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          revirtiendo.current = true;
+          setLocal(String(valor));
+          e.preventDefault();
+          e.stopPropagation();
+          e.currentTarget.blur();
+        }
+      }}
     />
   );
 }
