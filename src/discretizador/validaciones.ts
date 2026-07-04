@@ -587,6 +587,18 @@ function validarSujecion(
   // T-f3-sujecion-componentes: sigue siendo un heuristico global, pero ahora es
   // EXACTO respecto a lo que el discretizador emite]. El veredicto final de mecanismo
   // lo da el solver; aqui se atrapa el caso obvio.
+  //
+  // [F2.0/DP2] Losa plana sobre pilares: una losa acoplada SOLO a pilares (bordes
+  // libres) queda sujeta por el arranque de esos pilares — que YA cuenta abajo
+  // (`p.vinculacionExterior`). Con >=2 pilares con arranque, `haySujecionPilar` es true
+  // sin cambio estructural: el arranque del pilar interior sujeta igual que el de un
+  // pilar de esquina. NO se analizan componentes conexos en este corte (sujecion SOLO
+  // por pilar, DP2); una losa acoplada a pilares SIN arranque conviviendo con otra
+  // subestructura sujeta pasaria este heuristico global (agujero PRE-EXISTENTE, no lo
+  // introduce F2.0) y solo la cazaria `check_stability` del solver. Cerrarlo bien es
+  // `T-f3-sujecion-componentes` (deuda ortogonal): cuando se aborde, el analisis de
+  // componentes debera recorrer las aristas nudo<->quad que la losa plana añade al grafo
+  // (los quads conectan las cabezas de pilar a la losa), no solo nudo<->barra.
   const haySujecionPilar = modelo.pilares.some((p) => p.vinculacionExterior);
   const haySujecionPano = modelo.panos.some((pano) => {
     if (pano.tipo !== "losa" || pano.bordeApoyo === "libre") return false;
@@ -692,25 +704,78 @@ function validarNudosFlotantes(modelo: Modelo, errores: ErrorObra[]): void {
 
 // --- Validaciones del ACOPLE paño<->portico (F3.2) ----------------------------
 
-// 6. Elementos que ATRAVIESAN el paño por dentro sin acoplarse [OV-5 + TODO-2].
+// 6. Elementos que ATRAVIESAN el paño por dentro [OV-5 + TODO-2 + F2.0 losa plana].
 // Un pilar estrictamente interior que alcanza la cota del paño, o una viga cuyo
-// tramo pasa por dentro del rectangulo, NO se conectan a la losa en esta fase: el
-// calculo los ignoraria como apoyo y el reparto de cargas seria falso pero
-// verosimil (las vigas de contorno se llevarian TODO). Precedente M-5: BLOQUEAR
-// con mensaje de obra y salida clara es mas seguro que calcular basura plausible.
-// La losa plana (pilar interior acoplado con lineas de control de malla) llegara
-// en un corte futuro (T-f3-losa-plana).
-function validarElementosInterioresPano(modelo: Modelo, errores: ErrorObra[]): void {
+// tramo pasa por dentro del rectangulo. Reparto correcto solo si REALMENTE se
+// acoplan a la losa; si no, el calculo los ignoraria como apoyo y el reparto de
+// cargas seria falso pero verosimil. Precedente M-5: BLOQUEAR con mensaje de obra
+// y salida clara es mas seguro que calcular basura plausible.
+//
+// F2.0 (losa plana sobre pilares): un pilar interior YA NO bloquea SIEMPRE. Si la
+// losa plana lo recogio (su cabeza cae en un nudo de malla que el Paso 6c remapea a
+// su N*), el pilar esta en `acople.pilaresAcoplados` y es un apoyo legitimo: NO se
+// emite PANO_PILAR_INTERIOR. Reglas por paño (todas via `acoples`), en este orden:
+//
+//   1. Paño en `erroresMallado` (cap de lineas de control, PANO_DEMASIADOS_PILARES):
+//      se emite SOLO ese error una vez [RESERVA-3] y se CALLAN por completo los
+//      elementos interiores de ese paño (pilares Y vigas). Motivo: el paño NO se
+//      malla (esta fuera de `porPano`, XOR §1.2), luego no hay reparto que validar
+//      elemento a elemento; superponer PANO_PILAR_INTERIOR por cada pilar seria
+//      doble reporte contradictorio del MISMO problema (demasiados pilares). La viga
+//      interior tambien se calla: sin malla no hay losa donde embrochalarla, y el
+//      arreglo de obra es el mismo (dividir el paño), asi que un solo error guia
+//      mejor que dos.
+//   2. Pilar en `pilaresAcoplados` -> OK (la losa plana lo recoge), no error.
+//   3. Pilar en algun par de `pilaresJuntos` -> lo explica PANO_PILARES_JUNTOS
+//      (validarPilaresJuntos); no se duplica aqui como PANO_PILAR_INTERIOR.
+//   4. Resto (interior NI acoplado NI junto: p.ej. 1 solo pilar, DP1) -> bloquea
+//      con PANO_PILAR_INTERIOR (la losa plana exige >=2 apoyos acoplados).
+//
+// Las vigas interiores (embrochaladas) siguen bloqueando salvo bajo cap (regla 1):
+// una viga que pasa por dentro sin acoplarse no la recoge la losa plana en este corte.
+function validarElementosInterioresPano(
+  modelo: Modelo,
+  errores: ErrorObra[],
+  acoples: ResultadoAcoples,
+): void {
   // Orden por id de paño (determinista); dentro, los helpers ya ordenan por id.
   const panosOrdenados = [...modelo.panos].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   );
   for (const pano of panosOrdenados) {
+    // [RESERVA-3] Precedencia del cap: el paño no se mallo (esta en erroresMallado, XOR
+    // con porPano). Se emite SOLO PANO_DEMASIADOS_PILARES y se callan sus elementos
+    // interiores (pilares Y vigas): un unico error de obra en vez de doble reporte.
+    const errorMallado = acoples.erroresMallado.get(pano.id);
+    if (errorMallado !== undefined) {
+      errores.push({
+        codigo: "PANO_DEMASIADOS_PILARES",
+        severidad: "error",
+        // El mensaje ya viene en lenguaje de obra desde mallado.ts (mallado.ts:409-411).
+        mensaje: errorMallado.mensaje,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+      continue;
+    }
+
+    const acople = acoples.porPano.get(pano.id);
+    // Pilares REALMENTE acoplados por la losa plana (vacio en el corte 2 y en DP1).
+    const acoplados = new Set(acople?.pilaresAcoplados ?? []);
+    // Pilares que forman parte de una junta (los explica PANO_PILARES_JUNTOS).
+    const juntos = new Set<string>();
+    for (const [a, b] of acoples.pilaresJuntos.get(pano.id) ?? []) {
+      juntos.add(a);
+      juntos.add(b);
+    }
+
     for (const pilar of pilaresInterioresBajoPano(modelo, pano)) {
+      if (acoplados.has(pilar.id)) continue; // recogido por la losa plana: apoyo legitimo
+      if (juntos.has(pilar.id)) continue; // lo explica PANO_PILARES_JUNTOS
       errores.push({
         codigo: "PANO_PILAR_INTERIOR",
         severidad: "error",
-        mensaje: `El pilar "${pilar.nombre}" atraviesa el paño "${pano.nombre}" por dentro y aún no puede recogerlo. Lleva vigas hasta el pilar (partiendo el paño en crujías) o retíralo; la losa apoyada directamente en pilares llegará en una fase posterior.`,
+        mensaje: `El pilar "${pilar.nombre}" atraviesa el paño "${pano.nombre}" por dentro y no lo recoge. La losa plana necesita al menos dos pilares (o pilares y vigas) para apoyarse; añade otro apoyo, lleva vigas hasta el pilar (partiendo el paño en crujías) o retíralo.`,
         elementoId: pilar.id,
         elementoTipo: "pilar",
         posicion: { x: pilar.x, y: pilar.y },
@@ -723,6 +788,41 @@ function validarElementosInterioresPano(modelo: Modelo, errores: ErrorObra[]): v
         mensaje: `La viga "${viga.nombre}" pasa por dentro del paño "${pano.nombre}" y aún no puede recogerlo. Parte el paño en crujías siguiendo la viga o retírala.`,
         elementoId: viga.id,
         elementoTipo: "viga",
+      });
+    }
+  }
+}
+
+// 6b. Pilares JUNTOS bajo un paño [F2.0]: dos (o mas) cabezas de pilar interiores caen
+// en la MISMA celda 2D de la malla (misma clave de posicion = reclamarian el MISMO
+// nudo de malla, colision de acople silenciosa). `acople.ts` lo DETECTA por celda 2D
+// (RESERVA-2, el mismo criterio del remap del Paso 6c); aqui se EMITE como error de
+// obra que NOMBRA los dos pilares y el paño. BLOQUEA: no se puede acoplar cada pilar por
+// separado si comparten nudo. Determinista: paños por id, pares ya ordenados por id (a<b)
+// desde acople.ts.
+function validarPilaresJuntos(
+  modelo: Modelo,
+  errores: ErrorObra[],
+  acoples: ResultadoAcoples,
+): void {
+  const panoPorId = new Map(modelo.panos.map((p) => [p.id, p]));
+  const pilarPorId = new Map(modelo.pilares.map((p) => [p.id, p]));
+  const panoIds = [...acoples.pilaresJuntos.keys()].sort();
+  for (const panoId of panoIds) {
+    const pano = panoPorId.get(panoId);
+    if (pano === undefined) continue; // defensivo: acople siempre parte de modelo.panos
+    for (const [idA, idB] of acoples.pilaresJuntos.get(panoId)!) {
+      const pa = pilarPorId.get(idA);
+      const pb = pilarPorId.get(idB);
+      if (pa === undefined || pb === undefined) continue; // defensivo
+      errores.push({
+        codigo: "PANO_PILARES_JUNTOS",
+        severidad: "error",
+        mensaje: `Los pilares "${pa.nombre}" y "${pb.nombre}" caen en el mismo punto del paño "${pano.nombre}" y no se pueden apoyar por separado. Sepáralos o revisa sus coordenadas.`,
+        // Apunta al primer pilar del par (el de id menor); ambos nombres van en el mensaje.
+        elementoId: pa.id,
+        elementoTipo: "pilar",
+        posicion: { x: pa.x, y: pa.y },
       });
     }
   }
@@ -896,7 +996,8 @@ export function validarModelo(
   validarHipotesisPesoPropio(modelo, errores); // E1: guard de desincronizacion
   validarObraVacia(modelo, errores); // UX-VACIA: sin elementos no hay nada que calcular
   validarSujecion(modelo, errores, acoplesReales);
-  validarElementosInterioresPano(modelo, errores); // [OV-5/TODO-2] pilar/viga interior
+  validarElementosInterioresPano(modelo, errores, acoplesReales); // [OV-5/TODO-2/F2.0] pilar/viga interior condicional + cap
+  validarPilaresJuntos(modelo, errores, acoplesReales); // [F2.0] dos pilares en la misma celda de malla
   validarAvisosAcople(modelo, errores, acoplesReales); // [OV-2] parcial/insuficiente
   validarCargasGrupo(modelo, errores); // [D-1] id reservado + negativo + duplicidad
   validarHipotesisConCargas(modelo, errores);

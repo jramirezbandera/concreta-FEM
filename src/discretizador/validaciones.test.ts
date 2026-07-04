@@ -744,21 +744,106 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
     });
   });
 
-  describe("elementos INTERIORES bajo la losa bloquean [OV-5 + TODO-2]", () => {
-    it("pilar estrictamente dentro del paño -> error PANO_PILAR_INTERIOR navegable al pilar", () => {
-      const m = conPanoSobreViga("simple");
-      m.pilares.push({
-        id: "pil-int", nombre: "P9", x: 2.5, y: 1.5,
-        plantaInicial: "p0", plantaFinal: "p1",
+  describe("elementos INTERIORES bajo la losa [OV-5 + TODO-2 + F2.0 losa plana]", () => {
+    // Paño LIBRE cuadrado 5x5 SIN vigas: el unico apoyo posible viene de los pilares
+    // interiores que se le pongan. bordeApoyo "simple" (apoyos de borde propios) evita
+    // que PANO_SIN_APOYO enturbie los asserts: aisla el efecto de los pilares interiores.
+    function panoAisladoSobrePilares(): Modelo {
+      const m = modeloValido();
+      m.vigas = []; // sin portico: la losa se apoya SOLO en los pilares que se acoplen
+      m.cargas = []; // la carga colgaba de v1
+      m.nudos.push(
+        { id: "s1", x: 0, y: 0 }, { id: "s2", x: 5, y: 0 },
+        { id: "s3", x: 5, y: 5 }, { id: "s4", x: 0, y: 5 },
+      );
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["s1", "s2", "s3", "s4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      });
+      return m;
+    }
+    function pilarInterior(id: string, nombre: string, x: number, y: number): Modelo["pilares"][number] {
+      return {
+        id, nombre, x, y, plantaInicial: "p0", plantaFinal: "p1",
         seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
         vinculacionExterior: true, arranque: "empotrado",
-      });
+      };
+    }
+
+    it("[F2.0] losa sobre >=2 pilares interiores acoplados -> NO bloquea (la recoge la losa plana)", () => {
+      const m = panoAisladoSobrePilares();
+      m.pilares.push(
+        pilarInterior("pia", "PA", 1.5, 2.5),
+        pilarInterior("pib", "PB", 3.5, 2.5),
+      );
+      const cods = codigos(validarModelo(m));
+      expect(cods).not.toContain("PANO_PILAR_INTERIOR"); // ambos acoplados = apoyo legitimo
+      expect(cods).not.toContain("PANO_PILARES_JUNTOS");
+    });
+
+    it("[F2.0] pilar interior bajo un paño YA acoplado por vigas -> recogido (no bloquea)", () => {
+      // conPanoSobreViga("simple") ya esta acopleActivo por su borde inferior sobre v1;
+      // un pilar interior cae en un nudo de malla que la losa plana remapea a su N*.
+      const m = conPanoSobreViga("simple");
+      m.pilares.push(pilarInterior("pil-int", "P9", 2.5, 1.5));
+      expect(codigos(validarModelo(m))).not.toContain("PANO_PILAR_INTERIOR");
+    });
+
+    it("[DP1] losa sobre UN solo pilar interior -> SI bloquea con PANO_PILAR_INTERIOR (>=2 apoyos)", () => {
+      const m = panoAisladoSobrePilares();
+      m.pilares.push(pilarInterior("pil-int", "P9", 2.5, 2.5));
       const e = validarModelo(m).filter((x) => x.codigo === "PANO_PILAR_INTERIOR");
       expect(e).toHaveLength(1);
       expect(e[0].severidad).toBe("error");
       expect(e[0].elementoId).toBe("pil-int");
-      expect(e[0].posicion).toEqual({ x: 2.5, y: 1.5 });
+      expect(e[0].posicion).toEqual({ x: 2.5, y: 2.5 });
+      // Mensaje nuevo (ya no "en una fase posterior"): guia a añadir un segundo apoyo.
+      expect(e[0].mensaje).toContain("al menos dos pilares");
       sinJergaFEM(e[0]);
+    });
+
+    it("[F2.0] dos pilares en la MISMA celda -> PANO_PILARES_JUNTOS (nombra los 2), sin PANO_PILAR_INTERIOR por ellos", () => {
+      const m = panoAisladoSobrePilares();
+      // Mismo punto (2.5,2.5): caen en la misma celda 2D de la malla (junta).
+      m.pilares.push(
+        pilarInterior("pja", "PJ-A", 2.5, 2.5),
+        pilarInterior("pjb", "PJ-B", 2.5, 2.5),
+      );
+      const errores = validarModelo(m);
+      const juntos = errores.filter((x) => x.codigo === "PANO_PILARES_JUNTOS");
+      expect(juntos).toHaveLength(1);
+      expect(juntos[0].severidad).toBe("error");
+      expect(juntos[0].elementoTipo).toBe("pilar");
+      expect(juntos[0].mensaje).toContain("PJ-A");
+      expect(juntos[0].mensaje).toContain("PJ-B");
+      expect(juntos[0].mensaje).toContain("Losa"); // nombre del paño
+      sinJergaFEM(juntos[0]);
+      // Esos pilares NO reciben ademas PANO_PILAR_INTERIOR (lo explica PANO_PILARES_JUNTOS).
+      const interior = errores.filter((x) => x.codigo === "PANO_PILAR_INTERIOR");
+      expect(interior.map((x) => x.elementoId)).not.toContain("pja");
+      expect(interior.map((x) => x.elementoId)).not.toContain("pjb");
+    });
+
+    it("[F2.0/RESERVA-3] paño con demasiados pilares (cap) -> PANO_DEMASIADOS_PILARES una vez, sin PANO_PILAR_INTERIOR", () => {
+      // Cap = la rejilla MINIMA de bordes + lineas de control ya supera CAP_QUADS (2000):
+      // (nX+1)*(nY+1) > 2000. 45 pilares en diagonal con coords DISTINTAS dan 45 lineas de
+      // control X + 45 Y -> (45+1)*(45+1)=2116 celdas minimas -> mallarPano falla ->
+      // el paño cae en erroresMallado (fuera de porPano, XOR).
+      const m = panoAisladoSobrePilares();
+      for (let i = 1; i <= 45; i++) {
+        const c = (i * 5) / 46; // en (0,5), estrictamente interior, todas distintas
+        m.pilares.push(pilarInterior(`pc${i}`, `PC${i}`, c, c));
+      }
+      const errores = validarModelo(m);
+      const cap = errores.filter((x) => x.codigo === "PANO_DEMASIADOS_PILARES");
+      expect(cap).toHaveLength(1); // una sola vez por paño
+      expect(cap[0].severidad).toBe("error");
+      expect(cap[0].elementoTipo).toBe("pano");
+      expect(cap[0].elementoId).toBe("pano1");
+      sinJergaFEM(cap[0]);
+      // Bajo cap NO se superpone PANO_PILAR_INTERIOR por cada pilar (RESERVA-3).
+      expect(codigos(errores)).not.toContain("PANO_PILAR_INTERIOR");
     });
 
     it("viga que cruza el paño por dentro -> error PANO_VIGA_INTERIOR; el contorno no dispara", () => {
@@ -775,6 +860,39 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
     it("pilar en la ESQUINA o en el borde del paño no es interior (no bloquea)", () => {
       const m = conPanoSobreViga("simple"); // pil1 del fixture esta en (0,0) = esquina
       expect(codigos(validarModelo(m))).not.toContain("PANO_PILAR_INTERIOR");
+    });
+  });
+
+  describe("sujecion de losa plana sobre pilares [F2.0/DP2]", () => {
+    it("losa sobre >=2 pilares con arranque -> NO emite SIN_SUJECION", () => {
+      const m = modeloValido();
+      m.vigas = [];
+      m.cargas = [];
+      m.nudos.push(
+        { id: "s1", x: 0, y: 0 }, { id: "s2", x: 5, y: 0 },
+        { id: "s3", x: 5, y: 5 }, { id: "s4", x: 0, y: 5 },
+      );
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["s1", "s2", "s3", "s4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "libre",
+      });
+      // Solo pilares interiores con arranque (vinculacionExterior): su arranque sujeta.
+      m.pilares = [
+        {
+          id: "pia", nombre: "PA", x: 1.5, y: 2.5, plantaInicial: "p0", plantaFinal: "p1",
+          seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
+          vinculacionExterior: true, arranque: "empotrado",
+        },
+        {
+          id: "pib", nombre: "PB", x: 3.5, y: 2.5, plantaInicial: "p0", plantaFinal: "p1",
+          seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
+          vinculacionExterior: true, arranque: "empotrado",
+        },
+      ];
+      const cods = codigos(validarModelo(m));
+      expect(cods).not.toContain("SIN_SUJECION"); // el arranque de los pilares sujeta
+      expect(cods).not.toContain("PANO_PILAR_INTERIOR"); // ambos acoplados a la losa plana
     });
   });
 
