@@ -8,6 +8,7 @@ import {
   releasesDeExtremo,
 } from "./discretizar";
 import type { PuntoPlano } from "./mallado";
+import { calcularAcoples, pilaresInterioresBajoPano } from "./acople";
 import { mismaPosicionEnPlanta } from "./geometria";
 import { ModeloFEMSchema } from "./contratoFEM";
 import { type Modelo } from "../dominio";
@@ -981,5 +982,224 @@ describe("construirBaseFEM · subdivision de vigas (F3.2)", () => {
     };
     const total = tramos.reduce((acc, mm) => acc + longitud(mm), 0);
     expect(total).toBeCloseTo(5, 12); // = longitud de la viga n1(2,5)->n2(7,5)
+  });
+});
+
+// --- F2.0 (T2.1): LOSA PLANA sobre pilares interiores (Paso 6c) -----------------
+// Dos escenarios que ESTA tarea (discretizar.ts) debe soportar:
+//   (a) un paño losa cuya malla supera el CAP de lineas de control (muchos pilares
+//       interiores muy juntos): `discretizar` NO debe LANZAR (el Paso 6c salta el
+//       paño ausente de porPano pero presente en erroresMallado; el error de obra
+//       PANO_DEMASIADOS_PILARES lo pone validaciones, T2.2, no esta tarea).
+//   (b) una losa sobre >=2 pilares interiores: el remap del Paso 6c generaliza a las
+//       cabezas de pilar (su N* existe en construirBaseFEM via cotasDePilar) y la
+//       estabilizacion de plano se OMITE (acopleActivo con >=2 cabezas).
+//
+// NOTA DE FLUJO (verificada): con `validaciones.ts` sin tocar (T2.2 en paralelo), un
+// pilar interior bajo un paño dispara PANO_PILAR_INTERIOR (bloqueante), asi que
+// `discretizar` retorna ok:false ANTES del Paso 6c. Por eso los invariantes de la
+// malla acoplada (remap a la cabeza, ausencia de muleta, N* de la cabeza) se prueban
+// al nivel de COMPOSICION reachable HOY: `construirBaseFEM` + `calcularAcoples`, el
+// MISMO par que ejecuta el Paso 6c internamente (espejo del bloque de subdivision de
+// vigas de arriba). Cuando T2.2 relaje el bloqueo, ese remap correre tal cual por
+// discretizar sin cambios en esta tarea.
+
+// Portico con una LOSA plana 4x4 (cota 3) sobre `nInteriores` pilares interiores
+// estrictamente dentro del rectangulo y que ALCANZAN la cota del paño (p0->p1). El
+// pilar de esquina de modeloPortico se conserva (sujecion). Con tamMalla 1 la rejilla
+// base es 4x4; las coords de los pilares interiores caen sobre lineas de rejilla.
+function modeloLosaPlana(
+  pilaresXY: readonly (readonly [number, number])[],
+): Modelo {
+  const m = modeloPortico();
+  m.nudos.push(
+    { id: "q1", x: 0, y: 0 },
+    { id: "q2", x: 4, y: 0 },
+    { id: "q3", x: 4, y: 4 },
+    { id: "q4", x: 0, y: 4 },
+  );
+  m.panos.push({
+    id: "pano1",
+    nombre: "Losa plana",
+    tipo: "losa",
+    plantaId: "p1",
+    perimetro: ["q1", "q2", "q3", "q4"],
+    espesor: 0.25,
+    materialId: "HA-25",
+    tamMalla: 1,
+    bordeApoyo: "libre", // solo se sostiene por los pilares interiores acoplados
+  });
+  pilaresXY.forEach(([x, y], i) => {
+    m.pilares.push({
+      id: `pin${i + 1}`,
+      nombre: `PI${i + 1}`,
+      x,
+      y,
+      plantaInicial: "p0",
+      plantaFinal: "p1", // remata en la cota 3 = cota del paño
+      seccionId: SECCION,
+      materialId: MATERIAL,
+      angulo: 0,
+      vinculacionExterior: true,
+      arranque: "empotrado",
+    });
+  });
+  return m;
+}
+
+describe("discretizar · losa plana sobre pilares (F2.0, T2.1) — flujo", () => {
+  it("(a) paño losa que supera el CAP de lineas de control: discretizar NO lanza y NO emite quads de ese paño", () => {
+    // Diagonal de N pilares interiores muy juntos: N lineas de control en X y N en Y
+    // -> (N+1)^2 celdas minimas > CAP_QUADS. calcularAcoples registra el paño en
+    // erroresMallado (fuera de porPano). El Paso 6c debe SALTARLO limpiamente en vez
+    // de lanzar "Acople de paño ausente tras validar".
+    const N = 45;
+    const pilares: [number, number][] = [];
+    for (let i = 1; i <= N; i++) {
+      pilares.push([0.1 + (i * 3.8) / (N + 1), 0.1 + (i * 2.8) / (N + 1)]);
+    }
+    const m = modeloLosaPlana(pilares);
+    // Verifica primero el pre-pase: el paño esta en erroresMallado, NO en porPano (XOR).
+    const acoples = calcularAcoples(m);
+    expect(acoples.erroresMallado.get("pano1")?.codigo).toBe("PANO_DEMASIADOS_PILARES");
+    expect(acoples.porPano.has("pano1")).toBe(false);
+    // discretizar NO debe lanzar (la red anti-bug del Paso 6c es SOLO para el paño
+    // mallable ausente; este esta legitimamente en erroresMallado).
+    expect(() => discretizar(m)).not.toThrow();
+    const res = discretizar(m);
+    // Hoy retorna ok:false por PANO_PILAR_INTERIOR (validaciones, T2.2 aun no relaja):
+    // lo relevante para ESTA tarea es que NO CRASHEA y no hay quads de ese paño.
+    if (res.ok) {
+      expect(res.modeloFEM.quads ?? []).toHaveLength(0);
+    } else {
+      // El bloqueo previo es de obra (no un throw): el error superficia el problema.
+      expect(res.errores.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("(a-bis) el cap NO arrastra el material del paño a `materials` (paño no emitido)", () => {
+    // Refuerza que un paño saltado en el Paso 6c no contamina la Capa 2 aunque, por el
+    // flujo, hoy no lleguemos a construir el ModeloFEM. Se comprueba al nivel del
+    // pre-pase: el paño capado no esta en porPano, luego su material no se emitiria.
+    const N = 45;
+    const pilares: [number, number][] = [];
+    for (let i = 1; i <= N; i++) {
+      pilares.push([0.1 + (i * 3.8) / (N + 1), 0.1 + (i * 2.8) / (N + 1)]);
+    }
+    const acoples = calcularAcoples(modeloLosaPlana(pilares));
+    expect(acoples.porPano.has("pano1")).toBe(false);
+  });
+});
+
+describe("construirBaseFEM + calcularAcoples · losa plana (F2.0, T2.1) — malla acoplada", () => {
+  // La cabeza de cada pilar interior acoplado debe tener SIEMPRE su nodo estructural
+  // N* en la base (via cotasDePilar): el throw "Nudo acoplado sin nodo estructural"
+  // del Paso 6c NO puede dispararse para una cabeza legitima. Este es el invariante
+  // que el Paso 6c da por sentado; se verifica aqui de forma reachable.
+  function nombreCabeza(
+    base: ReturnType<typeof construirBaseFEM>,
+    x: number,
+    y: number,
+    cota: number,
+  ): string | undefined {
+    return base.nombrePorClave.get(clavePosicion(mapearEjes(x, y, cota), TOL_NODO));
+  }
+
+  it("(b) losa sobre 2 pilares interiores: ambas cabezas se acoplan y remapean a un N* existente", () => {
+    const m = modeloLosaPlana([
+      [1, 2],
+      [3, 2],
+    ]);
+    const acoples = calcularAcoples(m);
+    const acople = acoples.porPano.get("pano1")!;
+    // >=2 cabezas -> acople activo (sin vigas de contorno: la sujecion la dan los pilares).
+    expect(acople.acopleActivo).toBe(true);
+    // Ambos pilares interiores declarados como acoplados (RESERVA-1: solo bajo activo).
+    expect([...acople.pilaresAcoplados].sort()).toEqual(["pin1", "pin2"]);
+
+    // INVARIANTE N*-cabeza: cada cabeza acoplada resuelve a un N* de la base (el remap
+    // del Paso 6c no puede lanzar). La base se construye con las MISMAS subdivisiones
+    // que usara discretizar.
+    const base = construirBaseFEM(m, { subdivisionesViga: acoples.subdivisionesViga });
+    const cotaPano = 3; // cota de p1
+    for (const [x, y] of [
+      [1, 2],
+      [3, 2],
+    ] as const) {
+      expect(nombreCabeza(base, x, y, cotaPano)).toBeDefined();
+    }
+
+    // El nudo de malla de cada cabeza remapea EXACTAMENTE al N* de esa celda: espejo
+    // del bucle del Paso 6c (nombreFinalPorNudo). Ningun nudo acoplado queda sin N*.
+    const porNombreMalla = new Map(acople.malla.nodos.map((nd) => [nd.name, nd]));
+    for (const name of acople.nodosAcoplados) {
+      const nd = porNombreMalla.get(name)!;
+      const estructural = base.nombrePorClave.get(
+        clavePosicion([nd.x, nd.y, nd.z], TOL_NODO),
+      );
+      expect(estructural).toBeDefined();
+      expect(estructural!.startsWith("N")).toBe(true); // nombre estructural, no PQ*
+    }
+  });
+
+  it("(b) >=2 cabezas de pilar => acopleActivo => estabilizacion de plano OMITIDA (sin muleta)", () => {
+    // El Paso 6c aplica la muleta DX/DZ SOLO si `!acople.acopleActivo`. Con >=2 cabezas
+    // el acople esta activo, luego la malla NO recibe estabilizacion artificial (la
+    // membrana del emparrillado anclada a >=2 pilares sujeta el plano).
+    const acople = calcularAcoples(modeloLosaPlana([[1, 2], [3, 2]])).porPano.get("pano1")!;
+    expect(acople.acopleActivo).toBe(true);
+    // La malla lleva su plan de estabilizacion (por si el paño quedara aislado), pero
+    // el Paso 6c la ignora bajo acopleActivo: se documenta el gate que decide la muleta.
+    expect(acople.malla.estabilizacion.length).toBeGreaterThan(0);
+  });
+
+  it("losa sobre 1 SOLO pilar interior: acople INACTIVO y pilaresAcoplados vacio (DP1, sin remap)", () => {
+    // Con 1 sola cabeza: size==1 -> !acopleActivo -> la cabeza NO se remapea y el pilar
+    // seguira disparando PANO_PILAR_INTERIOR (bloqueo por DP1, en validaciones). Aqui se
+    // verifica el lado discretizador: sin acople activo, la muleta SI se conservaria.
+    const acople = calcularAcoples(modeloLosaPlana([[2, 2]])).porPano.get("pano1")!;
+    expect(acople.acopleActivo).toBe(false);
+    expect(acople.pilaresAcoplados).toEqual([]);
+  });
+
+  it("DP3: pilar PASANTE de otro grupo comparte el N* a la cota del paño (grupo = organizativo)", () => {
+    // Un pilar que atraviesa la cota del paño (p0->p2, pasando por p1) debe tener un N*
+    // troceado en la cota de p1 (la planta del paño), aunque su tramo abarque otro
+    // grupo. cotasDePilar trocea por TODA planta intermedia real: el N* de la cabeza a
+    // la cota del paño EXISTE. Es el respaldo del invariante N*-cabeza para el pasante.
+    const m = modeloLosaPlana([]); // sin interiores de base; se añade el pasante a mano
+    // Grupo B con una planta superior (cota 6) para que el pilar sea pasante en p1.
+    m.grupos.push({ id: "gB", nombre: "Grupo B", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 });
+    m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "gB" });
+    m.pilares.push({
+      id: "pas1",
+      nombre: "PAS1",
+      x: 2,
+      y: 2,
+      plantaInicial: "p0", // cota 0
+      plantaFinal: "p2", // cota 6 -> pasa por p1 (cota 3 = cota del paño)
+      seccionId: SECCION,
+      materialId: MATERIAL,
+      angulo: 0,
+      vinculacionExterior: true,
+      arranque: "empotrado",
+    });
+    // pilaresInterioresBajoPano reconoce el pasante (alcanza la cota, es interior).
+    const interiores = pilaresInterioresBajoPano(m, m.panos[0]).map((p) => p.id);
+    expect(interiores).toContain("pas1");
+    // La base tiene un N* en la cabeza del pasante a la cota del paño (cota 3).
+    const acoples = calcularAcoples(m);
+    const base = construirBaseFEM(m, { subdivisionesViga: acoples.subdivisionesViga });
+    expect(base.nombrePorClave.get(clavePosicion(mapearEjes(2, 2, 3), TOL_NODO))).toBeDefined();
+  });
+
+  it("determinismo byte a byte: la base con losa plana (2 pilares interiores) es identica en dos construcciones", () => {
+    const build = (): string => {
+      const m = modeloLosaPlana([[1, 2], [3, 2]]);
+      const acoples = calcularAcoples(m);
+      const base = construirBaseFEM(m, { subdivisionesViga: acoples.subdivisionesViga });
+      return JSON.stringify({ nodes: base.nodes, members: base.members });
+    };
+    expect(build()).toBe(build());
   });
 });

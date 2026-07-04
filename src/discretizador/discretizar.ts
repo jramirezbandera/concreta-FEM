@@ -336,6 +336,10 @@ export function construirBaseFEM(modelo: Modelo, opts?: OpcionesBaseFEM): BaseFE
   // acople genera un nodo estructural en la MISMA celda que el nudo de borde de la
   // malla (las coordenadas provienen de mallarPano via calcularAcoples): el Paso 6c
   // remapea por `nombrePorClave` y los quads comparten nudo con la viga.
+  // Un pilar interior (losa plana, F2.0) NO subdivide viga: su cabeza es un nudo
+  // PUNTUAL que ya nace por `cotasDePilar` a la cota del paño, no un punto sobre el
+  // segmento de una viga de contorno (`subdivisionesViga` solo lo alimentan nudos de
+  // BORDE, acople.ts). Aqui, por tanto, `subdivisionesViga` nunca contiene cabezas.
   const clavesViga = new Map<string, string[]>(); // vigaId -> claves i->j
   for (const v of modelo.vigas) {
     const planta = plantaPorId(modelo, v.plantaId) as Planta;
@@ -857,25 +861,33 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   // que el centro de rigidez (que reusa `construirBaseFEM` via `prepararModeloCR`) NO ve
   // los quads. Cada paño "losa" consume su malla YA computada por el pre-pase
   // `calcularAcoples` (no se malla dos veces, [1A]) y se emite asi:
-  //   - Nudos de BORDE ACOPLADOS (sobre vigas de contorno, acople activo): NO se
-  //     emiten como nudos propios; sus quads REFERENCIAN el nodo estructural N* de la
-  //     misma celda (nombrePorClave). La viga se subdividio en la base justo ahi:
-  //     compartir nudo = acople FEM (PyNite ensambla K global por nudo). Union
+  //   - Nudos ACOPLADOS (acople activo) = BORDE sobre vigas de contorno ∪ CABEZAS de
+  //     pilar interiores (losa plana, F2.0): NO se emiten como nudos propios; sus quads
+  //     REFERENCIAN el nodo estructural N* de la misma celda (nombrePorClave). La viga
+  //     se subdividio en la base justo ahi; la cabeza de pilar ya nace como N* en
+  //     `construirBaseFEM` (via cotasDePilar, un pilar NO subdivide viga: es un nudo
+  //     puntual). Compartir nudo = acople FEM (PyNite ensambla K global por nudo). Union
   //     monolitica (hormigon in situ): sin liberaciones de placa.
   //   - Resto de nudos (interiores y borde sin viga): nudos PROPIOS PQ<idx>-N* como
   //     en el corte 1.
   //   - Apoyos de bordeApoyo: POR NUDO, solo en los nudos de borde NO acoplados (el
-  //     borde acoplado descarga en el portico, no en un apoyo artificial).
+  //     borde acoplado descarga en el portico, no en un apoyo artificial). Las cabezas
+  //     de pilar interiores nunca reciben bordeApoyo (no estan en malla.nodosBorde).
   //   - Estabilizacion de plano: SOLO si el paño quedo AISLADO (sin acople activo).
-  //     Con acople, el portico ya sujeta la losa en su plano; dejarla robaria carga
-  //     horizontal (reacciones espurias).
+  //     Con acople, el portico (vigas de contorno) o >=2 pilares interiores ya sujetan
+  //     la losa en su plano; dejarla robaria carga horizontal (reacciones espurias).
   // Solo se emiten claves quads/quad_loads SI hay paños (regresion byte a byte).
   // Determinista: paños ordenados por id; prefijo PQ<idx> por posicion ordinal (el
   // MISMO indice con el que el pre-pase mallo, contrato de calcularAcoples).
   //
   // Las validaciones previas (validarRefsPano) ya garantizaron tipo "losa", material/
-  // planta/nudos validos, tamMalla>0 y geometria rectangular: aqui el acople no puede
-  // faltar (un paño ausente de porPano seria un bug interno; se deja propagar).
+  // planta/nudos validos, tamMalla>0 y geometria rectangular. Con la losa plana (F2.0)
+  // hay UN motivo legitimo de ausencia de `porPano`: la malla del paño supero el cap de
+  // lineas de control (demasiados pilares interiores). Ese paño esta en
+  // `acoples.erroresMallado` (XOR con `porPano`, contrato de calcularAcoples) y lo
+  // reporta validaciones como PANO_DEMASIADOS_PILARES: aqui SOLO se SALTA (no se emiten
+  // sus quads). El `throw` queda como red anti-bug-interno para el unico caso que de
+  // verdad no deberia ocurrir: un paño MALLABLE ausente de ambos mapas.
   const meshNodes: NodoFEM[] = [];
   const quads: QuadFEM[] = [];
   const meshSupportsPorNodo = new Map<string, ApoyoFEM>();
@@ -905,11 +917,14 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
 
   panosOrdenados.forEach((pano, indicePano) => {
     if (pano.tipo !== "losa") return; // reticular/unidireccional ya bloqueados en validaciones
-    materialIdsPano.add(pano.materialId);
-    // Malla YA computada por el pre-pase (calcularAcoples, [1A]). Tras validar, un
-    // paño losa SIN acople registrado o con indice desalineado es un bug interno.
+    // Malla YA computada por el pre-pase (calcularAcoples, [1A]).
     const acople = acoples.porPano.get(pano.id);
     if (acople === undefined) {
+      // Ausente de porPano por el cap de lineas de control (losa plana, F2.0): el paño
+      // NO es mallable y lo reporta validaciones como PANO_DEMASIADOS_PILARES. Se SALTA
+      // limpiamente (sin quads, sin material del paño): NO es un bug interno. Distinto
+      // del throw de abajo, reservado al paño mallable inexplicablemente ausente.
+      if (acoples.erroresMallado.has(pano.id)) return;
       throw new Error(`Acople de paño ausente tras validar: ${pano.id}`);
     }
     if (acople.indicePano !== indicePano) {
@@ -917,11 +932,16 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
         `Indice de paño desalineado (bug interno): ${pano.id} (${acople.indicePano} != ${indicePano})`,
       );
     }
+    // El material del paño solo se anade si el paño SI se malla (arriba se salta el que
+    // supero el cap): un paño no emitido no debe arrastrar su material a `materials`.
+    materialIdsPano.add(pano.materialId);
     const malla = acople.malla;
 
-    // Remap de nudos ACOPLADOS a su nodo estructural N* (misma celda de rejilla).
-    // Los NO acoplados conservan su nombre propio PQ<idx>-N*. El mapa se construye
-    // por nudo ANTES de emitir nada (quads y apoyos lo consultan).
+    // Remap de nudos ACOPLADOS a su nodo estructural N* (misma celda de rejilla). Un
+    // nudo acoplado puede ser de BORDE (sobre viga de contorno) o CABEZA de pilar
+    // interior (losa plana, F2.0): el remap no distingue el origen, casa por clave de
+    // celda. Los NO acoplados conservan su nombre propio PQ<idx>-N*. El mapa se
+    // construye por nudo ANTES de emitir nada (quads y apoyos lo consultan).
     const remapea = acople.acopleActivo ? acople.nodosAcoplados : undefined;
     const nombreFinalPorNudo = new Map<string, string>();
     for (const nd of malla.nodos) {
@@ -929,8 +949,10 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
         const clave = clavePosicion([nd.x, nd.y, nd.z], TOL_NODO);
         const estructural = base.nombrePorClave.get(clave);
         if (estructural === undefined) {
-          // La subdivision de la base nace de las MISMAS coordenadas de la malla:
-          // una celda sin nodo estructural aqui es un bug interno, no un error de obra.
+          // El N* SIEMPRE existe: el nudo de borde nace de la subdivision de la viga en
+          // esa celda; el nudo de cabeza de pilar nace de `cotasDePilar` en la cota del
+          // paño (que es una planta real, luego troceada). Ambos registran su clave en
+          // `construirBaseFEM`. Una celda sin N* aqui es un bug interno, no error de obra.
           throw new Error(`Nudo acoplado sin nodo estructural (bug interno): ${nd.name}`);
         }
         nombreFinalPorNudo.set(nd.name, estructural);
