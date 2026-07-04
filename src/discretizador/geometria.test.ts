@@ -9,6 +9,7 @@ import {
   cuantizar,
   mismaCoordenada,
   clavePosicion,
+  hayTresNoColineales,
   TOL_NODO,
 } from "./geometria";
 
@@ -79,6 +80,90 @@ describe("mapearReaccionAObra · componentes en ejes de obra (D5)", () => {
 // Si construimos rxnFem con ese orden (para fuerzas y, por separado, momentos) y le
 // aplicamos mapearReaccionAObra, debemos recuperar EXACTAMENTE las componentes de obra
 // originales: el helper es el inverso del mapeo de ejes de mapearEjes.
+// --- hayTresNoColineales (F2.3/T-f3-losa-plana): guarda de la losa sobre pilares ---
+// Una placa de bordes libres apoyada SOLO en puntos necesita >=3 apoyos NO colineales
+// para no bascular. El helper es la geometria pura de esa guarda (la EMITE validaciones).
+describe("hayTresNoColineales (guarda anti-basculamiento de la losa plana)", () => {
+  it("con <3 puntos siempre es false (no puede haber 3 no colineales)", () => {
+    expect(hayTresNoColineales([])).toBe(false);
+    expect(hayTresNoColineales([{ x: 0, y: 0 }])).toBe(false);
+    // Dos puntos SIEMPRE definen una recta: nunca hay un tercero fuera si no hay tercero.
+    expect(hayTresNoColineales([{ x: 0, y: 0 }, { x: 5, y: 5 }])).toBe(false);
+  });
+
+  it("tres puntos alineados (misma recta) -> false", () => {
+    // Colineales en X (misma y): el caso de 2 pilares es SIEMPRE este (2 puntos = 1 recta),
+    // pero incluso 3+ sobre la recta bascularian igual.
+    expect(
+      hayTresNoColineales([{ x: 0, y: 2 }, { x: 3, y: 2 }, { x: 7, y: 2 }]),
+    ).toBe(false);
+    // Colineales en diagonal (y = x): area del triangulo ~0.
+    expect(
+      hayTresNoColineales([{ x: 0, y: 0 }, { x: 2, y: 2 }, { x: 5, y: 5 }]),
+    ).toBe(false);
+  });
+
+  it("tres puntos en triangulo (no alineados) -> true", () => {
+    expect(
+      hayTresNoColineales([{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 0, y: 5 }]),
+    ).toBe(true);
+  });
+
+  it("un cuarto punto fuera de la recta de tres alineados -> true (basta uno)", () => {
+    expect(
+      hayTresNoColineales([
+        { x: 0, y: 0 },
+        { x: 2, y: 0 },
+        { x: 4, y: 0 }, // tres alineados en y=0
+        { x: 2, y: 3 }, // este rompe la colinealidad
+      ]),
+    ).toBe(true);
+  });
+
+  it("puntos duplicados no crean no-colinealidad falsa (misma posicion no es apoyo extra)", () => {
+    // Dos coincidentes + un tercero: geometricamente son 2 apoyos distintos (una recta),
+    // no 3. La base a~b es ~0 y se salta; el par (a,c)/(b,c) es una sola recta -> false.
+    expect(
+      hayTresNoColineales([{ x: 1, y: 1 }, { x: 1, y: 1 }, { x: 4, y: 1 }]),
+    ).toBe(false);
+    // Tres coincidentes: un solo punto fisico -> false.
+    expect(
+      hayTresNoColineales([{ x: 2, y: 2 }, { x: 2, y: 2 }, { x: 2, y: 2 }]),
+    ).toBe(false);
+  });
+
+  it("la desviacion se mide por DISTANCIA PERPENDICULAR (~TOL_NODO), no por area cruda", () => {
+    // Un tercer punto a 0.9 mm de la recta (< TOL_NODO = 1 mm) sobre una base LARGA: el
+    // area cruda (base*dist) seria grande, pero la distancia perpendicular esta por debajo
+    // del umbral -> se considera colineal (false). Asi el criterio no depende de la base.
+    const base = 100; // m
+    const desviacion = 0.0009; // < TOL_NODO
+    expect(
+      hayTresNoColineales([
+        { x: 0, y: 0 },
+        { x: base, y: 0 },
+        { x: base / 2, y: desviacion },
+      ]),
+    ).toBe(false);
+    // A 1.1 mm (> TOL_NODO) el mismo montaje SI es no colineal.
+    expect(
+      hayTresNoColineales([
+        { x: 0, y: 0 },
+        { x: base, y: 0 },
+        { x: base / 2, y: 0.0011 },
+      ]),
+    ).toBe(true);
+  });
+
+  it("es determinista: el orden de los puntos no altera el resultado", () => {
+    const p = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 2, y: 4 }];
+    const r1 = hayTresNoColineales(p);
+    const r2 = hayTresNoColineales([...p].reverse());
+    expect(r1).toBe(true);
+    expect(r2).toBe(r1);
+  });
+});
+
 describe("mapearReaccionAObra · identidad-inversa con mapearEjes (golden D5)", () => {
   it("recupera las 6 componentes de obra tras construir el vector FEM con el orden de mapearEjes", () => {
     // Componentes de obra elegidas arbitrariamente pero distinguibles.

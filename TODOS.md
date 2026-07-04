@@ -1026,6 +1026,24 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   A futuro exigirá punzonamiento para ser honesto (F4).
 - **Depende de / bloquea:** F3.2 (hecho). **Coste:** CC ~1 día (malla no uniforme + goldens).
 - **Origen:** Decisión de alcance F3.2 (usuario: diferir) + escalado a ERROR en la revisión (OV-5).
+- **Estado (F2.0/2.1/2.2 + F2.3):** el acople de cabeza y el levantamiento de
+  `PANO_PILAR_INTERIOR` para pilares acoplados están HECHOS. **F2.3 cierra el hueco de
+  `PANO_SIN_APOYO`**: una losa `bordeApoyo:"libre"` sin borde completo sobre vigas ya NO
+  aborta si sus pilares acoplados incluyen **≥3 NO colineales** (helper puro
+  `hayTresNoColineales` en `geometria.ts`, criterio = distancia perpendicular > `TOL_NODO`).
+  CORRECTNESS: con **2 pilares (siempre colineales) o ≥3 alineados** la placa BASCULA y el
+  solver disperso **no lo caza — devuelve basura silenciosa** (flecha −12 cm vs −1,5 mm,
+  medido F2.3·T3.2), así que validaciones bloquea con `PANO_PILARES_INSUFICIENTES`.
+  Precedencia en losa libre: 0 pilares → `PANO_SIN_APOYO`; 1 → `PANO_PILAR_INTERIOR` (DP1);
+  ≥2 acoplados pero <3 no colineales → `PANO_PILARES_INSUFICIENTES`; ≥3 no colineales → OK.
+  Golden puro `tests/golden/losa-plana-capa2.golden.test.ts` (+3 casos). **Deuda menor
+  restante:** el caso MIXTO (pilares interiores + un borde PARCIAL sobre viga sin borde
+  completo) sigue conservador — hoy se evalúa solo la vía de pilares (≥3 no colineales);
+  un tramo parcial de viga podría, en rigor, complementar a 2 pilares, pero no se cuenta
+  (bloquea si no hay ≥3 no colineales). Física correcta y del lado seguro; refinarlo es
+  menor. **Nota física (no bug):** voladizos perimetrales grandes (huella del paño mucho
+  mayor que el polígono de apoyos) hacen SUBIR el centro de la losa — es comportamiento
+  correcto de placa en voladizo, no un fallo (Finding 2, F2.3).
 
 ---
 

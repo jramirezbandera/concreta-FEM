@@ -896,6 +896,102 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
     });
   });
 
+  // ============================================================================
+  // [F2.3/T-f3-losa-plana] PANO_SIN_APOYO relajado por sujecion AUTONOMA de pilares.
+  // Una losa "libre" sin ninguna viga de contorno (bordesCompletos=0) es la tipologia
+  // estrella "forjado plano sobre pilares". F2.2 relajo PANO_PILAR_INTERIOR (los
+  // pilares acoplados son apoyos legitimos) pero olvido aplicar el mismo criterio a
+  // PANO_SIN_APOYO: HOY abortaba. Y hay un matiz de CORRECTNESS: una placa de bordes
+  // libres necesita >=3 apoyos NO colineales (con 2 -siempre colineales- bascula y el
+  // motor devuelve basura silenciosa bajo sparse). Criterio: >=3 pilares no alineados.
+  // ============================================================================
+  describe("PANO_SIN_APOYO relajado por >=3 pilares no colineales [F2.3]", () => {
+    // Losa 5x5 "libre" SIN vigas (bordesCompletos=0): la sujeta SOLO lo que se le
+    // acople por dentro. `interiores` = coords (x,y) de pilares interiores estrictos.
+    function losaLibreSobrePilares(interiores: Array<[number, number]>): Modelo {
+      const m = modeloValido();
+      m.vigas = [];
+      m.cargas = [];
+      m.nudos.push(
+        { id: "s1", x: 0, y: 0 }, { id: "s2", x: 5, y: 0 },
+        { id: "s3", x: 5, y: 5 }, { id: "s4", x: 0, y: 5 },
+      );
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["s1", "s2", "s3", "s4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "libre",
+      });
+      m.pilares = interiores.map(([x, y], k) => ({
+        id: `pi${k}`, nombre: `PI${k}`, x, y, plantaInicial: "p0", plantaFinal: "p1",
+        seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
+        vinculacionExterior: true, arranque: "empotrado",
+      }));
+      return m;
+    }
+
+    it("losa libre sobre >=3 pilares NO colineales -> NO bloquea (apoyo autonomo)", () => {
+      const m = losaLibreSobrePilares([[1, 1], [4, 1], [2.5, 4]]); // triangulo
+      const cods = codigos(validarModelo(m));
+      expect(cods).not.toContain("PANO_SIN_APOYO");
+      expect(cods).not.toContain("PANO_PILARES_INSUFICIENTES");
+      expect(cods).not.toContain("PANO_PILAR_INTERIOR"); // los 3 acoplados
+      expect(cods).not.toContain("SIN_SUJECION"); // sus arranques sujetan
+    });
+
+    it("losa libre sobre 2 pilares (colineales por definicion) -> PANO_PILARES_INSUFICIENTES", () => {
+      const m = losaLibreSobrePilares([[1.5, 2.5], [3.5, 2.5]]);
+      const e = validarModelo(m).filter((x) => x.codigo === "PANO_PILARES_INSUFICIENTES");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("error");
+      expect(e[0].elementoId).toBe("pano1");
+      expect(e[0].elementoTipo).toBe("pano");
+      sinJergaFEM(e[0]);
+      // Los 2 pilares estan acoplados: NO se superpone PANO_PILAR_INTERIOR (sin contradiccion).
+      expect(codigos(validarModelo(m))).not.toContain("PANO_PILAR_INTERIOR");
+      // Y ya no cae el mensaje generico de "todos los bordes libres".
+      expect(codigos(validarModelo(m))).not.toContain("PANO_SIN_APOYO");
+    });
+
+    it("losa libre sobre 3 pilares ALINEADOS -> PANO_PILARES_INSUFICIENTES (siguen basculando)", () => {
+      const m = losaLibreSobrePilares([[1, 2.5], [2.5, 2.5], [4, 2.5]]); // los 3 en y=2.5
+      const cods = codigos(validarModelo(m));
+      expect(cods).toContain("PANO_PILARES_INSUFICIENTES");
+      expect(cods).not.toContain("PANO_SIN_APOYO");
+    });
+
+    it("losa libre sin NINGUN pilar interior -> PANO_SIN_APOYO (mensaje generico)", () => {
+      const m = losaLibreSobrePilares([]);
+      const e = validarModelo(m).filter((x) => x.codigo === "PANO_SIN_APOYO");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("error");
+      expect(e[0].mensaje).toContain("todos los bordes libres");
+      sinJergaFEM(e[0]);
+      // No hay pilares: no aplica PANO_PILARES_INSUFICIENTES.
+      expect(codigos(validarModelo(m))).not.toContain("PANO_PILARES_INSUFICIENTES");
+    });
+
+    it("[DP1] losa libre sobre 1 solo pilar -> PANO_PILAR_INTERIOR, sin PANO_SIN_APOYO (un solo mensaje)", () => {
+      // 1 pilar: acopleActivo=false -> NO acoplado -> lo explica PANO_PILAR_INTERIOR (DP1).
+      // No se emite ADEMAS PANO_SIN_APOYO (evita el doble reporte contradictorio).
+      const m = losaLibreSobrePilares([[2.5, 2.5]]);
+      const cods = codigos(validarModelo(m));
+      expect(cods).toContain("PANO_PILAR_INTERIOR");
+      expect(cods).not.toContain("PANO_SIN_APOYO");
+      expect(cods).not.toContain("PANO_PILARES_INSUFICIENTES");
+    });
+
+    it("regresion: la relajacion por borde completo sobre viga sigue intacta (sin pilares)", () => {
+      // Una losa libre con un borde entero sobre una viga NO bloquea (comportamiento OV-2),
+      // aunque no tenga pilares interiores: la via del portico es independiente de la nueva.
+      expect(codigos(validarModelo(conPanoSobreViga("libre")))).not.toContain(
+        "PANO_SIN_APOYO",
+      );
+      expect(codigos(validarModelo(conPanoSobreViga("libre")))).not.toContain(
+        "PANO_PILARES_INSUFICIENTES",
+      );
+    });
+  });
+
   describe("sujecion exacta respecto a lo que emite el discretizador", () => {
     it("paño TOTALMENTE acoplado sin ningun pilar vinculado -> SIN_SUJECION", () => {
       // Contorno completo (el paño descarga en el portico, no emite apoyos propios)

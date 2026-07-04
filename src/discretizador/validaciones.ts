@@ -15,7 +15,7 @@
 import type { Modelo, Pilar, Viga, Carga, Pano } from "../dominio";
 import { plantaPorId, nudoPorId, seccionPorId, esHipotesisAutomatica } from "../dominio";
 import { getMaterial, getSeccion } from "../biblioteca";
-import { TOL_NODO, mapearEjes, clavePosicion } from "./geometria";
+import { TOL_NODO, mapearEjes, clavePosicion, hayTresNoColineales } from "./geometria";
 import { materialAportaMasa } from "./propiedadesBarra";
 import { mallarPano, type PuntoPlano } from "./mallado";
 // [1A] El acople paño<->portico (F3.2) se computa UNA vez por discretizacion:
@@ -366,21 +366,54 @@ function validarRefsPano(
     });
   }
 
-  // [AUDITORIA M-5, relajado en F3.2/OV-2] Losa con TODOS los bordes libres: sin
-  // apoyo de borde solo se sostiene si DESCANSA en el portico, y dos esquinas
-  // sueltas NO son un apoyo — se exige al menos un BORDE COMPLETO del rectangulo
-  // sobre vigas (bordesCompletos >= 1, criterio del acople). Sin eso el motor
-  // lanzaria inestable con jerga tecnica (verificado con el motor real en M-5) o,
-  // peor, calcularia una losa colgada de dos puntos con flechas absurdas.
+  // [AUDITORIA M-5, relajado en F3.2/OV-2, y en F2.3/T-f3-losa-plana] Losa con TODOS los
+  // bordes libres: sin apoyo de borde solo se sostiene si DESCANSA en algo. Dos vias:
+  //   (a) el PORTICO: un BORDE COMPLETO del rectangulo sobre vigas (bordesCompletos >= 1,
+  //       criterio del acople) — dos esquinas sueltas NO son apoyo.
+  //   (b) los PILARES: la losa apoyada SOLO en pilares interiores acoplados (la tipologia
+  //       "forjado plano sobre pilares"). El acople de cabeza (F2.0) la deja `acopleActivo`
+  //       y descarga axil en los pilares; su sujecion global la da el ARRANQUE de esos
+  //       pilares (validarSujecion). PERO una placa de bordes libres necesita >=3 apoyos
+  //       NO colineales para no BASCULAR: con 2 (siempre colineales: 2 puntos = 1 recta)
+  //       el plano queda cuasi-singular y el motor NO lo caza bajo el solver disperso
+  //       (devuelve basura silenciosa — flecha absurda sin lanzar; verificado motor real
+  //       F2.3·T3.2). Por eso el criterio de sujecion AUTONOMA por pilares es >=3 NO
+  //       colineales (decision de producto).
+  // Sin ninguna de las dos: se bloquea en lenguaje de obra ANTES del motor.
   const acople = acoples.porPano.get(pano.id);
-  if (pano.bordeApoyo === "libre" && (acople === undefined || acople.bordesCompletos === 0)) {
-    errores.push({
-      codigo: "PANO_SIN_APOYO",
-      severidad: "error",
-      mensaje: `El paño "${pano.nombre}" tiene todos los bordes libres y ningún borde descansa entero sobre vigas: no se sostiene. Elige borde apoyado o empotrado, o dibuja vigas bajo su contorno.`,
-      elementoId: pano.id,
-      elementoTipo: "pano",
-    });
+  const sinBordeCompleto = acople === undefined || acople.bordesCompletos === 0;
+  if (pano.bordeApoyo === "libre" && sinBordeCompleto) {
+    // Pilares REALMENTE acoplados a ESTE paño (su cabeza remapea a N*); vacio si <2 o cap.
+    const acoplados = new Set(acople?.pilaresAcoplados ?? []);
+    const puntosApoyo = pilaresInterioresBajoPano(modelo, pano)
+      .filter((p) => acoplados.has(p.id))
+      .map((p) => ({ x: p.x, y: p.y }));
+    if (hayTresNoColineales(puntosApoyo)) {
+      // Sujeta por >=3 pilares no alineados: apoyo autonomo legitimo, no se bloquea.
+    } else if (puntosApoyo.length >= 2) {
+      // Se apoya en pilares pero insuficientes: 2 (colineales) o >=3 alineados. BLOQUEA con
+      // un mensaje ESPECIFICO que guia a >=3 no alineados (o una viga/apoyo en algun borde).
+      // Precede a PANO_PILAR_INTERIOR: esos pilares SI estan acoplados (no disparan interior),
+      // asi que aqui no hay doble reporte contradictorio.
+      errores.push({
+        codigo: "PANO_PILARES_INSUFICIENTES",
+        severidad: "error",
+        mensaje: `El paño "${pano.nombre}" se apoya solo en pilares alineados: con los apoyos en línea la losa vuelca. Necesita al menos tres pilares no alineados, o un apoyo en algún borde (viga, borde apoyado o empotrado).`,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+    } else if (pilaresInterioresBajoPano(modelo, pano).length === 0) {
+      // Ni borde sobre viga ni pilar interior alguno: la losa flota. Mensaje clasico. Con 1
+      // pilar interior (o pilares NO acoplados) NO se emite aqui: ya lo explica, sin
+      // contradiccion, PANO_PILAR_INTERIOR (DP1: exige >=2 apoyos acoplados) [precedencia].
+      errores.push({
+        codigo: "PANO_SIN_APOYO",
+        severidad: "error",
+        mensaje: `El paño "${pano.nombre}" tiene todos los bordes libres y ningún borde descansa entero sobre vigas: no se sostiene. Elige borde apoyado o empotrado, o dibuja vigas bajo su contorno.`,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+    }
   }
 
   // Perimetro: corte 1 = rectangulo de 4 nudos PROPIOS existentes. El schema admite

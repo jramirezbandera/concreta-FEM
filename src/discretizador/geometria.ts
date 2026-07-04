@@ -103,3 +103,43 @@ export function mismaPosicionEnPlanta(
     clavePosicion(mapearEjes(b.x, b.y, 0), TOL_NODO)
   );
 }
+
+// [F2.3/T-f3-losa-plana] ¿Hay al menos TRES puntos NO colineales entre los dados?
+// Una placa de bordes libres apoyada SOLO en puntos (cabezas de pilar) necesita >=3
+// apoyos no alineados para no bascular: dos apoyos definen un eje de giro libre
+// (mecanismo), y >=3 colineales comparten esa misma recta. El motor NO caza este
+// mecanismo bajo el solver disperso (devuelve basura silenciosa: flecha absurda sin
+// lanzar), asi que validaciones DEBE guardarlo ANTES (validaciones.ts, PANO_SIN_APOYO).
+//
+// CRITERIO (robusto a la longitud del segmento base, NUNCA |Δ|<TOL suelto): existe un
+// punto cuya DISTANCIA PERPENDICULAR a la recta de otros dos supera TOL_NODO. Se usa el
+// area del triangulo (doble = |producto vectorial|) dividida por la base: distancia =
+// 2·area / |base|. Comparar el area cruda con un umbral fijo NO seria coherente (el area
+// escala con la longitud del segmento); la distancia perpendicular si es una tolerancia
+// geometrica homogenea, la misma escala que TOL_NODO (1 mm). Puntos duplicados (misma
+// posicion) tienen base ~0 y nunca definen recta: se saltan (no aportan no-colinealidad).
+//
+// PURO y determinista: O(n^3) sobre el nº de puntos (siempre pequeño: pilares interiores
+// de un paño). Con <3 puntos devuelve false por definicion (no puede haber 3 no colineales).
+export function hayTresNoColineales(
+  puntos: ReadonlyArray<{ x: number; y: number }>,
+): boolean {
+  if (puntos.length < 3) return false;
+  for (let i = 0; i < puntos.length; i++) {
+    for (let j = i + 1; j < puntos.length; j++) {
+      const a = puntos[i];
+      const b = puntos[j];
+      const baseX = b.x - a.x;
+      const baseY = b.y - a.y;
+      const base = Math.hypot(baseX, baseY);
+      if (base <= TOL_NODO) continue; // a y b coinciden: no definen recta
+      for (let k = j + 1; k < puntos.length; k++) {
+        const c = puntos[k];
+        // Doble del area del triangulo abc = |(b-a) x (c-a)|; distancia perp = 2A/base.
+        const areaDoble = Math.abs(baseX * (c.y - a.y) - baseY * (c.x - a.x));
+        if (areaDoble / base > TOL_NODO) return true; // c fuera de la recta ab
+      }
+    }
+  }
+  return false;
+}
