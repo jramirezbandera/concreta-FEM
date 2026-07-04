@@ -32,6 +32,12 @@ import { cargasDeAmbito } from "../../dominio";
 // usa el discretizador para emitirlas. La linea informativa del inspector no puede
 // divergir de lo que el calculo aplica.
 import { cargasGrupoDePano, CASE_CM_GRUPO } from "../../discretizador/cargasGrupo";
+// FUENTE UNICA (F2.3, losa plana): el MISMO detector geometrico que usa el acople del
+// discretizador para decidir que pilares interiores recogen la losa. Es pura Capa 1
+// (obra): lee pilares/plantas/perimetro, NO discretiza (no genera nudos/quads/FEM). La
+// nota de honestidad sobre el momento en cabeza de pilar no puede divergir de lo que
+// el calculo realmente acopla.
+import { pilaresInterioresBajoPano } from "../../discretizador/acople";
 import "./inspectorPano.css";
 
 function leerModelo() {
@@ -139,6 +145,13 @@ export function InspectorPano() {
   // Cargas automaticas del grupo que este paño recibira (F3.2, D-1), con la misma
   // fuente que el discretizador. [] si el grupo no aporta (linea ausente, GAP-H).
   const cargasGrupo = pano ? cargasGrupoDePano(modelo, pano) : [];
+
+  // Losa PLANA (F2.3): la losa se apoya en pilares interiores (su cabeza comparte
+  // el nudo con la malla). El acople exige >=2 apoyos (DP1: con 1 solo pilar el paño
+  // ni siquiera calcula, PANO_PILAR_INTERIOR bloquea), asi que umbral >=2 para no
+  // mostrar la nota sobre un paño que en realidad esta bloqueado. Detector puro de
+  // Capa 1 (misma fuente que el acople), no re-discretiza.
+  const esLosaPlana = pano ? pilaresInterioresBajoPano(modelo, pano).length >= 2 : false;
 
   // Al cambiar de paño seleccionado, limpia los errores de la anterior.
   useEffect(() => {
@@ -260,14 +273,32 @@ export function InspectorPano() {
           onValor={(v) => commit([], { bordeApoyo: v }, { bordeApoyo: v })}
         />
 
-        {/* UX-C9 (reescrita en F3.2): la losa ya DESCARGA en el portico cuando su
-            contorno coincide con vigas; el bordeApoyo queda como fallback de los
-            bordes sin viga. Lenguaje de obra, sin sobre-prometer (el acople exige
-            vigas debajo). */}
+        {/* UX-C9 (reescrita en F3.2; ampliada en F2.3): la losa DESCARGA en el
+            portico cuando su contorno coincide con vigas, y ademas en los pilares que
+            queden por DENTRO de su superficie (losa plana, >=2 pilares); el bordeApoyo
+            queda como fallback de los bordes sin viga. Lenguaje de obra, sin
+            sobre-prometer. */}
         <p className="cx-note">
-          La losa descarga en las vigas y pilares de su contorno cuando los comparte;
-          en los bordes sin viga se usa el apoyo de borde elegido.
+          La losa descarga en las vigas y pilares de su contorno cuando los comparte, y
+          también en los pilares que queden por dentro de su superficie; en los bordes
+          sin viga se usa el apoyo de borde elegido.
         </p>
+
+        {/* Nota de honestidad (F2.3, losa plana): cuando la losa se apoya en pilares
+            interiores, el pico de momento sobre la cabeza del pilar depende del
+            tamaño de malla y no converge (deuda T-f3-losa-plana-momento-local); la
+            flecha y el axil del pilar SI son fiables. Advertencia CUALITATIVA en
+            lenguaje de obra: no promete un valor, avisa de lo que aun no es de diseño.
+            El armado a punzonamiento sobre el pilar llega en una fase posterior. */}
+        {esLosaPlana ? (
+          <p className="cx-note">
+            Esta losa se apoya en pilares por dentro de su superficie. La flecha y la
+            carga que baja por cada pilar son fiables; en cambio, el momento justo sobre
+            la cabeza del pilar es orientativo (varía al afinar el tamaño de malla). El
+            dimensionado de la losa sobre el pilar (punzonamiento) llegará en una fase
+            posterior.
+          </p>
+        ) : null}
 
         {/* Linea informativa de cargas de GRUPO (F3.2, D-1): lo que este paño recibe
             automaticamente de su grupo, con la MISMA fuente que el calculo

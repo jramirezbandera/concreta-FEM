@@ -80,13 +80,15 @@ function PanelActivo() {
         onValor={(v) => setDefaults({ bordeApoyo: v })}
       />
 
-      {/* UX-C9 (reescrita en F3.2): la losa DESCARGA en el portico cuando su
-          contorno coincide con vigas; el bordeApoyo queda como fallback de los
-          bordes sin viga. Se comunica ANTES de colocar para fijar la expectativa:
-          dibujarla entre vigas = acoplada. */}
+      {/* UX-C9 (reescrita en F3.2; ampliada en F2.3): la losa DESCARGA en el portico
+          cuando su contorno coincide con vigas, y ademas en los pilares que queden
+          por DENTRO de su superficie (losa plana); el bordeApoyo queda como fallback
+          de los bordes sin viga. Se comunica ANTES de colocar para fijar la
+          expectativa: dibujarla sobre vigas/pilares = acoplada. */}
       <p className="cx-note">
-        La losa descarga en las vigas y pilares de su contorno cuando los comparte;
-        en los bordes sin viga se usa el apoyo de borde elegido.
+        La losa descarga en las vigas y pilares de su contorno cuando los comparte, y
+        también en los pilares que queden por dentro de su superficie; en los bordes
+        sin viga se usa el apoyo de borde elegido.
       </p>
 
       <div className="cx-herramienta-pano__acciones">

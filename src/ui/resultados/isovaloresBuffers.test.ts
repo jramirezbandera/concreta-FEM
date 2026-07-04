@@ -373,3 +373,146 @@ describe("construirBuffersIsovalores · losa acoplada (F3.2, sin agujeros de bor
     expect(buffers!.valorMax).toBeCloseTo(0.004, 9);
   });
 });
+
+// --- F2.3: losa PLANA (nudo de malla INTERIOR remapeado a N* de cabeza de pilar) ---
+// En la losa plana un pilar interior comparte su nudo estructural (N*) con la malla:
+// su nudo de malla se remapea a N* y desaparece de trazabilidad.nodosDeMalla igual que
+// los de borde. La diferencia con F3.2 es la POSICION del N* (interior, no en el anillo
+// de borde). isovaloresBuffers itera la union de quadANodos, asi que resuelve el N*
+// interior sin cambios: verificamos que NO queda como agujero/NaN, en flecha Y Mx/My.
+describe("construirBuffersIsovalores · losa plana (F2.3, N* de cabeza de pilar interior)", () => {
+  // 4 quads (2x2) que comparten el nudo CENTRAL: ese nudo es la cabeza de un pilar
+  // interior remapeada a N* (fuera de nodosDeMalla). Los 8 nudos de borde son de malla.
+  //   n6 n7 n8      Y=2  (fila z=2)
+  //   n3 NP n5      Y=1  (fila z=1) ; NP = nudo central = N* de la cabeza de pilar
+  //   n0 n1 n2      Y=0  (fila z=0)
+  // Todos a cota Y=3 (FEM). Los quads referencian NP en su esquina hacia el centro.
+  function modeloLosaPlana(): ModeloFEM {
+    const base = modeloUnQuad();
+    const nd = (name: string, x: number, z: number) => ({ name, x, y: 3, z });
+    return {
+      ...base,
+      nodes: [
+        nd("n0", 0, 0),
+        nd("n1", 1, 0),
+        nd("n2", 2, 0),
+        nd("n3", 0, 1),
+        nd("NP", 1, 1), // <- cabeza de pilar interior remapeada a N*
+        nd("n5", 2, 1),
+        nd("n6", 0, 2),
+        nd("n7", 1, 2),
+        nd("n8", 2, 2),
+      ],
+      quads: [
+        { name: "PQ0", i: "n0", j: "n1", m: "NP", n: "n3", t: 0.2, material: "h" },
+        { name: "PQ1", i: "n1", j: "n2", m: "n5", n: "NP", t: 0.2, material: "h" },
+        { name: "PQ2", i: "n3", j: "NP", m: "n7", n: "n6", t: 0.2, material: "h" },
+        { name: "PQ3", i: "NP", j: "n5", m: "n8", n: "n7", t: 0.2, material: "h" },
+      ],
+    };
+  }
+  function trazaLosaPlana(): Trazabilidad {
+    return {
+      ...trazabilidadVacia(),
+      panoAQuads: { pano1: ["PQ0", "PQ1", "PQ2", "PQ3"] },
+      quadAPano: { PQ0: "pano1", PQ1: "pano1", PQ2: "pano1", PQ3: "pano1" },
+      quadANodos: {
+        PQ0: ["n0", "n1", "NP", "n3"],
+        PQ1: ["n1", "n2", "n5", "NP"],
+        PQ2: ["n3", "NP", "n7", "n6"],
+        PQ3: ["NP", "n5", "n8", "n7"],
+      },
+      // NP NO esta aqui: es estructural (cabeza de pilar), lo trae quadANodos.
+      nodosDeMalla: ["n0", "n1", "n2", "n3", "n5", "n6", "n7", "n8"],
+      apoyosDeMalla: [],
+    };
+  }
+
+  it("resuelve la FLECHA del nudo N* de cabeza de pilar interior (sin agujero central)", () => {
+    const nodos: ResultadosCalculo["nodos"] = {};
+    // El nudo de cabeza NP existe en resultados.nodos (es estructural, el motor lo
+    // resuelve). Flecha ~0 sobre el pilar (apoyo); mayor en el borde libre.
+    const dy: Record<string, number> = {
+      n0: -0.002, n1: -0.001, n2: -0.002, n3: -0.001, NP: 0,
+      n5: -0.001, n6: -0.002, n7: -0.001, n8: -0.002,
+    };
+    for (const [nombre, v] of Object.entries(dy)) {
+      nodos[nombre] = { ELS: { disp: [0, v, 0, 0, 0, 0], rxn: cero6 } };
+    }
+    const cero4Mom: [number, number, number][] = [
+      [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+    ];
+    const r: ResultadosCalculo = {
+      units: "kN-m",
+      analysis: { type: "linear", n_points: 2 },
+      combos: ["ELS"],
+      nodos,
+      barras: {},
+      quads: {
+        PQ0: { ELS: { moments: cero4Mom, shears: [[0, 0], [0, 0], [0, 0], [0, 0]] } },
+        PQ1: { ELS: { moments: cero4Mom, shears: [[0, 0], [0, 0], [0, 0], [0, 0]] } },
+        PQ2: { ELS: { moments: cero4Mom, shears: [[0, 0], [0, 0], [0, 0], [0, 0]] } },
+        PQ3: { ELS: { moments: cero4Mom, shears: [[0, 0], [0, 0], [0, 0], [0, 0]] } },
+      },
+      check_statics: null,
+    };
+    const buffers = construirBuffersIsovalores({
+      modeloFEM: modeloLosaPlana(),
+      trazabilidad: trazaLosaPlana(),
+      resultados: r,
+      combo: "ELS",
+      magnitud: "flecha",
+    });
+    expect(buffers).not.toBeNull();
+    // Los 9 nudos (incl. NP central) tienen vertice; 4 quads -> 8 triangulos -> 24 indices.
+    expect(buffers!.vertices).toBe(9);
+    expect(buffers!.indices).toHaveLength(24);
+    // El central (flecha 0) fija el minimo del rango: la rampa lo pinta, no es un hueco.
+    expect(buffers!.valorMin).toBeCloseTo(0, 9);
+    expect(buffers!.valorMax).toBeCloseTo(0.002, 9);
+    // Ningun valor NaN (el N* central resuelto, no un agujero).
+    for (const v of buffers!.valores) expect(Number.isNaN(v)).toBe(false);
+  });
+
+  it("promedia Mx en el nudo N* de cabeza de pilar interior (lo tocan los 4 quads)", () => {
+    const nodos: ResultadosCalculo["nodos"] = {};
+    for (const n of ["n0", "n1", "n2", "n3", "NP", "n5", "n6", "n7", "n8"]) {
+      nodos[n] = { ELS: { disp: cero6, rxn: cero6 } };
+    }
+    const mx = (v: number): [number, number, number] => [v, 0, 0];
+    // Mx en la esquina de cada quad que toca NP: PQ0 esquina m=2, PQ1 n=4, PQ2 j=6,
+    // PQ3 i=8. NP recibe la MEDIA (2+4+6+8)/4 = 5. Un agujero daria NaN/omision.
+    const r: ResultadosCalculo = {
+      units: "kN-m",
+      analysis: { type: "linear", n_points: 2 },
+      combos: ["ELS"],
+      nodos,
+      barras: {},
+      quads: {
+        PQ0: { ELS: { moments: [mx(1), mx(1), mx(2), mx(1)], shears: [[0, 0], [0, 0], [0, 0], [0, 0]] } },
+        PQ1: { ELS: { moments: [mx(1), mx(1), mx(1), mx(4)], shears: [[0, 0], [0, 0], [0, 0], [0, 0]] } },
+        PQ2: { ELS: { moments: [mx(1), mx(6), mx(1), mx(1)], shears: [[0, 0], [0, 0], [0, 0], [0, 0]] } },
+        PQ3: { ELS: { moments: [mx(8), mx(1), mx(1), mx(1)], shears: [[0, 0], [0, 0], [0, 0], [0, 0]] } },
+      },
+      check_statics: null,
+    };
+    const buffers = construirBuffersIsovalores({
+      modeloFEM: modeloLosaPlana(),
+      trazabilidad: trazaLosaPlana(),
+      resultados: r,
+      combo: "ELS",
+      magnitud: "momentoX",
+    });
+    expect(buffers).not.toBeNull();
+    expect(buffers!.vertices).toBe(9);
+    // El N* central esta en el orden de nudos; su valor es la media (5), no un hueco.
+    // Localizamos su indice via quadANodos: es la esquina m (pos 2) de PQ0.
+    const idxNP = 2;
+    const nombresPQ0 = trazaLosaPlana().quadANodos.PQ0;
+    expect(nombresPQ0[idxNP]).toBe("NP");
+    // El valor 5 (media de las 4 esquinas que tocan NP) aparece entre los valores.
+    const valores = Array.from(buffers!.valores);
+    expect(valores.some((v) => Math.abs(v - 5) < 1e-6)).toBe(true);
+    for (const v of buffers!.valores) expect(Number.isNaN(v)).toBe(false);
+  });
+});

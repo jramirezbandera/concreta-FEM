@@ -53,6 +53,38 @@ function modeloConPano(): Modelo {
   return m;
 }
 
+// Losa PLANA (F2.3): el fixture anterior + una planta base (cota 0) y `n` pilares
+// ESTRICTAMENTE interiores al rectangulo del paño (0..4 x 0..3) que alcanzan su cota.
+// El detector pilaresInterioresBajoPano solo mira geometria (plantas + x/y + perimetro),
+// no seccion/material, asi que basta con ids coherentes.
+function modeloConLosaPlana(nPilares: number): Modelo {
+  const m = modeloConPano();
+  m.plantas.push({ id: "pl0", nombre: "Cimentación", cota: 0, altura: 3, grupoId: "g1" });
+  // Posiciones interiores distintas (dentro de 0<x<4, 0<y<3), separadas de sobra.
+  const pos = [
+    { x: 1, y: 1 },
+    { x: 3, y: 2 },
+    { x: 2, y: 1.5 },
+  ];
+  for (let i = 0; i < nPilares; i++) {
+    const p = pos[i]!;
+    m.pilares.push({
+      id: `PIN-${i}`,
+      nombre: `Pi${i}`,
+      x: p.x,
+      y: p.y,
+      plantaInicial: "pl0",
+      plantaFinal: "pl1",
+      seccionId: "s-pilar",
+      materialId: MAT_OK,
+      angulo: 0,
+      vinculacionExterior: true,
+      arranque: "empotrado",
+    });
+  }
+  return m;
+}
+
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   seleccionStore.getState().limpiar();
@@ -142,6 +174,40 @@ describe("InspectorPano: visibilidad", () => {
     seleccionStore.getState().seleccionar(["F-1"]);
     render(<InspectorPano />);
     expect(screen.queryByText(/recibe además, del grupo de su planta/i)).toBeNull();
+  });
+
+  it("F2.3: con >=2 pilares interiores (losa plana) muestra la nota de honestidad del momento en cabeza", () => {
+    modeloStore.getState().cargarModelo(modeloConLosaPlana(2));
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+    // Nota CUALITATIVA: la flecha/axil son fiables, el momento sobre la cabeza es orientativo.
+    const nota = screen.getByText(/momento justo sobre la cabeza del pilar es orientativo/i);
+    expect(nota).toBeInTheDocument();
+    expect(nota.textContent).toMatch(/flecha y la carga que baja por cada pilar son fiables/i);
+    expect(nota.textContent).toMatch(/punzonamiento.*fase posterior/i);
+    // La C-9 (ampliada) reconoce ahora los pilares por dentro de la superficie.
+    expect(
+      screen.getByText(/también en los pilares que queden por dentro de su superficie/i),
+    ).toBeInTheDocument();
+  });
+
+  it("F2.3: sin pilares interiores NO muestra la nota de honestidad (losa normal)", () => {
+    // El fixture base no tiene pilares interiores: la nota no debe aparecer.
+    renderConPanoSeleccionado();
+    expect(
+      screen.queryByText(/momento justo sobre la cabeza del pilar es orientativo/i),
+    ).toBeNull();
+  });
+
+  it("F2.3 [DP1]: con 1 SOLO pilar interior NO muestra la nota (ese paño ni calcula, umbral >=2)", () => {
+    // Con 1 pilar el acople no se activa (PANO_PILAR_INTERIOR bloquea): la nota de
+    // honestidad mentiria (no hay losa plana calculable). Umbral >=2 lo evita.
+    modeloStore.getState().cargarModelo(modeloConLosaPlana(1));
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+    expect(
+      screen.queryByText(/momento justo sobre la cabeza del pilar es orientativo/i),
+    ).toBeNull();
   });
 });
 
