@@ -1094,3 +1094,68 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   (coordenada local por tramo), con un golden de conservación (Σ por tramos = carga pedida).
 - **Depende de / bloquea:** ninguna hoy; DISPARADOR = añadir posición/rango a `Carga`.
 - **Coste:** CC ~30-45 min cuando aplique. **Origen:** Revisión F3.2 (outside voice #12; TODO-6).
+
+---
+
+## T-f3-losa-plana-momento-local · Fidelidad del momento local losa-pilar (zona rígida de cabeza)
+
+- **Qué:** Un apoyo de PUNTO bajo una placa DKMQ (la cabeza de pilar acoplada de la losa
+  plana) concentra el momento de forma DEPENDIENTE DE LA MALLA: el valor local de Mx/My en
+  el nudo de la cabeza crece al afinar y no converge a un valor físico, aunque el REPARTO
+  GLOBAL (axil del pilar, ΣV) sea correcto. Falta un modelado honesto de la zona de cabeza:
+  ábaco/capitel/zona rígida de cabeza de pilar, o promediar/integrar el momento sobre el
+  ancho real del pilar en vez de leer el pico nodal.
+- **Por qué:** hoy la losa plana da un axil de pilar correcto pero un momento local en la
+  cabeza numéricamente poco fiable (pico de malla). Presentarlo como si fuera el momento de
+  diseño induciría un armado erróneo justo en la zona más crítica (punzonamiento). El corte
+  de losa plana lo declara como límite en la nota de honestidad de la UI; esta deuda es la
+  solución de fondo.
+- **Cómo retomar:** junto a punzonamiento y armado (F4). Decidir el modelo (zona rígida de
+  cabeza / ábaco explícito vs promediado del momento sobre el ancho de pilar); leer Mx/My
+  del entorno del pilar de forma consistente en los isovalores/resultados. Cuidado: cruza
+  con el modelo de junta pilar-losa (rígida vs articulada) que fija el spike de la Fase 0.
+- **Depende de / bloquea:** requiere el corte de losa plana (T-f3-losa-plana) hecho. Se
+  cruza con punzonamiento (F4). **Coste:** CC ~medio día (modelo) cuando aplique.
+- **Verificado (spike F3-losa-plana, motor real PyNite 2.0.2):** |Mx|=|My| sobre el pilar
+  NO converge al refinar (93 → 121 → 152 → 170 kN·m/m en malla 4²→8²→16²→24²), mientras la
+  FLECHA sí converge (DY estable byte a byte). Confirma la singularidad de apoyo puntual: el
+  esfuerzo global es fiable, el pico local sobre el pilar no.
+- **Origen:** Revisión de ingeniería F3-losa-plana (outside voice Codex #4/#5: apoyo de
+  punto bajo placa = momento local dependiente de malla; el nudo compartido acopla también
+  rotaciones).
+
+---
+
+## T-f3-losa-plana-estab-lateral · Estabilización de plano de la losa bajo carga lateral
+
+- **Qué:** La estabilización de plano de [mallado.ts](src/discretizador/mallado.ts) (DX+DZ en
+  esquina (0,0) + DZ en (nx,0)) sujeta el único modo de cuerpo rígido EN PLANO de la losa. Bajo
+  GRAVEDAD toma reacción ~0 (medido en el spike: 1e-12 kN) y no altera axil ni flecha. Pero bajo
+  CARGA LATERAL concentra la reacción horizontal en esa esquina (medido: `N1.RxnFX=−99.9` kN bajo
+  FX=100 kN), que es un apoyo ARBITRARIO, no físico.
+- **Por qué:** el MVP de losa plana es gravitatorio, así que la muleta de esquina es inofensiva
+  hoy. Pero si se aplican cargas horizontales (viento/sísmico) a losas planas, el cortante lateral
+  iría a una esquina falsa en vez de bajar por los pilares. Con ≥2 pilares no coincidentes la
+  membrana del emparrillado ya sujeta el plano SIN la muleta (0 modos libres, medido), así que la
+  muleta debería ceder al camino real.
+- **Cómo retomar:** junto a la fase de cargas laterales sobre losas. Si ≥2 pilares no coincidentes
+  (o vigas de contorno) sujetan el plano, omitir la estabilización de esquina y dejar que el camino
+  real (pilares/pórtico) tome la reacción horizontal; conservarla solo para la losa sobre 1 pilar
+  (marquesina) o aislada.
+- **Depende de / bloquea:** requiere losa plana hecha; DISPARADOR = cargas horizontales sobre losas.
+  **Coste:** CC ~medio día. **Origen:** Spike F3-losa-plana (reconciliación marquesina).
+
+---
+
+## T-f3-losa-plana-torsion-espuria · Torsión del pilar mezcla real + artefacto de drilling
+
+- **Qué:** El nudo compartido pilar-losa acopla la torsión GJ del pilar con el GDL de drilling (RY
+  local) del quad, que en DKMQ es un muelle ficticio (truco de Bathe). Bajo gravedad la torsión del
+  pilar es 0.0 exacto (medido). Bajo cargas que fuercen giro en planta del nudo, el pilar recibe una
+  torsión pequeña de la que ~96% es real y ~4% artefacto del muelle de drilling (medido con MY=50).
+- **Por qué:** del lado de la seguridad y pequeña bajo gravedad, pero si algún día se arma el pilar
+  a torsión, ese valor mezcla torsión real + artefacto numérico. Conviene documentarlo para no armar
+  por un valor contaminado.
+- **Cómo retomar:** junto al armado del pilar (F4) o a cargas laterales. Decidir si se filtra la
+  componente de drilling o se ignora por pequeña. **Coste:** CC ~30 min (análisis) cuando aplique.
+- **Origen:** Spike F3-losa-plana (P2b: GJ del pilar domina 91:1 al muelle de drilling; sano).

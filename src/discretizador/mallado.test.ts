@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { mallarPano, CAP_QUADS, type ParametrosMallado, type PuntoPlano } from "./mallado";
+import {
+  mallarPano,
+  planificarRejilla,
+  CAP_QUADS,
+  type ParametrosMallado,
+  type PuntoPlano,
+  type LimitesRectangulo,
+} from "./mallado";
 
 // Tests PUROS del mallado (F1.1). Node puro, sin Pyodide, sin verificacion fisica:
 // solo la TRADUCCION geometria de paño -> rejilla de quads. Cubre: rejilla correcta y
@@ -233,5 +240,189 @@ describe("mallado - geometria degenerada -> error de obra", () => {
     // Con 1 celda, los 4 nudos son borde y la estabilizacion usa 2 esquinas distintas.
     expect(m.nodosBorde).toHaveLength(4);
     expect(m.estabilizacion[0].node).not.toBe(m.estabilizacion[1].node);
+  });
+});
+
+// --- Losa plana: lineas de control (rejilla NO uniforme) ----------------------
+// El pilar bajo la losa fuerza una linea de rejilla en su x/y para que un nudo caiga
+// EXACTO en su cabeza (== N* del pilar). Cubre: regresion (sin lineas = uniforme
+// byte-identico), colocacion exacta, dedup por celda, precedencia de CAP y aspecto.
+describe("mallado - lineas de control (losa plana)", () => {
+  it("REGRESION: lineasControl vacias/ausentes = malla uniforme byte-identica", () => {
+    const sin = mallarOk(params());
+    const vacias = mallarOk(params({ lineasControlX: [], lineasControlY: [] }));
+    expect(JSON.stringify(vacias)).toBe(JSON.stringify(sin));
+    expect(sin.aspectoRelajado).toBe(false);
+    // Y sigue siendo la rejilla 4x2 de siempre.
+    expect(sin.nx).toBe(4);
+    expect(sin.ny).toBe(2);
+  });
+
+  it("una linea de control X cae EXACTA en un nudo de malla (piedra angular del remap)", () => {
+    const m = mallarOk(params({ lineasControlX: [1.5] }));
+    // Existe un nudo en x=1.5 EXACTO (igualdad estricta, no toBeCloseTo): asi su clave
+    // de celda casa con la cabeza del pilar y el remap PQ*->N* no falla.
+    expect(m.nodos.some((n) => n.x === 1.5)).toBe(true);
+    // Los bordes 0 y 4 siguen presentes exactos.
+    expect(m.nodos.some((n) => n.x === 0)).toBe(true);
+    expect(m.nodos.some((n) => n.x === 4)).toBe(true);
+    // Todos los nudos de una MISMA columna x=1.5 (una por fila).
+    const enLinea = m.nodos.filter((n) => n.x === 1.5);
+    expect(enLinea).toHaveLength(m.ny + 1);
+  });
+
+  it("linea de control en Y tambien fuerza un nudo exacto", () => {
+    const m = mallarOk(params({ lineasControlY: [0.7] }));
+    expect(m.nodos.some((n) => n.z === 0.7)).toBe(true);
+  });
+
+  it("determinista byte a byte con lineas de control", () => {
+    const a = JSON.stringify(mallarOk(params({ lineasControlX: [1.5], lineasControlY: [0.7] })));
+    const b = JSON.stringify(mallarOk(params({ lineasControlX: [1.5], lineasControlY: [0.7] })));
+    expect(a).toBe(b);
+  });
+
+  it("dos lineas de control en la MISMA celda se funden en una (dedup por cuantizar)", () => {
+    // 1.5 y 1.5004 cuantizan a la misma celda (TOL_NODO=1e-3): una sola linea, la menor.
+    const m = mallarOk(params({ lineasControlX: [1.5, 1.5004] }));
+    const en15 = m.nodos.filter((n) => n.x === 1.5);
+    expect(en15.length).toBe(m.ny + 1); // existe la columna 1.5
+    // No hay una segunda columna espuria a 1.5004.
+    expect(m.nodos.some((n) => n.x === 1.5004)).toBe(false);
+  });
+
+  it("linea de control SOBRE o FUERA del borde se ignora (defensivo)", () => {
+    // 0 y 4 son bordes; 5 y -1 quedan fuera: todas se descartan -> malla uniforme.
+    const m = mallarOk(params({ lineasControlX: [0, 4, 5, -1] }));
+    const uniforme = mallarOk(params());
+    expect(JSON.stringify(m)).toBe(JSON.stringify(uniforme));
+  });
+
+  it("las lineas de control preservan la topologia (quads a ambos lados comparten la columna)", () => {
+    const m = mallarOk(params({ lineasControlX: [1.5] }));
+    // Un nudo interior en x=1.5 es referenciado por quads a su izquierda y a su derecha.
+    const byName = new Map(m.nodos.map((n) => [n.name, n]));
+    const interior = m.nodos.find((n) => n.x === 1.5 && n.z > 0 && n.z < 2)!;
+    const tocan = m.quads.filter(
+      (q) => q.i === interior.name || q.j === interior.name || q.m === interior.name || q.n === interior.name,
+    );
+    // Un nudo interior de una columna intermedia toca 4 quads (2 a cada lado).
+    expect(tocan.length).toBe(4);
+    expect(byName.has(interior.name)).toBe(true);
+  });
+
+  it("estabilizacion sigue usando 2 esquinas distintas con lineas de control", () => {
+    const m = mallarOk(params({ lineasControlX: [1.5], lineasControlY: [0.7] }));
+    expect(m.estabilizacion).toHaveLength(2);
+    expect(m.estabilizacion[0].node).not.toBe(m.estabilizacion[1].node);
+    // La estabilizacion sigue anclada en la arista inferior (z=0) del rectangulo.
+    const byName = new Map(m.nodos.map((n) => [n.name, n]));
+    expect(byName.get(m.estabilizacion[0].node)!.z).toBe(0);
+    expect(byName.get(m.estabilizacion[1].node)!.z).toBe(0);
+  });
+
+  it("CAP: demasiadas lineas de control (rejilla minima > CAP_QUADS) -> PANO_DEMASIADOS_PILARES", () => {
+    // 50 lineas en X y 50 en Y sobre un rectangulo grande -> 51*51 = 2601 > 2000.
+    const lineas = Array.from({ length: 50 }, (_, k) => k + 1); // 1..50, celdas distintas
+    const res = mallarPano(
+      params({ perimetro: rect(0, 0, 100, 100), tamMalla: 10, lineasControlX: lineas, lineasControlY: lineas }),
+    );
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.codigo).toBe("PANO_DEMASIADOS_PILARES");
+      // Lenguaje de obra, sin jerga FEM.
+      expect(res.error.mensaje.toLowerCase()).not.toContain("quad");
+      expect(res.error.mensaje.toLowerCase()).not.toContain("cap");
+    }
+  });
+
+  it("aspecto: una linea cerca del borde subdivide el otro eje (MEJORA de una pasada, NO garantiza ASPECTO_MAX)", () => {
+    // Pilar a 0.2 m del borde en X sobre 10x10: crea una franja fina; el eje Y se subdivide
+    // (mejora del aspecto -> mas filas que la base ny=2). NO se afirma aspecto <= ASPECTO_MAX:
+    // la pasada usa los minimos PREVIOS a refinar, asi que en franjas asimetricas el aspecto
+    // real puede seguir alto (documentado; medido en el describe directo + T-f3-convergencia).
+    const m = mallarOk(params({ perimetro: rect(0, 0, 10, 10), tamMalla: 5, lineasControlX: [0.2] }));
+    expect(m.aspectoRelajado).toBe(false);
+    expect(m.ny).toBeGreaterThan(2); // la pasada subdividio el otro eje
+    expect(m.nodos.some((n) => n.x === 0.2)).toBe(true); // la franja fina sigue exacta
+    expect(m.quads).toHaveLength(m.nx * m.ny);
+    expect(m.nodos).toHaveLength((m.nx + 1) * (m.ny + 1));
+  });
+
+  it("aspecto: una franja EXTREMA relaja el aspecto (no explota la malla)", () => {
+    // Pilar a 2 mm del borde: acotar el aspecto pediria una subdivision enorme del otro
+    // eje que excede el cap -> se RELAJA el aspecto (aspectoRelajado) en vez de bloquear.
+    const m = mallarOk(params({ perimetro: rect(0, 0, 10, 10), tamMalla: 5, lineasControlX: [0.002] }));
+    expect(m.aspectoRelajado).toBe(true);
+    expect(m.nx * m.ny).toBeLessThanOrEqual(CAP_QUADS);
+    // Sigue habiendo un nudo exacto en la linea de control (el remap no se sacrifica).
+    expect(m.nodos.some((n) => n.x === 0.002)).toBe(true);
+  });
+
+  it("linea de control a media crujia reparte los huecos hacia tamMalla a ambos lados", () => {
+    const m = mallarOk(params({ lineasControlX: [2] }));
+    // 4x2, tamMalla 1, control en x=2: [0,2] -> 2 celdas, [2,4] -> 2 celdas = 4 en X.
+    expect(m.nx).toBe(4);
+    const xsUnicos = [...new Set(m.nodos.map((n) => n.x))].sort((a, b) => a - b);
+    expect(xsUnicos).toEqual([0, 1, 2, 3, 4]);
+  });
+});
+
+// --- planificarRejilla (directo): matriz de cap/aspecto sobre xs/ys, sin reconstruir nudos.
+// Peor aspecto de una rejilla tensorial: max sobre celdas de max(lado)/min(lado).
+function peorAspecto(xs: readonly number[], ys: readonly number[]): number {
+  const gx = xs.slice(1).map((v, i) => v - xs[i]);
+  const gy = ys.slice(1).map((v, i) => v - ys[i]);
+  let peor = 0;
+  for (const dx of gx) for (const dy of gy) peor = Math.max(peor, Math.max(dx, dy) / Math.min(dx, dy));
+  return peor;
+}
+
+describe("planificarRejilla (directo)", () => {
+  const lim: LimitesRectangulo = { xMin: 0, xMax: 10, yMin: 0, yMax: 10 };
+
+  it("sin lineas de control delega en el camino uniforme (equiespaciado, aspectoRelajado false)", () => {
+    const plan = planificarRejilla(lim, [], [], 5);
+    if ("codigo" in plan) throw new Error("esperaba plan, no error");
+    expect(plan.xs).toEqual([0, 5, 10]);
+    expect(plan.ys).toEqual([0, 5, 10]);
+    expect(plan.capAplicado).toBe(false);
+    expect(plan.aspectoRelajado).toBe(false);
+  });
+
+  it("demasiadas lineas de control (rejilla minima > CAP) -> PANO_DEMASIADOS_PILARES", () => {
+    const lineas = Array.from({ length: 50 }, (_, k) => k + 1); // 1..50, celdas distintas
+    const plan = planificarRejilla(
+      { xMin: 0, xMax: 100, yMin: 0, yMax: 100 },
+      lineas,
+      lineas,
+      10,
+    );
+    expect("codigo" in plan).toBe(true);
+    if ("codigo" in plan) expect(plan.codigo).toBe("PANO_DEMASIADOS_PILARES");
+  });
+
+  it("engrose CON lineas de control: la rejilla a tamMalla excede el CAP -> capAplicado, cap respetado, linea EXACTA", () => {
+    // 100x100, tamMalla 0.5 daria 200x200 = 40000 > CAP; 1 linea de control en x=50. nMin=2
+    // pasa, pero el tamMalla fuerza el engrose (rama del paso 2, distinta del bloqueo nMin>CAP).
+    const plan = planificarRejilla({ xMin: 0, xMax: 100, yMin: 0, yMax: 100 }, [50], [], 0.5);
+    if ("codigo" in plan) throw new Error("esperaba plan, no error: " + plan.codigo);
+    expect(plan.capAplicado).toBe(true);
+    expect((plan.xs.length - 1) * (plan.ys.length - 1)).toBeLessThanOrEqual(CAP_QUADS);
+    // La linea de control x=50 sigue EXACTA tras el engrose (piedra angular del remap).
+    expect(plan.xs).toContain(50);
+  });
+
+  it("la mejora de aspecto REDUCE el peor aspecto frente a la rejilla base (aunque NO lo acote a ASPECTO_MAX)", () => {
+    // Franja fina en X (x=0.2) sobre 10x10, tamMalla 5. La base (sin mejora) es xs=[0,0.2,5.1,10],
+    // ys=[0,5,10] (peor celda 0.2x5 = 25:1). La pasada subdivide Y y baja el peor aspecto, pero
+    // NO llega a <=4 (franja asimetrica): esto FIJA la mejora real y la limitacion honesta.
+    const plan = planificarRejilla(lim, [0.2], [], 5);
+    if ("codigo" in plan) throw new Error("esperaba plan");
+    const peorBase = peorAspecto([0, 0.2, 5.1, 10], [0, 5, 10]);
+    const peorConMejora = peorAspecto(plan.xs, plan.ys);
+    expect(peorConMejora).toBeLessThan(peorBase); // la pasada MEJORA el aspecto
+    expect(plan.aspectoRelajado).toBe(false);
+    expect(plan.xs).toContain(0.2); // franja exacta preservada
   });
 });
