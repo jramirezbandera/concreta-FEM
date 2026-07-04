@@ -52,6 +52,7 @@ import {
   type LimitesRectangulo,
   type MallaPano,
   type PuntoPlano,
+  type ErrorMallado,
 } from "./mallado";
 
 type Viga = Modelo["vigas"][number];
@@ -71,12 +72,22 @@ export type AcoplePano = {
   // omite: el portico ya sujeta la losa en su plano). Con false, el paño queda
   // AISLADO exactamente como en el corte 1.
   acopleActivo: boolean;
-  // Hay nudos de borde acoplados Y sin acoplar a la vez (parte del borde descansa
+  // Hay nudos de BORDE acoplados Y sin acoplar a la vez (parte del borde descansa
   // en vigas y parte en el bordeApoyo elegido). Gobierna el aviso PANO_BORDE_PARCIAL.
+  // [F2.0/RESERVA-4] Se evalua SOLO sobre `malla.nodosBorde ∩ nodosAcoplados`, NUNCA
+  // sobre `nodosAcoplados.size` (que ahora incluye cabezas de pilar interiores).
   bordeParcial: boolean;
   // Nº de aristas del rectangulo (0..4) con TODOS sus nudos de borde acoplados.
-  // Gobierna la relajacion de PANO_SIN_APOYO (OV-2): "libre" exige >=1.
+  // Gobierna la relajacion de PANO_SIN_APOYO (OV-2): "libre" exige >=1. Vive sobre
+  // los nombres de borde (nombresPorArista): una cabeza de pilar interior nunca cuenta.
   bordesCompletos: number;
+  // --- NUEVO F2.0 (losa plana sobre pilares) --------------------------------
+  // Pilares interiores acoplados a ESTE paño: su cabeza cae en un nudo de malla que
+  // el Paso 6c remapea a su N*. Ordenados por id. VACIO en el corte 2 (sin lineas de
+  // control) y en el caso 1-pilar (RESERVA-1: volcado SOLO bajo `acopleActivo`, espejo
+  // del volcado condicional de `subsDelPano`). Lo consume validaciones.ts para NO
+  // emitir PANO_PILAR_INTERIOR sobre ellos. INVARIANTE: length>0 ⇒ acopleActivo.
+  pilaresAcoplados: readonly string[];
 };
 
 export type ResultadoAcoples = {
@@ -89,6 +100,19 @@ export type ResultadoAcoples = {
   // correspondiente: la clave de celda del punto y la del nudo coinciden por
   // construccion (el remap del Paso 6c depende de ello).
   subdivisionesViga: Map<string, PuntoPlano[]>;
+  // --- NUEVO F2.0 (losa plana sobre pilares) --------------------------------
+  // Paños losa cuya malla NO se pudo construir por el cap de lineas de control
+  // (PANO_DEMASIADOS_PILARES): antes mallarPano fallaba y el paño se saltaba en
+  // silencio; ahora se superficia para que validaciones lo emita como error de obra.
+  // XOR con `porPano`: un paño losa mallable esta en `porPano`, uno con cap esta aqui,
+  // nunca en ambos. Recorrido en orden de id de paño (determinismo). Clave = panoId.
+  erroresMallado: Map<string, ErrorMallado>;
+  // panoId -> pares de pilarId interiores cuyas cabezas caen en la MISMA celda 2D de
+  // la malla (`clavePosicion(mapearEjes(x,y,cota),TOL_NODO)` coincidente): reclamarian
+  // el mismo nudo de malla, colision de acople silenciosa. `acople.ts` DETECTA, lo
+  // EMITE validaciones.ts (PANO_PILARES_JUNTOS). Cada par [a,b] con a<b (id menor
+  // primero); pares ordenados; paños en orden de id. NUNCA dedup por eje 1D ni |Δ|<TOL.
+  pilaresJuntos: Map<string, [string, string][]>;
 };
 
 // --- Helpers internos ----------------------------------------------------------
@@ -141,10 +165,22 @@ function claveEnPlanta(p: PuntoPlano): string {
   return clavePosicion(mapearEjes(p.x, p.y, 0), TOL_NODO);
 }
 
+// Clave de celda 3D de una posicion de obra (x,y) a una cota concreta. Es el MISMO
+// criterio que usa el remap del Paso 6c para casar cabeza de pilar <-> N* y que usa
+// el mallado para colocar el nudo de la linea de control. FUENTE UNICA del "mismo
+// nudo de malla" entre acople y discretizar; nunca |Δ|<TOL (F2.0, RESERVA-2, [M-4]).
+function claveCabeza(x: number, y: number, cota: number): string {
+  return clavePosicion(mapearEjes(x, y, cota), TOL_NODO);
+}
+
 // --- calcularAcoples -----------------------------------------------------------
 
 export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
   const porPano = new Map<string, AcoplePano>();
+  // Paños losa cuya malla no se pudo construir por el cap (PANO_DEMASIADOS_PILARES).
+  const erroresMallado = new Map<string, ErrorMallado>();
+  // panoId -> pares de pilares interiores en la misma celda 2D (junta a bloquear).
+  const pilaresJuntos = new Map<string, [string, string][]>();
   // vigaId -> (clave de celda -> {punto, t}). El primer punto de una celda gana
   // (orden de descubrimiento determinista: paños por id, aristas en orden fijo,
   // vigas por id); los siguientes caen en la misma celda = mismo nodo FEM.
@@ -187,13 +223,40 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
     if (puntos === undefined) return;
     const limites = limitesRectangulo(puntos);
     if ("codigo" in limites) return;
+
+    // --- Lineas de control desde las cabezas de pilar interiores (losa plana) ---
+    // Fuente unica: pilaresInterioresBajoPano (ya filtra a estrictamente interior +
+    // cota alcanzada + ordenado por id). Las coords se pasan REALES a mallarPano (el
+    // mallado las emite EXACTAS) para que el nudo de malla case con el N* del pilar
+    // (que nace de p.x/p.y reales). Dedup por celda cuantizada (dos pilares en la MISMA
+    // X colapsan a UNA linea de control X; cada uno tendra su nudo por su Y). Sin
+    // pilares interiores -> listas VACIAS -> camino de mallado uniforme byte-identico.
+    const pilaresInteriores = pilaresInterioresBajoPano(modelo, pano);
+    const lineasControlX = dedupPorCelda(pilaresInteriores.map((p) => p.x));
+    const lineasControlY = dedupPorCelda(pilaresInteriores.map((p) => p.y));
+
+    // Deteccion de PILARES JUNTOS: dos cabezas en la MISMA celda 2D (clave coincidente)
+    // reclamarian el mismo nudo de malla (colision de acople silenciosa). Se detecta
+    // ANTES de mallar y se acumula por paño (validaciones.ts EMITE PANO_PILARES_JUNTOS).
+    const juntosDelPano = detectarPilaresJuntos(pilaresInteriores, planta.cota);
+    if (juntosDelPano.length > 0) pilaresJuntos.set(pano.id, juntosDelPano);
+
     const res = mallarPano({
       perimetro: puntos,
       cota: planta.cota,
       tamMalla: pano.tamMalla,
       indicePano,
+      lineasControlX,
+      lineasControlY,
     });
-    if (!res.ok) return; // limites ya OK: no deberia ocurrir, defensivo
+    if (!res.ok) {
+      // Cap de lineas de control (PANO_DEMASIADOS_PILARES): antes se perdia en
+      // silencio; ahora se superficia para que validaciones lo emita en obra. El paño
+      // queda FUERA de porPano (XOR con erroresMallado). Otros codigos no deberian
+      // ocurrir (limites ya OK); se registran igual por robustez (siempre error de obra).
+      erroresMallado.set(pano.id, res.error);
+      return;
+    }
     const malla = res.malla;
 
     const qCotaPano = cuantizar(planta.cota);
@@ -261,7 +324,9 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
     }
 
     // Completitud por arista: TODOS sus nudos acoplados (una esquina puede venir
-    // acoplada por la viga de la arista ADYACENTE: sigue atada al portico).
+    // acoplada por la viga de la arista ADYACENTE: sigue atada al portico). Vive sobre
+    // `nombresPorArista` (solo nombres de BORDE): una cabeza de pilar interior anadida
+    // a `nodosAcoplados` mas abajo nunca cuenta como "arista completa" (RESERVA-4).
     let bordesCompletos = 0;
     for (const nombres of nombresPorArista) {
       if (nombres.length > 0 && nombres.every((n) => nodosAcoplados.has(n))) {
@@ -269,9 +334,44 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
       }
     }
 
-    const acopleActivo = nodosAcoplados.size >= 2;
+    // [RESERVA-4] bordeParcial ANTES de anadir las cabezas: es una propiedad del BORDE
+    // (parte del contorno sobre vigas, parte no). Se calcula sobre `malla.nodosBorde ∩
+    // nodosAcoplados`, NUNCA sobre `nodosAcoplados.size` (que a continuacion se infla con
+    // las cabezas de pilar interiores). En este punto `nodosAcoplados` es solo borde.
+    let bordeAcopladoCount = 0;
+    for (const n of malla.nodosBorde) if (nodosAcoplados.has(n)) bordeAcopladoCount += 1;
     const bordeParcial =
-      nodosAcoplados.size > 0 && nodosAcoplados.size < malla.nodosBorde.length;
+      bordeAcopladoCount > 0 && bordeAcopladoCount < malla.nodosBorde.length;
+
+    // --- Union de las cabezas de pilar interiores a nodosAcoplados (borde ∪ cabezas) ---
+    // Mapa clave de celda 2D -> nombre de nudo de malla (a la cota del paño). Cada cabeza
+    // de pilar interior tiene un nudo EXACTO en su celda (garantia de las lineas de
+    // control + construirEjeRejilla). Match por clave = mismo criterio que el remap 6c.
+    const nombrePorCeldaMalla = new Map<string, string>();
+    for (const nd of malla.nodos) nombrePorCeldaMalla.set(clavePosicion([nd.x, nd.y, nd.z], TOL_NODO), nd.name);
+    // Pilares cuya cabeza SI tiene nudo de malla: candidatos a acople (su nudo entra en
+    // nodosAcoplados para contar hacia size>=2). Si NO hay nudo (linea saneada fuera, o
+    // cap que engroso): el pilar NO se acopla -> cae a PANO_PILAR_INTERIOR aguas abajo.
+    // Nunca se fuerza un acople sin nudo.
+    const pilaresConNudo: string[] = [];
+    for (const p of pilaresInteriores) {
+      const nombre = nombrePorCeldaMalla.get(claveCabeza(p.x, p.y, planta.cota));
+      if (nombre === undefined) continue;
+      nodosAcoplados.add(nombre);
+      pilaresConNudo.push(p.id);
+    }
+
+    // acopleActivo cuenta ahora tambien las cabezas (borde ∪ cabezas). Con 2 pilares
+    // interiores no coincidentes (sin vigas): size==2 -> activo. Con 1 solo pilar:
+    // size==1 -> inactivo -> BLOQUEO por DP1 (pilaresAcoplados quedara []).
+    const acopleActivo = nodosAcoplados.size >= 2;
+
+    // [RESERVA-1] Volcado CONDICIONAL a acopleActivo (espejo de subsDelPano): solo si el
+    // paño resulta acoplado se declaran los pilares como acoplados. Asi pilaresAcoplados
+    // refleja el remap REAL emitido (el 6c mira acopleActivo), no el potencial. En el
+    // caso 1-pilar (!acopleActivo) queda [] y PANO_PILAR_INTERIOR sigue disparando (DP1).
+    // Ordenado por id (pilaresInteriores ya viene ordenado, se preserva).
+    const pilaresAcoplados: string[] = acopleActivo ? pilaresConNudo : [];
 
     if (acopleActivo) {
       for (const sub of subsDelPano) {
@@ -294,6 +394,7 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
       acopleActivo,
       bordeParcial,
       bordesCompletos,
+      pilaresAcoplados,
     });
   });
 
@@ -307,7 +408,50 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
     subdivisionesViga.set(vigaId, puntos);
   }
 
-  return { porPano, subdivisionesViga };
+  return { porPano, subdivisionesViga, erroresMallado, pilaresJuntos };
+}
+
+// --- Helpers de losa plana (lineas de control + juntas) ------------------------
+
+// Coords distintas por CELDA (cuantizar), en orden ascendente, conservando la coord
+// REAL (la primera por orden ascendente de cada celda). Espejo del filtrado de
+// `sanearLineasControl` (mallado.ts) pero SIN filtrar por borde (eso lo hace el
+// mallado): aqui solo deduplicamos por celda para no pasar dos lineas identicas.
+function dedupPorCelda(coords: readonly number[]): number[] {
+  const ordenadas = [...coords].filter((c) => Number.isFinite(c)).sort((a, b) => a - b);
+  const out: number[] = [];
+  let ultimaCelda: number | null = null;
+  for (const c of ordenadas) {
+    const q = cuantizar(c);
+    if (q === ultimaCelda) continue; // misma celda: dedup
+    ultimaCelda = q;
+    out.push(c);
+  }
+  return out;
+}
+
+// Pares de pilares interiores cuyas cabezas caen en la MISMA celda 2D a la cota del
+// paño (clave de celda coincidente = reclamarian el mismo nudo de malla). Criterio
+// UNICO: `claveCabeza` (clave de celda 2D), el MISMO del remap 6c; NUNCA por eje 1D
+// ni |Δ|<TOL (RESERVA-2, [M-4]). `pilares` viene ordenado por id, asi que cada par
+// [a,b] sale con a.id < b.id (id menor primero) y los pares en orden determinista.
+function detectarPilaresJuntos(pilares: readonly Pilar[], cota: number): [string, string][] {
+  const porClave = new Map<string, string[]>();
+  for (const p of pilares) {
+    const clave = claveCabeza(p.x, p.y, cota);
+    const lista = porClave.get(clave);
+    if (lista === undefined) porClave.set(clave, [p.id]);
+    else lista.push(p.id);
+  }
+  const pares: [string, string][] = [];
+  for (const ids of porClave.values()) {
+    if (ids.length < 2) continue;
+    // ids ya en orden de id (recorrido de pilares ordenado): todos los pares (i<j).
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) pares.push([ids[i], ids[j]]);
+    }
+  }
+  return pares;
 }
 
 // --- Elementos interiores bajo el paño (OV-5 / TODO-2) --------------------------
