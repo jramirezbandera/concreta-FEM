@@ -9,7 +9,7 @@
 //
 // UNIDADES (CLAUDE.md §14): espesor y tamaño de malla se editan en mm (CampoLongitudMm,
 // conversion en el borde); el material por id; el apoyo de borde enum.
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PanelFlotante, Boton, SelectMaterial } from "../primitivas";
 import { CampoBordeApoyo, CampoLongitudMm } from "./camposPano";
 import { Dialogo } from "../dialogos/Dialogo";
@@ -32,12 +32,14 @@ import { cargasDeAmbito } from "../../dominio";
 // usa el discretizador para emitirlas. La linea informativa del inspector no puede
 // divergir de lo que el calculo aplica.
 import { cargasGrupoDePano, CASE_CM_GRUPO } from "../../discretizador/cargasGrupo";
-// FUENTE UNICA (F2.3, losa plana): el MISMO detector geometrico que usa el acople del
-// discretizador para decidir que pilares interiores recogen la losa. Es pura Capa 1
-// (obra): lee pilares/plantas/perimetro, NO discretiza (no genera nudos/quads/FEM). La
-// nota de honestidad sobre el momento en cabeza de pilar no puede divergir de lo que
-// el calculo realmente acopla.
-import { pilaresInterioresBajoPano } from "../../discretizador/acople";
+// FUENTE UNICA (F2.3, losa plana; afinado en code-review #2): el MISMO calculo de
+// acople que usa el discretizador decide que pilares interiores recogen la losa.
+// Es puro (malla en memoria acotada por CAP_QUADS, sin FEM/solver/IO) y se memoiza
+// por modelo+seleccion. La nota de honestidad sobre el momento en cabeza de pilar
+// no puede divergir de lo que el calculo realmente acopla: el detector geometrico
+// a secas (pilaresInterioresBajoPano) sobre-disparaba en paños BLOQUEADOS (pilares
+// juntos, cap de malla) donde no hay losa plana calculable.
+import { calcularAcoples } from "../../discretizador/acople";
 import "./inspectorPano.css";
 
 function leerModelo() {
@@ -146,12 +148,25 @@ export function InspectorPano() {
   // fuente que el discretizador. [] si el grupo no aporta (linea ausente, GAP-H).
   const cargasGrupo = pano ? cargasGrupoDePano(modelo, pano) : [];
 
-  // Losa PLANA (F2.3): la losa se apoya en pilares interiores (su cabeza comparte
-  // el nudo con la malla). El acople exige >=2 apoyos (DP1: con 1 solo pilar el paño
-  // ni siquiera calcula, PANO_PILAR_INTERIOR bloquea), asi que umbral >=2 para no
-  // mostrar la nota sobre un paño que en realidad esta bloqueado. Detector puro de
-  // Capa 1 (misma fuente que el acople), no re-discretiza.
-  const esLosaPlana = pano ? pilaresInterioresBajoPano(modelo, pano).length >= 2 : false;
+  // Losa PLANA (F2.3; code-review #2): la nota de honestidad se muestra SOLO si el
+  // calculo acoplara de verdad pilares interiores a la malla. `pilaresAcoplados` ya
+  // es [] con 1 solo pilar (DP1: el paño ni calcula); el paño queda FUERA de porPano
+  // si el mallado fallo por el cap (PANO_DEMASIADOS_PILARES); y un par de cabezas en
+  // la misma celda (pilaresJuntos) bloquea en validaciones, asi que tambien silencia
+  // la nota. Mejora ademas el caso acoplado-por-vigas + 1 pilar interior: antes
+  // (umbral >=2 interiores) la nota no salia aunque ese pilar SI queda acoplado.
+  // Residuo asumido: losa "libre" sobre pilares COLINEALES (bloqueada por
+  // PANO_PILARES_INSUFICIENTES) aun la mostraria; ese gate vive en validaciones y
+  // duplicarlo aqui podria divergir.
+  const acoples = useMemo(
+    () => (panoId ? calcularAcoples(modelo) : null),
+    [modelo, panoId],
+  );
+  const esLosaPlana =
+    pano !== null &&
+    acoples !== null &&
+    !acoples.pilaresJuntos.has(pano.id) &&
+    (acoples.porPano.get(pano.id)?.pilaresAcoplados.length ?? 0) > 0;
 
   // Al cambiar de paño seleccionado, limpia los errores de la anterior.
   useEffect(() => {
@@ -275,9 +290,9 @@ export function InspectorPano() {
 
         {/* UX-C9 (reescrita en F3.2; ampliada en F2.3): la losa DESCARGA en el
             portico cuando su contorno coincide con vigas, y ademas en los pilares que
-            queden por DENTRO de su superficie (losa plana, >=2 pilares); el bordeApoyo
-            queda como fallback de los bordes sin viga. Lenguaje de obra, sin
-            sobre-prometer. */}
+            queden por DENTRO de su superficie (losa plana, pilares acoplados); el
+            bordeApoyo queda como fallback de los bordes sin viga. Lenguaje de obra,
+            sin sobre-prometer. */}
         <p className="cx-note">
           La losa descarga en las vigas y pilares de su contorno cuando los comparte, y
           también en los pilares que queden por dentro de su superficie; en los bordes

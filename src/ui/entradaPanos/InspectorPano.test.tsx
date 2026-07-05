@@ -199,15 +199,67 @@ describe("InspectorPano: visibilidad", () => {
     ).toBeNull();
   });
 
-  it("F2.3 [DP1]: con 1 SOLO pilar interior NO muestra la nota (ese paño ni calcula, umbral >=2)", () => {
+  it("F2.3 [DP1]: con 1 SOLO pilar interior NO muestra la nota (ese paño ni calcula)", () => {
     // Con 1 pilar el acople no se activa (PANO_PILAR_INTERIOR bloquea): la nota de
-    // honestidad mentiria (no hay losa plana calculable). Umbral >=2 lo evita.
+    // honestidad mentiria (no hay losa plana calculable). pilaresAcoplados queda [].
     modeloStore.getState().cargarModelo(modeloConLosaPlana(1));
     seleccionStore.getState().seleccionar(["F-1"]);
     render(<InspectorPano />);
     expect(
       screen.queryByText(/momento justo sobre la cabeza del pilar es orientativo/i),
     ).toBeNull();
+  });
+
+  it("code-review #2: dos pilares en la MISMA celda (PANO_PILARES_JUNTOS) NO muestran la nota", () => {
+    // El paño esta BLOQUEADO por la junta: prometer flecha/axil fiables mentiria.
+    // La fuente unica (calcularAcoples.pilaresJuntos) silencia la nota.
+    const m = modeloConLosaPlana(1);
+    const base = m.pilares.find((p) => p.id === "PIN-0")!;
+    m.pilares.push({ ...base, id: "PIN-DUP", nombre: "PiDup" }); // misma (x,y) que PIN-0
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+    expect(
+      screen.queryByText(/momento justo sobre la cabeza del pilar es orientativo/i),
+    ).toBeNull();
+  });
+
+  it("code-review #2: demasiados pilares (cap de malla) NO muestran la nota (paño bloqueado)", () => {
+    // 45 pilares interiores con coords distintas: la rejilla minima de lineas de
+    // control supera CAP_QUADS -> PANO_DEMASIADOS_PILARES -> el paño queda fuera de
+    // porPano y la nota se silencia (antes: 45 >= 2 la mostraba sobre un paño roto).
+    const m = modeloConLosaPlana(0);
+    for (let i = 1; i <= 45; i++) {
+      m.pilares.push({
+        id: `PC-${i}`, nombre: `PC${i}`, x: (i * 4) / 46, y: (i * 3) / 46,
+        plantaInicial: "pl0", plantaFinal: "pl1", seccionId: "s-pilar",
+        materialId: MAT_OK, angulo: 0, vinculacionExterior: true, arranque: "empotrado",
+      });
+    }
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+    expect(
+      screen.queryByText(/momento justo sobre la cabeza del pilar es orientativo/i),
+    ).toBeNull();
+  });
+
+  it("code-review #2: paño acoplado por una viga de contorno + 1 pilar interior SI muestra la nota", () => {
+    // Mejora sobre el umbral viejo (>=2 interiores): con el borde sobre una viga el
+    // acople ya esta activo y ese UNICO pilar interior queda acoplado (su cabeza
+    // comparte nudo con la malla): el momento sobre su cabeza es igual de orientativo.
+    const m = modeloConLosaPlana(1);
+    m.vigas.push({
+      id: "V-1", nombre: "V1", plantaId: "pl1", nudoI: "n1", nudoJ: "n2",
+      seccionId: "s-viga", materialId: MAT_OK,
+      extremoI: "empotrado", extremoJ: "empotrado", tirante: false,
+    });
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+    expect(
+      screen.getByText(/momento justo sobre la cabeza del pilar es orientativo/i),
+    ).toBeInTheDocument();
   });
 });
 

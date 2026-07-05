@@ -1265,3 +1265,49 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   substring). **Coste:** CC ~30-45 min (traducción + golden de mensaje de obra).
 - **Origen:** eng-review "losa maciza sobre pilares" (/plan-eng-review + Codex #2 → golden motor real
   L7; sub-hallazgo de UX, usuario eligió diferir con contexto). Pre-existente del glue, ampliado.
+
+---
+
+## T-f3-mallado-aspecto-todo-o-nada · La mejora de aspecto se omite ENTERA aunque un solo eje exceda el cap
+
+- **Qué:** En `planificarRejilla` ([mallado.ts](src/discretizador/mallado.ts), paso (3)), la guarda
+  anti-explosión cuenta las celdas que produciría la mejora de aspecto en AMBOS ejes a la vez
+  (`celdasX * celdasY <= CAP_QUADS`) y, si el producto excede el cap, OMITE la pasada por completo
+  (`aspectoRelajado = true`), aunque refinar solo UNO de los ejes (o refinar parcialmente) sí cupiera
+  bajo el cap. Todo-o-nada entre ejes.
+- **Por qué:** una losa con un pilar pegado a un borde en X y una rejilla ya densa en Y puede quedarse
+  con quads de aspecto muy malo en X (Mx/My poco fiables cerca del pilar) cuando refinar solo X era
+  viable. Es una pérdida de CALIDAD de malla, no de corrección: el cap se respeta y el flag
+  `aspectoRelajado` lo declara. La mejora ya es "de una pasada, no garantía" por diseño (ver
+  `ASPECTO_MAX`); esto la degrada un escalón más en el caso borde.
+- **Cómo retomar:** decidir por-eje: probar (refinar X, refinar Y), (solo X), (solo Y) en un orden
+  determinista y quedarse con la mejor combinación que quepa bajo el cap (o repartir el presupuesto de
+  celdas entre ejes proporcionalmente al exceso de aspecto). Mantener `contarCeldasTrasAspecto` /
+  `refinarAspecto` como fuente única conteo-vs-construcción por eje (ya lo son). Pinar con un test:
+  rejilla donde refinar ambos excede el cap pero un eje solo NO → ese eje se refina.
+- **Depende de / bloquea:** ninguno. Se cruza con `T-f3-convergencia` (estudio de malla; si aquél
+  redefine la política de aspecto, absorbe éste). **Coste:** CC ~30-40 min.
+- **Origen:** /code-review del corte losa plana (hallazgo #5, M2, PLAUSIBLE — calidad, no bug).
+  Usuario eligió diferir con contexto.
+
+---
+
+## T-f3-validaciones-error-mallado-implicito · El re-mallado explicativo confía en un invariante implícito de códigos
+
+- **Qué:** `validarRefsPano` ([validaciones.ts](src/discretizador/validaciones.ts) ~línea 482) re-malla
+  el paño SOLO para explicar el rechazo cuando el acople no lo malló, y reenvía `res.error.codigo` tal
+  cual. El comentario (`// PANO_NO_RECTANGULAR | PANO_DEGENERADO`) documenta un invariante que el código
+  NO asserta: como esa llamada va SIN líneas de control, hoy no puede fallar por
+  `PANO_DEMASIADOS_PILARES` (el cap solo se alcanza con líneas de control; el paño capado ya viene por
+  el canal `erroresMallado` con su propia precedencia cap > junta > …).
+- **Por qué:** latente. Si `mallarPano` gana mañana un modo de fallo alcanzable SIN líneas de control
+  (p. ej. un código nuevo de geometría), este camino lo reenviaría en silencio SALTÁNDOSE las reglas de
+  precedencia construidas alrededor de `erroresMallado`, o duplicando un error ya emitido por el otro
+  canal. Hoy no hay bug: es fragilidad ante evolución.
+- **Cómo retomar:** convertir el invariante en código: filtrar/assertar que el código recibido sea de
+  geometría (`PANO_NO_RECTANGULAR | PANO_DEGENERADO`) y, si llega otro, lanzar (bug interno, espejo del
+  throw del Paso 6c) o degradar a un error genérico de paño con el código en el mensaje técnico. Un
+  test que simule un código inesperado fija el contrato.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~15 min.
+- **Origen:** /code-review del corte losa plana (hallazgo #6, M4, PLAUSIBLE — latente). Usuario eligió
+  diferir con contexto.
