@@ -32,6 +32,12 @@
 //     silenciosa (flecha ~ -12 cm sin lanzar; medido en F2.3). Validaciones lo BLOQUEA
 //     con mensaje de obra ANTES de calcular. La sujecion AUTONOMA por pilares exige
 //     >=3 NO colineales (hayTresNoColineales, validaciones.ts).
+//  6) MULETA DE PLANO OMITIDA CON BORDE APOYADO (eng-review, Codex #2 + F2): losa
+//     "simple"/"empotrado" + pilares interiores acoplados OMITE la muleta DX/DZ, y esos
+//     apoyos de borde solo restringen DY. Se PINA que con base EMPOTRADA el camino es
+//     ESTABLE (DX/DZ ~1e-7, DY en mm, ΣV=carga, check OK) — los pilares empotrados sujetan
+//     el plano. Y se DESTAPA que con base ARTICULADA el motor LANZA "Unstable node(s)"
+//     (restriccion real; no basura silenciosa, PyNite la caza).
 //
 // UNIDADES (kN, m; presion de quad kN/m²). E/nu/ρ REALES de HA-25 (catalogo,
 // getMaterial), no constantes pegadas. Ejes: planta (x,y)->global (X,Z); cota->Y
@@ -103,6 +109,27 @@ function picoAxilPilar(
   return pico;
 }
 
+// Maximos |DX|, |DZ|, |DY| (m) sobre los nudos de MALLA en un combo. El plano de la losa
+// (DX/DZ) debe quedar acotado/pequeño si no hay modo rigido en plano descontrolado; una
+// explosion (DX/DZ ~ metros, o >> flecha) delataria un mecanismo (muleta omitida sin
+// sujecion efectiva). DY es la flecha maxima (referencia de orden de magnitud).
+function maxDespMalla(
+  res: ResDiscretizado,
+  r: ResultadosCalculo,
+  combo: string,
+): { dx: number; dz: number; dy: number } {
+  let dx = 0;
+  let dz = 0;
+  let dy = 0;
+  for (const nm of res.trazabilidad.nodosDeMalla) {
+    const d = r.nodos[nm][combo].disp;
+    dx = Math.max(dx, Math.abs(d[0]));
+    dz = Math.max(dz, Math.abs(d[2]));
+    dy = Math.max(dy, Math.abs(d[1]));
+  }
+  return { dx, dz, dy };
+}
+
 // -----------------------------------------------------------------------------
 // Modelo canonico: losa cuadrada `lado`x`lado` sobre `pilares` interiores, sin
 // vigas de contorno (bordes libres). Los pilares (cota 0 -> cota 3, empotrados +
@@ -114,8 +141,18 @@ function losaSobrePilares(opts: {
   pilares: { id: string; x: number; y: number }[];
   qUsuario: number; // kN/m² superficial (permanente)
   pesoPropio: boolean;
+  // Borde de la losa (default "libre": la tipologia del corazon del corte). "simple"/
+  // "empotrado" ejercitan el camino donde se OMITE la muleta de plano (acopleActivo) pero
+  // SI hay apoyos de borde (que solo restringen DY, no DX/DZ): la estabilidad en plano
+  // recae en los pilares (T3.2 · eng-review).
+  bordeApoyo?: "libre" | "simple" | "empotrado";
+  // Arranque de TODOS los pilares (default "empotrado"). "articulado" deja las rotaciones
+  // libres en la base -> el angulo de Codex: comprobar si el plano sigue sujeto.
+  arranque?: "empotrado" | "articulado" | "elastico";
 }): Modelo {
   const L = opts.lado;
+  const bordeApoyo = opts.bordeApoyo ?? "libre";
+  const arranque = opts.arranque ?? "empotrado";
   const hipotesis: Modelo["hipotesis"] = [
     { id: "h1", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
   ];
@@ -155,7 +192,7 @@ function losaSobrePilares(opts: {
       materialId: "HA-25",
       angulo: 0,
       vinculacionExterior: true,
-      arranque: "empotrado" as const,
+      arranque,
     })),
     vigas: [],
     panos: [
@@ -168,7 +205,7 @@ function losaSobrePilares(opts: {
         espesor: ESPESOR,
         materialId: "HA-25",
         tamMalla: opts.tamMalla,
-        bordeApoyo: "libre",
+        bordeApoyo,
       },
     ],
     muros: [],
@@ -535,5 +572,143 @@ describe("golden losa PLANA sobre pilares Capa B (motor real PyNite)", () => {
       if (res.ok) return;
       expect(res.errores.map((e) => e.codigo)).toContain("PANO_PILARES_INSUFICIENTES");
     },
+  );
+
+  // ---------------------------------------------------------------------------
+  // MULETA DE PLANO OMITIDA CON BORDE APOYADO (T3.2 · eng-review, Codex #2 + F2).
+  //
+  // `acopleActivo` (>=2 nudos acoplados) OMITE la muleta de estabilizacion DX/DZ de
+  // esquina (discretizar Paso 6c). El guard >=3-no-colineales (PANO_PILARES_INSUFICIENTES)
+  // SOLO corre para bordeApoyo==="libre". Con "simple"/"empotrado" NO corre, y esos apoyos
+  // de borde restringen SOLO DY (no DX/DZ en plano). Duda: ¿la losa sin muleta pierde el
+  // control del plano? Se MIDE contra el motor real. Pilares SIEMPRE en esquina (no
+  // colineales) para aislar la variable "borde + arranque", no la colinealidad.
+  //
+  // RESULTADO MEDIDO:
+  //  - Base EMPOTRADA: ESTABLE. La columna empotrada aporta rigidez DX/DZ y de giro al
+  //    nudo cabeza; el plano queda sujeto (DX/DZ ~1e-7 m, ~cero) sin la muleta. Omitirla
+  //    es seguro con borde apoyado + pilares empotrados.
+  //  - Base ARTICULADA: el motor LANZA "Unstable node(s)" (NO basura silenciosa: PyNite lo
+  //    caza y aborta). Con la base rotulada, el nudo cabeza del pilar pierde el control de
+  //    un GDL de giro que ni el apoyo de borde (solo DY) ni la muleta omitida restringen.
+  //    Es una RESTRICCION REAL del camino: losa plana sobre pilares ARTICULADOS sin muleta
+  //    no se resuelve (ver L7 + hallazgos del reporte).
+  // ---------------------------------------------------------------------------
+  const PILARES_ESQ = [
+    { id: "pil1", x: 1, y: 1 },
+    { id: "pil2", x: 5, y: 1 },
+    { id: "pil3", x: 1, y: 5 },
+    { id: "pil4", x: 5, y: 5 },
+  ];
+
+  // ΣV total = reacciones DY de los arranques de pilar + de los apoyos de borde de la malla.
+  function sumaVTotal(res: ResDiscretizado, r: ResultadosCalculo, combo: string): number {
+    let s = 0;
+    for (const nodo of Object.values(res.trazabilidad.pilarANodoArranque)) s += r.nodos[nodo][combo].rxn[1];
+    for (const nm of res.trazabilidad.apoyosDeMalla) s += r.nodos[nm]?.[combo]?.rxn[1] ?? 0;
+    return s;
+  }
+
+  for (const borde of ["simple", "empotrado"] as const) {
+    it(
+      `L5(${borde}) · MULETA OMITIDA + borde ${borde} + base EMPOTRADA es ESTABLE: DY en mm, DX/DZ acotados, ΣV=carga, check OK`,
+      () => {
+        if (!arranque?.ok) return;
+        const res = discretizarOk(
+          losaSobrePilares({
+            lado: 6.0,
+            tamMalla: 1.0,
+            pilares: PILARES_ESQ,
+            qUsuario: 5.0,
+            pesoPropio: true,
+            bordeApoyo: borde,
+            arranque: "empotrado",
+          }),
+        );
+        const r = arranque.motor.calcular(res.modeloFEM);
+
+        const centro = nudoCentro(res, 3, 3);
+        const dyC = r.nodos[centro]["ELS"].disp[1];
+        const { dx, dz, dy } = maxDespMalla(res, r, "ELS");
+
+        // (a) La losa flecta hacia ABAJO, del orden de mm (NO la basura ~ -12 cm del
+        //     mecanismo de losa libre 2-colineal). Cota generosa: |DY| < 5 cm.
+        expect(dyC, `borde ${borde}: DY centro < 0`).toBeLessThan(0);
+        expect(Math.abs(dyC), `borde ${borde}: |DY| razonable (mm, no basura)`).toBeLessThan(0.05);
+
+        // (b) NINGUN modo en plano descontrolado: DX/DZ de malla << flecha (aqui ~1e-7 m).
+        //     Si la muleta omitida dejara un mecanismo en plano, DX/DZ explotarian (>> DY).
+        expect(dx, `borde ${borde}: DX de malla acotado (sin modo en plano)`).toBeLessThan(1e-4);
+        expect(dz, `borde ${borde}: DZ de malla acotado (sin modo en plano)`).toBeLessThan(1e-4);
+        expect(dx, `borde ${borde}: DX << flecha (plano sujeto por los pilares)`).toBeLessThan(0.05 * dy);
+        expect(dz, `borde ${borde}: DZ << flecha`).toBeLessThan(0.05 * dy);
+
+        // (c) Equilibrio: ΣV (arranques + apoyos de borde) = carga total. Con borde apoyado
+        //     la carga se reparte entre pilares Y borde; ambos suman la carga.
+        const mat = getMaterial("HA-25")!;
+        const rho = mat.peso;
+        const area = 6 * 6;
+        const g = PILARES_ESQ.length * (0.3 * 0.3 * rho * H_PLANTA) + rho * ESPESOR * area + 5 * area;
+        const sV = sumaVTotal(res, r, "ELS");
+        expect(Math.abs(sV - g) / g, `borde ${borde}: ΣV=${sV} vs carga=${g}`).toBeLessThan(1e-3);
+
+        // (d) check_statics OK.
+        expect(r.check_statics?.equilibrio_ok).toBe(true);
+
+        console.log(
+          `\n[L5 ${borde}/empotrado] DYc=${dyC.toExponential(3)} DXmax=${dx.toExponential(2)} ` +
+            `DZmax=${dz.toExponential(2)} ΣV=${sV.toFixed(1)} carga=${g.toFixed(1)} check=${r.check_statics?.equilibrio_ok}\n`,
+        );
+      },
+      TIMEOUT_ARRANQUE,
+    );
+  }
+
+  it(
+    "L7 · HALLAZGO: MULETA OMITIDA + borde simple + base ARTICULADA -> el motor LANZA 'Unstable node(s)' (NO basura silenciosa)",
+    () => {
+      if (!arranque?.ok) return;
+      // Mismo modelo estable de L5 pero con arranque ARTICULADO (rotaciones libres en base).
+      // El eng-review pidio MEDIRLO: o se mantiene estable, o se destapa la restriccion.
+      // Resultado: el motor lo caza y ABORTA (mejor que calcular basura), pero es un camino
+      // que HOY no se bloquea en validaciones (el guard >=3-no-colineales solo corre para
+      // bordeApoyo==="libre"): una losa plana sobre pilares ARTICULADOS con borde apoyado
+      // discretiza ok:true y REVIENTA en el motor con un mensaje TECNICO (no de obra).
+      const modeloArticulado = losaSobrePilares({
+        lado: 6.0,
+        tamMalla: 1.0,
+        pilares: PILARES_ESQ,
+        qUsuario: 5.0,
+        pesoPropio: true,
+        bordeApoyo: "simple",
+        arranque: "articulado",
+      });
+
+      // Discretiza OK (el guard de colinealidad NO corre para borde "simple").
+      const res = discretizarOk(modeloArticulado);
+      expect(res.modeloFEM.quads?.length ?? 0).toBeGreaterThan(0);
+
+      // El motor LANZA (inestabilidad de nudo cazada por PyNite): NO devuelve resultados.
+      let lanzo = false;
+      let mensaje = "";
+      try {
+        arranque.motor.calcular(res.modeloFEM);
+      } catch (e) {
+        lanzo = true;
+        mensaje = e instanceof Error ? e.message : String(e);
+      }
+      expect(
+        lanzo,
+        "base articulada + muleta omitida: el motor debe LANZAR (inestable), no dar basura",
+      ).toBe(true);
+      // El mensaje del camino LINEAL es tecnico crudo de PyNite (a diferencia del P-Δ, que
+      // el glue traduce a obra). Se documenta como deuda de UX (ver hallazgos del reporte).
+      expect(mensaje.toLowerCase()).toMatch(/unstable|inestable/);
+
+      console.log(
+        `\n[L7 simple/articulado] lanzo=${lanzo} mensaje="${mensaje.replace(/\n/g, " ").slice(0, 90)}"\n`,
+      );
+    },
+    TIMEOUT_ARRANQUE,
   );
 });
