@@ -803,6 +803,17 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
       sinJergaFEM(e[0]);
     });
 
+    it("[FIX code-review #1] pilar interior solitario NO dispara PANO_ACOPLE_INSUFICIENTE", () => {
+      // El unico nudo acoplado es la CABEZA del pilar, no un nudo de borde sobre viga:
+      // el aviso "prolonga las vigas bajo su contorno" seria enganoso (aqui no hay vigas
+      // que prolongar; su caso real es PANO_PILAR_INTERIOR, DP1). Tercera aparicion del
+      // gemelo `nodosAcoplados.size` (RESERVA-4): el gate del aviso debe contar
+      // `nodosBordeAcoplados`, nunca el set inflado con cabezas de pilar.
+      const m = panoAisladoSobrePilares();
+      m.pilares.push(pilarInterior("pil-int", "P9", 2.5, 2.5));
+      expect(codigos(validarModelo(m))).not.toContain("PANO_ACOPLE_INSUFICIENTE");
+    });
+
     it("[F2.0] dos pilares en la MISMA celda -> PANO_PILARES_JUNTOS (nombra los 2), sin PANO_PILAR_INTERIOR por ellos", () => {
       const m = panoAisladoSobrePilares();
       // Mismo punto (2.5,2.5): caen en la misma celda 2D de la malla (junta).

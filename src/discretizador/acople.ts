@@ -232,14 +232,16 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
 
     // --- Lineas de control desde las cabezas de pilar interiores (losa plana) ---
     // Fuente unica: pilaresInterioresBajoPano (ya filtra a estrictamente interior +
-    // cota alcanzada + ordenado por id). Las coords se pasan REALES a mallarPano (el
-    // mallado las emite EXACTAS) para que el nudo de malla case con el N* del pilar
-    // (que nace de p.x/p.y reales). Dedup por celda cuantizada (dos pilares en la MISMA
-    // X colapsan a UNA linea de control X; cada uno tendra su nudo por su Y). Sin
-    // pilares interiores -> listas VACIAS -> camino de mallado uniforme byte-identico.
+    // cota alcanzada + ordenado por id). Las coords se pasan REALES y SIN dedup a
+    // mallarPano: su saneo (sanearLineasControl) es la FUENTE UNICA de orden + dedup
+    // por celda cuantizada + filtrado de bordes (dos pilares en la misma X colapsan
+    // ALLI a una linea de control X, conservando la coord real menor de la celda;
+    // cada uno tendra su nudo por su Y). Duplicar aqui ese dedup era un espejo que
+    // podia divergir. Sin pilares interiores -> listas VACIAS -> camino uniforme
+    // byte-identico.
     const pilaresInteriores = pilaresInterioresBajoPano(modelo, pano);
-    const lineasControlX = dedupPorCelda(pilaresInteriores.map((p) => p.x));
-    const lineasControlY = dedupPorCelda(pilaresInteriores.map((p) => p.y));
+    const lineasControlX = pilaresInteriores.map((p) => p.x);
+    const lineasControlY = pilaresInteriores.map((p) => p.y);
 
     // Deteccion de PILARES JUNTOS: dos cabezas en la MISMA celda 2D (clave coincidente)
     // reclamarian el mismo nudo de malla (colision de acople silenciosa). Se detecta
@@ -420,24 +422,7 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
   return { porPano, subdivisionesViga, erroresMallado, pilaresJuntos };
 }
 
-// --- Helpers de losa plana (lineas de control + juntas) ------------------------
-
-// Coords distintas por CELDA (cuantizar), en orden ascendente, conservando la coord
-// REAL (la primera por orden ascendente de cada celda). Espejo del filtrado de
-// `sanearLineasControl` (mallado.ts) pero SIN filtrar por borde (eso lo hace el
-// mallado): aqui solo deduplicamos por celda para no pasar dos lineas identicas.
-function dedupPorCelda(coords: readonly number[]): number[] {
-  const ordenadas = [...coords].filter((c) => Number.isFinite(c)).sort((a, b) => a - b);
-  const out: number[] = [];
-  let ultimaCelda: number | null = null;
-  for (const c of ordenadas) {
-    const q = cuantizar(c);
-    if (q === ultimaCelda) continue; // misma celda: dedup
-    ultimaCelda = q;
-    out.push(c);
-  }
-  return out;
-}
+// --- Helpers de losa plana (juntas) ---------------------------------------------
 
 // Pares de pilares interiores cuyas cabezas caen en la MISMA celda 2D a la cota del
 // paño (clave de celda coincidente = reclamarian el mismo nudo de malla). Criterio

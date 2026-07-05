@@ -911,10 +911,14 @@ function validarAvisosAcople(
   for (const pano of panosOrdenados) {
     const acople = acoples.porPano.get(pano.id);
     if (acople === undefined) continue;
-    // Un UNICO nudo compartido con el portico: el acople se degrada a aislado (con
-    // un punto no se puede sujetar la losa en su plano a traves del portico). El
-    // usuario probablemente ESPERABA que apoyara en esa viga: se le avisa.
-    if (!acople.acopleActivo && acople.nodosAcoplados.size === 1) {
+    // Un UNICO nudo de BORDE sobre viga: el acople se degrada a aislado (con un
+    // punto no se puede sujetar la losa en su plano a traves del portico). El
+    // usuario probablemente ESPERABA que apoyara en esa viga: se le avisa. Se
+    // cuenta con `nodosBordeAcoplados` (fuente unica, RESERVA-4), NUNCA con
+    // `nodosAcoplados.size`: ese set incluye cabezas de pilar interiores y un
+    // pilar solitario dispararia aqui un aviso que habla de prolongar vigas
+    // (su caso real es PANO_PILAR_INTERIOR, DP1).
+    if (!acople.acopleActivo && acople.nodosBordeAcoplados === 1) {
       errores.push({
         codigo: "PANO_ACOPLE_INSUFICIENTE",
         severidad: "aviso",

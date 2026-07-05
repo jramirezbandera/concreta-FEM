@@ -425,4 +425,13 @@ describe("planificarRejilla (directo)", () => {
     expect(plan.aspectoRelajado).toBe(false);
     expect(plan.xs).toContain(0.2); // franja exacta preservada
   });
+
+  it("[FIX code-review #3] tamMalla invalido (0, negativo, NaN) -> LANZA en vez de colgar", () => {
+    // Bug del llamante (validaciones/acople ya guardan tamMalla>0): sin el guard, h=0
+    // hacia celdasDeSegmento=Infinity y el bucle de insercion de construirEjeRejilla
+    // no terminaba (cuelgue). Lanzar alto lo hace visible y depurable.
+    for (const tam of [0, -1, Number.NaN]) {
+      expect(() => planificarRejilla(lim, [5], [], tam)).toThrow(/tamMalla invalido/);
+    }
+  });
 });

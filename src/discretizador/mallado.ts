@@ -373,6 +373,12 @@ export function planificarRejilla(
   lineasControlY: readonly number[],
   tamMalla: number,
 ): PlanRejilla | ErrorMallado {
+  // Entrada mal tipada = bug del llamante (validaciones y acople ya garantizan
+  // tamMalla > 0 finito): se lanza ALTO en vez de colgar. Con h <= 0 el bucle de
+  // insercion de construirEjeRejilla (k < celdasDeSegmento = Infinity) no termina.
+  if (!(Number.isFinite(tamMalla) && tamMalla > 0)) {
+    throw new Error(`planificarRejilla: tamMalla invalido (${tamMalla}); debe ser > 0`);
+  }
   const { xMin, xMax, yMin, yMax } = limites;
   const ancho = xMax - xMin;
   const alto = yMax - yMin;
