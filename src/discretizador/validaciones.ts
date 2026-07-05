@@ -1023,16 +1023,22 @@ function validarModalNumModos(modal: ContextoModal, errores: ErrorObra[]): void 
   }
 }
 
-// M2 (MODAL_SIN_MASA): el analisis modal necesita masa para vibrar. La masa la deriva
-// el motor del peso propio (`rho` del material) de las barras, asi que debe existir al
-// menos un pilar o viga con material de `rho>0`. Si no, el motor lanzaria "massless"
-// (jerga). Esta red lo atrapa antes, en lenguaje de obra. Se lee `rho` via
-// `materialAportaMasa` (A-dry, throw-safe: una ref de material rota no aporta masa y
-// ya la cazo REF_MATERIAL). BLOQUEA.
+// M2 (MODAL_SIN_MASA): el analisis modal necesita masa para vibrar. La masa ya no viene
+// solo de las barras: el motor la deriva del peso propio (`rho` del material) de pilares
+// y vigas Y de la masa de placa (rho·t) que fabrica el glue para las losas (F-masa-placa).
+// Asi que basta con que exista un pilar, una viga o un paño LOSA con material de `rho>0`.
+// Solo cuentan los paños `tipo === "losa"`: reticular/unidireccional no se discretizan
+// (los bloquea PANO_TIPO_NO_SOPORTADO aguas abajo) y por tanto no aportan masa. Si no hay
+// masa alguna, el motor lanzaria "massless" (jerga); esta red lo atrapa antes, en lenguaje
+// de obra. Se lee `rho` via `materialAportaMasa` (A-dry, throw-safe: una ref de material
+// rota no aporta masa y ya la cazo REF_MATERIAL). BLOQUEA.
 function validarModalConMasa(modelo: Modelo, errores: ErrorObra[]): void {
   const hayMasa =
     modelo.pilares.some((p) => materialAportaMasa(p.materialId)) ||
-    modelo.vigas.some((v) => materialAportaMasa(v.materialId));
+    modelo.vigas.some((v) => materialAportaMasa(v.materialId)) ||
+    modelo.panos.some(
+      (p) => p.tipo === "losa" && materialAportaMasa(p.materialId),
+    );
   if (!hayMasa) {
     errores.push({
       codigo: "MODAL_SIN_MASA",

@@ -85,6 +85,95 @@ function payloadModal(): ModeloFEM {
   };
 }
 
+// --- Caso CON PLACA (quads): placa cuadrada SSSS de hormigon (el del spike -------
+// T-f3-masa-placa masa_placa_spike.py, malla reducida). Sin BARRAS: la masa la fabrica
+// el glue con _agregar_masa_quads (add_node_load FY -rho*t*area/4 en los 4 nudos de cada
+// quad) porque PyNite 2.0.2 NO da masa al Quad3D. Este SMOKE prueba que con solo quads el
+// modal vive (no masa cero -> el modo de placa aparece): f1 finita, positiva, del orden
+// esperado (~20-25 Hz para HA-25 6x6 t=0.25). La precision exacta (vs Leissa, TOL 3%) es
+// el golden F4.1; aqui basta la forma valida.
+//
+// HA-25 realista (Codigo Estructural): Ecm ~= 31477 MPa -> E = 3.1477e7 kN/m2; nu=0.2;
+// rho=25 kN/m3 (PESO especifico). Placa 6x6 m, t=0.25 m, malla NPLACA x NPLACA quads.
+const LADO_PLACA = 6;
+const ESPESOR_PLACA = 0.25;
+const NPLACA = 4; // 4x4 quads = 5x5 nudos (error medido -4.9% vs Leissa; sobra para smoke)
+const E_HA25 = 3.1477e7; // kN/m2 (Ecm HA-25 Codigo Estructural)
+const NU_HA25 = 0.2;
+const G_HA25 = E_HA25 / (2 * (1 + NU_HA25));
+const RHO_HA25 = 25; // kN/m3 (PESO especifico)
+
+function payloadModalPlaca(): ModeloFEM {
+  const nombre = (ix: number, iz: number): string => `N_${ix}_${iz}`;
+  const h = LADO_PLACA / NPLACA;
+
+  // Nudos (NPLACA+1) x (NPLACA+1) en el plano FEM X-Z (vertical = Y).
+  const nodes = [];
+  for (let iz = 0; iz <= NPLACA; iz++) {
+    for (let ix = 0; ix <= NPLACA; ix++) {
+      nodes.push({ name: nombre(ix, iz), x: ix * h, y: 0, z: iz * h });
+    }
+  }
+
+  // Quads en orden CANONICO i->j->m->n CCW visto desde +Y (mismo recorrido que el
+  // discretizador y el golden de placa).
+  const quads = [];
+  for (let iz = 0; iz < NPLACA; iz++) {
+    for (let ix = 0; ix < NPLACA; ix++) {
+      quads.push({
+        name: `Q_${ix}_${iz}`,
+        i: nombre(ix, iz),
+        j: nombre(ix + 1, iz),
+        m: nombre(ix + 1, iz + 1),
+        n: nombre(ix, iz + 1),
+        t: ESPESOR_PLACA,
+        material: "HA25",
+      });
+    }
+  }
+
+  // Apoyo SIMPLE de borde (DY) en todo el perimetro + estabilizacion en plano identica
+  // al discretizador (mallado.ts): esquina (0,0) -> DX+DZ, esquina (NPLACA,0) -> DZ. Fija
+  // las 2 traslaciones de plano y el giro RY de cuerpo rigido sin coartar la flexion.
+  const esBorde = (ix: number, iz: number): boolean =>
+    ix === 0 || ix === NPLACA || iz === 0 || iz === NPLACA;
+  const supports = [];
+  for (let iz = 0; iz <= NPLACA; iz++) {
+    for (let ix = 0; ix <= NPLACA; ix++) {
+      const enBorde = esBorde(ix, iz);
+      // (0,0): DY(borde)+DX+DZ ; (NPLACA,0): DY(borde)+DZ ; resto de borde: solo DY.
+      const esq00 = ix === 0 && iz === 0;
+      const esqN0 = ix === NPLACA && iz === 0;
+      if (!enBorde) continue;
+      supports.push({
+        node: nombre(ix, iz),
+        DX: esq00,
+        DY: true,
+        DZ: esq00 || esqN0,
+        RX: false,
+        RY: false,
+        RZ: false,
+      });
+    }
+  }
+
+  return {
+    units: "kN-m",
+    nodes,
+    materials: [{ name: "HA25", E: E_HA25, G: G_HA25, nu: NU_HA25, rho: RHO_HA25 }],
+    sections: [], // sin barras: la placa no usa SeccionFEM (el espesor va en el quad)
+    members: [],
+    quads,
+    supports,
+    node_loads: [],
+    dist_loads: [],
+    pt_loads: [],
+    quad_loads: [], // el modal no necesita cargas; la MASA la fabrica el glue desde rho
+    combos: [],
+    analysis: { type: "modal", check_statics: false, num_modes: 4 },
+  };
+}
+
 // Llama al glue `calcular` crudo (enruta modal) y devuelve el dict {ok|error} bruto.
 function calcularModalCrudo(motor: MotorArrancado, modeloFEM: ModeloFEM): unknown {
   const fn = motor.py.globals.get("calcular");
@@ -174,6 +263,80 @@ describe("smoke modal: analyze_modal end-to-end (biapoyada)", () => {
       expect(m1.numero).toBe(1);
       expect(m1.frecuencia).toBeCloseTo(f1, 6);
       const centro = m1.nodos["N4"];
+      expect(centro).toBeDefined();
+      expect(centro.length).toBe(6);
+      expect(Math.abs(centro[1])).toBeGreaterThan(0); // DY del centro no nulo
+    },
+    TIMEOUT_ARRANQUE,
+  );
+
+  it(
+    "vibra una placa (quads) sin barras: la masa de placa entra en el modal (T-f3-masa-placa)",
+    () => {
+      if (!arranque || arranque.skip) {
+        console.warn(`[SMOKE-MODAL][SKIP] ${arranque?.motivo ?? "arranque no ejecutado"}`);
+        return;
+      }
+
+      const raw = calcularModalCrudo(arranque.motor, payloadModalPlaca()) as
+        | { ok: true; resultados: unknown }
+        | { ok: false; error: { mensaje?: string; detalle?: string } };
+
+      // NO debe lanzar: con _agregar_masa_quads la placa entra al modal con masa != 0.
+      // Sin el fix, la losa entraria con masa CERO -> "sin masa"/modo de placa ausente.
+      if (!raw.ok) {
+        throw new Error(
+          `[SMOKE-MODAL-PLACA] el glue devolvio error: ${raw.error.mensaje}\n${raw.error.detalle}`,
+        );
+      }
+
+      // --- Borde Zod: la salida cumple ResultadosModalesSchema -----------------
+      const parseado = ResultadosModalesSchema.safeParse(raw.resultados);
+      if (!parseado.success) {
+        throw new Error(
+          `[SMOKE-MODAL-PLACA] ResultadosModalesSchema.safeParse FALLO:\n${JSON.stringify(
+            parseado.error.issues,
+            null,
+            2,
+          )}`,
+        );
+      }
+      const r = parseado.data;
+
+      // --- Forma + sanidad numerica (SMOKE, sin asertar el valor de Leissa) ----
+      expect(r.units).toBe("kN-m");
+      expect(r.analysis.type).toBe("modal");
+      expect(r.frecuencias.length).toBeGreaterThanOrEqual(1);
+      expect(r.analysis.num_modes).toBe(r.frecuencias.length);
+      expect(r.modos.length).toBe(r.frecuencias.length);
+
+      // f1 finita, POSITIVA (si la placa entrara con masa cero no habria modo de
+      // flexion o el modal fallaria). Ascendencia entre modos.
+      const f1 = r.frecuencias[0];
+      expect(Number.isFinite(f1)).toBe(true);
+      expect(f1).toBeGreaterThan(0);
+      for (const f of r.frecuencias) {
+        expect(Number.isFinite(f)).toBe(true);
+        expect(f).toBeGreaterThan(0);
+      }
+      for (let k = 1; k < r.frecuencias.length; k++) {
+        expect(r.frecuencias[k]).toBeGreaterThanOrEqual(r.frecuencias[k - 1] - 1e-9);
+      }
+
+      // Banda Hz plausible para esta placa (spike: ~20-25 Hz a mallas finas; con 4x4 el
+      // f1 ronda ~21.5 Hz, y el elemento de placa gruesa la mantiene en este orden).
+      // Banda AMPLIA a proposito (es SMOKE): caza masa cero (f1 disparada/NaN) y el x√g
+      // de gravity mal (~x3.1). El valor exacto lo aserta el golden F4.1.
+      console.warn(`\n[SMOKE-MODAL-PLACA][f1] ${f1.toFixed(4)} Hz (esperado ~20-25)\n`);
+      expect(f1).toBeGreaterThan(8);
+      expect(f1).toBeLessThan(45);
+
+      // El 1.er modo lleva su forma por nudo con 6 GDL; el nudo central de la placa
+      // (N_2_2, centro de la malla 4x4) se mueve en DY (flexion (1,1) de la placa).
+      const m1 = r.modos[0];
+      expect(m1.numero).toBe(1);
+      expect(m1.frecuencia).toBeCloseTo(f1, 6);
+      const centro = m1.nodos["N_2_2"];
       expect(centro).toBeDefined();
       expect(centro.length).toBe(6);
       expect(Math.abs(centro[1])).toBeGreaterThan(0); // DY del centro no nulo

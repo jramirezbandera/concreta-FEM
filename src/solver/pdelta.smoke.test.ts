@@ -120,6 +120,126 @@ function momentoBase(res: ResultadosCalculo): number {
   return Math.abs(res.nodos["N1"]["ELU"].rxn[5]);
 }
 
+// =============================================================================
+// Caso CON PLACA (quads): forjado de losa sobre 4 pilares empotrados + carga (corte
+// T-f3-masa-placa). PRUEBA que la rama P-Δ del glue YA NO bloquea con panos
+// (MotorAnalisisConPanos eliminado): analyze_PDelta(sparse=True) corre con quads
+// presentes y devuelve ok:true. El motor SI corre P-Δ con quads (spike
+// pdelta_placa_spike.md): los quads aportan rigidez elastica y transmiten carga, y el
+// P-Δ amplifica por el axil de los PILARES (PyNite 2.0.2 no da rigidez geometrica al
+// quad, pero eso no impide que el analisis corra). Aqui basta el SMOKE (corre + ok);
+// la amplificacion y el equilibrio exactos los aserta el golden losa-plana-pdelta (F3).
+//
+// GEOMETRIA (FEM Y-up, plano de losa X-Z): losa cuadrada 6x6 m a altura Y=H_PILAR sobre
+// 4 pilares en las esquinas que bajan a base empotrada en Y=0. Malla 2x2 quads = 3x3
+// nudos de losa (los 4 de esquina coinciden con las cabezas de pilar). HA-25 realista.
+const LADO_LOSA = 6;
+const ESPESOR_LOSA = 0.25;
+const H_PILAR = 3; // altura de los pilares (m)
+const E_HA25 = 3.1477e7; // kN/m2 (Ecm HA-25 Codigo Estructural)
+const NU_HA25 = 0.2;
+const G_HA25 = E_HA25 / (2 * (1 + NU_HA25));
+const RHO_HA25 = 25; // kN/m3 (PESO especifico)
+const Q_SUP = 5; // kN/m2 sobrecarga superficial (gravitatoria, presion POSITIVA)
+const H_LAT = 4; // kN carga lateral en +X por cabeza (provoca el sway que P-Δ toca)
+
+function payloadLosaSobrePilares(): ModeloFEM {
+  const N = 2; // 2x2 quads
+  const h = LADO_LOSA / N;
+  const nombre = (ix: number, iz: number): string => `L_${ix}_${iz}`;
+
+  // Nudos de la LOSA (a altura Y=H_PILAR) en el plano X-Z.
+  const nodes = [];
+  for (let iz = 0; iz <= N; iz++) {
+    for (let ix = 0; ix <= N; ix++) {
+      nodes.push({ name: nombre(ix, iz), x: ix * h, y: H_PILAR, z: iz * h });
+    }
+  }
+  // Bases de los 4 pilares de esquina (Y=0), empotradas.
+  const esquinas: Array<[number, number]> = [
+    [0, 0],
+    [N, 0],
+    [0, N],
+    [N, N],
+  ];
+  const bases = esquinas.map(([ix, iz], k) => ({
+    name: `B${k}`,
+    x: ix * h,
+    y: 0,
+    z: iz * h,
+  }));
+  nodes.push(...bases);
+
+  // Quads de la losa (orden CANONICO i->j->m->n CCW visto desde +Y).
+  const quads = [];
+  for (let iz = 0; iz < N; iz++) {
+    for (let ix = 0; ix < N; ix++) {
+      quads.push({
+        name: `Q_${ix}_${iz}`,
+        i: nombre(ix, iz),
+        j: nombre(ix + 1, iz),
+        m: nombre(ix + 1, iz + 1),
+        n: nombre(ix, iz + 1),
+        t: ESPESOR_LOSA,
+        material: "HA25",
+      });
+    }
+  }
+
+  // Pilares: cada base -> su cabeza de esquina de la losa (member vertical en Y).
+  const members = esquinas.map(([ix, iz], k) => ({
+    name: `P${k}`,
+    i: `B${k}`,
+    j: nombre(ix, iz),
+    material: "HA25",
+    section: "PILAR",
+    rotation: 0,
+    tension_only: false,
+    comp_only: false,
+    releases: null,
+  }));
+
+  // Apoyos: solo las 4 bases empotradas. La losa cuelga de los pilares (sin apoyos
+  // propios); los pilares empotrados le dan sujecion sobrada -> P-Δ estable (spike).
+  const supports = bases.map((b) => ({
+    node: b.name,
+    DX: true,
+    DY: true,
+    DZ: true,
+    RX: true,
+    RY: true,
+    RZ: true,
+  }));
+
+  // Carga vertical: presion superficial gravitatoria (POSITIVA = hacia abajo) en cada
+  // quad, case "G". Carga lateral en +X en las 4 cabezas, case "H" (sway).
+  const quad_loads = quads.map((q) => ({ quad: q.name, presion: Q_SUP, case: "G" }));
+  const node_loads = esquinas.map(([ix, iz]) => ({
+    node: nombre(ix, iz),
+    direction: "FX" as const,
+    P: H_LAT,
+    case: "H",
+  }));
+
+  return {
+    units: "kN-m",
+    nodes,
+    materials: [{ name: "HA25", E: E_HA25, G: G_HA25, nu: NU_HA25, rho: RHO_HA25 }],
+    // Pilar 0.30x0.30 (robusto, spike caso A): A, Iy, Iz, J de la seccion cuadrada.
+    sections: [{ name: "PILAR", A: 0.09, Iy: 6.75e-4, Iz: 6.75e-4, J: 1.14e-3 }],
+    members,
+    quads,
+    supports,
+    node_loads,
+    dist_loads: [],
+    pt_loads: [],
+    quad_loads,
+    combos: [{ name: "ELU", factors: { G: 1, H: 1 } }],
+    // P-Δ con quads: ya NO se bloquea (MotorAnalisisConPanos eliminado en T1.1).
+    analysis: { type: "PDelta", check_statics: false },
+  };
+}
+
 // -----------------------------------------------------------------------------
 // Arranque del motor (politica de skip propia, identica a smoke.test.ts).
 // -----------------------------------------------------------------------------
@@ -269,6 +389,43 @@ describe("smoke P-Δ: amplificacion real + inestabilidad legible", () => {
       // aparecer el texto crudo de PyNite: el glue lo deja solo en `detalle`.
       expect(mensaje).toContain("inestable bajo P-Δ");
       expect(mensaje.toLowerCase()).toContain("arriostramiento");
+    },
+    TIMEOUT_ARRANQUE,
+  );
+
+  it(
+    "corre P-Δ con PLACAS (quads) presentes sin bloquear (T-f3-masa-placa)",
+    () => {
+      if (!arranque || arranque.skip) {
+        console.warn(`[SMOKE P-Δ][SKIP] ${arranque?.motivo ?? "no arrancado"}`);
+        return;
+      }
+      // Forjado de losa sobre 4 pilares empotrados + carga (gravitatoria + lateral).
+      // ANTES el glue bloqueaba P-Δ con panos (MotorAnalisisConPanos); T1.1 lo elimino.
+      // El motor SI corre P-Δ con quads (spike pdelta_placa_spike.md): aqui basta con
+      // que NO lance y devuelva un resultado por-combo valido (ok:true implicito: el
+      // closure `calcular` lanza si el glue devuelve {ok:false} o si el borde Zod falla).
+      const r = arranque.motor.calcular(payloadLosaSobrePilares());
+
+      // El eco del tipo confirma que se ejecuto la rama P-Δ (no fallo ni cayo a otra).
+      expect(r.analysis.type).toBe("PDelta");
+      // check_statics NO aplica bajo P-Δ (el glue lo fuerza a null aunque el payload lo
+      // traiga): mismo invariante que el caso de columna sin placas.
+      expect(r.check_statics).toBeNull();
+
+      // Sanidad minima: hay reacciones del combo ELU en las bases de pilar y son finitas
+      // (si el P-Δ hubiera divergido/lanzado, el closure ya habria hecho throw). No se
+      // asertan magnitudes (eso es el golden losa-plana-pdelta): solo que la fisica salio.
+      const sumaV = ["B0", "B1", "B2", "B3"].reduce(
+        (acc, b) => acc + r.nodos[b]["ELU"].rxn[1], // rxn[1] = FY (vertical)
+        0,
+      );
+      console.warn(`\n[SMOKE P-Δ][PLACA] ok, ΣFY(bases)=${sumaV.toFixed(3)} kN\n`);
+      expect(Number.isFinite(sumaV)).toBe(true);
+      // El peso propio de la losa + la sobrecarga son gravitatorios (hacia abajo): la
+      // reaccion vertical total en las bases es POSITIVA (sostiene la carga). Banda
+      // amplia (SMOKE): solo confirma signo y orden de magnitud, no el valor exacto.
+      expect(sumaV).toBeGreaterThan(0);
     },
     TIMEOUT_ARRANQUE,
   );

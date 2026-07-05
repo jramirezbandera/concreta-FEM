@@ -226,22 +226,6 @@ class MotorInestableModal(Exception):
     """La estructura es inestable para el analisis modal (matriz singular)."""
 
 
-# -----------------------------------------------------------------------------
-# Error de dominio: analisis NO compatible con placas (F3, decision 6A del plan).
-#
-# El analisis modal y el P-Delta requieren la MASA del modelo. Hoy la masa modal se
-# fabrica con add_member_self_weight (solo BARRAS): la masa de los PAnos (placas) NO
-# se modela todavia (T-f3-masa-placa). Permitir modal/P-Delta con quads daria
-# frecuencias/efectos de 2.º orden FALSOS (masa de la losa ignorada), un error
-# silencioso peor que no calcular. Por eso, si el modelo tiene quads y el analisis es
-# modal o P-Delta, lo BLOQUEAMOS con un mensaje en lenguaje de obra. El estatico
-# (linear/analyze) SI corre con placas (no necesita masa). Lo envolvemos en una
-# excepcion propia para que calcular() emita el ErrorMotor legible correcto.
-# -----------------------------------------------------------------------------
-class MotorAnalisisConPanos(Exception):
-    """El analisis pedido (modal/P-Delta) aun no soporta la masa de los panos."""
-
-
 # Marcadores (minuscula) del mensaje de "sin masa" del solver modal (spike F2b):
 # "massless" (M() vacio) y "no mass terms" (M11.nnz==0 en analyze_modal).
 _MARCADORES_SIN_MASA = ("massless", "no mass terms", "no mass")
@@ -257,28 +241,20 @@ _MARCADORES_INESTABLE = ("singular", "unstable", "diverged", "diverge")
 # =============================================================================
 # 2) ANALISIS  (seleccion segun analysis.type, guia §6)
 # =============================================================================
-def run_analysis(m, analysis):
+def run_analysis(m, analysis, payload):
     """Ejecuta el analisis del tipo pedido. Devuelve (tipo_ejecutado, aviso|None).
 
     Soporta 'linear', 'analyze', 'PDelta' (F2a) y 'modal' (F2b). El camino modal
     es DISTINTO: no produce esfuerzos por combo, sino frecuencias propias + formas
     de vibracion. NO se serializa con serialize_results (por-combo) sino con
     serialize_results_modal; calcular() enruta segun el tipo.
+
+    `payload` se plomea hasta aqui (y a _run_modal) porque el modal necesita el
+    catalogo de materiales para la masa de placas (_agregar_masa_quads): Quad3D en
+    2.0.2 NO guarda rho, hay que releerlo del payload por nombre de material.
     """
     tipo = analysis.get("type", "analyze")
     cs = analysis.get("check_statics", False)
-
-    # BLOQUEO modal/P-Delta con PLACAS (decision 6A del plan F3): la masa de los panos
-    # no se modela aun (la masa modal = add_member_self_weight, solo barras), asi que un
-    # modal o un P-Delta con quads daria resultados FALSOS (masa de la losa ignorada).
-    # Se rechaza con error de obra ANTES de analizar. El estatico (linear/analyze) SI
-    # corre con placas. `m.quads` lo pobla build_model desde payload["quads"].
-    if tipo in ("modal", "PDelta") and len(m.quads) > 0:
-        raise MotorAnalisisConPanos(
-            "El analisis %s aun no incluye la masa de los panos (losas): "
-            "retira los panos del modelo o usa el analisis estatico."
-            % ("modal" if tipo == "modal" else "P-Δ")
-        )
 
     # sparse=True (default de PyNite) usa el solver disperso de scipy: la ruta
     # esperada (CLAUDE.md §8). check_statics solo IMPRIME el balance; el residuo
@@ -293,6 +269,14 @@ def run_analysis(m, analysis):
         # queda en su default True: si la estructura es inestable de 2.º orden
         # (pivote singular, GDL sin rigidez, no convergencia), PyNite lanza; lo
         # traducimos a un error de obra legible en vez de un traceback crudo.
+        #
+        # CON PLACAS (quads): PyNite 2.0.2 NO considera la rigidez geometrica de los
+        # quads (docstring oficial: "P-Delta effects in plates/quads are not
+        # considered"): el quad no tiene kg(). El efecto P-Δ de los PILARES por el axil
+        # que les descarga la losa SI se captura (spike pdelta_placa_spike.md: la deriva
+        # de las cabezas se amplifica, amp 1.005-1.25 segun esbeltez). Es decir, la losa
+        # transmite carga y aporta rigidez elastica, pero no se pandea ella misma. La UI
+        # lo declara en honestidad (Fase 4). Por eso ya NO se bloquea P-Δ con panos.
         try:
             m.analyze_PDelta(sparse=True)
         except Exception as e:  # noqa: BLE001 - se reclasifica, no se traga.
@@ -306,7 +290,7 @@ def run_analysis(m, analysis):
         # masa consistente y reclasifica los fallos del solver a errores de obra. La
         # serializacion la hace serialize_results_modal (NO la por-combo); calcular()
         # enruta segun el tipo, asi que aqui solo ejecutamos el analisis.
-        _run_modal(m, analysis)
+        _run_modal(m, analysis, payload)
     else:  # "analyze" (general, itera no linealidades tension/comp-only)
         m.analyze(check_statics=cs, sparse=True)
 
@@ -335,18 +319,92 @@ def _contar_gdl_libres(m):
     return len(m.nodes) * 6 - restringidos
 
 
-def _run_modal(m, analysis):
-    """Ejecuta analyze_modal sobre `m` con masa CONSISTENTE fabricada por el glue.
+def _area_quad_3d(m, i, j, mm, n):
+    """Area del cuadrilatero (nudos i,j,m,n) por triangulacion 3D robusta.
 
-    Receta (confirmada por el spike F2b ejecutando el motor real):
-      1) Fabricar masa CONSISTENTE: add_member_self_weight('FY', -1, case) crea las
-         dist loads self_weight=True que el camino consistent_m suma como
-         combo_factor*rho*L*A/gravity; add_load_combo(combo, {case: 1.0}) las activa.
-         (El camino lumped -reusar dist loads normales- daria -15% en f1.)
+    Triangula i->j->m y i->m->n y suma la mitad del modulo del producto vectorial de
+    cada triangulo. Usa las coords 3D reales (m.nodes[nombre].X/Y/Z), NO shoelace 2D:
+    asi es correcta tambien para placas NO horizontales (muros verticales, futuros),
+    donde la proyeccion al plano XZ daria area 0 o falseada.
+    """
+    def _p(nombre):
+        nd = m.nodes[nombre]
+        return (nd.X, nd.Y, nd.Z)
+
+    def _area_tri(a, b, c):
+        ux, uy, uz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
+        vx, vy, vz = c[0] - a[0], c[1] - a[1], c[2] - a[2]
+        cx = uy * vz - uz * vy
+        cy = uz * vx - ux * vz
+        cz = ux * vy - uy * vx
+        return 0.5 * (cx * cx + cy * cy + cz * cz) ** 0.5
+
+    pi, pj, pm, pn = _p(i), _p(j), _p(mm), _p(n)
+    return _area_tri(pi, pj, pm) + _area_tri(pi, pm, pn)
+
+
+def _agregar_masa_quads(m, payload):
+    """Agrega la masa de las PLACAS (quads) al combo de masa modal, LUMPED tributaria.
+
+    PyNite 2.0.2 NO da masa al Quad3D (no tiene m()/kg() ni guarda rho, solo E/nu) y
+    add_member_self_weight ignora los quads: sin este helper una losa entraria al modal
+    con masa CERO y sus modos de flexion no apareceran. Mecanismo (spike masa_placa):
+    por cada quad, W = rho * t * area (kN, peso propio) y se reparte como
+    add_node_load(FY, -W/4, case=_CASO_MASA_MODAL) en sus 4 nudos, acumulando entre
+    quads vecinos. analyze_modal(mass_direction="Y", gravity=9.81) lo convierte en masa
+    W/g; Node3D.M la coloca en las TRES traslaciones nodales (FX/FY/FZ) -> la losa aporta
+    masa tambien a los modos HORIZONTALES del edificio, que es lo correcto para una losa.
+
+    Precision: masa LUMPED tributaria, error medido <=1.7% vs Leissa (limite fisico del
+    elemento de placa gruesa Mindlin del motor, ~-2.2%; NO converge a Leissa delgada).
+    Ver src/solver/spikes/masa_placa_spike.md.
+
+    DIVERGENCIA DELIBERADA con el centro de masas: aqui solo entra el peso propio de la
+    placa (rho*t), NO las cargas muertas superpuestas; el CM (src/dominio/centros.ts:198-222)
+    SI suma las cargas muertas. Es decision de usuario: paridad con la masa de las BARRAS,
+    que tambien es solo peso propio (add_member_self_weight). T-modal-masa-altitud movera
+    TODA la masa (barras + placas + muertas) al discretizador en el futuro.
+
+    rho: Quad3D NO lo guarda, asi que se relee del payload["materials"] por nombre de
+    material (q["material"]). El lookup es directo m[q["material"]]["rho"]: si el material
+    no existe, salta un KeyError RUIDOSO (bug interno visible), no masa perdida en silencio.
+    En la practica no puede ocurrir: build_model ya habria fallado en add_quad con un
+    material inexistente. Los nombres de nudo del payload YA son los N* finales post-remap
+    (el glue NUNCA renombra: invariante del contrato Capa 2).
+    """
+    quads = payload.get("quads", []) or []
+    if not quads:
+        return
+    # Indice rho por nombre de material (peso especifico kN/m^3). KeyError natural si falta.
+    rho_por_material = {
+        mat["name"]: mat["rho"] for mat in payload.get("materials", [])
+    }
+    for q in quads:
+        rho = rho_por_material[q["material"]]  # KeyError ruidoso si el material no existe
+        area = _area_quad_3d(m, q["i"], q["j"], q["m"], q["n"])
+        w = rho * q["t"] * area  # peso del quad (kN); rho es PESO especifico, no masa
+        aporte = -w / 4.0  # FY negativa (hacia abajo) repartida a los 4 nudos
+        for nudo in (q["i"], q["j"], q["m"], q["n"]):
+            m.add_node_load(nudo, "FY", aporte, case=_CASO_MASA_MODAL)
+
+
+def _run_modal(m, analysis, payload):
+    """Ejecuta analyze_modal sobre `m` con masa fabricada por el glue (barras + placas).
+
+    Receta (confirmada por los spikes F2b y T-f3-masa-placa con el motor real):
+      1) Fabricar la masa en el MISMO caso/combo de masa (_CASO_MASA_MODAL /
+         _COMBO_MASA_MODAL), sumando dos fuentes:
+           - BARRAS: masa CONSISTENTE via add_member_self_weight('FY', -1, case) (el
+             camino consistent_m suma combo_factor*rho*L*A/gravity; el lumped daria -15%).
+           - PLACAS: masa LUMPED tributaria via _agregar_masa_quads (add_node_load FY
+             -rho*t*area/4 en los 4 nudos de cada quad; PyNite no da masa al Quad3D).
+         Ambas alimentan el mismo combo, asi que en un forjado sobre portico la masa de la
+         losa y la de los pilares/vigas SUMAN en la misma matriz M.
       2) Acotar num_modes a (GDL_libres - 1) para no superar el k<N de eigsh.
       3) analyze_modal(num_modes, mass_combo_name=combo, gravity=9.81). NO se pasa
          `sparse` ni `check_statics`: la firma real de 2.0.2 no los acepta (siempre
-         dispersa internamente). gravity=9.81 porque rho es PESO (kN/m^3): masa=peso/g.
+         dispersa internamente). gravity=9.81 porque rho es PESO (kN/m^3): masa=peso/g,
+         comun a barras y placas.
 
     No devuelve nada: deja m.frequencies y los combos internos "Mode N". La lectura
     la hace serialize_results_modal. Reclasifica los fallos a errores de obra.
@@ -361,8 +419,11 @@ def _run_modal(m, analysis):
         pedido = _NUM_MODES_DEFAULT
     pedido = max(1, int(pedido))
 
-    # 1) Masa consistente fabricada por el glue (la Capa 2 no emite combo de masa).
+    # 1) Masa fabricada por el glue (la Capa 2 no emite combo de masa). Dos fuentes en
+    #    el MISMO caso/combo: BARRAS (consistente, add_member_self_weight) + PLACAS
+    #    (lumped tributaria, _agregar_masa_quads: PyNite no da masa al Quad3D). Suman en M.
     m.add_member_self_weight("FY", -1.0, case=_CASO_MASA_MODAL)
+    _agregar_masa_quads(m, payload)
     m.add_load_combo(_COMBO_MASA_MODAL, {_CASO_MASA_MODAL: 1.0})
 
     # 2) Acotar num_modes < GDL libres (eigsh exige k < N). Para calcular >=1 modo
@@ -1238,7 +1299,7 @@ def calcular(payload, n_points=N_POINTS_DEFAULT):
         m = build_model(payload)
 
         analysis = payload.get("analysis", {"type": "analyze", "check_statics": False})
-        tipo, _aviso = run_analysis(m, analysis)
+        tipo, _aviso = run_analysis(m, analysis, payload)
 
         # MODAL: camino INDEPENDIENTE. No produce esfuerzos/reacciones por combo, asi
         # que NO se serializa con serialize_results (por-combo) ni se calcula
@@ -1263,19 +1324,6 @@ def calcular(payload, n_points=N_POINTS_DEFAULT):
 
         resultados = serialize_results(m, combos, n_points, tipo, check)
         return {"ok": True, "resultados": resultados}
-
-    except MotorAnalisisConPanos as e:
-        # Analisis modal/P-Delta pedido sobre un modelo con placas (F3, 6A): la masa de
-        # los panos no se modela aun. Mensaje de obra directo (el mensaje de la excepcion
-        # YA esta en lenguaje de obra); `detalle` conserva el crudo para modo avanzado.
-        return {
-            "ok": False,
-            "error": {
-                "mensaje": str(e),
-                "detalle": "Panos+analisis: " + (str(e) or e.__class__.__name__)
-                + "\n" + traceback.format_exc(),
-            },
-        }
 
     except MotorModalSinMasa as e:
         # El modelo no tiene masa para vibrar (sin peso propio ni material con rho, o

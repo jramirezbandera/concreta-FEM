@@ -84,8 +84,9 @@ export type ResultadoDiscretizacion =
 // `modal`: cuando esta presente, el calculo es un ANALISIS MODAL (camino separado del
 // estatico). El Paso 8 emite `analysis.type:"modal"` con `num_modes = modal.numModos`,
 // IGNORANDO `modelo.analisis.tipo` (lineal/general/pDelta solo gobiernan el estatico).
-// La masa modal NO se emite en Capa 2: la fabrica el glue (add_member_self_weight +
-// gravity=9.81), por eso `generarCombos` NO cambia y aqui no hay combo de masa. El
+// La masa modal NO se emite en Capa 2: la fabrica el glue (barras via
+// add_member_self_weight + placas via _agregar_masa_quads, gravity=9.81), por eso
+// `generarCombos` NO cambia y aqui no hay combo de masa. El
 // numero de modos NO se persiste en el Modelo: llega por aqui y se valida (guardas
 // MODAL_NUM_MODOS / MODAL_SIN_MASA).
 export type DiscretizarOpts = {
@@ -1116,7 +1117,8 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   // estatico). Se emite `type:"modal"` + `num_modes` (de opts.modal.numModos, ya
   // validado >0). `check_statics:false`: el analisis modal no comprueba equilibrio
   // por combo (no hay combo estatico que comprobar). La masa NO se emite en Capa 2:
-  // la fabrica el glue (add_member_self_weight + gravity=9.81); no hay combo de masa.
+  // la fabrica el glue (barras via add_member_self_weight + placas via
+  // _agregar_masa_quads, gravity=9.81); no hay combo de masa.
   //
   // Camino ESTATICO (sin opts.modal): mapeo `tipo` (Capa 1) -> AnalisisFEM.type, 3 ramas:
   //   lineal -> linear   (analisis lineal de primer orden)

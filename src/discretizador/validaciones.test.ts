@@ -507,6 +507,60 @@ describe("validarModelo", () => {
     expect(cods).not.toContain("MODAL_SIN_MASA");
   });
 
+  it("MODAL_SIN_MASA: SOLO un paño losa (sin pilares/vigas con masa) -> sin error", () => {
+    // F-masa-placa: el glue fabrica masa de placa (rho·t) para las losas, asi que un
+    // modelo SOLO-losas ya puede vibrar. La guarda debe contar la losa como masa (antes
+    // este modelo se bloqueaba en TS aunque el motor supiera darle masa). Losa de HA-25
+    // (peso>0), borde simple para no arrastrar PANO_SIN_APOYO.
+    const m = modeloValido();
+    m.pilares = [];
+    m.vigas = [];
+    m.cargas = []; // las cargas referenciaban v1 (ya borrada): se limpian para aislar
+    m.nudos.push(
+      { id: "q1", x: 10, y: 10 },
+      { id: "q2", x: 14, y: 10 },
+      { id: "q3", x: 14, y: 13 },
+      { id: "q4", x: 10, y: 13 },
+    );
+    m.panos.push({
+      id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+      perimetro: ["q1", "q2", "q3", "q4"],
+      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+    });
+    expect(codigos(validarModelo(m, { numModos: 6 }))).not.toContain("MODAL_SIN_MASA");
+  });
+
+  it("MODAL_SIN_MASA: sin masa alguna (ni barras ni losa con peso) -> sigue bloqueando", () => {
+    // No-regresion: quitados pilares y vigas y SIN paño losa, no hay nada que vibre.
+    const m = modeloValido();
+    m.pilares = [];
+    m.vigas = [];
+    m.cargas = [];
+    expect(codigos(validarModelo(m, { numModos: 6 }))).toContain("MODAL_SIN_MASA");
+  });
+
+  it("MODAL_SIN_MASA: paño reticular con material con peso NO cuenta como masa", () => {
+    // El gate es `tipo === "losa"`: reticular/unidireccional no se discretizan (los
+    // bloquea PANO_TIPO_NO_SOPORTADO aguas abajo) y no deben aportar masa. Con un paño
+    // reticular como unico "elemento con peso" y sin barras, sigue faltando masa.
+    const m = modeloValido();
+    m.pilares = [];
+    m.vigas = [];
+    m.cargas = [];
+    m.nudos.push(
+      { id: "q1", x: 10, y: 10 },
+      { id: "q2", x: 14, y: 10 },
+      { id: "q3", x: 14, y: 13 },
+      { id: "q4", x: 10, y: 13 },
+    );
+    m.panos.push({
+      id: "pano1", nombre: "Reticular", tipo: "reticular", plantaId: "p1",
+      perimetro: ["q1", "q2", "q3", "q4"],
+      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+    });
+    expect(codigos(validarModelo(m, { numModos: 6 }))).toContain("MODAL_SIN_MASA");
+  });
+
   // ============================================================================
   // [AUDITORIA M-1] IDS DUPLICADOS. El borde Zod no valida unicidad de ids y los
   // lookups del dominio son `.find()` (primer match): dos nudos con el mismo id y

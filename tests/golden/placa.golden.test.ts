@@ -41,6 +41,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 
 import { obtenerMotor, TIMEOUT_ARRANQUE, type ArranqueMotor } from "./_arnes";
 import type { ModeloFEM } from "../../src/discretizador/contratoFEM";
+import { ResultadosModalesSchema } from "../../src/solver/resultadosModales";
 
 // --- Parametros de la losa (sistema interno kN-m) ----------------------------
 const LADO = 4.0; // m (losa cuadrada a×a)
@@ -376,30 +377,112 @@ describe("golden placa Capa B (motor real PyNite)", () => {
   );
 
   // ---------------------------------------------------------------------------
-  // B5) BLOQUEO modal con placas (6A). El analisis modal con quads -> ErrorMotor de
-  //     obra (la masa de los panos no se modela aun), NO un crash ni un resultado
-  //     falso. El estatico ya corrio arriba; aqui el modal debe propagar el {ok:false}.
+  // B5) MODAL CON PLACAS -> frecuencias (la masa de la losa YA se modela).
+  //
+  //     HISTORIA (por que este test se INVIRTIO). En 6A (F3 corte 1) el glue BLOQUEABA
+  //     el modal en cuanto el modelo llevaba quads y devolvia un ErrorMotor de obra
+  //     "los panos no llevan masa aun": PyNite 2.0.2 NO da masa al Quad3D (no tiene
+  //     m()/kg() ni guarda rho) y add_member_self_weight ignora los quads, asi que una
+  //     losa entraba al modal con masa CERO -> sus modos de flexion no aparecian. Este
+  //     mismo test aseveraba entonces `toThrow(/pa[nñ]os|masa/i)`: pinaba ese bloqueo
+  //     como comportamiento CORRECTO mientras la masa de placa no estuviera modelada.
+  //
+  //     QUE LO LEVANTO (corte T-f3-masa-placa). El glue ahora FABRICA la masa de la
+  //     placa a mano (_agregar_masa_quads): por cada quad reparte W=rho*t*area como
+  //     add_node_load(FY,-W/4) en sus 4 nudos, en el MISMO combo de masa que las barras,
+  //     y analyze_modal(mass_direction="Y", gravity=9.81) lo convierte en masa W/g. Es
+  //     el patron peso->masa/g que el glue ya usa para las BARRAS, extendido a la placa
+  //     porque PyNite no lo da (spike src/solver/spikes/masa_placa_spike.md, veredicto
+  //     GO). Con la masa modelada el bloqueo sobra: el modal con placas debe RESOLVER.
+  //
+  //     Este test afirma el camino POSITIVO: calcularModal(conQuads) NO lanza y devuelve
+  //     frecuencias sanas (finitas, > 0, ascendentes) con forma modal por nudo valida
+  //     contra ResultadosModalesSchema. NO fija la magnitud contra Leissa (eso es un
+  //     golden de convergencia aparte; el spike mide error <=1.7% y limite fisico Mindlin
+  //     ~-2.2%, no converge a Leissa delgada); aqui basta con que la fisica sea del orden
+  //     esperado (decenas de Hz para esta placa a=4 m, t=0.2 m) para cazar el bug de masa
+  //     cero (que dispararia o anularia el modo de placa) sin acoplarse a una constante.
   // ---------------------------------------------------------------------------
   it(
-    "modal con placas -> ErrorMotor de obra (la masa de los panos no se modela aun)",
+    "modal con placas -> frecuencias (la masa de la losa ya se modela)",
     () => {
       if (!arranque || !arranque.ok) {
         console.warn(`[GOLDEN-PLACA][SKIP] ${arranque?.motivo ?? "arranque no ejecutado"}`);
         return;
       }
+      const PEDIDOS = 4;
       const conQuads = modeloFEMLosaCuadrada({
         n: N,
         presion: Q,
         estabilizar: true,
         checkStatics: false,
       });
-      conQuads.analysis = { type: "modal", check_statics: false, num_modes: 4 };
-      // calcularModal lanza cuando el glue devuelve {ok:false}; el mensaje debe hablar
-      // de panos/masa, no un traceback de PyNite.
+      conQuads.analysis = { type: "modal", check_statics: false, num_modes: PEDIDOS };
+
+      // (1) NO lanza: el glue ya no bloquea el modal con placas (la masa se fabrica).
+      // calcularModal valida internamente con ResultadosModalesSchema y lanzaria si el
+      // glue devolviera {ok:false} o la salida no cuadrara con el borde modal.
+      const r = arranque.motor.calcularModal(conQuads);
+
+      // (2) BORDE modal: metadatos del analisis y coherencia frecuencias<->modos.
+      expect(r.units).toBe("kN-m");
+      expect(r.analysis.type).toBe("modal");
+      expect(r.analysis.num_modes).toBe(r.frecuencias.length);
+      expect(r.modos.length).toBe(r.frecuencias.length);
+
+      // (3) Nº de modos: al menos 1 y como mucho los PEDIDOS (el glue ACOTA a los GDL
+      // libres si el pedido excede; una placa 8x8 tiene cientos de GDL, asi que devuelve
+      // los 4 pedidos, pero afirmamos la cota robusta en vez de computar GDL exacto).
+      expect(r.frecuencias.length, "al menos 1 modo").toBeGreaterThanOrEqual(1);
       expect(
-        () => arranque!.ok && arranque!.motor.calcularModal(conQuads),
-        "modal con placas debe propagar un ErrorMotor de obra (panos)",
-      ).toThrow(/pa[nñ]os|masa/i);
+        r.frecuencias.length,
+        "num_modes acotado a lo pedido (<= PEDIDOS)",
+      ).toBeLessThanOrEqual(PEDIDOS);
+
+      // (4) FRECUENCIAS sanas: todas finitas, > 0 (Hz) y ASCENDENTES (orden de eigsh).
+      // Masa CERO (el bug del bloqueo, si volviera) daria f1 disparada/NaN o el modal
+      // fallaria; unas frecuencias finitas y positivas demuestran que la masa entra.
+      for (const f of r.frecuencias) {
+        expect(Number.isFinite(f), `frecuencia finita (real=${f})`).toBe(true);
+        expect(f, "frecuencia > 0 (Hz)").toBeGreaterThan(0);
+      }
+      for (let k = 1; k < r.frecuencias.length; k++) {
+        expect(
+          r.frecuencias[k],
+          `frecuencias ascendentes (modo ${k + 1} >= modo ${k})`,
+        ).toBeGreaterThanOrEqual(r.frecuencias[k - 1] - 1e-9);
+      }
+
+      // (5) ORDEN DE MAGNITUD fisico: para esta placa (a=4 m, t=0.2 m, HA E=30e6, nu=0.2,
+      // rho=25) la f1 de referencia (Leissa delgada) ronda ~40 Hz; el motor DKMQ cae
+      // ligeramente por debajo (placa gruesa). Banda AMPLIA [5, 200] Hz: no es un golden
+      // de magnitud, solo confirma que la fisica es del orden de "decenas de Hz" (spike)
+      // y descarta masa cero / gravity mal (que sacarian f1 de esta banda por completo).
+      const f1 = r.frecuencias[0];
+      console.warn(`\n[GOLDEN-PLACA][modal] f1=${f1.toFixed(3)} Hz (decenas de Hz esperadas)\n`);
+      expect(f1, "f1 de la losa en el orden fisico (decenas de Hz)").toBeGreaterThan(5);
+      expect(f1, "f1 de la losa en el orden fisico (decenas de Hz)").toBeLessThan(200);
+
+      // (6) FORMA modal por nudo valida contra el borde Zod (defensa en profundidad,
+      // ademas de la validacion interna del arnes): 6 GDL finitos por nudo, el centro
+      // se mueve verticalmente (DY) en el 1.er modo de flexion de placa.
+      const parsed = ResultadosModalesSchema.safeParse(r);
+      expect(
+        parsed.success,
+        `la salida modal valida contra ResultadosModalesSchema${
+          parsed.success ? "" : `:\n${JSON.stringify(parsed.error!.issues, null, 2)}`
+        }`,
+      ).toBe(true);
+      const m1 = r.modos[0];
+      expect(m1.numero).toBe(1);
+      expect(m1.frecuencia).toBeCloseTo(f1, 6);
+      const centro = m1.nodos[NUDO_CENTRO];
+      expect(centro, "el nudo central tiene forma modal").toBeDefined();
+      expect(centro.length).toBe(6);
+      expect(
+        Math.abs(centro[1]),
+        "DY del centro no nulo (flexion vertical de la placa)",
+      ).toBeGreaterThan(0);
     },
     TIMEOUT_ARRANQUE,
   );
