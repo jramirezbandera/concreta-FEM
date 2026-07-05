@@ -72,10 +72,16 @@ export type AcoplePano = {
   // omite: el portico ya sujeta la losa en su plano). Con false, el paño queda
   // AISLADO exactamente como en el corte 1.
   acopleActivo: boolean;
+  // Nº de nudos de BORDE (∩ nodosAcoplados) que descansan sobre una viga de contorno.
+  // [F2.0/RESERVA-4] FUENTE UNICA de "cuantos nudos de BORDE estan acoplados": se cuenta
+  // sobre `malla.nodosBorde ∩ nodosAcoplados`, NUNCA sobre `nodosAcoplados.size` (que
+  // ahora incluye cabezas de pilar interiores). Lo consumen `bordeParcial` (aqui) y
+  // `haySujecionPano` (validaciones.ts): asi no pueden divergir dos recuentos del mismo
+  // concepto (un pilar interior nunca cuenta como "nudo de borde acoplado").
+  nodosBordeAcoplados: number;
   // Hay nudos de BORDE acoplados Y sin acoplar a la vez (parte del borde descansa
   // en vigas y parte en el bordeApoyo elegido). Gobierna el aviso PANO_BORDE_PARCIAL.
-  // [F2.0/RESERVA-4] Se evalua SOLO sobre `malla.nodosBorde ∩ nodosAcoplados`, NUNCA
-  // sobre `nodosAcoplados.size` (que ahora incluye cabezas de pilar interiores).
+  // Derivado directo de `nodosBordeAcoplados` (0 < n < malla.nodosBorde.length).
   bordeParcial: boolean;
   // Nº de aristas del rectangulo (0..4) con TODOS sus nudos de borde acoplados.
   // Gobierna la relajacion de PANO_SIN_APOYO (OV-2): "libre" exige >=1. Vive sobre
@@ -334,14 +340,16 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
       }
     }
 
-    // [RESERVA-4] bordeParcial ANTES de anadir las cabezas: es una propiedad del BORDE
-    // (parte del contorno sobre vigas, parte no). Se calcula sobre `malla.nodosBorde ∩
-    // nodosAcoplados`, NUNCA sobre `nodosAcoplados.size` (que a continuacion se infla con
-    // las cabezas de pilar interiores). En este punto `nodosAcoplados` es solo borde.
-    let bordeAcopladoCount = 0;
-    for (const n of malla.nodosBorde) if (nodosAcoplados.has(n)) bordeAcopladoCount += 1;
+    // [RESERVA-4] Conteo de nudos de BORDE acoplados ANTES de anadir las cabezas: es una
+    // propiedad del BORDE (parte del contorno sobre vigas, parte no). Se calcula sobre
+    // `malla.nodosBorde ∩ nodosAcoplados`, NUNCA sobre `nodosAcoplados.size` (que a
+    // continuacion se infla con las cabezas de pilar interiores). En este punto
+    // `nodosAcoplados` es solo borde. Se EXPONE como `nodosBordeAcoplados` (fuente unica
+    // consumida tambien por haySujecionPano en validaciones.ts).
+    let nodosBordeAcoplados = 0;
+    for (const n of malla.nodosBorde) if (nodosAcoplados.has(n)) nodosBordeAcoplados += 1;
     const bordeParcial =
-      bordeAcopladoCount > 0 && bordeAcopladoCount < malla.nodosBorde.length;
+      nodosBordeAcoplados > 0 && nodosBordeAcoplados < malla.nodosBorde.length;
 
     // --- Union de las cabezas de pilar interiores a nodosAcoplados (borde ∪ cabezas) ---
     // Mapa clave de celda 2D -> nombre de nudo de malla (a la cota del paño). Cada cabeza
@@ -392,6 +400,7 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
       indicePano,
       nodosAcoplados,
       acopleActivo,
+      nodosBordeAcoplados,
       bordeParcial,
       bordesCompletos,
       pilaresAcoplados,

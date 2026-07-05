@@ -528,6 +528,8 @@ describe("calcularAcoples · acople de cabezas de pilar (F2.0 losa plana)", () =
     // nodosAcoplados = 5 (borde inferior) + 2 (cabezas) = 7.
     expect(a.nodosAcoplados.size).toBe(7);
     expect(a.malla.nodosBorde.length).toBe(16);
+    // nodosBordeAcoplados cuenta SOLO borde (5), NO las 2 cabezas: fuente unica de bordeParcial.
+    expect(a.nodosBordeAcoplados).toBe(5);
     expect(a.bordeParcial).toBe(true); // 5 de 16 nudos de BORDE acoplados
     expect(a.bordesCompletos).toBe(1); // solo la inferior (cabezas no cuentan)
     expect(a.pilaresAcoplados).toEqual(["pil-A", "pil-B"]);
@@ -547,9 +549,28 @@ describe("calcularAcoples · acople de cabezas de pilar (F2.0 losa plana)", () =
     // Malla 5x5 (fila extra por y=1.5): 16 nudos de borde + 2 cabezas = 18.
     expect(a.malla.nodosBorde.length).toBe(16);
     expect(a.nodosAcoplados.size).toBe(18); // 16 borde + 2 cabezas
+    // nodosBordeAcoplados = 16 (todo el borde), aunque nodosAcoplados.size sea 18.
+    expect(a.nodosBordeAcoplados).toBe(16);
     expect(a.bordeParcial).toBe(false); // borde completo pese a size(18) > nodosBorde(16)
     expect(a.bordesCompletos).toBe(4);
     expect(a.pilaresAcoplados).toEqual(["pil-A", "pil-B"]);
+  });
+
+  it("nodosBordeAcoplados < nodosBorde con contorno completo + cabezas interiores (desbloquea sujecion)", () => {
+    // Contorno completo (16 nudos de borde acoplados) + 2 cabezas interiores. La cuenta
+    // que gobierna la sujecion del paño (nodosBordeAcoplados) es 16 = nodosBorde.length:
+    // el paño esta TOTALMENTE apoyado en su borde (no emite apoyos propios). El punto del
+    // fix: nodosAcoplados.size (18) NO debe usarse alli, o superaria nodosBorde y mentiria.
+    const m = modeloBase();
+    m.vigas = [
+      viga("v-inf", "n1", "n2"), viga("v-der", "n2", "n3"),
+      viga("v-sup", "n3", "n4"), viga("v-izq", "n4", "n1"),
+    ];
+    m.pilares.push(pilarInterior("pil-A", 1, 1.5), pilarInterior("pil-B", 3, 1.5));
+    m.panos = [pano("f1")];
+    const a = calcularAcoples(m).porPano.get("f1")!;
+    expect(a.nodosBordeAcoplados).toBe(a.malla.nodosBorde.length); // 16
+    expect(a.nodosAcoplados.size).toBeGreaterThan(a.malla.nodosBorde.length); // 18 > 16
   });
 
   it("un pilar interior NO subdivide ninguna viga (es nudo puntual, no extremo de segmento)", () => {

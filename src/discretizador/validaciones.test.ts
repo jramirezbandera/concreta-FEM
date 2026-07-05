@@ -846,6 +846,28 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
       expect(codigos(errores)).not.toContain("PANO_PILAR_INTERIOR");
     });
 
+    it("[FIX3 · Codex #5] paño capado + par de pilares en la misma celda -> SOLO PANO_DEMASIADOS_PILARES, sin PANO_PILARES_JUNTOS", () => {
+      // El cap (PANO_DEMASIADOS_PILARES) manda: aunque `acople.ts` detecte un par junto
+      // (la deteccion corre ANTES de mallar), validarPilaresJuntos DEBE saltar el paño
+      // capado. Sin el fix, el paño recibiria ademas PANO_PILARES_JUNTOS (doble error).
+      const m = panoAisladoSobrePilares();
+      // 45 pilares en diagonal con coords distintas -> supera CAP_QUADS (mismo patron
+      // que el test RESERVA-3): el paño cae en erroresMallado.
+      for (let i = 1; i <= 45; i++) {
+        const c = (i * 5) / 46; // en (0,5), estrictamente interior, todas distintas
+        m.pilares.push(pilarInterior(`pc${i}`, `PC${i}`, c, c));
+      }
+      // Un pilar EXTRA en la MISMA celda 2D que pc1 -> par junto (a < TOL de su cabeza).
+      const cPar = (1 * 5) / 46;
+      m.pilares.push(pilarInterior("pdup", "PDUP", cPar + 0.0004, cPar));
+      const errores = validarModelo(m);
+      const cods = codigos(errores);
+      // El cap se emite (una vez); PANO_PILARES_JUNTOS NO (el cap manda).
+      expect(cods.filter((c) => c === "PANO_DEMASIADOS_PILARES")).toHaveLength(1);
+      expect(cods).not.toContain("PANO_PILARES_JUNTOS");
+      expect(cods).not.toContain("PANO_PILAR_INTERIOR");
+    });
+
     it("viga que cruza el paño por dentro -> error PANO_VIGA_INTERIOR; el contorno no dispara", () => {
       const m = conPanoSobreViga("simple");
       m.nudos.push({ id: "qm1", x: 0, y: 1.5 }, { id: "qm2", x: 5, y: 1.5 });
@@ -893,6 +915,49 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
       const cods = codigos(validarModelo(m));
       expect(cods).not.toContain("SIN_SUJECION"); // el arranque de los pilares sujeta
       expect(cods).not.toContain("PANO_PILAR_INTERIOR"); // ambos acoplados a la losa plana
+    });
+
+    // [FIX FIX1 · gemelo de RESERVA-4] Una losa `bordeApoyo:"simple"` (emite apoyos de
+    // borde propios) con MUCHOS pilares interiores acoplados y SIN pilar con
+    // vinculacionExterior: sus apoyos de borde la sujetan, pero el conteo de sujecion
+    // NO debe usar `nodosAcoplados.size` (que incluye las cabezas de pilar interiores y
+    // supera el nº de nudos de borde) sino `nodosBordeAcoplados`. Con size>=nodosBorde
+    // el bug emitia un FALSO SIN_SUJECION que BLOQUEABA una losa valida. FALLA antes del
+    // fix (SIN_SUJECION presente), PASA despues (ausente).
+    it("[FIX1] losa bordeApoyo simple con muchos pilares interiores y sin arranque -> NO da falso SIN_SUJECION", () => {
+      const m = modeloValido();
+      m.vigas = []; // sin portico: la sujecion viene de los apoyos de BORDE del paño
+      m.cargas = []; // la carga colgaba de v1
+      m.nudos.push(
+        { id: "s1", x: 0, y: 0 }, { id: "s2", x: 5, y: 0 },
+        { id: "s3", x: 5, y: 5 }, { id: "s4", x: 0, y: 5 },
+      );
+      m.panos.push({
+        id: "pano1", nombre: "Losa", tipo: "losa", plantaId: "p1",
+        perimetro: ["s1", "s2", "s3", "s4"],
+        espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      });
+      // Rejilla 5x5 = 25 pilares interiores acoplados (sin vinculacionExterior): sus 25
+      // cabezas inflan nodosAcoplados.size a 25 > 24 nudos de borde (con el bug: no
+      // quedaria "apoyo propio" -> falso SIN_SUJECION). Todos acoplados => sin
+      // PANO_PILAR_INTERIOR; bordeApoyo simple => sin PANO_SIN_APOYO.
+      let idx = 0;
+      for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 5; j++) {
+          const x = 0.5 + i; // 0.5 .. 4.5, estrictamente interior
+          const y = 0.5 + j;
+          m.pilares.push({
+            id: `pi${String(idx).padStart(2, "0")}`, nombre: `PI${idx}`, x, y,
+            plantaInicial: "p0", plantaFinal: "p1",
+            seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
+            vinculacionExterior: false, arranque: "empotrado", // NINGUNO ancla al terreno
+          });
+          idx++;
+        }
+      }
+      const cods = codigos(validarModelo(m));
+      expect(cods).not.toContain("SIN_SUJECION"); // los apoyos de borde del paño sujetan
+      expect(cods).not.toContain("PANO_PILAR_INTERIOR"); // los 25 acoplados: apoyos legitimos
     });
   });
 

@@ -35,6 +35,24 @@ import {
   gruposConValorNegativo,
 } from "./cargasGrupo";
 
+// Memoizador de `pilaresInterioresBajoPano` por paño para una MISMA discretizacion.
+// El helper rehace geometria (limitesDePano + filtro sobre todos los pilares) en cada
+// llamada y se invoca varias veces por paño (validarRefsPano en el bloque PANO_SIN_APOYO
+// + validarElementosInterioresPano). `validarModelo` crea UNA instancia y la pasa a
+// ambas: misma pasada por paño. Determinismo intacto (el helper ya ordena por id; el
+// cache es por `pano.id`, no altera el orden de recorrido).
+type PilaresInteriores = (modelo: Modelo, pano: Pano) => Pilar[];
+function crearMemoPilaresInteriores(): PilaresInteriores {
+  const cache = new Map<string, Pilar[]>();
+  return (modelo: Modelo, pano: Pano): Pilar[] => {
+    const previo = cache.get(pano.id);
+    if (previo !== undefined) return previo;
+    const val = pilaresInterioresBajoPano(modelo, pano);
+    cache.set(pano.id, val);
+    return val;
+  };
+}
+
 // Error de obra: contrato estable consumido por la UI (resaltado del elemento) y
 // por los tests (assert de `codigo` + `elementoId`).
 //
@@ -321,6 +339,7 @@ function validarRefsPano(
   modelo: Modelo,
   errores: ErrorObra[],
   acoples: ResultadoAcoples,
+  pilaresInteriores: PilaresInteriores,
 ): void {
   // Solo la LOSA se calcula en el corte 1. Reticular/unidireccional se rechazan (NO se
   // mallan como losa, que daria un calculo fisicamente erroneo en silencio).
@@ -383,9 +402,12 @@ function validarRefsPano(
   const acople = acoples.porPano.get(pano.id);
   const sinBordeCompleto = acople === undefined || acople.bordesCompletos === 0;
   if (pano.bordeApoyo === "libre" && sinBordeCompleto) {
+    // Pilares interiores UNA sola vez (el helper rehace geometria): se reusa para
+    // `puntosApoyo` (los acoplados) y para el chequeo `.length === 0` de mas abajo.
+    const interiores = pilaresInteriores(modelo, pano);
     // Pilares REALMENTE acoplados a ESTE paño (su cabeza remapea a N*); vacio si <2 o cap.
     const acoplados = new Set(acople?.pilaresAcoplados ?? []);
-    const puntosApoyo = pilaresInterioresBajoPano(modelo, pano)
+    const puntosApoyo = interiores
       .filter((p) => acoplados.has(p.id))
       .map((p) => ({ x: p.x, y: p.y }));
     if (hayTresNoColineales(puntosApoyo)) {
@@ -402,7 +424,7 @@ function validarRefsPano(
         elementoId: pano.id,
         elementoTipo: "pano",
       });
-    } else if (pilaresInterioresBajoPano(modelo, pano).length === 0) {
+    } else if (interiores.length === 0) {
       // Ni borde sobre viga ni pilar interior alguno: la losa flota. Mensaje clasico. Con 1
       // pilar interior (o pilares NO acoplados) NO se emite aqui: ya lo explica, sin
       // contradiccion, PANO_PILAR_INTERIOR (DP1: exige >=2 apoyos acoplados) [precedencia].
@@ -553,10 +575,12 @@ function validarReferencias(
   modelo: Modelo,
   errores: ErrorObra[],
   acoples: ResultadoAcoples,
+  pilaresInteriores: PilaresInteriores,
 ): void {
   for (const p of modelo.pilares) validarRefsPilar(p, modelo, errores);
   for (const v of modelo.vigas) validarRefsViga(v, modelo, errores);
-  for (const pano of modelo.panos) validarRefsPano(pano, modelo, errores, acoples);
+  for (const pano of modelo.panos)
+    validarRefsPano(pano, modelo, errores, acoples, pilaresInteriores);
 
   // Ambito de carga: el id de cualquier elemento sobre el que puede actuar una
   // carga en F1 (viga, pilar, nudo o pano). Se precomputa un Set para O(1).
@@ -639,7 +663,13 @@ function validarSujecion(
     // Paño no mallable (refs rotas): se cuenta como antes (bordeApoyo != libre); el
     // bloqueo real llegara por sus errores de referencia/geometria.
     if (acople === undefined) return true;
-    const acoplados = acople.acopleActivo ? acople.nodosAcoplados.size : 0;
+    // [F2.3/RESERVA-4 gemelo] Solo cuentan los nudos de BORDE acoplados: el Paso 6c
+    // pone apoyos de borde en los nudos de borde SIN acoplar, asi que "queda algun
+    // apoyo propio" ⇔ nodosBordeAcoplados < nº total de nudos de borde. Se usa
+    // `acople.nodosBordeAcoplados` (fuente unica, ya = |nodosBorde ∩ nodosAcoplados|),
+    // NUNCA `nodosAcoplados.size`, que incluye cabezas de pilar interiores y podria
+    // superar nodosBorde.length -> falso SIN_SUJECION que bloquea una losa valida.
+    const acoplados = acople.acopleActivo ? acople.nodosBordeAcoplados : 0;
     return acoplados < acople.malla.nodosBorde.length; // queda algun apoyo propio
   });
   const haySujecion = haySujecionPilar || haySujecionPano;
@@ -770,6 +800,7 @@ function validarElementosInterioresPano(
   modelo: Modelo,
   errores: ErrorObra[],
   acoples: ResultadoAcoples,
+  pilaresInteriores: PilaresInteriores,
 ): void {
   // Orden por id de paño (determinista); dentro, los helpers ya ordenan por id.
   const panosOrdenados = [...modelo.panos].sort((a, b) =>
@@ -802,7 +833,7 @@ function validarElementosInterioresPano(
       juntos.add(b);
     }
 
-    for (const pilar of pilaresInterioresBajoPano(modelo, pano)) {
+    for (const pilar of pilaresInteriores(modelo, pano)) {
       if (acoplados.has(pilar.id)) continue; // recogido por la losa plana: apoyo legitimo
       if (juntos.has(pilar.id)) continue; // lo explica PANO_PILARES_JUNTOS
       errores.push({
@@ -842,6 +873,12 @@ function validarPilaresJuntos(
   const pilarPorId = new Map(modelo.pilares.map((p) => [p.id, p]));
   const panoIds = [...acoples.pilaresJuntos.keys()].sort();
   for (const panoId of panoIds) {
+    // [Codex #5] Precedencia del cap: si el paño esta en `erroresMallado`
+    // (PANO_DEMASIADOS_PILARES), el cap manda y emite SOLO ese error; sus pilares juntos
+    // se CALLAN (igual que validarElementosInterioresPano hace `continue` bajo cap). Sin
+    // esto, un paño capado con un par junto recibiria ademas PANO_PILARES_JUNTOS: doble
+    // error que contradice la precedencia documentada.
+    if (acoples.erroresMallado.has(panoId)) continue;
     const pano = panoPorId.get(panoId);
     if (pano === undefined) continue; // defensivo: acople siempre parte de modelo.panos
     for (const [idA, idB] of acoples.pilaresJuntos.get(panoId)!) {
@@ -1022,14 +1059,17 @@ export function validarModelo(
 ): ErrorObra[] {
   const errores: ErrorObra[] = [];
   const acoplesReales = acoples ?? calcularAcoples(modelo);
+  // Memo de pilares interiores por paño (una sola pasada de geometria por paño,
+  // reusada por validarRefsPano y validarElementosInterioresPano).
+  const pilaresInteriores = crearMemoPilaresInteriores();
   validarNombresUnicos(modelo, errores);
   validarIdsUnicos(modelo, errores); // [M-1] ids duplicados = proyecto dañado
   validarPilaresDegenerados(modelo, errores); // [M-3] pilar de longitud 0
-  validarReferencias(modelo, errores, acoplesReales);
+  validarReferencias(modelo, errores, acoplesReales, pilaresInteriores);
   validarHipotesisPesoPropio(modelo, errores); // E1: guard de desincronizacion
   validarObraVacia(modelo, errores); // UX-VACIA: sin elementos no hay nada que calcular
   validarSujecion(modelo, errores, acoplesReales);
-  validarElementosInterioresPano(modelo, errores, acoplesReales); // [OV-5/TODO-2/F2.0] pilar/viga interior condicional + cap
+  validarElementosInterioresPano(modelo, errores, acoplesReales, pilaresInteriores); // [OV-5/TODO-2/F2.0] pilar/viga interior condicional + cap
   validarPilaresJuntos(modelo, errores, acoplesReales); // [F2.0] dos pilares en la misma celda de malla
   validarAvisosAcople(modelo, errores, acoplesReales); // [OV-2] parcial/insuficiente
   validarCargasGrupo(modelo, errores); // [D-1] id reservado + negativo + duplicidad

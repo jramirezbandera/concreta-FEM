@@ -947,6 +947,39 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   su propia sujeción (apoyo). Error de obra por componente ("el pórtico de la zona X no está sujeto").
 - **Depende de / bloquea:** ninguno. **Coste:** CC ~2-3 h.
 - **Origen:** /code-review F3 corte 1 (finder correctness, severidad media; pre-existente, ensanchado).
+- **Ampliación (eng-review losa plana, Codex #3, DP2):** el heurístico de sujeción NO es por-componente,
+  y además `pilaresInterioresBajoPano` cuenta como "apoyo" un pilar cuyo rango de cotas SOLO CONTIENE la
+  cota de la losa por su BASE y sube (`qMin === qc`, sin desarrollo por debajo → sin camino a tierra propio).
+  Un pilar colgante/superior así puede: (a) ayudar a que `PANO_SIN_APOYO` se relaje (cuenta como apoyo de la
+  losa plana), y (b) el arranque de OTRO pilar en cualquier sitio (sujeción global = "algún
+  `vinculacionExterior`") tapa que ese componente no llega a tierra. Ver también `T-f3-losa-plana-apoyo-fantasma`
+  (recorte barato: exigir `qMin < qc`, es decir que el pilar se extienda por DEBAJO de la losa). El fix
+  definitivo es el análisis por-componente descrito arriba.
+
+---
+
+## T-f3-losa-plana-apoyo-fantasma · Un pilar "hacia arriba" cuenta como apoyo de la losa sin llegar a tierra
+
+- **Qué:** `pilaresInterioresBajoPano` ([acople.ts](src/discretizador/acople.ts)) acepta un pilar como
+  apoyo interior de la losa si el rango de cotas de sus plantas CONTIENE la cota del paño (extremos incluidos:
+  `qc >= qMin && qc <= qMax`). El caso límite `qMin === qc` (el pilar ARRANCA en la cota de la losa y SUBE,
+  sin desarrollo por debajo) también pasa: se cuenta como apoyo aunque ese pilar no tenga por sí mismo camino
+  a tierra por debajo de la losa. La relajación de `PANO_SIN_APOYO` (F2.3) y el levantamiento de
+  `PANO_PILAR_INTERIOR` (F2.2) lo tratan como apoyo legítimo.
+- **Por qué:** físicamente un pilar que solo sube desde la losa no la SOSTIENE (cuelga de ella o comparte
+  nudo, pero no la lleva a tierra). El reparto no es incorrecto per se (el nudo existe y PyNite ensambla),
+  pero la GUARDA de sujeción se relaja con un apoyo que no aporta camino a tierra; combinado con que la
+  sujeción global es un heurístico "algún pilar con `vinculacionExterior` en cualquier sitio"
+  (`T-f3-sujecion-componentes`), un modelo puede pasar la validación siendo un mecanismo por componente.
+  Pre-existente al corte de losa plana; lo cazaría `check_stability` del solver, no la guarda barata.
+- **Cómo retomar:** guarda barata en `pilaresInterioresBajoPano` — exigir `qMin < qc` (el pilar se extiende
+  por DEBAJO de la cota de la losa: "pilar hacia abajo", con camino a tierra al menos un tramo). Alternativa
+  robusta: subsumirlo en el análisis por-componente de `T-f3-sujecion-componentes` (recorrer aristas
+  nudo↔quad de la losa plana; cada componente exige su propia sujeción real a tierra). Añadir golden de un
+  pilar `qMin===qc` para blindar el criterio elegido.
+- **Depende de / bloquea:** enlaza con `T-f3-sujecion-componentes` (el fix robusto es el mismo). **Coste:**
+  guarda barata CC ~20-30 min; fix por-componente incluido en las ~2-3 h de la deuda hermana.
+- **Origen:** eng-review "losa maciza sobre pilares" (/plan-eng-review + Codex #3).
 
 ---
 
@@ -1177,3 +1210,58 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 - **Cómo retomar:** junto al armado del pilar (F4) o a cargas laterales. Decidir si se filtra la
   componente de drilling o se ignora por pequeña. **Coste:** CC ~30 min (análisis) cuando aplique.
 - **Origen:** Spike F3-losa-plana (P2b: GJ del pilar domina 91:1 al muelle de drilling; sano).
+
+---
+
+## T-determinismo-coord-representativa · La coord representativa de una celda depende del orden de entrada
+
+- **Qué:** `registrarPunto` en `construirBaseFEM` ([discretizar.ts](src/discretizador/discretizar.ts) ~línea
+  246) guarda la PRIMERA coord real que ve para cada celda cuantizada (`if (!puntosPorClave.has(clave))`),
+  recorriendo `modelo.pilares` y `modelo.vigas` en orden de ENTRADA (NO ordenado por id). Si dos puntos con
+  coordenadas REALES distintas caen en la MISMA celda cuantizada (`clavePosicion(coord, TOL_NODO)` coincide,
+  p. ej. dos pilares a <`TOL_NODO`), la coord representativa emitida a la Capa 2 es la del primero por orden
+  de entrada. Reordenar la entrada (import .json con otro orden, edición) cambia CUÁL gana → coord distinta
+  en la Capa 2 → posible ROTURA del determinismo byte a byte (mismo modelo lógico ⇒ misma Capa 2).
+- **Por qué:** el resto del discretizador es determinista (nudos numerados por (Y,X,Z), paños/vigas ordenados
+  por id), pero esta representante de celda NO. Pre-existente; en F1 es raro (la UI evita puntos coincidentes).
+  El camino de LOSA PLANA lo AMPLÍA: dedup de líneas de control por eje + remap por celda 3D multiplica las
+  ocasiones de dos puntos en la misma celda (cabezas de pilar cercanas). El invariante "determinista, byte a
+  byte" es del CLAUDE.md (regla de oro del discretizador).
+- **Repro:** dos elementos (dos pilares, o pilar+extremo de viga) con coords reales distintas pero dentro de
+  `TOL_NODO` (misma celda); construir la Capa 2, reordenar la entrada, reconstruir → la coord del nudo
+  compartido difiere.
+- **Cómo retomar:** canonicalizar la coord representativa por celda con un criterio INDEPENDIENTE del orden
+  de entrada (p. ej. el mínimo determinista `(y,x,z)` de las coords vistas en esa celda, o directamente la
+  coord cuantizada). Golden de determinismo con dos puntos same-cell + reordenado que hoy pasaría por suerte.
+- **Depende de / bloquea:** ninguno (ortogonal). Se relaciona con `T-f3-losa-plana` (que lo amplía). **Coste:**
+  CC ~30-45 min (canonicalización + golden).
+- **Origen:** eng-review "losa maciza sobre pilares" (/plan-eng-review + Codex #4; pre-existente, ampliado).
+
+---
+
+## T-glue-inestable-lineal-lenguaje-obra · "Unstable node(s)" crudo en el análisis LINEAL
+
+- **Qué:** Cuando el análisis LINEAL (no P-Δ) topa con un modelo inestable, PyNite lanza y el mensaje
+  crudo en inglés `"Unstable node(s)"` llega al usuario tal cual. El camino P-Δ ya traduce su
+  inestabilidad a lenguaje de obra en el glue (`_MARCADORES_INESTABLE` → "La estructura es inestable
+  bajo P-Δ… arriostramiento"), pero el camino lineal NO tiene esa traducción.
+- **Por qué:** viola la regla de oro §2.2 (errores en lenguaje de obra, no jerga FEM). Caso concreto
+  que lo destapa (golden `losa-plana.golden.test.ts` L7): una **losa plana sobre pilares de base
+  ARTICULADA con borde apoyado** discretiza `ok:true` (el guard `≥3 no colineales` de
+  `PANO_PILARES_INSUFICIENTES` solo corre para `bordeApoyo:"libre"`) y revienta en el motor con
+  "Unstable node(s)". FALLA SEGURO (PyNite lanza y aborta; NO es la basura silenciosa de la
+  basculación libre-colineal que sparse no caza), así que la INTEGRIDAD del cálculo está bien: el
+  usuario recibe un error, no un resultado falso. Lo que falla es la CLARIDAD del error. Pre-existente
+  del glue; la losa plana solo añade una vía nueva de alcanzarlo.
+- **Cómo retomar (fix durable, decisión de usuario en el eng-review):** que el glue
+  ([pynite_glue.py](src/solver/pynite_glue.py)) traduzca la inestabilidad del camino LINEAL a una
+  frase de obra (espejo del `_MARCADORES_INESTABLE` del P-Δ; cubre este caso Y toda inestabilidad
+  lineal, no solo la losa plana). Cuidado: comparte la fragilidad de detección por substring de
+  mensajes en inglés ya anotada en [T-pdelta-deteccion-inestable]. Alternativa acotada descartada:
+  un guard geométrico en validaciones para "pilares articulados como única sujeción en plano bajo
+  borde apoyado" (detección compleja para un combo raro; el fail-safe del motor ya cubre la
+  seguridad). El comportamiento actual queda PINADO por el golden L7 (afirma que lanza).
+- **Depende de / bloquea:** ninguno. Se cruza con [T-pdelta-deteccion-inestable] (misma detección por
+  substring). **Coste:** CC ~30-45 min (traducción + golden de mensaje de obra).
+- **Origen:** eng-review "losa maciza sobre pilares" (/plan-eng-review + Codex #2 → golden motor real
+  L7; sub-hallazgo de UX, usuario eligió diferir con contexto). Pre-existente del glue, ampliado.
