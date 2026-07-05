@@ -114,6 +114,14 @@ function useOverlayResultados() {
   );
 }
 
+// Nota de honestidad fija del corte T-f3-masa-placa: la masa del analisis modal es SOLO
+// el peso propio de la estructura (barras y losas: en las placas, ρ·t). Las demas cargas
+// (uso, muertas) no aportan masa todavia. Lenguaje de obra: nada de "lumped/consistente"
+// ni "quad" (CLAUDE.md §2.2/§17).
+const NOTA_MASA_MODAL =
+  "Las frecuencias se calculan con el peso propio de la estructura (barras y " +
+  "losas); las demás cargas no añaden masa todavía.";
+
 // Formatea una frecuencia (Hz) con dos decimales para la lista.
 function fmtHz(hz: number): string {
   return hz.toFixed(2);
@@ -346,6 +354,12 @@ export function PanelFrecuencias() {
           Sin modos calculados. Elige el número de modos y pulsa “Calcular modos”.
         </p>
       )}
+
+      {/* T-f3-masa-placa: nota fija de honestidad sobre la masa considerada. Fija (con o
+          sin modos): informa de que solo el peso propio aporta masa al modal. */}
+      <p className="cx-frecuencias__nota" role="note">
+        {NOTA_MASA_MODAL}
+      </p>
     </PanelFlotante>
   );
 }

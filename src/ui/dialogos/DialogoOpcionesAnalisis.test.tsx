@@ -150,6 +150,61 @@ describe("DialogoOpcionesAnalisis: D-diseño-3 (check_statics bajo P-Δ)", () =>
   });
 });
 
+describe("DialogoOpcionesAnalisis: T-f3-masa-placa (nota P-Δ con losas)", () => {
+  // Modelo con una losa: dispara la nota de honestidad del 2º orden (el efecto de la
+  // propia losa no se considera; el de los pilares, sí). El diálogo solo lee
+  // modelo.panos.length, así que basta un paño bien formado (no se discretiza aquí).
+  function cargarModeloConPano() {
+    const m = crearModeloVacio();
+    m.panos = [
+      {
+        id: "pa1",
+        nombre: "Losa 1",
+        tipo: "losa",
+        plantaId: "p1",
+        perimetro: ["n1", "n2", "n3", "n4"],
+        materialId: "m1",
+        espesor: 0.25,
+        tamMalla: 0.5,
+        bordeApoyo: "simple",
+      },
+    ];
+    modeloStore.getState().cargarModelo(m);
+  }
+
+  it("sin losas la nota NO aparece", () => {
+    const dialogo = renderAbierto();
+    expect(
+      within(dialogo).queryByText(/el efecto de segundo orden de la propia losa/i),
+    ).toBeNull();
+  });
+
+  it("con losas Y tipo P-Δ muestra la nota de honestidad junto al tipo de análisis", async () => {
+    // La nota habla de "segundo orden": solo acompaña a la opción P-Δ elegida
+    // (guardián T4.4, nota 1). Se elige P-Δ por la UI (patrón D-diseño-3).
+    const user = userEvent.setup();
+    cargarModeloConPano();
+    const dialogo = renderAbierto();
+    const grupo = within(dialogo).getByRole("radiogroup", {
+      name: "Tipo de análisis",
+    });
+    await user.click(within(grupo).getByRole("radio", { name: "P-Δ" }));
+    expect(
+      within(dialogo).getByText(
+        /Con losas, el efecto de segundo orden de la propia losa no se considera/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("con losas pero tipo Lineal la nota NO aparece (el 2º orden no aplica)", () => {
+    cargarModeloConPano(); // crearModeloVacio deja el tipo estático por defecto (no P-Δ)
+    const dialogo = renderAbierto();
+    expect(
+      within(dialogo).queryByText(/el efecto de segundo orden de la propia losa/i),
+    ).toBeNull();
+  });
+});
+
 describe("DialogoOpcionesAnalisis: D18 vista previa de combinaciones", () => {
   it("muestra la seccion 'Combinaciones que se generarán' con ELU y ELS", () => {
     const dialogo = renderAbierto();

@@ -624,6 +624,11 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   modal ignora las cargas muertas/permanentes y el toggle `incluirPesoPropio`, y la masa que vibra es invisible
   a "Ver modelo de cálculo" (vive en Python). Además `g=9.81` está duplicado a mano en los tests
   (`modal.golden.test.ts`/`modal.smoke.test.ts`) además de `_G_FISICO` en el glue.
+  **AMPLIADA (F-masa-placa):** también la masa de las LOSAS vive ahora en el glue
+  (`_agregar_masa_quads`: lumped tributaria por área, cargas nodales del caso de masa), igual de
+  invisible a "Ver modelo de cálculo". El fix futuro debe mover TODA la masa (barras + placas) al
+  discretizador DE UNA VEZ — mover solo una parte dejaría la fabricación partida entre TS y Python,
+  peor que el estado actual.
 - **Por qué:** el día que el peso propio del discretizador cambie (densidades, cargas de forjado), la masa
   modal seguirá usando solo `A·ρ` y dará frecuencias incoherentes con la deformada estática del mismo modelo.
   *Cuidado:* el camino lumped de la Capa 2 es −15% erróneo (spike F2b), así que emitir masa consistente desde
@@ -876,19 +881,27 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-f3-masa-placa · Masa de los paños en modal / P-Δ (hoy bloqueado)
+## T-f3-masa-placa · Masa de los paños en modal / P-Δ — RESUELTO (F-masa-placa)
 
-- **Qué:** El análisis modal y P-Δ se **BLOQUEAN** si el modelo tiene quads (la masa de los paños no se
-  modela aún): el glue lanza `MotorAnalisisConPanos` → error de obra (`pynite_glue.py`). Falta añadir la
-  masa de placa (consistente, vía la densidad del quad) al modal/P-Δ.
-- **Por qué:** la masa modal hoy se fabrica solo con `add_member_self_weight` (barras); ignorar la masa de
-  la losa daría frecuencias falsas. Bloquear con aviso honesto es más seguro que un resultado erróneo.
-- **Cómo retomar:** añadir la masa de placa al camino modal (PyNite: masa consistente del quad) y levantar
-  el bloqueo. **Mejora menor (guardián):** duplicar el bloqueo como guarda TS de fallo-rápido en
-  `validaciones.ts` (p. ej. `ANALISIS_CON_PANOS` cuando modal/P-Δ y `panos.length>0`), manteniendo el glue
-  como red final, para no viajar al worker por algo detectable en TS.
-- **Depende de / bloquea:** corte 1. **Coste:** CC ~medio día (masa) + ~15 min (guarda TS).
-- **Origen:** Plan F3 corte 1 (decisión 6A) + auditoría guardián F3 (hallazgo menor).
+- **Estado:** RESUELTO. El bloqueo `MotorAnalisisConPanos` ya no existe: modal y P-Δ corren con paños.
+  La masa de la placa la fabrica el glue (`_agregar_masa_quads`, [pynite_glue.py](src/solver/pynite_glue.py)):
+  masa LUMPED tributaria W=ρ·t·área por quad repartida FY=−W/4 en sus 4 nudos como cargas nodales del
+  caso de masa (`Node3D.M` las convierte en masa W/g en las 3 traslaciones — correcto para losa: aporta
+  masa a los modos horizontales; `Quad3D` en PyNite 2.0.2 no tiene matriz de masa ni guarda ρ, por eso
+  se re-lee del payload). Solo peso propio ρ·t (paridad con barras; divergencia DELIBERADA con el CM,
+  que sí suma cargas muertas — decisión de usuario; la masa sísmica G+ψQ es T-modal-masa-participante).
+  Precisión verificada motor real: f1 de placa SSSS a −1.69% de Leissa (malla 8×8; el elemento es
+  Mindlin, límite ≈−2.2% vs placa delgada, TOL del golden 3%) — spike
+  `src/solver/spikes/masa_placa_spike.md` + golden `tests/golden/placa-modal.golden.test.ts`. P-Δ con
+  placas corre ignorando la rigidez geométrica de la PROPIA placa (docstring oficial de PyNite); el 2.º
+  orden de los pilares por el axil que les descarga la losa SÍ se captura (amp 1.005 robusto / 1.245
+  esbelto, golden `tests/golden/losa-plana-pdelta.golden.test.ts`; spike `pdelta_placa_spike.md`).
+  `MODAL_SIN_MASA` cuenta ahora los paños losa como fuente de masa (validaciones.ts). La "mejora menor"
+  de duplicar el bloqueo como guarda TS `ANALISIS_CON_PANOS` se ELIMINÓ deliberadamente (no queda
+  pendiente): con el bloqueo levantado no hay nada que duplicar, y contradiría `validarModalConMasa`,
+  que ya acepta la losa como masa válida para el modal.
+- **Origen:** Plan F3 corte 1 (decisión 6A) + auditoría guardián F3; cerrado en el corte T-f3-masa-placa
+  (spikes T0.1/T0.2 + glue + goldens motor real; suite 1752).
 
 ---
 
@@ -1311,3 +1324,20 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 - **Depende de / bloquea:** ninguno. **Coste:** CC ~15 min.
 - **Origen:** /code-review del corte losa plana (hallazgo #6, M4, PLAUSIBLE — latente). Usuario eligió
   diferir con contexto.
+
+---
+
+## T-modal-overlay-losa · La animación de formas modales no dibuja la losa vibrando
+
+- **Qué:** `ModoOverlay` (animación de formas modales) dibuja solo BARRAS. Desde F-masa-placa el modal
+  corre con losas y los nudos de su malla llevan desplazamientos modales en los resultados
+  (`modos[].nodos` incluye los nudos PQ*/N* de la malla), pero la placa no se representa vibrando:
+  en un modelo solo-losas la animación no enseña nada, y en uno mixto solo se mueven las barras.
+- **Por qué:** la superficie deformada de la malla ya existe en el camino ESTÁTICO (deformada de placa
+  en Isovalores); reutilizarla para las formas modales es refinamiento de presentación, no de cálculo.
+  Diferido para no ensanchar el corte F-masa-placa.
+- **Cómo retomar:** espejo de la deformada estática de placas: construir la superficie por modo desde
+  `modos[].nodos` y animarla con la misma renormalización del render. Conviene hacer ANTES
+  [T-modal-overlay-dedup] (extraer el hook compartido de overlays abarata este trabajo).
+- **Depende de / bloquea:** se apoya en T-modal-overlay-dedup. **Coste:** CC ~1-2 h.
+- **Origen:** Corte T-f3-masa-placa (T4.2): gap visual detectado en el plan, no bloqueante.

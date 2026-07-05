@@ -38,6 +38,15 @@ const OPCIONES_TIPO = [
 const NOTA_PDELTA =
   "El análisis P-Δ no realiza la comprobación de equilibrio.";
 
+// Nota de honestidad del corte T-f3-masa-placa: cuando la obra tiene losas, el motor
+// captura el efecto de segundo orden de los pilares (P-Δ), pero NO el de la propia losa
+// (PyNite no ensambla la rigidez geométrica de las placas). Solo es relevante junto a
+// la opción P-Δ, y solo con losas en la obra. Lenguaje de obra: nada de "quad" ni
+// "rigidez geométrica" (CLAUDE.md §2.2/§17).
+const NOTA_PDELTA_LOSAS =
+  "Con losas, el efecto de segundo orden de la propia losa no se considera; " +
+  "el de los pilares que la reciben, sí.";
+
 // Lee el modelo ACTUAL del store (invariante del `base`).
 function leerModelo() {
   return modeloStore.getState().getModelo();
@@ -52,12 +61,17 @@ export function DialogoOpcionesAnalisis() {
   // estable via Immer): re-render solo al editar la obra, nunca por frame (#11).
   const modelo = modeloStore((s) => s.modelo);
   const combos = vistaPreviaCombos(modelo);
+  // T-f3-masa-placa: la obra tiene losas -> mostramos la nota de honestidad del P-Δ
+  // (el 2º orden de la propia losa no se considera). Derivado del modelo ya suscrito,
+  // sin selector extra.
+  const hayPanos = modelo.panos.length > 0;
 
   const dialogoActivo = vistaStore((s) => s.dialogoActivo);
   const cerrarDialogo = vistaStore((s) => s.cerrarDialogo);
   const open = dialogoActivo === "opcionesAnalisis";
 
   const notaId = useId();
+  const notaLosasId = useId();
 
   // Recuerda el valor de "Comprobar estática" ANTES de pasar a P-Δ, para restaurarlo
   // al volver a lineal/general (D-diseño-3). Ref (no estado): no necesita re-render,
@@ -132,6 +146,16 @@ export function DialogoOpcionesAnalisis() {
             valor={analisis.tipo}
             onValor={cambiarTipo}
           />
+          {/* T-f3-masa-placa: honestidad del P-Δ con losas. Junto al control del tipo
+              (donde vive P-Δ), solo si la obra tiene losas Y el tipo elegido es P-Δ:
+              la nota habla de "segundo orden", que no aplica a Lineal/General (guardian
+              T4.4, nota 1). role="note" la anuncia a lectores de pantalla (el
+              Segmentado no reenvia aria-describedby). */}
+          {hayPanos && analisis.tipo === "pDelta" ? (
+            <p id={notaLosasId} className="cx-note" role="note">
+              {NOTA_PDELTA_LOSAS}
+            </p>
+          ) : null}
         </div>
 
         {/* (2) Peso propio: ON por defecto. */}

@@ -235,6 +235,22 @@ describe("PanelFrecuencias · control de nº de modos", () => {
   });
 });
 
+describe("PanelFrecuencias · T-f3-masa-placa (nota de masa considerada)", () => {
+  it("muestra la nota fija de masa en el estado vacío (sin modos)", () => {
+    render(<PanelFrecuencias />);
+    expect(
+      screen.getByText(/Las frecuencias se calculan con el peso propio de la estructura/i),
+    ).toBeInTheDocument();
+  });
+
+  it("la nota de masa sigue presente con modos calculados", () => {
+    montarConModos([3.2, 7.8]);
+    expect(
+      screen.getByText(/las demás cargas no añaden masa todavía/i),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("PanelFrecuencias · reporte de errores de obra", () => {
   it("muestra los errores de obra del ultimo intento (lenguaje de obra)", () => {
     const err: ErrorObra = {

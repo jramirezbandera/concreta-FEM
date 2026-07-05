@@ -159,6 +159,36 @@ Verificadas contra `FEModel3D.py`, `Member3D.py`, `Node3D.py`, `Analysis.py` (ra
 
 ---
 
+## Bloque 9 — Placas (quads) en modal y P-Δ (§7, corte T-f3-masa-placa)
+
+> Añadido tras T-f3-masa-placa (T4.3). Verificado contra **el wheel 2.0.2 del proyecto** (no el `main` de GitHub, que es 3.x) y contra los dos spikes del repo con el motor real. Las cifras son mediciones propias reproducibles, no dato de tercero; su falsabilidad es re-ejecutar el spike.
+
+**Afirmación del doc (§7.1):** el wheel 2.0.2 no da masa al `Quad3D` (sin `m()`/`kg()`, no guarda `rho`); `add_member_self_weight` ignora quads; `FEModel3D.M()` no ensambla quads → losa entra al modal con masa cero.
+- **VERIFICADO.** Leído del código del wheel 2.0.2 (`Quad3D.py` guarda `E`/`nu`, no `rho`; sin `m()`/`kg()`; `FEModel3D.M()` itera members + `Node3D.M()`, sin rama de quads). Confirmado además por el spike: sin el fix el modal entra con masa cero y los modos de placa no aparecen.
+  - Fuentes: wheel PyNiteFEA 2.0.2 (`Pynite/Quad3D.py`, `Pynite/Node3D.py`, `Pynite/FEModel3D.py`); `src/solver/spikes/masa_placa_spike.md`; `src/solver/pynite_glue.py` (`_agregar_masa_quads`).
+  - **Matiz de método:** la §5 del doc de área cita firmas del `main` (3.x); esta §7 se apoya en el **wheel 2.0.2** real (par del proyecto). Coherente con que el proyecto pina 2.0.2.
+
+**Afirmación del doc (§7.2):** masa LUMPED tributaria `W=ρ·t·área`, `FY=−W/4` en 4 nudos del caso `__masa_modal__`, `Node3D.M` la pone en las 3 traslaciones; barras van por masa consistente; `gravity=9.81`.
+- **VERIFICADO (código).** `pynite_glue.py:382-388` implementa exactamente `w = rho*q["t"]*area`, `aporte = -w/4`, `add_node_load(nudo,"FY",aporte,case=_CASO_MASA_MODAL)` en los 4 nudos. `_run_modal:425-427` suma `add_member_self_weight("FY",-1.0,case)` (consistente, barras) + `_agregar_masa_quads` (lumped, placas) en el mismo combo, `analyze_modal(...,gravity=9.81)`.
+- **VERIFICADO (masa en 3 traslaciones + gravity).** El spike documenta que `Node3D.M` fija `m[0,0]=m[1,1]=m[2,2]=total_mass` (FX/FY/FZ) y GDL rotacionales sin masa; `gravity=9.81` obligatorio porque `rho` es PESO (masa=peso/g). Coherente con F2b (mismo "error sutil" ×√g si gravity=1.0).
+
+**Afirmación del doc (§7.3):** divergencia deliberada con el CM (modal solo peso propio ρ·t; CM suma cargas muertas).
+- **VERIFICADO.** Docstring de `_agregar_masa_quads` la declara como decisión de usuario (paridad con barras), no descuido; apunta a `src/dominio/centros.ts:198-222` como el lado que sí suma muertas y a `T-modal-masa-altitud` como deuda de unificación.
+
+**Afirmación del doc (§7.4):** f₁_Leissa=22.590 Hz; 8×8 −1.69 %, 16×16 −1.42 % (mínimo), 48×48 −2.23 %; convergencia no monótona hacia ≈−2.2 % (elemento Mindlin); TOL golden 3 %.
+- **VERIFICADO (medición del spike).** Tabla malla→f1→error del `masa_placa_spike.md` con el motor real; interpretación Mindlin/DKMQ contrastada con estimación de placa gruesa de 1.er orden. La regla "no refinar buscando 0 %, no TOL <1 % vs Leissa" es correcta y no ingenua.
+  - **Matiz:** las cifras se midieron con PyNite local (numpy 2.4.4/scipy 1.18.0), no con el par Pyodide (0.28.3/2.0.2/numpy 2.2.5). El algoritmo es Python puro idéntico; el golden `placa-modal.golden.test.ts` lo re-asevera con el motor Pyodide. Riesgo bajo (la TOL 3 % absorbe el cambio de build).
+
+**Afirmación del doc (§7.6):** docstring "P-Delta effects in plates/quads are not considered"; P-Δ corre con quads; amp 1.005 (robusto) → 1.25 (muy esbelto); ΣV exacto ≤9.1e-8 rel.
+- **VERIFICADO.** Docstring citado (no re-derivado) del wheel 2.0.2. Tabla de amplificación y equilibrio del `pdelta_placa_spike.md`, 4 casos con el motor real, sin no-convergencia ni warnings scipy. El 2.º orden solo por axil de barras (quads sin `kg()`) es consecuencia física del hallazgo, verificada por los números.
+
+**Afirmación del doc (§7.7):** existen los goldens y spikes citados.
+- **VERIFICADO.** `tests/golden/placa-modal.golden.test.ts` y `tests/golden/losa-plana-pdelta.golden.test.ts` presentes; spikes `src/solver/spikes/masa_placa_spike.{py,md}` y `pdelta_placa_spike.{py,md}` presentes.
+
+**Veredicto del bloque: VERIFICADO** (código del glue y del wheel 2.0.2 leídos; cifras medidas en spikes reproducibles). Única cautela metodológica: mediciones con build numpy/scipy local, re-aseveradas por los goldens con el motor Pyodide; la §5 del doc de área cita el `main` 3.x mientras §7 se apoya en el wheel 2.0.2 real del proyecto — deliberado y correcto.
+
+---
+
 ## CORRECCIONES NECESARIAS
 
 1. **CRÍTICA (API) — `def_releases`, §5.1 (línea 194):** la firma desarrollada lista solo 9 flags y omite `Dxj, Dyj, Dzj`. Corregir a las **12** reales:

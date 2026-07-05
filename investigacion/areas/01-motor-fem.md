@@ -14,6 +14,7 @@
 - **Patrón recomendado:** Pyodide cargado dentro de un **Web Worker**, expuesto a la UI con **Comlink** (`expose`/`wrap`); todas las llamadas son asíncronas; resultados devueltos como JSON/estructuras clonables o `ArrayBuffer` transferibles. [confianza alta]
 - **Arranque:** primera carga del orden de decenas de MB (runtime + numpy + scipy + matplotlib), cacheada por el navegador tras la primera vez; conviene **precargar el worker en segundo plano** mientras el arquitecto modela y habilitar "Calcular" al estar listo. Límite de memoria WASM ~2 GB (ampliable a 4 GB con memory growth). [confianza media]
 - **API PyNite:** `FEModel3D` → `add_node/add_material/add_section/add_member/def_support/def_releases/add_load_combo/add_*_load` → `analyze()`/`analyze_PDelta()` → resultados vía `Member.*_array()` y `Node.RxnFX[combo]`/`Node.DX[combo]`. Convención de direcciones: **MAYÚSCULAS = global, minúsculas = local**. [confianza alta]
+- **Placas (quads) en modal/P-Δ (corte T-f3-masa-placa):** el wheel 2.0.2 **no da masa al `Quad3D`** (sin `m()`/`kg()`, no guarda `rho`) y `add_member_self_weight` los ignora → una losa entraría al modal con masa CERO. El glue la fabrica a mano (`_agregar_masa_quads`): masa **LUMPED tributaria** `W=ρ·t·área` repartida `FY=−W/4` en los 4 nudos del caso `__masa_modal__`, convertida a `W/g` por `analyze_modal(gravity=9.81)`. Solo peso propio (paridad con barras; divergencia deliberada con el CM). P-Δ **corre con quads pero el 2.º orden lo aporta solo el axil de los pilares** (docstring oficial: "P-Delta effects in plates/quads are not considered"). Ver §7. [confianza alta]
 
 ---
 
@@ -288,6 +289,53 @@
 - **claim:** Devolver objetos `numpy.ndarray` u objetos Python directamente por Comlink falla o produce proxies costosos. Convertir a listas/`Float64Array` en Python (`.tolist()` / `pyodide.ffi.to_js`) antes de retornar.
 - **sources:** https://github.com/GoogleChromeLabs/comlink ; https://pyodide.org/en/stable/usage/type-conversions.html
 - **confidence:** media
+
+---
+
+## 7. Placas (quads) en modal y P-Δ — contrato de masa y 2.º orden (corte T-f3-masa-placa)
+
+> Sección añadida tras T-f3-masa-placa (T4.3, suite 1752 verde). Datos verificados leyendo el wheel de PyNite 2.0.2 (`Quad3D.py`, `Node3D.py`, `FEModel3D.py`, `Analysis.py`) y midiendo el motor real en dos spikes (`src/solver/spikes/masa_placa_spike.*`, `pdelta_placa_spike.*`).
+
+### 7.1 — El wheel de PyNite 2.0.2 NO da masa a los quads (hallazgo rector)
+- **claim:** `FEModel3D.M()` (la matriz de masa que ve `analyze_modal`) ensambla la masa de **members** y de **nodos**, pero **NUNCA** la de los quads. `Quad3D` **no** tiene `m()` ni `kg()` y **no guarda `rho`** (solo `E`/`ν`). Además `add_member_self_weight` **ignora los quads** (su docstring lo dice: solo recorre members). Consecuencia: una losa maciza modelada con quads entra al modal con **masa CERO** → sus modos de flexión de placa no aparecen. Ese es el bug que cierra el corte.
+- **rationale:** Leído del código del wheel 2.0.2 usado por el proyecto (no del `main` de GitHub, que es 3.x). `FEModel3D.M()` itera members y `Node3D.M()`; no hay rama de quads. `Quad3D.__init__` almacena `E`/`nu` pero no `rho`.
+- **sources:** wheel PyNiteFEA 2.0.2 (`Pynite/Quad3D.py`, `Pynite/Node3D.py`, `Pynite/FEModel3D.py`); `src/solver/spikes/masa_placa_spike.md` (hallazgo rector)
+- **confidence:** alta (verificado leyendo la fuente del wheel exacto del proyecto)
+
+### 7.2 — Mecanismo de masa de placa: LUMPED tributaria fabricada en el glue
+- **claim:** La masa de placa se fabrica **en el glue** (`_agregar_masa_quads` en `pynite_glue.py:346`), no en el discretizador. Por cada quad: `W = ρ·t·área` (peso propio, kN) repartido como cuatro cargas nodales `add_node_load(nudo, "FY", −W/4, case="__masa_modal__")` en sus 4 nudos, **acumulando** entre quads vecinos (nudo interior ~4 aportes, esquina ~1; la suma = peso total de la losa). En `_run_modal`, `analyze_modal(mass_combo_name=..., mass_direction="Y", gravity=9.81)` convierte esas cargas del combo de masa en masa **`W/g`**, y `Node3D.M()` la coloca en las **TRES traslaciones** nodales (FX/FY/FZ) — correcto para una losa: aporta masa también a los modos **horizontales** del edificio. Es masa **LUMPED tributaria** (a diferencia de las BARRAS, que van por masa **consistente** vía `add_member_self_weight('FY',−1,case)`; el lumped en barras daría −15 %). Ambas fuentes alimentan el **mismo** `__masa_modal__` / combo, así que en un forjado sobre pórtico la masa de losa y la de pilares/vigas **suman** en la misma M. Como `Quad3D` no guarda `rho`, el glue lo **re-lee del payload** (`materials[*].rho` por nombre de material); si faltara, `KeyError` ruidoso (bug visible), no masa perdida en silencio.
+- **rationale:** `pynite_glue.py:346-388` (`_agregar_masa_quads`) y `:391-427` (`_run_modal`). `gravity=9.81` es obligatorio porque `rho` es PESO (kN/m³): masa = peso/g; con `gravity=1.0` las frecuencias saldrían `×√g` (el "error sutil" que F2b ya documentó para barras).
+- **sources:** `src/solver/pynite_glue.py` (`_agregar_masa_quads`, `_run_modal`); `src/solver/spikes/masa_placa_spike.md`
+- **confidence:** alta
+
+### 7.3 — Divergencia deliberada con el centro de masas (decisión de usuario)
+- **claim:** La masa de placa del modal cuenta **solo el peso propio** `ρ·t`, **NO** las cargas muertas superpuestas. Es una **divergencia deliberada** con el **centro de masas** (`src/dominio/centros.ts:198-222`), que SÍ suma las cargas muertas. Motivo: paridad con la masa de las BARRAS (también solo peso propio vía `add_member_self_weight`). La deuda futura (`T-modal-masa-altitud`) moverá TODA la masa (barras + placas + muertas) al discretizador.
+- **rationale:** Documentado en el docstring de `_agregar_masa_quads` como decisión explícita, no descuido.
+- **sources:** `src/solver/pynite_glue.py` (docstring `_agregar_masa_quads`); `src/dominio/centros.ts:198-222`
+- **confidence:** alta
+
+### 7.4 — Convergencia del modal de placa: NO tiende a Leissa (elemento Mindlin, spike T0.1)
+- **claim:** Placa cuadrada **SSSS** 6×6 m, t=0.25 m, HA-25 (E=3.148·10⁷ kN/m², ν=0.2, ρ=25 kN/m³): la analítica de **Leissa delgada** (Kirchhoff) da **f₁ = 22.590 Hz**. El motor mide: malla **8×8 → −1.69 %**, **16×16 → −1.42 % (mínimo de |error|)**, 24×24 → −1.75 %, 32×32 → −1.99 %, **48×48 → −2.23 %**. **La convergencia es NO monótona: hay un mínimo en ~16×16 y luego el error CRECE hacia ≈ −2.2 %.** El elemento de placa de PyNite es **grueso (Mindlin/DKMQ)** — incluye cortante transversal → más flexible que la placa delgada → converge **por debajo** de Leissa, no a ella. A malla basta, un error de discretización que rigidiza compensa casualmente parte de ese déficit (por eso 8×8/16×16 dan menos |error| que el límite fino). **Regla de diseño:** NO refinar la malla buscando 0 % (al refinar el error crece); NO poner TOL <1 % contra Leissa (fallaría por el sesgo físico Mindlin, no por un bug); si algún día se quiere <1 %, la referencia correcta es una **placa gruesa (Mindlin) tabulada**, no Leissa. **TOL del golden = 3 %** (cubre el ≤1.7 % medido a malla de producción con margen para el cambio de build numpy/scipy local↔Pyodide).
+- **rationale:** Tabla malla→f1→error del spike, medida con el motor real. La interpretación Mindlin está contrastada con una estimación de 1.er orden (~−0.4 % de placa gruesa + ~−1.8 % de sesgo de convergencia del DKMQ).
+- **sources:** `src/solver/spikes/masa_placa_spike.md` (secciones (b) y DECISIÓN de TOL)
+- **confidence:** alta (medición directa; la referencia Leissa es exacta, el límite del motor es el observable medido)
+
+### 7.5 — Coste del eigen con placas: 16×16 es el punto dulce
+- **claim:** `analyze_modal` (medido local; el worker Pyodide/WASM será algo más lento, mismo orden): malla **16×16 (~1700 GDL libres) → 0.51 s con 6 modos, 0.80 s con 30 modos** — el nº de modos apenas mueve el coste (el grueso es la factorización, no el nº de autovalores). Escala rápido por encima: 32×32 → ~4 s, 40×40 → ~9 s, 48×48 → ~17 s. **16×16 es el punto dulce**: sub-segundo y por debajo del techo ~10 s del worker; refinar más **empeora** precisión (aflora el sesgo Mindlin) y coste. `check_statics`/`sparse` **no** se pasan a `analyze_modal` (la firma 2.0.2 no los acepta; siempre dispersa internamente).
+- **rationale:** Tabla de coste del spike; coherente con F2b (num_modes acotado a GDL, factorización domina).
+- **sources:** `src/solver/spikes/masa_placa_spike.md` (sección (c))
+- **confidence:** media-alta (cifras local; confirmar orden en Pyodide al medir)
+
+### 7.6 — P-Δ CON quads: corre, pero el 2.º orden viene solo del axil de los pilares (spike T0.2)
+- **claim:** Docstring oficial de `analyze_PDelta` en PyNite 2.0.2: **"P-Delta effects in plates/quads are not considered"**. Los quads ensamblan rigidez **elástica** `k()` pero **no** geométrica `kg()`. Verificado con el motor real: `analyze_PDelta(sparse=True)` **corre sin lanzar** con quads presentes (4 casos: robusto→muy esbelto), sin no-convergencia ni warnings de scipy. La amplificación de la deriva (DX cabezas, P-Δ/linear, combo 1.0·G+1.0·H) es **modesta y solo la aporta el axil de las BARRAS** (la losa transmite carga y da rigidez elástica pero **no se pandea ella misma**): pórtico robusto 0.30×0.30 H=3 → **amp 1.005**; muy esbelto 0.20×0.20 H=5 q=30 → **amp 1.25**. Equilibrio exacto: **ΣV = carga vertical total** con errRel ≤ **9.1e-8** (robusto 1.5e-9); ΣH = −FX_total; axiles conservados (sotavento gana, barlovento pierde, suma intacta). Consecuencia de UI/honestidad: el P-Δ de una losa **sin** pilares comprimidos sería idéntico al lineal.
+- **rationale:** Docstring citado (no re-derivado) + tabla de amplificación/equilibrio del spike. El glue actual bloquea P-Δ con quads (`MotorAnalisisConPanos`) por la **masa** (agrupado con el modal en 6A), no por limitación del solver estático; el spike lo demuestra.
+- **sources:** `src/solver/spikes/pdelta_placa_spike.md` (hallazgo rector, secciones (a)-(d)); docstring `analyze_PDelta` wheel 2.0.2
+- **confidence:** alta
+
+### 7.7 — Punteros de golden y spikes
+- **claim:** Goldens del motor real: `tests/golden/placa-modal.golden.test.ts` (magnitud + integración: f1 finita/positiva/del orden esperado, y baja con la masa de placa frente al modelo sin ella — regresión directa del bug de masa cero) y `tests/golden/losa-plana-pdelta.golden.test.ts` (ratios de amplificación + invariantes de equilibrio ΣV/ΣH, no cifras de campo malla-dependientes). Spikes reproducibles (fuera de `npm test`): `src/solver/spikes/masa_placa_spike.{py,md}` y `pdelta_placa_spike.{py,md}`.
+- **sources:** rutas del repo
+- **confidence:** alta
 
 ---
 
