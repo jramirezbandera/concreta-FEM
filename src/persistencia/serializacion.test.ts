@@ -2,6 +2,7 @@
 // usa IndexedDB, el modulo vive aqui y se prueba junto al resto de F8.
 import { describe, it, expect } from "vitest";
 import { crearModeloVacio, SCHEMA_VERSION, type Modelo } from "../dominio";
+import type { Pano } from "../dominio/pano";
 import {
   exportarProyecto,
   exportarProyectoComoTexto,
@@ -133,5 +134,41 @@ describe("serializacion export/import", () => {
     });
     const resultado = importarProyecto(texto);
     expect(resultado.ok).toBe(false);
+  });
+
+  it("roundtrip preserva los campos del forjado unidireccional (v5)", () => {
+    // Un paño unidireccional con los 5 campos del corte: el JSON debe conservarlos
+    // byte a byte al exportar e importar (la frontera Zod los tipa opcionales, no
+    // los descarta ni los normaliza).
+    const modelo = crearModeloVacio();
+    const uni: Pano = {
+      id: "pano-uni",
+      nombre: "Forjado unidireccional",
+      tipo: "unidireccional",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      // espesor/tamMalla obligatorios a nivel Zod (deuda T-f3-pano-schema-union):
+      // se portan con valor inocuo aunque el discretizador no los lea bajo uni.
+      espesor: 0.3,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+      direccionViguetas: "y",
+      intereje: 0.72,
+      canto: 0.28,
+      anchoNervio: 0.1,
+      pesoPropio: 4.2,
+    };
+    modelo.panos.push(uni);
+
+    const texto = exportarProyectoComoTexto("Con unidireccional", modelo);
+    const resultado = importarProyecto(texto);
+    expect(resultado.ok).toBe(true);
+    if (resultado.ok) {
+      expect(resultado.modelo.panos).toHaveLength(1);
+      // Deep-equal: los campos nuevos viajan intactos por el par export/import.
+      expect(resultado.modelo.panos[0]).toEqual(uni);
+      expect(resultado.modelo).toEqual(modelo);
+    }
   });
 });

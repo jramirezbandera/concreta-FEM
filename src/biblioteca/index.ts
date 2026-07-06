@@ -23,6 +23,7 @@ export type {
   TipoSeccionCatalogo,
 } from "./tipos";
 export type { EntradaCategoriaUso } from "./acciones";
+export type { EntradaForjado } from "./forjados";
 
 // --- Re-export de la tabla normativa de acciones (feature-13 T1.1) ------------
 // Sobrecargas de uso (qk) y coef. de simultaneidad (psi) por categoria, mas los
@@ -36,6 +37,16 @@ export {
   GAMMA_Q_FAV,
   GAMMA_ELS,
 } from "./acciones";
+
+// --- Re-export de la tabla de PESO PROPIO de forjados (corte unidireccional T1.3)
+// Tabla orientativa canto->peso (kN/m²) + default del pano unidireccional, con
+// fuente CTE DB-SE-AE Anejo C Tabla C.5. Datos aislados y verificables.
+export {
+  pesoPropioOrientativo,
+  listarForjadosUnidireccionales,
+  PESO_PROPIO_UNIDIRECCIONAL_DEFAULT,
+  CANTO_UNIDIRECCIONAL_DEFAULT,
+} from "./forjados";
 
 // --- Re-export de catalogos y helpers -----------------------------------------
 export { ACEROS } from "./aceros";

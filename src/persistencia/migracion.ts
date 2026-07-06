@@ -380,15 +380,48 @@ function migrarV3aV4(datos: unknown): ResultadoMigracion {
   return { datos: { ...obj, schemaVersion: 4 }, avisos };
 }
 
+// Migracion de model-schema v4 -> v5 (F3, forjado unidireccional). v5 añade a `Pano`
+// CINCO campos OPCIONALES a nivel Zod (direccionViguetas/intereje/canto/anchoNervio/
+// pesoPropio) que solo tienen sentido bajo `tipo:"unidireccional"`. Al ser OPCIONALES,
+// la migracion de DATOS es un NO-OP: un `Pano` v4 (siempre losa, porque unidireccional
+// se rechazaba aguas arriba y no era calculable) NO los lleva, y no hace falta
+// sembrarlos — ModeloSchema v5 los acepta ausentes.
+//
+// Por que NO se siembran valores: no existe un default fisicamente correcto para
+// intereje/canto/anchoNervio (dependen de la geometria real del forjado, que la
+// migracion no conoce). Un `Pano` v4 unidireccional PUEDE existir en un proyecto
+// guardado (el usuario lo creo y no calculo, porque se rechazaba): la migracion lo
+// deja SIN los campos nuevos, y `validaciones` lo bloqueara con `PANO_UNI_CAMPOS`
+// hasta que el usuario los rellene — comportamiento honesto (no se inventa geometria).
+//
+// Por tanto esta migracion SOLO bumpea la version (espejo del bump de v3->v4 cuando no
+// hay huerfanas). No emite avisos propios: el aviso generico de actualizacion de
+// esquema lo añade `migrarYValidar` al cierre de la cadena. La forma final v5 la
+// valida `ModeloSchema` una sola vez al final.
+function migrarV4aV5(datos: unknown): ResultadoMigracion {
+  // Si el raw no es un objeto, no reestructuramos: la validacion Zod final lo
+  // rechazara con una ruta legible (no es trabajo de la migracion validar). Espejo
+  // exacto de las migraciones anteriores para ser robustos ante un raw corrupto.
+  if (typeof datos !== "object" || datos === null) {
+    return { datos: { ...(datos as object), schemaVersion: 5 } };
+  }
+  const obj = { ...(datos as Record<string, unknown>) };
+  // No-op de datos: solo se eleva la version. Los paños viajan intactos (los campos
+  // nuevos, ausentes en v4, siguen ausentes; ModeloSchema v5 los admite opcionales).
+  return { datos: { ...obj, schemaVersion: 5 } };
+}
+
 // Registro indexado por version de origen: `MIGRACIONES[v]` transforma v -> v+1.
 // `MIGRACIONES[1]` lleva v1 -> v2 (F2a, model-schema); `MIGRACIONES[2]` lleva
 // v2 -> v3 (F3 corte 1, paño losa); `MIGRACIONES[3]` lleva v3 -> v4 (F3.4, plantas
-// sin grupos). La cadena de `migrarYValidar` los aplica en orden ascendente hasta
-// `SCHEMA_VERSION`.
+// sin grupos); `MIGRACIONES[4]` lleva v4 -> v5 (F3 unidireccional, bump de version:
+// campos opcionales, sin sembrado). La cadena de `migrarYValidar` los aplica en orden
+// ascendente hasta `SCHEMA_VERSION`.
 const MIGRACIONES: Record<number, Migracion> = {
   1: migrarV1aV2,
   2: migrarV2aV3,
   3: migrarV3aV4,
+  4: migrarV4aV5,
 };
 
 // Lee `schemaVersion` de forma defensiva: `raw` es `unknown` y puede no ser un

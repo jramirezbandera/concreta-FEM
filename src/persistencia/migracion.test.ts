@@ -574,6 +574,194 @@ describe("migrarYValidar — v3 -> v4: plantas sin grupos", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Migracion REAL de model-schema v4 -> v5 (F3, forjado unidireccional). v5 añade a
+// `Pano` 5 campos OPCIONALES (direccionViguetas/intereje/canto/anchoNervio/pesoPropio)
+// que solo aplican bajo `tipo:"unidireccional"`. Al ser opcionales, la migracion de
+// DATOS es un NO-OP: un paño v4 (siempre losa) NO los lleva y ModeloSchema v5 los
+// acepta ausentes. La migracion SOLO bumpea la version (no siembra: no hay default
+// fisicamente correcto para intereje/canto). Un paño "unidireccional" heredado sin
+// esos campos lo bloqueara `validaciones` (PANO_UNI_CAMPOS), no la frontera Zod.
+// ---------------------------------------------------------------------------
+
+// Fabrica un proyecto v4 valido (forma vigente ANTES de este corte: schemaVersion:4,
+// sin grupos, plantas con uso propio). Parametriza `panos` para ejercitar el bump.
+function proyectoV4(panos: unknown[] = []): Record<string, unknown> {
+  return {
+    unidades: "kN-m",
+    schemaVersion: 4,
+    plantas: [
+      {
+        id: "pl1",
+        nombre: "Planta 1",
+        cota: 3,
+        altura: 3,
+        categoriaUso: "A",
+        sobrecargaUso: 2,
+        cargasMuertas: 1,
+      },
+    ],
+    secciones: [],
+    nudos: [],
+    pilares: [],
+    vigas: [],
+    panos,
+    muros: [],
+    cargas: [],
+    hipotesis: [
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
+      { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable", automatica: false },
+      { id: ID_AUTO, nombre: "Peso propio", tipo: "permanente", automatica: true },
+    ],
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: true },
+  };
+}
+
+// Un paño LOSA v4 completo (la unica forma de paño calculable en v4): sirve para
+// comprobar que la migracion v4->v5 lo deja INTACTO (bump de version, no-op de datos).
+const LOSA_V4 = {
+  id: "pano-losa",
+  nombre: "Forjado 1",
+  tipo: "losa",
+  plantaId: "pl1",
+  perimetro: ["n1", "n2", "n3", "n4"],
+  espesor: 0.25,
+  materialId: "mat-horm",
+  tamMalla: 0.5,
+  bordeApoyo: "simple",
+} as const;
+
+describe("migrarYValidar — v4 -> v5: bump de version (campos opcionales)", () => {
+  it("v4 con una losa REAL migra a v5 intacta (no-op de datos + aviso de esquema)", () => {
+    const r = ok(migrarYValidar(proyectoV4([LOSA_V4])));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    // La losa v4 sobrevive byte a byte: la migracion es un bump, no toca los paños.
+    expect(r.modelo.panos).toHaveLength(1);
+    expect(r.modelo.panos[0]).toEqual(LOSA_V4);
+    // La losa NO gana los campos de unidireccional (opcionales, ausentes).
+    expect("direccionViguetas" in r.modelo.panos[0]).toBe(false);
+    expect("intereje" in r.modelo.panos[0]).toBe(false);
+    // Aviso generico de actualizacion de esquema (la cadena corrio v4->v5).
+    expect(r.avisos.some((a) => /actualiz/i.test(a))).toBe(true);
+  });
+
+  it("v4 con panos:[] migra a v5 sin tocar nada", () => {
+    const r = ok(migrarYValidar(proyectoV4()));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(r.modelo.panos).toEqual([]);
+  });
+
+  it("un paño unidireccional v5 con campos VALIDOS pasa la frontera Zod", () => {
+    // Ya en la version vigente: no corre la cadena; ejercita el ModeloSchema v5.
+    const uni = {
+      id: "pano-uni",
+      nombre: "Forjado unidireccional",
+      tipo: "unidireccional",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      // espesor/tamMalla obligatorios a nivel Zod aunque el discretizador los ignore
+      // bajo unidireccional (deuda T-f3-pano-schema-union): se portan con valor inocuo.
+      espesor: 0.3,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+      // Campos del corte unidireccional (todos presentes y > 0; pesoPropio >= 0).
+      direccionViguetas: "x",
+      intereje: 0.7,
+      canto: 0.3,
+      anchoNervio: 0.12,
+      pesoPropio: 3.5,
+    };
+    const raw = { ...proyectoV4([uni]), schemaVersion: SCHEMA_VERSION };
+    const r = ok(migrarYValidar(raw));
+    expect(r.modelo.panos).toHaveLength(1);
+    // Los 5 campos nuevos sobreviven la frontera Zod (z.infer los tipa opcionales).
+    expect(r.modelo.panos[0]).toMatchObject({
+      tipo: "unidireccional",
+      direccionViguetas: "x",
+      intereje: 0.7,
+      canto: 0.3,
+      anchoNervio: 0.12,
+      pesoPropio: 3.5,
+    });
+  });
+
+  it("un unidireccional con campos BASURA (intereje negativo) se RECHAZA en la frontera", () => {
+    // La positividad de intereje/canto/anchoNervio la exige el propio PanoSchema
+    // (.positive()): un valor <= 0 no pasa Zod, ni siquiera antes de validaciones.
+    const uniMalo = {
+      id: "pano-uni-malo",
+      nombre: "Forjado roto",
+      tipo: "unidireccional",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      espesor: 0.3,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+      direccionViguetas: "x",
+      intereje: -0.7, // BASURA: negativo -> rechazado por .positive()
+      canto: 0.3,
+      anchoNervio: 0.12,
+      pesoPropio: 3.5,
+    };
+    const raw = { ...proyectoV4([uniMalo]), schemaVersion: SCHEMA_VERSION };
+    const errs = errores(migrarYValidar(raw));
+    // La ruta de Zod apunta al campo culpable del paño (indice 0 del array).
+    expect(errs.some((e) => e.includes("panos.0.intereje"))).toBe(true);
+  });
+
+  it("un unidireccional con direccionViguetas invalida se RECHAZA en la frontera", () => {
+    const uniMalo = {
+      id: "pano-uni-dir",
+      nombre: "Forjado dir",
+      tipo: "unidireccional",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      espesor: 0.3,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+      direccionViguetas: "z", // BASURA: no es "x"|"y"
+      intereje: 0.7,
+      canto: 0.3,
+      anchoNervio: 0.12,
+      pesoPropio: 3.5,
+    };
+    const raw = { ...proyectoV4([uniMalo]), schemaVersion: SCHEMA_VERSION };
+    const errs = errores(migrarYValidar(raw));
+    expect(errs.some((e) => e.includes("panos.0.direccionViguetas"))).toBe(true);
+  });
+
+  it("cadena completa v1 -> v5 desde un raw v1: no rompe por el nuevo eslabon", () => {
+    // Un raw v1 legitimo (sin automatica/incluirPesoPropio, con grupos): la cadena
+    // corre entera 1->2->3->4->5 y llega a la version vigente sin huecos.
+    const rawV1: Record<string, unknown> = {
+      unidades: "kN-m",
+      schemaVersion: 1,
+      grupos: [{ id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 }],
+      plantas: [{ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" }],
+      secciones: [],
+      nudos: [],
+      pilares: [],
+      vigas: [],
+      panos: [],
+      muros: [],
+      cargas: [],
+      hipotesis: [
+        { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+      ],
+      analisis: { tipo: "lineal", comprobarEstatica: true },
+    };
+    const r = ok(migrarYValidar(rawV1));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    // v1->v2 sembro la automatica; v3->v4 volco el uso del grupo; v4->v5 solo bumpeo.
+    expect(autoDe(r.modelo)).toHaveLength(1);
+    expect(r.modelo.plantas[0]).toMatchObject({ categoriaUso: "A", sobrecargaUso: 2 });
+    expect("grupos" in r.modelo).toBe(false);
+  });
+});
+
 // Round-trip de un Modelo v3 nativo con un paño losa: export a texto -> import.
 // La frontera Zod (migrarYValidar via importarProyecto) lo acepta y el paño losa
 // sobrevive estable (no se descarta: ya esta en la forma v3).

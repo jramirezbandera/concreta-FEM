@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ModeloSchema, OpcionesAnalisisSchema, type Modelo } from "./modelo";
 import { NudoSchema } from "./nudo";
 import { SeccionSchema } from "./seccion";
+import { PanoSchema } from "./pano";
 import { HipotesisSchema } from "./carga";
 import { crearModeloVacio } from "./helpers";
 import { SCHEMA_VERSION } from "./comunes";
@@ -274,5 +275,77 @@ describe("HipotesisSchema (shape F2a: automatica)", () => {
       id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true,
     });
     expect(res.automatica).toBe(true);
+  });
+});
+
+describe("PanoSchema (losa v4 + campos del forjado unidireccional v5)", () => {
+  // Losa v4 SIN los campos nuevos: debe seguir pasando (los de vigueta son opcionales).
+  function losaV4(): Record<string, unknown> {
+    return {
+      id: "pano1",
+      nombre: "Forjado 1",
+      tipo: "losa",
+      plantaId: "p1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      espesor: 0.25,
+      materialId: "m1",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+    };
+  }
+
+  // Unidireccional VALIDO con los 5 campos nuevos. espesor/tamMalla se ignoran bajo
+  // unidireccional pero siguen obligatorios a nivel Zod (se portan con valor inocuo).
+  function unidireccionalValido(): Record<string, unknown> {
+    return {
+      ...losaV4(),
+      tipo: "unidireccional",
+      direccionViguetas: "x",
+      intereje: 0.7,
+      canto: 0.3,
+      anchoNervio: 0.12,
+      pesoPropio: 3.5,
+    };
+  }
+
+  it("una LOSA v4 sin los campos nuevos sigue pasando (opcionales)", () => {
+    expect(PanoSchema.safeParse(losaV4()).success).toBe(true);
+  });
+
+  it("un unidireccional con los campos de vigueta pasa", () => {
+    expect(PanoSchema.safeParse(unidireccionalValido()).success).toBe(true);
+  });
+
+  it("acepta pesoPropio = 0 (>=0 legitimo) y direccionViguetas 'y'", () => {
+    const p = unidireccionalValido();
+    p.pesoPropio = 0;
+    p.direccionViguetas = "y";
+    expect(PanoSchema.safeParse(p).success).toBe(true);
+  });
+
+  it("acepta direccionViguetas ausente (la presencia la exige validaciones, no el schema)", () => {
+    const p = unidireccionalValido();
+    delete p.direccionViguetas;
+    expect(PanoSchema.safeParse(p).success).toBe(true);
+  });
+
+  describe("rechaza campos de vigueta invalidos", () => {
+    const casos: Array<[string, (p: Record<string, unknown>) => void]> = [
+      ["direccionViguetas fuera del enum ('z')", (p) => { p.direccionViguetas = "z"; }],
+      ["intereje negativo", (p) => { p.intereje = -0.7; }],
+      ["intereje cero (.positive)", (p) => { p.intereje = 0; }],
+      ["intereje Infinity (.finite)", (p) => { p.intereje = Infinity; }],
+      ["canto negativo", (p) => { p.canto = -0.3; }],
+      ["canto no finito (NaN)", (p) => { p.canto = NaN; }],
+      ["anchoNervio negativo", (p) => { p.anchoNervio = -0.12; }],
+      ["anchoNervio Infinity", (p) => { p.anchoNervio = Infinity; }],
+      ["pesoPropio negativo", (p) => { p.pesoPropio = -1; }],
+      ["pesoPropio -Infinity", (p) => { p.pesoPropio = -Infinity; }],
+    ];
+    it.each(casos)("%s", (_titulo, mutar) => {
+      const p = unidireccionalValido();
+      mutar(p);
+      expect(PanoSchema.safeParse(p).success).toBe(false);
+    });
   });
 });

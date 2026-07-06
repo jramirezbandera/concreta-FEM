@@ -25,4 +25,10 @@ export const NumeroFinitoSchema = z.number().finite();
 // v4 (F3.4, "plantas sin grupos") ELIMINA `Grupo` y `Modelo.grupos`: cada `Planta`
 // absorbe categoriaUso/sobrecargaUso/cargasMuertas y pierde `grupoId`. La migracion
 // v3->v4 copia a cada planta los valores de su grupo (o defaults si no resuelve).
-export const SCHEMA_VERSION = 4;
+// v5 (F3, forjado unidireccional) añade a `Pano` 5 campos OPCIONALES para el tipo
+// "unidireccional" (direccionViguetas/intereje/canto/anchoNervio/pesoPropio). Como son
+// opcionales, la migracion v4->v5 solo bumpea la version: NO siembra valores (no hay un
+// default fisicamente correcto para intereje/canto). Un paño "unidireccional" heredado
+// sin esos campos lo bloqueara validaciones (PANO_UNI_CAMPOS) hasta que el usuario los
+// rellene — honesto, no se inventa geometria.
+export const SCHEMA_VERSION = 5;
