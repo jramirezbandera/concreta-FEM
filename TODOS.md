@@ -855,14 +855,25 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-f3-pano-unidireccional · Forjado unidireccional (viguetas en una dirección)
+## T-f3-pano-unidireccional · Forjado unidireccional (viguetas en una dirección) — RESUELTO (F-unidireccional)
 
-- **Qué:** `tipo:"unidireccional"` se RECHAZA hoy (`PANO_TIPO_NO_SOPORTADO`). Falta su modelo (viguetas
-  paralelas + reparto unidireccional de carga).
-- **Por qué:** reparte la carga en UNA dirección (no bidireccional como la losa); su discretización y sus
-  esfuerzos son distintos.
-- **Cómo retomar:** modelar como conjunto de barras (viguetas) en la dirección de canto, o placa muy
-  ortótropa; levantar el rechazo.
+- **Estado:** RESUELTO. El paño `tipo:"unidireccional"` se calcula: **viguetas = members sintéticos de
+  Capa 2** (`PV<idx>-V<k>`, biapoyadas Ry/Rz, sección sintética `VIG-<idx>` = nervio×canto) generadas por
+  [viguetas.ts](src/discretizador/viguetas.ts) (módulo hoja puro) e integradas en el Paso 6d de
+  [discretizar.ts](src/discretizador/discretizar.ts). Geometría: `n = max(1, round(B/intereje))`,
+  separación efectiva `s = B/n`, viguetas en `s·(k+½)` → Σ tributarios = B EXACTO (ΣV exacto, err
+  ~1e-15 en golden motor real). Extremos: remap a N* vía `subdivisionesViga` si hay viga de contorno
+  (+ MULETA TORSIONAL {RX|RZ} SOLO en nudos nacidos de la subdivisión — reacción medida = 0 exacto,
+  inofensiva) o apoyo nodal patrón spike (i: 6 GDL, j: sin DX) si el borde está aislado. Peso propio
+  TABULADO (`pesoPropio` kN/m², tabla CTE DB-SE-AE C.5 en [forjados.ts](src/biblioteca/forjados.ts));
+  cargas de planta y de usuario → w = presión·s por vigueta. Campos nuevos de Pano (v5): dirección,
+  intereje, canto, anchoNervio, pesoPropio. Verificado motor real
+  (`tests/golden/unidireccional.golden.test.ts`): M = qL²/8 al bit, vigas paralelas casi descargadas
+  (reparto en UNA dirección), semi-acoplado estable, borde libre sin viga bloquea
+  (PANO_UNI_SIN_APOYO). UI: selector de tipo, campos condicionales, rayado de dirección con el
+  intereje real, Isovalores honesto. Deudas hijas: T-f3-uni-* (abajo) y T-f3-pano-schema-union.
+- **Origen:** Plan F3 corte 1 (NOT-in-scope); cerrado en el corte F-unidireccional (contrato + spike
+  vigueta + goldens Capa A/B motor real).
 - **Depende de / bloquea:** corte 1. **Coste:** CC ~1 día.
 - **Origen:** Plan F3 corte 1 (NOT-in-scope).
 
@@ -1342,6 +1353,125 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   [T-modal-overlay-dedup] (extraer el hook compartido de overlays abarata este trabajo).
 - **Depende de / bloquea:** se apoya en T-modal-overlay-dedup. **Coste:** CC ~1-2 h.
 - **Origen:** Corte T-f3-masa-placa (T4.2): gap visual detectado en el plan, no bloqueante.
+
+---
+
+## T-f3-uni-rigidez-T · La vigueta se modela como rectángulo nervio×canto (sin capa de compresión)
+
+- **Qué:** La sección de vigueta (`VIG-<idx>`) es el rectángulo anchoNervio×canto del material del paño.
+  La sección REAL de un forjado unidireccional trabaja como T (nervio + cabeza de compresión con ancho
+  eficaz): la rigidez modelada INFRAVALORA la real → flechas por encima de las reales (lado seguro).
+- **Por qué:** decisión del corte (paramétrico mínimo); la T exige ancho eficaz normativo y más campos.
+- **Cómo retomar:** sección T con ancho eficaz (intereje como cota superior) en `seccionFEMDeVigueta`
+  ([viguetas.ts](src/discretizador/viguetas.ts)); o catálogo de forjados comerciales con A/I tabulados.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~2-3 h. **Origen:** contrato F-unidireccional (DP-scope).
+
+---
+
+## T-f3-uni-masa-modal · Masa modal del forjado unidireccional infravalorada (solo el nervio)
+
+- **Qué:** En modal, las viguetas aportan masa vía `add_member_self_weight` = ρ·A_nervio. El peso REAL
+  del forjado (bovedillas + capa, el `pesoPropio` tabulado que SÍ usa el estático) NO entra en la masa
+  → frecuencias SOBREestimadas con forjados unidireccionales (no conservador en sísmica futura).
+- **Por qué:** la masa modal la fabrica el glue y no conoce el pesoPropio tabulado del paño (misma
+  altitud que [T-modal-masa-altitud], que ya prevé mover TODA la masa al discretizador de una vez).
+- **Cómo retomar:** junto a T-modal-masa-altitud (la masa tabulada del paño se emite desde el
+  discretizador como los demás casos); mientras tanto la nota de honestidad del panel de frecuencias
+  cubre la expectativa genérica.
+- **Depende de / bloquea:** se resuelve DENTRO de T-modal-masa-altitud. **Coste:** incluido allí.
+- **Origen:** contrato F-unidireccional (decisión d, con aviso).
+
+---
+
+## T-f3-uni-pilar-interior · Pilar interior bajo forjado unidireccional (hoy bloquea)
+
+- **Qué:** Un pilar que atraviesa un unidireccional sigue bloqueando (`PANO_PILAR_INTERIOR`, fix R-4 del
+  contrato: los detectores de interiores se relajaron a losa||unidireccional precisamente para que el
+  bloqueo NO se perdiera en silencio). No hay acople de cabeza a viguetas.
+- **Por qué:** acoplar exigiría forzar una vigueta pasando por cada pilar + brochales transversales para
+  pilares entre viguetas — física nueva (brochal) fuera del corte.
+- **Cómo retomar:** espejo del corte losa plana: línea de control de vigueta por pilar + brochal
+  (member transversal) para cabezas entre viguetas; misma disciplina de clave de celda.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~1 día. **Origen:** decisión de usuario del corte (DP4).
+
+---
+
+## T-f3-uni-vigueta-diagramas · Los esfuerzos por vigueta no se consultan individualmente
+
+- **Qué:** Las viguetas se dibujan en deformada y "Ver modelo de cálculo", pero no son seleccionables
+  para diagramas (resolverBarra solo mapea vigaAMembers/pilarAMembers). `trazabilidad.panoAMembers`
+  ya existe con el mapeo paño→viguetas: la infraestructura está lista.
+- **Por qué:** exponer viguetas en la selección/inspector es UI nueva (picking de members sintéticos,
+  rótulos de obra "vigueta 3 del paño F1") que habría ensanchado el corte.
+- **Cómo retomar:** picking sobre los members PV* (InstancedMesh como las vigas) + PanelDiagramas
+  leyendo panoAMembers; rótulo en lenguaje de obra.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~3-4 h. **Origen:** contrato F-unidireccional (NOT-in-scope).
+
+---
+
+## T-f3-uni-continuidad · Viguetas siempre biapoyadas (empotrado ≈ apoyado)
+
+- **Qué:** Las viguetas son biarticuladas por decisión (lado seguro en vano, sin torsión a vigas de
+  borde); `bordeApoyo:"empotrado"` se comporta como "simple" bajo unidireccional (declarado en la UI).
+  No hay momentos negativos de continuidad en apoyos.
+- **Cómo retomar:** opción del paño "viguetas continuas" (sin releases en el extremo acoplado) cuando
+  el producto lo pida; revisar entonces la torsión que entra a las vigas de borde y la muleta.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~2-3 h. **Origen:** decisión de usuario del corte (DP3).
+
+---
+
+## T-f3-pano-schema-union · espesor/tamMalla obligatorios pero ignorados bajo unidireccional
+
+- **Qué:** `PanoSchema` exige espesor y tamMalla para TODOS los tipos; bajo unidireccional se ignoran
+  (viajan con defaults desde la UI, comentado en ColocacionPano/comandosModelo). Los 5 campos uni son
+  opcionales y la presencia la exige `PANO_UNI_CAMPOS` en validaciones (no el esquema).
+- **Por qué:** partir `PanoSchema` en unión discriminada por tipo rompía a media Capa 1 (fixtures,
+  migraciones, UI) para un beneficio de tipado; se difirió con el corte en ~1 día ya.
+- **Cómo retomar:** unión discriminada `z.discriminatedUnion("tipo", ...)` con migración v5→v6 que pode
+  los campos ajenos a cada tipo; barrido de consumidores.
+- **Depende de / bloquea:** conviene ANTES del reticular (tercer tipo con campos propios). **Coste:** CC ~2-3 h.
+- **Origen:** contrato F-unidireccional (§6, deuda declarada).
+
+---
+
+## T-glue-flecha-muestreo-par · La flecha muestreada pierde el pico central (N_POINTS=20 par)
+
+- **Qué:** El glue muestrea `defl_y` con `N_POINTS_DEFAULT=20` (par): `linspace(0,L,20)` no incluye
+  x=L/2, donde vive el pico de una biapoyada → la flecha reportada subestima ~0.33% (medido en el
+  golden U1 de unidireccional; afecta a CUALQUIER barra, no solo viguetas). El momento no lo sufre
+  (usa el extremo analítico `min_moment`).
+- **Cómo retomar:** usar el extremo analítico de flecha de PyNite (`max_deflection`/equivalente, como
+  ya se hace con momentos) o N_POINTS impar. Golden U1 pina el estado actual con TOL_FLECHA=0.005 y
+  cabecera explicativa.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~30 min (+ ajustar TOL del golden a la baja).
+- **Origen:** golden motor real U1 del corte F-unidireccional (hallazgo, no bug).
+
+---
+
+## T-f3-uni-rayado-dry · El rayado de la huella reimplementa el reparto de viguetas
+
+- **Qué:** [panoRayadoGeometria.ts](src/ui/viewport/panoRayadoGeometria.ts) reproduce el reparto
+  (`n = max(1, round(B/intereje))`, posiciones `s·(k+½)`) en vez de consumir `generarViguetas` del
+  discretizador. Declarado en su comentario; sus tests verifican la copia local, no la coincidencia.
+- **Por qué:** si mañana cambia el criterio de `n` o el redondeo en `viguetas.ts`, el rayado mentiría
+  sobre el nº real de viguetas sin que ningún test lo cace (mismo patrón que T-dedup-planta-de-nudo).
+- **Cómo retomar:** extraer un helper puro compartido `repartoViguetas(B, intereje)` consumido por
+  ambos, o un test que compare `verticesRayado` contra las posiciones de `generarViguetas`.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~30 min. **Origen:** guardián T5.3 (nota 1).
+
+---
+
+## T-f3-uni-golden-esquina-pilar · Cobertura: extremo de vigueta sobre N* preexistente sin muleta
+
+- **Qué:** la regla "muleta torsional SOLO en N* nacido de subdivisión" está implementada y U2 pina
+  reacción≈0 en las emitidas, pero no hay caso que afirme que un N* PREEXISTENTE (esquina con pilar,
+  pilar a mitad de borde donde terminan dos vigas) NO recibe muleta y resuelve estable. Nota: por
+  construcción `s·(k+½)` un extremo de vigueta nunca cae en una ESQUINA del paño (posición
+  estrictamente interior); el caso alcanzable es un pilar a mitad de borde de apoyo coincidiendo con
+  un extremo (extremo = endpoint de viga, no subdivisión).
+- **Cómo retomar:** caso Capa A (o golden motor real) con pilar a mitad del borde de apoyo en la
+  posición exacta de un extremo de vigueta: sin muleta en ese N*, estable, reparto intacto.
+- **Depende de / bloquea:** ninguno. **Coste:** CC ~30-45 min. **Origen:** guardián T5.3 (reserva 2).
 
 ---
 
