@@ -21,12 +21,11 @@ function crujia(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      { id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
-    ],
+    // v4 (plantas sin grupos): la planta del paño (p1) porta SU/CM. Arrancan a 0; el
+    // test D-1 las sube EN p1 (donde esta el paño losa que las recibe).
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: SECCION, nombre: "Viga 30x50", tipo: "hormigonRectangular", b: 0.3, h: 0.5 },
@@ -168,21 +167,24 @@ describe("golden A · losa acoplada a la crujia (4 vigas + 4 pilares)", () => {
     }
   });
 
-  it("D-1: las cargas del GRUPO bajan a los quads en cases sinteticos y entran en los combos", () => {
+  it("D-1: las cargas de la PLANTA bajan a los quads en cases sinteticos y entran en los combos", () => {
     const m = crujia();
-    m.grupos = [{ ...m.grupos[0], cargasMuertas: 1.5, sobrecargaUso: 2 }];
+    // v4: SU/CM viven en la planta del paño (p1), no en un grupo.
+    m.plantas = m.plantas.map((p) =>
+      p.id === "p1" ? { ...p, cargasMuertas: 1.5, sobrecargaUso: 2 } : p,
+    );
     const res = ok(discretizar(m));
     const fem = res.modeloFEM;
-    // 12 (usuario h1) + 12 (auto-grupo-cm) + 12 (auto-grupo-uso) = 36 quad_loads.
+    // 12 (usuario h1) + 12 (auto-planta-cm) + 12 (auto-planta-uso) = 36 quad_loads.
     expect(fem.quad_loads).toHaveLength(36);
     const porCase = (c: string) => fem.quad_loads!.filter((ql) => ql.case === c);
-    expect(porCase("auto-grupo-cm").every((ql) => ql.presion === 1.5)).toBe(true);
-    expect(porCase("auto-grupo-uso").every((ql) => ql.presion === 2)).toBe(true);
+    expect(porCase("auto-planta-cm").every((ql) => ql.presion === 1.5)).toBe(true);
+    expect(porCase("auto-planta-uso").every((ql) => ql.presion === 2)).toBe(true);
     // Y los combos les aplican su gamma (CM = G 1,35; uso = Q 1,50) — misma fuente
     // que la emision [2A]: sin termino fantasma ni carga sin factor.
     const elu = fem.combos.find((c) => c.name === "ELU")!;
-    expect(elu.factors["auto-grupo-cm"]).toBe(1.35);
-    expect(elu.factors["auto-grupo-uso"]).toBe(1.5);
+    expect(elu.factors["auto-planta-cm"]).toBe(1.35);
+    expect(elu.factors["auto-planta-uso"]).toBe(1.5);
   });
 
   it("determinismo: reordenar paños/vigas/pilares/nudos de entrada produce la MISMA Capa 2", () => {

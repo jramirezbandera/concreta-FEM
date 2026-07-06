@@ -23,7 +23,6 @@ function modeloConHipotesis(
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [],
     plantas: [],
     secciones: [],
     nudos: [],

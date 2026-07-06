@@ -58,10 +58,10 @@ function useHerramientaPilar(): boolean {
 
 // Tramo del pilar a partir del ambito activo. Delega en el helper PURO `tramoColocable`
 // (fuente unica de verdad, compartida con la guia de la barra de estado en App).
-function tramoDelGrupoActivo(): { plantaInicial: string; plantaFinal: string } | null {
+function tramoDelEdificio(): { plantaInicial: string; plantaFinal: string } | null {
   const modelo = modeloStore.getState().getModelo();
-  const { grupoActivoId, plantaActivaId } = vistaStore.getState();
-  return tramoColocable(modelo, grupoActivoId, plantaActivaId);
+  const { plantaActivaId } = vistaStore.getState();
+  return tramoColocable(modelo, plantaActivaId);
 }
 
 // --- Marcador fantasma --------------------------------------------------------
@@ -190,7 +190,7 @@ function ColocacionActiva() {
       return;
     }
 
-    const tramo = tramoDelGrupoActivo();
+    const tramo = tramoDelEdificio();
     if (!tramo) {
       if (import.meta.env.DEV) {
         console.warn(

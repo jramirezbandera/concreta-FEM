@@ -36,15 +36,14 @@ import type { Modelo } from "../../dominio";
 import { SCHEMA_VERSION } from "../../dominio";
 
 // Modelo con un pilar (pil1 en p0..p1), una viga (vg1 en p1) y un paño (pa1 en p1). Sirve
-// para que resolverContextoElemento resuelva el contexto (grupo/planta) del culpable.
+// para que resolverContextoElemento resuelva el contexto (planta) del culpable.
 function modeloPrueba(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [{ id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 }],
     plantas: [
-      { id: "p0", nombre: "Cimentación", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentación", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
     ],
     secciones: [{ id: "s1", nombre: "IPE 300", tipo: "perfilMetalico", perfilId: "IPE300" }],
     nudos: [
@@ -96,7 +95,6 @@ beforeEach(() => {
   } as UseCalcular;
   modeloStore.getState().cargarModelo(modeloPrueba());
   vistaStore.getState().setPestanaActiva("resultados");
-  vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
   seleccionStore.getState().limpiar();
 });
@@ -112,8 +110,7 @@ describe("BotonCalcular · errores navegables (D22b)", () => {
     await user.click(fila);
     expect(seleccionStore.getState().seleccion).toEqual(["pil1"]);
     expect(vistaStore.getState().pestanaActiva).toBe("entradaPilares");
-    // El contexto (grupo/planta del pie) se sincroniza vía resolverContextoElemento.
-    expect(vistaStore.getState().grupoActivoId).toBe("g1");
+    // El contexto (planta del pie) se sincroniza vía resolverContextoElemento.
     expect(vistaStore.getState().plantaActivaId).toBe("p0");
   });
 

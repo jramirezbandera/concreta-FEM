@@ -22,17 +22,15 @@ beforeAll(() => {
 
 const MAT_OK = listarMateriales()[0]!.id;
 
-// Modelo con grupo/planta, 4 nudos del perimetro y un paño losa valido.
+// Modelo con planta, 4 nudos del perimetro y un paño losa valido. La planta lleva
+// las cargas automaticas (F3.4; antes vivian en el grupo): sobrecargaUso=2,
+// cargasMuertas=1 (kN/m²) para conservar la Capa 2 y la linea informativa.
 function modeloConPano(): Modelo {
   const m = crearModeloVacio();
-  m.grupos.push({
-    id: "g1",
-    nombre: "G1",
-    categoriaUso: "A",
-    sobrecargaUso: 2,
-    cargasMuertas: 1,
+  m.plantas.push({
+    id: "pl1", nombre: "Planta 1", cota: 3, altura: 3,
+    categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1,
   });
-  m.plantas.push({ id: "pl1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" });
   m.nudos.push(
     { id: "n1", x: 0, y: 0 },
     { id: "n2", x: 4, y: 0 },
@@ -59,7 +57,11 @@ function modeloConPano(): Modelo {
 // no seccion/material, asi que basta con ids coherentes.
 function modeloConLosaPlana(nPilares: number): Modelo {
   const m = modeloConPano();
-  m.plantas.push({ id: "pl0", nombre: "Cimentación", cota: 0, altura: 3, grupoId: "g1" });
+  // Planta base sin paños: cargas automaticas inertes (0/0).
+  m.plantas.push({
+    id: "pl0", nombre: "Cimentación", cota: 0, altura: 3,
+    categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0,
+  });
   // Posiciones interiores distintas (dentro de 0<x<4, 0<y<3), separadas de sobra.
   const pos = [
     { x: 1, y: 1 },
@@ -157,23 +159,23 @@ describe("InspectorPano: visibilidad", () => {
     expect(screen.queryByText(/no se transmite a pilares ni vigas/i)).toBeNull();
   });
 
-  it("D-1: muestra las cargas automaticas del grupo con los valores reales (fuente unica)", () => {
-    // El grupo del fixture: cargasMuertas=1, sobrecargaUso=2 (kN/m²).
+  it("D-1: muestra las cargas automaticas de la planta con los valores reales (fuente unica)", () => {
+    // La planta del fixture (F3.4; antes el grupo): cargasMuertas=1, sobrecargaUso=2 (kN/m²).
     renderConPanoSeleccionado();
-    const linea = screen.getByText(/recibe además, del grupo de su planta/i);
+    const linea = screen.getByText(/recibe además, de su planta/i);
     expect(linea.textContent).toContain("1,00 kN/m² de cargas muertas");
     expect(linea.textContent).toContain("2,00 kN/m² de sobrecarga de uso");
   });
 
-  it("D-1 [GAP-H]: con el grupo a CERO no muestra la linea de cargas de grupo (estado vacio)", () => {
+  it("D-1 [GAP-H]: con la planta a CERO no muestra la linea de cargas de planta (estado vacio)", () => {
     const m = modeloConPano();
-    m.grupos = m.grupos.map((g) =>
-      g.id === "g1" ? { ...g, sobrecargaUso: 0, cargasMuertas: 0 } : g,
+    m.plantas = m.plantas.map((pl) =>
+      pl.id === "pl1" ? { ...pl, sobrecargaUso: 0, cargasMuertas: 0 } : pl,
     );
     modeloStore.getState().cargarModelo(m);
     seleccionStore.getState().seleccionar(["F-1"]);
     render(<InspectorPano />);
-    expect(screen.queryByText(/recibe además, del grupo de su planta/i)).toBeNull();
+    expect(screen.queryByText(/recibe además, de su planta/i)).toBeNull();
   });
 
   it("F2.3: con >=2 pilares interiores (losa plana) muestra la nota de honestidad del momento en cabeza", () => {

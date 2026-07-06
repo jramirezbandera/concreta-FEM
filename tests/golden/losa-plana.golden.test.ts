@@ -17,11 +17,11 @@
 //     pilar (recibe carga); ΣV (reacciones de los arranques) ≈ carga total (pp
 //     barras + pp losa + superficial), con tolerancia de equilibrio.
 //  2) check_statics OK con quad_loads (equilibrio global del modelo acoplado).
-//  3) §5.7 (DP3) — PILAR PASANTE DE OTRO GRUPO: un pilar cuyas plantas inicial/final
-//     son de un grupo B pero cuyo tramo cruza la cota del paño (grupo A) comparte el
+//  3) §5.7 (DP3) — PILAR PASANTE QUE ANCLA EN OTRAS PLANTAS: un pilar cuyas plantas
+//     inicial/final son de otra cota pero cuyo tramo cruza la cota del paño comparte el
 //     N* de esa cota y recoge la losa igual (axil>0). Unico respaldo del invariante
-//     "el N* de la cabeza siempre existe" cuando depende de que el pasante pertenezca
-//     a modelo.plantas (grupo = organizativo, no estructural).
+//     "el N* de la cabeza siempre existe" cuando depende de que la planta del paño
+//     pertenezca a modelo.plantas (la planta de anclaje es organizativa, no estructural).
 //  4) CONVERGENCIA de flecha al afinar la malla (la flecha SI es fiable; el momento
 //     local sobre el pilar NO -> NO se asevera, es dependiente de malla, spike /
 //     T-f3-losa-plana-momento-local).
@@ -166,13 +166,11 @@ function losaSobrePilares(opts: {
   }
   return {
     unidades: "kN-m",
-    schemaVersion: 3,
-    grupos: [
-      { id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
-    ],
+    schemaVersion: 4,
+    // v4 (plantas sin grupos): SU/CM en la planta (0, como el grupo original).
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: H_PLANTA, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: H_PLANTA, altura: H_PLANTA, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: H_PLANTA, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: H_PLANTA, altura: H_PLANTA, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [SEC_PILAR_HA],
     nudos: [
@@ -298,36 +296,35 @@ describe("golden losa PLANA sobre pilares Capa B (motor real PyNite)", () => {
     TIMEOUT_ARRANQUE,
   );
 
-  // Modelo §5.7: losa (grupo A, cota 3) sobre 4 pilares de ESQUINA. 3 son NORMALES de
-  // grupo A (cota 0 -> cota 3, rematan en la losa). El 4º es de grupo B: `remateB` fija
-  // su cota de cabeza. Con remateB=6 es un PASANTE GENUINO (cotas 0->6 saltando la cota
-  // del paño: se trocea en cota 3 aunque cota 3 no sea planta de grupo B). Con remateB=3
-  // remata EN la losa (comparte el N* de la planta de grupo A). En ambos, grupo B nunca
-  // tiene una planta en cota 3 -> el N* a esa cota nace de que la planta pA1 esta en
-  // modelo.plantas (invariante §2.2). 4 esquinas no colineales sujetan el plano.
-  function losaConPilarOtroGrupo(remateB: 3 | 6): Modelo {
+  // Modelo §5.7 (v4, plantas sin grupos): losa (planta pA1, cota 3) sobre 4 pilares de
+  // ESQUINA. 3 rematan EN la losa (cota 0 -> cota 3). El 4º ancla en OTRAS plantas del
+  // edificio: `remateB` fija su cota de cabeza. Con remateB=6 es un PASANTE GENUINO
+  // (cotas 0->6 saltando la cota del paño: se trocea en cota 3 aunque sus propias plantas
+  // de anclaje sean cota 0 y cota 6). Con remateB=3 remata EN la losa (comparte el N* de
+  // la planta del paño). El N* a la cota 3 nace de que la planta pA1 esta en
+  // modelo.plantas (invariante §2.2), no de la planta de anclaje del pilar. 4 esquinas no
+  // colineales sujetan el plano. (Antes: "otro grupo"; v4 lo expresa como pilar que ancla
+  // en plantas de distinta cota, no en grupos organizativos.)
+  function losaConPilarOtraPlanta(remateB: 3 | 6): Modelo {
     const LADO = 6.0;
+    const uso = { categoriaUso: "A" as const, sobrecargaUso: 0, cargasMuertas: 0 };
     const plantasB =
       remateB === 6
         ? [
-            { id: "pB0", nombre: "Cim B", cota: 0, altura: 6, grupoId: "gB" },
-            { id: "pB1", nombre: "Planta B (cota 6)", cota: 6, altura: 3, grupoId: "gB" },
+            { id: "pB0", nombre: "Cim B", cota: 0, altura: 6, ...uso },
+            { id: "pB1", nombre: "Planta B (cota 6)", cota: 6, altura: 3, ...uso },
           ]
         : [
-            { id: "pB0", nombre: "Cim B", cota: 0, altura: 3, grupoId: "gB" },
-            { id: "pB1", nombre: "Planta B (cota 3)", cota: 3, altura: 3, grupoId: "gB" },
+            { id: "pB0", nombre: "Cim B", cota: 0, altura: 3, ...uso },
+            { id: "pB1", nombre: "Planta B (cota 3)", cota: 3, altura: 3, ...uso },
           ];
     return {
       unidades: "kN-m",
-      schemaVersion: 3,
-      grupos: [
-        { id: "gA", nombre: "Grupo A", categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
-        { id: "gB", nombre: "Grupo B", categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
-      ],
+      schemaVersion: 4,
       plantas: [
-        // Grupo A: planta del paño en cota 3 (y su cimentacion en cota 0).
-        { id: "pA0", nombre: "Cim A", cota: 0, altura: 3, grupoId: "gA" },
-        { id: "pA1", nombre: "Planta A (paño)", cota: 3, altura: 3, grupoId: "gA" },
+        // Planta del paño en cota 3 (y su cimentacion en cota 0).
+        { id: "pA0", nombre: "Cim A", cota: 0, altura: 3, ...uso },
+        { id: "pA1", nombre: "Planta A (paño)", cota: 3, altura: 3, ...uso },
         ...plantasB,
       ],
       secciones: [SEC_PILAR_HA],
@@ -338,7 +335,7 @@ describe("golden losa PLANA sobre pilares Capa B (motor real PyNite)", () => {
         { id: "q4", x: 0, y: LADO },
       ],
       pilares: [
-        // 3 pilares NORMALES de grupo A (cota 0 -> cabeza cota 3), en tres esquinas.
+        // 3 pilares NORMALES de la planta del paño (cota 0 -> cabeza cota 3), en tres esquinas.
         ...(
           [
             ["pilA1", 1, 1],
@@ -358,7 +355,8 @@ describe("golden losa PLANA sobre pilares Capa B (motor real PyNite)", () => {
           vinculacionExterior: true,
           arranque: "empotrado" as const,
         })),
-        // Pilar de grupo B en la 4ª esquina (5,5): sus dos plantas son de gB.
+        // Pilar de la 4ª esquina (5,5): ancla en OTRAS plantas (pB0/pB1), de cota
+        // distinta a la del paño.
         {
           id: "pilPasante",
           nombre: "PILPASANTE",
@@ -379,7 +377,7 @@ describe("golden losa PLANA sobre pilares Capa B (motor real PyNite)", () => {
           id: "losa1",
           nombre: "Losa 1",
           tipo: "losa",
-          plantaId: "pA1", // planta del paño = grupo A, cota 3
+          plantaId: "pA1", // planta del paño, cota 3
           perimetro: ["q1", "q2", "q3", "q4"],
           espesor: ESPESOR,
           materialId: "HA-25",
@@ -398,22 +396,22 @@ describe("golden losa PLANA sobre pilares Capa B (motor real PyNite)", () => {
   }
 
   it(
-    "L2a · §5.7 (DP3) INVARIANTE: un pilar PASANTE de otro grupo (0->6) se trocea en la cota del paño y crea el N* compartido",
+    "L2a · §5.7 (DP3) INVARIANTE: un pilar PASANTE que ancla en otras plantas (0->6) se trocea en la cota del paño y crea el N* compartido",
     () => {
       // Este es el respaldo del invariante §2.2/§5.7: el N* de la cabeza a la cota del
       // paño existe PORQUE cotasDePilar trocea por TODA planta de modelo.plantas en el
-      // rango, SIN mirar el grupo del pilar. El pasante de grupo B (cotas 0->6) salta la
-      // cota 3 (que NO es planta de grupo B), pero se trocea ahi porque pA1 (grupo A,
-      // cota 3) esta en modelo.plantas. Es puro discretizador -> NO necesita el motor
-      // (la cabeza libre a cota 6, fuera de la losa, harIa singular el modelo: artefacto
-      // de modelado, no del acople; la FISICA del acople de otro grupo se prueba en L2b).
-      const res = discretizarOk(losaConPilarOtroGrupo(6));
+      // rango, SIN mirar la planta de anclaje del pilar. El pasante (cotas 0->6) salta la
+      // cota 3 (que NO es una de SUS plantas de anclaje), pero se trocea ahi porque pA1
+      // (planta del paño, cota 3) esta en modelo.plantas. Es puro discretizador -> NO
+      // necesita el motor (la cabeza libre a cota 6, fuera de la losa, harIa singular el
+      // modelo: artefacto de modelado, no del acople; la FISICA del acople se prueba en L2b).
+      const res = discretizarOk(losaConPilarOtraPlanta(6));
 
       // El pasante se troceo en la cota intermedia (cota 3): >=2 tramos pie->cabeza.
       const tramosPasante = res.trazabilidad.pilarAMembers["pilPasante"];
       expect(
         tramosPasante.length,
-        "el pasante de grupo B se troceo en la cota del paño (>=2 tramos)",
+        "el pasante se troceo en la cota del paño (>=2 tramos)",
       ).toBeGreaterThan(1);
 
       // El N* de su cabeza a la cota del paño existe en la Capa 2 (obra x=5,y=5,cota=3 ->
@@ -423,11 +421,11 @@ describe("golden losa PLANA sobre pilares Capa B (motor real PyNite)", () => {
       );
       expect(
         nudoPasanteCota3,
-        "N* del pasante de otro grupo en la cota del paño (x=5,z=5,y=3) existe",
+        "N* del pasante en la cota del paño (x=5,z=5,y=3) existe",
       ).toBeDefined();
 
       // Y ese nudo esta EN los quads de la losa (el acople lo unio): el pasante recoge
-      // la losa por comparticion de N*, aunque sea de otro grupo (grupo = organizativo).
+      // la losa por comparticion de N*, aunque ancle en plantas de otras cotas.
       const enQuads = new Set<string>();
       for (const q of res.modeloFEM.quads ?? []) enQuads.add(q.i).add(q.j).add(q.m).add(q.n);
       expect(
@@ -442,28 +440,28 @@ describe("golden losa PLANA sobre pilares Capa B (motor real PyNite)", () => {
   );
 
   it(
-    "L2b · §5.7 (DP3) FISICA: un pilar de OTRO grupo que remata en la losa recoge la carga (axil>0) igual que uno del grupo del paño",
+    "L2b · §5.7 (DP3) FISICA: un pilar que ancla en otras plantas y remata en la losa recoge la carga (axil>0) igual que uno de la planta del paño",
     () => {
       if (!arranque?.ok) return;
-      // El pasante de grupo B remata EN la cota del paño (cota 3): su cabeza es un N*
-      // compartido con la planta pA1 (grupo A), sin cabeza libre superior -> modelo
-      // estable resoluble. Prueba la FISICA del DP3: el pilar de otro grupo recoge la
-      // losa por AXIL exactamente como los normales (grupo = organizativo, no estructural).
-      const res = discretizarOk(losaConPilarOtroGrupo(3));
+      // El pasante remata EN la cota del paño (cota 3): su cabeza es un N* compartido con
+      // la planta pA1, sin cabeza libre superior -> modelo estable resoluble. Prueba la
+      // FISICA del DP3: el pilar que ancla en otras plantas recoge la losa por AXIL
+      // exactamente como los normales (la planta de anclaje es organizativa, no estructural).
+      const res = discretizarOk(losaConPilarOtraPlanta(3));
       const r = arranque.motor.calcular(res.modeloFEM);
 
       const axilPasante = picoAxilPilar(res, r, "pilPasante", "ELS");
       const axilNormal = picoAxilPilar(res, r, "pilA1", "ELS");
-      expect(axilPasante, `pilar de grupo B recoge la losa: axil>0; real=${axilPasante}`).toBeGreaterThan(0);
-      expect(axilNormal, `pilar de grupo A recoge la losa: axil>0; real=${axilNormal}`).toBeGreaterThan(0);
-      // Simetria de la crujia: el de otro grupo recoge lo mismo que uno del grupo del paño.
+      expect(axilPasante, `pilar que ancla en otra planta recoge la losa: axil>0; real=${axilPasante}`).toBeGreaterThan(0);
+      expect(axilNormal, `pilar de la planta del paño recoge la losa: axil>0; real=${axilNormal}`).toBeGreaterThan(0);
+      // Simetria de la crujia: recoge lo mismo que uno de la planta del paño.
       expect(Math.abs(axilPasante - axilNormal) / axilNormal).toBeLessThan(1e-6);
 
-      // Equilibrio global OK con el pilar de otro grupo en juego.
+      // Equilibrio global OK con el pilar pasante en juego.
       expect(r.check_statics?.equilibrio_ok).toBe(true);
 
       console.log(
-        `\n[L2b §5.7] axilPasante(grupoB)=${axilPasante.toFixed(2)} kN; axilNormal(grupoA)=${axilNormal.toFixed(2)} kN\n`,
+        `\n[L2b §5.7] axilPasante=${axilPasante.toFixed(2)} kN; axilNormal=${axilNormal.toFixed(2)} kN\n`,
       );
     },
     TIMEOUT_ARRANQUE,

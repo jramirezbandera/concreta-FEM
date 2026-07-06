@@ -1,16 +1,21 @@
 // Tests de resolverContextoElemento (PURA): dado el id de un pilar/viga, devuelve el
-// contexto activo {grupo, planta} o null. Factorias de dominio espejo de
-// useGeometriaModelo.test.ts.
+// contexto activo {plantaActivaId} o null. Sin grupos (F3.4). Factorias de dominio
+// espejo de useGeometriaModelo.test.ts.
 import { describe, it, expect } from "vitest";
 import { resolverContextoElemento } from "./resolverContextoElemento";
 import { crearModeloVacio } from "../../../dominio";
-import type { Modelo, Grupo, Planta, Nudo, Pilar, Viga } from "../../../dominio";
+import type { Modelo, Planta, Nudo, Pilar, Viga } from "../../../dominio";
 
-function grupo(id: string): Grupo {
-  return { id, nombre: id.toUpperCase(), categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 };
-}
-function planta(id: string, grupoId: string, cota: number): Planta {
-  return { id, nombre: id.toUpperCase(), cota, altura: 3, grupoId };
+function planta(id: string, cota: number): Planta {
+  return {
+    id,
+    nombre: id.toUpperCase(),
+    cota,
+    altura: 3,
+    categoriaUso: "A",
+    sobrecargaUso: 0,
+    cargasMuertas: 0,
+  };
 }
 function nudo(id: string, x: number, y: number): Nudo {
   return { id, x, y };
@@ -45,21 +50,19 @@ function viga(id: string, plantaId: string): Viga {
   };
 }
 
-// gA: p0 cota 0, p1 cota 3 / gB: p2 cota 6.
+// Edificio de tres plantas: p0 cota 0, p1 cota 3, p2 cota 6.
 function modeloBase(): Modelo {
   return {
     ...crearModeloVacio(),
-    grupos: [grupo("gA"), grupo("gB")],
-    plantas: [planta("p0", "gA", 0), planta("p1", "gA", 3), planta("p2", "gB", 6)],
+    plantas: [planta("p0", 0), planta("p1", 3), planta("p2", 6)],
     nudos: [nudo("n1", 0, 0), nudo("n2", 4, 0)],
   };
 }
 
 describe("resolverContextoElemento: pilar", () => {
-  it("usa la planta del PIE (cota menor) y su grupo", () => {
+  it("usa la planta del PIE (cota menor)", () => {
     const modelo: Modelo = { ...modeloBase(), pilares: [pilar("pa", "p0", "p1")] };
     expect(resolverContextoElemento(modelo, "pa")).toEqual({
-      grupoActivoId: "gA",
       plantaActivaId: "p0",
     });
   });
@@ -70,11 +73,10 @@ describe("resolverContextoElemento: pilar", () => {
     expect(resolverContextoElemento(modelo, "pa")?.plantaActivaId).toBe("p0");
   });
 
-  it("pilar pasante entre grupos -> contexto del pie (grupo del pie)", () => {
-    // p1 (gA, cota 3) -> p2 (gB, cota 6): pie = p1 -> grupo gA.
+  it("pilar pasante -> contexto del pie (planta de menor cota)", () => {
+    // p1 (cota 3) -> p2 (cota 6): pie = p1.
     const modelo: Modelo = { ...modeloBase(), pilares: [pilar("pc", "p1", "p2")] };
     expect(resolverContextoElemento(modelo, "pc")).toEqual({
-      grupoActivoId: "gA",
       plantaActivaId: "p1",
     });
   });
@@ -87,17 +89,15 @@ describe("resolverContextoElemento: pilar", () => {
   it("un extremo huerfano -> usa el que existe", () => {
     const modelo: Modelo = { ...modeloBase(), pilares: [pilar("py", "noA", "p1")] };
     expect(resolverContextoElemento(modelo, "py")).toEqual({
-      grupoActivoId: "gA",
       plantaActivaId: "p1",
     });
   });
 });
 
 describe("resolverContextoElemento: viga", () => {
-  it("devuelve la planta de la viga y su grupo", () => {
+  it("devuelve la planta de la viga", () => {
     const modelo: Modelo = { ...modeloBase(), vigas: [viga("vb", "p2")] };
     expect(resolverContextoElemento(modelo, "vb")).toEqual({
-      grupoActivoId: "gB",
       plantaActivaId: "p2",
     });
   });
@@ -111,14 +111,5 @@ describe("resolverContextoElemento: viga", () => {
 describe("resolverContextoElemento: bordes", () => {
   it("id inexistente -> null", () => {
     expect(resolverContextoElemento(modeloBase(), "nada")).toBeNull();
-  });
-
-  it("planta con grupo huerfano -> null", () => {
-    const modelo: Modelo = {
-      ...modeloBase(),
-      plantas: [planta("ph", "grupoFantasma", 0)],
-      vigas: [viga("vh", "ph")],
-    };
-    expect(resolverContextoElemento(modelo, "vh")).toBeNull();
   });
 });

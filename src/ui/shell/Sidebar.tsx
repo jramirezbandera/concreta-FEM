@@ -4,7 +4,6 @@ import {
   pilaresDePlanta,
   vigasDePlanta,
   panosDePlanta,
-  plantasDeGrupo,
 } from "../../dominio";
 
 // Sidebar / arbol de obra (Spec Diseno UI §3.3). Secciones colapsables via la primitiva
@@ -12,6 +11,9 @@ import {
 // Collapsible duplicado). Lenguaje de obra SIEMPRE: nada de nodos/members (CLAUDE §17).
 // Solo lectura del modelo + setters de vistaStore. El shell usa estado reactivo normal
 // (no esta en el bucle de render del viewport).
+//
+// Sin grupos (F3.4): el arbol lista las plantas del edificio directamente, de mayor
+// a menor cota (orden CYPECAD descendente).
 
 // Alias fino para conservar el JSX legible (<Seccion titulo=…>) tras adoptar la primitiva.
 const Seccion = SeccionColapsable;
@@ -23,40 +25,28 @@ export function Sidebar() {
   // dominio). El selector devuelve la misma referencia salvo que la obra cambie,
   // asi que el arbol solo re-renderiza al editar el modelo (no en alta frecuencia).
   const modelo = modeloStore((s) => s.modelo);
-  const grupos = modelo.grupos;
   const plantas = modelo.plantas;
 
-  const grupoActivoId = vistaStore((s) => s.grupoActivoId);
   const plantaActivaId = vistaStore((s) => s.plantaActivaId);
-  const setGrupoActivo = vistaStore((s) => s.setGrupoActivo);
   const setPlantaActiva = vistaStore((s) => s.setPlantaActiva);
   const abrirDialogo = vistaStore((s) => s.abrirDialogo);
   // [D11a] Conmutacion de vista desde el arbol (espejo del selector 2D/3D del HUD).
-  // "Planta de grupo" -> modoVista "planta"; "Vista 3D" -> "3d". La fila activa se
-  // resalta (patron FilaArbol `seleccionada`). Mosaico NO se ofrece aqui (sigue
+  // "Planta" -> modoVista "planta"; "Vista 3D" -> "3d". La fila activa se resalta
+  // (patron FilaArbol `seleccionada`). Mosaico NO se ofrece aqui (sigue
   // "próximamente" en el HUD).
   const modoVista = vistaStore((s) => s.modoVista);
   const setModoVista = vistaStore((s) => s.setModoVista);
 
   // Contador de un tipo de elemento en el AMBITO activo (lenguaje de obra, Spec Diseno
-  // UI §3.3): planta activa si la hay; si no, todo el grupo activo (elementos DISTINTOS
-  // por id, para no contar dos veces un pilar pasante que arranca y termina en plantas
-  // del grupo); si tampoco hay grupo, el total de la obra. UN solo criterio para pilares,
-  // vigas y paños (auditoria UX-A8: antes las vigas mostraban el total, incoherente).
-  // Conteo derivado en render: barato y siempre coherente con el modelo.
+  // UI §3.3): planta activa si la hay; si no, el total de la obra. UN solo criterio
+  // para pilares, vigas y paños (auditoria UX-A8). Conteo derivado en render: barato
+  // y siempre coherente con el modelo.
   const contarEnAmbito = (
     porPlanta: (m: typeof modelo, plantaId: string) => Array<{ id: string }>,
     totalObra: number,
   ): number => {
     if (plantaActivaId) {
       return porPlanta(modelo, plantaActivaId).length;
-    }
-    if (grupoActivoId) {
-      const ids = new Set<string>();
-      for (const planta of plantasDeGrupo(modelo, grupoActivoId)) {
-        for (const el of porPlanta(modelo, planta.id)) ids.add(el.id);
-      }
-      return ids.size;
     }
     return totalObra;
   };
@@ -65,46 +55,30 @@ export function Sidebar() {
   const numVigas = contarEnAmbito(vigasDePlanta, modelo.vigas.length);
   const numPanos = contarEnAmbito(panosDePlanta, modelo.panos.length);
 
-  const seleccionarPlanta = (grupoId: string, plantaId: string) => {
-    setGrupoActivo(grupoId);
-    setPlantaActiva(plantaId);
-  };
+  // Plantas de mayor a menor cota (orden CYPECAD descendente).
+  const plantasDesc = plantas.slice().sort((a, b) => b.cota - a.cota);
 
   return (
     <aside className="cx-sidebar" aria-label="Árbol de obra">
-      <Seccion titulo="Plantas / Grupos">
-        {grupos.length === 0 ? (
-          <div className="cx-menu-empty">Sin grupos definidos</div>
+      <Seccion titulo="Plantas">
+        {plantasDesc.length === 0 ? (
+          <div className="cx-menu-empty">Sin plantas definidas</div>
         ) : (
-          grupos.map((grupo) => {
-            // Plantas del grupo, de mayor a menor cota (orden CYPECAD descendente).
-            const plantasGrupo = plantas
-              .filter((p) => p.grupoId === grupo.id)
-              .sort((a, b) => b.cota - a.cota);
-            return (
-              <div key={grupo.id}>
-                {/* Cabecera de grupo: rotulo, no accion (todavia no se selecciona grupo aqui). */}
-                <FilaArbol label={grupo.nombre} interactiva={false} />
-                <div className="cx-side-indent">
-                  {plantasGrupo.map((planta) => (
-                    <FilaArbol
-                      key={planta.id}
-                      label={planta.nombre}
-                      contador={planta.cota.toFixed(2)}
-                      seleccionada={planta.id === plantaActivaId}
-                      onClick={() => seleccionarPlanta(grupo.id, planta.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })
+          plantasDesc.map((planta) => (
+            <FilaArbol
+              key={planta.id}
+              label={planta.nombre}
+              contador={planta.cota.toFixed(2)}
+              seleccionada={planta.id === plantaActivaId}
+              onClick={() => setPlantaActiva(planta.id)}
+            />
+          ))
         )}
-        {/* Acceso al dialogo de Plantas y grupos (feature-10): crear/editar la
+        {/* Acceso al dialogo de Plantas (feature-10/F3.4): crear/editar la
             estructura de la obra sin pasar por la menubar. */}
         <FilaArbol
-          label="Gestionar plantas y grupos…"
-          onClick={() => abrirDialogo("gruposPlantas")}
+          label="Gestionar plantas…"
+          onClick={() => abrirDialogo("plantas")}
         />
       </Seccion>
 
@@ -113,7 +87,7 @@ export function Sidebar() {
             (patron FilaArbol `seleccionada`). Mosaico no se ofrece (sigue en el HUD
             como "próximamente"). */}
         <FilaArbol
-          label="Planta de grupo"
+          label="Planta"
           seleccionada={modoVista === "planta"}
           onClick={() => setModoVista("planta")}
         />

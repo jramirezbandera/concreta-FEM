@@ -46,7 +46,7 @@ function esNavegable(obra: ErrorObra): boolean {
   return obra.elementoId !== undefined && pestanaDestino(obra.elementoTipo) !== null;
 }
 
-// Navega al elemento culpable: selecciona su id, sincroniza el contexto (grupo/planta,
+// Navega al elemento culpable: selecciona su id, sincroniza el contexto (planta,
 // reutilizando resolverContextoElemento de F2c — sin reimplementarlo) para que quede en
 // el ámbito visible, y salta a la pestaña de su tipo. Se lee el modelo ACTUAL del store.
 function navegarAElemento(obra: ErrorObra): void {
@@ -54,12 +54,11 @@ function navegarAElemento(obra: ErrorObra): void {
   const pestana = pestanaDestino(obra.elementoTipo);
   if (id === undefined || pestana === null) return;
   const vista = vistaStore.getState();
-  // Contexto (grupo+planta): resolverContextoElemento cubre pilar y viga; para el paño
+  // Contexto (planta): resolverContextoElemento cubre pilar y viga; para el paño
   // devuelve null (aún no mapeado), en cuyo caso no se toca el ámbito (basta con
   // seleccionar y cambiar de pestaña).
   const ctx = resolverContextoElemento(modeloStore.getState().getModelo(), id);
   if (ctx !== null) {
-    vista.setGrupoActivo(ctx.grupoActivoId);
     vista.setPlantaActiva(ctx.plantaActivaId);
   }
   seleccionStore.getState().seleccionar([id]);

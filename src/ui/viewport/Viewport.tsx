@@ -90,20 +90,14 @@ function useModoVista(): ModoVista {
   );
 }
 
-// True cuando no hay nada que dibujar todavia: el modelo no tiene grupos ni
-// plantas (primer uso / obra recien creada). Se lee FUERA del bucle de render
+// True cuando no hay nada que dibujar todavia: el modelo no tiene plantas
+// (primer uso / obra recien creada). Se lee FUERA del bucle de render
 // (subscribeWithSelector -> re-render solo al editar la obra, nunca por frame).
 function useObraVacia(): boolean {
   return useSyncExternalStore(
     (cb) => modeloStore.subscribe((s) => s.modelo, cb),
-    () => {
-      const { grupos, plantas } = modeloStore.getState().modelo;
-      return grupos.length === 0 || plantas.length === 0;
-    },
-    () => {
-      const { grupos, plantas } = modeloStore.getState().modelo;
-      return grupos.length === 0 || plantas.length === 0;
-    },
+    () => modeloStore.getState().modelo.plantas.length === 0,
+    () => modeloStore.getState().modelo.plantas.length === 0,
   );
 }
 
@@ -111,21 +105,21 @@ function useObraVacia(): boolean {
 // Lenguaje de obra (CLAUDE.md §17, sin jerga FEM); glass por tokens. La tarjeta
 // no captura el puntero (pointer-events: none en CSS) para no tapar los controles
 // del HUD; solo el boton de accion lo recupera (.cx-empty__accion). El boton hace
-// obvio el siguiente paso (Krug, "no me hagas pensar"): abre Grupos/Plantas en vez
-// de obligar a buscar la accion en el menu/sidebar.
+// obvio el siguiente paso (Krug, "no me hagas pensar"): abre el dialogo de Plantas
+// en vez de obligar a buscar la accion en el menu/sidebar.
 function EstadoVacio() {
   return (
     <div className="cx-empty cx-float--center" role="note" aria-label="Primeros pasos">
       <p className="cx-empty__titulo">Empieza tu estructura</p>
       <p className="cx-empty__texto">
-        Crea un grupo y una planta para empezar a introducir la estructura.
+        Crea las plantas del edificio para empezar a introducir la estructura.
       </p>
       <div className="cx-empty__accion">
         <Boton
           variante="primary"
-          onClick={() => vistaStore.getState().abrirDialogo("gruposPlantas")}
+          onClick={() => vistaStore.getState().abrirDialogo("plantas")}
         >
-          Crear grupo y planta
+          Crear plantas
         </Boton>
       </div>
     </div>

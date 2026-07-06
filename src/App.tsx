@@ -5,9 +5,9 @@
 //
 // NO inventa geometria de obra: el modelo arranca vacio (crearModeloVacio) y el
 // render de obra real llega en F11/12. Aqui solo se asegura que, SI existen
-// grupos/plantas, el grupo y la planta activos sean coherentes (no quedar en
-// null cuando hay algo que seleccionar, ni quedar apuntando a un grupo/planta de
-// una obra anterior tras restaurar autosave o cambiar de proyecto).
+// plantas, la planta activa sea coherente (no quedar en null cuando hay algo que
+// seleccionar, ni quedar apuntando a una planta de una obra anterior tras
+// restaurar autosave o cambiar de proyecto).
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   Shell,
@@ -71,18 +71,14 @@ function sincronizarVistaActiva(): void {
   const vista = vistaStore.getState();
   const modelo = modeloStore.getState().modelo;
   const resuelta = resolverVistaActiva(modelo, {
-    grupoActivoId: vista.grupoActivoId,
     plantaActivaId: vista.plantaActivaId,
   });
-  if (resuelta.grupoActivoId !== vista.grupoActivoId) {
-    vista.setGrupoActivo(resuelta.grupoActivoId);
-  }
   if (resuelta.plantaActivaId !== vista.plantaActivaId) {
     vista.setPlantaActiva(resuelta.plantaActivaId);
   }
 }
 
-// Mantiene grupo/planta activos coherentes con el modelo: al montar (modelo ya
+// Mantiene la planta activa coherente con el modelo: al montar (modelo ya
 // cargado, p. ej. autosave restaurado en F8) y ante cada cambio de obra.
 function useInicializarVistaActiva(): void {
   useEffect(() => {
@@ -115,8 +111,8 @@ const MENSAJE_PESTANA: Record<Pestana, string> = {
 const MENSAJE_HERRAMIENTA_PILAR =
   "Haz clic en la planta para colocar un pilar (Esc termina)";
 
-// Cuando la herramienta esta activa pero NO hay donde colocar (sin grupo con plantas
-// ni planta activa), la barra avisa ANTES de que el clic caiga en vacio (el clic
+// Cuando la herramienta esta activa pero NO hay donde colocar (edificio sin
+// plantas), la barra avisa ANTES de que el clic caiga en vacio (el clic
 // seria un no-op silencioso). Endurecimiento del review de ingenieria.
 const MENSAJE_PILAR_SIN_TRAMO =
   "Crea o selecciona una planta para colocar pilares";
@@ -217,7 +213,7 @@ function usePersistenciaLista(): boolean {
   );
 }
 
-// Hay un tramo donde colocar pilares (grupo activo con plantas, o planta activa).
+// Hay un tramo donde colocar pilares (edificio con plantas, o planta activa).
 // Reacciona a cambios del modelo y del ambito activo. Reusa el helper PURO
 // tramoColocable (misma logica que ColocacionPilar usa al colocar): una sola fuente
 // de verdad para decidir si la colocacion es posible. Exportado como costura de test
@@ -227,7 +223,6 @@ export function usePuedeColocarPilar(): boolean {
   const calcular = () =>
     tramoColocable(
       modeloStore.getState().getModelo(),
-      vistaStore.getState().grupoActivoId,
       vistaStore.getState().plantaActivaId,
     ) !== null;
   const [puede, setPuede] = useState(calcular);
@@ -235,7 +230,6 @@ export function usePuedeColocarPilar(): boolean {
     const recompute = () => setPuede(calcular());
     const desuscribir = [
       modeloStore.subscribe((s) => s.modelo, recompute),
-      vistaStore.subscribe((s) => s.grupoActivoId, recompute),
       vistaStore.subscribe((s) => s.plantaActivaId, recompute),
     ];
     recompute();
@@ -256,11 +250,10 @@ export function usePuedeColocarPilar(): boolean {
 // eslint-disable-next-line react-refresh/only-export-components
 export function usePuedeColocarViga(): boolean {
   const calcular = () => {
-    const { grupoActivoId, plantaActivaId, defaultsViga } = vistaStore.getState();
+    const { plantaActivaId, defaultsViga } = vistaStore.getState();
     return (
       plantaColocableViga(
         modeloStore.getState().getModelo(),
-        grupoActivoId,
         plantaActivaId,
       ) !== null &&
       defaultsViga.seccionId !== null &&
@@ -272,7 +265,6 @@ export function usePuedeColocarViga(): boolean {
     const recompute = () => setPuede(calcular());
     const desuscribir = [
       modeloStore.subscribe((s) => s.modelo, recompute),
-      vistaStore.subscribe((s) => s.grupoActivoId, recompute),
       vistaStore.subscribe((s) => s.plantaActivaId, recompute),
       vistaStore.subscribe((s) => s.defaultsViga, recompute),
     ];
@@ -294,11 +286,10 @@ export function usePuedeColocarViga(): boolean {
 // eslint-disable-next-line react-refresh/only-export-components
 export function usePuedeColocarPano(): boolean {
   const calcular = () => {
-    const { grupoActivoId, plantaActivaId, defaultsPano } = vistaStore.getState();
+    const { plantaActivaId, defaultsPano } = vistaStore.getState();
     return (
       plantaColocableViga(
         modeloStore.getState().getModelo(),
-        grupoActivoId,
         plantaActivaId,
       ) !== null && defaultsPano.materialId !== null
     );
@@ -308,7 +299,6 @@ export function usePuedeColocarPano(): boolean {
     const recompute = () => setPuede(calcular());
     const desuscribir = [
       modeloStore.subscribe((s) => s.modelo, recompute),
-      vistaStore.subscribe((s) => s.grupoActivoId, recompute),
       vistaStore.subscribe((s) => s.plantaActivaId, recompute),
       vistaStore.subscribe((s) => s.defaultsPano, recompute),
     ];

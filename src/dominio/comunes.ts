@@ -22,4 +22,7 @@ export const NumeroFinitoSchema = z.number().finite();
 // (nombre/tipo/plantaId/perimetro/espesor/materialId/tamMalla/bordeApoyo). La
 // migracion v2->v3 DESCARTA los paños-stub heredados (sin geometria) y sus cargas
 // superficiales (no se pueden completar a la forma de losa).
-export const SCHEMA_VERSION = 3;
+// v4 (F3.4, "plantas sin grupos") ELIMINA `Grupo` y `Modelo.grupos`: cada `Planta`
+// absorbe categoriaUso/sobrecargaUso/cargasMuertas y pierde `grupoId`. La migracion
+// v3->v4 copia a cada planta los valores de su grupo (o defaults si no resuelve).
+export const SCHEMA_VERSION = 4;

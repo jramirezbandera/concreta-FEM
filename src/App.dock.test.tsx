@@ -57,7 +57,6 @@ beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   vistaStore.getState().setPestanaActiva("resultados");
   vistaStore.getState().setModoVista("planta");
-  vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
   // El motor "listo" habilita "Calcular" sin depender del sondeo asincrono del stub.
   calculoStore.getState().setEstadoMotor("listo");

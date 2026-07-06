@@ -144,8 +144,8 @@ function ColocacionActiva() {
   // Planta donde caera el paño (misma logica que la viga: una sola planta).
   function plantaColocable(): string | null {
     const modelo = modeloStore.getState().getModelo();
-    const { grupoActivoId, plantaActivaId } = vistaStore.getState();
-    return plantaColocableViga(modelo, grupoActivoId, plantaActivaId);
+    const { plantaActivaId } = vistaStore.getState();
+    return plantaColocableViga(modelo, plantaActivaId);
   }
 
   // Cota (Z) de la planta donde caera el paño; donde se dibujan marcadores y rectangulo.

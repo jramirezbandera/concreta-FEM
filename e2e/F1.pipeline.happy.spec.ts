@@ -18,8 +18,8 @@ import { abrirApp, bridge } from "./fixtures";
 // en el canvas R3F). Eso lo cubren los component tests (flujoEntradaPilares,
 // ColocacionViga, ...). Aqui la obra se construye por la COSTURA window.__concreta
 // (crearPilar/crearViga/anadirCargaLineal), no por el canvas. Lo unico que se
-// ejercita por DOM real es lo que ES DOM: el dialogo de grupos/plantas, las
-// pestanas, el boton Calcular y los paneles de resultados.
+// ejercita por DOM real es lo que ES DOM: el dialogo de plantas, las pestanas, el
+// boton Calcular y los paneles de resultados.
 //
 // La numerica de libro (qL²/8, flechas) la cubren los golden de Node; aqui no se
 // re-asevera (seria acoplar la red de seguridad al mock).
@@ -28,8 +28,8 @@ import { abrirApp, bridge } from "./fixtures";
 // Hipotesis sembrada por crearModeloVacio (helpers.ts): el modelo nuevo SIEMPRE
 // trae estas dos hipotesis basicas de F1 con ids ASCII fijos y deterministas. La
 // carga lineal del spec cuelga de "Cargas muertas" (permanente). No hace falta
-// crearla por UI: existe desde el arranque (estadoObra solo expone grupos/plantas,
-// pero la hipotesis es un id estable del dominio).
+// crearla por UI: existe desde el arranque (estadoObra solo expone plantas, pero la
+// hipotesis es un id estable del dominio).
 const HIPOTESIS_PERMANENTE = "hip-cargas-muertas";
 
 // Valor concreto que el mock consciente del modelo reparte entre los apoyos: ΣFY de
@@ -46,19 +46,18 @@ test("F1 happy: obra -> Calcular (boton) -> deformada + diagramas + reacciones",
   await abrirApp(page);
 
   // ---------------------------------------------------------------------------
-  // 2) Grupos + 2 plantas POR EL DIALOGO REAL (DOM). Sin costura aqui: queremos
-  // ejercitar el dialogo Radix de verdad (commit en vivo, sin boton "Guardar").
+  // 2) Dos plantas POR EL DIALOGO REAL (DOM). Sin costura aqui: queremos ejercitar
+  // el dialogo Radix de verdad (commit en vivo, sin boton "Guardar"). Desde F3.4 no
+  // hay grupos: el diálogo es solo de plantas y "Nueva planta" está siempre visible.
   // ---------------------------------------------------------------------------
   // El acceso al dialogo vive en la Sidebar como fila pulsable (FilaArbol -> <button>).
-  await page.getByRole("button", { name: "Gestionar plantas y grupos…" }).click();
+  await page.getByRole("button", { name: "Gestionar plantas…" }).click();
 
-  const dialogo = page.getByRole("dialog", { name: "Plantas y grupos" });
+  const dialogo = page.getByRole("dialog", { name: "Plantas" });
   await expect(dialogo).toBeVisible();
 
-  // Un grupo (commit inmediato: queda seleccionado como activo).
-  await dialogo.getByRole("button", { name: "Nuevo grupo" }).click();
-
-  // Dos plantas en ese grupo. "Nueva planta" aparece solo con un grupo activo.
+  // Dos plantas (cada nueva se apila sobre la mas alta: cota 0 y cota 3). "Nueva
+  // planta" ya no depende de un grupo activo (F3.4): esta disponible siempre.
   const nuevaPlanta = dialogo.getByRole("button", { name: "Nueva planta" });
   await nuevaPlanta.click();
   await nuevaPlanta.click();
@@ -75,25 +74,20 @@ test("F1 happy: obra -> Calcular (boton) -> deformada + diagramas + reacciones",
 
   // ---------------------------------------------------------------------------
   // 3) Leer los ids creados por el dialogo y construir la obra POR LA COSTURA.
-  // estadoObra() devuelve los grupos/plantas reales (creados por el DOM de arriba);
-  // de ahi salen los plantaId para crearPilar/crearViga.
+  // estadoObra() devuelve las plantas reales (creadas por el DOM de arriba); de ahi
+  // salen los plantaId para crearPilar/crearViga.
   // ---------------------------------------------------------------------------
   const c = await bridge(page);
 
   const obra = await c.evaluate((api) => api.estadoObra());
-  expect(obra.grupos.length).toBe(1);
   expect(obra.plantas.length).toBe(2);
 
   // Orden de plantas: el dialogo las crea con cotas crecientes (cada nueva planta se
-  // apila sobre la mas alta). No dependemos del orden del array: tomamos la planta de
-  // cota MENOR como "baja" (donde apoyan los pilares) por su grupoId comun. Como
-  // estadoObra no expone la cota, basta con tomar las dos plantas del unico grupo:
-  // los pilares van de la primera a la segunda (un tramo), la viga en la segunda.
-  const grupoId = obra.grupos[0]!.id;
-  const plantasGrupo = obra.plantas.filter((p) => p.grupoId === grupoId);
-  expect(plantasGrupo.length).toBe(2);
-  const plantaBaja = plantasGrupo[0]!.id;
-  const plantaAlta = plantasGrupo[1]!.id;
+  // apila sobre la mas alta), en orden de creacion en el array. Tomamos la primera
+  // como "baja" (donde apoyan los pilares) y la segunda como "alta" (donde va la
+  // viga): los pilares van de la baja a la alta (un tramo).
+  const plantaBaja = obra.plantas[0]!.id;
+  const plantaAlta = obra.plantas[1]!.id;
 
   // Dos pilares (de planta baja a alta) + una viga que los une en la planta alta +
   // una carga lineal sobre la viga (hipotesis permanente sembrada). Todo por la

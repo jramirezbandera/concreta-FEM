@@ -187,8 +187,8 @@ function ColocacionActiva() {
   // linea. Se relee en cada interaccion (puede cambiar la planta activa).
   function cotaColocable(): number | null {
     const modelo = modeloStore.getState().getModelo();
-    const { grupoActivoId, plantaActivaId } = vistaStore.getState();
-    const plantaId = plantaColocableViga(modelo, grupoActivoId, plantaActivaId);
+    const { plantaActivaId } = vistaStore.getState();
+    const plantaId = plantaColocableViga(modelo, plantaActivaId);
     if (plantaId === null) return null;
     const planta = modelo.plantas.find((p) => p.id === plantaId);
     return planta ? planta.cota : null;
@@ -239,9 +239,8 @@ function ColocacionActiva() {
     const z = cotaColocable();
     if (z === null) return;
     const modelo = modeloStore.getState().getModelo();
-    const { grupoActivoId, plantaActivaId, snapActivo, plantillas } =
-      vistaStore.getState();
-    const plantaId = plantaColocableViga(modelo, grupoActivoId, plantaActivaId);
+    const { plantaActivaId, snapActivo, plantillas } = vistaStore.getState();
+    const plantaId = plantaColocableViga(modelo, plantaActivaId);
     if (plantaId === null) return;
 
     // Puntos notables del calco DXF visible de la planta activa (feature-15): se
@@ -282,9 +281,9 @@ function ColocacionActiva() {
     e.stopPropagation();
 
     const modelo = modeloStore.getState().getModelo();
-    const { grupoActivoId, plantaActivaId, defaultsViga, snapActivo, plantillas } =
+    const { plantaActivaId, defaultsViga, snapActivo, plantillas } =
       vistaStore.getState();
-    const plantaId = plantaColocableViga(modelo, grupoActivoId, plantaActivaId);
+    const plantaId = plantaColocableViga(modelo, plantaActivaId);
 
     // Sin planta colocable o sin seccion/material por defecto no se puede crear una
     // viga valida: clic silencioso (la guia de la barra de estado la pone App).

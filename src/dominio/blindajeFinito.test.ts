@@ -21,8 +21,8 @@ function modeloMinimo(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [{ id: "g1", nombre: "G", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 }],
-    plantas: [{ id: "p1", nombre: "P1", cota: 3, altura: 3, grupoId: "g1" }],
+    // v4: la planta absorbe el uso; sin paños losa, SU/CM a 0 (inertes).
+    plantas: [{ id: "p1", nombre: "P1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 }],
     secciones: [{ id: "s1", nombre: "S", tipo: "generico", A: 0.01, Iy: 1e-4, Iz: 1e-5, J: 1e-6 }],
     nudos: [{ id: "n1", x: 0, y: 0 }],
     pilares: [],
@@ -52,7 +52,7 @@ describe("AUDITORIA A-3: ModeloSchema (Capa 1) rechaza ±Infinity", () => {
     ["planta.cota = Infinity", (m) => { m.plantas[0].cota = Infinity; }],
     ["planta.altura = Infinity", (m) => { m.plantas[0].altura = Infinity; }],
     ["carga.valor = Infinity", (m) => { m.cargas[0].valor = Infinity; }],
-    ["grupo.sobrecargaUso = Infinity", (m) => { m.grupos[0].sobrecargaUso = Infinity; }],
+    ["planta.sobrecargaUso = Infinity", (m) => { m.plantas[0].sobrecargaUso = Infinity; }],
     [
       "seccion generica Iy = Infinity",
       (m) => {

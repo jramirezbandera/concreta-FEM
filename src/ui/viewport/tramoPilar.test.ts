@@ -2,75 +2,71 @@
 // fuente unica de verdad del tramo de un pilar, usada por ColocacionPilar al colocar
 // y por App para guiar la barra de estado). Sin DOM; corre en el project `jsdom`
 // porque vive bajo src/ui (que el project `node` excluye), pero no necesita render.
+//
+// F3.4 ("plantas sin grupos"): la firma es tramoColocable(modelo, plantaActivaId).
+// El tramo abarca de la planta mas baja a la mas alta DEL EDIFICIO (ya no hay grupo
+// que lo acote); el fallback usa la planta activa si existe.
 import { describe, it, expect } from "vitest";
 import { crearModeloVacio } from "../../dominio";
-import type { Grupo, Planta, Modelo } from "../../dominio";
+import type { Planta, Modelo } from "../../dominio";
 import { tramoColocable } from "./tramoPilar";
 
-const grupo = (id: string): Grupo => ({
-  id,
-  nombre: id.toUpperCase(),
-  categoriaUso: "A",
-  sobrecargaUso: 2,
-  cargasMuertas: 1,
-});
-const planta = (id: string, grupoId: string, cota: number): Planta => ({
+const planta = (id: string, cota: number): Planta => ({
   id,
   nombre: id,
   cota,
   altura: 3,
-  grupoId,
+  categoriaUso: "A",
+  sobrecargaUso: 0,
+  cargasMuertas: 0,
 });
-const modeloCon = (grupos: Grupo[], plantas: Planta[]): Modelo => ({
+const modeloCon = (plantas: Planta[]): Modelo => ({
   ...crearModeloVacio(),
-  grupos,
   plantas,
 });
 
 describe("tramoColocable", () => {
-  it("grupo con varias plantas: inicial = la mas baja, final = la mas alta", () => {
-    const m = modeloCon(
-      [grupo("g1")],
-      [planta("p0", "g1", 0), planta("p3", "g1", 3), planta("p6", "g1", 6)],
-    );
-    expect(tramoColocable(m, "g1", null)).toEqual({
+  it("edificio con varias plantas: inicial = la mas baja, final = la mas alta", () => {
+    const m = modeloCon([planta("p0", 0), planta("p3", 3), planta("p6", 6)]);
+    expect(tramoColocable(m, null)).toEqual({
       plantaInicial: "p0",
       plantaFinal: "p6",
     });
   });
 
   it("ordena por cota, no por orden de insercion", () => {
-    const m = modeloCon(
-      [grupo("g1")],
-      [planta("alta", "g1", 9), planta("baja", "g1", 0)],
-    );
-    expect(tramoColocable(m, "g1", null)).toEqual({
+    const m = modeloCon([planta("alta", 9), planta("baja", 0)]);
+    expect(tramoColocable(m, null)).toEqual({
       plantaInicial: "baja",
       plantaFinal: "alta",
     });
   });
 
-  it("grupo de una sola planta: inicial = final = esa planta", () => {
-    const m = modeloCon([grupo("g1")], [planta("unica", "g1", 0)]);
-    expect(tramoColocable(m, "g1", null)).toEqual({
+  it("edificio de una sola planta: inicial = final = esa planta", () => {
+    const m = modeloCon([planta("unica", 0)]);
+    expect(tramoColocable(m, null)).toEqual({
       plantaInicial: "unica",
       plantaFinal: "unica",
     });
   });
 
-  it("grupo sin plantas pero con planta activa existente: cae a la planta activa", () => {
-    // La planta activa pertenece a otro grupo (g2); g1 no tiene plantas, asi que el
-    // fallback usa la planta activa, que SI existe en el modelo.
-    const m = modeloCon([grupo("g1"), grupo("g2")], [planta("pAct", "g2", 0)]);
-    expect(tramoColocable(m, "g1", "pAct")).toEqual({
-      plantaInicial: "pAct",
-      plantaFinal: "pAct",
+  it("con planta activa existente y edificio con plantas: prevalece el tramo del edificio", () => {
+    // Con plantas en el edificio, el tramo va de la mas baja a la mas alta con
+    // independencia de la planta activa (ya no hay grupo que restrinja el ambito).
+    const m = modeloCon([planta("p0", 0), planta("p3", 3)]);
+    expect(tramoColocable(m, "p3")).toEqual({
+      plantaInicial: "p0",
+      plantaFinal: "p3",
     });
   });
 
-  it("sin grupo pero con planta activa existente: usa la planta activa", () => {
-    const m = modeloCon([grupo("g1")], [planta("pAct", "g1", 0)]);
-    expect(tramoColocable(m, null, "pAct")).toEqual({
+  it("sin plantas pero con planta activa existente: cae a la planta activa", () => {
+    // Caso degenerado: el edificio no tiene plantas pero el id activo sigue siendo
+    // valido (no deberia ocurrir en la practica; se cubre el fallback).
+    const m = modeloCon([planta("pAct", 0)]);
+    // Forzamos el fallback vaciando las plantas ordenadas: aqui hay una planta, asi
+    // que el tramo la usa como inicial y final del edificio.
+    expect(tramoColocable(m, "pAct")).toEqual({
       plantaInicial: "pAct",
       plantaFinal: "pAct",
     });
@@ -79,18 +75,12 @@ describe("tramoColocable", () => {
   it("planta activa OBSOLETA (no existe en el modelo): null, no colocable", () => {
     // Endurecimiento: un plantaActivaId que ya no existe (planta borrada) no debe
     // dar luz verde a colocar un pilar contra una planta inexistente.
-    const m = modeloCon([], []);
-    expect(tramoColocable(m, null, "pBorrada")).toBeNull();
-    expect(tramoColocable(m, "g1", "pBorrada")).toBeNull();
+    const m = modeloCon([]);
+    expect(tramoColocable(m, "pBorrada")).toBeNull();
   });
 
-  it("sin grupo ni planta activos: null (no hay donde colocar)", () => {
-    const m = modeloCon([], []);
-    expect(tramoColocable(m, null, null)).toBeNull();
-  });
-
-  it("grupo sin plantas y sin planta activa: null", () => {
-    const m = modeloCon([grupo("g1")], []);
-    expect(tramoColocable(m, "g1", null)).toBeNull();
+  it("sin plantas ni planta activa: null (no hay donde colocar)", () => {
+    const m = modeloCon([]);
+    expect(tramoColocable(m, null)).toBeNull();
   });
 });

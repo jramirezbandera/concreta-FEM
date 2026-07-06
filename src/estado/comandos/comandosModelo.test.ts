@@ -1,14 +1,12 @@
-// Tests de los comandos CRUD de Grupos y Plantas (feature-10, T1.1). Se ejecutan a
-// traves del modeloStore real (singleton de modulo): cargarModelo(crearModeloVacio())
-// en beforeEach aisla cada test. Verifican el delta (aplicar/revertir via undo/redo),
-// la cascada grupo->plantas en un solo paso de undo, y el naming "G{n}"/"Planta {n}"
-// derivado del mayor sufijo en uso (no del recuento). Proyecto "node" (sin DOM).
+// Tests de los comandos CRUD de Plantas (feature-10, T1.1; sin grupos desde F3.4).
+// Se ejecutan a traves del modeloStore real (singleton de modulo):
+// cargarModelo(crearModeloVacio()) en beforeEach aisla cada test. Verifican el delta
+// (aplicar/revertir via undo/redo), la cascada planta->pilares/vigas/cargas en un
+// solo paso de undo, y el naming "Planta {n}" derivado del mayor sufijo en uso (no
+// del recuento). Proyecto "node" (sin DOM).
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   modeloStore,
-  crearGrupo,
-  editarGrupo,
-  eliminarGrupo,
   crearPlanta,
   editarPlanta,
   eliminarPlanta,
@@ -32,118 +30,26 @@ import {
 } from "../index";
 import type { DatosViga, DatosPano, DatosSeccion } from "./comandosModelo";
 import { crearModeloVacio } from "../../dominio";
-import type { CategoriaUso } from "../../dominio";
 import type {
-  DatosGrupo,
   DatosPlanta,
   DatosCarga,
   DatosHipotesis,
 } from "./comandosModelo";
 
-// Datos minimos de prueba (sin id/nombre, los genera el comando).
-const datosGrupo: DatosGrupo = {
-  categoriaUso: "A",
-  sobrecargaUso: 2,
-  cargasMuertas: 1,
-};
-
+// Datos minimos de prueba de una planta (sin id/nombre, los genera el comando).
+// v4 (plantas sin grupos): la planta lleva su propio uso/cargas.
 const datosPlanta: DatosPlanta = {
   cota: 3,
   altura: 3,
-  grupoId: "g1",
+  categoriaUso: "A",
+  sobrecargaUso: 2,
+  cargasMuertas: 1,
 };
 
 const m = () => modeloStore.getState().getModelo();
 
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
-});
-
-// --- crearGrupo: aplicar / deshacer / rehacer --------------------------------
-
-describe("crearGrupo", () => {
-  it("anade un grupo con nombre 'G1'", () => {
-    modeloStore.getState().ejecutar(crearGrupo(m(), datosGrupo));
-    expect(m().grupos).toHaveLength(1);
-    expect(m().grupos[0].nombre).toBe("G1");
-    expect(m().grupos[0].id).toMatch(/[0-9a-f-]{36}/);
-  });
-
-  it("deshacer lo quita (deep-equal al previo) y rehacer lo vuelve a poner", () => {
-    const previo = structuredClone(m());
-    modeloStore.getState().ejecutar(crearGrupo(m(), datosGrupo));
-    const conGrupo = structuredClone(m());
-
-    modeloStore.getState().deshacer();
-    expect(m()).toEqual(previo);
-
-    modeloStore.getState().rehacer();
-    expect(m()).toEqual(conGrupo);
-  });
-
-  it("numera por el mayor sufijo en uso (G1, G2)", () => {
-    modeloStore.getState().ejecutar(crearGrupo(m(), datosGrupo));
-    modeloStore.getState().ejecutar(crearGrupo(m(), datosGrupo));
-    expect(m().grupos.map((g) => g.nombre)).toEqual(["G1", "G2"]);
-  });
-});
-
-// --- editarGrupo -------------------------------------------------------------
-
-describe("editarGrupo", () => {
-  it("cambia categoriaUso/sobrecargaUso y deshacer revierte", () => {
-    modeloStore.getState().ejecutar(crearGrupo(m(), datosGrupo));
-    const id = m().grupos[0].id;
-    const conGrupo = structuredClone(m());
-
-    const nuevaCategoria: CategoriaUso = "C";
-    modeloStore
-      .getState()
-      .ejecutar(
-        editarGrupo(m(), id, { categoriaUso: nuevaCategoria, sobrecargaUso: 5 }),
-      );
-    expect(m().grupos[0].categoriaUso).toBe("C");
-    expect(m().grupos[0].sobrecargaUso).toBe(5);
-
-    modeloStore.getState().deshacer();
-    expect(m()).toEqual(conGrupo);
-    expect(m().grupos[0].categoriaUso).toBe("A");
-    expect(m().grupos[0].sobrecargaUso).toBe(2);
-  });
-
-  it("editar un grupo inexistente es no-op (no lanza, no cambia)", () => {
-    modeloStore.getState().ejecutar(crearGrupo(m(), datosGrupo));
-    const antes = structuredClone(m());
-    modeloStore.getState().ejecutar(editarGrupo(m(), "no-existe", { sobrecargaUso: 9 }));
-    expect(m()).toEqual(antes);
-  });
-});
-
-// --- eliminarGrupo: cascada a plantas en un solo paso de undo ----------------
-
-describe("eliminarGrupo (cascada)", () => {
-  it("arrastra las plantas del grupo; deshacer restaura grupo + plantas", () => {
-    // Grupo con dos plantas asociadas + una planta de otro grupo que NO debe caer.
-    modeloStore.getState().ejecutar(crearGrupo(m(), datosGrupo));
-    const grupoId = m().grupos[0].id;
-    modeloStore.getState().ejecutar(crearPlanta(m(), { ...datosPlanta, grupoId }));
-    modeloStore.getState().ejecutar(crearPlanta(m(), { ...datosPlanta, grupoId }));
-    modeloStore
-      .getState()
-      .ejecutar(crearPlanta(m(), { ...datosPlanta, grupoId: "otro" }));
-    const conTodo = structuredClone(m());
-    expect(m().plantas).toHaveLength(3);
-
-    modeloStore.getState().ejecutar(eliminarGrupo(m(), grupoId));
-    expect(m().grupos).toHaveLength(0);
-    // Solo cae la planta de "otro" grupo se mantiene; las dos del grupo desaparecen.
-    expect(m().plantas).toHaveLength(1);
-    expect(m().plantas[0].grupoId).toBe("otro");
-
-    // Un solo deshacer restaura grupo Y sus plantas (cascada = un paso).
-    modeloStore.getState().deshacer();
-    expect(m()).toEqual(conTodo);
-  });
 });
 
 // --- crearPlanta: naming "Planta {n}" ----------------------------------------
@@ -202,20 +108,17 @@ describe("eliminarPlanta", () => {
 
 // --- Integridad referencial: el borrado arrastra pilares/vigas/cargas ---------
 // (revision de ingenieria F10). Construimos un modelo con elementos de Capa 1 que
-// referencian plantas de dos grupos y comprobamos que borrar arrastra SOLO los
-// dependientes correctos, deja los nudos (geometria compartida) y es un paso de undo.
+// referencian tres plantas y comprobamos que borrar arrastra SOLO los dependientes
+// correctos, deja los nudos (geometria compartida) y es un paso de undo.
 
-// Modelo con dos grupos, tres plantas y pilares/vigas/cargas/nudos que las referencian.
+// Modelo con tres plantas y pilares/vigas/cargas/nudos que las referencian.
+// v4 (plantas sin grupos): la planta lleva su propio uso/cargas.
 function modeloConDependientes() {
   const base = crearModeloVacio();
-  base.grupos = [
-    { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-    { id: "g2", nombre: "G2", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-  ];
   base.plantas = [
-    { id: "p1", nombre: "Planta 1", cota: 0, altura: 3, grupoId: "g1" },
-    { id: "p2", nombre: "Planta 2", cota: 3, altura: 3, grupoId: "g1" },
-    { id: "p3", nombre: "Planta 3", cota: 0, altura: 3, grupoId: "g2" },
+    { id: "p1", nombre: "Planta 1", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    { id: "p2", nombre: "Planta 2", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    { id: "p3", nombre: "Planta 3", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
   ];
   base.nudos = [
     { id: "n1", x: 0, y: 0 },
@@ -257,17 +160,21 @@ function modeloConDependientes() {
 }
 
 describe("integridad referencial al borrar", () => {
-  it("eliminarGrupo arrastra pilares/vigas/cargas de sus plantas, deja nudos y es 1 undo", () => {
+  // Cobertura de la CASCADA por planta (antes se probaba tambien via eliminarGrupo;
+  // sin grupos en v4, purgarPlantas sigue siendo el unico camino). Aqui se borra la
+  // planta que arrastra la carga superficial aplicada SOBRE la propia planta (c2).
+  it("eliminarPlanta arrastra el pilar que la toca, su carga superficial y es 1 undo", () => {
     modeloStore.getState().cargarModelo(modeloConDependientes());
     const conTodo = structuredClone(m());
 
-    modeloStore.getState().ejecutar(eliminarGrupo(m(), "g1"));
+    modeloStore.getState().ejecutar(eliminarPlanta(m(), "p1"));
 
-    expect(m().grupos.map((g) => g.id)).toEqual(["g2"]);
-    expect(m().plantas.map((p) => p.id)).toEqual(["p3"]);
-    expect(m().pilares.map((p) => p.id)).toEqual(["pil2"]); // pil1 (p1/p2) cae
-    expect(m().vigas.map((v) => v.id)).toEqual(["v2"]); // v1 (p2) cae
-    expect(m().cargas.map((c) => c.id)).toEqual(["c3"]); // c1 (v1) y c2 (p1) caen
+    expect(m().plantas.map((p) => p.id)).toEqual(["p2", "p3"]);
+    expect(m().pilares.map((p) => p.id)).toEqual(["pil2"]); // pil1 (p1/p2) toca p1: cae
+    // v1 es de p2 (sobrevive), v2 de p3 (sobrevive).
+    expect(m().vigas.map((v) => v.id)).toEqual(["v1", "v2"]);
+    // c2 (superficial sobre p1) cae; c1 (sobre v1) y c3 (sobre v2) sobreviven.
+    expect(m().cargas.map((c) => c.id).sort()).toEqual(["c1", "c3"]);
     expect(m().nudos).toHaveLength(2); // geometria compartida: intacta
 
     modeloStore.getState().deshacer();
@@ -294,12 +201,9 @@ describe("integridad referencial al borrar", () => {
 
 function modeloConPilares() {
   const base = crearModeloVacio();
-  base.grupos = [
-    { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-  ];
   base.plantas = [
-    { id: "p1", nombre: "Planta 1", cota: 0, altura: 3, grupoId: "g1" },
-    { id: "p2", nombre: "Planta 2", cota: 3, altura: 3, grupoId: "g1" },
+    { id: "p1", nombre: "Planta 1", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    { id: "p2", nombre: "Planta 2", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
   ];
   const pilarBase = {
     seccionId: "s1",
@@ -436,12 +340,9 @@ describe("moverPilar", () => {
 
 function modeloConVigas() {
   const base = crearModeloVacio();
-  base.grupos = [
-    { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-  ];
   base.plantas = [
-    { id: "p1", nombre: "Planta 1", cota: 0, altura: 3, grupoId: "g1" },
-    { id: "p2", nombre: "Planta 2", cota: 3, altura: 3, grupoId: "g1" },
+    { id: "p1", nombre: "Planta 1", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    { id: "p2", nombre: "Planta 2", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
   ];
   // Un nudo preexistente en (0,0) para probar el reuso por tolerancia.
   base.nudos = [{ id: "n1", x: 0, y: 0 }];

@@ -22,7 +22,6 @@ beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   vistaStore.getState().setPestanaActiva("entradaPilares");
   vistaStore.getState().setModoVista("planta");
-  vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
   vistaStore.getState().resetDockUI();
 });

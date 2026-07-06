@@ -54,5 +54,5 @@ export type {
 } from "./primitivas";
 
 // --- Dialogos (envoltorio Radix + dialogos concretos) ------------------------
-export { Dialogo, DialogoGruposYPlantas } from "./dialogos";
+export { Dialogo, DialogoPlantas } from "./dialogos";
 export type { DialogoProps } from "./dialogos";

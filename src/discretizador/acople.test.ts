@@ -24,12 +24,12 @@ function modeloBase(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      { id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-    ],
+    // v4 "plantas sin grupos": el uso/cargas viven en cada planta. `calcularAcoples`
+    // es geometria pura (no lee SU/CM), pero se conservan los valores del antiguo
+    // grupo para mantener la Capa 2 identica en las plantas con paño losa.
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
     ],
     secciones: [
       { id: SECCION_OK, nombre: "IPE 300", tipo: "perfilMetalico", perfilId: PERFIL_OK },
@@ -382,7 +382,7 @@ describe("pilaresInterioresBajoPano (OV-5)", () => {
 
   it("pilar PASANTE que atraviesa la cota del paño -> detectado", () => {
     const m = modeloBase();
-    m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+    m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
     m.pilares.push({
       id: "pil-pasante", nombre: "P6", x: 1, y: 1,
       plantaInicial: "p0", plantaFinal: "p2", // 0 -> 6, atraviesa la cota 3

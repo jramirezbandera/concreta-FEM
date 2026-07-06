@@ -1,8 +1,10 @@
 /*
- * Estilos del DialogoGruposYPlantas (feature-10) de Concreta · Estructuras.
- * Layout maestro-detalle (lista de grupos | detalle del grupo activo).
+ * Estilos del DialogoPlantas (feature-10; sin grupos desde F3.4) de Concreta ·
+ * Estructuras. Layout maestro-detalle (lista de plantas | detalle de la planta
+ * activa). Las clases conservan el prefijo historico .cx-gyp__* (las comparte
+ * DialogoHipotesis; renombrarlas seria ruido sin beneficio).
  * REGLA: solo tokens via var(--...); cero colores hardcodeados. Importado desde
- * DialogoGruposYPlantas.tsx. Convive con dialogos.css (clases .cx-dialog__*).
+ * DialogoPlantas.tsx. Convive con dialogos.css (clases .cx-dialog__*).
  */
 
 /* --- Rejilla de dos columnas: maestro (lista) | detalle --- */
@@ -59,9 +61,9 @@
   border-color: var(--accent-soft);
   font-weight: 600;
 }
-/* Variante con tag de tipo a la derecha (DialogoHipotesis): empuja el tag al borde.
-   No se toca el .cx-gyp__item global para no descolocar los items de grupos/plantas
-   (sin tag) en el DialogoGruposYPlantas, que comparte la clase base. */
+/* Variante con tag a la derecha (DialogoHipotesis: tipo; DialogoPlantas: cota):
+   empuja el tag al borde. No se toca el .cx-gyp__item global (clase base
+   compartida por ambos dialogos). */
 .cx-gyp__item--con-tag {
   justify-content: space-between;
   gap: 8px;

@@ -12,7 +12,9 @@ const planta = (id: string, cota: number): Planta => ({
   nombre: id,
   cota,
   altura: 3,
-  grupoId: "g1",
+  categoriaUso: "A",
+  sobrecargaUso: 0,
+  cargasMuertas: 0,
 });
 const nudo = (id: string, x: number, y: number): Nudo => ({ id, x, y });
 const pilar = (

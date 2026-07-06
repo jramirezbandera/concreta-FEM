@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  grupoPorId,
   plantaPorId,
-  plantasDeGrupo,
+  plantasOrdenadas,
   nudoPorId,
   seccionPorId,
   pilaresDePlanta,
@@ -22,14 +21,12 @@ function modeloPequeno(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-      { id: "g2", nombre: "G2", categoriaUso: "B", sobrecargaUso: 3, cargasMuertas: 1 },
-    ],
+    // v4 (plantas sin grupos): la planta absorbe el uso. Sin paños losa, SU/CM van
+    // a 0 (eran inertes sin paño; a 0 la Capa 2 y los avisos quedan identicos).
     plantas: [
-      { id: "p0", nombre: "Cim", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "P1", cota: 3, altura: 3, grupoId: "g1" },
-      { id: "p2", nombre: "P2", cota: 6, altura: 3, grupoId: "g2" },
+      { id: "p0", nombre: "Cim", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "P1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p2", nombre: "P2", cota: 6, altura: 3, categoriaUso: "B", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: "s1", nombre: "IPE 300", tipo: "perfilMetalico", perfilId: "IPE300" },
@@ -144,24 +141,21 @@ describe("helpers de consulta del dominio", () => {
     expect(crearModeloVacio().secciones).toEqual(crearModeloVacio().secciones);
   });
 
-  it("crearModeloVacio: schemaVersion = SCHEMA_VERSION (v2)", () => {
+  it("crearModeloVacio: schemaVersion = SCHEMA_VERSION", () => {
     expect(crearModeloVacio().schemaVersion).toBe(SCHEMA_VERSION);
   });
 
-  it("grupoPorId", () => {
-    expect(grupoPorId(m, "g1")?.nombre).toBe("G1");
-    expect(grupoPorId(m, "nope")).toBeUndefined();
-  });
-
   it("plantaPorId", () => {
-    expect(plantaPorId(m, "p2")?.grupoId).toBe("g2");
+    // v4: la planta ya no lleva grupoId; comprobamos su uso propio.
+    expect(plantaPorId(m, "p2")?.categoriaUso).toBe("B");
     expect(plantaPorId(m, "nope")).toBeUndefined();
   });
 
-  it("plantasDeGrupo", () => {
-    expect(plantasDeGrupo(m, "g1").map((p) => p.id)).toEqual(["p0", "p1"]);
-    expect(plantasDeGrupo(m, "g2").map((p) => p.id)).toEqual(["p2"]);
-    expect(plantasDeGrupo(m, "nope")).toEqual([]);
+  it("plantasOrdenadas (por cota ascendente; sustituye a plantasDeGrupo)", () => {
+    // El edificio es una unica lista ordenada por cota (cimentacion -> cubierta).
+    expect(plantasOrdenadas(m).map((p) => p.id)).toEqual(["p0", "p1", "p2"]);
+    // No muta el modelo (slice + sort sobre copia).
+    expect(m.plantas.map((p) => p.id)).toEqual(["p0", "p1", "p2"]);
   });
 
   it("nudoPorId", () => {

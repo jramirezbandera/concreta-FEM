@@ -445,18 +445,11 @@ function obraSimetrica4Pilares(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      {
-        id: "g1",
-        nombre: "Grupo",
-        categoriaUso: "A",
-        sobrecargaUso: 2,
-        cargasMuertas: 1,
-      },
-    ],
+    // v4 (plantas sin grupos): sin paños losa -> SU/CM a 0 (inertes; el CR no usa
+    // cargas superficiales). > 0 dispararia PLANTA_CARGA_SIN_PANO sin cambiar el CR.
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: H, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: H, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: H, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: H, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: SECCION_GOLDEN, nombre: "IPE 300", tipo: "perfilMetalico", perfilId: PERFIL_GOLDEN },

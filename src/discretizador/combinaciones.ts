@@ -24,9 +24,10 @@ import type { Modelo } from "../dominio";
 import { esHipotesisAutomatica } from "../dominio";
 import { GAMMA_G_DESFAV, GAMMA_Q_DESFAV, GAMMA_ELS } from "../biblioteca";
 import type { ComboFEM } from "./contratoFEM";
-// Cases SINTETICOS de las cargas de grupo sobre paños (F3.2, D-1): la MISMA fuente
-// (casesGrupoActivos) que usa el Paso 6c para emitirlas decide aqui sus factores.
-import { CASE_CM_GRUPO, CASE_USO_GRUPO, casesGrupoActivos } from "./cargasGrupo";
+// Cases SINTETICOS de las cargas de planta sobre paños (F3.4; antes "de grupo",
+// F3.2 D-1): la MISMA fuente (casesPlantaActivos) que usa el Paso 6c para
+// emitirlas decide aqui sus factores.
+import { CASE_CM_PLANTA, CASE_USO_PLANTA, casesPlantaActivos } from "./cargasPlanta";
 
 // Factor de mayoracion de una hipotesis en ELU persistente segun su tipo. En F1
 // toda accion es DESFAVORABLE (gravitatoria que suma esfuerzo): permanente ->
@@ -70,20 +71,21 @@ export function generarCombos(modelo: Modelo): ComboFEM[] {
     factoresELS[h.id] = GAMMA_ELS;
   }
 
-  // Cases SINTETICOS de las cargas de grupo (F3.2, D-1): cargasMuertas -> G (gamma
-  // permanente), sobrecargaUso -> Q (gamma variable). SOLO si algun paño losa las
-  // consume (casesGrupoActivos, la MISMA fuente que la emision del Paso 6c [2A]):
-  // sin consumidor no hay termino fantasma (espejo de E4) y un modelo sin paños
-  // produce combos byte-identicos a los de siempre. No son Hipotesis de Capa 1: no
-  // pasan por el bucle de arriba ni por esHipotesisAutomatica.
-  const grupoActivo = casesGrupoActivos(modelo);
-  if (grupoActivo.cm) {
-    factoresELU[CASE_CM_GRUPO] = GAMMA_G_DESFAV;
-    factoresELS[CASE_CM_GRUPO] = GAMMA_ELS;
+  // Cases SINTETICOS de las cargas de planta (F3.4; antes de grupo, F3.2 D-1):
+  // cargasMuertas -> G (gamma permanente), sobrecargaUso -> Q (gamma variable).
+  // SOLO si algun paño losa las consume (casesPlantaActivos, la MISMA fuente que
+  // la emision del Paso 6c [2A]): sin consumidor no hay termino fantasma (espejo
+  // de E4) y un modelo sin paños produce combos byte-identicos a los de siempre.
+  // No son Hipotesis de Capa 1: no pasan por el bucle de arriba ni por
+  // esHipotesisAutomatica.
+  const plantaActiva = casesPlantaActivos(modelo);
+  if (plantaActiva.cm) {
+    factoresELU[CASE_CM_PLANTA] = GAMMA_G_DESFAV;
+    factoresELS[CASE_CM_PLANTA] = GAMMA_ELS;
   }
-  if (grupoActivo.uso) {
-    factoresELU[CASE_USO_GRUPO] = GAMMA_Q_DESFAV;
-    factoresELS[CASE_USO_GRUPO] = GAMMA_ELS;
+  if (plantaActiva.uso) {
+    factoresELU[CASE_USO_PLANTA] = GAMMA_Q_DESFAV;
+    factoresELS[CASE_USO_PLANTA] = GAMMA_ELS;
   }
 
   return [

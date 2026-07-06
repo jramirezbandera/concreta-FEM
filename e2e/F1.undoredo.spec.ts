@@ -12,8 +12,8 @@
 //     calculo…". Aseveramos ese estado concreto, NUNCA "los resultados desaparecen".
 //
 // COMO (D10, costura pura): la obra se construye por `window.__concreta` (comandos
-// de dominio ya existentes) + el DIALOGO REAL de Plantas/Grupos (UI). El calculo se
-// dispara por el BOTON "Calcular" (por claridad/aislamiento; tras feature-17 el menu
+// de dominio ya existentes) + el DIALOGO REAL de Plantas (UI). El calculo se dispara
+// por el BOTON "Calcular" (por claridad/aislamiento; tras feature-17 el menu
 // tambien alimenta el calculoStore, pero el estado obsoleto se lee por los paneles
 // de Resultados) con el mock del solver controlable (usarMockSolver().resolver()).
 // No se toca el canvas R3F (eso lo cubren los component tests, D10).
@@ -74,20 +74,21 @@ function contadorArbol(page: Page, label: string) {
   return fila.locator(".cx-row__count");
 }
 
-// Crea por el DIALOGO REAL un grupo con DOS plantas (cimentacion cota 0 + planta de
-// calculo cota 3). Devuelve, leyendo la costura, los ids de planta en orden de
-// creacion: [cimentacion, calculo] (crearPlanta hace push al final del array; la
-// primera planta nueva queda en cota 0, la segunda apila encima a cota 3).
-async function crearGrupoConDosPlantas(
+// Crea por el DIALOGO REAL DOS plantas (cimentacion cota 0 + planta de calculo cota
+// 3). Devuelve, leyendo la costura, los ids de planta en orden de creacion:
+// [cimentacion, calculo] (crearPlanta hace push al final del array; la primera planta
+// nueva queda en cota 0, la segunda apila encima a cota 3). Desde F3.4 no hay grupos:
+// el dialogo es solo de plantas y "Nueva planta" esta siempre disponible.
+async function crearDosPlantas(
   page: Page,
 ): Promise<{ plantaCimentacion: string; plantaCalculo: string }> {
-  // Abrir el dialogo de Plantas y grupos desde el arbol de obra (entrada estable de UI).
-  await page.getByRole("button", { name: "Gestionar plantas y grupos…" }).click();
-  const dialogo = page.getByRole("dialog", { name: "Plantas y grupos" });
+  // Abrir el dialogo de Plantas desde el arbol de obra (entrada estable de UI).
+  await page.getByRole("button", { name: "Gestionar plantas…" }).click();
+  const dialogo = page.getByRole("dialog", { name: "Plantas" });
   await expect(dialogo).toBeVisible();
 
-  // Un grupo nuevo (defaults residenciales) + dos plantas (la 2.ª apila sobre la 1.ª).
-  await dialogo.getByRole("button", { name: "Nuevo grupo" }).click();
+  // Dos plantas (la 2.ª apila sobre la 1.ª: cota 0 y cota 3). "Nueva planta" ya no
+  // depende de un grupo activo (F3.4).
   await dialogo.getByRole("button", { name: "Nueva planta" }).click();
   await dialogo.getByRole("button", { name: "Nueva planta" }).click();
 
@@ -161,8 +162,8 @@ test("editar la obra tras calcular deja los resultados OBSOLETOS pero PRESENTES 
   await expect(page.getByRole("button", { name: "Calcular", exact: true })).toBeVisible();
   await activarPestana(page, /Entrada de pilares/);
 
-  // --- Construir una obra calculable: grupo + 2 plantas + 2 pilares + viga + carga ---
-  const { plantaCimentacion, plantaCalculo } = await crearGrupoConDosPlantas(page);
+  // --- Construir una obra calculable: 2 plantas + 2 pilares + viga + carga ---
+  const { plantaCimentacion, plantaCalculo } = await crearDosPlantas(page);
 
   // Dos pilares de apoyo (pie en cimentacion, cabeza en la planta de calculo) y la
   // viga entre sus cabezas; una carga lineal sobre la viga (hipotesis variable).

@@ -22,12 +22,13 @@ function modeloValido(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      { id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-    ],
+    // v4 "plantas sin grupos": el uso/cargas viven en cada planta. La base NO tiene
+    // paños, asi que SU/CM van a 0 (inertes sin paño y silencian el aviso nuevo
+    // PLANTA_CARGA_SIN_PANO, que ensuciaria los asserts de un modelo valido = []).
+    // Los tests de cargas de planta fijan esos valores explicitamente.
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: SECCION_OK, nombre: "IPE 300", tipo: "perfilMetalico", perfilId: PERFIL_OK },
@@ -581,7 +582,7 @@ describe("validarModelo", () => {
 
     it("dos plantas con el mismo id -> error ID_DUP", () => {
       const m = modeloValido();
-      m.plantas.push({ id: "p1", nombre: "Planta 1 bis", cota: 6, altura: 3, grupoId: "g1" });
+      m.plantas.push({ id: "p1", nombre: "Planta 1 bis", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
       expect(codigos(validarModelo(m))).toContain("ID_DUP");
     });
 
@@ -613,7 +614,7 @@ describe("validarModelo", () => {
 
     it("pilar entre dos plantas DISTINTAS a la misma cota -> error PILAR_DEGENERADO", () => {
       const m = modeloValido();
-      m.plantas.push({ id: "p0bis", nombre: "Cota cero bis", cota: 0, altura: 3, grupoId: "g1" });
+      m.plantas.push({ id: "p0bis", nombre: "Cota cero bis", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
       m.pilares[0].plantaFinal = "p0bis"; // p0(0) -> p0bis(0): L=0
       expect(codigos(validarModelo(m))).toContain("PILAR_DEGENERADO");
     });
@@ -1159,55 +1160,122 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
     });
   });
 
-  describe("cargas de grupo (D-1): red del borde y expectativas", () => {
-    it("[GAP-C] valor NEGATIVO en el grupo con paños -> aviso GRUPO_VALOR_NEGATIVO (no se aplica en silencio)", () => {
-      const m = conPanoSobreViga("simple");
-      m.grupos = [{ ...m.grupos[0], cargasMuertas: -1 }];
-      const e = validarModelo(m).filter((x) => x.codigo === "GRUPO_VALOR_NEGATIVO");
+  describe("cargas de planta (D-1/F3.4): red del borde y expectativas", () => {
+    // Fija las cargas de la PLANTA del paño (p1) en un modelo con `conPanoSobreViga`.
+    // El fixture base pone SU/CM a 0 (v4): estos tests las suben cuando las necesitan.
+    function conCargasPlanta(
+      m: Modelo,
+      datos: { sobrecargaUso?: number; cargasMuertas?: number },
+    ): Modelo {
+      m.plantas = m.plantas.map((p) =>
+        p.id === "p1"
+          ? {
+              ...p,
+              sobrecargaUso: datos.sobrecargaUso ?? p.sobrecargaUso,
+              cargasMuertas: datos.cargasMuertas ?? p.cargasMuertas,
+            }
+          : p,
+      );
+      return m;
+    }
+
+    it("[GAP-C] valor NEGATIVO en la planta con paños -> aviso PLANTA_VALOR_NEGATIVO (no se aplica en silencio)", () => {
+      const m = conCargasPlanta(conPanoSobreViga("simple"), { cargasMuertas: -1 });
+      const e = validarModelo(m).filter((x) => x.codigo === "PLANTA_VALOR_NEGATIVO");
       expect(e).toHaveLength(1);
       expect(e[0].severidad).toBe("aviso");
-      expect(e[0].mensaje).toContain(m.grupos[0].nombre);
+      expect(e[0].elementoId).toBe("p1"); // ahora apunta a la PLANTA culpable
+      expect(e[0].elementoTipo).toBe("planta");
+      expect(e[0].mensaje).toContain("Planta 1"); // nombre de la planta del paño
       sinJergaFEM(e[0]);
     });
 
-    it("valor negativo SIN paños que lo reciban -> sin aviso (el dato es inerte)", () => {
-      const m = modeloValido();
-      m.grupos = [{ ...m.grupos[0], sobrecargaUso: -2 }];
-      expect(codigos(validarModelo(m))).not.toContain("GRUPO_VALOR_NEGATIVO");
+    it("valor negativo SIN paños que lo reciban -> sin aviso de negativo (el dato es inerte)", () => {
+      // Sin paño, un negativo no lo recibe nadie: no dispara PLANTA_VALOR_NEGATIVO.
+      const m = conCargasPlanta(modeloValido(), { sobrecargaUso: -2 });
+      expect(codigos(validarModelo(m))).not.toContain("PLANTA_VALOR_NEGATIVO");
     });
 
-    it("[OV-1] paño con carga superficial MANUAL + cargas de grupo -> aviso de posible duplicidad", () => {
-      const m = conPanoSobreViga("simple"); // grupo del fixture: qk=2, CM=1 (>0)
+    it("[F3.4] planta con SU>0 sin ningun paño -> aviso PLANTA_CARGA_SIN_PANO (honestidad)", () => {
+      // La planta declara sobrecarga pero no tiene paño que la reciba: el calculo la
+      // IGNORA en silencio. El aviso apunta a la PLANTA culpable (elementoId = plantaId).
+      const m = conCargasPlanta(modeloValido(), { sobrecargaUso: 3 });
+      const e = validarModelo(m).filter((x) => x.codigo === "PLANTA_CARGA_SIN_PANO");
+      expect(e).toHaveLength(1);
+      expect(e[0].severidad).toBe("aviso");
+      expect(e[0].elementoId).toBe("p1");
+      expect(e[0].elementoTipo).toBe("planta");
+      expect(e[0].mensaje).toContain("Planta 1");
+      sinJergaFEM(e[0]);
+    });
+
+    it("[F3.4] planta con CM>0 sin ningun paño -> aviso PLANTA_CARGA_SIN_PANO", () => {
+      const m = conCargasPlanta(modeloValido(), { cargasMuertas: 2 });
+      const e = validarModelo(m).filter((x) => x.codigo === "PLANTA_CARGA_SIN_PANO");
+      expect(e).toHaveLength(1);
+      expect(e[0].elementoId).toBe("p1");
+    });
+
+    it("[F3.4] planta con paño losa que recibe las cargas -> SIN aviso PLANTA_CARGA_SIN_PANO", () => {
+      // p1 tiene un paño losa (conPanoSobreViga): sus cargas SI entran en el calculo.
+      const m = conCargasPlanta(conPanoSobreViga("simple"), { sobrecargaUso: 3, cargasMuertas: 2 });
+      expect(codigos(validarModelo(m))).not.toContain("PLANTA_CARGA_SIN_PANO");
+    });
+
+    it("[F3.4] planta con valores a 0 -> SIN aviso PLANTA_CARGA_SIN_PANO (nada que avisar)", () => {
+      // El fixture base ya deja SU/CM a 0 en todas las plantas: ningun aviso.
+      expect(codigos(validarModelo(modeloValido()))).not.toContain("PLANTA_CARGA_SIN_PANO");
+    });
+
+    it("[OV-1] paño con carga superficial MANUAL + cargas de planta -> aviso de posible duplicidad", () => {
+      const m = conCargasPlanta(conPanoSobreViga("simple"), { sobrecargaUso: 2, cargasMuertas: 1 });
       m.cargas.push({ id: "c9", tipo: "superficial", ambito: "pano1", valor: 2, hipotesisId: "h1" });
-      const e = validarModelo(m).filter((x) => x.codigo === "GRUPO_Y_SUPERFICIAL");
+      const e = validarModelo(m).filter((x) => x.codigo === "PLANTA_Y_SUPERFICIAL");
       expect(e).toHaveLength(1);
       expect(e[0].severidad).toBe("aviso");
       expect(e[0].elementoId).toBe("pano1");
       sinJergaFEM(e[0]);
     });
 
-    it("[OV-1] sin carga manual (solo grupo) o grupo a cero -> sin aviso de duplicidad", () => {
-      // Solo grupo: sin duplicidad posible.
-      expect(codigos(validarModelo(conPanoSobreViga("simple")))).not.toContain(
-        "GRUPO_Y_SUPERFICIAL",
-      );
-      // Grupo a cero + carga manual: tampoco (no hay carga automatica que duplicar).
-      const m = conPanoSobreViga("simple");
-      m.grupos = [{ ...m.grupos[0], sobrecargaUso: 0, cargasMuertas: 0 }];
+    it("[OV-1] sin carga manual (solo planta) o planta a cero -> sin aviso de duplicidad", () => {
+      // Solo cargas de planta: sin duplicidad posible.
+      const soloPlanta = conCargasPlanta(conPanoSobreViga("simple"), { sobrecargaUso: 2, cargasMuertas: 1 });
+      expect(codigos(validarModelo(soloPlanta))).not.toContain("PLANTA_Y_SUPERFICIAL");
+      // Planta a cero + carga manual: tampoco (no hay carga automatica que duplicar).
+      const m = conPanoSobreViga("simple"); // p1 ya trae SU/CM a 0
       m.cargas.push({ id: "c9", tipo: "superficial", ambito: "pano1", valor: 2, hipotesisId: "h1" });
-      expect(codigos(validarModelo(m))).not.toContain("GRUPO_Y_SUPERFICIAL");
+      expect(codigos(validarModelo(m))).not.toContain("PLANTA_Y_SUPERFICIAL");
     });
 
-    it("hipotesis con id RESERVADO (case sintetico) -> error ID_RESERVADO (red tras el saneo de import)", () => {
+    it("hipotesis con id RESERVADO (case sintetico de planta) -> error ID_RESERVADO (red tras el saneo de import)", () => {
       const m = modeloValido();
       m.hipotesis.push({
-        id: "auto-grupo-cm", nombre: "Intrusa", tipo: "permanente", automatica: false,
+        id: "auto-planta-cm", nombre: "Intrusa", tipo: "permanente", automatica: false,
       });
       const e = validarModelo(m).filter((x) => x.codigo === "ID_RESERVADO");
       expect(e).toHaveLength(1);
       expect(e[0].severidad).toBe("error");
-      expect(e[0].elementoId).toBe("auto-grupo-cm");
+      expect(e[0].elementoId).toBe("auto-planta-cm");
       sinJergaFEM(e[0]);
+    });
+
+    it("hipotesis con el id auto-planta-uso tambien reserva -> error ID_RESERVADO", () => {
+      const m = modeloValido();
+      m.hipotesis.push({
+        id: "auto-planta-uso", nombre: "Intrusa 2", tipo: "variable", automatica: false,
+      });
+      const e = validarModelo(m).filter((x) => x.codigo === "ID_RESERVADO");
+      expect(e).toHaveLength(1);
+      expect(e[0].elementoId).toBe("auto-planta-uso");
+    });
+
+    it("los ids ANTIGUOS auto-grupo-* YA NO estan reservados (no dispara ID_RESERVADO)", () => {
+      // Migracion v4: el saneo usa auto-planta-*; un id auto-grupo-* es ahora libre.
+      const m = modeloValido();
+      m.hipotesis.push({
+        id: "auto-grupo-cm", nombre: "Vieja", tipo: "permanente", automatica: false,
+      });
+      expect(codigos(validarModelo(m))).not.toContain("ID_RESERVADO");
     });
   });
 });

@@ -87,7 +87,8 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ## T-dialogo-1 · Unificar CampoTexto/CampoNumero (DRY)
 
-- **Qué:** En [src/ui/dialogos/DialogoGruposYPlantas.tsx](src/ui/dialogos/DialogoGruposYPlantas.tsx)
+- **Qué:** En [src/ui/dialogos/DialogoPlantas.tsx](src/ui/dialogos/DialogoPlantas.tsx)
+  (antes DialogoGruposYPlantas, renombrado en F3.4)
   los subcomponentes `CampoTexto` y `CampoNumero` son casi gemelos: ambos mantienen estado local,
   se resincronizan con `useEffect([valor])` y commitean en `onBlur`. Difieren solo en el parseo
   (`Number`/NaN) y dos props (`sufijo`, `className`).
@@ -104,13 +105,13 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 ## T-dialogo-2 · Helper de orden "plantas por cota descendente"
 
 - **Qué:** El orden de plantas por cota descendente (orden CYPECAD) está duplicado en
-  [src/ui/shell/Sidebar.tsx](src/ui/shell/Sidebar.tsx) (~línea 71) y
-  [src/ui/dialogos/DialogoGruposYPlantas.tsx](src/ui/dialogos/DialogoGruposYPlantas.tsx) (~línea 281):
-  `plantas.filter(p => p.grupoId === g).sort((a,b) => b.cota - a.cota)`.
+  [src/ui/shell/Sidebar.tsx](src/ui/shell/Sidebar.tsx) y
+  [src/ui/dialogos/DialogoPlantas.tsx](src/ui/dialogos/DialogoPlantas.tsx):
+  `plantas.slice().sort((a,b) => b.cota - a.cota)`.
 - **Por qué:** DRY. Si el criterio de orden cambia (p. ej. desempate por nombre) hay que tocar dos
-  sitios; F11/12/14 mostrarán plantas y repetirán el patrón.
-- **Cómo retomar:** añadir `plantasDeGrupoOrdenadas(modelo, grupoId): Planta[]` en
-  [src/dominio/helpers.ts](src/dominio/helpers.ts) (junto a `plantasDeGrupo`) y consumirlo en ambos.
+  sitios. Desde F3.4 existe `plantasOrdenadas(modelo)` (ascendente) en
+  [src/dominio/helpers.ts](src/dominio/helpers.ts): falta la variante descendente (o consumir
+  la ascendente invertida) en ambos sitios.
 - **Depende de / bloquea:** nada. **Coste:** CC ~10 min. **Origen:** Revisión de ingeniería F10 (DRY, diferido en D4).
 
 ---
@@ -1341,3 +1342,21 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
   [T-modal-overlay-dedup] (extraer el hook compartido de overlays abarata este trabajo).
 - **Depende de / bloquea:** se apoya en T-modal-overlay-dedup. **Coste:** CC ~1-2 h.
 - **Origen:** Corte T-f3-masa-placa (T4.2): gap visual detectado en el plan, no bloqueante.
+
+---
+
+## T-plantas-siembra · Sembrar plantas en la obra nueva (arranque sin diálogo)
+
+- **Qué:** Una obra recién creada nace sin plantas: el usuario debe pasar por el diálogo de
+  Plantas (botón "Crear plantas" del estado vacío) antes de poder colocar un pilar. F3.4 ya
+  redujo la fricción (una lista plana, "Nueva planta" a un clic), pero el arranque ideal sería
+  nacer con dos plantas sembradas (p. ej. "Cimentación" cota 0 + "Planta 1" cota 3) y poder
+  colocar pilares desde el primer clic.
+- **Por qué:** Origen de F3.4: el usuario señaló que la introducción de plantas era liosa.
+  No se sembró en `crearModeloVacio` a propósito: decenas de fixtures de test parten del
+  modelo vacío y sembrarlo colisionaría nombres/cotas con las plantas que cada test crea.
+- **Cómo retomar:** sembrar en el BORDE de "obra nueva" (useArranquePersistencia / flujo
+  "Nueva obra"), no en `crearModeloVacio` (factoría determinista compartida con tests). Decidir
+  los defaults (¿2 plantas?, ¿SU/CM de la planta tipo?) y cubrir con test del flujo de arranque.
+- **Depende de / bloquea:** nada. **Coste:** CC ~30-45 min.
+- **Origen:** F3.4 (plantas sin grupos), mejora de UX diferida.

@@ -30,12 +30,11 @@ import {
   seleccionStore,
   vistaStore,
   crearPilar,
-  crearGrupo,
   crearPlanta,
   eliminarPilar,
   type DatosPilar,
 } from "../../estado";
-import { crearModeloVacio, plantasDeGrupo } from "../../dominio";
+import { crearModeloVacio, plantasOrdenadas } from "../../dominio";
 import { snapARejilla } from "../viewport/snap";
 import { listarSecciones, listarMateriales } from "../../biblioteca";
 
@@ -73,7 +72,6 @@ beforeEach(() => {
     angulo: 0,
   });
   v.setSnapActivo(true);
-  v.setGrupoActivo(null);
   v.setPlantaActiva(null);
   v.setPestanaActiva("entradaPilares");
 });
@@ -83,35 +81,24 @@ const modelo = () => modeloStore.getState().getModelo();
 const pilares = () => modelo().pilares;
 const pilarPorNombre = (n: string) => pilares().find((p) => p.nombre === n);
 
-// --- Andamiaje del ambito: un grupo con dos plantas (cota 0 y 3) -----------------
-// Se construye con los COMANDOS reales (crearGrupo/crearPlanta) para ejercitar la
-// misma maquinaria que la UI, y se fijan grupo/planta activos como haria la Sidebar.
+// --- Andamiaje del ambito: dos plantas del edificio (cota 0 y 3) ----------------
+// Se construye con los COMANDOS reales (crearPlanta) para ejercitar la misma
+// maquinaria que la UI, y se fija la planta activa como haria la Sidebar. Sin grupos
+// (F3.4): las plantas son una lista plana del edificio.
 function prepararAmbito(): {
-  grupoId: string;
   plantaBajaId: string;
   plantaAltaId: string;
 } {
-  modeloStore.getState().ejecutar(
-    crearGrupo(modelo(), {
-      categoriaUso: "A",
-      sobrecargaUso: 2,
-      cargasMuertas: 1,
-    }),
-  );
-  const grupoId = modelo().grupos[0]!.id;
+  const cargas = { categoriaUso: "A" as const, sobrecargaUso: 0, cargasMuertas: 0 };
   modeloStore
     .getState()
-    .ejecutar(crearPlanta(modelo(), { cota: 0, altura: 3, grupoId }));
+    .ejecutar(crearPlanta(modelo(), { cota: 0, altura: 3, ...cargas }));
   modeloStore
     .getState()
-    .ejecutar(crearPlanta(modelo(), { cota: 3, altura: 3, grupoId }));
-  const plantas = plantasDeGrupo(modelo(), grupoId)
-    .slice()
-    .sort((a, b) => a.cota - b.cota);
-  vistaStore.getState().setGrupoActivo(grupoId);
+    .ejecutar(crearPlanta(modelo(), { cota: 3, altura: 3, ...cargas }));
+  const plantas = plantasOrdenadas(modelo());
   vistaStore.getState().setPlantaActiva(plantas[0]!.id);
   return {
-    grupoId,
     plantaBajaId: plantas[0]!.id,
     plantaAltaId: plantas[1]!.id,
   };
@@ -124,9 +111,8 @@ function colocarPilar(px: number, py: number): string {
   const v = vistaStore.getState();
   const { x, y } = v.snapActivo ? snapARejilla(px, py) : { x: px, y: py };
   const { defaultsPilar } = v;
-  const tramo = plantasDeGrupo(modelo(), v.grupoActivoId!)
-    .slice()
-    .sort((a, b) => a.cota - b.cota);
+  // Tramo del edificio: de la planta mas baja a la mas alta (sin grupos, F3.4).
+  const tramo = plantasOrdenadas(modelo());
   const datos: DatosPilar = {
     x,
     y,
@@ -365,7 +351,7 @@ describe("Flujo Entrada de pilares: contador de la Sidebar", () => {
     // contador es derivado en render, sin depender del timing de la suscripcion).
     colocarPilar(0, 0);
     colocarPilar(2, 2);
-    expect(plantasDeGrupo(modelo(), vistaStore.getState().grupoActivoId!)).toHaveLength(2);
+    expect(plantasOrdenadas(modelo())).toHaveLength(2);
     expect(plantaBajaId).toBe(vistaStore.getState().plantaActivaId);
     const r2 = render(<Sidebar />);
     expect(contadorPilares()).toBe("2");

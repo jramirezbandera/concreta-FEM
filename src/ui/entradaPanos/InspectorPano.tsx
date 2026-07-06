@@ -31,7 +31,7 @@ import { cargasDeAmbito } from "../../dominio";
 // FUENTE UNICA [2A] de las cargas automaticas de grupo (F3.2, D-1): la MISMA que
 // usa el discretizador para emitirlas. La linea informativa del inspector no puede
 // divergir de lo que el calculo aplica.
-import { cargasGrupoDePano, CASE_CM_GRUPO } from "../../discretizador/cargasGrupo";
+import { cargasPlantaDePano, CASE_CM_PLANTA } from "../../discretizador/cargasPlanta";
 // FUENTE UNICA (F2.3, losa plana; afinado en code-review #2): el MISMO calculo de
 // acople que usa el discretizador decide que pilares interiores recogen la losa.
 // Es puro (malla en memoria acotada por CAP_QUADS, sin FEM/solver/IO) y se memoiza
@@ -125,9 +125,9 @@ export function InspectorPano() {
   const panos = modeloStore((s) => s.modelo.panos);
   // Nudos del perimetro: para el bloque de dimensiones D8b. Suscripcion ligera.
   const nudos = modeloStore((s) => s.modelo.nudos);
-  // Modelo completo para la linea de cargas de grupo (F3.2, D-1): la fuente unica
-  // `cargasGrupoDePano` necesita plantas+grupos. Re-render por edicion de obra:
-  // aceptable (cromo HUD visible solo con un paño seleccionado, fuera del lienzo).
+  // Modelo completo para la linea de cargas de planta (F3.4; antes de grupo): la
+  // fuente unica `cargasPlantaDePano` necesita plantas. Re-render por edicion de
+  // obra: aceptable (cromo HUD visible solo con un paño seleccionado, fuera del lienzo).
   const modelo = modeloStore((s) => s.modelo);
   // Contexto de UI para el estado vacio: solo en Isovalores (editor principal del paño)
   // y con la herramienta de seleccion.
@@ -144,9 +144,10 @@ export function InspectorPano() {
   const panoId = seleccion.length === 1 ? seleccion[0] : null;
   const pano = panoId ? panos.find((p) => p.id === panoId) ?? null : null;
 
-  // Cargas automaticas del grupo que este paño recibira (F3.2, D-1), con la misma
-  // fuente que el discretizador. [] si el grupo no aporta (linea ausente, GAP-H).
-  const cargasGrupo = pano ? cargasGrupoDePano(modelo, pano) : [];
+  // Cargas automaticas de la planta que este paño recibira (F3.4; antes de grupo),
+  // con la misma fuente que el discretizador. [] si la planta no aporta (linea
+  // ausente, GAP-H).
+  const cargasPlanta = pano ? cargasPlantaDePano(modelo, pano) : [];
 
   // Losa PLANA (F2.3; code-review #2): la nota de honestidad se muestra SOLO si el
   // calculo acoplara de verdad pilares interiores a la malla. `pilaresAcoplados` ya
@@ -315,17 +316,17 @@ export function InspectorPano() {
           </p>
         ) : null}
 
-        {/* Linea informativa de cargas de GRUPO (F3.2, D-1): lo que este paño recibe
-            automaticamente de su grupo, con la MISMA fuente que el calculo
-            (cargasGrupoDePano). Ausente si el grupo no aporta (valores a 0). */}
-        {cargasGrupo.length > 0 ? (
+        {/* Linea informativa de cargas de PLANTA (F3.4; antes de grupo): lo que este
+            paño recibe automaticamente de su planta, con la MISMA fuente que el
+            calculo (cargasPlantaDePano). Ausente si la planta no aporta (valores a 0). */}
+        {cargasPlanta.length > 0 ? (
           <p className="cx-note cx-inspector-pano__grupo">
-            Recibe además, del grupo de su planta:{" "}
-            {cargasGrupo
+            Recibe además, de su planta:{" "}
+            {cargasPlanta
               .map(
                 (cg) =>
                   `${fmtCarga(cg.presion)} kN/m² de ${
-                    cg.case === CASE_CM_GRUPO ? "cargas muertas" : "sobrecarga de uso"
+                    cg.case === CASE_CM_PLANTA ? "cargas muertas" : "sobrecarga de uso"
                   }`,
               )
               .join(" y ")}

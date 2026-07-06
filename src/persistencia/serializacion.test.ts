@@ -8,24 +8,16 @@ import {
   importarProyecto,
 } from "./serializacion";
 
-// Modelo con contenido real (no vacio): un grupo, una planta, una seccion, un
-// nudo y un pilar validos. Asi el roundtrip ejercita arrays con datos, no solo
-// estructura vacia. Solo forma/tipos (Zod no exige integridad referencial).
+// Modelo con contenido real (no vacio): una planta, una seccion, un nudo y un
+// pilar validos. Asi el roundtrip ejercita arrays con datos, no solo estructura
+// vacia. Solo forma/tipos (Zod no exige integridad referencial). v4 (plantas sin
+// grupos): la planta lleva su uso; sin paños losa, SU/CM a 0 (inertes).
 function crearModeloConContenido(): Modelo {
   const base = crearModeloVacio();
   return {
     ...base,
-    grupos: [
-      {
-        id: "g1",
-        nombre: "Forjado tipo",
-        categoriaUso: "A",
-        sobrecargaUso: 2,
-        cargasMuertas: 1.5,
-      },
-    ],
     plantas: [
-      { id: "p1", nombre: "Planta baja", cota: 0, altura: 3, grupoId: "g1" },
+      { id: "p1", nombre: "Planta baja", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: "s1", nombre: "30x40", tipo: "hormigonRectangular", b: 0.3, h: 0.4 },

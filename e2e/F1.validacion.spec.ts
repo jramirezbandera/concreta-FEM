@@ -55,34 +55,31 @@ async function pulsarCalcular(panel: Locator): Promise<void> {
   await panel.getByRole("button", { name: "Calcular" }).click();
 }
 
-// Crea UN grupo y UNA planta por el DIALOGO REAL (Obra -> Plantas y grupos) y
-// devuelve el id de la planta creada, leido por la costura `estadoObra()`. Es la
-// minima base necesaria para que `crearViga` tenga una planta valida a la que
-// colgarse. Conducimos UI real (menu Radix + dialogo Radix) para no inventar una
-// via paralela: la creacion de obra-base pasa por donde pasa el usuario.
+// Crea UNA planta por el DIALOGO REAL (Obra -> Plantas) y devuelve el id de la
+// planta creada, leido por la costura `estadoObra()`. Es la minima base necesaria
+// para que `crearViga` tenga una planta valida a la que colgarse. Conducimos UI real
+// (menu Radix + dialogo Radix) para no inventar una via paralela: la creacion de
+// obra-base pasa por donde pasa el usuario. Desde F3.4 no hay grupos: el menu "Obra"
+// abre el dialogo de "Plantas" y "Nueva planta" esta siempre disponible.
 async function crearPlantaPorDialogo(page: Page): Promise<string> {
   // Abrir el menu "Obra" (Radix Menubar tras D12: el trigger es role=menuitem, no
-  // button) y elegir "Plantas y grupos". `exact` para no casar otros textos con "obra".
+  // button) y elegir "Plantas". OJO: el item se busca DENTRO del desplegable
+  // (role=menu): desde F3.4 existe ademas un menu SUPERIOR llamado "Plantas" cuyo
+  // trigger tambien es role=menuitem, y el locator global casaria con ambos.
   await page.getByRole("menuitem", { name: "Obra", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Plantas y grupos" }).click();
+  await page
+    .getByRole("menu")
+    .getByRole("menuitem", { name: "Plantas", exact: true })
+    .click();
 
   // El dialogo es modal (role=dialog); acotamos las acciones a el.
   const dialogo = page.getByRole("dialog");
   await expect(dialogo).toBeVisible();
 
-  // Crear un grupo (se autoselecciona). Gateamos el siguiente paso en la FUENTE DE
-  // VERDAD (el store via la costura), no en el timing de render de Radix: el detalle
-  // del grupo —y con el el boton "Nueva planta"— solo se monta cuando hay un grupo
-  // activo. Esperar a grupos>=1 elimina la carrera vista en --repeat-each (el clic en
-  // "Nueva planta" caia antes de que el detalle del grupo se montara).
+  // Crear una planta. "Nueva planta" ya no depende de un grupo activo (F3.4): esta
+  // disponible siempre. Gateamos en la FUENTE DE VERDAD (el store via la costura), no
+  // en el timing de render de Radix, para evitar carreras en --repeat-each.
   const cx = await bridge(page);
-  await dialogo.getByRole("button", { name: "Nuevo grupo" }).click();
-  await expect
-    .poll(() => cx.evaluate((c) => c.estadoObra().grupos.length))
-    .toBeGreaterThanOrEqual(1);
-
-  // Ahora el detalle del grupo esta montado: el boton "Nueva planta" existe. Click y
-  // gateo de nuevo en el store (planta creada) antes de cerrar.
   await dialogo.getByRole("button", { name: "Nueva planta" }).click();
   await expect
     .poll(() => cx.evaluate((c) => c.estadoObra().plantas.length))

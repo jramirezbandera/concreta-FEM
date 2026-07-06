@@ -16,34 +16,35 @@ import {
   modeloStore,
   seleccionStore,
   vistaStore,
-  crearGrupo,
   crearPlanta,
   crearPilar,
   crearViga,
 } from "../../estado";
-import { crearModeloVacio, plantasDeGrupo } from "../../dominio";
+import { crearModeloVacio } from "../../dominio";
 import { listarSecciones, listarMateriales } from "../../biblioteca";
 
 const modelo = () => modeloStore.getState().getModelo();
 
-// Siembra un grupo + una planta con los comandos reales. Devuelve el id de la
-// planta creada (raiz comun de sembrarPilar/sembrarViga).
-function sembrarGrupoPlanta(): string {
+// Siembra una planta con el comando real (sin grupos desde F3.4). Devuelve el id de
+// la planta creada (raiz comun de sembrarPilar/sembrarViga).
+function sembrarPlanta(): string {
   modeloStore
     .getState()
     .ejecutar(
-      crearGrupo(modelo(), { categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 }),
+      crearPlanta(modelo(), {
+        cota: 0,
+        altura: 3,
+        categoriaUso: "A",
+        sobrecargaUso: 0,
+        cargasMuertas: 0,
+      }),
     );
-  const grupoId = modelo().grupos[0]!.id;
-  modeloStore
-    .getState()
-    .ejecutar(crearPlanta(modelo(), { cota: 0, altura: 3, grupoId }));
-  return plantasDeGrupo(modelo(), grupoId)[0]!.id;
+  return modelo().plantas[0]!.id;
 }
 
-// Siembra un grupo + una planta + un pilar. Devuelve el id del pilar creado.
+// Siembra una planta + un pilar. Devuelve el id del pilar creado.
 function sembrarPilar(): string {
-  const plantaId = sembrarGrupoPlanta();
+  const plantaId = sembrarPlanta();
   modeloStore.getState().ejecutar(
     crearPilar(modelo(), {
       x: 0,
@@ -60,9 +61,9 @@ function sembrarPilar(): string {
   return modelo().pilares[0]!.id;
 }
 
-// Siembra un grupo + una planta + una viga. Devuelve el id de la viga creada.
+// Siembra una planta + una viga. Devuelve el id de la viga creada.
 function sembrarViga(): string {
-  const plantaId = sembrarGrupoPlanta();
+  const plantaId = sembrarPlanta();
   modeloStore.getState().ejecutar(
     crearViga(modelo(), {
       plantaId,

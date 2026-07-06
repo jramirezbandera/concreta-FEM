@@ -23,12 +23,10 @@ function secGenerica(id: string, A: number): Modelo["secciones"][number] {
 // recibe medio pilar -> CM en (x,y) del pilar con peso > 0.
 function modeloConMasa(): Modelo {
   const m = crearModeloVacio();
-  m.grupos.push({
-    id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 0,
-  });
+  // Sin paños losa: sobrecargaUso/cargasMuertas a 0 (inertes; >0 dispararia avisos).
   m.plantas.push(
-    { id: "p0", nombre: "Cimentación", cota: 0, altura: 3, grupoId: "g1" },
-    { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+    { id: "p0", nombre: "Cimentación", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+    { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
   );
   m.secciones.push(secGenerica("s1", 0.04));
   m.pilares.push({
@@ -42,10 +40,7 @@ function modeloConMasa(): Modelo {
 // Modelo con una planta SIN masa (sin pilares/vigas/cargas en ella).
 function modeloSinMasa(): Modelo {
   const m = crearModeloVacio();
-  m.grupos.push({
-    id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 0,
-  });
-  m.plantas.push({ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" });
+  m.plantas.push({ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
   return m;
 }
 

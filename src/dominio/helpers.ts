@@ -1,7 +1,7 @@
 // Helpers puros de consulta sobre el Modelo (Capa 1). Sin estado, sin efectos:
 // solo lectura del modelo y filtrado por id. No validan integridad referencial.
 import { SCHEMA_VERSION } from "./comunes";
-import type { Modelo, Grupo, Planta } from "./modelo";
+import type { Modelo, Planta } from "./modelo";
 import type { Seccion } from "./seccion";
 import type { Nudo } from "./nudo";
 import type { Pilar } from "./pilar";
@@ -9,16 +9,15 @@ import type { Viga } from "./viga";
 import type { Pano } from "./pano";
 import type { Carga, Hipotesis } from "./carga";
 
-export function grupoPorId(modelo: Modelo, id: string): Grupo | undefined {
-  return modelo.grupos.find((g) => g.id === id);
-}
-
 export function plantaPorId(modelo: Modelo, id: string): Planta | undefined {
   return modelo.plantas.find((p) => p.id === id);
 }
 
-export function plantasDeGrupo(modelo: Modelo, grupoId: string): Planta[] {
-  return modelo.plantas.filter((p) => p.grupoId === grupoId);
+// Plantas del modelo ordenadas por cota ASCENDENTE (de cimentacion a cubierta).
+// Sustituye a la antigua plantasDeGrupo (v4, "plantas sin grupos"): el edificio es
+// una unica lista y el orden por cota es el que consumen viewport, HUD y dialogos.
+export function plantasOrdenadas(modelo: Modelo): Planta[] {
+  return modelo.plantas.slice().sort((a, b) => a.cota - b.cota);
 }
 
 export function nudoPorId(modelo: Modelo, id: string): Nudo | undefined {
@@ -114,7 +113,6 @@ export function crearModeloVacio(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [],
     plantas: [],
     nudos: [],
     pilares: [],

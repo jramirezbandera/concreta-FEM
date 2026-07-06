@@ -1,4 +1,4 @@
-// vistaStore: estado de la vista (pestana activa, grupo/planta activos, modo de
+// vistaStore: estado de la vista (pestana activa, planta activa, modo de
 // vista, combinacion activa, plantillas/capturas). Estado de UI, no de obra: NO
 // participa en undo. subscribeWithSelector por coherencia (el shell/viewport se
 // suscriben a campos sueltos sin re-render global).
@@ -52,14 +52,14 @@ export function claveSeccionDock(pestana: Pestana, seccion: string): string {
   return `${pestana}:${seccion}`;
 }
 
-// Dialogos modales de la app: Plantas y grupos (feature-10), Hipotesis
-// (feature-13) y Opciones de analisis (F2.4). La introduccion de CARGAS no necesita
-// dialogo propio: vive en el Inspector del elemento. Los siguientes (biblioteca de
-// secciones...) se anaden aqui.
+// Dialogos modales de la app: Plantas (feature-10; sin grupos desde F3.4),
+// Hipotesis (feature-13) y Opciones de analisis (F2.4). La introduccion de CARGAS
+// no necesita dialogo propio: vive en el Inspector del elemento. Los siguientes
+// (biblioteca de secciones...) se anaden aqui.
 // "seccionPersonalizada" (D3, seccion de hormigon a medida) y "datosGenerales"
 // (D13, nombre de la obra) se anaden en la tanda de decisiones de la auditoria UI/UX.
 export type DialogoActivo =
-  | "gruposPlantas"
+  | "plantas"
   | "hipotesis"
   | "opcionesAnalisis"
   | "seccionPersonalizada"
@@ -137,7 +137,6 @@ export interface DefaultsPano {
 
 interface VistaState {
   pestanaActiva: Pestana;
-  grupoActivoId: string | null;
   plantaActivaId: string | null;
   modoVista: ModoVista;
   combinacionActiva: string | null;
@@ -239,7 +238,6 @@ interface VistaState {
   // CANAL DISTINTO de `animando` (la deformada): se anima independientemente.
   modalAnimando: boolean;
   setPestanaActiva(p: Pestana): void;
-  setGrupoActivo(id: string | null): void;
   setPlantaActiva(id: string | null): void;
   setModoVista(m: ModoVista): void;
   setCombinacionActiva(c: string | null): void;
@@ -300,7 +298,6 @@ interface VistaState {
 export const vistaStore = create<VistaState>()(
   subscribeWithSelector((set) => ({
     pestanaActiva: "entradaPilares",
-    grupoActivoId: null,
     plantaActivaId: null,
     modoVista: "planta",
     combinacionActiva: null,
@@ -358,7 +355,6 @@ export const vistaStore = create<VistaState>()(
     modalEscala: 1,
     modalAnimando: false,
     setPestanaActiva: (p) => set({ pestanaActiva: p }),
-    setGrupoActivo: (id) => set({ grupoActivoId: id }),
     setPlantaActiva: (id) => set({ plantaActivaId: id }),
     setModoVista: (m) => set({ modoVista: m }),
     setCombinacionActiva: (c) => set({ combinacionActiva: c }),

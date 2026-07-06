@@ -207,16 +207,14 @@ export function montar(): void {
 
     estadoObra() {
       // Accesor de LECTURA (ampliacion aditiva del contrato): los specs crean
-      // grupos/plantas por el DIALOGO REAL (UI), pero luego necesitan los ids de
-      // planta para crearPilar/crearViga. Esto los expone sin que el spec tenga que
-      // hurgar en el store. Solo id/nombre/grupoId: lo justo para resolver referencias.
+      // plantas por el DIALOGO REAL (UI), pero luego necesitan los ids de planta
+      // para crearPilar/crearViga. Esto los expone sin que el spec tenga que
+      // hurgar en el store. Solo id/nombre: lo justo para resolver referencias.
       const m = modelo();
       return {
-        grupos: m.grupos.map((g) => ({ id: g.id, nombre: g.nombre })),
         plantas: m.plantas.map((p) => ({
           id: p.id,
           nombre: p.nombre,
-          grupoId: p.grupoId,
         })),
       };
     },

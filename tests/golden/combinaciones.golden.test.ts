@@ -21,9 +21,9 @@
 //  - acciones.test.ts ya verifica `categoriaUso(cat).qk` exhaustivamente por
 //    categoria. AQUI NO se duplica: solo se anade el angulo "pipeline/combo" (que
 //    una sobrecarga variable de magnitud qk se mayora por 1,50 en ELU a traves del
-//    generarCombos REAL). OJO: el CABLEADO categoria -> grupo.sobrecargaUso NO vive
-//    en el pipeline, sino en el dialogo de grupos (DialogoGruposYPlantas); esa parte
-//    se prueba en su test de componente, no aqui. Este golden solo ejercita los
+//    generarCombos REAL). OJO: el CABLEADO categoria -> planta.sobrecargaUso NO vive
+//    en el pipeline, sino en el dialogo de Plantas (DialogoPlantas); esa parte se
+//    prueba en su test de componente, no aqui. Este golden solo ejercita los
 //    FACTORES de combinacion (que es lo unico que el pipeline decide).
 //
 // PIRAMIDE (igual que el resto de golden):
@@ -202,8 +202,8 @@ describe("combinaciones golden · CAPA A (discretizador puro, sin motor)", () =>
   // src/biblioteca/acciones.test.ts; NO se duplican.
   //
   // HONESTIDAD DEL LIMITE: aqui NO se afirma que el discretizador "cablee" la
-  // categoria a la sobrecarga. Ese cableado (categoria -> grupo.sobrecargaUso)
-  // vive en el dialogo de grupos y se prueba en DialogoGruposYPlantas.test.tsx.
+  // categoria a la sobrecarga. Ese cableado (categoria -> planta.sobrecargaUso)
+  // vive en el dialogo de Plantas y se prueba en DialogoPlantas.test.tsx.
   // Este caso solo verifica lo que el PIPELINE decide: el factor variable de ELU
   // (1,50) y su producto por un dato de catalogo, que es lo que llega al solver.
   // -------------------------------------------------------------------------

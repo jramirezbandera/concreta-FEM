@@ -14,7 +14,7 @@
 //
 //  2) EQUILIBRIO GLOBAL con secciones realistas (HA 30x50 / 30x30): la SUMA de
 //     reacciones verticales en los 4 ARRANQUES DE PILAR iguala el peso total
-//     calculado a mano (pp barras + pp losa + carga de usuario + cargas de grupo
+//     calculado a mano (pp barras + pp losa + carga de usuario + cargas de planta
 //     D-1), en ELS y en ELU (1,35·G + 1,50·Q): la carga de la losa BAJA por los
 //     pilares, no por apoyos artificiales (que ya no existen: Capa A).
 //
@@ -83,7 +83,8 @@ function crujia(opts: {
   bordeApoyo: "libre" | "simple";
   qUsuario: number;
   pesoPropio: boolean;
-  grupo?: { sobrecargaUso: number; cargasMuertas: number };
+  // Cargas automaticas de la PLANTA del paño (v4; antes vivian en el grupo, D-1).
+  cargasPlanta?: { sobrecargaUso: number; cargasMuertas: number };
 }): Modelo {
   const [secViga, secPilar] = opts.secciones;
   const hipotesis: Modelo["hipotesis"] = [
@@ -96,17 +97,17 @@ function crujia(opts: {
   }
   return {
     unidades: "kN-m",
-    schemaVersion: 3,
-    grupos: [
-      {
-        id: "g1", nombre: "Grupo 1", categoriaUso: "A",
-        sobrecargaUso: opts.grupo?.sobrecargaUso ?? 0,
-        cargasMuertas: opts.grupo?.cargasMuertas ?? 0,
-      },
-    ],
+    schemaVersion: 4,
+    // v4 (plantas sin grupos): SU/CM viven en la PLANTA del paño (p1, cota 3), que es
+    // donde la losa las recibe. Ponerlas en p0 (sin paño) dispararia PLANTA_CARGA_SIN_PANO;
+    // en p1 la Capa 2 (cargas de planta que bajan a los quads) es identica a la de grupos.
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      {
+        id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A",
+        sobrecargaUso: opts.cargasPlanta?.sobrecargaUso ?? 0,
+        cargasMuertas: opts.cargasPlanta?.cargasMuertas ?? 0,
+      },
     ],
     secciones: [secViga, secPilar],
     nudos: [
@@ -233,18 +234,18 @@ describe("golden placa ACOPLADA Capa B (motor real PyNite)", () => {
   );
 
   it(
-    "B2 · EQUILIBRIO GLOBAL: ΣV en los 4 arranques de pilar = peso total a mano (ELS y ELU con cargas de grupo D-1)",
+    "B2 · EQUILIBRIO GLOBAL: ΣV en los 4 arranques de pilar = peso total a mano (ELS y ELU con cargas de planta D-1)",
     () => {
       if (!arranque?.ok) return;
       const qUsuario = 3; // kN/m² (permanente, h1)
-      const grupo = { sobrecargaUso: 2, cargasMuertas: 1 }; // kN/m² (D-1)
+      const cargasPlanta = { sobrecargaUso: 2, cargasMuertas: 1 }; // kN/m² (D-1)
       const res = discretizarOk(
         crujia({
           secciones: [SEC_VIGA_HA, SEC_PILAR_HA],
           bordeApoyo: "libre",
           qUsuario,
           pesoPropio: true,
-          grupo,
+          cargasPlanta,
         }),
       );
       const r = arranque.motor.calcular(res.modeloFEM);
@@ -259,8 +260,8 @@ describe("golden placa ACOPLADA Capa B (motor real PyNite)", () => {
       const ppPilares = 4 * (0.3 * 0.3 * rho * 3); // 4 pilares de 3 m
       const ppVigas = 4 * (0.3 * 0.5 * rho * LADO); // 4 vigas de LADO m
       const ppLosa = rho * ESPESOR * area;
-      const g = ppPilares + ppVigas + ppLosa + qUsuario * area + grupo.cargasMuertas * area;
-      const q = grupo.sobrecargaUso * area;
+      const g = ppPilares + ppVigas + ppLosa + qUsuario * area + cargasPlanta.cargasMuertas * area;
+      const q = cargasPlanta.sobrecargaUso * area;
 
       // Reacciones SOLO en los arranques de pilar (la Capa A ya lo garantiza en
       // estructura; aqui se ve en la FISICA: nada mas reacciona).

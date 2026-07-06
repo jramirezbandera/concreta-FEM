@@ -4,13 +4,13 @@
 import { describe, it, expect } from "vitest";
 import { boundsEdificio } from "./boundsEdificio";
 import { crearModeloVacio } from "../../dominio";
-import type { Modelo, Grupo, Planta, Nudo, Pilar, Viga } from "../../dominio";
+import type { Modelo, Planta, Nudo, Pilar, Viga } from "../../dominio";
 
-function grupo(id: string): Grupo {
-  return { id, nombre: id, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 };
-}
-function planta(id: string, grupoId: string, cota: number): Planta {
-  return { id, nombre: id, cota, altura: 3, grupoId };
+function planta(id: string, cota: number): Planta {
+  return {
+    id, nombre: id, cota, altura: 3,
+    categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0,
+  };
 }
 function nudo(id: string, x: number, y: number): Nudo {
   return { id, x, y };
@@ -31,8 +31,7 @@ function viga(id: string, plantaId: string, nudoI: string, nudoJ: string): Viga 
 function base(): Modelo {
   return {
     ...crearModeloVacio(),
-    grupos: [grupo("gA")],
-    plantas: [planta("p0", "gA", 0), planta("p1", "gA", 3)],
+    plantas: [planta("p0", 0), planta("p1", 3)],
     nudos: [nudo("n1", 0, 0), nudo("n2", 4, 0)],
   };
 }

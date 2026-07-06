@@ -47,15 +47,14 @@ describe("vistaPreviaCombos", () => {
     expect(lineas.map((l) => l.formula)).toEqual(["—", "—"]);
   });
 
-  // F3.2 (D-1): las cargas automaticas de grupo viajan en cases SINTETICOS que no son
+  // F3.4 (D-1): las cargas automaticas de planta viajan en cases SINTETICOS que no son
   // hipotesis del modelo. La vista previa debe RECOGERLOS (CM=G, uso=Q) sin que la
   // formula cambie de forma: colapsan con el resto de terminos del mismo gamma.
-  it("con un paño y cargas de grupo activas la formula sigue colapsada (sin terminos fantasma)", () => {
+  it("con un paño y cargas de planta activas la formula sigue colapsada (sin terminos fantasma)", () => {
     const m: Modelo = crearModeloVacio();
-    m.grupos = [
-      { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    m.plantas = [
+      { id: "p1", nombre: "P1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
     ];
-    m.plantas = [{ id: "p1", nombre: "P1", cota: 3, altura: 3, grupoId: "g1" }];
     m.nudos = [
       { id: "q1", x: 0, y: 0 },
       { id: "q2", x: 4, y: 0 },
@@ -76,14 +75,13 @@ describe("vistaPreviaCombos", () => {
     expect(lineas[1].formula).toBe("1,00·G + 1,00·Q");
   });
 
-  it("SOLO cargas de grupo (sin hipotesis del modelo): la formula las refleja igualmente", () => {
+  it("SOLO cargas de planta (sin hipotesis del modelo): la formula las refleja igualmente", () => {
     const m: Modelo = crearModeloVacio();
     m.hipotesis = []; // sin hipotesis de usuario NI automatica
     m.analisis = { ...m.analisis, incluirPesoPropio: false };
-    m.grupos = [
-      { id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    m.plantas = [
+      { id: "p1", nombre: "P1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
     ];
-    m.plantas = [{ id: "p1", nombre: "P1", cota: 3, altura: 3, grupoId: "g1" }];
     m.nudos = [
       { id: "q1", x: 0, y: 0 },
       { id: "q2", x: 4, y: 0 },

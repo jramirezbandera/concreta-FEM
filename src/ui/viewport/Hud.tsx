@@ -1,17 +1,17 @@
 // Hud: controles "glass" en HTML posicionados sobre el <Canvas> (no dentro de la
 // escena WebGL; Spec §4.2). Tres zonas canonicas:
-//  - Arriba-izq: GroupRibbon (grupo/planta activos + cota, flechas para cambiar de
-//    planta dentro del grupo).
+//  - Arriba-izq: PlantaRibbon (planta activa + cota, flechas para cambiar de
+//    planta; sin grupos desde F3.4).
 //  - Arriba-der: Segmentado 2D/3D/Mosaico (modo de vista).
 //  - Abajo-der: zoom +/-.
 //
 // El HUD lee vistaStore/modeloStore con useSyncExternalStore (re-render solo al
-// cambiar grupo/planta/modo, nunca por frame). NO usa jerga FEM (CLAUDE.md §17).
+// cambiar planta/modo, nunca por frame). NO usa jerga FEM (CLAUDE.md §17).
 import { useSyncExternalStore } from "react";
 import { modeloStore, vistaStore, type ModoVista } from "../../estado";
 import { Segmentado, type OpcionSegmento, PanelFlotante, Boton } from "../primitivas";
 import { Slot } from "./Slot";
-import { plantasDeGrupo } from "./hooks/useGeometriaModelo";
+import { plantasDelEdificio } from "./hooks/useGeometriaModelo";
 import { emitirZoom } from "./hooks/zoomBus";
 import { emitirEncuadre } from "./hooks/encuadreBus";
 
@@ -32,16 +32,14 @@ function useVista<T>(selector: (s: ReturnType<typeof vistaStore.getState>) => T)
 }
 
 // Re-render cuando cambia el modelo (para refrescar nombres/cotas tras editar la
-// obra) o el grupo/planta activos.
+// obra) o la planta activa.
 function useRibbonData() {
   return useSyncExternalStore(
     (cb) => {
       const offM = modeloStore.subscribe((s) => s.modelo, cb);
-      const offG = vistaStore.subscribe((s) => s.grupoActivoId, cb);
       const offP = vistaStore.subscribe((s) => s.plantaActivaId, cb);
       return () => {
         offM();
-        offG();
         offP();
       };
     },
@@ -51,7 +49,6 @@ function useRibbonData() {
 }
 
 interface RibbonData {
-  grupoNombre: string | null;
   plantaNombre: string | null;
   cota: number | null;
   hayAnterior: boolean;
@@ -61,7 +58,6 @@ interface RibbonData {
 let ribbonCache: RibbonData = vacioRibbon();
 function vacioRibbon(): RibbonData {
   return {
-    grupoNombre: null,
     plantaNombre: null,
     cota: null,
     hayAnterior: false,
@@ -70,16 +66,11 @@ function vacioRibbon(): RibbonData {
 }
 
 function leerRibbon(): RibbonData {
-  const { grupoActivoId, plantaActivaId } = vistaStore.getState();
-  const modelo = modeloStore.getState().modelo;
-  const grupo = grupoActivoId
-    ? (modelo.grupos.find((g) => g.id === grupoActivoId) ?? null)
-    : null;
-  const plantas = plantasDeGrupo(grupoActivoId);
+  const { plantaActivaId } = vistaStore.getState();
+  const plantas = plantasDelEdificio();
   const idx = plantas.findIndex((p) => p.id === plantaActivaId);
   const planta = idx >= 0 ? plantas[idx] : null;
   const next: RibbonData = {
-    grupoNombre: grupo?.nombre ?? null,
     plantaNombre: planta?.nombre ?? null,
     cota: planta?.cota ?? null,
     hayAnterior: idx > 0,
@@ -87,7 +78,6 @@ function leerRibbon(): RibbonData {
   };
   // Estabilidad de referencia para useSyncExternalStore.
   if (
-    next.grupoNombre === ribbonCache.grupoNombre &&
     next.plantaNombre === ribbonCache.plantaNombre &&
     next.cota === ribbonCache.cota &&
     next.hayAnterior === ribbonCache.hayAnterior &&
@@ -99,10 +89,10 @@ function leerRibbon(): RibbonData {
   return next;
 }
 
-// Cambia a la planta adyacente (por cota) dentro del grupo activo.
+// Cambia a la planta adyacente (por cota) del edificio.
 function cambiarPlanta(direccion: 1 | -1): void {
-  const { grupoActivoId, plantaActivaId, setPlantaActiva } = vistaStore.getState();
-  const plantas = plantasDeGrupo(grupoActivoId);
+  const { plantaActivaId, setPlantaActiva } = vistaStore.getState();
+  const plantas = plantasDelEdificio();
   const idx = plantas.findIndex((p) => p.id === plantaActivaId);
   const destino = idx + direccion;
   if (destino >= 0 && destino < plantas.length) {
@@ -110,8 +100,8 @@ function cambiarPlanta(direccion: 1 | -1): void {
   }
 }
 
-function GroupRibbon() {
-  const { grupoNombre, plantaNombre, cota, hayAnterior, haySiguiente } = useRibbonData();
+function PlantaRibbon() {
+  const { plantaNombre, cota, hayAnterior, haySiguiente } = useRibbonData();
   // En 3D/mosaico se ve TODO el edificio (3D pleno, F2c): el tag lo comunica en lenguaje
   // de obra. La cota y las flechas de planta pertenecen a la navegacion 2D por plantas;
   // en 3D pleno se ocultan (mostrar la cota de UNA planta junto a "Edificio completo"
@@ -119,8 +109,8 @@ function GroupRibbon() {
   const enPleno = useVista((s) => s.modoVista) !== "planta";
   return (
     <PanelFlotante
-      titulo={grupoNombre ?? "Sin grupo"}
-      tag={enPleno ? "Edificio completo" : (plantaNombre ?? "—")}
+      titulo="Edificio"
+      tag={enPleno ? "Edificio completo" : (plantaNombre ?? "Sin plantas")}
     >
       {!enPleno && (
         <div className="cx-ribbon-row">
@@ -203,7 +193,7 @@ export function Hud() {
   return (
     <>
       <Slot zona="top-left">
-        <GroupRibbon />
+        <PlantaRibbon />
       </Slot>
       <Slot zona="top-right">
         <SelectorModo />

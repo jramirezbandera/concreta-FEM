@@ -34,9 +34,9 @@ import type { CategoriaUso } from "../dominio/categoria";
 // (qk) y los tres coeficientes de simultaneidad (psi0 combinacion, psi1 frecuente,
 // psi2 casi permanente).
 //
-// CONSUMIDOR REAL del `qk` (feature-13): el DIALOGO de grupos y plantas
-// (`DialogoGruposYPlantas`). Al elegir la categoria de uso de un grupo, asigna
-// `grupo.sobrecargaUso = categoriaUso(cat).qk` (override manual permitido despues),
+// CONSUMIDOR REAL del `qk` (feature-13/F3.4): el DIALOGO de plantas
+// (`DialogoPlantas`). Al elegir la categoria de uso de una planta, asigna
+// `planta.sobrecargaUso = categoriaUso(cat).qk` (override manual permitido despues),
 // y el discretizador toma ese `sobrecargaUso` ya resuelto. El `qk` NO se consulta
 // dentro del discretizador: la categoria se "cablea" a la sobrecarga en la UI.
 // Los `psi` aun NO los usa nadie: son PREPARATORIOS para los combos ELS de F2

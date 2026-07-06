@@ -62,8 +62,8 @@ function clicSeleccion(id: string, shift: boolean): void {
 
 // SINCRONIZAR CONTEXTO al pickear en 3D pleno (F2c). En cualquier vista que NO sea
 // "planta", la geometria muestra todo el edificio; pickear un elemento de otra planta
-// debe mover el contexto activo (grupo/planta) al suyo para que sidebar, inspector,
-// GroupRibbon y plantillas queden coherentes (T-3dpleno-ux). Ademas se cambia a la
+// debe mover el contexto activo (planta) al suyo para que sidebar, inspector,
+// ribbon y plantillas queden coherentes (T-3dpleno-ux). Ademas se cambia a la
 // PESTANA del tipo (pilar->entradaPilares, viga->entradaVigas) para que el inspector
 // correcto este montado (Issue 5-C) -- pero SOLO si ya estamos en una pestana de
 // entrada (en Resultados/Isovalores la seleccion alimenta diagramas; no saltamos).
@@ -75,7 +75,6 @@ function sincronizarContexto3D(id: string, shift: boolean, pestanaTipo: Pestana)
   if (v.modoVista === "planta") return;
   const ctx = resolverContextoElemento(modeloStore.getState().modelo, id);
   if (!ctx) return;
-  v.setGrupoActivo(ctx.grupoActivoId);
   v.setPlantaActiva(ctx.plantaActivaId);
   if (v.pestanaActiva === "entradaPilares" || v.pestanaActiva === "entradaVigas") {
     v.setPestanaActiva(pestanaTipo);

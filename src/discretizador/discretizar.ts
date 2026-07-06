@@ -45,7 +45,7 @@ import {
 } from "./contratoFEM";
 import { type PuntoPlano } from "./mallado";
 import { calcularAcoples } from "./acople";
-import { cargasGrupoDePano } from "./cargasGrupo";
+import { cargasPlantaDePano } from "./cargasPlanta";
 import { validarModelo, type ErrorObra, type ContextoModal } from "./validaciones";
 import { generarCombos } from "./combinaciones";
 // resolverSeccion y las propiedades de barra viven en el modulo hoja
@@ -272,30 +272,18 @@ export function construirBaseFEM(modelo: Modelo, opts?: OpcionesBaseFEM): BaseFE
   // por contexto de creacion, decision 1A). Reglas:
   //  - Se buscan las plantas cuya `cota` coincide con `c` (la cota deriva de
   //    modelo.plantas via cotasDePilar, asi que SIEMPRE existe al menos una).
-  //  - Se PREFIERE una planta del MISMO grupo que el pilar (su grupo lo definen
-  //    plantaInicial/plantaFinal): el arranque y la cabeza del pilar, y por extension
-  //    sus cotas intermedias dentro del tramo, pertenecen a ese grupo.
-  //  - DESEMPATE determinista (mismo grupo o no): la PRIMERA planta por orden canonico
-  //    de `id` (min). Independiente del orden de modelo.plantas (determinismo byte a
-  //    byte, CLAUDE.md §7).
+  //  - DESEMPATE determinista: la PRIMERA planta por orden canonico de `id` (min).
+  //    Independiente del orden de modelo.plantas (determinismo byte a byte,
+  //    CLAUDE.md §7). (En v4 ya no existe la preferencia "del mismo grupo que el
+  //    pilar" de F0.2: sin grupos, dos plantas a la misma cota se desempatan solo
+  //    por id — mismo criterio final que antes cuando el grupo no discriminaba.)
   // No puede devolver undefined para una cota de pilar (la cota proviene de una planta
   // real); si lo hiciera seria un bug interno y el Paso 1b/validacion lo detecta.
-  const gruposDelPilar = (p: Pilar): Set<string> => {
-    const grupos = new Set<string>();
-    const pi = plantaPorId(modelo, p.plantaInicial);
-    const pf = plantaPorId(modelo, p.plantaFinal);
-    if (pi !== undefined) grupos.add(pi.grupoId);
-    if (pf !== undefined) grupos.add(pf.grupoId);
-    return grupos;
-  };
-  const plantaDeCotaPilar = (p: Pilar, c: number): string | undefined => {
-    const grupos = gruposDelPilar(p);
+  const plantaDeCotaPilar = (_p: Pilar, c: number): string | undefined => {
     const enCota = modelo.plantas.filter((pl) => pl.cota === c);
     if (enCota.length === 0) return undefined;
-    const preferidas = enCota.filter((pl) => grupos.has(pl.grupoId));
-    const candidatas = preferidas.length > 0 ? preferidas : enCota;
     // Min por id (orden canonico) = desempate estable e independiente del orden.
-    return candidatas.reduce((min, pl) => (pl.id < min ? pl.id : min), candidatas[0].id);
+    return enCota.reduce((min, pl) => (pl.id < min ? pl.id : min), enCota[0].id);
   };
 
   // Candidatos de planta por clave de nodo (F0.2): clave de snapping -> conjunto de
@@ -1088,13 +1076,14 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
         quad_loads.push({ quad: q.name, presion: presionPP, case: casePesoPropioPano });
       }
     }
-    // Cargas AUTOMATICAS de grupo (F3.2, D-1): cargasMuertas (G) y sobrecargaUso (Q)
-    // del grupo de la planta del paño, como presion uniforme en cases SINTETICOS
-    // (auto-grupo-cm / auto-grupo-uso). La fuente unica `cargasGrupoDePano` [2A] es
-    // la MISMA que consulta generarCombos para poner sus factores: no pueden
-    // divergir. Presion POSITIVA = hacia abajo (mismo idioma sintetico que el peso
-    // propio de losa). Orden determinista por paño: usuario → pp → CM → uso.
-    for (const cg of cargasGrupoDePano(modelo, pano)) {
+    // Cargas AUTOMATICAS de planta (F3.4; antes de grupo, F3.2 D-1): cargasMuertas
+    // (G) y sobrecargaUso (Q) de la planta del paño, como presion uniforme en cases
+    // SINTETICOS (auto-planta-cm / auto-planta-uso). La fuente unica
+    // `cargasPlantaDePano` [2A] es la MISMA que consulta generarCombos para poner
+    // sus factores: no pueden divergir. Presion POSITIVA = hacia abajo (mismo
+    // idioma sintetico que el peso propio de losa). Orden determinista por paño:
+    // usuario → pp → CM → uso.
+    for (const cg of cargasPlantaDePano(modelo, pano)) {
       for (const q of malla.quads) {
         quad_loads.push({ quad: q.name, presion: cg.presion, case: cg.case });
       }

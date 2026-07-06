@@ -26,10 +26,9 @@ const FEM_3_2_1 = {
 // para la rama "no-calculable" (sin resultados vigentes, se discretiza el modelo).
 function modeloNoCalculable(): Modelo {
   const m = crearModeloVacio();
-  m.grupos.push({ id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 0 });
   m.plantas.push(
-    { id: "p0", nombre: "Cim", cota: 0, altura: 3, grupoId: "g1" },
-    { id: "p1", nombre: "P1", cota: 3, altura: 3, grupoId: "g1" },
+    { id: "p0", nombre: "Cim", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+    { id: "p1", nombre: "P1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
   );
   m.secciones.push({ id: "s1", nombre: "s1", tipo: "generico", A: 0.04, Iy: 1e-4, Iz: 1e-4, J: 1e-4 });
   m.pilares.push({

@@ -12,23 +12,17 @@ import { CargaSchema, HipotesisSchema } from "./carga";
 import { PanoSchema } from "./pano";
 import { MuroSchema } from "./muro";
 
-// Grupo: agrupa plantas con misma definicion de uso y cargas (vocabulario CYPECAD).
-export const GrupoSchema = z.object({
-  id: IdSchema,
-  nombre: NombreSchema,
-  categoriaUso: CategoriaUsoSchema,
-  sobrecargaUso: NumeroFinitoSchema, // [A-3] finito: Infinity aqui = carga basura
-  cargasMuertas: NumeroFinitoSchema,
-});
-export type Grupo = z.infer<typeof GrupoSchema>;
-
-// Planta: nivel con cota y altura libre, perteneciente a un grupo.
+// Planta: nivel con cota y altura libre. Desde v4 ("plantas sin grupos") la planta
+// absorbe el uso y las cargas superficiales automaticas que antes vivian en `Grupo`:
+// el arquitecto introduce UN edificio como lista de plantas, sin jerarquia extra.
 export const PlantaSchema = z.object({
   id: IdSchema,
   nombre: NombreSchema,
   cota: NumeroFinitoSchema, // [A-3] finito: la cota entra en la geometria FEM
   altura: NumeroFinitoSchema,
-  grupoId: IdSchema,
+  categoriaUso: CategoriaUsoSchema,
+  sobrecargaUso: NumeroFinitoSchema, // [A-3] finito: Infinity aqui = carga basura
+  cargasMuertas: NumeroFinitoSchema,
 });
 export type Planta = z.infer<typeof PlantaSchema>;
 
@@ -55,7 +49,6 @@ export type OpcionesAnalisis = z.infer<typeof OpcionesAnalisisSchema>;
 export const ModeloSchema = z.object({
   unidades: z.literal("kN-m"),
   schemaVersion: z.number(),
-  grupos: z.array(GrupoSchema),
   plantas: z.array(PlantaSchema),
   // Recursos referenciados por pilares/vigas. Las secciones se PERSISTEN aqui
   // (a diferencia de los materiales, que son catalogo fijo: Opcion A feature-3),

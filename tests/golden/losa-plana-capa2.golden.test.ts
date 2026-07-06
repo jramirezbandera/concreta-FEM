@@ -90,12 +90,11 @@ function crujia(interiores: Array<[number, number]>): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      { id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
-    ],
+    // v4 (plantas sin grupos): la losa recibe SU/CM de SU planta. Aqui valen 0 (como el
+    // grupo original), asi que la Capa 2 no cambia.
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: SECCION, nombre: "Seccion 30x50", tipo: "hormigonRectangular", b: 0.3, h: 0.5 },
@@ -373,12 +372,10 @@ function losaSoloPilares(interiores: Array<[number, number]>): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      { id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
-    ],
+    // v4 (plantas sin grupos): SU/CM en la planta (0, como el grupo original -> Capa 2 igual).
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: SECCION, nombre: "Seccion 30x50", tipo: "hormigonRectangular", b: 0.3, h: 0.5 },

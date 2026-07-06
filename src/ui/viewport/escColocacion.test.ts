@@ -17,11 +17,11 @@ describe("debeIgnorarEscColocacion (UX-C11)", () => {
 
   it("ignora el Esc si hay un dialogo abierto (dialogoActivo != null)", () => {
     // Cerrar un dialogo con Esc no debe ademas cancelar la colocacion.
-    expect(debeIgnorarEscColocacion(false, "gruposPlantas")).toBe(true);
+    expect(debeIgnorarEscColocacion(false, "plantas")).toBe(true);
     expect(debeIgnorarEscColocacion(false, "hipotesis")).toBe(true);
   });
 
   it("ignora el Esc si se dan ambas condiciones", () => {
-    expect(debeIgnorarEscColocacion(true, "gruposPlantas")).toBe(true);
+    expect(debeIgnorarEscColocacion(true, "plantas")).toBe(true);
   });
 });

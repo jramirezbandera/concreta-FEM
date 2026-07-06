@@ -108,11 +108,11 @@ function obraLosaPlana(opts: { lado: number; secLado: number; altura: number; q:
   ];
   return {
     unidades: "kN-m",
-    schemaVersion: 3,
-    grupos: [{ id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 }],
+    schemaVersion: 4,
+    // v4 (plantas sin grupos): SU/CM en la planta (0, como el grupo original).
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: opts.altura, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: opts.altura, altura: opts.altura, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: opts.altura, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: opts.altura, altura: opts.altura, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [secPilar],
     nudos: [

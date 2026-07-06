@@ -6,10 +6,10 @@
 import { SCHEMA_VERSION } from "../dominio/comunes";
 import { ModeloSchema, type Modelo } from "../dominio/modelo";
 import { ID_HIP_PESO_PROPIO } from "../dominio/helpers";
-// Ids RESERVADOS de los cases sinteticos de cargas de grupo (F3.2, [OV-4]). Import
-// directo al modulo HOJA (puro, solo depende de ../dominio): no arrastra el resto
-// del discretizador a la frontera de persistencia.
-import { CASE_CM_GRUPO, CASE_USO_GRUPO } from "../discretizador/cargasGrupo";
+// Ids RESERVADOS de los cases sinteticos de cargas de planta (F3.4; antes de
+// grupo, F3.2 [OV-4]). Import directo al modulo HOJA (puro, solo depende de
+// ../dominio): no arrastra el resto del discretizador a la frontera de persistencia.
+import { CASE_CM_PLANTA, CASE_USO_PLANTA } from "../discretizador/cargasPlanta";
 import type { ZodIssue } from "zod";
 
 // Resultado espejo de `ResultadoDiscretizacion` (feature-4): mismo patron
@@ -310,13 +310,85 @@ function migrarV2aV3(datos: unknown): ResultadoMigracion {
   return { datos: { ...obj, schemaVersion: 3 }, avisos };
 }
 
+// Tipos de forma para leer un raw v3 sin validarlo todavia (la migracion v3->v4
+// solo toca grupos/plantas; el resto viaja intacto).
+type GrupoCrudo = {
+  id?: unknown;
+  categoriaUso?: unknown;
+  sobrecargaUso?: unknown;
+  cargasMuertas?: unknown;
+};
+type PlantaCruda = Record<string, unknown> & { grupoId?: unknown };
+
+// Migracion de model-schema v3 -> v4 (F3.4, "plantas sin grupos"). v4 ELIMINA el
+// concepto de Grupo: `Modelo.grupos` desaparece y cada `Planta` absorbe
+// categoriaUso/sobrecargaUso/cargasMuertas de su antiguo grupo (y pierde `grupoId`).
+//
+// REGLAS:
+//  - Planta cuyo grupoId resuelve: HEREDA los tres valores del grupo tal cual
+//    (aunque fueran invalidos: la validacion Zod final los señalara con la ruta de
+//    la planta, igual que antes lo hacia con la del grupo). Preserva resultados: el
+//    calculo con los valores heredados es identico al de v3.
+//  - Planta con grupoId roto o ausente: categoriaUso "A" y cargas a CERO (no se
+//    INVENTA carga en un proyecto ajeno) + aviso en lenguaje de obra.
+//  - `grupos` se elimina del raw.
+function migrarV3aV4(datos: unknown): ResultadoMigracion {
+  // Si el raw no es un objeto, no reestructuramos: la validacion Zod final lo
+  // rechazara con una ruta legible (no es trabajo de la migracion validar).
+  if (typeof datos !== "object" || datos === null) {
+    return { datos: { ...(datos as object), schemaVersion: 4 } };
+  }
+  const obj = { ...(datos as Record<string, unknown>) };
+  const avisos: string[] = [];
+
+  const gruposOriginal: GrupoCrudo[] = Array.isArray(obj.grupos)
+    ? (obj.grupos as GrupoCrudo[])
+    : [];
+  const grupoPorId = new Map<string, GrupoCrudo>();
+  for (const g of gruposOriginal) {
+    if (typeof g?.id === "string") grupoPorId.set(g.id, g);
+  }
+
+  const plantasOriginal: PlantaCruda[] = Array.isArray(obj.plantas)
+    ? (obj.plantas as PlantaCruda[])
+    : [];
+  const huerfanas: string[] = [];
+  obj.plantas = plantasOriginal.map((p) => {
+    const { grupoId, ...resto } = p;
+    const grupo = typeof grupoId === "string" ? grupoPorId.get(grupoId) : undefined;
+    if (grupo !== undefined) {
+      return {
+        ...resto,
+        categoriaUso: grupo.categoriaUso,
+        sobrecargaUso: grupo.sobrecargaUso,
+        cargasMuertas: grupo.cargasMuertas,
+      };
+    }
+    huerfanas.push(typeof p.nombre === "string" ? p.nombre : "(sin nombre)");
+    return { ...resto, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 };
+  });
+  delete obj.grupos;
+
+  if (huerfanas.length > 0) {
+    avisos.push(
+      `Al actualizar el proyecto no se encontró el grupo de ${
+        huerfanas.length === 1 ? "la planta" : "las plantas"
+      } ${huerfanas.map((n) => `"${n}"`).join(", ")}: sus cargas de uso y muertas quedaron a cero. Revísalas en el diálogo de Plantas.`,
+    );
+  }
+
+  return { datos: { ...obj, schemaVersion: 4 }, avisos };
+}
+
 // Registro indexado por version de origen: `MIGRACIONES[v]` transforma v -> v+1.
 // `MIGRACIONES[1]` lleva v1 -> v2 (F2a, model-schema); `MIGRACIONES[2]` lleva
-// v2 -> v3 (F3 corte 1, paño losa). La cadena de `migrarYValidar` los aplica en
-// orden ascendente hasta `SCHEMA_VERSION`.
+// v2 -> v3 (F3 corte 1, paño losa); `MIGRACIONES[3]` lleva v3 -> v4 (F3.4, plantas
+// sin grupos). La cadena de `migrarYValidar` los aplica en orden ascendente hasta
+// `SCHEMA_VERSION`.
 const MIGRACIONES: Record<number, Migracion> = {
   1: migrarV1aV2,
   2: migrarV2aV3,
+  3: migrarV3aV4,
 };
 
 // Lee `schemaVersion` de forma defensiva: `raw` es `unknown` y puede no ser un
@@ -417,13 +489,13 @@ export function migrarYValidar(
   return { ok: true, modelo: saneado.modelo, avisos: [...avisos, ...saneado.avisos] };
 }
 
-// Renombra las hipotesis cuyo id es un case sintetico reservado (auto-grupo-cm /
-// auto-grupo-uso) a un id libre y re-apunta `modelo.cargas[].hipotesisId`. La
+// Renombra las hipotesis cuyo id es un case sintetico reservado (auto-planta-cm /
+// auto-planta-uso) a un id libre y re-apunta `modelo.cargas[].hipotesisId`. La
 // colision es casi imposible con ids generados por la app (opacos), pero un .json
 // editado a mano es justo el borde que esta frontera protege. PURA (no muta la
 // entrada).
 function sanearIdsReservados(modelo: Modelo): { modelo: Modelo; avisos: string[] } {
-  const reservados = new Set<string>([CASE_CM_GRUPO, CASE_USO_GRUPO]);
+  const reservados = new Set<string>([CASE_CM_PLANTA, CASE_USO_PLANTA]);
   const intrusas = modelo.hipotesis.filter((h) => reservados.has(h.id));
   if (intrusas.length === 0) return { modelo, avisos: [] };
 
@@ -442,7 +514,7 @@ function sanearIdsReservados(modelo: Modelo): { modelo: Modelo; avisos: string[]
     ocupados.add(candidato);
     renombres.set(h.id, candidato);
     avisos.push(
-      `La hipótesis "${h.nombre}" usaba un identificador reservado para las cargas automáticas de grupo y se ha ajustado internamente; sus cargas se conservan.`,
+      `La hipótesis "${h.nombre}" usaba un identificador reservado para las cargas automáticas de planta y se ha ajustado internamente; sus cargas se conservan.`,
     );
   }
   return {

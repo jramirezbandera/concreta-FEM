@@ -53,14 +53,11 @@ import { modeloStore, vistaStore, crStore } from "../../estado";
 import { crearModeloVacio } from "../../dominio";
 import type { Modelo } from "../../dominio";
 
-// Modelo con UN grupo + una planta (para resolver nombre/cota de la planta activa). No
-// hace falta geometria real: el CR a mostrar se inyecta por crStore.
+// Modelo con una planta (para resolver nombre/cota de la planta activa). No hace falta
+// geometria real: el CR a mostrar se inyecta por crStore.
 function modeloConPlanta(): Modelo {
   const m = crearModeloVacio();
-  m.grupos.push({
-    id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 0,
-  });
-  m.plantas.push({ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" });
+  m.plantas.push({ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
   return m;
 }
 

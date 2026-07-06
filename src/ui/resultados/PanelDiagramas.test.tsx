@@ -106,12 +106,9 @@ function traza(): Trazabilidad {
 function obraConPlantas(): Modelo {
   return {
     ...crearModeloVacio(),
-    grupos: [
-      { id: "g1", nombre: "G", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-    ],
     plantas: [
-      { id: "pl1", nombre: "Planta baja", cota: 3, altura: 3, grupoId: "g1" },
-      { id: "pl2", nombre: "Planta 1", cota: 6, altura: 3, grupoId: "g1" },
+      { id: "pl1", nombre: "Planta baja", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "pl2", nombre: "Planta 1", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
   };
 }

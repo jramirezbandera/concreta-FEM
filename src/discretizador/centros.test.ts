@@ -7,7 +7,7 @@ import { SCHEMA_VERSION, ID_HIP_PESO_PROPIO } from "../dominio";
 // Verifican el REPARTO especificado en E5: peso propio (A·rho·L via helper) + cargas
 // lineales permanentes sobre vigas + cargas nodales permanentes; medio pilar a cada
 // forjado; SIEMPRE incluye peso propio (independiente de incluirPesoPropio); excluye
-// Grupo.cargasMuertas; planta sin masa -> null.
+// Planta.cargasMuertas sin paño (v4); planta sin masa -> null.
 
 const MATERIAL = "S275"; // acero, peso = 78.5 kN/m³ (catalogo)
 const RHO = 78.5;
@@ -25,10 +25,12 @@ function modeloBase(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [{ id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 0 }],
+    // v4 "plantas sin grupos": uso/cargas en cada planta. La base no tiene paños, asi
+    // que sobrecargaUso/cargasMuertas van a 0 (inertes sin paño; los tests de losa que
+    // los necesitan los fijan en la planta del paño).
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [],
     nudos: [],
@@ -205,12 +207,15 @@ describe("calcularCentroMasaPlanta - invariantes E5", () => {
     expect(cmOff.pesoTotal).toBeCloseTo(cmOn.pesoTotal, 12);
   });
 
-  it("CM excluye Grupo.cargasMuertas (cambiar cargasMuertas no mueve el CM ni el peso)", () => {
+  it("CM excluye Planta.cargasMuertas sin paño (cambiar cargasMuertas no mueve el CM ni el peso)", () => {
     const sin = modeloBase();
     sin.secciones = [secGenerica("s1", 0.01)];
     sin.pilares = [pilar("a", 2, 7, "s1")];
     const con = structuredClone(sin);
-    con.grupos[0].cargasMuertas = 999; // kN/m²: debe ser ignorado (sin area tributaria)
+    // Sin paño no hay area tributaria: cargasMuertas de la planta se ignora en el CM.
+    con.plantas = con.plantas.map((p) =>
+      p.id === "p1" ? { ...p, cargasMuertas: 999 } : p,
+    );
 
     const cmSin = calcularCentroMasaPlanta(sin, "p1")!;
     const cmCon = calcularCentroMasaPlanta(con, "p1")!;
@@ -374,7 +379,7 @@ describe("AUDITORIA M-7: pilar pasante y masa tributaria por planta", () => {
   //   p2 (extremo):    medio tramo superior  = 1.5 m -> 1.1775 kN
   function modeloPasante(): Modelo {
     const m = modeloBase();
-    m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+    m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
     m.secciones = [secGenerica("s1", 0.01)];
     m.pilares = [pilar("pas", 4, 7, "s1", "p0", "p2")];
     return m;
@@ -420,7 +425,7 @@ describe("AUDITORIA M-7: pilar pasante y masa tributaria por planta", () => {
 // ============================================================================
 // F3.2 · Termino 4: PAÑOS LOSA en el CM (cierra T-cm-cargas-muertas). Con el
 // acople la masa de la losa existe de verdad: peso propio rho·t·A + cargas
-// muertas del GRUPO·A (fuente unica, solo permanente) + superficiales
+// muertas de la PLANTA·A (v4; fuente unica, solo permanente) + superficiales
 // PERMANENTES de usuario·A, en el centroide del rectangulo.
 // ============================================================================
 describe("centro de masas · paños losa (F3.2, T-cm-cargas-muertas)", () => {
@@ -443,9 +448,10 @@ describe("centro de masas · paños losa (F3.2, T-cm-cargas-muertas)", () => {
   const AREA = 8; // m²
   const PP_LOSA = 25 * 0.2 * AREA; // rho HA-25 · espesor · area = 40 kN
 
-  it("losa sola: CM en el centroide del rectangulo con peso rho·t·A + CM_grupo·A", () => {
+  it("losa sola: CM en el centroide del rectangulo con peso rho·t·A + CM_planta·A", () => {
     const m = conLosa(modeloBase());
-    m.grupos = [{ ...m.grupos[0], cargasMuertas: 1.5 }]; // 1.5·8 = 12 kN
+    // La planta del paño (p1) declara sus cargas muertas: 1.5·8 = 12 kN.
+    m.plantas = m.plantas.map((p) => (p.id === "p1" ? { ...p, cargasMuertas: 1.5 } : p));
     const cm = calcularCentroMasaPlanta(m, "p1");
     expect(cm).not.toBeNull();
     expect(cm!.x).toBeCloseTo(2, 10);
@@ -453,16 +459,14 @@ describe("centro de masas · paños losa (F3.2, T-cm-cargas-muertas)", () => {
     expect(cm!.pesoTotal).toBeCloseTo(PP_LOSA + 12, 10);
   });
 
-  it("la SOBRECARGA DE USO del grupo NO entra (el CM cuenta solo permanentes)", () => {
+  it("la SOBRECARGA DE USO de la planta NO entra (el CM cuenta solo permanentes)", () => {
     const base = conLosa(modeloBase());
-    const conUso = calcularCentroMasaPlanta(
-      { ...base, grupos: [{ ...base.grupos[0], sobrecargaUso: 5 }] },
-      "p1",
-    );
-    const sinUso = calcularCentroMasaPlanta(
-      { ...base, grupos: [{ ...base.grupos[0], sobrecargaUso: 0 }] },
-      "p1",
-    );
+    const conSU = (su: number): Modelo => ({
+      ...base,
+      plantas: base.plantas.map((p) => (p.id === "p1" ? { ...p, sobrecargaUso: su } : p)),
+    });
+    const conUso = calcularCentroMasaPlanta(conSU(5), "p1");
+    const sinUso = calcularCentroMasaPlanta(conSU(0), "p1");
     expect(conUso!.pesoTotal).toBeCloseTo(sinUso!.pesoTotal, 12);
   });
 

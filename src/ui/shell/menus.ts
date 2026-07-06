@@ -8,7 +8,7 @@ import type { Pestana } from "../../estado";
 // activen mas menus se anaden valores aqui (p. ej. "abrirCargas", "calcular").
 export type AccionMenu =
   | "abrirDatosGenerales"
-  | "abrirGruposPlantas"
+  | "abrirPlantas"
   | "abrirHipotesis"
   | "abrirOpcionesAnalisis"
   | "activarHerramientaPilar"
@@ -57,7 +57,7 @@ const OBRA: MenuDef = {
     // "Datos generales" abre el diálogo del nombre de la obra (D13). "Materiales" sigue
     // como placeholder (sin destino todavía).
     { etiqueta: "Datos generales", accion: "abrirDatosGenerales" },
-    { etiqueta: "Plantas y grupos", accion: "abrirGruposPlantas" },
+    { etiqueta: "Plantas", accion: "abrirPlantas" },
     "Materiales",
   ],
 };
@@ -76,20 +76,19 @@ const EDICION: MenuDef = {
     { etiqueta: "Eliminar", accion: "borrarSeleccion" },
   ],
 };
-const GRUPOS: MenuDef = {
-  etiqueta: "Grupos",
-  // En F10 los tres abren el mismo dialogo de Plantas y grupos. El matiz de
-  // "crear directamente" (nuevo grupo/planta sin pasar por el dialogo) se
-  // afinara mas adelante.
+const PLANTAS: MenuDef = {
+  etiqueta: "Plantas",
+  // Ambos abren el mismo dialogo de Plantas (F3.4, sin grupos). El matiz de
+  // "crear directamente" (nueva planta sin pasar por el dialogo) se afinara mas
+  // adelante.
   items: [
-    { etiqueta: "Nuevo grupo", accion: "abrirGruposPlantas" },
-    { etiqueta: "Nueva planta", accion: "abrirGruposPlantas" },
-    { etiqueta: "Gestionar plantas y grupos", accion: "abrirGruposPlantas" },
+    { etiqueta: "Nueva planta", accion: "abrirPlantas" },
+    { etiqueta: "Gestionar plantas", accion: "abrirPlantas" },
   ],
 };
 const VISTAS: MenuDef = {
   etiqueta: "Vistas",
-  items: ["Planta de grupo", "Vista 3D", "Mosaico", "Ajustar a ventana"],
+  items: ["Planta", "Vista 3D", "Mosaico", "Ajustar a ventana"],
 };
 const AYUDA: MenuDef = {
   etiqueta: "Ayuda",
@@ -110,7 +109,7 @@ export const MENUS_POR_PESTANA: Record<Pestana, MenuDef[]> = {
       ],
     },
     EDICION,
-    GRUPOS,
+    PLANTAS,
     VISTAS,
     AYUDA,
   ],
@@ -161,7 +160,7 @@ export const MENUS_POR_PESTANA: Record<Pestana, MenuDef[]> = {
         { etiqueta: "Opciones de cálculo…", accion: "abrirOpcionesAnalisis" },
       ],
     },
-    GRUPOS,
+    PLANTAS,
     VISTAS,
     AYUDA,
   ],

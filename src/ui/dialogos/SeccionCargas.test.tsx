@@ -30,14 +30,15 @@ beforeAll(() => {
 // trae las dos hipotesis sembradas (Cargas muertas, Sobrecarga de uso).
 function modeloConViga(): Modelo {
   const m = crearModeloVacio();
-  m.grupos.push({
-    id: "g1",
-    nombre: "G1",
+  m.plantas.push({
+    id: "pl1",
+    nombre: "Planta 1",
+    cota: 3,
+    altura: 3,
     categoriaUso: "A",
-    sobrecargaUso: 2,
-    cargasMuertas: 1,
+    sobrecargaUso: 0,
+    cargasMuertas: 0,
   });
-  m.plantas.push({ id: "pl1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" });
   m.nudos.push({ id: "n1", x: 0, y: 0 }, { id: "n2", x: 5, y: 0 });
   m.vigas.push({
     id: "V-1",

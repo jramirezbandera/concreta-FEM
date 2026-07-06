@@ -33,19 +33,15 @@ describe("migrarYValidar — caso feliz", () => {
 
   it("acepta un Modelo con elementos de obra", () => {
     const modelo = crearModeloVacio();
-    modelo.grupos.push({
-      id: "g1",
-      nombre: "Cubierta",
-      categoriaUso: "A",
-      sobrecargaUso: 2,
-      cargasMuertas: 1,
-    });
+    // v4 (plantas sin grupos): la planta lleva su propio uso; sin paños losa, SU/CM a 0.
     modelo.plantas.push({
       id: "p1",
       nombre: "Planta 1",
       cota: 3,
       altura: 3,
-      grupoId: "g1",
+      categoriaUso: "A",
+      sobrecargaUso: 0,
+      cargasMuertas: 0,
     });
     const pilar: Pilar = {
       id: "pi1",
@@ -445,6 +441,139 @@ describe("migrarYValidar — v2 -> v3: descarta paños-stub", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Migracion REAL de model-schema v3 -> v4 (F3.4, "plantas sin grupos"). v4 ELIMINA
+// el concepto de Grupo: `Modelo.grupos` desaparece y cada `Planta` HEREDA de su
+// antiguo grupo categoriaUso/sobrecargaUso/cargasMuertas (y pierde `grupoId`). Un raw
+// v3 con grupos es INPUT VALIDO (dato historico): estos tests prueban justo la
+// conversion, no la "arreglan" quitandole los grupos. La forma final v4 (sin grupos,
+// planta con uso propio) la valida ModeloSchema al cierre de la cadena.
+// ---------------------------------------------------------------------------
+
+// Fabrica un proyecto v3 valido: forma anterior a F3.4 (schemaVersion:3, con `grupos`
+// y plantas con `grupoId`). El resto (hipotesis con automatica, analisis F2a) ya en su
+// forma vigente para que la unica migracion con efecto sea v3->v4.
+function proyectoV3(
+  grupos: unknown[],
+  plantas: unknown[],
+): Record<string, unknown> {
+  return {
+    unidades: "kN-m",
+    schemaVersion: 3,
+    grupos,
+    plantas,
+    secciones: [],
+    nudos: [],
+    pilares: [],
+    vigas: [],
+    panos: [],
+    muros: [],
+    cargas: [],
+    hipotesis: [
+      { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente", automatica: false },
+      { id: "hip-sobrecarga-uso", nombre: "Sobrecarga de uso", tipo: "variable", automatica: false },
+      { id: ID_AUTO, nombre: "Peso propio", tipo: "permanente", automatica: true },
+    ],
+    analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: true },
+  };
+}
+
+describe("migrarYValidar — v3 -> v4: plantas sin grupos", () => {
+  it("(a) cada planta HEREDA categoriaUso/SU/CM de su grupo", () => {
+    const r = ok(
+      migrarYValidar(
+        proyectoV3(
+          [
+            { id: "g1", nombre: "Forjado tipo", categoriaUso: "C", sobrecargaUso: 3, cargasMuertas: 1.5 },
+            { id: "g2", nombre: "Cubierta", categoriaUso: "A", sobrecargaUso: 1, cargasMuertas: 2 },
+          ],
+          [
+            { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+            { id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g2" },
+          ],
+        ),
+      ),
+    );
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    const p1 = r.modelo.plantas.find((p) => p.id === "p1")!;
+    const p2 = r.modelo.plantas.find((p) => p.id === "p2")!;
+    // La Capa 1 v4 lleva el uso en la propia planta, heredado del grupo tal cual.
+    expect(p1).toMatchObject({ categoriaUso: "C", sobrecargaUso: 3, cargasMuertas: 1.5 });
+    expect(p2).toMatchObject({ categoriaUso: "A", sobrecargaUso: 1, cargasMuertas: 2 });
+    // Ninguna planta conserva grupoId (campo eliminado en v4).
+    expect(r.modelo.plantas.every((p) => !("grupoId" in p))).toBe(true);
+  });
+
+  it("(b) planta con grupoId roto -> categoriaUso 'A', SU/CM a 0 + aviso", () => {
+    const r = ok(
+      migrarYValidar(
+        proyectoV3(
+          [{ id: "g1", nombre: "G1", categoriaUso: "B", sobrecargaUso: 2, cargasMuertas: 1 }],
+          [
+            { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+            // grupoId apunta a un grupo inexistente: huerfana.
+            { id: "p2", nombre: "Terraza", cota: 6, altura: 3, grupoId: "no-existe" },
+          ],
+        ),
+      ),
+    );
+    const p2 = r.modelo.plantas.find((p) => p.id === "p2")!;
+    // No se INVENTA carga en un proyecto ajeno: uso "A" y cargas a cero.
+    expect(p2).toMatchObject({ categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
+    // Aviso en lenguaje de obra que nombra la planta huerfana.
+    expect(r.avisos.some((a) => /grupo/i.test(a) && a.includes("Terraza"))).toBe(true);
+  });
+
+  it("(c) `grupos` desaparece del modelo resultante", () => {
+    const r = ok(
+      migrarYValidar(
+        proyectoV3(
+          [{ id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 }],
+          [{ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" }],
+        ),
+      ),
+    );
+    // El modelo v4 ya no tiene `grupos` (ModeloSchema lo desconoce y no lo emite).
+    expect("grupos" in r.modelo).toBe(false);
+  });
+
+  it("(d) cadena completa v1 -> v4 desde un raw v1 con grupos", () => {
+    // Un raw v1 legitimo: sin `automatica` ni `incluirPesoPropio` (los siembra v1->v2),
+    // con `grupos` + plantas con grupoId (los absorbe v3->v4). La cadena corre entera.
+    const rawV1: Record<string, unknown> = {
+      unidades: "kN-m",
+      schemaVersion: 1,
+      grupos: [{ id: "g1", nombre: "G1", categoriaUso: "D", sobrecargaUso: 5, cargasMuertas: 2 }],
+      plantas: [{ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" }],
+      secciones: [],
+      nudos: [],
+      pilares: [],
+      vigas: [],
+      panos: [],
+      muros: [],
+      cargas: [],
+      hipotesis: [
+        { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+      ],
+      analisis: { tipo: "lineal", comprobarEstatica: true },
+    };
+    const r = ok(migrarYValidar(rawV1));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    // v1->v2 sembro la automatica de peso propio...
+    expect(autoDe(r.modelo)).toHaveLength(1);
+    expect(r.modelo.analisis.incluirPesoPropio).toBe(true);
+    // ...y v3->v4 volco el uso del grupo a la planta y borro `grupos`.
+    expect(r.modelo.plantas[0]).toMatchObject({
+      categoriaUso: "D",
+      sobrecargaUso: 5,
+      cargasMuertas: 2,
+    });
+    expect("grupos" in r.modelo).toBe(false);
+    // Aviso de actualizacion de esquema (la cadena corrio varios pasos).
+    expect(r.avisos.some((a) => /actualiz/i.test(a))).toBe(true);
+  });
+});
+
 // Round-trip de un Modelo v3 nativo con un paño losa: export a texto -> import.
 // La frontera Zod (migrarYValidar via importarProyecto) lo acepta y el paño losa
 // sobrevive estable (no se descarta: ya esta en la forma v3).
@@ -519,12 +648,13 @@ describe("migrarYValidar — cadena de migraciones inyectada (T3)", () => {
 });
 
 // ============================================================================
-// F3.2 [OV-4]: SANEO de ids reservados (cases sinteticos de cargas de grupo).
-// Un .json editado a mano con una hipotesis cuyo id sea "auto-grupo-cm"/"-uso"
-// pasaria de valido a INCALCULABLE (el id no se edita desde la UI): la frontera
-// lo renombra a un hueco libre y re-apunta sus cargas — importar nunca rompe.
+// [OV-4]: SANEO de ids reservados (cases sinteticos de cargas de planta). Desde
+// F3.4 los ids reservados son "auto-planta-cm"/"auto-planta-uso" (antes, F3.2, eran
+// "auto-grupo-*"). Un .json editado a mano con una hipotesis cuyo id sea uno de esos
+// pasaria de valido a INCALCULABLE (el id no se edita desde la UI): la frontera lo
+// renombra a un hueco libre y re-apunta sus cargas — importar nunca rompe.
 // ============================================================================
-describe("migrarYValidar · saneo de ids reservados (F3.2, OV-4)", () => {
+describe("migrarYValidar · saneo de ids reservados (OV-4)", () => {
   function modeloConIntrusa(id: string): Modelo {
     const m = crearModeloVacio();
     m.hipotesis = [
@@ -540,32 +670,32 @@ describe("migrarYValidar · saneo de ids reservados (F3.2, OV-4)", () => {
   }
 
   it("renombra la hipotesis intrusa, re-apunta sus cargas y avisa", () => {
-    const r = migrarYValidar(modeloConIntrusa("auto-grupo-cm"));
+    const r = migrarYValidar(modeloConIntrusa("auto-planta-cm"));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     // Ya no queda ninguna hipotesis con el id reservado.
-    expect(r.modelo.hipotesis.some((h) => h.id === "auto-grupo-cm")).toBe(false);
+    expect(r.modelo.hipotesis.some((h) => h.id === "auto-planta-cm")).toBe(false);
     // La intrusa conserva nombre y tipo bajo su id saneado...
     const saneada = r.modelo.hipotesis.find((h) => h.nombre === "Sobrecarga manual")!;
-    expect(saneada.id).toBe("auto-grupo-cm-usuario");
+    expect(saneada.id).toBe("auto-planta-cm-usuario");
     // ...y su carga la sigue: no queda huerfana ni desaparece.
-    expect(r.modelo.cargas[0].hipotesisId).toBe("auto-grupo-cm-usuario");
+    expect(r.modelo.cargas[0].hipotesisId).toBe("auto-planta-cm-usuario");
     expect(r.avisos.some((a) => /reservado/i.test(a))).toBe(true);
   });
 
   it("con el hueco '-usuario' ya OCUPADO busca el siguiente (-usuario-2)", () => {
-    const m = modeloConIntrusa("auto-grupo-uso");
+    const m = modeloConIntrusa("auto-planta-uso");
     m.hipotesis.push({
-      id: "auto-grupo-uso-usuario", nombre: "Ocupante", tipo: "variable", automatica: false,
+      id: "auto-planta-uso-usuario", nombre: "Ocupante", tipo: "variable", automatica: false,
     });
     const r = migrarYValidar(m);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const saneada = r.modelo.hipotesis.find((h) => h.nombre === "Sobrecarga manual")!;
-    expect(saneada.id).toBe("auto-grupo-uso-usuario-2");
-    expect(r.modelo.cargas[0].hipotesisId).toBe("auto-grupo-uso-usuario-2");
+    expect(saneada.id).toBe("auto-planta-uso-usuario-2");
+    expect(r.modelo.cargas[0].hipotesisId).toBe("auto-planta-uso-usuario-2");
     // El ocupante legitimo no se toca.
-    expect(r.modelo.hipotesis.some((h) => h.id === "auto-grupo-uso-usuario")).toBe(true);
+    expect(r.modelo.hipotesis.some((h) => h.id === "auto-planta-uso-usuario")).toBe(true);
   });
 
   it("sin colision no hay saneo ni avisos extra (regresion)", () => {

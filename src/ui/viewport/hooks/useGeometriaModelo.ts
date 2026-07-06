@@ -1,9 +1,9 @@
-// useGeometriaModelo: deriva la geometria dibujable del Modelo (Capa 1) para el
-// grupo/planta activos, FUERA del bucle de render por frame (regla #11 / #2).
+// useGeometriaModelo: deriva la geometria dibujable del Modelo (Capa 1) para la
+// planta activa, FUERA del bucle de render por frame (regla #11 / #2).
 //
 // El Modelo NO entra como prop reactiva que se recomputa cada frame: se LEE con
-// modeloStore.getState() y se RECONSTRUYE solo cuando cambian `modelo`,
-// `grupoActivoId` o `plantaActivaId`. Eso se logra con suscripciones transient
+// modeloStore.getState() y se RECONSTRUYE solo cuando cambian `modelo` o
+// `plantaActivaId`. Eso se logra con suscripciones transient
 // (subscribeWithSelector) que bumpean un contador de version; el componente que
 // usa el hook recalcula el useMemo cuando cambia esa version, no por frame.
 //
@@ -12,7 +12,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { modeloStore, vistaStore } from "../../../estado";
 import type { ModoVista } from "../../../estado";
-import type { Modelo, Grupo, Planta, Seccion } from "../../../dominio";
+import type { Modelo, Planta, Seccion } from "../../../dominio";
 
 // Un pilar listo para instanciar: centro del tramo (x, y, z) en metros, alto del
 // tramo y giro. Mantiene el id de dominio para el picking (instanceId -> id).
@@ -87,46 +87,36 @@ function cotaPlanta(plantaId: string, cotaPorPlanta: Map<string, number>): numbe
   return cotaPorPlanta.get(plantaId) ?? 0;
 }
 
-// Plantas pertenecientes al grupo activo (si lo hay). Si no hay grupo activo, se
-// consideran todas (vista 3D del edificio completo). plantaActivaId filtra ademas
-// la vista 2D a una sola planta.
-function plantasVisibles(
-  modelo: Modelo,
-  grupoActivoId: string | null,
-): Planta[] {
-  if (!grupoActivoId) return modelo.plantas;
-  return modelo.plantas.filter((p) => p.grupoId === grupoActivoId);
-}
-
 // Proyecta el Modelo a geometria dibujable. PURA respecto a stores: recibe los
-// snapshots ya leidos. Pilares filtrados por grupo (su tramo toca alguna planta
-// visible); vigas filtradas por planta activa si esta fijada, si no por grupo.
+// snapshots ya leidos. Con planta activa (vista 2D): vigas/paños de esa planta y
+// pilares cuyo tramo CRUZA su cota (un pilar pasante sigue visible en las plantas
+// intermedias, como dentro de su grupo antes de F3.4). Sin planta activa (3D):
+// todo el edificio.
 //
 // Exportada (named export) para poder testearla en `node` sin WebGL/React; el hook
 // la sigue usando internamente (las suscripciones transient viven en el hook).
 export function derivar(
   modelo: Modelo,
-  grupoActivoId: string | null,
   plantaActivaId: string | null,
 ): GeometriaModelo {
-  const plantas = plantasVisibles(modelo, grupoActivoId);
-  const idsVisibles = new Set(plantas.map((p) => p.id));
-
   // Maps construidos UNA sola vez (DRY/perf): evitan find() anidado por pilar/viga
   // (antes O(P×S) y O(N×plantas)). Misma fuente: modelo.secciones y modelo.plantas.
   const seccionPorId = new Map(modelo.secciones.map((s) => [s.id, s]));
   const cotaPorPlanta = new Map(modelo.plantas.map((p) => [p.id, p.cota]));
+  const cotaActiva = plantaActivaId ? cotaPorPlanta.get(plantaActivaId) : undefined;
 
-  // Pilares: un tramo es visible si su plantaInicial o plantaFinal cae en el grupo.
+  // Pilares: con planta activa, visible si su tramo vertical CRUZA la cota de esa
+  // planta (zMin <= cota <= zMax): incluye el que arranca, el que muere y el
+  // pasante. Sin planta activa, todos.
   const pilares: PilarDibujo[] = [];
   for (const pilar of modelo.pilares) {
-    const tocaGrupo =
-      idsVisibles.has(pilar.plantaInicial) || idsVisibles.has(pilar.plantaFinal);
-    if (grupoActivoId && !tocaGrupo) continue;
     const z0 = cotaPlanta(pilar.plantaInicial, cotaPorPlanta);
     const z1 = cotaPlanta(pilar.plantaFinal, cotaPorPlanta);
     const zMin = Math.min(z0, z1);
     const zMax = Math.max(z0, z1);
+    if (cotaActiva !== undefined && (cotaActiva < zMin || cotaActiva > zMax)) {
+      continue;
+    }
     const alto = Math.max(zMax - zMin, 0.01); // evita caja degenerada
     pilares.push({
       id: pilar.id,
@@ -139,16 +129,12 @@ export function derivar(
     });
   }
 
-  // Vigas: en planta solo las de la planta activa; en grupo, las de plantas del
-  // grupo. Cada extremo busca su nudo por id.
+  // Vigas: en planta solo las de la planta activa; sin planta activa, todas. Cada
+  // extremo busca su nudo por id.
   const nudoPorId = new Map(modelo.nudos.map((n) => [n.id, n]));
   const vigas: VigaDibujo[] = [];
   for (const viga of modelo.vigas) {
-    if (plantaActivaId) {
-      if (viga.plantaId !== plantaActivaId) continue;
-    } else if (grupoActivoId && !idsVisibles.has(viga.plantaId)) {
-      continue;
-    }
+    if (plantaActivaId && viga.plantaId !== plantaActivaId) continue;
     const ni = nudoPorId.get(viga.nudoI);
     const nj = nudoPorId.get(viga.nudoJ);
     if (!ni || !nj) continue; // referencia rota: la valida feature-4, aqui se omite
@@ -165,16 +151,12 @@ export function derivar(
     });
   }
 
-  // Paños (F3): misma logica de filtro por planta/grupo que las vigas. El contorno se
+  // Paños (F3): misma logica de filtro por planta que las vigas. El contorno se
   // resuelve por id de nudo (los 4 nudos PROPIOS del perimetro). Referencia rota -> se
   // omite (la valida feature-4; aqui no rompemos el render).
   const panos: PanoDibujo[] = [];
   for (const pano of modelo.panos) {
-    if (plantaActivaId) {
-      if (pano.plantaId !== plantaActivaId) continue;
-    } else if (grupoActivoId && !idsVisibles.has(pano.plantaId)) {
-      continue;
-    }
+    if (plantaActivaId && pano.plantaId !== plantaActivaId) continue;
     const contorno: { x: number; y: number }[] = [];
     let roto = false;
     for (const nudoId of pano.perimetro) {
@@ -202,52 +184,46 @@ export function derivar(
 // tambien a `modoVista`: conmutar planta<->3D cambia los ids EFECTIVOS (ver abajo).
 function suscribirEntradas(cb: () => void): () => void {
   const offModelo = modeloStore.subscribe((s) => s.modelo, cb);
-  const offGrupo = vistaStore.subscribe((s) => s.grupoActivoId, cb);
   const offPlanta = vistaStore.subscribe((s) => s.plantaActivaId, cb);
   const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
   return () => {
     offModelo();
-    offGrupo();
     offPlanta();
     offModo();
   };
 }
 
-// Snapshot estable: una tupla [modelo, grupoEfectivo, plantaEfectivo]. Los ids son los
-// EFECTIVOS (F2c): en cualquier vista que NO sea "planta" (3D y mosaico, que comparten
-// la escena 3D del Viewport) se colapsan a null para mostrar TODO el edificio reusando
-// la rama "sin filtro" de `derivar`. Esto ademas BLINDA el anti-bucle: al pickear en 3D
-// se sincroniza grupo/planta activos (F1.3), pero como aqui ya valen null, el snapshot
-// no cambia de referencia -> ni re-render ni recompute de geometria. modoVista NO entra
-// en la tupla: el colapso ya lo codifica (conmutar de modo SI cambia los ids efectivos).
-// Ids EFECTIVOS para la geometria segun el modo de vista (PURA, exportada para test):
-// en "planta" se respetan grupo/planta activos; en cualquier otra vista (3D/mosaico)
-// se colapsan a null para mostrar todo el edificio.
+// Snapshot estable: una tupla [modelo, plantaEfectiva]. El id es el EFECTIVO
+// (F2c): en cualquier vista que NO sea "planta" (3D y mosaico, que comparten la
+// escena 3D del Viewport) se colapsa a null para mostrar TODO el edificio reusando
+// la rama "sin filtro" de `derivar`. Esto ademas BLINDA el anti-bucle: al pickear
+// en 3D se sincroniza la planta activa (F1.3), pero como aqui ya vale null, el
+// snapshot no cambia de referencia -> ni re-render ni recompute de geometria.
+// modoVista NO entra en la tupla: el colapso ya lo codifica (conmutar de modo SI
+// cambia el id efectivo).
+// Id EFECTIVO para la geometria segun el modo de vista (PURA, exportada para test):
+// en "planta" se respeta la planta activa; en cualquier otra vista (3D/mosaico) se
+// colapsa a null para mostrar todo el edificio.
 export function idsEfectivos(
   modoVista: ModoVista,
-  grupoActivoId: string | null,
   plantaActivaId: string | null,
-): readonly [string | null, string | null] {
-  if (modoVista !== "planta") return [null, null];
-  return [grupoActivoId, plantaActivaId];
+): string | null {
+  if (modoVista !== "planta") return null;
+  return plantaActivaId;
 }
 
-function leerSnapshot(): readonly [Modelo, string | null, string | null] {
-  const { grupoActivoId, plantaActivaId, modoVista } = vistaStore.getState();
-  const [g, p] = idsEfectivos(modoVista, grupoActivoId, plantaActivaId);
-  return [modeloStore.getState().modelo, g, p] as const;
+function leerSnapshot(): readonly [Modelo, string | null] {
+  const { plantaActivaId, modoVista } = vistaStore.getState();
+  const p = idsEfectivos(modoVista, plantaActivaId);
+  return [modeloStore.getState().modelo, p] as const;
 }
 
 // Cache de la tupla para que getSnapshot devuelva una referencia estable mientras
 // las entradas efectivas no cambien (requisito de useSyncExternalStore).
 let snapCache = leerSnapshot();
-function getSnapshotEstable(): readonly [Modelo, string | null, string | null] {
+function getSnapshotEstable(): readonly [Modelo, string | null] {
   const actual = leerSnapshot();
-  if (
-    actual[0] === snapCache[0] &&
-    actual[1] === snapCache[1] &&
-    actual[2] === snapCache[2]
-  ) {
+  if (actual[0] === snapCache[0] && actual[1] === snapCache[1]) {
     return snapCache;
   }
   snapCache = actual;
@@ -255,29 +231,22 @@ function getSnapshotEstable(): readonly [Modelo, string | null, string | null] {
 }
 
 export function useGeometriaModelo(): GeometriaModelo {
-  const [modelo, grupoEfectivo, plantaEfectivo] = useSyncExternalStore(
+  const [modelo, plantaEfectiva] = useSyncExternalStore(
     suscribirEntradas,
     getSnapshotEstable,
     getSnapshotEstable,
   );
   return useMemo(
-    () => derivar(modelo, grupoEfectivo, plantaEfectivo),
-    [modelo, grupoEfectivo, plantaEfectivo],
+    () => derivar(modelo, plantaEfectiva),
+    [modelo, plantaEfectiva],
   );
 }
 
-// Helpers expuestos para el HUD (GroupRibbon): grupo y plantas activos.
-export function grupoActivo(): Grupo | null {
-  const { grupoActivoId } = vistaStore.getState();
-  if (!grupoActivoId) return null;
-  return modeloStore.getState().modelo.grupos.find((g) => g.id === grupoActivoId) ?? null;
-}
-
-export function plantasDeGrupo(grupoId: string | null): Planta[] {
-  if (!grupoId) return [];
+// Helper expuesto para el HUD (ribbon de plantas): plantas del edificio ordenadas
+// por cota ascendente. Sin grupos (F3.4) el edificio es una unica lista.
+export function plantasDelEdificio(): Planta[] {
   return modeloStore
     .getState()
-    .modelo.plantas.filter((p) => p.grupoId === grupoId)
-    .slice()
+    .modelo.plantas.slice()
     .sort((a, b) => a.cota - b.cota);
 }

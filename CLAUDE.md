@@ -6,7 +6,7 @@
 
 ## 1. Qué es este proyecto
 
-**Concreta · Estructuras** es una aplicación web de **cálculo estructural por elementos finitos para arquitectos**, con una interfaz **calcada a CYPECAD** (pestañas, grupos/plantas, introducción gráfica en planta) sobre el motor FEM **PyNite** (`PyNiteFEA`), que corre **en el navegador** vía Pyodide/WASM. Es un módulo de la marca **Concreta**.
+**Concreta · Estructuras** es una aplicación web de **cálculo estructural por elementos finitos para arquitectos**, con una interfaz **calcada a CYPECAD** (pestañas, plantas, introducción gráfica en planta) sobre el motor FEM **PyNite** (`PyNiteFEA`), que corre **en el navegador** vía Pyodide/WASM. Es un módulo de la marca **Concreta**.
 
 - **Público:** arquitectos y técnicos del mercado español.
 - **Tesis de producto:** trasladar la complejidad del FEM a **elementos constructivos** (pilares, vigas, paños, muros) que el arquitecto introduce de forma natural. Fácil en la introducción, potente en el cálculo.
@@ -23,8 +23,8 @@ Documento de diseño de la interfaz: `Concreta_Estructuras_Spec_Frontend.md` (re
 1. **PyNite es la única fuente de verdad del cálculo.** Nunca se reimplementa FEM, ni rigidez, ni resolución de sistemas en JavaScript/TypeScript. El TS construye datos y visualiza; el cálculo lo hace PyNite.
 2. **Modelo de dos capas.** El usuario actúa sobre la **Capa 1 (obra)**; el sistema genera la **Capa 2 (FEM)** mediante el *discretizador*. Jamás se expone jerga FEM en la UI (nada de "release", "nodo N12", "member M7") salvo en el modo explícito "Ver modelo de cálculo".
 3. **El discretizador es el producto.** Es el código más crítico y más testeado. Cualquier cambio en él exige *golden tests* que comparen contra resultados conocidos. Es **puro** (sin React, sin I/O, sin Pyodide).
-4. **Vocabulario CYPECAD.** Pestañas y elementos se nombran como en CYPECAD: *Entrada de pilares, Entrada de vigas, Resultados, Isovalores; grupos y plantas; paños; hipótesis*.
-5. **Identificadores de dominio en español y ASCII.** `Pilar`, `Viga`, `Pano`, `Grupo`, `Planta`, `Seccion`, `Hipotesis` (sin tildes ni ñ en el código). Las **etiquetas de UI** sí van en español correcto con tildes ("Sección", "Paño", "Hipótesis").
+4. **Vocabulario CYPECAD.** Pestañas y elementos se nombran como en CYPECAD: *Entrada de pilares, Entrada de vigas, Resultados, Isovalores; plantas; paños; hipótesis*. **Excepción deliberada (F3.4, decisión de producto):** los *grupos de plantas* de CYPECAD se eliminaron — el arquitecto introduce UN edificio como lista de plantas, y el uso y las cargas superficiales automáticas viven en cada `Planta`. Si algún día interesa "plantas iguales", se reintroducirá como herramienta de copia, no como jerarquía obligatoria.
+5. **Identificadores de dominio en español y ASCII.** `Pilar`, `Viga`, `Pano`, `Planta`, `Seccion`, `Hipotesis` (sin tildes ni ñ en el código). Las **etiquetas de UI** sí van en español correcto con tildes ("Sección", "Paño", "Hipótesis").
 6. **Unidades consistentes internas.** Todo el modelo interno y el solver trabajan en un sistema único (**kN, m**). La conversión a unidades de presentación (mm para secciones, N/mm² para E) ocurre **una sola vez en los bordes** (entrada/salida).
 7. **Cálculo siempre asíncrono.** Toda llamada al solver pasa por el worker; nunca se bloquea el hilo principal. Hay estados visibles de "cargando motor" y "calculando".
 8. **Todo dato que entra se valida.** El JSON de proyecto (Capa 1) y la salida del discretizador (Capa 2) se validan con Zod antes de usarse. Importar un proyecto nunca debe poder romper la app.
@@ -36,7 +36,7 @@ Documento de diseño de la interfaz: `Concreta_Estructuras_Spec_Frontend.md` (re
 
 ```
 CAPA 1 · MODELO CONSTRUCTIVO  (/src/dominio)
-  Grupos · Plantas · Pilares · Vigas · Paños · Muros · Cargas por hipótesis
+  Plantas · Pilares · Vigas · Paños · Muros · Cargas por hipótesis
         │  discretizar()  (/src/discretizador)   ← PURO, el corazón
         ▼
 CAPA 2 · MODELO DE CÁLCULO  (JSON contrato PyNite)
@@ -83,7 +83,7 @@ Base fijada por el usuario: **React + TypeScript + Vite**. El resto se elige as�
 ```
 /src
   /dominio          # CAPA 1: tipos y funciones puras del modelo constructivo
-    modelo.ts       #   Modelo, Grupo, Planta
+    modelo.ts       #   Modelo, Planta
     pilar.ts        #   Pilar
     viga.ts         #   Viga
     pano.ts         #   Pano (F3)
@@ -104,7 +104,7 @@ Base fijada por el usuario: **React + TypeScript + Vite**. El resto se elige as�
   /estado           # Zustand stores + comandos (undo/redo)
     modeloStore.ts
     seleccionStore.ts
-    vistaStore.ts   #   pestaña activa, grupo activo, vista 2D/3D/mosaico
+    vistaStore.ts   #   pestaña activa, planta activa, vista 2D/3D/mosaico
     resultadosStore.ts
     comandos/
   /biblioteca       # catálogos
@@ -120,7 +120,7 @@ Base fijada por el usuario: **React + TypeScript + Vite**. El resto se elige as�
     /isovalores     #   (F3)
     /viewport       #   escena R3F (planta/3D), gizmo, plantillas DXF, capturas
     /inspector
-    /dialogos       #   Plantas/Grupos, biblioteca de secciones, cargas
+    /dialogos       #   Plantas, biblioteca de secciones, cargas
   /unidades         # sistema de unidades y conversión en los bordes
   main.tsx
 /tests
@@ -137,7 +137,6 @@ Tipos en español, ASCII, sin tildes. Bosquejo (no exhaustivo):
 ```ts
 type Modelo = {
   unidades: "kN-m";
-  grupos: Grupo[];
   plantas: Planta[];
   pilares: Pilar[];
   vigas: Viga[];
@@ -148,8 +147,9 @@ type Modelo = {
   analisis: OpcionesAnalisis;
 };
 
-type Grupo  = { id: string; nombre: string; categoriaUso: CategoriaUso; sobrecargaUso: number; cargasMuertas: number };
-type Planta = { id: string; nombre: string; cota: number; altura: number; grupoId: string };
+// Sin grupos (F3.4): cada planta lleva su uso y sus cargas superficiales automáticas.
+type Planta = { id: string; nombre: string; cota: number; altura: number;
+                categoriaUso: CategoriaUso; sobrecargaUso: number; cargasMuertas: number };
 type Pilar  = { id: string; nombre: string; x: number; y: number; plantaInicial: string; plantaFinal: string;
                 seccionId: string; materialId: string; angulo: number;
                 vinculacionExterior: boolean; arranque: "empotrado" | "articulado" | "elastico" };
@@ -219,7 +219,7 @@ PyNite es **Python puro**; sus dependencias de cálculo (numpy, scipy) están en
 
 - `modeloStore` (Zustand + Immer): el `Modelo` (Capa 1). Único origen de la obra.
 - `seleccionStore`: elementos seleccionados, hover.
-- `vistaStore`: pestaña activa (pilares/vigas/resultados/isovalores), grupo activo, modo de vista (planta/3D/mosaico), combinación activa, plantillas/capturas.
+- `vistaStore`: pestaña activa (pilares/vigas/resultados/isovalores), planta activa, modo de vista (planta/3D/mosaico), combinación activa, plantillas/capturas.
 - `resultadosStore`: resultados del último cálculo (derivados; se limpian al editar la obra).
 - **Undo/redo por patrón Command**: cada edición de obra (crear pilar, mover viga, asignar sección) es un comando con `aplicar()`/`revertir()`. La pila de comandos permite deshacer; evitar snapshots completos del modelo salvo para acciones masivas.
 - Al modificar la Capa 1, **invalidar** los resultados (la deformada/esfuerzos dejan de ser válidos hasta recalcular).
@@ -228,7 +228,7 @@ PyNite es **Python puro**; sus dependencias de cálculo (numpy, scipy) están en
 
 ## 11. UI: las 4 pestañas y el sistema gráfico
 
-Resumen (detalle en el spec): pestañas **Entrada de pilares · Entrada de vigas · Resultados · Isovalores** abajo a la izquierda; barra de menús superior que cambia por pestaña; barra lateral izquierda (gestión de vistas, elementos, árbol de obra); herramientas arriba a la derecha (plantillas DXF F4, capturas F3, ayudas); barra de estado inferior con línea de mensajes. Viewport central en planta del grupo activo, conmutable a 3D o mosaico. En "Resultados": deformada 3D con escala de colores + animación, diagramas por barra, tablas de reacciones. Estilo: lienzo oscuro tipo CAD, paneles neutros, datos numéricos en monoespaciada, color = semántica.
+Resumen (detalle en el spec): pestañas **Entrada de pilares · Entrada de vigas · Resultados · Isovalores** abajo a la izquierda; barra de menús superior que cambia por pestaña; barra lateral izquierda (gestión de vistas, elementos, árbol de obra); herramientas arriba a la derecha (plantillas DXF F4, capturas F3, ayudas); barra de estado inferior con línea de mensajes. Viewport central en la planta activa, conmutable a 3D o mosaico. En "Resultados": deformada 3D con escala de colores + animación, diagramas por barra, tablas de reacciones. Estilo: lienzo oscuro tipo CAD, paneles neutros, datos numéricos en monoespaciada, color = semántica.
 
 ---
 
@@ -260,7 +260,7 @@ Sistema interno **kN-m**. Conversión sólo en los bordes:
 
 ## 15. Roadmap por fases
 
-- **F1 (MVP):** plantas/grupos, pilares, vigas, empotramientos/articulaciones, cargas lineales/superficiales por hipótesis, combinaciones básicas, **Calcular = esfuerzos + deformada**, plantillas DXF, análisis lineal/general.
+- **F1 (MVP):** plantas, pilares, vigas, empotramientos/articulaciones, cargas lineales/superficiales por hipótesis, combinaciones básicas, **Calcular = esfuerzos + deformada**, plantillas DXF, análisis lineal/general.
 - **F2:** 3D pleno, P-Δ y modal, peso propio automático, centro de masas/rigidez.
 - **F3:** muros, pantallas, **paños** (uni/reticular/losa), mallado, **pestaña Isovalores**.
 - **F4:** cimentación, **armados** y comprobación normativa (EHE-08/EC), separatas/memorias PDF.

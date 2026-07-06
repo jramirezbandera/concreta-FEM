@@ -18,20 +18,14 @@ import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import { crearModeloVacio } from "../../dominio";
 import type { Modelo } from "../../dominio";
 
-// Construye un modelo con un grupo, dos plantas (cota 0 y 3) y un pilar valido que
-// las recorre, con seccion/material del catalogo de la biblioteca.
+// Construye un modelo con dos plantas (cota 0 y 3) y un pilar valido que las recorre,
+// con seccion/material del catalogo de la biblioteca. Sin paños losa: cargas de planta
+// inertes (0/0) para no disparar avisos.
 function modeloConPilar(): Modelo {
   const m = crearModeloVacio();
-  m.grupos.push({
-    id: "g1",
-    nombre: "G1",
-    categoriaUso: "A",
-    sobrecargaUso: 2,
-    cargasMuertas: 1,
-  });
   m.plantas.push(
-    { id: "pl0", nombre: "Cimentación", cota: 0, altura: 3, grupoId: "g1" },
-    { id: "pl1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+    { id: "pl0", nombre: "Cimentación", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+    { id: "pl1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
   );
   m.pilares.push({
     id: "P-1",
@@ -181,7 +175,7 @@ describe("InspectorPilar: commit en vivo", () => {
     const user = userEvent.setup();
     // Modelo con tres plantas para poder bajar la final por debajo de la inicial.
     const m = modeloConPilar();
-    m.plantas.push({ id: "pl2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+    m.plantas.push({ id: "pl2", nombre: "Planta 2", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
     // Pilar arranca en pl1 (cota 3) y llega a pl2 (cota 6).
     const p = m.pilares[0];
     p.plantaInicial = "pl1";

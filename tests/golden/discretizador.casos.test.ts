@@ -504,22 +504,16 @@ function fixtureNudoCompartidoEntrePlantas(): Modelo {
     extremoJ: "empotrado" as const,
     tirante: false,
   });
+  // v4 (plantas sin grupos): sin paños losa -> SU/CM a 0 (eran inertes; ponerlos > 0
+  // dispararia PLANTA_CARGA_SIN_PANO). Capa 2 identica.
+  const uso = { categoriaUso: "A" as const, sobrecargaUso: 0, cargasMuertas: 0 };
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      {
-        id: "g1",
-        nombre: "Grupo",
-        categoriaUso: "A" as const,
-        sobrecargaUso: 2,
-        cargasMuertas: 1,
-      },
-    ],
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta baja", cota: 3, altura: 3, grupoId: "g1" },
-      { id: "p2", nombre: "Planta alta", cota: 6, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, ...uso },
+      { id: "p1", nombre: "Planta baja", cota: 3, altura: 3, ...uso },
+      { id: "p2", nombre: "Planta alta", cota: 6, altura: 3, ...uso },
     ],
     secciones: [seccion],
     nudos: [
@@ -587,26 +581,24 @@ describe("golden discretizador · localizarNodoDeNudo: determinismo y nudo compa
 // `nodes` debe mapear. Lo consume F2 (centro de rigidez) para el diafragma por planta.
 // =============================================================================
 
-// Fixture de CONFLICTO de snap: dos GRUPOS con una planta a la MISMA cota (3) y un
-// pilar por grupo, ambos en (0,0). Sus cabezas snapean al MISMO nudo FEM (mismo X,Z y
-// misma cota) pero lo reclaman dos plantas (pa1 de g1, pa2 de g2). El desempate
-// determinista (primera planta por id) debe elegir SIEMPRE la de id menor, sin NaN ni
-// no-determinismo. Estructura estable: cada pilar empotrado en su base (cota 0).
-function fixtureConflictoSnapDosGrupos(): Modelo {
+// Fixture de CONFLICTO de snap: v4 (plantas sin grupos) — dos PLANTAS DISTINTAS a la
+// MISMA cota (3) y un pilar por planta, ambos en (0,0). Antes (con grupos) eran dos
+// grupos con techo coincidente; el modelo v4 lo expresa como dos plantas de igual cota
+// (permitido: la unicidad de cota es una validacion de UI, no del schema). Sus cabezas
+// snapean al MISMO nudo FEM (mismo X,Z y misma cota) pero lo reclaman dos plantas (p1a,
+// p1b). El desempate determinista (primera planta por id) debe elegir SIEMPRE la de id
+// menor, sin NaN ni no-determinismo. Estructura estable: cada pilar empotrado en su
+// base (cota 0).
+function fixtureConflictoSnapDosPlantas(): Modelo {
   const seccion = {
     id: SECCION_GOLDEN,
     nombre: "IPE 300",
     tipo: "perfilMetalico" as const,
     perfilId: "IPE300",
   };
-  const grupo = (id: string) => ({
-    id,
-    nombre: id,
-    categoriaUso: "A" as const,
-    sobrecargaUso: 2,
-    cargasMuertas: 1,
-  });
-  // Pilar de g{n}: sube de su base (cota 0) a su planta de techo (cota 3), en (0,0).
+  // Sin paños losa -> SU/CM a 0 (inertes; > 0 dispararia PLANTA_CARGA_SIN_PANO).
+  const uso = { categoriaUso: "A" as const, sobrecargaUso: 0, cargasMuertas: 0 };
+  // Pilar de la planta {n}: sube de su base (cota 0) a su planta de techo (cota 3), en (0,0).
   const pilar = (id: string, plantaInicial: string, plantaFinal: string) => ({
     id,
     nombre: id.toUpperCase(),
@@ -623,15 +615,14 @@ function fixtureConflictoSnapDosGrupos(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [grupo("g1"), grupo("g2")],
     plantas: [
-      // Bases (cota 0): distintas por grupo (no colisionan; pilares distintos en x?
-      // no: ambos en (0,0) y cota 0 tambien colisionan -> tambien es conflicto, mismo
-      // desempate). Techos: AMBOS a cota 3 -> el nudo de cabeza es el conflicto clave.
-      { id: "p0a", nombre: "Base g1", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p0b", nombre: "Base g2", cota: 0, altura: 3, grupoId: "g2" },
-      { id: "p1a", nombre: "Techo g1", cota: 3, altura: 3, grupoId: "g1" },
-      { id: "p1b", nombre: "Techo g2", cota: 3, altura: 3, grupoId: "g2" },
+      // Bases (cota 0): dos plantas de base distintas (ambos pilares en (0,0) y cota 0
+      // -> tambien es conflicto, mismo desempate). Techos: AMBOS a cota 3 -> el nudo de
+      // cabeza es el conflicto clave.
+      { id: "p0a", nombre: "Base A", cota: 0, altura: 3, ...uso },
+      { id: "p0b", nombre: "Base B", cota: 0, altura: 3, ...uso },
+      { id: "p1a", nombre: "Techo A", cota: 3, altura: 3, ...uso },
+      { id: "p1b", nombre: "Techo B", cota: 3, altura: 3, ...uso },
     ],
     secciones: [seccion],
     nudos: [],
@@ -691,12 +682,12 @@ describe("golden discretizador · nodoFEMAPlanta (asignacion autoritativa por pl
     expect(t.nodoFEMAPlanta[nudoCota3.name]).toBe("p1");
   });
 
-  it("conflicto de snap entre grupos: desempate determinista (planta de id menor)", () => {
-    const modelo = fixtureConflictoSnapDosGrupos();
+  it("conflicto de snap entre plantas de igual cota: desempate determinista (planta de id menor)", () => {
+    const modelo = fixtureConflictoSnapDosPlantas();
     const fem = discretizarOExplotar(modelo);
     const t = trazabilidadDe(modelo);
     // 2 nudos: base comun (0,0,0) y cabeza comun (0,3,0) — ambos compartidos por los
-    // dos pilares de grupos distintos (snapping geometrico colapsa a 1 nudo cada uno).
+    // dos pilares de plantas distintas de igual cota (snapping colapsa a 1 nudo cada uno).
     expect(fem.nodes).toHaveLength(2);
     // Cobertura total + desempate: base -> p0a (< p0b), cabeza -> p1a (< p1b).
     const base = fem.nodes.find((n) => n.y === 0)!;
@@ -705,12 +696,11 @@ describe("golden discretizador · nodoFEMAPlanta (asignacion autoritativa por pl
     expect(t.nodoFEMAPlanta[cabeza.name]).toBe("p1a");
   });
 
-  it("determinismo: barajar plantas/grupos/pilares NO cambia nodoFEMAPlanta", () => {
-    const base = fixtureConflictoSnapDosGrupos();
+  it("determinismo: barajar plantas/pilares NO cambia nodoFEMAPlanta", () => {
+    const base = fixtureConflictoSnapDosPlantas();
     const reordenado: Modelo = {
       ...base,
       plantas: [...base.plantas].reverse(),
-      grupos: [...base.grupos].reverse(),
       pilares: [...base.pilares].reverse(),
     };
     expect(trazabilidadDe(reordenado).nodoFEMAPlanta).toEqual(

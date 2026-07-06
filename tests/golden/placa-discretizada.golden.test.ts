@@ -33,11 +33,12 @@ const CZ = LADO / 2; // centroide Z FEM (= y de obra)
 function modeloLosaAislada(): Modelo {
   return {
     unidades: "kN-m",
-    schemaVersion: 3,
-    grupos: [
-      { id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
+    schemaVersion: 4,
+    // v4 (plantas sin grupos): la planta del paño hereda SU/CM del grupo original
+    // (2/1). Con paño losa esas cargas BAJAN a los quads igual que antes: Capa 2 identica.
+    plantas: [
+      { id: "p1", nombre: "Planta 1", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
     ],
-    plantas: [{ id: "p1", nombre: "Planta 1", cota: 0, altura: 3, grupoId: "g1" }],
     secciones: [],
     nudos: [
       { id: "q1", x: 0, y: 0 },

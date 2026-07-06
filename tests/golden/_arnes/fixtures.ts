@@ -52,19 +52,22 @@ function seccionIpe() {
 
 // Plantas estandar: cimentacion en cota 0, planta de calculo en cota `cotaViga`.
 // La viga vive en la planta superior; los pilares suben de p0 a p1.
+// v4 ("plantas sin grupos"): la planta absorbe uso/cargas del antiguo Grupo. Estos
+// fixtures NO llevan paños losa, asi que SU/CM se ponen a 0: eran INERTES (sin paño
+// que los reciba) y ponerlos > 0 dispararia el aviso PLANTA_CARGA_SIN_PANO. Con 0 la
+// Capa 2 y los avisos quedan identicos a la version con grupos.
 function plantas(cotaViga: number) {
   return [
-    { id: "p0", nombre: "Cimentacion", cota: 0, altura: cotaViga, grupoId: "g1" },
-    { id: "p1", nombre: "Planta", cota: cotaViga, altura: 3, grupoId: "g1" },
+    { id: "p0", nombre: "Cimentacion", cota: 0, altura: cotaViga, ...USO_PLANTA },
+    { id: "p1", nombre: "Planta", cota: cotaViga, altura: 3, ...USO_PLANTA },
   ];
 }
 
-const GRUPO = {
-  id: "g1",
-  nombre: "Grupo",
+// Campos de uso/carga de planta (v4). SU/CM a 0 porque estos fixtures no tienen paños.
+const USO_PLANTA = {
   categoriaUso: "A" as const,
-  sobrecargaUso: 2,
-  cargasMuertas: 1,
+  sobrecargaUso: 0,
+  cargasMuertas: 0,
 };
 
 // Pilar de apoyo: sube de p0 (cota 0) a p1 (cota `cotaViga`) en (x,y), con
@@ -110,7 +113,6 @@ export function fixtureBiapoyadaUDL({ L, q, cota = 3 }: ParamsUDL): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [GRUPO],
     plantas: plantas(cota),
     secciones: [seccionIpe()],
     nudos: [
@@ -160,7 +162,6 @@ export function fixtureVoladizoPuntual({ L, P, cota = 3 }: ParamsVoladizoP): Mod
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [GRUPO],
     plantas: plantas(cota),
     secciones: [seccionIpe()],
     nudos: [
@@ -226,7 +227,6 @@ export function fixtureBiapoyadaPuntualCentro({
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [GRUPO],
     plantas: plantas(cota),
     secciones: [seccionIpe()],
     nudos: [
@@ -288,7 +288,6 @@ export function fixturePorticoSimple({ B, H, q }: ParamsPortico): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [GRUPO],
     plantas: plantas(H), // p0 cota 0 (bases), p1 cota H (dintel)
     secciones: [seccionIpe()],
     nudos: [
@@ -391,7 +390,6 @@ export function fixturePesoPropioVigaBiapoyada({
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [GRUPO],
     plantas: plantas(cota),
     secciones: [seccionGenerica(SEC_PP, A)],
     nudos: [
@@ -442,10 +440,9 @@ export function fixturePesoPropioPilar({ H, A }: ParamsPesoPropioPilar): Modelo 
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [GRUPO],
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: H, grupoId: "g1" },
-      { id: "p1", nombre: "Planta", cota: H, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: H, ...USO_PLANTA },
+      { id: "p1", nombre: "Planta", cota: H, altura: 3, ...USO_PLANTA },
     ],
     secciones: [seccionGenerica(SEC_PP, A)],
     nudos: [],

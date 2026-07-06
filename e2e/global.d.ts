@@ -22,12 +22,11 @@ export interface ResumenModelo {
 }
 
 // Lectura del estado de obra para resolver referencias en los specs (T0.2). Los specs
-// crean grupos/plantas por el DIALOGO REAL (UI) y luego necesitan los ids de planta
-// para crearPilar/crearViga; este accesor los expone sin hurgar en el store interno.
-// Solo id/nombre (y grupoId en plantas): lo justo para localizar por nombre y resolver.
+// crean plantas por el DIALOGO REAL (UI) y luego necesitan los ids de planta para
+// crearPilar/crearViga; este accesor los expone sin hurgar en el store interno.
+// Solo id/nombre: lo justo para localizar por nombre y resolver.
 export interface EstadoObra {
-  grupos: { id: string; nombre: string }[];
-  plantas: { id: string; nombre: string; grupoId: string }[];
+  plantas: { id: string; nombre: string }[];
 }
 
 // Puente de test: despacha COMANDOS de dominio ya existentes (no reimplementa nada).
@@ -56,7 +55,7 @@ export interface ConcretaE2E {
   deshacer(): void;
   rehacer(): void;
   resumenModelo(): ResumenModelo;
-  // Lectura de grupos/plantas creados por el dialogo real (resuelve ids de planta para
+  // Lectura de plantas creadas por el dialogo real (resuelve ids de planta para
   // crearPilar/crearViga). Ampliacion aditiva del contrato (T0.2).
   estadoObra(): EstadoObra;
   // Motor (control del mock, D5/D7): instala el ParWorker falso y devuelve su control.

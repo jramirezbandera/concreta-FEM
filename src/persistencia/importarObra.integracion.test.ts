@@ -53,8 +53,7 @@ function jsonConPilar(nombre: string): string {
     vinculacionExterior: true,
     arranque: "empotrado",
   });
-  // Necesita una planta/grupo válidos para pasar Zod: crearModeloVacio ya trae la
-  // estructura mínima; añadimos referencias coherentes si el esquema las exige.
+  // crearModeloVacio ya trae la estructura mínima válida para Zod (v4, sin grupos).
   return exportarProyectoComoTexto(nombre, modelo);
 }
 

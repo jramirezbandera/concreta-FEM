@@ -6,9 +6,17 @@ import { detectarIncoherenciasCotas } from "./coherenciaCotas";
 import type { Planta } from "../../dominio";
 
 // Fabrica una planta minima con lo que consume el helper (id, nombre, cota, altura).
-// grupoId es indiferente aqui (el helper recibe ya las plantas de un grupo).
+// El uso/cargas son indiferentes aqui (el helper solo mira cota y altura).
 function planta(id: string, nombre: string, cota: number, altura: number): Planta {
-  return { id, nombre, cota, altura, grupoId: "g1" };
+  return {
+    id,
+    nombre,
+    cota,
+    altura,
+    categoriaUso: "A",
+    sobrecargaUso: 0,
+    cargasMuertas: 0,
+  };
 }
 
 describe("detectarIncoherenciasCotas", () => {

@@ -14,8 +14,8 @@ import { validarPilar, esValido, type DatosPilarUI } from "./validacionesPilar";
 const MATERIAL_OK = "S275"; // src/biblioteca/aceros.ts
 const PERFIL_OK = "IPE200"; // src/biblioteca/perfiles.ts (catalogo)
 
-function planta(id: string, nombre: string, cota: number, grupoId: string): Planta {
-  return { id, nombre, cota, altura: 3, grupoId };
+function planta(id: string, nombre: string, cota: number): Planta {
+  return { id, nombre, cota, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 };
 }
 
 function pilar(id: string, nombre: string): Pilar {
@@ -39,10 +39,10 @@ function seccionObra(id: string): Seccion {
   return { id, nombre: id, tipo: "hormigonRectangular", b: 0.3, h: 0.3 };
 }
 
-// Modelo con dos plantas (cota 0 y 3) de un grupo y un pilar existente "P1".
+// Modelo con dos plantas (cota 0 y 3) y un pilar existente "P1".
 function modeloBase(): Modelo {
   const m = crearModeloVacio();
-  m.plantas = [planta("p1", "Forjado 1", 0, "g1"), planta("p2", "Forjado 2", 3, "g1")];
+  m.plantas = [planta("p1", "Forjado 1", 0), planta("p2", "Forjado 2", 3)];
   m.pilares = [pilar("pil1", "P1")];
   return m;
 }

@@ -6,23 +6,16 @@ import { HipotesisSchema } from "./carga";
 import { crearModeloVacio } from "./helpers";
 import { SCHEMA_VERSION } from "./comunes";
 
-// Porticio minimo de F1: 1 grupo, 2 plantas, 1 pilar, 1 viga, 1 hipotesis, 1 carga.
+// Porticio minimo de F1: 2 plantas, 1 pilar, 1 viga, 1 hipotesis, 1 carga.
+// Sin paños losa: la planta lleva SU/CM a 0 (esos valores eran inertes sin paño;
+// ponerlos a 0 mantiene la Capa 2 identica y no dispara PLANTA_CARGA_SIN_PANO).
 function modeloPorticoMinimo(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      {
-        id: "g1",
-        nombre: "Forjado tipo",
-        categoriaUso: "A",
-        sobrecargaUso: 2,
-        cargasMuertas: 1,
-      },
-    ],
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: "s1", nombre: "IPE 300", tipo: "perfilMetalico", perfilId: "IPE300" },
@@ -100,11 +93,12 @@ describe("ModeloSchema (forma/tipos/enums)", () => {
 
     it("valor de enum invalido (categoriaUso = 'Z')", () => {
       const m = modeloPorticoMinimo() as unknown as Record<string, unknown>;
-      (m.grupos as Array<Record<string, unknown>>)[0].categoriaUso = "Z";
+      // v4: el uso vive en la planta (antes en el grupo).
+      (m.plantas as Array<Record<string, unknown>>)[0].categoriaUso = "Z";
       const res = ModeloSchema.safeParse(m);
       expect(res.success).toBe(false);
       if (!res.success) {
-        expect(res.error.issues.some((i) => i.path.join(".") === "grupos.0.categoriaUso")).toBe(true);
+        expect(res.error.issues.some((i) => i.path.join(".") === "plantas.0.categoriaUso")).toBe(true);
       }
     });
 

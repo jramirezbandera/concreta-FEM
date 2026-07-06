@@ -24,12 +24,13 @@ function seccion(id: string) {
   };
 }
 
-const GRUPO = {
-  id: "g1",
-  nombre: "Grupo",
+// v4 "plantas sin grupos": campos de uso/cargas que cada planta absorbio del grupo.
+// El fixture base no tiene paños losa, asi que SU/CM van a 0 (inertes sin paño y
+// silencian el aviso PLANTA_CARGA_SIN_PANO). prepararModeloCR no lee cargas.
+const USO_PLANTA = {
   categoriaUso: "A" as const,
-  sobrecargaUso: 2,
-  cargasMuertas: 1,
+  sobrecargaUso: 0,
+  cargasMuertas: 0,
 };
 
 function pilar(id: string, x: number, y: number) {
@@ -69,10 +70,9 @@ function fixturePortico1Planta(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [GRUPO],
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, ...USO_PLANTA },
+      { id: "p1", nombre: "Planta", cota: 3, altura: 3, ...USO_PLANTA },
     ],
     secciones: [seccion("sec")],
     nudos: [
@@ -163,14 +163,13 @@ describe("prepararModeloCR", () => {
   });
 
   it("planta sin nudos FEM se OMITE de plantasInfo (no es error)", () => {
-    // Anade una planta extra (p2, otro grupo/cota) que ningun elemento usa: sin nudos.
+    // Anade una planta extra (p2, otra cota) que ningun elemento usa: sin nudos.
     const m = fixturePortico1Planta();
     const conPlantaVacia: Modelo = {
       ...m,
-      grupos: [...m.grupos, { ...GRUPO, id: "g2", nombre: "Grupo 2" }],
       plantas: [
         ...m.plantas,
-        { id: "p2", nombre: "Vacia", cota: 9, altura: 3, grupoId: "g2" },
+        { id: "p2", nombre: "Vacia", cota: 9, altura: 3, ...USO_PLANTA },
       ],
     };
     const res = prepararModeloCR(conPlantaVacia);

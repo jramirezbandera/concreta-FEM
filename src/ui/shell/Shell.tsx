@@ -10,7 +10,7 @@ import { AvisoPersistencia } from "./AvisoPersistencia";
 import type { EstadoArranquePersistencia } from "./useArranquePersistencia";
 import { vistaStore } from "../../estado";
 import {
-  DialogoGruposYPlantas,
+  DialogoPlantas,
   DialogoHipotesis,
   DialogoOpcionesAnalisis,
 } from "../dialogos";
@@ -104,7 +104,7 @@ export function Shell({
 
       {/* Dialogos modales de la app, montados una sola vez como hermanos del
           layout. Autocontrolados: se abren/cierran segun vistaStore.dialogoActivo. */}
-      <DialogoGruposYPlantas />
+      <DialogoPlantas />
       <DialogoHipotesis />
       <DialogoOpcionesAnalisis />
     </div>

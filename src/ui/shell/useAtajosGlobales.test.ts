@@ -17,25 +17,27 @@ import {
   modeloStore,
   vistaStore,
   seleccionStore,
-  crearGrupo,
   crearPlanta,
   crearPilar,
 } from "../../estado";
-import { crearModeloVacio, plantasDeGrupo } from "../../dominio";
+import { crearModeloVacio } from "../../dominio";
 import { listarSecciones, listarMateriales } from "../../biblioteca";
 
 const modelo = () => modeloStore.getState().getModelo();
 
 // Siembra un pilar (una edicion en la pila de undo). Devuelve el id del pilar creado.
+// Sin grupos (F3.4): una planta directa del edificio.
 function sembrarPilar(): string {
-  modeloStore
-    .getState()
-    .ejecutar(
-      crearGrupo(modelo(), { categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 }),
-    );
-  const grupoId = modelo().grupos[0]!.id;
-  modeloStore.getState().ejecutar(crearPlanta(modelo(), { cota: 0, altura: 3, grupoId }));
-  const plantaId = plantasDeGrupo(modelo(), grupoId)[0]!.id;
+  modeloStore.getState().ejecutar(
+    crearPlanta(modelo(), {
+      cota: 0,
+      altura: 3,
+      categoriaUso: "A",
+      sobrecargaUso: 0,
+      cargasMuertas: 0,
+    }),
+  );
+  const plantaId = modelo().plantas[0]!.id;
   modeloStore.getState().ejecutar(
     crearPilar(modelo(), {
       x: 0, y: 0, plantaInicial: plantaId, plantaFinal: plantaId,
@@ -128,7 +130,7 @@ describe("useAtajosGlobales · guardas (no pisar el undo nativo)", () => {
   it("IGNORA los atajos si hay un diálogo modal abierto", () => {
     renderHook(() => useAtajosGlobales());
     sembrarPilar();
-    vistaStore.getState().abrirDialogo("gruposPlantas");
+    vistaStore.getState().abrirDialogo("plantas");
     pulsar("z", { ctrl: true });
     expect(modelo().pilares).toHaveLength(1); // no deshizo
     pulsar("f4");
@@ -189,7 +191,7 @@ describe("useAtajosGlobales · Supr/Delete borra la selección (D23)", () => {
     renderHook(() => useAtajosGlobales());
     const pilarId = sembrarPilar();
     seleccionStore.getState().seleccionar([pilarId]);
-    vistaStore.getState().abrirDialogo("gruposPlantas");
+    vistaStore.getState().abrirDialogo("plantas");
     pulsar("Delete");
     expect(modelo().pilares).toHaveLength(1);
   });
@@ -221,7 +223,7 @@ describe("useAtajosGlobales · 1-4 cambian de pestaña (D23)", () => {
 
   it("IGNORA 1-4 con un diálogo modal abierto", () => {
     renderHook(() => useAtajosGlobales());
-    vistaStore.getState().abrirDialogo("gruposPlantas");
+    vistaStore.getState().abrirDialogo("plantas");
     pulsar("3");
     expect(vistaStore.getState().pestanaActiva).toBe("entradaPilares");
   });

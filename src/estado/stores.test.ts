@@ -111,7 +111,6 @@ beforeEach(() => {
   seleccionStore.getState().setHover(null);
   vistaStore.getState().setPestanaActiva("entradaPilares");
   vistaStore.getState().setModoVista("planta");
-  vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
   vistaStore.getState().setCombinacionActiva(null);
   // descartar (no limpiar): reset TOTAL de resultados para aislar cada test, ya que
@@ -376,17 +375,16 @@ describe("seleccionStore: acciones", () => {
 // --- Cobertura breve: vistaStore ---------------------------------------------
 
 describe("vistaStore: setters", () => {
-  it("cambia pestana, modo de vista, grupo, planta y combinacion", () => {
+  it("cambia pestana, modo de vista, planta y combinacion", () => {
+    // v4 (plantas sin grupos): grupoActivoId/setGrupoActivo ya no existen.
     vistaStore.getState().setPestanaActiva("isovalores");
     vistaStore.getState().setModoVista("mosaico");
-    vistaStore.getState().setGrupoActivo("g1");
     vistaStore.getState().setPlantaActiva("p1");
     vistaStore.getState().setCombinacionActiva("ELU");
 
     const s = vistaStore.getState();
     expect(s.pestanaActiva).toBe("isovalores");
     expect(s.modoVista).toBe("mosaico");
-    expect(s.grupoActivoId).toBe("g1");
     expect(s.plantaActivaId).toBe("p1");
     expect(s.combinacionActiva).toBe("ELU");
   });

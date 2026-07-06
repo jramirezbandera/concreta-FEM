@@ -28,9 +28,9 @@ import { getMaterial } from "../biblioteca";
 import { propiedadesDePilar, propiedadesDeViga } from "./propiedadesBarra";
 import type { PropiedadesBarra } from "./propiedadesBarra";
 // Paños (F3.2, cierra T-cm-cargas-muertas): bbox del rectangulo por la FUENTE UNICA
-// del mallado, y cargas de grupo por la MISMA fuente que el discretizador [2A].
+// del mallado, y cargas de planta por la MISMA fuente que el discretizador [2A].
 import { limitesRectangulo, type PuntoPlano } from "./mallado";
-import { CASE_CM_GRUPO, cargasGrupoDePano } from "./cargasGrupo";
+import { CASE_CM_PLANTA, cargasPlantaDePano } from "./cargasPlanta";
 
 // El CM corre sobre el modelo VIVO (sin la pasada de validaciones que precede al
 // discretizador). Si una barra tiene seccion/material/planta no resolubles
@@ -118,7 +118,7 @@ function plantaDeNudo(modelo: Modelo, nudoId: string): string | undefined {
 // (las dos mitades) cae en esa planta. El (x,y) del pilar es constante en planta.
 //
 //  4) PAÑOS LOSA de la planta (F3.2, cierra T-cm-cargas-muertas): peso propio de la
-//     losa (rho·t·A) + cargas muertas del GRUPO (kN/m²·A, misma fuente unica que el
+//     losa (rho·t·A) + cargas muertas de la PLANTA (kN/m²·A, misma fuente unica que el
 //     discretizador, solo el case permanente) + cargas superficiales PERMANENTES de
 //     usuario (|q|·A), todo en el CENTROIDE del rectangulo del paño. La sobrecarga
 //     de uso NO entra (el CM cuenta solo permanentes, como el resto de terminos).
@@ -198,7 +198,7 @@ export function calcularCentroMasaPlanta(
   // --- 4) PAÑOS LOSA de la planta (F3.2, cierra T-cm-cargas-muertas) ---------------
   // La masa de la losa existe de verdad en el calculo desde el acople: peso propio
   // SIEMPRE (como las barras: la masa es fisica, E5, independiente del flag), cargas
-  // muertas del grupo por la fuente unica [2A] (solo el case PERMANENTE: la
+  // muertas de la planta por la fuente unica [2A] (solo el case PERMANENTE: la
   // sobrecarga de uso es variable y el CM cuenta permanentes) y superficiales
   // permanentes de usuario. Ubicado en el centroide del rectangulo (fuente unica
   // limitesRectangulo). Geometria/material no resolubles => se OMITE (el CM no lanza).
@@ -210,8 +210,8 @@ export function calcularCentroMasaPlanta(
     if (material !== undefined) {
       acumular(acc, material.peso * pano.espesor * geo.area, geo.cx, geo.cy);
     }
-    for (const cg of cargasGrupoDePano(modelo, pano)) {
-      if (cg.case !== CASE_CM_GRUPO) continue; // solo permanentes (uso = variable)
+    for (const cg of cargasPlantaDePano(modelo, pano)) {
+      if (cg.case !== CASE_CM_PLANTA) continue; // solo permanentes (uso = variable)
       acumular(acc, cg.presion * geo.area, geo.cx, geo.cy);
     }
     for (const c of modelo.cargas) {
@@ -276,13 +276,13 @@ function centroDeViga(modelo: Modelo, v: Viga): { x: number; y: number } | null 
 //
 // DESEMPATE de cotas compartidas (dos plantas a la MISMA cota): la tributaria de una
 // cota se atribuye a UNA sola planta — la misma que elegiria `plantaDeCotaPilar` del
-// discretizador (preferencia por el grupo del pilar; min por id) — para no contarla
-// dos veces y para que el CM atribuya como `nodoFEMAPlanta`. Devuelve 0 si `planta`
-// no toca el pilar o pierde el desempate.
+// discretizador (min por id; en v4 ya no hay preferencia por grupo) — para no
+// contarla dos veces y para que el CM atribuya como `nodoFEMAPlanta`. Devuelve 0 si
+// `planta` no toca el pilar o pierde el desempate.
 function tributariaDePilarEnPlanta(
   modelo: Modelo,
   p: Modelo["pilares"][number],
-  planta: { id: string; cota: number; grupoId: string },
+  planta: { id: string; cota: number },
 ): number {
   const pi = plantaPorId(modelo, p.plantaInicial);
   const pf = plantaPorId(modelo, p.plantaFinal);
@@ -301,17 +301,12 @@ function tributariaDePilarEnPlanta(
   const idx = cotas.indexOf(c);
   if (idx === -1) return 0; // la planta no aporta cota al troceo de este pilar
 
-  // Desempate: entre las plantas a la cota `c`, gana la preferida por el grupo del
-  // pilar y, dentro, la de menor id (mismo criterio que plantaDeCotaPilar).
-  const grupos = new Set<string>();
-  if (pi !== undefined) grupos.add(pi.grupoId);
-  if (pf !== undefined) grupos.add(pf.grupoId);
+  // Desempate: entre las plantas a la cota `c`, gana la de menor id (mismo criterio
+  // que plantaDeCotaPilar; en v4 sin preferencia por grupo).
   const enCota = modelo.plantas.filter((pl) => pl.cota === c);
-  const preferidas = enCota.filter((pl) => grupos.has(pl.grupoId));
-  const candidatas = preferidas.length > 0 ? preferidas : enCota;
-  const ganadora = candidatas.reduce(
+  const ganadora = enCota.reduce(
     (min, pl) => (pl.id < min ? pl.id : min),
-    candidatas[0]?.id ?? planta.id,
+    enCota[0]?.id ?? planta.id,
   );
   if (ganadora !== planta.id) return 0;
 

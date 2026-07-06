@@ -1,10 +1,10 @@
 // resolverContextoElemento: logica PURA que, dado el id de un elemento de obra
-// (pilar o viga), devuelve el CONTEXTO activo (grupo + planta) al que pertenece.
+// (pilar o viga), devuelve el CONTEXTO activo (planta) al que pertenece.
 // SIN React/three: testeable en Node. Espejo de estilo de resolverVistaActiva.ts.
 //
 // USO (F2c, "sincronizar contexto" en 3D pleno): al pickear un elemento en 3D, la
-// vista fija grupoActivoId/plantaActivaId a los suyos para que sidebar, inspector,
-// GroupRibbon y plantillas queden coherentes con lo seleccionado.
+// vista fija plantaActivaId a la suya para que sidebar, inspector, ribbon y
+// plantillas queden coherentes con lo seleccionado.
 //
 // CRITERIO de planta para un PILAR (decision F2c, Issue 6-A): un pilar puede abarcar
 // un tramo (plantaInicial..plantaFinal); como se dibuja con UNA instancia de altura
@@ -12,18 +12,17 @@
 // menor). El refinamiento por altura de impacto del raycast queda como TODO
 // (T-3dpleno-pick-altura). Para una VIGA es directo: su plantaId.
 //
-// ROBUSTEZ: id inexistente, o planta/grupo huerfanos (referencias rotas) -> null
+// ROBUSTEZ: id inexistente o planta huerfana (referencia rota) -> null
 // (el llamador no toca el contexto). Nunca lanza.
 import type { Modelo } from "../../../dominio";
-import { grupoPorId, plantaPorId } from "../../../dominio";
+import { plantaPorId } from "../../../dominio";
 
 export interface ContextoElemento {
-  grupoActivoId: string;
   plantaActivaId: string;
 }
 
-// Devuelve el contexto (grupo+planta) de un elemento, o null si no se puede resolver
-// a un par (grupo, planta) valido (id desconocido o referencias rotas).
+// Devuelve el contexto (planta) de un elemento, o null si no se puede resolver a
+// una planta valida (id desconocido o referencia rota).
 export function resolverContextoElemento(
   modelo: Modelo,
   elementoId: string,
@@ -36,22 +35,15 @@ export function resolverContextoElemento(
       .filter((p): p is NonNullable<typeof p> => p !== undefined);
     if (candidatas.length === 0) return null; // ambos extremos huerfanos
     const pie = candidatas.reduce((a, b) => (b.cota < a.cota ? b : a));
-    return contextoDePlanta(modelo, pie.id);
+    return { plantaActivaId: pie.id };
   }
 
   const viga = modelo.vigas.find((v) => v.id === elementoId);
   if (viga) {
-    return contextoDePlanta(modelo, viga.plantaId);
+    const planta = plantaPorId(modelo, viga.plantaId);
+    if (!planta) return null; // planta huerfana
+    return { plantaActivaId: planta.id };
   }
 
   return null; // ni pilar ni viga con ese id
-}
-
-// Resuelve el par (grupo, planta) a partir de una plantaId, validando que tanto la
-// planta como su grupo existan (planta/grupo huerfano -> null).
-function contextoDePlanta(modelo: Modelo, plantaId: string): ContextoElemento | null {
-  const planta = plantaPorId(modelo, plantaId);
-  if (!planta) return null;
-  if (!grupoPorId(modelo, planta.grupoId)) return null; // grupo huerfano
-  return { grupoActivoId: planta.grupoId, plantaActivaId: planta.id };
 }

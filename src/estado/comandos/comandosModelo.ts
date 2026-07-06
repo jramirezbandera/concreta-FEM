@@ -9,7 +9,6 @@ import type {
   Viga,
   Nudo,
   Pano,
-  Grupo,
   Planta,
   Carga,
   Hipotesis,
@@ -65,7 +64,7 @@ export function crearPilar(base: Modelo, datos: DatosPilar): Comando {
 
 // Edita propiedades de un pilar (merge superficial de `cambios`). No toca id ni
 // nombre (visible, lo gestiona el sistema). Pilar inexistente => no-op, igual que
-// editarGrupo/editarPlanta. El delta solo recoge los campos que cambian.
+// editarPlanta. El delta solo recoge los campos que cambian.
 export function editarPilar(
   base: Modelo,
   pilarId: string,
@@ -452,13 +451,13 @@ export function eliminarCarga(base: Modelo, cargaId: string): Comando {
 // `automatica` (una hipotesis creada por el usuario NUNCA es automatica: solo el
 // sistema siembra la automatica `hip-peso-propio`). El nombre puede venir vacio: en
 // ese caso se deriva "Hipotesis {n}" del mayor sufijo en uso (mismo criterio que
-// grupos/pilares); si viene con nombre, se respeta.
+// pilares); si viene con nombre, se respeta.
 export type DatosHipotesis = Omit<Hipotesis, "id" | "automatica">;
 
 export function crearHipotesis(base: Modelo, datos: DatosHipotesis): Comando {
   const id = nuevoId();
   // Nombre vacio => derivamos "Hipotesis {n}" por el mayor sufijo en uso (no el
-  // recuento), igual que crearGrupo/crearPilar. Con nombre dado, se respeta.
+  // recuento), igual que crearPilar. Con nombre dado, se respeta.
   const nombre = datos.nombre.trim()
     ? datos.nombre
     : siguienteNombre("Hipotesis ", base.hipotesis);
@@ -551,42 +550,12 @@ export function editarAnalisis(
   return comando;
 }
 
-// --- Grupos (feature-10, dialogo de Grupos y Plantas) ------------------------
+// --- Plantas (feature-10; sin grupos desde F3.4) ------------------------------
 
-// Datos del grupo que aporta el llamante: todo Grupo salvo id (interno) y nombre
-// (visible "G{n}", derivado del mayor numero en uso).
-export type DatosGrupo = Omit<Grupo, "id" | "nombre">;
-// Idem para planta: nombre visible "Planta {n}".
+// Datos de la planta que aporta el llamante: todo Planta salvo id (interno) y
+// nombre (visible "Planta {n}", derivado del mayor numero en uso). Desde v4 la
+// planta lleva su propio uso y cargas (categoriaUso/sobrecargaUso/cargasMuertas).
 export type DatosPlanta = Omit<Planta, "id" | "nombre">;
-
-export function crearGrupo(base: Modelo, datos: DatosGrupo): Comando {
-  // id opaco fijado AQUI (se reutiliza en redo via el delta); nombre visible
-  // derivado del mayor numero en uso (no del recuento). No es el id (CLAUDE.md §5).
-  const id = nuevoId();
-  const nombre = siguienteNombre("G", base.grupos);
-  const grupo: Grupo = { id, nombre, ...datos };
-
-  const { comando } = crearComandoParches(
-    base,
-    `Crear grupo ${nombre}`,
-    (borrador) => {
-      borrador.grupos.push(grupo);
-    },
-  );
-  return comando;
-}
-
-export function editarGrupo(
-  base: Modelo,
-  grupoId: string,
-  cambios: Partial<Omit<Grupo, "id">>,
-): Comando {
-  const { comando } = crearComandoParches(base, "Editar grupo", (borrador) => {
-    const grupo = borrador.grupos.find((g) => g.id === grupoId);
-    if (grupo) Object.assign(grupo, cambios);
-  });
-  return comando;
-}
 
 // Integridad referencial de Capa 1: borra un conjunto de plantas Y todo lo que las
 // referencia, sobre el MISMO borrador Immer (un solo paso de undo). Eliminar una
@@ -630,21 +599,6 @@ function purgarPlantas(borrador: Modelo, plantaIds: Set<string>): void {
   borrador.plantas = borrador.plantas.filter((p) => !plantaIds.has(p.id));
 }
 
-export function eliminarGrupo(base: Modelo, grupoId: string): Comando {
-  // Cascada en UNA sola receta: quitar el grupo, sus plantas y todo lo que cuelga
-  // de ellas (pilares/vigas/cargas) en el mismo delta -> un unico paso de undo.
-  const { comando } = crearComandoParches(base, "Eliminar grupo", (borrador) => {
-    const plantaIds = new Set(
-      borrador.plantas.filter((p) => p.grupoId === grupoId).map((p) => p.id),
-    );
-    borrador.grupos = borrador.grupos.filter((g) => g.id !== grupoId);
-    purgarPlantas(borrador, plantaIds);
-  });
-  return comando;
-}
-
-// --- Plantas (feature-10) ----------------------------------------------------
-
 export function crearPlanta(base: Modelo, datos: DatosPlanta): Comando {
   const id = nuevoId();
   // Prefijo con espacio: produce "Planta 1". startsWith("Planta ") casa y el
@@ -675,8 +629,8 @@ export function editarPlanta(
 }
 
 export function eliminarPlanta(base: Modelo, plantaId: string): Comando {
-  // Misma integridad referencial que eliminarGrupo, para una sola planta: arrastra
-  // sus pilares/vigas/cargas en el mismo delta (un paso de undo).
+  // Integridad referencial de la cascada (purgarPlantas): arrastra sus
+  // pilares/vigas/cargas en el mismo delta (un paso de undo).
   const { comando } = crearComandoParches(base, "Eliminar planta", (borrador) => {
     purgarPlantas(borrador, new Set([plantaId]));
   });

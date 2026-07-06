@@ -1,7 +1,7 @@
 // Tests de la Sidebar (arbol de obra, Spec Diseno UI §3.3). RTL en el project
 // `jsdom`. Stores Zustand = singletons de modulo -> reset en beforeEach (igual que
 // Shell.test.tsx). Foco: la fila "Pilares" de "Elementos propios" muestra el
-// contador del AMBITO activo (planta activa, si no grupo activo, si no la obra).
+// contador del AMBITO activo (planta activa, si no la obra). Sin grupos (F3.4).
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -10,20 +10,17 @@ import { modeloStore, vistaStore } from "../../estado";
 import { crearModeloVacio, type Modelo } from "../../dominio";
 import { SCHEMA_VERSION } from "../../dominio";
 
-// Obra de prueba: g1 (plantas p0,p1) y g2 (planta p2). pil1 cubre p0..p1 y pil2
-// cubre p1..p2 (pasante que comparte p1). Asi el conteo por ambito es no trivial.
+// Obra de prueba: tres plantas del edificio (p0,p1,p2 a cotas 0,3,6). pil1 cubre
+// p0..p1 y pil2 cubre p1..p2 (pasante que comparte p1). Asi el conteo por planta
+// activa es no trivial (p1 toca ambos pilares).
 function modeloPrueba(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      { id: "g1", nombre: "Forjado 1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-      { id: "g2", nombre: "Cubierta", categoriaUso: "B", sobrecargaUso: 3, cargasMuertas: 1 },
-    ],
     plantas: [
-      { id: "p0", nombre: "Cimentación", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
-      { id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g2" },
+      { id: "p0", nombre: "Cimentación", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p2", nombre: "Planta 2", cota: 6, altura: 3, categoriaUso: "B", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [{ id: "s1", nombre: "IPE 300", tipo: "perfilMetalico", perfilId: "IPE300" }],
     nudos: [
@@ -46,7 +43,7 @@ function modeloPrueba(): Modelo {
         vinculacionExterior: false, arranque: "articulado",
       },
     ],
-    // Una viga en p1 (grupo g1) y otra en p2 (grupo g2): el conteo por ambito difiere.
+    // Una viga en p1 y otra en p2: el conteo por planta activa difiere.
     vigas: [
       {
         id: "vg1", nombre: "V1", plantaId: "p1", nudoI: "n1", nudoJ: "n2",
@@ -59,7 +56,7 @@ function modeloPrueba(): Modelo {
         extremoI: "empotrado", extremoJ: "empotrado", tirante: false,
       },
     ],
-    // Un paño en p1 (grupo g1).
+    // Un paño en p1.
     panos: [
       {
         id: "pa1", nombre: "Losa 1", tipo: "losa", plantaId: "p1",
@@ -76,7 +73,6 @@ function modeloPrueba(): Modelo {
 
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
-  vistaStore.getState().setGrupoActivo(null);
   vistaStore.getState().setPlantaActiva(null);
   vistaStore.getState().setModoVista("planta");
 });
@@ -92,7 +88,7 @@ function contadorPilares(): string {
 }
 
 describe("Sidebar: fila Pilares (Elementos propios)", () => {
-  it("muestra el total de la obra cuando no hay ambito activo", () => {
+  it("muestra el total de la obra cuando no hay planta activa", () => {
     modeloStore.getState().cargarModelo(modeloPrueba());
     render(<Sidebar />);
     expect(screen.getByText("Pilares")).toBeInTheDocument();
@@ -103,17 +99,16 @@ describe("Sidebar: fila Pilares (Elementos propios)", () => {
     expect(contadorPilares()).toBe("2");
   });
 
-  it("cuenta los pilares del grupo activo (pilares distintos, sin doble conteo)", () => {
+  it("cuenta los pilares que tocan la planta activa (sin doble conteo)", () => {
     modeloStore.getState().cargarModelo(modeloPrueba());
-    vistaStore.getState().setGrupoActivo("g1");
+    // p1 (cota 3): pil1 (p0..p1) y pil2 (p1..p2, comparte p1) -> 2 distintos.
+    vistaStore.getState().setPlantaActiva("p1");
     render(<Sidebar />);
-    // g1 = plantas p0,p1; pil1 (p0..p1) y pil2 (p1..p2 comparte p1) -> 2 distintos.
     expect(contadorPilares()).toBe("2");
   });
 
   it("cuenta solo los pilares de la planta activa", () => {
     modeloStore.getState().cargarModelo(modeloPrueba());
-    vistaStore.getState().setGrupoActivo("g2");
     vistaStore.getState().setPlantaActiva("p2");
     render(<Sidebar />);
     // p2 solo toca pil2.
@@ -139,25 +134,24 @@ describe("Sidebar: fila Pilares (Elementos propios)", () => {
 // UX-A8: vigas y paños deben usar el MISMO criterio de ambito que pilares (antes las
 // vigas mostraban el total de la obra siempre, incoherente).
 describe("Sidebar: filas Vigas y Paños por ambito (UX-A8)", () => {
-  it("sin ambito activo muestran el total de la obra", () => {
+  it("sin planta activa muestran el total de la obra", () => {
     modeloStore.getState().cargarModelo(modeloPrueba());
     render(<Sidebar />);
     expect(contadorDe("Vigas")).toBe("2"); // vg1 + vg2
     expect(contadorDe("Paños")).toBe("1"); // pa1
   });
 
-  it("filtran por grupo activo", () => {
+  it("filtran por planta activa (p1)", () => {
     modeloStore.getState().cargarModelo(modeloPrueba());
-    vistaStore.getState().setGrupoActivo("g1"); // plantas p0,p1
+    vistaStore.getState().setPlantaActiva("p1");
     render(<Sidebar />);
-    // g1: vg1 (p1) y pa1 (p1); vg2 esta en p2 (g2) -> fuera.
+    // p1: vg1 (p1) y pa1 (p1); vg2 esta en p2 -> fuera.
     expect(contadorDe("Vigas")).toBe("1");
     expect(contadorDe("Paños")).toBe("1");
   });
 
-  it("filtran por planta activa", () => {
+  it("filtran por planta activa (p2)", () => {
     modeloStore.getState().cargarModelo(modeloPrueba());
-    vistaStore.getState().setGrupoActivo("g2");
     vistaStore.getState().setPlantaActiva("p2");
     render(<Sidebar />);
     // p2: solo vg2; ningun paño.
@@ -182,7 +176,7 @@ describe("Sidebar: seccion Vistas (D11a)", () => {
     await user.click(screen.getByRole("button", { name: /Vistas/i }));
   }
 
-  it("las filas Planta de grupo / Vista 3D son pulsables y conmutan el modo", async () => {
+  it("las filas Planta / Vista 3D son pulsables y conmutan el modo", async () => {
     const user = userEvent.setup();
     render(<Sidebar />);
     await abrirVistas(user);
@@ -193,7 +187,7 @@ describe("Sidebar: seccion Vistas (D11a)", () => {
     expect(vistaStore.getState().modoVista).toBe("3d");
 
     const filaPlanta = screen
-      .getByText("Planta de grupo")
+      .getByText("Planta")
       .closest(".cx-row") as HTMLElement;
     await user.click(filaPlanta);
     expect(vistaStore.getState().modoVista).toBe("planta");
@@ -207,7 +201,7 @@ describe("Sidebar: seccion Vistas (D11a)", () => {
     const fila3d = screen.getByText("Vista 3D").closest(".cx-row") as HTMLElement;
     expect(fila3d.getAttribute("aria-pressed")).toBe("true");
     const filaPlanta = screen
-      .getByText("Planta de grupo")
+      .getByText("Planta")
       .closest(".cx-row") as HTMLElement;
     expect(filaPlanta.getAttribute("aria-pressed")).toBe("false");
   });

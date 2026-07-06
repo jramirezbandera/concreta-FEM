@@ -53,17 +53,23 @@ const TOL_REL = 0.02;
 // e2e-real).
 const TIMEOUT_MOTOR = 90_000;
 
-// Crea grupo + dos plantas (cota 0 y cota 3) por el DIALOGO REAL. No se editan
-// campos: los defaults del dialogo ya producen la geometria buscada — "Nueva
-// planta" sugiere cota 0 la primera vez y cota (max+altura)=3 la segunda (ver
-// DialogoGruposYPlantas.nuevaPlanta). Asi el humo no depende de teclear cotas en
-// inputs con commit-en-blur (fragil), solo de tres clics de boton.
-async function crearGrupoYPlantas(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Gestionar plantas y grupos…" }).click();
-  const dialogo = page.getByRole("dialog");
+// Crea dos plantas (cota 0 y cota 3) por el DIALOGO REAL. No se editan campos: los
+// defaults del dialogo ya producen la geometria buscada — "Nueva planta" sugiere
+// cota 0 la primera vez y cota (max+altura)=3 la segunda (ver DialogoPlantas.
+// nuevaPlanta). Asi el humo no depende de teclear cotas en inputs con commit-en-blur
+// (fragil), solo de dos clics de boton. Desde F3.4 no hay grupos: el dialogo es solo
+// de plantas y "Nueva planta" esta siempre disponible.
+//
+// NOTA (aviso PLANTA_CARGA_SIN_PANO): las plantas nuevas traen SU/CM > 0 y esta obra
+// no tiene paños, asi que el discretizador emite el aviso NO bloqueante
+// PLANTA_CARGA_SIN_PANO. No altera la numerica: sin paños losa la Capa 2 no lleva
+// ninguna carga superficial (cargasPlanta.casesPlantaActivos = {false,false}), asi
+// que ΣFY sigue siendo exactamente q·L. El humo no asevera avisos.
+async function crearPlantas(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Gestionar plantas…" }).click();
+  const dialogo = page.getByRole("dialog", { name: "Plantas" });
   await expect(dialogo).toBeVisible();
 
-  await dialogo.getByRole("button", { name: "Nuevo grupo" }).click();
   // Dos plantas: la 1ª nace en cota 0 (base), la 2ª en cota 3 (superior).
   await dialogo.getByRole("button", { name: "Nueva planta" }).click();
   await dialogo.getByRole("button", { name: "Nueva planta" }).click();
@@ -87,8 +93,8 @@ test("humo de integracion: el worker real (Pyodide+PyNite) resuelve una biapoyad
   await abrirApp(page, { mock: false });
 
   // 2) Construir la biapoyada.
-  //    2a) Grupo + dos plantas por el dialogo real (cota 0 y cota 3).
-  await crearGrupoYPlantas(page);
+  //    2a) Dos plantas por el dialogo real (cota 0 y cota 3).
+  await crearPlantas(page);
 
   //    2b) Pilares de apoyo + viga + carga lineal por la costura. Los ids de planta
   //    se leen de estadoObra() en orden de creacion: [0]=base (cota 0), [1]=superior

@@ -30,12 +30,13 @@ function modeloPortico(): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
-    grupos: [
-      { id: "g1", nombre: "Grupo 1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 },
-    ],
+    // v4 "plantas sin grupos": el uso/cargas viven en cada planta. La base NO tiene
+    // paños losa, asi que SU/CM van a 0 (inertes sin paño; con >0 dispararian el aviso
+    // PLANTA_CARGA_SIN_PANO y ensuciarian los asserts de avisos vacios). El test que
+    // añade un paño (carga superficial) fija esos valores en su planta explicitamente.
     plantas: [
-      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, grupoId: "g1" },
-      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" },
+      { id: "p0", nombre: "Cimentacion", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
     ],
     secciones: [
       { id: SECCION, nombre: "IPE 300", tipo: "perfilMetalico", perfilId: PERFIL },
@@ -404,6 +405,11 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
       // F3 corte 1: el bloqueo PANO_NO_SOPORTADO de F1 SE LEVANTA. Una carga superficial
       // sobre una losa bien formada se malla y se reparte como presion a TODOS sus quads.
       const m = modeloPortico();
+      // La planta del paño (p1) declara sus cargas de planta (v4): CM=1, uso=2, que se
+      // aplican como presiones automaticas sobre la losa. Antes vivian en el grupo.
+      m.plantas = m.plantas.map((p) =>
+        p.id === "p1" ? { ...p, sobrecargaUso: 2, cargasMuertas: 1 } : p,
+      );
       // Paño losa rectangular (4 nudos PROPIOS, malla aislada): hormigon HA-25, en p1.
       m.nudos.push(
         { id: "q1", x: 0, y: 0 },
@@ -430,10 +436,10 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
         // Se emiten quads y quad_loads (solo porque hay paño).
         expect(fem.quads).toBeDefined();
         expect(fem.quad_loads).toBeDefined();
-        // 4x2 = 8 quads. quad_loads (F3.2, D-1): la carga superficial de USUARIO
-        // (8, case h1) MAS las cargas automaticas del grupo del fixture
-        // (cargasMuertas=1 -> 8 en auto-grupo-cm; sobrecargaUso=2 -> 8 en
-        // auto-grupo-uso) = 24. Los campos del grupo por fin tienen consumidor.
+        // 4x2 = 8 quads. quad_loads (F3.4, D-1): la carga superficial de USUARIO
+        // (8, case h1) MAS las cargas automaticas de la PLANTA del paño
+        // (cargasMuertas=1 -> 8 en auto-planta-cm; sobrecargaUso=2 -> 8 en
+        // auto-planta-uso) = 24. Los campos de la planta por fin tienen consumidor.
         expect(fem.quads).toHaveLength(8);
         expect(fem.quad_loads).toHaveLength(24);
         // Presion con signo canonico de gravedad: POSITIVA = hacia abajo en quads
@@ -441,10 +447,10 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
         const porCase = (c: string) => fem.quad_loads!.filter((ql) => ql.case === c);
         expect(porCase("h1")).toHaveLength(8);
         for (const ql of porCase("h1")) expect(ql.presion).toBe(4);
-        expect(porCase("auto-grupo-cm")).toHaveLength(8);
-        for (const ql of porCase("auto-grupo-cm")) expect(ql.presion).toBe(1);
-        expect(porCase("auto-grupo-uso")).toHaveLength(8);
-        for (const ql of porCase("auto-grupo-uso")) expect(ql.presion).toBe(2);
+        expect(porCase("auto-planta-cm")).toHaveLength(8);
+        for (const ql of porCase("auto-planta-cm")) expect(ql.presion).toBe(1);
+        expect(porCase("auto-planta-uso")).toHaveLength(8);
+        for (const ql of porCase("auto-planta-uso")) expect(ql.presion).toBe(2);
         // Procedencia (2A): trazabilidad mapea el paño a sus quads.
         expect(res.trazabilidad.panoAQuads["pano1"]).toHaveLength(8);
         expect(res.trazabilidad.nodosDeMalla.length).toBeGreaterThan(0);
@@ -502,7 +508,7 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
     it("pilar pasante (3 cotas) -> 2 barras compartiendo el nodo intermedio con su viga", () => {
       const m = modeloPortico();
       // Tercera planta intermedia: p0(0) - p1(3) - p2(6). El pilar va de p0 a p2.
-      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
       m.pilares[0].plantaFinal = "p2";
       // La viga vive en p1 (cota 3) sobre el punto del pilar (2,5): comparte el nudo
       // intermedio del pilar.
@@ -559,7 +565,7 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
     it("AUDITORIA A-1: carga lineal sobre pilar pasante llega a TODOS los tramos", () => {
       const m = modeloPortico();
       // p0(0) - p1(3) - p2(6); el pilar pasa de p0 a p2 (2 tramos).
-      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
       m.pilares[0].plantaFinal = "p2";
       // La unica carga: lineal de 10 kN/m sobre EL PILAR (no la viga).
       m.cargas = [{ id: "c1", tipo: "lineal", ambito: "pil1", valor: 10, hipotesisId: "h1" }];
@@ -632,7 +638,7 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
     it("pilar pasante -> peso propio en CADA tramo del pilar", () => {
       const m = modeloConPesoPropio();
       // p0(0)-p1(3)-p2(6); pilar de p0 a p2 => 2 tramos.
-      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "g1" });
+      m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
       m.pilares[0].plantaFinal = "p2";
       const fem = discretizarOk(m);
       // Barras del pilar (vertical) que llevan peso propio.
@@ -1162,15 +1168,14 @@ describe("construirBaseFEM + calcularAcoples · losa plana (F2.0, T2.1) — mall
     expect(acople.pilaresAcoplados).toEqual([]);
   });
 
-  it("DP3: pilar PASANTE de otro grupo comparte el N* a la cota del paño (grupo = organizativo)", () => {
+  it("DP3: pilar PASANTE por una planta superior comparte el N* a la cota del paño", () => {
     // Un pilar que atraviesa la cota del paño (p0->p2, pasando por p1) debe tener un N*
-    // troceado en la cota de p1 (la planta del paño), aunque su tramo abarque otro
-    // grupo. cotasDePilar trocea por TODA planta intermedia real: el N* de la cabeza a
-    // la cota del paño EXISTE. Es el respaldo del invariante N*-cabeza para el pasante.
+    // troceado en la cota de p1 (la planta del paño). cotasDePilar trocea por TODA
+    // planta intermedia real: el N* de la cabeza a la cota del paño EXISTE. Es el
+    // respaldo del invariante N*-cabeza para el pasante.
     const m = modeloLosaPlana([]); // sin interiores de base; se añade el pasante a mano
-    // Grupo B con una planta superior (cota 6) para que el pilar sea pasante en p1.
-    m.grupos.push({ id: "gB", nombre: "Grupo B", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 });
-    m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, grupoId: "gB" });
+    // Planta superior (cota 6) para que el pilar sea pasante en p1 (sin paños: SU/CM 0).
+    m.plantas.push({ id: "p2", nombre: "Planta 2", cota: 6, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
     m.pilares.push({
       id: "pas1",
       nombre: "PAS1",

@@ -53,7 +53,7 @@ export { borrarSeleccion };
 // eslint-disable-next-line react-refresh/only-export-components
 export const DISPATCH: Record<AccionMenu, () => void> = {
   abrirDatosGenerales: () => vistaStore.getState().abrirDialogo("datosGenerales"),
-  abrirGruposPlantas: () => vistaStore.getState().abrirDialogo("gruposPlantas"),
+  abrirPlantas: () => vistaStore.getState().abrirDialogo("plantas"),
   abrirHipotesis: () => vistaStore.getState().abrirDialogo("hipotesis"),
   abrirOpcionesAnalisis: () =>
     vistaStore.getState().abrirDialogo("opcionesAnalisis"),

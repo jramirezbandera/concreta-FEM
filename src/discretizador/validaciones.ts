@@ -29,11 +29,12 @@ import {
   type ResultadoAcoples,
 } from "./acople";
 import {
-  CASE_CM_GRUPO,
-  CASE_USO_GRUPO,
-  cargasGrupoDePano,
-  gruposConValorNegativo,
-} from "./cargasGrupo";
+  CASE_CM_PLANTA,
+  CASE_USO_PLANTA,
+  cargasPlantaDePano,
+  plantasConValorNegativo,
+  plantasConCargaSinPano,
+} from "./cargasPlanta";
 
 // Memoizador de `pilaresInterioresBajoPano` por paño para una MISMA discretizacion.
 // El helper rehace geometria (limitesDePano + filtro sobre todos los pilares) en cada
@@ -142,14 +143,12 @@ function comprobarNombresUnicos(
   }
 }
 
-// 1. Nombres unicos de pilares, vigas, hipotesis, plantas y grupos.
+// 1. Nombres unicos de pilares, vigas, hipotesis y plantas.
 function validarNombresUnicos(modelo: Modelo, errores: ErrorObra[]): void {
   comprobarNombresUnicos(errores, modelo.pilares, "pilar", "pilar");
   comprobarNombresUnicos(errores, modelo.vigas, "viga", "viga");
   comprobarNombresUnicos(errores, modelo.hipotesis, "hipotesis", "hipótesis");
   comprobarNombresUnicos(errores, modelo.plantas, "planta", "planta");
-  // Grupos tambien se nombran; un grupo duplicado confunde el arbol de obra.
-  comprobarNombresUnicos(errores, modelo.grupos, "modelo", "grupo");
 }
 
 // 1b. [AUDITORIA M-1] IDS unicos por coleccion. El borde Zod valida solo forma
@@ -181,7 +180,6 @@ function comprobarIdsUnicos(
 }
 
 function validarIdsUnicos(modelo: Modelo, errores: ErrorObra[]): void {
-  comprobarIdsUnicos(errores, modelo.grupos, "modelo", "grupo");
   comprobarIdsUnicos(errores, modelo.plantas, "planta", "planta");
   comprobarIdsUnicos(errores, modelo.secciones, "modelo", "sección");
   comprobarIdsUnicos(errores, modelo.nudos, "modelo", "punto");
@@ -942,55 +940,74 @@ function validarAvisosAcople(
   }
 }
 
-// 8. Cargas AUTOMATICAS de grupo (F3.2, D-1): red del borde y gestion de expectativas.
-function validarCargasGrupo(modelo: Modelo, errores: ErrorObra[]): void {
+// 8. Cargas AUTOMATICAS de planta (F3.4; antes de grupo, F3.2 D-1): red del borde
+// y gestion de expectativas.
+function validarCargasPlanta(modelo: Modelo, errores: ErrorObra[]): void {
   // ID_RESERVADO (red defensiva FINAL): la frontera de import ya SANEA la colision
   // renombrando la hipotesis intrusa [OV-4]; si aun asi llega una hipotesis con un
   // id sintetico (p.ej. creada programaticamente saltandose la frontera), se
-  // bloquea: su `case` colisionaria en el solver con la carga automatica de grupo
+  // bloquea: su `case` colisionaria en el solver con la carga automatica de planta
   // y se sumarian esfuerzos en silencio.
   for (const h of modelo.hipotesis) {
-    if (h.id === CASE_CM_GRUPO || h.id === CASE_USO_GRUPO) {
+    if (h.id === CASE_CM_PLANTA || h.id === CASE_USO_PLANTA) {
       errores.push({
         codigo: "ID_RESERVADO",
         severidad: "error",
-        mensaje: `La hipótesis "${h.nombre}" usa un identificador reservado para las cargas automáticas de grupo. Vuelve a importar el proyecto o recrea la hipótesis.`,
+        mensaje: `La hipótesis "${h.nombre}" usa un identificador reservado para las cargas automáticas de planta. Vuelve a importar el proyecto o recrea la hipótesis.`,
         elementoId: h.id,
         elementoTipo: "hipotesis",
       });
     }
   }
-  // GRUPO_VALOR_NEGATIVO (aviso, [2A]): un valor negativo NO se aplica (una carga
+  // PLANTA_VALOR_NEGATIVO (aviso, [2A]): un valor negativo NO se aplica (una carga
   // "muerta" ascendente es un error de tecleo casi seguro); callarlo haria creer al
-  // usuario que esa carga existe. Solo avisa si el grupo tiene paños que la
-  // recibirian (si no, el valor es inerte y ya lo dice la nota del dialogo).
-  for (const g of gruposConValorNegativo(modelo)) {
+  // usuario que esa carga existe. Solo avisa si la planta tiene paños que la
+  // recibirian (si no, lo cubre PLANTA_CARGA_SIN_PANO).
+  for (const p of plantasConValorNegativo(modelo)) {
     errores.push({
-      codigo: "GRUPO_VALOR_NEGATIVO",
+      codigo: "PLANTA_VALOR_NEGATIVO",
       severidad: "aviso",
-      mensaje: `El grupo "${g.nombre}" tiene un valor negativo en ${
-        g.campo === "cargasMuertas" ? "cargas muertas" : "la sobrecarga de uso"
-      }: no se aplica a sus paños. Revisa el dato en Plantas y grupos.`,
-      elementoTipo: "modelo",
+      mensaje: `La planta "${p.nombre}" tiene un valor negativo en ${
+        p.campo === "cargasMuertas" ? "cargas muertas" : "la sobrecarga de uso"
+      }: no se aplica a sus paños. Revisa el dato en el diálogo de Plantas.`,
+      elementoId: p.plantaId,
+      elementoTipo: "planta",
     });
   }
-  // GRUPO_Y_SUPERFICIAL (aviso, [OV-1]): un paño con carga superficial MANUAL y
-  // ademas cargas automaticas de grupo puede estar contando la misma accion dos
+  // PLANTA_CARGA_SIN_PANO (aviso, F3.4 honestidad): la planta declara sobrecarga o
+  // cargas muertas (> 0) pero no tiene ningun paño que las reciba, asi que el
+  // calculo las IGNORA. Callarlo hacia creer que esas cargas actuaban (la queja
+  // que motivo F3.4). No bloquea: un portico desnudo con cargas lineales en vigas
+  // es un modelo legitimo.
+  for (const p of plantasConCargaSinPano(modelo)) {
+    const campos: string[] = [];
+    if (Number.isFinite(p.sobrecargaUso) && p.sobrecargaUso > 0) campos.push("la sobrecarga de uso");
+    if (Number.isFinite(p.cargasMuertas) && p.cargasMuertas > 0) campos.push("las cargas muertas");
+    errores.push({
+      codigo: "PLANTA_CARGA_SIN_PANO",
+      severidad: "aviso",
+      mensaje: `La planta "${p.nombre}" define ${campos.join(" y ")} pero no tiene ningún paño: esas cargas no entran en el cálculo. Introduce un paño, aplica cargas lineales sobre las vigas o pon el valor a cero.`,
+      elementoId: p.id,
+      elementoTipo: "planta",
+    });
+  }
+  // PLANTA_Y_SUPERFICIAL (aviso, [OV-1]): un paño con carga superficial MANUAL y
+  // ademas cargas automaticas de planta puede estar contando la misma accion dos
   // veces (proyectos anteriores a F3.2 metian a mano lo que el grupo no aplicaba).
-  // Coexistir es legitimo (p.ej. tabiqueria manual + uso del grupo): NO bloquea.
+  // Coexistir es legitimo (p.ej. tabiqueria manual + uso de la planta): NO bloquea.
   const panosOrdenados = [...modelo.panos].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   );
   for (const pano of panosOrdenados) {
-    if (cargasGrupoDePano(modelo, pano).length === 0) continue;
+    if (cargasPlantaDePano(modelo, pano).length === 0) continue;
     const tieneSuperficialManual = modelo.cargas.some(
       (c) => c.tipo === "superficial" && c.ambito === pano.id,
     );
     if (tieneSuperficialManual) {
       errores.push({
-        codigo: "GRUPO_Y_SUPERFICIAL",
+        codigo: "PLANTA_Y_SUPERFICIAL",
         severidad: "aviso",
-        mensaje: `El paño "${pano.nombre}" recibe cargas superficiales introducidas a mano además de las automáticas de su grupo: revisa que no estén duplicadas.`,
+        mensaje: `El paño "${pano.nombre}" recibe cargas superficiales introducidas a mano además de las automáticas de su planta: revisa que no estén duplicadas.`,
         elementoId: pano.id,
         elementoTipo: "pano",
       });
@@ -1082,7 +1099,7 @@ export function validarModelo(
   validarElementosInterioresPano(modelo, errores, acoplesReales, pilaresInteriores); // [OV-5/TODO-2/F2.0] pilar/viga interior condicional + cap
   validarPilaresJuntos(modelo, errores, acoplesReales); // [F2.0] dos pilares en la misma celda de malla
   validarAvisosAcople(modelo, errores, acoplesReales); // [OV-2] parcial/insuficiente
-  validarCargasGrupo(modelo, errores); // [D-1] id reservado + negativo + duplicidad
+  validarCargasPlanta(modelo, errores); // [D-1/F3.4] id reservado + negativo + sin paño + duplicidad
   validarHipotesisConCargas(modelo, errores);
   validarVariablesConcomitantes(modelo, errores);
   validarNudosFlotantes(modelo, errores);

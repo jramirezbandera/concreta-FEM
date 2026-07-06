@@ -28,19 +28,12 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = () => {};
 });
 
-// Construye un modelo con un grupo, una planta, dos nudos y una viga valida que los
-// une, con seccion/material del catalogo de la biblioteca (IPE200/S275), igual que
-// el fixture del inspector de pilares.
+// Construye un modelo con una planta, dos nudos y una viga valida que los une, con
+// seccion/material del catalogo de la biblioteca (IPE200/S275), igual que el fixture
+// del inspector de pilares. Sin paños losa: cargas de planta inertes (0/0).
 function modeloConViga(): Modelo {
   const m = crearModeloVacio();
-  m.grupos.push({
-    id: "g1",
-    nombre: "G1",
-    categoriaUso: "A",
-    sobrecargaUso: 2,
-    cargasMuertas: 1,
-  });
-  m.plantas.push({ id: "pl1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" });
+  m.plantas.push({ id: "pl1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
   m.nudos.push(
     { id: "n1", x: 0, y: 0 },
     { id: "n2", x: 5, y: 0 },
