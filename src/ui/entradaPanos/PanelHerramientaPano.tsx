@@ -10,11 +10,28 @@
 // UNIDADES (CLAUDE.md §14): espesor y tamaño de malla se muestran/teclean en mm (campos
 // CampoLongitudMm); el dominio guarda m. El material se elige por id.
 import { useEffect, useSyncExternalStore } from "react";
-import { PanelFlotante, Boton, SelectMaterial } from "../primitivas";
-import { CampoBordeApoyo, CampoLongitudMm } from "./camposPano";
+import { PanelFlotante, Boton, SelectMaterial, Segmentado } from "../primitivas";
+import {
+  CampoBordeApoyo,
+  CampoLongitudMm,
+  CampoDireccionViguetas,
+  CampoPesoPropio,
+} from "./camposPano";
 import { vistaStore, type DefaultsPano } from "../../estado";
 import { DEFAULT_MATERIAL_ID } from "../../biblioteca";
 import "./panelHerramientaPano.css";
+
+// Selector de tipo de paño. "Losa maciza" (placa de quads) y "Unidireccional"
+// (viguetas en una direccion). Reticular NO se ofrece: sigue sin soporte (DP5 del
+// contrato). Etiquetas de obra; el valor es el `tipo` del dominio.
+const OPCIONES_TIPO: ReadonlyArray<{
+  valor: DefaultsPano["tipo"];
+  etiqueta: string;
+  titulo: string;
+}> = [
+  { valor: "losa", etiqueta: "Losa maciza", titulo: "Losa maciza de hormigón (placa)" },
+  { valor: "unidireccional", etiqueta: "Unidireccional", titulo: "Forjado de viguetas en una dirección" },
+];
 
 // True solo en modo "pano". subscribeWithSelector -> re-render solo al conmutar.
 function useHerramientaPano(): boolean {
@@ -48,6 +65,8 @@ function PanelActivo() {
     }
   }, [defaults.materialId, setDefaults]);
 
+  const esUni = defaults.tipo === "unidireccional";
+
   return (
     <PanelFlotante
       className="cx-herramienta-pano"
@@ -55,41 +74,114 @@ function PanelActivo() {
       tag="losa"
       data-testid="panel-herramienta-pano"
     >
-      <CampoLongitudMm
-        etiqueta="Espesor"
-        valorM={defaults.espesor}
-        onValorM={(m) => {
-          if (Number.isFinite(m)) setDefaults({ espesor: m });
-        }}
-      />
+      {/* Selector de tipo: fija que se colocara (losa maciza o forjado unidireccional)
+          ANTES de colocar. Reticular no se ofrece (sin soporte). */}
+      <div className="cx-campo cx-herramienta-pano__campo">
+        <span className="cx-campo__label">Tipo de forjado</span>
+        <Segmentado<DefaultsPano["tipo"]>
+          opciones={OPCIONES_TIPO}
+          valor={defaults.tipo}
+          onValor={(v) => setDefaults({ tipo: v })}
+          aria-label="Tipo de forjado"
+        />
+      </div>
+
       <SelectMaterial
         etiqueta="Material"
         valor={defaults.materialId}
         onCambio={(id) => setDefaults({ materialId: id })}
       />
-      <CampoLongitudMm
-        etiqueta="Tamaño de malla"
-        valorM={defaults.tamMalla}
-        onValorM={(m) => {
-          if (Number.isFinite(m)) setDefaults({ tamMalla: m });
-        }}
-      />
+
+      {/* Campos de la LOSA MACIZA: espesor + tamaño de malla. Ocultos bajo
+          unidireccional (no aplican: la vigueta no es una placa mallada). */}
+      {!esUni ? (
+        <>
+          <CampoLongitudMm
+            etiqueta="Espesor"
+            valorM={defaults.espesor}
+            onValorM={(m) => {
+              if (Number.isFinite(m)) setDefaults({ espesor: m });
+            }}
+          />
+          <CampoLongitudMm
+            etiqueta="Tamaño de malla"
+            valorM={defaults.tamMalla}
+            onValorM={(m) => {
+              if (Number.isFinite(m)) setDefaults({ tamMalla: m });
+            }}
+          />
+        </>
+      ) : null}
+
+      {/* Campos del forjado UNIDIRECCIONAL: direccion de viguetas, intereje, canto,
+          ancho de nervio y peso propio. Solo bajo tipo "unidireccional". */}
+      {esUni ? (
+        <>
+          <CampoDireccionViguetas
+            className="cx-herramienta-pano__campo"
+            valor={defaults.direccionViguetas}
+            onValor={(v) => setDefaults({ direccionViguetas: v })}
+          />
+          <CampoLongitudMm
+            etiqueta="Intereje"
+            valorM={defaults.intereje}
+            onValorM={(m) => {
+              if (Number.isFinite(m)) setDefaults({ intereje: m });
+            }}
+          />
+          <CampoLongitudMm
+            etiqueta="Canto"
+            valorM={defaults.canto}
+            onValorM={(m) => {
+              if (Number.isFinite(m)) setDefaults({ canto: m });
+            }}
+          />
+          <CampoLongitudMm
+            etiqueta="Ancho de nervio"
+            valorM={defaults.anchoNervio}
+            onValorM={(m) => {
+              if (Number.isFinite(m)) setDefaults({ anchoNervio: m });
+            }}
+          />
+          <CampoPesoPropio
+            className="cx-herramienta-pano__campo"
+            valor={defaults.pesoPropio}
+            onValor={(v) => {
+              if (Number.isFinite(v)) setDefaults({ pesoPropio: v });
+            }}
+          />
+        </>
+      ) : null}
+
       <CampoBordeApoyo
         className="cx-herramienta-pano__campo"
         valor={defaults.bordeApoyo}
         onValor={(v) => setDefaults({ bordeApoyo: v })}
       />
 
-      {/* UX-C9 (reescrita en F3.2; ampliada en F2.3): la losa DESCARGA en el portico
-          cuando su contorno coincide con vigas, y ademas en los pilares que queden
-          por DENTRO de su superficie (losa plana); el bordeApoyo queda como fallback
-          de los bordes sin viga. Se comunica ANTES de colocar para fijar la
-          expectativa: dibujarla sobre vigas/pilares = acoplada. */}
-      <p className="cx-note">
-        La losa descarga en las vigas y pilares de su contorno cuando los comparte, y
-        también en los pilares que queden por dentro de su superficie; en los bordes
-        sin viga se usa el apoyo de borde elegido.
-      </p>
+      {esUni ? (
+        /* Nota de honestidad del forjado unidireccional: reparto en UNA direccion
+           (las viguetas descargan en sus dos bordes de apoyo; los bordes paralelos no
+           reciben carga), viguetas biapoyadas (empotrado se comporta como apoyado) y
+           deuda de los esfuerzos por vigueta. Sustituye a la nota de la losa. */
+        <p className="cx-note">
+          El forjado reparte en una dirección: las viguetas descargan en sus dos bordes
+          de apoyo (los bordes paralelos no reciben carga). Son biapoyadas: un borde
+          empotrado se comporta como apoyado. Los esfuerzos de cada vigueta aún no se
+          consultan por separado.
+        </p>
+      ) : (
+        /* UX-C9 (reescrita en F3.2; ampliada en F2.3): la losa DESCARGA en el portico
+           cuando su contorno coincide con vigas, y ademas en los pilares que queden
+           por DENTRO de su superficie (losa plana); el bordeApoyo queda como fallback
+           de los bordes sin viga. Se comunica ANTES de colocar para fijar la
+           expectativa: dibujarla sobre vigas/pilares = acoplada. */
+        <p className="cx-note">
+          La losa descarga en las vigas y pilares de su contorno cuando los comparte, y
+          también en los pilares que queden por dentro de su superficie; en los bordes
+          sin viga se usa el apoyo de borde elegido.
+        </p>
+      )}
 
       <div className="cx-herramienta-pano__acciones">
         <Boton variante="ghost" onClick={terminar}>

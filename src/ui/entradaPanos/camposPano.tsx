@@ -11,7 +11,7 @@
 import { Segmentado } from "../primitivas";
 import { CampoNumero } from "../primitivas";
 import { mToMm, mmToM } from "../../unidades";
-import type { BordeApoyo } from "../../dominio";
+import type { BordeApoyo, TipoDireccionViguetas } from "../../dominio";
 
 // Opciones del apoyo de borde en lenguaje de obra. El orden replica "de mas a menos
 // sujecion": simple (apoyado) -> empotrado (encastrado) -> libre (voladizo).
@@ -69,5 +69,73 @@ export function CampoLongitudMm({
       error={error}
       className={className}
     />
+  );
+}
+
+// --- Campos del forjado UNIDIRECCIONAL ---------------------------------------
+//
+// Estos campos solo se muestran cuando el paño es de tipo "unidireccional"; el
+// PanelHerramientaPano (creacion) y el InspectorPano (edicion) los rinden
+// condicionalmente. Vocabulario de obra ("vigueta" SI es lenguaje de obra); cero
+// jerga FEM.
+
+// Direccion en que corren las viguetas, en ejes de OBRA. La luz de la vigueta es la
+// dimension del paño en esta direccion; el intereje se mide en la perpendicular. Se
+// nombran por el eje de obra (X / Y), no por jerga FEM.
+const OPCIONES_DIRECCION: ReadonlyArray<{
+  valor: TipoDireccionViguetas;
+  etiqueta: string;
+  titulo: string;
+}> = [
+  { valor: "x", etiqueta: "Eje X", titulo: "Viguetas paralelas al eje X (apoyan en los bordes izquierdo y derecho)" },
+  { valor: "y", etiqueta: "Eje Y", titulo: "Viguetas paralelas al eje Y (apoyan en los bordes inferior y superior)" },
+];
+
+export interface CampoDireccionViguetasProps {
+  valor: TipoDireccionViguetas;
+  onValor: (v: TipoDireccionViguetas) => void;
+  className?: string;
+}
+
+export function CampoDireccionViguetas({ valor, onValor, className }: CampoDireccionViguetasProps) {
+  return (
+    <div className={["cx-campo", className].filter(Boolean).join(" ")}>
+      <span className="cx-campo__label">Dirección de viguetas</span>
+      <Segmentado<TipoDireccionViguetas>
+        opciones={OPCIONES_DIRECCION}
+        valor={valor}
+        onValor={onValor}
+        aria-label="Dirección de viguetas del forjado"
+      />
+    </div>
+  );
+}
+
+// Peso propio TABULADO del forjado (kN/m², unidad interna de carga superficial -> SIN
+// conversion, §14). Es el peso del forjado COMPLETO (viguetas, bovedillas y capa de
+// compresion), orientativo segun canto (CTE DB-SE-AE Tabla C.5). La ayuda resume la
+// fuente sin exigir que el usuario la memorice; el valor es editable.
+export const AYUDA_PESO_PROPIO =
+  "Peso del forjado completo (viguetas, bovedillas y capa de compresión), orientativo según canto (CTE DB-SE-AE)";
+
+export interface CampoPesoPropioProps {
+  valor: number; // kN/m² (sistema interno; sin conversion)
+  onValor: (v: number) => void;
+  error?: string;
+  className?: string;
+}
+
+export function CampoPesoPropio({ valor, onValor, error, className }: CampoPesoPropioProps) {
+  return (
+    <div className={["cx-campo-pp", className].filter(Boolean).join(" ")} title={AYUDA_PESO_PROPIO}>
+      <CampoNumero
+        etiqueta="Peso propio"
+        sufijo="kN/m²"
+        valor={valor}
+        onCommit={onValor}
+        error={error}
+      />
+      <p className="cx-note cx-campo-pp__ayuda">{AYUDA_PESO_PROPIO}</p>
+    </div>
   );
 }

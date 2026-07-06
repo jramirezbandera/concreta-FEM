@@ -262,15 +262,30 @@ function ColocacionActiva() {
     }
 
     // crearPano: leer el modelo JUSTO antes de construir el comando (invariante del base).
+    // El tipo lo fija el selector del panel (defaultsPano.tipo): "losa" o
+    // "unidireccional" (reticular no se ofrece). Bajo unidireccional se pasan tambien
+    // los campos uni; espesor/tamMalla siguen viajando con sus defaults aunque el
+    // discretizador los ignore ahi (el dominio los exige a nivel Zod, deuda
+    // T-f3-pano-schema-union).
     const base = modeloStore.getState().getModelo();
+    const esUni = defaultsPano.tipo === "unidireccional";
     const comando = crearPano(base, {
-      tipo: "losa",
+      tipo: defaultsPano.tipo,
       plantaId,
       perimetro: accion.perimetro,
       espesor: defaultsPano.espesor,
       materialId: defaultsPano.materialId,
       tamMalla: defaultsPano.tamMalla,
       bordeApoyo: defaultsPano.bordeApoyo,
+      ...(esUni
+        ? {
+            direccionViguetas: defaultsPano.direccionViguetas,
+            intereje: defaultsPano.intereje,
+            canto: defaultsPano.canto,
+            anchoNervio: defaultsPano.anchoNervio,
+            pesoPropio: defaultsPano.pesoPropio,
+          }
+        : {}),
     });
     modeloStore.getState().ejecutar(comando);
 

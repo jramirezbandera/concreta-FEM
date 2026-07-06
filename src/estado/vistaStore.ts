@@ -7,6 +7,12 @@ import { subscribeWithSelector } from "zustand/middleware";
 // Plantilla DXF (feature-15): ayuda de dibujo (calco), NO Capa 1. Vive en este
 // store de UI; su contrato de datos puro esta en el modulo viewport/dxf.
 import type { Plantilla, TransformPlantilla } from "../ui/viewport/dxf/tiposDxf";
+// Defaults del forjado unidireccional (T4.1): el peso propio por defecto DERIVA del
+// helper tabulado con el canto por defecto (fuente unica CTE DB-SE-AE, biblioteca).
+import {
+  CANTO_UNIDIRECCIONAL_DEFAULT,
+  pesoPropioOrientativo,
+} from "../biblioteca";
 
 // Parche de actualizacion de plantilla. Es `Partial<Plantilla>` pero con `transform`
 // relajado a parcial: la UI puede mandar solo { transform: { escala } } (un solo
@@ -148,11 +154,27 @@ export interface DefaultsCarga {
 // apoyo de borde) y los aplica a cada paño nuevo. UNIDADES (CLAUDE.md §14): espesor y
 // tamMalla viajan AQUI en METROS (sistema interno); la UI convierte mm<->m solo en el
 // borde de sus campos. No es estado de obra: viaja en vistaStore, no en undo.
+//
+// Corte "forjado unidireccional" (T4.1): DefaultsPano gana `tipo` (el selector
+// "Losa maciza" / "Unidireccional" del panel; reticular NO se ofrece) y los campos
+// del forjado unidireccional (direccion de viguetas, intereje, canto, ancho de
+// nervio, peso propio TABULADO). Todos viajan en METROS salvo `pesoPropio` (kN/m²,
+// unidad interna de carga superficial, sin conversion). La ColocacionPano los pasa
+// al crearPano solo cuando `tipo === "unidireccional"`; bajo "losa" el discretizador
+// los ignora. El `pesoPropio` default DERIVA de `pesoPropioOrientativo(canto)`
+// (fuente unica, biblioteca/forjados.ts), NO se hardcodea.
 export interface DefaultsPano {
+  tipo: "losa" | "unidireccional";
   espesor: number; // m
   materialId: string | null;
   tamMalla: number; // m
   bordeApoyo: "simple" | "empotrado" | "libre";
+  // --- Campos del forjado UNIDIRECCIONAL (solo se aplican si tipo === "unidireccional").
+  direccionViguetas: "x" | "y";
+  intereje: number; // m (separacion objetivo entre viguetas)
+  canto: number; // m (canto del nervio de la vigueta)
+  anchoNervio: number; // m (ancho del nervio de la vigueta)
+  pesoPropio: number; // kN/m² (peso propio TABULADO del forjado completo)
 }
 
 interface VistaState {
@@ -375,11 +397,21 @@ export const vistaStore = create<VistaState>()(
     // Paño losa (F3): espesor 0.25 m (losa de hormigon tipica), malla 0.5 m (coincide
     // con la rejilla del lienzo), borde simplemente apoyado. UNIDADES internas en m
     // (la UI los muestra en mm). Material: la UI preselecciona el primero del catalogo.
+    // Forjado unidireccional (T4.1): defaults del corte (canto 0.30 m, intereje 0.70 m,
+    // ancho de nervio 0.12 m, viguetas en "x"). El peso propio default DERIVA de
+    // pesoPropioOrientativo(canto) (fuente unica; con el canto 0.30 el CTE da 4 kN/m²,
+    // pero lo que MANDA es el helper, no un literal — su test pina la arruga de umbrales).
     defaultsPano: {
+      tipo: "losa",
       espesor: 0.25,
       materialId: null,
       tamMalla: 0.5,
       bordeApoyo: "simple",
+      direccionViguetas: "x",
+      intereje: 0.7,
+      canto: CANTO_UNIDIRECCIONAL_DEFAULT,
+      anchoNervio: 0.12,
+      pesoPropio: pesoPropioOrientativo(CANTO_UNIDIRECCIONAL_DEFAULT),
     },
     snapActivo: true,
     rejillaVisible: true,

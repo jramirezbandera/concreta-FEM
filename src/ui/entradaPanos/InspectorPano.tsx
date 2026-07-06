@@ -11,7 +11,12 @@
 // conversion en el borde); el material por id; el apoyo de borde enum.
 import { useEffect, useMemo, useState } from "react";
 import { PanelFlotante, Boton, SelectMaterial } from "../primitivas";
-import { CampoBordeApoyo, CampoLongitudMm } from "./camposPano";
+import {
+  CampoBordeApoyo,
+  CampoLongitudMm,
+  CampoDireccionViguetas,
+  CampoPesoPropio,
+} from "./camposPano";
 import { Dialogo } from "../dialogos/Dialogo";
 import { SeccionCargaSuperficial } from "./SeccionCargaSuperficial";
 import {
@@ -52,14 +57,21 @@ function errorDe(errores: ErrorCampo[], campo: string): string | undefined {
 
 // Construye los DatosPanoUI completos a partir del paño actual y un parche del campo
 // editado. validarPano valida el CONJUNTO. El nombre no se edita aqui (solo-propiedades)
-// pero forma parte del contrato de validacion (unicidad).
+// pero forma parte del contrato de validacion (unicidad). El `tipo` y los campos uni
+// viajan tambien para que validarPano aplique las reglas del forjado unidireccional.
 function datosDesde(pano: Pano, cambios: Partial<DatosPanoUI>): DatosPanoUI {
   return {
     nombre: pano.nombre,
+    tipo: pano.tipo === "unidireccional" ? "unidireccional" : "losa",
     materialId: pano.materialId,
     espesor: pano.espesor,
     tamMalla: pano.tamMalla,
     bordeApoyo: pano.bordeApoyo,
+    direccionViguetas: pano.direccionViguetas,
+    intereje: pano.intereje,
+    canto: pano.canto,
+    anchoNervio: pano.anchoNervio,
+    pesoPropio: pano.pesoPropio,
     ...cambios,
   };
 }
@@ -143,6 +155,9 @@ export function InspectorPano() {
 
   const panoId = seleccion.length === 1 ? seleccion[0] : null;
   const pano = panoId ? panos.find((p) => p.id === panoId) ?? null : null;
+  // Tipo del paño: gobierna que campos y notas se muestran. Un paño legacy sin `tipo`
+  // uni se trata como losa.
+  const esUni = pano?.tipo === "unidireccional";
 
   // Cargas automaticas de la planta que este paño recibira (F3.4; antes de grupo),
   // con la misma fuente que el discretizador. [] si la planta no aporta (linea
@@ -163,8 +178,11 @@ export function InspectorPano() {
     () => (panoId ? calcularAcoples(modelo) : null),
     [modelo, panoId],
   );
+  // La nota de losa plana (pilares interiores acoplados) NO aplica a unidireccional:
+  // ahi un pilar interior BLOQUEA el paño (PANO_PILAR_INTERIOR, DP4), no lo acopla.
   const esLosaPlana =
     pano !== null &&
+    !esUni &&
     acoples !== null &&
     !acoples.pilaresJuntos.has(pano.id) &&
     (acoples.porPano.get(pano.id)?.pilaresAcoplados.length ?? 0) > 0;
@@ -247,6 +265,16 @@ export function InspectorPano() {
         titulo={`Paño ${pano.nombre}`}
         tag="losa"
       >
+        {/* Tipo del paño en solo-lectura (cabecera de propiedades): el tipo lo fija la
+            introduccion grafica (el selector del panel de creacion), no se cambia aqui
+            para no alterar la geometria/campos de un paño ya colocado. Etiqueta de obra. */}
+        <div className="cx-inspector-pano__geom">
+          <span className="cx-inspector-pano__geom-etq">Tipo</span>
+          <span className="cx-inspector-pano__geom-val">
+            {esUni ? "Forjado unidireccional" : "Losa maciza"}
+          </span>
+        </div>
+
         {/* D8b: dimensiones del paño (solo lectura). Ancho × alto en m (2 decimales,
             mono). Derivadas de la geometria en planta; no se editan aqui. */}
         {dimensiones ? (
@@ -257,13 +285,6 @@ export function InspectorPano() {
             </span>
           </div>
         ) : null}
-
-        <CampoLongitudMm
-          etiqueta="Espesor"
-          valorM={pano.espesor}
-          onValorM={(m) => commit(["espesor"], { espesor: m }, { espesor: m })}
-          error={errorDe(errores, "espesor")}
-        />
 
         <SelectMaterial
           etiqueta="Material"
@@ -276,12 +297,63 @@ export function InspectorPano() {
           </div>
         ) : null}
 
-        <CampoLongitudMm
-          etiqueta="Tamaño de malla"
-          valorM={pano.tamMalla}
-          onValorM={(m) => commit(["tamMalla"], { tamMalla: m }, { tamMalla: m })}
-          error={errorDe(errores, "tamMalla")}
-        />
+        {/* Campos de la LOSA MACIZA: espesor + tamaño de malla. Ocultos bajo
+            unidireccional (no aplican: la vigueta no es una placa mallada). */}
+        {!esUni ? (
+          <>
+            <CampoLongitudMm
+              etiqueta="Espesor"
+              valorM={pano.espesor}
+              onValorM={(m) => commit(["espesor"], { espesor: m }, { espesor: m })}
+              error={errorDe(errores, "espesor")}
+            />
+            <CampoLongitudMm
+              etiqueta="Tamaño de malla"
+              valorM={pano.tamMalla}
+              onValorM={(m) => commit(["tamMalla"], { tamMalla: m }, { tamMalla: m })}
+              error={errorDe(errores, "tamMalla")}
+            />
+          </>
+        ) : null}
+
+        {/* Campos del forjado UNIDIRECCIONAL: direccion de viguetas, intereje, canto,
+            ancho de nervio y peso propio. Solo bajo tipo "unidireccional". Commit en
+            vivo (mismo patron que el resto de campos del inspector). */}
+        {esUni ? (
+          <>
+            <CampoDireccionViguetas
+              className="cx-inspector-pano__campo"
+              valor={pano.direccionViguetas ?? "x"}
+              onValor={(v) =>
+                commit(["direccionViguetas"], { direccionViguetas: v }, { direccionViguetas: v })
+              }
+            />
+            <CampoLongitudMm
+              etiqueta="Intereje"
+              valorM={pano.intereje ?? 0}
+              onValorM={(m) => commit(["intereje"], { intereje: m }, { intereje: m })}
+              error={errorDe(errores, "intereje")}
+            />
+            <CampoLongitudMm
+              etiqueta="Canto"
+              valorM={pano.canto ?? 0}
+              onValorM={(m) => commit(["canto"], { canto: m }, { canto: m })}
+              error={errorDe(errores, "canto")}
+            />
+            <CampoLongitudMm
+              etiqueta="Ancho de nervio"
+              valorM={pano.anchoNervio ?? 0}
+              onValorM={(m) => commit(["anchoNervio"], { anchoNervio: m }, { anchoNervio: m })}
+              error={errorDe(errores, "anchoNervio")}
+            />
+            <CampoPesoPropio
+              className="cx-inspector-pano__campo"
+              valor={pano.pesoPropio ?? 0}
+              onValor={(v) => commit(["pesoPropio"], { pesoPropio: v }, { pesoPropio: v })}
+              error={errorDe(errores, "pesoPropio")}
+            />
+          </>
+        ) : null}
 
         <CampoBordeApoyo
           className="cx-inspector-pano__campo"
@@ -289,16 +361,30 @@ export function InspectorPano() {
           onValor={(v) => commit([], { bordeApoyo: v }, { bordeApoyo: v })}
         />
 
-        {/* UX-C9 (reescrita en F3.2; ampliada en F2.3): la losa DESCARGA en el
-            portico cuando su contorno coincide con vigas, y ademas en los pilares que
-            queden por DENTRO de su superficie (losa plana, pilares acoplados); el
-            bordeApoyo queda como fallback de los bordes sin viga. Lenguaje de obra,
-            sin sobre-prometer. */}
-        <p className="cx-note">
-          La losa descarga en las vigas y pilares de su contorno cuando los comparte, y
-          también en los pilares que queden por dentro de su superficie; en los bordes
-          sin viga se usa el apoyo de borde elegido.
-        </p>
+        {esUni ? (
+          /* Nota de honestidad del forjado unidireccional (sustituye a la de la losa):
+             reparto en UNA direccion (las viguetas descargan en sus dos bordes de
+             apoyo; los bordes paralelos no reciben carga), biapoyadas (empotrado se
+             comporta como apoyado) y deuda de los esfuerzos por vigueta. El bordeApoyo
+             "empotrado" no empotra el giro bajo unidireccional (DP3 del contrato). */
+          <p className="cx-note">
+            El forjado reparte en una dirección: las viguetas descargan en sus dos bordes
+            de apoyo (los bordes paralelos no reciben carga). Son biapoyadas: un borde
+            empotrado se comporta como apoyado. Los esfuerzos de cada vigueta aún no se
+            consultan por separado.
+          </p>
+        ) : (
+          /* UX-C9 (reescrita en F3.2; ampliada en F2.3): la losa DESCARGA en el
+             portico cuando su contorno coincide con vigas, y ademas en los pilares que
+             queden por DENTRO de su superficie (losa plana, pilares acoplados); el
+             bordeApoyo queda como fallback de los bordes sin viga. Lenguaje de obra,
+             sin sobre-prometer. */
+          <p className="cx-note">
+            La losa descarga en las vigas y pilares de su contorno cuando los comparte, y
+            también en los pilares que queden por dentro de su superficie; en los bordes
+            sin viga se usa el apoyo de borde elegido.
+          </p>
+        )}
 
         {/* Nota de honestidad (F2.3, losa plana): cuando la losa se apoya en pilares
             interiores, el pico de momento sobre la cabeza del pilar depende del

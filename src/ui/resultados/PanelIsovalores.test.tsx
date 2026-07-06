@@ -58,6 +58,14 @@ function traza(): Trazabilidad {
     nodosDeMalla: ["Q0", "Q1", "Q2", "Q3"],
   };
 }
+// Traza de un modelo con forjado UNIDIRECCIONAL y sin losa: sus viguetas viven en
+// panoAMembers (espejo de panoAQuads). Sin quads que colorear -> estado honesto.
+function trazaUnidireccional(): Trazabilidad {
+  return {
+    ...trazabilidadVacia(),
+    panoAMembers: { "pano-uni": ["PV0-V0", "PV0-V1", "PV0-V2"] },
+  };
+}
 const cero6 = [0, 0, 0, 0, 0, 0];
 function resultadosConPlaca(): ResultadosCalculo {
   const nodos: ResultadosCalculo["nodos"] = {};
@@ -116,6 +124,36 @@ describe("PanelIsovalores", () => {
     expect(
       screen.queryByRole("radiogroup", { name: "Magnitud de isovalores" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("con forjado unidireccional y sin losa: estado HONESTO (isovalores = losas; uni por reacciones/deformada)", () => {
+    // Modelo calculado con viguetas (panoAMembers) pero sin quads: no hay placa que colorear.
+    resultadosStore
+      .getState()
+      .setResultados(resultadosSinPlaca(), femSinQuad(), trazaUnidireccional());
+    vistaStore.getState().setCombinacionActiva("ELS");
+    render(<PanelIsovalores />);
+    // El mensaje honesto explica que los isovalores son de losas y donde leer el forjado uni.
+    expect(screen.getByText(/losas macizas/i)).toBeInTheDocument();
+    expect(screen.getByText(/reacciones/i)).toBeInTheDocument();
+    expect(screen.getByText(/deformada/i)).toBeInTheDocument();
+    // NO cae en el guia generico "no hay losas / introduce un paño" (ya hay un forjado).
+    expect(screen.queryByText(/introduce un paño/i)).not.toBeInTheDocument();
+    // Sin jerga FEM en el texto visible (nada de "member"/"vigueta FEM"/"quad").
+    expect(screen.queryByText(/member|quad/i)).not.toBeInTheDocument();
+    // Sigue sin selector (no hay nada que colorear).
+    expect(
+      screen.queryByRole("radiogroup", { name: "Magnitud de isovalores" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sin losa y sin forjado unidireccional: cae en el guia generico (no el mensaje uni)", () => {
+    resultadosStore.getState().setResultados(resultadosSinPlaca(), femSinQuad(), traza());
+    vistaStore.getState().setCombinacionActiva("ELS");
+    render(<PanelIsovalores />);
+    expect(screen.getByText(/no hay losas calculadas/i)).toBeInTheDocument();
+    // No debe mencionar el forjado unidireccional cuando no lo hay.
+    expect(screen.queryByText(/losas macizas/i)).not.toBeInTheDocument();
   });
 
   it("visible con resultados de placa: muestra el selector de magnitud (sin rampa, D10)", () => {

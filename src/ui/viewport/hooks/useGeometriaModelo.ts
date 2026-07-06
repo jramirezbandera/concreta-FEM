@@ -12,7 +12,13 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { modeloStore, vistaStore } from "../../../estado";
 import type { ModoVista } from "../../../estado";
-import type { Modelo, Planta, Seccion } from "../../../dominio";
+import type {
+  Modelo,
+  Planta,
+  Seccion,
+  TipoPano,
+  TipoDireccionViguetas,
+} from "../../../dominio";
 
 // Un pilar listo para instanciar: centro del tramo (x, y, z) en metros, alto del
 // tramo y giro. Mantiene el id de dominio para el picking (instanceId -> id).
@@ -47,6 +53,13 @@ export interface PanoDibujo {
   id: string;
   contorno: { x: number; y: number }[]; // nudos del perimetro (m), en orden de recorrido
   z: number; // cota de la planta del paño (m)
+  // Tipo de forjado (losa/unidireccional/reticular): lo usa el rayado de viguetas para
+  // dibujar solo bajo "unidireccional". La huella (PanoHuella) es igual para todos.
+  tipo: TipoPano;
+  // Direccion e intereje de las viguetas (solo bajo "unidireccional"; ausentes en losa).
+  // Alimentan el rayado (PanoRayado): direccion de las lineas + reparto real s=B/n.
+  direccionViguetas?: TipoDireccionViguetas;
+  intereje?: number; // m, objetivo (el reparto real lo calcula el rayado)
 }
 
 export interface GeometriaModelo {
@@ -172,6 +185,9 @@ export function derivar(
       id: pano.id,
       contorno,
       z: cotaPlanta(pano.plantaId, cotaPorPlanta),
+      tipo: pano.tipo,
+      direccionViguetas: pano.direccionViguetas,
+      intereje: pano.intereje,
     });
   }
 

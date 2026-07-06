@@ -333,6 +333,19 @@
   flex-direction: column;
   gap: 4px;
 }
+
+/* Campo de peso propio del forjado unidireccional: el campo numerico + una ayuda
+   corta (CTE) debajo, atenuada. El wrapper apila ambos. */
+.cx-campo-pp {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-campo-pp__ayuda {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-3, var(--text-2));
+}
 .cx-campo__label {
   font-family: var(--font-sans);
   font-size: 12px;

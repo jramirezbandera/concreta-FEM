@@ -297,6 +297,17 @@ export type DatosPano = {
   materialId: string;
   tamMalla: number; // m
   bordeApoyo: Pano["bordeApoyo"];
+  // Campos del forjado UNIDIRECCIONAL (opcionales; solo viajan cuando tipo ===
+  // "unidireccional"). La ColocacionPano los pasa desde defaultsPano. Se copian al
+  // Pano solo si estan presentes: un paño losa no los porta (coherente con que sean
+  // opcionales en PanoSchema). Espejo del contrato: espesor/tamMalla siguen viajando
+  // con sus defaults aunque el discretizador los ignore bajo uni (deuda
+  // T-f3-pano-schema-union).
+  direccionViguetas?: Pano["direccionViguetas"];
+  intereje?: number; // m
+  canto?: number; // m
+  anchoNervio?: number; // m
+  pesoPropio?: number; // kN/m²
 };
 
 // Resuelve un punto del perimetro a un id de nudo SOBRE el borrador Immer (misma receta
@@ -340,6 +351,19 @@ export function crearPano(base: Modelo, datos: DatosPano): Comando {
         materialId: datos.materialId,
         tamMalla: datos.tamMalla,
         bordeApoyo: datos.bordeApoyo,
+        // Campos del forjado unidireccional: solo se copian cuando `tipo` es
+        // "unidireccional" (bajo "losa" un `undefined` dejaria claves ausentes,
+        // coherente con que sean opcionales en PanoSchema). El discretizador los lee
+        // solo bajo uni; espesor/tamMalla los ignora ahi (deuda T-f3-pano-schema-union).
+        ...(datos.tipo === "unidireccional"
+          ? {
+              direccionViguetas: datos.direccionViguetas,
+              intereje: datos.intereje,
+              canto: datos.canto,
+              anchoNervio: datos.anchoNervio,
+              pesoPropio: datos.pesoPropio,
+            }
+          : {}),
       };
       borrador.panos.push(pano);
     },

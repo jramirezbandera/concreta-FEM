@@ -87,6 +87,27 @@ function modeloConLosaPlana(nPilares: number): Modelo {
   return m;
 }
 
+// Variante UNIDIRECCIONAL del fixture: mismo rectangulo/planta pero tipo
+// "unidireccional" con sus campos (T4.1). El discretizador no interviene en estos
+// tests de UI: basta con que el paño porte los campos uni.
+function modeloConPanoUni(): Modelo {
+  const m = modeloConPano();
+  m.panos = m.panos.map((p) =>
+    p.id === "F-1"
+      ? {
+          ...p,
+          tipo: "unidireccional" as const,
+          direccionViguetas: "x" as const,
+          intereje: 0.7,
+          canto: 0.3,
+          anchoNervio: 0.12,
+          pesoPropio: 4,
+        }
+      : p,
+  );
+  return m;
+}
+
 beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   seleccionStore.getState().limpiar();
@@ -417,5 +438,120 @@ describe("InspectorPano: dimensiones (D8b)", () => {
     renderConPanoSeleccionado();
     expect(screen.getByText("Dimensiones")).toBeInTheDocument();
     expect(screen.getByText("4.00 × 3.00 m")).toBeInTheDocument();
+  });
+});
+
+// --- Forjado UNIDIRECCIONAL (T4.1): tipo solo-lectura, campos condicionales, commit ---
+
+function renderConPanoUniSeleccionado() {
+  modeloStore.getState().cargarModelo(modeloConPanoUni());
+  seleccionStore.getState().seleccionar(["F-1"]);
+  render(<InspectorPano />);
+}
+
+describe("InspectorPano: forjado unidireccional", () => {
+  it("muestra el TIPO en solo-lectura (Losa maciza / Forjado unidireccional)", () => {
+    // Losa.
+    renderConPanoSeleccionado();
+    expect(screen.getByText("Tipo")).toBeInTheDocument();
+    expect(screen.getByText("Losa maciza")).toBeInTheDocument();
+  });
+
+  it("en un paño unidireccional el tipo solo-lectura dice 'Forjado unidireccional'", () => {
+    renderConPanoUniSeleccionado();
+    expect(screen.getByText("Forjado unidireccional")).toBeInTheDocument();
+  });
+
+  it("en UNIDIRECCIONAL muestra los campos de vigueta y oculta Espesor/Tamaño de malla", () => {
+    renderConPanoUniSeleccionado();
+    expect(screen.getByText("Dirección de viguetas")).toBeInTheDocument();
+    expect(screen.getByLabelText("Intereje")).toBeInTheDocument();
+    expect(screen.getByLabelText("Canto")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ancho de nervio")).toBeInTheDocument();
+    expect(screen.getByLabelText("Peso propio")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Espesor")).toBeNull();
+    expect(screen.queryByLabelText("Tamaño de malla")).toBeNull();
+  });
+
+  it("en LOSA oculta los campos de vigueta", () => {
+    renderConPanoSeleccionado();
+    expect(screen.queryByText("Dirección de viguetas")).toBeNull();
+    expect(screen.queryByLabelText("Intereje")).toBeNull();
+    expect(screen.queryByLabelText("Peso propio")).toBeNull();
+  });
+
+  it("commit en vivo: editar el intereje (mm) lo convierte a m y persiste", async () => {
+    const user = userEvent.setup();
+    renderConPanoUniSeleccionado();
+    const input = screen.getByLabelText("Intereje") as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, "600"); // 600 mm -> 0.6 m
+    await user.tab();
+    expect(pano()!.intereje).toBeCloseTo(0.6, 6);
+  });
+
+  it("commit en vivo: editar el peso propio (kN/m²) persiste sin conversion", async () => {
+    const user = userEvent.setup();
+    renderConPanoUniSeleccionado();
+    const input = screen.getByLabelText("Peso propio") as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, "5");
+    await user.tab();
+    expect(pano()!.pesoPropio).toBe(5);
+  });
+
+  it("commit en vivo: cambiar la dirección de viguetas a Eje Y persiste y es reversible", async () => {
+    const user = userEvent.setup();
+    renderConPanoUniSeleccionado();
+    const grupo = screen.getByRole("radiogroup", { name: "Dirección de viguetas del forjado" });
+    await user.click(within(grupo).getByRole("radio", { name: "Eje Y" }));
+    expect(pano()!.direccionViguetas).toBe("y");
+    modeloStore.getState().deshacer();
+    expect(pano()!.direccionViguetas).toBe("x");
+  });
+
+  it("validación: un intereje inválido (0) NO comitea y muestra el error", async () => {
+    const user = userEvent.setup();
+    renderConPanoUniSeleccionado();
+    const input = screen.getByLabelText("Intereje") as HTMLInputElement;
+    await user.clear(input);
+    await user.type(input, "0");
+    await user.tab();
+    // No comitea: el intereje sigue en 0.7 m.
+    expect(pano()!.intereje).toBeCloseTo(0.7, 6);
+    expect(screen.getByText(/El intereje debe ser mayor que cero/i)).toBeInTheDocument();
+  });
+
+  it("nota: en UNI la nota de reparto en una dirección, no la de descarga en el contorno", () => {
+    renderConPanoUniSeleccionado();
+    expect(screen.getByText(/reparte en una dirección/i)).toBeInTheDocument();
+    expect(screen.getByText(/los bordes paralelos no reciben carga/i)).toBeInTheDocument();
+    expect(screen.getByText(/un borde empotrado se comporta como apoyado/i)).toBeInTheDocument();
+    expect(screen.queryByText(/descarga en las vigas y pilares de su contorno/i)).toBeNull();
+  });
+
+  it("nota de losa plana (momento en cabeza) NO aparece en un paño unidireccional", () => {
+    // Aunque hubiera pilares interiores, bajo uni el pilar BLOQUEA (no acopla): la
+    // nota de momento en cabeza (losa plana) no debe salir.
+    const m = modeloConLosaPlana(2);
+    m.panos = m.panos.map((p) =>
+      p.id === "F-1"
+        ? {
+            ...p,
+            tipo: "unidireccional" as const,
+            direccionViguetas: "x" as const,
+            intereje: 0.7,
+            canto: 0.3,
+            anchoNervio: 0.12,
+            pesoPropio: 4,
+          }
+        : p,
+    );
+    modeloStore.getState().cargarModelo(m);
+    seleccionStore.getState().seleccionar(["F-1"]);
+    render(<InspectorPano />);
+    expect(
+      screen.queryByText(/momento justo sobre la cabeza del pilar es orientativo/i),
+    ).toBeNull();
   });
 });

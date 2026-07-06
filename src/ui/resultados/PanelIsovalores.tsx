@@ -8,6 +8,11 @@
 // (un portico sin losa). El panel conserva su gate en la misma fuente pura (construirBuffers-
 // Isovalores) para decidir vacio-vs-selector, pero no dibuja la rampa.
 //
+// ESTADO HONESTO (F3, unidireccional): si la obra calculada tiene forjados unidireccionales
+// (trazabilidad.panoAMembers no vacio) pero NINGUNA losa que colorear, el estado vacio lo
+// explica en lenguaje de obra en vez de sugerir "introduce un paño" (que ya existe): los
+// isovalores son de losas macizas; el forjado unidireccional se lee por reacciones/deformada.
+//
 // LENGUAJE DE OBRA (CLAUDE.md §17): "Flecha", "Momento Mx", "Momento My"; nunca "quad" ni
 // "nodo".
 import { useMemo, useSyncExternalStore } from "react";
@@ -110,16 +115,35 @@ export function PanelIsovalores() {
     [entradas],
   );
 
+  // ¿La obra calculada tiene forjados UNIDIRECCIONALES? El discretizador registra sus
+  // viguetas en `trazabilidad.panoAMembers` (espejo de panoAQuads para la losa); si hay
+  // alguna entrada, hubo al menos un forjado unidireccional en el ultimo calculo. Los
+  // isovalores muestran resultados de LOSA (placa); un forjado unidireccional no genera
+  // mapa de color, se consulta por reacciones y deformada. Se comunica en lenguaje de obra.
+  const hayForjadoUnidireccional = useMemo(() => {
+    const porPano = entradas.trazabilidad?.panoAMembers ?? {};
+    return Object.values(porPano).some((viguetas) => viguetas.length > 0);
+  }, [entradas.trazabilidad]);
+
   // Sin resultados de placa: ESTADO VACIO GUIA (UX-I1). Antes se ocultaba el panel entero
   // (return null), dejando la pestana Isovalores sin explicar por que esta en blanco.
-  // Ahora la seccion se muestra y guia al usuario a introducir un paño y calcular.
+  // Ahora la seccion se muestra y guia al usuario. Si el modelo tiene forjados
+  // unidireccionales (sin placa que colorear), el mensaje es HONESTO: los isovalores son
+  // para losas; el forjado unidireccional se lee por reacciones y deformada.
   if (!hayPlaca) {
     return (
       <PanelFlotante className="cx-isovalores" titulo="Isovalores" tag="losa">
-        <p className="cx-isovalores__vacio">
-          No hay losas calculadas. Introduce un paño (Entrada de vigas → Paños) y calcula
-          la obra.
-        </p>
+        {hayForjadoUnidireccional ? (
+          <p className="cx-isovalores__vacio">
+            Los isovalores muestran resultados de losas macizas. Los forjados
+            unidireccionales se consultan por sus reacciones y su deformada.
+          </p>
+        ) : (
+          <p className="cx-isovalores__vacio">
+            No hay losas calculadas. Introduce un paño (Entrada de vigas → Paños) y calcula
+            la obra.
+          </p>
+        )}
       </PanelFlotante>
     );
   }

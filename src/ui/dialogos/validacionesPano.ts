@@ -21,12 +21,25 @@ export { type ErrorCampo, esValido };
 // null mientras no se asigna). El apoyo de borde es un enum (el Segmentado solo emite
 // valores validos). El nombre forma parte del contrato (unicidad), aunque el inspector
 // solo-propiedades no lo edite (espejo de DatosVigaUI).
+//
+// Corte "forjado unidireccional" (T4.1): los campos uni (direccion de viguetas,
+// intereje, canto, ancho de nervio, peso propio) son OPCIONALES aqui y SOLO se validan
+// cuando `tipo === "unidireccional"` (espejo de PANO_UNI_CAMPOS en validaciones.ts del
+// discretizador, pero en la capa de UX, campo a campo). Un paño losa no los porta.
 export interface DatosPanoUI {
   nombre: string;
+  tipo?: "losa" | "unidireccional"; // ausente -> se trata como losa (retrocompat)
   materialId: string | null;
   espesor: number; // m
   tamMalla: number; // m
   bordeApoyo: "simple" | "empotrado" | "libre";
+  // Campos del forjado UNIDIRECCIONAL (m; pesoPropio en kN/m²). Presencia + positividad
+  // se exigen SOLO bajo tipo "unidireccional".
+  direccionViguetas?: "x" | "y";
+  intereje?: number; // m
+  canto?: number; // m
+  anchoNervio?: number; // m
+  pesoPropio?: number; // kN/m²
 }
 
 // Mensaje unico para un numero no finito (NaN tras Number("") o texto no numerico).
@@ -92,5 +105,46 @@ export function validarPano(
   // El apoyo de borde (simple/empotrado/libre) es un enum: el Segmentado no emite
   // valores invalidos, asi que no se valida aqui.
 
+  // 5. Campos del forjado UNIDIRECCIONAL: solo se validan cuando el paño es de ese
+  // tipo (espejo de PANO_UNI_CAMPOS del discretizador, aqui campo a campo para la UX).
+  // La direccion es un enum (Segmentado): no se valida. Intereje/canto/anchoNervio
+  // deben ser finitos y > 0 (dimensiones fisicas); pesoPropio finito y >= 0 (0 es
+  // legitimo: un forjado sin peso tabulado). Cada mensaje va en lenguaje de obra.
+  if (datos.tipo === "unidireccional") {
+    validarPositivo(errores, datos.intereje, "intereje", "El intereje debe ser mayor que cero.");
+    validarPositivo(errores, datos.canto, "canto", "El canto de la vigueta debe ser mayor que cero.");
+    validarPositivo(
+      errores,
+      datos.anchoNervio,
+      "anchoNervio",
+      "El ancho de nervio debe ser mayor que cero.",
+    );
+    if (!Number.isFinite(datos.pesoPropio)) {
+      errores.push({ campo: "pesoPropio", mensaje: MSG_NUMERO });
+    } else if ((datos.pesoPropio as number) < 0) {
+      errores.push({
+        campo: "pesoPropio",
+        mensaje: "El peso propio no puede ser negativo.",
+      });
+    }
+  }
+
   return errores;
+}
+
+// Valida que un campo uni sea finito y > 0; empuja el error `msg` al campo `campo` si
+// no lo es. `valor` puede ser undefined (campo ausente en un paño que aun no tiene los
+// datos uni): undefined es NaN por Number.isFinite -> dispara el error, coherente con
+// que un unidireccional los exige.
+function validarPositivo(
+  errores: ErrorCampo[],
+  valor: number | undefined,
+  campo: string,
+  msg: string,
+): void {
+  if (!Number.isFinite(valor)) {
+    errores.push({ campo, mensaje: MSG_NUMERO });
+  } else if ((valor as number) <= 0) {
+    errores.push({ campo, mensaje: msg });
+  }
 }

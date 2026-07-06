@@ -42,6 +42,7 @@ import {
 } from "./enfasisPestana";
 import { RotulosElemento } from "./RotulosElemento";
 import { CargasDibujadas } from "./CargasDibujadas";
+import { PanosRayado } from "./PanoRayado";
 
 // --- Picking helpers ---------------------------------------------------------
 
@@ -644,7 +645,12 @@ export function GeometriaModelo() {
   return (
     <group>
       {capas.panos !== true && (
-        <PanosHuella panos={panos} atenuado={enfasis.panos === "atenuado"} />
+        <>
+          <PanosHuella panos={panos} atenuado={enfasis.panos === "atenuado"} />
+          {/* Rayado de direccion de viguetas (F3, unidireccional): solo bajo esa capa,
+              junto a la huella. Los paños losa/reticular no dibujan rayado. */}
+          <PanosRayado panos={panos} atenuado={enfasis.panos === "atenuado"} />
+        </>
       )}
       {capas.pilares !== true && (
         <>
