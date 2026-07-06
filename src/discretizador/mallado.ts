@@ -75,7 +75,9 @@ export const CAP_QUADS = 2000;
 const ASPECTO_MAX = 4;
 
 // Tolerancia geometrica para "es un rectangulo alineado con los ejes" y "area ~ 0".
-const TOL_GEOM = 1e-3; // m
+// EXPORTADA: malladoMuro (hermano vertical) usa el MISMO criterio para su segmento
+// (degenerado / no alineado) — fuente unica, no duplicar el valor.
+export const TOL_GEOM = 1e-3; // m
 
 // Coordenadas en planta de un nudo del perimetro (lo que el discretizador extrae de
 // modelo.nudos para los 4 ids de `perimetro`). Solo (x,y); la cota la aporta la planta.
