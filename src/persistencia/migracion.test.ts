@@ -762,6 +762,97 @@ describe("migrarYValidar — v4 -> v5: bump de version (campos opcionales)", () 
   });
 });
 
+// ---------------------------------------------------------------------------
+// Migracion REAL de model-schema v5 -> v6 (F3, muros/pantallas). v6 expande `Muro`
+// de stub `{id}` a la forma completa (segmento x1/y1/x2/y2 + plantas + espesor/
+// material/malla/vinculacion). Un muro-stub heredado (v1..v5) se DESCARTA con aviso
+// (espejo del descarte de paños-stub en v2->v3); un muro ya completo viaja intacto.
+// ---------------------------------------------------------------------------
+
+// Fabrica un proyecto v5 valido (forma vigente ANTES de este corte). Parametriza
+// `muros` para ejercitar el descarte de stubs.
+function proyectoV5(muros: unknown[] = []): Record<string, unknown> {
+  return { ...proyectoV4([]), schemaVersion: 5, muros };
+}
+
+// Un muro v6 COMPLETO (la forma nueva): sirve para comprobar que la migracion lo
+// deja intacto (solo descarta stubs, no toca muros con geometria).
+const MURO_V6 = {
+  id: "muro-1",
+  nombre: "M1",
+  x1: 0,
+  y1: 0,
+  x2: 4,
+  y2: 0,
+  plantaInicial: "pl1",
+  plantaFinal: "pl1",
+  espesor: 0.3,
+  materialId: "mat-horm",
+  tamMalla: 0.5,
+  vinculacionExterior: true,
+} as const;
+
+describe("migrarYValidar — v5 -> v6: muros-stub descartados, completos intactos", () => {
+  it("v5 con muros:[] migra a v6 sin avisos de muros (no-op en la practica)", () => {
+    const r = ok(migrarYValidar(proyectoV5()));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(r.modelo.muros).toEqual([]);
+    expect(r.avisos.some((a) => /muro/i.test(a))).toBe(false);
+  });
+
+  it("v5 con un muro-STUB {id} lo DESCARTA con aviso en lenguaje de obra", () => {
+    const r = ok(migrarYValidar(proyectoV5([{ id: "muro-stub" }])));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(r.modelo.muros).toEqual([]);
+    expect(r.avisos.some((a) => /muro.*sin geometría/i.test(a))).toBe(true);
+  });
+
+  it("v5 con un muro COMPLETO (forma v6 en un .json editado) lo conserva intacto", () => {
+    const r = ok(migrarYValidar(proyectoV5([MURO_V6])));
+    expect(r.modelo.muros).toHaveLength(1);
+    expect(r.modelo.muros[0]).toEqual(MURO_V6);
+    expect(r.avisos.some((a) => /muro/i.test(a))).toBe(false);
+  });
+
+  it("mezcla stub + completo: descarta SOLO el stub y avisa en singular", () => {
+    const r = ok(migrarYValidar(proyectoV5([{ id: "stub" }, MURO_V6])));
+    expect(r.modelo.muros).toHaveLength(1);
+    expect(r.modelo.muros[0]).toEqual(MURO_V6);
+    expect(r.avisos.some((a) => /1 muro sin geometría/i.test(a))).toBe(true);
+  });
+
+  it("un muro v6 con espesor NEGATIVO se RECHAZA en la frontera Zod (ruta legible)", () => {
+    const muroMalo = { ...MURO_V6, espesor: -0.3 };
+    const raw = { ...proyectoV5(), schemaVersion: SCHEMA_VERSION, muros: [muroMalo] };
+    const errs = errores(migrarYValidar(raw));
+    expect(errs.some((e) => e.includes("muros.0.espesor"))).toBe(true);
+  });
+
+  it("cadena completa v1 -> v6 desde un raw v1 con muro-stub: descarta y llega", () => {
+    const rawV1: Record<string, unknown> = {
+      unidades: "kN-m",
+      schemaVersion: 1,
+      grupos: [{ id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 }],
+      plantas: [{ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" }],
+      secciones: [],
+      nudos: [],
+      pilares: [],
+      vigas: [],
+      panos: [],
+      muros: [{ id: "muro-stub-v1" }],
+      cargas: [],
+      hipotesis: [
+        { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+      ],
+      analisis: { tipo: "lineal", comprobarEstatica: true },
+    };
+    const r = ok(migrarYValidar(rawV1));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(r.modelo.muros).toEqual([]);
+    expect(r.avisos.some((a) => /muro.*sin geometría/i.test(a))).toBe(true);
+  });
+});
+
 // Round-trip de un Modelo v3 nativo con un paño losa: export a texto -> import.
 // La frontera Zod (migrarYValidar via importarProyecto) lo acepta y el paño losa
 // sobrevive estable (no se descarta: ya esta en la forma v3).

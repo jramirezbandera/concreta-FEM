@@ -31,4 +31,8 @@ export const NumeroFinitoSchema = z.number().finite();
 // default fisicamente correcto para intereje/canto). Un paño "unidireccional" heredado
 // sin esos campos lo bloqueara validaciones (PANO_UNI_CAMPOS) hasta que el usuario los
 // rellene — honesto, no se inventa geometria.
-export const SCHEMA_VERSION = 5;
+// v6 (F3, muros/pantallas) expande `Muro` de stub `{id}` a la forma completa (segmento
+// x1/y1/x2/y2, plantaInicial/Final, espesor, material, tamMalla, vinculacionExterior).
+// La migracion v5->v6 DESCARTA los muros-stub heredados (sin geometria; nunca hubo UI
+// que los creara — espejo del descarte de paños-stub en v2->v3).
+export const SCHEMA_VERSION = 6;

@@ -411,17 +411,86 @@ function migrarV4aV5(datos: unknown): ResultadoMigracion {
   return { datos: { ...obj, schemaVersion: 5 } };
 }
 
+// Tipo de forma para leer un `Muro` crudo v5 sin validarlo todavia. En v1..v5 un
+// `Muro` era un STUB reservado: solo `{ id }` (nunca hubo UI que creara muros). v6
+// (F3 muros/pantallas) lo expande a la forma completa. Solo describimos los campos
+// que la migracion inspecciona para separar stub de muro-completo.
+type MuroCrudo = {
+  id?: unknown;
+  x1?: unknown;
+  y1?: unknown;
+  x2?: unknown;
+  y2?: unknown;
+  plantaInicial?: unknown;
+  plantaFinal?: unknown;
+  espesor?: unknown;
+  materialId?: unknown;
+  tamMalla?: unknown;
+};
+
+// ¿Tiene este `Muro` crudo la GEOMETRIA minima de la forma v6? Un stub `{id}`
+// (v1..v5) carece de segmento/espesor/etc.: NO se puede completar (nunca tuvo
+// geometria de obra). La VALIDACION Zod estricta de cada campo la hace `MuroSchema`
+// despues; esto solo separa stub de no-stub (espejo de panoTieneGeometriaV3).
+function muroTieneGeometriaV6(muro: MuroCrudo): boolean {
+  return (
+    typeof muro.x1 === "number" &&
+    typeof muro.y1 === "number" &&
+    typeof muro.x2 === "number" &&
+    typeof muro.y2 === "number" &&
+    typeof muro.plantaInicial === "string" &&
+    typeof muro.plantaFinal === "string" &&
+    typeof muro.espesor === "number" &&
+    typeof muro.materialId === "string" &&
+    typeof muro.tamMalla === "number"
+  );
+}
+
+// Migracion de model-schema v5 -> v6 (F3, muros/pantallas). v6 expande `Muro` de
+// stub `{id}` a la forma completa (segmento en planta + tramo de plantas + espesor/
+// material/malla/vinculacion). Un `Muro` v1..v5 era un STUB reservado: se DESCARTA
+// con aviso (espejo EXACTO de migrarV2aV3 con los paños-stub, pero mas simple: no
+// hay cargas que purgar porque ninguna carga podia apuntar a un muro). En la
+// practica es un NO-OP: nunca existio UI de muros, todo proyecto real tiene
+// `muros: []`. Pero la migracion es robusta ante un .json editado a mano.
+function migrarV5aV6(datos: unknown): ResultadoMigracion {
+  // Si el raw no es un objeto, no reestructuramos: la validacion Zod final lo
+  // rechazara con una ruta legible (no es trabajo de la migracion validar).
+  if (typeof datos !== "object" || datos === null) {
+    return { datos: { ...(datos as object), schemaVersion: 6 } };
+  }
+  const obj = { ...(datos as Record<string, unknown>) };
+  const avisos: string[] = [];
+
+  const murosOriginal: MuroCrudo[] = Array.isArray(obj.muros)
+    ? (obj.muros as MuroCrudo[])
+    : [];
+  const murosConservados = murosOriginal.filter(muroTieneGeometriaV6);
+  const nDescartados = murosOriginal.length - murosConservados.length;
+  obj.muros = murosConservados;
+
+  if (nDescartados > 0) {
+    avisos.push(
+      `Se descartaron ${nDescartados} muro${nDescartados === 1 ? "" : "s"} sin geometría de una versión anterior.`,
+    );
+  }
+
+  return { datos: { ...obj, schemaVersion: 6 }, avisos };
+}
+
 // Registro indexado por version de origen: `MIGRACIONES[v]` transforma v -> v+1.
 // `MIGRACIONES[1]` lleva v1 -> v2 (F2a, model-schema); `MIGRACIONES[2]` lleva
 // v2 -> v3 (F3 corte 1, paño losa); `MIGRACIONES[3]` lleva v3 -> v4 (F3.4, plantas
 // sin grupos); `MIGRACIONES[4]` lleva v4 -> v5 (F3 unidireccional, bump de version:
-// campos opcionales, sin sembrado). La cadena de `migrarYValidar` los aplica en orden
+// campos opcionales, sin sembrado); `MIGRACIONES[5]` lleva v5 -> v6 (F3 muros,
+// descarte de muros-stub). La cadena de `migrarYValidar` los aplica en orden
 // ascendente hasta `SCHEMA_VERSION`.
 const MIGRACIONES: Record<number, Migracion> = {
   1: migrarV1aV2,
   2: migrarV2aV3,
   3: migrarV3aV4,
   4: migrarV4aV5,
+  5: migrarV5aV6,
 };
 
 // Lee `schemaVersion` de forma defensiva: `raw` es `unknown` y puede no ser un

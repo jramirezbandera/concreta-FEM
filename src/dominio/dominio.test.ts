@@ -3,6 +3,7 @@ import { ModeloSchema, OpcionesAnalisisSchema, type Modelo } from "./modelo";
 import { NudoSchema } from "./nudo";
 import { SeccionSchema } from "./seccion";
 import { PanoSchema } from "./pano";
+import { MuroSchema } from "./muro";
 import { HipotesisSchema } from "./carga";
 import { crearModeloVacio } from "./helpers";
 import { SCHEMA_VERSION } from "./comunes";
@@ -346,6 +347,61 @@ describe("PanoSchema (losa v4 + campos del forjado unidireccional v5)", () => {
       const p = unidireccionalValido();
       mutar(p);
       expect(PanoSchema.safeParse(p).success).toBe(false);
+    });
+  });
+});
+
+describe("MuroSchema (pantalla v6: segmento en planta + tramo de plantas)", () => {
+  function muroValido(): Record<string, unknown> {
+    return {
+      id: "muro1",
+      nombre: "M1",
+      x1: 0,
+      y1: 0,
+      x2: 4,
+      y2: 0,
+      plantaInicial: "p0",
+      plantaFinal: "p2",
+      espesor: 0.3,
+      materialId: "m1",
+      tamMalla: 0.5,
+      vinculacionExterior: true,
+    };
+  }
+
+  it("un muro completo pasa", () => {
+    expect(MuroSchema.safeParse(muroValido()).success).toBe(true);
+  });
+
+  it("acepta coordenadas negativas y vinculacionExterior false", () => {
+    const m = muroValido();
+    m.x1 = -3.5;
+    m.y2 = -1.25;
+    m.vinculacionExterior = false;
+    expect(MuroSchema.safeParse(m).success).toBe(true);
+  });
+
+  it("el stub v1..v5 {id} ya NO pasa (v6 exige la forma completa)", () => {
+    expect(MuroSchema.safeParse({ id: "muro-stub" }).success).toBe(false);
+  });
+
+  describe("rechaza campos invalidos", () => {
+    const casos: Array<[string, (m: Record<string, unknown>) => void]> = [
+      ["x1 no finito (Infinity)", (m) => { m.x1 = Infinity; }],
+      ["y2 NaN", (m) => { m.y2 = NaN; }],
+      ["espesor cero (.positive)", (m) => { m.espesor = 0; }],
+      ["espesor negativo", (m) => { m.espesor = -0.3; }],
+      ["espesor Infinity (.finite)", (m) => { m.espesor = Infinity; }],
+      ["tamMalla cero", (m) => { m.tamMalla = 0; }],
+      ["tamMalla negativo", (m) => { m.tamMalla = -0.5; }],
+      ["plantaInicial vacia", (m) => { m.plantaInicial = ""; }],
+      ["materialId vacio", (m) => { m.materialId = ""; }],
+      ["vinculacionExterior no booleana", (m) => { m.vinculacionExterior = "si"; }],
+    ];
+    it.each(casos)("%s", (_titulo, mutar) => {
+      const m = muroValido();
+      mutar(m);
+      expect(MuroSchema.safeParse(m).success).toBe(false);
     });
   });
 });
