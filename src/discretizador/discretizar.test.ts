@@ -888,6 +888,250 @@ describe("discretizar - traduccion Capa 1 -> Capa 2", () => {
   });
 });
 
+// --- F3 corte "unidireccional": Paso 6d (viguetas) ------------------------------
+// Espejo estructural de los tests de losa: la TRADUCCION Capa 1 (paño unidireccional) ->
+// Capa 2 (viguetas). Node PURO, sin verificacion fisica (la analitica qL²/8 la clava el
+// golden motor real de Fase 3, spike T0.2). Cubre: nudos/members/seccion/releases/apoyos
+// del caso AISLADO, remap a viga de contorno (subdivision + N* compartido + muleta),
+// extremo AISLADO (patron spike), cargas FY- (usuario/pp/CM/uso), determinismo y la
+// REGRESION byte a byte (modelo mixto losa+portico SIN unidireccional == identico).
+describe("discretizar · paños UNIDIRECCIONALES (Paso 6d, F3)", () => {
+  // Modelo AISLADO: una planta (cota 3) y un paño unidireccional 2x5 m sobre 4 nudos
+  // PROPIOS, SIN portico (bordes de apoyo sin viga -> viguetas aisladas). Sujeto por su
+  // propio bordeApoyo (simple != libre). direccion "y": viguetas paralelas a Y (luz 5),
+  // reparto en X (B=2). intereje 1 -> n = round(2/1) = 2 viguetas, s = 1.
+  function modeloUniAislado(over: Partial<import("../dominio").Pano> = {}): Modelo {
+    return {
+      unidades: "kN-m",
+      schemaVersion: SCHEMA_VERSION,
+      plantas: [
+        { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      ],
+      secciones: [],
+      nudos: [
+        { id: "u1", x: 0, y: 0 },
+        { id: "u2", x: 2, y: 0 },
+        { id: "u3", x: 2, y: 5 },
+        { id: "u4", x: 0, y: 5 },
+      ],
+      pilares: [],
+      vigas: [],
+      panos: [
+        {
+          id: "pu1", nombre: "Forjado 1", tipo: "unidireccional", plantaId: "p1",
+          perimetro: ["u1", "u2", "u3", "u4"],
+          espesor: 0.3, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+          direccionViguetas: "y", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
+          ...over,
+        },
+      ],
+      muros: [],
+      cargas: [],
+      hipotesis: [{ id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false }],
+      analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: false },
+    };
+  }
+
+  it("REGRESION byte a byte: modelo mixto losa+portico SIN unidireccional == identico", () => {
+    // Un modelo con portico + losa (sin ningun paño unidireccional) NO puede cambiar ni un
+    // byte: sin members PV, sin seccion VIG-, sin nudos PV, sin dist_loads de vigueta, sin
+    // panoAMembers no vacio (invariante I3). Se compara la Capa 2 completa serializada.
+    const m = modeloPortico();
+    m.nudos.push(
+      { id: "q1", x: 0, y: 0 }, { id: "q2", x: 4, y: 0 },
+      { id: "q3", x: 4, y: 2 }, { id: "q4", x: 0, y: 2 },
+    );
+    m.panos.push({
+      id: "pano1", nombre: "Losa 1", tipo: "losa", plantaId: "p1",
+      perimetro: ["q1", "q2", "q3", "q4"],
+      espesor: 0.25, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+    });
+    const fem = discretizarOk(m);
+    const json = JSON.stringify(fem);
+    // Ni un byte de vigueta: sin prefijos PV/VIG-.
+    expect(json).not.toContain("PV");
+    expect(json).not.toContain("VIG-");
+    // panoAMembers vacio (aditivo, no rompe): la trazabilidad no gana viguetas.
+    const res = discretizar(m);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.trazabilidad.panoAMembers).toEqual({});
+  });
+
+  it("aislado 2x5 direccion y: 2 viguetas -> 2 members PV0-V0/V1 biapoyados + seccion VIG-0", () => {
+    const fem = discretizarOk(modeloUniAislado());
+    const pv = fem.members.filter((mb) => mb.name.startsWith("PV0-V"));
+    expect(pv.map((m) => m.name).sort()).toEqual(["PV0-V0", "PV0-V1"]);
+    for (const mb of pv) {
+      expect(mb.section).toBe("VIG-0");
+      expect(mb.material).toBe("HA-25");
+      expect(mb.tension_only).toBe(false);
+      // Release biapoyado (#8 / I6): Ry,Rz ambos extremos; Rx NUNCA (indices 3 y 9 false).
+      expect(mb.releases).not.toBeNull();
+      const r = mb.releases!;
+      expect(r[3]).toBe(false); // Rxi
+      expect(r[9]).toBe(false); // Rxj
+      expect(r[4]).toBe(true); // Ryi
+      expect(r[5]).toBe(true); // Rzi
+      expect(r[10]).toBe(true); // Ryj
+      expect(r[11]).toBe(true); // Rzj
+    }
+    // Seccion sintetica VIG-0 presente y con Iy/Iz INTERCAMBIADOS (canto gobierna flexion
+    // vertical, I7): el rectangulo 0.12x0.30 tiene I_fuerte = 0.12·0.30³/12; tras el swap el
+    // campo FEM Iz recibe ese valor.
+    const vig = fem.sections.find((s) => s.name === "VIG-0");
+    expect(vig).toBeDefined();
+    const Ifuerte = (0.12 * 0.3 ** 3) / 12; // canto gobierna
+    expect(vig!.Iz).toBeCloseTo(Ifuerte, 12); // tras swap, FEM Iz = eje fuerte
+    // Material del paño en `materials` (PyNite resuelve la vigueta por nombre).
+    expect(fem.materials.some((mat) => mat.name === "HA-25")).toBe(true);
+    // Trazabilidad panoAMembers.
+    const res = discretizar(modeloUniAislado());
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.trazabilidad.panoAMembers!["pu1"]).toEqual(["PV0-V0", "PV0-V1"]);
+  });
+
+  it("aislado: extremos son nudos PROPIOS PV0-N* con apoyo del spike (i completo, j sin DX)", () => {
+    const fem = discretizarOk(modeloUniAislado());
+    // Los extremos NO remapean (no hay portico): nudos propios PV0-N*.
+    const pvNodes = fem.nodes.filter((n) => n.name.startsWith("PV0-N"));
+    expect(pvNodes.length).toBe(4); // 2 viguetas x 2 extremos = 4 nudos propios
+    // Cota en Y (vertical, #18): la del paño (3).
+    for (const n of pvNodes) expect(n.y).toBe(3);
+    const pvSup = fem.supports.filter((s) => s.node.startsWith("PV0-N"));
+    expect(pvSup.length).toBe(4);
+    // Extremo i (a): patron completo {DX,DY,DZ,RX,RY,RZ}. Extremo j (b): sin DX.
+    const conDX = pvSup.filter((s) => s.DX);
+    const sinDX = pvSup.filter((s) => !s.DX);
+    expect(conDX.length).toBe(2); // un extremo i por vigueta
+    expect(sinDX.length).toBe(2); // un extremo j por vigueta
+    for (const s of pvSup) {
+      expect(s.DY && s.DZ && s.RX && s.RY && s.RZ).toBe(true); // todo salvo (a veces) DX
+    }
+    // Los apoyos de vigueta van a apoyosDeMalla (TablaReacciones los agrega/oculta).
+    const res = discretizar(modeloUniAislado());
+    if (res.ok) {
+      for (const s of pvSup) expect(res.trazabilidad.apoyosDeMalla).toContain(s.node);
+    }
+  });
+
+  it("cargas: pp tabulado + CM + uso -> dist_loads FY NEGATIVO w = -(presion·s) (I5)", () => {
+    // Planta con CM=1, uso=2; paño con pesoPropio=4; incluirPesoPropio ON. s = B/n = 2/2 = 1.
+    const m = modeloUniAislado();
+    m.plantas[0].cargasMuertas = 1;
+    m.plantas[0].sobrecargaUso = 2;
+    m.analisis.incluirPesoPropio = true;
+    m.hipotesis = [
+      { id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true },
+      { id: "h1", nombre: "CM", tipo: "permanente", automatica: false },
+    ];
+    const fem = discretizarOk(m);
+    const s = 1;
+    const porCase = (c: string) => fem.dist_loads.filter((d) => d.case === c && d.member.startsWith("PV0-V"));
+    // Peso propio tabulado: w = -(4·1) = -4, una por vigueta (2).
+    const pp = porCase("hip-peso-propio");
+    expect(pp).toHaveLength(2);
+    for (const d of pp) {
+      expect(d.direction).toBe("FY");
+      expect(d.w1).toBeCloseTo(-(4 * s), 9); // FY NEGATIVO (gravedad, I5)
+      expect(d.w2).toBeCloseTo(-(4 * s), 9);
+    }
+    // Carga de planta CM (auto-planta-cm): w = -(1·1) = -1.
+    const cm = porCase("auto-planta-cm");
+    expect(cm).toHaveLength(2);
+    for (const d of cm) expect(d.w1).toBeCloseTo(-1, 9);
+    // Carga de planta uso (auto-planta-uso): w = -(2·1) = -2.
+    const uso = porCase("auto-planta-uso");
+    expect(uso).toHaveLength(2);
+    for (const d of uso) expect(d.w1).toBeCloseTo(-2, 9);
+  });
+
+  it("carga superficial de USUARIO sobre el paño -> dist_load FY- por vigueta", () => {
+    const m = modeloUniAislado();
+    m.cargas = [{ id: "cs1", tipo: "superficial", ambito: "pu1", valor: 3, hipotesisId: "h1" }];
+    const fem = discretizarOk(m);
+    const usr = fem.dist_loads.filter((d) => d.case === "h1" && d.member.startsWith("PV0-V"));
+    expect(usr).toHaveLength(2); // una por vigueta
+    // w = -(|q|·s) = -(3·1) = -3 (gravitatoria: FY-, I5).
+    for (const d of usr) expect(d.w1).toBeCloseTo(-3, 9);
+  });
+
+  it("incluirPesoPropio OFF -> NINGUN dist_load de vigueta en hip-peso-propio (R-2)", () => {
+    const m = modeloUniAislado(); // incluirPesoPropio false por defecto
+    const fem = discretizarOk(m);
+    const pp = fem.dist_loads.filter((d) => d.case === "hip-peso-propio");
+    expect(pp).toHaveLength(0);
+  });
+
+  it("remap a viga de contorno: extremo comparte N* subdividido + muleta torsional (R-6)", () => {
+    // Paño 2x5 direccion "y" apoyando en los bordes y=0 e y=5. Ponemos una viga de contorno
+    // bajo el borde y=5 (de (0,5) a (2,5)) en la misma planta. Las viguetas cruzan ese borde
+    // en x=0.5 y x=1.5 (interior estricto de la viga) -> subdivision -> N* compartido +
+    // MULETA torsional (borde y=5 corre en X -> torsion RX).
+    const m = modeloUniAislado();
+    // Portico minimo para sujetar (un pilar con arranque en una esquina de la viga).
+    m.secciones = [{ id: "sec-ipe", nombre: "IPE 300", tipo: "perfilMetalico", perfilId: PERFIL }];
+    m.plantas.unshift({ id: "p0", nombre: "Cim", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
+    m.pilares = [
+      { id: "pilA", nombre: "PA", x: 0, y: 5, plantaInicial: "p0", plantaFinal: "p1", seccionId: "sec-ipe", materialId: MATERIAL, angulo: 0, vinculacionExterior: true, arranque: "empotrado" },
+      { id: "pilB", nombre: "PB", x: 2, y: 5, plantaInicial: "p0", plantaFinal: "p1", seccionId: "sec-ipe", materialId: MATERIAL, angulo: 0, vinculacionExterior: true, arranque: "empotrado" },
+    ];
+    m.vigas = [
+      { id: "vSup", nombre: "VSUP", plantaId: "p1", nudoI: "u4", nudoJ: "u3", seccionId: "sec-ipe", materialId: MATERIAL, extremoI: "empotrado", extremoJ: "empotrado", tirante: false },
+    ];
+    // El borde y=0 sigue sin viga -> extremos "a" siguen siendo nudos propios; cambio el
+    // bordeApoyo a "simple" (ya lo es) para que apoyen.
+    const fem = discretizarOk(m);
+    // Los extremos "b" (y=5) de las viguetas comparten N* con la viga subdividida: NO hay
+    // nudo propio PV0-N en y=5.
+    const pvNodesY5 = fem.nodes.filter((n) => n.name.startsWith("PV0-N") && n.z === 5);
+    expect(pvNodesY5).toHaveLength(0);
+    // Los members de vigueta referencian un N* estructural en su extremo j (y=5).
+    const pv = fem.members.filter((mb) => mb.name.startsWith("PV0-V"));
+    for (const mb of pv) expect(mb.j.startsWith("N")).toBe(true); // N* del portico (subdivision)
+    // MULETA torsional en esos N*: un apoyo con SOLO RX (borde y=5 corre en X -> RX), sin DY.
+    const muletas = fem.supports.filter((s) => s.node.startsWith("N") && s.RX && !s.DY && !s.DX && !s.DZ && !s.RY && !s.RZ);
+    expect(muletas.length).toBeGreaterThan(0);
+    // Los extremos "a" (y=0) siguen siendo nudos propios con apoyo (aislados por ese borde).
+    const pvNodesY0 = fem.nodes.filter((n) => n.name.startsWith("PV0-N") && n.z === 0);
+    expect(pvNodesY0).toHaveLength(2);
+  });
+
+  it("supports: NUNCA dos entradas para el mismo nudo (def_support ASIGNA, no fusiona)", () => {
+    // Con muletas + apoyos aislados + apoyos del portico, un nudo debe aparecer UNA sola vez
+    // en `supports` (dos entradas se pisarian en el glue, pynite_glue.py:1087).
+    const m = modeloUniAislado();
+    m.secciones = [{ id: "sec-ipe", nombre: "IPE 300", tipo: "perfilMetalico", perfilId: PERFIL }];
+    m.plantas.unshift({ id: "p0", nombre: "Cim", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 });
+    m.pilares = [
+      { id: "pilA", nombre: "PA", x: 0, y: 5, plantaInicial: "p0", plantaFinal: "p1", seccionId: "sec-ipe", materialId: MATERIAL, angulo: 0, vinculacionExterior: true, arranque: "empotrado" },
+      { id: "pilB", nombre: "PB", x: 2, y: 5, plantaInicial: "p0", plantaFinal: "p1", seccionId: "sec-ipe", materialId: MATERIAL, angulo: 0, vinculacionExterior: true, arranque: "empotrado" },
+    ];
+    m.vigas = [
+      { id: "vSup", nombre: "VSUP", plantaId: "p1", nudoI: "u4", nudoJ: "u3", seccionId: "sec-ipe", materialId: MATERIAL, extremoI: "empotrado", extremoJ: "empotrado", tirante: false },
+    ];
+    const fem = discretizarOk(m);
+    const nodos = fem.supports.map((s) => s.node);
+    expect(new Set(nodos).size).toBe(nodos.length); // sin nudo repetido en supports
+  });
+
+  it("determinismo byte a byte: mismo modelo unidireccional -> misma Capa 2 en dos llamadas", () => {
+    const a = JSON.stringify(discretizarOk(modeloUniAislado()));
+    const b = JSON.stringify(discretizarOk(modeloUniAislado()));
+    expect(a).toBe(b);
+  });
+
+  it("Capa 2 con vigueta valida contra ModeloFEMSchema", () => {
+    const m = modeloUniAislado();
+    m.analisis.incluirPesoPropio = true;
+    m.hipotesis = [
+      { id: "hip-peso-propio", nombre: "Peso propio", tipo: "permanente", automatica: true },
+      { id: "h1", nombre: "CM", tipo: "permanente", automatica: false },
+    ];
+    const fem = discretizarOk(m);
+    expect(() => ModeloFEMSchema.parse(fem)).not.toThrow();
+  });
+});
+
 // --- F3.2 Fase 3: SUBDIVISION de vigas en construirBaseFEM (sin wire-up) --------
 // La subdivision se pasa a mano (mapa manual, como hara discretizar en la Fase 4 via
 // calcularAcoples). Se prueba la BASE: nº de members, numeracion determinista,

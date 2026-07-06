@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validarModelo, type ErrorObra } from "./validaciones";
 import { calcularAcoples } from "./acople";
-import { ModeloSchema, type Modelo, crearModeloVacio } from "../dominio";
+import { ModeloSchema, type Modelo, type Pano, crearModeloVacio } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
 
 // Tests de las validaciones previas (feature-4, T1.2). Proyecto `node` (sin DOM):
@@ -560,6 +560,28 @@ describe("validarModelo", () => {
       espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
     });
     expect(codigos(validarModelo(m, { numModos: 6 }))).toContain("MODAL_SIN_MASA");
+  });
+
+  it("MODAL_SIN_MASA: SOLO un paño unidireccional con material con peso -> sin error", () => {
+    // El glue fabrica masa rho·A_nervio de cada vigueta (infravalorada, deuda), asi que un
+    // modelo solo-unidireccional con material HA-25 (peso>0) YA aporta masa: no bloquea.
+    const m = modeloValido();
+    m.pilares = [];
+    m.vigas = [];
+    m.cargas = [];
+    m.nudos.push(
+      { id: "q1", x: 10, y: 10 },
+      { id: "q2", x: 14, y: 10 },
+      { id: "q3", x: 14, y: 13 },
+      { id: "q4", x: 10, y: 13 },
+    );
+    m.panos.push({
+      id: "pano1", nombre: "Forjado", tipo: "unidireccional", plantaId: "p1",
+      perimetro: ["q1", "q2", "q3", "q4"],
+      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      direccionViguetas: "x", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
+    });
+    expect(codigos(validarModelo(m, { numModos: 6 }))).not.toContain("MODAL_SIN_MASA");
   });
 
   // ============================================================================
@@ -1277,5 +1299,150 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
       });
       expect(codigos(validarModelo(m))).not.toContain("ID_RESERVADO");
     });
+  });
+});
+
+// --- F3 corte "unidireccional": validaciones del forjado unidireccional ----------
+describe("validaciones · forjado unidireccional (F3)", () => {
+  // Modelo con un forjado unidireccional 4x3 sobre 4 nudos propios, apoyado en su borde
+  // (bordeApoyo simple != libre: se sostiene solo). Sin portico: el paño se auto-sujeta.
+  function modeloUni(over: Partial<Pano> = {}): Modelo {
+    return {
+      unidades: "kN-m",
+      schemaVersion: SCHEMA_VERSION,
+      plantas: [
+        { id: "p0", nombre: "Cim", cota: 0, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+        { id: "p1", nombre: "Planta 1", cota: 3, altura: 3, categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0 },
+      ],
+      secciones: [{ id: SECCION_OK, nombre: "IPE 300", tipo: "perfilMetalico", perfilId: PERFIL_OK }],
+      nudos: [
+        { id: "u1", x: 0, y: 0 }, { id: "u2", x: 4, y: 0 },
+        { id: "u3", x: 4, y: 3 }, { id: "u4", x: 0, y: 3 },
+      ],
+      pilares: [],
+      vigas: [],
+      panos: [
+        {
+          id: "fu", nombre: "Forjado 1", tipo: "unidireccional", plantaId: "p1",
+          perimetro: ["u1", "u2", "u3", "u4"],
+          espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+          direccionViguetas: "x", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
+          ...over,
+        },
+      ],
+      muros: [],
+      cargas: [],
+      hipotesis: [{ id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false }],
+      analisis: { tipo: "lineal", comprobarEstatica: true, incluirPesoPropio: false },
+    };
+  }
+
+  it("unidireccional valido -> sin PANO_TIPO_NO_SOPORTADO ni PANO_UNI_CAMPOS", () => {
+    const cods = codigos(validarModelo(modeloUni()));
+    expect(cods).not.toContain("PANO_TIPO_NO_SOPORTADO");
+    expect(cods).not.toContain("PANO_UNI_CAMPOS");
+    expect(cods).not.toContain("PANO_UNI_SIN_APOYO");
+  });
+
+  it("PANO_TIPO_NO_SOPORTADO ahora es SOLO reticular (mensaje sin 'unidireccional')", () => {
+    const m = modeloUni({ tipo: "reticular" });
+    const e = validarModelo(m).find((x) => x.codigo === "PANO_TIPO_NO_SOPORTADO");
+    expect(e).toBeDefined();
+    expect(e!.mensaje).toContain("reticular");
+    sinJergaFEM(e!);
+  });
+
+  it("PANO_UNI_CAMPOS: falta intereje -> error agrupador", () => {
+    const m = modeloUni({ intereje: undefined });
+    const e = validarModelo(m).find((x) => x.codigo === "PANO_UNI_CAMPOS");
+    expect(e).toBeDefined();
+    expect(e!.severidad).toBe("error");
+    expect(e!.elementoId).toBe("fu");
+    sinJergaFEM(e!);
+  });
+
+  it("PANO_UNI_CAMPOS: canto/anchoNervio <= 0 o direccion ausente -> error", () => {
+    expect(codigos(validarModelo(modeloUni({ canto: 0 })))).toContain("PANO_UNI_CAMPOS");
+    expect(codigos(validarModelo(modeloUni({ anchoNervio: -0.1 })))).toContain("PANO_UNI_CAMPOS");
+    expect(codigos(validarModelo(modeloUni({ direccionViguetas: undefined })))).toContain("PANO_UNI_CAMPOS");
+  });
+
+  it("PANO_UNI_CAMPOS: pesoPropio ausente -> error (contrato exige valor valido)", () => {
+    expect(codigos(validarModelo(modeloUni({ pesoPropio: undefined })))).toContain("PANO_UNI_CAMPOS");
+  });
+
+  it("PANO_UNI_CAMPOS: pesoPropio 0 es LEGITIMO (>=0) -> no dispara por ese campo", () => {
+    // Un forjado sin peso propio tabulado (0) es valido; los demas campos > 0.
+    expect(codigos(validarModelo(modeloUni({ pesoPropio: 0 })))).not.toContain("PANO_UNI_CAMPOS");
+  });
+
+  it("precedencia: PANO_UNI_CAMPOS salta la geometria (no PANO_NO_RECTANGULAR a la vez)", () => {
+    // Geometria no rectangular Y campos faltantes: solo PANO_UNI_CAMPOS (se salta el resto).
+    const m = modeloUni({ intereje: undefined });
+    m.nudos = m.nudos.map((n) => (n.id === "u3" ? { ...n, x: 8, y: 0 } : n)); // rompe rectangulo
+    const cods = codigos(validarModelo(m));
+    expect(cods).toContain("PANO_UNI_CAMPOS");
+    expect(cods).not.toContain("PANO_NO_RECTANGULAR");
+    expect(cods).not.toContain("PANO_DEGENERADO");
+  });
+
+  it("geometria no rectangular (campos OK) -> PANO_NO_RECTANGULAR o PANO_DEGENERADO", () => {
+    const m = modeloUni();
+    m.nudos = m.nudos.map((n) => (n.id === "u3" ? { ...n, x: 8, y: 0 } : n));
+    const cods = codigos(validarModelo(m));
+    expect(
+      cods.includes("PANO_NO_RECTANGULAR") || cods.includes("PANO_DEGENERADO"),
+    ).toBe(true);
+  });
+
+  it("PANO_UNI_SIN_APOYO: bordeApoyo 'libre' y sin viga de contorno -> error", () => {
+    const m = modeloUni({ bordeApoyo: "libre" });
+    const e = validarModelo(m).find((x) => x.codigo === "PANO_UNI_SIN_APOYO");
+    expect(e).toBeDefined();
+    expect(e!.severidad).toBe("error");
+    sinJergaFEM(e!);
+  });
+
+  it("bordeApoyo 'libre' PERO ambos bordes de apoyo con viga -> NO PANO_UNI_SIN_APOYO", () => {
+    // Portico con vigas en los dos bordes de apoyo (x=0 y x=4) + pilares sujetos.
+    const m = modeloUni({ bordeApoyo: "libre" });
+    m.pilares = [
+      { id: "pa", nombre: "PA", x: 0, y: 0, plantaInicial: "p0", plantaFinal: "p1", seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0, vinculacionExterior: true, arranque: "empotrado" },
+      { id: "pb", nombre: "PB", x: 0, y: 3, plantaInicial: "p0", plantaFinal: "p1", seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0, vinculacionExterior: true, arranque: "empotrado" },
+      { id: "pc", nombre: "PC", x: 4, y: 0, plantaInicial: "p0", plantaFinal: "p1", seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0, vinculacionExterior: true, arranque: "empotrado" },
+      { id: "pd", nombre: "PD", x: 4, y: 3, plantaInicial: "p0", plantaFinal: "p1", seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0, vinculacionExterior: true, arranque: "empotrado" },
+    ];
+    m.vigas = [
+      { id: "vizq", nombre: "VIZQ", plantaId: "p1", nudoI: "u1", nudoJ: "u4", seccionId: SECCION_OK, materialId: MATERIAL_OK, extremoI: "empotrado", extremoJ: "empotrado", tirante: false },
+      { id: "vder", nombre: "VDER", plantaId: "p1", nudoI: "u2", nudoJ: "u3", seccionId: SECCION_OK, materialId: MATERIAL_OK, extremoI: "empotrado", extremoJ: "empotrado", tirante: false },
+    ];
+    expect(codigos(validarModelo(m))).not.toContain("PANO_UNI_SIN_APOYO");
+  });
+
+  it("R-4: pilar interior bajo unidireccional -> PANO_PILAR_INTERIOR (bloquea, DP4)", () => {
+    const m = modeloUni();
+    m.pilares.push({
+      id: "pint", nombre: "PINT", x: 2, y: 1.5,
+      plantaInicial: "p0", plantaFinal: "p1",
+      seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
+      vinculacionExterior: false, arranque: "empotrado",
+    });
+    const e = validarModelo(m).find((x) => x.codigo === "PANO_PILAR_INTERIOR");
+    expect(e).toBeDefined();
+    expect(e!.elementoId).toBe("pint");
+  });
+
+  it("R-4: viga interior bajo unidireccional -> PANO_VIGA_INTERIOR (bloquea, DP4)", () => {
+    const m = modeloUni();
+    m.nudos.push({ id: "vi1", x: 0, y: 1.5 }, { id: "vi2", x: 4, y: 1.5 });
+    m.vigas = [{ id: "vint", nombre: "VINT", plantaId: "p1", nudoI: "vi1", nudoJ: "vi2", seccionId: SECCION_OK, materialId: MATERIAL_OK, extremoI: "empotrado", extremoJ: "empotrado", tirante: false }];
+    const e = validarModelo(m).find((x) => x.codigo === "PANO_VIGA_INTERIOR");
+    expect(e).toBeDefined();
+    expect(e!.elementoId).toBe("vint");
+  });
+
+  it("sujecion: un forjado unidireccional apoyado en su borde NO da SIN_SUJECION (sin pilares)", () => {
+    // El paño se auto-sujeta por sus apoyos nodales de vigueta (bordeApoyo != libre).
+    expect(codigos(validarModelo(modeloUni()))).not.toContain("SIN_SUJECION");
   });
 });

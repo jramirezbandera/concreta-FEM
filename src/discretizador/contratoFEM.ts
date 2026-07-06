@@ -182,6 +182,18 @@ export interface Trazabilidad {
 
   // pano (obra) -> nombres de sus quads FEM (en el orden determinista del mallado).
   panoAQuads: Record<string, string[]>;
+  // pano UNIDIRECCIONAL (obra) -> sus members de vigueta FEM (PV<idx>-V<k>, en orden de
+  // indice k ascendente). Espejo de `panoAQuads` para el forjado unidireccional (F3, corte
+  // "unidireccional"): un paño losa monta quads (panoAQuads), uno unidireccional monta
+  // viguetas (panoAMembers). VACIO cuando no hay paños unidireccionales (regresion byte a
+  // byte de un portico/losa). La UI de Resultados lo usa para mapear un paño a sus
+  // viguetas (diagramas de vigueta individuales = deuda, no este corte).
+  //
+  // OPCIONAL (aditivo): `discretizar` y `trazabilidadVacia` lo emiten SIEMPRE (nunca
+  // ausente en salida real), pero se marca opcional para NO romper los literales de
+  // `Trazabilidad` construidos a mano por consumidores previos (tests de UI/estado que no
+  // conocian este campo). Los consumidores leen `panoAMembers ?? {}`.
+  panoAMembers?: Record<string, string[]>;
   // quad FEM (p.ej. "PQ0-Q3") -> el pano de obra que lo genero (mapa inverso).
   quadAPano: Record<string, string>;
   // quad FEM -> sus 4 nudos en orden canonico [i,j,m,n] (CCW desde +Y). La UI de
@@ -209,6 +221,7 @@ export function trazabilidadVacia(): Trazabilidad {
     nudoANodo: {},
     nodoFEMAPlanta: {},
     panoAQuads: {},
+    panoAMembers: {},
     quadAPano: {},
     quadANodos: {},
     nodosDeMalla: [],

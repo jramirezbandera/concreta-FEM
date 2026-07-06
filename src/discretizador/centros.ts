@@ -221,6 +221,31 @@ export function calcularCentroMasaPlanta(
     }
   }
 
+  // --- 5) PAÑOS UNIDIRECCIONALES de la planta (F3, corte "unidireccional") ----------
+  // Espejo del termino losa (el de losa NO cambia): peso propio TABULADO (pano.pesoPropio,
+  // DP2 — NO rho·t: no hay losa maciza) + cargas muertas de la PLANTA (case permanente,
+  // fuente unica [2A]) + superficiales permanentes de usuario, todo en el CENTROIDE del
+  // rectangulo. La sobrecarga de uso NO entra (el CM cuenta permanentes). `pesoPropio`
+  // ausente (paño a medio definir; el CM corre sobre el modelo VIVO sin validar) => 0,
+  // no aporta (coherente con DP2 y con `acumular` que ignora w<=0).
+  for (const pano of modelo.panos) {
+    if (pano.tipo !== "unidireccional" || pano.plantaId !== plantaId) continue;
+    const geo = geometriaDePano(modelo, pano);
+    if (geo === null) continue;
+    if (pano.pesoPropio !== undefined && Number.isFinite(pano.pesoPropio)) {
+      acumular(acc, pano.pesoPropio * geo.area, geo.cx, geo.cy);
+    }
+    for (const cg of cargasPlantaDePano(modelo, pano)) {
+      if (cg.case !== CASE_CM_PLANTA) continue; // solo permanentes (uso = variable)
+      acumular(acc, cg.presion * geo.area, geo.cx, geo.cy);
+    }
+    for (const c of modelo.cargas) {
+      if (c.tipo !== "superficial" || c.ambito !== pano.id) continue;
+      if (!esPermanente(c, hipById)) continue;
+      acumular(acc, Math.abs(c.valor) * geo.area, geo.cx, geo.cy);
+    }
+  }
+
   // Sin masa permanente en la planta => null (sin division por cero). El llamante
   // (panel de UI) lo presenta como "Sin masa en esta planta".
   if (acc.w <= 0) return null;

@@ -32,13 +32,23 @@ export const CASE_USO_PLANTA = "auto-planta-uso"; // sobrecarga de uso de la pla
 // losa +ρ·t; verificada contra el motor real en F3 corte 1).
 export type CargaPlantaPano = { case: string; presion: number };
 
+// ¿Recibe este tipo de paño cargas de planta? Losa (quads) Y unidireccional (viguetas):
+// ambos son forjados que descargan la carga de la planta (CM/uso). Reticular sigue
+// rechazado (no se discretiza). FUENTE UNICA del criterio de tipo para las cargas de
+// planta: acopla el gate de `cargasPlantaDePano` y de los helpers de coherencia
+// (plantasConValorNegativo/plantasConCargaSinPano) para que no diverjan.
+function panoRecibeCargasPlanta(pano: Pano): boolean {
+  return pano.tipo === "losa" || pano.tipo === "unidireccional";
+}
+
 // Cargas de planta de UN paño, en orden determinista y documentado: CM primero, uso
-// despues (el Paso 6c las emite tras el peso propio: usuario → pp → CM → uso).
-// Devuelve [] si el paño no es losa, su planta no resuelve (el bloqueo real llega
-// antes por REF_PLANTA) o los valores no aportan (<= 0; el valor NEGATIVO ademas se
-// avisa en validaciones: PLANTA_VALOR_NEGATIVO, no se aplica en silencio).
+// despues (el Paso 6c/6d las emite tras el peso propio: usuario → pp → CM → uso).
+// Devuelve [] si el paño no es un forjado con carga de planta (losa/unidireccional), su
+// planta no resuelve (el bloqueo real llega antes por REF_PLANTA) o los valores no aportan
+// (<= 0; el valor NEGATIVO ademas se avisa en validaciones: PLANTA_VALOR_NEGATIVO, no se
+// aplica en silencio).
 export function cargasPlantaDePano(modelo: Modelo, pano: Pano): CargaPlantaPano[] {
-  if (pano.tipo !== "losa") return [];
+  if (!panoRecibeCargasPlanta(pano)) return [];
   const planta = plantaPorId(modelo, pano.plantaId);
   if (planta === undefined) return [];
   const cargas: CargaPlantaPano[] = [];
@@ -75,11 +85,11 @@ export function casesPlantaActivos(modelo: Modelo): { cm: boolean; uso: boolean 
 export function plantasConValorNegativo(
   modelo: Modelo,
 ): { plantaId: string; nombre: string; campo: "cargasMuertas" | "sobrecargaUso" }[] {
-  // Plantas que tienen algun paño losa (si no, el valor es inerte y lo cubre el
-  // aviso PLANTA_CARGA_SIN_PANO).
+  // Plantas que tienen algun paño con carga de planta (losa/unidireccional); si no, el
+  // valor es inerte y lo cubre el aviso PLANTA_CARGA_SIN_PANO.
   const plantasConPano = new Set<string>();
   for (const pano of modelo.panos) {
-    if (pano.tipo !== "losa") continue;
+    if (!panoRecibeCargasPlanta(pano)) continue;
     if (plantaPorId(modelo, pano.plantaId) !== undefined) {
       plantasConPano.add(pano.plantaId);
     }
@@ -101,7 +111,7 @@ export function plantasConValorNegativo(
 export function plantasConCargaSinPano(modelo: Modelo): Planta[] {
   const plantasConPano = new Set<string>();
   for (const pano of modelo.panos) {
-    if (pano.tipo === "losa") plantasConPano.add(pano.plantaId);
+    if (panoRecibeCargasPlanta(pano)) plantasConPano.add(pano.plantaId);
   }
   return modelo.plantas.filter(
     (p) =>

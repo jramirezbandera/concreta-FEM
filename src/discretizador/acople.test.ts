@@ -710,3 +710,120 @@ describe("vigasInterioresBajoPano (TODO-2)", () => {
     expect(vigasInterioresBajoPano(m, m.panos[0]).map((v) => v.id)).toEqual(["v-diag"]);
   });
 });
+
+// --- Rama UNIDIRECCIONAL (F3): sin malla, aporta subdivisiones + deteccion de bordes ---
+// Paño unidireccional 4x3 sobre n1..n4 de la base. direccion "x": viguetas paralelas a X
+// (luz 4), reparto en Y (B=3). intereje 1 -> n = round(3/1) = 3 viguetas.
+function panoUni(id: string, extra?: Partial<Pano>): Pano {
+  return {
+    id, nombre: id.toUpperCase(), tipo: "unidireccional", plantaId: "p1",
+    perimetro: ["n1", "n2", "n3", "n4"],
+    espesor: 0.2, materialId: MATERIAL_LOSA, tamMalla: 1, bordeApoyo: "simple",
+    direccionViguetas: "x", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
+    ...extra,
+  };
+}
+
+describe("calcularAcoples · rama unidireccional (F3)", () => {
+  it("paño unidireccional resoluble entra en unidireccionalPorPano (NO en porPano)", () => {
+    const m = modeloBase();
+    m.panos = [panoUni("fu")];
+    const res = calcularAcoples(m);
+    expect(res.porPano.has("fu")).toBe(false); // no malla quads
+    const uni = res.unidireccionalPorPano.get("fu");
+    expect(uni).toBeDefined();
+    expect(uni!.indicePano).toBe(0);
+    expect(uni!.malla.n).toBe(3); // round(3/1) = 3 viguetas
+  });
+
+  it("SIN vigas de contorno: ambos bordes de apoyo sin viga, sin subdivisiones", () => {
+    const m = modeloBase();
+    m.panos = [panoUni("fu")];
+    const res = calcularAcoples(m);
+    const uni = res.unidireccionalPorPano.get("fu")!;
+    expect(uni.bordeAConViga).toBe(false);
+    expect(uni.bordeBConViga).toBe(false);
+    expect(uni.celdasSubdivididas.size).toBe(0);
+    expect(res.subdivisionesViga.size).toBe(0);
+  });
+
+  it("viga bajo un borde de apoyo (x=0): remap con subdivision en los extremos interiores", () => {
+    // direccion "x": bordes de apoyo x=xMin(0) y x=xMax(4). Viga izquierda (0,0)-(0,3).
+    // Las 3 viguetas cruzan x=0 en y=0.5,1.5,2.5 (interior estricto de la viga) -> subdivision.
+    const m = modeloBase();
+    m.vigas = [viga("v-izq", "n1", "n4")]; // (0,0)-(0,3), borde izquierdo (x=0)
+    m.panos = [panoUni("fu")];
+    const res = calcularAcoples(m);
+    const uni = res.unidireccionalPorPano.get("fu")!;
+    expect(uni.bordeAConViga).toBe(true); // borde a = xMin cubierto por la viga
+    expect(uni.bordeBConViga).toBe(false); // borde b = xMax sin viga
+    // Subdivisiones de la viga izquierda en y=0.5,1.5,2.5.
+    expect(res.subdivisionesViga.get("v-izq")).toEqual([
+      { x: 0, y: 0.5 }, { x: 0, y: 1.5 }, { x: 0, y: 2.5 },
+    ]);
+    expect(uni.celdasSubdivididas.size).toBe(3); // una celda por extremo subdividido
+  });
+
+  it("subdivisionesViga: losa y unidireccional COMPARTEN la Map sin duplicar (dedup por celda)", () => {
+    // Un paño losa y uno unidireccional que tocan la MISMA viga de contorno: los puntos se
+    // funden en la misma Map con dedup por celda (primer punto de la celda gana).
+    const m = modeloBase();
+    m.vigas = [viga("v-izq", "n1", "n4")];
+    m.panos = [panoUni("fu")]; // solo el unidireccional aqui basta para probar la Map
+    const res = calcularAcoples(m);
+    // La viga izquierda tiene 3 subdivisiones (una por vigueta), ordenadas por t (distancia
+    // a nudoI = n1 en (0,0)): y creciente.
+    const subs = res.subdivisionesViga.get("v-izq")!;
+    expect(subs.map((p) => p.y)).toEqual([0.5, 1.5, 2.5]);
+  });
+
+  it("reticular NO entra en unidireccionalPorPano ni en porPano", () => {
+    const m = modeloBase();
+    m.panos = [panoUni("fu", { tipo: "reticular" })];
+    const res = calcularAcoples(m);
+    expect(res.unidireccionalPorPano.has("fu")).toBe(false);
+    expect(res.porPano.has("fu")).toBe(false);
+  });
+
+  it("campos ausentes (sin intereje): no entra (undefined); lo reporta validaciones", () => {
+    const m = modeloBase();
+    m.panos = [panoUni("fu", { intereje: undefined })];
+    const res = calcularAcoples(m);
+    expect(res.unidireccionalPorPano.has("fu")).toBe(false);
+  });
+
+  it("R-4: pilar/viga interior bajo unidireccional SI se detectan (filtros relajados)", () => {
+    const m = modeloBase();
+    m.panos = [panoUni("fu")];
+    // Pilar interior (centro del paño 4x3).
+    m.pilares.push({
+      id: "pil-int", nombre: "PINT", x: 2, y: 1.5,
+      plantaInicial: "p0", plantaFinal: "p1",
+      seccionId: SECCION_OK, materialId: MATERIAL_BARRA, angulo: 0,
+      vinculacionExterior: false, arranque: "empotrado",
+    });
+    expect(pilaresInterioresBajoPano(m, m.panos[0]).map((p) => p.id)).toEqual(["pil-int"]);
+    // Viga interior (crujia intermedia horizontal por el centro).
+    m.nudos.push({ id: "ni1", x: 0, y: 1.5 }, { id: "ni2", x: 4, y: 1.5 });
+    m.vigas = [viga("v-int", "ni1", "ni2")];
+    expect(vigasInterioresBajoPano(m, m.panos[0]).map((v) => v.id)).toEqual(["v-int"]);
+  });
+
+  it("determinismo: reordenar panos no cambia unidireccionalPorPano ni subdivisiones", () => {
+    // Dos paños unidireccionales (fu-a, fu-b) sobre el mismo borde izquierdo con su viga:
+    // el indicePano y las subdivisiones se resuelven por id de paño, no por orden de entrada.
+    const m = modeloBase();
+    m.vigas = [viga("v-izq", "n1", "n4")];
+    m.panos = [panoUni("fu-a"), panoUni("fu-b")];
+    const a = calcularAcoples(m);
+    const m2 = modeloBase();
+    m2.vigas = [viga("v-izq", "n1", "n4")];
+    m2.panos = [panoUni("fu-b"), panoUni("fu-a")]; // orden de panos invertido
+    const b = calcularAcoples(m2);
+    expect(b.subdivisionesViga.get("v-izq")).toEqual(a.subdivisionesViga.get("v-izq"));
+    // El indicePano se fija por id ordenado (fu-a=0, fu-b=1) en ambos casos.
+    expect(b.unidireccionalPorPano.get("fu-a")!.indicePano).toBe(0);
+    expect(b.unidireccionalPorPano.get("fu-b")!.indicePano).toBe(1);
+    expect(a.unidireccionalPorPano.get("fu-a")!.indicePano).toBe(0);
+  });
+});

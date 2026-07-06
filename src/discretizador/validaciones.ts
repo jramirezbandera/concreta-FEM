@@ -17,7 +17,7 @@ import { plantaPorId, nudoPorId, seccionPorId, esHipotesisAutomatica } from "../
 import { getMaterial, getSeccion } from "../biblioteca";
 import { TOL_NODO, mapearEjes, clavePosicion, hayTresNoColineales } from "./geometria";
 import { materialAportaMasa } from "./propiedadesBarra";
-import { mallarPano, type PuntoPlano } from "./mallado";
+import { mallarPano, limitesRectangulo, type PuntoPlano } from "./mallado";
 // [1A] El acople paño<->portico (F3.2) se computa UNA vez por discretizacion:
 // `discretizar` lo pasa como parametro; el fallback interno cubre a los llamantes
 // que no lo tienen (prepararModeloCR, tests). Sus resultados gobiernan la
@@ -339,19 +339,21 @@ function validarRefsPano(
   acoples: ResultadoAcoples,
   pilaresInteriores: PilaresInteriores,
 ): void {
-  // Solo la LOSA se calcula en el corte 1. Reticular/unidireccional se rechazan (NO se
-  // mallan como losa, que daria un calculo fisicamente erroneo en silencio).
-  if (pano.tipo !== "losa") {
+  // Tipos soportados: LOSA (corte 1) y UNIDIRECCIONAL (este corte). RETICULAR sigue
+  // rechazado (DP5): no se malla como losa (calculo fisicamente erroneo en silencio).
+  if (pano.tipo === "reticular") {
     errores.push({
       codigo: "PANO_TIPO_NO_SOPORTADO",
       severidad: "error",
-      mensaje: `El forjado "${pano.nombre}" es ${
-        pano.tipo === "reticular" ? "reticular" : "unidireccional"
-      } y aún no se calcula en esta fase. Usa una losa maciza.`,
+      mensaje: `El forjado "${pano.nombre}" es reticular y aún no se calcula en esta fase. Usa una losa maciza o un forjado unidireccional.`,
       elementoId: pano.id,
       elementoTipo: "pano",
     });
     return; // sin tipo soportado no tiene sentido validar el resto de su geometria
+  }
+  if (pano.tipo === "unidireccional") {
+    validarRefsPanoUnidireccional(pano, modelo, errores, acoples);
+    return; // el forjado unidireccional tiene su propia validacion (viguetas, no malla)
   }
 
   if (getMaterial(pano.materialId) === undefined) {
@@ -488,6 +490,126 @@ function validarRefsPano(
       codigo: res.error.codigo, // PANO_NO_RECTANGULAR | PANO_DEGENERADO
       severidad: "error",
       mensaje: res.error.mensaje,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+}
+
+// 2b-bis. Referencias y campos de un paño UNIDIRECCIONAL (F3, corte "unidireccional").
+// El forjado unidireccional NO se malla (monta viguetas): tiene su propia cadena de
+// validacion, con la PRECEDENCIA del contrato §7-E:
+//   1. tipo (ya aceptado por el llamante) -> 2. REF_MATERIAL/REF_PLANTA ->
+//   3. PANO_UNI_CAMPOS (los 4 campos geometricos presentes y > 0; sin ellos NO hay
+//      geometria de viguetas que evaluar -> se SALTA el resto) ->
+//   4. PANO_PERIMETRO / PANO_NO_RECTANGULAR / PANO_DEGENERADO (bbox rectangular) ->
+//   5. PANO_UNI_SIN_APOYO (borde de apoyo "libre" sin viga de contorno completa).
+// Los interiores (PANO_PILAR/VIGA_INTERIOR) los emite validarElementosInterioresPano
+// (compartido con la losa); la sujecion global la cubre validarSujecion.
+function validarRefsPanoUnidireccional(
+  pano: Pano,
+  modelo: Modelo,
+  errores: ErrorObra[],
+  acoples: ResultadoAcoples,
+): void {
+  // 2) Referencias.
+  if (getMaterial(pano.materialId) === undefined) {
+    errores.push({
+      codigo: "REF_MATERIAL",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" usa un material que no existe en la biblioteca.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+  const planta = plantaPorId(modelo, pano.plantaId);
+  if (planta === undefined) {
+    errores.push({
+      codigo: "REF_PLANTA",
+      severidad: "error",
+      mensaje: `El paño "${pano.nombre}" pertenece a una planta que no existe.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+  }
+
+  // 3) PANO_UNI_CAMPOS (agrupador): direccionViguetas ∈ {"x","y"} y intereje/canto/
+  // anchoNervio finitos y > 0 (pesoPropio finito y >= 0; 0 es legitimo). Un solo codigo:
+  // el mensaje enumera lo que falta, la UI resalta el campo vacio (DECISION, contrato §7-B).
+  const esPos = (v: number | undefined): boolean =>
+    typeof v === "number" && Number.isFinite(v) && v > 0;
+  const esNoNeg = (v: number | undefined): boolean =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0;
+  const camposOk =
+    (pano.direccionViguetas === "x" || pano.direccionViguetas === "y") &&
+    esPos(pano.intereje) &&
+    esPos(pano.canto) &&
+    esPos(pano.anchoNervio) &&
+    esNoNeg(pano.pesoPropio);
+  if (!camposOk) {
+    errores.push({
+      codigo: "PANO_UNI_CAMPOS",
+      severidad: "error",
+      mensaje: `El forjado unidireccional "${pano.nombre}" necesita dirección de viguetas, intereje, canto y ancho de nervio (todos mayores que cero) y un peso propio válido. Revísalos.`,
+      elementoId: pano.id,
+      elementoTipo: "pano",
+    });
+    return; // sin campos no hay geometria de viguetas que validar (contrato §7-E-3)
+  }
+
+  // 4) Geometria: rectangulo de 4 nudos existentes. [1A] Si el acople YA resolvio el paño
+  // (esta en `unidireccionalPorPano`) la geometria es valida por construccion: no se
+  // re-evalua. Solo se re-evalua para EXPLICAR el motivo del rechazo.
+  const uni = acoples.unidireccionalPorPano.get(pano.id);
+  if (uni === undefined) {
+    if (pano.perimetro.length !== 4) {
+      errores.push({
+        codigo: "PANO_PERIMETRO",
+        severidad: "error",
+        mensaje: `El paño "${pano.nombre}" debe tener cuatro esquinas (un rectángulo).`,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+      return;
+    }
+    const puntos: PuntoPlano[] = [];
+    for (const nudoId of pano.perimetro) {
+      const n = nudoPorId(modelo, nudoId);
+      if (n === undefined) {
+        errores.push({
+          codigo: "REF_NUDO",
+          severidad: "error",
+          mensaje: `El paño "${pano.nombre}" tiene una esquina en un punto que no existe en la obra.`,
+          elementoId: pano.id,
+          elementoTipo: "pano",
+        });
+        return;
+      }
+      puntos.push({ x: n.x, y: n.y });
+    }
+    const l = limitesRectangulo(puntos);
+    if ("codigo" in l) {
+      errores.push({
+        codigo: l.codigo, // PANO_NO_RECTANGULAR | PANO_DEGENERADO
+        severidad: "error",
+        mensaje: l.mensaje,
+        elementoId: pano.id,
+        elementoTipo: "pano",
+      });
+    }
+    // Sin geometria valida no hay bordes de apoyo que evaluar: no se sigue a UNI_SIN_APOYO.
+    return;
+  }
+
+  // 5) PANO_UNI_SIN_APOYO: bordeApoyo "libre" y algun borde de APOYO sin viga de contorno
+  // completa (sus viguetas quedarian con un extremo suelto = voladizo sin recoger). Solo los
+  // bordes de APOYO importan (los paralelos con "libre" son correctos). `bordeApoyo` es un
+  // campo unico del paño: si es "libre" y NO ambos bordes de apoyo tienen viga -> bloqueo.
+  if (pano.bordeApoyo === "libre" && !(uni.bordeAConViga && uni.bordeBConViga)) {
+    errores.push({
+      codigo: "PANO_UNI_SIN_APOYO",
+      severidad: "error",
+      mensaje: `El forjado "${pano.nombre}" tiene viguetas sin apoyo en un borde: pon una viga bajo ese borde o cámbialo a apoyado.`,
       elementoId: pano.id,
       elementoTipo: "pano",
     });
@@ -656,19 +778,35 @@ function validarSujecion(
   // (los quads conectan las cabezas de pilar a la losa), no solo nudo<->barra.
   const haySujecionPilar = modelo.pilares.some((p) => p.vinculacionExterior);
   const haySujecionPano = modelo.panos.some((pano) => {
-    if (pano.tipo !== "losa" || pano.bordeApoyo === "libre") return false;
-    const acople = acoples.porPano.get(pano.id);
-    // Paño no mallable (refs rotas): se cuenta como antes (bordeApoyo != libre); el
-    // bloqueo real llegara por sus errores de referencia/geometria.
-    if (acople === undefined) return true;
-    // [F2.3/RESERVA-4 gemelo] Solo cuentan los nudos de BORDE acoplados: el Paso 6c
-    // pone apoyos de borde en los nudos de borde SIN acoplar, asi que "queda algun
-    // apoyo propio" ⇔ nodosBordeAcoplados < nº total de nudos de borde. Se usa
-    // `acople.nodosBordeAcoplados` (fuente unica, ya = |nodosBorde ∩ nodosAcoplados|),
-    // NUNCA `nodosAcoplados.size`, que incluye cabezas de pilar interiores y podria
-    // superar nodosBorde.length -> falso SIN_SUJECION que bloquea una losa valida.
-    const acoplados = acople.acopleActivo ? acople.nodosBordeAcoplados : 0;
-    return acoplados < acople.malla.nodosBorde.length; // queda algun apoyo propio
+    if (pano.tipo === "losa") {
+      if (pano.bordeApoyo === "libre") return false;
+      const acople = acoples.porPano.get(pano.id);
+      // Paño no mallable (refs rotas): se cuenta como antes (bordeApoyo != libre); el
+      // bloqueo real llegara por sus errores de referencia/geometria.
+      if (acople === undefined) return true;
+      // [F2.3/RESERVA-4 gemelo] Solo cuentan los nudos de BORDE acoplados: el Paso 6c
+      // pone apoyos de borde en los nudos de borde SIN acoplar, asi que "queda algun
+      // apoyo propio" ⇔ nodosBordeAcoplados < nº total de nudos de borde. Se usa
+      // `acople.nodosBordeAcoplados` (fuente unica, ya = |nodosBorde ∩ nodosAcoplados|),
+      // NUNCA `nodosAcoplados.size`, que incluye cabezas de pilar interiores y podria
+      // superar nodosBorde.length -> falso SIN_SUJECION que bloquea una losa valida.
+      const acoplados = acople.acopleActivo ? acople.nodosBordeAcoplados : 0;
+      return acoplados < acople.malla.nodosBorde.length; // queda algun apoyo propio
+    }
+    // [F3 unidireccional] Un forjado unidireccional con apoyo de borde (bordeApoyo !=
+    // "libre") aporta sujecion por sus apoyos nodales propios (el Paso 6d los emite en los
+    // extremos de vigueta que NO remapean al portico). Si AMBOS bordes de apoyo descansan
+    // en vigas de contorno (bordeAConViga && bordeBConViga), descarga TODO en el portico y
+    // NO aporta apoyo propio -> la sujecion debe venir de los pilares (espejo de la losa
+    // totalmente acoplada). Un paño no resoluble se cuenta como antes (el bloqueo real
+    // llega por sus errores de campos/geometria).
+    if (pano.tipo === "unidireccional") {
+      if (pano.bordeApoyo === "libre") return false;
+      const uni = acoples.unidireccionalPorPano.get(pano.id);
+      if (uni === undefined) return true;
+      return !(uni.bordeAConViga && uni.bordeBConViga); // queda algun apoyo propio
+    }
+    return false;
   });
   const haySujecion = haySujecionPilar || haySujecionPano;
   if (!haySujecion) {
@@ -1043,18 +1181,21 @@ function validarModalNumModos(modal: ContextoModal, errores: ErrorObra[]): void 
 // M2 (MODAL_SIN_MASA): el analisis modal necesita masa para vibrar. La masa ya no viene
 // solo de las barras: el motor la deriva del peso propio (`rho` del material) de pilares
 // y vigas Y de la masa de placa (rho·t) que fabrica el glue para las losas (F-masa-placa).
-// Asi que basta con que exista un pilar, una viga o un paño LOSA con material de `rho>0`.
-// Solo cuentan los paños `tipo === "losa"`: reticular/unidireccional no se discretizan
-// (los bloquea PANO_TIPO_NO_SOPORTADO aguas abajo) y por tanto no aportan masa. Si no hay
-// masa alguna, el motor lanzaria "massless" (jerga); esta red lo atrapa antes, en lenguaje
-// de obra. Se lee `rho` via `materialAportaMasa` (A-dry, throw-safe: una ref de material
-// rota no aporta masa y ya la cazo REF_MATERIAL). BLOQUEA.
+// Asi que basta con que exista un pilar, una viga o un paño LOSA/UNIDIRECCIONAL con
+// material de `rho>0`. Cuentan los paños `losa` (masa de placa rho·t) y `unidireccional`
+// (el glue fabrica masa rho·A_nervio de cada vigueta, infravalorada pero > 0: deuda
+// T-f3-uni-masa-modal); reticular no se discretiza (lo bloquea PANO_TIPO_NO_SOPORTADO) y
+// no aporta masa. Si no hay masa alguna, el motor lanzaria "massless" (jerga); esta red lo
+// atrapa antes, en lenguaje de obra. Se lee `rho` via `materialAportaMasa` (A-dry,
+// throw-safe: una ref de material rota no aporta masa y ya la cazo REF_MATERIAL). BLOQUEA.
 function validarModalConMasa(modelo: Modelo, errores: ErrorObra[]): void {
   const hayMasa =
     modelo.pilares.some((p) => materialAportaMasa(p.materialId)) ||
     modelo.vigas.some((v) => materialAportaMasa(v.materialId)) ||
     modelo.panos.some(
-      (p) => p.tipo === "losa" && materialAportaMasa(p.materialId),
+      (p) =>
+        (p.tipo === "losa" || p.tipo === "unidireccional") &&
+        materialAportaMasa(p.materialId),
     );
   if (!hayMasa) {
     errores.push({

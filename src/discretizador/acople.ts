@@ -54,6 +54,11 @@ import {
   type PuntoPlano,
   type ErrorMallado,
 } from "./mallado";
+import {
+  generarViguetas,
+  subdivisionesDeBordes,
+  type MallaViguetas,
+} from "./viguetas";
 
 type Viga = Modelo["vigas"][number];
 
@@ -96,10 +101,46 @@ export type AcoplePano = {
   pilaresAcoplados: readonly string[];
 };
 
+// Resultado del PRE-PASE unidireccional de UN paño `tipo:"unidireccional"` resoluble
+// (F3, corte "unidireccional"). Espejo estructural de `AcoplePano` (losa) pero SIN malla
+// de quads: el forjado unidireccional monta VIGUETAS (members sinteticos), no una placa.
+// La geometria de viguetas la produce `generarViguetas`; aqui se resuelve solo lo que el
+// pre-pase debe compartir con la base/validaciones: (a) que bordes de apoyo tienen una
+// viga de contorno COMPLETA (para PANO_UNI_SIN_APOYO y para saber si la vigueta remapea o
+// nace nudo propio), y (b) que celdas de extremo se convirtieron en SUBDIVISION de una
+// viga de contorno (para la muleta torsional del Paso 6d). El Paso 6d consume esto + la
+// malla de viguetas (que recomputa con `generarViguetas`, funcion pura del par).
+export type UnidireccionalPano = {
+  // Malla de viguetas YA computada (con el MISMO indicePano que usara el Paso 6d): se
+  // reutiliza para no regenerar dos veces (espejo de `AcoplePano.malla`).
+  malla: MallaViguetas;
+  // Indice posicional del paño en modelo.panos ordenados por id (fija el prefijo PV<idx>;
+  // debe coincidir con el del Paso 6d).
+  indicePano: number;
+  // ¿El borde de apoyo A (coordenada MENOR a lo largo de la luz) tiene una viga de
+  // contorno que lo cubre por completo? Si SI, todos los extremos "a" de las viguetas
+  // remapean a N* (la viga se subdivide ahi); si NO y bordeApoyo=="libre" -> PANO_UNI_SIN_APOYO.
+  bordeAConViga: boolean;
+  // Idem para el borde de apoyo B (coordenada mayor).
+  bordeBConViga: boolean;
+  // Claves de celda 2D (clavePosicion(mapearEjes(x,y,cota),TOL_NODO)) de los extremos de
+  // vigueta que este paño aporto como SUBDIVISION de una viga de contorno (extremo
+  // ESTRICTAMENTE interior al segmento de la viga). El Paso 6d pone la muleta torsional
+  // minima SOLO sobre un N* cuya celda este aqui (nacido de la subdivision de la vigueta);
+  // un N* preexistente (esquina con pilar, cruce de vigas) NO esta y NO lleva muleta
+  // (rigidez real presente, contrato §8-4). Espejo de `subdivisionesViga` pero por celda.
+  celdasSubdivididas: ReadonlySet<string>;
+};
+
 export type ResultadoAcoples = {
   // Solo paños LOSA mallables (refs y geometria validas). Un paño ausente aqui se
   // trata como aislado/invalido; sus errores los reporta validarRefsPano.
   porPano: Map<string, AcoplePano>;
+  // Paños UNIDIRECCIONALES resolubles (campos validos + geometria rectangular). XOR con
+  // `porPano`: un paño es losa (porPano) O unidireccional (unidireccionalPorPano), nunca
+  // ambos (es el tipo el que decide). Ausente si el paño no resuelve (los errores los
+  // reporta validarRefsPano). Clave = panoId. Recorrido en orden de id (determinismo).
+  unidireccionalPorPano: Map<string, UnidireccionalPano>;
   // vigaId -> puntos de subdivision (x,y de obra), UNION sobre todos los paños con
   // acople activo, dedup por celda, ordenados por distancia a nudoI de la viga.
   // Las coordenadas son las MISMAS que emite mallarPano para el nudo de borde
@@ -183,6 +224,8 @@ function claveCabeza(x: number, y: number, cota: number): string {
 
 export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
   const porPano = new Map<string, AcoplePano>();
+  // Paños unidireccionales resolubles (rama SIN malla; monta viguetas, no quads).
+  const unidireccionalPorPano = new Map<string, UnidireccionalPano>();
   // Paños losa cuya malla no se pudo construir por el cap (PANO_DEMASIADOS_PILARES).
   const erroresMallado = new Map<string, ErrorMallado>();
   // panoId -> pares de pilares interiores en la misma celda 2D (junta a bloquear).
@@ -221,6 +264,17 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
   }
 
   panosOrdenados.forEach((pano, indicePano) => {
+    // --- Rama UNIDIRECCIONAL (F3, SIN malla de quads) --------------------------
+    // Un forjado unidireccional no malla: monta viguetas. El pre-pase resuelve su
+    // geometria de viguetas y aporta a `subdivisionesViga` los puntos de los extremos
+    // que caen sobre una viga de contorno (misma Map, mismo dedup por celda que la losa).
+    // Los AcoplePano de losa NO se generan aqui (no hay quads): el resultado vive en
+    // `unidireccionalPorPano` (contrato §4-F). Reticular sigue sin rama (cae a return).
+    if (pano.tipo === "unidireccional") {
+      const uni = procesarUnidireccional(modelo, pano, indicePano, vigasResueltas, subsPorViga);
+      if (uni !== undefined) unidireccionalPorPano.set(pano.id, uni);
+      return;
+    }
     if (pano.tipo !== "losa") return;
     if (!(Number.isFinite(pano.tamMalla) && pano.tamMalla > 0)) return;
     const planta = plantaPorId(modelo, pano.plantaId);
@@ -419,7 +473,120 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
     subdivisionesViga.set(vigaId, puntos);
   }
 
-  return { porPano, subdivisionesViga, erroresMallado, pilaresJuntos };
+  return { porPano, unidireccionalPorPano, subdivisionesViga, erroresMallado, pilaresJuntos };
+}
+
+// --- Rama unidireccional: viguetas sobre bordes de apoyo (contrato §4-F) ---------
+// Resuelve la geometria de viguetas de UN paño unidireccional y aporta a `subsPorViga`
+// (compartido con la losa) los puntos de subdivision de las vigas de contorno de sus
+// bordes de apoyo. Devuelve `undefined` si el paño no resuelve (campos ausentes,
+// geometria no rectangular): el error de obra lo emite validaciones, aqui se salta.
+// NUNCA lanza (espejo del cuerpo losa de calcularAcoples).
+//
+// `subsPorViga` es la MISMA estructura que la losa usa (vigaId -> celda -> {punto,t}): el
+// dedup por celda es unico y el primer punto de una celda gana (orden de descubrimiento
+// determinista). Asi una viga de contorno compartida por losa y unidireccional recibe la
+// UNION de puntos sin duplicar nudos.
+function procesarUnidireccional(
+  modelo: Modelo,
+  pano: Pano,
+  indicePano: number,
+  vigasResueltas: { viga: Viga; ni: PuntoPlano; nj: PuntoPlano; qCota: number }[],
+  subsPorViga: Map<string, Map<string, { punto: PuntoPlano; t: number }>>,
+): UnidireccionalPano | undefined {
+  const malla = generarViguetas(modelo, pano);
+  if (malla === undefined) return undefined; // campos/geometria invalidos -> validaciones
+  const planta = plantaPorId(modelo, pano.plantaId);
+  if (planta === undefined) return undefined;
+  const subs = subdivisionesDeBordes(modelo, pano, malla);
+  if (subs === undefined) return undefined;
+
+  const cota = planta.cota;
+  const qCota = cuantizar(cota);
+  const vigasEnCota = vigasResueltas.filter((vr) => vr.qCota === qCota);
+  const celdasSubdivididas = new Set<string>();
+
+  // Procesa UN borde de apoyo: para cada extremo de vigueta sobre el borde, busca una viga
+  // de contorno que lo cubra (colineal + solape). Si el punto es ESTRICTAMENTE interior al
+  // segmento de la viga -> subdivision (nudo N* nuevo, muleta en 6d); si cae en un extremo
+  // de viga -> ya es N* (esquina/cruce, sin muleta). Devuelve true si el borde tiene una
+  // viga que lo cubre por completo (todos los extremos remapean): entonces la vigueta apoya
+  // en el portico y no necesita apoyo nodal propio en ese borde.
+  const procesarBorde = (
+    borde: { lado: "xMin" | "xMax" | "yMin" | "yMax"; corre: "x" | "y" },
+    puntos: readonly PuntoPlano[],
+  ): boolean => {
+    // El borde CORRE en `borde.corre`; la coordenada perpendicular es fija (la del lado).
+    // Un borde que corre en X (yMin/yMax) tiene los extremos variando en X, perpendicular Y.
+    const ejeAlong = borde.corre; // eje a lo largo del borde
+    const l = malla.limites;
+    const perpFijo = cuantizar(
+      borde.lado === "xMin" ? l.xMin : borde.lado === "xMax" ? l.xMax
+        : borde.lado === "yMin" ? l.yMin : l.yMax,
+    );
+    const alongDe = (p: PuntoPlano): number => (ejeAlong === "x" ? p.x : p.y);
+    const perpDe = (p: PuntoPlano): number => (ejeAlong === "x" ? p.y : p.x);
+
+    // Vigas de contorno de este borde: colineales (perpendicular cuantizada = la del lado)
+    // y con solape real con el rango del borde (mismo criterio que `vigasArista` de la losa).
+    const rangoDesde = ejeAlong === "x" ? l.xMin : l.yMin;
+    const rangoHasta = ejeAlong === "x" ? l.xMax : l.yMax;
+    const vigasBorde = vigasEnCota
+      .filter((vr) => {
+        const perpI = ejeAlong === "x" ? vr.ni.y : vr.ni.x;
+        const perpJ = ejeAlong === "x" ? vr.nj.y : vr.nj.x;
+        if (cuantizar(perpI) !== perpFijo || cuantizar(perpJ) !== perpFijo) return false;
+        const aI = ejeAlong === "x" ? vr.ni.x : vr.ni.y;
+        const aJ = ejeAlong === "x" ? vr.nj.x : vr.nj.y;
+        const a = Math.min(aI, aJ);
+        const b = Math.max(aI, aJ);
+        return Math.min(b, rangoHasta) - Math.max(a, rangoDesde) > TOL_NODO;
+      })
+      .map((vr) => {
+        const aI = ejeAlong === "x" ? vr.ni.x : vr.ni.y;
+        const aJ = ejeAlong === "x" ? vr.nj.x : vr.nj.y;
+        return { vr, qA: cuantizar(Math.min(aI, aJ)), qB: cuantizar(Math.max(aI, aJ)) };
+      });
+
+    let todosCubiertos = true;
+    for (const p of puntos) {
+      // Un extremo debe caer sobre el borde (perpendicular cuantizada = la del lado); si
+      // no (bug de geometria), no cuenta como cubierto.
+      if (cuantizar(perpDe(p)) !== perpFijo) {
+        todosCubiertos = false;
+        continue;
+      }
+      const qAlong = cuantizar(alongDe(p));
+      let cubierto = false;
+      for (const vb of vigasBorde) {
+        if (qAlong >= vb.qA && qAlong <= vb.qB) {
+          cubierto = true;
+          // ESTRICTAMENTE interior: subdivide la viga (nudo N* nuevo -> muleta en 6d).
+          if (qAlong > vb.qA && qAlong < vb.qB) {
+            const t = Math.hypot(p.x - vb.vr.ni.x, p.y - vb.vr.ni.y);
+            let porClave = subsPorViga.get(vb.vr.viga.id);
+            if (porClave === undefined) {
+              porClave = new Map();
+              subsPorViga.set(vb.vr.viga.id, porClave);
+            }
+            const clavePlanta = clavePosicion(mapearEjes(p.x, p.y, 0), TOL_NODO);
+            if (!porClave.has(clavePlanta)) porClave.set(clavePlanta, { punto: p, t });
+            // Celda 3D a la cota del paño: el Paso 6d la casa contra el N* que nacera de
+            // esta subdivision para poner la muleta torsional (nunca sobre N* preexistente).
+            celdasSubdivididas.add(claveCabeza(p.x, p.y, cota));
+          }
+          break;
+        }
+      }
+      if (!cubierto) todosCubiertos = false;
+    }
+    return puntos.length > 0 && todosCubiertos;
+  };
+
+  const bordeAConViga = procesarBorde(subs.bordeA.borde, subs.bordeA.puntos);
+  const bordeBConViga = procesarBorde(subs.bordeB.borde, subs.bordeB.puntos);
+
+  return { malla, indicePano, bordeAConViga, bordeBConViga, celdasSubdivididas };
 }
 
 // --- Helpers de losa plana (juntas) ---------------------------------------------
@@ -460,7 +627,10 @@ function detectarPilaresJuntos(pilares: readonly Pilar[], cota: number): [string
 // un pilar que REMATA en la losa es justo el que deberia recogerla). Un pilar
 // sobre el BORDE no entra aqui: lo gobiernan las reglas de borde (fallback/aviso).
 export function pilaresInterioresBajoPano(modelo: Modelo, pano: Pano): Pilar[] {
-  if (pano.tipo !== "losa") return [];
+  // [R-4] losa || unidireccional: bajo unidireccional NO hay acople de cabeza de pilar
+  // (DP4), asi que cualquier pilar interior BLOQUEA (PANO_PILAR_INTERIOR). Sin relajar
+  // este filtro, un pilar interior bajo unidireccional se ignoraria en silencio.
+  if (pano.tipo !== "losa" && pano.tipo !== "unidireccional") return [];
   const planta = plantaPorId(modelo, pano.plantaId);
   if (planta === undefined) return [];
   const limites = limitesDePano(modelo, pano);
@@ -524,7 +694,10 @@ function recortarSegmento(
 // arista, tiene el punto medio SOBRE el borde y queda fuera; asi el contorno nunca
 // se confunde con una viga embrochalada).
 export function vigasInterioresBajoPano(modelo: Modelo, pano: Pano): Viga[] {
-  if (pano.tipo !== "losa") return [];
+  // [R-4] losa || unidireccional: una viga interior (crujia intermedia) bajo unidireccional
+  // BLOQUEA (PANO_VIGA_INTERIOR, DP4). El reparto unidireccional supone luz limpia entre
+  // los dos bordes de apoyo; una viga por dentro particionaria el paño (deuda futura).
+  if (pano.tipo !== "losa" && pano.tipo !== "unidireccional") return [];
   const planta = plantaPorId(modelo, pano.plantaId);
   if (planta === undefined) return [];
   const limites = limitesDePano(modelo, pano);

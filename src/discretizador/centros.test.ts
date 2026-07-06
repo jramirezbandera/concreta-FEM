@@ -511,3 +511,59 @@ describe("centro de masas · paños losa (F3.2, T-cm-cargas-muertas)", () => {
     expect(cm!.pesoTotal).toBeCloseTo(PP_LOSA + wPilar, 10);
   });
 });
+
+// ============================================================================
+// F3 corte "unidireccional": termino CM del forjado unidireccional. Espejo del
+// termino losa (que NO cambia) pero con peso propio TABULADO (pano.pesoPropio·A,
+// DP2 — NO rho·t: no hay losa maciza) + CM_planta·A + superficiales permanentes.
+// ============================================================================
+describe("centro de masas · paños unidireccionales (F3)", () => {
+  // Paño 4x2 en p1: area 8 m², centroide (2,1). Con los 5 campos de vigueta.
+  function conUni(m: Modelo, extra?: Partial<Modelo["panos"][number]>): Modelo {
+    m.nudos.push(
+      { id: "q1", x: 0, y: 0 }, { id: "q2", x: 4, y: 0 },
+      { id: "q3", x: 4, y: 2 }, { id: "q4", x: 0, y: 2 },
+    );
+    m.panos.push({
+      id: "fu", nombre: "FU", tipo: "unidireccional", plantaId: "p1",
+      perimetro: ["q1", "q2", "q3", "q4"],
+      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      direccionViguetas: "x", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
+      ...extra,
+    });
+    return m;
+  }
+  const AREA = 8; // m²
+
+  it("unidireccional solo: CM en el centroide con peso pesoPropio·A + CM_planta·A", () => {
+    const m = conUni(modeloBase());
+    m.plantas = m.plantas.map((p) => (p.id === "p1" ? { ...p, cargasMuertas: 1.5 } : p));
+    const cm = calcularCentroMasaPlanta(m, "p1");
+    expect(cm).not.toBeNull();
+    expect(cm!.x).toBeCloseTo(2, 10);
+    expect(cm!.y).toBeCloseTo(1, 10);
+    // pesoPropio tabulado 4·8 = 32 + CM planta 1.5·8 = 12.
+    expect(cm!.pesoTotal).toBeCloseTo(4 * AREA + 1.5 * AREA, 10);
+  });
+
+  it("usa el pesoPropio TABULADO, NO rho·t (DP2: no hay losa maciza)", () => {
+    // rho·t seria 25·0.2·8 = 40; el tabulado es 4·8 = 32. Debe salir 32 (sin CM planta).
+    const m = conUni(modeloBase());
+    expect(calcularCentroMasaPlanta(m, "p1")!.pesoTotal).toBeCloseTo(4 * AREA, 10);
+  });
+
+  it("pesoPropio ausente (modelo vivo a medio definir) -> aporta 0, no lanza", () => {
+    const m = conUni(modeloBase(), { pesoPropio: undefined });
+    // Sin peso propio ni cargas de planta ni usuario -> sin masa (null), sin lanzar.
+    expect(() => calcularCentroMasaPlanta(m, "p1")).not.toThrow();
+    expect(calcularCentroMasaPlanta(m, "p1")).toBeNull();
+  });
+
+  it("la sobrecarga de uso NO entra; la superficial PERMANENTE de usuario si", () => {
+    const m = conUni(modeloBase());
+    m.plantas = m.plantas.map((p) => (p.id === "p1" ? { ...p, sobrecargaUso: 5 } : p));
+    m.cargas.push({ id: "cp", tipo: "superficial", ambito: "fu", valor: 3, hipotesisId: "hip-perm" });
+    // pp tabulado 32 + superficial permanente 3·8 = 24; la SU de planta (variable) NO.
+    expect(calcularCentroMasaPlanta(m, "p1")!.pesoTotal).toBeCloseTo(4 * AREA + 3 * AREA, 10);
+  });
+});

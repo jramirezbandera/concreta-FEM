@@ -46,6 +46,16 @@ import {
 import { type PuntoPlano } from "./mallado";
 import { calcularAcoples } from "./acople";
 import { cargasPlantaDePano } from "./cargasPlanta";
+import {
+  extremosDeVigueta,
+  seccionFEMDeVigueta,
+  nombreSeccionVigueta,
+  nombreMemberVigueta,
+  nombreNudoVigueta,
+  RELEASES_VIGUETA_BIAPOYADA,
+  APOYO_VIGUETA_AISLADA_I,
+  APOYO_VIGUETA_AISLADA_J,
+} from "./viguetas";
 import { validarModelo, type ErrorObra, type ContextoModal } from "./validaciones";
 import { generarCombos } from "./combinaciones";
 // resolverSeccion y las propiedades de barra viven en el modulo hoja
@@ -577,6 +587,7 @@ export function construirBaseFEM(modelo: Modelo, opts?: OpcionesBaseFEM): BaseFE
     nudoANodo,
     nodoFEMAPlanta,
     panoAQuads: {},
+    panoAMembers: {},
     quadAPano: {},
     quadANodos: {},
     nodosDeMalla: [],
@@ -623,6 +634,35 @@ function emitirDistribuidaEnTramos(
       case: caseName,
     });
   }
+}
+
+// Merge de apoyos nodales de VIGUETA por nudo (Paso 6d): union OR de GDL (un nudo puede
+// recibir el apoyo aislado de una vigueta y la muleta torsional de otra). Espejo del
+// `acumularApoyo` de la losa (6c), factorizado aqui para reusarlo desde el Paso 6d.
+function acumularApoyoUni(
+  porNodo: Map<string, ApoyoFEM>,
+  node: string,
+  gdl: Partial<ApoyoFEM>,
+): void {
+  const previo = porNodo.get(node);
+  const base0: ApoyoFEM = previo ?? {
+    node,
+    DX: false,
+    DY: false,
+    DZ: false,
+    RX: false,
+    RY: false,
+    RZ: false,
+  };
+  porNodo.set(node, {
+    node,
+    DX: base0.DX || gdl.DX === true,
+    DY: base0.DY || gdl.DY === true,
+    DZ: base0.DZ || gdl.DZ === true,
+    RX: base0.RX || gdl.RX === true,
+    RY: base0.RY || gdl.RY === true,
+    RZ: base0.RZ || gdl.RZ === true,
+  });
 }
 
 // --- discretizador -----------------------------------------------------------
@@ -1090,6 +1130,141 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     }
   });
 
+  // --- Paso 6d: paños UNIDIRECCIONALES (F3, viguetas SIN malla de quads) --------
+  // Espejo del Paso 6c pero para el forjado unidireccional: cada paño monta VIGUETAS
+  // (members sinteticos biapoyados PV<idx>-V<k>), no una placa. La geometria la produce
+  // `generarViguetas` (modulo hoja puro, T2.1); el pre-pase `calcularAcoples` ya aporto a
+  // `subdivisionesViga` los puntos donde las viguetas cruzan una viga de contorno (que la
+  // base subdividio en N*). Aqui se resuelven los extremos a nombres de nudo (remap a N*
+  // o nudo propio PV<idx>-N*), se emiten members + su seccion sintetica + apoyos + cargas.
+  //
+  // Determinista: paños ordenados por id (mismo `indicePano` posicional que el 6c usa para
+  // PQ), viguetas por k. Todo se SEGREGA en arrays propios que se anaden al final DESPUES de
+  // la base y de la malla de losa; un modelo sin paños unidireccionales no emite ni un byte
+  // nuevo (regresion I3): sin members PV, sin seccion VIG-, sin nudos PV, sin dist_loads.
+  const uniMembers: MiembroFEM[] = [];
+  const uniSections: SeccionFEM[] = [];
+  const uniNodes: NodoFEM[] = [];
+  const uniSupportsPorNodo = new Map<string, ApoyoFEM>();
+  const uniDistLoads: CargaDistFEM[] = [];
+  const panoAMembers: Record<string, string[]> = {};
+  const materialIdsUni = new Set<string>();
+
+  // Presion total FY- por vigueta = -(Σ presiones · tributario). La presion de paño
+  // (presionesPorPano, cargasPlanta) viaja POSITIVA-hacia-abajo (convencion de quad); el
+  // dist_load de barra usa FY para la gravedad, donde gravedad = FY NEGATIVA. Por eso el
+  // reparto a la vigueta NIEGA la presion: `w = -(presion · s)` (#3, invariante I5). Cada
+  // fuente en SU case, orden usuario -> pp -> CM -> uso (espejo exacto de la losa).
+  panosOrdenados.forEach((pano, indicePano) => {
+    if (pano.tipo !== "unidireccional") return;
+    const uni = acoples.unidireccionalPorPano.get(pano.id);
+    if (uni === undefined) return; // no resoluble: el error de obra lo emite validaciones
+    if (uni.indicePano !== indicePano) {
+      throw new Error(
+        `Indice de paño unidireccional desalineado (bug interno): ${pano.id} (${uni.indicePano} != ${indicePano})`,
+      );
+    }
+    const malla = uni.malla;
+
+    // Seccion sintetica VIG-<idx> (una por paño). `seccionFEMDeVigueta` la emite en convenio
+    // DOMINIO (Iy = eje fuerte, canto); el swap Iy<->Iz a convenio PyNite lo hace el EMISOR
+    // aqui (via `seccionFEMParaPyNite`), IGUAL que toda seccion de viga [C-1]: sin el swap la
+    // vigueta se calcularia "acostada" (invariante I7).
+    const seccionDominio = seccionFEMDeVigueta(pano, indicePano);
+    if (seccionDominio === undefined) return; // faltan canto/anchoNervio: lo emite validaciones
+    uniSections.push(seccionFEMParaPyNite(seccionDominio));
+    const nombreSeccion = nombreSeccionVigueta(indicePano);
+    materialIdsUni.add(pano.materialId);
+
+    // Muleta torsional minima sobre un N* NACIDO de la subdivision de un extremo de vigueta:
+    // solo el GDL borde.torsion (RX o RZ), NUNCA sobre un N* preexistente (esquina con pilar,
+    // cruce de vigas: ahi hay rigidez real y la muleta absorberia momento real, contrato §8-4).
+    const acumularMuletaTorsion = (node: string, torsion: "RX" | "RZ"): void => {
+      acumularApoyoUni(uniSupportsPorNodo, node, torsion === "RX" ? { RX: true } : { RZ: true });
+    };
+
+    const nombresMembers: string[] = [];
+    for (const vigueta of malla.viguetas) {
+      const ext = extremosDeVigueta(modelo, pano, vigueta);
+      if (ext === undefined) return; // planta no resuelve (bug del llamante): validaciones lo garantiza
+      const [extA, extB] = ext;
+
+      // Resuelve UN extremo a nombre de nudo. Tres estados (contrato §4-B/C):
+      //  - remap a N* de SUBDIVISION (celda en uni.celdasSubdivididas): el N* nacio de la
+      //    subdivision de esta vigueta -> muleta torsional.
+      //  - remap a N* PREEXISTENTE (celda con N* pero NO subdividida): esquina/cruce, sin muleta.
+      //  - nudo PROPIO PV<idx>-N* (no hay N* en la celda): apoyo nodal (aislado o {DY}).
+      const resolverExtremo = (
+        e: typeof extA,
+      ): { nombre: string; propio: boolean } => {
+        const estructural = base.nombrePorClave.get(e.clave);
+        if (estructural !== undefined) {
+          if (uni.celdasSubdivididas.has(e.clave)) {
+            acumularMuletaTorsion(estructural, e.borde.torsion);
+          }
+          return { nombre: estructural, propio: false };
+        }
+        // Nudo propio: coords EXACTAS de obra mapeadas a FEM (cota de la planta del paño).
+        const nombre = nombreNudoVigueta(indicePano, `${vigueta.indice}${e.cual}`);
+        const [x, y, z] = e.coordFEM;
+        uniNodes.push({ name: nombre, x, y, z });
+        nodosDeMalla.push(nombre);
+        return { nombre, propio: true };
+      };
+
+      const rA = resolverExtremo(extA);
+      const rB = resolverExtremo(extB);
+
+      // ¿Vigueta AISLADA? = NINGUN extremo cae en el portico (ambos nudos propios). Solo
+      // entonces se emite el patron completo del spike (estabiliza los 3 modos rigidos del
+      // plano + torsion). Con al menos un extremo en el portico, este ya sujeta el plano y
+      // el nudo propio solo necesita fijar sus GDL locales sin DX (axil ya fijado, §4-E).
+      const aislada = rA.propio && rB.propio;
+      if (rA.propio) {
+        // Extremo a = i. Aislada -> patron I (con DX); si no, patron J (sin DX: no doble axil).
+        acumularApoyoUni(uniSupportsPorNodo, rA.nombre, aislada ? APOYO_VIGUETA_AISLADA_I : APOYO_VIGUETA_AISLADA_J);
+      }
+      if (rB.propio) {
+        // Extremo b = j. Patron J (sin DX) siempre: el axil lo fija el extremo i (aislada) o
+        // el portico (no aislada).
+        acumularApoyoUni(uniSupportsPorNodo, rB.nombre, APOYO_VIGUETA_AISLADA_J);
+      }
+
+      // Member de la vigueta: biapoyada (releases Ry,Rz ambos extremos, Rx NUNCA, #8/I6),
+      // seccion sintetica del paño, material del paño. i = extremo a (luz menor), j = b.
+      const nombreMember = nombreMemberVigueta(indicePano, vigueta.indice);
+      uniMembers.push({
+        name: nombreMember,
+        i: rA.nombre,
+        j: rB.nombre,
+        material: pano.materialId,
+        section: nombreSeccion,
+        rotation: 0,
+        tension_only: false,
+        comp_only: false,
+        releases: [...RELEASES_VIGUETA_BIAPOYADA],
+      });
+      nombresMembers.push(nombreMember);
+
+      // Cargas de la vigueta: w = -(Σ presion · tributario) FY (invariante I5). Orden:
+      // usuario -> pp tabulado (gated) -> CM -> uso (espejo de la losa 6c). tributario = s.
+      const s = vigueta.tributario;
+      const emitirW = (presionAbajo: number, caseName: string): void => {
+        if (presionAbajo === 0) return; // sin presion, sin carga (evita w=0 espurio)
+        emitirDistribuidaEnTramos(uniDistLoads, [nombreMember], -(presionAbajo * s), caseName);
+      };
+      // 1) Usuario (superficial). presionesDePano viaja YA con signo de quad (positiva-abajo).
+      for (const pp of presionesDePano(pano.id)) emitirW(pp.presion, pp.case);
+      // 2) Peso propio TABULADO (DP2), gated por incluirPesoPropio (mismo criterio que losa).
+      if (casePesoPropioPano !== undefined && pano.pesoPropio !== undefined) {
+        emitirW(pano.pesoPropio, casePesoPropioPano); // pesoPropio POSITIVA hacia abajo (kN/m²)
+      }
+      // 3) Cargas de PLANTA (CM/uso), fuente unica cargasPlantaDePano (positiva-abajo).
+      for (const cg of cargasPlantaDePano(modelo, pano)) emitirW(cg.presion, cg.case);
+    }
+    panoAMembers[pano.id] = nombresMembers;
+  });
+
   avisos.push(...avisosPano);
 
   // --- Paso 7: combinaciones (delegado a ./combinaciones) ----------------------
@@ -1148,9 +1323,15 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   // de paños (2A): panoAQuads/quadAPano/quadANodos + nodosDeMalla/apoyosDeMalla, que la
   // base dejo vacios (la malla nace en este Paso 6c, fuera de la base). PURA y
   // determinista. `apoyosDeMalla` se ordena para una salida estable.
+  // Apoyos de VIGUETA (nudos propios aislados + muletas torsionales sobre N*): se agregan a
+  // `apoyosDeMalla` (contrato §8-4) para que la TablaReacciones los agrupe/oculte igual que
+  // los de la losa (no inundar la tabla con las reacciones de borde del forjado). Vacio si
+  // no hay paños unidireccionales (regresion).
+  for (const node of uniSupportsPorNodo.keys()) apoyosDeMalla.add(node);
   const trazabilidad: Trazabilidad = {
     ...base.trazabilidad,
     panoAQuads,
+    panoAMembers,
     quadAPano,
     quadANodos,
     nodosDeMalla,
@@ -1167,8 +1348,13 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   // debe existir en `materials`). Determinista: se anaden por orden alfabetico de id,
   // detras de los del portico, sin duplicar. Si no hay material de paño nuevo, es el
   // mismo array que antes (regresion byte-a-byte de la Capa 2 de un portico).
+  // Materiales de paños (losa `materialIdsPano` ∪ unidireccional `materialIdsUni`) que el
+  // portico NO referencia: PyNite resuelve el material del quad/vigueta por nombre, asi que
+  // deben existir en `materials`. Determinista: orden alfabetico de id, detras del portico,
+  // sin duplicar. Sin material de paño nuevo => mismo array (regresion byte a byte).
   const materialIdsBase = new Set(materials.map((m) => m.name));
-  const materialesPanoNuevos: MaterialFEM[] = [...materialIdsPano]
+  const materialIdsPanoTodos = new Set<string>([...materialIdsPano, ...materialIdsUni]);
+  const materialesPanoNuevos: MaterialFEM[] = [...materialIdsPanoTodos]
     .filter((id) => !materialIdsBase.has(id))
     .sort()
     .map((id) => {
@@ -1179,22 +1365,76 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   const materialsFinal: MaterialFEM[] =
     materialesPanoNuevos.length > 0 ? [...materials, ...materialesPanoNuevos] : materials;
 
-  const nodesFinal: NodoFEM[] = meshNodes.length > 0 ? [...nodes, ...meshNodes] : nodes;
+  // Nudos: base (portico) -> malla de losa (PQ) -> viguetas (PV). Cada tramo solo se anade
+  // si tiene contenido, para que un modelo sin paños unidireccionales no cambie ni un byte.
+  let nodesFinal: NodoFEM[] = meshNodes.length > 0 ? [...nodes, ...meshNodes] : nodes;
+  if (uniNodes.length > 0) nodesFinal = [...nodesFinal, ...uniNodes];
+
+  // Apoyos: base -> malla de losa -> viguetas (ordenados por nombre de nudo, determinista).
   const meshSupports = [...meshSupportsPorNodo.values()].sort((a, b) =>
     a.node < b.node ? -1 : a.node > b.node ? 1 : 0,
   );
-  const supportsFinal: ApoyoFEM[] =
+  let supportsFinal: ApoyoFEM[] =
     meshSupports.length > 0 ? [...supports, ...meshSupports] : supports;
+  // Apoyos de VIGUETA (muletas torsionales sobre N* + apoyos aislados de nudos propios).
+  // GOTCHA CRITICO: el glue aplica `def_support` que ASIGNA los 6 flags (no fusiona,
+  // pynite_glue.py:1087) -> DOS entradas de `supports` para el MISMO nudo se PISAN (la
+  // ultima gana, borrando la primera). Una muleta torsional sobre un N* que YA tuviera un
+  // apoyo (p.ej. un pilar cuyo arranque cae justo en la subdivision) borraria el apoyo
+  // real. Por eso se FUSIONA (OR) por nudo: la muleta se OR-mergea en la entrada existente
+  // (base o malla de losa) si el nudo ya tiene apoyo; si no, se anade como entrada nueva.
+  // Los nudos PROPIOS de vigueta (PV*) nunca colisionan (nombre disjunto): se anaden.
+  if (uniSupportsPorNodo.size > 0) {
+    const porNodoFinal = new Map<string, { apoyo: ApoyoFEM; nuevo: boolean }>();
+    for (const s of supportsFinal) porNodoFinal.set(s.node, { apoyo: s, nuevo: false });
+    for (const [node, muleta] of uniSupportsPorNodo) {
+      const previo = porNodoFinal.get(node);
+      const acc: ApoyoFEM = previo?.apoyo ?? {
+        node, DX: false, DY: false, DZ: false, RX: false, RY: false, RZ: false,
+      };
+      porNodoFinal.set(node, {
+        apoyo: {
+          node,
+          DX: acc.DX || muleta.DX,
+          DY: acc.DY || muleta.DY,
+          DZ: acc.DZ || muleta.DZ,
+          RX: acc.RX || muleta.RX,
+          RY: acc.RY || muleta.RY,
+          RZ: acc.RZ || muleta.RZ,
+        },
+        nuevo: previo === undefined,
+      });
+    }
+    // Preserva el orden de `supportsFinal` (entradas existentes, ya deterministas) y anade
+    // detras los nudos NUEVos de vigueta ordenados por nombre. Asi las entradas base/malla
+    // no cambian de posicion (regresion) y las de vigueta quedan segregadas al final.
+    const existentes = supportsFinal.map((s) => porNodoFinal.get(s.node)!.apoyo);
+    const nuevos = [...porNodoFinal.values()]
+      .filter((v) => v.nuevo)
+      .map((v) => v.apoyo)
+      .sort((a, b) => (a.node < b.node ? -1 : a.node > b.node ? 1 : 0));
+    supportsFinal = [...existentes, ...nuevos];
+  }
+
+  // Secciones: catalogo/obra (base) -> sinteticas VIG-<idx> (viguetas). Members: base ->
+  // viguetas PV. dist_loads: base (usuario/pp barras) -> viguetas. Cada uno solo crece si
+  // hay viguetas (regresion I3: sin paños unidireccionales, arrays base intactos).
+  const sectionsFinal: SeccionFEM[] =
+    uniSections.length > 0 ? [...sections, ...uniSections] : sections;
+  const membersFinal: MiembroFEM[] =
+    uniMembers.length > 0 ? [...members, ...uniMembers] : members;
+  const distLoadsFinal: CargaDistFEM[] =
+    uniDistLoads.length > 0 ? [...dist_loads, ...uniDistLoads] : dist_loads;
 
   const modeloFEM: ModeloFEM = {
     units: "kN-m",
     nodes: nodesFinal,
     materials: materialsFinal,
-    sections,
-    members,
+    sections: sectionsFinal,
+    members: membersFinal,
     supports: supportsFinal,
     node_loads,
-    dist_loads,
+    dist_loads: distLoadsFinal,
     pt_loads,
     combos,
     analysis,

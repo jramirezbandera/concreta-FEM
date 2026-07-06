@@ -177,3 +177,40 @@ describe("plantasConCargaSinPano (F3.4, honestidad)", () => {
     expect(plantasConCargaSinPano(m).map((p) => p.id)).toEqual(["p1"]);
   });
 });
+
+// --- F3 corte "unidireccional": el gate se extiende a losa || unidireccional -------
+describe("cargasPlanta · gate unidireccional (F3, R-5)", () => {
+  it("cargasPlantaDePano de un paño UNIDIRECCIONAL emite CM y uso (gate relajado)", () => {
+    const m = modeloConPano({ cargasMuertas: 1.5, sobrecargaUso: 2, tipoPano: "unidireccional" });
+    expect(cargasPlantaDePano(m, m.panos[0])).toEqual([
+      { case: CASE_CM_PLANTA, presion: 1.5 },
+      { case: CASE_USO_PLANTA, presion: 2 },
+    ]);
+  });
+
+  it("casesPlantaActivos cuenta el paño unidireccional (combos con gamma)", () => {
+    const m = modeloConPano({ tipoPano: "unidireccional" });
+    expect(casesPlantaActivos(m)).toEqual({ cm: true, uso: true });
+    const elu = generarCombos(m).find((c) => c.name === "ELU")!;
+    expect(elu.factors[CASE_CM_PLANTA]).toBe(GAMMA_G_DESFAV);
+    expect(elu.factors[CASE_USO_PLANTA]).toBe(GAMMA_Q_DESFAV);
+  });
+
+  it("plantasConCargaSinPano: un paño unidireccional SI cuenta como receptor -> NO aparece", () => {
+    const m = modeloConPano({ sobrecargaUso: 3, tipoPano: "unidireccional" });
+    expect(plantasConCargaSinPano(m)).toEqual([]);
+  });
+
+  it("plantasConValorNegativo: un paño unidireccional cuenta -> detecta el negativo", () => {
+    const m = modeloConPano({ cargasMuertas: -1, tipoPano: "unidireccional" });
+    expect(plantasConValorNegativo(m)).toEqual([
+      { plantaId: "p1", nombre: "Planta 1", campo: "cargasMuertas" },
+    ]);
+  });
+
+  it("reticular NO cuenta (solo losa/unidireccional): la planta con carga sigue sin receptor", () => {
+    const m = modeloConPano({ sobrecargaUso: 3, tipoPano: "reticular" });
+    expect(cargasPlantaDePano(m, m.panos[0])).toEqual([]);
+    expect(plantasConCargaSinPano(m).map((p) => p.id)).toEqual(["p1"]);
+  });
+});
