@@ -24,6 +24,7 @@ import {
   Vector3,
   Shape,
   ShapeGeometry,
+  type MeshBasicMaterial,
 } from "three";
 import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import type { Pestana } from "../../estado";
@@ -34,6 +35,11 @@ import {
 } from "./hooks/useGeometriaModelo";
 import { resolverContextoElemento } from "./hooks/resolverContextoElemento";
 import { useResaltadoSeleccion, aplicarTinte } from "./hooks/usePickingRef";
+import {
+  enfasisDePestana,
+  ENFASIS_PLENO,
+  type EnfasisPestana,
+} from "./enfasisPestana";
 import { RotulosElemento } from "./RotulosElemento";
 import { CargasDibujadas } from "./CargasDibujadas";
 
@@ -133,19 +139,77 @@ function salirHover(id: string): void {
   }
 }
 
+// --- Enfasis por pestana (UX-1.4) ---------------------------------------------
+
+// Suscripcion fina a pestanaActiva+modoVista: re-render solo al cambiar de pestana o
+// de modo (accion esporadica del usuario, aceptable). El snapshot es referencia-
+// estable (constantes congeladas de enfasisPestana.ts), requisito de
+// useSyncExternalStore para no entrar en bucle de render.
+function useEnfasisPestana(): EnfasisPestana {
+  return useSyncExternalStore(
+    (cb) => {
+      const offPestana = vistaStore.subscribe((s) => s.pestanaActiva, cb);
+      const offModo = vistaStore.subscribe((s) => s.modoVista, cb);
+      return () => {
+        offPestana();
+        offModo();
+      };
+    },
+    () =>
+      enfasisDePestana(
+        vistaStore.getState().pestanaActiva,
+        vistaStore.getState().modoVista,
+      ),
+    () => ENFASIS_PLENO,
+  );
+}
+
+// Conmuta el material del tipo ATENUADO (UX-1.4): opacidad baja y sin escribir depth
+// (el contexto gris no debe tapar lo pleno); needsUpdate porque `transparent` cambia
+// el programa del shader. Conmutacion esporadica (cambio de pestana), nunca por frame.
+function useMaterialAtenuado(
+  ref: { current: { material: unknown } | null },
+  atenuado: boolean,
+  opacidadPlena = 1,
+  opacidadAtenuada = 0.35,
+): void {
+  useEffect(() => {
+    const mat = ref.current?.material as MeshBasicMaterial | undefined;
+    if (!mat) return;
+    mat.transparent = atenuado || opacidadPlena < 1;
+    mat.opacity = atenuado ? opacidadAtenuada : opacidadPlena;
+    mat.depthWrite = !atenuado && opacidadPlena >= 1;
+    mat.needsUpdate = true;
+    invalidate();
+    // ref es estable (useRef); las opacidades son constantes por componente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atenuado]);
+}
+
 // --- Pilares (InstancedMesh) -------------------------------------------------
 
-function PilaresInstanciados({ pilares }: { pilares: GeoModelo["pilares"] }) {
+function PilaresInstanciados({
+  pilares,
+  atenuado,
+}: {
+  pilares: GeoModelo["pilares"];
+  atenuado: boolean;
+}) {
   const ref = useRef<InstancedMesh>(null);
 
   // Mapa instanceId -> id de dominio (estable por reconstruccion). Lo necesita el
   // picking (evento da instanceId) y el resaltado.
   const idPorInstancia = useMemo(() => pilares.map((p) => p.id), [pilares]);
 
-  // Colores base/hover/seleccion derivados de tokens (Spec §1.3 / §6.2).
-  const colBase = useMemo(() => colorToken("pilar"), []);
+  // Colores base/hover/seleccion derivados de tokens (Spec §1.3 / §6.2). Atenuado
+  // (UX-1.4): gris de rejilla — el tipo es contexto, no protagonista.
+  const colPleno = useMemo(() => colorToken("pilar"), []);
+  const colAtenuado = useMemo(() => colorToken("canvasGrid2"), []);
+  const colBase = atenuado ? colAtenuado : colPleno;
   const colHover = useMemo(() => colorToken("accentLine"), []);
   const colSel = useMemo(() => colorToken("accent"), []);
+
+  useMaterialAtenuado(ref, atenuado);
 
   // Coloca cada instancia (matriz de transformacion) cuando cambia la geometria.
   useEffect(() => {
@@ -176,13 +240,20 @@ function PilaresInstanciados({ pilares }: { pilares: GeoModelo["pilares"] }) {
   }, [pilares, colBase]);
 
   // Resaltado hover/seleccion via mutacion de colores de instancia (sin setState).
+  // Atenuado: siempre color base gris (ni hover ni tinte de seleccion: es contexto).
+  // colBase/atenuado viajan en depsExtra para que el pintor no quede viciado (UX-1.4).
   const aux = useMemo(() => new Color(), []);
-  useResaltadoSeleccion(ref, idPorInstancia, {
-    pintar: (i, modo) => {
-      aplicarTinte(aux, colBase, colHover, colSel, modo);
-      ref.current?.setColorAt(i, aux);
+  useResaltadoSeleccion(
+    ref,
+    idPorInstancia,
+    {
+      pintar: (i, modo) => {
+        aplicarTinte(aux, colBase, colHover, colSel, atenuado ? "base" : modo);
+        ref.current?.setColorAt(i, aux);
+      },
     },
-  });
+    [colBase, atenuado],
+  );
 
   if (pilares.length === 0) return null;
   return (
@@ -192,6 +263,7 @@ function PilaresInstanciados({ pilares }: { pilares: GeoModelo["pilares"] }) {
         // args[2] = capacidad inicial; usamos length actual (se recrea al cambiar).
         args={[undefined, undefined, Math.max(pilares.length, 1)]}
         onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+          if (atenuado) return; // contexto atenuado: no es blanco de picking (UX-1.4)
           if (!modoSeleccionActivo()) return; // deja pasar el evento a la colocacion
           e.stopPropagation();
           const id = idPorInstancia[e.instanceId ?? -1];
@@ -202,6 +274,7 @@ function PilaresInstanciados({ pilares }: { pilares: GeoModelo["pilares"] }) {
           if (id) salirHover(id);
         }}
         onClick={(e: ThreeEvent<MouseEvent>) => {
+          if (atenuado) return; // contexto atenuado: no es blanco de picking (UX-1.4)
           if (!modoSeleccionActivo()) return; // el clic debe llegar al plano (snap/iman)
           e.stopPropagation();
           const id = idPorInstancia[e.instanceId ?? -1];
@@ -289,15 +362,26 @@ function HaloPilarSeleccionado({ pilares }: { pilares: GeoModelo["pilares"] }) {
 // del nudo I al J: se lee como volumen igual que un pilar y el mismo mesh sirve de
 // blanco de picking (sin cilindro aparte). Coste O(1) en mallas/suscripciones.
 
-function VigasInstanciadas({ vigas }: { vigas: GeoModelo["vigas"] }) {
+function VigasInstanciadas({
+  vigas,
+  atenuado,
+}: {
+  vigas: GeoModelo["vigas"];
+  atenuado: boolean;
+}) {
   const ref = useRef<InstancedMesh>(null);
 
   // Mapa instanceId -> id de dominio (estable por reconstruccion): picking y resaltado.
   const idPorInstancia = useMemo(() => vigas.map((v) => v.id), [vigas]);
 
-  const colBase = useMemo(() => colorToken("viga"), []);
+  // Atenuado (UX-1.4): gris de rejilla, mismo criterio que los pilares.
+  const colPleno = useMemo(() => colorToken("viga"), []);
+  const colAtenuado = useMemo(() => colorToken("canvasGrid2"), []);
+  const colBase = atenuado ? colAtenuado : colPleno;
   const colHover = useMemo(() => colorToken("accentLine"), []);
   const colSel = useMemo(() => colorToken("accent"), []);
+
+  useMaterialAtenuado(ref, atenuado);
 
   // Coloca cada instancia (matriz de transformacion) cuando cambia la geometria. La caja
   // unitaria se escala a (ancho, largo, canto) y se orienta con el eje local Y a lo largo
@@ -339,13 +423,19 @@ function VigasInstanciadas({ vigas }: { vigas: GeoModelo["vigas"] }) {
 
   // Resaltado hover/seleccion via mutacion de colores de instancia (sin setState),
   // identico a los pilares: una sola pareja de suscripciones para todas las vigas.
+  // Atenuado: siempre base gris (ni hover ni seleccion); depsExtra evita el pintor viciado.
   const aux = useMemo(() => new Color(), []);
-  useResaltadoSeleccion(ref, idPorInstancia, {
-    pintar: (i, modo) => {
-      aplicarTinte(aux, colBase, colHover, colSel, modo);
-      ref.current?.setColorAt(i, aux);
+  useResaltadoSeleccion(
+    ref,
+    idPorInstancia,
+    {
+      pintar: (i, modo) => {
+        aplicarTinte(aux, colBase, colHover, colSel, atenuado ? "base" : modo);
+        ref.current?.setColorAt(i, aux);
+      },
     },
-  });
+    [colBase, atenuado],
+  );
 
   if (vigas.length === 0) return null;
   return (
@@ -354,6 +444,7 @@ function VigasInstanciadas({ vigas }: { vigas: GeoModelo["vigas"] }) {
         ref={ref}
         args={[undefined, undefined, Math.max(vigas.length, 1)]}
         onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+          if (atenuado) return; // contexto atenuado: no es blanco de picking (UX-1.4)
           if (!modoSeleccionActivo()) return; // deja pasar el evento a la colocacion
           e.stopPropagation();
           const id = idPorInstancia[e.instanceId ?? -1];
@@ -364,6 +455,7 @@ function VigasInstanciadas({ vigas }: { vigas: GeoModelo["vigas"] }) {
           if (id) salirHover(id);
         }}
         onClick={(e: ThreeEvent<MouseEvent>) => {
+          if (atenuado) return; // contexto atenuado: no es blanco de picking (UX-1.4)
           if (!modoSeleccionActivo()) return; // el clic debe llegar al plano (snap/iman)
           e.stopPropagation();
           const id = idPorInstancia[e.instanceId ?? -1];
@@ -390,14 +482,26 @@ function VigasInstanciadas({ vigas }: { vigas: GeoModelo["vigas"] }) {
 // pero sobre el plano de coords).
 const PANO_Z_EPS = 0.01;
 
-function PanoHuella({ pano }: { pano: GeoModelo["panos"][number] }) {
+function PanoHuella({
+  pano,
+  atenuado,
+}: {
+  pano: GeoModelo["panos"][number];
+  atenuado: boolean;
+}) {
   const ref = useRef<Mesh>(null);
   // Token propio del paño (UX-C13/G11): la huella usaba `colorToken("pilar")`, lo que
   // rompia el mapa color->elemento (§1.3). Ahora usa --pano (sage) como los pilares
-  // usan --pilar y las vigas --viga.
-  const colBase = useMemo(() => colorToken("pano"), []);
+  // usan --pilar y las vigas --viga. Atenuado (UX-1.4): gris de rejilla.
+  const colPleno = useMemo(() => colorToken("pano"), []);
+  const colAtenuado = useMemo(() => colorToken("canvasGrid2"), []);
+  const colBase = atenuado ? colAtenuado : colPleno;
   const colHover = useMemo(() => colorToken("accentLine"), []);
   const colSel = useMemo(() => colorToken("accent"), []);
+
+  // La huella ya es translucida de por si (0.3); atenuada baja a 0.12 para leerse
+  // como contexto. depthWrite ya era false en ambos casos (formula del hook).
+  useMaterialAtenuado(ref, atenuado, 0.3, 0.12);
 
   // Geometria del poligono relleno (Shape en el plano XY). Se posiciona luego a z=cota.
   const geom = useMemo(() => {
@@ -411,6 +515,7 @@ function PanoHuella({ pano }: { pano: GeoModelo["panos"][number] }) {
   useEffect(() => () => geom.dispose(), [geom]);
 
   // Color del relleno via mutacion del material (hover/seleccion), sin setState por frame.
+  // Atenuado: siempre base gris (ni hover ni seleccion, coherente con pilares/vigas).
   const aux = useMemo(() => new Color(), []);
   useEffect(() => {
     const aplicar = () => {
@@ -419,7 +524,8 @@ function PanoHuella({ pano }: { pano: GeoModelo["panos"][number] }) {
       const { seleccion, hoverId } = seleccionStore.getState();
       const sel = seleccion.includes(pano.id);
       const hov = hoverId === pano.id;
-      aplicarTinte(aux, colBase, colHover, colSel, sel ? "seleccion" : hov ? "hover" : "base");
+      const modo = atenuado ? "base" : sel ? "seleccion" : hov ? "hover" : "base";
+      aplicarTinte(aux, colBase, colHover, colSel, modo);
       const mat = m.material as { color?: Color };
       if (mat.color) mat.color.copy(aux);
       invalidate();
@@ -431,7 +537,7 @@ function PanoHuella({ pano }: { pano: GeoModelo["panos"][number] }) {
       offHover();
       offSel();
     };
-  }, [pano.id, aux, colBase, colHover, colSel]);
+  }, [pano.id, aux, colBase, colHover, colSel, atenuado]);
 
   return (
     <Bvh firstHitOnly>
@@ -440,12 +546,14 @@ function PanoHuella({ pano }: { pano: GeoModelo["panos"][number] }) {
         geometry={geom}
         position={[0, 0, pano.z + PANO_Z_EPS]}
         onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+          if (atenuado) return; // contexto atenuado: no es blanco de picking (UX-1.4)
           if (!modoSeleccionActivo()) return; // deja pasar el evento a la colocacion
           e.stopPropagation();
           entrarHover(pano.id);
         }}
         onPointerOut={() => salirHover(pano.id)}
         onClick={(e: ThreeEvent<MouseEvent>) => {
+          if (atenuado) return; // contexto atenuado: no es blanco de picking (UX-1.4)
           if (!modoSeleccionActivo()) return; // el clic debe llegar al plano (colocacion)
           e.stopPropagation();
           clicSeleccionPano(pano.id, e.shiftKey);
@@ -462,7 +570,13 @@ function PanoHuella({ pano }: { pano: GeoModelo["panos"][number] }) {
   );
 }
 
-function PanosHuella({ panos }: { panos: GeoModelo["panos"] }) {
+function PanosHuella({
+  panos,
+  atenuado,
+}: {
+  panos: GeoModelo["panos"];
+  atenuado: boolean;
+}) {
   useEffect(() => {
     invalidate();
   }, [panos]);
@@ -470,7 +584,7 @@ function PanosHuella({ panos }: { panos: GeoModelo["panos"] }) {
   return (
     <group>
       {panos.map((p) => (
-        <PanoHuella key={p.id} pano={p} />
+        <PanoHuella key={p.id} pano={p} atenuado={atenuado} />
       ))}
     </group>
   );
@@ -505,24 +619,28 @@ function useObraOculta(): boolean {
 export function GeometriaModelo() {
   const { pilares, vigas, panos } = useGeometriaModelo();
   const obraOculta = useObraOculta();
-  // Repinta al ocultar/mostrar la obra (frameloop="demand": montar/desmontar la
-  // geometria no programa frame por si solo).
+  // Enfasis por pestana (UX-1.4): la pestana activa protagoniza su tipo y atenua el
+  // resto (patron CYPECAD). Se decide aqui una vez y baja como prop a cada tipo.
+  const enfasis = useEnfasisPestana();
+  // Repinta al ocultar/mostrar la obra o cambiar el enfasis (frameloop="demand":
+  // montar/desmontar o mutar materiales no programa frame por si solo).
   useEffect(() => {
     invalidate();
-  }, [obraOculta]);
+  }, [obraOculta, enfasis]);
   if (obraOculta) return null;
   return (
     <group>
-      <PanosHuella panos={panos} />
-      <PilaresInstanciados pilares={pilares} />
+      <PanosHuella panos={panos} atenuado={enfasis.panos === "atenuado"} />
+      <PilaresInstanciados pilares={pilares} atenuado={enfasis.pilares === "atenuado"} />
       <HaloPilarSeleccionado pilares={pilares} />
-      <VigasInstanciadas vigas={vigas} />
+      <VigasInstanciadas vigas={vigas} atenuado={enfasis.vigas === "atenuado"} />
       {/* Cargas dibujadas (D7b) y rotulos de elemento (D7a): ambos SOLO en planta; cada
           componente se autooculta en 3D y deriva su geometria junto a la del modelo, nunca
           por frame (regla #11). Se montan aqui (bajo `obraOculta`) para desaparecer con la
-          obra cuando se pide "solo modelo de calculo". */}
+          obra cuando se pide "solo modelo de calculo". Los rotulos de un tipo atenuado se
+          ocultan (un rotulo a pleno color sobre geometria gris delata la costura). */}
       <CargasDibujadas />
-      <RotulosElemento />
+      <RotulosElemento enfasis={enfasis} />
     </group>
   );
 }

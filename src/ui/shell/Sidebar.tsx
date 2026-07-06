@@ -36,6 +36,14 @@ export function Sidebar() {
   // "próximamente" en el HUD).
   const modoVista = vistaStore((s) => s.modoVista);
   const setModoVista = vistaStore((s) => s.setModoVista);
+  // Alzados de consulta (UX-1.5): sub-vista de 3D con camara ortografica fija.
+  const vista3d = vistaStore((s) => s.vista3d);
+  const setVista3d = vistaStore((s) => s.setVista3d);
+  const irAAlzado = (dir: "frontal" | "lateral") => {
+    // El orden importa: setModoVista resetea vista3d a "orbita".
+    setModoVista("3d");
+    setVista3d(dir);
+  };
 
   // Contador de un tipo de elemento en el AMBITO activo (lenguaje de obra, Spec Diseno
   // UI §3.3): planta activa si la hay; si no, el total de la obra. UN solo criterio
@@ -93,8 +101,20 @@ export function Sidebar() {
         />
         <FilaArbol
           label="Vista 3D"
-          seleccionada={modoVista === "3d"}
+          seleccionada={modoVista === "3d" && vista3d === "orbita"}
           onClick={() => setModoVista("3d")}
+        />
+        {/* Alzados de consulta (UX-1.5): encuadre ortografico fijo, solo lectura
+            (el dibujo sigue siendo en planta). */}
+        <FilaArbol
+          label="Alzado frontal"
+          seleccionada={modoVista === "3d" && vista3d === "frontal"}
+          onClick={() => irAAlzado("frontal")}
+        />
+        <FilaArbol
+          label="Alzado lateral"
+          seleccionada={modoVista === "3d" && vista3d === "lateral"}
+          onClick={() => irAAlzado("lateral")}
         />
       </Seccion>
 

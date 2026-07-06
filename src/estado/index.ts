@@ -9,6 +9,7 @@ export { vistaStore } from "./vistaStore";
 export type {
   Pestana,
   ModoVista,
+  Vista3D,
   DialogoActivo,
   MagnitudDiagrama,
   MagnitudIsovalores,

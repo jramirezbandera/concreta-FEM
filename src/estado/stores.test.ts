@@ -389,6 +389,45 @@ describe("vistaStore: setters", () => {
     expect(s.combinacionActiva).toBe("ELU");
   });
 
+  // Corte UX-1.3: cambiar de pestana con una herramienta de colocacion activa la
+  // resetea a "seleccion" (evita la herramienta huerfana que bloquea el picking).
+  it("setPestanaActiva resetea la herramienta a seleccion SOLO si la pestana cambia", () => {
+    vistaStore.getState().setPestanaActiva("entradaVigas");
+    vistaStore.getState().setHerramienta("viga");
+
+    // Misma pestana: la herramienta se conserva (re-click en la solapa activa).
+    vistaStore.getState().setPestanaActiva("entradaVigas");
+    expect(vistaStore.getState().herramienta).toBe("viga");
+
+    // Pestana distinta: reset a seleccion.
+    vistaStore.getState().setPestanaActiva("entradaPilares");
+    expect(vistaStore.getState().herramienta).toBe("seleccion");
+  });
+
+  // Corte UX-1.5: alzados de consulta como sub-vista de 3D.
+  it("setModoVista resetea vista3d a orbita y la herramienta al salir de planta", () => {
+    vistaStore.getState().setModoVista("3d");
+    vistaStore.getState().setVista3d("frontal");
+    expect(vistaStore.getState().vista3d).toBe("frontal");
+
+    // Pulsar "3D" desde un alzado recupera la orbita.
+    vistaStore.getState().setModoVista("3d");
+    expect(vistaStore.getState().vista3d).toBe("orbita");
+
+    // Salir de planta con una herramienta activa la resetea (herramienta huerfana).
+    vistaStore.getState().setModoVista("planta");
+    vistaStore.getState().setHerramienta("pilar");
+    vistaStore.getState().setModoVista("3d");
+    expect(vistaStore.getState().herramienta).toBe("seleccion");
+
+    // En planta la herramienta se conserva (cambiar a planta no la roba).
+    vistaStore.getState().setModoVista("planta");
+    vistaStore.getState().setHerramienta("viga");
+    vistaStore.getState().setModoVista("planta");
+    expect(vistaStore.getState().herramienta).toBe("viga");
+    vistaStore.getState().setHerramienta("seleccion");
+  });
+
   // UX-A4: la rejilla es un flag transitorio (fuera de undo, patron de snapActivo).
   it("rejillaVisible arranca en true y toggleRejilla lo conmuta", () => {
     expect(vistaStore.getState().rejillaVisible).toBe(true);

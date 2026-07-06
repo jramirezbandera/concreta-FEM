@@ -20,11 +20,13 @@ import {
   Grid,
 } from "@react-three/drei";
 import { invalidate, useThree } from "@react-three/fiber";
-import { OrthographicCamera as OrthoCam, Vector3 } from "three";
-import { vistaStore, type ModoVista } from "../../estado";
+import { MOUSE, OrthographicCamera as OrthoCam, Vector3 } from "three";
+import { vistaStore, type ModoVista, type Vista3D } from "../../estado";
 import { colorToken, hexToken } from "./colores";
 import { GeometriaModelo } from "./GeometriaModelo";
 import { AjusteCamara3D } from "./AjusteCamara3D";
+import { AjusteCamaraAlzado } from "./AjusteCamaraAlzado";
+import type { DireccionAlzado } from "./encuadreVistas";
 import { suscribirZoom } from "./hooks/zoomBus";
 import { emitirCoords } from "./hooks/coordsBus";
 import { suscribirCaptura } from "./hooks/capturaBus";
@@ -64,6 +66,23 @@ function Camara3D() {
       fov={45}
       near={0.1}
       far={2000}
+    />
+  );
+}
+
+// Camara ortografica de ALZADO de consulta (UX-1.5): mira al edificio desde -Y
+// (frontal) o desde +X (lateral), con Z-up. Posicion/zoom iniciales nominales:
+// AjusteCamaraAlzado encuadra a los bounds reales del edificio al montar.
+function CamaraAlzado({ dir }: { dir: DireccionAlzado }) {
+  return (
+    <OrthographicCamera
+      key={`cam-alzado-${dir}`}
+      makeDefault
+      position={dir === "frontal" ? [0, -50, 0] : [50, 0, 0]}
+      zoom={40}
+      up={[0, 0, 1]}
+      near={0.1}
+      far={1000}
     />
   );
 }
@@ -210,9 +229,22 @@ function useRejillaVisible(): boolean {
   );
 }
 
+// Sub-vista de la camara 3D (UX-1.5): orbita o alzado de consulta. Mismo caracter
+// esporadico que modoVista (accion manual), re-render de la Escena aceptable.
+function useVista3d(): Vista3D {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.vista3d, cb),
+    () => vistaStore.getState().vista3d,
+    () => vistaStore.getState().vista3d,
+  );
+}
+
 export function Escena({ modoVista, overlays }: EscenaProps) {
   const esPlanta = modoVista === "planta";
   const rejillaVisible = useRejillaVisible();
+  // Alzados de consulta (UX-1.5): sub-vista de 3D. En planta se ignora (vale "orbita").
+  const vista3d = useVista3d();
+  const enAlzado = !esPlanta && vista3d !== "orbita";
 
   // Color de los ejes del gizmo desde tokens.
   const ejeColor = useMemo(
@@ -227,26 +259,59 @@ export function Escena({ modoVista, overlays }: EscenaProps) {
 
   return (
     <>
-      {esPlanta ? <CamaraPlanta /> : <Camara3D />}
+      {esPlanta ? (
+        <CamaraPlanta />
+      ) : vista3d !== "orbita" ? (
+        <CamaraAlzado dir={vista3d} />
+      ) : (
+        <Camara3D />
+      )}
 
       {/* Controles re-anclados por `key` distinta segun modo: MapControls en planta
-          (pan + zoom, sin rotar), OrbitControls en 3D (orbita completa). makeDefault
-          + onChange->invalidate para que frameloop="demand" pinte al mover. */}
+          y alzados (pan + zoom, sin rotar: encuadres fijos), OrbitControls en 3D
+          orbita. makeDefault + onChange->invalidate para que frameloop="demand"
+          pinte al mover.
+          RATON CAD (convencion universal de CAD): boton central = pan en TODOS los
+          modos (memoria muscular unica), rueda = zoom AL CURSOR (zoomToCursor de
+          three-stdlib, soporta camara orto), izquierdo reservado a herramienta/
+          seleccion en planta (antes paneaba: pisaba la convencion). El objeto
+          `mouseButtons` REEMPLAZA al default del control (R3F no mergea): se pasa
+          completo; omitir LEFT lo deshabilita. */}
       {esPlanta ? (
         <MapControls
           key="ctrl-planta"
           makeDefault
           enableRotate={false}
           screenSpacePanning
+          zoomToCursor
+          mouseButtons={{ MIDDLE: MOUSE.PAN, RIGHT: MOUSE.PAN }}
+          onChange={() => invalidate()}
+        />
+      ) : vista3d !== "orbita" ? (
+        <MapControls
+          key={`ctrl-alzado-${vista3d}`}
+          makeDefault
+          enableRotate={false}
+          screenSpacePanning
+          zoomToCursor
+          // En alzado no se dibuja: el izquierdo tambien panea (comodidad de consulta).
+          mouseButtons={{ LEFT: MOUSE.PAN, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.PAN }}
           onChange={() => invalidate()}
         />
       ) : (
-        <OrbitControls key="ctrl-3d" makeDefault onChange={() => invalidate()} />
+        <OrbitControls
+          key="ctrl-3d"
+          makeDefault
+          zoomToCursor
+          mouseButtons={{ LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.PAN, RIGHT: MOUSE.PAN }}
+          onChange={() => invalidate()}
+        />
       )}
 
-      {/* Encuadre de la camara al edificio completo (F2c). Solo en 3D: se monta al
-          entrar en 3D y reacciona al boton "Encuadrar". */}
-      {!esPlanta && <AjusteCamara3D />}
+      {/* Encuadre de la camara al edificio completo (F2c / UX-1.5): perspectiva en
+          orbita, ortografico en alzados. Ambos reaccionan al boton "Encuadrar". */}
+      {!esPlanta && vista3d === "orbita" && <AjusteCamara3D />}
+      {!esPlanta && vista3d !== "orbita" && <AjusteCamaraAlzado dir={vista3d} />}
 
       <ambientLight intensity={0.9} />
       <directionalLight position={[10, -10, 20]} intensity={0.4} />
@@ -260,10 +325,14 @@ export function Escena({ modoVista, overlays }: EscenaProps) {
       <GeometriaModelo />
       {overlays}
 
-      {/* Gizmo de orientacion (cubo/ejes) abajo-derecha dentro del canvas. */}
-      <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
-        <GizmoViewport axisColors={ejeColor} labelColor={hexToken("onAccent")} />
-      </GizmoHelper>
+      {/* Gizmo de orientacion (cubo/ejes) abajo-derecha, SOLO en 3D orbita: en planta
+          y en los alzados la orientacion es fija y el gizmo — que ademas GIRA la
+          camara al pulsarlo — solo confunde (queja directa del usuario). */}
+      {!esPlanta && !enAlzado && (
+        <GizmoHelper alignment="bottom-right" margin={[72, 72]}>
+          <GizmoViewport axisColors={ejeColor} labelColor={hexToken("onAccent")} />
+        </GizmoHelper>
+      )}
     </>
   );
 }

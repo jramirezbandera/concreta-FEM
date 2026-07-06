@@ -23,10 +23,15 @@ export interface PintorInstancias {
 // de dominio; `instanciaPorId` el inverso. Ante cada cambio de hover/seleccion
 // REPINTA TODAS las instancias segun el estado actual (recorrido completo en
 // `aplicar()`), no solo las afectadas; basta para el volumen de F1 y simplifica.
+//
+// `depsExtra`: valores capturados por el CLOSURE de `pintor` que pueden cambiar
+// entre renders (p.ej. el color base efectivo del enfasis por pestana, UX-1.4).
+// Sin ellos el efecto seguiria pintando con el pintor viciado de un render viejo.
 export function useResaltadoSeleccion(
   malla: { current: InstancedMesh | null },
   idPorInstancia: readonly string[],
   pintor: PintorInstancias,
+  depsExtra: readonly unknown[] = [],
 ): void {
   useEffect(() => {
     const instanciaPorId = new Map<string, number>();
@@ -55,9 +60,10 @@ export function useResaltadoSeleccion(
       offSel();
     };
     // idPorInstancia es estable por reconstruccion de geometria (nuevo array =>
-    // re-suscribir, correcto). pintor/malla son refs estables.
+    // re-suscribir, correcto). malla es ref estable; pintor se re-captura via
+    // depsExtra cuando su closure depende de valores cambiantes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idPorInstancia]);
+  }, [idPorInstancia, ...depsExtra]);
 }
 
 // Mezcla in-place: deja `destino` = base, salvo tinte de hover/seleccion. Helper

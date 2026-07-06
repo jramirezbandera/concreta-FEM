@@ -26,6 +26,13 @@ export type Pestana =
 
 export type ModoVista = "planta" | "3d" | "mosaico";
 
+// Sub-vista de la camara 3D (UX-1.5): "orbita" (perspectiva libre) o un ALZADO de
+// consulta (camara ortografica frontal/lateral, solo lectura: el dibujo sigue siendo
+// en planta). NO es un ModoVista nuevo a proposito: todos los checks existentes
+// `modoVista !== "planta"` dan gratis el gating correcto en alzado (sin colocacion,
+// sin calco DXF, sin rotulos).
+export type Vista3D = "orbita" | "frontal" | "lateral";
+
 // [D14 · PR3] Estado de UI del DOCK de paneles de datos. TRANSITORIO: estado de vista puro
 // (como snapActivo/rejillaVisible), NO participa en undo y se RESETEA al cambiar de obra
 // (patron resolverVistaActiva/snapActivo). Dos ejes:
@@ -139,6 +146,9 @@ interface VistaState {
   pestanaActiva: Pestana;
   plantaActivaId: string | null;
   modoVista: ModoVista;
+  // Sub-vista de la camara en modo 3D (UX-1.5): orbita o alzado de consulta.
+  // Cualquier setModoVista vuelve a "orbita" (el alzado es un encuadre puntual).
+  vista3d: Vista3D;
   combinacionActiva: string | null;
   // Dialogo modal abierto, o null si ninguno. Estado de UI puro: NO participa en
   // undo (coherente con el resto de vistaStore; ver cabecera del fichero).
@@ -240,6 +250,7 @@ interface VistaState {
   setPestanaActiva(p: Pestana): void;
   setPlantaActiva(id: string | null): void;
   setModoVista(m: ModoVista): void;
+  setVista3d(v: Vista3D): void;
   setCombinacionActiva(c: string | null): void;
   abrirDialogo(d: DialogoActivo): void;
   cerrarDialogo(): void;
@@ -300,6 +311,7 @@ export const vistaStore = create<VistaState>()(
     pestanaActiva: "entradaPilares",
     plantaActivaId: null,
     modoVista: "planta",
+    vista3d: "orbita",
     combinacionActiva: null,
     dialogoActivo: null,
     importarSolicitado: false,
@@ -354,9 +366,28 @@ export const vistaStore = create<VistaState>()(
     numModos: 6,
     modalEscala: 1,
     modalAnimando: false,
-    setPestanaActiva: (p) => set({ pestanaActiva: p }),
+    // Al cambiar de pestana, la herramienta de colocacion vuelve a "seleccion": la
+    // Colocacion* de la pestana anterior se desmonta pero una herramienta activa
+    // huerfana dejaria el picking bloqueado (modoSeleccionActivo() false) sin ningun
+    // indicio visible. Mismo criterio que el paso a 3D (Hud/SelectorModo).
+    setPestanaActiva: (p) =>
+      set((estado) =>
+        estado.pestanaActiva === p
+          ? { pestanaActiva: p }
+          : { pestanaActiva: p, herramienta: "seleccion" },
+      ),
     setPlantaActiva: (id) => set({ plantaActivaId: id }),
-    setModoVista: (m) => set({ modoVista: m }),
+    // Cambiar de modo SIEMPRE vuelve a la orbita (pulsar "3D" desde un alzado debe
+    // recuperar la perspectiva) y, al salir de planta, resetea la herramienta de
+    // colocacion (mismo criterio que setPestanaActiva: una herramienta huerfana
+    // bloquea el picking sin indicio visible; antes lo hacia solo el Hud a mano).
+    setModoVista: (m) =>
+      set((estado) => ({
+        modoVista: m,
+        vista3d: "orbita",
+        herramienta: m === "planta" ? estado.herramienta : "seleccion",
+      })),
+    setVista3d: (v) => set({ vista3d: v }),
     setCombinacionActiva: (c) => set({ combinacionActiva: c }),
     abrirDialogo: (d) => set({ dialogoActivo: d }),
     cerrarDialogo: () => set({ dialogoActivo: null }),

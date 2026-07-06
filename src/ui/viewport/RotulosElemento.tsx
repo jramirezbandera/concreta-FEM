@@ -27,6 +27,7 @@ import { Text } from "@react-three/drei";
 import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import type { Modelo } from "../../dominio";
 import { hexToken } from "./colores";
+import { ENFASIS_PLENO, type EnfasisPestana } from "./enfasisPestana";
 import { useGeometriaModelo, type GeometriaModelo } from "./hooks/useGeometriaModelo";
 import { nombreSeccion } from "./nombreSeccion";
 import {
@@ -138,7 +139,14 @@ function Rotulo({
   );
 }
 
-export function RotulosElemento() {
+// `enfasis` (UX-1.4): los rotulos de un tipo ATENUADO por la pestana activa se ocultan
+// (texto a pleno color sobre geometria gris = incoherente). Default: todo pleno, para
+// no obligar a los montajes existentes/tests a pasar el prop.
+export function RotulosElemento({
+  enfasis = ENFASIS_PLENO,
+}: {
+  enfasis?: EnfasisPestana;
+} = {}) {
   const enPlanta = useEnPlanta();
   const geo = useGeometriaModelo();
   const seleccion = useSeleccion();
@@ -153,22 +161,24 @@ export function RotulosElemento() {
 
   const selSet = useMemo(() => new Set(seleccion), [seleccion]);
 
-  // Pinta un frame al cambiar etiquetas/seleccion/visibilidad (frameloop="demand": montar
-  // texto o cambiar su color no programa frame por si solo).
+  // Pinta un frame al cambiar etiquetas/seleccion/visibilidad/enfasis (frameloop=
+  // "demand": montar texto o cambiar su color no programa frame por si solo).
   useEffect(() => {
     invalidate();
-  }, [pilares, vigas, selSet, enPlanta]);
+  }, [pilares, vigas, selSet, enPlanta, enfasis]);
 
   if (!enPlanta) return null;
 
   return (
     <group>
-      {pilares.map((e) => (
-        <Rotulo key={e.id} etiqueta={e} seleccionado={selSet.has(e.id)} />
-      ))}
-      {vigas.map((e) => (
-        <Rotulo key={e.id} etiqueta={e} seleccionado={selSet.has(e.id)} />
-      ))}
+      {enfasis.pilares === "pleno" &&
+        pilares.map((e) => (
+          <Rotulo key={e.id} etiqueta={e} seleccionado={selSet.has(e.id)} />
+        ))}
+      {enfasis.vigas === "pleno" &&
+        vigas.map((e) => (
+          <Rotulo key={e.id} etiqueta={e} seleccionado={selSet.has(e.id)} />
+        ))}
     </group>
   );
 }
