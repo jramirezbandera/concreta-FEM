@@ -1,39 +1,73 @@
-import { FilaArbol, SeccionColapsable } from "../primitivas";
+import type { CapaVista } from "../../estado";
 import { modeloStore, vistaStore } from "../../estado";
-import {
-  pilaresDePlanta,
-  vigasDePlanta,
-  panosDePlanta,
-} from "../../dominio";
+import { panosDePlanta, pilaresDePlanta, vigasDePlanta } from "../../dominio";
+import { FilaArbol, SeccionColapsable } from "../primitivas";
+import { emitirEncuadre } from "../viewport/hooks/encuadreBus";
+import { ArbolObra } from "./ArbolObra";
 
-// Sidebar / arbol de obra (Spec Diseno UI §3.3). Secciones colapsables via la primitiva
-// compartida SeccionColapsable (D14 · PR3: DRY — antes tenia un `Seccion` local con Radix
-// Collapsible duplicado). Lenguaje de obra SIEMPRE: nada de nodos/members (CLAUDE §17).
-// Solo lectura del modelo + setters de vistaStore. El shell usa estado reactivo normal
+// Sidebar (Spec Diseno UI §3.3, rediseno UX-3). Tres secciones, todas ACCIONABLES
+// (la auditoria UX-A7/A8 enterro las filas muertas):
+//   1. Vistas: espejo real de modoVista/vista3d (planta, 3D, alzados) + Encuadrar.
+//   2. Capas:  visibilidad por capa del lienzo (pilares, vigas, paños, cargas,
+//              rotulos, plantilla DXF, rejilla) — spec §3.3 "visibilidad por capa".
+//   3. Arbol de obra: plantas -> elementos, sincronizado con el lienzo (UX-3.2).
+// Lenguaje de obra SIEMPRE: nada de nodos/members (CLAUDE §17). Solo lectura del
+// modelo + setters de vistaStore/seleccionStore; el shell usa estado reactivo normal
 // (no esta en el bucle de render del viewport).
-//
-// Sin grupos (F3.4): el arbol lista las plantas del edificio directamente, de mayor
-// a menor cota (orden CYPECAD descendente).
 
-// Alias fino para conservar el JSX legible (<Seccion titulo=…>) tras adoptar la primitiva.
+// Alias fino para conservar el JSX legible (<Seccion titulo=…>).
 const Seccion = SeccionColapsable;
 
+// Fila de capa: toggle de visibilidad con "ojo" + swatch semantico + contador chip.
+// Boton nativo (aria-pressed = visible); el glifo de ojo es texto (patron ToolsRail,
+// sin dependencias de iconos).
+function FilaCapa({
+  etiqueta,
+  visible,
+  onToggle,
+  swatch,
+  contador,
+}: {
+  etiqueta: string;
+  visible: boolean;
+  onToggle: () => void;
+  swatch?: string;
+  contador?: number;
+}) {
+  return (
+    <button
+      type="button"
+      className={`cx-row cx-row--btn cx-capa${visible ? "" : " cx-capa--oculta"}`}
+      aria-pressed={visible}
+      title={visible ? `Ocultar ${etiqueta.toLowerCase()}` : `Mostrar ${etiqueta.toLowerCase()}`}
+      onClick={onToggle}
+    >
+      <span className="cx-capa__ojo" aria-hidden="true">
+        {visible ? "◉" : "○"}
+      </span>
+      {swatch && (
+        <span
+          className="cx-row__swatch"
+          style={{ backgroundColor: swatch }}
+          aria-hidden="true"
+        />
+      )}
+      <span className="cx-row__label">{etiqueta}</span>
+      {contador !== undefined && (
+        <span className="cx-row__count mono">{contador}</span>
+      )}
+    </button>
+  );
+}
+
 export function Sidebar() {
-  // Lectura del modelo: campos sueltos via selectores. El arbol re-renderiza al
-  // editar la obra (aceptable; el shell no es alta frecuencia).
-  // El modelo completo: lo necesitamos para contar pilares por ambito (helpers de
-  // dominio). El selector devuelve la misma referencia salvo que la obra cambie,
-  // asi que el arbol solo re-renderiza al editar el modelo (no en alta frecuencia).
+  // Lectura del modelo: el selector devuelve la misma referencia salvo edicion de la
+  // obra, asi que el sidebar solo re-renderiza al editar (no alta frecuencia).
   const modelo = modeloStore((s) => s.modelo);
-  const plantas = modelo.plantas;
 
   const plantaActivaId = vistaStore((s) => s.plantaActivaId);
-  const setPlantaActiva = vistaStore((s) => s.setPlantaActiva);
   const abrirDialogo = vistaStore((s) => s.abrirDialogo);
   // [D11a] Conmutacion de vista desde el arbol (espejo del selector 2D/3D del HUD).
-  // "Planta" -> modoVista "planta"; "Vista 3D" -> "3d". La fila activa se resalta
-  // (patron FilaArbol `seleccionada`). Mosaico NO se ofrece aqui (sigue
-  // "próximamente" en el HUD).
   const modoVista = vistaStore((s) => s.modoVista);
   const setModoVista = vistaStore((s) => s.setModoVista);
   // Alzados de consulta (UX-1.5): sub-vista de 3D con camara ortografica fija.
@@ -45,55 +79,27 @@ export function Sidebar() {
     setVista3d(dir);
   };
 
-  // Contador de un tipo de elemento en el AMBITO activo (lenguaje de obra, Spec Diseno
-  // UI §3.3): planta activa si la hay; si no, el total de la obra. UN solo criterio
-  // para pilares, vigas y paños (auditoria UX-A8). Conteo derivado en render: barato
-  // y siempre coherente con el modelo.
+  // Capas (UX-3.1): ausencia de clave = visible. La rejilla conserva su flag propio.
+  const capasOcultas = vistaStore((s) => s.capasOcultas);
+  const toggleCapa = vistaStore((s) => s.toggleCapa);
+  const rejillaVisible = vistaStore((s) => s.rejillaVisible);
+  const toggleRejilla = vistaStore((s) => s.toggleRejilla);
+  const numPlantillas = vistaStore((s) => s.plantillas).length;
+  const capaVisible = (c: CapaVista): boolean => capasOcultas[c] !== true;
+
+  // Contador de un tipo en el AMBITO activo (planta activa si la hay; si no, la
+  // obra), mismo criterio que la auditoria UX-A8. Derivado en render: barato.
   const contarEnAmbito = (
     porPlanta: (m: typeof modelo, plantaId: string) => Array<{ id: string }>,
     totalObra: number,
   ): number => {
-    if (plantaActivaId) {
-      return porPlanta(modelo, plantaActivaId).length;
-    }
+    if (plantaActivaId) return porPlanta(modelo, plantaActivaId).length;
     return totalObra;
   };
 
-  const numPilares = contarEnAmbito(pilaresDePlanta, modelo.pilares.length);
-  const numVigas = contarEnAmbito(vigasDePlanta, modelo.vigas.length);
-  const numPanos = contarEnAmbito(panosDePlanta, modelo.panos.length);
-
-  // Plantas de mayor a menor cota (orden CYPECAD descendente).
-  const plantasDesc = plantas.slice().sort((a, b) => b.cota - a.cota);
-
   return (
     <aside className="cx-sidebar" aria-label="Árbol de obra">
-      <Seccion titulo="Plantas">
-        {plantasDesc.length === 0 ? (
-          <div className="cx-menu-empty">Sin plantas definidas</div>
-        ) : (
-          plantasDesc.map((planta) => (
-            <FilaArbol
-              key={planta.id}
-              label={planta.nombre}
-              contador={planta.cota.toFixed(2)}
-              seleccionada={planta.id === plantaActivaId}
-              onClick={() => setPlantaActiva(planta.id)}
-            />
-          ))
-        )}
-        {/* Acceso al dialogo de Plantas (feature-10/F3.4): crear/editar la
-            estructura de la obra sin pasar por la menubar. */}
-        <FilaArbol
-          label="Gestionar plantas…"
-          onClick={() => abrirDialogo("plantas")}
-        />
-      </Seccion>
-
-      <Seccion titulo="Vistas" defaultAbierta={false}>
-        {/* [D11a] Filas accionables: espejo de setModoVista. La activa se resalta
-            (patron FilaArbol `seleccionada`). Mosaico no se ofrece (sigue en el HUD
-            como "próximamente"). */}
+      <Seccion titulo="Vistas">
         <FilaArbol
           label="Planta"
           seleccionada={modoVista === "planta"}
@@ -116,30 +122,65 @@ export function Sidebar() {
           seleccionada={modoVista === "3d" && vista3d === "lateral"}
           onClick={() => irAAlzado("lateral")}
         />
+        <FilaArbol label="Encuadrar la obra" onClick={() => emitirEncuadre()} />
       </Seccion>
 
-      <Seccion titulo="Elementos propios">
-        {/* Filas-dato (swatch + contador): informativas, no pulsables. */}
-        <FilaArbol
-          label="Pilares"
+      <Seccion titulo="Capas">
+        {/* Visibilidad por capa (UX-3.1, spec §3.3). Una capa oculta GANA al enfasis
+            por pestana; no toca la Capa 1 ni el calculo. */}
+        <FilaCapa
+          etiqueta="Pilares"
           swatch="var(--pilar)"
-          contador={numPilares}
-          interactiva={false}
+          contador={contarEnAmbito(pilaresDePlanta, modelo.pilares.length)}
+          visible={capaVisible("pilares")}
+          onToggle={() => toggleCapa("pilares")}
         />
-        <FilaArbol
-          label="Vigas"
+        <FilaCapa
+          etiqueta="Vigas"
           swatch="var(--viga)"
-          contador={numVigas}
-          interactiva={false}
+          contador={contarEnAmbito(vigasDePlanta, modelo.vigas.length)}
+          visible={capaVisible("vigas")}
+          onToggle={() => toggleCapa("vigas")}
         />
-        {/* Paños (forjados, F3): mismo criterio de ambito que pilares/vigas. Swatch
-            con el token del pilar (no hay --pano dedicado; PanoHuella pinta la huella
-            con --pilar, asi el arbol es coherente con el lienzo). */}
+        <FilaCapa
+          etiqueta="Paños"
+          swatch="var(--pano)"
+          contador={contarEnAmbito(panosDePlanta, modelo.panos.length)}
+          visible={capaVisible("panos")}
+          onToggle={() => toggleCapa("panos")}
+        />
+        <FilaCapa
+          etiqueta="Cargas"
+          visible={capaVisible("cargas")}
+          onToggle={() => toggleCapa("cargas")}
+        />
+        <FilaCapa
+          etiqueta="Rótulos"
+          visible={capaVisible("rotulos")}
+          onToggle={() => toggleCapa("rotulos")}
+        />
+        <FilaCapa
+          etiqueta="Plantillas DXF"
+          contador={numPlantillas}
+          visible={capaVisible("plantillas")}
+          onToggle={() => toggleCapa("plantillas")}
+        />
+        {/* La rejilla ya tenia flag propio (ToolsRail); esta fila lo REFLEJA para que
+            el panel de capas sea el inventario completo de lo que se dibuja. */}
+        <FilaCapa
+          etiqueta="Rejilla"
+          visible={rejillaVisible}
+          onToggle={toggleRejilla}
+        />
+      </Seccion>
+
+      <Seccion titulo="Árbol de obra">
+        <ArbolObra />
+        {/* Acceso al dialogo de Plantas (feature-10/F3.4): crear/editar la estructura
+            de la obra sin pasar por la menubar. */}
         <FilaArbol
-          label="Paños"
-          swatch="var(--pilar)"
-          contador={numPanos}
-          interactiva={false}
+          label="Gestionar plantas…"
+          onClick={() => abrirDialogo("plantas")}
         />
       </Seccion>
     </aside>

@@ -77,6 +77,19 @@ export type DialogoActivo =
 // vigas con clic; "pano" coloca losas por DOS clics (rectangulo) en planta. Estado de UI.
 export type Herramienta = "seleccion" | "pilar" | "viga" | "pano";
 
+// CAPAS de visibilidad del lienzo (UX-3.1, spec §3.3 "Elementos propios: visibilidad
+// por capa"). Gobiernan que se DIBUJA (no que existe): ocultar una capa no toca la
+// Capa 1 ni el calculo. PRECEDENCIA sobre el enfasis por pestana (UX-1.4): una capa
+// oculta gana siempre; el enfasis solo modula lo visible. La rejilla conserva su flag
+// propio (rejillaVisible); su fila en el panel de capas lo refleja.
+export type CapaVista =
+  | "pilares"
+  | "vigas"
+  | "panos"
+  | "cargas"
+  | "rotulos"
+  | "plantillas";
+
 // Magnitud que pinta el diagrama por barra en la pestana Resultados (feature-14).
 // Mapea a los `*_array()` de PyNite: axil N, cortante Vy, flector Mz, flecha dy.
 // Identificadores en ingles tecnico; las etiquetas visibles las pone la UI.
@@ -203,6 +216,10 @@ interface VistaState {
   // con orto off, Shift lo fuerza; con orto on, Shift lo suelta). Toggle del
   // ToolsRail; estado de UI puro, fuera de undo.
   ortoActivo: boolean;
+  // Capas OCULTAS del lienzo (UX-3.1): ausencia de clave = capa visible (default).
+  // Mapa parcial (no booleans sueltos) para iterar el panel de capas con un solo
+  // origen. Estado de UI puro, fuera de undo; se resetea al cambiar de obra.
+  capasOcultas: Partial<Record<CapaVista, boolean>>;
   // Overlay de CENTRO DE MASAS (F2.4, D-diseño-1). Toggle de ayuda de modelado:
   // dibuja el marcador ⊕ del CM de la planta activa + un panel HUD con coords/peso.
   // Apagado por defecto (regla de subtraccion: nunca siempre-visible). Disponible en
@@ -278,6 +295,9 @@ interface VistaState {
   setPasoRejilla(paso: number): void;
   setOrtoActivo(b: boolean): void;
   toggleOrto(): void;
+  setCapaVisible(capa: CapaVista, visible: boolean): void;
+  toggleCapa(capa: CapaVista): void;
+  resetCapas(): void;
   // --- Dock UI (D14 · PR3) ---
   // Colapso del dock entero (D14e). setDockColapsado fija; toggleDockColapsado conmuta.
   setDockColapsado(b: boolean): void;
@@ -365,6 +385,7 @@ export const vistaStore = create<VistaState>()(
     rejillaVisible: true,
     pasoRejilla: 0.5,
     ortoActivo: false,
+    capasOcultas: {},
     dockUI: dockUIInicial(),
     mostrarCentroMasa: false,
     mostrarCentroRigidez: false,
@@ -428,6 +449,23 @@ export const vistaStore = create<VistaState>()(
       ),
     setOrtoActivo: (b) => set({ ortoActivo: b }),
     toggleOrto: () => set((estado) => ({ ortoActivo: !estado.ortoActivo })),
+    // Capas (UX-3.1): `visible=true` BORRA la clave (ausencia = visible) para que el
+    // mapa no acumule claves muertas y "todo visible" siga siendo el objeto vacio.
+    setCapaVisible: (capa, visible) =>
+      set((estado) => {
+        const capasOcultas = { ...estado.capasOcultas };
+        if (visible) delete capasOcultas[capa];
+        else capasOcultas[capa] = true;
+        return { capasOcultas };
+      }),
+    toggleCapa: (capa) =>
+      set((estado) => {
+        const capasOcultas = { ...estado.capasOcultas };
+        if (capasOcultas[capa] === true) delete capasOcultas[capa];
+        else capasOcultas[capa] = true;
+        return { capasOcultas };
+      }),
+    resetCapas: () => set({ capasOcultas: {} }),
     // --- Dock UI (D14 · PR3) ---
     setDockColapsado: (b) =>
       set((estado) => ({ dockUI: { ...estado.dockUI, dockColapsado: b } })),

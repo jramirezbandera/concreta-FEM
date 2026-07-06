@@ -11,9 +11,9 @@ import { useEffect } from "react";
 import { invalidate, useThree } from "@react-three/fiber";
 import { OrthographicCamera, Vector3 } from "three";
 import { modeloStore } from "../../estado";
-import { boundsEdificio } from "./boundsEdificio";
+import { boundsEdificio, boundsElemento } from "./boundsEdificio";
 import { encuadreAlzado, type DireccionAlzado } from "./encuadreVistas";
-import { suscribirEncuadre } from "./hooks/encuadreBus";
+import { suscribirEncuadre, type ObjetivoEncuadre } from "./hooks/encuadreBus";
 
 // Interfaz minima de los controles (target + update), como en AjusteCamara3D.
 interface ControlesConTarget {
@@ -30,9 +30,13 @@ export function AjusteCamaraAlzado({ dir }: { dir: DireccionAlzado }) {
 
   useEffect(() => {
     if (!controls || !(camera instanceof OrthographicCamera)) return;
-    const ajustar = () => {
-      const b = boundsEdificio(modeloStore.getState().modelo);
-      if (!b) return; // modelo sin geometria: no mover la camara (mismo guard que 3D)
+    const ajustar = (obj: ObjetivoEncuadre = { objetivo: "edificio" }) => {
+      const modelo = modeloStore.getState().modelo;
+      const b =
+        obj.objetivo === "elemento"
+          ? boundsElemento(modelo, obj.id)
+          : boundsEdificio(modelo);
+      if (!b) return; // sin geometria / id roto: no mover la camara (mismo guard que 3D)
       const e = encuadreAlzado(b, dir, { w: size.width, h: size.height });
       camera.position.set(e.position[0], e.position[1], e.position[2]);
       camera.up.set(0, 0, 1);

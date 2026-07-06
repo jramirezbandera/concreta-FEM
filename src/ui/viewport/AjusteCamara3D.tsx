@@ -14,8 +14,12 @@ import { useEffect } from "react";
 import { invalidate, useThree } from "@react-three/fiber";
 import { PerspectiveCamera, Vector3 } from "three";
 import { modeloStore } from "../../estado";
-import { boundsEdificio, type BoundsEdificio } from "./boundsEdificio";
-import { suscribirEncuadre } from "./hooks/encuadreBus";
+import {
+  boundsEdificio,
+  boundsElemento,
+  type BoundsEdificio,
+} from "./boundsEdificio";
+import { suscribirEncuadre, type ObjetivoEncuadre } from "./hooks/encuadreBus";
 
 // Interfaz minima de los OrbitControls que necesitamos (target + update). Evita
 // arrastrar el tipo completo de three-stdlib/drei.
@@ -59,13 +63,19 @@ export function AjusteCamara3D() {
 
   useEffect(() => {
     if (!controls || !(camera instanceof PerspectiveCamera)) return;
-    const ajustar = () => {
-      const b = boundsEdificio(modeloStore.getState().modelo);
-      if (!b) return; // modelo sin geometria: no mover la camara (G3)
+    // Sin payload = edificio completo (montaje / boton "Encuadrar"); con
+    // { objetivo: "elemento" } (doble clic en el arbol, UX-3.2) encuadra ese elemento.
+    const ajustar = (obj: ObjetivoEncuadre = { objetivo: "edificio" }) => {
+      const modelo = modeloStore.getState().modelo;
+      const b =
+        obj.objetivo === "elemento"
+          ? boundsElemento(modelo, obj.id)
+          : boundsEdificio(modelo);
+      if (!b) return; // sin geometria / id roto: no mover la camara (G3)
       encuadrar(camera, controls, b);
     };
     ajustar(); // al entrar en 3D (montaje) / cuando los controles ya existen
-    return suscribirEncuadre(ajustar); // y cuando el usuario pulse "Encuadrar"
+    return suscribirEncuadre(ajustar); // y cuando el usuario pida encuadrar
   }, [camera, controls]);
 
   return null;

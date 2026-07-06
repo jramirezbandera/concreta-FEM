@@ -45,5 +45,13 @@ export function resolverContextoElemento(
     return { plantaActivaId: planta.id };
   }
 
-  return null; // ni pilar ni viga con ese id
+  // Paño (UX-3.2, arbol de obra): directo por su plantaId, como la viga.
+  const pano = modelo.panos.find((p) => p.id === elementoId);
+  if (pano) {
+    const planta = plantaPorId(modelo, pano.plantaId);
+    if (!planta) return null; // planta huerfana
+    return { plantaActivaId: planta.id };
+  }
+
+  return null; // ningun elemento de obra con ese id
 }

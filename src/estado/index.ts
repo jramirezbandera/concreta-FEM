@@ -20,6 +20,7 @@ export type {
 export { claveSeccionDock } from "./vistaStore";
 export type {
   Herramienta,
+  CapaVista,
   DefaultsPilar,
   DefaultsViga,
   DefaultsCarga,

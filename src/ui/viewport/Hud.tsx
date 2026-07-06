@@ -164,8 +164,6 @@ function SelectorModo() {
 }
 
 function ControlesZoom() {
-  // El boton "Encuadrar" solo tiene sentido en 3D (reencuadra el edificio completo).
-  const enPleno = useVista((s) => s.modoVista) !== "planta";
   return (
     <div className="cx-float cx-float--bare cx-zoom">
       <Boton variante="ghost" aria-label="Acercar" onClick={() => emitirZoom("in")}>
@@ -174,16 +172,16 @@ function ControlesZoom() {
       <Boton variante="ghost" aria-label="Alejar" onClick={() => emitirZoom("out")}>
         −
       </Boton>
-      {enPleno && (
-        <Boton
-          variante="ghost"
-          aria-label="Encuadrar edificio"
-          title="Encuadrar el edificio"
-          onClick={() => emitirEncuadre()}
-        >
-          ⤢
-        </Boton>
-      )}
+      {/* "Encuadrar" funciona en TODAS las vistas desde UX-3.2 (en planta lo atiende
+          AjusteCamaraPlanta, bajo demanda). */}
+      <Boton
+        variante="ghost"
+        aria-label="Encuadrar edificio"
+        title="Encuadrar el edificio"
+        onClick={() => emitirEncuadre()}
+      >
+        ⤢
+      </Boton>
     </div>
   );
 }

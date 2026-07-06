@@ -76,3 +76,71 @@ export function boundsEdificio(modelo: Modelo): BoundsEdificio | null {
   const radio = Math.max(semidiag, RADIO_MIN);
   return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ], centro, radio };
 }
+
+// Caja envolvente de UN elemento de obra (UX-3.2, doble clic en el arbol del
+// Sidebar): mismos puntos que proyecta la geometria para ese elemento. null si el
+// id no existe o sus referencias estan rotas (el llamador no mueve la camara).
+export function boundsElemento(modelo: Modelo, id: string): BoundsEdificio | null {
+  const cotaPorPlanta = new Map(modelo.plantas.map((p) => [p.id, p.cota]));
+  const puntos: Array<[number, number, number]> = [];
+
+  const pilar = modelo.pilares.find((p) => p.id === id);
+  if (pilar) {
+    for (const plantaId of [pilar.plantaInicial, pilar.plantaFinal]) {
+      const z = cotaPorPlanta.get(plantaId);
+      if (z !== undefined) puntos.push([pilar.x, pilar.y, z]);
+    }
+  }
+
+  const viga = modelo.vigas.find((v) => v.id === id);
+  if (viga) {
+    const z = cotaPorPlanta.get(viga.plantaId) ?? 0;
+    const nudoPorId = new Map(modelo.nudos.map((n) => [n.id, n]));
+    for (const nudoId of [viga.nudoI, viga.nudoJ]) {
+      const n = nudoPorId.get(nudoId);
+      if (n) puntos.push([n.x, n.y, z]);
+    }
+  }
+
+  const pano = modelo.panos.find((p) => p.id === id);
+  if (pano) {
+    const z = cotaPorPlanta.get(pano.plantaId) ?? 0;
+    const nudoPorId = new Map(modelo.nudos.map((n) => [n.id, n]));
+    for (const nudoId of pano.perimetro) {
+      const n = nudoPorId.get(nudoId);
+      if (n) puntos.push([n.x, n.y, z]);
+    }
+  }
+
+  if (puntos.length === 0) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (const [x, y, z] of puntos) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (z < minZ) minZ = z;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+    if (z > maxZ) maxZ = z;
+  }
+  if (!Number.isFinite(minX)) return null; // todos los puntos eran no finitos
+
+  const centro: [number, number, number] = [
+    (minX + maxX) / 2,
+    (minY + maxY) / 2,
+    (minZ + maxZ) / 2,
+  ];
+  const semidiag = Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) / 2;
+  return {
+    min: [minX, minY, minZ],
+    max: [maxX, maxY, maxZ],
+    centro,
+    radio: Math.max(semidiag, RADIO_MIN),
+  };
+}

@@ -27,7 +27,7 @@ import {
   type MeshBasicMaterial,
 } from "three";
 import { modeloStore, seleccionStore, vistaStore } from "../../estado";
-import type { Pestana } from "../../estado";
+import type { CapaVista, Pestana } from "../../estado";
 import { colorToken, hexToken } from "./colores";
 import {
   useGeometriaModelo,
@@ -161,6 +161,17 @@ function useEnfasisPestana(): EnfasisPestana {
         vistaStore.getState().modoVista,
       ),
     () => ENFASIS_PLENO,
+  );
+}
+
+// Capas de visibilidad (UX-3.1): suscripcion fina a capasOcultas (referencia nueva
+// solo al conmutar una capa, accion esporadica del usuario). PRECEDENCIA: una capa
+// oculta desmonta su tipo entero; el enfasis por pestana solo modula lo visible.
+function useCapasOcultas(): Partial<Record<CapaVista, boolean>> {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.capasOcultas, cb),
+    () => vistaStore.getState().capasOcultas,
+    () => vistaStore.getState().capasOcultas,
   );
 }
 
@@ -622,25 +633,39 @@ export function GeometriaModelo() {
   // Enfasis por pestana (UX-1.4): la pestana activa protagoniza su tipo y atenua el
   // resto (patron CYPECAD). Se decide aqui una vez y baja como prop a cada tipo.
   const enfasis = useEnfasisPestana();
-  // Repinta al ocultar/mostrar la obra o cambiar el enfasis (frameloop="demand":
+  // Capas de visibilidad (UX-3.1): una capa oculta DESMONTA su tipo (gana al enfasis).
+  const capas = useCapasOcultas();
+  // Repinta al ocultar/mostrar la obra o cambiar enfasis/capas (frameloop="demand":
   // montar/desmontar o mutar materiales no programa frame por si solo).
   useEffect(() => {
     invalidate();
-  }, [obraOculta, enfasis]);
+  }, [obraOculta, enfasis, capas]);
   if (obraOculta) return null;
   return (
     <group>
-      <PanosHuella panos={panos} atenuado={enfasis.panos === "atenuado"} />
-      <PilaresInstanciados pilares={pilares} atenuado={enfasis.pilares === "atenuado"} />
-      <HaloPilarSeleccionado pilares={pilares} />
-      <VigasInstanciadas vigas={vigas} atenuado={enfasis.vigas === "atenuado"} />
+      {capas.panos !== true && (
+        <PanosHuella panos={panos} atenuado={enfasis.panos === "atenuado"} />
+      )}
+      {capas.pilares !== true && (
+        <>
+          <PilaresInstanciados
+            pilares={pilares}
+            atenuado={enfasis.pilares === "atenuado"}
+          />
+          <HaloPilarSeleccionado pilares={pilares} />
+        </>
+      )}
+      {capas.vigas !== true && (
+        <VigasInstanciadas vigas={vigas} atenuado={enfasis.vigas === "atenuado"} />
+      )}
       {/* Cargas dibujadas (D7b) y rotulos de elemento (D7a): ambos SOLO en planta; cada
           componente se autooculta en 3D y deriva su geometria junto a la del modelo, nunca
           por frame (regla #11). Se montan aqui (bajo `obraOculta`) para desaparecer con la
           obra cuando se pide "solo modelo de calculo". Los rotulos de un tipo atenuado se
-          ocultan (un rotulo a pleno color sobre geometria gris delata la costura). */}
-      <CargasDibujadas />
-      <RotulosElemento enfasis={enfasis} />
+          ocultan (un rotulo a pleno color sobre geometria gris delata la costura); las
+          capas "cargas"/"rotulos" (UX-3.1) los desmontan del todo. */}
+      {capas.cargas !== true && <CargasDibujadas />}
+      {capas.rotulos !== true && <RotulosElemento enfasis={enfasis} />}
     </group>
   );
 }

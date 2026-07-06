@@ -1,12 +1,13 @@
-// Tests de la Sidebar (arbol de obra, Spec Diseno UI §3.3). RTL en el project
+// Tests de la Sidebar (rediseno UX-3, Spec Diseno UI §3.3). RTL en el project
 // `jsdom`. Stores Zustand = singletons de modulo -> reset en beforeEach (igual que
-// Shell.test.tsx). Foco: la fila "Pilares" de "Elementos propios" muestra el
-// contador del AMBITO activo (planta activa, si no la obra). Sin grupos (F3.4).
+// Shell.test.tsx). Foco: las filas de CAPA (Pilares/Vigas/Paños) muestran el
+// contador del AMBITO activo (planta activa, si no la obra) y conmutan la
+// visibilidad (UX-3.1); la seccion Vistas es espejo real de modoVista/vista3d.
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
-import { modeloStore, vistaStore } from "../../estado";
+import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import { crearModeloVacio, type Modelo } from "../../dominio";
 import { SCHEMA_VERSION } from "../../dominio";
 
@@ -75,6 +76,8 @@ beforeEach(() => {
   modeloStore.getState().cargarModelo(crearModeloVacio());
   vistaStore.getState().setPlantaActiva(null);
   vistaStore.getState().setModoVista("planta");
+  vistaStore.getState().resetCapas();
+  seleccionStore.getState().limpiar();
 });
 
 // Localiza la fila de un elemento por su etiqueta y devuelve su contador.
@@ -87,7 +90,7 @@ function contadorPilares(): string {
   return contadorDe("Pilares");
 }
 
-describe("Sidebar: fila Pilares (Elementos propios)", () => {
+describe("Sidebar: fila Pilares (Capas)", () => {
   it("muestra el total de la obra cuando no hay planta activa", () => {
     modeloStore.getState().cargarModelo(modeloPrueba());
     render(<Sidebar />);
@@ -120,14 +123,41 @@ describe("Sidebar: fila Pilares (Elementos propios)", () => {
     expect(contadorPilares()).toBe("0");
   });
 
-  it("la fila Pilares no es interactiva (dato, no accion)", () => {
+  // UX-3.1: la fila deja de ser un dato inerte — es el TOGGLE de la capa.
+  it("la fila Pilares es un toggle de capa (boton con aria-pressed)", () => {
     modeloStore.getState().cargarModelo(modeloPrueba());
     render(<Sidebar />);
     const fila = screen.getByText("Pilares").closest(".cx-row") as HTMLElement;
-    // Etiqueta inerte: <div> con .cx-row--label, sin role button.
-    expect(fila.tagName).toBe("DIV");
-    expect(fila.classList.contains("cx-row--label")).toBe(true);
-    expect(within(fila).queryByRole("button")).toBeNull();
+    expect(fila.tagName).toBe("BUTTON");
+    expect(fila.getAttribute("aria-pressed")).toBe("true"); // visible por defecto
+  });
+});
+
+// UX-3.1: pulsar una fila de capa oculta/muestra ese tipo en el lienzo (store).
+describe("Sidebar: capas de visibilidad (UX-3.1)", () => {
+  it("pulsar la fila Vigas conmuta capasOcultas.vigas y el aria-pressed", async () => {
+    const user = userEvent.setup();
+    modeloStore.getState().cargarModelo(modeloPrueba());
+    render(<Sidebar />);
+    const fila = screen.getByText("Vigas").closest(".cx-row") as HTMLElement;
+
+    await user.click(fila);
+    expect(vistaStore.getState().capasOcultas.vigas).toBe(true);
+    expect(fila.getAttribute("aria-pressed")).toBe("false");
+
+    await user.click(fila);
+    expect(vistaStore.getState().capasOcultas.vigas).toBeUndefined();
+    expect(fila.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("la fila Rejilla refleja y conmuta el flag historico rejillaVisible", async () => {
+    const user = userEvent.setup();
+    vistaStore.getState().setRejillaVisible(true);
+    render(<Sidebar />);
+    const fila = screen.getByText("Rejilla").closest(".cx-row") as HTMLElement;
+    await user.click(fila);
+    expect(vistaStore.getState().rejillaVisible).toBe(false);
+    vistaStore.getState().setRejillaVisible(true);
   });
 });
 
@@ -167,19 +197,13 @@ describe("Sidebar: filas Vigas y Paños por ambito (UX-A8)", () => {
   });
 });
 
-// [D11a] Seccion "Vistas": filas accionables (espejo de setModoVista), la activa
-// resaltada; Mosaico NO se ofrece aqui. La seccion arranca colapsada -> se abre antes
-// de tocar las filas (Radix Collapsible no monta el contenido cerrado).
-describe("Sidebar: seccion Vistas (D11a)", () => {
-  async function abrirVistas(user: ReturnType<typeof userEvent.setup>) {
-    // La cabecera-trigger de la seccion "Vistas" la despliega.
-    await user.click(screen.getByRole("button", { name: /Vistas/i }));
-  }
-
+// [D11a + UX-1.5] Seccion "Vistas": filas accionables (espejo de setModoVista y de
+// vista3d para los alzados), la activa resaltada; Mosaico NO se ofrece aqui. La
+// seccion arranca ABIERTA desde el rediseno UX-3.3 (es navegacion primaria).
+describe("Sidebar: seccion Vistas (D11a/UX-1.5)", () => {
   it("las filas Planta / Vista 3D son pulsables y conmutan el modo", async () => {
     const user = userEvent.setup();
     render(<Sidebar />);
-    await abrirVistas(user);
 
     const fila3d = screen.getByText("Vista 3D").closest(".cx-row") as HTMLElement;
     expect(fila3d.tagName).toBe("BUTTON");
@@ -193,11 +217,9 @@ describe("Sidebar: seccion Vistas (D11a)", () => {
     expect(vistaStore.getState().modoVista).toBe("planta");
   });
 
-  it("resalta la fila del modo activo (aria-pressed)", async () => {
-    const user = userEvent.setup();
+  it("resalta la fila del modo activo (aria-pressed)", () => {
     vistaStore.getState().setModoVista("3d");
     render(<Sidebar />);
-    await abrirVistas(user);
     const fila3d = screen.getByText("Vista 3D").closest(".cx-row") as HTMLElement;
     expect(fila3d.getAttribute("aria-pressed")).toBe("true");
     const filaPlanta = screen
@@ -206,10 +228,24 @@ describe("Sidebar: seccion Vistas (D11a)", () => {
     expect(filaPlanta.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("no ofrece Mosaico (sigue como 'próximamente' en el HUD)", async () => {
+  // UX-1.5: alzados de consulta como sub-vista de 3D.
+  it("Alzado frontal entra en 3D con vista3d=frontal y desmarca 'Vista 3D'", async () => {
     const user = userEvent.setup();
     render(<Sidebar />);
-    await abrirVistas(user);
+    const alzado = screen
+      .getByText("Alzado frontal")
+      .closest(".cx-row") as HTMLElement;
+    await user.click(alzado);
+    expect(vistaStore.getState().modoVista).toBe("3d");
+    expect(vistaStore.getState().vista3d).toBe("frontal");
+    // "Vista 3D" (orbita) NO se marca activa estando en un alzado.
+    const fila3d = screen.getByText("Vista 3D").closest(".cx-row") as HTMLElement;
+    expect(fila3d.getAttribute("aria-pressed")).toBe("false");
+    expect(alzado.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("no ofrece Mosaico (sigue como 'próximamente' en el HUD)", () => {
+    render(<Sidebar />);
     expect(screen.queryByText("Mosaico")).toBeNull();
   });
 });

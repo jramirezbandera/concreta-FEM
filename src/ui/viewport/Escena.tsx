@@ -26,6 +26,7 @@ import { colorToken, hexToken } from "./colores";
 import { GeometriaModelo } from "./GeometriaModelo";
 import { AjusteCamara3D } from "./AjusteCamara3D";
 import { AjusteCamaraAlzado } from "./AjusteCamaraAlzado";
+import { AjusteCamaraPlanta } from "./AjusteCamaraPlanta";
 import type { DireccionAlzado } from "./encuadreVistas";
 import { suscribirZoom } from "./hooks/zoomBus";
 import { emitirCoords } from "./hooks/coordsBus";
@@ -321,8 +322,10 @@ export function Escena({ modoVista, overlays }: EscenaProps) {
         />
       )}
 
-      {/* Encuadre de la camara al edificio completo (F2c / UX-1.5): perspectiva en
-          orbita, ortografico en alzados. Ambos reaccionan al boton "Encuadrar". */}
+      {/* Encuadre de la camara (F2c / UX-1.5 / UX-3.2): perspectiva en orbita,
+          ortografico en alzados, cenital BAJO DEMANDA en planta (boton "Encuadrar" y
+          doble clic del arbol de obra). */}
+      {esPlanta && <AjusteCamaraPlanta />}
       {!esPlanta && vista3d === "orbita" && <AjusteCamara3D />}
       {!esPlanta && vista3d !== "orbita" && <AjusteCamaraAlzado dir={vista3d} />}
 

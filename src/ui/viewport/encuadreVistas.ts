@@ -23,6 +23,23 @@ const DIST = 50;
 // no debe producir zoom Infinity/NaN.
 const EXTENSION_MIN = 1;
 
+// Encuadre en PLANTA (UX-3.2): camara cenital sobre el centro XY del bounds, con el
+// zoom que hace entrar su extension XY en el viewport. El suelo de extension es mas
+// generoso que el de los alzados: encuadrar UN pilar de 30 cm a pantalla completa
+// desorienta; con 4 m de minimo el elemento aparece con su entorno.
+const EXTENSION_MIN_PLANTA = 4;
+
+export function encuadrePlanta(
+  bounds: BoundsEdificio,
+  viewport: { w: number; h: number },
+): EncuadreAlzado {
+  const [cx, cy] = bounds.centro;
+  const w = Math.max(bounds.max[0] - bounds.min[0], EXTENSION_MIN_PLANTA);
+  const h = Math.max(bounds.max[1] - bounds.min[1], EXTENSION_MIN_PLANTA);
+  const zoom = Math.min(viewport.w / (w * MARGEN), viewport.h / (h * MARGEN));
+  return { position: [cx, cy, DIST], target: [cx, cy, 0], zoom };
+}
+
 export function encuadreAlzado(
   bounds: BoundsEdificio,
   dir: DireccionAlzado,

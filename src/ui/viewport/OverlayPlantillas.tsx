@@ -57,6 +57,16 @@ function usePlantaActivaId(): string | null {
   );
 }
 
+// Capa "plantillas" (UX-3.1): interruptor MAESTRO del calco desde el panel de capas.
+// El `visible` por-plantilla (panel F4) se conserva: esta capa apaga el conjunto.
+function useCapaPlantillasOculta(): boolean {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.capasOcultas, cb),
+    () => vistaStore.getState().capasOcultas.plantillas === true,
+    () => vistaStore.getState().capasOcultas.plantillas === true,
+  );
+}
+
 // --- Teselado de circulo/arco ------------------------------------------------
 // Aproxima el arco a segmentos y los acumula en `out` (lineSegments 3D). Delega la
 // matematica en `verticesArco` (modulo puro testeado): este normaliza el barrido a
@@ -153,17 +163,19 @@ function construirGeomPlantilla(plantilla: Plantilla): GeomPlantilla {
 export function OverlayPlantillas() {
   const plantillas = usePlantillas();
   const plantaActivaId = usePlantaActivaId();
+  const capaOculta = useCapaPlantillasOculta();
   const color = useMemo(() => hexToken("canvasGrid2"), []);
 
   // Geometrias reconstruidas SOLO al cambiar las plantillas o la planta activa
   // (regla #11: nunca por frame). Filtra por visible + planta activa (NO por
-  // plantillaActivaId, que solo marca cual se edita en el panel).
+  // plantillaActivaId, que solo marca cual se edita en el panel). Con la capa
+  // "plantillas" oculta (UX-3.1) no se construye nada.
   const geoms = useMemo<GeomPlantilla[]>(() => {
-    if (!plantaActivaId) return [];
+    if (!plantaActivaId || capaOculta) return [];
     return plantillas
       .filter((p) => p.visible && p.plantaId === plantaActivaId)
       .map(construirGeomPlantilla);
-  }, [plantillas, plantaActivaId]);
+  }, [plantillas, plantaActivaId, capaOculta]);
 
   // Pinta un frame al (re)construir y libera las BufferGeometry al sustituirlas
   // o desmontar (evita fugas de memoria en GPU).

@@ -428,6 +428,28 @@ describe("vistaStore: setters", () => {
     vistaStore.getState().setHerramienta("seleccion");
   });
 
+  // Corte UX-3.1: capas de visibilidad del lienzo (ausencia de clave = visible).
+  it("toggleCapa oculta/muestra y resetCapas vuelve a todo visible", () => {
+    expect(vistaStore.getState().capasOcultas).toEqual({});
+
+    vistaStore.getState().toggleCapa("vigas");
+    expect(vistaStore.getState().capasOcultas).toEqual({ vigas: true });
+
+    // Volver a visible BORRA la clave (no deja `vigas: false` muerto).
+    vistaStore.getState().toggleCapa("vigas");
+    expect(vistaStore.getState().capasOcultas).toEqual({});
+
+    vistaStore.getState().setCapaVisible("rotulos", false);
+    vistaStore.getState().setCapaVisible("cargas", false);
+    expect(vistaStore.getState().capasOcultas).toEqual({
+      rotulos: true,
+      cargas: true,
+    });
+
+    vistaStore.getState().resetCapas();
+    expect(vistaStore.getState().capasOcultas).toEqual({});
+  });
+
   // UX-A4: la rejilla es un flag transitorio (fuera de undo, patron de snapActivo).
   it("rejillaVisible arranca en true y toggleRejilla lo conmuta", () => {
     expect(vistaStore.getState().rejillaVisible).toBe(true);

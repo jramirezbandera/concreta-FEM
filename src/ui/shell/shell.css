@@ -299,6 +299,37 @@
   padding-left: 14px;
 }
 
+/* --- Rediseno del sidebar (UX-3.3) --- */
+/* Elementos del arbol de obra: sangrados bajo su planta con una guia vertical
+   sutil (jerarquia legible sin iconografia extra). */
+.cx-arbol__planta {
+  margin-bottom: 2px;
+}
+.cx-arbol__elemento {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  border-radius: 0 5px 5px 0;
+}
+
+/* Fila de capa (UX-3.1): toggle con "ojo" + swatch + contador. Reusa la metrica de
+   .cx-row; el estado oculto atenua toda la fila (la capa no se esta dibujando). */
+.cx-capa {
+  width: 100%;
+}
+.cx-capa__ojo {
+  flex: 0 0 14px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--accent);
+}
+.cx-capa--oculta {
+  opacity: 0.55;
+}
+.cx-capa--oculta .cx-capa__ojo {
+  color: var(--text-3);
+}
+
 /* --- Work canvas (§2): recibe el viewport (children) --- */
 .cx-work {
   position: relative;
