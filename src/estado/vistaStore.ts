@@ -194,6 +194,15 @@ interface VistaState {
   // Escena monta la Rejilla() solo si este flag esta activo; el ToolsRail lo refleja y
   // conmuta. Encendida por defecto (la rejilla es la referencia visual del replanteo).
   rejillaVisible: boolean;
+  // Paso de la rejilla (m), UNICO para lo visual Y para el snap (UX-2.1): dibujar a
+  // 0.5 y snapear a otro paso seria una trampa. Configurable desde el popover del
+  // ToolsRail; default 0.5 (Spec §4.1). Estado de UI puro, fuera de undo.
+  pasoRejilla: number;
+  // Modo ORTO (UX-2.3): restringe el trazado de vigas a 0/45/90 grados desde el
+  // extremo fijado. Shift mantenido INVIERTE el estado efectivo (convencion AutoCAD:
+  // con orto off, Shift lo fuerza; con orto on, Shift lo suelta). Toggle del
+  // ToolsRail; estado de UI puro, fuera de undo.
+  ortoActivo: boolean;
   // Overlay de CENTRO DE MASAS (F2.4, D-diseño-1). Toggle de ayuda de modelado:
   // dibuja el marcador ⊕ del CM de la planta activa + un panel HUD con coords/peso.
   // Apagado por defecto (regla de subtraccion: nunca siempre-visible). Disponible en
@@ -266,6 +275,9 @@ interface VistaState {
   setSnapActivo(b: boolean): void;
   setRejillaVisible(b: boolean): void;
   toggleRejilla(): void;
+  setPasoRejilla(paso: number): void;
+  setOrtoActivo(b: boolean): void;
+  toggleOrto(): void;
   // --- Dock UI (D14 · PR3) ---
   // Colapso del dock entero (D14e). setDockColapsado fija; toggleDockColapsado conmuta.
   setDockColapsado(b: boolean): void;
@@ -351,6 +363,8 @@ export const vistaStore = create<VistaState>()(
     },
     snapActivo: true,
     rejillaVisible: true,
+    pasoRejilla: 0.5,
+    ortoActivo: false,
     dockUI: dockUIInicial(),
     mostrarCentroMasa: false,
     mostrarCentroRigidez: false,
@@ -406,6 +420,14 @@ export const vistaStore = create<VistaState>()(
     setRejillaVisible: (b) => set({ rejillaVisible: b }),
     toggleRejilla: () =>
       set((estado) => ({ rejillaVisible: !estado.rejillaVisible })),
+    // Guard: un paso no finito o <= 0 dejaria el snap inerte y la rejilla sin dibujar
+    // (drei Grid con cellSize 0). Se ignora en vez de propagar el valor invalido.
+    setPasoRejilla: (paso) =>
+      set((estado) =>
+        Number.isFinite(paso) && paso > 0 ? { pasoRejilla: paso } : estado,
+      ),
+    setOrtoActivo: (b) => set({ ortoActivo: b }),
+    toggleOrto: () => set((estado) => ({ ortoActivo: !estado.ortoActivo })),
     // --- Dock UI (D14 · PR3) ---
     setDockColapsado: (b) =>
       set((estado) => ({ dockUI: { ...estado.dockUI, dockColapsado: b } })),

@@ -51,15 +51,28 @@ import {
   type ExtremoViga,
 } from "../../estado";
 import { colorToken } from "./colores";
-import { resolverPunto } from "./imanViga";
+import { resolverPuntoConInfo, type EngancheIman } from "./imanViga";
 import { puntosSnapDePlantillas } from "./dxf/snapDxf";
 import type { Plantilla, PuntoXY } from "./dxf/tiposDxf";
+import type { Modelo } from "../../dominio";
 import { plantaColocableViga } from "./tramoViga";
 // Logica pura del flujo de dos clics en su propio modulo (este fichero solo
 // exporta componentes -> react-refresh/only-export-components).
 import { posicionExtremo, procesarClicViga } from "./colocacionVigaLogica";
+import { puntoOrto } from "./orto";
+import {
+  buscarAlineaciones,
+  puntosGuiaDeModelo,
+  type ResultadoGuias,
+} from "./guiasAlineacion";
+import { useGuiasOverlay } from "./GuiasOverlay";
 import { debeIgnorarEscColocacion } from "./escColocacion";
+import { resolverPuntoEntrada } from "./entradaNumerica";
 import { emitirCota, limpiarCota } from "./hooks/cotaBus";
+import { emitirAviso } from "./hooks/avisoBus";
+import { emitirEnganche, limpiarEnganche } from "./hooks/imanBus";
+import { suscribirEntrada } from "./hooks/entradaBus";
+import { useAltSuprime } from "./hooks/useAltSuprime";
 import { cotaBanda } from "./formateo";
 
 // Semibrazo de la cruz / medio lado del cuadrado del marcador (m). Z (sobre la cota)
@@ -94,14 +107,19 @@ function crearGeoCruz(): BufferGeometry {
 
 // Cuadrado translucido + cruz en el plano XY. Color token "viga". El grupo se
 // reposiciona por mutacion de ref (no por props reactivas) en onPointerMove/onClick.
+// `refAnillo` (opcional, UX-2.2): anillo en acento que el marcador del CURSOR muestra
+// cuando el iman engancha a obra (se conmuta visible por mutacion de ref).
 function Marcador({
   refGrupo,
   visible,
+  refAnillo,
 }: {
   refGrupo: RefObject<Group | null>;
   visible: boolean;
+  refAnillo?: RefObject<Mesh | null>;
 }) {
   const color = useMemo(() => colorToken("viga"), []);
+  const colorAnillo = useMemo(() => colorToken("accent"), []);
   const geoCruz = useMemo(() => crearGeoCruz(), []);
   useEffect(() => () => geoCruz.dispose(), [geoCruz]);
 
@@ -126,6 +144,18 @@ function Marcador({
           toneMapped={false}
         />
       </lineSegments>
+      {refAnillo && (
+        <mesh ref={refAnillo} position={[0, 0, MARCA_Z]} visible={false}>
+          <ringGeometry args={[MARCA_R * 1.15, MARCA_R * 1.45, 32]} />
+          <meshBasicMaterial
+            color={colorAnillo}
+            transparent
+            opacity={0.9}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -135,6 +165,7 @@ function Marcador({
 function ColocacionActiva() {
   const refMarcadorCursor = useRef<Group>(null); // sigue al cursor (snap/iman)
   const refMarcadorAncla = useRef<Group>(null); // extremo I fijado
+  const refAnillo = useRef<Mesh>(null); // anillo de enganche del cursor (UX-2.2)
   const refLinea = useRef<LineSegments>(null); // linea elastica I -> cursor
   const refPlano = useRef<Mesh>(null);
 
@@ -182,6 +213,9 @@ function ColocacionActiva() {
   }, []);
   useEffect(() => () => geoLinea.dispose(), [geoLinea]);
   const colorLinea = useMemo(() => colorToken("vigaLine"), []);
+
+  // Guias de alineacion (UX-2.4): overlay compartido entre herramientas.
+  const guias = useGuiasOverlay();
 
   // Cota (Z) de la planta donde caera la viga; es donde se dibujan marcadores y
   // linea. Se relee en cada interaccion (puede cambiar la planta activa).
@@ -235,26 +269,90 @@ function ColocacionActiva() {
     if (refLinea.current) refLinea.current.visible = false;
   }
 
+  // Resuelve el punto EFECTIVO del cursor con la prioridad de ayudas de dibujo
+  // (UX-2.2/2.3/2.4): iman de obra > orto (con I fijado) > guias de alineacion >
+  // DXF/rejilla. Alt mantenido (sinAyudas, D8b) lo apaga todo: coords crudas.
+  // Devuelve ademas el enganche (feedback de iman) y las guias activas (dibujo).
+  function resolverCursor(
+    modelo: Modelo,
+    plantaId: string,
+    px: number,
+    py: number,
+    ev: { altKey: boolean; shiftKey: boolean },
+  ): { extremo: ExtremoViga; enganche: EngancheIman; guias: ResultadoGuias | null } {
+    const { snapActivo, plantillas, plantaActivaId, pasoRejilla, ortoActivo } =
+      vistaStore.getState();
+    const sinAyudas = ev.altKey;
+    if (sinAyudas) {
+      return { extremo: { x: px, y: py }, enganche: { tipo: "libre" }, guias: null };
+    }
+
+    // Puntos notables del calco DXF visible de la planta activa (feature-15):
+    // candidatos de prioridad media (obra > DXF > rejilla). Memoizados (T6).
+    const puntosSnapExtra = puntosSnapMemo(plantillas, plantaActivaId);
+    const info = resolverPuntoConInfo(modelo, plantaId, px, py, {
+      snapRejilla: snapActivo,
+      pasoRejilla,
+      puntosSnapExtra,
+    });
+
+    // Osnap manda: un enganche a obra o al calco gana a orto y a las guias.
+    if (info.enganche.tipo !== "rejilla" && info.enganche.tipo !== "libre") {
+      return { extremo: info.extremo, enganche: info.enganche, guias: null };
+    }
+
+    // Orto (UX-2.3, solo con extremo I fijado): Shift INVIERTE el toggle (AutoCAD).
+    // Modo explicito del usuario: gana a las guias implicitas.
+    const i = pendienteI.current;
+    const ortoEfectivo = ortoActivo !== ev.shiftKey;
+    if (i !== null && ortoEfectivo) {
+      const posI = posicionExtremo(modelo, i);
+      if (posI !== null) {
+        const p = puntoOrto(posI.x, posI.y, px, py, snapActivo ? pasoRejilla : undefined);
+        return { extremo: p, enganche: { tipo: "libre" }, guias: null };
+      }
+    }
+
+    // Guias de alineacion (UX-2.4) sobre el cursor CRUDO: la coordenada alineada se
+    // toma de la guia (exacta); la libre, del resolver (rejilla si snap activo).
+    const alineaciones = buscarAlineaciones(px, py, puntosGuiaDeModelo(modelo));
+    if (alineaciones.guiaX !== null || alineaciones.guiaY !== null) {
+      const base = posicionExtremo(modelo, info.extremo);
+      const x = alineaciones.guiaX !== null ? alineaciones.guiaX.valor : (base?.x ?? px);
+      const y = alineaciones.guiaY !== null ? alineaciones.guiaY.valor : (base?.y ?? py);
+      return { extremo: { x, y }, enganche: info.enganche, guias: alineaciones };
+    }
+
+    return { extremo: info.extremo, enganche: info.enganche, guias: null };
+  }
+
   const onMove = (e: ThreeEvent<PointerEvent>) => {
     const z = cotaColocable();
     if (z === null) return;
     const modelo = modeloStore.getState().getModelo();
-    const { plantaActivaId, snapActivo, plantillas } = vistaStore.getState();
+    const { plantaActivaId } = vistaStore.getState();
     const plantaId = plantaColocableViga(modelo, plantaActivaId);
     if (plantaId === null) return;
 
-    // Puntos notables del calco DXF visible de la planta activa (feature-15): se
-    // pasan como candidatos de prioridad media (obra > DXF > rejilla) al iman.
-    // Memoizado: solo recalcula si cambian plantillas/plantaActivaId (T6).
-    const puntosSnapExtra = puntosSnapMemo(plantillas, plantaActivaId);
-    const extremo = resolverPunto(modelo, plantaId, e.point.x, e.point.y, {
-      snapRejilla: snapActivo,
-      puntosSnapExtra,
+    const r = resolverCursor(modelo, plantaId, e.point.x, e.point.y, {
+      altKey: e.nativeEvent.altKey,
+      shiftKey: e.nativeEvent.shiftKey,
     });
-    const pos = posicionExtremo(modelo, extremo);
+    const pos = posicionExtremo(modelo, r.extremo);
     if (pos === null) return;
 
     moverCursor(pos.x, pos.y, z);
+
+    // Feedback del iman (UX-2.2): anillo en acento sobre el marcador + etiqueta en
+    // la barra de estado (el imanBus deduplica; solo notifica al cambiar de enganche).
+    const eng = r.enganche;
+    const etiquetaObra =
+      eng.tipo === "nudo" || eng.tipo === "pilar" ? eng.etiqueta : null;
+    if (refAnillo.current) refAnillo.current.visible = etiquetaObra !== null;
+    emitirEnganche(etiquetaObra);
+
+    // Guias de alineacion (UX-2.4): visibles solo mientras hay alineacion.
+    guias.pintar(r.guias, pos.x, pos.y, z);
 
     // Si hay extremo I pendiente, estira la linea elastica desde el (I) hasta aqui y
     // EMITE la cota viva (longitud + angulo) por cotaBus (D8a): la etiqueta HTML junto al
@@ -277,12 +375,12 @@ function ColocacionActiva() {
     invalidate();
   };
 
-  const onClick = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-
+  // Nucleo del clic: procesa un extremo YA RESUELTO (del iman del clic o de la
+  // entrada numerica, UX-2.5) con el MISMO pipeline: guardar I / ignorar degenerada /
+  // crear la viga via el comando crearViga. Unica puerta de commit de la herramienta.
+  function confirmarExtremo(extremo: ExtremoViga): void {
     const modelo = modeloStore.getState().getModelo();
-    const { plantaActivaId, defaultsViga, snapActivo, plantillas } =
-      vistaStore.getState();
+    const { plantaActivaId, defaultsViga } = vistaStore.getState();
     const plantaId = plantaColocableViga(modelo, plantaActivaId);
 
     // Sin planta colocable o sin seccion/material por defecto no se puede crear una
@@ -303,12 +401,6 @@ function ColocacionActiva() {
     const planta = modelo.plantas.find((p) => p.id === plantaId);
     const z = planta ? planta.cota : 0;
 
-    // Mismos candidatos DXF que en onMove (obra > DXF > rejilla); via la cache.
-    const puntosSnapExtra = puntosSnapMemo(plantillas, plantaActivaId);
-    const extremo = resolverPunto(modelo, plantaId, e.point.x, e.point.y, {
-      snapRejilla: snapActivo,
-      puntosSnapExtra,
-    });
     const accion = procesarClicViga(
       pendienteI.current,
       extremo,
@@ -333,7 +425,9 @@ function ColocacionActiva() {
 
     if (accion.tipo === "ignorar") {
       // Segundo clic sobre el mismo punto que I: no se crea viga degenerada. Se
-      // mantiene I pendiente para que el usuario reintente el extremo J.
+      // mantiene I pendiente para que el usuario reintente el extremo J. Antes era
+      // un silencio total (UX-2.0): ahora la barra de estado explica el porque.
+      emitirAviso("Los dos extremos coinciden: pulsa en otro punto para el extremo final");
       invalidate();
       return;
     }
@@ -347,8 +441,27 @@ function ColocacionActiva() {
     // Reset del ciclo: lista para la siguiente viga (la herramienta sigue activa).
     pendienteI.current = null;
     ocultarAnclaYLinea();
+    guias.ocultar();
     limpiarCota(); // banda fijada -> se retira la etiqueta viva (D8a)
     invalidate();
+  }
+
+  const onClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const modelo = modeloStore.getState().getModelo();
+    const { plantaActivaId } = vistaStore.getState();
+    const plantaId = plantaColocableViga(modelo, plantaActivaId);
+    if (plantaId === null) {
+      if (import.meta.env.DEV) {
+        console.warn("[ColocacionViga] sin planta colocable: clic ignorado.");
+      }
+      return;
+    }
+    const r = resolverCursor(modelo, plantaId, e.point.x, e.point.y, {
+      altKey: e.nativeEvent.altKey,
+      shiftKey: e.nativeEvent.shiftKey,
+    });
+    confirmarExtremo(r.extremo);
   };
 
   // Al entrar en la herramienta, limpia la seleccion: el InspectorViga (que se
@@ -380,9 +493,39 @@ function ColocacionActiva() {
   }, []);
 
   // Al desmontar la herramienta (cambio de modo/vista), retira cualquier cota viva
-  // colgada (D8a): si el usuario sale de "viga" con un extremo I pendiente, la etiqueta
-  // no debe quedar visible.
-  useEffect(() => () => limpiarCota(), []);
+  // colgada (D8a) y el enganche de la barra de estado (UX-2.2).
+  useEffect(
+    () => () => {
+      limpiarCota();
+      limpiarEnganche();
+    },
+    [],
+  );
+
+  // Alt mantenido suprime iman/snap (D8b); el hook evita que Alt dispare el menu
+  // del navegador en Windows mientras la herramienta esta activa.
+  useAltSuprime();
+
+  // Entrada numerica (UX-2.5): un punto tecleado en la barra de coordenadas se
+  // resuelve contra el extremo I pendiente (relativa "@"/polar "<") y entra por el
+  // MISMO confirmarExtremo del clic. La coordenada tecleada es EXACTA: sin iman ni
+  // rejilla (la fusion de nudos por celda la garantiza resolverExtremo de crearViga).
+  // Deps vacias: el handler cierra sobre refs y stores (estables); vive lo que la
+  // herramienta.
+  useEffect(() => {
+    return suscribirEntrada((expr) => {
+      const modelo = modeloStore.getState().getModelo();
+      const i = pendienteI.current;
+      const base = i !== null ? posicionExtremo(modelo, i) : null;
+      const r = resolverPuntoEntrada(expr, base);
+      if (!r.ok) {
+        emitirAviso(r.error);
+        return;
+      }
+      confirmarExtremo({ x: r.x, y: r.y });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <group>
@@ -410,9 +553,14 @@ function ColocacionActiva() {
         />
       </lineSegments>
 
-      {/* Ancla del extremo I (oculta hasta el primer clic) y marcador del cursor. */}
+      {/* Guias de alineacion (UX-2.4): visibles solo mientras el cursor se alinea
+          con un pilar/nudo existente. Overlay compartido (GuiasOverlay). */}
+      {guias.nodo}
+
+      {/* Ancla del extremo I (oculta hasta el primer clic) y marcador del cursor
+          (con anillo de enganche del iman, UX-2.2). */}
       <Marcador refGrupo={refMarcadorAncla} visible={false} />
-      <Marcador refGrupo={refMarcadorCursor} visible />
+      <Marcador refGrupo={refMarcadorCursor} visible refAnillo={refAnillo} />
     </group>
   );
 }

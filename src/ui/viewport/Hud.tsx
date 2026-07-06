@@ -14,6 +14,7 @@ import { Slot } from "./Slot";
 import { plantasDelEdificio } from "./hooks/useGeometriaModelo";
 import { emitirZoom } from "./hooks/zoomBus";
 import { emitirEncuadre } from "./hooks/encuadreBus";
+import { EntradaNumericaOverlay } from "./EntradaNumericaOverlay";
 
 const OPCIONES_MODO: ReadonlyArray<OpcionSegmento<ModoVista>> = [
   { valor: "planta", etiqueta: "2D", titulo: "Planta (2D)" },
@@ -204,6 +205,11 @@ export function Hud() {
           MARCADORES de escena (CentroMasaOverlay/CentroRigidezOverlay/ModeloCalculoOverlay)
           siguen como sceneOverlays (no se tocan): control en el dock, marcador en la
           escena, comunicados solo por vistaStore (mostrarCentroMasa, …). */}
+      {/* Barra de coordenadas de la colocacion (UX-2.5): se autooculta fuera de una
+          herramienta de colocacion en planta. */}
+      <Slot zona="bottom-center">
+        <EntradaNumericaOverlay />
+      </Slot>
       <Slot zona="bottom-right">
         <ControlesZoom />
       </Slot>

@@ -1,7 +1,8 @@
-// Tests del ToolsRail (auditoria UX-A4/UX-A6). Project `jsdom`. Foco:
-//   - "rejilla" esta CABLEADA a vistaStore.rejillaVisible (toggle conmuta el flag), ya
-//     no un toggle local cosmetico.
-//   - "orto" y biblioteca/config/ayuda son placeholders DESHABILITADOS (no clic muerto).
+// Tests del ToolsRail (auditoria UX-A4/UX-A6 + Corte UX-2). Project `jsdom`. Foco:
+//   - "rejilla" esta CABLEADA a vistaStore.rejillaVisible (boton dividido
+//     PopoverRejilla: toggle + popover con el paso, UX-2.1).
+//   - "orto" pasa de placeholder a toggle REAL de vistaStore.ortoActivo (UX-2.3).
+//   - config/ayuda siguen como placeholders DESHABILITADOS (no clic muerto).
 //   - "snap" sigue cableado a vistaStore.snapActivo.
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
@@ -12,6 +13,7 @@ import { vistaStore } from "../../estado";
 beforeEach(() => {
   vistaStore.getState().setRejillaVisible(true);
   vistaStore.getState().setSnapActivo(true);
+  vistaStore.getState().setOrtoActivo(false);
   vistaStore.getState().resetDockUI();
 });
 
@@ -49,16 +51,21 @@ describe("ToolsRail · rejilla cableada al store (UX-A4)", () => {
   });
 });
 
-describe("ToolsRail · placeholders deshabilitados (UX-A4/UX-A6)", () => {
-  it('"Modo orto" está deshabilitado y no es conmutable', () => {
+describe("ToolsRail · orto cableado al store (UX-2.3)", () => {
+  it("refleja ortoActivo y lo conmuta al pulsar", async () => {
+    const user = userEvent.setup();
     render(<ToolsRail />);
-    // aria-label conserva "Modo orto"; title pasa a "Disponible próximamente".
-    const orto = boton("Modo orto");
-    expect(orto).toBeDisabled();
-    expect(orto).toHaveAttribute("title", "Disponible próximamente");
-    expect(orto).not.toHaveAttribute("aria-pressed");
-  });
+    const orto = boton("Modo orto (Shift lo invierte)");
+    expect(orto).not.toBeDisabled();
+    expect(orto).toHaveAttribute("aria-pressed", "false");
 
+    await user.click(orto);
+    expect(vistaStore.getState().ortoActivo).toBe(true);
+    expect(orto).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("ToolsRail · placeholders deshabilitados (UX-A4/UX-A6)", () => {
   it("Configuración/Ayuda están deshabilitados (no clic muerto)", () => {
     render(<ToolsRail />);
     for (const label of ["Configuración", "Ayuda"]) {
@@ -66,6 +73,20 @@ describe("ToolsRail · placeholders deshabilitados (UX-A4/UX-A6)", () => {
       expect(b, label).toBeDisabled();
       expect(b).toHaveAttribute("title", "Disponible próximamente");
     }
+  });
+});
+
+describe("ToolsRail · paso de rejilla (UX-2.1)", () => {
+  it("el boton dividido anuncia el paso actual en su title", () => {
+    act(() => {
+      vistaStore.getState().setPasoRejilla(0.25);
+    });
+    render(<ToolsRail />);
+    const config = boton("Configurar el paso de la rejilla");
+    expect(config).toHaveAttribute("title", "Paso de rejilla: 0.25 m");
+    act(() => {
+      vistaStore.getState().setPasoRejilla(0.5);
+    });
   });
 });
 

@@ -38,11 +38,14 @@ import {
 import { modeloStore, vistaStore, seleccionStore, crearPano } from "../../estado";
 import { colorToken } from "./colores";
 import { snapARejilla } from "./snap";
-import { PASO_REJILLA_M } from "./imanViga";
 import { plantaColocableViga } from "./tramoViga";
 import { procesarClicPano, type PuntoPano } from "./colocacionPanoLogica";
 import { debeIgnorarEscColocacion } from "./escColocacion";
+import { resolverPuntoEntrada } from "./entradaNumerica";
 import { emitirCota, limpiarCota } from "./hooks/cotaBus";
+import { emitirAviso } from "./hooks/avisoBus";
+import { suscribirEntrada } from "./hooks/entradaBus";
+import { useAltSuprime } from "./hooks/useAltSuprime";
 import { cotaRectangulo } from "./formateo";
 
 // Semibrazo de la cruz del marcador (m) y elevacion sobre la cota (anti z-fight).
@@ -158,10 +161,10 @@ function ColocacionActiva() {
 
   // Resuelve el punto del clic (snap a rejilla si snapActivo; si no, crudo). Corte 1 es
   // AISLADO: NO hay iman a obra (no se comparte nudo con el portico), solo rejilla.
-  function resolverPunto(x: number, y: number): PuntoPano {
-    return vistaStore.getState().snapActivo
-      ? snapARejilla(x, y, PASO_REJILLA_M)
-      : { x, y };
+  // Paso configurable (UX-2.1); Alt suprime el snap momentaneamente (D8b).
+  function resolverPunto(x: number, y: number, sinAyudas = false): PuntoPano {
+    const { snapActivo, pasoRejilla } = vistaStore.getState();
+    return snapActivo && !sinAyudas ? snapARejilla(x, y, pasoRejilla) : { x, y };
   }
 
   function moverCursor(x: number, y: number, z: number): void {
@@ -211,7 +214,7 @@ function ColocacionActiva() {
   const onMove = (e: ThreeEvent<PointerEvent>) => {
     const z = cotaColocable();
     if (z === null) return;
-    const punto = resolverPunto(e.point.x, e.point.y);
+    const punto = resolverPunto(e.point.x, e.point.y, e.nativeEvent.altKey);
     moverCursor(punto.x, punto.y, z);
     const a = pendienteA.current;
     if (a !== null) {
@@ -227,8 +230,9 @@ function ColocacionActiva() {
     invalidate();
   };
 
-  const onClick = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
+  // Nucleo del clic: procesa una esquina YA RESUELTA (del snap del clic o de la
+  // entrada numerica, UX-2.5). Unica puerta de commit de la herramienta.
+  function confirmarEsquina(punto: PuntoPano): void {
     const plantaId = plantaColocable();
     const { defaultsPano } = vistaStore.getState();
 
@@ -241,7 +245,6 @@ function ColocacionActiva() {
       return;
     }
 
-    const punto = resolverPunto(e.point.x, e.point.y);
     const accion = procesarClicPano(pendienteA.current, punto);
 
     if (accion.tipo === "guardarA") {
@@ -251,7 +254,9 @@ function ColocacionActiva() {
     }
     if (accion.tipo === "ignorar") {
       // Segundo clic sin area (esquinas casi coincidentes): no se crea paño degenerado.
-      // Se mantiene A pendiente para que el usuario reintente la esquina opuesta.
+      // Se mantiene A pendiente para que el usuario reintente la esquina opuesta. La
+      // barra de estado explica el porque (UX-2.0), antes era un silencio total.
+      emitirAviso("Las dos esquinas coinciden: pulsa mas lejos para cerrar la losa");
       invalidate();
       return;
     }
@@ -274,6 +279,11 @@ function ColocacionActiva() {
     ocultarRectangulo();
     limpiarCota(); // rectangulo fijado -> retira la etiqueta viva (D8a)
     invalidate();
+  }
+
+  const onClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    confirmarEsquina(resolverPunto(e.point.x, e.point.y, e.nativeEvent.altKey));
   };
 
   // Al entrar en la herramienta, limpia la seleccion (el InspectorPano no debe convivir
@@ -306,6 +316,26 @@ function ColocacionActiva() {
 
   // Al desmontar la herramienta, retira cualquier cota viva colgada (D8a).
   useEffect(() => () => limpiarCota(), []);
+
+  // Alt mantenido suprime el snap (D8b); el hook evita que Alt dispare el menu del
+  // navegador en Windows mientras la herramienta esta activa.
+  useAltSuprime();
+
+  // Entrada numerica (UX-2.5): "x,y" absoluto o "@dx,dy"/"d<a" desde la esquina A
+  // pendiente. El punto tecleado es EXACTO (sin snap) y entra por el MISMO
+  // confirmarEsquina del clic (p. ej. "@6,4" cierra una losa de 6x4 m).
+  useEffect(() => {
+    return suscribirEntrada((expr) => {
+      const r = resolverPuntoEntrada(expr, pendienteA.current);
+      if (!r.ok) {
+        emitirAviso(r.error);
+        return;
+      }
+      confirmarEsquina({ x: r.x, y: r.y });
+    });
+    // Deps vacias: el handler cierra sobre refs/stores estables; vive lo que la herramienta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <group>

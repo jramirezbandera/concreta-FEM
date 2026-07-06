@@ -1,13 +1,14 @@
 // Tools rail (Spec Diseno UI §3.4): columna de ayudas de dibujo CAD a la derecha
 // (52px). F4 abre/cierra el PanelPlantillas (DXF) y F3 dispara la captura PNG del
-// viewport (feature-15, T4.1). snap y rejilla estan CABLEADOS al store: reflejan y
-// conmutan vistaStore.snapActivo / vistaStore.rejillaVisible (gobiernan el snapping
-// real y la visibilidad de la rejilla en la Escena). "Orto" aun no tiene logica real:
-// se muestra DESHABILITADO (no como un toggle muerto que aparenta funcionar).
-// biblioteca/config/ayuda tampoco tienen destino todavia: deshabilitados con title.
+// viewport (feature-15, T4.1). snap, orto y rejilla estan CABLEADOS al store:
+// reflejan y conmutan vistaStore.snapActivo / ortoActivo / rejillaVisible (gobiernan
+// el snapping real, el trazado a 0/45/90 y la rejilla de la Escena). La rejilla es un
+// boton DIVIDIDO (PopoverRejilla): toggle + popover con el paso (UX-2.1/2.3).
+// biblioteca/config/ayuda sin destino: deshabilitados con title.
 import { useSyncExternalStore } from "react";
 import { vistaStore } from "../../estado";
 import { capturarViewport } from "../viewport";
+import { PopoverRejilla } from "./PopoverRejilla";
 
 // Copy unico para lo que aun no tiene destino (mismo que menus/ToolsRail): honesto
 // sobre que la accion llegara, en vez de un clic muerto que no hace nada.
@@ -60,13 +61,13 @@ function useSnapActivo(): boolean {
   );
 }
 
-// Suscripcion fina: el boton rejilla refleja vistaStore.rejillaVisible (la Escena la
-// monta segun ese flag). Igual patron que snap: onClick + activoExterno.
-function useRejillaVisible(): boolean {
+// Suscripcion fina: el boton orto refleja vistaStore.ortoActivo (la colocacion de
+// vigas lo consulta; Shift lo invierte momentaneamente). Patron snap.
+function useOrtoActivo(): boolean {
   return useSyncExternalStore(
-    (cb) => vistaStore.subscribe((s) => s.rejillaVisible, cb),
-    () => vistaStore.getState().rejillaVisible,
-    () => vistaStore.getState().rejillaVisible,
+    (cb) => vistaStore.subscribe((s) => s.ortoActivo, cb),
+    () => vistaStore.getState().ortoActivo,
+    () => vistaStore.getState().ortoActivo,
   );
 }
 
@@ -85,8 +86,8 @@ export function ToolsRail() {
   // snap refleja vistaStore.snapActivo y lo conmuta al pulsar (gobierna el
   // snapping real, igual patron que F4: onClick + activoExterno).
   const snapActivo = useSnapActivo();
-  // rejilla refleja vistaStore.rejillaVisible y lo conmuta al pulsar.
-  const rejillaVisible = useRejillaVisible();
+  // orto refleja vistaStore.ortoActivo (UX-2.3): trazado de vigas a 0/45/90.
+  const ortoActivo = useOrtoActivo();
   // [D14 · PR3] colapso del dock entero: refleja dockUI.dockColapsado y lo conmuta.
   const dockColapsado = useDockColapsado();
   // Botón de colapsar/expandir el dock (recupera/entrega los ~400px al lienzo). aria-pressed
@@ -105,18 +106,16 @@ export function ToolsRail() {
     onClick: () => vistaStore.getState().setSnapActivo(!vistaStore.getState().snapActivo),
     activoExterno: snapActivo,
   };
-  // snap (cableado) + orto (placeholder deshabilitado) + rejilla (cableada al store).
+  // snap + orto cableados al store; la rejilla se renderiza aparte como boton
+  // dividido (PopoverRejilla: toggle + paso configurable, UX-2.1).
   const AYUDAS: HerramientaIcono[] = [
     SNAP,
-    // "Modo orto" descriptivo en aria-label; el flag `deshabilitado` hace que el title
-    // VISIBLE pase a "Disponible próximamente" (patron de los FINALES).
-    { clave: "orto", glifo: "∟", title: "Modo orto", deshabilitado: true },
     {
-      clave: "rejilla",
-      glifo: "▤",
-      title: "Rejilla",
-      onClick: () => vistaStore.getState().toggleRejilla(),
-      activoExterno: rejillaVisible,
+      clave: "orto",
+      glifo: "∟",
+      title: "Modo orto (Shift lo invierte)",
+      onClick: () => vistaStore.getState().toggleOrto(),
+      activoExterno: ortoActivo,
     },
   ];
   const ANTES: HerramientaIcono[] = [
@@ -171,8 +170,9 @@ export function ToolsRail() {
       {/* [D14 · PR3] Colapsar/expandir el dock de datos (recupera el ancho al lienzo). */}
       {boton(DOCK)}
       <span className="cx-tools__sep" aria-hidden="true" />
-      {/* snap (cableado) + orto (placeholder) + rejilla (cableada al store). */}
+      {/* snap + orto (cableados) + rejilla como boton dividido con paso (UX-2.1). */}
       {AYUDAS.map(boton)}
+      <PopoverRejilla />
       <span className="cx-tools__sep" aria-hidden="true" />
       {FINALES.map(boton)}
     </div>

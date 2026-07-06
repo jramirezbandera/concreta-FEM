@@ -46,6 +46,9 @@ export interface OpcionesImanViga {
   // iman a nudos/pilares NO depende de esto: es osnap y siempre engancha. Default
   // true (comportamiento previo).
   snapRejilla?: boolean;
+  // Si false, se SALTAN los pasos de iman (obra y DXF): coords crudas o rejilla segun
+  // snapRejilla. Es el "osnap off momentaneo" de Alt (D8b). Default true.
+  conIman?: boolean;
   // Puntos notables de las plantillas DXF visibles de la planta activa (feature-15),
   // ya transformados a coords de obra (m) por el LLAMADOR (ColocacionViga, desde
   // vistaStore: asi imanViga sigue puro). Son candidatos de PRIORIDAD MEDIA: la obra
@@ -56,12 +59,29 @@ export interface OpcionesImanViga {
   puntosSnapExtra?: PuntoXY[];
 }
 
+// A QUE ha enganchado el iman (UX-2.2, D8b): alimenta el feedback visible (anillo del
+// marcador + segmento de la barra de estado). "nudo"/"pilar" son enganches de OBRA
+// (etiqueta en lenguaje de obra: "Nudo de V2", "Pilar P3"); "dxf" es el calco;
+// "rejilla"/"libre" es el fallback sin iman.
+export type EngancheIman =
+  | { tipo: "nudo"; etiqueta: string }
+  | { tipo: "pilar"; etiqueta: string }
+  | { tipo: "dxf" }
+  | { tipo: "rejilla" }
+  | { tipo: "libre" };
+
+export interface PuntoConInfo {
+  extremo: ExtremoViga;
+  enganche: EngancheIman;
+}
+
 // Un candidato de enganche ya resuelto a su representacion ExtremoViga, con sus
-// coordenadas para medir distancia al clic.
+// coordenadas para medir distancia al clic y el enganche que lo describe.
 interface Candidato {
   x: number;
   y: number;
   extremo: ExtremoViga;
+  enganche: EngancheIman;
 }
 
 // Cota de una planta por su id (m). undefined si la planta no existe: en ese caso
@@ -76,7 +96,8 @@ function candidatos(modelo: Modelo, plantaId: string): Candidato[] {
 
   // (a) Nudos ya usados por vigas de esta planta: el extremo se referencia por id
   // (comparten nudo => el discretizador los une). Dedup por nudoId para no medir
-  // el mismo punto varias veces.
+  // el mismo punto varias veces. La etiqueta nombra la PRIMERA viga que usa el nudo
+  // (lenguaje de obra para la barra de estado, UX-2.2).
   const vistos = new Set<string>();
   for (const viga of vigasDePlanta(modelo, plantaId)) {
     for (const nudoId of [viga.nudoI, viga.nudoJ]) {
@@ -84,7 +105,12 @@ function candidatos(modelo: Modelo, plantaId: string): Candidato[] {
       vistos.add(nudoId);
       const nudo = nudoPorId(modelo, nudoId);
       if (nudo === undefined) continue; // referencia rota: la valida feature-4
-      lista.push({ x: nudo.x, y: nudo.y, extremo: { nudoId } });
+      lista.push({
+        x: nudo.x,
+        y: nudo.y,
+        extremo: { nudoId },
+        enganche: { tipo: "nudo", etiqueta: `Extremo de ${viga.nombre}` },
+      });
     }
   }
 
@@ -102,7 +128,8 @@ function candidatos(modelo: Modelo, plantaId: string): Candidato[] {
       if (cota < cMin || cota > cMax) continue; // el tramo no llega a esta cota
 
       // Hay nudo en la MISMA celda de rejilla que el pilar? enganchar a ese id
-      // ([M-4]: mismo predicado que el snapping del discretizador).
+      // ([M-4]: mismo predicado que el snapping del discretizador). En ambos casos
+      // el enganche se etiqueta con el PILAR (es lo que el usuario ve en planta).
       const nudoEnPilar = modelo.nudos.find((n) => mismaPosicionEnPlanta(n, pilar));
       if (nudoEnPilar !== undefined) {
         if (vistos.has(nudoEnPilar.id)) continue; // ya contado como nudo de viga
@@ -111,9 +138,15 @@ function candidatos(modelo: Modelo, plantaId: string): Candidato[] {
           x: nudoEnPilar.x,
           y: nudoEnPilar.y,
           extremo: { nudoId: nudoEnPilar.id },
+          enganche: { tipo: "pilar", etiqueta: `Pilar ${pilar.nombre}` },
         });
       } else {
-        lista.push({ x: pilar.x, y: pilar.y, extremo: { x: pilar.x, y: pilar.y } });
+        lista.push({
+          x: pilar.x,
+          y: pilar.y,
+          extremo: { x: pilar.x, y: pilar.y },
+          enganche: { tipo: "pilar", etiqueta: `Pilar ${pilar.nombre}` },
+        });
       }
     }
   }
@@ -122,14 +155,58 @@ function candidatos(modelo: Modelo, plantaId: string): Candidato[] {
 }
 
 // Resuelve el extremo de una viga para un clic en (x,y) sobre `plantaId`, con
-// PRIORIDAD obra > DXF > rejilla:
+// PRIORIDAD obra > DXF > rejilla, e informa DE QUE engancho (UX-2.2):
 //  1. obra: si el nudo/cabeza de pilar mas cercano cae dentro de `radioIman`,
 //     devuelve ese candidato (nudo existente por id, o coords de una cabeza de pilar
-//     sin nudo aun). La obra real no la roba la plantilla.
+//     sin nudo aun). La obra real no la roba la plantilla. Se salta con conIman=false
+//     (Alt mantenido, D8b).
 //  2. DXF: si no hay obra en radio, engancha al punto notable de plantilla mas
 //     cercano dentro de `radioIman` (devuelto como coords { x, y }). Solo si el snap
 //     esta activo (snapRejilla): el calco es ayuda de dibujo, sujeta al mismo snap.
 //  3. rejilla: si no hay nada, { x, y } ajustado a rejilla (o crudo si snap off).
+export function resolverPuntoConInfo(
+  modelo: Modelo,
+  plantaId: string,
+  x: number,
+  y: number,
+  opts: OpcionesImanViga = {},
+): PuntoConInfo {
+  const radioIman = opts.radioIman ?? RADIO_IMAN_M;
+  const pasoRejilla = opts.pasoRejilla ?? PASO_REJILLA_M;
+  const snapRejilla = opts.snapRejilla ?? true;
+  const conIman = opts.conIman ?? true;
+
+  if (conIman) {
+    // (1) Obra: nudos/cabezas de pilar. Maxima prioridad (geometria real).
+    let mejor: Candidato | null = null;
+    let mejorDist2 = Infinity;
+    const radio2 = radioIman * radioIman;
+    for (const cand of candidatos(modelo, plantaId)) {
+      const dx = cand.x - x;
+      const dy = cand.y - y;
+      const dist2 = dx * dx + dy * dy;
+      if (dist2 <= radio2 && dist2 < mejorDist2) {
+        mejor = cand;
+        mejorDist2 = dist2;
+      }
+    }
+    if (mejor !== null) return { extremo: mejor.extremo, enganche: mejor.enganche };
+
+    // (2) DXF: solo si el snap esta activo y no hubo candidato de obra mas cercano.
+    if (snapRejilla && opts.puntosSnapExtra && opts.puntosSnapExtra.length > 0) {
+      const p = engancharAPuntoExtra(x, y, opts.puntosSnapExtra, radioIman);
+      if (p !== null) return { extremo: { x: p.x, y: p.y }, enganche: { tipo: "dxf" } };
+    }
+  }
+
+  // (3) Rejilla: punto libre. Ajustado a rejilla solo si snap activo; si no, crudo.
+  return snapRejilla
+    ? { extremo: snapARejilla(x, y, pasoRejilla), enganche: { tipo: "rejilla" } }
+    : { extremo: { x, y }, enganche: { tipo: "libre" } };
+}
+
+// Version historica sin info de enganche: wrapper de compatibilidad (los tests y
+// llamadores que solo necesitan el extremo siguen funcionando sin cambios).
 export function resolverPunto(
   modelo: Modelo,
   plantaId: string,
@@ -137,31 +214,5 @@ export function resolverPunto(
   y: number,
   opts: OpcionesImanViga = {},
 ): ExtremoViga {
-  const radioIman = opts.radioIman ?? RADIO_IMAN_M;
-  const pasoRejilla = opts.pasoRejilla ?? PASO_REJILLA_M;
-  const snapRejilla = opts.snapRejilla ?? true;
-
-  // (1) Obra: nudos/cabezas de pilar. Maxima prioridad (geometria real).
-  let mejor: Candidato | null = null;
-  let mejorDist2 = Infinity;
-  const radio2 = radioIman * radioIman;
-  for (const cand of candidatos(modelo, plantaId)) {
-    const dx = cand.x - x;
-    const dy = cand.y - y;
-    const dist2 = dx * dx + dy * dy;
-    if (dist2 <= radio2 && dist2 < mejorDist2) {
-      mejor = cand;
-      mejorDist2 = dist2;
-    }
-  }
-  if (mejor !== null) return mejor.extremo;
-
-  // (2) DXF: solo si el snap esta activo y no hubo candidato de obra mas cercano.
-  if (snapRejilla && opts.puntosSnapExtra && opts.puntosSnapExtra.length > 0) {
-    const p = engancharAPuntoExtra(x, y, opts.puntosSnapExtra, radioIman);
-    if (p !== null) return { x: p.x, y: p.y };
-  }
-
-  // (3) Rejilla: punto libre. Ajustado a rejilla solo si snap activo; si no, crudo.
-  return snapRejilla ? snapARejilla(x, y, pasoRejilla) : { x, y };
+  return resolverPuntoConInfo(modelo, plantaId, x, y, opts).extremo;
 }

@@ -35,6 +35,16 @@ import { puntosSnapDePlantillas, engancharAPuntoExtra } from "./dxf/snapDxf";
 import type { Plantilla, PuntoXY } from "./dxf/tiposDxf";
 import { RADIO_IMAN_M } from "./imanViga";
 import { tramoColocable } from "./tramoPilar";
+import {
+  buscarAlineaciones,
+  puntosGuiaDeModelo,
+  type ResultadoGuias,
+} from "./guiasAlineacion";
+import { useGuiasOverlay } from "./GuiasOverlay";
+import { resolverPuntoEntrada } from "./entradaNumerica";
+import { emitirAviso } from "./hooks/avisoBus";
+import { suscribirEntrada } from "./hooks/entradaBus";
+import { useAltSuprime } from "./hooks/useAltSuprime";
 import { debeIgnorarEscColocacion } from "./escColocacion";
 
 // Semibrazo de la cruz y medio lado del cuadrado del marcador (m). Z ligeramente
@@ -144,6 +154,13 @@ function ColocacionActiva() {
     return puntos;
   }
 
+  // Guias de alineacion (UX-2.4): overlay compartido entre herramientas.
+  const guias = useGuiasOverlay();
+
+  // Ultimo pilar colocado en esta sesion de herramienta: base de la entrada numerica
+  // RELATIVA ("@dx,dy" coloca respecto al anterior, UX-2.5). Ref: no re-renderiza.
+  const ultimoColocado = useRef<{ x: number; y: number } | null>(null);
+
   // Coloca el marcador en la posicion (snap) del cursor mutando el ref del grupo.
   function moverMarcador(x: number, y: number): void {
     const g = refMarcador.current;
@@ -152,32 +169,52 @@ function ColocacionActiva() {
     invalidate();
   }
 
-  // Resuelve la posicion de colocacion con prioridad DXF > rejilla (los pilares no
-  // enganchan a otra obra: se colocan libres). Si el snap esta off, no engancha a
-  // nada (ni calco ni rejilla): coords crudas. El iman al calco usa el mismo radio
-  // que el de vigas (RADIO_IMAN_M) para una sensacion consistente.
-  function aplicarSnap(px: number, py: number): { x: number; y: number } {
-    const { snapActivo, plantillas, plantaActivaId } = vistaStore.getState();
-    if (!snapActivo) return { x: px, y: py };
+  // Punto EFECTIVO del cursor con prioridad DXF > guias de alineacion > rejilla
+  // (UX-2.1/2.4). Los pilares no enganchan a otra obra (se colocan libres): las
+  // GUIAS son su ayuda para alinearse con pilares/nudos existentes. Alt mantenido
+  // (sinAyudas, D8b) lo apaga todo: coords crudas.
+  function resolverCursor(
+    px: number,
+    py: number,
+    sinAyudas: boolean,
+  ): { x: number; y: number; guias: ResultadoGuias | null } {
+    const { snapActivo, plantillas, plantaActivaId, pasoRejilla } =
+      vistaStore.getState();
+    if (sinAyudas) return { x: px, y: py, guias: null };
 
-    // (1) DXF: punto notable del calco visible de la planta activa dentro del radio.
-    const puntosDxf = puntosSnapMemo(plantillas, plantaActivaId);
-    const p = engancharAPuntoExtra(px, py, puntosDxf, RADIO_IMAN_M);
-    if (p !== null) return { x: p.x, y: p.y };
+    // (1) DXF: punto notable del calco visible dentro del radio (osnap: manda).
+    if (snapActivo) {
+      const puntosDxf = puntosSnapMemo(plantillas, plantaActivaId);
+      const p = engancharAPuntoExtra(px, py, puntosDxf, RADIO_IMAN_M);
+      if (p !== null) return { x: p.x, y: p.y, guias: null };
+    }
 
-    // (2) Rejilla.
-    return snapARejilla(px, py);
+    // (2) Guias de alineacion sobre el cursor crudo; la coordenada no alineada cae
+    // a rejilla si el snap esta activo.
+    const modelo = modeloStore.getState().getModelo();
+    const al = buscarAlineaciones(px, py, puntosGuiaDeModelo(modelo));
+    const s = snapActivo ? snapARejilla(px, py, pasoRejilla) : { x: px, y: py };
+    if (al.guiaX !== null || al.guiaY !== null) {
+      return {
+        x: al.guiaX !== null ? al.guiaX.valor : s.x,
+        y: al.guiaY !== null ? al.guiaY.valor : s.y,
+        guias: al,
+      };
+    }
+
+    // (3) Rejilla (paso configurable, UX-2.1) o crudo si snap off.
+    return { x: s.x, y: s.y, guias: null };
   }
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {
-    const { x, y } = aplicarSnap(e.point.x, e.point.y);
-    moverMarcador(x, y);
+    const r = resolverCursor(e.point.x, e.point.y, e.nativeEvent.altKey);
+    moverMarcador(r.x, r.y);
+    guias.pintar(r.guias, r.x, r.y, 0);
   };
 
-  const onClick = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-    const { x, y } = aplicarSnap(e.point.x, e.point.y);
-
+  // Nucleo del clic: coloca un pilar en un punto YA RESUELTO (del snap del clic o
+  // de la entrada numerica, UX-2.5). Unica puerta de commit de la herramienta.
+  function confirmarPunto(x: number, y: number): void {
     const { defaultsPilar } = vistaStore.getState();
     // Sin seccion/material no se puede crear un pilar valido: no colocar (la Fase 4
     // garantiza que la herramienta fije defaults antes de habilitar el clic).
@@ -217,7 +254,14 @@ function ColocacionActiva() {
     const base = modeloStore.getState().getModelo();
     const comando = crearPilar(base, datos);
     modeloStore.getState().ejecutar(comando);
+    ultimoColocado.current = { x, y }; // base del "@dx,dy" de la entrada numerica
     invalidate();
+  }
+
+  const onClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const r = resolverCursor(e.point.x, e.point.y, e.nativeEvent.altKey);
+    confirmarPunto(r.x, r.y);
   };
 
   // Al entrar en la herramienta, limpia la seleccion: el InspectorPilar (que se
@@ -243,6 +287,25 @@ function ColocacionActiva() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Alt mantenido suprime snap/guias (D8b); el hook evita que Alt dispare el menu
+  // del navegador en Windows mientras la herramienta esta activa.
+  useAltSuprime();
+
+  // Entrada numerica (UX-2.5): "x,y" absoluto o "@dx,dy"/"d<a" desde el ULTIMO pilar
+  // colocado (asi se replantea una crujia entera tecleando distancias). El punto
+  // tecleado es EXACTO (sin snap) y entra por el MISMO confirmarPunto del clic.
+  useEffect(() => {
+    return suscribirEntrada((expr) => {
+      const r = resolverPuntoEntrada(expr, ultimoColocado.current);
+      if (!r.ok) {
+        emitirAviso(r.error);
+        return;
+      }
+      confirmarPunto(r.x, r.y);
+    });
+    // Deps vacias: el handler cierra sobre refs/stores estables; vive lo que la herramienta.
+  }, []);
+
   return (
     <group>
       {/* Plano de captura propio: gemelo de PlanoCoords, dedicado a la herramienta.
@@ -252,6 +315,8 @@ function ColocacionActiva() {
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial visible={false} transparent opacity={0} depthWrite={false} />
       </mesh>
+      {/* Guias de alineacion (UX-2.4): overlay compartido (GuiasOverlay). */}
+      {guias.nodo}
       <MarcadorFantasma refGrupo={refMarcador} />
     </group>
   );

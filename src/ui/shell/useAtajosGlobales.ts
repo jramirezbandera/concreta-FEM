@@ -35,8 +35,9 @@ const PESTANA_POR_TECLA: Record<string, Pestana> = {
 };
 
 // ¿El foco esta en un elemento donde el undo/redo del teclado debe ser el NATIVO del
-// campo (edicion de texto), no el de la obra?
-function focoEnCampoEditable(): boolean {
+// campo (edicion de texto), no el de la obra? Exportado: la barra de coordenadas
+// (EntradaNumericaOverlay, UX-2.5) usa el mismo criterio para no robar el teclado.
+export function focoEnCampoEditable(): boolean {
   const el = document.activeElement;
   if (el === null) return false;
   const tag = el.tagName;
@@ -85,6 +86,9 @@ export function useAtajosGlobales(): void {
       const pestana = PESTANA_POR_TECLA[e.key];
       if (pestana !== undefined && !ctrl && !e.altKey && !e.shiftKey) {
         if (focoEnCampoEditable()) return;
+        // Durante una colocacion (herramienta activa) un digito es una COORDENADA
+        // (la captura la barra de entrada numerica, UX-2.5), no un salto de pestaña.
+        if (vistaStore.getState().herramienta !== "seleccion") return;
         e.preventDefault();
         vistaStore.getState().setPestanaActiva(pestana);
         return;

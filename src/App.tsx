@@ -27,6 +27,8 @@ import {
   ModeloCalculo,
 } from "./ui/viewport";
 import { suscribirCoords, leerCoords } from "./ui/viewport";
+import { suscribirAviso } from "./ui/viewport/hooks/avisoBus";
+import { suscribirEnganche, leerEnganche } from "./ui/viewport/hooks/imanBus";
 import { ProveedorModoPanel } from "./ui/primitivas";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
@@ -339,6 +341,43 @@ function useCoordsThrottled(): { x: number; y: number } | null {
   return coords;
 }
 
+// --- Corte UX-2.2 · Enganche del iman -> barra de estado ------------------------
+
+// Etiqueta del enganche actual del iman ("Pilar P3", "Extremo de V2") o null. El bus
+// DEDUPLICA (solo notifica al cambiar el enganche real), asi que el setState directo
+// es barato aunque la herramienta emita en cada move.
+function useEnganche(): string | null {
+  const [enganche, setEnganche] = useState<string | null>(() => leerEnganche());
+  useEffect(() => suscribirEnganche(setEnganche), []);
+  return enganche;
+}
+
+// --- Corte UX-2.0 · Avisos puntuales de las herramientas -> barra de estado ----
+
+// Duracion del aviso en pantalla (ms): suficiente para leerlo, corto para que no se
+// enquiste sobre el mensaje contextual.
+const AVISO_MS = 4000;
+
+// Ultimo aviso emitido por una herramienta (avisoBus), o null. setState directo (los
+// avisos son esporadicos: un clic que no creo nada, no alta frecuencia) con
+// autolimpieza. Prioriza sobre el mensaje contextual, NO sobre el de calculo.
+function useAvisoTransitorio(): string | null {
+  const [aviso, setAviso] = useState<string | null>(null);
+  useEffect(() => {
+    let timer = 0;
+    const off = suscribirAviso((texto) => {
+      setAviso(texto);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setAviso(null), AVISO_MS);
+    });
+    return () => {
+      window.clearTimeout(timer);
+      off();
+    };
+  }, []);
+  return aviso;
+}
+
 // --- Composicion por pestana (refactor "dock de paneles", PR1/PR2) ------------
 
 // Lo que App inyecta en el Viewport (sceneOverlays/hudOverlays) y en el Shell (dock)
@@ -597,6 +636,10 @@ export default function App() {
   // Feedback de calculo (auditoria UX-L6): mientras el motor trabaja, prioriza sobre el
   // mensaje contextual; null en reposo.
   const mensajeCalculo = useMensajeCalculo();
+  // Aviso puntual de una herramienta (UX-2.0): prioriza sobre el contextual unos segundos.
+  const avisoHerramienta = useAvisoTransitorio();
+  // Enganche del iman (UX-2.2): "Pilar P3" / "Extremo de V2" mientras el cursor engancha.
+  const enganche = useEnganche();
   // En 3D pleno se inhabilita la introduccion grafica y las ayudas 2D (calco DXF,
   // paneles de herramienta): se inspecciona, no se introduce (F2c, decision #3).
   const enPleno = useEnPleno();
@@ -641,21 +684,23 @@ export default function App() {
   // siguen el mismo patron; cada pestana solo consulta su propia herramienta.
   const mensaje = mensajeCalculo
     ? mensajeCalculo
-    : enPleno
-      ? MENSAJE_3D
-      : enPilares && herramienta === "pilar"
-        ? puedeColocar
-          ? MENSAJE_HERRAMIENTA_PILAR
-          : MENSAJE_PILAR_SIN_TRAMO
-        : enVigas && herramienta === "viga"
-          ? puedeColocarViga
-            ? MENSAJE_HERRAMIENTA_VIGA
-            : MENSAJE_VIGA_SIN_TRAMO
-          : enVigas && herramienta === "pano"
-            ? puedeColocarPano
-              ? MENSAJE_HERRAMIENTA_PANO
-              : MENSAJE_PANO_SIN_TRAMO
-            : MENSAJE_PESTANA[pestana];
+    : avisoHerramienta
+      ? avisoHerramienta
+      : enPleno
+        ? MENSAJE_3D
+        : enPilares && herramienta === "pilar"
+          ? puedeColocar
+            ? MENSAJE_HERRAMIENTA_PILAR
+            : MENSAJE_PILAR_SIN_TRAMO
+          : enVigas && herramienta === "viga"
+            ? puedeColocarViga
+              ? MENSAJE_HERRAMIENTA_VIGA
+              : MENSAJE_VIGA_SIN_TRAMO
+            : enVigas && herramienta === "pano"
+              ? puedeColocarPano
+                ? MENSAJE_HERRAMIENTA_PANO
+                : MENSAJE_PANO_SIN_TRAMO
+              : MENSAJE_PESTANA[pestana];
 
   return (
     <Shell
@@ -663,6 +708,7 @@ export default function App() {
       status={{
         mensaje,
         snapActivo,
+        enganche,
         ...(coords ? { coords } : {}),
       }}
       dock={dock}

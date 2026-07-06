@@ -87,18 +87,20 @@ function CamaraAlzado({ dir }: { dir: DireccionAlzado }) {
   );
 }
 
-// Rejilla en el plano XY (suelo) con malla cada 0.5 m (Spec §4.1). Pasiva: no
-// raycastea (no estorba al picking). drei <Grid> usa un shader propio.
-function Rejilla() {
+// Rejilla en el plano XY (suelo), paso configurable (UX-2.1: vistaStore.pasoRejilla,
+// default 0.5 m — Spec §4.1). La linea mayor cada 10 celdas (major/minor legible a
+// cualquier paso). Pasiva: no raycastea (no estorba al picking). drei <Grid> usa un
+// shader propio.
+function Rejilla({ paso }: { paso: number }) {
   return (
     <Grid
       // Plano XY: rotar el grid (por defecto en XZ) para que quede en el suelo Z=0.
       rotation={[Math.PI / 2, 0, 0]}
       args={[200, 200]}
-      cellSize={0.5}
+      cellSize={paso}
       cellThickness={0.6}
       cellColor={hexToken("canvasGrid")}
-      sectionSize={5}
+      sectionSize={paso * 10}
       sectionThickness={1}
       sectionColor={hexToken("canvasGrid2")}
       infiniteGrid
@@ -239,9 +241,20 @@ function useVista3d(): Vista3D {
   );
 }
 
+// Paso de la rejilla (UX-2.1): cambio esporadico (popover del ToolsRail), re-render
+// de la Escena aceptable (mismo caracter que rejillaVisible).
+function usePasoRejilla(): number {
+  return useSyncExternalStore(
+    (cb) => vistaStore.subscribe((s) => s.pasoRejilla, cb),
+    () => vistaStore.getState().pasoRejilla,
+    () => vistaStore.getState().pasoRejilla,
+  );
+}
+
 export function Escena({ modoVista, overlays }: EscenaProps) {
   const esPlanta = modoVista === "planta";
   const rejillaVisible = useRejillaVisible();
+  const pasoRejilla = usePasoRejilla();
   // Alzados de consulta (UX-1.5): sub-vista de 3D. En planta se ignora (vale "orbita").
   const vista3d = useVista3d();
   const enAlzado = !esPlanta && vista3d !== "orbita";
@@ -316,7 +329,7 @@ export function Escena({ modoVista, overlays }: EscenaProps) {
       <ambientLight intensity={0.9} />
       <directionalLight position={[10, -10, 20]} intensity={0.4} />
 
-      {rejillaVisible && <Rejilla />}
+      {rejillaVisible && <Rejilla paso={pasoRejilla} />}
       <Ejes />
 
       <ControlZoom />
