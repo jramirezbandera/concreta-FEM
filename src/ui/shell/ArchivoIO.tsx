@@ -91,6 +91,11 @@ export function ArchivoIO({ nombreObraActual, onImportado }: ArchivoIOProps) {
   const confirmarImport = useCallback(async (): Promise<void> => {
     if (estado?.fase !== "confirmar") return;
     await aplicarImport(estado.validado);
+    // [D14/UX-3.1 · guardián M-1] Cambiar de obra por IMPORT tambien resetea el estado
+    // de UI transitorio (dock + capas de visibilidad): la obra importada arranca con el
+    // dock abierto y todo visible, igual que la carga del arranque.
+    vistaStore.getState().resetDockUI();
+    vistaStore.getState().resetCapas();
     // Refresca el nombre del Brandbar (el proyecto activo cambió al importado).
     onImportado();
     setEstado(null);

@@ -160,6 +160,10 @@ export function useArranquePersistencia(): ArranquePersistencia {
       // entero + por sección): la obra nueva empieza con el dock abierto y sus secciones
       // abiertas (patrón resolverVistaActiva/snapActivo, estado de vista transitorio).
       vistaStore.getState().resetDockUI();
+      // [UX-3.1 · guardián M-1] Mismo criterio para las capas de visibilidad: la obra
+      // nueva arranca con TODO visible (una capa oculta heredada de otro proyecto seria
+      // un "¿donde estan mis vigas?" sin indicio).
+      vistaStore.getState().resetCapas();
 
       // cargarPlantillasEnStore valida las plantillas (Zod) al leer de IndexedDB.
       await cargarPlantillasEnStore(proyectoId);
