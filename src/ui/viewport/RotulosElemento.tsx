@@ -161,6 +161,15 @@ export function RotulosElemento({
 
   const selSet = useMemo(() => new Set(seleccion), [seleccion]);
 
+  // Cota de la viga SELECCIONADA (UX-4a): su rotulo gana la longitud ("V3 · 5.00 m").
+  // Derivada de la geometria ya proyectada (no por frame); solo se muestra en la
+  // seleccionada para no saturar el lienzo (las cotas permanentes son fase futura).
+  const longitudPorViga = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const v of geo.vigas) m.set(v.id, Math.hypot(v.bx - v.ax, v.by - v.ay));
+    return m;
+  }, [geo]);
+
   // Pinta un frame al cambiar etiquetas/seleccion/visibilidad/enfasis (frameloop=
   // "demand": montar texto o cambiar su color no programa frame por si solo).
   useEffect(() => {
@@ -176,9 +185,15 @@ export function RotulosElemento({
           <Rotulo key={e.id} etiqueta={e} seleccionado={selSet.has(e.id)} />
         ))}
       {enfasis.vigas === "pleno" &&
-        vigas.map((e) => (
-          <Rotulo key={e.id} etiqueta={e} seleccionado={selSet.has(e.id)} />
-        ))}
+        vigas.map((e) => {
+          const sel = selSet.has(e.id);
+          const largo = longitudPorViga.get(e.id);
+          const etiqueta =
+            sel && largo !== undefined
+              ? { ...e, texto: `${e.texto} · ${largo.toFixed(2)} m` }
+              : e;
+          return <Rotulo key={e.id} etiqueta={etiqueta} seleccionado={sel} />;
+        })}
     </group>
   );
 }
