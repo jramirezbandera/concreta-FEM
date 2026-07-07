@@ -45,6 +45,7 @@ import {
 } from "./contratoFEM";
 import { type PuntoPlano } from "./mallado";
 import { calcularAcoples } from "./acople";
+import { emitirMuros } from "./muros";
 import { cargasPlantaDePano } from "./cargasPlanta";
 import {
   extremosDeVigueta,
@@ -665,6 +666,45 @@ function acumularApoyoUni(
   });
 }
 
+// FUSION (OR) de un mapa de apoyos nodales en la lista final de `supports`. FUENTE
+// UNICA del gotcha "def_support ASIGNA los 6 flags" (pynite_glue.py:1087): NUNCA debe
+// haber dos entradas de `supports` para el mismo nudo (la ultima pisaria la primera).
+// Una entrada existente se OR-mergea IN PLACE (conserva su posicion: regresion byte a
+// byte de las entradas base/malla); un nudo nuevo se anade DETRAS, ordenado por nombre
+// (segregado y determinista). La consumen el Paso 6d (viguetas) y el Paso 6e (muros).
+function fusionarApoyosEnLista(
+  lista: ApoyoFEM[],
+  porNodoNuevos: ReadonlyMap<string, ApoyoFEM>,
+): ApoyoFEM[] {
+  if (porNodoNuevos.size === 0) return lista;
+  const porNodoFinal = new Map<string, { apoyo: ApoyoFEM; nuevo: boolean }>();
+  for (const s of lista) porNodoFinal.set(s.node, { apoyo: s, nuevo: false });
+  for (const [node, gdl] of porNodoNuevos) {
+    const previo = porNodoFinal.get(node);
+    const acc: ApoyoFEM = previo?.apoyo ?? {
+      node, DX: false, DY: false, DZ: false, RX: false, RY: false, RZ: false,
+    };
+    porNodoFinal.set(node, {
+      apoyo: {
+        node,
+        DX: acc.DX || gdl.DX,
+        DY: acc.DY || gdl.DY,
+        DZ: acc.DZ || gdl.DZ,
+        RX: acc.RX || gdl.RX,
+        RY: acc.RY || gdl.RY,
+        RZ: acc.RZ || gdl.RZ,
+      },
+      nuevo: previo === undefined,
+    });
+  }
+  const existentes = lista.map((s) => porNodoFinal.get(s.node)!.apoyo);
+  const nuevos = [...porNodoFinal.values()]
+    .filter((v) => v.nuevo)
+    .map((v) => v.apoyo)
+    .sort((a, b) => (a.node < b.node ? -1 : a.node > b.node ? 1 : 0));
+  return nuevos.length > 0 ? [...existentes, ...nuevos] : existentes;
+}
+
 // --- discretizador -----------------------------------------------------------
 
 export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDiscretizacion {
@@ -1265,6 +1305,31 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     panoAMembers[pano.id] = nombresMembers;
   });
 
+  // --- Paso 6e: MUROS/pantallas (F3, muros) -------------------------------------
+  // La emision (nudos, quads, remap por celda, apoyos de base, tributarios de peso
+  // propio) vive en `emitirMuros` (modulo hoja) porque tiene DOS llamantes: este
+  // Paso 6e y `prepararModeloCR` (la base del CR SI lleva la malla de muros — es la
+  // rigidez lateral que mide — aunque siga sin la de losas, decision 3A). Aqui se
+  // añade lo exclusivo del calculo con cargas: el PESO PROPIO como cargas NODALES
+  // FY = -W/4 por nudo del quad (NUNCA presion de superficie: la normal del muro es
+  // horizontal y la "presion de peso" empujaria el muro de lado). Verificado en el
+  // spike (P5: SumaV base = rho*t*L*H exacta) y sin doble conteo con la masa modal
+  // del glue (case __masa_modal__ separado). Orden determinista: muro por id ->
+  // quad por k -> nudo i,j,m,n. Sin muros, nada se emite (regresion byte a byte).
+  const muros = emitirMuros(modelo, acoples, base.nombrePorClave);
+  if (casePesoPropioPano !== undefined) {
+    for (const pp of muros.pesosPropios) {
+      for (const nodo of pp.nodos) {
+        node_loads.push({
+          node: nodo,
+          direction: "FY",
+          P: -pp.w / 4,
+          case: casePesoPropioPano,
+        });
+      }
+    }
+  }
+
   avisos.push(...avisosPano);
 
   // --- Paso 7: combinaciones (delegado a ./combinaciones) ----------------------
@@ -1328,12 +1393,19 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   // los de la losa (no inundar la tabla con las reacciones de borde del forjado). Vacio si
   // no hay paños unidireccionales (regresion).
   for (const node of uniSupportsPorNodo.keys()) apoyosDeMalla.add(node);
+  // Muros (Paso 6e): sus quads comparten los campos genericos (quadANodos,
+  // nodosDeMalla, apoyosDeMalla) y aportan su procedencia propia (muroAQuads/
+  // quadAMuro, espejo de la losa). Sin muros, todo esta vacio (regresion).
+  for (const nd of muros.nodosDeMalla) nodosDeMalla.push(nd);
+  for (const nd of muros.apoyosDeMalla) apoyosDeMalla.add(nd);
   const trazabilidad: Trazabilidad = {
     ...base.trazabilidad,
     panoAQuads,
     panoAMembers,
     quadAPano,
-    quadANodos,
+    muroAQuads: muros.muroAQuads,
+    quadAMuro: muros.quadAMuro,
+    quadANodos: { ...quadANodos, ...muros.quadANodos },
     nodosDeMalla,
     apoyosDeMalla: [...apoyosDeMalla].sort(),
   };
@@ -1353,7 +1425,11 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   // deben existir en `materials`. Determinista: orden alfabetico de id, detras del portico,
   // sin duplicar. Sin material de paño nuevo => mismo array (regresion byte a byte).
   const materialIdsBase = new Set(materials.map((m) => m.name));
-  const materialIdsPanoTodos = new Set<string>([...materialIdsPano, ...materialIdsUni]);
+  const materialIdsPanoTodos = new Set<string>([
+    ...materialIdsPano,
+    ...materialIdsUni,
+    ...muros.materialIds,
+  ]);
   const materialesPanoNuevos: MaterialFEM[] = [...materialIdsPanoTodos]
     .filter((id) => !materialIdsBase.has(id))
     .sort()
@@ -1365,10 +1441,11 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   const materialsFinal: MaterialFEM[] =
     materialesPanoNuevos.length > 0 ? [...materials, ...materialesPanoNuevos] : materials;
 
-  // Nudos: base (portico) -> malla de losa (PQ) -> viguetas (PV). Cada tramo solo se anade
-  // si tiene contenido, para que un modelo sin paños unidireccionales no cambie ni un byte.
+  // Nudos: base (portico) -> malla de losa (PQ) -> viguetas (PV) -> muros (MQ). Cada tramo
+  // solo se anade si tiene contenido, para que un modelo sin esos elementos no cambie ni un byte.
   let nodesFinal: NodoFEM[] = meshNodes.length > 0 ? [...nodes, ...meshNodes] : nodes;
   if (uniNodes.length > 0) nodesFinal = [...nodesFinal, ...uniNodes];
+  if (muros.nodes.length > 0) nodesFinal = [...nodesFinal, ...muros.nodes];
 
   // Apoyos: base -> malla de losa -> viguetas (ordenados por nombre de nudo, determinista).
   const meshSupports = [...meshSupportsPorNodo.values()].sort((a, b) =>
@@ -1376,45 +1453,17 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
   );
   let supportsFinal: ApoyoFEM[] =
     meshSupports.length > 0 ? [...supports, ...meshSupports] : supports;
-  // Apoyos de VIGUETA (muletas torsionales sobre N* + apoyos aislados de nudos propios).
+  // Apoyos de VIGUETA (muletas torsionales sobre N* + apoyos aislados de nudos propios)
+  // y de MURO (fila base 6 GDL, posiblemente sobre N* fusionados).
   // GOTCHA CRITICO: el glue aplica `def_support` que ASIGNA los 6 flags (no fusiona,
   // pynite_glue.py:1087) -> DOS entradas de `supports` para el MISMO nudo se PISAN (la
-  // ultima gana, borrando la primera). Una muleta torsional sobre un N* que YA tuviera un
-  // apoyo (p.ej. un pilar cuyo arranque cae justo en la subdivision) borraria el apoyo
-  // real. Por eso se FUSIONA (OR) por nudo: la muleta se OR-mergea en la entrada existente
-  // (base o malla de losa) si el nudo ya tiene apoyo; si no, se anade como entrada nueva.
-  // Los nudos PROPIOS de vigueta (PV*) nunca colisionan (nombre disjunto): se anaden.
-  if (uniSupportsPorNodo.size > 0) {
-    const porNodoFinal = new Map<string, { apoyo: ApoyoFEM; nuevo: boolean }>();
-    for (const s of supportsFinal) porNodoFinal.set(s.node, { apoyo: s, nuevo: false });
-    for (const [node, muleta] of uniSupportsPorNodo) {
-      const previo = porNodoFinal.get(node);
-      const acc: ApoyoFEM = previo?.apoyo ?? {
-        node, DX: false, DY: false, DZ: false, RX: false, RY: false, RZ: false,
-      };
-      porNodoFinal.set(node, {
-        apoyo: {
-          node,
-          DX: acc.DX || muleta.DX,
-          DY: acc.DY || muleta.DY,
-          DZ: acc.DZ || muleta.DZ,
-          RX: acc.RX || muleta.RX,
-          RY: acc.RY || muleta.RY,
-          RZ: acc.RZ || muleta.RZ,
-        },
-        nuevo: previo === undefined,
-      });
-    }
-    // Preserva el orden de `supportsFinal` (entradas existentes, ya deterministas) y anade
-    // detras los nudos NUEVos de vigueta ordenados por nombre. Asi las entradas base/malla
-    // no cambian de posicion (regresion) y las de vigueta quedan segregadas al final.
-    const existentes = supportsFinal.map((s) => porNodoFinal.get(s.node)!.apoyo);
-    const nuevos = [...porNodoFinal.values()]
-      .filter((v) => v.nuevo)
-      .map((v) => v.apoyo)
-      .sort((a, b) => (a.node < b.node ? -1 : a.node > b.node ? 1 : 0));
-    supportsFinal = [...existentes, ...nuevos];
-  }
+  // ultima gana, borrando la primera). Una muleta torsional o un apoyo de base de muro
+  // sobre un N* que YA tuviera un apoyo (p.ej. un pilar cuyo arranque comparte celda)
+  // borraria el apoyo real. Por eso se FUSIONA (OR) por nudo con `fusionarApoyosEnLista`
+  // (helper unico): entrada existente -> OR in place (conserva posicion, regresion);
+  // nudo nuevo -> se anade detras ordenado por nombre.
+  supportsFinal = fusionarApoyosEnLista(supportsFinal, uniSupportsPorNodo);
+  supportsFinal = fusionarApoyosEnLista(supportsFinal, muros.supportsPorNodo);
 
   // Secciones: catalogo/obra (base) -> sinteticas VIG-<idx> (viguetas). Members: base ->
   // viguetas PV. dist_loads: base (usuario/pp barras) -> viguetas. Cada uno solo crece si
@@ -1439,11 +1488,14 @@ export function discretizar(modelo: Modelo, opts?: DiscretizarOpts): ResultadoDi
     combos,
     analysis,
   };
-  // quads / quad_loads SOLO si hay paños (decision: claves OPCIONALES). Un portico de
-  // barras NO lleva esas claves -> Capa 2 byte-identica a antes (regresion). Los
-  // consumidores leen `quads ?? []`.
-  if (quads.length > 0) {
-    modeloFEM.quads = quads;
+  // quads / quad_loads SOLO si hay paños o muros (decision: claves OPCIONALES). Un
+  // portico de barras NO lleva esas claves -> Capa 2 byte-identica a antes (regresion).
+  // Orden: quads de losa (PQ) primero, de muro (MQ) despues (segregados). Los
+  // consumidores leen `quads ?? []`. Los muros NO aportan quad_loads (su peso propio
+  // viaja como node_loads, Paso 6e).
+  const quadsFinal = muros.quads.length > 0 ? [...quads, ...muros.quads] : quads;
+  if (quadsFinal.length > 0) {
+    modeloFEM.quads = quadsFinal;
   }
   if (quad_loads.length > 0) {
     modeloFEM.quad_loads = quad_loads;

@@ -196,6 +196,16 @@ export interface Trazabilidad {
   panoAMembers?: Record<string, string[]>;
   // quad FEM (p.ej. "PQ0-Q3") -> el pano de obra que lo genero (mapa inverso).
   quadAPano: Record<string, string>;
+  // --- Procedencia de la malla de MUROS (F3, muros) ---------------------------
+  // Espejo vertical de panoAQuads/quadAPano para las pantallas: un muro se malla en
+  // quads MQ<idx>-Q<k> en su plano vertical. Los quads de muro comparten los campos
+  // genericos (quadANodos, nodosDeMalla, apoyosDeMalla); estos dos mapas marcan su
+  // PROCEDENCIA para que la UI los distinga de los de losa (p.ej. los isovalores de
+  // planta saltan los quads sin entrada en quadAPano). OPCIONALES (aditivos, mismo
+  // argumento que panoAMembers): `discretizar` los emite SIEMPRE; los literales
+  // previos construidos a mano no se rompen. Consumidores: `muroAQuads ?? {}`.
+  muroAQuads?: Record<string, string[]>;
+  quadAMuro?: Record<string, string>;
   // quad FEM -> sus 4 nudos en orden canonico [i,j,m,n] (CCW desde +Y). La UI de
   // isovalores promedia el valor por-quad a los nudos usando este mapa.
   quadANodos: Record<string, [string, string, string, string]>;
@@ -223,6 +233,8 @@ export function trazabilidadVacia(): Trazabilidad {
     panoAQuads: {},
     panoAMembers: {},
     quadAPano: {},
+    muroAQuads: {},
+    quadAMuro: {},
     quadANodos: {},
     nodosDeMalla: [],
     apoyosDeMalla: [],
