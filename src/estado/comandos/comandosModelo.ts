@@ -9,6 +9,9 @@ import type {
   Viga,
   Nudo,
   Pano,
+  PanoLosa,
+  PanoUnidireccional,
+  TipoDireccionViguetas,
   Muro,
   Planta,
   Carga,
@@ -290,7 +293,10 @@ export function eliminarViga(base: Modelo, vigaId: string): Comando {
 // nudos PROPIOS en vez de ids ya resueltos. Espejo de DatosViga: la introduccion
 // grafica trabaja en coordenadas; el comando crea los nudos. UNIDADES internas en m.
 export type DatosPano = {
-  tipo: Pano["tipo"];
+  // La UI solo introduce losa maciza y forjado unidireccional (el reticular no se ofrece en
+  // creacion: el selector del panel excluye "reticular"). Restringido a esos dos tipos para
+  // que el literal del comando satisfaga la union discriminada de Pano sin ramas muertas.
+  tipo: "losa" | "unidireccional";
   plantaId: string;
   // Perimetro del paño como puntos en planta (m). Corte 1: 4 esquinas (rectangulo).
   perimetro: { x: number; y: number }[];
@@ -304,7 +310,7 @@ export type DatosPano = {
   // opcionales en PanoSchema). Espejo del contrato: espesor/tamMalla siguen viajando
   // con sus defaults aunque el discretizador los ignore bajo uni (deuda
   // T-f3-pano-schema-union).
-  direccionViguetas?: Pano["direccionViguetas"];
+  direccionViguetas?: TipoDireccionViguetas;
   intereje?: number; // m
   canto?: number; // m
   anchoNervio?: number; // m
@@ -342,46 +348,67 @@ export function crearPano(base: Modelo, datos: DatosPano): Comando {
       const perimetro = datos.perimetro.map((p) =>
         resolverPuntoPerimetro(borrador, p),
       );
-      const pano: Pano = {
+      // Union discriminada por `tipo`: cada variante lleva SOLO sus campos. Se construye el
+      // literal por rama para que TS lo valide (una losa con campos uni, o al reves, ya no
+      // compila). Los campos uni ausentes en la losa: coherente con la variante.
+      const comun = {
         id,
         nombre,
-        tipo: datos.tipo,
         plantaId: datos.plantaId,
         perimetro,
-        espesor: datos.espesor,
         materialId: datos.materialId,
-        tamMalla: datos.tamMalla,
         bordeApoyo: datos.bordeApoyo,
-        // Campos del forjado unidireccional: solo se copian cuando `tipo` es
-        // "unidireccional" (bajo "losa" un `undefined` dejaria claves ausentes,
-        // coherente con que sean opcionales en PanoSchema). El discretizador los lee
-        // solo bajo uni; espesor/tamMalla los ignora ahi (deuda T-f3-pano-schema-union).
-        ...(datos.tipo === "unidireccional"
-          ? {
-              direccionViguetas: datos.direccionViguetas,
-              intereje: datos.intereje,
-              canto: datos.canto,
-              anchoNervio: datos.anchoNervio,
-              pesoPropio: datos.pesoPropio,
-            }
-          : {}),
       };
+      const pano: Pano =
+        datos.tipo === "unidireccional"
+          ? {
+              ...comun,
+              tipo: "unidireccional",
+              direccionViguetas: datos.direccionViguetas ?? "x",
+              intereje: datos.intereje ?? 0,
+              canto: datos.canto ?? 0,
+              anchoNervio: datos.anchoNervio ?? 0,
+              pesoPropio: datos.pesoPropio ?? 0,
+            }
+          : {
+              ...comun,
+              tipo: "losa",
+              espesor: datos.espesor,
+              tamMalla: datos.tamMalla,
+            };
       borrador.panos.push(pano);
     },
   );
   return comando;
 }
 
-// Edita propiedades de un paño (merge superficial de `cambios`). No toca id, nombre ni
-// perimetro (la geometria la fija la introduccion grafica, no el inspector, espejo de
-// editarViga). Paño inexistente => no-op. El delta solo recoge los campos que cambian.
+// Parche de edicion de un paño: un subconjunto (opcional) de los campos editables de
+// CUALQUIER variante. Se aplana a un solo objeto de campos opcionales porque el inspector
+// edita campo a campo (un commit por control) y un `Partial<Omit<Pano,...>>` sobre la union
+// discriminada NO acepta un literal con un campo suelto (TS exige que encaje en UNA variante).
+// El `tipo` NO se edita aqui (es solo-lectura en el inspector: cambiarlo alteraria la forma
+// del paño). El merge superficial (Object.assign) preserva el resto de campos de la variante.
+export type CambiosPano = Partial<
+  Pick<PanoLosa, "materialId" | "bordeApoyo" | "espesor" | "tamMalla"> &
+    Pick<
+      PanoUnidireccional,
+      "direccionViguetas" | "intereje" | "canto" | "anchoNervio" | "pesoPropio"
+    >
+>;
+
+// Edita propiedades de un paño (merge superficial de `cambios`). No toca id, nombre, tipo ni
+// perimetro (la geometria y el tipo los fija la introduccion grafica, no el inspector, espejo
+// de editarViga). Paño inexistente => no-op. El delta solo recoge los campos que cambian.
 export function editarPano(
   base: Modelo,
   panoId: string,
-  cambios: Partial<Omit<Pano, "id" | "nombre" | "perimetro">>,
+  cambios: CambiosPano,
 ): Comando {
   const { comando } = crearComandoParches(base, "Editar paño", (borrador) => {
     const pano = borrador.panos.find((p) => p.id === panoId);
+    // Object.assign sobre la variante concreta: los campos del parche que no pertenecen a la
+    // variante del paño no llegan aqui (el inspector solo commitea los campos visibles de su
+    // variante). Cast a un registro laxo para el merge (el tipo de `pano` es la union).
     if (pano) Object.assign(pano, cambios);
   });
   return comando;

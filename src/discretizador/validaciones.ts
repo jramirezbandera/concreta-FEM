@@ -12,7 +12,7 @@
 // Estas comprobaciones son HEURISTICAS BARATAS, complementarias (no sustitutas) del
 // veredicto exacto de estabilidad/mecanismo que dara `check_stability` del solver
 // (feature-5/6). Aqui se atrapa lo evidente en lenguaje del arquitecto.
-import type { Modelo, Pilar, Viga, Carga, Pano, Muro } from "../dominio";
+import type { Modelo, Pilar, Viga, Carga, Pano, PanoUnidireccional, Muro } from "../dominio";
 import { plantaPorId, nudoPorId, seccionPorId, esHipotesisAutomatica } from "../dominio";
 import { getMaterial, getSeccion } from "../biblioteca";
 import { TOL_NODO, mapearEjes, clavePosicion, hayTresNoColineales, cuantizar } from "./geometria";
@@ -503,14 +503,19 @@ function validarRefsPano(
 // El forjado unidireccional NO se malla (monta viguetas): tiene su propia cadena de
 // validacion, con la PRECEDENCIA del contrato §7-E:
 //   1. tipo (ya aceptado por el llamante) -> 2. REF_MATERIAL/REF_PLANTA ->
-//   3. PANO_UNI_CAMPOS (los 4 campos geometricos presentes y > 0; sin ellos NO hay
-//      geometria de viguetas que evaluar -> se SALTA el resto) ->
-//   4. PANO_PERIMETRO / PANO_NO_RECTANGULAR / PANO_DEGENERADO (bbox rectangular) ->
-//   5. PANO_UNI_SIN_APOYO (borde de apoyo "libre" sin viga de contorno completa).
+//   3. PANO_PERIMETRO / PANO_NO_RECTANGULAR / PANO_DEGENERADO (bbox rectangular) ->
+//   4. PANO_UNI_SIN_APOYO (borde de apoyo "libre" sin viga de contorno completa).
 // Los interiores (PANO_PILAR/VIGA_INTERIOR) los emite validarElementosInterioresPano
 // (compartido con la losa); la sujecion global la cubre validarSujecion.
+//
+// La PRESENCIA y positividad de los campos de vigueta (direccionViguetas/intereje/canto/
+// anchoNervio/pesoPropio) YA la garantiza el esquema Zod: la union discriminada por `tipo`
+// los declara OBLIGATORIOS y > 0 (`.positive()` / `.nonnegative()`) en la variante
+// unidireccional. Por eso el antiguo chequeo de presencia `PANO_UNI_CAMPOS` MURIO: era
+// redundante con el borde de dominio (cierre de T-f3-pano-schema-union). El parametro se
+// tipa `PanoUnidireccional` (el llamante lo pasa ya estrechado por `pano.tipo`).
 function validarRefsPanoUnidireccional(
-  pano: Pano,
+  pano: PanoUnidireccional,
   modelo: Modelo,
   errores: ErrorObra[],
   acoples: ResultadoAcoples,
@@ -536,31 +541,7 @@ function validarRefsPanoUnidireccional(
     });
   }
 
-  // 3) PANO_UNI_CAMPOS (agrupador): direccionViguetas ∈ {"x","y"} y intereje/canto/
-  // anchoNervio finitos y > 0 (pesoPropio finito y >= 0; 0 es legitimo). Un solo codigo:
-  // el mensaje enumera lo que falta, la UI resalta el campo vacio (DECISION, contrato §7-B).
-  const esPos = (v: number | undefined): boolean =>
-    typeof v === "number" && Number.isFinite(v) && v > 0;
-  const esNoNeg = (v: number | undefined): boolean =>
-    typeof v === "number" && Number.isFinite(v) && v >= 0;
-  const camposOk =
-    (pano.direccionViguetas === "x" || pano.direccionViguetas === "y") &&
-    esPos(pano.intereje) &&
-    esPos(pano.canto) &&
-    esPos(pano.anchoNervio) &&
-    esNoNeg(pano.pesoPropio);
-  if (!camposOk) {
-    errores.push({
-      codigo: "PANO_UNI_CAMPOS",
-      severidad: "error",
-      mensaje: `El forjado unidireccional "${pano.nombre}" necesita dirección de viguetas, intereje, canto y ancho de nervio (todos mayores que cero) y un peso propio válido. Revísalos.`,
-      elementoId: pano.id,
-      elementoTipo: "pano",
-    });
-    return; // sin campos no hay geometria de viguetas que validar (contrato §7-E-3)
-  }
-
-  // 4) Geometria: rectangulo de 4 nudos existentes. [1A] Si el acople YA resolvio el paño
+  // 3) Geometria: rectangulo de 4 nudos existentes. [1A] Si el acople YA resolvio el paño
   // (esta en `unidireccionalPorPano`) la geometria es valida por construccion: no se
   // re-evalua. Solo se re-evalua para EXPLICAR el motivo del rechazo.
   const uni = acoples.unidireccionalPorPano.get(pano.id);
@@ -604,7 +585,7 @@ function validarRefsPanoUnidireccional(
     return;
   }
 
-  // 5) PANO_UNI_SIN_APOYO: bordeApoyo "libre" y algun borde de APOYO sin viga de contorno
+  // 4) PANO_UNI_SIN_APOYO: bordeApoyo "libre" y algun borde de APOYO sin viga de contorno
   // completa (sus viguetas quedarian con un extremo suelto = voladizo sin recoger). Solo los
   // bordes de APOYO importan (los paralelos con "libre" son correctos). `bordeApoyo` es un
   // campo unico del paño: si es "libre" y NO ambos bordes de apoyo tienen viga -> bloqueo.

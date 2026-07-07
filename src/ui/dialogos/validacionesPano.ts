@@ -24,8 +24,9 @@ export { type ErrorCampo, esValido };
 //
 // Corte "forjado unidireccional" (T4.1): los campos uni (direccion de viguetas,
 // intereje, canto, ancho de nervio, peso propio) son OPCIONALES aqui y SOLO se validan
-// cuando `tipo === "unidireccional"` (espejo de PANO_UNI_CAMPOS en validaciones.ts del
-// discretizador, pero en la capa de UX, campo a campo). Un paño losa no los porta.
+// cuando `tipo === "unidireccional"`. Esta validacion de UX (campo a campo, feedback en
+// vivo) es la primera linea; el borde Zod del dominio (union discriminada por `tipo`) es la
+// garantia dura de presencia/positividad. Un paño losa no los porta.
 export interface DatosPanoUI {
   nombre: string;
   tipo?: "losa" | "unidireccional"; // ausente -> se trata como losa (retrocompat)
@@ -106,7 +107,7 @@ export function validarPano(
   // valores invalidos, asi que no se valida aqui.
 
   // 5. Campos del forjado UNIDIRECCIONAL: solo se validan cuando el paño es de ese
-  // tipo (espejo de PANO_UNI_CAMPOS del discretizador, aqui campo a campo para la UX).
+  // tipo (feedback de UX campo a campo; el borde Zod es la garantia dura de positividad).
   // La direccion es un enum (Segmentado): no se valida. Intereje/canto/anchoNervio
   // deben ser finitos y > 0 (dimensiones fisicas); pesoPropio finito y >= 0 (0 es
   // legitimo: un forjado sin peso tabulado). Cada mensaje va en lenguaje de obra.

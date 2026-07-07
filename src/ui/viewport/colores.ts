@@ -50,6 +50,11 @@ const FALLBACK = {
   nodoCalc: "#33506e",
   apoyoCalc: "#1f9e89",
   releaseCalc: "#e0863a",
+  // Diagramas de esfuerzos sobre las barras (Resultados): color por SIGNO del
+  // esfuerzo (positivo azul / negativo rojo). DEBE coincidir con tokens.css
+  // (--esfuerzo-pos / --esfuerzo-neg).
+  esfuerzoPos: "#2563eb",
+  esfuerzoNeg: "#dc2626",
 } as const;
 
 // Mapa nombre logico -> nombre de la CSS custom property (sin el prefijo --).
@@ -79,6 +84,8 @@ const VAR_NAME: Record<keyof typeof FALLBACK, string> = {
   nodoCalc: "nodo-calc",
   apoyoCalc: "apoyo-calc",
   releaseCalc: "release-calc",
+  esfuerzoPos: "esfuerzo-pos",
+  esfuerzoNeg: "esfuerzo-neg",
 };
 
 export type NombreColor = keyof typeof FALLBACK;

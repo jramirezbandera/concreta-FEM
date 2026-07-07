@@ -33,6 +33,7 @@ import {
 } from "../index";
 import type { DatosViga, DatosPano, DatosMuro, DatosSeccion } from "./comandosModelo";
 import { crearModeloVacio } from "../../dominio";
+import type { PanoLosa } from "../../dominio";
 import type {
   DatosPlanta,
   DatosCarga,
@@ -639,10 +640,10 @@ describe("editarPano", () => {
     modeloStore.getState().ejecutar(
       editarPano(m(), id, { espesor: 0.3, bordeApoyo: "empotrado" }),
     );
-    expect(m().panos[0].espesor).toBeCloseTo(0.3, 6);
+    expect((m().panos[0] as PanoLosa).espesor).toBeCloseTo(0.3, 6);
     expect(m().panos[0].bordeApoyo).toBe("empotrado");
     modeloStore.getState().deshacer();
-    expect(m().panos[0].espesor).toBeCloseTo(0.25, 6);
+    expect((m().panos[0] as PanoLosa).espesor).toBeCloseTo(0.25, 6);
     expect(m().panos[0].bordeApoyo).toBe("simple");
   });
 

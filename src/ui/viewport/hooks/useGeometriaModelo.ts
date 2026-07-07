@@ -202,8 +202,11 @@ export function derivar(
       contorno,
       z: cotaPlanta(pano.plantaId, cotaPorPlanta),
       tipo: pano.tipo,
-      direccionViguetas: pano.direccionViguetas,
-      intereje: pano.intereje,
+      // El rayado de viguetas solo aplica a la variante unidireccional (union discriminada
+      // por `tipo`): las demas no portan estos campos. Ausentes -> opcionales de PanoDibujo.
+      ...(pano.tipo === "unidireccional"
+        ? { direccionViguetas: pano.direccionViguetas, intereje: pano.intereje }
+        : {}),
     });
   }
 

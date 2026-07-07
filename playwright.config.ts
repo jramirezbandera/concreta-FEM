@@ -16,6 +16,13 @@ import { defineConfig, devices } from "@playwright/test";
 // resetea IndexedDB y los singletons de modulo (par, calculoEnVuelo, undo stack)
 // entre specs. La limpieza explicita de IndexedDB ANTES de `goto` la hace el
 // fixture `abrirApp` via addInitScript (e2e/fixtures.ts).
+// Puerto del dev server E2E, configurable con E2E_PORT. Motivo: con
+// `reuseExistingServer`, un `npm run dev` NORMAL ya abierto en 5173 (sesion de
+// trabajo paralela) se reutilizaria SIN la costura VITE_E2E y los 5 specs caerian
+// con "window.__concreta no esta montado". Con E2E_PORT=5199 (p. ej.) los E2E
+// levantan su propio Vite con costura sin tocar el dev server del usuario.
+const puertoE2E = Number(process.env.E2E_PORT ?? 5173);
+
 export default defineConfig({
   testDir: "./e2e",
   // Cada test corre en su propio worker/context: paralelo seguro (no comparten DB).
@@ -25,14 +32,16 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: `http://localhost:${puertoE2E}`,
     // Traza solo al reintentar: barata en verde, util para diagnosticar el flake.
     trace: "on-first-retry",
   },
   // Un unico dev server compartido por ambos proyectos. VITE_E2E activa la costura.
+  // --strictPort: si el puerto esta ocupado, Vite FALLA en vez de saltar a otro
+  // (Playwright espera en el puerto declarado; un salto silencioso seria un cuelgue).
   webServer: {
-    command: "cross-env VITE_E2E=true vite",
-    port: 5173,
+    command: `cross-env VITE_E2E=true vite --port ${puertoE2E} --strictPort`,
+    port: puertoE2E,
     // En local reutiliza un `vite` ya abierto; en CI arranca uno limpio.
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

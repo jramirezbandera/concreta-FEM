@@ -17,8 +17,9 @@
 //   3) REGRESION byte a byte: un modelo mixto (portico + losa, SIN unidireccional) produce
 //      EXACTAMENTE el mismo JSON que sin el corte; y el propio unidireccional es determinista
 //      (reordenar la entrada -> mismo string).
-//   4) VALIDACIONES de contrato: PANO_UNI_CAMPOS, PANO_UNI_SIN_APOYO, PANO_PILAR_INTERIOR,
-//      reticular sigue PANO_TIPO_NO_SOPORTADO; trazabilidad panoAMembers.
+//   4) VALIDACIONES de contrato: PANO_UNI_SIN_APOYO, PANO_PILAR_INTERIOR, reticular sigue
+//      PANO_TIPO_NO_SOPORTADO; trazabilidad panoAMembers. (La presencia de los campos de
+//      vigueta la garantiza ahora el borde Zod, no `discretizar` — T-f3-pano-schema-union.)
 //   5) CM: termino del unidireccional (pesoPropio·A al centroide).
 //
 // Fixtures/builders LOCALES a este fichero (no se tocan tests/golden/_arnes/*).
@@ -28,7 +29,7 @@ import type { ResultadoDiscretizacion } from "../../src/discretizador";
 import type { ModeloFEM } from "../../src/discretizador/contratoFEM";
 import { seccionRectangular } from "../../src/biblioteca";
 import { mToMm } from "../../src/unidades";
-import type { Modelo, Pano, Pilar, Viga } from "../../src/dominio";
+import type { Modelo, Pano, PanoUnidireccional, Pilar, Viga } from "../../src/dominio";
 import { SCHEMA_VERSION, ID_HIP_PESO_PROPIO } from "../../src/dominio";
 
 const MATERIAL = "HA-25";
@@ -69,17 +70,14 @@ const NUDOS_RECT = [
   { id: "n4", x: 0, y: 5 },
 ];
 
-function panoUni(id: string, extra?: Partial<Pano>): Pano {
+function panoUni(id: string, extra?: Partial<PanoUnidireccional>): Pano {
   return {
     id,
     nombre: id.toUpperCase(),
     tipo: "unidireccional",
     plantaId: "p1",
     perimetro: ["n1", "n2", "n3", "n4"],
-    // espesor/tamMalla se IGNORAN bajo unidireccional pero son obligatorios en el schema.
-    espesor: 0.05,
     materialId: MATERIAL,
-    tamMalla: 1,
     bordeApoyo: "simple",
     direccionViguetas: "y",
     intereje: 0.7,
@@ -92,7 +90,7 @@ function panoUni(id: string, extra?: Partial<Pano>): Pano {
 
 // Forjado unidireccional AISLADO: solo el paño (sin pilares ni vigas). Sujeto por los apoyos
 // nodales de borde de sus propias viguetas (bordeApoyo "simple" -> {DY} + muleta de plano).
-function modeloAislado(extra?: Partial<Pano>): Modelo {
+function modeloAislado(extra?: Partial<PanoUnidireccional>): Modelo {
   return {
     unidades: "kN-m",
     schemaVersion: SCHEMA_VERSION,
@@ -594,28 +592,13 @@ describe("golden A · REGRESION byte a byte: el corte unidireccional NO toca un 
 // bloquean ANTES de llegar a Capa 2 (no se calcula basura plausible).
 // ============================================================================
 describe("golden A · validaciones de contrato del unidireccional (bloquean antes de Capa 2)", () => {
-  it("PANO_UNI_CAMPOS: unidireccional sin campos de vigueta -> bloquea (no llega a Capa 2)", () => {
-    const m = modeloAislado();
-    // Un paño unidireccional al que le faltan direccionViguetas/intereje/canto/anchoNervio.
-    m.panos = [
-      {
-        id: "f1",
-        nombre: "F1",
-        tipo: "unidireccional",
-        plantaId: "p1",
-        perimetro: ["n1", "n2", "n3", "n4"],
-        espesor: 0.05,
-        materialId: MATERIAL,
-        tamMalla: 1,
-        bordeApoyo: "simple",
-        // sin direccionViguetas/intereje/canto/anchoNervio/pesoPropio
-      },
-    ];
-    const res = discretizar(m);
-    expect(res.ok).toBe(false);
-    if (res.ok) throw new Error("no deberia ser ok: faltan campos de vigueta");
-    expect(res.errores.map((e) => e.codigo)).toContain("PANO_UNI_CAMPOS");
-  });
+  // NOTA (T-f3-pano-schema-union): el antiguo golden "PANO_UNI_CAMPOS: unidireccional sin
+  // campos -> bloquea" DESAPARECIO. La presencia y positividad de los campos de vigueta la
+  // garantiza ahora el BORDE Zod (union discriminada: `PanoUnidireccionalSchema` los declara
+  // obligatorios y > 0), no un chequeo en `discretizar`. Un paño uni sin esos campos ya no es
+  // ni construible en TS ni parseable por ModeloSchema en import — esa cobertura vive en
+  // dominio.test.ts ("PanoSchema · union discriminada"). Aqui solo se calcula sobre modelos
+  // ya validos por el schema.
 
   it("PANO_UNI_SIN_APOYO: bordeApoyo libre + sin viga en un borde de apoyo -> bloquea", () => {
     // Aislado (sin vigas) con bordeApoyo "libre": las viguetas quedan con extremos sueltos.
@@ -650,7 +633,8 @@ describe("golden A · validaciones de contrato del unidireccional (bloquean ante
 
   it("DP5 · reticular sigue rechazado con PANO_TIPO_NO_SOPORTADO (solo se levanto unidireccional)", () => {
     const m = modeloAislado();
-    // Reutiliza el mismo paño rectangular pero como reticular (tipo no soportado).
+    // Mismo paño rectangular pero como reticular VALIDO (union discriminada: sus campos
+    // propios, con capaCompresion). Su calculo llega en un corte posterior; en F2 se rechaza.
     m.panos = [
       {
         id: "f1",
@@ -658,10 +642,13 @@ describe("golden A · validaciones de contrato del unidireccional (bloquean ante
         tipo: "reticular",
         plantaId: "p1",
         perimetro: ["n1", "n2", "n3", "n4"],
-        espesor: 0.3,
         materialId: MATERIAL,
-        tamMalla: 1,
         bordeApoyo: "simple",
+        intereje: 0.8,
+        canto: 0.3,
+        anchoNervio: 0.12,
+        capaCompresion: 0.05,
+        pesoPropio: 4,
       },
     ];
     const res = discretizar(m);
@@ -669,8 +656,8 @@ describe("golden A · validaciones de contrato del unidireccional (bloquean ante
     if (res.ok) throw new Error("no deberia ser ok: reticular no soportado");
     const cods = res.errores.map((e) => e.codigo);
     expect(cods).toContain("PANO_TIPO_NO_SOPORTADO");
-    // Y NO cae en un codigo de unidireccional (no es unidireccional).
-    expect(cods).not.toContain("PANO_UNI_CAMPOS");
+    // Y NO cae en un codigo de unidireccional (no es unidireccional): PANO_UNI_SIN_APOYO no sale.
+    expect(cods).not.toContain("PANO_UNI_SIN_APOYO");
   });
 
   it("trazabilidad panoAMembers mapea el paño unidireccional a SUS members de vigueta", () => {

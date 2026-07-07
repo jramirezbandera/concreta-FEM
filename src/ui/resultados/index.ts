@@ -6,6 +6,13 @@
 // diagramaLazy.ts y solo lo consume PanelDiagramas (aislamiento de Plotly, #21).
 export { DeformadaOverlay } from "./DeformadaOverlay";
 export { LeyendaEscala } from "./LeyendaEscala";
+// --- Diagramas de esfuerzos sobre las barras (N/V/M en escena) -----------------
+// Overlay de escena (cinta rellena + contorno + rotulos de pico por elemento),
+// leyenda con selector de magnitud y tamano, y conmutador Deformada|Esfuerzos.
+// Los monta App.tsx en la pestana Resultados (sceneOverlays / Slot mid-right).
+export { EsfuerzosOverlay } from "./EsfuerzosOverlay";
+export { LeyendaEsfuerzos } from "./LeyendaEsfuerzos";
+export { SelectorOverlayResultados } from "./SelectorOverlayResultados";
 export { LeyendaRampa } from "./LeyendaRampa";
 export { PanelDiagramas } from "./PanelDiagramas";
 export { TablaReacciones } from "./TablaReacciones";

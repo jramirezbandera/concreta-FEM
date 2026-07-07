@@ -190,10 +190,7 @@ describe("golden FORJADO UNIDIRECCIONAL Capa B (motor real PyNite)", () => {
           tipo: "unidireccional",
           plantaId: "p1",
           perimetro: ["q1", "q2", "q3", "q4"],
-          // espesor/tamMalla obligatorios en el schema pero IGNORADOS bajo unidireccional.
-          espesor: 0.3,
           materialId: "HA-25",
-          tamMalla: 1,
           bordeApoyo: "simple",
           direccionViguetas: "x", // viguetas a lo largo de X (luz = 5), reparto en Y (B = 0.5)
           intereje: 1.0, // > B -> n=1
@@ -346,9 +343,7 @@ describe("golden FORJADO UNIDIRECCIONAL Capa B (motor real PyNite)", () => {
           tipo: "unidireccional",
           plantaId: "p1",
           perimetro: ["q1", "q2", "q3", "q4"],
-          espesor: 0.3,
           materialId: "HA-25",
-          tamMalla: 1,
           bordeApoyo: "simple",
           direccionViguetas: "x",
           intereje: 1.0, // B=6 -> n=6
@@ -515,9 +510,7 @@ describe("golden FORJADO UNIDIRECCIONAL Capa B (motor real PyNite)", () => {
           tipo: "unidireccional",
           plantaId: "p1",
           perimetro: ["q1", "q2", "q3", "q4"],
-          espesor: 0.3,
           materialId: "HA-25",
-          tamMalla: 1,
           bordeApoyo: "simple", // x=6 sin viga es legitimo: hay apoyo nodal propio
           direccionViguetas: "x",
           intereje: 1.0, // B=4 -> n=4
@@ -634,9 +627,7 @@ describe("golden FORJADO UNIDIRECCIONAL Capa B (motor real PyNite)", () => {
             tipo: "unidireccional",
             plantaId: "p1",
             perimetro: ["q1", "q2", "q3", "q4"],
-            espesor: 0.3,
             materialId: "HA-25",
-            tamMalla: 1,
             bordeApoyo: "libre", // <- borde de apoyo sin viga y libre: voladizo suelto
             direccionViguetas: "x",
             intereje: 1.0,

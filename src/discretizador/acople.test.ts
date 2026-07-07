@@ -9,7 +9,7 @@ import {
   pilaresInterioresBajoPano,
   vigasInterioresBajoPano,
 } from "./acople";
-import type { Modelo, Pano } from "../dominio";
+import type { Modelo, Pano, PanoLosa, PanoUnidireccional } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
 
 const MATERIAL_BARRA = "S275";
@@ -74,7 +74,7 @@ function viga(
 
 // Paño losa 4x3 sobre los nudos n1..n4 de la base, tamMalla 1 (rejilla 4x3:
 // 14 nudos de borde; arista inferior/superior 5 nudos, izquierda/derecha 4).
-function pano(id: string, extra?: Partial<Pano>): Pano {
+function pano(id: string, extra?: Partial<PanoLosa>): Pano {
   return {
     id, nombre: id.toUpperCase(), tipo: "losa", plantaId: "p1",
     perimetro: ["n1", "n2", "n3", "n4"],
@@ -294,7 +294,7 @@ describe("calcularAcoples · determinismo y robustez", () => {
     m.vigas = [viga("v-inf", "n1", "n2")];
     // "a-ret" (reticular, se salta) ordena ANTES que "b-losa": el indice de la losa
     // debe ser 1 (no 0) para que sus nombres PQ1-* coincidan con los del Paso 6c.
-    m.panos = [pano("b-losa"), pano("a-ret", { tipo: "reticular" })];
+    m.panos = [pano("b-losa"), panoRet("a-ret")];
     const res = calcularAcoples(m);
     expect(res.porPano.has("a-ret")).toBe(false);
     const losa = res.porPano.get("b-losa")!;
@@ -714,13 +714,23 @@ describe("vigasInterioresBajoPano (TODO-2)", () => {
 // --- Rama UNIDIRECCIONAL (F3): sin malla, aporta subdivisiones + deteccion de bordes ---
 // Paño unidireccional 4x3 sobre n1..n4 de la base. direccion "x": viguetas paralelas a X
 // (luz 4), reparto en Y (B=3). intereje 1 -> n = round(3/1) = 3 viguetas.
-function panoUni(id: string, extra?: Partial<Pano>): Pano {
+function panoUni(id: string, extra?: Partial<PanoUnidireccional>): Pano {
   return {
     id, nombre: id.toUpperCase(), tipo: "unidireccional", plantaId: "p1",
     perimetro: ["n1", "n2", "n3", "n4"],
-    espesor: 0.2, materialId: MATERIAL_LOSA, tamMalla: 1, bordeApoyo: "simple",
+    materialId: MATERIAL_LOSA, bordeApoyo: "simple",
     direccionViguetas: "x", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
     ...extra,
+  };
+}
+
+// Paño reticular 4x3 sobre n1..n4 (union discriminada: sus campos propios, con capaCompresion).
+function panoRet(id: string): Pano {
+  return {
+    id, nombre: id.toUpperCase(), tipo: "reticular", plantaId: "p1",
+    perimetro: ["n1", "n2", "n3", "n4"],
+    materialId: MATERIAL_LOSA, bordeApoyo: "simple",
+    intereje: 0.8, canto: 0.3, anchoNervio: 0.12, capaCompresion: 0.05, pesoPropio: 4,
   };
 }
 
@@ -779,7 +789,7 @@ describe("calcularAcoples · rama unidireccional (F3)", () => {
 
   it("reticular NO entra en unidireccionalPorPano ni en porPano", () => {
     const m = modeloBase();
-    m.panos = [panoUni("fu", { tipo: "reticular" })];
+    m.panos = [panoRet("fu")];
     const res = calcularAcoples(m);
     expect(res.unidireccionalPorPano.has("fu")).toBe(false);
     expect(res.porPano.has("fu")).toBe(false);

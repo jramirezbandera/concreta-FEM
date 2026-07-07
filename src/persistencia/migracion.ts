@@ -478,19 +478,149 @@ function migrarV5aV6(datos: unknown): ResultadoMigracion {
   return { datos: { ...obj, schemaVersion: 6 }, avisos };
 }
 
+// Campos que conserva cada variante de `Pano` tras la union discriminada v7
+// (T-f3-pano-schema-union). Los COMUNES viajan siempre; los PROPIOS de cada
+// variante se conservan solo bajo su `tipo`, y CUALQUIER otro campo (los ajenos a
+// la variante que un raw v6 arrastrase) se PODA. El orden no es contractual (Zod no
+// lo exige); se listan agrupados por claridad.
+const CAMPOS_COMUNES_PANO_V7 = [
+  "id",
+  "nombre",
+  "tipo",
+  "plantaId",
+  "perimetro",
+  "materialId",
+  "bordeApoyo",
+] as const;
+// Propios por variante (contrato §2 del corte reticular). `losa` conserva
+// espesor/tamMalla; `unidireccional` sus 5 campos (y pierde espesor/tamMalla, que en
+// v5/v6 estaban declaradamente ignorados bajo ese tipo). El `reticular` NO figura
+// aqui: un paño reticular v6 NO existe con forma valida (ver `migrarV6aV7`).
+const CAMPOS_PROPIOS_PANO_V7: Record<string, readonly string[]> = {
+  losa: ["espesor", "tamMalla"],
+  unidireccional: [
+    "direccionViguetas",
+    "intereje",
+    "canto",
+    "anchoNervio",
+    "pesoPropio",
+  ],
+};
+
+// Poda un `Pano` crudo a los campos permitidos por su variante v7: comunes + los
+// propios de su `tipo`. Copia SOLO las claves presentes (no siembra ausentes: la
+// validacion Zod final exige la presencia de los obligatorios y señalara con ruta si
+// falta alguno). Todo lo demas (campos ajenos a la variante) se descarta.
+function podarPanoV7(pano: PanoCrudo, tipo: string): Record<string, unknown> {
+  const permitidos = new Set<string>([
+    ...CAMPOS_COMUNES_PANO_V7,
+    ...(CAMPOS_PROPIOS_PANO_V7[tipo] ?? []),
+  ]);
+  const origen = pano as Record<string, unknown>;
+  const podado: Record<string, unknown> = {};
+  for (const clave of Object.keys(origen)) {
+    if (permitidos.has(clave)) podado[clave] = origen[clave];
+  }
+  return podado;
+}
+
+// Migracion de model-schema v6 -> v7 (F3, forjado reticular). v7 parte `PanoSchema`
+// en una UNION DISCRIMINADA por `tipo`: cada variante lleva SOLO sus campos, y los
+// ajenos ya no son opcionales tolerados sino EXTRAÑOS. Esta migracion discrimina
+// cada paño por `tipo` y PODA los campos que no pertenecen a su variante:
+//   - `losa`: conserva espesor/tamMalla; ELIMINA los 5 campos uni si los arrastraba.
+//   - `unidireccional`: conserva sus 5 campos; ELIMINA espesor/tamMalla (en v5/v6
+//     estaban obligatorios a nivel Zod pero DECLARADAMENTE ignorados bajo este tipo).
+//   - `reticular`: DESCARTE con aviso. En v6 el `tipo:"reticular"` estaba en el enum
+//     (RESERVADO) pero la UI NUNCA lo ofrecio (PanelHerramientaPano: "Reticular no se
+//     ofrece") y `PanoSchema` v6 exigia espesor/tamMalla OBLIGATORIOS para TODO tipo:
+//     un reticular v6 solo podia existir con forma de LOSA (via .json editado a mano).
+//     Esa forma NO satisface los nuevos campos reticulares obligatorios (intereje/
+//     canto/anchoNervio/capaCompresion/pesoPropio) y no hay datos de obra que
+//     preservar, asi que se DESCARTA (patron migrarV2aV3) junto con sus cargas
+//     superficiales. NO se siembran defaults de `biblioteca/forjados.ts`: importar un
+//     paño reticular v6 nunca debe romper la app, y sembrar geometria inventada
+//     acoplaria esta frontera a la tabla normativa (§2 del contrato del corte).
+//
+// En la practica el descarte reticular es un NO-OP (nunca fue creable desde la UI);
+// la poda de losa/uni tambien lo es para proyectos generados por la app (la app no
+// filtraba campos ajenos, pero tampoco los sembraba). La migracion es robusta ante
+// un .json HEREDADO o editado a mano que arrastrase campos cruzados.
+function migrarV6aV7(datos: unknown): ResultadoMigracion {
+  // Si el raw no es un objeto, no reestructuramos: la validacion Zod final lo
+  // rechazara con una ruta legible (no es trabajo de la migracion validar).
+  if (typeof datos !== "object" || datos === null) {
+    return { datos: { ...(datos as object), schemaVersion: 7 } };
+  }
+  const obj = { ...(datos as Record<string, unknown>) };
+  const avisos: string[] = [];
+
+  const panosOriginal: PanoCrudo[] = Array.isArray(obj.panos)
+    ? (obj.panos as PanoCrudo[])
+    : [];
+
+  // Poda por variante; descarta los reticular (sin forma valida en v6).
+  const panosConservados: Record<string, unknown>[] = [];
+  const idsDescartados = new Set<string>();
+  let nReticularesDescartados = 0;
+  for (const pano of panosOriginal) {
+    const tipo = pano.tipo;
+    if (tipo === "reticular") {
+      // Sin datos de obra reconstruibles: se descarta (y se purgan sus cargas).
+      if (typeof pano.id === "string") idsDescartados.add(pano.id);
+      nReticularesDescartados += 1;
+      continue;
+    }
+    // losa / unidireccional (o cualquier `tipo` desconocido: se poda a comunes y la
+    // validacion Zod final lo rechazara por `tipo` invalido con ruta legible, en vez
+    // de que la migracion invente una decision).
+    panosConservados.push(podarPanoV7(pano, typeof tipo === "string" ? tipo : ""));
+  }
+
+  obj.panos = panosConservados;
+
+  // Purga las cargas superficiales que apuntaban a un paño reticular descartado
+  // (referencias colgantes; mismo criterio que migrarV2aV3). El resto viaja intacto.
+  if (idsDescartados.size > 0) {
+    const cargasOriginal: CargaCruda[] = Array.isArray(obj.cargas)
+      ? (obj.cargas as CargaCruda[])
+      : [];
+    obj.cargas = cargasOriginal.filter(
+      (c) =>
+        !(
+          c.tipo === "superficial" &&
+          typeof c.ambito === "string" &&
+          idsDescartados.has(c.ambito)
+        ),
+    );
+  }
+
+  if (nReticularesDescartados > 0) {
+    const n = nReticularesDescartados;
+    avisos.push(
+      `Se descartaron ${n} paño${n === 1 ? "" : "s"} reticular${n === 1 ? "" : "es"} de una versión anterior que no se podían actualizar; vuelva a definirlos con el nuevo forjado reticular.`,
+    );
+  }
+
+  return { datos: { ...obj, schemaVersion: 7 }, avisos };
+}
+
 // Registro indexado por version de origen: `MIGRACIONES[v]` transforma v -> v+1.
 // `MIGRACIONES[1]` lleva v1 -> v2 (F2a, model-schema); `MIGRACIONES[2]` lleva
 // v2 -> v3 (F3 corte 1, paño losa); `MIGRACIONES[3]` lleva v3 -> v4 (F3.4, plantas
 // sin grupos); `MIGRACIONES[4]` lleva v4 -> v5 (F3 unidireccional, bump de version:
 // campos opcionales, sin sembrado); `MIGRACIONES[5]` lleva v5 -> v6 (F3 muros,
-// descarte de muros-stub). La cadena de `migrarYValidar` los aplica en orden
-// ascendente hasta `SCHEMA_VERSION`.
+// descarte de muros-stub); `MIGRACIONES[6]` lleva v6 -> v7 (F3 reticular, union
+// discriminada de `Pano`: poda de campos ajenos por variante + descarte de paños
+// reticular heredados sin forma valida). La cadena de `migrarYValidar` los aplica en
+// orden ascendente hasta `SCHEMA_VERSION`.
 const MIGRACIONES: Record<number, Migracion> = {
   1: migrarV1aV2,
   2: migrarV2aV3,
   3: migrarV3aV4,
   4: migrarV4aV5,
   5: migrarV5aV6,
+  6: migrarV6aV7,
 };
 
 // Lee `schemaVersion` de forma defensiva: `raw` es `unknown` y puede no ser un

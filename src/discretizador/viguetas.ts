@@ -133,22 +133,22 @@ export type MallaViguetas = {
 // --- generarViguetas: geometria pura (firma del contrato §2.1) ---------------
 
 // Genera la geometria de viguetas de UN paño unidireccional. Devuelve `undefined` si:
-//   - el paño no es `tipo:"unidireccional"`,
-//   - le faltan campos de vigueta o no son positivos (direccionViguetas/intereje ausentes
-//     o intereje <= 0): el ERROR de obra lo emite validaciones (PANO_UNI_CAMPOS), NO aqui,
+//   - el paño no es `tipo:"unidireccional"` (union discriminada: solo esa variante porta
+//     los campos de vigueta),
+//   - direccionViguetas ausente o intereje no finito/<=0 (defensa en profundidad: el borde
+//     Zod ya lo garantiza > 0, pero un dato corrupto que lo evada no fabrica geometria),
 //   - su perimetro no resuelve (refs rotas / nº de nudos != 4),
 //   - el bbox no es rectangular/degenerado (mismos filtros que mallarPano).
 // NUNCA lanza (espejo de calcularAcoples: un paño no resoluble se salta en silencio y lo
-// reporta validaciones). Precondicion: el llamante ya corrio `validarModelo` (que bloquea
-// con PANO_UNI_CAMPOS antes de discretizar); si aun asi se llama con campos ausentes,
-// devuelve undefined en vez de fabricar geometria inventada (comportamiento honesto).
+// reporta validaciones). La presencia y positividad de los campos de vigueta la garantiza
+// el esquema (tras T-f3-pano-schema-union, ya NO un chequeo PANO_UNI_CAMPOS en validaciones).
 export function generarViguetas(modelo: Modelo, pano: Pano): MallaViguetas | undefined {
+  // Estrecha a la variante unidireccional: solo ella porta direccionViguetas/intereje/etc.
+  // (union discriminada por `tipo`). El schema ya los exige presentes y > 0, pero se mantiene
+  // la defensa en profundidad (nunca fabricar geometria inventada si un dato corrupto evadiera
+  // el borde Zod): direccion ausente o intereje no finito/<=0 -> undefined, no throw.
   if (pano.tipo !== "unidireccional") return undefined;
 
-  // Campos de vigueta: OPCIONALES en el schema (un paño losa no los lleva). Su PRESENCIA y
-  // positividad las exige validaciones (PANO_UNI_CAMPOS); aqui, si faltan o no son > 0
-  // finitos, no hay geometria posible -> undefined (nunca throw: la politica la decide
-  // validaciones aguas arriba, no este generador; espejo de calcularAcoples con tamMalla).
   const direccion = pano.direccionViguetas;
   const intereje = pano.intereje;
   if (direccion === undefined) return undefined;
@@ -221,14 +221,16 @@ export function nombreSeccionVigueta(indicePano: number): string {
 // mm): PRECEDENTE de import biblioteca<-discretizador ya existente (propiedadesBarra.ts
 // importa seccionRectangular/seccionCircular), asi que no rompe la jerarquia ni la pureza.
 // Conversion de borde m->mm con `mToMm` (canto/anchoNervio se persisten en m), IGUAL que
-// resolverSeccion en propiedadesBarra.ts. Devuelve undefined si faltan canto/anchoNervio
-// (el error de obra lo emite validaciones; espejo de generarViguetas con los campos).
+// resolverSeccion en propiedadesBarra.ts. Devuelve undefined si el paño no es unidireccional
+// (solo esa variante porta canto/anchoNervio en la union discriminada por `tipo`).
 export function seccionFEMDeVigueta(
   pano: Pano,
   indicePano: number,
 ): SeccionFEM | undefined {
+  if (pano.tipo !== "unidireccional") return undefined;
   const canto = pano.canto;
   const anchoNervio = pano.anchoNervio;
+  // Defensa en profundidad (el schema ya exige > 0; se blinda ante datos que evadan Zod).
   if (!(typeof canto === "number" && Number.isFinite(canto) && canto > 0)) return undefined;
   if (!(typeof anchoNervio === "number" && Number.isFinite(anchoNervio) && anchoNervio > 0)) {
     return undefined;
@@ -308,10 +310,11 @@ export function extremosDeVigueta(
   pano: Pano,
   vigueta: Vigueta,
 ): [ExtremoVigueta, ExtremoVigueta] | undefined {
+  // Solo la variante unidireccional porta direccionViguetas (union discriminada por `tipo`).
+  if (pano.tipo !== "unidireccional") return undefined;
   const planta = plantaPorId(modelo, pano.plantaId);
   if (planta === undefined) return undefined;
   const direccion = pano.direccionViguetas;
-  if (direccion === undefined) return undefined;
 
   const cota = planta.cota;
   const esX = direccion === "x";
@@ -373,6 +376,8 @@ export function subdivisionesDeBordes(
   pano: Pano,
   malla: MallaViguetas,
 ): SubdivisionesPorBorde | undefined {
+  // Solo la variante unidireccional porta direccionViguetas (union discriminada por `tipo`).
+  if (pano.tipo !== "unidireccional") return undefined;
   const esX = pano.direccionViguetas === "x";
   const bordeA: BordeDeApoyo = esX
     ? { lado: "xMin", corre: "y", torsion: "RZ" }

@@ -33,6 +33,7 @@ import { mToMm } from "../../unidades";
 
 import { DiagramaBarraLazy } from "./diagramaLazy";
 import { serieVigaTramos } from "./serieVigaTramos";
+import { SIGNO_UI } from "./convencionEsfuerzos";
 import "./panelDiagramas.css";
 
 // Metadatos de presentacion por magnitud: campo del contrato del solver, etiqueta
@@ -51,26 +52,28 @@ interface MetaMagnitud {
   convertir?: (v: number) => number;
 }
 
+// Etiquetas con la NOTACION ESTANDAR y su eje (N, Vy, Mz): el contrato del solver
+// trae el cortante/flector del plano local x-y, de ahi los subindices.
 const META: Record<MagnitudDiagrama, MetaMagnitud> = {
   axil: {
     campo: "axial",
-    etiquetaEje: "Axil (kN)",
+    etiquetaEje: "Axil N (kN)",
     etiquetaBoton: "N",
-    titulo: "Axil",
+    titulo: "Axil (tracción +)",
     color: "var(--text-2, #5a6678)",
   },
   cortante: {
     campo: "shear_y",
-    etiquetaEje: "Cortante (kN)",
-    etiquetaBoton: "V",
-    titulo: "Cortante",
+    etiquetaEje: "Cortante Vy (kN)",
+    etiquetaBoton: "Vy",
+    titulo: "Cortante Vy",
     color: "var(--accent, #2563eb)",
   },
   momento: {
     campo: "moment_z",
-    etiquetaEje: "Momento (kN·m)",
-    etiquetaBoton: "M",
-    titulo: "Momento",
+    etiquetaEje: "Flector Mz (kN·m)",
+    etiquetaBoton: "Mz",
+    titulo: "Flector Mz (vano +)",
     color: "var(--moment, #a855f7)",
   },
   flecha: {
@@ -161,21 +164,31 @@ function resolverBarra(
   return null;
 }
 
-// Extrae la serie (x[], v[]) de un EstadoMiembroCombo segun la magnitud, aplicando
-// la conversion de presentacion. El diagrama es forma (2,n): fila 0 = posiciones
-// (m), fila 1 = valores. Mantenemos x en m (eje de la barra) y convertimos los
-// valores con el factor de la magnitud (solo la flecha: m -> mm).
+// Valores crudos -> presentacion: signo del convenio (convencionEsfuerzos: traccion
+// +, vano +; UNICO punto de flip compartido con el overlay 3D) y conversion de
+// unidades en el borde (solo la flecha: m -> mm).
+function aPresentacion(
+  crudos: readonly number[],
+  meta: MetaMagnitud,
+): number[] {
+  const signo = SIGNO_UI[meta.campo];
+  const { convertir } = meta;
+  return crudos.map((v) => {
+    const s = v * signo;
+    return convertir === undefined ? s : convertir(s);
+  });
+}
+
+// Extrae la serie (x[], v[]) de un EstadoMiembroCombo segun la magnitud, en
+// convenio y unidades de presentacion. El diagrama es forma (2,n): fila 0 =
+// posiciones (m, eje de la barra), fila 1 = valores.
 function extraerSerie(
   estado: EstadoMiembroCombo,
   magnitud: MagnitudDiagrama,
 ): { posiciones: number[]; valores: number[] } {
   const meta = META[magnitud];
   const diagrama = estado[meta.campo]; // [ [x...], [v...] ]
-  const posiciones = diagrama[0];
-  const { convertir } = meta;
-  const valores =
-    convertir === undefined ? diagrama[1] : diagrama[1].map(convertir);
-  return { posiciones, valores };
+  return { posiciones: diagrama[0], valores: aPresentacion(diagrama[1], meta) };
 }
 
 export function PanelDiagramas() {
@@ -233,12 +246,13 @@ export function PanelDiagramas() {
         meta.campo,
       );
       if (serie.estado !== "ok") return { estado: serie.estado };
-      // Conversion de presentacion en el borde (solo la flecha: m -> mm), igual que
+      // Signo del convenio + conversion de presentacion en el borde, igual que
       // extraerSerie para el pilar.
-      const valores = meta.convertir
-        ? serie.valores.map(meta.convertir)
-        : serie.valores;
-      return { estado: "ok" as const, posiciones: serie.posiciones, valores };
+      return {
+        estado: "ok" as const,
+        posiciones: serie.posiciones,
+        valores: aPresentacion(serie.valores, meta),
+      };
     }
     const tramo = resolucion.tramos[idxTramo] ?? resolucion.tramos[0]!;
     const porCombo = resultados.barras[tramo.memberName];

@@ -132,10 +132,12 @@ export function crearParMock(metodos: MetodosProxyMock): {
 // muestren "sin barra"/vacio en los specs E2E.
 // =============================================================================
 
-// n_points enlatado del mock. 2 estaciones bastan para un diagrama valido y para
-// que la UI dibuje (extremos), y mantienen el payload pequeno; el schema exige
-// exactamente 2 filas de igual longitud y >=2 estaciones en la deformada.
-const N_POINTS_MOCK = 2;
+// n_points enlatado del mock. 3 estaciones: las curvas enlatadas son parabolas con
+// pico en el CENTRO y cero en extremos (diagramaParabolico/deformadaGlobal); con
+// solo 2 estaciones (extremos) todas las muestras valian 0 y los diagramas del mock
+// quedaban PLANOS — el overlay de esfuerzos (que honestamente no dibuja diagramas
+// nulos) no tenia nada que pintar en E2E. 3 mantiene el payload minimo con pico real.
+const N_POINTS_MOCK = 3;
 
 // Carga vertical total enlatada (kN) que el mock "reparte" entre los apoyos para un
 // equilibrio plausible: las reacciones verticales (FY) suman +CARGA_TOTAL_FY, signo
@@ -145,10 +147,12 @@ const N_POINTS_MOCK = 2;
 const CARGA_TOTAL_FY = 100;
 
 // Magnitudes enlatadas de los esfuerzos por barra (kN, kN·m). Plausibles para un
-// portico pequeno; el signo del momento sigue la convencion observada en PyNite
-// (UDL gravitatoria -> Mz negativo en el vano, pico en min_moment_z; ver memoria
-// feature-5). max_moment_z queda >= 0 y min_moment_z <= 0 para coherencia de extremos.
-const AXIL_MOCK = -50; // compresion tipica de un soporte (kN)
+// portico pequeno; los signos siguen la convencion CRUDA de PyNite (la que emite el
+// motor real y la que la UI voltea a presentacion en convencionEsfuerzos): UDL
+// gravitatoria -> Mz NEGATIVO en el vano (pico en min_moment_z; memoria feature-5),
+// y axil de COMPRESION POSITIVO (verificado con motor real: pilar bajo peso propio
+// -> axial = +A·rho·y). max_moment_z queda >= 0 y min_moment_z <= 0 por coherencia.
+const AXIL_MOCK = 50; // compresion tipica de un soporte (kN, crudo PyNite: +)
 const CORTANTE_MOCK = 30; // pico de cortante (kN)
 const MOMENTO_PICO_MOCK = -40; // pico de flector en el vano (kN·m, negativo)
 const FLECHA_PICO_MOCK = -0.004; // flecha vertical local en el centro (m)

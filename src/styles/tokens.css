@@ -68,6 +68,15 @@
   --apoyo-calc: #1f9e89; /* apoyos (glifo por GDL restringidos) */
   --release-calc: #e0863a; /* extremo liberado (release) */
 
+  /* --- Diagramas de esfuerzos sobre las barras (Resultados) ---
+     Color por SIGNO del esfuerzo (una sola magnitud a la vez; la leyenda dice cuál):
+     positivo azul / negativo rojo, dos hues muy separados porque la lectura del
+     diagrama es forma + lado + signo, no una rampa. Coinciden con --accent y
+     --danger a propósito (semántica ya establecida: azul = dato primario,
+     rojo = negativo/atención). */
+  --esfuerzo-pos: #2563eb; /* esfuerzo positivo (azul) */
+  --esfuerzo-neg: #dc2626; /* esfuerzo negativo (rojo) */
+
   /* --- Centros del forjado (F2a, D-diseño-5) ---
      Centro de masas: ayuda de modelado (overlay ⊕ + panel). Hue DISTINTO del mapa
      semantico de elementos (--pilar azul-gris / --viga ocre / --load naranja /

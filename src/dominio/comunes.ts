@@ -35,4 +35,10 @@ export const NumeroFinitoSchema = z.number().finite();
 // x1/y1/x2/y2, plantaInicial/Final, espesor, material, tamMalla, vinculacionExterior).
 // La migracion v5->v6 DESCARTA los muros-stub heredados (sin geometria; nunca hubo UI
 // que los creara — espejo del descarte de paños-stub en v2->v3).
-export const SCHEMA_VERSION = 6;
+// v7 (F3, forjado reticular) parte `PanoSchema` en union discriminada por `tipo`
+// (T-f3-pano-schema-union): cada variante lleva SOLO sus campos. La migracion v6->v7
+// PODA los campos ajenos a cada variante (un `losa` pierde los 5 campos uni si los
+// arrastraba; un `unidireccional` pierde `espesor`/`tamMalla`, que en v5/v6 estaban
+// declaradamente ignorados) y DESCARTA los paños `reticular` heredados (que en v6 solo
+// podian tener forma de losa y no satisfacen los nuevos campos reticulares obligatorios).
+export const SCHEMA_VERSION = 7;

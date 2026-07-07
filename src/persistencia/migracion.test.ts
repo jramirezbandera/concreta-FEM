@@ -651,16 +651,18 @@ describe("migrarYValidar — v4 -> v5: bump de version (campos opcionales)", () 
     expect(r.modelo.panos).toEqual([]);
   });
 
-  it("un paño unidireccional v5 con campos VALIDOS pasa la frontera Zod", () => {
-    // Ya en la version vigente: no corre la cadena; ejercita el ModeloSchema v5.
+  it("un paño unidireccional con campos VALIDOS pasa la frontera Zod (v7)", () => {
+    // Ya en la version vigente (v7): no corre la cadena; ejercita el ModeloSchema con
+    // la union discriminada. espesor/tamMalla YA NO pertenecen a la variante uni: se
+    // portan aqui a proposito para comprobar que la frontera los TOLERA (los strippea
+    // sin romper — robustez ante un .json editado a mano), no que sean obligatorios.
     const uni = {
       id: "pano-uni",
       nombre: "Forjado unidireccional",
       tipo: "unidireccional",
       plantaId: "pl1",
       perimetro: ["n1", "n2", "n3", "n4"],
-      // espesor/tamMalla obligatorios a nivel Zod aunque el discretizador los ignore
-      // bajo unidireccional (deuda T-f3-pano-schema-union): se portan con valor inocuo.
+      // Campos AJENOS a la variante (de losa): la union los descarta, no los exige.
       espesor: 0.3,
       materialId: "mat-horm",
       tamMalla: 0.5,
@@ -675,7 +677,7 @@ describe("migrarYValidar — v4 -> v5: bump de version (campos opcionales)", () 
     const raw = { ...proyectoV4([uni]), schemaVersion: SCHEMA_VERSION };
     const r = ok(migrarYValidar(raw));
     expect(r.modelo.panos).toHaveLength(1);
-    // Los 5 campos nuevos sobreviven la frontera Zod (z.infer los tipa opcionales).
+    // Los 5 campos propios sobreviven la frontera Zod...
     expect(r.modelo.panos[0]).toMatchObject({
       tipo: "unidireccional",
       direccionViguetas: "x",
@@ -684,6 +686,9 @@ describe("migrarYValidar — v4 -> v5: bump de version (campos opcionales)", () 
       anchoNervio: 0.12,
       pesoPropio: 3.5,
     });
+    // ...y los campos ajenos de losa fueron descartados por la union discriminada.
+    expect("espesor" in (r.modelo.panos[0] as Record<string, unknown>)).toBe(false);
+    expect("tamMalla" in (r.modelo.panos[0] as Record<string, unknown>)).toBe(false);
   });
 
   it("un unidireccional con campos BASURA (intereje negativo) se RECHAZA en la frontera", () => {
@@ -850,6 +855,242 @@ describe("migrarYValidar — v5 -> v6: muros-stub descartados, completos intacto
     expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
     expect(r.modelo.muros).toEqual([]);
     expect(r.avisos.some((a) => /muro.*sin geometría/i.test(a))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Migracion REAL de model-schema v6 -> v7 (F3, forjado reticular). v7 parte
+// `PanoSchema` en una UNION DISCRIMINADA por `tipo`: cada variante lleva SOLO sus
+// campos. La migracion PODA los campos ajenos a cada variante y DESCARTA los paños
+// `reticular` heredados (que en v6 solo podian existir con forma de losa, via .json
+// editado a mano, y no satisfacen los nuevos campos reticulares obligatorios).
+// ---------------------------------------------------------------------------
+
+// Fabrica un proyecto v6 valido (forma vigente ANTES de este corte: schemaVersion:6,
+// con `muros` ya en su forma completa). Parametriza `panos`/`cargas` para ejercitar
+// la poda por variante y el descarte de reticulares.
+function proyectoV6(
+  panos: unknown[] = [],
+  cargas: unknown[] = [],
+): Record<string, unknown> {
+  return { ...proyectoV4([]), schemaVersion: 6, muros: [], panos, cargas };
+}
+
+describe("migrarYValidar — v6 -> v7: poda de campos ajenos por variante de paño", () => {
+  it("v6 con panos:[] migra a v7 sin avisos de paños (no-op en la practica)", () => {
+    const r = ok(migrarYValidar(proyectoV6()));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(r.modelo.panos).toEqual([]);
+    expect(r.avisos.some((a) => /paño/i.test(a))).toBe(false);
+    // La cadena corrio (v6->v7): el aviso generico de actualizacion si esta.
+    expect(r.avisos.some((a) => /actualiz/i.test(a))).toBe(true);
+  });
+
+  it("losa v6 que ARRASTRA campos uni -> v7 los PODA (conserva espesor/tamMalla)", () => {
+    // Un .json editado a mano donde una losa quedo con campos de unidireccional
+    // pegados. La migracion los elimina; la losa conserva sus propios.
+    const losaSucia = {
+      id: "pano-losa",
+      nombre: "Forjado losa",
+      tipo: "losa",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      espesor: 0.25,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+      // Campos AJENOS (de unidireccional) que arrastraba: deben desaparecer.
+      direccionViguetas: "x",
+      intereje: 0.7,
+      canto: 0.3,
+      anchoNervio: 0.12,
+      pesoPropio: 4,
+    };
+    const r = ok(migrarYValidar(proyectoV6([losaSucia])));
+    expect(r.modelo.panos).toHaveLength(1);
+    const p = r.modelo.panos[0] as Record<string, unknown>;
+    // Conserva comunes + propios de losa.
+    expect(p).toMatchObject({
+      id: "pano-losa",
+      nombre: "Forjado losa",
+      tipo: "losa",
+      espesor: 0.25,
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+    });
+    // Los 5 campos uni fueron podados.
+    expect("direccionViguetas" in p).toBe(false);
+    expect("intereje" in p).toBe(false);
+    expect("canto" in p).toBe(false);
+    expect("anchoNervio" in p).toBe(false);
+    expect("pesoPropio" in p).toBe(false);
+  });
+
+  it("unidireccional v6 con espesor/tamMalla -> v7 los PODA (conserva sus 5 campos)", () => {
+    // En v5/v6 espesor/tamMalla eran obligatorios a nivel Zod aunque el discretizador
+    // los IGNORABA bajo unidireccional. v7 los proscribe: la migracion los elimina.
+    const uniV6 = {
+      id: "pano-uni",
+      nombre: "Forjado unidireccional",
+      tipo: "unidireccional",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      // Campos declaradamente ignorados que se portaban por obligacion Zod v6:
+      espesor: 0.3,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+      // Propios de unidireccional (los 5): se conservan.
+      direccionViguetas: "y",
+      intereje: 0.7,
+      canto: 0.3,
+      anchoNervio: 0.12,
+      pesoPropio: 3.5,
+    };
+    const r = ok(migrarYValidar(proyectoV6([uniV6])));
+    expect(r.modelo.panos).toHaveLength(1);
+    const p = r.modelo.panos[0] as Record<string, unknown>;
+    // espesor/tamMalla podados.
+    expect("espesor" in p).toBe(false);
+    expect("tamMalla" in p).toBe(false);
+    // Los 5 campos propios sobreviven intactos.
+    expect(p).toMatchObject({
+      tipo: "unidireccional",
+      direccionViguetas: "y",
+      intereje: 0.7,
+      canto: 0.3,
+      anchoNervio: 0.12,
+      pesoPropio: 3.5,
+    });
+  });
+});
+
+describe("migrarYValidar — v6 -> v7: descarta paños reticular heredados", () => {
+  // Un paño `reticular` v6 solo podia existir con forma de LOSA (espesor/tamMalla
+  // obligatorios en v6, tipo:"reticular" en el enum pero NUNCA ofrecido por la UI).
+  // Esa forma no satisface la nueva variante reticular: se DESCARTA con aviso.
+  const reticularV6ConFormaLosa = {
+    id: "pano-ret",
+    nombre: "Reticular heredado",
+    tipo: "reticular",
+    plantaId: "pl1",
+    perimetro: ["n1", "n2", "n3", "n4"],
+    espesor: 0.3,
+    materialId: "mat-horm",
+    tamMalla: 0.8,
+    bordeApoyo: "simple",
+  };
+
+  it("descarta un reticular v6 (forma de losa) con aviso en lenguaje de obra, valida", () => {
+    const r = ok(migrarYValidar(proyectoV6([reticularV6ConFormaLosa])));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    // El paño reticular desaparece (no era completable a la nueva variante).
+    expect(r.modelo.panos).toEqual([]);
+    // Aviso explicito en lenguaje de obra.
+    expect(
+      r.avisos.some((a) => /descartaron 1 paño reticular/i.test(a)),
+    ).toBe(true);
+  });
+
+  it("descarta el reticular Y sus cargas superficiales; conserva la losa y su carga", () => {
+    const losa = {
+      id: "pano-losa",
+      nombre: "Losa buena",
+      tipo: "losa",
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      espesor: 0.25,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+    };
+    const r = ok(
+      migrarYValidar(
+        proyectoV6(
+          [reticularV6ConFormaLosa, losa],
+          [
+            // Superficial sobre el reticular descartado -> se purga.
+            { id: "c1", tipo: "superficial", ambito: "pano-ret", valor: 5, hipotesisId: "hip-cargas-muertas" },
+            // Superficial sobre la losa conservada -> se conserva.
+            { id: "c2", tipo: "superficial", ambito: "pano-losa", valor: 3, hipotesisId: "hip-cargas-muertas" },
+          ],
+        ),
+      ),
+    );
+    // Solo sobrevive la losa.
+    expect(r.modelo.panos).toHaveLength(1);
+    expect((r.modelo.panos[0] as Record<string, unknown>).id).toBe("pano-losa");
+    // Solo sobrevive la carga que apunta a la losa.
+    expect(r.modelo.cargas.map((c) => c.id)).toEqual(["c2"]);
+  });
+
+  it("varios reticulares -> aviso en plural", () => {
+    const otro = { ...reticularV6ConFormaLosa, id: "pano-ret-2", nombre: "Reticular 2" };
+    const r = ok(migrarYValidar(proyectoV6([reticularV6ConFormaLosa, otro])));
+    expect(r.modelo.panos).toEqual([]);
+    expect(
+      r.avisos.some((a) => /descartaron 2 paños reticulares/i.test(a)),
+    ).toBe(true);
+  });
+});
+
+describe("migrarYValidar — v6 -> v7: cadena completa y robustez", () => {
+  it("cadena completa v1 -> v7 desde un raw v1 con un paño losa: llega y valida", () => {
+    // Un raw v1 realista con grupos + una losa que se introdujo (schemaVersion:1 no
+    // conocia panos con geometria, pero un .json heredado editado puede llevarla). Lo
+    // relevante: la cadena entera 1->2->...->7 corre sin huecos y valida al final.
+    const rawV1: Record<string, unknown> = {
+      unidades: "kN-m",
+      schemaVersion: 1,
+      grupos: [{ id: "g1", nombre: "G1", categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1 }],
+      plantas: [{ id: "p1", nombre: "Planta 1", cota: 3, altura: 3, grupoId: "g1" }],
+      secciones: [],
+      nudos: [],
+      pilares: [],
+      vigas: [],
+      panos: [],
+      muros: [],
+      cargas: [],
+      hipotesis: [
+        { id: "hip-cargas-muertas", nombre: "Cargas muertas", tipo: "permanente" },
+      ],
+      analisis: { tipo: "lineal", comprobarEstatica: true },
+    };
+    const r = ok(migrarYValidar(rawV1));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    // v1->v2 sembro la automatica; v3->v4 volco el uso del grupo; v6->v7 sin paños es
+    // no-op de datos. La cadena llego a la version vigente.
+    expect(autoDe(r.modelo)).toHaveLength(1);
+    expect("grupos" in r.modelo).toBe(false);
+    expect(r.avisos.some((a) => /actualiz/i.test(a))).toBe(true);
+  });
+
+  it("cadena v4 -> v7 con una losa v4: sobrevive y llega a v7 (poda no-op)", () => {
+    // Una losa v4 no arrastra campos uni: la poda v6->v7 la deja intacta (byte a byte
+    // salvo por no ganar nada). Comprueba que el nuevo eslabon no rompe una losa limpia.
+    const r = ok(migrarYValidar(proyectoV4([LOSA_V4])));
+    expect(r.modelo.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(r.modelo.panos).toHaveLength(1);
+    expect(r.modelo.panos[0]).toEqual(LOSA_V4);
+  });
+
+  it("import corrupto en v6 (paño con tipo basura) -> ok:false con ruta legible, no lanza", () => {
+    // Un paño con `tipo` desconocido: la migracion lo poda a comunes (no inventa una
+    // variante) y la frontera Zod lo rechaza por `tipo` invalido con ruta. No lanza.
+    const panoBasura = {
+      id: "pano-x",
+      nombre: "Paño raro",
+      tipo: "hexagonal", // BASURA: no es losa|unidireccional|reticular
+      plantaId: "pl1",
+      perimetro: ["n1", "n2", "n3", "n4"],
+      espesor: 0.25,
+      materialId: "mat-horm",
+      tamMalla: 0.5,
+      bordeApoyo: "simple",
+    };
+    expect(() => migrarYValidar(proyectoV6([panoBasura]))).not.toThrow();
+    const errs = errores(migrarYValidar(proyectoV6([panoBasura])));
+    expect(errs.some((e) => e.includes("panos.0"))).toBe(true);
   });
 });
 

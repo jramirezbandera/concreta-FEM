@@ -215,10 +215,19 @@ export async function calcularObra(sinkLlamante: CalculoSink = {}): Promise<void
       const escalaInicial = calcularEscalaInicial(modeloFEM, resultados, comboFinal);
       vistaStore.getState().setDeformadaEscala(escalaInicial);
 
-      // [AUDITORIA D9] Al llegar resultados ESTATICOS nuevos se muestra la DEFORMADA (no la
-      // forma modal): la deformada es la lectura primaria del calculo estatico. Exclusion
-      // mutua con la forma modal (que se activa desde "Calcular modos" / seleccionar modo).
-      vistaStore.getState().setOverlayResultados("deformada");
+      // Tamano de los diagramas de esfuerzos: el multiplicador vuelve a ×1 al llegar
+      // resultados nuevos (la escala BASE ya es automatica por magnitud/combo; un
+      // ajuste manual del modelo anterior no tiene por que valer para el nuevo).
+      vistaStore.getState().setEsfuerzosEscala(1);
+
+      // [AUDITORIA D9] Al llegar resultados ESTATICOS nuevos se sale de la forma modal
+      // (la lectura primaria del calculo estatico es la deformada), pero se CONSERVA la
+      // eleccion estatica del usuario: si estaba mirando los diagramas de esfuerzos,
+      // recalcular no debe devolverle a la deformada.
+      const overlayActual = vistaStore.getState().overlayResultados;
+      vistaStore
+        .getState()
+        .setOverlayResultados(overlayActual === "modal" ? "deformada" : overlayActual);
     },
     mensajeFalloInesperado:
       "No se pudo completar el calculo por un fallo inesperado. " +

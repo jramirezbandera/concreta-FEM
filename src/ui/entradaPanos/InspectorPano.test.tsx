@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { InspectorPano } from "./InspectorPano";
 import { modeloStore, seleccionStore, vistaStore } from "../../estado";
 import { crearModeloVacio } from "../../dominio";
-import type { Modelo } from "../../dominio";
+import type { Modelo, Pano, PanoLosa, PanoUnidireccional } from "../../dominio";
 import { listarMateriales } from "../../biblioteca";
 
 beforeAll(() => {
@@ -92,12 +92,19 @@ function modeloConLosaPlana(nPilares: number): Modelo {
 // tests de UI: basta con que el paño porte los campos uni.
 function modeloConPanoUni(): Modelo {
   const m = modeloConPano();
-  m.panos = m.panos.map((p) =>
+  // Union discriminada: la variante unidireccional NO lleva espesor/tamMalla. Se reconstruye
+  // el paño con los campos comunes + los de vigueta (no se hereda la forma de losa).
+  m.panos = m.panos.map((p): Pano =>
     p.id === "F-1"
       ? {
-          ...p,
-          tipo: "unidireccional" as const,
-          direccionViguetas: "x" as const,
+          id: p.id,
+          nombre: p.nombre,
+          plantaId: p.plantaId,
+          perimetro: p.perimetro,
+          materialId: p.materialId,
+          bordeApoyo: p.bordeApoyo,
+          tipo: "unidireccional",
+          direccionViguetas: "x",
           intereje: 0.7,
           canto: 0.3,
           anchoNervio: 0.12,
@@ -120,6 +127,9 @@ beforeEach(() => {
 
 const modelo = () => modeloStore.getState().getModelo();
 const pano = () => modelo().panos.find((p) => p.id === "F-1");
+// Accesos ESTRECHADOS por variante (union discriminada): el test sabe que tipo colocó.
+const panoLosa = () => pano() as PanoLosa | undefined;
+const panoUni = () => pano() as PanoUnidireccional | undefined;
 
 function renderConPanoSeleccionado() {
   modeloStore.getState().cargarModelo(modeloConPano());
@@ -303,7 +313,7 @@ describe("InspectorPano: commit en vivo", () => {
     await user.clear(input);
     await user.type(input, "300");
     await user.tab(); // blur -> commit
-    expect(pano()!.espesor).toBeCloseTo(0.3, 6);
+    expect(panoLosa()!.espesor).toBeCloseTo(0.3, 6);
   });
 
   it("deshacer revierte la edición del apoyo de borde", async () => {
@@ -487,7 +497,7 @@ describe("InspectorPano: forjado unidireccional", () => {
     await user.clear(input);
     await user.type(input, "600"); // 600 mm -> 0.6 m
     await user.tab();
-    expect(pano()!.intereje).toBeCloseTo(0.6, 6);
+    expect(panoUni()!.intereje).toBeCloseTo(0.6, 6);
   });
 
   it("commit en vivo: editar el peso propio (kN/m²) persiste sin conversion", async () => {
@@ -497,7 +507,7 @@ describe("InspectorPano: forjado unidireccional", () => {
     await user.clear(input);
     await user.type(input, "5");
     await user.tab();
-    expect(pano()!.pesoPropio).toBe(5);
+    expect(panoUni()!.pesoPropio).toBe(5);
   });
 
   it("commit en vivo: cambiar la dirección de viguetas a Eje Y persiste y es reversible", async () => {
@@ -505,9 +515,9 @@ describe("InspectorPano: forjado unidireccional", () => {
     renderConPanoUniSeleccionado();
     const grupo = screen.getByRole("radiogroup", { name: "Dirección de viguetas del forjado" });
     await user.click(within(grupo).getByRole("radio", { name: "Eje Y" }));
-    expect(pano()!.direccionViguetas).toBe("y");
+    expect(panoUni()!.direccionViguetas).toBe("y");
     modeloStore.getState().deshacer();
-    expect(pano()!.direccionViguetas).toBe("x");
+    expect(panoUni()!.direccionViguetas).toBe("x");
   });
 
   it("validación: un intereje inválido (0) NO comitea y muestra el error", async () => {
@@ -518,7 +528,7 @@ describe("InspectorPano: forjado unidireccional", () => {
     await user.type(input, "0");
     await user.tab();
     // No comitea: el intereje sigue en 0.7 m.
-    expect(pano()!.intereje).toBeCloseTo(0.7, 6);
+    expect(panoUni()!.intereje).toBeCloseTo(0.7, 6);
     expect(screen.getByText(/El intereje debe ser mayor que cero/i)).toBeInTheDocument();
   });
 
@@ -534,12 +544,17 @@ describe("InspectorPano: forjado unidireccional", () => {
     // Aunque hubiera pilares interiores, bajo uni el pilar BLOQUEA (no acopla): la
     // nota de momento en cabeza (losa plana) no debe salir.
     const m = modeloConLosaPlana(2);
-    m.panos = m.panos.map((p) =>
+    m.panos = m.panos.map((p): Pano =>
       p.id === "F-1"
         ? {
-            ...p,
-            tipo: "unidireccional" as const,
-            direccionViguetas: "x" as const,
+            id: p.id,
+            nombre: p.nombre,
+            plantaId: p.plantaId,
+            perimetro: p.perimetro,
+            materialId: p.materialId,
+            bordeApoyo: p.bordeApoyo,
+            tipo: "unidireccional",
+            direccionViguetas: "x",
             intereje: 0.7,
             canto: 0.3,
             anchoNervio: 0.12,

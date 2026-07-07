@@ -31,6 +31,7 @@ import {
   editarPano,
   eliminarPano,
 } from "../../estado";
+import type { CambiosPano } from "../../estado";
 import type { Modelo, Pano, Nudo } from "../../dominio";
 import { cargasDeAmbito } from "../../dominio";
 // FUENTE UNICA [2A] de las cargas automaticas de grupo (F3.2, D-1): la MISMA que
@@ -60,18 +61,24 @@ function errorDe(errores: ErrorCampo[], campo: string): string | undefined {
 // pero forma parte del contrato de validacion (unicidad). El `tipo` y los campos uni
 // viajan tambien para que validarPano aplique las reglas del forjado unidireccional.
 function datosDesde(pano: Pano, cambios: Partial<DatosPanoUI>): DatosPanoUI {
+  // La union discriminada por `tipo` estrecha que campos porta cada variante: espesor/tamMalla
+  // solo la losa; direccionViguetas/intereje/canto/anchoNervio/pesoPropio solo la unidireccional.
+  // DatosPanoUI (contrato de UI, corte 1) trata la losa como el caso base: espesor/tamMalla
+  // OBLIGATORIOS. Para una variante sin ellos (unidireccional) se emiten 0 de placeholder
+  // (los campos de placa estan ocultos en su UI y validarPano no los mira bajo unidireccional).
+  const uni = pano.tipo === "unidireccional" ? pano : null;
   return {
     nombre: pano.nombre,
-    tipo: pano.tipo === "unidireccional" ? "unidireccional" : "losa",
+    tipo: uni ? "unidireccional" : "losa",
     materialId: pano.materialId,
-    espesor: pano.espesor,
-    tamMalla: pano.tamMalla,
+    espesor: pano.tipo === "losa" ? pano.espesor : 0,
+    tamMalla: pano.tipo === "losa" ? pano.tamMalla : 0,
     bordeApoyo: pano.bordeApoyo,
-    direccionViguetas: pano.direccionViguetas,
-    intereje: pano.intereje,
-    canto: pano.canto,
-    anchoNervio: pano.anchoNervio,
-    pesoPropio: pano.pesoPropio,
+    direccionViguetas: uni ? uni.direccionViguetas : undefined,
+    intereje: uni ? uni.intereje : undefined,
+    canto: uni ? uni.canto : undefined,
+    anchoNervio: uni ? uni.anchoNervio : undefined,
+    pesoPropio: uni ? uni.pesoPropio : undefined,
     ...cambios,
   };
 }
@@ -212,7 +219,7 @@ export function InspectorPano() {
   const commit = (
     campos: ReadonlyArray<keyof DatosPanoUI>,
     cambios: Partial<DatosPanoUI>,
-    parche: Partial<Omit<Pano, "id" | "nombre" | "perimetro">>,
+    parche: CambiosPano,
   ) => {
     const m = leerModelo();
     const actual = m.panos.find((p) => p.id === pano.id);
@@ -226,9 +233,11 @@ export function InspectorPano() {
       ...errsCampo,
     ]);
     if (errsCampo.length > 0) return;
-    const sinCambio = (Object.keys(parche) as (keyof Pano)[]).every(
-      (k) => actual[k] === parche[k as keyof typeof parche],
-    );
+    // Comparacion laxa (el paño es una union discriminada; keyof Pano solo cubre los campos
+    // comunes). Se lee el campo del paño actual como registro para el chequeo "sin cambio".
+    const actualRec = actual as Record<string, unknown>;
+    const parcheRec = parche as Record<string, unknown>;
+    const sinCambio = Object.keys(parcheRec).every((k) => actualRec[k] === parcheRec[k]);
     if (sinCambio) return;
     modeloStore.getState().ejecutar(editarPano(m, pano.id, parche));
   };
@@ -257,6 +266,13 @@ export function InspectorPano() {
   // D8b: dimensiones del paño (ancho × alto, solo lectura). Del bounding box de su
   // perimetro (modelo.nudos). El bloque no se pinta si el perimetro no resuelve.
   const dimensiones = dimensionesDePano(nudos, pano);
+
+  // Variantes ESTRECHADAS por `tipo` (union discriminada): cada bloque de campos lee solo los
+  // que su variante porta. `esUni` (booleano) NO estrecha `pano` en TS, por eso se derivan
+  // estas referencias. La losa maciza es la variante con espesor/tamMalla; la unidireccional
+  // la de viguetas. Un paño reticular no tiene UI de edicion aqui (no se ofrece en creacion).
+  const panoLosa = pano.tipo === "losa" ? pano : null;
+  const panoUni = pano.tipo === "unidireccional" ? pano : null;
 
   return (
     <>
@@ -297,19 +313,19 @@ export function InspectorPano() {
           </div>
         ) : null}
 
-        {/* Campos de la LOSA MACIZA: espesor + tamaño de malla. Ocultos bajo
-            unidireccional (no aplican: la vigueta no es una placa mallada). */}
-        {!esUni ? (
+        {/* Campos de la LOSA MACIZA: espesor + tamaño de malla. Solo bajo la variante losa
+            (la vigueta no es una placa mallada; el reticular no se edita aqui). */}
+        {panoLosa ? (
           <>
             <CampoLongitudMm
               etiqueta="Espesor"
-              valorM={pano.espesor}
+              valorM={panoLosa.espesor}
               onValorM={(m) => commit(["espesor"], { espesor: m }, { espesor: m })}
               error={errorDe(errores, "espesor")}
             />
             <CampoLongitudMm
               etiqueta="Tamaño de malla"
-              valorM={pano.tamMalla}
+              valorM={panoLosa.tamMalla}
               onValorM={(m) => commit(["tamMalla"], { tamMalla: m }, { tamMalla: m })}
               error={errorDe(errores, "tamMalla")}
             />
@@ -317,38 +333,38 @@ export function InspectorPano() {
         ) : null}
 
         {/* Campos del forjado UNIDIRECCIONAL: direccion de viguetas, intereje, canto,
-            ancho de nervio y peso propio. Solo bajo tipo "unidireccional". Commit en
+            ancho de nervio y peso propio. Solo bajo la variante "unidireccional". Commit en
             vivo (mismo patron que el resto de campos del inspector). */}
-        {esUni ? (
+        {panoUni ? (
           <>
             <CampoDireccionViguetas
               className="cx-inspector-pano__campo"
-              valor={pano.direccionViguetas ?? "x"}
+              valor={panoUni.direccionViguetas}
               onValor={(v) =>
                 commit(["direccionViguetas"], { direccionViguetas: v }, { direccionViguetas: v })
               }
             />
             <CampoLongitudMm
               etiqueta="Intereje"
-              valorM={pano.intereje ?? 0}
+              valorM={panoUni.intereje}
               onValorM={(m) => commit(["intereje"], { intereje: m }, { intereje: m })}
               error={errorDe(errores, "intereje")}
             />
             <CampoLongitudMm
               etiqueta="Canto"
-              valorM={pano.canto ?? 0}
+              valorM={panoUni.canto}
               onValorM={(m) => commit(["canto"], { canto: m }, { canto: m })}
               error={errorDe(errores, "canto")}
             />
             <CampoLongitudMm
               etiqueta="Ancho de nervio"
-              valorM={pano.anchoNervio ?? 0}
+              valorM={panoUni.anchoNervio}
               onValorM={(m) => commit(["anchoNervio"], { anchoNervio: m }, { anchoNervio: m })}
               error={errorDe(errores, "anchoNervio")}
             />
             <CampoPesoPropio
               className="cx-inspector-pano__campo"
-              valor={pano.pesoPropio ?? 0}
+              valor={panoUni.pesoPropio}
               onValor={(v) => commit(["pesoPropio"], { pesoPropio: v }, { pesoPropio: v })}
               error={errorDe(errores, "pesoPropio")}
             />

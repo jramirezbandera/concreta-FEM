@@ -26,7 +26,8 @@ function acotar(escala: number): number {
 // Dimension mayor del bounding box del modelo (m), sobre las posiciones FEM de los nudos.
 // Los ejes FEM y de escena difieren en un intercambio Y<->Z, pero el bbox (max-min por eje)
 // es invariante a esa permutacion, asi que da igual usar coords FEM. 0 si no hay nudos.
-function ladoMayorBBox(modeloFEM: ModeloFEM): number {
+// Exportada: la reutiliza la escala base del overlay de esfuerzos (esfuerzosEscala).
+export function ladoMayorBBox(modeloFEM: ModeloFEM): number {
   const ns = modeloFEM.nodes;
   if (ns.length === 0) return 0;
   let minX = Infinity,

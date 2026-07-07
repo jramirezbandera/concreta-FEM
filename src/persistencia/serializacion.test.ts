@@ -136,10 +136,11 @@ describe("serializacion export/import", () => {
     expect(resultado.ok).toBe(false);
   });
 
-  it("roundtrip preserva los campos del forjado unidireccional (v5)", () => {
-    // Un paño unidireccional con los 5 campos del corte: el JSON debe conservarlos
-    // byte a byte al exportar e importar (la frontera Zod los tipa opcionales, no
-    // los descarta ni los normaliza).
+  it("roundtrip preserva los campos del forjado unidireccional (v7)", () => {
+    // Un paño unidireccional con SOLO sus campos de variante (v7, union discriminada
+    // de T-f3-pano-schema-union): el JSON debe conservarlos byte a byte al exportar e
+    // importar. Ya NO lleva espesor/tamMalla (eran de la losa; la union los proscribe
+    // en esta variante — la migracion v6->v7 los poda de un paño uni heredado).
     const modelo = crearModeloVacio();
     const uni: Pano = {
       id: "pano-uni",
@@ -147,11 +148,7 @@ describe("serializacion export/import", () => {
       tipo: "unidireccional",
       plantaId: "pl1",
       perimetro: ["n1", "n2", "n3", "n4"],
-      // espesor/tamMalla obligatorios a nivel Zod (deuda T-f3-pano-schema-union):
-      // se portan con valor inocuo aunque el discretizador no los lea bajo uni.
-      espesor: 0.3,
       materialId: "mat-horm",
-      tamMalla: 0.5,
       bordeApoyo: "simple",
       direccionViguetas: "y",
       intereje: 0.72,

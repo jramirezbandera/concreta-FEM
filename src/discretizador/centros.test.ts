@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { calcularCentroMasaPlanta } from "./centros";
-import { type Modelo } from "../dominio";
+import { type Modelo, type PanoLosa, type PanoUnidireccional } from "../dominio";
 import { SCHEMA_VERSION, ID_HIP_PESO_PROPIO } from "../dominio";
 
 // Tests del centro de masas (F2.1, F2a Fase 2). Vitest en Node PURO: sin Pyodide.
@@ -430,7 +430,7 @@ describe("AUDITORIA M-7: pilar pasante y masa tributaria por planta", () => {
 // ============================================================================
 describe("centro de masas · paños losa (F3.2, T-cm-cargas-muertas)", () => {
   // Paño 4x2 en p1 con esquinas (0,0)-(4,0)-(4,2)-(0,2): area 8 m², centroide (2,1).
-  function conLosa(m: Modelo, extra?: Partial<Modelo["panos"][number]>): Modelo {
+  function conLosa(m: Modelo, extra?: Partial<PanoLosa>): Modelo {
     m.nudos.push(
       { id: "q1", x: 0, y: 0 },
       { id: "q2", x: 4, y: 0 },
@@ -519,7 +519,7 @@ describe("centro de masas · paños losa (F3.2, T-cm-cargas-muertas)", () => {
 // ============================================================================
 describe("centro de masas · paños unidireccionales (F3)", () => {
   // Paño 4x2 en p1: area 8 m², centroide (2,1). Con los 5 campos de vigueta.
-  function conUni(m: Modelo, extra?: Partial<Modelo["panos"][number]>): Modelo {
+  function conUni(m: Modelo, extra?: Partial<PanoUnidireccional>): Modelo {
     m.nudos.push(
       { id: "q1", x: 0, y: 0 }, { id: "q2", x: 4, y: 0 },
       { id: "q3", x: 4, y: 2 }, { id: "q4", x: 0, y: 2 },
@@ -527,7 +527,7 @@ describe("centro de masas · paños unidireccionales (F3)", () => {
     m.panos.push({
       id: "fu", nombre: "FU", tipo: "unidireccional", plantaId: "p1",
       perimetro: ["q1", "q2", "q3", "q4"],
-      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      materialId: "HA-25", bordeApoyo: "simple",
       direccionViguetas: "x", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
       ...extra,
     });

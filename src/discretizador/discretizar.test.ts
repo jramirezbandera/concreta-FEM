@@ -900,7 +900,7 @@ describe("discretizar · paños UNIDIRECCIONALES (Paso 6d, F3)", () => {
   // PROPIOS, SIN portico (bordes de apoyo sin viga -> viguetas aisladas). Sujeto por su
   // propio bordeApoyo (simple != libre). direccion "y": viguetas paralelas a Y (luz 5),
   // reparto en X (B=2). intereje 1 -> n = round(2/1) = 2 viguetas, s = 1.
-  function modeloUniAislado(over: Partial<import("../dominio").Pano> = {}): Modelo {
+  function modeloUniAislado(over: Partial<import("../dominio").PanoUnidireccional> = {}): Modelo {
     return {
       unidades: "kN-m",
       schemaVersion: SCHEMA_VERSION,
@@ -920,7 +920,7 @@ describe("discretizar · paños UNIDIRECCIONALES (Paso 6d, F3)", () => {
         {
           id: "pu1", nombre: "Forjado 1", tipo: "unidireccional", plantaId: "p1",
           perimetro: ["u1", "u2", "u3", "u4"],
-          espesor: 0.3, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+          materialId: "HA-25", bordeApoyo: "simple",
           direccionViguetas: "y", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
           ...over,
         },

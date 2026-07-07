@@ -22,7 +22,7 @@ import {
 import { releasesDeExtremo } from "./discretizar";
 import { seccionRectangular } from "../biblioteca";
 import { mToMm } from "../unidades";
-import type { Modelo, Pano } from "../dominio";
+import type { Modelo, Pano, PanoUnidireccional } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
 
 const MATERIAL_LOSA = "HA-25";
@@ -56,17 +56,14 @@ function modeloBase(ancho: number, alto: number): Modelo {
 
 // Paño unidireccional sobre n1..n4 con los 5 campos de vigueta. Defaults del corte
 // (canto 0.30, anchoNervio 0.12, pesoPropio 4). El caller pasa direccion e intereje.
-function panoUni(extra?: Partial<Pano>): Pano {
+function panoUni(extra?: Partial<PanoUnidireccional>): Pano {
   return {
     id: "pano1",
     nombre: "PANO1",
     tipo: "unidireccional",
     plantaId: "p1",
     perimetro: ["n1", "n2", "n3", "n4"],
-    // espesor/tamMalla obligatorios en el schema pero IGNORADOS bajo unidireccional.
-    espesor: 0.3,
     materialId: MATERIAL_LOSA,
-    tamMalla: 1,
     bordeApoyo: "simple",
     direccionViguetas: "x",
     intereje: 0.7,
@@ -267,11 +264,16 @@ describe("viguetas - seccion sintetica VIG-<idx>", () => {
     expect(sec.J).toBe(e.J);
   });
 
-  it("undefined si faltan canto/anchoNervio (validaciones bloquea antes con PANO_UNI_CAMPOS)", () => {
-    expect(seccionFEMDeVigueta(panoUni({ canto: undefined }), 0)).toBeUndefined();
-    expect(seccionFEMDeVigueta(panoUni({ anchoNervio: undefined }), 0)).toBeUndefined();
-    expect(seccionFEMDeVigueta(panoUni({ canto: 0 }), 0)).toBeUndefined();
-    expect(seccionFEMDeVigueta(panoUni({ anchoNervio: -1 }), 0)).toBeUndefined();
+  it("undefined si el paño no es unidireccional (la union discriminada garantiza canto/anchoNervio > 0)", () => {
+    // Tras la union discriminada (T-f3-pano-schema-union) canto/anchoNervio son obligatorios y
+    // > 0 en la variante unidireccional (borde Zod): ya no se puede construir un paño uni con
+    // esos campos ausentes o <= 0. El unico caso de undefined es que el paño NO sea uni.
+    const losa: Pano = {
+      id: "losa1", nombre: "L1", tipo: "losa", plantaId: "p1",
+      perimetro: ["n1", "n2", "n3", "n4"], materialId: MATERIAL_LOSA, bordeApoyo: "simple",
+      espesor: 0.2, tamMalla: 1,
+    };
+    expect(seccionFEMDeVigueta(losa, 0)).toBeUndefined();
   });
 });
 
@@ -341,8 +343,17 @@ describe("viguetas - nombres deterministas (prefijo PV<idx>)", () => {
 describe("viguetas - precondicion (undefined, no lanza)", () => {
   it("paño no unidireccional (losa/reticular) -> undefined", () => {
     const modelo = modeloBase(6, 5);
-    expect(generarViguetas(modelo, panoUni({ tipo: "losa" }))).toBeUndefined();
-    expect(generarViguetas(modelo, panoUni({ tipo: "reticular" }))).toBeUndefined();
+    const comun = {
+      id: "pano1", nombre: "PANO1", plantaId: "p1",
+      perimetro: ["n1", "n2", "n3", "n4"], materialId: MATERIAL_LOSA, bordeApoyo: "simple" as const,
+    };
+    const losa: Pano = { ...comun, tipo: "losa", espesor: 0.2, tamMalla: 1 };
+    const reticular: Pano = {
+      ...comun, tipo: "reticular",
+      intereje: 0.8, canto: 0.3, anchoNervio: 0.12, capaCompresion: 0.05, pesoPropio: 4,
+    };
+    expect(generarViguetas(modelo, losa)).toBeUndefined();
+    expect(generarViguetas(modelo, reticular)).toBeUndefined();
   });
 
   it("campos de vigueta ausentes o <= 0 -> undefined (no lanza; validaciones bloquea antes)", () => {

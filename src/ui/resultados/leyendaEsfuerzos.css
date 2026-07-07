@@ -1,0 +1,85 @@
+/* LeyendaEsfuerzos: panel glass del overlay de esfuerzos (selector N/V/M, leyenda de
+   colores por signo, tamano del diagrama). Espejo de leyendaEscala.css: mismo ancho y
+   solo tokens semanticos (los colores de signo salen de --esfuerzo-pos/-neg). */
+
+.cx-leyenda-esf {
+  width: 200px;
+}
+
+.cx-leyenda-esf .cx-float__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+}
+
+/* Selector de magnitud (N/V/M). */
+.cx-leyenda-esf__selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-leyenda-esf__selector .cx-seg {
+  width: 100%;
+}
+.cx-leyenda-esf__selector .cx-seg__item {
+  flex: 1;
+}
+
+.cx-leyenda-esf__etq {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* Leyenda de los dos colores por signo. */
+.cx-leyenda-esf__colores {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.cx-leyenda-esf__color {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.cx-leyenda-esf__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  /* La cinta se dibuja translucida sobre el lienzo; el swatch lo replica. */
+  opacity: 0.75;
+}
+
+/* Valor |maximo| del combo activo (dato numerico: mono + tnum). */
+.cx-leyenda-esf__max {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* Guia "se muestran en la vista 3D" (solo en planta): texto secundario. */
+.cx-leyenda-esf__guia {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+
+/* Control del tamano (slider log). */
+.cx-leyenda-esf__control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cx-leyenda-esf__control input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* Controles atenuados en planta (no operan alli), espejo de leyendaEscala.css. */
+.cx-leyenda-esf__control--off {
+  opacity: 0.5;
+  cursor: default;
+}

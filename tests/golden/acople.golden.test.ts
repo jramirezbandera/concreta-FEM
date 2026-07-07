@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { discretizar } from "../../src/discretizador";
 import type { ResultadoDiscretizacion } from "../../src/discretizador";
-import type { Modelo, Pano } from "../../src/dominio";
+import type { Modelo, Pano, PanoLosa } from "../../src/dominio";
 import { SCHEMA_VERSION } from "../../src/dominio";
 
 const MATERIAL_BARRA = "HA-25";
@@ -65,7 +65,7 @@ function crujia(): Modelo {
 
 // Losa 4x3 con bordeApoyo LIBRE: ejercita la relajacion de PANO_SIN_APOYO [OV-2]
 // (con las 4 vigas debajo hay bordes completos; sin ellas debe BLOQUEAR).
-function pano(id: string, extra?: Partial<Pano>): Pano {
+function pano(id: string, extra?: Partial<PanoLosa>): Pano {
   return {
     id, nombre: id.toUpperCase(), tipo: "losa", plantaId: "p1",
     perimetro: ["n1", "n2", "n3", "n4"],

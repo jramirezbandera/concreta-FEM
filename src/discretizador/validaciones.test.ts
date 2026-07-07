@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { validarModelo, type ErrorObra } from "./validaciones";
 import { calcularAcoples } from "./acople";
-import { ModeloSchema, type Modelo, type Pano, crearModeloVacio } from "../dominio";
+import {
+  ModeloSchema,
+  type Modelo,
+  type PanoUnidireccional,
+  crearModeloVacio,
+} from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
 
 // Tests de las validaciones previas (feature-4, T1.2). Proyecto `node` (sin DOM):
@@ -557,7 +562,8 @@ describe("validarModelo", () => {
     m.panos.push({
       id: "pano1", nombre: "Reticular", tipo: "reticular", plantaId: "p1",
       perimetro: ["q1", "q2", "q3", "q4"],
-      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      materialId: "HA-25", bordeApoyo: "simple",
+      intereje: 0.8, canto: 0.3, anchoNervio: 0.12, capaCompresion: 0.05, pesoPropio: 4,
     });
     expect(codigos(validarModelo(m, { numModos: 6 }))).toContain("MODAL_SIN_MASA");
   });
@@ -578,7 +584,7 @@ describe("validarModelo", () => {
     m.panos.push({
       id: "pano1", nombre: "Forjado", tipo: "unidireccional", plantaId: "p1",
       perimetro: ["q1", "q2", "q3", "q4"],
-      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+      materialId: "HA-25", bordeApoyo: "simple",
       direccionViguetas: "x", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
     });
     expect(codigos(validarModelo(m, { numModos: 6 }))).not.toContain("MODAL_SIN_MASA");
@@ -1306,7 +1312,7 @@ describe("F3.2 · validaciones del acople paño<->portico", () => {
 describe("validaciones · forjado unidireccional (F3)", () => {
   // Modelo con un forjado unidireccional 4x3 sobre 4 nudos propios, apoyado en su borde
   // (bordeApoyo simple != libre: se sostiene solo). Sin portico: el paño se auto-sujeta.
-  function modeloUni(over: Partial<Pano> = {}): Modelo {
+  function modeloUni(over: Partial<PanoUnidireccional> = {}): Modelo {
     return {
       unidades: "kN-m",
       schemaVersion: SCHEMA_VERSION,
@@ -1325,7 +1331,7 @@ describe("validaciones · forjado unidireccional (F3)", () => {
         {
           id: "fu", nombre: "Forjado 1", tipo: "unidireccional", plantaId: "p1",
           perimetro: ["u1", "u2", "u3", "u4"],
-          espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+          materialId: "HA-25", bordeApoyo: "simple",
           direccionViguetas: "x", intereje: 1, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
           ...over,
         },
@@ -1337,54 +1343,36 @@ describe("validaciones · forjado unidireccional (F3)", () => {
     };
   }
 
-  it("unidireccional valido -> sin PANO_TIPO_NO_SOPORTADO ni PANO_UNI_CAMPOS", () => {
+  it("unidireccional valido -> sin PANO_TIPO_NO_SOPORTADO", () => {
     const cods = codigos(validarModelo(modeloUni()));
     expect(cods).not.toContain("PANO_TIPO_NO_SOPORTADO");
-    expect(cods).not.toContain("PANO_UNI_CAMPOS");
     expect(cods).not.toContain("PANO_UNI_SIN_APOYO");
   });
 
   it("PANO_TIPO_NO_SOPORTADO ahora es SOLO reticular (mensaje sin 'unidireccional')", () => {
-    const m = modeloUni({ tipo: "reticular" });
+    // El reticular AUN se rechaza en F2 (su calculo llega en un corte posterior). Se sustituye
+    // el paño uni por uno reticular valido (union discriminada: sus propios campos).
+    const m = modeloUni();
+    m.panos = [
+      {
+        id: "fu", nombre: "Forjado 1", tipo: "reticular", plantaId: "p1",
+        perimetro: ["u1", "u2", "u3", "u4"],
+        materialId: "HA-25", bordeApoyo: "simple",
+        intereje: 0.8, canto: 0.3, anchoNervio: 0.12, capaCompresion: 0.05, pesoPropio: 4,
+      },
+    ];
     const e = validarModelo(m).find((x) => x.codigo === "PANO_TIPO_NO_SOPORTADO");
     expect(e).toBeDefined();
     expect(e!.mensaje).toContain("reticular");
     sinJergaFEM(e!);
   });
 
-  it("PANO_UNI_CAMPOS: falta intereje -> error agrupador", () => {
-    const m = modeloUni({ intereje: undefined });
-    const e = validarModelo(m).find((x) => x.codigo === "PANO_UNI_CAMPOS");
-    expect(e).toBeDefined();
-    expect(e!.severidad).toBe("error");
-    expect(e!.elementoId).toBe("fu");
-    sinJergaFEM(e!);
-  });
-
-  it("PANO_UNI_CAMPOS: canto/anchoNervio <= 0 o direccion ausente -> error", () => {
-    expect(codigos(validarModelo(modeloUni({ canto: 0 })))).toContain("PANO_UNI_CAMPOS");
-    expect(codigos(validarModelo(modeloUni({ anchoNervio: -0.1 })))).toContain("PANO_UNI_CAMPOS");
-    expect(codigos(validarModelo(modeloUni({ direccionViguetas: undefined })))).toContain("PANO_UNI_CAMPOS");
-  });
-
-  it("PANO_UNI_CAMPOS: pesoPropio ausente -> error (contrato exige valor valido)", () => {
-    expect(codigos(validarModelo(modeloUni({ pesoPropio: undefined })))).toContain("PANO_UNI_CAMPOS");
-  });
-
-  it("PANO_UNI_CAMPOS: pesoPropio 0 es LEGITIMO (>=0) -> no dispara por ese campo", () => {
-    // Un forjado sin peso propio tabulado (0) es valido; los demas campos > 0.
-    expect(codigos(validarModelo(modeloUni({ pesoPropio: 0 })))).not.toContain("PANO_UNI_CAMPOS");
-  });
-
-  it("precedencia: PANO_UNI_CAMPOS salta la geometria (no PANO_NO_RECTANGULAR a la vez)", () => {
-    // Geometria no rectangular Y campos faltantes: solo PANO_UNI_CAMPOS (se salta el resto).
-    const m = modeloUni({ intereje: undefined });
-    m.nudos = m.nudos.map((n) => (n.id === "u3" ? { ...n, x: 8, y: 0 } : n)); // rompe rectangulo
-    const cods = codigos(validarModelo(m));
-    expect(cods).toContain("PANO_UNI_CAMPOS");
-    expect(cods).not.toContain("PANO_NO_RECTANGULAR");
-    expect(cods).not.toContain("PANO_DEGENERADO");
-  });
+  // NOTA (T-f3-pano-schema-union): el antiguo chequeo de PRESENCIA `PANO_UNI_CAMPOS` MURIO.
+  // La presencia y positividad de los campos de vigueta (direccionViguetas/intereje/canto/
+  // anchoNervio/pesoPropio) la garantiza ahora el BORDE Zod: `PanoUnidireccionalSchema` los
+  // declara obligatorios y > 0 (`.positive()` / `.nonnegative()`). Ya NO se puede construir un
+  // paño uni con esos campos ausentes o <= 0 (el tipo lo prohibe; el schema lo rechaza en
+  // import). Esa cobertura vive en dominio.test.ts ("PanoSchema · union discriminada").
 
   it("geometria no rectangular (campos OK) -> PANO_NO_RECTANGULAR o PANO_DEGENERADO", () => {
     const m = modeloUni();

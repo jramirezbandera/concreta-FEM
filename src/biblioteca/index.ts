@@ -48,6 +48,20 @@ export {
   CANTO_UNIDIRECCIONAL_DEFAULT,
 } from "./forjados";
 
+// --- Re-export de la tabla de PESO PROPIO del forjado RETICULAR (corte T2.3) ----
+// Espejo del bloque unidireccional: tabla orientativa canto->peso (kN/m²) +
+// defaults del pano reticular/bidireccional, con fuente CTE DB-SE-AE Anejo C Tabla
+// C.5 (peso) y Codigo Estructural Anejo 19 §5.3.1(6) (geometria). Datos verificables.
+export {
+  pesoPropioOrientativoReticular,
+  listarForjadosReticulares,
+  PESO_PROPIO_RETICULAR_DEFAULT,
+  CANTO_RETICULAR_DEFAULT,
+  INTEREJE_RETICULAR_DEFAULT,
+  ANCHO_NERVIO_RETICULAR_DEFAULT,
+  CAPA_COMPRESION_RETICULAR_DEFAULT,
+} from "./forjados";
+
 // --- Re-export de catalogos y helpers -----------------------------------------
 export { ACEROS } from "./aceros";
 export { HORMIGONES, derivarEcm, seccionRectangular, seccionCircular } from "./hormigon";

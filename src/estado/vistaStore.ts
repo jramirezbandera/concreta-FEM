@@ -103,14 +103,22 @@ export type CapaVista =
 // Identificadores en ingles tecnico; las etiquetas visibles las pone la UI.
 export type MagnitudDiagrama = "axil" | "cortante" | "momento" | "flecha";
 
+// Magnitud del overlay de ESFUERZOS sobre las barras en escena (diagramas N/V/M estilo
+// SAP2000/CYPE). Tipo PROPIO, no MagnitudDiagrama: aquel incluye "flecha" (que en escena
+// ya la cubre la deformada) y acoplar la seleccion del panel Plotly con la del overlay
+// sorprenderia (cambiar el diagrama de una barra no debe redibujar toda la escena).
+export type MagnitudEsfuerzo = "axil" | "cortante" | "momento";
+
 // [AUDITORIA D9] Overlay de resultados 3D ACTIVO en la pestana Resultados: la DEFORMADA
-// (por combo) o la FORMA MODAL (por modo). Son dos magnitudes DISTINTAS que comparten la
-// misma rampa de color: dibujarlas superpuestas hace la escena ilegible. Discriminante de
-// EXCLUSION MUTUA: solo una se dibuja a la vez. Default "deformada" (la lectura estatica es
-// la primaria). Lo conmutan: "Calcular modos" / seleccionar un modo -> "modal"; volver a la
-// deformada (boton "Ver deformada", deseleccionar el modo activo, o llegar resultados
-// estaticos nuevos) -> "deformada". Estado de UI puro: NO participa en undo.
-export type OverlayResultados = "deformada" | "modal";
+// (por combo), la FORMA MODAL (por modo) o los ESFUERZOS sobre las barras (N/V/M). Son
+// magnitudes DISTINTAS que comparten escena (deformada/modal ademas comparten rampa):
+// dibujarlas superpuestas hace la escena ilegible. Discriminante de EXCLUSION MUTUA: solo
+// una se dibuja a la vez. Default "deformada" (la lectura estatica es la primaria). Lo
+// conmutan: "Calcular modos" / seleccionar un modo -> "modal"; el SelectorOverlayResultados
+// -> "deformada" | "esfuerzos"; llegar resultados estaticos nuevos conserva la eleccion
+// estatica (deformada/esfuerzos) y solo sale de "modal". Estado de UI puro: NO participa
+// en undo.
+export type OverlayResultados = "deformada" | "modal" | "esfuerzos";
 
 // Magnitud que pinta el mapa de ISOVALORES de la losa en la pestana Isovalores (F3).
 // "flecha" = desplazamiento vertical NODAL (DY de los nudos de malla); "momentoX"/
@@ -293,6 +301,17 @@ interface VistaState {
   animando: boolean;
   // Magnitud que pinta el diagrama por barra seleccionada.
   magnitudDiagrama: MagnitudDiagrama;
+  // Magnitud del overlay de esfuerzos sobre las barras (N/V/M en escena). Canal
+  // DISTINTO de magnitudDiagrama (panel por-barra): cambiar el diagrama consultado
+  // no debe redibujar la escena entera, y viceversa. Default "momento" (la lectura
+  // primaria de un portico).
+  magnitudEsfuerzo: MagnitudEsfuerzo;
+  // Multiplicador RELATIVO del tamano de los diagramas de esfuerzos en escena
+  // (sobre la escala base automatica ~7% del bbox). CANAL DISTINTO de
+  // deformadaEscala: aquella es un factor fisico ×N (m sobre m); aqui la escala
+  // fisica (m por kN) la deriva el overlay por magnitud/combo y este numero solo
+  // la ajusta (default 1, slider log [0.1, 10]).
+  esfuerzosEscala: number;
   // Magnitud que pinta el mapa de isovalores de la losa (F3): flecha / Mx / My.
   // Estado de UI puro: NO participa en undo. Default "flecha" (la lectura natural de
   // una losa). El overlay solo se muestra si hay resultados de placa (quads).
@@ -359,6 +378,8 @@ interface VistaState {
   setDeformadaEscala(e: number): void;
   setAnimando(b: boolean): void;
   setMagnitudDiagrama(m: MagnitudDiagrama): void;
+  setMagnitudEsfuerzo(m: MagnitudEsfuerzo): void;
+  setEsfuerzosEscala(e: number): void;
   setMagnitudIsovalores(m: MagnitudIsovalores): void;
   // --- Analisis modal (F2b) ---
   setNumModos(n: number): void;
@@ -453,6 +474,8 @@ export const vistaStore = create<VistaState>()(
     deformadaEscala: 1,
     animando: false,
     magnitudDiagrama: "momento",
+    magnitudEsfuerzo: "momento",
+    esfuerzosEscala: 1,
     magnitudIsovalores: "flecha",
     // Analisis modal (F2b): default 6 modos (decision de alcance del plan), escala 1,
     // sin animar.
@@ -574,6 +597,8 @@ export const vistaStore = create<VistaState>()(
     setDeformadaEscala: (e) => set({ deformadaEscala: e }),
     setAnimando: (b) => set({ animando: b }),
     setMagnitudDiagrama: (m) => set({ magnitudDiagrama: m }),
+    setMagnitudEsfuerzo: (m) => set({ magnitudEsfuerzo: m }),
+    setEsfuerzosEscala: (e) => set({ esfuerzosEscala: e }),
     setMagnitudIsovalores: (m) => set({ magnitudIsovalores: m }),
     setNumModos: (n) => set({ numModos: n }),
     setModalEscala: (e) => set({ modalEscala: e }),

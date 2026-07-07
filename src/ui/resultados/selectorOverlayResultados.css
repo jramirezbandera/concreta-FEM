@@ -1,0 +1,20 @@
+/* SelectorOverlayResultados: conmutador Deformada | Esfuerzos en glass junto al
+   lienzo (Slot mid-right). Mismo ancho que las leyendas (200px) para que la columna
+   derecha se lea como un bloque. Solo tokens semanticos. */
+
+.cx-selector-overlay {
+  width: 200px;
+}
+
+.cx-selector-overlay .cx-float__body {
+  display: flex;
+}
+
+/* El segmentado ocupa todo el ancho del panel, con los dos segmentos a partes
+   iguales (dos opciones de la misma jerarquia). */
+.cx-selector-overlay .cx-seg {
+  width: 100%;
+}
+.cx-selector-overlay .cx-seg__item {
+  flex: 1;
+}

@@ -48,11 +48,14 @@ import {
 } from "./ui/dialogos";
 import {
   DeformadaOverlay,
+  EsfuerzosOverlay,
   BotonCalcular,
   ComboSelector,
   TablaReacciones,
   PanelDiagramas,
   LeyendaEscala,
+  LeyendaEsfuerzos,
+  SelectorOverlayResultados,
   ModoOverlay,
   PanelFrecuencias,
   IsovaloresOverlay,
@@ -573,6 +576,9 @@ function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPest
         sceneOverlays: (
           <>
             <DeformadaOverlay />
+            {/* Diagramas de esfuerzos N/V/M sobre las barras: se autooculta salvo con
+                el overlay "esfuerzos" activo (D9) y fuera de planta. */}
+            <EsfuerzosOverlay />
             {/* Forma modal (F2b): se autooculta sin modos o fuera de 3D. NO reutiliza
                 datos de la deformada (lee del modalStore). */}
             <ModoOverlay />
@@ -582,13 +588,15 @@ function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPest
             <ModeloCalculoOverlay />
           </>
         ),
-        // La leyenda de escala se QUEDA en el lienzo (control de lienzo: lee contra los
-        // colores de la deformada). El resto de paneles de datos van al dock. [D10] Anclada
-        // a la DERECHA del lienzo (Slot mid-right, vertical): misma ubicacion que la rampa de
-        // isovalores. Se autooculta si el overlay activo es la forma modal (D9).
+        // Los controles de LIENZO se quedan en glass (leen contra los colores de la
+        // escena); el resto de paneles de datos van al dock. [D10] Anclados a la DERECHA
+        // (Slot mid-right, vertical): conmutador Deformada|Esfuerzos arriba y, debajo, la
+        // leyenda del overlay activo (cada una se autooculta si no es el suyo, D9).
         hudOverlays: (
           <Slot zona="mid-right">
+            <SelectorOverlayResultados />
             <LeyendaEscala />
+            <LeyendaEsfuerzos />
           </Slot>
         ),
         // [D14 · PR3] Anatomía C: "Cálculo" (BotonCalcular) + "Combinación" (ComboSelector)

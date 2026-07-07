@@ -29,7 +29,7 @@ import { describe, it, expect } from "vitest";
 import { discretizar, clavePosicion, TOL_NODO } from "../../src/discretizador";
 import type { ResultadoDiscretizacion } from "../../src/discretizador";
 import type { ModeloFEM } from "../../src/discretizador/contratoFEM";
-import type { Modelo, Pano, Pilar, Viga } from "../../src/dominio";
+import type { Modelo, Pano, PanoLosa, Pilar, Viga } from "../../src/dominio";
 import { SCHEMA_VERSION } from "../../src/dominio";
 
 const MATERIAL = "HA-25";
@@ -115,7 +115,7 @@ function crujia(interiores: Array<[number, number]>): Modelo {
   };
 }
 
-function losa(id: string, extra?: Partial<Pano>): Pano {
+function losa(id: string, extra?: Partial<PanoLosa>): Pano {
   return {
     id,
     nombre: id.toUpperCase(),

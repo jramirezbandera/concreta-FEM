@@ -279,27 +279,25 @@ describe("HipotesisSchema (shape F2a: automatica)", () => {
   });
 });
 
-describe("PanoSchema (losa v4 + campos del forjado unidireccional v5)", () => {
-  // Losa v4 SIN los campos nuevos: debe seguir pasando (los de vigueta son opcionales).
-  function losaV4(): Record<string, unknown> {
-    return {
-      id: "pano1",
-      nombre: "Forjado 1",
-      tipo: "losa",
-      plantaId: "p1",
-      perimetro: ["n1", "n2", "n3", "n4"],
-      espesor: 0.25,
-      materialId: "m1",
-      tamMalla: 0.5,
-      bordeApoyo: "simple",
-    };
+describe("PanoSchema (union discriminada por tipo: losa | unidireccional | reticular)", () => {
+  // T-f3-pano-schema-union: cada variante declara SOLO sus campos, OBLIGATORIOS. La presencia
+  // y positividad las exige el BORDE Zod (ya no un chequeo de presencia en validaciones).
+  const COMUNES = {
+    id: "pano1",
+    nombre: "Forjado 1",
+    plantaId: "p1",
+    perimetro: ["n1", "n2", "n3", "n4"],
+    materialId: "m1",
+    bordeApoyo: "simple",
+  };
+
+  function losaValida(): Record<string, unknown> {
+    return { ...COMUNES, tipo: "losa", espesor: 0.25, tamMalla: 0.5 };
   }
 
-  // Unidireccional VALIDO con los 5 campos nuevos. espesor/tamMalla se ignoran bajo
-  // unidireccional pero siguen obligatorios a nivel Zod (se portan con valor inocuo).
   function unidireccionalValido(): Record<string, unknown> {
     return {
-      ...losaV4(),
+      ...COMUNES,
       tipo: "unidireccional",
       direccionViguetas: "x",
       intereje: 0.7,
@@ -309,28 +307,71 @@ describe("PanoSchema (losa v4 + campos del forjado unidireccional v5)", () => {
     };
   }
 
-  it("una LOSA v4 sin los campos nuevos sigue pasando (opcionales)", () => {
-    expect(PanoSchema.safeParse(losaV4()).success).toBe(true);
+  function reticularValido(): Record<string, unknown> {
+    return {
+      ...COMUNES,
+      tipo: "reticular",
+      intereje: 0.8,
+      canto: 0.3,
+      anchoNervio: 0.12,
+      capaCompresion: 0.05,
+      pesoPropio: 4,
+    };
+  }
+
+  it("una LOSA con espesor + tamMalla pasa", () => {
+    expect(PanoSchema.safeParse(losaValida()).success).toBe(true);
   });
 
-  it("un unidireccional con los campos de vigueta pasa", () => {
+  it("un UNIDIRECCIONAL con sus 5 campos pasa", () => {
     expect(PanoSchema.safeParse(unidireccionalValido()).success).toBe(true);
   });
 
-  it("acepta pesoPropio = 0 (>=0 legitimo) y direccionViguetas 'y'", () => {
+  it("un RETICULAR con sus 5 campos (incl. capaCompresion) pasa", () => {
+    expect(PanoSchema.safeParse(reticularValido()).success).toBe(true);
+  });
+
+  it("acepta pesoPropio = 0 (>=0 legitimo) y direccionViguetas 'y' en unidireccional", () => {
     const p = unidireccionalValido();
     p.pesoPropio = 0;
     p.direccionViguetas = "y";
     expect(PanoSchema.safeParse(p).success).toBe(true);
   });
 
-  it("acepta direccionViguetas ausente (la presencia la exige validaciones, no el schema)", () => {
+  it("RECHAZA un unidireccional SIN direccionViguetas (obligatorio en la variante)", () => {
     const p = unidireccionalValido();
     delete p.direccionViguetas;
-    expect(PanoSchema.safeParse(p).success).toBe(true);
+    expect(PanoSchema.safeParse(p).success).toBe(false);
   });
 
-  describe("rechaza campos de vigueta invalidos", () => {
+  it("RECHAZA un unidireccional SIN intereje/canto/anchoNervio/pesoPropio (obligatorios)", () => {
+    for (const campo of ["intereje", "canto", "anchoNervio", "pesoPropio"]) {
+      const p = unidireccionalValido();
+      delete p[campo];
+      expect(PanoSchema.safeParse(p).success).toBe(false);
+    }
+  });
+
+  it("RECHAZA una losa SIN espesor o SIN tamMalla (obligatorios en la variante)", () => {
+    for (const campo of ["espesor", "tamMalla"]) {
+      const p = losaValida();
+      delete p[campo];
+      expect(PanoSchema.safeParse(p).success).toBe(false);
+    }
+  });
+
+  it("RECHAZA un reticular SIN capaCompresion (obligatorio en la variante)", () => {
+    const p = reticularValido();
+    delete p.capaCompresion;
+    expect(PanoSchema.safeParse(p).success).toBe(false);
+  });
+
+  it("RECHAZA un tipo desconocido (no es ninguna variante de la union)", () => {
+    const p = { ...COMUNES, tipo: "postesada", espesor: 0.25, tamMalla: 0.5 };
+    expect(PanoSchema.safeParse(p).success).toBe(false);
+  });
+
+  describe("rechaza campos de vigueta invalidos (unidireccional)", () => {
     const casos: Array<[string, (p: Record<string, unknown>) => void]> = [
       ["direccionViguetas fuera del enum ('z')", (p) => { p.direccionViguetas = "z"; }],
       ["intereje negativo", (p) => { p.intereje = -0.7; }],
@@ -345,6 +386,22 @@ describe("PanoSchema (losa v4 + campos del forjado unidireccional v5)", () => {
     ];
     it.each(casos)("%s", (_titulo, mutar) => {
       const p = unidireccionalValido();
+      mutar(p);
+      expect(PanoSchema.safeParse(p).success).toBe(false);
+    });
+  });
+
+  describe("rechaza campos invalidos (reticular)", () => {
+    const casos: Array<[string, (p: Record<string, unknown>) => void]> = [
+      ["intereje cero (.positive)", (p) => { p.intereje = 0; }],
+      ["canto negativo", (p) => { p.canto = -0.3; }],
+      ["anchoNervio Infinity", (p) => { p.anchoNervio = Infinity; }],
+      ["capaCompresion cero (.positive)", (p) => { p.capaCompresion = 0; }],
+      ["capaCompresion negativa", (p) => { p.capaCompresion = -0.05; }],
+      ["pesoPropio negativo", (p) => { p.pesoPropio = -1; }],
+    ];
+    it.each(casos)("%s", (_titulo, mutar) => {
+      const p = reticularValido();
       mutar(p);
       expect(PanoSchema.safeParse(p).success).toBe(false);
     });

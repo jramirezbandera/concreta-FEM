@@ -194,9 +194,10 @@ describe("PanelDiagramas · mapeo seleccion -> member via trazabilidad", () => {
     render(<PanelDiagramas />);
 
     const stub = screen.getByTestId("diagrama-stub");
-    // Magnitud por defecto = momento -> serie de moment_z [0,45].
-    expect(stub).toHaveAttribute("data-valores", JSON.stringify([0, 45]));
-    expect(stub).toHaveAttribute("data-etiqueta-y", "Momento (kN·m)");
+    // Magnitud por defecto = momento -> serie de moment_z [0,45] crudos, presentada
+    // con el convenio (vano +): el signo crudo de PyNite se voltea (convencionEsfuerzos).
+    expect(stub).toHaveAttribute("data-valores", JSON.stringify([0, -45]));
+    expect(stub).toHaveAttribute("data-etiqueta-y", "Flector Mz (kN·m)");
   });
 
   it("seleccionar el PILAR pasante p1 usa el primer tramo (M1) por defecto (pie)", () => {
@@ -227,12 +228,12 @@ describe("PanelDiagramas · selector de magnitud", () => {
     seleccionStore.getState().seleccionar(["v1"]);
   });
 
-  it("cambiar a Cortante (V) actualiza vistaStore y la serie dibujada", async () => {
+  it("cambiar a Cortante (Vy) actualiza vistaStore y la serie dibujada", async () => {
     const user = userEvent.setup();
     render(<PanelDiagramas />);
 
-    // El segmentado expone un boton por magnitud (etiquetaBoton: N/V/M/Flecha).
-    await user.click(screen.getByRole("radio", { name: "V" }));
+    // El segmentado expone un boton por magnitud (etiquetaBoton: N/Vy/Mz/Flecha).
+    await user.click(screen.getByRole("radio", { name: "Vy" }));
 
     expect(vistaStore.getState().magnitudDiagrama).toBe("cortante");
     expect(screen.getByTestId("diagrama-stub")).toHaveAttribute(
@@ -283,10 +284,10 @@ describe("PanelDiagramas · selector de tramo del pilar (D20)", () => {
     // Etiquetadas con el NOMBRE de la planta que alcanza cada tramo (lenguaje de obra).
     expect(within(grupo).getByRole("radio", { name: "Planta baja" })).toBeInTheDocument();
     expect(within(grupo).getByRole("radio", { name: "Planta 1" })).toBeInTheDocument();
-    // Por defecto se dibuja el tramo inferior (M1, momento 45).
+    // Por defecto se dibuja el tramo inferior (M1, momento crudo 45 -> -45 presentado).
     expect(screen.getByTestId("diagrama-stub")).toHaveAttribute(
       "data-valores",
-      JSON.stringify([0, 45]),
+      JSON.stringify([0, -45]),
     );
   });
 
@@ -297,11 +298,11 @@ describe("PanelDiagramas · selector de tramo del pilar (D20)", () => {
     seleccionStore.getState().seleccionar(["p1"]);
     render(<PanelDiagramas />);
 
-    // Elegir el tramo superior (Planta 1) -> serie de M2 (momento 90).
+    // Elegir el tramo superior (Planta 1) -> serie de M2 (crudo 90 -> -90 presentado).
     await user.click(screen.getByRole("radio", { name: "Planta 1" }));
     expect(screen.getByTestId("diagrama-stub")).toHaveAttribute(
       "data-valores",
-      JSON.stringify([0, 90]),
+      JSON.stringify([0, -90]),
     );
   });
 });
@@ -371,13 +372,14 @@ describe("PanelDiagramas · viga subdividida: serie concatenada (F3.2)", () => {
     render(<PanelDiagramas />);
 
     // Momento (por defecto): posiciones concatenadas [0,3, 3,8] (el punto x=3 se
-    // DUPLICA: fin de M10 e inicio de M11), valores [0,12, 12,0].
+    // DUPLICA: fin de M10 e inicio de M11), valores crudos [0,12, 12,0] presentados
+    // con el signo del convenio (vano +): [0,-12, -12,0].
     const stub = screen.getByTestId("diagrama-stub");
     expect(stub).toHaveAttribute("data-posiciones", JSON.stringify([0, 3, 3, 8]));
-    expect(stub).toHaveAttribute("data-valores", JSON.stringify([0, 12, 12, 0]));
+    expect(stub).toHaveAttribute("data-valores", JSON.stringify([0, -12, -12, 0]));
 
     // Cortante: el SALTO fisico en x=3 (7 -> -2) se conserva, no se suaviza.
-    await user.click(screen.getByRole("radio", { name: "V" }));
+    await user.click(screen.getByRole("radio", { name: "Vy" }));
     expect(screen.getByTestId("diagrama-stub")).toHaveAttribute(
       "data-valores",
       JSON.stringify([7, 7, -2, -2]),

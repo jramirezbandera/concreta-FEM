@@ -14,8 +14,31 @@ import {
 } from "./cargasPlanta";
 import { generarCombos } from "./combinaciones";
 import { GAMMA_G_DESFAV, GAMMA_Q_DESFAV, GAMMA_ELS } from "../biblioteca";
-import type { Modelo, Pano } from "../dominio";
+import type { Modelo, Pano, TipoPano } from "../dominio";
 import { SCHEMA_VERSION } from "../dominio";
+
+// Construye un paño de la variante pedida sobre q1..q4 (union discriminada por `tipo`).
+// Cada variante lleva SOLO sus campos: losa (espesor/tamMalla), unidireccional
+// (direccion/intereje/canto/anchoNervio/pesoPropio), reticular (idem + capaCompresion).
+function panoDeTipo(tipo: TipoPano): Pano {
+  const comun = {
+    id: "f1", nombre: "F1", plantaId: "p1",
+    perimetro: ["q1", "q2", "q3", "q4"], materialId: "HA-25", bordeApoyo: "simple" as const,
+  };
+  if (tipo === "unidireccional") {
+    return {
+      ...comun, tipo: "unidireccional",
+      direccionViguetas: "x", intereje: 0.7, canto: 0.3, anchoNervio: 0.12, pesoPropio: 4,
+    };
+  }
+  if (tipo === "reticular") {
+    return {
+      ...comun, tipo: "reticular",
+      intereje: 0.8, canto: 0.3, anchoNervio: 0.12, capaCompresion: 0.05, pesoPropio: 4,
+    };
+  }
+  return { ...comun, tipo: "losa", espesor: 0.2, tamMalla: 1 };
+}
 
 // Modelo con UNA planta (p1) que lleva sus cargas de planta y, por defecto, un paño
 // losa que las recibe. En v4 los valores SU/CM viven en la propia planta (no en un
@@ -49,15 +72,7 @@ function modeloConPano(opts?: {
     ],
     pilares: [],
     vigas: [],
-    panos: opts?.sinPano
-      ? []
-      : [
-          {
-            id: "f1", nombre: "F1", tipo: opts?.tipoPano ?? "losa", plantaId: "p1",
-            perimetro: ["q1", "q2", "q3", "q4"],
-            espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
-          },
-        ],
+    panos: opts?.sinPano ? [] : [panoDeTipo(opts?.tipoPano ?? "losa")],
     muros: [],
     cargas: [],
     hipotesis: [{ id: "h1", nombre: "Permanente", tipo: "permanente", automatica: false }],

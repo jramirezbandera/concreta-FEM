@@ -178,12 +178,12 @@ test("F1 happy: obra -> Calcular (boton) -> deformada + diagramas + reacciones",
   // 5.b Deformada: el canvas R3F del viewport esta visible (unico gancho estable).
   await expect(page.getByTestId("viewport-canvas")).toBeVisible();
 
-  // 5.c El selector de magnitud (N/V/M/Flecha) del panel de diagramas funciona: es
-  // un radiogroup Radix; al activar "M" queda marcado. Acotado al panel-diagramas
+  // 5.c El selector de magnitud (N/Vy/Mz/Flecha) del panel de diagramas funciona: es
+  // un radiogroup Radix; al activar "Mz" queda marcado. Acotado al panel-diagramas
   // para no enganchar otros controles.
   const panelDiagramas = page.getByTestId("panel-diagramas");
   await expect(panelDiagramas).toBeVisible();
-  const radioM = panelDiagramas.getByRole("radio", { name: "M" });
+  const radioM = panelDiagramas.getByRole("radio", { name: "Mz" });
   await radioM.click();
   await expect(radioM).toHaveAttribute("aria-checked", "true");
 

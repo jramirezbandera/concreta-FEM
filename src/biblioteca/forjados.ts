@@ -137,3 +137,133 @@ export function pesoPropioOrientativo(canto: number): number {
 export function listarForjadosUnidireccionales(): EntradaForjado[] {
   return TABLA_UNIDIRECCIONAL.map((e) => ({ ...e }));
 }
+
+// =============================================================================
+// FORJADO RETICULAR / BIDIRECCIONAL (corte F3-reticular, T2.3)
+// =============================================================================
+//
+// El pano `tipo:"reticular"` (losa aligerada bidireccional, emparrillado de
+// nervios en dos direcciones) gana el mismo campo `pesoPropio` (kN/m²) editable
+// que el unidireccional. Aqui viven su DEFAULT y su tabla orientativa canto->peso,
+// ESPEJO del bloque unidireccional (arriba), con la MISMA fuente citada y marca de
+// verificacion por fila.
+//
+// A diferencia del unidireccional, el reticular ES bidireccional, asi que las DOS
+// filas de la Tabla C.5 que lo tabulan le aplican LITERALMENTE (no por
+// extrapolacion): la fila "uni o bidireccional; grueso < 0,30 -> 4" y la fila
+// "bidireccional; grueso < 0,35 -> 5" nombran expresamente al bidireccional. Por
+// eso el tramo "< 0,35" NO lleva el `TODO VERIFICAR` de extrapolacion que si lleva
+// el unidireccional (para el uni ese tramo era una cota prestada del bidireccional).
+//
+// Fuente (misma que el bloque unidireccional, VERIFICADA 2026-07-06 contra el PDF
+// oficial de codigotecnico.org, edicion "Abril 2009", pag. SE-AE 20):
+//   - CTE DB-SE-AE, Anejo C, Tabla C.5, subseccion "Forjados":
+//       - Forjado uni o bidireccional; grueso total < 0,30 m ... 4 kN/m²
+//       - Forjado bidireccional, grueso total < 0,35 m ......... 5 kN/m²
+//
+// DEUDA / ORIENTACION (NO tabla de norma): el peso propio real de un reticular
+// depende del TIPO DE CASETON (recuperable de plastico/metal vs perdido de
+// hormigon/EPS/ceramica) y de la geometria del aligeramiento. Esos pesos son
+// ORIENTACION DE FABRICANTE (ficha tecnica), NO norma, y por eso NO se tabulan aqui:
+// el default de producto lo fija la Tabla C.5 por CANTO TOTAL (grueso), como en el
+// unidireccional. El desglose por tipo de caseton queda como deuda `T-f3-ret-casetones`.
+//
+// RANGO NORMATIVO (contexto; la VALIDACION de estos rangos NO vive aqui sino en
+// validaciones.ts con codigo `PANO_RET_CAMPOS`, F4): Codigo Estructural, Anejo 19
+// §5.3.1(6) (VERIFICADO contra PDF oficial MITMA, pag. 805): capa de compresion
+// >= 0,05 m (0,04 con caseton perdido); intereje (separacion entre ejes de nervios)
+// <= 1,5 m; esbeltez del nervio (canto - capaCompresion)/anchoNervio <= 4. Aqui solo
+// se tabula el peso propio orientativo y se fijan los defaults; los rangos son de F4.
+
+// --- Tabla orientativa de forjados RETICULARES/BIDIRECCIONALES (Tabla C.5) -----
+//
+// Solo los tramos APLICABLES al bidireccional. La Tabla C.5 no da un tramo ligero
+// especifico para bidireccional (el "< 0,28 -> 3" es del unidireccional puro), asi
+// que la tabla bidireccional arranca en "< 0,30 -> 4". Tramos ordenados por
+// `cantoMax` ascendente: el helper toma el PRIMER tramo cuyo limite cubre el canto.
+//
+// VERIFICAR contra CTE DB-SE-AE Anejo C, Tabla C.5 "Forjados" (vigente).
+const TABLA_BIDIRECCIONAL: readonly EntradaForjado[] = [
+  // Forjado uni o bidireccional; grueso total < 0,30 m -> 4 kN/m². Cubre el
+  // reticular de canto habitual (default del corte, 0,30 m = 25+5). La norma nombra
+  // EXPRESAMENTE "bidireccional" en este tramo: aplica al reticular sin extrapolar.
+  // Fuente: DB-SE-AE Tabla C.5, subseccion Forjados, fila "Forjado uni o bidireccional".
+  // VERIFICAR contra CTE DB-SE-AE Anejo C Tabla C.5
+  { cantoMax: 0.3, pesoPropio: 4, descripcion: "Forjado uni o bidireccional; grueso total < 0,30 m" },
+  // Forjado bidireccional, grueso total < 0,35 m -> 5 kN/m². La norma nombra
+  // EXPRESAMENTE "bidireccional": para el reticular es valor de norma (a diferencia
+  // del unidireccional, donde este mismo tramo era una extrapolacion prestada).
+  // Fuente: DB-SE-AE Tabla C.5, subseccion Forjados, fila "Forjado bidireccional".
+  // VERIFICAR contra CTE DB-SE-AE Anejo C Tabla C.5
+  { cantoMax: 0.35, pesoPropio: 5, descripcion: "Forjado bidireccional; grueso total < 0,35 m" },
+] as const;
+
+// Peso propio orientativo para cantos por ENCIMA del ultimo tramo tabulado del
+// bidireccional (> 0,35 m). La Tabla C.5 no cubre forjados tan gruesos como
+// "practica habitual"; se conserva el ultimo valor (5 kN/m²) como cota conservadora
+// y se deja al usuario afinarlo con la ficha tecnica del forjado real.
+// TODO VERIFICAR: fuera del rango tabulado por el CTE; 5 kN/m² es una cota
+//   orientativa (ultimo tramo), no un valor de norma para canto > 0,35 m.
+const PESO_FUERA_DE_RANGO_BIDIRECCIONAL = 5;
+
+// --- Defaults del corte "forjado reticular" -----------------------------------
+//
+// El corte define su reticular por defecto con la geometria del contrato §3
+// (coherente con el Codigo Estructural, Anejo 19 §5.3.1(6)):
+//   - canto 0,30 m (25+5)  ·  intereje 0,80 m (<= 1,5 m con holgura)
+//   - anchoNervio 0,12 m (esbeltez (0,30-0,05)/0,12 = 2,08 <= 4 OK)
+//   - capaCompresion 0,05 m (= minimo de norma; 0,04 con caseton perdido)
+//
+// Como en el unidireccional, el peso por defecto SALE del tramo de la Tabla C.5 que
+// cubre el canto por defecto: un reticular de grueso total 0,30 m cae en el tramo
+// "grueso total < 0,30 m -> 4 kN/m²". De ahi PESO_PROPIO_RETICULAR_DEFAULT = 4
+// (coherencia peso<->canto identica a PESO_PROPIO_UNIDIRECCIONAL_DEFAULT).
+
+// Peso propio por defecto del pano reticular del corte (kN/m²). Es el peso del
+// forjado COMPLETO (nervios + casetones + capa de compresion), EDITABLE por el
+// usuario; no incluye solados, tabiqueria ni sobrecarga de uso.
+// Fuente: CTE DB-SE-AE Tabla C.5 (tramo "Forjado uni o bidireccional; grueso < 0,30 m").
+// VERIFICAR contra CTE DB-SE-AE Anejo C Tabla C.5
+export const PESO_PROPIO_RETICULAR_DEFAULT = 4;
+
+// Canto total por defecto (m). Documentado aqui para trazar de donde sale el default
+// de peso: es el `cantoMax` del tramo "< 0,30 m". Semilla de UI coherente con el peso.
+export const CANTO_RETICULAR_DEFAULT = 0.3;
+
+// Intereje (separacion entre ejes de nervios) por defecto (m). Contrato §3: 0,80 m,
+// holgado bajo el maximo normativo 1,5 m (Codigo Estructural Anejo 19 §5.3.1(6)).
+export const INTEREJE_RETICULAR_DEFAULT = 0.8;
+
+// Ancho del nervio por defecto (m). Contrato §3: 0,12 m; con canto 0,30 y capa 0,05
+// da esbeltez (0,30-0,05)/0,12 = 2,08 <= 4 (Codigo Estructural Anejo 19 §5.3.1(6)).
+export const ANCHO_NERVIO_RETICULAR_DEFAULT = 0.12;
+
+// Espesor de la capa de compresion por defecto (m). Contrato §3: 0,05 m = minimo de
+// norma (0,04 admisible con caseton perdido; el tipo de caseton no es campo del corte).
+// Codigo Estructural, Anejo 19 §5.3.1(6).
+export const CAPA_COMPRESION_RETICULAR_DEFAULT = 0.05;
+
+// --- Helper de lookup (reticular) ---------------------------------------------
+
+// Devuelve el peso propio ORIENTATIVO (kN/m²) de un forjado reticular/bidireccional
+// segun su canto total (grueso, en m), sobre TABLA_BIDIRECCIONAL. Mismo lookup por
+// tramo estricto (`canto < cantoMax`) y misma convencion de umbrales que
+// `pesoPropioOrientativo`: un canto de EXACTAMENTE 0,30 m NO entra en "< 0,30" y sube
+// a "< 0,35". Puro y sin efectos.
+//
+// Cantos no fisicos (<= 0): se devuelve el valor del primer tramo (el mas ligero, 4);
+// no lanza (helper orientativo, no validador). Fuera de rango (> 0,35 m): se devuelve
+// `PESO_FUERA_DE_RANGO_BIDIRECCIONAL` (5 kN/m²), cota conservadora del ultimo tramo.
+export function pesoPropioOrientativoReticular(canto: number): number {
+  for (const tramo of TABLA_BIDIRECCIONAL) {
+    if (canto < tramo.cantoMax) return tramo.pesoPropio;
+  }
+  return PESO_FUERA_DE_RANGO_BIDIRECCIONAL;
+}
+
+// Listado completo de la tabla orientativa bidireccional (para UI: mostrar la
+// referencia por canto junto al campo editable del reticular). Devuelve copia para
+// que el consumidor no pueda mutar la tabla interna.
+export function listarForjadosReticulares(): EntradaForjado[] {
+  return TABLA_BIDIRECCIONAL.map((e) => ({ ...e }));
+}
