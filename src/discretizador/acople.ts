@@ -43,7 +43,7 @@
 // rectangular, tamMalla invalido) simplemente se salta (queda fuera de `porPano`);
 // quien lo reporta en lenguaje de obra es validarRefsPano, como en el corte 1.
 
-import type { Modelo, Pano, Pilar } from "../dominio";
+import type { Modelo, Pano, Pilar, Muro } from "../dominio";
 import { plantaPorId, nudoPorId } from "../dominio";
 import { TOL_NODO, clavePosicion, mapearEjes, cuantizar } from "./geometria";
 import {
@@ -54,6 +54,12 @@ import {
   type PuntoPlano,
   type ErrorMallado,
 } from "./mallado";
+import {
+  mallarMuro,
+  resolverEje,
+  type MallaMuro,
+  type ErrorMalladoMuro,
+} from "./malladoMuro";
 import {
   generarViguetas,
   subdivisionesDeBordes,
@@ -132,10 +138,55 @@ export type UnidireccionalPano = {
   celdasSubdivididas: ReadonlySet<string>;
 };
 
+// Resultado del acople de UN muro/pantalla mallable (F3, muros). Espejo vertical de
+// `AcoplePano`, con dos diferencias de fondo:
+//  - El remap esta SIEMPRE activo (sin umbral >=2): no hay muleta de estabilizacion
+//    que omitir (el muro no la lleva) y un solo nudo acoplado es una conexion real.
+//    La ESTABILIDAD la gobierna validaciones (MURO_SIN_SUJECION): sin base vinculada
+//    se exigen >=3 puntos acoplados NO colineales en el plano (s,cota) — un muro
+//    colgado de UNA linea penduleria alrededor de ella (basura silenciosa bajo
+//    sparse, precedente losa plana).
+//  - No hay `MURO_PILARES_JUNTOS`: dos pilares apilados en la misma celda de s son
+//    inofensivos (comparten columna de control; a cada cota de planta el snapping ya
+//    fundio sus nudos en UN N*, asi que el remap por celda no puede colisionar — al
+//    reves que la cabeza puntual de la losa plana).
+export type AcopleMuro = {
+  // Malla YA computada (mallarMuro con el MISMO indiceMuro que usara el Paso 6e).
+  malla: MallaMuro;
+  // Indice posicional del muro en modelo.muros ordenados por id (fija el prefijo
+  // MQ<idx>; debe coincidir con el del Paso 6e).
+  indiceMuro: number;
+  // Nombres de nudos de malla que caen sobre el portico (viga colineal de una fila
+  // de planta, N* de pilar sobre el eje, o extremo de viga que muere en el eje):
+  // el Paso 6e los remapea a N* en vez de emitirlos como MQ*.
+  nodosAcoplados: ReadonlySet<string>;
+  // Coordenadas EN EL PLANO DEL MURO (x = s a lo largo del eje, y = cota) de los
+  // nudos acoplados, ordenadas por nombre de nudo (determinismo). Las consume
+  // validaciones (hayTresNoColineales) para MURO_SIN_SUJECION.
+  puntosAcoplados: readonly { x: number; y: number }[];
+  // ¿La fila de CORONACION (cota tope) tiene alguna viga colineal con solape? Gobierna
+  // el aviso MURO_SIN_CORONACION (la losa descarga en el muro a traves de esa viga).
+  coronacionConViga: boolean;
+};
+
 export type ResultadoAcoples = {
   // Solo paños LOSA mallables (refs y geometria validas). Un paño ausente aqui se
   // trata como aislado/invalido; sus errores los reporta validarRefsPano.
   porPano: Map<string, AcoplePano>;
+  // Muros/pantallas mallables (refs, geometria y cap validos). Un muro ausente aqui
+  // se salta en el Paso 6e; sus errores los reporta validarRefsMuro. Clave = muroId.
+  porMuro: Map<string, AcopleMuro>;
+  // Muros cuya malla NO se pudo construir por el cap (MURO_DEMASIADO_DENSO). XOR con
+  // `porMuro` (espejo de erroresMallado de losa). Los errores de GEOMETRIA (degenerado/
+  // diagonal) NO viven aqui: los recomputa validarRefsMuro con resolverEje (fuente
+  // unica), igual que la losa recomputa limitesRectangulo.
+  erroresMalladoMuro: Map<string, ErrorMalladoMuro>;
+  // vigaId -> puntos de subdivision aportados SOLO por muros (subconjunto de la union
+  // `subdivisionesViga`, con dedup y orden propios). Lo consume `prepararModeloCR`:
+  // la base del CR lleva la malla de MUROS (su rigidez lateral es lo que el CR mide)
+  // pero NO la de losas (decision 3A intacta) — por eso necesita las subdivisiones
+  // que introducen los muros SIN arrastrar las de las losas.
+  subdivisionesVigaMuro: Map<string, PuntoPlano[]>;
   // Paños UNIDIRECCIONALES resolubles (campos validos + geometria rectangular). XOR con
   // `porPano`: un paño es losa (porPano) O unidireccional (unidireccionalPorPano), nunca
   // ambos (es el tipo el que decide). Ausente si el paño no resuelve (los errores los
@@ -463,17 +514,294 @@ export function calcularAcoples(modelo: Modelo): ResultadoAcoples {
     });
   });
 
+  // --- Muros/pantallas (F3, muros): acople al portico -------------------------
+  // Tras los paños (el primer punto de una celda compartida gana en la UNION de
+  // subdivisiones: paños por id primero, muros por id despues — determinista).
+  const porMuro = new Map<string, AcopleMuro>();
+  const erroresMalladoMuro = new Map<string, ErrorMalladoMuro>();
+  // Subdivisiones aportadas SOLO por muros (para el CR): misma estructura y dedup
+  // que subsPorViga, acumulada en paralelo a la union.
+  const subsPorVigaMuro = new Map<string, Map<string, { punto: PuntoPlano; t: number }>>();
+
+  const murosOrdenados = [...modelo.muros].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
+  murosOrdenados.forEach((muro, indiceMuro) => {
+    const acople = procesarMuro(
+      modelo,
+      muro,
+      indiceMuro,
+      vigasResueltas,
+      subsPorViga,
+      subsPorVigaMuro,
+    );
+    if (acople === undefined) return;
+    if ("codigo" in acople) {
+      erroresMalladoMuro.set(muro.id, acople);
+      return;
+    }
+    porMuro.set(muro.id, acople);
+  });
+
   // Emision final determinista: vigas por id; puntos por distancia a nudoI.
-  const subdivisionesViga = new Map<string, PuntoPlano[]>();
-  const vigaIds = [...subsPorViga.keys()].sort();
-  for (const vigaId of vigaIds) {
-    const puntos = [...subsPorViga.get(vigaId)!.values()]
-      .sort((a, b) => a.t - b.t)
-      .map((s) => s.punto);
-    subdivisionesViga.set(vigaId, puntos);
+  const emitirSubdivisiones = (
+    fuente: Map<string, Map<string, { punto: PuntoPlano; t: number }>>,
+  ): Map<string, PuntoPlano[]> => {
+    const out = new Map<string, PuntoPlano[]>();
+    const ids = [...fuente.keys()].sort();
+    for (const vigaId of ids) {
+      const puntos = [...fuente.get(vigaId)!.values()]
+        .sort((a, b) => a.t - b.t)
+        .map((s) => s.punto);
+      out.set(vigaId, puntos);
+    }
+    return out;
+  };
+  const subdivisionesViga = emitirSubdivisiones(subsPorViga);
+  const subdivisionesVigaMuro = emitirSubdivisiones(subsPorVigaMuro);
+
+  return {
+    porPano,
+    porMuro,
+    unidireccionalPorPano,
+    subdivisionesViga,
+    subdivisionesVigaMuro,
+    erroresMallado,
+    erroresMalladoMuro,
+    pilaresJuntos,
+  };
+}
+
+// --- Rama muro/pantalla (F3, muros) ----------------------------------------------
+// Resuelve el acople de UN muro: malla su plano vertical (con filas mandatorias en
+// cada cota de planta y columnas en pilares/extremos de viga sobre el eje) y deriva
+// que nudos de malla remapean a N* del portico. Devuelve:
+//   - undefined            si el muro no resuelve (refs rotas, geometria degenerada/
+//                          diagonal, tamMalla invalido): lo reporta validarRefsMuro.
+//   - ErrorMalladoMuro     si el cap de malla bloquea (MURO_DEMASIADO_DENSO).
+//   - AcopleMuro           si malla y acople resuelven.
+// NUNCA lanza (espejo del cuerpo losa/unidireccional de calcularAcoples).
+//
+// Fuentes de acople (todas por celda cuantizada [M-4], nunca |Δ|<TOL):
+//  1. VIGA COLINEAL en una fila de cota de planta: nudos de la fila dentro de su
+//     segmento (extremos INCLUIDOS) remapean; los ESTRICTAMENTE interiores ademas
+//     subdividen la viga (mismo mecanismo que el borde de losa, F3.2).
+//  2. PILAR sobre el eje: su columna es linea de control; en cada fila de cota de
+//     planta dentro del rango vertical COMUN, el nudo de malla cae en la celda del
+//     N* del pilar (que `cotasDePilar` garantiza) y remapea.
+//  3. EXTREMO DE VIGA que muere sobre el eje (viga perpendicular u oblicua que
+//     entra en el muro): su s es linea de control y el nudo de la fila de SU planta
+//     remapea al N* del extremo. Sin esto, la viga quedaria colgada de un nudo
+//     flotante junto al plano del muro (mecanismo o inestabilidad del motor).
+function procesarMuro(
+  modelo: Modelo,
+  muro: Muro,
+  indiceMuro: number,
+  vigasResueltas: { viga: Viga; ni: PuntoPlano; nj: PuntoPlano; qCota: number }[],
+  subsPorViga: Map<string, Map<string, { punto: PuntoPlano; t: number }>>,
+  subsPorVigaMuro: Map<string, Map<string, { punto: PuntoPlano; t: number }>>,
+): AcopleMuro | ErrorMalladoMuro | undefined {
+  if (!(Number.isFinite(muro.tamMalla) && muro.tamMalla > 0)) return undefined;
+  const pi = plantaPorId(modelo, muro.plantaInicial);
+  const pf = plantaPorId(modelo, muro.plantaFinal);
+  if (pi === undefined || pf === undefined) return undefined;
+  const cotaBase = Math.min(pi.cota, pf.cota);
+  const cotaTope = Math.max(pi.cota, pf.cota);
+  if (!(cotaTope - cotaBase > 0)) return undefined; // sin desarrollo: MURO_PLANTAS
+
+  const p1 = { x: muro.x1, y: muro.y1 };
+  const p2 = { x: muro.x2, y: muro.y2 };
+  const ejeR = resolverEje(p1, p2);
+  if ("codigo" in ejeR) return undefined; // degenerado/diagonal: validarRefsMuro
+  const { eje, sMin, sMax, coordFija } = ejeR;
+  const qFijo = cuantizar(coordFija);
+  const qSMin = cuantizar(sMin);
+  const qSMax = cuantizar(sMax);
+  const qBase = cuantizar(cotaBase);
+  const qTope = cuantizar(cotaTope);
+
+  // Coordenadas (s, perp) de un punto de obra segun la orientacion del eje.
+  const sDe = (p: PuntoPlano): number => (eje === "x" ? p.x : p.y);
+  const perpDe = (p: PuntoPlano): number => (eje === "x" ? p.y : p.x);
+  // Punto de OBRA de una coordenada s del eje (la perpendicular es la del muro).
+  const puntoObra = (s: number): PuntoPlano =>
+    eje === "x" ? { x: s, y: coordFija } : { x: coordFija, y: s };
+
+  // Filas mandatorias: toda planta INTERMEDIA cruzada (comparacion cruda, espejo
+  // exacto de cotasDePilar: alli se trocea el pilar con > y < sobre cotas crudas).
+  const cotasControl = modelo.plantas
+    .filter((pl) => pl.cota > cotaBase && pl.cota < cotaTope)
+    .map((pl) => pl.cota);
+
+  // --- Fuente 2: pilares sobre el eje ----------------------------------------
+  // Perp en la celda del muro, s dentro del rango (inclusive) y solape vertical
+  // con [base,tope] (por celdas de cota). Ordenados por id (determinismo).
+  type PilarEnEje = { pilar: Pilar; qS: number; s: number; qMin: number; qMax: number };
+  const pilaresEnEje: PilarEnEje[] = [];
+  const pilaresOrdenados = [...modelo.pilares].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
+  for (const p of pilaresOrdenados) {
+    if (cuantizar(perpDe(p)) !== qFijo) continue;
+    const qS = cuantizar(sDe(p));
+    if (qS < qSMin || qS > qSMax) continue;
+    const ppi = plantaPorId(modelo, p.plantaInicial);
+    const ppf = plantaPorId(modelo, p.plantaFinal);
+    if (ppi === undefined || ppf === undefined) continue;
+    const qMin = Math.min(cuantizar(ppi.cota), cuantizar(ppf.cota));
+    const qMax = Math.max(cuantizar(ppi.cota), cuantizar(ppf.cota));
+    if (qMax < qBase || qMin > qTope) continue; // sin solape vertical
+    pilaresEnEje.push({ pilar: p, qS, s: sDe(p), qMin, qMax });
   }
 
-  return { porPano, unidireccionalPorPano, subdivisionesViga, erroresMallado, pilaresJuntos };
+  // --- Fuente 3: extremos de viga que mueren sobre el eje ---------------------
+  // Cualquier viga (colineal o no) cuya cota este en el rango del muro y cuyo
+  // extremo caiga sobre el eje. Para las COLINEALES es un bonus deliberado: una
+  // viga de coronacion que cubre solo PARTE del muro gana una columna de malla en
+  // su extremo interior y su N* queda cosido al muro.
+  type ExtremoEnEje = { s: number; punto: PuntoPlano; qCota: number };
+  const extremosEnEje: ExtremoEnEje[] = [];
+  for (const vr of vigasResueltas) {
+    if (vr.qCota < qBase || vr.qCota > qTope) continue;
+    for (const pt of [vr.ni, vr.nj]) {
+      if (cuantizar(perpDe(pt)) !== qFijo) continue;
+      const qS = cuantizar(sDe(pt));
+      if (qS < qSMin || qS > qSMax) continue;
+      extremosEnEje.push({ s: sDe(pt), punto: pt, qCota: vr.qCota });
+    }
+  }
+
+  // Lineas de control de s: pilares + extremos de viga. El saneo (orden, dedup por
+  // celda, filtrado de bordes) es de sanearLineasControl en el planificador (fuente
+  // unica, mismo argumento que las lineas de control de losa plana).
+  const lineasControlS = [
+    ...pilaresEnEje.map((pe) => pe.s),
+    ...extremosEnEje.map((ex) => ex.s),
+  ];
+
+  const res = mallarMuro({
+    p1,
+    p2,
+    cotaBase,
+    cotaTope,
+    tamMalla: muro.tamMalla,
+    indiceMuro,
+    cotasControl,
+    lineasControlS,
+  });
+  if (!res.ok) {
+    // Solo el cap (MURO_DEMASIADO_DENSO) puede llegar aqui: la geometria ya se
+    // resolvio arriba con la MISMA fuente (resolverEje). Se superficia igual por
+    // robustez (siempre acaba en error de obra via validaciones).
+    return res.error;
+  }
+  const malla = res.malla;
+
+  // Mapa celda 3D -> nombre de nudo de malla (para pilares/extremos, espejo losa
+  // plana) y mapa nombre -> (s, cota) del plano del muro (para puntosAcoplados).
+  const nombrePorCeldaMalla = new Map<string, string>();
+  for (const nd of malla.nodos) {
+    nombrePorCeldaMalla.set(clavePosicion([nd.x, nd.y, nd.z], TOL_NODO), nd.name);
+  }
+  const planoPorNombre = new Map<string, { x: number; y: number }>();
+  for (let fila = 0; fila < malla.porFila.length; fila++) {
+    for (let col = 0; col < malla.ss.length; col++) {
+      planoPorNombre.set(malla.porFila[fila][col], {
+        x: malla.ss[col],
+        y: malla.cotas[fila],
+      });
+    }
+  }
+
+  const nodosAcoplados = new Set<string>();
+
+  // --- Fuente 1: vigas colineales por fila de cota de planta ------------------
+  // Vigas colineales con el eje del muro (perpendicular cuantizada) y con solape
+  // real, agrupadas por su celda de cota. Las filas de la malla a esa celda de
+  // cota (filaPorCotaQ) son las candidatas al remap/subdivision.
+  type VigaColineal = { vr: (typeof vigasResueltas)[number]; qA: number; qB: number };
+  const vigasColinealesPorQCota = new Map<number, VigaColineal[]>();
+  let coronacionConViga = false;
+  for (const vr of vigasResueltas) {
+    if (vr.qCota < qBase || vr.qCota > qTope) continue;
+    if (cuantizar(perpDe(vr.ni)) !== qFijo || cuantizar(perpDe(vr.nj)) !== qFijo) continue;
+    const aI = sDe(vr.ni);
+    const aJ = sDe(vr.nj);
+    const a = Math.min(aI, aJ);
+    const b = Math.max(aI, aJ);
+    if (Math.min(b, sMax) - Math.max(a, sMin) <= TOL_NODO) continue; // sin solape
+    const lista = vigasColinealesPorQCota.get(vr.qCota) ?? [];
+    lista.push({ vr, qA: cuantizar(a), qB: cuantizar(b) });
+    vigasColinealesPorQCota.set(vr.qCota, lista);
+    if (vr.qCota === qTope) coronacionConViga = true;
+  }
+
+  for (const [qCotaFila, fila] of malla.filaPorCotaQ) {
+    const colineales = vigasColinealesPorQCota.get(qCotaFila);
+    if (colineales === undefined) continue;
+    for (let col = 0; col < malla.ss.length; col++) {
+      const s = malla.ss[col];
+      const qAlong = cuantizar(s);
+      for (const vc of colineales) {
+        // Acoplado: dentro del segmento de la viga, extremos INCLUIDOS.
+        if (qAlong >= vc.qA && qAlong <= vc.qB) {
+          nodosAcoplados.add(malla.porFila[fila][col]);
+          // Subdivision: ESTRICTAMENTE interior (los extremos ya son N*). Va a la
+          // UNION (subsPorViga) Y al mapa solo-muro (subsPorVigaMuro, para el CR).
+          if (qAlong > vc.qA && qAlong < vc.qB) {
+            const punto = puntoObra(s);
+            const t = Math.hypot(punto.x - vc.vr.ni.x, punto.y - vc.vr.ni.y);
+            const clave = claveEnPlanta(punto);
+            for (const destino of [subsPorViga, subsPorVigaMuro]) {
+              let porClave = destino.get(vc.vr.viga.id);
+              if (porClave === undefined) {
+                porClave = new Map();
+                destino.set(vc.vr.viga.id, porClave);
+              }
+              if (!porClave.has(clave)) porClave.set(clave, { punto, t });
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // --- Fuente 2 (whitelist): nudo de malla en la celda del N* del pilar --------
+  // Solo en filas cuya cota es de PLANTA dentro del rango vertical del pilar
+  // (`cotasDePilar` garantiza el N* exactamente en esas cotas; fuera de ellas NO
+  // hay N* y forzar el remap seria el throw anti-bug del 6e). Si el lookup falla
+  // (linea saneada en borde ya cubierta, celda inesperada) NO se fuerza (espejo losa).
+  const qCotasPlanta = new Set(modelo.plantas.map((pl) => cuantizar(pl.cota)));
+  for (const pe of pilaresEnEje) {
+    for (const [qCotaFila, fila] of malla.filaPorCotaQ) {
+      if (!qCotasPlanta.has(qCotaFila)) continue;
+      if (qCotaFila < pe.qMin || qCotaFila > pe.qMax) continue;
+      const clave = claveCabeza(pe.pilar.x, pe.pilar.y, malla.cotas[fila]);
+      const nombre = nombrePorCeldaMalla.get(clave);
+      if (nombre !== undefined) nodosAcoplados.add(nombre);
+    }
+  }
+
+  // --- Fuente 3 (whitelist): nudo de malla en la celda del extremo de viga -----
+  // Solo en la fila de la cota de SU planta (el N* del extremo existe alli).
+  for (const ex of extremosEnEje) {
+    const fila = malla.filaPorCotaQ.get(ex.qCota);
+    if (fila === undefined) continue;
+    const clave = claveCabeza(ex.punto.x, ex.punto.y, malla.cotas[fila]);
+    const nombre = nombrePorCeldaMalla.get(clave);
+    if (nombre !== undefined) nodosAcoplados.add(nombre);
+  }
+
+  // Puntos acoplados en el plano (s, cota), en orden GEOMETRICO (cota asc, s asc):
+  // determinista e independiente del naming de la malla (un orden por nombre seria
+  // lexicografico: "N13" < "N3").
+  const puntosAcoplados = [...nodosAcoplados]
+    .map((name) => planoPorNombre.get(name)!)
+    .filter((p) => p !== undefined)
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+
+  return { malla, indiceMuro, nodosAcoplados, puntosAcoplados, coronacionConViga };
 }
 
 // --- Rama unidireccional: viguetas sobre bordes de apoyo (contrato §4-F) ---------

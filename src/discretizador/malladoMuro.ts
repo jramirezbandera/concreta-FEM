@@ -110,13 +110,18 @@ function nombreNodoMuro(indiceMuro: number, col: number, fila: number, ncols: nu
   return `MQ${indiceMuro}-N${fila * ncols + col + 1}`;
 }
 
+// Orientacion resuelta del eje de un muro (o error de obra si degenerado/diagonal).
+export type EjeMuro = { eje: "x" | "y"; sMin: number; sMax: number; coordFija: number };
+
 // Resuelve la orientacion del segmento del eje: paralelo a obra-X, a obra-Y, o invalido.
 // Criterio TOL_GEOM_MURO (espejo del criterio rectangular de losa, no la celda [M-4]:
 // esto es geometria de OBRA del elemento, no snapping entre elementos).
-function resolverEje(
+// EXPORTADA (fuente unica): el acople la usa para derivar lineas de control ANTES de
+// mallar y validaciones para emitir MURO_DEGENERADO/MURO_NO_ALINEADO en obra.
+export function resolverEje(
   p1: PuntoEjeMuro,
   p2: PuntoEjeMuro,
-): { eje: "x" | "y"; sMin: number; sMax: number; coordFija: number } | ErrorMalladoMuro {
+): EjeMuro | ErrorMalladoMuro {
   const dx = Math.abs(p2.x - p1.x);
   const dy = Math.abs(p2.y - p1.y);
   if (dx <= TOL_GEOM_MURO && dy <= TOL_GEOM_MURO) {

@@ -827,3 +827,221 @@ describe("calcularAcoples · rama unidireccional (F3)", () => {
     expect(a.unidireccionalPorPano.get("fu-a")!.indicePano).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Muros/pantallas (F3, muros): acople muro<->portico. El muro se malla en su plano
+// vertical y sus nudos remapean a N* por tres fuentes: viga COLINEAL en una fila de
+// cota de planta (extremos incluidos; interiores subdividen), PILAR sobre el eje
+// (N* garantizado por cotasDePilar en cada cota de planta) y EXTREMO de viga que
+// muere sobre el eje. Sin umbral de activacion (remap siempre); la estabilidad la
+// gobierna validaciones (MURO_SIN_SUJECION).
+// ---------------------------------------------------------------------------
+
+// Muro por defecto: eje (0,10)-(4,10) — LEJOS del pilar pil1 en (0,0) de la base —
+// de p0 (cota 0) a p1 (cota 3), tamMalla 1 => rejilla 4x3 (filas en cotas 0..3).
+function muro(
+  id: string,
+  extra?: Partial<Modelo["muros"][number]>,
+): Modelo["muros"][number] {
+  return {
+    id, nombre: id.toUpperCase(),
+    x1: 0, y1: 10, x2: 4, y2: 10,
+    plantaInicial: "p0", plantaFinal: "p1",
+    espesor: 0.3, materialId: MATERIAL_LOSA, tamMalla: 1,
+    vinculacionExterior: true,
+    ...extra,
+  };
+}
+
+describe("calcularAcoples · muros: viga de coronacion colineal", () => {
+  it("viga colineal en la coronacion: acopla los 5 nudos de la fila tope y subdivide en los interiores", () => {
+    const m = modeloBase();
+    m.nudos.push({ id: "nA", x: 0, y: 10 }, { id: "nB", x: 4, y: 10 });
+    m.vigas = [viga("v-cor", "nA", "nB")]; // p1 (cota 3) = fila tope del muro
+    m.muros = [muro("mu1")];
+    const res = calcularAcoples(m);
+    const a = res.porMuro.get("mu1")!;
+    expect(a.coronacionConViga).toBe(true);
+    // 5 nudos de la fila tope: puntos (s, cota) = (0..4, 3).
+    expect([...a.puntosAcoplados]).toEqual([
+      { x: 0, y: 3 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 }, { x: 4, y: 3 },
+    ]);
+    // Subdivisiones: SOLO interiores estrictos (s=1,2,3), en coords de OBRA.
+    expect(res.subdivisionesViga.get("v-cor")).toEqual([
+      { x: 1, y: 10 }, { x: 2, y: 10 }, { x: 3, y: 10 },
+    ]);
+    // El mapa solo-muro (para el CR) lleva LO MISMO (ningun paño toca esta viga).
+    expect(res.subdivisionesVigaMuro.get("v-cor")).toEqual(
+      res.subdivisionesViga.get("v-cor"),
+    );
+  });
+
+  it("muro de dos plantas: la fila INTERMEDIA (planta 1) tambien acopla a su viga", () => {
+    const m = modeloBase();
+    m.plantas.push({
+      id: "p2", nombre: "Planta 2", cota: 6, altura: 3,
+      categoriaUso: "A", sobrecargaUso: 2, cargasMuertas: 1,
+    });
+    m.nudos.push({ id: "nA", x: 0, y: 10 }, { id: "nB", x: 4, y: 10 });
+    // Vigas colineales en p1 (cota 3, intermedia) y p2 (cota 6, coronacion).
+    m.vigas = [
+      viga("v-p1", "nA", "nB", { plantaId: "p1" }),
+      viga("v-p2", "nA", "nB", { plantaId: "p2" }),
+    ];
+    m.muros = [muro("mu1", { plantaFinal: "p2" })];
+    const res = calcularAcoples(m);
+    const a = res.porMuro.get("mu1")!;
+    expect(a.coronacionConViga).toBe(true);
+    // 5 nudos por fila x 2 filas (cotas 3 y 6).
+    expect(a.puntosAcoplados).toHaveLength(10);
+    expect(a.puntosAcoplados.filter((p) => p.y === 3)).toHaveLength(5);
+    expect(a.puntosAcoplados.filter((p) => p.y === 6)).toHaveLength(5);
+    expect(res.subdivisionesViga.get("v-p1")).toHaveLength(3);
+    expect(res.subdivisionesViga.get("v-p2")).toHaveLength(3);
+  });
+
+  it("sin nada coincidente: nodosAcoplados vacio, sin coronacion, sin subdivisiones", () => {
+    const m = modeloBase();
+    m.muros = [muro("mu1")];
+    const res = calcularAcoples(m);
+    const a = res.porMuro.get("mu1")!;
+    expect(a.nodosAcoplados.size).toBe(0);
+    expect(a.puntosAcoplados).toEqual([]);
+    expect(a.coronacionConViga).toBe(false);
+    expect(res.subdivisionesVigaMuro.size).toBe(0);
+  });
+});
+
+describe("calcularAcoples · muros: pilares y extremos de viga sobre el eje", () => {
+  it("pilar a mitad del eje: acopla el nudo de malla en cada cota de planta de su rango", () => {
+    const m = modeloBase();
+    m.pilares.push({
+      id: "pil-eje", nombre: "PE", x: 2.5, y: 10,
+      plantaInicial: "p0", plantaFinal: "p1",
+      seccionId: SECCION_OK, materialId: MATERIAL_BARRA, angulo: 0,
+      vinculacionExterior: true, arranque: "empotrado",
+    });
+    m.muros = [muro("mu1")];
+    const res = calcularAcoples(m);
+    const a = res.porMuro.get("mu1")!;
+    // x=2.5 NO es multiplo de tamMalla: la linea de control crea la columna exacta.
+    // Acopla en cotas 0 (arranque) y 3 (cabeza) — el rango completo del pilar.
+    expect([...a.puntosAcoplados]).toEqual([
+      { x: 2.5, y: 0 }, { x: 2.5, y: 3 },
+    ]);
+    // Un pilar NO subdivide vigas (no hay viga aqui).
+    expect(res.subdivisionesViga.size).toBe(0);
+  });
+
+  it("viga perpendicular que muere en el eje: acopla el nudo de SU planta en su s exacta", () => {
+    const m = modeloBase();
+    m.nudos.push({ id: "nP1", x: 1.7, y: 8 }, { id: "nP2", x: 1.7, y: 10 });
+    m.vigas = [viga("v-perp", "nP1", "nP2")]; // p1 (cota 3), muere en (1.7, 10)
+    m.muros = [muro("mu1")];
+    const res = calcularAcoples(m);
+    const a = res.porMuro.get("mu1")!;
+    // Solo el extremo nP2 esta sobre el eje: nudo (s=1.7, cota 3).
+    expect([...a.puntosAcoplados]).toEqual([{ x: 1.7, y: 3 }]);
+    // Una viga perpendicular NO es colineal: no hay coronacion ni subdivisiones.
+    expect(a.coronacionConViga).toBe(false);
+    expect(res.subdivisionesViga.size).toBe(0);
+  });
+
+  it("viga colineal PARCIAL: su extremo interior gana columna de malla y queda acoplado", () => {
+    const m = modeloBase();
+    // Viga de coronacion que cubre solo la mitad izquierda (0..2.3) del muro.
+    m.nudos.push({ id: "nA", x: 0, y: 10 }, { id: "nM", x: 2.3, y: 10 });
+    m.vigas = [viga("v-media", "nA", "nM")];
+    m.muros = [muro("mu1")];
+    const res = calcularAcoples(m);
+    const a = res.porMuro.get("mu1")!;
+    expect(a.coronacionConViga).toBe(true);
+    // La columna de control en s=2.3 (extremo interior de la viga) REPARTE los
+    // segmentos [0,2.3] y [2.3,4] hacia tamMalla (construirEjeRejilla): columnas en
+    // 0, 1.15, 2.3, 3.15, 4. Acoplados: los de s en [0, 2.3] = 0, 1.15 y 2.3.
+    expect([...a.puntosAcoplados]).toEqual([
+      { x: 0, y: 3 }, { x: 1.15, y: 3 }, { x: 2.3, y: 3 },
+    ]);
+    // Subdivide SOLO el estrictamente interior al segmento (s=1.15); el extremo
+    // 2.3 es N* de obra (no subdivide).
+    expect(res.subdivisionesViga.get("v-media")).toEqual([{ x: 1.15, y: 10 }]);
+  });
+});
+
+describe("calcularAcoples · muros: union con losa, determinismo y robustez", () => {
+  it("losa y muro sobre la MISMA viga: la union dedup por celda; el mapa solo-muro conserva lo del muro", () => {
+    const m = modeloBase();
+    // Viga (0,10)-(4,10) en p1: borde inferior de una losa 4x3 Y coronacion del muro.
+    m.nudos.push(
+      { id: "nA", x: 0, y: 10 }, { id: "nB", x: 4, y: 10 },
+      { id: "nC", x: 4, y: 13 }, { id: "nD", x: 0, y: 13 },
+    );
+    m.vigas = [viga("v-comp", "nA", "nB")];
+    m.panos = [pano("f1", { perimetro: ["nA", "nB", "nC", "nD"] })];
+    m.muros = [muro("mu1")];
+    const res = calcularAcoples(m);
+    // Losa (tamMalla 1) y muro (tamMalla 1) aportan los MISMOS interiores x=1,2,3:
+    // la union dedup por celda (el primero gana; mismas celdas => 3 puntos).
+    expect(res.subdivisionesViga.get("v-comp")).toHaveLength(3);
+    // El mapa solo-muro lleva los 3 puntos del muro (independiente de la losa).
+    expect(res.subdivisionesVigaMuro.get("v-comp")).toHaveLength(3);
+    // Y ambos elementos quedaron acoplados.
+    expect(res.porPano.get("f1")!.acopleActivo).toBe(true);
+    expect(res.porMuro.get("mu1")!.puntosAcoplados.length).toBeGreaterThan(0);
+  });
+
+  it("determinismo: invertir p1<->p2 del eje produce el MISMO acople byte a byte", () => {
+    const m = modeloBase();
+    m.nudos.push({ id: "nA", x: 0, y: 10 }, { id: "nB", x: 4, y: 10 });
+    m.vigas = [viga("v-cor", "nA", "nB")];
+    m.muros = [muro("mu1")];
+    const a = calcularAcoples(m).porMuro.get("mu1")!;
+    const m2 = modeloBase();
+    m2.nudos.push({ id: "nA", x: 0, y: 10 }, { id: "nB", x: 4, y: 10 });
+    m2.vigas = [viga("v-cor", "nA", "nB")];
+    m2.muros = [muro("mu1", { x1: 4, y1: 10, x2: 0, y2: 10 })]; // extremos invertidos
+    const b = calcularAcoples(m2).porMuro.get("mu1")!;
+    expect(b.malla).toEqual(a.malla);
+    expect([...b.nodosAcoplados].sort()).toEqual([...a.nodosAcoplados].sort());
+    expect(b.puntosAcoplados).toEqual(a.puntosAcoplados);
+  });
+
+  it("muro segun Y: mismas fuentes de acople con el eje girado", () => {
+    const m = modeloBase();
+    m.nudos.push({ id: "nA", x: 10, y: 0 }, { id: "nB", x: 10, y: 4 });
+    m.vigas = [viga("v-cor", "nA", "nB")];
+    m.muros = [muro("mu1", { x1: 10, y1: 0, x2: 10, y2: 4 })];
+    const res = calcularAcoples(m);
+    const a = res.porMuro.get("mu1")!;
+    expect(a.malla.eje).toBe("y");
+    expect(a.coronacionConViga).toBe(true);
+    expect(a.puntosAcoplados).toHaveLength(5); // s=0..4 en la fila tope
+    // Subdivisiones en coords de obra: x fija = 10, y = interiores 1,2,3.
+    expect(res.subdivisionesViga.get("v-cor")).toEqual([
+      { x: 10, y: 1 }, { x: 10, y: 2 }, { x: 10, y: 3 },
+    ]);
+  });
+
+  it("robustez: muro diagonal, degenerado o con refs rotas se SALTA sin lanzar", () => {
+    const m = modeloBase();
+    m.muros = [
+      muro("mu-diag", { x2: 4, y2: 14 }), // diagonal
+      muro("mu-cero", { x2: 0, y2: 10 }), // sin longitud
+      muro("mu-ref", { plantaFinal: "p-inexistente" }), // ref rota
+      muro("mu-plano", { plantaFinal: "p0" }), // sin desarrollo vertical
+    ];
+    const res = calcularAcoples(m);
+    expect(res.porMuro.size).toBe(0);
+    expect(res.erroresMalladoMuro.size).toBe(0); // geometria la reporta validaciones
+  });
+
+  it("sin muros: porMuro y subdivisionesVigaMuro vacios (regresion)", () => {
+    const m = modeloBase();
+    m.vigas = [viga("v-inf", "n1", "n2")];
+    m.panos = [pano("f1")];
+    const res = calcularAcoples(m);
+    expect(res.porMuro.size).toBe(0);
+    expect(res.erroresMalladoMuro.size).toBe(0);
+    expect(res.subdivisionesVigaMuro.size).toBe(0);
+  });
+});
