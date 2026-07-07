@@ -25,6 +25,7 @@ export type {
   DefaultsViga,
   DefaultsCarga,
   DefaultsPano,
+  DefaultsMuro,
 } from "./vistaStore";
 export { resultadosStore } from "./resultadosStore";
 // modalStore (F2b): resultados del analisis MODAL (frecuencias + formas de vibracion).
@@ -66,6 +67,9 @@ export {
   crearPano,
   editarPano,
   eliminarPano,
+  crearMuro,
+  editarMuro,
+  eliminarMuro,
   crearPlanta,
   editarPlanta,
   eliminarPlanta,
@@ -82,6 +86,7 @@ export type {
   DatosViga,
   ExtremoViga,
   DatosPano,
+  DatosMuro,
   DatosPlanta,
   DatosCarga,
   DatosHipotesis,

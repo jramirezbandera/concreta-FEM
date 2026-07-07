@@ -126,6 +126,15 @@ export function clicSeleccionPano(id: string, shift: boolean): void {
   sincronizarContexto3D(id, shift, "entradaVigas");
 }
 
+// Clic sobre un muro/pantalla (F3, muros): espejo de `clicSeleccionPano`. El muro se
+// introduce/edita en la pestana de vigas (menu "Muros" de la spec §Menus).
+// eslint-disable-next-line react-refresh/only-export-components
+export function clicSeleccionMuro(id: string, shift: boolean): void {
+  if (vistaStore.getState().herramienta !== "seleccion") return;
+  clicSeleccion(id, shift);
+  sincronizarContexto3D(id, shift, "entradaVigas");
+}
+
 function entrarHover(id: string): void {
   if (seleccionStore.getState().hoverId !== id) {
     seleccionStore.getState().setHover(id);
@@ -582,6 +591,103 @@ function PanoHuella({
   );
 }
 
+// --- Muros/pantallas (F3, muros): caja largo x espesor x alto ------------------
+// Una caja por muro (pocos muros por obra: sin instancing, espejo de PanoHuella en
+// disciplina de picking/tinte). Vista cenital se lee como la huella e×L; en 3D es el
+// volumen. Semitransparente (0.55): deja ver la rejilla y la obra tras el muro.
+function MuroCaja({
+  muro,
+  atenuado,
+}: {
+  muro: GeoModelo["muros"][number];
+  atenuado: boolean;
+}) {
+  const ref = useRef<Mesh>(null);
+  const colPleno = useMemo(() => colorToken("muro"), []);
+  const colAtenuado = useMemo(() => colorToken("canvasGrid2"), []);
+  const colBase = atenuado ? colAtenuado : colPleno;
+  const colHover = useMemo(() => colorToken("accentLine"), []);
+  const colSel = useMemo(() => colorToken("accent"), []);
+
+  useMaterialAtenuado(ref, atenuado, 0.55, 0.12);
+
+  // Color via mutacion del material (hover/seleccion), sin setState por frame.
+  const aux = useMemo(() => new Color(), []);
+  useEffect(() => {
+    const aplicar = () => {
+      const m = ref.current;
+      if (!m) return;
+      const { seleccion, hoverId } = seleccionStore.getState();
+      const sel = seleccion.includes(muro.id);
+      const hov = hoverId === muro.id;
+      const modo = atenuado ? "base" : sel ? "seleccion" : hov ? "hover" : "base";
+      aplicarTinte(aux, colBase, colHover, colSel, modo);
+      const mat = m.material as { color?: Color };
+      if (mat.color) mat.color.copy(aux);
+      invalidate();
+    };
+    aplicar();
+    const offHover = seleccionStore.subscribe((s) => s.hoverId, aplicar);
+    const offSel = seleccionStore.subscribe((s) => s.seleccion, aplicar);
+    return () => {
+      offHover();
+      offSel();
+    };
+  }, [muro.id, aux, colBase, colHover, colSel, atenuado]);
+
+  return (
+    <Bvh firstHitOnly>
+      <mesh
+        ref={ref}
+        position={[muro.cx, muro.cy, muro.cz]}
+        rotation={[0, 0, muro.angulo]}
+        onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+          if (atenuado) return; // contexto atenuado: no es blanco de picking (UX-1.4)
+          if (!modoSeleccionActivo()) return; // deja pasar el evento a la colocacion
+          e.stopPropagation();
+          entrarHover(muro.id);
+        }}
+        onPointerOut={() => salirHover(muro.id)}
+        onClick={(e: ThreeEvent<MouseEvent>) => {
+          if (atenuado) return;
+          if (!modoSeleccionActivo()) return;
+          e.stopPropagation();
+          clicSeleccionMuro(muro.id, e.shiftKey);
+        }}
+      >
+        {/* Caja en ejes locales: X = eje del muro (largo), Y = espesor, Z = alto. */}
+        <boxGeometry args={[muro.largo, muro.espesor, muro.alto]} />
+        <meshBasicMaterial
+          transparent
+          opacity={0.55}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </Bvh>
+  );
+}
+
+function MurosCaja({
+  muros,
+  atenuado,
+}: {
+  muros: GeoModelo["muros"];
+  atenuado: boolean;
+}) {
+  useEffect(() => {
+    invalidate();
+  }, [muros]);
+  if (muros.length === 0) return null;
+  return (
+    <group>
+      {muros.map((m) => (
+        <MuroCaja key={m.id} muro={m} atenuado={atenuado} />
+      ))}
+    </group>
+  );
+}
+
 function PanosHuella({
   panos,
   atenuado,
@@ -629,7 +735,7 @@ function useObraOculta(): boolean {
 }
 
 export function GeometriaModelo() {
-  const { pilares, vigas, panos } = useGeometriaModelo();
+  const { pilares, vigas, panos, muros } = useGeometriaModelo();
   const obraOculta = useObraOculta();
   // Enfasis por pestana (UX-1.4): la pestana activa protagoniza su tipo y atenua el
   // resto (patron CYPECAD). Se decide aqui una vez y baja como prop a cada tipo.
@@ -663,6 +769,11 @@ export function GeometriaModelo() {
       )}
       {capas.vigas !== true && (
         <VigasInstanciadas vigas={vigas} atenuado={enfasis.vigas === "atenuado"} />
+      )}
+      {/* Muros/pantallas (F3, muros): capa propia; mismo enfasis que los paños (se
+          introducen en la pestana de vigas, como ellos). */}
+      {capas.muros !== true && (
+        <MurosCaja muros={muros} atenuado={enfasis.panos === "atenuado"} />
       )}
       {/* Cargas dibujadas (D7b) y rotulos de elemento (D7a): ambos SOLO en planta; cada
           componente se autooculta en 3D y deriva su geometria junto a la del modelo, nunca

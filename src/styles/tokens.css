@@ -42,6 +42,7 @@
   --viga: #c9a66b;
   --viga-line: #ddbd87;
   --muro: #7c8aa3;
+  --muro-line: #96a2b8; /* contorno / colocacion del muro (F3, muros): aclara --muro */
   /* Paño / losa (F3, UX-C13/G11): AMPLIACION del mapa semantico §1.3 (igual que se
      hizo con --centro-masa/--centro-rigidez). El paño usaba el token del pilar
      (huella) y el acento (colocacion), rompiendo el mapa color->elemento. Verde-azulado

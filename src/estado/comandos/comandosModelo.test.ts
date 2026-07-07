@@ -19,6 +19,9 @@ import {
   crearPano,
   editarPano,
   eliminarPano,
+  crearMuro,
+  editarMuro,
+  eliminarMuro,
   crearCarga,
   editarCarga,
   eliminarCarga,
@@ -28,7 +31,7 @@ import {
   editarAnalisis,
   crearSeccion,
 } from "../index";
-import type { DatosViga, DatosPano, DatosSeccion } from "./comandosModelo";
+import type { DatosViga, DatosPano, DatosMuro, DatosSeccion } from "./comandosModelo";
 import { crearModeloVacio } from "../../dominio";
 import type {
   DatosPlanta,
@@ -706,6 +709,97 @@ describe("guarda eliminarViga <-> paño (dependencia inversa de nudos)", () => {
     for (const nudoId of m().panos[0].perimetro) {
       expect(m().nudos.some((n) => n.id === nudoId)).toBe(true);
     }
+  });
+});
+
+// --- Comandos de muro/pantalla (F3, muros) -----------------------------------
+
+// Datos minimos de un muro (sin id/nombre, los genera el comando). Eje (0,0)-(4,0)
+// de p1 a p2, HA-25, base vinculada.
+const datosMuroBase: DatosMuro = {
+  x1: 0, y1: 0, x2: 4, y2: 0,
+  plantaInicial: "p1", plantaFinal: "p2",
+  espesor: 0.3, materialId: "m1", tamMalla: 0.5,
+  vinculacionExterior: true,
+};
+
+describe("crearMuro", () => {
+  it("crea el muro con nombre M{n}, SIN tocar nudos (segmento por coords)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const nudosAntes = m().nudos.length;
+    const previo = structuredClone(m());
+    modeloStore.getState().ejecutar(crearMuro(m(), datosMuroBase));
+    expect(m().muros).toHaveLength(1);
+    const muro = m().muros[0];
+    expect(muro.nombre).toBe("M1");
+    expect(muro).toMatchObject(datosMuroBase);
+    // El muro NO referencia nudos: la coleccion de nudos no cambia.
+    expect(m().nudos).toHaveLength(nudosAntes);
+
+    // Undo restaura el modelo exacto (crear muro es un solo paso).
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(previo);
+  });
+
+  it("nombra por el mayor sufijo en uso (M1, M2, ...)", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    modeloStore.getState().ejecutar(crearMuro(m(), datosMuroBase));
+    modeloStore.getState().ejecutar(crearMuro(m(), datosMuroBase));
+    expect(m().muros.map((mu) => mu.nombre)).toEqual(["M1", "M2"]);
+  });
+});
+
+describe("editarMuro", () => {
+  it("merge superficial de propiedades; no toca id/nombre/coords", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    modeloStore.getState().ejecutar(crearMuro(m(), datosMuroBase));
+    const muroId = m().muros[0].id;
+    modeloStore.getState().ejecutar(
+      editarMuro(m(), muroId, { espesor: 0.4, vinculacionExterior: false }),
+    );
+    const muro = m().muros[0];
+    expect(muro.espesor).toBe(0.4);
+    expect(muro.vinculacionExterior).toBe(false);
+    // Coords y nombre intactos.
+    expect(muro).toMatchObject({ x1: 0, y1: 0, x2: 4, y2: 0, nombre: "M1" });
+  });
+
+  it("muro inexistente -> no-op", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(editarMuro(m(), "no-existe", { espesor: 0.5 }));
+    expect(m()).toEqual(antes);
+  });
+});
+
+describe("eliminarMuro (cascada)", () => {
+  it("quita el muro y purga cargas cuyo ambito apunta a el, en un undo", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    modeloStore.getState().ejecutar(crearMuro(m(), datosMuroBase));
+    const muroId = m().muros[0].id;
+    modeloStore.getState().cargarModelo({
+      ...m(),
+      cargas: [
+        { id: "cm", tipo: "lineal", ambito: muroId, valor: 5, hipotesisId: "h1" },
+        { id: "cl", tipo: "lineal", ambito: "otro", valor: 3, hipotesisId: "h1" },
+      ],
+      hipotesis: [{ id: "h1", nombre: "G", tipo: "permanente", automatica: false }],
+    });
+    const conTodo = structuredClone(m());
+
+    modeloStore.getState().ejecutar(eliminarMuro(m(), muroId));
+    expect(m().muros).toHaveLength(0);
+    expect(m().cargas.map((c) => c.id)).toEqual(["cl"]); // la del muro cae
+
+    modeloStore.getState().deshacer();
+    expect(m()).toEqual(conTodo);
+  });
+
+  it("muro inexistente -> no-op", () => {
+    modeloStore.getState().cargarModelo(modeloConVigas());
+    const antes = structuredClone(m());
+    modeloStore.getState().ejecutar(eliminarMuro(m(), "no-existe"));
+    expect(m()).toEqual(antes);
   });
 });
 

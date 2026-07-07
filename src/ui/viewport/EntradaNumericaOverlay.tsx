@@ -25,6 +25,7 @@ const PROMPT: Record<Exclude<Herramienta, "seleccion">, string> = {
   pilar: "x,y · @dx,dy desde el último pilar",
   viga: "x,y · @dx,dy · d<a desde el extremo fijado",
   pano: "x,y · @dx,dy · d<a desde la esquina fijada",
+  muro: "x,y · @dx,dy desde el extremo fijado (se alinea a los ejes)",
 };
 
 // Herramienta de colocacion activa en vista planta, o null (overlay oculto).

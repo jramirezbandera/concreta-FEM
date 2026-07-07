@@ -14,6 +14,7 @@ export type AccionMenu =
   | "activarHerramientaPilar"
   | "activarHerramientaViga"
   | "activarHerramientaPano"
+  | "activarHerramientaMuro"
   | "borrarSeleccion"
   | "calcular"
   | "calcularModos"
@@ -124,7 +125,12 @@ export const MENUS_POR_PESTANA: Record<Pestana, MenuDef[]> = {
         "Articular extremo",
       ],
     },
-    { etiqueta: "Muros", items: ["Muro (disponible en fase posterior)"] },
+    {
+      etiqueta: "Muros",
+      // "Muro" activa la herramienta de introduccion del muro/pantalla por dos clics
+      // del eje (F3, muros). Fabrica/sotano siguen reservados (solo pantalla HA).
+      items: [{ etiqueta: "Muro (pantalla)", accion: "activarHerramientaMuro" }],
+    },
     {
       etiqueta: "Paños",
       // "Paño" activa la herramienta de introduccion de losa por dos clics (F3 corte 1).

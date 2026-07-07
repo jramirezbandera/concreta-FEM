@@ -60,6 +60,7 @@ export const DISPATCH: Record<AccionMenu, () => void> = {
   activarHerramientaPilar: () => vistaStore.getState().setHerramienta("pilar"),
   activarHerramientaViga: () => vistaStore.getState().setHerramienta("viga"),
   activarHerramientaPano: () => vistaStore.getState().setHerramienta("pano"),
+  activarHerramientaMuro: () => vistaStore.getState().setHerramienta("muro"),
   borrarSeleccion,
   // El calculo es asincrono (CLAUDE.md §7): el menu lanza el pipeline y NO espera la promesa
   // (`void` la descarta deliberadamente). No es un "disparar y olvidar" ciego: `calcularObra()`

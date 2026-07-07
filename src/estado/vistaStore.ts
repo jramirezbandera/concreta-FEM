@@ -80,8 +80,9 @@ export type DialogoActivo =
 
 // Herramienta activa de introduccion grafica (feature-11/12/F3). "seleccion" es el
 // modo por defecto (picking/edicion); "pilar" coloca pilares con clic; "viga" coloca
-// vigas con clic; "pano" coloca losas por DOS clics (rectangulo) en planta. Estado de UI.
-export type Herramienta = "seleccion" | "pilar" | "viga" | "pano";
+// vigas con clic; "pano" coloca losas por DOS clics (rectangulo) en planta; "muro"
+// coloca muros/pantallas por DOS clics (eje, orto forzado). Estado de UI.
+export type Herramienta = "seleccion" | "pilar" | "viga" | "pano" | "muro";
 
 // CAPAS de visibilidad del lienzo (UX-3.1, spec §3.3 "Elementos propios: visibilidad
 // por capa"). Gobiernan que se DIBUJA (no que existe): ocultar una capa no toca la
@@ -92,6 +93,7 @@ export type CapaVista =
   | "pilares"
   | "vigas"
   | "panos"
+  | "muros"
   | "cargas"
   | "rotulos"
   | "plantillas";
@@ -177,6 +179,19 @@ export interface DefaultsPano {
   pesoPropio: number; // kN/m² (peso propio TABULADO del forjado completo)
 }
 
+// Valores por defecto del muro/pantalla que se introduce con la herramienta "muro"
+// (F3, muros). Espejo de DefaultsPano: la UI los preselecciona y los aplica a cada
+// muro nuevo. UNIDADES (CLAUDE.md §14): espesor y tamMalla viajan AQUI en METROS; la
+// UI convierte mm<->m solo en el borde. tamMalla default 0.5 m (NO 0.25: el CR
+// reconstruye+analiza por campo y planta, y el spike midio el coste ~lineal con los
+// quads — muro_membrana_spike.md P4). No es estado de obra: fuera de undo.
+export interface DefaultsMuro {
+  espesor: number; // m
+  materialId: string | null;
+  tamMalla: number; // m
+  vinculacionExterior: boolean;
+}
+
 interface VistaState {
   pestanaActiva: Pestana;
   plantaActivaId: string | null;
@@ -223,6 +238,7 @@ interface VistaState {
   defaultsViga: DefaultsViga;
   defaultsCarga: DefaultsCarga;
   defaultsPano: DefaultsPano;
+  defaultsMuro: DefaultsMuro;
   snapActivo: boolean;
   // Visibilidad de la rejilla del lienzo (ayuda de dibujo CAD). Toggle transitorio de
   // vista, MISMO patron que snapActivo: estado de UI puro, NO participa en undo. La
@@ -311,6 +327,7 @@ interface VistaState {
   setDefaultsViga(p: Partial<DefaultsViga>): void; // merge superficial
   setDefaultsCarga(p: Partial<DefaultsCarga>): void; // merge superficial
   setDefaultsPano(p: Partial<DefaultsPano>): void; // merge superficial
+  setDefaultsMuro(p: Partial<DefaultsMuro>): void; // merge superficial
   setSnapActivo(b: boolean): void;
   setRejillaVisible(b: boolean): void;
   toggleRejilla(): void;
@@ -413,6 +430,15 @@ export const vistaStore = create<VistaState>()(
       anchoNervio: 0.12,
       pesoPropio: pesoPropioOrientativo(CANTO_UNIDIRECCIONAL_DEFAULT),
     },
+    // Muro/pantalla (F3, muros): espesor 0.30 m (pantalla HA tipica), malla 0.5 m
+    // (coste del CR, ver DefaultsMuro), base vinculada al terreno (el arranque
+    // empotrado es el caso normal de una pantalla). Material: la UI preselecciona.
+    defaultsMuro: {
+      espesor: 0.3,
+      materialId: null,
+      tamMalla: 0.5,
+      vinculacionExterior: true,
+    },
     snapActivo: true,
     rejillaVisible: true,
     pasoRejilla: 0.5,
@@ -469,6 +495,8 @@ export const vistaStore = create<VistaState>()(
       set((estado) => ({ defaultsCarga: { ...estado.defaultsCarga, ...p } })),
     setDefaultsPano: (p) =>
       set((estado) => ({ defaultsPano: { ...estado.defaultsPano, ...p } })),
+    setDefaultsMuro: (p) =>
+      set((estado) => ({ defaultsMuro: { ...estado.defaultsMuro, ...p } })),
     setSnapActivo: (b) => set({ snapActivo: b }),
     setRejillaVisible: (b) => set({ rejillaVisible: b }),
     toggleRejilla: () =>

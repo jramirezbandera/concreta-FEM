@@ -30,6 +30,10 @@ const FALLBACK = {
   // apagado), hue distinto de pilar/viga/muro/support/load/centro-rigidez.
   pano: "#8fb5a3",
   panoLine: "#a7c8bb",
+  // Muro/pantalla (F3, muros): --muro (azul-gris del Spec §1.3, ya en tokens.css).
+  // La variante -line (contorno/linea elastica de colocacion) aclara el mismo hue.
+  muro: "#7c8aa3",
+  muroLine: "#96a2b8",
   // Cargas dibujadas (D7b): --load (naranja). DEBE coincidir con tokens.css.
   load: "#f97316",
   node: "#c07d12",
@@ -63,6 +67,8 @@ const VAR_NAME: Record<keyof typeof FALLBACK, string> = {
   vigaLine: "viga-line",
   pano: "pano",
   panoLine: "pano-line",
+  muro: "muro",
+  muroLine: "muro-line",
   load: "load",
   node: "node",
   deformed: "deformed",

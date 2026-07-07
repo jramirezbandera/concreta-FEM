@@ -33,6 +33,7 @@ import { ProveedorModoPanel } from "./ui/primitivas";
 import { ColocacionPilar } from "./ui/viewport/ColocacionPilar";
 import { ColocacionViga } from "./ui/viewport/ColocacionViga";
 import { ColocacionPano } from "./ui/viewport/ColocacionPano";
+import { ColocacionMuro } from "./ui/viewport/ColocacionMuro";
 import { OverlayPlantillas } from "./ui/viewport/OverlayPlantillas";
 import { PanelPlantillas } from "./ui/plantillas";
 import { tramoColocable } from "./ui/viewport/tramoPilar";
@@ -40,6 +41,7 @@ import { plantaColocableViga } from "./ui/viewport/tramoViga";
 import { InspectorPilar, PanelHerramientaPilar } from "./ui/entradaPilares";
 import { InspectorViga, PanelHerramientaViga } from "./ui/entradaVigas";
 import { InspectorPano, PanelHerramientaPano } from "./ui/entradaPanos";
+import { InspectorMuro, PanelHerramientaMuro } from "./ui/entradaMuros";
 import {
   DialogoDatosGenerales,
   DialogoSeccionPersonalizada,
@@ -143,6 +145,16 @@ const MENSAJE_HERRAMIENTA_PANO =
 // clic caiga en vacio. Espejo del aviso de vigas, en lenguaje de obra.
 const MENSAJE_PANO_SIN_TRAMO =
   "Crea o selecciona una planta y elige un material para introducir una losa";
+
+// Guia contextual mientras la herramienta "muro" esta activa. Un muro se traza por su
+// eje: dos clics (orto forzado). Lenguaje de obra, sin jerga FEM.
+const MENSAJE_HERRAMIENTA_MURO =
+  "Haz clic en dos puntos para trazar el eje de un muro (Esc termina)";
+
+// Cuando la herramienta "muro" esta activa pero NO se puede colocar (sin tramo de
+// plantas, o sin material por defecto elegido). Espejo del aviso de losas.
+const MENSAJE_MURO_SIN_TRAMO =
+  "Crea o selecciona una planta y elige un material para introducir un muro";
 
 // Vista 3D pleno (F2c): la introduccion grafica es solo 2D, asi que el mensaje guia a
 // seleccionar/inspeccionar en vez de a colocar. Lenguaje de obra, sin jerga FEM.
@@ -303,6 +315,33 @@ export function usePuedeColocarPano(): boolean {
       modeloStore.subscribe((s) => s.modelo, recompute),
       vistaStore.subscribe((s) => s.plantaActivaId, recompute),
       vistaStore.subscribe((s) => s.defaultsPano, recompute),
+    ];
+    recompute();
+    return () => desuscribir.forEach((u) => u());
+  }, []);
+  return puede;
+}
+
+// Se puede introducir un muro: hay tramo de plantas donde nace (tramoColocable !== null)
+// Y hay material por defecto. Mismas DOS condiciones que ColocacionMuro comprueba antes
+// de crear (fuente unica de la luz verde). Espejo de usePuedeColocarPano; el muro nace
+// del EDIFICIO (tramoColocable, como el pilar), no de una sola planta.
+// eslint-disable-next-line react-refresh/only-export-components
+export function usePuedeColocarMuro(): boolean {
+  const calcular = () => {
+    const { plantaActivaId, defaultsMuro } = vistaStore.getState();
+    return (
+      tramoColocable(modeloStore.getState().getModelo(), plantaActivaId) !== null &&
+      defaultsMuro.materialId !== null
+    );
+  };
+  const [puede, setPuede] = useState(calcular);
+  useEffect(() => {
+    const recompute = () => setPuede(calcular());
+    const desuscribir = [
+      modeloStore.subscribe((s) => s.modelo, recompute),
+      vistaStore.subscribe((s) => s.plantaActivaId, recompute),
+      vistaStore.subscribe((s) => s.defaultsMuro, recompute),
     ];
     recompute();
     return () => desuscribir.forEach((u) => u());
@@ -492,14 +531,17 @@ function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPest
                 que vigas (donde vive el menu "Paños"). Se autooculta salvo herramienta
                 "pano" + vista planta. */}
             {!enPleno && <ColocacionPano />}
+            {/* Colocacion de muros (F3, muros): eje por dos clics (orto forzado). Menu
+                "Muros" de esta pestana. Se autooculta salvo herramienta "muro" + planta. */}
+            {!enPleno && <ColocacionMuro />}
             <ModeloCalculoOverlay />
           </>
         ),
         hudOverlays: null,
         dockFijo: null,
-        // Inspectores de viga y de paño comparten la pestana: cada uno se autooculta si
-        // la seleccion no es de su tipo (solo uno se muestra a la vez). Herramientas y
-        // calco DXF: ayudas 2D, ocultas en 3D pleno.
+        // Inspectores de viga, paño y muro comparten la pestana: cada uno se autooculta
+        // si la seleccion no es de su tipo (solo uno se muestra a la vez). Herramientas
+        // y calco DXF: ayudas 2D, ocultas en 3D pleno.
         panelesDock: (
           <>
             <Sec pestana={pestana} seccion="herramienta">
@@ -508,11 +550,17 @@ function composicionPestana(pestana: Pestana, enPleno: boolean): ComposicionPest
             <Sec pestana={pestana} seccion="herramientaPano">
               {!enPleno && <PanelHerramientaPano />}
             </Sec>
+            <Sec pestana={pestana} seccion="herramientaMuro">
+              {!enPleno && <PanelHerramientaMuro />}
+            </Sec>
             <Sec pestana={pestana} seccion="inspector">
               <InspectorViga />
             </Sec>
             <Sec pestana={pestana} seccion="inspectorPano">
               <InspectorPano />
+            </Sec>
+            <Sec pestana={pestana} seccion="inspectorMuro">
+              <InspectorMuro />
             </Sec>
             <Sec pestana={pestana} seccion="plantillas">
               {!enPleno && <PanelPlantillas />}
@@ -631,6 +679,7 @@ export default function App() {
   const puedeColocar = usePuedeColocarPilar();
   const puedeColocarViga = usePuedeColocarViga();
   const puedeColocarPano = usePuedeColocarPano();
+  const puedeColocarMuro = usePuedeColocarMuro();
   const coords = useCoordsThrottled();
   const persistenciaLista = usePersistenciaLista();
   // Feedback de calculo (auditoria UX-L6): mientras el motor trabaja, prioriza sobre el
@@ -700,7 +749,11 @@ export default function App() {
               ? puedeColocarPano
                 ? MENSAJE_HERRAMIENTA_PANO
                 : MENSAJE_PANO_SIN_TRAMO
-              : MENSAJE_PESTANA[pestana];
+              : enVigas && herramienta === "muro"
+                ? puedeColocarMuro
+                  ? MENSAJE_HERRAMIENTA_MURO
+                  : MENSAJE_MURO_SIN_TRAMO
+                : MENSAJE_PESTANA[pestana];
 
   return (
     <Shell

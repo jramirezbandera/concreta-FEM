@@ -62,10 +62,26 @@ export interface PanoDibujo {
   intereje?: number; // m, objetivo (el reparto real lo calcula el rayado)
 }
 
+// Un muro/pantalla listo para dibujar como CAJA (largo x espesor x alto) centrada en
+// su eje (F3, muros). Vista en planta cenital, la caja se lee como la huella e×L; en
+// 3D es el volumen del muro (espejo de las cajas de pilar). Mantiene el id de dominio
+// para el picking.
+export interface MuroDibujo {
+  id: string;
+  cx: number; // centro del eje en planta (m)
+  cy: number;
+  cz: number; // cota del centro del tramo vertical (m)
+  largo: number; // longitud del eje (m)
+  espesor: number; // m
+  alto: number; // desarrollo vertical (m)
+  angulo: number; // giro del eje en planta (rad, atan2)
+}
+
 export interface GeometriaModelo {
   pilares: PilarDibujo[];
   vigas: VigaDibujo[];
   panos: PanoDibujo[];
+  muros: MuroDibujo[];
 }
 
 // Lado por defecto de la caja de un pilar cuando la seccion no aporta dimensiones
@@ -191,7 +207,36 @@ export function derivar(
     });
   }
 
-  return { pilares, vigas, panos };
+  // Muros (F3, muros): MISMA visibilidad por tramo vertical que los pilares (visible
+  // si el tramo CRUZA la cota de la planta activa; sin planta activa, todos). La caja
+  // se centra en el eje; angulo por atan2 (0 = eje en X).
+  const muros: MuroDibujo[] = [];
+  for (const muro of modelo.muros) {
+    const z0 = cotaPlanta(muro.plantaInicial, cotaPorPlanta);
+    const z1 = cotaPlanta(muro.plantaFinal, cotaPorPlanta);
+    const zMin = Math.min(z0, z1);
+    const zMax = Math.max(z0, z1);
+    if (cotaActiva !== undefined && (cotaActiva < zMin || cotaActiva > zMax)) {
+      continue;
+    }
+    const dx = muro.x2 - muro.x1;
+    const dy = muro.y2 - muro.y1;
+    const largo = Math.hypot(dx, dy);
+    if (largo <= 0) continue; // degenerado: lo bloquea validaciones, aqui no se dibuja
+    const alto = Math.max(zMax - zMin, 0.01);
+    muros.push({
+      id: muro.id,
+      cx: (muro.x1 + muro.x2) / 2,
+      cy: (muro.y1 + muro.y2) / 2,
+      cz: zMin + alto / 2,
+      largo,
+      espesor: muro.espesor,
+      alto,
+      angulo: Math.atan2(dy, dx),
+    });
+  }
+
+  return { pilares, vigas, panos, muros };
 }
 
 // Suscripcion transient que bumpea un "tick" cuando cambia cualquiera de las entradas

@@ -4,17 +4,18 @@
 // duplicar la lógica. No es un componente ni un hook: función plana que habla con los
 // stores/servicios (igual que calcularObra()).
 //
-// Los elementos borrables son pilar, viga y PAÑO (F3): se exige EXACTAMENTE uno
-// seleccionado y que sea uno de esos tipos del modelo. Se lee el modelo con getModelo()
-// JUSTO antes de construir el comando (invariante del `base`, CLAUDE.md §10). Si no
-// aplica, no-op silencioso. Los comandos eliminar* ya gestionan la cascada (cargas,
-// nudos huérfanos…) en un único paso de undo.
+// Los elementos borrables son pilar, viga, PAÑO (F3) y MURO (F3, muros): se exige
+// EXACTAMENTE uno seleccionado y que sea uno de esos tipos del modelo. Se lee el
+// modelo con getModelo() JUSTO antes de construir el comando (invariante del `base`,
+// CLAUDE.md §10). Si no aplica, no-op silencioso. Los comandos eliminar* ya gestionan
+// la cascada (cargas, nudos huérfanos…) en un único paso de undo.
 import {
   modeloStore,
   seleccionStore,
   eliminarPilar,
   eliminarViga,
   eliminarPano,
+  eliminarMuro,
 } from "../../estado";
 
 export function borrarSeleccion(): void {
@@ -28,6 +29,8 @@ export function borrarSeleccion(): void {
     modeloStore.getState().ejecutar(eliminarViga(base, id));
   } else if (base.panos.some((pa) => pa.id === id)) {
     modeloStore.getState().ejecutar(eliminarPano(base, id));
+  } else if (base.muros.some((mu) => mu.id === id)) {
+    modeloStore.getState().ejecutar(eliminarMuro(base, id));
   } else {
     return;
   }

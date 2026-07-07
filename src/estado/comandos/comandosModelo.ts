@@ -9,6 +9,7 @@ import type {
   Viga,
   Nudo,
   Pano,
+  Muro,
   Planta,
   Carga,
   Hipotesis,
@@ -402,6 +403,55 @@ export function eliminarPano(base: Modelo, panoId: string): Comando {
     borrador.nudos = borrador.nudos.filter((n) =>
       nudoEnUso(borrador, n.id),
     );
+  });
+  return comando;
+}
+
+// --- Muros/pantallas (F3, muros) ----------------------------------------------
+
+// Datos del muro que aporta el llamante: todo Muro salvo id (interno) y nombre
+// (visible "M{n}"). A diferencia del paño, el muro NO referencia nudos de obra
+// (segmento del eje por coords crudas, espejo de Pilar.x/y): la receta es un push
+// simple, sin resolver nudos ni higiene de huerfanos.
+export type DatosMuro = Omit<Muro, "id" | "nombre">;
+
+export function crearMuro(base: Modelo, datos: DatosMuro): Comando {
+  // id/nombre fijados AQUI (se reutilizan en redo via el delta). Nombre visible
+  // "M{n}" (muro, estilo CYPECAD) por el mayor sufijo en uso.
+  const id = nuevoId();
+  const nombre = siguienteNombre("M", base.muros);
+  const { comando } = crearComandoParches(base, `Crear muro ${nombre}`, (borrador) => {
+    const muro: Muro = { id, nombre, ...datos };
+    borrador.muros.push(muro);
+  });
+  return comando;
+}
+
+// Edita propiedades de un muro (merge superficial de `cambios`). No toca id, nombre
+// ni el segmento del eje (la geometria la fija la introduccion grafica, no el
+// inspector, espejo de editarPano). Muro inexistente => no-op.
+export function editarMuro(
+  base: Modelo,
+  muroId: string,
+  cambios: Partial<Omit<Muro, "id" | "nombre" | "x1" | "y1" | "x2" | "y2">>,
+): Comando {
+  const { comando } = crearComandoParches(base, "Editar muro", (borrador) => {
+    const muro = borrador.muros.find((m) => m.id === muroId);
+    if (muro) Object.assign(muro, cambios);
+  });
+  return comando;
+}
+
+// Elimina un muro y, en la MISMA receta (un solo paso de undo), purga las cargas
+// cuyo ambito apunta a el (una carga sobre muro solo puede venir de un import: la UI
+// no las crea y validaciones las bloquea, pero la purga evita dejarla colgante).
+// Sin nudos que limpiar (el muro no referencia nudos de obra).
+export function eliminarMuro(base: Modelo, muroId: string): Comando {
+  const { comando } = crearComandoParches(base, "Eliminar muro", (borrador) => {
+    const i = borrador.muros.findIndex((m) => m.id === muroId);
+    if (i === -1) return; // muro inexistente: no-op
+    borrador.muros.splice(i, 1);
+    borrador.cargas = borrador.cargas.filter((c) => c.ambito !== muroId);
   });
   return comando;
 }
