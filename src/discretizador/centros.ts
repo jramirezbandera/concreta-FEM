@@ -246,6 +246,29 @@ export function calcularCentroMasaPlanta(
     }
   }
 
+  // --- 6) MUROS/pantallas que tocan la planta (F3, muros) --------------------------
+  // Espejo del termino de PILARES (1a): masa tributaria por planta = rho·t·L por la
+  // ALTURA tributaria (mitad de cada tramo adyacente a la cota; mismo troceo por
+  // plantas y mismo desempate min-id que tributariaDePilarEnPlanta — el helper es
+  // COMPARTIDO: un muro es un "elemento vertical entre dos plantas" como el pilar).
+  // Ubicada en el punto MEDIO del segmento del eje. Sin esto, la excentricidad
+  // CM<->CR de un edificio con pantallas — el punto del corte — saldria falsa.
+  // Material/geometria no resolubles => se OMITE (el CM no lanza).
+  for (const muro of modelo.muros) {
+    const material = getMaterial(muro.materialId);
+    if (material === undefined) continue;
+    const largo = Math.hypot(muro.x2 - muro.x1, muro.y2 - muro.y1);
+    if (!(largo > 0)) continue;
+    const alturaTributaria = tributariaDePilarEnPlanta(modelo, muro, planta);
+    if (alturaTributaria <= 0) continue;
+    acumular(
+      acc,
+      material.peso * muro.espesor * largo * alturaTributaria,
+      (muro.x1 + muro.x2) / 2,
+      (muro.y1 + muro.y2) / 2,
+    );
+  }
+
   // Sin masa permanente en la planta => null (sin division por cero). El llamante
   // (panel de UI) lo presenta como "Sin masa en esta planta".
   if (acc.w <= 0) return null;
@@ -292,21 +315,22 @@ function centroDeViga(modelo: Modelo, v: Viga): { x: number; y: number } | null 
   return { x: (ni.x + nj.x) / 2, y: (ni.y + nj.y) / 2 };
 }
 
-// --- [AUDITORIA M-7] Masa tributaria de un pilar en una planta --------------------
-// Longitud del pilar `p` que tributa a `planta`: la mitad de cada TRAMO adyacente a
-// la cota de la planta. Los tramos son los del troceo del discretizador (una cota por
-// cada planta cuya cota cae dentro de [cMin, cMax] del pilar, espejo de
-// `cotasDePilar` en discretizar.ts): asi el CM reparte la masa por los MISMOS tramos
-// que el solver usa para las barras.
+// --- [AUDITORIA M-7] Altura tributaria de un ELEMENTO VERTICAL en una planta -------
+// Longitud vertical del elemento `p` (pilar O muro: cualquier cosa con
+// plantaInicial/plantaFinal) que tributa a `planta`: la mitad de cada TRAMO adyacente
+// a la cota de la planta. Los tramos son los del troceo del discretizador (una cota
+// por cada planta cuya cota cae dentro de [cMin, cMax], espejo de `cotasDePilar` en
+// discretizar.ts — y de las filas mandatorias del mallado de muro): asi el CM reparte
+// la masa por los MISMOS tramos que el solver usa.
 //
 // DESEMPATE de cotas compartidas (dos plantas a la MISMA cota): la tributaria de una
 // cota se atribuye a UNA sola planta — la misma que elegiria `plantaDeCotaPilar` del
 // discretizador (min por id; en v4 ya no hay preferencia por grupo) — para no
 // contarla dos veces y para que el CM atribuya como `nodoFEMAPlanta`. Devuelve 0 si
-// `planta` no toca el pilar o pierde el desempate.
+// `planta` no toca el elemento o pierde el desempate.
 function tributariaDePilarEnPlanta(
   modelo: Modelo,
-  p: Modelo["pilares"][number],
+  p: { plantaInicial: string; plantaFinal: string },
   planta: { id: string; cota: number },
 ): number {
   const pi = plantaPorId(modelo, p.plantaInicial);

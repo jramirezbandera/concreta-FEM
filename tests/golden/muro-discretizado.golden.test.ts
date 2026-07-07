@@ -193,4 +193,38 @@ describe("golden muro discretizado Capa B (obra -> discretizar -> motor real)", 
     },
     180_000,
   );
+
+  it(
+    "5) el modal CORRE con muro y rigidiza: f1 con pantalla > f1 sin pantalla",
+    () => {
+      if (!arranque || !arranque.ok) return;
+      // La masa del muro la fabrica el glue (_agregar_masa_quads, agnostico a la
+      // orientacion); su rigidez de membrana entra en K. No se replica Leissa aqui:
+      // solo se asevera que el camino modal corre con muros y que la pantalla
+      // RIGIDIZA el modo fundamental (el portico solo es mucho mas blando lateral).
+      const dSin = discretizar(
+        modeloPortico({ conMuro: false, conPesoPropio: true, conCarga: false }),
+        { modal: { numModos: 3 } },
+      );
+      expect(dSin.ok).toBe(true);
+      if (!dSin.ok) return;
+      const rSin = arranque.motor.calcularModal(dSin.modeloFEM);
+
+      const dCon = discretizar(
+        modeloPortico({ conMuro: true, conPesoPropio: true, conCarga: false }),
+        { modal: { numModos: 3 } },
+      );
+      expect(dCon.ok).toBe(true);
+      if (!dCon.ok) return;
+      const rCon = arranque.motor.calcularModal(dCon.modeloFEM);
+
+      expect(rSin.frecuencias.length).toBeGreaterThan(0);
+      expect(rCon.frecuencias.length).toBeGreaterThan(0);
+      const f1Sin = rSin.frecuencias[0];
+      const f1Con = rCon.frecuencias[0];
+      expect(f1Sin).toBeGreaterThan(0);
+      expect(f1Con).toBeGreaterThan(f1Sin); // la pantalla sube la frecuencia fundamental
+    },
+    180_000,
+  );
 });

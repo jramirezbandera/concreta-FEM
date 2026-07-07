@@ -567,3 +567,74 @@ describe("centro de masas · paños unidireccionales (F3)", () => {
     expect(calcularCentroMasaPlanta(m, "p1")!.pesoTotal).toBeCloseTo(4 * AREA + 3 * AREA, 10);
   });
 });
+
+// --- Termino 6: MUROS/pantallas (F3, muros) -----------------------------------------
+// Espejo del termino de pilares: masa tributaria rho·t·L·h_trib en el punto medio del
+// eje. Sin este termino, la excentricidad CM<->CR de un edificio con pantallas — el
+// punto del corte de muros — saldria falsa.
+describe("calcularCentroMasaPlanta — muros (termino 6)", () => {
+  const RHO_HA = 25.0; // HA-25 del catalogo
+
+  function muro(
+    id: string,
+    extra?: Partial<Modelo["muros"][number]>,
+  ): Modelo["muros"][number] {
+    return {
+      id, nombre: id.toUpperCase(),
+      x1: 0, y1: 0, x2: 4, y2: 0,
+      plantaInicial: "p0", plantaFinal: "p1",
+      espesor: 0.3, materialId: "HA-25", tamMalla: 0.5,
+      vinculacionExterior: true,
+      ...extra,
+    };
+  }
+
+  it("muro de una planta: mitad de su altura tributa a cada forjado, en el punto medio del eje", () => {
+    const m = modeloBase();
+    m.muros = [muro("mu1")];
+    // Peso total del muro = 25·0.3·4·3 = 90; a p1 tributa la mitad del tramo (h=1.5).
+    const wTributaria = RHO_HA * 0.3 * 4 * 1.5; // 45 kN
+    const cm = calcularCentroMasaPlanta(m, "p1")!;
+    expect(cm.pesoTotal).toBeCloseTo(wTributaria, 10);
+    expect(cm.x).toBeCloseTo(2, 10); // punto medio del eje (0,0)-(4,0)
+    expect(cm.y).toBeCloseTo(0, 10);
+    // p0 recibe la otra mitad.
+    expect(calcularCentroMasaPlanta(m, "p0")!.pesoTotal).toBeCloseTo(wTributaria, 10);
+  });
+
+  it("muro pasante de dos plantas: la intermedia recibe mitad de cada tramo (como el pilar)", () => {
+    const m = modeloBase();
+    m.plantas.push({
+      id: "p2", nombre: "Planta 2", cota: 6, altura: 3,
+      categoriaUso: "A", sobrecargaUso: 0, cargasMuertas: 0,
+    });
+    m.muros = [muro("mu1", { plantaFinal: "p2" })];
+    // p1 (cota 3, intermedia): mitad del tramo inferior (1.5) + mitad del superior (1.5).
+    expect(calcularCentroMasaPlanta(m, "p1")!.pesoTotal).toBeCloseTo(RHO_HA * 0.3 * 4 * 3, 10);
+    // Extremos: solo mitad de su tramo adyacente.
+    expect(calcularCentroMasaPlanta(m, "p0")!.pesoTotal).toBeCloseTo(RHO_HA * 0.3 * 4 * 1.5, 10);
+    expect(calcularCentroMasaPlanta(m, "p2")!.pesoTotal).toBeCloseTo(RHO_HA * 0.3 * 4 * 1.5, 10);
+  });
+
+  it("el muro DESPLAZA el CM: pilar + muro combinados ponderan por peso", () => {
+    const m = modeloBase();
+    m.secciones = [secGenerica("secA", 0.09)];
+    m.pilares = [pilar("pil1", 10, 0, "secA")]; // en (10,0)
+    m.muros = [muro("mu1")]; // eje (0,0)-(4,0), punto medio (2,0)
+    const wPilar = 0.09 * RHO * 1.5; // A·rho·(h/2)
+    const wMuro = RHO_HA * 0.3 * 4 * 1.5;
+    const cm = calcularCentroMasaPlanta(m, "p1")!;
+    expect(cm.pesoTotal).toBeCloseTo(wPilar + wMuro, 10);
+    expect(cm.x).toBeCloseTo((wPilar * 10 + wMuro * 2) / (wPilar + wMuro), 10);
+  });
+
+  it("material irresoluble o segmento degenerado: se OMITE sin lanzar", () => {
+    const m = modeloBase();
+    m.muros = [
+      muro("mu-mat", { materialId: "NO_EXISTE" }),
+      muro("mu-cero", { x2: 0, y2: 0 }),
+    ];
+    expect(() => calcularCentroMasaPlanta(m, "p1")).not.toThrow();
+    expect(calcularCentroMasaPlanta(m, "p1")).toBeNull(); // ninguno aporta
+  });
+});
