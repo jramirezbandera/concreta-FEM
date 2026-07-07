@@ -46,7 +46,7 @@ RESULTADOS  (esfuerzos, deformada, reacciones)  →  UI (/src/ui)
 | Validación | Zod (bordes de Capa 1 y Capa 2) |
 | Tests | Vitest + React Testing Library + Playwright · *golden tests* del cálculo |
 
-El par de versiones confirmado del motor es **Pyodide 0.28.3 ↔ PyNiteFEA 2.0.2**. Los *wheels* necesarios están vendorizados en [`public/pyodide/`](public/pyodide/) y [`vendor/wheels/`](vendor/wheels/) para funcionar sin red.
+El par de versiones confirmado del motor es **Pyodide 0.28.3 ↔ PyNiteFEA 2.0.2**. Los *wheels* necesarios (numpy, scipy, libopenblas, micropip, wcwidth, PyNiteFEA, PrettyTable) están vendorizados en [`vendor/wheels/`](vendor/wheels/) para funcionar sin red — Pyodide npm solo publica el core. `scripts/copy-pyodide-assets.mjs` los aterriza junto al core en `public/pyodide/` (**derivado, no versionado**) en cada `postinstall`/build.
 
 ---
 
@@ -63,7 +63,8 @@ El par de versiones confirmado del motor es **Pyodide 0.28.3 ↔ PyNiteFEA 2.0.2
   /ui               React, organizado por las 4 pestañas CYPECAD
   /unidades         Sistema de unidades y conversión en los bordes
 /tests/golden       Casos de libro con solución analítica conocida
-/public/pyodide     Runtime Pyodide + wheels del motor (offline)
+/vendor/wheels      Wheels del motor vendorizados (fuente offline: numpy/scipy/PyNite/…)
+/public/pyodide     Runtime Pyodide (DERIVADO, gitignored; lo regenera copy-pyodide)
 /investigacion      Investigación por áreas y verificación
 ```
 

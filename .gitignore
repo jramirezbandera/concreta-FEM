@@ -36,6 +36,12 @@ test-results/
 .pyodide-cache
 .gstack/
 
+# Runtime de Pyodide autohospedado: DERIVADO, no se versiona. Lo regenera
+# scripts/copy-pyodide-assets.mjs (postinstall + buildStart) desde node_modules/pyodide
+# (core) + vendor/wheels/ (wheels que Pyodide npm no publica). La FUENTE versionada de
+# los wheels es vendor/wheels/, no esta carpeta. Ver tests/golden/README.md.
+public/pyodide/
+
 # Bytecode de Python (el glue corre via Pyodide; el .pyc es artefacto de build local)
 __pycache__/
 *.pyc

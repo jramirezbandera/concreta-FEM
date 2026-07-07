@@ -23,9 +23,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 const srcDir = join(projectRoot, "node_modules", "pyodide");
 const destDir = join(projectRoot, "public", "pyodide");
-// Wheels NO-Pyodide vendorizados en el repo (PyNiteFEA, PrettyTable). Se sirven
-// bajo /pyodide/ para que worker.ts los instale con micropip desde URL local,
-// sin red (regla de oro #9). copy-pyodide los aterriza junto a los wheels WASM.
+// Wheels vendorizados en el repo. Se sirven bajo /pyodide/ para arranque offline
+// (regla de oro #9). Son DOS familias, ambas en vendor/wheels/ (fuente versionada):
+//   - Instalados por micropip (worker.ts): PyNiteFEA + PrettyTable (no estan en el
+//     catalogo WASM de Pyodide). Orden/flags en WHEELS_VENDOR de src/solver/config.ts.
+//   - Resueltos por loadPackage via pyodide-lock.json: numpy, scipy, libopenblas,
+//     micropip, wcwidth. VAN VENDORIZADOS porque `pyodide` npm 0.28.3 publica SOLO
+//     el core (13 ficheros; su package.json `files` NO incluye ningun wheel de
+//     paquete). En un `npm ci` limpio node_modules/pyodide NO los trae, asi que
+//     copiarlos de ahi dejaba public/pyodide SIN numpy/scipy -> 404 en GitHub Pages
+//     -> el motor no arrancaba (el deploy pasaba en verde porque la verificacion de
+//     abajo solo miraba core + PyNiteFEA/PrettyTable). Vendorizarlos hace la copia
+//     DETERMINISTA e independiente de lo que traiga node_modules.
 const vendorWheelsDir = join(projectRoot, "vendor", "wheels");
 
 // -----------------------------------------------------------------------------
@@ -41,6 +50,12 @@ const PYODIDE_PINEADA = "0.28.3"; // == src/solver/config.ts VERSIONES.pyodide
 // version: el matcher comprueba el prefijo, asi un bump del pin no rompe esto).
 // Acoplado a WHEELS_VENDOR de src/solver/config.ts (PyNiteFEA + PrettyTable).
 const WHEELS_VENDOR_ESPERADOS = ["pynitefea", "prettytable"];
+// Wheels de PAQUETE que loadPackage(numpy,scipy,micropip) resuelve por el
+// pyodide-lock.json: cierre transitivo {numpy, scipy(+numpy,libopenblas), micropip,
+// wcwidth(dep de PrettyTable)}. `pyodide` npm 0.28.3 NO los publica, asi que van
+// vendorizados; verificarlos aqui evita re-desplegar un motor roto en silencio (fue
+// el bug del 404 en GitHub Pages). Prefijos (libopenblas es .zip, no .whl).
+const PAQUETES_CRITICOS = ["numpy", "scipy", "libopenblas", "micropip", "wcwidth"];
 // Assets de runtime CRITICOS sin los cuales el motor del navegador no arranca.
 const RUNTIME_CRITICOS = ["pyodide.asm.wasm", "pyodide-lock.json"];
 
@@ -131,22 +146,25 @@ async function main() {
     },
   });
 
-  // Copiar los wheels vendorizados (PyNiteFEA, PrettyTable) a public/pyodide/.
-  // Sin ellos, el navegador caeria a PyPI en runtime (riesgo "matplotlib/red").
-  // FIX A3: si la carpeta vendor/wheels/ no existe en un runtime PRESENTE, es un
-  // fallo DURO (no warning): el motor offline quedaria sin sus wheels.
+  // Copiar los wheels vendorizados a public/pyodide/. vendor/wheels/ es la FUENTE
+  // versionada de TODO wheel que Pyodide npm no publica: los de micropip (PyNiteFEA,
+  // PrettyTable) y los de paquete que loadPackage resuelve (numpy, scipy, libopenblas,
+  // micropip, wcwidth). Sin ellos el navegador daria 404 (o caeria a PyPI). FIX A3:
+  // si la carpeta no existe en un runtime PRESENTE, es un fallo DURO (no warning).
+  // Copiamos TODO fichero (no solo .whl): libopenblas es .zip y numpy/scipy tambien
+  // son wheels que deben aterrizar tal cual junto al pyodide-lock.json.
   let vendorCopiados = 0;
   if (await exists(vendorWheelsDir)) {
-    const entradas = await readdir(vendorWheelsDir);
-    for (const nombre of entradas) {
-      if (!nombre.toLowerCase().endsWith(".whl")) continue;
-      await cp(join(vendorWheelsDir, nombre), join(destDir, nombre));
+    const entradas = await readdir(vendorWheelsDir, { withFileTypes: true });
+    for (const ent of entradas) {
+      if (!ent.isFile()) continue;
+      await cp(join(vendorWheelsDir, ent.name), join(destDir, ent.name));
       vendorCopiados += 1;
     }
   } else {
     abortar(
-      `${vendorWheelsDir} no existe; faltan los wheels vendorizados ` +
-        `(PyNiteFEA/PrettyTable). El arranque offline es imposible y caeria a PyPI.`,
+      `${vendorWheelsDir} no existe; faltan los wheels vendorizados (PyNiteFEA/` +
+        `PrettyTable + numpy/scipy/micropip/…). El arranque offline es imposible.`,
     );
   }
 
@@ -171,6 +189,22 @@ async function main() {
     );
   }
 
+  // 1bis) Wheels de PAQUETE (numpy/scipy/libopenblas/micropip/wcwidth): loadPackage
+  //    los necesita servidos bajo /pyodide/. Comprobamos por PREFIJO SIN exigir .whl
+  //    (libopenblas es .zip). ESTA guarda es la que faltaba: sin ella, un `npm ci`
+  //    limpio (node_modules/pyodide core-only) dejaba public/pyodide sin numpy/scipy
+  //    y el deploy pasaba en verde -> 404 en GitHub Pages, motor sin arrancar.
+  const paquetesFaltan = PAQUETES_CRITICOS.filter(
+    (prefijo) => !presentesLower.some((n) => n.startsWith(prefijo)),
+  );
+  if (paquetesFaltan.length > 0) {
+    abortar(
+      `tras copiar faltan en ${destDir} estos wheels de paquete criticos: ` +
+        `${paquetesFaltan.join(", ")}. Deben estar VENDORIZADOS en vendor/wheels/ ` +
+        `(pyodide npm 0.28.3 no los publica; ver PAQUETES_CRITICOS).`,
+    );
+  }
+
   // 2) Assets de runtime criticos (pyodide.asm.wasm, pyodide-lock.json): sin
   //    ellos loadPyodide ni siquiera arranca.
   const runtimeFaltan = RUNTIME_CRITICOS.filter(
@@ -186,7 +220,8 @@ async function main() {
   console.log(
     `[copy-pyodide] Runtime copiado a ${destDir} (indexURL: /pyodide/) + ` +
       `${vendorCopiados} wheel(s) vendorizado(s). Verificacion OK ` +
-      `(wheels: ${WHEELS_VENDOR_ESPERADOS.join("+")}; runtime: ${RUNTIME_CRITICOS.join("+")}).`,
+      `(vendor: ${WHEELS_VENDOR_ESPERADOS.join("+")}; paquete: ${PAQUETES_CRITICOS.join("+")}; ` +
+      `runtime: ${RUNTIME_CRITICOS.join("+")}).`,
   );
 }
 

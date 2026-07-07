@@ -36,20 +36,32 @@ npm run test                        # toda la suite del repo (Vitest run)
 
 El arranque del motor en los tests **no toca la red** (regla de oro #9):
 
-- **numpy / scipy / micropip / wcwidth**: wheels WASM ya presentes en `node_modules/pyodide`
-  (Pyodide los resuelve por su `pyodide-lock.json` con `indexURL` local).
+- **numpy / scipy / micropip / wcwidth (+ libopenblas)**: `loadPackage` los resuelve por el
+  `pyodide-lock.json` con `indexURL` local. En los tests de **Node** el `indexURL` es
+  `node_modules/pyodide` (donde están presentes al instalar). En el **navegador / GitHub Pages**
+  el `indexURL` es `/pyodide/`, servido desde `public/pyodide/` — y ahí llegan **vendorizados**
+  desde `vendor/wheels/`, porque el paquete `pyodide` de npm publica **solo el core** (13
+  ficheros; su `package.json` `files` no incluye ningún wheel de paquete).
 - **PyNiteFEA + PrettyTable**: **vendorizados** en `vendor/wheels/*.whl` e instalados con
-  micropip desde una URL `file://` local. El orden y los flags (`deps`) son fuente única en
+  micropip desde una URL local. El orden y los flags (`deps`) son fuente única en
   `src/solver/config.ts` (`WHEELS_VENDOR`).
 
 ### Wheels vendorizados vs. `public/pyodide/`
 
-- `vendor/wheels/*.whl` **se versionan en el repo**: son la fuente offline de los wheels que
-  no trae Pyodide (PyNiteFEA, PrettyTable). Son la entrada, no un artefacto.
-- `public/pyodide/*.whl` **se regeneran en `postinstall`** (`scripts/copy-pyodide-assets.mjs`):
-  copia el runtime de `node_modules/pyodide` y aterriza ahí también los wheels vendorizados
-  para servirlos autohospedados al navegador. **No se versiona** (es derivado); si falta, basta
+- `vendor/wheels/` **se versiona en el repo**: es la fuente offline de **todo** wheel que
+  Pyodide npm no publica. Dos familias: los que instala micropip (PyNiteFEA, PrettyTable) y los
+  que resuelve `loadPackage` (numpy, scipy, libopenblas, micropip, wcwidth). Son la entrada, no
+  un artefacto.
+- `public/pyodide/` **es DERIVADO y NO se versiona** (`.gitignore`): lo regenera
+  `scripts/copy-pyodide-assets.mjs` en `postinstall` + `buildStart` copiando el core de
+  `node_modules/pyodide` y **todos** los wheels de `vendor/wheels/`. Si falta, basta
   `npm run copy-pyodide`.
+
+> **Lección (bug del 404 en GitHub Pages):** antes numpy/scipy se copiaban solo desde
+> `node_modules/pyodide`. En un `npm ci` limpio (CI) ese directorio es core-only, así que
+> `public/pyodide` quedaba sin numpy/scipy → 404 en el sitio → el motor no arrancaba, y el deploy
+> pasaba en verde porque la verificación post-copia no los miraba. Ahora van vendorizados y
+> `PAQUETES_CRITICOS` los verifica (corta el build en rojo si faltan).
 
 ## Política de tolerancias
 

@@ -45,10 +45,13 @@ export const VERSIONES = {
 // RUNTIME AUTOHOSPEDADO (NO CDN — decision cerrada del proyecto)
 // -----------------------------------------------------------------------------
 //
-// Los assets de Pyodide (pyodide.js/.mjs, .wasm, pyodide-lock.json y los wheels
-// de numpy/scipy/micropip) se copian de node_modules/pyodide a public/pyodide/
-// por scripts/copy-pyodide-assets.mjs (postinstall + buildStart de Vite). Vite
-// publica public/ bajo el base configurado, asi que el indexURL en runtime es
+// Los assets se aterrizan en public/pyodide/ por scripts/copy-pyodide-assets.mjs
+// (postinstall + buildStart de Vite) desde DOS fuentes: el CORE de Pyodide
+// (pyodide.js/.mjs, .wasm, pyodide-lock.json, python_stdlib) viene de
+// node_modules/pyodide; los WHEELS DE PAQUETE (numpy, scipy, libopenblas, micropip,
+// wcwidth) vienen VENDORIZADOS de vendor/wheels/, porque pyodide npm 0.28.3 publica
+// solo el core (no incluye ningun wheel). public/pyodide/ es DERIVADO (gitignored).
+// Vite publica public/ bajo el base configurado, asi que el indexURL en runtime es
 // `${BASE_URL}pyodide/`: "/pyodide/" en dev y "/concreta-FEM/pyodide/" en el
 // build de GitHub Pages (subpath del repo).
 //
