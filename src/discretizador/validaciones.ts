@@ -12,12 +12,13 @@
 // Estas comprobaciones son HEURISTICAS BARATAS, complementarias (no sustitutas) del
 // veredicto exacto de estabilidad/mecanismo que dara `check_stability` del solver
 // (feature-5/6). Aqui se atrapa lo evidente en lenguaje del arquitecto.
-import type { Modelo, Pilar, Viga, Carga, Pano } from "../dominio";
+import type { Modelo, Pilar, Viga, Carga, Pano, Muro } from "../dominio";
 import { plantaPorId, nudoPorId, seccionPorId, esHipotesisAutomatica } from "../dominio";
 import { getMaterial, getSeccion } from "../biblioteca";
-import { TOL_NODO, mapearEjes, clavePosicion, hayTresNoColineales } from "./geometria";
+import { TOL_NODO, mapearEjes, clavePosicion, hayTresNoColineales, cuantizar } from "./geometria";
 import { materialAportaMasa } from "./propiedadesBarra";
 import { mallarPano, limitesRectangulo, type PuntoPlano } from "./mallado";
+import { resolverEje } from "./malladoMuro";
 // [1A] El acople paño<->portico (F3.2) se computa UNA vez por discretizacion:
 // `discretizar` lo pasa como parametro; el fallback interno cubre a los llamantes
 // que no lo tienen (prepararModeloCR, tests). Sus resultados gobiernan la
@@ -70,7 +71,7 @@ export type ErrorObra = {
   severidad: "error" | "aviso"; // error = bloquea; aviso = informa, no bloquea
   mensaje: string; // espanol con tildes, SIN jerga FEM (es texto de UI)
   elementoId?: string; // id del Pilar/Viga/Nudo/Carga/Pano/... culpable
-  elementoTipo?: "pilar" | "viga" | "nudo" | "carga" | "pano" | "hipotesis" | "planta" | "modelo";
+  elementoTipo?: "pilar" | "viga" | "nudo" | "carga" | "pano" | "muro" | "hipotesis" | "planta" | "modelo";
   // [D22a] Coordenadas de OBRA (no FEM: x=Este, y=Norte en m, ejes del plano de planta)
   // del elemento culpable, cuando aportan navegabilidad. Hoy solo lo rellena FLOTANTE
   // (posicion del nudo suelto): el reporte puede mostrar "en (4.00, 3.00)" y la UI puede
@@ -143,10 +144,11 @@ function comprobarNombresUnicos(
   }
 }
 
-// 1. Nombres unicos de pilares, vigas, hipotesis y plantas.
+// 1. Nombres unicos de pilares, vigas, muros, hipotesis y plantas.
 function validarNombresUnicos(modelo: Modelo, errores: ErrorObra[]): void {
   comprobarNombresUnicos(errores, modelo.pilares, "pilar", "pilar");
   comprobarNombresUnicos(errores, modelo.vigas, "viga", "viga");
+  comprobarNombresUnicos(errores, modelo.muros, "muro", "muro");
   comprobarNombresUnicos(errores, modelo.hipotesis, "hipotesis", "hipótesis");
   comprobarNombresUnicos(errores, modelo.plantas, "planta", "planta");
 }
@@ -186,6 +188,7 @@ function validarIdsUnicos(modelo: Modelo, errores: ErrorObra[]): void {
   comprobarIdsUnicos(errores, modelo.pilares, "pilar", "pilar");
   comprobarIdsUnicos(errores, modelo.vigas, "viga", "viga");
   comprobarIdsUnicos(errores, modelo.panos, "pano", "paño");
+  comprobarIdsUnicos(errores, modelo.muros, "muro", "muro");
   comprobarIdsUnicos(errores, modelo.cargas, "carga", "carga");
   comprobarIdsUnicos(errores, modelo.hipotesis, "hipotesis", "hipótesis");
 }
@@ -616,12 +619,214 @@ function validarRefsPanoUnidireccional(
   }
 }
 
+// 2b-ter. Referencias y geometria de un MURO/pantalla (F3, muros). Precedencia:
+//   1. REF_MATERIAL / REF_PLANTA -> 2. MURO_PLANTAS (sin desarrollo vertical) ->
+//   3. MURO_TAM_MALLA -> 4. MURO_DEGENERADO / MURO_NO_ALINEADO (resolverEje, la
+//      MISMA fuente que usa el mallado: no pueden divergir) ->
+//   5. MURO_DEMASIADO_DENSO (cap del planificador, via acoples.erroresMalladoMuro) ->
+//   6. MURO_SIN_SUJECION (base no vinculada y acople insuficiente) ->
+//   avisos MURO_MALLA_LIMITADA (cap aplicado) y MURO_SIN_CORONACION (hay forjado
+//   con borde sobre el eje pero ninguna viga de coronacion que lo descargue al muro).
+function validarRefsMuro(
+  muro: Muro,
+  modelo: Modelo,
+  errores: ErrorObra[],
+  acoples: ResultadoAcoples,
+): void {
+  if (getMaterial(muro.materialId) === undefined) {
+    errores.push({
+      codigo: "REF_MATERIAL",
+      severidad: "error",
+      mensaje: `El muro "${muro.nombre}" usa un material que no existe en la biblioteca.`,
+      elementoId: muro.id,
+      elementoTipo: "muro",
+    });
+  }
+  const pi = plantaPorId(modelo, muro.plantaInicial);
+  const pf = plantaPorId(modelo, muro.plantaFinal);
+  if (pi === undefined) {
+    errores.push({
+      codigo: "REF_PLANTA",
+      severidad: "error",
+      mensaje: `El muro "${muro.nombre}" arranca en una planta que no existe.`,
+      elementoId: muro.id,
+      elementoTipo: "muro",
+    });
+  }
+  if (pf === undefined) {
+    errores.push({
+      codigo: "REF_PLANTA",
+      severidad: "error",
+      mensaje: `El muro "${muro.nombre}" llega a una planta que no existe.`,
+      elementoId: muro.id,
+      elementoTipo: "muro",
+    });
+  }
+  // Sin desarrollo vertical (espejo de PILAR_DEGENERADO): misma planta o dos plantas
+  // a la misma cota. Umbral TOL_NODO, el criterio geometrico unico.
+  if (pi !== undefined && pf !== undefined && Math.abs(pf.cota - pi.cota) <= TOL_NODO) {
+    errores.push({
+      codigo: "MURO_PLANTAS",
+      severidad: "error",
+      mensaje: `El muro "${muro.nombre}" arranca y termina a la misma altura: no tiene desarrollo vertical. Revisa sus plantas inicial y final.`,
+      elementoId: muro.id,
+      elementoTipo: "muro",
+    });
+  }
+  if (!(muro.tamMalla > 0)) {
+    errores.push({
+      codigo: "MURO_TAM_MALLA",
+      severidad: "error",
+      mensaje: `El muro "${muro.nombre}" tiene un tamaño de malla no válido.`,
+      elementoId: muro.id,
+      elementoTipo: "muro",
+    });
+  }
+
+  // Geometria del eje en planta: FUENTE UNICA resolverEje (la misma del mallado).
+  const ejeR = resolverEje({ x: muro.x1, y: muro.y1 }, { x: muro.x2, y: muro.y2 });
+  if ("codigo" in ejeR) {
+    errores.push({
+      codigo: ejeR.codigo, // MURO_DEGENERADO | MURO_NO_ALINEADO
+      severidad: "error",
+      mensaje:
+        ejeR.codigo === "MURO_DEGENERADO"
+          ? `El muro "${muro.nombre}" no tiene longitud: sus dos extremos coinciden en planta.`
+          : `El muro "${muro.nombre}" no es paralelo a los ejes. En esta fase solo se calculan muros alineados con los ejes X o Y de la obra.`,
+      elementoId: muro.id,
+      elementoTipo: "muro",
+    });
+    return; // sin eje no hay malla, sujecion ni coronacion que evaluar
+  }
+
+  // Cap del planificador (filas/columnas mandatorias > CAP_QUADS): improbable pero
+  // superficiado por el acople (XOR con porMuro, espejo de la losa plana).
+  const errorMallado = acoples.erroresMalladoMuro.get(muro.id);
+  if (errorMallado !== undefined) {
+    errores.push({
+      codigo: errorMallado.codigo, // MURO_DEMASIADO_DENSO
+      severidad: "error",
+      mensaje: `El muro "${muro.nombre}": ${errorMallado.mensaje}`,
+      elementoId: muro.id,
+      elementoTipo: "muro",
+    });
+    return;
+  }
+
+  const acople = acoples.porMuro.get(muro.id);
+
+  // SUJECION del muro: con base vinculada, la fila base se empotra al terreno y el
+  // muro esta sujeto por construccion. Sin ella, debe quedar COSIDO al portico en
+  // >=3 puntos NO colineales de su plano (s, cota): colgado de UNA linea (una sola
+  // viga de coronacion, una sola columna de pilar) penduleria alrededor de ella —
+  // mecanismo fuera de plano que el solver disperso devuelve como basura silenciosa
+  // (precedente losa plana sobre pilares colineales). BLOQUEA antes del motor.
+  if (!muro.vinculacionExterior) {
+    const puntos = acople !== undefined ? [...acople.puntosAcoplados] : [];
+    if (!hayTresNoColineales(puntos)) {
+      errores.push({
+        codigo: "MURO_SIN_SUJECION",
+        severidad: "error",
+        mensaje: `El muro "${muro.nombre}" no está anclado al terreno ni suficientemente unido a la estructura: quedaría suelto o colgado de una sola línea. Ancla su base al terreno o conéctalo a vigas y pilares en al menos dos niveles.`,
+        elementoId: muro.id,
+        elementoTipo: "muro",
+      });
+    }
+  }
+
+  // AVISO: el cap engroso la malla (espejo PANO_MALLA_LIMITADA).
+  if (acople !== undefined && acople.malla.capAplicado) {
+    errores.push({
+      codigo: "MURO_MALLA_LIMITADA",
+      severidad: "aviso",
+      mensaje: `La malla del muro "${muro.nombre}" se ha limitado para que el cálculo sea viable; los resultados cerca de sus bordes pierden detalle.`,
+      elementoId: muro.id,
+      elementoTipo: "muro",
+    });
+  }
+
+  // AVISO MURO_SIN_CORONACION (honestidad de la decision de alcance F3-muros): la
+  // losa NO comparte malla con el muro en este corte; el forjado le descarga a
+  // traves de una VIGA de coronacion colineal. Si hay un forjado con borde sobre el
+  // eje del muro a su cota de coronacion pero NINGUNA viga colineal alli, el muro
+  // quedara al margen de esa descarga — se avisa con la salida ("añade una viga").
+  if (
+    acople !== undefined &&
+    !acople.coronacionConViga &&
+    pi !== undefined &&
+    pf !== undefined
+  ) {
+    const cotaTope = Math.max(pi.cota, pf.cota);
+    if (panoConBordeSobreEje(modelo, ejeR, cuantizar(cotaTope))) {
+      errores.push({
+        codigo: "MURO_SIN_CORONACION",
+        severidad: "aviso",
+        mensaje: `El forjado que llega al muro "${muro.nombre}" no le descarga: en esta fase la losa apoya en el muro a través de una viga. Dibuja una viga de coronación sobre el eje del muro.`,
+        elementoId: muro.id,
+        elementoTipo: "muro",
+      });
+    }
+  }
+}
+
+// ¿Algun forjado (losa/unidireccional) de la cota dada tiene un BORDE colineal con
+// el eje del muro (perpendicular en la misma celda y solape real)? Soporte del aviso
+// MURO_SIN_CORONACION. Un paño no resoluble (refs rotas, no rectangular) no cuenta
+// (sus propios errores ya lo reportan).
+function panoConBordeSobreEje(
+  modelo: Modelo,
+  eje: { eje: "x" | "y"; sMin: number; sMax: number; coordFija: number },
+  qCotaTope: number,
+): boolean {
+  const qFijo = cuantizar(eje.coordFija);
+  for (const pano of modelo.panos) {
+    if (pano.tipo !== "losa" && pano.tipo !== "unidireccional") continue;
+    const planta = plantaPorId(modelo, pano.plantaId);
+    if (planta === undefined || cuantizar(planta.cota) !== qCotaTope) continue;
+    if (pano.perimetro.length !== 4) continue;
+    const puntos: PuntoPlano[] = [];
+    let falta = false;
+    for (const nudoId of pano.perimetro) {
+      const n = nudoPorId(modelo, nudoId);
+      if (n === undefined) {
+        falta = true;
+        break;
+      }
+      puntos.push({ x: n.x, y: n.y });
+    }
+    if (falta) continue;
+    const limites = limitesRectangulo(puntos);
+    if ("codigo" in limites) continue;
+    // Aristas del rectangulo perpendiculares al plano del muro: para muro segun X,
+    // las de y fija (yMin/yMax) con rango [xMin,xMax]; para muro segun Y, las de x
+    // fija con rango [yMin,yMax].
+    const candidatas =
+      eje.eje === "x"
+        ? [
+            { fijo: limites.yMin, desde: limites.xMin, hasta: limites.xMax },
+            { fijo: limites.yMax, desde: limites.xMin, hasta: limites.xMax },
+          ]
+        : [
+            { fijo: limites.xMin, desde: limites.yMin, hasta: limites.yMax },
+            { fijo: limites.xMax, desde: limites.yMin, hasta: limites.yMax },
+          ];
+    for (const arista of candidatas) {
+      if (cuantizar(arista.fijo) !== qFijo) continue;
+      if (Math.min(arista.hasta, eje.sMax) - Math.max(arista.desde, eje.sMin) > TOL_NODO) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // 2c. Referencias de una Carga: ambito (elemento existente) e hipotesis.
 function validarRefsCarga(
   c: Carga,
   modelo: Modelo,
   errores: ErrorObra[],
   ambitosValidos: ReadonlySet<string>,
+  idsMuros: ReadonlySet<string>,
 ): void {
   // [D22a] Nombra el ámbito de la carga SOLO si resuelve a un elemento del modelo:
   // "la carga sobre la viga V3…". Si no resuelve (elemento borrado, etc.) se cae al
@@ -629,7 +834,17 @@ function validarRefsCarga(
   // definición NO existe, así que `ambito` será null y el mensaje queda genérico.
   const ambito = nombreDeAmbito(modelo, c.ambito);
   const sufijoAmbito = ambito ? ` sobre ${ambito.etiqueta} "${ambito.nombre}"` : "";
-  if (!ambitosValidos.has(c.ambito)) {
+  if (idsMuros.has(c.ambito)) {
+    // El muro EXISTE pero no admite cargas en este corte (viento/empuje = deuda
+    // T-muro-cargas-laterales): mensaje especifico, no el generico de ambito roto.
+    errores.push({
+      codigo: "CARGA_SOBRE_MURO",
+      severidad: "error",
+      mensaje: `Una carga está aplicada sobre un muro: las cargas sobre muros (viento, empuje) aún no se calculan en esta fase. Elimínala o aplícala sobre otro elemento.`,
+      elementoId: c.id,
+      elementoTipo: "carga",
+    });
+  } else if (!ambitosValidos.has(c.ambito)) {
     errores.push({
       codigo: "REF_AMBITO",
       severidad: "error",
@@ -701,16 +916,23 @@ function validarReferencias(
   for (const v of modelo.vigas) validarRefsViga(v, modelo, errores);
   for (const pano of modelo.panos)
     validarRefsPano(pano, modelo, errores, acoples, pilaresInteriores);
+  for (const muro of modelo.muros) validarRefsMuro(muro, modelo, errores, acoples);
 
   // Ambito de carga: el id de cualquier elemento sobre el que puede actuar una
   // carga en F1 (viga, pilar, nudo o pano). Se precomputa un Set para O(1).
+  // Los MUROS quedan deliberadamente FUERA (las cargas sobre muros — viento,
+  // empuje de tierras — no se soportan en este corte): una carga que apunte a un
+  // muro cae en CARGA_SOBRE_MURO (mensaje especifico, no el REF_AMBITO generico
+  // de "elemento que ya no existe", que mentiria: el muro SI existe).
   const ambitosValidos = new Set<string>();
   for (const v of modelo.vigas) ambitosValidos.add(v.id);
   for (const p of modelo.pilares) ambitosValidos.add(p.id);
   for (const n of modelo.nudos) ambitosValidos.add(n.id);
   for (const pano of modelo.panos) ambitosValidos.add(pano.id);
+  const idsMuros = new Set(modelo.muros.map((mu) => mu.id));
 
-  for (const c of modelo.cargas) validarRefsCarga(c, modelo, errores, ambitosValidos);
+  for (const c of modelo.cargas)
+    validarRefsCarga(c, modelo, errores, ambitosValidos, idsMuros);
 }
 
 // 2e. [AUDITORIA UX-VACIA] Obra vacia: sin NINGUN elemento estructural (pilares, vigas
@@ -723,7 +945,8 @@ function validarObraVacia(modelo: Modelo, errores: ErrorObra[]): void {
   if (
     modelo.pilares.length === 0 &&
     modelo.vigas.length === 0 &&
-    modelo.panos.length === 0
+    modelo.panos.length === 0 &&
+    modelo.muros.length === 0
   ) {
     errores.push({
       codigo: "OBRA_VACIA",
@@ -745,12 +968,14 @@ function validarSujecion(
   errores: ErrorObra[],
   acoples: ResultadoAcoples,
 ): void {
-  // Si no hay elementos estructurales (barras NI paños), no hay nada que sujetar (no es
-  // un error de sujecion: un modelo vacio es valido como punto de partida).
+  // Si no hay elementos estructurales (barras, paños NI muros), no hay nada que
+  // sujetar (no es un error de sujecion: un modelo vacio es valido como punto de
+  // partida).
   if (
     modelo.pilares.length === 0 &&
     modelo.vigas.length === 0 &&
-    modelo.panos.length === 0
+    modelo.panos.length === 0 &&
+    modelo.muros.length === 0
   ) {
     return;
   }
@@ -777,6 +1002,10 @@ function validarSujecion(
   // componentes debera recorrer las aristas nudo<->quad que la losa plana añade al grafo
   // (los quads conectan las cabezas de pilar a la losa), no solo nudo<->barra.
   const haySujecionPilar = modelo.pilares.some((p) => p.vinculacionExterior);
+  // [F3 muros] Un muro con base vinculada empotra su fila base al terreno (Paso 6e):
+  // sujeta la obra igual que el arranque de un pilar. Un muro SIN base no aporta
+  // sujecion global (su propia estabilidad la exige MURO_SIN_SUJECION aparte).
+  const haySujecionMuro = modelo.muros.some((mu) => mu.vinculacionExterior);
   const haySujecionPano = modelo.panos.some((pano) => {
     if (pano.tipo === "losa") {
       if (pano.bordeApoyo === "libre") return false;
@@ -808,13 +1037,13 @@ function validarSujecion(
     }
     return false;
   });
-  const haySujecion = haySujecionPilar || haySujecionPano;
+  const haySujecion = haySujecionPilar || haySujecionMuro || haySujecionPano;
   if (!haySujecion) {
     errores.push({
       codigo: "SIN_SUJECION",
       severidad: "error",
       mensaje:
-        "Ningún pilar tiene arranque ni conexión con el terreno: la estructura no está sujeta y no se puede calcular.",
+        "Ningún pilar ni muro tiene arranque ni conexión con el terreno: la estructura no está sujeta y no se puede calcular.",
       elementoTipo: "modelo",
     });
   }
@@ -1189,9 +1418,12 @@ function validarModalNumModos(modal: ContextoModal, errores: ErrorObra[]): void 
 // atrapa antes, en lenguaje de obra. Se lee `rho` via `materialAportaMasa` (A-dry,
 // throw-safe: una ref de material rota no aporta masa y ya la cazo REF_MATERIAL). BLOQUEA.
 function validarModalConMasa(modelo: Modelo, errores: ErrorObra[]): void {
+  // [F3 muros] Los muros tambien aportan masa: el glue fabrica masa lumped rho·t·area
+  // para TODO quad (`_agregar_masa_quads` es agnostico a la orientacion de la placa).
   const hayMasa =
     modelo.pilares.some((p) => materialAportaMasa(p.materialId)) ||
     modelo.vigas.some((v) => materialAportaMasa(v.materialId)) ||
+    modelo.muros.some((mu) => materialAportaMasa(mu.materialId)) ||
     modelo.panos.some(
       (p) =>
         (p.tipo === "losa" || p.tipo === "unidireccional") &&

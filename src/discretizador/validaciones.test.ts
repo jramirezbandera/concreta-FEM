@@ -1446,3 +1446,204 @@ describe("validaciones · forjado unidireccional (F3)", () => {
     expect(codigos(validarModelo(modeloUni()))).not.toContain("SIN_SUJECION");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Muros/pantallas (F3, muros): validarRefsMuro + barrido de gates (obra vacia,
+// sujecion, modal, nombres/ids, cargas). Un caso por codigo MURO_* nuevo.
+// ---------------------------------------------------------------------------
+describe("validarModelo · muros (F3)", () => {
+  // Muro valido por defecto: eje (0,10)-(4,10) — lejos del portico de la base — de
+  // p0 a p1, HA-25, base vinculada. Cada test lo clona y rompe UNA cosa.
+  function muro(extra?: Partial<Modelo["muros"][number]>): Modelo["muros"][number] {
+    return {
+      id: "mu1", nombre: "M1",
+      x1: 0, y1: 10, x2: 4, y2: 10,
+      plantaInicial: "p0", plantaFinal: "p1",
+      espesor: 0.3, materialId: "HA-25", tamMalla: 0.5,
+      vinculacionExterior: true,
+      ...extra,
+    };
+  }
+
+  it("un muro valido anclado no añade errores", () => {
+    const m = modeloValido();
+    m.muros = [muro()];
+    expect(validarModelo(m)).toEqual([]);
+  });
+
+  it("REF_MATERIAL: material del muro inexistente", () => {
+    const m = modeloValido();
+    m.muros = [muro({ materialId: "NO_EXISTE" })];
+    const e = validarModelo(m).find((x) => x.codigo === "REF_MATERIAL")!;
+    expect(e.elementoId).toBe("mu1");
+    expect(e.elementoTipo).toBe("muro");
+    sinJergaFEM(e);
+  });
+
+  it("REF_PLANTA: plantaFinal del muro rota", () => {
+    const m = modeloValido();
+    m.muros = [muro({ plantaFinal: "p-borrada" })];
+    const e = validarModelo(m).find(
+      (x) => x.codigo === "REF_PLANTA" && x.elementoId === "mu1",
+    )!;
+    expect(e.severidad).toBe("error");
+    sinJergaFEM(e);
+  });
+
+  it("MURO_PLANTAS: arranca y termina en la misma planta (sin desarrollo vertical)", () => {
+    const m = modeloValido();
+    m.muros = [muro({ plantaFinal: "p0" })];
+    const e = validarModelo(m).find((x) => x.codigo === "MURO_PLANTAS")!;
+    expect(e.elementoId).toBe("mu1");
+    expect(e.severidad).toBe("error");
+    sinJergaFEM(e);
+  });
+
+  it("MURO_DEGENERADO: extremos coincidentes en planta", () => {
+    const m = modeloValido();
+    m.muros = [muro({ x2: 0, y2: 10 })];
+    const e = validarModelo(m).find((x) => x.codigo === "MURO_DEGENERADO")!;
+    expect(e.elementoId).toBe("mu1");
+    sinJergaFEM(e);
+  });
+
+  it("MURO_NO_ALINEADO: eje diagonal", () => {
+    const m = modeloValido();
+    m.muros = [muro({ x2: 4, y2: 12 })];
+    const e = validarModelo(m).find((x) => x.codigo === "MURO_NO_ALINEADO")!;
+    expect(e.elementoId).toBe("mu1");
+    sinJergaFEM(e);
+  });
+
+  it("MURO_SIN_SUJECION: sin base vinculada y sin acople alguno", () => {
+    const m = modeloValido();
+    m.muros = [muro({ vinculacionExterior: false })];
+    const e = validarModelo(m).find((x) => x.codigo === "MURO_SIN_SUJECION")!;
+    expect(e.elementoId).toBe("mu1");
+    expect(e.severidad).toBe("error");
+    sinJergaFEM(e);
+  });
+
+  it("MURO_SIN_SUJECION: colgado SOLO de la viga de coronacion (puntos en una linea)", () => {
+    const m = modeloValido();
+    m.nudos.push({ id: "nA", x: 0, y: 10 }, { id: "nB", x: 4, y: 10 });
+    m.vigas.push({
+      id: "v-cor", nombre: "VCOR", plantaId: "p1", nudoI: "nA", nudoJ: "nB",
+      seccionId: SECCION_OK, materialId: MATERIAL_OK,
+      extremoI: "empotrado", extremoJ: "empotrado", tirante: false,
+    });
+    m.muros = [muro({ vinculacionExterior: false })];
+    // Toda la fila de coronacion acoplada, pero COLINEAL: pendulearia. BLOQUEA.
+    expect(codigos(validarModelo(m))).toContain("MURO_SIN_SUJECION");
+  });
+
+  it("sin base pero cosido en DOS niveles (coronacion + pilar en el eje): sujeto", () => {
+    const m = modeloValido();
+    m.nudos.push({ id: "nA", x: 0, y: 10 }, { id: "nB", x: 4, y: 10 });
+    m.vigas.push({
+      id: "v-cor", nombre: "VCOR", plantaId: "p1", nudoI: "nA", nudoJ: "nB",
+      seccionId: SECCION_OK, materialId: MATERIAL_OK,
+      extremoI: "empotrado", extremoJ: "empotrado", tirante: false,
+    });
+    // Pilar sobre el eje: sus N* de arranque (cota 0) y cabeza (cota 3) cosen el muro
+    // fuera de la linea de coronacion -> 3 puntos no colineales.
+    m.pilares.push({
+      id: "pil-eje", nombre: "PE", x: 0, y: 10,
+      plantaInicial: "p0", plantaFinal: "p1",
+      seccionId: SECCION_OK, materialId: MATERIAL_OK, angulo: 0,
+      vinculacionExterior: true, arranque: "empotrado",
+    });
+    m.muros = [muro({ vinculacionExterior: false })];
+    expect(codigos(validarModelo(m))).not.toContain("MURO_SIN_SUJECION");
+  });
+
+  it("CARGA_SOBRE_MURO: una carga con ambito muro bloquea con mensaje especifico (no REF_AMBITO)", () => {
+    const m = modeloValido();
+    m.muros = [muro()];
+    m.cargas.push({ id: "c-mu", tipo: "lineal", ambito: "mu1", valor: -5, hipotesisId: "h1" });
+    const errores = validarModelo(m);
+    const e = errores.find((x) => x.codigo === "CARGA_SOBRE_MURO")!;
+    expect(e.elementoId).toBe("c-mu");
+    expect(e.severidad).toBe("error");
+    sinJergaFEM(e);
+    // No se dobla con el generico: el muro existe.
+    expect(errores.filter((x) => x.codigo === "REF_AMBITO")).toEqual([]);
+  });
+
+  it("MURO_SIN_CORONACION: losa con borde sobre el eje sin viga -> aviso; con viga -> sin aviso", () => {
+    const m = modeloValido();
+    // Losa 4x3 con su borde inferior (y=10) sobre el eje del muro, en p1 (cota tope).
+    m.nudos.push(
+      { id: "nA", x: 0, y: 10 }, { id: "nB", x: 4, y: 10 },
+      { id: "nC", x: 4, y: 13 }, { id: "nD", x: 0, y: 13 },
+    );
+    m.panos = [{
+      id: "f1", nombre: "F1", tipo: "losa", plantaId: "p1",
+      perimetro: ["nA", "nB", "nC", "nD"],
+      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+    }];
+    m.muros = [muro()];
+    const sinViga = validarModelo(m);
+    const aviso = sinViga.find((x) => x.codigo === "MURO_SIN_CORONACION")!;
+    expect(aviso.severidad).toBe("aviso");
+    expect(aviso.elementoId).toBe("mu1");
+    sinJergaFEM(aviso);
+    // Con viga de coronacion colineal, el aviso desaparece (la losa descarga via viga).
+    m.vigas.push({
+      id: "v-cor", nombre: "VCOR", plantaId: "p1", nudoI: "nA", nudoJ: "nB",
+      seccionId: SECCION_OK, materialId: MATERIAL_OK,
+      extremoI: "empotrado", extremoJ: "empotrado", tirante: false,
+    });
+    expect(codigos(validarModelo(m))).not.toContain("MURO_SIN_CORONACION");
+  });
+
+  it("losa a OTRA cota o lejos del eje: sin aviso de coronacion", () => {
+    const m = modeloValido();
+    m.nudos.push(
+      { id: "nA", x: 20, y: 20 }, { id: "nB", x: 24, y: 20 },
+      { id: "nC", x: 24, y: 23 }, { id: "nD", x: 20, y: 23 },
+    );
+    m.panos = [{
+      id: "f1", nombre: "F1", tipo: "losa", plantaId: "p1",
+      perimetro: ["nA", "nB", "nC", "nD"],
+      espesor: 0.2, materialId: "HA-25", tamMalla: 1, bordeApoyo: "simple",
+    }];
+    m.muros = [muro()];
+    expect(codigos(validarModelo(m))).not.toContain("MURO_SIN_CORONACION");
+  });
+
+  it("obra con SOLO un muro anclado: ni OBRA_VACIA ni SIN_SUJECION", () => {
+    const m = modeloValido();
+    m.pilares = [];
+    m.vigas = [];
+    m.cargas = []; // la carga de la base apuntaba a v1
+    m.muros = [muro()];
+    const errores = validarModelo(m).filter((e) => e.severidad === "error");
+    expect(errores).toEqual([]);
+  });
+
+  it("el muro anclado cuenta como sujecion GLOBAL (pilar sin vinculacion)", () => {
+    const m = modeloValido();
+    m.pilares[0].vinculacionExterior = false;
+    m.muros = [muro()];
+    expect(codigos(validarModelo(m))).not.toContain("SIN_SUJECION");
+  });
+
+  it("NOMBRE_DUP e ID_DUP tambien cubren muros", () => {
+    const m = modeloValido();
+    m.muros = [muro(), muro({ id: "mu2" })]; // mismo nombre "M1"
+    expect(codigos(validarModelo(m))).toContain("NOMBRE_DUP");
+    const m2 = modeloValido();
+    m2.muros = [muro(), muro({ nombre: "M2" })]; // mismo id "mu1"
+    expect(codigos(validarModelo(m2))).toContain("ID_DUP");
+  });
+
+  it("modal: un muro de hormigon aporta masa (sin MODAL_SIN_MASA)", () => {
+    const m = modeloValido();
+    m.pilares = [];
+    m.vigas = [];
+    m.cargas = [];
+    m.muros = [muro()];
+    expect(codigos(validarModelo(m, { numModos: 3 }))).not.toContain("MODAL_SIN_MASA");
+  });
+});
