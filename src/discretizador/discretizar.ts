@@ -152,7 +152,9 @@ type Punto = { clave: string; coord: [number, number, number] };
 
 // Mapea EntradaMaterial del catalogo a MaterialFEM. `rho <- peso`; `fy` solo en
 // acero (hormigon no lo lleva). name = id para que el glue Python lo case directo.
-function materialFEM(id: string): MaterialFEM | undefined {
+// EXPORTADA: prepararModeloCR la reusa para añadir el material de los muros a la
+// base del CR (un HA de muro puede no estar referenciado por ninguna barra).
+export function materialFEM(id: string): MaterialFEM | undefined {
   const m = getMaterial(id);
   if (m === undefined) return undefined;
   const base: MaterialFEM = { name: id, E: m.E, G: m.G, nu: m.nu, rho: m.peso };
@@ -671,8 +673,9 @@ function acumularApoyoUni(
 // haber dos entradas de `supports` para el mismo nudo (la ultima pisaria la primera).
 // Una entrada existente se OR-mergea IN PLACE (conserva su posicion: regresion byte a
 // byte de las entradas base/malla); un nudo nuevo se anade DETRAS, ordenado por nombre
-// (segregado y determinista). La consumen el Paso 6d (viguetas) y el Paso 6e (muros).
-function fusionarApoyosEnLista(
+// (segregado y determinista). La consumen el Paso 6d (viguetas), el Paso 6e (muros)
+// y prepararModeloCR (apoyos de base de muro sobre la base del CR) — EXPORTADA.
+export function fusionarApoyosEnLista(
   lista: ApoyoFEM[],
   porNodoNuevos: ReadonlyMap<string, ApoyoFEM>,
 ): ApoyoFEM[] {

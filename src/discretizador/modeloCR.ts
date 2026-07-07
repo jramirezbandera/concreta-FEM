@@ -25,9 +25,11 @@
 
 import type { Modelo } from "../dominio";
 import { plantaPorId } from "../dominio";
-import type { ModeloFEM } from "./contratoFEM";
+import type { ModeloFEM, MaterialFEM } from "./contratoFEM";
 import { ModeloFEMSchema } from "./contratoFEM";
-import { construirBaseFEM } from "./discretizar";
+import { construirBaseFEM, fusionarApoyosEnLista, materialFEM } from "./discretizar";
+import { calcularAcoples } from "./acople";
+import { emitirMuros } from "./muros";
 import { validarModelo, type ErrorObra } from "./validaciones";
 
 // Informacion por planta para el diafragma rigido del glue (F1.2). Coordenadas FEM
@@ -52,28 +54,44 @@ export type ResultadoPrepararCR =
   | { ok: false; errores: ErrorObra[] };
 
 export function prepararModeloCR(modelo: Modelo): ResultadoPrepararCR {
+  // Pre-pase de acoples: el CR necesita las subdivisiones de viga que introducen los
+  // MUROS (subdivisionesVigaMuro) y sus mallas ya computadas (porMuro). Se computa
+  // UNA vez y se comparte con las validaciones (mismo patron [1A] que discretizar).
+  const acoples = calcularAcoples(modelo);
+
   // 1) Validacion de RIGIDEZ (no de cargas): referencias rotas, sin sujecion, nombres
   // duplicados, viga degenerada. `validarModelo` (sin contexto modal) NO incluye la
   // traduccion de cargas (esa la hace `discretizar` en su Paso 6), de modo que una
   // carga superficial/no aplicable NO bloquea el CR. Solo los "error" bloquean; los
   // "aviso" (hipotesis vacia, nudo flotante, concomitancia) son irrelevantes para el CR.
-  const bloqueantes = validarModelo(modelo).filter((e) => e.severidad === "error");
+  const bloqueantes = validarModelo(modelo, undefined, acoples).filter(
+    (e) => e.severidad === "error",
+  );
   if (bloqueantes.length > 0) {
     return { ok: false, errores: bloqueantes };
   }
 
   // [OV-3] Sujecion del CR contra SU PROPIA base: esta base NO lleva la malla de
-  // paños (decision 3A), asi que los apoyos de borde de una losa NO existen aqui.
+  // paños (decision 3A intacta: el diafragma se IMPONE, la placa horizontal no aporta
+  // al CR), asi que los apoyos de borde de una losa NO existen aqui. Los MUROS en
+  // cambio SI entran (F3-muros: su membrana ES la rigidez lateral que el CR mide), y
+  // su base vinculada ancla la base del CR igual que el arranque de un pilar.
   // `validarModelo` puede aceptar la losa como sujecion del modelo (valido para el
   // calculo normal, donde la malla SI se emite), pero si esa fuera la UNICA
   // sujecion, la base del CR seria un mecanismo y el resultado saldria "no
   // determinable" (guarda cond>1e12) sin explicacion — un null opaco. Se exige lo
-  // que la base SI puede cumplir: al menos un pilar anclado al terreno. (Un modelo
+  // que la base SI puede cumplir: un pilar O un muro anclados al terreno. (Un modelo
   // VACIO no entra aqui: sin elementos no hay CR que medir y plantasInfo sale
   // vacia, comportamiento previo intacto.)
   const hayElementos =
-    modelo.pilares.length > 0 || modelo.vigas.length > 0 || modelo.panos.length > 0;
-  if (hayElementos && !modelo.pilares.some((p) => p.vinculacionExterior)) {
+    modelo.pilares.length > 0 ||
+    modelo.vigas.length > 0 ||
+    modelo.panos.length > 0 ||
+    modelo.muros.length > 0;
+  const hayAnclaje =
+    modelo.pilares.some((p) => p.vinculacionExterior) ||
+    modelo.muros.some((mu) => mu.vinculacionExterior);
+  if (hayElementos && !hayAnclaje) {
     return {
       ok: false,
       errores: [
@@ -81,7 +99,7 @@ export function prepararModeloCR(modelo: Modelo): ResultadoPrepararCR {
           codigo: "CR_SIN_PILARES",
           severidad: "error",
           mensaje:
-            "El centro de rigidez necesita al menos un pilar anclado al terreno; el apoyo del borde de una losa no basta para medirlo.",
+            "El centro de rigidez necesita al menos un pilar o un muro anclados al terreno; el apoyo del borde de una losa no basta para medirlo.",
           elementoTipo: "modelo",
         },
       ],
@@ -90,52 +108,91 @@ export function prepararModeloCR(modelo: Modelo): ResultadoPrepararCR {
 
   // 2) Base FEM (geometria + rigidez + trazabilidad), SIN cargas. Misma factorizacion
   // que usa `discretizar`: no se duplica logica FEM. Tras validar, sus throw internos
-  // son bugs internos, no errores de obra.
-  const base = construirBaseFEM(modelo);
+  // son bugs internos, no errores de obra. Las vigas se subdividen SOLO en los puntos
+  // que introducen los MUROS (subdivisionesVigaMuro, mapa solo-muro): sin muros es un
+  // mapa vacio y la base del CR es byte-identica a antes (regresion, 3A).
+  const base = construirBaseFEM(modelo, {
+    subdivisionesViga: acoples.subdivisionesVigaMuro,
+  });
+
+  // 2b) MUROS en la base del CR (F3-muros, la razon de ser del corte): la MISMA
+  // emision que usa el Paso 6e de discretizar (fuente unica emitirMuros): nudos,
+  // quads con remap por celda y apoyos de fila base. El glue `calcular_cr` NO cambia
+  // (build_model ya monta quads; la fusion de apoyos del diafragma preserva la base
+  // del muro; la deteccion de cimentacion DX∧DZ clasifica bien su fila base). El peso
+  // propio (pesosPropios) se IGNORA: el CR no lleva cargas.
+  const muros = emitirMuros(modelo, acoples, base.nombrePorClave);
+  const materialIdsBase = new Set(base.materials.map((m) => m.name));
+  const materialesMuroNuevos: MaterialFEM[] = [...muros.materialIds]
+    .filter((id) => !materialIdsBase.has(id))
+    .sort()
+    .map((id) => {
+      const m = materialFEM(id);
+      if (m === undefined) throw new Error(`Material de muro inexistente tras validar: ${id}`);
+      return m;
+    });
 
   // ModeloFEM BASE: solo geometria + rigidez. node_loads/dist_loads/pt_loads vacios
   // (el CR no usa cargas del usuario; las fabrica el glue). `combos` vacio (no hay
   // hipotesis que combinar; el glue define sus propios combos por planta). `analysis`
   // es indiferente para el CR (el glue tiene su rutina `calcular_cr`), se fija a un
-  // valor benigno que cumple el contrato.
+  // valor benigno que cumple el contrato. Sin muros, cada rama toma el array base
+  // intacto y NO se emite la clave `quads` (regresion byte a byte).
   const modeloFEM: ModeloFEM = {
     units: "kN-m",
-    nodes: base.nodes,
-    materials: base.materials,
+    nodes: muros.nodes.length > 0 ? [...base.nodes, ...muros.nodes] : base.nodes,
+    materials:
+      materialesMuroNuevos.length > 0
+        ? [...base.materials, ...materialesMuroNuevos]
+        : base.materials,
     sections: base.sections,
     members: base.members,
-    supports: base.supports,
+    supports: fusionarApoyosEnLista(base.supports, muros.supportsPorNodo),
     node_loads: [],
     dist_loads: [],
     pt_loads: [],
     combos: [],
     analysis: { type: "linear", check_statics: false },
   };
+  if (muros.quads.length > 0) {
+    modeloFEM.quads = muros.quads;
+  }
 
-  // 3) plantasInfo: una entrada por planta CON nudos FEM (via nodoFEMAPlanta). Una
-  // planta sin nudos se OMITE (no es error: una planta vacia no aporta diafragma). El
-  // maestro es el centroide aritmetico de (X,Z) de sus nudos, a la cota (Y) de la
-  // planta. Orden determinista por plantaId.
+  // 3) plantasInfo: una entrada por planta CON nudos FEM (via nodoFEMAPlanta) ∪ los
+  // nudos de MURO de la fila de su cota (nodosMuroPorPlanta: el diafragma debe
+  // arrastrar tambien el muro en su nivel; sus nudos intermedios quedan libres y la
+  // rigidez de membrana se condensa de forma natural). Una planta sin nudos se OMITE
+  // (no es error: una planta vacia no aporta diafragma). El maestro es el centroide
+  // aritmetico de (X,Z) de la union, a la cota (Y) de la planta. Orden determinista
+  // por plantaId; dedup por Set (un nudo remapeado puede venir por ambas fuentes).
   const coordPorNombre = new Map<string, { x: number; y: number; z: number }>(
-    base.nodes.map((n) => [n.name, { x: n.x, y: n.y, z: n.z }]),
+    modeloFEM.nodes.map((n) => [n.name, { x: n.x, y: n.y, z: n.z }]),
   );
-  // Agrupa los nudos FEM por planta (nodoFEMAPlanta: nombre -> plantaId).
-  const nodosPorPlanta = new Map<string, string[]>();
-  for (const [nombre, plantaId] of Object.entries(base.trazabilidad.nodoFEMAPlanta)) {
-    let lista = nodosPorPlanta.get(plantaId);
-    if (lista === undefined) {
-      lista = [];
-      nodosPorPlanta.set(plantaId, lista);
+  // Agrupa los nudos FEM por planta (nodoFEMAPlanta: nombre -> plantaId) y une los
+  // del muro por planta.
+  const nodosPorPlanta = new Map<string, Set<string>>();
+  const anotar = (plantaId: string, nombre: string): void => {
+    let set = nodosPorPlanta.get(plantaId);
+    if (set === undefined) {
+      set = new Set();
+      nodosPorPlanta.set(plantaId, set);
     }
-    lista.push(nombre);
+    set.add(nombre);
+  };
+  for (const [nombre, plantaId] of Object.entries(base.trazabilidad.nodoFEMAPlanta)) {
+    anotar(plantaId, nombre);
+  }
+  for (const [plantaId, nombres] of Object.entries(muros.nodosMuroPorPlanta)) {
+    for (const nombre of nombres) anotar(plantaId, nombre);
   }
 
   const plantasInfo: PlantaInfoCR[] = [];
   // Orden determinista por plantaId.
   const plantaIds = [...nodosPorPlanta.keys()].sort();
   for (const plantaId of plantaIds) {
-    // Nodos ordenados por su nombre FEM (N1<N2<... numerico-lexico estable); el orden
-    // no afecta al centroide pero fija una salida byte a byte estable.
+    // Nodos ordenados por su nombre FEM (N1<N2<... numerico-lexico estable; los MQ*
+    // de muro caen al respaldo lexicografico, tambien estable); el orden no afecta
+    // al centroide pero fija una salida byte a byte estable.
     const nodos = [...nodosPorPlanta.get(plantaId)!].sort(ordenNodoFEM);
     const planta = plantaPorId(modelo, plantaId);
     // La cota (Y FEM) del maestro = cota de la planta. Si la planta no se resolviera
