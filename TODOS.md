@@ -879,17 +879,53 @@ Deuda técnica diferida con contexto. Cada item nace de una decisión explícita
 
 ---
 
-## T-f3-muros · Muros y pantallas (placas verticales)
+## T-f3-muros · Muros y pantallas (placas verticales) — RESUELTO (F3, corte muros)
 
-- **Qué:** F3 (epic) incluye muros/pantallas como elementos de superficie verticales (rigidez lateral).
-  El corte 1 solo hizo la losa horizontal. Los muros usan el mismo motor de quads pero en vertical y se
-  cruzan con el centro de rigidez (aportan rigidez lateral real).
-- **Por qué:** los muros cambian el reparto lateral y el CR; encadenarlos con la losa habría ensanchado
-  demasiado el corte. El motor de placa (quads) ya está, así que el muro reutiliza F1.3.
-- **Cómo retomar:** `Muro` (hoy stub) → Capa 1 análogo a `Pano` pero vertical; discretizar a quads en el
-  plano del muro; integrar con el CR (cruza con `T-cr-diafragma-pano`).
-- **Depende de / bloquea:** corte 1 (motor de placa). Se cruza con F2-CR. **Coste:** CC ~1-2 días.
-- **Origen:** Plan F3 (epic; NOT-in-scope del corte 1).
+- **Estado:** RESUELTO. El muro/pantalla se calcula de punta a punta: se introduce por su eje (menú
+  Muros de Entrada de vigas, dos clics con orto forzado), se malla en quads en su plano VERTICAL,
+  rigidiza lateralmente el edificio (mueve el **centro de rigidez** hacia él — el hito del corte),
+  aporta masa al modal y peso propio al estático. Verificado con motor real (voladizo vs Timoshenko,
+  membrana, CR con pantalla excéntrica, ΣV, peso propio nodal).
+- **Cómo se hizo (para cortes futuros):**
+  - Spike F0 (`src/solver/spikes/muro_membrana_spike.md`): el `Quad3D` de PyNite 2.0.2 tiene membrana
+    (plane-stress) además de flexión DKMQ → funciona como pantalla; drilling estabilizado por PyNite
+    (sin singularidad con base 6 GDL); `q.membrane()` = tensión kN/m² (Sy = vertical con el orden de
+    nudos del mallado); el CR con quads converge y se va al muro.
+  - `Muro` Capa 1 = segmento del eje `{x1,y1,x2,y2}` (coords crudas, espejo Pilar) + tramo
+    plantaInicial/Final + espesor/material/tamMalla/vinculacionExterior. Esquema v5→v6.
+  - `malladoMuro.ts` (plano vertical, reusa `planificarRejilla`), rama muro en `acople.ts` (3 fuentes:
+    viga colineal por fila de cota, pilar sobre el eje, extremo de viga que muere en el eje), Paso 6e
+    `emitirMuros.ts` (remap por celda + apoyos base 6 GDL + peso propio NODAL — nunca presión).
+  - **CR (revisión de la decisión 3A):** la base del CR sigue SIN malla de losa (diafragma impuesto)
+    pero SÍ lleva la de MUROS (su membrana ES la rigidez lateral que el CR mide) vía
+    `subdivisionesVigaMuro` + `emitirMuros` compartido. Glue `calcular_cr` sin cambios.
+  - Membrana [Sx,Sy,Txy] emitida en el contrato de resultados (sin UI de consulta aún:
+    `T-muro-isovalores`).
+- **Origen:** Plan F3 (epic). Cerrado en la rama de muros (commits `45b2cc3`..; goldens
+  muro-voladizo/muro-discretizado/muro-capa2/cr-muro con motor real).
+
+### Deudas hijas del corte de muros
+
+- **T-muro-cargas-laterales:** viento / empuje de tierras sobre el muro. Hoy la Capa 1 no tiene tipo de
+  carga lateral; el valor del muro se demuestra en CR/modal/deformada/P-Δ. Una carga sobre muro se
+  bloquea con `CARGA_SOBRE_MURO`.
+- **T-muro-losa-compatibilidad:** acople DIRECTO malla-losa ↔ malla-muro (hoy la losa descarga en el
+  muro a través de una viga de coronación coincidente; red = aviso `MURO_SIN_CORONACION`).
+- **T-muro-pilar-embebido:** subdividir el pilar coincidente a las alturas de la malla del muro (acción
+  compuesta pilar-de-borde + pantalla). Hoy se unen solo en cotas de planta (conservador).
+- **T-muro-isovalores:** mapa de tensiones de membrana sobre el plano vertical del muro (el dato ya
+  viaja en `quads[].membrane`; falta la UI: overlay/cámara sobre plano vertical).
+- **T-muro-diagonal:** muros no alineados a los ejes (hoy `MURO_NO_ALINEADO` bloquea el diagonal).
+- **T-muro-huecos:** puertas/ventanas en pantallas (hueco en la malla).
+- **T-muro-arranque-articulado-elastico:** arranque articulado/elástico del muro (hoy solo empotrado a
+  cimentación vía `vinculacionExterior`) + muros de fábrica (material). Sin campo `arranque` (YAGNI).
+- **T-muro-reaccion-agregada:** reacción resultante POR muro en la TablaReacciones (hoy sus apoyos de
+  base van a `apoyosDeMalla`, agregados/ocultos como los de losa).
+- **T-muro-malla-desalineada:** aviso cuando dos muros que comparten arista vertical llevan tamMalla
+  distinto (solo se funden en cotas de planta, no en filas intermedias).
+- **T-cr-una-factorizacion** (existente, agravada): el CR reconstruye+analiza por campo × planta; con
+  muros (cientos de quads) el coste crece — el spike lo midió ~lineal. Por eso tamMalla de muro
+  default 0.5 m.
 
 ---
 
