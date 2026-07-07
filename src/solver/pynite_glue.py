@@ -895,6 +895,7 @@ def serialize_results(m, combos, n_points, tipo_analisis, check_statics):
         for c in combos:
             momentos = []
             cortantes = []
+            membranas = []
             for xi, eta in _ESQUINAS_NAT:
                 # q.moment(local=True) -> np.array([Mx,My,Mxy]) de forma (3,1) (cada
                 # componente es un array columna en el codigo de Quad3D 2.0.2); q.shear
@@ -902,9 +903,24 @@ def serialize_results(m, combos, n_points, tipo_analisis, check_statics):
                 # DeprecationWarning de float(array_1d) (numpy 1.25+).
                 mom = q.moment(xi, eta, local=True, combo_name=c).flatten()
                 sh = q.shear(xi, eta, local=True, combo_name=c).flatten()
+                # q.membrane(local=True) -> [Sx, Sy, Txy] de forma (3,1): TENSIONES de
+                # membrana (en plano) en kN/m2 — la Cm de Quad3D es tension plana SIN
+                # espesor (verificado en la fuente del wheel 2.0.2). Es el resultado que
+                # da sentido al MURO/pantalla (F3, muros): con el orden canonico de
+                # nudos del mallado vertical (col=s, fila=cota; spike
+                # muro_membrana_spike.md), y_local = +Y GLOBAL => Sy = tension normal
+                # VERTICAL del muro (compresion negativa). Para una LOSA en flexion
+                # gravitatoria pura la membrana es ~0 (viaja igual: 12 floats/quad/combo,
+                # coste despreciable y evita bifurcar el contrato por tipo de placa).
+                mem = q.membrane(xi, eta, local=True, combo_name=c).flatten()
                 momentos.append([float(mom[0]), float(mom[1]), float(mom[2])])
                 cortantes.append([float(sh[0]), float(sh[1])])
-            por_combo[c] = {"moments": momentos, "shears": cortantes}
+                membranas.append([float(mem[0]), float(mem[1]), float(mem[2])])
+            por_combo[c] = {
+                "moments": momentos,
+                "shears": cortantes,
+                "membrane": membranas,
+            }
         quads[name] = por_combo
 
     resultado = {

@@ -141,9 +141,19 @@ export type ResultadoMiembro = z.infer<typeof ResultadoMiembroSchema>;
 // de los nudos de malla), igual que cualquier desplazamiento de nudo.
 const MomentosEsquinaSchema = z.tuple([numFinito, numFinito, numFinito]); // [Mx,My,Mxy] kN·m/m
 const CortantesEsquinaSchema = z.tuple([numFinito, numFinito]); // [Qx,Qy] kN/m
+// [F3 muros] Tensiones de MEMBRANA (en plano) por esquina: [Sx, Sy, Txy] en kN/m²
+// (TENSION, no fuerza por unidad de ancho: la Cm de Quad3D es tension plana SIN
+// espesor — verificado en la fuente del wheel y pinado por el golden del muro
+// voladizo: Sy(base) ≈ ±6M/(t·L²)). Es el resultado con el que se consulta una
+// PANTALLA (Sy = tension normal VERTICAL con el orden canonico del mallado de muro).
+const MembranaEsquinaSchema = z.tuple([numFinito, numFinito, numFinito]); // [Sx,Sy,Txy] kN/m²
 export const EstadoQuadComboSchema = z.object({
   moments: z.array(MomentosEsquinaSchema).length(4), // 4 esquinas, orden i,j,m,n
   shears: z.array(CortantesEsquinaSchema).length(4),
+  // OPCIONAL (aditivo): el glue lo emite SIEMPRE desde F3-muros, pero los fixtures
+  // de tests previos construyen EstadoQuadCombo a mano sin esta clave — no se rompen.
+  // Consumidores: `membrane ?? undefined` (sin UI de consulta aun: T-muro-isovalores).
+  membrane: z.array(MembranaEsquinaSchema).length(4).optional(),
 });
 export type EstadoQuadCombo = z.infer<typeof EstadoQuadComboSchema>;
 // Resultados de un quad indexados por nombre de combinacion (igual que barras/nodos).

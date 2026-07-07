@@ -188,6 +188,46 @@ describe("golden muro voladizo Capa B (motor real PyNite)", () => {
   );
 
   it(
+    "B5) membrana [Sx,Sy,Txy]: TENSION kN/m² con Sy vertical — Sy(esquinas base) ≈ ±6M/(t·L²), flexion pura sin momentos de placa",
+    () => {
+      if (!arranque || !arranque.ok) return;
+      const L = 1.5;
+      const H = 6.0;
+      const { fem, nx } = modeloFEMMuroVoladizo({ L, H, h: 0.25 });
+      const res = arranque.motor.calcular(fem);
+      const quads = res.quads ?? {};
+      // Referencia de viga: tension de borde en la base, M = P·H.
+      const syRef = (6 * P_LATERAL * H) / (ESPESOR * L ** 2);
+      // Esquina i (xi,eta=-1,-1) del quad inferior-izquierdo = esquina de base s=0;
+      // esquina j (1,-1) del inferior-derecho = s=L. membrane = [[Sx,Sy,Txy] x4 i,j,m,n].
+      const mem0 = quads[`Q_0_0`]["LAT"].membrane;
+      const memL = quads[`Q_${nx - 1}_0`]["LAT"].membrane;
+      expect(mem0).toBeDefined();
+      expect(memL).toBeDefined();
+      const sy0 = mem0![0][1]; // esquina i, componente Sy
+      const syL = memL![1][1]; // esquina j, componente Sy
+      // Signos opuestos (traccion en s=0 con carga +X, spike P2b) y magnitud ≈ ref
+      // (la esquina empotrada concentra ~+5%; banda [0.9, 1.25] pinada del spike).
+      expect(sy0).toBeGreaterThan(0);
+      expect(syL).toBeLessThan(0);
+      expect(Math.abs(sy0) / syRef).toBeGreaterThan(0.9);
+      expect(Math.abs(sy0) / syRef).toBeLessThan(1.25);
+      expect(Math.abs(syL) / syRef).toBeGreaterThan(0.9);
+      expect(Math.abs(syL) / syRef).toBeLessThan(1.25);
+      // Flexion EN PLANO pura: los momentos de PLACA (fuera de plano) son ~0 — el
+      // muro trabaja como membrana, no como losa.
+      let maxMomento = 0;
+      for (const q of Object.values(quads)) {
+        for (const esquina of q["LAT"].moments) {
+          for (const v of esquina) maxMomento = Math.max(maxMomento, Math.abs(v));
+        }
+      }
+      expect(maxMomento).toBeLessThan(1e-6 * syRef);
+    },
+    120_000,
+  );
+
+  it(
     "B3+B4) estabilidad y equilibrio: sin reacciones parasitas (drilling MZ, fuera de plano FZ) y SumaFX = -P",
     () => {
       if (!arranque || !arranque.ok) return;
