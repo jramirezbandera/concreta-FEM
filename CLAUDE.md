@@ -49,5 +49,10 @@
 
 ## Estado
 - **2026-10-03:** repo reiniciado con la investigación.
-- **Siguiente paso:** el spike E0 (S7). Antes hay que instalar Rust (`rustup`, el target `wasm32-unknown-unknown`, `wasm-bindgen-cli` y `wasm-opt`). En esta máquina no hay MSVC Build Tools: o se usa el toolchain `x86_64-pc-windows-gnu`, o se instalan las Build Tools.
+- **2026-10-03:** Rust instalado y la cadena probada de extremo a extremo (crate → `.wasm` → `wasm-bindgen` → `wasm-opt` → bun):
+  - Rust 1.99.0, toolchain `stable-x86_64-pc-windows-msvc` con el target `wasm32-unknown-unknown`, sobre Visual Studio Build Tools 2026 (carga C++).
+  - `wasm-bindgen-cli` 0.2.129: tiene que coincidir con la versión del crate `wasm-bindgen` del `Cargo.lock`.
+  - `wasm-opt` 133 (binaryen), en `%USERPROFILE%\.local\binaryen-version_133\bin`. Necesita `--enable-bulk-memory --enable-nontrapping-float-to-int`, porque rustc ya emite esas extensiones.
+  - Se descartó el toolchain `x86_64-pc-windows-gnu`: al `dlltool` que trae le falta el ensamblador, y eso rompe `windows-sys` y `getrandom` en el host.
+- **Siguiente paso:** el spike E0 (S7).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
