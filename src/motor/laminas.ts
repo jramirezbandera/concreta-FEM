@@ -142,6 +142,8 @@ const vec = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3 && v.e
 /** Coordenadas naturales de los nudos. */
 const XI = [-1, 1, 1, -1];
 const ETA = [-1, -1, 1, 1];
+/** Nudos de la lámina respecto al centro del modelo (búfer). */
+const XR = new Float64Array(12);
 
 /**
  * Punto global → (x, y) locales, distancia al plano y si está dentro del contorno (con la
@@ -222,7 +224,6 @@ export function cargasDeLaminasDelCaso(
     const ids = [idCaso, la.id];
     const { R } = pl;
     const g = (v: Vec3): [number, number, number] => (c.ejes === "global" ? [v[0], v[1], v[2]] : aGlobal(R, v));
-    const nodo = (a: number) => [xyz[3 * la.nudos[a]!]! - C[0], xyz[3 * la.nudos[a]! + 1]! - C[1], xyz[3 * la.nudos[a]! + 2]! - C[2]];
     f.fill(0);
     if (c.tipo === "superficie") {
       const porNudo = Array.isArray(c.q[0]);
@@ -244,23 +245,31 @@ export function cargasDeLaminasDelCaso(
       // Resultante, en forma cerrada: ∫ Nₐ dA = j0 + (j1·ξₐ + j2·ηₐ)/3 y
       // ∫ Nₐ·N_b dA = [j0·Iₐᵦ(ξ)·Iₐᵦ(η) + j1·Jₐᵦ(ξ)·Iₐᵦ(η) + j2·Iₐᵦ(ξ)·Jₐᵦ(η)]/16, con
       // Iₐᵦ(ξ) = ∫(1 + ξₐξ)(1 + ξᵦξ) dξ = 2 + 2ξₐξᵦ/3 y Jₐᵦ(ξ) = ∫ ξ(1 + ξₐξ)(1 + ξᵦξ) dξ = 2(ξₐ + ξᵦ)/3
+      for (let b = 0; b < 4; b++) for (let k = 0; k < 3; k++) XR[3 * b + k] = xyz[3 * la.nudos[b]! + k]! - C[k]!;
       const F = [0, 0, 0];
       const M = [0, 0, 0];
       let brazo = 0;
       let qmax = 0;
       for (let a = 0; a < 4; a++) {
         const Ia = j0 + (j1 * XI[a]! + j2 * ETA[a]!) / 3;
-        for (let k = 0; k < 3; k++) F[k] += qg[a]![k]! * Ia;
-        qmax = Math.max(qmax, norma(qg[a]!));
-        brazo = Math.max(brazo, norma(nodo(a)));
+        const [qx, qy, qz] = qg[a]!;
+        F[0] += qx * Ia;
+        F[1] += qy * Ia;
+        F[2] += qz * Ia;
+        qmax = Math.max(qmax, Math.hypot(qx, qy, qz));
+        brazo = Math.max(brazo, Math.hypot(XR[3 * a]!, XR[3 * a + 1]!, XR[3 * a + 2]!));
         for (let b = 0; b < 4; b++) {
           const Ix = 2 + (2 * XI[a]! * XI[b]!) / 3;
           const Iy = 2 + (2 * ETA[a]! * ETA[b]!) / 3;
           const Jx = (2 * (XI[a]! + XI[b]!)) / 3;
           const Jy = (2 * (ETA[a]! + ETA[b]!)) / 3;
           const Iab = (j0 * Ix * Iy + j1 * Jx * Iy + j2 * Ix * Jy) / 16;
-          const m = cruz(nodo(b), qg[a]!);
-          for (let k = 0; k < 3; k++) M[k] += m[k]! * Iab;
+          const x = XR[3 * b]!;
+          const y = XR[3 * b + 1]!;
+          const z = XR[3 * b + 2]!;
+          M[0] += (y * qz - z * qy) * Iab;
+          M[1] += (z * qx - x * qz) * Iab;
+          M[2] += (x * qy - y * qx) * Iab;
         }
       }
       sumarResultante(F, M, qmax * pl.area, brazo * qmax * pl.area);
