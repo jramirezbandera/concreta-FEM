@@ -20,6 +20,8 @@ export interface OpcionesMalla {
   lamina?: OpcionesLamina | ((i: number, j: number) => OpcionesLamina);
   /** Prefijo de los ids. */
   prefijo?: string;
+  /** Nudo ya existente que ocupa la posición (i, j) (un borde compartido con otra malla). */
+  existente?: (i: number, j: number) => number | undefined;
 }
 
 export interface Malla {
@@ -40,7 +42,7 @@ export function mallaRectangular(m: Constructor, o: OpcionesMalla): Malla {
   const nudos: number[][] = [];
   for (let i = 0; i <= o.nx; i++) {
     nudos.push([]);
-    for (let j = 0; j <= o.ny; j++) nudos[i]!.push(m.nudo(...punto((i * o.a) / o.nx, (j * o.b) / o.ny), `${p}N${i}-${j}`));
+    for (let j = 0; j <= o.ny; j++) nudos[i]!.push(o.existente?.(i, j) ?? m.nudo(...punto((i * o.a) / o.nx, (j * o.b) / o.ny), `${p}N${i}-${j}`));
   }
   const laminas: number[][] = [];
   for (let i = 0; i < o.nx; i++) {

@@ -5,7 +5,8 @@
  * pruebas metamórficas, la referencia congelada y el banco de tamaño (D9, H52).
  * No es código del motor ni un compilador: sólo fabrica modelos analíticos coherentes.
  */
-import type { CargaBarra, ModeloAnalitico } from "../motor/modelo.ts";
+import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
+import type { CargaBarra, CargaLamina, ModeloAnalitico } from "../motor/modelo.ts";
 import { carga, Constructor, seccionRectangular, seccionRectangularTimoshenko } from "./constructor.ts";
 
 export interface OpcionesEdificio {
@@ -36,7 +37,18 @@ export interface OpcionesEdificio {
    * rótulas (My en j) en las vigas de la fachada norte y cargas de barra en G y Vx.
    */
   barrasE2?: boolean;
+  /**
+   * Láminas de E3: los vanos alternos de la losa son reticular (multiplicadores de RETICULAR y eje 1
+   * de los nervios girado respecto a X) con ábacos macizos alrededor de los pilares; la gravitatoria
+   * va como carga de superficie (en vez de nodal), con una tabiquería como carga de línea y una
+   * puntual por planta; el viento en Y como presión sobre el muro; en Vx, una sobrecarga variable
+   * por nudos; en T, una puntual con momento dentro de un elemento.
+   */
+  laminasE3?: boolean;
 }
+
+/** Multiplicadores de un reticular (H46, D3): flexión ~0,3, torsión, membrana y cortante reducidos. */
+export const RETICULAR: MultiplicadoresLamina = { f11: 0.55, f22: 0.4, f12: 0.25, m11: 0.32, m22: 0.27, m12: 0.12, v13: 0.2, v23: 0.15 };
 
 export interface Edificio {
   modelo: ModeloAnalitico;
@@ -63,6 +75,7 @@ export function edificio(o: OpcionesEdificio): Edificio {
   const viga = o.barrasE2 ? seccionRectangularTimoshenko(0.3, 0.6, E, nu) : seccionRectangular(0.3, 0.6, E, nu);
   const cargasBarra: CargaBarra[][] = [[], [], [], []]; // G, Vx, Vy, T
   const mat = { E, nu, t };
+  const cargasLamina: CargaLamina[][] = [[], [], [], []]; // G, Vx, Vy, T
 
   // Base
   const pies: number[] = [];
@@ -102,7 +115,21 @@ export function edificio(o: OpcionesEdificio): Edificio {
     losa.push(nudos);
     for (let a = 0; a < NX; a++) {
       for (let b = 0; b < NY; b++) {
-        m.lamina([nudos[tag(a, b)]!, nudos[tag(a + 1, b)]!, nudos[tag(a + 1, b + 1)]!, nudos[tag(a, b + 1)]!], mat, `L${k}-${a}-${b}`);
+        const enPilar = [a, a + 1].some((i) => i % ex === 0) && [b, b + 1].some((j) => j % ey === 0);
+        const reticular = o.laminasE3 && (Math.floor(a / ex) + Math.floor(b / ey)) % 2 === 1 && !enPilar;
+        const l = m.lamina(
+          [nudos[tag(a, b)]!, nudos[tag(a + 1, b)]!, nudos[tag(a + 1, b + 1)]!, nudos[tag(a, b + 1)]!],
+          mat,
+          reticular ? { id: `L${k}-${a}-${b}`, multiplicadores: RETICULAR, eje1: [1, 0.2, 0] } : `L${k}-${a}-${b}`,
+        );
+        if (o.laminasE3) {
+          cargasLamina[0]!.push({ tipo: "superficie", lamina: l, ejes: "global", q: [0, 0, -10] });
+          // sobrecarga variable en Vx, por nudos (crece con x)
+          if (b === 0) cargasLamina[1]!.push({ tipo: "superficie", lamina: l, ejes: "local", q: [[0, 0, -a * dx * 0.1], [0, 0, -(a + 1) * dx * 0.1], [0, 0, -(a + 1) * dx * 0.1], [0, 0, -a * dx * 0.1]] });
+          // tabiquería: carga de línea diagonal dentro del elemento (1, 1); puntual con momento en (2, 1)
+          if (a === 1 && b === 1) cargasLamina[0]!.push({ tipo: "linea", lamina: l, ejes: "global", a: [1.2 * dx, 1.1 * dy, z], b: [1.9 * dx, 1.8 * dy, z], qa: [0, 0, -7], qb: [0, 0, -4] });
+          if (a === 2 && b === 1) cargasLamina[3]!.push({ tipo: "puntual", lamina: l, ejes: "global", punto: [2.3 * dx, 1.6 * dy, z], F: [0, 0, -12], M: [3, -2, 1] });
+        }
       }
     }
     // Pilares
@@ -151,7 +178,11 @@ export function edificio(o: OpcionesEdificio): Edificio {
     // Muro: una fila de láminas por planta, en el primer vano de y = 0
     if (o.muro) {
       const arriba = Array.from({ length: ex + 1 }, (_, a) => nudos[tag(a, 0)]!);
-      for (let a = 0; a < ex; a++) m.lamina([muroAnterior[a]!, muroAnterior[a + 1]!, arriba[a + 1]!, arriba[a]!], mat, `W${k}-${a}`);
+      for (let a = 0; a < ex; a++) {
+        const l = m.lamina([muroAnterior[a]!, muroAnterior[a + 1]!, arriba[a + 1]!, arriba[a]!], mat, `W${k}-${a}`);
+        // viento en +Y: el muro tiene la normal −Y (ejes de CSI: 1 = +X, 2 = +Z, 3 = −Y), así que es −1,2 según el eje 3
+        if (o.laminasE3) cargasLamina[2]!.push({ tipo: "superficie", lamina: l, ejes: "local", q: [0, 0, -1.2] });
+      }
       muroAnterior = arriba;
     }
     // Huella: nudos de losa cercanos a cada cabeza, enlazados a ella
@@ -194,16 +225,16 @@ export function edificio(o: OpcionesEdificio): Edificio {
     nudos.forEach((v, idx) => {
       const a = Math.floor(idx / (NY + 1));
       const b = idx % (NY + 1);
-      g.push(carga(v, { fz: -10 * area * borde(a, b) }));
+      if (!o.laminasE3) g.push(carga(v, { fz: -10 * area * borde(a, b) }));
       if (a === 0) vx.push(carga(v, { fx: 1.5 * (k + 1) * dy * borde(1, b) }));
       if (b === 0) vy.push(carga(v, { fy: 1.5 * (k + 1) * dx * borde(a, 1) }));
       if (a === NX && b === NY) tor.push(carga(v, { fx: 20, mz: 5 }));
     });
   });
-  m.caso("G", g, [], cargasBarra[0]);
-  m.caso("Vx", vx, [], cargasBarra[1]);
-  m.caso("Vy", vy, [], cargasBarra[2]);
-  m.caso("T", tor, [], cargasBarra[3]);
+  m.caso("G", g, [], cargasBarra[0], cargasLamina[0]);
+  m.caso("Vx", vx, [], cargasBarra[1], cargasLamina[1]);
+  m.caso("Vy", vy, [], cargasBarra[2], cargasLamina[2]);
+  m.caso("T", tor, [], cargasBarra[3], cargasLamina[3]);
   if (!o.muelles) m.caso("asiento", [], [{ nudo: pies[0]!, gdl: 2, valor: -0.005 }]);
   return { modelo: m.modelo(), losa, pies, maestros };
 }

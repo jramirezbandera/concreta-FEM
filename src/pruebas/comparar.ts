@@ -10,6 +10,34 @@ export function casosValidos(r: ResultadoCalculo): ResultadoCaso[] {
 }
 
 /**
+ * Error de resultantes de lámina (8 por lámina: N, M, Q) por grupos: max|a − b| de cada grupo
+ * entre una escala. N y Q (kN/m) comparten escala, max(|N|, |Q|); la de M (kN·m/m) es max|M|, con
+ * un mínimo de 1e-3 m por la de N y Q, para que un grupo de puro redondeo (la membrana de una
+ * placa sin cargas en su plano) no divida ruido entre ruido. Devuelve el peor.
+ */
+export function errorLaminas(a: ArrayLike<number>, b: ArrayLike<number>): number {
+  let dN = 0;
+  let dM = 0;
+  let dQ = 0;
+  let mN = 0;
+  let mM = 0;
+  let mQ = 0;
+  for (let i = 0; i < b.length; i += 8) {
+    for (let c = 0; c < 8; c++) {
+      const d = Math.abs(a[i + c]! - b[i + c]!);
+      const v = Math.abs(b[i + c]!);
+      if (c < 3) [dN, mN] = [Math.max(dN, d), Math.max(mN, v)];
+      else if (c < 6) [dM, mM] = [Math.max(dM, d), Math.max(mM, v)];
+      else [dQ, mQ] = [Math.max(dQ, d), Math.max(mQ, v)];
+    }
+  }
+  const fNQ = Math.max(mN, mQ);
+  const fM = Math.max(mM, 1e-3 * fNQ);
+  const r = (d: number, f: number) => (f > 0 ? d / f : d);
+  return Math.max(r(dN, fNQ), r(dQ, fNQ), r(dM, fM));
+}
+
+/**
  * Error relativo por grupos de 6 por nudo (traslaciones / giros, o fuerzas / momentos):
  * max|a − b| / max|b| de cada grupo, el peor de los dos, sobre `nudos` (todos si se omite).
  */
