@@ -24,3 +24,6 @@ venv312/
 .idea
 .DS_Store
 .claude/settings.local.json
+
+# Spike E0: matrices K y compilaciones de prueba (cientos de MB; se regeneran con spike/e0/solver/preparar_k.py)
+spike/e0/datos/

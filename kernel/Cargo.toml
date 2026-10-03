@@ -1,0 +1,25 @@
+[package]
+name = "concreta-fem-kernel"
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+description = "Núcleo numérico del motor FEM 3D de Concreta: LDLᵀ dispersa supernodal (faer) para WASM"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Sin rayon: un solo hilo (GitHub Pages no tiene SharedArrayBuffer, H20).
+faer = { version = "=0.24.4", default-features = false, features = ["std", "linalg", "sparse", "sparse-linalg"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Tiene que coincidir con wasm-bindgen-cli (0.2.129).
+wasm-bindgen = "=0.2.129"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false

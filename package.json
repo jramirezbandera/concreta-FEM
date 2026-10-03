@@ -1,0 +1,19 @@
+{
+  "name": "concreta-fem",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Motor FEM 3D propio para Concreta (TypeScript + núcleo faer en WASM)",
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "nucleo:compilar": "bun scripts/compilar-nucleo.mjs",
+    "nucleo:verificar": "bun scripts/compilar-nucleo.mjs --verificar"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.2"
+  }
+}
