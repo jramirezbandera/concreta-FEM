@@ -5,14 +5,17 @@
  * 1. Comprobación de nudos, elementos, muelles y apoyos.
  * 2. Numeración de GDL con las restricciones por transformación (u = T·û).
  * 3. Partes del modelo sin ningún apoyo (mecanismo de sólido rígido evidente).
- * 4. Cargas: b = Tᵀ·f por caso y desplazamientos impuestos.
+ * 4. Cargas: nodales y de barra (fuerzas nodales equivalentes de sus FER), b = Tᵀ·f por caso y
+ *    desplazamientos impuestos.
  * 5. Patrón CSC y ensamblado de K' = Tᵀ·K·T.
  * 6. Factorización con diagnóstico de mecanismos, resolución por bloque y refinamiento.
- * 7. Recuperación: u = T·û, reacciones de apoyos y muelles a tierra.
- * 8. Regla de oro 2: equilibrio ΣF/ΣM a 1e-9 y resultados finitos en cada caso.
+ * 7. Recuperación: u = T·û, reacciones de apoyos y muelles a tierra, esfuerzos de las barras.
+ * 8. Regla de oro 2: equilibrio ΣF/ΣM a 1e-9 (con la resultante real de las cargas de barra) y
+ *    resultados finitos en cada caso.
  *
  * El motor es puro: sin IO, sin DOM. El solver "nucleo" necesita `iniciarNucleo()` antes.
  */
+import { cargasDeBarrasDelCaso, desplazamientosLocales, equivalentesEnNudos, esfuerzosDeExtremo, fuerzasLocales, type BarraPreparada } from "./barras.ts";
 import { Diagnosticos, listaIds } from "./diagnosticos.ts";
 import { elementosDelModelo, esMuelleATierra, geometria, rigidezGlobal, type ElementoMotor, type Geometria } from "./elementos.ts";
 import { ensamblarRigidez, patronSistema } from "./ensamblado.ts";
@@ -96,7 +99,27 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
     }
   });
   if (diag.hayErrores) return fallo();
-  const bIndep = cargas.map((f) => fuerzasIndependientes(num, f));
+  // Cargas de barra: FER condensadas → fuerzas nodales equivalentes. El equilibrio usa su
+  // resultante real, no las equivalentes, para que un error de las FER no se cancele.
+  const preparadas: (BarraPreparada | undefined)[] = [];
+  for (const e of elementos) if (e.barra) preparadas[e.indice] = e.barra;
+  const deBarras = casos.map((caso) => cargasDeBarrasDelCaso(caso.id, caso.barras ?? [], preparadas, modelo, geo, diag));
+  if (diag.hayErrores) return fallo();
+  const totales = cargas.map((f, k) => {
+    const porBarra = deBarras[k]!.porBarra;
+    if (porBarra.size === 0) return f;
+    const t = Float64Array.from(f);
+    for (const [ib, cb] of porBarra) {
+      const [i, j] = modelo.barras![ib]!.nudos;
+      const eq = equivalentesEnNudos(preparadas[ib]!, cb.ferC);
+      for (let c = 0; c < 6; c++) {
+        t[6 * i + c]! += eq[c]!;
+        t[6 * j + c]! += eq[6 + c]!;
+      }
+    }
+    return t;
+  });
+  const bIndep = totales.map((f) => fuerzasIndependientes(num, f));
   casos.forEach((caso, k) => {
     const perdidas: number[] = [];
     for (let q = 0; q < P; q++) if (num.tipo[q] === TipoGdl.SinRigidez && bIndep[k]![q] !== 0) perdidas.push(q);
@@ -221,11 +244,19 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
         magnitud[6 * v + a]! += m;
       }
     });
-    const eq = equilibrio(geo, cargas[k]!, reacciones, magnitud);
+    const eq = equilibrio(geo, cargas[k]!, reacciones, magnitud, deBarras[k]!.resultante);
+    // Esfuerzos de las barras en los extremos de su tramo flexible
+    const esfuerzosBarras = new Float64Array(12 * (modelo.barras?.length ?? 0));
+    for (const e of elementos) {
+      if (!e.barra) continue;
+      const cb = deBarras[k]!.porBarra.get(e.indice);
+      const ul = desplazamientosLocales(e.barra, u, e.nudos[0]!, e.nudos[1]!, cb);
+      esfuerzosDeExtremo(fuerzasLocales(e.barra, ul, cb), cb, esfuerzosBarras, 12 * e.indice);
+    }
     const residuo = sol ? sol.residuos[k]! : 0;
-    const finito = u.every(Number.isFinite) && reacciones.every(Number.isFinite);
+    const finito = u.every(Number.isFinite) && reacciones.every(Number.isFinite) && esfuerzosBarras.every(Number.isFinite);
     if (!finito) {
-      diag.error("resultado/no-finito", `El caso ${caso.id} da desplazamientos o reacciones no finitos.`, [caso.id]);
+      diag.error("resultado/no-finito", `El caso ${caso.id} da desplazamientos, reacciones o esfuerzos no finitos.`, [caso.id]);
     } else if (!(eq.fuerzas <= TOL_EQUILIBRIO && eq.momentos <= TOL_EQUILIBRIO)) {
       equilibrioRoto = true;
       diag.error(
@@ -246,7 +277,7 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
         { residuo },
       );
     }
-    resultados.push({ id: caso.id, u, reacciones, equilibrio: eq, residuo });
+    resultados.push({ id: caso.id, u, reacciones, esfuerzosBarras, equilibrio: eq, residuo });
   }
   marcar("recuperacion");
   if (diag.hayErrores) {

@@ -10,13 +10,29 @@
  * - Cargas nodales positivas en el sentido de los ejes globales.
  * - Reacciones: fuerza que ejercen sobre la estructura los apoyos y los muelles a tierra, en ejes
  *   globales (como las «Joint Reactions» de CSI, que también incluyen los muelles).
- * - Los esfuerzos de barra y de lámina (E2, E3) seguirán el convenio tipo CSI de H02.
+ *
+ * Barras (E2, convenio tipo CSI de H02):
+ * - Ejes locales del tramo flexible (entre los extremos i' y j', tras los offsets rígidos):
+ *   x = i'→j'; z = dirección del canto h (el vector `vz` proyectado); y = z × x. El eje fuerte de
+ *   una viga o un pilar es siempre y (inercia Iy, momento My), como `MEdy` de los módulos.
+ * - Esfuerzos [N, Vy, Vz, T, My, Mz] de una sección, con la regla de CSI aplicada a estos ejes:
+ *   · N, Vy, Vz, T: sobre la cara de normal +x, positivos en el sentido de +x, +y, +z y del giro +x.
+ *     N > 0 es tracción.
+ *   · My > 0 comprime la fibra +z (tracciona la −z): en una viga con z hacia arriba, el momento de
+ *     vano es positivo. Mz > 0 comprime la fibra +y.
+ *   · Por equilibrio: N' = −qx, Vy' = −qy, Vz' = −qz, My' = −Vz, Mz' = −Vy. En una biapoyada
+ *     con carga de gravedad, Vz es negativo en el apoyo izquierdo y positivo en el derecho.
+ * - Correspondencia con la salida de SAP2000/ETABS si su eje 2 es el canto (z de aquí = 2,
+ *   y de aquí = −3): N = P, Vz = V2, Vy = −V3, T = T, My = M3, Mz = −M2.
+ * - Con los mismos ejes locales, PyNite da todas las componentes con el signo cambiado (H02).
+ * - Cargas de barra: por unidad de longitud del tramo flexible (no proyectada), en ejes locales o
+ *   globales; posiciones en m desde i'.
  *
  * Los objetos se referencian por índice (nudos de un elemento, maestro de una restricción…). Los
  * `id` no los usa el cálculo: sólo sirven para que los diagnósticos señalen el objeto analítico,
  * que el compilador traduce después al objeto físico.
  */
-import type { SeccionBarra } from "../elementos/barra.ts";
+import type { ModificadoresBarra, SeccionBarra } from "../elementos/barra.ts";
 import type { MaterialLamina } from "../elementos/dkmq.ts";
 import type { OpcionesMembrana } from "../elementos/membrana.ts";
 import type { Diagnostico } from "./diagnosticos.ts";
@@ -35,16 +51,32 @@ export interface NudoAnalitico {
   z: number;
 }
 
+/** Seis valores por extremo de barra, en el orden de los GDL locales [ux, uy, uz, rx, ry, rz]. */
+export type Seis<T> = readonly [T, T, T, T, T, T];
+
 /**
- * Barra de Euler–Bernoulli de 12 GDL (la del spike E0). En E2 la sustituye la de Timoshenko con
- * offsets, punto de inserción y liberaciones.
+ * Barra 3D de Timoshenko (Euler–Bernoulli si la sección no da áreas de cortante), con offsets
+ * rígidos, liberaciones y modificadores de rigidez.
  */
 export interface BarraAnalitica {
   id: string;
   nudos: readonly [number, number];
   seccion: SeccionBarra;
-  /** Dirección del canto (z local), que no puede ser paralela al eje de la barra. */
+  /** Dirección del canto (z local), que no puede ser paralela al tramo flexible. */
   vz: Vec3;
+  /**
+   * Offsets rígidos en ejes globales, del nudo al extremo del tramo flexible (m): i' = i + dᵢ,
+   * j' = j + dⱼ. Sirven para las zonas rígidas (a lo largo del eje) y para el punto de inserción
+   * (offset lateral, como una viga descolgada). Por defecto, nulos.
+   */
+  offsets?: { i?: Vec3; j?: Vec3 };
+  /**
+   * GDL liberados en los extremos del tramo flexible, en ejes locales: [N, Vy, Vz, T, My, Mz]
+   * (= [ux, uy, uz, rx, ry, rz] locales). Se condensan; un juego inestable es un error.
+   */
+  liberaciones?: { i?: Seis<boolean>; j?: Seis<boolean> };
+  /** Multiplicadores de A, Avy, Avz, J, Iy e Iz (H47). Por defecto, 1. */
+  modificadores?: ModificadoresBarra;
 }
 
 /** Lámina cuadrilátera plana DKMQ + membrana con drilling (la del spike E0). */
@@ -106,9 +138,40 @@ export interface DesplazamientoImpuesto {
   valor: number;
 }
 
+/**
+ * Carga sobre el tramo flexible de una barra (exacta: no se trocea la barra). Las posiciones son
+ * distancias en m desde i' y tienen que caer en [0, L'], con L' la longitud del tramo flexible.
+ * Las componentes van en ejes locales del tramo flexible o en globales, por unidad de longitud
+ * del tramo (no proyectada).
+ */
+export type CargaBarra =
+  | {
+      tipo: "puntual";
+      barra: number;
+      ejes: "local" | "global";
+      x: number;
+      /** Fuerza, kN. */
+      F?: Vec3;
+      /** Momento, kN·m (vector, regla de la mano derecha). */
+      M?: Vec3;
+    }
+  | {
+      tipo: "distribuida";
+      barra: number;
+      ejes: "local" | "global";
+      /** Carga en `a`, kN/m. */
+      qa: Vec3;
+      /** Carga en `b` (variación lineal entre a y b). Por defecto, igual a `qa`. */
+      qb?: Vec3;
+      /** Tramo cargado [a, b] en m desde i'. Por defecto, todo el tramo flexible. */
+      a?: number;
+      b?: number;
+    };
+
 export interface CasoCarga {
   id: string;
   nodales?: readonly CargaNodal[];
+  barras?: readonly CargaBarra[];
   impuestos?: readonly DesplazamientoImpuesto[];
 }
 
@@ -129,8 +192,16 @@ export interface ResultadoCaso {
   /** Reacciones de apoyos y muelles a tierra, 6 por nudo (kN, kN·m); 0 donde no hay. */
   reacciones: Float64Array;
   /**
+   * Esfuerzos de cada barra (en el orden de `barras`) en los extremos de su tramo flexible,
+   * 12 por barra: [N, Vy, Vz, T, My, Mz] en i' (x = 0⁺) y en j' (x = L'⁻), en ejes locales y con
+   * el convenio de la cabecera. Son esfuerzos dentro de la barra: una carga puntual justo en un
+   * extremo pasa al nudo y no aparece. Los diagramas completos los da `DiagramasBarras`.
+   */
+  esfuerzosBarras: Float64Array;
+  /**
    * Regla de oro 2: |ΣF| / Σ|F| y |ΣM| / Σ|M| entre cargas y reacciones, con los momentos
-   * respecto al centro del modelo. Tienen que quedar por debajo de 1e-9.
+   * respecto al centro del modelo. Las cargas de barra entran con su resultante real (no con las
+   * fuerzas nodales equivalentes). Tienen que quedar por debajo de 1e-9.
    */
   equilibrio: { fuerzas: number; momentos: number };
   /**

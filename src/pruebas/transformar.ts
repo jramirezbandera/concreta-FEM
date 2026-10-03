@@ -41,12 +41,22 @@ export function girarModelo(m: ModeloAnalitico, R: readonly number[], t: Vec3): 
       const p = girar(R, [v.x, v.y, v.z]);
       return { id: v.id, x: p[0] + t[0], y: p[1] + t[1], z: p[2] + t[2] };
     }),
-    barras: m.barras?.map((b) => ({ ...b, vz: girar(R, b.vz) })),
+    barras: m.barras?.map((b) => ({
+      ...b,
+      vz: girar(R, b.vz),
+      offsets: b.offsets && { i: b.offsets.i && girar(R, b.offsets.i), j: b.offsets.j && girar(R, b.offsets.j) },
+    })),
     // ejes del muelle: filas eᵢ → R·eᵢ, es decir E' = E·Rᵀ
     muelles: m.muelles?.map((mu) => ({ ...mu, ejes: mul(mu.ejes ?? [1, 0, 0, 0, 1, 0, 0, 0, 1], RT) })),
     casos: m.casos.map((c) => ({
       ...c,
       nodales: c.nodales?.map((n) => ({ nudo: n.nudo, f: [...girar(R, n.f.slice(0, 3)), ...girar(R, n.f.slice(3))] as never })),
+      // las cargas de barra en ejes locales no cambian; las globales giran
+      barras: c.barras?.map((cb) => {
+        if (cb.ejes === "local") return cb;
+        if (cb.tipo === "puntual") return { ...cb, F: cb.F && girar(R, cb.F), M: cb.M && girar(R, cb.M) };
+        return { ...cb, qa: girar(R, cb.qa), qb: cb.qb && girar(R, cb.qb) };
+      }),
     })),
   };
 }
@@ -82,6 +92,8 @@ export function renumerarModelo(m: ModeloAnalitico, nuevo: readonly number[]): M
       ...c,
       nodales: c.nodales?.map((n) => ({ ...n, nudo: N(n.nudo) })),
       impuestos: c.impuestos?.map((d) => ({ ...d, nudo: N(d.nudo) })),
+      // las barras van en orden inverso
+      barras: c.barras?.map((cb) => ({ ...cb, barra: m.barras!.length - 1 - cb.barra })),
     })),
   };
 }

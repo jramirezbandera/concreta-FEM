@@ -6,7 +6,8 @@
  * del solver. Así se detectan a la vez errores de formulación de un elemento (que no esté
  * autoequilibrado), de las restricciones (una T que no sea rígida) y de la resolución.
  */
-import type { Geometria } from "./elementos.ts";
+import type { Resultante } from "./barras.ts";
+import type { Geometria } from "./geometria.ts";
 
 export interface Equilibrio {
   /** |ΣF| / Σ|F|, con Σ|F| la suma de las normas de todas las fuerzas (cargas y reacciones). */
@@ -22,15 +23,16 @@ export interface Equilibrio {
  * `f` y `r`: cargas y reacciones físicas, 6 por nudo, en ejes globales. `magnitudR` (opcional,
  * 6 por nudo) es la suma de los valores absolutos de los términos que se cancelan en cada
  * reacción: es la escala del redondeo cuando la reacción neta es casi nula (p. ej. un giro de
- * sólido rígido impuesto), y sustituye a `r` en las escalas.
+ * sólido rígido impuesto), y sustituye a `r` en las escalas. `extra` es la resultante de las
+ * cargas que no son nodales (las de barra), respecto al centro del modelo, con sus escalas.
  */
-export function equilibrio(geo: Geometria, f: Float64Array, r: Float64Array, magnitudR?: Float64Array): Equilibrio {
+export function equilibrio(geo: Geometria, f: Float64Array, r: Float64Array, magnitudR?: Float64Array, extra?: Resultante): Equilibrio {
   const { xyz, centro } = geo;
   const nn = xyz.length / 3;
-  const F = [0, 0, 0];
-  const M = [0, 0, 0];
-  let escalaF = 0;
-  let escalaM = 0;
+  const F = extra ? [...extra.F] : [0, 0, 0];
+  const M = extra ? [...extra.M] : [0, 0, 0];
+  let escalaF = extra?.escalaF ?? 0;
+  let escalaM = extra?.escalaM ?? 0;
   const v = [0, 0, 0];
   for (let i = 0; i < nn; i++) {
     const x = xyz[3 * i]! - centro[0];

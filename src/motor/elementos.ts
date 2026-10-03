@@ -5,10 +5,13 @@
  * El núcleo (numeración, restricciones, ensamblado) no sabe de tipos de elemento: sólo ve
  * nudos, una matriz (6m)×(6m) en ejes globales y qué GDL rigidiza cada elemento.
  */
-import { marcoBarra, rigidezBarraGlobal, rigidezBarraLocal } from "../elementos/barra.ts";
 import { marcoLocal, rigidezAGlobales, rigidezLaminaLocal } from "../elementos/lamina.ts";
+import { prepararBarra, type BarraPreparada } from "./barras.ts";
 import type { Diagnosticos } from "./diagnosticos.ts";
+import { TOL_GEOMETRICA, type Geometria } from "./geometria.ts";
 import type { ModeloAnalitico, Muelle } from "./modelo.ts";
+
+export { geometria, TOL_GEOMETRICA, type Geometria } from "./geometria.ts";
 
 export type TipoElemento = "barra" | "lamina" | "muelle";
 
@@ -18,43 +21,8 @@ export interface ElementoMotor {
   indice: number;
   id: string;
   nudos: readonly number[];
-}
-
-/**
- * Tolerancia geométrica relativa al tamaño del modelo (con un mínimo de 1 m). Es la de las
- * comprobaciones que, si fallan, romperían el equilibrio a 1e-9: nudos de un diafragma a la
- * misma cota, muelles de longitud nula y láminas planas.
- */
-export const TOL_GEOMETRICA = 1e-9;
-
-/** Coordenadas de los nudos [x0, y0, z0, x1, …] y tamaño característico del modelo. */
-export interface Geometria {
-  xyz: Float64Array;
-  /** Centro de la caja envolvente. */
-  centro: [number, number, number];
-  /** Mitad de la diagonal de la caja envolvente, con un mínimo de 1 m. */
-  tamano: number;
-}
-
-export function geometria(modelo: ModeloAnalitico): Geometria {
-  const n = modelo.nudos.length;
-  const xyz = new Float64Array(3 * n);
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < n; i++) {
-    const v = modelo.nudos[i]!;
-    const p = [v.x, v.y, v.z];
-    for (let c = 0; c < 3; c++) {
-      xyz[3 * i + c] = p[c]!;
-      min[c] = Math.min(min[c]!, p[c]!);
-      max[c] = Math.max(max[c]!, p[c]!);
-    }
-  }
-  if (n === 0) return { xyz, centro: [0, 0, 0], tamano: 1 };
-  const centro: [number, number, number] = [0, 0, 0];
-  for (let c = 0; c < 3; c++) centro[c] = (min[c]! + max[c]!) / 2;
-  const tamano = Math.max(1, Math.hypot(max[0]! - min[0]!, max[1]! - min[1]!, max[2]! - min[2]!) / 2);
-  return { xyz, centro, tamano };
+  /** Sólo barras: geometría, rigidez en los nudos y GDL que rigidiza. */
+  barra?: BarraPreparada;
 }
 
 const finito = (...v: number[]) => v.every(Number.isFinite);
@@ -160,28 +128,8 @@ export function elementosDelModelo(modelo: ModeloAnalitico, geo: Geometria, diag
       diag.error("modelo/nudo-no-valido", `La barra ${b.id} hace referencia a nudos inexistentes o repetidos.`, [b.id]);
       return;
     }
-    const s = b.seccion;
-    if (!finito(s.E, s.G, s.A, s.Iy, s.Iz, s.J) || !(s.E > 0 && s.G > 0 && s.A > 0 && s.Iy > 0 && s.Iz > 0 && s.J > 0)) {
-      diag.error("modelo/propiedad-no-valida", `La barra ${b.id} tiene una sección o un material no válidos (E, G, A, Iy, Iz y J tienen que ser positivos).`, [b.id]);
-      return;
-    }
-    const [i, j] = b.nudos;
-    const L = Math.hypot(xyz[3 * j] - xyz[3 * i], xyz[3 * j + 1] - xyz[3 * i + 1], xyz[3 * j + 2] - xyz[3 * i + 2]);
-    if (!(L > tol)) {
-      diag.error("modelo/elemento-degenerado", `La barra ${b.id} tiene longitud nula.`, [b.id, modelo.nudos[i]!.id, modelo.nudos[j]!.id]);
-      return;
-    }
-    if (!finito(...b.vz)) {
-      diag.error("modelo/propiedad-no-valida", `La barra ${b.id} tiene un vector de canto no válido.`, [b.id]);
-      return;
-    }
-    try {
-      marcoBarra(xyz.subarray(3 * i, 3 * i + 3), xyz.subarray(3 * j, 3 * j + 3), b.vz);
-    } catch {
-      diag.error("modelo/orientacion-no-valida", `El vector de canto de la barra ${b.id} es paralelo a su eje.`, [b.id]);
-      return;
-    }
-    lista.push({ tipo: "barra", indice, id: b.id, nudos: b.nudos });
+    const barra = prepararBarra(b, indice, modelo, geo, diag);
+    if (barra) lista.push({ tipo: "barra", indice, id: b.id, nudos: b.nudos, barra });
   });
 
   (modelo.laminas ?? []).forEach((l, indice) => {
@@ -265,12 +213,7 @@ export function elementosDelModelo(modelo: ModeloAnalitico, geo: Geometria, diag
 
 /** Rigidez del elemento en ejes globales, (6m)×(6m) por filas. */
 export function rigidezGlobal(modelo: ModeloAnalitico, e: ElementoMotor, xyz: Float64Array): Float64Array {
-  if (e.tipo === "barra") {
-    const b = modelo.barras![e.indice]!;
-    const [i, j] = b.nudos;
-    const { R, L } = marcoBarra(xyz.subarray(3 * i, 3 * i + 3), xyz.subarray(3 * j, 3 * j + 3), b.vz);
-    return rigidezBarraGlobal(rigidezBarraLocal(L, b.seccion), R);
-  }
+  if (e.tipo === "barra") return e.barra!.kNudos;
   if (e.tipo === "lamina") {
     const l = modelo.laminas![e.indice]!;
     const X = l.nudos.flatMap((v) => [xyz[3 * v]!, xyz[3 * v + 1]!, xyz[3 * v + 2]!]);
@@ -292,11 +235,13 @@ export function rigidezGlobal(modelo: ModeloAnalitico, e: ElementoMotor, xyz: Fl
 }
 
 /**
- * GDL locales (0..6m−1) que el elemento rigidiza. Barras y láminas, todos (la lámina tiene
- * drilling real); un muelle, sólo los de diagonal no nula en ejes globales.
+ * GDL locales (0..6m−1) que el elemento rigidiza. Láminas, todos (tienen drilling real); una
+ * barra, los de filas no nulas de su rigidez en los nudos (las liberaciones pueden dejar un nudo
+ * sin rigidez a giro); un muelle, los de diagonal no nula en ejes globales.
  */
 export function gdlRigidizados(modelo: ModeloAnalitico, e: ElementoMotor): boolean[] {
   const m = 6 * e.nudos.length;
+  if (e.tipo === "barra") return e.barra!.rigidizados;
   if (e.tipo !== "muelle") return new Array<boolean>(m).fill(true);
   const k6 = rigidezMuelle6(modelo.muelles![e.indice]!);
   const r: boolean[] = [];

@@ -7,6 +7,7 @@ import type { MaterialLamina } from "../elementos/dkmq.ts";
 import type {
   Apoyo,
   BarraAnalitica,
+  CargaBarra,
   CargaNodal,
   CasoCarga,
   DesplazamientoImpuesto,
@@ -28,6 +29,14 @@ export function seccionRectangular(b: number, h: number, E = 3e7, nu = 0.2): Sec
   return { E, G: E / (2 * (1 + nu)), A: b * h, Iy: (b * h ** 3) / 12, Iz: (h * b ** 3) / 12, J };
 }
 
+export type OpcionesBarra = Partial<Pick<BarraAnalitica, "id" | "offsets" | "liberaciones" | "modificadores">>;
+
+/** Sección rectangular con áreas de cortante 5/6·A (Timoshenko). */
+export function seccionRectangularTimoshenko(b: number, h: number, E = 3e7, nu = 0.2): SeccionBarra {
+  const s = seccionRectangular(b, h, E, nu);
+  return { ...s, Avy: (5 / 6) * s.A, Avz: (5 / 6) * s.A };
+}
+
 export class Constructor {
   readonly nudos: NudoAnalitico[] = [];
   readonly barras: BarraAnalitica[] = [];
@@ -42,8 +51,10 @@ export class Constructor {
     return this.nudos.length - 1;
   }
 
-  barra(i: number, j: number, seccion: SeccionBarra, vz: Vec3, id = `B${this.barras.length}`): number {
-    this.barras.push({ id, nudos: [i, j], seccion, vz });
+  /** `extra`: el id, u opciones de E2 (offsets, liberaciones, modificadores) con id opcional. */
+  barra(i: number, j: number, seccion: SeccionBarra, vz: Vec3, extra?: string | OpcionesBarra): number {
+    const o = typeof extra === "string" ? { id: extra } : (extra ?? {});
+    this.barras.push({ ...o, id: o.id ?? `B${this.barras.length}`, nudos: [i, j], seccion, vz });
     return this.barras.length - 1;
   }
 
@@ -69,8 +80,8 @@ export class Constructor {
     this.restricciones.push({ tipo: "enlace-rigido", id, maestro, esclavos });
   }
 
-  caso(id: string, nodales: CargaNodal[] = [], impuestos: DesplazamientoImpuesto[] = []): void {
-    this.casos.push({ id, nodales, impuestos });
+  caso(id: string, nodales: CargaNodal[] = [], impuestos: DesplazamientoImpuesto[] = [], barras: CargaBarra[] = []): void {
+    this.casos.push({ id, nodales, impuestos, barras });
   }
 
   modelo(): ModeloAnalitico {
