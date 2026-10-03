@@ -5,8 +5,8 @@
  * pruebas metamórficas, la referencia congelada y el banco de tamaño (D9, H52).
  * No es código del motor ni un compilador: sólo fabrica modelos analíticos coherentes.
  */
-import type { ModeloAnalitico } from "../motor/modelo.ts";
-import { carga, Constructor, seccionRectangular } from "./constructor.ts";
+import type { CargaBarra, ModeloAnalitico } from "../motor/modelo.ts";
+import { carga, Constructor, seccionRectangular, seccionRectangularTimoshenko } from "./constructor.ts";
 
 export interface OpcionesEdificio {
   /** Vanos en X y en Y. */
@@ -30,6 +30,12 @@ export interface OpcionesEdificio {
   muelles?: boolean;
   /** Vigas de borde en el perímetro. */
   vigas?: boolean;
+  /**
+   * Barras de E2: pilares y vigas de Timoshenko, zona rígida de 0,3 m en la cabeza de los pilares,
+   * vigas descolgadas (offset lateral de 0,175 m) con zonas rígidas en las caras de los pilares,
+   * rótulas (My en j) en las vigas de la fachada norte y cargas de barra en G y Vx.
+   */
+  barrasE2?: boolean;
 }
 
 export interface Edificio {
@@ -53,8 +59,9 @@ export function edificio(o: OpcionesEdificio): Edificio {
   const dx = o.luzX / ex;
   const dy = o.luzY / ey;
   const m = new Constructor();
-  const pilar = seccionRectangular(0.3, 0.4, E, nu);
-  const viga = seccionRectangular(0.3, 0.6, E, nu);
+  const pilar = o.barrasE2 ? seccionRectangularTimoshenko(0.3, 0.4, E, nu) : seccionRectangular(0.3, 0.4, E, nu);
+  const viga = o.barrasE2 ? seccionRectangularTimoshenko(0.3, 0.6, E, nu) : seccionRectangular(0.3, 0.6, E, nu);
+  const cargasBarra: CargaBarra[][] = [[], [], [], []]; // G, Vx, Vy, T
   const mat = { E, nu, t };
 
   // Base
@@ -103,7 +110,9 @@ export function edificio(o: OpcionesEdificio): Edificio {
     for (let i = 0; i <= o.vanosX; i++) {
       for (let j = 0; j <= o.vanosY; j++) {
         const cabeza = nudos[tag(i * ex, j * ey)]!;
-        m.barra(anterior(i, j), cabeza, pilar, [1, 0, 0], `C${i}-${j}-${k}`);
+        const c = m.barra(anterior(i, j), cabeza, pilar, [1, 0, 0], o.barrasE2 ? { id: `C${i}-${j}-${k}`, offsets: { j: [0, 0, -0.3] } } : `C${i}-${j}-${k}`);
+        // viento en +X sobre los pilares de la fachada x = 0, en ejes locales (z local = X)
+        if (o.barrasE2 && i === 0) cargasBarra[1]!.push({ tipo: "distribuida", barra: c, ejes: "local", qa: [0, 0, 1.2], qb: [0, 0, 2] });
         cabezas.push(cabeza);
       }
     }
@@ -112,7 +121,26 @@ export function edificio(o: OpcionesEdificio): Edificio {
     if (o.vigas) {
       const borde = (a0: number, b0: number, da: number, db: number, n: number, id: string) => {
         for (let s = 0; s < n; s++) {
-          m.barra(nudos[tag(a0 + s * da, b0 + s * db)]!, nudos[tag(a0 + (s + 1) * da, b0 + (s + 1) * db)]!, viga, [0, 0, 1], `V${k}-${id}-${s}`);
+          const [a1, b1] = [a0 + s * da, b0 + s * db];
+          const [a2, b2] = [a1 + da, b1 + db];
+          const ni = nudos[tag(a1, b1)]!;
+          const nj = nudos[tag(a2, b2)]!;
+          if (!o.barrasE2) {
+            m.barra(ni, nj, viga, [0, 0, 1], `V${k}-${id}-${s}`);
+            continue;
+          }
+          // zona rígida de 0,15 m en la cara de los pilares y descuelgue de 0,175 m
+          const enPilar = (a: number, b: number) => a % ex === 0 && b % ey === 0;
+          const u = [da, db];
+          const ri = enPilar(a1, b1) ? 0.15 : 0;
+          const rj = enPilar(a2, b2) ? 0.15 : 0;
+          const b = m.barra(ni, nj, viga, [0, 0, 1], {
+            id: `V${k}-${id}-${s}`,
+            offsets: { i: [ri * u[0]!, ri * u[1]!, -0.175], j: [-rj * u[0]!, -rj * u[1]!, -0.175] },
+            liberaciones: id === "N" && enPilar(a2, b2) ? { j: [false, false, false, false, true, false] } : undefined,
+          });
+          cargasBarra[0]!.push({ tipo: "distribuida", barra: b, ejes: "global", qa: [0, 0, -7] });
+          if (s === 0 && id === "S") cargasBarra[0]!.push({ tipo: "puntual", barra: b, ejes: "global", x: 0.3, F: [0, 0, -15], M: [0, 2, 0] });
         }
       };
       borde(0, 0, 1, 0, NX, "S");
@@ -172,10 +200,10 @@ export function edificio(o: OpcionesEdificio): Edificio {
       if (a === NX && b === NY) tor.push(carga(v, { fx: 20, mz: 5 }));
     });
   });
-  m.caso("G", g);
-  m.caso("Vx", vx);
-  m.caso("Vy", vy);
-  m.caso("T", tor);
+  m.caso("G", g, [], cargasBarra[0]);
+  m.caso("Vx", vx, [], cargasBarra[1]);
+  m.caso("Vy", vy, [], cargasBarra[2]);
+  m.caso("T", tor, [], cargasBarra[3]);
   if (!o.muelles) m.caso("asiento", [], [{ nudo: pies[0]!, gdl: 2, valor: -0.005 }]);
   return { modelo: m.modelo(), losa, pies, maestros };
 }

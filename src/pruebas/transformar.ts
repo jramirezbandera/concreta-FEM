@@ -97,3 +97,45 @@ export function renumerarModelo(m: ModeloAnalitico, nuevo: readonly number[]): M
     })),
   };
 }
+
+/** Longitud del tramo flexible de cada barra (entre i' y j', tras los offsets). */
+export function longitudesFlexibles(m: ModeloAnalitico): number[] {
+  return (m.barras ?? []).map((b) => {
+    const [i, j] = b.nudos;
+    const di = b.offsets?.i ?? [0, 0, 0];
+    const dj = b.offsets?.j ?? [0, 0, 0];
+    const a = m.nudos[i]!;
+    const c = m.nudos[j]!;
+    return Math.hypot(c.x + dj[0] - a.x - di[0], c.y + dj[1] - a.y - di[1], c.z + dj[2] - a.z - di[2]);
+  });
+}
+
+/**
+ * Invierte el sentido de todas las barras (i ↔ j) con sus offsets, liberaciones y cargas. El
+ * triedro local pasa a ser (−x, −y, z): las componentes locales de las cargas cambian de signo en
+ * x e y, y las posiciones van de x a L' − x. En una sección, N, Vy, T y My no cambian; Vz y Mz
+ * cambian de signo.
+ */
+export function invertirBarras(m: ModeloAnalitico): ModeloAnalitico {
+  const Lf = longitudesFlexibles(m);
+  const v = (q: Vec3, ejes: "local" | "global"): Vec3 => (ejes === "local" ? [-q[0], -q[1], q[2]] : q);
+  return {
+    ...m,
+    barras: m.barras?.map((b) => ({
+      ...b,
+      nudos: [b.nudos[1], b.nudos[0]] as const,
+      offsets: b.offsets && { i: b.offsets.j, j: b.offsets.i },
+      liberaciones: b.liberaciones && { i: b.liberaciones.j, j: b.liberaciones.i },
+    })),
+    casos: m.casos.map((c) => ({
+      ...c,
+      barras: c.barras?.map((cb) => {
+        const L = Lf[cb.barra]!;
+        if (cb.tipo === "puntual") return { ...cb, x: L - cb.x, F: cb.F && v(cb.F, cb.ejes), M: cb.M && v(cb.M, cb.ejes) };
+        const a = cb.a ?? 0;
+        const b = cb.b ?? L;
+        return { ...cb, a: L - b, b: L - a, qa: v(cb.qb ?? cb.qa, cb.ejes), qb: v(cb.qa, cb.ejes) };
+      }),
+    })),
+  };
+}
