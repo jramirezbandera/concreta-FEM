@@ -1,0 +1,11 @@
+## OpenSeesPy (peor de u y reacciones; faer)
+diafragma-h07: Transformation 9.3e-16 · Lagrange 6.2e-15 · (OpenSees T frente a L: 6.4e-15) · equilibrio 5.5e-17
+diafragma-dos-plantas: Transformation 8.6e-15 · Lagrange 3.2e-14 · (OpenSees T frente a L: 2.4e-14) · equilibrio 1.6e-16
+enlace-rigido: Transformation 1.1e-15 · Lagrange 7.9e-16 · (OpenSees T frente a L: 1.9e-15) · equilibrio 1.1e-16
+cadenas: Transformation 5.5e+0 · Lagrange 4.6e-15 · (OpenSees T frente a L: 2.5e+0) · equilibrio 7.1e-17
+muelles: Transformation 2.0e-14 · Lagrange 2.9e-14 · (OpenSees T frente a L: 9.8e-15) · equilibrio 2.4e-15
+impuestos: Transformation 1.4e-13 · Lagrange 2.0e-13 · (OpenSees T frente a L: 3.5e-16) · equilibrio 2.0e-16
+
+## Metamórficas (peor de u y reacciones)
+con diafragma: giro 1.5e-12 · renumeración 1.9e-12 · faer/perfil 1.3e-13 · equilibrio 6.6e-14 · ω 1.4e-15
+sin diafragma, con muelles: giro 3.7e-12 · renumeración 2.8e-12 · faer/perfil 1.5e-12 · equilibrio 1.2e-13 · ω 1.1e-15

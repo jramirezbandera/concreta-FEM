@@ -5,8 +5,8 @@
  * validacion/e1/oraculo_opensees.py → __fixtures__/opensees-e1.json.
  *
  * Las cadenas sólo se comparan con Lagrange: el Transformation de OpenSees 3.8 da resultados
- * erróneos sin avisar cuando el maestro de una restricción es esclavo de otra (difiere un
- * 145 % de su propio Lagrange; hallazgo E1-1 en docs/fem3d/fase-e1.md).
+ * erróneos sin avisar cuando el maestro de una restricción es esclavo de otra (difiere hasta un
+ * 250 % de su propio Lagrange; hallazgo E1-1 en docs/fem3d/fase-e1.md).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

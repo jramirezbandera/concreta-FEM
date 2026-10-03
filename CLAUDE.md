@@ -60,5 +60,9 @@
   - **El núcleo** se compila con `bun run nucleo:compilar` y se verifica con `bun run nucleo:verificar` (sha256 reproducible). No se edita `src/nucleo/pkg/` a mano.
   - **Oráculos:** PyNite 3.2.0 en `.venv` (Python 3.14); OpenSeesPy 3.8 en `.venv312` (Python 3.12: con 3.14 no carga en Windows).
   - **Pendiente:** ver el CI (`.github/workflows/ci.yml`) en verde tras un push y medir en móvil.
-- **Siguiente paso:** E1 (núcleo del motor: GDL, restricciones, apoyos, CSC con patrón fijo, ΣF/ΣM y diagnósticos de pivote). En paralelo, la Fase 1 de S1.
+- **2026-10-03: fase E1 superada** (núcleo del motor). Pasan los cinco criterios. El informe está en `docs/fem3d/fase-e1.md`, con criterios, hallazgos E1-1…E1-8 y pendientes.
+  - **Ya en `src/motor/`:** modelo analítico (convenios en la cabecera de `modelo.ts`), GDL con diafragma rígido y enlace rígido por transformación (cadenas incluidas), patrón CSC fijo, mecanismos por pivote con su modo, refinamiento por error hacia atrás y ΣF/ΣM ≤ 1e-9 en cada cálculo. Se usa con `calcular(modelo)`.
+  - **Validación:** `validacion/e1/` (oráculo OpenSeesPy, banco del edificio objetivo, margen de pivotes). Las cadenas se validan sólo contra el `Lagrange` de OpenSees, porque su `Transformation` las resuelve mal (E1-1).
+  - **Fase 1 de S1, en paralelo** (otra sesión, ya en `main`): generador de combinaciones CTE/NCSE (`src/combinaciones/`, `docs/fem3d/combinaciones.md`) y Wood–Armer (`src/dimensionado/`).
+- **Siguiente paso:** E2 (barras: Timoshenko, offsets, punto de inserción, liberaciones por condensación, FER, diagramas y `seccion3D()`).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
