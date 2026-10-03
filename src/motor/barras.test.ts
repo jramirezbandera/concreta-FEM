@@ -391,6 +391,24 @@ describe("diagnósticos de barras y cargas de barra", () => {
     }
   });
 
+  it("un torsor sobre una barra con la torsión liberada en el apoyo va a un nudo sin rigidez a torsión: carga/gdl-sin-rigidez", () => {
+    const m = new Constructor();
+    const a = m.nudo(0, 0, 0);
+    const b = m.nudo(4, 0, 0);
+    m.barra(a, b, T, [0, 0, 1], { id: "V1", liberaciones: { i: [false, false, false, true, false, false] } });
+    m.apoyo(a);
+    m.caso("Mx", [], [], [{ tipo: "puntual", barra: 0, ejes: "local", x: 2, M: [5, 0, 0] }]);
+    const r = calcular(m.modelo(), { solver: "perfil" });
+    expect(r.valido).toBe(false);
+    expect(r.diagnosticos.filter((d) => d.severidad === "error").map((d) => d.codigo)).toEqual(["carga/gdl-sin-rigidez"]);
+    // sin el torsor el cálculo es válido, con el giro sin rigidez restringido y un aviso
+    m.casos.length = 0;
+    m.caso("Fz", [], [], [{ tipo: "puntual", barra: 0, ejes: "local", x: 2, F: [0, 0, -5] }]);
+    const r2 = calcular(m.modelo(), { solver: "perfil" });
+    expect(r2.valido).toBe(true);
+    expect(r2.diagnosticos.map((d) => d.codigo)).toEqual(["gdl/sin-rigidez"]);
+  });
+
   it("sin falsos positivos: offsets laterales, liberaciones estables, cargas en los extremos y a 1e-12 del final", () => {
     const m = base({ offsets: { i: [0.1, 0, -0.2], j: [-0.1, 0, -0.2] }, liberaciones: { i: [false, false, false, false, false, true], j: [false, false, false, false, true, true] } });
     m.caso("G", [], [], [

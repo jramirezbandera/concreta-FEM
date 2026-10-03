@@ -1,0 +1,28 @@
+# validacion/e2/resumen.ts — 2026-10-03
+## Criterio 1a: PyNite 3.2.0 (peor error relativo por grupos; faer y perfil)
+portico-espacial (nucleo): u 7.5e-14 · reacciones 4.7e-14 · esfuerzos en 7 estaciones por barra 4.2e-14
+portico-espacial (perfil): u 5.2e-14 · reacciones 3.1e-14 · esfuerzos en 7 estaciones por barra 2.8e-14
+viga-gerber (nucleo): u 6.3e-15 · reacciones 5.4e-15 · esfuerzos en 7 estaciones por barra 4.4e-15
+viga-gerber (perfil): u 1.7e-14 · reacciones 6.6e-15 · esfuerzos en 7 estaciones por barra 6.7e-15
+
+## Criterio 1b: OpenSeesPy 3.8 (peor error relativo por grupos; faer)
+timoshenko [simple]: u 4.8e-14 · reacciones 2.4e-14 · fuerzas de extremo de los trozos 9.4e-15
+offsets [rigid]: u 9.3e-15 · reacciones 9.5e-15 · fuerzas de extremo de los trozos 2.7e-14
+offsets-eb [jnt]: u 6.4e-14 · reacciones 1.0e-14 · fuerzas de extremo de los trozos 1.4e-14
+offsets-eb [rigid]: u 3.3e-14 · reacciones 5.1e-15 · fuerzas de extremo de los trozos 1.4e-14
+liberaciones [rigid]: u 2.8e-14 · reacciones 2.8e-14 · fuerzas de extremo de los trozos 5.3e-14
+
+## Criterio 2: FER de Timoshenko frente a un modelo de dos barras y a la integral de puntuales
+puntual (fuerza y momento) en 3 posiciones: 9.2e-16
+trapecial parcial frente a ∫ q·FER puntual (Gauss de 8 puntos): 1.3e-15
+
+## Criterio 3: pruebas metamórficas (peor de u, reacciones y esfuerzos de barra; faer)
+pórtico espacial: giro 9.4e-14 · renumeración 4.6e-14 · inversión de barras 1.2e-14 · superposición 3.3e-15
+viga de Gerber: giro 3.2e-14 · renumeración 1.1e-14 · inversión de barras 5.8e-15 · superposición 3.1e-15
+Timoshenko: giro 1.8e-14 · renumeración 2.2e-15 · inversión de barras 4.6e-15 · superposición 8.4e-16
+offsets: giro 5.7e-14 · renumeración 4.5e-15 · inversión de barras 1.4e-15 · superposición 1.4e-15
+liberaciones: giro 3.8e-14 · renumeración 2.0e-14 · inversión de barras 1.5e-14 · superposición 1.5e-14
+edificio E2 con diafragma: giro 1.4e-12 · renumeración 1.5e-12 · inversión de barras 2.3e-15 · superposición 3.1e-15
+edificio E2 con muelles: giro 3.1e-12 · renumeración 9.6e-13 · inversión de barras 2.7e-14 · superposición 5.4e-15
+
+## Regla de oro 2: peor equilibrio (ΣF o ΣM relativos) en todos los modelos anteriores: 1.1e-13

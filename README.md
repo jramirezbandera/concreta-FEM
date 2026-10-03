@@ -2,7 +2,7 @@
 
 Motor de cálculo por elementos finitos 3D para edificios. Se desarrolla para integrarlo después en Concreta, donde sus resultados alimentarán los módulos de comprobación.
 
-- **Estado:** spike E0 y fase E1 (núcleo del motor: GDL, restricciones, ensamblado, diagnósticos y equilibrio) superados ([spike-e0.md](docs/fem3d/spike-e0.md), [fase-e1.md](docs/fem3d/fase-e1.md)); lo siguiente es E2, las barras.
+- **Estado:** superados el spike E0, la fase E1 (núcleo del motor: GDL, restricciones, ensamblado, diagnósticos y equilibrio) y la fase E2 (barras de Timoshenko con offsets, liberaciones, cargas de barra y diagramas) ([spike-e0.md](docs/fem3d/spike-e0.md), [fase-e1.md](docs/fem3d/fase-e1.md), [fase-e2.md](docs/fem3d/fase-e2.md)); lo siguiente es E3, las láminas.
 - **Arquitectura prevista:**
   - en TypeScript: elementos (lámina DKMQ24, barra de Timoshenko), restricciones por transformación, ensamblado y recuperación de esfuerzos;
   - en un núcleo Rust con `faer` compilado a WebAssembly: la factorización LDLᵀ supernodal.
@@ -13,5 +13,6 @@ Motor de cálculo por elementos finitos 3D para edificios. Se desarrolla para in
   - [docs/fem3d/diseno-tecnico.md](docs/fem3d/diseno-tecnico.md): diseño técnico v0.1;
   - [docs/fem3d/spike-e0.md](docs/fem3d/spike-e0.md): resultado del spike E0;
   - [docs/fem3d/fase-e1.md](docs/fem3d/fase-e1.md): resultado de la fase E1 (núcleo del motor).
+  - [docs/fem3d/fase-e2.md](docs/fem3d/fase-e2.md): resultado de la fase E2 (barras).
 
 Repositorio privado. Todos los derechos reservados.

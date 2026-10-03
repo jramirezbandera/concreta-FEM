@@ -64,5 +64,13 @@
   - **Ya en `src/motor/`:** modelo analítico (convenios en la cabecera de `modelo.ts`), GDL con diafragma rígido y enlace rígido por transformación (cadenas incluidas), patrón CSC fijo, mecanismos por pivote con su modo, refinamiento por error hacia atrás y ΣF/ΣM ≤ 1e-9 en cada cálculo. Se usa con `calcular(modelo)`.
   - **Validación:** `validacion/e1/` (oráculo OpenSeesPy, banco del edificio objetivo, margen de pivotes). Las cadenas se validan sólo contra el `Lagrange` de OpenSees, porque su `Transformation` las resuelve mal (E1-1).
   - **Fase 1 de S1, en paralelo** (otra sesión, ya en `main`): generador de combinaciones CTE/NCSE (`src/combinaciones/`, `docs/fem3d/combinaciones.md`) y Wood–Armer (`src/dimensionado/`).
-- **Siguiente paso:** E2 (barras: Timoshenko, offsets, punto de inserción, liberaciones por condensación, FER, diagramas y `seccion3D()`).
+- **2026-10-03: fase E2 superada** (barras). Pasan los cinco criterios. El informe está en `docs/fem3d/fase-e2.md`, con criterios, hallazgos E2-1…E2-7 y pendientes.
+  - **Ya en `src/`:**
+    - barra de Timoshenko con offsets rígidos, liberaciones por condensación y modificadores (`src/elementos/barra.ts`);
+    - cargas de barra con FER exactas y diagramas cerrados (`cargasBarra.ts`, `tramos.ts`);
+    - la barra en el motor (`src/motor/barras.ts`: esfuerzos de extremo por caso y `DiagramasBarras`);
+    - `seccion3D()` (`src/secciones/`).
+  - **Convenio de signos de barra** en la cabecera de `modelo.ts` (H02, con la correspondencia con SAP2000).
+  - **Validación:** `validacion/e2/` (oráculos PyNite y OpenSeesPy, pruebas metamórficas, banco y referencia congelada). La `ElasticTimoshenkoBeam` de OpenSees 3.8 aplica mal `-jntOffset` (E2-1): los offsets de Timoshenko se validan con `rigidLink`.
+- **Siguiente paso:** E3 (láminas: DKMQ24 con multiplicadores, cargas, resultantes y giro a ejes de usuario).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
