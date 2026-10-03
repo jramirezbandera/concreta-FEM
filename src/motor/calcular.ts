@@ -150,7 +150,11 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
   // 6. Factorización y resolución
   const sol = n > 0 ? resolver(ps.patron, K.valores, K.diagonal, B, nc, opciones.solver ?? "nucleo") : null;
   marcar("solucion");
-  if (sol) estadisticas.nnzL = sol.nnzL;
+  if (sol) {
+    estadisticas.nnzL = sol.nnzL;
+    for (const [fase, ms] of Object.entries(sol.tiempos)) tiempos[`solucion.${fase}`] = ms;
+    estadisticas.pasosRefinamiento = sol.pasosRefinamiento;
+  }
   if (sol && sol.mecanismos.length) {
     diagnosticarMecanismos(modelo, num, geo, sol.mecanismos, diag);
     return fallo(estadisticas);

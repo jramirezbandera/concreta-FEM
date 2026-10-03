@@ -26,8 +26,11 @@ export const UMBRAL_MECANISMO = 1e-11;
 export const UMBRAL_MAL_CONDICIONADO = 1e-8;
 /** Error hacia atrás objetivo tras el refinamiento. */
 export const RESIDUO_OBJETIVO = 1e-10;
-/** Error hacia atrás por debajo del cual ya no se refina (unas pocas ε). */
-const RESIDUO_SUFICIENTE = 1e-15;
+/**
+ * Error hacia atrás por debajo del cual no se refina. LDLᵀ deja ω entre 5e-16 y 2e-15 (el ruido
+ * de la propia medida); refinar por debajo de 1e-13 no mejora nada y cuesta otra resolución.
+ */
+const RESIDUO_SUFICIENTE = 1e-13;
 
 const MAX_PIVOTES_NULOS = 64;
 const MAX_MODOS = 24;
@@ -99,6 +102,8 @@ export interface Solucion {
   malCondicionados: PivoteSospechoso[];
   nnzL?: number;
   pasosRefinamiento: number;
+  /** Milisegundos de: análisis simbólico y factorización, resolución, residuo y refinamiento. */
+  tiempos: Record<string, number>;
 }
 
 function cifras(relativo: number): number {
@@ -107,6 +112,13 @@ function cifras(relativo: number): number {
 
 export function resolver(patron: PatronCsc, valores: Float64Array, diagonalK: Float64Array, B: Float64Array, nrhs: number, tipo: TipoSolver): Solucion {
   const n = patron.n;
+  const tiempos: Record<string, number> = {};
+  let t0 = performance.now();
+  const marcar = (fase: string) => {
+    const t = performance.now();
+    tiempos[fase] = (tiempos[fase] ?? 0) + t - t0;
+    t0 = t;
+  };
   const factorizador = tipo === "nucleo" ? new FactorizadorNucleo(patron) : new FactorizadorPerfil(patron);
   try {
     // 1. Factorizar; cada pivote exactamente nulo se marca y se sujeta con un muelle
@@ -124,6 +136,7 @@ export function resolver(patron: PatronCsc, valores: Float64Array, diagonalK: Fl
       }
     }
 
+    marcar("factorizacion");
     // 2. Pivotes pequeños o negativos frente a la diagonal de K'
     const d = factor.diagonal();
     const sospechosos: PivoteSospechoso[] = nulos.map((ecuacion) => ({ ecuacion, relativo: NaN, cifrasPerdidas: Infinity }));
@@ -158,11 +171,13 @@ export function resolver(patron: PatronCsc, valores: Float64Array, diagonalK: Fl
         malCondicionados,
         nnzL: factor.nnzL,
         pasosRefinamiento: 0,
+        tiempos,
       };
     }
 
     // 4. Resolver y refinar
     const X = nrhs > 0 ? factor.resolver(B, nrhs) : new Float64Array(0);
+    marcar("resolucion");
     const residuos = new Float64Array(nrhs);
     const R = new Float64Array(n * nrhs);
     const y = new Float64Array(n);
@@ -185,6 +200,7 @@ export function resolver(patron: PatronCsc, valores: Float64Array, diagonalK: Fl
       }
     };
     calcularResiduos();
+    marcar("residuo");
     let pasos = 0;
     while (pasos < 3 && residuos.some((r) => r > RESIDUO_SUFICIENTE)) {
       const anterior = Math.max(...residuos);
@@ -192,11 +208,12 @@ export function resolver(patron: PatronCsc, valores: Float64Array, diagonalK: Fl
       for (let i = 0; i < X.length; i++) X[i]! += dX[i]!;
       pasos++;
       calcularResiduos();
+      marcar("refinamiento");
       if (Math.max(...residuos) > anterior / 2) break;
     }
     const nnzL = factor.nnzL;
     factor.liberar();
-    return { X, residuos, mecanismos: [], malCondicionados, nnzL, pasosRefinamiento: pasos };
+    return { X, residuos, mecanismos: [], malCondicionados, nnzL, pasosRefinamiento: pasos, tiempos };
   } finally {
     factorizador.liberar();
   }

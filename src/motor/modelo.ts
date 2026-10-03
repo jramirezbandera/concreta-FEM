@@ -151,6 +151,8 @@ export interface EstadisticasCalculo {
   sinRigidez: number;
   nnzK: number;
   nnzL?: number;
+  /** Pasos de refinamiento iterativo que hicieron falta (0 casi siempre). */
+  pasosRefinamiento?: number;
   /** Milisegundos de cada fase. */
   tiempos: Record<string, number>;
 }
