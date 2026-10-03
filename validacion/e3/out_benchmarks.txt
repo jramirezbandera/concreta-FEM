@@ -1,0 +1,12 @@
+# validacion/e3/benchmarks.ts — 2026-10-04: valor del motor / referencia (H48)
+
+malla N×N | Scordelis-Lo (0,3024) | cilindro pellizcado (1,8248e-5) | hemisferio (0,0940)
+        4 |                1.0496 |                          0.6334 |              0.3205
+        8 |                1.0054 |                          0.9482 |              0.9255
+       16 |                0.9967 |                          1.0200 |              0.9921
+       32 |                0.9951 |                          1.0180 |              0.9948
+
+viga recta de MacNeal–Harder, carga fuera del plano (0,4321)
+rectangular   | 0.9869
+trapezoidal   | 0.9872
+paralelogramo | 0.9860
