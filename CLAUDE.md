@@ -72,5 +72,13 @@
     - `seccion3D()` (`src/secciones/`).
   - **Convenio de signos de barra** en la cabecera de `modelo.ts` (H02, con la correspondencia con SAP2000).
   - **Validación:** `validacion/e2/` (oráculos PyNite y OpenSeesPy, pruebas metamórficas, banco y referencia congelada). La `ElasticTimoshenkoBeam` de OpenSees 3.8 aplica mal `-jntOffset` (E2-1): los offsets de Timoshenko se validan con `rigidLink`.
-- **Siguiente paso:** E3 (láminas: DKMQ24 con multiplicadores, cargas, resultantes y giro a ejes de usuario).
+- **2026-10-04: fase E3 superada** (láminas). Pasan los seis criterios. El informe está en `docs/fem3d/fase-e3.md`, con criterios, hallazgos E3-1…E3-6 y pendientes.
+  - **Ya en `src/`:**
+    - DKMQ24 con sección general y φₖ anisótropa, y membrana con C general (`src/elementos/`);
+    - lámina formulada en ejes de usuario (eje 3 por el orden de los nudos; eje 1 = `eje1` proyectado o la regla de CSI) con multiplicadores f11…v23 como D' = S·D·S (`lamina.ts`);
+    - la lámina en el motor (`src/motor/laminas.ts`): cargas de superficie, línea y puntuales con el equilibrio sobre su resultante real, `esfuerzosLaminas` en el centroide y `ResultantesLaminas`.
+  - **Convenio de láminas** en la cabecera de `modelo.ts` (H02: F11…V23 de CSI).
+  - **Validación:** `validacion/e3/` (oráculo PyNite con resultantes giradas en Python, Navier ortótropa, benchmarks de H48, metamórficas, banco y referencia congelada).
+  - **Abierto:** la semántica de los multiplicadores frente a SAP2000 (S5 #21) necesita un modelo del usuario; la propuesta está en «Pendiente» del informe.
+- **Siguiente paso:** E5 (Q y bandas: corte por fuerzas nodales y SPR, H18) o lo que queda de E4 (worker y memoria); lo decide el usuario.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

@@ -8,7 +8,8 @@ PyNite (PyNiteFEA) 3.2.0 — https://github.com/JWock82/Pynite
 Licencia MIT. Copyright (c) 2018 D. Craig Brinck
 
 Portado a TypeScript:
-  src/elementos/dkmq.ts  ←  Pynite/Quad3D.py (ke_b, B_b, B_s, fer, moment, shear)
+  src/elementos/dkmq.ts  ←  Pynite/Quad3D.py (ke_b, B_b, B_s, fer, moment, shear);
+                            generalizado en E3 a una sección anisótropa (código propio)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
