@@ -1,0 +1,13 @@
+válido: edificio objetivo con diafragma: 1.7 cifras
+válido: edificio objetivo semirrígido: 2.5 cifras
+válido: losa de 2 cm con malla de 0,25 m: 2.8 cifras
+válido: barra 1e+4 veces más rígida: 6.2 cifras
+mal condicionado: barra 1e+6 veces más rígida: 8.2 cifras
+mal condicionado: barra 1e+8 veces más rígida: 10.2 cifras
+mecanismo: barra biarticulada (giro rx): pivote exactamente nulo (pivote nulo en la columna 3)
+mecanismo: barra con un extremo articulado: pivote exactamente nulo (pivote nulo en la columna 6)
+válido: edificio con diafragma sobre pilares articulados en la base (la losa empotra las cabezas): 1.2 cifras
+mecanismo: ménsula con rótula a torsión en el edificio objetivo con diafragma: pivote exactamente nulo (pivote nulo en la columna 76149)
+mecanismo: ménsula con rótula a torsión en el edificio objetivo semirrígido: pivote exactamente nulo (pivote nulo en la columna 152253)
+mecanismo: la misma ménsula girada 30° (rótula en ejes locales), con diafragma: pivote exactamente nulo (pivote nulo en la columna 76150)
+mecanismo: la misma ménsula girada 30° (rótula en ejes locales), semirrígido: pivote exactamente nulo (pivote nulo en la columna 152254)

@@ -285,7 +285,11 @@ function diagnosticarMecanismos(
       const orden = [...mag.keys()].filter((v) => mag[v]! > 1e-3 * max).sort((a, b) => mag[b]! - mag[a]!);
       mueve = orden.map((v) => modelo.nudos[v]!.id);
     }
-    const perdidas = Number.isFinite(pivote.cifrasPerdidas) ? `se pierden ${pivote.cifrasPerdidas.toFixed(1)} cifras` : "pivote nulo";
+    const perdidas = Number.isNaN(pivote.relativo)
+      ? "pivote nulo"
+      : pivote.relativo <= 0
+        ? `pivote ≤ 0: ${pivote.relativo.toExponential(1)} de la diagonal`
+        : `se pierden ${pivote.cifrasPerdidas.toFixed(1)} cifras`;
     diag.error(
       "solver/mecanismo",
       `Mecanismo: el GDL ${NOMBRES_GDL[p % 6]} del nudo ${id} no tiene rigidez frente al resto (${perdidas}).` +

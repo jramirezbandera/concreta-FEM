@@ -102,6 +102,20 @@ describe.each<TipoSolver>(["nucleo", "perfil"])("mecanismos (solver %s)", (solve
     expect(d.detalles!.gdl).toBe("rx");
   });
 
+  it("barra biarticulada sesgada en 3D: el giro alrededor de su eje deja un pivote diminuto, no nulo", () => {
+    const m = new Constructor();
+    const a = m.nudo(0, 0, 0, "A");
+    const b = m.nudo(3, 2.1, 0.9, "B");
+    m.barra(a, b, S, [0, 0, 1], "BAR");
+    m.apoyo(a, ARTICULADO);
+    m.apoyo(b, ARTICULADO);
+    m.caso("P", [carga(b, { fz: -1 })]);
+    const d = esperarError(calcular(m.modelo(), { solver }), "solver/mecanismo", ["A", "B"]);
+    // pasa por la comparación dⱼ/Kⱼⱼ, no por el error de pivote exactamente nulo de faer
+    expect(Number.isNaN(d.detalles!.pivoteRelativo)).toBe(false);
+    expect(Math.abs(d.detalles!.pivoteRelativo as number)).toBeLessThan(1e-11);
+  });
+
   it("planta con diafragma sobre pilares biarticulados: el mecanismo mueve la planta entera", () => {
     const { m } = plantaSobrePilares(true);
     const r = calcular(m.modelo(), { solver });
