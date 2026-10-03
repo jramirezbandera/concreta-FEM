@@ -36,6 +36,16 @@ export interface PatronCsc {
 
 export type ModoFactor = "auto" | "supernodal" | "simplicial";
 
+/** Pivote exactamente nulo durante la factorización; `columna` es la ecuación original (sin permutar). */
+export class ErrorPivoteNulo extends Error {
+  readonly columna: number;
+  constructor(columna: number) {
+    super(`pivote nulo en la columna ${columna}`);
+    this.name = "ErrorPivoteNulo";
+    this.columna = columna;
+  }
+}
+
 export interface EstadisticasFactor {
   n: number;
   nnzA: number;
@@ -71,7 +81,13 @@ export class FactorLdlt {
     const nucleo = this.vivo();
     const mem = memoria() as WebAssembly.Memory;
     new Float64Array(mem.buffer, nucleo.valoresPtr(), this.nnz).set(valores);
-    nucleo.factorizar();
+    try {
+      nucleo.factorizar();
+    } catch (e) {
+      const m = /pivote nulo en la columna (\d+)/.exec(e instanceof Error ? e.message : String(e));
+      if (m) throw new ErrorPivoteNulo(Number(m[1]));
+      throw e;
+    }
   }
 
   /** Resuelve K·X = B; `b` tiene n·nrhs valores en orden de columnas. Devuelve X (copia). */

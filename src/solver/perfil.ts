@@ -5,7 +5,7 @@
  * pequeños (S7: hasta ~30 000 GDL). Algoritmo de columna activa de COLSOL (Bathe, Finite Element
  * Procedures, tabla 8.3). Entrada: triángulo superior de K en CSC (como el núcleo).
  */
-import type { PatronCsc } from "../nucleo/index.ts";
+import { ErrorPivoteNulo, type PatronCsc } from "../nucleo/index.ts";
 
 /** Permutación RCM: perm[k] = GDL original en la posición k. */
 export function ordenRcm(p: PatronCsc): Uint32Array {
@@ -146,9 +146,16 @@ export class FactorPerfil {
         d -= l * g;
         v[bj + i] = l;
       }
-      if (d === 0 || !Number.isFinite(d)) throw new Error(`pivote nulo en el GDL ${this.perm[j]}`);
+      if (d === 0 || !Number.isFinite(d)) throw new ErrorPivoteNulo(this.perm[j]!);
       v[bj + j] = d;
     }
+  }
+
+  /** Diagonal D de LDLᵀ en el orden original de los GDL (pivotes; inercia). */
+  diagonal(): Float64Array {
+    const d = new Float64Array(this.n);
+    for (let k = 0; k < this.n; k++) d[this.perm[k]!] = this.v[this.inicio[k + 1]! - 1]!;
+    return d;
   }
 
   /** Resuelve K·x = b (un lado derecho). */
