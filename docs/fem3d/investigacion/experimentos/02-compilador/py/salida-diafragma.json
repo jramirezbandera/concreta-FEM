@@ -1,0 +1,140 @@
+{
+  "sin_diafragma": {
+    "ux_esquinas_mm": [
+      2.02378,
+      1.95792,
+      0.11379,
+      0.11386
+    ],
+    "N_vigas_kN": [
+      49.3976,
+      0.0,
+      0.0529,
+      -0.0
+    ],
+    "cond_K11": "1.405e+02",
+    "gdl": 24,
+    "err_equilibrio_rel": "1.7e-15"
+  },
+  "barras_rigidas EA x100": {
+    "ux_esquinas_mm": [
+      1.71918,
+      1.71859,
+      0.38583,
+      0.38576
+    ],
+    "N_vigas_kN": [
+      0.444,
+      -0.051,
+      -0.051,
+      -0.051
+    ],
+    "cond_K11": "2.338e+04",
+    "gdl": 24,
+    "err_equilibrio_rel": "3.0e-14"
+  },
+  "barras_rigidas EA x10000": {
+    "ux_esquinas_mm": [
+      1.64284,
+      1.64283,
+      0.46185,
+      0.46185
+    ],
+    "N_vigas_kN": [
+      0.0045,
+      -0.0005,
+      -0.0005,
+      -0.0005
+    ],
+    "cond_K11": "2.325e+06",
+    "gdl": 24,
+    "err_equilibrio_rel": "2.3e-12"
+  },
+  "barras_rigidas EA x1e+06": {
+    "ux_esquinas_mm": [
+      1.49018,
+      1.49018,
+      0.6145,
+      0.61449
+    ],
+    "N_vigas_kN": [
+      0.0,
+      -0.0,
+      -0.0,
+      -0.0
+    ],
+    "cond_K11": "2.324e+08",
+    "gdl": 24,
+    "err_equilibrio_rel": "2.5e-09"
+  },
+  "barras_rigidas EA x1e+08": {
+    "ux_esquinas_mm": [
+      1.48513,
+      1.48513,
+      0.61955,
+      0.61955
+    ],
+    "N_vigas_kN": [
+      0.0,
+      -0.0,
+      -0.0,
+      -0.0
+    ],
+    "cond_K11": "2.324e+10",
+    "gdl": 24,
+    "err_equilibrio_rel": "2.0e-07"
+  },
+  "barras_rigidas EA x1e+10": {
+    "error": "Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis."
+  },
+  "losa_shell": {
+    "ux_esquinas_mm": [
+      1.55033,
+      1.51929,
+      0.3056,
+      0.30434
+    ],
+    "N_vigas_kN": [
+      18.1422,
+      -2.7862,
+      -1.8633,
+      -4.0227
+    ],
+    "cond_K11": "3.054e+05",
+    "gdl": 1014,
+    "err_equilibrio_rel": "3.5e-12"
+  },
+  "membrana_equivalente k=20": {
+    "ux_esquinas_mm": [
+      1.74858,
+      1.69701,
+      0.38261,
+      0.38112
+    ],
+    "N_vigas_kN": [
+      35.8913,
+      -2.335,
+      -2.2109,
+      -2.9373
+    ],
+    "cond_K11": "8.495e+09",
+    "gdl": 1014,
+    "err_equilibrio_rel": "6.2e-13"
+  },
+  "maestro_esclavo_exacto": {
+    "ux_esquinas_mm": [
+      1.71662,
+      1.71662,
+      0.38806,
+      0.38806
+    ],
+    "N_vigas_kN": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "cond_Kr": "5.494e+01",
+    "gdl": 15
+  }
+}

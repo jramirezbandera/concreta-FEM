@@ -1,0 +1,9 @@
+   ejes locales quad: [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [-0.0, 1.0, 0.0]]
+   reacción vertical total = 6000.0 (w·L·1 = 6000.0)
+   en x≈L/2 (nodo i del quad central, xi=-1): Mx,My,Mxy = [-4500.    -0.     0.]  wL²/8 = 4500.0
+   centroide: Mx,My,Mxy = [-4437.5    -0.      0. ]
+   moment(local=False) -> EXC TypeError: only 0-dimensional arrays can be converted to Python scalars  (numpy 2.4.3)
+   shear(local=False) -> EXC TypeError: only 0-dimensional arrays can be converted to Python scalars  (numpy 2.4.3)
+   membrane(local=False) -> EXC TypeError: only 0-dimensional arrays can be converted to Python scalars  (numpy 2.4.3)
+   cerca del apoyo (q0, xi=-1): Qx,Qy = [-2750.     0.]  (wL/2 = 3000.0 )
+PYODIDE_INFO {"mode":"script","pyodide":"314.0.0","heap_after_packages_MB":62.4,"import_ok":true,"heap_after_import_MB":74.9,"heap_final_MB":129.8,"node_rss_MB":436.6,"times":{"import_pyodide_mjs_ms":2,"loadPyodide_ms":1417,"loadPackage_numpy_scipy_ms":1471,"import_Pynite_ms":892,"script_ms":1430}}

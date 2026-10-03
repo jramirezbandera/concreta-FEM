@@ -1,0 +1,51 @@
+{
+ "m0_pagina": {
+  "procesos": 12,
+  "privadaMB": 335,
+  "mayorMB": 92
+ },
+ "arranque": {
+  "msBoot": 2218,
+  "heapTrasBootMB": 30,
+  "msNumpy": 408,
+  "msScipy": 1295,
+  "msImportScipySparse": 1903,
+  "heapTrasScipyMB": 74.9,
+  "msTotal": 5824,
+  "crossOriginIsolated": false
+ },
+ "m1_trasArranque": {
+  "procesos": 12,
+  "privadaMB": 670,
+  "mayorMB": 360
+ },
+ "solve300": {
+  "gdl": 90000,
+  "nnz": 448800,
+  "sFactorizar": 0.878,
+  "sResolver1": 0.0452,
+  "nnzLU": 8902568,
+  "heapMB": 599.9
+ },
+ "m2_trasSolve90k": {
+  "procesos": 11,
+  "privadaMB": 1166,
+  "mayorMB": 876
+ },
+ "techo": {
+  "bloques128MiB": 30,
+  "reservadoMiB": 3840,
+  "error": "MemoryError",
+  "heapTrasLiberarMB": 4095.9
+ },
+ "m3_trasTechoYLiberarEnPython": {
+  "procesos": 10,
+  "privadaMB": 4617,
+  "mayorMB": 4348
+ },
+ "m4_trasTerminate": {
+  "procesos": 10,
+  "privadaMB": 335,
+  "mayorMB": 90
+ }
+}

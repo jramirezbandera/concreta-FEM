@@ -1,0 +1,50 @@
+== A {"ptsPSLG":122,"segPSLG":120,"steiner":385,"areaEsperada":103}
+cdt2d (exterior:false)                     83.12 912 nodos  minA 30.95 AR 1.7 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [true,true,true] 60da600aaacdbd41 Jmin  franja 
+cdt2d + clasificación propia               80.982 912 nodos  minA 30.95 AR 1.7 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [true,true,true] 60da600aaacdbd41 Jmin  franja 
+cdt-js (eraseOuterTrianglesAndHoles)       4.068 912 nodos  minA 30.95 AR 1.7 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [true,true,true] 60da600aaacdbd41 Jmin  franja 
+cdt-js + clasificación propia              4.603 912 nodos  minA 30.95 AR 1.7 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [true,true,true] 60da600aaacdbd41 Jmin  franja 
+delaunator + constrainautor                1.734 912 nodos  minA 30.95 AR 1.7 area 103 inv 912 seg 120/120 viga 18/18 pil 4/4 det true baraj [true,true,true] 60da600aaacdbd41 Jmin  franja 
+poly2tri (viga como Steiner)               4.014 912 nodos  minA 30.95 AR 1.7 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [true,true,true] 60da600aaacdbd41 Jmin  franja 
+earcut (sin Steiner ni líneas internas)    0.054 8 nodos  minA 4.56 AR 9.07 area 103 inv 0 seg 0/120 viga 0/18 pil 0/4 det true baraj [true,true,true] 3ca342bd2846f4f9 Jmin  franja 
+tri->3 quads (sobre constrainautor)         2736 nodos 2838 minA 30.95 AR 3.76 area 103 inv  seg  viga  pil  det  baraj   Jmin 0.485 franja 
+rejilla estructurada (líneas de control)    443 nodos 497 minA 90 AR 1.25 area 103 inv  seg  viga  pil  det  baraj   Jmin 1 franja 0.4
+== B {"ptsPSLG":123,"segPSLG":120,"steiner":385,"areaEsperada":103}
+cdt2d (exterior:false)                     94.66 914 nodos  minA 3.43 AR 9.94 area 103 inv 0 seg 120/120 viga 18/18 pil 5/5 det true baraj [true,true,true] 1002234c314d4b21 Jmin  franja 
+cdt2d + clasificación propia               89.249 914 nodos  minA 3.43 AR 9.94 area 103 inv 0 seg 120/120 viga 18/18 pil 5/5 det true baraj [true,true,true] 1002234c314d4b21 Jmin  franja 
+cdt-js (eraseOuterTrianglesAndHoles)       3.851 914 nodos  minA 3.43 AR 9.94 area 103 inv 0 seg 120/120 viga 18/18 pil 5/5 det true baraj [true,true,true] 1002234c314d4b21 Jmin  franja 
+cdt-js + clasificación propia              4.065 914 nodos  minA 3.43 AR 9.94 area 103 inv 0 seg 120/120 viga 18/18 pil 5/5 det true baraj [true,true,true] 1002234c314d4b21 Jmin  franja 
+delaunator + constrainautor                1.1 914 nodos  minA 3.43 AR 9.94 area 103 inv 914 seg 120/120 viga 18/18 pil 5/5 det true baraj [true,true,true] 1002234c314d4b21 Jmin  franja 
+poly2tri (viga como Steiner)               2.354 914 nodos  minA 3.43 AR 9.94 area 103 inv 0 seg 120/120 viga 18/18 pil 5/5 det true baraj [true,true,true] 1002234c314d4b21 Jmin  franja 
+earcut (sin Steiner ni líneas internas)    0.021 8 nodos  minA 4.56 AR 9.07 area 103 inv 0 seg 0/120 viga 0/18 pil 0/5 det true baraj [true,true,true] 3ca342bd2846f4f9 Jmin  franja 
+tri->3 quads (sobre constrainautor)         2742 nodos 2844 minA 3.43 AR 16.7 area 103 inv  seg  viga  pil  det  baraj   Jmin 0.06 franja 
+rejilla estructurada (líneas de control)    461 nodos 516 minA 90 AR 16.67 area 103 inv  seg  viga  pil  det  baraj   Jmin 1 franja 0.03
+== C {"ptsPSLG":126,"segPSLG":125,"steiner":468,"areaEsperada":103}
+cdt2d (exterior:false)                     78.845 1086 nodos  minA 12.18 AR 3.18 area 103 inv 0 seg 125/125 viga 23/23 pil 3/3 det true baraj [true,true,true] 8761a6b328f2f1f1 Jmin  franja 
+cdt2d + clasificación propia               75.78 1086 nodos  minA 12.18 AR 3.18 area 103 inv 0 seg 125/125 viga 23/23 pil 3/3 det true baraj [true,true,true] 8761a6b328f2f1f1 Jmin  franja 
+cdt-js (eraseOuterTrianglesAndHoles)       3.857 1086 nodos  minA 12.18 AR 3.18 area 103 inv 0 seg 125/125 viga 23/23 pil 3/3 det true baraj [true,true,true] 8761a6b328f2f1f1 Jmin  franja 
+cdt-js + clasificación propia              5.493 1086 nodos  minA 12.18 AR 3.18 area 103 inv 0 seg 125/125 viga 23/23 pil 3/3 det true baraj [true,true,true] 8761a6b328f2f1f1 Jmin  franja 
+delaunator + constrainautor                1.301 1086 nodos  minA 12.18 AR 3.18 area 103 inv 1086 seg 125/125 viga 23/23 pil 3/3 det true baraj [true,true,true] 8761a6b328f2f1f1 Jmin  franja 
+poly2tri (viga como Steiner)               2.875 1086 nodos  minA 12.18 AR 3.18 area 103 inv 0 seg 124/125 viga 22/23 pil 3/3 det true baraj [true,true,true] cba3580070432894 Jmin  franja 
+earcut (sin Steiner ni líneas internas)    0.016 8 nodos  minA 4.56 AR 9.07 area 103 inv 0 seg 0/125 viga 0/23 pil 0/3 det true baraj [true,true,true] 3ca342bd2846f4f9 Jmin  franja 
+tri->3 quads (sobre constrainautor)         3258 nodos 3360 minA 12.18 AR 6 area 103 inv  seg  viga  pil  det  baraj   Jmin 0.211 franja 
+rejilla estructurada (líneas de control)    443 nodos 497 minA 90 AR 1.25 area 103 inv  seg  viga  pil  det  baraj   Jmin 1 franja 0.4
+== S {"ptsPSLG":122,"segPSLG":120,"steiner":347,"areaEsperada":103}
+cdt2d (exterior:false)                     40.405 836 nodos  minA 21.8 AR 1.93 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [false,false,false] 566e9c85db36fa38 Jmin  franja 
+cdt2d + clasificación propia               44.506 836 nodos  minA 21.8 AR 1.93 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [false,false,false] 566e9c85db36fa38 Jmin  franja 
+cdt-js (eraseOuterTrianglesAndHoles)       2.925 836 nodos  minA 21.8 AR 1.93 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [false,false,false] b5661af17b14e484 Jmin  franja 
+cdt-js + clasificación propia              3.14 836 nodos  minA 21.8 AR 1.93 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [false,false,false] b5661af17b14e484 Jmin  franja 
+delaunator + constrainautor                1.066 836 nodos  minA 21.8 AR 1.93 area 103 inv 836 seg 120/120 viga 18/18 pil 4/4 det true baraj [false,false,false] 7b4aea7f76d2d727 Jmin  franja 
+poly2tri (viga como Steiner)               0.853 836 nodos  minA 21.8 AR 1.93 area 103 inv 0 seg 120/120 viga 18/18 pil 4/4 det true baraj [true,true,true] 6b9d1332f27f4c56 Jmin  franja 
+earcut (sin Steiner ni líneas internas)    0.011 8 nodos  minA 4.56 AR 9.07 area 103 inv 0 seg 0/120 viga 0/18 pil 0/4 det true baraj [true,true,true] 3ca342bd2846f4f9 Jmin  franja 
+tri->3 quads (sobre constrainautor)         2508 nodos 2610 minA 21.8 AR 3 area 103 inv  seg  viga  pil  det  baraj   Jmin 0.371 franja 
+rejilla estructurada (líneas de control)    443 nodos 497 minA 90 AR 1.25 area 103 inv  seg  viga  pil  det  baraj   Jmin 1 franja 0.4
+== D {"ptsPSLG":122,"segPSLG":120,"steiner":350,"areaEsperada":103}
+cdt2d (exterior:false)                     42.452 16 nodos  minA 14.04 AR 3 area 5 inv 0 seg 18/120 viga 0/18 pil 0/4 det true baraj [true,true,true] 6a35217cbed4f592 Jmin  franja 
+cdt2d + clasificación propia               41.66 793 nodos  minA 0.27 AR 130.49 area 98.35 inv 0 seg 114/120 viga 18/18 pil 4/4 det true baraj [false,false,false] 21b68025eac7cc68 Jmin  franja 
+cdt-js (eraseOuterTrianglesAndHoles)       ERROR 132120
+cdt-js + clasificación propia              ERROR 187800
+delaunator + constrainautor                0.501 836 nodos  minA 21.8 AR 1.93 area 103 inv 836 seg 120/120 viga 18/18 pil 3/4 det true baraj [false,false,false] df33b02aa9f73591 Jmin  franja 
+poly2tri (viga como Steiner)               1.086 842 nodos  minA  AR  area 103 inv 6 seg 120/120 viga 18/18 pil 4/4 det true baraj [true,true,true] acf1e0ba4f35aae6 Jmin  franja 
+earcut (sin Steiner ni líneas internas)    0.011 8 nodos  minA 4.56 AR 9.07 area 103 inv 0 seg 0/120 viga 0/18 pil 0/4 det true baraj [true,true,true] 3ca342bd2846f4f9 Jmin  franja 
+tri->3 quads (sobre constrainautor)         2508 nodos 2610 minA 21.8 AR 3 area 103 inv  seg  viga  pil  det  baraj   Jmin 0.371 franja 
+rejilla estructurada (líneas de control)    443 nodos 497 minA 90 AR 1.25 area 103 inv  seg  viga  pil  det  baraj   Jmin 1 franja 0.4

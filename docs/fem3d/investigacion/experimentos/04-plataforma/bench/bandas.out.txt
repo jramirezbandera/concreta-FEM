@@ -1,0 +1,3 @@
+porElemento {'pixeles': 331776, 'coloresDistintos': 10, 'pctFueraDeLeyenda': 0}
+texturaNodal {'pixeles': 331776, 'coloresDistintos': 8, 'pctFueraDeLeyenda': 0}
+colorNodalInterpolado {'pixeles': 331776, 'coloresDistintos': 1863, 'pctFueraDeLeyenda': 73.2}

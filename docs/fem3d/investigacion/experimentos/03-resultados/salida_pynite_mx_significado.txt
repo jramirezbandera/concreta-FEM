@@ -1,0 +1,3 @@
+centro de la luz: Mx=-19754.4  My=-1808.0  Mxy=0.13  N·m/m ; q·a²/8 = 20000.0
+junto al apoyo x=0: Qx=-16741.9  Qy=2564.8  N/m ; q·a/2 = 20000.0
+junto al apoyo x=a: Qx=16741.9  Qy=2564.8  N/m

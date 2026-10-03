@@ -1,0 +1,28 @@
+=== n=30 cholmod 15:20:02
+BENCH {"n": 30, "nodes": 6516, "dof": 39096, "quads": 6319, "bars": 480, "nnzG": 58408, "t_graph_s": 0.02, "nnzKlower": 1070892, "cholmod_analyze_s": 0.07, "cholmod_factor_s": 0.82, "cholmod_minor_eq_n": true, "cholmod_is_super": 1, "cholmod_ordering": 2, "cholmod_xsize": 9880164, "cholmod_solve_24rhs_s": 0.21, "cholmod_relres": 1.5074919943341243e-15}
+RUNINFO {"args":["30","cholmod","24"],"boot_ms":3408,"total_ms":6607,"forkCalls":4122,"heap_MB":304,"rss_MB":656,"err":null}
+=== n=30 superlu 15:20:09
+BENCH {"n": 30, "nodes": 6516, "dof": 39096, "quads": 6319, "bars": 480, "nnzG": 58408, "t_graph_s": 0.02, "nnzK": 2102688, "t_buildK_s": 0.11, "superlu_factor_s": 2.29, "superlu_nnzLU": 15828484, "superlu_solve_24rhs_s": 0.71, "superlu_relres": 2.001119911997356e-15}
+RUNINFO {"args":["30","superlu","24"],"boot_ms":2801,"total_ms":8377,"forkCalls":0,"heap_MB":1808,"rss_MB":837,"err":null}
+=== n=45 cholmod 15:20:18
+BENCH {"n": 45, "nodes": 14847, "dof": 89082, "quads": 14560, "bars": 480, "nnzG": 132847, "t_graph_s": 0.03, "nnzKlower": 2435787, "cholmod_analyze_s": 0.15, "cholmod_factor_s": 1.65, "cholmod_minor_eq_n": true, "cholmod_is_super": 1, "cholmod_ordering": 2, "cholmod_xsize": 21579840, "cholmod_solve_24rhs_s": 0.42, "cholmod_relres": 1.6351171390505238e-15}
+RUNINFO {"args":["45","cholmod","24"],"boot_ms":2941,"total_ms":7478,"forkCalls":9518,"heap_MB":535,"rss_MB":893,"err":null}
+=== n=45 superlu 15:20:25
+BENCH {"n": 45, "nodes": 14847, "dof": 89082, "quads": 14560, "bars": 480, "nnzG": 132847, "t_graph_s": 0.03, "nnzK": 4782492, "t_buildK_s": 0.19, "superlu_factor_s": 7.97, "superlu_nnzLU": 39651232, "superlu_solve_24rhs_s": 1.96, "superlu_relres": 2.1434146343578946e-15}
+RUNINFO {"args":["45","superlu","24"],"boot_ms":2752,"total_ms":15481,"forkCalls":0,"heap_MB":4038,"rss_MB":1411,"err":null}
+=== n=64 cholmod 15:20:41
+BENCH {"n": 64, "nodes": 30040, "dof": 180240, "quads": 29607, "bars": 480, "nnzG": 268708, "t_graph_s": 0.05, "nnzKlower": 4926864, "cholmod_analyze_s": 0.82, "cholmod_factor_s": 4.17, "cholmod_minor_eq_n": true, "cholmod_is_super": 1, "cholmod_ordering": 2, "cholmod_xsize": 46019700, "cholmod_solve_24rhs_s": 1.01, "cholmod_relres": 1.7217475601319627e-15}
+RUNINFO {"args":["64","cholmod","24"],"boot_ms":3321,"total_ms":12650,"forkCalls":19407,"heap_MB":1035,"rss_MB":1295,"err":null}
+=== n=64 superlu 15:20:54
+RUNINFO {"args":["64","superlu","24"],"boot_ms":3134,"total_ms":18261,"forkCalls":0,"heap_MB":4096,"rss_MB":1404,"err":"    info[\"superlu_nnzLU\"] = int(lu.L.nnz + lu.U.nnz) |                                 ^^^^ | numpy._core._exceptions._ArrayMemoryError: Unable to allocate 156. MiB for an array with shape (41007936,) and data type int32"}
+=== n=90 cholmod 15:21:12
+BENCH {"n": 90, "nodes": 60060, "dof": 360360, "quads": 59479, "bars": 480, "nnzG": 538000, "t_graph_s": 0.1, "nnzKlower": 9864180, "chk_supernodal_switch": 40.0, "chk_supernodal_default": 1, "cholmod_analyze_s": 1.74, "cholmod_factor_s": 11.18, "nnzL_colcount": 86196564, "flops_LLt_approx": 57149877036.0, "cholmod_minor_eq_n": true, "cholmod_is_super": 1, "cholmod_ordering": 2, "cholmod_xsize": 99861012, "cholmod_solve_24rhs_s": 2.07, "cholmod_relres": 1.8055747871102157e-15}
+RUNINFO {"args":["90","cholmod","24"],"boot_ms":3548,"total_ms":22650,"forkCalls":39603,"heap_MB":1920,"rss_MB":2182,"err":null}
+=== n=90 superlu 15:21:35
+RUNINFO {"args":["90","superlu","24"],"boot_ms":2858,"total_ms":32082,"forkCalls":0,"heap_MB":3859,"rss_MB":2422,"err":"    info[\"superlu_nnzLU\"] = int(lu.L.nnz + lu.U.nnz) |                                 ^^^^ | numpy._core._exceptions._ArrayMemoryError: Unable to allocate 324. MiB for an array with shape (84956544,) and data type int32"}
+=== n=113 cholmod 15:22:08
+BENCH {"n": 113, "nodes": 94423, "dof": 566538, "quads": 93688, "bars": 480, "nnzG": 846343, "t_graph_s": 0.13, "nnzKlower": 15517443, "chk_supernodal_switch": 40.0, "chk_supernodal_default": 1, "cholmod_analyze_s": 2.39, "cholmod_factor_s": 21.96, "nnzL_colcount": 134803047, "flops_LLt_approx": 94852644241.0, "cholmod_minor_eq_n": true, "cholmod_is_super": 1, "cholmod_ordering": 2, "cholmod_xsize": 154898640, "cholmod_solve_24rhs_s": 5.08, "cholmod_relres": 1.8436304784827624e-15}
+RUNINFO {"args":["113","cholmod","24"],"boot_ms":3217,"total_ms":47127,"forkCalls":61198,"heap_MB":2814,"rss_MB":3117,"err":null}
+=== n=113 superlu 15:22:55
+RUNINFO {"args":["113","superlu","24"],"boot_ms":4645,"total_ms":31916,"forkCalls":0,"heap_MB":3348,"rss_MB":2670,"err":"                          ilu=False, options=_options) |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ | SystemError: gstrf was called with invalid arguments"}
+DONE

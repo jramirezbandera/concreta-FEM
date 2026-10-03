@@ -1,0 +1,13 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/etiquetas.html",
+ "ms": 40045,
+ "value": {
+  "textoSuelto": "timeout 20 s",
+  "batched": "timeout 20 s",
+  "drawCalls": 2,
+  "terceros": []
+ },
+ "consola": []
+}

@@ -1,0 +1,3 @@
+malla  6x 6 (h = 0.500 m): δ punta = 13.839 mm (2.88·ref), giro del nudo = 3.011e-03 rad
+malla 12x12 (h = 0.250 m): δ punta = 15.194 mm (3.17·ref), giro del nudo = 3.462e-03 rad
+malla 24x24 (h = 0.125 m): δ punta = 16.922 mm (3.53·ref), giro del nudo = 4.037e-03 rad

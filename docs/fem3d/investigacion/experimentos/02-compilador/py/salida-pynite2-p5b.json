@@ -1,0 +1,25 @@
+{
+  "P5b_momentos_kmod": {
+    "teorico_kNm_m": 45.0,
+    "Quad kx_mod=1.0": {
+      "Mx_centro_kNm_m": 44.0349508915935,
+      "My": 2.8827962436749868,
+      "flecha_max_mm": 4.395316430906307
+    },
+    "Quad kx_mod=0.1": {
+      "Mx_centro_kNm_m": 44.0349508915935,
+      "My": 2.8827962436749868,
+      "flecha_max_mm": 4.395316430906307
+    },
+    "Rect kx_mod=1.0": {
+      "Mx_centro_kNm_m": -44.2338412582168,
+      "My": -3.1580522404412044,
+      "flecha_max_mm": 4.391628090263939
+    },
+    "Rect kx_mod=0.1": {
+      "Mx_centro_kNm_m": -4.423384125821681,
+      "My": -3.1580522404412044,
+      "flecha_max_mm": 4.391628090263939
+    }
+  }
+}

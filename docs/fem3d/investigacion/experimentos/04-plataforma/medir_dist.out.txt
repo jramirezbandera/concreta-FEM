@@ -1,0 +1,62 @@
+Entradas precache: 217  (faltan en disco: 0)
+Precache total: 6.97 MiB bruto, 2.54 MiB gzip-9
+Mayores entradas del precache:
+     445.0 KiB  (gz   125.1)  assets/docx-vendor-BtcVUEOI.js
+     369.7 KiB  (gz   160.8)  assets/pdf-lib-vendor-D5MhVdZo.js
+     352.5 KiB  (gz   108.3)  assets/index-WI8M10SH.js
+     344.5 KiB  (gz   110.9)  assets/fuente-Bsr6V5CN.js
+     262.5 KiB  (gz    89.2)  assets/fem2d-xAq20k4m.js
+     217.6 KiB  (gz    73.1)  assets/seismic-ncse02-Cl0vNJ2r.js
+     194.9 KiB  (gz    44.8)  assets/html2canvas-Bl65bhOo.js
+     189.2 KiB  (gz    63.3)  assets/viento-nieve-Dxd1amRx.js
+
+Ficheros de dist/ fuera del precache: 23, 20.68 MiB
+  pyodide       15.70 MiB
+  plantillas     2.55 MiB
+  assets         2.22 MiB
+  landing        0.17 MiB
+  workbox-600a0daf.js   0.02 MiB
+  sw.js          0.01 MiB
+  fonts          0.00 MiB
+  CNAME          0.00 MiB
+  assets fuera: ['assets/ai-vendor-D9tsi_vj.js', 'assets/pdf.worker.min-Dswkl-cV.mjs', 'assets/pdfjs-vendor-7LBEddeY.js']
+
+public/pyodide (copiado a dist/pyodide):
+  numpy-2.4.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl         2.78 MiB  gz   2.74 MiB
+  pyodide-lock.json                                              0.11 MiB  gz   0.03 MiB
+  pyodide.asm.mjs                                                1.19 MiB  gz   0.25 MiB
+  pyodide.asm.wasm                                               9.16 MiB  gz   3.37 MiB
+  pyodide.mjs                                                    0.02 MiB  gz   0.01 MiB
+  python_stdlib.zip                                              2.43 MiB  gz   2.39 MiB
+  TOTAL 15.70 MiB bruto, 8.80 MiB gzip-9
+
+index.html referencia:
+  assets/index-WI8M10SH.js                             352.5 KiB gz  108.3 KiB
+  assets/rolldown-runtime-B1FJdls4.js                    1.0 KiB gz    0.6 KiB
+  assets/vite-preload-helper-geU1UoMQ.js                 1.2 KiB gz    0.7 KiB
+  assets/createLucideIcon-DYjgnFEV.js                   99.2 KiB gz   32.8 KiB
+  assets/seguro-Bsk6CG6o.js                              1.9 KiB gz    0.8 KiB
+  assets/ThemeToggle-BcZy3EP8.js                         3.7 KiB gz    1.7 KiB
+  assets/Toast-B-BW1Ll1.js                               8.2 KiB gz    3.3 KiB
+  assets/defaults-Dj18NfLE.js                            6.3 KiB gz    2.7 KiB
+  assets/proyectoKeys-DzNG-wWm.js                        5.2 KiB gz    1.2 KiB
+  assets/moduleRegistry-C7rrQv08.js                      3.4 KiB gz    1.0 KiB
+  assets/cuadros-DFiFmbfS.js                            36.0 KiB gz   13.1 KiB
+  assets/provincias-CTSPtX5O.js                         12.1 KiB gz    4.1 KiB
+  assets/types-C41v7Nir.js                               0.7 KiB gz    0.4 KiB
+  assets/obra-BCOo-SaK.js                                1.3 KiB gz    0.6 KiB
+  assets/format-ChrVbqkW.js                              1.9 KiB gz    0.7 KiB
+  assets/state-CctNNWKU.js                              87.2 KiB gz   28.1 KiB
+  assets/catalogos-sYW-A1Lk.js                           6.6 KiB gz    2.6 KiB
+  assets/blobs-DoEVqi0q.js                               2.9 KiB gz    1.4 KiB
+  assets/proyecto-AFa-nnfl.js                            5.8 KiB gz    2.4 KiB
+  assets/AppShell-B90YtthS.js                          132.5 KiB gz   41.3 KiB
+  assets/chevron-right-DgaEAz-F.js                       0.1 KiB gz    0.1 KiB
+  assets/lz-string-DI_sSjj3.js                           4.6 KiB gz    1.4 KiB
+  assets/marketing-CyQolkEm.js                          67.0 KiB gz   23.4 KiB
+  assets/timberGrades-Bx11OPcJ.js                        5.9 KiB gz    1.4 KiB
+  assets/steelProfiles-C9hEVTEC.js                       6.9 KiB gz    3.2 KiB
+  assets/catalog-Ca3-7zkS.js                             7.1 KiB gz    2.7 KiB
+  assets/sections-C4VkJi2Y.js                            0.8 KiB gz    0.5 KiB
+  assets/marketing-BI6INMYt.css                         11.2 KiB gz    2.7 KiB
+  assets/index-BU0JntCe.css                            110.7 KiB gz   19.0 KiB

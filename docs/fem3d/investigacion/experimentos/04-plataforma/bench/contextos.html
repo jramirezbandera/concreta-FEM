@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><script>
+// ¿Cuántos contextos WebGL vivos admite la página antes de perder el más antiguo?
+// (simula montar/desmontar el visor sin dispose()/forceContextLoss()).
+window.contextos = async (n = 24) => {
+  const perdidos = []; const cs = [];
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement("canvas"); const gl = c.getContext("webgl2");
+    c.addEventListener("webglcontextlost", () => perdidos.push(i)); cs.push(gl);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+  await new Promise((r) => setTimeout(r, 500));
+  return { creados: n, perdidosIndices: perdidos, vivos: cs.filter((g) => !g.isContextLost()).length };
+};
+</script></body></html>

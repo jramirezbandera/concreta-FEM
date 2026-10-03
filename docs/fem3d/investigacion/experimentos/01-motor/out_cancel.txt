@@ -1,0 +1,52 @@
+Error thrown in write:
+TypeError: The "fd" argument must be of type number. Received undefined
+    at Object.writeSync (node:fs:967:22)
+    at Ve.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:664616)
+    at file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:660326
+    at handleEAGAIN (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:659208)
+    at readWriteHelper (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:659324)
+    at Object.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:660308)
+    at Object.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:84777)
+    at doWritev (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:226588)
+    at _fd_write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:228159)
+    at wasm://wasm/024a8f0e:wasm-function[13197]:0x55aa44 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+Error thrown in write:
+arranque en frío del worker (Pyodide+numpy+scipy+PyNite): 3961 ms (interno 3925 ms)
+TypeError: The "fd" argument must be of type number. Received undefined
+    at Object.writeSync (node:fs:967:22)
+    at Ve.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:664616)
+    at file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:660326
+    at handleEAGAIN (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:659208)
+    at readWriteHelper (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:659324)
+    at Object.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:660308)
+    at Object.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:84777)
+    at doWritev (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:226588)
+    at _fd_write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:228159)
+    at wasm://wasm/024a8f0e:wasm-function[13197]:0x55aa44 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+(1) síncrono: tarea 6.48 s; 'cancel' enviado a +1.5 s se atendió 4976 ms después (tras terminar la tarea: true)
+(2) asíncrono: estado=cancelado a los 3.30 s; 'cancel' atendido a 1801 ms, tarea parada 1802 ms después del envío
+(4) repetición 1: heap WASM 228.2 MB
+(4) repetición 2: heap WASM 228.2 MB
+(4) repetición 3: heap WASM 228.2 MB
+(4) repetición 4: heap WASM 228.2 MB
+(4) repetición 5: heap WASM 228.2 MB
+Error thrown in write:
+TypeError: The "fd" argument must be of type number. Received undefined
+    at Object.writeSync (node:fs:967:22)
+    at Ve.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:664616)
+    at file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:660326
+    at handleEAGAIN (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:659208)
+    at readWriteHelper (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:659324)
+    at Object.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:660308)
+    at Object.write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:84777)
+    at doWritev (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:226588)
+    at _fd_write (file:///C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-EST/b287d96a-8882-4d7d-800f-3c46ec2b77b4/scratchpad/fem3d/01-motor/pyodide-dist/pyodide.asm.mjs:1:228159)
+    at wasm://wasm/024a8f0e:wasm-function[13197]:0x55aa44 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+Error thrown in write:
+(3) terminate(): 52 ms; re-arranque completo: 5573 ms

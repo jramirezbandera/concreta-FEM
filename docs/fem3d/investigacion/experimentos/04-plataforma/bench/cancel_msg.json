@@ -1,0 +1,19 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/cancel_msg.html",
+ "ms": 2617,
+ "value": [
+  {
+   "type": "success",
+   "ms": 2000,
+   "msMain": 2004
+  },
+  {
+   "type": "cancel-recibido",
+   "msDesdeInicioSolve": 2000,
+   "msMain": 2004
+  }
+ ],
+ "consola": []
+}

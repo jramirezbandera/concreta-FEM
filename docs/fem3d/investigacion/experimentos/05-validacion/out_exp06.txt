@@ -1,0 +1,9 @@
+M1 [G] rotación+traslación, CON orientación explícita: desplaz. 7.84e-13 | reacciones 1.11e-13 | esfuerzos barra 1.11e-13 | momentos losa 1.04e-13
+M1 [G] rotación+traslación, SIN orientación explícita: desplaz. 1.29e-01 | esfuerzos barra 3.13e-01
+M1 [H] rotación+traslación, CON orientación explícita: desplaz. 6.72e-13 | reacciones 6.67e-13 | esfuerzos barra 6.67e-13 | momentos losa 6.72e-13
+M1 [H] rotación+traslación, SIN orientación explícita: desplaz. 7.55e-01 | esfuerzos barra 9.88e-01
+M2 renumeración (semilla 1): desplaz. 3.06e-14 | momentos losa 2.63e-14
+M2 renumeración (semilla 2): desplaz. 6.46e-14 | momentos losa 6.14e-14
+M3 superposición 1.35G+1.5H vs combo: desplaz. 4.73e-16
+M4 Maxwell-Betti: δ_ab = -5.498357e-09, δ_ba = -5.498357e-09, diferencia relativa 6.92e-15
+Equilibrio caso G: ΣRy = -120000.000000 N, carga total = 120000.0 N, error relativo 8.00e-15

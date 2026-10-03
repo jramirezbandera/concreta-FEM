@@ -1,0 +1,55 @@
+(calentamiento del JIT: primera pasada descartada)
+
+[A] 2000 barras × 11 est. × 6 esf.; 8 casos → 60 comb.
+   resultados base (Float64)                 : 8.1 MB
+   todas las combinaciones materializadas     : 60.4 MB  (no se guardan)
+   envolvente max/min + índice Uint16         : 2.5 MB
+   envolvente + vector concomitante completo  : 14.6 MB  (alternativa precalculada)
+   tiempo envolvente (todas las combinaciones): 94 ms
+   200000 consultas de concomitantes perezosas : 60 ms  (0.30 µs/consulta)  chk=-125551
+   error máx. concomitante vs extremo         : 0.00e+0
+
+[A] 2000 barras × 11 est. × 6 esf.; 8 casos → 60 comb.
+   resultados base (Float64)                 : 8.1 MB
+   todas las combinaciones materializadas     : 60.4 MB  (no se guardan)
+   envolvente max/min + índice Uint16         : 2.5 MB
+   envolvente + vector concomitante completo  : 14.6 MB  (alternativa precalculada)
+   tiempo envolvente (todas las combinaciones): 143 ms
+   200000 consultas de concomitantes perezosas : 75 ms  (0.37 µs/consulta)  chk=-125551
+   error máx. concomitante vs extremo         : 0.00e+0
+
+[A] 2000 barras × 11 est. × 6 esf.; 11 casos → 138 comb.
+   resultados base (Float64)                 : 11.1 MB
+   todas las combinaciones materializadas     : 139.0 MB  (no se guardan)
+   envolvente max/min + índice Uint16         : 2.5 MB
+   envolvente + vector concomitante completo  : 14.6 MB  (alternativa precalculada)
+   tiempo envolvente (todas las combinaciones): 298 ms
+   200000 consultas de concomitantes perezosas : 62 ms  (0.31 µs/consulta)  chk=-43103
+   error máx. concomitante vs extremo         : 0.00e+0
+
+[A] 2000 barras × 11 est. × 6 esf.; 11 casos → 176 comb.
+   resultados base (Float64)                 : 11.1 MB
+   todas las combinaciones materializadas     : 177.2 MB  (no se guardan)
+   envolvente max/min + índice Uint16         : 2.5 MB
+   envolvente + vector concomitante completo  : 14.6 MB  (alternativa precalculada)
+   tiempo envolvente (todas las combinaciones): 367 ms
+   200000 consultas de concomitantes perezosas : 62 ms  (0.31 µs/consulta)  chk=-72585
+   error máx. concomitante vs extremo         : 0.00e+0
+
+[B] 300 pilares × 2 extremos, 74 combinaciones ELU (ELU-P)
+   llamadas a calcRCColumn: 44400 en 5711 ms → 128.6 µs/llamada
+   extremos de pilar evaluados: 600
+   la envolvente con concomitantes (6 comb.) NO contiene la pésima en 198 (33.0 %)
+   ... y subestima η más de un 5 % en 60 (10.0 %)
+   cociente η_extremos/η_todas: mín 0.763, p5 0.917, mediana 1.000
+   peor caso: pilar 277 extremo 1: η_todas=18.594 (ELU-P G1.35 *Q S Wx-) η_extremos=14.181
+   sólo pilares con 0,3 ≤ η ≤ 1,5 (345): no contiene la pésima en 35.9 %; subestima >5 % en 8.7 %
+
+[B] 300 pilares × 2 extremos, 138 combinaciones ELU (ELU-P + ELU-S)
+   llamadas a calcRCColumn: 82800 en 11359 ms → 137.2 µs/llamada
+   extremos de pilar evaluados: 600
+   la envolvente con concomitantes (6 comb.) NO contiene la pésima en 349 (58.2 %)
+   ... y subestima η más de un 5 % en 201 (33.5 %)
+   cociente η_extremos/η_todas: mín 0.678, p5 0.828, mediana 0.888
+   peor caso: pilar 33 extremo 1: η_todas=1.334 (ELU-S +EY+e +0.3EX-e) η_extremos=0.905
+   sólo pilares con 0,3 ≤ η ≤ 1,5 (315): no contiene la pésima en 73.0 %; subestima >5 % en 40.3 %

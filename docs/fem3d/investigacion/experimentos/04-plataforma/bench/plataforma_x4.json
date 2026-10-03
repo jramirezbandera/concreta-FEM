@@ -1,0 +1,38 @@
+{
+ "modo": "gpu",
+ "throttle": 4,
+ "url": "http://127.0.0.1:8794/bench/platform.html",
+ "ms": 4184,
+ "value": {
+  "huellaMedio": {
+   "nNodos": 20000,
+   "nFrames": 25000,
+   "nShells": 40000,
+   "MBjson": 12.5,
+   "msCanonico": 545.6,
+   "msStringifyPlano": 120.3,
+   "msTextEncoder": 80.1,
+   "msSha256": 37.4,
+   "msTotalJsonCanonico": 663.1,
+   "MBbuffers": 1.1,
+   "msShaBuffers": 11.8,
+   "huella": "49927500b76d6d30",
+   "huellaBuf": "1ee532d4f04c22b4",
+   "igualTrasRepetir": true,
+   "stringifyPlanoIgualCanonico": false
+  },
+  "transferencia": {
+   "MB": 45.8,
+   "msCopiaIda": 155.2,
+   "msTransferIda": 2.8,
+   "byteLengthTrasTransferir": 0,
+   "msStringify": 1095.4,
+   "MBjson": 57.5,
+   "msJsonIdaYParseEnWorker": 186.8,
+   "msJsonParseEnHiloPrincipal": 709,
+   "msEcoTransfer": 0.9,
+   "ecoLongitud": 6000000
+  }
+ },
+ "consola": []
+}

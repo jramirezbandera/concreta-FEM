@@ -1,0 +1,19 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/snap.html",
+ "ms": 1691,
+ "value": {
+  "hacer": {
+   "ok": true,
+   "ms": 1497,
+   "MB": 30
+  },
+  "cargar": {
+   "ok": false,
+   "error": "  await pyodide.loadPackage(\"scipy\") in JavaScript | See https://pyodide.org/en/stable/usage/loading-packages.html for more details. | ",
+   "ms": 176
+  }
+ },
+ "consola": []
+}

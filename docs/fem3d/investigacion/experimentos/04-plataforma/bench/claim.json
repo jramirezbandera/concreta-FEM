@@ -1,0 +1,13 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/claim/index.html",
+ "ms": 32,
+ "value": {
+  "paginaControlada": true,
+  "fetchPagina": "INTERCEPTADO",
+  "workerCreadoAntesDelClaim": "INTERCEPTADO",
+  "workerCreadoDespuesDelClaim": "INTERCEPTADO"
+ },
+ "consola": []
+}

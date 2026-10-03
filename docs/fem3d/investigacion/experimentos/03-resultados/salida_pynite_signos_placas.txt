@@ -1,0 +1,19 @@
+=== (1) placa SS, presión add_quad_surface_pressure = -q (q=10 kPa) ===
+w_centro = -4.885576e-04 m   (Timoshenko 4.729088e-04, signo esperado si -q es hacia -Z: negativo)
+Mx,My,Mxy centro (local) = [-7.84157845e+03 -7.84157845e+03  1.29974097e-01]  N·m/m   (Timoshenko |M| = 7664.0)
+sum Rz = 160000.0 N  (carga total 160000.0)
+con presión +q: w_centro = 4.885576e-04, Mx_centro = 7841.6
+esquina (0,0): Mx,My,Mxy = [-5363.99054711 -5363.9905471   4082.88503545]; Qx,Qy=[35504.18210413 35504.18210413]
+borde x=0, y=a/2: Qx,Qy = [-11561.37736455  -3246.16493867] N/m  (Timoshenko |Qx| borde = 13520; Vx Kirchhoff 0.420qa)
+
+=== (2) membrane(): tracción uniforme Nx = 1,0e6 N/m en placa t=0,20 ===
+membrane(local) en el centro = [ 5.00000000e+06 -1.85526802e-08 -2.17361686e-08]  → si es tensión: Nx/t = 5.000e+06 Pa; si es esfuerzo: 1,0e6 N/m
+
+=== (3) placa girada 30°: transformación local→global de momentos ===
+local=False lanza: TypeError only 0-dimensional arrays can be converted to Python scalars
+sin girar  local (= global, ejes alineados) = [-4354.57389561 -3804.8549594   1787.58579167]
+girada 30° local                            = [-4354.57389561 -3804.85495941  1787.58579167]  (debe coincidir: mismo problema físico)
+REFERENCIA global girada = Rz·T0·Rzᵀ → Mx=-5765.24 My=-2394.19 Mxy=655.76
+álgebra de PyNite (My→-My; R·M·Rᵀ)  → Mx=-766.62 My=216.90 Mxy=4426.93
+álgebra correcta (Rᵀ·M·R, sin cambio)  → Mx=-5765.24 My=-2394.19 Mxy=655.76
+placa SIN girar con el álgebra de PyNite → Mx=-4354.57 My=3804.85 (local Mx=-4354.57, My=-3804.85)

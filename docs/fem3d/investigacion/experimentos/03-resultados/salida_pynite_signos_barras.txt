@@ -1,0 +1,31 @@
+## FX=+1 (tracción)
+   local_axes_rows_xyz [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+   results {"x=0.0": {"N(axial)": -1.0, "Vy(shear Fy)": 0.0, "Vz(shear Fz)": 0.0, "T(torque)": 0.0, "My(moment My)": -0.0, "Mz(moment Mz)": 0.0}, "x=1.0": {"N(axial)": -1.0, "Vy(shear Fy)": 0.0, "Vz(shear Fz)": 0.0, "T(torque)": 0.0, "My(moment My)": -0.0, "Mz(moment Mz)": 0.0}}
+   reaction_i[FX,FY,FZ,MX,MY,MZ] [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+## FY=-1 (hacia -Y, «gravedad» en PyNite)
+   local_axes_rows_xyz [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+   results {"x=0.0": {"N(axial)": 0.0, "Vy(shear Fy)": 0.9999999999999999, "Vz(shear Fz)": 0.0, "T(torque)": 0.0, "My(moment My)": -0.0, "Mz(moment Mz)": 2.0}, "x=1.0": {"N(axial)": 0.0, "Vy(shear Fy)": 0.9999999999999999, "Vz(shear Fz)": 0.0, "T(torque)": 0.0, "My(moment My)": -0.0, "Mz(moment Mz)": 1.0}}
+   reaction_i[FX,FY,FZ,MX,MY,MZ] [0.0, 1.0, 0.0, 0.0, 0.0, 2.0]
+## FZ=-1 (hacia -Z)
+   local_axes_rows_xyz [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+   results {"x=0.0": {"N(axial)": 0.0, "Vy(shear Fy)": 0.0, "Vz(shear Fz)": 1.0, "T(torque)": 0.0, "My(moment My)": 2.0, "Mz(moment Mz)": 0.0}, "x=1.0": {"N(axial)": 0.0, "Vy(shear Fy)": 0.0, "Vz(shear Fz)": 1.0, "T(torque)": 0.0, "My(moment My)": 1.0, "Mz(moment Mz)": 0.0}}
+   reaction_i[FX,FY,FZ,MX,MY,MZ] [0.0, 0.0, 1.0, 0.0, -2.0, 0.0]
+## MX=+1 (torsor)
+   local_axes_rows_xyz [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+   results {"x=0.0": {"N(axial)": 0.0, "Vy(shear Fy)": 0.0, "Vz(shear Fz)": 0.0, "T(torque)": -1.0, "My(moment My)": -0.0, "Mz(moment Mz)": 0.0}, "x=1.0": {"N(axial)": 0.0, "Vy(shear Fy)": 0.0, "Vz(shear Fz)": 0.0, "T(torque)": -1.0, "My(moment My)": -0.0, "Mz(moment Mz)": 0.0}}
+   reaction_i[FX,FY,FZ,MX,MY,MZ] [0.0, 0.0, 0.0, -1.0, 0.0, 0.0]
+## PILAR Z-arriba, FZ=-1 (compresión)
+   local_axes_rows_xyz [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
+   N(x=0) 1.0
+   My(x=0) -0.0
+   Mz(x=0) 0.0
+## PILAR Z-arriba, FX=+1 en cabeza
+   local_axes_rows_xyz [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
+   N(x=0) 0.0
+   My(x=0) 3.0
+   Mz(x=0) 0.0
+## PILAR Z-arriba, FY=+1 en cabeza
+   local_axes_rows_xyz [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
+   N(x=0) 0.0
+   My(x=0) -0.0
+   Mz(x=0) -3.0

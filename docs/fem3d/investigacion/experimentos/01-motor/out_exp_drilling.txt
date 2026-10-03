@@ -1,0 +1,3 @@
+W    ΣM_vert: aplicado=  -900000.00  reacciones=   900000.00  desequilibrio=     -0.00 N·m (0.00 % del aplicado)  absorbido por drilling=      0.00
+TOR  ΣM_vert: aplicado=   600000.00  reacciones=  -595718.86  desequilibrio=   4281.14 N·m (0.71 % del aplicado)  absorbido por drilling=   4281.14
+G    ΣM_vert: aplicado=        0.00  reacciones=       -0.00  desequilibrio=     -0.00 N·m (0.00 % del aplicado)  absorbido por drilling=      0.00

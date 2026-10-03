@@ -1,0 +1,19 @@
+entrada                          modo                      tool      min KiB  gzip KiB  br KiB
+a_three_star.js                  todo (salvo react)        esbuild    728.0   187.8   152.7
+a_three_star.js                  todo (salvo react)        rolldown   726.5   182.1   147.0
+b_three_min.js                   todo (salvo react)        esbuild    532.4   134.7   110.4
+b_three_min.js                   todo (salvo react)        rolldown   530.7   130.9   106.7
+c_three_visor.js                 todo (salvo react)        esbuild    656.5   170.0   139.1
+c_three_visor.js                 todo (salvo react)        rolldown   648.3   162.6   132.4
+d_three_visor_cc_troika.js       todo (salvo react)        esbuild    825.2   225.7   185.6
+d_three_visor_cc_troika.js       todo (salvo react)        rolldown   814.3   216.2   176.8
+e_r3f_only.js                    todo (salvo react)        esbuild    906.5   245.0   202.1
+e_r3f_only.js                    todo (salvo react)        rolldown   899.4   236.0   193.6
+e_r3f_only.js                    sin three (incremental)   esbuild    176.9    56.7    49.6
+e_r3f_only.js                    sin three (incremental)   rolldown   172.7    54.4    47.4
+f_r3f_drei.js                    todo (salvo react)        esbuild   1173.6   332.5   273.9
+f_r3f_drei.js                    todo (salvo react)        rolldown  1157.8   317.9   260.2
+f_r3f_drei.js                    sin three (incremental)   esbuild    447.7   145.4   125.5
+f_r3f_drei.js                    sin three (incremental)   rolldown   432.1   136.4   117.1
+g_webgpu.js                      todo (salvo react)        esbuild    795.4   220.3   177.2
+g_webgpu.js                      todo (salvo react)        rolldown   801.2   216.5   172.9

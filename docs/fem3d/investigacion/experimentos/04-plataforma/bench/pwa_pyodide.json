@@ -1,0 +1,35 @@
+{
+ "1-navegar-raiz": "11:24:49.740",
+ "swTrasRaiz": {
+  "activo": true,
+  "scope": "http://127.0.0.1:8796/",
+  "controla": false
+ },
+ "cachesTrasRaiz": [
+  "workbox-precache-v2-http://127.0.0.1:8796/"
+ ],
+ "2-navegar-taludes": "11:24:56.785",
+ "controlaEnTaludes": true,
+ "cachesTrasTaludes": [
+  "workbox-precache-v2-http://127.0.0.1:8796/",
+  "pyodide-runtime-v314_0_0"
+ ],
+ "entradasPyodide": [
+  "/pyodide/pyodide.mjs",
+  "/pyodide/pyodide-lock.json",
+  "/pyodide/python_stdlib.zip",
+  "/pyodide/pyodide.asm.mjs",
+  "/pyodide/pyodide.asm.wasm",
+  "/pyodide/numpy-2.4.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl"
+ ],
+ "3-recargar-taludes": "11:25:16.811",
+ "4-fin": "11:25:31.824",
+ "estimacion": {
+  "usoMB": 24.4,
+  "detalle": {
+   "caches": 25527552,
+   "indexedDB": 33233,
+   "serviceWorkerRegistrations": 37052
+  }
+ }
+}

@@ -1,0 +1,3 @@
+h= 1.00 m: ux=0.4706 mm  (Timoshenko 0.5035 mm, ratio 0.935)  ΣM: aplicado=-600000.0 reacc=600000.0 desequilibrio=-0.000 %
+h= 0.50 m: ux=0.4933 mm  (Timoshenko 0.5035 mm, ratio 0.980)  ΣM: aplicado=-600000.0 reacc=600000.0 desequilibrio=-0.000 %
+h= 0.25 m: ux=0.4995 mm  (Timoshenko 0.5035 mm, ratio 0.992)  ΣM: aplicado=-600000.0 reacc=600000.0 desequilibrio=0.000 %

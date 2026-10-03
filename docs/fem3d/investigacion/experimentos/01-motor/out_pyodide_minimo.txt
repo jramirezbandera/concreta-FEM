@@ -1,0 +1,47 @@
+Loading numpy, scipy
+Loaded numpy, scipy
+modelo {'nodes': 88, 'members': 52, 'quads': 60, 'plates': 0, 'dof': 528} yup
+analyze_linear 2.060s
+Σreacciones[G] F=(0.000, 399000.000, -0.000) N
+   vertical: reacción 399000.0000 vs carga 399000.0000  err rel 4.67e-15
+Σreacciones[Q] F=(0.000, 120000.000, -0.000) N
+   vertical: reacción 120000.0000 vs carga 120000.0000  err rel 6.79e-15
+Σreacciones[W] F=(-0.000, -0.000, -80000.000) N
+Σreacciones[ELU] F=(-0.000, 718650.000, -72000.000) N
+   W horizontal: reacción -80000.0000 vs carga -80000.0000  err rel 4.00e-12
+superposición desplazamientos: max|ELU - Σ| / max|ELU| = 5.47568616945185e-16
+superposición esfuerzos de barra: max err rel = 2.1929256412386687e-13
+C0_0_1 L=3.000 subs 1
+  [N, Vy, Vz, T, My, Mz] caso G:
+ [[99750.  -2032.2  3065.      1.1  3069.3 -2033.8]
+ [98062.5 -2032.2  3065.      1.1   770.5  -509.7]
+ [96375.  -2032.2  3065.      1.1 -1528.2  1014.5]
+ [94687.5 -2032.2  3065.      1.1 -3827.   2538.6]
+ [93000.  -2032.2  3065.      1.1 -6125.7  4062.7]]
+  ejes locales (filas x,y,z) con rotation=0:
+ [[ 0.  1.  0.]
+ [-1.  0.  0.]
+ [ 0.  0.  1.]]
+BX0_0_1 L=1.000 subs 1
+  [N, Vy, Vz, T, My, Mz] caso G:
+ [[-1983.4 20101.2    72.6   481.7    53.4 13243.7]
+ [-1983.4 19163.7    72.6   481.7    35.2  8335.6]
+ [-1983.4 18226.2    72.6   481.7    17.1  3661.8]
+ [-1983.4 17288.7    72.6   481.7    -1.1  -777.6]
+ [-1983.4 16351.2    72.6   481.7   -19.2 -4982.6]]
+  ejes locales (filas x,y,z) con rotation=0:
+ [[ 0.  0.  1.]
+ [ 0.  1.  0.]
+ [-1.  0.  0.]]
+quad Q0_0_1 (+0,+0) M=[ 570.8   42.8 -135.5] Q=[-5085.6 -4597.3] S=[7681.4 4816.6 6041.6] -> Nx,Ny,Nxy = [1920.3 1204.2 1510.4]
+quad Q0_0_1 (-1,-1) M=[5620.1 4158.1  519.7] Q=[-6661.6 -5337.1] S=[15186.9  9822.4 10212. ] -> Nx,Ny,Nxy = [3796.7 2455.6 2553. ]
+quad Q0_0_1 (+1,-1) M=[-1416.    953.4  -337.5] Q=[-6661.6 -3857.6] S=[13726.6  2521.   4791.7] -> Nx,Ny,Nxy = [3431.6  630.2 1197.9]
+quad Q0_0_1 (+1,+1) M=[-2754.5 -3017.5  -790.6] Q=[-3509.6 -3857.6] S=[ 175.8 -189.2 1871.1] -> Nx,Ny,Nxy = [ 44.  -47.3 467.8]
+quad Q0_0_1 (-1,+1) M=[  833.7 -1922.8    66.6] Q=[-3509.6 -5337.1] S=[1636.1 7112.2 7291.4] -> Nx,Ny,Nxy = [ 409.  1778.1 1822.9]
+quad ejes locales:
+ [[0. 0. 1.]
+ [1. 0. 0.]
+ [0. 1. 0.]]
+superposición quads (centroide): max err rel = 3.706480716233831e-12
+done 2.71s
+PYODIDE_INFO {"mode":"minimo","pyodide":"314.0.0","heap_after_packages_MB":62.4,"import_ok":true,"heap_after_import_MB":74.9,"heap_final_MB":113.9,"node_rss_MB":435.9,"times":{"import_pyodide_mjs_ms":3,"loadPyodide_ms":1741,"loadPackage_numpy_scipy_ms":1998,"import_Pynite_ms":860,"exp_a_minimo_ms":2726}}

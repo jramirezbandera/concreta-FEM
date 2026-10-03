@@ -1,0 +1,94 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/platform.html",
+ "ms": 2224,
+ "value": {
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+  "crossOriginIsolated": false,
+  "hardwareConcurrency": 24,
+  "deviceMemory": 32,
+  "localStorageAscii": {
+   "caracter": "a",
+   "caracteresTotales": 5242880,
+   "MiCaracteres": 5,
+   "error": "QuotaExceededError"
+  },
+  "localStorageNoAscii": {
+   "caracter": "ñ",
+   "caracteresTotales": 5242880,
+   "MiCaracteres": 5,
+   "error": "QuotaExceededError"
+  },
+  "huellaMedio": {
+   "nNodos": 20000,
+   "nFrames": 25000,
+   "nShells": 40000,
+   "MBjson": 12.5,
+   "msCanonico": 145.7,
+   "msStringifyPlano": 24.6,
+   "msTextEncoder": 23.9,
+   "msSha256": 9.1,
+   "msTotalJsonCanonico": 178.7,
+   "MBbuffers": 1.1,
+   "msShaBuffers": 23.4,
+   "huella": "eae1c1964e2354fb",
+   "huellaBuf": "44441149fcffebc9",
+   "igualTrasRepetir": true,
+   "stringifyPlanoIgualCanonico": false
+  },
+  "huellaPequeno": {
+   "nNodos": 2000,
+   "nFrames": 2500,
+   "nShells": 4000,
+   "MBjson": 1.2,
+   "msCanonico": 11.9,
+   "msStringifyPlano": 1.9,
+   "msTextEncoder": 2.2,
+   "msSha256": 0.9,
+   "msTotalJsonCanonico": 15,
+   "MBbuffers": 0.1,
+   "msShaBuffers": 2.5,
+   "huella": "4c96f75c88460ea2",
+   "huellaBuf": "2a61497af613bbe6",
+   "igualTrasRepetir": true,
+   "stringifyPlanoIgualCanonico": false
+  },
+  "transferencia": {
+   "MB": 45.8,
+   "msCopiaIda": 49.2,
+   "msTransferIda": 3.7,
+   "byteLengthTrasTransferir": 0,
+   "msStringify": 272.1,
+   "MBjson": 57.5,
+   "msJsonIdaYParseEnWorker": 191.3,
+   "msJsonParseEnHiloPrincipal": 164.4,
+   "msEcoTransfer": 0.3,
+   "ecoLongitud": 6000000
+  },
+  "idb": {
+   "MB": 45.8,
+   "msEscribir": 107.3,
+   "msLeer": 35.2,
+   "integro": true,
+   "cuotaEstimadaGB": 10.8,
+   "usoMB": 45.8,
+   "persisted": false
+  },
+  "longTasks": {
+   "soportado": true,
+   "loaf": true,
+   "tareasMs": [
+    263,
+    176,
+    138,
+    347,
+    164,
+    328,
+    127,
+    68
+   ]
+  }
+ },
+ "consola": []
+}

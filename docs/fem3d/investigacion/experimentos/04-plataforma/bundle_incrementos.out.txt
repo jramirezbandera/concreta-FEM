@@ -1,0 +1,8 @@
+base (three núcleo típico): 134.7 KiB gz
++ bvh.js                 24.8 KiB gz
++ cameracontrols.js      10.1 KiB gz
++ css2d.js                1.1 KiB gz
++ fatlines.js             7.4 KiB gz
++ orbit.js                5.3 KiB gz
++ troika.js              44.2 KiB gz
++ viewhelper.js           3.2 KiB gz

@@ -1,0 +1,126 @@
+
+### B. Apoyada blanda, a/t=100, Quad3D  (bc=ss_soft, elem=Quad, a/t=100, distorsión=0.0)
+ref w*D/(q a^4) = 0.004064   ref M = 0.04788637832333646   ref borde = None
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |    -6.692 | +0.06130 |   +28.020 |   -50.015 | +0.1010 | -0.01803 | -0.00376 | 0.24
+  4 |    -0.418 | +0.05008 |    +4.576 |    -7.663 | +0.1318 | -0.02755 | -0.00025 | 0.09
+  8 |    -0.068 | +0.04842 |    +1.109 |    -1.711 | +0.1696 | -0.03087 | -0.00022 | 0.34
+ 16 |    -0.012 | +0.04804 |    +0.327 |    -0.416 | +0.2004 | -0.03201 | -0.00037 | 1.56
+ 32 |    +0.063 | +0.04797 |    +0.171 |    -0.055 | +0.2372 | -0.03196 | -0.00059 | 9.20
+  w: orden observado p = -0.44; Richardson = 0.0040553 (-0.2257 % vs ref); GCI_fino = -0.3609 %
+  Mc: orden observado p = 2.32; Richardson = 0.0479496 (+0.1321 % vs ref); GCI_fino = 0.0486 %
+
+### B. Apoyada blanda, a/t=100, Plate3D  (bc=ss_soft, elem=Rect, a/t=100, distorsión=0.0)
+ref w*D/(q a^4) = 0.004062   ref M = 0.04788637832333646   ref borde = None
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |   +27.922 | -0.07362 |   +53.737 |   -10.323 | +0.2395 | +0.02628 | -0.00752 | 0.02
+  4 |    +6.598 | -0.05213 |    +8.867 |    -2.639 | +0.2458 | +0.03392 | -0.00454 | 0.06
+  8 |    +1.649 | -0.04892 |    +2.155 |    -0.549 | +0.2906 | +0.03530 | -0.00118 | 0.29
+ 16 |    +0.412 | -0.04814 |    +0.535 |    -0.131 | +0.3165 | +0.03560 | -0.00031 | 1.09
+ 32 |    +0.103 | -0.04795 |    +0.134 |    -0.032 | +0.3307 | +0.03567 | -0.00008 | 4.83
+  w: orden observado p = 2.00; Richardson = 0.0040624 (-0.0000 % vs ref); GCI_fino = 0.1288 %
+  Mc: orden observado p = 2.01; Richardson = 0.0478869 (+0.0012 % vs ref); GCI_fino = 0.1653 %
+
+### C. Empotrada, a/t=100, Quad3D  (bc=clamped, elem=Quad, a/t=100, distorsión=0.0)
+ref w*D/(q a^4) = 0.001265   ref M = 0.0229051   ref borde = -0.0513338
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |   +23.690 | +0.04876 |  +112.893 |      +nan | +0.1500 | -0.00438 | -0.03751 | 0.03
+  4 |   +15.606 | +0.02877 |   +25.593 |      +nan | +0.2501 | -0.00216 | -0.04863 | 0.11
+  8 |    +4.454 | +0.02436 |    +6.348 |      +nan | +0.3275 | -0.00054 | -0.05071 | 0.48
+ 16 |    +1.270 | +0.02329 |    +1.660 |      +nan | +0.3793 | -0.00003 | -0.05119 | 1.84
+ 32 |    +0.456 | +0.02302 |    +0.480 |      +nan | +0.4101 | +0.00004 | -0.05131 | 8.52
+  w: orden observado p = 1.97; Richardson = 0.0012676 (+0.1765 % vs ref); GCI_fino = 0.3478 %
+  Mc: orden observado p = 1.99; Richardson = 0.0229241 (+0.0829 % vs ref); GCI_fino = 0.4941 %
+
+### C. Empotrada, a/t=100, Plate3D  (bc=clamped, elem=Rect, a/t=100, distorsión=0.0)
+ref w*D/(q a^4) = 0.001265   ref M = 0.0229051   ref borde = -0.0513338
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |   +16.938 | -0.04616 |  +101.548 |      +nan | +0.2180 | -0.00455 | +0.03551 | 0.02
+  4 |   +10.908 | -0.02778 |   +21.297 |      +nan | +0.3016 | -0.00618 | +0.04761 | 0.08
+  8 |    +3.053 | -0.02405 |    +4.988 |      +nan | +0.3587 | -0.00322 | +0.05028 | 0.28
+ 16 |    +0.779 | -0.02319 |    +1.232 |      +nan | +0.3962 | -0.00111 | +0.05104 | 1.30
+ 32 |    +0.196 | -0.02298 |    +0.307 |      +nan | +0.4177 | -0.00025 | +0.05126 | 6.46
+  w: orden observado p = 1.96; Richardson = 0.0012652 (-0.0057 % vs ref); GCI_fino = 0.2513 %
+  Mc: orden observado p = 2.02; Richardson = 0.0229062 (+0.0049 % vs ref); GCI_fino = 0.3766 %
+
+### D. Apoyada dura, a/t=10, Quad3D (ref Mindlin)  (bc=ss_hard, elem=Quad, a/t=10, distorsión=0.0)
+ref w*D/(q a^4) = 0.004273   ref M = 0.04788637832333646   ref borde = None
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |    -6.469 | +0.06303 |   +31.618 |   -51.657 | +0.1064 | -0.01843 | -0.00470 | 0.06
+  4 |    -1.027 | +0.05225 |    +9.103 |    -8.491 | +0.1699 | -0.02780 | -0.00506 | 0.24
+  8 |    -0.414 | +0.04941 |    +3.179 |    -2.124 | +0.2462 | -0.03106 | -0.00501 | 0.91
+ 16 |    -0.132 | +0.04834 |    +0.948 |    -0.551 | +0.2962 | -0.03206 | -0.00331 | 2.84
+ 32 |    -0.036 | +0.04801 |    +0.251 |    -0.140 | +0.3192 | -0.03236 | -0.00180 | 9.34
+  w: orden observado p = 1.54; Richardson = 0.0042735 (+0.0147 % vs ref); GCI_fino = 0.0630 %
+  Mc: orden observado p = 1.68; Richardson = 0.0478546 (-0.0665 % vs ref); GCI_fino = 0.3955 %
+
+### D. Apoyada dura, a/t=10, Plate3D (ref Mindlin)  (bc=ss_hard, elem=Rect, a/t=10, distorsión=0.0)
+ref w*D/(q a^4) = 0.004273   ref M = 0.04788637832333646   ref borde = None
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |   +18.498 | -0.06602 |   +37.865 |   -21.903 | +0.1703 | +0.03883 | -0.01995 | 0.02
+  4 |    +1.296 | -0.05217 |    +8.944 |    -2.611 | +0.2489 | +0.03725 | -0.00408 | 0.06
+  8 |    -3.360 | -0.04892 |    +2.155 |    -0.549 | +0.2904 | +0.03625 | -0.00118 | 0.23
+ 16 |    -4.534 | -0.04814 |    +0.535 |    -0.131 | +0.3164 | +0.03587 | -0.00031 | 0.86
+ 32 |    -4.828 | -0.04795 |    +0.134 |    -0.032 | +0.3307 | +0.03575 | -0.00008 | 4.79
+  w: orden observado p = 2.00; Richardson = 0.0040623 (-4.9264 % vs ref); GCI_fino = 0.1289 %
+  Mc: orden observado p = 2.01; Richardson = 0.0478869 (+0.0012 % vs ref); GCI_fino = 0.1653 %
+
+### E. Apoyada dura, a/t=1000, Quad3D  (bc=ss_hard, elem=Quad, a/t=1000, distorsión=0.0)
+ref w*D/(q a^4) = 0.004062   ref M = 0.04788637832333646   ref borde = None
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |    -6.834 | +0.06031 |   +25.935 |   -50.929 | +0.0967 | -0.01838 | -0.00194 | 0.02
+  4 |    -0.413 | +0.05011 |    +4.633 |    -7.619 | +0.1326 | -0.02758 | -0.00025 | 0.10
+  8 |    -0.058 | +0.04839 |    +1.045 |    -1.699 | +0.1673 | -0.03086 | -0.00004 | 0.48
+ 16 |    -0.012 | +0.04801 |    +0.256 |    -0.413 | +0.1909 | -0.03197 | -0.00001 | 1.94
+ 32 |    -0.003 | +0.04792 |    +0.064 |    -0.103 | +0.2048 | -0.03233 | -0.00001 | 9.17
+  w: orden observado p = 2.31; Richardson = 0.0040623 (-0.0007 % vs ref); GCI_fino = 0.0029 %
+  Mc: orden observado p = 2.04; Richardson = 0.0478875 (+0.0024 % vs ref); GCI_fino = 0.0773 %
+
+### E. Apoyada dura, a/t=10000, Quad3D  (bc=ss_hard, elem=Quad, a/t=10000, distorsión=0.0)
+ref w*D/(q a^4) = 0.004062   ref M = 0.04788637832333646   ref borde = None
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |    -6.834 | +0.06031 |   +25.935 |   -50.929 | +0.0967 | -0.01838 | -0.00194 | 0.03
+  4 |    -0.412 | +0.05010 |    +4.633 |    -7.618 | +0.1326 | -0.02758 | -0.00025 | 0.13
+  8 |    -0.058 | +0.04839 |    +1.044 |    -1.699 | +0.1673 | -0.03086 | -0.00004 | 0.46
+ 16 |    -0.012 | +0.04801 |    +0.256 |    -0.413 | +0.1908 | -0.03197 | -0.00000 | 2.00
+ 32 |    -0.003 | +0.04792 |    +0.064 |    -0.102 | +0.2044 | -0.03233 | -0.00000 | 8.75
+  w: orden observado p = 2.31; Richardson = 0.0040623 (-0.0006 % vs ref); GCI_fino = 0.0029 %
+  Mc: orden observado p = 2.04; Richardson = 0.0478872 (+0.0018 % vs ref); GCI_fino = 0.0773 %
+
+### F. Apoyada dura, a/t=100, Quad3D, distorsión 0.2h  (bc=ss_hard, elem=Quad, a/t=100, distorsión=0.2)
+ref w*D/(q a^4) = 0.004064   ref M = 0.04788637832333646   ref borde = None
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |    -6.832 | +0.06034 |   +25.998 |   -50.937 | +0.0968 | -0.01838 | -0.00198 | 0.03
+  4 |    -0.578 | +0.04993 |    +4.267 |   -11.523 | +0.1287 | -0.02718 | -0.00085 | 0.12
+  8 |    -0.188 | +0.04850 |    +1.274 |    -0.289 | +0.1671 | -0.03066 | -0.00007 | 0.47
+ 16 |    -0.062 | +0.04810 |    +0.456 |    -0.576 | +0.1926 | -0.03192 | +0.00015 | 2.05
+ 32 |    -0.021 | +0.04793 |    +0.100 |    -0.217 | +0.2349 | -0.03233 | -0.00045 | 8.50
+  w: orden observado p = 1.62; Richardson = 0.0040644 (-0.0013 % vs ref); GCI_fino = 0.0246 %
+  Mc: orden observado p = 1.20; Richardson = 0.0478032 (-0.1736 % vs ref); GCI_fino = 0.3419 %
+C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py:662: UserWarning: The Jacobian matrix for quad element E_1_7 is less than or equal to zero, indicating the element is invalid or badly distorted.
+  warnings.warn(f'The Jacobian matrix for quad element {self.name} is less than or equal to zero, indicating the element is invalid or badly distorted.')
+C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py:662: UserWarning: The Jacobian matrix for quad element E_6_26 is less than or equal to zero, indicating the element is invalid or badly distorted.
+  warnings.warn(f'The Jacobian matrix for quad element {self.name} is less than or equal to zero, indicating the element is invalid or badly distorted.')
+C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py:662: UserWarning: The Jacobian matrix for quad element E_12_1 is less than or equal to zero, indicating the element is invalid or badly distorted.
+  warnings.warn(f'The Jacobian matrix for quad element {self.name} is less than or equal to zero, indicating the element is invalid or badly distorted.')
+C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py:662: UserWarning: The Jacobian matrix for quad element E_29_4 is less than or equal to zero, indicating the element is invalid or badly distorted.
+  warnings.warn(f'The Jacobian matrix for quad element {self.name} is less than or equal to zero, indicating the element is invalid or badly distorted.')
+C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py:662: UserWarning: The Jacobian matrix for quad element E_1_7 is less than or equal to zero, indicating the element is invalid or badly distorted.
+  warnings.warn(f'The Jacobian matrix for quad element {self.name} is less than or equal to zero, indicating the element is invalid or badly distorted.')
+C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py:662: UserWarning: The Jacobian matrix for quad element E_6_26 is less than or equal to zero, indicating the element is invalid or badly distorted.
+  warnings.warn(f'The Jacobian matrix for quad element {self.name} is less than or equal to zero, indicating the element is invalid or badly distorted.')
+C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py:662: UserWarning: The Jacobian matrix for quad element E_12_1 is less than or equal to zero, indicating the element is invalid or badly distorted.
+  warnings.warn(f'The Jacobian matrix for quad element {self.name} is less than or equal to zero, indicating the element is invalid or badly distorted.')
+C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py:662: UserWarning: The Jacobian matrix for quad element E_29_4 is less than or equal to zero, indicating the element is invalid or badly distorted.
+  warnings.warn(f'The Jacobian matrix for quad element {self.name} is less than or equal to zero, indicating the element is invalid or badly distorted.')
+
+### F. Apoyada dura, a/t=100, Quad3D, distorsión 0.4h  (bc=ss_hard, elem=Quad, a/t=100, distorsión=0.4)
+ref w*D/(q a^4) = 0.004064   ref M = 0.04788637832333646   ref borde = None
+ n  | w/ref-1 %  | Mc(nodal) | Mc/ref-1 % | Mcentroide/ref_loc-1 % | Qx_borde (ref 0.3374) | Mxy_esq (ref ±0.0325) | M_borde | t[s]
+  2 |    -6.832 | +0.06034 |   +25.998 |   -50.937 | +0.0968 | -0.01838 | -0.00198 | 0.03
+  4 |    -1.015 | +0.04969 |    +3.760 |   -15.351 | +0.1119 | -0.02603 | -0.00030 | 0.14
+  8 |    -0.514 | +0.04863 |    +1.555 |    +0.932 | +0.1593 | -0.03008 | +0.00010 | 0.54
+ 16 |    -0.165 | +0.04810 |    +0.439 |    -0.797 | +0.1704 | -0.03174 | +0.00085 | 2.29
+ 32 |   -60.584 | +0.02131 |   -55.497 |   -52.449 | +0.2991 | -0.00044 | -0.00051 | 9.48
+  w: orden observado p = nan; Richardson = nan (+nan % vs ref); GCI_fino = nan %
+  Mc: orden observado p = -5.65; Richardson = 0.0486417 (+1.5774 % vs ref); GCI_fino = -160.3101 %

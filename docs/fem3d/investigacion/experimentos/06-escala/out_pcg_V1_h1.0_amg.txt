@@ -1,0 +1,4 @@
+{"K": "K11_V1_h1.0.npz", "n": 94206, "directo_s": 1.357}
+amg setup 0.49 niveles 2 complejidad_op 1.23
+amg_sa_rbm {'iter': 30, 'converge': True, 's': 2.54, 'err_rel_vs_directo': 5.03e-10}
+{"K": "K11_V1_h1.0.npz", "n": 94206, "directo_s": 1.357, "amg_setup_s": 0.49, "amg_niveles": 2, "amg_sa_rbm": {"iter": 30, "converge": true, "s": 2.54, "err_rel_vs_directo": 5.03e-10}}

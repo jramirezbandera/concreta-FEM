@@ -1,0 +1,5 @@
+Modelo mixto, caso H (fuerza horizontal excéntrica): |ΣF|/Σ|F| = 7.93e-13  |ΣM|/(Σ|F|·L) = 3.48e-13
+P_0_0 torsor en cabeza = 0.0 N·m;  Mz base = 8337.0
+P_6_0 torsor en cabeza = 0.0 N·m;  Mz base = 8147.0
+P_0_4 torsor en cabeza = 0.0 N·m;  Mz base = 14904.9
+P_6_4 torsor en cabeza = 0.0 N·m;  Mz base = 15440.4

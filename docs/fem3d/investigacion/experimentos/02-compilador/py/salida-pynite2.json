@@ -1,0 +1,133 @@
+{
+  "P5b_momentos_kmod": {
+    "error": "'Combo 1'",
+    "tb": "e\\d--PROGRAMACION-Concreta-EST\\b287d96a-8882-4d7d-800f-3c46ec2b77b4\\scratchpad\\fem3d\\02-compilador\\py\\exp_pynite2.py\", line 58, in p5b\n    M = el.moment(el.width() / 2, el.height() / 2, \"C1\").flatten()\n        ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\javie\\AppData\\Local\\Temp\\claude\\d--PROGRAMACION-Concreta-EST\\b287d96a-8882-4d7d-800f-3c46ec2b77b4\\scratchpad\\fem3d\\02-compilador\\venv\\Lib\\site-packages\\Pynite\\Plate3D.py\", line 609, in moment\n    return -self.Db() @ self._Q(x, y) @ self._a(combo_name)\n                                        ~~~~~~~^^^^^^^^^^^^\n  File \"C:\\Users\\javie\\AppData\\Local\\Temp\\claude\\d--PROGRAMACION-Concreta-EST\\b287d96a-8882-4d7d-800f-3c46ec2b77b4\\scratchpad\\fem3d\\02-compilador\\venv\\Lib\\site-packages\\Pynite\\Plate3D.py\", line 585, in _a\n    d = self.d(combo_name)[[2, 3, 4, 8, 9, 10, 14, 15, 16, 20, 21, 22], :]\n        ~~~~~~^^^^^^^^^^^^\n  File \"C:\\Users\\javie\\AppData\\Local\\Temp\\claude\\d--PROGRAMACION-Concreta-EST\\b287d96a-8882-4d7d-800f-3c46ec2b77b4\\scratchpad\\fem3d\\02-compilador\\venv\\Lib\\site-packages\\Pynite\\Plate3D.py\", line 401, in d\n    return matmul(self.T(), self.D(combo_name))\n                            ~~~~~~^^^^^^^^^^^^\n  File \"C:\\Users\\javie\\AppData\\Local\\Temp\\claude\\d--PROGRAMACION-Concreta-EST\\b287d96a-8882-4d7d-800f-3c46ec2b77b4\\scratchpad\\fem3d\\02-compilador\\venv\\Lib\\site-packages\\Pynite\\Plate3D.py\", line 420, in D\n    D[0, 0] = self.i_node.DX[combo_name]\n              ~~~~~~~~~~~~~~^^^^^^^^^^^^\nKeyError: 'Combo 1'\n"
+  },
+  "P9_diafragma": {
+    "sin_diafragma": {
+      "ux_esquinas_mm": [
+        2.02378,
+        1.95792,
+        0.11379,
+        0.11386
+      ],
+      "N_vigas_kN": [
+        49.3976,
+        0.0,
+        0.0529,
+        -0.0
+      ],
+      "cond_K11": "1.405e+02",
+      "gdl_libres": 24,
+      "error_equilibrio_rel": 1.7462298274040223e-15
+    },
+    "diagonales_rigidas EA x1": {
+      "ux_esquinas_mm": [
+        1.81134,
+        1.74621,
+        0.32624,
+        0.32558
+      ],
+      "N_vigas_kN": [
+        48.847,
+        -0.5537,
+        -0.4977,
+        -0.5537
+      ],
+      "cond_K11": "1.455e+02",
+      "gdl_libres": 24,
+      "error_equilibrio_rel": 1.0186340659856795e-15
+    },
+    "diagonales_rigidas EA x100": {
+      "ux_esquinas_mm": [
+        1.74645,
+        1.69413,
+        0.39112,
+        0.37765
+      ],
+      "N_vigas_kN": [
+        39.2411,
+        -10.2119,
+        -10.1036,
+        -10.2119
+      ],
+      "cond_K11": "7.806e+02",
+      "gdl_libres": 24,
+      "error_equilibrio_rel": 7.8580342233181e-15
+    },
+    "diagonales_rigidas EA x10000": {
+      "ux_esquinas_mm": [
+        1.70699,
+        1.65756,
+        0.43059,
+        0.41422
+      ],
+      "N_vigas_kN": [
+        37.0726,
+        -12.3475,
+        -12.2721,
+        -12.3475
+      ],
+      "cond_K11": "6.433e+04",
+      "gdl_libres": 24,
+      "error_equilibrio_rel": 1.0657822713255882e-12
+    },
+    "diagonales_rigidas EA x1e+06": {
+      "ux_esquinas_mm": [
+        1.55222,
+        1.50293,
+        0.58535,
+        0.56886
+      ],
+      "N_vigas_kN": [
+        36.9719,
+        -12.299,
+        -12.3728,
+        -12.299
+      ],
+      "cond_K11": "6.419e+06",
+      "gdl_libres": 24,
+      "error_equilibrio_rel": 7.1091926656663414e-12
+    },
+    "diagonales_rigidas EA x1e+08": {
+      "ux_esquinas_mm": [
+        1.54399,
+        1.4947,
+        0.59358,
+        0.57708
+      ],
+      "N_vigas_kN": [
+        36.9683,
+        -12.296,
+        -12.3764,
+        -12.296
+      ],
+      "cond_K11": "6.419e+08",
+      "gdl_libres": 24,
+      "error_equilibrio_rel": 1.1527057649800554e-08
+    },
+    "diagonales_rigidas EA x1e+10": {
+      "error": "Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis."
+    },
+    "diagonales_rigidas EA x1e+12": {
+      "error": "Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis."
+    },
+    "losa_shell_t25": {
+      "ux_esquinas_mm": [
+        1.55033,
+        1.51929,
+        0.3056,
+        0.30434
+      ],
+      "N_vigas_kN": [
+        18.1422,
+        -2.7862,
+        -1.8633,
+        -4.0227
+      ],
+      "cond_K11": "3.054e+05",
+      "gdl_libres": 1014,
+      "error_equilibrio_rel": 3.4939148463308812e-12
+    }
+  }
+}

@@ -1,0 +1,134 @@
+{
+  "desalineación ±0 m": {
+    "sinFusion": {
+      "quads": 1200,
+      "nodos": 1271,
+      "franjaMin_cm": 50,
+      "maxAspecto": 1,
+      "quadsAR_gt3": 0,
+      "quadsAR_gt5": 0,
+      "quadsAR_gt10": 0
+    },
+    "fusion ε=0.02 m": {
+      "quads": 1200,
+      "nodos": 1271,
+      "franjaMin_cm": 50,
+      "maxAspecto": 1,
+      "quadsAR_gt3": 0,
+      "quadsAR_gt5": 0,
+      "quadsAR_gt10": 0,
+      "lineasFundidas": 0,
+      "desplazamientoMax_cm": 0
+    },
+    "fusion ε=0.05 m": {
+      "quads": 1200,
+      "nodos": 1271,
+      "franjaMin_cm": 50,
+      "maxAspecto": 1,
+      "quadsAR_gt3": 0,
+      "quadsAR_gt5": 0,
+      "quadsAR_gt10": 0,
+      "lineasFundidas": 0,
+      "desplazamientoMax_cm": 0
+    },
+    "fusion ε=0.1 m": {
+      "quads": 1200,
+      "nodos": 1271,
+      "franjaMin_cm": 50,
+      "maxAspecto": 1,
+      "quadsAR_gt3": 0,
+      "quadsAR_gt5": 0,
+      "quadsAR_gt10": 0,
+      "lineasFundidas": 0,
+      "desplazamientoMax_cm": 0
+    }
+  },
+  "desalineación ±0.05 m": {
+    "sinFusion": {
+      "quads": 1862,
+      "nodos": 1950,
+      "franjaMin_cm": 0.05,
+      "maxAspecto": 941.2,
+      "quadsAR_gt3": 627,
+      "quadsAR_gt5": 619,
+      "quadsAR_gt10": 493
+    },
+    "fusion ε=0.02 m": {
+      "quads": 1462,
+      "nodos": 1540,
+      "franjaMin_cm": 2.05,
+      "maxAspecto": 24.4,
+      "quadsAR_gt3": 250,
+      "quadsAR_gt5": 250,
+      "quadsAR_gt10": 140,
+      "lineasFundidas": 10,
+      "desplazamientoMax_cm": 1.9
+    },
+    "fusion ε=0.05 m": {
+      "quads": 1376,
+      "nodos": 1452,
+      "franjaMin_cm": 5.2,
+      "maxAspecto": 9.5,
+      "quadsAR_gt3": 114,
+      "quadsAR_gt5": 92,
+      "quadsAR_gt10": 0,
+      "lineasFundidas": 14,
+      "desplazamientoMax_cm": 4.7
+    },
+    "fusion ε=0.1 m": {
+      "quads": 1344,
+      "nodos": 1419,
+      "franjaMin_cm": 45.47,
+      "maxAspecto": 1.1,
+      "quadsAR_gt3": 0,
+      "quadsAR_gt5": 0,
+      "quadsAR_gt10": 0,
+      "lineasFundidas": 17,
+      "desplazamientoMax_cm": 9.8
+    }
+  },
+  "desalineación ±0.3 m": {
+    "sinFusion": {
+      "quads": 1776,
+      "nodos": 1862,
+      "franjaMin_cm": 0.32,
+      "maxAspecto": 156.4,
+      "quadsAR_gt3": 474,
+      "quadsAR_gt5": 388,
+      "quadsAR_gt10": 178
+    },
+    "fusion ε=0.02 m": {
+      "quads": 1680,
+      "nodos": 1764,
+      "franjaMin_cm": 2.24,
+      "maxAspecto": 22,
+      "quadsAR_gt3": 379,
+      "quadsAR_gt5": 294,
+      "quadsAR_gt10": 89,
+      "lineasFundidas": 2,
+      "desplazamientoMax_cm": 0.9
+    },
+    "fusion ε=0.05 m": {
+      "quads": 1575,
+      "nodos": 1656,
+      "franjaMin_cm": 5.13,
+      "maxAspecto": 9.7,
+      "quadsAR_gt3": 284,
+      "quadsAR_gt5": 197,
+      "quadsAR_gt10": 0,
+      "lineasFundidas": 5,
+      "desplazamientoMax_cm": 4.9
+    },
+    "fusion ε=0.1 m": {
+      "quads": 1496,
+      "nodos": 1575,
+      "franjaMin_cm": 10.53,
+      "maxAspecto": 4.7,
+      "quadsAR_gt3": 151,
+      "quadsAR_gt5": 0,
+      "quadsAR_gt10": 0,
+      "lineasFundidas": 8,
+      "desplazamientoMax_cm": 9.3
+    }
+  }
+}

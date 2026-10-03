@@ -1,0 +1,4 @@
+desvío 0 m: sub-barras de V = 2 ->  CONECTADO | DY(c) = -1.421e-06
+desvío 1e-13 m: sub-barras de V = 2 ->  CONECTADO | DY(c) = -1.421e-06
+desvío 1e-09 m: sub-barras de V = 1 ->  NO conectado | DY(c) = -1.429e-06
+desvío 1e-06 m: sub-barras de V = 1 ->  NO conectado | DY(c) = -1.429e-06

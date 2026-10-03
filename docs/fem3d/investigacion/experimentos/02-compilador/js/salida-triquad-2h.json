@@ -1,0 +1,92 @@
+{
+ "A": {
+  "tri(2h=1,0 m)": {
+   "nTri": 234,
+   "minAngle": 32.77,
+   "maxAngle": 103.7,
+   "maxAspect": 1.69,
+   "triMin20": 0,
+   "area": 103,
+   "inverted": 234
+  },
+  "tri->3quads (~0,5 m)": {
+   "nQuad": 702,
+   "nNodos": 754,
+   "minAngle": 32.77,
+   "maxAngle": 150.97,
+   "maxLadoLargoCorto": 3.8,
+   "minJacobianoEscalado": 0.485,
+   "area": 103,
+   "ms_total": 10.1
+  },
+  "rejilla h=0,5 m": {
+   "nQuad": 443,
+   "nNodos": 497,
+   "minAngle": 90,
+   "maxAngle": 90,
+   "maxLadoLargoCorto": 1.25,
+   "minJacobianoEscalado": 1,
+   "area": 103
+  }
+ },
+ "B": {
+  "tri(2h=1,0 m)": {
+   "nTri": 236,
+   "minAngle": 2.41,
+   "maxAngle": 169.63,
+   "maxAspect": 17.9,
+   "triMin20": 2,
+   "area": 103,
+   "inverted": 236
+  },
+  "tri->3quads (~0,5 m)": {
+   "nQuad": 708,
+   "nNodos": 760,
+   "minAngle": 2.41,
+   "maxAngle": 177.45,
+   "maxLadoLargoCorto": 5.53,
+   "minJacobianoEscalado": 0.042,
+   "area": 103,
+   "ms_total": 4.2
+  },
+  "rejilla h=0,5 m": {
+   "nQuad": 461,
+   "nNodos": 516,
+   "minAngle": 90,
+   "maxAngle": 90,
+   "maxLadoLargoCorto": 16.67,
+   "minJacobianoEscalado": 1,
+   "area": 103
+  }
+ },
+ "C": {
+  "tri(2h=1,0 m)": {
+   "nTri": 296,
+   "minAngle": 13.63,
+   "maxAngle": 126.87,
+   "maxAspect": 2.83,
+   "triMin20": 22,
+   "area": 103,
+   "inverted": 296
+  },
+  "tri->3quads (~0,5 m)": {
+   "nQuad": 888,
+   "nNodos": 940,
+   "minAngle": 13.63,
+   "maxAngle": 161.81,
+   "maxLadoLargoCorto": 6,
+   "minJacobianoEscalado": 0.236,
+   "area": 103,
+   "ms_total": 2.3
+  },
+  "rejilla h=0,5 m": {
+   "nQuad": 443,
+   "nNodos": 497,
+   "minAngle": 90,
+   "maxAngle": 90,
+   "maxLadoLargoCorto": 1.25,
+   "minJacobianoEscalado": 1,
+   "area": 103
+  }
+ }
+}

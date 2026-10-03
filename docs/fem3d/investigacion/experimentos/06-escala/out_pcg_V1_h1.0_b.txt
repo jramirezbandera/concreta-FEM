@@ -1,0 +1,7 @@
+{"K": "K11_V1_h1.0.npz", "n": 94206, "directo_s": 1.361}
+ilu_0.001_5 fact_s 0.97 nnz 6645362
+ilu_0.001_5 {'iter': 5000, 'converge': False, 's': 94.28, 'err_rel_vs_directo': 0.00157}
+ilu_0.0001_10 fact_s 1.81 nnz 9741441
+ilu_0.0001_10 {'iter': 24, 'converge': True, 's': 0.6, 'err_rel_vs_directo': 4.19e-09}
+amg setup 0.63 niveles 2 complejidad_op 1.23
+{"abort": "memlimit 3000 MB", "rss_MB": 3589}

@@ -1,0 +1,27 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/etiquetas.html",
+ "ms": 688,
+ "value": {
+  "a": {
+   "n": 500,
+   "css2d_msCrear": 5.3,
+   "css2d_frame": {
+    "med": 4.4,
+    "p95": 7.8
+   },
+   "peticionesTerceros": []
+  },
+  "b": {
+   "n": 3000,
+   "css2d_msCrear": 16.3,
+   "css2d_frame": {
+    "med": 30.7,
+    "p95": 84.9
+   },
+   "peticionesTerceros": []
+  }
+ },
+ "consola": []
+}

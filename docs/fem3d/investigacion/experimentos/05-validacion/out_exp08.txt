@@ -1,0 +1,25 @@
+Using ASDShellQ4 - Developed by: Massimo Petracca, Guido Camata, ASDEA Software Technology
+OpenSees version: 3.8.0
+== Placa apoyada a/t=100 con ShellMITC4: w/ref-1 y M centroide/ref_loc-1
+  n= 4: w -2.244 % | M11 -100.000 % (signo -) | 0.03 s
+  n= 8: w -0.463 % | M11 -100.000 % (signo -) | 0.01 s
+  n=16: w -0.075 % | M11 -100.000 % (signo -) | 0.03 s
+  n=32: w +0.020 % | M11 -100.000 % (signo -) | 0.10 s
+== Placa apoyada a/t=100 con ShellDKGQ: w/ref-1 y M centroide/ref_loc-1
+  n= 4: w -0.412 % | M11 -100.000 % (signo -) | 0.01 s
+  n= 8: w -0.058 % | M11 -100.000 % (signo -) | 0.01 s
+  n=16: w -0.012 % | M11 -100.000 % (signo -) | 0.04 s
+  n=32: w -0.003 % | M11 -100.000 % (signo -) | 0.15 s
+== Placa apoyada a/t=100 con ASDShellQ4: w/ref-1 y M centroide/ref_loc-1
+  n= 4: w -2.244 % | M11 -5.059 % (signo +) | 0.01 s
+  n= 8: w -0.463 % | M11 -1.073 % (signo +) | 0.01 s
+  n=16: w -0.075 % | M11 -0.258 % (signo +) | 0.03 s
+  n=32: w +0.020 % | M11 -0.064 % (signo +) | 0.13 s
+== Viga de MacNeal-Harder, cortante en el plano (malla 6x1 rectangular), normalizado a 0.1081
+  ShellMITC4: 0.0762
+  ShellDKGQ: 0.9036
+  ASDShellQ4: 0.9873
+== Muro H=9, B=3 (Timoshenko 1.5552 mm)
+  ShellMITC4: 1x3 0.9804 mm | 4x12 1.4884 mm | 16x48 1.5462 mm
+  ShellDKGQ: 1x3 1.4400 mm | 4x12 1.5418 mm | 16x48 1.5500 mm
+  ASDShellQ4: 1x3 1.4956 mm | 4x12 1.5409 mm | 16x48 1.5500 mm

@@ -1,0 +1,45 @@
+--- nudo suelto {'check_stability': True}
+    resultado: EXC Exception: Unstable node(s). See console output for details.
+    stdout: * Nodal instability detected: node suelto is unstable for translation in the global X direction. || * Nodal instability detected: node suelto is unstable for translation in the global Y direction. || * Nodal instability detected: node suelto is unstable for translation in the global Z direction. || * Nodal instability detected: node suelto is unstable for rotation about the global X axis. || * Nod
+    warnings: 
+--- nudo suelto {'check_stability': False}
+    resultado: OK | D finito=False max|D|=0.000e+00
+    stdout: 
+    warnings: 
+--- mecanismo por rótula interior {'check_stability': True, 'sparse': True}
+    resultado: EXC Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis.
+    stdout: 
+    warnings: 
+--- mecanismo por rótula interior {'check_stability': True, 'sparse': False}
+    resultado: EXC Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis.
+    stdout: 
+    warnings: 
+--- mecanismo por rótula interior {'check_stability': False, 'sparse': True}
+    resultado: OK | D finito=True max|D|=6.442e+12
+    stdout: 
+    warnings: 
+--- mecanismo por rótula interior {'check_stability': False, 'sparse': False}
+    resultado: OK | D finito=True max|D|=8.590e+12
+    stdout: 
+    warnings: 
+--- sin apoyos {'check_stability': True}
+    resultado: EXC Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis.
+    stdout: 
+    warnings: 
+--- sin apoyos {'check_stability': False}
+    resultado: OK | D finito=False max|D|=nan
+    stdout: 
+    warnings: RuntimeWarning: All-NaN slice encountered
+--- cercha con giros libres en nudos {}
+    resultado: EXC Exception: Unstable node(s). See console output for details.
+    stdout: * Nodal instability detected: node a is unstable for rotation about the global Y axis. || * Nodal instability detected: node b is unstable for rotation about the global X axis. || * Nodal instability detected: node b is unstable for rotation about the global Y axis. || * Nodal instability detected: node c is unstable for rotation about the global Y axis.
+    warnings: 
+--- quad apoyado en esquinas {}
+    resultado: OK | D finito=True max|D|=0.000e+00
+    stdout: 
+    warnings: 
+--- torsor en nudo pilar-losa {}
+    resultado: OK | D finito=True max|D|=1.263e-03
+    stdout: 
+    warnings: 
+    giro RZ n11 = 0.0012625824302587782  torsor en pilar T = -34.08972561698701

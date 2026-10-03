@@ -1,0 +1,6 @@
+# LF en el repositorio y en el árbol de trabajo, como en Concreta.
+* text=auto eol=lf
+*.wasm binary
+*.npz binary
+*.png binary
+*.pdf binary

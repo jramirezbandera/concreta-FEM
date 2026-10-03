@@ -1,0 +1,44 @@
+{
+ "sin": {
+  "distintos": 4991,
+  "de": 200000,
+  "pct": 2.5,
+  "maxUlp": 1
+ },
+ "cos": {
+  "distintos": 4704,
+  "de": 200000,
+  "pct": 2.35,
+  "maxUlp": 1
+ },
+ "atan2": {
+  "distintos": 14534,
+  "de": 200000,
+  "pct": 7.27,
+  "maxUlp": 1
+ },
+ "exp": {
+  "distintos": 18602,
+  "de": 200000,
+  "pct": 9.3,
+  "maxUlp": 1
+ },
+ "log": {
+  "distintos": 9722,
+  "de": 200000,
+  "pct": 4.86,
+  "maxUlp": 1
+ },
+ "cbrt": {
+  "distintos": 54451,
+  "de": 200000,
+  "pct": 27.23,
+  "maxUlp": 1
+ },
+ "hypot": {
+  "distintos": 71445,
+  "de": 200000,
+  "pct": 35.72,
+  "maxUlp": 2
+ }
+}

@@ -1,0 +1,6 @@
+== nostubs
+PYODIDE_INFO {"mode":"nostubs","pyodide":"314.0.0","heap_after_packages_MB":62.4,"import_ok":false,"import_error":"    from prettytable import PrettyTable | ModuleNotFoundError: No module named 'prettytable'","heap_after_import_MB":74.9,"heap_final_MB":74.9,"node_rss_MB":391.7,"times":{"import_pyodide_mjs_ms":2,"loadPyodide_ms":1474,"loadPackage_numpy_scipy_ms":1520}}
+== noscipy
+PYODIDE_INFO {"mode":"noscipy","pyodide":"314.0.0","heap_after_packages_MB":36,"import_ok":false,"import_error":"  File \"<exec>\", line 6, in find_spec | ModuleNotFoundError: scipy bloqueado en el experimento","heap_after_import_MB":43.3,"heap_final_MB":43.3,"node_rss_MB":234.4,"times":{"import_pyodide_mjs_ms":2,"loadPyodide_ms":1460,"loadPackage_numpy_ms":276}}
+== memmax
+{"mode":"memmax","pyodide":"314.0.0","max_numpy_alloc_MB":4032,"heap_MB":4095.9}

@@ -1,0 +1,19 @@
+
+== Quad: Qx en centroides de elementos de la fila y=a/2 (encima de la línea media)
+ n=8: x=0.0625: Qx=+0.1648 ref=+0.2752 (-40.1 %) | x=0.1875: Qx=+0.0833 ref=+0.1758 (-52.6 %) | x=0.3125: Qx=+0.0362 ref=+0.0970 (-62.6 %)
+ n=16: x=0.0312: Qx=+0.1990 ref=+0.3064 (-35.1 %) | x=0.0938: Qx=+0.1476 ref=+0.2504 (-41.1 %) | x=0.2812: Qx=+0.0505 ref=+0.1165 (-56.7 %)
+ n=32: x=0.0156: Qx=+0.2347 ref=+0.3220 (-27.1 %) | x=0.0469: Qx=+0.2061 ref=+0.2924 (-29.5 %) | x=0.2656: Qx=+0.0698 ref=+0.1264 (-44.8 %)
+
+== Rect: Qx en centroides de elementos de la fila y=a/2 (encima de la línea media)
+ n=8: x=0.0625: Qx=+0.2839 ref=+0.2752 (+3.2 %) | x=0.1875: Qx=+0.1827 ref=+0.1758 (+3.9 %) | x=0.3125: Qx=+0.1012 ref=+0.0970 (+4.4 %)
+ n=16: x=0.0312: Qx=+0.3147 ref=+0.3064 (+2.7 %) | x=0.0938: Qx=+0.2584 ref=+0.2504 (+3.2 %) | x=0.2812: Qx=+0.1215 ref=+0.1165 (+4.3 %)
+ n=32: x=0.0156: Qx=+0.3303 ref=+0.3220 (+2.5 %) | x=0.0469: Qx=+0.3005 ref=+0.2924 (+2.8 %) | x=0.2656: Qx=+0.1317 ref=+0.1264 (+4.2 %)
+
+Quad E_4_4 local  [Mx,My,Mxy] = [ 0.04582578  0.04582578 -0.00094842]
+Traceback (most recent call last):
+  File "C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\exp01b_cortante_signos.py", line 26, in <module>
+    print("Quad E_4_4 global [Mx,My,Mxy] =", np.array(e.moment(0, 0, local=False, combo_name="C")).flatten() / (q * a * a))
+                                                      ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\javie\AppData\Local\Temp\claude\d--PROGRAMACION-Concreta-EST\b287d96a-8882-4d7d-800f-3c46ec2b77b4\scratchpad\fem3d\05-validacion\venv\Lib\site-packages\Pynite\Quad3D.py", line 1159, in moment
+    Mx = float(Mx)
+TypeError: only 0-dimensional arrays can be converted to Python scalars

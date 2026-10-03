@@ -1,0 +1,94 @@
+{
+  "pynite": "3.2.0",
+  "P1_carga_barra_exacta": {
+    "1 elemento(s)": {
+      "flecha_3m_mm": -3.601493095238097,
+      "Mz_3m_kNm": -91.29464285714285,
+      "giro_apoyo_mrad": -1.9334316666666667
+    },
+    "10 elemento(s)": {
+      "flecha_3m_mm": -3.6014930952381436,
+      "Mz_3m_kNm": -91.29464285714421,
+      "giro_apoyo_mrad": -1.9334316666667093
+    },
+    "dif_rel_flecha": 1.2947232106569754e-14,
+    "dif_rel_M": 1.494328703157454e-14,
+    "Mz_3m_analitico_kNm": 91.29468535798215
+  },
+  "P2_physmember_autotroceo": {
+    "desvio 0 m": {
+      "submiembros_VIGA": 2,
+      "DY_T_mm": -1.266666666666668
+    },
+    "desvio 1e-09 m": {
+      "error": "Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis."
+    },
+    "desvio 1e-06 m": {
+      "error": "Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis."
+    }
+  },
+  "P3_merge_pierde_cargas": {
+    "nudos_eliminados": [
+      "B2"
+    ],
+    "suma_reacciones_FX_kN": 0.0,
+    "carga_aplicada_kN": 50.0,
+    "carga_perdida": 1.0
+  },
+  "P4_tri3d": {
+    "FEModel3D_tiene_add_tri": false,
+    "FEModel3D_tiene_tris": false,
+    "ke_error": "AttributeError: 'Tri3D' object has no attribute 'n_node'"
+  },
+  "P5_kmod_quad_vs_rect": {
+    "Quad kx_mod=1.0": {
+      "flecha_max_mm": 4.395316430906307
+    },
+    "Quad kx_mod=0.1": {
+      "flecha_max_mm": 4.395316430906307
+    },
+    "Rect kx_mod=1.0": {
+      "flecha_max_mm": 4.391628090263939
+    },
+    "Rect kx_mod=0.1": {
+      "flecha_max_mm": 4.391628090263939
+    }
+  },
+  "P6_signo_presion_orden": {
+    "antihorario": {
+      "DY_n3_mm": -0.0831539548973409
+    },
+    "horario": {
+      "DY_n3_mm": 0.08315395489734087
+    }
+  },
+  "P7_perforacion_viga_muro": {
+    "voladizo_empotrado_teorico_mm": 0.5688888888888889,
+    "rigido": {
+      "flecha_punta_mm": 0.5688888888888892,
+      "M_empotramiento_kNm": 40.00000000000002
+    },
+    "muro_directo": {
+      "flecha_punta_mm": 2056.161081097497,
+      "M_empotramiento_kNm": 40.0000000000298
+    },
+    "muro_viga_embebida_1elem": {
+      "flecha_punta_mm": 1.0203645348042347,
+      "M_empotramiento_kNm": 40.000000000000036
+    },
+    "muro_viga_embebida_todo": {
+      "flecha_punta_mm": 0.9502665231648892,
+      "M_empotramiento_kNm": 40.00000000000005
+    },
+    "control_viga_perpendicular_al_muro": {
+      "flecha_punta_mm": 4.089225191037775
+    }
+  },
+  "P8_quad_degenerado": {
+    "ke_finita": false
+  },
+  "P9_diafragma_penalizacion": {
+    "error": "Exception: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis.",
+    "tb": "lador\\py\\exp_pynite.py\", line 271, in p9\n    m.analyze_linear(check_statics=False)\n    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\javie\\AppData\\Local\\Temp\\claude\\d--PROGRAMACION-Concreta-EST\\b287d96a-8882-4d7d-800f-3c46ec2b77b4\\scratchpad\\fem3d\\02-compilador\\venv\\Lib\\site-packages\\Pynite\\FEModel3D.py\", line 2314, in analyze_linear\n    D1 = Analysis._solve_unknown_disp(K11, rhs, sparse, check_stability)\n  File \"C:\\Users\\javie\\AppData\\Local\\Temp\\claude\\d--PROGRAMACION-Concreta-EST\\b287d96a-8882-4d7d-800f-3c46ec2b77b4\\scratchpad\\fem3d\\02-compilador\\venv\\Lib\\site-packages\\Pynite\\Analysis.py\", line 239, in _solve_unknown_disp\n    raise Exception(_SINGULAR_MSG)\nException: The stiffness matrix is singular, which implies rigid body motion. The structure is unstable. Aborting analysis.\n"
+  }
+}

@@ -1,0 +1,8 @@
+Referencia viga empotrada en apoyo rígido: δ = 4.800 mm, M_emp = 150.0 kN·m
+(a) en el plano, conexión en 1 nudo (taladro)    malla  6: δ punta =  5786.123 mm (1205.44·ref); δ raíz = 0.020 mm; giro raíz = -1.93e+00 rad; M raíz viga = +150.00 kN·m
+(a) en el plano, conexión en 1 nudo (taladro)    malla 12: δ punta =  8222.185 mm (1712.96·ref); δ raíz = 0.023 mm; giro raíz = -2.74e+00 rad; M raíz viga = +150.00 kN·m
+(b1) en el plano, embebida 1 elemento            malla  6: δ punta =     6.258 mm (   1.30·ref); δ raíz = 0.089 mm; giro raíz = -4.56e-04 rad; M raíz viga = +150.00 kN·m
+(b1) en el plano, embebida 1 elemento            malla 12: δ punta =     7.402 mm (   1.54·ref); δ raíz = 0.153 mm; giro raíz = -8.16e-04 rad; M raíz viga = +150.00 kN·m
+(b2) en el plano, embebida todo el ancho         malla  6: δ punta =     6.235 mm (   1.30·ref); δ raíz = 0.085 mm; giro raíz = -4.50e-04 rad; M raíz viga = +150.00 kN·m
+(b2) en el plano, embebida todo el ancho         malla 12: δ punta =     6.326 mm (   1.32·ref); δ raíz = 0.104 mm; giro raíz = -4.74e-04 rad; M raíz viga = +150.00 kN·m
+(c) perpendicular al muro (flexión de placa)     malla  6: δ punta =    13.839 mm (   2.88·ref); δ raíz = 0.007 mm; giro raíz = 3.01e-03 rad; M raíz viga = +150.00 kN·m

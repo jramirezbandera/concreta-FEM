@@ -1,0 +1,23 @@
+== (a) Viga recta de MacNeal-Harder (malla 6x1), desplazamiento normalizado = FE/ref
+  rect : extensión 0.9954 | cortante plano 0.0933 | cortante fuera plano 0.9869
+  trap : extensión 0.9957 | cortante plano 0.0269 | cortante fuera plano 0.9872
+  para : extensión 0.9957 | cortante plano 0.0342 | cortante fuera plano 0.9872
+
+== (b) muro H=9, B=3 (H/B=3): Timoshenko flexión 1.4400 mm + cortante 0.1152 mm = 1.5552 mm
+  malla  1x 3: δ = 1.0560 mm  (-32.10 % vs Timoshenko)
+  malla  2x 6: δ = 1.3734 mm  (-11.69 % vs Timoshenko)
+  malla  4x12: δ = 1.4998 mm  (-3.56 % vs Timoshenko)
+  malla  8x24: δ = 1.5371 mm  (-1.16 % vs Timoshenko)
+  malla 16x48: δ = 1.5472 mm  (-0.52 % vs Timoshenko)
+  Richardson: p = 1.89, δ_ext = 1.5509 mm (-0.28 % vs Timoshenko); GCI = 0.299 %
+  error de cada malla frente al extrapolado: -31.9 %, -11.4 %, -3.3 %, -0.9 %, -0.2 %
+
+== (c) muro H=3, B=3 (H/B=1): Timoshenko flexión 0.0533 mm + cortante 0.0384 mm = 0.0917 mm
+  malla  1x 1: δ = 0.0594 mm  (-35.22 % vs Timoshenko)
+  malla  2x 2: δ = 0.0764 mm  (-16.75 % vs Timoshenko)
+  malla  4x 4: δ = 0.0864 mm  (-5.76 % vs Timoshenko)
+  malla  8x 8: δ = 0.0900 mm  (-1.84 % vs Timoshenko)
+  malla 16x16: δ = 0.0911 mm  (-0.72 % vs Timoshenko)
+  malla 32x32: δ = 0.0913 mm  (-0.44 % vs Timoshenko)
+  Richardson: p = 2.04, δ_ext = 0.0914 mm (-0.35 % vs Timoshenko); GCI = 0.110 %
+  error de cada malla frente al extrapolado: -35.0 %, -16.5 %, -5.4 %, -1.5 %, -0.4 %, -0.1 %

@@ -1,0 +1,30 @@
+
+### malla h = 1.0 m: 144 quads, 1014 GDL; análisis 4.4 s; extracción 0.3 s
+  pilar central, todo cargado: Mx en el nudo (4 elementos): [192.9 192.9 192.9 192.9] kN·m/m; media nodal 192.9
+  Mx en la cara del pilar (x = 6,20): 153.3 kN·m/m ; reacción del pilar 704 kN; F·t/8 = 35.2 kN·m (¡no es por metro!)
+  ∫Mx dy en la cara: banda de pilar 3 m = 211.4 kN·m ; pórtico virtual 6 m = 331.3 kN·m
+  mx inf: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.277 | sin Mxy / WA: mín 0.191 (elementos con |M| > 5 % del máx: 120)
+  my inf: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.277 | sin Mxy / WA: mín 0.191 (elementos con |M| > 5 % del máx: 120)
+  mx sup: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.521 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 48)
+  my sup: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.521 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 48)
+  máx. global WA inferior x: 45.6 kN·m/m; superior x: -89.6 kN·m/m
+
+### malla h = 0.5 m: 576 quads, 3750 GDL; análisis 16.8 s; extracción 1.2 s
+  pilar central, todo cargado: Mx en el nudo (4 elementos): [254.6 254.6 254.6 254.6] kN·m/m; media nodal 254.6
+  Mx en la cara del pilar (x = 6,20): 164.7 kN·m/m ; reacción del pilar 712 kN; F·t/8 = 35.6 kN·m (¡no es por metro!)
+  ∫Mx dy en la cara: banda de pilar 3 m = 263.6 kN·m ; pórtico virtual 6 m = 336.8 kN·m
+  mx inf: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.587 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 476)
+  my inf: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.587 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 476)
+  mx sup: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.330 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 168)
+  my sup: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.330 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 168)
+  máx. global WA inferior x: 48.6 kN·m/m; superior x: -139.0 kN·m/m
+
+### malla h = 0.25 m: 2304 quads, 14406 GDL; análisis 77.2 s; extracción 5.1 s
+  pilar central, todo cargado: Mx en el nudo (4 elementos): [318.7 318.7 318.7 318.7] kN·m/m; media nodal 318.7
+  Mx en la cara del pilar (x = 6,20): 111.8 kN·m/m ; reacción del pilar 715 kN; F·t/8 = 35.7 kN·m (¡no es por metro!)
+  ∫Mx dy en la cara: banda de pilar 3 m = 261.1 kN·m ; pórtico virtual 6 m = 337.3 kN·m
+  mx inf: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.731 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 1928)
+  my inf: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.731 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 1928)
+  mx sup: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.427 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 608)
+  my sup: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.427 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 608)
+  máx. global WA inferior x: 49.8 kN·m/m; superior x: -188.0 kN·m/m

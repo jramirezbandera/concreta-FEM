@@ -1,0 +1,27 @@
+{
+ "1-navegar-raiz": "11:25:47.117",
+ "swTrasRaiz": {
+  "activo": true,
+  "scope": "http://127.0.0.1:8796/",
+  "controla": false
+ },
+ "cachesTrasRaiz": [
+  "workbox-precache-v2-http://127.0.0.1:8796/"
+ ],
+ "2-navegar-taludes": "11:25:54.147",
+ "controlaEnTaludes": false,
+ "cachesTrasTaludes": [
+  "workbox-precache-v2-http://127.0.0.1:8796/"
+ ],
+ "entradasPyodide": null,
+ "3-recargar-taludes": "11:26:14.161",
+ "4-fin": "11:26:29.174",
+ "estimacion": {
+  "usoMB": 23.1,
+  "detalle": {
+   "caches": 24161792,
+   "indexedDB": 16994,
+   "serviceWorkerRegistrations": 37052
+  }
+ }
+}

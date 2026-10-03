@@ -1,0 +1,9 @@
+pequeño (3 pl, 16 pil, 24 vig): 48 pilares, 72 vigas
+  JSON 46 Ki car · en el ProyectoFile archivado 50 Ki car · clave viva + archivo 96 Ki car = 1.9 % del tope medido en Chrome (5 Mi car)
+  lz-string URI 20 Ki car (enlace) · lz-string UTF16 8 Ki car
+medio (8 pl, 40 pil, 70 vig): 320 pilares, 560 vigas
+  JSON 311 Ki car · en el ProyectoFile archivado 340 Ki car · clave viva + archivo 650 Ki car = 12.7 % del tope medido en Chrome (5 Mi car)
+  lz-string URI 89 Ki car (enlace) · lz-string UTF16 36 Ki car
+grande (15 pl, 80 pil, 140 vig): 1200 pilares, 2100 vigas
+  JSON 1148 Ki car · en el ProyectoFile archivado 1254 Ki car · clave viva + archivo 2401 Ki car = 46.9 % del tope medido en Chrome (5 Mi car)
+  lz-string URI 268 Ki car (enlace) · lz-string UTF16 107 Ki car

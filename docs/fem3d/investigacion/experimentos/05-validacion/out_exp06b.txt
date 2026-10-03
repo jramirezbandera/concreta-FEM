@@ -1,0 +1,3 @@
+alabeo 0.00 m: asimetría ||K-K^T||/||K|| = 7.9e-17 | Tx: 4.0e-17  Ty: 6.2e-17  Tz: 3.6e-18  Rx: 1.0e-18  Ry: 1.6e-18  Rz: 2.6e-06
+alabeo 0.01 m: asimetría ||K-K^T||/||K|| = 7.3e-17 | Tx: 7.2e-17  Ty: 8.5e-17  Tz: 4.0e-18  Rx: 2.3e-03  Ry: 2.3e-03  Rz: 2.1e-05
+alabeo 0.10 m: asimetría ||K-K^T||/||K|| = 9.1e-17 | Tx: 5.9e-17  Ty: 7.1e-17  Tz: 4.0e-18  Rx: 2.3e-02  Ry: 2.2e-02  Rz: 2.1e-03

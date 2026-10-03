@@ -1,0 +1,13 @@
+=== n=30 simplicial 15:23:30
+BENCH {"n": 30, "nodes": 6516, "dof": 39096, "quads": 6319, "bars": 480, "nnzG": 58408, "t_graph_s": 0.05, "nnzKlower": 1070892, "chk_supernodal_switch": 40.0, "chk_supernodal_default": 1, "cholmod_analyze_s": 0.08, "cholmod_factor_s": 7.57, "nnzL_colcount": 7790940, "flops_LLt_approx": 3841694532.0, "cholmod_minor_eq_n": true, "cholmod_is_super": 0, "cholmod_ordering": 2, "cholmod_xsize": 7790940, "cholmod_solve_24rhs_s": 0.27, "cholmod_relres": 3.727290074274324e-15}
+RUNINFO {"args":["30","simplicial","24"],"boot_ms":4085,"total_ms":14550,"forkCalls":0,"heap_MB":306,"rss_MB":631,"err":null}
+=== n=45 simplicial 15:23:45
+BENCH {"n": 45, "nodes": 14847, "dof": 89082, "quads": 14560, "bars": 480, "nnzG": 132847, "t_graph_s": 0.04, "nnzKlower": 2435787, "chk_supernodal_switch": 40.0, "chk_supernodal_default": 1, "cholmod_analyze_s": 0.21, "cholmod_factor_s": 16.32, "nnzL_colcount": 18126495, "flops_LLt_approx": 8847909177.0, "cholmod_minor_eq_n": true, "cholmod_is_super": 0, "cholmod_ordering": 2, "cholmod_xsize": 18126495, "cholmod_solve_24rhs_s": 0.67, "cholmod_relres": 4.0932479729378525e-15}
+RUNINFO {"args":["45","simplicial","24"],"boot_ms":3637,"total_ms":24243,"forkCalls":0,"heap_MB":556,"rss_MB":880,"err":null}
+=== n=64 simplicial 15:24:10
+BENCH {"n": 64, "nodes": 30040, "dof": 180240, "quads": 29607, "bars": 480, "nnzG": 268708, "t_graph_s": 0.08, "nnzKlower": 4926864, "chk_supernodal_switch": 40.0, "chk_supernodal_default": 1, "cholmod_analyze_s": 0.96, "cholmod_factor_s": 44.13, "nnzL_colcount": 39482040, "flops_LLt_approx": 21815933128.0, "cholmod_minor_eq_n": true, "cholmod_is_super": 0, "cholmod_ordering": 2, "cholmod_xsize": 39482040, "cholmod_solve_24rhs_s": 1.6, "cholmod_relres": 4.552838012796565e-15}
+RUNINFO {"args":["64","simplicial","24"],"boot_ms":3494,"total_ms":53924,"forkCalls":0,"heap_MB":1095,"rss_MB":1349,"err":null}
+=== n=90 simplicial 15:25:04
+BENCH {"n": 90, "nodes": 60060, "dof": 360360, "quads": 59479, "bars": 480, "nnzG": 538000, "t_graph_s": 0.1, "nnzKlower": 9864180, "chk_supernodal_switch": 40.0, "chk_supernodal_default": 1, "cholmod_analyze_s": 1.53, "cholmod_factor_s": 114.06, "nnzL_colcount": 86196564, "flops_LLt_approx": 57149877036.0, "cholmod_minor_eq_n": true, "cholmod_is_super": 0, "cholmod_ordering": 2, "cholmod_xsize": 86196564, "cholmod_solve_24rhs_s": 2.28, "cholmod_relres": 5.322016772238561e-15}
+RUNINFO {"args":["90","simplicial","24"],"boot_ms":3487,"total_ms":125420,"forkCalls":0,"heap_MB":2102,"rss_MB":2365,"err":null}
+DONE

@@ -1,0 +1,210 @@
+{
+ "modo": "swiftshader",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/index.html",
+ "ms": 13567,
+ "value": {
+  "info": {
+   "webgl2": true,
+   "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+   "three": "186"
+  },
+  "modelo": {
+   "barras": 5115,
+   "triangulosLamina": 20280,
+   "msGenerar": 15.3
+  },
+  "variantes": {
+   "naive": {
+    "msConstruir": 27,
+    "msPrimerFrame": 114.8,
+    "frame": {
+     "med": 77.7,
+     "p95": 84.3,
+     "media": 77.173
+    },
+    "drawCalls": 5115,
+    "triangulos": 61380,
+    "lineas": 0,
+    "geometriasGPU": 1,
+    "pick_raycastLineal": {
+     "med": 0.3,
+     "p95": 0.8,
+     "media": 0.42,
+     "aciertos": 58
+    }
+   },
+   "instanced": {
+    "msConstruir": 5.4,
+    "msPrimerFrame": 107.6,
+    "frame": {
+     "med": 62.4,
+     "p95": 64.4,
+     "media": 62.683
+    },
+    "drawCalls": 1,
+    "triangulos": 61380,
+    "lineas": 0,
+    "geometriasGPU": 1,
+    "pick_raycastLineal": {
+     "med": 1,
+     "p95": 1.2,
+     "media": 0.997,
+     "aciertos": 58
+    }
+   },
+   "fusionada": {
+    "msConstruir": 16.7,
+    "msPrimerFrame": 63.5,
+    "frame": {
+     "med": 27.8,
+     "p95": 29.7,
+     "media": 27.743
+    },
+    "drawCalls": 1,
+    "triangulos": 61380,
+    "lineas": 0,
+    "geometriasGPU": 1,
+    "pick_raycastLineal": {
+     "med": 3.2,
+     "p95": 4,
+     "media": 3.16,
+     "aciertos": 58
+    },
+    "msPrep_bvh": 30,
+    "pick_bvh": {
+     "med": 0,
+     "p95": 0.1,
+     "media": 0.04,
+     "aciertos": 58
+    }
+   },
+   "lineas": {
+    "msConstruir": 0.2,
+    "msPrimerFrame": 30.4,
+    "frame": {
+     "med": 9.7,
+     "p95": 11.1,
+     "media": 9.683
+    },
+    "drawCalls": 1,
+    "triangulos": 0,
+    "lineas": 5115,
+    "geometriasGPU": 1,
+    "pick_raycastLineal": {
+     "med": 0.4,
+     "p95": 0.7,
+     "media": 0.408,
+     "aciertos": 58
+    },
+    "msPrep_bvh": 6,
+    "pick_bvh": {
+     "med": 0,
+     "p95": 0.1,
+     "media": 0.058,
+     "aciertos": 58
+    }
+   },
+   "fat": {
+    "msConstruir": 3.1,
+    "msPrimerFrame": 101.9,
+    "frame": {
+     "med": 63,
+     "p95": 65.2,
+     "media": 62.817
+    },
+    "drawCalls": 1,
+    "triangulos": 30690,
+    "lineas": 0,
+    "geometriasGPU": 1,
+    "pick_raycastLineal": {
+     "med": 0.8,
+     "p95": 3.2,
+     "media": 0.99,
+     "aciertos": 59
+    }
+   },
+   "lamina": {
+    "msConstruir": 3.9,
+    "msPrimerFrame": 46.9,
+    "frame": {
+     "med": 18.4,
+     "p95": 22.3,
+     "media": 18.88
+    },
+    "drawCalls": 1,
+    "triangulos": 20280,
+    "lineas": 0,
+    "geometriasGPU": 1,
+    "pick_raycastLineal": {
+     "med": 1.6,
+     "p95": 2.4,
+     "media": 1.7,
+     "aciertos": 58
+    },
+    "msPrep_bvh": 8.4,
+    "pick_bvh": {
+     "med": 0,
+     "p95": 0.1,
+     "media": 0.012,
+     "aciertos": 58
+    },
+    "msPrep_bvhIndirect": 5.9,
+    "pick_bvhIndirect": {
+     "med": 0,
+     "p95": 0.1,
+     "media": 0.01,
+     "aciertos": 58
+    },
+    "msPrepGpuPick": 8.3,
+    "pick_gpu": {
+     "med": 1.2,
+     "p95": 1.4,
+     "media": 1.622,
+     "aciertos": 59
+    }
+   },
+   "laminaTextura": {
+    "msConstruir": 1.5,
+    "msPrimerFrame": 56.1,
+    "frame": {
+     "med": 23.4,
+     "p95": 25.9,
+     "media": 22.737
+    },
+    "drawCalls": 1,
+    "triangulos": 20280,
+    "lineas": 0,
+    "geometriasGPU": 2
+   },
+   "laminaInterp": {
+    "msConstruir": 5.9,
+    "msPrimerFrame": 25,
+    "frame": {
+     "med": 22.2,
+     "p95": 26.4,
+     "media": 22.63
+    },
+    "drawCalls": 1,
+    "triangulos": 20280,
+    "lineas": 0,
+    "geometriasGPU": 2
+   },
+   "mixto": {
+    "msConstruir": 37.5,
+    "msPrimerFrame": 127.4,
+    "frame": {
+     "med": 98.1,
+     "p95": 111.8,
+     "media": 99.5
+    },
+    "drawCalls": 3,
+    "triangulos": 112350,
+    "lineas": 0,
+    "geometriasGPU": 4
+   }
+  },
+  "heapMB": 19.7
+ },
+ "consola": []
+}

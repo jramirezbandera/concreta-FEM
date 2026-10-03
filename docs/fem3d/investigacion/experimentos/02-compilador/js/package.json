@@ -1,0 +1,24 @@
+{
+  "name": "js",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@kninnug/constrainautor": "^4.1.0",
+    "cdt-js": "^0.1.7",
+    "cdt2d": "^1.0.0",
+    "clipper2-js": "^1.2.4",
+    "delaunator": "^5.1.0",
+    "earcut": "^3.2.4",
+    "poly2tri": "^1.5.0",
+    "robust-predicates": "^3.0.3",
+    "triangle-wasm": "^1.0.0"
+  }
+}

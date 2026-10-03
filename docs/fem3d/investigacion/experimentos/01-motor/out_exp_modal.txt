@@ -1,0 +1,3 @@
+modal OK 0.52 s; frecuencias [np.float64(4.687), np.float64(4.748), np.float64(5.362), np.float64(13.15), np.float64(13.223), np.float64(15.033)]
+modal OK 2.18 s; frecuencias [np.float64(4.687), np.float64(4.748), np.float64(5.362), np.float64(13.15), np.float64(13.223), np.float64(15.033)]
+PYODIDE_INFO {"mode":"script","pyodide":"314.0.0","heap_after_packages_MB":62.4,"import_ok":true,"heap_after_import_MB":74.9,"heap_final_MB":121.4,"node_rss_MB":436.2,"times":{"import_pyodide_mjs_ms":2,"loadPyodide_ms":1479,"loadPackage_numpy_scipy_ms":1588,"import_Pynite_ms":1157,"script_ms":2201}}

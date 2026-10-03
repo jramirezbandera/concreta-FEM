@@ -1,0 +1,59 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8795/bench/pyo.html",
+ "ms": 112151,
+ "value": {
+  "crossOriginIsolated": true,
+  "arranqueFrio": {
+   "msBoot": 2095,
+   "heapTrasBootMB": 30,
+   "msNumpy": 289,
+   "msScipy": 1120,
+   "msImportScipySparse": 2126,
+   "heapTrasScipyMB": 74.9,
+   "msTotal": 5630,
+   "crossOriginIsolated": true,
+   "msDesdeMain": 5638
+  },
+  "memUA_trasArranque": 164,
+  "solves": [
+   {
+    "gdl": 10000,
+    "nnz": 49600,
+    "sFactorizar": 0.049,
+    "sResolver1": 0.0046,
+    "nnzLU": 645750,
+    "heapMB": 155.4
+   }
+  ],
+  "msTerminate": 0,
+  "memUA_trasTerminate": 0,
+  "arranqueTibio": {
+   "msBoot": 1702,
+   "heapTrasBootMB": 30,
+   "msNumpy": 311,
+   "msScipy": 1059,
+   "msImportScipySparse": 1804,
+   "heapTrasScipyMB": 74.9,
+   "msTotal": 4876,
+   "crossOriginIsolated": true,
+   "msDesdeMain": 4883
+  },
+  "interrupcion": {
+   "bucle": {
+    "termino": false,
+    "excepcion": "KeyboardInterrupt",
+    "msHastaVolver": 414,
+    "msDesdeSenal": 4
+   },
+   "splu": {
+    "termino": false,
+    "excepcion": "numpy._core._exceptions._ArrayMemoryError: Unable to allocate 580. MiB for an array with shape (76054572,) and data type float64",
+    "msHastaVolver": 21574,
+    "msDesdeSenal": 21173
+   }
+  }
+ },
+ "consola": []
+}

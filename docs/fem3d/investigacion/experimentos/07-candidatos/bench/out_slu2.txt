@@ -1,0 +1,13 @@
+=== n=64 superlu(nnz) 15:27:10
+BENCH {"n": 64, "nodes": 30040, "dof": 180240, "quads": 29607, "bars": 480, "nnzG": 268708, "t_graph_s": 0.05, "nnzK": 9673488, "t_buildK_s": 0.38, "superlu_factor_s": 11.51, "superlu_nnzLU": 82015872, "superlu_solve_24rhs_s": 3.6, "superlu_relres": 2.228948485443274e-15}
+RUNINFO {"args":["64","superlu","24"],"boot_ms":3488,"total_ms":21068,"forkCalls":0,"heap_MB":3745,"rss_MB":1500,"err":null}
+=== n=90 superlu(nnz) 15:27:31
+BENCH {"n": 90, "nodes": 60060, "dof": 360360, "quads": 59479, "bars": 480, "nnzG": 538000, "t_graph_s": 0.07, "nnzK": 19368000, "t_buildK_s": 0.67, "superlu_factor_s": 24.92, "superlu_nnzLU": 169913088, "superlu_solve_24rhs_s": 8.76, "superlu_relres": 2.356307052214898e-15}
+RUNINFO {"args":["90","superlu","24"],"boot_ms":3127,"total_ms":40368,"forkCalls":0,"heap_MB":4096,"rss_MB":2620,"err":null}
+DONE
+=== n=30 superlu(nnz) 15:29:11
+BENCH {"n": 30, "nodes": 6516, "dof": 39096, "quads": 6319, "bars": 480, "nnzG": 58408, "t_graph_s": 0.03, "nnzK": 2102688, "t_buildK_s": 0.1, "superlu_factor_s": 2.21, "superlu_nnzLU": 16093728, "superlu_solve_24rhs_s": 0.71, "superlu_relres": 2.001119911997356e-15}
+RUNINFO {"args":["30","superlu","24"],"boot_ms":3582,"total_ms":8965,"forkCalls":0,"heap_MB":1686,"rss_MB":651,"err":null}
+=== n=45 superlu(nnz) 15:29:21
+BENCH {"n": 45, "nodes": 14847, "dof": 89082, "quads": 14560, "bars": 480, "nnzG": 132847, "t_graph_s": 0.05, "nnzK": 4782492, "t_buildK_s": 0.27, "superlu_factor_s": 10.43, "superlu_nnzLU": 40271166, "superlu_solve_24rhs_s": 2.14, "superlu_relres": 2.1434146343578946e-15}
+RUNINFO {"args":["45","superlu","24"],"boot_ms":3566,"total_ms":18633,"forkCalls":0,"heap_MB":3545,"rss_MB":927,"err":null}

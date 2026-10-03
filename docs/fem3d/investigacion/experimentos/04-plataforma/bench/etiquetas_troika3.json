@@ -1,0 +1,13 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/etiquetas.html",
+ "ms": 237,
+ "value": {
+  "textoSuelto": 66,
+  "batched": 148,
+  "drawCalls": 2,
+  "terceros": []
+ },
+ "consola": []
+}

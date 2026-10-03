@@ -1,0 +1,86 @@
+export function EncuadreEnRender(t0) {
+  const {
+    r
+  } = t0;
+  const camera = useThree(_temp);
+  camera.position.set(r, r, r);
+  return null;
+}
+
+// E) Objeto Three creado con useMemo y mutado después en un efecto.
+function _temp(s) {
+  return s.camera;
+}
+export function MatricesInstancias(t0) {
+  const $ = _c(7);
+  const {
+    n,
+    datos
+  } = t0;
+  const ref = useRef(null);
+  let t1;
+  if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
+    t1 = new THREE.Matrix4();
+    $[0] = t1;
+  } else {
+    t1 = $[0];
+  }
+  const tmp = t1;
+  let t2;
+  let t3;
+  if ($[1] !== datos || $[2] !== n) {
+    t2 = () => {
+      for (let i = 0; i < n; i++) {
+        tmp.makeTranslation(datos[i * 3], datos[i * 3 + 1], datos[i * 3 + 2]);
+        ref.current.setMatrixAt(i, tmp);
+      }
+      ref.current.instanceMatrix.needsUpdate = true;
+    };
+    t3 = [n, datos, tmp];
+    $[1] = datos;
+    $[2] = n;
+    $[3] = t2;
+    $[4] = t3;
+  } else {
+    t2 = $[3];
+    t3 = $[4];
+  }
+  useLayoutEffect(t2, t3);
+  let t4;
+  if ($[5] !== n) {
+    t4 = <instancedMesh ref={ref} args={[undefined, undefined, n]} />;
+    $[5] = n;
+    $[6] = t4;
+  } else {
+    t4 = $[6];
+  }
+  return t4;
+}
+
+// F) Objeto Three mutado DURANTE el render (anti-patrón).
+export function ColorEnRender(t0) {
+  const $ = _c(2);
+  const {
+    c
+  } = t0;
+  let t1;
+  if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
+    t1 = new THREE.MeshBasicMaterial();
+    $[0] = t1;
+  } else {
+    t1 = $[0];
+  }
+  const mat = t1;
+  mat.color.set(c);
+  let t2;
+  if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
+    t2 = <mesh material={mat} />;
+    $[1] = t2;
+  } else {
+    t2 = $[1];
+  }
+  return t2;
+}
+
+// G) Estado con un objeto Three mutable (se muta y se vuelve a fijar).
+

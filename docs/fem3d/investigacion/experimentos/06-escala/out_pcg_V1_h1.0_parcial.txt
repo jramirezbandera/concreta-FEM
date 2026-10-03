@@ -1,0 +1,6 @@
+jacobi {'iter': 2673, 'converge': True, 's': 4.97, 'err_rel_vs_directo': 3.83e-10}
+jacobi_bloques6 {'iter': 2671, 'converge': True, 's': 7.02, 'err_rel_vs_directo': 3.8e-10}
+ilu_0.001_5 {'iter': 5000, 'converge': False, 's': 86.52, 'err_rel_vs_directo': 0.00157}
+ilu_0.0001_10 {'iter': 24, 'converge': True, 's': 0.66, 'err_rel_vs_directo': 4.19e-09}
+
+[exited with code 0]

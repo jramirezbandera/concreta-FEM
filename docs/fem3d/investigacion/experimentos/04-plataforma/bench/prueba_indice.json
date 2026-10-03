@@ -1,0 +1,26 @@
+{
+ "modo": "gpu",
+ "url": "http://127.0.0.1:8794/bench/index.html",
+ "ms": 21,
+ "value": {
+  "sinBvh": {
+   "triangulos": 128,
+   "faceIndexIgualAlOriginal": 128,
+   "resolviendoPorIndice": 128,
+   "tieneIndice": false
+  },
+  "bvhNormal": {
+   "triangulos": 128,
+   "faceIndexIgualAlOriginal": 16,
+   "resolviendoPorIndice": 128,
+   "tieneIndice": true
+  },
+  "bvhIndirect": {
+   "triangulos": 128,
+   "faceIndexIgualAlOriginal": 128,
+   "resolviendoPorIndice": 128,
+   "tieneIndice": false
+  }
+ },
+ "consola": []
+}

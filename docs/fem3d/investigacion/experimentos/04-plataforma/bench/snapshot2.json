@@ -1,0 +1,14 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/snap.html",
+ "ms": 2886,
+ "value": {
+  "hacer": {
+   "ok": false,
+   "error": "Unexpected hiwire entry at index 6",
+   "ms": 2864
+  }
+ },
+ "consola": []
+}

@@ -1,0 +1,28 @@
+--- numpy 2.4.3
+numpy 2.4.3
+E_4_4 local  M = [ 0.04583  0.04583 -0.00095]  Q = [-0.00985 -0.00985]  S = [0. 0. 0.]
+   global moment ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global shear ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global membrane ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+E_1_4 local  M = [0.03134 0.02777 0.00419]  Q = [ 0.08332 -0.00477]  S = [0. 0. 0.]
+   global moment ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global shear ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global membrane ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+E_4_1 local  M = [0.02777 0.03134 0.00419]  Q = [-0.00477  0.08332]  S = [0. 0. 0.]
+   global moment ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global shear ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global membrane ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+--- numpy 2.5.3
+numpy 2.5.3
+E_4_4 local  M = [ 0.04583  0.04583 -0.00095]  Q = [-0.00985 -0.00985]  S = [0. 0. 0.]
+   global moment ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global shear ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global membrane ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+E_1_4 local  M = [0.03134 0.02777 0.00419]  Q = [ 0.08332 -0.00477]  S = [0. 0. 0.]
+   global moment ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global shear ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global membrane ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+E_4_1 local  M = [0.02777 0.03134 0.00419]  Q = [-0.00477  0.08332]  S = [0. 0. 0.]
+   global moment ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global shear ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars
+   global membrane ERROR: TypeError only 0-dimensional arrays can be converted to Python scalars

@@ -1,0 +1,15 @@
+== React Compiler 1.0.0
+  OK      VisorDirecto
+  OK      Gira
+  OK      EncuadreEnEfecto
+  OK      EncuadreEnRender
+  OK      MatricesInstancias
+  OK      ColorEnRender
+  SALTADO 84: This value cannot be modified
+  SALTADO 97: Cannot access refs during render
+  SALTADO 97: Cannot access refs during render
+
+== eslint-plugin-react-hooks 7.0.1 (recommended)
+  L89 react-hooks/immutability: Error: This value cannot be modified
+  L99 react-hooks/refs: Error: Cannot access refs during render
+  L99 react-hooks/refs: Error: Cannot access refs during render

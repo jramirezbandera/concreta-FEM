@@ -1,0 +1,14 @@
+Placa de Morley 30°, L/t = 1000. w_c en unidades de 1e-4 qL^4/D. Ref Kirchhoff 4.455
+  Quad  4x 4: w_c = 7.6030  (+70.66 %)  avisos=0
+  Quad  8x 8: w_c = 5.0665  (+13.73 %)  avisos=0
+  Quad 16x16: w_c = 4.4276  (-0.61 %)  avisos=0
+  Quad 32x32: w_c = 4.2460  (-4.69 %)  avisos=0
+  Rect  4x 4: w_c = 43.3037  (+872.02 %)  avisos=0
+  Rect  8x 8: w_c = 41.2933  (+826.90 %)  avisos=0
+  Rect 16x16: w_c = 40.7910  (+815.62 %)  avisos=0
+  Rect 32x32: w_c = 40.6654  (+812.80 %)  avisos=0
+
+Idem con L/t = 100 (Quad)
+  Quad  8x 8: w_c = 5.0403  (+13.14 %)
+  Quad 16x16: w_c = 4.4052  (-1.12 %)
+  Quad 32x32: w_c = 4.2321  (-5.00 %)

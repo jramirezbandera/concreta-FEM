@@ -1,0 +1,9 @@
+caso | Mx(T) My(T) Mx(B) My(B)  [convención LUSAS]
+Point Load (fila sin nombre)     102.46   128.27  -127.04  -101.23
+UDL                               64.04    80.17   -79.40   -63.27
+SW                                -0.00    -0.00    -3.29    -8.97
+Patch                             18.47    29.70   -20.17    -8.94
+Suma (combinación)               181.68   229.17  -227.38  -179.89
+suma de W-A por caso             184.97   238.14  -229.90  -182.41
+LUSAS tabla 2 (combinada):        181.67   229.16  -227.38  -179.89
+LUSAS tabla 3 (suma por casos):   184.96   238.14  -229.91  -182.41

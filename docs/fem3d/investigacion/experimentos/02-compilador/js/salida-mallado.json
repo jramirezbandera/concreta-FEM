@@ -1,0 +1,811 @@
+{
+  "nodo": "v24.19.0",
+  "variantes": {
+    "A": {
+      "entrada": {
+        "ptsPSLG": 122,
+        "segPSLG": 120,
+        "steiner": 385,
+        "areaEsperada": 103
+      },
+      "cdt2d (exterior:false)": {
+        "ms_mediana": 83.12,
+        "nTri": 912,
+        "minAngle": 30.95,
+        "maxAngle": 103.14,
+        "maxAspect": 1.7,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "60da600aaacdbd41"
+      },
+      "cdt2d + clasificación propia": {
+        "ms_mediana": 80.982,
+        "nTri": 912,
+        "minAngle": 30.95,
+        "maxAngle": 103.14,
+        "maxAspect": 1.7,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "60da600aaacdbd41"
+      },
+      "cdt-js (eraseOuterTrianglesAndHoles)": {
+        "ms_mediana": 4.068,
+        "nTri": 912,
+        "minAngle": 30.95,
+        "maxAngle": 103.14,
+        "maxAspect": 1.7,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "60da600aaacdbd41"
+      },
+      "cdt-js + clasificación propia": {
+        "ms_mediana": 4.603,
+        "nTri": 912,
+        "minAngle": 30.95,
+        "maxAngle": 103.14,
+        "maxAspect": 1.7,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "60da600aaacdbd41"
+      },
+      "delaunator + constrainautor": {
+        "ms_mediana": 1.734,
+        "nTri": 912,
+        "minAngle": 30.95,
+        "maxAngle": 103.14,
+        "maxAspect": 1.7,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 912,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "60da600aaacdbd41"
+      },
+      "poly2tri (viga como Steiner)": {
+        "ms_mediana": 4.014,
+        "nTri": 912,
+        "minAngle": 30.95,
+        "maxAngle": 103.14,
+        "maxAspect": 1.7,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "60da600aaacdbd41"
+      },
+      "earcut (sin Steiner ni líneas internas)": {
+        "ms_mediana": 0.054,
+        "nTri": 8,
+        "minAngle": 4.56,
+        "maxAngle": 157.38,
+        "maxAspect": 9.07,
+        "triMin20": 5,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "0/120",
+        "vigaPreservada": "0/18",
+        "pilaresComoVertice": "0/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "3ca342bd2846f4f9"
+      },
+      "tri->3 quads (sobre constrainautor)": {
+        "nQuad": 2736,
+        "nNodos": 2838,
+        "minAngle": 30.95,
+        "maxAngle": 151,
+        "maxLadoLargoCorto": 3.76,
+        "minJacobianoEscalado": 0.485,
+        "area": 103
+      },
+      "rejilla estructurada (líneas de control)": {
+        "nQuad": 443,
+        "nNodos": 497,
+        "minAngle": 90,
+        "maxAngle": 90,
+        "maxLadoLargoCorto": 1.25,
+        "minJacobianoEscalado": 1,
+        "area": 103,
+        "franjaMinX_m": 0.4,
+        "franjaMinY_m": 0.5
+      }
+    },
+    "B": {
+      "entrada": {
+        "ptsPSLG": 123,
+        "segPSLG": 120,
+        "steiner": 385,
+        "areaEsperada": 103
+      },
+      "cdt2d (exterior:false)": {
+        "ms_mediana": 94.66,
+        "nTri": 914,
+        "minAngle": 3.43,
+        "maxAngle": 103.14,
+        "maxAspect": 9.94,
+        "triMin20": 2,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "5/5",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "1002234c314d4b21"
+      },
+      "cdt2d + clasificación propia": {
+        "ms_mediana": 89.249,
+        "nTri": 914,
+        "minAngle": 3.43,
+        "maxAngle": 103.14,
+        "maxAspect": 9.94,
+        "triMin20": 2,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "5/5",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "1002234c314d4b21"
+      },
+      "cdt-js (eraseOuterTrianglesAndHoles)": {
+        "ms_mediana": 3.851,
+        "nTri": 914,
+        "minAngle": 3.43,
+        "maxAngle": 103.14,
+        "maxAspect": 9.94,
+        "triMin20": 2,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "5/5",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "1002234c314d4b21"
+      },
+      "cdt-js + clasificación propia": {
+        "ms_mediana": 4.065,
+        "nTri": 914,
+        "minAngle": 3.43,
+        "maxAngle": 103.14,
+        "maxAspect": 9.94,
+        "triMin20": 2,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "5/5",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "1002234c314d4b21"
+      },
+      "delaunator + constrainautor": {
+        "ms_mediana": 1.1,
+        "nTri": 914,
+        "minAngle": 3.43,
+        "maxAngle": 103.14,
+        "maxAspect": 9.94,
+        "triMin20": 2,
+        "area": 103,
+        "inverted": 914,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "5/5",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "1002234c314d4b21"
+      },
+      "poly2tri (viga como Steiner)": {
+        "ms_mediana": 2.354,
+        "nTri": 914,
+        "minAngle": 3.43,
+        "maxAngle": 103.14,
+        "maxAspect": 9.94,
+        "triMin20": 2,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "5/5",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "1002234c314d4b21"
+      },
+      "earcut (sin Steiner ni líneas internas)": {
+        "ms_mediana": 0.021,
+        "nTri": 8,
+        "minAngle": 4.56,
+        "maxAngle": 157.38,
+        "maxAspect": 9.07,
+        "triMin20": 5,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "0/120",
+        "vigaPreservada": "0/18",
+        "pilaresComoVertice": "0/5",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "3ca342bd2846f4f9"
+      },
+      "tri->3 quads (sobre constrainautor)": {
+        "nQuad": 2742,
+        "nNodos": 2844,
+        "minAngle": 3.43,
+        "maxAngle": 174.88,
+        "maxLadoLargoCorto": 16.7,
+        "minJacobianoEscalado": 0.06,
+        "area": 103
+      },
+      "rejilla estructurada (líneas de control)": {
+        "nQuad": 461,
+        "nNodos": 516,
+        "minAngle": 90,
+        "maxAngle": 90,
+        "maxLadoLargoCorto": 16.67,
+        "minJacobianoEscalado": 1,
+        "area": 103,
+        "franjaMinX_m": 0.03,
+        "franjaMinY_m": 0.5
+      }
+    },
+    "C": {
+      "entrada": {
+        "ptsPSLG": 126,
+        "segPSLG": 125,
+        "steiner": 468,
+        "areaEsperada": 103
+      },
+      "cdt2d (exterior:false)": {
+        "ms_mediana": 78.845,
+        "nTri": 1086,
+        "minAngle": 12.18,
+        "maxAngle": 126.87,
+        "maxAspect": 3.18,
+        "triMin20": 86,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "125/125",
+        "vigaPreservada": "23/23",
+        "pilaresComoVertice": "3/3",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "8761a6b328f2f1f1"
+      },
+      "cdt2d + clasificación propia": {
+        "ms_mediana": 75.78,
+        "nTri": 1086,
+        "minAngle": 12.18,
+        "maxAngle": 126.87,
+        "maxAspect": 3.18,
+        "triMin20": 86,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "125/125",
+        "vigaPreservada": "23/23",
+        "pilaresComoVertice": "3/3",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "8761a6b328f2f1f1"
+      },
+      "cdt-js (eraseOuterTrianglesAndHoles)": {
+        "ms_mediana": 3.857,
+        "nTri": 1086,
+        "minAngle": 12.18,
+        "maxAngle": 126.87,
+        "maxAspect": 3.18,
+        "triMin20": 86,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "125/125",
+        "vigaPreservada": "23/23",
+        "pilaresComoVertice": "3/3",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "8761a6b328f2f1f1"
+      },
+      "cdt-js + clasificación propia": {
+        "ms_mediana": 5.493,
+        "nTri": 1086,
+        "minAngle": 12.18,
+        "maxAngle": 126.87,
+        "maxAspect": 3.18,
+        "triMin20": 86,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "125/125",
+        "vigaPreservada": "23/23",
+        "pilaresComoVertice": "3/3",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "8761a6b328f2f1f1"
+      },
+      "delaunator + constrainautor": {
+        "ms_mediana": 1.301,
+        "nTri": 1086,
+        "minAngle": 12.18,
+        "maxAngle": 126.87,
+        "maxAspect": 3.18,
+        "triMin20": 86,
+        "area": 103,
+        "inverted": 1086,
+        "segPreservados": "125/125",
+        "vigaPreservada": "23/23",
+        "pilaresComoVertice": "3/3",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "8761a6b328f2f1f1"
+      },
+      "poly2tri (viga como Steiner)": {
+        "ms_mediana": 2.875,
+        "nTri": 1086,
+        "minAngle": 12.18,
+        "maxAngle": 126.87,
+        "maxAspect": 3.18,
+        "triMin20": 86,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "124/125",
+        "vigaPreservada": "22/23",
+        "pilaresComoVertice": "3/3",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "cba3580070432894"
+      },
+      "earcut (sin Steiner ni líneas internas)": {
+        "ms_mediana": 0.016,
+        "nTri": 8,
+        "minAngle": 4.56,
+        "maxAngle": 157.38,
+        "maxAspect": 9.07,
+        "triMin20": 5,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "0/125",
+        "vigaPreservada": "0/23",
+        "pilaresComoVertice": "0/3",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "3ca342bd2846f4f9"
+      },
+      "tri->3 quads (sobre constrainautor)": {
+        "nQuad": 3258,
+        "nNodos": 3360,
+        "minAngle": 12.18,
+        "maxAngle": 164.17,
+        "maxLadoLargoCorto": 6,
+        "minJacobianoEscalado": 0.211,
+        "area": 103
+      },
+      "rejilla estructurada (líneas de control)": {
+        "nQuad": 443,
+        "nNodos": 497,
+        "minAngle": 90,
+        "maxAngle": 90,
+        "maxLadoLargoCorto": 1.25,
+        "minJacobianoEscalado": 1,
+        "area": 103,
+        "franjaMinX_m": 0.4,
+        "franjaMinY_m": 0.5
+      }
+    },
+    "S": {
+      "entrada": {
+        "ptsPSLG": 122,
+        "segPSLG": 120,
+        "steiner": 347,
+        "areaEsperada": 103
+      },
+      "cdt2d (exterior:false)": {
+        "ms_mediana": 40.405,
+        "nTri": 836,
+        "minAngle": 21.8,
+        "maxAngle": 90,
+        "maxAspect": 1.93,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          false,
+          false,
+          false
+        ],
+        "huella": "566e9c85db36fa38"
+      },
+      "cdt2d + clasificación propia": {
+        "ms_mediana": 44.506,
+        "nTri": 836,
+        "minAngle": 21.8,
+        "maxAngle": 90,
+        "maxAspect": 1.93,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          false,
+          false,
+          false
+        ],
+        "huella": "566e9c85db36fa38"
+      },
+      "cdt-js (eraseOuterTrianglesAndHoles)": {
+        "ms_mediana": 2.925,
+        "nTri": 836,
+        "minAngle": 21.8,
+        "maxAngle": 90,
+        "maxAspect": 1.93,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          false,
+          false,
+          false
+        ],
+        "huella": "b5661af17b14e484"
+      },
+      "cdt-js + clasificación propia": {
+        "ms_mediana": 3.14,
+        "nTri": 836,
+        "minAngle": 21.8,
+        "maxAngle": 90,
+        "maxAspect": 1.93,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          false,
+          false,
+          false
+        ],
+        "huella": "b5661af17b14e484"
+      },
+      "delaunator + constrainautor": {
+        "ms_mediana": 1.066,
+        "nTri": 836,
+        "minAngle": 21.8,
+        "maxAngle": 90,
+        "maxAspect": 1.93,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 836,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          false,
+          false,
+          false
+        ],
+        "huella": "7b4aea7f76d2d727"
+      },
+      "poly2tri (viga como Steiner)": {
+        "ms_mediana": 0.853,
+        "nTri": 836,
+        "minAngle": 21.8,
+        "maxAngle": 90,
+        "maxAspect": 1.93,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "6b9d1332f27f4c56"
+      },
+      "earcut (sin Steiner ni líneas internas)": {
+        "ms_mediana": 0.011,
+        "nTri": 8,
+        "minAngle": 4.56,
+        "maxAngle": 157.38,
+        "maxAspect": 9.07,
+        "triMin20": 5,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "0/120",
+        "vigaPreservada": "0/18",
+        "pilaresComoVertice": "0/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "3ca342bd2846f4f9"
+      },
+      "tri->3 quads (sobre constrainautor)": {
+        "nQuad": 2508,
+        "nNodos": 2610,
+        "minAngle": 21.8,
+        "maxAngle": 152.65,
+        "maxLadoLargoCorto": 3,
+        "minJacobianoEscalado": 0.371,
+        "area": 103
+      },
+      "rejilla estructurada (líneas de control)": {
+        "nQuad": 443,
+        "nNodos": 497,
+        "minAngle": 90,
+        "maxAngle": 90,
+        "maxLadoLargoCorto": 1.25,
+        "minJacobianoEscalado": 1,
+        "area": 103,
+        "franjaMinX_m": 0.4,
+        "franjaMinY_m": 0.5
+      }
+    },
+    "D": {
+      "entrada": {
+        "ptsPSLG": 122,
+        "segPSLG": 120,
+        "steiner": 350,
+        "areaEsperada": 103
+      },
+      "cdt2d (exterior:false)": {
+        "ms_mediana": 42.452,
+        "nTri": 16,
+        "minAngle": 14.04,
+        "maxAngle": 135,
+        "maxAspect": 3,
+        "triMin20": 10,
+        "area": 5,
+        "inverted": 0,
+        "segPreservados": "18/120",
+        "vigaPreservada": "0/18",
+        "pilaresComoVertice": "0/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "6a35217cbed4f592"
+      },
+      "cdt2d + clasificación propia": {
+        "ms_mediana": 41.66,
+        "nTri": 793,
+        "minAngle": 0.27,
+        "maxAngle": 175.91,
+        "maxAspect": 130.49,
+        "triMin20": 35,
+        "area": 98.35,
+        "inverted": 0,
+        "segPreservados": "114/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          false,
+          false,
+          false
+        ],
+        "huella": "21b68025eac7cc68"
+      },
+      "cdt-js (eraseOuterTrianglesAndHoles)": {
+        "error": "132120"
+      },
+      "cdt-js + clasificación propia": {
+        "error": "187800"
+      },
+      "delaunator + constrainautor": {
+        "ms_mediana": 0.501,
+        "nTri": 836,
+        "minAngle": 21.8,
+        "maxAngle": 90,
+        "maxAspect": 1.93,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 836,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "3/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          false,
+          false,
+          false
+        ],
+        "huella": "df33b02aa9f73591"
+      },
+      "poly2tri (viga como Steiner)": {
+        "ms_mediana": 1.086,
+        "nTri": 842,
+        "minAngle": null,
+        "maxAngle": null,
+        "maxAspect": null,
+        "triMin20": 0,
+        "area": 103,
+        "inverted": 6,
+        "segPreservados": "120/120",
+        "vigaPreservada": "18/18",
+        "pilaresComoVertice": "4/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "acf1e0ba4f35aae6"
+      },
+      "earcut (sin Steiner ni líneas internas)": {
+        "ms_mediana": 0.011,
+        "nTri": 8,
+        "minAngle": 4.56,
+        "maxAngle": 157.38,
+        "maxAspect": 9.07,
+        "triMin20": 5,
+        "area": 103,
+        "inverted": 0,
+        "segPreservados": "0/120",
+        "vigaPreservada": "0/18",
+        "pilaresComoVertice": "0/4",
+        "mismaSalidaDosVeces": true,
+        "mismaGeometriaConEntradaBarajada": [
+          true,
+          true,
+          true
+        ],
+        "huella": "3ca342bd2846f4f9"
+      },
+      "tri->3 quads (sobre constrainautor)": {
+        "nQuad": 2508,
+        "nNodos": 2610,
+        "minAngle": 21.8,
+        "maxAngle": 152.65,
+        "maxLadoLargoCorto": 3,
+        "minJacobianoEscalado": 0.371,
+        "area": 103
+      },
+      "rejilla estructurada (líneas de control)": {
+        "nQuad": 443,
+        "nNodos": 497,
+        "minAngle": 90,
+        "maxAngle": 90,
+        "maxLadoLargoCorto": 1.25,
+        "minJacobianoEscalado": 1,
+        "area": 103,
+        "franjaMinX_m": 0.4,
+        "franjaMinY_m": 0.5
+      }
+    }
+  }
+}

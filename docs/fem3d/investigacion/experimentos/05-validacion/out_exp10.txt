@@ -1,0 +1,2 @@
+Membrana: error máx. desplazamientos interiores (rel. a 1e-3·0.24) = 1.13e-16; error máx. tensiones = 2.50e-10; elemento A centroide [sx, sy, txy] = [1333.3333 1333.3333  400.    ]
+Flexión:  error w interiores = 8.82e-16; error giros = 1.76e-14; error momentos = 5.19e-13; M_A = [-5.55555556e-08 -5.55555556e-08 -1.66666667e-08], |ref| = [5.55555556e-08 5.55555556e-08 1.66666667e-08]; |Q|max espurio = 1.34e-18

@@ -1,0 +1,4 @@
+{"K": "K11_V1_h0.5.npz", "n": 312816, "directo_s": 3.786}
+jacobi {'iter': 5574, 'converge': True, 's': 39.4, 'err_rel_vs_directo': 3.23e-10}
+jacobi_bloques6 {'iter': 5505, 'converge': True, 's': 47.82, 'err_rel_vs_directo': 3.2e-10}
+{"K": "K11_V1_h0.5.npz", "n": 312816, "directo_s": 3.786, "jacobi": {"iter": 5574, "converge": true, "s": 39.4, "err_rel_vs_directo": 3.23e-10}, "jacobi_bloques6": {"iter": 5505, "converge": true, "s": 47.82, "err_rel_vs_directo": 3.2e-10}}

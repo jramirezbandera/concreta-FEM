@@ -1,0 +1,41 @@
+{
+  "predicados": {
+    "puntos": 999,
+    "exactamenteColinealesSegunOrient2dExacto": 0,
+    "colinealesSegunIngenuo": 645,
+    "distanciaMaximaAlEje_m": 1.3023906594146752e-15,
+    "nota": "orient2d de robust-predicates devuelve ccw>0 con signo opuesto al producto vectorial (convención)"
+  },
+  "cruces": {
+    "10x8 vanos, ruido 0 m": {
+      "vigas": 178,
+      "paresBruta": 15753,
+      "cruzan": 0,
+      "tocanExacto": 478,
+      "casiSinTocar_le5cm": 0,
+      "ms_bruta": 3.5,
+      "ms_rejilla": 1,
+      "mismoResultado": true
+    },
+    "10x8 vanos, ruido 0.02 m": {
+      "vigas": 178,
+      "paresBruta": 15753,
+      "cruzan": 80,
+      "tocanExacto": 0,
+      "casiSinTocar_le5cm": 398,
+      "ms_bruta": 2.9,
+      "ms_rejilla": 1.1,
+      "mismoResultado": true
+    },
+    "40x30 vanos, ruido 0.02 m": {
+      "vigas": 2470,
+      "paresBruta": 3049215,
+      "cruzan": 1198,
+      "tocanExacto": 0,
+      "casiSinTocar_le5cm": 6000,
+      "ms_bruta": 46.7,
+      "ms_rejilla": 12.2,
+      "mismoResultado": true
+    }
+  }
+}

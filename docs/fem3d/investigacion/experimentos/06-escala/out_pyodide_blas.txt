@@ -1,0 +1,3 @@
+{"dgemm_500_GFLOPs": 5.11, "chol_500_GFLOPs": 4.14, "np_matmul_500_GFLOPs": 2.95, "dgemm_1000_GFLOPs": 6.51, "chol_1000_GFLOPs": 5.92, "np_matmul_1000_GFLOPs": 2.8, "dgemm_2000_GFLOPs": 6.57, "chol_2000_GFLOPs": 6.29, "np_matmul_2000_GFLOPs": 2.65}
+PYODIDE_INFO {"mode":"blas","pyodide":"314.0.0","heap_after_packages_MB":62.4,"heap_final_MB":339.2,"node_rss_MB":661.5,"times":{"loadPyodide_ms":1383,"loadPackage_ms":1398,"blas_ms":18894}}
+CPYTHON_1hilo {"dgemm_500_GFLOPs": 49.74, "chol_500_GFLOPs": 22.41, "dgemm_1000_GFLOPs": 58.2, "chol_1000_GFLOPs": 30.33, "dgemm_2000_GFLOPs": 57.96, "chol_2000_GFLOPs": 42.55}

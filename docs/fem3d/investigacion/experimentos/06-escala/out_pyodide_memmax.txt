@@ -1,0 +1,2 @@
+Loaded numpy, scipy
+PYODIDE_INFO {"mode":"memmax","pyodide":"314.0.0","heap_after_packages_MB":62.4,"max_numpy_alloc_MB":3968,"heap_MB":4095.9,"getHeapMax_MB":4095.9,"node_rss_MB":356}

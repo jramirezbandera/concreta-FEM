@@ -1,0 +1,15 @@
+casos base: 11 (G, Q, S, Wx+, Wx-, Wy+, Wy-, EX+e, EX-e, EY+e, EY-e)
+ELU-P: 74 combinaciones
+ELU-S: 64 combinaciones
+ELS-C: 37 combinaciones
+ELS-CP: 1 combinaciones
+total: 176
+ELU-P sin G favorable: 37
+muestras:
+   ELU-P G1.35
+   ELU-P G0.8
+   ELU-P G1.35 *Q
+   ELU-P G0.8 *Q Wx+
+   ELU-P G1.35 *S Q Wy-
+   ELS-C G1 *Q
+   ELU-S +EX+e +0.3EY+e +ψ2Q

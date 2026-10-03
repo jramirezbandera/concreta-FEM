@@ -1,0 +1,6 @@
+scipy-1.17.1-cp314-cp314-pyemscripten_2026_0_wasm32.whl HTTP/1.1 200 OK Content-Length: 14031718 
+numpy-2.4.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl HTTP/1.1 200 OK Content-Length: 2914079 
+libopenblas-0.3.28.zip HTTP/1.1 200 OK Content-Length: 2143326 
+micropip-0.11.1-py3-none-any.whl HTTP/1.1 200 OK Content-Length: 115486 
+packaging-26.1-py3-none-any.whl HTTP/1.1 200 OK Content-Length: 95846 
+matplotlib-3.10.8-cp314-cp314-pyemscripten_2026_0_wasm32.whl HTTP/1.1 200 OK Content-Length: 6972262 

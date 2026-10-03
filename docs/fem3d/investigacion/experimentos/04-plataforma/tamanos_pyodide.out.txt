@@ -1,0 +1,33 @@
+Core Pyodide (wasm+asm.mjs+mjs+stdlib+lock): 12.92 MiB
+
+== Solo numpy (hoy, taludes): numpy
+  numpy                  2.4.3         2.78 MiB  numpy-2.4.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  TOTAL 2.78 MiB (1 paquetes)
+
+== numpy + scipy (PyNite con matplotlib/prettytable stub): numpy, scipy
+  scipy                  1.17.1       13.38 MiB  scipy-1.17.1-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  numpy                  2.4.3         2.78 MiB  numpy-2.4.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  TOTAL 16.16 MiB (2 paquetes)
+
+== PyNite 3.2.0 requires_dist completo en Pyodide: numpy, scipy, matplotlib
+  scipy                  1.17.1       13.38 MiB  scipy-1.17.1-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  matplotlib             3.10.8        6.65 MiB  matplotlib-3.10.8-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  numpy                  2.4.3         2.78 MiB  numpy-2.4.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  fonttools              4.62.1        1.10 MiB  fonttools-4.62.1-py3-none-any.whl
+  pillow                 12.2.0        0.99 MiB  pillow-12.2.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  pytz                   2026.1.post1    0.49 MiB  pytz-2026.1.post1-py2.py3-none-any.whl
+  python-dateutil        2.9.0.post0    0.22 MiB  python_dateutil-2.9.0.post0-py2.py3-none-any.whl
+  pyparsing              3.3.2         0.12 MiB  pyparsing-3.3.2-py3-none-any.whl
+  contourpy              1.3.3         0.11 MiB  contourpy-1.3.3-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  packaging              26.1          0.09 MiB  packaging-26.1-py3-none-any.whl
+  kiwisolver             1.5.0         0.04 MiB  kiwisolver-1.5.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl
+  six                    1.17.0        0.01 MiB  six-1.17.0-py2.py3-none-any.whl
+  cycler                 0.12.1        0.01 MiB  cycler-0.12.1-py3-none-any.whl
+  TOTAL 25.98 MiB (13 paquetes)
+
+(prettytable NO está en el lock: wheel puro de PyPI, hay que vendorizarlo o stub)
+
+Incremento sobre hoy si se stubbea matplotlib: 13.38 MiB
+Incremento sobre hoy con matplotlib real:     23.20 MiB
+Total offline FEM3D (core + numpy + scipy + PyNite ~0.2 MiB): 29.27 MiB
+Total offline FEM3D con matplotlib:                          39.09 MiB

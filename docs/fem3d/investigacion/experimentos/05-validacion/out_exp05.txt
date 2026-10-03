@@ -1,0 +1,48 @@
+== 1. Voladizo: error relativo
+  δy = PL³/3EIz                +3.42e-16
+  θz = PL²/2EIz                +2.28e-16
+  δz = PL³/3EIy                +3.42e-16
+  δx = PL/EA                   +0.00e+00
+  φx = TL/GJ                   +0.00e+00
+  Mz(0) = PL                   +4.55e-16
+  My(0) = PL                   +4.55e-16
+  T(x) = T                     +0.00e+00
+  signos brutos: {'Mz(0) bruto (carga +FY)': np.float64(-4000.0), 'My(0) bruto (carga +FZ)': np.float64(-4000.0), 'Fy(0) bruto (carga +FY)': np.float64(-1000.0), 'Fz(0) bruto (carga +FZ)': np.float64(-1000.0), 'N bruto (carga +FX, tracción)': np.float64(-1000.0), 'T bruto (MX +)': np.float64(-2000.0)}
+== 2. Biapoyada
+  M(L/2) = wL²/8                           +0.00e+00
+  δ(L/2) = 5wL⁴/384EI                      +0.00e+00
+  max|M(x)-exacto|/Mmax en 7 estaciones    +0.00e+00
+  ΣR = wL                                  +0.00e+00
+  signo bruto de Mz(L/2) con carga gravitatoria (-Y): -45000.0
+== 3. Pórtico espacial k = 0.1
+  Δ (pendiente-desplazamiento)             +4.10e-06
+  |M base| (pendiente-desplazamiento)      +3.72e-06
+  ΣFx reacciones + cargas (rel)            +1.48e-11
+  ΣMz global (rel a H·h)                   -1.48e-11
+== 3. Pórtico espacial k = 1.0
+  Δ (pendiente-desplazamiento)             +1.02e-05
+  |M base| (pendiente-desplazamiento)      +7.51e-06
+  ΣFx reacciones + cargas (rel)            +2.54e-12
+  ΣMz global (rel a H·h)                   -2.54e-12
+== 3. Pórtico espacial k = 10.0
+  Δ (pendiente-desplazamiento)             +1.50e-05
+  |M base| (pendiente-desplazamiento)      +1.15e-05
+  ΣFx reacciones + cargas (rel)            +4.32e-12
+  ΣMz global (rel a H·h)                   -4.32e-12
+== 4. Voladizo en L (flexión + torsión)
+  δ punta = Pa³/3EI + Pb³/3EI + Pb²a/GJ    +1.01e-12
+  T en tramo 1 = P·b                       +1.01e-12
+== 5. Trípode
+  N = P/(3 cosβ)                           +4.54e-16
+  δv = PL/(3EA cos²β)                      +0.00e+00
+== 6. Pilar 'vertical' con ruido numérico en la coordenada de cabeza (carga 10 kN en X)
+  ruido 0 en X: δx = 3.3333 mm; eje local y = [-1.  0.  0.], z = [0. 0. 1.]
+  ruido 1e-12 en X: δx = 3.3333 mm; eje local y = [-1.  0.  0.], z = [0. 0. 1.]
+  ruido 1e-12 en Z: δx = 1.8750 mm; eje local y = [ 0.  0. -1.], z = [-1.  0.  0.]
+  ruido 1e-09 en Z: δx = 1.8750 mm; eje local y = [ 0.  0. -1.], z = [-1.  0.  0.]
+== 7. Fracción de la flecha debida al cortante (biempotrada, carga centrada, 30x60, nu=0.2)
+  L/h =  2: 74.2 % de la flecha total no la ve Member3D
+  L/h =  4: 41.9 % de la flecha total no la ve Member3D
+  L/h =  8: 15.3 % de la flecha total no la ve Member3D
+  L/h = 12: 7.4 % de la flecha total no la ve Member3D
+  L/h = 20: 2.8 % de la flecha total no la ve Member3D

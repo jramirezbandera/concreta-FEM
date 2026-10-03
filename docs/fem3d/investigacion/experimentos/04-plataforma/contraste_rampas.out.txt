@@ -1,0 +1,6 @@
+#00204d sobre #0c0c0e 1.22
+#ffea46 sobre #ffffff 1.23
+#00204d sobre #ffffff 15.98
+#ffea46 sobre #0c0c0e 15.92
+#440154 sobre #0c0c0e 1.28
+#fde725 sobre #ffffff 1.26

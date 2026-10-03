@@ -1,0 +1,3 @@
+(a) viga en el plano del muro, 1 nudo   : |ΣF|/Σ|F| = 5.98e-15   |ΣM|/(Σ|F|·L) = 4.85e-01
+(a') viga embebida                      : |ΣF|/Σ|F| = 1.41e-13   |ΣM|/(Σ|F|·L) = 1.38e-04
+(b) muro en L (quads no coplanarios)    : |ΣF|/Σ|F| = 9.50e-14   |ΣM|/(Σ|F|·L) = 3.47e-05

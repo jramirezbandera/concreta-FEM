@@ -1,0 +1,9 @@
+
+### malla h = 0.25 m: 2304 quads, 14406 GDL; análisis 87.3 s; extracción 6.1 s
+  pilar central, todo cargado: Mx en el nudo (4 elementos): [318.7 318.7 318.7 318.7] kN·m/m; media nodal 318.7
+  Mx en la cara del pilar (x = 6,20): 111.8 kN·m/m ; reacción del pilar 715 kN; F·t/8 = 35.7 kN·m (¡no es por metro!)
+  mx inf: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.731 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 1928)
+  my inf: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.731 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 1928)
+  mx sup: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.427 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 608)
+  my sup: WA(envolvente)/envolvente(WA) mín 1.000 máx 1.427 | sin Mxy / WA: mín 0.000 (elementos con |M| > 5 % del máx: 608)
+  máx. global WA inferior x: 49.8 kN·m/m; superior x: -188.0 kN·m/m

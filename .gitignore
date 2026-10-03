@@ -1,0 +1,26 @@
+node_modules
+dist
+*.local
+*.log
+
+# bun es el único gestor de paquetes, como en Concreta
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Rust (núcleo WASM)
+target/
+
+# Python de los oráculos y experimentos
+__pycache__/
+.venv/
+venv/
+venv312/
+*.npz
+
+# Editor y sistema
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+.claude/settings.local.json

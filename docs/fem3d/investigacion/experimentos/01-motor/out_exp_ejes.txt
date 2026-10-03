@@ -1,0 +1,22 @@
+== (1) sensibilidad del eje por defecto (Y-up de PyNite) ==
+pilar Y-up dx=0: y_local=[-1.  0.  0.], z_local=[0. 0. 1.]
+pilar Y-up dx=1e-15: y_local=[-1.  0.  0.], z_local=[0. 0. 1.]
+pilar Y-up dx=1e-12: y_local=[-1.  0.  0.], z_local=[0. 0. 1.]
+pilar Y-up dx=1e-09: y_local=[-1.  0.  0.], z_local=[0. 0. 1.]
+pilar Z-up exacto: y=[0. 1. 0.] | con ruido (dx=0, dy=1e-14): y=[ 0.  1. -0.]
+pilar Z-up exacto: y=[0. 1. 0.] | con ruido (dx=1e-15, dy=1e-14): y=[-0.  1. -0.]
+pilar Z-up exacto: y=[0. 1. 0.] | con ruido (dx=1e-12, dy=1e-14): y=[-0.  1. -0.]
+viga X Y-up dy=0: y_local=[0. 1. 0.]
+viga X Y-up dy=1e-15: y_local=[-0.  1.  0.]
+viga X Y-up dy=1e-12: y_local=[-0.  1.  0.]
+
+== (2) rotation a partir de vector de referencia ==
+(0, 0, 0)->(0, 0, 3) yref=(1, 0, 0): rotation= -90.000°  y=[1. 0. 0.]  z=[-0.  1.  0.]  |y-yd|=6.1e-17
+(0, 0, 0)->(6, 0, 0) yref=(0, 0, 1): rotation=  90.000°  y=[0. 0. 1.]  z=[ 0. -1.  0.]  |y-yd|=6.1e-17
+(0, 0, 0)->(0, 5, 0) yref=(0, 0, 1): rotation=  90.000°  y=[-0.  0.  1.]  z=[1. 0. 0.]  |y-yd|=6.1e-17
+(0, 0, 0)->(4, 3, 2) yref=(0, 0, 1): rotation= 105.565°  y=[-0.297113 -0.222834  0.928477]  z=[ 0.6 -0.8 -0. ]  |y-yd|=1.2e-16
+(1, 2, 3)->(1, 2, 0) yref=(0, 1, 0): rotation=   0.000°  y=[0. 1. 0.]  z=[ 1. -0.  0.]  |y-yd|=0.0e+00
+peor error 1.2412670766236366e-16
+
+== (3) liberación Rxi y Rxj simultánea ==
+EXCEPCIÓN: LinAlgError Singular matrix

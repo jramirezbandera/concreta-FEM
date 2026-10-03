@@ -1,0 +1,20 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/etiquetas.html",
+ "ms": 30118,
+ "value": {
+  "a": {
+   "n": 500,
+   "troika_sincronizo": false,
+   "troika_msHastaSync": 30020.5,
+   "troika_frame": {
+    "med": 0.5,
+    "p95": 2
+   },
+   "troika_drawCalls": 1,
+   "peticionesTerceros": []
+  }
+ },
+ "consola": []
+}

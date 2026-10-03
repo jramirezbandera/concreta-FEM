@@ -1,0 +1,2 @@
+{"py": "3.14.2", "numpy": "2.4.3", "scipy": "1.17.1", "plate_w": "np.float64(0.014790964804995699)", "plate_Mx": "473.6719036210004", "mixed_DX": "np.float64(0.00042439324407595933)", "mixed_N": "-43565.75613192127"}
+{"load_numpy_scipy_ms":2879,"install_pynite_ms":332,"compute_ms":5473}

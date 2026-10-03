@@ -1,0 +1,4 @@
+ramas cubiertas: {'principal': 8615, 'mx*=0': 4045, 'my*=0': 3933, 'sin armadura': 3407}
+violaciones del criterio de Johansen: 0
+exceso relativo máx. de mx*+my* sobre el óptimo por búsqueda: 0.00e+00
+casos (0,0) que en realidad necesitan armadura inferior: 0

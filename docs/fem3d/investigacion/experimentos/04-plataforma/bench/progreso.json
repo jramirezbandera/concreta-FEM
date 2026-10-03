@@ -1,0 +1,31 @@
+{
+ "modo": "gpu",
+ "throttle": 1,
+ "url": "http://127.0.0.1:8794/bench/cancel_msg.html",
+ "ms": 2505,
+ "value": [
+  {
+   "type": "progress",
+   "etapa": 1,
+   "msWorker": 500,
+   "msMain": 504
+  },
+  {
+   "type": "progress",
+   "etapa": 2,
+   "msWorker": 1000,
+   "msMain": 1004
+  },
+  {
+   "type": "progress",
+   "etapa": 3,
+   "msWorker": 1500,
+   "msMain": 1504
+  },
+  {
+   "type": "success",
+   "msMain": 2004
+  }
+ ],
+ "consola": []
+}
