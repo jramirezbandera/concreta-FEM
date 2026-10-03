@@ -76,3 +76,52 @@ export function asimetria(A: ArrayLike<number>, n: number): number {
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) m = Math.max(m, Math.abs(A[n * i + j]! - A[n * j + i]!));
   return m / maxAbs(A);
 }
+
+/** Resuelve A·x = b (n×n por filas) por eliminación de Gauss con pivoteo parcial. */
+export function resolverDenso(A: ArrayLike<number>, b: ArrayLike<number>, n: number): Float64Array {
+  const a = Float64Array.from(A);
+  const x = Float64Array.from(b);
+  for (let k = 0; k < n; k++) {
+    let p = k;
+    for (let i = k + 1; i < n; i++) if (Math.abs(a[n * i + k]!) > Math.abs(a[n * p + k]!)) p = i;
+    if (a[n * p + k] === 0) throw new Error("resolverDenso: matriz singular");
+    if (p !== k) {
+      for (let j = 0; j < n; j++) [a[n * k + j], a[n * p + j]] = [a[n * p + j]!, a[n * k + j]!];
+      [x[k], x[p]] = [x[p]!, x[k]!];
+    }
+    for (let i = k + 1; i < n; i++) {
+      const f = a[n * i + k]! / a[n * k + k]!;
+      if (f === 0) continue;
+      for (let j = k; j < n; j++) a[n * i + j]! -= f * a[n * k + j]!;
+      x[i]! -= f * x[k]!;
+    }
+  }
+  for (let i = n - 1; i >= 0; i--) {
+    let s = x[i]!;
+    for (let j = i + 1; j < n; j++) s -= a[n * i + j]! * x[j]!;
+    x[i] = s / a[n * i + i]!;
+  }
+  return x;
+}
+
+/** Nudos y pesos de Gauss–Legendre de n puntos en [a, b] (Newton sobre Pₙ). */
+export function gaussLegendre(n: number, a = -1, b = 1): { x: number[]; w: number[] } {
+  const x: number[] = [];
+  const w: number[] = [];
+  for (let i = 1; i <= n; i++) {
+    let t = Math.cos((Math.PI * (i - 0.25)) / (n + 0.5));
+    let dp = 0;
+    for (let it = 0; it < 100; it++) {
+      let p0 = 1;
+      let p1 = t;
+      for (let k = 2; k <= n; k++) [p0, p1] = [p1, ((2 * k - 1) * t * p1 - (k - 1) * p0) / k];
+      dp = (n * (t * p1 - p0)) / (t * t - 1);
+      const dt = p1 / dp;
+      t -= dt;
+      if (Math.abs(dt) < 1e-16) break;
+    }
+    x.push(((b - a) / 2) * t + (a + b) / 2);
+    w.push(((b - a) / 2) * (2 / ((1 - t * t) * dp * dp)));
+  }
+  return { x, w };
+}
