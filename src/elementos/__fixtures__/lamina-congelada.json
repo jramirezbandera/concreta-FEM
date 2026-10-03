@@ -1,0 +1,23 @@
+{
+ "generador": "spike/e0/membrana/congelar.ts",
+ "opciones": "por defecto (γ = G, estabilización 1e-2)",
+ "valores": {
+  "muro_1x3": 0.0014376906813348164,
+  "muro_2x6": 0.0015145390953446448,
+  "muro_4x12": 0.0015395099269533013,
+  "muro_8x24": 0.0015472631740430084,
+  "mh_rectangular_cortante": 0.09767456180712761,
+  "mh_rectangular_momento": 0.024570000000319003,
+  "mh_trapezoidal_cortante": 0.08454151500311494,
+  "mh_trapezoidal_momento": 0.021434048299065464,
+  "mh_paralelogramo_cortante": 0.0850706489129372,
+  "mh_paralelogramo_momento": 0.021219842632166322,
+  "viga_6_0": 0.008168053043143081,
+  "viga_6_1": 0.006138282511436067,
+  "viga_6_6": 0.006109662764585685,
+  "viga_12_0": 0.01765511318782114,
+  "viga_12_1": 0.0071275471230097705,
+  "viga_12_2": 0.006430186076268758,
+  "viga_12_12": 0.006360461223242853
+ }
+}

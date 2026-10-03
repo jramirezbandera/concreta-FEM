@@ -1,0 +1,220 @@
+
+== completa γ=G
+  modos de energía nula: 4   (λ4/λmax = 8.43e-17)
+  modos de energía nula: 3   (λ4/λmax = 4.90e-3)
+  muro 1x3: 1.4377 mm | vs ASD   -3.9 % | vs Timoshenko   -7.6 %
+  muro 2x6: 1.5146 mm | vs ASD   -0.4 % | vs Timoshenko   -2.6 %
+  muro 4x12: 1.5395 mm | vs ASD   -0.1 % | vs Timoshenko   -1.0 %
+  MH rectangular   cortante: 0.9036 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 0.9100 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.7821 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.7939 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.7872 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.7859 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta     8.201 mm | ASD   356.124 |  -97.7 % | ΣF 2.8e-14 ΣM 9.6e-15
+  viga n= 6 emb= 1: punta     6.142 mm | ASD     6.340 |   -3.1 % | ΣF 2.3e-14 ΣM 1.0e-14
+  viga n= 6 emb= 6: punta     6.113 mm | ASD     6.293 |   -2.8 % | ΣF 1.4e-14 ΣM 6.6e-15
+  viga n=12 emb= 0: punta    17.784 mm | ASD  1332.785 |  -98.7 % | ΣF 1.3e-13 ΣM 5.1e-14
+  viga n=12 emb= 1: punta     7.129 mm | ASD     7.718 |   -7.6 % | ΣF 1.3e-13 ΣM 5.8e-14
+  viga n=12 emb= 2: punta     6.431 mm | ASD     6.451 |   -0.3 % | ΣF 1.1e-13 ΣM 5.0e-14
+  viga n=12 emb=12: punta     6.361 mm | ASD     6.367 |   -0.1 % | ΣF 1.0e-13 ΣM 4.8e-14
+
+== completa γ=G/1000
+  modos de energía nula: 4   (λ4/λmax = 1.47e-17)
+  modos de energía nula: 3   (λ4/λmax = 1.35e-4)
+  muro 1x3: 1.4400 mm | vs ASD   -3.7 % | vs Timoshenko   -7.4 %
+  muro 2x6: 1.5188 mm | vs ASD   -0.1 % | vs Timoshenko   -2.3 %
+  muro 4x12: 1.5417 mm | vs ASD    0.1 % | vs Timoshenko   -0.9 %
+  MH rectangular   cortante: 0.9036 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 0.9100 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.8056 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.8174 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.8722 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.8799 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta    14.646 mm | ASD   356.124 |  -95.9 % | ΣF 1.1e-14 ΣM 1.8e-15
+  viga n= 6 emb= 1: punta     6.265 mm | ASD     6.340 |   -1.2 % | ΣF 2.0e-14 ΣM 4.4e-15
+  viga n= 6 emb= 6: punta     6.201 mm | ASD     6.293 |   -1.5 % | ΣF 2.0e-14 ΣM 3.7e-16
+  viga n=12 emb= 0: punta    45.954 mm | ASD  1332.785 |  -96.6 % | ΣF 2.1e-13 ΣM 7.1e-14
+  viga n=12 emb= 1: punta     7.476 mm | ASD     7.718 |   -3.1 % | ΣF 4.0e-14 ΣM 1.7e-15
+  viga n=12 emb= 2: punta     6.476 mm | ASD     6.451 |    0.4 % | ΣF 2.6e-14 ΣM 4.8e-15
+  viga n=12 emb=12: punta     6.385 mm | ASD     6.367 |    0.3 % | ΣF 1.4e-14 ΣM 7.9e-15
+
+== reducida γ=G
+  modos de energía nula: 4   (λ4/λmax = 9.22e-17)
+  modos de energía nula: 3   (λ4/λmax = 4.38e-3)
+  muro 1x3: 1.4379 mm | vs ASD   -3.9 % | vs Timoshenko   -7.5 %
+  muro 2x6: 1.5178 mm | vs ASD   -0.1 % | vs Timoshenko   -2.4 %
+  muro 4x12: 1.5403 mm | vs ASD   -0.0 % | vs Timoshenko   -1.0 %
+  MH rectangular   cortante: 0.9036 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 0.9100 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.8048 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.8168 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.8678 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.8782 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta     8.498 mm | ASD   356.124 |  -97.6 % | ΣF 5.3e-15 ΣM 1.8e-15
+  viga n= 6 emb= 1: punta     6.164 mm | ASD     6.340 |   -2.8 % | ΣF 1.2e-14 ΣM 2.0e-15
+  viga n= 6 emb= 6: punta     6.135 mm | ASD     6.293 |   -2.5 % | ΣF 1.9e-14 ΣM 5.9e-15
+  viga n=12 emb= 0: punta    18.952 mm | ASD  1332.785 |  -98.6 % | ΣF 6.4e-14 ΣM 2.5e-14
+  viga n=12 emb= 1: punta     7.164 mm | ASD     7.718 |   -7.2 % | ΣF 5.9e-14 ΣM 2.4e-14
+  viga n=12 emb= 2: punta     6.438 mm | ASD     6.451 |   -0.2 % | ΣF 5.3e-14 ΣM 4.6e-15
+  viga n=12 emb=12: punta     6.366 mm | ASD     6.367 |   -0.0 % | ΣF 5.6e-14 ΣM 4.4e-15
+
+== completa+incomp γ=G
+  modos de energía nula: 4   (λ4/λmax = 8.82e-17)
+  modos de energía nula: 3   (λ4/λmax = 2.51e-5)
+  muro 1x3: 1.4950 mm | vs ASD   -0.0 % | vs Timoshenko   -3.9 %
+  muro 2x6: 1.5772 mm | vs ASD    3.8 % | vs Timoshenko    1.4 %
+  muro 4x12: 1.5496 mm | vs ASD    0.6 % | vs Timoshenko   -0.4 %
+  MH rectangular   cortante: 0.9929 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 1.0000 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.8814 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.8867 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.9478 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.9655 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta    10.737 mm | ASD   356.124 |  -97.0 % | ΣF 3.3e-14 ΣM 9.9e-15
+  viga n= 6 emb= 1: punta     6.274 mm | ASD     6.340 |   -1.0 % | ΣF 2.7e-14 ΣM 1.2e-14
+  viga n= 6 emb= 6: punta     6.231 mm | ASD     6.293 |   -1.0 % | ΣF 2.6e-14 ΣM 1.3e-14
+  viga n=12 emb= 0: punta    27.719 mm | ASD  1332.785 |  -97.9 % | ΣF 2.0e-13 ΣM 5.7e-14
+  viga n=12 emb= 1: punta     7.369 mm | ASD     7.718 |   -4.5 % | ΣF 1.5e-13 ΣM 4.7e-14
+  viga n=12 emb= 2: punta     6.480 mm | ASD     6.451 |    0.5 % | ΣF 1.6e-13 ΣM 3.1e-14
+  viga n=12 emb=12: punta     6.393 mm | ASD     6.367 |    0.4 % | ΣF 1.8e-13 ΣM 3.9e-14
+
+== reducida+incomp γ=G
+  modos de energía nula: 6   (λ4/λmax = -2.50e-19)
+  modos de energía nula: 4   (λ4/λmax = 2.83e-17)
+  muro 1x3: 1.4960 mm | vs ASD    0.0 % | vs Timoshenko   -3.8 %
+  muro 2x6: 4.7896 mm | vs ASD  215.1 % | vs Timoshenko  208.0 %
+  muro 4x12: 1.8645 mm | vs ASD   21.0 % | vs Timoshenko   19.9 %
+  MH rectangular   cortante: 0.9929 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 1.0000 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.9086 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.9135 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.9786 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.9890 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta    18.537 mm | ASD   356.124 |  -94.8 % | ΣF 7.2e-14 ΣM 2.4e-14
+  viga n= 6 emb= 1: punta     6.362 mm | ASD     6.340 |    0.3 % | ΣF 3.4e-14 ΣM 8.8e-15
+  viga n= 6 emb= 6: punta     6.279 mm | ASD     6.293 |   -0.2 % | ΣF 2.4e-14 ΣM 4.8e-15
+  viga n=12 emb= 0: punta    65.787 mm | ASD  1332.785 |  -95.1 % | ΣF 2.4e-13 ΣM 7.4e-15
+  viga n=12 emb= 1: punta     7.727 mm | ASD     7.718 |    0.1 % | ΣF 4.0e-14 ΣM 7.2e-15
+  viga n=12 emb= 2: punta     6.536 mm | ASD     6.451 |    1.3 % | ΣF 6.3e-14 ΣM 4.8e-15
+  viga n=12 emb=12: punta     6.416 mm | ASD     6.367 |    0.8 % | ΣF 6.9e-14 ΣM 1.0e-14
+
+== incomp-en-ω γ=G α=1e-2
+  modos de energía nula: 3   (λ4/λmax = 6.38e-4)
+  modos de energía nula: 3   (λ4/λmax = 5.79e-4)
+  muro 1x3: 1.4942 mm | vs ASD   -0.1 % | vs Timoshenko   -3.9 %
+  muro 2x6: 1.5367 mm | vs ASD    1.1 % | vs Timoshenko   -1.2 %
+  muro 4x12: 1.5449 mm | vs ASD    0.3 % | vs Timoshenko   -0.7 %
+  MH rectangular   cortante: 0.9929 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 1.0000 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.8870 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.8943 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.9743 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.9865 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta     8.789 mm | ASD   356.124 |  -97.5 % | ΣF 1.4e-14 ΣM 1.1e-15
+  viga n= 6 emb= 1: punta     6.189 mm | ASD     6.340 |   -2.4 % | ΣF 2.0e-14 ΣM 7.0e-15
+  viga n= 6 emb= 6: punta     6.157 mm | ASD     6.293 |   -2.1 % | ΣF 1.9e-14 ΣM 8.6e-15
+  viga n=12 emb= 0: punta    20.091 mm | ASD  1332.785 |  -98.5 % | ΣF 1.2e-13 ΣM 1.4e-14
+  viga n=12 emb= 1: punta     7.214 mm | ASD     7.718 |   -6.5 % | ΣF 7.8e-14 ΣM 2.7e-14
+  viga n=12 emb= 2: punta     6.450 mm | ASD     6.451 |   -0.0 % | ΣF 1.1e-13 ΣM 2.5e-14
+  viga n=12 emb=12: punta     6.374 mm | ASD     6.367 |    0.1 % | ΣF 9.1e-14 ΣM 2.8e-14
+
+== incomp-en-ω γ=G/10 α=1e-2
+  modos de energía nula: 3   (λ4/λmax = 6.38e-5)
+  modos de energía nula: 3   (λ4/λmax = 5.83e-5)
+  muro 1x3: 1.4958 mm | vs ASD    0.0 % | vs Timoshenko   -3.8 %
+  muro 2x6: 1.6619 mm | vs ASD    9.3 % | vs Timoshenko    6.9 %
+  muro 4x12: 1.5650 mm | vs ASD    1.6 % | vs Timoshenko    0.6 %
+  MH rectangular   cortante: 0.9929 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 1.0000 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.9069 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.9120 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.9779 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.9888 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta    21.144 mm | ASD   356.124 |  -94.1 % | ΣF 1.7e-14 ΣM 3.7e-16
+  viga n= 6 emb= 1: punta     6.370 mm | ASD     6.340 |    0.5 % | ΣF 1.6e-14 ΣM 9.6e-15
+  viga n= 6 emb= 6: punta     6.324 mm | ASD     6.293 |    0.5 % | ΣF 9.5e-15 ΣM 2.9e-15
+  viga n=12 emb= 0: punta    68.741 mm | ASD  1332.785 |  -94.8 % | ΣF 3.9e-14 ΣM 1.3e-14
+  viga n=12 emb= 1: punta     7.634 mm | ASD     7.718 |   -1.1 % | ΣF 2.0e-14 ΣM 3.9e-15
+  viga n=12 emb= 2: punta     6.534 mm | ASD     6.451 |    1.3 % | ΣF 2.1e-14 ΣM 6.6e-15
+  viga n=12 emb=12: punta     6.421 mm | ASD     6.367 |    0.8 % | ΣF 3.7e-14 ΣM 5.5e-15
+
+== incomp-en-ω γ=G/1000 α=1e-2
+  modos de energía nula: 3   (λ4/λmax = 6.38e-7)
+  modos de energía nula: 3   (λ4/λmax = 5.84e-7)
+  muro 1x3: 1.4960 mm | vs ASD    0.0 % | vs Timoshenko   -3.8 %
+  muro 2x6: 4.1584 mm | vs ASD  173.6 % | vs Timoshenko  167.4 %
+  muro 4x12: 2.8673 mm | vs ASD   86.1 % | vs Timoshenko   84.4 %
+  MH rectangular   cortante: 0.9929 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 1.0000 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.9170 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.9227 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.9801 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.9907 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta   374.742 mm | ASD   356.124 |    5.2 % | ΣF 8.1e-13 ΣM 1.3e-13
+  viga n= 6 emb= 1: punta     6.583 mm | ASD     6.340 |    3.8 % | ΣF 6.0e-15 ΣM 2.9e-15
+  viga n= 6 emb= 6: punta     6.469 mm | ASD     6.293 |    2.8 % | ΣF 1.5e-14 ΣM 5.5e-15
+  viga n=12 emb= 0: punta  1290.385 mm | ASD  1332.785 |   -3.2 % | ΣF 2.0e-12 ΣM 1.1e-12
+  viga n=12 emb= 1: punta     8.257 mm | ASD     7.718 |    7.0 % | ΣF 8.6e-14 ΣM 5.0e-14
+  viga n=12 emb= 2: punta     6.867 mm | ASD     6.451 |    6.4 % | ΣF 8.4e-14 ΣM 4.9e-14
+  viga n=12 emb=12: punta     6.566 mm | ASD     6.367 |    3.1 % | ΣF 7.2e-14 ΣM 4.5e-14
+
+== sin incomp γ=G α=1e-2
+  modos de energía nula: 3   (λ4/λmax = 6.38e-4)
+  modos de energía nula: 3   (λ4/λmax = 5.42e-3)
+  muro 1x3: 1.4377 mm | vs ASD   -3.9 % | vs Timoshenko   -7.6 %
+  muro 2x6: 1.5145 mm | vs ASD   -0.4 % | vs Timoshenko   -2.6 %
+  muro 4x12: 1.5395 mm | vs ASD   -0.1 % | vs Timoshenko   -1.0 %
+  MH rectangular   cortante: 0.9036 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 0.9100 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.7821 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.7939 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.7870 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.7859 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta     8.168 mm | ASD   356.124 |  -97.7 % | ΣF 2.8e-14 ΣM 6.1e-15
+  viga n= 6 emb= 1: punta     6.138 mm | ASD     6.340 |   -3.2 % | ΣF 1.4e-14 ΣM 6.8e-15
+  viga n= 6 emb= 6: punta     6.110 mm | ASD     6.293 |   -2.9 % | ΣF 6.6e-15 ΣM 4.6e-15
+  viga n=12 emb= 0: punta    17.655 mm | ASD  1332.785 |  -98.7 % | ΣF 1.4e-13 ΣM 5.2e-14
+  viga n=12 emb= 1: punta     7.128 mm | ASD     7.718 |   -7.6 % | ΣF 1.2e-13 ΣM 5.3e-14
+  viga n=12 emb= 2: punta     6.430 mm | ASD     6.451 |   -0.3 % | ΣF 8.4e-14 ΣM 3.9e-14
+  viga n=12 emb=12: punta     6.360 mm | ASD     6.367 |   -0.1 % | ΣF 1.3e-13 ΣM 4.7e-14
+
+== sin incomp γ=G/10 α=1e-2
+  modos de energía nula: 3   (λ4/λmax = 6.38e-5)
+  modos de energía nula: 3   (λ4/λmax = 4.51e-3)
+  muro 1x3: 1.4393 mm | vs ASD   -3.8 % | vs Timoshenko   -7.5 %
+  muro 2x6: 1.5181 mm | vs ASD   -0.1 % | vs Timoshenko   -2.4 %
+  muro 4x12: 1.5412 mm | vs ASD    0.0 % | vs Timoshenko   -0.9 %
+  MH rectangular   cortante: 0.9036 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 0.9100 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.8028 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.8147 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.8595 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.8678 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta    10.389 mm | ASD   356.124 |  -97.1 % | ΣF 3.8e-14 ΣM 1.2e-14
+  viga n= 6 emb= 1: punta     6.226 mm | ASD     6.340 |   -1.8 % | ΣF 3.7e-14 ΣM 5.3e-15
+  viga n= 6 emb= 6: punta     6.184 mm | ASD     6.293 |   -1.7 % | ΣF 2.4e-14 ΣM 6.1e-15
+  viga n=12 emb= 0: punta    26.473 mm | ASD  1332.785 |  -98.0 % | ΣF 9.8e-14 ΣM 1.9e-14
+  viga n=12 emb= 1: punta     7.327 mm | ASD     7.718 |   -5.1 % | ΣF 6.2e-14 ΣM 1.2e-14
+  viga n=12 emb= 2: punta     6.461 mm | ASD     6.451 |    0.2 % | ΣF 8.7e-14 ΣM 2.0e-14
+  viga n=12 emb=12: punta     6.380 mm | ASD     6.367 |    0.2 % | ΣF 3.3e-14 ΣM 8.8e-15
+
+== sin incomp γ=G/1000 α=1e-2
+  modos de energía nula: 3   (λ4/λmax = 6.38e-7)
+  modos de energía nula: 3   (λ4/λmax = 1.35e-4)
+  muro 1x3: 1.4400 mm | vs ASD   -3.7 % | vs Timoshenko   -7.4 %
+  muro 2x6: 1.5188 mm | vs ASD   -0.1 % | vs Timoshenko   -2.3 %
+  muro 4x12: 1.5417 mm | vs ASD    0.1 % | vs Timoshenko   -0.9 %
+  MH rectangular   cortante: 0.9036 (ASD 0.9873, DKGQ 0.9036)
+  MH rectangular   momento : 0.9100 (ASD 0.9944, DKGQ 0.9100)
+  MH trapezoidal   cortante: 0.8056 (ASD 0.0512, DKGQ 0.8056)
+  MH trapezoidal   momento : 0.8174 (ASD 0.0461, DKGQ 0.8174)
+  MH paralelogramo cortante: 0.8722 (ASD 0.5922, DKGQ 0.8725)
+  MH paralelogramo momento : 0.8799 (ASD 0.6955, DKGQ 0.8801)
+  viga n= 6 emb= 0: punta    14.646 mm | ASD   356.124 |  -95.9 % | ΣF 2.2e-14 ΣM 2.2e-15
+  viga n= 6 emb= 1: punta     6.265 mm | ASD     6.340 |   -1.2 % | ΣF 5.6e-15 ΣM 4.0e-15
+  viga n= 6 emb= 6: punta     6.201 mm | ASD     6.293 |   -1.5 % | ΣF 2.6e-14 ΣM 1.3e-14
+  viga n=12 emb= 0: punta    45.954 mm | ASD  1332.785 |  -96.6 % | ΣF 2.1e-13 ΣM 8.1e-14
+  viga n=12 emb= 1: punta     7.476 mm | ASD     7.718 |   -3.1 % | ΣF 4.5e-14 ΣM 1.8e-14
+  viga n=12 emb= 2: punta     6.476 mm | ASD     6.451 |    0.4 % | ΣF 3.5e-14 ΣM 8.6e-15
+  viga n=12 emb=12: punta     6.385 mm | ASD     6.367 |    0.3 % | ΣF 4.2e-14 ΣM 1.0e-14

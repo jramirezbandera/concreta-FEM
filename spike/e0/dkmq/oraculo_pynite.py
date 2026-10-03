@@ -180,6 +180,6 @@ if __name__ == "__main__":
         modelos=modelos(),
     )
     SALIDA.parent.mkdir(parents=True, exist_ok=True)
-    SALIDA.write_text(json.dumps(datos, indent=None, separators=(",", ":")) + "\n", encoding="utf8")
+    SALIDA.write_text(json.dumps(datos, indent=None, separators=(",", ":")) + "\n", encoding="utf8", newline="\n")
     print(f"{SALIDA.relative_to(RAIZ)}: {len(datos['elementos'])} elementos, {len(datos['modelos'])} modelos, "
           f"{SALIDA.stat().st_size / 1024:.0f} KiB")

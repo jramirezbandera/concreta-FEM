@@ -4,7 +4,8 @@
  * Ejes locales (como PyNite, H01): x = 1→2; z = x × (1→3); y = z × x; origen en el nudo 1.
  * GDL por nudo, en locales y en globales: [ux, uy, uz, rx, ry, rz].
  */
-import type { CoordenadasLocales } from "./dkmq.ts";
+import { rigidezDkmq, type CoordenadasLocales, type MaterialLamina } from "./dkmq.ts";
+import { rigidezMembrana, type OpcionesMembrana } from "./membrana.ts";
 
 export interface MarcoLocal {
   /** Filas: e1, e2, e3 (3×3 por filas). u_local = R·u_global. */
@@ -105,3 +106,11 @@ export function vectorALocales(ug: ArrayLike<number>, R: ArrayLike<number>): Flo
 }
 
 export type { CoordenadasLocales };
+
+/** Rigidez local 24×24 de la lámina: flexión DKMQ + membrana con drilling (sin acoplamiento: elemento plano). */
+export function rigidezLaminaLocal(xy: CoordenadasLocales, mat: MaterialLamina, op: OpcionesMembrana = {}): Float64Array {
+  const k = new Float64Array(576);
+  expandir(k, rigidezDkmq(xy, mat), GDL_FLEXION);
+  expandir(k, rigidezMembrana(xy, mat, op), GDL_MEMBRANA);
+  return k;
+}
