@@ -27,10 +27,12 @@ export const UMBRAL_MAL_CONDICIONADO = 1e-8;
 /** Error hacia atrás objetivo tras el refinamiento. */
 export const RESIDUO_OBJETIVO = 1e-10;
 /**
- * Error hacia atrás por debajo del cual no se refina. LDLᵀ deja ω entre 5e-16 y 2e-15 (el ruido
- * de la propia medida); refinar por debajo de 1e-13 no mejora nada y cuesta otra resolución.
+ * Error hacia atrás por debajo del cual no se refina. LDLᵀ deja ω entre 5e-16 y 2e-15 en los
+ * modelos de E1 (el ruido de la propia medida), y hasta 1,3e-13 en unas pocas filas con barras
+ * de E2 (brazos rígidos y vigas descolgadas, E2-4); refinar por debajo de 1e-12 no mejora nada que
+ * importe y cuesta otra resolución (≈ 0,9 s en el semirrígido del edificio objetivo).
  */
-const RESIDUO_SUFICIENTE = 1e-13;
+const RESIDUO_SUFICIENTE = 1e-12;
 
 const MAX_PIVOTES_NULOS = 64;
 const MAX_MODOS = 24;
