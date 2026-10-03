@@ -143,7 +143,12 @@ Tiempos de factorización con 24 lados derechos. Ryzen 9 5900X; WASM en Chrome 1
 **Comparaciones:**
 - **Frente al proxy de H50,** faer en WASM es más rápido que CHOLMOD supernodal (que es GPL) en Pyodide y ocupa un 40 % menos de memoria.
 - **Las K reales del edificio son mucho más fáciles que las sintéticas:** la del tamaño objetivo cabe en 1 s.
-- **Solver de perfil en TypeScript** (`src/solver/perfil.ts`, RCM): 107 s y 475 MB para los 39 096 GDL sintéticos, frente a 0,65 s de faer, unas 165 veces más lento. La vía «TS puro» queda descartada salvo como referencia en modelos pequeños. Coincide con faer a ≤ 1e-12.
+- **Solver de perfil en TypeScript** (`src/solver/perfil.ts`, RCM; `out_perfil.txt`):
+  - 39 096 GDL sintéticos: 107 s y 475 MB, frente a 0,65 s de faer (unas 165 veces más lento);
+  - K real V1 h = 1,0 (94 206 GDL): 248 s y 1 069 MB, frente a 0,66 s (unas 375 veces);
+  - K real V3 (44 268 GDL): más de 600 s, cortado.
+
+  La vía «TS puro» queda descartada salvo como referencia en modelos pequeños. Coincide con faer a ≤ 1e-12.
 
 ## 4. Criterio 4: tamaño y toolchain
 
@@ -170,7 +175,7 @@ Tiempos de factorización con 24 lados derechos. Ryzen 9 5900X; WASM en Chrome 1
 | E0-5 | **`ASDShellQ4` bloquea en MacNeal–Harder distorsionado** (0,05) | Contrastar las membranas también con `ShellDKGQ` |
 | E0-6 | **La unión barra–lámina en un nudo** sigue siendo singular, pero deja de ser un mecanismo | Se mantiene la regla del compilador de H05 |
 | E0-7 | **OpenSeesPy 3.8 no carga con Python 3.14 en Windows** (DLL) | Oráculo OpenSees en `.venv312` (Python 3.12.10 del gestor oficial `py install 3.12`) |
-| E0-8 | **El solver de perfil en TS** es ~165× más lento que faer-WASM | Sólo como oráculo diferencial y para modelos ≤ ~10 000 GDL (S7 decía 30 000) |
+| E0-8 | **El solver de perfil en TS** es entre 165 y 375 veces más lento que faer-WASM | Sólo como oráculo diferencial y para modelos ≤ ~10 000 GDL (S7 decía 30 000) |
 
 ## Pendiente
 

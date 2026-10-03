@@ -1,0 +1,3 @@
+{"k":"sint_n30.kcsc","plataforma":"TS perfil (node v24.19.0)","n":39096,"perfil_MB":475,"t_rcm_s":0.197,"t_factor_s":107.543,"t_resolver_1rhs_s":0.159}
+{"k":"V1_h1.0.kcsc","plataforma":"TS perfil (node v24.19.0)","n":94206,"perfil_MB":1069,"t_rcm_s":1.352,"t_factor_s":247.874,"t_resolver_1rhs_s":0.347}
+{"k":"V3.kcsc","plataforma":"TS perfil (node v24.19.0)","n":44268,"error":"más de 600 s: cortado por timeout"}
