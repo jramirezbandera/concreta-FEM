@@ -152,6 +152,30 @@ describe.each(SOLVERS)("láminas (solver %s)", (solver) => {
       expect(res(r!, malla.laminas[0]![0]!)[6]!).toBeLessThan(0);
     });
 
+    it("H01: placa de 4 × 4 girada 30° en su plano, con el eje 1 según X global: los momentos globales de referencia de la investigación", () => {
+      // investigacion/experimentos/03-resultados/exp_pynite_signos_placas.py, apartado (3): placa
+      // apoyada de 4 × 4 m, t = 0,20, E = 30 GPa, ν = 0,3, q = 10 kPa hacia −Z, malla 16 × 16, girada
+      // 30° alrededor de Z; elemento (2, 5). Referencia (Rz·T0·Rzᵀ, convenio de PyNite, N·m/m):
+      // Mx = −5 765,24, My = −2 394,19, Mxy = 655,76. En el motor (kN, signo de CSI): −1e-3 × eso.
+      const n = 16;
+      const c = Math.cos(Math.PI / 6);
+      const s = Math.sin(Math.PI / 6);
+      const m = new Constructor();
+      const g = mallaRectangular(m, { a: 4, b: 4, nx: n, ny: n, ex: [c, s, 0], ey: [-s, c, 0], material: { E: 3e7, nu: 0.3, t: 0.2 }, lamina: { eje1: [1, 0, 0] } });
+      for (let i = 0; i <= n; i++) {
+        for (let j = 0; j <= n; j++) {
+          const borde = i === 0 || i === n || j === 0 || j === n;
+          m.apoyo(g.nudos[i]![j]!, [i === 0 && j === 0, (i === 0 && j === 0) || (i === n && j === 0), borde, false, false, true]);
+        }
+      }
+      m.caso("q", [], [], [], g.laminas.flat().map((l) => ({ tipo: "superficie", lamina: l, ejes: "global", q: [0, 0, -10] })));
+      const [r] = casosValidos(calcular(m.modelo(), { solver }));
+      const s25 = res(r!, g.laminas[2]![5]!);
+      expect(Math.abs(s25[3]! - 5.76524)).toBeLessThan(1e-5);
+      expect(Math.abs(s25[4]! - 2.39419)).toBeLessThan(1e-5);
+      expect(Math.abs(s25[5]! + 0.65576)).toBeLessThan(1e-5);
+    });
+
     it("invertir el orden de los nudos cambia los signos que dice la cabecera", () => {
       const L = 4;
       const F = 10;
