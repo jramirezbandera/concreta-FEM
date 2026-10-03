@@ -8,6 +8,7 @@ import type {
   Apoyo,
   BarraAnalitica,
   CargaBarra,
+  CargaLamina,
   CargaNodal,
   CasoCarga,
   DesplazamientoImpuesto,
@@ -30,6 +31,7 @@ export function seccionRectangular(b: number, h: number, E = 3e7, nu = 0.2): Sec
 }
 
 export type OpcionesBarra = Partial<Pick<BarraAnalitica, "id" | "offsets" | "liberaciones" | "modificadores">>;
+export type OpcionesLamina = Partial<Pick<LaminaAnalitica, "id" | "eje1" | "multiplicadores" | "membrana">>;
 
 /** Sección rectangular con áreas de cortante 5/6·A (Timoshenko). */
 export function seccionRectangularTimoshenko(b: number, h: number, E = 3e7, nu = 0.2): SeccionBarra {
@@ -58,8 +60,10 @@ export class Constructor {
     return this.barras.length - 1;
   }
 
-  lamina(nudos: readonly [number, number, number, number], material: MaterialLamina, id = `L${this.laminas.length}`): number {
-    this.laminas.push({ id, nudos, material });
+  /** `extra`: el id, u opciones de E3 (eje1, multiplicadores, membrana) con id opcional. */
+  lamina(nudos: readonly [number, number, number, number], material: MaterialLamina, extra?: string | OpcionesLamina): number {
+    const o = typeof extra === "string" ? { id: extra } : (extra ?? {});
+    this.laminas.push({ ...o, id: o.id ?? `L${this.laminas.length}`, nudos, material });
     return this.laminas.length - 1;
   }
 
@@ -80,8 +84,8 @@ export class Constructor {
     this.restricciones.push({ tipo: "enlace-rigido", id, maestro, esclavos });
   }
 
-  caso(id: string, nodales: CargaNodal[] = [], impuestos: DesplazamientoImpuesto[] = [], barras: CargaBarra[] = []): void {
-    this.casos.push({ id, nodales, impuestos, barras });
+  caso(id: string, nodales: CargaNodal[] = [], impuestos: DesplazamientoImpuesto[] = [], barras: CargaBarra[] = [], laminas: CargaLamina[] = []): void {
+    this.casos.push({ id, nodales, impuestos, barras, laminas });
   }
 
   modelo(): ModeloAnalitico {

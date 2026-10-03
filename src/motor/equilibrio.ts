@@ -19,12 +19,22 @@ export interface Equilibrio {
   momentos: number;
 }
 
+/** Suma de resultantes de cargas no nodales (de barra y de lámina), con sus escalas. */
+export function sumaResultantes(a: Resultante, b: Resultante): Resultante {
+  return {
+    F: [a.F[0] + b.F[0], a.F[1] + b.F[1], a.F[2] + b.F[2]],
+    M: [a.M[0] + b.M[0], a.M[1] + b.M[1], a.M[2] + b.M[2]],
+    escalaF: a.escalaF + b.escalaF,
+    escalaM: a.escalaM + b.escalaM,
+  };
+}
+
 /**
  * `f` y `r`: cargas y reacciones físicas, 6 por nudo, en ejes globales. `magnitudR` (opcional,
  * 6 por nudo) es la suma de los valores absolutos de los términos que se cancelan en cada
  * reacción: es la escala del redondeo cuando la reacción neta es casi nula (p. ej. un giro de
  * sólido rígido impuesto), y sustituye a `r` en las escalas. `extra` es la resultante de las
- * cargas que no son nodales (las de barra), respecto al centro del modelo, con sus escalas.
+ * cargas que no son nodales (de barra y de lámina), respecto al centro del modelo, con sus escalas.
  */
 export function equilibrio(geo: Geometria, f: Float64Array, r: Float64Array, magnitudR?: Float64Array, extra?: Resultante): Equilibrio {
   const { xyz, centro } = geo;

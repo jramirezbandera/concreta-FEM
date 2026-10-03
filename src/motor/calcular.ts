@@ -5,13 +5,14 @@
  * 1. Comprobación de nudos, elementos, muelles y apoyos.
  * 2. Numeración de GDL con las restricciones por transformación (u = T·û).
  * 3. Partes del modelo sin ningún apoyo (mecanismo de sólido rígido evidente).
- * 4. Cargas: nodales y de barra (fuerzas nodales equivalentes de sus FER), b = Tᵀ·f por caso y
- *    desplazamientos impuestos.
+ * 4. Cargas: nodales, de barra (fuerzas nodales equivalentes de sus FER) y de lámina, b = Tᵀ·f
+ *    por caso y desplazamientos impuestos.
  * 5. Patrón CSC y ensamblado de K' = Tᵀ·K·T.
  * 6. Factorización con diagnóstico de mecanismos, resolución por bloque y refinamiento.
- * 7. Recuperación: u = T·û, reacciones de apoyos y muelles a tierra, esfuerzos de las barras.
- * 8. Regla de oro 2: equilibrio ΣF/ΣM a 1e-9 (con la resultante real de las cargas de barra) y
- *    resultados finitos en cada caso.
+ * 7. Recuperación: u = T·û, reacciones de apoyos y muelles a tierra, esfuerzos de las barras y
+ *    resultantes de las láminas en su centroide.
+ * 8. Regla de oro 2: equilibrio ΣF/ΣM a 1e-9 (con la resultante real de las cargas de barra y de
+ *    lámina) y resultados finitos en cada caso.
  *
  * El motor es puro: sin IO, sin DOM. El solver "nucleo" necesita `iniciarNucleo()` antes.
  */
@@ -19,8 +20,9 @@ import { cargasDeBarrasDelCaso, desplazamientosLocales, equivalentesEnNudos, esf
 import { Diagnosticos, listaIds } from "./diagnosticos.ts";
 import { elementosDelModelo, esMuelleATierra, geometria, rigidezGlobal, type ElementoMotor, type Geometria } from "./elementos.ts";
 import { ensamblarRigidez, patronSistema } from "./ensamblado.ts";
-import { equilibrio } from "./equilibrio.ts";
+import { equilibrio, sumaResultantes } from "./equilibrio.ts";
 import { desplazamientosFisicos, fuerzasIndependientes, numerar, TipoGdl, type Numeracion } from "./gdl.ts";
+import { cargasDeLaminasDelCaso, resultantesEnCentroides, type LaminaPreparada } from "./laminas.ts";
 import { NOMBRES_GDL, type EstadisticasCalculo, type ModeloAnalitico, type ResultadoCalculo, type ResultadoCaso } from "./modelo.ts";
 import { resolver, RESIDUO_OBJETIVO, type TipoSolver } from "./solucion.ts";
 
@@ -104,11 +106,17 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
   const preparadas: (BarraPreparada | undefined)[] = [];
   for (const e of elementos) if (e.barra) preparadas[e.indice] = e.barra;
   const deBarras = casos.map((caso) => cargasDeBarrasDelCaso(caso.id, caso.barras ?? [], preparadas, modelo, geo, diag));
+  // Cargas de lámina: equivalentes por las funciones bilineales; el equilibrio usa su resultante real
+  const laminas: (LaminaPreparada | undefined)[] = [];
+  for (const e of elementos) if (e.lamina) laminas[e.indice] = e.lamina;
+  const deLaminas = casos.map((caso) => cargasDeLaminasDelCaso(caso.id, caso.laminas ?? [], laminas, modelo, geo, diag));
   if (diag.hayErrores) return fallo();
   const totales = cargas.map((f, k) => {
     const porBarra = deBarras[k]!.porBarra;
-    if (porBarra.size === 0) return f;
+    const deLamina = deLaminas[k]!.equivalentes;
+    if (porBarra.size === 0 && !deLamina) return f;
     const t = Float64Array.from(f);
+    if (deLamina) for (let q = 0; q < P; q++) t[q] += deLamina[q]!;
     for (const [ib, cb] of porBarra) {
       const [i, j] = modelo.barras![ib]!.nudos;
       const eq = equivalentesEnNudos(preparadas[ib]!, cb.ferC);
@@ -138,7 +146,7 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
   // 5. Patrón y ensamblado
   const ps = patronSistema(num, elementos);
   marcar("patron");
-  const K = ensamblarRigidez(modelo, geo.xyz, num, elementos, ps);
+  const K = ensamblarRigidez(modelo, num, elementos, ps);
   marcar("ensamblado");
   const n = num.nEcuaciones;
   const estadisticas: EstadisticasCalculo = {
@@ -196,7 +204,7 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
 
   // 7. Recuperación y 8. comprobaciones
   const muellesTierra = elementos.filter(esMuelleATierra);
-  const kMuelles = muellesTierra.map((e) => rigidezGlobal(modelo, e, geo.xyz));
+  const kMuelles = muellesTierra.map((e) => rigidezGlobal(modelo, e));
   const resultados: ResultadoCaso[] = [];
   let equilibrioRoto = false;
   for (let k = 0; k < nc; k++) {
@@ -244,7 +252,7 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
         magnitud[6 * v + a]! += m;
       }
     });
-    const eq = equilibrio(geo, cargas[k]!, reacciones, magnitud, deBarras[k]!.resultante);
+    const eq = equilibrio(geo, cargas[k]!, reacciones, magnitud, sumaResultantes(deBarras[k]!.resultante, deLaminas[k]!.resultante));
     // Esfuerzos de las barras en los extremos de su tramo flexible
     const esfuerzosBarras = new Float64Array(12 * (modelo.barras?.length ?? 0));
     for (const e of elementos) {
@@ -277,7 +285,19 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
         { residuo },
       );
     }
-    resultados.push({ id: caso.id, u, reacciones, esfuerzosBarras, equilibrio: eq, residuo });
+    const esfuerzosLaminas = new Float64Array(8 * (modelo.laminas?.length ?? 0));
+    resultados.push({ id: caso.id, u, reacciones, esfuerzosBarras, esfuerzosLaminas, equilibrio: eq, residuo });
+  }
+  // Resultantes de las láminas en su centroide: el operador de cada lámina se calcula una vez para todos los casos
+  if (modelo.laminas?.length) {
+    resultantesEnCentroides(
+      elementos.filter((e) => e.lamina),
+      resultados.map((r) => r.u),
+      resultados.map((r) => r.esfuerzosLaminas),
+    );
+    for (const r of resultados) {
+      if (!r.esfuerzosLaminas.every(Number.isFinite)) diag.error("resultado/no-finito", `El caso ${r.id} da resultantes de lámina no finitas.`, [r.id]);
+    }
   }
   marcar("recuperacion");
   if (diag.hayErrores) {

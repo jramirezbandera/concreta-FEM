@@ -40,7 +40,7 @@ function sistemaLibre(m: ModeloAnalitico) {
   const num = numerar(libre, elementos, geo, diag)!;
   expect(diag.hayErrores).toBe(false);
   const ps = patronSistema(num, elementos);
-  const K = ensamblarRigidez(libre, geo.xyz, num, elementos, ps);
+  const K = ensamblarRigidez(libre, num, elementos, ps);
   return { libre, geo, num, ps, K };
 }
 

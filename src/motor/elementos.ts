@@ -5,10 +5,10 @@
  * El núcleo (numeración, restricciones, ensamblado) no sabe de tipos de elemento: sólo ve
  * nudos, una matriz (6m)×(6m) en ejes globales y qué GDL rigidiza cada elemento.
  */
-import { marcoLocal, rigidezAGlobales, rigidezLaminaLocal } from "../elementos/lamina.ts";
 import { prepararBarra, type BarraPreparada } from "./barras.ts";
 import type { Diagnosticos } from "./diagnosticos.ts";
 import { TOL_GEOMETRICA, type Geometria } from "./geometria.ts";
+import { prepararLamina, rigidezLamina, type LaminaPreparada } from "./laminas.ts";
 import type { ModeloAnalitico, Muelle } from "./modelo.ts";
 
 export { geometria, TOL_GEOMETRICA, type Geometria } from "./geometria.ts";
@@ -23,6 +23,8 @@ export interface ElementoMotor {
   nudos: readonly number[];
   /** Sólo barras: geometría, rigidez en los nudos y GDL que rigidiza. */
   barra?: BarraPreparada;
+  /** Sólo láminas: ejes, coordenadas locales y sección. */
+  lamina?: LaminaPreparada;
 }
 
 const finito = (...v: number[]) => v.every(Number.isFinite);
@@ -133,47 +135,12 @@ export function elementosDelModelo(modelo: ModeloAnalitico, geo: Geometria, diag
   });
 
   (modelo.laminas ?? []).forEach((l, indice) => {
-    if (!nudosValidos(l.nudos, nn)) {
+    if (l.nudos.length !== 4 || !nudosValidos(l.nudos, nn)) {
       diag.error("modelo/nudo-no-valido", `La lámina ${l.id} hace referencia a nudos inexistentes o repetidos.`, [l.id]);
       return;
     }
-    const m = l.material;
-    if (!finito(m.E, m.nu, m.t) || !(m.E > 0 && m.t > 0 && m.nu >= 0 && m.nu < 0.5)) {
-      diag.error("modelo/propiedad-no-valida", `La lámina ${l.id} tiene un material no válido (E > 0, t > 0 y 0 ≤ ν < 0,5).`, [l.id]);
-      return;
-    }
-    const X = l.nudos.flatMap((v) => [xyz[3 * v]!, xyz[3 * v + 1]!, xyz[3 * v + 2]!]);
-    const marco = marcoLocal(X);
-    const xy = marco.xy;
-    let lado = 0;
-    let convexa = finito(...xy);
-    for (let a = 0; a < 4; a++) {
-      const b = (a + 1) % 4;
-      const c = (a + 2) % 4;
-      const ex = xy[2 * b]! - xy[2 * a]!;
-      const ey = xy[2 * b + 1]! - xy[2 * a + 1]!;
-      lado = Math.max(lado, Math.hypot(ex, ey));
-      const cruz = ex * (xy[2 * c + 1]! - xy[2 * b + 1]!) - ey * (xy[2 * c]! - xy[2 * b]!);
-      if (!(cruz > 0)) convexa = false;
-    }
-    if (!convexa) {
-      diag.error(
-        "modelo/elemento-degenerado",
-        `La lámina ${l.id} es degenerada, no convexa o tiene los nudos desordenados (el orden tiene que recorrer el contorno).`,
-        [l.id],
-      );
-      return;
-    }
-    if (marco.alabeo > TOL_GEOMETRICA * Math.max(1, lado)) {
-      diag.error(
-        "modelo/lamina-alabeada",
-        `La lámina ${l.id} no es plana: su cuarto nudo se separa ${marco.alabeo.toExponential(2)} m del plano de los otros tres. El elemento es plano y una lámina alabeada rompe el equilibrio.`,
-        [l.id],
-        { alabeo: marco.alabeo },
-      );
-      return;
-    }
-    lista.push({ tipo: "lamina", indice, id: l.id, nudos: l.nudos });
+    const lamina = prepararLamina(l, indice, geo, diag);
+    if (lamina) lista.push({ tipo: "lamina", indice, id: l.id, nudos: l.nudos, lamina });
   });
 
   (modelo.muelles ?? []).forEach((m, indice) => {
@@ -212,14 +179,9 @@ export function elementosDelModelo(modelo: ModeloAnalitico, geo: Geometria, diag
 }
 
 /** Rigidez del elemento en ejes globales, (6m)×(6m) por filas. */
-export function rigidezGlobal(modelo: ModeloAnalitico, e: ElementoMotor, xyz: Float64Array): Float64Array {
+export function rigidezGlobal(modelo: ModeloAnalitico, e: ElementoMotor): Float64Array {
   if (e.tipo === "barra") return e.barra!.kNudos;
-  if (e.tipo === "lamina") {
-    const l = modelo.laminas![e.indice]!;
-    const X = l.nudos.flatMap((v) => [xyz[3 * v]!, xyz[3 * v + 1]!, xyz[3 * v + 2]!]);
-    const marco = marcoLocal(X);
-    return rigidezAGlobales(rigidezLaminaLocal(marco.xy, l.material, l.membrana), marco.R);
-  }
+  if (e.tipo === "lamina") return rigidezLamina(e.lamina!);
   const m = modelo.muelles![e.indice]!;
   const k6 = rigidezMuelle6(m);
   if (m.nudos.length === 1) return k6;

@@ -28,12 +28,33 @@
  * - Cargas de barra: por unidad de longitud del tramo flexible (no proyectada), en ejes locales o
  *   globales; posiciones en m desde i'.
  *
+ * Láminas (E3, convenio tipo CSI de H02):
+ * - Ejes de la lámina (1, 2, 3): 3 = normal según el orden de los nudos (regla de la mano
+ *   derecha, (X₃ − X₁) × (X₄ − X₂)); 1 = `eje1` proyectado sobre el plano o, sin él, la regla de
+ *   CSI (eje 1 horizontal y eje 2 hacia +Z; en una lámina horizontal, eje 2 = +Y); 2 = 3 × 1. Una
+ *   losa con la normal hacia +Z tiene 1 = X y 2 = Y. Los multiplicadores van en estos ejes.
+ * - Resultantes por unidad de longitud en esos ejes (x = 1, y = 2, z = 3):
+ *   · Nx, Ny, Nxy = ∫ σ dz (kN/m), tracción positiva (= F11, F22, F12 de CSI).
+ *   · Mx = −∫ z·σx dz, My = −∫ z·σy dz, Mxy = −∫ z·τxy dz (kN·m/m) (= M11, M22, M12 de CSI): Mx
+ *     produce σx y es positivo con tracción en la cara −z. En una losa con la normal hacia arriba,
+ *     el momento de vano es positivo, como en las barras.
+ *   · Qx = ∫ τxz dz, Qy = ∫ τyz dz (kN/m) (= V13, V23 de CSI). Por equilibrio, Qx = −(∂Mx/∂x +
+ *     ∂Mxy/∂y): en una losa con gravedad, Qx es negativo junto al apoyo de x menor, como Vz en una
+ *     biapoyada. Son los de la DKMQ, que con mallas de obra quedan un 30–50 % bajos (H18): sólo
+ *     sirven para ver; para comprobar, las fuerzas nodales en una línea (E5).
+ * - Invertir el orden de los nudos invierte el eje 3 y con él otro: el 1 con la regla de CSI, el 2
+ *   con `eje1`. Nxy, Mx y My cambian de signo; Mxy no; y de los cortantes, el del eje que se
+ *   invierte no cambia (Qx con la regla de CSI, Qy con `eje1`) y el otro sí.
+ * - Cargas de lámina por unidad de superficie real (no proyectada) o de longitud, en ejes de la
+ *   lámina ("local") o globales. Una presión normal es [0, 0, p] en locales, positiva según +3.
+ *
  * Los objetos se referencian por índice (nudos de un elemento, maestro de una restricción…). Los
  * `id` no los usa el cálculo: sólo sirven para que los diagnósticos señalen el objeto analítico,
  * que el compilador traduce después al objeto físico.
  */
 import type { ModificadoresBarra, SeccionBarra } from "../elementos/barra.ts";
 import type { MaterialLamina } from "../elementos/dkmq.ts";
+import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import type { OpcionesMembrana } from "../elementos/membrana.ts";
 import type { Diagnostico } from "./diagnosticos.ts";
 
@@ -79,12 +100,22 @@ export interface BarraAnalitica {
   modificadores?: ModificadoresBarra;
 }
 
-/** Lámina cuadrilátera plana DKMQ + membrana con drilling (la del spike E0). */
+/**
+ * Lámina cuadrilátera plana DKMQ24: flexión DKMQ + membrana con drilling real, con multiplicadores
+ * de rigidez por componente (D3) en sus ejes 1-2.
+ */
 export interface LaminaAnalitica {
   id: string;
-  /** En sentido antihorario visto desde la cara +z local, que es (1→2) × (1→3). */
+  /** Recorren el contorno; su orden fija la normal (eje 3) por la regla de la mano derecha. */
   nudos: readonly [number, number, number, number];
   material: MaterialLamina;
+  /**
+   * Dirección de referencia del eje 1 (global), que se proyecta sobre el plano: la de los nervios
+   * de un reticular, por ejemplo. Por defecto, la regla de CSI (cabecera).
+   */
+  eje1?: Vec3;
+  /** Multiplicadores f11…v23 sobre la sección maciza, en los ejes 1-2 (D3). Por defecto, 1. */
+  multiplicadores?: MultiplicadoresLamina;
   membrana?: OpcionesMembrana;
 }
 
@@ -168,10 +199,53 @@ export type CargaBarra =
       b?: number;
     };
 
+/**
+ * Carga sobre una lámina, en ejes de la lámina ("local": 1, 2, 3) o globales. Las de superficie
+ * van por unidad de superficie real (kN/m²) y las de línea por unidad de longitud (kN/m). Los
+ * puntos son globales y tienen que caer en la lámina (en su plano y dentro de su contorno). Las
+ * fuerzas nodales equivalentes salen de las funciones bilineales (sin momentos nodales, como la
+ * presión de PyNite), así que son estáticamente equivalentes a la carga.
+ */
+export type CargaLamina =
+  | {
+      tipo: "superficie";
+      lamina: number;
+      ejes: "local" | "global";
+      /**
+       * Uniforme (un vector) o con un valor en cada nudo de la lámina, en su orden, interpolado
+       * bilinealmente: así una ley lineal en el espacio (un empuje hidrostático) es exacta.
+       */
+      q: Vec3 | readonly [Vec3, Vec3, Vec3, Vec3];
+    }
+  | {
+      tipo: "linea";
+      lamina: number;
+      ejes: "local" | "global";
+      /** Extremos del tramo cargado (globales), dentro de la lámina. */
+      a: Vec3;
+      b: Vec3;
+      /** Carga en `a`, kN/m. */
+      qa: Vec3;
+      /** Carga en `b` (variación lineal). Por defecto, igual a `qa`. */
+      qb?: Vec3;
+    }
+  | {
+      tipo: "puntual";
+      lamina: number;
+      ejes: "local" | "global";
+      /** Punto de aplicación (global), dentro de la lámina. */
+      punto: Vec3;
+      /** Fuerza, kN. */
+      F?: Vec3;
+      /** Momento, kN·m (vector, regla de la mano derecha). */
+      M?: Vec3;
+    };
+
 export interface CasoCarga {
   id: string;
   nodales?: readonly CargaNodal[];
   barras?: readonly CargaBarra[];
+  laminas?: readonly CargaLamina[];
   impuestos?: readonly DesplazamientoImpuesto[];
 }
 
@@ -199,9 +273,17 @@ export interface ResultadoCaso {
    */
   esfuerzosBarras: Float64Array;
   /**
+   * Resultantes de cada lámina (en el orden de `laminas`) en su centroide, 8 por lámina:
+   * [Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy] en los ejes de la lámina y con el convenio de la cabecera.
+   * El valor del centroide es la media de los 4 puntos de Gauss (como PyNite), que converge con
+   * orden 2 en su punto (H10): es el dato bruto para comprobar. Los valores en los puntos de Gauss
+   * y en los nudos los da `ResultantesLaminas`.
+   */
+  esfuerzosLaminas: Float64Array;
+  /**
    * Regla de oro 2: |ΣF| / Σ|F| y |ΣM| / Σ|M| entre cargas y reacciones, con los momentos
-   * respecto al centro del modelo. Las cargas de barra entran con su resultante real (no con las
-   * fuerzas nodales equivalentes). Tienen que quedar por debajo de 1e-9.
+   * respecto al centro del modelo. Las cargas de barra y de lámina entran con su resultante real
+   * (no con las fuerzas nodales equivalentes). Tienen que quedar por debajo de 1e-9.
    */
   equilibrio: { fuerzas: number; momentos: number };
   /**

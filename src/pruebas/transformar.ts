@@ -48,6 +48,8 @@ export function girarModelo(m: ModeloAnalitico, R: readonly number[], t: Vec3): 
     })),
     // ejes del muelle: filas eᵢ → R·eᵢ, es decir E' = E·Rᵀ
     muelles: m.muelles?.map((mu) => ({ ...mu, ejes: mul(mu.ejes ?? [1, 0, 0, 0, 1, 0, 0, 0, 1], RT) })),
+    // el eje 1 de referencia gira; sin él, la regla de CSI sólo es invariante si R deja quieto Z
+    laminas: m.laminas?.map((l) => ({ ...l, eje1: l.eje1 && girar(R, l.eje1) })),
     casos: m.casos.map((c) => ({
       ...c,
       nodales: c.nodales?.map((n) => ({ nudo: n.nudo, f: [...girar(R, n.f.slice(0, 3)), ...girar(R, n.f.slice(3))] as never })),
@@ -57,7 +59,50 @@ export function girarModelo(m: ModeloAnalitico, R: readonly number[], t: Vec3): 
         if (cb.tipo === "puntual") return { ...cb, F: cb.F && girar(R, cb.F), M: cb.M && girar(R, cb.M) };
         return { ...cb, qa: girar(R, cb.qa), qb: cb.qb && girar(R, cb.qb) };
       }),
+      // cargas de lámina: los puntos giran y se trasladan; los vectores globales giran
+      laminas: c.laminas?.map((cl) => {
+        const v = (q: Vec3): Vec3 => (cl.ejes === "local" ? q : girar(R, q));
+        const p = (x: Vec3): Vec3 => {
+          const g = girar(R, x);
+          return [g[0] + t[0], g[1] + t[1], g[2] + t[2]];
+        };
+        if (cl.tipo === "superficie") return { ...cl, q: Array.isArray(cl.q[0]) ? ((cl.q as readonly Vec3[]).map(v) as never) : v(cl.q as Vec3) };
+        if (cl.tipo === "linea") return { ...cl, a: p(cl.a), b: p(cl.b), qa: v(cl.qa), qb: cl.qb && v(cl.qb) };
+        return { ...cl, punto: p(cl.punto), F: cl.F && v(cl.F), M: cl.M && v(cl.M) };
+      }),
     })),
+  };
+}
+
+/**
+ * Invierte el orden de los nudos de todas las láminas ([a, b, c, d] → [a, d, c, b]): la normal
+ * (eje 3) se invierte y, con ella, el eje 1 si la lámina sigue la regla de CSI o el 2 si tiene
+ * `eje1`. Las cargas en ejes locales cambian de signo en esos dos ejes; las de superficie por nudo
+ * se reordenan. `signos(l)` da el factor de cada resultante [Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy]:
+ * Nxy, Mx y My cambian de signo, Mxy no, y de los cortantes cambia el del eje que no se invierte.
+ */
+export function invertirLaminas(m: ModeloAnalitico): { modelo: ModeloAnalitico; signos: (l: number) => number[] } {
+  const conEje = (l: number) => m.laminas![l]!.eje1 !== undefined;
+  const local = (l: number, q: Vec3): Vec3 => (conEje(l) ? [q[0], -q[1], -q[2]] : [-q[0], q[1], -q[2]]);
+  return {
+    modelo: {
+      ...m,
+      laminas: m.laminas?.map((l) => ({ ...l, nudos: [l.nudos[0], l.nudos[3], l.nudos[2], l.nudos[1]] as const })),
+      casos: m.casos.map((c) => ({
+        ...c,
+        laminas: c.laminas?.map((cl) => {
+          const v = (q: Vec3): Vec3 => (cl.ejes === "local" ? local(cl.lamina, q) : q);
+          if (cl.tipo === "superficie") {
+            if (!Array.isArray(cl.q[0])) return { ...cl, q: v(cl.q as Vec3) };
+            const q = cl.q as readonly Vec3[];
+            return { ...cl, q: [v(q[0]!), v(q[3]!), v(q[2]!), v(q[1]!)] as const };
+          }
+          if (cl.tipo === "linea") return { ...cl, qa: v(cl.qa), qb: cl.qb && v(cl.qb) };
+          return { ...cl, F: cl.F && v(cl.F), M: cl.M && v(cl.M) };
+        }),
+      })),
+    },
+    signos: (l) => (conEje(l) ? [1, 1, -1, -1, -1, 1, -1, 1] : [1, 1, -1, -1, -1, 1, 1, -1]),
   };
 }
 
@@ -94,6 +139,13 @@ export function renumerarModelo(m: ModeloAnalitico, nuevo: readonly number[]): M
       impuestos: c.impuestos?.map((d) => ({ ...d, nudo: N(d.nudo) })),
       // las barras van en orden inverso
       barras: c.barras?.map((cb) => ({ ...cb, barra: m.barras!.length - 1 - cb.barra })),
+      // las láminas también, y empiezan por su segundo nudo: las cargas por nudo rotan
+      laminas: c.laminas?.map((cl) => {
+        const lamina = m.laminas!.length - 1 - cl.lamina;
+        if (cl.tipo !== "superficie" || !Array.isArray(cl.q[0])) return { ...cl, lamina };
+        const q = cl.q as readonly Vec3[];
+        return { ...cl, lamina, q: [q[1]!, q[2]!, q[3]!, q[0]!] as const };
+      }),
     })),
   };
 }

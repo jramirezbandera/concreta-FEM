@@ -22,7 +22,7 @@ function peorPivote(m: ModeloAnalitico): string {
   const el = elementosDelModelo(m, geo, diag);
   const num = numerar(m, el, geo, diag)!;
   const ps = patronSistema(num, el);
-  const K = ensamblarRigidez(m, geo.xyz, num, el, ps);
+  const K = ensamblarRigidez(m, num, el, ps);
   const f = new FactorLdlt(ps.patron);
   try {
     f.factorizar(K.valores);

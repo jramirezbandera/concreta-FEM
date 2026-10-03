@@ -190,7 +190,6 @@ function seleccionarElemento(num: Numeracion, nudos: readonly number[], ke: Floa
 
 export function ensamblarRigidez(
   modelo: ModeloAnalitico,
-  xyz: Float64Array,
   num: Numeracion,
   elementos: readonly ElementoMotor[],
   ps: PatronSistema,
@@ -201,7 +200,7 @@ export function ensamblarRigidez(
   const eqLocal: number[] = [];
   for (let e = 0; e < elementos.length; e++) {
     const el = elementos[e]!;
-    const ke = rigidezGlobal(modelo, el, xyz);
+    const ke = rigidezGlobal(modelo, el);
     const t = ps.conEsclavos[e] ? transformarElemento(num, el.nudos, ke) : seleccionarElemento(num, el.nudos, ke);
     const nq = t.gdl.length;
     eqLocal.length = nq;
