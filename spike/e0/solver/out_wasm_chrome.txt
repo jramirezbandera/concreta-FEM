@@ -1,0 +1,9 @@
+{"k":"V3","plataforma":"wasm (Chrome, Worker)","n":44268,"nnz_l":5312718,"nrhs":24,"t_simbolico_s":0.074,"t_factor_s":0.329,"t_resolver_s":0.112,"t_total_s":0.515,"residuo_rel":1.45e-9,"heap_MB":70}
+{"k":"V1_h0.75","plataforma":"wasm (Chrome, Worker)","n":164472,"nnz_l":18171504,"nrhs":24,"t_simbolico_s":0.232,"t_factor_s":1.035,"t_resolver_s":0.423,"t_total_s":1.69,"residuo_rel":1.46e-11,"heap_MB":277}
+{"k":"V1_h0.5","plataforma":"wasm (Chrome, Worker)","n":312816,"nnz_l":41449044,"nrhs":24,"t_simbolico_s":0.485,"t_factor_s":2.46,"t_resolver_s":0.849,"t_total_s":3.794,"residuo_rel":3.51e-11,"heap_MB":568}
+{"k":"V2_h0.5","plataforma":"wasm (Chrome, Worker)","n":377454,"nnz_l":44220650,"nrhs":24,"t_simbolico_s":0.518,"t_factor_s":2.692,"t_resolver_s":0.953,"t_total_s":4.163,"residuo_rel":4.24e-11,"heap_MB":638}
+{"k":"V1_h0.35","plataforma":"wasm (Chrome, Worker)","n":680646,"nnz_l":86828359,"nrhs":24,"t_simbolico_s":1.11,"t_factor_s":5.441,"t_resolver_s":1.775,"t_total_s":8.326,"residuo_rel":1.07e-10,"heap_MB":1210}
+{"k":"sint_n64","plataforma":"wasm (Chrome, Worker)","n":180240,"nnz_l":45853020,"nrhs":24,"t_simbolico_s":0.342,"t_factor_s":3.456,"t_resolver_s":0.7,"t_total_s":4.498,"residuo_rel":7.77e-15,"heap_MB":526}
+{"k":"sint_n90","plataforma":"wasm (Chrome, Worker)","n":360360,"nnz_l":98728020,"nrhs":24,"t_simbolico_s":0.601,"t_factor_s":8.514,"t_resolver_s":1.491,"t_total_s":10.606,"residuo_rel":7.83e-15,"heap_MB":1103}
+{"k":"sint_n113","plataforma":"wasm (Chrome, Worker)","n":566538,"nnz_l":154129356,"nrhs":24,"t_simbolico_s":0.929,"t_factor_s":13.864,"t_resolver_s":2.314,"t_total_s":17.107,"residuo_rel":7.9e-15,"heap_MB":1721}
+{"navegador":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36"}

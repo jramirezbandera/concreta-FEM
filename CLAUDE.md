@@ -3,7 +3,7 @@
 ## Qué es
 - **Repositorio:** privado y personal de jramirezbandera, para desarrollar el módulo FEM 3D de Concreta con un **motor de cálculo propio**.
 - **Origen:** se empezó de cero el 2026-10-03. La app que había antes en este repo (interfaz tipo CYPECAD sobre PyNite) se descartó y no se reutiliza.
-- **Destino final:** integrarse en Concreta (`wh0am1-dev/concreta`, clon en `../concreta-v2`) para que sus resultados alimenten los módulos de comprobación.
+- **Destino final:** integrarse en Concreta (`wh0am1-dev/concreta`, clon en `../Concreta EST/concreta-v2`) para que sus resultados alimenten los módulos de comprobación.
   - Esa integración será un PR revisado por wh0am1, y sólo cuando el usuario lo decida.
   - Hasta entonces, nada de este repo toca producción.
 
@@ -45,7 +45,7 @@
 - **Commits:** es un proyecto personal, así que se trabaja en `main`, con commits pequeños por tema y mensajes en español. No hay PR, revisor ni despliegue.
 - **Herramientas,** como en Concreta: bun como único gestor de paquetes, TypeScript estricto y vitest.
 - **Rust** sólo en el núcleo (`kernel/`). El `.wasm` se versiona con su sha256 para que el resto del repo no necesite Rust.
-- **Independencia:** el motor no depende de Concreta. Lo que haga falta de allí más adelante (secciones, tipologías de forjado, combinaciones) se copia citando el fichero de origen; nunca se importa desde `../concreta-v2`.
+- **Independencia:** el motor no depende de Concreta. Lo que haga falta de allí más adelante (secciones, tipologías de forjado, combinaciones) se copia citando el fichero de origen; nunca se importa desde `../Concreta EST/concreta-v2`.
 
 ## Estado
 - **2026-10-03:** repo reiniciado con la investigación.
@@ -54,5 +54,11 @@
   - `wasm-bindgen-cli` 0.2.129: tiene que coincidir con la versión del crate `wasm-bindgen` del `Cargo.lock`.
   - `wasm-opt` 133 (binaryen), en `%USERPROFILE%\.local\binaryen-version_133\bin`. Necesita `--enable-bulk-memory --enable-nontrapping-float-to-int`, porque rustc ya emite esas extensiones.
   - Se descartó el toolchain `x86_64-pc-windows-gnu`: al `dlltool` que trae le falta el ensamblador, y eso rompe `windows-sys` y `getrandom` en el host.
-- **Siguiente paso:** el spike E0 (S7).
+- **2026-10-03: spike E0 superado.** Pasan los cuatro criterios de S7. El informe está en `docs/fem3d/spike-e0.md`, con resultados, hallazgos E0-1…E0-8 y pendientes.
+  - **Ya en `src/`:** núcleo WASM (`src/nucleo/`), DKMQ, membrana con drilling y lámina (`src/elementos/`), y solver de perfil (`src/solver/`).
+  - **Herramientas de prueba:** `src/pruebas/` y los benches y oráculos en `spike/e0/`.
+  - **El núcleo** se compila con `bun run nucleo:compilar` y se verifica con `bun run nucleo:verificar` (sha256 reproducible). No se edita `src/nucleo/pkg/` a mano.
+  - **Oráculos:** PyNite 3.2.0 en `.venv` (Python 3.14); OpenSeesPy 3.8 en `.venv312` (Python 3.12: con 3.14 no carga en Windows).
+  - **Pendiente:** ver el CI (`.github/workflows/ci.yml`) en verde tras un push y medir en móvil.
+- **Siguiente paso:** E1 (núcleo del motor: GDL, restricciones, apoyos, CSC con patrón fijo, ΣF/ΣM y diagnósticos de pivote). En paralelo, la Fase 1 de S1.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

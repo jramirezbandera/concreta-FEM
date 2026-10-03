@@ -1,0 +1,59 @@
+# CI del motor FEM 3D.
+# - pruebas: bun + vitest + tsc, sin Rust (el núcleo WASM va versionado en src/nucleo/pkg/).
+# - nucleo: recompila el núcleo desde cero con la cadena fijada y comprueba que el .wasm es
+#   idéntico byte a byte al versionado (sha256 de MANIFIESTO.json). En Windows, porque las rutas
+#   de los mensajes de pánico llevan las barras del sistema (scripts/compilar-nucleo.mjs).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pruebas:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run test:run
+
+  nucleo:
+    runs-on: windows-latest
+    env:
+      WASM_BINDGEN: 0.2.129
+      BINARYEN: "133"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Toolchain de Rust (kernel/rust-toolchain.toml)
+        working-directory: kernel
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Caché de wasm-bindgen-cli
+        id: cache-bindgen
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-bindgen.exe
+          key: wasm-bindgen-cli-${{ env.WASM_BINDGEN }}-windows
+      - name: wasm-bindgen-cli
+        if: steps.cache-bindgen.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --version ${{ env.WASM_BINDGEN }} --locked
+      - name: binaryen (wasm-opt)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/WebAssembly/binaryen/releases/download/version_$env:BINARYEN/binaryen-version_$env:BINARYEN-x86_64-windows.tar.gz"
+          Invoke-WebRequest $url -OutFile binaryen.tar.gz
+          tar -xzf binaryen.tar.gz -C $env:RUNNER_TEMP
+          "BINARYEN_BIN=$env:RUNNER_TEMP\binaryen-version_$env:BINARYEN\bin" >> $env:GITHUB_ENV
+      - name: Recompilar y verificar el sha256 del núcleo
+        run: bun scripts/compilar-nucleo.mjs --verificar
+      - name: Tests nativos del núcleo
+        working-directory: kernel
+        run: cargo test --release --locked
