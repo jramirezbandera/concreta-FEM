@@ -6,12 +6,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { parcheMacNealHarder } from "../../validacion/e3/parche.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { casosValidos, errorPorGrupos } from "../pruebas/comparar.ts";
 import { carga, Constructor, EMPOTRADO } from "../pruebas/constructor.ts";
-import { PARCHE_EXTERIORES, PARCHE_NUDOS, PARCHE_QUADS } from "../pruebas/parche.ts";
 import { mallaRectangular } from "../pruebas/placa.ts";
 import { invertirLaminas } from "../pruebas/transformar.ts";
+import { RETICULAR } from "../pruebas/edificio.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { calcular } from "./calcular.ts";
 import { ResultantesLaminas } from "./laminas.ts";
@@ -23,12 +24,11 @@ beforeAll(async () => {
 });
 
 const SOLVERS: TipoSolver[] = ["nucleo", "perfil"];
-const RETICULAR: MultiplicadoresLamina = { f11: 0.55, f22: 0.4, f12: 0.25, m11: 0.32, m22: 0.27, m12: 0.12, v13: 0.2, v23: 0.15 };
 const max = (v: ArrayLike<number>) => Math.max(...Array.from(v, Math.abs));
 const res = (r: { esfuerzosLaminas: Float64Array }, l: number) => Array.from(r.esfuerzosLaminas.subarray(8 * l, 8 * l + 8));
 
 describe.each(SOLVERS)("láminas (solver %s)", (solver) => {
-  describe("patch test de MacNeal–Harder: membrana y flexión a la vez", () => {
+  describe("patch test de MacNeal–Harder: membrana y flexión a la vez (validacion/e3/parche.ts)", () => {
     const casos: { nombre: string; mult?: MultiplicadoresLamina; angulo?: number }[] = [
       { nombre: "isótropa, ejes de CSI" },
       { nombre: "reticular, ejes de CSI", mult: RETICULAR },
@@ -37,53 +37,11 @@ describe.each(SOLVERS)("láminas (solver %s)", (solver) => {
     ];
     for (const c of casos) {
       it(`${c.nombre}: nudos interiores exactos y resultantes constantes`, () => {
-        const E = 1e6;
-        const nu = 0.25;
-        const t = 0.001;
-        const k = 1e-3;
-        // membrana: u = k(2x + 2y), v = 3ky, ψ = ω = −k; flexión: w = k(x² + xy + y²)/2, θx = ∂w/∂y, θy = −∂w/∂x
-        const exacto = ([x, y]: readonly [number, number]) => [k * (2 * x + 2 * y), 3 * k * y, (k * (x * x + x * y + y * y)) / 2, k * (x / 2 + y), -k * (x + y / 2), -k];
-        const a = ((c.angulo ?? 0) * Math.PI) / 180;
-        const eje1: Vec3 | undefined = c.angulo === undefined ? undefined : [Math.cos(a), Math.sin(a), 0];
-        const m = new Constructor();
-        PARCHE_NUDOS.forEach(([x, y]) => m.nudo(x, y, 0));
-        PARCHE_QUADS.forEach((q) => m.lamina(q, { E, nu, t }, { eje1, multiplicadores: c.mult }));
-        for (const v of PARCHE_EXTERIORES) m.apoyo(v, EMPOTRADO);
-        m.caso(
-          "parche",
-          [],
-          PARCHE_EXTERIORES.flatMap((v) => exacto(PARCHE_NUDOS[v]!).map((valor, g) => ({ nudo: v, gdl: g as 0, valor }))),
-        );
-        const [r] = casosValidos(calcular(m.modelo(), { solver }));
-        const calc: number[] = [];
-        const ref: number[] = [];
-        PARCHE_NUDOS.forEach((p, v) => {
-          calc.push(...r!.u.subarray(6 * v, 6 * v + 6));
-          ref.push(...exacto(p));
-        });
-        expect(errorPorGrupos(calc, ref)).toBeLessThan(1e-10);
-
-        // Resultantes exactas en los ejes de usuario (giro α respecto a X; normal +Z)
-        const [C, S] = [Math.cos(a), Math.sin(a)];
-        const giro = ([ex, ey, g]: number[]) => [C * C * ex! + S * S * ey! + C * S * g!, S * S * ex! + C * C * ey! - C * S * g!, -2 * C * S * ex! + 2 * C * S * ey! + (C * C - S * S) * g!];
-        const eps = giro([2 * k, 3 * k, 2 * k]);
-        const kap = giro([-k, -k, -k]); // curvaturas de Batoz [βx,x, βy,y, βx,y + βy,x], con βx = θy y βy = −θx
-        const mu = c.mult ?? {};
-        const ortotropa = (D: number, s: number[]) => [
-          [s[0]! * s[0]! * D, s[0]! * s[1]! * D * nu, 0],
-          [s[0]! * s[1]! * D * nu, s[1]! * s[1]! * D, 0],
-          [0, 0, (s[2]! * s[2]! * D * (1 - nu)) / 2],
-        ];
-        const Cm = ortotropa((E * t) / (1 - nu * nu), [Math.sqrt(mu.f11 ?? 1), Math.sqrt(mu.f22 ?? 1), Math.sqrt(mu.f12 ?? 1)]);
-        const Hb = ortotropa((E * t ** 3) / (12 * (1 - nu * nu)), [Math.sqrt(mu.m11 ?? 1), Math.sqrt(mu.m22 ?? 1), Math.sqrt(mu.m12 ?? 1)]);
-        const N = Cm.map((fila) => fila[0]! * eps[0]! + fila[1]! * eps[1]! + fila[2]! * eps[2]!);
-        const M = Hb.map((fila) => -(fila[0]! * kap[0]! + fila[1]! * kap[1]! + fila[2]! * kap[2]!));
-        for (let l = 0; l < PARCHE_QUADS.length; l++) {
-          const s = res(r!, l);
-          expect(max(s.slice(0, 3).map((v, i) => v - N[i]!)) / max(N), `N ${l}`).toBeLessThan(1e-9);
-          expect(max(s.slice(3, 6).map((v, i) => v - M[i]!)) / max(M), `M ${l}`).toBeLessThan(1e-9);
-          expect(max(s.slice(6)) / (max(M) / 0.24), `Q ${l}`).toBeLessThan(1e-9);
-        }
+        const e = parcheMacNealHarder(c.mult, c.angulo, solver);
+        expect(e.u, "u").toBeLessThan(1e-10);
+        expect(e.N, "N").toBeLessThan(1e-9);
+        expect(e.M, "M").toBeLessThan(1e-9);
+        expect(e.Q, "Q").toBeLessThan(1e-9);
       });
     }
   });

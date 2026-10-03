@@ -1,0 +1,35 @@
+# validacion/e3/resumen.ts — 2026-10-04
+## Criterio 1: el elemento
+sección isótropa sin multiplicadores frente al camino del material isótropo (consistencia interna; frente al código de E0, ver el informe): 0.0e+0
+reticular: 6.º autovalor / máximo 1.4e-16 (nulos) y 7.º / máximo 6.7e-5 (positivos)
+girar el eje 1 90° = intercambiar los multiplicadores de las dos direcciones: 8.3e-16
+patch test de MacNeal–Harder, isótropa, ejes de CSI: u 3.5e-15 · N 5.9e-16 · M 4.2e-15 · Q 5.9e-14
+patch test de MacNeal–Harder, reticular, ejes de CSI: u 3.5e-15 · N 4.3e-16 · M 2.6e-15 · Q 5.8e-14
+patch test de MacNeal–Harder, reticular, eje 1 a 30°: u 2.6e-15 · N 7.5e-16 · M 2.7e-15 · Q 4.3e-14
+patch test de MacNeal–Harder, reticular, eje 1 a −110°: u 4.3e-15 · N 5.9e-16 · M 1.4e-15 · Q 1.1e-13
+
+## Criterio 2a: PyNite 3.2.0 (peor error relativo por grupos; faer y perfil)
+losa-distorsionada (nucleo): u 6.8e-15 · reacciones 1.4e-14 · M centroide 1.4e-14 · Q centroide 2.5e-14 · M Gauss 1.2e-14 · Q Gauss 3.1e-14
+losa-distorsionada (perfil): u 4.1e-15 · reacciones 1.0e-14 · M centroide 6.6e-15 · Q centroide 2.4e-14 · M Gauss 8.9e-15 · Q Gauss 2.6e-14
+losa-inclinada (nucleo): u 6.5e-13 · reacciones 8.1e-13 · M centroide 5.0e-13 · Q centroide 6.4e-13 · M Gauss 5.5e-13 · Q Gauss 7.0e-13
+losa-inclinada (perfil): u 5.9e-13 · reacciones 1.0e-12 · M centroide 4.4e-13 · Q centroide 6.3e-13 · M Gauss 4.9e-13 · Q Gauss 7.5e-13
+muro-viento (nucleo): u 1.4e-12 · reacciones 7.1e-13 · M centroide 5.2e-13 · Q centroide 6.2e-13 · M Gauss 5.4e-13 · Q Gauss 6.0e-13
+muro-viento (perfil): u 1.5e-12 · reacciones 7.1e-13 · M centroide 5.8e-13 · Q centroide 5.4e-13 · M Gauss 5.7e-13 · Q Gauss 5.9e-13
+losa-normal-abajo (nucleo): u 2.9e-14 · reacciones 2.5e-14 · M centroide 3.5e-14 · Q centroide 4.4e-14 · M Gauss 4.1e-14 · Q Gauss 4.7e-14
+losa-normal-abajo (perfil): u 2.3e-14 · reacciones 1.9e-14 · M centroide 2.8e-14 · Q centroide 3.8e-14 · M Gauss 3.2e-14 · Q Gauss 4.4e-14
+
+## Criterio 3: cargas de lámina (equilibrio con la resultante real)
+lámina plegada, caso G: ΣF 4.8e-16 · ΣM 1.0e-16
+lámina plegada, caso empuje: ΣF 4.6e-16 · ΣM 1.0e-16
+lámina plegada, caso puntual: ΣF 5.5e-16 · ΣM 1.3e-16
+
+## Criterio 4: pruebas metamórficas (peor error relativo)
+lámina plegada: giro 1.5e-12 · renumeración 4.4e-13 · inversión del orden de nudos 2.2e-13 · superposición 1.2e-13
+edificio E3 con diafragma: giro 9.5e-13 · renumeración 1.3e-12 · inversión del orden de nudos 7.7e-13 · superposición 1.0e-14
+edificio E3 con muelles: giro 2.2e-12 · renumeración 9.7e-13 · inversión del orden de nudos 4.1e-13 · superposición 3.1e-14
+PyNite: losa-distorsionada: giro — · renumeración 1.8e-14 · inversión del orden de nudos 2.2e-14 · superposición 2.0e-14
+PyNite: losa-inclinada: giro — · renumeración 1.5e-12 · inversión del orden de nudos 4.7e-13 · superposición 2.0e-13
+PyNite: muro-viento: giro — · renumeración 5.3e-13 · inversión del orden de nudos 6.3e-13 · superposición 9.6e-14
+PyNite: losa-normal-abajo: giro — · renumeración 2.4e-14 · inversión del orden de nudos 1.3e-14 · superposición 7.5e-15
+
+Peor equilibrio (ΣF o ΣM relativos) en todos los cálculos de este resumen: 1.1e-13
