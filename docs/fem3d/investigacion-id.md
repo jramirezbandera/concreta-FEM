@@ -89,7 +89,7 @@ líneas se han movido, `grep -n "^## H07 " docs/fem3d/investigacion-id.md`.
 |---|---|---|
 | S0 | Veredicto en una página: motor propio para el tamaño de D9, qué sigue valiendo del veredicto original y tamaños realistas | 101–152 |
 | S1 | Plan por fases (0–5) con entregables, rutas reales del repo y estrategia de ramas y PR | 1986–2092 |
-| S2 | Decisiones: D1–D3, D5, D9 y D11 (motor propio) tomadas; D4 pendiente, con recomendación | 2093–2119 |
+| S2 | Decisiones: D1–D5, D9 y D11 (motor propio) tomadas | 2093–2119 |
 | S3 | Qué apartados del diseño técnico cambian y por qué (tabla § → hallazgo → cambio) | 2120–2158 |
 | S4 | Fallos en código ya desplegado (fem2d: G favorable y αcr del HA), para PR aparte | 2159–2175 |
 | S5 | Lo que la investigación no pudo cerrar, con el experimento que lo cerraría y su fase | 2176–2206 |
@@ -2094,7 +2094,7 @@ Sustituye a los §20 y §22 del diseño técnico. Las duraciones son las del dis
 
 Ninguna se cierra sólo con la investigación: son decisiones de criterio profesional o de producto. Cada una lleva una recomendación razonada.
 
-**Tomadas por el usuario (2026-10-03):** D1, D2, D3 y D9, y después D11. **El 2026-10-04:** D5.
+**Tomadas por el usuario (2026-10-03):** D1, D2, D3 y D9, y después D11. **El 2026-10-04:** D5 y D4.
 
 | # | Decisión | Respuesta del usuario | Consecuencia | Base |
 |---|---|---|---|---|
@@ -2104,12 +2104,12 @@ Ninguna se cierra sólo con la investigación: son decisiones de criterio profes
 | D9 | Tamaño máximo del modelo | **Del orden de 7 plantas con 80 pilares por planta.** El límite real lo marca el rendimiento | Son ~27 500–44 000 nudos y 165 000–265 000 GDL. Deja fuera a PyNite y obliga a un solver supernodal. El límite se fija en GDL según el dispositivo | H52, H49, H50 |
 | **D11** | **Motor de cálculo** | **Motor propio, la vía (c),** después de ver los riesgos y la validación propuesta. Se trabaja en el repo personal `jramirezbandera/concreta-FEM`, desde cero: la app anterior con PyNite se descarta | Spike E0 con criterios de paso como puerta. La vía (b) queda como plan B medido. PyNite pasa a ser oráculo. La validación va primero: equilibrio en cada cálculo, oráculos, módulo oculto hasta pasar la batería y un periodo «en sombra» frente a SAP2000 o CYPE | S7, H49, H50 |
 | D5 | Quién define las bandas de dimensionado de las losas | **(c) Automáticas y editables** (2026-10-04): el compilador propone las bandas del Ap. I del CE A19 a partir de los ejes de los pilares, y el usuario puede moverlas, cambiar su anchura, partirlas o añadir otras | Coincide con la recomendación. El compilador siembra en la malla los bordes de las bandas y las caras de los apoyos (E5-5), así que editar una banda cambia la malla y obliga a recalcular. Las bandas editadas se guardan en el modelo físico y se marcan como tales en la memoria | H25, E5-5 |
+| D4 | Modificadores de rigidez por defecto | **(b), por material** (2026-10-04, con las medidas de `validacion/c1/out_decisiones.txt`): axil de todos los pilares ×2 y torsión de las vigas de hormigón ×0,1. La flexión no se toca: la rigidez nominal de H32 va en la comprobación de estabilidad | Coincide con la recomendación. Sin la torsión reducida, el vano de una secundaria que acomete a una viga de borde sale un 27 % corto; sin el axil ×2, la cara de una viga interior pierde un 6 %. Se aplican por defecto (`MODIFICADORES_D4`), se cambian con una opción y quedan en las hipótesis de la compilación | H47, C1 |
 
 **Pendientes:**
 
 | # | Decisión | Opciones | Recomendación | Base |
 |---|---|---|---|---|
-| D4 | Modificadores de rigidez por defecto | (a) Ninguno; (b) los de CYPECAD (axil de pilares y muros ×2, torsión del HA reducida) | **(b),** visibles en el modelo y en la memoria. Sin ellos aparecen momentos por acortamiento diferencial y torsiones de borde que el usuario no espera. Con motor propio son nativos | H47 |
 | D6–D8, D10 | scipy, offline con Pyodide, versión de Pyodide y fork de PyNite | — | **Obsoletas con D11 = (c).** Sólo volverían si el spike falla y se pasa al plan B, la vía (b) | H26, H03, H55 |
 
 Decisiones menores, con un valor por defecto que se puede cambiar después:

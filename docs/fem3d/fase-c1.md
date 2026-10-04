@@ -5,9 +5,9 @@
 > **Veredicto: pasan los ocho criterios.**
 > - SAP2000 1-022 descrito como modelo físico da los tres valores publicados del caso LAT y coincide con el modelo hecho a mano de E6 a 1e-14.
 > - Cuatro modelos físicos coinciden con su modelo analítico escrito a mano a ≤ 1,2e-14. Cubren zonas rígidas, excentricidades, rótulas, encuentros en T y cruces, pilares apeados y apilados, inserción superior y cargas en zonas rígidas.
-> - Siete relaciones metamórficas pasan en 12 modelos aleatorios: reordenar da el mismo modelo bit a bit, y girar 37° da los resultados girados a 3,8e-13.
+> - Siete relaciones metamórficas pasan en 12 modelos aleatorios: reordenar da el mismo modelo bit a bit, y girar 37° da los resultados girados a 3,3e-13.
 > - El control «sin pérdidas» queda en ~1e-15. 67 entradas no válidas dan su error con el id físico, y ninguna lanza.
-> - La huella es la misma en V8 y en JavaScriptCore. Las barras del edificio objetivo compilan en 46 ms.
+> - La huella es la misma en V8 y en JavaScriptCore. Las barras del edificio objetivo compilan en 47 ms.
 >
 > **Hallazgo principal (C1-1 y C1-2):** los dos fallos que encontraron las pruebas eran silenciosos y de los que el plan quería evitar.
 > - Una viga dibujada encima de otra duplicaba la rigidez sin aviso.
@@ -21,11 +21,11 @@
 |---|---|---|---|
 | 1 | Oráculo publicado: SAP2000 1-022 como modelo físico, dentro del redondeo del caso LAT | **Pasa.** Ux 1,450757 in (1,45076), P 69,9867 k (69,99) y M 2 324,677 k·in (2 324,68). Frente al modelo a mano de E6: u 9,9e-15 y esfuerzos 1,2e-14 | `src/compilador/csi.test.ts`; `validacion/c1/out_resumen.txt` |
 | 2 | Oráculo a mano: modelos físicos frente a su modelo analítico escrito a mano, a ≤ 1e-10 | **Pasa.** 4 casos con 38 nudos y 43 barras: el peor error, 1,2e-14. Los avisos son los previstos | `src/compilador/oraculo-mano.test.ts`; `validacion/c1/mano.ts` |
-| 3 | Metamórficas: reordenar (bit a bit), trasladar y girar, ruido < ε_geom y < ε_snap, partir e invertir vigas | **Pasa** en 12 semillas, con y sin diafragma. Reordenar: idéntico en modelo, mapeo y diagnósticos. Traslación 1,2e-13; giro de 90°, 3,0e-13; de 37°, 3,8e-13. Ruido de 1e-8 m: misma topología y u a 1,9e-8. Ruido de ±1,5 cm: misma topología, 114 avisos. Partir 306 vigas: 3,1e-13. Invertir: 5,2e-15. Partir cargas: 9,1e-16 | `src/compilador/metamorficas.test.ts`; `src/pruebas/metamorficasFisicas.ts` |
-| 4 | Sin pérdidas en cada compilación (≤ 1e-9) y equilibrio del motor | **Pasa.** 24 modelos aleatorios: 9,7e-16 en fuerzas y 1,2e-16 en momentos; equilibrio del motor ≤ 1,5e-14 | `out_resumen.txt`; `estadisticas.sinPerdidas` |
+| 3 | Metamórficas: reordenar (bit a bit), trasladar y girar, ruido < ε_geom y < ε_snap, partir e invertir vigas | **Pasa** en 12 semillas, con y sin diafragma. Reordenar: idéntico en modelo, mapeo y diagnósticos. Traslación 1,7e-13; giro de 90°, 2,9e-13; de 37°, 3,3e-13. Ruido de 1e-8 m: misma topología y u a 2,6e-8. Ruido de ±1,5 cm: misma topología, 114 avisos. Partir 306 vigas: 7,6e-13. Invertir: 4,2e-15. Partir cargas: 1,9e-15 | `src/compilador/metamorficas.test.ts`; `src/pruebas/metamorficasFisicas.ts` |
+| 4 | Sin pérdidas en cada compilación (≤ 1e-9) y equilibrio del motor | **Pasa.** 24 modelos aleatorios: 1,2e-15 en fuerzas y 1,2e-16 en momentos; equilibrio del motor ≤ 1,2e-14 | `out_resumen.txt`; `estadisticas.sinPerdidas` |
 | 5 | Entradas no válidas: error con su código y el id físico, sin lanzar nunca | **Pasa.** 67 entradas, ninguna lanza ni llega a `compilador/error-interno`. Abarcan forma del modelo, plantas, materiales, secciones, pilares, vigas, apoyos, cargas, topología y opciones | `src/compilador/invalidos.test.ts` |
 | 6 | Huella: la misma en Node (V8) y en Bun (JSC), sin depender del orden; vectores de SHA-256 | **Pasa.** Coinciden en 13 modelos, la física y la analítica a 12 cifras. Vectores de FIPS 180-4 y 201 textos comparados con `node:crypto` | `src/compilador/huella.test.ts`; `validacion/c1/huellas.ts` |
-| 7 | Rendimiento: las barras del edificio objetivo, en una fracción del cálculo | **Pasa.** 7 plantas, 80 pilares, 567 vigas y 1 152 cargas, que dan 1 151 nudos y 2 499 barras: 46 ms de mediana, el 20 % del cálculo con el núcleo (234 ms), con la misma huella en cada repetición | `validacion/c1/out_banco.txt` |
+| 7 | Rendimiento: las barras del edificio objetivo, en una fracción del cálculo | **Pasa.** 7 plantas, 80 pilares, 567 vigas y 1 152 cargas, que dan 1 151 nudos y 2 499 barras: 47 ms de mediana, el 20 % del cálculo con el núcleo (234 ms), con la misma huella en cada repetición | `validacion/c1/out_banco.txt` |
 | 8 | Referencia congelada | **Pasa.** 1-022, un edificio reducido y tres modelos aleatorios: modelo analítico a 1e-12, mapeo y resultados a 1e-9 con los dos solvers. Generada con Bun y comprobada en Node | `src/compilador/congelado-c1.test.ts` |
 
 ---
@@ -50,7 +50,7 @@
 **Uso:**
 
 ```ts
-const r = compilar(fisico); // { valido, modelo, mapeo, diagnosticos, huella, estadisticas }
+const r = compilar(fisico); // { valido, modelo, mapeo, diagnosticos, hipotesis, huella, estadisticas }
 if (r.valido) {
   const c = calcular(r.modelo);
   const diags = traducirDiagnosticos(c.diagnosticos, r.modelo, r.mapeo); // ids físicos
@@ -91,21 +91,26 @@ if (r.valido) {
 
 ## 4. Decisiones por defecto (de `compilador.md`)
 
-Las ocho de `compilador.md` (C1-a a C1-h) se mantienen. C1-c tiene ahora su medida (C1-5).
+Los criterios se cumplieron con el nudo entero rígido y sin modificadores. Después, el usuario decidió (2026-10-04) con las medidas de `validacion/c1/decisiones.ts` sobre el edificio objetivo:
 
-Las que son criterio profesional y siguen pendientes del usuario:
-- **C1-a:** zonas rígidas con factor 1, como CYPECAD.
-- **C1-d:** diafragma rígido en todas las plantas menos la más baja.
-- **C1-g:** sin modificadores de rigidez hasta que se decida D4.
+| Decisión | Por defecto | Medida que la sostiene |
+|---|---|---|
+| C1-a | Factor de zona rígida **0,5** (antes 1) | Con 1, la deriva baja un 34 % y el momento de vano un 11 % frente a 0; 0,5 queda en medio. Para comparar con CYPE, 1 |
+| D4 (C1-g) | Axil de todos los pilares **×2** y torsión de las vigas de hormigón **×0,1** (`MODIFICADORES_D4`) | Sin la torsión reducida, el vano de una secundaria que acomete a una viga de borde sale un 27 % corto (lado inseguro). Sin el axil ×2, la cara de una viga interior pierde un 6 % por el acortamiento diferencial |
+| C1-c | Eje de la viga en el plano del forjado (sin cambios) | C1-5 |
+| C1-d | Diafragma rígido salvo en la planta más baja (sin cambios) | Como CYPECAD; el axil de las vigas no sale y habrá que marcarlo en C5 |
 
-Las tres se cambian con una opción, y la opción entra en la huella.
+- **Cómo se cambian:** con opciones de `compilar`, que entran en la huella. Los modificadores van por tipo de pieza y material, en (0, 100].
+- **Qué cambia en el código:** la versión del compilador pasa a `C1.1`. El resultado trae `hipotesis`, en texto, para la memoria de cálculo.
+- **Cómo se comprueba:**
+  - `opciones.test.ts` comprueba los valores por defecto;
+  - los modelos hechos a mano (criterio 2) y 1-022 (criterio 1) se compilan con las opciones con que se escribieron;
+  - la referencia congelada se regeneró con los nuevos valores, salvo 1-022, que va sin modificadores como su modelo de SAP2000;
+  - las metamórficas, el control «sin pérdidas» y el banco se volvieron a medir con los nuevos valores (tabla de criterios).
 
 ## 5. Pendiente
 
-- **Del usuario:**
-  - D4 (modificadores por defecto);
-  - la licencia ISC del mallador de C2 ya está admitida (2026-10-04);
-  - revisar los valores por defecto de C1-a, C1-c y C1-d.
+- **Del usuario:** nada que bloquee C2. La licencia ISC, C1-a y D4 se decidieron el 2026-10-04.
 - **Para C2:**
   - qué nudos entran en el diafragma según la geometría de la losa (C1-e);
   - los pilares de doble altura;

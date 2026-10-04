@@ -19,6 +19,7 @@
 - **D1 – Unidades:** kN–m, como Concreta (E en kN/m²).
 - **D2 – Forjado unidireccional:** se introduce como paño con reparto de cargas, pero se discretiza en viguetas como barras y se ven los esfuerzos por vigueta.
 - **D3 – Reticular:** multiplicadores por dirección sobre la losa maciza (f11…v23 y peso), calculados a partir de nervios y casetones. Los ábacos van macizos, con multiplicador 1. Hay que validarlo contra un modelo de SAP2000 del usuario.
+- **D4 – Modificadores de rigidez (2026-10-04):** por defecto, axil de todos los pilares ×2 y torsión de las vigas de hormigón ×0,1, por material (`MODIFICADORES_D4`); la flexión no se toca. Con ellos, el factor de zona rígida por defecto pasa a 0,5 (C1-a). Medidas en `validacion/c1/out_decisiones.txt`.
 - **D5 – Bandas de dimensionado de las losas:** automáticas y editables. El compilador propone las del Ap. I del CE A19 a partir de los ejes de los pilares, y el usuario puede moverlas, cambiar su anchura, partirlas o añadir otras. Sus bordes y las caras de los apoyos se siembran en la malla (E5-5), así que editar una banda obliga a recalcular.
 - **D9 – Tope de tamaño:** unas 7 plantas con 80 pilares por planta, que en sobremesa son ≈ 50 000 nudos y 300 000 GDL. El límite se fija en GDL según el dispositivo.
 - **D11 – Motor propio:**
@@ -118,11 +119,13 @@
     Se usa con `compilar(fisico)`. `traducirDiagnosticos` y `EsfuerzosPiezas` devuelven diagnósticos y esfuerzos a las piezas físicas.
   - **Regla del compilador:** la geometría dibujada no se mueve nunca. Las tolerancias deciden la conectividad, y el hueco hasta el nudo es un offset rígido.
   - **Validación:** `validacion/c1/` (1-022 como modelo físico, modelos hechos a mano, metamórficas, huellas V8/JSC, banco y referencia congelada).
-  - **Valores por defecto que el usuario tiene que revisar:**
-    - C1-a: zonas rígidas con factor 1;
+  - **Valores por defecto, decididos por el usuario el 2026-10-04:**
+    - C1-a: factor de zona rígida 0,5;
     - C1-c: eje de la viga en el plano del forjado (C1-5 lo mide);
     - C1-d: diafragma rígido salvo en la planta más baja;
-    - C1-g: sin modificadores hasta que se decida D4.
+    - D4: axil de pilares ×2 y torsión de vigas de hormigón ×0,1.
+
+    El compilador pasa a la versión C1.1 y deja estas hipótesis en `hipotesis`.
 - **Siguiente paso:**
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
   - compilador C2 (losas), con delaunator + constrainautor (ISC, admitida);

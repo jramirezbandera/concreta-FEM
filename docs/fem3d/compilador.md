@@ -52,13 +52,13 @@
 
 | # | Decisión | Por defecto | Por qué | Alternativa |
 |---|---|---|---|---|
-| C1-a | Nudos de dimensión finita | Zonas rígidas con factor 1: la viga es rígida dentro del pilar y el pilar dentro del canto de la viga más alta que le llega | CYPECAD trata el cruce como un «nudo de dimensión finita» (ccadmc01, p. 15). E2 ya prevé offsets desde las caras | `factorZonaRigida` en [0, 1]; con 0, como SAP2000 por defecto |
+| C1-a | Nudos de dimensión finita | Zonas rígidas con **factor 0,5** (decidido por el usuario el 2026-10-04): es rígida la mitad de la viga dentro del pilar y la mitad del pilar dentro del canto de la viga más alta que le llega | Con 1 (CYPECAD, ccadmc01, p. 15) el nudo es infinitamente rígido: en el edificio objetivo, la deriva baja un 34 % y el momento de vano un 11 % frente a 0; 0,5 queda en medio (`out_decisiones.txt`) | `factorZonaRigida` en [0, 1]: 1 para comparar con CYPE, 0 como SAP2000 por defecto |
 | C1-b | Viga excéntrica respecto al pilar | Se une al nudo del pilar con un offset que lleva la excentricidad, siempre que su eje pase por la huella del pilar | Sin penalización y sin mover la viga | — |
 | C1-c | Eje analítico de la viga | En el plano del forjado (sin offset vertical) | Con diafragma rígido, una viga con offset vertical trabaja como una T de ala infinitamente rígida. En un pórtico de 6 m con viga de 30×60, la flecha baja un 21 %, el momento en la cara sube un 16 % y aparece un axil de 87 kN que no existe (C1-5) | `insercion: "superior"` por viga, con aviso si la planta tiene diafragma rígido |
 | C1-d | Diafragma | Rígido en todas las plantas menos la más baja | Como CYPECAD. En la más baja suelen estar los arranques empotrados, y un GDL esclavo no puede llevar apoyo | `diafragma: "ninguno"` por planta. El semirrígido llega con las losas (C2) |
 | C1-e | Qué nudos entran en el diafragma | Todos los de la cota de la planta | Sin la geometría de la losa (C2) no se sabe dónde hay forjado | En C2, por la geometría de la losa |
 | C1-f | Un apoyo en ux, uy o rz de un nudo con diafragma rígido | Error con la planta y el apoyo | El motor no admite apoyos en GDL esclavos. Moverlo al maestro no es equivalente | Quitar el diafragma de esa planta |
-| C1-g | Modificadores de rigidez | Ninguno, hasta que se decida D4 | D4 sigue pendiente (S2). La recomendación es la de CYPECAD | `modificadores` por tipo de pieza |
+| C1-g | Modificadores de rigidez | **D4 (b)** (decidida el 2026-10-04): axil de todos los pilares ×2 y torsión de las vigas de hormigón ×0,1 | Sin la torsión reducida, el vano de una secundaria que acomete a una viga de borde sale un 27 % corto; sin el axil ×2, la cara de una viga interior pierde un 6 % (`out_decisiones.txt`) | `modificadores` por tipo de pieza y material, en (0, 100]; `{}` los quita |
 | C1-h | Peso propio | γ·A en vigas y pilares, de nudo a nudo, en el caso marcado | El de las losas sale de `pp` en C2 (H24). El solape viga–losa se resuelve allí | — |
 
 **Lo que C1 deja fuera:**
@@ -86,6 +86,4 @@
 ## Preguntas para el usuario (no bloquean C1)
 
 - **Licencia ISC:** admitida por el usuario el 2026-10-04 (regla 6 de `CLAUDE.md`). El mallador de C2 usará delaunator y constrainautor (H29).
-
-- **D4:** modificadores de rigidez por defecto (C1-g).
-- **C1-a, C1-c y C1-d** son decisiones de modelado con efecto del 5–35 % en rigidez. Se pueden cambiar por opción, pero el valor por defecto es criterio profesional.
+- **C1-a, C1-c, C1-d y D4:** decididas por el usuario el 2026-10-04 con las medidas de `validacion/c1/out_decisiones.txt`: factor de zona rígida 0,5, D4 (b) por material, y C1-c y C1-d como estaban.
