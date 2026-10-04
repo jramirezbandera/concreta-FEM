@@ -89,5 +89,13 @@
     - el worker se recicla tras cada cálculo (E4-1: la memoria es sobre todo JS y el worker no puede medirla);
     - límites provisionales por perfil de dispositivo.
   - **Validación:** `validacion/e4/`. El banco en Chrome (`chrome.ts`) da los mismos bits que Node. Su modo `--dispositivos` sirve para medir en el móvil.
-- **Siguiente paso:** E5 (Q y bandas: corte por fuerzas nodales y SPR, H18), o medir en el móvil y reducir la memoria JS del motor (pendientes de E4); lo decide el usuario.
+- **2026-10-04: fase E5 superada** (Q y bandas). Pasan los seis criterios. El informe está en `docs/fem3d/fase-e5.md`, con criterios, hallazgos E5-1…E5-7 y pendientes.
+  - **Ya en `src/motor/`:**
+    - `FuerzasNodales`: g = k·u − f_eq por elemento y fuerzas de cada restricción sobre sus nudos (cadenas resueltas desde las hojas);
+    - `Cortes`: esfuerzos [N, Vy, Vz, T, My, Mz] que atraviesan un plano recortado a un rectángulo, con el convenio de las barras. «fuerzas-nodales» es exacto y exige que el corte siga la malla; «campos» es mixto (campos sólo en las láminas que atraviesa) y da muestras para Wood–Armer;
+    - `CamposLaminas`: SPR por centroides con parches de dos coronas y Q por equilibrio, por regiones (las huellas quedan fuera).
+  - **S5 #3 cerrada:** el Q recuperado converge con orden 2 sin depender del espesor (−1,8 % con 16 elementos por vano).
+  - **Para el compilador (E5-5):** sembrar en la malla las caras de los apoyos y los bordes de las bandas. En las caras, la banda se dimensiona con el corte por fuerzas nodales.
+  - **Validación:** `validacion/e5/` (oráculo de equilibrio de los cortes, réplica de exp01d, Navier, losa plana de H25, banco y referencia congelada).
+- **Siguiente paso:** E6 (endurecimiento: ETABS 15, SAP 1-024, modelos SAP2000 del usuario, metamórficas y rendimiento), o medir en el móvil y reducir la memoria JS del motor (pendientes de E4); lo decide el usuario. D5 (quién define las bandas) sigue abierta.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

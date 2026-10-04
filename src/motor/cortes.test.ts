@@ -16,6 +16,7 @@ import { BASE_E5 } from "../../validacion/e5/fuerzasNodales.ts";
 import { laminaPlegada } from "../../validacion/e3/metamorficas.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { casosValidos } from "../pruebas/comparar.ts";
+import { carga, Constructor, seccionRectangularTimoshenko } from "../pruebas/constructor.ts";
 import { edificio } from "../pruebas/edificio.ts";
 import { matrizGiro } from "../pruebas/transformar.ts";
 import { DiagramasBarras } from "./barras.ts";
@@ -155,6 +156,19 @@ describe("criterio 5 de E5: diagnósticos de los cortes", () => {
     // malla de 1 m: sólo entra la lámina de y ∈ [2, 3] (centroide en y = +0,5 del corte)
     expect(r.extension!.y[0]).toBeCloseTo(0, 12);
     expect(r.extension!.y[1]).toBeCloseTo(1, 12);
+  });
+
+  it("una barra cuyos offsets cruzan el plano y vuelven es ambigua", () => {
+    const m = new Constructor();
+    const a = m.nudo(0, 0, 0);
+    const b = m.nudo(0, 0, 3);
+    m.barra(a, b, seccionRectangularTimoshenko(0.3, 0.3), [1, 0, 0], { offsets: { i: [1, 0, 0], j: [1, 0, 0] } });
+    m.apoyo(a);
+    m.caso("F", [carga(b, { fx: 2, fz: -5 })]);
+    const modelo = m.modelo();
+    const r = new Cortes(modelo).cortar({ origen: [0.5, 0, 1.5], x: [1, 0, 0], vz: [0, 0, 1], y: [-1, 1], z: [-5, 5] }, casosValidos(calcular(modelo)));
+    expect(r.valido).toBe(false);
+    expect(r.diagnosticos.map((d) => d.codigo)).toEqual(["corte/barra-ambigua"]);
   });
 
   it("definiciones no válidas y cortes vacíos", () => {

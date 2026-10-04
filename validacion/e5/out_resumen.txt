@@ -1,0 +1,30 @@
+# validacion/e5/resumen.ts — 2026-10-04
+## Criterio 1: fuerzas nodales (k·u autoequilibrado; Σg = P + R + C en cada nudo)
+lámina plegada: elementos 1.0e-13 · nudos 3.5e-13
+edificio E3 con diafragma y huellas: elementos 5.1e-14 · nudos 2.2e-12
+edificio E3 con muelles: elementos 1.0e-13 · nudos 1.1e-12
+
+## Criterio 2: corte por fuerzas nodales
+Cortes completos frente a −(cargas + reacciones del lado A):
+losa unidireccional (5 cortes): 6.2e-13
+lámina plegada (3 cortes): 3.2e-13
+edificio E3 con diafragma y huellas (4 cortes): 1.4e-12
+edificio E3 con diafragma, sin muro (2 cortes): 8.6e-13
+edificio E3 con muelles (3 cortes): 2.5e-13
+pórtico (2 cortes): 1.5e-15
+losa unidireccional (mallas 6 × 2 y 12 × 5, todas las líneas): My 3.7e-14 · Vz 2.3e-14 · N, Vy, T, Mz 7.2e-15
+ménsula con ν = 0,3: 9.5e-14
+barra cortada frente a su diagrama (pórtico, 4 secciones): 0.0e+0
+Metamórficas (giro, renumeración, inversión de barras y de láminas):
+lámina plegada: 2.2e-12
+pórtico: 2.3e-14
+edificio E3 con muelles: 1.5e-12
+edificio E3 con diafragma: 4.2e-12
+
+## Criterio 3: campos recuperados (SPR); la convergencia va en out_spr.txt
+patch test de MacNeal–Harder, isótropo: N 1.5e-11 · M 1.5e-11 · Q 5.4e-11
+patch test de MacNeal–Harder, reticular con el eje 1 a 30°: N 7.7e-15 · M 4.8e-15 · Q 2.0e-14
+ménsula con ν = 0: 8 × 2 5.7e-13 · 3 × 3 1.7e-12 · una fila (6 × 1) 1.2e-13
+lámina plegada: giro 4.8e-13 · renumeración 7.2e-13 · inversión del orden de nudos 3.0e-13
+placa de Navier ortótropa: giro — · renumeración 5.6e-14 · inversión del orden de nudos 5.9e-14
+ejes de usuario mezclados en una región isótropa (eje 1 a 37° en la mitad de las láminas): 7.5e-14
