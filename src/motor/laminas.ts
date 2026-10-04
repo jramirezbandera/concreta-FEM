@@ -189,6 +189,8 @@ function coeficientesJacobiano(xy: ArrayLike<number>): [number, number, number] 
  * (Gauss 2×2 o a lo largo del tramo, con las funciones bilineales) y la resultante real, que se
  * calcula por otro camino (integrales cerradas de la carga sobre el cuadrilátero, el tramo o el
  * punto) para que un error en las equivalentes rompa el equilibrio. Los defectos van a `diag`.
+ * Con `porLamina`, deja además en él las equivalentes de cada lámina cargada (24, globales), que
+ * son las que necesitan sus fuerzas nodales (E5).
  */
 export function cargasDeLaminasDelCaso(
   idCaso: string,
@@ -197,6 +199,7 @@ export function cargasDeLaminasDelCaso(
   modelo: ModeloAnalitico,
   geo: Geometria,
   diag: Diagnosticos,
+  porLamina?: Map<number, Float64Array>,
 ): CargasDeLaminas {
   const res: Resultante = { F: [0, 0, 0], M: [0, 0, 0], escalaF: 0, escalaM: 0 };
   if (cargas.length === 0) return { equivalentes: null, resultante: res };
@@ -359,6 +362,11 @@ export function cargasDeLaminasDelCaso(
       continue;
     }
     for (let a = 0; a < 4; a++) for (let k = 0; k < 6; k++) eq[6 * la.nudos[a]! + k] += f[6 * a + k]!;
+    if (porLamina) {
+      let fl = porLamina.get(c.lamina);
+      if (!fl) porLamina.set(c.lamina, (fl = new Float64Array(24)));
+      for (let q = 0; q < 24; q++) fl[q] += f[q]!;
+    }
   }
   return { equivalentes: eq, resultante: res };
 }
