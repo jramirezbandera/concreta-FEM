@@ -167,7 +167,11 @@ export function edificio(o: OpcionesEdificio): Edificio {
             liberaciones: id === "N" && enPilar(a2, b2) ? { j: [false, false, false, false, true, false] } : undefined,
           });
           cargasBarra[0]!.push({ tipo: "distribuida", barra: b, ejes: "global", qa: [0, 0, -7] });
-          if (s === 0 && id === "S") cargasBarra[0]!.push({ tipo: "puntual", barra: b, ejes: "global", x: 0.3, F: [0, 0, -15], M: [0, 2, 0] });
+          if (s === 0 && id === "S") {
+            // en x = 0,3 m del tramo flexible; con mallas de menos de 0,45 m no cabe y va a su centro
+            const Lf = Math.hypot((a2 - a1) * dx, (b2 - b1) * dy) - ri - rj;
+            cargasBarra[0]!.push({ tipo: "puntual", barra: b, ejes: "global", x: Lf >= 0.3 ? 0.3 : Lf / 2, F: [0, 0, -15], M: [0, 2, 0] });
+          }
         }
       };
       borde(0, 0, 1, 0, NX, "S");
