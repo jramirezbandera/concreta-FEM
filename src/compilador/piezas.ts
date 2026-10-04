@@ -20,6 +20,7 @@ import type { Seis, Vec3 } from "../motor/modelo.ts";
 import type { Liberacion, Pilar } from "./fisico.ts";
 import type { Losas } from "./losas.ts";
 import type { SeccionCompilada } from "./secciones.ts";
+import { proyectar } from "./geometria2d.ts";
 import { cuerdaEnTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
 
@@ -63,6 +64,8 @@ export interface BarraP {
   liberaciones?: { i?: Seis<boolean>; j?: Seis<boolean> };
   /** Estaciones de i, i', j' y j a lo largo de la pieza. */
   s: [number, number, number, number];
+  /** Barra auxiliar de C3-e: prolonga la viga dentro de un muro; no es un tramo de la pieza. */
+  auxiliar?: true;
 }
 
 export interface Piezas {
@@ -240,7 +243,34 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     }
   }
 
-  // Apoyos: vínculos de las bases de los pilares y apoyos físicos (se suman)
+  // Barras auxiliares (C3-e, H05): la viga sigue dentro del muro por su fila de nudos, con su
+  // sección, sin cargas y sin liberaciones
+  for (const ax of losas.auxiliares) {
+    const tv = ax.tramo;
+    const sc = ctx.secciones.get(tv.viga.seccion)!;
+    const z = ctx.cotas[tv.k]!;
+    const X = (n: number): Vec3 => [topo.nudos[n]!.x, topo.nudos[n]!.y, z];
+    const s = tv.s0 + proyectar([topo.nudos[ax.nudos[0]!]!.x, topo.nudos[ax.nudos[0]!]!.y], tv.t).sigma;
+    for (let j = 0; j + 1 < ax.nudos.length; j++) {
+      barras.push({
+        id: `${tv.viga.id}:aux${tv.indice + 1}.${barras.filter((b) => b.auxiliar && b.pieza === tv.viga.id).length + 1}`,
+        pieza: tv.viga.id,
+        tipo: "viga",
+        tramo: tv.indice,
+        i: ax.nudos[j]!,
+        j: ax.nudos[j + 1]!,
+        ip: X(ax.nudos[j]!),
+        jp: X(ax.nudos[j + 1]!),
+        seccion: sc.barra,
+        material: sc.material,
+        vz: [0, 0, 1],
+        s: [s, s, s, s],
+        auxiliar: true,
+      });
+    }
+  }
+
+  // Apoyos: vínculos de las bases de los pilares y de los muros, y apoyos físicos (se suman)
   const apoyos = new Map<number, boolean[]>();
   const origen = new Map<number, string>();
   const apoyar = (n: number, c: readonly boolean[], id: string) => {
@@ -271,6 +301,10 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     if (n !== undefined) apoyar(n, a.coartados, a.id);
   }
   for (const a of ctx.apoyosLineales) for (const n of losas.apoyosLineales.get(a.id) ?? []) apoyar(n, a.coartados, a.id);
+  for (const [id, ns] of losas.apoyosMuros) {
+    const c = ctx.muroDe.get(id)!.muro.base === "articulado" ? [true, true, true, false, false, false] : [true, true, true, true, true, true];
+    for (const n of ns) apoyar(n, c, id);
+  }
   // Un apoyo en un esclavo de una huella: el motor no lo admite (como C1-f)
   const esclavos = new Map<number, string>();
   for (const h of losas.huellas) for (const n of h.esclavos) esclavos.set(n, h.pilar);
@@ -287,6 +321,7 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
   const diafragmas: { k: number; nudos: number[] }[] = [];
   const porK = new Map<number, number[]>();
   topo.nudos.forEach((nd, n) => {
+    if (nd.z !== undefined) return; // nudo intermedio de un muro (C3): no está en la cota de la planta
     let l = porK.get(nd.k);
     if (!l) porK.set(nd.k, (l = []));
     l.push(n);

@@ -1,7 +1,8 @@
 /**
  * Modelo físico del compilador (C1: plantas, pilares, vigas, apoyos, casos y cargas; C2: losas,
- * apoyos lineales, bandas y cargas de superficie y lineales). Es lo que el usuario describe; el
- * compilador lo convierte en el `ModeloAnalitico` del motor (`docs/fem3d/compilador.md`).
+ * apoyos lineales, bandas y cargas de superficie y lineales; C3: muros y empujes). Es lo que el
+ * usuario describe; el compilador lo convierte en el `ModeloAnalitico` del motor
+ * (`docs/fem3d/compilador.md`).
  *
  * Convenios:
  * - Unidades kN y m (D1); los módulos elásticos, en kN/m², salvo los datos de material que se
@@ -26,6 +27,12 @@
  *   y sus huecos son polígonos simples en planta, en cualquier sentido y sin repetir el primer
  *   punto. Los bordes van a ejes: un borde que se apoya en una viga se dibuja sobre su eje (C2-c).
  *   Las láminas tienen la normal hacia +Z y el eje 1 en la dirección `eje1` (E3-2).
+ * - Muros (C3): verticales, de forjado a forjado, con el plano medio sobre su eje en planta (una
+ *   polilínea; cada tramo es un paño plano). Los bordes de las losas que se apoyan en un muro van
+ *   sobre su eje (C3-b). En alzado, la estación s va a lo largo del eje desde su primer punto
+ *   (sumando sus tramos) y la altura z, desde la cota de su base. Sus láminas tienen el eje 1
+ *   horizontal en el sentido del tramo, el 2 hacia +Z y el 3 (la normal) a la derecha del sentido
+ *   del eje en planta. «Izquierdo» y «derecho» son los lados del eje mirando en su sentido.
  */
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
@@ -191,13 +198,33 @@ export type CargaFisica =
       zona?: readonly Vec2[];
     }
   | {
-      /** Carga lineal uniforme sobre una polilínea de una losa (C2), en kN/m y ejes globales. */
+      /**
+       * Carga lineal uniforme sobre una polilínea de una planta (C2), en kN/m y ejes globales: sobre
+       * una losa o sobre el eje de un muro (C3).
+       */
       tipo: "lineal";
       id: string;
       caso: string;
       planta: string;
       puntos: readonly Vec2[];
       q: Vec3;
+    }
+  | {
+      /**
+       * Empuje sobre un muro (C3-h): presión normal a su cara del lado `lado` (donde está el terreno
+       * o el agua), que empuja hacia el otro lado. Vale `p0` a la altura `z0` y `p1` a la `z1` (sobre
+       * la base del muro, m), varía linealmente entre ellas y es nula fuera; kN/m². Va sobre el muro
+       * entero, sin sus huecos.
+       */
+      tipo: "empuje";
+      id: string;
+      caso: string;
+      muro: string;
+      lado: "izquierdo" | "derecho";
+      z0: number;
+      z1: number;
+      p0: number;
+      p1: number;
     };
 
 /** Losa maciza (C2): una lámina plana en el plano de su planta. */
@@ -219,7 +246,7 @@ export interface Losa {
   eje1?: number;
 }
 
-/** Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa. */
+/** Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa o del eje de un muro (C3). */
 export interface ApoyoLineal {
   id: string;
   planta: string;
@@ -242,6 +269,37 @@ export interface Banda {
   ancho: number;
 }
 
+/** Hueco de un muro (C3): rectángulo en su alzado, dentro de un tramo. */
+export interface HuecoMuro {
+  /** Estaciones de sus bordes a lo largo del eje del muro, m. */
+  desde: number;
+  hasta: number;
+  /** Alturas de sus bordes sobre la base del muro, m. */
+  z0: number;
+  z1: number;
+}
+
+/** Muro (C3): láminas verticales de forjado a forjado, sobre una polilínea en planta. */
+export interface Muro {
+  id: string;
+  nombre?: string;
+  /** Eje en planta, m: polilínea de al menos dos puntos; cada tramo es un paño plano. */
+  puntos: readonly Vec2[];
+  /** Planta de su base y planta de su cabeza, como los pilares. */
+  desde: string;
+  hasta: string;
+  /** Espesor, m. */
+  espesor: number;
+  /** Material: hormigón o general. */
+  material: string;
+  /**
+   * Vínculo de la base (C3-f). Por defecto, "empotrado" (todos los nudos de la base). "ninguno": el
+   * muro nace sobre una viga, una losa u otro muro, que tienen que llegarle.
+   */
+  base?: "empotrado" | "articulado" | "ninguno";
+  huecos?: readonly HuecoMuro[];
+}
+
 export interface ModeloFisico {
   plantas: readonly Planta[];
   materiales: readonly Material[];
@@ -252,6 +310,7 @@ export interface ModeloFisico {
   losas?: readonly Losa[];
   apoyosLineales?: readonly ApoyoLineal[];
   bandas?: readonly Banda[];
+  muros?: readonly Muro[];
   casos: readonly CasoFisico[];
   cargas?: readonly CargaFisica[];
 }
@@ -313,7 +372,10 @@ export interface OpcionesCompilacion {
    * quita todos.
    */
   modificadores?: ModificadoresPiezas;
-  /** Tamaño de malla de las losas, h en m (C2-a): la retícula de triángulos va a 2h. Por defecto, 0,75. */
+  /**
+   * Tamaño de malla de las losas y los muros, h en m (C2-a, C3-a): la retícula de triángulos de las
+   * losas va a 2h, y los muros llevan elementos de ~h. Por defecto, 0,75.
+   */
   tamanoMalla?: number;
 }
 

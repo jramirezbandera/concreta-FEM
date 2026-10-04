@@ -1,12 +1,12 @@
 /**
- * Compilador: modelo físico → modelo analítico del motor (C1: barras; C2: losas). Plan, reglas y
- * decisiones por defecto en `docs/fem3d/compilador.md`.
+ * Compilador: modelo físico → modelo analítico del motor (C1: barras; C2: losas; C3: muros). Plan,
+ * reglas y decisiones por defecto en `docs/fem3d/compilador.md`.
  *
  * Pasos, cada uno con sus diagnósticos (si alguno deja un error, la compilación no sigue):
  * 1. Esquema, referencias y cotas (`validar.ts`).
  * 2. Topología por planta con dos tolerancias (`topologia.ts`).
- * 2b. Losas: arreglo plano, malla y su unión con pilares (huellas), vigas, apoyos y cargas
- *     (`losas.ts`).
+ * 2b. Losas y muros: arreglo plano, estaciones de los muros, malla y su unión con pilares
+ *     (huellas), vigas, apoyos y cargas, y rejilla de los muros (`losas.ts`, `muros.ts`).
  * 3. Barras con zonas rígidas y excentricidades, apoyos y diafragmas (`piezas.ts`).
  * 4. Numeración canónica de los nudos: por cota, x e y; los maestros de diafragma al final.
  * 5. Cargas y peso propio (`cargas.ts`), con el control «sin pérdidas» por caso.
@@ -25,23 +25,27 @@ import { construirLosas, direccionEje1, type Losas } from "./losas.ts";
 import { VERSIONES_MALLADOR } from "./mallado.ts";
 import type { Mapeo, NudoMapeado } from "./mapeo.ts";
 import { construirPiezas, diafragmaDe, type BarraP, type Piezas } from "./piezas.ts";
-import { construirTopologia } from "./topologia.ts";
+import { construirTopologia, cotaNudo } from "./topologia.ts";
 import { validar, type Contexto } from "./validar.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "C2.0";
+export const VERSION_COMPILADOR = "C3.0";
 
 export interface EstadisticasCompilacion {
   nudos: number;
   barras: number;
-  /** Láminas de las losas (C2). */
+  /** Láminas de las losas (C2) y de los muros (C3). */
   laminas: number;
+  /** Láminas de los muros (C3). */
+  laminasMuros: number;
   diafragmas: number;
   /** Huellas de pilar en losa (enlaces rígidos, C2-d). */
   huellas: number;
   /** Calidad de la malla de las losas: jacobiano escalado mínimo y cuadriláteros bajo el umbral. */
   malla: { jacobianoMin: number; bajos: number };
+  /** Muros (C3): relación de aspecto máxima de sus elementos, cuántos pasan de 4, y barras auxiliares (C3-e). */
+  muros: { aspectoMax: number; altos: number; auxiliares: number };
   /** Peor error relativo del control «sin pérdidas» entre los casos (regla 3 del plan). */
   sinPerdidas: { fuerzas: number; momentos: number };
   /** Milisegundos de cada paso. */
@@ -78,7 +82,7 @@ function fisicoCanonico(f: ModeloFisico): unknown {
   const clave = (x: unknown, campo = "id") => (typeof x === "object" && x !== null ? String((x as Record<string, unknown>)[campo]) : "");
   const ordenar = (v: unknown, campo = "id") => (Array.isArray(v) ? [...v].sort((a, b) => (clave(a, campo) < clave(b, campo) ? -1 : clave(a, campo) > clave(b, campo) ? 1 : 0)) : v);
   const r: Record<string, unknown> = { ...f };
-  for (const k of ["materiales", "secciones", "vigas", "apoyos", "cargas", "losas", "apoyosLineales", "bandas"]) if (r[k] !== undefined) r[k] = ordenar(r[k]);
+  for (const k of ["materiales", "secciones", "vigas", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros"]) if (r[k] !== undefined) r[k] = ordenar(r[k]);
   r.pilares = Array.isArray(f.pilares)
     ? (ordenar(f.pilares) as unknown[]).map((p) => (typeof p === "object" && p !== null && Array.isArray((p as Record<string, unknown>).tramos) ? { ...p, tramos: ordenar((p as Record<string, unknown>).tramos, "planta") } : p))
     : f.pilares;
@@ -134,7 +138,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   if (diag.hayErrores) return fallo();
 
   // Numeración canónica: por cota, x e y (no depende del orden de la entrada)
-  const zDe = (n: number) => ctx.cotas[topo.nudos[n]!.k]!;
+  const zDe = (n: number) => cotaNudo(ctx, topo.nudos[n]!);
   // Por coordenadas cuantizadas a CUANTO_ORDEN y luego exactas: dos nudos con la misma x salvo un
   // ulp (el seno de un giro difiere entre V8 y JSC, COM-12) se ordenan por su y en los dos motores
   const qx = (n: number) => Math.round(topo.nudos[n]!.x / CUANTO_ORDEN);
@@ -190,6 +194,13 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     const [ex, ey] = direccionEje1(lc.losa.eje1 ?? 0);
     return { id: `${lc.losa.id}:${k}`, nudos: l.nudos.map((n) => nuevo[n]!) as unknown as LaminaAnalitica["nudos"], material: lc.material, eje1: [ex, ey, 0] };
   });
+  // Láminas de los muros (C3), tras las de las losas: eje 1 horizontal a lo largo del tramo
+  for (const lm of losas.muros) {
+    const mw = ctx.muros[lm.w]!;
+    const k = (cuenta.get(mw.muro.id) ?? 0) + 1;
+    cuenta.set(mw.muro.id, k);
+    laminas.push({ id: `${mw.muro.id}:${k}`, nudos: lm.nudos.map((n) => nuevo[n]!) as unknown as LaminaAnalitica["nudos"], material: mw.material, eje1: [lm.eje1[0], lm.eje1[1], 0] });
+  }
 
   // Barras con offsets (del nudo al extremo del tramo flexible)
   const offset = (p: Vec3, n: number): Vec3 | undefined => {
@@ -236,9 +247,12 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     const nodales = [...cc.nodales]
       .map(([n, f]) => ({ nudo: nuevo[n]!, f: f as unknown as readonly [number, number, number, number, number, number] }))
       .sort((a, b) => a.nudo - b.nudo);
-    const enLaminas: CargaLamina[] = [...cc.laminas]
+    const enLaminas: CargaLamina[] = [
+      ...[...cc.laminas].map(([l, q]): [number, CargaLamina] => [l, { tipo: "superficie", lamina: l, ejes: "global", q: [q[0]!, q[1]!, q[2]!] }]),
+      ...[...cc.laminasNodos].map(([l, q]): [number, CargaLamina] => [l, { tipo: "superficie", lamina: l, ejes: "global", q: q.map((v) => [v[0]!, v[1]!, v[2]!] as const) as unknown as readonly [Vec3, Vec3, Vec3, Vec3] }]),
+    ]
       .sort((a, b) => a[0] - b[0])
-      .map(([l, q]) => ({ tipo: "superficie", lamina: l, ejes: "global", q: [q[0]!, q[1]!, q[2]!] }));
+      .map(([, cl]) => cl);
     return { id: c.id, ...(nodales.length ? { nodales } : {}), ...(cc.barras.length ? { barras: cc.barras } : {}), ...(enLaminas.length ? { laminas: enLaminas } : {}) };
   });
   const modelo: ModeloAnalitico = { nudos, barras, ...(laminas.length ? { laminas } : {}), apoyos, restricciones, casos };
@@ -262,7 +276,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   if (diag.hayErrores) return fallo();
 
   const piezasMap: Record<string, number[]> = {};
-  piezas.barras.forEach((b, i) => (piezasMap[b.pieza] ??= []).push(i));
+  piezas.barras.forEach((b, i) => !b.auxiliar && (piezasMap[b.pieza] ??= []).push(i));
   const nudosPilar: Record<string, number> = {};
   for (const [clave, n] of topo.nudoPilar) {
     const at = clave.lastIndexOf("@");
@@ -273,17 +287,24 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   for (const [id, n] of losas.apoyosPuntuales) apoyosMap[id] = nuevo[n]!;
   const mapeo: Mapeo = {
     nudos: mapNudos,
-    barras: piezas.barras.map((b) => ({ pieza: b.pieza, tipo: b.tipo, tramo: b.tramo, s: b.s })),
+    barras: piezas.barras.map((b) => ({ pieza: b.pieza, tipo: b.tipo, tramo: b.tramo, s: b.s, ...(b.auxiliar ? { auxiliar: true as const } : {}) })),
     restricciones: mapRestr,
     piezas: piezasMap,
     nudosPilar,
     apoyos: apoyosMap,
   };
   if (laminas.length) {
-    mapeo.laminas = losas.laminas.map((l) => ({ losa: ctx.losas[l.losa]!.losa.id }));
-    const porLosa: Record<string, number[]> = {};
-    losas.laminas.forEach((l, i) => (porLosa[ctx.losas[l.losa]!.losa.id] ??= []).push(i));
-    mapeo.losas = porLosa;
+    mapeo.laminas = [...losas.laminas.map((l) => ({ losa: ctx.losas[l.losa]!.losa.id })), ...losas.muros.map((lm) => ({ muro: ctx.muros[lm.w]!.muro.id }))];
+    if (losas.laminas.length) {
+      const porLosa: Record<string, number[]> = {};
+      losas.laminas.forEach((l, i) => (porLosa[ctx.losas[l.losa]!.losa.id] ??= []).push(i));
+      mapeo.losas = porLosa;
+    }
+    if (losas.muros.length) {
+      const porMuro: Record<string, number[]> = {};
+      losas.muros.forEach((lm, i) => (porMuro[ctx.muros[lm.w]!.muro.id] ??= []).push(losas.laminas.length + i));
+      mapeo.muros = porMuro;
+    }
   }
   marca("mapeo");
   return {
@@ -300,6 +321,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       diafragmas: piezas.diafragmas.length,
       huellas: losas.huellas.length,
       malla: { jacobianoMin: losas.malla.jacobianoMin, bajos: losas.malla.bajos },
+      laminasMuros: losas.muros.length,
+      muros: { aspectoMax: losas.aspectoMuros.max, altos: losas.aspectoMuros.altos, auxiliares: piezas.barras.filter((b) => b.auxiliar).length },
       sinPerdidas,
       tiempos,
     },
@@ -309,7 +332,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
 const coma = (x: number) => String(x).replace(".", ",");
 const NOMBRE_MATERIAL = { hormigon: "de hormigón", acero: "de acero", general: "de material general" } as const;
 
-/** Las hipótesis de modelado de una compilación, en texto (C1-a, C1-c, C1-d, D4 y C2). */
+/** Las hipótesis de modelado de una compilación, en texto (C1-a, C1-c, C1-d, D4, C2 y C3). */
 function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined): string[] {
   const h: string[] = [];
   h.push(
@@ -345,6 +368,19 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     h.push(
       `Peso propio de las losas desde su pp (${ctx.losas.map((l) => `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).`,
     );
+  }
+  if (ctx.muros.length) {
+    const aux = piezas.barras.filter((b) => b.auxiliar).length;
+    h.push(
+      `Muros mallados con láminas DKMQ con membrana con drilling en rejilla por paño: columnas en las estaciones de su eje (las mismas en todas sus plantas) y en sus puntos medios, a ~${coma(op.tamanoMalla)} m y con al menos 8 elementos por tramo recto (H17), y filas a ≤ ${coma(op.tamanoMalla)} m (${losas.muros.length} láminas; relación de aspecto máxima ${coma(Number(losas.aspectoMuros.max.toFixed(2)))}).`,
+    );
+    h.push(
+      "Encuentros de los muros: comparten los nudos de sus aristas con los otros muros y con las losas (a ejes); en la cota de una planta, los nudos del muro en la huella de un pilar van con su enlace rígido, y entre plantas el pilar y el muro no se unen. Los nudos del muro en la cota de una planta entran en el diafragma con la misma regla que el resto, también los de lo alto de los dinteles (C3-d).",
+    );
+    h.push(
+      `Las vigas que corren por el eje de un muro se parten en sus nudos${aux ? `; las que acaban en el extremo de un muro en su plano se prolongan dentro con ${aux} barras auxiliares de su sección a lo largo de su canto (C3-e, H05)` : ""}. Las vigas perpendiculares que acaban en un muro se unen en un nudo (C3-i).`,
+    );
+    h.push("Peso propio de los muros: γ·t por m² de alzado sin huecos, de forjado a forjado, menos el solape con las losas (C3-g).");
   }
   return h;
 }

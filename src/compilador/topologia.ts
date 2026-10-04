@@ -24,12 +24,19 @@
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Pilar, Vec2, Viga } from "./fisico.ts";
 import { cortarTramos, cuerdaHuella, dist, distanciaAHuella, huellaPilar, proyectar, radioHuella, RejillaHash, tramo, type Huella, type Tramo2D } from "./geometria2d.ts";
-import { distanciaABorde, puntoEnRegion, type Region } from "./poligonos.ts";
+import { distanciaABorde, distanciaASegmento, puntoEnRegion, type Region } from "./poligonos.ts";
 
 /** Distancia de un punto a una región (0 dentro). */
 export function distanciaARegion(q: Vec2, r: Region): number {
   if (puntoEnRegion(q, r)) return 0;
   return Math.min(distanciaABorde(q, r.contorno), ...r.huecos.map((h) => distanciaABorde(q, h)));
+}
+
+/** Distancia de un punto a una polilínea abierta. */
+export function distanciaAPolilinea(q: Vec2, p: readonly Vec2[]): number {
+  let d = Infinity;
+  for (let i = 1; i < p.length; i++) d = Math.min(d, distanciaASegmento(q, p[i - 1]!, p[i]!));
+  return d;
 }
 import type { Contexto } from "./validar.ts";
 
@@ -42,13 +49,18 @@ export interface PuntoPilar {
 }
 
 export interface NudoT {
-  /** Planta (índice de arriba abajo). */
+  /** Planta (índice de arriba abajo); en un nudo intermedio de un muro, la de la cabeza de su paño. */
   k: number;
   x: number;
   y: number;
+  /** Cota de un nudo intermedio de un muro (C3), entre dos plantas; sin ella, la de su planta. */
+  z?: number;
   fisicos: Set<string>;
   pilar: PuntoPilar | null;
 }
+
+/** Cota de un nudo de la topología. */
+export const cotaNudo = (ctx: { cotas: readonly number[] }, nd: NudoT): number => nd.z ?? ctx.cotas[nd.k]!;
 
 export interface TramoViga {
   /** Índice global del tramo (orden canónico: planta, viga por id, tramo). */
@@ -361,8 +373,9 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
         }
       }
       if (n < 0) {
-        // En una losa lo coloca su malla (C2)
+        // En una losa lo coloca su malla (C2); en el eje de un muro, sus estaciones (C3)
         if (ctx.losas.some((l) => ctx.planta.get(l.losa.planta) === k && (puntoEnRegion(Q, l.region) || distanciaARegion(Q, l.region) <= epsSnap))) continue;
+        if (ctx.muros.some((w) => k >= w.kh && k <= w.kb && distanciaAPolilinea(Q, w.muro.puntos) <= 2 * epsSnap)) continue;
         diag.error("apoyo/sin-destino", `El apoyo ${ap.id} no cae sobre ningún pilar, nudo, viga ni losa de la planta ${ap.planta} (tolerancia ${cm(epsSnap)}).`, [ap.id]);
         continue;
       }

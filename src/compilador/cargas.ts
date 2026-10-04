@@ -13,6 +13,10 @@
  *   rectangular de hormigón bajo losa pesa sólo su descuelgue (C2-g). Las cargas de superficie van
  *   por lámina entera (las zonas están sembradas en la malla), las lineales a los nudos de sus
  *   aristas y las puntuales que caen en una losa a su vértice (C2-h).
+ * - Muros (C3): pesan γ·t por lámina, menos su solape con las losas, que va como carga lineal hacia
+ *   arriba en la cota de la planta (C3-g). Los empujes van por lámina con su valor en cada nudo
+ *   (bilineal: exacto con una ley lineal en z, C3-h). Su resultante física se calcula por franjas
+ *   entre estaciones, sin las láminas, restando los huecos.
  * - Sin pérdidas (regla 3 del plan): la resultante física de cada caso (F y M respecto al centro
  *   del modelo, calculada sobre la pieza entera) tiene que coincidir con la analítica (leída del
  *   modelo analítico ya montado, con sus offsets) a 1e-9. La de las losas se calcula sin la malla,
@@ -22,10 +26,11 @@ import type { CargaBarra, ModeloAnalitico, Vec3 } from "../motor/modelo.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Vec2, Viga } from "./fisico.ts";
 import type { Losas } from "./losas.ts";
+import type { PanoMuro, PlanMuros } from "./muros.ts";
 import type { Piezas, Recta } from "./piezas.ts";
 import { areaConSigno, momentosInterseccion, momentosRegion, puntoEnRegion, type Momentos, type Region } from "./poligonos.ts";
 import type { Topologia } from "./topologia.ts";
-import { seccionTramo } from "./topologia.ts";
+import { cotaNudo, seccionTramo } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
 
 export const TOL_SIN_PERDIDAS = 1e-9;
@@ -71,11 +76,43 @@ function sumarLineal(r: Resultante, X1: readonly number[], e: readonly number[],
 export interface CargasCompiladas {
   /**
    * Por caso: cargas nodales (por nudo provisional), cargas de barra (por barra de `piezas`) y
-   * cargas de superficie uniformes y globales por lámina (por índice de lámina, ya canónico).
+   * cargas de superficie globales por lámina (por índice de lámina, ya canónico): uniformes o con
+   * un valor por nudo (empujes, C3-h).
    */
-  casos: { nodales: Map<number, number[]>; barras: CargaBarra[]; laminas: Map<number, number[]> }[];
+  casos: { nodales: Map<number, number[]>; barras: CargaBarra[]; laminas: Map<number, number[]>; laminasNodos: Map<number, number[][]> }[];
   /** Por caso: resultante física respecto a `centro`. */
   fisicas: Resultante[];
+}
+
+/**
+ * Tramos de cota de la franja de un paño de muro (de σ medio `sm`) dentro de [z0, z1] y fuera de
+ * sus huecos.
+ */
+function franjasLibres(plan: PlanMuros, pa: PanoMuro, sm: number, z0: number, z1: number): [number, number][] {
+  const huecos = plan.huecos[pa.w]!.filter((hh) => hh.i === pa.i && sm > Math.min(hh.sa, hh.sb) && sm < Math.max(hh.sa, hh.sb))
+    .map((hh) => [hh.z0, hh.z1] as const)
+    .sort((a, b) => a[0] - b[0]);
+  const r: [number, number][] = [];
+  let z = z0;
+  for (const [a, b] of huecos) {
+    if (b <= z) continue;
+    if (a >= z1) break;
+    if (a > z) r.push([z, Math.min(a, z1)]);
+    z = Math.max(z, b);
+  }
+  if (z < z1) r.push([z, z1]);
+  return r.filter(([a, b]) => b > a);
+}
+
+/** Franjas de un paño de muro entre estaciones: origen en planta, longitud, dirección y σ medio. */
+function franjas(pa: PanoMuro): { A: Vec2; L: number; u: Vec2; sm: number }[] {
+  const r: { A: Vec2; L: number; u: Vec2; sm: number }[] = [];
+  for (let j = 0; j + 1 < pa.estaciones.length; j++) {
+    const [A, B] = [pa.estaciones[j]!, pa.estaciones[j + 1]!];
+    const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+    r.push({ A, L, u: [(B[0] - A[0]) / L, (B[1] - A[1]) / L], sm: (pa.sigmas[2 * j]! + pa.sigmas[2 * j + 2]!) / 2 });
+  }
+  return r;
 }
 
 /** Suma una carga de superficie uniforme q sobre una figura de momentos m, a la cota z (relativa al centro). */
@@ -133,15 +170,23 @@ function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: reado
 }
 
 export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, losas: Losas, centro: Vec3, diag: Diagnosticos): CargasCompiladas {
-  const casos = ctx.casos.map(() => ({ nodales: new Map<number, number[]>(), barras: [] as CargaBarra[], laminas: new Map<number, number[]>() }));
+  const casos = ctx.casos.map(() => ({ nodales: new Map<number, number[]>(), barras: [] as CargaBarra[], laminas: new Map<number, number[]>(), laminasNodos: new Map<number, number[][]>() }));
   const lamina = (c: number, l: number, q: readonly number[]) => {
     const m = casos[c]!.laminas;
     let v = m.get(l);
     if (!v) m.set(l, (v = [0, 0, 0]));
     for (let i = 0; i < 3; i++) v[i]! += q[i]!;
   };
+  const laminaNodos = (c: number, l: number, q: readonly (readonly number[])[]) => {
+    const m = casos[c]!.laminasNodos;
+    let v = m.get(l);
+    if (!v) m.set(l, (v = [0, 1, 2, 3].map(() => [0, 0, 0])));
+    for (let n = 0; n < 4; n++) for (let i = 0; i < 3; i++) v[n]![i]! += q[n]![i]!;
+  };
+  // Las láminas de los muros van tras las de las losas en el modelo analítico
+  const nLosas = losas.laminas.length;
   const fisicas = ctx.casos.map(resultanteCero);
-  const Xn = (n: number): V => [topo.nudos[n]!.x, topo.nudos[n]!.y, ctx.cotas[topo.nudos[n]!.k]!];
+  const Xn = (n: number): V => [topo.nudos[n]!.x, topo.nudos[n]!.y, cotaNudo(ctx, topo.nudos[n]!)];
   const P = (r: Recta, sigma: number): V => mas(r.O, por(r.e, sigma));
   const aGlobal = (r: Recta, ejes: "global" | "local", q: readonly number[]): V =>
     ejes === "global" ? [q[0]!, q[1]!, q[2]!] : mas(mas(por(r.ex, q[0]!), por(r.ey, q[1]!)), por(r.ez, q[2]!));
@@ -244,6 +289,42 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     ctx.losas.forEach((l, i) => {
       if (l.pp > 0 && losas.laminas.some((x) => x.losa === i)) sumarSuperficie(fisicas[cPeso]!, desplazar(momentosRegion(losas.regiones[i]!)), cota(l.losa.planta), [0, 0, -l.pp]);
     });
+    // Muros (C3-g): γ·t por lámina; la física, por franjas sin los huecos
+    losas.muros.forEach((lm, j) => {
+      const m = ctx.muros[lm.w]!;
+      if (m.gamma * m.material.t > 0) lamina(cPeso, nLosas + j, [0, 0, -m.gamma * m.material.t]);
+    });
+    const plan = losas.planMuros;
+    for (const pa of plan?.panos ?? []) {
+      const m = ctx.muros[pa.w]!;
+      const w = m.gamma * m.material.t;
+      if (!(w > 0)) continue;
+      for (const f of franjas(pa))
+        for (const [za, zb] of franjasLibres(plan!, pa, f.sm, ctx.cotas[pa.k + 1]!, ctx.cotas[pa.k]!)) {
+          const A = f.L * (zb - za);
+          sumarPuntual(fisicas[cPeso]!, [f.A[0] + (f.u[0] * f.L) / 2 - centro[0], f.A[1] + (f.u[1] * f.L) / 2 - centro[1], (za + zb) / 2 - centro[2]], [0, 0, -w * A], [0, 0, 0]);
+        }
+    }
+    // Solape muro–losa (C3-g): γ·(t/2)·(e/2) hacia arriba por lado cubierto y por muro que llega
+    for (const ld of losas.ladosMuros) {
+      const m = ctx.muros[ld.w]!;
+      const L = Math.sqrt((ld.B[0] - ld.A[0]) * (ld.B[0] - ld.A[0]) + (ld.B[1] - ld.A[1]) * (ld.B[1] - ld.A[1]));
+      const u: Vec2 = [(ld.B[0] - ld.A[0]) / L, (ld.B[1] - ld.A[1]) / L];
+      const M: Vec2 = [(ld.A[0] + ld.B[0]) / 2, (ld.A[1] + ld.B[1]) / 2];
+      const idPlanta = ctx.plantas[ld.k]!.id;
+      let e = 0;
+      for (const s of [1, -1]) {
+        const q: Vec2 = [M[0] - (s * u[1] * m.material.t) / 4, M[1] + (s * u[0] * m.material.t) / 4];
+        const i = ctx.losas.findIndex((l, li) => l.losa.planta === idPlanta && puntoEnRegion(q, losas.regiones[li]!));
+        if (i >= 0) e += ctx.losas[i]!.material.t;
+      }
+      const qz = m.gamma * (m.material.t / 2) * (e / 2) * ((ld.debajo ? 1 : 0) + (ld.encima ? 1 : 0));
+      if (!(qz > 0)) continue;
+      nodal(cPeso, ld.nudos[0], [0, 0, (qz * L) / 4], [0, 0, 0]);
+      nodal(cPeso, ld.nudos[1], [0, 0, (qz * L) / 2], [0, 0, 0]);
+      nodal(cPeso, ld.nudos[2], [0, 0, (qz * L) / 4], [0, 0, 0]);
+      sumarLineal(fisicas[cPeso]!, [ld.A[0] - centro[0], ld.A[1] - centro[1], ctx.cotas[ld.k]! - centro[2]], [u[0], u[1], 0], L, [0, 0, qz], [0, 0, qz]);
+    }
   }
 
   for (const carga of ctx.cargas) {
@@ -297,6 +378,33 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         const L = norma(d);
         sumarLineal(fisicas[c]!, menos(X1, centro), por(d, 1 / L), L, carga.q, carga.q);
       }
+    } else if (carga.tipo === "empuje") {
+      // C3-h: por lámina con su valor en cada nudo; la física, por franjas sin los huecos
+      const plan = losas.planMuros!;
+      const w = ctx.muros.findIndex((m) => m.muro.id === carga.muro);
+      const m = ctx.muros[w]!;
+      const ley = plan.empujes.get(carga.id)!;
+      const base = ctx.cotas[m.kb]!;
+      const [a, b] = [base + carga.z0, base + carga.z1];
+      const p = (z: number) => carga.p0 + ((carga.p1 - carga.p0) * (z - a)) / (b - a);
+      // Empuja hacia el otro lado: −n del lado del terreno (n izquierda = (−u_y, u_x))
+      const s = carga.lado === "izquierdo" ? -1 : 1;
+      const dir = (u: Vec2): V => [-s * u[1], s * u[0], 0];
+      losas.muros.forEach((lm, j) => {
+        if (lm.w !== w) return;
+        const zm = (lm.z0 + lm.z1) / 2;
+        if (!(zm > ley.z0 && zm < ley.z1)) return;
+        const d = dir(lm.eje1);
+        laminaNodos(c, nLosas + j, lm.nudos.map((n) => por(d, p(cotaNudo(ctx, topo.nudos[n]!)))));
+      });
+      for (const pa of plan.panos) {
+        if (pa.w !== w) continue;
+        for (const f of franjas(pa))
+          for (const [za, zb] of franjasLibres(plan, pa, f.sm, Math.max(ctx.cotas[pa.k + 1]!, ley.z0), Math.min(ctx.cotas[pa.k]!, ley.z1))) {
+            const X1: V = [f.A[0] + (f.u[0] * f.L) / 2 - centro[0], f.A[1] + (f.u[1] * f.L) / 2 - centro[1], za - centro[2]];
+            sumarLineal(fisicas[c]!, X1, [0, 0, 1], zb - za, por(dir(f.u), f.L * p(za)), por(dir(f.u), f.L * p(zb)));
+          }
+      }
     } else if (carga.tipo === "viga") {
       sobrePieza(c, carga.viga, piezas.rectasDe.get(carga.viga) ?? [], carga.ejes, carga.q, carga.qb, carga.desde, carga.hasta, carga.id);
     } else {
@@ -319,10 +427,34 @@ export function resultanteAnalitica(modelo: ModeloAnalitico, c: number, centro: 
     return [nd.x - centro[0], nd.y - centro[1], nd.z - centro[2]];
   };
   for (const cn of caso.nodales ?? []) sumarPuntual(r, X(cn.nudo), cn.f.slice(0, 3), cn.f.slice(3, 6));
-  // Superficie uniforme y global sobre una lámina plana: q·A en su centroide (dos triángulos)
+  // Superficie uniforme y global sobre una lámina plana: q·A en su centroide (dos triángulos). Con
+  // un valor por nudo, la integral del campo bilineal con 2×2 puntos de Gauss (exacta en las
+  // láminas rectangulares de los muros)
   for (const cl of caso.laminas ?? []) {
-    if (cl.tipo !== "superficie" || cl.ejes !== "global" || cl.q.length !== 3 || typeof cl.q[0] !== "number") throw new Error("resultanteAnalitica: sólo superficies uniformes y globales");
+    if (cl.tipo !== "superficie" || cl.ejes !== "global") throw new Error("resultanteAnalitica: sólo superficies globales");
     const [a, b, c2, d] = modelo.laminas![cl.lamina]!.nudos.map(X) as [V, V, V, V];
+    if (typeof cl.q[0] !== "number") {
+      const qs = cl.q as readonly (readonly number[])[];
+      const g = 1 / Math.sqrt(3);
+      for (const [xi, eta] of [[-g, -g], [g, -g], [g, g], [-g, g]] as const) {
+        const N = [(1 - xi) * (1 - eta), (1 + xi) * (1 - eta), (1 + xi) * (1 + eta), (1 - xi) * (1 + eta)].map((x) => x / 4);
+        const dxi = [-(1 - eta), 1 - eta, 1 + eta, -(1 + eta)].map((x) => x / 4);
+        const deta = [-(1 - xi), -(1 + xi), 1 + xi, 1 - xi].map((x) => x / 4);
+        const P4 = [a, b, c2, d];
+        let Xg: V = [0, 0, 0];
+        let Xx: V = [0, 0, 0];
+        let Xe: V = [0, 0, 0];
+        let qg: V = [0, 0, 0];
+        for (let n = 0; n < 4; n++) {
+          Xg = mas(Xg, por(P4[n]!, N[n]!));
+          Xx = mas(Xx, por(P4[n]!, dxi[n]!));
+          Xe = mas(Xe, por(P4[n]!, deta[n]!));
+          qg = mas(qg, por(qs[n]!, N[n]!));
+        }
+        sumarPuntual(r, Xg, por(qg, norma(cruz(Xx, Xe))), [0, 0, 0]);
+      }
+      continue;
+    }
     const t1 = norma(cruz(menos(b, a), menos(c2, a))) / 2;
     const t2 = norma(cruz(menos(c2, a), menos(d, a))) / 2;
     const g1 = por(mas(mas(a, b), c2), 1 / 3);

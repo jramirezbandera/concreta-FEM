@@ -48,6 +48,7 @@ export function transformar(f: ModeloFisico, t: Plano): ModeloFisico {
     losas: f.losas?.map((l) => ({ ...l, contorno: l.contorno.map(t.p), huecos: l.huecos?.map((h) => h.map(t.p)), eje1: (l.eje1 ?? 0) + t.giro })),
     apoyosLineales: f.apoyosLineales?.map((a) => ({ ...a, puntos: a.puntos.map(t.p) })),
     bandas: f.bandas?.map((b) => ({ ...b, desde: t.p(b.desde), hasta: t.p(b.hasta) })),
+    muros: f.muros?.map((w) => ({ ...w, puntos: w.puntos.map(t.p) })),
     cargas: f.cargas?.map((c): CargaFisica => {
       if (c.tipo === "puntual") {
         const [x, y] = t.p([c.x, c.y]);
@@ -55,10 +56,11 @@ export function transformar(f: ModeloFisico, t: Plano): ModeloFisico {
       }
       if (c.tipo === "superficie") return { ...c, q: t.v(c.q), zona: c.zona?.map(t.p) };
       if (c.tipo === "lineal") return { ...c, q: t.v(c.q), puntos: c.puntos.map(t.p) };
+      if (c.tipo === "empuje") return c;
       return c.ejes === "global" ? { ...c, q: t.v(c.q), qb: v3(c.qb) } : c;
     }),
   };
-  for (const k of ["pilares", "vigas", "apoyos", "losas", "apoyosLineales", "bandas", "cargas"] as const) if (g[k] === undefined) delete g[k];
+  for (const k of ["pilares", "vigas", "apoyos", "losas", "apoyosLineales", "bandas", "muros", "cargas"] as const) if (g[k] === undefined) delete g[k];
   return g;
 }
 

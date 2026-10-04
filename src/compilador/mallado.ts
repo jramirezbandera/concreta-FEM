@@ -239,7 +239,36 @@ export function jacobianoEscalado(X: readonly Vec2[]): number {
   return min;
 }
 
-export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6): ResultadoMalla {
+/**
+ * Siembra graduada de un lado de longitud L (paso 1): el tamaño a lo largo del lado es g(x) =
+ * min(s, sa + λx, sb + λ(L − x)), con sa y sb el de los rasgos de sus extremos, y los puntos van
+ * donde ∫dx/g es múltiplo de su total / n. Devuelve n y los parámetros t ∈ (0, 1) de los n − 1
+ * puntos interiores. Con `nFijo`, reparte ese número de tramos (los muros de C3 lo unifican entre
+ * plantas).
+ */
+export function siembraGraduada(L: number, sa: number, sb: number, s: number, nFijo?: number): { n: number; t: number[] } {
+  const g = (x: number) => Math.min(s, sa + CRECIMIENTO * x, sb + CRECIMIENTO * (L - x));
+  const m = 64;
+  const acum = [0];
+  for (let i = 1; i <= m; i++) acum.push(acum[i - 1]! + ((L / m) * (1 / g(((i - 1) * L) / m) + 1 / g((i * L) / m))) / 2);
+  const total = acum[m]!;
+  // Con holgura: un lado de justo k pasos no puede pasar a k + 1 por un redondeo o un ruido
+  const n = nFijo ?? Math.max(1, Math.ceil(total - HOLGURA_SIEMBRA));
+  const t: number[] = [];
+  let j = 0;
+  for (let i = 1; i < n; i++) {
+    const objetivo = (total * i) / n;
+    while (acum[j + 1]! < objetivo) j++;
+    t.push((j + (objetivo - acum[j]!) / (acum[j + 1]! - acum[j]!)) / m);
+  }
+  return { n, t };
+}
+
+/**
+ * Malla las losas de una planta. `presembrados`: claves «a,b» (a < b) de los lados que no se
+ * siembran, los de los ejes de los muros (C3), cuyos puntos ya son sus estaciones.
+ */
+export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>): ResultadoMalla {
   const s = 2 * h;
   const lados = arreglo.lados();
   const regiones = losas.map((l) => regionDe(arreglo, l));
@@ -275,24 +304,12 @@ export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: 
   };
   const tam = Array.from({ length: nPuntos }, (_, i) => rasgo(i));
   const cadenas: number[][] = lados.map((l) => {
+    // Los lados de los ejes de los muros ya vienen sembrados (C3): sus puntos son las estaciones
+    if (presembrados?.has(`${l.a},${l.b}`)) return [l.a, l.b];
     const [A, B] = [P[l.a]!, P[l.b]!];
     const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
-    // Tamaño a lo largo del lado, g(x) = min(2h, sa + λx, sb + λ(L − x)); se reparten los puntos
-    // donde ∫dx/g es múltiplo de su total / n
-    const [sa, sb] = [tam[l.a]!, tam[l.b]!];
-    const g = (x: number) => Math.min(s, sa + CRECIMIENTO * x, sb + CRECIMIENTO * (L - x));
-    const m = 64;
-    const acum = [0];
-    for (let i = 1; i <= m; i++) acum.push(acum[i - 1]! + ((L / m) * (1 / g(((i - 1) * L) / m) + 1 / g((i * L) / m))) / 2);
-    const total = acum[m]!;
-    // Con holgura: un lado de justo k pasos no puede pasar a k + 1 por un redondeo o un ruido
-    const n = Math.max(1, Math.ceil(total - HOLGURA_SIEMBRA));
     const c = [l.a];
-    let j = 0;
-    for (let i = 1; i < n; i++) {
-      const objetivo = (total * i) / n;
-      while (acum[j + 1]! < objetivo) j++;
-      const t = (j + (objetivo - acum[j]!) / (acum[j + 1]! - acum[j]!)) / m;
+    for (const t of siembraGraduada(L, tam[l.a]!, tam[l.b]!, s).t) {
       P.push([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]);
       origen.push(-1);
       c.push(P.length - 1);

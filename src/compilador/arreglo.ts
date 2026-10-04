@@ -30,7 +30,7 @@
 import { orient2d } from "robust-predicates";
 import type { Vec2 } from "./fisico.ts";
 
-export type TipoTrazo = "viga" | "huella" | "losa" | "hueco" | "banda" | "zona" | "linea" | "apoyo-lineal";
+export type TipoTrazo = "viga" | "huella" | "muro" | "losa" | "hueco" | "banda" | "zona" | "linea" | "apoyo-lineal";
 
 export interface PuntoArreglo {
   x: number;
@@ -175,6 +175,43 @@ export class Arreglo {
   /** Nudo de C1 fijo: no se une a nada (la topología de C1 ya los separa más de ε_snap). */
   fijo(x: number, y: number, nudo: number): number {
     return this.nuevo(x, y, nudo);
+  }
+
+  /**
+   * Vértice de un muro (C3): ya viene ajustado a lo cercano en todas sus plantas (`muros.ts`), así
+   * que no se mueve; sólo reutiliza un punto a ≤ ε_geom.
+   */
+  fijoMuro(q: Vec2): number {
+    const c = this.puntoCercano(q, this.epsGeom);
+    return c.i >= 0 ? c.i : this.nuevo(q[0], q[1]);
+  }
+
+  /**
+   * Parte el lado ab con los puntos `qs` (en orden de a a b), sin unirlos a nada salvo a un punto a
+   * ≤ ε_geom: las estaciones de un muro que vienen de otra planta o de su división (C3). Devuelve
+   * sus puntos.
+   */
+  partirLado(a: number, b: number, qs: readonly Vec2[]): number[] {
+    const ps = qs.map((q) => {
+      const c = this.puntoCercano(q, this.epsGeom);
+      return c.i >= 0 ? c.i : this.nuevo(q[0], q[1]);
+    });
+    this.partir(a, b, ps);
+    return ps;
+  }
+
+  /** Distancia del punto i al punto más cercano, o `r` si no hay ninguno a menos de `r`. */
+  rasgo(i: number, r: number): number {
+    const p = this.puntos[i]!;
+    let d = r;
+    for (const j of this.gPuntos.buscar(p.x - r, p.y - r, p.x + r, p.y + r)) {
+      if (j === i) continue;
+      const q = this.puntos[j]!;
+      const dx = q.x - p.x;
+      const dy = q.y - p.y;
+      d = Math.min(d, Math.sqrt(dx * dx + dy * dy));
+    }
+    return d;
   }
 
   /** Vértice de algo: se une al punto o al segmento más cercano a ≤ ε_snap (regla 1). */

@@ -5,7 +5,7 @@
  */
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
-import type { ApoyoFisico, ApoyoLineal, Banda, CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesResueltas, Pilar, Planta, Seccion, Vec2, Viga } from "./fisico.ts";
+import type { ApoyoFisico, ApoyoLineal, Banda, CargaFisica, CasoFisico, Losa, Material, ModeloFisico, Muro, OpcionesResueltas, Pilar, Planta, Seccion, Vec2, Viga } from "./fisico.ts";
 import { areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { compilarSeccion, materialElastico, type SeccionCompilada } from "./secciones.ts";
 
@@ -19,6 +19,23 @@ export interface LosaCompilada {
   pp: number;
   /** Peso específico del material, kN/m³. */
   gamma: number;
+}
+
+/** Un muro ya comprobado (C3), con su material de lámina y la geometría de sus tramos. */
+export interface MuroCompilado {
+  muro: Muro;
+  /** Material de las láminas (E en kN/m², ν, espesor en m). */
+  material: { E: number; nu: number; t: number };
+  /** Peso específico del material, kN/m³. */
+  gamma: number;
+  /** Plantas de la base y de la cabeza (índices, de arriba abajo: kh < kb). */
+  kb: number;
+  kh: number;
+  /** Estación del primer punto de cada tramo y su longitud. */
+  s0: number[];
+  largo: number[];
+  /** Huecos, con el tramo en el que caen. */
+  huecos: { tramo: number; desde: number; hasta: number; z0: number; z1: number }[];
 }
 
 /** El modelo físico ya comprobado, con sus índices. Las listas de objetos van ordenadas por `id`. */
@@ -45,6 +62,9 @@ export interface Contexto {
   losaDe: ReadonlyMap<string, LosaCompilada>;
   apoyosLineales: readonly ApoyoLineal[];
   bandas: readonly Banda[];
+  /** C3: muros (por id). */
+  muros: readonly MuroCompilado[];
+  muroDe: ReadonlyMap<string, MuroCompilado>;
 }
 
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -147,6 +167,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   const losas = (lista("losas", false) as unknown as Losa[]).sort(porId);
   const apoyosLineales = (lista("apoyosLineales", false) as unknown as ApoyoLineal[]).sort(porId);
   const bandas = (lista("bandas", false) as unknown as Banda[]).sort(porId);
+  const muros = (lista("muros", false) as unknown as Muro[]).sort(porId);
   if (diag.hayErrores) return null;
 
   // Ids únicos en todo el modelo
@@ -163,6 +184,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     ["losas", losas],
     ["apoyosLineales", apoyosLineales],
     ["bandas", bandas],
+    ["muros", muros],
   ] as const) {
     for (const o of objs) {
       const antes = vistos.get(o.id);
@@ -360,7 +382,12 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       if (!vec3(c.q)) mal(c.id, "q tiene que ser un vector de 3 números (kN/m)");
       const d = polilineaNoValida(c.puntos);
       if (d) mal(c.id, d);
-    } else mal((c as { id: string }).id, "el tipo de carga tiene que ser puntual, viga, pilar, superficie o lineal");
+    } else if (c.tipo === "empuje") {
+      if (typeof r.muro !== "string" || !muros.some((m) => m.id === r.muro)) diag.error("fisico/referencia", `${c.id}: el muro «${String(r.muro)}» no existe.`, [c.id]);
+      if (c.lado !== "izquierdo" && c.lado !== "derecho") mal(c.id, "el lado tiene que ser izquierdo o derecho");
+      if (![c.z0, c.z1, c.p0, c.p1].every(num)) mal(c.id, "z0, z1, p0 y p1 tienen que ser números (m y kN/m²)");
+      else if (!(c.z1 > c.z0)) mal(c.id, "z1 tiene que ser mayor que z0");
+    } else mal((c as { id: string }).id, "el tipo de carga tiene que ser puntual, viga, pilar, superficie, lineal o empuje");
   }
 
   // Losas, apoyos lineales y bandas (C2)
@@ -431,6 +458,107 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     else if (!(Math.sqrt((b.hasta[0] - b.desde[0]) ** 2 + (b.hasta[1] - b.desde[1]) ** 2) > op.epsGeom)) mal(b.id, "desde y hasta coinciden");
     if (!pos(b.ancho)) mal(b.id, "el ancho tiene que ser un número > 0 (m)");
   }
+
+  // Muros (C3)
+  const murosC: MuroCompilado[] = [];
+  for (const w of muros) {
+    const okD = usaPlanta(w.id, w.desde, "la planta de la base");
+    const okH = usaPlanta(w.id, w.hasta, "la planta de la cabeza");
+    if (okD && okH && !(planta.get(w.desde)! > planta.get(w.hasta)!)) mal(w.id, "la planta de la base tiene que estar por debajo de la de cabeza");
+    if (!pos(w.espesor)) mal(w.id, "el espesor tiene que ser un número > 0 (m)");
+    if (w.base !== undefined && w.base !== "empotrado" && w.base !== "articulado" && w.base !== "ninguno") mal(w.id, "la base tiene que ser empotrado, articulado o ninguno");
+    const m = typeof w.material === "string" ? material.get(w.material) : undefined;
+    if (!m) diag.error("fisico/referencia", `${w.id}: el material «${String(w.material)}» no existe.`, [w.id]);
+    else if (m.tipo === "acero") mal(w.id, "el material de un muro tiene que ser hormigón o general");
+    const dp = polilineaNoValida(w.puntos);
+    if (dp) {
+      mal(w.id, dp);
+      continue;
+    }
+    const s0: number[] = [];
+    const largo: number[] = [];
+    let s = 0;
+    let bien = true;
+    for (let k = 1; k < w.puntos.length; k++) {
+      const [a, b] = [w.puntos[k - 1]!, w.puntos[k]!];
+      const L = Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2);
+      if (!(L > 2 * op.epsSnap)) {
+        mal(w.id, `el tramo ${k} mide ${L.toPrecision(3)} m, y un tramo de muro tiene que medir más de 2·ε_snap (${2 * op.epsSnap} m)`);
+        bien = false;
+        break;
+      }
+      if (k >= 2) {
+        const c = w.puntos[k - 2]!;
+        const u = [a[0] - c[0], a[1] - c[1]];
+        const v = [b[0] - a[0], b[1] - a[1]];
+        const cruz = u[0]! * v[1]! - u[1]! * v[0]!;
+        const prod = u[0]! * v[0]! + u[1]! * v[1]!;
+        if (prod < 0 && Math.abs(cruz) <= 1e-9 * Math.abs(prod)) {
+          mal(w.id, `la polilínea vuelve sobre sí misma en el punto ${k}`);
+          bien = false;
+          break;
+        }
+      }
+      s0.push(s);
+      largo.push(L);
+      s += L;
+    }
+    if (!bien) continue;
+    const huecos: MuroCompilado["huecos"] = [];
+    if (w.huecos !== undefined && !Array.isArray(w.huecos)) mal(w.id, "los huecos tienen que ser una lista de { desde, hasta, z0, z1 }");
+    else {
+      (w.huecos ?? []).forEach((h, i) => {
+        const o = h as unknown;
+        if (!esObjeto(o) || ![o.desde, o.hasta, o.z0, o.z1].every(num)) {
+          mal(w.id, `el hueco ${i + 1} tiene que ser { desde, hasta, z0, z1 } con números (m)`);
+          return;
+        }
+        if (!(h.hasta - h.desde > op.epsSnap && h.z1 - h.z0 > op.epsSnap)) {
+          mal(w.id, `el hueco ${i + 1} tiene que medir más de ε_snap (${op.epsSnap} m) de ancho y de alto`);
+          return;
+        }
+        const t = s0.findIndex((a, k) => h.desde >= a - op.epsGeom && h.hasta <= a + largo[k]! + op.epsGeom);
+        if (t < 0) {
+          mal(w.id, `el hueco ${i + 1} (de ${h.desde} a ${h.hasta} m) no cae entero en un tramo del muro`);
+          return;
+        }
+        if (h.z0 < -op.epsGeom) {
+          mal(w.id, `el hueco ${i + 1} empieza por debajo de la base del muro`);
+          return;
+        }
+        huecos.push({ tramo: t, desde: h.desde, hasta: h.hasta, z0: h.z0, z1: h.z1 });
+      });
+      for (let i = 0; i < huecos.length; i++)
+        for (let j = i + 1; j < huecos.length; j++) {
+          const [a, b] = [huecos[i]!, huecos[j]!];
+          if (a.tramo === b.tramo && Math.min(a.hasta, b.hasta) - Math.max(a.desde, b.desde) > op.epsGeom && Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0) > op.epsGeom)
+            mal(w.id, `los huecos ${i + 1} y ${j + 1} se solapan`);
+        }
+    }
+    if (!m || m.tipo === "acero" || !pos(w.espesor) || !okD || !okH) continue;
+    const { elastico, peso } = materialElastico(m);
+    const nu = elastico.E / (2 * elastico.G) - 1;
+    if (!(nu > -1 && nu < 0.5)) {
+      mal(w.id, `el material ${m.id} da ν = ${nu.toPrecision(4)} (con E y G), fuera de (−1, 0,5)`);
+      continue;
+    }
+    murosC.push({ muro: w, material: { E: elastico.E, nu, t: w.espesor }, gamma: peso, kb: planta.get(w.desde)!, kh: planta.get(w.hasta)!, s0, largo, huecos });
+  }
+  // Muros solapados: tramos casi colineales que comparten una planta (de forjado a forjado)
+  for (let i = 0; i < murosC.length; i++)
+    for (let j = i + 1; j < murosC.length; j++) {
+      const [a, b] = [murosC[i]!, murosC[j]!];
+      if (!(a.kh < b.kb && b.kh < a.kb)) continue;
+      const sol = solapeMuros(a.muro.puntos, b.muro.puntos, op.epsSnap);
+      if (sol > op.epsSnap) diag.error("muro/solapados", `Los muros ${a.muro.id} y ${b.muro.id} se solapan a lo largo de ${sol.toPrecision(3)} m en las mismas plantas.`, [a.muro.id, b.muro.id]);
+    }
+  for (const w of murosC) {
+    for (let k = 1; k < w.muro.puntos.length; k++)
+      for (let l = k + 2; l < w.muro.puntos.length; l++) {
+        const sol = solapeMuros([w.muro.puntos[k - 1]!, w.muro.puntos[k]!], [w.muro.puntos[l - 1]!, w.muro.puntos[l]!], op.epsSnap);
+        if (sol > op.epsSnap) diag.error("muro/solapados", `El muro ${w.muro.id} se solapa consigo mismo (tramos ${k} y ${l}).`, [w.muro.id]);
+      }
+  }
   if (diag.hayErrores) return null;
 
   // Cotas: las de las plantas que se usan tienen que poder saberse
@@ -444,6 +572,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   for (const a of apoyos) usar(planta.get(a.planta)!, a.id);
   for (const c of cargas) if (c.tipo === "puntual" || c.tipo === "superficie" || c.tipo === "lineal") usar(planta.get(c.planta)!, c.id);
   for (const o of [...losas, ...apoyosLineales, ...bandas]) usar(planta.get(o.planta)!, o.id);
+  for (const w of murosC) for (let k = w.kh; k <= w.kb; k++) usar(k, w.muro.id);
   for (const [k, id] of [...usadas].sort((a, b) => a[0] - b[0])) {
     if (cotas[k] === null) {
       const p = plantas[k]!;
@@ -459,6 +588,13 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     for (let k = planta.get(p.hasta)!; k < planta.get(p.desde)!; k++) {
       if (!(cotas[k]! - cotas[k + 1]! > op.epsGeom)) mal(p.id, `el tramo con cabeza en ${plantas[k]!.id} tiene altura nula`);
     }
+  }
+  for (const w of murosC) {
+    for (let k = w.kh; k < w.kb; k++) if (!(cotas[k]! - cotas[k + 1]! > 2 * op.epsSnap)) mal(w.muro.id, `la planta con cabeza en ${plantas[k]!.id} mide menos de 2·ε_snap de alto`);
+    const H = cotas[w.kh]! - cotas[w.kb]!;
+    w.huecos.forEach((h, i) => {
+      if (h.z1 > H + op.epsGeom) mal(w.muro.id, `el hueco ${i + 1} acaba por encima de la cabeza del muro (${H.toPrecision(4)} m)`);
+    });
   }
   if (diag.hayErrores) return null;
 
@@ -483,5 +619,30 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     losaDe: new Map(losasC.map((l) => [l.losa.id, l] as const)),
     apoyosLineales,
     bandas,
+    muros: murosC,
+    muroDe: new Map(murosC.map((w) => [w.muro.id, w] as const)),
   };
+}
+
+/**
+ * Longitud que comparten dos polilíneas de muro casi colineales: por cada par de tramos, si los dos
+ * extremos de uno están a ≤ ε de la recta del otro, la de sus proyecciones dentro de él.
+ */
+function solapeMuros(pa: readonly Vec2[], pb: readonly Vec2[], eps: number): number {
+  let r = 0;
+  for (let i = 1; i < pa.length; i++)
+    for (let j = 1; j < pb.length; j++) {
+      const [A, B] = [pa[i - 1]!, pa[i]!];
+      const L = Math.sqrt((B[0] - A[0]) ** 2 + (B[1] - A[1]) ** 2);
+      const u = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
+      const pr = (Q: Vec2) => {
+        const dx = Q[0] - A[0];
+        const dy = Q[1] - A[1];
+        return { s: dx * u[0]! + dy * u[1]!, d: Math.abs(dx * u[1]! - dy * u[0]!) };
+      };
+      const [c, d] = [pr(pb[j - 1]!), pr(pb[j]!)];
+      if (c.d > eps || d.d > eps) continue;
+      r = Math.max(r, Math.min(L, Math.max(c.s, d.s)) - Math.max(0, Math.min(c.s, d.s)));
+    }
+  return r;
 }

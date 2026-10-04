@@ -191,7 +191,7 @@ describe("criterio 3 de C2: validador de la malla en plantas al azar", () => {
         const j = jacobianoEscalado(X);
         expect(j).toBeGreaterThan(0);
         jmin = Math.min(jmin, j);
-        const losa = r.mapeo.laminas![i]!.losa;
+        const losa = r.mapeo.laminas![i]!.losa!;
         areas.set(losa, (areas.get(losa) ?? 0) + a);
       });
       for (const l of f.losas!) {
