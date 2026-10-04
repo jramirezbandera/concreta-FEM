@@ -1,0 +1,20 @@
+# validacion/e6/escalado.ts diafragma — 2026-10-04, AMD Ryzen 9 5900X 12-Core Processor, node v24.19.0; 24 casos
+
+elementos por vano | nudos | ecuaciones | nnz(L) | total (s) | factorización (s) | WASM (MB) | maxRSS (MB) | válido
+7 | 22493 | 55965 | 4984848 | 2.36 | 0.24 | 84 | 562 | sí
+8 | 29221 | 76146 | 8547957 | 3.08 | 0.41 | 128 | 681 | sí
+10 | 45323 | 124446 | 15458895 | 4.82 | 0.77 | 220 | 946 | sí
+12 | 64953 | 183330 | 24536664 | 7.96 | 1.28 | 337 | 1262 | sí
+14 | 88111 | 252798 | 35721072 | 11.44 | 1.91 | 477 | 1686 | sí
+
+Exponente del tiempo frente a los nudos (pendiente log–log):
+  numeracion: 0.96 (0.32, 0.42, 0.61, 0.90, 1.21 s)
+  cargas: 0.89 (0.50, 0.52, 0.70, 1.22, 1.55 s)
+  patron: 0.91 (0.07, 0.09, 0.12, 0.18, 0.23 s)
+  ensamblado: 1.07 (0.33, 0.44, 0.75, 1.01, 1.45 s)
+  solucion.analisis: 1.75 (0.06, 0.09, 0.14, 0.37, 0.65 s)
+  solucion.factorizacion: 1.49 (0.24, 0.41, 0.77, 1.28, 1.91 s)
+  solucion.resolucion: 1.25 (0.17, 0.24, 0.40, 0.60, 0.96 s)
+  solucion.residuo: 1.09 (0.12, 0.17, 0.27, 0.40, 0.55 s)
+  recuperacion: 1.25 (0.54, 0.72, 1.06, 2.00, 2.93 s)
+  total: 1.16 (2.36, 3.08, 4.82, 7.96, 11.44 s)
