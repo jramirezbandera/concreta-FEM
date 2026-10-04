@@ -149,9 +149,10 @@ export function sap1018(): { resultados: Publicado[] } {
   const L = 144 * IN;
   const w = 0.1 * (KIP / IN);
   const conCortante: SeccionBarra = { E, G, A, Iy: I, Iz: 37.1 * IN ** 4, J: 0.536 * IN ** 4, Avz: Av };
-  const { Avz: _, ...sinCortante } = conCortante;
+  const { Avz: _, ...resto } = conCortante;
+  const sinCortante: SeccionBarra = resto;
   const variantes = [
-    { id: "A", s: conCortante, mod: {}, valor: -2.77076 },
+    { id: "A", s: conCortante, mod: {} as { A?: number; Iy?: number }, valor: -2.77076 },
     { id: "B", s: sinCortante, mod: { A: 1e4 }, valor: -2.72361 },
     { id: "C", s: conCortante, mod: { A: 1e4, Iy: 1e7 }, valor: -0.03954 },
     { id: "D", s: sinCortante, mod: { Iy: 1e7 }, valor: -0.0076 },

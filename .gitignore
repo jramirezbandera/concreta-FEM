@@ -28,3 +28,7 @@ venv312/
 
 # Spike E0: matrices K y compilaciones de prueba (cientos de MB; se regeneran con spike/e0/solver/preparar_k.py)
 spike/e0/datos/
+
+# Validación E6: modelos exportados para el oráculo (se regeneran con validacion/e6/modelos-oraculo.ts)
+validacion/e6/modelos-oraculo.json
+validacion/e6/tmp/

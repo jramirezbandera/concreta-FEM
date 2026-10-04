@@ -67,7 +67,7 @@ export function modos(K: readonly (readonly number[])[], masas: readonly number[
   const n = K.length;
   const s = masas.map((m) => 1 / Math.sqrt(m));
   const a = K.map((f, i) => f.map((_, j) => (0.5 * (K[i]![j]! + K[j]![i]!)) * s[i]! * s[j]!));
-  const v = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
+  const v: number[][] = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
   for (let barrido = 0; barrido < 100; barrido++) {
     let off = 0;
     let tot = 0;
