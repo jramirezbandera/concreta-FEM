@@ -9,6 +9,12 @@
 import type { Vec2 } from "./fisico.ts";
 import type { FormaHuella } from "./secciones.ts";
 
+/**
+ * Cuanto de las coordenadas en la numeración canónica de nudos y láminas, m: dos coordenadas que
+ * sólo difieren en un ulp (el seno de un giro difiere entre V8 y JSC, COM-12) ordenan igual.
+ */
+export const CUANTO_ORDEN = 1e-9;
+
 export const dist = (a: Vec2, b: Vec2): number => {
   const dx = a[0] - b[0];
   const dy = a[1] - b[1];

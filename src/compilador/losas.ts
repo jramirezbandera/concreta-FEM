@@ -22,6 +22,7 @@
  */
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
+import { CUANTO_ORDEN } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type LosaMallar } from "./mallado.ts";
 import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
@@ -504,10 +505,11 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
   }
 
   // Cargas puntuales de plantas sin losa o fuera de ellas: las que C1 no coloca dan error en cargas.ts
-  // Orden canónico de las láminas: cota, centroide x, y, losa
+  // Orden canónico de las láminas: cota, centroide x, y (cuantizados, como los nudos), losa
+  const q = (v: number) => Math.round(v / CUANTO_ORDEN);
   const orden = laminasSinOrden.map((_, i) => i).sort((x, y) => {
     const [a, b] = [laminasSinOrden[x]!, laminasSinOrden[y]!];
-    return ctx.cotas[a.k]! - ctx.cotas[b.k]! || a.c[0] - b.c[0] || a.c[1] - b.c[1] || a.losa - b.losa || x - y;
+    return ctx.cotas[a.k]! - ctx.cotas[b.k]! || q(a.c[0]) - q(b.c[0]) || q(a.c[1]) - q(b.c[1]) || a.losa - b.losa || a.c[0] - b.c[0] || a.c[1] - b.c[1] || x - y;
   });
   const nuevo = new Int32Array(orden.length);
   orden.forEach((v, i) => (nuevo[v] = i));

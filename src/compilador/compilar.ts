@@ -19,6 +19,7 @@ import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, ModeloAnalitico, NudoAnalitico, Restriccion, Vec3 } from "../motor/modelo.ts";
 import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PERDIDAS } from "./cargas.ts";
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type OpcionesResueltas } from "./fisico.ts";
+import { CUANTO_ORDEN } from "./geometria2d.ts";
 import { huellaDe } from "./huella.ts";
 import { construirLosas, direccionEje1, type Losas } from "./losas.ts";
 import { VERSIONES_MALLADOR } from "./mallado.ts";
@@ -134,7 +135,13 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
 
   // Numeración canónica: por cota, x e y (no depende del orden de la entrada)
   const zDe = (n: number) => ctx.cotas[topo.nudos[n]!.k]!;
-  const orden = topo.nudos.map((_, i) => i).sort((a, b) => zDe(a) - zDe(b) || topo.nudos[a]!.x - topo.nudos[b]!.x || topo.nudos[a]!.y - topo.nudos[b]!.y || a - b);
+  // Por coordenadas cuantizadas a CUANTO_ORDEN y luego exactas: dos nudos con la misma x salvo un
+  // ulp (el seno de un giro difiere entre V8 y JSC, COM-12) se ordenan por su y en los dos motores
+  const qx = (n: number) => Math.round(topo.nudos[n]!.x / CUANTO_ORDEN);
+  const qy = (n: number) => Math.round(topo.nudos[n]!.y / CUANTO_ORDEN);
+  const orden = topo.nudos
+    .map((_, i) => i)
+    .sort((a, b) => zDe(a) - zDe(b) || qx(a) - qx(b) || qy(a) - qy(b) || topo.nudos[a]!.x - topo.nudos[b]!.x || topo.nudos[a]!.y - topo.nudos[b]!.y || a - b);
   const nuevo = new Int32Array(topo.nudos.length);
   orden.forEach((n, i) => (nuevo[n] = i));
   const nudos: NudoAnalitico[] = [];
