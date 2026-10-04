@@ -31,6 +31,7 @@ const finito = (...v: number[]) => v.every(Number.isFinite);
 
 /** Comprueba índices de nudo de un objeto: en rango y sin repetir. */
 function nudosValidos(nudos: readonly number[], nn: number): boolean {
+  if (!Array.isArray(nudos)) return false;
   for (let a = 0; a < nudos.length; a++) {
     const v = nudos[a]!;
     if (!Number.isInteger(v) || v < 0 || v >= nn) return false;
@@ -103,8 +104,17 @@ function semidefinidaPositiva(k: Float64Array): boolean {
   return true;
 }
 
+/** ¿Es simétrica la rigidez dada (6 valores: diagonal; 36: matriz por filas)? */
+function simetrica(k: readonly number[]): boolean {
+  if (k.length === 6) return true;
+  let escala = 0;
+  for (const v of k) escala = Math.max(escala, Math.abs(v));
+  for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) if (Math.abs(k[6 * i + j]! - k[6 * j + i]!) > 1e-12 * escala) return false;
+  return true;
+}
+
 function ortonormal(R: readonly number[]): boolean {
-  if (R.length !== 9 || !finito(...R)) return false;
+  if (!Array.isArray(R) || R.length !== 9 || !finito(...R)) return false;
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
     const p = R[3 * i]! * R[3 * j]! + R[3 * i + 1]! * R[3 * j + 1]! + R[3 * i + 2]! * R[3 * j + 2]!;
     if (Math.abs(p - (i === j ? 1 : 0)) > 1e-9) return false;
@@ -135,7 +145,7 @@ export function elementosDelModelo(modelo: ModeloAnalitico, geo: Geometria, diag
   });
 
   (modelo.laminas ?? []).forEach((l, indice) => {
-    if (l.nudos.length !== 4 || !nudosValidos(l.nudos, nn)) {
+    if (!nudosValidos(l.nudos, nn) || l.nudos.length !== 4) {
       diag.error("modelo/nudo-no-valido", `La lámina ${l.id} hace referencia a nudos inexistentes o repetidos.`, [l.id]);
       return;
     }
@@ -144,11 +154,11 @@ export function elementosDelModelo(modelo: ModeloAnalitico, geo: Geometria, diag
   });
 
   (modelo.muelles ?? []).forEach((m, indice) => {
-    if ((m.nudos.length !== 1 && m.nudos.length !== 2) || !nudosValidos(m.nudos, nn)) {
+    if (!nudosValidos(m.nudos, nn) || (m.nudos.length !== 1 && m.nudos.length !== 2)) {
       diag.error("modelo/nudo-no-valido", `El muelle ${m.id} hace referencia a nudos inexistentes o repetidos.`, [m.id]);
       return;
     }
-    if ((m.k.length !== 6 && m.k.length !== 36) || !finito(...m.k)) {
+    if (!Array.isArray(m.k) || (m.k.length !== 6 && m.k.length !== 36) || !finito(...m.k)) {
       diag.error("modelo/propiedad-no-valida", `El muelle ${m.id} tiene que dar 6 rigideces (diagonal) o 36 (matriz 6×6) finitas.`, [m.id]);
       return;
     }
@@ -156,7 +166,8 @@ export function elementosDelModelo(modelo: ModeloAnalitico, geo: Geometria, diag
       diag.error("modelo/orientacion-no-valida", `Los ejes del muelle ${m.id} no forman un triedro ortonormal dextrógiro.`, [m.id]);
       return;
     }
-    if (!semidefinidaPositiva(rigidezMuelle6(m))) {
+    // la simetría, en la matriz dada: girarla la simetriza (frente al redondeo) y ocultaría una asimétrica
+    if (!simetrica(m.k) || !semidefinidaPositiva(rigidezMuelle6(m))) {
       diag.error("modelo/propiedad-no-valida", `La rigidez del muelle ${m.id} no es simétrica y semidefinida positiva.`, [m.id]);
       return;
     }

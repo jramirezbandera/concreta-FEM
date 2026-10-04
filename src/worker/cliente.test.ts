@@ -189,14 +189,17 @@ describe("cliente", () => {
     expect(conUmbral.estado).toMatchObject({ reciclajes: 1, arranques: 2 });
   });
 
-  it("una excepción del motor es ErrorWorker; el worker se recicla y la cola sigue", async () => {
+  it("un modelo mal formado no es una excepción: da motor/error-interno, el worker no se recicla y la cola sigue (E6)", async () => {
+    // Antes de E6 llegaba como ErrorWorker; las excepciones del worker son ya las trampas del WASM (abajo)
     const cliente = nuevoCliente({ umbralReciclaje: 2 ** 32 });
     const roto = { nudos: null } as unknown as ModeloAnalitico;
     const [malo, bueno] = [cliente.calcular(roto), cliente.calcular(pequeno())];
-    await expect(malo).rejects.toBeInstanceOf(ErrorWorker);
-    await expect(malo).rejects.toThrow(/TypeError/);
+    const r = await malo;
+    expect(r.valido).toBe(false);
+    expect(r.diagnosticos.map((d) => d.codigo)).toEqual(["motor/error-interno"]);
+    expect(r.diagnosticos[0]!.mensaje).toMatch(/TypeError/);
     expect((await bueno).valido).toBe(true);
-    expect(cliente.estado).toMatchObject({ reciclajes: 1, arranques: 2 });
+    expect(cliente.estado).toMatchObject({ reciclajes: 0, arranques: 1 });
   });
 
   it("si el worker se cae, el siguiente cálculo va a uno nuevo", async () => {

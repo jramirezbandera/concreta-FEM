@@ -68,6 +68,7 @@ export function prepararBarra(b: BarraAnalitica, indice: number, modelo: ModeloA
   const ids = [b.id];
   const avValida = (v: number | undefined) => v === undefined || (Number.isFinite(v) && v > 0);
   if (
+    !s ||
     !finito(s.E, s.G, s.A, s.Iy, s.Iz, s.J) ||
     !(s.E > 0 && s.G > 0 && s.A > 0 && s.Iy > 0 && s.Iz > 0 && s.J > 0) ||
     !avValida(s.Avy) ||
@@ -117,7 +118,7 @@ export function prepararBarra(b: BarraAnalitica, indice: number, modelo: ModeloA
       return null;
     }
   }
-  if (b.vz.length !== 3 || !finito(...b.vz)) {
+  if (!Array.isArray(b.vz) || b.vz.length !== 3 || !finito(...b.vz)) {
     diag.error("modelo/propiedad-no-valida", `La barra ${b.id} tiene un vector de canto no válido.`, ids);
     return null;
   }
@@ -254,6 +255,10 @@ export function cargasDeBarrasDelCaso(
     const acotar = (x: number) => Math.min(L, Math.max(0, x));
     const aLocal = (v: V3): V3 => (c.ejes === "local" ? v : local(R, v));
     const aGlobal = (v: V3): V3 => (c.ejes === "global" ? v : global(R, v));
+    if (c.tipo !== "puntual" && c.tipo !== "distribuida") {
+      diag.error("carga/no-valida", `El caso ${idCaso} tiene una carga de barra de un tipo desconocido en la barra ${idBarra}.`, ids);
+      continue;
+    }
     if (c.tipo === "puntual") {
       const F = c.F ?? [0, 0, 0];
       const M = c.M ?? [0, 0, 0];

@@ -1,0 +1,88 @@
+# validacion/e6/entradas.ts — 2026-10-04; cada entrada sobre los modelos aleatorios 1…40 que tienen el objeto
+
+entrada | descripción | modelos | resultado (errores de cada cálculo) | esperado | ¿cumple?
+nudo-nan | coordenada NaN | 40 | modelo/valor-no-finito ×40 | modelo/valor-no-finito | sí
+nudo-infinito | coordenada infinita | 40 | modelo/valor-no-finito ×40 | modelo/valor-no-finito | sí
+nudo-sin-y (contrato) | nudo sin coordenada y | 40 | modelo/valor-no-finito ×40 | modelo/valor-no-finito | sí
+barra-nudo-fuera | barra con un nudo inexistente | 40 | modelo/nudo-no-valido ×40 | modelo/nudo-no-valido | sí
+barra-nudo-negativo | barra con un índice de nudo negativo | 40 | modelo/nudo-no-valido ×40 | modelo/nudo-no-valido | sí
+barra-nudo-repetido | barra con el mismo nudo en los dos extremos | 40 | modelo/nudo-no-valido ×40 | modelo/nudo-no-valido | sí
+barra-nudo-decimal | barra con un índice de nudo no entero | 40 | modelo/nudo-no-valido ×40 | modelo/nudo-no-valido | sí
+barra-E-nula | barra con E = 0 | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-I-negativa | barra con Iy < 0 | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-J-nan | barra con J = NaN | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-Av-nula | barra con Avz = 0 | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-sin-seccion (contrato) | barra sin sección | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-vz-nulo | vector de canto nulo | 40 | modelo/orientacion-no-valida ×40 | modelo/orientacion-no-valida o modelo/propiedad-no-valida | sí
+barra-vz-paralelo | vector de canto paralelo al pilar | 40 | modelo/orientacion-no-valida ×40 | modelo/orientacion-no-valida | sí
+barra-vz-corto | vector de canto de 2 componentes | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-sin-vz (contrato) | barra sin vector de canto | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-offsets-solapados | offsets que se comen la barra | 40 | modelo/elemento-degenerado ×40 | modelo/elemento-degenerado o modelo/offset-no-valido | sí
+barra-offset-nan | offset con NaN | 40 | modelo/offset-no-valido ×40 | modelo/offset-no-valido | sí
+barra-liberacion-inestable | axil liberado en los dos extremos | 40 | modelo/liberacion-inestable ×40 | modelo/liberacion-inestable | sí
+barra-liberacion-corta | liberaciones de 5 valores | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-modificador-nulo | modificador de inercia 0 | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-modificador-nan | modificador NaN | 40 | modelo/propiedad-no-valida ×40 | modelo/propiedad-no-valida | sí
+barra-longitud-nula | barra entre dos nudos coincidentes | 40 | modelo/elemento-degenerado ×40 | modelo/elemento-degenerado | sí
+lamina-nudo-fuera | lámina con un nudo inexistente | 38 | modelo/nudo-no-valido ×38 | modelo/nudo-no-valido | sí
+lamina-tres-nudos | lámina de 3 nudos | 38 | modelo/nudo-no-valido ×38 | modelo/nudo-no-valido | sí
+lamina-nudo-repetido | lámina con un nudo repetido | 38 | modelo/nudo-no-valido ×38 | modelo/nudo-no-valido | sí
+lamina-t-nulo | espesor 0 | 38 | modelo/propiedad-no-valida ×38 | modelo/propiedad-no-valida | sí
+lamina-nu-medio | ν = 0,5 | 38 | modelo/propiedad-no-valida ×38 | modelo/propiedad-no-valida | sí
+lamina-E-nan | E = NaN | 38 | modelo/propiedad-no-valida ×38 | modelo/propiedad-no-valida | sí
+lamina-sin-material (contrato) | lámina sin material | 38 | modelo/propiedad-no-valida ×38 | modelo/propiedad-no-valida | sí
+lamina-cruzada | nudos de la lámina en orden cruzado (pajarita) | 38 | modelo/elemento-degenerado ×38 | modelo/elemento-degenerado | sí
+lamina-alabeada | un nudo de forjado subido 0,1 m (láminas alabeadas) | 36 | modelo/lamina-alabeada ×36 | modelo/lamina-alabeada | sí
+lamina-eje1-normal | eje 1 normal al plano de la lámina | 36 | modelo/orientacion-no-valida ×36 | modelo/orientacion-no-valida | sí
+lamina-eje1-nan | eje 1 con NaN | 38 | modelo/orientacion-no-valida ×38 | modelo/orientacion-no-valida | sí
+lamina-eje1-corto | eje 1 de 2 componentes | 38 | modelo/orientacion-no-valida ×38 | modelo/orientacion-no-valida | sí
+lamina-multiplicador-negativo | multiplicador m11 < 0 | 38 | modelo/propiedad-no-valida ×38 | modelo/propiedad-no-valida | sí
+lamina-gamma-nulo | γ/G del drilling = 0 | 38 | modelo/propiedad-no-valida ×38 | modelo/propiedad-no-valida | sí
+muelle-k-corta | muelle con 5 rigideces | 39 | modelo/propiedad-no-valida ×39 | modelo/propiedad-no-valida | sí
+muelle-k-negativa | muelle con una rigidez negativa | 39 | modelo/propiedad-no-valida ×39 | modelo/propiedad-no-valida | sí
+muelle-k-asimetrica | matriz de rigidez no simétrica | 39 | modelo/propiedad-no-valida ×39 | modelo/propiedad-no-valida | sí
+muelle-k-nan | rigidez NaN | 39 | modelo/propiedad-no-valida ×39 | modelo/propiedad-no-valida | sí
+muelle-ejes-zurdos | ejes del muelle levógiros | 39 | modelo/orientacion-no-valida ×39 | modelo/orientacion-no-valida | sí
+muelle-ejes-no-ortonormales | ejes del muelle no ortonormales | 39 | modelo/orientacion-no-valida ×39 | modelo/orientacion-no-valida | sí
+muelle-separado | muelle entre dos nudos separados | 35 | modelo/muelle-no-nulo ×35 | modelo/muelle-no-nulo | sí
+muelle-nudo-fuera | muelle sobre un nudo inexistente | 39 | modelo/nudo-no-valido ×39 | modelo/nudo-no-valido | sí
+apoyo-nudo-fuera | apoyo sobre un nudo inexistente | 40 | modelo/apoyo-no-valido ×40 | modelo/apoyo-no-valido | sí
+apoyo-cinco | apoyo con 5 GDL | 40 | modelo/apoyo-no-valido ×40 | modelo/apoyo-no-valido | sí
+sin-apoyos | sin apoyos ni muelles a tierra | 40 | modelo/parte-sin-apoyo ×40 | modelo/parte-sin-apoyo | sí
+apoyo-en-esclavo | apoyo en un esclavo de diafragma | 24 | restriccion/apoyo-en-esclavo ×24 | restriccion/apoyo-en-esclavo | sí
+restriccion-maestro-fuera | maestro inexistente | 32 | restriccion/nudo-no-valido ×32 | restriccion/nudo-no-valido | sí
+restriccion-esclavo-maestro | el maestro es también esclavo de sí mismo | 32 | restriccion/nudo-no-valido ×32 | restriccion/nudo-no-valido | sí
+restriccion-esclavo-doble | un nudo esclavo de dos restricciones | 14 | restriccion/esclavo-doble ×14 | restriccion/esclavo-doble | sí
+diafragma-otra-cota | diafragma con un nudo de otra cota | 24 | restriccion/diafragma-no-plano ×24 | restriccion/diafragma-no-plano | sí
+restriccion-tipo | restricción de tipo desconocido | 32 | restriccion/tipo-no-valido ×32 | restriccion/tipo-no-valido | sí
+restriccion-ciclo | cadena cerrada: A esclavo de B y B esclavo de A | 23 | restriccion/ciclo ×11; restriccion/esclavo-doble + restriccion/ciclo ×12 | restriccion/ciclo | sí
+carga-nudo-fuera | carga nodal sobre un nudo inexistente | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-nan | carga nodal NaN | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-cinco | carga nodal de 5 componentes | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-barra-fuera | carga sobre una barra inexistente | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-barra-x-fuera | puntual fuera del tramo flexible | 40 | carga/fuera-de-barra ×40 | carga/fuera-de-barra | sí
+carga-barra-invertida | distribuida con a > b | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-barra-nan | distribuida con NaN | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-barra-ejes | carga de barra con ejes desconocidos | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-barra-tipo | carga de barra de tipo desconocido (antes de E6 se tomaba por distribuida) | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-lamina-fuera | carga sobre una lámina inexistente | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-lamina-punto-fuera | puntual fuera de la lámina | 38 | carga/fuera-de-lamina ×38 | carga/fuera-de-lamina | sí
+carga-lamina-linea-nula | carga de línea de longitud nula | 38 | carga/no-valida ×38 | carga/no-valida | sí
+carga-lamina-tres-q | superficie por nudo con 3 vectores | 38 | carga/no-valida ×38 | carga/no-valida | sí
+carga-lamina-nan | superficie con NaN | 38 | carga/no-valida ×38 | carga/no-valida | sí
+impuesto-sin-apoyo | desplazamiento impuesto en un GDL sin apoyo | 40 | carga/impuesto-sin-apoyo ×40 | carga/impuesto-sin-apoyo | sí
+impuesto-gdl | desplazamiento impuesto en el GDL 7 | 40 | carga/no-valida ×40 | carga/no-valida | sí
+impuesto-nan | desplazamiento impuesto NaN | 40 | carga/no-valida ×40 | carga/no-valida | sí
+carga-sin-rigidez | momento rx sobre el maestro auxiliar de un diafragma (GDL sin rigidez) | 17 | carga/gdl-sin-rigidez ×17 | carga/gdl-sin-rigidez | sí
+barra-sin-nudos (contrato) | barra sin nudos | 40 | modelo/nudo-no-valido ×40 | modelo/nudo-no-valido | sí
+lamina-sin-nudos (contrato) | lámina sin nudos | 38 | modelo/nudo-no-valido ×38 | modelo/nudo-no-valido | sí
+muelle-sin-k (contrato) | muelle sin rigidez | 39 | modelo/propiedad-no-valida ×39 | modelo/propiedad-no-valida | sí
+apoyo-sin-coartados (contrato) | apoyo sin la lista de GDL | 40 | modelo/apoyo-no-valido ×40 | modelo/apoyo-no-valido | sí
+restriccion-sin-esclavos (contrato) | restricción sin la lista de esclavos | 32 | restriccion/nudo-no-valido ×32 | restriccion/nudo-no-valido | sí
+carga-sin-f (contrato) | carga nodal sin vector | 40 | carga/no-valida ×40 | carga/no-valida | sí
+modelo-sin-lista-de-nudos (contrato) | modelo sin la lista de nudos | 40 | motor/error-interno ×40 | motor/error-interno | sí
+modelo-sin-casos | modelo sin casos de carga | 40 | válido ×40 | válido o error | sí
+caso-vacio | un caso sin cargas | 40 | válido ×40 | válido o error | sí
+modelo-vacio | modelo sin nudos ni objetos | 40 | válido ×40 | válido o error | sí
+
+83 entradas; incumplen: 0

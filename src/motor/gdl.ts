@@ -70,7 +70,7 @@ export function numerar(modelo: ModeloAnalitico, elementos: readonly ElementoMot
   const restricciones = modelo.restricciones ?? [];
   const enRestriccion = new Uint8Array(nn);
   restricciones.forEach((r, ir) => {
-    const indices = [r.maestro, ...r.esclavos];
+    const indices = Array.isArray(r.esclavos) ? [r.maestro, ...r.esclavos] : [Number.NaN];
     if (indices.some((v) => !Number.isInteger(v) || v < 0 || v >= nn) || new Set(indices).size !== indices.length) {
       diag.error("restriccion/nudo-no-valido", `La restricción ${r.id} hace referencia a nudos inexistentes o repetidos (el maestro no puede ser esclavo de sí mismo).`, [r.id]);
       return;
@@ -165,7 +165,7 @@ export function numerar(modelo: ModeloAnalitico, elementos: readonly ElementoMot
   // 3. Apoyos
   const coartado = new Uint8Array(P);
   for (const a of modelo.apoyos ?? []) {
-    if (!Number.isInteger(a.nudo) || a.nudo < 0 || a.nudo >= nn || a.coartados.length !== 6) {
+    if (!Number.isInteger(a.nudo) || a.nudo < 0 || a.nudo >= nn || !Array.isArray(a.coartados) || a.coartados.length !== 6) {
       diag.error("modelo/apoyo-no-valido", `Hay un apoyo sobre un nudo inexistente o sin sus 6 GDL (índice ${a.nudo}).`);
       continue;
     }

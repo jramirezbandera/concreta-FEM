@@ -124,6 +124,7 @@ export function modeloAleatorio(semilla: number): ModeloAleatorio {
 
   // Plantas: forjado de láminas, vigas, muros, huellas y diafragma
   const laminasCargables: number[] = [];
+  const nudosMuro = new Map<string, number>();
   const restringidos = new Set<number>(); // esclavos de huellas
   for (let k = 1; k <= plantas; k++) {
     const z = zs[k]!;
@@ -200,7 +201,15 @@ export function modeloAleatorio(semilla: number): ModeloAleatorio {
           const esquina = (a === 0 || a === 2) && (b === 0 || b === 2);
           if (esquina) w[a]!.push(cabezas[b === 0 ? k - 1 : k]![a === 0 ? i : i + 1]![j]!);
           else {
+            // el nudo central del borde de un muro de la planta de abajo se comparte
+            const clave = `${i},${j},${k - 1 + b / 2},${a}`;
+            const previo = nudosMuro.get(clave);
+            if (previo !== undefined) {
+              w[a]!.push(previo);
+              continue;
+            }
             const v = m.nudo(x0 + ((x1 - x0) * a) / 2, y, z0 + ((z1 - z0) * b) / 2, `W${i}${j}-${k}.${a}${b}`);
+            nudosMuro.set(clave, v);
             if (k === 1 && b === 0) {
               m.apoyo(v, EMPOTRADO);
               coartados.add(v);

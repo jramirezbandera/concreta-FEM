@@ -55,7 +55,33 @@ export interface OpcionesCalculo {
 const ahora = () => performance.now();
 const MB = (b: number) => Math.ceil(b / 2 ** 20);
 
+/**
+ * Calcula el modelo. Nunca lanza por un dato del modelo: un dato no válido es un diagnóstico de
+ * error, y cualquier otra excepción de JavaScript (un campo obligatorio que falta, un fallo del
+ * propio motor) acaba en el error `motor/error-interno`. Sólo se propaga una trampa del WASM
+ * (`WebAssembly.RuntimeError`): deja el núcleo en un estado desconocido y quien llama tiene que
+ * descartarlo (el worker se recicla, E4).
+ */
 export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}): ResultadoCalculo {
+  try {
+    return calcularModelo(modelo, opciones);
+  } catch (e) {
+    if (e instanceof WebAssembly.RuntimeError) throw e;
+    const texto = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    return {
+      valido: false,
+      diagnosticos: [
+        {
+          codigo: "motor/error-interno",
+          severidad: "error",
+          mensaje: `El motor no ha podido calcular el modelo (${texto}). Suele deberse a un modelo analítico mal formado (un campo obligatorio que falta); si no, es un fallo del motor.`,
+        },
+      ],
+    };
+  }
+}
+
+function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): ResultadoCalculo {
   const diag = new Diagnosticos();
   const tiempos: Record<string, number> = {};
   let t0 = ahora();
@@ -106,7 +132,7 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
   const indep = casos.map(() => new Float64Array(P)); // û por GDL físico independiente
   casos.forEach((caso, k) => {
     for (const c of caso.nodales ?? []) {
-      if (!Number.isInteger(c.nudo) || c.nudo < 0 || c.nudo >= nn || c.f.length !== 6 || !c.f.every(Number.isFinite)) {
+      if (!Number.isInteger(c.nudo) || c.nudo < 0 || c.nudo >= nn || !Array.isArray(c.f) || c.f.length !== 6 || !c.f.every(Number.isFinite)) {
         diag.error("carga/no-valida", `El caso ${caso.id} tiene una carga nodal sobre un nudo inexistente o con valores no finitos.`, [caso.id]);
         continue;
       }
@@ -479,8 +505,8 @@ function nudosCoincidentes(modelo: ModeloAnalitico, geo: Geometria, diag: Diagno
   const orden = Array.from({ length: nn }, (_, i) => i).sort((a, b) => xyz[3 * a]! - xyz[3 * b]!);
   const unidos = new Set<string>();
   const clave = (a: number, b: number) => (a < b ? `${a},${b}` : `${b},${a}`);
-  for (const m of modelo.muelles ?? []) if (m.nudos.length === 2) unidos.add(clave(m.nudos[0], m.nudos[1]!));
-  for (const r of modelo.restricciones ?? []) for (const s of r.esclavos) unidos.add(clave(r.maestro, s));
+  for (const m of modelo.muelles ?? []) if (Array.isArray(m.nudos) && m.nudos.length === 2) unidos.add(clave(m.nudos[0], m.nudos[1]!));
+  for (const r of modelo.restricciones ?? []) for (const s of Array.isArray(r.esclavos) ? r.esclavos : []) unidos.add(clave(r.maestro, s));
   const pares: string[] = [];
   for (let a = 0; a < nn; a++) {
     const i = orden[a]!;
