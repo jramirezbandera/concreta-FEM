@@ -90,7 +90,7 @@ describe("mismo resultado que calcular()", () => {
   };
 
   it("los modelos congelados de E1–E3, en cola en un mismo worker, bit a bit", async () => {
-    const cliente = nuevoCliente();
+    const cliente = nuevoCliente({ umbralReciclaje: 2 ** 32 });
     const nombres = Object.keys(modelos);
     const enWorker = await Promise.all(nombres.map((k) => cliente.calcular(modelos[k]!())));
     nombres.forEach((k, i) => {
@@ -149,7 +149,7 @@ describe("cliente", () => {
   });
 
   it("cancelar rechaza en el acto lo pendiente, calienta otro worker y el siguiente cálculo sale igual", async () => {
-    const cliente = nuevoCliente();
+    const cliente = nuevoCliente({ umbralReciclaje: 2 ** 32 });
     await cliente.calentar();
     const modelo = mediano();
     let t0 = 0;
@@ -171,22 +171,26 @@ describe("cliente", () => {
     expect(cliente.estado.arranques).toBe(2);
   });
 
-  it("recicla el worker cuando la memoria lineal pasa del umbral", async () => {
-    const cliente = nuevoCliente({ umbralReciclaje: 1 });
+  it("por defecto recicla tras cada cálculo; con umbral, sólo cuando la memoria lineal pasa de él", async () => {
+    const cliente = nuevoCliente();
     const modelo = pequeno();
     const a = await cliente.calcular(modelo);
     const b = await cliente.calcular(modelo);
     mismoResultado(a, b);
-    expect(cliente.estado.reciclajes).toBe(2);
-    expect(cliente.estado.arranques).toBe(3);
-    const holgado = nuevoCliente();
-    await holgado.calcular(modelo);
-    await holgado.calcular(modelo);
-    expect(holgado.estado).toMatchObject({ reciclajes: 0, arranques: 1 });
+    expect(cliente.estado).toMatchObject({ reciclajes: 2, arranques: 3, vivo: true }); // el siguiente ya se está calentando
+    await cliente.calentar();
+    expect(cliente.estado.listo).toBe(true);
+    const conUmbral = nuevoCliente({ umbralReciclaje: 2 * 2 ** 20 });
+    await conUmbral.calcular(modelo);
+    await conUmbral.calcular(modelo);
+    expect(conUmbral.estado.memoria!.lineal).toBeLessThan(2 * 2 ** 20);
+    expect(conUmbral.estado).toMatchObject({ reciclajes: 0, arranques: 1 });
+    await conUmbral.calcular(mediano());
+    expect(conUmbral.estado).toMatchObject({ reciclajes: 1, arranques: 2 });
   });
 
   it("una excepción del motor es ErrorWorker; el worker se recicla y la cola sigue", async () => {
-    const cliente = nuevoCliente();
+    const cliente = nuevoCliente({ umbralReciclaje: 2 ** 32 });
     const roto = { nudos: null } as unknown as ModeloAnalitico;
     const [malo, bueno] = [cliente.calcular(roto), cliente.calcular(pequeno())];
     await expect(malo).rejects.toBeInstanceOf(ErrorWorker);
@@ -221,7 +225,7 @@ describe("cliente", () => {
   });
 
   it("en reposo termina el worker y lo vuelve a arrancar al calcular", async () => {
-    const cliente = nuevoCliente({ reposoMs: 30 });
+    const cliente = nuevoCliente({ reposoMs: 30, umbralReciclaje: 2 ** 32 });
     await cliente.calcular(pequeno());
     expect(cliente.estado.vivo).toBe(true);
     await hasta(() => !cliente.estado.vivo);

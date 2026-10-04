@@ -27,5 +27,6 @@ describe("perfil del dispositivo", () => {
     expect(p.ecuaciones).toBeGreaterThan(m.ecuaciones);
     expect(s.memoriaNucleo).toBeLessThanOrEqual(2 ** 32 * 0.75);
     for (const l of [s, p, m]) expect(l.umbralReciclaje).toBeLessThan(l.memoriaNucleo);
+    expect([p.umbralReciclaje, m.umbralReciclaje]).toEqual([0, 0]); // tras cada cálculo
   });
 });

@@ -9,8 +9,11 @@
  * - **Portátil:** la mitad. El edificio objetivo semirrígido (152 250 ecuaciones, 370 MB) cabe.
  * - **Móvil:** iOS daría entre 300 MB y 1 GB (H16, soporte C). El edificio objetivo con diafragma
  *   rígido (76 146 ecuaciones, 128 MB de núcleo) cabe; el semirrígido, no.
- * - **Reciclaje:** un worker que ha pasado de la mitad de su límite se recicla, para que el
- *   siguiente cálculo empiece con la memoria lineal pequeña (la estimación del pico cuenta con ella).
+ * - **Reciclaje:** un worker caliente se queda con el pico de memoria de su último cálculo, y la
+ *   mayor parte no es del núcleo: en Chrome, el edificio objetivo con diafragma deja ~800 MB en el
+ *   renderer con 128 MB de núcleo, y V8 no los devuelve con el worker en reposo (E4). En portátil y
+ *   móvil se recicla tras cada cálculo (un 7–12 % más lento, sin JIT caliente); en sobremesa, sólo
+ *   cuando el núcleo pasa de la mitad de su límite.
  */
 import type { LimitesCalculo } from "../motor/calcular.ts";
 
@@ -25,13 +28,13 @@ const MiB = 2 ** 20;
 
 export const LIMITES: Record<PerfilDispositivo, LimitesDispositivo> = {
   sobremesa: { ecuaciones: 600_000, memoriaNucleo: 2560 * MiB, umbralReciclaje: 1280 * MiB },
-  portatil: { ecuaciones: 300_000, memoriaNucleo: 1280 * MiB, umbralReciclaje: 640 * MiB },
-  movil: { ecuaciones: 100_000, memoriaNucleo: 384 * MiB, umbralReciclaje: 192 * MiB },
+  portatil: { ecuaciones: 300_000, memoriaNucleo: 1280 * MiB, umbralReciclaje: 0 },
+  movil: { ecuaciones: 100_000, memoriaNucleo: 384 * MiB, umbralReciclaje: 0 },
 };
 
 export interface InfoDispositivo {
   movil: boolean;
-  /** GB de memoria del equipo según el navegador (`navigator.deviceMemory`: sólo Chromium, y como mucho 8). */
+  /** GB de memoria del equipo según el navegador (`navigator.deviceMemory`: sólo Chromium, redondeado; Chrome 154 da 32 en un equipo de 32 GB). */
   memoriaGB?: number;
 }
 

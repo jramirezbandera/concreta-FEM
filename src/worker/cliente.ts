@@ -8,9 +8,11 @@
  *   siguiente cálculo cuando llega el resultado del anterior.
  * - **Cancelar (H20)** es `terminate()`: se rechaza lo pendiente con `ErrorCancelado` y se calienta
  *   otro worker en segundo plano.
- * - **Reciclar (H16).** La memoria lineal del núcleo no baja nunca: si tras un cálculo pasa de
- *   `umbralReciclaje`, el worker se termina y se calienta otro. Lo mismo si el worker falla
- *   (`ErrorWorker`): tras una excepción o una trampa del WASM no se reutiliza.
+ * - **Reciclar (H16).** Ni la memoria lineal del núcleo ni el heap de V8 del worker bajan tras un
+ *   cálculo, y el worker no puede medir su heap JS (no hay `performance.memory` en un worker). Por
+ *   defecto el worker se recicla tras cada cálculo: el siguiente arranca en ~10 ms y pierde el JIT
+ *   caliente (un 7–12 % más lento, E4). Con `umbralReciclaje`, sólo cuando la memoria lineal pasa
+ *   de él. Tras un fallo (`ErrorWorker`: excepción o trampa del WASM) se recicla siempre.
  * - **Reposo.** Sin cálculos durante `reposoMs`, el worker se termina y se vuelve a arrancar al
  *   calcular.
  *
@@ -69,7 +71,10 @@ export interface OpcionesCliente {
   crearWorker: CrearWorker;
   /** Núcleo WASM compilado una vez (`WebAssembly.compileStreaming(fetch(url))`), para todos los workers. */
   nucleo: WebAssembly.Module | Promise<WebAssembly.Module>;
-  /** Memoria lineal (bytes) por encima de la cual se recicla el worker tras un cálculo. Por defecto, 512 MiB. */
+  /**
+   * Memoria lineal del núcleo (bytes) por encima de la cual se recicla el worker tras un cálculo.
+   * Por defecto, 0: tras cada cálculo (ver la cabecera y `LIMITES` en `limites.ts`).
+   */
   umbralReciclaje?: number;
   /** Milisegundos sin cálculos tras los que se termina el worker. Por defecto, nunca. */
   reposoMs?: number;
@@ -113,7 +118,6 @@ interface Activo {
   rechazarListo: (e: Error) => void;
 }
 
-export const UMBRAL_RECICLAJE = 512 * 2 ** 20;
 
 export class ClienteMotor {
   private readonly opciones: OpcionesCliente;
@@ -241,7 +245,7 @@ export class ClienteMotor {
         const t = this.enCurso;
         if (t?.id !== m.id) return;
         this.enCurso = null;
-        if (m.memoria.lineal > (this.opciones.umbralReciclaje ?? UMBRAL_RECICLAJE)) this.reciclar();
+        if (m.memoria.lineal > (this.opciones.umbralReciclaje ?? 0)) this.reciclar();
         t.resolver(m.resultado);
         this.despachar();
         this.programarReposo();
