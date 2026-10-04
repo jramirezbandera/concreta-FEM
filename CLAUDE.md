@@ -59,7 +59,7 @@
   - **Herramientas de prueba:** `src/pruebas/` y los benches y oráculos en `spike/e0/`.
   - **El núcleo** se compila con `bun run nucleo:compilar` y se verifica con `bun run nucleo:verificar` (sha256 reproducible). No se edita `src/nucleo/pkg/` a mano.
   - **Oráculos:** PyNite 3.2.0 en `.venv` (Python 3.14); OpenSeesPy 3.8 en `.venv312` (Python 3.12: con 3.14 no carga en Windows).
-  - **Pendiente:** ver el CI (`.github/workflows/ci.yml`) en verde tras un push y medir en móvil.
+  - **Pendiente:** medir en móvil (el CI, `.github/workflows/ci.yml`, está en verde).
 - **2026-10-03: fase E1 superada** (núcleo del motor). Pasan los cinco criterios. El informe está en `docs/fem3d/fase-e1.md`, con criterios, hallazgos E1-1…E1-8 y pendientes.
   - **Ya en `src/motor/`:** modelo analítico (convenios en la cabecera de `modelo.ts`), GDL con diafragma rígido y enlace rígido por transformación (cadenas incluidas), patrón CSC fijo, mecanismos por pivote con su modo, refinamiento por error hacia atrás y ΣF/ΣM ≤ 1e-9 en cada cálculo. Se usa con `calcular(modelo)`.
   - **Validación:** `validacion/e1/` (oráculo OpenSeesPy, banco del edificio objetivo, margen de pivotes). Las cadenas se validan sólo contra el `Lagrange` de OpenSees, porque su `Transformation` las resuelve mal (E1-1).
@@ -80,7 +80,7 @@
   - **Convenio de láminas** en la cabecera de `modelo.ts` (H02: F11…V23 de CSI).
   - **Validación:** `validacion/e3/` (oráculo PyNite con resultantes giradas en Python, Navier ortótropa, benchmarks de H48, metamórficas, banco y referencia congelada).
   - **Abierto:** la semántica de los multiplicadores frente a SAP2000 (S5 #21) necesita un modelo del usuario; la propuesta está en «Pendiente» del informe.
-- **2026-10-04: fase E4 superada** (núcleo WASM, worker y memoria), salvo ver el CI en verde, que espera un push. El informe está en `docs/fem3d/fase-e4.md`, con criterios, hallazgos E4-1…E4-8 y pendientes.
+- **2026-10-04: fase E4 superada** (núcleo WASM, worker y memoria), con el CI en verde en GitHub. El informe está en `docs/fem3d/fase-e4.md`, con criterios, hallazgos E4-1…E4-8 y pendientes.
   - **Núcleo API 2:** `memoriaRequerida(nrhs)` y `memoriaEnUso()`. El motor rechaza antes de factorizar lo que no cabe (`limites`, diagnóstico `modelo/demasiado-grande`) y avisa del avance con `alProgreso`.
   - **Ya en `src/worker/`:** protocolo propio (sin Comlink), atendedor común a navegador y Node, y `ClienteMotor`:
     - el núcleo se compila una vez;

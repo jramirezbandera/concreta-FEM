@@ -1,7 +1,7 @@
 # Fase E4 — núcleo WASM, worker y memoria: resultado
 
 > **Fecha:** 2026-10-04. **Plan:** S7 de `investigacion-id.md` (fase E4: «crate, API, artefacto versionado, CI, worker y memoria»), con H16 (memoria), H20 (cancelar) y H27 (frontera worker → UI). El crate, la API y el artefacto versionado salieron ya del spike E0; aquí se añaden el worker, la memoria y la medida en Chrome.
-> **Veredicto: pasan cinco de los seis criterios; el sexto (ver el CI en verde) espera un push, que decide el usuario.**
+> **Veredicto: pasan los seis criterios.**
 > - El worker da los mismos bits que `calcular()`: en Node, los modelos congelados de E1–E3; en Chrome 154, la huella del edificio objetivo coincide con la de Node.
 > - Los resultados vuelven por Transferable sin bloquear el hilo principal (111 MB en 24 casos).
 > - Cancelar rechaza en 0,2 ms y el worker siguiente está listo en ~10 ms: S7 estimaba ~0,1 s.
@@ -17,7 +17,7 @@
 | 3 | Cancelar (H20): rechazo inmediato, worker listo en ≤ 0,1 s (S7) y el siguiente cálculo igual | **Pasa.** En Chrome, cancelar en plena factorización del semirrígido rechaza en 0,1–0,2 ms y el worker nuevo está listo en 7–13 ms. El cálculo siguiente da la misma huella | `out_chrome.txt`; `cliente.test.ts` |
 | 4 | Memoria (H16): la del núcleo en cada fase; límites por dispositivo que rechazan antes de factorizar; agotarla nunca deja un cuelgue ni un resultado; reciclar la devuelve | **Pasa.** El pico estimado queda por encima del real en los 6 modelos de la calibración, también con fragmentación. Pasar del límite de ecuaciones o de memoria da `modelo/demasiado-grande` sin factorizar (el perfil móvil, en 0,44 s). Sin memoria → `solver/sin-memoria`; trampa del WASM → `ErrorWorker`; en los dos casos se recicla el worker. En Chrome, terminar el worker tras el semirrígido devuelve 600–710 MB | `src/motor/memoria.test.ts`, `cliente.test.ts`; `out_calibrar_memoria.txt`, `out_chrome.txt` |
 | 5 | Núcleo versionado: API con la memoria antes de factorizar, ≤ 1,5 MB y sha256 reproducible | **Pasa.** API 2: 252 KB (80 KB en gzip); `nucleo:verificar` da el mismo hash desde cero | `src/nucleo/pkg/MANIFIESTO.json`, `src/nucleo/nucleo.test.ts` |
-| 6 | CI en verde en GitHub (pendiente desde E0) | **Pendiente.** Hace falta un push. El job de pruebas ya fija Node 24, que necesitan las pruebas del worker | `.github/workflows/ci.yml` |
+| 6 | CI en verde en GitHub (pendiente desde E0) | **Pasa.** Run 37198215432 del 2026-10-04: pruebas (tsc y los 412 tests, con Node 24 por las pruebas del worker) en 45 s; núcleo (recompilar, sha256 idéntico y `cargo test`) en 4 min. El CI ya había salido verde con el push del spike E0, el 2026-10-03 | `.github/workflows/ci.yml` |
 
 ---
 
@@ -220,7 +220,6 @@ Faltan el móvil y el portátil (S5 #2), que tiene que medir el usuario en sus d
 
 ## Pendiente
 
-- **Ver el CI en verde** (pendiente desde E0). Hace falta un push: `main` va por delante de `origin/main` desde el spike. **Ojo:** GitHub da el repositorio como **público**, aunque CLAUDE.md y el README dicen que es privado. Conviene decidirlo antes de empujar. El job de pruebas ya fija Node 24, que necesitan las pruebas del worker.
 - **Medir en móvil y portátil** (S5 #2):
   1. `node validacion/e4/chrome.ts --dispositivos`;
   2. abrir en el dispositivo `http://<IP>:8765/?manual`, en la misma red, y pulsar «Medir». Windows pedirá permiso al cortafuegos para Node.
