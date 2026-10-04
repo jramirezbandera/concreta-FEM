@@ -110,8 +110,21 @@
   - **Puente con SAP2000** (`validacion/e6/sap2000/`, LEEME.md): importador de modelos $2k, comparador de resultados y la placa de Navier de S5 #21 lista para importar.
 - **2026-10-04: D5 tomada** (bandas automáticas y editables).
 - **2026-10-04: placa de Navier calculada en SAP2000 v21** (E6-11). SAP2000 aplica los multiplicadores de flexión como el motor (D3 validada en flexión), pero sus cortantes de Shell-Thick se separan de la solución exacta hasta un 21 %; los del motor, ≤ 0,9 %.
+- **2026-10-04: fase C1 del compilador superada** (barras). Pasan los ocho criterios. El plan del compilador está en `docs/fem3d/compilador.md` (fases C1–C5) y el informe, en `docs/fem3d/fase-c1.md`, con criterios, hallazgos C1-1…C1-5 y pendientes.
+  - **Ya en `src/compilador/`:**
+    - modelo físico: plantas de arriba abajo con su altura, como `lib/edificio`; pilares, vigas en polilínea, apoyos y cargas (convenios en la cabecera de `fisico.ts`);
+    - topología con dos tolerancias (H28), nudos de dimensión finita por offsets, diafragma por planta, cargas sin pérdidas, mapeo y huella.
+
+    Se usa con `compilar(fisico)`. `traducirDiagnosticos` y `EsfuerzosPiezas` devuelven diagnósticos y esfuerzos a las piezas físicas.
+  - **Regla del compilador:** la geometría dibujada no se mueve nunca. Las tolerancias deciden la conectividad, y el hueco hasta el nudo es un offset rígido.
+  - **Validación:** `validacion/c1/` (1-022 como modelo físico, modelos hechos a mano, metamórficas, huellas V8/JSC, banco y referencia congelada).
+  - **Valores por defecto que el usuario tiene que revisar:**
+    - C1-a: zonas rígidas con factor 1;
+    - C1-c: eje de la viga en el plano del forjado (C1-5 lo mide);
+    - C1-d: diafragma rígido salvo en la planta más baja;
+    - C1-g: sin modificadores hasta que se decida D4.
 - **Siguiente paso:**
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
-  - en paralelo, empezar el compilador (Fase 2 de S1);
+  - compilador C2 (losas). Antes, el usuario decide si admite la licencia ISC (delaunator y constrainautor, H29) o si se escribe la CDT propia;
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

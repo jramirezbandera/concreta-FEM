@@ -3,6 +3,8 @@
 > **Qué es.** El compilador convierte el modelo físico (plantas, pilares, vigas, losas, muros, cargas) en el `ModeloAnalitico` del motor, con un mapeo de ida y vuelta y diagnósticos que nombran objetos físicos. Es el «núcleo diferencial» del §7 del diseño. **Fecha:** 2026-10-04.
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
+>
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). Siguiente: C2.
 
 ## Entrada, salida y reglas
 
@@ -52,7 +54,7 @@
 |---|---|---|---|---|
 | C1-a | Nudos de dimensión finita | Zonas rígidas con factor 1: la viga es rígida dentro del pilar y el pilar dentro del canto de la viga más alta que le llega | CYPECAD trata el cruce como un «nudo de dimensión finita» (ccadmc01, p. 15). E2 ya prevé offsets desde las caras | `factorZonaRigida` en [0, 1]; con 0, como SAP2000 por defecto |
 | C1-b | Viga excéntrica respecto al pilar | Se une al nudo del pilar con un offset que lleva la excentricidad, siempre que su eje pase por la huella del pilar | Sin penalización y sin mover la viga | — |
-| C1-c | Eje analítico de la viga | En el plano del forjado (sin offset vertical) | Con diafragma rígido, una viga descolgada con offset vertical se rigidiza como una T de ala infinita: +EA·e², que en una viga de 30×60 bajo una losa de 25 cm duplica su rigidez | `insercion: "superior"` por viga, con aviso si la planta tiene diafragma rígido |
+| C1-c | Eje analítico de la viga | En el plano del forjado (sin offset vertical) | Con diafragma rígido, una viga con offset vertical trabaja como una T de ala infinitamente rígida. En un pórtico de 6 m con viga de 30×60, la flecha baja un 21 %, el momento en la cara sube un 16 % y aparece un axil de 87 kN que no existe (C1-5) | `insercion: "superior"` por viga, con aviso si la planta tiene diafragma rígido |
 | C1-d | Diafragma | Rígido en todas las plantas menos la más baja | Como CYPECAD. En la más baja suelen estar los arranques empotrados, y un GDL esclavo no puede llevar apoyo | `diafragma: "ninguno"` por planta. El semirrígido llega con las losas (C2) |
 | C1-e | Qué nudos entran en el diafragma | Todos los de la cota de la planta | Sin la geometría de la losa (C2) no se sabe dónde hay forjado | En C2, por la geometría de la losa |
 | C1-f | Un apoyo en ux, uy o rz de un nudo con diafragma rígido | Error con la planta y el apoyo | El motor no admite apoyos en GDL esclavos. Moverlo al maestro no es equivalente | Quitar el diafragma de esa planta |

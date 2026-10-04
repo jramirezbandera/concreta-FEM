@@ -27,3 +27,7 @@ Criterio 3: relaciones metamórficas, peor valor en 12 semillas
 
 Criterio 4: sin pérdidas (resultante física frente a analítica) y equilibrio del motor
   24 modelos aleatorios: sin pérdidas 9.7e-16 en fuerzas y 1.2e-16 en momentos; equilibrio del motor 1.5e-14
+
+Decisión C1-c: punto de inserción de una viga descolgada (pórtico de 6 m, viga 30×60, pilares 40×40)
+  diafragma rigido: plano: flecha 0.875 mm, M vano 40.84, M cara -37.56 kN·m, N 0.0 kN; superior: flecha 0.692 mm, M vano 34.83, M cara -43.57 kN·m, N 87.0 kN
+  diafragma ninguno: plano: flecha 0.882 mm, M vano 41.10, M cara -37.30 kN·m, N -23.3 kN; superior: flecha 0.997 mm, M vano 44.87, M cara -33.53 kN·m, N -24.3 kN

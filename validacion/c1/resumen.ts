@@ -100,3 +100,31 @@ console.log("\nCriterio 4: sin pérdidas (resultante física frente a analítica
   }
   console.log(`  ${n} modelos aleatorios: sin pérdidas ${e(f)} en fuerzas y ${e(m)} en momentos; equilibrio del motor ${e(eq)}`);
 }
+
+console.log("\nDecisión C1-c: punto de inserción de una viga descolgada (pórtico de 6 m, viga 30×60, pilares 40×40)");
+{
+  const { EsfuerzosPiezas } = await import("../../src/compilador/resultados.ts");
+  for (const diafragma of ["rigido", "ninguno"] as const) {
+    const filas: string[] = [];
+    for (const insercion of ["plano", "superior"] as const) {
+      const r = valido(
+        compilar({
+          plantas: [{ id: "P1", altura: null, diafragma }, { id: "C", altura: 3, tipo: "sotano" }],
+          materiales: [{ id: "HA", tipo: "hormigon", fck: 25 }],
+          secciones: [{ id: "p", material: "HA", forma: "rectangular", b: 0.4, h: 0.4 }, { id: "v", material: "HA", forma: "rectangular", b: 0.3, h: 0.6 }],
+          pilares: [[0, 0], [6, 0], [0, 5], [6, 5]].map(([x, y]) => ({ id: `P${x}${y}`, x: x!, y: y!, desde: "C", hasta: "P1", seccion: "p" })),
+          vigas: [0, 5].map((y) => ({ id: `V${y}`, planta: "P1", puntos: [[0, y], [6, y]] as const, seccion: "v", insercion })),
+          casos: [{ id: "Q" }],
+          cargas: [{ tipo: "viga", id: "q", caso: "Q", viga: "V0", ejes: "global", q: [0, 0, -20] }],
+        }),
+      );
+      const casos = casosValidos(calcular(r.modelo, { solver: "perfil" }));
+      const ep = new EsfuerzosPiezas(r.modelo, r.mapeo, casos);
+      const d = ep.diagrama(r.mapeo.piezas.V0![0]!, 0);
+      const w = -d.desplazamientosEn(d.L / 2)[2]! * 1000;
+      const [N, , , , Mc] = ep.en("V0", 0, 3)!;
+      filas.push(`${insercion}: flecha ${w.toFixed(3)} mm, M vano ${Mc!.toFixed(2)}, M cara ${ep.en("V0", 0, 0.2)![4]!.toFixed(2)} kN·m, N ${N!.toFixed(1)} kN`);
+    }
+    console.log(`  diafragma ${diafragma}: ${filas.join("; ")}`);
+  }
+}
