@@ -1,17 +1,17 @@
 {
-  "versionApi": 1,
+  "versionApi": 2,
   "herramientas": {
     "rustc": "1.99.0",
     "wasmBindgen": "0.2.129",
     "wasmOpt": "133"
   },
   "simd128": true,
-  "bytes": 239295,
-  "bytesGzip": 77344,
+  "bytes": 252129,
+  "bytesGzip": 79746,
   "sha256": {
-    "nucleo.js": "2ce870e33d0cfa884dd5d54769d30762cd46f6749cdf0f392c6d8745f520163d",
-    "nucleo.d.ts": "9dafa2a74e71088bdb6391d4a38f309d63aa33b180795e20fd7537547d3f65b5",
-    "nucleo_bg.wasm": "89f887b73f2a89666480f03224058f6db9e6db159c0661cc4a9f0ca16cd0fd0f",
-    "nucleo_bg.wasm.d.ts": "c69ce6f86487281f447893f7cb3b69f516ecd77eb3cc065dac4113ebd4756a5f"
+    "nucleo.js": "bc51a2767c9a576d0e6fe94deca96b090f1ed710399183002a5468a3fd12718f",
+    "nucleo.d.ts": "ac0a53151cb51b01493321bcd77a57f1e445ee7d474ff8865f48649e56844283",
+    "nucleo_bg.wasm": "3cc4d3c8660be864d29fbe9279b6fd9a676df266863a3ab9389a29df54540471",
+    "nucleo_bg.wasm.d.ts": "8066e7825d5e6026c2d5377ccc61dbae5389a315b64063aef5e66b0386358021"
   }
 }

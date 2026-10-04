@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { FactorLdlt, iniciarNucleo, type PatronCsc } from "./index.ts";
+import { FactorLdlt, iniciarNucleo, memoriaEnUsoNucleo, memoriaNucleo, type PatronCsc } from "./index.ts";
 
 const pkg = join(import.meta.dirname, "pkg");
 
@@ -84,6 +84,27 @@ describe("FactorLdlt", () => {
     const f = new FactorLdlt(patron, { modo: "simplicial", perm: Uint32Array.of(0, 1) });
     expect(() => f.factorizar(Float64Array.of(1, -1, 1))).toThrow(/pivote nulo en la columna 1/);
     f.liberar();
+  });
+
+  it("dice la memoria que pedirá sin reservarla, y la devuelve al liberar", () => {
+    const { patron, valores } = laplaciano2d(60);
+    const antes = memoriaEnUsoNucleo();
+    const f = new FactorLdlt(patron, { modo: "supernodal" });
+    const req = f.memoriaRequerida(4);
+    const analizado = memoriaEnUsoNucleo();
+    expect(req.l).toBe(8 * f.estadisticas().nnzL);
+    expect(req.lados).toBe(8 * patron.n * 4);
+    expect(req.total).toBe(req.l + req.factorizacion + req.resolucion + req.lados);
+    expect(f.memoriaRequerida(1).resolucion).toBeLessThanOrEqual(req.resolucion);
+    f.factorizar(valores);
+    f.resolver(new Float64Array(4 * patron.n).fill(1), 4);
+    // Lo que queda reservado tras resolver: L y los lados derechos, dentro de lo anunciado
+    expect(memoriaEnUsoNucleo() - analizado).toBeGreaterThanOrEqual(req.l + req.lados);
+    expect(memoriaEnUsoNucleo() - analizado).toBeLessThanOrEqual(req.total);
+    expect(memoriaNucleo()).toBeGreaterThanOrEqual(memoriaEnUsoNucleo());
+    f.liberar();
+    // Sólo puede quedar la reserva fija de gemm (512 KiB) de la primera factorización densa
+    expect(memoriaEnUsoNucleo() - antes).toBeLessThanOrEqual(512 * 1024 + 512);
   });
 
   it("rechaza un patrón con entradas bajo la diagonal", () => {

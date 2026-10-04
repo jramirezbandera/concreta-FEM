@@ -16,6 +16,13 @@ export class Nucleo {
      */
     ladosPtr(nrhs: number): number;
     /**
+     * Bytes que pedirán la factorización y la resolución de `nrhs` lados derechos, sin
+     * reservarlos: [valores de L, trabajo de la factorización, trabajo de la resolución,
+     * lados derechos]. Con el análisis simbólico ya hecho, permite rechazar un modelo que no
+     * cabe antes de factorizar (H16).
+     */
+    memoriaRequerida(nrhs: number): Float64Array;
+    /**
      * `modo`: 0 = automático, 1 = supernodal, 2 = simplicial.
      */
     constructor(n: number, col_ptr: Uint32Array, row_idx: Uint32Array, perm: Uint32Array | null | undefined, modo: number);
@@ -32,6 +39,11 @@ export class Nucleo {
 export function memoria(): any;
 
 /**
+ * Bytes reservados y no liberados por el núcleo (incluye lo que reserva wasm-bindgen).
+ */
+export function memoriaEnUso(): number;
+
+/**
  * Versión de la API; el envoltorio TS la comprueba al cargar el módulo.
  */
 export function versionApi(): number;
@@ -42,10 +54,12 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_nucleo_free: (a: number, b: number) => void;
     readonly memoria: () => any;
+    readonly memoriaEnUso: () => number;
     readonly nucleo_diagonal: (a: number) => [number, number, number, number];
     readonly nucleo_estadisticas: (a: number) => [number, number];
     readonly nucleo_factorizar: (a: number) => [number, number];
     readonly nucleo_ladosPtr: (a: number, b: number) => [number, number, number];
+    readonly nucleo_memoriaRequerida: (a: number, b: number) => [number, number];
     readonly nucleo_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number];
     readonly nucleo_resolver: (a: number, b: number) => [number, number];
     readonly nucleo_valoresPtr: (a: number) => number;

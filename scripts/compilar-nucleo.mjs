@@ -21,7 +21,7 @@ import { gzipSync } from "node:zlib";
 
 const WASM_BINDGEN = "0.2.129";
 const WASM_OPT = "133";
-const VERSION_API = 1;
+const VERSION_API = 2;
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const kernel = join(raiz, "kernel");

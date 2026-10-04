@@ -8,9 +8,9 @@
  * La factorización se puede repetir con valores nuevos sobre el mismo patrón, y la resolución
  * trabaja por bloques de lados derechos en orden de columnas (n·nrhs valores).
  */
-import iniciar, { Nucleo, memoria, versionApi } from "./pkg/nucleo.js";
+import iniciar, { Nucleo, memoria, memoriaEnUso, versionApi } from "./pkg/nucleo.js";
 
-const VERSION_API = 1;
+const VERSION_API = 2;
 
 let iniciado = false;
 
@@ -26,6 +26,14 @@ export async function iniciarNucleo(fuente: BufferSource | WebAssembly.Module): 
 /** Bytes de la memoria lineal del núcleo: sólo crece (H16), así que es el pico del hilo. */
 export function memoriaNucleo(): number {
   return (memoria() as WebAssembly.Memory).buffer.byteLength;
+}
+
+/**
+ * Bytes reservados y no liberados dentro del núcleo. La memoria lineal no baja, pero el asignador
+ * reutiliza lo liberado: el pico de un cálculo nuevo es max(memoriaNucleo, en uso + lo que pida).
+ */
+export function memoriaEnUsoNucleo(): number {
+  return memoriaEnUso();
 }
 
 export interface PatronCsc {
@@ -44,6 +52,39 @@ export class ErrorPivoteNulo extends Error {
     this.name = "ErrorPivoteNulo";
     this.columna = columna;
   }
+}
+
+/**
+ * El núcleo no pudo reservar memoria: su memoria lineal no pasa de 4 GiB, y el navegador puede
+ * darle menos. El núcleo sigue siendo utilizable, pero su memoria ya no baja (H16).
+ */
+export class ErrorSinMemoria extends Error {
+  constructor() {
+    super("el núcleo WASM se ha quedado sin memoria");
+    this.name = "ErrorSinMemoria";
+  }
+}
+
+/** Traduce los errores del núcleo a errores tipados. */
+function traducir(e: unknown): unknown {
+  const m = e instanceof Error ? e.message : String(e);
+  const nulo = /pivote nulo en la columna (\d+)/.exec(m);
+  if (nulo) return new ErrorPivoteNulo(Number(nulo[1]));
+  if (m === "sin memoria") return new ErrorSinMemoria();
+  return e;
+}
+
+/** Bytes que pedirán la factorización y la resolución (ver `FactorLdlt.memoriaRequerida`). */
+export interface MemoriaRequerida {
+  /** Valores de L. */
+  l: number;
+  /** Memoria de trabajo de la factorización numérica. */
+  factorizacion: number;
+  /** Memoria de trabajo de la resolución del bloque de lados derechos. */
+  resolucion: number;
+  /** El propio bloque de lados derechos. */
+  lados: number;
+  total: number;
 }
 
 export interface EstadisticasFactor {
@@ -67,7 +108,11 @@ export class FactorLdlt {
     if (!iniciado) throw new Error("núcleo WASM sin iniciar: llama antes a iniciarNucleo()");
     this.n = patron.n;
     this.nnz = patron.rowIdx.length;
-    this.nucleo = new Nucleo(patron.n, patron.colPtr, patron.rowIdx, opciones.perm, MODOS[opciones.modo ?? "auto"]);
+    try {
+      this.nucleo = new Nucleo(patron.n, patron.colPtr, patron.rowIdx, opciones.perm, MODOS[opciones.modo ?? "auto"]);
+    } catch (e) {
+      throw traducir(e);
+    }
   }
 
   private vivo(): Nucleo {
@@ -84,9 +129,7 @@ export class FactorLdlt {
     try {
       nucleo.factorizar();
     } catch (e) {
-      const m = /pivote nulo en la columna (\d+)/.exec(e instanceof Error ? e.message : String(e));
-      if (m) throw new ErrorPivoteNulo(Number(m[1]));
-      throw e;
+      throw traducir(e);
     }
   }
 
@@ -94,16 +137,29 @@ export class FactorLdlt {
   resolver(b: Float64Array, nrhs = 1): Float64Array {
     if (b.length !== this.n * nrhs) throw new Error(`el bloque tiene ${b.length} valores; se esperaban ${this.n * nrhs}`);
     const nucleo = this.vivo();
-    const ptr = nucleo.ladosPtr(nrhs);
-    const mem = memoria() as WebAssembly.Memory;
-    new Float64Array(mem.buffer, ptr, b.length).set(b);
-    nucleo.resolver(nrhs);
+    let ptr: number;
+    try {
+      ptr = nucleo.ladosPtr(nrhs);
+      new Float64Array((memoria() as WebAssembly.Memory).buffer, ptr, b.length).set(b);
+      nucleo.resolver(nrhs);
+    } catch (e) {
+      throw traducir(e);
+    }
     return new Float64Array((memoria() as WebAssembly.Memory).buffer, ptr, b.length).slice();
   }
 
   /** Diagonal D de LDLᵀ en el orden original de los GDL (pivotes; inercia). */
   diagonal(): Float64Array {
     return this.vivo().diagonal();
+  }
+
+  /**
+   * Bytes que pedirán `factorizar()` y `resolver(…, nrhs)`, calculados del análisis simbólico sin
+   * reservar nada. Sirve para rechazar un modelo que no cabe antes de factorizar (H16).
+   */
+  memoriaRequerida(nrhs: number): MemoriaRequerida {
+    const [l, factorizacion, resolucion, lados] = this.vivo().memoriaRequerida(nrhs);
+    return { l: l!, factorizacion: factorizacion!, resolucion: resolucion!, lados: lados!, total: l! + factorizacion! + resolucion! + lados! };
   }
 
   estadisticas(): EstadisticasFactor {

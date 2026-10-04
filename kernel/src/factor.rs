@@ -159,6 +159,18 @@ impl Factor {
         }
     }
 
+    /// Bytes que pedirán la factorización numérica y la resolución de `nrhs` lados derechos,
+    /// calculados del análisis simbólico sin reservar nada: [valores de L, memoria de trabajo de
+    /// la factorización, memoria de trabajo de la resolución]. Sirve para rechazar un modelo que
+    /// no cabe antes de factorizar (H16).
+    pub fn memoria_requerida(&self, nrhs: usize) -> [usize; 3] {
+        let par = Par::Seq;
+        let l = self.simbolica.len_val() * core::mem::size_of::<f64>();
+        let f = self.simbolica.factorize_numeric_ldlt_scratch::<f64>(par, Default::default()).unaligned_bytes_required();
+        let s = self.simbolica.solve_in_place_scratch::<f64>(nrhs, par).unaligned_bytes_required();
+        [l, f, s]
+    }
+
     /// Factorización numérica con los valores de A en el patrón del análisis.
     pub fn factorizar(&mut self, valores: &[f64]) -> Result<(), Error> {
         if valores.len() != self.row_idx.len() {
@@ -345,6 +357,23 @@ mod tests {
                 Err(Error::PivoteNulo { columna }) => assert_eq!(columna, 1, "{modo:?}"),
                 otro => panic!("{modo:?}: {otro:?}"),
             }
+        }
+    }
+
+    #[test]
+    fn memoria_requerida_sin_reservar() {
+        // La memoria de L es la de len_val; la de trabajo crece con los lados derechos.
+        for modo in [Modo::Supernodal, Modo::Simplicial] {
+            let n = 300;
+            let (cp, ri, v) = laplaciano(n);
+            let mut f = Factor::analizar(n, cp, ri, None, modo).unwrap();
+            let [l, fac, s1] = f.memoria_requerida(1);
+            let [l24, fac24, s24] = f.memoria_requerida(24);
+            assert_eq!(l, f.nnz_l() * 8, "{modo:?}");
+            assert_eq!((l24, fac24), (l, fac), "{modo:?}");
+            assert!(s24 >= s1, "{modo:?}");
+            // No reserva: la factorización sigue funcionando igual después
+            f.factorizar(&v).unwrap();
         }
     }
 

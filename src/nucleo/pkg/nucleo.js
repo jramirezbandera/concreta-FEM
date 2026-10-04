@@ -53,6 +53,20 @@ export class Nucleo {
         return ret[0] >>> 0;
     }
     /**
+     * Bytes que pedirán la factorización y la resolución de `nrhs` lados derechos, sin
+     * reservarlos: [valores de L, trabajo de la factorización, trabajo de la resolución,
+     * lados derechos]. Con el análisis simbólico ya hecho, permite rechazar un modelo que no
+     * cabe antes de factorizar (H16).
+     * @param {number} nrhs
+     * @returns {Float64Array}
+     */
+    memoriaRequerida(nrhs) {
+        const ret = wasm.nucleo_memoriaRequerida(this.__wbg_ptr, nrhs);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
      * `modo`: 0 = automático, 1 = supernodal, 2 = simplicial.
      * @param {number} n
      * @param {Uint32Array} col_ptr
@@ -101,6 +115,15 @@ if (Symbol.dispose) Nucleo.prototype[Symbol.dispose] = Nucleo.prototype.free;
  */
 export function memoria() {
     const ret = wasm.memoria();
+    return ret;
+}
+
+/**
+ * Bytes reservados y no liberados por el núcleo (incluye lo que reserva wasm-bindgen).
+ * @returns {number}
+ */
+export function memoriaEnUso() {
+    const ret = wasm.memoriaEnUso();
     return ret;
 }
 
