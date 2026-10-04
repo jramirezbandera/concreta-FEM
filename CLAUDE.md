@@ -80,5 +80,14 @@
   - **Convenio de láminas** en la cabecera de `modelo.ts` (H02: F11…V23 de CSI).
   - **Validación:** `validacion/e3/` (oráculo PyNite con resultantes giradas en Python, Navier ortótropa, benchmarks de H48, metamórficas, banco y referencia congelada).
   - **Abierto:** la semántica de los multiplicadores frente a SAP2000 (S5 #21) necesita un modelo del usuario; la propuesta está en «Pendiente» del informe.
-- **Siguiente paso:** E5 (Q y bandas: corte por fuerzas nodales y SPR, H18) o lo que queda de E4 (worker y memoria); lo decide el usuario.
+- **2026-10-04: fase E4 superada** (núcleo WASM, worker y memoria), salvo ver el CI en verde, que espera un push. El informe está en `docs/fem3d/fase-e4.md`, con criterios, hallazgos E4-1…E4-8 y pendientes.
+  - **Núcleo API 2:** `memoriaRequerida(nrhs)` y `memoriaEnUso()`. El motor rechaza antes de factorizar lo que no cabe (`limites`, diagnóstico `modelo/demasiado-grande`) y avisa del avance con `alProgreso`.
+  - **Ya en `src/worker/`:** protocolo propio (sin Comlink), atendedor común a navegador y Node, y `ClienteMotor`:
+    - el núcleo se compila una vez;
+    - los resultados vuelven por Transferable;
+    - cancelar es `terminate` y volver a calentar (~10 ms);
+    - el worker se recicla tras cada cálculo (E4-1: la memoria es sobre todo JS y el worker no puede medirla);
+    - límites provisionales por perfil de dispositivo.
+  - **Validación:** `validacion/e4/`. El banco en Chrome (`chrome.ts`) da los mismos bits que Node. Su modo `--dispositivos` sirve para medir en el móvil.
+- **Siguiente paso:** E5 (Q y bandas: corte por fuerzas nodales y SPR, H18), o medir en el móvil y reducir la memoria JS del motor (pendientes de E4); lo decide el usuario.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
