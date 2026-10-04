@@ -56,6 +56,12 @@ export class ErrorLimiteMemoria extends Error {
  * en la segunda vuelta). En un núcleo nuevo, la estimación con el margen queda un 0–20 % por encima.
  */
 const MARGEN_FRAGMENTACION = 1.15;
+/**
+ * Margen fijo para lo que el núcleo reserva fuera de lo que anuncia faer: la reserva de `gemm`
+ * (512 KiB), la diagonal y el redondeo a páginas de 64 KiB. Sin él, el edificio objetivo con malla
+ * de 1,5 m y 5 casos quedaba 1 MB por debajo (15 MB estimados, 16 reales; E4, en Chrome y en iOS).
+ */
+const MARGEN_FIJO = 4 * 2 ** 20;
 
 export interface OpcionesResolver {
   /** Bytes de memoria lineal que el núcleo no debe pasar (sólo con el solver "nucleo"). */
@@ -171,7 +177,7 @@ export function resolver(
     if (factorizador instanceof FactorizadorNucleo) {
       marcar("analisis");
       const requerida = factorizador.memoriaRequerida(nrhs).total;
-      memoria = { requerida, picoEstimado: Math.max(memoriaNucleo(), memoriaEnUsoNucleo() + MARGEN_FRAGMENTACION * requerida) };
+      memoria = { requerida, picoEstimado: Math.max(memoriaNucleo(), memoriaEnUsoNucleo() + MARGEN_FRAGMENTACION * requerida + MARGEN_FIJO) };
       if (opciones.limiteMemoria !== undefined && memoria.picoEstimado > opciones.limiteMemoria) {
         throw new ErrorLimiteMemoria(memoria.picoEstimado, opciones.limiteMemoria);
       }

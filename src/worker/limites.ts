@@ -2,13 +2,16 @@
  * Límites de tamaño por tipo de dispositivo (D9: «el límite se fija en GDL según el dispositivo»;
  * H16). Un modelo que los pasa acaba con `modelo/demasiado-grande` antes de factorizar.
  *
- * **Valores provisionales** hasta medir en portátil y móvil (S5 #2). De dónde salen:
+ * **De dónde salen** (el portátil y los móviles de menos memoria, sin medir aún: S5 #2):
  * - **Sobremesa:** S7 estima ≈ 600 000 GDL en 10 s; E0 midió 680 646 ecuaciones con 1,2 GB de
  *   memoria del núcleo en 5,4 s, y su criterio de memoria era ≤ 2,5 GB. La memoria lineal de wasm32
  *   no pasa de 4 GiB.
  * - **Portátil:** la mitad. El edificio objetivo semirrígido (152 250 ecuaciones, 370 MB) cabe.
- * - **Móvil:** iOS daría entre 300 MB y 1 GB (H16, soporte C). El edificio objetivo con diafragma
- *   rígido (76 146 ecuaciones, 128 MB de núcleo) cabe; el semirrígido, no.
+ * - **Móvil:** lo medido en un iPhone 13 Pro (6 GB, iOS 26.6; E4): calcula todos los tamaños del
+ *   banco de dispositivos, hasta 183 330 ecuaciones (malla de 0,5 m) y el semirrígido del edificio
+ *   objetivo (152 250 ecuaciones, 369 MB de núcleo, pico estimado 447 MB), tan rápido como el
+ *   sobremesa. El límite es lo medido, no el techo del teléfono, que no se alcanzó; un móvil con
+ *   menos memoria puede caerse antes.
  * - **Reciclaje:** un worker caliente se queda con el pico de memoria de su último cálculo, y la
  *   mayor parte no es del núcleo: en Chrome, el edificio objetivo con diafragma deja ~800 MB en el
  *   renderer con 128 MB de núcleo, y V8 no los devuelve con el worker en reposo (E4). En portátil y
@@ -29,7 +32,7 @@ const MiB = 2 ** 20;
 export const LIMITES: Record<PerfilDispositivo, LimitesDispositivo> = {
   sobremesa: { ecuaciones: 600_000, memoriaNucleo: 2560 * MiB, umbralReciclaje: 1280 * MiB },
   portatil: { ecuaciones: 300_000, memoriaNucleo: 1280 * MiB, umbralReciclaje: 0 },
-  movil: { ecuaciones: 100_000, memoriaNucleo: 384 * MiB, umbralReciclaje: 0 },
+  movil: { ecuaciones: 200_000, memoriaNucleo: 512 * MiB, umbralReciclaje: 0 },
 };
 
 export interface InfoDispositivo {

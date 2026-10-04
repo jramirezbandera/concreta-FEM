@@ -2,7 +2,8 @@
 
 > **Fecha:** 2026-10-04. **Plan:** S7 de `investigacion-id.md` (fase E4: «crate, API, artefacto versionado, CI, worker y memoria»), con H16 (memoria), H20 (cancelar) y H27 (frontera worker → UI). El crate, la API y el artefacto versionado salieron ya del spike E0; aquí se añaden el worker, la memoria y la medida en Chrome.
 > **Veredicto: pasan los seis criterios.**
-> - El worker da los mismos bits que `calcular()`: en Node, los modelos congelados de E1–E3; en Chrome 154, la huella del edificio objetivo coincide con la de Node.
+> - El worker da los mismos bits que `calcular()`: en Node, los modelos congelados de E1–E3; en Chrome 154, la huella del edificio objetivo coincide con la de Node. En un iPhone 13 Pro (JavaScriptCore) difiere a ≤ 3,1e-12.
+> - El iPhone 13 Pro calcula el edificio objetivo, también el semirrígido, tan rápido como el sobremesa (E4-9).
 > - Los resultados vuelven por Transferable sin bloquear el hilo principal (111 MB en 24 casos).
 > - Cancelar rechaza en 0,2 ms y el worker siguiente está listo en ~10 ms: S7 estimaba ~0,1 s.
 > - Un modelo que no cabe se rechaza antes de factorizar, con un diagnóstico; ni el agotamiento de memoria del núcleo ni una trampa del WASM dejan un cuelgue o un resultado.
@@ -12,10 +13,10 @@
 
 | # | Criterio | Resultado | Evidencia |
 |---|---|---|---|
-| 1 | El worker da los mismos bits que `calcular()`: en Node, con los modelos congelados de E1–E3; en Chrome, con el edificio objetivo frente a Node | **Pasa.** Node (`worker_threads`): los 7 modelos congelados y uno con diagnóstico, bit a bit y en cola en un mismo worker. Chrome 154: la huella del edificio objetivo (diafragma y semirrígido, 24 casos) es la de Node 24.19 en las seis pasadas | `src/worker/cliente.test.ts`; `validacion/e4/out_chrome.txt` |
+| 1 | El worker da los mismos bits que `calcular()`: en Node, con los modelos congelados de E1–E3; en Chrome, con el edificio objetivo frente a Node | **Pasa.** Node (`worker_threads`): los 7 modelos congelados y uno con diagnóstico, bit a bit y en cola en un mismo worker. Chrome 154: la huella del edificio objetivo (diafragma y semirrígido, 24 casos) es la de Node 24.19 en las siete pasadas | `src/worker/cliente.test.ts`; `validacion/e4/out_chrome.txt` |
 | 2 | La frontera worker → UI no usa JSON ni bloquea el hilo principal (H27) | **Pasa.** Los resultados van por Transferable y en el worker quedan vacíos. Recibir 111 MB no da ninguna tarea larga. La única es enviar el modelo analítico: 61–74 ms (E4-3) | `cliente.test.ts`; `out_chrome.txt` |
 | 3 | Cancelar (H20): rechazo inmediato, worker listo en ≤ 0,1 s (S7) y el siguiente cálculo igual | **Pasa.** En Chrome, cancelar en plena factorización del semirrígido rechaza en 0,1–0,2 ms y el worker nuevo está listo en 7–13 ms. El cálculo siguiente da la misma huella | `out_chrome.txt`; `cliente.test.ts` |
-| 4 | Memoria (H16): la del núcleo en cada fase; límites por dispositivo que rechazan antes de factorizar; agotarla nunca deja un cuelgue ni un resultado; reciclar la devuelve | **Pasa.** El pico estimado queda por encima del real en los 6 modelos de la calibración, también con fragmentación. Pasar del límite de ecuaciones o de memoria da `modelo/demasiado-grande` sin factorizar (el perfil móvil, en 0,44 s). Sin memoria → `solver/sin-memoria`; trampa del WASM → `ErrorWorker`; en los dos casos se recicla el worker. En Chrome, terminar el worker tras el semirrígido devuelve 600–710 MB | `src/motor/memoria.test.ts`, `cliente.test.ts`; `out_calibrar_memoria.txt`, `out_chrome.txt` |
+| 4 | Memoria (H16): la del núcleo en cada fase; límites por dispositivo que rechazan antes de factorizar; agotarla nunca deja un cuelgue ni un resultado; reciclar la devuelve | **Pasa.** El pico estimado queda por encima del real en los 6 modelos de la calibración, también con fragmentación. Pasar del límite de ecuaciones o de memoria da `modelo/demasiado-grande` sin factorizar (en Chrome, 0,44 s con el semirrígido). Sin memoria → `solver/sin-memoria`; trampa del WASM → `ErrorWorker`; en los dos casos se recicla el worker. En Chrome, terminar el worker tras el semirrígido devuelve 600–715 MB | `src/motor/memoria.test.ts`, `cliente.test.ts`; `out_calibrar_memoria.txt`, `out_chrome.txt` |
 | 5 | Núcleo versionado: API con la memoria antes de factorizar, ≤ 1,5 MB y sha256 reproducible | **Pasa.** API 2: 252 KB (80 KB en gzip); `nucleo:verificar` da el mismo hash desde cero | `src/nucleo/pkg/MANIFIESTO.json`, `src/nucleo/nucleo.test.ts` |
 | 6 | CI en verde en GitHub (pendiente desde E0) | **Pasa.** Run 37198215432 del 2026-10-04: pruebas (tsc y los 412 tests, con Node 24 por las pruebas del worker) en 45 s; núcleo (recompilar, sha256 idéntico y `cargo test`) en 4 min. El CI ya había salido verde con el push del spike E0, el 2026-10-03 | `.github/workflows/ci.yml` |
 
@@ -61,24 +62,25 @@ cliente.cerrar();                                                      // al sal
 **Qué se hizo.**
 - `memoriaRequerida(nrhs)` suma los bytes de los valores de L (`len_val`) y los `StackReq` de faer para factorizar y para resolver `nrhs` lados derechos, más el propio bloque de lados. No reserva nada.
 - `memoriaEnUso()` cuenta los bytes vivos con un asignador global que envuelve al del sistema (dlmalloc en wasm32). La memoria lineal sólo crece (H16); esto dice cuánta está ocupada de verdad.
-- El motor estima el pico tras el análisis simbólico: max(memoria lineal, en uso + 1,15 · requerida). Si pasa de `limites.memoriaNucleo`, el cálculo acaba con `modelo/demasiado-grande` antes de factorizar.
+- El motor estima el pico tras el análisis simbólico: max(memoria lineal, en uso + 1,15 · requerida + 4 MiB). Si pasa de `limites.memoriaNucleo`, el cálculo acaba con `modelo/demasiado-grande` antes de factorizar.
 - **Artefacto:** 252 129 B (79 746 B en gzip), frente a 239 295 B de la API 1. El sha256 es reproducible: `bun run nucleo:verificar` recompila desde cero y da el mismo hash.
 
 **Calibración** (`validacion/e4/calibrar-memoria.ts` → `out_calibrar_memoria.txt`). Edificio objetivo con 24 casos, Node 24, en un proceso nuevo por modelo; luego, el mismo cálculo cuatro veces más en el mismo núcleo.
 
 | Modelo (malla) | Ecuaciones | Pedida por faer | Pico estimado | Memoria lineal real, núcleo nuevo | Real al repetir (vueltas 2.ª–5.ª) |
 |---|---|---|---|---|---|
-| Diafragma (1,5 m) | 11 298 | 14 MB | 19 MB | 18 MB | 18 MB |
-| Semirrígido (1,5 m) | 22 554 | 43 | 57 | 48 | 48 |
-| Diafragma (1,0 m) | 38 430 | 48 | 64 | 57 | 57 |
-| Semirrígido (1,0 m) | 76 818 | 146 | 195 | 162 | **189** |
-| Diafragma (0,75 m) | 76 146 | 110 | 145 | 128 | 128 |
-| Semirrígido (0,75 m) | 152 250 | 338 | 443 | 369 | **424** |
+| Diafragma (1,5 m), 5 casos | 11 298 | 11 MB | 19 MB | 16 MB | 16 MB |
+| Diafragma (1,5 m) | 11 298 | 14 | 23 | 18 | 18 |
+| Semirrígido (1,5 m) | 22 554 | 43 | 61 | 48 | 48 |
+| Diafragma (1,0 m) | 38 430 | 48 | 68 | 57 | 57 |
+| Semirrígido (1,0 m) | 76 818 | 146 | 199 | 162 | **189** |
+| Diafragma (0,75 m) | 76 146 | 110 | 149 | 128 | 128 |
+| Semirrígido (0,75 m) | 152 250 | 338 | 447 | 369 | **424** |
 
 **Lecturas:**
 - **Sin margen** (en uso + pedida), la estimación queda en un núcleo nuevo entre un 6 % por debajo (modelos pequeños, por la memoria inicial y el redondeo a páginas) y un 7 % por encima.
 - **Al repetir en el mismo núcleo, la fragmentación cuesta hasta un 9 %:** los huecos que deja libres el cálculo anterior no siempre sirven (369 → 424 MB). Se estabiliza en la segunda vuelta.
-- **Con el margen de ×1,15,** la estimación queda siempre por encima de la memoria real: entre un 3 % y un 21 %.
+- **Con los márgenes (×1,15 y 4 MiB fijos),** la estimación queda siempre por encima de la memoria real: entre un 5 % (al repetir) y un 29 % (modelos pequeños). Los 4 MiB fijos se añadieron al ver en el banco de dispositivos que el modelo más pequeño, con 5 casos, quedaba 1 MB por debajo (15 frente a 16 MB, en Chrome y en iOS).
 - **No hay fugas:** tras cada cálculo, la memoria en uso vuelve al mismo valor. Sólo quedan 512 B y una reserva fija de 512 KiB que hace `gemm` (su búfer de empaquetado) en la primera factorización densa, y no crece después.
 
 ## 3. Límites por dispositivo (D9)
@@ -89,13 +91,13 @@ cliente.cerrar();                                                      // al sal
 
 Las dos acaban con `modelo/demasiado-grande` y nombran el número de ecuaciones y el límite. Con el solver de perfil sólo se aplica la primera.
 
-Los perfiles (`src/worker/limites.ts`) son **provisionales** hasta medir en portátil y móvil (S5 #2):
+Los perfiles (`src/worker/limites.ts`). El móvil sale de lo medido en un iPhone 13 Pro (§6, E4-9); el portátil sigue sin medir (S5 #2):
 
 | Perfil | Ecuaciones | Memoria del núcleo | Reciclar el worker | Qué cabe del edificio objetivo |
 |---|---|---|---|---|
 | Sobremesa | 600 000 | 2,5 GiB | Si el núcleo pasa de 1,25 GiB | Todo (S7: ≈ 600 000 GDL en 10 s) |
 | Portátil | 300 000 | 1,25 GiB | Tras cada cálculo | Semirrígido (152 250 ecuaciones, 370 MB de núcleo) |
-| Móvil | 100 000 | 384 MiB | Tras cada cálculo | Con diafragma (76 146 ecuaciones, 128 MB); el semirrígido, no |
+| Móvil | 200 000 | 512 MiB | Tras cada cálculo | Todo lo medido: el semirrígido (pico estimado de 447 MB) y la malla de 0,5 m (183 330 ecuaciones) |
 
 **El perfil** sale de `navigator`:
 - es móvil si lo dice `userAgentData.mobile`, el agente de usuario, o si es un iPad que se presenta como Mac táctil;
@@ -143,7 +145,7 @@ Los perfiles (`src/worker/limites.ts`) son **provisionales** hasta medir en port
 3. el servidor lee con PowerShell la memoria privada de los procesos de esa instancia en cada punto de control;
 4. al terminar, calcula en Node la huella de los mismos modelos.
 
-Seis pasadas. Las cifras son de la última (`out_chrome.txt`), con el rango de las seis donde varía.
+Siete pasadas. Las cifras son de la última (`out_chrome.txt`, con los márgenes de memoria finales), con el rango de las siete donde varía.
 
 **Arranque y cancelación:**
 
@@ -158,10 +160,10 @@ Seis pasadas. Las cifras son de la última (`out_chrome.txt`), con el rango de l
 
 | | Diafragma, worker recién arrancado | Diafragma, worker caliente | Semirrígido |
 |---|---|---|---|
-| Total visto desde el hilo principal | 3,19 s (3,02–3,19) | 2,59 s (2,56–2,64) | 4,70 s (4,70–4,91) |
-| Cálculo dentro del worker | 3,01 s | 2,45 s | 4,55 s |
-| Tareas largas del hilo principal (= enviar el modelo) | 74 ms | 61 ms | 67 ms |
-| Memoria del núcleo: lineal / pico estimado | 128 / 145 MB | 128 / 146 MB | 355 / 443 MB |
+| Total visto desde el hilo principal | 2,96 s (2,96–3,19) | 2,51 s (2,51–2,64) | 4,67 s (4,67–4,91) |
+| Cálculo dentro del worker | 2,78 s | 2,37 s | 4,52 s |
+| Tareas largas del hilo principal (= enviar el modelo) | 69 ms | 61 ms | 69 ms |
+| Memoria del núcleo: lineal / pico estimado | 128 / 149 MB | 128 / 150 MB | 355 / 447 MB |
 | Equilibrio / error hacia atrás | 2,1e-11 / 5,0e-15 | igual | 2,9e-12 / 2,5e-13 |
 | Huella (la misma en Node) | `697c0376dc704188` | igual | `210f09f58fe8a595` |
 
@@ -169,21 +171,21 @@ Seis pasadas. Las cifras son de la última (`out_chrome.txt`), con el rango de l
 
 | Momento | Renderer | Todos los procesos |
 |---|---|---|
-| Página cargada | 116 MB | 194 MB |
-| Worker caliente | 125 | 210 |
-| Tras el edificio con diafragma | 930 | 1 021 |
-| 10 s después, con el worker vivo y en reposo | 909 | 1 002 |
-| Tras repetirlo en el mismo worker | 1 143 | 1 237 |
-| Tras el semirrígido | 1 428 | 1 522 |
-| 2 s después de terminar el worker | 719 | 813 |
+| Página cargada | 119 MB | 204 MB |
+| Worker caliente | 130 | 208 |
+| Tras el edificio con diafragma | 936 | 1 027 |
+| 10 s después, con el worker vivo y en reposo | 913 | 1 005 |
+| Tras repetirlo en el mismo worker | 1 130 | 1 222 |
+| Tras el semirrígido | 1 447 | 1 539 |
+| 2 s después de terminar el worker | 733 | 825 |
 
 **Reciclar tras cada cálculo.** El edificio con diafragma, tres veces con `umbralReciclaje: 0` (un worker nuevo cada vez):
-- **Lo habitual:** 2,77–2,92 s frente a 2,56–2,64 s con el worker caliente, es decir, **un 7–12 % más** en cuatro de las seis pasadas.
+- **Lo habitual:** 2,73–2,92 s frente a 2,51–2,64 s con el worker caliente, es decir, **un 7–12 % más** en cinco de las siete pasadas.
 - **De dónde sale la diferencia:** casi entera de la fase de cargas, que pasa de 250–270 ms con el JIT caliente a 440–520 ms.
 - **Dos pasadas fueron más lentas:** en una, un cálculo dio 3,42 s (cargas: 697 ms); en otra, los tres dieron 4,6–5,7 s (no se registraron las fases).
 - **Una posible explicación, sin comprobar:** en el banco, cada cálculo empieza 100 ms después de terminar un worker que suelta ~700 MB, y eso puede coincidir con que el sistema esté liberando esa memoria. En uso real, el siguiente cálculo llega minutos después.
 
-**Límite del perfil móvil:** el semirrígido acaba con `modelo/demasiado-grande` en 0,44 s, sin ensamblar.
+**Un límite de 100 000 ecuaciones:** el semirrígido acaba con `modelo/demasiado-grande` en 0,44 s, sin ensamblar.
 
 ## 6. Medida en dispositivos
 
@@ -191,40 +193,55 @@ Seis pasadas. Las cifras son de la última (`out_chrome.txt`), con el rango de l
 - la página calcula tamaños crecientes del edificio objetivo, con un worker nuevo para cada uno y sin límites, hasta donde aguante;
 - manda cada resultado al servidor en cuanto sale (`out_dispositivos.jsonl`), con el agente de usuario, el perfil detectado y `deviceMemory`.
 
-Con `--local` hace lo mismo en esta máquina, con Chrome headless. Es la primera fila de la tabla (perfil detectado: sobremesa, `deviceMemory` = 32):
+Con `--local` hace lo mismo en esta máquina, con Chrome headless.
 
-| Variante | Nudos | Ecuaciones | Total | Memoria del núcleo |
-|---|---|---|---|---|
-| Diafragma, malla 1,5 m, 5 casos | 7 601 | 11 298 | 0,56 s | 16 MB |
-| Diafragma, 1,0 m, 5 casos | 16 647 | 38 430 | 1,14 s | 50 MB |
-| Diafragma, 0,75 m, 5 casos | 29 221 | 76 146 | 1,82 s | 114 MB |
-| Diafragma, 0,75 m, 24 casos | 29 221 | 76 146 | 2,86 s | 128 MB |
-| Semirrígido, 1,0 m, 24 casos | 16 640 | 76 818 | 2,50 s | 162 MB |
-| Semirrígido, 0,75 m, 24 casos | 29 214 | 152 250 | 4,92 s | 369 MB |
-| Diafragma, 0,5 m, 24 casos | 64 953 | 183 330 | 6,16 s | 337 MB |
+Además, cada cálculo manda una muestra fija de sus resultados (~1 500 valores de u, de los esfuerzos de barra y de las resultantes de lámina del primer y del último caso, y las reacciones de todos los apoyos). `validacion/e4/comparar-dispositivos.ts` recalcula lo mismo en Node y compara (`out_comparar_dispositivos.txt`).
 
-Faltan el móvil y el portátil (S5 #2), que tiene que medir el usuario en sus dispositivos.
+**Medido:**
+- **PC:** Chrome 154 headless; perfil detectado: sobremesa, con `deviceMemory` = 32.
+- **iPhone 13 Pro:** 6 GB, iOS 26.6.1, Chrome 154 para iOS, es decir, WebKit y JavaScriptCore. Perfil detectado: móvil. Compilar el núcleo, 20 ms; arrancar el worker, 25–37 ms. Dos pasadas; la tabla da la segunda.
+
+| Variante | Nudos | Ecuaciones | PC | iPhone 13 Pro | Memoria del núcleo (las dos) | iPhone frente a Node |
+|---|---|---|---|---|---|---|
+| Diafragma, malla 1,5 m, 5 casos | 7 601 | 11 298 | 0,56 s | 0,51 s | 16 MB | 1,2e-13 |
+| Diafragma, 1,0 m, 5 casos | 16 647 | 38 430 | 1,14 s | 0,90 s | 50 MB | 7,7e-14 |
+| Diafragma, 0,75 m, 5 casos | 29 221 | 76 146 | 1,82 s | 1,58 s | 114 MB | 4,8e-14 |
+| Diafragma, 0,75 m, 24 casos | 29 221 | 76 146 | 2,86 s | 2,64 s | 128 MB | 1,5e-12 |
+| Semirrígido, 1,0 m, 24 casos | 16 640 | 76 818 | 2,50 s | 2,11 s | 162 MB | 2,7e-13 |
+| Semirrígido, 0,75 m, 24 casos | 29 214 | 152 250 | 4,92 s | 4,27 s | 369 MB | 1,3e-12 |
+| Diafragma, 0,5 m, 24 casos | 64 953 | 183 330 | 6,16 s | 6,04 s | 337 MB | 3,1e-12 |
+
+La última columna es el error relativo máximo de la muestra del iPhone frente a Node, por campo y sobre la escala del campo. El PC da 0: la misma huella y los mismos valores.
+
+**Lecturas:**
+- **El iPhone 13 Pro calcula todo el banco, y tan rápido como el sobremesa.** Llega al semirrígido del edificio objetivo y a la malla de 0,5 m, que con los límites provisionales del perfil móvil se habrían rechazado.
+- **La memoria del núcleo es idéntica byte a byte en los dos.** No se pudo medir la del proceso en iOS.
+- **iOS no da los mismos bits que V8, pero difiere a ≤ 3,1e-12** (E4-6). Las referencias congeladas comparan a 1e-9.
+
+Falta un portátil y un móvil con menos memoria, por ejemplo un Android de gama media o un iPhone de 4 GB.
 
 ## Hallazgos de E4
 
 | ID | Hallazgo | Consecuencia |
 |---|---|---|
 | E4-1 | **La memoria de un cálculo es sobre todo JS, no del núcleo, y un worker caliente no la devuelve.** En Chrome, el renderer sube ~800 MB con el edificio de diafragma (128 MB de núcleo) y no baja con el worker en reposo (931 → 909 MB a los 10 s); terminar el worker devuelve ~610 MB tras el semirrígido. En Node, en el pico hay 129 MB de heap y 196–274 MB de `Float64Array` vivos antes de que crezca el núcleo, y el RSS llega a 753 / 1 020 MB. Un worker no puede medir su heap JS: `performance.memory` no existe dentro de un worker | El reciclaje no puede depender sólo de la memoria del núcleo. Por defecto, y en portátil y móvil, el worker se recicla tras cada cálculo; en sobremesa, cuando el núcleo pasa de 1,25 GiB. Reducir la memoria JS del motor es la palanca para el móvil (ver «Pendiente») |
-| E4-2 | **Arrancar un worker con el núcleo ya compilado cuesta 7–13 ms,** y compilar el `.wasm` 2–2,5 ms (una vez por sesión). S7 estimaba ~0,1 s, y con Pyodide eran 5 s (H20) | Cancelar y reciclar son baratos. El precio de reciclar es el JIT caliente: un 7–12 % más por cálculo, casi todo en la fase de cargas. Dos de seis pasadas fueron más lentas, con los cálculos encadenados 100 ms después de terminar el worker anterior |
+| E4-2 | **Arrancar un worker con el núcleo ya compilado cuesta 7–13 ms,** y compilar el `.wasm` 2–2,5 ms (una vez por sesión). S7 estimaba ~0,1 s, y con Pyodide eran 5 s (H20) | Cancelar y reciclar son baratos. El precio de reciclar es el JIT caliente: un 7–12 % más por cálculo, casi todo en la fase de cargas. Dos de siete pasadas fueron más lentas, con los cálculos encadenados 100 ms después de terminar el worker anterior |
 | E4-3 | **Enviar el modelo analítico del edificio objetivo bloquea el hilo principal 61–74 ms** (el clonado estructurado de unos 200 000 objetos). Recibir 111 MB de resultados por transferencia no llega a tarea larga | En Concreta el compilador va dentro del worker (informe 08, §4: «un solo worker compila y resuelve») y lo que cruza es el modelo físico, que es pequeño. Si alguna vez hubiera que enviar el analítico, se empaqueta en arrays tipados |
 | E4-4 | **Repetir un cálculo en el mismo núcleo fragmenta su memoria:** la lineal llega hasta un 9 % por encima de en uso + pedida, y se estabiliza en la 2.ª vuelta | Margen de ×1,15 en el pico estimado. Con el reciclaje tras cada cálculo apenas cuenta |
 | E4-5 | **El núcleo no pierde memoria.** La memoria en uso vuelve a su nivel tras cada cálculo; sólo queda una reserva fija de 512 KiB (el búfer de empaquetado de `gemm`) desde la primera factorización densa | Queda como prueba de propiedades (`src/motor/memoria.test.ts`, `src/nucleo/nucleo.test.ts`) |
-| E4-6 | **Chrome 154 y Node 24 dan los mismos bits** en el edificio objetivo, con dos versiones distintas de V8 | Las referencias congeladas y los oráculos, medidos en Node, valen tal cual para el navegador |
+| E4-6 | **Con V8, los mismos bits; con JavaScriptCore, a ≤ 3,1e-12.** Chrome 154 y Node 24 (dos versiones de V8) dan la misma huella en todos los tamaños. iOS no la da en ninguno: la memoria y el WASM son idénticos, pero las funciones de `Math` de JavaScriptCore redondean distinto, y el condicionamiento lo lleva hasta 3,1e-12 en la peor muestra | Las referencias congeladas y los oráculos, medidos en Node, valen para cualquier navegador con su tolerancia de 1e-9. No se puede exigir igualdad bit a bit entre navegadores; la huella sólo sirve dentro de V8 |
+| E4-9 | **Un iPhone 13 Pro (2021, 6 GB) calcula el edificio objetivo semirrígido y la malla de 0,5 m tan rápido como el sobremesa** (4,3 s y 6,0 s). La memoria del núcleo es la misma byte a byte | El perfil móvil sube a 200 000 ecuaciones y 512 MiB de núcleo, que es lo medido (pico estimado de 447 MB), no el techo del teléfono, que no se alcanzó. Los móviles con menos memoria siguen sin medir |
 | E4-7 | **Agotar la memoria del núcleo puede acabar en una trampa del WASM,** cuando falla una reserva que Rust no deja fallar (por ejemplo, al pasar los arrays del patrón por wasm-bindgen). Con 8 MB libres, en cambio, falla limpio en un `try_reserve` | El cliente trata la trampa como `ErrorWorker` y recicla. El límite de memoria del perfil evita llegar ahí |
 | E4-8 | **`navigator.deviceMemory` ya no se queda en 8:** Chrome 154 da 32 en este equipo | El perfil de sobremesa pide ≥ 8. Safari y Firefox no lo dan y caen en el de portátil |
 
 ## Pendiente
 
-- **Medir en móvil y portátil** (S5 #2):
+- **Medir un portátil y un móvil con menos memoria** (S5 #2; el iPhone 13 Pro ya está, E4-9):
   1. `node validacion/e4/chrome.ts --dispositivos`;
-  2. abrir en el dispositivo `http://<IP>:8765/?manual`, en la misma red, y pulsar «Medir». Windows pedirá permiso al cortafuegos para Node.
+  2. abrir en el dispositivo `http://<IP>:8765/?manual`, en la misma red, y pulsar «Medir»;
+  3. `node validacion/e4/comparar-dispositivos.ts`.
 
-  Cada tamaño se manda al servidor en cuanto sale (`out_dispositivos.jsonl`), así que, si la pestaña se cae, queda el último que cupo. La fila de este equipo ya está. Con esos datos se fijan los valores de `LIMITES`, hoy provisionales.
+  Si la pestaña se cae, el último tamaño que llegó al servidor es el que cupo. Con un móvil que se caiga se encuentra el techo real; hoy el límite móvil es lo que cupo en el iPhone.
 - **Memoria JS del motor** (E4-1). Con 24 casos, el edificio objetivo tiene ~270 MB en vectores de 6·nudos por caso: cargas, desplazamientos independientes, totales, lados derechos, equivalentes de lámina, u, reacciones y su magnitud. Varios se pueden fundir o liberar antes. Es lo que haría caber el semirrígido en un móvil.
 - **Integración en Concreta:**
   - el compilador corre dentro del worker (E4-3);

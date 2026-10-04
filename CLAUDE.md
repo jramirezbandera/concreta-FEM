@@ -59,7 +59,7 @@
   - **Herramientas de prueba:** `src/pruebas/` y los benches y oráculos en `spike/e0/`.
   - **El núcleo** se compila con `bun run nucleo:compilar` y se verifica con `bun run nucleo:verificar` (sha256 reproducible). No se edita `src/nucleo/pkg/` a mano.
   - **Oráculos:** PyNite 3.2.0 en `.venv` (Python 3.14); OpenSeesPy 3.8 en `.venv312` (Python 3.12: con 3.14 no carga en Windows).
-  - **Pendiente:** medir en móvil (el CI, `.github/workflows/ci.yml`, está en verde).
+  - **Cerrado en E4:** el CI (`.github/workflows/ci.yml`) está en verde y se midió un iPhone 13 Pro (`docs/fem3d/fase-e4.md`, §6).
 - **2026-10-03: fase E1 superada** (núcleo del motor). Pasan los cinco criterios. El informe está en `docs/fem3d/fase-e1.md`, con criterios, hallazgos E1-1…E1-8 y pendientes.
   - **Ya en `src/motor/`:** modelo analítico (convenios en la cabecera de `modelo.ts`), GDL con diafragma rígido y enlace rígido por transformación (cadenas incluidas), patrón CSC fijo, mecanismos por pivote con su modo, refinamiento por error hacia atrás y ΣF/ΣM ≤ 1e-9 en cada cálculo. Se usa con `calcular(modelo)`.
   - **Validación:** `validacion/e1/` (oráculo OpenSeesPy, banco del edificio objetivo, margen de pivotes). Las cadenas se validan sólo contra el `Lagrange` de OpenSees, porque su `Transformation` las resuelve mal (E1-1).
@@ -88,7 +88,7 @@
     - cancelar es `terminate` y volver a calentar (~10 ms);
     - el worker se recicla tras cada cálculo (E4-1: la memoria es sobre todo JS y el worker no puede medirla);
     - límites provisionales por perfil de dispositivo.
-  - **Validación:** `validacion/e4/`. El banco en Chrome (`chrome.ts`) da los mismos bits que Node. Su modo `--dispositivos` sirve para medir en el móvil.
+  - **Validación:** `validacion/e4/`. El banco en Chrome (`chrome.ts`) da los mismos bits que Node. Su modo `--dispositivos` mide en el móvil: un iPhone 13 Pro calcula el edificio objetivo, también el semirrígido, tan rápido como el sobremesa, y difiere de Node a ≤ 3,1e-12 (E4-6, E4-9). El perfil móvil queda en 200 000 ecuaciones y 512 MiB; falta un móvil con menos memoria.
 - **2026-10-04: fase E5 superada** (Q y bandas). Pasan los seis criterios. El informe está en `docs/fem3d/fase-e5.md`, con criterios, hallazgos E5-1…E5-7 y pendientes.
   - **Ya en `src/motor/`:**
     - `FuerzasNodales`: g = k·u − f_eq por elemento y fuerzas de cada restricción sobre sus nudos (cadenas resueltas desde las hojas);

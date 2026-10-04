@@ -67,6 +67,29 @@ export function huellaResultado(r: ResultadoCalculo): string {
   return (a >>> 0).toString(16).padStart(8, "0") + (b >>> 0).toString(16).padStart(8, "0");
 }
 
+/**
+ * Muestra fija de los resultados, para comparar dos motores de JS sin enviar los 111 MB: del primer
+ * y del último caso, ~1 500 valores de u, de los esfuerzos de barra y de las resultantes de lámina
+ * (uno de cada `paso`), y las reacciones de todos los nudos apoyados. Los índices sólo dependen del
+ * modelo, así que la misma función en Node da los valores correspondientes.
+ */
+export function muestraResultado(modelo: ModeloAnalitico, r: ResultadoCalculo): Record<string, number[]> {
+  const casos = r.valido ? r.casos : [];
+  const apoyos = (modelo.apoyos ?? []).flatMap((a) => [0, 1, 2, 3, 4, 5].map((g) => 6 * a.nudo + g));
+  const salida: Record<string, number[]> = {};
+  for (const c of casos.length ? [casos[0]!, casos.at(-1)!] : []) {
+    for (const campo of ["u", "esfuerzosBarras", "esfuerzosLaminas"] as const) {
+      const a = c[campo];
+      const paso = Math.max(1, Math.ceil(a.length / 1500));
+      const v: number[] = [];
+      for (let i = 0; i < a.length; i += paso) v.push(a[i]!);
+      salida[`${c.id}/${campo}`] = v;
+    }
+    salida[`${c.id}/reacciones`] = apoyos.map((i) => c.reacciones[i]!);
+  }
+  return salida;
+}
+
 /** Peor equilibrio y peor error hacia atrás de los casos. */
 export function calidad(r: ResultadoCalculo): { equilibrio: number; residuo: number } {
   const casos = r.valido ? r.casos : [];

@@ -4,7 +4,7 @@
  *
  * - **Automático** (Chrome headless): arranque en frío y en caliente, el edificio objetivo por el
  *   worker (huella de los resultados, tareas largas del hilo principal, memoria del núcleo y del
- *   proceso), cancelar en plena factorización, reciclaje por memoria y límite del perfil móvil.
+ *   proceso), cancelar en plena factorización, reciclaje por memoria y un límite de ecuaciones.
  * - **Manual** (`?manual`, para medir en un móvil o un portátil): tamaños crecientes con un worker
  *   nuevo cada vez, hasta donde aguante el dispositivo. Cada resultado se envía al servidor en
  *   cuanto sale, así que, si la pestaña se cae, queda el último que cupo.
@@ -12,7 +12,7 @@
 import type { ModeloAnalitico, ResultadoCalculo } from "../../src/motor/modelo.ts";
 import { ClienteMotor, crearWorkerWeb, ErrorCancelado, type OpcionesCliente, type Progreso } from "../../src/worker/cliente.ts";
 import { infoNavegador, LIMITES, perfilDispositivo } from "../../src/worker/limites.ts";
-import { calidad, edificioObjetivo, huellaResultado, nombreVariante, type Variante } from "./modelos.ts";
+import { calidad, edificioObjetivo, huellaResultado, muestraResultado, nombreVariante, type Variante } from "./modelos.ts";
 
 const parametros = new URLSearchParams(location.search);
 const manual = parametros.has("manual");
@@ -21,9 +21,10 @@ const MB = (b: number) => Math.round(b / 2 ** 20);
 const ms = (t: number) => Math.round(t);
 const espera = (t: number) => new Promise((ok) => setTimeout(ok, t));
 
-async function enviar(r: Record<string, unknown>): Promise<void> {
+/** Pinta `r` en la página y lo envía al servidor junto con `oculto` (datos que no se pintan). */
+async function enviar(r: Record<string, unknown>, oculto: Record<string, unknown> = {}): Promise<void> {
   salida.textContent += JSON.stringify(r) + "\n";
-  await fetch("/resultado", { method: "POST", body: JSON.stringify(r) });
+  await fetch("/resultado", { method: "POST", body: JSON.stringify({ ...r, ...oculto }) });
 }
 
 /** Memoria de los procesos de Chrome, medida por el servidor (sólo en el modo automático). */
@@ -203,10 +204,10 @@ async function automatico(): Promise<void> {
   await enviar({ evento: "reciclar siempre", variante: "diafragma-0.75-24c", totalMs: tiempos, fasesMs: fases, arranques: c4.estado.arranques });
   c4.cerrar();
 
-  // Límite del perfil móvil: el semirrígido se rechaza antes de factorizar
+  // Un límite de 100 000 ecuaciones: el semirrígido se rechaza antes de ensamblar
   t = performance.now();
-  const r4 = await c3.calcular(semirrigido, { limites: LIMITES.movil });
-  await enviar({ evento: "limite", perfil: "movil", valido: r4.valido, errores: r4.diagnosticos.map((d) => d.codigo), ms: ms(performance.now() - t) });
+  const r4 = await c3.calcular(semirrigido, { limites: { ecuaciones: 100_000 } });
+  await enviar({ evento: "limite", ecuaciones: 100_000, valido: r4.valido, errores: r4.diagnosticos.map((d) => d.codigo), ms: ms(performance.now() - t) });
   c3.cerrar();
 }
 
@@ -236,7 +237,8 @@ async function enDispositivo(): Promise<void> {
     const generarMs = performance.now() - t;
     try {
       const m = await medir(cliente, modelo);
-      await enviar({ evento: "calculo", ...resumen(nombreVariante(v), m, generarMs, 0) });
+      // La muestra de valores deja comparar con Node otro motor de JS (JavaScriptCore en iOS)
+      await enviar({ evento: "calculo", ...resumen(nombreVariante(v), m, generarMs, 0) }, { parametros: v, muestra: muestraResultado(modelo, m.r) });
     } catch (e) {
       await enviar({ evento: "fallo", variante: nombreVariante(v), error: String(e) });
       break;
