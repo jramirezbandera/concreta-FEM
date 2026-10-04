@@ -9,7 +9,7 @@
  */
 import type { MultiplicadoresLamina } from "../../src/elementos/lamina.ts";
 import { calcular } from "../../src/motor/calcular.ts";
-import type { Vec3 } from "../../src/motor/modelo.ts";
+import type { ModeloAnalitico, Vec3 } from "../../src/motor/modelo.ts";
 import type { TipoSolver } from "../../src/motor/solucion.ts";
 import { casosValidos, errorPorGrupos } from "../../src/pruebas/comparar.ts";
 import { Constructor, EMPOTRADO } from "../../src/pruebas/constructor.ts";
@@ -24,13 +24,14 @@ export interface ErroresParche {
   Q: number;
 }
 
-/** `angulo` (grados) del eje 1 respecto a X; sin él, la regla de CSI (eje 1 = X). */
-export function parcheMacNealHarder(mult: MultiplicadoresLamina = {}, angulo?: number, solver: TipoSolver = "nucleo"): ErroresParche {
-  const E = 1e6;
-  const nu = 0.25;
-  const t = 0.001;
-  const k = 1e-3;
-  const exacto = ([x, y]: readonly [number, number]) => [k * (2 * x + 2 * y), 3 * k * y, (k * (x * x + x * y + y * y)) / 2, k * (x / 2 + y), -k * (x + y / 2), -k];
+const E = 1e6;
+const nu = 0.25;
+const t = 0.001;
+const k = 1e-3;
+const exacto = ([x, y]: readonly [number, number]) => [k * (2 * x + 2 * y), 3 * k * y, (k * (x * x + x * y + y * y)) / 2, k * (x / 2 + y), -k * (x + y / 2), -k];
+
+/** Modelo del parche con el campo exacto impuesto en los nudos exteriores (`angulo`: ver abajo). */
+export function modeloParcheMacNealHarder(mult: MultiplicadoresLamina = {}, angulo?: number): ModeloAnalitico {
   const a = ((angulo ?? 0) * Math.PI) / 180;
   const eje1: Vec3 | undefined = angulo === undefined ? undefined : [Math.cos(a), Math.sin(a), 0];
   const m = new Constructor();
@@ -42,7 +43,13 @@ export function parcheMacNealHarder(mult: MultiplicadoresLamina = {}, angulo?: n
     [],
     PARCHE_EXTERIORES.flatMap((v) => exacto(PARCHE_NUDOS[v]!).map((valor, g) => ({ nudo: v, gdl: g as 0, valor }))),
   );
-  const [r] = casosValidos(calcular(m.modelo(), { solver }));
+  return m.modelo();
+}
+
+/** `angulo` (grados) del eje 1 respecto a X; sin él, la regla de CSI (eje 1 = X). */
+export function parcheMacNealHarder(mult: MultiplicadoresLamina = {}, angulo?: number, solver: TipoSolver = "nucleo"): ErroresParche {
+  const a = ((angulo ?? 0) * Math.PI) / 180;
+  const [r] = casosValidos(calcular(modeloParcheMacNealHarder(mult, angulo), { solver }));
   const calc: number[] = [];
   const ref: number[] = [];
   PARCHE_NUDOS.forEach((p, v) => {
