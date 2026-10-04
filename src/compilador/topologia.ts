@@ -416,7 +416,9 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
       if (nudos[n]!.pilar || usos.get(n) !== 1 || [...apoyoEn.values()].includes(n)) continue;
       const Q = vt.P;
       const r = 3 * epsSnap;
-      const cerca1 = puntos.find((pp) => distanciaAHuella(Q, pp.huella) <= r);
+      // Un pilar al que la propia viga ya se une (pasa por él) no cuenta
+      const propios = new Set((tramosDe.get(vt.viga.id) ?? []).flatMap((tv) => tv.cadena.map((c) => c.nudo)));
+      const cerca1 = puntos.find((pp) => distanciaAHuella(Q, pp.huella) <= r && !propios.has(pp.nudo));
       const cerca2 = tramosCerca(Q, r).find((tv) => {
         if (incide(tv, n)) return false;
         const { sigma, d } = proyectar(Q, tv.t);
