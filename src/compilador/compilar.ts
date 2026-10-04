@@ -139,13 +139,15 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
 
   // Numeración canónica: por cota, x e y (no depende del orden de la entrada)
   const zDe = (n: number) => cotaNudo(ctx, topo.nudos[n]!);
-  // Por coordenadas cuantizadas a CUANTO_ORDEN y luego exactas: dos nudos con la misma x salvo un
-  // ulp (el seno de un giro difiere entre V8 y JSC, COM-12) se ordenan por su y en los dos motores
+  // Por coordenadas cuantizadas a CUANTO_ORDEN y luego por orden de creación: dos nudos con la misma
+  // x salvo un ulp (el seno de un giro difiere entre V8 y JSC, COM-12) se ordenan por su y en los
+  // dos motores, y dos en el mismo sitio (la base de un pilar y la de un muro) no cambian de orden
+  // por un ulp al trasladar o girar la planta
   const qx = (n: number) => Math.round(topo.nudos[n]!.x / CUANTO_ORDEN);
   const qy = (n: number) => Math.round(topo.nudos[n]!.y / CUANTO_ORDEN);
   const orden = topo.nudos
     .map((_, i) => i)
-    .sort((a, b) => zDe(a) - zDe(b) || qx(a) - qx(b) || qy(a) - qy(b) || topo.nudos[a]!.x - topo.nudos[b]!.x || topo.nudos[a]!.y - topo.nudos[b]!.y || a - b);
+    .sort((a, b) => zDe(a) - zDe(b) || qx(a) - qx(b) || qy(a) - qy(b) || a - b);
   const nuevo = new Int32Array(topo.nudos.length);
   orden.forEach((n, i) => (nuevo[n] = i));
   const nudos: NudoAnalitico[] = [];

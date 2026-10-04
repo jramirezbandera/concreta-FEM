@@ -257,7 +257,12 @@ export function relacionPartirCargas(f: ModeloFisico): number {
   return errorNudos(resolver(a.modelo), resolver(b.modelo), pares, identidad, "u");
 }
 
-/** Empareja todos los nudos (salvo los maestros de diafragma) por posición transformada. */
+/**
+ * Empareja todos los nudos (salvo los maestros de diafragma) por posición transformada, uno a uno:
+ * de dos nudos distintos en el mismo sitio (la base de un pilar y la de un muro, o el maestro y un
+ * esclavo de una huella), el de la misma firma (cuántas láminas, barras y restricciones le llegan, y
+ * su apoyo), y si no, en su orden.
+ */
 export function emparejarTodos(a: ModeloAnalitico, b: ModeloAnalitico, p: (q: Vec2) => Vec2, tol: number): Map<number, number> {
   const clave = (x: number, y: number, z: number) => `${Math.round(x / tol)},${Math.round(y / tol)},${Math.round(z / tol)}`;
   const idx = new Map<string, number[]>();
@@ -269,12 +274,24 @@ export function emparejarTodos(a: ModeloAnalitico, b: ModeloAnalitico, p: (q: Ve
       l.push(j);
     }
   });
+  const firma = (m: ModeloAnalitico) => {
+    const f = m.nudos.map(() => [0, 0, 0, ""] as [number, number, number, string]);
+    for (const l of m.laminas ?? []) for (const n of l.nudos) f[n]![0]++;
+    for (const x of m.barras ?? []) for (const n of x.nudos) f[n]![1]++;
+    for (const x of m.restricciones ?? []) for (const n of [x.maestro, ...x.esclavos]) f[n]![2]++;
+    for (const x of m.apoyos ?? []) f[x.nudo]![3] = x.coartados.join();
+    return f.map((v) => v.join("|"));
+  };
+  const [fa, fb] = [firma(a), firma(b)];
   const r = new Map<number, number>();
+  const usados = new Set<number>();
   a.nudos.forEach((n, i) => {
     if (n.id.endsWith(":maestro")) return;
     const [x, y] = p([n.x, n.y]);
-    const j = (idx.get(clave(x, y, n.z)) ?? []).find((k) => Math.abs(b.nudos[k]!.x - x) < tol && Math.abs(b.nudos[k]!.y - y) < tol);
+    const cand = (idx.get(clave(x, y, n.z)) ?? []).filter((k) => !usados.has(k) && Math.abs(b.nudos[k]!.x - x) < tol && Math.abs(b.nudos[k]!.y - y) < tol);
+    const j = cand.find((k) => fb[k] === fa[i]) ?? cand[0];
     if (j === undefined) throw new Error(`el nudo ${n.id} no tiene pareja`);
+    usados.add(j);
     r.set(i, j);
   });
   return r;

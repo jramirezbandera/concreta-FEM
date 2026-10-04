@@ -60,15 +60,15 @@ const laminasDe = (r: ReturnType<typeof valido>, id: string) => r.mapeo.muros![i
 const resolver = (m: ModeloAnalitico) => casosValidos(calcular(m, { solver: "perfil" }));
 
 describe("rejilla de un muro (C3-a)", () => {
-  it("un muro de 6 m y dos plantas: rejilla de elementos de ~h, láminas con el eje 1 a lo largo y la normal a la derecha", () => {
+  it("un muro de 6 m y dos plantas: rejilla de columnas de ~h y filas de ≤ min(h, H/12), láminas con el eje 1 a lo largo y la normal a la derecha", () => {
     const r = valido(compilar(modelo({ muros: [muro("M", [[0, 0], [6, 0]])] }), { tamanoMalla: 0.5 }));
     const ls = laminasDe(r, "M");
-    // 6 m a paso 1 (2h) con su punto medio: 12 columnas de 0,5; 3 m a ≤ 0,5: 6 filas por planta
-    expect(ls).toHaveLength(12 * 6 * 2);
+    // 6 m a paso 1 (2h) con su punto medio: 12 columnas de 0,5; 3 m a ≤ min(0,5, 3/12): 12 filas por planta
+    expect(ls).toHaveLength(12 * 12 * 2);
     for (const l of ls) {
       const X = l.nudos.map((n) => r.modelo.nudos[n]!);
       expect(X[1]!.x - X[0]!.x).toBeCloseTo(0.5, 12);
-      expect(X[3]!.z - X[0]!.z).toBeCloseTo(0.5, 12);
+      expect(X[3]!.z - X[0]!.z).toBeCloseTo(0.25, 12);
       expect(l.eje1).toEqual([1, 0, 0]);
       // Normal (X3 − X1) × (X4 − X2): a la derecha del eje, −Y
       const a = [X[2]!.x - X[0]!.x, X[2]!.y - X[0]!.y, X[2]!.z - X[0]!.z];
@@ -103,7 +103,7 @@ describe("encuentros (C3-c)", () => {
     ] as const) {
       const vertical = nudosEn(x, y);
       // Cada nudo de la arista está en láminas de los dos muros (o tramos) que se encuentran
-      expect(vertical.length).toBe(13); // 2 plantas de 6 filas
+      expect(vertical.length).toBe(25); // 2 plantas de 12 filas
       for (const n of vertical) {
         const de = new Set(m.laminas!.flatMap((l, i) => (l.nudos.includes(n) ? [r.mapeo.laminas![i]!.muro] : [])));
         if (x === 2.5) expect([...de].sort()).toEqual(["A", "T"]);

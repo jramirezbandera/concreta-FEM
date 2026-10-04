@@ -15,7 +15,9 @@
  *    partes en todas las plantas. Los lados de los ejes ya quedan sembrados para la malla de C2.
  * 3. `planMuros`: los paños, las filas de cada grupo de paños de una planta que se tocan (cotas de
  *    las plantas, bordes de huecos y cambios de ley de los empujes, unidas a ≤ ε_snap, y cada
- *    intervalo dividido a ≤ h), los huecos y los empujes unidos, y dónde hay muro junto a la cota de
+ *    intervalo dividido a ≤ min(h, H/12), con H la altura de la planta: H10 pide 8 elementos por vano
+ *    en flexión de placa y 16 junto a un empotramiento), los huecos y los empujes unidos, y dónde hay
+ *    muro junto a la cota de
  *    cada planta (los nudos de la cota sólo se crean donde hacen falta).
  * 4. `mallarMuros`: la rejilla de cada paño (columnas en las estaciones y en los puntos medios de sus
  *    lados, que son los de la división en 3 cuadriláteros de las losas), sin los elementos de los
@@ -542,11 +544,14 @@ export function planMuros(ctx: Contexto, plantas: ReadonlyMap<number, PlantaMuro
     const pa = panos.find((x) => x.w === w && x.i === i && z > zb(x) && z < zt(x))!;
     return unido.get(`${pa.grupo}:${z}`) ?? z;
   };
+  // Filas de ≤ min(h, H/12), con H la altura de la planta: la flexión de placa del muro (empujes,
+  // momentos de las losas) pide 8 elementos por vano, y 16 junto a un empotramiento (H10)
   const filas = niveles.map((nv) => {
+    const paso = Math.min(h, (nv[nv.length - 1]! - nv[0]!) / FILAS_POR_PLANTA);
     const f: number[] = [nv[0]!];
     for (let j = 0; j + 1 < nv.length; j++) {
       const d = nv[j + 1]! - nv[j]!;
-      const n = Math.max(1, Math.ceil(d / h - 1e-4));
+      const n = Math.max(1, Math.ceil(d / paso - 1e-4));
       for (let l = 1; l < n; l++) f.push(nv[j]! + (d * l) / n);
       f.push(nv[j + 1]!);
     }
@@ -618,6 +623,12 @@ export interface MallaMuros {
    */
   aspecto: { max: number; altos: number };
 }
+
+/**
+ * Filas por planta, como mínimo (C3-a): con 8, el muro de sótano en flexión cilíndrica queda a +1,3 %;
+ * con 12, a +0,6 % (`validacion/c3/out_oraculos.txt`).
+ */
+export const FILAS_POR_PLANTA = 12;
 
 /** Relación de aspecto por encima de la cual se avisa (C3: H17 pide ≤ 2 en el cuerpo del muro). */
 export const ASPECTO_ALTO = 4;

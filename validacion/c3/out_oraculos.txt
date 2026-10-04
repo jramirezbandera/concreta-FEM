@@ -1,0 +1,29 @@
+# validacion/c3/oraculos.ts — 2026-10-05: oráculos analíticos de los muros (criterio 2 de C3); h = 0,75 es el tamaño por defecto
+
+## Muro en voladizo 3 × 9 m frente a Timoshenko (1.5552 mm)
+| h | láminas | δ (mm) | error |
+|---|---|---|---|
+| 0.75 | 288 | 1.5483 | -0.44 % |
+| 0.375 | 288 | 1.5483 | -0.44 % |
+| 0.1875 | 768 | 1.5496 | -0.36 % |
+
+## Muro de sótano 24 × 3 m con empuje hidrostático (flexión cilíndrica): w = 1.1664 mm, M base = 45 kN·m/m
+| h | láminas | w (mm) | error w | error M (máx en la columna central) |
+|---|---|---|---|---|
+| 0.75 | 384 | 1.1732 | 0.59 % | 0.51 % |
+| 0.375 | 768 | 1.1732 | 0.59 % | 0.51 % |
+| 0.1875 | 2048 | 1.1703 | 0.34 % | 0.29 % |
+
+## Losa sobre dos muros frente al pórtico equivalente: encuentro -26.105 y vano 18.895 kN·m/m
+| h | láminas | encuentro (corte) | error | vano (SPR) | error |
+|---|---|---|---|---|---|
+| 0.75 | 1242 | -25.698 | -1.56 % | 18.717 | -0.94 % |
+| 0.375 | 3390 | -26.164 | 0.22 % | 18.784 | -0.58 % |
+| 0.25 | 6384 | -26.113 | 0.03 % | 18.848 | -0.25 % |
+
+## Viga en el plano de un muro (E0): embebida (E0) 6.430 mm, ASDShellQ4 6.451 mm, rígida 4.80 mm
+| h | barras auxiliares | punta (mm) | frente a E0 | frente a ASDShellQ4 | ÷ rígida |
+|---|---|---|---|---|---|
+| 0.75 | 2 | 6.418 | -0.18 % | -0.50 % | 1.337 |
+| 0.375 | 2 | 6.418 | -0.18 % | -0.50 % | 1.337 |
+| 0.25 | 2 | 6.509 | 1.23 % | 0.90 % | 1.356 |

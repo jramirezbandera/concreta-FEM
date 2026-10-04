@@ -104,3 +104,38 @@ export function resultadosFisico(m: MuroEtabs, h: number, op: OpcionesCompilacio
   });
   return { ...out, nudos: r.modelo.nudos.length, laminas: r.modelo.laminas?.length ?? 0 };
 }
+
+if (import.meta.main) {
+  const { readFileSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { iniciarNucleo } = await import("../../src/nucleo/index.ts");
+  const { murosEtabs15, resultadosMuro } = await import("../e6/etabs15.ts");
+  await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "..", "src", "nucleo", "pkg", "nucleo_bg.wasm")));
+  const lineas = [
+    `# validacion/c3/etabs15.ts — ${new Date().toLocaleDateString("sv-SE")}: los muros de ETABS 15 como modelo físico (C3), frente al modelo a mano de E6; desplazamientos en in, giros en rad`,
+    "Malla del compilador con h = la intermedia de E6 (h(1)); «a mano h» es el modelo de E6 con ese h y «a mano fina», con su malla más fina (h(2)).",
+    "",
+    "| muro | magnitud | SAP2000 | físico | a mano h | físico − a mano h | a mano fina | físico − fina | físico − SAP | nudos físico / a mano | s |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
+  ];
+  let peorMisma = 0;
+  for (const m of murosEtabs15()) {
+    const h = m.h(1);
+    const t0 = performance.now();
+    const f = resultadosFisico(m, h);
+    const t = (performance.now() - t0) / 1000;
+    const a = resultadosMuro(m, h);
+    const fina = resultadosMuro(m, m.h(2));
+    for (const k of Object.keys(m.sap)) {
+      const d = f[k]! / a[k]! - 1;
+      if (!m.id.startsWith("15d")) peorMisma = Math.max(peorMisma, Math.abs(d));
+      lineas.push(
+        `| ${m.id} | ${k} | ${m.sap[k]} | ${f[k]!.toPrecision(6)} | ${a[k]!.toPrecision(6)} (h = ${h}) | ${d.toExponential(2)} | ${fina[k]!.toPrecision(6)} (h = ${m.h(2)}) | ${(100 * (f[k]! / fina[k]! - 1)).toFixed(2)} % | ${(100 * (f[k]! / m.sap[k]! - 1)).toFixed(2)} % | ${f.nudos} / ${a.nudos} | ${t.toFixed(2)} |`,
+      );
+    }
+  }
+  lineas.push("", `Peor diferencia con el modelo a mano de la misma malla (todos menos 15d): ${peorMisma.toExponential(2)}`);
+  const texto = lineas.join("\n");
+  console.log(texto);
+  writeFileSync(join(import.meta.dirname, "out_etabs15.txt"), texto + "\n");
+}
