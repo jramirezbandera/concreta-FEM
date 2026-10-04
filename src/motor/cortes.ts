@@ -271,8 +271,7 @@ export class Cortes {
         if (enCorte.length === 0) continue;
         info.laminas.push(e.indice);
         if (enCorte.some(([v]) => !cp.dentro(X(v)))) bordes.push(e.id);
-        casos.forEach((r, k) => {
-          const g = this.fuerzas.lamina(e.indice, k, r);
+        this.fuerzas.laminaCasos(e.indice, casos).forEach((g, k) => {
           for (const [v, a] of enCorte) suma.agregar(k, X(v), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6));
         });
         for (const [v] of enCorte) extender(X(v));
@@ -326,8 +325,7 @@ export class Cortes {
         if (otro !== -1 || !cp.dentro(X(n0))) continue;
         info.barras.push(e.indice);
         extender(X(n0));
-        casos.forEach((r, k) => {
-          const g = this.fuerzas.barra(e.indice, k, r);
+        this.fuerzas.barraCasos(e.indice, casos).forEach((g, k) => {
           suma.agregar(k, X(n0), g.subarray(6 * a0, 6 * a0 + 3), g.subarray(6 * a0 + 3, 6 * a0 + 6));
         });
         continue;
@@ -371,8 +369,7 @@ export class Cortes {
         });
       } else {
         const [nA, aA] = aEsI ? [i, 0] : [j, 1];
-        casos.forEach((r, k) => {
-          const g = this.fuerzas.barra(e.indice, k, r);
+        this.fuerzas.barraCasos(e.indice, casos).forEach((g, k) => {
           suma.agregar(k, X(nA), g.subarray(6 * aA, 6 * aA + 3), g.subarray(6 * aA + 3, 6 * aA + 6), -1);
         });
       }
@@ -414,8 +411,7 @@ export class Cortes {
     });
     if (incluidas.length) {
       info.restricciones.push(...incluidas);
-      casos.forEach((r, k) => {
-        const fr = this.fuerzas.restricciones(k, r, incluidas);
+      this.fuerzas.restricciones(casos, incluidas).forEach((fr, k) => {
         for (const ir of incluidas) {
           const rs = lista[ir]!;
           const f = fr.get(ir)!;

@@ -1,13 +1,18 @@
 /**
- * Motor FEM 3D de Concreta (fases E1, E2 y E3: núcleo, barras y láminas). API pública.
+ * Motor FEM 3D de Concreta (fases E1, E2, E3 y E5: núcleo, barras, láminas, Q y bandas). API pública.
  *
  * Entra un `ModeloAnalitico` y sale, por caso, un `Float64Array` de desplazamientos y otro de
  * reacciones (6 por nudo), los esfuerzos de extremo de las barras y las resultantes de las
  * láminas en su centroide, con diagnósticos. Los diagramas completos de las barras salen de
  * `DiagramasBarras`, y las resultantes de lámina en cualquier punto, de `ResultantesLaminas`. Los
- * convenios de unidades, ejes y signos están en la cabecera de `modelo.ts`.
+ * campos continuos de las láminas (N, M y Q por equilibrio, para los mapas) salen de
+ * `CamposLaminas`, y los esfuerzos que atraviesan un plano (bandas de losa, machones de muro,
+ * plantas), de `Cortes`. Los convenios de unidades, ejes y signos están en la cabecera de `modelo.ts`.
  */
 export { DiagramasBarras, type BarraPreparada } from "./barras.ts";
+export { CamposLaminas, EvaluadorCampos, type OpcionesCampos, type RegionCampos } from "./campos.ts";
+export { Cortes, TOL_CORTE, type Corte, type MetodoCorte, type MuestrasCorte, type ResultadoCorte } from "./cortes.ts";
+export { FuerzasNodales } from "./fuerzasNodales.ts";
 export { ResultantesLaminas, type LaminaPreparada } from "./laminas.ts";
 export { COMPONENTES_LAMINA, type MultiplicadoresLamina } from "../elementos/lamina.ts";
 export type { MaterialLamina } from "../elementos/dkmq.ts";

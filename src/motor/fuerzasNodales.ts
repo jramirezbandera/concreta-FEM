@@ -146,6 +146,26 @@ export class FuerzasNodales {
     return this.deElemento(e, k, r.u, rigidezLamina(e.lamina!));
   }
 
+  /** g de un elemento en todos los casos (`casos[k]`, el caso k del modelo), con su rigidez calculada una vez. */
+  private deElementoCasos(e: ElementoMotor, casos: readonly ResultadoCaso[]): Float64Array[] {
+    const K = rigidezGlobal(this.modelo, e);
+    return casos.map((r, k) => this.deElemento(e, k, r.u, K));
+  }
+
+  /** `barra` en todos los casos. */
+  barraCasos(b: number, casos: readonly ResultadoCaso[]): Float64Array[] {
+    const e = this.porBarra[b];
+    if (!e) throw new Error(`FuerzasNodales: no hay barra ${b}`);
+    return this.deElementoCasos(e, casos);
+  }
+
+  /** `lamina` en todos los casos. */
+  laminaCasos(l: number, casos: readonly ResultadoCaso[]): Float64Array[] {
+    const e = this.porLamina[l];
+    if (!e) throw new Error(`FuerzasNodales: no hay lámina ${l}`);
+    return this.deElementoCasos(e, casos);
+  }
+
   /** Elementos (índices en `elementos`) que tocan cada nudo, sin los muelles a tierra (CSR). */
   private incidencias(): { ptr: Uint32Array; idx: Uint32Array } {
     if (this.incidencia) return this.incidencia;
@@ -166,23 +186,36 @@ export class FuerzasNodales {
   }
 
   /**
-   * Σ g de los elementos (sin los muelles a tierra) en cada nudo de `nudos`, en el caso k: 6 por
-   * nudo de la lista. Cada elemento se evalúa una sola vez.
+   * Σ g de los elementos (sin los muelles a tierra) en cada nudo de `nudos`, por caso: 6 por nudo
+   * de la lista. La rigidez de cada elemento se calcula una sola vez para todos los casos.
    */
-  sumaEnNudos(nudos: readonly number[], k: number, r: ResultadoCaso): Float64Array {
+  sumaEnNudos(nudos: readonly number[], casos: readonly ResultadoCaso[]): Float64Array[] {
     const { ptr, idx } = this.incidencias();
-    const pos = new Map<number, number>();
-    nudos.forEach((v, i) => pos.set(v, i));
+    const pos = new Int32Array(this.modelo.nudos.length).fill(-1);
+    nudos.forEach((v, i) => (pos[v] = i));
     const usados = new Set<number>();
     for (const v of nudos) for (let p = ptr[v]!; p < ptr[v + 1]!; p++) usados.add(idx[p]!);
-    const out = new Float64Array(6 * nudos.length);
+    const out = casos.map(() => new Float64Array(6 * nudos.length));
+    const ue = new Float64Array(24);
     for (const ie of usados) {
       const e = this.elementos[ie]!;
-      const g = this.deElemento(e, k, r.u, e.lamina ? rigidezLamina(e.lamina) : undefined);
-      e.nudos.forEach((v, a) => {
-        const i = pos.get(v);
-        if (i === undefined) return;
-        for (let c = 0; c < 6; c++) out[6 * i + c]! += g[6 * a + c]!;
+      const K = rigidezGlobal(this.modelo, e);
+      const m = 6 * e.nudos.length;
+      casos.forEach((r, k) => {
+        const o = out[k]!;
+        for (let b = 0; b < m; b++) ue[b] = r.u[6 * e.nudos[(b / 6) | 0]! + (b % 6)]!;
+        const eq = e.tipo === "barra" ? this.cargasCaso(k).barras.get(e.indice) : e.tipo === "lamina" ? this.cargasCaso(k).laminas.get(e.indice) : undefined;
+        // Sólo las filas de los nudos de la lista: g = k·u − f_eq
+        for (let a = 0; a < e.nudos.length; a++) {
+          const i = pos[e.nudos[a]!]!;
+          if (i < 0) continue;
+          for (let c = 0; c < 6; c++) {
+            const fila = m * (6 * a + c);
+            let s = eq ? -eq[6 * a + c]! : 0;
+            for (let b = 0; b < m; b++) s += K[fila + b]! * ue[b]!;
+            o[6 * i + c]! += s;
+          }
+        }
       });
     }
     return out;
@@ -190,10 +223,11 @@ export class FuerzasNodales {
 
   /**
    * Fuerzas de las restricciones `cuales` (índices en `modelo.restricciones`; todas si se omite)
-   * sobre sus nudos en el caso k: 6 por nudo, en el orden [maestro, ...esclavos]. Calcula también
-   * las de las restricciones de las que dependen (las que tienen por maestro a uno de sus esclavos).
+   * sobre sus nudos, por caso (`casos[k]`, el caso k del modelo): 6 por nudo, en el orden
+   * [maestro, ...esclavos]. Calcula también las de las restricciones de las que dependen (las que
+   * tienen por maestro a uno de sus esclavos).
    */
-  restricciones(k: number, r: ResultadoCaso, cuales?: readonly number[]): Map<number, FuerzasRestriccion> {
+  restricciones(casos: readonly ResultadoCaso[], cuales?: readonly number[]): Map<number, FuerzasRestriccion>[] {
     const lista = this.modelo.restricciones ?? [];
     // Restricciones de las que cada nudo es maestro
     const deMaestro = new Map<number, number[]>();
@@ -211,9 +245,22 @@ export class FuerzasNodales {
       necesarias.add(ir);
       for (const s of lista[ir]!.esclavos) for (const j of deMaestro.get(s) ?? []) pila.push(j);
     }
-    // C de los esclavos: Σ g − P − R
     const esclavos = [...new Set([...necesarias].flatMap((ir) => lista[ir]!.esclavos))];
-    const suma = this.sumaEnNudos(esclavos, k, r);
+    const sumas = this.sumaEnNudos(esclavos, casos);
+    return casos.map((r, k) => this.resolverRestricciones(lista, necesarias, deMaestro, esclavos, sumas[k]!, k, r));
+  }
+
+  /** Fuerzas de las restricciones de un caso, desde las hojas de las cadenas. */
+  private resolverRestricciones(
+    lista: readonly NonNullable<ModeloAnalitico["restricciones"]>[number][],
+    necesarias: Set<number>,
+    deMaestro: Map<number, number[]>,
+    esclavos: readonly number[],
+    suma: Float64Array,
+    k: number,
+    r: ResultadoCaso,
+  ): Map<number, FuerzasRestriccion> {
+    // C de los esclavos: Σ g − P − R
     const P = this.cargasCaso(k).nodales;
     const R = r.reacciones;
     const C = new Map<number, Float64Array>();

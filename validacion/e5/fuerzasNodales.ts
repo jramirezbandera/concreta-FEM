@@ -50,6 +50,7 @@ export function erroresFuerzasNodales(modelo: ModeloAnalitico): [number, number]
   const xyz = (v: number) => [modelo.nudos[v]!.x, modelo.nudos[v]!.y, modelo.nudos[v]!.z];
   let peorElemento = 0;
   let peorNudo = 0;
+  const restricciones = fn.restricciones(casos);
   casos.forEach((r, k) => {
     const suma = new Float64Array(6 * nn);
     const equilibrios: ReturnType<typeof autoequilibrio>[] = [];
@@ -66,7 +67,7 @@ export function erroresFuerzasNodales(modelo: ModeloAnalitico): [number, number]
     for (const q of equilibrios) peorElemento = Math.max(peorElemento, q.F / eF, q.M / eM);
     const C = new Float64Array(6 * nn);
     const lista = modelo.restricciones ?? [];
-    for (const [ir, f] of fn.restricciones(k, r)) {
+    for (const [ir, f] of restricciones[k]!) {
       const rs = lista[ir]!;
       [rs.maestro, ...rs.esclavos].forEach((v, a) => {
         for (let c = 0; c < 6; c++) C[6 * v + c]! += f[6 * a + c]!;
