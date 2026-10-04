@@ -31,7 +31,7 @@ import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type LosaMallar, type ResultadoMalla } from "./mallado.ts";
-import { ajustarMuros, mallarMuros, planMuros, unificarEstaciones, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
+import { ajustarMuros, estacionesComunes, mallarMuros, planMuros, unificarEstaciones, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
 import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
@@ -286,8 +286,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
   const plantas = [...ks].sort((a, b) => b - a);
   const laminasSinOrden: (LaminaL & { c: Vec2 })[] = [];
 
-  // 1. C2-c, C3-b y el arreglo plano de cada planta
-  const estado = new Map<number, PlantaL>();
+  // 1. C2-c y C3-b, y el arreglo plano de cada planta
   for (const k of plantas) {
     const idPlanta = ctx.plantas[k]!.id;
     const losasK = ctx.losas.map((l, i) => ({ l, i })).filter(({ l }) => l.losa.planta === idPlanta);
@@ -329,9 +328,16 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
           );
       }
     }
-    if (diag.hayErrores) continue;
+  }
+  if (diag.hayErrores) return r;
 
-    // Arreglo plano. Dentro de una huella todo es rígido: ni el nudo del pilar (el maestro de su
+  /** Arreglo plano de la planta k, con los puntos `fijos` (las estaciones comunes de los muros). */
+  const montar = (k: number, fijos: readonly Vec2[], diag: Diagnosticos): PlantaL | null => {
+    const idPlanta = ctx.plantas[k]!.id;
+    const losasK = ctx.losas.map((l, i) => ({ l, i })).filter(({ l }) => l.losa.planta === idPlanta);
+    const tramosK = topo.tramos.filter((tv) => tv.k === k);
+    const murosK = ctx.muros.map((m, w) => ({ m, w })).filter(({ m }) => k >= m.kh && k <= m.kb);
+    // Dentro de una huella todo es rígido: ni el nudo del pilar (el maestro de su
     // enlace) ni los ejes de las vigas que le llegan hacen falta en la malla, y la partirían en
     // triángulos diminutos.
     const a = new Arreglo(epsGeom, epsSnap);
@@ -343,6 +349,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     }
     for (const n of nudosK) if (!huellasK.has(n)) a.fijo(topo.nudos[n]!.x, topo.nudos[n]!.y, n);
     for (const { w } of murosK) for (const P of puntosMuros[w]!) a.fijoMuro(P);
+    for (const P of fijos) a.fijoMuro(P);
     for (const tv of tramosK) {
       const polis = tv.cadena.flatMap((c) => (huellasK.has(c.nudo) ? [huellasK.get(c.nudo)!] : []));
       const { A, B } = tv.t;
@@ -403,13 +410,29 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       if (ap.planta !== idPlanta || topo.apoyoEn.has(ap.id)) continue;
       puntoDe.set(ap.id, { i: a.punto([ap.x, ap.y], ap.id, "punto", "su punto"), Q: [ap.x, ap.y] });
     }
-    if (diag.hayErrores) continue;
+    if (diag.hayErrores) return null;
     if (!a.resolver()) {
       diag.error("malla/arreglo", `No se ha podido ordenar la geometría de la planta ${idPlanta} para mallarla: hay rasgos más pequeños que ${cm(epsSnap)} que se cruzan entre sí.`, [idPlanta, ...losasK.map(({ l }) => l.losa.id)]);
-      continue;
+      return null;
     }
-    estado.set(k, { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe });
-  }
+    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe };
+  };
+  const montarTodas = (fijos: ReadonlyMap<number, Vec2[]>, d: Diagnosticos): Map<number, PlantaL> => {
+    const e = new Map<number, PlantaL>();
+    for (const k of plantas) {
+      const p = montar(k, fijos.get(k) ?? [], d);
+      if (p) e.set(k, p);
+    }
+    return e;
+  };
+  // Con muros, una primera pasada da sus estaciones en cada planta; las cercanas de plantas
+  // distintas se unen en una sola (`estacionesComunes`) y la segunda pasada las lleva ya fijas, para
+  // que cada planta resuelva igual los «casi encuentros» con el eje del muro
+  let estado: Map<number, PlantaL>;
+  if (ctx.muros.length) {
+    const previa = montarTodas(new Map(), new Diagnosticos());
+    estado = montarTodas(previa.size === plantas.length ? estacionesComunes(ctx, previa, puntosMuros) : new Map(), diag);
+  } else estado = montarTodas(new Map(), diag);
   if (diag.hayErrores) return r;
 
   // 2. Estaciones de los muros, iguales en todas sus plantas (C3)
@@ -669,7 +692,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
 
   // 4. Rejilla de los muros
   if (plan) {
-    const mm = mallarMuros(ctx, topo, plan, (k, w, i) => nudosCadena.get(`${k}:${w}:${i}`)!, esclavosTodos, diag);
+    const mm = mallarMuros(ctx, topo, plan, (k, w, i) => nudosCadena.get(`${k}:${w}:${i}`)!, esclavosTodos, (k) => [...(estado.get(k)?.huellasK.values() ?? [])], diag);
     r.muros = mm.laminas;
     r.apoyosMuros = mm.apoyos;
     r.auxiliares = mm.auxiliares;

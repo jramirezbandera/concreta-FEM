@@ -28,6 +28,7 @@ import type { Arreglo, Trazo } from "./arreglo.ts";
 import type { Vec2 } from "./fisico.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
 import { siembraGraduada } from "./mallado.ts";
+import { puntoEnPoligono } from "./poligonos.ts";
 import type { Topologia, TramoViga } from "./topologia.ts";
 import type { Contexto, MuroCompilado } from "./validar.ts";
 
@@ -169,6 +170,81 @@ export function cadenaTramo(tm: TrazoMuro, i: number): number[] {
     idx.push(pos);
   }
   return p.slice(idx[i]!, idx[i + 1]! + 1);
+}
+
+/**
+ * Estaciones comunes (paso 2, antes de `unificarEstaciones`): los puntos de los ejes de los muros en
+ * los arreglos de una primera pasada, de todas las plantas, agrupados a ≤ ε_snap. Cada grupo se
+ * queda con un punto: un nudo de C1 (fijo), si no un vértice de muro, si no el más cercano al eje
+ * del tramo, y si no el de menor (x, y). Devuelve, por planta, los puntos que la segunda pasada
+ * pone fijos: los de los muros de cada grupo, en todas sus plantas. Así una esquina de una huella o
+ * un cruce que cae a pocos milímetros del eje se resuelve igual en todas las plantas. Entran también
+ * los bordes de los huecos, para que se unan a lo que tengan a ≤ ε_snap en cualquier planta.
+ */
+export function estacionesComunes(ctx: Contexto, plantas: ReadonlyMap<number, PlantaMuros>, puntos: readonly Vec2[][]): Map<number, Vec2[]> {
+  const { epsSnap } = ctx.op;
+  const lista: { X: Vec2; w: number; pr: number; d: number }[] = [];
+  for (const [, pl] of [...plantas].sort((a, b) => a[0] - b[0]))
+    for (const tm of pl.muros)
+      for (let i = 0; i + 1 < tm.vertices.length; i++) {
+        const [A, B] = [puntos[tm.w]![i]!, puntos[tm.w]![i + 1]!];
+        const L = dist(A, B);
+        const u: Vec2 = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
+        for (const p of cadenaTramo(tm, i)) {
+          const q = pl.a.puntos[p]!;
+          const pr = q.nudo >= 0 ? 0 : tm.vertices.includes(p) ? 1 : 2;
+          lista.push({ X: [q.x, q.y], w: tm.w, pr, d: Math.abs((q.x - A[0]) * u[1] - (q.y - A[1]) * u[0]) });
+        }
+      }
+  // Los bordes de los huecos, en su sitio sobre el eje ajustado
+  ctx.muros.forEach((m, w) =>
+    m.huecos.forEach((hh) => {
+      const [A, B] = [puntos[w]![hh.tramo]!, puntos[w]![hh.tramo + 1]!];
+      const L = dist(A, B);
+      for (const s of [hh.desde, hh.hasta]) {
+        const sg = Math.min(L, Math.max(0, s - m.s0[hh.tramo]!));
+        lista.push({ X: [A[0] + ((B[0] - A[0]) * sg) / L, A[1] + ((B[1] - A[1]) * sg) / L], w, pr: 2, d: 0 });
+      }
+    }),
+  );
+  const uf = new UnionFind(lista.length);
+  const lado = Math.max(1, 4 * epsSnap);
+  const celdas = new Map<string, number[]>();
+  lista.forEach((e, j) => {
+    const cx = Math.floor(e.X[0] / lado);
+    const cy = Math.floor(e.X[1] / lado);
+    for (let a = cx - 1; a <= cx + 1; a++)
+      for (let b = cy - 1; b <= cy + 1; b++) for (const o of celdas.get(`${a},${b}`) ?? []) if (dist(lista[o]!.X, e.X) <= epsSnap) uf.unir(o, j);
+    const c = `${cx},${cy}`;
+    let v = celdas.get(c);
+    if (!v) celdas.set(c, (v = []));
+    v.push(j);
+  });
+  const grupos = new Map<number, number[]>();
+  lista.forEach((_, j) => {
+    const r = uf.raiz(j);
+    let g = grupos.get(r);
+    if (!g) grupos.set(r, (g = []));
+    g.push(j);
+  });
+  const r = new Map<number, Vec2[]>();
+  for (const g of grupos.values()) {
+    let mejor = lista[g[0]!]!;
+    for (const j of g) {
+      const e = lista[j]!;
+      if (e.pr < mejor.pr || (e.pr === mejor.pr && (e.d < mejor.d || (e.d === mejor.d && (e.X[0] < mejor.X[0] || (e.X[0] === mejor.X[0] && e.X[1] < mejor.X[1])))))) mejor = e;
+    }
+    for (const w of new Set(g.map((j) => lista[j]!.w))) {
+      const m = ctx.muros[w]!;
+      for (let k = m.kh; k <= m.kb; k++) {
+        let v = r.get(k);
+        if (!v) r.set(k, (v = []));
+        if (!v.some((X) => X[0] === mejor.X[0] && X[1] === mejor.X[1])) v.push(mejor.X);
+      }
+    }
+  }
+  for (const v of r.values()) v.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  return r;
 }
 
 export interface EstacionesMuros {
@@ -326,7 +402,11 @@ export function unificarEstaciones(ctx: Contexto, plantas: ReadonlyMap<number, P
     const it = intervalos.get(kk)!;
     const L = dist(it.A, it.B);
     const [ka, kb] = kk.split("|") as [string, string];
-    const { t } = siembraGraduada(L, Math.min(it.paso, tam.get(ka)!), Math.min(it.paso, tam.get(kb)!), it.paso);
+    // El tamaño de un rasgo, nunca por debajo de ε_snap: dos estaciones más juntas (dos nudos de C1 de
+    // plantas distintas que no pueden unirse) no deben llenar el intervalo de puntos
+    const ta = Math.min(it.paso, Math.max(epsSnap, tam.get(ka)!));
+    const tb = Math.min(it.paso, Math.max(epsSnap, tam.get(kb)!));
+    const { t } = siembraGraduada(L, ta, tb, it.paso);
     if (!t.length) continue;
     const qs = t.map((x) => [it.A[0] + (it.B[0] - it.A[0]) * x, it.A[1] + (it.B[1] - it.A[1]) * x] as Vec2);
     for (const { k, p, q } of it.donde.values()) {
@@ -532,7 +612,10 @@ export interface MallaMuros {
   apoyos: Map<string, number[]>;
   /** Barras auxiliares de C3-e: el tramo de viga y los nudos de la fila del muro por la que sigue. */
   auxiliares: { tramo: TramoViga; nudos: number[] }[];
-  /** Relación de aspecto máxima de los elementos de muro y cuántos pasan de 4. */
+  /**
+   * Relación de aspecto máxima de los elementos de muro y cuántos pasan de 4, sin contar los que
+   * caen en la huella de un pilar (la franja entre su eje y su cara: allí el muro es el pilar).
+   */
   aspecto: { max: number; altos: number };
 }
 
@@ -550,6 +633,7 @@ export function mallarMuros(
   plan: PlanMuros,
   nudosCadena: (k: number, w: number, i: number) => number[],
   esclavos: ReadonlySet<number>,
+  huellas: (k: number) => readonly (readonly Vec2[])[],
   diag: Diagnosticos,
 ): MallaMuros {
   const laminas: LaminaMuro[] = [];
@@ -598,10 +682,13 @@ export function mallarMuros(
         const ancho = Math.sqrt((X[1]!.x - X[0]!.x) ** 2 + (X[1]!.y - X[0]!.y) ** 2);
         const alto = Z[l + 1]! - Z[l]!;
         const asp = Math.max(ancho / alto, alto / ancho);
-        aspectoMax = Math.max(aspectoMax, asp);
-        if (asp > ASPECTO_ALTO) {
-          altos++;
-          peor.set(m.muro.id, Math.max(peor.get(m.muro.id) ?? 0, asp));
+        const centro: Vec2 = [(X[0]!.x + X[1]!.x) / 2, (X[0]!.y + X[1]!.y) / 2];
+        if (![...huellas(pa.k), ...huellas(pa.k + 1)].some((p) => puntoEnPoligono(centro, p))) {
+          aspectoMax = Math.max(aspectoMax, asp);
+          if (asp > ASPECTO_ALTO) {
+            altos++;
+            peor.set(m.muro.id, Math.max(peor.get(m.muro.id) ?? 0, asp));
+          }
         }
         laminas.push({ nudos: ns, w: pa.w, i: pa.i, k: pa.k, eje1: [(X[1]!.x - X[0]!.x) / ancho, (X[1]!.y - X[0]!.y) / ancho], z0: Z[l]!, z1: Z[l + 1]! });
       }
@@ -610,7 +697,7 @@ export function mallarMuros(
   for (const [id, a] of [...peor].sort((x, y) => (x[0] < y[0] ? -1 : 1)))
     diag.aviso(
       "muro/aspecto",
-      `El muro ${id} tiene elementos hasta ${a.toFixed(1)} veces más altos que anchos (o al revés): hay estaciones o filas muy juntas (bordes de huecos, caras de pilares o cruces a poco más de ε_snap), y la membrana pierde precisión (H17 pide ≤ 2).`,
+      `El muro ${id} tiene elementos hasta ${a.toFixed(1)} veces más altos que anchos (o al revés), fuera de las huellas de los pilares: hay estaciones o filas muy juntas (bordes de huecos, vigas o cruces a poco más de ε_snap), y la membrana pierde precisión (H17 pide ≤ 2).`,
       [id],
       { aspecto: a },
     );
