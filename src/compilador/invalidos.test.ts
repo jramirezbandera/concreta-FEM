@@ -96,7 +96,7 @@ const CATALOGO: Caso[] = [
   ["liberaciones con una clave desconocida", (f) => (f.pilares![0] = m({ ...f.pilares![0], liberaciones: { medio: [true, false, false, false, false, false] } })), "fisico/valor-no-valido", "A"],
   ["pilares solapados", (f) => f.pilares!.push({ id: "A2", x: 0.02, y: 0, desde: "C", hasta: "P1", seccion: "p30" }), "topologia/pilares-solapados", "A2"],
   ["pilar apeado sin nada que le llegue", (f) => f.pilares!.push({ id: "Ap", x: 3, y: 2.5, desde: "P1", hasta: "P2", seccion: "p30", base: "ninguno" }), "pilar/arranque-sin-apoyo", "Ap"],
-  ["cabeza de pilar entera dentro del canto de la viga", (f) => (f.plantas[0] = { ...f.plantas[0]! }) && (f.plantas[1] = { ...f.plantas[1]!, altura: 0.4 }), "pilar/tramo-flexible-nulo", "A"],
+  ["cabeza de pilar entera dentro del canto de la viga", (f) => (f.plantas[0] = { ...f.plantas[0]! }) && (f.plantas[1] = { ...f.plantas[1]!, altura: 0.4 }), "pilar/tramo-flexible-nulo", "A", { factorZonaRigida: 1 }],
   // Vigas
   ["viga con una planta que no existe", (f) => (f.vigas![0] = { ...f.vigas![0]!, planta: "Z" }), "fisico/referencia", "X0P1"],
   ["viga con un solo punto", (f) => (f.vigas![0] = { ...f.vigas![0]!, puntos: [[0, 0]] }), "fisico/valor-no-valido", "X0P1"],
@@ -106,7 +106,7 @@ const CATALOGO: Caso[] = [
   ["inserción desconocida", (f) => (f.vigas![0] = m({ ...f.vigas![0], insercion: "inferior" })), "fisico/valor-no-valido", "X0P1"],
   ["vigas solapadas", (f) => f.vigas!.push({ id: "S1", planta: "P1", puntos: [[1, 0], [4, 0]], seccion: "v" }), "topologia/vigas-solapadas", "S1"],
   ["viga entera dentro de un pilar", (f) => f.vigas!.push({ id: "Z", planta: "P1", puntos: [[-0.1, 0.05], [0.1, 0.05]], seccion: "v" }), "viga/sin-tramo-flexible", "Z"],
-  ["vigas que se tocan dentro de sus zonas rígidas", (f) => f.pilares!.push({ id: "Pz", x: 0.3, y: 0, desde: "C", hasta: "P1", seccion: "c40" }), "viga/tramo-flexible-nulo", "X0P1"],
+  ["vigas que se tocan dentro de sus zonas rígidas", (f) => f.pilares!.push({ id: "Pz", x: 0.3, y: 0, desde: "C", hasta: "P1", seccion: "c40" }), "viga/tramo-flexible-nulo", "X0P1", { factorZonaRigida: 1 }],
   ["dos extremos que caen a 4 cm sobre la misma viga", (f) => f.vigas!.push({ id: "Ya", planta: "P1", puntos: [[3, 5], [3, 0.03]], seccion: "v" }, { id: "Yb", planta: "P1", puntos: [[3.04, -2], [3.04, -0.03]], seccion: "v" }), "topologia/nudos-proximos", "Ya"],
   // Apoyos
   ["apoyo sin ninguna coacción", (f) => f.apoyos!.push({ id: "Ap", planta: "P1", x: 3, y: 0, coartados: [false, false, false, false, false, false] }), "fisico/valor-no-valido", "Ap"],
@@ -129,6 +129,10 @@ const CATALOGO: Caso[] = [
   // Opciones
   ["ε_snap menor que ε_geom", () => undefined, "opciones/no-validas", undefined, { epsGeom: 1e-3, epsSnap: 1e-4 }],
   ["factor de zona rígida mayor que 1", () => undefined, "opciones/no-validas", undefined, { factorZonaRigida: 1.5 }],
+  ["modificador nulo", () => undefined, "opciones/no-validas", undefined, { modificadores: { vigas: { todos: { J: 0 } } } }],
+  ["modificador enorme (una penalización, E6-1)", () => undefined, "opciones/no-validas", undefined, { modificadores: { pilares: { hormigon: { A: 1e5 } } } }],
+  ["modificador de una propiedad desconocida", () => undefined, "opciones/no-validas", undefined, { modificadores: m({ vigas: { hormigon: { E: 2 } } }) }],
+  ["modificadores por un material desconocido", () => undefined, "opciones/no-validas", undefined, { modificadores: m({ pilares: { madera: { A: 2 } } }) }],
 ];
 
 describe("criterio 5 de C1: entradas físicas no válidas", () => {

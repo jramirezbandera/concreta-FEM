@@ -10,6 +10,7 @@ export { canonico, huellaDe, sha256 } from "./huella.ts";
 export { fisicosDeIds, traducirDiagnosticos, type BarraMapeada, type Mapeo, type NudoMapeado } from "./mapeo.ts";
 export { TOL_SIN_PERDIDAS } from "./cargas.ts";
 export { EsfuerzosPiezas, type TramoFlexible } from "./resultados.ts";
+export { FACTOR_ZONA_RIGIDA, MODIFICADORES_D4 } from "./fisico.ts";
 export type {
   ApoyoFisico,
   CargaFisica,
@@ -17,6 +18,7 @@ export type {
   Liberacion,
   Material,
   ModeloFisico,
+  ModificadoresPieza,
   ModificadoresPiezas,
   OpcionesCompilacion,
   Pilar,

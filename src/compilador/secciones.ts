@@ -17,6 +17,8 @@ export interface SeccionCompilada {
   canto: number;
   /** Huella en planta si es la sección de un pilar; null si no se conoce. */
   huella: FormaHuella | null;
+  /** Tipo de material (para los modificadores por material, D4). */
+  material: Material["tipo"];
 }
 
 export function materialElastico(m: Material): { elastico: MaterialElastico; peso: number } {
@@ -69,5 +71,5 @@ export function compilarSeccion(s: Seccion, m: Material, cortante: boolean): Sec
     delete barra.Avy;
     delete barra.Avz;
   }
-  return { barra, peso: peso * barra.A, canto, huella };
+  return { barra, peso: peso * barra.A, canto, huella, material: m.tipo };
 }

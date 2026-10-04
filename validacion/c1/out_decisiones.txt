@@ -5,3 +5,4 @@ zona rígida 1                  deriva Vx 0.85 mm | X5-N3: cara -95.3, vano 86.4
 D4: axil de pilares ×2         deriva Vx 0.84 mm | X5-N3: cara -100.9, vano 86.6 | S0-0-N3: arranque -14.9, vano 24.4 | T máx 11.2 | N int/esq -1652/-681
 D4: torsión de vigas ×0,1      deriva Vx 0.85 mm | X5-N3: cara -99.0, vano 90.3 | S0-0-N3: arranque 0.9, vano 31.1 | T máx 2.4 | N int/esq -1643/-698
 D4: los dos                    deriva Vx 0.84 mm | X5-N3: cara -104.6, vano 90.4 | S0-0-N3: arranque 1.0, vano 31.0 | T máx 2.3 | N int/esq -1652/-673
+por defecto (0,5 y D4)         deriva Vx 1.04 mm | X5-N3: cara -101.6, vano 95.6 | S0-0-N3: arranque 1.1, vano 31.2 | T máx 2.2 | N int/esq -1643/-664

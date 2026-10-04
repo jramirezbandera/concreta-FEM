@@ -59,7 +59,7 @@ describe("esfuerzos por pieza física", () => {
     expect(e.en("V", 0, 2, -1)![4]).toBeCloseTo(e.en("V", 0, 2, 1)![4]!, 9);
   });
 
-  it("viga empotrada en dos pilares muy rígidos: zonas rígidas sin esfuerzos y M = q·L'²/12 en la cara", () => {
+  it("viga empotrada en dos pilares muy rígidos: la mitad del nudo rígida (por defecto), sin esfuerzos, y M = q·L'²/12 al final de la zona rígida", () => {
     const q = 12;
     const f = base({
       secciones: [
@@ -79,11 +79,11 @@ describe("esfuerzos por pieza física", () => {
     });
     const e = piezas(f);
     const [t] = e.tramos("V");
-    expect([t!.s0, t!.s1]).toEqual([0.2, 5.8]);
-    expect(e.en("V", 0, 0.1)).toBeNull();
-    const Lp = 5.6;
-    // Con los pilares casi rígidos, empotramiento perfecto en las caras (a 1e-6 por su flexibilidad)
-    expect(e.en("V", 0, 0.2)![4]! / (-(q * Lp * Lp) / 12)).toBeCloseTo(1, 6);
+    expect([t!.s0, t!.s1]).toEqual([0.1, 5.9]);
+    expect(e.en("V", 0, 0.05)).toBeNull();
+    const Lp = 5.8;
+    // Con los pilares casi rígidos, empotramiento perfecto al final de la zona rígida (a 1e-6 por su flexibilidad)
+    expect(e.en("V", 0, 0.1)![4]! / (-(q * Lp * Lp) / 12)).toBeCloseTo(1, 6);
     expect(e.en("V", 0, 3)![4]! / ((q * Lp * Lp) / 24)).toBeCloseTo(1, 6);
   });
 });

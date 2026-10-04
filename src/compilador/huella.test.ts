@@ -57,7 +57,8 @@ describe("criterio 6 de C1: huella", () => {
       const h = { ...f, pilares: f.pilares!.map((p, i) => (i === 0 ? { ...p, x: p.x + 1e-9 } : p)) };
       expect(compilar(h).huella).not.toBe(a.huella);
       // y con otras opciones
-      expect(compilar(f, { factorZonaRigida: 0.5 }).huella).not.toBe(a.huella);
+      expect(compilar(f, { factorZonaRigida: 0.25 }).huella).not.toBe(a.huella);
+      expect(compilar(f, { modificadores: {} }).huella).not.toBe(a.huella);
     }
   });
 

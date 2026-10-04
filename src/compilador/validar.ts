@@ -37,6 +37,27 @@ const vec2 = (v: unknown): boolean => Array.isArray(v) && v.length === 2 && v.ev
 const seis = (v: unknown): boolean => Array.isArray(v) && v.length === 6 && v.every((x) => typeof x === "boolean");
 const porId = <T extends { id: string }>(a: T, b: T) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
+/** Qué falla en los modificadores de rigidez de las opciones, o null si están bien. */
+function modificadoresNoValidos(m: unknown): string | null {
+  if (!esObjeto(m)) return "no son un objeto";
+  for (const [pieza, g] of Object.entries(m)) {
+    if (g === undefined) continue;
+    if (pieza !== "pilares" && pieza !== "vigas") return `pieza desconocida «${pieza}»`;
+    if (!esObjeto(g)) return `${pieza} no es un objeto`;
+    for (const [mat, mods] of Object.entries(g)) {
+      if (mods === undefined) continue;
+      if (!["todos", "hormigon", "acero", "general"].includes(mat)) return `material desconocido «${mat}» en ${pieza}`;
+      if (!esObjeto(mods)) return `${pieza}.${mat} no es un objeto`;
+      for (const [k, x] of Object.entries(mods)) {
+        if (x === undefined) continue;
+        if (!["A", "Avy", "Avz", "J", "Iy", "Iz"].includes(k)) return `propiedad desconocida «${k}» en ${pieza}.${mat}`;
+        if (!(num(x) && x > 0 && x <= 100)) return `${pieza}.${mat}.${k} = ${String(x)}`;
+      }
+    }
+  }
+  return null;
+}
+
 export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagnosticos): Contexto | null {
   const f = fisico as unknown as Record<string, unknown>;
   if (!esObjeto(f)) {
@@ -45,6 +66,14 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   }
   if (!(num(op.epsGeom) && op.epsGeom > 0 && num(op.epsSnap) && op.epsSnap >= op.epsGeom && num(op.factorZonaRigida) && op.factorZonaRigida >= 0 && op.factorZonaRigida <= 1)) {
     diag.error("opciones/no-validas", "Las opciones no son válidas: hace falta 0 < ε_geom ≤ ε_snap y un factor de zona rígida en [0, 1].");
+    return null;
+  }
+  const malMod = modificadoresNoValidos(op.modificadores);
+  if (malMod) {
+    diag.error(
+      "opciones/no-validas",
+      `Los modificadores de rigidez no son válidos (${malMod}): van por pilares y vigas, para todos o por material (hormigon, acero, general), y cada uno de A, Avy, Avz, J, Iy o Iz tiene que estar en (0, 100] (uno mayor es una penalización, E6-1).`,
+    );
     return null;
   }
   const lista = (clave: string, obligatoria: boolean): Record<string, unknown>[] => {

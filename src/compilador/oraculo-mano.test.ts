@@ -2,6 +2,8 @@
  * Criterio 2 de C1: cada modelo físico de `validacion/c1/mano.ts` se compara con su modelo analítico
  * escrito a mano, sin llamar al compilador. Desplazamientos, reacciones y esfuerzos de extremo
  * tienen que coincidir a ≤ 1e-10, con los mismos nudos y barras, y los avisos son los previstos.
+ * Se escribieron con el nudo entero rígido y sin modificadores, y se compilan con esas opciones; los
+ * valores por defecto actuales (C1-a y D4) los comprueba `opciones.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 import { casosMano } from "../../validacion/c1/mano.ts";
@@ -10,7 +12,7 @@ import { compilar } from "./compilar.ts";
 
 describe("criterio 2 de C1: modelos físicos frente a su modelo analítico hecho a mano", () => {
   it.each(casosMano().map((c) => [c.nombre, c] as const))("%s", (_n, caso) => {
-    const r = compilar(caso.fisico);
+    const r = compilar(caso.fisico, caso.opciones);
     if (!r.valido) throw new Error(r.diagnosticos.map((d) => `${d.codigo}: ${d.mensaje}`).join("\n"));
     expect(r.diagnosticos.map((d) => d.codigo)).toEqual(caso.avisos);
     const c = compararModelos(r.modelo, caso.mano);

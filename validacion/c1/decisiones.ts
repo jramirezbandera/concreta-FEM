@@ -2,7 +2,8 @@
  * Efecto de las decisiones por defecto pendientes (C1-a y D4) sobre las barras del edificio
  * objetivo de `banco.ts` (7 plantas, 80 pilares), con el núcleo:
  * - factor de zona rígida 0, 0,5 y 1;
- * - D4: axil de pilares ×2, torsión de vigas ×0,1 y los dos a la vez (con factor 1).
+ * - D4: axil de pilares ×2, torsión de vigas ×0,1 y los dos a la vez (con factor 1);
+ * - los valores por defecto que se adoptaron con esas medidas (factor 0,5 y D4, el 2026-10-04).
  * Mide la deriva de cabeza en Vx, los momentos de una viga interior (X5-N3: cara del pilar en
  * x = 5,8 y vano en x = 3) y de una secundaria que acomete en T a la viga de borde (S0-0-N3:
  * arranque y vano) con G, la torsión máxima de las vigas con G y el axil de un pilar interior y
@@ -42,7 +43,8 @@ function medir(nombre: string, op: OpcionesCompilacion) {
 }
 
 console.log("Momentos en kN·m, axiles en kN (G); deriva de la esquina en cubierta con Vx (3 kN/m en la fachada x = 0)");
-for (const z of [0, 0.5, 1]) medir(`zona rígida ${z}`, { factorZonaRigida: z });
-medir("D4: axil de pilares ×2", { modificadores: { pilares: { A: 2 } } });
-medir("D4: torsión de vigas ×0,1", { modificadores: { vigas: { J: 0.1 } } });
-medir("D4: los dos", { modificadores: { pilares: { A: 2 }, vigas: { J: 0.1 } } });
+for (const z of [0, 0.5, 1]) medir(`zona rígida ${z}`, { factorZonaRigida: z, modificadores: {} });
+medir("D4: axil de pilares ×2", { factorZonaRigida: 1, modificadores: { pilares: { todos: { A: 2 } } } });
+medir("D4: torsión de vigas ×0,1", { factorZonaRigida: 1, modificadores: { vigas: { hormigon: { J: 0.1 } } } });
+medir("D4: los dos", { factorZonaRigida: 1, modificadores: { pilares: { todos: { A: 2 } }, vigas: { hormigon: { J: 0.1 } } } });
+medir("por defecto (0,5 y D4)", {});

@@ -115,10 +115,10 @@ describe("topología: encuentros", () => {
   it("una viga dibujada 10 cm más allá de la cara del pilar se une a él y no da aviso de casi encuentro con él", () => {
     const r = valido(compilar(modelo([pilar("A", 0, 0), pilar("B", 6, 0)], [viga("V", [0, 0], [6.25, 0])])));
     expect(codigos(r)).toEqual([]);
-    // el tramo flexible entre caras y un voladizo de 10 cm desde la cara de B
+    // el tramo flexible (con la mitad del nudo rígida) y un voladizo hasta 10 cm más allá de la cara de B
     expect(r.mapeo.piezas.V!.map((b) => r.mapeo.barras[b]!.s.map((x) => +x.toFixed(9)))).toEqual([
-      [0, 0.15, 5.85, 6],
-      [6, 6.15, 6.25, 6.25],
+      [0, 0.075, 5.925, 6],
+      [6, 6.075, 6.25, 6.25],
     ]);
   });
 

@@ -13,7 +13,8 @@ import { casosValidos } from "../pruebas/comparar.ts";
 import { compilar } from "./compilar.ts";
 
 describe("criterio 1 de C1: SAP2000 1-022 como modelo físico", () => {
-  const r = compilar(fisico1022());
+  // Sin modificadores de rigidez: el modelo de SAP2000 no los tiene (sin b ni h, tampoco hay zonas rígidas)
+  const r = compilar(fisico1022(), { modificadores: {} });
   if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
   const { modelo, mapeo } = r;
 

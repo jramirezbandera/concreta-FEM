@@ -1,6 +1,6 @@
 Edificio objetivo, sólo barras: 80 pilares por 7 plantas, 567 vigas, 1152 cargas
 Compilación: 1151 nudos, 2499 barras, 7 diafragmas, 0 diagnósticos
-  mediana de 5: 46 ms (mín 38, máx 58); huellas distintas: 1
-  por paso (última): validacion 0.8, topologia 10.7, piezas 3.9, numeracion 2.2, cargas 12.1, sinPerdidas 1.9, mapeo 0.4 ms
-Cálculo con el núcleo: 234 ms, 3213 ecuaciones, equilibrio ≤ 2.2e-14
+  mediana de 5: 47 ms (mín 33, máx 64); huellas distintas: 1
+  por paso (última): validacion 0.9, topologia 11.6, piezas 1.3, numeracion 3.1, cargas 9.4, sinPerdidas 4.9, mapeo 0.6 ms
+Cálculo con el núcleo: 234 ms, 3213 ecuaciones, equilibrio ≤ 1.9e-14
 Compilación / cálculo: 20 %

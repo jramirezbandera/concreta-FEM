@@ -19,12 +19,13 @@ import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PE
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type OpcionesResueltas } from "./fisico.ts";
 import { huellaDe } from "./huella.ts";
 import type { Mapeo, NudoMapeado } from "./mapeo.ts";
-import { construirPiezas } from "./piezas.ts";
+import { construirPiezas, diafragmaDe, type BarraP, type Piezas } from "./piezas.ts";
 import { construirTopologia } from "./topologia.ts";
-import { validar } from "./validar.ts";
+import { validar, type Contexto } from "./validar.ts";
+import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "C1.0";
+export const VERSION_COMPILADOR = "C1.1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -37,7 +38,16 @@ export interface EstadisticasCompilacion {
 }
 
 export type ResultadoCompilacion =
-  | { valido: true; modelo: ModeloAnalitico; mapeo: Mapeo; diagnosticos: Diagnostico[]; huella: string; estadisticas: EstadisticasCompilacion }
+  | {
+      valido: true;
+      modelo: ModeloAnalitico;
+      mapeo: Mapeo;
+      diagnosticos: Diagnostico[];
+      /** Hipótesis de modelado aplicadas, en texto, para la memoria de cálculo. */
+      hipotesis: string[];
+      huella: string;
+      estadisticas: EstadisticasCompilacion;
+    }
   | { valido: false; diagnosticos: Diagnostico[]; huella: string };
 
 /**
@@ -152,15 +162,20 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     const d: Vec3 = [p[0] - X.x, p[1] - X.y, p[2] - X.z];
     return d[0] === 0 && d[1] === 0 && d[2] === 0 ? undefined : d;
   };
-  const modificadores = { pilar: op.modificadores.pilares, viga: op.modificadores.vigas };
+  // Modificadores de rigidez (D4): los de todos los materiales y, encima, los del material de la barra
+  const modificadoresDe = (b: BarraP): ModificadoresBarra | undefined => {
+    const g = op.modificadores[b.tipo === "pilar" ? "pilares" : "vigas"];
+    const m: ModificadoresBarra = { ...g?.todos, ...g?.[b.material] };
+    return Object.keys(m).length ? m : undefined;
+  };
   const barras: BarraAnalitica[] = piezas.barras.map((b) => {
     const r: BarraAnalitica = { id: b.id, nudos: [nuevo[b.i]!, nuevo[b.j]!], seccion: b.seccion, vz: b.vz };
     const di = offset(b.ip, b.i);
     const dj = offset(b.jp, b.j);
     if (di || dj) r.offsets = { ...(di ? { i: di } : {}), ...(dj ? { j: dj } : {}) };
     if (b.liberaciones) r.liberaciones = b.liberaciones;
-    const m = modificadores[b.tipo];
-    if (m && Object.keys(m).length) r.modificadores = m;
+    const m = modificadoresDe(b);
+    if (m) r.modificadores = m;
     return r;
   });
   const apoyos: Apoyo[] = [...piezas.apoyos]
@@ -231,7 +246,38 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     modelo,
     mapeo,
     diagnosticos: diag.lista,
+    hipotesis: hipotesis(ctx, op, piezas, modificadoresDe),
     huella,
     estadisticas: { nudos: nudos.length, barras: barras.length, diafragmas: restricciones.length, sinPerdidas, tiempos },
   };
+}
+
+const coma = (x: number) => String(x).replace(".", ",");
+const NOMBRE_MATERIAL = { hormigon: "de hormigón", acero: "de acero", general: "de material general" } as const;
+
+/** Las hipótesis de modelado de una compilación, en texto (C1-a, C1-c, C1-d y D4). */
+function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined): string[] {
+  const h: string[] = [];
+  h.push(
+    `Nudos de dimensión finita: es rígido ${op.factorZonaRigida === 1 ? "todo el nudo" : op.factorZonaRigida === 0 ? "ningún tramo del nudo (de eje a eje)" : `el ${coma(op.factorZonaRigida * 100)} % del nudo`} (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).`,
+  );
+  const grupos = new Map<string, number>();
+  for (const b of piezas.barras) {
+    const m = modificadoresDe(b);
+    if (!m) continue;
+    const clave = `${b.tipo === "pilar" ? "tramos de pilar" : "tramos de viga"} ${NOMBRE_MATERIAL[b.material]}: ${Object.entries(m)
+      .map(([k, x]) => `${k} ×${coma(x!)}`)
+      .join(", ")}`;
+    grupos.set(clave, (grupos.get(clave) ?? 0) + 1);
+  }
+  if (grupos.size) h.push(`Modificadores de rigidez (D4): ${[...grupos].map(([k, n]) => `${k} (${n})`).join("; ")}.`);
+  else h.push("Sin modificadores de rigidez.");
+  const usadas = new Set<string>(ctx.vigas.map((v) => v.planta));
+  for (const p of ctx.pilares) for (let k = ctx.planta.get(p.hasta)!; k <= ctx.planta.get(p.desde)!; k++) usadas.add(ctx.plantas[k]!.id);
+  const conDiafragma = [...new Set(piezas.diafragmas.map((d) => ctx.plantas[d.k]!.id))];
+  const sin = ctx.plantas.filter((p, k) => usadas.has(p.id) && diafragmaDe(ctx, k) !== "rigido").map((p) => p.id);
+  h.push(`Diafragma rígido en ${conDiafragma.length ? conDiafragma.join(", ") : "ninguna planta"}${sin.length ? `; sin diafragma en ${sin.join(", ")}` : ""}.`);
+  const superiores = ctx.vigas.filter((v) => v.insercion === "superior").map((v) => v.id);
+  h.push(superiores.length ? `Eje de las vigas en el plano del forjado, salvo ${superiores.join(", ")} (bajo él, con la cara superior en el forjado).` : "Eje de las vigas en el plano del forjado.");
+  return h;
 }

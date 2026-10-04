@@ -182,22 +182,55 @@ export interface ModeloFisico {
   cargas?: readonly CargaFisica[];
 }
 
-/** Multiplicadores de rigidez por tipo de pieza (H47, D4). */
-export interface ModificadoresPiezas {
-  pilares?: ModificadoresBarra;
-  vigas?: ModificadoresBarra;
+/**
+ * Multiplicadores de rigidez de un tipo de pieza (H47, D4): `todos` vale para cualquier material y
+ * los de un material lo completan o lo sustituyen campo a campo ({ ...todos, ...hormigon }).
+ */
+export interface ModificadoresPieza {
+  todos?: ModificadoresBarra;
+  hormigon?: ModificadoresBarra;
+  acero?: ModificadoresBarra;
+  general?: ModificadoresBarra;
 }
+
+export interface ModificadoresPiezas {
+  pilares?: ModificadoresPieza;
+  vigas?: ModificadoresPieza;
+}
+
+/**
+ * Modificadores por defecto (D4, decidida el 2026-10-04, `validacion/c1/out_decisiones.txt`):
+ * - axil de todos los pilares ×2: el acortamiento de los pilares se va compensando en obra planta a
+ *   planta, como hace CYPECAD (ccadmc01, p. 20); sin él, el acortamiento diferencial entre pilares
+ *   interiores y de borde quita momento a los apoyos interiores (−6 % en la cara en el edificio
+ *   objetivo);
+ * - torsión de las vigas de hormigón ×0,1: la de compatibilidad se pierde al fisurar (EC2,
+ *   6.3.1(2)); con la entera, una viga de borde empotra a la secundaria que le llega y el vano de
+ *   ésta sale un 27 % corto. La torsión de equilibrio se sigue transmitiendo, con más giro.
+ */
+export const MODIFICADORES_D4: ModificadoresPiezas = { pilares: { todos: { A: 2 } }, vigas: { hormigon: { J: 0.1 } } };
+
+/** Factor de zona rígida por defecto (C1-a, decidido el 2026-10-04): la mitad del nudo es rígida. */
+export const FACTOR_ZONA_RIGIDA = 0.5;
 
 export interface OpcionesCompilacion {
   /** Tolerancia numérica, m: fusión silenciosa. Por defecto, 1e-6. */
   epsGeom?: number;
   /** Tolerancia de modelado, m: fusión con aviso. Por defecto, 0,05 (H28). */
   epsSnap?: number;
-  /** Fracción rígida de los nudos de dimensión finita, en [0, 1] (C1-a). Por defecto, 1. */
+  /**
+   * Fracción rígida de los nudos de dimensión finita, en [0, 1] (C1-a). Por defecto, 0,5. Con 1, el
+   * nudo es infinitamente rígido, como en CYPECAD; con 0, se calcula de eje a eje, como SAP2000 por
+   * defecto.
+   */
   factorZonaRigida?: number;
   /** Deformación por cortante (Timoshenko). Por defecto, sí. */
   cortante?: boolean;
-  /** Por defecto, ninguno (C1-g, hasta que se decida D4). */
+  /**
+   * Multiplicadores de rigidez, cada uno en (0, 100] (E6-1: uno enorme es una penalización). Por
+   * defecto, `MODIFICADORES_D4`; si se dan, sustituyen enteros a los de por defecto, y `{}` los
+   * quita todos.
+   */
   modificadores?: ModificadoresPiezas;
 }
 
@@ -213,8 +246,8 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
   return {
     epsGeom: o.epsGeom ?? 1e-6,
     epsSnap: o.epsSnap ?? 0.05,
-    factorZonaRigida: o.factorZonaRigida ?? 1,
+    factorZonaRigida: o.factorZonaRigida ?? FACTOR_ZONA_RIGIDA,
     cortante: o.cortante ?? true,
-    modificadores: o.modificadores ?? {},
+    modificadores: o.modificadores ?? MODIFICADORES_D4,
   };
 }

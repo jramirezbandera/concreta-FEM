@@ -15,6 +15,7 @@ import type { SeccionBarra } from "../elementos/barra.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
 import type { Liberacion, Pilar } from "./fisico.ts";
+import type { SeccionCompilada } from "./secciones.ts";
 import { cuerdaEnTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
 
@@ -52,6 +53,8 @@ export interface BarraP {
   ip: Vec3;
   jp: Vec3;
   seccion: SeccionBarra;
+  /** Tipo de material de la sección (para los modificadores por material). */
+  material: SeccionCompilada["material"];
   vz: Vec3;
   liberaciones?: { i?: Seis<boolean>; j?: Seis<boolean> };
   /** Estaciones de i, i', j' y j a lo largo de la pieza. */
@@ -120,6 +123,7 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, diag: Diagnostic
         ip,
         jp,
         seccion: ctx.secciones.get(seccionTramo(ctx, p, k - 1))!.barra,
+        material: ctx.secciones.get(seccionTramo(ctx, p, k - 1))!.material,
         vz: ez,
         liberaciones: lib.i || lib.j ? lib : undefined,
         s: [sI, sI, sJp, sJ],
@@ -194,6 +198,7 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, diag: Diagnostic
           ip: P(si),
           jp: P(sj),
           seccion: sc.barra,
+          material: sc.material,
           vz: [0, 0, 1],
           s: [tv.s0 + na.sigma, tv.s0 + si, tv.s0 + sj, tv.s0 + nb.sigma],
         });

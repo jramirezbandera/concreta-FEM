@@ -19,7 +19,7 @@ const SEMILLAS = [1, 2, 5, 6, 9, 13, 14, 17, 21, 25, 29, 30];
 
 console.log("Criterio 1: SAP2000 1-022 como modelo físico");
 {
-  const r = valido(compilar(fisico1022()));
+  const r = valido(compilar(fisico1022(), { modificadores: {} }));
   const [lat] = casosValidos(calcular(r.modelo, { solver: "perfil" }));
   const n22 = r.mapeo.nudosPilar["izquierda@N7"]!;
   const b1 = r.mapeo.piezas.izquierda![0]!;
@@ -36,7 +36,7 @@ console.log("Criterio 1: SAP2000 1-022 como modelo físico");
 
 console.log("\nCriterio 2: modelos físicos frente a su modelo analítico hecho a mano");
 for (const caso of casosMano()) {
-  const r = valido(compilar(caso.fisico));
+  const r = valido(compilar(caso.fisico, caso.opciones));
   const c = compararModelos(r.modelo, caso.mano);
   console.log(`  ${caso.nombre}\n    u ${e(c.u)}, reacciones ${e(c.reacciones)}, esfuerzos ${e(c.barras)}; ${c.nudos} nudos y ${c.nBarras} barras; avisos: ${r.diagnosticos.map((d) => d.codigo).join(", ") || "ninguno"}`);
 }
@@ -101,7 +101,7 @@ console.log("\nCriterio 4: sin pérdidas (resultante física frente a analítica
   console.log(`  ${n} modelos aleatorios: sin pérdidas ${e(f)} en fuerzas y ${e(m)} en momentos; equilibrio del motor ${e(eq)}`);
 }
 
-console.log("\nDecisión C1-c: punto de inserción de una viga descolgada (pórtico de 6 m, viga 30×60, pilares 40×40)");
+console.log("\nDecisión C1-c: punto de inserción de una viga descolgada (pórtico de 6 m, viga 30×60, pilares 40×40; nudo entero rígido y sin modificadores, como se midió)");
 {
   const { EsfuerzosPiezas } = await import("../../src/compilador/resultados.ts");
   for (const diafragma of ["rigido", "ninguno"] as const) {
@@ -116,7 +116,7 @@ console.log("\nDecisión C1-c: punto de inserción de una viga descolgada (pórt
           vigas: [0, 5].map((y) => ({ id: `V${y}`, planta: "P1", puntos: [[0, y], [6, y]] as const, seccion: "v", insercion })),
           casos: [{ id: "Q" }],
           cargas: [{ tipo: "viga", id: "q", caso: "Q", viga: "V0", ejes: "global", q: [0, 0, -20] }],
-        }),
+        }, { factorZonaRigida: 1, modificadores: {} }),
       );
       const casos = casosValidos(calcular(r.modelo, { solver: "perfil" }));
       const ep = new EsfuerzosPiezas(r.modelo, r.mapeo, casos);

@@ -4,7 +4,7 @@
  * repartidas en tramos flexibles y nudos), sin llamar al compilador. Los comparan
  * `src/compilador/oraculo-mano.test.ts` (a ≤ 1e-10) y `resumen.ts`.
  */
-import type { ModeloFisico } from "../../src/compilador/fisico.ts";
+import type { ModeloFisico, OpcionesCompilacion } from "../../src/compilador/fisico.ts";
 import type { CargaBarra, CargaNodal, ModeloAnalitico, Vec3 } from "../../src/motor/modelo.ts";
 import { puntualANudo, uniformeANudo } from "../../src/pruebas/compilador.ts";
 import { Constructor, EMPOTRADO } from "../../src/pruebas/constructor.ts";
@@ -16,7 +16,12 @@ export interface CasoMano {
   mano: ModeloAnalitico;
   /** Códigos de los avisos que tiene que dar la compilación. */
   avisos: string[];
+  /** Opciones con que se escribieron a mano: el nudo entero rígido y sin modificadores. */
+  opciones: OpcionesCompilacion;
 }
+
+/** Las de C1 cuando se escribieron estos modelos (antes de cambiar C1-a y D4). */
+export const OPCIONES_MANO: OpcionesCompilacion = { factorZonaRigida: 1, modificadores: {} };
 
 const HA = hormigon(25);
 const rect = (b: number, h: number) => rectangular(b, h, HA);
@@ -127,7 +132,7 @@ function caso1(): CasoMano {
   Q.push(puntualANudo(n.A![2]!, [0, 0, 3], [0.05, 0.02, 3], [10, 0, 0]));
   m.caso("G", G, [], bG);
   m.caso("Q", Q, [], bQ);
-  return { nombre: "pórtico 3D de 2 plantas: pilares rectangulares girados, zonas rígidas, diafragmas, peso propio y cargas en zonas rígidas", fisico: f, mano: m.modelo(), avisos: [] };
+  return { nombre: "pórtico 3D de 2 plantas: pilares rectangulares girados, zonas rígidas, diafragmas, peso propio y cargas en zonas rígidas", fisico: f, mano: m.modelo(), avisos: [], opciones: OPCIONES_MANO };
 }
 
 /** viga excéntrica respecto a sus pilares, sin diafragma: el offset lleva la zona rígida y la excentricidad. */
@@ -171,7 +176,7 @@ function caso2(): CasoMano {
   const r: Vec3 = [0, 0.02, 0];
   const M: Vec3 = [r[1] * F[2] - r[2] * F[1], r[2] * F[0] - r[0] * F[2], r[0] * F[1] - r[1] * F[0]];
   m.caso("G", nodales, [], [dl(b, g(-20), 0, 5.6), { tipo: "puntual", barra: b, ejes: "global", x: 2.8, F, M }]);
-  return { nombre: "viga excéntrica respecto a sus pilares, sin diafragma: el offset lleva la zona rígida y la excentricidad", fisico: f, mano: m.modelo(), avisos: [] };
+  return { nombre: "viga excéntrica respecto a sus pilares, sin diafragma: el offset lleva la zona rígida y la excentricidad", fisico: f, mano: m.modelo(), avisos: [], opciones: OPCIONES_MANO };
 }
 
 /** encuentro en T con hueco de 2 cm, viga en polilínea con rótula, cruce de vigas y cargas junto a un cruce. */
@@ -258,7 +263,7 @@ function caso3(): CasoMano {
       { tipo: "puntual", barra: v5c, ejes: "global", x: 0.02, F: [0, 0, -7], M: [-0.07, 0, 0] },
     ],
   );
-  return { nombre: "encuentro en T con hueco de 2 cm, viga en polilínea con rótula, cruce de vigas y cargas junto a un cruce", fisico: f, mano: m.modelo(), avisos: ["topologia/fusion"] };
+  return { nombre: "encuentro en T con hueco de 2 cm, viga en polilínea con rótula, cruce de vigas y cargas junto a un cruce", fisico: f, mano: m.modelo(), avisos: ["topologia/fusion"], opciones: OPCIONES_MANO };
 }
 
 /** pilar apeado girado 30°, pilares apilados, viga con inserción superior y cargas locales y de pilar. */
@@ -349,5 +354,5 @@ function caso4(): CasoMano {
   m.diafragma(m.nudo(3, 0.5, 3), [n0[2]!, n3[1]!, n6[2]!]);
   m.caso("G", G, [], bG);
   m.caso("Q", Q, [], bQ);
-  return { nombre: "pilar apeado girado 30°, pilares apilados, viga con inserción superior y cargas locales y de pilar", fisico: f, mano: m.modelo(), avisos: ["viga/insercion-con-diafragma"] };
+  return { nombre: "pilar apeado girado 30°, pilares apilados, viga con inserción superior y cargas locales y de pilar", fisico: f, mano: m.modelo(), avisos: ["viga/insercion-con-diafragma"], opciones: OPCIONES_MANO };
 }

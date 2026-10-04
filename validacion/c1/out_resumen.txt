@@ -16,18 +16,18 @@ Criterio 2: modelos físicos frente a su modelo analítico hecho a mano
 
 Criterio 3: relaciones metamórficas, peor valor en 12 semillas
   reordenar las listas: el mismo modelo analítico, mapeo y diagnósticos, bit a bit
-  traslación (con y sin diafragma): 1.2e-13
-  giro de 90° (con y sin diafragma): 3.0e-13
-  giro de 37° (con y sin diafragma): 3.8e-13
-  ruido de 1e-8 m: misma topología, u 1.9e-8
+  traslación (con y sin diafragma): 1.7e-13
+  giro de 90° (con y sin diafragma): 2.9e-13
+  giro de 37° (con y sin diafragma): 3.3e-13
+  ruido de 1e-8 m: misma topología, u 2.6e-8
   ruido de ±1,5 cm en las vigas: misma topología, 114 avisos de fusión
-  partir 306 vigas en dos (sin diafragma): 3.1e-13
-  invertir las vigas: 5.2e-15
-  partir las cargas repartidas: 9.1e-16
+  partir 306 vigas en dos (sin diafragma): 7.6e-13
+  invertir las vigas: 4.2e-15
+  partir las cargas repartidas: 1.9e-15
 
 Criterio 4: sin pérdidas (resultante física frente a analítica) y equilibrio del motor
-  24 modelos aleatorios: sin pérdidas 9.7e-16 en fuerzas y 1.2e-16 en momentos; equilibrio del motor 1.5e-14
+  24 modelos aleatorios: sin pérdidas 1.2e-15 en fuerzas y 1.2e-16 en momentos; equilibrio del motor 1.2e-14
 
-Decisión C1-c: punto de inserción de una viga descolgada (pórtico de 6 m, viga 30×60, pilares 40×40)
+Decisión C1-c: punto de inserción de una viga descolgada (pórtico de 6 m, viga 30×60, pilares 40×40; nudo entero rígido y sin modificadores, como se midió)
   diafragma rigido: plano: flecha 0.875 mm, M vano 40.84, M cara -37.56 kN·m, N 0.0 kN; superior: flecha 0.692 mm, M vano 34.83, M cara -43.57 kN·m, N 87.0 kN
   diafragma ninguno: plano: flecha 0.882 mm, M vano 41.10, M cara -37.30 kN·m, N -23.3 kN; superior: flecha 0.997 mm, M vano 44.87, M cara -33.53 kN·m, N -24.3 kN
