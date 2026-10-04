@@ -1,7 +1,7 @@
 # CLAUDE.md — Concreta FEM 3D (motor propio)
 
 ## Qué es
-- **Repositorio:** privado y personal de jramirezbandera, para desarrollar el módulo FEM 3D de Concreta con un **motor de cálculo propio**.
+- **Repositorio:** público y personal de jramirezbandera (público por decisión del usuario, 2026-10-04), para desarrollar el módulo FEM 3D de Concreta con un **motor de cálculo propio**.
 - **Origen:** se empezó de cero el 2026-10-03. La app que había antes en este repo (interfaz tipo CYPECAD sobre PyNite) se descartó y no se reutiliza.
 - **Destino final:** integrarse en Concreta (`wh0am1-dev/concreta`, clon en `../Concreta EST/concreta-v2`) para que sus resultados alimenten los módulos de comprobación.
   - Esa integración será un PR revisado por wh0am1, y sólo cuando el usuario lo decida.

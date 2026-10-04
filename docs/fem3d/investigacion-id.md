@@ -2,7 +2,7 @@
 
 > **Qué es.** La investigación previa al módulo FEM 3D de Concreta, contrastada con el diseño técnico (`docs/fem3d/diseno-tecnico.md`, citado como «§N»). Cada sección es un hallazgo con su soporte y lo que hay que hacer en Concreta.
 >
-> - **Repositorio:** `jramirezbandera/concreta-FEM` (privado, rama `main`). Se empezó el 2026-10-03 en la rama `feat/fem3d` de Concreta y se trasladó aquí ese mismo día. **Fecha:** 2026-10-03.
+> - **Repositorio:** `jramirezbandera/concreta-FEM` (público desde el 2026-10-04, rama `main`). Se empezó el 2026-10-03 en la rama `feat/fem3d` de Concreta y se trasladó aquí ese mismo día. **Fecha:** 2026-10-03.
 > - **Rutas:** las de código (`src/lib/frame-core/…`, `src/features/fem2d/…`, `scripts/vendor-pyslope.mjs`…) son de **Concreta** (`wh0am1-dev/concreta`), el destino final del módulo. Las de `docs/fem3d/…` son de este repositorio.
 > - **Motor estudiado:** PyNiteFEA 3.2.0 sobre Pyodide 314.0.0 (numpy 2.4.3, scipy 1.17.1). La revisión tras D9 recomienda un motor propio: ver S0 y S7.
 > - **Áreas:** 1 Motor (MOT) · 2 Compilador y mallado (COM) · 3 Resultados y comprobaciones (RES) · 4 Plataforma web (PLA) · 5 Validación (VAL). Revisión del motor: 6 Escala del edificio objetivo (ESC) · 7 Candidatos y licencias (CAN) · 8 Motor propio (MPR).
@@ -1991,7 +1991,7 @@ Sustituye a los §20 y §22 del diseño técnico. Las duraciones son las del dis
 > - la Fase 0 y todo lo que es específico de PyNite (vendor, driver, scipy, barras de penalización) se sustituye por el spike E0 y las fases E1–E6 de S7;
 > - `solvers/pynite/` pasa a `solvers/propio/` + `kernel/`.
 >
-> **Cambia también dónde se trabaja.** Por decisión del usuario, el desarrollo es personal y se hace en su repositorio privado `jramirezbandera/concreta-FEM`, en `main`. No se mezcla con el repositorio de producción ni con sus PR.
+> **Cambia también dónde se trabaja.** Por decisión del usuario, el desarrollo es personal y se hace en su repositorio personal `jramirezbandera/concreta-FEM`, en `main`. No se mezcla con el repositorio de producción ni con sus PR.
 > - El motor se construye como paquete independiente, sin React ni dependencias de la app.
 > - Cuando el módulo esté maduro, se integra en Concreta con un PR revisado por wh0am1.
 > - Lo que se dice abajo sobre ramas y PR de Concreta vale para esa integración final.
@@ -2102,7 +2102,7 @@ Ninguna se cierra sólo con la investigación: son decisiones de criterio profes
 | D2 | Forjado unidireccional | **Se introduce como paño con reparto de cargas, pero se discretiza en viguetas como barras y se ven los esfuerzos por vigueta** | Sustituye la recomendación (a), la del paño de reparto. Es barato: 7 500 nudos en el edificio objetivo. Exige un diafragma rígido real (MPC), que PyNite no tiene | H46, H52, S7 |
 | D3 | Rigidez del reticular | **Se distingue la zona aligerada de los ábacos, que van con la inercia completa. A la zona aligerada se le aplican multiplicadores por dirección sobre la sección maciza** (inercia, peso, etc., calculados a partir de nervios y casetones), como hace el usuario en SAP2000. Lo que importa es que sea lógico y fiable | Sustituye el «½ maciza» de CYPE. Hace falta flexión ortótropa (m11 ≠ m22, m12 reducido), que PyNite no tiene (H55). Los multiplicadores se documentan en un ADR y en la memoria, y se validan contra un modelo SAP2000 del usuario | H46, H24, S7 |
 | D9 | Tamaño máximo del modelo | **Del orden de 7 plantas con 80 pilares por planta.** El límite real lo marca el rendimiento | Son ~27 500–44 000 nudos y 165 000–265 000 GDL. Deja fuera a PyNite y obliga a un solver supernodal. El límite se fija en GDL según el dispositivo | H52, H49, H50 |
-| **D11** | **Motor de cálculo** | **Motor propio, la vía (c),** después de ver los riesgos y la validación propuesta. Se trabaja en el repo privado `jramirezbandera/concreta-FEM`, desde cero: la app anterior con PyNite se descarta | Spike E0 con criterios de paso como puerta. La vía (b) queda como plan B medido. PyNite pasa a ser oráculo. La validación va primero: equilibrio en cada cálculo, oráculos, módulo oculto hasta pasar la batería y un periodo «en sombra» frente a SAP2000 o CYPE | S7, H49, H50 |
+| **D11** | **Motor de cálculo** | **Motor propio, la vía (c),** después de ver los riesgos y la validación propuesta. Se trabaja en el repo personal `jramirezbandera/concreta-FEM`, desde cero: la app anterior con PyNite se descarta | Spike E0 con criterios de paso como puerta. La vía (b) queda como plan B medido. PyNite pasa a ser oráculo. La validación va primero: equilibrio en cada cálculo, oráculos, módulo oculto hasta pasar la batería y un periodo «en sombra» frente a SAP2000 o CYPE | S7, H49, H50 |
 
 **Pendientes:**
 

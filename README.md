@@ -18,4 +18,4 @@ Motor de cálculo por elementos finitos 3D para edificios. Se desarrolla para in
   - [docs/fem3d/fase-e3.md](docs/fem3d/fase-e3.md): resultado de la fase E3 (láminas);
   - [docs/fem3d/fase-e4.md](docs/fem3d/fase-e4.md): resultado de la fase E4 (worker y memoria).
 
-Repositorio privado. Todos los derechos reservados.
+Repositorio público, sin licencia de uso: todos los derechos reservados.

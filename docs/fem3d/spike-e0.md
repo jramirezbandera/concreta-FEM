@@ -179,7 +179,7 @@ Tiempos de factorización con 24 lados derechos. Ryzen 9 5900X; WASM en Chrome 1
 
 ## Pendiente
 
-- **Ver el CI en verde en GitHub.** Hace falta un push. Ojo: `gh` muestra el repositorio como **público**, aunque CLAUDE.md y el README dicen que es privado.
+- ~~**Ver el CI en verde en GitHub.**~~ Hecho: verde con el push del spike (2026-10-03) y con el de E4 (2026-10-04). El repositorio es público por decisión del usuario.
 - **Medir en móvil y portátil** (S5 #2). El heap del objetivo es de 277 MB, dentro del rango estimado de iOS (300 MB–1 GB), pero sin medir.
 - **Llevar a `src/pruebas/`** los modelos de membrana (`spike/e0/membrana/modelos.ts`), de los que ya dependen los tests de `src/`.
 
