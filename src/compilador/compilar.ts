@@ -30,6 +30,8 @@ export interface EstadisticasCompilacion {
   nudos: number;
   barras: number;
   diafragmas: number;
+  /** Peor error relativo del control «sin pérdidas» entre los casos (regla 3 del plan). */
+  sinPerdidas: { fuerzas: number; momentos: number };
   /** Milisegundos de cada paso. */
   tiempos: Record<string, number>;
 }
@@ -189,8 +191,11 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const modelo: ModeloAnalitico = { nudos, barras, apoyos, restricciones, casos };
 
   // Sin pérdidas: resultante física = analítica, por caso
+  const sinPerdidas = { fuerzas: 0, momentos: 0 };
   ctx.casos.forEach((c, k) => {
     const err = diferenciaResultantes(cargas.fisicas[k]!, resultanteAnalitica(modelo, k, centro));
+    sinPerdidas.fuerzas = Math.max(sinPerdidas.fuerzas, err.fuerzas);
+    sinPerdidas.momentos = Math.max(sinPerdidas.momentos, err.momentos);
     if (err.fuerzas > TOL_SIN_PERDIDAS || err.momentos > TOL_SIN_PERDIDAS) {
       diag.error(
         "cargas/perdidas",
@@ -227,6 +232,6 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     mapeo,
     diagnosticos: diag.lista,
     huella,
-    estadisticas: { nudos: nudos.length, barras: barras.length, diafragmas: restricciones.length, tiempos },
+    estadisticas: { nudos: nudos.length, barras: barras.length, diafragmas: restricciones.length, sinPerdidas, tiempos },
   };
 }

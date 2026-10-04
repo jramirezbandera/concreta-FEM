@@ -1,0 +1,29 @@
+Criterio 1: SAP2000 1-022 como modelo físico
+  Ux nudo 22 (in): publicado 1.45076, compilado 1.4507570 (dentro del redondeo)
+  axil pilar 1 (kip): publicado 69.99, compilado 69.9867 (dentro del redondeo)
+  momento pilar 1 en el nudo 1 (k·in): publicado 2324.68, compilado 2324.6773 (dentro del redondeo)
+  frente al modelo a mano de E6: u 9.9e-15, esfuerzos 1.2e-14 (35 barras)
+
+Criterio 2: modelos físicos frente a su modelo analítico hecho a mano
+  pórtico 3D de 2 plantas: pilares rectangulares girados, zonas rígidas, diafragmas, peso propio y cargas en zonas rígidas
+    u 2.1e-15, reacciones 1.7e-15, esfuerzos 1.4e-15; 12 nudos y 16 barras; avisos: ninguno
+  viga excéntrica respecto a sus pilares, sin diafragma: el offset lleva la zona rígida y la excentricidad
+    u 2.8e-16, reacciones 3.0e-16, esfuerzos 3.4e-16; 4 nudos y 3 barras; avisos: ninguno
+  encuentro en T con hueco de 2 cm, viga en polilínea con rótula, cruce de vigas y cargas junto a un cruce
+    u 8.9e-16, reacciones 7.2e-16, esfuerzos 4.4e-15; 14 nudos y 15 barras; avisos: topologia/fusion
+  pilar apeado girado 30°, pilares apilados, viga con inserción superior y cargas locales y de pilar
+    u 5.3e-15, reacciones 1.1e-14, esfuerzos 1.2e-14; 8 nudos y 9 barras; avisos: viga/insercion-con-diafragma
+
+Criterio 3: relaciones metamórficas, peor valor en 12 semillas
+  reordenar las listas: el mismo modelo analítico, mapeo y diagnósticos, bit a bit
+  traslación (con y sin diafragma): 1.2e-13
+  giro de 90° (con y sin diafragma): 3.0e-13
+  giro de 37° (con y sin diafragma): 3.8e-13
+  ruido de 1e-8 m: misma topología, u 1.9e-8
+  ruido de ±1,5 cm en las vigas: misma topología, 114 avisos de fusión
+  partir 306 vigas en dos (sin diafragma): 3.1e-13
+  invertir las vigas: 5.2e-15
+  partir las cargas repartidas: 9.1e-16
+
+Criterio 4: sin pérdidas (resultante física frente a analítica) y equilibrio del motor
+  24 modelos aleatorios: sin pérdidas 9.7e-16 en fuerzas y 1.2e-16 en momentos; equilibrio del motor 1.5e-14
