@@ -4,14 +4,15 @@
  * los nudos de las láminas y superposición. Las usan el test (src/motor/propiedades-e3.test.ts) y
  * el resumen del informe (resumen.ts).
  */
-import { marcoLamina } from "../../src/elementos/lamina.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import type { CargaBarra, CargaLamina, CasoCarga, ModeloAnalitico, ResultadoCaso, Vec3 } from "../../src/motor/modelo.ts";
 import { casosValidos, errorLaminas, errorPorGrupos } from "../../src/pruebas/comparar.ts";
 import { carga, Constructor, EMPOTRADO, seccionRectangularTimoshenko } from "../../src/pruebas/constructor.ts";
 import { edificio, RETICULAR, type OpcionesEdificio } from "../../src/pruebas/edificio.ts";
 import { mallaRectangular } from "../../src/pruebas/placa.ts";
-import { girarModelo, girarVector6, invertirLaminas, matrizGiro, permutacion, renumerarModelo } from "../../src/pruebas/transformar.ts";
+import { fijarEjes, girarModelo, girarVector6, invertirLaminas, matrizGiro, permutacion, renumerarModelo } from "../../src/pruebas/transformar.ts";
+
+export { fijarEjes };
 import { MODELOS_PYNITE_E3 } from "./modelos-oraculo.ts";
 
 /**
@@ -76,20 +77,6 @@ export const MODELOS_PROPIEDADES_E3: [string, () => ModeloAnalitico, number[] | 
   ["edificio E3 con muelles", () => edificio({ ...BASE_E3, muelles: true }).modelo, matrizGiro([-0.6, 0.2, 0.4], 2.3)],
   ...Object.entries(MODELOS_PYNITE_E3).map(([k, f]): [string, () => ModeloAnalitico, null] => [`PyNite: ${k}`, f, null]),
 ];
-
-/** Fija el eje 1 de cada lámina que no lo tiene (el de la regla de CSI), para que gire con el modelo. */
-export function fijarEjes(m: ModeloAnalitico): ModeloAnalitico {
-  return {
-    ...m,
-    laminas: m.laminas?.map((l) => {
-      if (l.eje1) return l;
-      const X = l.nudos.flatMap((v) => [m.nudos[v]!.x, m.nudos[v]!.y, m.nudos[v]!.z]);
-      const marco = marcoLamina(X);
-      if (typeof marco === "string") throw new Error(marco);
-      return { ...l, eje1: [marco.R[0]!, marco.R[1]!, marco.R[2]!] as const };
-    }),
-  };
-}
 
 /** Errores metamórficos: [giro (o NaN), renumeración, inversión del orden de nudos, superposición]. */
 export function erroresMetamorficosE3(m: ModeloAnalitico, R: number[] | null): number[] {

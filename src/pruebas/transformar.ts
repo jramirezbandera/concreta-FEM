@@ -2,7 +2,8 @@
  * Transformaciones de modelos para las pruebas metamórficas (H38): giro + traslación rígidos y
  * renumeración de nudos y elementos. No es código del motor.
  */
-import type { ModeloAnalitico, Vec3 } from "../motor/modelo.ts";
+import { marcoLamina } from "../elementos/lamina.ts";
+import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "../motor/modelo.ts";
 
 /** Matriz de giro 3×3 por filas a partir de un eje (unitario) y un ángulo (Rodrigues). */
 export function matrizGiro(eje: Vec3, angulo: number): number[] {
@@ -189,5 +190,82 @@ export function invertirBarras(m: ModeloAnalitico): ModeloAnalitico {
         return { ...cb, a: L - b, b: L - a, qa: v(cb.qb ?? cb.qa, cb.ejes), qb: v(cb.qa, cb.ejes) };
       }),
     })),
+  };
+}
+
+/** Fija el eje 1 de cada lámina que no lo tiene (el de la regla de CSI), para que gire con el modelo. */
+export function fijarEjes(m: ModeloAnalitico): ModeloAnalitico {
+  return {
+    ...m,
+    laminas: m.laminas?.map((l) => {
+      if (l.eje1) return l;
+      const X = l.nudos.flatMap((v) => [m.nudos[v]!.x, m.nudos[v]!.y, m.nudos[v]!.z]);
+      const marco = marcoLamina(X);
+      if (typeof marco === "string") throw new Error(marco);
+      return { ...l, eje1: [marco.R[0]!, marco.R[1]!, marco.R[2]!] as const };
+    }),
+  };
+}
+
+/**
+ * Cambio de unidades: longitudes ×a y fuerzas ×b (de kN–m a N–mm, a = b = 1000). Todo lo demás
+ * sigue por análisis dimensional: E, G ×b/a²; áreas ×a², inercias ×a⁴; espesores y offsets ×a;
+ * muelles ×b/a (traslación), ×b (cruzados) y ×b·a (giro); cargas puntuales ×b y sus momentos ×b·a,
+ * de línea ×b/a y de superficie ×b/a²; desplazamientos impuestos ×a (los giros no cambian).
+ */
+export function escalarModelo(m: ModeloAnalitico, a: number, b: number): ModeloAnalitico {
+  const L = (v: Vec3): Vec3 => [a * v[0], a * v[1], a * v[2]];
+  const F = (v: Vec3 | undefined, f: number) => v && ([f * v[0], f * v[1], f * v[2]] as Vec3);
+  const kMuelle = (k: readonly number[]) => {
+    const s = (c: number) => (c < 3 ? -0.5 : 0.5); // k_ij ×b·a^(s_i + s_j)
+    if (k.length === 6) return k.map((v, c) => v * b * a ** (2 * s(c)));
+    return k.map((v, idx) => v * b * a ** (s(Math.floor(idx / 6)) + s(idx % 6)));
+  };
+  return {
+    ...m,
+    nudos: m.nudos.map((v) => ({ id: v.id, x: a * v.x, y: a * v.y, z: a * v.z })),
+    barras: m.barras?.map((br) => {
+      const s = br.seccion;
+      return {
+        ...br,
+        seccion: {
+          E: (s.E * b) / a ** 2,
+          G: (s.G * b) / a ** 2,
+          A: s.A * a ** 2,
+          Iy: s.Iy * a ** 4,
+          Iz: s.Iz * a ** 4,
+          J: s.J * a ** 4,
+          ...(s.Avy !== undefined ? { Avy: s.Avy * a ** 2 } : {}),
+          ...(s.Avz !== undefined ? { Avz: s.Avz * a ** 2 } : {}),
+        },
+        offsets: br.offsets && { i: br.offsets.i && L(br.offsets.i), j: br.offsets.j && L(br.offsets.j) },
+      };
+    }),
+    laminas: m.laminas?.map((l) => ({ ...l, material: { E: (l.material.E * b) / a ** 2, nu: l.material.nu, t: a * l.material.t } })),
+    muelles: m.muelles?.map((mu) => ({ ...mu, k: kMuelle(mu.k) })),
+    casos: m.casos.map((c) => ({
+      ...c,
+      nodales: c.nodales?.map((n) => ({ nudo: n.nudo, f: n.f.map((v, g) => v * (g < 3 ? b : b * a)) as never })),
+      impuestos: c.impuestos?.map((d) => ({ ...d, valor: d.gdl < 3 ? a * d.valor : d.valor })),
+      barras: c.barras?.map((cb) => {
+        if (cb.tipo === "puntual") return { ...cb, x: a * cb.x, F: F(cb.F, b), M: F(cb.M, b * a) };
+        return { ...cb, qa: F(cb.qa, b / a)!, qb: F(cb.qb, b / a), a: cb.a === undefined ? undefined : a * cb.a, b: cb.b === undefined ? undefined : a * cb.b };
+      }),
+      laminas: c.laminas?.map((cl) => {
+        if (cl.tipo === "superficie") return { ...cl, q: Array.isArray(cl.q[0]) ? ((cl.q as readonly Vec3[]).map((q) => F(q, b / a ** 2)!) as never) : F(cl.q as Vec3, b / a ** 2)! };
+        if (cl.tipo === "linea") return { ...cl, a: L(cl.a), b: L(cl.b), qa: F(cl.qa, b / a)!, qb: F(cl.qb, b / a) };
+        return { ...cl, punto: L(cl.punto), F: F(cl.F, b), M: F(cl.M, b * a) };
+      }),
+    })),
+  };
+}
+
+/** Resultados de un caso pasados a las unidades de `escalarModelo(m, a, b)`. */
+export function escalarResultados(c: ResultadoCaso, a: number, b: number): Pick<ResultadoCaso, "u" | "reacciones" | "esfuerzosBarras" | "esfuerzosLaminas"> {
+  return {
+    u: c.u.map((v, i) => (i % 6 < 3 ? a * v : v)),
+    reacciones: c.reacciones.map((v, i) => (i % 6 < 3 ? b * v : b * a * v)),
+    esfuerzosBarras: c.esfuerzosBarras.map((v, i) => (i % 6 < 3 ? b * v : b * a * v)),
+    esfuerzosLaminas: c.esfuerzosLaminas.map((v, i) => (i % 8 < 3 || i % 8 >= 6 ? (b / a) * v : b * v)),
   };
 }

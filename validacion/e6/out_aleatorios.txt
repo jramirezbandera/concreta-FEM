@@ -1,0 +1,28 @@
+# validacion/e6/aleatorios.ts — 2026-10-04; 2000 modelos (semillas 1…2000), 29.1 s
+Nudos por modelo: media 37, máximo 117
+
+Cobertura (modelos que tienen cada objeto):
+  diafragma: 1408 (70 %)
+  forjado de láminas: 1902 (95 %)
+  multiplicadores de lámina: 1264 (63 %)
+  muro de láminas: 1091 (55 %)
+  liberaciones: 1763 (88 %)
+  offsets: 1993 (100 %)
+  muelle a tierra: 1607 (80 %)
+  muelle entre nudos: 1611 (81 %)
+  desplazamientos impuestos: 1117 (56 %)
+  huella (enlace rígido): 1205 (60 %)
+  cadena huella → diafragma: 876 (44 %)
+
+Peor error de cada relación (tolerancia 1e-9; determinismo, 0 exacto):
+  solvers: 7.26e-12 (semilla 28)
+  determinismo: 0.00e+0 (semilla 0)
+  giro: 1.78e-11 (semilla 263)
+  renumeracion: 2.38e-11 (semilla 263)
+  invertirBarras: 1.96e-12 (semilla 1750)
+  invertirLaminas: 2.78e-11 (semilla 263)
+  superposicion: 2.59e-12 (semilla 1059)
+  betti: 1.92e-15 (semilla 1825)
+  unidades: 1.98e-11 (semilla 263)
+
+Modelos con algún fallo: 0; con excepción: 0
