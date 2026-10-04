@@ -84,7 +84,7 @@ function sumarSuperficie(r: Resultante, m: Momentos, z: number, q: readonly numb
  * cubierto por una losa se le quita γ·(b/2)·min(h, t); el lado se mira a b/4 del eje, en tramos
  * partidos donde esas dos líneas cortan el borde de una losa.
  */
-function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: readonly { region: Region; t: number }[]): { desde: number; hasta: number; w: number }[] {
+function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: readonly { region: Region; t: number }[], eps: number): { desde: number; hasta: number; w: number }[] {
   const gamma = w / (b * h);
   const n: Vec2 = [-r.e[1], r.e[0]];
   const cortes = new Set<number>([0, r.len]);
@@ -102,12 +102,14 @@ function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: reado
           const wy = A[1] - O[1];
           const sigma = (wx * d[1] - wy * d[0]) / den;
           const tau = (wx * r.e[1] - wy * r.e[0]) / den;
-          if (tau >= 0 && tau <= 1 && sigma > 0 && sigma < r.len) cortes.add(sigma);
+          if (tau >= 0 && tau <= 1 && sigma > eps && sigma < r.len - eps) cortes.add(sigma);
         }
       }
     }
   }
-  const cs = [...cortes].sort((x, y) => x - y);
+  // Sin tramos más cortos que ε_geom (un borde que corta el eje casi en el mismo punto dos veces)
+  const cs = [...cortes].sort((x, y) => x - y).filter((x, i, l) => i === 0 || i === l.length - 1 || x - l[i - 1]! > eps);
+  if (cs.length > 2 && cs[cs.length - 1]! - cs[cs.length - 2]! <= eps) cs.splice(cs.length - 2, 1);
   const tramos: { desde: number; hasta: number; w: number }[] = [];
   for (let i = 0; i + 1 < cs.length; i++) {
     const sm = (cs[i]! + cs[i + 1]!) / 2;
@@ -226,7 +228,7 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
           repartir(cPeso, r, 0, r.len, [0, 0, -w], [0, 0, -w]);
           continue;
         }
-        for (const t of pesoBajoLosa(r, w, sc.huella.b, sc.canto, regiones)) if (t.w > 0) repartir(cPeso, r, t.desde, t.hasta, [0, 0, -t.w], [0, 0, -t.w]);
+        for (const t of pesoBajoLosa(r, w, sc.huella.b, sc.canto, regiones, ctx.op.epsGeom)) if (t.w > 0) repartir(cPeso, r, t.desde, t.hasta, [0, 0, -t.w], [0, 0, -t.w]);
       }
     }
     // Losas: su pp, por lámina (C2-g)

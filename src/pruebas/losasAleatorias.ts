@@ -16,6 +16,9 @@ export function conLosasAleatorias(f: ModeloFisico, semilla: number, o: Opciones
   const r = azar(7000 + semilla);
   const entre = (a: number, b: number) => a + (b - a) * r();
   const red = (x: number, paso = 0.05) => Math.round(x / paso) * paso;
+  // Los ejes de los pilares van en múltiplos de 5 cm: lo de las losas se desplaza 1,23 cm para que
+  // ningún rasgo caiga justo a ε_snap (5 cm) de otro, en el umbral de unión
+  const fuera = (x: number) => red(x) + 0.0123;
   const xs = [...new Set(f.pilares!.map((p) => p.x))].sort((a, b) => a - b);
   const ys = [...new Set(f.pilares!.map((p) => p.y))].sort((a, b) => a - b);
   const [X, Y] = [xs[xs.length - 1]!, ys[ys.length - 1]!];
@@ -49,10 +52,10 @@ export function conLosasAleatorias(f: ModeloFisico, semilla: number, o: Opciones
       r() < 0.5
         ? [
             [
-              [red(x0 + 1), red(y0 + 1)],
-              [red(x0 + 1 + entre(0.8, x1 - x0 - 2.2)), red(y0 + 1)],
-              [red(x0 + 1 + entre(0.8, x1 - x0 - 2.2)), red(y0 + 1 + entre(0.8, (y1 - y0) / 2 - 1.2))],
-              [red(x0 + 1), red(y0 + 1 + entre(0.8, (y1 - y0) / 2 - 1.2))],
+              [fuera(x0 + 1), fuera(y0 + 1)],
+              [fuera(x0 + 1 + entre(0.8, x1 - x0 - 2.2)), fuera(y0 + 1)],
+              [fuera(x0 + 1 + entre(0.8, x1 - x0 - 2.2)), fuera(y0 + 1 + entre(0.8, (y1 - y0) / 2 - 1.2))],
+              [fuera(x0 + 1), fuera(y0 + 1 + entre(0.8, (y1 - y0) / 2 - 1.2))],
             ],
           ]
         : [];
@@ -64,8 +67,8 @@ export function conLosasAleatorias(f: ModeloFisico, semilla: number, o: Opciones
     cargas.push({ tipo: "superficie", id: `s${n++}-${p}`, caso: "G", planta: p, losa: `L-${p}`, q: [0, 0, -red(entre(1, 3), 0.1)] });
     // Zona en otro vano (puede salirse de la losa por el chaflán)
     const zi = Math.floor(entre(0, xs.length - 1 - 1e-9));
-    const zx = [red(xs[zi]! + entre(0.3, 1)), red(xs[zi + 1]! - entre(0.3, 1))];
-    const zy = [red(entre(0.2, Y / 2)), red(entre(Y / 2 + 0.5, Y))];
+    const zx = [fuera(xs[zi]! + entre(0.3, 1)), fuera(xs[zi + 1]! - entre(0.3, 1))];
+    const zy = [fuera(entre(0.2, Y / 2)), fuera(entre(Y / 2 + 0.5, Y))];
     cargas.push({
       tipo: "superficie",
       id: `z${n++}-${p}`,
@@ -80,16 +83,16 @@ export function conLosasAleatorias(f: ModeloFisico, semilla: number, o: Opciones
       q: [0, 0, -red(entre(2, 5), 0.5)],
     });
     // Tabique: polilínea dentro del primer vano en x
-    const tx = red(xs[0]! + entre(1, xs[1]! - 1));
+    const tx = fuera(xs[0]! + entre(1, xs[1]! - 1));
     cargas.push({
       tipo: "lineal",
       id: `t${n++}-${p}`,
       caso: "G",
       planta: p,
       puntos: [
-        [tx, red(entre(0.5, Y / 3))],
-        [tx, red(entre(Y / 2, Y - 0.5))],
-        [red(Math.min(tx + entre(0.8, 2), xs[1]! - 0.5)), red(entre(Y / 2, Y - 0.5))],
+        [tx, fuera(entre(0.5, Y / 3))],
+        [tx, fuera(entre(Y / 2, Y - 0.5))],
+        [fuera(Math.min(tx + entre(0.8, 2), xs[1]! - 0.5)), fuera(entre(Y / 2, Y - 0.5))],
       ],
       q: [0, 0, -red(entre(4, 8), 0.5)],
     });
@@ -99,7 +102,7 @@ export function conLosasAleatorias(f: ModeloFisico, semilla: number, o: Opciones
     cargas.push({ tipo: "puntual", id: `f${n++}-${p}`, caso: "Q", planta: p, x: red((xs[pi]! + xs[pi + 1]!) / 2 + entre(-0.6, 0.6), 0.01), y: red((ys[pj]! + ys[pj + 1]!) / 2 + entre(-0.6, 0.6), 0.01), F: [0, 0, -red(entre(5, 20), 0.5)] });
     // Banda de pilar a lo largo de un eje y, desde la cara de un pilar
     const bj = Math.floor(entre(0, ys.length - 1e-9));
-    bandas.push({ id: `B-${p}`, planta: p, desde: [red(xs[0]! + 0.4), ys[bj]!], hasta: [red(xs[1]! - 0.4), ys[bj]!], ancho: red(entre(1.2, 2.5)) });
+    bandas.push({ id: `B-${p}`, planta: p, desde: [fuera(xs[0]! + 0.4), ys[bj]!], hasta: [fuera(xs[1]! - 0.4), ys[bj]!], ancho: red(entre(1.2, 2.5)) + 0.0246 });
   }
   return { ...f, losas, bandas, cargas };
 }

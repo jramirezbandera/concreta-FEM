@@ -8,12 +8,13 @@
  *    y a ≥ 0,45·2h de todo lado.
  * 3. Triangulación de Delaunay restringida (delaunator + constrainautor) de todos los puntos,
  *    ordenados por (x, y), con los lados sembrados como aristas obligatorias. Los empates de
- *    Delaunay (cuatro puntos cocirculares, que la siembra regular produce a menudo) y los casi
- *    empates por redondeo se resuelven con una regla intrínseca (la diagonal más corta; si miden
- *    igual, la más alineada con el eje 1; si no, la de pendiente positiva en sus ejes), no con el
- *    orden de barrido de delaunator: así la malla no cambia al trasladar o girar la planta.
+ *    Delaunay (cuatro o más puntos cocirculares, que la siembra regular y las huellas producen a
+ *    menudo) y los casi empates por redondeo o por un ruido de ε_geom se deshacen con una
+ *    perturbación simbólica ligada a los ejes de la losa (`Restringidor`), no con el orden de
+ *    barrido de delaunator: así la malla no cambia al trasladar o girar la planta.
  * 4. Se quedan los triángulos cuyo centroide cae en una losa (fuera de sus huecos): como los
- *    contornos son aristas obligatorias, cada triángulo está entero dentro o fuera.
+ *    contornos son aristas obligatorias, cada triángulo está entero dentro o fuera. Los de área de
+ *    redondeo (entre un borde sembrado y la envolvente convexa) se descartan antes.
  * 5. Cada triángulo se divide en 3 cuadriláteros (vértice, puntos medios de sus lados y
  *    centroide), en sentido antihorario: normal hacia +Z.
  * 6. Validador (H23): Σ áreas de cada losa = su área (sin la malla, `poligonos.ts`) a 1e-9; cada
@@ -38,6 +39,9 @@ export const JACOBIANO_BAJO = 0.2;
 
 /** Pendiente con que crece el paso de la siembra desde un rasgo pequeño (m por m). */
 const CRECIMIENTO = 2;
+
+/** Fracción de paso que se tolera antes de añadir un tramo más a la siembra de un lado. */
+const HOLGURA_SIEMBRA = 1e-4;
 
 export interface LosaMallar {
   id: string;
@@ -89,7 +93,12 @@ export type ResultadoMalla =
     }
   | { ok: false; mensaje: string };
 
-/** Empate de Delaunay: |incircle| ≤ TOL_EMPATE·L⁴, con L el tamaño de los cuatro puntos. */
+/**
+ * Empate de Delaunay: |incircle| ≤ máx(TOL_EMPATE·L⁴, 10·ε_geom·L³), con L el tamaño de los cuatro
+ * puntos. El segundo término es lo que mueve el incircle un ruido de ε_geom en un punto: un empate
+ * exacto (cuatro puntos cocirculares, como las esquinas de una huella dentro de la losa) sigue
+ * siéndolo con ese ruido, o con el redondeo de una traslación o un giro.
+ */
 const TOL_EMPATE = 1e-10;
 
 const nextEdge = (e: number) => (e % 3 === 2 ? e - 2 : e + 1);
@@ -101,10 +110,23 @@ const prevEdge = (e: number) => (e % 3 === 0 ? e + 2 : e - 1);
  */
 class Restringidor extends Constrainautor {
   private e1: Vec2 = [1, 0];
+  private O: Vec2 = [0, 0];
+  private epsGeom = 0;
 
-  /** Restringe las aristas y normaliza los empates; devuelve las pasadas de normalización. */
-  restringir(aristas: readonly [number, number][], e1: Vec2): number {
+  /**
+   * Restringe las aristas y normaliza los empates; devuelve las pasadas de normalización. Los
+   * empates se deshacen con una perturbación simbólica (Edelsbrunner–Mücke): cada punto se levanta
+   * en el paraboloide con un peso infinitesimal w = U² + (√2 − 1)·U·V, con (U, V) sus coordenadas en
+   * los ejes 1-2 de la primera losa respecto a `O`. Con ella la triangulación es la regular de esos
+   * pesos, única aunque haya 5 o más puntos cocirculares (el octógono de la huella de un pilar
+   * circular), las vueltas de Lawson llegan a ella sin ciclos y no depende de la posición de la
+   * planta. Un peso no afín y con un término cruzado irracional rompe también las simetrías de los
+   * rectángulos y trapecios alineados con el eje 1.
+   */
+  restringir(aristas: readonly [number, number][], e1: Vec2, O: Vec2, epsGeom: number): number {
     this.e1 = e1;
+    this.O = O;
+    this.epsGeom = epsGeom;
     this.constrainAll(aristas);
     const del = this.del as unknown as { triangles: Uint32Array; halfedges: Int32Array };
     const giro = this as unknown as { flipDiagonal(e: number): number };
@@ -132,9 +154,25 @@ class Restringidor extends Constrainautor {
     const v = incircle(A[0], A[1], B[0], B[1], C[0], C[1], D[0], D[1]);
     let L = 0;
     for (const P of [B, C, D]) L = Math.max(L, Math.abs(P[0] - A[0]), Math.abs(P[1] - A[1]));
-    const tol = TOL_EMPATE * L * L * L * L;
+    const tol = Math.max(TOL_EMPATE * L * L * L * L, 10 * this.epsGeom * L * L * L);
     if (v < -tol) return true;
     if (v > tol) return false;
+    // Empate: el término de primer orden de la perturbación (el incircle con los pesos en la
+    // columna levantada, con el mismo convenio de signo que el de robust-predicates)
+    const w = (P: Vec2) => {
+      const dx = P[0] - this.O[0];
+      const dy = P[1] - this.O[1];
+      const U = dx * this.e1[0] + dy * this.e1[1];
+      const V = -dx * this.e1[1] + dy * this.e1[0];
+      return U * U + (Math.SQRT2 - 1) * U * V;
+    };
+    const wd = w(D);
+    const f = [A, B, C].map((P) => [P[0] - D[0], P[1] - D[1], w(P) - wd] as const);
+    const [a, b, cc] = f as [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]];
+    const delta = a[0] * (b[1] * cc[2] - b[2] * cc[1]) - a[1] * (b[0] * cc[2] - b[2] * cc[0]) + a[2] * (b[0] * cc[1] - b[1] * cc[0]);
+    let escala = 0;
+    for (const r of f) escala = Math.max(escala, Math.abs(r[2]));
+    if (Math.abs(delta) > 1e-12 * escala * L * L) return delta < 0;
     return this.prefiere(A, D, B, C);
   }
 
@@ -144,7 +182,8 @@ class Restringidor extends Constrainautor {
     const d2: Vec2 = [S[0] - R[0], S[1] - R[1]];
     const L1 = Math.sqrt(d1[0] * d1[0] + d1[1] * d1[1]);
     const L2 = Math.sqrt(d2[0] * d2[0] + d2[1] * d2[1]);
-    const tol = 1e-9 * Math.max(L1, L2);
+    // Con la misma holgura que el empate: lo que mueve un ruido de ε_geom no decide
+    const tol = Math.max(1e-9 * Math.max(L1, L2), 10 * this.epsGeom);
     if (Math.abs(L1 - L2) > tol) return L1 < L2;
     const [ex, ey] = this.e1;
     const u1 = d1[0] * ex + d1[1] * ey;
@@ -200,7 +239,7 @@ export function jacobianoEscalado(X: readonly Vec2[]): number {
   return min;
 }
 
-export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number): ResultadoMalla {
+export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6): ResultadoMalla {
   const s = 2 * h;
   const lados = arreglo.lados();
   const regiones = losas.map((l) => regionDe(arreglo, l));
@@ -246,7 +285,8 @@ export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: 
     const acum = [0];
     for (let i = 1; i <= m; i++) acum.push(acum[i - 1]! + ((L / m) * (1 / g(((i - 1) * L) / m) + 1 / g((i * L) / m))) / 2);
     const total = acum[m]!;
-    const n = Math.max(1, Math.ceil(total - 1e-9));
+    // Con holgura: un lado de justo k pasos no puede pasar a k + 1 por un redondeo o un ruido
+    const n = Math.max(1, Math.ceil(total - HOLGURA_SIEMBRA));
     const c = [l.a];
     let j = 0;
     for (let i = 1; i < n; i++) {
@@ -280,14 +320,20 @@ export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: 
     return true;
   };
   const fila = (s * Math.sqrt(3)) / 2;
+  const origenes: Vec2[] = [];
   losas.forEach((l, k) => {
     const r = regiones[k]!;
     const [e1x, e1y] = l.eje1;
     const u = (q: Vec2) => q[0] * e1x + q[1] * e1y;
     const v = (q: Vec2) => -q[0] * e1y + q[1] * e1x;
-    // Vértice canónico: el menor en v y luego en u
+    // Vértice canónico: el menor en v y luego en u, comparando a ε_geom (dos vértices de un lado
+    // paralelo al eje 1 empatan en v, y el redondeo de un giro o un ruido no puede decidir cuál)
     let O = r.contorno[0]!;
-    for (const q of r.contorno) if (v(q) < v(O) || (v(q) === v(O) && u(q) < u(O))) O = q;
+    for (const q of r.contorno) {
+      const dv = v(q) - v(O);
+      if (dv < -epsGeom || (Math.abs(dv) <= epsGeom && u(q) < u(O) - epsGeom)) O = q;
+    }
+    origenes.push(O);
     let [u0, v0, u1, v1] = [Infinity, Infinity, -Infinity, -Infinity];
     for (const q of r.contorno) {
       const du = u(q) - u(O);
@@ -325,7 +371,7 @@ export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: 
   try {
     const d = new Delaunator(coords);
     // Dirección de referencia de los empates: el eje 1 de la primera losa
-    pasadas = new Restringidor(d).restringir(aristas, losas[0]?.eje1 ?? [1, 0]);
+    pasadas = new Restringidor(d).restringir(aristas, losas[0]?.eje1 ?? [1, 0], origenes[0] ?? [0, 0], epsGeom);
     tri = d.triangles;
   } catch (e) {
     return { ok: false, mensaje: e instanceof Error ? e.message : String(e) };
@@ -338,7 +384,17 @@ export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: 
     let [a, b, c] = [tri[t]!, tri[t + 1]!, tri[t + 2]!];
     const [A, B, C] = [Q(a), Q(b), Q(c)];
     const area2 = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
-    if (area2 === 0) continue;
+    // Degenerados: entre la cadena sembrada de un lado recto (que en una dirección cualquiera no es
+    // exactamente recta) y la envolvente convexa quedan triángulos de área de redondeo cuyo
+    // centroide cae en el borde. Dentro de una losa no los hay: su lado libre se voltea.
+    let L2 = 0;
+    for (const [P1, P2] of [
+      [A, B],
+      [B, C],
+      [C, A],
+    ] as const)
+      L2 = Math.max(L2, (P2[0] - P1[0]) * (P2[0] - P1[0]) + (P2[1] - P1[1]) * (P2[1] - P1[1]));
+    if (!(Math.abs(area2) > 1e-10 * L2)) continue;
     if (area2 < 0) [b, c] = [c, b];
     const g: Vec2 = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3];
     let losa = -1;

@@ -72,7 +72,10 @@ export interface Losas {
 
 const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
 
-/** Polígono de la huella de un pilar: rectángulo, u octógono inscrito en el círculo. */
+/**
+ * Polígono de la huella de un pilar: rectángulo, u octógono inscrito en el círculo. El octógono va
+ * en los ejes de la huella (los de su `giro`), para que gire con el pilar.
+ */
 function poligonoHuella(nd: NudoT): Vec2[] | null {
   const h = nd.pilar?.huella;
   const f = h?.forma;
@@ -80,17 +83,19 @@ function poligonoHuella(nd: NudoT): Vec2[] | null {
   const [cx, cy] = h.c;
   if (f.tipo === "circulo") {
     const r = f.D / 2;
-    const s = Math.SQRT1_2 * r;
+    const q = Math.SQRT1_2;
+    const [zx, zy] = h.ez;
+    const [yx, yy] = h.ey;
     return [
-      [cx + r, cy],
-      [cx + s, cy + s],
-      [cx, cy + r],
-      [cx - s, cy + s],
-      [cx - r, cy],
-      [cx - s, cy - s],
-      [cx, cy - r],
-      [cx + s, cy - s],
-    ];
+      [1, 0],
+      [q, q],
+      [0, 1],
+      [-q, q],
+      [-1, 0],
+      [-q, -q],
+      [0, -1],
+      [q, -q],
+    ].map(([a, b]) => [cx + r * (a! * zx + b! * yx), cy + r * (a! * zy + b! * yy)] as Vec2);
   }
   const [zx, zy] = [(h.ez[0] * f.h) / 2, (h.ez[1] * f.h) / 2];
   const [yx, yy] = [(h.ey[0] * f.b) / 2, (h.ey[1] * f.b) / 2];
@@ -346,7 +351,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
 
     // 3. Malla
     if (!mallar.length) continue;
-    const m = mallarPlanta(a, mallar, h);
+    const m = mallarPlanta(a, mallar, h, epsGeom);
     if (!m.ok) {
       diag.error("malla/triangulacion", `La triangulación de la planta ${idPlanta} ha fallado (${m.mensaje}). Es un fallo del compilador.`, [idPlanta, ...mallar.map((x) => x.id)]);
       continue;

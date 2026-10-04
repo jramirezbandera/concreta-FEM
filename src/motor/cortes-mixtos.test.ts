@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { A, B, CASOS_NAVIER, placaNavier } from "../../validacion/e3/navier.ts";
+import { B, CASOS_NAVIER, placaNavier } from "../../validacion/e3/navier.ts";
 import { cortarModelo } from "../../validacion/e5/bandas.ts";
 import { navierFisico } from "../../validacion/c2/navier.ts";
 import { compilar } from "../compilador/compilar.ts";
