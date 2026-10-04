@@ -1,0 +1,44 @@
+# validacion/e6/resumen-csi.ts — 2026-10-04
+
+valor | publicado | motor | dif. relativa | redondeo | frente a la cerrada | fuente
+1-004 caso 1: Uy punta (in) | -0.01806 | -0.018060574 | 0.0032 % | dentro | -2.3e-15 | SAP2000 1-004, p. 2
+1-004 caso 1: Uz punta (in) | -0.03029 | -0.030291901 | 0.0063 % | dentro | -3.4e-16 | SAP2000 1-004, p. 2
+1-004 caso 2: Uy punta (in) | -0.03345 | -0.033445508 | -0.0134 % | dentro | -2.1e-15 | SAP2000 1-004, p. 2
+1-004 caso 2: Uz punta (in) | -0.0561 | -0.056096113 | -0.0069 % | dentro | -1.2e-16 | SAP2000 1-004, p. 2
+1-004 caso 3: Uy punta (in) | -0.08361 | -0.083613770 | 0.0045 % | dentro | -2.5e-15 | SAP2000 1-004, p. 2
+1-004 caso 3: Uz punta (in) | -0.14024 | -0.14024028 | 0.0002 % | dentro | -2.0e-16 | SAP2000 1-004, p. 2
+1-018 modelo A: Uz nudo 5 (in) | -2.77076 | -2.7707562 | -0.0001 % | dentro | -2.0e-13 | SAP2000 1-018, p. 2
+1-018 modelo B: Uz nudo 5 (in) | -2.72361 | -2.7236104 | 0.0000 % | dentro | -1.9e-9 | SAP2000 1-018, p. 2
+1-018 modelo C: Uz nudo 5 (in) | -0.03954 | -0.039543367 | 0.0085 % | dentro | -1.8e-16 | SAP2000 1-018, p. 2
+1-018 modelo D: Uz nudo 5 (in) | -0.0076 | -0.0076045674 | 0.0601 % | dentro | 6.2e-12 | SAP2000 1-018, p. 2
+1-022 LAT: Ux nudo 22 (in) | 1.45076 | 1.4507570 | -0.0002 % | dentro | — | SAP2000 1-022, p. 6
+1-022 LAT: axil pilar 1 (kip) | 69.99 | 69.986734 | -0.0047 % | dentro | — | SAP2000 1-022, p. 6
+1-022 LAT: momento pilar 1 en el nudo 1 (k·in) | 2324.68 | 2324.6773 | -0.0001 % | dentro | — | SAP2000 1-022, p. 6
+1-022 periodo del modo 1 (s) | 1.2732 | 1.2732111 | 0.0009 % | dentro | — | SAP2000 1-022, p. 6
+1-022 periodo del modo 2 (s) | 0.4313 | 0.43127847 | -0.0050 % | dentro | — | SAP2000 1-022, p. 6
+1-022 periodo del modo 3 (s) | 0.242 | 0.24204319 | 0.0178 % | dentro | — | SAP2000 1-022, p. 6
+1-022 periodo del modo 4 (s) | 0.1602 | 0.16017884 | -0.0132 % | dentro | — | SAP2000 1-022, p. 6
+1-022 periodo del modo 5 (s) | 0.119 | 0.11898951 | -0.0088 % | dentro | — | SAP2000 1-022, p. 6
+1-022 periodo del modo 6 (s) | 0.0951 | 0.095063798 | -0.0381 % | dentro | — | SAP2000 1-022, p. 6
+1-022 periodo del modo 7 (s) | 0.0795 | 0.079514740 | 0.0185 % | dentro | — | SAP2000 1-022, p. 6
+1-022 SRSS: Ux nudo 22 (in) | 5.436 | 5.4367155 | 0.0132 % | dentro | — | SAP2000 1-022, p. 7
+1-022 SRSS: axil pilar 1 (kip) | 261.7 | 261.71352 | 0.0052 % | dentro | — | SAP2000 1-022, p. 7
+1-022 SRSS: momento pilar 1 (k·in) | 9864 | 9864.3807 | 0.0039 % | dentro | — | SAP2000 1-022, p. 7
+1-022 CQC: Ux nudo 22 (in) | 5.431 | 5.4313412 | 0.0063 % | dentro | — | SAP2000 1-022, p. 7
+1-022 CQC: axil pilar 1 (kip) | 261.5 | 261.51549 | 0.0059 % | dentro | — | SAP2000 1-022, p. 7
+1-022 CQC: momento pilar 1 (k·in) | 9916 | 9916.1217 | 0.0012 % | dentro | — | SAP2000 1-022, p. 7
+1-024 periodo del modo 1 (s) | 0.2271 | 0.22706181 | -0.0168 % | dentro | — | SAP2000 1-024, p. 3
+1-024 periodo del modo 2 (s) | 0.2156 | 0.21563335 | 0.0155 % | dentro | — | SAP2000 1-024, p. 3
+1-024 periodo del modo 3 (s) | 0.0733 | 0.073345206 | 0.0617 % | dentro | — | SAP2000 1-024, p. 3
+1-024 periodo del modo 4 (s) | 0.072 | 0.072005081 | 0.0071 % | dentro | — | SAP2000 1-024, p. 3
+1-024 CQC: Ux nudo 29 (ft) | 0.02014 | 0.020144410 | 0.0219 % | dentro | — | SAP2000 1-024, p. 3
+1-024 SRSS: Ux nudo 29 (ft) | 0.02012 | 0.020118714 | -0.0064 % | dentro | — | SAP2000 1-024, p. 3
+1-024 ABS: Ux nudo 29 (ft) | 0.0205 | 0.020502001 | 0.0098 % | dentro | — | SAP2000 1-024, p. 3
+1-024 NRC 10 %: Ux nudo 29 (ft) | 0.02016 | 0.020156991 | -0.0149 % | dentro | — | SAP2000 1-024, p. 3
+
+1-024: sensibilidad a la J de pilares y vigas (el PDF no la da), en ft⁴:
+J = 0.000001: 0.22706 0.21563 0.073345 0.072005 0.020144 0.020119 0.020502 0.020157
+J = 0.5: 0.22706 0.21563 0.073345 0.072004 0.020144 0.020119 0.020502 0.020157
+J = 2.25: 0.22705 0.21561 0.073343 0.072001 0.020143 0.020119 0.020500 0.020155
+J = 10: 0.22702* 0.21555* 0.073335 0.071990 0.020140 0.020120 0.020495* 0.020150*
+(* = fuera del redondeo publicado; columnas: T1…T4, CQC, SRSS, ABS, NRC 10 %)
