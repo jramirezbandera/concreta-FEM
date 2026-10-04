@@ -1,5 +1,5 @@
-# validacion/e6/aleatorios.ts — 2026-10-04; 2000 modelos (semillas 1…2000), 29.1 s
-Nudos por modelo: media 37, máximo 117
+# validacion/e6/aleatorios.ts — 2026-10-04; 2000 modelos (semillas 1…2000), 28.6 s
+Nudos por modelo: media 37, máximo 116
 
 Cobertura (modelos que tienen cada objeto):
   diafragma: 1408 (70 %)

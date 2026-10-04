@@ -1,0 +1,47 @@
+# validacion/e6/mutaciones.ts — 2026-10-04; 200 modelos aleatorios por mutación
+
+Sin mutación (control): Tests 555 passed (555)
+
+M1 (src/motor/gdl.ts): diafragma: ux = uxm + Δy·rzm (signo del término de giro)
+  batería: DETECTADA en 138/200 modelos; el motor rechaza 138
+  primer fallo: semilla 1: Error: cálculo no válido:   equilibrio/no-cumple: El caso C0 no cumple el equilibrio global: |ΣF|/Σ|F| = 5.90e-15 y |ΣM|/Σ|M| = 2.28e-2 (tolerancia 1e-9). El resultado no es válido.   equilibrio/no-cumple: El 
+  suite completa: Tests 50 failed | 495 passed | 10 skipped (555)
+
+M2 (src/motor/gdl.ts): enlace rígido: uz = uzm + θx·Δy + θy·Δx (signo de un término de θ × r)
+  batería: DETECTADA en 130/200 modelos; el motor rechaza 130
+  primer fallo: semilla 4: Error: cálculo no válido:   equilibrio/no-cumple: El caso C0 no cumple el equilibrio global: |ΣF|/Σ|F| = 6.86e-15 y |ΣM|/Σ|M| = 9.30e-4 (tolerancia 1e-9). El resultado no es válido.   equilibrio/no-cumple: El 
+  suite completa: Tests 58 failed | 490 passed | 7 skipped (555)
+
+M3 (src/elementos/barra.ts): barra de Timoshenko: Φy a la mitad (error de formulación coherente)
+  batería: no detectada en 0/200 modelos
+  suite completa: Tests 25 failed | 530 passed (555)
+
+M4 (src/elementos/barra.ts): offsets: θ × d mal en la recuperación de los desplazamientos de extremo
+  batería: DETECTADA en 198/200 modelos; relaciones: giro 198
+  primer fallo: semilla 1: giro = 4.44e-1
+  suite completa: Tests 26 failed | 529 passed (555)
+
+M5 (src/motor/barras.ts): cargas de barra en globales pasadas a locales con Rᵀ en vez de R
+  batería: DETECTADA en 183/200 modelos; el motor rechaza 183
+  primer fallo: semilla 1: Error: cálculo no válido:   equilibrio/no-cumple: El caso C0 no cumple el equilibrio global: |ΣF|/Σ|F| = 1.65e-1 y |ΣM|/Σ|M| = 7.16e-2 (tolerancia 1e-9). El resultado no es válido.   equilibrio/no-cumple: El c
+  suite completa: Tests 24 failed | 531 passed (555)
+
+M6 (src/motor/laminas.ts): carga de línea en lámina: la ley lineal al revés en las equivalentes
+  batería: DETECTADA en 119/200 modelos; el motor rechaza 119
+  primer fallo: semilla 1: Error: cálculo no válido:   equilibrio/no-cumple: El caso C1 no cumple el equilibrio global: |ΣF|/Σ|F| = 3.25e-15 y |ΣM|/Σ|M| = 4.29e-4 (tolerancia 1e-9). El resultado no es válido.
+  suite completa: Tests 43 failed | 505 passed | 7 skipped (555)
+
+M7 (src/motor/elementos.ts): muelles con ejes: la matriz de giro traspuesta
+  batería: DETECTADA en 195/200 modelos; relaciones: giro 195
+  primer fallo: semilla 1: giro = 1.89e-1
+  suite completa: Tests 9 failed | 546 passed (555)
+
+M8 (src/motor/calcular.ts): recuperación de esfuerzos de barra con las cargas del primer caso
+  batería: DETECTADA en 193/200 modelos; relaciones: superposicion 193
+  primer fallo: semilla 1: superposicion = 1.28e+0
+  suite completa: Tests 21 failed | 534 passed (555)
+
+M9 (src/motor/laminas.ts): cargas de lámina en locales: ejes 1 y 2 intercambiados
+  batería: DETECTADA en 184/200 modelos; relaciones: invertirLaminas 184
+  primer fallo: semilla 1: invertirLaminas = 1.72e+0
+  suite completa: Tests 10 failed | 545 passed (555)
