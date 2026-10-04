@@ -1,0 +1,7 @@
+Momentos en kN·m, axiles en kN (G); deriva de la esquina en cubierta con Vx (3 kN/m en la fachada x = 0)
+zona rígida 0                  deriva Vx 1.28 mm | X5-N3: cara -88.9, vano 96.7 | S0-0-N3: arranque -14.7, vano 25.1 | T máx 11.8 | N int/esq -1627/-685
+zona rígida 0.5                deriva Vx 1.05 mm | X5-N3: cara -92.2, vano 91.5 | S0-0-N3: arranque -15.0, vano 24.8 | T máx 11.8 | N int/esq -1635/-695
+zona rígida 1                  deriva Vx 0.85 mm | X5-N3: cara -95.3, vano 86.4 | S0-0-N3: arranque -15.3, vano 24.5 | T máx 11.8 | N int/esq -1642/-706
+D4: axil de pilares ×2         deriva Vx 0.84 mm | X5-N3: cara -100.9, vano 86.6 | S0-0-N3: arranque -14.9, vano 24.4 | T máx 11.2 | N int/esq -1652/-681
+D4: torsión de vigas ×0,1      deriva Vx 0.85 mm | X5-N3: cara -99.0, vano 90.3 | S0-0-N3: arranque 0.9, vano 31.1 | T máx 2.4 | N int/esq -1643/-698
+D4: los dos                    deriva Vx 0.84 mm | X5-N3: cara -104.6, vano 90.4 | S0-0-N3: arranque 1.0, vano 31.0 | T máx 2.3 | N int/esq -1652/-673
