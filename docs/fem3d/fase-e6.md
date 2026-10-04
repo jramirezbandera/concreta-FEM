@@ -191,15 +191,15 @@ Ninguna fase del motor en TypeScript es cuadrática.
 | E6-5 | **La membrana con drilling coincide con `ASDShellQ4` a ≤ 0,5 % en muros, muros con huecos y núcleos** | S5 #1 cerrada: no hace falta el parche de D10 |
 | E6-6 | **La batería metamórfica no ve los errores de formulación coherentes** (M3), y sí los de cinemática, transformación y combinación | Los oráculos (PyNite, OpenSees, cerradas, CSI) siguen siendo imprescindibles para todo elemento nuevo; las metamórficas, para todo lo demás |
 | E6-7 | **Dos fallos silenciosos corregidos:** una matriz de muelle no simétrica con ejes se daba por buena (al girarla se simetrizaba antes de comprobarla) y una carga de barra de tipo desconocido se aplicaba como distribuida. Además, una barra sin sección o sin vector de canto lanzaba un `TypeError` | Las entradas no válidas se prueban con un catálogo, no caso a caso |
-| E6-8 | **La memoria JS evitable eran los vectores por caso y la copia de \|K\|.** Pico de un 41–45 % menor con los mismos bits; lo que queda vivo tras el cálculo baja de 243 a 125 MB | Ayuda a que el semirrígido quepa en un móvil (pendiente de E4); el resto es el resultado (111 MB) y el modelo |
-| E6-9 | **El motor calcula 88 000 nudos en sobremesa** (11,4 s con diafragma; 22,9 s y 2,65 GB semirrígido). Fuera del solver, todo es casi lineal | El edificio objetivo (D9) tiene un margen de ×3 en sobremesa. En el móvil, lo dirán los `LIMITES` medidos |
+| E6-8 | **La memoria JS evitable eran los vectores por caso y la copia de \|K\|.** Pico de un 41–45 % menor con los mismos bits; lo que queda vivo tras el cálculo baja de 243 a 125 MB | Más margen en los móviles con menos memoria (el iPhone 13 Pro ya calcula el semirrígido, E4-9); lo que queda es el resultado (111 MB) y el modelo |
+| E6-9 | **El motor calcula 88 000 nudos en sobremesa** (11,4 s con diafragma; 22,9 s y 2,65 GB semirrígido). Fuera del solver, todo es casi lineal | El edificio objetivo (D9) tiene un margen de ×3 en sobremesa; en el móvil, el perfil medido queda en 200 000 ecuaciones (E4-9) |
 | E6-10 | **Erratas de las fuentes:** en 1-004, el momento del caso 3 es alrededor de +Y (el texto dice Z); en 1-022, el A de W24X110 es 2,5 in² (no influye); los espectros de CSI usan g = 386,4 in/s² | Citadas en `validacion/e6/csi.ts` |
 
 ## Pendiente
 
 - **Del usuario:**
   - Calcular en SAP2000 la placa ortótropa de Navier y comparar con `validacion/e6/sap2000/comparar.ts` (S5 #21). Después, el reticular con ábacos y el unidireccional con viguetas (LEEME.md).
-  - Medir en el móvil (pendiente de E4).
+  - Medir un móvil con menos memoria que el iPhone 13 Pro (E4-9).
 - **El importador de SAP2000** no se ha probado aún con un fichero de SAP2000 real: el primero puede pedir algún ajuste. Además, no traduce:
   - puntos de inserción distintos del centroide;
   - cargas «uniform to frame»;

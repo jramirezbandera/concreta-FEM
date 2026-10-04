@@ -109,7 +109,7 @@
   - **Puente con SAP2000** (`validacion/e6/sap2000/`, LEEME.md): importador de modelos $2k, comparador de resultados y la placa de Navier de S5 #21 lista para importar.
 - **Siguiente paso:** lo decide el usuario:
   - calcular en SAP2000 la placa de Navier y sus modelos (S5 #21, D3);
-  - medir en el móvil;
+  - medir un móvil con menos memoria que el iPhone 13 Pro (E4-9);
   - E7 (modal, temperatura, triángulos);
   - o empezar el compilador (Fase 2 de S1).
 
