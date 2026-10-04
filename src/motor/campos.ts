@@ -33,10 +33,15 @@
  */
 import { PUNTOS_GAUSS } from "../elementos/dkmq.ts";
 import { coordenadasNaturales, funcionesForma, operadorResultantes, vectorALocales } from "../elementos/lamina.ts";
-import { Diagnosticos } from "./diagnosticos.ts";
+import { TOL_CORTE, type CortePreparado, type InfoCorte, type IntegradorCampos, type MuestrasCorte } from "./cortes.ts";
+import { Diagnosticos, listaIds } from "./diagnosticos.ts";
 import { geometria, type Geometria } from "./geometria.ts";
 import { prepararLamina, type LaminaPreparada } from "./laminas.ts";
-import type { LaminaAnalitica, ModeloAnalitico } from "./modelo.ts";
+import type { LaminaAnalitica, ModeloAnalitico, ResultadoCaso } from "./modelo.ts";
+
+/** Gauss–Legendre de 4 puntos en [0, 1]: abscisas y pesos. */
+const GL4_S = [0.0694318442029737, 0.3300094782075719, 0.6699905217924281, 0.9305681557970263];
+const GL4_W = [0.1739274225687269, 0.3260725774312731, 0.3260725774312731, 0.1739274225687269];
 
 /** Base del polinomio de los parches. */
 export type BaseSpr = "cuadratica" | "bilineal";
@@ -193,7 +198,7 @@ function mismaSeccion(a: LaminaAnalitica, pa: LaminaPreparada, b: LaminaAnalitic
   return Math.abs(c) >= 1 - 1e-9;
 }
 
-export class CamposLaminas {
+export class CamposLaminas implements IntegradorCampos {
   readonly modelo: ModeloAnalitico;
   readonly geo: Geometria;
   readonly regiones: RegionCampos[] = [];
@@ -218,6 +223,8 @@ export class CamposLaminas {
   private readonly cambio: Float64Array;
   private readonly planes: (PlanNudo | undefined)[] = [];
   private readonly parchesCentro: (Parche | null | undefined)[] = [];
+  private libres: Set<string> | null = null;
+  private porLado: Map<string, number[]> | null = null;
 
   constructor(modelo: ModeloAnalitico, opciones: OpcionesCampos = {}) {
     this.modelo = modelo;
@@ -561,6 +568,304 @@ export class CamposLaminas {
     const ETA = [-1, -1, 1, 1];
     for (let a = 0; a < 4; a++) out.set(ev.en(l, XI[a]!, ETA[a]!), 8 * a);
     return out;
+  }
+
+  /**
+   * ¿Comparte el lado (u, v) con la lámina k otra lámina coplanaria que esté en alguna región? (la
+   * de su otro lado en la misma superficie: un muro que cuelgue del lado no cuenta).
+   */
+  private vecinaEnRegion(u: number, v: number, k: number): boolean {
+    if (!this.porLado) {
+      this.porLado = new Map();
+      (this.modelo.laminas ?? []).forEach((l, i) => {
+        for (let a = 0; a < 4; a++) {
+          const p = l.nudos[a]!;
+          const q = l.nudos[(a + 1) % 4]!;
+          const c = p < q ? `${p},${q}` : `${q},${p}`;
+          let lista = this.porLado!.get(c);
+          if (!lista) this.porLado!.set(c, (lista = []));
+          lista.push(i);
+        }
+      });
+    }
+    const nk = this.laminas[k]!.R;
+    return (this.porLado.get(u < v ? `${u},${v}` : `${v},${u}`) ?? []).some((i) => {
+      if (i === k || this.regionDe[i]! < 0) return false;
+      const ni = this.laminas[i]!.R;
+      return Math.abs(ni[6]! * nk[6]! + ni[7]! * nk[7]! + ni[8]! * nk[8]!) >= 1 - 1e-6;
+    });
+  }
+
+  /**
+   * Lados de lámina libres: en el borde de su región, sin otra lámina ni barra que los comparta y
+   * sin apoyo, muelle ni enlace rígido en sus nudos. Claves «u,v» con u < v.
+   */
+  private bordesLibres(): Set<string> {
+    if (this.libres) return this.libres;
+    const clave = (u: number, v: number) => (u < v ? `${u},${v}` : `${v},${u}`);
+    const usos = new Map<string, number>();
+    const enRegion = new Map<string, number>();
+    (this.modelo.laminas ?? []).forEach((l, k) => {
+      for (let a = 0; a < 4; a++) {
+        const c = clave(l.nudos[a]!, l.nudos[(a + 1) % 4]!);
+        usos.set(c, (usos.get(c) ?? 0) + 1);
+        if (this.regionDe[k]! >= 0) enRegion.set(c, (enRegion.get(c) ?? 0) + 1);
+      }
+    });
+    const barras = new Set((this.modelo.barras ?? []).map((b) => clave(b.nudos[0], b.nudos[1])));
+    const atados = new Set<number>();
+    for (const a of this.modelo.apoyos ?? []) if (a.coartados.some(Boolean)) atados.add(a.nudo);
+    for (const m of this.modelo.muelles ?? []) for (const v of m.nudos) atados.add(v);
+    for (const r of this.modelo.restricciones ?? []) if (r.tipo === "enlace-rigido") for (const v of [r.maestro, ...r.esclavos]) atados.add(v);
+    this.libres = new Set<string>();
+    for (const [c, n] of enRegion) {
+      if (n !== 1 || usos.get(c) !== 1 || barras.has(c)) continue;
+      const [u, v] = c.split(",").map(Number);
+      if (!atados.has(u!) && !atados.has(v!)) this.libres.add(c);
+    }
+    return this.libres;
+  }
+
+  /**
+   * Método «campos» de los cortes (IntegradorCampos), para las láminas que atraviesan el plano:
+   * integra a lo largo de su intersección con el plano la fuerza y el momento por unidad de longitud
+   * que el lado B ejerce sobre el A, f = N·ν + (Q·ν)·e₃ y m = (M·ν) × e₃, con ν la normal al corte
+   * en el plano de la lámina (hacia +x) y e₃ la normal de su región, con Gauss de 4 puntos por
+   * tramo. Si un tramo acaba en un borde libre, añade allí la fuerza de borde de Kirchhoff ±Mxy·e₃
+   * (en los ejes de la franja): el Mxy recuperado no se anula en el borde, mientras que el de la
+   * lámina real cae a cero en una capa de anchura ~t que concentra ese cortante. Los lados de lámina
+   * sobre el plano los da cortes.ts por fuerzas nodales; aquí sólo se muestrean (para las muestras).
+   * Las láminas rígidas no entran: lo que pasa por ellas lo transmite su enlace.
+   */
+  integrar(cp: CortePreparado, casos: readonly ResultadoCaso[], info: InfoCorte, diag: Diagnosticos): { suma: Float64Array; muestras: MuestrasCorte } {
+    const { xyz } = this.geo;
+    const ex = [cp.ejes[0]!, cp.ejes[1]!, cp.ejes[2]!];
+    const ey = [cp.ejes[3]!, cp.ejes[4]!, cp.ejes[5]!];
+    const ez = [cp.ejes[6]!, cp.ejes[7]!, cp.ejes[8]!];
+    const pr = (a: ArrayLike<number>, b: ArrayLike<number>) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+    const cruz = (a: ArrayLike<number>, b: ArrayLike<number>) => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
+    const libres = this.bordesLibres();
+    const claveLado = (l: LaminaAnalitica, e: number) => {
+      const u = l.nudos[e]!;
+      const v = l.nudos[(e + 1) % 4]!;
+      return u < v ? `${u},${v}` : `${v},${u}`;
+    };
+    // 1. Tramos: intersección del plano con cada lámina, recortada al rectángulo
+    interface Tramo {
+      k: number;
+      A: number[];
+      B: number[];
+      /** Atraviesa la lámina (se integra); si no, es un lado sobre el plano (sólo se muestrea). */
+      cruza: boolean;
+      /** ¿Acaba A (o B) en un borde libre? */
+      libreA: boolean;
+      libreB: boolean;
+    }
+    const tramos: Tramo[] = [];
+    const ext = { y: [Infinity, -Infinity] as [number, number], z: [Infinity, -Infinity] as [number, number] };
+    (this.modelo.laminas ?? []).forEach((l, k) => {
+      if (this.regionDe[k]! < 0) return;
+      const X = l.nudos.map((v) => xyz.subarray(3 * v, 3 * v + 3));
+      const d = X.map((p) => {
+        const s = cp.coordenadas(p)[0];
+        return Math.abs(s) <= TOL_CORTE ? 0 : s;
+      });
+      const neg = d.filter((s) => s < 0).length;
+      const pos = d.filter((s) => s > 0).length;
+      const cer = 4 - neg - pos;
+      // Puntos de corte con los lados en los que están (un vértice está en dos)
+      let P: { x: number[]; lados: number[] }[] = [];
+      const cruza = neg > 0 && pos > 0;
+      if (cruza) {
+        for (let a = 0; a < 4; a++) {
+          const b = (a + 1) % 4;
+          if (d[a] === 0) P.push({ x: [...X[a]!], lados: [(a + 3) % 4, a] });
+          else if (d[a]! * d[b]! < 0) {
+            const t = d[a]! / (d[a]! - d[b]!);
+            P.push({ x: [0, 1, 2].map((c) => X[a]![c]! + t * (X[b]![c]! - X[a]![c]!)), lados: [a] });
+          }
+        }
+      } else if (cer === 2 && (pos === 0 || neg === 0)) {
+        // Un lado sobre el plano: lo muestrea la lámina del lado A o, si ésa no está en ninguna región
+        // (la huella de un pilar) o no existe, la del lado B
+        for (let a = 0; a < 4; a++) {
+          if (d[a] !== 0 || d[(a + 1) % 4] !== 0) continue;
+          if (neg === 0 && this.vecinaEnRegion(l.nudos[a]!, l.nudos[(a + 1) % 4]!, k)) break;
+          P = [{ x: [...X[a]!], lados: [] }, { x: [...X[(a + 1) % 4]!], lados: [] }];
+        }
+      }
+      if (P.length < 2) return;
+      if (P.length > 2) {
+        // Por redondeo: los dos más alejados
+        let mejor: [number, number] = [0, 1];
+        let dm = -1;
+        for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+          const dd = Math.hypot(P[i]!.x[0]! - P[j]!.x[0]!, P[i]!.x[1]! - P[j]!.x[1]!, P[i]!.x[2]! - P[j]!.x[2]!);
+          if (dd > dm) [dm, mejor] = [dd, [i, j]];
+        }
+        P = [P[mejor[0]]!, P[mejor[1]]!];
+      }
+      // Recorte al rectángulo: y(t), z(t) lineales en el tramo
+      const [, ya, za] = cp.coordenadas(P[0]!.x);
+      const [, yb, zb] = cp.coordenadas(P[1]!.x);
+      let t0 = 0;
+      let t1 = 1;
+      for (const [va, vb, [lo, hi]] of [
+        [ya, yb, cp.y],
+        [za, zb, cp.z],
+      ] as const) {
+        const dv = vb - va;
+        if (Math.abs(dv) < 1e-15) {
+          if (va < lo - TOL_CORTE || va > hi + TOL_CORTE) t1 = -1;
+          continue;
+        }
+        let ta = (lo - TOL_CORTE - va) / dv;
+        let tb = (hi + TOL_CORTE - va) / dv;
+        if (ta > tb) [ta, tb] = [tb, ta];
+        t0 = Math.max(t0, ta);
+        t1 = Math.min(t1, tb);
+      }
+      const L = Math.hypot(P[1]!.x[0]! - P[0]!.x[0]!, P[1]!.x[1]! - P[0]!.x[1]!, P[1]!.x[2]! - P[0]!.x[2]!);
+      if (!((t1 - t0) * L > 10 * TOL_CORTE)) return;
+      const en = (t: number) => [0, 1, 2].map((c) => P[0]!.x[c]! + t * (P[1]!.x[c]! - P[0]!.x[c]!));
+      const esLibre = (q: { lados: number[] }) => q.lados.some((e) => libres.has(claveLado(l, e)));
+      tramos.push({ k, A: en(Math.max(0, t0)), B: en(Math.min(1, t1)), cruza, libreA: cruza && t0 <= 0 && esLibre(P[0]!), libreB: cruza && t1 >= 1 && esLibre(P[1]!) });
+      if (cruza) info.laminas.push(k);
+      for (const q of [tramos.at(-1)!.A, tramos.at(-1)!.B]) {
+        const [, cy, cz] = cp.coordenadas(q);
+        ext.y = [Math.min(ext.y[0], cy), Math.max(ext.y[1], cy)];
+        ext.z = [Math.min(ext.z[0], cz), Math.max(ext.z[1], cz)];
+      }
+    });
+    if (tramos.length) info.extension = ext;
+
+    // 2. Puntos de integración, ejes de franja y extremos libres (no dependen del caso)
+    const ns = 4 * tramos.length;
+    const m: MuestrasCorte = {
+      laminas: new Int32Array(ns),
+      puntos: new Float64Array(3 * ns),
+      yz: new Float64Array(2 * ns),
+      pesos: new Float64Array(ns),
+      ejes: new Float64Array(9 * ns),
+      valores: [],
+    };
+    const natural = new Float64Array(2 * ns);
+    /** Por punto: ν y t = n × ν en el triedro de la región y σ = n·s₃. */
+    const marco = new Float64Array(5 * ns);
+    const naturales = (k: number, P: ArrayLike<number>): [number, number] => {
+      const pl = this.laminas[k]!;
+      const d = [P[0]! - pl.origen[0]!, P[1]! - pl.origen[1]!, P[2]! - pl.origen[2]!];
+      const nat = coordenadasNaturales(pl.xy, pr(d, pl.R.subarray(0, 3)), pr(d, pl.R.subarray(3, 6)));
+      return [Math.min(1, Math.max(-1, nat?.[0] ?? 0)), Math.min(1, Math.max(-1, nat?.[1] ?? 0))];
+    };
+    /** Extremos libres: lámina, punto, coordenadas naturales, signo del extremo, marco y normal n. */
+    const extremos: { k: number; P: number[]; nat: [number, number]; s: number; marco: number[]; n: number[] }[] = [];
+    tramos.forEach(({ k, A, B, cruza, libreA, libreB }, i) => {
+      const g = this.regiones[this.regionDe[k]!]!;
+      const s1 = g.R.subarray(0, 3);
+      const s2 = g.R.subarray(3, 6);
+      const s3 = g.R.subarray(6, 9);
+      const L = Math.hypot(B[0]! - A[0]!, B[1]! - A[1]!, B[2]! - A[2]!);
+      const dir = [0, 1, 2].map((c) => (B[c]! - A[c]!) / L);
+      let nu = cruz(s3, dir);
+      if (pr(nu, ex) < 0) nu = nu.map((c) => -c);
+      // Normal de la franja: hacia z del corte; si es perpendicular, hacia y; si no, hacia x
+      const zs = pr(s3, ez);
+      const ys = pr(s3, ey);
+      const sigma = Math.abs(zs) > 1e-9 ? Math.sign(zs) : Math.abs(ys) > 1e-9 ? Math.sign(ys) : Math.sign(pr(s3, ex)) || 1;
+      const n = [0, 1, 2].map((c) => sigma * s3[c]!);
+      const t = cruz(n, nu);
+      const mr = [pr(nu, s1), pr(nu, s2), pr(t, s1), pr(t, s2), sigma];
+      for (let q = 0; q < 4; q++) {
+        const j = 4 * i + q;
+        const P = [0, 1, 2].map((c) => A[c]! + GL4_S[q]! * (B[c]! - A[c]!));
+        m.laminas[j] = k;
+        m.puntos.set(P, 3 * j);
+        const [, cy, cz] = cp.coordenadas(P);
+        m.yz.set([cy, cz], 2 * j);
+        m.pesos[j] = GL4_W[q]! * L;
+        m.ejes.set([...nu, ...t, ...n], 9 * j);
+        natural.set(naturales(k, P), 2 * j);
+        marco.set(mr, 5 * j);
+      }
+      if (!cruza) return;
+      // Signo del extremo: + en el que está más adelante según t
+      const st = pr(dir, t) >= 0 ? 1 : -1;
+      if (libreA) extremos.push({ k, P: A, nat: naturales(k, A), s: -st, marco: mr, n });
+      if (libreB) extremos.push({ k, P: B, nat: naturales(k, B), s: st, marco: mr, n });
+    });
+
+    // 3. Por caso: campos en cada punto, fuerza y momento de los tramos que atraviesan
+    const nc = casos.length;
+    const suma = new Float64Array(6 * nc);
+    const O = cp.origen;
+    let degradadas = 0;
+    /** Mxy en los ejes de franja (de ν y t con σ) a partir de los valores en el triedro de la región. */
+    const mxyFranja = (v: ArrayLike<number>, mr: readonly number[]) => {
+      const [nx, ny, tx, ty, sg] = mr;
+      const b11 = nx! * v[3]! + ny! * v[5]!;
+      const b12 = nx! * v[5]! + ny! * v[4]!;
+      return sg! * (b11 * tx! + b12 * ty!);
+    };
+    const agregar = (o: number, P: ArrayLike<number>, f: ArrayLike<number>, mm: ArrayLike<number>, w: number) => {
+      const rx = P[0]! - O[0]!;
+      const ry = P[1]! - O[1]!;
+      const rz = P[2]! - O[2]!;
+      suma[o]! += w * f[0]!;
+      suma[o + 1]! += w * f[1]!;
+      suma[o + 2]! += w * f[2]!;
+      suma[o + 3]! += w * (mm[0]! + ry * f[2]! - rz * f[1]!);
+      suma[o + 4]! += w * (mm[1]! + rz * f[0]! - rx * f[2]!);
+      suma[o + 5]! += w * (mm[2]! + rx * f[1]! - ry * f[0]!);
+    };
+    casos.forEach((r, kc) => {
+      const ev = this.evaluador(r.u);
+      const val = new Float64Array(8 * ns);
+      for (let j = 0; j < ns; j++) {
+        const k = m.laminas[j]!;
+        const g = this.regiones[this.regionDe[k]!]!;
+        const v = ev.enRegion(k, natural[2 * j]!, natural[2 * j + 1]!);
+        const [nx, ny, tx, ty, sg] = marco.subarray(5 * j, 5 * j + 5);
+        const Qn = v[6]! * nx! + v[7]! * ny!;
+        if (tramos[j >> 2]!.cruza) {
+          // Tracción en el triedro de la región: N·ν, Q·ν y M·ν; m = (M·ν) × e₃ = (Mν)_y·s₁ − (Mν)_x·s₂
+          const Nn = [v[0]! * nx! + v[2]! * ny!, v[2]! * nx! + v[1]! * ny!];
+          const Mn = [v[3]! * nx! + v[5]! * ny!, v[5]! * nx! + v[4]! * ny!];
+          const f = [0, 1, 2].map((c) => Nn[0]! * g.R[c]! + Nn[1]! * g.R[3 + c]! + Qn * g.R[6 + c]!);
+          const mm = [0, 1, 2].map((c) => Mn[1]! * g.R[c]! - Mn[0]! * g.R[3 + c]!);
+          agregar(6 * kc, m.puntos.subarray(3 * j, 3 * j + 3), f, mm, m.pesos[j]!);
+        }
+        // Valores en los ejes de franja: T' = B·T·Bᵀ con B = [ν; t] (M y Q, con σ)
+        const ten = (xx: number, yy: number, xy: number, s: number) => {
+          const b11 = nx! * xx + ny! * xy;
+          const b12 = nx! * xy + ny! * yy;
+          const b21 = tx! * xx + ty! * xy;
+          const b22 = tx! * xy + ty! * yy;
+          return [s * (b11 * nx! + b12 * ny!), s * (b21 * tx! + b22 * ty!), s * (b11 * tx! + b12 * ty!)];
+        };
+        val.set(ten(v[0]!, v[1]!, v[2]!, 1), 8 * j);
+        val.set(ten(v[3]!, v[4]!, v[5]!, sg!), 8 * j + 3);
+        val[8 * j + 6] = sg! * Qn;
+        val[8 * j + 7] = sg! * (v[6]! * tx! + v[7]! * ty!);
+      }
+      // Fuerza de borde de Kirchhoff en los extremos libres: ±Mxy·n
+      for (const e of extremos) {
+        const v = ev.enRegion(e.k, e.nat[0], e.nat[1]);
+        const fk = e.s * mxyFranja(v, e.marco);
+        agregar(6 * kc, e.P, e.n.map((c) => fk * c), [0, 0, 0], 1);
+      }
+      m.valores.push(val);
+      degradadas = Math.max(degradadas, ev.degradadas);
+    });
+    if (degradadas) {
+      const ids = [...new Set(tramos.map((t) => this.modelo.laminas![t.k]!.id))];
+      diag.aviso(
+        "corte/campos-degradados",
+        `El corte ${cp.corte.id ?? "(sin id)"} usa ${degradadas} nudos con campos degradados (una sola fila de láminas: no se puede ajustar un polinomio en dos direcciones; ${listaIds(ids)}). Su Q es aproximado.`,
+        [cp.corte.id ?? "(sin id)", ...ids],
+      );
+    }
+    return { suma, muestras: m };
   }
 
   // Acceso para el evaluador

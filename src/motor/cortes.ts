@@ -12,14 +12,16 @@
  * quedan del lado B, así que una carga nodal sobre ellos no entra.
  *
  * Qué entra:
- * - Láminas del lado A con el centroide dentro del rectángulo:
- *   · "fuerzas-nodales" (por defecto): la suma de sus fuerzas nodales g = k·u − f_eq en los nudos
- *     del corte. Es exacto: un corte que separa el modelo en dos cierra el equilibrio con las cargas
- *     y reacciones de un lado. Las láminas no pueden atravesar el plano: el corte tiene que seguir
- *     la malla (el compilador siembra las líneas de corte, H29).
- *   · "campos": la integral de los campos recuperados (SPR, campos.ts) a lo largo de la
- *     intersección del plano con cada lámina, recortada al rectángulo. Vale en cualquier posición;
- *     no es exacto.
+ * - Láminas que tocan el plano desde el lado A, con el centroide dentro del rectángulo: la suma de
+ *   sus fuerzas nodales g = k·u − f_eq en los nudos del corte. Es exacto: un corte que separa el
+ *   modelo en dos cierra el equilibrio con las cargas y reacciones de un lado.
+ * - Láminas que atraviesan el plano:
+ *   · "fuerzas-nodales" (por defecto): no puede haberlas (error): el corte tiene que seguir la malla
+ *     (el compilador siembra las líneas de corte, H29).
+ *   · "campos": la integral de los campos recuperados (SPR, campos.ts) a lo largo de su intersección
+ *     con el plano, recortada al rectángulo; si el tramo acaba en un borde libre, con la fuerza de
+ *     borde de Kirchhoff. Vale en cualquier posición; no es exacto. Donde el corte sigue la malla
+ *     sigue usando fuerzas nodales, así que un corte alineado da lo mismo por los dos métodos.
  * - Barras: si atraviesan el plano, su esfuerzo exacto en el punto de cruce (diagrama de E2, o la
  *   fuerza de su nudo del lado A si el cruce cae en un offset rígido); si sólo lo tocan en un nudo
  *   desde el lado A, su fuerza nodal en ese nudo.
@@ -58,13 +60,37 @@ export interface Corte {
   metodo?: MetodoCorte;
 }
 
+/**
+ * Puntos de integración del método «campos» a lo largo del corte (los de Gauss de cada tramo de
+ * lámina), con los campos recuperados en unos ejes de franja: x = la normal al corte en el plano de
+ * la lámina (hacia +x del corte), z = la normal de la lámina orientada hacia el z del corte (si es
+ * perpendicular, hacia su y), y = z × x. En una franja de losa son los ejes de la franja: Mx es el
+ * momento que la flecta, y Σ peso·Mx es su My. Sirven para aplicar Wood–Armer punto a punto antes
+ * de integrar (H25, H34).
+ */
+export interface MuestrasCorte {
+  /** Lámina de cada punto. */
+  laminas: Int32Array;
+  /** Puntos (globales): 3 por punto. */
+  puntos: Float64Array;
+  /** Coordenadas y, z en el corte: 2 por punto. */
+  yz: Float64Array;
+  /** Peso de integración (m): Σ peso·valor = ∫ valor a lo largo del corte. */
+  pesos: Float64Array;
+  /** Ejes de franja de cada punto por filas (x, y, z): 9 por punto. */
+  ejes: Float64Array;
+  /** Por caso: [Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy] en los ejes de franja, 8 por punto. */
+  valores: Float64Array[];
+}
+
 /** Contribución de las láminas por el método de campos (la da campos.ts). */
 export interface IntegradorCampos {
   /**
    * Fuerza y momento (respecto al origen del corte, globales) que el lado B ejerce sobre las láminas
-   * del lado A, por caso: 6 por caso. Añade a `info` las láminas que integra y la extensión.
+   * del lado A, por caso (6 por caso), y los puntos de integración. Añade a `info` las láminas que
+   * integra y la extensión, y a `diag` sus avisos.
    */
-  integrar(corte: CortePreparado, casos: readonly ResultadoCaso[], info: InfoCorte): Float64Array;
+  integrar(corte: CortePreparado, casos: readonly ResultadoCaso[], info: InfoCorte, diag: Diagnosticos): { suma: Float64Array; muestras: MuestrasCorte };
 }
 
 /** Corte con sus ejes y el lado de cada nudo, preparado para integrar. */
@@ -102,6 +128,8 @@ export interface ResultadoCorte extends InfoCorte {
   diagnosticos: Diagnostico[];
   /** Sin diagnósticos de error. Un corte no válido no trae esfuerzos (todo NaN). */
   valido: boolean;
+  /** Sólo con el método «campos»: los puntos de integración de las láminas. */
+  muestras?: MuestrasCorte;
 }
 
 const norma = (v: ArrayLike<number>) => Math.hypot(v[0]!, v[1]!, v[2]!);
@@ -210,6 +238,7 @@ export class Cortes {
     const X = (v: number) => xyz.subarray(3 * v, 3 * v + 3);
     const suma = new Suma(nc, O);
     const ext = { y: [Infinity, -Infinity] as [number, number], z: [Infinity, -Infinity] as [number, number] };
+    let muestras: MuestrasCorte | undefined;
     const extender = (p: ArrayLike<number>) => {
       const [, cy, cz] = cp.coordenadas(p);
       ext.y[0] = Math.min(ext.y[0], cy);
@@ -218,8 +247,9 @@ export class Cortes {
       ext.z[1] = Math.max(ext.z[1], cz);
     };
 
-    // Láminas
-    if (metodo === "fuerzas-nodales") {
+    // Láminas: las que tocan el plano desde el lado A, por sus fuerzas nodales (exacto, con los dos
+    // métodos); las que lo atraviesan, error por fuerzas nodales o integral de campos
+    {
       const atraviesan: string[] = [];
       const bordes: string[] = [];
       for (const e of this.fuerzas.elementos) {
@@ -234,7 +264,7 @@ export class Cortes {
         }
         if (menos === 0 || !cp.dentro(c)) continue;
         if (mas > 0) {
-          atraviesan.push(e.id);
+          if (metodo === "fuerzas-nodales") atraviesan.push(e.id);
           continue;
         }
         const enCorte = e.nudos.map((v, a) => [v, a] as const).filter(([v]) => lado[v] === 0);
@@ -261,12 +291,16 @@ export class Cortes {
           [id, ...bordes],
         );
       }
-    } else {
-      const c = campos!.integrar(cp, casos, info);
-      for (let q = 0; q < c.length; q++) suma.v[q]! += c[q]!;
+    }
+    if (metodo === "campos") {
+      const c = campos!.integrar(cp, casos, info, diag);
+      for (let q = 0; q < c.suma.length; q++) suma.v[q]! += c.suma[q]!;
+      muestras = c.muestras;
       if (info.extension) {
-        ext.y = [...info.extension.y];
-        ext.z = [...info.extension.z];
+        for (const q of [0, 1] as const) {
+          ext.y[q] = q ? Math.max(ext.y[1], info.extension.y[1]) : Math.min(ext.y[0], info.extension.y[0]);
+          ext.z[q] = q ? Math.max(ext.z[1], info.extension.z[1]) : Math.min(ext.z[0], info.extension.z[0]);
+        }
       }
     }
 
@@ -414,7 +448,7 @@ export class Cortes {
       for (let c = 0; c < 6; c++) if (nan[c]) esfuerzos[o + c] = NaN;
     }
     info.extension = Number.isFinite(ext.y[0]) ? ext : null;
-    return { ...info, esfuerzos, ejes, diagnosticos: diag.lista, valido: true };
+    return { ...info, esfuerzos, ejes, diagnosticos: diag.lista, valido: true, muestras };
   }
 
   /** Distancia con signo de un punto al plano del corte. */

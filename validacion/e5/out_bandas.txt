@@ -1,0 +1,48 @@
+# Criterio 4 de E5: bandas por el método «campos»
+
+## 1. Losa unidireccional de 6 × 2 m: estaciones fuera de la malla (x = 0,37 … 5,6 m)
+| malla | error de My (÷ qbL²/8) | error de Vz (÷ qbL/2) |
+|---|---|---|
+| 6 × 2 | 1.94e-1 | 3.87e-1 |
+| 12 × 4 | 1.33e-2 | 1.04e-1 |
+| 24 × 8 | 3.38e-3 | 1.37e-2 |
+
+## 2. Placas de Navier (6 × 4 m): ∫Mx dy y ∫Qx dy a lo ancho de la placa
+
+isótropa delgada (a/t = 100)
+| h | ∫Mx dy en x = 3 (línea de malla) | ∫Mx dy en x = 1,3 | ∫Qx dy en x = 1,3 |
+|---|---|---|---|
+| 0.5 | -1.33 % | -5.38 % | +1.53 % |
+| 0.25 | -0.29 % | -1.30 % | -0.25 % |
+| 0.125 | -0.04 % | -0.36 % | -0.03 % |
+
+isótropa gruesa (a/t = 15)
+| h | ∫Mx dy en x = 3 (línea de malla) | ∫Mx dy en x = 1,3 | ∫Qx dy en x = 1,3 |
+|---|---|---|---|
+| 0.5 | -0.29 % | -5.68 % | +1.82 % |
+| 0.25 | +0.02 % | -1.39 % | -0.17 % |
+| 0.125 | +0.01 % | -0.38 % | -0.01 % |
+
+ortótropa (reticular, a/t = 20)
+| h | ∫Mx dy en x = 3 (línea de malla) | ∫Mx dy en x = 1,3 | ∫Qx dy en x = 1,3 |
+|---|---|---|---|
+| 0.5 | -0.76 % | -5.39 % | -3.09 % |
+| 0.25 | -0.17 % | -1.30 % | -1.28 % |
+| 0.125 | -0.04 % | -0.35 % | -0.28 % |
+
+## 3. Losa plana de H25 con huella de 0,6 × 0,6 m (q = 10 kN/m²): banda de pilar (3 m) y pórtico virtual (6 m)
+| h | método | My banda, cara | My pórtico, cara | Vz banda, cara | Vz pórtico, cara | My banda, vano | My pórtico, vano |
+|---|---|---|---|---|---|---|---|
+| 0.3 | fuerzas nodales | -205.28 | -262.59 | -262.04 | -265.76 | 76.65 | 138.94 |
+| 0.3 | campos | -205.28 | -262.59 | -262.04 | -265.76 | 76.65 | 138.94 |
+| 0.15 | fuerzas nodales | -205.50 | -262.74 | -254.97 | -264.07 | 76.78 | 138.90 |
+| 0.15 | campos | -205.50 | -262.74 | -254.97 | -264.07 | 76.78 | 138.90 |
+| 0.075 | fuerzas nodales | -205.58 | -262.71 | -251.51 | -263.21 | 76.98 | 139.00 |
+| 0.075 | campos | -205.58 | -262.71 | -251.51 | -263.21 | 76.98 | 139.00 |
+
+Banda de pilar en la cara, con las muestras del corte (kN·m): −My exacto (fuerzas nodales), −∫Mx dy de las muestras, y Wood–Armer de la cara superior en x integrado punto a punto y sobre los momentos medios de la banda (× su ancho)
+| h | −My | −∫Mx dy (muestras) | ∫ WA punto a punto | WA de la media × ancho |
+|---|---|---|---|---|
+| 0.3 | 205.28 | 162.58 | 174.47 | 162.58 |
+| 0.15 | 205.50 | 180.52 | 205.51 | 180.52 |
+| 0.075 | 205.58 | 191.95 | 223.51 | 191.95 |

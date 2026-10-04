@@ -171,9 +171,9 @@ export function errorEquilibrioCorte(modelo: ModeloAnalitico, corte: Corte, caso
  * (hay efecto de placa: el reparto según y no es uniforme). Carga uniforme q, una carga de línea
  * oblicua y una puntual con momento dentro de elementos. Malla nx × ny.
  */
-export function losaUnidireccional(nx: number, ny: number, L = 6, b = 2): { modelo: ModeloAnalitico; L: number; b: number; q: number } {
+export function losaUnidireccional(nx: number, ny: number, L = 6, b = 2, material = { E: 3e7, nu: 0.2, t: 0.25 }): { modelo: ModeloAnalitico; L: number; b: number; q: number } {
   const m = new Constructor();
-  const g = mallaRectangular(m, { a: L, b, nx, ny, material: { E: 3e7, nu: 0.2, t: 0.25 } });
+  const g = mallaRectangular(m, { a: L, b, nx, ny, material });
   for (let j = 0; j <= ny; j++) {
     m.apoyo(g.nudos[0]![j]!, [j === 0, true, true, false, false, false]);
     m.apoyo(g.nudos[nx]![j]!, [false, j === 0, true, false, false, false]);
