@@ -15,9 +15,9 @@
  *    partes en todas las plantas. Los lados de los ejes ya quedan sembrados para la malla de C2.
  * 3. `planMuros`: los paños, las filas de cada grupo de paños de una planta que se tocan (cotas de
  *    las plantas, bordes de huecos y cambios de ley de los empujes, unidas a ≤ ε_snap, y cada
- *    intervalo dividido a ≤ min(h, H/12), con H la altura de la planta: H10 pide 8 elementos por vano
- *    en flexión de placa y 16 junto a un empotramiento), los huecos y los empujes unidos, y dónde hay
- *    muro junto a la cota de
+ *    intervalo dividido a ≤ min(h, máx(H/12, h/4)), con H la altura de la planta: H10 pide 8 elementos
+ *    por vano en flexión de placa y 16 junto a un empotramiento, y h/4 limita la relación de aspecto),
+ *    los huecos y los empujes unidos, y dónde hay muro junto a la cota de
  *    cada planta (los nudos de la cota sólo se crean donde hacen falta).
  * 4. `mallarMuros`: la rejilla de cada paño (columnas en las estaciones y en los puntos medios de sus
  *    lados, que son los de la división en 3 cuadriláteros de las losas), sin los elementos de los
@@ -545,9 +545,11 @@ export function planMuros(ctx: Contexto, plantas: ReadonlyMap<number, PlantaMuro
     return unido.get(`${pa.grupo}:${z}`) ?? z;
   };
   // Filas de ≤ min(h, H/12), con H la altura de la planta: la flexión de placa del muro (empujes,
-  // momentos de las losas) pide 8 elementos por vano, y 16 junto a un empotramiento (H10)
+  // momentos de las losas) pide 8 elementos por vano, y 16 junto a un empotramiento (H10). Pero no
+  // más finas que h/4: en una planta baja (un sótano de 1,5 m), los elementos serían más de 4 veces
+  // más anchos que altos
   const filas = niveles.map((nv) => {
-    const paso = Math.min(h, (nv[nv.length - 1]! - nv[0]!) / FILAS_POR_PLANTA);
+    const paso = Math.min(h, Math.max((nv[nv.length - 1]! - nv[0]!) / FILAS_POR_PLANTA, h / 4));
     const f: number[] = [nv[0]!];
     for (let j = 0; j + 1 < nv.length; j++) {
       const d = nv[j + 1]! - nv[j]!;
@@ -625,8 +627,8 @@ export interface MallaMuros {
 }
 
 /**
- * Filas por planta, como mínimo (C3-a): con 8, el muro de sótano en flexión cilíndrica queda a +1,3 %;
- * con 12, a +0,6 % (`validacion/c3/out_oraculos.txt`).
+ * Filas por planta (C3-a), mientras no sean más finas que h/4: con 8, el muro de sótano en flexión
+ * cilíndrica queda a +1,3 %; con 12, a +0,6 % (`validacion/c3/out_oraculos.txt`).
  */
 export const FILAS_POR_PLANTA = 12;
 
@@ -696,7 +698,7 @@ export function mallarMuros(
         const centro: Vec2 = [(X[0]!.x + X[1]!.x) / 2, (X[0]!.y + X[1]!.y) / 2];
         if (![...huellas(pa.k), ...huellas(pa.k + 1)].some((p) => puntoEnPoligono(centro, p))) {
           aspectoMax = Math.max(aspectoMax, asp);
-          if (asp > ASPECTO_ALTO) {
+          if (asp > ASPECTO_ALTO + 1e-9) {
             altos++;
             peor.set(m.muro.id, Math.max(peor.get(m.muro.id) ?? 0, asp));
           }

@@ -24,6 +24,6 @@
 ## Viga en el plano de un muro (E0): embebida (E0) 6.430 mm, ASDShellQ4 6.451 mm, rígida 4.80 mm
 | h | barras auxiliares | punta (mm) | frente a E0 | frente a ASDShellQ4 | ÷ rígida |
 |---|---|---|---|---|---|
-| 0.75 | 2 | 6.418 | -0.18 % | -0.50 % | 1.337 |
+| 0.75 | 2 | 6.392 | -0.59 % | -0.92 % | 1.332 |
 | 0.375 | 2 | 6.418 | -0.18 % | -0.50 % | 1.337 |
 | 0.25 | 2 | 6.509 | 1.23 % | 0.90 % | 1.356 |

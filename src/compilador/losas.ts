@@ -312,13 +312,17 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       for (const { m, w } of murosK) {
         const b = m.material.t;
         if (!(b / 2 > epsSnap)) continue;
+        // Tramo a tramo, como las vigas: junto a una esquina del muro, el borde perpendicular de la
+        // losa entra t/2 en su espesor sin ser un error
         const p = puntosMuros[w]!;
         let largo = 0;
         for (let i = 0; i + 1 < p.length; i++) {
           const [A, B] = [p[i]!, p[i + 1]!];
           const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
           const u: Vec2 = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
-          for (const q of polis) for (let j = 0; j < q.length; j++) largo += dentroDelAncho(q[j]!, q[(j + 1) % q.length]!, A, u, L, b, epsSnap);
+          let tramo = 0;
+          for (const q of polis) for (let j = 0; j < q.length; j++) tramo += dentroDelAncho(q[j]!, q[(j + 1) % q.length]!, A, u, L, b, epsSnap);
+          largo = Math.max(largo, tramo);
         }
         if (largo > Math.max(2 * b, 4 * epsSnap))
           diag.error(
