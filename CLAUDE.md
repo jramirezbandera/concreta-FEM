@@ -127,8 +127,19 @@
     - D4: axil de pilares ×2 y torsión de vigas de hormigón ×0,1.
 
     El compilador pasa a la versión C1.1 y deja estas hipótesis en `hipotesis`.
+- **2026-10-05: fase C2 del compilador terminada** (losas). Pasan ocho de los nueve criterios; el 8 (tamaño frente a D9) queda a medias. El informe está en `docs/fem3d/fase-c2.md`, con criterios, hallazgos C2-1…C2-7, decisiones medidas y pendientes.
+  - **Ya en `src/compilador/`:**
+    - losas, apoyos lineales, bandas y cargas de superficie y lineales en el modelo físico (`fisico.ts`);
+    - arreglo plano por planta con las dos tolerancias (`arreglo.ts`) y mallador: siembra graduada, retícula por losa, CDT con delaunator + constrainautor y división en 3 cuadriláteros, con validador (`mallado.ts`);
+    - unión con pilares (huella rígida, C2-d), vigas embebidas (C2-e), diafragma sobre las losas (C2-f), peso propio desde `pp` y descuelgue de las vigas (C2-g) y cargas en losa (`losas.ts`, `cargas.ts`).
+  - **Regla del mallador:** la malla no depende del orden de las listas, de una traslación o un giro de la planta, de un ruido de ε_geom ni del motor de JavaScript. Los empates de Delaunay se deshacen con una perturbación simbólica ligada a los ejes de la losa (C2-3), y nudos y láminas se numeran por coordenadas cuantizadas.
+  - **Corregido en el motor (C2-2):** un corte mixto por «campos» contaba dos veces lo que pasa por los nudos de una malla no estructurada (+38 %). Ahora va entero por campos.
+  - **C2-1:** en las mallas de C2, el valor del centroide de una lámina converge sólo con orden 1. Para comprobar se usan los campos (SPR) y los cortes.
+  - **Validación:** `validacion/c2/` (Navier y losa plana de H25 como modelos físicos, resumen, banco, decisiones, huellas y referencia congelada).
+  - **Pendiente del usuario:** C2-a (con h = 0,75 el edificio objetivo tiene 79 649 nudos y 199 983 ecuaciones: ×1,6 los de D9), C2-c y C2-g (preguntas en `compilador.md`).
 - **Siguiente paso:**
+  - el usuario decide C2-a, C2-c y C2-g;
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
-  - compilador C2 (losas), con delaunator + constrainautor (ISC, admitida);
+  - compilador C3 (muros);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

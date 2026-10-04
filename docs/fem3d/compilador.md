@@ -4,7 +4,7 @@
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
 >
-> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 en curso desde el 2026-10-04 (alcance, decisiones y criterios abajo).
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 terminada el 2026-10-05 (`fase-c2.md`): pasan ocho de los nueve criterios y el 8 (tamaño frente a D9) queda a medias, pendiente de la decisión C2-a. Siguiente: C3 (muros).
 
 ## Entrada, salida y reglas
 
@@ -150,8 +150,11 @@
 8. **Rendimiento:** el edificio objetivo con losa maciza (7 plantas, 80 pilares) compila en una fracción del cálculo y, con el h por defecto, cabe en D9.
 9. **Referencia congelada** del modelo analítico y de sus resultados.
 
-## Preguntas para el usuario (no bloquean C1)
+## Preguntas para el usuario (no bloquean C3)
 
 - **Licencia ISC:** admitida por el usuario el 2026-10-04 (regla 6 de `CLAUDE.md`). El mallador de C2 usará delaunator y constrainautor (H29).
 - **Licencia Unlicense:** admitida por el usuario el 2026-10-04 sólo para robust-predicates 3.0.3 (los predicados exactos de Shewchuk), que delaunator y constrainautor importan directamente.
 - **C1-a, C1-c, C1-d y D4:** decididas por el usuario el 2026-10-04 con las medidas de `validacion/c1/out_decisiones.txt`: factor de zona rígida 0,5, D4 (b) por material, y C1-c y C1-d como estaban.
+- **C2-a, tamaño de malla** (`validacion/c2/out_decisiones.txt`, `out_banco.txt`): con h = 0,75, el edificio objetivo tiene 79 649 nudos y 199 983 ecuaciones (×1,6 los nudos de D9, justo en el perfil móvil); con h = 1, 61 365 y 145 089, pero la cara de una banda pierde un 4,5 %. ¿Mantener 0,75, pasar a 1, o 0,75 con la rejilla alineada de H52 en las zonas regulares?
+- **C2-c:** ¿un borde de losa dentro del ancho de una viga es un error (por defecto) o un aviso?
+- **C2-g:** ¿se confirma que una viga rectangular de hormigón bajo losa pesa sólo su descuelgue ((b/2)·min(h, t) menos por cada lado cubierto)? Evita contar dos veces el 8,6 % del caso G.
