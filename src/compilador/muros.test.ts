@@ -76,7 +76,7 @@ describe("rejilla de un muro (C3-a)", () => {
       expect(a[2]! * b[0]! - a[0]! * b[2]!).toBeLessThan(0);
     }
     // Base empotrada: los 13 nudos de su base
-    expect(r.modelo.apoyos.filter((a) => r.modelo.nudos[a.nudo]!.z === -3)).toHaveLength(13);
+    expect(r.modelo.apoyos!.filter((a) => r.modelo.nudos[a.nudo]!.z === -3)).toHaveLength(13);
   });
 
   it("al menos 8 elementos por tramo recto (H17), aunque el muro sea corto", () => {
@@ -178,7 +178,7 @@ describe("huecos y bases (C3-f)", () => {
     expect(area).toBeCloseTo(6 * 6 - 2.1 - 1.5, 10);
     // La puerta llega a la base: sus nudos de la base no existen o no tienen apoyo sin lámina
     const usados = new Set(r.modelo.laminas!.flatMap((l) => [...l.nudos]));
-    for (const a of r.modelo.apoyos) expect(usados.has(a.nudo)).toBe(true);
+    for (const a of r.modelo.apoyos!) expect(usados.has(a.nudo)).toBe(true);
   });
 
   it("un hueco de doble altura que cruza la planta: no deja nudos sueltos en la cota", () => {
@@ -190,7 +190,7 @@ describe("huecos y bases (C3-f)", () => {
 
   it("base articulada: coarta los desplazamientos de sus nudos y deja los giros", () => {
     const r = valido(compilar(modelo({ muros: [muro("M", [[0, 0], [6, 0]], "C", "P1", { base: "articulado" })] }), { tamanoMalla: 0.5 }));
-    const base = r.modelo.apoyos.filter((a) => r.modelo.nudos[a.nudo]!.z === -3);
+    const base = r.modelo.apoyos!.filter((a) => r.modelo.nudos[a.nudo]!.z === -3);
     expect(base).toHaveLength(13);
     for (const a of base) expect(a.coartados).toEqual([true, true, true, false, false, false]);
   });
@@ -251,7 +251,7 @@ describe("cargas (C3-g, C3-h)", () => {
     const r = valido(compilar(f, { tamanoMalla: 0.5 }));
     const [G] = resolver(r.modelo);
     let Fz = 0;
-    for (const a of r.modelo.apoyos) Fz += G!.reacciones[6 * a.nudo + 2]!;
+    for (const a of r.modelo.apoyos!) Fz += G!.reacciones[6 * a.nudo + 2]!;
     // Solape: un lado cubierto en 4 m, con muro debajo y encima: 2 · γ·(t/2)·(e/2)
     const esperado = g * t * (6 * 6 - 2) - 2 * g * (t / 2) * (e / 2) * 4;
     expect(Fz / esperado - 1).toBeLessThan(1e-9);
@@ -265,7 +265,7 @@ describe("cargas (C3-g, C3-h)", () => {
     const [, Q] = resolver(r.modelo);
     let Fy = 0;
     let Mx = 0;
-    for (const a of r.modelo.apoyos) {
+    for (const a of r.modelo.apoyos!) {
       Fy += Q!.reacciones[6 * a.nudo + 1]!;
       Mx += Q!.reacciones[6 * a.nudo + 3]! + (r.modelo.nudos[a.nudo]!.y * Q!.reacciones[6 * a.nudo + 2]! - r.modelo.nudos[a.nudo]!.z * Q!.reacciones[6 * a.nudo + 1]!);
     }
