@@ -253,7 +253,6 @@ describe("criterio 2 de C1: modelos físicos frente a su modelo analítico hecho
       [
         uniformeANudo(col.K1!, [0, 0, 0], [0, 0, 0], [0.15, 0, 0], g(-5)),
         uniformeANudo(col.K2!, [8, 0, 0], [7.85, 0, 0], [8, 0, 0], g(-5)),
-        puntualANudo(X, [6, 3, 0], [6.02, 3.01, 0], [0, 0, -7]),
       ],
       [],
       [
@@ -265,6 +264,8 @@ describe("criterio 2 de C1: modelos físicos frente a su modelo analítico hecho
         dl(v7a, g(-4), 0, 2),
         dl(v7b, g(-4), 0, 2),
         { tipo: "puntual", barra: v7b, ejes: "global", x: 1.5, F: [0, 0, -10] },
+        // La que cae a 1 cm del eje de V5 y a 2 cm del cruce va a V5 (la viga, antes que el nudo): x = 0,02 desde X
+        { tipo: "puntual", barra: v5c, ejes: "global", x: 0.02, F: [0, 0, -7], M: [-0.07, 0, 0] },
       ],
     );
     const { codigos } = comprobar(f, m.modelo());

@@ -61,7 +61,10 @@ export interface TramoViga {
   cadena: { nudo: number; sigma: number }[];
 }
 
-/** Dónde cae un punto de una planta. */
+/**
+ * Dónde cae un punto de una planta: en la huella de un pilar (su nudo); si no, sobre una viga a
+ * ≤ ε_snap (exacto); si no, en un nudo a ≤ ε_snap.
+ */
 export type Destino = { tipo: "nudo"; nudo: number } | { tipo: "tramo"; tramo: TramoViga; sigma: number };
 
 export interface Topologia {
@@ -445,20 +448,21 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
       if (d < dp) [mejorPilar, dp] = [pp, d];
     }
     if (mejorPilar) return { tipo: "nudo", nudo: mejorPilar.nudo };
-    let n = -1;
-    let dn = Infinity;
-    for (const m of pk.gNudos.buscar(Q[0] - epsSnap, Q[1] - epsSnap, Q[0] + epsSnap, Q[1] + epsSnap)) {
-      const d = dist(Q, P(m));
-      if (d <= epsSnap && d < dn) [n, dn] = [m, d];
-    }
-    if (n >= 0) return { tipo: "nudo", nudo: n };
+    // Sobre una viga antes que en un nudo cercano: así la carga queda donde está (exacta)
     let mejor: { tv: TramoViga; sigma: number; d: number } | null = null;
     for (const i of pk.gTramos.buscar(Q[0] - epsSnap, Q[1] - epsSnap, Q[0] + epsSnap, Q[1] + epsSnap)) {
       const tv = pk.tramos[i]!;
       const { sigma, d } = proyectar(Q, tv.t);
       if (d <= epsSnap && sigma >= 0 && sigma <= tv.t.len && (!mejor || d < mejor.d)) mejor = { tv, sigma, d };
     }
-    return mejor ? { tipo: "tramo", tramo: mejor.tv, sigma: mejor.sigma } : null;
+    if (mejor) return { tipo: "tramo", tramo: mejor.tv, sigma: mejor.sigma };
+    let n = -1;
+    let dn = Infinity;
+    for (const m of pk.gNudos.buscar(Q[0] - epsSnap, Q[1] - epsSnap, Q[0] + epsSnap, Q[1] + epsSnap)) {
+      const d = dist(Q, P(m));
+      if (d <= epsSnap && d < dn) [n, dn] = [m, d];
+    }
+    return n >= 0 ? { tipo: "nudo", nudo: n } : null;
   };
 
   return { nudos, nudoPilar, tramosDe, tramos, apoyoEn, vigasEn, localizar };

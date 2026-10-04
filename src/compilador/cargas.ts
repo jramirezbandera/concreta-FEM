@@ -5,8 +5,9 @@
  *   (`piezas.ts`): en un tramo flexible es una carga de barra exacta (no se trocea la barra, COM-13);
  *   en una zona rígida o fuera de la cadena va al nudo como fuerza y momento estáticamente
  *   equivalentes (E2: el motor sólo carga el tramo flexible).
- * - Una carga puntual va al nudo (pilar o nudo a ≤ ε_snap) o a la viga sobre la que cae, con el
- *   momento de transporte de la distancia entre el punto y el eje: es exacta.
+ * - Una carga puntual va al nudo del pilar en cuya huella cae, a la viga sobre la que cae (a
+ *   ≤ ε_snap de su eje) o, si no, al nudo a ≤ ε_snap, con el momento de transporte de la distancia
+ *   entre el punto y el eje o el nudo.
  * - Todo va en ejes globales; las cargas "local" se giran aquí con los ejes de cada tramo.
  * - Sin pérdidas (regla 3 del plan): la resultante física de cada caso (F y M respecto al centro
  *   del modelo, calculada sobre la pieza entera) tiene que coincidir con la analítica (leída del
