@@ -1,0 +1,24 @@
+# validacion/c2/decisiones.ts — 2026-10-05: edificio objetivo con losas, 3 plantas
+
+## C2-a: tamaño de malla (frente a h = 0,5)
+| variante | nudos | ecuaciones | cálculo | deriva arriba (Vx) | flecha del vano (G + Q) | My banda en la cara (G + Q), kN·m |
+|---|---|---|---|---|---|---|
+| h = 0,5 | 55075 | 148389 | 4.9 s | 0.099 mm | -0.438 mm | -86.4 |
+| h = 0,75 (por defecto) | 34231 | 85857 | 2.9 s | 0.099 mm (+0.0 %) | -0.439 mm (+0.3 %) | -87.0 (+0.7 %) |
+| h = 1 | 26415 | 62391 | 2.2 s | 0.099 mm (+0.0 %) | -0.445 mm (+1.5 %) | -82.5 (-4.5 %) |
+
+## C2-f: diafragma (frente al rígido)
+| variante | nudos | ecuaciones | cálculo | deriva arriba (Vx) | flecha del vano (G + Q) | My banda en la cara (G + Q), kN·m |
+|---|---|---|---|---|---|---|
+| rígido (por defecto) | 34231 | 85857 | 2.9 s | 0.099 mm | -0.439 mm | -87.0 |
+| semirrígido (membrana de las losas) | 34228 | 171696 | 4.9 s | 0.099 mm (+0.1 %) | -0.439 mm (+0.0 %) | -87.1 (+0.0 %) |
+
+## C1-a con losas: factor de zona rígida (frente a 0,5)
+| variante | nudos | ecuaciones | cálculo | deriva arriba (Vx) | flecha del vano (G + Q) | My banda en la cara (G + Q), kN·m |
+|---|---|---|---|---|---|---|
+| 0 | 34231 | 85857 | 2.8 s | 0.123 mm (+23.7 %) | -0.485 mm (+10.5 %) | -88.1 (+1.2 %) |
+| 0,5 (por defecto) | 34231 | 85857 | 2.9 s | 0.099 mm | -0.439 mm | -87.0 |
+| 1 | 34231 | 85857 | 2.8 s | 0.079 mm (-20.3 %) | -0.392 mm (-10.7 %) | -86.0 (-1.2 %) |
+
+## C2-g: solape del peso de las vigas con la losa
+Caso G (peso propio y permanentes): 56903 kN. Con las vigas enteras (sin descontar lo que solapa con la losa) serían 62258 kN: se quitan 5355 kN, el 8.6 % del caso G, que de otro modo se contaría dos veces (en la carga y en la masa sísmica).

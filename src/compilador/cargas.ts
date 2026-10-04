@@ -9,9 +9,14 @@
  *   ≤ ε_snap de su eje) o, si no, al nudo a ≤ ε_snap, con el momento de transporte de la distancia
  *   entre el punto y el eje o el nudo.
  * - Todo va en ejes globales; las cargas "local" se giran aquí con los ejes de cada tramo.
+ * - Losas (C2): el peso propio sale de su pp, como carga de superficie de cada lámina, y una viga
+ *   rectangular de hormigón bajo losa pesa sólo su descuelgue (C2-g). Las cargas de superficie van
+ *   por lámina entera (las zonas están sembradas en la malla), las lineales a los nudos de sus
+ *   aristas y las puntuales que caen en una losa a su vértice (C2-h).
  * - Sin pérdidas (regla 3 del plan): la resultante física de cada caso (F y M respecto al centro
  *   del modelo, calculada sobre la pieza entera) tiene que coincidir con la analítica (leída del
- *   modelo analítico ya montado, con sus offsets) a 1e-9.
+ *   modelo analítico ya montado, con sus offsets) a 1e-9. La de las losas se calcula sin la malla,
+ *   con sus polígonos ya unidos (`poligonos.ts`): así comprueba también el mallado.
  */
 import type { CargaBarra, ModeloAnalitico, Vec3 } from "../motor/modelo.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";

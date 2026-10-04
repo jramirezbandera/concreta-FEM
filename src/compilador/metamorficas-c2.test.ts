@@ -11,11 +11,11 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { calcular } from "../motor/calcular.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
-import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "../motor/modelo.ts";
+import type { ModeloAnalitico } from "../motor/modelo.ts";
 import { casosValidos } from "../pruebas/comparar.ts";
 import { azar, fisicoAleatorio } from "../pruebas/fisicoAleatorio.ts";
 import { conLosasAleatorias } from "../pruebas/losasAleatorias.ts";
-import { barajar, planos, transformar, valido, type Plano } from "../pruebas/metamorficasFisicas.ts";
+import { barajar, emparejarTodos, errorU, planos, relacionPlanoC2, valido } from "../pruebas/metamorficasFisicas.ts";
 import { compilar } from "./compilar.ts";
 import type { ModeloFisico, Vec2 } from "./fisico.ts";
 
@@ -26,59 +26,6 @@ const resolver = (m: ModeloAnalitico) => casosValidos(calcular(m));
 beforeAll(async () => {
   await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
 });
-
-/** Empareja todos los nudos (salvo los maestros de diafragma) por posición transformada. */
-function emparejarTodos(a: ModeloAnalitico, b: ModeloAnalitico, p: (q: Vec2) => Vec2, tol: number): Map<number, number> {
-  const clave = (x: number, y: number, z: number) => `${Math.round(x / tol)},${Math.round(y / tol)},${Math.round(z / tol)}`;
-  const idx = new Map<string, number[]>();
-  b.nudos.forEach((n, j) => {
-    for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) {
-      const k = clave(n.x + dx * tol, n.y + dy * tol, n.z);
-      let l = idx.get(k);
-      if (!l) idx.set(k, (l = []));
-      l.push(j);
-    }
-  });
-  const r = new Map<number, number>();
-  a.nudos.forEach((n, i) => {
-    if (n.id.endsWith(":maestro")) return;
-    const [x, y] = p([n.x, n.y]);
-    const j = (idx.get(clave(x, y, n.z)) ?? []).find((k) => Math.abs(b.nudos[k]!.x - x) < tol && Math.abs(b.nudos[k]!.y - y) < tol);
-    if (j === undefined) throw new Error(`el nudo ${n.id} no tiene pareja`);
-    r.set(i, j);
-  });
-  return r;
-}
-
-/** Peor error relativo de v(u_A) frente a u_B, por grupos de 3 (traslaciones y giros). */
-function errorU(ra: ResultadoCaso[], rb: ResultadoCaso[], pares: Map<number, number>, v: (q: readonly number[]) => Vec3, campo: "u" | "reacciones"): number {
-  let peor = 0;
-  ra.forEach((ca, c) => {
-    for (const g of [0, 3]) {
-      let dif = 0;
-      let ref = 0;
-      for (const [i, j] of pares) {
-        const t = v(Array.from(ca[campo].subarray(6 * i + g, 6 * i + g + 3)));
-        for (let k = 0; k < 3; k++) {
-          dif = Math.max(dif, Math.abs(t[k]! - rb[c]![campo][6 * j + g + k]!));
-          ref = Math.max(ref, Math.abs(rb[c]![campo][6 * j + g + k]!));
-        }
-      }
-      peor = Math.max(peor, ref > 0 ? dif / ref : dif);
-    }
-  });
-  return peor;
-}
-
-function relacionPlanoC2(f: ModeloFisico, t: Plano): { mismaMalla: boolean; u: number; reacciones: number } {
-  const a = valido(compilar(f));
-  const b = valido(compilar(transformar(f, t)));
-  const mismaMalla = a.modelo.nudos.length === b.modelo.nudos.length && a.modelo.laminas!.length === b.modelo.laminas!.length;
-  if (!mismaMalla) return { mismaMalla, u: NaN, reacciones: NaN };
-  const pares = emparejarTodos(a.modelo, b.modelo, t.p, 1e-6);
-  const [ra, rb] = [resolver(a.modelo), resolver(b.modelo)];
-  return { mismaMalla, u: errorU(ra, rb, pares, t.v, "u"), reacciones: errorU(ra, rb, pares, t.v, "reacciones") };
-}
 
 describe("criterio 4 de C2: metamórficas con losas", () => {
   it("reordenar todas las listas da el mismo modelo analítico, mapeo y diagnósticos, bit a bit", () => {

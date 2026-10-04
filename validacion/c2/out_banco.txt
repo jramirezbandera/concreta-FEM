@@ -1,0 +1,8 @@
+Edificio objetivo con losas: 80 pilares, 7 plantas, 567 vigas, 7 losas, 46 cargas; h = por defecto
+Compilación: 79649 nudos, 15169 barras, 77217 láminas, 7 diafragmas, 560 huellas; jacobiano mínimo 0.252 (0 bajo el umbral)
+  diagnósticos: 0 ()
+  mediana de 3: 2740 ms (mín 2518, máx 2971); huellas distintas: 1
+  por paso (última): validacion 2, topologia 19, losas 2377, piezas 18, numeracion 322, cargas 74, sinPerdidas 116, mapeo 8 ms
+  sin pérdidas: fuerzas 1.2e-13, momentos 4.9e-15
+Cálculo con el núcleo: 8201 ms, 199983 ecuaciones (477894 GDL), equilibrio ≤ 5.0e-13
+Compilación / cálculo: 33 %

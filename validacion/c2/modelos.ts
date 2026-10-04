@@ -13,6 +13,8 @@ import { edificioObjetivo } from "../c1/banco.ts";
 export function edificioObjetivoLosas(plantas = 7, nx = 9, ny = 7): ModeloFisico {
   const f = edificioObjetivo(plantas, nx, ny);
   const [X, Y] = [6 * nx, 5 * ny];
+  // Hueco de la escalera en el vano (4, 3), o en el último si el edificio es más pequeño
+  const [bx, by] = [6 * Math.min(4, nx - 1), 5 * Math.min(3, ny - 1)];
   const ids = Array.from({ length: plantas }, (_, k) => `N${k + 1}`);
   // Sin las cargas lineales de las vigas de C1: las cargas van ahora a la losa
   const cargas: CargaFisica[] = f.cargas!.filter((c) => c.tipo === "pilar");
@@ -26,9 +28,9 @@ export function edificioObjetivoLosas(plantas = 7, nx = 9, ny = 7): ModeloFisico
       planta: p,
       zona: [
         [6.8, 2.6],
-        [17.2, 2.6],
-        [17.2, 12.4],
-        [6.8, 12.4],
+        [Math.min(17.2, X - 0.8), 2.6],
+        [Math.min(17.2, X - 0.8), Math.min(12.4, Y - 0.6)],
+        [6.8, Math.min(12.4, Y - 0.6)],
       ],
       q: [0, 0, -3],
     });
@@ -37,10 +39,11 @@ export function edificioObjetivoLosas(plantas = 7, nx = 9, ny = 7): ModeloFisico
       id: `T-${p}`,
       caso: "G",
       planta: p,
+      // En un edificio pequeño, en la primera fila de vanos (lejos del hueco)
       puntos: [
-        [1.5, 7.5],
-        [22.5, 7.5],
-        [22.5, 21.5],
+        [1.5, ny >= 4 ? 7.5 : 2.5],
+        [Math.min(22.5, X - 1.5), ny >= 4 ? 7.5 : 2.5],
+        [Math.min(22.5, X - 1.5), ny >= 4 ? Math.min(21.5, Y - 1.5) : 4.5],
       ],
       q: [0, 0, -7],
     });
@@ -58,10 +61,10 @@ export function edificioObjetivoLosas(plantas = 7, nx = 9, ny = 7): ModeloFisico
       ],
       huecos: [
         [
-          [24.6, 15.4],
-          [29.4, 15.4],
-          [29.4, 19.6],
-          [24.6, 19.6],
+          [bx + 0.6, by + 0.4],
+          [bx + 5.4, by + 0.4],
+          [bx + 5.4, by + 4.6],
+          [bx + 0.6, by + 4.6],
         ],
       ],
       espesor: 0.25,

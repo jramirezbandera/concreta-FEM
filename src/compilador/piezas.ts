@@ -5,7 +5,10 @@
  * por él tiene su tramo flexible sobre su propia recta, desde la proyección del eje del pilar más
  * `factorZonaRigida` veces lo que su recta recorre dentro de la huella; el offset (del nudo al
  * extremo del tramo flexible) lleva a la vez la zona rígida y la excentricidad. El tramo de un
- * pilar es rígido en su cabeza a lo largo del canto de la viga más alta que le llega.
+ * pilar es rígido en su cabeza a lo largo del canto de la viga más alta (o de la losa) que le llega.
+ *
+ * Con losas (C2): los apoyos lineales y los puntuales que caen en una losa van a sus nudos de la
+ * malla, y el diafragma rígido de una planta con losas abarca los nudos sobre ellas (C2-f).
  *
  * Cada pieza se describe además como una o varias «rectas» (el eje analítico, P(σ) = O + σ·e)
  * partidas en trozos: tramos flexibles de barras y zonas rígidas o tramos fuera de la cadena, que

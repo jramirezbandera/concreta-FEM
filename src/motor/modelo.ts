@@ -275,9 +275,11 @@ export interface ResultadoCaso {
   /**
    * Resultantes de cada lámina (en el orden de `laminas`) en su centroide, 8 por lámina:
    * [Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy] en los ejes de la lámina y con el convenio de la cabecera.
-   * El valor del centroide es la media de los 4 puntos de Gauss (como PyNite), que converge con
-   * orden 2 en su punto (H10): es el dato bruto para comprobar. Los valores en los puntos de Gauss
-   * y en los nudos los da `ResultantesLaminas`.
+   * El valor del centroide es la media de los 4 puntos de Gauss (como PyNite). En paralelogramos
+   * converge con orden 2 en su punto (H10); en cuadriláteros distorsionados, como los de la malla
+   * de C2 (triángulos divididos en 3), sólo con orden 1 (C2-1): es un dato bruto, y para comprobar
+   * van los campos recuperados (`CamposLaminas`, orden 2 en las dos mallas) y los cortes. Los
+   * valores en los puntos de Gauss y en los nudos los da `ResultantesLaminas`.
    */
   esfuerzosLaminas: Float64Array;
   /**
