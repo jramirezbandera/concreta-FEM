@@ -1,8 +1,8 @@
 Edificio objetivo con losas y muros: 80 pilares, 7 plantas, 567 vigas, 7 losas, 2 muros, 47 cargas; h = por defecto
 Compilación: 88683 nudos, 15197 barras (0 auxiliares), 86557 láminas (9088 de muros), 7 diafragmas, 560 huellas; jacobiano mínimo 0.240 (0 bajo el umbral); aspecto de los muros ≤ 5.27 (54 por encima de 4)
   diagnósticos: 1 (muro/aspecto)
-  mediana de 3: 2482 ms (mín 2405, máx 2482); huellas distintas: 1
-  por paso (última): validacion 1, topologia 11, losas 1699, piezas 13, numeracion 205, cargas 98, sinPerdidas 428, mapeo 8 ms
+  mediana de 3: 2509 ms (mín 2465, máx 2550); huellas distintas: 1
+  por paso (última): validacion 1, topologia 10, losas 1710, piezas 14, numeracion 227, cargas 91, sinPerdidas 420, mapeo 15 ms
   sin pérdidas: fuerzas 1.9e-13, momentos 4.9e-15
-Cálculo con el núcleo: 7162 ms, 249741 ecuaciones (532098 GDL), equilibrio ≤ 1.9e-13
-Compilación / cálculo: 35 %
+Cálculo con el núcleo: 7309 ms, 249417 ecuaciones (532098 GDL), equilibrio ≤ 1.5e-13
+Compilación / cálculo: 34 %

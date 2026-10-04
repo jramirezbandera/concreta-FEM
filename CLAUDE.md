@@ -138,10 +138,20 @@
   - **Validación:** `validacion/c2/` (Navier y losa plana de H25 como modelos físicos, resumen, banco, decisiones, huellas y referencia congelada).
   - **Pendiente del usuario:** C2-a (con h = 0,75 el edificio objetivo tiene 79 649 nudos y 199 983 ecuaciones: ×1,6 los de D9), C2-c y C2-g (preguntas en `compilador.md`).
 - **2026-10-05: C2-a, C2-c y C2-g decididas** (`compilador.md`, «Decisiones del usuario»): h = 0,75 con la rejilla alineada de H52 en las zonas regulares (por hacer; hasta entonces el criterio 8 de C2 sigue a medias), el borde de losa dentro de una viga es error y la viga bajo losa pesa sólo su descuelgue.
-- **2026-10-05: fase C3 del compilador (muros) en curso.** Alcance, decisiones C3-a…C3-i y criterios en `compilador.md`.
+- **2026-10-05: fase C3 del compilador superada** (muros). Pasan los nueve criterios. El informe está en `docs/fem3d/fase-c3.md`, con criterios, hallazgos C3-1…C3-8, decisiones medidas y pendientes.
+  - **Ya en `src/compilador/`:**
+    - muros en el modelo físico (eje en polilínea, plantas de base y cabeza, espesor, base y huecos en alzado) y la carga `empuje` (`fisico.ts`);
+    - `muros.ts`: vértices ajustados igual en todas las plantas, estaciones comunes en dos pasadas y unificadas entre plantas, división graduada (≥ 8 elementos por tramo recto, H17), filas a ≤ min(h, máx(H/12, h/4)), rejilla sin los huecos y validador de su área;
+    - uniones: muro–muro por sus aristas, muro–losa nudo a nudo (los lados del eje ya sembrados en la malla de C2), pilares por su huella en la cota, vigas por el eje partidas, vigas en el plano con barras auxiliares (C3-e) y vigas perpendiculares con su huella en el muro (C3-i);
+    - peso con el solape de las losas (C3-g) y empujes con un valor por nudo (C3-h).
+  - **Regla de los muros:** las estaciones de un muro tienen las mismas coordenadas en todas sus plantas (nada se mueve: lo que falta se inserta), así que cada franja es un rectángulo vertical y la resultante física se calcula exacta por franjas.
+  - **Corregido en el compilador (C3-5):** la numeración canónica desempata por orden de creación tras las coordenadas cuantizadas; antes, dos nudos en el mismo sitio dependían de un ulp.
+  - **Validación:** `validacion/c3/` (ETABS 15 como modelo físico, cuatro oráculos analíticos, resumen, banco, decisiones, huellas y referencia congelada).
+  - **Pendiente del usuario:** confirmar C3-a (12 filas por planta), C3-d, C3-g y el cambio de C3-i a la huella de la viga (preguntas en `fase-c3.md`).
 - **Siguiente paso:**
-  - terminar C3 (muros);
-  - la rejilla alineada de H52 para las losas (C2-a);
+  - el usuario confirma las decisiones de C3;
+  - la rejilla alineada de H52 para las losas (C2-a): más urgente con los muros, que suben el edificio objetivo a 249 417 ecuaciones (C3-8);
+  - compilador C4 (forjados unidireccional y reticular);
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

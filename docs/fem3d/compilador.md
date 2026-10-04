@@ -4,7 +4,7 @@
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
 >
-> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 terminada el 2026-10-05 (`fase-c2.md`): pasan ocho de los nueve criterios y el 8 (tamaño frente a D9) queda a medias hasta que llegue la rejilla alineada de H52 (decisión C2-a). C3 (muros) en curso desde el 2026-10-05.
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 terminada el 2026-10-05 (`fase-c2.md`): pasan ocho de los nueve criterios y el 8 (tamaño frente a D9) queda a medias hasta que llegue la rejilla alineada de H52 (decisión C2-a). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). Siguiente: la rejilla alineada de H52 (C2-a) y C4 (forjados).
 
 ## Entrada, salida y reglas
 
@@ -170,30 +170,32 @@
 
 **Cómo malla C3** (H17, H29):
 1. **Estaciones del eje.** El arreglo plano de cada planta (el de C2) lleva también los ejes de los muros que la tocan, con prioridad tras las huellas. Los puntos del arreglo sobre el eje de un muro (cruces con vigas, losas, bandas y otros muros, pilares y cargas) son sus estaciones en esa planta.
-   - Un paño necesita las mismas estaciones en su cabeza y en su base, así que se unifican entre plantas, emparejadas a ε_snap, hasta que nada cambia.
+   - Los vértices de los muros se ajustan antes, igual en todas sus plantas (a otro vértice de muro, a un nudo de C1 sin huella o en T a otro muro), para que cada paño sea plano.
+   - Una primera pasada da las estaciones de cada planta; las de todas las plantas (y los bordes de los huecos) se agrupan a ≤ ε_snap y cada grupo se queda con un punto, que la segunda pasada pone fijo en todas las plantas de sus muros (C3-1).
+   - Un paño necesita las mismas estaciones en su cabeza y en su base, así que lo que aún falte en una planta se inserta con las mismas coordenadas, hasta que nada cambia.
    - Entre dos estaciones seguidas se reparte una división graduada (como la siembra de C2) de paso ≤ min(2h, L/4), con L el tramo recto de muro que la contiene: ≥ 8 elementos por tramo recto (H17).
    - En las losas, esos lados ya van sembrados: la malla de C2 no los vuelve a partir, y sus puntos medios (la división en 3 cuadriláteros) son también nudos del muro.
-2. **Rejilla por paño.** Columnas en las estaciones y sus puntos medios; filas en las cotas de las plantas, de los bordes de los huecos y de los cambios de ley de los empujes, cada intervalo dividido en partes iguales de ≤ h. Las filas de una planta se unifican entre los muros que se tocan (esquinas, T y cruces), para que su arista común sea conforme.
+2. **Rejilla por paño.** Columnas en las estaciones y sus puntos medios; filas en las cotas de las plantas, de los bordes de los huecos y de los cambios de ley de los empujes, cada intervalo dividido en partes iguales de ≤ min(h, máx(H/12, h/4)), con H la altura de la planta (C3-2). Las filas de una planta se unifican entre los muros que se tocan (esquinas, T y cruces), para que su arista común sea conforme.
 3. Se quitan los elementos que caen en un hueco. Las láminas tienen el eje 1 horizontal a lo largo del tramo y el 2 hacia +Z (la regla de CSI), y el 3 a la derecha del sentido del eje.
-4. **Validador** (H23, como el de C2): Σ áreas de cada paño = su alzado sin los huecos, a 1e-9; jacobiano > 0; cada arista de muro en la cota de una planta con losa al lado es también arista de la losa (conformidad); sin nudos sueltos. Aviso si un elemento es más de 4 veces más alto que ancho, o al revés.
+4. **Validador** (H23, como el de C2), en cada compilación: Σ áreas de cada muro = su alzado sin los huecos calculado por franjas, a 1e-9, y elementos no degenerados. La conformidad con las losas y la ausencia de nudos sueltos salen de la construcción (los nudos de la cota se crean sólo donde hay muro o losa) y las comprueban las pruebas. Aviso si un elemento es más de 4 veces más alto que ancho, o al revés, fuera de las huellas de los pilares.
 
 **Decisiones por defecto de C3.** Como en C1 y C2, cada una es una opción o una regla registrada en las hipótesis:
 
 | # | Decisión | Por defecto | Por qué | Alternativa |
 |---|---|---|---|---|
-| C3-a | Tamaño de la malla de los muros | El de las losas (`tamanoMalla`): columnas a ~h y filas a ≤ h, y ≥ 8 elementos por tramo recto | H17: con 8 elementos, −1,2 % en un muro en voladizo; con 1, −32 %. La cabeza tiene que coincidir con la malla de la losa | `tamanoMalla` |
+| C3-a | Tamaño de la malla de los muros | El de las losas (`tamanoMalla`): columnas a ~h, ≥ 8 elementos por tramo recto, y filas a ≤ min(h, máx(H/12, h/4)) | H17: con 8 elementos, −1,2 % en un muro en voladizo; con 1, −32 %. La cabeza tiene que coincidir con la malla de la losa. Con 8 filas por planta, un muro de sótano en flexión cilíndrica sale un 1,3 % flexible; con 12, un 0,6 %; h/4 evita filas muy finas en plantas bajas (C3-2) | `tamanoMalla` |
 | C3-b | Geometría de los muros | Sus vértices se unen a lo cercano a ≤ ε_snap con aviso, como las losas (C2-b). Un borde de losa dentro del espesor de un muro y fuera de su eje es un error, como C2-c | En una lámina no hay offsets. Los bordes van a ejes | Dibujar el borde sobre el eje |
 | C3-c | Encuentros | Muro–muro: la arista común (esquina, T o cruce) tiene los mismos nudos. Muro–losa: nudos comunes a lo largo del eje. Muro–pilar: el nudo del pilar en la planta es una estación, y los nudos del muro en esa cota dentro de su huella van con su enlace rígido (C2-d); entre plantas, el pilar y el muro no se unen | Conformidad sin penalizaciones. Unir el pilar al muro en toda su altura (como un elemento de borde) queda para más adelante | — |
-| C3-d | Diafragma y dinteles (E6-3) | Los nudos del muro en la cota de una planta entran con la misma regla que el resto (C2-f, o C1-e en una planta sin losas), también los de lo alto de los dinteles | Con losa encima, el dintel está coaccionado por ella. Se mide frente a la losa semirrígida y frente a dejar fuera los dinteles | `diafragma: "ninguno"` por planta |
+| C3-d | Diafragma y dinteles (E6-3) | Los nudos del muro en la cota de una planta entran con la misma regla que el resto (C2-f, o C1-e en una planta sin losas), también los de lo alto de los dinteles | Con losa encima, el dintel está coaccionado por ella. Medido en un muro acoplado de 6 plantas: −6,1 % de desplazamiento frente a la losa semirrígida; sin los dinteles, −4,3 %; sin losas y sin dinteles (SAP2000 15c), +15,5 % (C3-4) | `diafragma: "ninguno"` por planta |
 | C3-e | Viga en el plano de un muro (H05, E0-6) | Si corre por el eje del muro, se parte en sus nudos (embebida, como C2-e). Si acaba en el muro en su plano sin solaparse con él, se prolonga dentro con barras auxiliares de su sección por la fila de nudos de la planta, a lo largo de su canto y al menos un elemento | E0: la viga embebida a lo largo de su canto queda a −0,3 / −3,2 % de `ASDShellQ4`; unida en un nudo, el giro de drilling es singular | — |
 | C3-f | Base de los muros | Empotrada (todos los nudos de la base). `"ninguno"`: el muro nace sobre una viga, una losa u otro muro, que tienen que llegarle | Como los pilares (C1) | `base` por muro |
 | C3-g | Peso propio de los muros | γ·t por m² de alzado sin huecos, de forjado a forjado, menos el solape con las losas: (t/2)·(e/2) por cada lado cubierto por una losa de espesor e y por cada muro que llega a esa planta (el de debajo y el de encima) | Como C2-g (H24): la losa ya pesa hasta el eje del muro | — |
 | C3-h | Empujes | Por lámina, con su valor en cada nudo (bilineal, exacto con una ley lineal); las cotas donde cambia la ley son filas de la malla | La resultante física, sin la malla (alzado menos huecos), comprueba el mallado | — |
-| C3-i | Viga perpendicular que acaba en un muro | Unión en un nudo (la flexión de placa del muro) | H09: no converge al refinar. Se mide su efecto antes de decidir si hace falta una huella | — |
+| C3-i | Viga perpendicular (u oblicua) que acaba en un muro | **Huella de la viga:** los nudos del muro bajo la cota, a lo largo de su canto y a ≤ b/2 + ε_snap de su eje, son esclavos de un enlace rígido con maestro en su extremo | H09: unida en un nudo, su momento en el muro diverge al refinar (−18 %, −25 % y −35 % frente a la huella con h = 0,75, 0,375 y 0,1875); con la huella, ±2 % (C3-3) | — |
 
 **Lo que C3 deja fuera:**
 - muros inclinados, de espesor variable dentro de un tramo y huecos que no son rectangulares;
-- pilares unidos al muro en toda su altura (elementos de borde) y huellas de vigas perpendiculares en el muro (C3-i);
+- pilares unidos al muro en toda su altura (elementos de borde);
 - muros que no van de forjado a forjado (antepechos, muros que acaban a media planta);
 - cimentación: zapatas corridas, muros sobre terreno elástico (de momento, base empotrada o articulada);
 - cargas de superficie generales sobre muros (viento en fachada): sólo empujes.
