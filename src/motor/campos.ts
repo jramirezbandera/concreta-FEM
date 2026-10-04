@@ -634,10 +634,12 @@ export class CamposLaminas implements IntegradorCampos {
    * tramo. Si un tramo acaba en un borde libre, añade allí la fuerza de borde de Kirchhoff ±Mxy·e₃
    * (en los ejes de la franja): el Mxy recuperado no se anula en el borde, mientras que el de la
    * lámina real cae a cero en una capa de anchura ~t que concentra ese cortante. Los lados de lámina
-   * sobre el plano los da cortes.ts por fuerzas nodales; aquí sólo se muestrean (para las muestras).
-   * Las láminas rígidas no entran: lo que pasa por ellas lo transmite su enlace.
+   * sobre el plano se integran sólo con `lados` (corte mixto, C2-2), cada uno una vez (con la lámina
+   * del lado A o, si ésa es rígida o no existe, la del B); si no, los da cortes.ts por fuerzas
+   * nodales y aquí sólo se muestrean. Las láminas rígidas no entran: lo que pasa por ellas lo
+   * transmite su enlace.
    */
-  integrar(cp: CortePreparado, casos: readonly ResultadoCaso[], info: InfoCorte, diag: Diagnosticos): { suma: Float64Array; muestras: MuestrasCorte } {
+  integrar(cp: CortePreparado, casos: readonly ResultadoCaso[], info: InfoCorte, diag: Diagnosticos, lados = false): { suma: Float64Array; muestras: MuestrasCorte } {
     const { xyz } = this.geo;
     const ex = [cp.ejes[0]!, cp.ejes[1]!, cp.ejes[2]!];
     const ey = [cp.ejes[3]!, cp.ejes[4]!, cp.ejes[5]!];
@@ -655,8 +657,10 @@ export class CamposLaminas implements IntegradorCampos {
       k: number;
       A: number[];
       B: number[];
-      /** Atraviesa la lámina (se integra); si no, es un lado sobre el plano (sólo se muestrea). */
+      /** Atraviesa la lámina; si no, es un lado sobre el plano. */
       cruza: boolean;
+      /** Se integra: atraviesa, o es un lado sobre el plano de un corte mixto. */
+      integra: boolean;
       /** ¿Acaba A (o B) en un borde libre? */
       libreA: boolean;
       libreB: boolean;
@@ -691,7 +695,8 @@ export class CamposLaminas implements IntegradorCampos {
         for (let a = 0; a < 4; a++) {
           if (d[a] !== 0 || d[(a + 1) % 4] !== 0) continue;
           if (neg === 0 && this.vecinaEnRegion(l.nudos[a]!, l.nudos[(a + 1) % 4]!, k)) break;
-          P = [{ x: [...X[a]!], lados: [] }, { x: [...X[(a + 1) % 4]!], lados: [] }];
+          // Sus extremos están en los lados contiguos (para los bordes libres de un corte mixto)
+          P = [{ x: [...X[a]!], lados: [(a + 3) % 4] }, { x: [...X[(a + 1) % 4]!], lados: [(a + 1) % 4] }];
         }
       }
       if (P.length < 2) return;
@@ -729,8 +734,9 @@ export class CamposLaminas implements IntegradorCampos {
       if (!((t1 - t0) * L > 10 * TOL_CORTE)) return;
       const en = (t: number) => [0, 1, 2].map((c) => P[0]!.x[c]! + t * (P[1]!.x[c]! - P[0]!.x[c]!));
       const esLibre = (q: { lados: number[] }) => q.lados.some((e) => libres.has(claveLado(l, e)));
-      tramos.push({ k, A: en(Math.max(0, t0)), B: en(Math.min(1, t1)), cruza, libreA: cruza && t0 <= 0 && esLibre(P[0]!), libreB: cruza && t1 >= 1 && esLibre(P[1]!) });
-      if (cruza) info.laminas.push(k);
+      const integra = cruza || lados;
+      tramos.push({ k, A: en(Math.max(0, t0)), B: en(Math.min(1, t1)), cruza, integra, libreA: integra && t0 <= 0 && esLibre(P[0]!), libreB: integra && t1 >= 1 && esLibre(P[1]!) });
+      if (integra) info.laminas.push(k);
       for (const q of [tramos.at(-1)!.A, tramos.at(-1)!.B]) {
         const [, cy, cz] = cp.coordenadas(q);
         ext.y = [Math.min(ext.y[0], cy), Math.max(ext.y[1], cy)];
@@ -760,7 +766,7 @@ export class CamposLaminas implements IntegradorCampos {
     };
     /** Extremos libres: lámina, punto, coordenadas naturales, signo del extremo, marco y normal n. */
     const extremos: { k: number; P: number[]; nat: [number, number]; s: number; marco: number[]; n: number[] }[] = [];
-    tramos.forEach(({ k, A, B, cruza, libreA, libreB }, i) => {
+    tramos.forEach(({ k, A, B, integra, libreA, libreB }, i) => {
       const g = this.regiones[this.regionDe[k]!]!;
       const s1 = g.R.subarray(0, 3);
       const s2 = g.R.subarray(3, 6);
@@ -788,7 +794,7 @@ export class CamposLaminas implements IntegradorCampos {
         natural.set(naturales(k, P), 2 * j);
         marco.set(mr, 5 * j);
       }
-      if (!cruza) return;
+      if (!integra) return;
       // Signo del extremo: + en el que está más adelante según t
       const st = pr(dir, t) >= 0 ? 1 : -1;
       if (libreA) extremos.push({ k, P: A, nat: naturales(k, A), s: -st, marco: mr, n });
@@ -827,7 +833,7 @@ export class CamposLaminas implements IntegradorCampos {
         const v = ev.enRegion(k, natural[2 * j]!, natural[2 * j + 1]!);
         const [nx, ny, tx, ty, sg] = marco.subarray(5 * j, 5 * j + 5);
         const Qn = v[6]! * nx! + v[7]! * ny!;
-        if (tramos[j >> 2]!.cruza) {
+        if (tramos[j >> 2]!.integra) {
           // Tracción en el triedro de la región: N·ν, Q·ν y M·ν; m = (M·ν) × e₃ = (Mν)_y·s₁ − (Mν)_x·s₂
           const Nn = [v[0]! * nx! + v[2]! * ny!, v[2]! * nx! + v[1]! * ny!];
           const Mn = [v[3]! * nx! + v[5]! * ny!, v[5]! * nx! + v[4]! * ny!];

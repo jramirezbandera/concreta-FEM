@@ -20,8 +20,12 @@
  *     (el compilador siembra las líneas de corte, H29).
  *   · "campos": la integral de los campos recuperados (SPR, campos.ts) a lo largo de su intersección
  *     con el plano, recortada al rectángulo; si el tramo acaba en un borde libre, con la fuerza de
- *     borde de Kirchhoff. Vale en cualquier posición; no es exacto. Donde el corte sigue la malla
- *     sigue usando fuerzas nodales, así que un corte alineado da lo mismo por los dos métodos.
+ *     borde de Kirchhoff. Vale en cualquier posición; no es exacto. Si el corte sigue la malla
+ *     entero, usa fuerzas nodales, así que un corte alineado da lo mismo por los dos métodos. Si
+ *     atraviesa alguna lámina, todas las láminas van por campos, también los lados que caen sobre el
+ *     plano (C2-2): las fuerzas nodales sólo son exactas sumando todas las láminas de un lado en cada
+ *     nudo del corte, y mezclarlas con integrales en un mismo nudo contaba dos veces lo que pasa por
+ *     él (+38 % en un corte que pasa por los vértices de una malla no estructurada).
  * - Barras: si atraviesan el plano, su esfuerzo exacto en el punto de cruce (diagrama de E2, o la
  *   fuerza de su nudo del lado A si el cruce cae en un offset rígido); si sólo lo tocan en un nudo
  *   desde el lado A, su fuerza nodal en ese nudo.
@@ -35,6 +39,7 @@
  * casos.
  */
 import { DiagramasBarras } from "./barras.ts";
+import type { ElementoMotor } from "./elementos.ts";
 import { Diagnosticos, listaIds, type Diagnostico } from "./diagnosticos.ts";
 import { FuerzasNodales } from "./fuerzasNodales.ts";
 import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "./modelo.ts";
@@ -87,10 +92,11 @@ export interface MuestrasCorte {
 export interface IntegradorCampos {
   /**
    * Fuerza y momento (respecto al origen del corte, globales) que el lado B ejerce sobre las láminas
-   * del lado A, por caso (6 por caso), y los puntos de integración. Añade a `info` las láminas que
-   * integra y la extensión, y a `diag` sus avisos.
+   * del lado A, por caso (6 por caso), y los puntos de integración. Con `lados`, integra también los
+   * lados de lámina que caen sobre el plano (corte mixto); sin él, sólo los muestrea. Añade a `info`
+   * las láminas que integra y la extensión, y a `diag` sus avisos.
    */
-  integrar(corte: CortePreparado, casos: readonly ResultadoCaso[], info: InfoCorte, diag: Diagnosticos): { suma: Float64Array; muestras: MuestrasCorte };
+  integrar(corte: CortePreparado, casos: readonly ResultadoCaso[], info: InfoCorte, diag: Diagnosticos, lados?: boolean): { suma: Float64Array; muestras: MuestrasCorte };
 }
 
 /** Corte con sus ejes y el lado de cada nudo, preparado para integrar. */
@@ -247,11 +253,14 @@ export class Cortes {
       ext.z[1] = Math.max(ext.z[1], cz);
     };
 
-    // Láminas: las que tocan el plano desde el lado A, por sus fuerzas nodales (exacto, con los dos
-    // métodos); las que lo atraviesan, error por fuerzas nodales o integral de campos
+    // Láminas: las que tocan el plano desde el lado A, por sus fuerzas nodales (exacto); las que lo
+    // atraviesan, error por fuerzas nodales o integral de campos. Si el método es «campos» y alguna lo
+    // atraviesa, todas van por campos (corte mixto, C2-2).
+    let mixto = false;
     {
       const atraviesan: string[] = [];
       const bordes: string[] = [];
+      const tocan: ElementoMotor[] = [];
       for (const e of this.fuerzas.elementos) {
         if (e.tipo !== "lamina") continue;
         let menos = 0;
@@ -265,8 +274,12 @@ export class Cortes {
         if (menos === 0 || !cp.dentro(c)) continue;
         if (mas > 0) {
           if (metodo === "fuerzas-nodales") atraviesan.push(e.id);
+          else mixto = true;
           continue;
         }
+        tocan.push(e);
+      }
+      for (const e of mixto ? [] : tocan) {
         const enCorte = e.nudos.map((v, a) => [v, a] as const).filter(([v]) => lado[v] === 0);
         if (enCorte.length === 0) continue;
         info.laminas.push(e.indice);
@@ -292,7 +305,7 @@ export class Cortes {
       }
     }
     if (metodo === "campos") {
-      const c = campos!.integrar(cp, casos, info, diag);
+      const c = campos!.integrar(cp, casos, info, diag, mixto);
       for (let q = 0; q < c.suma.length; q++) suma.v[q]! += c.suma[q]!;
       muestras = c.muestras;
       if (info.extension) {
