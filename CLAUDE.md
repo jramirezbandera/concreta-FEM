@@ -97,5 +97,21 @@
   - **S5 #3 cerrada:** el Q recuperado converge con orden 2 sin depender del espesor (−1,8 % con 16 elementos por vano).
   - **Para el compilador (E5-5):** sembrar en la malla las caras de los apoyos y los bordes de las bandas. En las caras, la banda se dimensiona con el corte por fuerzas nodales.
   - **Validación:** `validacion/e5/` (oráculo de equilibrio de los cortes, réplica de exp01d, Navier, losa plana de H25, banco y referencia congelada).
-- **Siguiente paso:** E6 (endurecimiento: ETABS 15, SAP 1-024, modelos SAP2000 del usuario, metamórficas y rendimiento), o medir en el móvil y reducir la memoria JS del motor (pendientes de E4); lo decide el usuario. D5 (quién define las bandas) sigue abierta.
+- **2026-10-04: fase E6 superada** (endurecimiento). Pasan los cinco criterios; el 2, con la referencia corregida. El informe está en `docs/fem3d/fase-e6.md`, con criterios, hallazgos E6-1…E6-10 y pendientes.
+  - **Validación con CSI:** SAP2000 1-004, 1-018, 1-022 y 1-024 dan sus 34 valores publicados (los periodos, por condensación exacta, sin modal).
+  - **ETABS 15 con láminas:** el motor coincide con `ASDShellQ4` a ≤ 0,5 %, así que S5 #1 y #18 quedan cerradas. Las diferencias con SAP2000 en 15b, 15c y 15d son de su modelado (E6-2), y E6-3 y E6-4 son decisiones para el compilador.
+  - **Ya en `src/pruebas/`:** generador de modelos aleatorios (`aleatorio.ts`), batería metamórfica de 9 relaciones (`metamorficas.ts`), catálogo de 83 entradas no válidas (`invalidos.ts`) y periodos por condensación (`modal.ts`).
+  - **Motor:**
+    - nunca lanza por un dato del modelo (`motor/error-interno` para lo inesperado; sólo se propagan las trampas del WASM);
+    - dos fallos silenciosos corregidos (E6-7);
+    - memoria JS un 41–45 % menor con los mismos bits (E6-8);
+    - 88 000 nudos en 11–23 s en sobremesa.
+  - **Puente con SAP2000** (`validacion/e6/sap2000/`, LEEME.md): importador de modelos $2k, comparador de resultados y la placa de Navier de S5 #21 lista para importar.
+- **Siguiente paso:** lo decide el usuario:
+  - calcular en SAP2000 la placa de Navier y sus modelos (S5 #21, D3);
+  - medir en el móvil;
+  - E7 (modal, temperatura, triángulos);
+  - o empezar el compilador (Fase 2 de S1).
+
+  D5 (quién define las bandas) sigue abierta.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
