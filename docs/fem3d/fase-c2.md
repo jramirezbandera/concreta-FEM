@@ -91,7 +91,7 @@ Medidas en el edificio objetivo con losas reducido a 3 plantas (`validacion/c2/o
 
 ## 5. Pendiente
 
-- **Del usuario:** C2-a (tamaño de malla frente a D9), C2-c (error o aviso) y C2-g (la regla del solape). Ninguna bloquea C3.
+- **Decididas por el usuario el 2026-10-05:** C2-a (h = 0,75 y la rejilla alineada de H52 en las zonas regulares, por hacer: hasta entonces el criterio 8 sigue a medias), C2-c (error) y C2-g (sólo el descuelgue).
 - **Para más adelante:**
   - la rejilla alineada de H52 en las zonas regulares, para bajar los nudos;
   - refinado local (Ruppert) o unión de las zonas de carga a 3·ε_snap, para los «casi encuentros» (C2-7);

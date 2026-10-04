@@ -4,7 +4,7 @@
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
 >
-> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 terminada el 2026-10-05 (`fase-c2.md`): pasan ocho de los nueve criterios y el 8 (tamaño frente a D9) queda a medias, pendiente de la decisión C2-a. Siguiente: C3 (muros).
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 terminada el 2026-10-05 (`fase-c2.md`): pasan ocho de los nueve criterios y el 8 (tamaño frente a D9) queda a medias hasta que llegue la rejilla alineada de H52 (decisión C2-a). C3 (muros) en curso desde el 2026-10-05.
 
 ## Entrada, salida y reglas
 
@@ -150,11 +150,66 @@
 8. **Rendimiento:** el edificio objetivo con losa maciza (7 plantas, 80 pilares) compila en una fracción del cálculo y, con el h por defecto, cabe en D9.
 9. **Referencia congelada** del modelo analítico y de sus resultados.
 
-## Preguntas para el usuario (no bloquean C3)
+## Decisiones del usuario
 
-- **Licencia ISC:** admitida por el usuario el 2026-10-04 (regla 6 de `CLAUDE.md`). El mallador de C2 usará delaunator y constrainautor (H29).
+- **Licencia ISC:** admitida por el usuario el 2026-10-04 (regla 6 de `CLAUDE.md`). El mallador de C2 usa delaunator y constrainautor (H29).
 - **Licencia Unlicense:** admitida por el usuario el 2026-10-04 sólo para robust-predicates 3.0.3 (los predicados exactos de Shewchuk), que delaunator y constrainautor importan directamente.
 - **C1-a, C1-c, C1-d y D4:** decididas por el usuario el 2026-10-04 con las medidas de `validacion/c1/out_decisiones.txt`: factor de zona rígida 0,5, D4 (b) por material, y C1-c y C1-d como estaban.
-- **C2-a, tamaño de malla** (`validacion/c2/out_decisiones.txt`, `out_banco.txt`): con h = 0,75, el edificio objetivo tiene 79 649 nudos y 199 983 ecuaciones (×1,6 los nudos de D9, justo en el perfil móvil); con h = 1, 61 365 y 145 089, pero la cara de una banda pierde un 4,5 %. ¿Mantener 0,75, pasar a 1, o 0,75 con la rejilla alineada de H52 en las zonas regulares?
-- **C2-c:** ¿un borde de losa dentro del ancho de una viga es un error (por defecto) o un aviso?
-- **C2-g:** ¿se confirma que una viga rectangular de hormigón bajo losa pesa sólo su descuelgue ((b/2)·min(h, t) menos por cada lado cubierto)? Evita contar dos veces el 8,6 % del caso G.
+- **C2-a, tamaño de malla** (decidida el 2026-10-05, con `validacion/c2/out_decisiones.txt` y `out_banco.txt`): se mantiene h = 0,75 y se añadirá la rejilla alineada de H52 en las zonas regulares, que es lo que baja los nudos sin perder precisión. Con 0,75 y sólo la CDT, el edificio objetivo tiene 79 649 nudos y 199 983 ecuaciones (×1,6 los nudos de D9). El criterio 8 de C2 queda a medias hasta que llegue esa rejilla.
+- **C2-c** (decidida el 2026-10-05): un borde de losa dentro del ancho de una viga y fuera de su eje es un **error**. Obliga a dibujar las losas a ejes.
+- **C2-g** (decidida el 2026-10-05): una viga rectangular de hormigón bajo losa pesa sólo su descuelgue: se le quita (b/2)·min(h, t) por cada lado cubierto. Evita contar dos veces el 8,6 % del caso G.
+
+## C3: alcance y decisiones
+
+**Modelo físico de C3** (se añade a C2 en `fisico.ts`):
+- `muros`: eje en planta (polilínea; cada tramo es un paño plano y vertical), planta de base y de cabeza (como los pilares), `espesor`, `material` (hormigón o general) y `base` (`"empotrado"` por defecto, `"articulado"` o `"ninguno"`).
+  - `huecos`: rectángulos en el alzado, dados por la estación a lo largo del eje (desde su primer punto) y la altura sobre la base del muro. Cada uno cae en un tramo; pueden llegar a la base de una planta (puertas) y cruzar plantas (dobles alturas).
+  - Los muros van de forjado a forjado, con el eje en el plano medio y los bordes de las losas sobre él (a ejes, como C2-c).
+- Carga nueva `empuje`: presión normal a una cara del muro, con ley lineal en z entre dos cotas y nula fuera de ellas (el terreno, el agua o una sobrecarga). Va sobre el muro entero.
+- Las cargas puntuales y lineales de una planta pueden caer ya sobre el eje de un muro.
+
+**Cómo malla C3** (H17, H29):
+1. **Estaciones del eje.** El arreglo plano de cada planta (el de C2) lleva también los ejes de los muros que la tocan, con prioridad tras las huellas. Los puntos del arreglo sobre el eje de un muro (cruces con vigas, losas, bandas y otros muros, pilares y cargas) son sus estaciones en esa planta.
+   - Un paño necesita las mismas estaciones en su cabeza y en su base, así que se unifican entre plantas, emparejadas a ε_snap, hasta que nada cambia.
+   - Entre dos estaciones seguidas se reparte una división graduada (como la siembra de C2) de paso ≤ min(2h, L/4), con L el tramo recto de muro que la contiene: ≥ 8 elementos por tramo recto (H17).
+   - En las losas, esos lados ya van sembrados: la malla de C2 no los vuelve a partir, y sus puntos medios (la división en 3 cuadriláteros) son también nudos del muro.
+2. **Rejilla por paño.** Columnas en las estaciones y sus puntos medios; filas en las cotas de las plantas, de los bordes de los huecos y de los cambios de ley de los empujes, cada intervalo dividido en partes iguales de ≤ h. Las filas de una planta se unifican entre los muros que se tocan (esquinas, T y cruces), para que su arista común sea conforme.
+3. Se quitan los elementos que caen en un hueco. Las láminas tienen el eje 1 horizontal a lo largo del tramo y el 2 hacia +Z (la regla de CSI), y el 3 a la derecha del sentido del eje.
+4. **Validador** (H23, como el de C2): Σ áreas de cada paño = su alzado sin los huecos, a 1e-9; jacobiano > 0; cada arista de muro en la cota de una planta con losa al lado es también arista de la losa (conformidad); sin nudos sueltos. Aviso si un elemento es más de 4 veces más alto que ancho, o al revés.
+
+**Decisiones por defecto de C3.** Como en C1 y C2, cada una es una opción o una regla registrada en las hipótesis:
+
+| # | Decisión | Por defecto | Por qué | Alternativa |
+|---|---|---|---|---|
+| C3-a | Tamaño de la malla de los muros | El de las losas (`tamanoMalla`): columnas a ~h y filas a ≤ h, y ≥ 8 elementos por tramo recto | H17: con 8 elementos, −1,2 % en un muro en voladizo; con 1, −32 %. La cabeza tiene que coincidir con la malla de la losa | `tamanoMalla` |
+| C3-b | Geometría de los muros | Sus vértices se unen a lo cercano a ≤ ε_snap con aviso, como las losas (C2-b). Un borde de losa dentro del espesor de un muro y fuera de su eje es un error, como C2-c | En una lámina no hay offsets. Los bordes van a ejes | Dibujar el borde sobre el eje |
+| C3-c | Encuentros | Muro–muro: la arista común (esquina, T o cruce) tiene los mismos nudos. Muro–losa: nudos comunes a lo largo del eje. Muro–pilar: el nudo del pilar en la planta es una estación, y los nudos del muro en esa cota dentro de su huella van con su enlace rígido (C2-d); entre plantas, el pilar y el muro no se unen | Conformidad sin penalizaciones. Unir el pilar al muro en toda su altura (como un elemento de borde) queda para más adelante | — |
+| C3-d | Diafragma y dinteles (E6-3) | Los nudos del muro en la cota de una planta entran con la misma regla que el resto (C2-f, o C1-e en una planta sin losas), también los de lo alto de los dinteles | Con losa encima, el dintel está coaccionado por ella. Se mide frente a la losa semirrígida y frente a dejar fuera los dinteles | `diafragma: "ninguno"` por planta |
+| C3-e | Viga en el plano de un muro (H05, E0-6) | Si corre por el eje del muro, se parte en sus nudos (embebida, como C2-e). Si acaba en el muro en su plano sin solaparse con él, se prolonga dentro con barras auxiliares de su sección por la fila de nudos de la planta, a lo largo de su canto y al menos un elemento | E0: la viga embebida a lo largo de su canto queda a −0,3 / −3,2 % de `ASDShellQ4`; unida en un nudo, el giro de drilling es singular | — |
+| C3-f | Base de los muros | Empotrada (todos los nudos de la base). `"ninguno"`: el muro nace sobre una viga, una losa u otro muro, que tienen que llegarle | Como los pilares (C1) | `base` por muro |
+| C3-g | Peso propio de los muros | γ·t por m² de alzado sin huecos, de forjado a forjado, menos el solape con las losas: (t/2)·(e/2) por cada lado cubierto por una losa de espesor e y por cada muro que llega a esa planta (el de debajo y el de encima) | Como C2-g (H24): la losa ya pesa hasta el eje del muro | — |
+| C3-h | Empujes | Por lámina, con su valor en cada nudo (bilineal, exacto con una ley lineal); las cotas donde cambia la ley son filas de la malla | La resultante física, sin la malla (alzado menos huecos), comprueba el mallado | — |
+| C3-i | Viga perpendicular que acaba en un muro | Unión en un nudo (la flexión de placa del muro) | H09: no converge al refinar. Se mide su efecto antes de decidir si hace falta una huella | — |
+
+**Lo que C3 deja fuera:**
+- muros inclinados, de espesor variable dentro de un tramo y huecos que no son rectangulares;
+- pilares unidos al muro en toda su altura (elementos de borde) y huellas de vigas perpendiculares en el muro (C3-i);
+- muros que no van de forjado a forjado (antepechos, muros que acaban a media planta);
+- cimentación: zapatas corridas, muros sobre terreno elástico (de momento, base empotrada o articulada);
+- cargas de superficie generales sobre muros (viento en fachada): sólo empujes.
+
+## C3: criterios de paso
+
+1. **Oráculo publicado.** Los muros de ETABS 15 (a–f) descritos como modelo físico. Con la misma malla que el modelo hecho a mano de E6 (15a, 15c y 15e, donde las dos coinciden), los mismos desplazamientos a ≤ 1e-9. Con la malla del compilador, los valores de SAP2000 con la tolerancia de E6 (15a, 15e y 15f con la geometría del PDF) y, en 15b, 15c y 15d, el modelo a mano de E6 a ≤ 1 % con su malla más fina.
+2. **Oráculos analíticos:**
+   - muro en voladizo de varias plantas frente a la viga de Timoshenko: ≤ 2 % con la malla por defecto y orden ≈ 2 al refinar (H17);
+   - muro de sótano bajo empuje hidrostático, en flexión cilíndrica: momento en la base y flecha en cabeza a ≤ 1 %;
+   - losa apoyada en dos muros paralelos frente al pórtico equivalente de barras: momento en el vano y en el encuentro a ≤ 2 %;
+   - viga en el plano de un muro (el voladizo de E0): a ≤ 3 % del modelo embebido de E0 y ≤ 2× la solución rígida (H05).
+3. **Validador de malla** en una batería de edificios al azar con muros (sótano perimetral, núcleo con huecos, muros sobre vigas, pilares que arrancan de muros): todas sus comprobaciones pasan y la calidad queda medida.
+4. **Metamórficas:** reordenar las listas (bit a bit); trasladar y girar 90° (la misma malla) y un giro cualquiera (resultados girados); ruido < ε_geom (la misma malla) y < ε_snap (la misma topología, con avisos); invertir el sentido de un muro y partirlo en dos colineales (los mismos resultados).
+5. **Sin pérdidas** en cada compilación (≤ 1e-9), con la resultante física calculada sin la malla (peso con huecos y solapes, empujes con huecos), y equilibrio del motor.
+6. **Entradas no válidas:** un catálogo de muros, huecos y empujes no válidos da su error con el id físico, sin lanzar.
+7. **Determinismo y huella:** la misma malla en V8 y en JavaScriptCore; la huella no depende del orden de las listas.
+8. **Rendimiento:** el edificio objetivo con un núcleo de muros y muros de sótano compila en una fracción del cálculo.
+9. **Referencia congelada** del modelo analítico y de sus resultados.

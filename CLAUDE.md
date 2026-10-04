@@ -137,9 +137,11 @@
   - **C2-1:** en las mallas de C2, el valor del centroide de una lámina converge sólo con orden 1. Para comprobar se usan los campos (SPR) y los cortes.
   - **Validación:** `validacion/c2/` (Navier y losa plana de H25 como modelos físicos, resumen, banco, decisiones, huellas y referencia congelada).
   - **Pendiente del usuario:** C2-a (con h = 0,75 el edificio objetivo tiene 79 649 nudos y 199 983 ecuaciones: ×1,6 los de D9), C2-c y C2-g (preguntas en `compilador.md`).
+- **2026-10-05: C2-a, C2-c y C2-g decididas** (`compilador.md`, «Decisiones del usuario»): h = 0,75 con la rejilla alineada de H52 en las zonas regulares (por hacer; hasta entonces el criterio 8 de C2 sigue a medias), el borde de losa dentro de una viga es error y la viga bajo losa pesa sólo su descuelgue.
+- **2026-10-05: fase C3 del compilador (muros) en curso.** Alcance, decisiones C3-a…C3-i y criterios en `compilador.md`.
 - **Siguiente paso:**
-  - el usuario decide C2-a, C2-c y C2-g;
+  - terminar C3 (muros);
+  - la rejilla alineada de H52 para las losas (C2-a);
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
-  - compilador C3 (muros);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
