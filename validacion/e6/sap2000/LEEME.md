@@ -20,15 +20,29 @@ Es la propuesta de `docs/fem3d/fase-e3.md` («Pendiente»):
 Pasos:
 
 1. `bun validacion/e6/sap2000/navier.ts` escribe `validacion/e6/sap2000/navier-ortotropa.$2k`.
-2. En SAP2000, importa el modelo con **File > Import > SAP2000 .s2k Text File** y calcula el caso `Q`.
-3. Exporta las tablas de resultados **Joint Displacements** y **Element Forces – Area Shells**:
-   - **Display > Show Tables > Analysis Results**;
-   - en la ventana de tablas, **File > Export All Tables > To Text File**, o a Excel y luego cada hoja como CSV.
-4. Lanza la comparación:
+2. **Importar.** En SAP2000, con las unidades en `KN, m, C` (desplegable abajo a la derecha):
+   - **File > Import > SAP2000 .s2k / .$2k Text File**, elige el fichero y acepta *New Model*;
+   - si sale un registro de importación con avisos, guárdalo.
+3. **Comprobar lo importado** (dos minutos):
+   - **Define > Section Properties > Area Sections > LOSA30**: Shell-Thick, espesor 0,3, material HA30 con E = 3·10⁷ y U = 0,2;
+   - **Assign > Area > Stiffness Modifiers** sobre cualquier área: m11 = 1, m22 = 0,3, m12 = 0,2, v13 = 0,5, v23 = 0,15, el resto 1;
+   - **Display > Show Load Assigns > Area**, patrón `Q`: 10 kN/m² en Gravity.
+4. **Calcular.** **Analyze > Set Load Cases to Run**: sólo `Q` en *Run*; `MODAL` y `DEAD`, si SAP2000 los ha creado, en *Do Not Run* (la placa no tiene masa). **Run Now.**
+5. **Comprobaciones rápidas:**
+   - **Display > Show Tables > Analysis Results > Structure Output > Base Reactions**: FZ = 240 kN (10 × 6 × 4);
+   - nudo 809, el centro: U3 ≈ −8,28·10⁻⁴ m.
+6. **Exportar.** **File > Export > SAP2000 .s2k / .$2k Text File**. En el diálogo de tablas:
+   - deja marcada la definición del modelo (MODEL DEFINITION), que sirve para probar el lector con un fichero real;
+   - marca en ANALYSIS RESULTS **Joint Displacements**, **Joint Reactions** y **Element Forces – Area Shells**;
+   - con **Select Load Cases**, sólo `Q`;
+   - guárdalo como `validacion/e6/sap2000/navier-sap.$2k` (no se versiona).
 
-   `bun validacion/e6/sap2000/comparar.ts validacion/e6/sap2000/navier-ortotropa.$2k <resultados exportados>`
+   Si el diálogo no deja exportar resultados, la alternativa es **Display > Show Tables**, esas tres tablas, y en la ventana de tablas **File > Export All Tables > To Excel**; luego cada hoja como CSV.
+7. Lanza la comparación:
 
-   Escribe el informe en `navier-ortotropa.comparacion.txt`.
+   `bun validacion/e6/sap2000/comparar.ts validacion/e6/sap2000/navier-ortotropa.$2k validacion/e6/sap2000/navier-sap.$2k`
+
+   Escribe el informe en `navier-ortotropa.comparacion.txt`. Con `comparar.ts validacion/e6/sap2000/navier-sap.$2k`, el modelo se lee del fichero que exportó SAP2000: así se prueba también el lector.
 
 Qué esperar:
 

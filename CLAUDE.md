@@ -19,6 +19,7 @@
 - **D1 – Unidades:** kN–m, como Concreta (E en kN/m²).
 - **D2 – Forjado unidireccional:** se introduce como paño con reparto de cargas, pero se discretiza en viguetas como barras y se ven los esfuerzos por vigueta.
 - **D3 – Reticular:** multiplicadores por dirección sobre la losa maciza (f11…v23 y peso), calculados a partir de nervios y casetones. Los ábacos van macizos, con multiplicador 1. Hay que validarlo contra un modelo de SAP2000 del usuario.
+- **D5 – Bandas de dimensionado de las losas:** automáticas y editables. El compilador propone las del Ap. I del CE A19 a partir de los ejes de los pilares, y el usuario puede moverlas, cambiar su anchura, partirlas o añadir otras. Sus bordes y las caras de los apoyos se siembran en la malla (E5-5), así que editar una banda obliga a recalcular.
 - **D9 – Tope de tamaño:** unas 7 plantas con 80 pilares por planta, que en sobremesa son ≈ 50 000 nudos y 300 000 GDL. El límite se fija en GDL según el dispositivo.
 - **D11 – Motor propio:**
   - TypeScript para elementos, restricciones, ensamblado y recuperación de esfuerzos;
@@ -107,11 +108,9 @@
     - memoria JS un 41–45 % menor con los mismos bits (E6-8);
     - 88 000 nudos en 11–23 s en sobremesa.
   - **Puente con SAP2000** (`validacion/e6/sap2000/`, LEEME.md): importador de modelos $2k, comparador de resultados y la placa de Navier de S5 #21 lista para importar.
-- **Siguiente paso:** lo decide el usuario:
-  - calcular en SAP2000 la placa de Navier y sus modelos (S5 #21, D3);
-  - medir un móvil con menos memoria que el iPhone 13 Pro (E4-9);
-  - E7 (modal, temperatura, triángulos);
-  - o empezar el compilador (Fase 2 de S1).
-
-  D5 (quién define las bandas) sigue abierta.
+- **2026-10-04: D5 tomada** (bandas automáticas y editables).
+- **Siguiente paso:**
+  - el usuario calcula en SAP2000 la placa de Navier y luego sus modelos (S5 #21, D3; pasos en `validacion/e6/sap2000/LEEME.md`);
+  - en paralelo, empezar el compilador (Fase 2 de S1);
+  - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
