@@ -166,7 +166,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   }
   // Maestros de diafragma: en el centro de los nudos de su planta (sumados en orden canónico)
   const restricciones: Restriccion[] = [];
-  const mapRestr: { planta: string; pilar?: string }[] = [];
+  const mapRestr: { planta: string; pilar?: string; viga?: string }[] = [];
   for (const d of [...piezas.diafragmas].sort((a, b) => ctx.cotas[a.k]! - ctx.cotas[b.k]!)) {
     const esclavos = d.nudos.map((n) => nuevo[n]!).sort((a, b) => a - b);
     let sx = 0;
@@ -186,6 +186,12 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     const planta = ctx.plantas[h.k]!.id;
     restricciones.push({ tipo: "enlace-rigido", id: `${h.pilar}@${planta}:huella`, maestro: nuevo[h.maestro]!, esclavos: h.esclavos.map((n) => nuevo[n]!).sort((a, b) => a - b) });
     mapRestr.push({ planta, pilar: h.pilar });
+  }
+  // Huellas de las vigas que acaban en un muro fuera de su plano (C3-i)
+  for (const h of [...losas.huellasVigas].sort((a, b) => ctx.cotas[a.k]! - ctx.cotas[b.k]! || nuevo[a.maestro]! - nuevo[b.maestro]!)) {
+    const planta = ctx.plantas[h.k]!.id;
+    restricciones.push({ tipo: "enlace-rigido", id: `${h.viga}@${planta}:huella-muro`, maestro: nuevo[h.maestro]!, esclavos: h.esclavos.map((n) => nuevo[n]!).sort((a, b) => a - b) });
+    mapRestr.push({ planta, viga: h.viga });
   }
   // Láminas (C2), ya en orden canónico; su id, la losa y el orden dentro de ella
   const cuenta = new Map<string, number>();

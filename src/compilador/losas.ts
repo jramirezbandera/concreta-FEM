@@ -31,7 +31,7 @@ import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type LosaMallar, type ResultadoMalla } from "./mallado.ts";
-import { ajustarMuros, estacionesComunes, mallarMuros, planMuros, unificarEstaciones, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
+import { ajustarMuros, estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
 import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
@@ -91,6 +91,8 @@ export interface Losas {
   ladosMuros: { k: number; w: number; i: number; nudos: [number, number, number]; A: Vec2; B: Vec2; debajo: boolean; encima: boolean }[];
   /** Relación de aspecto de los elementos de muro. */
   aspectoMuros: { max: number; altos: number };
+  /** Huellas de las vigas que acaban en un muro fuera de su plano (C3-i). */
+  huellasVigas: HuellaViga[];
 }
 
 const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
@@ -275,6 +277,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     planMuros: null,
     ladosMuros: [],
     aspectoMuros: { max: 1, altos: 0 },
+    huellasVigas: [],
   };
   const nudosAntes = topo.nudos.length;
   const indiceLosa = new Map(ctx.losas.map((l, i) => [l.losa.id, i] as const));
@@ -701,6 +704,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     r.apoyosMuros = mm.apoyos;
     r.auxiliares = mm.auxiliares;
     r.aspectoMuros = mm.aspecto;
+    r.huellasVigas = huellasVigas(ctx, topo, (k, w, i) => nudosCadena.get(`${k}:${w}:${i}`)!, esclavosTodos);
   }
 
   // Orden canónico de las láminas de las losas: cota, centroide x, y (cuantizados, como los nudos), losa

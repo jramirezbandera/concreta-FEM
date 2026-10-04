@@ -1,12 +1,14 @@
 /**
  * C3 en modelos pequeños escritos a mano: rejilla y ejes de las láminas (C3-a), encuentros con otros
  * muros, losas y pilares (C3-c), huecos, bases (C3-f), diafragma (C3-d), barras auxiliares (C3-e),
+ * huellas de las vigas perpendiculares (C3-i),
  * peso propio con el solape de las losas (C3-g) y empujes (C3-h) frente a un cálculo a mano; y en
  * baterías al azar, el validador de la malla de los muros (criterio 3) y «sin pérdidas» (criterio 5).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { DiagramasBarras } from "../motor/barras.ts";
 import { calcular } from "../motor/calcular.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
@@ -234,6 +236,34 @@ describe("diafragma y vigas (C3-d, C3-e)", () => {
     const r2 = valido(compilar(modelo({ pilares, vigas: [{ id: "V", planta: "P1", puntos: [[2, 0], [10, 0]], seccion: "v" }], muros: [muro("M", [[0, 0], [6, 0]])] }), { tamanoMalla: 0.5 }));
     expect(r2.mapeo.barras.some((b) => b.auxiliar)).toBe(false);
     expect(r2.mapeo.piezas.V!.length).toBeGreaterThan(8);
+  });
+});
+
+describe("viga perpendicular que acaba en un muro (C3-i)", () => {
+  it("se une por su huella: los nudos del muro en su canto y su ancho van con su extremo, y el momento no depende de la malla", () => {
+    const f = modelo({
+      muros: [muro("M", [[0, 0], [6, 0]], "C", "P2")],
+      pilares: [{ id: "A", x: 3, y: 6, desde: "C", hasta: "P1", seccion: "p" }],
+      vigas: [{ id: "V", planta: "P1", puntos: [[3, 0], [3, 6]], seccion: "v" }],
+      cargas: [{ tipo: "viga", id: "q", caso: "Q", viga: "V", ejes: "global", q: [0, 0, -30] }],
+    });
+    f.plantas = f.plantas.map((p) => ({ ...p, diafragma: "ninguno" as const }));
+    const momento = (h: number) => {
+      const r = valido(compilar(f, { tamanoMalla: h }));
+      const huella = r.modelo.restricciones!.find((x) => x.id === "V@P1:huella-muro")!;
+      expect(r.mapeo.restricciones[r.modelo.restricciones!.indexOf(huella)]!.viga).toBe("V");
+      for (const s of huella.esclavos) {
+        const v = r.modelo.nudos[s]!;
+        expect(Math.abs(v.x - 3)).toBeLessThanOrEqual(0.15 + 0.05 + 1e-9);
+        expect(v.z).toBeLessThan(0);
+        expect(v.z).toBeGreaterThanOrEqual(-0.6 - 1e-9);
+      }
+      const [, Q] = resolver(r.modelo);
+      const b = r.mapeo.piezas.V![0]!;
+      return new DiagramasBarras(r.modelo).diagrama(b, 1, Q!).esfuerzosEn(0, 1)[4]!;
+    };
+    const [a, b] = [momento(0.75), momento(0.375)];
+    expect(Math.abs(a / b - 1)).toBeLessThan(0.03);
   });
 });
 

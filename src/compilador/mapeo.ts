@@ -34,8 +34,8 @@ export interface BarraMapeada {
 export interface Mapeo {
   nudos: NudoMapeado[];
   barras: BarraMapeada[];
-  /** Planta de cada restricción; las huellas (C2-d), además, su pilar. */
-  restricciones: { planta: string; pilar?: string }[];
+  /** Planta de cada restricción; las huellas (C2-d), además, su pilar, y las de las vigas en un muro (C3-i), su viga. */
+  restricciones: { planta: string; pilar?: string; viga?: string }[];
   /** C2 y C3: losa o muro de cada lámina, en paralelo a `modelo.laminas` (sólo si hay láminas). */
   laminas?: { losa?: string; muro?: string }[];
   /** C2: láminas de cada losa, en orden canónico (sólo si hay losas). */
@@ -56,7 +56,7 @@ export function fisicosDeIds(modelo: ModeloAnalitico, mapeo: Mapeo): Map<string,
   modelo.nudos.forEach((n, i) => m.set(n.id, mapeo.nudos[i]!.maestro ? [mapeo.nudos[i]!.planta] : mapeo.nudos[i]!.fisicos));
   (modelo.barras ?? []).forEach((b, i) => m.set(b.id, [mapeo.barras[i]!.pieza]));
   (modelo.laminas ?? []).forEach((l, i) => m.set(l.id, [mapeo.laminas![i]!.losa ?? mapeo.laminas![i]!.muro!]));
-  (modelo.restricciones ?? []).forEach((r, i) => m.set(r.id, [mapeo.restricciones[i]!.pilar ?? mapeo.restricciones[i]!.planta]));
+  (modelo.restricciones ?? []).forEach((r, i) => m.set(r.id, [mapeo.restricciones[i]!.pilar ?? mapeo.restricciones[i]!.viga ?? mapeo.restricciones[i]!.planta]));
   for (const c of modelo.casos) m.set(c.id, [c.id]);
   return m;
 }

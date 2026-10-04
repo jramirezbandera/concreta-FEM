@@ -1,0 +1,16 @@
+# validacion/c3/decisiones.ts — 2026-10-05
+
+## C3-d: diafragma y dinteles en un muro acoplado de 6 plantas (desplazamiento de cabeza, mm)
+- losas, diafragma rígido con los dinteles (por defecto): 1.768 mm (-6.1 % frente a la semirrígida)
+- losas, diafragma rígido sin los dinteles: 1.801 mm (-4.3 % frente a la semirrígida)
+- losas semirrígidas (la membrana; referencia física): 1.882 mm (0.0 % frente a la semirrígida)
+- sin losas, diafragma rígido con los dinteles (C1-e, ETABS 15c): 1.824 mm (-3.1 % frente a la semirrígida)
+- sin losas, diafragma rígido sin los dinteles (SAP2000 15c): 2.173 mm (15.5 % frente a la semirrígida)
+
+## C3-i: viga perpendicular de 6 m que acaba en un muro (M en el extremo del muro y en el centro, kN·m)
+- h = 0.75: con huella (2 nudos) M extremo -70.53, M vano 79.48; en un nudo M extremo -57.91 (-17.9 %), M vano 86.39 (8.7 %)
+- h = 0.375: con huella (2 nudos) M extremo -69.48, M vano 80.02; en un nudo M extremo -52.38 (-24.6 %), M vano 89.33 (11.6 %)
+- h = 0.1875: con huella (9 nudos) M extremo -72.49, M vano 78.42; en un nudo M extremo -46.97 (-35.2 %), M vano 92.22 (17.6 %)
+
+## C3-g: solape del peso de los muros con las losas en el edificio objetivo con muros
+- peso de los muros (γ·t·alzado sin huecos): 4598.1 kN; solape que se quita: 302.2 kN (6.6 %)

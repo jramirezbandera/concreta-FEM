@@ -1,0 +1,37 @@
+# validacion/c3/resumen.ts — 2026-10-05: criterios 3, 4 y 5 de C3 en modelos al azar con muros
+
+## Criterios 3 y 5: malla, sin pérdidas y equilibrio (h por defecto, 0,75 m)
+| semilla | losas | nudos | láminas de muro | aux. | aspecto máx. | > 4 | avisos de muro | sin pérdidas F | sin pérdidas M | equilibrio |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | sí | 4093 | 2306 | 9 | 3.86 | 0 | — | 1.5e-15 | 1.4e-15 | 1.6e-14 |
+| 1 | no | 2074 | 1900 | 9 | 3.86 | 0 | — | 1.5e-15 | 8.2e-16 | 5.0e-15 |
+| 2 | sí | 2805 | 1450 | 8 | 3.97 | 0 | muro/ajuste | 7.3e-15 | 6.5e-16 | 6.0e-15 |
+| 2 | no | 1470 | 1310 | 8 | 3.97 | 0 | muro/ajuste | 9.5e-16 | 4.9e-16 | 6.4e-15 |
+| 3 | sí | 1528 | 512 | 3 | 7.06 | 74 | muro/aspecto | 2.2e-15 | 2.5e-16 | 1.4e-14 |
+| 3 | no | 609 | 498 | 3 | 7.06 | 74 | muro/aspecto | 1.9e-15 | 5.7e-16 | 3.6e-15 |
+| 4 | sí | 2016 | 916 | 4 | 6.73 | 16 | muro/aspecto | 1.3e-14 | 2.8e-16 | 8.7e-15 |
+| 4 | no | 1016 | 888 | 4 | 6.81 | 20 | muro/aspecto | 3.4e-15 | 3.0e-16 | 1.8e-15 |
+| 5 | sí | 5190 | 2274 | 15 | 5.02 | 60 | muro/aspecto | 7.4e-15 | 8.1e-16 | 8.0e-15 |
+| 5 | no | 2221 | 2012 | 12 | 5.02 | 60 | muro/aspecto | 5.0e-15 | 1.7e-15 | 1.1e-14 |
+| 6 | sí | 4055 | 1504 | 6 | 3.72 | 0 | muro/ajuste | 1.9e-15 | 3.8e-16 | 1.9e-14 |
+| 6 | no | 1640 | 1454 | 6 | 3.72 | 0 | muro/ajuste | 7.3e-15 | 1.6e-15 | 3.5e-15 |
+| 7 | sí | 2331 | 876 | 3 | 5.11 | 28 | muro/aspecto | 6.0e-15 | 2.2e-15 | 6.2e-15 |
+| 7 | no | 975 | 850 | 3 | 5.11 | 28 | muro/aspecto | 7.3e-16 | 1.3e-16 | 9.3e-15 |
+| 8 | sí | 1516 | 758 | 4 | 4.04 | 16 | muro/aspecto | 1.2e-15 | 5.2e-16 | 7.0e-15 |
+| 8 | no | 822 | 712 | 3 | 4.04 | 16 | muro/aspecto | 3.4e-15 | 1.1e-15 | 1.7e-15 |
+| 9 | sí | 4897 | 2516 | 9 | 7.80 | 406 | muro/aspecto | 7.8e-15 | 1.2e-15 | 1.3e-14 |
+| 9 | no | 2252 | 2046 | 9 | 7.80 | 208 | muro/aspecto | 1.8e-15 | 6.8e-16 | 1.6e-14 |
+| 10 | sí | 2777 | 1580 | 8 | 3.54 | 0 | muro/ajuste | 1.4e-14 | 8.9e-16 | 6.7e-15 |
+| 10 | no | 1562 | 1404 | 8 | 3.54 | 0 | muro/ajuste | 3.2e-15 | 5.5e-16 | 6.0e-15 |
+| 11 | sí | 1837 | 802 | 3 | 5.15 | 100 | muro/aspecto | 3.1e-15 | 5.0e-16 | 1.8e-14 |
+| 11 | no | 869 | 750 | 3 | 5.37 | 110 | muro/aspecto | 2.0e-15 | 2.7e-16 | 3.0e-15 |
+| 12 | sí | 1622 | 596 | 3 | 5.38 | 78 | muro/ajuste, muro/aspecto | 2.3e-15 | 6.4e-16 | 4.5e-15 |
+| 12 | no | 639 | 528 | 3 | 5.50 | 90 | muro/ajuste, muro/aspecto | 4.9e-16 | 5.0e-16 | 3.3e-15 |
+Peor: sin pérdidas 1.4e-14; equilibrio 1.9e-14; aspecto 7.80 (fuera de las huellas de los pilares).
+
+## Criterio 4: transformaciones de la planta (semillas 1, 2, 3, 5, 8, con losas)
+| transformación | misma malla | error de u | error de reacciones |
+|---|---|---|---|
+| traslación | sí, en 5 de 5 | 9.4e-13 | 4.1e-13 |
+| giro de 90° | sí, en 5 de 5 | 4.4e-13 | 3.3e-13 |
+| giro de 37° | sí, en 5 de 5 | 7.5e-13 | 4.9e-13 |

@@ -599,6 +599,37 @@ export function planMuros(ctx: Contexto, plantas: ReadonlyMap<number, PlantaMuro
   return { panos, filas, huecos, empujes, ejes, presente };
 }
 
+/**
+ * Tramos de cota de la franja de un paño de muro (de σ medio `sm`) dentro de [z0, z1] y fuera de
+ * sus huecos.
+ */
+export function franjasLibres(plan: PlanMuros, pa: PanoMuro, sm: number, z0: number, z1: number): [number, number][] {
+  const huecos = plan.huecos[pa.w]!.filter((hh) => hh.i === pa.i && sm > Math.min(hh.sa, hh.sb) && sm < Math.max(hh.sa, hh.sb))
+    .map((hh) => [hh.z0, hh.z1] as const)
+    .sort((a, b) => a[0] - b[0]);
+  const r: [number, number][] = [];
+  let z = z0;
+  for (const [a, b] of huecos) {
+    if (b <= z) continue;
+    if (a >= z1) break;
+    if (a > z) r.push([z, Math.min(a, z1)]);
+    z = Math.max(z, b);
+  }
+  if (z < z1) r.push([z, z1]);
+  return r.filter(([a, b]) => b > a);
+}
+
+/** Franjas de un paño de muro entre estaciones: origen en planta, longitud, dirección y σ medio. */
+export function franjas(pa: PanoMuro): { A: Vec2; L: number; u: Vec2; sm: number }[] {
+  const r: { A: Vec2; L: number; u: Vec2; sm: number }[] = [];
+  for (let j = 0; j + 1 < pa.estaciones.length; j++) {
+    const [A, B] = [pa.estaciones[j]!, pa.estaciones[j + 1]!];
+    const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+    r.push({ A, L, u: [(B[0] - A[0]) / L, (B[1] - A[1]) / L], sm: (pa.sigmas[2 * j]! + pa.sigmas[2 * j + 2]!) / 2 });
+  }
+  return r;
+}
+
 /** Lámina de un muro: nudos de la topología (normal a la derecha del eje), muro, tramo y paño. */
 export interface LaminaMuro {
   nudos: [number, number, number, number];
@@ -707,6 +738,22 @@ export function mallarMuros(
       }
     }
   }
+  // Validador (H23): elementos no degenerados y el área de cada muro, la de su alzado sin huecos
+  // calculada por franjas, sin las láminas (a 1e-9)
+  const area = new Map<number, number>();
+  for (const l of laminas) {
+    const X = l.nudos.map((n) => topo.nudos[n]!);
+    const a = Math.sqrt((X[1]!.x - X[0]!.x) ** 2 + (X[1]!.y - X[0]!.y) ** 2) * (l.z1 - l.z0);
+    if (!(a > 0)) diag.error("malla/muro", `El muro ${ctx.muros[l.w]!.muro.id} tiene un elemento degenerado. Es un fallo del compilador.`, [ctx.muros[l.w]!.muro.id]);
+    area.set(l.w, (area.get(l.w) ?? 0) + a);
+  }
+  const alzado = new Map<number, number>();
+  for (const pa of plan.panos)
+    for (const f of franjas(pa)) for (const [za, zb] of franjasLibres(plan, pa, f.sm, ctx.cotas[pa.k + 1]!, ctx.cotas[pa.k]!)) alzado.set(pa.w, (alzado.get(pa.w) ?? 0) + f.L * (zb - za));
+  for (const [w, A] of alzado) {
+    const e = Math.abs((area.get(w) ?? 0) - A) / A;
+    if (!(e <= 1e-9)) diag.error("malla/area", `La malla del muro ${ctx.muros[w]!.muro.id} no cubre su alzado sin huecos: ${(area.get(w) ?? 0).toPrecision(10)} m² frente a ${A.toPrecision(10)} m² (error ${e.toExponential(2)}). Es un fallo del compilador.`, [ctx.muros[w]!.muro.id]);
+  }
   for (const [id, a] of [...peor].sort((x, y) => (x[0] < y[0] ? -1 : 1)))
     diag.aviso(
       "muro/aspecto",
@@ -769,4 +816,63 @@ function auxiliaresVigas(ctx: Contexto, topo: Topologia, nudosCadena: (k: number
     }
   }
   return r;
+}
+
+/** Huella de una viga en un muro (C3-i): enlace rígido con maestro en el nudo de su extremo. */
+export interface HuellaViga {
+  viga: string;
+  k: number;
+  maestro: number;
+  esclavos: number[];
+}
+
+/**
+ * C3-i (H09): una viga que acaba en un muro fuera de su plano (perpendicular u oblicua) se une a él
+ * por su huella: los nudos del muro por debajo de la cota de la planta, a lo largo de su canto y a
+ * ≤ b/2 + ε_snap de su eje en planta, son esclavos de un enlace rígido con maestro en el nudo del
+ * extremo de la viga. Unida sólo en ese nudo, el momento de la viga en el muro no converge al
+ * refinar: la flexión de placa del muro es singular en un punto (−18 % con la malla por defecto, y
+ * a peor al refinar; `validacion/c3/out_decisiones.txt`). Los nudos de la cota quedan como estaban
+ * (en el diafragma o en la losa); los que ya son esclavos de otra cosa, también.
+ */
+export function huellasVigas(ctx: Contexto, topo: Topologia, nudosCadena: (k: number, w: number, i: number) => number[], ocupados: ReadonlySet<number>): HuellaViga[] {
+  const { epsGeom, epsSnap } = ctx.op;
+  const porMaestro = new Map<number, HuellaViga>();
+  const tomados = new Set<number>();
+  const XY = (n: number): Vec2 => [topo.nudos[n]!.x, topo.nudos[n]!.y];
+  for (const tv of topo.tramos) {
+    if (!tv.cadena.length) continue;
+    const sc = ctx.secciones.get(tv.viga.seccion)!;
+    const b = !sc.huella ? 0 : sc.huella.tipo === "rectangulo" ? sc.huella.b : sc.huella.D;
+    const z = ctx.cotas[tv.k]!;
+    for (const n of [tv.cadena[0]!.nudo, tv.cadena[tv.cadena.length - 1]!.nudo]) {
+      if (topo.nudos[n]!.pilar) continue;
+      ctx.muros.forEach((m, w) => {
+        if (tv.k < m.kh || tv.k >= m.kb) return; // hace falta muro debajo de la planta
+        for (let i = 0; i + 1 < m.muro.puntos.length; i++) {
+          const c = nudosCadena(tv.k, w, i);
+          const j = c.indexOf(n);
+          if (j < 0) continue;
+          // En el plano del muro la llevan las barras auxiliares (C3-e) o el propio muro
+          const a = c[j > 0 ? j - 1 : j + 1]!;
+          if (a < 0) continue;
+          const [X0, X1] = [XY(n), XY(a)];
+          const L = dist(X0, X1);
+          const dw: Vec2 = [(X1[0] - X0[0]) / L, (X1[1] - X0[1]) / L];
+          if (Math.abs(dw[0] * tv.t.u[1] - dw[1] * tv.t.u[0]) <= 0.01) continue;
+          const esclavos = topo.nudos.flatMap((nd, s) =>
+            nd.z !== undefined && nd.k === tv.k && nd.z < z - epsGeom && nd.z >= z - sc.canto - epsGeom && nd.fisicos.has(m.muro.id) && dist(XY(s), X0) <= b / 2 + epsSnap && !ocupados.has(s) && !tomados.has(s) ? [s] : [],
+          );
+          if (!esclavos.length) continue;
+          let hv = porMaestro.get(n);
+          if (!hv) porMaestro.set(n, (hv = { viga: tv.viga.id, k: tv.k, maestro: n, esclavos: [] }));
+          for (const s of esclavos) {
+            tomados.add(s);
+            hv.esclavos.push(s);
+          }
+        }
+      });
+    }
+  }
+  return [...porMaestro.values()].map((hv) => ({ ...hv, esclavos: [...hv.esclavos].sort((x, y) => x - y) }));
 }

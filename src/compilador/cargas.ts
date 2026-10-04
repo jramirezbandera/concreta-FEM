@@ -26,7 +26,7 @@ import type { CargaBarra, ModeloAnalitico, Vec3 } from "../motor/modelo.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Vec2, Viga } from "./fisico.ts";
 import type { Losas } from "./losas.ts";
-import type { PanoMuro, PlanMuros } from "./muros.ts";
+import { franjas, franjasLibres } from "./muros.ts";
 import type { Piezas, Recta } from "./piezas.ts";
 import { areaConSigno, momentosInterseccion, momentosRegion, puntoEnRegion, type Momentos, type Region } from "./poligonos.ts";
 import type { Topologia } from "./topologia.ts";
@@ -82,37 +82,6 @@ export interface CargasCompiladas {
   casos: { nodales: Map<number, number[]>; barras: CargaBarra[]; laminas: Map<number, number[]>; laminasNodos: Map<number, number[][]> }[];
   /** Por caso: resultante física respecto a `centro`. */
   fisicas: Resultante[];
-}
-
-/**
- * Tramos de cota de la franja de un paño de muro (de σ medio `sm`) dentro de [z0, z1] y fuera de
- * sus huecos.
- */
-function franjasLibres(plan: PlanMuros, pa: PanoMuro, sm: number, z0: number, z1: number): [number, number][] {
-  const huecos = plan.huecos[pa.w]!.filter((hh) => hh.i === pa.i && sm > Math.min(hh.sa, hh.sb) && sm < Math.max(hh.sa, hh.sb))
-    .map((hh) => [hh.z0, hh.z1] as const)
-    .sort((a, b) => a[0] - b[0]);
-  const r: [number, number][] = [];
-  let z = z0;
-  for (const [a, b] of huecos) {
-    if (b <= z) continue;
-    if (a >= z1) break;
-    if (a > z) r.push([z, Math.min(a, z1)]);
-    z = Math.max(z, b);
-  }
-  if (z < z1) r.push([z, z1]);
-  return r.filter(([a, b]) => b > a);
-}
-
-/** Franjas de un paño de muro entre estaciones: origen en planta, longitud, dirección y σ medio. */
-function franjas(pa: PanoMuro): { A: Vec2; L: number; u: Vec2; sm: number }[] {
-  const r: { A: Vec2; L: number; u: Vec2; sm: number }[] = [];
-  for (let j = 0; j + 1 < pa.estaciones.length; j++) {
-    const [A, B] = [pa.estaciones[j]!, pa.estaciones[j + 1]!];
-    const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
-    r.push({ A, L, u: [(B[0] - A[0]) / L, (B[1] - A[1]) / L], sm: (pa.sigmas[2 * j]! + pa.sigmas[2 * j + 2]!) / 2 });
-  }
-  return r;
 }
 
 /** Suma una carga de superficie uniforme q sobre una figura de momentos m, a la cota z (relativa al centro). */
