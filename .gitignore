@@ -32,3 +32,5 @@ spike/e0/datos/
 # Validación E6: modelos exportados para el oráculo (se regeneran con validacion/e6/modelos-oraculo.ts)
 validacion/e6/modelos-oraculo.json
 validacion/e6/tmp/
+validacion/e6/sap2000/*.$2k
+validacion/e6/sap2000/*.comparacion.txt
