@@ -32,3 +32,30 @@ SOFTWARE.
 --------------------------------------------------------------------------------
 faer 0.24.4 — https://codeberg.org/sarah-quinones/faer
 Licencia MIT. Se enlaza como dependencia del núcleo WASM (kernel/), sin modificar.
+
+--------------------------------------------------------------------------------
+Dependencias del mallador del compilador (fase C2), sin modificar, por bun
+(package.json, versiones exactas). Las versiones entran en la huella de compilación.
+
+delaunator 5.1.0 — https://github.com/mapbox/delaunator
+Licencia ISC. Copyright (c) 2026, Mapbox
+
+@kninnug/constrainautor 4.1.0 — https://github.com/kninnug/Constrainautor
+Licencia ISC. Copyright 2020, Marco Gunnink
+(Incluye una adaptación de robust-segment-intersect de Mikola Lysenko, licencia MIT.)
+
+  Permission to use, copy, modify, and/or distribute this software for any purpose
+  with or without fee is hereby granted, provided that the above copyright notice
+  and this permission notice appear in all copies.
+
+  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+  REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+  FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+  INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+  OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+  TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+  THIS SOFTWARE.
+
+robust-predicates 3.0.3 — https://github.com/mourner/robust-predicates
+Unlicense (dominio público), admitida el 2026-10-04 sólo para esta dependencia.
+Port de los predicados geométricos adaptativos de J. R. Shewchuk (dominio público).

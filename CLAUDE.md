@@ -39,6 +39,7 @@
 5. **Convenio de signos tipo CSI nativo,** escrito en la cabecera del motor (H02).
 6. **Licencias:**
    - sólo MIT, BSD, Apache-2.0, MPL-2.0 o ISC (equivalente a MIT; admitida el 2026-10-04 para el mallador de C2: delaunator y constrainautor, H29);
+   - Unlicense (dominio público), admitida el 2026-10-04 sólo para robust-predicates, que delaunator y constrainautor importan;
    - no usar ni copiar código de OpenSees, xara, stabileo (AGPL), CHOLMOD Supernodal (GPL) ni Triangle (H54);
    - lo que se porte de PyNite o de hekatan-struct-lineal (MIT) se cita en `NOTICE`.
 7. **No se usa para calcular de verdad** hasta que pase la batería de validación y un periodo «en sombra»: los mismos proyectos reales calculados también con SAP2000 o CYPE, para comparar.

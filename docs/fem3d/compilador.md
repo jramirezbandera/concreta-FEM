@@ -4,7 +4,7 @@
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
 >
-> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). Siguiente: C2.
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 en curso desde el 2026-10-04 (alcance, decisiones y criterios abajo).
 
 ## Entrada, salida y reglas
 
@@ -83,7 +83,75 @@
 7. **Rendimiento.** Las barras del edificio objetivo (7 plantas con 80 pilares y sus vigas) compilan en sobremesa en una fracción del tiempo de cálculo.
 8. **Referencia congelada** del modelo analítico y de sus resultados (regla de oro 1).
 
+## C2: alcance y decisiones
+
+**Modelo físico de C2** (se añade a C1 en `fisico.ts`):
+- `losas`: planta, contorno (polígono simple), huecos, espesor, material (hormigón o general), `pp` (kN/m²; por defecto γ·t, el de una maciza, H24) y `eje1` (grados desde +X; por defecto 0).
+- `apoyosLineales`: polilínea de una planta con sus GDL coartados. Tiene que ir sobre losa: las vigas sobre muros llegan con C3.
+- `bandas`: rectángulos de dimensionado (eje `desde`→`hasta` y `ancho`) cuyos lados se siembran en la malla (D5, E5-5). En C2 sólo se siembran; las automáticas y su integración son de C5.
+- Cargas nuevas:
+  - `superficie` (kN/m², global) sobre una losa entera o sobre una zona poligonal de una planta;
+  - `lineal` (kN/m, global) sobre una polilínea de una losa.
+
+  La `puntual` puede caer ya en una losa.
+- Opción `tamanoMalla` (h, m).
+
+**Cómo malla C2** (H29, H23):
+1. **Un arreglo plano por planta** con todo lo que la malla tiene que respetar:
+   - contornos y huecos de las losas, ejes de las vigas y huellas de los pilares;
+   - apoyos lineales, zonas y líneas de carga, lados de las bandas;
+   - puntos: cargas y apoyos puntuales, y los nudos de C1, que no se mueven.
+
+   Con ε_snap, un vértice se une al punto o al segmento cercano, un punto cercano a un segmento lo parte y los cruces crean puntos. Al acabar no quedan dos puntos a menos de ε_snap, ni un punto a menos de ε_snap de un segmento ajeno, ni cruces: lo que constrainautor exige.
+2. **Siembra:** cada segmento, a paso ≤ 2h. Retícula triangular de Steiner a 2h por losa, orientada con su `eje1`, anclada en uno de sus vértices y a ≥ 0,45·2h de los segmentos (COM-11: sin puntos cocirculares).
+3. **CDT** (delaunator 5.1.0 + constrainautor 4.1.0, versiones en la huella) sobre los puntos ordenados canónicamente. Se quedan los triángulos cuyo centroide cae en una losa y fuera de sus huecos, y cada uno se divide en 3 cuadriláteros (vértice, puntos medios y centroide), con la normal hacia +Z.
+4. **Validador obligatorio** (H23):
+   - Σ áreas = área de la losa menos sus huecos, a 1e-9;
+   - normal +Z;
+   - cada segmento del arreglo y cada punto obligatorio, en la malla;
+   - sin nudos huérfanos;
+   - jacobiano escalado en los 4 puntos de Gauss: error si es ≤ 0, aviso si es bajo.
+
+   Si falla, el error nombra la losa.
+
+**Decisiones por defecto de C2.** Como en C1, cada una es una opción o una regla registrada en las hipótesis:
+
+| # | Decisión | Por defecto | Por qué | Alternativa |
+|---|---|---|---|---|
+| C2-a | Tamaño de malla | h = **0,75 m** (triángulos de 1,5 m, cuadriláteros de ~0,57 m: ~10 por vano de 5,5 m) | H10 pide 8 por vano. Con h = 0,75, el edificio objetivo se queda en ~37 000 nudos, dentro de D9; con 0,5 pasaría de 80 000 (H52 × 1,6 del CDT). Las caras se comprueban por fuerzas nodales, que no dependen de la malla (E5-5) | `tamanoMalla` |
+| C2-b | Geometría de las losas | Sus vértices se unen a lo cercano a ≤ ε_snap, con aviso del desplazamiento y del área que cambia; las cargas se calculan sobre la geometría unida | En una lámina no hay offsets: es la única excepción a «la geometría no se mueve» | — |
+| C2-c | Borde de losa dentro del ancho de una viga y a más de ε_snap de su eje | **Error** | La losa quedaría suelta de la viga sin aviso. Los bordes van a ejes, como en SAP2000 y ETABS | Dibujar el borde sobre el eje |
+| C2-d | Unión pilar–losa | **Huella rígida:** los nudos de la losa en la huella del pilar (o a ≤ ε_snap de ella) son esclavos de un enlace rígido con maestro en su nudo, que a su vez es esclavo del diafragma (cadena, E1). Un pilar sin dimensiones se une en un punto, con aviso (H09) | H09, COM-15 y E5: con la huella, el momento en la cara converge; en un punto, diverge | — |
+| C2-e | Vigas embebidas | Se parten en los nudos de la malla sobre su eje, salvo en los de las huellas. Su zona rígida sigue siendo la de C1-a. La zona rígida de la cabeza del pilar cuenta también el espesor de la losa | La viga trabaja con la losa nudo a nudo (H29). Fuera de las huellas, para que C1-a conserve su sentido | — |
+| C2-f | Diafragma con losas | En una planta con losas entran los nudos sobre ellas, también los de las vigas y pilares que caen dentro; las huellas, por la cadena. Los que quedan fuera (pilares en dobles alturas, vigas sin losa) no entran. «ninguno» con losas es un forjado semirrígido | Cierra C1-e y los pilares de doble altura de C1 | `diafragma: "ninguno"` por planta |
+| C2-g | Peso propio | Losa: `pp` (por defecto γ·t), como carga de superficie del caso de peso propio. Viga de hormigón rectangular bajo losa: sólo su descuelgue; se le quita (b/2)·min(h, t) por cada lado cubierto por losa | H24: en una viga plana el peso se contaba dos veces. Con el lado como unidad, una viga de borde con la losa a ejes pierde sólo la mitad que solapa | — |
+| C2-h | Cargas sobre losa | Zonas y líneas sembradas en la malla: superficie, por lámina entera; lineal, a los nudos de sus aristas (exacto con las funciones lineales del borde); puntual, en un vértice sembrado, con el momento de transporte si se une a otro a ≤ ε_snap. La parte de una zona fuera de las losas no es carga, con aviso | H29 y COM-14. La resultante física se calcula sin la malla (recortes de polígonos) para que «sin pérdidas» compruebe el mallado | — |
+
+**Lo que C2 deja fuera:**
+- losas inclinadas, rampas y losas a otra cota que la de su planta;
+- la rejilla alineada para zonas regulares (H52) y el refinado local (Ruppert);
+- cargas lineales variables y zonas con carga variable;
+- las bandas automáticas y su integración (C5), los muros (C3) y los forjados reticular y unidireccional (C4);
+- el solape del peso del pilar con la losa, y el de las vigas que no son rectangulares de hormigón.
+
+## C2: criterios de paso
+
+1. **Oráculo analítico.** Placas de Navier (isótropa delgada y gruesa de E3) descritas como modelo físico con apoyos lineales: la malla de C2 converge con orden ≈ 2 a la serie de Mindlin, y con h = 0,25 queda a ≤ 0,5 % en w y en M, como la rejilla de E3 (H29: 0,2 % entre ellas).
+2. **Oráculo de E5.** La losa plana de H25 descrita como modelo físico, con pilares y bandas: My y Vz de la banda de pilar y del pórtico virtual en la cara (fuerzas nodales) y My en el vano, a ≤ 1 % de los de la rejilla de E5.
+3. **Validador de malla** en una batería de plantas aleatorias (losas con huecos, vigas oblicuas, pilares girados, zonas, líneas y bandas): todas sus comprobaciones pasan y la calidad queda medida.
+4. **Metamórficas:**
+   - reordenar las listas da el mismo modelo analítico bit a bit;
+   - una traslación y un giro de 90° (con el `eje1`) dan la misma malla y los resultados transformados;
+   - un giro cualquiera, los resultados girados a la precisión de la malla;
+   - un ruido menor que ε_geom no cambia la malla, y uno menor que ε_snap no cambia la topología de C1 (con avisos).
+5. **Sin pérdidas** en cada compilación (≤ 1e-9), con la resultante física calculada sin la malla, y equilibrio del motor.
+6. **Entradas no válidas:** un catálogo de losas, cargas, apoyos lineales y bandas no válidos da su error con el id físico, sin lanzar.
+7. **Determinismo y huella:** la misma malla en V8 y en JavaScriptCore; la huella no depende del orden de las listas.
+8. **Rendimiento:** el edificio objetivo con losa maciza (7 plantas, 80 pilares) compila en una fracción del cálculo y, con el h por defecto, cabe en D9.
+9. **Referencia congelada** del modelo analítico y de sus resultados.
+
 ## Preguntas para el usuario (no bloquean C1)
 
 - **Licencia ISC:** admitida por el usuario el 2026-10-04 (regla 6 de `CLAUDE.md`). El mallador de C2 usará delaunator y constrainautor (H29).
+- **Licencia Unlicense:** admitida por el usuario el 2026-10-04 sólo para robust-predicates 3.0.3 (los predicados exactos de Shewchuk), que delaunator y constrainautor importan directamente.
 - **C1-a, C1-c, C1-d y D4:** decididas por el usuario el 2026-10-04 con las medidas de `validacion/c1/out_decisiones.txt`: factor de zona rígida 0,5, D4 (b) por material, y C1-c y C1-d como estaban.
