@@ -15,6 +15,7 @@ import type { SeccionBarra } from "../elementos/barra.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
 import type { Liberacion, Pilar } from "./fisico.ts";
+import type { Losas } from "./losas.ts";
 import type { SeccionCompilada } from "./secciones.ts";
 import { cuerdaEnTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
@@ -74,11 +75,13 @@ export interface Piezas {
 
 const libera = (l?: Liberacion): Seis<boolean> | undefined => (l && l.some(Boolean) ? l : undefined);
 
-export function construirPiezas(ctx: Contexto, topo: Topologia, diag: Diagnosticos): Piezas {
+export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, diag: Diagnosticos): Piezas {
   const { epsGeom, factorZonaRigida: f } = ctx.op;
   const barras: BarraP[] = [];
   const rectas: Recta[] = [];
   const rectasDe = new Map<string, Recta[]>();
+  // Espesor de la losa en la huella de cada nudo de pilar (C2-e: cuenta como canto en la cabeza)
+  const espesorHuella = new Map(losas.huellas.map((h) => [h.maestro, h.espesor] as const));
 
   // Pilares: una recta por pilar, de su base a su cabeza; un tramo por planta
   for (const p of ctx.pilares) {
@@ -99,12 +102,12 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, diag: Diagnostic
       const zi = ctx.cotas[k]!;
       const zj = ctx.cotas[k - 1]!;
       const vigas = topo.vigasEn.get(nj) ?? new Set<string>();
-      const canto = Math.max(0, ...[...vigas].map((v) => ctx.secciones.get(ctx.vigaDe.get(v)!.seccion)!.canto));
+      const canto = Math.max(espesorHuella.get(nj) ?? 0, ...[...vigas].map((v) => ctx.secciones.get(ctx.vigaDe.get(v)!.seccion)!.canto));
       const rz = f * canto;
       const ip: Vec3 = [p.x, p.y, zi];
       const jp: Vec3 = [p.x, p.y, zj - rz];
       if (!(jp[2] - ip[2] > epsGeom)) {
-        diag.error("pilar/tramo-flexible-nulo", `El tramo del pilar ${p.id} bajo la planta ${ctx.plantas[k - 1]!.id} queda entero dentro del canto de las vigas que le llegan (${canto} m).`, [p.id, ...vigas]);
+        diag.error("pilar/tramo-flexible-nulo", `El tramo del pilar ${p.id} bajo la planta ${ctx.plantas[k - 1]!.id} queda entero dentro del canto de las vigas o de la losa que le llegan (${canto} m).`, [p.id, ...vigas]);
         continue;
       }
       const lib: { i?: Seis<boolean>; j?: Seis<boolean> } = {};
@@ -261,11 +264,23 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, diag: Diagnostic
     }
   }
   for (const a of ctx.apoyos) {
-    const n = topo.apoyoEn.get(a.id);
+    const n = topo.apoyoEn.get(a.id) ?? losas.apoyosPuntuales.get(a.id);
     if (n !== undefined) apoyar(n, a.coartados, a.id);
   }
+  for (const a of ctx.apoyosLineales) for (const n of losas.apoyosLineales.get(a.id) ?? []) apoyar(n, a.coartados, a.id);
+  // Un apoyo en un esclavo de una huella: el motor no lo admite (como C1-f)
+  const esclavos = new Map<number, string>();
+  for (const h of losas.huellas) for (const n of h.esclavos) esclavos.set(n, h.pilar);
+  for (const n of apoyos.keys()) {
+    if (!esclavos.has(n)) continue;
+    diag.error(
+      "apoyo/en-huella",
+      `${origen.get(n)} apoya un nudo de la losa dentro de la huella del pilar ${esclavos.get(n)}, que se mueve con él: el motor no admite apoyos en los nudos de un enlace rígido. Apoye el pilar.`,
+      [origen.get(n)!, esclavos.get(n)!],
+    );
+  }
 
-  // Diafragmas: todos los nudos de la planta (C1-e)
+  // Diafragmas: en una planta con losas, los nudos sobre ellas (C2-f); si no, todos (C1-e)
   const diafragmas: { k: number; nudos: number[] }[] = [];
   const porK = new Map<number, number[]>();
   topo.nudos.forEach((nd, n) => {
@@ -273,6 +288,7 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, diag: Diagnostic
     if (!l) porK.set(nd.k, (l = []));
     l.push(n);
   });
+  for (const [k, l] of losas.diafragma) porK.set(k, l);
   for (const [k, lista] of [...porK].sort((a, b) => b[0] - a[0])) {
     if (diafragmaDe(ctx, k) !== "rigido" || lista.length < 2) continue;
     const malos = lista.filter((n) => {

@@ -24,6 +24,13 @@
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Pilar, Vec2, Viga } from "./fisico.ts";
 import { cortarTramos, cuerdaHuella, dist, distanciaAHuella, huellaPilar, proyectar, radioHuella, RejillaHash, tramo, type Huella, type Tramo2D } from "./geometria2d.ts";
+import { distanciaABorde, puntoEnRegion, type Region } from "./poligonos.ts";
+
+/** Distancia de un punto a una región (0 dentro). */
+export function distanciaARegion(q: Vec2, r: Region): number {
+  if (puntoEnRegion(q, r)) return 0;
+  return Math.min(distanciaABorde(q, r.contorno), ...r.huecos.map((h) => distanciaABorde(q, h)));
+}
 import type { Contexto } from "./validar.ts";
 
 export interface PuntoPilar {
@@ -354,7 +361,9 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
         }
       }
       if (n < 0) {
-        diag.error("apoyo/sin-destino", `El apoyo ${ap.id} no cae sobre ningún pilar, nudo ni viga de la planta ${ap.planta} (tolerancia ${cm(epsSnap)}).`, [ap.id]);
+        // En una losa lo coloca su malla (C2)
+        if (ctx.losas.some((l) => ctx.planta.get(l.losa.planta) === k && (puntoEnRegion(Q, l.region) || distanciaARegion(Q, l.region) <= epsSnap))) continue;
+        diag.error("apoyo/sin-destino", `El apoyo ${ap.id} no cae sobre ningún pilar, nudo, viga ni losa de la planta ${ap.planta} (tolerancia ${cm(epsSnap)}).`, [ap.id]);
         continue;
       }
       const d = dist(Q, P(n));
@@ -364,22 +373,7 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
     }
 
     // 8. Cadenas
-    for (const tv of tramosK) {
-      const lista = [tv.ini, tv.fin, ...tv.partes];
-      const unicos = [...new Set(lista)];
-      tv.cadena = unicos.map((n) => ({ nudo: n, sigma: proyectar(P(n), tv.t).sigma })).sort((a, b) => a.sigma - b.sigma || a.nudo - b.nudo);
-      for (let i = 1; i < tv.cadena.length; i++) {
-        if (!(tv.cadena[i]!.sigma - tv.cadena[i - 1]!.sigma > epsGeom)) {
-          diag.error(
-            "topologia/tramo-degenerado",
-            `La viga ${tv.viga.id} tiene dos nudos en el mismo punto de su tramo ${tv.indice + 1} (planta ${ctx.plantas[k]!.id}): el encuentro es ambiguo.`,
-            [tv.viga.id, ...nudos[tv.cadena[i]!.nudo]!.fisicos],
-          );
-          break;
-        }
-      }
-      for (const { nudo } of tv.cadena) nudos[nudo]!.fisicos.add(tv.viga.id);
-    }
+    for (const tv of tramosK) ordenarCadena(ctx, nudos, tv, diag);
     porPlanta.set(k, { pilares: puntos, gPilares, gTramos, gNudos, tramos: tramosK });
 
     // 9. Comprobaciones
@@ -488,6 +482,27 @@ function solape(p: Tramo2D, q: Tramo2D, eps: number, huellas: readonly Huella[])
     if (c) dentro += Math.max(0, Math.min(hi, c[1]) - Math.max(lo, c[0]));
   }
   return hi - lo - dentro;
+}
+
+/**
+ * Cadena de un tramo: sus nudos (extremos y los que lo parten) ordenados por su proyección σ sobre
+ * la recta del tramo. Dos nudos en el mismo σ son un encuentro ambiguo (error). La usan la
+ * topología (paso 8) y las losas, al añadir los nudos de la malla sobre el eje de la viga (C2).
+ */
+export function ordenarCadena(ctx: Contexto, nudos: NudoT[], tv: TramoViga, diag: Diagnosticos): void {
+  const unicos = [...new Set([tv.ini, tv.fin, ...tv.partes])];
+  tv.cadena = unicos.map((n) => ({ nudo: n, sigma: proyectar([nudos[n]!.x, nudos[n]!.y], tv.t).sigma })).sort((a, b) => a.sigma - b.sigma || a.nudo - b.nudo);
+  for (let i = 1; i < tv.cadena.length; i++) {
+    if (!(tv.cadena[i]!.sigma - tv.cadena[i - 1]!.sigma > ctx.op.epsGeom)) {
+      diag.error(
+        "topologia/tramo-degenerado",
+        `La viga ${tv.viga.id} tiene dos nudos en el mismo punto de su tramo ${tv.indice + 1} (planta ${ctx.plantas[tv.k]!.id}): el encuentro es ambiguo.`,
+        [tv.viga.id, ...nudos[tv.cadena[i]!.nudo]!.fisicos],
+      );
+      break;
+    }
+  }
+  for (const { nudo } of tv.cadena) nudos[nudo]!.fisicos.add(tv.viga.id);
 }
 
 /** Cuerda de la recta de un tramo dentro de la huella de un pilar, en σ del tramo. */

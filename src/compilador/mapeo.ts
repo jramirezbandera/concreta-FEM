@@ -7,7 +7,7 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 
 export interface NudoMapeado {
-  /** Objetos físicos que lo originan (pilares, vigas, apoyos); vacío en un maestro de diafragma. */
+  /** Objetos físicos que lo originan (pilares, vigas, losas, apoyos); vacío en un maestro de diafragma. */
   fisicos: string[];
   planta: string;
   /** Nudo maestro (auxiliar, sin pieza) del diafragma de su planta. */
@@ -29,7 +29,12 @@ export interface BarraMapeada {
 export interface Mapeo {
   nudos: NudoMapeado[];
   barras: BarraMapeada[];
-  restricciones: { planta: string }[];
+  /** Planta de cada restricción; las huellas (C2-d), además, su pilar. */
+  restricciones: { planta: string; pilar?: string }[];
+  /** C2: losa de cada lámina, en paralelo a `modelo.laminas` (sólo si hay losas). */
+  laminas?: { losa: string }[];
+  /** C2: láminas de cada losa, en orden canónico (sólo si hay losas). */
+  losas?: Record<string, number[]>;
   /** Barras de cada pieza física, en orden a lo largo de ella. */
   piezas: Record<string, number[]>;
   /** Nudo del eje de cada pilar en cada planta: clave `${pilar}@${planta}`. */
@@ -43,7 +48,8 @@ export function fisicosDeIds(modelo: ModeloAnalitico, mapeo: Mapeo): Map<string,
   const m = new Map<string, string[]>();
   modelo.nudos.forEach((n, i) => m.set(n.id, mapeo.nudos[i]!.maestro ? [mapeo.nudos[i]!.planta] : mapeo.nudos[i]!.fisicos));
   (modelo.barras ?? []).forEach((b, i) => m.set(b.id, [mapeo.barras[i]!.pieza]));
-  (modelo.restricciones ?? []).forEach((r, i) => m.set(r.id, [mapeo.restricciones[i]!.planta]));
+  (modelo.laminas ?? []).forEach((l, i) => m.set(l.id, [mapeo.laminas![i]!.losa]));
+  (modelo.restricciones ?? []).forEach((r, i) => m.set(r.id, [mapeo.restricciones[i]!.pilar ?? mapeo.restricciones[i]!.planta]));
   for (const c of modelo.casos) m.set(c.id, [c.id]);
   return m;
 }

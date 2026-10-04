@@ -1,7 +1,7 @@
 /**
- * Modelo físico del compilador (fase C1: plantas, pilares, vigas, apoyos, casos y cargas). Es lo
- * que el usuario describe; el compilador lo convierte en el `ModeloAnalitico` del motor
- * (`docs/fem3d/compilador.md`).
+ * Modelo físico del compilador (C1: plantas, pilares, vigas, apoyos, casos y cargas; C2: losas,
+ * apoyos lineales, bandas y cargas de superficie y lineales). Es lo que el usuario describe; el
+ * compilador lo convierte en el `ModeloAnalitico` del motor (`docs/fem3d/compilador.md`).
  *
  * Convenios:
  * - Unidades kN y m (D1); los módulos elásticos, en kN/m², salvo los datos de material que se
@@ -22,6 +22,10 @@
  *   Las liberaciones y las cargas "local" van en esos ejes.
  * - Estaciones: distancia en m a lo largo de la pieza, desde el primer punto de una viga (sumando
  *   sus tramos) o desde la base de un pilar.
+ * - Losas (C2): planas, en el plano de su planta (el plano medio a la cota del forjado). Su contorno
+ *   y sus huecos son polígonos simples en planta, en cualquier sentido y sin repetir el primer
+ *   punto. Los bordes van a ejes: un borde que se apoya en una viga se dibuja sobre su eje (C2-c).
+ *   Las láminas tienen la normal hacia +Z y el eje 1 en la dirección `eje1` (E3-2).
  */
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
@@ -40,7 +44,8 @@ export interface Planta {
   altura: number | null;
   /**
    * Diafragma de la planta (C1-d). Por defecto, rígido en todas menos en la más baja, donde
-   * suelen estar los arranques empotrados.
+   * suelen estar los arranques empotrados. Con losas, el rígido abarca los nudos que caen en ellas
+   * (C2-f) y "ninguno" es un forjado semirrígido (la membrana de las losas).
    */
   diafragma?: "rigido" | "ninguno";
 }
@@ -160,7 +165,7 @@ export type CargaFisica =
       tipo: "puntual";
       id: string;
       caso: string;
-      /** Punto en planta y planta: cae en un pilar, en un nudo o sobre una viga. */
+      /** Punto en planta y planta: cae en un pilar, en un nudo, sobre una viga o en una losa. */
       planta: string;
       x: number;
       y: number;
@@ -169,7 +174,73 @@ export type CargaFisica =
       M?: Vec3;
     }
   | { tipo: "viga"; id: string; caso: string; viga: string; ejes: "global" | "local"; q: Vec3; qb?: Vec3; desde?: number; hasta?: number }
-  | { tipo: "pilar"; id: string; caso: string; pilar: string; ejes: "global" | "local"; q: Vec3; qb?: Vec3; desde?: number; hasta?: number };
+  | { tipo: "pilar"; id: string; caso: string; pilar: string; ejes: "global" | "local"; q: Vec3; qb?: Vec3; desde?: number; hasta?: number }
+  | {
+      /**
+       * Carga de superficie uniforme (C2), en kN/m² y ejes globales: sobre la losa `losa` entera
+       * (sin sus huecos) o sobre la parte de las losas de la planta que cae en el polígono `zona`
+       * (si se dan los dos, la parte de esa losa en la zona). Lo que cae fuera de las losas no es
+       * carga (C2-h).
+       */
+      tipo: "superficie";
+      id: string;
+      caso: string;
+      planta: string;
+      q: Vec3;
+      losa?: string;
+      zona?: readonly Vec2[];
+    }
+  | {
+      /** Carga lineal uniforme sobre una polilínea de una losa (C2), en kN/m y ejes globales. */
+      tipo: "lineal";
+      id: string;
+      caso: string;
+      planta: string;
+      puntos: readonly Vec2[];
+      q: Vec3;
+    };
+
+/** Losa maciza (C2): una lámina plana en el plano de su planta. */
+export interface Losa {
+  id: string;
+  nombre?: string;
+  planta: string;
+  /** Contorno exterior en planta, m: polígono simple de al menos 3 vértices. */
+  contorno: readonly Vec2[];
+  /** Huecos: polígonos simples dentro del contorno, sin tocarse entre sí ni tocarlo. */
+  huecos?: readonly (readonly Vec2[])[];
+  /** Espesor, m (el de su rigidez). */
+  espesor: number;
+  /** Material: hormigón o general. */
+  material: string;
+  /** Peso propio, kN/m² (H24). Por defecto, γ·espesor: el de una losa maciza. */
+  pp?: number;
+  /** Dirección del eje 1 de sus láminas en planta, en grados desde +X (E3-2). Por defecto, 0. Orienta también la retícula de la malla. */
+  eje1?: number;
+}
+
+/** Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa. */
+export interface ApoyoLineal {
+  id: string;
+  planta: string;
+  puntos: readonly Vec2[];
+  /** GDL coartados en ejes globales, [ux, uy, uz, rx, ry, rz]. */
+  coartados: Seis<boolean>;
+}
+
+/**
+ * Banda de dimensionado (D5): el rectángulo de eje `desde` → `hasta` y anchura `ancho`. En C2 sólo
+ * se siembran sus lados en la malla, para que los cortes por fuerzas nodales en sus extremos (las
+ * caras de los apoyos) y en sus bordes sean exactos (E5-5); las automáticas y su integración son
+ * de C5.
+ */
+export interface Banda {
+  id: string;
+  planta: string;
+  desde: Vec2;
+  hasta: Vec2;
+  ancho: number;
+}
 
 export interface ModeloFisico {
   plantas: readonly Planta[];
@@ -178,6 +249,9 @@ export interface ModeloFisico {
   pilares?: readonly Pilar[];
   vigas?: readonly Viga[];
   apoyos?: readonly ApoyoFisico[];
+  losas?: readonly Losa[];
+  apoyosLineales?: readonly ApoyoLineal[];
+  bandas?: readonly Banda[];
   casos: readonly CasoFisico[];
   cargas?: readonly CargaFisica[];
 }
@@ -213,6 +287,13 @@ export const MODIFICADORES_D4: ModificadoresPiezas = { pilares: { todos: { A: 2 
 /** Factor de zona rígida por defecto (C1-a, decidido el 2026-10-04): la mitad del nudo es rígida. */
 export const FACTOR_ZONA_RIGIDA = 0.5;
 
+/**
+ * Tamaño de malla por defecto de las losas, m (C2-a): triángulos de 2h divididos en 3
+ * cuadriláteros de ~0,76·h de lado, unos 10 por vano de 5,5 m (H10 pide 8). Con él, el edificio
+ * objetivo cabe en D9.
+ */
+export const TAMANO_MALLA = 0.75;
+
 export interface OpcionesCompilacion {
   /** Tolerancia numérica, m: fusión silenciosa. Por defecto, 1e-6. */
   epsGeom?: number;
@@ -232,6 +313,8 @@ export interface OpcionesCompilacion {
    * quita todos.
    */
   modificadores?: ModificadoresPiezas;
+  /** Tamaño de malla de las losas, h en m (C2-a): la retícula de triángulos va a 2h. Por defecto, 0,75. */
+  tamanoMalla?: number;
 }
 
 export interface OpcionesResueltas {
@@ -240,6 +323,7 @@ export interface OpcionesResueltas {
   factorZonaRigida: number;
   cortante: boolean;
   modificadores: ModificadoresPiezas;
+  tamanoMalla: number;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -249,5 +333,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     factorZonaRigida: o.factorZonaRigida ?? FACTOR_ZONA_RIGIDA,
     cortante: o.cortante ?? true,
     modificadores: o.modificadores ?? MODIFICADORES_D4,
+    tamanoMalla: o.tamanoMalla ?? TAMANO_MALLA,
   };
 }

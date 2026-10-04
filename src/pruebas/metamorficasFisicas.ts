@@ -28,23 +28,38 @@ export interface Plano {
   giro: number;
 }
 
+/**
+ * Transforma la planta de un modelo físico. Los apoyos sólo se trasladan o giran de sitio: sus
+ * coacciones globales no se giran (vale para apoyos simétricos en ux, uy).
+ */
 export function transformar(f: ModeloFisico, t: Plano): ModeloFisico {
   const v3 = (q?: readonly number[]) => (q ? t.v(q) : undefined);
-  return {
+  const g: ModeloFisico = {
     ...f,
-    pilares: f.pilares!.map((p) => {
+    pilares: f.pilares?.map((p) => {
       const [x, y] = t.p([p.x, p.y]);
       return { ...p, x, y, giro: (p.giro ?? 0) + t.giro };
     }),
-    vigas: f.vigas!.map((v) => ({ ...v, puntos: v.puntos.map(t.p) })),
-    cargas: f.cargas!.map((c): CargaFisica => {
+    vigas: f.vigas?.map((v) => ({ ...v, puntos: v.puntos.map(t.p) })),
+    apoyos: f.apoyos?.map((a) => {
+      const [x, y] = t.p([a.x, a.y]);
+      return { ...a, x, y };
+    }),
+    losas: f.losas?.map((l) => ({ ...l, contorno: l.contorno.map(t.p), huecos: l.huecos?.map((h) => h.map(t.p)), eje1: (l.eje1 ?? 0) + t.giro })),
+    apoyosLineales: f.apoyosLineales?.map((a) => ({ ...a, puntos: a.puntos.map(t.p) })),
+    bandas: f.bandas?.map((b) => ({ ...b, desde: t.p(b.desde), hasta: t.p(b.hasta) })),
+    cargas: f.cargas?.map((c): CargaFisica => {
       if (c.tipo === "puntual") {
         const [x, y] = t.p([c.x, c.y]);
         return { ...c, x, y, F: v3(c.F), M: v3(c.M) };
       }
+      if (c.tipo === "superficie") return { ...c, q: t.v(c.q), zona: c.zona?.map(t.p) };
+      if (c.tipo === "lineal") return { ...c, q: t.v(c.q), puntos: c.puntos.map(t.p) };
       return c.ejes === "global" ? { ...c, q: t.v(c.q), qb: v3(c.qb) } : c;
     }),
   };
+  for (const k of ["pilares", "vigas", "apoyos", "losas", "apoyosLineales", "bandas", "cargas"] as const) if (g[k] === undefined) delete g[k];
+  return g;
 }
 
 /** Traslación, giro exacto de 90° y giro de 37°. */

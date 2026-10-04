@@ -19,6 +19,8 @@ export interface SeccionCompilada {
   huella: FormaHuella | null;
   /** Tipo de material (para los modificadores por material, D4). */
   material: Material["tipo"];
+  /** Forma de la sección física (C2-g: sólo las rectangulares de hormigón solapan su peso con la losa). */
+  forma: Seccion["forma"];
 }
 
 export function materialElastico(m: Material): { elastico: MaterialElastico; peso: number } {
@@ -71,5 +73,5 @@ export function compilarSeccion(s: Seccion, m: Material, cortante: boolean): Sec
     delete barra.Avy;
     delete barra.Avz;
   }
-  return { barra, peso: peso * barra.A, canto, huella, material: m.tipo };
+  return { barra, peso: peso * barra.A, canto, huella, material: m.tipo, forma: s.forma };
 }

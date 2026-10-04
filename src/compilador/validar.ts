@@ -5,8 +5,21 @@
  */
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
-import type { ApoyoFisico, CargaFisica, CasoFisico, Material, ModeloFisico, OpcionesResueltas, Pilar, Planta, Seccion, Viga } from "./fisico.ts";
-import { compilarSeccion, type SeccionCompilada } from "./secciones.ts";
+import type { ApoyoFisico, ApoyoLineal, Banda, CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesResueltas, Pilar, Planta, Seccion, Vec2, Viga } from "./fisico.ts";
+import { areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
+import { compilarSeccion, materialElastico, type SeccionCompilada } from "./secciones.ts";
+
+/** Una losa ya comprobada, con su material de lámina y su peso propio. */
+export interface LosaCompilada {
+  losa: Losa;
+  region: Region;
+  /** Material de las láminas (E en kN/m², ν, espesor en m). */
+  material: { E: number; nu: number; t: number };
+  /** Peso propio, kN/m² (H24, C2-g). */
+  pp: number;
+  /** Peso específico del material, kN/m³. */
+  gamma: number;
+}
 
 /** El modelo físico ya comprobado, con sus índices. Las listas de objetos van ordenadas por `id`. */
 export interface Contexto {
@@ -27,6 +40,11 @@ export interface Contexto {
   cargas: readonly CargaFisica[];
   pilarDe: ReadonlyMap<string, Pilar>;
   vigaDe: ReadonlyMap<string, Viga>;
+  /** C2: losas (por id), apoyos lineales y bandas. */
+  losas: readonly LosaCompilada[];
+  losaDe: ReadonlyMap<string, LosaCompilada>;
+  apoyosLineales: readonly ApoyoLineal[];
+  bandas: readonly Banda[];
 }
 
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -58,6 +76,30 @@ function modificadoresNoValidos(m: unknown): string | null {
   return null;
 }
 
+/** Qué le falta a un polígono de la entrada (forma y simplicidad), o null. */
+function poligonoNoValido(p: unknown): string | null {
+  if (!Array.isArray(p) || !p.every(vec2)) return "tiene que ser una lista de pares [x, y] de números";
+  const d = defectoPoligono(p as Vec2[], 1e-9);
+  return d ? `no es un polígono simple: ${d}` : null;
+}
+
+/** Qué le falta a una polilínea de la entrada, o null. */
+function polilineaNoValida(p: unknown): string | null {
+  if (!Array.isArray(p) || p.length < 2 || !p.every(vec2)) return "los puntos tienen que ser una lista de al menos dos pares [x, y] de números";
+  for (let k = 1; k < p.length; k++) {
+    const [a, b] = [p[k - 1] as Vec2, p[k] as Vec2];
+    if (!(Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) > 1e-9)) return `los puntos ${k} y ${k + 1} coinciden`;
+  }
+  return null;
+}
+
+/** ¿Se tocan o se cortan los lados de dos polígonos? */
+function tocan(a: readonly Vec2[], b: readonly Vec2[]): boolean {
+  for (let i = 0; i < a.length; i++)
+    for (let j = 0; j < b.length; j++) if (distanciaEntreSegmentos(a[i]!, a[(i + 1) % a.length]!, b[j]!, b[(j + 1) % b.length]!) <= 1e-9) return true;
+  return false;
+}
+
 export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagnosticos): Contexto | null {
   const f = fisico as unknown as Record<string, unknown>;
   if (!esObjeto(f)) {
@@ -66,6 +108,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   }
   if (!(num(op.epsGeom) && op.epsGeom > 0 && num(op.epsSnap) && op.epsSnap >= op.epsGeom && num(op.factorZonaRigida) && op.factorZonaRigida >= 0 && op.factorZonaRigida <= 1)) {
     diag.error("opciones/no-validas", "Las opciones no son válidas: hace falta 0 < ε_geom ≤ ε_snap y un factor de zona rígida en [0, 1].");
+    return null;
+  }
+  if (!(num(op.tamanoMalla) && op.tamanoMalla >= 2 * op.epsSnap)) {
+    diag.error("opciones/no-validas", `El tamaño de malla tiene que ser un número de al menos 2·ε_snap (${2 * op.epsSnap} m).`);
     return null;
   }
   const malMod = modificadoresNoValidos(op.modificadores);
@@ -98,6 +144,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   const apoyos = (lista("apoyos", false) as unknown as ApoyoFisico[]).sort(porId);
   const casos = lista("casos", true) as unknown as CasoFisico[];
   const cargas = (lista("cargas", false) as unknown as CargaFisica[]).sort(porId);
+  const losas = (lista("losas", false) as unknown as Losa[]).sort(porId);
+  const apoyosLineales = (lista("apoyosLineales", false) as unknown as ApoyoLineal[]).sort(porId);
+  const bandas = (lista("bandas", false) as unknown as Banda[]).sort(porId);
   if (diag.hayErrores) return null;
 
   // Ids únicos en todo el modelo
@@ -111,6 +160,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     ["apoyos", apoyos],
     ["casos", casos],
     ["cargas", cargas],
+    ["losas", losas],
+    ["apoyosLineales", apoyosLineales],
+    ["bandas", bandas],
   ] as const) {
     for (const o of objs) {
       const antes = vistos.get(o.id);
@@ -290,7 +342,94 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       if (!vec3(c.q) || (c.qb !== undefined && !vec3(c.qb))) mal(c.id, "q (y qb) tienen que ser vectores de 3 números (kN/m)");
       if ((c.desde !== undefined && !num(c.desde)) || (c.hasta !== undefined && !num(c.hasta))) mal(c.id, "desde y hasta tienen que ser números (m)");
       else if (c.desde !== undefined && c.hasta !== undefined && !(c.hasta > c.desde)) mal(c.id, "hasta tiene que ser mayor que desde");
-    } else mal((c as { id: string }).id, "el tipo de carga tiene que ser puntual, viga o pilar");
+    } else if (c.tipo === "superficie") {
+      usaPlanta(c.id, c.planta);
+      if (!vec3(c.q)) mal(c.id, "q tiene que ser un vector de 3 números (kN/m²)");
+      if (c.losa === undefined && c.zona === undefined) mal(c.id, "la carga de superficie necesita una losa, una zona o las dos");
+      if (c.losa !== undefined) {
+        const l = losas.find((x) => x.id === c.losa);
+        if (!l) diag.error("fisico/referencia", `${c.id}: la losa «${String(c.losa)}» no existe.`, [c.id]);
+        else if (l.planta !== c.planta) mal(c.id, `la losa ${l.id} no está en la planta ${String(c.planta)}`);
+      }
+      if (c.zona !== undefined) {
+        const d = poligonoNoValido(c.zona);
+        if (d) mal(c.id, `la zona ${d}`);
+      }
+    } else if (c.tipo === "lineal") {
+      usaPlanta(c.id, c.planta);
+      if (!vec3(c.q)) mal(c.id, "q tiene que ser un vector de 3 números (kN/m)");
+      const d = polilineaNoValida(c.puntos);
+      if (d) mal(c.id, d);
+    } else mal((c as { id: string }).id, "el tipo de carga tiene que ser puntual, viga, pilar, superficie o lineal");
+  }
+
+  // Losas, apoyos lineales y bandas (C2)
+  const losasC: LosaCompilada[] = [];
+  for (const l of losas) {
+    usaPlanta(l.id, l.planta);
+    if (!pos(l.espesor)) mal(l.id, "el espesor tiene que ser un número > 0 (m)");
+    if (l.pp !== undefined && !(num(l.pp) && l.pp >= 0)) mal(l.id, "el peso propio pp tiene que ser un número ≥ 0 (kN/m²)");
+    if (l.eje1 !== undefined && !num(l.eje1)) mal(l.id, "el eje 1 tiene que ser un número (grados)");
+    const m = typeof l.material === "string" ? material.get(l.material) : undefined;
+    if (!m) diag.error("fisico/referencia", `${l.id}: el material «${String(l.material)}» no existe.`, [l.id]);
+    else if (m.tipo === "acero") mal(l.id, "el material de una losa tiene que ser hormigón o general");
+    const dc = poligonoNoValido(l.contorno);
+    if (dc) {
+      mal(l.id, `el contorno ${dc}`);
+      continue;
+    }
+    if (l.huecos !== undefined && !Array.isArray(l.huecos)) {
+      mal(l.id, "los huecos tienen que ser una lista de polígonos");
+      continue;
+    }
+    const huecos = (l.huecos ?? []) as readonly (readonly Vec2[])[];
+    let huecosBien = true;
+    huecos.forEach((h, i) => {
+      const dh = poligonoNoValido(h);
+      if (dh) {
+        mal(l.id, `el hueco ${i + 1} ${dh}`);
+        huecosBien = false;
+      } else if (!h.every((q) => puntoEnPoligono(q, l.contorno)) || tocan(h, l.contorno)) {
+        mal(l.id, `el hueco ${i + 1} no está dentro del contorno (o lo toca)`);
+        huecosBien = false;
+      }
+    });
+    for (let i = 0; i < huecos.length && huecosBien; i++)
+      for (let j = i + 1; j < huecos.length; j++)
+        if (tocan(huecos[i]!, huecos[j]!) || huecos[i]!.some((q) => puntoEnPoligono(q, huecos[j]!)) || huecos[j]!.some((q) => puntoEnPoligono(q, huecos[i]!))) {
+          mal(l.id, `los huecos ${i + 1} y ${j + 1} se solapan o se tocan`);
+          huecosBien = false;
+        }
+    if (!huecosBien || !m || m.tipo === "acero" || !pos(l.espesor)) continue;
+    const { elastico, peso } = materialElastico(m);
+    const nu = elastico.E / (2 * elastico.G) - 1;
+    if (!(nu > -1 && nu < 0.5)) {
+      mal(l.id, `el material ${m.id} da ν = ${nu.toPrecision(4)} (con E y G), fuera de (−1, 0,5)`);
+      continue;
+    }
+    losasC.push({ losa: l, region: { contorno: l.contorno, huecos }, material: { E: elastico.E, nu, t: l.espesor }, pp: l.pp ?? peso * l.espesor, gamma: peso });
+  }
+  // Losas solapadas en una planta
+  for (let i = 0; i < losasC.length; i++) {
+    for (let j = i + 1; j < losasC.length; j++) {
+      const [a, b] = [losasC[i]!, losasC[j]!];
+      if (a.losa.planta !== b.losa.planta) continue;
+      const A = areaInterseccionRegiones(a.region, b.region);
+      if (A > op.epsSnap * op.epsSnap)
+        diag.error("losa/solapadas", `Las losas ${a.losa.id} y ${b.losa.id} se solapan en ${A.toPrecision(3)} m² en la planta ${a.losa.planta}.`, [a.losa.id, b.losa.id]);
+    }
+  }
+  for (const a of apoyosLineales) {
+    usaPlanta(a.id, a.planta);
+    const d = polilineaNoValida(a.puntos);
+    if (d) mal(a.id, d);
+    if (!seis(a.coartados) || !a.coartados.some(Boolean)) mal(a.id, "coartados tienen que ser 6 booleanos, con alguno verdadero");
+  }
+  for (const b of bandas) {
+    usaPlanta(b.id, b.planta);
+    if (!vec2(b.desde) || !vec2(b.hasta)) mal(b.id, "desde y hasta tienen que ser pares [x, y] de números");
+    else if (!(Math.sqrt((b.hasta[0] - b.desde[0]) ** 2 + (b.hasta[1] - b.desde[1]) ** 2) > op.epsGeom)) mal(b.id, "desde y hasta coinciden");
+    if (!pos(b.ancho)) mal(b.id, "el ancho tiene que ser un número > 0 (m)");
   }
   if (diag.hayErrores) return null;
 
@@ -303,7 +442,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   for (const p of pilares) for (let k = planta.get(p.hasta)!; k <= planta.get(p.desde)!; k++) usar(k, p.id);
   for (const v of vigas) usar(planta.get(v.planta)!, v.id);
   for (const a of apoyos) usar(planta.get(a.planta)!, a.id);
-  for (const c of cargas) if (c.tipo === "puntual") usar(planta.get(c.planta)!, c.id);
+  for (const c of cargas) if (c.tipo === "puntual" || c.tipo === "superficie" || c.tipo === "lineal") usar(planta.get(c.planta)!, c.id);
+  for (const o of [...losas, ...apoyosLineales, ...bandas]) usar(planta.get(o.planta)!, o.id);
   for (const [k, id] of [...usadas].sort((a, b) => a[0] - b[0])) {
     if (cotas[k] === null) {
       const p = plantas[k]!;
@@ -339,5 +479,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     cargas,
     pilarDe,
     vigaDe,
+    losas: losasC,
+    losaDe: new Map(losasC.map((l) => [l.losa.id, l] as const)),
+    apoyosLineales,
+    bandas,
   };
 }
