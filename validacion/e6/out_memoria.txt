@@ -1,0 +1,65 @@
+# Memoria JS por fase del edificio objetivo (malla 0,75, 24 casos), antes y después de E6, con validacion/e4/memoria-js.ts (node --expose-gc)
+
+## diafragma — antes (commit 13ef777)
+{"variante":"diafragma-0.75-24c","nudos":29221,"laminas":28280,"barras":2352,"resultadoMB":111,"picoHeapSinGcMB":182}
+{"fase":"base","heapMB":12,"arrayBuffersMB":0,"wasmMB":1,"rssMB":75}
+{"fase":"modelo","heapMB":44,"arrayBuffersMB":0,"wasmMB":1,"rssMB":146}
+{"fase":"numeracion","heapMB":89,"arrayBuffersMB":14,"wasmMB":1,"rssMB":359}
+{"fase":"cargas","heapMB":129,"arrayBuffersMB":163,"wasmMB":1,"rssMB":481}
+{"fase":"patron","heapMB":129,"arrayBuffersMB":176,"wasmMB":1,"rssMB":496}
+{"fase":"ensamblado","heapMB":129,"arrayBuffersMB":197,"wasmMB":1,"rssMB":515}
+{"fase":"solucion.analisis","heapMB":129,"arrayBuffersMB":191,"wasmMB":31,"rssMB":540}
+{"fase":"solucion.factorizacion","heapMB":129,"arrayBuffersMB":166,"wasmMB":114,"rssMB":596}
+{"fase":"solucion.resolucion","heapMB":129,"arrayBuffersMB":180,"wasmMB":128,"rssMB":623}
+{"fase":"solucion.residuo","heapMB":129,"arrayBuffersMB":209,"wasmMB":128,"rssMB":653}
+{"fase":"solucion","heapMB":129,"arrayBuffersMB":191,"wasmMB":128,"rssMB":648}
+{"fase":"recuperacion","heapMB":124,"arrayBuffersMB":271,"wasmMB":128,"rssMB":752}
+{"fase":"resultado vivo","heapMB":41,"arrayBuffersMB":243,"wasmMB":128,"rssMB":725}
+
+## diafragma — después
+{"variante":"diafragma-0.75-24c","nudos":29221,"laminas":28280,"barras":2352,"resultadoMB":111,"picoHeapSinGcMB":177}
+{"fase":"base","heapMB":12,"arrayBuffersMB":0,"wasmMB":1,"rssMB":75}
+{"fase":"modelo","heapMB":44,"arrayBuffersMB":0,"wasmMB":1,"rssMB":151}
+{"fase":"numeracion","heapMB":89,"arrayBuffersMB":14,"wasmMB":1,"rssMB":359}
+{"fase":"cargas","heapMB":129,"arrayBuffersMB":65,"wasmMB":1,"rssMB":414}
+{"fase":"patron","heapMB":129,"arrayBuffersMB":41,"wasmMB":1,"rssMB":389}
+{"fase":"ensamblado","heapMB":129,"arrayBuffersMB":62,"wasmMB":1,"rssMB":412}
+{"fase":"solucion.analisis","heapMB":129,"arrayBuffersMB":44,"wasmMB":31,"rssMB":420}
+{"fase":"solucion.factorizacion","heapMB":129,"arrayBuffersMB":44,"wasmMB":114,"rssMB":503}
+{"fase":"solucion.resolucion","heapMB":129,"arrayBuffersMB":58,"wasmMB":128,"rssMB":531}
+{"fase":"solucion.residuo","heapMB":129,"arrayBuffersMB":59,"wasmMB":128,"rssMB":531}
+{"fase":"solucion","heapMB":129,"arrayBuffersMB":58,"wasmMB":128,"rssMB":531}
+{"fase":"recuperacion","heapMB":124,"arrayBuffersMB":150,"wasmMB":128,"rssMB":642}
+{"fase":"resultado vivo","heapMB":41,"arrayBuffersMB":125,"wasmMB":128,"rssMB":609}
+
+## semirrigido — antes (commit 13ef777)
+{"variante":"semirrigido-0.75-24c","nudos":29214,"laminas":28280,"barras":2352,"resultadoMB":111,"picoHeapSinGcMB":190}
+{"fase":"base","heapMB":12,"arrayBuffersMB":0,"wasmMB":1,"rssMB":75}
+{"fase":"modelo","heapMB":44,"arrayBuffersMB":0,"wasmMB":1,"rssMB":144}
+{"fase":"numeracion","heapMB":89,"arrayBuffersMB":11,"wasmMB":1,"rssMB":309}
+{"fase":"cargas","heapMB":128,"arrayBuffersMB":161,"wasmMB":1,"rssMB":473}
+{"fase":"patron","heapMB":128,"arrayBuffersMB":194,"wasmMB":1,"rssMB":522}
+{"fase":"ensamblado","heapMB":129,"arrayBuffersMB":274,"wasmMB":1,"rssMB":589}
+{"fase":"solucion.analisis","heapMB":124,"arrayBuffersMB":211,"wasmMB":87,"rssMB":598}
+{"fase":"solucion.factorizacion","heapMB":124,"arrayBuffersMB":211,"wasmMB":369,"rssMB":883}
+{"fase":"solucion.resolucion","heapMB":124,"arrayBuffersMB":239,"wasmMB":369,"rssMB":919}
+{"fase":"solucion.residuo","heapMB":124,"arrayBuffersMB":313,"wasmMB":369,"rssMB":993}
+{"fase":"solucion","heapMB":124,"arrayBuffersMB":272,"wasmMB":369,"rssMB":979}
+{"fase":"recuperacion","heapMB":124,"arrayBuffersMB":279,"wasmMB":369,"rssMB":1018}
+{"fase":"resultado vivo","heapMB":41,"arrayBuffersMB":241,"wasmMB":369,"rssMB":954}
+
+## semirrigido — después
+{"variante":"semirrigido-0.75-24c","nudos":29214,"laminas":28280,"barras":2352,"resultadoMB":111,"picoHeapSinGcMB":192}
+{"fase":"base","heapMB":12,"arrayBuffersMB":0,"wasmMB":1,"rssMB":75}
+{"fase":"modelo","heapMB":44,"arrayBuffersMB":0,"wasmMB":1,"rssMB":144}
+{"fase":"numeracion","heapMB":89,"arrayBuffersMB":11,"wasmMB":1,"rssMB":309}
+{"fase":"cargas","heapMB":128,"arrayBuffersMB":117,"wasmMB":1,"rssMB":461}
+{"fase":"patron","heapMB":128,"arrayBuffersMB":72,"wasmMB":1,"rssMB":429}
+{"fase":"ensamblado","heapMB":129,"arrayBuffersMB":152,"wasmMB":1,"rssMB":500}
+{"fase":"solucion.analisis","heapMB":124,"arrayBuffersMB":89,"wasmMB":87,"rssMB":506}
+{"fase":"solucion.factorizacion","heapMB":124,"arrayBuffersMB":89,"wasmMB":369,"rssMB":788}
+{"fase":"solucion.resolucion","heapMB":124,"arrayBuffersMB":117,"wasmMB":369,"rssMB":826}
+{"fase":"solucion.residuo","heapMB":124,"arrayBuffersMB":120,"wasmMB":369,"rssMB":828}
+{"fase":"solucion","heapMB":124,"arrayBuffersMB":120,"wasmMB":369,"rssMB":828}
+{"fase":"recuperacion","heapMB":124,"arrayBuffersMB":185,"wasmMB":369,"rssMB":923}
+{"fase":"resultado vivo","heapMB":40,"arrayBuffersMB":124,"wasmMB":369,"rssMB":856}

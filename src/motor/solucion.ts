@@ -19,7 +19,7 @@
  */
 import { ErrorPivoteNulo, FactorLdlt, memoriaEnUsoNucleo, memoriaNucleo, type MemoriaRequerida, type PatronCsc } from "../nucleo/index.ts";
 import { FactorPerfil } from "../solver/perfil.ts";
-import { productoSimetrico } from "./ensamblado.ts";
+import { productoSimetrico, productoSimetricoAbsoluto } from "./ensamblado.ts";
 
 export type TipoSolver = "nucleo" | "perfil";
 
@@ -240,21 +240,21 @@ export function resolver(
     // 4. Resolver y refinar
     const X = nrhs > 0 ? factor.resolver(B, nrhs) : new Float64Array(0);
     marcar("resolucion");
+    // Residuo r = b − K·x y |K|·|x| sin copias de K ni de X; R (n × nrhs) sólo si hay que refinar (E6)
     const residuos = new Float64Array(nrhs);
-    const R = new Float64Array(n * nrhs);
+    let R: Float64Array | null = null;
     const y = new Float64Array(n);
     const ya = new Float64Array(n);
-    const absK = valores.map(Math.abs);
     const calcularResiduos = () => {
       for (let k = 0; k < nrhs; k++) {
         const x = X.subarray(n * k, n * (k + 1));
         productoSimetrico(patron, valores, x, y);
-        productoSimetrico(patron, absK, x.map(Math.abs), ya);
+        productoSimetricoAbsoluto(patron, valores, x, ya);
         let w = 0;
         for (let i = 0; i < n; i++) {
           const b = B[n * k + i]!;
           const r = b - y[i]!;
-          R[n * k + i] = r;
+          if (R) R[n * k + i] = r;
           const den = ya[i]! + Math.abs(b);
           if (den > 0) w = Math.max(w, Math.abs(r) / den);
         }
@@ -266,6 +266,10 @@ export function resolver(
     let pasos = 0;
     while (pasos < 3 && residuos.some((r) => r > RESIDUO_SUFICIENTE)) {
       const anterior = Math.max(...residuos);
+      if (!R) {
+        R = new Float64Array(n * nrhs);
+        calcularResiduos();
+      }
       const dX = factor.resolver(R, nrhs);
       for (let i = 0; i < X.length; i++) X[i]! += dX[i]!;
       pasos++;

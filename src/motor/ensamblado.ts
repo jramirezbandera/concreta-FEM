@@ -241,3 +241,26 @@ export function productoSimetrico(p: PatronCsc, valores: Float64Array, x: Float6
   }
   return y;
 }
+
+/**
+ * y = |K|·|x| (valores absolutos término a término) con el mismo recorrido que `productoSimetrico`:
+ * el denominador del error hacia atrás de Oettli–Prager sin copiar K ni x.
+ */
+export function productoSimetricoAbsoluto(p: PatronCsc, valores: Float64Array, x: Float64Array, y: Float64Array = new Float64Array(p.n)): Float64Array {
+  y.fill(0);
+  for (let j = 0; j < p.n; j++) {
+    const xj = Math.abs(x[j]!);
+    let s = 0;
+    for (let q = p.colPtr[j]!; q < p.colPtr[j + 1]!; q++) {
+      const i = p.rowIdx[q]!;
+      const v = Math.abs(valores[q]!);
+      if (i === j) s += v * xj;
+      else {
+        y[i]! += v * xj;
+        s += v * Math.abs(x[i]!);
+      }
+    }
+    y[j]! += s;
+  }
+  return y;
+}

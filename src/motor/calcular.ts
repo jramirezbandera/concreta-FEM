@@ -23,7 +23,7 @@ import { ensamblarRigidez, patronSistema } from "./ensamblado.ts";
 import { equilibrio, sumaResultantes } from "./equilibrio.ts";
 import { desplazamientosFisicos, fuerzasIndependientes, numerar, TipoGdl, type Numeracion } from "./gdl.ts";
 import { cargasDeLaminasDelCaso, resultantesEnCentroides, type LaminaPreparada } from "./laminas.ts";
-import { NOMBRES_GDL, type EstadisticasCalculo, type ModeloAnalitico, type ResultadoCalculo, type ResultadoCaso } from "./modelo.ts";
+import { NOMBRES_GDL, type CasoCarga, type EstadisticasCalculo, type ModeloAnalitico, type ResultadoCalculo, type ResultadoCaso } from "./modelo.ts";
 import { ErrorSinMemoria } from "../nucleo/index.ts";
 import { ErrorLimiteMemoria, resolver, RESIDUO_OBJETIVO, type TipoSolver } from "./solucion.ts";
 
@@ -124,19 +124,18 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   }
   marcar("numeracion");
 
-  // 4. Cargas
+  // 4. Cargas. Los vectores de 6 por nudo de cada caso (cargas nodales, equivalentes, Tᵀ·f,
+  // desplazamientos impuestos) se construyen caso a caso y se sueltan: del caso sólo quedan sus
+  // ecuaciones libres (en B) y Tᵀ·f en los GDL coartados, para las reacciones. La memoria de un
+  // cálculo es sobre todo JS (E4-1) y eran ~5 vectores por caso (E6).
   const casos = modelo.casos;
   const nc = casos.length;
   const P = 6 * nn;
-  const cargas = casos.map(() => new Float64Array(P));
-  const indep = casos.map(() => new Float64Array(P)); // û por GDL físico independiente
-  casos.forEach((caso, k) => {
+  casos.forEach((caso) => {
     for (const c of caso.nodales ?? []) {
       if (!Number.isInteger(c.nudo) || c.nudo < 0 || c.nudo >= nn || !Array.isArray(c.f) || c.f.length !== 6 || !c.f.every(Number.isFinite)) {
         diag.error("carga/no-valida", `El caso ${caso.id} tiene una carga nodal sobre un nudo inexistente o con valores no finitos.`, [caso.id]);
-        continue;
       }
-      for (let g = 0; g < 6; g++) cargas[k]![6 * c.nudo + g]! += c.f[g]!;
     }
     for (const d of caso.impuestos ?? []) {
       const p = 6 * d.nudo + d.gdl;
@@ -151,9 +150,7 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
           `El caso ${caso.id} impone el GDL ${NOMBRES_GDL[d.gdl]} del nudo ${id}, que no está coartado por un apoyo.`,
           [caso.id, id],
         );
-        continue;
       }
-      indep[k]![p] = d.valor;
     }
   });
   if (diag.hayErrores) return fallo();
@@ -167,12 +164,17 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   for (const e of elementos) if (e.lamina) laminas[e.indice] = e.lamina;
   const deLaminas = casos.map((caso) => cargasDeLaminasDelCaso(caso.id, caso.laminas ?? [], laminas, modelo, geo, diag));
   if (diag.hayErrores) return fallo();
-  const totales = cargas.map((f, k) => {
+  // Lados derechos: b = Tᵀ·f, con f = nodales + equivalentes de barras y de láminas
+  const n = num.nEcuaciones;
+  const nCoart = num.coartados.length;
+  const B = new Float64Array(n * nc);
+  const bCoartados = new Float64Array(nCoart * nc);
+  casos.forEach((caso, k) => {
+    const t = cargasNodales(caso, P);
     const porBarra = deBarras[k]!.porBarra;
     const deLamina = deLaminas[k]!.equivalentes;
-    if (porBarra.size === 0 && !deLamina) return f;
-    const t = Float64Array.from(f);
     if (deLamina) for (let q = 0; q < P; q++) t[q] += deLamina[q]!;
+    deLaminas[k]!.equivalentes = null;
     for (const [ib, cb] of porBarra) {
       const [i, j] = modelo.barras![ib]!.nudos;
       const eq = equivalentesEnNudos(preparadas[ib]!, cb.ferC);
@@ -181,12 +183,11 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
         t[6 * j + c]! += eq[6 + c]!;
       }
     }
-    return t;
-  });
-  const bIndep = totales.map((f) => fuerzasIndependientes(num, f));
-  casos.forEach((caso, k) => {
+    const b = fuerzasIndependientes(num, t);
+    for (let j = 0; j < n; j++) B[n * k + j] = b[num.gdlDeEcuacion[j]!]!;
+    for (let i = 0; i < nCoart; i++) bCoartados[nCoart * k + i] = b[num.coartados[i]!]!;
     const perdidas: number[] = [];
-    for (let q = 0; q < P; q++) if (num.tipo[q] === TipoGdl.SinRigidez && bIndep[k]![q] !== 0) perdidas.push(q);
+    for (let q = 0; q < P; q++) if (num.tipo[q] === TipoGdl.SinRigidez && b[q] !== 0) perdidas.push(q);
     if (perdidas.length) {
       const nombres = perdidas.map((q) => `${modelo.nudos[Math.floor(q / 6)]!.id}.${NOMBRES_GDL[q % 6]}`);
       diag.error(
@@ -204,7 +205,6 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   marcar("patron");
   const K = ensamblarRigidez(modelo, num, elementos, ps);
   marcar("ensamblado");
-  const n = num.nEcuaciones;
   const estadisticas: EstadisticasCalculo = {
     nudos: nn,
     gdl: P,
@@ -216,12 +216,10 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
     tiempos,
   };
 
-  // Lados derechos: b = (Tᵀ·f)_libres − K'_{libres, coartados}·û_coartados
-  const B = new Float64Array(n * nc);
-  for (let k = 0; k < nc; k++) for (let j = 0; j < n; j++) B[n * k + j] = bIndep[k]![num.gdlDeEcuacion[j]!]!;
+  // Desplazamientos impuestos: b = (Tᵀ·f)_libres − K'_{libres, coartados}·û_coartados
   for (let k = 0; k < nc; k++) {
-    const u = indep[k]!;
     if (!(casos[k]!.impuestos?.length)) continue;
+    const u = impuestosDelCaso(casos[k]!, P);
     for (const e of K.coartados) {
       const nq = e.gdl.length;
       for (let i = 0; i < nq; i++) {
@@ -294,18 +292,21 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
   const kMuelles = muellesTierra.map((e) => rigidezGlobal(modelo, e));
   const resultados: ResultadoCaso[] = [];
   let equilibrioRoto = false;
+  const magnitud = new Float64Array(P);
   for (let k = 0; k < nc; k++) {
     const caso = casos[k]!;
-    const uI = indep[k]!;
+    const uI = impuestosDelCaso(caso, P); // û por GDL físico independiente
     if (sol?.X) for (let j = 0; j < n; j++) uI[num.gdlDeEcuacion[j]!] = sol.X[n * k + j]!;
     const u = desplazamientosFisicos(num, uI);
     // Reacciones de los apoyos: R = (K'·û − Tᵀ·f) en los GDL coartados
     // (`magnitud`: suma de |términos| de cada reacción, la escala de su redondeo)
     const reacciones = new Float64Array(P);
-    const magnitud = new Float64Array(P);
-    for (const p of num.coartados) {
-      reacciones[p] = -bIndep[k]![p]!;
-      magnitud[p] = Math.abs(bIndep[k]![p]!);
+    magnitud.fill(0);
+    for (let i = 0; i < nCoart; i++) {
+      const p = num.coartados[i]!;
+      const b = bCoartados[nCoart * k + i]!;
+      reacciones[p] = -b;
+      magnitud[p] = Math.abs(b);
     }
     for (const e of K.coartados) {
       const nq = e.gdl.length;
@@ -339,7 +340,7 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
         magnitud[6 * v + a]! += m;
       }
     });
-    const eq = equilibrio(geo, cargas[k]!, reacciones, magnitud, sumaResultantes(deBarras[k]!.resultante, deLaminas[k]!.resultante));
+    const eq = equilibrio(geo, cargasNodales(caso, P), reacciones, magnitud, sumaResultantes(deBarras[k]!.resultante, deLaminas[k]!.resultante));
     // Esfuerzos de las barras en los extremos de su tramo flexible
     const esfuerzosBarras = new Float64Array(12 * (modelo.barras?.length ?? 0));
     for (const e of elementos) {
@@ -391,6 +392,20 @@ function calcularModelo(modelo: ModeloAnalitico, opciones: OpcionesCalculo): Res
     return { valido: false, casosNoValidos: equilibrioRoto ? resultados : undefined, diagnosticos: diag.lista, estadisticas };
   }
   return { valido: true, casos: resultados, diagnosticos: diag.lista, estadisticas };
+}
+
+/** Cargas nodales del caso (ya comprobadas), 6 por nudo, sumadas en el orden del caso. */
+function cargasNodales(caso: CasoCarga, P: number): Float64Array {
+  const f = new Float64Array(P);
+  for (const c of caso.nodales ?? []) for (let g = 0; g < 6; g++) f[6 * c.nudo + g]! += c.f[g]!;
+  return f;
+}
+
+/** Desplazamientos impuestos del caso (ya comprobados) en sus GDL físicos; si se repite uno, vale el último. */
+function impuestosDelCaso(caso: CasoCarga, P: number): Float64Array {
+  const u = new Float64Array(P);
+  for (const d of caso.impuestos ?? []) u[6 * d.nudo + d.gdl] = d.valor;
+  return u;
 }
 
 /** Errores de mecanismo: el GDL del pivote, las cifras perdidas y los nudos que mueve su modo. */
