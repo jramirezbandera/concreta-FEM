@@ -271,7 +271,7 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
     // 5. Vigas que pasan por un pilar
     for (const pp of puntos) {
       const c = pp.huella.c;
-      for (const tv of tramosCerca(c, radioHuella(pp.huella) + epsSnap)) {
+      for (const tv of tramosCerca(c, radioHuella(pp.huella) + 3 * epsSnap)) {
         if (incide(tv, pp.nudo)) continue;
         const { sigma, d } = proyectar(c, tv.t);
         if (!(sigma > epsGeom && sigma < tv.t.len - epsGeom)) continue;
@@ -280,10 +280,15 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
         const f = pp.huella.forma;
         const semi = !f ? 0 : f.tipo === "circulo" ? f.D / 2 : (f.h / 2) * Math.abs(nrm[0] * pp.huella.ez[0] + nrm[1] * pp.huella.ez[1]) + (f.b / 2) * Math.abs(nrm[0] * pp.huella.ey[0] + nrm[1] * pp.huella.ey[1]);
         if (d - semi <= epsSnap) tv.partes.push(pp.nudo);
+        else if (d - semi <= 3 * epsSnap)
+          diag.aviso("topologia/casi-encuentro", `La viga ${tv.viga.id} pasa a ${cm(d - semi)} del pilar ${pp.pilares[0]} sin unirse a él.`, [tv.viga.id, pp.pilares[0]!], {
+            distancia: d - semi,
+          });
       }
     }
 
     // 6. Cruces
+    const huellas = puntos.map((pp) => pp.huella);
     for (let a = 0; a < tramosK.length; a++) {
       const p = tramosK[a]!;
       const { A, B } = p.t;
@@ -291,19 +296,16 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
       for (const b of candidatos) {
         if (b <= a) continue;
         const q = tramosK[b]!;
+        // Solape (aunque compartan nudos: una viga dibujada encima de otra se une a ella en T)
+        const sol = Math.max(solape(p.t, q.t, epsSnap, huellas), solape(q.t, p.t, epsSnap, huellas));
+        if (sol > epsSnap) {
+          diag.error("topologia/vigas-solapadas", `Las vigas ${p.viga.id} y ${q.viga.id} se solapan a lo largo de ${sol.toPrecision(3)} m en la planta ${ctx.plantas[k]!.id}.`, [p.viga.id, q.viga.id]);
+          continue;
+        }
         const comunes = [p.ini, p.fin, ...p.partes].filter((n) => incide(q, n));
         if (comunes.length) continue;
         const c = cortarTramos(p.t, q.t);
-        if (!c) {
-          // Paralelos: solapados si están a ≤ ε_snap y comparten más de ε_snap de longitud
-          const { sigma: s1, d } = proyectar(q.t.A, p.t);
-          if (d > epsSnap) continue;
-          const s2 = s1 + q.t.len * (q.t.u[0] * p.t.u[0] + q.t.u[1] * p.t.u[1]);
-          const solape = Math.min(p.t.len, Math.max(s1, s2)) - Math.max(0, Math.min(s1, s2));
-          if (solape > epsSnap)
-            diag.error("topologia/vigas-solapadas", `Las vigas ${p.viga.id} y ${q.viga.id} se solapan a lo largo de ${solape.toPrecision(3)} m en la planta ${ctx.plantas[k]!.id}.`, [p.viga.id, q.viga.id]);
-          continue;
-        }
+        if (!c) continue;
         if (!(c.sp > epsGeom && c.sp < p.t.len - epsGeom && c.sq > epsGeom && c.sq < q.t.len - epsGeom)) continue;
         const X: Vec2 = [A[0] + c.sp * p.t.u[0], A[1] + c.sp * p.t.u[1]];
         if (pilarCercano(X)) continue;
@@ -316,6 +318,8 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
         if (n < 0) {
           n = nuevoNudo(k, X[0], X[1]);
           insertarNudo(n);
+        } else if (dmin > epsGeom) {
+          diag.aviso("topologia/fusion", `El cruce de las vigas ${p.viga.id} y ${q.viga.id} se une a un nudo a ${cm(dmin)}, con brazos rígidos.`, [p.viga.id, q.viga.id], { distancia: dmin });
         }
         if (!incide(p, n)) p.partes.push(n);
         if (!incide(q, n)) q.partes.push(n);
@@ -458,6 +462,26 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
   };
 
   return { nudos, nudoPilar, tramosDe, tramos, apoyoEn, vigasEn, localizar };
+}
+
+/**
+ * Longitud que comparten dos tramos casi colineales fuera de las huellas de los pilares (dentro de
+ * un pilar se solapan dos vigas dibujadas hasta su cara lejana, y no importa): si los dos extremos
+ * de q están a ≤ ε de la recta de p, la de sus proyecciones dentro de p; si no, 0.
+ */
+function solape(p: Tramo2D, q: Tramo2D, eps: number, huellas: readonly Huella[]): number {
+  const a = proyectar(q.A, p);
+  const b = proyectar(q.B, p);
+  if (a.d > eps || b.d > eps) return 0;
+  const lo = Math.max(0, Math.min(a.sigma, b.sigma));
+  const hi = Math.min(p.len, Math.max(a.sigma, b.sigma));
+  if (!(hi - lo > eps)) return 0;
+  let dentro = 0;
+  for (const h of huellas) {
+    const c = cuerdaHuella(p.A, p.u, h);
+    if (c) dentro += Math.max(0, Math.min(hi, c[1]) - Math.max(lo, c[0]));
+  }
+  return hi - lo - dentro;
 }
 
 /** Cuerda de la recta de un tramo dentro de la huella de un pilar, en σ del tramo. */
