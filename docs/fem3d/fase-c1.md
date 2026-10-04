@@ -104,7 +104,7 @@ Las tres se cambian con una opción, y la opción entra en la huella.
 
 - **Del usuario:**
   - D4 (modificadores por defecto);
-  - aceptar la licencia ISC (delaunator y constrainautor) para el mallador de C2, o escribir la CDT propia;
+  - la licencia ISC del mallador de C2 ya está admitida (2026-10-04);
   - revisar los valores por defecto de C1-a, C1-c y C1-d.
 - **Para C2:**
   - qué nudos entran en el diafragma según la geometría de la losa (C1-e);

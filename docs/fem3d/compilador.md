@@ -85,6 +85,7 @@
 
 ## Preguntas para el usuario (no bloquean C1)
 
+- **Licencia ISC:** admitida por el usuario el 2026-10-04 (regla 6 de `CLAUDE.md`). El mallador de C2 usará delaunator y constrainautor (H29).
+
 - **D4:** modificadores de rigidez por defecto (C1-g).
-- **Licencia ISC** (delaunator y constrainautor, para el mallador de C2): equivale a MIT, pero la regla 6 de `CLAUDE.md` no la nombra. Hay que admitirla o escribir la CDT propia.
 - **C1-a, C1-c y C1-d** son decisiones de modelado con efecto del 5–35 % en rigidez. Se pueden cambiar por opción, pero el valor por defecto es criterio profesional.

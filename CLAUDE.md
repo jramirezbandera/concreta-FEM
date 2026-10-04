@@ -37,7 +37,7 @@
 4. **Restricciones por transformación** maestro-esclavo, nunca por penalización.
 5. **Convenio de signos tipo CSI nativo,** escrito en la cabecera del motor (H02).
 6. **Licencias:**
-   - sólo MIT, BSD, Apache-2.0 o MPL-2.0;
+   - sólo MIT, BSD, Apache-2.0, MPL-2.0 o ISC (equivalente a MIT; admitida el 2026-10-04 para el mallador de C2: delaunator y constrainautor, H29);
    - no usar ni copiar código de OpenSees, xara, stabileo (AGPL), CHOLMOD Supernodal (GPL) ni Triangle (H54);
    - lo que se porte de PyNite o de hekatan-struct-lineal (MIT) se cita en `NOTICE`.
 7. **No se usa para calcular de verdad** hasta que pase la batería de validación y un periodo «en sombra»: los mismos proyectos reales calculados también con SAP2000 o CYPE, para comparar.
@@ -125,6 +125,6 @@
     - C1-g: sin modificadores hasta que se decida D4.
 - **Siguiente paso:**
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
-  - compilador C2 (losas). Antes, el usuario decide si admite la licencia ISC (delaunator y constrainautor, H29) o si se escribe la CDT propia;
+  - compilador C2 (losas), con delaunator + constrainautor (ISC, admitida);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
