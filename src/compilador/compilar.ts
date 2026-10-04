@@ -41,9 +41,25 @@ export type ResultadoCompilacion =
 /**
  * Huella de la compilación (H13): SHA-256 del modelo físico canónico, las opciones resueltas y la
  * versión del compilador. Es la clave para reutilizar un modelo analítico o sus resultados.
+ *
+ * Canónico: las listas cuyo orden no significa nada (materiales, secciones, pilares, vigas, apoyos
+ * y cargas, y los tramos de cada pilar) van ordenadas por id; las plantas, los casos y los puntos
+ * de las vigas conservan el suyo. Así la huella no cambia al reordenar, como el modelo analítico.
  */
 export function huellaCompilacion(fisico: ModeloFisico, op: OpcionesResueltas): string {
-  return huellaDe({ compilador: VERSION_COMPILADOR, fisico, opciones: op });
+  return huellaDe({ compilador: VERSION_COMPILADOR, fisico: fisicoCanonico(fisico), opciones: op });
+}
+
+function fisicoCanonico(f: ModeloFisico): unknown {
+  if (typeof f !== "object" || f === null) return f;
+  const clave = (x: unknown, campo = "id") => (typeof x === "object" && x !== null ? String((x as Record<string, unknown>)[campo]) : "");
+  const ordenar = (v: unknown, campo = "id") => (Array.isArray(v) ? [...v].sort((a, b) => (clave(a, campo) < clave(b, campo) ? -1 : clave(a, campo) > clave(b, campo) ? 1 : 0)) : v);
+  const r: Record<string, unknown> = { ...f };
+  for (const k of ["materiales", "secciones", "vigas", "apoyos", "cargas"]) r[k] = ordenar(r[k]);
+  r.pilares = Array.isArray(f.pilares)
+    ? (ordenar(f.pilares) as unknown[]).map((p) => (typeof p === "object" && p !== null && Array.isArray((p as Record<string, unknown>).tramos) ? { ...p, tramos: ordenar((p as Record<string, unknown>).tramos, "planta") } : p))
+    : f.pilares;
+  return r;
 }
 
 export function compilar(fisico: ModeloFisico, opciones: OpcionesCompilacion = {}): ResultadoCompilacion {

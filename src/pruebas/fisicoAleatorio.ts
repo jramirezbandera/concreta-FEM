@@ -2,7 +2,8 @@
  * Generador de modelos físicos aleatorios para las pruebas metamórficas del compilador (C1):
  * retícula de pilares con plantas y luces al azar, pilares girados o que acaban antes, vigas
  * continuas o por vano, vigas secundarias en T, voladizos, rótulas y cargas de todos los tipos.
- * Reproducible por semilla. No es código del compilador.
+ * Reproducible por semilla y el mismo en V8 y en JavaScriptCore (sin `Math.hypot` ni `**`, COM-12). No es
+ * código del compilador.
  */
 import type { CargaFisica, ModeloFisico, Pilar, Planta, Seccion, Vec2, Viga } from "../compilador/fisico.ts";
 
@@ -25,7 +26,8 @@ export function puntoEnPolilinea(puntos: readonly Vec2[], s: number): Vec2 {
   let resto = s;
   for (let i = 0; i + 1 < puntos.length; i++) {
     const [a, b] = [puntos[i]!, puntos[i + 1]!];
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+    const L = Math.sqrt(dx * dx + dy * dy);
     if (resto <= L || i + 2 === puntos.length) return [a[0] + ((b[0] - a[0]) * resto) / L, a[1] + ((b[1] - a[1]) * resto) / L];
     resto -= L;
   }
@@ -34,7 +36,10 @@ export function puntoEnPolilinea(puntos: readonly Vec2[], s: number): Vec2 {
 
 export function longitudPolilinea(puntos: readonly Vec2[]): number {
   let L = 0;
-  for (let i = 0; i + 1 < puntos.length; i++) L += Math.hypot(puntos[i + 1]![0] - puntos[i]![0], puntos[i + 1]![1] - puntos[i]![1]);
+  for (let i = 0; i + 1 < puntos.length; i++) {
+    const [dx, dy] = [puntos[i + 1]![0] - puntos[i]![0], puntos[i + 1]![1] - puntos[i]![1]];
+    L += Math.sqrt(dx * dx + dy * dy);
+  }
   return L;
 }
 

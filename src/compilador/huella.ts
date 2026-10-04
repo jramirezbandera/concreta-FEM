@@ -2,7 +2,8 @@
  * Huella del modelo (H13, COM-12): SHA-256 de una serialización canónica, con las claves de los
  * objetos ordenadas. Los números se escriben con `Number.prototype.toString` (exacto por ECMA-262)
  * o, si se pide, redondeados a unas cifras significativas con `toPrecision` (también exacto), que
- * absorbe la diferencia de 1–2 ulp de `Math.cbrt`, `Math.hypot`… entre V8 y JavaScriptCore.
+ * absorbe la diferencia de 1–2 ulp de `Math.cbrt`, `Math.hypot`, `**`… entre V8 y JavaScriptCore
+ * (`0.0254 ** 4` ya difiere: `seccion3D()` no da los mismos bits en los dos).
  *
  * El SHA-256 es una implementación propia de FIPS 180-4, síncrona y sin dependencias, para que la
  * compilación no tenga que ser asíncrona (`crypto.subtle` lo es).
