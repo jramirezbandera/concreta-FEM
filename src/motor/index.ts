@@ -11,7 +11,7 @@ export { DiagramasBarras, type BarraPreparada } from "./barras.ts";
 export { ResultantesLaminas, type LaminaPreparada } from "./laminas.ts";
 export { COMPONENTES_LAMINA, type MultiplicadoresLamina } from "../elementos/lamina.ts";
 export type { MaterialLamina } from "../elementos/dkmq.ts";
-export { calcular, TOL_EQUILIBRIO, type OpcionesCalculo } from "./calcular.ts";
+export { calcular, TOL_EQUILIBRIO, type LimitesCalculo, type OpcionesCalculo } from "./calcular.ts";
 export type { Diagnostico, Severidad } from "./diagnosticos.ts";
 export {
   NOMBRES_GDL,

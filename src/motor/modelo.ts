@@ -306,6 +306,11 @@ export interface EstadisticasCalculo {
   nnzL?: number;
   /** Pasos de refinamiento iterativo que hicieron falta (0 casi siempre). */
   pasosRefinamiento?: number;
+  /**
+   * Memoria del núcleo en bytes (sólo con el solver "nucleo"): lo que pidieron factorizar y
+   * resolver según el análisis simbólico, y el pico estimado de su memoria lineal (H16).
+   */
+  memoriaNucleo?: { requerida: number; picoEstimado: number };
   /** Milisegundos de cada fase. */
   tiempos: Record<string, number>;
 }

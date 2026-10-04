@@ -24,17 +24,36 @@ import { equilibrio, sumaResultantes } from "./equilibrio.ts";
 import { desplazamientosFisicos, fuerzasIndependientes, numerar, TipoGdl, type Numeracion } from "./gdl.ts";
 import { cargasDeLaminasDelCaso, resultantesEnCentroides, type LaminaPreparada } from "./laminas.ts";
 import { NOMBRES_GDL, type EstadisticasCalculo, type ModeloAnalitico, type ResultadoCalculo, type ResultadoCaso } from "./modelo.ts";
-import { resolver, RESIDUO_OBJETIVO, type TipoSolver } from "./solucion.ts";
+import { ErrorSinMemoria } from "../nucleo/index.ts";
+import { ErrorLimiteMemoria, resolver, RESIDUO_OBJETIVO, type TipoSolver } from "./solucion.ts";
 
 /** Tolerancia del equilibrio global por caso (regla de oro 2). */
 export const TOL_EQUILIBRIO = 1e-9;
 
+/**
+ * Límites de tamaño del dispositivo (D9, H16). Un modelo que los pasa acaba con el error
+ * `modelo/demasiado-grande` antes de factorizar, en vez de agotar la memoria a medias.
+ */
+export interface LimitesCalculo {
+  /** Ecuaciones del sistema reducido (GDL libres e independientes); se comprueba tras numerar. */
+  ecuaciones?: number;
+  /** Bytes de memoria lineal del núcleo; se comprueba tras el análisis simbólico, con lo que pedirá factorizar. */
+  memoriaNucleo?: number;
+}
+
 export interface OpcionesCalculo {
   /** "nucleo" (faer en WASM, por defecto) o "perfil" (TypeScript, referencia para modelos pequeños). */
   solver?: TipoSolver;
+  limites?: LimitesCalculo;
+  /**
+   * Se llama al terminar cada fase (las claves de `estadisticas.tiempos`), con su duración en ms.
+   * Las de la solución llegan con el prefijo «solucion.» antes que la propia «solucion».
+   */
+  alProgreso?: (fase: string, ms: number) => void;
 }
 
 const ahora = () => performance.now();
+const MB = (b: number) => Math.ceil(b / 2 ** 20);
 
 export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}): ResultadoCalculo {
   const diag = new Diagnosticos();
@@ -43,6 +62,7 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
   const marcar = (fase: string) => {
     const t = ahora();
     tiempos[fase] = t - t0;
+    opciones.alProgreso?.(fase, t - t0);
     t0 = t;
   };
   const fallo = (estadisticas?: EstadisticasCalculo): ResultadoCalculo => ({ valido: false, diagnosticos: diag.lista, estadisticas });
@@ -66,6 +86,16 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
   // 3. Partes sin apoyo
   partesSinApoyo(modelo, elementos, diag);
   if (diag.hayErrores) return fallo();
+  const limiteEcuaciones = opciones.limites?.ecuaciones;
+  if (limiteEcuaciones !== undefined && num.nEcuaciones > limiteEcuaciones) {
+    diag.error(
+      "modelo/demasiado-grande",
+      `El modelo tiene ${num.nEcuaciones} ecuaciones y el límite de este dispositivo es ${limiteEcuaciones}. Usa una malla más gruesa o diafragma rígido, o calcula en un equipo con más memoria.`,
+      undefined,
+      { ecuaciones: num.nEcuaciones, limite: limiteEcuaciones },
+    );
+    return fallo();
+  }
   marcar("numeracion");
 
   // 4. Cargas
@@ -179,10 +209,41 @@ export function calcular(modelo: ModeloAnalitico, opciones: OpcionesCalculo = {}
   }
 
   // 6. Factorización y resolución
-  const sol = n > 0 ? resolver(ps.patron, K.valores, K.diagonal, B, nc, opciones.solver ?? "nucleo") : null;
+  const alProgreso = opciones.alProgreso;
+  let sol: ReturnType<typeof resolver> | null = null;
+  try {
+    sol =
+      n > 0
+        ? resolver(ps.patron, K.valores, K.diagonal, B, nc, opciones.solver ?? "nucleo", {
+            limiteMemoria: opciones.limites?.memoriaNucleo,
+            alProgreso: alProgreso && ((fase, ms) => alProgreso(`solucion.${fase}`, ms)),
+          })
+        : null;
+  } catch (e) {
+    if (e instanceof ErrorLimiteMemoria) {
+      diag.error(
+        "modelo/demasiado-grande",
+        `Factorizar el modelo (${n} ecuaciones) necesitaría unos ${MB(e.estimada)} MB de memoria y el límite de este dispositivo es ${MB(e.limite)} MB. Usa una malla más gruesa o diafragma rígido, o calcula en un equipo con más memoria.`,
+        undefined,
+        { ecuaciones: n, memoriaEstimada: e.estimada, limite: e.limite },
+      );
+      return fallo(estadisticas);
+    }
+    if (e instanceof ErrorSinMemoria) {
+      diag.error(
+        "solver/sin-memoria",
+        `El núcleo se ha quedado sin memoria al resolver el modelo (${n} ecuaciones): es demasiado grande para la memoria disponible. Usa una malla más gruesa o diafragma rígido, o calcula en un equipo con más memoria.`,
+        undefined,
+        { ecuaciones: n },
+      );
+      return fallo(estadisticas);
+    }
+    throw e;
+  }
   marcar("solucion");
   if (sol) {
     estadisticas.nnzL = sol.nnzL;
+    if (sol.memoria) estadisticas.memoriaNucleo = sol.memoria;
     for (const [fase, ms] of Object.entries(sol.tiempos)) tiempos[`solucion.${fase}`] = ms;
     estadisticas.pasosRefinamiento = sol.pasosRefinamiento;
   }

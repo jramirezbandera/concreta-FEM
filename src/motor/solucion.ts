@@ -13,8 +13,11 @@
  *   ω = maxᵢ |K·x − b|ᵢ / (|K|·|x| + |b|)ᵢ, como medida del residuo (§2.7 pide ≤ 1e-10). A
  *   diferencia de ‖r‖/‖b‖, ω no crece con el condicionamiento: mide la calidad del solver. Lo
  *   que el condicionamiento cuesta en precisión lo vigila el equilibrio (regla de oro 2).
+ * - Memoria (H16): tras el análisis simbólico, el núcleo dice cuántos bytes pedirán factorizar y
+ *   resolver. El pico estimado es max(memoria lineal, en uso + lo pedido): si pasa del límite del
+ *   dispositivo, se rechaza el modelo antes de factorizar en vez de agotar la memoria a medias.
  */
-import { ErrorPivoteNulo, FactorLdlt, type PatronCsc } from "../nucleo/index.ts";
+import { ErrorPivoteNulo, FactorLdlt, memoriaEnUsoNucleo, memoriaNucleo, type MemoriaRequerida, type PatronCsc } from "../nucleo/index.ts";
 import { FactorPerfil } from "../solver/perfil.ts";
 import { productoSimetrico } from "./ensamblado.ts";
 
@@ -34,6 +37,33 @@ export const RESIDUO_OBJETIVO = 1e-10;
  */
 const RESIDUO_SUFICIENTE = 1e-12;
 
+/** El pico de memoria estimado del núcleo pasa del límite: el modelo se rechaza antes de factorizar. */
+export class ErrorLimiteMemoria extends Error {
+  readonly estimada: number;
+  readonly limite: number;
+  constructor(estimada: number, limite: number) {
+    super(`el núcleo necesitaría ${estimada} bytes y el límite es ${limite}`);
+    this.name = "ErrorLimiteMemoria";
+    this.estimada = estimada;
+    this.limite = limite;
+  }
+}
+
+/**
+ * Margen sobre la memoria pedida por la fragmentación del asignador: al repetir un cálculo en el
+ * mismo núcleo, los huecos liberados no siempre sirven y la memoria lineal llega hasta un 9 % por
+ * encima de en uso + lo pedido (369 → 424 MB en el semirrígido del edificio objetivo; se estabiliza
+ * en la segunda vuelta). En un núcleo nuevo, la estimación con el margen queda un 0–20 % por encima.
+ */
+const MARGEN_FRAGMENTACION = 1.15;
+
+export interface OpcionesResolver {
+  /** Bytes de memoria lineal que el núcleo no debe pasar (sólo con el solver "nucleo"). */
+  limiteMemoria?: number;
+  /** Se llama al terminar cada subfase, con su duración en ms. */
+  alProgreso?: (fase: string, ms: number) => void;
+}
+
 const MAX_PIVOTES_NULOS = 64;
 const MAX_MODOS = 24;
 
@@ -48,6 +78,9 @@ class FactorizadorNucleo {
   private readonly f: FactorLdlt;
   constructor(patron: PatronCsc) {
     this.f = new FactorLdlt(patron);
+  }
+  memoriaRequerida(nrhs: number): MemoriaRequerida {
+    return this.f.memoriaRequerida(nrhs);
   }
   factorizar(valores: Float64Array): Factor {
     this.f.factorizar(valores);
@@ -104,7 +137,9 @@ export interface Solucion {
   malCondicionados: PivoteSospechoso[];
   nnzL?: number;
   pasosRefinamiento: number;
-  /** Milisegundos de: análisis simbólico y factorización, resolución, residuo y refinamiento. */
+  /** Memoria del núcleo (bytes): lo que pedirán factorizar y resolver, y el pico estimado. */
+  memoria?: { requerida: number; picoEstimado: number };
+  /** Milisegundos de: análisis simbólico, factorización, resolución, residuo y refinamiento. */
   tiempos: Record<string, number>;
 }
 
@@ -112,17 +147,35 @@ function cifras(relativo: number): number {
   return relativo > 0 ? -Math.log10(relativo) : Infinity;
 }
 
-export function resolver(patron: PatronCsc, valores: Float64Array, diagonalK: Float64Array, B: Float64Array, nrhs: number, tipo: TipoSolver): Solucion {
+export function resolver(
+  patron: PatronCsc,
+  valores: Float64Array,
+  diagonalK: Float64Array,
+  B: Float64Array,
+  nrhs: number,
+  tipo: TipoSolver,
+  opciones: OpcionesResolver = {},
+): Solucion {
   const n = patron.n;
   const tiempos: Record<string, number> = {};
   let t0 = performance.now();
   const marcar = (fase: string) => {
     const t = performance.now();
     tiempos[fase] = (tiempos[fase] ?? 0) + t - t0;
+    opciones.alProgreso?.(fase, t - t0);
     t0 = t;
   };
   const factorizador = tipo === "nucleo" ? new FactorizadorNucleo(patron) : new FactorizadorPerfil(patron);
   try {
+    let memoria: Solucion["memoria"];
+    if (factorizador instanceof FactorizadorNucleo) {
+      marcar("analisis");
+      const requerida = factorizador.memoriaRequerida(nrhs).total;
+      memoria = { requerida, picoEstimado: Math.max(memoriaNucleo(), memoriaEnUsoNucleo() + MARGEN_FRAGMENTACION * requerida) };
+      if (opciones.limiteMemoria !== undefined && memoria.picoEstimado > opciones.limiteMemoria) {
+        throw new ErrorLimiteMemoria(memoria.picoEstimado, opciones.limiteMemoria);
+      }
+    }
     // 1. Factorizar; cada pivote exactamente nulo se marca y se sujeta con un muelle
     const nulos: number[] = [];
     let actuales = valores;
@@ -173,6 +226,7 @@ export function resolver(patron: PatronCsc, valores: Float64Array, diagonalK: Fl
         malCondicionados,
         nnzL: factor.nnzL,
         pasosRefinamiento: 0,
+        memoria,
         tiempos,
       };
     }
@@ -215,7 +269,7 @@ export function resolver(patron: PatronCsc, valores: Float64Array, diagonalK: Fl
     }
     const nnzL = factor.nnzL;
     factor.liberar();
-    return { X, residuos, mecanismos: [], malCondicionados, nnzL, pasosRefinamiento: pasos, tiempos };
+    return { X, residuos, mecanismos: [], malCondicionados, nnzL, pasosRefinamiento: pasos, memoria, tiempos };
   } finally {
     factorizador.liberar();
   }
