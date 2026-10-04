@@ -1,0 +1,29 @@
+# validacion/e4/memoria-js.ts — 2026-10-04, Ryzen 9 5900X, Windows 11, node v24.19.0; tras cada fase, con gc() antes de medir
+{"variante":"diafragma-0.75-24c","nudos":29221,"laminas":28280,"barras":2352,"resultadoMB":111,"picoHeapSinGcMB":177}
+{"fase":"base","heapMB":12,"arrayBuffersMB":0,"wasmMB":1,"rssMB":76}
+{"fase":"modelo","heapMB":44,"arrayBuffersMB":0,"wasmMB":1,"rssMB":146}
+{"fase":"numeracion","heapMB":89,"arrayBuffersMB":14,"wasmMB":1,"rssMB":361}
+{"fase":"cargas","heapMB":129,"arrayBuffersMB":163,"wasmMB":1,"rssMB":483}
+{"fase":"patron","heapMB":129,"arrayBuffersMB":174,"wasmMB":1,"rssMB":496}
+{"fase":"ensamblado","heapMB":129,"arrayBuffersMB":196,"wasmMB":1,"rssMB":522}
+{"fase":"solucion.analisis","heapMB":129,"arrayBuffersMB":190,"wasmMB":31,"rssMB":542}
+{"fase":"solucion.factorizacion","heapMB":129,"arrayBuffersMB":166,"wasmMB":114,"rssMB":601}
+{"fase":"solucion.resolucion","heapMB":129,"arrayBuffersMB":180,"wasmMB":128,"rssMB":626}
+{"fase":"solucion.residuo","heapMB":129,"arrayBuffersMB":206,"wasmMB":128,"rssMB":658}
+{"fase":"solucion","heapMB":129,"arrayBuffersMB":191,"wasmMB":128,"rssMB":645}
+{"fase":"recuperacion","heapMB":124,"arrayBuffersMB":257,"wasmMB":128,"rssMB":753}
+{"fase":"resultado vivo","heapMB":41,"arrayBuffersMB":243,"wasmMB":128,"rssMB":727}
+{"variante":"semirrigido-0.75-24c","nudos":29214,"laminas":28280,"barras":2352,"resultadoMB":111,"picoHeapSinGcMB":190}
+{"fase":"base","heapMB":12,"arrayBuffersMB":0,"wasmMB":1,"rssMB":77}
+{"fase":"modelo","heapMB":44,"arrayBuffersMB":0,"wasmMB":1,"rssMB":146}
+{"fase":"numeracion","heapMB":89,"arrayBuffersMB":11,"wasmMB":1,"rssMB":311}
+{"fase":"cargas","heapMB":128,"arrayBuffersMB":161,"wasmMB":1,"rssMB":475}
+{"fase":"patron","heapMB":128,"arrayBuffersMB":194,"wasmMB":1,"rssMB":524}
+{"fase":"ensamblado","heapMB":129,"arrayBuffersMB":274,"wasmMB":1,"rssMB":591}
+{"fase":"solucion.analisis","heapMB":124,"arrayBuffersMB":211,"wasmMB":87,"rssMB":602}
+{"fase":"solucion.factorizacion","heapMB":124,"arrayBuffersMB":211,"wasmMB":369,"rssMB":885}
+{"fase":"solucion.resolucion","heapMB":124,"arrayBuffersMB":239,"wasmMB":369,"rssMB":920}
+{"fase":"solucion.residuo","heapMB":124,"arrayBuffersMB":313,"wasmMB":369,"rssMB":994}
+{"fase":"solucion","heapMB":124,"arrayBuffersMB":272,"wasmMB":369,"rssMB":980}
+{"fase":"recuperacion","heapMB":124,"arrayBuffersMB":279,"wasmMB":369,"rssMB":1020}
+{"fase":"resultado vivo","heapMB":41,"arrayBuffersMB":241,"wasmMB":369,"rssMB":955}
