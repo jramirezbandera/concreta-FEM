@@ -215,4 +215,11 @@ describe("E6: puente con SAP2000", () => {
     expect(con('TABLE:  "FRAME RELEASE ASSIGNMENTS 1 - GENERAL"\n   Frame=1   M3J=Yes   PartialFix=Yes')).toMatch(/parciales/);
     expect(importarS2k(leerTablas(S2K_1004.replace('CurrUnits="Kip, in, F"', 'CurrUnits="Kip, yd, F"'))).errores.join()).toMatch(/Unidades/);
   });
+
+  it("un material no isótropo sólo es un error si se usa (SAP2000 exporta sus materiales por defecto)", () => {
+    const sinUsar = 'TABLE:  "MATERIAL PROPERTIES 01 - GENERAL"\n   Material=A416Gr270   Type=Tendon   SymType=Uniaxial   TempDepend=No';
+    expect(importarS2k(leerTablas(S2K_1004.replace("END TABLE DATA", `${sinUsar}\nEND TABLE DATA`))).errores).toEqual([]);
+    const usado = importarS2k(leerTablas(S2K_1004.replace("Material=A992Fy50   Type=Steel   SymType=Isotropic", "Material=A992Fy50   Type=Steel   SymType=Orthotropic")));
+    expect(usado.errores.join()).toMatch(/A992Fy50 no es isótropo/);
+  });
 });

@@ -52,6 +52,25 @@ Qué esperar:
   - los momentos de los nudos de cada elemento, algo menos, porque cada programa extrapola desde sus puntos de Gauss.
 - Si SAP2000 no escala el término de Poisson, los momentos M11 y M22 del centro difieren del orden de ν·(1 − √0,3) ≈ 9 %. Esa diferencia es justo lo que se quiere saber.
 
+Con tres columnas (motor, SAP2000 y la solución exacta de Navier):
+
+`bun validacion/e6/sap2000/analizar-navier.ts <fichero exportado por SAP2000>`
+
+**Resultado (SAP2000 v21, 2026-10-04; `out_navier_sap.txt`, hallazgo E6-11 de `docs/fem3d/fase-e6.md`):**
+
+- los momentos y la flecha coinciden con Navier (SAP2000 ≤ 1 %, motor ≤ 0,17 %): SAP2000 escala el término de Poisson como el motor, y D3 queda validada en flexión;
+- los cortantes V13 y V23 de SAP2000 se separan de Navier hasta un 21 %, y el reparto de las reacciones entre lados un 24 %; los del motor, ≤ 0,9 %.
+
+### Las tres variantes que separan el cortante
+
+Para saber si lo del cortante viene de v13 y v23 o es propio del Shell-Thick de SAP2000, repite los pasos 2–6 con:
+
+- `navier-isotropa.$2k`: sin multiplicadores;
+- `navier-flexion.$2k`: sólo m22 = 0,3 y m12 = 0,2;
+- `navier-cortante.$2k`: sólo v13 = 0,5 y v23 = 0,15.
+
+Se generan con `bun validacion/e6/sap2000/navier.ts isotropa` (`flexion`, `cortante`). Cada una se analiza igual, con `analizar-navier.ts`.
+
 ## 2. Tus modelos (reticular con ábacos, unidireccional con viguetas)
 
 1. En SAP2000:

@@ -5,13 +5,28 @@
  * membrana y giro normal coartados en todos los nudos), q = 10 kN/m² y los multiplicadores
  * m11 = 1, m22 = 0,3, m12 = 0,2, v13 = 0,5, v23 = 0,15. Malla de 0,125 m (48 × 32).
  *
- * Uso: bun validacion/e6/sap2000/navier.ts [h] → validacion/e6/sap2000/navier-ortotropa.$2k
+ * Variantes, para separar el efecto de cada grupo de multiplicadores:
+ * - ortotropa: todos (la de arriba);
+ * - isotropa: ninguno;
+ * - flexion: sólo m22 y m12 (v13 = v23 = 1);
+ * - cortante: sólo v13 y v23 (m22 = m12 = 1).
+ *
+ * Uso: bun validacion/e6/sap2000/navier.ts [variante] [h] → validacion/e6/sap2000/navier-<variante>.$2k
  */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { escribirTablas, type Registro } from "./s2k.ts";
 
-export function s2kNavier(h = 0.125): string {
+export const VARIANTES_NAVIER = {
+  ortotropa: { m22: 0.3, m12: 0.2, v13: 0.5, v23: 0.15 },
+  isotropa: { m22: 1, m12: 1, v13: 1, v23: 1 },
+  flexion: { m22: 0.3, m12: 0.2, v13: 1, v23: 1 },
+  cortante: { m22: 1, m12: 1, v13: 0.5, v23: 0.15 },
+} as const;
+export type VarianteNavier = keyof typeof VARIANTES_NAVIER;
+
+export function s2kNavier(h = 0.125, variante: VarianteNavier = "ortotropa"): string {
+  const mult = VARIANTES_NAVIER[variante];
   const [a, b, t, E, nu, q] = [6, 4, 0.3, 3e7, 0.2, 10];
   const nx = Math.round(a / h);
   const ny = Math.round(b / h);
@@ -36,7 +51,7 @@ export function s2kNavier(h = 0.125): string {
       const id = String(i * ny + j + 1);
       areas.push({ Area: id, NumJoints: "4", Joint1: joint(i, j), Joint2: joint(i + 1, j), Joint3: joint(i + 1, j + 1), Joint4: joint(i, j + 1) });
       secciones.push({ Area: id, Section: "LOSA30", MatProp: "Default" });
-      modificadores.push({ Area: id, f11: "1", f22: "1", f12: "1", m11: "1", m22: "0.3", m12: "0.2", v13: "0.5", v23: "0.15", MMod: "1", WMod: "1" });
+      modificadores.push({ Area: id, f11: "1", f22: "1", f12: "1", m11: "1", m22: String(mult.m22), m12: String(mult.m12), v13: String(mult.v13), v23: String(mult.v23), MMod: "1", WMod: "1" });
       cargas.push({ Area: id, LoadPat: "Q", CoordSys: "GLOBAL", Dir: "Gravity", UnifLoad: String(q) });
     }
   }
@@ -57,13 +72,15 @@ export function s2kNavier(h = 0.125): string {
       ["CASE - STATIC 1 - LOAD ASSIGNMENTS", [{ Case: "Q", LoadType: "Load pattern", LoadName: "Q", LoadSF: "1" }]],
       ["AREA LOADS - UNIFORM", cargas],
     ],
-    "navier-ortotropa.$2k: placa ortótropa de Navier de Concreta FEM (E3/E6)",
+    `navier-${variante}.$2k: placa de Navier de Concreta FEM (E3/E6), variante ${variante}`,
   );
 }
 
 if (import.meta.main) {
-  const h = Number(process.argv[2] ?? 0.125);
-  const ruta = join(import.meta.dirname, "navier-ortotropa.$2k");
-  writeFileSync(ruta, s2kNavier(h));
+  const variante = (process.argv[2] ?? "ortotropa") as VarianteNavier;
+  if (!(variante in VARIANTES_NAVIER)) throw new Error(`Variante desconocida: ${variante} (${Object.keys(VARIANTES_NAVIER).join(", ")})`);
+  const h = Number(process.argv[3] ?? 0.125);
+  const ruta = join(import.meta.dirname, `navier-${variante}.$2k`);
+  writeFileSync(ruta, s2kNavier(h, variante));
   console.log(`Escrito ${ruta} (malla de ${h} m)`);
 }

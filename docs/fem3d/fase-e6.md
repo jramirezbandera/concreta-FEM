@@ -194,13 +194,14 @@ Ninguna fase del motor en TypeScript es cuadrática.
 | E6-8 | **La memoria JS evitable eran los vectores por caso y la copia de \|K\|.** Pico de un 41–45 % menor con los mismos bits; lo que queda vivo tras el cálculo baja de 243 a 125 MB | Más margen en los móviles con menos memoria (el iPhone 13 Pro ya calcula el semirrígido, E4-9); lo que queda es el resultado (111 MB) y el modelo |
 | E6-9 | **El motor calcula 88 000 nudos en sobremesa** (11,4 s con diafragma; 22,9 s y 2,65 GB semirrígido). Fuera del solver, todo es casi lineal | El edificio objetivo (D9) tiene un margen de ×3 en sobremesa; en el móvil, el perfil medido queda en 200 000 ecuaciones (E4-9) |
 | E6-10 | **Erratas de las fuentes:** en 1-004, el momento del caso 3 es alrededor de +Y (el texto dice Z); en 1-022, el A de W24X110 es 2,5 in² (no influye); los espectros de CSI usan g = 386,4 in/s² | Citadas en `validacion/e6/csi.ts` |
+| E6-11 | **SAP2000 v21 aplica los multiplicadores de flexión como el motor** (D' = S·D·S, con el término de Poisson por √(m11·m22)), **pero su Shell-Thick da cortantes y reparto de reacciones lejos de la solución exacta.** En la placa de Navier ortótropa (2026-10-04), frente a Navier: momentos de los centroides, motor ≤ 0,17 % y SAP2000 ≤ 1,0 %; w del centro, 0,01 % y 0,27 %; V13 y V23, motor ≤ 0,9 % y SAP2000 hasta un 21 % (también en el interior); reacción de los lados x, exacta 108,2 kN, motor 108,9 y SAP2000 134,0. La hipótesis contraria (Poisson sin escalar) daría ~9 % en los momentos | D3 queda validada en flexión. Falta saber si lo del cortante viene de v13 y v23 o es propio del Shell-Thick: se separa con tres variantes de la placa (isótropa, sólo flexión, sólo cortante; `validacion/e6/sap2000/navier.ts`). Hasta entonces, el cortante de las losas no se compara con el de SAP2000 en el periodo en sombra, sino con el corte por fuerzas nodales (E5-3) |
 
 ## Pendiente
 
 - **Del usuario:**
-  - Calcular en SAP2000 la placa ortótropa de Navier y comparar con `validacion/e6/sap2000/comparar.ts` (S5 #21). Después, el reticular con ábacos y el unidireccional con viguetas (LEEME.md).
+  - La placa ortótropa de Navier ya está calculada en SAP2000 (E6-11, `validacion/e6/sap2000/out_navier_sap.txt`). Faltan las tres variantes que separan el cortante (isótropa, sólo flexión, sólo cortante) y, después, el reticular con ábacos y el unidireccional con viguetas (LEEME.md).
   - Medir un móvil con menos memoria que el iPhone 13 Pro (E4-9).
-- **El importador de SAP2000** no se ha probado aún con un fichero de SAP2000 real: el primero puede pedir algún ajuste. Además, no traduce:
+- **El importador de SAP2000** ya lee un fichero exportado por SAP2000 v21 (el de la placa de Navier: hubo que ignorar los materiales por defecto no isótropos que no se usan). No traduce:
   - puntos de inserción distintos del centroide;
   - cargas «uniform to frame»;
   - áreas de 3 nudos y malla automática de áreas.

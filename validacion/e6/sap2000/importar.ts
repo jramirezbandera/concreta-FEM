@@ -179,7 +179,10 @@ export function importarS2k(t: Tablas): Importado {
 
   // Materiales
   const materiales = new Map<string, { E: number; G: number; nu: number; peso: number }>();
-  for (const r of tabla("MATERIAL PROPERTIES 01 - GENERAL")) if (r.SymType && r.SymType.toUpperCase() !== "ISOTROPIC") errores.push(`El material ${r.Material} no es isótropo.`);
+  // SAP2000 exporta también sus materiales por defecto (A992Fy50, 4000Psi, A416Gr270…): uno no isótropo
+  // sólo es un error si alguna barra o área lo usa
+  const noIsotropos = new Set<string>();
+  for (const r of tabla("MATERIAL PROPERTIES 01 - GENERAL")) if (r.SymType && r.SymType.toUpperCase() !== "ISOTROPIC") noIsotropos.add(r.Material!);
   for (const r of tabla("MATERIAL PROPERTIES 02 - BASIC MECHANICAL PROPERTIES")) {
     const E = num(r, "E1") * (F1 / L1 ** 2);
     const nu = num(r, "U12");
@@ -187,6 +190,10 @@ export function importarS2k(t: Tablas): Importado {
     materiales.set(r.Material!, { E, G, nu, peso: num(r, "UnitWeight", 0) * (F1 / L1 ** 3) });
   }
   const material = (n: string | undefined, que: string) => {
+    if (n !== undefined && noIsotropos.has(n)) {
+      errores.push(`${que}: el material ${n} no es isótropo.`);
+      return undefined;
+    }
     const m = n === undefined ? undefined : materiales.get(n);
     if (!m) errores.push(`${que}: el material ${n} no está definido.`);
     return m;

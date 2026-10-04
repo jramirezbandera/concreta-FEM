@@ -109,8 +109,9 @@
     - 88 000 nudos en 11–23 s en sobremesa.
   - **Puente con SAP2000** (`validacion/e6/sap2000/`, LEEME.md): importador de modelos $2k, comparador de resultados y la placa de Navier de S5 #21 lista para importar.
 - **2026-10-04: D5 tomada** (bandas automáticas y editables).
+- **2026-10-04: placa de Navier calculada en SAP2000 v21** (E6-11). SAP2000 aplica los multiplicadores de flexión como el motor (D3 validada en flexión), pero sus cortantes de Shell-Thick se separan de la solución exacta hasta un 21 %; los del motor, ≤ 0,9 %.
 - **Siguiente paso:**
-  - el usuario calcula en SAP2000 la placa de Navier y luego sus modelos (S5 #21, D3; pasos en `validacion/e6/sap2000/LEEME.md`);
+  - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
   - en paralelo, empezar el compilador (Fase 2 de S1);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
