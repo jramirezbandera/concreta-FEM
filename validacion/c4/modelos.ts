@@ -25,7 +25,7 @@ export function edificioReticular(plantas = 7, nx = 9, ny = 7): ModeloFisico {
   const abacos = f.pilares!.map((p) => rect(p.x - 1.25, p.y - 1.25, p.x + 1.25, p.y + 1.25));
   return {
     ...f,
-    losas: f.losas!.map((l) => ({ ...l, espesor: 0.35, reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05, abacos } })),
+    losas: f.losas!.map((l) => ({ ...l, espesor: 0.35, reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05, caseton: "recuperable", abacos } })),
   };
 }
 

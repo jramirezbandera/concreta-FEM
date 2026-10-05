@@ -35,7 +35,7 @@ import type { Piezas, Recta } from "./piezas.ts";
 import { areaConSigno, momentosInterseccion, momentosRegion, puntoEnRegion, type Momentos, type Region } from "./poligonos.ts";
 import type { Topologia } from "./topologia.ts";
 import { cotaNudo, seccionTramo } from "./topologia.ts";
-import { RepartoPano, trozosEnPanos, type EmisorPano, type PanosU, type Receptor } from "./unidireccional.ts";
+import { RepartoPano, trozosEnPanos, type BordePano, type EmisorPano, type NudosBorde, type PanosU, type Receptor } from "./unidireccional.ts";
 import { distanciaARegion } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
 
@@ -242,21 +242,77 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     ...ctx.panos.flatMap((p, i) => (p.pano.planta === v.planta && panos ? [{ region: panos.regiones[i]!, t: p.seccion.canto }] : [])),
   ];
 
-  // Reparto de los paños (C4-e): a las rectas de sus viguetas y de las vigas de sus lados paralelos
+  // Reparto de los paños (C4-e): a las rectas de sus viguetas y de las vigas de sus lados paralelos, y
+  // a los nudos de los muros de sus lados paralelos
+  /** Nudos de los receptores de borde del paño i: de una viga, su cadena; de un muro, los de sus lados en la cota. */
+  const nudosBorde = (i: number): NudosBorde => {
+    const { d } = panos!.marcos[i]!;
+    const k = ctx.panos[i]!.k;
+    const sd = (X: readonly number[]) => X[0]! * d[0] + X[1]! * d[1];
+    const lados = (b: BordePano) => losas.ladosMuros.filter((l) => l.k === k && l.w === b.muro!.w && l.i === b.muro!.i);
+    return {
+      nudos: (b) => {
+        if (b.tramo) {
+          const t = b.tramo.t;
+          return b.tramo.cadena.map((x) => ({ nudo: x.nudo, s: sd([t.A[0] + x.sigma * t.u[0], t.A[1] + x.sigma * t.u[1]]) })).sort((x, y) => x.s - y.s);
+        }
+        const ns = new Set(lados(b).flatMap((l) => l.nudos));
+        return [...ns].map((nudo) => ({ nudo, s: sd(Xn(nudo)) })).sort((x, y) => x.s - y.s);
+      },
+      trozos: (b) => {
+        if (b.tramo) return [[b.a, b.b]];
+        const ts = lados(b)
+          .map((l) => [Math.min(sd(l.A), sd(l.B)), Math.max(sd(l.A), sd(l.B))] as [number, number])
+          .sort((x, y) => x[0] - y[0]);
+        const r: [number, number][] = [];
+        for (const t of ts) {
+          const u = r[r.length - 1];
+          if (u && t[0] <= u[1] + ctx.op.epsGeom) u[1] = Math.max(u[1], t[1]);
+          else r.push([t[0], t[1]]);
+        }
+        return r;
+      },
+    };
+  };
   const repartos = new Map<number, RepartoPano>();
   const reparto = (i: number) => {
     let x = repartos.get(i);
-    if (!x) repartos.set(i, (x = new RepartoPano(panos!, i)));
+    if (!x) repartos.set(i, (x = new RepartoPano(panos!, i, nudosBorde(i))));
     return x;
   };
   const emisor = (c: number, i: number): EmisorPano => {
     const z = ctx.cotas[ctx.panos[i]!.k]!;
     const { d, n } = panos!.marcos[i]!;
+    const nb = nudosBorde(i);
     /** Nudos del receptor por su estación en el marco del paño. */
-    const nudosDe = (rec: Receptor): { nudo: number; s: number }[] => {
-      if (rec.tipo === "vigueta") return panos!.viguetas[rec.v]!.cadena.map((x) => ({ nudo: x.nudo, s: x.sigma }));
-      const t = rec.b.tramo.t;
-      return rec.b.tramo.cadena.map((x) => ({ nudo: x.nudo, s: (t.A[0] + x.sigma * t.u[0]) * d[0] + (t.A[1] + x.sigma * t.u[1]) * d[1] })).sort((a, b) => a.s - b.s);
+    const nudosDe = (rec: Receptor): { nudo: number; s: number }[] => (rec.tipo === "vigueta" ? panos!.viguetas[rec.v]!.cadena.map((x) => ({ nudo: x.nudo, s: x.sigma })) : nb.nudos(rec.b));
+    /** Punto (σ, η) del paño, a la cota de la planta. */
+    const Q = (sg: number, eta: number): V => [sg * d[0] + eta * n[0], sg * d[1] + eta * n[1], z];
+    /**
+     * Fuerza f(σ) lineal de fa (en sa) a fb (en sb) sobre el lado de un muro: a sus nudos por la
+     * palanca entre los dos que rodean cada trozo (exacta en fuerza y momento; el punto de aplicación
+     * se lleva a cada nudo con su momento de transporte).
+     */
+    const enMuro = (b: BordePano, sa: number, sb: number, fa: V, fb: V) => {
+      const ns = nb.nudos(b);
+      const L = sb - sa;
+      const f = (sg: number): V => (L > 0 ? mas(fa, por(menos(fb, fa), (sg - sa) / L)) : fa);
+      const cortes = [sa, ...ns.map((x) => x.s).filter((x) => x > sa && x < sb), sb];
+      for (let j = 0; j + 1 < cortes.length; j++) {
+        const [s0, s1] = [cortes[j]!, cortes[j + 1]!];
+        const [q0, q1] = [f(s0), f(s1)];
+        const l = s1 - s0;
+        let k = 0;
+        while (k + 2 < ns.length && ns[k + 1]!.s <= (s0 + s1) / 2) k++;
+        const [A, B] = [ns[k]!, ns[Math.min(k + 1, ns.length - 1)]!];
+        // F y su primer momento respecto a A: l·(q0 + q1)/2 y (s0 − sA)·F + l²·(q0/6 + q1/3)
+        const F = por(mas(q0, q1), l / 2);
+        const S = mas(por(F, s0 - A.s), por(mas(por(q0, 1 / 6), por(q1, 1 / 3)), l * l));
+        const FB = B.s > A.s ? por(S, 1 / (B.s - A.s)) : ([0, 0, 0] as V);
+        const FA = menos(F, FB);
+        nodal(c, A.nudo, FA, cruz(menos(Q(A.s, b.eta), Xn(A.nudo)), FA));
+        if (B.nudo !== A.nudo) nodal(c, B.nudo, FB, cruz(menos(Q(B.s, b.eta), Xn(B.nudo)), FB));
+      }
     };
     const rectaDe = (rec: Receptor): { r: Recta; s: (sigma: number) => number; X: (sigma: number) => V } => {
       if (rec.tipo === "vigueta") {
@@ -264,7 +320,7 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         const r = piezas.rectasDe.get(v.id)![0]!;
         return { r, s: (sg) => sg - v.a, X: (sg) => [sg * d[0] + v.eta * n[0], sg * d[1] + v.eta * n[1], z] };
       }
-      const tv = rec.b.tramo;
+      const tv = rec.b.tramo!;
       const r = piezas.rectasDe.get(tv.viga.id)!.find((x) => x.tramo === tv)!;
       const eta = rec.b.eta;
       const X = (sg: number): V => [sg * d[0] + eta * n[0], sg * d[1] + eta * n[1], z];
@@ -282,6 +338,7 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     return {
       momento,
       lineal: (rec, sa, sb, qa, qb) => {
+        if (rec.tipo === "borde" && rec.b.muro) return enMuro(rec.b, sa, sb, [qa[0]!, qa[1]!, qa[2]!], [qb[0]!, qb[1]!, qb[2]!]);
         const { r, s } = rectaDe(rec);
         const [a, b] = [s(sa), s(sb)];
         const [q1, q2]: [V, V] = [
@@ -295,6 +352,18 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         if (dz !== 0) momento(rec, (sa + sb) / 2, cruz([0, 0, dz], por(mas(q1, q2), (sb - sa) / 2)));
       },
       puntual: (rec, sg, F) => {
+        if (rec.tipo === "borde" && rec.b.muro) {
+          // Una fuerza concentrada: a los dos nudos que la rodean por la palanca
+          const ns = nb.nudos(rec.b);
+          let k = 0;
+          while (k + 2 < ns.length && ns[k + 1]!.s < sg) k++;
+          const [A, B] = [ns[k]!, ns[Math.min(k + 1, ns.length - 1)]!];
+          const w = B.s > A.s ? (sg - A.s) / (B.s - A.s) : 0;
+          const [FA, FB] = [por(F, 1 - w), por(F, w)];
+          nodal(c, A.nudo, FA, cruz(menos(Q(A.s, rec.b.eta), Xn(A.nudo)), FA));
+          if (B.nudo !== A.nudo) nodal(c, B.nudo, FB, cruz(menos(Q(B.s, rec.b.eta), Xn(B.nudo)), FB));
+          return;
+        }
         const { r, s, X } = rectaDe(rec);
         puntualEnRecta(c, r, s(sg), X(sg), [F[0]!, F[1]!, F[2]!], [0, 0, 0]);
       },

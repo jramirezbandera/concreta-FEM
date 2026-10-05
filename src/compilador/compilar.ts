@@ -27,7 +27,7 @@ import { construirLosas, direccionEje1, type Losas } from "./losas.ts";
 import { VERSIONES_MALLADOR } from "./mallado.ts";
 import type { Mapeo, NudoMapeado } from "./mapeo.ts";
 import { ajustarMuros } from "./muros.ts";
-import { construirPiezas, diafragmaDe, type BarraP, type Piezas } from "./piezas.ts";
+import { barrasTorsionEquilibrio, construirPiezas, diafragmaDe, type BarraP, type Piezas } from "./piezas.ts";
 import { construirTopologia, cotaNudo } from "./topologia.ts";
 import { construirPanos, type PanosU } from "./unidireccional.ts";
 import { ordenarPoligonos, validar, type Contexto } from "./validar.ts";
@@ -35,7 +35,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "C4.0";
+export const VERSION_COMPILADOR = "C4.1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -248,10 +248,13 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     const d: Vec3 = [p[0] - X.x, p[1] - X.y, p[2] - X.z];
     return d[0] === 0 && d[1] === 0 && d[2] === 0 ? undefined : d;
   };
-  // Modificadores de rigidez (D4): los de todos los materiales y, encima, los del material de la barra
+  // Modificadores de rigidez (D4): los de todos los materiales y, encima, los del material de la barra.
+  // En los tramos con torsión de equilibrio (C4-k), la torsión no se reduce
+  const equilibrio = new Set([...(op.torsionEquilibrio ? barrasTorsionEquilibrio(ctx, topo, piezas, panos) : [])].map((i) => piezas.barras[i]!));
   const modificadoresDe = (b: BarraP): ModificadoresBarra | undefined => {
     const g = op.modificadores[b.tipo === "pilar" ? "pilares" : b.tipo === "vigueta" ? "viguetas" : "vigas"];
     const m: ModificadoresBarra = { ...g?.todos, ...g?.[b.material] };
+    if (equilibrio.has(b) && m.J !== undefined && m.J < 1) delete m.J;
     return Object.keys(m).length ? m : undefined;
   };
   const barras: BarraAnalitica[] = piezas.barras.map((b) => {
@@ -335,6 +338,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       s: b.s,
       ...(b.auxiliar ? { auxiliar: true as const } : {}),
       ...(b.tipo === "vigueta" ? { pano: panoDeVigueta.get(b.pieza)! } : {}),
+      ...(equilibrio.has(b) ? { torsionEquilibrio: true as const } : {}),
     })),
     restricciones: mapRestr,
     piezas: piezasMap,
@@ -365,7 +369,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     modelo,
     mapeo,
     diagnosticos: diag.lista,
-    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe),
+    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio),
     huella,
     estadisticas: {
       nudos: nudos.length,
@@ -387,7 +391,7 @@ const coma = (x: number) => String(x).replace(".", ",");
 const NOMBRE_MATERIAL = { hormigon: "de hormigón", acero: "de acero", general: "de material general" } as const;
 
 /** Las hipótesis de modelado de una compilación, en texto (C1-a, C1-c, C1-d, D4, C2, C3 y C4). */
-function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined): string[] {
+function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>): string[] {
   const h: string[] = [];
   h.push(
     `Nudos de dimensión finita: es rígido ${op.factorZonaRigida === 1 ? "todo el nudo" : op.factorZonaRigida === 0 ? "ningún tramo del nudo (de eje a eje)" : `el ${coma(op.factorZonaRigida * 100)} % del nudo`} (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).`,
@@ -427,7 +431,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       `Unión pilar–losa por la huella del pilar, rígida (${losas.huellas.length} huellas, H09). Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas, y la zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
     );
     h.push(
-      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).`,
+      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos, con casetón recuperable (C4-i)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).`,
     );
     for (const l of ctx.losas) {
       const r = l.reticular;
@@ -463,8 +467,20 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       `Forjados unidireccionales como viguetas-barra (D2; ${lista}). Las viguetas de los paños contiguos con la misma dirección e intereje siguen las mismas rectas, centradas en su ancho, y son continuas sobre sus apoyos comunes (C4-a). Cada vigueta va de apoyo a apoyo (vigas, muros, pilares y bordes de losa), sin nudos intermedios y con la torsión liberada en un extremo; las de un voladizo la conservan (C4-c, E2-3).`,
     );
     h.push(
-      "Cargas de los paños (su pp, de superficie, lineales y puntuales): a las viguetas por la regla de la palanca en la dirección transversal, y a las vigas de los lados paralelos a ellas la franja entre la última vigueta y la viga; la franja junto a un borde sin viga va a la última vigueta con su momento de transporte (C4-e). Las vigas bajo un paño pesan sólo su descuelgue (C2-g con el canto de la vigueta).",
+      "Cargas de los paños (su pp, de superficie, lineales y puntuales): a las viguetas por la regla de la palanca en la dirección transversal, y a las vigas y los muros paralelos a ellas en sus lados la franja entre la última vigueta y la viga o el muro; la franja junto a un borde sin viga ni muro va a la última vigueta con su momento de transporte (C4-e). Las vigas bajo un paño pesan sólo su descuelgue (C2-g con el canto de la vigueta).",
     );
+    if (panos.voladizos) {
+      const vigas = [...new Set([...equilibrio].map((b) => b.pieza))].sort();
+      h.push(
+        `Viguetas en voladizo sin otro apoyo en su línea: ${panos.voladizos} (C4-k). Su momento no lo compensa ningún vano, así que lo resiste la pieza que las sujeta. ${
+          !op.torsionEquilibrio
+            ? "La opción de torsión de equilibrio está desactivada: las vigas que las sujetan conservan sus modificadores de torsión."
+            : vigas.length
+              ? `Es torsión de equilibrio en ${vigas.length > 1 ? "las vigas" : "la viga"} ${vigas.join(", ")} (${equilibrio.size} tramos, hasta los pilares, muros o vigas que coartan su giro): su torsión no se reduce (sin el J de D4) y hay que dimensionarlas a torsión.`
+              : "Las sujetan pilares, muros o losas, por su flexión: ninguna viga trabaja a torsión de equilibrio."
+        }`,
+      );
+    }
   }
   return h;
 }

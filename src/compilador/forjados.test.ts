@@ -5,7 +5,9 @@
  *   todas compilan, «sin pérdidas» ≤ 1e-9, el cálculo es válido (sin mecanismos) y en equilibrio;
  * - unidireccional: viguetas, mapeo, torsión liberada, continuidad, diafragma, pesos, avisos,
  *   modificadores y esfuerzos por vigueta;
- * - reticular: multiplicadores y ν de la zona aligerada, ábacos macizos y su peso;
+ * - viguetas en voladizo y torsión de equilibrio de la viga que las sujeta (C4-k);
+ * - un muro paralelo a las viguetas como receptor de borde (C4-e);
+ * - reticular: multiplicadores y ν de la zona aligerada, ábacos macizos, su peso y el casetón (C4-i);
  * - regresiones de la malla de C2 que encontró C4.
  */
 import { readFileSync } from "node:fs";
@@ -193,12 +195,154 @@ describe("C4: unidireccional", () => {
   });
 });
 
+describe("C4-k: viguetas en voladizo y torsión de equilibrio", () => {
+  /**
+   * Un vano de 5 × 6 (F1, entre VY0 y VY5 o entre VX0 y VX6) y un voladizo de 1,5 m (FV) que sale de
+   * VY5 con las viguetas según X, de y = 0 a `hasta`.
+   */
+  const voladizo = (o: { vano: "continuo" | "girado" | "ninguno"; hasta?: number; vx3?: boolean; muro?: boolean }): ModeloFisico => ({
+    plantas: [
+      { id: "P1", altura: null },
+      { id: "P0", altura: 3 },
+    ],
+    materiales: [{ id: "HA", tipo: "hormigon", fck: 25 }],
+    secciones: [
+      { id: "p", material: "HA", forma: "rectangular", b: 0.3, h: 0.3 },
+      { id: "v", material: "HA", forma: "rectangular", b: 0.3, h: 0.5 },
+      { id: "T", material: "HA", forma: "T", bf: 0.75, hf: 0.05, bw: 0.12, h: 0.3 },
+    ],
+    pilares: [0, 5].flatMap((x) => [0, 6].map((y) => ({ id: `C${x}-${y}`, x, y, desde: "P0", hasta: "P1", seccion: "p" }))),
+    vigas: [
+      { id: "VY0", planta: "P1", puntos: [[0, 0], [0, 6]], seccion: "v" },
+      ...(o.muro ? [] : [{ id: "VY5", planta: "P1", puntos: [[5, 0], [5, 6]] as Vec2[], seccion: "v" }]),
+      { id: "VX0", planta: "P1", puntos: [[0, 0], [5, 0]], seccion: "v" },
+      { id: "VX6", planta: "P1", puntos: [[0, 6], [5, 6]], seccion: "v" },
+      ...(o.vx3 ? [{ id: "VX3", planta: "P1", puntos: [[0, 3], [5, 3]] as Vec2[], seccion: "v" }] : []),
+    ],
+    ...(o.muro ? { muros: [{ id: "M", puntos: [[5, 0], [5, 6]] as Vec2[], desde: "P0", hasta: "P1", espesor: 0.25, material: "HA" }] } : {}),
+    panos: [
+      ...(o.vano === "ninguno" ? [] : [{ id: "F1", planta: "P1", contorno: rect(0, 0, 5, 6), direccion: o.vano === "girado" ? 90 : 0, intereje: 0.75, seccion: "T", pp: 3.5 }]),
+      { id: "FV", planta: "P1", contorno: rect(5, 0, 6.5, o.hasta ?? 6), direccion: 0, intereje: 0.75, seccion: "T", pp: 3.5 },
+      ...(o.vano === "ninguno" ? [{ id: "FW", planta: "P1", contorno: rect(3.5, 0, 5, 6), direccion: 0, intereje: 0.75, seccion: "T", pp: 3.5 }] : []),
+    ],
+    casos: [{ id: "G", pesoPropio: true }],
+  });
+  const tramosEq = (r: ReturnType<typeof valido>) => r.mapeo.barras.flatMap((b, i) => (b.torsionEquilibrio ? [i] : []));
+  const sinJ = (r: ReturnType<typeof valido>, pieza: string) => r.mapeo.barras.every((b, i) => b.pieza !== pieza || r.modelo.barras![i]!.modificadores?.J === undefined);
+  const conJ = (r: ReturnType<typeof valido>, pieza: string) => r.mapeo.barras.every((b, i) => b.pieza !== pieza || r.modelo.barras![i]!.modificadores?.J === 0.1);
+
+  it("con el vano detrás en la misma recta, el voladizo se compensa: la viga conserva su J ×0,1", () => {
+    const r = valido(compilar(voladizo({ vano: "continuo" })));
+    expect(r.estadisticas.forjados.voladizos).toBe(0);
+    expect(tramosEq(r)).toEqual([]);
+    expect(conJ(r, "VY5")).toBe(true);
+    expect(r.diagnosticos.map((d) => d.codigo)).not.toContain("pano/vigueta-en-voladizo");
+  });
+
+  it("sin vano detrás (las viguetas de atrás van en la otra dirección): torsión de equilibrio en VY5, de pilar a pilar", () => {
+    const r = valido(compilar(voladizo({ vano: "girado" })));
+    expect(r.estadisticas.forjados.voladizos).toBe(8);
+    expect(r.diagnosticos.find((d) => d.codigo === "pano/vigueta-en-voladizo")?.mensaje).toContain("torsión de equilibrio");
+    const eq = tramosEq(r);
+    expect(eq.length).toBeGreaterThan(0);
+    expect(eq.every((i) => r.mapeo.barras[i]!.pieza === "VY5")).toBe(true);
+    expect(eq.length).toBe(r.mapeo.piezas.VY5!.length);
+    expect(sinJ(r, "VY5")).toBe(true);
+    for (const v of ["VY0", "VX0", "VX6"]) expect(conJ(r, v)).toBe(true);
+    expect(r.hipotesis.find((h) => h.includes("C4-k"))).toContain("la viga VY5");
+    // Equilibrio: la torsión es la misma que con J ×0,1 (sólo cambia el giro), y no es nula
+    const T = (m: typeof r.modelo) => {
+      const ep = new EsfuerzosPiezas(m, r.mapeo, casosValidos(calcular(m)));
+      return Math.max(...r.mapeo.piezas.VY5!.map((b) => Math.abs(ep.diagrama(b, 0).esfuerzosEn(0, 1)[3]!)));
+    };
+    const t1 = T(r.modelo);
+    const t01 = T({ ...r.modelo, barras: r.modelo.barras!.map((b, i) => (r.mapeo.barras[i]!.pieza === "VY5" ? { ...b, modificadores: { J: 0.1 } } : b)) });
+    expect(t1).toBeGreaterThan(10);
+    expect(t1).toBeCloseTo(t01, 6);
+  });
+
+  it("la torsión de equilibrio llega hasta la primera viga que coarta el giro: con el voladizo hasta y = 3 y VX3, sólo VY5 entre y = 0 y 3", () => {
+    const r = valido(compilar(voladizo({ vano: "girado", hasta: 3, vx3: true })));
+    const eq = tramosEq(r);
+    expect(eq.length).toBeGreaterThan(0);
+    for (const i of r.mapeo.piezas.VY5!) {
+      const [a, b] = r.modelo.barras![i]!.nudos.map((n) => r.modelo.nudos[n]!.y);
+      expect(eq.includes(i), `VY5 de y = ${a} a ${b}`).toBe(Math.max(a!, b!) <= 3 + 1e-9);
+    }
+  });
+
+  it("un balancín (viguetas en voladizo a los dos lados de VY5, sin otro apoyo) también es torsión de equilibrio", () => {
+    const f = voladizo({ vano: "ninguno" });
+    const r = valido(compilar({ ...f, vigas: f.vigas!.filter((v) => v.id === "VY0" || v.id === "VY5") }));
+    expect(r.estadisticas.forjados.voladizos).toBe(16);
+    expect(tramosEq(r).length).toBe(r.mapeo.piezas.VY5!.length);
+  });
+
+  it("un voladizo que sale de un muro no hace trabajar ninguna viga a torsión", () => {
+    const r = valido(compilar(voladizo({ vano: "girado", muro: true })));
+    expect(r.estadisticas.forjados.voladizos).toBe(8);
+    expect(tramosEq(r)).toEqual([]);
+    expect(r.hipotesis.find((h) => h.includes("C4-k"))).toContain("Las sujetan pilares, muros o losas");
+  });
+
+  it("con la opción desactivada, la viga conserva su J ×0,1, y lo dice", () => {
+    const r = valido(compilar(voladizo({ vano: "girado" }), { torsionEquilibrio: false }));
+    expect(tramosEq(r)).toEqual([]);
+    expect(conJ(r, "VY5")).toBe(true);
+    expect(r.hipotesis.find((h) => h.includes("C4-k"))).toContain("desactivada");
+    expect(compilar(voladizo({ vano: "girado" }), { torsionEquilibrio: "no" as never }).diagnosticos.map((d) => d.codigo)).toContain("opciones/no-validas");
+  });
+});
+
+describe("C4-e: un muro paralelo a las viguetas en un lado del paño recibe su franja, como una viga", () => {
+  /** El recuadro con el lado y = 0 sobre un muro: entero, o de x = 0 a 3 y una viga de 3 a 5. */
+  const conMuro = (hasta: number): ModeloFisico => {
+    const f = recuadro({ pp: 0 });
+    return {
+      ...f,
+      vigas: [...f.vigas!.filter((v) => v.id !== "VC"), ...(hasta < 5 ? [{ id: "VC", planta: "P1", puntos: [[hasta, 0], [5, 0]] as Vec2[], seccion: "v" }] : [])],
+      muros: [{ id: "M", puntos: [[0, 0], [hasta, 0]], desde: "P0", hasta: "P1", espesor: 0.25, material: "HA" }],
+    };
+  };
+  // De 2 kN/m², la mitad de la franja de borde (0,375 m) en 5 m: 1,875 kN por lado. Lo que va a un
+  // lado: las cargas nodales en sus nudos (el muro, y la viga dentro de las zonas rígidas de los
+  // pilares) y las distribuidas en las barras que van por él
+  const lado = (r: ReturnType<typeof valido>, y: number, pieza?: string) => {
+    const enY = (n: number) => Math.abs(r.modelo.nudos[n]!.y - y) <= 1e-9;
+    let F = 0;
+    for (const cb of r.modelo.casos[1]!.barras ?? []) {
+      const b = r.modelo.barras![cb.barra]!;
+      if (enY(b.nudos[0]) && enY(b.nudos[1]) && (!pieza || r.mapeo.barras[cb.barra]!.pieza === pieza) && cb.tipo === "distribuida") F += ((cb.qa[2] + (cb.qb ?? cb.qa)[2]) / 2) * ((cb.b ?? 0) - (cb.a ?? 0));
+    }
+    if (!pieza) for (const c of r.modelo.casos[1]!.nodales ?? []) if (enY(c.nudo)) F += c.f[2];
+    return F;
+  };
+
+  it("el muro entero: la misma carga que la viga del otro lado, sin pérdidas y en equilibrio", () => {
+    const r = valido(compilar(conMuro(5)));
+    expect(lado(r, 0)).toBeCloseTo(-1.875, 9);
+    expect(lado(r, 6)).toBeCloseTo(-1.875, 9);
+    // Al muro, en sus nudos de la cota (los de dentro, fuera de los pilares)
+    const dentro = (r.modelo.casos[1]!.nodales ?? []).filter((c) => Math.abs(r.modelo.nudos[c.nudo]!.y) <= 1e-9 && r.modelo.nudos[c.nudo]!.x > 0.5 && r.modelo.nudos[c.nudo]!.x < 4.5);
+    expect(dentro.length).toBeGreaterThan(3);
+    expect(r.hipotesis.some((h) => h.includes("los muros paralelos"))).toBe(true);
+    casosValidos(calcular(r.modelo));
+  });
+
+  it("un muro hasta x = 3 y una viga de 3 a 5: cada uno su parte (la viga, salvo su zona rígida en el pilar)", () => {
+    const r = valido(compilar(conMuro(3)));
+    expect(lado(r, 0)).toBeCloseTo(-1.875, 9);
+    expect(lado(r, 0, "VC")).toBeCloseTo(-0.375 * (2 - 0.5 * 0.15), 9);
+    casosValidos(calcular(r.modelo));
+  });
+});
+
 describe("C4: reticular", () => {
-  const reticular = (pp?: number, multiplicadores?: object): ModeloFisico => ({
+  const reticular = (pp?: number, multiplicadores?: object, caseton: "perdido" | "recuperable" | undefined = pp === undefined ? "recuperable" : undefined): ModeloFisico => ({
     plantas: [{ id: "P0", altura: null }],
     materiales: [{ id: "H", tipo: "hormigon", fck: 25 }],
     secciones: [],
-    losas: [{ id: "L", planta: "P0", contorno: rect(0, 0, 6, 6), espesor: 0.35, material: "H", ...(pp !== undefined ? { pp } : {}), reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05, abacos: [rect(2, 2, 4, 4), rect(5, 5, 7, 7)], ...(multiplicadores ? { multiplicadores } : {}) } }],
+    losas: [{ id: "L", planta: "P0", contorno: rect(0, 0, 6, 6), espesor: 0.35, material: "H", ...(pp !== undefined ? { pp } : {}), reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05, abacos: [rect(2, 2, 4, 4), rect(5, 5, 7, 7)], ...(caseton ? { caseton } : {}), ...(multiplicadores ? { multiplicadores } : {}) } }],
     apoyosLineales: [{ id: "A", planta: "P0", puntos: [[0, 0], [6, 0], [6, 6], [0, 6], [0, 0]], coartados: [true, true, true, false, false, false] }],
     casos: [{ id: "G", pesoPropio: true }],
   });
@@ -238,6 +382,21 @@ describe("C4: reticular", () => {
     const abaco = momentosInterseccion({ contorno: rect(0, 0, 6, 6), huecos: [] }, rect(2, 2, 4, 4)).A + 1;
     expect(peso(reticular())).toBeCloseTo(v * (36 - abaco) + 25 * 0.35 * abaco, 8);
     expect(peso(reticular(4.5))).toBeCloseTo(4.5 * 36, 8);
+    expect(peso(reticular(4.5, undefined, "recuperable"))).toBeCloseTo(4.5 * 36, 8);
+  });
+
+  it("con casetón perdido (por defecto) el pp es obligatorio: su peso depende de su material (C4-i)", () => {
+    for (const omitido of [true, false]) {
+      const f = reticular(undefined, undefined, "perdido");
+      if (omitido) delete (f.losas![0]!.reticular as { caseton?: string }).caseton;
+      const r = compilar(f);
+      expect(r.valido).toBe(false);
+      expect(r.diagnosticos.find((d) => d.codigo === "reticular/sin-pp")?.ids).toEqual(["L"]);
+    }
+    expect(compilar(reticular(4.5, undefined, "perdido")).valido).toBe(true);
+    const f = reticular(undefined, undefined, "recuperable");
+    (f.losas![0]!.reticular as unknown as Record<string, unknown>).caseton = "de corcho";
+    expect(compilar(f).diagnosticos.map((d) => d.codigo)).toContain("fisico/valor-no-valido");
   });
 
   it("los multiplicadores dados se aplican sobre la maciza con el ν del material", () => {

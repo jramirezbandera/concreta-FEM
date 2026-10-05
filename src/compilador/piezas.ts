@@ -440,3 +440,44 @@ function arranqueSobrePieza(topo: Topologia, n: number, p: Pilar): boolean {
   const nd = topo.nudos[n]!;
   return (nd.pilar?.pilares.length ?? 0) > 1 || [...nd.fisicos].some((f) => f !== p.id);
 }
+
+/**
+ * Tramos de viga con torsión de equilibrio (C4-k): los que sujetan una línea de viguetas en voladizo
+ * sin otro apoyo (`PanosU.equilibrio`). Desde cada uno de esos nudos que va sobre una viga (no en un
+ * pilar ni en un muro, que coartan el giro por su flexión), las barras de la viga en los dos sentidos
+ * hasta el primer nudo que coarta su giro a torsión: un pilar, un muro, otra viga que le llega o el
+ * final del tramo de su polilínea. Devuelve los índices de esas barras.
+ */
+export function barrasTorsionEquilibrio(ctx: Contexto, topo: Topologia, piezas: Piezas, panos: PanosU | null): Set<number> {
+  const r = new Set<number>();
+  if (!panos?.equilibrio.length) return r;
+  const muros = new Set(ctx.muros.map((m) => m.muro.id));
+  const vigas = new Set(ctx.vigas.map((v) => v.id));
+  const enPilar = (n: number) => topo.nudos[n]!.pilar?.nudo === n;
+  const enMuro = (n: number) => [...topo.nudos[n]!.fisicos].some((id) => muros.has(id));
+  // Barras de viga por nudo
+  const porNudo = new Map<number, number[]>();
+  piezas.barras.forEach((b, i) => {
+    if (b.tipo !== "viga" || b.auxiliar) return;
+    for (const n of [b.i, b.j]) porNudo.set(n, [...(porNudo.get(n) ?? []), i]);
+  });
+  const coarta = (n: number, pieza: string) => enPilar(n) || enMuro(n) || (porNudo.get(n) ?? []).some((i) => piezas.barras[i]!.pieza !== pieza) || [...topo.nudos[n]!.fisicos].some((id) => vigas.has(id) && id !== pieza);
+  for (const { nudo } of panos.equilibrio) {
+    if (enPilar(nudo) || enMuro(nudo)) continue;
+    for (const i0 of porNudo.get(nudo) ?? []) {
+      const { pieza, tramo } = piezas.barras[i0]!;
+      // Por la viga, barra a barra, hasta un nudo que coarta su torsión
+      let [i, n] = [i0, nudo];
+      while (!r.has(i)) {
+        r.add(i);
+        const b = piezas.barras[i]!;
+        n = b.i === n ? b.j : b.i;
+        if (coarta(n, pieza)) break;
+        const sig = (porNudo.get(n) ?? []).find((x) => x !== i && piezas.barras[x]!.pieza === pieza && piezas.barras[x]!.tramo === tramo);
+        if (sig === undefined) break;
+        i = sig;
+      }
+    }
+  }
+  return r;
+}

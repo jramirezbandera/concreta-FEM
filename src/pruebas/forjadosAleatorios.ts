@@ -120,8 +120,11 @@ export function conForjadosAleatorios(f: ModeloFisico, semilla: number, o: Opcio
         espesor: h,
         material: "HA",
         eje1: r() < 0.5 ? 0 : 90,
-        reticular: { intereje: s, nervio: 0.12, capa: 0.05, abacos },
-        ...(r() < 0.4 ? { pp: red(entre(4, 5), 0.1) } : {}),
+        // Con pp, casetón perdido (por defecto); sin él, recuperable (C4-i)
+        ...((conPp: boolean) => ({
+          reticular: { intereje: s, nervio: 0.12, capa: 0.05, ...(conPp ? {} : { caseton: "recuperable" as const }), abacos },
+          ...(conPp ? { pp: red(entre(4, 5), 0.1) } : {}),
+        }))(r() < 0.4),
       });
     }
     // Una zona en un vano, un tabique que cruza vanos y una puntual dentro de un vano

@@ -77,7 +77,7 @@ export function navierReticular(malla: number) {
     plantas: [{ id: "P0", altura: null }],
     materiales: [{ id: "H", tipo: "hormigon", fck: 25, peso: 0 }],
     secciones: [],
-    losas: [{ id: "L", planta: "P0", contorno: [[0, 0], [A, 0], [A, B], [0, B]], espesor: RET.h, material: "H", reticular: { intereje: RET.s, nervio: RET.bw, capa: RET.hf } }],
+    losas: [{ id: "L", planta: "P0", contorno: [[0, 0], [A, 0], [A, B], [0, B]], espesor: RET.h, material: "H", reticular: { intereje: RET.s, nervio: RET.bw, capa: RET.hf, caseton: "recuperable" } }],
     apoyosLineales: [
       { id: "x0", planta: "P0", puntos: [[0, 0], [0, B]], coartados: bx },
       { id: "xA", planta: "P0", puntos: [[A, 0], [A, B]], coartados: bx },
@@ -124,7 +124,7 @@ export function emparrillado(N: number, abacos: boolean, malla = RET.s / 4): Emp
     plantas: [{ id: "P0", altura: null }],
     materiales: [{ id: "H", tipo: "hormigon", fck: 25, peso: 0 }],
     secciones: [],
-    losas: [{ id: "L", planta: "P0", contorno: [[0, 0], [L, 0], [L, L], [0, L]], espesor: h, material: "H", reticular: { intereje: s, nervio: bw, capa: hf, abacos: ab } }],
+    losas: [{ id: "L", planta: "P0", contorno: [[0, 0], [L, 0], [L, L], [0, L]], espesor: h, material: "H", reticular: { intereje: s, nervio: bw, capa: hf, caseton: "recuperable", abacos: ab } }],
     apoyosLineales: [
       { id: "a", planta: "P0", puntos: [[0, 0], [L, 0]], coartados: sop },
       { id: "b", planta: "P0", puntos: [[L, 0], [L, L]], coartados: sop },
@@ -217,7 +217,7 @@ export function emparrilladoPilar(N: number, conAbaco: boolean, nu0 = false, mal
   const f: ModeloFisico = {
     plantas: [{ id: "P0", altura: null }],
     secciones: [],
-    losas: [{ id: "L", planta: "P0", contorno: [[0, 0], [L, 0], [L, L], [0, L]], espesor: h, material: "H", reticular: { intereje: s, nervio: bw, capa: hf, abacos: ab } }],
+    losas: [{ id: "L", planta: "P0", contorno: [[0, 0], [L, 0], [L, L], [0, L]], espesor: h, material: "H", reticular: { intereje: s, nervio: bw, capa: hf, caseton: "recuperable", abacos: ab } }],
     apoyosLineales: [
       { id: "a", planta: "P0", puntos: [[0, 0], [L, 0]], coartados: sop },
       { id: "b", planta: "P0", puntos: [[L, 0], [L, L]], coartados: sop },

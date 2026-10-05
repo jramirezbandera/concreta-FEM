@@ -19,7 +19,8 @@
  *    su vértice si lo tiene a ≤ ε_snap) o en el borde de la losa; si no, un extremo libre. Un extremo
  *    libre en el borde de otro paño es un error (dos paños se separan por una viga).
  * 5. Receptores de borde (C4-e): los lados del paño paralelos a d que van sobre el eje de una viga,
- *    por los tramos de viga que los cubren.
+ *    por los tramos de viga que los cubren, o sobre el eje de un muro, donde lo hay en la cota (la
+ *    bovedilla apoya en él).
  * 6. Reparto (C4-e, `RepartoPano`): en el marco del paño, por franjas en σ entre cortes (vértices,
  *    extremos de viguetas y de receptores de borde y, en una zona, sus vértices), la sección del
  *    paño son intervalos en η con lados lineales. En cada intervalo, los receptores (las viguetas
@@ -70,13 +71,24 @@ export interface ViguetaU {
   cadena: EslabonVigueta[];
 }
 
-/** Lado de un paño paralelo a sus viguetas sobre el eje de una viga: receptor de borde (C4-e). */
+/** Lado de un paño paralelo a sus viguetas sobre el eje de una viga o de un muro: receptor de borde (C4-e). */
 export interface BordePano {
   eta: number;
-  /** Tramo del lado cubierto por esta viga, en σ. */
+  /** Tramo del lado cubierto por esta viga o este muro, en σ. */
   a: number;
   b: number;
-  tramo: TramoViga;
+  /** La viga: el tramo de su polilínea. */
+  tramo?: TramoViga;
+  /** El muro: su índice en `ctx.muros` y el tramo de su eje. */
+  muro?: { w: number; i: number };
+}
+
+/** Nudos de los receptores de borde, que se conocen tras mallar las losas y los muros. */
+export interface NudosBorde {
+  /** Nudos del receptor por su estación σ en el marco del paño, ordenados. */
+  nudos(b: BordePano): { nudo: number; s: number }[];
+  /** Trozos en σ donde existe (un muro, donde hay muro debajo o encima en la cota de la planta). */
+  trozos(b: BordePano): [number, number][];
 }
 
 export interface PanosU {
@@ -91,8 +103,16 @@ export interface PanosU {
   porPano: number[][];
   /** Nudos creados por las viguetas. */
   nudosNuevos: number;
-  /** Viguetas con un solo apoyo (voladizos que sujeta una sola pieza). */
+  /**
+   * Viguetas en voladizo: las de una línea de viguetas continuas (la misma recta, unidas por sus
+   * nudos) con un solo apoyo en toda ella. Ni el vano de atrás ni otra vigueta compensan su momento.
+   */
   voladizos: number;
+  /**
+   * Nudos que sujetan esas líneas (C4-k): su giro sólo lo coarta la pieza del nudo. En una viga, es
+   * torsión de equilibrio. Por nudo, sin repetir, con los paños de sus viguetas.
+   */
+  equilibrio: { nudo: number; panos: number[] }[];
 }
 
 const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
@@ -147,7 +167,7 @@ function cortesRecta(anillosSE: readonly (readonly Vec2[])[], eta: number): numb
 /** Lo que el compilador sabe de una planta con paños. */
 interface PlantaP {
   tramos: TramoViga[];
-  ejesMuros: { w: number; t: Tramo2D }[];
+  ejesMuros: { w: number; i: number; t: Tramo2D }[];
   verticesMuros: Vec2[];
   pilares: PuntoPilar[];
   losas: Region[];
@@ -165,6 +185,7 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
     porPano: ctx.panos.map(() => []),
     nudosNuevos: 0,
     voladizos: 0,
+    equilibrio: [],
   };
   if (!ctx.panos.length) return r;
   const nudosAntes = topo.nudos.length;
@@ -179,7 +200,7 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
     ctx.muros.forEach((m, w) => {
       if (k < m.kh || k > m.kb) return;
       const p = puntosMuros[w]!;
-      for (let i = 0; i + 1 < p.length; i++) ejesMuros.push({ w, t: tramo(p[i]!, p[i + 1]!) });
+      for (let i = 0; i + 1 < p.length; i++) ejesMuros.push({ w, i, t: tramo(p[i]!, p[i + 1]!) });
       verticesMuros.push(...p);
     });
     const hash = new RejillaHash(lado);
@@ -371,8 +392,6 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
   // 3 y 4. Rectas, viguetas y sus apoyos, grupo a grupo
   const sinApoyo = new Map<number, number>();
   const voladizos = new Map<number, number>();
-  /** Viguetas con un solo apoyo: un voladizo, salvo si sigue en la misma recta por otra vigueta (continua). */
-  const unApoyo: { v: number; nudo: number }[] = [];
   const contiguos = new Map<string, [number, number]>();
   for (const g of [...grupos.values()].sort((a, b) => a[0]! - b[0]!)) {
     const { d, n } = r.marcos[g[0]!]!;
@@ -477,17 +496,43 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
           continue;
         }
         const id = `${pc.pano.id}:v${r.porPano[i]!.length + 1}`;
-        if (apoyos === 1) unApoyo.push({ v: r.viguetas.length, nudo: cadena.find((x) => x.apoyo !== "libre")!.nudo });
         for (const x of cadena) topo.nudos[x.nudo]!.fisicos.add(pc.pano.id);
         r.porPano[i]!.push(r.viguetas.length);
         r.viguetas.push({ id, pano: i, k, d, n, eta, a, b, cadena });
       }
     }
   }
-  for (const { v, nudo } of unApoyo) {
-    const x = r.viguetas[v]!;
-    const sigue = r.viguetas.some((o, w) => w !== v && o.k === x.k && o.d === x.d && Math.abs(o.eta - x.eta) <= 1e-9 && o.cadena.some((c) => c.nudo === nudo));
-    if (!sigue) voladizos.set(x.pano, (voladizos.get(x.pano) ?? 0) + 1);
+  // Líneas de viguetas continuas (C4-k): las de la misma recta de un grupo que comparten un nudo. Una
+  // línea con un solo apoyo es un voladizo (o un balancín sobre una viga): su momento no lo compensa
+  // ningún vano, y su equilibrio depende de la pieza que la sujeta
+  {
+    const padre = r.viguetas.map((_, v) => v);
+    const raiz = (v: number): number => (padre[v] === v ? v : (padre[v] = raiz(padre[v]!)));
+    const enNudo = new Map<number, number[]>();
+    r.viguetas.forEach((x, v) => {
+      for (const c of x.cadena) {
+        for (const o of enNudo.get(c.nudo) ?? []) {
+          const y = r.viguetas[o]!;
+          if (y.d === x.d && Math.abs(y.eta - x.eta) <= 1e-9) padre[raiz(o)] = raiz(v);
+        }
+        enNudo.set(c.nudo, [...(enNudo.get(c.nudo) ?? []), v]);
+      }
+    });
+    const lineas = new Map<number, number[]>();
+    r.viguetas.forEach((_, v) => lineas.set(raiz(v), [...(lineas.get(raiz(v)) ?? []), v]));
+    const equilibrio = new Map<number, Set<number>>();
+    for (const vs of lineas.values()) {
+      const apoyosLinea = new Set(vs.flatMap((v) => r.viguetas[v]!.cadena.filter((c) => c.apoyo !== "libre").map((c) => c.nudo)));
+      if (apoyosLinea.size !== 1) continue;
+      const [nudo] = apoyosLinea;
+      for (const v of vs) {
+        const p = r.viguetas[v]!.pano;
+        voladizos.set(p, (voladizos.get(p) ?? 0) + 1);
+        if (!equilibrio.has(nudo!)) equilibrio.set(nudo!, new Set());
+        equilibrio.get(nudo!)!.add(p);
+      }
+    }
+    r.equilibrio = [...equilibrio].sort((a, b) => a[0] - b[0]).map(([nudo, ps]) => ({ nudo, panos: [...ps].sort((a, b) => a - b) }));
   }
   for (const [x, y] of [...contiguos.values()].sort((p, q) => p[0] - q[0] || p[1] - q[1]))
     diag.error(
@@ -500,7 +545,7 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
   for (const [i, c] of [...voladizos].sort((p, q) => p[0] - q[0]))
     diag.aviso(
       "pano/vigueta-en-voladizo",
-      `${c} viguetas del paño ${ctx.panos[i]!.pano.id} se apoyan en un solo punto y no siguen en otra vigueta: trabajan en voladizo y su giro sólo lo coarta la pieza que las sujeta (con una viga, su torsión). Compruebe que no les falta un apoyo.`,
+      `${c} viguetas del paño ${ctx.panos[i]!.pano.id} se apoyan en un solo punto, y la línea de viguetas a la que pertenecen no tiene otro apoyo: trabajan en voladizo y su equilibrio depende de la pieza que las sujeta. Si es una viga, es torsión de equilibrio (C4-k): su rigidez a torsión no se reduce y hay que dimensionarla a torsión. Compruebe que no les falta un apoyo.`,
       [ctx.panos[i]!.pano.id],
     );
   ctx.panos.forEach((_, i) => r.porPano[i]!.length === 0 && validos[i] && !sinApoyo.has(i) && ![...contiguos.values()].some(([x]) => x === i) && diag.error("pano/sin-viguetas", `El paño ${ctx.panos[i]!.pano.id} no tiene ninguna vigueta: es más estrecho que su intereje en toda su longitud o va entero por ejes de vigas.`, [ctx.panos[i]!.pano.id]));
@@ -531,7 +576,7 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
       );
   });
 
-  // 5. Receptores de borde: lados paralelos a d sobre el eje de una viga
+  // 5. Receptores de borde: lados paralelos a d sobre el eje de una viga o de un muro
   ctx.panos.forEach((pc, i) => {
     if (!validos[i]) return;
     const { d, n } = r.marcos[i]!;
@@ -553,8 +598,19 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
           const b = Math.min(hi, Math.max(sa, sb));
           if (b - a > epsGeom) r.bordes[i]!.push({ eta: (eV + eU) / 2, a, b, tramo: tv });
         }
+        for (const { w, i: im, t } of pl.ejesMuros) {
+          if (Math.abs(t.u[0] * d[1] - t.u[1] * d[0]) > 1e-9) continue;
+          const dl = (X: Vec2) => Math.abs((X[0] - t.A[0]) * t.u[1] - (X[1] - t.A[1]) * t.u[0]);
+          if (dl(V) > epsSnap || dl(U) > epsSnap) continue;
+          const [sa, sb] = [t.A[0] * d[0] + t.A[1] * d[1], t.B[0] * d[0] + t.B[1] * d[1]];
+          const a = Math.max(lo, Math.min(sa, sb));
+          const b = Math.min(hi, Math.max(sa, sb));
+          if (b - a > epsGeom) r.bordes[i]!.push({ eta: (eV + eU) / 2, a, b, muro: { w, i: im } });
+        }
       }
-    r.bordes[i]!.sort((x, y) => x.eta - y.eta || x.a - y.a || x.tramo.id - y.tramo.id);
+    // Las vigas antes que los muros: si un lado va sobre los dos, recibe la viga
+    const clave = (b: BordePano) => (b.tramo ? b.tramo.id : topo.tramos.length + b.muro!.w * 1e4 + b.muro!.i);
+    r.bordes[i]!.sort((x, y) => x.eta - y.eta || x.a - y.a || clave(x) - clave(y));
   });
   r.nudosNuevos = topo.nudos.length - nudosAntes;
   return r;
@@ -643,21 +699,28 @@ export class RepartoPano {
   private readonly viguetas: { v: number; vig: ViguetaU }[];
   private readonly bordes: BordePano[];
 
-  constructor(panos: PanosU, i: number) {
+  constructor(panos: PanosU, i: number, nb: NudosBorde) {
     const { d, n } = panos.marcos[i]!;
     this.d = d;
     this.n = n;
     this.anillos = anillos(panos.regiones[i]!).map((p) => p.map((V) => this.se(V)));
     this.viguetas = panos.porPano[i]!.map((v) => ({ v, vig: panos.viguetas[v]! }));
-    this.bordes = panos.bordes[i]!;
-    // Cortes: los vértices, los nudos de las viguetas y los de las vigas de los receptores de borde
-    // (cada franja cae entre dos nudos seguidos de cada receptor: el momento de transporte de una
-    // franja se reparte entre ellos, C4-e)
-    const sigmaTramo = (b: BordePano, s: number) => (b.tramo.t.A[0] + s * b.tramo.t.u[0]) * d[0] + (b.tramo.t.A[1] + s * b.tramo.t.u[1]) * d[1];
+    // Un muro recibe sólo donde lo hay en la cota: sus trozos
+    this.bordes = panos.bordes[i]!.flatMap((b) =>
+      b.muro
+        ? nb
+            .trozos(b)
+            .map(([x, y]) => ({ ...b, a: Math.max(b.a, x), b: Math.min(b.b, y) }))
+            .filter((x) => x.b - x.a > 1e-9)
+        : [b],
+    );
+    // Cortes: los vértices, los nudos de las viguetas y los de los receptores de borde (cada franja
+    // cae entre dos nudos seguidos de cada receptor: el momento de transporte de una franja se
+    // reparte entre ellos, C4-e)
     this.cortesBase = [
       ...this.anillos.flatMap((p) => p.map((V) => V[0])),
       ...this.viguetas.flatMap(({ vig }) => vig.cadena.map((x) => x.sigma)),
-      ...this.bordes.flatMap((b) => [b.a, b.b, ...b.tramo.cadena.map((x) => sigmaTramo(b, x.sigma)).filter((s) => s > b.a && s < b.b)]),
+      ...this.bordes.flatMap((b) => [b.a, b.b, ...nb.nudos(b).map((x) => x.s).filter((s) => s > b.a && s < b.b)]),
     ];
   }
 

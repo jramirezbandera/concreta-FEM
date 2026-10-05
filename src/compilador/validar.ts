@@ -198,6 +198,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", "La opción rejilla tiene que ser true o false.");
     return null;
   }
+  if (typeof op.torsionEquilibrio !== "boolean") {
+    diag.error("opciones/no-validas", "La opción torsionEquilibrio tiene que ser true o false.");
+    return null;
+  }
   const malMod = modificadoresNoValidos(op.modificadores);
   if (malMod) {
     diag.error(
@@ -500,7 +504,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
           huecosBien = false;
         }
     const region: Region = { contorno: l.contorno, huecos };
-    const reticular = l.reticular !== undefined && huecosBien ? validarReticular(l, region, mal, op) : undefined;
+    const reticular = l.reticular !== undefined && huecosBien ? validarReticular(l, region, mal, op, diag) : undefined;
     if (!huecosBien || !m || m.tipo === "acero" || !pos(l.espesor) || reticular === null) continue;
     const { elastico, peso } = materialElastico(m);
     const nu = elastico.E / (2 * elastico.G) - 1;
@@ -793,10 +797,10 @@ const MULTIPLICADORES = ["f11", "f22", "f12", "m11", "m22", "m12", "v13", "v23"]
  * Comprueba el reticular de una losa (C4): nervios, ábacos y multiplicadores. Devuelve sus ábacos en
  * orden canónico, o null si algo falla.
  */
-function validarReticular(l: Losa, region: Region, mal: (id: string, que: string) => void, op: OpcionesResueltas): { abacos: Vec2[][] } | null {
+function validarReticular(l: Losa, region: Region, mal: (id: string, que: string) => void, op: OpcionesResueltas, diag: Diagnosticos): { abacos: Vec2[][] } | null {
   const r = l.reticular as unknown;
   if (!esObjeto(r)) {
-    mal(l.id, "el reticular tiene que ser { intereje, nervio, capa, abacos?, multiplicadores? }");
+    mal(l.id, "el reticular tiene que ser { intereje, nervio, capa, caseton?, abacos?, multiplicadores? }");
     return null;
   }
   let bien = true;
@@ -809,6 +813,14 @@ function validarReticular(l: Losa, region: Region, mal: (id: string, que: string
     if (!((r.nervio as number) < (r.intereje as number))) no("el nervio del reticular tiene que ser más estrecho que su intereje");
     if (pos(l.espesor) && !((r.capa as number) < l.espesor)) no("la capa de compresión del reticular tiene que ser más delgada que el canto total (el espesor de la losa)");
   }
+  if (r.caseton !== undefined && r.caseton !== "perdido" && r.caseton !== "recuperable") no("el casetón del reticular tiene que ser «perdido» o «recuperable»");
+  // C4-i: con casetón perdido (por defecto) el peso depende de su material: sólo lo sabe el usuario
+  else if ((r.caseton ?? "perdido") === "perdido" && l.pp === undefined)
+    diag.error(
+      "reticular/sin-pp",
+      `${l.id}: un reticular con casetón perdido (el caso por defecto) necesita su peso propio pp, porque depende del material del casetón (C4-i). Dé el pp medio de la losa con los ábacos o, si el casetón es recuperable, ponga caseton: "recuperable" y el peso será el del hormigón.`,
+      [l.id],
+    );
   if (r.multiplicadores !== undefined) {
     const m = r.multiplicadores;
     if (!esObjeto(m) || Object.keys(m).some((k) => !(MULTIPLICADORES as readonly string[]).includes(k)) || Object.values(m).some((x) => x !== undefined && !(num(x) && x > 0 && x <= 100)))

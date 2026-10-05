@@ -32,6 +32,11 @@ export interface BarraMapeada {
    * de la pieza (no está en `piezas`), y sus s son las del extremo de la viga.
    */
   auxiliar?: true;
+  /**
+   * Tramo de viga con torsión de equilibrio (C4-k): sujeta viguetas en voladizo sin otro apoyo, así
+   * que su torsión no se reduce y hay que dimensionarlo a torsión.
+   */
+  torsionEquilibrio?: true;
 }
 
 export interface Mapeo {

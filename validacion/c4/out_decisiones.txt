@@ -7,6 +7,23 @@ C4-c, torsión de las viguetas en los dos vanos de 5 m sobre vigas (peso propio)
   conservada, J de la T bruta: vigueta del vano 1, M en la fachada -0.28, máximo de vano 5.42 y en el apoyo intermedio -5.74 kN·m; viga de fachada, M máximo de vano 28.30 y torsión máxima 2.46 kN·m
   conservada, J ×0,1 (como D4 en las vigas): vigueta del vano 1, M en la fachada -0.29, máximo de vano 5.44 y en el apoyo intermedio -5.69 kN·m; viga de fachada, M máximo de vano 28.04 y torsión máxima 2.47 kN·m
 C4-e, de 3,5 kN/m² sobre el recuadro de 5 × 6 (105 kN), lo que va a las vigas paralelas a las viguetas (VC y VD): 6.563 kN, el 6.25 % (franjas de 0,1875 m, la mitad de la de borde de 0,375 m); con toda la franja de borde a la última vigueta, 0
+  con un muro en el lado y = 0 en lugar de la viga VC: el muro recibe 3.281 kN en sus nudos y la viga VD, 3.281 kN (en C4.0 el muro no recibía nada: su franja iba a la última vigueta)
 C4-h, multiplicadores del reticular 30+5 frente al emparrillado de nervios (recuadro apoyado de 8 nervios, flecha junto al centro y momento por nervio):
   del emparrillado con ν = 0 (C4-h): lámina w -4.822 mm y M 24.848 kN·m; emparrillado -4.957 mm y 25.348 kN·m: -2.7 % y -2.0 %
   las mismas razones sobre la maciza con ν = 0,2 (multiplicadores dados, como SAP2000): w -3.913 mm: -21.1 % frente al emparrillado
+C4-k, voladizo de 1,5 m de viguetas cada 0,75 m que sale de la viga VY5 (de pilar a pilar, 6 m); la vigueta del voladizo en y = 2,625, su momento en el apoyo y su flecha en la punta, y la torsión máxima de las vigas:
+  con el vano detrás en la misma recta (peso propio):
+    con torsión de equilibrio (C4-k): ninguna viga con J entera; voladizo -2.95 kN·m y -1.26 mm; la vigueta del vano, -2.97 kN·m junto a VY5; torsión de VY5 1.12 kN·m
+    sin ella (J ×0,1 en todas): ninguna viga con J entera; voladizo -2.95 kN·m y -1.26 mm; la vigueta del vano, -2.97 kN·m junto a VY5; torsión de VY5 1.12 kN·m
+  con el vano detrás, 2 kN/m² sólo en el voladizo:
+    con torsión de equilibrio (C4-k): ninguna viga con J entera; voladizo -1.69 kN·m y -0.85 mm; la vigueta del vano, -1.61 kN·m junto a VY5; torsión de VY5 1.10 kN·m
+    sin ella (J ×0,1 en todas): ninguna viga con J entera; voladizo -1.69 kN·m y -0.85 mm; la vigueta del vano, -1.61 kN·m junto a VY5; torsión de VY5 1.10 kN·m
+  sin vano detrás: las viguetas del vano van según Y (peso propio):
+    con torsión de equilibrio (C4-k): J entera en VY5; voladizo -2.95 kN·m y -1.45 mm; torsión de VY5 11.81 kN·m
+    sin ella (J ×0,1 en todas): ninguna viga con J entera; voladizo -2.95 kN·m y -8.55 mm; torsión de VY5 11.81 kN·m
+  un hueco de 1,4 × 2 m junto a VY5 corta dos líneas de viguetas: las del vano quedan en voladizo desde VY0 y las del voladizo, sin vano (peso propio):
+    con torsión de equilibrio (C4-k): J entera en VY0, VY5; voladizo -2.95 kN·m y -1.22 mm; torsión de VY5 3.78 y de VY0 16.08 kN·m
+    sin ella (J ×0,1 en todas): ninguna viga con J entera; voladizo -2.95 kN·m y -1.59 mm; torsión de VY5 2.95 y de VY0 16.08 kN·m
+  balancín: viguetas en voladizo a los dos lados de VY5, 2 kN/m² sólo en uno:
+    con torsión de equilibrio (C4-k): J entera en VY5; voladizo -1.69 kN·m y -2.37 mm; torsión de VY5 6.75 kN·m
+    sin ella (J ×0,1 en todas): ninguna viga con J entera; voladizo -1.69 kN·m y -6.43 mm; torsión de VY5 6.75 kN·m

@@ -272,6 +272,12 @@ export interface Reticular {
   /** Espesor de la capa de compresión (hf). */
   capa: number;
   /**
+   * Casetón (C4-i). Por defecto, "perdido", el caso más común en obra: se queda en el forjado y su
+   * peso depende de su material, así que el `pp` de la losa es obligatorio. Con "recuperable", sin
+   * `pp` el peso es el del hormigón: γ·volumen en la zona aligerada y γ·h en los ábacos.
+   */
+  caseton?: "perdido" | "recuperable";
+  /**
    * Ábacos: polígonos simples macizos (multiplicador 1). Pueden salirse de la losa: cuenta su
    * parte dentro. No pueden solaparse entre sí.
    */
@@ -448,6 +454,12 @@ export interface OpcionesCompilacion {
    * que no cae en ella. Por defecto, sí; sin ella, toda la losa va por la triangulación.
    */
   rejilla?: boolean;
+  /**
+   * Torsión de equilibrio (C4-k): en los tramos de viga que sujetan viguetas en voladizo sin otro
+   * apoyo en su línea (ni vano de atrás ni otra vigueta que compense su momento), la torsión no se
+   * reduce: los modificadores de J menores que 1 (D4) no se aplican. Por defecto, sí.
+   */
+  torsionEquilibrio?: boolean;
 }
 
 export interface OpcionesResueltas {
@@ -458,6 +470,7 @@ export interface OpcionesResueltas {
   modificadores: ModificadoresPiezas;
   tamanoMalla: number;
   rejilla: boolean;
+  torsionEquilibrio: boolean;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -469,5 +482,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     modificadores: o.modificadores ?? MODIFICADORES_D4,
     tamanoMalla: o.tamanoMalla ?? TAMANO_MALLA,
     rejilla: o.rejilla ?? true,
+    torsionEquilibrio: o.torsionEquilibrio ?? true,
   };
 }
