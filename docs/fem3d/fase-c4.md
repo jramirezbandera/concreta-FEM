@@ -14,6 +14,11 @@
 > - **C4-3 y C4-4:** dos fallos latentes de la malla de C2, que aparecían con un ábaco, una zona o una banda que se sale de la losa junto a un pilar de esquina o de fachada. Las bandas de pilar de fachada de D5 serán así. Están corregidos sin cambiar ninguna malla existente.
 > - **C4-5:** una carga lineal en una planta sin losas ni muros se perdía en silencio (C2). Ahora es un error.
 >
+> **Actualización C4.1 (2026-10-05):** el usuario confirma C4-a, C4-c, C4-e, C4-h y C4-i, con tres cambios que se miden en §6:
+> - **C4-i:** el casetón por defecto es el perdido, el caso más común en obra, y entonces el pp es obligatorio;
+> - **C4-e:** los muros paralelos a las viguetas también reciben su franja, como las vigas;
+> - **C4-k, nueva:** la viga que sujeta viguetas en voladizo sin vano detrás trabaja a torsión de equilibrio, y su torsión no se reduce.
+>
 > **Cómo leerlo:** la tabla resume los criterios, que se fijaron al empezar la fase. Cada sección da el detalle y la evidencia. Lo que queda para el usuario está en «Decisiones por defecto» y en «Pendiente».
 
 | # | Criterio | Resultado | Evidencia |
@@ -79,29 +84,60 @@
 | C4-9 | **La continuidad depende de que las viguetas caigan en la misma recta:** desalineadas 15 cm sobre una viga, el momento de la vigueta en el apoyo baja un 12 % y el de vano sube un 5,5 %, y la viga intermedia se tuerce (4,6 kN·m). Sobre muros de 25 cm, el muro empotra la vigueta y la reacción central es 1,08·q·L en vez de 1,25 | C4-a (rectas comunes por grupo). Lo del muro es física: se ve en el modelo |
 | C4-10 | **Trozos de carga de barra de redondeo** (2e-15 m) en el reparto: el motor rechaza una carga distribuida con un tramo menor que su tolerancia | Un trozo de ≤ 1e-6 m va como fuerza concentrada en su centro con el momento de su reparto, exacto |
 | C4-11 | **Una viga o un muro dentro de un paño y paralelos a sus viguetas no reciben su carga** (las viguetas pasan a su lado sin cruzarlos) | Aviso `pano/viga-paralela-dentro`, que pide partir el paño por ella |
+| C4-12 | **(C4.1) Un balancín no se veía como voladizo.** Si las viguetas en voladizo a los dos lados de una viga no tienen otro apoyo, cada una «seguía» en la otra por el nudo común y no había aviso. Con la carga en un solo lado, la viga trabaja a torsión de equilibrio: 6,75 kN·m en el caso de §6 | Un voladizo se decide por **líneas** de viguetas continuas (la misma recta, unidas por sus nudos): es voladizo la línea con un solo apoyo en toda ella. La batería al azar tiene un aviso más (15 en vez de 14) |
+| C4-13 | **(C4.1) Con J ×0,1 (D4) en una viga con torsión de equilibrio, la fuerza sale bien y la flecha no.** Sin vano detrás, la torsión de la viga es la misma con J entera o ×0,1 (11,81 kN·m), porque la impone el equilibrio. Pero el giro de la viga es diez veces mayor, y la punta del voladizo baja 8,55 mm en vez de 1,45. Con un hueco que corta sólo algunas líneas, parte del momento va por la viga a las viguetas vecinas, y con ×0,1 la viga se lleva menos torsión (2,95 kN·m frente a 3,78) | C4-k: en esos tramos de viga la torsión no se reduce. Con el vano detrás no cambia nada: el vano compensa el voladizo y a la viga sólo le llega torsión de compatibilidad (1,1 kN·m) |
+| C4-14 | **(C4.1) Un muro paralelo a las viguetas en un lado del paño no recibía nada:** la franja entre la última vigueta y el muro iba entera a la vigueta, con su momento de transporte | El muro es receptor de borde, como una viga: la franja va a sus nudos de la cota por la palanca entre los dos que la rodean (exacto en fuerza y momento), y sólo donde hay muro debajo o encima |
 
 ## 4. Decisiones por defecto (de `compilador.md`), con sus medidas
 
-| Decisión | Por defecto | Medida | Para el usuario |
+| Decisión | Por defecto | Medida | Del usuario (2026-10-05) |
 |---|---|---|---|
-| C4-a, posición de las viguetas | Rectas comunes por grupo de paños contiguos con la misma dirección e intereje, centradas en su ancho | Desalineadas 15 cm: −12 % de momento en el apoyo y +5,5 % en el vano (C4-9) | Confirmar |
-| C4-c, torsión de las viguetas | Liberada en un extremo de cada tramo entre apoyos; los voladizos la conservan | Conservarla cambia ≤ 1 % (C4-8) | Confirmar |
-| C4-e, reparto | La palanca entre receptores; la franja junto a un borde sin viga, a la última vigueta con su transporte, que va a sus nudos (C4-1) | En un recuadro de 5 × 6 con s = 0,75, las vigas paralelas reciben el 6,25 % (franjas de 0,1875 m) | Confirmar. Alternativa: que los muros y las losas paralelos también sean receptores |
-| C4-h, multiplicadores del reticular | Del emparrillado de nervios, con ν = 0 y G compensado | −2,7 % frente al emparrillado; con las razones y ν = 0,2 (como SAP2000), −21 % (C4-6) | **La más importante:** confirmar, y contrastar con el modelo SAP2000 del usuario (S5 #21) |
-| C4-i, peso del reticular | `pp` medio en toda la losa; sin él, γ·volumen (casetón recuperable) y γ·h en los ábacos | 30+5: 3,28 kN/m² en la zona aligerada y 8,75 en los ábacos | Confirmar (con casetones perdidos hay que dar el pp) |
+| C4-a, posición de las viguetas | Rectas comunes por grupo de paños contiguos con la misma dirección e intereje, centradas en su ancho | Desalineadas 15 cm: −12 % de momento en el apoyo y +5,5 % en el vano (C4-9) | **Confirmada** |
+| C4-c, torsión de las viguetas | Liberada en un extremo de cada tramo entre apoyos; los voladizos la conservan | Conservarla cambia ≤ 1 % (C4-8) | **Confirmada** |
+| C4-e, reparto | La palanca entre receptores (viguetas y lados paralelos sobre una viga **o un muro**, C4.1); la franja junto a un borde sin viga ni muro, a la última vigueta con su transporte, que va a sus nudos (C4-1) | En un recuadro de 5 × 6 con s = 0,75, las vigas paralelas reciben el 6,25 % (franjas de 0,1875 m); un muro en lugar de una de ellas, lo mismo (3,281 kN) | **Confirmada, con los muros como receptores** (C4-14). Las losas paralelas, para más adelante |
+| C4-h, multiplicadores del reticular | Del emparrillado de nervios, con ν = 0 y G compensado | −2,7 % frente al emparrillado; con las razones y ν = 0,2 (como SAP2000), −21 % (C4-6) | **Confirmada.** Falta contrastarla con el modelo SAP2000 del usuario (S5 #21) |
+| C4-i, peso del reticular | **Casetón perdido por defecto (C4.1): el `pp` es obligatorio** (`reticular/sin-pp`), porque depende del material del casetón. Con `caseton: "recuperable"`, sin `pp`: γ·volumen en la zona aligerada y γ·h en los ábacos. El `pp` dado es el medio de toda la losa | 30+5 recuperable: 3,28 kN/m² en la zona aligerada y 8,75 en los ábacos | **Confirmada, con el casetón perdido por defecto**: es el caso más común en obra |
+| C4-k, torsión de equilibrio (C4.1) | Una línea de viguetas con un solo apoyo (voladizo o balancín) sujeta por una viga: los tramos de la viga desde ese nudo hasta el primer pilar, muro u otra viga que coarta su giro van sin el J de D4 y se marcan (`mapeo.barras[i].torsionEquilibrio`). Un pilar, un muro o una losa la sujetan por su flexión. Opción `torsionEquilibrio`, por defecto sí | §6: misma torsión, flecha del voladizo 1,45 mm en vez de 8,55 | **Pedida por el usuario** |
 | C4-b, C4-d, C4-f, C4-g y C4-j | Como en el plan, más el aviso de C4-11 | Validadas por los criterios 1 a 6 | — |
 
 ## 5. Pendiente
 
 - **Del usuario:**
-  - confirmar C4-a, C4-c, C4-e, C4-h (sobre todo) y C4-i;
-  - calcular en SAP2000 el reticular con ábacos y el unidireccional con viguetas (`validacion/e6/sap2000/LEEME.md`), para cerrar S5 #21 y comparar las vigas paralelas.
+  - calcular en SAP2000 el reticular con ábacos y el unidireccional con viguetas (`validacion/e6/sap2000/LEEME.md`), para cerrar S5 #21 y comparar las vigas paralelas. Si en SAP2000 la viga paralela se lleva bastante más que la media franja (la capa de compresión, que aquí no se modela, la hace trabajar por compatibilidad), añadir la opción de una banda mínima para ella.
 - **Para más adelante:**
   - ábacos automáticos alrededor de los pilares;
-  - receptores de borde sobre muros y losas paralelos, y la opción de articular las viguetas en sus apoyos o de dar un momento negativo mínimo;
+  - receptores de borde sobre losas paralelas, y la opción de articular las viguetas en sus apoyos o de dar un momento negativo mínimo;
+  - torsión de equilibrio en una losa en voladizo sujeta sólo por una viga de borde (C2): hoy no se detecta, y la viga conserva su J ×0,1;
+  - pasar la marca `torsionEquilibrio` a los módulos de comprobación, que tienen que dimensionar esos tramos a torsión;
   - reticular con distinto intereje en cada dirección; placas alveolares y chapa colaborante validadas como tales;
   - el ábaco del criterio 2 frente a un modelo de referencia que tenga efecto Poisson (sólidos o SAP2000), no un emparrillado.
 - **Validación externa:** el periodo «en sombra» con proyectos reales reticulares y unidireccionales calculados también en CYPE o SAP2000.
+
+## 6. C4.1: decisiones del usuario (2026-10-05)
+
+**Qué cambia en el código:**
+- `fisico.ts`, `validar.ts`: `Reticular.caseton` («perdido», por defecto, o «recuperable»), el error `reticular/sin-pp` y la opción `torsionEquilibrio`.
+- `unidireccional.ts`: los muros paralelos como receptores de borde (`BordePano.muro`, `NudosBorde`) y los voladizos por líneas de viguetas (`PanosU.equilibrio`).
+- `cargas.ts`: la franja de un muro, a sus nudos de la cota por la palanca.
+- `piezas.ts`: `barrasTorsionEquilibrio`, los tramos de viga desde cada nudo de `equilibrio` hasta el primer pilar, muro u otra viga.
+- `compilar.ts` y `mapeo.ts`: los modificadores de esos tramos sin J, la marca `torsionEquilibrio`, las hipótesis y la versión C4.1.
+
+**Medidas** (`validacion/c4/out_decisiones.txt`, C4-k). Voladizo de 1,5 m de viguetas cada 0,75 m que sale de una viga de 6 m entre pilares, con peso propio salvo donde se indica. El momento y la flecha son los de la vigueta en y = 2,625:
+
+| Caso | J de la viga | Momento del voladizo | Flecha en la punta | Torsión de la viga |
+|---|---|---|---|---|
+| Vano detrás en la misma recta | ×0,1 (no hay torsión de equilibrio) | −2,95 kN·m (el vano, −2,97 junto a la viga) | 1,26 mm | 1,12 kN·m |
+| Vano detrás, 2 kN/m² sólo en el voladizo | ×0,1 | −1,69 (el vano, −1,61) | 0,85 mm | 1,10 |
+| Sin vano detrás (viguetas del vano según Y) | entera (C4-k) / ×0,1 | −2,95 / −2,95 | **1,45 / 8,55 mm** | 11,81 / 11,81 |
+| Hueco de 1,4 × 2 m junto a la viga | entera en las dos vigas / ×0,1 | −2,95 / −2,95 | 1,22 / 1,59 mm | 3,78 / 2,95; la viga del otro lado, 16,08 / 16,08 |
+| Balancín, 2 kN/m² en un solo lado | entera / ×0,1 | −1,69 / −1,69 | 2,37 / 6,43 mm | 6,75 / 6,75 |
+
+**Lectura:**
+- **Con el vano detrás, el voladizo se compensa sin torsión.** Su momento lo toma la vigueta del vano, que es continua sobre la viga (C4-a), y a la viga le llega poca torsión, que es de compatibilidad, también con la carga sólo en el voladizo. Que la vigueta sea continua es cosa del modelo: en obra lo hace la armadura de negativos, anclada en el vano.
+- **Sin vano detrás, la torsión es de equilibrio.** La impone la estática, así que es la misma con cualquier J. Con ×0,1, la flecha del voladizo sale 5,9 veces mayor de lo que da la viga sin reducir. Lo importante para el usuario es que esa viga hay que dimensionarla a torsión: lo dicen el aviso, las hipótesis y la marca del mapeo.
+- **Con un hueco sin brochales, el reparto depende del J.** Las líneas cortadas son voladizos (de 3,5 m desde la otra viga, en el ejemplo: su torsión de 16 kN·m avisa de que falta un brochal). Las vecinas sí tienen vano, así que parte del momento va por la viga hasta ellas, y cuánto depende de la rigidez a torsión de la viga. Con C4-k la viga se lleva más torsión (3,78 kN·m frente a 2,95), que es lo seguro para ella; las viguetas vecinas reciben algo menos.
+- **El balancín** es un mecanismo sin la torsión de la viga en cuanto la carga no es simétrica. Antes no se avisaba (C4-12).
+- **Sin cambios en el resto:** las referencias congeladas de C1–C3 y las de C4 sin voladizos (paño girado, dos vanos con voladizo continuo, reticular y mixto al azar) son idénticas. Cambian sólo el paño con hueco sin brochales y la planta al azar 7 (con un balancín), y en su modelo analítico sólo cambia el J de los tramos marcados. Se han regenerado a sabiendas.
 
 ## Cómo reproducir
 
@@ -110,6 +146,6 @@ bun run test:run                                        # todos los tests (E0–
 bun validacion/c4/oraculos.ts                           # criterio 2 (y la viga continua) → out_oraculos.txt
 bun validacion/c4/resumen.ts                            # criterios 1, 3, 4 y 5 → out_resumen.txt
 node validacion/c4/banco.ts > validacion/c4/out_banco.txt              # criterio 8
-node validacion/c4/decisiones.ts > validacion/c4/out_decisiones.txt    # decisiones C4-a, C4-c, C4-e y C4-h
+node validacion/c4/decisiones.ts > validacion/c4/out_decisiones.txt    # decisiones C4-a, C4-c, C4-e, C4-h y C4-k
 bun validacion/c4/congelar.ts                           # SÓLO a sabiendas: regenera la referencia congelada de C4
 ```

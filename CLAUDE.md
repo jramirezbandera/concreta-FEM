@@ -167,8 +167,13 @@
   - **Edificio objetivo:** con unidireccional (V3), 7 360 nudos y 21 840 ecuaciones; con reticular y ábacos (V2), 52 125 nudos y 142 065 ecuaciones. Los dos caben en el perfil móvil.
   - **Validación:** `validacion/c4/` (paños a mano, oráculos del reticular con Navier y el emparrillado de nervios, resumen, decisiones, huellas, banco y referencia congelada).
   - **Pendiente del usuario:** confirmar C4-a, C4-c, C4-e, C4-i y sobre todo C4-h: las mismas razones con ν = 0,2 (como en SAP2000) dan un reticular un 21 % más rígido que los nervios (C4-6).
+- **2026-10-05: decisiones de C4 confirmadas** (C4-a, C4-c, C4-e, C4-h y C4-i), con tres cambios que hacen el compilador C4.1 (`fase-c4.md`, §6):
+  - **C4-i:** el casetón por defecto es el perdido, el más común en obra, y entonces el pp es obligatorio (`reticular/sin-pp`). Sin pp, sólo con `caseton: "recuperable"`.
+  - **C4-e:** los muros paralelos a las viguetas también reciben su franja, en sus nudos de la cota (C4-14).
+  - **C4-k, nueva:** una línea de viguetas con un solo apoyo (voladizo sin vano detrás, también por un hueco, o balancín) sujeta por una viga es torsión de equilibrio. Los tramos de esa viga hasta el primer pilar, muro u otra viga van sin el J de D4 y se marcan en el mapeo (`torsionEquilibrio`), con aviso e hipótesis. Con ×0,1 la torsión sale igual, pero la flecha del voladizo, 5,9 veces mayor. Con el vano detrás se compensa sin torsión (medido). Antes, un balancín no se avisaba (C4-12).
+  - Sólo cambian las referencias congeladas de C4 con voladizos sin vano (paño con hueco y planta al azar 7), y sólo en el J de esos tramos.
 - **Siguiente paso:**
-  - el usuario confirma las decisiones de C3, las de la rejilla (`rejilla.md`, §4) y las de C4 (`fase-c4.md`, §4);
+  - el usuario confirma las decisiones de C3 y las de la rejilla (`rejilla.md`, §4);
   - compilador C5 (bandas automáticas de D5, machones y dinteles como cortes, consultas por objeto físico);
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos, entre ellos el reticular con ábacos y el unidireccional (pasos en `validacion/e6/sap2000/LEEME.md`);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
