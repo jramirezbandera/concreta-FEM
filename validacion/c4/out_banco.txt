@@ -1,0 +1,16 @@
+V2, reticular 30+5 con ábacos de 2,5 m: 80 pilares, 7 plantas, 567 vigas, 7 losas, 0 paños, 46 cargas
+  compilación: 52125 nudos, 13055 barras (0 viguetas), 50134 láminas (10857 de ábacos), 7 diafragmas, 560 huellas; jacobiano mínimo 0.244 (0 bajo el umbral)
+  diagnósticos: 0 ()
+  mediana de 3: 2382 ms (mín 2048, máx 2449); huellas distintas: 1
+  por paso (última): validacion 132, topologia 13, panos 0, losas 1810, piezas 14, numeracion 121, cargas 253, sinPerdidas 75, mapeo 6 ms
+  sin pérdidas: fuerzas 2.1e-13, momentos 1.0e-15
+  cálculo con el núcleo: 5021 ms, 142065 ecuaciones (312750 GDL), equilibrio ≤ 7.4e-13
+  compilación / cálculo: 47 %; tamaño: 52125 nudos (D9 estimaba ≈ 50 000) y 142065 ecuaciones, dentro de los perfiles sobremesa, portatil, movil
+V3, unidireccional con viguetas cada 0,70 m: 80 pilares, 7 plantas, 567 vigas, 0 losas, 434 paños, 46 cargas
+  compilación: 7360 nudos, 14896 barras (3094 viguetas), 0 láminas (0 de ábacos), 7 diafragmas, 0 huellas; jacobiano mínimo 1.000 (0 bajo el umbral)
+  diagnósticos: 14 (carga/zona-fuera-de-losa)
+  mediana de 3: 442 ms (mín 430, máx 566); huellas distintas: 1
+  por paso (última): validacion 75, topologia 8, panos 97, losas 0, piezas 55, numeracion 18, cargas 142, sinPerdidas 23, mapeo 4 ms
+  sin pérdidas: fuerzas 8.5e-13, momentos 3.2e-16
+  cálculo con el núcleo: 1311 ms, 21840 ecuaciones (44160 GDL), equilibrio ≤ 4.2e-13
+  compilación / cálculo: 34 %; tamaño: 7360 nudos (D9 estimaba ≈ 50 000) y 21840 ecuaciones, dentro de los perfiles sobremesa, portatil, movil
