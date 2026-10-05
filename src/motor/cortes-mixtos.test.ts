@@ -35,7 +35,8 @@ describe("cortes por campos en una malla no estructurada (C2-2)", () => {
   it("la placa de Navier mallada por C2: ∫Mx dy a ≤ 1 % también por los vértices de la malla", () => {
     const c = CASOS_NAVIER[0]!;
     const p = placaNavier(c);
-    const modelo = valido(compilar(navierFisico(c), { tamanoMalla: 0.25 })).modelo;
+    // Sin rejilla: la regresión es de una malla no estructurada
+    const modelo = valido(compilar(navierFisico(c), { tamanoMalla: 0.25, rejilla: false })).modelo;
     const xs = [1.3, 2.17, 3.0];
     const anchos = [B / 2, 0.7];
     const cortes: Corte[] = xs.flatMap((x) => anchos.map((a): Corte => ({ origen: [x, B / 2, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [-a, a], metodo: "campos" })));

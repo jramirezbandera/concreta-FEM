@@ -7,6 +7,9 @@
  * - dos modelos aleatorios con losas (semilla 8 con diafragma y eje 1 al azar; 11 sin diafragma),
  *   h = 1: pilares girados y circulares, vigas embebidas y secundarias, huecos, chaflanes, zonas,
  *   tabiques, puntuales en losa y bandas.
+ * Todos con la triangulación sola (`rejilla: false`), como se congelaron en C2. Con la rejilla
+ * alineada de H52 (C2-a), la losa plana y el modelo aleatorio 8 otra vez, y la retícula con la losa
+ * enrasada con los pilares de fachada (1 planta, h = 0,75): plantillas de pilar y franja de fachada.
  * Los números se guardan con 13 cifras significativas (el test compara el modelo a 1e-12 y los
  * resultados a 1e-9), para que el fichero no pase de unos 2 MB.
  * El test (src/compilador/congelado-c2.test.ts) los recompila y recalcula con los dos solvers.
@@ -27,13 +30,17 @@ import { conLosasAleatorias } from "../../src/pruebas/losasAleatorias.ts";
 import type { ModeloCongelado } from "../c1/congelar.ts";
 import { CASOS_NAVIER } from "../e3/navier.ts";
 import { losaPlanaFisica, OPCIONES_LOSA_PLANA } from "./losaPlana.ts";
+import { reticulaEnrasada } from "./modelos.ts";
 import { navierFisico } from "./navier.ts";
 
 export const MODELOS_CONGELADOS_C2: Record<string, () => ModeloCongelado> = {
-  "losa-plana": () => ({ fisico: losaPlanaFisica(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 1 } }),
-  "navier-delgada": () => ({ fisico: navierFisico(CASOS_NAVIER[0]!), opciones: { tamanoMalla: 0.5 } }),
-  "aleatorio-8-losas": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { tamanoMalla: 1 } }),
-  "aleatorio-11-losas-sin-diafragma": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(11, { diafragma: false }), 11), opciones: { tamanoMalla: 1 } }),
+  "losa-plana": () => ({ fisico: losaPlanaFisica(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, rejilla: false } }),
+  "navier-delgada": () => ({ fisico: navierFisico(CASOS_NAVIER[0]!), opciones: { tamanoMalla: 0.5, rejilla: false } }),
+  "aleatorio-8-losas": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { tamanoMalla: 1, rejilla: false } }),
+  "aleatorio-11-losas-sin-diafragma": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(11, { diafragma: false }), 11), opciones: { tamanoMalla: 1, rejilla: false } }),
+  "losa-plana-rejilla": () => ({ fisico: losaPlanaFisica(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 1 } }),
+  "aleatorio-8-losas-rejilla": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { tamanoMalla: 1 } }),
+  "reticula-enrasada": () => ({ fisico: reticulaEnrasada(1), opciones: {} }),
 };
 
 export interface ReferenciaC2 {

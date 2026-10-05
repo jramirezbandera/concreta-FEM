@@ -7,7 +7,8 @@
  *   los nudos ÷ M_ex del centro, en toda la placa y en su interior (a más de 0,75 m de los bordes);
  * - Mx, My brutos del centroide (la media de los 4 puntos de Gauss) frente a M_ex en la media de los
  *   4 nudos: en los cuadriláteros de C2, que no son paralelogramos, converge con orden 1 (C2-1).
- * Para comparar, lo mismo con la rejilla de E3 (`modeloNavier`) del mismo h.
+ * Para comparar, lo mismo con la rejilla de E3 (`modeloNavier`) del mismo h. C2 se mide con la
+ * triangulación sola y con la rejilla alineada de H52 (C2-a), que en esta placa es la de E3.
  *
  * Uso: bun validacion/c2/navier.ts → validacion/c2/out_navier.txt
  */
@@ -139,8 +140,8 @@ export function erroresGlobales(c: CasoNavier, modelo: ModeloAnalitico): Errores
   };
 }
 
-export function erroresNavierC2(c: CasoNavier, h: number): ErroresNavier {
-  return erroresGlobales(c, valido(compilar(navierFisico(c), { tamanoMalla: h })).modelo);
+export function erroresNavierC2(c: CasoNavier, h: number, rejilla = true): ErroresNavier {
+  return erroresGlobales(c, valido(compilar(navierFisico(c), { tamanoMalla: h, rejilla })).modelo);
 }
 
 export function erroresNavierRejilla(c: CasoNavier, h: number): ErroresNavier {
@@ -159,18 +160,19 @@ if (import.meta.main) {
 ## ${c.nombre}`);
     lineas.push("| h (m) | malla | nudos | láminas | w | Mx SPR centro | My SPR centro | Mx SPR | My SPR | Mx SPR interior | My SPR interior | Mx centroide | My centroide |");
     lineas.push("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
-    const filas: Record<string, ErroresNavier[]> = { C2: [], rejilla: [] };
+    const filas: Record<string, ErroresNavier[]> = { "C2, triangulación": [], "C2, rejilla alineada": [], "rejilla de E3": [] };
     for (const h of [0.5, 0.25, 0.125]) {
       for (const [nombre, f] of [
-        ["C2", erroresNavierC2],
-        ["rejilla", erroresNavierRejilla],
+        ["C2, triangulación", (c: CasoNavier, h: number) => erroresNavierC2(c, h, false)],
+        ["C2, rejilla alineada", (c: CasoNavier, h: number) => erroresNavierC2(c, h, true)],
+        ["rejilla de E3", erroresNavierRejilla],
       ] as const) {
         const e = f(c, h);
         filas[nombre]!.push(e);
         lineas.push(`| ${h} | ${nombre} | ${e.nudos} | ${e.laminas} | ${pct(e.w)} | ${pct(e.sprMxCentro)} | ${pct(e.sprMyCentro)} | ${pct(e.sprMx)} | ${pct(e.sprMy)} | ${pct(e.sprMxInterior)} | ${pct(e.sprMyInterior)} | ${pct(e.Mx)} | ${pct(e.My)} |`);
       }
     }
-    for (const nombre of ["C2", "rejilla"]) {
+    for (const nombre of Object.keys(filas)) {
       const f = filas[nombre]!;
       const o = (k: keyof ErroresNavier) => Math.log2((f[1]![k] as number) / (f[2]![k] as number)).toFixed(2);
       lineas.push(`Orden observado (${nombre}, 0,25 → 0,125): w ${o("w")}; SPR interior Mx ${o("sprMxInterior")}, My ${o("sprMyInterior")}; centroide Mx ${o("Mx")}, My ${o("My")}`);

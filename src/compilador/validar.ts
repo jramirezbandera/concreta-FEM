@@ -134,6 +134,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", `El tamaño de malla tiene que ser un número de al menos 2·ε_snap (${2 * op.epsSnap} m).`);
     return null;
   }
+  if (typeof op.rejilla !== "boolean") {
+    diag.error("opciones/no-validas", "La opción rejilla tiene que ser true o false.");
+    return null;
+  }
   const malMod = modificadoresNoValidos(op.modificadores);
   if (malMod) {
     diag.error(

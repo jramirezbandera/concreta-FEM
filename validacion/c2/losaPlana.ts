@@ -78,8 +78,8 @@ export function cortesC2(): Corte[] {
   return [c(xc, 3, "fuerzas-nodales"), c(xc, 6, "fuerzas-nodales"), c(3, 3, "campos"), c(3, 6, "campos")];
 }
 
-export function losaPlanaC2(h: number): ResultadoLosaPlana {
-  const r = valido(compilar(losaPlanaFisica(), { ...OPCIONES_LOSA_PLANA, tamanoMalla: h }));
+export function losaPlanaC2(h: number, rejilla = true): ResultadoLosaPlana {
+  const r = valido(compilar(losaPlanaFisica(), { ...OPCIONES_LOSA_PLANA, tamanoMalla: h, rejilla }));
   const cs = cortarModelo(r.modelo, cortesC2());
   for (const x of cs) if (!x.valido) throw new Error(x.diagnosticos.map((d) => d.mensaje).join(" | "));
   return {
@@ -104,10 +104,10 @@ if (import.meta.main) {
   const f = (v: number) => v.toFixed(2);
   lineas.push(`| E5, h = 0,075 | | | | ${f(ref.caraNodal[0]![0]!)} | ${f(ref.caraNodal[1]![0]!)} | ${f(ref.caraNodal[0]![1]!)} | ${f(ref.caraNodal[1]![1]!)} | ${f(ref.vanoCampos[0]!)} | ${f(ref.vanoCampos[1]!)} |`);
   const pct = (a: number, b: number) => `${(100 * (a / b - 1) >= 0 ? "+" : "") + (100 * (a / b - 1)).toFixed(2)} %`;
-  for (const h of [0.5, 0.3, 0.15]) {
-    const r = losaPlanaC2(h);
+  for (const h of [0.5, 0.3, 0.15, 0.1]) for (const rejilla of [false, true]) {
+    const r = losaPlanaC2(h, rejilla);
     lineas.push(
-      `| C2, h = ${h} | ${r.nudos} | ${r.laminas} | ${r.jacobianoMin.toFixed(3)} | ${f(r.cara[0]![0]!)} (${pct(r.cara[0]![0]!, ref.caraNodal[0]![0]!)}) | ${f(r.cara[0]![1]!)} (${pct(r.cara[0]![1]!, ref.caraNodal[1]![0]!)}) | ${f(r.cara[1]![0]!)} (${pct(r.cara[1]![0]!, ref.caraNodal[0]![1]!)}) | ${f(r.cara[1]![1]!)} (${pct(r.cara[1]![1]!, ref.caraNodal[1]![1]!)}) | ${f(r.vano[0]!)} (${pct(r.vano[0]!, ref.vanoCampos[0]!)}) | ${f(r.vano[1]!)} (${pct(r.vano[1]!, ref.vanoCampos[1]!)}) |`,
+      `| C2 ${rejilla ? "con rejilla" : "sin rejilla"}, h = ${h} | ${r.nudos} | ${r.laminas} | ${r.jacobianoMin.toFixed(3)} | ${f(r.cara[0]![0]!)} (${pct(r.cara[0]![0]!, ref.caraNodal[0]![0]!)}) | ${f(r.cara[0]![1]!)} (${pct(r.cara[0]![1]!, ref.caraNodal[1]![0]!)}) | ${f(r.cara[1]![0]!)} (${pct(r.cara[1]![0]!, ref.caraNodal[0]![1]!)}) | ${f(r.cara[1]![1]!)} (${pct(r.cara[1]![1]!, ref.caraNodal[1]![1]!)}) | ${f(r.vano[0]!)} (${pct(r.vano[0]!, ref.vanoCampos[0]!)}) | ${f(r.vano[1]!)} (${pct(r.vano[1]!, ref.vanoCampos[1]!)}) |`,
     );
   }
   const texto = lineas.join("\n");

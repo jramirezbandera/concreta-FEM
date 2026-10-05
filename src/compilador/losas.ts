@@ -11,7 +11,8 @@
  *      carga, los apoyos lineales y los puntos (cargas y apoyos que C1 no ha colocado).
  * 2. Estaciones de los muros, las mismas en todas sus plantas (`muros.ts`): sus lados quedan
  *    sembrados. Lo que se ha movido más de ε_geom al unirse se avisa (C2-b, C3-b).
- * 3. Por planta: malla las losas (`mallado.ts`) y lleva los problemas del validador a diagnósticos
+ * 3. Por planta: malla las losas (`mallado.ts`, con la rejilla alineada de `rejilla.ts` en las zonas
+ *    regulares) y lleva los problemas del validador a diagnósticos
  *    con la losa. Crea los nudos de la cota de la planta sobre los ejes de los muros, donde el muro
  *    los necesita, y une todo:
  *    - los nudos de la malla que son nudos de C1 se reutilizan; los demás son nudos nuevos;
@@ -75,7 +76,7 @@ export interface Losas {
   /** Nudos que entran en el diafragma de su planta (C2-f), por planta. */
   diafragma: Map<number, number[]>;
   /** Estadísticas de la malla. */
-  malla: { nudos: number; laminas: number; jacobianoMin: number; bajos: number };
+  malla: { nudos: number; laminas: number; jacobianoMin: number; bajos: number; laminasRejilla: number; plantillas: number };
   /** C3: láminas de los muros (van tras las de las losas en el modelo analítico). */
   muros: LaminaMuro[];
   /** Nudos de la base de cada muro con vínculo. */
@@ -257,7 +258,7 @@ interface PlantaL extends PlantaMuros {
 }
 
 export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly CargaFisica[], diag: Diagnosticos): Losas {
-  const { epsGeom, epsSnap, tamanoMalla: h } = ctx.op;
+  const { epsGeom, epsSnap, tamanoMalla: h, rejilla } = ctx.op;
   const r: Losas = {
     laminas: [],
     huellas: [],
@@ -270,7 +271,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     puntos: new Map(),
     regiones: ctx.losas.map((l) => l.region),
     diafragma: new Map(),
-    malla: { nudos: 0, laminas: 0, jacobianoMin: 1, bajos: 0 },
+    malla: { nudos: 0, laminas: 0, jacobianoMin: 1, bajos: 0, laminasRejilla: 0, plantillas: 0 },
     muros: [],
     apoyosMuros: new Map(),
     auxiliares: [],
@@ -477,7 +478,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // Malla de las losas (los lados de los muros ya van sembrados)
     let m: Extract<ResultadoMalla, { ok: true }> | null = null;
     if (mallar.length) {
-      const res = mallarPlanta(a, mallar, h, epsGeom, est?.presembrados.get(k));
+      const res = mallarPlanta(a, mallar, h, epsGeom, est?.presembrados.get(k), rejilla);
       if (!res.ok) {
         diag.error("malla/triangulacion", `La triangulación de la planta ${idPlanta} ha fallado (${res.mensaje}). Es un fallo del compilador.`, [idPlanta, ...mallar.map((x) => x.id)]);
         continue;
@@ -489,6 +490,8 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       }
       r.malla.jacobianoMin = Math.min(r.malla.jacobianoMin, res.calidad.jacobianoMin);
       r.malla.bajos += res.calidad.bajos;
+      r.malla.laminasRejilla += res.rejilla.quads;
+      r.malla.plantillas += res.rejilla.plantillas;
       if (res.problemas.some((p) => p.severidad === "error")) continue;
       mallar.forEach((_, j) => (r.regiones[losaDeMallar[j]!] = res.regiones[j]!));
       m = res;
@@ -655,22 +658,23 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         r.lineasUnidas.set(id, t.puntos.map(xy));
       } else r.zonasUnidas.set(id, t.puntos.map(xy));
     }
-    // Cargas de superficie: láminas cuyo triángulo cae en la zona (y en su losa, si la da)
+    // Cargas de superficie: láminas cuya pieza (triángulo o celda de la rejilla) cae en la zona (y en
+    // su losa, si la da)
     if (m) {
       for (const c of cargas) {
         if (c.tipo !== "superficie" || c.planta !== idPlanta) continue;
         const zona = r.zonasUnidas.get(c.id);
         const li = c.losa !== undefined ? indiceLosa.get(c.losa) : undefined;
-        const tris = new Set<number>();
-        m.triangulos.forEach((t, ti) => {
+        const piezas = new Set<number>();
+        m.piezas.forEach((t, ti) => {
           if (li !== undefined && losaDeMallar[t.losa] !== li) return;
           if (zona && !puntoEnPoligono(t.c, zona)) return;
-          tris.add(ti);
+          piezas.add(ti);
         });
         const base = r.laminas.length + laminasSinOrden.length - m.quads.length;
         r.superficies.set(
           c.id,
-          m.quads.flatMap((q, qi) => (tris.has(q.triangulo) ? [base + qi] : [])),
+          m.quads.flatMap((q, qi) => (piezas.has(q.pieza) ? [base + qi] : [])),
         );
       }
     }

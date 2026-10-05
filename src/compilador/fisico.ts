@@ -377,6 +377,12 @@ export interface OpcionesCompilacion {
    * losas va a 2h, y los muros llevan elementos de ~h. Por defecto, 0,75.
    */
   tamanoMalla?: number;
+  /**
+   * Rejilla alineada en las zonas regulares de las losas (H52, C2-a): cuadriláteros de ≤ h en los
+   * ejes de la losa donde la planta lo permite, y la triangulación restringida sólo alrededor de lo
+   * que no cae en ella. Por defecto, sí; sin ella, toda la losa va por la triangulación.
+   */
+  rejilla?: boolean;
 }
 
 export interface OpcionesResueltas {
@@ -386,6 +392,7 @@ export interface OpcionesResueltas {
   cortante: boolean;
   modificadores: ModificadoresPiezas;
   tamanoMalla: number;
+  rejilla: boolean;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -396,5 +403,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     cortante: o.cortante ?? true,
     modificadores: o.modificadores ?? MODIFICADORES_D4,
     tamanoMalla: o.tamanoMalla ?? TAMANO_MALLA,
+    rejilla: o.rejilla ?? true,
   };
 }

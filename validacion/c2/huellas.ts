@@ -15,6 +15,7 @@ import { huellaDe } from "../../src/compilador/huella.ts";
 import { fisicoAleatorio } from "../../src/pruebas/fisicoAleatorio.ts";
 import { conLosasAleatorias } from "../../src/pruebas/losasAleatorias.ts";
 import { losaPlanaFisica } from "./losaPlana.ts";
+import { reticulaEnrasada } from "./modelos.ts";
 
 export interface HuellasC2 {
   nombre: string;
@@ -26,6 +27,8 @@ export interface HuellasC2 {
 export function huellasC2(): HuellasC2[] {
   const modelos = [
     { nombre: "losa plana de H25", f: losaPlanaFisica() },
+    // Toda en rejilla alineada y plantillas de pilar (H52)
+    { nombre: "retícula enrasada", f: reticulaEnrasada(2) },
     ...[1, 2, 3, 5, 8].flatMap((s) => (["x", "azar"] as const).map((e) => ({ nombre: `aleatorio ${s}, eje 1 ${e}`, f: conLosasAleatorias(fisicoAleatorio(s), s, { eje1: e }) }))),
   ];
   return modelos.map(({ nombre, f }) => {

@@ -22,7 +22,7 @@ const bun = (() => {
 })();
 
 describe("criterio 7 de C2: determinismo y huella", () => {
-  it("la huella no depende del orden de las listas y cambia con 1e-9 m o con el tamaño de malla", () => {
+  it("la huella no depende del orden de las listas y cambia con 1e-9 m, con el tamaño de malla o sin la rejilla", () => {
     for (const s of [1, 4]) {
       const f = conLosasAleatorias(fisicoAleatorio(s), s);
       const r = azar(s);
@@ -32,6 +32,7 @@ describe("criterio 7 de C2: determinismo y huella", () => {
       const h = { ...f, losas: f.losas!.map((l, i) => (i === 0 ? { ...l, contorno: l.contorno.map(([x, y], k) => [k === 1 ? x + 1e-9 : x, y] as const) } : l)) };
       expect(compilar(h).huella).not.toBe(a.huella);
       expect(compilar(f, { tamanoMalla: 0.6 }).huella).not.toBe(a.huella);
+      expect(compilar(f, { rejilla: false }).huella).not.toBe(a.huella);
     }
   });
 

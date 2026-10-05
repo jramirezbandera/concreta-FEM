@@ -6,7 +6,7 @@
  *   a N1, con el empuje del terreno.
  */
 import type { CargaFisica, ModeloFisico, Muro } from "../../src/compilador/fisico.ts";
-import { edificioObjetivoLosas } from "../c2/modelos.ts";
+import { edificioObjetivoLosas, reticulaEnrasada } from "../c2/modelos.ts";
 
 export function edificioObjetivoMuros(plantas = 7, nx = 9, ny = 7): ModeloFisico {
   const f = edificioObjetivoLosas(plantas, nx, ny);
@@ -21,4 +21,18 @@ export function edificioObjetivoMuros(plantas = 7, nx = 9, ny = 7): ModeloFisico
   ];
   const cargas: CargaFisica[] = [...f.cargas!, { tipo: "empuje", id: "TERRENO", caso: "G", muro: "SOTANO", lado: "derecho", z0: 0, z1: 1.5, p0: 15, p1: 0 }];
   return { ...f, muros, cargas };
+}
+
+/**
+ * La retícula de C2 con la losa enrasada con los pilares de fachada (`reticulaEnrasada`, 3 × 3 vanos
+ * y 1 planta) con un núcleo de muros de 25 cm en los ejes del vano central, de la cimentación a N1,
+ * con una puerta y el hueco de la escalera dentro: la rejilla alineada (H52) con plantillas de pilar,
+ * franja de fachada y la triangulación alrededor del núcleo.
+ */
+export function reticulaConNucleo(): ModeloFisico {
+  const f = reticulaEnrasada(1, 3, 3);
+  const muros: Muro[] = [
+    { id: "NUCLEO", puntos: [[6, 5], [12, 5], [12, 10], [6, 10], [6, 5]], desde: "C", hasta: "N1", espesor: 0.25, material: "HA", huecos: [{ desde: 2.4, hasta: 3.4, z0: 0, z1: 1.2 }] },
+  ];
+  return { ...f, losas: f.losas!.map((l) => ({ ...l, huecos: [[[6.6, 5.4], [11.4, 5.4], [11.4, 9.6], [6.6, 9.6]]] })), muros };
 }

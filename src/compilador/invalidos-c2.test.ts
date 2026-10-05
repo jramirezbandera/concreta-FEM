@@ -113,6 +113,7 @@ const CATALOGO: Caso[] = [
   // Opciones
   ["tamaño de malla menor que 2·ε_snap", () => undefined, "opciones/no-validas", undefined, { tamanoMalla: 0.05 }],
   ["tamaño de malla no finito", () => undefined, "opciones/no-validas", undefined, { tamanoMalla: Number.POSITIVE_INFINITY }],
+  ["rejilla que no es un booleano", () => undefined, "opciones/no-validas", undefined, { rejilla: "sí" as unknown as boolean }],
 ];
 
 describe("criterio 6 de C2: entradas no válidas", () => {
