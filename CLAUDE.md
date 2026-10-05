@@ -176,5 +176,6 @@
   - el usuario confirma las decisiones de C3 y las de la rejilla (`rejilla.md`, §4);
   - compilador C5 (bandas automáticas de D5, machones y dinteles como cortes, consultas por objeto físico);
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos, entre ellos el reticular con ábacos y el unidireccional (pasos en `validacion/e6/sap2000/LEEME.md`);
-  - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
+  - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
+  - capa de agente (propuesta del 2026-10-05, `docs/fem3d/agente.md`): fichero de proyecto con esquema, CLI, consultas, sensatez del modelo e informe de revisión (A0–A7). Decididas A-a…A-d: A0–A2 justo después de C5. A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
