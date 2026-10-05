@@ -1,0 +1,12 @@
+C4-a, viguetas de dos vanos de 5 m sobre una viga intermedia (peso propio):
+  en las mismas rectas (C4-a): vigueta del vano 1, momento en el apoyo intermedio -5.68 kN·m y máximo de vano 5.44 kN·m; torsión máxima de la viga intermedia 0.00 kN·m
+  desalineadas (cada paño en su ancho): vigueta del vano 1, momento en el apoyo intermedio -4.98 kN·m y máximo de vano 5.74 kN·m; torsión máxima de la viga intermedia 4.57 kN·m
+  (viga continua de dos vanos iguales: −qL²/8 = -8.20 y 9qL²/128 = 4.61 kN·m; biapoyada: qL²/8 = 8.20)
+C4-c, torsión de las viguetas en los dos vanos de 5 m sobre vigas (peso propio):
+  liberada en un extremo (C4-c): vigueta del vano 1, M en la fachada -0.29, máximo de vano 5.44 y en el apoyo intermedio -5.68 kN·m; viga de fachada, M máximo de vano 28.01 y torsión máxima 2.47 kN·m
+  conservada, J de la T bruta: vigueta del vano 1, M en la fachada -0.28, máximo de vano 5.42 y en el apoyo intermedio -5.74 kN·m; viga de fachada, M máximo de vano 28.30 y torsión máxima 2.46 kN·m
+  conservada, J ×0,1 (como D4 en las vigas): vigueta del vano 1, M en la fachada -0.29, máximo de vano 5.44 y en el apoyo intermedio -5.69 kN·m; viga de fachada, M máximo de vano 28.04 y torsión máxima 2.47 kN·m
+C4-e, de 3,5 kN/m² sobre el recuadro de 5 × 6 (105 kN), lo que va a las vigas paralelas a las viguetas (VC y VD): 6.563 kN, el 6.25 % (franjas de 0,1875 m, la mitad de la de borde de 0,375 m); con toda la franja de borde a la última vigueta, 0
+C4-h, multiplicadores del reticular 30+5 frente al emparrillado de nervios (recuadro apoyado de 8 nervios, flecha junto al centro y momento por nervio):
+  del emparrillado con ν = 0 (C4-h): lámina w -4.822 mm y M 24.848 kN·m; emparrillado -4.957 mm y 25.348 kN·m: -2.7 % y -2.0 %
+  las mismas razones sobre la maciza con ν = 0,2 (multiplicadores dados, como SAP2000): w -3.913 mm: -21.1 % frente al emparrillado

@@ -94,7 +94,7 @@ describe("C4: unidireccional", () => {
     expect(r.estadisticas.forjados).toMatchObject({ panos: 1, viguetas: 8, nudosViguetas: 16, voladizos: 0 });
     ids.forEach((v, j) => {
       const [b] = r.mapeo.piezas[v]!;
-      const barra = r.modelo.barras[b!]!;
+      const barra = r.modelo.barras![b!]!;
       expect(r.mapeo.barras[b!]).toMatchObject({ pieza: v, tipo: "vigueta", pano: "F" });
       expect(barra.liberaciones).toEqual({ i: [false, false, false, true, false, false] });
       const [ni, nj] = barra.nudos.map((n) => r.modelo.nudos[n]!);
@@ -106,7 +106,7 @@ describe("C4: unidireccional", () => {
   it("el diafragma rígido de la planta abarca los nudos de las viguetas; sin él, aviso (C4-g)", () => {
     const r = valido(compilar(recuadro()));
     const d = r.modelo.restricciones!.find((x) => x.tipo === "diafragma")!;
-    const conVigueta = r.modelo.barras.filter((_, i) => r.mapeo.barras[i]!.tipo === "vigueta").flatMap((b) => [...b.nudos]);
+    const conVigueta = r.modelo.barras!.filter((_, i) => r.mapeo.barras[i]!.tipo === "vigueta").flatMap((b) => [...b.nudos]);
     for (const n of conVigueta) expect(d.esclavos).toContain(n);
     const s = valido(compilar(recuadro({ diafragma: "ninguno" })));
     expect(s.diagnosticos.map((x) => x.codigo)).toContain("pano/sin-diafragma");
@@ -133,7 +133,7 @@ describe("C4: unidireccional", () => {
         panos: [...f.panos!, { id: "F2", planta: "P1", contorno: rect(5, 0, 10, 6), direccion: 180, intereje: s2, seccion: "T", pp: 3 }],
       };
     };
-    const nudosEn5 = (r: ReturnType<typeof valido>, p: string) => new Set(r.mapeo.panos![p]!.flatMap((v) => r.mapeo.piezas[v]!.flatMap((b) => [...r.modelo.barras[b]!.nudos])).filter((n) => r.modelo.nudos[n]!.x === 5));
+    const nudosEn5 = (r: ReturnType<typeof valido>, p: string) => new Set(r.mapeo.panos![p]!.flatMap((v) => r.mapeo.piezas[v]!.flatMap((b) => [...r.modelo.barras![b]!.nudos])).filter((n) => r.modelo.nudos[n]!.x === 5));
     const a = valido(compilar(dos(0.75)));
     expect([...nudosEn5(a, "F2")].sort()).toEqual([...nudosEn5(a, "F")].sort());
     const b = valido(compilar(dos(0.6)));
@@ -147,7 +147,7 @@ describe("C4: unidireccional", () => {
     const r = valido(compilar(g));
     expect(r.diagnosticos.map((d) => d.codigo)).toContain("pano/ajuste");
     for (const v of r.mapeo.panos!.F!) {
-      const barra = r.modelo.barras[r.mapeo.piezas[v]![0]!]!;
+      const barra = r.modelo.barras![r.mapeo.piezas[v]![0]!]!;
       expect(r.modelo.nudos[barra.nudos[0]]!.x).toBe(0);
       expect(barra.offsets).toBeUndefined();
     }
@@ -155,7 +155,7 @@ describe("C4: unidireccional", () => {
 
   it("los modificadores de las viguetas van a sus barras y a las hipótesis", () => {
     const r = valido(compilar(recuadro(), { modificadores: { viguetas: { hormigon: { Iy: 0.5 } } } }));
-    for (const v of r.mapeo.panos!.F!) expect(r.modelo.barras[r.mapeo.piezas[v]![0]!]!.modificadores).toEqual({ Iy: 0.5 });
+    for (const v of r.mapeo.panos!.F!) expect(r.modelo.barras![r.mapeo.piezas[v]![0]!]!.modificadores).toEqual({ Iy: 0.5 });
     expect(r.hipotesis.some((h) => h.includes("viguetas de hormigón: Iy ×0,5"))).toBe(true);
   });
 
@@ -169,6 +169,16 @@ describe("C4: unidireccional", () => {
     const qsL2 = (2 * 0.75 * 5) / 2;
     expect(ep.en(v, 1, 0)![2]!).toBeCloseTo(-qsL2, 9);
     expect(ep.en(v, 1, 5)![2]!).toBeCloseTo(qsL2, 9);
+  });
+
+  it("una viga dentro del paño y paralela a sus viguetas: aviso (no recibe su carga); una perpendicular es un apoyo más", () => {
+    const f = recuadro();
+    const par = valido(compilar({ ...f, vigas: [...f.vigas!, { id: "VP", planta: "P1", puntos: [[0, 3], [5, 3]], seccion: "v" }] }));
+    const d = par.diagnosticos.find((x) => x.codigo === "pano/viga-paralela-dentro");
+    expect(d?.ids).toEqual(["F", "VP"]);
+    const per = valido(compilar({ ...f, vigas: [...f.vigas!, { id: "VQ", planta: "P1", puntos: [[2.5, 0], [2.5, 6]], seccion: "v" }] }));
+    expect(per.diagnosticos.map((x) => x.codigo)).not.toContain("pano/viga-paralela-dentro");
+    for (const v of per.mapeo.panos!.F!) expect(per.mapeo.piezas[v]!.length).toBe(2);
   });
 
   it("una carga lineal paralela a las viguetas entre dos de ellas se reparte por la palanca", () => {

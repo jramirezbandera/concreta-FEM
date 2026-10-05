@@ -1,0 +1,15 @@
+Criterio 1, paños a mano frente a su modelo analítico hecho a mano (u, reacciones, esfuerzos de barra):
+  paño entre cuatro vigas: viguetas, vigas paralelas que reciben la franja de borde, puntual y lineal entre viguetas: 24 nudos, 32 barras; 4.9e-15, 1.4e-14, 2.0e-14
+  el mismo paño girado 30° (viguetas oblicuas): 24 nudos, 32 barras; 3.8e-15, 7.2e-15, 2.0e-14
+  dos vanos y un voladizo: viguetas continuas sobre las vigas comunes y torsión en el voladizo: 44 nudos, 61 barras; 4.9e-15, 1.1e-14, 1.2e-14
+  viguetas que acaban en la huella de un pilar: nudo del pilar, offset y zona rígida: 20 nudos, 26 barras; 9.7e-16, 1.7e-15, 2.3e-15
+  paño con un hueco sin brochales: viguetas en voladizo y franjas junto al hueco: 28 nudos, 34 barras; 1.3e-15, 1.0e-14, 1.5e-14
+Criterios 3 y 5, batería de plantas al azar (12 semillas por tipo):
+  mixtas: 4817 nudos, 486 viguetas, 1621 láminas de ábacos; sin pérdidas ≤ 8.8e-15, equilibrio ≤ 1.7e-13; avisos: pano/vigueta-en-voladizo 11, malla/calidad 4, carga/zona-fuera-de-losa 2, pano/ajuste 1, losa/ajuste 1
+  unidireccional: 1780 nudos, 688 viguetas, 0 láminas de ábacos; sin pérdidas ≤ 1.1e-14, equilibrio ≤ 2.8e-14; avisos: pano/vigueta-en-voladizo 14, carga/zona-fuera-de-losa 4, pano/ajuste 1
+  reticular: 17850 nudos, 0 viguetas, 8005 láminas de ábacos; sin pérdidas ≤ 3.5e-15, equilibrio ≤ 3.8e-13; avisos: losa/ajuste 6, malla/calidad 17
+Criterio 4, metamórficas (5 semillas mixtas y unidireccionales):
+  traslación: las mismas viguetas y malla; u 2.3e-12, reacciones 4.9e-12
+  giro de 90°: las mismas viguetas y malla; u 7.8e-13, reacciones 1.6e-12
+  giro de 37°: las mismas viguetas y malla; u 2.5e-12, reacciones 2.3e-12
+  invertir el contorno y girar la dirección 180°: 1.8e-14

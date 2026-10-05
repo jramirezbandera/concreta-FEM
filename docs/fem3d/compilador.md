@@ -4,7 +4,7 @@
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
 >
-> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 superada el 2026-10-05 (`fase-c2.md`): el criterio 8 (tamaño frente a D9) pasa desde la rejilla alineada de H52 en las zonas regulares (decisión C2-a, `rejilla.md`). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). C4 (forjados) en curso desde el 2026-10-05: plan, decisiones y criterios abajo.
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 superada el 2026-10-05 (`fase-c2.md`): el criterio 8 (tamaño frente a D9) pasa desde la rejilla alineada de H52 en las zonas regulares (decisión C2-a, `rejilla.md`). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). C4 (forjados) superada el 2026-10-05 (`fase-c4.md`): pasan los nueve criterios, el 2 con una salvedad en el ábaco. Siguiente: C5 (bandas y salida).
 
 ## Entrada, salida y reglas
 
@@ -246,14 +246,15 @@
 2. **Rectas de las viguetas.** Los paños de una planta con la misma dirección y el mismo intereje que comparten un lado forman un grupo. Sus viguetas siguen las mismas rectas, separadas `intereje`, y son continuas sobre sus apoyos comunes. Las rectas se centran en el ancho W del grupo: n = round(W/s), con la primera a (W − (n − 1)·s)/2 de su borde.
 3. **Tramos y apoyos.** Cada recta se recorta al paño sin sus huecos, y cada trozo es una vigueta.
    - Sus apoyos son los ejes de vigas y muros que cruza o en los que acaba, las huellas de pilar por las que pasa o en las que acaba, y los bordes de losa en los que acaba.
-   - Un extremo sin apoyo es un voladizo. Una vigueta sin ningún apoyo es un error (mecanismo), y con uno solo, un aviso.
+   - Un extremo sin apoyo es un voladizo. Una vigueta sin ningún apoyo es un error (mecanismo), y con uno solo (sin seguir en otra vigueta de la misma recta), un aviso.
    - Acabar en el borde de otro paño sin viga entre ellos es un error.
+   - Una viga o un muro dentro del paño y paralelos a sus viguetas no reciben su carga: aviso, para partir el paño por ellos (C4-11).
 4. **Nudos.**
    - Un apoyo a ≤ ε_snap de un nudo que ya existe (de C1, de otra vigueta o un vértice de muro) lo reutiliza.
    - Si no, el nudo es nuevo: sobre el eje de la viga (que se parte), sobre el del muro (una estación) o en el borde de la losa (un nudo de su malla).
    - El hueco entre la vigueta y su nudo va en un offset, y en una huella de pilar, con la zona rígida de C1-a.
 5. **Barras:** una por tramo entre apoyos consecutivos, sin nudos intermedios (E2-3).
-6. **Reparto de las cargas** (C4-e) y **diafragma** (C4-g).
+6. **Reparto de las cargas** (C4-e) y **diafragma** (C4-g). El momento de transporte va a los nudos del receptor por interpolación lineal (C4-1): no depende del sentido de la vigueta ni de qué extremo lleva la torsión liberada.
 
 **Decisiones por defecto de C4.** Como en C1–C3, cada una es una opción o una regla registrada en las hipótesis:
 

@@ -510,6 +510,27 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
   // Las vigas partidas por las viguetas
   for (const tv of [...tramosTocados].sort((x, y) => x.id - y.id)) ordenarCadena(ctx, topo.nudos, tv, diag);
 
+  // Una viga o un muro dentro de un paño y paralelos a sus viguetas no reciben su carga (C4-e): aviso
+  ctx.panos.forEach((pc, i) => {
+    if (!validos[i]) return;
+    const { d } = r.marcos[i]!;
+    const pl = plantas.get(pc.k)!;
+    const dentro: string[] = [];
+    const mirar = (t: Tramo2D, id: string) => {
+      if (Math.abs(t.u[0] * d[1] - t.u[1] * d[0]) > 0.02) return; // no es paralelo (± 1°): lo cruzan
+      const M: Vec2 = [(t.A[0] + t.B[0]) / 2, (t.A[1] + t.B[1]) / 2];
+      if (distanciaARegion(M, r.regiones[i]!) === 0 && anillos(r.regiones[i]!).every((p) => p.every((V, k) => distanciaASegmento(M, V, p[(k + 1) % p.length]!) > epsSnap))) dentro.push(id);
+    };
+    for (const tv of pl.tramos) mirar(tv.t, tv.viga.id);
+    for (const { w, t } of pl.ejesMuros) mirar(t, ctx.muros[w]!.muro.id);
+    if (dentro.length)
+      diag.aviso(
+        "pano/viga-paralela-dentro",
+        `${[...new Set(dentro)].sort().join(", ")} ${dentro.length > 1 ? "van" : "va"} dentro del paño ${pc.pano.id} y paralela a sus viguetas: no recibe su carga, que va entera a las viguetas (C4-e). Parta el paño por ella para que sea un lado suyo.`,
+        [pc.pano.id, ...new Set(dentro)],
+      );
+  });
+
   // 5. Receptores de borde: lados paralelos a d sobre el eje de una viga
   ctx.panos.forEach((pc, i) => {
     if (!validos[i]) return;

@@ -159,9 +159,17 @@
   - **Edificio objetivo:** 34 737 nudos y 90 657 ecuaciones (antes, 79 649 y 199 983); con muros, 48 451 y 151 905. Frente a la CDT fina, la cara del pilar sale mejor que con la CDT del mismo h; la deriva, −0,75 %.
   - **Validación:** `validacion/c2/rejilla.ts`. Nuevos modelos `reticulaEnrasada` (C2) y `reticulaConNucleo` (C3). Las referencias congeladas antiguas quedan con `rejilla: false` (idénticas) y se añaden las de la rejilla.
   - **Pendiente del usuario:** confirmar h = 0,75 con la rejilla y la deriva, y R-9 (posible falso positivo de C2-c con un hueco a ejes entre vigas).
+- **2026-10-05: fase C4 del compilador superada** (forjados). Pasan los nueve criterios; el 2, con una salvedad en el ábaco (la flecha a −4,5 % del emparrillado con el ν del hormigón, por su efecto Poisson; −2,1 % con ν = 0 en los dos). El informe está en `docs/fem3d/fase-c4.md`, con criterios, hallazgos C4-1…C4-11, decisiones medidas y pendientes.
+  - **Ya en `src/compilador/`:**
+    - reticular (`Losa.reticular`, `reticular.ts`): la zona aligerada con los multiplicadores del emparrillado de nervios, con ν = 0 y G compensado (C4-h); ábacos macizos sembrados en la malla; peso por zonas (C4-i). Los multiplicadores dados se aplican como en SAP2000;
+    - unidireccional (`panos`, `unidireccional.ts`): contorno unido, rectas comunes por grupo de paños (C4-a), viguetas de apoyo a apoyo con la torsión liberada en un extremo (C4-c, E2-3), nudos sobre vigas, muros, huellas y bordes de losa (C4-d), y reparto exacto por la regla de la palanca, con los lados paralelos sobre vigas como receptores y el momento de transporte a los nudos (C4-e). Cada vigueta es una pieza (`<paño>:v<n>`) para `EsfuerzosPiezas`.
+  - **Corregido en C2:** la arista de una plantilla de pilar por el borde de la losa es obligatoria (C4-3), un lado entero fuera de las losas ya no lo es (C4-4: constrainautor fallaba en plantas giradas) y una carga lineal en una planta sin losas ni muros ya no se pierde en silencio (C4-5). Las mallas de C1–C3 no cambian.
+  - **Edificio objetivo:** con unidireccional (V3), 7 360 nudos y 21 840 ecuaciones; con reticular y ábacos (V2), 52 125 nudos y 142 065 ecuaciones. Los dos caben en el perfil móvil.
+  - **Validación:** `validacion/c4/` (paños a mano, oráculos del reticular con Navier y el emparrillado de nervios, resumen, decisiones, huellas, banco y referencia congelada).
+  - **Pendiente del usuario:** confirmar C4-a, C4-c, C4-e, C4-i y sobre todo C4-h: las mismas razones con ν = 0,2 (como en SAP2000) dan un reticular un 21 % más rígido que los nervios (C4-6).
 - **Siguiente paso:**
-  - el usuario confirma las decisiones de C3 y las de la rejilla (`rejilla.md`, §4);
-  - compilador C4 (forjados unidireccional y reticular);
-  - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
+  - el usuario confirma las decisiones de C3, las de la rejilla (`rejilla.md`, §4) y las de C4 (`fase-c4.md`, §4);
+  - compilador C5 (bandas automáticas de D5, machones y dinteles como cortes, consultas por objeto físico);
+  - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos, entre ellos el reticular con ábacos y el unidireccional (pasos en `validacion/e6/sap2000/LEEME.md`);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
