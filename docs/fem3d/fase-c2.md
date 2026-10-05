@@ -2,12 +2,12 @@
 
 > **Fecha:** 2026-10-05. **Plan:** `compilador.md` (alcance, decisiones C2-a…C2-h y criterios de C2), que concreta la fase C2: «mallador de losas, validador de malla, huella del pilar, vigas embebidas, `eje1`, peso propio desde `pp`, cargas de superficie y de línea, siembra de las caras y las bandas».
 >
-> **Veredicto: pasan ocho de los nueve criterios; el 8, a medias.**
+> **Veredicto: pasan los nueve criterios; el 8, desde la rejilla alineada de H52 (decisión C2-a, `rejilla.md`).**
 > - La placa de Navier descrita como losa física converge a la serie con orden 2 y queda como la rejilla de E3: con h = 0,25, w a 0,17 % y M del centro a 0,46 %.
 > - La losa plana de H25 descrita con pilares, huellas y bandas reproduce los cortes de E5 a ≤ 0,37 % con h = 0,15.
 > - La malla es la misma al reordenar (bit a bit), al trasladar, al girar 90° o 37°, con un ruido de 1e-8 m y en V8 y JavaScriptCore.
 > - El control «sin pérdidas» queda en ~1e-15, y 50 entradas no válidas dan su error con el id físico, sin lanzar.
-> - **Criterio 8, a medias:** el edificio objetivo con losa maciza compila en 2,7 s (el 33 % del cálculo), pero con el h por defecto tiene 79 649 nudos y 199 983 ecuaciones. Supera los ~50 000 nudos de D9 y queda justo en el perfil móvil. Es la decisión C2-a, abajo.
+> - **Criterio 8:** con la triangulación sola, el edificio objetivo tenía 79 649 nudos y 199 983 ecuaciones (×1,6 los ~50 000 nudos de D9). Con la rejilla alineada de H52 en las zonas regulares (2026-10-05, `rejilla.md`) tiene 34 737 nudos y 90 657 ecuaciones, y compila en 0,85 s.
 >
 > **Hallazgos principales:**
 > - **C2-2:** el corte por «campos» de E5 contaba dos veces lo que pasa por los nudos de una malla no estructurada (+38 %), y nadie lo había visto porque E5 sólo usó rejillas. Está corregido en el motor y tiene su regresión.
@@ -24,7 +24,7 @@
 | 5 | Sin pérdidas (≤ 1e-9) con la resultante física calculada sin la malla, y equilibrio | **Pasa.** 32 modelos al azar: ≤ 2,9e-15. Equilibrio del motor ≤ 6,6e-13. Edificio objetivo, 1,2e-13 | `losas.test.ts`; `out_resumen.txt`; `out_banco.txt` |
 | 6 | Entradas no válidas con su id físico, sin lanzar | **Pasa.** 50 entradas de losas, huecos, apoyos lineales, bandas, cargas de superficie y lineales y opciones; ninguna lanza ni llega a `compilador/error-interno` | `invalidos-c2.test.ts` |
 | 7 | La misma malla en V8 y JSC; la huella no depende del orden | **Pasa.** 11 modelos: topología idéntica y coordenadas a ≤ 1e-12 entre Node y Bun. La huella de compilación no depende del orden de las listas y cambia con 1e-9 m en una losa o con h | `huella-c2.test.ts`; `validacion/c2/huellas.ts` |
-| 8 | Rendimiento: el edificio objetivo con losa maciza compila en una fracción del cálculo y, con el h por defecto, cabe en D9 | **A medias.** Compila en 2,7 s, el 33 % del cálculo (8,2 s), con la misma huella en cada repetición. Pero tiene 79 649 nudos, 77 217 láminas, 199 983 ecuaciones y 477 894 GDL: ×1,6 los ~50 000 nudos de D9 y justo en el perfil móvil de E4 (200 000 ecuaciones). Con h = 1: 61 365 nudos y 145 089 ecuaciones | `validacion/c2/out_banco.txt`; `out_decisiones.txt` |
+| 8 | Rendimiento: el edificio objetivo con losa maciza compila en una fracción del cálculo y, con el h por defecto, cabe en D9 | **Pasa** desde la rejilla alineada (2026-10-05, `rejilla.md`): 34 737 nudos y 90 657 ecuaciones; compila en 0,85 s, el 22 % del cálculo (3,8 s). Con la triangulación sola estaba a medias: 79 649 nudos y 199 983 ecuaciones, ×1,6 los ~50 000 nudos de D9 | `validacion/c2/out_banco.txt`; `out_decisiones.txt` |
 | 9 | Referencia congelada | **Pasa.** Losa plana, Navier y dos modelos al azar con losas, malla incluida: modelo a 1e-12 y resultados de barras y láminas a 1e-9 con los dos solvers. Generada con Bun y comprobada en Node | `congelado-c2.test.ts` |
 
 ---
@@ -82,7 +82,7 @@ Medidas en el edificio objetivo con losas reducido a 3 plantas (`validacion/c2/o
 
 | Decisión | Por defecto | Medida | Para el usuario |
 |---|---|---|---|
-| C2-a, tamaño de malla | h = 0,75 m | Frente a h = 0,5: flecha de vano +0,3 % y My de la banda en la cara +0,7 %, con un 38 % menos de nudos. Con h = 1: +1,5 % y −4,5 %. El edificio objetivo entero: 79 649 nudos y 199 983 ecuaciones con 0,75; 61 365 y 145 089 con 1 | **Decidir:** mantener 0,75 (lo que pide H10, por encima de los ~50 000 nudos de D9 y justo en el perfil móvil); pasar a 1, o 0,75 con la rejilla alineada de H52 para las zonas regulares, que es lo que bajaría los nudos sin perder precisión |
+| C2-a, tamaño de malla | h = 0,75 m con la rejilla alineada de H52 (desde el 2026-10-05) | Con la triangulación sola, frente a h = 0,5: flecha de vano +0,3 % y My de la banda en la cara +0,7 %, con un 38 % menos de nudos; el edificio objetivo entero, 79 649 nudos. Con la rejilla: 34 737 nudos y la cara mejor que con la triangulación del mismo h (`rejilla.md`) | Decidida por el usuario el 2026-10-05; hecha la rejilla (`rejilla.md`) |
 | C2-c, borde de losa dentro del ancho de una viga | Error | — | Confirmar el error (frente a un aviso). Obliga a dibujar las losas a ejes |
 | C2-f, diafragma con losas | Rígido sobre las losas | El semirrígido da lo mismo en deriva, flecha y cara (+0,1 %), con el doble de ecuaciones y 1,7 veces el tiempo | Sin cambios |
 | C1-a con losas | Factor 0,5 | Sigue pesando: entre 0 y 1, la deriva cambia ±20 % y la flecha ±10 %; la cara, ±1,2 % | Sin cambios (decidido en C1) |
@@ -91,9 +91,8 @@ Medidas en el edificio objetivo con losas reducido a 3 plantas (`validacion/c2/o
 
 ## 5. Pendiente
 
-- **Decididas por el usuario el 2026-10-05:** C2-a (h = 0,75 y la rejilla alineada de H52 en las zonas regulares, por hacer: hasta entonces el criterio 8 sigue a medias), C2-c (error) y C2-g (sólo el descuelgue).
+- **Decididas por el usuario el 2026-10-05:** C2-a (h = 0,75 y la rejilla alineada de H52 en las zonas regulares, hecha el mismo día: `rejilla.md`), C2-c (error) y C2-g (sólo el descuelgue).
 - **Para más adelante:**
-  - la rejilla alineada de H52 en las zonas regulares, para bajar los nudos;
   - refinado local (Ruppert) o unión de las zonas de carga a 3·ε_snap, para los «casi encuentros» (C2-7);
   - losas inclinadas y rampas;
   - cargas lineales variables y zonas con carga variable;

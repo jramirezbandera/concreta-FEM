@@ -4,7 +4,7 @@
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
 >
-> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 terminada el 2026-10-05 (`fase-c2.md`): pasan ocho de los nueve criterios y el 8 (tamaño frente a D9) queda a medias hasta que llegue la rejilla alineada de H52 (decisión C2-a). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). Siguiente: la rejilla alineada de H52 (C2-a) y C4 (forjados).
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 superada el 2026-10-05 (`fase-c2.md`): el criterio 8 (tamaño frente a D9) pasa desde la rejilla alineada de H52 en las zonas regulares (decisión C2-a, `rejilla.md`). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). Siguiente: C4 (forjados).
 
 ## Entrada, salida y reglas
 
@@ -129,7 +129,7 @@
 
 **Lo que C2 deja fuera:**
 - losas inclinadas, rampas y losas a otra cota que la de su planta;
-- la rejilla alineada para zonas regulares (H52) y el refinado local (Ruppert);
+- el refinado local (Ruppert); la rejilla alineada para zonas regulares (H52) llegó después, con la decisión C2-a (`rejilla.md`);
 - cargas lineales variables y zonas con carga variable;
 - las bandas automáticas y su integración (C5), los muros (C3) y los forjados reticular y unidireccional (C4);
 - el solape del peso del pilar con la losa, y el de las vigas que no son rectangulares de hormigón.
@@ -155,7 +155,7 @@
 - **Licencia ISC:** admitida por el usuario el 2026-10-04 (regla 6 de `CLAUDE.md`). El mallador de C2 usa delaunator y constrainautor (H29).
 - **Licencia Unlicense:** admitida por el usuario el 2026-10-04 sólo para robust-predicates 3.0.3 (los predicados exactos de Shewchuk), que delaunator y constrainautor importan directamente.
 - **C1-a, C1-c, C1-d y D4:** decididas por el usuario el 2026-10-04 con las medidas de `validacion/c1/out_decisiones.txt`: factor de zona rígida 0,5, D4 (b) por material, y C1-c y C1-d como estaban.
-- **C2-a, tamaño de malla** (decidida el 2026-10-05, con `validacion/c2/out_decisiones.txt` y `out_banco.txt`): se mantiene h = 0,75 y se añadirá la rejilla alineada de H52 en las zonas regulares, que es lo que baja los nudos sin perder precisión. Con 0,75 y sólo la CDT, el edificio objetivo tiene 79 649 nudos y 199 983 ecuaciones (×1,6 los nudos de D9). El criterio 8 de C2 queda a medias hasta que llegue esa rejilla.
+- **C2-a, tamaño de malla** (decidida el 2026-10-05, con `validacion/c2/out_decisiones.txt` y `out_banco.txt`): se mantiene h = 0,75 y se añade la rejilla alineada de H52 en las zonas regulares, que es lo que baja los nudos sin perder precisión. Con 0,75 y sólo la CDT, el edificio objetivo tenía 79 649 nudos y 199 983 ecuaciones (×1,6 los nudos de D9). **Hecha el 2026-10-05** (`rejilla.md`): 34 737 nudos y 90 657 ecuaciones, con la cara del pilar mejor que con la CDT del mismo h; el criterio 8 de C2 pasa.
 - **C2-c** (decidida el 2026-10-05): un borde de losa dentro del ancho de una viga y fuera de su eje es un **error**. Obliga a dibujar las losas a ejes.
 - **C2-g** (decidida el 2026-10-05): una viga rectangular de hormigón bajo losa pesa sólo su descuelgue: se le quita (b/2)·min(h, t) por cada lado cubierto. Evita contar dos veces el 8,6 % del caso G.
 

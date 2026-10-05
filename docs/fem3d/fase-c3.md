@@ -77,7 +77,7 @@
 | C3-5 | **La numeración canónica dependía de un ulp:** dos nudos distintos en el mismo sitio (la base de un pilar y la de un muro, cada una con su apoyo) se ordenaban por su coordenada exacta, que al trasladar la planta cambia en un ulp. Las metamórficas lo vieron como un 66 % de error en las reacciones, porque emparejaban mal esos nudos | Tras las coordenadas cuantizadas a 1e-9, el desempate es el orden de creación (determinista). Las referencias de C1 y C2 no cambian. El emparejamiento de las pruebas va uno a uno y por la firma de cada nudo |
 | C3-6 | **El control C3-b sumaba todo el muro:** en un muro perimetral cerrado, los bordes perpendiculares de la losa entran t/2 en su espesor junto a cada esquina, y la suma de las ocho esquinas pasaba del umbral | Se mira tramo a tramo, como C2-c en las vigas |
 | C3-7 | **Una viga con sección «general» sin canto sólo se prolonga un elemento dentro del muro (C3-e):** en la viga en el plano de E0 da +10,8 %, el caso «embebida 1 elemento» de E0 | Es la regla de E0 (a lo largo del canto y al menos un elemento): para las barras auxiliares hace falta el canto de la sección. Las rectangulares, T e I lo tienen; las generales, si se da `h` |
-| C3-8 | **Los muros añaden un 25 % de ecuaciones** al edificio objetivo (249 417 frente a 199 983 de C2): 9 088 láminas, sobre todo por las 12 filas por planta y por las estaciones de los cruces | Supera el perfil móvil (200 000 ecuaciones). La rejilla alineada de H52 en las losas (C2-a) es la palanca principal; también cabe aflojar las filas donde el muro no tiene flexión de placa relevante |
+| C3-8 | **Los muros añaden un 25 % de ecuaciones** al edificio objetivo (249 417 frente a 199 983 de C2): 9 088 láminas, sobre todo por las 12 filas por planta y por las estaciones de los cruces | Supera el perfil móvil (200 000 ecuaciones). La rejilla alineada de H52 en las losas (C2-a) es la palanca principal; también cabe aflojar las filas donde el muro no tiene flexión de placa relevante. **Con la rejilla (2026-10-05, `rejilla.md`):** 48 451 nudos y 151 905 ecuaciones, dentro del perfil móvil |
 
 ## 4. Decisiones por defecto (de `compilador.md`), con sus medidas
 
@@ -93,7 +93,8 @@
 
 - **Del usuario:** confirmar C3-a (12 filas por planta), C3-d, C3-g y el cambio de C3-i.
 - **Para más adelante:**
-  - la rejilla alineada de H52 en las losas (C2-a), más urgente con los muros (C3-8);
+  - la rejilla alineada de H52 en las losas (C2-a), más urgente con los muros (C3-8): hecha el 2026-10-05 (`rejilla.md`);
+  - las estaciones de los muros en las líneas de esa rejilla: hoy el eje de un muro deja una franja de triangulación a su lado;
   - pilares unidos al muro en toda su altura (elementos de borde): hoy sólo en la cota de cada planta;
   - muros que no van de forjado a forjado (antepechos), de espesor variable o con huecos no rectangulares;
   - cargas de superficie generales sobre muros (viento) y cimentación (zapatas corridas, muros sobre terreno elástico);

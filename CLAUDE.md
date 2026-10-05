@@ -148,9 +148,19 @@
   - **Corregido en el compilador (C3-5):** la numeración canónica desempata por orden de creación tras las coordenadas cuantizadas; antes, dos nudos en el mismo sitio dependían de un ulp.
   - **Validación:** `validacion/c3/` (ETABS 15 como modelo físico, cuatro oráculos analíticos, resumen, banco, decisiones, huellas y referencia congelada).
   - **Pendiente del usuario:** confirmar C3-a (12 filas por planta), C3-d, C3-g y el cambio de C3-i a la huella de la viga (preguntas en `fase-c3.md`).
+- **2026-10-05: rejilla alineada de H52 hecha** (decisión C2-a). El criterio 8 de C2 pasa, así que C2 queda superada. El informe está en `docs/fem3d/rejilla.md`, con criterios, hallazgos R-1…R-10, decisiones medidas y pendientes.
+  - **Ya en `src/compilador/rejilla.ts`:**
+    - rejilla por planta en los ejes de la primera losa, con líneas de los lados alineados (prioridad por longitud, d_min = 0,4·h; las líneas largas, a d_min/4);
+    - celdas regulares lejos (δ) de lo que no cae en ella;
+    - plantillas de pilar: el bloque de la huella con una red estructurada por sus caras, también para pilares de fachada enrasados;
+    - división conforme con la CDT por tramos (paridad).
+
+    `mallado.ts` cose la rejilla con la CDT del resto (interfaz obligatoria, centros de celda como puntos de Steiner). Si la rejilla cubre menos del 75 % de una planta, se queda la malla con menos nudos. La opción `rejilla: false` da la triangulación de C2 bit a bit.
+  - **Edificio objetivo:** 34 737 nudos y 90 657 ecuaciones (antes, 79 649 y 199 983); con muros, 48 451 y 151 905. Frente a la CDT fina, la cara del pilar sale mejor que con la CDT del mismo h; la deriva, −0,75 %.
+  - **Validación:** `validacion/c2/rejilla.ts`. Nuevos modelos `reticulaEnrasada` (C2) y `reticulaConNucleo` (C3). Las referencias congeladas antiguas quedan con `rejilla: false` (idénticas) y se añaden las de la rejilla.
+  - **Pendiente del usuario:** confirmar h = 0,75 con la rejilla y la deriva, y R-9 (posible falso positivo de C2-c con un hueco a ejes entre vigas).
 - **Siguiente paso:**
-  - el usuario confirma las decisiones de C3;
-  - la rejilla alineada de H52 para las losas (C2-a): más urgente con los muros, que suben el edificio objetivo a 249 417 ecuaciones (C3-8);
+  - el usuario confirma las decisiones de C3 y las de la rejilla (`rejilla.md`, §4);
   - compilador C4 (forjados unidireccional y reticular);
   - el usuario calcula en SAP2000 las tres variantes de Navier que separan el cortante y luego sus modelos (pasos en `validacion/e6/sap2000/LEEME.md`);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos).
