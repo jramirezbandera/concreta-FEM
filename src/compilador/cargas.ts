@@ -189,7 +189,13 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       const hi = Math.min(sb, t.hasta);
       if (!(hi > lo)) continue;
       const [qlo, qhi] = [q(lo), q(hi)];
-      if ("barra" in t) {
+      if ("barra" in t && hi - lo <= 1e-6) {
+        // Un trozo de redondeo (más corto que lo que el motor admite en una carga distribuida): su
+        // fuerza en su centro con el momento de su reparto, exacto
+        const d = hi - lo;
+        const sm = (lo + hi) / 2;
+        casos[c]!.barras.push({ tipo: "puntual", barra: t.barra, ejes: "global", x: sm - t.ip, F: por(mas(qlo, qhi), d / 2), M: cruz(r.e, por(menos(qhi, qlo), (d * d) / 12)) });
+      } else if ("barra" in t) {
         casos[c]!.barras.push({ tipo: "distribuida", barra: t.barra, ejes: "global", qa: qlo, qb: qhi, a: lo - t.ip, b: hi - t.ip });
       } else {
         const d = hi - lo;
@@ -246,6 +252,12 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
   const emisor = (c: number, i: number): EmisorPano => {
     const z = ctx.cotas[ctx.panos[i]!.k]!;
     const { d, n } = panos!.marcos[i]!;
+    /** Nudos del receptor por su estación en el marco del paño. */
+    const nudosDe = (rec: Receptor): { nudo: number; s: number }[] => {
+      if (rec.tipo === "vigueta") return panos!.viguetas[rec.v]!.cadena.map((x) => ({ nudo: x.nudo, s: x.sigma }));
+      const t = rec.b.tramo.t;
+      return rec.b.tramo.cadena.map((x) => ({ nudo: x.nudo, s: (t.A[0] + x.sigma * t.u[0]) * d[0] + (t.A[1] + x.sigma * t.u[1]) * d[1] })).sort((a, b) => a.s - b.s);
+    };
     const rectaDe = (rec: Receptor): { r: Recta; s: (sigma: number) => number; X: (sigma: number) => V } => {
       if (rec.tipo === "vigueta") {
         const v = panos!.viguetas[rec.v]!;
@@ -258,7 +270,17 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       const X = (sg: number): V => [sg * d[0] + eta * n[0], sg * d[1] + eta * n[1], z];
       return { r, s: (sg) => (X(sg)[0] - r.O[0]) * r.e[0] + (X(sg)[1] - r.O[1]) * r.e[1], X };
     };
+    const momento = (rec: Receptor, sg: number, M: readonly number[]) => {
+      const ns = nudosDe(rec);
+      let k = 0;
+      while (k + 2 < ns.length && ns[k + 1]!.s < sg) k++;
+      const [a, b] = [ns[k]!, ns[Math.min(k + 1, ns.length - 1)]!];
+      const w = b.s > a.s ? Math.min(1, Math.max(0, (sg - a.s) / (b.s - a.s))) : 0;
+      if (w < 1) nodal(c, a.nudo, [0, 0, 0], por(M, 1 - w));
+      if (w > 0) nodal(c, b.nudo, [0, 0, 0], por(M, w));
+    };
     return {
+      momento,
       lineal: (rec, sa, sb, qa, qb) => {
         const { r, s } = rectaDe(rec);
         const [a, b] = [s(sa), s(sb)];
@@ -270,15 +292,11 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         else aplicarLineal(c, r, b, a, q2, q1);
         // Una viga con el eje bajo el forjado (C1-c): el transporte vertical de la carga
         const dz = z - r.O[2];
-        if (dz !== 0) {
-          const F = por(mas(q1, q2), (sb - sa) / 2);
-          const sm = s((sa + sb) / 2);
-          puntualEnRecta(c, r, sm, P(r, sm), [0, 0, 0], cruz([0, 0, dz], F));
-        }
+        if (dz !== 0) momento(rec, (sa + sb) / 2, cruz([0, 0, dz], por(mas(q1, q2), (sb - sa) / 2)));
       },
-      puntual: (rec, sg, F, M) => {
+      puntual: (rec, sg, F) => {
         const { r, s, X } = rectaDe(rec);
-        puntualEnRecta(c, r, s(sg), X(sg), [F[0]!, F[1]!, F[2]!], [M[0]!, M[1]!, M[2]!]);
+        puntualEnRecta(c, r, s(sg), X(sg), [F[0]!, F[1]!, F[2]!], [0, 0, 0]);
       },
       aNudo: (nudo, Q, F, M) => nodal(c, nudo, F, mas(M, cruz(menos([Q[0], Q[1], z], Xn(nudo)), F))),
     };

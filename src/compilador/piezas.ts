@@ -265,11 +265,11 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       let sj = nb.s;
       // Zona rígida en la huella de un pilar (C1-a): f veces lo que la vigueta recorre dentro
       if (na.pilar) {
-        const cu = cuerdaHuella(A, v.d, na.pilar.huella);
+        const cu = cuerdaHuella(A, v.d, na.pilar.huella, epsGeom);
         if (cu) si += f * Math.max(0, cu[1] - Math.max(na.s, cu[0]));
       }
       if (nb.pilar) {
-        const cu = cuerdaHuella(A, v.d, nb.pilar.huella);
+        const cu = cuerdaHuella(A, v.d, nb.pilar.huella, epsGeom);
         if (cu) sj -= f * Math.max(0, Math.min(nb.s, cu[1]) - cu[0]);
       }
       if (!(sj - si > epsGeom)) {

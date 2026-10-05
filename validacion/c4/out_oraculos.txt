@@ -1,0 +1,22 @@
+1. Multiplicadores del reticular frente a la T a mano (ν = 0,2):
+   25+5: f11 0.2886, f12 0.1389, m11 0.3006, m12 0.0266, v13 0.1220; error de los exactos 2.2e-16, m12 frente a Roark 0.07 %
+   30+5: f11 0.2683, f12 0.1190, m11 0.2954, m12 0.0208, v13 0.1220; error de los exactos 6.7e-16, m12 frente a Roark 0.05 %
+   35+10: f11 0.3360, f12 0.1852, m11 0.3056, m12 0.0197, v13 0.1220; error de los exactos 3.3e-16, m12 frente a Roark 0.02 %
+2. Placa de Navier ortótropa (reticular 30+5 de 6 × 4 m, «hard»), w en el centro:
+   h = 0.5: 96 láminas, w -1.17561 mm frente a -1.17986 mm: -0.360 %
+   h = 0.25: 384 láminas, w -1.17881 mm frente a -1.17986 mm: -0.088 %
+   h = 0.125: 1536 láminas, w -1.17960 mm frente a -1.17986 mm: -0.022 %
+3. Recuadro reticular 30+5 frente al emparrillado de nervios (flecha junto al centro y momento por nervio en el centro):
+   apoyado, 8 nervios por lado (6.56 m): lámina w -4.822 mm y M 24.848 kN·m; emparrillado -4.957 mm y 25.348 kN·m: -2.71 % y -1.97 %
+   apoyado, 12 nervios por lado (9.84 m): lámina w -24.721 mm y M 56.537 kN·m; emparrillado -25.105 mm y 57.196 kN·m: -1.53 % y -1.15 %
+   apoyado, 16 nervios por lado (13.12 m): lámina w -78.462 mm y M 100.895 kN·m; emparrillado -79.289 mm y 101.710 kN·m: -1.04 % y -0.80 %
+   apoyado, 8 nervios, con ábacos de 2s en las esquinas (el emparrillado no tiene nudo en la esquina: no da su reacción de torsión): lámina w -2.212 mm y M 12.499 kN·m; emparrillado -2.976 mm y 15.920 kN·m: -25.66 % y -21.49 %
+   12 nervios (9,84 m) con un pilar central sin ábaco (w en (2s, 2s), M en (2,5s, 2s)): lámina w -1.291 mm y M 6.487 kN·m; emparrillado -1.266 mm y 6.477 kN·m: 1.93 % y 0.15 %
+   12 nervios (9,84 m) con un pilar central sin ábaco, con ν = 0 en los dos (w en (2s, 2s), M en (2,5s, 2s)): lámina w -1.264 mm y M 6.444 kN·m; emparrillado -1.250 mm y 6.468 kN·m: 1.18 % y -0.37 %
+   12 nervios (9,84 m) con un pilar central y su ábaco de 3s (w en (2s, 2s), M en (2,5s, 2s)): lámina w -0.901 mm y M 5.961 kN·m; emparrillado -0.943 mm y 6.062 kN·m: -4.47 % y -1.66 %
+   12 nervios (9,84 m) con un pilar central y su ábaco de 3s, con ν = 0 en los dos (w en (2s, 2s), M en (2,5s, 2s)): lámina w -0.922 mm y M 5.990 kN·m; emparrillado -0.941 mm y 6.077 kN·m: -2.08 % y -1.44 %
+4. Dos vanos de viguetas (5 m, s = 0,75) sobre muros de espesor t: reacción central frente a 1,25·q·s·L:
+   t = 0.25 m: extrema 0.4614·qL (0,375), central 1.0773·qL: -13.82 %
+   t = 0.1 m: extrema 0.3925·qL (0,375), central 1.2149·qL: -2.81 %
+   t = 0.05 m: extrema 0.3789·qL (0,375), central 1.2422·qL: -0.63 %
+   t = 0.03 m: extrema 0.3777·qL (0,375), central 1.2446·qL: -0.43 %

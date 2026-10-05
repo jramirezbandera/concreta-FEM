@@ -277,8 +277,10 @@ function dosVanosConVoladizo(): CasoMano {
     // Voladizo: la franja de borde (0,375 m) a la vigueta extrema, con su transporte n × q
     if (j === 0 || j === 7) {
       const brazo = j === 0 ? -0.375 / 2 : 0.375 / 2;
-      // ∫(η − η_j) dA = brazo·0,375·1,5; n = +Y, n × (0, 0, q) = (q, 0, 0)
-      bG.push({ tipo: "puntual", barra: v3, ejes: "global", x: 0.75, F: [0, 0, 0], M: [q * brazo * 0.375 * 1.5, 0, 0] });
+      // ∫(η − η_j) dA = brazo·0,375·1,5; n = +Y, n × (0, 0, q) = (q, 0, 0). Con su centroide en el
+      // centro del voladizo, la mitad a cada nudo de la vigueta (interpolación lineal, C4-e)
+      const Mx = (q * brazo * 0.375 * 1.5) / 2;
+      nG.push({ nudo: enX[10]![j]!, f: [0, 0, 0, Mx, 0, 0] }, { nudo: libres[j]!, f: [0, 0, 0, Mx, 0, 0] });
     }
   });
   // Franjas de borde de los dos vanos a las vigas en y = 0 y 6 (de x = 0 a 10)
@@ -353,10 +355,10 @@ function viguetaEnHuella(): CasoMano {
     if (extremo) {
       nG.push(uniformeANudo(i0, [0, j === 0 ? 0 : 6, z], [0, y, z], [a, y, z], g(q * 0.75)));
       nG.push(uniformeANudo(i1, [5, j === 0 ? 0 : 6, z], [5 - a, y, z], [5, y, z], g(q * 0.75)));
-      // Transporte de la franja de borde: ∫(η − η_j) dA = ∓(0,375²/2)·5, n × q = (q, 0, 0); va a la
-      // estación media del paño (x = 2,5), en el tramo flexible
+      // Transporte de la franja de borde: ∫(η − η_j) dA = ∓(0,375²/2)·5, n × q = (q, 0, 0), con su
+      // centroide en x = 2,5: la mitad a cada nudo de la vigueta (interpolación lineal, C4-e)
       const brazo = j === 0 ? -(0.375 ** 2) / 2 : 0.375 ** 2 / 2;
-      bG.push({ tipo: "puntual", barra: b, ejes: "global", x: 2.5 - a, F: [0, 0, 0], M: [q * brazo * 5, 0, 0] });
+      nG.push({ nudo: i0, f: [0, 0, 0, (q * brazo * 5) / 2, 0, 0] }, { nudo: i1, f: [0, 0, 0, (q * brazo * 5) / 2, 0, 0] });
     }
   });
   m.diafragma(m.nudo(2.5, 3, z), [...Object.values(cab), ...nA, ...nB]);
@@ -428,7 +430,8 @@ function panoConHueco(): CasoMano {
       // de fuera más la franja hasta el hueco (0,625), con el transporte ±0,625²/2
       bG.push(dl(b, g(q * 0.75), 0, 2), dl(b, g(q * 0.75), 3, 5), dl(b, g(q * (0.375 + 0.625)), 2, 3));
       const brazo = j === 2 ? 0.625 ** 2 / 2 : -(0.625 ** 2) / 2;
-      bG.push({ tipo: "puntual", barra: b, ejes: "global", x: 2.5, F: [0, 0, 0], M: [q * brazo, 0, 0] });
+      // centrado en x = 2,5: la mitad a cada nudo de la vigueta (interpolación lineal, C4-e)
+      nG.push({ nudo: nA[j]!, f: [0, 0, 0, (q * brazo) / 2, 0, 0] }, { nudo: nB[j]!, f: [0, 0, 0, (q * brazo) / 2, 0, 0] });
     } else bG.push(dl(b, g(q * ancho(j)), 0, 5));
   });
   cargarViga(VC, cadC, [0, 0], [1, 0], z, 0, 5, g(q * 0.1875), bG, nG);

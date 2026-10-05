@@ -45,7 +45,14 @@ export function transformar(f: ModeloFisico, t: Plano): ModeloFisico {
       const [x, y] = t.p([a.x, a.y]);
       return { ...a, x, y };
     }),
-    losas: f.losas?.map((l) => ({ ...l, contorno: l.contorno.map(t.p), huecos: l.huecos?.map((h) => h.map(t.p)), eje1: (l.eje1 ?? 0) + t.giro })),
+    losas: f.losas?.map((l) => ({
+      ...l,
+      contorno: l.contorno.map(t.p),
+      huecos: l.huecos?.map((h) => h.map(t.p)),
+      eje1: (l.eje1 ?? 0) + t.giro,
+      ...(l.reticular ? { reticular: { ...l.reticular, abacos: l.reticular.abacos?.map((a) => a.map(t.p)) } } : {}),
+    })),
+    panos: f.panos?.map((p) => ({ ...p, contorno: p.contorno.map(t.p), huecos: p.huecos?.map((h) => h.map(t.p)), direccion: p.direccion + t.giro })),
     apoyosLineales: f.apoyosLineales?.map((a) => ({ ...a, puntos: a.puntos.map(t.p) })),
     bandas: f.bandas?.map((b) => ({ ...b, desde: t.p(b.desde), hasta: t.p(b.hasta) })),
     muros: f.muros?.map((w) => ({ ...w, puntos: w.puntos.map(t.p) })),
@@ -60,7 +67,7 @@ export function transformar(f: ModeloFisico, t: Plano): ModeloFisico {
       return c.ejes === "global" ? { ...c, q: t.v(c.q), qb: v3(c.qb) } : c;
     }),
   };
-  for (const k of ["pilares", "vigas", "apoyos", "losas", "apoyosLineales", "bandas", "muros", "cargas"] as const) if (g[k] === undefined) delete g[k];
+  for (const k of ["pilares", "vigas", "apoyos", "losas", "apoyosLineales", "bandas", "muros", "panos", "cargas"] as const) if (g[k] === undefined) delete g[k];
   return g;
 }
 
@@ -321,7 +328,7 @@ export function errorU(ra: ResultadoCaso[], rb: ResultadoCaso[], pares: Map<numb
 export function relacionPlanoC2(f: ModeloFisico, t: Plano): { mismaMalla: boolean; u: number; reacciones: number } {
   const a = valido(compilar(f));
   const b = valido(compilar(transformar(f, t)));
-  const mismaMalla = a.modelo.nudos.length === b.modelo.nudos.length && a.modelo.laminas!.length === b.modelo.laminas!.length;
+  const mismaMalla = a.modelo.nudos.length === b.modelo.nudos.length && (a.modelo.laminas ?? []).length === (b.modelo.laminas ?? []).length && (a.modelo.barras ?? []).length === (b.modelo.barras ?? []).length;
   if (!mismaMalla) return { mismaMalla, u: NaN, reacciones: NaN };
   const pares = emparejarTodos(a.modelo, b.modelo, t.p, 1e-6);
   const [ra, rb] = [casosValidos(calcular(a.modelo)), casosValidos(calcular(b.modelo))];

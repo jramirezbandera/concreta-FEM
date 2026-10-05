@@ -456,6 +456,12 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   // Cadena de cada lado: sus extremos, los nudos de la rejilla que son esquina de una celda regular
   // y la siembra de los tramos que van por la CDT
   const cadenas: number[][] = lados.map((l, k) => {
+    // Un lado entero fuera de las losas (el trozo de un ábaco, una zona o una banda que se sale, o
+    // una viga sin losa) no se siembra ni es obligatorio: lo de fuera se descarta, y como los bordes
+    // de las losas sí lo son, no cambia nada dentro. Con él, constrainautor fallaba en algunas
+    // plantas giradas (C4)
+    const [Aa, Bb] = [P[l.a]!, P[l.b]!];
+    if (!l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!)) && enLosa([(Aa[0] + Bb[0]) / 2, (Aa[1] + Bb[1]) / 2]) < 0) return [l.a, l.b];
     // Los lados de los ejes de los muros ya vienen sembrados (C3): sus puntos son las estaciones
     if (fijos[k]) {
       restringir(l.a, l.b);

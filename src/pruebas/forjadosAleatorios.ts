@@ -86,8 +86,8 @@ export function conForjadosAleatorios(f: ModeloFisico, semilla: number, o: Opcio
           planta: p,
           contorno: [
             [X, y0],
-            [X + 1.2, y0],
-            [X + 1.2, y1],
+            [X + 1.2123, y0],
+            [X + 1.2123, y1],
             [X, y1],
           ],
           direccion: 0,

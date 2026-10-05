@@ -62,9 +62,10 @@ export function radioHuella(h: Huella): number {
 
 /**
  * Cuerda de la recta P(σ) = A + σ·u (u unitario) dentro de la huella: [σ entrada, σ salida], o
- * null si no la corta (o no hay forma).
+ * null si no la corta (o no hay forma). Una recta paralela a una cara a ≤ `tol` de ella no entra:
+ * así una vigueta que va justo por la cara de un pilar (C4) no depende del último bit.
  */
-export function cuerdaHuella(A: Vec2, u: Vec2, h: Huella): [number, number] | null {
+export function cuerdaHuella(A: Vec2, u: Vec2, h: Huella, tol = 0): [number, number] | null {
   const f = h.forma;
   if (!f) return null;
   const ax = A[0] - h.c[0];
@@ -88,7 +89,7 @@ export function cuerdaHuella(A: Vec2, u: Vec2, h: Huella): [number, number] | nu
     const p = ax * e[0] + ay * e[1];
     const d = u[0] * e[0] + u[1] * e[1];
     if (Math.abs(d) < 1e-15) {
-      if (Math.abs(p) >= semi) return null;
+      if (Math.abs(p) >= semi - tol) return null;
       continue;
     }
     let a = (-semi - p) / d;

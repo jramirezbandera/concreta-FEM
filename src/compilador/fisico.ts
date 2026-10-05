@@ -35,8 +35,9 @@
  *   del eje en planta. «Izquierdo» y «derecho» son los lados del eje mirando en su sentido.
  * - Forjados (C4): un reticular es una losa con `reticular` (los nervios van según su `eje1` y la
  *   perpendicular); un unidireccional es un paño (`panos`) dibujado como una losa, a ejes, cuyas
- *   viguetas van según su `direccion`. Las viguetas tienen los ejes de las vigas: x en la dirección
- *   del paño (de η menor a mayor a lo largo de la recta, desde su primer extremo) y z = +Z.
+ *   viguetas van según su `direccion`. Cada vigueta es una pieza (`<paño>:v<n>`) con los ejes de
+ *   una viga: x a lo largo de ella, en el sentido de la dirección llevada a [0°, 180°) (las de 0° y
+ *   180° son las mismas), y z = +Z; sus estaciones van desde su primer extremo.
  */
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";

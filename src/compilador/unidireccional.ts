@@ -454,7 +454,7 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
         for (const pp of pl.pilares) {
           const sc = (pp.huella.c[0] - A[0]) * recta.u[0] + (pp.huella.c[1] - A[1]) * recta.u[1];
           if (!interior(a + sc)) continue;
-          const cu = cuerdaHuella(A, recta.u, pp.huella);
+          const cu = cuerdaHuella(A, recta.u, pp.huella, epsGeom);
           const cerca = cu ? true : distanciaAHuella(punto(d, n, a + sc, eta), pp.huella) <= epsSnap;
           if (!cerca) continue;
           eslabones.push({ sigma: a + sc, nudo: pp.nudo, apoyo: "pilar", ...(pp.huella.forma ? { pilar: pp } : {}), extremo: false });
@@ -588,8 +588,16 @@ export type Receptor = { tipo: "vigueta"; v: number } | { tipo: "borde"; b: Bord
 export interface EmisorPano {
   /** Carga lineal de qa (en σa) a qb (en σb) sobre la recta del receptor, σa < σb. */
   lineal(rec: Receptor, sa: number, sb: number, qa: readonly number[], qb: readonly number[]): void;
-  /** Fuerza y momento en la estación σ de la recta del receptor. */
-  puntual(rec: Receptor, sigma: number, F: readonly number[], M: readonly number[]): void;
+  /** Fuerza en la estación σ de la recta del receptor. */
+  puntual(rec: Receptor, sigma: number, F: readonly number[]): void;
+  /**
+   * Momento M (un vector libre: el de transporte o el de una carga puntual) cuya densidad a lo largo
+   * de la recta del receptor tiene su centroide en σ: a los dos nudos del receptor que lo rodean,
+   * por interpolación lineal (las reacciones de empotramiento de un par torsor en una barra
+   * prismática). Así no depende del sentido de la vigueta, de qué extremo lleva la torsión liberada
+   * ni de cómo se corten las franjas.
+   */
+  momento(rec: Receptor, sigma: number, M: readonly number[]): void;
   /** Fuerza F y momento M en el punto Q (en planta, a la cota de la planta), llevados al nudo n con el momento de transporte. */
   aNudo(n: number, Q: Vec2, F: readonly number[], M: readonly number[]): void;
 }
@@ -621,7 +629,15 @@ export class RepartoPano {
     this.anillos = anillos(panos.regiones[i]!).map((p) => p.map((V) => this.se(V)));
     this.viguetas = panos.porPano[i]!.map((v) => ({ v, vig: panos.viguetas[v]! }));
     this.bordes = panos.bordes[i]!;
-    this.cortesBase = [...this.anillos.flatMap((p) => p.map((V) => V[0])), ...this.viguetas.flatMap(({ vig }) => [vig.a, vig.b]), ...this.bordes.flatMap((b) => [b.a, b.b])];
+    // Cortes: los vértices, los nudos de las viguetas y los de las vigas de los receptores de borde
+    // (cada franja cae entre dos nudos seguidos de cada receptor: el momento de transporte de una
+    // franja se reparte entre ellos, C4-e)
+    const sigmaTramo = (b: BordePano, s: number) => (b.tramo.t.A[0] + s * b.tramo.t.u[0]) * d[0] + (b.tramo.t.A[1] + s * b.tramo.t.u[1]) * d[1];
+    this.cortesBase = [
+      ...this.anillos.flatMap((p) => p.map((V) => V[0])),
+      ...this.viguetas.flatMap(({ vig }) => vig.cadena.map((x) => x.sigma)),
+      ...this.bordes.flatMap((b) => [b.a, b.b, ...b.tramo.cadena.map((x) => sigmaTramo(b, x.sigma)).filter((s) => s > b.a && s < b.b)]),
+    ];
   }
 
   /** (σ, η) de un punto en planta. */
@@ -721,7 +737,8 @@ export class RepartoPano {
           area += m.A;
           if (rec) {
             emitir(rec.rec, m.A, m.Sx);
-            if (m.Sy !== 0) e.puntual(rec.rec, sm + m.Sx / m.A, [0, 0, 0], escalar(nPorQ(this.n, q), m.Sy));
+            // El transporte: ∫(η − η_r) dA·(n × q), con su densidad centrada en sm + Sxy/Sy
+            if (m.Sy !== 0) e.momento(rec.rec, sm + m.Sxy / m.Sy, escalar(nPorQ(this.n, q), m.Sy));
           } else this.huerfana(q, [sm + m.Sx / m.A, er + m.Sy / m.A], m.A, e);
         };
         if (!R.length) {
@@ -788,13 +805,15 @@ export class RepartoPano {
       // Fuera de los receptores: al del extremo, con el momento de transporte
       const rec = k === 0 ? R[0]! : R[R.length - 1]!;
       const T = escalar(nPorQ(this.n, F), S[1] - rec.eta);
-      e.puntual(rec.rec, S[0], F, [M[0]! + T[0]!, M[1]! + T[1]!, M[2]! + T[2]!]);
+      e.puntual(rec.rec, S[0], F);
+      e.momento(rec.rec, S[0], [M[0]! + T[0]!, M[1]! + T[1]!, M[2]! + T[2]!]);
       return true;
     }
     const [a, b] = [R[k - 1]!, R[k]!];
     const t = (S[1] - a.eta) / (b.eta - a.eta);
-    e.puntual(a.rec, S[0], escalar(F, 1 - t), M);
-    e.puntual(b.rec, S[0], escalar(F, t), [0, 0, 0]);
+    e.puntual(a.rec, S[0], escalar(F, 1 - t));
+    e.puntual(b.rec, S[0], escalar(F, t));
+    if (M.some((x) => x !== 0)) e.momento(t < 0.5 ? a.rec : b.rec, S[0], M);
     return true;
   }
 
@@ -848,7 +867,7 @@ export class RepartoPano {
           const k = l / Math.abs(ds);
           if (ds > 0) e.lineal(rec, X0[0], X1[0], escalar(q, f0 * k), escalar(q, f1 * k));
           else e.lineal(rec, X1[0], X0[0], escalar(q, f1 * k), escalar(q, f0 * k));
-        } else e.puntual(rec, Xm[0], escalar(q, ((f0 + f1) / 2) * l), [0, 0, 0]);
+        } else e.puntual(rec, Xm[0], escalar(q, ((f0 + f1) / 2) * l));
       };
       if (!R.length) {
         this.huerfana(q, Xm, l, e);
@@ -858,8 +877,16 @@ export class RepartoPano {
       if (k === 0 || k < 0) {
         const rec = k === 0 ? R[0]! : R[R.length - 1]!;
         dar(rec.rec, 1, 1);
-        const brazo = (X0[1] + X1[1]) / 2 - rec.eta;
-        if (brazo !== 0) e.puntual(rec.rec, Xm[0], [0, 0, 0], escalar(nPorQ(this.n, q), brazo * l));
+        // El transporte: ∫(η − η_r) dℓ·(n × q), con su densidad centrada en ∫(η − η_r)·σ dℓ / ∫(η − η_r) dℓ
+        // (los integrandos son lineales y cuadráticos en t: Gauss de 2 puntos es exacto)
+        const g = 0.5 / Math.sqrt(3);
+        let [I0, I1] = [0, 0];
+        for (const tg of [0.5 - g, 0.5 + g]) {
+          const [sg, eg] = [X0[0] + tg * (X1[0] - X0[0]), X0[1] + tg * (X1[1] - X0[1])];
+          I0 += 0.5 * l * (eg - rec.eta);
+          I1 += 0.5 * l * (eg - rec.eta) * sg;
+        }
+        if (I0 !== 0) e.momento(rec.rec, I1 / I0, escalar(nPorQ(this.n, q), I0));
         continue;
       }
       const [a, b] = [R[k - 1]!, R[k]!];
