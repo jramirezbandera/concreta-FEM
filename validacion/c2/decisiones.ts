@@ -1,14 +1,17 @@
 /**
  * Efecto de las decisiones por defecto de C2 en el edificio objetivo con losas, reducido a 3
  * plantas (`modelos.ts`), para que el usuario decida con números:
- * - C2-a, tamaño de malla: h = 0,5, 0,75 (por defecto) y 1 m;
+ * - C2-a, tamaño de malla: h = 0,5, 0,75 (por defecto) y 1 m, con la rejilla alineada de H52 (por
+ *   defecto) y, para comparar, sin ella (la precisión, en `rejilla.ts`);
  * - C2-f, diafragma rígido (por defecto) o semirrígido (`diafragma: "ninguno"`, la membrana de las
  *   losas);
  * - C1-a con losas: factor de zona rígida 0, 0,5 (por defecto) y 1;
  * - C2-g: el peso que se quita a las vigas por el solape con la losa.
  *
  * Magnitudes: nudos, ecuaciones y tiempo; deriva de la planta de arriba con el viento en X; flecha
- * en el centro de un vano de la planta de arriba con G + Q; y My de la banda de pilar en la cara del
+ * en el centro del recuadro (25,5; 12,5) de la planta de arriba con G + Q, interpolada en su lámina
+ * (hasta el 2026-10-05 se tomaba en el nudo más cercano a (27; 17,5), que cae en el hueco de la
+ * escalera: era la flecha de su borde); y My de la banda de pilar en la cara del
  * pilar central (24, 15), por fuerzas nodales, con G + Q (la banda va de su cara al pilar siguiente,
  * con 2,5 m de ancho).
  *
@@ -25,6 +28,7 @@ import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
 import { valido } from "../../src/pruebas/metamorficasFisicas.ts";
 import { edificioObjetivoLosas } from "./modelos.ts";
+import { flechaEn } from "./rejilla.ts";
 
 const PLANTAS = 3;
 const ARRIBA = `N${PLANTAS}`;
@@ -60,15 +64,8 @@ function medir(f: ModeloFisico, op: OpcionesCompilacion): Medida {
   // Deriva: ux medio de los nudos de pilar de la planta de arriba
   const pilares = Object.entries(r.mapeo.nudosPilar).filter(([clave]) => clave.endsWith(`@${ARRIBA}`)).map(([, n]) => n);
   const deriva = pilares.reduce((s, n) => s + casos[Vx]!.u[6 * n]!, 0) / pilares.length;
-  // Flecha en el centro del vano (27, 17,5) de la planta de arriba: el nudo más cercano
-  let nc = 0;
-  let dmin = Infinity;
-  m.nudos.forEach((n, i) => {
-    if (n.z !== zTop || r.mapeo.nudos[i]!.maestro) return;
-    const d = (n.x - 27) ** 2 + (n.y - 17.5) ** 2;
-    if (d < dmin) [dmin, nc] = [d, i];
-  });
-  const flecha = casos[G]!.u[6 * nc + 2]! + casos[Q]!.u[6 * nc + 2]!;
+  // Flecha en el centro del recuadro (25,5; 12,5) de la planta de arriba
+  const flecha = flechaEn(m, casos, G, Q, zTop, 25.5, 12.5);
   const corte: Corte = { origen: [24.2, 15, zTop], x: [1, 0, 0], vz: [0, 0, 1], y: [-1.25, 1.25], metodo: "fuerzas-nodales" };
   const rc = new Cortes(m).cortar(corte, casos);
   if (!rc.valido) throw new Error(rc.diagnosticos.map((d) => d.mensaje).join(" | "));
@@ -85,13 +82,15 @@ if (import.meta.main) {
   };
   const cabecera = ["| variante | nudos | ecuaciones | cálculo | deriva arriba (Vx) | flecha del vano (G + Q) | My banda en la cara (G + Q), kN·m |", "|---|---|---|---|---|---|---|"];
 
-  lineas.push("", "## C2-a: tamaño de malla (frente a h = 0,5)");
+  lineas.push("", "## C2-a: tamaño de malla, con y sin la rejilla alineada de H52 (frente a h = 0,5 sin rejilla)");
   lineas.push(...cabecera);
-  const finas = medir(modelo(), { tamanoMalla: 0.5 });
-  lineas.push(fila("h = 0,5", finas));
+  const finas = medir(modelo(), { tamanoMalla: 0.5, rejilla: false });
+  lineas.push(fila("h = 0,5, sin rejilla", finas));
+  lineas.push(fila("h = 0,75, sin rejilla (por defecto hasta el 2026-10-05)", medir(modelo(), { rejilla: false }), finas));
+  lineas.push(fila("h = 0,5, con rejilla", medir(modelo(), { tamanoMalla: 0.5 }), finas));
   const base = medir(modelo(), {});
-  lineas.push(fila("h = 0,75 (por defecto)", base, finas));
-  lineas.push(fila("h = 1", medir(modelo(), { tamanoMalla: 1 }), finas));
+  lineas.push(fila("h = 0,75, con rejilla (por defecto)", base, finas));
+  lineas.push(fila("h = 1, con rejilla", medir(modelo(), { tamanoMalla: 1 }), finas));
 
   lineas.push("", "## C2-f: diafragma (frente al rígido)");
   lineas.push(...cabecera);
