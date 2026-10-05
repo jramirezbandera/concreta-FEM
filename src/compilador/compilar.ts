@@ -5,7 +5,9 @@
  * Pasos, cada uno con sus diagnósticos (si alguno deja un error, la compilación no sigue):
  * 1. Esquema, referencias y cotas (`validar.ts`).
  * 2. Topología por planta con dos tolerancias (`topologia.ts`).
- * 2b. Losas y muros: arreglo plano, estaciones de los muros, malla y su unión con pilares
+ * 2b. Vértices de los muros ajustados (`muros.ts`) y viguetas de los paños unidireccionales, con
+ *     sus nudos (`unidireccional.ts`, C4): son nudos de C1 más para las losas y los muros.
+ * 2c. Losas y muros: arreglo plano, estaciones de los muros, malla y su unión con pilares
  *     (huellas), vigas, apoyos y cargas, y rejilla de los muros (`losas.ts`, `muros.ts`).
  * 3. Barras con zonas rígidas y excentricidades, apoyos y diafragmas (`piezas.ts`).
  * 4. Numeración canónica de los nudos: por cota, x e y; los maestros de diafragma al final.
@@ -24,13 +26,16 @@ import { huellaDe } from "./huella.ts";
 import { construirLosas, direccionEje1, type Losas } from "./losas.ts";
 import { VERSIONES_MALLADOR } from "./mallado.ts";
 import type { Mapeo, NudoMapeado } from "./mapeo.ts";
+import { ajustarMuros } from "./muros.ts";
 import { construirPiezas, diafragmaDe, type BarraP, type Piezas } from "./piezas.ts";
 import { construirTopologia, cotaNudo } from "./topologia.ts";
-import { validar, type Contexto } from "./validar.ts";
+import { construirPanos, type PanosU } from "./unidireccional.ts";
+import { ordenarPoligonos, validar, type Contexto } from "./validar.ts";
+import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "C3.1";
+export const VERSION_COMPILADOR = "C4.0";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -49,6 +54,11 @@ export interface EstadisticasCompilacion {
   malla: { jacobianoMin: number; bajos: number; laminasRejilla: number; plantillas: number };
   /** Muros (C3): relación de aspecto máxima de sus elementos, cuántos pasan de 4, y barras auxiliares (C3-e). */
   muros: { aspectoMax: number; altos: number; auxiliares: number };
+  /**
+   * Forjados (C4): paños unidireccionales, sus viguetas, los nudos que crean y las que sólo tienen un
+   * apoyo; láminas de los ábacos de los reticulares.
+   */
+  forjados: { panos: number; viguetas: number; nudosViguetas: number; voladizos: number; laminasAbaco: number };
   /** Peor error relativo del control «sin pérdidas» entre los casos (regla 3 del plan). */
   sinPerdidas: { fuerzas: number; momentos: number };
   /** Milisegundos de cada paso. */
@@ -85,7 +95,16 @@ function fisicoCanonico(f: ModeloFisico): unknown {
   const clave = (x: unknown, campo = "id") => (typeof x === "object" && x !== null ? String((x as Record<string, unknown>)[campo]) : "");
   const ordenar = (v: unknown, campo = "id") => (Array.isArray(v) ? [...v].sort((a, b) => (clave(a, campo) < clave(b, campo) ? -1 : clave(a, campo) > clave(b, campo) ? 1 : 0)) : v);
   const r: Record<string, unknown> = { ...f };
-  for (const k of ["materiales", "secciones", "vigas", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros"]) if (r[k] !== undefined) r[k] = ordenar(r[k]);
+  for (const k of ["materiales", "secciones", "vigas", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos"]) if (r[k] !== undefined) r[k] = ordenar(r[k]);
+  // Los ábacos de un reticular, por su vértice menor (C4): su orden no significa nada
+  if (Array.isArray(r.losas))
+    r.losas = (r.losas as unknown[]).map((l) => {
+      const ret = typeof l === "object" && l !== null ? (l as Record<string, unknown>).reticular : undefined;
+      if (typeof ret !== "object" || ret === null || !Array.isArray((ret as Record<string, unknown>).abacos)) return l;
+      const ab = (ret as Record<string, unknown>).abacos as unknown[];
+      if (!ab.every((p) => Array.isArray(p) && p.length > 0 && p.every((q) => Array.isArray(q) && q.length === 2 && q.every((x) => typeof x === "number")))) return l;
+      return { ...(l as object), reticular: { ...(ret as object), abacos: ordenarPoligonos(ab as Vec2[][]) } };
+    });
   r.pilares = Array.isArray(f.pilares)
     ? (ordenar(f.pilares) as unknown[]).map((p) => (typeof p === "object" && p !== null && Array.isArray((p as Record<string, unknown>).tramos) ? { ...p, tramos: ordenar((p as Record<string, unknown>).tramos, "planta") } : p))
     : f.pilares;
@@ -133,10 +152,16 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const topo = construirTopologia(ctx, diag);
   marca("topologia");
   if (diag.hayErrores) return fallo();
-  const losas = construirLosas(ctx, topo, ctx.cargas, diag);
+  // Muros ajustados antes que las viguetas, para que sus nudos no los muevan (C4)
+  const puntosMuros = ctx.muros.length ? ajustarMuros(ctx, topo, diag) : [];
+  if (!puntosMuros || diag.hayErrores) return fallo();
+  const panos = construirPanos(ctx, topo, puntosMuros, diag);
+  marca("panos");
+  if (diag.hayErrores) return fallo();
+  const losas = construirLosas(ctx, topo, ctx.cargas, diag, puntosMuros, panos);
   marca("losas");
   if (diag.hayErrores) return fallo();
-  const piezas = construirPiezas(ctx, topo, losas, diag);
+  const piezas = construirPiezas(ctx, topo, losas, diag, panos);
   marca("piezas");
   if (diag.hayErrores) return fallo();
 
@@ -203,7 +228,11 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     const k = (cuenta.get(lc.losa.id) ?? 0) + 1;
     cuenta.set(lc.losa.id, k);
     const [ex, ey] = direccionEje1(lc.losa.eje1 ?? 0);
-    return { id: `${lc.losa.id}:${k}`, nudos: l.nudos.map((n) => nuevo[n]!) as unknown as LaminaAnalitica["nudos"], material: lc.material, eje1: [ex, ey, 0] };
+    const r: LaminaAnalitica = { id: `${lc.losa.id}:${k}`, nudos: l.nudos.map((n) => nuevo[n]!) as unknown as LaminaAnalitica["nudos"], material: lc.material, eje1: [ex, ey, 0] };
+    // Zona aligerada de un reticular (C4-h): sus multiplicadores y su ν
+    const ret = lc.reticular;
+    if (ret && !l.abaco) return { ...r, material: { ...lc.material, nu: ret.nu }, multiplicadores: ret.multiplicadores };
+    return r;
   });
   // Láminas de los muros (C3), tras las de las losas: eje 1 horizontal a lo largo del tramo
   for (const lm of losas.muros) {
@@ -221,7 +250,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   };
   // Modificadores de rigidez (D4): los de todos los materiales y, encima, los del material de la barra
   const modificadoresDe = (b: BarraP): ModificadoresBarra | undefined => {
-    const g = op.modificadores[b.tipo === "pilar" ? "pilares" : "vigas"];
+    const g = op.modificadores[b.tipo === "pilar" ? "pilares" : b.tipo === "vigueta" ? "viguetas" : "vigas"];
     const m: ModificadoresBarra = { ...g?.todos, ...g?.[b.material] };
     return Object.keys(m).length ? m : undefined;
   };
@@ -250,7 +279,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     });
   }
   const centro: Vec3 = nudos.length ? [(min[0]! + max[0]!) / 2, (min[1]! + max[1]!) / 2, (min[2]! + max[2]!) / 2] : [0, 0, 0];
-  const cargas = construirCargas(ctx, topo, piezas, losas, centro, diag);
+  const cargas = construirCargas(ctx, topo, piezas, losas, centro, diag, panos);
   marca("cargas");
   if (diag.hayErrores) return fallo();
   const casos: CasoCarga[] = ctx.casos.map((c, k) => {
@@ -288,6 +317,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
 
   const piezasMap: Record<string, number[]> = {};
   piezas.barras.forEach((b, i) => !b.auxiliar && (piezasMap[b.pieza] ??= []).push(i));
+  const panoDeVigueta = new Map(panos.viguetas.map((v) => [v.id, ctx.panos[v.pano]!.pano.id] as const));
   const nudosPilar: Record<string, number> = {};
   for (const [clave, n] of topo.nudoPilar) {
     const at = clave.lastIndexOf("@");
@@ -298,14 +328,26 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   for (const [id, n] of losas.apoyosPuntuales) apoyosMap[id] = nuevo[n]!;
   const mapeo: Mapeo = {
     nudos: mapNudos,
-    barras: piezas.barras.map((b) => ({ pieza: b.pieza, tipo: b.tipo, tramo: b.tramo, s: b.s, ...(b.auxiliar ? { auxiliar: true as const } : {}) })),
+    barras: piezas.barras.map((b) => ({
+      pieza: b.pieza,
+      tipo: b.tipo,
+      tramo: b.tramo,
+      s: b.s,
+      ...(b.auxiliar ? { auxiliar: true as const } : {}),
+      ...(b.tipo === "vigueta" ? { pano: panoDeVigueta.get(b.pieza)! } : {}),
+    })),
     restricciones: mapRestr,
     piezas: piezasMap,
     nudosPilar,
     apoyos: apoyosMap,
   };
+  if (panos.viguetas.length) {
+    const porPano: Record<string, string[]> = {};
+    ctx.panos.forEach((p, i) => panos.porPano[i]!.length && (porPano[p.pano.id] = panos.porPano[i]!.map((v) => panos.viguetas[v]!.id)));
+    mapeo.panos = porPano;
+  }
   if (laminas.length) {
-    mapeo.laminas = [...losas.laminas.map((l) => ({ losa: ctx.losas[l.losa]!.losa.id })), ...losas.muros.map((lm) => ({ muro: ctx.muros[lm.w]!.muro.id }))];
+    mapeo.laminas = [...losas.laminas.map((l) => ({ losa: ctx.losas[l.losa]!.losa.id, ...(l.abaco ? { abaco: true as const } : {}) })), ...losas.muros.map((lm) => ({ muro: ctx.muros[lm.w]!.muro.id }))];
     if (losas.laminas.length) {
       const porLosa: Record<string, number[]> = {};
       losas.laminas.forEach((l, i) => (porLosa[ctx.losas[l.losa]!.losa.id] ??= []).push(i));
@@ -323,7 +365,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     modelo,
     mapeo,
     diagnosticos: diag.lista,
-    hipotesis: hipotesis(ctx, op, piezas, losas, modificadoresDe),
+    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe),
     huella,
     estadisticas: {
       nudos: nudos.length,
@@ -334,6 +376,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       malla: { jacobianoMin: losas.malla.jacobianoMin, bajos: losas.malla.bajos, laminasRejilla: losas.malla.laminasRejilla, plantillas: losas.malla.plantillas },
       laminasMuros: losas.muros.length,
       muros: { aspectoMax: losas.aspectoMuros.max, altos: losas.aspectoMuros.altos, auxiliares: piezas.barras.filter((b) => b.auxiliar).length },
+      forjados: { panos: ctx.panos.length, viguetas: panos.viguetas.length, nudosViguetas: panos.nudosNuevos, voladizos: panos.voladizos, laminasAbaco: losas.laminas.filter((l) => l.abaco).length },
       sinPerdidas,
       tiempos,
     },
@@ -343,8 +386,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
 const coma = (x: number) => String(x).replace(".", ",");
 const NOMBRE_MATERIAL = { hormigon: "de hormigón", acero: "de acero", general: "de material general" } as const;
 
-/** Las hipótesis de modelado de una compilación, en texto (C1-a, C1-c, C1-d, D4, C2 y C3). */
-function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined): string[] {
+/** Las hipótesis de modelado de una compilación, en texto (C1-a, C1-c, C1-d, D4, C2, C3 y C4). */
+function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined): string[] {
   const h: string[] = [];
   h.push(
     `Nudos de dimensión finita: es rígido ${op.factorZonaRigida === 1 ? "todo el nudo" : op.factorZonaRigida === 0 ? "ningún tramo del nudo (de eje a eje)" : `el ${coma(op.factorZonaRigida * 100)} % del nudo`} (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).`,
@@ -353,20 +396,24 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
   for (const b of piezas.barras) {
     const m = modificadoresDe(b);
     if (!m) continue;
-    const clave = `${b.tipo === "pilar" ? "tramos de pilar" : "tramos de viga"} ${NOMBRE_MATERIAL[b.material]}: ${Object.entries(m)
+    const clave = `${b.tipo === "pilar" ? "tramos de pilar" : b.tipo === "vigueta" ? "viguetas" : "tramos de viga"} ${NOMBRE_MATERIAL[b.material]}: ${Object.entries(m)
       .map(([k, x]) => `${k} ×${coma(x!)}`)
       .join(", ")}`;
     grupos.set(clave, (grupos.get(clave) ?? 0) + 1);
   }
   if (grupos.size) h.push(`Modificadores de rigidez (D4): ${[...grupos].map(([k, n]) => `${k} (${n})`).join("; ")}.`);
   else h.push("Sin modificadores de rigidez.");
-  const usadas = new Set<string>([...ctx.vigas.map((v) => v.planta), ...ctx.losas.map((l) => l.losa.planta)]);
+  const usadas = new Set<string>([...ctx.vigas.map((v) => v.planta), ...ctx.losas.map((l) => l.losa.planta), ...ctx.panos.map((p) => p.pano.planta)]);
   for (const p of ctx.pilares) for (let k = ctx.planta.get(p.hasta)!; k <= ctx.planta.get(p.desde)!; k++) usadas.add(ctx.plantas[k]!.id);
   const conLosa = new Set(ctx.losas.map((l) => l.losa.planta));
+  const conPano = new Set(ctx.panos.map((p) => p.pano.planta));
   const conDiafragma = [...new Set(piezas.diafragmas.map((d) => ctx.plantas[d.k]!.id))];
   const sin = ctx.plantas.filter((p, k) => usadas.has(p.id) && diafragmaDe(ctx, k) !== "rigido").map((p) => (conLosa.has(p.id) ? `${p.id} (semirrígido: la membrana de sus losas)` : p.id));
   h.push(`Diafragma rígido en ${conDiafragma.length ? conDiafragma.join(", ") : "ninguna planta"}${sin.length ? `; sin diafragma en ${sin.join(", ")}` : ""}.`);
-  if (conDiafragma.some((p) => conLosa.has(p))) h.push("En las plantas con losas, el diafragma rígido abarca los nudos sobre las losas (los de las huellas, por su pilar); los que quedan fuera, como los pilares de una doble altura, no entran (C2-f).");
+  if (conDiafragma.some((p) => conLosa.has(p) || conPano.has(p)))
+    h.push(
+      `En las plantas con ${conPano.size ? "losas o paños unidireccionales" : "losas"}, el diafragma rígido abarca los nudos sobre ${conPano.size ? "ellos" : "las losas"} (los de las huellas, por su pilar); los que quedan fuera, como los pilares de una doble altura, no entran (C2-f${conPano.size ? ", C4-g" : ""}).`,
+    );
   const superiores = ctx.vigas.filter((v) => v.insercion === "superior").map((v) => v.id);
   h.push(superiores.length ? `Eje de las vigas en el plano del forjado, salvo ${superiores.join(", ")} (bajo él, con la cara superior en el forjado).` : "Eje de las vigas en el plano del forjado.");
   if (ctx.losas.length) {
@@ -380,8 +427,20 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       `Unión pilar–losa por la huella del pilar, rígida (${losas.huellas.length} huellas, H09). Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas, y la zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
     );
     h.push(
-      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).`,
+      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).`,
     );
+    for (const l of ctx.losas) {
+      const r = l.reticular;
+      if (!r) continue;
+      const m = r.multiplicadores;
+      const f = (x: number | undefined) => coma(Number((x ?? 1).toFixed(4)));
+      const nr = l.losa.reticular!;
+      h.push(
+        r.dados
+          ? `Forjado reticular ${l.losa.id}: zona aligerada con los multiplicadores dados por el usuario sobre la losa maciza de ${coma(l.material.t)} m, con el ν del material (C4-h): f11 ${f(m.f11)}, f22 ${f(m.f22)}, f12 ${f(m.f12)}, m11 ${f(m.m11)}, m22 ${f(m.m22)}, m12 ${f(m.m12)}, v13 ${f(m.v13)}, v23 ${f(m.v23)}; ${r.abacos.length} ábacos macizos.`
+          : `Forjado reticular ${l.losa.id} (nervios de ${coma(nr.nervio)} m cada ${coma(nr.intereje)} m, capa de ${coma(nr.capa)} m y canto total ${coma(l.material.t)} m): la zona aligerada es una lámina maciza con los multiplicadores del emparrillado de nervios, sin efecto Poisson (ν = 0) y con el G del hormigón (C4-h): f11 = f22 ${f(m.f11)}, f12 ${f(m.f12)}, m11 = m22 ${f(m.m11)}, m12 ${f(m.m12)}, v13 = v23 ${f(m.v13)}; ${r.abacos.length} ábacos macizos.`,
+      );
+    }
   }
   if (ctx.muros.length) {
     const aux = piezas.barras.filter((b) => b.auxiliar).length;
@@ -392,9 +451,20 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       "Encuentros de los muros: comparten los nudos de sus aristas con los otros muros y con las losas (a ejes); en la cota de una planta, los nudos del muro en la huella de un pilar van con su enlace rígido, y entre plantas el pilar y el muro no se unen. Los nudos del muro en la cota de una planta entran en el diafragma con la misma regla que el resto, también los de lo alto de los dinteles (C3-d).",
     );
     h.push(
-      `Las vigas que corren por el eje de un muro se parten en sus nudos${aux ? `; las que acaban en el extremo de un muro en su plano se prolongan dentro con ${aux} barras auxiliares de su sección a lo largo de su canto (C3-e, H05)` : ""}. Las vigas perpendiculares que acaban en un muro se unen en un nudo (C3-i).`,
+      `Las vigas que corren por el eje de un muro se parten en sus nudos${aux ? `; las que acaban en el extremo de un muro en su plano se prolongan dentro con ${aux} barras auxiliares de su sección a lo largo de su canto (C3-e, H05)` : ""}. Las vigas perpendiculares que acaban en un muro se unen a él por su huella: los nudos del muro a lo largo de su canto y de su ancho van con su extremo en un enlace rígido (C3-i).`,
     );
     h.push("Peso propio de los muros: γ·t por m² de alzado sin huecos, de forjado a forjado, menos el solape con las losas (C3-g).");
+  }
+  if (panos.viguetas.length) {
+    const lista = ctx.panos
+      .map((p, i) => `${p.pano.id}: ${panos.porPano[i]!.length} viguetas de ${p.pano.seccion} cada ${coma(p.pano.intereje)} m a ${coma(Number((((Math.atan2(panos.marcos[i]!.d[1], panos.marcos[i]!.d[0]) * 180) / Math.PI + 180) % 180).toFixed(2)))}°, pp ${coma(p.pano.pp)} kN/m²`)
+      .join("; ");
+    h.push(
+      `Forjados unidireccionales como viguetas-barra (D2; ${lista}). Las viguetas de los paños contiguos con la misma dirección e intereje siguen las mismas rectas, centradas en su ancho, y son continuas sobre sus apoyos comunes (C4-a). Cada vigueta va de apoyo a apoyo (vigas, muros, pilares y bordes de losa), sin nudos intermedios y con la torsión liberada en un extremo; las de un voladizo la conservan (C4-c, E2-3).`,
+    );
+    h.push(
+      "Cargas de los paños (su pp, de superficie, lineales y puntuales): a las viguetas por la regla de la palanca en la dirección transversal, y a las vigas de los lados paralelos a ellas la franja entre la última vigueta y la viga; la franja junto a un borde sin viga va a la última vigueta con su momento de transporte (C4-e). Las vigas bajo un paño pesan sólo su descuelgue (C2-g con el canto de la vigueta).",
+    );
   }
   return h;
 }

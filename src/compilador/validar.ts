@@ -3,22 +3,79 @@
  * diagnóstico que nombra el objeto físico por su `id`; nada lanza, ni con datos basura (la
  * entrada puede venir de un fichero). Si hay errores, la compilación no sigue.
  */
+import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
-import type { ApoyoFisico, ApoyoLineal, Banda, CargaFisica, CasoFisico, Losa, Material, ModeloFisico, Muro, OpcionesResueltas, Pilar, Planta, Seccion, Vec2, Viga } from "./fisico.ts";
-import { areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
+import type { ApoyoFisico, ApoyoLineal, Banda, CargaFisica, CasoFisico, Losa, Material, ModeloFisico, Muro, OpcionesResueltas, PanoUnidireccional, Pilar, Planta, Seccion, Vec2, Viga } from "./fisico.ts";
+import { areaConSigno, areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
+import { multiplicadoresReticular, volumenReticular } from "./reticular.ts";
 import { compilarSeccion, materialElastico, type SeccionCompilada } from "./secciones.ts";
 
 /** Una losa ya comprobada, con su material de lámina y su peso propio. */
 export interface LosaCompilada {
   losa: Losa;
   region: Region;
-  /** Material de las láminas (E en kN/m², ν, espesor en m). */
+  /** Material de las láminas (E en kN/m², ν, espesor en m); en un reticular, el de los ábacos. */
   material: { E: number; nu: number; t: number };
-  /** Peso propio, kN/m² (H24, C2-g). */
+  /** Peso propio, kN/m² (H24, C2-g); en un reticular, el de la zona aligerada (C4-i). */
   pp: number;
   /** Peso específico del material, kN/m³. */
   gamma: number;
+  /** Forjado reticular (C4): la zona aligerada y sus ábacos. */
+  reticular?: ReticularCompilado;
+}
+
+/** Un reticular ya comprobado (C4-h, C4-i). */
+export interface ReticularCompilado {
+  /** Multiplicadores de las láminas de la zona aligerada. */
+  multiplicadores: MultiplicadoresLamina;
+  /** ν de las láminas de la zona aligerada: 0 con los multiplicadores calculados, el del material con los dados. */
+  nu: number;
+  /** ¿Los ha dado el usuario? */
+  dados: boolean;
+  /** Peso propio de la zona aligerada y de los ábacos, kN/m². */
+  ppAligerada: number;
+  ppAbaco: number;
+  /** Ábacos en orden canónico (por su vértice menor). */
+  abacos: Vec2[][];
+}
+
+/** Un paño unidireccional ya comprobado (C4). */
+export interface PanoCompilado {
+  pano: PanoUnidireccional;
+  region: Region;
+  /** Planta (índice). */
+  k: number;
+  seccion: SeccionCompilada;
+  /** Dirección de las viguetas (unitaria, exacta en los múltiplos de 90°) y su normal (d girada 90°). */
+  d: Vec2;
+  n: Vec2;
+}
+
+/** Dirección de un ángulo en planta (grados desde +X): exacta en los múltiplos de 90°. */
+export function direccionGrados(grados: number): Vec2 {
+  const g = (((grados % 360) + 360) % 360) / 90;
+  const ejes: Vec2[] = [
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+    [0, -1],
+  ];
+  if (Number.isInteger(g)) return ejes[g]!;
+  return [Math.cos((grados * Math.PI) / 180), Math.sin((grados * Math.PI) / 180)];
+}
+
+/** Orden canónico de unos polígonos: por su vértice menor (x, y) y, si empatan, por sus vértices. */
+export function ordenarPoligonos(ps: readonly (readonly Vec2[])[]): Vec2[][] {
+  const menor = (p: readonly Vec2[]) => p.reduce((m, q) => (q[0] < m[0] || (q[0] === m[0] && q[1] < m[1]) ? q : m), p[0]!);
+  const cmp = (a: readonly Vec2[], b: readonly Vec2[]) => {
+    const [ma, mb] = [menor(a), menor(b)];
+    if (ma[0] !== mb[0]) return ma[0] - mb[0];
+    if (ma[1] !== mb[1]) return ma[1] - mb[1];
+    const [sa, sb] = [JSON.stringify(a), JSON.stringify(b)];
+    return sa < sb ? -1 : sa > sb ? 1 : 0;
+  };
+  return [...ps].sort(cmp).map((p) => p.map((q) => [q[0], q[1]] as Vec2));
 }
 
 /** Un muro ya comprobado (C3), con su material de lámina y la geometría de sus tramos. */
@@ -65,6 +122,9 @@ export interface Contexto {
   /** C3: muros (por id). */
   muros: readonly MuroCompilado[];
   muroDe: ReadonlyMap<string, MuroCompilado>;
+  /** C4: paños unidireccionales (por id). */
+  panos: readonly PanoCompilado[];
+  panoDe: ReadonlyMap<string, PanoCompilado>;
 }
 
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -80,7 +140,7 @@ function modificadoresNoValidos(m: unknown): string | null {
   if (!esObjeto(m)) return "no son un objeto";
   for (const [pieza, g] of Object.entries(m)) {
     if (g === undefined) continue;
-    if (pieza !== "pilares" && pieza !== "vigas") return `pieza desconocida «${pieza}»`;
+    if (pieza !== "pilares" && pieza !== "vigas" && pieza !== "viguetas") return `pieza desconocida «${pieza}»`;
     if (!esObjeto(g)) return `${pieza} no es un objeto`;
     for (const [mat, mods] of Object.entries(g)) {
       if (mods === undefined) continue;
@@ -142,7 +202,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   if (malMod) {
     diag.error(
       "opciones/no-validas",
-      `Los modificadores de rigidez no son válidos (${malMod}): van por pilares y vigas, para todos o por material (hormigon, acero, general), y cada uno de A, Avy, Avz, J, Iy o Iz tiene que estar en (0, 100] (uno mayor es una penalización, E6-1).`,
+      `Los modificadores de rigidez no son válidos (${malMod}): van por pilares, vigas y viguetas, para todos o por material (hormigon, acero, general), y cada uno de A, Avy, Avz, J, Iy o Iz tiene que estar en (0, 100] (uno mayor es una penalización, E6-1).`,
     );
     return null;
   }
@@ -172,6 +232,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   const apoyosLineales = (lista("apoyosLineales", false) as unknown as ApoyoLineal[]).sort(porId);
   const bandas = (lista("bandas", false) as unknown as Banda[]).sort(porId);
   const muros = (lista("muros", false) as unknown as Muro[]).sort(porId);
+  const panos = (lista("panos", false) as unknown as PanoUnidireccional[]).sort(porId);
   if (diag.hayErrores) return null;
 
   // Ids únicos en todo el modelo
@@ -189,6 +250,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     ["apoyosLineales", apoyosLineales],
     ["bandas", bandas],
     ["muros", muros],
+    ["panos", panos],
   ] as const) {
     for (const o of objs) {
       const antes = vistos.get(o.id);
@@ -371,11 +433,17 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     } else if (c.tipo === "superficie") {
       usaPlanta(c.id, c.planta);
       if (!vec3(c.q)) mal(c.id, "q tiene que ser un vector de 3 números (kN/m²)");
-      if (c.losa === undefined && c.zona === undefined) mal(c.id, "la carga de superficie necesita una losa, una zona o las dos");
+      if (c.losa === undefined && c.pano === undefined && c.zona === undefined) mal(c.id, "la carga de superficie necesita una losa, un paño o una zona (o la losa o el paño con una zona)");
+      if (c.losa !== undefined && c.pano !== undefined) mal(c.id, "la carga de superficie va sobre una losa o sobre un paño, no sobre los dos");
       if (c.losa !== undefined) {
         const l = losas.find((x) => x.id === c.losa);
         if (!l) diag.error("fisico/referencia", `${c.id}: la losa «${String(c.losa)}» no existe.`, [c.id]);
         else if (l.planta !== c.planta) mal(c.id, `la losa ${l.id} no está en la planta ${String(c.planta)}`);
+      }
+      if (c.pano !== undefined) {
+        const p = panos.find((x) => x.id === c.pano);
+        if (!p) diag.error("fisico/referencia", `${c.id}: el paño «${String(c.pano)}» no existe.`, [c.id]);
+        else if (p.planta !== c.planta) mal(c.id, `el paño ${p.id} no está en la planta ${String(c.planta)}`);
       }
       if (c.zona !== undefined) {
         const d = poligonoNoValido(c.zona);
@@ -431,14 +499,39 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
           mal(l.id, `los huecos ${i + 1} y ${j + 1} se solapan o se tocan`);
           huecosBien = false;
         }
-    if (!huecosBien || !m || m.tipo === "acero" || !pos(l.espesor)) continue;
+    const region: Region = { contorno: l.contorno, huecos };
+    const reticular = l.reticular !== undefined && huecosBien ? validarReticular(l, region, mal, op) : undefined;
+    if (!huecosBien || !m || m.tipo === "acero" || !pos(l.espesor) || reticular === null) continue;
     const { elastico, peso } = materialElastico(m);
     const nu = elastico.E / (2 * elastico.G) - 1;
     if (!(nu > -1 && nu < 0.5)) {
       mal(l.id, `el material ${m.id} da ν = ${nu.toPrecision(4)} (con E y G), fuera de (−1, 0,5)`);
       continue;
     }
-    losasC.push({ losa: l, region: { contorno: l.contorno, huecos }, material: { E: elastico.E, nu, t: l.espesor }, pp: l.pp ?? peso * l.espesor, gamma: peso });
+    if (!reticular) {
+      losasC.push({ losa: l, region, material: { E: elastico.E, nu, t: l.espesor }, pp: l.pp ?? peso * l.espesor, gamma: peso });
+      continue;
+    }
+    // C4-h y C4-i: multiplicadores (los calculados, con ν = 0; los dados, con el del material) y pesos
+    const r = l.reticular!;
+    const g = { h: l.espesor, hf: r.capa, bw: r.nervio, s: r.intereje };
+    const dados = r.multiplicadores !== undefined;
+    const ppAligerada = l.pp ?? peso * volumenReticular(g);
+    losasC.push({
+      losa: l,
+      region,
+      material: { E: elastico.E, nu, t: l.espesor },
+      pp: ppAligerada,
+      gamma: peso,
+      reticular: {
+        multiplicadores: dados ? { ...r.multiplicadores } : multiplicadoresReticular(g, nu),
+        nu: dados ? nu : 0,
+        dados,
+        ppAligerada,
+        ppAbaco: l.pp ?? peso * l.espesor,
+        abacos: reticular.abacos,
+      },
+    });
   }
   // Losas solapadas en una planta
   for (let i = 0; i < losasC.length; i++) {
@@ -448,6 +541,47 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       const A = areaInterseccionRegiones(a.region, b.region);
       if (A > op.epsSnap * op.epsSnap)
         diag.error("losa/solapadas", `Las losas ${a.losa.id} y ${b.losa.id} se solapan en ${A.toPrecision(3)} m² en la planta ${a.losa.planta}.`, [a.losa.id, b.losa.id]);
+    }
+  }
+  // Paños unidireccionales (C4)
+  const panosC: PanoCompilado[] = [];
+  for (const p of panos) {
+    const okP = usaPlanta(p.id, p.planta);
+    usaSeccion(p.id, p.seccion);
+    const okDir = num(p.direccion);
+    const okS = num(p.intereje) && p.intereje > 2 * op.epsSnap;
+    const okPp = num(p.pp) && p.pp >= 0;
+    if (!okDir) mal(p.id, "la dirección de las viguetas tiene que ser un número (grados)");
+    if (!okS) mal(p.id, `el intereje tiene que ser un número mayor que 2·ε_snap (${2 * op.epsSnap} m)`);
+    if (!okPp) mal(p.id, "el peso propio pp tiene que ser un número ≥ 0 (kN/m²): incluye las bovedillas, que la sección de la vigueta no conoce");
+    const dc = poligonoNoValido(p.contorno);
+    if (dc) {
+      mal(p.id, `el contorno ${dc}`);
+      continue;
+    }
+    if (p.huecos !== undefined && !Array.isArray(p.huecos)) {
+      mal(p.id, "los huecos tienen que ser una lista de polígonos");
+      continue;
+    }
+    const huecos = (p.huecos ?? []) as readonly (readonly Vec2[])[];
+    if (!huecosValidos(p.id, p.contorno, huecos, mal)) continue;
+    if (!okP || !okDir || !okS || !okPp || typeof p.seccion !== "string" || !seccionFisica.has(p.seccion)) continue;
+    const d = direccionGrados(p.direccion);
+    panosC.push({ pano: p, region: { contorno: p.contorno, huecos }, k: planta.get(p.planta)!, seccion: null as unknown as SeccionCompilada, d, n: [-d[1], d[0]] });
+  }
+  // Paños solapados entre sí o con una losa de su planta
+  for (let i = 0; i < panosC.length; i++) {
+    const a = panosC[i]!;
+    for (let j = i + 1; j < panosC.length; j++) {
+      const b = panosC[j]!;
+      if (a.pano.planta !== b.pano.planta) continue;
+      const A = areaInterseccionRegiones(a.region, b.region);
+      if (A > op.epsSnap * op.epsSnap) diag.error("pano/solapados", `Los paños ${a.pano.id} y ${b.pano.id} se solapan en ${A.toPrecision(3)} m² en la planta ${a.pano.planta}.`, [a.pano.id, b.pano.id]);
+    }
+    for (const l of losasC) {
+      if (l.losa.planta !== a.pano.planta) continue;
+      const A = areaInterseccionRegiones(a.region, l.region);
+      if (A > op.epsSnap * op.epsSnap) diag.error("pano/solapado-con-losa", `El paño ${a.pano.id} y la losa ${l.losa.id} se solapan en ${A.toPrecision(3)} m² en la planta ${a.pano.planta}.`, [a.pano.id, l.losa.id]);
     }
   }
   for (const a of apoyosLineales) {
@@ -575,7 +709,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   for (const v of vigas) usar(planta.get(v.planta)!, v.id);
   for (const a of apoyos) usar(planta.get(a.planta)!, a.id);
   for (const c of cargas) if (c.tipo === "puntual" || c.tipo === "superficie" || c.tipo === "lineal") usar(planta.get(c.planta)!, c.id);
-  for (const o of [...losas, ...apoyosLineales, ...bandas]) usar(planta.get(o.planta)!, o.id);
+  for (const o of [...losas, ...apoyosLineales, ...bandas, ...panosC.map((p) => p.pano)]) usar(planta.get(o.planta)!, o.id);
   for (const w of murosC) for (let k = w.kh; k <= w.kb; k++) usar(k, w.muro.id);
   for (const [k, id] of [...usadas].sort((a, b) => a[0] - b[0])) {
     if (cotas[k] === null) {
@@ -604,6 +738,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
 
   const compiladas = new Map<string, SeccionCompilada>();
   for (const s of secciones) compiladas.set(s.id, compilarSeccion(s, material.get(s.material)!, op.cortante));
+  for (const p of panosC) p.seccion = compiladas.get(p.pano.seccion)!;
   return {
     op,
     plantas,
@@ -625,7 +760,78 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     bandas,
     muros: murosC,
     muroDe: new Map(murosC.map((w) => [w.muro.id, w] as const)),
+    panos: panosC,
+    panoDe: new Map(panosC.map((p) => [p.pano.id, p] as const)),
   };
+}
+
+/** ¿Son válidos los huecos de un contorno? (simples, dentro de él sin tocarlo y disjuntos) */
+function huecosValidos(id: string, contorno: readonly Vec2[], huecos: readonly (readonly Vec2[])[], mal: (id: string, que: string) => void): boolean {
+  let bien = true;
+  huecos.forEach((h, i) => {
+    const dh = poligonoNoValido(h);
+    if (dh) {
+      mal(id, `el hueco ${i + 1} ${dh}`);
+      bien = false;
+    } else if (!h.every((q) => puntoEnPoligono(q, contorno)) || tocan(h, contorno)) {
+      mal(id, `el hueco ${i + 1} no está dentro del contorno (o lo toca)`);
+      bien = false;
+    }
+  });
+  for (let i = 0; i < huecos.length && bien; i++)
+    for (let j = i + 1; j < huecos.length; j++)
+      if (tocan(huecos[i]!, huecos[j]!) || huecos[i]!.some((q) => puntoEnPoligono(q, huecos[j]!)) || huecos[j]!.some((q) => puntoEnPoligono(q, huecos[i]!))) {
+        mal(id, `los huecos ${i + 1} y ${j + 1} se solapan o se tocan`);
+        bien = false;
+      }
+  return bien;
+}
+
+const MULTIPLICADORES = ["f11", "f22", "f12", "m11", "m22", "m12", "v13", "v23"] as const;
+
+/**
+ * Comprueba el reticular de una losa (C4): nervios, ábacos y multiplicadores. Devuelve sus ábacos en
+ * orden canónico, o null si algo falla.
+ */
+function validarReticular(l: Losa, region: Region, mal: (id: string, que: string) => void, op: OpcionesResueltas): { abacos: Vec2[][] } | null {
+  const r = l.reticular as unknown;
+  if (!esObjeto(r)) {
+    mal(l.id, "el reticular tiene que ser { intereje, nervio, capa, abacos?, multiplicadores? }");
+    return null;
+  }
+  let bien = true;
+  const no = (que: string) => {
+    mal(l.id, que);
+    bien = false;
+  };
+  if (![r.intereje, r.nervio, r.capa].every(pos)) no("el reticular necesita intereje, nervio y capa > 0 (m)");
+  else {
+    if (!((r.nervio as number) < (r.intereje as number))) no("el nervio del reticular tiene que ser más estrecho que su intereje");
+    if (pos(l.espesor) && !((r.capa as number) < l.espesor)) no("la capa de compresión del reticular tiene que ser más delgada que el canto total (el espesor de la losa)");
+  }
+  if (r.multiplicadores !== undefined) {
+    const m = r.multiplicadores;
+    if (!esObjeto(m) || Object.keys(m).some((k) => !(MULTIPLICADORES as readonly string[]).includes(k)) || Object.values(m).some((x) => x !== undefined && !(num(x) && x > 0 && x <= 100)))
+      no(`los multiplicadores del reticular van por ${MULTIPLICADORES.join(", ")}, cada uno en (0, 100]`);
+  }
+  const abacos = r.abacos ?? [];
+  if (!Array.isArray(abacos)) {
+    no("los ábacos tienen que ser una lista de polígonos");
+    return null;
+  }
+  abacos.forEach((a, i) => {
+    const d = poligonoNoValido(a);
+    if (d) no(`el ábaco ${i + 1} ${d}`);
+  });
+  if (!bien) return null;
+  const ab = abacos as readonly (readonly Vec2[])[];
+  for (let i = 0; i < ab.length; i++) {
+    const reg: Region = { contorno: ab[i]!, huecos: [] };
+    if (!(areaInterseccionRegiones(region, reg) > op.epsSnap * op.epsSnap)) no(`el ábaco ${i + 1} no cae en la losa`);
+    for (let j = i + 1; j < ab.length; j++)
+      if (areaInterseccionRegiones(reg, { contorno: ab[j]!, huecos: [] }) > op.epsGeom * Math.abs(areaConSigno(ab[i]!))) no(`los ábacos ${i + 1} y ${j + 1} se solapan`);
+  }
+  return bien ? { abacos: ordenarPoligonos(ab) } : null;
 }
 
 /**

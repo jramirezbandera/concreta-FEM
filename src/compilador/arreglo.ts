@@ -30,7 +30,7 @@
 import { orient2d } from "robust-predicates";
 import type { Vec2 } from "./fisico.ts";
 
-export type TipoTrazo = "viga" | "huella" | "muro" | "losa" | "hueco" | "banda" | "zona" | "linea" | "apoyo-lineal";
+export type TipoTrazo = "viga" | "huella" | "muro" | "losa" | "hueco" | "abaco" | "banda" | "zona" | "linea" | "apoyo-lineal";
 
 export interface PuntoArreglo {
   x: number;

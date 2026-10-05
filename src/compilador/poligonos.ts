@@ -233,6 +233,56 @@ export function momentosInterseccion(r: Region, z: readonly Vec2[]): Momentos {
   return m;
 }
 
+/** Integrales de {1, x, y, x·y} sobre una figura (C4: el reparto de las cargas de un paño). */
+export interface Momentos2 {
+  A: number;
+  Sx: number;
+  Sy: number;
+  Sxy: number;
+}
+
+/** Integrales de {1, x, y, x·y} con signo sobre un polígono (teorema de Green). */
+export function momentos2Poligono(p: readonly Vec2[]): Momentos2 {
+  let A = 0;
+  let Sx = 0;
+  let Sy = 0;
+  let Sxy = 0;
+  for (let i = 0, n = p.length; i < n; i++) {
+    const [x0, y0] = p[i]!;
+    const [x1, y1] = p[(i + 1) % n]!;
+    const c = x0 * y1 - x1 * y0;
+    A += c;
+    Sx += (x0 + x1) * c;
+    Sy += (y0 + y1) * c;
+    Sxy += (x0 * y1 + 2 * x0 * y0 + 2 * x1 * y1 + x1 * y0) * c;
+  }
+  return { A: A / 2, Sx: Sx / 6, Sy: Sy / 6, Sxy: Sxy / 24 };
+}
+
+/**
+ * Integrales de {1, x, y, x·y} sobre la intersección del polígono simple `z` (en cualquier sentido)
+ * con el polígono convexo `c` (antihorario): los triángulos en abanico de z recortados por c.
+ */
+export function momentos2Interseccion(z: readonly Vec2[], c: readonly Vec2[]): Momentos2 {
+  const [x0, y0, x1, y1] = caja(c);
+  const O: Vec2 = [(x0 + x1) / 2, (y0 + y1) / 2];
+  const s = Math.sign(areaConSigno(z));
+  const r: Momentos2 = { A: 0, Sx: 0, Sy: 0, Sxy: 0 };
+  for (const a of abanico(z, O)) {
+    const ca = caja(a.t);
+    if (ca[0] > x1 || ca[2] < x0 || ca[1] > y1 || ca[3] < y0) continue;
+    const poli = recortarConvexo(a.t, c);
+    if (poli.length < 3) continue;
+    const m = momentos2Poligono(poli);
+    const f = s * a.s;
+    r.A += f * m.A;
+    r.Sx += f * m.Sx;
+    r.Sy += f * m.Sy;
+    r.Sxy += f * m.Sxy;
+  }
+  return r;
+}
+
 /** Área de la intersección de dos regiones (para el solape de losas). */
 export function areaInterseccionRegiones(a: Region, b: Region): number {
   let A = momentosInterseccion(a, b.contorno).A;

@@ -17,6 +17,10 @@
  *   arriba en la cota de la planta (C3-g). Los empujes van por lámina con su valor en cada nudo
  *   (bilineal: exacto con una ley lineal en z, C3-h). Su resultante física se calcula por franjas
  *   entre estaciones, sin las láminas, restando los huecos.
+ * - Paños unidireccionales (C4): su pp y las cargas de superficie, lineales y puntuales que caen en
+ *   ellos van a sus viguetas y a las vigas de sus lados paralelos por la regla de la palanca
+ *   (`RepartoPano`, C4-e). Su resultante física se calcula con los polígonos del paño unido, sin
+ *   las viguetas. Una viga bajo un paño pesa sólo su descuelgue (C2-g con el canto de la vigueta).
  * - Sin pérdidas (regla 3 del plan): la resultante física de cada caso (F y M respecto al centro
  *   del modelo, calculada sobre la pieza entera) tiene que coincidir con la analítica (leída del
  *   modelo analítico ya montado, con sus offsets) a 1e-9. La de las losas se calcula sin la malla,
@@ -31,6 +35,8 @@ import type { Piezas, Recta } from "./piezas.ts";
 import { areaConSigno, momentosInterseccion, momentosRegion, puntoEnRegion, type Momentos, type Region } from "./poligonos.ts";
 import type { Topologia } from "./topologia.ts";
 import { cotaNudo, seccionTramo } from "./topologia.ts";
+import { RepartoPano, trozosEnPanos, type EmisorPano, type PanosU, type Receptor } from "./unidireccional.ts";
+import { distanciaARegion } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
 
 export const TOL_SIN_PERDIDAS = 1e-9;
@@ -138,7 +144,7 @@ function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: reado
   return tramos;
 }
 
-export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, losas: Losas, centro: Vec3, diag: Diagnosticos): CargasCompiladas {
+export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, losas: Losas, centro: Vec3, diag: Diagnosticos, panos: PanosU | null = null): CargasCompiladas {
   const casos = ctx.casos.map(() => ({ nodales: new Map<number, number[]>(), barras: [] as CargaBarra[], laminas: new Map<number, number[]>(), laminasNodos: new Map<number, number[][]>() }));
   const lamina = (c: number, l: number, q: readonly number[]) => {
     const m = casos[c]!.laminas;
@@ -172,8 +178,12 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
 
   /** Carga lineal global de q1 (en σa) a q2 (en σb) sobre una recta, repartida en sus trozos. */
   const repartir = (c: number, r: Recta, sa: number, sb: number, q1: V, q2: V) => {
-    const q = (s: number): V => (sb === sa ? q1 : mas(q1, por(menos(q2, q1), (s - sa) / (sb - sa))));
     sumarLineal(fisicas[c]!, menos(P(r, sa), centro), r.e, sb - sa, q1, q2);
+    aplicarLineal(c, r, sa, sb, q1, q2);
+  };
+  /** Lo analítico de `repartir`, sin la resultante física (C4: la de un paño sale de su polígono). */
+  const aplicarLineal = (c: number, r: Recta, sa: number, sb: number, q1: V, q2: V) => {
+    const q = (s: number): V => (sb === sa ? q1 : mas(q1, por(menos(q2, q1), (s - sa) / (sb - sa))));
     for (const t of r.trozos) {
       const lo = Math.max(sa, t.desde);
       const hi = Math.min(sb, t.hasta);
@@ -220,8 +230,72 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
   // Momentos de una figura respecto al centro del modelo (en planta), y cota relativa de una planta
   const desplazar = (m: Momentos): Momentos => ({ A: m.A, Sx: m.Sx - centro[0] * m.A, Sy: m.Sy - centro[1] * m.A });
   const cota = (planta: string) => ctx.cotas[ctx.planta.get(planta)!]! - centro[2];
-  /** Losas de la planta de una viga, con su región unida y su espesor (C2-g). */
-  const regionesBajo = (v: Viga) => ctx.losas.flatMap((l, i) => (l.losa.planta === v.planta ? [{ region: losas.regiones[i]!, t: l.material.t }] : []));
+  /** Losas y paños (C4) de la planta de una viga, con su región unida y su espesor (C2-g). */
+  const regionesBajo = (v: Viga) => [
+    ...ctx.losas.flatMap((l, i) => (l.losa.planta === v.planta ? [{ region: losas.regiones[i]!, t: l.material.t }] : [])),
+    ...ctx.panos.flatMap((p, i) => (p.pano.planta === v.planta && panos ? [{ region: panos.regiones[i]!, t: p.seccion.canto }] : [])),
+  ];
+
+  // Reparto de los paños (C4-e): a las rectas de sus viguetas y de las vigas de sus lados paralelos
+  const repartos = new Map<number, RepartoPano>();
+  const reparto = (i: number) => {
+    let x = repartos.get(i);
+    if (!x) repartos.set(i, (x = new RepartoPano(panos!, i)));
+    return x;
+  };
+  const emisor = (c: number, i: number): EmisorPano => {
+    const z = ctx.cotas[ctx.panos[i]!.k]!;
+    const { d, n } = panos!.marcos[i]!;
+    const rectaDe = (rec: Receptor): { r: Recta; s: (sigma: number) => number; X: (sigma: number) => V } => {
+      if (rec.tipo === "vigueta") {
+        const v = panos!.viguetas[rec.v]!;
+        const r = piezas.rectasDe.get(v.id)![0]!;
+        return { r, s: (sg) => sg - v.a, X: (sg) => [sg * d[0] + v.eta * n[0], sg * d[1] + v.eta * n[1], z] };
+      }
+      const tv = rec.b.tramo;
+      const r = piezas.rectasDe.get(tv.viga.id)!.find((x) => x.tramo === tv)!;
+      const eta = rec.b.eta;
+      const X = (sg: number): V => [sg * d[0] + eta * n[0], sg * d[1] + eta * n[1], z];
+      return { r, s: (sg) => (X(sg)[0] - r.O[0]) * r.e[0] + (X(sg)[1] - r.O[1]) * r.e[1], X };
+    };
+    return {
+      lineal: (rec, sa, sb, qa, qb) => {
+        const { r, s } = rectaDe(rec);
+        const [a, b] = [s(sa), s(sb)];
+        const [q1, q2]: [V, V] = [
+          [qa[0]!, qa[1]!, qa[2]!],
+          [qb[0]!, qb[1]!, qb[2]!],
+        ];
+        if (a <= b) aplicarLineal(c, r, a, b, q1, q2);
+        else aplicarLineal(c, r, b, a, q2, q1);
+        // Una viga con el eje bajo el forjado (C1-c): el transporte vertical de la carga
+        const dz = z - r.O[2];
+        if (dz !== 0) {
+          const F = por(mas(q1, q2), (sb - sa) / 2);
+          const sm = s((sa + sb) / 2);
+          puntualEnRecta(c, r, sm, P(r, sm), [0, 0, 0], cruz([0, 0, dz], F));
+        }
+      },
+      puntual: (rec, sg, F, M) => {
+        const { r, s, X } = rectaDe(rec);
+        puntualEnRecta(c, r, s(sg), X(sg), [F[0]!, F[1]!, F[2]!], [M[0]!, M[1]!, M[2]!]);
+      },
+      aNudo: (nudo, Q, F, M) => nodal(c, nudo, F, mas(M, cruz(menos([Q[0], Q[1], z], Xn(nudo)), F))),
+    };
+  };
+  const panosDe = (planta: string) => ctx.panos.flatMap((p, i) => (p.pano.planta === planta && panos?.porPano[i]!.length ? [i] : []));
+  /** Reparte una carga lineal q sobre los lados que caen en los paños de la planta; devuelve lo que queda fuera (m). */
+  const linealEnPanos = (c: number, planta: string, lados: readonly (readonly [Vec2, Vec2])[], q: V): number => {
+    let fuera = 0;
+    const lista = panosDe(planta).map((i) => ({ i, region: panos!.regiones[i]! }));
+    for (const [A, B] of lados) {
+      const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+      let cubierto = 0;
+      for (const t of trozosEnPanos(A, B, lista)) cubierto += reparto(t.i).segmento(t.A, t.B, q, emisor(c, t.i));
+      fuera += Math.max(0, L - cubierto);
+    }
+    return fuera;
+  };
 
   // Peso propio (C1-h): vigas en toda su longitud (bajo losa, sólo su descuelgue, C2-g); pilares, tramo a tramo con su sección
   const cPeso = ctx.casos.findIndex((c) => c.pesoPropio === true);
@@ -250,14 +324,26 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         for (const t of pesoBajoLosa(r, w, sc.huella.b, sc.canto, regiones, ctx.op.epsGeom)) if (t.w > 0) repartir(cPeso, r, t.desde, t.hasta, [0, 0, -t.w], [0, 0, -t.w]);
       }
     }
-    // Losas: su pp, por lámina (C2-g)
+    // Losas: su pp, por lámina (C2-g); en un reticular, el de la zona aligerada o el de los ábacos (C4-i)
     losas.laminas.forEach((l, i) => {
-      const pp = ctx.losas[l.losa]!.pp;
+      const lc = ctx.losas[l.losa]!;
+      const pp = l.abaco ? lc.reticular!.ppAbaco : lc.pp;
       if (pp > 0) lamina(cPeso, i, [0, 0, -pp]);
     });
     ctx.losas.forEach((l, i) => {
-      if (l.pp > 0 && losas.laminas.some((x) => x.losa === i)) sumarSuperficie(fisicas[cPeso]!, desplazar(momentosRegion(losas.regiones[i]!)), cota(l.losa.planta), [0, 0, -l.pp]);
+      if (!losas.laminas.some((x) => x.losa === i)) return;
+      if (l.pp > 0) sumarSuperficie(fisicas[cPeso]!, desplazar(momentosRegion(losas.regiones[i]!)), cota(l.losa.planta), [0, 0, -l.pp]);
+      // Ábacos: la diferencia con la zona aligerada sobre su parte dentro de la losa unida
+      const dif = l.reticular ? l.reticular.ppAbaco - l.reticular.ppAligerada : 0;
+      if (dif !== 0) for (const ab of losas.abacosUnidos.get(i) ?? []) sumarSuperficie(fisicas[cPeso]!, desplazar(momentosInterseccion(losas.regiones[i]!, ab)), cota(l.losa.planta), [0, 0, -dif]);
     });
+    // Paños (C4-f): su pp, repartido a las viguetas; la física, sobre el paño unido
+    for (const i of ctx.panos.flatMap((_, i) => (panos?.porPano[i]!.length ? [i] : []))) {
+      const p = ctx.panos[i]!;
+      if (!(p.pano.pp > 0)) continue;
+      reparto(i).superficie([0, 0, -p.pano.pp], null, emisor(cPeso, i));
+      sumarSuperficie(fisicas[cPeso]!, desplazar(momentosRegion(panos!.regiones[i]!)), cota(p.pano.planta), [0, 0, -p.pano.pp]);
+    }
     // Muros (C3-g): γ·t por lámina; la física, por franjas sin los huecos
     losas.muros.forEach((lm, j) => {
       const m = ctx.muros[lm.w]!;
@@ -305,12 +391,15 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       const M: V = carga.M ? [...carga.M] : [0, 0, 0];
       const destino = topo.localizar(k, [carga.x, carga.y]);
       const enLosa = losas.puntos.get(carga.id);
-      if (!destino && enLosa === undefined) {
-        diag.error("carga/sin-destino", `La carga ${carga.id} no cae sobre ningún pilar, nudo, viga ni losa de la planta ${carga.planta} (tolerancia ${ctx.op.epsSnap} m).`, [carga.id]);
+      // En un paño (C4-e): a sus viguetas
+      const enPano = !destino && enLosa === undefined ? panosDe(carga.planta).find((i) => distanciaARegion([carga.x, carga.y], panos!.regiones[i]!) <= 1e-9) : undefined;
+      if (!destino && enLosa === undefined && enPano === undefined) {
+        diag.error("carga/sin-destino", `La carga ${carga.id} no cae sobre ningún pilar, nudo, viga, losa ni paño de la planta ${carga.planta} (tolerancia ${ctx.op.epsSnap} m).`, [carga.id]);
         continue;
       }
       sumarPuntual(fisicas[c]!, menos(Q, centro), F, M);
-      if (!destino) nodal(c, enLosa!, F, mas(M, cruz(menos(Q, Xn(enLosa!)), F)));
+      if (enPano !== undefined) reparto(enPano).puntual([carga.x, carga.y], F, M, emisor(c, enPano));
+      else if (!destino) nodal(c, enLosa!, F, mas(M, cruz(menos(Q, Xn(enLosa!)), F)));
       else if (destino.tipo === "nudo") nodal(c, destino.nudo, F, mas(M, cruz(menos(Q, Xn(destino.nudo)), F)));
       else {
         const r = piezas.rectasDe.get(destino.tramo.viga.id)!.find((r) => r.tramo === destino.tramo)!;
@@ -319,18 +408,33 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     } else if (carga.tipo === "superficie") {
       // C2-h: por lámina entera; la resultante física, sobre la losa (o la zona ∩ las losas) unida
       for (const l of losas.superficies.get(carga.id) ?? []) lamina(c, l, carga.q);
-      const zona = losas.zonasUnidas.get(carga.id);
+      const zona = losas.zonasUnidas.get(carga.id) ?? (carga.zona && panosDe(carga.planta).length ? carga.zona.map((x) => [x[0], x[1]] as Vec2) : undefined);
       let A = 0;
       ctx.losas.forEach((l, i) => {
-        if (l.losa.planta !== carga.planta || (carga.losa !== undefined && l.losa.id !== carga.losa)) return;
+        if (l.losa.planta !== carga.planta || carga.pano !== undefined || (carga.losa !== undefined && l.losa.id !== carga.losa)) return;
         const m = zona ? momentosInterseccion(losas.regiones[i]!, zona) : momentosRegion(losas.regiones[i]!);
         A += m.A;
         sumarSuperficie(fisicas[c]!, desplazar(m), cota(carga.planta), carga.q);
       });
+      // Paños (C4-e): la parte que cae en ellos, a sus viguetas; la física, sobre el paño unido
+      for (const i of panosDe(carga.planta)) {
+        if (carga.losa !== undefined || (carga.pano !== undefined && ctx.panos[i]!.pano.id !== carga.pano)) continue;
+        const m = zona ? momentosInterseccion(panos!.regiones[i]!, zona) : momentosRegion(panos!.regiones[i]!);
+        if (!(m.A > 0)) continue;
+        A += m.A;
+        reparto(i).superficie(carga.q, zona ?? null, emisor(c, i));
+        sumarSuperficie(fisicas[c]!, desplazar(m), cota(carga.planta), carga.q);
+      }
       const Az = zona ? Math.abs(areaConSigno(zona)) : A;
-      if (!(A > 0)) diag.error("carga/fuera-de-losa", `La carga ${carga.id} no cae sobre ninguna losa de la planta ${carga.planta}.`, [carga.id]);
+      const conPanos = ctx.panos.some((p) => p.pano.planta === carga.planta);
+      if (!(A > 0)) diag.error("carga/fuera-de-losa", `La carga ${carga.id} no cae sobre ninguna losa${conPanos ? " ni ningún paño" : ""} de la planta ${carga.planta}.`, [carga.id]);
       else if (Az - A > 1e-6 * Az)
-        diag.aviso("carga/zona-fuera-de-losa", `${(Az - A).toFixed(3)} m² de la zona de la carga ${carga.id} caen fuera de las losas${carga.losa ? ` (o de la losa ${carga.losa})` : ""} y no son carga (C2-h).`, [carga.id], { area: Az - A });
+        diag.aviso(
+          "carga/zona-fuera-de-losa",
+          `${(Az - A).toFixed(3)} m² de la zona de la carga ${carga.id} caen fuera de las losas${conPanos ? " y los paños" : ""}${carga.losa ? ` (o de la losa ${carga.losa})` : carga.pano ? ` (o del paño ${carga.pano})` : ""} y no son carga (C2-h).`,
+          [carga.id],
+          { area: Az - A },
+        );
     } else if (carga.tipo === "lineal") {
       // C2-h: a los nudos de sus aristas (exacto con las funciones lineales del borde de la lámina)
       for (const [a, b] of losas.lineas.get(carga.id) ?? []) {
@@ -339,7 +443,21 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         nodal(c, a, por(carga.q, L / 2), [0, 0, 0]);
         nodal(c, b, por(carga.q, L / 2), [0, 0, 0]);
       }
-      const p = losas.lineasUnidas.get(carga.id) ?? [];
+      // C4-e: los lados que no van sobre la malla ni sobre un muro, a los paños; en una planta sin
+      // losas ni muros, toda la polilínea. Lo que no cubran se perdería: error
+      const unida = losas.lineasUnidas.get(carga.id);
+      const p: Vec2[] = unida ?? carga.puntos.map((x) => [x[0], x[1]] as Vec2);
+      const sueltos: [Vec2, Vec2][] = unida ? (losas.lineasFuera.get(carga.id) ?? []) : p.slice(1).map((B, i) => [p[i]!, B]);
+      if (sueltos.length) {
+        const fuera = linealEnPanos(c, carga.planta, sueltos, [carga.q[0], carga.q[1], carga.q[2]]);
+        if (fuera > ctx.op.epsGeom)
+          diag.error(
+            "carga/fuera-de-losa",
+            `La carga lineal ${carga.id} no va entera sobre las losas, los paños o los ejes de los muros de la planta ${carga.planta}: ${fuera.toFixed(3)} m caen fuera y se perderían.`,
+            [carga.id],
+            { longitud: fuera },
+          );
+      }
       const z = ctx.cotas[ctx.planta.get(carga.planta)!]!;
       for (let i = 0; i + 1 < p.length; i++) {
         const X1: V = [p[i]![0], p[i]![1], z];

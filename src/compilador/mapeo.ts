@@ -16,9 +16,12 @@ export interface NudoMapeado {
 
 export interface BarraMapeada {
   pieza: string;
-  tipo: "viga" | "pilar";
+  /** Una vigueta (C4) es una pieza generada: `<paño>:v<n>`. */
+  tipo: "viga" | "pilar" | "vigueta";
   /** Tramo de la polilínea de la viga, o índice de la planta de la cabeza del tramo de pilar. */
   tramo: number;
+  /** Paño de una vigueta (el objeto físico, C4). */
+  pano?: string;
   /**
    * Estaciones a lo largo de la pieza (m, desde el primer punto de la viga o la base del pilar)
    * de [i, i', j', j]: los nudos (proyectados sobre el eje) y los extremos del tramo flexible.
@@ -36,14 +39,16 @@ export interface Mapeo {
   barras: BarraMapeada[];
   /** Planta de cada restricción; las huellas (C2-d), además, su pilar, y las de las vigas en un muro (C3-i), su viga. */
   restricciones: { planta: string; pilar?: string; viga?: string }[];
-  /** C2 y C3: losa o muro de cada lámina, en paralelo a `modelo.laminas` (sólo si hay láminas). */
-  laminas?: { losa?: string; muro?: string }[];
+  /** C2 y C3: losa o muro de cada lámina, en paralelo a `modelo.laminas` (sólo si hay láminas); las de los ábacos de un reticular (C4), marcadas. */
+  laminas?: { losa?: string; muro?: string; abaco?: true }[];
   /** C2: láminas de cada losa, en orden canónico (sólo si hay losas). */
   losas?: Record<string, number[]>;
   /** C3: láminas de cada muro, por tramo, planta (de abajo arriba), columna y fila (sólo si hay muros). */
   muros?: Record<string, number[]>;
-  /** Barras de cada pieza física, en orden a lo largo de ella. */
+  /** Barras de cada pieza física, en orden a lo largo de ella (también las de cada vigueta, C4). */
   piezas: Record<string, number[]>;
+  /** C4: viguetas de cada paño unidireccional, por orden de (η, σ) (sólo si hay paños). */
+  panos?: Record<string, string[]>;
   /** Nudo del eje de cada pilar en cada planta: clave `${pilar}@${planta}`. */
   nudosPilar: Record<string, number>;
   /** Nudo de cada apoyo físico. */
@@ -54,7 +59,7 @@ export interface Mapeo {
 export function fisicosDeIds(modelo: ModeloAnalitico, mapeo: Mapeo): Map<string, string[]> {
   const m = new Map<string, string[]>();
   modelo.nudos.forEach((n, i) => m.set(n.id, mapeo.nudos[i]!.maestro ? [mapeo.nudos[i]!.planta] : mapeo.nudos[i]!.fisicos));
-  (modelo.barras ?? []).forEach((b, i) => m.set(b.id, [mapeo.barras[i]!.pieza]));
+  (modelo.barras ?? []).forEach((b, i) => m.set(b.id, [mapeo.barras[i]!.pano ?? mapeo.barras[i]!.pieza]));
   (modelo.laminas ?? []).forEach((l, i) => m.set(l.id, [mapeo.laminas![i]!.losa ?? mapeo.laminas![i]!.muro!]));
   (modelo.restricciones ?? []).forEach((r, i) => m.set(r.id, [mapeo.restricciones[i]!.pilar ?? mapeo.restricciones[i]!.viga ?? mapeo.restricciones[i]!.planta]));
   for (const c of modelo.casos) m.set(c.id, [c.id]);

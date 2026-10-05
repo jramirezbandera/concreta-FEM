@@ -10,6 +10,10 @@
  * Con losas (C2): los apoyos lineales y los puntuales que caen en una losa van a sus nudos de la
  * malla, y el diafragma rígido de una planta con losas abarca los nudos sobre ellas (C2-f).
  *
+ * Viguetas (C4): una barra entre cada dos apoyos seguidos, con su torsión liberada en el primero
+ * si los dos son apoyos (C4-c, E2-3) y con la zona rígida de C1-a en las huellas de pilar. En una
+ * planta con paños, el diafragma rígido abarca además los nudos sobre ellos (C4-g).
+ *
  * Cada pieza se describe además como una o varias «rectas» (el eje analítico, P(σ) = O + σ·e)
  * partidas en trozos: tramos flexibles de barras y zonas rígidas o tramos fuera de la cadena, que
  * van a un nudo. Las cargas se reparten sobre esos trozos (`cargas.ts`).
@@ -20,8 +24,9 @@ import type { Seis, Vec3 } from "../motor/modelo.ts";
 import type { Liberacion, Pilar } from "./fisico.ts";
 import type { Losas } from "./losas.ts";
 import type { SeccionCompilada } from "./secciones.ts";
-import { proyectar } from "./geometria2d.ts";
-import { cuerdaEnTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
+import { cuerdaHuella, proyectar } from "./geometria2d.ts";
+import { cuerdaEnTramo, distanciaARegion, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
+import type { PanosU } from "./unidireccional.ts";
 import type { Contexto } from "./validar.ts";
 
 /** Trozo de una recta: [desde, hasta] en σ, que va a un nudo o al tramo flexible de una barra. */
@@ -29,7 +34,7 @@ export type Trozo = { desde: number; hasta: number; nudo: number } | { desde: nu
 
 export interface Recta {
   pieza: string;
-  tipo: "viga" | "pilar";
+  tipo: "viga" | "pilar" | "vigueta";
   /** Eje analítico: P(σ) = O + σ·e (globales). */
   O: Vec3;
   e: Vec3;
@@ -49,7 +54,7 @@ export interface Recta {
 export interface BarraP {
   id: string;
   pieza: string;
-  tipo: "viga" | "pilar";
+  tipo: "viga" | "pilar" | "vigueta";
   /** Tramo de la polilínea (vigas) o planta de la cabeza (pilares). */
   tramo: number;
   i: number;
@@ -81,7 +86,7 @@ export interface Piezas {
 
 const libera = (l?: Liberacion): Seis<boolean> | undefined => (l && l.some(Boolean) ? l : undefined);
 
-export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, diag: Diagnosticos): Piezas {
+export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, diag: Diagnosticos, panos: PanosU | null = null): Piezas {
   const { epsGeom, factorZonaRigida: f } = ctx.op;
   const barras: BarraP[] = [];
   const rectas: Recta[] = [];
@@ -243,6 +248,61 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     }
   }
 
+  // Viguetas (C4): una recta por vigueta, con σ desde su primer extremo (σ − a en el marco del paño)
+  const TORSION: Seis<boolean> = [false, false, false, true, false, false];
+  for (const v of panos?.viguetas ?? []) {
+    const pc = ctx.panos[v.pano]!;
+    const z = ctx.cotas[v.k]!;
+    const A: [number, number] = [v.a * v.d[0] + v.eta * v.n[0], v.a * v.d[1] + v.eta * v.n[1]];
+    const P = (s: number): Vec3 => [A[0] + s * v.d[0], A[1] + s * v.d[1], z];
+    const recta: Recta = { pieza: v.id, tipo: "vigueta", O: [A[0], A[1], z], e: [v.d[0], v.d[1], 0], s0: 0, len: v.b - v.a, ex: [v.d[0], v.d[1], 0], ey: [-v.d[1], v.d[0], 0], ez: [0, 0, 1], trozos: [] };
+    const cad = v.cadena.map((x) => ({ ...x, s: x.sigma - v.a }));
+    recta.trozos.push({ desde: -Infinity, hasta: cad[0]!.s, nudo: cad[0]!.nudo });
+    let n = 0;
+    for (let q = 0; q + 1 < cad.length; q++) {
+      const [na, nb] = [cad[q]!, cad[q + 1]!];
+      let si = na.s;
+      let sj = nb.s;
+      // Zona rígida en la huella de un pilar (C1-a): f veces lo que la vigueta recorre dentro
+      if (na.pilar) {
+        const cu = cuerdaHuella(A, v.d, na.pilar.huella);
+        if (cu) si += f * Math.max(0, cu[1] - Math.max(na.s, cu[0]));
+      }
+      if (nb.pilar) {
+        const cu = cuerdaHuella(A, v.d, nb.pilar.huella);
+        if (cu) sj -= f * Math.max(0, Math.min(nb.s, cu[1]) - cu[0]);
+      }
+      if (!(sj - si > epsGeom)) {
+        diag.error("vigueta/tramo-flexible-nulo", `La vigueta ${v.id} del paño ${pc.pano.id} no tiene tramo flexible entre ${[...topo.nudos[na.nudo]!.fisicos].join(", ")} y ${[...topo.nudos[nb.nudo]!.fisicos].join(", ")}: las zonas rígidas se tocan.`, [pc.pano.id]);
+        recta.trozos.push({ desde: na.s, hasta: nb.s, nudo: na.nudo });
+        continue;
+      }
+      n++;
+      barras.push({
+        id: `${v.id}:${n}`,
+        pieza: v.id,
+        tipo: "vigueta",
+        tramo: 0,
+        i: na.nudo,
+        j: nb.nudo,
+        ip: P(si),
+        jp: P(sj),
+        seccion: pc.seccion.barra,
+        material: pc.seccion.material,
+        vz: [0, 0, 1],
+        // C4-c (E2-3): sin torsión entre dos apoyos; un voladizo la conserva
+        ...(na.apoyo !== "libre" && nb.apoyo !== "libre" ? { liberaciones: { i: TORSION } } : {}),
+        s: [na.s, si, sj, nb.s],
+      });
+      recta.trozos.push({ desde: na.s, hasta: si, nudo: na.nudo });
+      recta.trozos.push({ desde: si, hasta: sj, barra: barras.length - 1, ip: si });
+      recta.trozos.push({ desde: sj, hasta: nb.s, nudo: nb.nudo });
+    }
+    recta.trozos.push({ desde: cad[cad.length - 1]!.s, hasta: Infinity, nudo: cad[cad.length - 1]!.nudo });
+    rectas.push(recta);
+    rectasDe.set(v.id, [recta]);
+  }
+
   // Barras auxiliares (C3-e, H05): la viga sigue dentro del muro por su fila de nudos, con su
   // sección, sin cargas y sin liberaciones
   for (const ax of losas.auxiliares) {
@@ -327,6 +387,29 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     l.push(n);
   });
   for (const [k, l] of losas.diafragma) porK.set(k, l);
+  // C4-g: en una planta con paños, los nudos sobre ellos (y aquellos a los que llegan sus viguetas)
+  // se suman a los de las losas; sin losas, sólo ellos
+  if (panos && ctx.panos.length) {
+    const esclavosH = new Set(losas.huellas.flatMap((h) => h.esclavos));
+    for (const k of [...new Set(ctx.panos.map((p) => p.k))].sort((a, b) => b - a)) {
+      const regiones = ctx.panos.flatMap((p, i) => (p.k === k ? [panos.regiones[i]!] : []));
+      const conLosa = ctx.losas.some((l) => ctx.planta.get(l.losa.planta) === k);
+      const lista = new Set<number>(conLosa ? (losas.diafragma.get(k) ?? []) : []);
+      topo.nudos.forEach((nd, n) => {
+        if (nd.k !== k || nd.z !== undefined || esclavosH.has(n)) return;
+        const Q: [number, number] = [nd.x, nd.y];
+        if (regiones.some((reg) => distanciaARegion(Q, reg) <= ctx.op.epsSnap)) lista.add(n);
+      });
+      for (const v of panos.viguetas) if (v.k === k) for (const x of v.cadena) if (!esclavosH.has(x.nudo)) lista.add(x.nudo);
+      porK.set(k, [...lista].sort((a, b) => a - b));
+      if (diafragmaDe(ctx, k) !== "rigido")
+        diag.aviso(
+          "pano/sin-diafragma",
+          `La planta ${ctx.plantas[k]!.id} tiene paños unidireccionales y no tiene diafragma rígido: sin la capa de compresión, el forjado sólo tiene en su plano la rigidez de vigas y viguetas (C4-g).`,
+          [ctx.plantas[k]!.id, ...ctx.panos.filter((p) => p.k === k).map((p) => p.pano.id)],
+        );
+    }
+  }
   for (const [k, lista] of [...porK].sort((a, b) => b[0] - a[0])) {
     if (diafragmaDe(ctx, k) !== "rigido" || lista.length < 2) continue;
     const malos = lista.filter((n) => {

@@ -32,9 +32,10 @@ import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type LosaMallar, type ResultadoMalla } from "./mallado.ts";
-import { ajustarMuros, estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
+import { estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
 import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
-import { ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
+import { distanciaARegion, ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
+import type { PanosU } from "./unidireccional.ts";
 import type { Contexto } from "./validar.ts";
 
 export interface LaminaL {
@@ -43,6 +44,8 @@ export interface LaminaL {
   /** Índice de la losa en `ctx.losas`. */
   losa: number;
   k: number;
+  /** Lámina de un ábaco de un reticular (C4): maciza, sin multiplicadores. */
+  abaco?: true;
 }
 
 export interface HuellaL {
@@ -63,6 +66,11 @@ export interface Losas {
   apoyosPuntuales: Map<string, number>;
   /** Por carga lineal: sus aristas (pares de nudos) a lo largo de la polilínea unida. */
   lineas: Map<string, [number, number][]>;
+  /**
+   * Por carga lineal de una planta con paños (C4): los lados de la polilínea unida que no van sobre
+   * la malla ni sobre un muro. Los reparten los paños; lo que no cubran es un error.
+   */
+  lineasFuera: Map<string, [Vec2, Vec2][]>;
   /** Polilínea unida de cada carga lineal (la geometría física tras unir, C2-b). */
   lineasUnidas: Map<string, Vec2[]>;
   /** Por carga de superficie: las láminas que cubre. */
@@ -94,6 +102,8 @@ export interface Losas {
   aspectoMuros: { max: number; altos: number };
   /** Huellas de las vigas que acaban en un muro fuera de su plano (C3-i). */
   huellasVigas: HuellaViga[];
+  /** Ábacos de cada losa reticular (por índice en `ctx.losas`), con su geometría ya unida (C4). */
+  abacosUnidos: Map<number, Vec2[][]>;
 }
 
 const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
@@ -255,9 +265,16 @@ interface PlantaL extends PlantaMuros {
   trazoCarga: Map<string, Trazo>;
   trazoApoyo: Map<string, Trazo>;
   puntoDe: Map<string, { i: number; Q: Vec2 }>;
+  /** Trazos de los ábacos de cada losa reticular de la planta (C4). */
+  trazoAbaco: Map<number, Trazo[]>;
 }
 
-export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly CargaFisica[], diag: Diagnosticos): Losas {
+/**
+ * `puntosMuros`: los vértices de los muros ya ajustados (`ajustarMuros`, antes de las viguetas de
+ * C4, para que sus nudos no los muevan). `panos`: los paños unidireccionales de C4; sus cargas
+ * puntuales y los lados de las lineales que caen en ellos los reparten ellos.
+ */
+export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly CargaFisica[], diag: Diagnosticos, puntosMuros: readonly Vec2[][], panos: PanosU | null = null): Losas {
   const { epsGeom, epsSnap, tamanoMalla: h, rejilla } = ctx.op;
   const r: Losas = {
     laminas: [],
@@ -265,6 +282,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     apoyosLineales: new Map(),
     apoyosPuntuales: new Map(),
     lineas: new Map(),
+    lineasFuera: new Map(),
     lineasUnidas: new Map(),
     superficies: new Map(),
     zonasUnidas: new Map(),
@@ -279,12 +297,11 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     ladosMuros: [],
     aspectoMuros: { max: 1, altos: 0 },
     huellasVigas: [],
+    abacosUnidos: new Map(),
   };
   const nudosAntes = topo.nudos.length;
   const indiceLosa = new Map(ctx.losas.map((l, i) => [l.losa.id, i] as const));
-  // Vértices de los muros, ajustados igual en todas sus plantas (C3-b)
-  const puntosMuros = ctx.muros.length ? ajustarMuros(ctx, topo, diag) : [];
-  if (!puntosMuros) return r;
+  const enPano = (k: number, Q: Vec2) => (panos?.regiones ?? []).some((reg, i) => ctx.panos[i]!.k === k && panos!.porPano[i]!.length > 0 && distanciaARegion(Q, reg) <= 1e-9);
   const ks = new Set(ctx.losas.map((l) => ctx.planta.get(l.losa.planta)!));
   for (const m of ctx.muros) for (let k = m.kh; k <= m.kb; k++) ks.add(k);
   const plantas = [...ks].sort((a, b) => b - a);
@@ -389,6 +406,18 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       mallar.push({ id: l.losa.id, contorno, huecos: huecos as Trazo[], eje1: direccionEje1(l.losa.eje1 ?? 0) });
       losaDeMallar.push(i);
     }
+    // Ábacos de los reticulares (C4): sus lados se siembran en la malla
+    const trazoAbaco = new Map<number, Trazo[]>();
+    for (const { l, i } of losasK) {
+      if (!l.reticular) continue;
+      const ts: Trazo[] = [];
+      l.reticular.abacos.forEach((ab, j) => {
+        const t = a.trazo(l.losa.id, "abaco", j, ab, true);
+        if (t) ts.push(t);
+        else diag.error("losa/degenerada", `El ábaco ${j + 1} de la losa ${l.losa.id} se queda sin área al unir sus vértices a lo cercano (tolerancia ${cm(epsSnap)}).`, [l.losa.id]);
+      });
+      trazoAbaco.set(i, ts);
+    }
     for (const b of ctx.bandas) if (b.planta === idPlanta) a.trazo(b.id, "banda", -1, rectanguloBanda(b.desde, b.hasta, b.ancho), true);
     const trazoCarga = new Map<string, Trazo>();
     for (const c of cargas) {
@@ -411,7 +440,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     }
     const puntoDe = new Map<string, { i: number; Q: Vec2 }>();
     for (const c of cargas) {
-      if (c.tipo !== "puntual" || c.planta !== idPlanta || topo.localizar(k, [c.x, c.y])) continue;
+      if (c.tipo !== "puntual" || c.planta !== idPlanta || topo.localizar(k, [c.x, c.y]) || enPano(k, [c.x, c.y])) continue;
       puntoDe.set(c.id, { i: a.punto([c.x, c.y], c.id, "punto", "su punto"), Q: [c.x, c.y] });
     }
     for (const ap of ctx.apoyos) {
@@ -423,7 +452,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       diag.error("malla/arreglo", `No se ha podido ordenar la geometría de la planta ${idPlanta} para mallarla: hay rasgos más pequeños que ${cm(epsSnap)} que se cruzan entre sí.`, [idPlanta, ...losasK.map(({ l }) => l.losa.id)]);
       return null;
     }
-    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe };
+    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco };
   };
   const montarTodas = (fijos: ReadonlyMap<number, Vec2[]>, d: Diagnosticos): Map<number, PlantaL> => {
     const e = new Map<number, PlantaL>();
@@ -460,11 +489,19 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       diag.error("malla/arreglo", `La geometría de la planta ${idPlanta} no se ha podido preparar para mallarla (${defecto}). Es un fallo del compilador.`, [idPlanta]);
       continue;
     }
-    // Avisos de lo que se ha movido (el mayor por objeto)
-    const mov = new Map<string, { tipo: TipoTrazo | "punto"; d: number }>();
-    for (const mv of a.movimientos) if ((mov.get(mv.id)?.d ?? 0) < mv.distancia) mov.set(mv.id, { tipo: mv.tipo, d: mv.distancia });
-    for (const [id, mv] of [...mov].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
+    // Avisos de lo que se ha movido (el mayor por objeto; los ábacos, aparte de su losa)
+    const mov = new Map<string, { id: string; tipo: TipoTrazo | "punto"; d: number }>();
+    for (const mv of a.movimientos) {
+      const clave = mv.tipo === "abaco" ? `${mv.id}|abaco` : mv.id;
+      if ((mov.get(clave)?.d ?? 0) < mv.distancia) mov.set(clave, { id: mv.id, tipo: mv.tipo, d: mv.distancia });
+    }
+    for (const [, mv] of [...mov].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
+      const id = mv.id;
       if (mv.tipo === "huella") continue;
+      if (mv.tipo === "abaco") {
+        diag.aviso("losa/ajuste", `Un ábaco de la losa ${id} se ajusta a lo que lo rodea: su borde se mueve hasta ${cm(mv.d)} (C2-b).`, [id], { distancia: mv.d });
+        continue;
+      }
       if (mv.tipo === "losa" || mv.tipo === "hueco") {
         const li = indiceLosa.get(id)!;
         const t = mallar.find((x) => x.id === id);
@@ -504,12 +541,18 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       topo.nudos.push({ k, x: nm.x, y: nm.y, fisicos: new Set(), pilar: null });
       return topo.nudos.length - 1;
     });
+    // Ábacos unidos (C4): una lámina es de un ábaco si el centroide de su pieza cae en él (sus lados
+    // están sembrados, así que cada pieza está entera dentro o fuera)
+    const xyA = (p: number): Vec2 => [a.puntos[p]!.x, a.puntos[p]!.y];
+    for (const [li, ts] of e.trazoAbaco) r.abacosUnidos.set(li, ts.map((t) => t.puntos.map(xyA)));
     for (const q of m?.quads ?? []) {
       const li = losaDeMallar[q.losa]!;
       const ns = q.nudos.map((n) => nudoT[n]!) as [number, number, number, number];
       for (const n of ns) topo.nudos[n]!.fisicos.add(ctx.losas[li]!.losa.id);
       const c: Vec2 = [(topo.nudos[ns[0]]!.x + topo.nudos[ns[1]]!.x + topo.nudos[ns[2]]!.x + topo.nudos[ns[3]]!.x) / 4, (topo.nudos[ns[0]]!.y + topo.nudos[ns[1]]!.y + topo.nudos[ns[2]]!.y + topo.nudos[ns[3]]!.y) / 4];
-      laminasSinOrden.push({ nudos: ns, losa: li, k, c });
+      const abacos = r.abacosUnidos.get(li);
+      const abaco = abacos?.some((ab) => puntoEnPoligono(m!.piezas[q.pieza]!.c, ab)) ?? false;
+      laminasSinOrden.push({ nudos: ns, losa: li, k, c, ...(abaco ? { abaco: true as const } : {}) });
     }
     const nudosMalla = [...new Set((m?.quads ?? []).flatMap((q) => q.nudos.map((n) => nudoT[n]!)))].sort((x, y) => x - y);
     const usado = new Map((m?.nudos ?? []).map((nm, i) => [nm.punto, i] as const).filter(([p]) => p >= 0));
@@ -628,8 +671,9 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     }
 
     // Apoyos lineales y cargas lineales: nudos y aristas a lo largo de sus lados
-    const recorrer = (t: Trazo): { aristas: [number, number][]; fuera: boolean } => {
+    const recorrer = (t: Trazo): { aristas: [number, number][]; fuera: boolean; lados: [Vec2, Vec2][] } => {
       const aristas: [number, number][] = [];
+      const lados: [Vec2, Vec2][] = [];
       let fuera = false;
       const n = t.puntos.length;
       for (let i = 0; i < (t.cerrado ? n : n - 1); i++) {
@@ -637,13 +681,18 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         const c = ladoNodos.get(pa < pb ? `${pa},${pb}` : `${pb},${pa}`) ?? [];
         if (!c.length) {
           fuera = true;
+          lados.push([
+            [a.puntos[pa]!.x, a.puntos[pa]!.y],
+            [a.puntos[pb]!.x, a.puntos[pb]!.y],
+          ]);
           continue;
         }
         const ordenada = pa < pb ? c : [...c].reverse();
         for (let j = 0; j + 1 < ordenada.length; j++) aristas.push([ordenada[j]!, ordenada[j + 1]!]);
       }
-      return { aristas, fuera };
+      return { aristas, fuera, lados };
     };
+    const conPanos = ctx.panos.some((p) => p.k === k);
     for (const [id, t] of e.trazoApoyo) {
       const { aristas, fuera } = recorrer(t);
       if (fuera) diag.error("apoyo/fuera-de-losa", `El apoyo lineal ${id} no va entero sobre las losas o los ejes de los muros de la planta ${idPlanta}.`, [id]);
@@ -652,8 +701,10 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     for (const [id, t] of e.trazoCarga) {
       const xy = (p: number): Vec2 => [a.puntos[p]!.x, a.puntos[p]!.y];
       if (t.tipo === "linea") {
-        const { aristas, fuera } = recorrer(t);
-        if (fuera) diag.error("carga/fuera-de-losa", `La carga lineal ${id} no va entera sobre las losas o los ejes de los muros de la planta ${idPlanta}: lo que cae fuera se perdería.`, [id]);
+        const { aristas, fuera, lados } = recorrer(t);
+        // Con paños (C4), lo que no va sobre la malla lo reparten ellos (y lo que no cubran, error)
+        if (fuera && conPanos) r.lineasFuera.set(id, lados);
+        else if (fuera) diag.error("carga/fuera-de-losa", `La carga lineal ${id} no va entera sobre las losas o los ejes de los muros de la planta ${idPlanta}: lo que cae fuera se perdería.`, [id]);
         r.lineas.set(id, aristas);
         r.lineasUnidas.set(id, t.puntos.map(xy));
       } else r.zonasUnidas.set(id, t.puntos.map(xy));
@@ -662,7 +713,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // su losa, si la da)
     if (m) {
       for (const c of cargas) {
-        if (c.tipo !== "superficie" || c.planta !== idPlanta) continue;
+        if (c.tipo !== "superficie" || c.planta !== idPlanta || c.pano !== undefined) continue;
         const zona = r.zonasUnidas.get(c.id);
         const li = c.losa !== undefined ? indiceLosa.get(c.losa) : undefined;
         const piezas = new Set<number>();
@@ -720,8 +771,8 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
   const nuevo = new Int32Array(orden.length);
   orden.forEach((v, i) => (nuevo[v] = i));
   r.laminas = orden.map((i) => {
-    const { nudos, losa, k } = laminasSinOrden[i]!;
-    return { nudos, losa, k };
+    const { nudos, losa, k, abaco } = laminasSinOrden[i]!;
+    return { nudos, losa, k, ...(abaco ? { abaco } : {}) };
   });
   for (const [id, l] of r.superficies) r.superficies.set(id, l.map((i) => nuevo[i]!).sort((x, y) => x - y));
   r.malla.nudos = topo.nudos.length - nudosAntes;

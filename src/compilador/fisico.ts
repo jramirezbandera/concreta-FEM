@@ -33,8 +33,13 @@
  *   (sumando sus tramos) y la altura z, desde la cota de su base. Sus láminas tienen el eje 1
  *   horizontal en el sentido del tramo, el 2 hacia +Z y el 3 (la normal) a la derecha del sentido
  *   del eje en planta. «Izquierdo» y «derecho» son los lados del eje mirando en su sentido.
+ * - Forjados (C4): un reticular es una losa con `reticular` (los nervios van según su `eje1` y la
+ *   perpendicular); un unidireccional es un paño (`panos`) dibujado como una losa, a ejes, cuyas
+ *   viguetas van según su `direccion`. Las viguetas tienen los ejes de las vigas: x en la dirección
+ *   del paño (de η menor a mayor a lo largo de la recta, desde su primer extremo) y z = +Z.
  */
 import type { ModificadoresBarra } from "../elementos/barra.ts";
+import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
 import type { PerfilCatalogo } from "../secciones/seccion3D.ts";
 
@@ -184,10 +189,10 @@ export type CargaFisica =
   | { tipo: "pilar"; id: string; caso: string; pilar: string; ejes: "global" | "local"; q: Vec3; qb?: Vec3; desde?: number; hasta?: number }
   | {
       /**
-       * Carga de superficie uniforme (C2), en kN/m² y ejes globales: sobre la losa `losa` entera
-       * (sin sus huecos) o sobre la parte de las losas de la planta que cae en el polígono `zona`
-       * (si se dan los dos, la parte de esa losa en la zona). Lo que cae fuera de las losas no es
-       * carga (C2-h).
+       * Carga de superficie uniforme (C2), en kN/m² y ejes globales: sobre la losa `losa` o el paño
+       * `pano` (C4) enteros (sin sus huecos) o sobre la parte de las losas y los paños de la planta
+       * que cae en el polígono `zona` (si se dan los dos, la parte de esa losa o ese paño en la
+       * zona). Lo que cae fuera de las losas y los paños no es carga (C2-h).
        */
       tipo: "superficie";
       id: string;
@@ -195,6 +200,8 @@ export type CargaFisica =
       planta: string;
       q: Vec3;
       losa?: string;
+      /** Paño unidireccional (C4): la carga va sobre él entero (o sobre su parte en la zona). */
+      pano?: string;
       zona?: readonly Vec2[];
     }
   | {
@@ -244,6 +251,59 @@ export interface Losa {
   pp?: number;
   /** Dirección del eje 1 de sus láminas en planta, en grados desde +X (E3-2). Por defecto, 0. Orienta también la retícula de la malla. */
   eje1?: number;
+  /**
+   * Forjado reticular (C4, D3): la losa es su zona aligerada, de canto total `espesor`, con nervios
+   * según el `eje1` y la perpendicular.
+   */
+  reticular?: Reticular;
+}
+
+/**
+ * Nervios de un forjado reticular (C4, D3), en m, iguales en las dos direcciones. Con ellos el
+ * compilador calcula los multiplicadores de la zona aligerada (`reticular.ts`, C4-h). El `pp` de la
+ * losa, si se da, es el peso medio de toda ella con los ábacos (C4-i).
+ */
+export interface Reticular {
+  /** Distancia entre ejes de nervios. */
+  intereje: number;
+  /** Ancho del nervio (bw). */
+  nervio: number;
+  /** Espesor de la capa de compresión (hf). */
+  capa: number;
+  /**
+   * Ábacos: polígonos simples macizos (multiplicador 1). Pueden salirse de la losa: cuenta su
+   * parte dentro. No pueden solaparse entre sí.
+   */
+  abacos?: readonly (readonly Vec2[])[];
+  /**
+   * Multiplicadores de la zona aligerada dados por el usuario: sustituyen a los calculados y se
+   * aplican sobre la maciza con el ν del material, como en SAP2000 (C4-h). Cada uno en (0, 100].
+   */
+  multiplicadores?: MultiplicadoresLamina;
+}
+
+/**
+ * Paño de forjado unidireccional (C4, D2): viguetas como barras según `direccion`, cada
+ * `intereje`, dentro de su contorno (sin sus huecos). Vale también para placas alveolares y chapa
+ * colaborante (barras unidireccionales con su intereje, H46). Su contorno va a ejes (C2-c): sobre
+ * los ejes de las vigas y los muros en los que se apoya.
+ */
+export interface PanoUnidireccional {
+  id: string;
+  nombre?: string;
+  planta: string;
+  /** Contorno exterior en planta, m: polígono simple de al menos 3 vértices. */
+  contorno: readonly Vec2[];
+  /** Huecos: polígonos simples dentro del contorno, sin tocarse entre sí ni tocarlo. */
+  huecos?: readonly (readonly Vec2[])[];
+  /** Dirección de las viguetas en planta, en grados desde +X. */
+  direccion: number;
+  /** Distancia entre ejes de viguetas, m. */
+  intereje: number;
+  /** Sección de una vigueta: la T bruta (bf = intereje) u otra. No pesa: el peso es el `pp`. */
+  seccion: string;
+  /** Peso propio del forjado, kN/m² (H24): incluye las bovedillas, que la sección no conoce. */
+  pp: number;
 }
 
 /** Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa o del eje de un muro (C3). */
@@ -311,6 +371,8 @@ export interface ModeloFisico {
   apoyosLineales?: readonly ApoyoLineal[];
   bandas?: readonly Banda[];
   muros?: readonly Muro[];
+  /** C4: paños de forjado unidireccional. */
+  panos?: readonly PanoUnidireccional[];
   casos: readonly CasoFisico[];
   cargas?: readonly CargaFisica[];
 }
@@ -329,6 +391,8 @@ export interface ModificadoresPieza {
 export interface ModificadoresPiezas {
   pilares?: ModificadoresPieza;
   vigas?: ModificadoresPieza;
+  /** Viguetas de los paños unidireccionales (C4). Su torsión ya va liberada (C4-c). */
+  viguetas?: ModificadoresPieza;
 }
 
 /**

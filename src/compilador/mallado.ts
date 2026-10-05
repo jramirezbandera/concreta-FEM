@@ -464,6 +464,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     const ch = cadenaHuella.get(k);
     if (ch) return ch;
     const el = rj?.enLinea[k];
+    const borde = l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!));
     const cortes: { p: number; n: number }[] = [];
     if (!el) cortes.push({ p: l.a, n: -1 }, { p: l.b, n: -1 });
     else
@@ -478,7 +479,10 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     for (let m = 0; m + 1 < cortes.length; m++) {
       const [x, y] = [cortes[m]!, cortes[m + 1]!];
       if (aristasPlantilla.has(x.p < y.p ? `${x.p},${y.p}` : `${y.p},${x.p}`)) {
-        // Arista dentro de una plantilla (el tramo de viga entre la cara del pilar y el borde)
+        // Arista dentro de una plantilla (el tramo de viga entre la cara del pilar y el borde). Si va
+        // por el borde de una losa (un pilar de esquina o de fachada), fuera de ella puede haber CDT
+        // (lo que la cruce desde fuera: un ábaco, una zona o una banda) y tiene que ser obligatoria
+        if (borde) restringir(x.p, y.p);
         c.push(y.p);
         continue;
       }
