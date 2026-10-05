@@ -4,7 +4,7 @@
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
 >
-> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 superada el 2026-10-05 (`fase-c2.md`): el criterio 8 (tamaño frente a D9) pasa desde la rejilla alineada de H52 en las zonas regulares (decisión C2-a, `rejilla.md`). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). Siguiente: C4 (forjados).
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 superada el 2026-10-05 (`fase-c2.md`): el criterio 8 (tamaño frente a D9) pasa desde la rejilla alineada de H52 en las zonas regulares (decisión C2-a, `rejilla.md`). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). C4 (forjados) en curso desde el 2026-10-05: plan, decisiones y criterios abajo.
 
 ## Entrada, salida y reglas
 
@@ -214,4 +214,85 @@
 6. **Entradas no válidas:** un catálogo de muros, huecos y empujes no válidos da su error con el id físico, sin lanzar.
 7. **Determinismo y huella:** la misma malla en V8 y en JavaScriptCore; la huella no depende del orden de las listas.
 8. **Rendimiento:** el edificio objetivo con un núcleo de muros y muros de sótano compila en una fracción del cálculo.
+9. **Referencia congelada** del modelo analítico y de sus resultados.
+
+## C4: alcance y decisiones
+
+**Modelo físico de C4** (se añade a C3 en `fisico.ts`):
+- `losas[].reticular`: forjado reticular (D3). La losa es la zona aligerada, con nervios en la dirección de su `eje1` y en la perpendicular; su `espesor` es el canto total h.
+  - `intereje` (s, m, entre ejes de nervios, el mismo en las dos direcciones), `nervio` (ancho bw, m) y `capa` (capa de compresión hf, m);
+  - `abacos`: polígonos macizos (multiplicador 1). Pueden salirse de la losa: cuenta su parte dentro;
+  - `multiplicadores` (opcional): sustituyen a los calculados y se aplican sobre la maciza con el ν del material, como en SAP2000.
+  - `pp`: si se da, el peso medio de toda la losa con los ábacos (como el de la tabla C.5 del CTE y el de Cargas por planta). Sin él, γ por el volumen de hormigón de un casetón recuperable en la zona aligerada y γ·h en los ábacos.
+- `panos`: paños de forjado unidireccional (D2), que valen también para placas alveolares y chapa colaborante (barras unidireccionales con su intereje, H46).
+  - Contorno y huecos en planta, como una losa y a ejes (C2-c);
+  - `direccion` de las viguetas (grados desde +X), `intereje` (m) y `seccion` de la vigueta (la T bruta, con bf = intereje, u otra);
+  - `pp` (kN/m²), obligatorio: incluye las bovedillas, que la sección no conoce (H24).
+- Cargas: una carga de superficie puede ir sobre un paño (`pano`) o sobre una zona que lo cubra; las lineales y las puntuales de una planta pueden caer ya en un paño.
+- Opción `modificadores.viguetas`, por material como los de las vigas.
+
+**Cómo se hace el reticular** (D3, H46):
+1. **Multiplicadores de la zona aligerada.** Salen de la sección en T de un nervio (bf = s, hf, bw, h) y reproducen la rigidez de un emparrillado de nervios: E·I_T/s a flexión, sin acoplamiento de Poisson (un emparrillado no lo tiene: la zona aligerada lleva ν = 0 y G compensado). Con G_c = E/(2(1 + ν)) el del hormigón y G₀ = E/2 el de ν = 0:
+   - m11 = m22 = I_T / (s·h³/12);
+   - f11 = f22 = A_T / (s·h);
+   - m12 = (G_c/G₀)·(hf³ + 6·J_w/s) / h³: la torsión de la capa como placa más la de las almas de los nervios de las dos direcciones, igualando la energía (J_w, la de Saint-Venant del rectángulo bw × (h − hf));
+   - v13 = v23 = (G_c/G₀)·bw/s;
+   - f12 = (G_c/G₀)·hf/h (el cortante en su plano lo lleva la capa).
+2. **Ábacos.** Sus lados se siembran en la malla (como las bandas) y cada lámina lleva los multiplicadores si su centroide cae fuera de ellos.
+3. **Peso propio** por lámina (zona aligerada y ábacos). La resultante física se calcula por regiones, sin la malla.
+
+**Cómo se hace el unidireccional** (D2, H46, E2-3):
+1. **Contorno unido.** Un vértice del paño a ≤ ε_snap de un nudo de C1, del eje de una viga o del de un muro se lleva a él (a su cruce, si son dos), con aviso (C2-b). Las viguetas y las cargas van sobre el contorno unido.
+2. **Rectas de las viguetas.** Los paños de una planta con la misma dirección y el mismo intereje que comparten un lado forman un grupo. Sus viguetas siguen las mismas rectas, separadas `intereje`, y son continuas sobre sus apoyos comunes. Las rectas se centran en el ancho W del grupo: n = round(W/s), con la primera a (W − (n − 1)·s)/2 de su borde.
+3. **Tramos y apoyos.** Cada recta se recorta al paño sin sus huecos, y cada trozo es una vigueta.
+   - Sus apoyos son los ejes de vigas y muros que cruza o en los que acaba, las huellas de pilar por las que pasa o en las que acaba, y los bordes de losa en los que acaba.
+   - Un extremo sin apoyo es un voladizo. Una vigueta sin ningún apoyo es un error (mecanismo), y con uno solo, un aviso.
+   - Acabar en el borde de otro paño sin viga entre ellos es un error.
+4. **Nudos.**
+   - Un apoyo a ≤ ε_snap de un nudo que ya existe (de C1, de otra vigueta o un vértice de muro) lo reutiliza.
+   - Si no, el nudo es nuevo: sobre el eje de la viga (que se parte), sobre el del muro (una estación) o en el borde de la losa (un nudo de su malla).
+   - El hueco entre la vigueta y su nudo va en un offset, y en una huella de pilar, con la zona rígida de C1-a.
+5. **Barras:** una por tramo entre apoyos consecutivos, sin nudos intermedios (E2-3).
+6. **Reparto de las cargas** (C4-e) y **diafragma** (C4-g).
+
+**Decisiones por defecto de C4.** Como en C1–C3, cada una es una opción o una regla registrada en las hipótesis:
+
+| # | Decisión | Por defecto | Por qué | Alternativa |
+|---|---|---|---|---|
+| C4-a | Posición de las viguetas | Rectas comunes por grupo de paños contiguos con la misma dirección e intereje, centradas en su ancho (n = round(W/s)) | Las viguetas de dos vanos seguidos tienen que caer en la misma recta para ser continuas: si no, el momento del apoyo pasa por la torsión de la viga (×0,1) y la vigueta queda casi articulada. Centrar deja los bordes a ~s/2 | — |
+| C4-b | Apoyos de las viguetas | Vigas, muros, huellas de pilar y bordes de losa; voladizo con aviso si sólo hay un apoyo; error sin ninguno o en el borde de otro paño sin viga | Un mecanismo no puede llegar al motor sin decirlo, y dos paños se separan siempre por una viga o un zuncho | — |
+| C4-c | Torsión de las viguetas | **Liberada en un extremo** de cada tramo entre apoyos (E2-3); los voladizos la conservan. Sin zona rígida en las vigas (como C1) | La torsión de una vigueta fisurada no cuenta, y con ella haría de muelle al giro de flexión de la viga. Liberarla en los dos extremos dejaría el giro de un nudo sin rigidez | `modificadores.viguetas` |
+| C4-d | Unión de los extremos | Reutiliza el nudo a ≤ ε_snap; si no, un nudo nuevo sobre la viga o el muro, o en el borde de la losa. En una huella de pilar, el nudo del pilar con offset y zona rígida (C1-a, C1-b) | Sin penalizaciones y sin mover la vigueta | — |
+| C4-e | Reparto de las cargas del paño | **Regla de la palanca** en la dirección transversal entre los receptores consecutivos de cada estación (las viguetas y los lados del paño paralelos a ellas que van sobre una viga). Más allá del receptor extremo (un borde libre o sin viga), a esa vigueta con el momento de transporte en sus nudos; más allá del extremo de una vigueta, a su nudo | Exacta en fuerzas y momentos (sin pérdidas) y física: la franja entre la última vigueta y una viga paralela se apoya en las dos. Por tramos entre cortes, cada receptor recibe una carga trapecial estáticamente equivalente | — |
+| C4-f | Peso propio del unidireccional | El `pp` del paño, repartido como C4-e; la vigueta no pesa γ·A. La viga bajo el paño pesa sólo su descuelgue (C2-g con el canto de la vigueta) | El pp incluye las bovedillas (H24) | — |
+| C4-g | Diafragma | En una planta con paños, el rígido abarca los nudos sobre ellos y sobre las losas (C2-f). «ninguno» en una planta con paños es un aviso | Sin la membrana de la capa de compresión, el paño sólo tiene la rigidez en su plano de vigas y viguetas | `diafragma` por planta |
+| C4-h | Multiplicadores del reticular | Del emparrillado de nervios, **con ν = 0 en la zona aligerada** y G compensado. Los dados por el usuario, sobre la maciza con el ν del material | Con ν = 0,2 y m11 = I_T/I_maciza, el modelo es un 4 % más rígido que los nervios (1/(1 − ν²)) y acopla las dos direcciones como una losa, lo que en un recuadro cuadrado sube el momento de vano | `multiplicadores` |
+| C4-i | Peso propio del reticular | `pp` dado: medio, en toda la losa. Sin él: γ·volumen de hormigón (casetón recuperable) en la zona aligerada y γ·h en los ábacos | El pp de la tabla C.5 y de Cargas por planta ya promedia los ábacos | `pp` |
+| C4-j | Resultados | Cada vigueta es una pieza (`<paño>:v<n>`, en orden transversal) con sus esfuerzos por estación (`EsfuerzosPiezas`); las láminas de los ábacos van marcadas en el mapeo | D2: «se ven los esfuerzos por vigueta». El momento por nervio del reticular es M11·s, para C5 | — |
+
+**Lo que C4 deja fuera:**
+- ábacos automáticos alrededor de los pilares (los dibuja el usuario o Concreta);
+- reticular con distinto intereje en cada dirección, casetones no rectangulares y nervios de canto variable;
+- en el unidireccional, la opción de articular las viguetas en sus apoyos, el momento negativo mínimo y las viguetas dobles junto a los huecos;
+- receptores de borde que no sean vigas: un lado paralelo sobre un muro o una losa no recibe carga de la franja de borde, que va a la última vigueta;
+- forjados inclinados y a otra cota que la de su planta.
+
+## C4: criterios de paso
+
+1. **Oráculo a mano del unidireccional.** Una batería de paños pequeños con su modelo analítico escrito a mano, sin el compilador: paño entre dos vigas, vigas paralelas que reciben la franja de borde, dos vanos continuos con voladizo, vigueta que acaba en una huella de pilar, paño oblicuo y paño con un hueco. Desplazamientos y esfuerzos de extremo a ≤ 1e-10. Además, dos vanos iguales sobre muros dan la reacción central de la viga continua (1,25·q·L, H46) a ≤ 1 %.
+2. **Oráculos del reticular:**
+   - los multiplicadores de 25+5, 30+5 y 35+10 frente al cálculo a mano de la T;
+   - la placa de Navier ortótropa con esos multiplicadores, descrita como modelo físico: ≤ 0,5 % en w y M con h = 0,25 y orden ≈ 2;
+   - un recuadro reticular apoyado en su contorno y otro sobre pilares con ábacos frente al emparrillado de nervios como barras (el modelo de CYPECAD, H46): ≤ 3 % en la flecha y ≤ 5 % en el momento por nervio del centro.
+3. **Batería de plantas al azar** con paños (oblicuos, con huecos, voladizos y contiguos) y reticulares con ábacos: el validador de la malla, «sin pérdidas» y el equilibrio pasan en todas, y ninguna vigueta queda en mecanismo.
+4. **Metamórficas:**
+   - reordenar las listas da el mismo modelo bit a bit;
+   - trasladar y girar 90° da la misma malla y las mismas viguetas, y un giro cualquiera, los resultados girados;
+   - un ruido < ε_geom no cambia nada;
+   - invertir el sentido del contorno o girar la dirección 180° da lo mismo;
+   - partir un paño por una viga interior perpendicular a las viguetas da los mismos resultados.
+5. **Sin pérdidas** (≤ 1e-9) en cada compilación, con la resultante física calculada sin viguetas ni malla (polígonos del paño unido, de los ábacos y de la zona aligerada), y equilibrio del motor.
+6. **Entradas no válidas:** un catálogo de paños, reticulares y cargas sobre paños no válidos da su error con el id físico, sin lanzar.
+7. **Determinismo y huella:** el mismo modelo en V8 y en JavaScriptCore; la huella no depende del orden de las listas (tampoco del de los ábacos).
+8. **Rendimiento:** el edificio objetivo con reticular y ábacos (H52 V2) y con unidireccional (V3) compila en una fracción del cálculo y cabe en D9.
 9. **Referencia congelada** del modelo analítico y de sus resultados.
