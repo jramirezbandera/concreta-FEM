@@ -1,0 +1,29 @@
+# Placa de Navier (validacion/e6/sap2000/Prueba sap/CALCULADOS/navier-cortante.s2k): motor y SAP2000 frente a la solución exacta
+
+Multiplicadores de SAP2000: {"m11":1,"m22":1,"m12":1,"v13":0.5,"v23":0.15,"f11":1,"f22":1,"f12":1}
+
+## Centroides de las 1536 áreas (media de los cuatro nudos de cada una)
+
+Errores frente al mayor |Navier| de la componente; «borde» es la fila de áreas que toca un apoyo.
+
+componente | máx. |Navier| | motor: máx. (dónde) | motor: RMS | motor: máx. sin borde | SAP2000: máx. (dónde) | SAP2000: RMS | SAP2000: máx. sin borde
+M11 | 7.0313 | 0.27 % (0.0625, 2.0625) | 0.15 % | 0.25 % | 3.17 % (2.1875, 1.9375) | 2.08 % | 3.17 %
+M22 | 12.2934 | 0.16 % (3.0625, 0.0625) | 0.10 % | 0.15 % | 1.65 % (3.8125, 1.9375) | 1.04 % | 1.65 %
+M12 | 7.9252 | 0.19 % (0.0625, 0.0625) | 0.03 % | 0.09 % | 2.30 % (0.6875, 0.0625) | 0.88 % | 2.15 %
+V13 | 14.1185 | 1.36 % (0.0625, 0.0625) | 0.67 % | 1.32 % | 53.42 % (0.0625, 2.0625) | 28.65 % | 53.01 %
+V23 | 16.2497 | 0.23 % (1.5625, 0.0625) | 0.12 % | 0.19 % | 29.48 % (3.0625, 3.9375) | 16.67 % | 29.13 %
+
+## Centro de la placa (nudo 809; momentos: media de las cuatro áreas en el nudo)
+
+magnitud | Navier | motor | error | SAP2000 | error
+w (m) | -0.000308755 | -0.000308646 | 0.04 % | -0.000302035 | 2.18 %
+M11 (kN·m/m) | 7.03918 | 7.05126 | 0.17 % | 6.84692 | -2.73 %
+M22 (kN·m/m) | 12.3089 | 12.3254 | 0.13 % | 12.5257 | 1.76 %
+
+## Reacción vertical por par de lados (kN)
+
+lado | Navier (∫Qn) | motor | SAP2000
+lados x = 0, 6 | 87.35 | 87.85 | 133.11
+lados y = 0, 4 | 151.37 | 152.69 | 106.21
+esquinas | 0.00 | -0.54 | 0.68
+total | 238.72 (la serie de Qn converge despacio en las esquinas) | 240.00 | 240.00

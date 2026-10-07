@@ -1,0 +1,29 @@
+# Placa de Navier (validacion/e6/sap2000/Prueba sap/CALCULADOS/navier-flexion.s2k): motor y SAP2000 frente a la solución exacta
+
+Multiplicadores de SAP2000: {"m11":1,"m22":0.3,"m12":0.2,"v13":1,"v23":1,"f11":1,"f22":1,"f12":1}
+
+## Centroides de las 1536 áreas (media de los cuatro nudos de cada una)
+
+Errores frente al mayor |Navier| de la componente; «borde» es la fila de áreas que toca un apoyo.
+
+componente | máx. |Navier| | motor: máx. (dónde) | motor: RMS | motor: máx. sin borde | SAP2000: máx. (dónde) | SAP2000: RMS | SAP2000: máx. sin borde
+M11 | 17.8310 | 0.11 % (2.9375, 2.0625) | 0.10 % | 0.11 % | 0.11 % (5.9375, 1.9375) | 0.05 % | 0.10 %
+M22 | 11.4726 | 0.17 % (3.0625, 3.9375) | 0.09 % | 0.16 % | 0.17 % (3.0625, 0.0625) | 0.13 % | 0.16 %
+M12 | 4.2177 | 0.17 % (0.0625, 3.9375) | 0.03 % | 0.10 % | 0.56 % (5.9375, 3.9375) | 0.08 % | 0.32 %
+V13 | 18.0110 | 1.48 % (5.8125, 1.9375) | 0.79 % | 1.48 % | 13.82 % (0.0625, 1.9375) | 6.23 % | 13.81 %
+V23 | 14.5297 | 3.38 % (2.9375, 3.9375) | 1.87 % | 3.30 % | 10.17 % (0.9375, 3.9375) | 5.65 % | 10.12 %
+
+## Centro de la placa (nudo 809; momentos: media de las cuatro áreas en el nudo)
+
+magnitud | Navier | motor | error | SAP2000 | error
+w (m) | -0.000811220 | -0.000811120 | 0.01 % | -0.000811082 | 0.02 %
+M11 (kN·m/m) | 17.8555 | 17.8712 | 0.09 % | 17.8840 | 0.16 %
+M22 (kN·m/m) | 11.4872 | 11.5025 | 0.13 % | 11.4961 | 0.08 %
+
+## Reacción vertical por par de lados (kN)
+
+lado | Navier (∫Qn) | motor | SAP2000
+lados x = 0, 6 | 107.35 | 110.32 | 93.87
+lados y = 0, 4 | 131.37 | 132.75 | 145.55
+esquinas | 0.00 | -3.06 | 0.59
+total | 238.72 (la serie de Qn converge despacio en las esquinas) | 240.00 | 240.00

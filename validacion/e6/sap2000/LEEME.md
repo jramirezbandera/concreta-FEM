@@ -71,6 +71,23 @@ Para saber si lo del cortante viene de v13 y v23 o es propio del Shell-Thick de 
 
 Se generan con `bun validacion/e6/sap2000/navier.ts isotropa` (`flexion`, `cortante`). Cada una se analiza igual, con `analizar-navier.ts`.
 
+**Resultado (SAP2000 v21, 2026-10-07; `out_navier_sap_<variante>.txt`):** la isótropa sale exacta en SAP2000 (V ≤ 0,4 %), así que su Shell-Thick está bien; lo que se separa son los multiplicadores:
+
+| variante | SAP2000: momentos | SAP2000: V13, V23 | SAP2000: reacción por lado | motor: momentos | motor: V13, V23 | motor: reacción por lado |
+|---|---|---|---|---|---|---|
+| isótropa | ≤ 0,5 % | ≤ 0,4 % | 0,5 % | ≤ 0,3 % | ≤ 2,6 % | 2,4 % |
+| sólo flexión | ≤ 0,6 % | ≤ 14 % | 13 % | ≤ 0,2 % | ≤ 3,4 % | 2,8 % |
+| sólo cortante | ≤ 3,2 % | ≤ 53 % | 52 % | ≤ 0,3 % | ≤ 1,4 % | 0,9 % |
+| ortótropa | ≤ 1 % | ≤ 21 % | 24 % | ≤ 0,2 % | ≤ 0,9 % | 0,9 % |
+
+(Errores frente a Navier, en los centroides y relativos al máximo de cada componente; el V del motor es el bruto del elemento, sin SPR.)
+
+En la práctica, con SAP2000:
+
+- los multiplicadores de flexión hacen lo que se espera: los momentos y la flecha son fiables;
+- v13 y v23 no actúan como una rigidez a cortante por dirección: en flecha y momentos, SAP2000 se comporta como si los dos valieran ~0,25–0,28 (≈ √(v13·v23));
+- con cualquier multiplicador, **los V13 y V23 de un Shell-Thick y el reparto de reacciones entre apoyos no son fiables** (del 10 al 50 %): no sirven para comprobar cortante ni punzonamiento.
+
 ## 2. Tus modelos (reticular con ábacos, unidireccional con viguetas)
 
 1. En SAP2000:
