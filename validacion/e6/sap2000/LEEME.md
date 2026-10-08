@@ -98,6 +98,8 @@ En la práctica, con SAP2000:
 
 Resultado: el motor coincide con SAP2000 en reacciones (0,03 %), pilares (≤ 1,4 %), flecha máxima (0,7 %) y momentos M11, M22 de la losa (≤ 1,4 %). Los multiplicadores del compilador dan un 3 % más de flecha y ≤ 3,3 % en los momentos que dimensionan. Las salidas están en `out_reticular_*.txt`.
 
+**Unidireccional (2026-10-08, hallazgos E6-13 y E6-14):** `comparar.ts` da el motor igual a SAP2000 a precisión de máquina. `unidireccional-d2.ts <modelo.s2k>` mide, uno a uno, los criterios del compilador sobre ese edificio (palanca, torsión de las viguetas, colocación de las viguetas, diafragma, D4 y zona rígida); salida en `out_unidireccional_d2.txt`.
+
 1. En SAP2000:
    - **File > Export > SAP2000 .s2k Text File** con el modelo;
    - las tablas de resultados de los casos estáticos lineales: **Joint Displacements**, **Joint Reactions**, **Element Forces – Frames** y **Element Forces – Area Shells**.

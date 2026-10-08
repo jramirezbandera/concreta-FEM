@@ -115,6 +115,7 @@
 - **2026-10-07: las tres variantes de Navier calculadas en SAP2000** (E6-11 completo). La isótropa sale exacta en SAP2000; con multiplicadores, sus V13, V23 y el reparto de reacciones se separan de Navier del 10 al 50 %, y v13 y v23 no actúan por dirección. El motor queda a ≤ 3,4 % en todo (momentos ≤ 0,3 %). En el periodo en sombra, con multiplicadores no se compara el cortante de SAP2000.
 - **2026-10-08: el reticular de SAP2000 del usuario comparado** (E6-12). El motor coincide con SAP2000 en lo que dimensiona: reacciones 0,03 %, pilares ≤ 1,4 %, flecha máxima 0,7 %, M11 y M22 de la losa ≤ 1,4 %. Con los multiplicadores del compilador (C4-h), +3 % de flecha y ≤ 3,3 % en los momentos que dimensionan, así que C4-h queda contrastada. El lector traduce ya las cargas «gravity».
 - **2026-10-08: el unidireccional de SAP2000 del usuario coincide a precisión de máquina** (E6-13), tras corregir en el comparador el lado del salto en los nudos intermedios de las barras.
+- **2026-10-08: D2 contrastada con el unidireccional del usuario** (E6-14). Con la misma carga, el compilador da los esfuerzos de viguetas y pilares a ≤ 3,4 % del modelo del usuario. Lo que pesa es la regla de la palanca: el usuario carga las vigas paralelas como una vigueta entera, y eso da +11 % de carga total y +23 % en los pilares de borde.
 - **2026-10-04: fase C1 del compilador superada** (barras). Pasan los ocho criterios. El plan del compilador está en `docs/fem3d/compilador.md` (fases C1–C5) y el informe, en `docs/fem3d/fase-c1.md`, con criterios, hallazgos C1-1…C1-5 y pendientes.
   - **Ya en `src/compilador/`:**
     - modelo físico: plantas de arriba abajo con su altura, como `lib/edificio`; pilares, vigas en polilínea, apoyos y cargas (convenios en la cabecera de `fisico.ts`);
@@ -178,7 +179,6 @@
 - **Siguiente paso:**
   - el usuario confirma las decisiones de C3 y las de la rejilla (`rejilla.md`, §4);
   - compilador C5 (bandas automáticas de D5, machones y dinteles como cortes, consultas por objeto físico);
-  - contrastar D2 (el unidireccional del compilador) con el modelo SAP2000 del usuario, como C4-h con el reticular;
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - capa de agente (propuesta del 2026-10-05, `docs/fem3d/agente.md`): fichero de proyecto con esquema, CLI, consultas, sensatez del modelo e informe de revisión (A0–A7). Decididas A-a…A-d: A0–A2 justo después de C5. A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
