@@ -206,7 +206,9 @@ function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[]
         const e = semiextension(huellaDe.get(q.id)!, d);
         return [redondear(Math.max(0, q.s - e - s0)), redondear(Math.min(s1 - s0, q.s + e - s0))] as [number, number];
       })
-      .filter(([a, c]) => c >= a);
+      .filter(([a, c]) => c >= a)
+      .filter(([a, c], i, todos) => todos.findIndex(([x, y]) => x === a && y === c) === i)
+      .sort((x, y) => x[0] - y[0] || x[1] - y[1]);
   const nueva = (id: string, tipo: "pilares" | "central", s0: number, s1: number, tMenos: number, tMas: number, apoyos: [number, number][]) => {
     const tc = (tMenos + tMas) / 2;
     const desde = punto(d, n, s0, tc).map(redondear) as unknown as Vec2;

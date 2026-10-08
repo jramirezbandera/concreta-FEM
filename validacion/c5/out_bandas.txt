@@ -1,0 +1,32 @@
+# validacion/c5/bandas.ts — 2026-10-08: bandas propuestas en la losa plana de H25
+
+Diagnósticos de la propuesta: ninguno
+
+banda | tipo | eje | ancho (m) | apoyos (m desde el comienzo)
+LOSA:1:P1 | pilares | (0, 0.75) → (12, 0.75) | 1.5 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:1:P2 | pilares | (0, 6) → (12, 6) | 3 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:1:P3 | pilares | (0, 11.25) → (12, 11.25) | 1.5 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:1:C1-2 | central | (0, 3) → (12, 3) | 3 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:1:C2-3 | central | (0, 9) → (12, 9) | 3 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:2:P1 | pilares | (0.75, 0) → (0.75, 12) | 1.5 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:2:P2 | pilares | (6, 0) → (6, 12) | 3 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:2:P3 | pilares | (11.25, 0) → (11.25, 12) | 1.5 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:2:C1-2 | central | (3, 0) → (3, 12) | 3 | 0–0.3, 5.7–6.3, 11.7–12
+LOSA:2:C2-3 | central | (9, 0) → (9, 12) | 3 | 0–0.3, 5.7–6.3, 11.7–12
+
+## Cara x = 6,3 del pilar central (dirección 1, alineación y = 6), caso q
+
+h (m) | banda de pilares 3 m (kN·m) | centrales C1-2 + C2-3 (kN·m) | pórtico virtual de 6 m, corte exacto (kN·m) | pilares / pórtico | toda la losa (kN·m) | WA cara, superior X: (a) / (b) (kN·m/m) | WA vano, inferior X: (a) / (b)
+1 | -203.0 | -85.3 | -259.7 | 78.2 % | -409.4 | 67.7 / 86.5 | 26.2 / 27.4
+0.5 | -203.9 | -86.3 | -261.0 | 78.1 % | -411.8 | 68.0 / 88.7 | 26.1 / 27.3
+0.25 | -204.7 | -86.1 | -261.7 | 78.2 % | -413.1 | 68.2 / 91.4 | 25.9 / 27.2
+
+## Wood–Armer en la banda de pilares interior (h = 0,25), caso q (kN·m/m)
+
+estación | s (m) | método | inferior X | inferior Y | superior X | superior Y
+cara | 6.30 | (a) medios | 0.0 | 0.0 | 68.2 | 41.2
+cara | 6.30 | (b) puntos | 0.0 | 0.0 | 91.4 | 47.3
+vano | 9.00 | (a) medios | 25.9 | 0.0 | 0.0 | 6.6
+vano | 9.00 | (b) puntos | 27.2 | 0.6 | 0.0 | 6.9
+
+Referencia: la rejilla fina de E5 (h = 0,075 m) con el mismo modelo, en la cara: banda de pilares de 3 m −205,58 kN·m y pórtico de 6 m −262,71 (`validacion/c2/out_losa_plana.txt`); la banda de pilares lleva el 78,3 %. Las cifras de la tabla de H25 (211 / 264 / 261 y 331 / 337 / 337) son de su experimento con PyNite, con otro pilar.
