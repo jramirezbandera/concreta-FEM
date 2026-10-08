@@ -334,6 +334,13 @@ export interface Banda {
   desde: Vec2;
   hasta: Vec2;
   ancho: number;
+  /** C5: banda de pilares o central (Anejo I). Una banda dibujada por el usuario puede no tenerlo. */
+  tipo?: "pilares" | "central";
+  /**
+   * C5 (D5): "propuesta" si la dio `proponerBandas` y no se ha tocado; "usuario" si la creó o la
+   * editó (la memoria las distingue). Por defecto, "usuario".
+   */
+  origen?: "propuesta" | "usuario";
 }
 
 /** Hueco de un muro (C3): rectángulo en su alzado, dentro de un tramo. */

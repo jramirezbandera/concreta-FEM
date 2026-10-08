@@ -599,6 +599,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     if (!vec2(b.desde) || !vec2(b.hasta)) mal(b.id, "desde y hasta tienen que ser pares [x, y] de números");
     else if (!(Math.sqrt((b.hasta[0] - b.desde[0]) ** 2 + (b.hasta[1] - b.desde[1]) ** 2) > op.epsGeom)) mal(b.id, "desde y hasta coinciden");
     if (!pos(b.ancho)) mal(b.id, "el ancho tiene que ser un número > 0 (m)");
+    if (b.tipo !== undefined && b.tipo !== "pilares" && b.tipo !== "central") mal(b.id, "el tipo tiene que ser \"pilares\" o \"central\"");
+    if (b.origen !== undefined && b.origen !== "propuesta" && b.origen !== "usuario") mal(b.id, "el origen tiene que ser \"propuesta\" o \"usuario\"");
   }
 
   // Muros (C3)
