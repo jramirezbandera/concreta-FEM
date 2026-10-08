@@ -4,6 +4,7 @@
  * de C1–C4 nombrando el id físico. Además, los mensajes del validador.
  */
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { RUTA_ESQUEMA, textoEsquema } from "../../scripts/generar-esquema.ts";
 import { modelosValidos } from "../../validacion/a0/modelos.ts";
@@ -21,6 +22,15 @@ describe("criterio 1 de A0: el esquema", () => {
   it("el versionado es el que sale de los tipos (bun scripts/generar-esquema.ts)", () => {
     expect(readFileSync(RUTA_ESQUEMA, "utf8").replace(/\r\n/g, "\n")).toBe(textoEsquema());
   }, 120_000);
+
+  it("el ejemplo de la skill (.claude/skills/fem/ejemplo.json) es válido y compila sin avisos", () => {
+    const r = leerProyecto(readFileSync(join(import.meta.dirname, "..", "..", ".claude", "skills", "fem", "ejemplo.json"), "utf8"));
+    expect(r.diagnosticos).toEqual([]);
+    if (!r.valido) return;
+    const c = compilar(r.proyecto.modelo, r.proyecto.opciones);
+    expect(c.diagnosticos).toEqual([]);
+    expect(c.valido).toBe(true);
+  });
 
   const validos = modelosValidos();
   it(`acepta los ${validos.length} modelos válidos de C1–C5 (tras pasar por JSON)`, () => {
