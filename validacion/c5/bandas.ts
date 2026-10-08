@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { proponerBandas } from "../../src/compilador/bandas.ts";
 import { compilar } from "../../src/compilador/compilar.ts";
 import { EsfuerzosBandas, woodArmerEstacion, type EstacionResultado } from "../../src/compilador/esfuerzosBandas.ts";
+import type { ModeloFisico } from "../../src/compilador/fisico.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { Cortes } from "../../src/motor/cortes.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
