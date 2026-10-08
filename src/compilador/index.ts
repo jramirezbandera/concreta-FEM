@@ -14,6 +14,7 @@ export { EsfuerzosPiezas, type TramoFlexible } from "./resultados.ts";
 export { proponerBandas, type PropuestaBandas } from "./bandas.ts";
 export { EsfuerzosBandas, woodArmerEstacion, DELTA_MUESTRAS, type EstacionResultado, type MetodoWoodArmer } from "./esfuerzosBandas.ts";
 export { estacionesBanda, ejesBanda, type EstacionBanda } from "./estaciones.ts";
+export { EsfuerzosMuros, DELTA_BORDE, type Dintel, type EsfuerzosCorte, type Machon } from "./esfuerzosMuros.ts";
 export { FACTOR_ZONA_RIGIDA, MODIFICADORES_D4, TAMANO_MALLA } from "./fisico.ts";
 export { JACOBIANO_BAJO, VERSIONES_MALLADOR } from "./mallado.ts";
 export type {
