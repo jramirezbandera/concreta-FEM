@@ -1,0 +1,23 @@
+# validacion/c5/etabs15c.ts — 2026-10-08: machones y dinteles de ETABS 15c frente a OpenSeesPy ASDShellQ4
+
+Los mismos cortes por fuerzas nodales, calculados en Python con las fuerzas de los elementos de OpenSees. La diferencia es la peor de cada componente, relativa a su mayor valor en las piezas del modelo. Ninguno de los cortes cruza una restricción.
+
+modelo | h (in) | pieza | componente: peor diferencia (pieza) | Σ Vy de las bases de los machones por planta / P
+15c-3-60 | 20 | machon | N 0.92 % (M:N1:T1:M1:cabeza); Vy 1.23 % (M:N1:T1:M1:cabeza); Mz 0.54 % (M:N1:T1:M1:cabeza) | 1.000000000000, 1.000000000000, 1.000000000000
+15c-3-60 | 20 | dintel | N 1.92 % (M:H1:inicio); Vz 0.39 % (M:H3:inicio); My 1.03 % (M:H1:inicio) | 
+15c-3-60 | 10 | machon | N 0.23 % (M:N1:T1:M2:base); Vy 0.50 % (M:N1:T1:M1:cabeza); Mz 0.24 % (M:N1:T1:M1:base) | 1.000000000000, 1.000000000001, 1.000000000001
+15c-3-60 | 10 | dintel | N 1.03 % (M:H1:inicio); Vz 0.28 % (M:H3:fin); My 1.12 % (M:H1:inicio) | 
+15c-3-240 | 20 | machon | N 5.90 % (M:N1:T1:M1:cabeza); Vy 1.00 % (M:N1:T1:M1:cabeza); Mz 0.75 % (M:N1:T1:M1:cabeza) | 1.000000000000, 1.000000000000, 1.000000000000
+15c-3-240 | 20 | dintel | N 1.07 % (M:H1:inicio); Vz 0.92 % (M:H3:fin); My 2.35 % (M:H1:inicio) | 
+15c-3-240 | 10 | machon | N 0.40 % (M:N1:T1:M1:cabeza); Vy 0.44 % (M:N1:T1:M1:cabeza); Mz 0.14 % (M:N2:T1:M1:base) | 1.000000000000, 1.000000000000, 1.000000000000
+15c-3-240 | 10 | dintel | N 0.52 % (M:H1:inicio); Vz 0.40 % (M:H3:fin); My 1.01 % (M:H1:inicio) | 
+15c-6-60 | 20 | machon | N 0.48 % (M:N1:T1:M1:cabeza); Vy 1.51 % (M:N1:T1:M1:cabeza); Mz 0.45 % (M:N1:T1:M1:cabeza) | 1.000000000000, 1.000000000000, 1.000000000001, 1.000000000001, 1.000000000001, 1.000000000001
+15c-6-60 | 20 | dintel | N 2.29 % (M:H1:inicio); Vz 0.39 % (M:H6:fin); My 1.14 % (M:H1:inicio) | 
+15c-6-60 | 10 | machon | N 0.10 % (M:N1:T1:M2:base); Vy 0.73 % (M:N3:T1:M1:cabeza); Mz 0.18 % (M:N1:T1:M1:base) | 1.000000000000, 1.000000000001, 1.000000000002, 1.000000000003, 1.000000000003, 1.000000000003
+15c-6-60 | 10 | dintel | N 1.38 % (M:H1:inicio); Vz 0.16 % (M:H6:fin); My 1.11 % (M:H1:inicio) | 
+15c-6-240 | 20 | machon | N 2.14 % (M:N1:T1:M1:cabeza); Vy 1.57 % (M:N4:T1:M2:cabeza); Mz 0.56 % (M:N2:T1:M1:base) | 1.000000000000, 1.000000000000, 0.999999999999, 0.999999999999, 0.999999999999, 0.999999999999
+15c-6-240 | 20 | dintel | N 0.92 % (M:H1:inicio); Vz 0.52 % (M:H6:fin); My 1.62 % (M:H1:inicio) | 
+15c-6-240 | 10 | machon | N 0.20 % (M:N2:T1:M2:base); Vy 0.63 % (M:N1:T1:M1:cabeza); Mz 0.27 % (M:N2:T1:M1:base) | 0.999999999998, 0.999999999998, 0.999999999997, 0.999999999997, 0.999999999997, 0.999999999997
+15c-6-240 | 10 | dintel | N 0.55 % (M:H5:fin); Vz 0.27 % (M:H5:fin); My 0.74 % (M:H1:inicio) | 
+
+Con h = 20 in, lo peor está en la cabeza del machón de la planta baja, junto a la esquina del hueco (el axil, hasta un 5,9 % con dinteles de 240 in); con h = 10 in todo queda por debajo del 1,4 %: es la diferencia entre los dos elementos junto a la esquina, que se reduce al refinar. La estática cuadra a precisión de máquina. Unidades del modelo: kN y m (1 in = 0.0254 m).

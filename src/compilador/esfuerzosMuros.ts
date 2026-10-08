@@ -41,6 +41,13 @@ export interface EsfuerzosCorte {
   /** Barras que atraviesan el corte. */
   barras: string[];
   valido: boolean;
+  /**
+   * El corte del motor que se ha calculado (`Cortes`). Con `invertido` (la base de un machón y el
+   * inicio de un dintel, para dejar sus láminas en el lado A), su normal va al revés y los esfuerzos
+   * son los suyos con Vz y Mz cambiados de signo.
+   */
+  corte: Corte;
+  invertido: boolean;
 }
 
 export interface Machon {
@@ -143,7 +150,7 @@ export class EsfuerzosMuros {
     const r: ResultadoCorte = this.cortes.cortar(corte, this.casos, this.campos);
     const esfuerzos = Float64Array.from(r.esfuerzos);
     if (invertido) for (let k = 0; k < esfuerzos.length / 6; k++) for (const q of [2, 5]) esfuerzos[6 * k + q] = -esfuerzos[6 * k + q]!;
-    return { esfuerzos, origen: c.origen, barras: r.barras.map((i) => this.modelo.barras![i]!.id), valido: r.valido };
+    return { esfuerzos, origen: c.origen, barras: r.barras.map((i) => this.modelo.barras![i]!.id), valido: r.valido, corte, invertido };
   }
 
   /** Machones del muro, por tramo y planta (de arriba abajo); null si el muro no existe. */

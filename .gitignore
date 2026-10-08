@@ -31,6 +31,8 @@ spike/e0/datos/
 
 # Validación E6: modelos exportados para el oráculo (se regeneran con validacion/e6/modelos-oraculo.ts)
 validacion/e6/modelos-oraculo.json
+# Validación C5: machones y dinteles de ETABS 15c para el oráculo (validacion/c5/etabs15c-modelos.ts)
+validacion/c5/etabs15c-modelos.json
 validacion/e6/tmp/
 validacion/e6/sap2000/*.$2k
 validacion/e6/sap2000/*.comparacion.txt
