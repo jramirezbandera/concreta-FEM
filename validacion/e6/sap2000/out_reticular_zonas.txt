@@ -21,12 +21,12 @@ V23 (máx |SAP| en centroides 33.77)
   V23 áreas que tocan un pilar: máx 13.4 % en (9.5, -3.5) [motor 38.30, SAP 33.77], RMS 8.5 %
   V23 resto del ábaco: máx 17.8 % en (-9.5, 4.5) [motor -10.30, SAP -16.33], RMS 9.6 %
   V23 aligerada: máx 9.5 % en (5.5, 7.5) [motor 3.56, SAP 0.37], RMS 3.7 %
-viga P: máx |SAP| 1.08; máx dif 0.52 (47.8 %) en 47@5
-viga V2: máx |SAP| 10.41; máx dif 4.52 (43.4 %) en 29@1
-viga V3: máx |SAP| 0.08; máx dif 0.11 (133.1 %) en 44@1
-viga T: máx |SAP| 1.41; máx dif 1.27 (89.9 %) en 29@1
-viga M2: máx |SAP| 0.05; máx dif 0.03 (48.0 %) en 29@5
-viga M3: máx |SAP| 10.85; máx dif 3.21 (29.6 %) en 29@4
+viga P: máx |SAP| 1.08; máx dif 0.08 (7.6 %) en 44@5
+viga V2: máx |SAP| 10.41; máx dif 1.90 (18.3 %) en 60@6
+viga V3: máx |SAP| 0.08; máx dif 0.02 (20.7 %) en 47@3
+viga T: máx |SAP| 1.41; máx dif 0.40 (28.6 %) en 28@5
+viga M2: máx |SAP| 0.05; máx dif 0.01 (28.2 %) en 28@5
+viga M3: máx |SAP| 10.85; máx dif 0.96 (8.8 %) en 47@0
 pilar P: máx |SAP| 232.59; máx dif 0.07 (0.0 %) en 19@0
 pilar V2: máx |SAP| 4.46; máx dif 0.05 (1.2 %) en 2@0
 pilar V3: máx |SAP| 4.67; máx dif 0.06 (1.4 %) en 9@0

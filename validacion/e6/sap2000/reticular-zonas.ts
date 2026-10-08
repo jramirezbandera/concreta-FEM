@@ -98,10 +98,13 @@ for (const f of sap.get("ELEMENT FORCES - FRAMES") ?? []) {
   const b = imp.barras.get(f.Frame!);
   if (!b) continue;
   const st = num(f, "Station") * imp.longitud;
-  const tr = b.trozos.find((t) => st >= t.s0 - 1e-9 && st <= t.s1 + 1e-9);
+  // dos filas en un nudo intermedio: el final de un elemento (ElemStation > 0) y el principio del siguiente
+  const alFinal = f.ElemStation !== undefined ? num(f, "ElemStation") > 1e-9 : undefined;
+  const dentro = (t: { s0: number; s1: number }) => st >= t.s0 - 1e-9 && st <= t.s1 + 1e-9;
+  const tr = (alFinal === true ? b.trozos.find((t) => dentro(t) && st > t.s0 + 1e-9) : alFinal === false ? b.trozos.find((t) => dentro(t) && st < t.s1 - 1e-9) : undefined) ?? b.trozos.find(dentro);
   if (!tr) continue;
   const x = Math.min(Math.max(st - tr.s0, 0), tr.s1 - tr.s0);
-  const e = diag.diagrama(tr.barra, k, r.casos[k]!).esfuerzosEn(x, x >= tr.s1 - tr.s0 ? -1 : 1);
+  const e = diag.diagrama(tr.barra, k, r.casos[k]!).esfuerzosEn(x, (alFinal ?? x >= tr.s1 - tr.s0) ? -1 : 1);
   const [N, Vy, Vz, T, My, Mz] = e as unknown as number[];
   const s = ["P", "V2", "V3", "T", "M2", "M3"].map((c) => num(f, c));
   const m = [N!, Vz!, -Vy!, T!, -Mz!, My!];

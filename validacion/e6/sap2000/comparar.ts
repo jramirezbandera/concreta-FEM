@@ -17,7 +17,7 @@ import { DiagramasBarras } from "../../../src/motor/barras.ts";
 import { ResultantesLaminas } from "../../../src/motor/laminas.ts";
 import type { ResultadoCaso } from "../../../src/motor/modelo.ts";
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
-import { importarS2k, type Importado } from "./importar.ts";
+import { importarS2k, type Importado, type Trozo } from "./importar.ts";
 import { leerTablas, num, type Tablas } from "./s2k.ts";
 
 /** Diferencias de un grupo de magnitudes: la mayor absoluta frente al mayor valor de SAP2000, y dónde. */
@@ -115,15 +115,22 @@ export function compararConSap(imp: Importado, porPatron: ResultadoCaso[], resul
       const sap = imp.barras.get(r.Frame!);
       if (!sap) continue;
       const s = num(r, "Station") * L;
-      // las estaciones en las zonas rígidas no se comparan
-      const tr = sap.trozos.find((t) => s >= t.s0 - 1e-9 && s <= t.s1 + 1e-9);
+      // En un nudo intermedio SAP2000 da dos filas con la misma estación: el final de un elemento
+      // (ElemStation > 0) y el principio del siguiente (ElemStation = 0). Cada una se compara con su
+      // lado del salto. Las estaciones en las zonas rígidas no se comparan.
+      const alFinal = r.ElemStation !== undefined ? num(r, "ElemStation") > 1e-9 : undefined;
+      const dentro = (t: Trozo) => s >= t.s0 - 1e-9 && s <= t.s1 + 1e-9;
+      const tr =
+        (alFinal === true ? sap.trozos.find((t) => dentro(t) && s > t.s0 + 1e-9) : alFinal === false ? sap.trozos.find((t) => dentro(t) && s < t.s1 - 1e-9) : undefined) ??
+        sap.trozos.find(dentro);
       if (!tr) continue;
       const x = Math.min(Math.max(s - tr.s0, 0), tr.s1 - tr.s0);
+      const lado = (alFinal ?? x >= tr.s1 - tr.s0) ? -1 : 1;
       const e = [0, 0, 0, 0, 0, 0];
       imp.patrones.forEach((_, k) => {
         const f = c.peso(k);
         if (!f) return;
-        const v = diagrama(tr.barra, k).esfuerzosEn(x, x >= tr.s1 - tr.s0 ? -1 : 1);
+        const v = diagrama(tr.barra, k).esfuerzosEn(x, lado);
         for (let g = 0; g < 6; g++) e[g]! += f * v[g]!;
       });
       const [N, Vy, Vz, T, My, Mz] = e as [number, number, number, number, number, number];
