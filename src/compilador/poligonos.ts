@@ -289,3 +289,34 @@ export function areaInterseccionRegiones(a: Region, b: Region): number {
   for (const h of b.huecos) A -= momentosInterseccion(a, h).A;
   return A;
 }
+
+/**
+ * Fracción del segmento ab que cae dentro de alguna de las regiones (en tantos por uno de su
+ * longitud): se parte por sus cruces con los bordes y se mira el punto medio de cada trozo. Un
+ * segmento entero dentro (sin cruces en su interior) da exactamente 1.
+ */
+export function fraccionEnRegiones(a: Vec2, b: Vec2, regiones: readonly Region[]): number {
+  const d: Vec2 = [b[0] - a[0], b[1] - a[1]];
+  const ts = [0, 1];
+  for (const r of regiones)
+    for (const p of [r.contorno, ...r.huecos])
+      for (let i = 0, n = p.length; i < n; i++) {
+        const [c, e] = [p[i]!, p[(i + 1) % n]!];
+        const f: Vec2 = [e[0] - c[0], e[1] - c[1]];
+        const den = d[0] * f[1] - d[1] * f[0];
+        if (den === 0) continue;
+        const w: Vec2 = [c[0] - a[0], c[1] - a[1]];
+        const t = (w[0] * f[1] - w[1] * f[0]) / den;
+        const u = (w[0] * d[1] - w[1] * d[0]) / den;
+        if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
+      }
+  ts.sort((x, y) => x - y);
+  let s = 0;
+  for (let i = 0; i + 1 < ts.length; i++) {
+    const [t0, t1] = [ts[i]!, ts[i + 1]!];
+    if (!(t1 > t0)) continue;
+    const m: Vec2 = [a[0] + ((t0 + t1) / 2) * d[0], a[1] + ((t0 + t1) / 2) * d[1]];
+    if (regiones.some((r) => puntoEnRegion(m, r))) s += t1 - t0;
+  }
+  return s;
+}

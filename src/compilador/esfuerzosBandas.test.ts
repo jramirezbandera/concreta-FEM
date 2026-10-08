@@ -146,6 +146,61 @@ describe("integración exacta (C5, criterio 2)", () => {
   });
 });
 
+describe("huecos y bandas editadas (C5, criterio 1)", () => {
+  it("un hueco que corta las bandas: el ancho en losa de cada estación, y una estación entera en el hueco no vale", () => {
+    // Hueco [8, 10] × [6, 9] en el vano x = 6–12: tapa la central y = 6,25–8,75 entera en x = 9 y
+    // 0,25 m de cada banda de pilares vecina
+    const base = losaPlana();
+    const f0: ModeloFisico = { ...base, losas: [{ ...base.losas![0]!, huecos: [rect(8, 6, 10, 9)] }], cargas: [] };
+    const f = { ...f0, bandas: proponerBandas(f0).bandas };
+    const r = compilar(f, { tamanoMalla: 0.5 });
+    if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
+    const cs = casosValidos(calcular(r.modelo));
+    const e2 = new EsfuerzosBandas(f, r.modelo, cs);
+    const en = (id: string, s: number) => e2.estaciones(id)!.find((x) => Math.abs(x.s - s) < 1e-9)!;
+    const central = en("L:1:C2-3", 9);
+    expect(central.valido).toBe(false);
+    expect(central.anchoEnLosa).toBe(0);
+    expect(central.diagnosticos.map((d) => d.codigo)).toContain("banda/estacion-sin-losa");
+    expect(Array.from(central.medios).every(Number.isNaN)).toBe(true);
+    for (const id of ["L:1:P2", "L:1:P3"]) {
+      const e = en(id, 9);
+      expect(e.valido).toBe(true);
+      expect(e.anchoEnLosa).toBeCloseTo(2.25, 12);
+      expect(e.medios[0]).toBeCloseTo(e.esfuerzos[4]! / 2.25, 12);
+    }
+    // Las demás estaciones, enteras en la losa: el ancho de la banda, exacto
+    expect(en("L:1:P2", 3).anchoEnLosa).toBe(2.5);
+    // Las bandas que cruzan x = 9 suman el corte de toda la losa (el hueco no tiene nada)
+    const toda = new Cortes(r.modelo).cortar({ origen: [9, 7.5, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [-7.5, 7.5], z: [0, 0], metodo: "campos" }, cs, (e2 as unknown as { campos: import("../motor/campos.ts").CamposLaminas }).campos);
+    let My = 0;
+    for (const id of e2.bandas.filter((x) => x.startsWith("L:1:"))) My += en(id, 9).esfuerzos[4]!;
+    expect(rel(My, toda.esfuerzos[4]!)).toBeLessThan(1e-9);
+  });
+
+  it("las bandas editadas se respetan tal cual: su geometría en la malla y en sus estaciones", () => {
+    const f0 = losaPlana();
+    const propuestas = proponerBandas(f0).bandas;
+    // La de pilares de y = 5, movida 0,5 m y con 2 m de ancho; y una nueva, sin apoyos, en y = 13. Lo
+    // editado a menos de ε_snap de otra línea se une a ella, como cualquier geometría (C2)
+    const bandas = propuestas.map((b) => (b.id === "L:1:P2" ? { ...b, desde: [0, 5.5] as Vec2, hasta: [18, 5.5] as Vec2, ancho: 2, origen: "usuario" as const } : b));
+    bandas.push({ id: "U", planta: "P1", desde: [1, 13], hasta: [17, 13], ancho: 1, origen: "usuario" });
+    const f = { ...f0, bandas };
+    const r = compilar(f, { tamanoMalla: 0.5 });
+    if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
+    // Sus bordes, en la malla (y = 4,5 y 6,5; y = 12,5 y 13,5 de x = 1 a 17)
+    const enLinea = (y: number, x0: number, x1: number) => r.modelo.nudos.filter((n) => Math.abs(n.y - y) < 1e-9 && n.x > x0 + 0.1 && n.x < x1 - 0.1).length;
+    for (const y of [4.5, 6.5]) expect(enLinea(y, 0, 18)).toBeGreaterThan(10);
+    for (const y of [12.5, 13.5]) expect(enLinea(y, 1, 17)).toBeGreaterThan(10);
+    const cs = casosValidos(calcular(r.modelo));
+    const e2 = new EsfuerzosBandas(f, r.modelo, cs);
+    const est = e2.estaciones("L:1:P2")!;
+    expect(est.every((x) => x.ancho === 2 && x.punto[1] === 5.5 && x.valido)).toBe(true);
+    // Sin apoyos no hay estaciones
+    expect(e2.estaciones("U")).toEqual([]);
+  });
+});
+
 describe("Wood–Armer en las bandas (C5, criterio 3)", () => {
   it("por combinación, con los momentos medios, es woodArmer de su combinación de casos", () => {
     const e = eb.estaciones("L:1:P2")!.find((x) => x.tipo === "cara")!;

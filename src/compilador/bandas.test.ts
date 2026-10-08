@@ -187,6 +187,21 @@ describe("las bandas propuestas en el modelo (C5.1, criterio 7)", () => {
     expect(new Set([...girada.values()].map((x) => `${x.ancho}`))).toEqual(new Set(a.map((x) => `${x.ancho}`)));
   });
 
+  it("una banda en una planta sin losa o entera fuera de ella es un error; con menos de la mitad dentro, un aviso (criterio 6)", () => {
+    const f = losaPlana();
+    const con = (b: Partial<Banda>) => compilar({ ...f, bandas: [{ id: "B", planta: "P1", desde: [0, 2.5], hasta: [18, 2.5], ancho: 2, origen: "usuario", ...b }] });
+    const codigos = (r: ReturnType<typeof compilar>) => r.diagnosticos.filter((d) => d.ids?.includes("B")).map((d) => `${d.severidad}:${d.codigo}`);
+    expect(codigos(con({ planta: "C" }))).toEqual(["error:banda/sin-losa"]);
+    expect(codigos(con({ desde: [20, 2.5], hasta: [30, 2.5] }))).toEqual(["error:banda/fuera-de-losa"]);
+    // De x = 12 a x = 32: 6 m de 20 dentro (30 %)
+    const r = con({ desde: [12, 2.5], hasta: [32, 2.5] });
+    expect(r.valido).toBe(true);
+    expect(codigos(r)).toEqual(["aviso:banda/fuera-de-losa"]);
+    expect(r.diagnosticos.find((d) => d.codigo === "banda/fuera-de-losa")!.detalles).toMatchObject({ fraccion: expect.closeTo(0.3, 9) });
+    // Entera dentro, sin diagnósticos
+    expect(codigos(con({}))).toEqual([]);
+  });
+
   it("tipo y origen no válidos son un error de la banda", () => {
     const f = losaPlana();
     const mal = (extra: Partial<Banda>) => compilar({ ...f, bandas: [{ id: "B", planta: "P1", desde: [0, 1], hasta: [18, 1], ancho: 1, ...extra } as Banda] });

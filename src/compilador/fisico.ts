@@ -446,6 +446,12 @@ export const FACTOR_ZONA_RIGIDA = 0.5;
  */
 export const TAMANO_MALLA = 0.75;
 
+/**
+ * Fracción mínima del área de una banda en las losas de su planta (C5): la propuesta descarta las
+ * que quedan por debajo, y el compilador avisa de las editadas.
+ */
+export const FRACCION_MINIMA_BANDA = 0.5;
+
 export interface OpcionesCompilacion {
   /** Tolerancia numérica, m: fusión silenciosa. Por defecto, 1e-6. */
   epsGeom?: number;

@@ -349,8 +349,8 @@ Se hace por partes, cada una con sus tests y su commit:
    - Una combinación es la combinación lineal de sus casos.
 2. **Momentos por metro y por nervio:** M/ancho y, en un reticular, M·s/ancho por nervio (C4-j).
 3. **Wood–Armer** (H34): por combinación, nunca sobre la envolvente, con los momentos medios de la banda (C5-c).
-   - mx y mxy, exactos del corte (My/b y T/b);
-   - my, la media de las muestras.
+   - mx, exacto del corte: My/b, con b el ancho de la banda en losa en esa estación (sin huecos ni lo que se sale);
+   - my y mxy, la media de las muestras (en un vano, las de su corte; en una cara, las de un corte a 1 mm). El T del corte no es ∫mxy: lleva también el momento del cortante por su brazo.
 
    La envolvente guarda el máximo por cara y dirección y la combinación que lo da.
 

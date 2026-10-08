@@ -6,7 +6,7 @@
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
-import type { ApoyoFisico, ApoyoLineal, Banda, CargaFisica, CasoFisico, Losa, Material, ModeloFisico, Muro, OpcionesResueltas, PanoUnidireccional, Pilar, Planta, Seccion, Vec2, Viga } from "./fisico.ts";
+import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
 import { areaConSigno, areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { multiplicadoresReticular, volumenReticular } from "./reticular.ts";
 import { compilarSeccion, materialElastico, type SeccionCompilada } from "./secciones.ts";
@@ -606,6 +606,28 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       const L = vec2(b.desde) && vec2(b.hasta) ? Math.sqrt((b.hasta[0] - b.desde[0]) ** 2 + (b.hasta[1] - b.desde[1]) ** 2) : NaN;
       if (!Array.isArray(b.apoyos) || !b.apoyos.every((a) => vec2(a) && a[0] >= -op.epsGeom && a[0] <= a[1] && a[1] <= L + op.epsGeom)) mal(b.id, "los apoyos tienen que ser tramos [desde, hasta] del eje de la banda, con 0 ≤ desde ≤ hasta ≤ su longitud (m)");
     }
+    // En las losas de su planta (C5, criterio 6): sin losa no hay nada que cortar
+    if (!planta.has(b.planta) || !vec2(b.desde) || !vec2(b.hasta) || !pos(b.ancho)) continue;
+    const L = Math.sqrt((b.hasta[0] - b.desde[0]) ** 2 + (b.hasta[1] - b.desde[1]) ** 2);
+    if (!(L > op.epsGeom)) continue;
+    const losasB = losasC.filter((l) => l.losa.planta === b.planta);
+    if (!losasB.length) {
+      diag.error("banda/sin-losa", `La banda ${b.id} está en la planta ${b.planta}, que no tiene losas macizas ni reticulares: no hay nada que cortar.`, [b.id]);
+      continue;
+    }
+    const m: Vec2 = [(-(b.hasta[1] - b.desde[1]) / L) * (b.ancho / 2), ((b.hasta[0] - b.desde[0]) / L) * (b.ancho / 2)];
+    const rect: Region = {
+      contorno: [
+        [b.desde[0] - m[0], b.desde[1] - m[1]],
+        [b.hasta[0] - m[0], b.hasta[1] - m[1]],
+        [b.hasta[0] + m[0], b.hasta[1] + m[1]],
+        [b.desde[0] + m[0], b.desde[1] + m[1]],
+      ],
+      huecos: [],
+    };
+    const fraccion = losasB.reduce((s, l) => s + areaInterseccionRegiones(rect, l.region), 0) / (L * b.ancho);
+    if (!(fraccion > 1e-9)) diag.error("banda/fuera-de-losa", `La banda ${b.id} queda entera fuera de las losas de la planta ${b.planta} (o en sus huecos).`, [b.id]);
+    else if (fraccion < FRACCION_MINIMA_BANDA) diag.aviso("banda/fuera-de-losa", `La banda ${b.id} sólo tiene el ${(100 * fraccion).toFixed(0)} % de su área en las losas de la planta ${b.planta}: sus estaciones fuera de la losa no tienen esfuerzos.`, [b.id], { fraccion });
   }
 
   // Muros (C3)

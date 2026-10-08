@@ -25,7 +25,7 @@
  * Las coordenadas van en la base (d, n) de la dirección: s = p·d a lo largo, t = p·n transversal.
  */
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
-import { resolverOpciones, type Banda, type ModeloFisico, type OpcionesCompilacion, type Pilar, type Vec2 } from "./fisico.ts";
+import { FRACCION_MINIMA_BANDA, resolverOpciones, type Banda, type ModeloFisico, type OpcionesCompilacion, type Pilar, type Vec2 } from "./fisico.ts";
 import { huellaPilar, radioHuella, type Huella } from "./geometria2d.ts";
 import { direccionEje1 } from "./losas.ts";
 import { areaConSigno, areaInterseccionRegiones, distanciaABorde, puntoEnPoligono, puntoEnRegion, type Region } from "./poligonos.ts";
@@ -35,8 +35,7 @@ import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
 export const SEPARACION_MINIMA_ALINEACIONES = 1;
 /** τ = máx(ε_snap, FACTOR_TAU · S) (C5-b). */
 export const FACTOR_TAU = 0.1;
-/** Fracción mínima del área de una banda dentro de la losa para conservarla. */
-export const FRACCION_MINIMA_BANDA = 0.5;
+export { FRACCION_MINIMA_BANDA };
 /** Distancia mínima de la cara común al eje de cada pilar, en fracciones de su semiextensión (C5-g). */
 export const CARA_COMUN = 0.5;
 
