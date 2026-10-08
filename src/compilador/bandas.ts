@@ -23,7 +23,7 @@
  */
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import { resolverOpciones, type Banda, type ModeloFisico, type OpcionesCompilacion, type Pilar, type Vec2 } from "./fisico.ts";
-import { huellaPilar, radioHuella } from "./geometria2d.ts";
+import { huellaPilar, radioHuella, type Huella } from "./geometria2d.ts";
 import { direccionEje1 } from "./losas.ts";
 import { areaConSigno, areaInterseccionRegiones, distanciaABorde, puntoEnPoligono, puntoEnRegion, type Region } from "./poligonos.ts";
 import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
@@ -43,8 +43,8 @@ export interface PropuestaBandas {
 interface PilarEnLosa {
   id: string;
   p: Vec2;
-  /** Radio de su huella (0 sin forma). */
-  r: number;
+  /** Su huella en la planta (sin forma, un punto). */
+  huella: Huella;
 }
 
 interface Alineacion {
@@ -97,11 +97,19 @@ function pilaresEnLosa(ctx: Contexto, l: LosaCompilada): PilarEnLosa[] {
     const kb = ctx.planta.get(p.desde)!;
     if (!(k >= kh && k < kb)) continue;
     const forma = ctx.secciones.get(seccionEn(p, l.losa.planta))?.huella ?? null;
-    const radio = radioHuella(huellaPilar(p.x, p.y, p.giro ?? 0, forma));
+    const huella = huellaPilar(p.x, p.y, p.giro ?? 0, forma);
     const P: Vec2 = [p.x, p.y];
-    if (puntoEnRegion(P, l.region) || distanciaABorde(P, l.region.contorno) <= radio + ctx.op.epsSnap) r.push({ id: p.id, p: P, r: radio });
+    if (puntoEnRegion(P, l.region) || distanciaABorde(P, l.region.contorno) <= radioHuella(huella) + ctx.op.epsSnap) r.push({ id: p.id, p: P, huella });
   }
   return r;
+}
+
+/** Media extensión de una huella a lo largo de la dirección d (0 sin forma). */
+function semiextension(h: Huella, d: Vec2): number {
+  const f = h.forma;
+  if (!f) return 0;
+  if (f.tipo === "circulo") return f.D / 2;
+  return (f.h / 2) * Math.abs(h.ez[0] * d[0] + h.ez[1] * d[1]) + (f.b / 2) * Math.abs(h.ey[0] * d[0] + h.ey[1] * d[1]);
 }
 
 /** Agrupa los pilares por t (C5-b). */
@@ -190,11 +198,20 @@ function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[]
   });
 
   const bandas: Banda[] = [];
-  const nueva = (id: string, tipo: "pilares" | "central", s0: number, s1: number, tMenos: number, tMas: number) => {
+  const huellaDe = new Map(pilares.map((p) => [p.id, p.huella]));
+  // Apoyos de una banda (C5.2): la huella de cada pilar a lo largo de d, desde su comienzo s0
+  const apoyosDe = (ps: { id: string; s: number }[], s0: number, s1: number): [number, number][] =>
+    ps
+      .map((q) => {
+        const e = semiextension(huellaDe.get(q.id)!, d);
+        return [redondear(Math.max(0, q.s - e - s0)), redondear(Math.min(s1 - s0, q.s + e - s0))] as [number, number];
+      })
+      .filter(([a, c]) => c >= a);
+  const nueva = (id: string, tipo: "pilares" | "central", s0: number, s1: number, tMenos: number, tMas: number, apoyos: [number, number][]) => {
     const tc = (tMenos + tMas) / 2;
     const desde = punto(d, n, s0, tc).map(redondear) as unknown as Vec2;
     const hasta = punto(d, n, s1, tc).map(redondear) as unknown as Vec2;
-    const b: Banda = { id, planta: l.losa.planta, desde, hasta, ancho: redondear(tMas - tMenos), tipo, origen: "propuesta" };
+    const b: Banda = { id, planta: l.losa.planta, desde, hasta, ancho: redondear(tMas - tMenos), tipo, origen: "propuesta", apoyos };
     if (!(b.ancho > eps) || !(s1 - s0 > eps)) return;
     const rect: Region = { contorno: rectangulo(b), huecos: [] };
     const fraccion = areaInterseccionRegiones(rect, l.region) / Math.abs(areaConSigno(rect.contorno));
@@ -204,12 +221,13 @@ function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[]
     }
     bandas.push(b);
   };
-  al.forEach((a, i) => nueva(`${l.losa.id}:${etiqueta}:P${i + 1}`, "pilares", a.s0, a.s1, a.t - a.wMenos, a.t + a.wMas));
+  al.forEach((a, i) => nueva(`${l.losa.id}:${etiqueta}:P${i + 1}`, "pilares", a.s0, a.s1, a.t - a.wMenos, a.t + a.wMas, apoyosDe(a.pilares, a.s0, a.s1)));
   al.forEach((a, i) => {
     const b = vecina(i, 1);
     if (!b) return;
     const j = al.indexOf(b);
-    nueva(`${l.losa.id}:${etiqueta}:C${i + 1}-${j + 1}`, "central", Math.max(a.s0, b.s0), Math.min(a.s1, b.s1), a.t + a.wMas, b.t - b.wMenos);
+    const [s0, s1] = [Math.max(a.s0, b.s0), Math.min(a.s1, b.s1)];
+    nueva(`${l.losa.id}:${etiqueta}:C${i + 1}-${j + 1}`, "central", s0, s1, a.t + a.wMas, b.t - b.wMenos, apoyosDe([...a.pilares, ...b.pilares], s0, s1));
   });
   return bandas;
 }

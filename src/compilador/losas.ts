@@ -32,6 +32,7 @@ import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type LosaMallar, type ResultadoMalla } from "./mallado.ts";
+import { estacionesBanda, ladoEstacion } from "./estaciones.ts";
 import { estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
 import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { distanciaARegion, ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
@@ -421,7 +422,12 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       });
       trazoAbaco.set(i, ts);
     }
-    for (const b of ctx.bandas) if (b.planta === idPlanta) a.trazo(b.id, "banda", -1, rectanguloBanda(b.desde, b.hasta, b.ancho), true);
+    for (const b of ctx.bandas) {
+      if (b.planta !== idPlanta) continue;
+      a.trazo(b.id, "banda", -1, rectanguloBanda(b.desde, b.hasta, b.ancho), true);
+      // Las caras de sus apoyos, a lo ancho (C5.2): sus cortes por fuerzas nodales son exactos
+      for (const e of estacionesBanda(b, epsGeom)) if (e.tipo === "cara") a.trazo(b.id, "banda", -1, ladoEstacion(b, e.s), false);
+    }
     const trazoCarga = new Map<string, Trazo>();
     for (const c of cargas) {
       if (c.tipo === "superficie" && c.planta === idPlanta && c.zona) {

@@ -601,6 +601,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     if (!pos(b.ancho)) mal(b.id, "el ancho tiene que ser un número > 0 (m)");
     if (b.tipo !== undefined && b.tipo !== "pilares" && b.tipo !== "central") mal(b.id, "el tipo tiene que ser \"pilares\" o \"central\"");
     if (b.origen !== undefined && b.origen !== "propuesta" && b.origen !== "usuario") mal(b.id, "el origen tiene que ser \"propuesta\" o \"usuario\"");
+    if (b.apoyos !== undefined) {
+      const L = vec2(b.desde) && vec2(b.hasta) ? Math.sqrt((b.hasta[0] - b.desde[0]) ** 2 + (b.hasta[1] - b.desde[1]) ** 2) : NaN;
+      if (!Array.isArray(b.apoyos) || !b.apoyos.every((a) => vec2(a) && a[0] >= -op.epsGeom && a[0] <= a[1] && a[1] <= L + op.epsGeom)) mal(b.id, "los apoyos tienen que ser tramos [desde, hasta] del eje de la banda, con 0 ≤ desde ≤ hasta ≤ su longitud (m)");
+    }
   }
 
   // Muros (C3)

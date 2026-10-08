@@ -341,6 +341,14 @@ export interface Banda {
    * editó (la memoria las distingue). Por defecto, "usuario".
    */
   origen?: "propuesta" | "usuario";
+  /**
+   * C5.2: tramos del eje ocupados por apoyos (la huella de un pilar, o la línea de sus caras en una
+   * banda central), como [desde, hasta] en m desde `desde`. Sus extremos son las caras: se siembran
+   * a lo ancho de la banda (cortes exactos por fuerzas nodales, E5-5) y son las estaciones de los
+   * momentos de apoyo; los centros entre apoyos, las de vano. Sin ellos, la banda sólo se siembra
+   * por su contorno (C2).
+   */
+  apoyos?: readonly (readonly [number, number])[];
 }
 
 /** Hueco de un muro (C3): rectángulo en su alzado, dentro de un tramo. */
