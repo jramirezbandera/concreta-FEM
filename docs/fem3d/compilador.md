@@ -307,3 +307,111 @@
 7. **Determinismo y huella:** el mismo modelo en V8 y en JavaScriptCore; la huella no depende del orden de las listas (tampoco del de los ábacos).
 8. **Rendimiento:** el edificio objetivo con reticular y ábacos (H52 V2) y con unidireccional (V3) compila en una fracción del cálculo y cabe en D9.
 9. **Referencia congelada** del modelo analítico y de sus resultados.
+
+## C5: alcance y decisiones
+
+C5 cierra el compilador. Las bandas de dimensionado de las losas pasan de sembrarse (C2) a proponerse e integrarse. Los machones y dinteles de los muros salen como cortes. Y los resultados se consultan por objeto físico, que es lo que piden los módulos de comprobación de Concreta (H35) y la capa de agente (A1, `agente.md`).
+
+Se hace por partes, cada una con sus tests y su commit:
+- **C5.1:** bandas propuestas;
+- **C5.2:** esfuerzos de banda y Wood–Armer;
+- **C5.3:** machones y dinteles;
+- **C5.4:** consultas por objeto físico y combinaciones.
+
+**Modelo físico de C5** (se añade a C4 en `fisico.ts`):
+- `bandas[]` gana:
+  - `tipo`: `"pilares"` o `"central"`;
+  - `origen`: `"propuesta"`, si la dio el compilador y no se ha tocado, o `"usuario"`, si la ha creado o editado. La memoria las distingue (D5).
+- `casos[]` gana `accion`, opcional: el tipo de acción y sus datos (`tipo`, `psi`, `familia`, `permanente`, `direccion`, `signo`, `duracion`), los mismos que `CasoCarga` de `src/combinaciones/`. Sin ella, las consultas son por caso o por combinaciones dadas con sus factores.
+
+**Cómo se proponen las bandas** (C5.1, D5, H25; Anejo I del EC2, que transpone el Anejo 19 del CE):
+1. **Plantas y direcciones.** En cada planta con losa maciza o reticular (los paños unidireccionales ya dan sus viguetas), las dos direcciones de los ejes de la losa: su `eje1` y la perpendicular.
+2. **Alineaciones de pilares.** En cada dirección, los pilares que llegan a la planta (su cabeza o un tramo que la atraviesa) se agrupan por su coordenada transversal. Dos pilares están en la misma alineación si sus ejes distan ≤ τ en esa coordenada (C5-b). Una alineación necesita ≥ 2 pilares. Su eje pasa por la media de sus pilares.
+3. **Banda de pilares** de cada alineación (I.1.2(1), figura I.1):
+   - va del primer pilar al último, prolongada hasta el borde de la losa si el voladizo es ≤ el vano contiguo;
+   - mide a cada lado lx/4, con lx la menor dimensión de los recuadros de ese lado: la distancia a la alineación paralela y el vano a lo largo de ella. En una alineación de borde, el lado exterior llega como mucho hasta el borde de la losa;
+   - en un reticular, si los ábacos de la alineación miden más de lx/3 en la dirección transversal, la banda toma su ancho (I.1.2(3)).
+4. **Bandas centrales:** lo que queda entre dos bandas de pilares paralelas consecutivas, con la misma longitud.
+5. **Recorte:** cada banda se recorta a la losa (sin sus huecos). Las que salen de la losa se acortan, y una que queda con menos de la mitad de su área se descarta, con aviso.
+6. **Estaciones** de cada banda, a lo largo de su eje:
+   - las caras de los apoyos que cruza (la huella del pilar o del ábaco, o un muro);
+   - el centro de cada vano.
+
+   Las líneas de las caras se siembran en la malla a lo ancho de la banda, como sus bordes (C2), para que su corte por fuerzas nodales sea exacto (E5-5).
+
+**Cómo se integran** (C5.2, E5):
+1. **Por caso:** en cada estación, un corte de la banda (`Cortes`) da [N, Vy, Vz, T, My, Mz] en los ejes de la banda.
+   - En las caras va «fuerzas-nodales», exacto.
+   - En los vanos va «campos», mixto, con muestras para Wood–Armer.
+   - Una combinación es la combinación lineal de sus casos.
+2. **Momentos por metro y por nervio:** M/ancho y, en un reticular, M·s/ancho por nervio (C4-j).
+3. **Wood–Armer** (H34): por combinación, nunca sobre la envolvente, con los momentos medios de la banda (C5-c).
+   - mx y mxy, exactos del corte (My/b y T/b);
+   - my, la media de las muestras.
+
+   La envolvente guarda el máximo por cara y dirección y la combinación que lo da.
+
+**Machones y dinteles** (C5.3, C3, E5):
+- **Machón:** cada trozo de muro entre huecos, o entre un hueco y el extremo, en cada planta. Cortes horizontales en su base y su cabeza (las filas de la malla en la cota y en los bordes de los huecos), por fuerzas nodales. Da N, V y M como un pilar, en los ejes del muro.
+- **Dintel:** el trozo de muro sobre un hueco y bajo la cota. Cortes verticales en sus extremos (las caras del hueco, ya en la malla) y en su centro. Da V y M como una viga.
+
+**Consultas por objeto físico** (C5.4, H35, A1):
+- **Pilares:** por planta, en la cabeza y en la base, N (+ compresión), Vy, Vz, T, My y Mz en los ejes de la sección física (b, h y su giro), con la longitud del tramo.
+- **Vigas y viguetas:** por pieza y vano, con estaciones y en las caras de los apoyos: N, V, T y M; momento de vano y de apoyos.
+- **Bandas, machones y dinteles:** sus estaciones (C5.2, C5.3).
+- **Apoyos:** sus reacciones.
+- **Plantas:** desplazamiento del maestro del diafragma y deriva entre plantas.
+- **Losas:** la flecha máxima por recuadro.
+
+Las consultas trabajan por caso, por combinación o en envolvente (máximo y mínimo con la combinación que los da). Las unidades son kN y m, con los signos documentados en la cabecera. Dan exactamente lo que `EsfuerzosPiezas`, `Cortes` y `CamposLaminas` dan llamados a mano (`agente.md`).
+
+**Decisiones por defecto de C5:**
+
+| # | Decisión | Por defecto | Por qué | Alternativa |
+|---|---|---|---|---|
+| C5-a | Bandas automáticas | **Una propuesta** (`proponerBandas(fisico)`) que se guarda en el modelo físico; compilar no las añade por su cuenta | D5: se proponen y se editan, y cambiar una banda cambia la malla. Si el compilador las añadiera solo, cambiarían todos los modelos ya validados | Añadirlas al compilar cuando no haya ninguna |
+| C5-b | Tolerancia de alineación τ | **τ = 0,1 × la menor separación entre alineaciones de la planta, y como mínimo ε_snap** | Un replanteo real tiene pilares desplazados unos centímetros; τ sólo une los que son la misma alineación | Fija (p. ej. 0,30 m) |
+| C5-c | Wood–Armer en la banda | **(a)** sobre los momentos medios de la banda, con mx y mxy exactos del corte | Es lo que pide el Anejo I (el momento de la banda, repartido en su ancho) y es exacto en la cara del apoyo. (b), repartir el My exacto según las muestras punto a punto, se mide como contraste. E5-5 descarta integrar las muestras crudas en la cara | (b) |
+| C5-d | Reparto pilares/central | **El que da el cálculo** (el corte de cada banda), con un aviso si sale del 60–80 % (negativos) o del 50–70 % (positivos) de la tabla I.1 | Por elementos finitos el reparto ya sale del cálculo; la tabla es la referencia del método simplificado | Imponer la tabla |
+| C5-e | Machones de borde con pilar | El pilar unido al muro en la cota va **aparte** (su barra), y se dice en el resultado del machón | Sólo se unen en la cota (C3); sumarlo sería otra pieza | Sumarlo al machón |
+| C5-f | Combinaciones | **De `src/combinaciones/`** cuando los casos llevan `accion`; si no, por caso o con factores dados | El generador CTE/NCSE ya está validado (fase 1 de S1) | Sólo por caso |
+
+**Lo que C5 deja fuera:**
+- el punzonamiento a 2d (necesita cortes por polilínea cerrada, E5);
+- el límite de momento transmitido a los pilares de borde y esquina (I.1.2(5)), que es del módulo de punzonamiento;
+- los extractores de cada módulo de Concreta (`DesignActionExtractor`, H35), que van con la integración en Concreta: C5 da las consultas en kN y m con su convenio, y el extractor de cada módulo sólo convierte;
+- las bandas de losas sobre muros o vigas sin pilares (losas apoyadas en su contorno), que hoy se dibujan a mano.
+
+## C5: criterios de paso
+
+1. **Bandas propuestas frente a un cálculo a mano:**
+   - una retícula regular (3 × 3 vanos de 6 × 5 m) da los anchos lx/4 por lado y las centrales que faltan;
+   - alineaciones con pilares desplazados (≤ τ y > τ);
+   - un voladizo;
+   - un reticular con ábacos > lx/3;
+   - una losa con un hueco que corta una banda;
+   - las bandas editadas se respetan tal cual.
+2. **Integración exacta:**
+   - en una línea de caras sembrada, la suma de las bandas de pilares y centrales que la cruzan es el corte de toda la losa (≤ 1e-9);
+   - en un pórtico virtual entero, M⁺ + (M⁻ᵢ + M⁻ⱼ)/2 = q·b·L²/8 por estática (≤ 1e-9);
+   - la losa plana de H25 da su reparto (77 % en la banda de pilares) y su convergencia (±1 %).
+3. **Wood–Armer:**
+   - por combinación frente a `woodArmer` a mano;
+   - la envolvente no pierde el máximo y guarda la combinación;
+   - medida (a) frente a (b) en la losa plana de H25 y en un reticular.
+4. **Machones y dinteles:**
+   - en cada planta, la suma de los machones es el corte de la planta por el muro (≤ 1e-9);
+   - un muro en voladizo con un hueco frente a la estática;
+   - el muro acoplado de ETABS 15c frente a sus esfuerzos de dintel y de machón (con la referencia corregida de E6-2).
+5. **Consultas:**
+   - cada una da lo mismo que llamar a mano a `EsfuerzosPiezas`, `Cortes` o `CamposLaminas` (≤ 1e-12);
+   - una combinación es la combinación de sus casos;
+   - las envolventes no pierden el máximo;
+   - las unidades y los signos de la cabecera se prueban con una ménsula y un pilar a mano.
+6. **Entradas no válidas:** bandas editadas fuera de la losa, de ancho nulo o en una planta sin losa, y consultas a objetos que no existen, dan su diagnóstico con el id físico, sin lanzar.
+7. **Determinismo y huella:**
+   - la propuesta de bandas no depende del orden de las listas;
+   - trasladar y girar 90° da las mismas bandas trasladadas y giradas;
+   - la huella incluye las bandas.
+8. **Rendimiento:** proponer las bandas, integrarlas en todas las combinaciones del edificio objetivo y responder a las consultas cuesta una fracción del cálculo.
+9. **Referencia congelada** de las bandas propuestas, sus esfuerzos y las consultas.
