@@ -19,6 +19,9 @@ venv312/
 .venv312/
 *.npz
 
+# Resultados de la CLI fem (derivados del proyecto.json, A0)
+.fem/
+
 # Editor y sistema
 .vscode/*
 !.vscode/extensions.json
