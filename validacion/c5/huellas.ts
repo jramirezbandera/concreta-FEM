@@ -8,15 +8,13 @@
  *
  *   bun validacion/c5/huellas.ts      → JSON por la salida estándar
  */
-import { proponerBandas } from "../../src/compilador/bandas.ts";
 import { compilar } from "../../src/compilador/compilar.ts";
-import type { ModeloFisico } from "../../src/compilador/fisico.ts";
 import { huellaDe } from "../../src/compilador/huella.ts";
 import { fisicoAleatorio } from "../../src/pruebas/fisicoAleatorio.ts";
 import { conLosasAleatorias } from "../../src/pruebas/losasAleatorias.ts";
 import { planos, transformar } from "../../src/pruebas/metamorficasFisicas.ts";
 import { losaPlanaFisica } from "../c2/losaPlana.ts";
-import { edificioObjetivoLosas } from "../c2/modelos.ts";
+import { conPropuesta, losaPilaresMezclados } from "./modelos.ts";
 
 export interface HuellasC5 {
   nombre: string;
@@ -24,19 +22,6 @@ export interface HuellasC5 {
   compilacion: string;
   topologia: string;
   coordenadas: number[];
-}
-
-/** Losa plana de 3 × 2 vanos de 6 × 5 m con los pilares de 30 × 50 (girados) y 40 × 40 del edificio objetivo. */
-export function losaPilaresMezclados(): ModeloFisico {
-  const f = edificioObjetivoLosas(1, 3, 2);
-  return { ...f, vigas: [], cargas: f.cargas!.filter((c) => c.tipo !== "viga") };
-}
-
-/** El modelo con las bandas que propone el compilador (en vez de las que tuviera). */
-export function conPropuesta(f: ModeloFisico): ModeloFisico {
-  const { bandas, diagnosticos } = proponerBandas({ ...f, bandas: undefined });
-  if (diagnosticos.some((d) => d.severidad === "error")) throw new Error(diagnosticos.map((d) => d.mensaje).join("; "));
-  return { ...f, bandas };
 }
 
 export function huellasC5(): HuellasC5[] {

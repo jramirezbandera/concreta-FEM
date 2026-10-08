@@ -16,12 +16,12 @@ import { join } from "node:path";
 import { proponerBandas } from "../../src/compilador/bandas.ts";
 import { compilar } from "../../src/compilador/compilar.ts";
 import { EsfuerzosBandas, woodArmerEstacion, type EstacionResultado } from "../../src/compilador/esfuerzosBandas.ts";
-import type { ModeloFisico } from "../../src/compilador/fisico.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { Cortes } from "../../src/motor/cortes.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
 import { losaPlanaFisica, OPCIONES_LOSA_PLANA } from "../c2/losaPlana.ts";
+import { reticularH25 } from "./modelos.ts";
 
 await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "..", "src", "nucleo", "pkg", "nucleo_bg.wasm")));
 
@@ -85,25 +85,7 @@ decir("## La misma losa como reticular 30+5 con ábacos de 2,5 × 2,5 m (criteri
 decir();
 decir("Nervios de 12 cm cada 82 cm, capa de 5 cm, casetón recuperable (sin peso propio: sólo q). Los ábacos (2,5 m > lx/3 = 2 m) dan el ancho de las bandas de pilares (I.1.2(3)).");
 decir();
-const reticular: ModeloFisico = {
-  ...base,
-  losas: base.losas!.map((l) => ({
-    ...l,
-    espesor: 0.35,
-    reticular: {
-      intereje: 0.82,
-      nervio: 0.12,
-      capa: 0.05,
-      caseton: "recuperable",
-      abacos: base.pilares!.map((p) => [
-        [p.x - 1.25, p.y - 1.25],
-        [p.x + 1.25, p.y - 1.25],
-        [p.x + 1.25, p.y + 1.25],
-        [p.x - 1.25, p.y + 1.25],
-      ]),
-    },
-  })),
-};
+const reticular = reticularH25();
 const bandasR = proponerBandas(reticular).bandas;
 const fr = { ...reticular, bandas: bandasR };
 decir(`Banda de pilares interior LOSA:1:P2: ancho ${bandasR.find((b) => b.id === "LOSA:1:P2")!.ancho} m; centrales ${bandasR.filter((b) => b.tipo === "central" && b.id.startsWith("LOSA:1:")).map((b) => b.ancho).join(" y ")} m`);

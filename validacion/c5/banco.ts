@@ -22,6 +22,7 @@ import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
 import { edificioObjetivoLosas } from "../c2/modelos.ts";
+import { conAcciones } from "./modelos.ts";
 
 await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "..", "src", "nucleo", "pkg", "nucleo_bg.wasm")));
 
@@ -30,19 +31,6 @@ const decir = (l = "") => {
   lineas.push(l);
   console.log(l);
 };
-const PSI_Q = { psi0: 0.7, psi1: 0.5, psi2: 0.3 };
-const PSI_W = { psi0: 0.6, psi1: 0.5, psi2: 0 };
-
-function conAcciones(f: ModeloFisico): ModeloFisico {
-  const accion: Record<string, NonNullable<ModeloFisico["casos"][number]["accion"]>> = {
-    G: { tipo: "G" },
-    Q: { tipo: "Q", psi: PSI_Q },
-    Vx: { tipo: "W", direccion: "X", signo: 1, psi: PSI_W },
-    Vy: { tipo: "W", direccion: "Y", signo: 1, psi: PSI_W },
-  };
-  return { ...f, casos: f.casos.map((c) => ({ ...c, accion: accion[c.id]! })) };
-}
-
 const n = process.argv[2] ? Number(process.argv[2]) : 7;
 const sinVigas = (f: ModeloFisico): ModeloFisico => ({ ...f, vigas: [], cargas: f.cargas!.filter((c) => c.tipo !== "viga") });
 const modelos: [string, ModeloFisico][] = [

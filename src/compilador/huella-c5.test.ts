@@ -8,7 +8,8 @@
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { conPropuesta, huellasC5, losaPilaresMezclados } from "../../validacion/c5/huellas.ts";
+import { huellasC5 } from "../../validacion/c5/huellas.ts";
+import { conPropuesta, losaPilaresMezclados } from "../../validacion/c5/modelos.ts";
 import { azar } from "../pruebas/fisicoAleatorio.ts";
 import { barajar, planos, transformar } from "../pruebas/metamorficasFisicas.ts";
 import { compilar } from "./compilar.ts";
