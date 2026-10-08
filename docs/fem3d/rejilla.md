@@ -102,7 +102,7 @@ Medidas en `validacion/c2/out_rejilla.txt` y `out_decisiones.txt`.
 
 ## 5. Pendiente
 
-- **Del usuario:** confirmar h = 0,75 con la rejilla y la deriva (§4), y R-9 (C2-c con un hueco a ejes entre vigas).
+- **Confirmadas por el usuario el 2026-10-08:** h = 0,75 con la rejilla y la deriva (§4). R-9: el hueco a ejes entre vigas es válido, y C2-c mide ahora el avance a lo largo de la viga (`losas.ts`, `dentroDelAncho`).
 - **Para más adelante:**
   - estaciones de los muros en las líneas de la rejilla: hoy los ejes de los muros son rasgos ajenos y dejan una franja de triangulación a su lado (el muro de sótano perimetral cuesta un 5 % de nudos);
   - ejes de la rejilla cuando el eje 1 de la primera losa no sigue la geometría (un edificio girado con el eje 1 por defecto se queda sin rejilla), y losas de una misma planta con ejes distintos;

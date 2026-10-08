@@ -204,8 +204,10 @@ export function direccionEje1(grados: number): Vec2 {
 }
 
 /**
- * C2-c: longitud de un lado PQ que corre dentro del ancho de una viga (a más de ε_snap de su eje y
- * a ≤ b/2), dentro de su tramo.
+ * C2-c: lo que un lado PQ corre a lo largo de una viga (su avance según el eje, σ) por dentro de su
+ * ancho (a más de ε_snap de su eje y a ≤ b/2), dentro de su tramo. Un lado que sólo cruza la viga
+ * de través (el de un hueco o del contorno que acaba en su eje) no avanza a lo largo de ella y no
+ * cuenta (R-9: un hueco dibujado a ejes entre vigas sumaba b/2 en cada cruce y llegaba al umbral).
  */
 function dentroDelAncho(P: Vec2, Q: Vec2, A: Vec2, u: Vec2, len: number, b: number, eps: number): number {
   const s = (X: Vec2) => (X[0] - A[0]) * u[1] - (X[1] - A[1]) * u[0]; // distancia con signo a la recta
@@ -227,8 +229,9 @@ function dentroDelAncho(P: Vec2, Q: Vec2, A: Vec2, u: Vec2, len: number, b: numb
   };
   recortar(g0, g1, 0, len);
   if (!(hi > lo)) return 0;
-  // Dentro de ese intervalo, la parte con eps < |s| ≤ b/2 (s es lineal en t): muestreo fino exacto por tramos
-  const L = Math.sqrt((Q[0] - P[0]) * (Q[0] - P[0]) + (Q[1] - P[1]) * (Q[1] - P[1]));
+  // Dentro de ese intervalo, la parte con eps < |s| ≤ b/2 (s es lineal en t), medida por su avance
+  // a lo largo del eje de la viga (σ también es lineal en t)
+  const L = Math.abs(g1 - g0);
   let r = 0;
   for (const signo of [1, -1]) {
     let a = lo;

@@ -91,7 +91,7 @@
 
 ## 5. Pendiente
 
-- **Del usuario:** confirmar C3-a (12 filas por planta), C3-d, C3-g y el cambio de C3-i.
+- **Confirmadas por el usuario el 2026-10-08:** C3-a (12 filas por planta), C3-d (con un aviso para los dinteles de ≥ 1,5 m en un diafragma rígido sin losa, `compilador.md`), C3-g y el cambio de C3-i.
 - **Para más adelante:**
   - la rejilla alineada de H52 en las losas (C2-a), más urgente con los muros (C3-8): hecha el 2026-10-05 (`rejilla.md`);
   - las estaciones de los muros en las líneas de esa rejilla: hoy el eje de un muro deja una franja de triangulación a su lado;

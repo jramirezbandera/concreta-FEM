@@ -221,6 +221,17 @@ describe("diafragma y vigas (C3-d, C3-e)", () => {
     expect(enCota.some((n) => r.modelo.nudos[n]!.x > 2 && r.modelo.nudos[n]!.x < 4)).toBe(true);
   });
 
+  it("un dintel de ≥ 1,5 m en el diafragma rígido de una planta sin losa da un aviso; con losa o más corto, no (C3-d, E6-3)", () => {
+    const con = (luz: number, losas: Losa[] = []) => valido(compilar(modelo({ muros: [muro("M", [[0, 0], [6, 0]], "C", "P1", { huecos: [{ desde: 2, hasta: 2 + luz, z0: 0, z1: 2.2 }] })], losas }), { tamanoMalla: 0.5 }));
+    const avisos = (r: ReturnType<typeof valido>) => r.diagnosticos.filter((d) => d.codigo === "muro/dintel-en-diafragma");
+    const [d] = avisos(con(2));
+    expect(d?.ids).toEqual(["M", "P1"]);
+    expect(d?.detalles?.luz).toBeCloseTo(2, 12);
+    expect(d?.detalles?.canto).toBeCloseTo(0.8, 12);
+    expect(avisos(con(1))).toEqual([]);
+    expect(avisos(con(2, [{ id: "L", planta: "P1", contorno: rect(0, 0, 6, 4), espesor: 0.25, material: "HA" }]))).toEqual([]);
+  });
+
   it("una viga que acaba en el extremo de un muro en su plano sigue dentro con barras auxiliares a lo largo de su canto", () => {
     const pilares: Pilar[] = [{ id: "A", x: 10, y: 0, desde: "C", hasta: "P2", seccion: "p" }];
     const vigas: Viga[] = [{ id: "V", planta: "P1", puntos: [[6, 0], [10, 0]], seccion: "v" }];

@@ -164,6 +164,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const piezas = construirPiezas(ctx, topo, losas, diag, panos);
   marca("piezas");
   if (diag.hayErrores) return fallo();
+  avisarDintelesEnDiafragma(ctx, diag);
 
   // Numeración canónica: por cota, x e y (no depende del orden de la entrada)
   const zDe = (n: number) => cotaNudo(ctx, topo.nudos[n]!);
@@ -391,6 +392,41 @@ const coma = (x: number) => String(x).replace(".", ",");
 const NOMBRE_MATERIAL = { hormigon: "de hormigón", acero: "de acero", general: "de material general" } as const;
 
 /** Las hipótesis de modelado de una compilación, en texto (C1-a, C1-c, C1-d, D4, C2, C3 y C4). */
+/** Luz mínima de un dintel para el aviso de C3-d, m: con 1,5 m, el diafragma ya rigidiza un 7 % (E6-3). */
+export const LUZ_DINTEL_AVISO = 1.5;
+
+/**
+ * C3-d: los dinteles entran en el diafragma rígido de su planta. Con losa encima, ella ya los
+ * coacciona (−6,1 % frente a la losa semirrígida, C3-4); sin losa (una planta de barras o de paños
+ * unidireccionales, que no tienen membrana), el diafragma impide que su fibra superior se alargue y
+ * rigidiza el muro acoplado mucho más: un 7 % con dinteles de 1,5 m y un 35 % con los de 6 m en
+ * ETABS 15 (E6-3), un 15,5 % en el muro de C3-4. Aviso por dintel de luz ≥ LUZ_DINTEL_AVISO.
+ */
+function avisarDintelesEnDiafragma(ctx: Contexto, diag: Diagnosticos): void {
+  const eps = ctx.op.epsGeom;
+  for (const m of ctx.muros) {
+    const base = ctx.cotas[m.kb]!;
+    m.huecos.forEach((hh, nh) => {
+      const luz = Math.abs(hh.hasta - hh.desde);
+      if (luz < LUZ_DINTEL_AVISO - eps) return;
+      const techo = base + hh.z1;
+      // La planta de encima del hueco, dentro del muro: su dintel va de lo alto del hueco a esa cota
+      let k = -1;
+      for (let j = m.kh; j < m.kb; j++) if (ctx.cotas[j]! > techo + eps && (k < 0 || ctx.cotas[j]! < ctx.cotas[k]!)) k = j;
+      if (k < 0 || diafragmaDe(ctx, k) !== "rigido") return;
+      const planta = ctx.plantas[k]!.id;
+      if (ctx.losas.some((l) => l.losa.planta === planta)) return;
+      const canto = ctx.cotas[k]! - techo;
+      diag.aviso(
+        "muro/dintel-en-diafragma",
+        `El dintel sobre el hueco ${nh + 1} del muro ${m.muro.id} (${luz.toFixed(2)} m de luz y ${canto.toFixed(2)} m de canto) entra en el diafragma rígido de la planta ${planta}, que no tiene losa que lo coaccione: el diafragma impide que su fibra superior se alargue y rigidiza el muro acoplado (un 7 % con dinteles de 1,5 m y un 35 % con los de 6 m en ETABS 15, E6-3). Para el sismo, contraste con diafragma "ninguno" en esa planta (C3-d).`,
+        [m.muro.id, planta],
+        { luz, canto },
+      );
+    });
+  }
+}
+
 function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>): string[] {
   const h: string[] = [];
   h.push(

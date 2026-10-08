@@ -149,6 +149,26 @@ describe("errores y avisos de C2", () => {
     expect(d.ids).toEqual(["L", "V0"]);
   });
 
+  it("un hueco dibujado a ejes entre cuatro vigas es válido: los bordes que sólo cruzan una viga no corren por su ancho (R-9)", () => {
+    const vigas: Viga[] = [
+      { id: "H1", planta: "P1", puntos: [[0, 1.5], [6, 1.5]], seccion: "v" },
+      { id: "H2", planta: "P1", puntos: [[0, 3.5], [6, 3.5]], seccion: "v" },
+      { id: "W1", planta: "P1", puntos: [[2, 0], [2, 5]], seccion: "v" },
+      { id: "W2", planta: "P1", puntos: [[4, 0], [4, 5]], seccion: "v" },
+    ];
+    const losas: Losa[] = [{ id: "L", planta: "P1", contorno: rect(0, 0, 6, 5), huecos: [rect(2, 1.5, 4, 3.5)], espesor: 0.25, material: "HA" }];
+    const r = compilar(base({ vigas, losas }), { tamanoMalla: 0.5 });
+    expect(r.diagnosticos.filter((x) => x.codigo === "losa/borde-en-viga")).toEqual([]);
+    expect(r.valido).toBe(true);
+  });
+
+  it("un borde oblicuo que corre por dentro del ancho de una viga cuenta lo que avanza a lo largo de ella (C2-c)", () => {
+    // borde de (0, 0,12) a (6, 0,14): casi paralelo a V0 (y = 0), a 12–14 cm de su eje
+    const losas: Losa[] = [{ id: "L", planta: "P1", contorno: [[0, 0.12], [6, 0.14], [6, 5], [0, 5]], espesor: 0.25, material: "HA" }];
+    const r = compilar(base({ losas }));
+    expect(r.diagnosticos.find((x) => x.codigo === "losa/borde-en-viga")?.ids).toEqual(["L", "V0"]);
+  });
+
   it("cargas y apoyos fuera de las losas", () => {
     const fuera = compilar(base({ cargas: [{ tipo: "lineal", id: "t", caso: "Q", planta: "P1", puntos: [[3, 1], [3, 7]], q: [0, 0, -5] }] }));
     expect(fuera.valido).toBe(false);

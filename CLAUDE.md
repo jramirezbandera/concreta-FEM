@@ -151,7 +151,7 @@
   - **Regla de los muros:** las estaciones de un muro tienen las mismas coordenadas en todas sus plantas (nada se mueve: lo que falta se inserta), así que cada franja es un rectángulo vertical y la resultante física se calcula exacta por franjas.
   - **Corregido en el compilador (C3-5):** la numeración canónica desempata por orden de creación tras las coordenadas cuantizadas; antes, dos nudos en el mismo sitio dependían de un ulp.
   - **Validación:** `validacion/c3/` (ETABS 15 como modelo físico, cuatro oráculos analíticos, resumen, banco, decisiones, huellas y referencia congelada).
-  - **Pendiente del usuario:** confirmar C3-a (12 filas por planta), C3-d, C3-g y el cambio de C3-i a la huella de la viga (preguntas en `fase-c3.md`).
+  - **Confirmadas el 2026-10-08:** C3-a (12 filas por planta), C3-d (con el aviso `muro/dintel-en-diafragma` para dinteles de ≥ 1,5 m en un diafragma rígido sin losa), C3-g y el cambio de C3-i a la huella de la viga.
 - **2026-10-05: rejilla alineada de H52 hecha** (decisión C2-a). El criterio 8 de C2 pasa, así que C2 queda superada. El informe está en `docs/fem3d/rejilla.md`, con criterios, hallazgos R-1…R-10, decisiones medidas y pendientes.
   - **Ya en `src/compilador/rejilla.ts`:**
     - rejilla por planta en los ejes de la primera losa, con líneas de los lados alineados (prioridad por longitud, d_min = 0,4·h; las líneas largas, a d_min/4);
@@ -162,7 +162,7 @@
     `mallado.ts` cose la rejilla con la CDT del resto (interfaz obligatoria, centros de celda como puntos de Steiner). Si la rejilla cubre menos del 75 % de una planta, se queda la malla con menos nudos. La opción `rejilla: false` da la triangulación de C2 bit a bit.
   - **Edificio objetivo:** 34 737 nudos y 90 657 ecuaciones (antes, 79 649 y 199 983); con muros, 48 451 y 151 905. Frente a la CDT fina, la cara del pilar sale mejor que con la CDT del mismo h; la deriva, −0,75 %.
   - **Validación:** `validacion/c2/rejilla.ts`. Nuevos modelos `reticulaEnrasada` (C2) y `reticulaConNucleo` (C3). Las referencias congeladas antiguas quedan con `rejilla: false` (idénticas) y se añaden las de la rejilla.
-  - **Pendiente del usuario:** confirmar h = 0,75 con la rejilla y la deriva, y R-9 (posible falso positivo de C2-c con un hueco a ejes entre vigas).
+  - **Confirmadas el 2026-10-08:** h = 0,75 con la rejilla y la deriva. R-9 resuelto: un hueco a ejes entre vigas es válido (C2-c mide el avance del borde a lo largo de la viga).
 - **2026-10-05: fase C4 del compilador superada** (forjados). Pasan los nueve criterios; el 2, con una salvedad en el ábaco (la flecha a −4,5 % del emparrillado con el ν del hormigón, por su efecto Poisson; −2,1 % con ν = 0 en los dos). El informe está en `docs/fem3d/fase-c4.md`, con criterios, hallazgos C4-1…C4-11, decisiones medidas y pendientes.
   - **Ya en `src/compilador/`:**
     - reticular (`Losa.reticular`, `reticular.ts`): la zona aligerada con los multiplicadores del emparrillado de nervios, con ν = 0 y G compensado (C4-h); ábacos macizos sembrados en la malla; peso por zonas (C4-i). Los multiplicadores dados se aplican como en SAP2000;
@@ -177,7 +177,6 @@
   - **C4-k, nueva:** una línea de viguetas con un solo apoyo (voladizo sin vano detrás, también por un hueco, o balancín) sujeta por una viga es torsión de equilibrio. Los tramos de esa viga hasta el primer pilar, muro u otra viga van sin el J de D4 y se marcan en el mapeo (`torsionEquilibrio`), con aviso e hipótesis. Con ×0,1 la torsión sale igual, pero la flecha del voladizo, 5,9 veces mayor. Con el vano detrás se compensa sin torsión (medido). Antes, un balancín no se avisaba (C4-12).
   - Sólo cambian las referencias congeladas de C4 con voladizos sin vano (paño con hueco y planta al azar 7), y sólo en el J de esos tramos.
 - **Siguiente paso:**
-  - el usuario confirma las decisiones de C3 y las de la rejilla (`rejilla.md`, §4);
   - compilador C5 (bandas automáticas de D5, machones y dinteles como cortes, consultas por objeto físico);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - capa de agente (propuesta del 2026-10-05, `docs/fem3d/agente.md`): fichero de proyecto con esquema, CLI, consultas, sensatez del modelo e informe de revisión (A0–A7). Decididas A-a…A-d: A0–A2 justo después de C5. A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
