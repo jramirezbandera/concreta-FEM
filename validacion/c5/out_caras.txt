@@ -1,0 +1,25 @@
+# validacion/c5/caras.ts — 2026-10-08: caras comunes (C5-g) frente a la cara de cada pilar
+
+A, caras comunes:
+  8998 nudos, 75 plantillas
+B, cara de cada pilar en las bandas de pilares:
+  16919 nudos, 0 plantillas
+A con h = 0,375 m (referencia de malla):
+  23840 nudos, 80 plantillas
+
+Caras de bandas de pilares comparadas: 284 (no válidas en A o B: 0)
+
+cara común dentro de la huella (m) | caso | caras | My_A / My_B medio | mín | máx | caras con |My_A| < |My_B| | con |My_B| ≥ 30 kN·m: caras, medio, mín, máx
+0.000 | G | 177 | 1.0209 | 0.9633 | 1.2045 | 63 | 156 | 1.0176 | 0.9661 | 1.1801
+0.000 | Q | 177 | 1.0208 | 0.9635 | 1.2047 | 60 | 8 | 1.0125 | 0.9796 | 1.0639
+0.050 | G | 72 | 1.0574 | 1.0329 | 1.1230 | 0 | 68 | 1.0566 | 1.0329 | 1.1230
+0.050 | Q | 72 | 1.0574 | 1.0330 | 1.1196 | 0 | 4 | 1.0561 | 1.0481 | 1.0640
+0.100 | G | 35 | 1.1459 | 1.1196 | 1.2392 | 0 | 28 | 1.1361 | 1.1196 | 1.1748
+0.100 | Q | 35 | 1.1462 | 1.1195 | 1.2392 | 0 | 0 | — | — | —
+
+Malla: frente a A con h = 0,375 m en la misma cara (caso G, |My| ≥ 30 kN·m): medio, mín y máx
+
+cara común dentro de la huella (m) | caras | A / A fina | B / A fina (sólo donde coinciden)
+0.000 | 159 | 1.0057, 0.9617, 1.1437 | 0.9881, 0.9544, 1.0055
+0.050 | 70 | 0.9845, 0.9648, 1.0415 | —
+0.100 | 29 | 0.9654, 0.9576, 0.9879 | —

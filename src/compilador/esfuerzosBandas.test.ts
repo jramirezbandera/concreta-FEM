@@ -103,6 +103,34 @@ describe("integración exacta (C5, criterio 2)", () => {
     }
   });
 
+  it("con pilares de tamaños distintos, la cara común de cada línea sale recta en la malla: todas las caras son válidas y suman el corte de toda la losa (C5-g)", () => {
+    // Pilares de 30 × 30 y 40 × 40 alternos: cada línea corta por la cara del de 30, 5 cm dentro de
+    // la huella del de 40; con el h por defecto, en la rejilla alineada con sus plantillas
+    const base = losaPlana();
+    const f0: ModeloFisico = {
+      ...base,
+      secciones: [...base.secciones, { id: "p40", material: "HA", forma: "rectangular", b: 0.4, h: 0.4 }],
+      pilares: base.pilares!.map((p) => ((p.x / 6 + p.y / 5) % 2 ? { ...p, seccion: "p40" } : p)),
+    };
+    const f = { ...f0, bandas: proponerBandas(f0).bandas };
+    const r = compilar(f);
+    if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
+    expect(r.estadisticas.malla.plantillas).toBe(16);
+    const cs = casosValidos(calcular(r.modelo));
+    const e2 = new EsfuerzosBandas(f, r.modelo, cs);
+    const todas = e2.bandas.flatMap((id) => e2.estaciones(id)!);
+    expect(todas.filter((x) => x.tipo === "cara")).toHaveLength(14 * 6);
+    expect(todas.every((x) => x.valido)).toBe(true);
+    const ids = e2.bandas.filter((id) => id.startsWith("L:1:"));
+    const toda = new Cortes(r.modelo).cortar({ origen: [5.85, 7.5, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [-7.5, 7.5], z: [0, 0] }, cs);
+    expect(toda.valido).toBe(true);
+    for (const k of [0, 1]) {
+      let My = 0;
+      for (const id of ids) My += e2.estaciones(id)!.find((x) => x.tipo === "cara" && Math.abs(x.s - 5.85) < 1e-9)!.esfuerzos[6 * k + 4]!;
+      expect(rel(My, toda.esfuerzos[6 * k + 4]!)).toBeLessThan(1e-9);
+    }
+  });
+
   it("el trozo de losa entre las caras de un vano está en equilibrio con su carga (≤ 1e-9)", () => {
     // Pórtico virtual entero (toda la losa) entre x = 6,15 y x = 11,85, caso Q
     const [a, b] = [6.15, 11.85];

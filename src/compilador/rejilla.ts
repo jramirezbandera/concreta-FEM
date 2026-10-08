@@ -21,7 +21,9 @@
  *    con una red de cuadriláteros. En cada dirección, la red va por las líneas de la rejilla del
  *    bloque de celdas que ocupa y, en cada celda, por la cara que cae dentro (a no más del 70 % de la
  *    celda desde la línea interior) o por su punto medio; una cara sobre una línea del borde del
- *    bloque necesita fuera de las losas al otro lado (un pilar de fachada enrasado). En el borde del
+ *    bloque necesita fuera de las losas al otro lado (un pilar de fachada enrasado), salvo que esa
+ *    línea sea la de una cara de banda (un trazo exacto, C5-g): entonces el bloque crece una celda
+ *    más allá y la cara va por dentro, por la línea, que sigue recta de lado a lado. En el borde del
  *    bloque, los nudos son los de la rejilla partida; dentro, las esquinas de la huella, los puntos
  *    de sus caras sobre las líneas que la cruzan (por donde llegan las vigas) y, en el interior
  *    rígido, lo que haga falta. Sus celdas en una losa quedan cubiertas.
@@ -85,6 +87,8 @@ export interface EntradaRejilla {
   puntoEnLosa: readonly boolean[];
   /** Lados que no pueden ir por la rejilla (los de los ejes de los muros, ya sembrados). */
   fijos: readonly boolean[];
+  /** Lados de los trazos exactos (las caras de las bandas, C5-g). Sin él, ninguno. */
+  exactos?: readonly boolean[];
   /** Huellas de los pilares: sus puntos, en orden, y sus lados. */
   huellas: readonly { puntos: readonly number[]; lados: readonly number[] }[];
   regiones: readonly Region[];
@@ -112,10 +116,11 @@ export type NudoPlantilla = { tipo: "nudo"; n: number } | { tipo: "medio"; n1: n
 /**
  * Eje de la red de una plantilla en una dirección: línea del borde del bloque («b»), línea por dentro
  * de la huella («n»), cara de la huella dentro de una celda («f»), cara apoyada en una línea del
- * borde («bf») o punto medio de una celda sin cara (dentro de la huella, «m»).
+ * borde («bf»), cara sobre una línea por dentro del bloque («nf», la de una cara de banda) o punto
+ * medio de una celda sin cara (dentro de la huella, «m»).
  */
 interface EjePlantilla {
-  t: "b" | "n" | "f" | "bf" | "m";
+  t: "b" | "n" | "f" | "bf" | "nf" | "m";
   /** Línea de la rejilla, o −1 en una cara. */
   g: number;
   x: number;
@@ -125,8 +130,8 @@ interface ModoPlantilla {
   ejes: EjePlantilla[];
   /** Celdas del bloque en esta dirección. */
   celdas: number[];
-  /** Celdas al otro lado de las caras apoyadas en una línea. */
-  apoyo: number[];
+  /** Celda al otro lado de cada cara (la menor y la mayor) apoyada en una línea del borde, o null. */
+  apoyo: [number | null, number | null];
 }
 
 export interface Plantilla {
@@ -139,7 +144,10 @@ export interface Plantilla {
   losas: number[];
   /** Anillo de la huella en la red (índices), en sentido antihorario. */
   anillo: number[];
-  /** Aristas de la rejilla del borde con su punto medio en la red, y la losa de su celda. */
+  /**
+   * Aristas de la rejilla con su punto medio en la red (las del borde del bloque y las que cruzan una
+   * celda ganada por una cara de banda), y la losa de su celda.
+   */
   bordes: { n1: number; n2: number; losa: number }[];
   /** Lados del arreglo de la huella. */
   huellaLados: readonly number[];
@@ -389,6 +397,20 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
     return { horizontal, linea, nudos: [...(ea >= 0 ? [ea] : []), ...interiores.map(nudo), ...(eb >= 0 ? [eb] : [])] };
   });
 
+  // Líneas de caras de banda (las que llevan un lado de un trazo exacto, C5-g) y aristas de la
+  // rejilla que recorre un lado
+  const corteU = new Uint8Array(nu);
+  const corteV = new Uint8Array(nv);
+  const aristaDeLado = new Set<string>();
+  enLinea.forEach((el, k) => {
+    if (!el) return;
+    if (E.exactos?.[k]) (el.horizontal ? corteV : corteU)[el.linea] = 1;
+    for (let m = 0; m + 1 < el.nudos.length; m++) {
+      const [n1, n2] = [el.nudos[m]!, el.nudos[m + 1]!];
+      aristaDeLado.add(n1 < n2 ? `${n1},${n2}` : `${n2},${n1}`);
+    }
+  });
+
   // Celdas con rasgos ajenos a menos de δ: −1 ninguno, k sólo de la huella k, −2 otros
   const cerca = new Int32Array(nc).fill(-1);
   for (const { A, B, huella } of ajenos) {
@@ -415,19 +437,24 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
    * última por debajo de la huella a la primera por encima) y, en cada celda, la cara que cae dentro
    * (a no más del 70 % de la celda de la línea interior) o, si no hay ninguna, su punto medio. Una
    * cara sobre una línea del borde se apoya en ella: al otro lado tiene que estar fuera de las losas.
+   * Con `crecer` (la cara menor y la mayor), una cara sobre una línea de cara de banda (`corte`) no
+   * se apoya: el bloque crece una celda más allá y la cara va por dentro («nf»).
    */
-  const ejesDe = (L: readonly number[], f0: number, f1: number): ModoPlantilla | null => {
-    const lo = tramo(L, f0 + tol);
-    const hi = tramo(L, f1 - tol) + 1;
+  const ejesDe = (L: readonly number[], f0: number, f1: number, corte: Uint8Array, crecer: readonly [boolean, boolean]): ModoPlantilla | null => {
+    let lo = tramo(L, f0 + tol);
+    let hi = tramo(L, f1 - tol) + 1;
+    if (crecer[0] && lo >= 0 && corte[lo] === 1 && Math.abs(L[lo]! - f0) <= tol) lo--;
+    if (crecer[1] && hi < L.length && corte[hi] === 1 && Math.abs(L[hi]! - f1) <= tol) hi++;
     if (lo < 0 || hi > L.length - 1 || hi <= lo) return null;
     const ejes: EjePlantilla[] = [];
-    const apoyo: number[] = [];
+    const apoyo: [number | null, number | null] = [null, null];
     for (let m = lo; m <= hi; m++) {
-      const cara0 = m === lo && Math.abs(L[m]! - f0) <= tol;
-      const cara1 = m === hi && Math.abs(L[m]! - f1) <= tol;
-      ejes.push({ t: m === lo || m === hi ? (cara0 || cara1 ? "bf" : "b") : "n", g: m, x: cara0 ? f0 : cara1 ? f1 : L[m]! });
-      if (cara0) apoyo.push(m - 1);
-      if (cara1) apoyo.push(m);
+      const cara0 = Math.abs(L[m]! - f0) <= tol;
+      const cara1 = Math.abs(L[m]! - f1) <= tol;
+      const borde = m === lo || m === hi;
+      ejes.push({ t: borde ? (cara0 || cara1 ? "bf" : "b") : cara0 || cara1 ? "nf" : "n", g: m, x: cara0 ? f0 : cara1 ? f1 : L[m]! });
+      if (borde && cara0) apoyo[0] = m - 1;
+      if (borde && cara1) apoyo[1] = m;
       if (m === hi) break;
       const dentro = [f0, f1].filter((f) => f > L[m]! + tol && f < L[m + 1]! - tol);
       if (dentro.length > 1) return null;
@@ -443,11 +470,28 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
     return { ejes, celdas, apoyo };
   };
   const candidatas: { k: number; mu: ModoPlantilla; mv: ModoPlantilla }[] = [];
+  const dentroDeLosa = (a: number, b: number) => a >= 0 && b >= 0 && a <= nu - 2 && b <= nv - 2 && losaCelda[celda(a, b)]! >= 0;
   rects.forEach((r, k) => {
     if (!r) return;
-    const mu = ejesDe(U, r.u0, r.u1);
-    const mv = ejesDe(V, r.v0, r.v1);
-    if (!mu || !mv) return;
+    // Una cara sobre una línea de cara de banda con losa al otro lado: el bloque crece por ese lado
+    // (cada lado crece una vez como mucho, así que acaba)
+    const crecerU: [boolean, boolean] = [false, false];
+    const crecerV: [boolean, boolean] = [false, false];
+    let mu: ModoPlantilla | null;
+    let mv: ModoPlantilla | null;
+    for (;;) {
+      mu = ejesDe(U, r.u0, r.u1, corteU, crecerU);
+      mv = ejesDe(V, r.v0, r.v1, corteV, crecerV);
+      if (!mu || !mv) return;
+      let cambio = false;
+      for (const lado of [0, 1] as const) {
+        const a = mu.apoyo[lado];
+        if (a !== null && !crecerU[lado] && corteU[lado ? a : a + 1] === 1 && mv.celdas.some((b) => dentroDeLosa(a, b))) cambio = crecerU[lado] = true;
+        const b = mv.apoyo[lado];
+        if (b !== null && !crecerV[lado] && corteV[lado ? b : b + 1] === 1 && mu.celdas.some((a2) => dentroDeLosa(a2, b))) cambio = crecerV[lado] = true;
+      }
+      if (!cambio) break;
+    }
     // Sus puntos: las esquinas y los de sus caras sobre las líneas que la cruzan
     const enLinea = (m: ModoPlantilla, x: number) => m.ejes.some((e) => e.t === "n" && Math.abs(e.x - x) <= tol);
     for (const p of E.huellas[k]!.puntos) {
@@ -469,9 +513,8 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
         }
       }
     // Al otro lado de una cara apoyada en una línea, fuera de las losas (un pilar de fachada enrasado)
-    const dentroDeLosa = (a: number, b: number) => a >= 0 && b >= 0 && a <= nu - 2 && b <= nv - 2 && losaCelda[celda(a, b)]! >= 0;
-    if (mu.apoyo.some((a) => mv.celdas.some((b) => dentroDeLosa(a, b)))) return;
-    if (mv.apoyo.some((b) => mu.celdas.some((a) => dentroDeLosa(a, b)))) return;
+    if (mu.apoyo.some((a) => a !== null && mv!.celdas.some((b) => dentroDeLosa(a, b)))) return;
+    if (mv.apoyo.some((b) => b !== null && mu!.celdas.some((a) => dentroDeLosa(a, b)))) return;
     if (enLosa) candidatas.push({ k, mu, mv });
   });
   // Dos bloques que se solapan se quedan sin plantilla
@@ -612,12 +655,14 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
   const celdaEje = (m: ModoPlantilla, a: number) => m.celdas[m.ejes.slice(0, a + 1).filter(enRejilla).length - 1]!;
   const plantillas: Plantilla[] = elegidas.map(({ k, mu: mu0, mv: mv0 }) => {
     // El punto medio de una celda sin cara, sólo si su tramo va partido (en el borde del bloque es el
-    // punto medio de la arista de la rejilla)
-    const [jb, ib] = [mv0.ejes[0]!.g, mu0.ejes[0]!.g];
+    // punto medio de la arista de la rejilla). Las celdas del bloque en las losas son un solo tramo,
+    // así que vale cualquiera de sus líneas (la primera puede caer fuera de las losas)
+    const lineasU = mu0.ejes.filter(enRejilla).map((e) => e.g);
+    const lineasV = mv0.ejes.filter(enRejilla).map((e) => e.g);
     let q = -1;
-    const mu = { ...mu0, ejes: mu0.ejes.filter((e) => (e.t !== "f" && e.t !== "m" ? (q++, true) : e.t === "f" || partidaH[mu0.celdas[q]! + jb * (nu - 1)] === 1)) };
+    const mu = { ...mu0, ejes: mu0.ejes.filter((e) => (enRejilla(e) ? (q++, true) : e.t === "f" || lineasV.some((j) => partidaH[mu0.celdas[q]! + j * (nu - 1)] === 1))) };
     q = -1;
-    const mv = { ...mv0, ejes: mv0.ejes.filter((e) => (e.t !== "f" && e.t !== "m" ? (q++, true) : e.t === "f" || partidaV[ib + mv0.celdas[q]! * nu] === 1)) };
+    const mv = { ...mv0, ejes: mv0.ejes.filter((e) => (enRejilla(e) ? (q++, true) : e.t === "f" || lineasU.some((i) => partidaV[i + mv0.celdas[q]! * nu] === 1))) };
     const r = rects[k]!;
     const pts = E.huellas[k]!.puntos;
     for (const p of pts) absorbidos[p] = 1;
@@ -636,6 +681,18 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
     const red: NudoPlantilla[] = [];
     const bordes: Plantilla["bordes"] = [];
     const losaCuad = (a: number, b: number) => losa[celda(celdaEje(mu, Math.min(a, A - 2)), celdaEje(mv, Math.min(b, B - 2)))]!;
+    // Losa de alguno de los cuadriláteros que tocan el nudo (a, b) de la red, o −1
+    const losaAlrededor = (a: number, b: number) => {
+      let k = -1;
+      for (const x of [a - 1, a]) for (const y of [b - 1, b]) if (x >= 0 && y >= 0 && x <= A - 2 && y <= B - 2) k = Math.max(k, losaCuad(x, y));
+      return k;
+    };
+    // Punto medio de una celda que el bloque ha ganado por una cara de banda (fuera de la huella) o,
+    // por una línea que cruza la huella, el de una arista de la rejilla que recorre un lado (una cara
+    // de banda o un borde de losa que la atraviesan): un lado que va por esa línea sigue entero por
+    // la red
+    const medioEn = (x: EjePlantilla, f0: number, f1: number, y: EjePlantilla, n1: number, n2: number) =>
+      x.t === "m" && (x.x < f0 - tol || x.x > f1 + tol || (y.t === "n" && aristaDeLado.has(n1 < n2 ? `${n1},${n2}` : `${n2},${n1}`)));
     for (let b = 0; b < B; b++)
       for (let a = 0; a < A; a++) {
         const [eu, ev] = [mu.ejes[a]!, mv.ejes[b]!];
@@ -649,6 +706,14 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
           const [n1, n2] = [g(eu, mv.ejes[b - 1]!), g(eu, mv.ejes[b + 1]!)];
           red.push({ tipo: "medio", n1, n2 });
           bordes.push({ n1, n2, losa: losaCuad(a, b) });
+        } else if (enRejilla(eu) && b > 0 && b < B - 1 && medioEn(ev, r.v0, r.v1, eu, g(eu, mv.ejes[b - 1]!), g(eu, mv.ejes[b + 1]!))) {
+          const [n1, n2] = [g(eu, mv.ejes[b - 1]!), g(eu, mv.ejes[b + 1]!)];
+          red.push({ tipo: "medio", n1, n2 });
+          bordes.push({ n1, n2, losa: losaAlrededor(a, b) });
+        } else if (enRejilla(ev) && a > 0 && a < A - 1 && medioEn(eu, r.u0, r.u1, ev, g(mu.ejes[a - 1]!, ev), g(mu.ejes[a + 1]!, ev))) {
+          const [n1, n2] = [g(mu.ejes[a - 1]!, ev), g(mu.ejes[a + 1]!, ev)];
+          red.push({ tipo: "medio", n1, n2 });
+          bordes.push({ n1, n2, losa: losaAlrededor(a, b) });
         } else {
           // En la huella: en su borde, un punto de su cara; dentro (todo rígido), uno nuevo
           const [u, v] = [eu.x, ev.x];
@@ -659,7 +724,7 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
     const losas: number[] = [];
     for (let b = 0; b < B - 1; b++) for (let a = 0; a < A - 1; a++) losas.push(losaCuad(a, b));
     // Anillo de la huella: el borde del rectángulo de la red entre sus caras
-    const cara_ = (x: EjePlantilla) => x.t === "f" || x.t === "bf";
+    const cara_ = (x: EjePlantilla) => x.t === "f" || x.t === "bf" || x.t === "nf";
     const [a0, a1] = [mu.ejes.findIndex(cara_), mu.ejes.findLastIndex(cara_)];
     const [b0, b1] = [mv.ejes.findIndex(cara_), mv.ejes.findLastIndex(cara_)];
     const anilloH: number[] = [];

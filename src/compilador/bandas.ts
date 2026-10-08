@@ -18,6 +18,9 @@
  * 3. Banda central: lo que queda entre dos bandas de pilares vecinas, en el tramo que comparten.
  * 4. Una banda que queda con menos de la mitad de su área dentro de la losa (sin sus huecos) se
  *    descarta, con aviso.
+ * 5. Apoyos de cada banda (C5.2): el tramo de cada pilar a lo largo de d, con una cara común por
+ *    línea transversal de pilares (C5-g, `carasComunes`): todas las bandas cortan esa línea por las
+ *    mismas dos rectas, que la malla siembra enteras (E5-5).
  *
  * Las coordenadas van en la base (d, n) de la dirección: s = p·d a lo largo, t = p·n transversal.
  */
@@ -34,6 +37,8 @@ export const SEPARACION_MINIMA_ALINEACIONES = 1;
 export const FACTOR_TAU = 0.1;
 /** Fracción mínima del área de una banda dentro de la losa para conservarla. */
 export const FRACCION_MINIMA_BANDA = 0.5;
+/** Distancia mínima de la cara común al eje de cada pilar, en fracciones de su semiextensión (C5-g). */
+export const CARA_COMUN = 0.5;
 
 export interface PropuestaBandas {
   bandas: Banda[];
@@ -112,6 +117,58 @@ export function semiextension(h: Huella, d: Vec2): number {
   return (f.h / 2) * Math.abs(h.ez[0] * d[0] + h.ez[1] * d[1]) + (f.b / 2) * Math.abs(h.ey[0] * d[0] + h.ey[1] * d[1]);
 }
 
+/**
+ * Caras comunes de los apoyos a lo largo de d (C5-g): los pilares de una misma línea transversal
+ * comparten sus dos caras, la más interior de cada lado. Así todas las bandas cortan la línea por las
+ * mismas dos rectas, que se siembran enteras en la malla, sin quiebros ni rasgos de unos centímetros
+ * entre pilares de tamaños distintos. El corte de un pilar mayor cae dentro de su huella, del lado
+ * seguro: el momento de apoyo crece hacia el eje.
+ * 1. Líneas: los pilares cuyas huellas se solapan a lo largo de d, encadenadas.
+ * 2. Grupos de cada línea, de la menor semiextensión a la mayor: un pilar entra en el grupo mientras
+ *    la cara común quede, a los dos lados, a no menos de CARA_COMUN de su semiextensión de su eje
+ *    (con los ejes alineados, mientras no pase del doble de la menor); si no, empieza otro.
+ * Devuelve el tramo [s0, s1] de cada pilar (s = p·d).
+ */
+export function carasComunes(pilares: readonly { id: string; p: Vec2; huella: Huella }[], d: Vec2): Map<string, [number, number]> {
+  type Item = { id: string; s: number; e: number };
+  const items: Item[] = pilares.map((p) => ({ id: p.id, s: p.p[0] * d[0] + p.p[1] * d[1], e: semiextension(p.huella, d) })).sort((a, b) => a.s - a.e - (b.s - b.e) || (a.id < b.id ? -1 : 1));
+  const tramo = (g: Item[]): [number, number] => [Math.max(...g.map((x) => x.s - x.e)), Math.min(...g.map((x) => x.s + x.e))];
+  const cabe = (g: Item[]) => {
+    const [lo, hi] = tramo(g);
+    return g.every((x) => hi - x.s >= CARA_COMUN * x.e - 1e-12 && x.s - lo >= CARA_COMUN * x.e - 1e-12);
+  };
+  const r = new Map<string, [number, number]>();
+  const agrupar = (linea: Item[]) => {
+    linea.sort((a, b) => a.e - b.e || a.s - b.s || (a.id < b.id ? -1 : 1));
+    let grupo: Item[] = [];
+    const cerrar = () => {
+      const t = tramo(grupo);
+      for (const x of grupo) r.set(x.id, t);
+    };
+    for (const q of linea) {
+      if (grupo.length && cabe([...grupo, q])) grupo.push(q);
+      else {
+        if (grupo.length) cerrar();
+        grupo = [q];
+      }
+    }
+    cerrar();
+  };
+  // Líneas: huellas que se solapan a lo largo de d (por su comienzo s − e)
+  let linea: Item[] = [];
+  let fin = -Infinity;
+  for (const q of items) {
+    if (linea.length && q.s - q.e >= fin) {
+      agrupar(linea);
+      linea = [];
+    }
+    linea.push(q);
+    fin = Math.max(linea.length > 1 ? fin : -Infinity, q.s + q.e);
+  }
+  if (linea.length) agrupar(linea);
+  return r;
+}
+
 /** Agrupa los pilares por t (C5-b). */
 function alineaciones(pilares: PilarEnLosa[], d: Vec2, n: Vec2, epsSnap: number): { id: string; s: number; t: number }[][] {
   const pts = pilares.map((p) => ({ id: p.id, s: p.p[0] * d[0] + p.p[1] * d[1], t: p.p[0] * n[0] + p.p[1] * n[1] })).sort((a, b) => a.t - b.t || a.s - b.s || (a.id < b.id ? -1 : 1));
@@ -142,7 +199,7 @@ function rectangulo(b: Banda): Vec2[] {
 }
 
 /** Las bandas de una losa en una dirección (d a lo largo, n transversal). */
-function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[], d: Vec2, n: Vec2, etiqueta: string, diag: Diagnosticos): Banda[] {
+function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[], tramos: ReadonlyMap<string, [number, number]>, d: Vec2, n: Vec2, etiqueta: string, diag: Diagnosticos): Banda[] {
   const eps = ctx.op.epsGeom;
   const grupos = alineaciones(pilares, d, n, ctx.op.epsSnap);
   if (!grupos.length) {
@@ -198,13 +255,13 @@ function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[]
   });
 
   const bandas: Banda[] = [];
-  const huellaDe = new Map(pilares.map((p) => [p.id, p.huella]));
-  // Apoyos de una banda (C5.2): la huella de cada pilar a lo largo de d, desde su comienzo s0
+  // Apoyos de una banda (C5.2): el tramo de cada pilar a lo largo de d, con las caras comunes de su
+  // línea transversal (C5-g), desde el comienzo s0 de la banda
   const apoyosDe = (ps: { id: string; s: number }[], s0: number, s1: number): [number, number][] =>
     ps
       .map((q) => {
-        const e = semiextension(huellaDe.get(q.id)!, d);
-        return [redondear(Math.max(0, q.s - e - s0)), redondear(Math.min(s1 - s0, q.s + e - s0))] as [number, number];
+        const [a, c] = tramos.get(q.id)!;
+        return [redondear(Math.max(0, a - s0)), redondear(Math.min(s1 - s0, c - s0))] as [number, number];
       })
       .filter(([a, c]) => c >= a)
       .filter(([a, c], i, todos) => todos.findIndex(([x, y]) => x === a && y === c) === i)
@@ -264,11 +321,19 @@ export function proponerBandas(fisico: ModeloFisico, opciones: OpcionesCompilaci
   const ctx = validar(fisico, resolverOpciones(opciones), diag);
   if (!ctx || diag.hayErrores) return { bandas: [], diagnosticos: diag.lista };
   const bandas: Banda[] = [];
-  for (const l of ctx.losas) {
-    const pilares = pilaresEnLosa(ctx, l);
+  const enLosa = ctx.losas.map((l) => pilaresEnLosa(ctx, l));
+  ctx.losas.forEach((l, i) => {
+    const pilares = enLosa[i]!;
     const d = direccionEje1(l.losa.eje1 ?? 0);
     const n: Vec2 = [-d[1], d[0]];
-    bandas.push(...bandasDireccion(ctx, l, pilares, d, n, "1", diag), ...bandasDireccion(ctx, l, pilares, n, d, "2", diag));
-  }
+    // Las caras comunes, con los pilares de todas las losas de la planta (C5-g): una línea
+    // transversal de pilares es la misma en dos losas vecinas
+    const dePlanta = new Map<string, PilarEnLosa>();
+    ctx.losas.forEach((o, j) => {
+      if (o.losa.planta === l.losa.planta) for (const p of enLosa[j]!) dePlanta.set(p.id, p);
+    });
+    const todos = [...dePlanta.values()];
+    bandas.push(...bandasDireccion(ctx, l, pilares, carasComunes(todos, d), d, n, "1", diag), ...bandasDireccion(ctx, l, pilares, carasComunes(todos, n), n, d, "2", diag));
+  });
   return { bandas, diagnosticos: diag.lista };
 }

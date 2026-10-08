@@ -425,8 +425,9 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     for (const b of ctx.bandas) {
       if (b.planta !== idPlanta) continue;
       a.trazo(b.id, "banda", -1, rectanguloBanda(b.desde, b.hasta, b.ancho), true);
-      // Las caras de sus apoyos, a lo ancho (C5.2): sus cortes por fuerzas nodales son exactos
-      for (const e of estacionesBanda(b, epsGeom)) if (e.tipo === "cara") a.trazo(b.id, "banda", -1, ladoEstacion(b, e.s), false);
+      // Las caras de sus apoyos, a lo ancho (C5.2): sus cortes por fuerzas nodales son exactos. Son
+      // trazos exactos (C5-g): ni se doblan hacia la esquina de un pilar cercano ni la mueven
+      for (const e of estacionesBanda(b, epsGeom)) if (e.tipo === "cara") a.trazo(b.id, "banda", -1, ladoEstacion(b, e.s), false, true);
     }
     const trazoCarga = new Map<string, Trazo>();
     for (const c of cargas) {

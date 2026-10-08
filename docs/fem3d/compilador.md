@@ -338,6 +338,9 @@ Se hace por partes, cada una con sus tests y su commit:
    - el centro de cada vano.
 
    Las líneas de las caras se siembran en la malla a lo ancho de la banda, como sus bordes (C2), para que su corte por fuerzas nodales sea exacto (E5-5).
+7. **Caras comunes** (C5-g): los pilares de una misma línea transversal comparten sus dos caras, la más interior de cada lado, mientras esa cara quede a no menos de la mitad de la semiextensión de cada pilar de su eje (con ejes alineados, mientras ninguno pase del doble del menor). Así todas las bandas cortan la línea por las mismas dos rectas. El corte de un pilar mayor cae dentro de su huella, del lado seguro.
+
+   En la malla, las caras son **trazos exactos**: el arreglo sólo los une, y sólo une a ellos lo que no es exacto, a ≤ ε_geom, así que no se doblan hacia la esquina de un pilar a 5 cm. Son líneas de la rejilla alineada. Una cara sobre una línea del borde del bloque de una plantilla de pilar hace crecer el bloque una celda, y la cara va por dentro. Sin caras de banda, la malla de C2–C4 no cambia (bit a bit).
 
 **Cómo se integran** (C5.2, E5):
 1. **Por caso:** en cada estación, un corte de la banda (`Cortes`) da [N, Vy, Vz, T, My, Mz] en los ejes de la banda.
@@ -378,6 +381,7 @@ Lo que es lineal en los casos (una sección fija, una reacción) se da por caso,
 | C5-d | Reparto pilares/central | **El que da el cálculo** (el corte de cada banda), con un aviso si sale del 60–80 % (negativos) o del 50–70 % (positivos) de la tabla I.1 | Por elementos finitos el reparto ya sale del cálculo; la tabla es la referencia del método simplificado | Imponer la tabla |
 | C5-e | Machones de borde con pilar | El pilar unido al muro en la cota va **aparte** (su barra), y se dice en el resultado del machón | Sólo se unen en la cota (C3); sumarlo sería otra pieza | Sumarlo al machón |
 | C5-f | Combinaciones | **De `src/combinaciones/`** cuando los casos llevan `accion`; si no, por caso o con factores dados | El generador CTE/NCSE ya está validado (fase 1 de S1) | Sólo por caso |
+| C5-g | Caras de los apoyos (decidida por el usuario el 2026-10-08, opción A) | **Una cara común por línea transversal de pilares**, la más interior, sembrada como trazo exacto (`CARA_COMUN` = 0,5) | Con la cara de cada pilar (C5.2), en el edificio objetivo con losa plana la malla pasaba de 6 409 nudos (sólo los bordes de las bandas) a 19 611, sin plantillas, y 32 de 536 caras no daban corte: los pilares de una línea cambian de 5 en 5 cm y el arreglo doblaba las caras hacia sus esquinas. Con la cara común: 8 998 nudos, 75 plantillas y 536 caras válidas (`validacion/c5/out_malla.txt`). El corte 5 cm dentro de la huella da un momento de apoyo un 5,7 % mayor que en la cara del pilar, y 10 cm dentro, un 14 % (`out_caras.txt`) | La cara de cada pilar (C5.2); cortar las caras por campos (−5 a −17 %, del lado inseguro) |
 
 **Lo que C5 deja fuera:**
 - el punzonamiento a 2d (necesita cortes por polilínea cerrada, E5);

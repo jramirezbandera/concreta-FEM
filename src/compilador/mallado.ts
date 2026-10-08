@@ -347,7 +347,8 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     });
     // Huellas de los pilares: sus puntos y sus lados
     const huellas = arreglo.trazos.flatMap((t, ti) => (t.tipo === "huella" ? [{ puntos: t.puntos, lados: lados.flatMap((l, k) => (l.trazos.includes(ti) ? [k] : [])) }] : []));
-    rj = rejillaPlanta({ P, lados, ladoEnLosa, puntoEnLosa, fijos, huellas, regiones, enLosa, O: origenes[0]!, e: losas[0]!.eje1, h, epsGeom });
+    const exactos = lados.map((l) => l.trazos.some((t) => arreglo.trazos[t]!.exacto));
+    rj = rejillaPlanta({ P, lados, ladoEnLosa, puntoEnLosa, fijos, exactos, huellas, regiones, enLosa, O: origenes[0]!, e: losas[0]!.eje1, h, epsGeom });
   }
   // Punto (índice en P) de cada nudo de la rejilla que se usa
   const pNudo = new Map<number, number>();

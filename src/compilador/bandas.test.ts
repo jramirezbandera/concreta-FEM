@@ -88,6 +88,50 @@ describe("bandas propuestas frente a un cálculo a mano (C5.1, criterio 1)", () 
     expect(b.get("L:1:C1-2")!.ancho).toBeCloseTo(5 - 1.5 - 1.5, 12);
   });
 
+  it("caras comunes (C5-g): una línea de pilares de tamaños distintos corta por la cara más interior; uno de más del doble, o con el eje desplazado, va aparte", () => {
+    const base = losaPlana();
+    const seccion: Record<string, string> = { "P6-5": "p40", "P6-10": "p40", "P6-15": "p70", "P12-5": "p40" };
+    const f: ModeloFisico = {
+      ...base,
+      secciones: [...base.secciones, { id: "p40", material: "HA", forma: "rectangular", b: 0.4, h: 0.4 }, { id: "p70", material: "HA", forma: "rectangular", b: 0.7, h: 0.7 }],
+      // P12-5, de 40 × 40, con el eje 10 cm a la derecha de los de su línea
+      pilares: base.pilares!.map((p) => ({ ...p, seccion: seccion[p.id] ?? p.seccion, ...(p.id === "P12-5" ? { x: 12.1 } : {}) })),
+    };
+    const { bandas, diagnosticos } = proponerBandas(f);
+    expect(diagnosticos).toEqual([]);
+    const b = porId(bandas);
+    const apoyos = (id: string) => b.get(id)!.apoyos!.map(([a, c]) => [Number(a.toFixed(9)), Number(c.toFixed(9))]);
+    // x = 6: los de 30 y 40 cortan por la cara del de 30 (5,85 y 6,15, dentro de la huella del de 40);
+    // el de 70 (0,35 > 2·0,15) por la suya. x = 12: el de 40 desplazado dejaría la cara común a 5 cm de
+    // su eje (< 0,5·0,20), así que va con la suya; los de 30, con la de ellos
+    expect(apoyos("L:1:P2")).toEqual([
+      [0, 0.15],
+      [5.85, 6.15],
+      [11.9, 12.3],
+      [17.85, 18],
+    ]);
+    expect(apoyos("L:1:P3")).toEqual([
+      [0, 0.15],
+      [5.85, 6.15],
+      [11.85, 12.15],
+      [17.85, 18],
+    ]);
+    expect(apoyos("L:1:P4")).toEqual([
+      [0, 0.15],
+      [5.65, 6.35],
+      [11.85, 12.15],
+      [17.85, 18],
+    ]);
+    // La central entre y = 10 y 15 junta los de sus dos alineaciones: corta por las caras de fuera
+    expect(apoyos("L:1:C3-4")).toEqual([
+      [0, 0.15],
+      [5.65, 6.35],
+      [5.85, 6.15],
+      [11.85, 12.15],
+      [17.85, 18],
+    ]);
+  });
+
   it("una losa sin dos pilares alineados no tiene bandas en esa dirección (aviso)", () => {
     const { bandas, diagnosticos } = proponerBandas(losaPlana({ pilares: [{ id: "A", x: 3, y: 3, desde: "C", hasta: "P1", seccion: "p" }] }));
     expect(bandas).toEqual([]);

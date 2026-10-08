@@ -20,6 +20,15 @@
  * 2 y 3 se repiten hasta que nada cambia. Al acabar no hay dos puntos a ≤ ε_snap, ni un punto a
  * ≤ ε_geom del interior de un segmento, ni cruces: lo que pide constrainautor.
  *
+ * Trazos exactos (las caras de las bandas, C5-g): sus vértices sólo se unen a lo que está a
+ * ≤ ε_geom, y sus segmentos y sus puntos (sus vértices y sus cruces) sólo parten o se parten a
+ * ≤ ε_geom. Así una línea de corte sembrada no se dobla hacia la esquina de un pilar a 5 cm, ni
+ * dobla nada hacia ella; lo que queda a menos de ε_snap de ella es un rasgo pequeño de la malla. Un
+ * vértice de otro trazo sí se une a ellos (a un punto exacto, o a la proyección sobre un segmento
+ * exacto, que lo parte sin doblarlo), pero el cruce de dos segmentos que no son exactos sólo se une a
+ * un punto exacto a ≤ ε_geom: si no, doblaría los dos. La regla de los dos puntos a ≤ ε_snap no vale
+ * para los exactos.
+ *
  * Los desplazamientos mayores que ε_geom (un vértice unido a otro sitio o un trazo doblado) quedan
  * en `movimientos`, para los avisos. Los de las vigas no: sus ejes no se mueven (C1 lleva el hueco
  * en un offset) y sólo se doblan los trazos que siembran la malla.
@@ -51,6 +60,8 @@ export interface Trazo {
   cerrado: boolean;
   /** Índices de sus puntos, en orden (sin repetir el primero si es cerrado). */
   puntos: number[];
+  /** Exacto: se une y se parte sólo a ≤ ε_geom. */
+  exacto: boolean;
 }
 
 export interface Movimiento {
@@ -101,8 +112,10 @@ export class Arreglo {
   private readonly epsSnap: number;
   private readonly gPuntos: Celdas<number>;
   private readonly gSegmentos: Celdas<string>;
-  /** Segmentos vivos: clave → extremos y número de trazos que lo usan. */
-  private readonly segmentos = new Map<string, { a: number; b: number; usos: number }>();
+  /** Segmentos vivos: clave → extremos, número de trazos que lo usan y cuántos de ellos son exactos. */
+  private readonly segmentos = new Map<string, { a: number; b: number; usos: number; exactos: number }>();
+  /** Puntos de los trazos exactos. */
+  private readonly exactos = new Set<number>();
 
   constructor(epsGeom: number, epsSnap: number) {
     this.epsGeom = epsGeom;
@@ -124,21 +137,23 @@ export class Arreglo {
     return i;
   }
 
-  private alta(a: number, b: number): void {
+  private alta(a: number, b: number, exacto: boolean): void {
     const k = clave(a, b);
     const s = this.segmentos.get(k);
     if (s) {
       s.usos++;
+      if (exacto) s.exactos++;
       return;
     }
-    this.segmentos.set(k, { a: Math.min(a, b), b: Math.max(a, b), usos: 1 });
+    this.segmentos.set(k, { a: Math.min(a, b), b: Math.max(a, b), usos: 1, exactos: exacto ? 1 : 0 });
     const [A, B] = [this.P(a), this.P(b)];
     this.gSegmentos.poner(k, Math.min(A[0], B[0]), Math.min(A[1], B[1]), Math.max(A[0], B[0]), Math.max(A[1], B[1]));
   }
 
-  private baja(a: number, b: number): void {
+  private baja(a: number, b: number, exacto: boolean): void {
     const k = clave(a, b);
     const s = this.segmentos.get(k)!;
+    if (exacto) s.exactos--;
     if (--s.usos > 0) return;
     this.segmentos.delete(k);
     const [A, B] = [this.P(a), this.P(b)];
@@ -158,8 +173,11 @@ export class Arreglo {
     return { t, d: Math.sqrt(ex * ex + ey * ey), X };
   }
 
-  /** Punto más cercano a q a ≤ r, o −1 (en empate, el de menor índice). */
-  private puntoCercano(q: Vec2, r: number): { i: number; d: number } {
+  /**
+   * Punto más cercano a q a ≤ r, o −1 (en empate, el de menor índice). Con `sinExactos`, los puntos
+   * exactos sólo cuentan a ≤ ε_geom.
+   */
+  private puntoCercano(q: Vec2, r: number, sinExactos = false): { i: number; d: number } {
     let mejor = -1;
     let dmin = Infinity;
     for (const i of this.gPuntos.buscar(q[0] - r, q[1] - r, q[0] + r, q[1] + r)) {
@@ -167,6 +185,7 @@ export class Arreglo {
       const dx = p.x - q[0];
       const dy = p.y - q[1];
       const d = Math.sqrt(dx * dx + dy * dy);
+      if (sinExactos && d > this.epsGeom && this.exactos.has(i)) continue;
       if (d <= r && (d < dmin || (d === dmin && i < mejor))) [mejor, dmin] = [i, d];
     }
     return { i: mejor, d: dmin };
@@ -214,15 +233,27 @@ export class Arreglo {
     return d;
   }
 
-  /** Vértice de algo: se une al punto o al segmento más cercano a ≤ ε_snap (regla 1). */
-  punto(q: Vec2, id: string, tipo: TipoTrazo | "punto", que: string): number {
-    const c = this.puntoCercano(q, this.epsSnap);
+  /** ¿Es exacto el segmento ab (lo usa algún trazo exacto)? */
+  private segmentoExacto(a: number, b: number): boolean {
+    return (this.segmentos.get(clave(a, b))?.exactos ?? 0) > 0;
+  }
+
+  /**
+   * Vértice de algo: se une al punto o al segmento más cercano a ≤ ε_snap (regla 1); el de un trazo
+   * exacto, a ≤ ε_geom, y queda como punto exacto.
+   */
+  punto(q: Vec2, id: string, tipo: TipoTrazo | "punto", que: string, exacto = false): number {
+    const r = exacto ? this.epsGeom : this.epsSnap;
+    const marcar = (i: number) => {
+      if (exacto) this.exactos.add(i);
+      return i;
+    };
+    const c = this.puntoCercano(q, r);
     if (c.i >= 0) {
       if (c.d > this.epsGeom && tipo !== "viga") this.movimientos.push({ id, tipo, que, distancia: c.d });
-      return c.i;
+      return marcar(c.i);
     }
     // Al segmento más cercano (en empate, el de menor clave)
-    const r = this.epsSnap;
     let mejor: { k: string; t: number; d: number; X: Vec2 } | null = null;
     for (const k of [...this.gSegmentos.buscar(q[0] - r, q[1] - r, q[0] + r, q[1] + r)].sort()) {
       const s = this.segmentos.get(k)!;
@@ -231,38 +262,40 @@ export class Arreglo {
     }
     if (mejor) {
       // Si la proyección cae junto a un punto, a ese punto
-      const c2 = this.puntoCercano(mejor.X, this.epsSnap);
+      const c2 = this.puntoCercano(mejor.X, r);
       if (c2.i >= 0) {
         const dx = this.puntos[c2.i]!.x - q[0];
         const dy = this.puntos[c2.i]!.y - q[1];
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d > this.epsGeom && tipo !== "viga") this.movimientos.push({ id, tipo, que, distancia: d });
-        return c2.i;
+        return marcar(c2.i);
       }
       if (mejor.d > this.epsGeom && tipo !== "viga") this.movimientos.push({ id, tipo, que, distancia: mejor.d });
       const s = this.segmentos.get(mejor.k)!;
       const n = this.nuevo(mejor.X[0], mejor.X[1]);
+      // En la proyección sobre un segmento exacto, el punto es suyo
+      if (s.exactos > 0) this.exactos.add(n);
       this.partir(s.a, s.b, [n]);
-      return n;
+      return marcar(n);
     }
-    return this.nuevo(q[0], q[1]);
+    return marcar(this.nuevo(q[0], q[1]));
   }
 
   /**
    * Trazo: une sus vértices (regla 1) y quita los repetidos seguidos. Devuelve null si le quedan
-   * menos de 2 puntos distintos (3 si es cerrado).
+   * menos de 2 puntos distintos (3 si es cerrado). Uno exacto se une sólo a ≤ ε_geom.
    */
-  trazo(id: string, tipo: TipoTrazo, ref: number, vertices: readonly Vec2[], cerrado: boolean): Trazo | null {
+  trazo(id: string, tipo: TipoTrazo, ref: number, vertices: readonly Vec2[], cerrado: boolean, exacto = false): Trazo | null {
     const ps: number[] = [];
     vertices.forEach((v, i) => {
-      const n = this.punto(v, id, tipo, `el vértice ${i + 1}`);
+      const n = this.punto(v, id, tipo, `el vértice ${i + 1}`, exacto);
       if (ps[ps.length - 1] !== n) ps.push(n);
     });
     if (cerrado && ps.length > 1 && ps[0] === ps[ps.length - 1]) ps.pop();
     if (ps.length < (cerrado ? 3 : 2)) return null;
-    const t: Trazo = { id, tipo, ref, cerrado, puntos: ps };
+    const t: Trazo = { id, tipo, ref, cerrado, puntos: ps, exacto };
     this.trazos.push(t);
-    this.recorrerLados(t, (a, b) => this.alta(a, b));
+    this.recorrerLados(t, (a, b) => this.alta(a, b, exacto));
     return t;
   }
 
@@ -283,10 +316,10 @@ export class Arreglo {
         const q = t.puntos[(i + 1) % n]!;
         if (!((p === a && q === b) || (p === b && q === a))) continue;
         const ins = p === a ? medio : [...medio].reverse();
-        this.baja(p, q);
+        this.baja(p, q, t.exacto);
         t.puntos.splice(i + 1, 0, ...ins);
         const cadena = [p, ...ins, q];
-        for (let j = 0; j + 1 < cadena.length; j++) this.alta(cadena[j]!, cadena[j + 1]!);
+        for (let j = 0; j + 1 < cadena.length; j++) this.alta(cadena[j]!, cadena[j + 1]!, t.exacto);
         i += ins.length;
         if (t.tipo !== "viga") {
           for (const m of ins) {
@@ -308,12 +341,12 @@ export class Arreglo {
     return false;
   }
 
-  /** ¿Parte el punto i al segmento ab? (regla 2) */
+  /** ¿Parte el punto i al segmento ab? (regla 2; con un punto o un segmento exacto, sólo a ≤ ε_geom) */
   private parte(i: number, a: number, b: number): { t: number } | null {
     const p = this.proyectar(this.P(i), a, b);
     if (!(p.t > 0 && p.t < 1)) return null;
     if (p.d <= this.epsGeom) return { t: p.t };
-    if (p.d > this.epsSnap) return null;
+    if (p.d > this.epsSnap || this.exactos.has(i) || this.segmentoExacto(a, b)) return null;
     const [A, B] = [this.P(a), this.P(b)];
     const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
     return p.t * L > this.epsSnap && (1 - p.t) * L > this.epsSnap ? { t: p.t } : null;
@@ -362,8 +395,12 @@ export class Arreglo {
         // Cruce en el primero (por clave): A + t·(B − A), con t = o3 / (o3 − o4)
         const t = o3 / (o3 - o4);
         const X: Vec2 = [A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])];
-        const c = this.puntoCercano(X, this.epsSnap);
+        // Con un segmento exacto, el cruce se une sólo a lo que está a ≤ ε_geom y es un punto exacto;
+        // el de dos segmentos que no lo son, a un punto exacto sólo a ≤ ε_geom (no se doblan hacia él)
+        const exacto = s.exactos > 0 || s2.exactos > 0;
+        const c = this.puntoCercano(X, exacto ? this.epsGeom : this.epsSnap, true);
         const i = c.i >= 0 ? c.i : this.nuevo(X[0], X[1]);
+        if (exacto) this.exactos.add(i);
         for (const [kk, ss] of [
           [k, s],
           [k2, s2],
