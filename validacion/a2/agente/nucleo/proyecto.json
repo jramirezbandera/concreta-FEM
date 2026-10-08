@@ -1,0 +1,455 @@
+{
+  "esquema": "concreta-fem/proyecto@1",
+  "nombre": "Retícula de una planta con núcleo de muros",
+  "modelo": {
+    "plantas": [
+      {
+        "id": "N1",
+        "altura": null
+      },
+      {
+        "id": "C",
+        "tipo": "sotano",
+        "altura": 1.5
+      }
+    ],
+    "materiales": [
+      {
+        "id": "HA-25",
+        "tipo": "hormigon",
+        "fck": 25
+      }
+    ],
+    "secciones": [
+      {
+        "id": "P50x50",
+        "material": "HA-25",
+        "forma": "rectangular",
+        "b": 0.5,
+        "h": 0.5
+      },
+      {
+        "id": "V30x50",
+        "material": "HA-25",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.5
+      }
+    ],
+    "pilares": [
+      {
+        "id": "P0-0",
+        "x": 0,
+        "y": 0,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P0-5",
+        "x": 0,
+        "y": 5,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P0-10",
+        "x": 0,
+        "y": 10,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P0-15",
+        "x": 0,
+        "y": 15,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P6-0",
+        "x": 6,
+        "y": 0,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P6-5",
+        "x": 6,
+        "y": 5,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P6-10",
+        "x": 6,
+        "y": 10,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P6-15",
+        "x": 6,
+        "y": 15,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P12-0",
+        "x": 12,
+        "y": 0,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P12-5",
+        "x": 12,
+        "y": 5,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P12-10",
+        "x": 12,
+        "y": 10,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P12-15",
+        "x": 12,
+        "y": 15,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P18-0",
+        "x": 18,
+        "y": 0,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P18-5",
+        "x": 18,
+        "y": 5,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P18-10",
+        "x": 18,
+        "y": 10,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "P18-15",
+        "x": 18,
+        "y": 15,
+        "desde": "C",
+        "hasta": "N1",
+        "seccion": "P50x50"
+      }
+    ],
+    "vigas": [
+      {
+        "id": "VX0",
+        "planta": "N1",
+        "puntos": [
+          [
+            -0.25,
+            0.1
+          ],
+          [
+            18.25,
+            0.1
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX5",
+        "planta": "N1",
+        "puntos": [
+          [
+            -0.25,
+            5
+          ],
+          [
+            18.25,
+            5
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX10",
+        "planta": "N1",
+        "puntos": [
+          [
+            -0.25,
+            10
+          ],
+          [
+            18.25,
+            10
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX15",
+        "planta": "N1",
+        "puntos": [
+          [
+            -0.25,
+            14.9
+          ],
+          [
+            18.25,
+            14.9
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VY0",
+        "planta": "N1",
+        "puntos": [
+          [
+            0.1,
+            -0.25
+          ],
+          [
+            0.1,
+            15.25
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VY6",
+        "planta": "N1",
+        "puntos": [
+          [
+            6,
+            -0.25
+          ],
+          [
+            6,
+            15.25
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VY12",
+        "planta": "N1",
+        "puntos": [
+          [
+            12,
+            -0.25
+          ],
+          [
+            12,
+            15.25
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VY18",
+        "planta": "N1",
+        "puntos": [
+          [
+            17.9,
+            -0.25
+          ],
+          [
+            17.9,
+            15.25
+          ]
+        ],
+        "seccion": "V30x50"
+      }
+    ],
+    "losas": [
+      {
+        "id": "L-N1",
+        "planta": "N1",
+        "contorno": [
+          [
+            -0.25,
+            -0.25
+          ],
+          [
+            18.25,
+            -0.25
+          ],
+          [
+            18.25,
+            15.25
+          ],
+          [
+            -0.25,
+            15.25
+          ]
+        ],
+        "huecos": [
+          [
+            [
+              6.6,
+              5.4
+            ],
+            [
+              11.4,
+              5.4
+            ],
+            [
+              11.4,
+              9.6
+            ],
+            [
+              6.6,
+              9.6
+            ]
+          ]
+        ],
+        "espesor": 0.22,
+        "material": "HA-25"
+      }
+    ],
+    "muros": [
+      {
+        "id": "NUCLEO",
+        "puntos": [
+          [
+            6,
+            5
+          ],
+          [
+            12,
+            5
+          ],
+          [
+            12,
+            10
+          ],
+          [
+            6,
+            10
+          ],
+          [
+            6,
+            5
+          ]
+        ],
+        "desde": "C",
+        "hasta": "N1",
+        "espesor": 0.25,
+        "material": "HA-25",
+        "base": "empotrado",
+        "huecos": [
+          {
+            "desde": 2.4,
+            "hasta": 3.4,
+            "z0": 0,
+            "z1": 1.2
+          }
+        ]
+      }
+    ],
+    "casos": [
+      {
+        "id": "G",
+        "pesoPropio": true
+      },
+      {
+        "id": "Q"
+      },
+      {
+        "id": "V"
+      }
+    ],
+    "cargas": [
+      {
+        "tipo": "superficie",
+        "id": "SU-N1",
+        "caso": "Q",
+        "planta": "N1",
+        "losa": "L-N1",
+        "q": [
+          0,
+          0,
+          -3
+        ]
+      },
+      {
+        "tipo": "pilar",
+        "id": "V-P0-0",
+        "caso": "V",
+        "pilar": "P0-0",
+        "ejes": "global",
+        "q": [
+          2,
+          0,
+          0
+        ]
+      },
+      {
+        "tipo": "pilar",
+        "id": "V-P0-5",
+        "caso": "V",
+        "pilar": "P0-5",
+        "ejes": "global",
+        "q": [
+          2,
+          0,
+          0
+        ]
+      },
+      {
+        "tipo": "pilar",
+        "id": "V-P0-10",
+        "caso": "V",
+        "pilar": "P0-10",
+        "ejes": "global",
+        "q": [
+          2,
+          0,
+          0
+        ]
+      },
+      {
+        "tipo": "pilar",
+        "id": "V-P0-15",
+        "caso": "V",
+        "pilar": "P0-15",
+        "ejes": "global",
+        "q": [
+          2,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "opciones": {
+    "tamanoMalla": 1
+  }
+}
