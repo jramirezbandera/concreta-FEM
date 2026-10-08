@@ -1,0 +1,1575 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:concreta-fem:proyecto@1",
+  "title": "Proyecto de Concreta FEM 3D",
+  "description": "Proyecto de Concreta FEM 3D: el modelo físico y sus opciones de compilación. Unidades kN y m.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Para el editor: ruta o URL de este esquema. No cambia nada del cálculo."
+    },
+    "esquema": {
+      "const": "concreta-fem/proyecto@1",
+      "description": "Versión del esquema del fichero."
+    },
+    "nombre": {
+      "type": "string",
+      "description": "Nombre del proyecto. No entra en la huella."
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripción libre. No entra en la huella."
+    },
+    "modelo": {
+      "$ref": "#/$defs/ModeloFisico"
+    },
+    "opciones": {
+      "$ref": "#/$defs/OpcionesCompilacion",
+      "description": "Opciones de compilación; por defecto, las decididas (C1-a, D4, C2-a…)."
+    }
+  },
+  "required": [
+    "esquema",
+    "modelo"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "ApoyoFisico": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "coartados": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6,
+          "description": "GDL coartados en ejes globales, [ux, uy, uz, rx, ry, rz]."
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "x",
+        "y",
+        "coartados"
+      ],
+      "additionalProperties": false
+    },
+    "ApoyoLineal": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "puntos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          }
+        },
+        "coartados": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6,
+          "description": "GDL coartados en ejes globales, [ux, uy, uz, rx, ry, rz]."
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "puntos",
+        "coartados"
+      ],
+      "additionalProperties": false,
+      "description": "Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa o del eje de un muro (C3)."
+    },
+    "Banda": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "desde": {
+          "$ref": "#/$defs/Vec2"
+        },
+        "hasta": {
+          "$ref": "#/$defs/Vec2"
+        },
+        "ancho": {
+          "type": "number"
+        },
+        "tipo": {
+          "enum": [
+            "central",
+            "pilares"
+          ],
+          "description": "C5: banda de pilares o central (Anejo I). Una banda dibujada por el usuario puede no tenerlo."
+        },
+        "origen": {
+          "enum": [
+            "propuesta",
+            "usuario"
+          ],
+          "description": "C5 (D5): \"propuesta\" si la dio `proponerBandas` y no se ha tocado; \"usuario\" si la creó o la\neditó (la memoria las distingue). Por defecto, \"usuario\"."
+        },
+        "apoyos": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "description": "C5.2: tramos del eje ocupados por apoyos (la huella de un pilar, o la línea de sus caras en una\nbanda central), como [desde, hasta] en m desde `desde`. Sus extremos son las caras: se siembran\na lo ancho de la banda (cortes exactos por fuerzas nodales, E5-5) y son las estaciones de los\nmomentos de apoyo; los centros entre apoyos, las de vano. Sin ellos, la banda sólo se siembra\npor su contorno (C2)."
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "desde",
+        "hasta",
+        "ancho"
+      ],
+      "additionalProperties": false,
+      "description": "Banda de dimensionado (D5): el rectángulo de eje `desde` → `hasta` y anchura `ancho`. En C2 sólo\nse siembran sus lados en la malla, para que los cortes por fuerzas nodales en sus extremos (las\ncaras de los apoyos) y en sus bordes sean exactos (E5-5); las automáticas y su integración son\nde C5."
+    },
+    "CargaFisica": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "puntual"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "planta": {
+              "type": "string",
+              "description": "Punto en planta y planta: cae en un pilar, en un nudo, sobre una viga o en una losa."
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "F": {
+              "$ref": "#/$defs/Vec3",
+              "description": "Fuerza, kN, y momento, kN·m, en ejes globales."
+            },
+            "M": {
+              "$ref": "#/$defs/Vec3"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "planta",
+            "x",
+            "y"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "viga"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "viga": {
+              "type": "string"
+            },
+            "ejes": {
+              "enum": [
+                "global",
+                "local"
+              ]
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "qb": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "desde": {
+              "type": "number"
+            },
+            "hasta": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "viga",
+            "ejes",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "pilar"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "pilar": {
+              "type": "string"
+            },
+            "ejes": {
+              "enum": [
+                "global",
+                "local"
+              ]
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "qb": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "desde": {
+              "type": "number"
+            },
+            "hasta": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "pilar",
+            "ejes",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "superficie",
+              "description": "Carga de superficie uniforme (C2), en kN/m² y ejes globales: sobre la losa `losa` o el paño\n`pano` (C4) enteros (sin sus huecos) o sobre la parte de las losas y los paños de la planta\nque cae en el polígono `zona` (si se dan los dos, la parte de esa losa o ese paño en la\nzona). Lo que cae fuera de las losas y los paños no es carga (C2-h)."
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "planta": {
+              "type": "string"
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "losa": {
+              "type": "string"
+            },
+            "pano": {
+              "type": "string",
+              "description": "Paño unidireccional (C4): la carga va sobre él entero (o sobre su parte en la zona)."
+            },
+            "zona": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Vec2"
+              }
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "planta",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "lineal",
+              "description": "Carga lineal uniforme sobre una polilínea de una planta (C2), en kN/m y ejes globales: sobre\nuna losa o sobre el eje de un muro (C3)."
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "planta": {
+              "type": "string"
+            },
+            "puntos": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Vec2"
+              }
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "planta",
+            "puntos",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "empuje",
+              "description": "Empuje sobre un muro (C3-h): presión normal a su cara del lado `lado` (donde está el terreno\no el agua), que empuja hacia el otro lado. Vale `p0` a la altura `z0` y `p1` a la `z1` (sobre\nla base del muro, m), varía linealmente entre ellas y es nula fuera; kN/m². Va sobre el muro\nentero, sin sus huecos."
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "muro": {
+              "type": "string"
+            },
+            "lado": {
+              "enum": [
+                "derecho",
+                "izquierdo"
+              ]
+            },
+            "z0": {
+              "type": "number"
+            },
+            "z1": {
+              "type": "number"
+            },
+            "p0": {
+              "type": "number"
+            },
+            "p1": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "muro",
+            "lado",
+            "z0",
+            "z1",
+            "p0",
+            "p1"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Cargas físicas (C1). Las repartidas van por unidad de longitud de la pieza (kN/m), en ejes\nglobales o locales, con variación lineal de `q` (en `desde`) a `qb` (en `hasta`). `desde` y\n`hasta` son estaciones de la pieza; por defecto, la pieza entera."
+    },
+    "CasoFisico": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "pesoPropio": {
+          "type": "boolean",
+          "description": "El peso propio de las piezas (γ·A) va a este caso. Como mucho, uno."
+        },
+        "accion": {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "$ref": "#/$defs/TipoAccion"
+            },
+            "familia": {
+              "type": "string",
+              "description": "Familia excluyente: como mucho un caso de la familia por combinación."
+            },
+            "psi": {
+              "$ref": "#/$defs/Psi",
+              "description": "ψ de la tabla 4.2 (Q, S, W y T)."
+            },
+            "permanente": {
+              "enum": [
+                "agua",
+                "empuje",
+                "peso"
+              ],
+              "description": "G: fila de la tabla 4.1 (peso propio y del terreno por defecto)."
+            },
+            "direccion": {
+              "enum": [
+                "X",
+                "Y"
+              ],
+              "description": "W, E y N: dirección horizontal; W y N, además, el signo."
+            },
+            "signo": {
+              "enum": [
+                -1,
+                1
+              ]
+            },
+            "derivadoDe": {
+              "type": "string",
+              "description": "N: id del caso vertical del que deriva (Hi = φ·Ni)."
+            },
+            "duracion": {
+              "$ref": "#/$defs/Duracion",
+              "description": "Por defecto: G permanente, Q media, S corta, W y T corta, E y A instantánea; N la de su origen."
+            }
+          },
+          "required": [
+            "tipo"
+          ],
+          "additionalProperties": false,
+          "description": "C5.4 (C5-f): la acción del caso, con los datos de `CasoCarga` de `src/combinaciones/` (tipo, ψ,\nfamilia, dirección…), para generar las combinaciones CTE/NCSE de las consultas. No cambia la\ncompilación. Sin ella, las consultas van por caso o con combinaciones dadas por sus factores."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Duracion": {
+      "enum": [
+        "corta",
+        "instantanea",
+        "larga",
+        "media",
+        "permanente"
+      ],
+      "description": "Clase de duración (DB SE-M tabla 2.2), para el kmod de la madera."
+    },
+    "HuecoMuro": {
+      "type": "object",
+      "properties": {
+        "desde": {
+          "type": "number",
+          "description": "Estaciones de sus bordes a lo largo del eje del muro, m."
+        },
+        "hasta": {
+          "type": "number"
+        },
+        "z0": {
+          "type": "number",
+          "description": "Alturas de sus bordes sobre la base del muro, m."
+        },
+        "z1": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "desde",
+        "hasta",
+        "z0",
+        "z1"
+      ],
+      "additionalProperties": false,
+      "description": "Hueco de un muro (C3): rectángulo en su alzado, dentro de un tramo."
+    },
+    "Liberacion": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        }
+      ],
+      "items": false,
+      "minItems": 6,
+      "maxItems": 6,
+      "description": "GDL liberados de un extremo, en ejes locales: [N, Vy, Vz, T, My, Mz]."
+    },
+    "Losa": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "contorno": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          },
+          "description": "Contorno exterior en planta, m: polígono simple de al menos 3 vértices."
+        },
+        "huecos": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Vec2"
+            }
+          },
+          "description": "Huecos: polígonos simples dentro del contorno, sin tocarse entre sí ni tocarlo."
+        },
+        "espesor": {
+          "type": "number",
+          "description": "Espesor, m (el de su rigidez)."
+        },
+        "material": {
+          "type": "string",
+          "description": "Material: hormigón o general."
+        },
+        "pp": {
+          "type": "number",
+          "description": "Peso propio, kN/m² (H24). Por defecto, γ·espesor: el de una losa maciza."
+        },
+        "eje1": {
+          "type": "number",
+          "description": "Dirección del eje 1 de sus láminas en planta, en grados desde +X (E3-2). Por defecto, 0. Orienta también la retícula de la malla."
+        },
+        "reticular": {
+          "$ref": "#/$defs/Reticular",
+          "description": "Forjado reticular (C4, D3): la losa es su zona aligerada, de canto total `espesor`, con nervios\nsegún el `eje1` y la perpendicular."
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "contorno",
+        "espesor",
+        "material"
+      ],
+      "additionalProperties": false,
+      "description": "Losa maciza (C2): una lámina plana en el plano de su planta."
+    },
+    "Material": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "tipo": {
+              "const": "hormigon"
+            },
+            "fck": {
+              "type": "number",
+              "description": "Resistencia característica, MPa. E = 8500·∛(fck + 8) MPa, como el solver de Concreta."
+            },
+            "nu": {
+              "type": "number",
+              "description": "Coeficiente de Poisson. Por defecto, 0,2."
+            },
+            "peso": {
+              "type": "number",
+              "description": "Peso específico, kN/m³. Por defecto, 25."
+            }
+          },
+          "required": [
+            "id",
+            "tipo",
+            "fck"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "tipo": {
+              "const": "acero"
+            },
+            "E": {
+              "type": "number",
+              "description": "Módulo de elasticidad, MPa. Por defecto, 210 000."
+            },
+            "peso": {
+              "type": "number",
+              "description": "Peso específico, kN/m³. Por defecto, 78,5."
+            }
+          },
+          "required": [
+            "id",
+            "tipo"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "tipo": {
+              "const": "general"
+            },
+            "E": {
+              "type": "number",
+              "description": "Módulos de elasticidad y de cortante, kN/m²."
+            },
+            "G": {
+              "type": "number"
+            },
+            "peso": {
+              "type": "number",
+              "description": "Peso específico, kN/m³."
+            }
+          },
+          "required": [
+            "id",
+            "tipo",
+            "E",
+            "G",
+            "peso"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ModeloFisico": {
+      "type": "object",
+      "properties": {
+        "plantas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Planta"
+          }
+        },
+        "materiales": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Material"
+          }
+        },
+        "secciones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Seccion"
+          }
+        },
+        "pilares": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Pilar"
+          }
+        },
+        "vigas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Viga"
+          }
+        },
+        "apoyos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ApoyoFisico"
+          }
+        },
+        "losas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Losa"
+          }
+        },
+        "apoyosLineales": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ApoyoLineal"
+          }
+        },
+        "bandas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Banda"
+          }
+        },
+        "muros": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Muro"
+          }
+        },
+        "panos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PanoUnidireccional"
+          },
+          "description": "C4: paños de forjado unidireccional."
+        },
+        "casos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CasoFisico"
+          }
+        },
+        "cargas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CargaFisica"
+          }
+        }
+      },
+      "required": [
+        "plantas",
+        "materiales",
+        "secciones",
+        "casos"
+      ],
+      "additionalProperties": false,
+      "description": "Modelo físico del compilador (C1: plantas, pilares, vigas, apoyos, casos y cargas; C2: losas,\napoyos lineales, bandas y cargas de superficie y lineales; C3: muros y empujes). Es lo que el\nusuario describe; el compilador lo convierte en el `ModeloAnalitico` del motor\n(`docs/fem3d/compilador.md`).\n\nConvenios:\n- Unidades kN y m (D1); los módulos elásticos, en kN/m², salvo los datos de material que se\n  dicen en MPa; el peso específico, en kN/m³.\n- Ejes globales X, Y en planta y Z hacia arriba, los del motor (cabecera de `motor/modelo.ts`).\n- Las plantas van de ARRIBA ABAJO, cada una con su altura de forjado a forjado hasta la de\n  encima, como `lib/edificio` de Concreta. Las cotas se derivan (`cotas.ts`); nunca se guardan\n  (H33, COM-17). Un nivel de cimentación es una planta más, de tipo `sotano`, que cuelga de la de\n  encima su propia altura.\n- Todo lo demás se sitúa en planta (x, y) y por la planta a la que pertenece.\n- Los `id` son únicos en todo el modelo (plantas, materiales, secciones, piezas, apoyos, casos y\n  cargas), así que un diagnóstico nombra el objeto sólo por su `id`.\n- Ejes locales de las piezas, los de las barras del motor (H02):\n  · viga: x a lo largo de cada tramo de su polilínea, en el sentido de sus puntos; z = +Z (el\n    canto, vertical); y = z × x;\n  · pilar: x hacia arriba; z = dirección del canto h en planta, girada `giro` grados desde +X;\n    y = z × x. Con giro 0, el canto h va según X y el ancho b según −Y.\n  Las liberaciones y las cargas \"local\" van en esos ejes.\n- Estaciones: distancia en m a lo largo de la pieza, desde el primer punto de una viga (sumando\n  sus tramos) o desde la base de un pilar.\n- Losas (C2): planas, en el plano de su planta (el plano medio a la cota del forjado). Su contorno\n  y sus huecos son polígonos simples en planta, en cualquier sentido y sin repetir el primer\n  punto. Los bordes van a ejes: un borde que se apoya en una viga se dibuja sobre su eje (C2-c).\n  Las láminas tienen la normal hacia +Z y el eje 1 en la dirección `eje1` (E3-2).\n- Muros (C3): verticales, de forjado a forjado, con el plano medio sobre su eje en planta (una\n  polilínea; cada tramo es un paño plano). Los bordes de las losas que se apoyan en un muro van\n  sobre su eje (C3-b). En alzado, la estación s va a lo largo del eje desde su primer punto\n  (sumando sus tramos) y la altura z, desde la cota de su base. Sus láminas tienen el eje 1\n  horizontal en el sentido del tramo, el 2 hacia +Z y el 3 (la normal) a la derecha del sentido\n  del eje en planta. «Izquierdo» y «derecho» son los lados del eje mirando en su sentido.\n- Forjados (C4): un reticular es una losa con `reticular` (los nervios van según su `eje1` y la\n  perpendicular); un unidireccional es un paño (`panos`) dibujado como una losa, a ejes, cuyas\n  viguetas van según su `direccion`. Cada vigueta es una pieza (`<paño>:v<n>`) con los ejes de\n  una viga: x a lo largo de ella, en el sentido de la dirección llevada a [0°, 180°) (las de 0° y\n  180° son las mismas), y z = +Z; sus estaciones van desde su primer extremo."
+    },
+    "ModificadoresBarra": {
+      "type": "object",
+      "properties": {
+        "A": {
+          "type": "number"
+        },
+        "Avy": {
+          "type": "number"
+        },
+        "Avz": {
+          "type": "number"
+        },
+        "J": {
+          "type": "number"
+        },
+        "Iy": {
+          "type": "number"
+        },
+        "Iz": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Multiplicadores de las propiedades de la sección (H47). Ausentes valen 1."
+    },
+    "ModificadoresPieza": {
+      "type": "object",
+      "properties": {
+        "todos": {
+          "$ref": "#/$defs/ModificadoresBarra"
+        },
+        "hormigon": {
+          "$ref": "#/$defs/ModificadoresBarra"
+        },
+        "acero": {
+          "$ref": "#/$defs/ModificadoresBarra"
+        },
+        "general": {
+          "$ref": "#/$defs/ModificadoresBarra"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Multiplicadores de rigidez de un tipo de pieza (H47, D4): `todos` vale para cualquier material y\nlos de un material lo completan o lo sustituyen campo a campo ({ ...todos, ...hormigon })."
+    },
+    "ModificadoresPiezas": {
+      "type": "object",
+      "properties": {
+        "pilares": {
+          "$ref": "#/$defs/ModificadoresPieza"
+        },
+        "vigas": {
+          "$ref": "#/$defs/ModificadoresPieza"
+        },
+        "viguetas": {
+          "$ref": "#/$defs/ModificadoresPieza",
+          "description": "Viguetas de los paños unidireccionales (C4). Su torsión ya va liberada (C4-c)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "MultiplicadoresLamina": {
+      "type": "object",
+      "properties": {
+        "f11": {
+          "type": "number",
+          "description": "Membrana: Nx frente a εx (f11), Ny frente a εy (f22) y Nxy frente a γxy (f12)."
+        },
+        "f22": {
+          "type": "number"
+        },
+        "f12": {
+          "type": "number"
+        },
+        "m11": {
+          "type": "number",
+          "description": "Flexión: Mx (m11), My (m22) y Mxy (m12)."
+        },
+        "m22": {
+          "type": "number"
+        },
+        "m12": {
+          "type": "number"
+        },
+        "v13": {
+          "type": "number",
+          "description": "Cortante transversal: Qx (v13) y Qy (v23)."
+        },
+        "v23": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Multiplicadores de rigidez por componente, en los ejes 1-2 de la lámina (D3). Por defecto, 1."
+    },
+    "Muro": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "puntos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          },
+          "description": "Eje en planta, m: polilínea de al menos dos puntos; cada tramo es un paño plano."
+        },
+        "desde": {
+          "type": "string",
+          "description": "Planta de su base y planta de su cabeza, como los pilares."
+        },
+        "hasta": {
+          "type": "string"
+        },
+        "espesor": {
+          "type": "number",
+          "description": "Espesor, m."
+        },
+        "material": {
+          "type": "string",
+          "description": "Material: hormigón o general."
+        },
+        "base": {
+          "enum": [
+            "articulado",
+            "empotrado",
+            "ninguno"
+          ],
+          "description": "Vínculo de la base (C3-f). Por defecto, \"empotrado\" (todos los nudos de la base). \"ninguno\": el\nmuro nace sobre una viga, una losa u otro muro, que tienen que llegarle."
+        },
+        "huecos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HuecoMuro"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "puntos",
+        "desde",
+        "hasta",
+        "espesor",
+        "material"
+      ],
+      "additionalProperties": false,
+      "description": "Muro (C3): láminas verticales de forjado a forjado, sobre una polilínea en planta."
+    },
+    "OpcionesCompilacion": {
+      "type": "object",
+      "properties": {
+        "epsGeom": {
+          "type": "number",
+          "description": "Tolerancia numérica, m: fusión silenciosa. Por defecto, 1e-6."
+        },
+        "epsSnap": {
+          "type": "number",
+          "description": "Tolerancia de modelado, m: fusión con aviso. Por defecto, 0,05 (H28)."
+        },
+        "factorZonaRigida": {
+          "type": "number",
+          "description": "Fracción rígida de los nudos de dimensión finita, en [0, 1] (C1-a). Por defecto, 0,5. Con 1, el\nnudo es infinitamente rígido, como en CYPECAD; con 0, se calcula de eje a eje, como SAP2000 por\ndefecto."
+        },
+        "cortante": {
+          "type": "boolean",
+          "description": "Deformación por cortante (Timoshenko). Por defecto, sí."
+        },
+        "modificadores": {
+          "$ref": "#/$defs/ModificadoresPiezas",
+          "description": "Multiplicadores de rigidez, cada uno en (0, 100] (E6-1: uno enorme es una penalización). Por\ndefecto, `MODIFICADORES_D4`; si se dan, sustituyen enteros a los de por defecto, y `{}` los\nquita todos."
+        },
+        "tamanoMalla": {
+          "type": "number",
+          "description": "Tamaño de malla de las losas y los muros, h en m (C2-a, C3-a): la retícula de triángulos de las\nlosas va a 2h, y los muros llevan elementos de ~h. Por defecto, 0,75."
+        },
+        "rejilla": {
+          "type": "boolean",
+          "description": "Rejilla alineada en las zonas regulares de las losas (H52, C2-a): cuadriláteros de ≤ h en los\nejes de la losa donde la planta lo permite, y la triangulación restringida sólo alrededor de lo\nque no cae en ella. Por defecto, sí; sin ella, toda la losa va por la triangulación."
+        },
+        "torsionEquilibrio": {
+          "type": "boolean",
+          "description": "Torsión de equilibrio (C4-k): en los tramos de viga que sujetan viguetas en voladizo sin otro\napoyo en su línea (ni vano de atrás ni otra vigueta que compense su momento), la torsión no se\nreduce: los modificadores de J menores que 1 (D4) no se aplican. Por defecto, sí."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PanoUnidireccional": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "contorno": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          },
+          "description": "Contorno exterior en planta, m: polígono simple de al menos 3 vértices."
+        },
+        "huecos": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Vec2"
+            }
+          },
+          "description": "Huecos: polígonos simples dentro del contorno, sin tocarse entre sí ni tocarlo."
+        },
+        "direccion": {
+          "type": "number",
+          "description": "Dirección de las viguetas en planta, en grados desde +X."
+        },
+        "intereje": {
+          "type": "number",
+          "description": "Distancia entre ejes de viguetas, m."
+        },
+        "seccion": {
+          "type": "string",
+          "description": "Sección de una vigueta: la T bruta (bf = intereje) u otra. No pesa: el peso es el `pp`."
+        },
+        "pp": {
+          "type": "number",
+          "description": "Peso propio del forjado, kN/m² (H24): incluye las bovedillas, que la sección no conoce."
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "contorno",
+        "direccion",
+        "intereje",
+        "seccion",
+        "pp"
+      ],
+      "additionalProperties": false,
+      "description": "Paño de forjado unidireccional (C4, D2): viguetas como barras según `direccion`, cada\n`intereje`, dentro de su contorno (sin sus huecos). Vale también para placas alveolares y chapa\ncolaborante (barras unidireccionales con su intereje, H46). Su contorno va a ejes (C2-c): sobre\nlos ejes de las vigas y los muros en los que se apoya."
+    },
+    "PerfilCatalogo": {
+      "type": "object",
+      "properties": {
+        "A": {
+          "type": "number"
+        },
+        "Iy": {
+          "type": "number"
+        },
+        "Iz": {
+          "type": "number"
+        },
+        "It": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
+        },
+        "b": {
+          "type": "number"
+        },
+        "tf": {
+          "type": "number"
+        },
+        "tw": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "A",
+        "Iy",
+        "Iz",
+        "It",
+        "h",
+        "b",
+        "tf",
+        "tw"
+      ],
+      "additionalProperties": false,
+      "description": "Perfil de acero en I o H del catálogo de Concreta, en sus unidades (`src/data/steelProfiles.ts`:\nA en cm², Iy, Iz e It en cm⁴; h, b, tf y tw en mm). Iy es el eje fuerte (canto según z)."
+    },
+    "Pilar": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number",
+          "description": "Posición del eje en planta, m."
+        },
+        "y": {
+          "type": "number"
+        },
+        "desde": {
+          "type": "string",
+          "description": "Planta de su base y planta de su cabeza; entre ellas, un tramo por planta."
+        },
+        "hasta": {
+          "type": "string"
+        },
+        "seccion": {
+          "type": "string"
+        },
+        "tramos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "planta": {
+                "type": "string"
+              },
+              "seccion": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "planta",
+              "seccion"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Sección de algunos tramos, por la planta de su cabeza."
+        },
+        "giro": {
+          "type": "number",
+          "description": "Giro en planta de la dirección del canto h, en grados desde +X. Por defecto, 0."
+        },
+        "base": {
+          "enum": [
+            "articulado",
+            "empotrado",
+            "ninguno"
+          ],
+          "description": "Vínculo de la base. Por defecto, \"empotrado\". \"ninguno\" es un pilar que nace sobre otra pieza\n(apeado), que tiene que llegarle en esa planta."
+        },
+        "liberaciones": {
+          "type": "object",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/Liberacion"
+            },
+            "cabeza": {
+              "$ref": "#/$defs/Liberacion"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Liberaciones en la base física (tramo inferior) y en la cabeza física (tramo superior)."
+        }
+      },
+      "required": [
+        "id",
+        "x",
+        "y",
+        "desde",
+        "hasta",
+        "seccion"
+      ],
+      "additionalProperties": false
+    },
+    "Planta": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "tipo": {
+          "$ref": "#/$defs/TipoPlanta",
+          "description": "Como en `lib/edificio`: un sótano cuelga de la planta de encima. Por defecto, \"planta\"."
+        },
+        "altura": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "m, de forjado a forjado hasta la planta de encima; la de arriba del todo no la necesita."
+        },
+        "diafragma": {
+          "enum": [
+            "ninguno",
+            "rigido"
+          ],
+          "description": "Diafragma de la planta (C1-d). Por defecto, rígido en todas menos en la más baja, donde\nsuelen estar los arranques empotrados. Con losas, el rígido abarca los nudos que caen en ellas\n(C2-f) y \"ninguno\" es un forjado semirrígido (la membrana de las losas)."
+        }
+      },
+      "required": [
+        "id",
+        "altura"
+      ],
+      "additionalProperties": false
+    },
+    "Psi": {
+      "type": "object",
+      "properties": {
+        "psi0": {
+          "type": "number"
+        },
+        "psi1": {
+          "type": "number"
+        },
+        "psi2": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "psi0",
+        "psi1",
+        "psi2"
+      ],
+      "additionalProperties": false,
+      "description": "Coeficientes de simultaneidad ψ0, ψ1, ψ2 del CTE DB SE, tabla 4.2 (copiados del texto del DB SE,\nno de Concreta: `src/lib/calculations/loadGen.ts` da a la categoría E los valores de almacén\ndel Eurocódigo, 1,0/0,9/0,8, y el CTE dice 0,7/0,7/0,6)."
+    },
+    "Reticular": {
+      "type": "object",
+      "properties": {
+        "intereje": {
+          "type": "number",
+          "description": "Distancia entre ejes de nervios."
+        },
+        "nervio": {
+          "type": "number",
+          "description": "Ancho del nervio (bw)."
+        },
+        "capa": {
+          "type": "number",
+          "description": "Espesor de la capa de compresión (hf)."
+        },
+        "caseton": {
+          "enum": [
+            "perdido",
+            "recuperable"
+          ],
+          "description": "Casetón (C4-i). Por defecto, \"perdido\", el caso más común en obra: se queda en el forjado y su\npeso depende de su material, así que el `pp` de la losa es obligatorio. Con \"recuperable\", sin\n`pp` el peso es el del hormigón: γ·volumen en la zona aligerada y γ·h en los ábacos."
+        },
+        "abacos": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Vec2"
+            }
+          },
+          "description": "Ábacos: polígonos simples macizos (multiplicador 1). Pueden salirse de la losa: cuenta su\nparte dentro. No pueden solaparse entre sí."
+        },
+        "multiplicadores": {
+          "$ref": "#/$defs/MultiplicadoresLamina",
+          "description": "Multiplicadores de la zona aligerada dados por el usuario: sustituyen a los calculados y se\naplican sobre la maciza con el ν del material, como en SAP2000 (C4-h). Cada uno en (0, 100]."
+        }
+      },
+      "required": [
+        "intereje",
+        "nervio",
+        "capa"
+      ],
+      "additionalProperties": false,
+      "description": "Nervios de un forjado reticular (C4, D3), en m, iguales en las dos direcciones. Con ellos el\ncompilador calcula los multiplicadores de la zona aligerada (`reticular.ts`, C4-h). El `pp` de la\nlosa, si se da, es el peso medio de toda ella con los ábacos (C4-i)."
+    },
+    "Seccion": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "rectangular"
+            },
+            "b": {
+              "type": "number"
+            },
+            "h": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "b",
+            "h"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "circular"
+            },
+            "D": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "D"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "I"
+            },
+            "perfil": {
+              "$ref": "#/$defs/PerfilCatalogo"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "perfil"
+          ],
+          "additionalProperties": false,
+          "description": "Perfil en I o H del catálogo de Concreta, en sus unidades (cm², cm⁴ y mm)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "T"
+            },
+            "bf": {
+              "type": "number"
+            },
+            "hf": {
+              "type": "number"
+            },
+            "bw": {
+              "type": "number"
+            },
+            "h": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "bf",
+            "hf",
+            "bw",
+            "h"
+          ],
+          "additionalProperties": false,
+          "description": "T con el ala arriba: ala bf×hf y alma bw de canto total h. El eje pasa por su centro de gravedad."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "general"
+            },
+            "A": {
+              "type": "number"
+            },
+            "Iy": {
+              "type": "number"
+            },
+            "Iz": {
+              "type": "number"
+            },
+            "J": {
+              "type": "number"
+            },
+            "Avy": {
+              "type": "number"
+            },
+            "Avz": {
+              "type": "number"
+            },
+            "b": {
+              "type": "number"
+            },
+            "h": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "A",
+            "Iy",
+            "Iz",
+            "J"
+          ],
+          "additionalProperties": false,
+          "description": "Propiedades dadas (m², m⁴). Sin áreas de cortante, Euler–Bernoulli en ese plano. `b` y `h`,\nsi se dan, son la huella del pilar y el canto de la viga (sin ellos, no hay zonas rígidas)."
+        }
+      ],
+      "description": "Sección de pieza, en m. `b` va según y local y `h` (el canto) según z local. De la forma salen\nlas propiedades (`seccion3D()`) y la huella en planta del pilar, que fija sus zonas rígidas."
+    },
+    "TipoAccion": {
+      "enum": [
+        "A",
+        "E",
+        "G",
+        "N",
+        "Q",
+        "S",
+        "T",
+        "W"
+      ],
+      "description": "G permanente · Q uso · S nieve · W viento · T temperatura · E sismo · A accidental · N nocional."
+    },
+    "TipoPlanta": {
+      "enum": [
+        "cubierta",
+        "planta",
+        "sotano"
+      ]
+    },
+    "Vec2": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "Vec3": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "Viga": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "puntos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          },
+          "description": "Polilínea en planta, m, con al menos dos puntos distintos."
+        },
+        "seccion": {
+          "type": "string"
+        },
+        "liberaciones": {
+          "type": "object",
+          "properties": {
+            "inicio": {
+              "$ref": "#/$defs/Liberacion"
+            },
+            "fin": {
+              "$ref": "#/$defs/Liberacion"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Liberaciones en el primer punto (inicio) y en el último (fin)."
+        },
+        "insercion": {
+          "enum": [
+            "plano",
+            "superior"
+          ],
+          "description": "Punto de inserción (C1-c). \"plano\" (por defecto): el eje analítico en el plano del forjado.\n\"superior\": la cara superior en el plano del forjado y el eje h/2 más abajo (con diafragma\nrígido, la viga trabaja como una T de ala infinitamente rígida)."
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "puntos",
+        "seccion"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
