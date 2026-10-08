@@ -37,11 +37,18 @@
  *
  * Todo es lineal en (u, cargas): los esfuerzos de una combinación son la combinación de los de sus
  * casos.
+ *
+ * Rendimiento (C5, criterio 8): un corte sólo mira lo que tiene cerca, con un índice espacial
+ * (`indice.ts`) de láminas, barras y restricciones; el lado de cada nudo se calcula al pedirlo, y las
+ * fuerzas nodales de un elemento o de una restricción que ya pidió otro corte (con los mismos
+ * `casos`) se reutilizan. El resultado es el mismo, bit a bit, que recorriendo todo el modelo. Lo
+ * único que se mira en todo el modelo es si una barra con offsets es ambigua.
  */
 import { DiagramasBarras } from "./barras.ts";
 import type { ElementoMotor } from "./elementos.ts";
 import { Diagnosticos, listaIds, type Diagnostico } from "./diagnosticos.ts";
-import { FuerzasNodales } from "./fuerzasNodales.ts";
+import { FuerzasNodales, type FuerzasRestriccion } from "./fuerzasNodales.ts";
+import { cajaDe, IndiceCajas } from "./indice.ts";
 import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "./modelo.ts";
 
 /** Distancia al plano por debajo de la cual un nudo está en el corte (m): la tolerancia numérica de H28. */
@@ -107,10 +114,12 @@ export interface CortePreparado {
   ejes: Float64Array;
   y: readonly [number, number];
   z: readonly [number, number];
-  /** Lado de cada nudo: −1 (A), 0 (en el plano), +1 (B). */
-  lado: Int8Array;
+  /** Lado de un nudo: −1 (A), 0 (en el plano), +1 (B). Se calcula al pedirlo. */
+  lado(v: number): number;
   /** ¿Cae la proyección del punto dentro del rectángulo (con TOL_CORTE)? */
   dentro(p: ArrayLike<number>): boolean;
+  /** `dentro` del nudo v. */
+  dentroNudo(v: number): boolean;
   /** Coordenadas (x, y, z) del punto en los ejes del corte, respecto al origen. */
   coordenadas(p: ArrayLike<number>): [number, number, number];
 }
@@ -169,14 +178,111 @@ class Suma {
   }
 }
 
+/**
+ * Caja (global) del rectángulo de un corte, con holgura: lo que el corte puede tocar tiene su caja en
+ * el índice (las láminas, agrandada por su diámetro) cortándola.
+ */
+export function cajaCorte(cp: CortePreparado): { min: number[]; max: number[] } {
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (const y of cp.y)
+    for (const z of cp.z)
+      for (let c = 0; c < 3; c++) {
+        const v = cp.origen[c]! + y * cp.ejes[3 + c]! + z * cp.ejes[6 + c]!;
+        min[c] = Math.min(min[c]!, v - 4 * TOL_CORTE);
+        max[c] = Math.max(max[c]!, v + 4 * TOL_CORTE);
+      }
+  return { min, max };
+}
+
+/** Lado de las celdas del índice: el doble del diámetro medio de los elementos (o 1/16 del modelo, sin elementos). */
+export function ladoIndice(diametros: readonly number[], tamano: number): number {
+  const d = diametros.filter((x) => x > 0);
+  return Math.max(1e-3, d.length ? (2 * d.reduce((a, b) => a + b, 0)) / d.length : tamano / 16);
+}
+
 export class Cortes {
   readonly modelo: ModeloAnalitico;
   readonly fuerzas: FuerzasNodales;
   private diagramas: DiagramasBarras | null = null;
+  private indice: {
+    /** Láminas (caja agrandada por su diámetro) y barras (con sus offsets), por su posición en `fuerzas.elementos`. */
+    elementos: IndiceCajas;
+    /** Barras con algún offset (posición en `fuerzas.elementos`): las únicas que pueden ser ambiguas. */
+    conOffsets: number[];
+    /** Restricciones (caja de sus nudos agrandada por su diámetro). */
+    restricciones: IndiceCajas;
+    /** Caja de los nudos de cada restricción, sin agrandar (6 por restricción). */
+    cajasRestricciones: Float64Array;
+  } | null = null;
+
+  /**
+   * Fuerzas nodales de los elementos y de las restricciones que ya ha pedido algún corte, por la
+   * identidad de `casos` (los resultados de un cálculo, que no cambian): una lámina junto a un pilar
+   * o el enlace de su huella los piden varios cortes (sus dos caras, las muestras, las bandas de las
+   * dos direcciones). Son los mismos valores que se calcularían de nuevo.
+   */
+  private readonly guardados = new WeakMap<readonly ResultadoCaso[], { laminas: Map<number, Float64Array[]>; barras: Map<number, Float64Array[]>; restricciones: Map<string, Map<number, FuerzasRestriccion>[]> }>();
+
+  /** Lado de cada nudo del último corte preparado y su época (`preparar`). */
+  private lados = new Int8Array(0);
+  private epocas = new Uint32Array(0);
+  private epoca = 0;
 
   constructor(modelo: ModeloAnalitico) {
     this.modelo = modelo;
     this.fuerzas = new FuerzasNodales(modelo);
+  }
+
+  private guardado(casos: readonly ResultadoCaso[]) {
+    let g = this.guardados.get(casos);
+    if (!g) this.guardados.set(casos, (g = { laminas: new Map(), barras: new Map(), restricciones: new Map() }));
+    const { laminas, barras, restricciones } = g;
+    const pedir = <K, V>(m: Map<K, V>, k: K, f: () => V): V => {
+      let v = m.get(k);
+      if (v === undefined) m.set(k, (v = f()));
+      return v;
+    };
+    return {
+      lamina: (l: number) => pedir(laminas, l, () => this.fuerzas.laminaCasos(l, casos)),
+      barra: (b: number) => pedir(barras, b, () => this.fuerzas.barraCasos(b, casos)),
+      restricciones: (cuales: readonly number[]) => pedir(restricciones, cuales.join(","), () => this.fuerzas.restricciones(casos, cuales)),
+    };
+  }
+
+  /** Índices espaciales de elementos y restricciones (C5, criterio 8), la primera vez que se piden. */
+  private indices(): NonNullable<Cortes["indice"]> {
+    if (this.indice) return this.indice;
+    const { xyz, tamano } = this.fuerzas.geo;
+    const els = this.fuerzas.elementos;
+    const cajas = new Float64Array(6 * els.length).fill(NaN);
+    const conOffsets: number[] = [];
+    const diametros: number[] = [];
+    els.forEach((e, p) => {
+      if (e.tipo === "lamina") {
+        cajas.set(cajaDe(xyz, e.nudos, [], true, TOL_CORTE), 6 * p);
+        const b = cajaDe(xyz, e.nudos);
+        diametros.push(Math.sqrt((b[3]! - b[0]!) ** 2 + (b[4]! - b[1]!) ** 2 + (b[5]! - b[2]!) ** 2));
+      } else if (e.tipo === "barra") {
+        const pb = e.barra!;
+        cajas.set(cajaDe(xyz, e.nudos, [pb.ip, pb.jp], false, TOL_CORTE), 6 * p);
+        const [i, j] = e.nudos as [number, number];
+        let igual = true;
+        for (let q = 0; q < 3; q++) igual &&= pb.ip[q] === xyz[3 * i + q] && pb.jp[q] === xyz[3 * j + q];
+        if (!igual) conOffsets.push(p);
+      }
+    });
+    const lado = ladoIndice(diametros, tamano);
+    const lista = this.modelo.restricciones ?? [];
+    const cajasR = new Float64Array(6 * lista.length);
+    const agrandadas = new Float64Array(6 * lista.length);
+    lista.forEach((rs, ir) => {
+      const nudos = [rs.maestro, ...rs.esclavos];
+      cajasR.set(cajaDe(xyz, nudos), 6 * ir);
+      agrandadas.set(cajaDe(xyz, nudos, [], true, TOL_CORTE), 6 * ir);
+    });
+    this.indice = { elementos: new IndiceCajas(cajas, lado), conOffsets, restricciones: new IndiceCajas(agrandadas, lado), cajasRestricciones: cajasR };
+    return this.indice;
   }
 
   /** Comprueba la definición y prepara los ejes y el lado de cada nudo; null si no es válida. */
@@ -211,18 +317,31 @@ export class Cortes {
       const d2 = q[2]! - O[2]!;
       return [d0 * ejes[0]! + d1 * ejes[1]! + d2 * ejes[2]!, d0 * ejes[3]! + d1 * ejes[4]! + d2 * ejes[5]!, d0 * ejes[6]! + d1 * ejes[7]! + d2 * ejes[8]!];
     };
-    const dentro = (q: ArrayLike<number>) => {
-      const [, cy, cz] = coordenadas(q);
+    // Las cuentas de `coordenadas`, sin crear el array
+    const enRectangulo = (q0: number, q1: number, q2: number) => {
+      const d0 = q0 - O[0]!;
+      const d1 = q1 - O[1]!;
+      const d2 = q2 - O[2]!;
+      const cy = d0 * ejes[3]! + d1 * ejes[4]! + d2 * ejes[5]!;
+      const cz = d0 * ejes[6]! + d1 * ejes[7]! + d2 * ejes[8]!;
       return cy >= y[0] - TOL_CORTE && cy <= y[1] + TOL_CORTE && cz >= z[0] - TOL_CORTE && cz <= z[1] + TOL_CORTE;
     };
     const { xyz } = this.fuerzas.geo;
+    const dentro = (q: ArrayLike<number>) => enRectangulo(q[0]!, q[1]!, q[2]!);
+    const dentroNudo = (v: number) => enRectangulo(xyz[3 * v]!, xyz[3 * v + 1]!, xyz[3 * v + 2]!);
+    // El lado de cada nudo, al pedirlo: un corte sólo mira los nudos de lo que tiene cerca. Los
+    // búferes se reutilizan entre cortes; `epoca` dice si el lado guardado es de este corte
     const nn = this.modelo.nudos.length;
-    const lado = new Int8Array(nn);
-    for (let v = 0; v < nn; v++) {
+    if (this.lados.length !== nn) [this.lados, this.epocas] = [new Int8Array(nn), new Uint32Array(nn)];
+    const { lados, epocas } = this;
+    const epoca = ++this.epoca;
+    const lado = (v: number) => {
+      if (epocas[v] === epoca) return lados[v]!;
       const d = (xyz[3 * v]! - O[0]!) * ex[0]! + (xyz[3 * v + 1]! - O[1]!) * ex[1]! + (xyz[3 * v + 2]! - O[2]!) * ex[2]!;
-      lado[v] = Math.abs(d) <= TOL_CORTE ? 0 : d < 0 ? -1 : 1;
-    }
-    return { corte, origen: O, ejes, y, z, lado, dentro, coordenadas };
+      epocas[v] = epoca;
+      return (lados[v] = Math.abs(d) <= TOL_CORTE ? 0 : d < 0 ? -1 : 1);
+    };
+    return { corte, origen: O, ejes, y, z, lado, dentro, dentroNudo, coordenadas };
   }
 
   /**
@@ -242,6 +361,10 @@ export class Cortes {
     const { lado, origen: O, ejes } = cp;
     const { xyz } = this.fuerzas.geo;
     const X = (v: number) => xyz.subarray(3 * v, 3 * v + 3);
+    // Lo que puede tocar el rectángulo del corte (índice espacial), en el orden del modelo
+    const ind = this.indices();
+    const caja = cajaCorte(cp);
+    const cerca = ind.elementos.buscar(caja.min, caja.max).map((p) => this.fuerzas.elementos[p]!);
     const suma = new Suma(nc, O);
     const ext = { y: [Infinity, -Infinity] as [number, number], z: [Infinity, -Infinity] as [number, number] };
     let muestras: MuestrasCorte | undefined;
@@ -261,14 +384,15 @@ export class Cortes {
       const atraviesan: string[] = [];
       const bordes: string[] = [];
       const tocan: ElementoMotor[] = [];
-      for (const e of this.fuerzas.elementos) {
+      for (const e of cerca) {
         if (e.tipo !== "lamina") continue;
         let menos = 0;
         let mas = 0;
         const c = [0, 0, 0];
         for (const v of e.nudos) {
-          if (lado[v]! < 0) menos++;
-          else if (lado[v]! > 0) mas++;
+          const s = lado(v);
+          if (s < 0) menos++;
+          else if (s > 0) mas++;
           for (let q = 0; q < 3; q++) c[q]! += xyz[3 * v + q]! / 4;
         }
         if (menos === 0 || !cp.dentro(c)) continue;
@@ -280,11 +404,11 @@ export class Cortes {
         tocan.push(e);
       }
       for (const e of mixto ? [] : tocan) {
-        const enCorte = e.nudos.map((v, a) => [v, a] as const).filter(([v]) => lado[v] === 0);
+        const enCorte = e.nudos.map((v, a) => [v, a] as const).filter(([v]) => lado(v) === 0);
         if (enCorte.length === 0) continue;
         info.laminas.push(e.indice);
         if (enCorte.some(([v]) => !cp.dentro(X(v)))) bordes.push(e.id);
-        this.fuerzas.laminaCasos(e.indice, casos).forEach((g, k) => {
+        this.guardado(casos).lamina(e.indice).forEach((g, k) => {
           for (const [v, a] of enCorte) suma.agregar(k, X(v), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6));
         });
         for (const [v] of enCorte) extender(X(v));
@@ -317,28 +441,33 @@ export class Cortes {
     }
 
     // Barras
+    const ladoDe = (d: number) => (Math.abs(d) <= TOL_CORTE ? 0 : d < 0 ? -1 : 1);
+    // Con los dos nudos del mismo lado (o los dos en el plano), una barra sólo cruza si un offset saca
+    // el tramo flexible al otro lado: se mira en todas las que tienen offsets, estén donde estén
     const ambiguas: string[] = [];
-    for (const e of this.fuerzas.elementos) {
+    for (const p of ind.conOffsets) {
+      const e = this.fuerzas.elementos[p]!;
+      const [i, j] = e.nudos as [number, number];
+      const si = lado(i);
+      if (si === 0 || si !== lado(j)) continue;
+      if (ladoDe(this.distancia(cp, e.barra!.ip)) === -si || ladoDe(this.distancia(cp, e.barra!.jp)) === -si) ambiguas.push(e.id);
+    }
+    for (const e of cerca) {
       if (e.tipo !== "barra") continue;
       const [i, j] = e.nudos as [number, number];
-      const si = lado[i]!;
-      const sj = lado[j]!;
+      const si = lado(i);
+      const sj = lado(j);
+      if (si === sj) continue;
       const pb = e.barra!;
       const dIp = this.distancia(cp, pb.ip);
       const dJp = this.distancia(cp, pb.jp);
-      const ladoDe = (d: number) => (Math.abs(d) <= TOL_CORTE ? 0 : d < 0 ? -1 : 1);
-      if (si === sj) {
-        // Del mismo lado (o las dos en el plano): sólo puede cruzar si un offset saca el tramo flexible al otro lado
-        if (si !== 0 && (ladoDe(dIp) === -si || ladoDe(dJp) === -si)) ambiguas.push(e.id);
-        continue;
-      }
       if (si === 0 || sj === 0) {
         // Toca el plano en un nudo: entra si la barra queda del lado A
         const [n0, a0, otro] = si === 0 ? [i, 0, sj] : [j, 1, si];
         if (otro !== -1 || !cp.dentro(X(n0))) continue;
         info.barras.push(e.indice);
         extender(X(n0));
-        this.fuerzas.barraCasos(e.indice, casos).forEach((g, k) => {
+        this.guardado(casos).barra(e.indice).forEach((g, k) => {
           suma.agregar(k, X(n0), g.subarray(6 * a0, 6 * a0 + 3), g.subarray(6 * a0 + 3, 6 * a0 + 6));
         });
         continue;
@@ -382,7 +511,7 @@ export class Cortes {
         });
       } else {
         const [nA, aA] = aEsI ? [i, 0] : [j, 1];
-        this.fuerzas.barraCasos(e.indice, casos).forEach((g, k) => {
+        this.guardado(casos).barra(e.indice).forEach((g, k) => {
           suma.agregar(k, X(nA), g.subarray(6 * aA, 6 * aA + 3), g.subarray(6 * aA + 3, 6 * aA + 6), -1);
         });
       }
@@ -399,18 +528,52 @@ export class Cortes {
     const lista = this.modelo.restricciones ?? [];
     const incluidas: number[] = [];
     const nan = new Uint8Array(6);
-    lista.forEach((rs, ir) => {
-      const nudos = [rs.maestro, ...rs.esclavos];
-      const enA = nudos.filter((v) => lado[v] === -1);
-      if (enA.length === 0 || enA.length === nudos.length) return;
-      const dentro = enA.filter((v) => cp.dentro(X(v)));
-      if (dentro.length === 0) return;
-      if (dentro.length === enA.length) {
+    // Sólo las que pueden tener un nudo del lado A dentro del rectángulo: las cercanas (índice) cuya
+    // caja, proyectada sobre los ejes y, z del corte, alcanza el rectángulo
+    const yz = (ir: number) => {
+      const c = ind.cajasRestricciones;
+      for (const [e, [lo, hi]] of [
+        [3, cp.y],
+        [6, cp.z],
+      ] as const) {
+        let a = -O[0]! * ejes[e]! - O[1]! * ejes[e + 1]! - O[2]! * ejes[e + 2]!;
+        let b = a;
+        for (let q = 0; q < 3; q++) {
+          const [m, M] = [c[6 * ir + q]! * ejes[e + q]!, c[6 * ir + 3 + q]! * ejes[e + q]!];
+          a += Math.min(m, M);
+          b += Math.max(m, M);
+        }
+        if (b < lo - 2 * TOL_CORTE || a > hi + 2 * TOL_CORTE) return false;
+      }
+      return true;
+    };
+    for (const ir of ind.restricciones.buscar(caja.min, caja.max)) {
+      if (!yz(ir)) continue;
+      const rs = lista[ir]!;
+      // Sus nudos del lado A, dentro y fuera del rectángulo, y los demás; se para en cuanto está
+      // partida. Los esclavos se recorren alternando sus dos extremos: en un diafragma (numerado por
+      // coordenadas) así aparecen pronto nudos de los dos lados
+      let enA = false;
+      let otros = false;
+      let dentro = false;
+      let fuera = false;
+      const n = rs.esclavos.length;
+      for (let a = -1; a < n && !(otros && dentro && fuera); a++) {
+        const v = a < 0 ? rs.maestro : rs.esclavos[a % 2 ? n - 1 - (a >> 1) : a >> 1]!;
+        if (lado(v) !== -1) otros = true;
+        else {
+          enA = true;
+          if (cp.dentroNudo(v)) dentro = true;
+          else fuera = true;
+        }
+      }
+      if (!enA || !otros || !dentro) continue;
+      if (!fuera) {
         incluidas.push(ir);
-        return;
+        continue;
       }
       // Partida por el borde del rectángulo: no se puede atribuir al corte
-      const afectadas = this.componentesDe(rs.tipo, cp, nudos.map((v) => X(v)[2]!));
+      const afectadas = this.componentesDe(rs.tipo, cp, [X(rs.maestro)[2]!]);
       afectadas.forEach((a, c) => {
         if (a) nan[c] = 1;
       });
@@ -421,15 +584,15 @@ export class Cortes {
         [id, rs.id],
         { componentes: COMPONENTES.filter((_, c) => afectadas[c]) },
       );
-    });
+    }
     if (incluidas.length) {
       info.restricciones.push(...incluidas);
-      this.fuerzas.restricciones(casos, incluidas).forEach((fr, k) => {
+      this.guardado(casos).restricciones(incluidas).forEach((fr, k) => {
         for (const ir of incluidas) {
           const rs = lista[ir]!;
           const f = fr.get(ir)!;
           [rs.maestro, ...rs.esclavos].forEach((v, a) => {
-            if (lado[v] !== -1) return;
+            if (lado(v) !== -1) return;
             suma.agregar(k, X(v), f.subarray(6 * a, 6 * a + 3), f.subarray(6 * a + 3, 6 * a + 6));
             if (k === 0) extender(X(v));
           });

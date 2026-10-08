@@ -13,9 +13,9 @@
  *
  * Momentos medios por metro de ancho, para Wood–Armer (C5-c):
  * - mx = My/b, exacto;
- * - my (el que flecta la banda en transversal) y mxy, medias de las muestras de un corte «campos»
- *   a DELTA_MUESTRAS de la estación (en el plano exacto de una cara sembrada no hay láminas que
- *   atravesar).
+ * - my (el que flecta la banda en transversal) y mxy, medias de las muestras: en un vano, las de su
+ *   propio corte; en una cara, las de un corte «campos» a DELTA_MUESTRAS (en el plano exacto de una
+ *   cara sembrada no hay láminas que atravesar).
  * Wood–Armer va por combinación (H34), con (a) los momentos medios, por defecto, o (b) punto a punto
  * con las muestras corregidas para que integren el My exacto, y de ellas la media de lo que pide
  * cada punto.
@@ -48,7 +48,7 @@ export interface EstacionResultado {
   esfuerzos: Float64Array;
   /** [mx, my, mxy] medios por caso (3·nc), kN·m/m. my y mxy son NaN sin muestras. */
   medios: Float64Array;
-  /** Muestras del corte a DELTA_MUESTRAS: pesos (m) y [Mx, My, Mxy] por punto y caso (3·np por caso). */
+  /** Muestras (del corte del vano, o del corte a DELTA_MUESTRAS de la cara): pesos (m) y [Mx, My, Mxy] por punto y caso (3·np por caso). */
   muestras: { pesos: Float64Array; momentos: Float64Array[] } | null;
   /** Ids de las barras que atraviesan el corte (vigas embebidas en la banda, por ejemplo). */
   barras: string[];
@@ -102,9 +102,10 @@ export class EsfuerzosBandas {
     const nc = this.casos.length;
     return estacionesBanda(b, this.eps).map((e) => {
       const r = this.cortes.cortar(this.corte(b, e.s, e.tipo === "cara" ? "fuerzas-nodales" : "campos"), this.casos, this.campos);
-      // Muestras a δ de la estación, del lado del vano más largo (las dos caras de un apoyo miran a vanos distintos)
+      // Muestras: en un vano, las del propio corte (por campos); en una cara, las de un corte a δ, del
+      // lado del vano más largo (las dos caras de un apoyo miran a vanos distintos)
       const sm = e.s - DELTA_MUESTRAS > 0 ? e.s - DELTA_MUESTRAS : Math.min(L, e.s + DELTA_MUESTRAS);
-      const rm = this.cortes.cortar(this.corte(b, sm, "campos"), this.casos, this.campos);
+      const rm = e.tipo === "vano" ? r : this.cortes.cortar(this.corte(b, sm, "campos"), this.casos, this.campos);
       const ms = rm.valido && rm.muestras && rm.muestras.pesos.length ? rm.muestras : null;
       const medios = new Float64Array(3 * nc);
       let muestras: EstacionResultado["muestras"] = null;
@@ -140,7 +141,7 @@ export class EsfuerzosBandas {
         muestras,
         barras: r.barras.map((i) => this.modelo.barras![i]!.id),
         valido: r.valido,
-        diagnosticos: [...r.diagnosticos, ...rm.diagnosticos.filter((d) => d.severidad === "error")],
+        diagnosticos: [...r.diagnosticos, ...(rm === r ? [] : rm.diagnosticos.filter((d) => d.severidad === "error"))],
       };
     });
   }

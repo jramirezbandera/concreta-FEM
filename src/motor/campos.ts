@@ -33,7 +33,8 @@
  */
 import { PUNTOS_GAUSS } from "../elementos/dkmq.ts";
 import { coordenadasNaturales, funcionesForma, operadorResultantes, vectorALocales } from "../elementos/lamina.ts";
-import { TOL_CORTE, type CortePreparado, type InfoCorte, type IntegradorCampos, type MuestrasCorte } from "./cortes.ts";
+import { cajaCorte, ladoIndice, TOL_CORTE, type CortePreparado, type InfoCorte, type IntegradorCampos, type MuestrasCorte } from "./cortes.ts";
+import { cajaDe, IndiceCajas } from "./indice.ts";
 import { Diagnosticos, listaIds } from "./diagnosticos.ts";
 import { geometria, type Geometria } from "./geometria.ts";
 import { prepararLamina, type LaminaPreparada } from "./laminas.ts";
@@ -225,6 +226,12 @@ export class CamposLaminas implements IntegradorCampos {
   private readonly parchesCentro: (Parche | null | undefined)[] = [];
   private libres: Set<string> | null = null;
   private porLado: Map<string, number[]> | null = null;
+  /** Índice espacial de las láminas, para los cortes (C5, criterio 8). */
+  private indice: IndiceCajas | null = null;
+  /** Evaluadores de los cortes por desplazamientos: se reutilizan entre cortes con sus cachés. */
+  private readonly deCortes = new WeakMap<object, EvaluadorCampos>();
+  /** Operadores de resultantes de las últimas láminas evaluadas (`_operador`). */
+  private readonly operadores = new Map<number, Float64Array>();
 
   constructor(modelo: ModeloAnalitico, opciones: OpcionesCampos = {}) {
     this.modelo = modelo;
@@ -626,6 +633,21 @@ export class CamposLaminas implements IntegradorCampos {
     return this.libres;
   }
 
+  /** Índice espacial de las láminas (su caja con la holgura de los cortes), la primera vez que se pide. */
+  private indiceLaminas(): IndiceCajas {
+    if (this.indice) return this.indice;
+    const lista = this.modelo.laminas ?? [];
+    const cajas = new Float64Array(6 * lista.length);
+    const diametros: number[] = [];
+    lista.forEach((l, k) => {
+      cajas.set(cajaDe(this.geo.xyz, l.nudos, [], false, TOL_CORTE), 6 * k);
+      const b = cajaDe(this.geo.xyz, l.nudos);
+      diametros.push(Math.sqrt((b[3]! - b[0]!) ** 2 + (b[4]! - b[1]!) ** 2 + (b[5]! - b[2]!) ** 2));
+    });
+    this.indice = new IndiceCajas(cajas, ladoIndice(diametros, this.geo.tamano));
+    return this.indice;
+  }
+
   /**
    * Método «campos» de los cortes (IntegradorCampos), para las láminas que atraviesan el plano:
    * integra a lo largo de su intersección con el plano la fuerza y el momento por unidad de longitud
@@ -667,7 +689,11 @@ export class CamposLaminas implements IntegradorCampos {
     }
     const tramos: Tramo[] = [];
     const ext = { y: [Infinity, -Infinity] as [number, number], z: [Infinity, -Infinity] as [number, number] };
-    (this.modelo.laminas ?? []).forEach((l, k) => {
+    // Sólo las láminas que pueden cortar el rectángulo (índice espacial), en el orden del modelo
+    const caja = cajaCorte(cp);
+    const todas = this.modelo.laminas ?? [];
+    this.indiceLaminas().buscar(caja.min, caja.max).forEach((k) => {
+      const l = todas[k]!;
       if (this.regionDe[k]! < 0) return;
       const X = l.nudos.map((v) => xyz.subarray(3 * v, 3 * v + 3));
       const d = X.map((p) => {
@@ -825,7 +851,11 @@ export class CamposLaminas implements IntegradorCampos {
       suma[o + 5]! += w * (mm[2]! + rx * f[1]! - ry * f[0]!);
     };
     casos.forEach((r, kc) => {
-      const ev = this.evaluador(r.u);
+      // El evaluador de estos desplazamientos, con lo que ya calcularon los cortes anteriores (los
+      // mismos valores); cuenta las plazas degradadas que usa este corte
+      let ev = this.deCortes.get(r.u as object);
+      if (!ev) this.deCortes.set(r.u as object, (ev = this.evaluador(r.u)));
+      ev.empezar();
       const val = new Float64Array(8 * ns);
       for (let j = 0; j < ns; j++) {
         const k = m.laminas[j]!;
@@ -861,7 +891,7 @@ export class CamposLaminas implements IntegradorCampos {
         agregar(6 * kc, e.P, e.n.map((c) => fk * c), [0, 0, 0], 1);
       }
       m.valores.push(val);
-      degradadas = Math.max(degradadas, ev.degradadas);
+      degradadas = Math.max(degradadas, ev.usadasDegradadas);
     });
     if (degradadas) {
       const ids = [...new Set(tramos.map((t) => this.modelo.laminas![t.k]!.id))];
@@ -884,22 +914,54 @@ export class CamposLaminas implements IntegradorCampos {
   /** @internal */ _plan(p: number): PlanNudo {
     return this.plan(p);
   }
+  /**
+   * @internal Operador de resultantes de la lámina k (768): no depende del caso, así que los
+   * evaluadores de los casos de un mismo corte lo comparten. Se guardan los últimos que se piden.
+   */
+  _operador(k: number): Float64Array {
+    let op = this.operadores.get(k);
+    if (op) return op;
+    if (this.operadores.size >= OPERADORES_GUARDADOS) this.operadores.clear();
+    const pl = this.laminas[k]!;
+    op = new Float64Array(768);
+    operadorResultantes(pl.xy, pl.seccion, op);
+    this.operadores.set(k, op);
+    return op;
+  }
 }
+
+/** Operadores de resultantes que guarda CamposLaminas (6 KB cada uno). */
+const OPERADORES_GUARDADOS = 2048;
 
 /** Valores de los campos para unos desplazamientos concretos, con cachés por lámina, parche y plaza. */
 export class EvaluadorCampos {
   private readonly c: CamposLaminas;
   private readonly u: ArrayLike<number>;
-  private readonly gauss = new Map<number, Float64Array>();
+  /** Por lámina y por plaza (arrays: los cortes de un edificio piden decenas de miles). */
+  private readonly gauss: (Float64Array | undefined)[];
   private readonly coef = new Map<Parche, Float64Array>();
-  private readonly valores = new Map<number, Float64Array>();
-  private static readonly OP = new Float64Array(768);
+  private readonly valores: (Float64Array | undefined)[];
+  private static readonly R = new Float64Array(8);
   /** Plazas degradadas (sin derivadas: Q de la DKMQ) que ha evaluado. */
   degradadas = 0;
+  /** Plazas degradadas usadas desde `empezar` (un corte que reutiliza el evaluador). */
+  private usadas: Set<number> | null = null;
+
+  /** Empieza a contar las plazas degradadas que se usan (las ya calculadas también cuentan). */
+  empezar(): void {
+    this.usadas = new Set();
+  }
+
+  /** Plazas degradadas distintas usadas desde `empezar`. */
+  get usadasDegradadas(): number {
+    return this.usadas?.size ?? 0;
+  }
 
   constructor(campos: CamposLaminas, u: ArrayLike<number>) {
     this.c = campos;
     this.u = u;
+    this.gauss = new Array((campos.modelo.laminas ?? []).length);
+    this.valores = new Array(campos.nPlazas);
   }
 
   /**
@@ -907,40 +969,41 @@ export class EvaluadorCampos {
    * media), con 8 valores cada una: N y M ajustables y el Q de la DKMQ (5 × 8).
    */
   private gaussDe(k: number): Float64Array {
-    let v = this.gauss.get(k);
+    let v = this.gauss[k];
     if (v) return v;
     const pl = this.c._lamina(k)!;
     const nudos = this.c.modelo.laminas![k]!.nudos;
     const ug = new Float64Array(24);
     for (let a = 0; a < 4; a++) for (let q = 0; q < 6; q++) ug[6 * a + q] = this.u[6 * nudos[a]! + q]!;
     const ul = vectorALocales(ug, pl.R);
-    const OP = EvaluadorCampos.OP;
-    operadorResultantes(pl.xy, pl.seccion, OP);
+    const OP = this.c._operador(k);
     const [a11, a12, a21, a22, s3] = this.c._cambio(k);
     v = new Float64Array(MUESTRAS_LAMINA * NV);
+    const r = EvaluadorCampos.R;
+    // Tensores a la región: T' = A·T·Aᵀ (M con el signo de la normal), en v desde o
+    const girar = (o: number, txx: number, tyy: number, txy: number, s: number) => {
+      const b11 = a11! * txx + a12! * txy;
+      const b12 = a11! * txy + a12! * tyy;
+      const b21 = a21! * txx + a22! * txy;
+      const b22 = a21! * txy + a22! * tyy;
+      v![o] = s * (b11 * a11! + b12 * a12!);
+      v![o + 1] = s * (b21 * a21! + b22 * a22!);
+      v![o + 2] = s * (b11 * a21! + b12 * a22!);
+    };
     for (let g = 0; g < 4; g++) {
-      const r = new Float64Array(8);
       for (let f = 0; f < 8; f++) {
         let s = 0;
         const o = 192 * g + 24 * f;
         for (let q = 0; q < 24; q++) s += OP[o + q]! * ul[q]!;
         r[f] = s;
       }
-      // Tensores a la región: T' = A·T·Aᵀ (M con el signo de la normal)
-      const girar = (txx: number, tyy: number, txy: number, s: number) => {
-        const b11 = a11! * txx + a12! * txy;
-        const b12 = a11! * txy + a12! * tyy;
-        const b21 = a21! * txx + a22! * txy;
-        const b22 = a21! * txy + a22! * tyy;
-        return [s * (b11 * a11! + b12 * a12!), s * (b21 * a21! + b22 * a22!), s * (b11 * a21! + b12 * a22!)];
-      };
-      v.set(girar(r[0]!, r[1]!, r[2]!, 1), NV * g);
-      v.set(girar(r[3]!, r[4]!, r[5]!, s3!), NV * g + 3);
+      girar(NV * g, r[0]!, r[1]!, r[2]!, 1);
+      girar(NV * g + 3, r[3]!, r[4]!, r[5]!, s3!);
       v[NV * g + 6] = s3! * (a11! * r[6]! + a12! * r[7]!);
       v[NV * g + 7] = s3! * (a21! * r[6]! + a22! * r[7]!);
     }
     for (let q = 0; q < NV; q++) v[NV * CENTROIDE + q] = 0.25 * (v[q]! + v[NV + q]! + v[2 * NV + q]! + v[3 * NV + q]!);
-    this.gauss.set(k, v);
+    this.gauss[k] = v;
     return v;
   }
 
@@ -966,9 +1029,10 @@ export class EvaluadorCampos {
 
   /** Valores de la plaza p (8, en el triedro de su región): N y M ajustados y Q por equilibrio. */
   plaza(p: number): Float64Array {
-    let v = this.valores.get(p);
-    if (v) return v;
     const pl = this.c._plan(p);
+    if (pl.degradado) this.usadas?.add(p);
+    let v = this.valores[p];
+    if (v) return v;
     v = new Float64Array(8);
     const dx = new Float64Array(NC);
     const dy = new Float64Array(NC);
@@ -998,7 +1062,7 @@ export class EvaluadorCampos {
       v[6] = -(dx[3]! + dy[5]!);
       v[7] = -(dx[5]! + dy[4]!);
     }
-    this.valores.set(p, v);
+    this.valores[p] = v;
     return v;
   }
 
