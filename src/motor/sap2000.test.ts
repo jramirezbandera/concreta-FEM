@@ -216,6 +216,22 @@ describe("E6: puente con SAP2000", () => {
     expect(importarS2k(leerTablas(S2K_1004.replace('CurrUnits="Kip, in, F"', 'CurrUnits="Kip, yd, F"'))).errores.join()).toMatch(/Unidades/);
   });
 
+  it("las cargas «gravity» de área son multiplicadores del peso propio, con el signo de los ejes (MultiplierZ = −1, el peso)", () => {
+    const base = s2kNavier(0.5).replace("UnitWeight=0", "UnitWeight=25");
+    const conPeso = base.replace("SelfWtMult=0", "SelfWtMult=1").replace(/TABLE: {2}"AREA LOADS - UNIFORM"[\s\S]*?(?=END TABLE DATA)/, "");
+    const gravedad = (mz: number) => base.replace('"AREA LOADS - UNIFORM"', '"AREA LOADS - GRAVITY"').replace(/Dir=Gravity {3}UnifLoad=10/g, `MultiplierX=0   MultiplierY=0   MultiplierZ=${mz}`);
+    const w = (texto: string) => {
+      const imp = importarS2k(leerTablas(texto));
+      expect(imp.errores).toEqual([]);
+      const [c] = casosValidos(calcular(imp.modelo));
+      return c!.u[6 * imp.nudos.get(String(6 * 9 + 4 + 1))! + 2]!;
+    };
+    const peso = w(conPeso);
+    expect(peso).toBeLessThan(0);
+    expect(Math.abs(w(gravedad(-1)) / peso - 1)).toBeLessThan(1e-12);
+    expect(Math.abs(w(gravedad(2)) / peso + 2)).toBeLessThan(1e-12);
+  });
+
   it("un material no isótropo sólo es un error si se usa (SAP2000 exporta sus materiales por defecto)", () => {
     const sinUsar = 'TABLE:  "MATERIAL PROPERTIES 01 - GENERAL"\n   Material=A416Gr270   Type=Tendon   SymType=Uniaxial   TempDepend=No';
     expect(importarS2k(leerTablas(S2K_1004.replace("END TABLE DATA", `${sinUsar}\nEND TABLE DATA`))).errores).toEqual([]);

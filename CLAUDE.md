@@ -113,6 +113,7 @@
 - **2026-10-04: D5 tomada** (bandas automáticas y editables).
 - **2026-10-04: placa de Navier calculada en SAP2000 v21** (E6-11). SAP2000 aplica los multiplicadores de flexión como el motor (D3 validada en flexión), pero sus cortantes de Shell-Thick se separan de la solución exacta hasta un 21 %; los del motor, ≤ 0,9 %.
 - **2026-10-07: las tres variantes de Navier calculadas en SAP2000** (E6-11 completo). La isótropa sale exacta en SAP2000; con multiplicadores, sus V13, V23 y el reparto de reacciones se separan de Navier del 10 al 50 %, y v13 y v23 no actúan por dirección. El motor queda a ≤ 3,4 % en todo (momentos ≤ 0,3 %). En el periodo en sombra, con multiplicadores no se compara el cortante de SAP2000.
+- **2026-10-08: el reticular de SAP2000 del usuario comparado** (E6-12). El motor coincide con SAP2000 en lo que dimensiona: reacciones 0,03 %, pilares ≤ 1,4 %, flecha máxima 0,7 %, M11 y M22 de la losa ≤ 1,4 %. Con los multiplicadores del compilador (C4-h), +3 % de flecha y ≤ 3,3 % en los momentos que dimensionan, así que C4-h queda contrastada. El lector traduce ya las cargas «gravity».
 - **2026-10-04: fase C1 del compilador superada** (barras). Pasan los ocho criterios. El plan del compilador está en `docs/fem3d/compilador.md` (fases C1–C5) y el informe, en `docs/fem3d/fase-c1.md`, con criterios, hallazgos C1-1…C1-5 y pendientes.
   - **Ya en `src/compilador/`:**
     - modelo físico: plantas de arriba abajo con su altura, como `lib/edificio`; pilares, vigas en polilínea, apoyos y cargas (convenios en la cabecera de `fisico.ts`);
@@ -176,7 +177,7 @@
 - **Siguiente paso:**
   - el usuario confirma las decisiones de C3 y las de la rejilla (`rejilla.md`, §4);
   - compilador C5 (bandas automáticas de D5, machones y dinteles como cortes, consultas por objeto físico);
-  - el usuario calcula en SAP2000 sus modelos, entre ellos el reticular con ábacos y el unidireccional (pasos en `validacion/e6/sap2000/LEEME.md`);
+  - el usuario calcula en SAP2000 sus modelos que faltan, entre ellos el unidireccional (pasos en `validacion/e6/sap2000/LEEME.md`);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - capa de agente (propuesta del 2026-10-05, `docs/fem3d/agente.md`): fichero de proyecto con esquema, CLI, consultas, sensatez del modelo e informe de revisión (A0–A7). Decididas A-a…A-d: A0–A2 justo después de C5. A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

@@ -138,8 +138,6 @@ export function importarS2k(t: Tablas): Importado {
     "CONNECTIVITY - LINK",
     "CONNECTIVITY - SOLID",
     "JOINT SPRING ASSIGNMENTS 2 - COUPLED",
-    "FRAME LOADS - GRAVITY",
-    "AREA LOADS - GRAVITY",
     "CONSTRAINT DEFINITIONS - EQUAL",
     "CONSTRAINT DEFINITIONS - LOCAL",
     "CONSTRAINT DEFINITIONS - WELD",
@@ -492,6 +490,35 @@ export function importarS2k(t: Tablas): Importado {
     const k = idx.get(r.LoadPat!)!;
     for (const { sap, q } of pesoBarras) if (q) repartir(k, sap, 0, sap.L, [0, 0, -f * q], [0, 0, -f * q]);
     for (const { l, q } of pesoLaminas) if (q) deLamina[k]!.push({ tipo: "superficie", lamina: l, ejes: "global", q: [0, 0, -f * q] });
+  }
+  // Cargas «gravity»: multiplicadores (globales) del peso propio de cada elemento, con su WMod. El
+  // signo es el de los ejes: MultiplierZ = −1 es el peso propio hacia abajo (comprobado con las
+  // reacciones de SAP2000 v21: MultiplierZ = 2 da una carga hacia arriba de dos veces el peso)
+  const multiplicadoresGravedad = (r: Registro, que: string): Vec3 | null => {
+    if ((r.CoordSys ?? "GLOBAL").toUpperCase() !== "GLOBAL") {
+      errores.push(`${que} no está en ejes globales.`);
+      return null;
+    }
+    return [num(r, "MultiplierX", 0), num(r, "MultiplierY", 0), num(r, "MultiplierZ", 0)];
+  };
+  const pesoBarra = new Map(pesoBarras.map(({ sap, q }) => [sap, q]));
+  for (const r of tabla("FRAME LOADS - GRAVITY")) {
+    const k = caso(r.LoadPat, `La carga gravity de la barra ${r.Frame}`);
+    const sap = barras.get(r.Frame!);
+    if (!sap) errores.push(`Una carga gravity es de la barra inexistente ${r.Frame}.`);
+    const g = multiplicadoresGravedad(r, `La carga gravity de la barra ${r.Frame}`);
+    if (k < 0 || !sap || !g) continue;
+    const q = esc(g, pesoBarra.get(sap) ?? 0);
+    repartir(k, sap, 0, sap.L, q, q);
+  }
+  const pesoLamina = new Map(pesoLaminas.map(({ l, q }) => [l, q]));
+  for (const r of tabla("AREA LOADS - GRAVITY")) {
+    const k = caso(r.LoadPat, `La carga gravity del área ${r.Area}`);
+    const l = laminas.get(r.Area!);
+    if (l === undefined) errores.push(`Una carga gravity es del área inexistente ${r.Area}.`);
+    const g = multiplicadoresGravedad(r, `La carga gravity del área ${r.Area}`);
+    if (k < 0 || l === undefined || !g) continue;
+    deLamina[k]!.push({ tipo: "superficie", lamina: l, ejes: "global", q: esc(g, pesoLamina.get(l) ?? 0) });
   }
   for (const r of tabla("JOINT LOADS - FORCE")) {
     const k = caso(r.LoadPat, `Una carga en el nudo ${r.Joint}`);

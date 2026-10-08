@@ -90,6 +90,14 @@ En la práctica, con SAP2000:
 
 ## 2. Tus modelos (reticular con ábacos, unidireccional con viguetas)
 
+**Reticular (2026-10-08, hallazgo E6-12):** el modelo del usuario se compara con
+
+- `reticular-zonas.ts <modelo.s2k> [caso]`: motor frente a SAP2000 por zonas (flechas, centroides de ábaco, de zona aligerada y junto a los pilares, vigas y pilares);
+- `reticular-vigas.ts <modelo.s2k>`: convergencia de las vigas embebidas al refinar la malla en el motor;
+- `reticular-d3.ts <modelo.s2k>`: sus multiplicadores frente a los del compilador (C4-h), cada diferencia por separado.
+
+Resultado: el motor coincide con SAP2000 en reacciones (0,03 %), pilares (≤ 1,4 %), flecha máxima (0,7 %) y momentos M11, M22 de la losa (≤ 1,4 %). Los multiplicadores del compilador dan un 3 % más de flecha y ≤ 3,3 % en los momentos que dimensionan. Las salidas están en `out_reticular_*.txt`.
+
 1. En SAP2000:
    - **File > Export > SAP2000 .s2k Text File** con el modelo;
    - las tablas de resultados de los casos estáticos lineales: **Joint Displacements**, **Joint Reactions**, **Element Forces – Frames** y **Element Forces – Area Shells**.
@@ -103,7 +111,7 @@ Lo que se traduce y lo que no:
   - ejes locales con giro, liberaciones, zonas rígidas (RZ) y modificadores;
   - láminas de 4 nudos Shell (fina o gruesa), Membrane o Plate, con sus modificadores y el giro de sus ejes;
   - apoyos, muelles desacoplados, diafragmas, cuerpos rígidos y pórticos planos (GDL activos);
-  - peso propio, cargas nodales, cargas de barra distribuidas y puntuales, y cargas uniformes de área;
+  - peso propio, cargas nodales, cargas de barra distribuidas y puntuales, cargas uniformes de área y cargas «gravity» de área y de barra (multiplicadores del peso propio de cada elemento, con su WMod; MultiplierZ = −1 es el peso hacia abajo);
   - casos estáticos lineales.
 - **Da un error y no calcula:**
   - áreas de 3 nudos y malla automática de áreas: hay que mallarlas en SAP2000, con **Edit > Edit Areas > Divide Areas**, antes de exportar;
