@@ -1,0 +1,7 @@
+# validacion/c5/banco.ts — 2026-10-08: edificio objetivo de 7 plantas (10 × 8 pilares), Bun
+
+modelo | nudos | ecuaciones | bandas | estaciones | combinaciones ELU-PT / ELS-C | proponer (s) | compilar (s) | calcular (s) | bandas y Wood–Armer (s) | consultas (s) | lo de C5 / cálculo
+losa plana | 62506 | 166320 | 238 | 5628 | 26 / 13 | 0.03 | 2.2 | 4.6 | 5.5 | 0.3 | 127 %
+maciza con vigas | 86663 | 227703 | 238 | 5628 | 26 / 13 | 0.01 | 3.9 | 7.1 | 8.5 | 0.4 | 126 %
+
+«Lo de C5» es proponer, integrar las bandas con Wood–Armer y las consultas; compilar ya era de C1–C4. La integración de las bandas es sobre todo recuperar los campos SPR (my y mxy de Wood–Armer, y los vanos), que los cortes de las estaciones piden en casi toda la losa y en cada caso.

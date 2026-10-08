@@ -625,7 +625,11 @@ export class Cortes {
 
   /** Distancia con signo de un punto al plano del corte. */
   private distancia(cp: CortePreparado, p: ArrayLike<number>): number {
-    return cp.coordenadas(p)[0];
+    // La x de `coordenadas`, con las mismas cuentas y sin crear el array (se pide para cada barra
+    // con offsets del modelo en cada corte)
+    const O = cp.origen;
+    const e = cp.ejes;
+    return (p[0]! - O[0]!) * e[0]! + (p[1]! - O[1]!) * e[1]! + (p[2]! - O[2]!) * e[2]!;
   }
 
   private diagramasBarras(): DiagramasBarras {

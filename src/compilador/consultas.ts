@@ -37,7 +37,7 @@ import { huellaPilar } from "./geometria2d.ts";
 import type { Mapeo } from "./mapeo.ts";
 import { diafragmaDe } from "./piezas.ts";
 import { EsfuerzosPiezas } from "./resultados.ts";
-import { validar, type Contexto } from "./validar.ts";
+import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
 
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
@@ -165,6 +165,12 @@ export interface Flechas {
   recuadros: Recuadro[];
 }
 
+/** Lo de las flechas de una losa que no depende de la combinación (`geometriaFlechas`). */
+interface GeometriaFlechas {
+  nudos: number[];
+  recuadros: { pilares: [string, string, string, string]; esquinas: number[]; nudos: number[]; xi: number[]; eta: number[] }[];
+}
+
 const ANCHO_POR_FORMA = (s: Seccion): number => (s.forma === "rectangular" ? s.b : s.forma === "T" ? s.bw : s.forma === "circular" ? s.D : s.forma === "general" ? (s.b ?? 0) : 0);
 
 /** Sección del tramo de pilar cuya cabeza está en la planta, o la del pilar. */
@@ -180,6 +186,7 @@ export class Consultas {
   private piezasC?: EsfuerzosPiezas;
   private bandasC?: EsfuerzosBandas;
   private murosC?: EsfuerzosMuros;
+  private readonly flechasGeo = new Map<string, GeometriaFlechas>();
   private readonly apoyoEnNudo = new Map<number, string>();
   private readonly coartado = new Set<number>();
   private readonly nudoPorId = new Map<string, number>();
@@ -604,10 +611,38 @@ export class Consultas {
       for (let j = 0; j < this.nc; j++) if (factores[j]) v += factores[j]! * this.casos[j]!.u[6 * n + 2]!;
       return v;
     };
-    const nudos = [...new Set((this.mapeo.losas?.[id] ?? []).flatMap((i) => [...this.modelo.laminas![i]!.nudos]))].sort((a, b) => a - b);
+    const { nudos, recuadros: geo } = this.geometriaFlechas(id, l);
     const punto = (n: number): Vec3 => [this.modelo.nudos[n]!.x, this.modelo.nudos[n]!.y, this.modelo.nudos[n]!.z];
     let maxima: FlechaPunto = { nudo: nudos[0]!, punto: punto(nudos[0]!), flecha: -uz(nudos[0]!) };
     for (const n of nudos) if (-uz(n) > maxima.flecha) maxima = { nudo: n, punto: punto(n), flecha: -uz(n) };
+    const recuadros: Recuadro[] = [];
+    for (const g of geo) {
+      const w = g.esquinas.map((n) => (n < 0 ? Number.NaN : uz(n)));
+      if (w.some(Number.isNaN)) continue;
+      let mejor: FlechaPunto | null = null;
+      for (let k = 0; k < g.nudos.length; k++) {
+        const n = g.nudos[k]!;
+        const [xi, eta] = [g.xi[k]!, g.eta[k]!];
+        // esquinas: (i, j) = (t0, s0); (i, j+1) = (t0, s1); (i+1, j) = (t1, s0); (i+1, j+1) = (t1, s1)
+        const base = (1 - eta) * ((1 - xi) * w[0]! + xi * w[1]!) + eta * ((1 - xi) * w[2]! + xi * w[3]!);
+        const f = base - uz(n);
+        if (!mejor || f > mejor.flecha) mejor = { nudo: n, punto: punto(n), flecha: f };
+      }
+      recuadros.push({ pilares: g.pilares, maxima: mejor });
+    }
+    return { valido: true, valor: { maxima, recuadros }, diagnosticos: [] };
+  }
+
+  /**
+   * Lo de las flechas de una losa que no depende de la combinación (se calcula la primera vez): sus
+   * nudos y, por recuadro entre cuatro pilares de dos alineaciones consecutivas de cada dirección, sus
+   * pilares, los nudos de sus esquinas (−1 si no hay) y los nudos de dentro con sus coordenadas
+   * relativas (ξ a lo largo de la dirección 1, η a lo largo de la 2).
+   */
+  private geometriaFlechas(id: string, l: LosaCompilada): GeometriaFlechas {
+    const hecha = this.flechasGeo.get(id);
+    if (hecha) return hecha;
+    const nudos = [...new Set((this.mapeo.losas?.[id] ?? []).flatMap((i) => [...this.modelo.laminas![i]!.nudos]))].sort((a, b) => a - b);
     // Recuadros: las alineaciones de la dirección 1 (t a lo largo de n1) y de la 2 (t a lo largo de d1)
     const [dir1, dir2] = alineacionesLosa(this.ctx, l);
     const A = [...dir1!.alineaciones].sort((a, b) => a.t - b.t);
@@ -617,32 +652,30 @@ export class Consultas {
       const comunes = a.pilares.filter((p) => b.pilares.includes(p));
       return comunes.length === 1 ? comunes[0]! : null;
     };
-    const recuadros: Recuadro[] = [];
+    const recuadros: GeometriaFlechas["recuadros"] = [];
     for (let i = 0; i + 1 < A.length; i++)
       for (let j = 0; j + 1 < B.length; j++) {
         const ps = [esquina(A[i]!, B[j]!), esquina(A[i]!, B[j + 1]!), esquina(A[i + 1]!, B[j]!), esquina(A[i + 1]!, B[j + 1]!)];
         if (ps.some((p) => p === null)) continue;
-        const w = ps.map((p) => {
-          const n = this.mapeo.nudosPilar[`${p}@${l.losa.planta}`];
-          return n === undefined ? Number.NaN : uz(n);
-        });
-        if (w.some(Number.isNaN)) continue;
+        const esquinas = ps.map((p) => this.mapeo.nudosPilar[`${p}@${l.losa.planta}`] ?? -1);
         const [s0, s1, t0, t1] = [B[j]!.t, B[j + 1]!.t, A[i]!.t, A[i + 1]!.t];
-        let mejor: FlechaPunto | null = null;
+        const dentro: number[] = [];
+        const xi: number[] = [];
+        const eta: number[] = [];
         for (const n of nudos) {
           const nd = this.modelo.nudos[n]!;
           const s = nd.x * d1[0] + nd.y * d1[1];
           const t = nd.x * n1[0] + nd.y * n1[1];
           if (s < s0 - 1e-9 || s > s1 + 1e-9 || t < t0 - 1e-9 || t > t1 + 1e-9) continue;
-          const [xi, eta] = [(s - s0) / (s1 - s0), (t - t0) / (t1 - t0)];
-          // esquinas: (i, j) = (t0, s0); (i, j+1) = (t0, s1); (i+1, j) = (t1, s0); (i+1, j+1) = (t1, s1)
-          const base = (1 - eta) * ((1 - xi) * w[0]! + xi * w[1]!) + eta * ((1 - xi) * w[2]! + xi * w[3]!);
-          const f = base - uz(n);
-          if (!mejor || f > mejor.flecha) mejor = { nudo: n, punto: punto(n), flecha: f };
+          dentro.push(n);
+          xi.push((s - s0) / (s1 - s0));
+          eta.push((t - t0) / (t1 - t0));
         }
-        recuadros.push({ pilares: ps as [string, string, string, string], maxima: mejor });
+        recuadros.push({ pilares: ps as [string, string, string, string], esquinas, nudos: dentro, xi, eta });
       }
-    return { valido: true, valor: { maxima, recuadros }, diagnosticos: [] };
+    const g = { nudos, recuadros };
+    this.flechasGeo.set(id, g);
+    return g;
   }
 
   // ─── Combinaciones ──────────────────────────────────────────────────────────────────────────
