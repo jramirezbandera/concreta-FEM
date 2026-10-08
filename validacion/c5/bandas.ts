@@ -7,7 +7,7 @@
  *   con h = 1, 0,5 y 0,25 m: convergencia y reparto (H25: 261 kN·m de 337 en el pórtico virtual, el
  *   77 %, dentro del 60–80 % de la tabla I.1);
  * - Wood–Armer (a) con los momentos medios frente a (b) punto a punto, en la cara y en el vano
- *   (C5-c, criterio 3).
+ *   (C5-c, criterio 3), también con la losa como reticular 30+5 con ábacos, y su momento por nervio.
  *
  * Uso: bun validacion/c5/bandas.ts → validacion/c5/out_bandas.txt
  */
@@ -77,6 +77,52 @@ for (const e of [enCara(est, 6.3), est.find((x) => x.tipo === "vano" && x.s > 6.
 }
 decir();
 decir("Referencia: la rejilla fina de E5 (h = 0,075 m) con el mismo modelo, en la cara: banda de pilares de 3 m −205,58 kN·m y pórtico de 6 m −262,71 (`validacion/c2/out_losa_plana.txt`); la banda de pilares lleva el 78,3 %. Las cifras de la tabla de H25 (211 / 264 / 261 y 331 / 337 / 337) son de su experimento con PyNite, con otro pilar.");
+
+// Criterio 3: Wood–Armer (a) frente a (b) en un reticular
+decir();
+decir("## La misma losa como reticular 30+5 con ábacos de 2,5 × 2,5 m (criterio 3), caso q");
+decir();
+decir("Nervios de 12 cm cada 82 cm, capa de 5 cm, casetón recuperable (sin peso propio: sólo q). Los ábacos (2,5 m > lx/3 = 2 m) dan el ancho de las bandas de pilares (I.1.2(3)).");
+decir();
+const reticular: ModeloFisico = {
+  ...base,
+  losas: base.losas!.map((l) => ({
+    ...l,
+    espesor: 0.35,
+    reticular: {
+      intereje: 0.82,
+      nervio: 0.12,
+      capa: 0.05,
+      caseton: "recuperable",
+      abacos: base.pilares!.map((p) => [
+        [p.x - 1.25, p.y - 1.25],
+        [p.x + 1.25, p.y - 1.25],
+        [p.x + 1.25, p.y + 1.25],
+        [p.x - 1.25, p.y + 1.25],
+      ]),
+    },
+  })),
+};
+const bandasR = proponerBandas(reticular).bandas;
+const fr = { ...reticular, bandas: bandasR };
+decir(`Banda de pilares interior LOSA:1:P2: ancho ${bandasR.find((b) => b.id === "LOSA:1:P2")!.ancho} m; centrales ${bandasR.filter((b) => b.tipo === "central" && b.id.startsWith("LOSA:1:")).map((b) => b.ancho).join(" y ")} m`);
+decir();
+decir("h (m) | banda | estación | s (m) | My (kN·m) | por nervio (kN·m) | en ábaco | (a) medios: sup. X / inf. X / sup. Y / inf. Y (kN·m/m) | (b) puntos: sup. X / inf. X / sup. Y / inf. Y");
+for (const h of [0.5, 0.25]) {
+  const r = compilar(fr, { ...OPCIONES_LOSA_PLANA, tamanoMalla: h });
+  if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
+  const ebR = new EsfuerzosBandas(fr, r.modelo, casosValidos(calcular(r.modelo)));
+  for (const id of ["LOSA:1:P2", "LOSA:1:C1-2"]) {
+    const est = ebR.estaciones(id)!;
+    for (const e of [enCara(est, 6.3), est.find((x) => x.tipo === "vano" && x.s > 6.3)!]) {
+      const [a, b] = (["medios", "puntos"] as const).map((m) => woodArmerEstacion(e, [Float64Array.from([1])], m).porCombinacion[0]!);
+      const f = (w: typeof a) => [w!.superiorX, w!.inferiorX, w!.superiorY, w!.inferiorY].map((v) => v.toFixed(1)).join(" / ");
+      decir(`${h} | ${id} | ${e.tipo} | ${e.s.toFixed(2)} | ${e.esfuerzos[4]!.toFixed(1)} | ${e.nervio!.momentos[0]!.toFixed(1)} | ${(100 * e.nervio!.fraccionAbaco).toFixed(0)} % | ${f(a)} | ${f(b)}`);
+    }
+  }
+}
+decir();
+decir("En la cara, (b) pide más armadura superior que (a), como en la maciza: el momento se concentra junto al pilar y (b) no lo reparte en el ancho. En el vano, los dos casi coinciden. El momento por nervio, My·s/b, sólo tiene sentido en la zona aligerada (en el ábaco no hay nervios).");
 
 const salida = lineas.join("\n") + "\n";
 writeFileSync(join(import.meta.dirname, "out_bandas.txt"), salida);

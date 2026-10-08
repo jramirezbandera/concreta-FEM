@@ -11,6 +11,8 @@
  * - En las caras, por fuerzas nodales: exacto, porque el compilador las siembra (`apoyos`).
  * - En los vanos, por campos (mixto, E5-6).
  *
+ * En un reticular, también el momento por nervio, My·s/b (C4-j), y la parte del ancho en ábacos.
+ *
  * Momentos medios por metro de ancho, para Wood–Armer (C5-c):
  * - mx = My/b, exacto, con b el ancho de la banda que cae en losa en esa estación (sin lo que cruza
  *   un hueco o se sale); una estación sin losa no vale (aviso `banda/estacion-sin-losa`);
@@ -31,8 +33,8 @@ import type { ModeloAnalitico, ResultadoCaso } from "../motor/modelo.ts";
 import { cotasPlantas } from "./cotas.ts";
 import { combinar } from "./envolventes.ts";
 import { ejesBanda, estacionesBanda, ladoEstacion, puntoBanda } from "./estaciones.ts";
-import type { Banda, ModeloFisico, Vec2 } from "./fisico.ts";
-import { fraccionEnRegiones, type Region } from "./poligonos.ts";
+import type { Banda, Losa, ModeloFisico, Vec2 } from "./fisico.ts";
+import { fraccionEnRegiones, puntoEnRegion, type Region } from "./poligonos.ts";
 
 /** Distancia a la estación del corte de muestras, m. */
 export const DELTA_MUESTRAS = 1e-3;
@@ -57,6 +59,12 @@ export interface EstacionResultado {
   medios: Float64Array;
   /** Muestras (del corte del vano, o del corte a DELTA_MUESTRAS de la cara): pesos (m) y [Mx, My, Mxy] por punto y caso (3·np por caso). */
   muestras: { pesos: Float64Array; momentos: Float64Array[] } | null;
+  /**
+   * En un reticular (la losa del punto del eje), el momento por nervio (C4-j): My·s/b por caso, con s
+   * el intereje y b el ancho en losa, kN·m por nervio; y la fracción del ancho en losa que cae en
+   * ábacos (macizos: ahí no hay nervios). null en una losa maciza.
+   */
+  nervio: { intereje: number; momentos: Float64Array; fraccionAbaco: number } | null;
   /** Ids de las barras que atraviesan el corte (vigas embebidas en la banda, por ejemplo). */
   barras: string[];
   valido: boolean;
@@ -72,8 +80,9 @@ export class EsfuerzosBandas {
   private readonly cota: Map<string, number>;
   private readonly bandaDe: Map<string, Banda>;
   private readonly eps: number;
-  /** Losas de cada planta (sus regiones). */
+  /** Losas de cada planta (sus regiones), con la losa de cada región. */
   private readonly regiones = new Map<string, Region[]>();
+  private readonly losasPlanta = new Map<string, Losa[]>();
 
   /**
    * @param fisico el modelo físico con sus bandas (las que se compilaron).
@@ -93,6 +102,9 @@ export class EsfuerzosBandas {
       let r = this.regiones.get(l.planta);
       if (!r) this.regiones.set(l.planta, (r = []));
       r.push({ contorno: l.contorno, huecos: l.huecos ?? [] });
+      let ls = this.losasPlanta.get(l.planta);
+      if (!ls) this.losasPlanta.set(l.planta, (ls = []));
+      ls.push(l);
     }
   }
 
@@ -151,16 +163,29 @@ export class EsfuerzosBandas {
       if (!enLosa) diag.aviso("banda/estacion-sin-losa", `La estación ${e.s.toFixed(3)} m de la banda ${b.id} cae entera en un hueco o fuera de las losas: no tiene esfuerzos.`, [b.id]);
       for (let k = 0; k < nc; k++) medios[3 * k] = enLosa ? r.esfuerzos[6 * k + 4]! / anchoEnLosa : Number.NaN;
       if (!enLosa) medios.fill(Number.NaN);
+      // Por nervio, en un reticular
+      const P = puntoBanda(b, e.s);
+      const regs = this.regiones.get(b.planta) ?? [];
+      const losa = (this.losasPlanta.get(b.planta) ?? []).find((_, i) => puntoEnRegion(P, regs[i]!));
+      let nervio: EstacionResultado["nervio"] = null;
+      if (losa?.reticular) {
+        const s = losa.reticular.intereje;
+        const momentos = new Float64Array(nc);
+        for (let k = 0; k < nc; k++) momentos[k] = enLosa ? (r.esfuerzos[6 * k + 4]! * s) / anchoEnLosa : Number.NaN;
+        const enAbacos = b.ancho * fraccionEnRegiones(A!, B!, (losa.reticular.abacos ?? []).map((c) => ({ contorno: c, huecos: [] })));
+        nervio = { intereje: s, momentos, fraccionAbaco: enLosa ? Math.min(1, enAbacos / anchoEnLosa) : Number.NaN };
+      }
       return {
         banda: b.id,
         s: e.s,
         tipo: e.tipo,
-        punto: puntoBanda(b, e.s),
+        punto: P,
         ancho: b.ancho,
         anchoEnLosa,
         esfuerzos: r.esfuerzos,
         medios,
         muestras,
+        nervio,
         barras: r.barras.map((i) => this.modelo.barras![i]!.id),
         valido: r.valido && enLosa,
         diagnosticos: [...r.diagnosticos, ...(rm === r ? [] : rm.diagnosticos.filter((d) => d.severidad === "error")), ...diag.lista],

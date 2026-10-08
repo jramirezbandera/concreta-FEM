@@ -30,3 +30,21 @@ vano | 9.00 | (a) medios | 25.9 | 0.0 | 0.0 | 6.6
 vano | 9.00 | (b) puntos | 27.2 | 0.6 | 0.0 | 6.9
 
 Referencia: la rejilla fina de E5 (h = 0,075 m) con el mismo modelo, en la cara: banda de pilares de 3 m −205,58 kN·m y pórtico de 6 m −262,71 (`validacion/c2/out_losa_plana.txt`); la banda de pilares lleva el 78,3 %. Las cifras de la tabla de H25 (211 / 264 / 261 y 331 / 337 / 337) son de su experimento con PyNite, con otro pilar.
+
+## La misma losa como reticular 30+5 con ábacos de 2,5 × 2,5 m (criterio 3), caso q
+
+Nervios de 12 cm cada 82 cm, capa de 5 cm, casetón recuperable (sin peso propio: sólo q). Los ábacos (2,5 m > lx/3 = 2 m) dan el ancho de las bandas de pilares (I.1.2(3)).
+
+Banda de pilares interior LOSA:1:P2: ancho 2.5 m; centrales 3.5 y 3.5 m
+
+h (m) | banda | estación | s (m) | My (kN·m) | por nervio (kN·m) | en ábaco | (a) medios: sup. X / inf. X / sup. Y / inf. Y (kN·m/m) | (b) puntos: sup. X / inf. X / sup. Y / inf. Y
+0.5 | LOSA:1:P2 | cara | 6.30 | -289.3 | -94.9 | 100 % | 115.7 / 0.0 / 66.4 / 0.0 | 159.6 / 0.0 / 73.7 / 0.0
+0.5 | LOSA:1:P2 | vano | 9.00 | 62.1 | 20.4 | 0 % | 0.0 / 24.9 / 8.1 / 0.0 | 0.0 / 24.9 / 8.1 / 0.0
+0.5 | LOSA:1:C1-2 | cara | 6.30 | -43.9 | -10.3 | 0 % | 12.5 / 0.0 / 0.0 / 15.7 | 12.6 / 0.0 / 3.9 / 19.6
+0.5 | LOSA:1:C1-2 | vano | 9.00 | 41.6 | 9.7 | 0 % | 0.0 / 12.0 / 0.0 / 6.8 | 0.0 / 12.1 / 0.3 / 7.2
+0.25 | LOSA:1:P2 | cara | 6.30 | -289.0 | -94.8 | 100 % | 115.6 / 0.0 / 79.2 / 0.0 | 162.6 / 0.0 / 89.7 / 0.0
+0.25 | LOSA:1:P2 | vano | 9.00 | 61.8 | 20.3 | 0 % | 0.0 / 24.7 / 8.2 / 0.0 | 0.0 / 24.8 / 8.2 / 0.0
+0.25 | LOSA:1:C1-2 | cara | 6.30 | -44.1 | -10.3 | 0 % | 12.6 / 0.0 / 0.0 / 16.1 | 12.6 / 0.0 / 3.9 / 20.0
+0.25 | LOSA:1:C1-2 | vano | 9.00 | 41.6 | 9.7 | 0 % | 0.0 / 12.0 / 0.0 / 6.8 | 0.0 / 12.1 / 0.3 / 7.2
+
+En la cara, (b) pide más armadura superior que (a), como en la maciza: el momento se concentra junto al pilar y (b) no lo reparte en el ancho. En el vano, los dos casi coinciden. El momento por nervio, My·s/b, sólo tiene sentido en la zona aligerada (en el ábaco no hay nervios).

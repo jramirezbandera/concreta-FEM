@@ -201,6 +201,28 @@ describe("huecos y bandas editadas (C5, criterio 1)", () => {
   });
 });
 
+describe("reticular: momento por nervio (C4-j)", () => {
+  it("es My·s/b en losa, con la parte del ancho en ábacos; en una maciza no hay", () => {
+    expect(eb.estaciones("L:1:P2")!.every((e) => e.nervio === null)).toBe(true);
+    const base = losaPlana();
+    const abacos = base.pilares!.map((p) => rect(p.x - 1, p.y - 1, p.x + 1, p.y + 1));
+    const f0: ModeloFisico = { ...base, losas: [{ ...base.losas![0]!, espesor: 0.35, reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05, caseton: "recuperable", abacos } }] };
+    const f = { ...f0, bandas: proponerBandas(f0).bandas };
+    const r = compilar(f, { tamanoMalla: 0.5 });
+    if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
+    const e2 = new EsfuerzosBandas(f, r.modelo, casosValidos(calcular(r.modelo)));
+    const est = e2.estaciones("L:1:P2")!;
+    for (const e of est) {
+      for (let k = 0; k < 2; k++) expect(e.nervio!.momentos[k]).toBeCloseTo((e.esfuerzos[6 * k + 4]! * 0.82) / e.anchoEnLosa, 9);
+      expect(e.nervio!.intereje).toBe(0.82);
+    }
+    // Los ábacos (2 m > lx/3) dan el ancho de la banda de pilares: en la cara de un pilar, entera en el
+    // ábaco; en el vano, nada
+    expect(est.find((e) => e.tipo === "cara" && Math.abs(e.s - 5.85) < 1e-9)!.nervio!.fraccionAbaco).toBeCloseTo(1, 9);
+    expect(est.find((e) => e.tipo === "vano")!.nervio!.fraccionAbaco).toBe(0);
+  });
+});
+
 describe("Wood–Armer en las bandas (C5, criterio 3)", () => {
   it("por combinación, con los momentos medios, es woodArmer de su combinación de casos", () => {
     const e = eb.estaciones("L:1:P2")!.find((x) => x.tipo === "cara")!;
