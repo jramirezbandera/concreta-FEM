@@ -36,7 +36,7 @@
 | **C2 Losas** | Mallador de losas (CDT a 2h dividida en 3 quads, o rejilla en paños alineados), validador de malla, huella del pilar con enlace rígido (H09), vigas embebidas, `eje1` en todas las losas (E3-2), peso propio desde `pp` (H24), cargas de superficie y de línea recortadas a cada lámina, siembra de las caras de los apoyos y los bordes de las bandas (E5-5) | H23, H24, H29, COM-07/08/10/11/14/15/16 |
 | **C3 Muros** | Rejilla por paño con ≥ 8 elementos (H17), encuentros muro–muro y muro–losa, viga embebida en el plano del muro (H05, E0-6), dinteles y qué nudos del muro entran en el diafragma (E6-3), empujes por nudos | H05, H17, E6-3 |
 | **C4 Forjados** | Unidireccional como viguetas-barra (D2; sin nudos intermedios sin rigidez a torsión, E2-3) y reticular con multiplicadores y ábacos (D3) | D2, D3, H46 |
-| **C5 Bandas y salida** | Bandas del Ap. I del CE A19 automáticas y editables (D5), machones y dinteles como cortes, consultas por objeto físico para los módulos de comprobación | D5, E5, H35 |
+| **C5 Bandas y salida** | Bandas del Ap. I del CE A19 automáticas y editables (D5), machones y dinteles como cortes, consultas por objeto físico para los módulos de comprobación. **Terminada el 2026-10-08** (`fase-c5.md`): ocho de los nueve criterios; el rendimiento, a medias | D5, E5, H35 |
 
 ## C1: alcance y decisiones
 

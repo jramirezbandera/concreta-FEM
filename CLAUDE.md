@@ -176,8 +176,17 @@
   - **C4-e:** los muros paralelos a las viguetas también reciben su franja, en sus nudos de la cota (C4-14).
   - **C4-k, nueva:** una línea de viguetas con un solo apoyo (voladizo sin vano detrás, también por un hueco, o balancín) sujeta por una viga es torsión de equilibrio. Los tramos de esa viga hasta el primer pilar, muro u otra viga van sin el J de D4 y se marcan en el mapeo (`torsionEquilibrio`), con aviso e hipótesis. Con ×0,1 la torsión sale igual, pero la flecha del voladizo, 5,9 veces mayor. Con el vano detrás se compensa sin torsión (medido). Antes, un balancín no se avisaba (C4-12).
   - Sólo cambian las referencias congeladas de C4 con voladizos sin vano (paño con hueco y planta al azar 7), y sólo en el J de esos tramos.
+- **2026-10-08: fase C5 del compilador terminada** (bandas, machones, dinteles y consultas). Pasan ocho de los nueve criterios; el 8 (rendimiento) queda a medias. El informe está en `docs/fem3d/fase-c5.md`, con criterios, hallazgos C5-1…C5-10, decisiones medidas y pendientes.
+  - **Ya en `src/compilador/`:**
+    - `proponerBandas` (Anejo I: alineaciones, bandas de pilares y centrales) con caras comunes por línea de pilares (C5-g, opción A del usuario), sembradas como trazos exactos del arreglo; las plantillas de pilar crecen una celda por una cara de banda. Sin caras de banda, la malla de C1–C4 no cambia;
+    - `EsfuerzosBandas`: cortes exactos en las caras y por campos en los vanos, ancho en losa, momentos medios, momento por nervio, Wood–Armer por combinación y reparto pilares/central con aviso fuera de la tabla I.1 (C5-d);
+    - `EsfuerzosMuros`: machones y dinteles como cortes;
+    - `Consultas` por objeto físico (pilares, vigas por vanos, bandas, muros, reacciones, plantas, desplomes, flechas, combinaciones CTE/NCSE) y `combinar`/`envolvente`.
+  - **Motor:** índice espacial de los cortes y campos SPR reutilizados entre cortes (`src/motor/indice.ts`): mismo resultado bit a bit, de 13 ms a ~1 ms por estación.
+  - **Validación:** `validacion/c5/` (H25 y reticular, caras comunes frente a la cara de cada pilar, tamaño de malla, ETABS 15c frente a OpenSeesPy ASDShellQ4 con sus cortes calculados en Python, huellas, banco y referencia congelada).
+  - **Pendiente del usuario:** `CARA_COMUN` (0,5 o 0,75). **Pendiente técnico:** integrar las bandas cuesta ~1,26 veces el cálculo (la recuperación SPR, caso a caso); con vigas en todos los ejes, el edificio objetivo con caras pasa del perfil móvil.
 - **Siguiente paso:**
-  - compilador C5 (bandas automáticas de D5, machones y dinteles como cortes, consultas por objeto físico);
+  - capa de agente A0–A2 (decidida para justo después de C5, `docs/fem3d/agente.md`);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - capa de agente (propuesta del 2026-10-05, `docs/fem3d/agente.md`): fichero de proyecto con esquema, CLI, consultas, sensatez del modelo e informe de revisión (A0–A7). Decididas A-a…A-d: A0–A2 justo después de C5. A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
+  - capa de agente completa (propuesta del 2026-10-05): fichero de proyecto con esquema, CLI, consultas, sensatez del modelo e informe de revisión (A0–A7). Decididas A-a…A-d. A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
