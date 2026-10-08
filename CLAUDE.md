@@ -185,8 +185,16 @@
   - **Motor:** índice espacial de los cortes y campos SPR reutilizados entre cortes (`src/motor/indice.ts`): mismo resultado bit a bit, de 13 ms a ~1 ms por estación.
   - **Validación:** `validacion/c5/` (H25 y reticular, caras comunes frente a la cara de cada pilar, tamaño de malla, ETABS 15c frente a OpenSeesPy ASDShellQ4 con sus cortes calculados en Python, huellas, banco y referencia congelada).
   - **Pendiente del usuario:** `CARA_COMUN` (0,5 o 0,75). **Pendiente técnico:** integrar las bandas cuesta ~1,26 veces el cálculo (la recuperación SPR, caso a caso); con vigas en todos los ejes, el edificio objetivo con caras pasa del perfil móvil.
+- **2026-10-09: fases A0–A2 de la capa de agente superadas.** Pasan todos los criterios, también la puerta A2. El informe está en `docs/fem3d/fase-a0-a2.md`, con criterios, hallazgos A-1…A-10 y pendientes. La recuperación SPR (C5-4) queda como pendiente técnico, por decisión del usuario.
+  - **Ya en el repo:**
+    - `src/agente/` (puro): `proyecto.json` con su esquema generado desde los tipos (`bun run esquema`) y un validador propio; resultados guardados; combinaciones; `resumen` y consultas acotadas;
+    - `cli/` (la única parte con IO): `fem validar|compilar|calcular|resumen|consultar|esquema`, con `bun run fem`. Escribe un JSON por orden, con códigos de salida 0/1/2/3, y guarda los resultados en `.fem/<huella>/`;
+    - `.claude/skills/fem/`: la skill, con un ejemplo que se valida en un test.
+  - **Spike A2:** tres subagentes, con sólo la descripción en texto, la skill y la CLI, llegaron al primer `validar` a 1-022, a la retícula con núcleo y al edificio objetivo. Sus resultados coinciden con la referencia a ≤ 5e-12 (`validacion/a2/`).
+  - **A-1:** sin el esquema, `compilar` acepta en silencio un campo opcional mal escrito y usa el valor por defecto.
+  - **Pendiente del usuario:** que `compilar` rechace los campos desconocidos (A-1), el peso propio doble de vigas sobre muros y del solape pilar–losa (A-9), y ψ por categoría de uso (A-2).
 - **Siguiente paso:**
-  - capa de agente A0–A2 (decidida para justo después de C5, `docs/fem3d/agente.md`);
+  - A3 de la capa de agente (sensatez del modelo e informe de revisión), antes de usarla con un proyecto real (A-d);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - capa de agente completa (propuesta del 2026-10-05): fichero de proyecto con esquema, CLI, consultas, sensatez del modelo e informe de revisión (A0–A7). Decididas A-a…A-d. A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
+  - el resto de la capa de agente (A4–A7). A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

@@ -2,7 +2,7 @@
 
 > **Qué es.** Una capa para que un agente de IA (Claude Code u otro) pueda manejar el motor de punta a punta: crear y editar el modelo físico, compilar, calcular, consultar resultados, revisarlos y, más adelante, leer planos y exportar a CAD. **Fecha:** 2026-10-05.
 >
-> **Estado:** propuesta aceptada, sin empezar. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). No cambia el motor ni el compilador y no adelanta ninguna fase. Lo natural es empezar tras C5, porque las consultas por objeto físico de C5 son la base de A1.
+> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). Lo siguiente es A3, que tiene que estar antes de usar la capa con un proyecto real (A-d).
 >
 > **Veredicto.** Es viable, y el repositorio está mejor preparado de lo habitual (§1). El objetivo realista no es «todo con IA», sino que **la IA haga casi todo el tecleo y la iteración, y el ingeniero revise y firme** sobre un informe y un visor. Lo difícil no es la interfaz con el agente. Son los extremos de la cadena (leer planos en imagen y sacar planos de armado) y un riesgo nuevo: **el fallo silencioso pasa del motor al modelo**. El motor puede estar perfecto y el modelo tener una carga, un pilar o una unidad mal puestos (§4, regla A3).
 
@@ -134,3 +134,51 @@ Los rangos se fijan con el usuario. Igual que las metamórficas, se validan con 
 - **A-c. Procedencia:** en un fichero aparte (`proyecto.origen.json`), fuera del modelo físico y de su huella.
 - **A-d. Cuándo:** A0–A2 justo después de C5, porque el spike A2 dice pronto si merece la pena seguir. A3 tiene que estar antes de usarlo con un proyecto real.
 - **A-e. Confidencialidad: aplazada.** Se decidirá más adelante, y en todo caso antes de A5. Hasta entonces, el agente sólo trabaja con modelos de prueba y de validación, no con planos de clientes.
+
+## 7. A0–A2: lo que se fija al empezar (2026-10-09)
+
+El usuario arranca A0–A2 tras C5 y deja la recuperación SPR (C5-4, criterio 8 de C5) como pendiente técnico. Lo que sigue se fija antes de escribir código, como los criterios.
+
+**`proyecto.json`.** Un objeto con:
+- `esquema`: `"concreta-fem/proyecto@1"`, la versión del esquema. Un cambio incompatible sube el número.
+- `nombre` y `descripcion`, opcionales.
+- `modelo`: el `ModeloFisico` tal cual.
+- `opciones`: las `OpcionesCompilacion`, opcionales.
+- `$schema`, opcional, sólo para que el editor encuentre el esquema.
+
+La huella es la del compilador (modelo y opciones); `nombre` y `descripcion` no entran.
+
+**Esquema.**
+- JSON Schema 2020-12 generado desde el tipo `Proyecto` con la API del compilador de TypeScript, que ya es dependencia de desarrollo (Apache-2.0): no entra ninguna dependencia nueva.
+- Las descripciones salen de los comentarios de los tipos, y la del modelo es la cabecera de `fisico.ts` con sus convenios.
+- El esquema va versionado en `src/agente/proyecto.schema.json`, y un test comprueba que es el que sale de los tipos.
+- **`additionalProperties: false` en todos los objetos.** Un campo opcional mal escrito (`"insercon"`) se ignoraría y sería un fallo silencioso; así es un error.
+- Lo valida un validador propio del subconjunto que se genera (`src/agente/esquema.ts`), no Ajv: da los mensajes en español con la ruta y el id del objeto, y no hay que llevar otra dependencia a Concreta.
+
+**CLI `fem`** (`cli/fem.ts`, con Bun). Órdenes:
+
+| Orden | Hace |
+|---|---|
+| `validar <proyecto>` | Esquema y compilación; diagnósticos con el id físico |
+| `compilar <proyecto>` | Además, huella, estadísticas e hipótesis |
+| `calcular <proyecto>` | Además, calcula y guarda los resultados |
+| `resumen <proyecto>` | A1: el modelo en unas líneas por planta |
+| `consultar <proyecto> <consulta> …` | A1: envolventes, piezas, bandas, reacciones… |
+| `esquema` | La ruta del esquema |
+
+- Cada orden escribe un único JSON por la salida estándar, con `orden`, `ok` y `diagnosticos` siempre presentes.
+- **Códigos de salida:** 0 si todo va bien; 1 si el modelo o el cálculo tienen errores; 2 si la orden está mal dada (argumentos, fichero que no existe, JSON roto); 3 si hay un error interno.
+- **Resultados:** se guardan junto al proyecto, en `.fem/<huella>/`, y se reutilizan mientras la huella no cambie. Son derivados y no van a git.
+- **Números:** la capa pura (`src/agente/`) los da completos. La CLI los redondea a 6 cifras significativas para el agente, y `--exacto` los da completos.
+
+**Tope de tamaño de A1 (criterio 2).** En el edificio objetivo de 7 plantas, el resumen y cada consulta con sus opciones por defecto caben en **4 000 tokens**. No hay un tokenizador oficial en local, así que se estima como bytes / 2,5, que es conservador para JSON con números (cuenta de más). Las listas van acotadas (los 10 mayores por defecto) y lo dicen cuando cortan.
+
+**Spike A2.**
+- **Agentes:** subagentes de Claude Code, cada uno con la descripción en texto, la skill y la CLI. No pueden leer `src/`, `validacion/` ni `docs/`, para no copiar el modelo de referencia, y al acabar dicen qué ficheros han leído.
+- **Los tres modelos:** 1-022, `reticulaConNucleo` y el edificio objetivo con losa maciza y vigas (`edificioObjetivoLosas`).
+- **Ids:** los de los casos se dan en la descripción; los demás son libres.
+- **Comparación** con la referencia, a 1e-6:
+  - reacciones totales por caso;
+  - desplazamiento del maestro de cada planta (las plantas se emparejan por su cota);
+  - flecha máxima de cada losa;
+  - esfuerzos de cinco piezas elegidas, localizadas por su posición.
