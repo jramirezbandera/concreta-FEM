@@ -28,6 +28,7 @@ import { Cortes, type Corte } from "../motor/cortes.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, ResultadoCaso } from "../motor/modelo.ts";
 import { cotasPlantas } from "./cotas.ts";
+import { combinar } from "./envolventes.ts";
 import { ejesBanda, estacionesBanda, puntoBanda } from "./estaciones.ts";
 import type { Banda, ModeloFisico, Vec2 } from "./fisico.ts";
 
@@ -143,16 +144,6 @@ export class EsfuerzosBandas {
       };
     });
   }
-}
-
-/** Combinación lineal de un vector por caso (n valores por caso) con unos factores. */
-function combinar(v: ArrayLike<number>, n: number, f: ArrayLike<number>): Float64Array {
-  const r = new Float64Array(n);
-  for (let k = 0; k < f.length; k++) {
-    const a = f[k]!;
-    if (a) for (let q = 0; q < n; q++) r[q]! += a * v[n * k + q]!;
-  }
-  return r;
 }
 
 export type MetodoWoodArmer = "medios" | "puntos";

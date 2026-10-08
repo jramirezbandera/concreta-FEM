@@ -418,6 +418,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       `Hay ${conPeso.length} casos con el peso propio (${conPeso.map((c) => c.id).join(", ")}); como mucho, uno.`,
       conPeso.map((c) => c.id),
     );
+  validarAcciones(casos, caso, mal);
   const pilarDe = new Map(pilares.map((p) => [p.id, p] as const));
   const vigaDe = new Map(vigas.map((v) => [v.id, v] as const));
   for (const c of cargas) {
@@ -873,4 +874,63 @@ function solapeMuros(pa: readonly Vec2[], pb: readonly Vec2[], eps: number): num
       r = Math.max(r, Math.min(L, Math.max(c.s, d.s)) - Math.max(0, Math.min(c.s, d.s)));
     }
   return r;
+}
+
+const TIPOS_ACCION = ["G", "Q", "S", "W", "T", "E", "A", "N"];
+const DURACIONES = ["permanente", "larga", "media", "corta", "instantanea"];
+
+/**
+ * La acción de cada caso (C5.4, C5-f): el esquema de `CasoCarga` y las reglas del generador de
+ * combinaciones (`src/combinaciones/generador.ts`: ψ en las variables, dirección en el sismo,
+ * dirección, signo y caso vertical de origen en las nocionales, familias de un solo tipo), para que
+ * un dato mal puesto sea un error con el id del caso y no una excepción al combinar.
+ */
+function validarAcciones(casos: readonly CasoFisico[], caso: ReadonlyMap<string, number>, mal: (id: string, que: string) => void): void {
+  const tipoDe = new Map<string, string>();
+  for (const c of casos) {
+    const a = (c as unknown as Record<string, unknown>).accion;
+    if (a === undefined) continue;
+    if (!esObjeto(a)) {
+      mal(c.id, "la acción tiene que ser un objeto con su tipo (G, Q, S, W, T, E, A o N)");
+      continue;
+    }
+    if (typeof a.tipo !== "string" || !TIPOS_ACCION.includes(a.tipo)) {
+      mal(c.id, "el tipo de la acción tiene que ser G, Q, S, W, T, E, A o N");
+      continue;
+    }
+    tipoDe.set(c.id, a.tipo);
+    const variable = a.tipo === "Q" || a.tipo === "S" || a.tipo === "W" || a.tipo === "T";
+    if (a.psi !== undefined) {
+      const p = a.psi;
+      if (!esObjeto(p) || !["psi0", "psi1", "psi2"].every((k) => num(p[k]) && (p[k] as number) >= 0 && (p[k] as number) <= 1)) mal(c.id, "ψ tiene que ser { psi0, psi1, psi2 }, números entre 0 y 1");
+    } else if (variable) mal(c.id, `la acción variable (${a.tipo}) necesita sus ψ`);
+    if (a.familia !== undefined && typeof a.familia !== "string") mal(c.id, "la familia tiene que ser un texto");
+    if (a.permanente !== undefined && a.permanente !== "peso" && a.permanente !== "empuje" && a.permanente !== "agua") mal(c.id, "permanente tiene que ser peso, empuje o agua");
+    if (a.direccion !== undefined && a.direccion !== "X" && a.direccion !== "Y") mal(c.id, "la dirección tiene que ser X o Y");
+    if (a.signo !== undefined && a.signo !== 1 && a.signo !== -1) mal(c.id, "el signo tiene que ser 1 o −1");
+    if (a.duracion !== undefined && (typeof a.duracion !== "string" || !DURACIONES.includes(a.duracion))) mal(c.id, "la duración tiene que ser permanente, larga, media, corta o instantanea");
+    if (a.tipo === "E" && a.direccion === undefined) mal(c.id, "el sismo necesita su dirección (X o Y)");
+    if (a.tipo === "N") {
+      if (a.direccion === undefined || a.signo === undefined) mal(c.id, "la carga nocional necesita su dirección y su signo");
+      if (typeof a.derivadoDe !== "string" || !caso.has(a.derivadoDe)) mal(c.id, `la carga nocional deriva de un caso que no existe («${String(a.derivadoDe)}»)`);
+    } else if (a.derivadoDe !== undefined) mal(c.id, "sólo una carga nocional (N) deriva de otro caso");
+  }
+  for (const c of casos) {
+    const a = (c as unknown as Record<string, unknown>).accion as Record<string, unknown> | undefined;
+    if (tipoDe.get(c.id) === "N" && typeof a?.derivadoDe === "string" && caso.has(a.derivadoDe)) {
+      const t = tipoDe.get(a.derivadoDe);
+      if (t !== "G" && t !== "Q" && t !== "S") mal(c.id, `la carga nocional tiene que derivar de un caso vertical (G, Q o S); ${a.derivadoDe} es ${t ?? "un caso sin acción"}`);
+    }
+  }
+  // Una familia excluyente es de un solo tipo de acción
+  const familias = new Map<string, Set<string>>();
+  for (const c of casos) {
+    const f = (c as unknown as { accion?: { familia?: unknown } }).accion?.familia;
+    const t = tipoDe.get(c.id);
+    if (typeof f === "string" && t) familias.set(f, (familias.get(f) ?? new Set()).add(t));
+  }
+  for (const c of casos) {
+    const f = (c as unknown as { accion?: { familia?: unknown } }).accion?.familia;
+    if (typeof f === "string" && (familias.get(f)?.size ?? 0) > 1) mal(c.id, `la familia «${f}» mezcla tipos de acción (${[...familias.get(f)!].join(", ")})`);
+  }
 }

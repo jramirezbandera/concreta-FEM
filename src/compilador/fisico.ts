@@ -39,6 +39,7 @@
  *   una viga: x a lo largo de ella, en el sentido de la dirección llevada a [0°, 180°) (las de 0° y
  *   180° son las mismas), y z = +Z; sus estaciones van desde su primer extremo.
  */
+import type { CasoCarga } from "../combinaciones/generador.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
@@ -166,6 +167,12 @@ export interface CasoFisico {
   nombre?: string;
   /** El peso propio de las piezas (γ·A) va a este caso. Como mucho, uno. */
   pesoPropio?: boolean;
+  /**
+   * C5.4 (C5-f): la acción del caso, con los datos de `CasoCarga` de `src/combinaciones/` (tipo, ψ,
+   * familia, dirección…), para generar las combinaciones CTE/NCSE de las consultas. No cambia la
+   * compilación. Sin ella, las consultas van por caso o con combinaciones dadas por sus factores.
+   */
+  accion?: Omit<CasoCarga, "id">;
 }
 
 /**

@@ -356,14 +356,17 @@ Se hace por partes, cada una con sus tests y su commit:
 - **Dintel:** el trozo de muro sobre un hueco y bajo la cota. Cortes verticales en sus extremos (las caras del hueco, ya en la malla) y en su centro. Da V y M como una viga.
 
 **Consultas por objeto físico** (C5.4, H35, A1):
-- **Pilares:** por planta, en la cabeza y en la base, N (+ compresión), Vy, Vz, T, My y Mz en los ejes de la sección física (b, h y su giro), con la longitud del tramo.
+- **Pilares:** por planta, en la cabeza y en la base (los extremos de su tramo flexible), N, Vy, Vz, T, My y Mz en los ejes de la sección física (b, h y su giro), con la longitud del tramo. N con el convenio del motor (+ tracción): el cambio a compresión positiva es del extractor de rcColumns (H02, H35), como cualquier otro cambio de signo hacia un módulo.
 - **Vigas y viguetas:** por pieza y vano, con estaciones y en las caras de los apoyos: N, V, T y M; momento de vano y de apoyos.
+  - Los apoyos de una viga son sus pilares, muros y apoyos, y la viga en la que acaba (no la que cruza); los de una vigueta, todos sus nudos interiores. La cara es el eje del apoyo ± su media anchura a lo largo de la pieza.
+  - El máximo y el mínimo de un vano en una combinación son exactos: los extremos del diagrama combinado, no la combinación de los máximos de cada caso.
+  - Una viga en el plano de un diafragma rígido se marca con el axil sin valor (C1-d).
 - **Bandas, machones y dinteles:** sus estaciones (C5.2, C5.3).
-- **Apoyos:** sus reacciones.
-- **Plantas:** desplazamiento del maestro del diafragma y deriva entre plantas.
-- **Losas:** la flecha máxima por recuadro.
+- **Apoyos:** la resultante de las reacciones de un apoyo, de la base de un pilar o de un muro, o de un apoyo lineal.
+- **Plantas:** desplazamiento del maestro del diafragma y desplome de cada pilar respecto a la planta de abajo (CTE DB SE 4.3.3.2), con el mayor.
+- **Losas:** la flecha máxima de la losa y, por recuadro entre cuatro pilares de las alineaciones de C5-b, la relativa a sus esquinas (elástica; la activa es del módulo).
 
-Las consultas trabajan por caso, por combinación o en envolvente (máximo y mínimo con la combinación que los da). Las unidades son kN y m, con los signos documentados en la cabecera. Dan exactamente lo que `EsfuerzosPiezas`, `Cortes` y `CamposLaminas` dan llamados a mano (`agente.md`).
+Lo que es lineal en los casos (una sección fija, una reacción) se da por caso, y una combinación o una envolvente (máximo y mínimo con la combinación que los da) sale de `combinar` y `envolvente`. Lo que es un máximo sobre una región (un vano, una losa, una planta) se pide para una combinación, porque el máximo de una combinación no es la combinación de los máximos. Las unidades son kN y m, con los signos documentados en la cabecera. Dan exactamente lo que `EsfuerzosPiezas`, `Cortes` y `CamposLaminas` dan llamados a mano (`agente.md`).
 
 **Decisiones por defecto de C5:**
 

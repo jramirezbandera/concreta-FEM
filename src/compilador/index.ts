@@ -15,6 +15,26 @@ export { proponerBandas, type PropuestaBandas } from "./bandas.ts";
 export { EsfuerzosBandas, woodArmerEstacion, DELTA_MUESTRAS, type EstacionResultado, type MetodoWoodArmer } from "./esfuerzosBandas.ts";
 export { estacionesBanda, ejesBanda, type EstacionBanda } from "./estaciones.ts";
 export { EsfuerzosMuros, DELTA_BORDE, type Dintel, type EsfuerzosCorte, type Machon } from "./esfuerzosMuros.ts";
+export {
+  Consultas,
+  SENO_MINIMO_APOYO,
+  type ApoyoPieza,
+  type Desplome,
+  type Desplomes,
+  type EsfuerzosVano,
+  type ExtremoDiagrama,
+  type FlechaPunto,
+  type Flechas,
+  type PiezaVanos,
+  type PlantaConsulta,
+  type Recuadro,
+  type Respuesta,
+  type Resultante,
+  type SeccionPieza,
+  type TramoPilar,
+  type VanoPieza,
+} from "./consultas.ts";
+export { combinar, envolvente, factoresCaso, type Envolvente } from "./envolventes.ts";
 export { FACTOR_ZONA_RIGIDA, MODIFICADORES_D4, TAMANO_MALLA } from "./fisico.ts";
 export { JACOBIANO_BAJO, VERSIONES_MALLADOR } from "./mallado.ts";
 export type {

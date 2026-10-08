@@ -105,7 +105,7 @@ function pilaresEnLosa(ctx: Contexto, l: LosaCompilada): PilarEnLosa[] {
 }
 
 /** Media extensión de una huella a lo largo de la dirección d (0 sin forma). */
-function semiextension(h: Huella, d: Vec2): number {
+export function semiextension(h: Huella, d: Vec2): number {
   const f = h.forma;
   if (!f) return 0;
   if (f.tipo === "circulo") return f.D / 2;
@@ -232,6 +232,26 @@ function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[]
     nueva(`${l.losa.id}:${etiqueta}:C${i + 1}-${j + 1}`, "central", s0, s1, a.t + a.wMas, b.t - b.wMenos, apoyosDe([...a.pilares, ...b.pilares], s0, s1));
   });
   return bandas;
+}
+
+/**
+ * Alineaciones de pilares de una losa en sus dos direcciones (las de la propuesta, C5-b): para cada
+ * dirección d (su eje 1 y la perpendicular), la coordenada transversal t = p·n de cada alineación
+ * (la media de sus pilares) y sus pilares ordenados a lo largo. Las usan los recuadros de las
+ * flechas (C5.4).
+ */
+export function alineacionesLosa(ctx: Contexto, l: LosaCompilada): { d: Vec2; n: Vec2; alineaciones: { t: number; pilares: string[] }[] }[] {
+  const pilares = pilaresEnLosa(ctx, l);
+  const d = direccionEje1(l.losa.eje1 ?? 0);
+  const n: Vec2 = [-d[1], d[0]];
+  return [
+    [d, n],
+    [n, d],
+  ].map(([a, b]) => ({
+    d: a as Vec2,
+    n: b as Vec2,
+    alineaciones: alineaciones(pilares, a as Vec2, b as Vec2, ctx.op.epsSnap).map((g) => ({ t: g.reduce((s, q) => s + q.t, 0) / g.length, pilares: g.map((q) => q.id) })),
+  }));
 }
 
 /**
