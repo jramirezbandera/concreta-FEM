@@ -4,7 +4,7 @@
 >
 > Sustituye al §7 del diseño técnico con lo que cambian la investigación (COM-01…20, H28, H29) y las fases E0–E6 del motor. Lo de PyNite que el motor propio ya no necesita (barras de penalización, nudos conformes forzados por falta de MPC, troceado por cargas) desaparece.
 >
-> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 superada el 2026-10-05 (`fase-c2.md`): el criterio 8 (tamaño frente a D9) pasa desde la rejilla alineada de H52 en las zonas regulares (decisión C2-a, `rejilla.md`). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). C4 (forjados) superada el 2026-10-05 (`fase-c4.md`): pasan los nueve criterios, el 2 con una salvedad en el ábaco. Siguiente: C5 (bandas y salida).
+> **Estado:** C1 superada el 2026-10-04 (`fase-c1.md`). C2 superada el 2026-10-05 (`fase-c2.md`): el criterio 8 (tamaño frente a D9) pasa desde la rejilla alineada de H52 en las zonas regulares (decisión C2-a, `rejilla.md`). C3 (muros) superada el 2026-10-05 (`fase-c3.md`). C4 (forjados) superada el 2026-10-05 (`fase-c4.md`): pasan los nueve criterios, el 2 con una salvedad en el ábaco. C5 (bandas y salida) en curso: plan y decisiones por defecto en «C5: alcance y decisiones».
 
 ## Entrada, salida y reglas
 
