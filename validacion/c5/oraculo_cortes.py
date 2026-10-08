@@ -123,7 +123,7 @@ def main():
         salida[nombre] = {"esfuerzos": res, "notas": notas}
         print(nombre, f"{time.perf_counter() - t:.1f} s", f"{len(notas)} cortes sin comparar" if notas else "", flush=True)
     ruta = os.path.join(os.path.dirname(os.path.dirname(AQUI)), "src", "compilador", "__fixtures__", "opensees-c5.json")
-    json.dump(salida, open(ruta, "w", encoding="utf-8"), indent=1)
+    json.dump(salida, open(ruta, "w", encoding="utf-8", newline=""), indent=1)
     print("escrito", ruta)
 
 
