@@ -21,7 +21,7 @@ import { Cortes } from "../../src/motor/cortes.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
 import { losaPlanaFisica, OPCIONES_LOSA_PLANA } from "../c2/losaPlana.ts";
-import { reticularH25 } from "./modelos.ts";
+import { conPropuesta, losaPilaresMezclados, reticularH25 } from "./modelos.ts";
 
 await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "..", "src", "nucleo", "pkg", "nucleo_bg.wasm")));
 
@@ -78,6 +78,27 @@ for (const e of [enCara(est, 6.3), est.find((x) => x.tipo === "vano" && x.s > 6.
 }
 decir();
 decir("Referencia: la rejilla fina de E5 (h = 0,075 m) con el mismo modelo, en la cara: banda de pilares de 3 m −205,58 kN·m y pórtico de 6 m −262,71 (`validacion/c2/out_losa_plana.txt`); la banda de pilares lleva el 78,3 %. Las cifras de la tabla de H25 (211 / 264 / 261 y 331 / 337 / 337) son de su experimento con PyNite, con otro pilar.");
+
+// C5-d: reparto entre bandas de pilares y centrales
+decir();
+decir("## Reparto entre bandas de pilares y centrales (C5-d), dirección 1");
+decir();
+decir("modelo | línea | s (m) | pilares (kN·m) | centrales (kN·m) | pilares / total | tabla I.1");
+const repartir = (nombre: string, e: EsfuerzosBandas, losa: string, factores: number[]) => {
+  const { lineas, diagnosticos } = e.reparto(losa, [1, 0], factores);
+  for (const l of lineas) decir(`${nombre} | ${l.tipo} | ${l.s.toFixed(2)} | ${l.pilares.toFixed(1)} | ${l.centrales.toFixed(1)} | ${Number.isNaN(l.fraccion) ? "— (signos distintos)" : `${(100 * l.fraccion).toFixed(1)} %`} | ${l.fuera ? "aviso" : ""}`);
+  return diagnosticos.length;
+};
+repartir("H25, q, h = 0,25", eb, "LOSA", [1]);
+{
+  const fm = conPropuesta(losaPilaresMezclados());
+  const r = compilar(fm);
+  if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
+  const ebm = new EsfuerzosBandas(fm, r.modelo, casosValidos(calcular(r.modelo)));
+  const n = repartir("pilares mezclados, 1,35·G + 1,5·Q", ebm, fm.losas![0]!.id, [1.35, 1.5, 0, 0]);
+  decir();
+  decir(`En H25 las caras interiores dan el 79–80 % y los vanos el 55–56 %, dentro de la tabla; en las caras de los pilares de borde (articulados en cabeza) no hay negativo y no se compara. En la losa de pilares mezclados, con pilares de 30 × 50 más rígidos y el hueco de la escalera, ${n} línea(s) salen de la tabla y dan su aviso; las de fachada, con las centrales en positivo, no se comparan.`);
+}
 
 // Criterio 3: Wood–Armer (a) frente a (b) en un reticular
 decir();

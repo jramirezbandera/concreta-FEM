@@ -83,6 +83,8 @@ export class EsfuerzosBandas {
   /** Losas de cada planta (sus regiones), con la losa de cada región. */
   private readonly regiones = new Map<string, Region[]>();
   private readonly losasPlanta = new Map<string, Losa[]>();
+  /** Estaciones ya calculadas por banda (no se cambian: las devuelve `estaciones`). */
+  private readonly hechas = new Map<string, EstacionResultado[]>();
 
   /**
    * @param fisico el modelo físico con sus bandas (las que se compilaron).
@@ -120,10 +122,70 @@ export class EsfuerzosBandas {
     return { id: `${b.id}@${s.toFixed(3)}`, origen: [P[0], P[1], this.cota.get(b.planta)!], x: [d[0], d[1], 0], vz: [0, 0, 1], y: [-b.ancho / 2, b.ancho / 2], z: [0, 0], metodo };
   }
 
-  /** Esfuerzos de la banda en todas sus estaciones; null si no existe. */
+  /** Esfuerzos de la banda en todas sus estaciones (se calculan la primera vez; no se cambian); null si no existe. */
   estaciones(id: string): EstacionResultado[] | null {
     const b = this.bandaDe.get(id);
     if (!b) return null;
+    let r = this.hechas.get(id);
+    if (!r) this.hechas.set(id, (r = this.calcularEstaciones(b)));
+    return r;
+  }
+
+  /**
+   * Reparto entre bandas de pilares y centrales (C5-d): en cada línea de caras y de vanos de las
+   * bandas de la planta de la losa paralelas a `direccion` (con su `tipo`), la suma de los My de las
+   * de pilares y la de las centrales en la combinación `factores`. Con las caras comunes (C5-g),
+   * todas las bandas de una línea de pilares tienen sus caras en las mismas rectas. Un aviso
+   * `banda/reparto` cuando la parte de las de pilares sale del 60–80 % (caras, negativos) o del
+   * 50–70 % (vanos, positivos) de la tabla I.1 del Anejo I: el reparto es el del cálculo, la tabla es
+   * la referencia del método simplificado. Sólo se compara cuando las dos sumas son negativas (caras)
+   * o positivas (vanos).
+   */
+  reparto(losa: string, direccion: Vec2, factores: ArrayLike<number>): { lineas: LineaReparto[]; diagnosticos: Diagnostico[] } {
+    const l = (this.fisico.losas ?? []).find((x) => x.id === losa);
+    const diag = new Diagnosticos();
+    if (!l) return { lineas: [], diagnosticos: diag.lista };
+    const nd = Math.sqrt(direccion[0] * direccion[0] + direccion[1] * direccion[1]);
+    const d: Vec2 = [direccion[0] / nd, direccion[1] / nd];
+    const lineas = new Map<string, LineaReparto>();
+    for (const b of this.fisico.bandas ?? []) {
+      if (b.planta !== l.planta || !b.tipo) continue;
+      const e = ejesBanda(b).d;
+      if (Math.abs(Math.abs(e[0] * d[0] + e[1] * d[1]) - 1) > 1e-9) continue;
+      for (const x of this.estaciones(b.id)!) {
+        if (!x.valido) continue;
+        const s = x.punto[0] * d[0] + x.punto[1] * d[1];
+        const clave = `${x.tipo}@${Math.round(s / this.eps)}`;
+        let li = lineas.get(clave);
+        if (!li) lineas.set(clave, (li = { tipo: x.tipo, s, pilares: 0, centrales: 0, fraccion: Number.NaN, rango: x.tipo === "cara" ? [0.6, 0.8] : [0.5, 0.7], fuera: false, bandas: [] }));
+        const M = combinar(x.esfuerzos, 6, factores)[4]!;
+        if (b.tipo === "pilares") li.pilares += M;
+        else li.centrales += M;
+        li.bandas.push(b.id);
+      }
+    }
+    const r = [...lineas.values()].sort((a, b) => a.s - b.s || (a.tipo < b.tipo ? -1 : 1));
+    for (const li of r) {
+      const total = li.pilares + li.centrales;
+      // La tabla reparte negativos en las caras y positivos en los vanos: con el otro signo en alguna
+      // de las dos sumas (un pilar de borde articulado, las centrales junto a una fachada, un viento)
+      // no se compara
+      const signo = li.tipo === "cara" ? -1 : 1;
+      if (!li.bandas.length || !(signo * li.pilares > 0 && signo * li.centrales > 0)) continue;
+      li.fraccion = li.pilares / total;
+      li.fuera = li.fraccion < li.rango[0] || li.fraccion > li.rango[1];
+      if (li.fuera)
+        diag.aviso(
+          "banda/reparto",
+          `En la ${li.tipo === "cara" ? "línea de caras" : "línea de vanos"} s = ${li.s.toFixed(3)} m de la losa ${losa}, las bandas de pilares llevan el ${(100 * li.fraccion).toFixed(0)} % del momento (la tabla I.1 del Anejo I da del ${100 * li.rango[0]} al ${100 * li.rango[1]} %). El reparto es el del cálculo; revise las bandas si no lo espera.`,
+          [losa, ...li.bandas],
+          { s: li.s, fraccion: li.fraccion },
+        );
+    }
+    return { lineas: r, diagnosticos: diag.lista };
+  }
+
+  private calcularEstaciones(b: Banda): EstacionResultado[] {
     const { L } = ejesBanda(b);
     const nc = this.casos.length;
     return estacionesBanda(b, this.eps).map((e) => {
@@ -192,6 +254,22 @@ export class EsfuerzosBandas {
       };
     });
   }
+}
+
+/** Una línea de caras o de vanos para el reparto entre bandas (C5-d). */
+export interface LineaReparto {
+  tipo: "cara" | "vano";
+  /** Coordenada de la línea a lo largo de la dirección, m (p·d). */
+  s: number;
+  /** Suma de los My de las bandas de pilares y de las centrales en la línea, kN·m. */
+  pilares: number;
+  centrales: number;
+  /** pilares / (pilares + centrales); NaN si alguna de las dos sumas no es negativa (en una cara) o positiva (en un vano). */
+  fraccion: number;
+  /** El de la tabla I.1: [0,6, 0,8] en las caras, [0,5, 0,7] en los vanos. */
+  rango: [number, number];
+  fuera: boolean;
+  bandas: string[];
 }
 
 export type MetodoWoodArmer = "medios" | "puntos";

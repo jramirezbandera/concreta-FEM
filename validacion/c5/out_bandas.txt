@@ -31,6 +31,27 @@ vano | 9.00 | (b) puntos | 27.2 | 0.6 | 0.0 | 6.9
 
 Referencia: la rejilla fina de E5 (h = 0,075 m) con el mismo modelo, en la cara: banda de pilares de 3 m −205,58 kN·m y pórtico de 6 m −262,71 (`validacion/c2/out_losa_plana.txt`); la banda de pilares lleva el 78,3 %. Las cifras de la tabla de H25 (211 / 264 / 261 y 331 / 337 / 337) son de su experimento con PyNite, con otro pilar.
 
+## Reparto entre bandas de pilares y centrales (C5-d), dirección 1
+
+modelo | línea | s (m) | pilares (kN·m) | centrales (kN·m) | pilares / total | tabla I.1
+H25, q, h = 0,25 | cara | 0.30 | 52.1 | 20.8 | — (signos distintos) | 
+H25, q, h = 0,25 | vano | 3.00 | 147.6 | 119.7 | 55.2 % | 
+H25, q, h = 0,25 | cara | 5.70 | -328.8 | -84.4 | 79.6 % | 
+H25, q, h = 0,25 | cara | 6.30 | -327.1 | -86.1 | 79.2 % | 
+H25, q, h = 0,25 | vano | 9.00 | 149.5 | 117.8 | 55.9 % | 
+H25, q, h = 0,25 | cara | 11.70 | 45.2 | 27.7 | — (signos distintos) | 
+pilares mezclados, 1,35·G + 1,5·Q | cara | 0.20 | -187.4 | 5.2 | — (signos distintos) | 
+pilares mezclados, 1,35·G + 1,5·Q | vano | 3.02 | 141.3 | 124.7 | 53.1 % | 
+pilares mezclados, 1,35·G + 1,5·Q | cara | 5.85 | -347.7 | -119.5 | 74.4 % | 
+pilares mezclados, 1,35·G + 1,5·Q | cara | 6.15 | -356.0 | -124.5 | 74.1 % | 
+pilares mezclados, 1,35·G + 1,5·Q | vano | 8.98 | 151.9 | 133.1 | 53.3 % | 
+pilares mezclados, 1,35·G + 1,5·Q | cara | 11.80 | -309.4 | -64.1 | 82.8 % | aviso
+pilares mezclados, 1,35·G + 1,5·Q | cara | 12.20 | -251.9 | -63.0 | 80.0 % | 
+pilares mezclados, 1,35·G + 1,5·Q | vano | 15.03 | 109.0 | 79.9 | 57.7 % | 
+pilares mezclados, 1,35·G + 1,5·Q | cara | 17.85 | -160.2 | 5.5 | — (signos distintos) | 
+
+En H25 las caras interiores dan el 79–80 % y los vanos el 55–56 %, dentro de la tabla; en las caras de los pilares de borde (articulados en cabeza) no hay negativo y no se compara. En la losa de pilares mezclados, con pilares de 30 × 50 más rígidos y el hueco de la escalera, 1 línea(s) salen de la tabla y dan su aviso; las de fachada, con las centrales en positivo, no se comparan.
+
 ## La misma losa como reticular 30+5 con ábacos de 2,5 × 2,5 m (criterio 3), caso q
 
 Nervios de 12 cm cada 82 cm, capa de 5 cm, casetón recuperable (sin peso propio: sólo q). Los ábacos (2,5 m > lx/3 = 2 m) dan el ancho de las bandas de pilares (I.1.2(3)).

@@ -146,6 +146,33 @@ describe("integración exacta (C5, criterio 2)", () => {
   });
 });
 
+describe("reparto entre bandas de pilares y centrales (C5-d)", () => {
+  it("en cada línea de caras y de vanos, las sumas de las bandas de la línea; aviso sólo fuera de la tabla I.1", () => {
+    const { lineas, diagnosticos } = eb.reparto("L", [1, 0], [0, 1]);
+    // Líneas de caras y de vanos de las bandas según X: cuatro líneas de pilares y tres vanos
+    expect(lineas.filter((l) => l.tipo === "vano").map((l) => l.s)).toEqual([3, 9, 15]);
+    for (const l of lineas) {
+      // Las sumas son las de las estaciones de la línea (con las caras comunes, todas en la misma recta)
+      let [p, c] = [0, 0];
+      for (const id of eb.bandas.filter((x) => x.startsWith("L:1:"))) {
+        const e = eb.estaciones(id)!.find((x) => x.tipo === l.tipo && Math.abs(x.s - l.s) < 1e-9);
+        if (!e) continue;
+        if (id.includes(":P")) p += e.esfuerzos[6 + 4]!;
+        else c += e.esfuerzos[6 + 4]!;
+      }
+      expect(l.pilares).toBeCloseTo(p, 9);
+      expect(l.centrales).toBeCloseTo(c, 9);
+    }
+    // Las caras de los pilares interiores, con negativos en las dos sumas: dentro del 60–80 %
+    const interiores = lineas.filter((l) => l.tipo === "cara" && l.s > 1 && l.s < 17);
+    expect(interiores.length).toBe(4);
+    for (const l of interiores) expect(l.fraccion).toBeGreaterThan(0.6);
+    // Un aviso por cada línea fuera de su rango, con el id de la losa
+    expect(diagnosticos.length).toBe(lineas.filter((l) => l.fuera).length);
+    expect(diagnosticos.every((d) => d.codigo === "banda/reparto" && d.ids![0] === "L")).toBe(true);
+  });
+});
+
 describe("huecos y bandas editadas (C5, criterio 1)", () => {
   it("un hueco que corta las bandas: el ancho en losa de cada estación, y una estación entera en el hueco no vale", () => {
     // Hueco [8, 10] × [6, 9] en el vano x = 6–12: tapa la central y = 6,25–8,75 entera en x = 9 y

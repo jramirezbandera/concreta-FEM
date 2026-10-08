@@ -30,7 +30,7 @@ import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "../motor/modelo.ts";
 import { alineacionesLosa, semiextension } from "./bandas.ts";
-import { EsfuerzosBandas, type EstacionResultado } from "./esfuerzosBandas.ts";
+import { EsfuerzosBandas, type EstacionResultado, type LineaReparto } from "./esfuerzosBandas.ts";
 import { EsfuerzosMuros, type Dintel, type Machon } from "./esfuerzosMuros.ts";
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type Pilar, type Seccion, type Vec2 } from "./fisico.ts";
 import { huellaPilar } from "./geometria2d.ts";
@@ -458,6 +458,20 @@ export class Consultas {
     this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom });
     const r = this.bandasC.estaciones(id);
     return r ? { valido: true, valor: r, diagnosticos: r.flatMap((e) => e.diagnosticos) } : this.noExiste("La banda", id);
+  }
+
+  /**
+   * Reparto entre bandas de pilares y centrales en las líneas de caras y de vanos de una losa, en
+   * la dirección `direccion` y la combinación `factores` (C5-d): con un aviso donde sale de la tabla
+   * I.1 del Anejo I.
+   */
+  reparto(losa: string, direccion: Vec2, factores: ArrayLike<number>): Respuesta<LineaReparto[]> {
+    if (!this.ctx.losaDe.has(losa)) return this.noExiste("La losa", losa);
+    const mal = this.factoresMal<LineaReparto[]>(factores, losa);
+    if (mal) return mal;
+    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom });
+    const r = this.bandasC.reparto(losa, direccion, factores);
+    return { valido: true, valor: r.lineas, diagnosticos: r.diagnosticos };
   }
 
   private muros(): EsfuerzosMuros {
