@@ -939,7 +939,7 @@
           "items": {
             "$ref": "#/$defs/Vec2"
           },
-          "description": "Eje en planta, m: polilínea de al menos dos puntos; cada tramo es un paño plano."
+          "description": "Eje en planta, m: polilínea de al menos dos puntos; cada tramo es un paño plano. Un muro cerrado\n(un núcleo) repite el primer punto al final."
         },
         "desde": {
           "type": "string",
@@ -1212,7 +1212,7 @@
         },
         "tipo": {
           "$ref": "#/$defs/TipoPlanta",
-          "description": "Como en `lib/edificio`: un sótano cuelga de la planta de encima. Por defecto, \"planta\"."
+          "description": "Como en `lib/edificio`: un sótano cuelga de la planta de encima. Por defecto, \"planta\". Sólo\ncambia el origen de las cotas: la cota 0 es la planta más baja que no es sótano. El cálculo no\ncambia: con la cimentación como sótano o como planta, los mismos resultados (salvo el redondeo)\ncon otras cotas."
         },
         "altura": {
           "type": [
@@ -1464,7 +1464,7 @@
             "J"
           ],
           "additionalProperties": false,
-          "description": "Propiedades dadas (m², m⁴). Sin áreas de cortante, Euler–Bernoulli en ese plano. `b` y `h`,\nsi se dan, son la huella del pilar y el canto de la viga (sin ellos, no hay zonas rígidas)."
+          "description": "Propiedades dadas (m², m⁴). Iy es la inercia de la flexión de My, en el plano vertical de una\nviga y en el del canto h de un pilar (el de +X con giro 0); Iz, la de Mz. Sin áreas de\ncortante, Euler–Bernoulli en ese plano. `b` y `h`, si se dan, son la huella del pilar y el\ncanto de la viga (sin ellos, no hay zonas rígidas)."
         }
       ],
       "description": "Sección de pieza, en m. `b` va según y local y `h` (el canto) según z local. De la forma salen\nlas propiedades (`seccion3D()`) y la huella en planta del pilar, que fija sus zonas rígidas."

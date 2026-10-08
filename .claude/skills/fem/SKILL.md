@@ -14,7 +14,7 @@ Trabajas sobre **un único fichero `proyecto.json`**: es la única fuente de ver
    - Los coeficientes (ψ, cargas de uso, γ) los da quien describe el proyecto.
    - Si faltan, deja los casos sin `accion`: las consultas irán por caso, sin combinaciones.
    - No te inventes cargas que no te han dado.
-3. **No decides por el ingeniero.** Si la descripción es ambigua (una luz, una sección, un apoyo), pregunta o dilo; no elijas en silencio. Las opciones de compilación por defecto (`opciones`) ya están decididas: no las cambies si no te lo piden.
+3. **No decides por el ingeniero.** Si la descripción es ambigua (una luz, una sección, un apoyo), pregunta o dilo; no elijas en silencio. Las opciones de compilación por defecto (`opciones`) ya están decididas: no las cambies si no te lo piden. Si te lo piden («sin modificadores de rigidez», «malla de 1 m»), búscalas en el esquema: `"modificadores": {}` quita los de por defecto.
 4. **Ningún resultado vale si `ok` no es `true`.** Los errores se corrigen en el fichero, por el `id` que nombra cada diagnóstico. Los avisos se leen todos y se explican al usuario si afectan al modelo.
 
 ## Flujo
@@ -29,6 +29,7 @@ fem consultar proyecto.json <consulta> …     # resultados acotados
 
 - `fem` es `bun "<repo>/cli/fem.ts"`; dentro del repo, también `bun run fem`.
 - Cada orden escribe **un objeto JSON** con `orden`, `ok` y `diagnosticos`. Los diagnósticos repetidos se resumen en `omitidos`.
+- `calcular` puede añadir avisos del motor que `validar` no da (por ejemplo, `modelo/nudos-coincidentes`): léelos también.
 - **Códigos de salida:** 0 bien; 1 errores del modelo o del cálculo; 2 orden mal dada; 3 error interno.
 - **Números:** la salida va a 6 cifras significativas; con `--exacto`, completos.
 
@@ -49,15 +50,18 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 - **Plantas, de ARRIBA ABAJO.**
   - Cada una lleva su `altura` hasta la de encima; la primera de la lista (la de arriba) lleva `"altura": null`.
   - El nivel de cimentación es la última planta: los pilares arrancan en él (`desde`) y se empotran por defecto.
-  - Las cotas no se escriben; salen de las alturas.
+  - Las cotas no se escriben; salen de las alturas. La cota 0 es la planta más baja que no es `"tipo": "sotano"`. Marcar la cimentación como sótano sólo mueve el origen de las cotas: el cálculo es el mismo, salvo el redondeo.
 - **`id` únicos en todo el modelo** (plantas, materiales, secciones, piezas, casos y cargas).
-- **Pilares:** se sitúan con `x`, `y`, `desde` (la planta de su base) y `hasta` (la de su cabeza). Una sección rectangular lleva `b` y `h`; el canto `h` va según X con `giro` 0.
+- **Pilares:** se sitúan con `x`, `y`, `desde` (la planta de su base) y `hasta` (la de su cabeza). Una sección rectangular lleva `b` y `h`; el canto `h` va según X con `giro` 0. Si la sección cambia en altura, `tramos` da la de cada tramo por la planta de su cabeza.
+- **Secciones y materiales dados por sus propiedades:**
+  - Una sección `general` lleva A, Iy, Iz y J. Iy es la de My: en una viga, la flexión vertical; en un pilar, la del plano de su canto (el XZ con giro 0).
+  - Un material `general` lleva E y G en kN/m² y su peso.
 - **Vigas:** se dibujan con `puntos` en planta sobre su eje y con su planta. Se conectan solas a los pilares y a otras vigas que tocan (tolerancia de 5 cm, con aviso).
 - **Losas y paños:** su contorno es un polígono simple y no repite el primer punto.
   - **Se dibujan a ejes:** el borde que apoya en una viga va sobre el eje de la viga.
   - El peso propio de una losa maciza se calcula solo (γ·espesor).
   - Un paño unidireccional necesita su `pp`, y un reticular, el `pp` (casetón perdido por defecto).
-- **Muros:** verticales, de `desde` a `hasta`, sobre su eje en planta.
+- **Muros:** verticales, de `desde` a `hasta`, sobre su eje en planta. Un muro cerrado (un núcleo) repite el primer punto al final.
 - **Casos:** como mucho uno con `pesoPropio: true`.
   - Con `accion` en **todos** los casos, las consultas usan las combinaciones CTE/NCSE.
   - `accion` lleva: `tipo` G, Q, W, S, E…; `psi` como `{ psi0, psi1, psi2 }` con los valores que te den; y, en W y E, `direccion` y `signo`.
@@ -65,7 +69,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
   - `superficie`: sobre una `losa`, un `pano` o una `zona` (polígono) de su planta.
   - `lineal`: polilínea sobre una losa o el eje de un muro.
   - `puntual`: `F` y `M` en ejes globales, en un punto de una planta.
-  - `viga` y `pilar`: repartidas a lo largo de la pieza.
+  - `viga` y `pilar`: repartidas a lo largo de la pieza; sin `desde` ni `hasta`, en toda ella. Es la forma de dar el viento sobre los pilares de una fachada.
   - `empuje`: sobre un muro.
 
   Lo que cae fuera de las losas no carga, y lo avisa.

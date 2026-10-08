@@ -52,7 +52,12 @@ export type TipoPlanta = "cubierta" | "planta" | "sotano";
 export interface Planta {
   id: string;
   nombre?: string;
-  /** Como en `lib/edificio`: un sótano cuelga de la planta de encima. Por defecto, "planta". */
+  /**
+   * Como en `lib/edificio`: un sótano cuelga de la planta de encima. Por defecto, "planta". Sólo
+   * cambia el origen de las cotas: la cota 0 es la planta más baja que no es sótano. El cálculo no
+   * cambia: con la cimentación como sótano o como planta, los mismos resultados (salvo el redondeo)
+   * con otras cotas.
+   */
   tipo?: TipoPlanta;
   /** m, de forjado a forjado hasta la planta de encima; la de arriba del todo no la necesita. */
   altura: number | null;
@@ -105,8 +110,10 @@ export type Seccion =
   /** T con el ala arriba: ala bf×hf y alma bw de canto total h. El eje pasa por su centro de gravedad. */
   | { id: string; material: string; forma: "T"; bf: number; hf: number; bw: number; h: number }
   /**
-   * Propiedades dadas (m², m⁴). Sin áreas de cortante, Euler–Bernoulli en ese plano. `b` y `h`,
-   * si se dan, son la huella del pilar y el canto de la viga (sin ellos, no hay zonas rígidas).
+   * Propiedades dadas (m², m⁴). Iy es la inercia de la flexión de My, en el plano vertical de una
+   * viga y en el del canto h de un pilar (el de +X con giro 0); Iz, la de Mz. Sin áreas de
+   * cortante, Euler–Bernoulli en ese plano. `b` y `h`, si se dan, son la huella del pilar y el
+   * canto de la viga (sin ellos, no hay zonas rígidas).
    */
   | { id: string; material: string; forma: "general"; A: number; Iy: number; Iz: number; J: number; Avy?: number; Avz?: number; b?: number; h?: number };
 
@@ -372,7 +379,10 @@ export interface HuecoMuro {
 export interface Muro {
   id: string;
   nombre?: string;
-  /** Eje en planta, m: polilínea de al menos dos puntos; cada tramo es un paño plano. */
+  /**
+   * Eje en planta, m: polilínea de al menos dos puntos; cada tramo es un paño plano. Un muro cerrado
+   * (un núcleo) repite el primer punto al final.
+   */
   puntos: readonly Vec2[];
   /** Planta de su base y planta de su cabeza, como los pilares. */
   desde: string;
