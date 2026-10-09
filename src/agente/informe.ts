@@ -28,8 +28,18 @@ export const AVISOS_POR_COMPROBACION = 25;
 /** Tramos de pilar de la bajada tributaria que se listan (los que más se separan). */
 export const TRAMOS_TRIBUTARIA = 12;
 
+/** Reacciones de un objeto con base (pilar, muro, apoyo o apoyo lineal) en su punto, por caso: [Fx, Fy, Fz, Mx, My, Mz] (6·nc). */
+export interface ReaccionBase {
+  id: string;
+  tipo: "pilar" | "muro" | "apoyo" | "apoyo lineal";
+  punto: readonly number[];
+  R: ArrayLike<number>;
+}
+
 export interface DatosInforme {
   proyecto: Proyecto;
+  /** Cargas en cimentación: las reacciones de cada pilar, muro y apoyo con base, en el orden del modelo. */
+  cimentacion: readonly ReaccionBase[];
   huella: string;
   /** sha256 del núcleo WASM con el que se calculó. */
   motor: string;
@@ -150,6 +160,34 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
       tipo: "tabla",
       cabecera: ["Planta", ...ch.map((c) => `${c}: ΣFx, ΣFy (kN)`)],
       filas: r.plantas.map((p) => [p.id, ...ch.map((c) => (p.horizontales?.[c] ? `${kN(p.horizontales[c][0])}; ${kN(p.horizontales[c][1])}` : "—"))]),
+    });
+  }
+
+  // ─── Cargas en cimentación ─────────────────────────────────────────────────────────────────
+  if (d.cimentacion.length) {
+    titulo(2, "Cargas en cimentación");
+    parrafo(
+      "Reacciones en la base de cada pilar, muro y apoyo, por caso, en ejes globales: fuerzas en kN y momentos en kN·m respecto al punto de la base (en un muro, el centro de sus nudos de la base). Fz > 0 es hacia arriba: el pilar comprime la cimentación. La carga que transmite cada pieza a su cimentación es la reacción cambiada de signo.",
+    );
+    const sumas = casos.map((_, k) => d.cimentacion.reduce((s, x) => s + x.R[6 * k + 2]!, 0));
+    b.push({
+      tipo: "tabla",
+      cabecera: ["Objeto", "x (m)", "y (m)", ...casos.map((c) => `Fz ${c} (kN)`)],
+      numericas: [1, 2, ...casos.map((_, i) => i + 3)],
+      filas: [
+        ...d.cimentacion.map((x) => [x.tipo === "pilar" ? x.id : `${x.id} (${x.tipo})`, num(x.punto[0]!, 4), num(x.punto[1]!, 4), ...casos.map((_, k) => kN(x.R[6 * k + 2]!))]),
+        ["Total", "", "", ...sumas.map(kN)],
+      ],
+    });
+    casos.forEach((c, k) => {
+      if (!d.cimentacion.some((x) => [0, 1, 2, 3, 4, 5].some((i) => x.R[6 * k + i] !== 0))) return;
+      titulo(3, `Caso ${c}`);
+      b.push({
+        tipo: "tabla",
+        cabecera: ["Objeto", "Fx", "Fy", "Fz", "Mx", "My", "Mz"],
+        numericas: [1, 2, 3, 4, 5, 6],
+        filas: d.cimentacion.map((x) => [x.tipo === "pilar" ? x.id : `${x.id} (${x.tipo})`, ...[0, 1, 2, 3, 4, 5].map((i) => kN(x.R[6 * k + i]!))]),
+      });
     });
   }
 

@@ -15,7 +15,7 @@ import type { ResultadoCompilacion } from "../compilador/compilar.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { resumen } from "./consultas.ts";
-import { documentoInforme, html, markdown, type Bloque } from "./informe.ts";
+import { documentoInforme, html, markdown, type Bloque, type ReaccionBase } from "./informe.ts";
 import type { Proyecto } from "./proyecto.ts";
 import { sensatezModelo, type Comprobacion, type DesglosePesoPropio } from "./sensatez.ts";
 import { sensatezResultados, type TramoComparado } from "./sensatezResultados.ts";
@@ -62,7 +62,7 @@ export function revisar(
   if (!res.valido) throw new Error("revisar: el resumen de un modelo compilado no puede fallar");
   const modelo = sensatezModelo(p.modelo, p.opciones, res.valor);
   const resultados = sensatezResultados(q, res.valor, p.opciones);
-  const documento = documentoInforme({ proyecto: p, huella: c.huella, resumen: res.valor, hipotesis: c.hipotesis, modelo, resultados, ...datos });
+  const documento = documentoInforme({ proyecto: p, huella: c.huella, resumen: res.valor, hipotesis: c.hipotesis, modelo, resultados, cimentacion: cimentacion(q), ...datos });
   const comprobaciones = [...modelo.comprobaciones, ...resultados.comprobaciones];
   return {
     comprobaciones,
@@ -73,6 +73,23 @@ export function revisar(
     markdown: markdown(documento),
     html: html(documento),
   };
+}
+
+/** Reacciones de cada pilar, muro y apoyo con base, en el orden del modelo (las cargas en cimentación del informe). */
+export function cimentacion(q: Consultas): ReaccionBase[] {
+  const f = q.fisico;
+  const objetos: [string, ReaccionBase["tipo"]][] = [
+    ...(f.pilares ?? []).filter((x) => x.base !== "ninguno").map((x) => [x.id, "pilar"] as [string, ReaccionBase["tipo"]]),
+    ...(f.muros ?? []).filter((x) => x.base !== "ninguno").map((x) => [x.id, "muro"] as [string, ReaccionBase["tipo"]]),
+    ...(f.apoyos ?? []).map((x) => [x.id, "apoyo"] as [string, ReaccionBase["tipo"]]),
+    ...(f.apoyosLineales ?? []).map((x) => [x.id, "apoyo lineal"] as [string, ReaccionBase["tipo"]]),
+  ];
+  const r: ReaccionBase[] = [];
+  for (const [id, tipo] of objetos) {
+    const x = q.reacciones(id);
+    if (x.valido && x.valor.nudos) r.push({ id, tipo, punto: x.valor.punto, R: x.valor.resultante });
+  }
+  return r;
 }
 
 /** Lee el fichero de firmas; un texto vacío es un fichero sin firmas. */

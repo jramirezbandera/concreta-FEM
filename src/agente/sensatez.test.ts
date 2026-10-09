@@ -187,6 +187,16 @@ describe("informe y firmas", () => {
     expect(a.revision.html).not.toContain("<de>");
   });
 
+  it("las cargas en cimentación: una fila por pilar, y su suma es toda la carga de cada caso", () => {
+    const r = revisarProyecto(proyectoDe(losaCuatroPilares(10)));
+    if (!r.valido) throw new Error("no se revisa");
+    const md = r.revision.markdown;
+    expect(md).toContain("## Cargas en cimentación");
+    // G: la losa (25 · 0,2 · 36 = 180) y los pilares (4 · 25 · 0,09 · 3 = 27); Q: 10 · 36 = 360
+    expect(md).toContain("| Total |  |  | 207 | 360 |");
+    for (const p of ["P1", "P2", "P3", "P4"]) expect(md).toMatch(new RegExp(`\\| ${p} \\| [0-9,]+ \\| [0-9,]+ \\| 51,75 \\| 90 \\|`));
+  });
+
   it("una firma vale para su huella y dice si el informe es el mismo", () => {
     let f = leerFirmas("");
     if ("error" in f) throw new Error(f.error);

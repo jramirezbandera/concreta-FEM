@@ -35,16 +35,16 @@
   no-aplica sensatez/planta-sin-caso     
   bien      sensatez/pilar-arranque      
   bien      sensatez/pilar-interrumpido  
-  bien      sensatez/peso-propio         N1: 5,5e-13 %
+  bien      sensatez/peso-propio         N1: 6,3e-13 %
   bien      sensatez/tributaria          P0-0 en N1: 0,93
   bien      sensatez/esbeltez-viga       X5-N1: 11
   bien      sensatez/esbeltez-losa       L-N1: 27,3
   bien      sensatez/flecha              L-N1: 1/4660
   bien      sensatez/desplome            N1: 1/6240000
-  bien      sensatez/axil-reducido       P6-5 bajo N1: 0,0691
+  bien      sensatez/axil-reducido       P6-5 bajo N1: 0,0686
   bajada tributaria: 12 de 16 tramos comparados; axil/bajada de 0.930 a 1.028
 
-== edificio objetivo con losas (6.3 s): 48 avisos
+== edificio objetivo con losas (4.8 s): 48 avisos
   bien      sensatez/altura              N6: 3 m
   bien      sensatez/espesor             L-N1: 0,25 m
   bien      sensatez/seccion             v2540: b = 0,25 m
@@ -73,7 +73,7 @@
       … y 43 más
   bajada tributaria: 560 de 560 tramos comparados; axil/bajada de 0.863 a 1.081
 
-== edificio objetivo con losas y acciones (10.6 s): 48 avisos
+== edificio objetivo con losas y acciones (6.9 s): 48 avisos
   bien      sensatez/altura              N6: 3 m
   bien      sensatez/espesor             L-N1: 0,25 m
   bien      sensatez/seccion             v2540: b = 0,25 m
@@ -102,7 +102,7 @@
       … y 43 más
   bajada tributaria: 560 de 560 tramos comparados; axil/bajada de 0.863 a 1.081
 
-== edificio objetivo con muros (9.3 s): 44 avisos
+== edificio objetivo con muros (6.4 s): 44 avisos
   bien      sensatez/altura              N6: 3 m
   bien      sensatez/espesor             L-N1: 0,25 m
   bien      sensatez/seccion             v2540: b = 0,25 m
@@ -116,8 +116,8 @@
   bien      sensatez/planta-sin-caso     
   bien      sensatez/pilar-arranque      
   bien      sensatez/pilar-interrumpido  
-  bien      sensatez/peso-propio         N6: 0,005 %
-  bien      sensatez/tributaria          P0-0 en N7: 0,859
+  bien      sensatez/peso-propio         N6: 0,0051 %
+  bien      sensatez/tributaria          P0-0 en N7: 0,858
   bien      sensatez/esbeltez-viga       S4-3-N1: 11,9
   bien      sensatez/esbeltez-losa       L-N1: 24
   bien      sensatez/flecha              L-N7: 1/4190
@@ -129,9 +129,9 @@
       El pilar P6-20 bajo la planta N1 tiene ν = 1,14 (Nd = 3430 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
       El pilar P6-25 bajo la planta N1 tiene ν = 1,12 (Nd = 3570 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
       … y 39 más
-  bajada tributaria: 500 de 560 tramos comparados; axil/bajada de 0.859 a 1.083
+  bajada tributaria: 500 de 560 tramos comparados; axil/bajada de 0.858 a 1.083
 
-== edificio reticular (V2) (7.8 s): 48 avisos
+== edificio reticular (V2) (7.7 s): 48 avisos
   bien      sensatez/altura              N6: 3 m
   bien      sensatez/espesor             L-N1: 0,35 m
   bien      sensatez/seccion             v2540: b = 0,25 m
@@ -160,7 +160,7 @@
       … y 43 más
   bajada tributaria: 560 de 560 tramos comparados; axil/bajada de 0.864 a 1.098
 
-== edificio unidireccional (V3) (3.8 s): 48 avisos
+== edificio unidireccional (V3) (3.3 s): 48 avisos
   bien      sensatez/altura              N6: 3 m
   no-aplica sensatez/espesor             
   bien      sensatez/seccion             T25: hf = 0,05 m
@@ -211,7 +211,7 @@
   bien      sensatez/desplome            N4: 1/616
   no-aplica sensatez/axil-reducido       
 
-== A2: retícula con núcleo del agente (0.2 s): 0 avisos
+== A2: retícula con núcleo del agente (0.1 s): 0 avisos
   bien      sensatez/altura              C: 1,5 m
   bien      sensatez/espesor             L-N1: 0,22 m
   bien      sensatez/seccion             V30x50: b = 0,3 m
@@ -225,16 +225,16 @@
   no-aplica sensatez/planta-sin-caso     
   bien      sensatez/pilar-arranque      
   bien      sensatez/pilar-interrumpido  
-  bien      sensatez/peso-propio         N1: 6,8e-13 %
+  bien      sensatez/peso-propio         N1: 5,6e-13 %
   bien      sensatez/tributaria          P0-0 en N1: 0,931
   bien      sensatez/esbeltez-viga       VX5: 11
   bien      sensatez/esbeltez-losa       L-N1: 27,3
   bien      sensatez/flecha              L-N1: 1/4700
   bien      sensatez/desplome            N1: 1/6270000
-  bien      sensatez/axil-reducido       P6-5 bajo N1: 0,069
+  bien      sensatez/axil-reducido       P6-5 bajo N1: 0,0685
   bajada tributaria: 12 de 16 tramos comparados; axil/bajada de 0.931 a 1.027
 
-== A2: edificio objetivo del agente (7.1 s): 48 avisos
+== A2: edificio objetivo del agente (4.2 s): 48 avisos
   bien      sensatez/altura              N6: 3 m
   bien      sensatez/espesor             L-N1: 0,25 m
   bien      sensatez/seccion             V25x40: b = 0,25 m
