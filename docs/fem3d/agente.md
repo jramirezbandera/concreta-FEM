@@ -2,7 +2,7 @@
 
 > **Qué es.** Una capa para que un agente de IA (Claude Code u otro) pueda manejar el motor de punta a punta: crear y editar el modelo físico, compilar, calcular, consultar resultados, revisarlos y, más adelante, leer planos y exportar a CAD. **Fecha:** 2026-10-05.
 >
-> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). A3 en curso: lo fijado al empezar está en §8.
+> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). A3 superada el 2026-10-09; el informe está en `fase-a3.md` y lo fijado al empezar, en §8. Lo siguiente es A4.
 >
 > **Veredicto.** Es viable, y el repositorio está mejor preparado de lo habitual (§1). El objetivo realista no es «todo con IA», sino que **la IA haga casi todo el tecleo y la iteración, y el ingeniero revise y firme** sobre un informe y un visor. Lo difícil no es la interfaz con el agente. Son los extremos de la cadena (leer planos en imagen y sacar planos de armado) y un riesgo nuevo: **el fallo silencioso pasa del motor al modelo**. El motor puede estar perfecto y el modelo tener una carga, un pilar o una unidad mal puestos (§4, regla A3).
 

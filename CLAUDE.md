@@ -193,8 +193,22 @@
   - **Spike A2:** tres subagentes, con sólo la descripción en texto, la skill y la CLI, llegaron al primer `validar` a 1-022, a la retícula con núcleo y al edificio objetivo. Sus resultados coinciden con la referencia a ≤ 5e-12 (`validacion/a2/`).
   - **A-1:** sin el esquema, `compilar` acepta en silencio un campo opcional mal escrito y usa el valor por defecto.
   - **Pendiente del usuario:** que `compilar` rechace los campos desconocidos (A-1), el peso propio doble de vigas sobre muros y del solape pilar–losa (A-9), y ψ por categoría de uso (A-2).
+- **2026-10-09: fase A3 de la capa de agente superada** (sensatez e informe de revisión). Pasan sus dos criterios. Los umbrales, las mutaciones y la firma los fijó el usuario al empezar (`agente.md` §8). El informe está en `docs/fem3d/fase-a3.md`, con criterios, hallazgos A3-1…A3-7 y pendientes.
+  - **Ya en `src/agente/`:**
+    - `sensatez.ts`: unidades y magnitudes, cargas (duplicadas, hacia arriba, por m² de planta y tipo de acción, plantas sin un caso), arranques e interrupciones de pilares, y peso propio esperado sin la malla frente al calculado;
+    - `tributaria.ts`: bajada por áreas tributarias (Voronoi por planta, cada carga donde cae);
+    - `sensatezResultados.ts`: axil frente a bajada, luz/canto, flechas, desplomes y axil reducido;
+    - `informe.ts` y `revision.ts`: informe determinista en Markdown y HTML, y fichero de firmas.
+  - **CLI:**
+    - `fem revisar` escribe `.fem/<huella>/informe.md` e `informe.html`;
+    - `fem firmar --por` es sólo del ingeniero (la skill lo prohíbe al agente) y deja la firma en `<proyecto>.revision.json`;
+    - `validar` da los avisos que no necesitan el cálculo aunque el modelo no compile (A3-5).
+  - **Criterios:** detecta las 46 mutaciones graves aplicables. En las referencias sólo avisa el axil reducido de los edificios objetivo de 7 plantas, y es verdadero: sus pilares no están dimensionados (A3-3).
+  - **A3-1:** el peso propio esperado coincide con el del compilador a precisión de máquina (≤ 0,01 % con muros), lo que contrasta C2-g y C3-g.
+  - **Validación:** `validacion/a3/` (mutaciones, referencias e informe de ejemplo).
+  - **Pendiente del usuario:** revisar el informe de ejemplo y el nombre del fichero de firmas. Siguen abiertas A-1, A-2 y A-9.
 - **Siguiente paso:**
-  - A3 de la capa de agente (sensatez del modelo e informe de revisión), antes de usarla con un proyecto real (A-d);
+  - A4 de la capa de agente (render y revisión visual);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - el resto de la capa de agente (A4–A7). A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
+  - el resto de la capa de agente (A5–A7). A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
