@@ -2,7 +2,7 @@
 
 > **Qué es.** Una capa para que un agente de IA (Claude Code u otro) pueda manejar el motor de punta a punta: crear y editar el modelo físico, compilar, calcular, consultar resultados, revisarlos y, más adelante, leer planos y exportar a CAD. **Fecha:** 2026-10-05.
 >
-> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). Lo siguiente es A3, que tiene que estar antes de usar la capa con un proyecto real (A-d).
+> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). A3 en curso: lo fijado al empezar está en §8.
 >
 > **Veredicto.** Es viable, y el repositorio está mejor preparado de lo habitual (§1). El objetivo realista no es «todo con IA», sino que **la IA haga casi todo el tecleo y la iteración, y el ingeniero revise y firme** sobre un informe y un visor. Lo difícil no es la interfaz con el agente. Son los extremos de la cadena (leer planos en imagen y sacar planos de armado) y un riesgo nuevo: **el fallo silencioso pasa del motor al modelo**. El motor puede estar perfecto y el modelo tener una carga, un pilar o una unidad mal puestos (§4, regla A3).
 
@@ -182,3 +182,71 @@ La huella es la del compilador (modelo y opciones); `nombre` y `descripcion` no 
   - desplazamiento del maestro de cada planta (las plantas se emparejan por su cota);
   - flecha máxima de cada losa;
   - esfuerzos de cinco piezas elegidas, localizadas por su posición.
+
+## 8. A3: lo que se fija al empezar (2026-10-09)
+
+Lo propuso el agente y el usuario lo aceptó el 2026-10-09, antes de escribir código: los umbrales, la lista de mutaciones, la firma y el reparto de la bajada por áreas tributarias.
+
+**Qué es.**
+- `src/agente/sensatez.ts` (puro): las comprobaciones. Dan avisos (`sensatez/…`), nunca errores. Se calculan desde el modelo físico, sin la malla, con la geometría de `poligonos.ts`.
+- `src/agente/informe.ts` (puro): el informe en Markdown y HTML. Es determinista (sin fecha), así que su sha256 se puede reproducir.
+- `fem revisar <proyecto>`: calcula (o reutiliza lo guardado), comprueba y escribe `informe.md` e `informe.html` en `.fem/<huella>/`.
+- `fem firmar <proyecto> --por "<nombre>"`: añade a `<proyecto>.revision.json`, junto al proyecto y en git, la huella, quién firma, la fecha y el sha256 del informe.
+  - `fem revisar` dice si la huella actual está firmada y si el informe sigue siendo el mismo.
+  - El agente nunca firma (lo dice la skill).
+
+**Umbrales de aviso.**
+
+| Comprobación | Avisa si |
+|---|---|
+| Altura de planta | Fuera de [2,2; 8] m. En la planta más baja, la de los arranques, sólo si pasa de 8 m |
+| Espesor de losa o muro | Fuera de [0,08; 2] m |
+| b, h o D de una sección | Fuera de [0,10; 3] m. En una T, h y bf; su bw y su hf, fuera de [0,03; 3] m |
+| fck; E de un material general; peso específico | Fuera de [12; 100] MPa; de [1e6; 4e8] kN/m²; de [1; 100] kN/m³ |
+| pp dado / (γ·espesor) | Fuera de [0,3; 1,3] en una losa maciza y de [0,3; 1] en un reticular. En un paño, pp fuera de [1,5; 8] kN/m² |
+| Carga vertical de la planta por m² de losas y paños, sumando los casos G (el de peso propio, si no lleva acción, cuenta como G) | Fuera de [3; 20] kN/m² |
+| Lo mismo con los casos Q y con los S | Fuera de [0,5; 10] y de [0,1; 3] kN/m² |
+| Cada caso sin acción (salvo el de peso propio) | Más de 25 kN/m² en una planta |
+| Carga vertical hacia arriba en un caso G, Q o S, o sin acción | Siempre |
+| Sin caso de peso propio; caso vacío; carga duplicada (igual a otra salvo el id, en el mismo caso) | Siempre |
+| Planta con losas o paños sin carga de un caso que carga al menos dos plantas y la mitad de las que tienen losas. No se aplica a la planta más alta con losas ni a las de tipo `cubierta` | Siempre |
+| Pilar con vínculo en la base que arranca en una planta que no es la más baja | Siempre |
+| Pilar que acaba bajo una losa o un paño de la planta de encima que cubre su eje | Siempre |
+| Peso propio del cálculo frente al esperado: Σ V·γ por tipo de pieza, menos los solapes que descuenta el compilador (C2-g, C3-g), estimados aparte | Difieren más de un 10 % |
+| Axil de cada tramo de pilar frente a la bajada por áreas tributarias, con la suma de los casos gravitatorios | Cociente fuera de [0,5; 2], salvo en tramos con una bajada menor que el 10 % de la mediana de su planta |
+| Luz libre / canto de cada vano de viga | > 18 si es descolgada; > 25 si es plana (b ≥ h). Un voladizo cuenta con el doble de su luz |
+| Mayor lado del recuadro / espesor | > 35 en una losa maciza y > 30 en un reticular |
+| Flecha relativa elástica / luz, del recuadro (su mayor lado) o del vano de viga o vigueta | > 1/500 |
+| Desplome por planta | > 1/250 |
+| Axil reducido ν = Nd/(Ac·fcd), con fcd = fck/1,5 | > 0,65 |
+
+**Combinaciones de las comprobaciones con resultados.**
+- Si todos los casos llevan su acción: ELS característica para las flechas y el desplome, ELU para ν.
+- Si no, «gravedad»: la suma de los casos gravitatorios (todos menos W, E, T, N y A, y menos los que no tienen carga vertical), con factor 1 para flechas y 1,4 para ν. El desplome, caso a caso.
+
+**Bajada por áreas tributarias.**
+- En cada planta, Voronoi de los pilares que la sostienen (los que tienen un tramo debajo) y de puntos cada 0,5 m de los ejes de los muros, recortado a las losas y los paños.
+- Cada carga va donde cae:
+  - las de superficie y los pp, por el área de cada celda;
+  - las lineales, las de viga y el peso de las vigas, muestreados por su eje;
+  - las puntuales, a su celda.
+- La bajada de un tramo acumula las plantas que el pilar sostiene por encima, más el peso de sus tramos superiores.
+- Lo que va a los muros no se comprueba: sólo hacen de generadores.
+
+**Mutaciones graves (criterio 1).**
+- Se inyectan en 1-022, la retícula con núcleo y los edificios objetivo con losas, unidireccional y reticular (en tamaño reducido), cada una donde aplica:
+  1. carga de superficie en N/m² (×1000);
+  2. carga vertical con el signo cambiado;
+  3. pilar interior quitado;
+  4. ningún caso de peso propio;
+  5. espesor de losa en cm;
+  6. canto de viga en cm;
+  7. altura de planta en cm;
+  8. las cargas de uso de una planta, en el caso G;
+  9. carga duplicada;
+  10. fck en kN/m²;
+  11. pp de losa en kN/m³.
+- Se detecta si aparece algún aviso de sensatez que el modelo sin mutar no da, o si el compilador la rechaza.
+- **Fuera de la lista:** «una planta con la altura de otra» cuando la altura sigue siendo plausible. Sin la descripción, ninguna comprobación lo puede saber; el informe da las alturas por planta para que las revise el ingeniero.
+
+**Falsos avisos (criterio 2).** Se miden en los modelos de referencia a tamaño completo y en los tres proyectos de los agentes de A2. Cada aviso que quede se justifica en el informe de la fase.
