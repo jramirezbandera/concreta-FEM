@@ -331,7 +331,7 @@ Combinaciones por defecto: las de las consultas de A1 (`combinaciones.ts`); si l
      - edificio objetivo con losas:
        1. un pilar interior desplazado 1 m en X en toda su altura;
        2. el hueco de la escalera olvidado en una planta;
-       3. una viga secundaria que acaba 0,6 m antes de la principal;
+       3. una viga secundaria desplazada 2 m del centro del vano (la primera propuesta, una secundaria que acaba 0,6 m antes de la principal, ya la avisa A3 como voladizo esbelto: `sensatez/esbeltez-viga`);
        4. la zona de 3 kN/m² de Q de una planta, desplazada un vano en X;
        5. un pilar de 30 × 50 de una columna girada con giro 0;
        6. la tabiquería de una planta con un vértice errado (22,5, 21,5 → 22,5, 15,5);

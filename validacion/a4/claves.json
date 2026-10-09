@@ -1,0 +1,12 @@
+{
+  "encargo-A": "edificio, mutación 2: el hueco de la escalera olvidado en N4",
+  "encargo-B": "edificio sin mutar",
+  "encargo-C": "edificio, mutación 6: la tabiquería de N5 con un vértice errado: (22,5, 21,5) → (22,5, 15,5)",
+  "encargo-D": "edificio, mutación 1: el pilar interior P-x36-y15 desplazado 1 m en X (x = 37) en toda su altura",
+  "encargo-E": "edificio, mutación 5: el pilar de 30 × 50 P-x18-y10, de una columna girada, con giro 0",
+  "encargo-F": "nucleo, mutación 7: el hueco de la losa fuera del núcleo: desplazado 6 m en X",
+  "encargo-G": "nucleo sin mutar",
+  "encargo-H": "edificio, mutación 3: la viga secundaria VS-x15-y10-N3 desplazada 2 m en −X (en x = 13, fuera de la mitad del vano)",
+  "encargo-I": "edificio, mutación 4: la zona de 3 kN/m² de Q de N2 desplazada un vano en X (de x = 12,8 a 23,2)",
+  "encargo-J": "nucleo, mutación 8: la puerta del núcleo en el tercer lado (y = 10), a 2,4 m de su esquina (12, 10)"
+}

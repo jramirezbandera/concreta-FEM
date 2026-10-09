@@ -331,8 +331,8 @@ describe("A4, criterio 2: determinismo", () => {
   });
 });
 
-const SVG_CONGELADO = "2b91a6c90ba6799bbeb05605cb1ad941c8d0701c6b9601a2120b866bfcdbd812";
-const PNG_CONGELADO = "d294514d8ec4f4b539b7f87db7c705ff8ff6675e77bc1deff4a6c506f151d21f";
+const SVG_CONGELADO = "71f0b353b5f5fb73200321210124f2f03c96c7fc0617db69cf321662e7ec8183";
+const PNG_CONGELADO = "054d7cd8964a073efc8dc874a556244b650e3c47579024cff5ddf1b28c8eb6e0";
 
 describe("A4, criterio 3: tamaño de la imagen y del texto", () => {
   it(`el lado mayor no pasa de ${LADO_MAXIMO} px y ningún texto baja de 11 px, en todas las vistas`, () => {

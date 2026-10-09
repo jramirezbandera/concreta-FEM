@@ -140,6 +140,19 @@ export function giroTexto(d: Vec2): number {
   return Math.round(a * 1000) / 1000;
 }
 
+/**
+ * Sección y dirección del canto de un pilar rectangular no cuadrado, para su rótulo: a la escala de
+ * un edificio entero la huella mide unos pocos px y no se ve hacia dónde va el canto h.
+ */
+function orientacion(p: Pilar, s: Seccion | undefined): string {
+  const h = huellaSeccion(p, s);
+  if (!h || !("anillo" in h) || !s) return "";
+  const [a0, a1, a2] = h.anillo as [Vec2, Vec2, Vec2];
+  if (Math.abs(Math.hypot(a1[0] - a0[0], a1[1] - a0[1]) - Math.hypot(a2[0] - a1[0], a2[1] - a1[1])) < 1e-9) return "";
+  const g = ((((p.giro ?? 0) % 180) + 180) % 180);
+  return ` ${SECCION(s)} ${g === 0 ? "hX" : g === 90 ? "hY" : `h${rotulo(g)}°`}`;
+}
+
 const SECCION = (s: Seccion | undefined): string => {
   if (!s) return "";
   switch (s.forma) {
@@ -232,7 +245,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     else P.push({ tipo: "poligono", anillos: [circulo(h.centro, h.radio)], estilo: e, objeto: p.id });
     // El rótulo, junto a una esquina de la huella; si no cabe, en otra
     const r = h ? ("anillo" in h ? Math.max(...h.anillo.map((q) => Math.max(Math.abs(q[0] - p.x), Math.abs(q[1] - p.y)))) : h.radio) : 0;
-    texto([p.x + r, p.y + r], p.id, 50, {
+    texto([p.x + r, p.y + r], `${p.id}${orientacion(p, seccion)}`, 50, {
       dx: 3,
       dy: -3,
       negrita: true,
@@ -270,7 +283,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   entrada("pano", "Paño unidireccional; las rayas, en la dirección de sus viguetas");
   entrada("viga", "Viga, con su ancho y su sección (cm)");
   entrada("vigueta", "Viga sin ancho conocido");
-  entrada("pilar-llega", "Pilar que llega desde la planta de abajo, con su sección orientada");
+  entrada("pilar-llega", "Pilar que llega desde la planta de abajo, con su sección orientada. Si es rectangular, su rótulo da b×h (cm) y hacia dónde va el canto h: hX según X, hY según Y");
   entrada("pilar-arranca", "Pilar que arranca aquí hacia arriba");
   entrada("muro-llega", "Muro que llega desde abajo");
   entrada("muro-arranca", "Muro que arranca aquí hacia arriba");
@@ -434,7 +447,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
   };
   entrada("carga-superficie", "Carga de superficie (kN/m²), sobre su zona, su losa o su paño. Las que se solapan se suman");
   entrada("carga-lineal", "Carga lineal (kN/m)");
-  entrada("carga-puntual", "Carga puntual (kN): ⊙ hacia abajo, ⊗ hacia arriba, flecha si es horizontal");
+  entrada("carga-puntual", "Carga puntual (kN): círculo con punto si va hacia abajo, con aspa si va hacia arriba, flecha si es horizontal");
   entrada("carga-pieza", "Carga en una viga, un pilar que llega a la planta o un muro (kN/m o kN/m²)");
   if (!c) notas.push(`El caso «${caso}» no existe.`);
   else if (c.pesoPropio) notas.push("Este caso lleva además el peso propio de la estructura, que calcula el programa y no se dibuja.");

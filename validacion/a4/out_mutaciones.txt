@@ -1,0 +1,12 @@
+# validacion/a4/mutaciones.ts — mutaciones visuales (A4, criterio 4): el compilador las acepta y ni él ni A3 avisan
+1. el pilar interior P-x36-y15 desplazado 1 m en X (x = 37) en toda su altura: sólo se ve en el dibujo; huella a32c863f000c
+2. el hueco de la escalera olvidado en N4: sólo se ve en el dibujo; huella bb9df12d3540
+3. la viga secundaria VS-x15-y10-N3 desplazada 2 m en −X (en x = 13, fuera de la mitad del vano): sólo se ve en el dibujo; huella c8fe00420a4d
+4. la zona de 3 kN/m² de Q de N2 desplazada un vano en X (de x = 12,8 a 23,2): sólo se ve en el dibujo; huella ba903a36227c
+5. el pilar de 30 × 50 P-x18-y10, de una columna girada, con giro 0: sólo se ve en el dibujo; huella 613ae11ff96d
+6. la tabiquería de N5 con un vértice errado: (22,5, 21,5) → (22,5, 15,5): sólo se ve en el dibujo; huella 4775cb542475
+7. el hueco de la losa fuera del núcleo: desplazado 6 m en X: sólo se ve en el dibujo; huella 2030b565715a
+8. la puerta del núcleo en el tercer lado (y = 10), a 2,4 m de su esquina (12, 10): sólo se ve en el dibujo; huella ec4ceb091f9f
+
+8 de 8 sólo se ven en el dibujo.
+Imágenes en C:/Users/javie/AppData/Local/Temp/claude/d--PROGRAMACION-Concreta-FEM/6d0c6270-d035-49b8-b09d-2ea62188bf13/scratchpad/spike-a4; claves en validacion/a4/claves.json.
