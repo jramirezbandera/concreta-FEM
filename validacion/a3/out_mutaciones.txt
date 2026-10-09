@@ -1,0 +1,104 @@
+
+== 1-022: 0 avisos sin mutar (ninguno)
+   1. carga de superficie en N/m² (×1000) [F1 (puntual, caso LAT)]: DETECTADA por sensatez/desplome (2)
+        La planta N2 se desploma 42,3 mm respecto a la de abajo (pilar centro, LAT): 1/97,4 de su altura (más de 1/250).
+   2. carga vertical con el signo cambiado: no aplica
+   3. pilar interior quitado [centro]: DETECTADA por sensatez/desplome (4)
+        La planta N5 se desploma 17,9 mm respecto a la de abajo (pilar derecha, LAT): 1/221 de su altura (más de 1/250).
+   4. ningún caso de peso propio: no aplica
+   5. espesor de losa en cm: no aplica
+   6. canto de viga en cm: no aplica
+   7. altura de planta en cm [N4: 396.23999999999995]: DETECTADA por sensatez/altura (1), sensatez/desplome (5)
+        La planta N4 tiene 396 m de altura (fuera de [2,2; 8] m): ¿está en cm o es la de otra planta?
+   8. las cargas de uso de una planta, en el caso G: no aplica
+   9. carga duplicada [F1]: DETECTADA por sensatez/carga-duplicada (1)
+        La carga F1-bis es igual que la F1 (mismo caso, mismo destino y mismos valores): ¿está dos veces?
+  10. fck en kN/m²: no aplica
+  11. pp de losa en kN/m³: no aplica
+
+== retícula con núcleo: 0 avisos sin mutar (ninguno)
+   1. carga de superficie en N/m² (×1000) [Q-N1 (superficie, caso Q)]: DETECTADA por sensatez/carga-planta (1), sensatez/flecha (9), sensatez/axil-reducido (16)
+        La planta N1 recibe 3000 kN/m² del caso Q (más de 25 kN/m²): ¿está en N?
+   2. carga vertical con el signo cambiado [Q-N1 (superficie, caso Q)]: DETECTADA por sensatez/carga-hacia-arriba (1)
+        La carga Q-N1 del caso Q va hacia arriba (componente vertical 3 > 0; Z es hacia arriba): ¿falta el signo?
+   3. pilar interior quitado [P6-5]: DETECTADA por sensatez/esbeltez-viga (1)
+        La viga X5-N1 (descolgada, canto 0,5 m) tiene un vano de 11,5 m de luz libre: L/h = 23 (más de 18): ¿el canto o la luz están bien?
+   4. ningún caso de peso propio [G]: DETECTADA por sensatez/sin-peso-propio (1), sensatez/caso-vacio (1)
+        Ningún caso lleva `pesoPropio`: las piezas no pesan en el cálculo.
+   5. espesor de losa en cm [L-N1: 22]: DETECTADA: la rechaza pilar/tramo-flexible-nulo (El tramo del pilar P0-0 bajo la planta N1 queda entero dentro del canto de las vigas o de )
+   6. canto de viga en cm [v3050: h = 50]: DETECTADA: la rechaza pilar/tramo-flexible-nulo (El tramo del pilar P0-0 bajo la planta N1 queda entero dentro del canto de las vigas o de )
+   7. altura de planta en cm [C: 150]: DETECTADA por sensatez/altura (1), sensatez/carga-planta (1)
+        La planta C tiene 150 m de altura (fuera de [0; 8] m): ¿está en cm o es la de otra planta?
+   8. las cargas de uso de una planta, en el caso G: no aplica
+   9. carga duplicada [Q-N1]: DETECTADA por sensatez/carga-duplicada (1)
+        La carga Q-N1-bis es igual que la Q-N1 (mismo caso, mismo destino y mismos valores): ¿está dos veces?
+  10. fck en kN/m² [HA: 25000]: DETECTADA por sensatez/material (1)
+        El hormigón HA tiene fck = 25000 MPa (fuera de [12; 100] MPa): ¿está en kN/m²?
+  11. pp de losa en kN/m³ [L-N1: pp = 25]: DETECTADA por sensatez/pp (1), sensatez/carga-planta (1)
+        La losa L-N1 tiene pp = 25 kN/m², 4,55 veces el de una maciza de su espesor (fuera de [0,3; 1,3]): ¿es un peso específico o está mal el espesor?
+
+== edificio con losas (3 plantas, 4 × 3 vanos): 0 avisos sin mutar (ninguno)
+   1. carga de superficie en N/m² (×1000) [Q-N1 (superficie, caso Q)]: DETECTADA por sensatez/carga-planta (1), sensatez/tributaria (4), sensatez/flecha (21), sensatez/axil-reducido (20)
+        La planta N1 recibe 2000 kN/m² del caso Q (más de 25 kN/m²): ¿está en N?
+   2. carga vertical con el signo cambiado [R-N1 (superficie, caso G)]: DETECTADA por sensatez/carga-hacia-arriba (1)
+        La carga R-N1 del caso G va hacia arriba (componente vertical 2 > 0; Z es hacia arriba): ¿falta el signo?
+   3. pilar interior quitado [P6-5]: DETECTADA por sensatez/esbeltez-viga (3), sensatez/axil-reducido (2)
+        La viga X5-N1 (descolgada, canto 0,6 m) tiene un vano de 11,6 m de luz libre: L/h = 19,3 (más de 18): ¿el canto o la luz están bien?
+   4. ningún caso de peso propio [G]: DETECTADA por sensatez/sin-peso-propio (1)
+        Ningún caso lleva `pesoPropio`: las piezas no pesan en el cálculo.
+   5. espesor de losa en cm [L-N1: 25]: DETECTADA: la rechaza pilar/tramo-flexible-nulo (El tramo del pilar P0-0 bajo la planta N1 queda entero dentro del canto de las vigas o de )
+   6. canto de viga en cm [v3060: h = 60]: DETECTADA: la rechaza pilar/tramo-flexible-nulo (El tramo del pilar P0-0 bajo la planta N1 queda entero dentro del canto de las vigas o de )
+   7. altura de planta en cm [N2: 300]: DETECTADA: la rechaza equilibrio/no-cumple (El caso Vx no cumple el equilibrio global: |ΣF|/Σ|F| = 3.97e-9 y |ΣM|/Σ|M| = 1.98e-9 (tole)
+   8. las cargas de uso de una planta, en el caso G [2 cargas de Q en N2, a G]: DETECTADA por sensatez/carga-duplicada (1), sensatez/planta-sin-caso (1)
+        La carga Q-N2 es igual que la R-N2 (mismo caso, mismo destino y mismos valores): ¿está dos veces?
+   9. carga duplicada [wP0-0]: DETECTADA por sensatez/carga-duplicada (1)
+        La carga wP0-0-bis es igual que la wP0-0 (mismo caso, mismo destino y mismos valores): ¿está dos veces?
+  10. fck en kN/m² [HA: 30000]: DETECTADA por sensatez/material (1)
+        El hormigón HA tiene fck = 30000 MPa (fuera de [12; 100] MPa): ¿está en kN/m²?
+  11. pp de losa en kN/m³ [L-N1: pp = 25]: DETECTADA por sensatez/pp (1), sensatez/carga-planta (1), sensatez/axil-reducido (6)
+        La losa L-N1 tiene pp = 25 kN/m², 4 veces el de una maciza de su espesor (fuera de [0,3; 1,3]): ¿es un peso específico o está mal el espesor?
+
+== edificio unidireccional (3, 4 × 3): 0 avisos sin mutar (ninguno)
+   1. carga de superficie en N/m² (×1000) [Q-N1 (superficie, caso Q)]: DETECTADA por sensatez/carga-planta (1), sensatez/tributaria (4), sensatez/flecha (97), sensatez/axil-reducido (19)
+        La planta N1 recibe 2000 kN/m² del caso Q (más de 25 kN/m²): ¿está en N?
+   2. carga vertical con el signo cambiado [R-N1 (superficie, caso G)]: DETECTADA por sensatez/carga-hacia-arriba (1)
+        La carga R-N1 del caso G va hacia arriba (componente vertical 2 > 0; Z es hacia arriba): ¿falta el signo?
+   3. pilar interior quitado [P6-5]: DETECTADA por sensatez/esbeltez-viga (3)
+        La viga X5-N1 (descolgada, canto 0,6 m) tiene un vano de 11,6 m de luz libre: L/h = 19,3 (más de 18): ¿el canto o la luz están bien?
+   4. ningún caso de peso propio [G]: DETECTADA por sensatez/sin-peso-propio (1)
+        Ningún caso lleva `pesoPropio`: las piezas no pesan en el cálculo.
+   5. espesor de losa en cm: no aplica
+   6. canto de viga en cm [v3060: h = 60]: DETECTADA: la rechaza pilar/tramo-flexible-nulo (El tramo del pilar P0-0 bajo la planta N1 queda entero dentro del canto de las vigas o de )
+   7. altura de planta en cm [N2: 300]: DETECTADA por sensatez/altura (1), sensatez/carga-planta (1), sensatez/desplome (3), sensatez/axil-reducido (14)
+        La planta N2 tiene 300 m de altura (fuera de [2,2; 8] m): ¿está en cm o es la de otra planta?
+   8. las cargas de uso de una planta, en el caso G [2 cargas de Q en N2, a G]: DETECTADA por sensatez/carga-duplicada (1), sensatez/planta-sin-caso (1)
+        La carga Q-N2 es igual que la R-N2 (mismo caso, mismo destino y mismos valores): ¿está dos veces?
+   9. carga duplicada [wP0-0]: DETECTADA por sensatez/carga-duplicada (1)
+        La carga wP0-0-bis es igual que la wP0-0 (mismo caso, mismo destino y mismos valores): ¿está dos veces?
+  10. fck en kN/m² [HA: 30000]: DETECTADA por sensatez/material (1)
+        El hormigón HA tiene fck = 30000 MPa (fuera de [12; 100] MPa): ¿está en kN/m²?
+  11. pp de losa en kN/m³ [F0-0-N1: pp = 25]: DETECTADA por sensatez/pp (1)
+        El paño F0-0-N1 tiene pp = 25 kN/m² (fuera de [1,5; 8] kN/m²).
+
+== edificio reticular (3, 4 × 3): 0 avisos sin mutar (ninguno)
+   1. carga de superficie en N/m² (×1000) [Q-N1 (superficie, caso Q)]: DETECTADA por sensatez/carga-planta (1), sensatez/tributaria (9), sensatez/flecha (21), sensatez/axil-reducido (20)
+        La planta N1 recibe 2000 kN/m² del caso Q (más de 25 kN/m²): ¿está en N?
+   2. carga vertical con el signo cambiado [R-N1 (superficie, caso G)]: DETECTADA por sensatez/carga-hacia-arriba (1)
+        La carga R-N1 del caso G va hacia arriba (componente vertical 2 > 0; Z es hacia arriba): ¿falta el signo?
+   3. pilar interior quitado [P6-5]: DETECTADA por sensatez/esbeltez-viga (3), sensatez/axil-reducido (2)
+        La viga X5-N1 (descolgada, canto 0,6 m) tiene un vano de 11,6 m de luz libre: L/h = 19,3 (más de 18): ¿el canto o la luz están bien?
+   4. ningún caso de peso propio [G]: DETECTADA por sensatez/sin-peso-propio (1)
+        Ningún caso lleva `pesoPropio`: las piezas no pesan en el cálculo.
+   5. espesor de losa en cm [L-N1: 35]: DETECTADA: la rechaza pilar/tramo-flexible-nulo (El tramo del pilar P0-0 bajo la planta N1 queda entero dentro del canto de las vigas o de )
+   6. canto de viga en cm [v3060: h = 60]: DETECTADA: la rechaza pilar/tramo-flexible-nulo (El tramo del pilar P0-0 bajo la planta N1 queda entero dentro del canto de las vigas o de )
+   7. altura de planta en cm [N2: 300]: DETECTADA: la rechaza equilibrio/no-cumple (El caso Vx no cumple el equilibrio global: |ΣF|/Σ|F| = 3.13e-9 y |ΣM|/Σ|M| = 1.56e-9 (tole)
+   8. las cargas de uso de una planta, en el caso G [2 cargas de Q en N2, a G]: DETECTADA por sensatez/carga-duplicada (1), sensatez/planta-sin-caso (1)
+        La carga Q-N2 es igual que la R-N2 (mismo caso, mismo destino y mismos valores): ¿está dos veces?
+   9. carga duplicada [wP0-0]: DETECTADA por sensatez/carga-duplicada (1)
+        La carga wP0-0-bis es igual que la wP0-0 (mismo caso, mismo destino y mismos valores): ¿está dos veces?
+  10. fck en kN/m² [HA: 30000]: DETECTADA por sensatez/material (1)
+        El hormigón HA tiene fck = 30000 MPa (fuera de [12; 100] MPa): ¿está en kN/m²?
+  11. pp de losa en kN/m³ [L-N1: pp = 25]: DETECTADA por sensatez/pp (1), sensatez/carga-planta (1), sensatez/axil-reducido (6)
+        La losa L-N1 tiene pp = 25 kN/m², 2,86 veces el de una maciza de su espesor (fuera de [0,3; 1]): ¿es un peso específico o está mal el espesor?
+
+Mutaciones aplicadas: 46; detectadas: 46.

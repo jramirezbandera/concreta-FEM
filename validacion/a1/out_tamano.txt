@@ -1,19 +1,20 @@
-# validacion/a1/tamano.ts — 2026-10-08: edificio objetivo de 7 plantas (10 × 8 pilares, losa maciza con vigas, 238 bandas, casos con acción), CLI con Bun
+# validacion/a1/tamano.ts — 2026-10-09: edificio objetivo de 7 plantas (10 × 8 pilares, losa maciza con vigas, 238 bandas, casos con acción), CLI con Bun
 
 Tope: 4000 tokens, estimados como bytes / 2,5.
 
 orden | código | bytes | tokens (est.) | segundos | cabe
 ---|---|---|---|---|---
-calcular | 0 | 1905 | 762 | 11.1 | —
-resumen | 0 | 2135 | 854 | 4.5 | sí
-consultar envolventes | 0 | 5030 | 2012 | 10.8 | sí
-consultar flechas | 0 | 1658 | 664 | 4.6 | sí
-consultar deriva | 0 | 2038 | 816 | 4.3 | sí
-consultar reacciones | 0 | 3343 | 1338 | 4.3 | sí
-consultar combinaciones | 0 | 1797 | 719 | 4.2 | sí
-consultar pieza X15-N3 | 0 | 2122 | 849 | 4.6 | sí
-consultar pieza P24-15 | 0 | 5942 | 2377 | 4.5 | sí
-consultar banda L-N3:1:P1 | 0 | 3840 | 1536 | 6.3 | sí
+calcular | 0 | 1905 | 762 | 14.3 | —
+resumen | 0 | 2422 | 969 | 5.3 | sí
+consultar envolventes | 0 | 5030 | 2012 | 15.1 | sí
+consultar flechas | 0 | 1658 | 664 | 5.4 | sí
+consultar deriva | 0 | 2038 | 816 | 4.4 | sí
+consultar reacciones | 0 | 3343 | 1338 | 5.0 | sí
+consultar combinaciones | 0 | 1797 | 719 | 6.1 | sí
+consultar pieza X15-N3 | 0 | 2122 | 849 | 5.8 | sí
+consultar pieza P24-15 | 0 | 5942 | 2377 | 5.3 | sí
+consultar banda L-N3:1:P1 | 0 | 3840 | 1536 | 7.2 | sí
+revisar | 0 | 4135 | 1654 | 17.9 | sí
 
 Todas caben en el tope y dan ok: true.
 

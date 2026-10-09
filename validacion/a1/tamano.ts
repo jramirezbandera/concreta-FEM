@@ -5,7 +5,8 @@
  * bytes / 2,5, que cuenta de más en JSON con números (`docs/fem3d/agente.md` §7).
  *
  * Ejecuta la CLI de verdad (`bun cli/fem.ts`), como un agente, y mide también el tiempo de cada
- * orden. La pieza y el pilar son los del centro de la planta N3; la banda, la más larga de N3.
+ * orden. La pieza y el pilar son los del centro de la planta N3; la banda, la más larga de N3. Desde
+ * A3, también `fem revisar`.
  *
  * Uso: bun validacion/a1/tamano.ts → validacion/a1/out_tamano.txt
  */
@@ -40,6 +41,8 @@ const ordenes: string[][] = [
   ["consultar", ruta, "pieza", "X15-N3"],
   ["consultar", ruta, "pieza", "P24-15"],
   ["consultar", ruta, "banda", bandaN3],
+  // A3: la revisión, con sus avisos acotados como los demás diagnósticos
+  ["revisar", ruta],
 ];
 
 const lineas = [

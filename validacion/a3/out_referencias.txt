@@ -1,0 +1,264 @@
+
+== 1-022 (0.0 s): 0 avisos
+  bien      sensatez/altura              N6: 3,96 m
+  no-aplica sensatez/espesor             
+  no-aplica sensatez/seccion             
+  bien      sensatez/material            acero: E = 2,03e+8 kN/m²
+  no-aplica sensatez/pp                  
+  no-aplica sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  no-aplica sensatez/carga-planta        
+  no-aplica sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  no-aplica sensatez/peso-propio         
+  no-aplica sensatez/tributaria          
+  no-aplica sensatez/esbeltez-viga       
+  no-aplica sensatez/esbeltez-losa       
+  no-aplica sensatez/flecha              
+  bien      sensatez/desplome            N4: 1/623
+  no-aplica sensatez/axil-reducido       
+
+== retícula con núcleo (0.4 s): 0 avisos
+  bien      sensatez/altura              C: 1,5 m
+  bien      sensatez/espesor             L-N1: 0,22 m
+  bien      sensatez/seccion             v3050: b = 0,3 m
+  bien      sensatez/material            HA: fck = 25 MPa
+  no-aplica sensatez/pp                  
+  bien      sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  bien      sensatez/carga-planta        N1, Q: 3 kN/m²
+  no-aplica sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  bien      sensatez/peso-propio         N1: 5,5e-13 %
+  bien      sensatez/tributaria          P0-0 en N1: 0,93
+  bien      sensatez/esbeltez-viga       X5-N1: 11
+  bien      sensatez/esbeltez-losa       L-N1: 27,3
+  bien      sensatez/flecha              L-N1: 1/4660
+  bien      sensatez/desplome            N1: 1/6240000
+  bien      sensatez/axil-reducido       P6-5 bajo N1: 0,0691
+  bajada tributaria: 12 de 16 tramos comparados; axil/bajada de 0.930 a 1.028
+
+== edificio objetivo con losas (6.3 s): 48 avisos
+  bien      sensatez/altura              N6: 3 m
+  bien      sensatez/espesor             L-N1: 0,25 m
+  bien      sensatez/seccion             v2540: b = 0,25 m
+  bien      sensatez/material            HA: fck = 30 MPa
+  no-aplica sensatez/pp                  
+  bien      sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  bien      sensatez/carga-planta        N7, Q: 2,16 kN/m²
+  bien      sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  bien      sensatez/peso-propio         N1: -5,6e-13 %
+  bien      sensatez/tributaria          P0-0 en N7: 0,863
+  bien      sensatez/esbeltez-viga       S0-0-N1: 11,7
+  bien      sensatez/esbeltez-losa       L-N1: 24
+  bien      sensatez/flecha              L-N7: 1/4200
+  bien      sensatez/desplome            N2: 1/10700
+  avisos    sensatez/axil-reducido       P12-10 bajo N1: 1,46
+      El pilar P6-5 bajo la planta N1 tiene ν = 1,28 (Nd = 4100 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-10 bajo la planta N1 tiene ν = 1,33 (Nd = 3980 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-15 bajo la planta N1 tiene ν = 1,13 (Nd = 3620 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-20 bajo la planta N1 tiene ν = 1,15 (Nd = 3460 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-25 bajo la planta N1 tiene ν = 1,12 (Nd = 3590 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      … y 43 más
+  bajada tributaria: 560 de 560 tramos comparados; axil/bajada de 0.863 a 1.081
+
+== edificio objetivo con losas y acciones (10.6 s): 48 avisos
+  bien      sensatez/altura              N6: 3 m
+  bien      sensatez/espesor             L-N1: 0,25 m
+  bien      sensatez/seccion             v2540: b = 0,25 m
+  bien      sensatez/material            HA: fck = 30 MPa
+  no-aplica sensatez/pp                  
+  bien      sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  bien      sensatez/carga-planta        N7, G: 10,2 kN/m²
+  bien      sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  bien      sensatez/peso-propio         N1: -5,6e-13 %
+  bien      sensatez/tributaria          P0-0 en N7: 0,863
+  bien      sensatez/esbeltez-viga       S0-0-N1: 11,7
+  bien      sensatez/esbeltez-losa       L-N1: 24
+  bien      sensatez/flecha              L-N7: 1/4200
+  bien      sensatez/desplome            N2: 1/9530
+  avisos    sensatez/axil-reducido       P12-10 bajo N1: 1,46
+      El pilar P6-5 bajo la planta N1 tiene ν = 1,27 (Nd = 4060 kN con ELU-PT-5; más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-10 bajo la planta N1 tiene ν = 1,31 (Nd = 3930 kN con ELU-PT-4; más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-15 bajo la planta N1 tiene ν = 1,11 (Nd = 3570 kN con ELU-PT-4; más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-20 bajo la planta N1 tiene ν = 1,13 (Nd = 3400 kN con ELU-PT-5; más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-25 bajo la planta N1 tiene ν = 1,1 (Nd = 3530 kN con ELU-PT-5; más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      … y 43 más
+  bajada tributaria: 560 de 560 tramos comparados; axil/bajada de 0.863 a 1.081
+
+== edificio objetivo con muros (9.3 s): 44 avisos
+  bien      sensatez/altura              N6: 3 m
+  bien      sensatez/espesor             L-N1: 0,25 m
+  bien      sensatez/seccion             v2540: b = 0,25 m
+  bien      sensatez/material            HA: fck = 30 MPa
+  no-aplica sensatez/pp                  
+  bien      sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  bien      sensatez/carga-planta        N7, Q: 2,16 kN/m²
+  bien      sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  bien      sensatez/peso-propio         N6: 0,005 %
+  bien      sensatez/tributaria          P0-0 en N7: 0,859
+  bien      sensatez/esbeltez-viga       S4-3-N1: 11,9
+  bien      sensatez/esbeltez-losa       L-N1: 24
+  bien      sensatez/flecha              L-N7: 1/4190
+  bien      sensatez/desplome            N3: 1/40700
+  avisos    sensatez/axil-reducido       P12-10 bajo N1: 1,47
+      El pilar P6-5 bajo la planta N1 tiene ν = 1,26 (Nd = 4020 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-10 bajo la planta N1 tiene ν = 1,32 (Nd = 3960 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-15 bajo la planta N1 tiene ν = 1,12 (Nd = 3590 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-20 bajo la planta N1 tiene ν = 1,14 (Nd = 3430 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-25 bajo la planta N1 tiene ν = 1,12 (Nd = 3570 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      … y 39 más
+  bajada tributaria: 500 de 560 tramos comparados; axil/bajada de 0.859 a 1.083
+
+== edificio reticular (V2) (7.8 s): 48 avisos
+  bien      sensatez/altura              N6: 3 m
+  bien      sensatez/espesor             L-N1: 0,35 m
+  bien      sensatez/seccion             v2540: b = 0,25 m
+  bien      sensatez/material            HA: fck = 30 MPa
+  no-aplica sensatez/pp                  
+  bien      sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  bien      sensatez/carga-planta        N7, Q: 2,16 kN/m²
+  bien      sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  bien      sensatez/peso-propio         N1: 3,8e-12 %
+  bien      sensatez/tributaria          P0-0 en N7: 0,864
+  bien      sensatez/esbeltez-viga       S0-0-N1: 11,7
+  bien      sensatez/esbeltez-losa       L-N1: 17,1
+  bien      sensatez/flecha              L-N7: 1/5310
+  bien      sensatez/desplome            N2: 1/11600
+  avisos    sensatez/axil-reducido       P12-10 bajo N1: 1,25
+      El pilar P6-5 bajo la planta N1 tiene ν = 1,08 (Nd = 3450 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-10 bajo la planta N1 tiene ν = 1,11 (Nd = 3330 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-15 bajo la planta N1 tiene ν = 0,925 (Nd = 2960 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-20 bajo la planta N1 tiene ν = 0,934 (Nd = 2800 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-25 bajo la planta N1 tiene ν = 0,914 (Nd = 2920 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      … y 43 más
+  bajada tributaria: 560 de 560 tramos comparados; axil/bajada de 0.864 a 1.098
+
+== edificio unidireccional (V3) (3.8 s): 48 avisos
+  bien      sensatez/altura              N6: 3 m
+  no-aplica sensatez/espesor             
+  bien      sensatez/seccion             T25: hf = 0,05 m
+  bien      sensatez/material            HA: fck = 30 MPa
+  bien      sensatez/pp                  F0-0-N1: pp = 3,5 kN/m²
+  bien      sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  bien      sensatez/carga-planta        N7, Q: 2,16 kN/m²
+  bien      sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  bien      sensatez/peso-propio         N7: -8,1e-13 %
+  bien      sensatez/tributaria          P0-0 en N7: 0,853
+  bien      sensatez/esbeltez-viga       S0-0-N1: 11,7
+  no-aplica sensatez/esbeltez-losa       
+  bien      sensatez/flecha              S8-6-N7: 1/3620
+  bien      sensatez/desplome            N2: 1/9100
+  avisos    sensatez/axil-reducido       P12-10 bajo N1: 1,18
+      El pilar P6-5 bajo la planta N1 tiene ν = 1,02 (Nd = 3260 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-10 bajo la planta N1 tiene ν = 1,05 (Nd = 3150 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-15 bajo la planta N1 tiene ν = 0,853 (Nd = 2730 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-20 bajo la planta N1 tiene ν = 0,878 (Nd = 2640 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P6-25 bajo la planta N1 tiene ν = 0,843 (Nd = 2700 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      … y 43 más
+  bajada tributaria: 560 de 560 tramos comparados; axil/bajada de 0.853 a 1.108
+
+== A2: 1-022 del agente (0.0 s): 0 avisos
+  bien      sensatez/altura              N6: 3,96 m
+  no-aplica sensatez/espesor             
+  no-aplica sensatez/seccion             
+  bien      sensatez/material            ACERO: E = 2,03e+8 kN/m²
+  no-aplica sensatez/pp                  
+  no-aplica sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  no-aplica sensatez/carga-planta        
+  no-aplica sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  no-aplica sensatez/peso-propio         
+  no-aplica sensatez/tributaria          
+  no-aplica sensatez/esbeltez-viga       
+  no-aplica sensatez/esbeltez-losa       
+  no-aplica sensatez/flecha              
+  bien      sensatez/desplome            N4: 1/616
+  no-aplica sensatez/axil-reducido       
+
+== A2: retícula con núcleo del agente (0.2 s): 0 avisos
+  bien      sensatez/altura              C: 1,5 m
+  bien      sensatez/espesor             L-N1: 0,22 m
+  bien      sensatez/seccion             V30x50: b = 0,3 m
+  bien      sensatez/material            HA-25: fck = 25 MPa
+  no-aplica sensatez/pp                  
+  bien      sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  bien      sensatez/carga-planta        N1, Q: 3 kN/m²
+  no-aplica sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  bien      sensatez/peso-propio         N1: 6,8e-13 %
+  bien      sensatez/tributaria          P0-0 en N1: 0,931
+  bien      sensatez/esbeltez-viga       VX5: 11
+  bien      sensatez/esbeltez-losa       L-N1: 27,3
+  bien      sensatez/flecha              L-N1: 1/4700
+  bien      sensatez/desplome            N1: 1/6270000
+  bien      sensatez/axil-reducido       P6-5 bajo N1: 0,069
+  bajada tributaria: 12 de 16 tramos comparados; axil/bajada de 0.931 a 1.027
+
+== A2: edificio objetivo del agente (7.1 s): 48 avisos
+  bien      sensatez/altura              N6: 3 m
+  bien      sensatez/espesor             L-N1: 0,25 m
+  bien      sensatez/seccion             V25x40: b = 0,25 m
+  bien      sensatez/material            HA-30: fck = 30 MPa
+  no-aplica sensatez/pp                  
+  bien      sensatez/sin-peso-propio     
+  bien      sensatez/caso-vacio          
+  bien      sensatez/carga-duplicada     
+  bien      sensatez/carga-hacia-arriba  
+  bien      sensatez/carga-planta        N7, Q: 2,16 kN/m²
+  bien      sensatez/planta-sin-caso     
+  bien      sensatez/pilar-arranque      
+  bien      sensatez/pilar-interrumpido  
+  bien      sensatez/peso-propio         N1: -5,5e-13 %
+  bien      sensatez/tributaria          P-x0-y0 en N7: 0,863
+  bien      sensatez/esbeltez-viga       VS-x3-y0-N1: 11,7
+  bien      sensatez/esbeltez-losa       L-N1: 24
+  bien      sensatez/flecha              L-N7: 1/4200
+  bien      sensatez/desplome            N2: 1/10700
+  avisos    sensatez/axil-reducido       P-x12-y10 bajo N1: 1,46
+      El pilar P-x6-y5 bajo la planta N1 tiene ν = 1,28 (Nd = 4100 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P-x12-y5 bajo la planta N1 tiene ν = 1,43 (Nd = 4570 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P-x18-y5 bajo la planta N1 tiene ν = 1,26 (Nd = 4040 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P-x24-y5 bajo la planta N1 tiene ν = 1,15 (Nd = 3680 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      El pilar P-x30-y5 bajo la planta N1 tiene ν = 1,1 (Nd = 3520 kN con 1,4·(G + Q); más de 0,65): ¿la sección es pequeña o le llega más carga de la debida?
+      … y 43 más
+  bajada tributaria: 560 de 560 tramos comparados; axil/bajada de 0.863 a 1.081
