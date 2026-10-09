@@ -372,7 +372,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     modelo,
     mapeo,
     diagnosticos: diag.lista,
-    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio),
+    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets)),
     huella,
     estadisticas: {
       nudos: nudos.length,
@@ -429,10 +429,15 @@ function avisarDintelesEnDiafragma(ctx: Contexto, diag: Diagnosticos): void {
   }
 }
 
-function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>): string[] {
+function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>, conZonas: boolean): string[] {
   const h: string[] = [];
+  // Sin ninguna barra con zona rígida (perfiles dados por sus propiedades, sin b ni h), el factor no actúa
   h.push(
-    `Nudos de dimensión finita: es rígido ${op.factorZonaRigida === 1 ? "todo el nudo" : op.factorZonaRigida === 0 ? "ningún tramo del nudo (de eje a eje)" : `el ${coma(op.factorZonaRigida * 100)} % del nudo`} (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).`,
+    !conZonas
+      ? "Nudos de eje a eje: ninguna barra tiene zona rígida ni excentricidad (las secciones no dan dimensiones al nudo), así que el factor de zona rígida no actúa."
+      : op.factorZonaRigida === 0
+        ? "Nudos de eje a eje: sin zonas rígidas (factor 0), como SAP2000 por defecto."
+        : `Nudos de dimensión finita: es rígido ${op.factorZonaRigida === 1 ? "todo el nudo" : `el ${coma(op.factorZonaRigida * 100)} % del nudo`} (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).`,
   );
   const grupos = new Map<string, number>();
   for (const b of piezas.barras) {

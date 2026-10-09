@@ -24,3 +24,15 @@ Se responden con la referencia:
 - **Casos:** sin acción. Para esta prueba no hacen falta las combinaciones.
 - **Material:** HA-25 con el resto de sus propiedades por defecto.
 - **Diafragma, modificadores y demás opciones:** por defecto, salvo la malla de 1 m.
+
+## Errata del encargo (detectada en el spike)
+
+**Qué pasó.**
+- El encargo dice que las vigas de fachada van «enrasadas por fuera con los pilares», pero la referencia las tiene con el eje 10 cm hacia **dentro**: y = 0,10, x = 0,10, etc.
+- Con la cara exterior en el borde, el eje estaría en −0,10.
+- El «0,25 − 0,15» de arriba lleva a la cara interior enrasada, no a la exterior.
+
+**Cómo se resolvió.**
+- El agente modeló lo que decía el encargo, chocó con C2-c (`losa/borde-en-viga`) y lo declaró.
+- La ingeniera corrigió el encargo en la segunda ronda.
+- No es una trampa: es un error de quien escribió el encargo.

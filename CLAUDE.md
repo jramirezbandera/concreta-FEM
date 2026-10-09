@@ -212,6 +212,11 @@
   - **A-9:** una viga por el eje de un muro pesa sólo lo que sobresale de él; el pilar sigue sin descontar su cruce con la losa (hipótesis del lado de la seguridad);
   - **A-2:** ψ por su nombre (`"uso-A"`, `"viento"`…);
   - el fichero de firmas se queda como `<proyecto>.revision.json`, y el informe da las cargas en cimentación.
+- **2026-10-09: spike realista de la capa de agente superado** (`docs/fem3d/spike-realista.md`, diseño en `agente.md` §9). Los tres modelos de A2 se dieron como encargos reales con 14 trampas (datos que faltan, contradicciones, datos de norma sin valor).
+  - 13 trampas preguntadas y 1 declarada; ninguna silenciosa ni sacada de memoria.
+  - Los tres modelos coinciden con la referencia a ≤ 3e-13, y los agentes revisaron sin firmar.
+  - **R-2:** la viga de fachada enrasada por fuera, con la losa hasta la cara exterior del pilar, es error por C2-c. **Pendiente del usuario:** la opción B (admitirla y llevar la franja a la viga).
+  - Corregido: la hipótesis de zona rígida cuando ninguna barra la tiene (R-3).
 - **Siguiente paso:**
   - A4 de la capa de agente (render y revisión visual);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);

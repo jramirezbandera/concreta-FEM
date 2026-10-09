@@ -77,7 +77,10 @@ export function edificioObjetivoLosas(plantas = 7, nx = 9, ny = 7): ModeloFisico
 /**
  * Retícula con la losa enrasada con la cara exterior de los pilares de fachada (lo habitual en obra):
  * nx × ny vanos de 6 × 5 m, pilares de 50 × 50 cm, vigas de 30 × 50 por los ejes interiores y, en la
- * fachada, con su cara exterior en el borde (eje a 15 cm del borde y a 10 cm del de los pilares);
+ * fachada, con el eje 10 cm hacia dentro del de los pilares: su cara interior enrasa con la de los
+ * pilares, y la exterior queda 20 cm dentro del borde de la losa. (Hasta el 2026-10-09 este
+ * comentario decía «con su cara exterior en el borde», que no es lo que hace el código; con la viga
+ * enrasada por fuera, el borde de la losa caería dentro de ella, que es error por C2-c);
  * losa de 22 cm, peso propio, sobrecarga de 3 kN/m² y viento en los pilares de la fachada x = 0.
  * Ejercita las plantillas de pilar con la cara en el borde y la franja estrecha bajo la viga de
  * fachada (H52).

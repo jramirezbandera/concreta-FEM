@@ -1,0 +1,441 @@
+{
+  "esquema": "concreta-fem/proyecto@1",
+  "nombre": "Pórtico de acero de 7 plantas (verificación SAP2000)",
+  "descripcion": "Encargo de Luis: pórtico plano de 3 pilares a 30 ft, base empotrada, carga lateral LAT. Datos convertidos de unidades americanas a kN y m.",
+  "modelo": {
+    "plantas": [
+      {
+        "id": "N7",
+        "altura": null
+      },
+      {
+        "id": "N6",
+        "altura": 3.9624
+      },
+      {
+        "id": "N5",
+        "altura": 3.9624
+      },
+      {
+        "id": "N4",
+        "altura": 3.9624
+      },
+      {
+        "id": "N3",
+        "altura": 3.9624
+      },
+      {
+        "id": "N2",
+        "altura": 3.9624
+      },
+      {
+        "id": "N1",
+        "altura": 4.1148
+      },
+      {
+        "id": "B",
+        "altura": 4.1148
+      }
+    ],
+    "materiales": [
+      {
+        "id": "ACERO",
+        "tipo": "acero",
+        "E": 203395.34014846664,
+        "peso": 0
+      }
+    ],
+    "secciones": [
+      {
+        "id": "W14X176",
+        "material": "ACERO",
+        "forma": "general",
+        "A": 0.033354772,
+        "Iy": 0.0008948975650399998,
+        "Iz": 0.0002982991883466666,
+        "J": 4.162314255999999e-06
+      },
+      {
+        "id": "W14X211",
+        "material": "ACERO",
+        "forma": "general",
+        "A": 0.040064436,
+        "Iy": 0.0011113379063519997,
+        "Iz": 0.0003704459687839999,
+        "J": 4.162314255999999e-06
+      },
+      {
+        "id": "W14X246",
+        "material": "ACERO",
+        "forma": "general",
+        "A": 0.046645068,
+        "Iy": 0.0013444275046879998,
+        "Iz": 0.0004481425015626666,
+        "J": 4.162314255999999e-06
+      },
+      {
+        "id": "W14X287",
+        "material": "ACERO",
+        "forma": "general",
+        "A": 0.054451504000000005,
+        "Iy": 0.0016274648740959997,
+        "Iz": 0.0005424882913653332,
+        "J": 4.162314255999999e-06
+      },
+      {
+        "id": "W24X110",
+        "material": "ACERO",
+        "forma": "general",
+        "A": 0.0016129,
+        "Iy": 0.0013860506472479998,
+        "Iz": 0.0004620168824159999,
+        "J": 4.162314255999999e-06
+      },
+      {
+        "id": "W24X130",
+        "material": "ACERO",
+        "forma": "general",
+        "A": 0.024709627999999997,
+        "Iy": 0.0016732503309119997,
+        "Iz": 0.0005577501103039999,
+        "J": 4.162314255999999e-06
+      },
+      {
+        "id": "W24X160",
+        "material": "ACERO",
+        "forma": "general",
+        "A": 0.030387036,
+        "Iy": 0.0021311048990719996,
+        "Iz": 0.0007103682996906666,
+        "J": 4.162314255999999e-06
+      }
+    ],
+    "pilares": [
+      {
+        "id": "izquierda",
+        "x": 0.0,
+        "y": 0.0,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X246",
+        "tramos": [
+          {
+            "planta": "N1",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N2",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N3",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N4",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X176"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X176"
+          }
+        ]
+      },
+      {
+        "id": "centro",
+        "x": 9.144,
+        "y": 0.0,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X287",
+        "tramos": [
+          {
+            "planta": "N1",
+            "seccion": "W14X287"
+          },
+          {
+            "planta": "N2",
+            "seccion": "W14X287"
+          },
+          {
+            "planta": "N3",
+            "seccion": "W14X287"
+          },
+          {
+            "planta": "N4",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X211"
+          }
+        ]
+      },
+      {
+        "id": "derecha",
+        "x": 18.288,
+        "y": 0.0,
+        "desde": "B",
+        "hasta": "N7",
+        "seccion": "W14X246",
+        "tramos": [
+          {
+            "planta": "N1",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N2",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N3",
+            "seccion": "W14X246"
+          },
+          {
+            "planta": "N4",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N5",
+            "seccion": "W14X211"
+          },
+          {
+            "planta": "N6",
+            "seccion": "W14X176"
+          },
+          {
+            "planta": "N7",
+            "seccion": "W14X176"
+          }
+        ]
+      }
+    ],
+    "vigas": [
+      {
+        "id": "V-N1",
+        "planta": "N1",
+        "puntos": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            18.288,
+            0.0
+          ]
+        ],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N2",
+        "planta": "N2",
+        "puntos": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            18.288,
+            0.0
+          ]
+        ],
+        "seccion": "W24X160"
+      },
+      {
+        "id": "V-N3",
+        "planta": "N3",
+        "puntos": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            18.288,
+            0.0
+          ]
+        ],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N4",
+        "planta": "N4",
+        "puntos": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            18.288,
+            0.0
+          ]
+        ],
+        "seccion": "W24X130"
+      },
+      {
+        "id": "V-N5",
+        "planta": "N5",
+        "puntos": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            18.288,
+            0.0
+          ]
+        ],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N6",
+        "planta": "N6",
+        "puntos": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            18.288,
+            0.0
+          ]
+        ],
+        "seccion": "W24X110"
+      },
+      {
+        "id": "V-N7",
+        "planta": "N7",
+        "puntos": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            18.288,
+            0.0
+          ]
+        ],
+        "seccion": "W24X110"
+      }
+    ],
+    "casos": [
+      {
+        "id": "LAT",
+        "nombre": "Cargas laterales"
+      }
+    ],
+    "cargas": [
+      {
+        "tipo": "puntual",
+        "id": "LAT-N1",
+        "caso": "LAT",
+        "planta": "N1",
+        "x": 0.0,
+        "y": 0.0,
+        "F": [
+          11.12055403815125,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "tipo": "puntual",
+        "id": "LAT-N2",
+        "caso": "LAT",
+        "planta": "N2",
+        "x": 0.0,
+        "y": 0.0,
+        "F": [
+          22.2411080763025,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "tipo": "puntual",
+        "id": "LAT-N3",
+        "caso": "LAT",
+        "planta": "N3",
+        "x": 0.0,
+        "y": 0.0,
+        "F": [
+          33.36166211445375,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "tipo": "puntual",
+        "id": "LAT-N4",
+        "caso": "LAT",
+        "planta": "N4",
+        "x": 0.0,
+        "y": 0.0,
+        "F": [
+          44.482216152605,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "tipo": "puntual",
+        "id": "LAT-N5",
+        "caso": "LAT",
+        "planta": "N5",
+        "x": 0.0,
+        "y": 0.0,
+        "F": [
+          55.602770190756246,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "tipo": "puntual",
+        "id": "LAT-N6",
+        "caso": "LAT",
+        "planta": "N6",
+        "x": 0.0,
+        "y": 0.0,
+        "F": [
+          66.7233242289075,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "tipo": "puntual",
+        "id": "LAT-N7",
+        "caso": "LAT",
+        "planta": "N7",
+        "x": 0.0,
+        "y": 0.0,
+        "F": [
+          88.96443230521,
+          0.0,
+          0.0
+        ]
+      }
+    ]
+  },
+  "opciones": {
+    "modificadores": {},
+    "cortante": false,
+    "factorZonaRigida": 0
+  }
+}

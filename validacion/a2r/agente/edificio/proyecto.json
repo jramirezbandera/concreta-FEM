@@ -1,0 +1,10406 @@
+{
+ "$schema": "D:/PROGRAMACION/Concreta FEM/src/agente/proyecto.schema.json",
+ "esquema": "concreta-fem/proyecto@1",
+ "nombre": "Residencial calle Mayor",
+ "descripcion": "7 plantas de vivienda, 80 pilares, losa maciza con vigas. Modelo para predimensionar.",
+ "modelo": {
+  "plantas": [
+   {
+    "id": "N7",
+    "altura": null
+   },
+   {
+    "id": "N6",
+    "altura": 3.0
+   },
+   {
+    "id": "N5",
+    "altura": 3.0
+   },
+   {
+    "id": "N4",
+    "altura": 3.0
+   },
+   {
+    "id": "N3",
+    "altura": 3.0
+   },
+   {
+    "id": "N2",
+    "altura": 3.0
+   },
+   {
+    "id": "N1",
+    "altura": 3.0
+   },
+   {
+    "id": "C",
+    "nombre": "Cimentación",
+    "tipo": "sotano",
+    "altura": 1.5
+   }
+  ],
+  "materiales": [
+   {
+    "id": "HA-30",
+    "tipo": "hormigon",
+    "fck": 30
+   }
+  ],
+  "secciones": [
+   {
+    "id": "P30x50",
+    "material": "HA-30",
+    "forma": "rectangular",
+    "b": 0.3,
+    "h": 0.5
+   },
+   {
+    "id": "P40x40",
+    "material": "HA-30",
+    "forma": "rectangular",
+    "b": 0.4,
+    "h": 0.4
+   },
+   {
+    "id": "V30x60",
+    "material": "HA-30",
+    "forma": "rectangular",
+    "b": 0.3,
+    "h": 0.6
+   },
+   {
+    "id": "V25x40",
+    "material": "HA-30",
+    "forma": "rectangular",
+    "b": 0.25,
+    "h": 0.4
+   }
+  ],
+  "pilares": [
+   {
+    "id": "A1",
+    "x": 0.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "A2",
+    "x": 6.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "A3",
+    "x": 12.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "A4",
+    "x": 18.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "A5",
+    "x": 24.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "A6",
+    "x": 30.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "A7",
+    "x": 36.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "A8",
+    "x": 42.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "A9",
+    "x": 48.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "A10",
+    "x": 54.0,
+    "y": 0.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "B1",
+    "x": 0.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "B2",
+    "x": 6.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "B3",
+    "x": 12.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "B4",
+    "x": 18.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "B5",
+    "x": 24.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "B6",
+    "x": 30.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "B7",
+    "x": 36.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "B8",
+    "x": 42.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "B9",
+    "x": 48.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "B10",
+    "x": 54.0,
+    "y": 5.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "C1",
+    "x": 0.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "C2",
+    "x": 6.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "C3",
+    "x": 12.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "C4",
+    "x": 18.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "C5",
+    "x": 24.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "C6",
+    "x": 30.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "C7",
+    "x": 36.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "C8",
+    "x": 42.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "C9",
+    "x": 48.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "C10",
+    "x": 54.0,
+    "y": 10.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "D1",
+    "x": 0.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "D2",
+    "x": 6.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "D3",
+    "x": 12.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "D4",
+    "x": 18.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "D5",
+    "x": 24.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "D6",
+    "x": 30.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "D7",
+    "x": 36.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "D8",
+    "x": 42.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "D9",
+    "x": 48.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "D10",
+    "x": 54.0,
+    "y": 15.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "E1",
+    "x": 0.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "E2",
+    "x": 6.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "E3",
+    "x": 12.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "E4",
+    "x": 18.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "E5",
+    "x": 24.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "E6",
+    "x": 30.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "E7",
+    "x": 36.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "E8",
+    "x": 42.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "E9",
+    "x": 48.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "E10",
+    "x": 54.0,
+    "y": 20.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "F1",
+    "x": 0.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "F2",
+    "x": 6.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "F3",
+    "x": 12.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "F4",
+    "x": 18.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "F5",
+    "x": 24.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "F6",
+    "x": 30.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "F7",
+    "x": 36.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "F8",
+    "x": 42.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "F9",
+    "x": 48.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "F10",
+    "x": 54.0,
+    "y": 25.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "G1",
+    "x": 0.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "G2",
+    "x": 6.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "G3",
+    "x": 12.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "G4",
+    "x": 18.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "G5",
+    "x": 24.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "G6",
+    "x": 30.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "G7",
+    "x": 36.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "G8",
+    "x": 42.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "G9",
+    "x": 48.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 0
+   },
+   {
+    "id": "G10",
+    "x": 54.0,
+    "y": 30.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P30x50",
+    "giro": 90
+   },
+   {
+    "id": "H1",
+    "x": 0.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "H2",
+    "x": 6.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "H3",
+    "x": 12.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "H4",
+    "x": 18.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "H5",
+    "x": 24.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "H6",
+    "x": 30.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "H7",
+    "x": 36.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "H8",
+    "x": 42.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   },
+   {
+    "id": "H9",
+    "x": 48.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 0
+   },
+   {
+    "id": "H10",
+    "x": 54.0,
+    "y": 35.0,
+    "desde": "C",
+    "hasta": "N7",
+    "seccion": "P40x40",
+    "giro": 90
+   }
+  ],
+  "vigas": [
+   {
+    "id": "VA-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      5.0
+     ],
+     [
+      54.0,
+      5.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      10.0
+     ],
+     [
+      54.0,
+      10.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      15.0
+     ],
+     [
+      54.0,
+      15.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      20.0
+     ],
+     [
+      54.0,
+      20.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      25.0
+     ],
+     [
+      54.0,
+      25.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      30.0
+     ],
+     [
+      54.0,
+      30.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      35.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V1-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V2-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      6.0,
+      0.0
+     ],
+     [
+      6.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V3-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      12.0,
+      0.0
+     ],
+     [
+      12.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V4-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      18.0,
+      0.0
+     ],
+     [
+      18.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V5-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      24.0,
+      0.0
+     ],
+     [
+      24.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V6-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      30.0,
+      0.0
+     ],
+     [
+      30.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V7-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      36.0,
+      0.0
+     ],
+     [
+      36.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V8-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      42.0,
+      0.0
+     ],
+     [
+      42.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V9-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      48.0,
+      0.0
+     ],
+     [
+      48.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V10-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VT12-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      3.0,
+      0.0
+     ],
+     [
+      3.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      3.0,
+      5.0
+     ],
+     [
+      3.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      3.0,
+      10.0
+     ],
+     [
+      3.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      3.0,
+      15.0
+     ],
+     [
+      3.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      3.0,
+      20.0
+     ],
+     [
+      3.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      3.0,
+      25.0
+     ],
+     [
+      3.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      3.0,
+      30.0
+     ],
+     [
+      3.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      9.0,
+      0.0
+     ],
+     [
+      9.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      9.0,
+      5.0
+     ],
+     [
+      9.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      9.0,
+      10.0
+     ],
+     [
+      9.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      9.0,
+      15.0
+     ],
+     [
+      9.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      9.0,
+      20.0
+     ],
+     [
+      9.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      9.0,
+      25.0
+     ],
+     [
+      9.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      9.0,
+      30.0
+     ],
+     [
+      9.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      15.0,
+      0.0
+     ],
+     [
+      15.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      15.0,
+      5.0
+     ],
+     [
+      15.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      15.0,
+      10.0
+     ],
+     [
+      15.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      15.0,
+      15.0
+     ],
+     [
+      15.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      15.0,
+      20.0
+     ],
+     [
+      15.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      15.0,
+      25.0
+     ],
+     [
+      15.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      15.0,
+      30.0
+     ],
+     [
+      15.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      21.0,
+      0.0
+     ],
+     [
+      21.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      21.0,
+      5.0
+     ],
+     [
+      21.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      21.0,
+      10.0
+     ],
+     [
+      21.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      21.0,
+      15.0
+     ],
+     [
+      21.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      21.0,
+      20.0
+     ],
+     [
+      21.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      21.0,
+      25.0
+     ],
+     [
+      21.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      21.0,
+      30.0
+     ],
+     [
+      21.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      27.0,
+      0.0
+     ],
+     [
+      27.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      27.0,
+      5.0
+     ],
+     [
+      27.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      27.0,
+      10.0
+     ],
+     [
+      27.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      27.0,
+      15.0
+     ],
+     [
+      27.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      27.0,
+      20.0
+     ],
+     [
+      27.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      27.0,
+      25.0
+     ],
+     [
+      27.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      27.0,
+      30.0
+     ],
+     [
+      27.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      33.0,
+      0.0
+     ],
+     [
+      33.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      33.0,
+      5.0
+     ],
+     [
+      33.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      33.0,
+      10.0
+     ],
+     [
+      33.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      33.0,
+      15.0
+     ],
+     [
+      33.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      33.0,
+      20.0
+     ],
+     [
+      33.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      33.0,
+      25.0
+     ],
+     [
+      33.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      33.0,
+      30.0
+     ],
+     [
+      33.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      39.0,
+      0.0
+     ],
+     [
+      39.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      39.0,
+      5.0
+     ],
+     [
+      39.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      39.0,
+      10.0
+     ],
+     [
+      39.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      39.0,
+      15.0
+     ],
+     [
+      39.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      39.0,
+      20.0
+     ],
+     [
+      39.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      39.0,
+      25.0
+     ],
+     [
+      39.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      39.0,
+      30.0
+     ],
+     [
+      39.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      45.0,
+      0.0
+     ],
+     [
+      45.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      45.0,
+      5.0
+     ],
+     [
+      45.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      45.0,
+      10.0
+     ],
+     [
+      45.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      45.0,
+      15.0
+     ],
+     [
+      45.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      45.0,
+      20.0
+     ],
+     [
+      45.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      45.0,
+      25.0
+     ],
+     [
+      45.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      45.0,
+      30.0
+     ],
+     [
+      45.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-AB-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      51.0,
+      0.0
+     ],
+     [
+      51.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-BC-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      51.0,
+      5.0
+     ],
+     [
+      51.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-CD-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      51.0,
+      10.0
+     ],
+     [
+      51.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-DE-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      51.0,
+      15.0
+     ],
+     [
+      51.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-EF-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      51.0,
+      20.0
+     ],
+     [
+      51.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-FG-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      51.0,
+      25.0
+     ],
+     [
+      51.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-GH-N7",
+    "planta": "N7",
+    "puntos": [
+     [
+      51.0,
+      30.0
+     ],
+     [
+      51.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VA-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      5.0
+     ],
+     [
+      54.0,
+      5.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      10.0
+     ],
+     [
+      54.0,
+      10.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      15.0
+     ],
+     [
+      54.0,
+      15.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      20.0
+     ],
+     [
+      54.0,
+      20.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      25.0
+     ],
+     [
+      54.0,
+      25.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      30.0
+     ],
+     [
+      54.0,
+      30.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      35.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V1-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V2-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      6.0,
+      0.0
+     ],
+     [
+      6.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V3-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      12.0,
+      0.0
+     ],
+     [
+      12.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V4-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      18.0,
+      0.0
+     ],
+     [
+      18.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V5-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      24.0,
+      0.0
+     ],
+     [
+      24.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V6-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      30.0,
+      0.0
+     ],
+     [
+      30.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V7-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      36.0,
+      0.0
+     ],
+     [
+      36.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V8-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      42.0,
+      0.0
+     ],
+     [
+      42.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V9-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      48.0,
+      0.0
+     ],
+     [
+      48.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V10-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VT12-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      3.0,
+      0.0
+     ],
+     [
+      3.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      3.0,
+      5.0
+     ],
+     [
+      3.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      3.0,
+      10.0
+     ],
+     [
+      3.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      3.0,
+      15.0
+     ],
+     [
+      3.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      3.0,
+      20.0
+     ],
+     [
+      3.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      3.0,
+      25.0
+     ],
+     [
+      3.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      3.0,
+      30.0
+     ],
+     [
+      3.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      9.0,
+      0.0
+     ],
+     [
+      9.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      9.0,
+      5.0
+     ],
+     [
+      9.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      9.0,
+      10.0
+     ],
+     [
+      9.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      9.0,
+      15.0
+     ],
+     [
+      9.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      9.0,
+      20.0
+     ],
+     [
+      9.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      9.0,
+      25.0
+     ],
+     [
+      9.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      9.0,
+      30.0
+     ],
+     [
+      9.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      15.0,
+      0.0
+     ],
+     [
+      15.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      15.0,
+      5.0
+     ],
+     [
+      15.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      15.0,
+      10.0
+     ],
+     [
+      15.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      15.0,
+      15.0
+     ],
+     [
+      15.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      15.0,
+      20.0
+     ],
+     [
+      15.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      15.0,
+      25.0
+     ],
+     [
+      15.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      15.0,
+      30.0
+     ],
+     [
+      15.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      21.0,
+      0.0
+     ],
+     [
+      21.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      21.0,
+      5.0
+     ],
+     [
+      21.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      21.0,
+      10.0
+     ],
+     [
+      21.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      21.0,
+      15.0
+     ],
+     [
+      21.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      21.0,
+      20.0
+     ],
+     [
+      21.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      21.0,
+      25.0
+     ],
+     [
+      21.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      21.0,
+      30.0
+     ],
+     [
+      21.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      27.0,
+      0.0
+     ],
+     [
+      27.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      27.0,
+      5.0
+     ],
+     [
+      27.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      27.0,
+      10.0
+     ],
+     [
+      27.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      27.0,
+      15.0
+     ],
+     [
+      27.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      27.0,
+      20.0
+     ],
+     [
+      27.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      27.0,
+      25.0
+     ],
+     [
+      27.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      27.0,
+      30.0
+     ],
+     [
+      27.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      33.0,
+      0.0
+     ],
+     [
+      33.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      33.0,
+      5.0
+     ],
+     [
+      33.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      33.0,
+      10.0
+     ],
+     [
+      33.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      33.0,
+      15.0
+     ],
+     [
+      33.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      33.0,
+      20.0
+     ],
+     [
+      33.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      33.0,
+      25.0
+     ],
+     [
+      33.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      33.0,
+      30.0
+     ],
+     [
+      33.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      39.0,
+      0.0
+     ],
+     [
+      39.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      39.0,
+      5.0
+     ],
+     [
+      39.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      39.0,
+      10.0
+     ],
+     [
+      39.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      39.0,
+      15.0
+     ],
+     [
+      39.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      39.0,
+      20.0
+     ],
+     [
+      39.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      39.0,
+      25.0
+     ],
+     [
+      39.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      39.0,
+      30.0
+     ],
+     [
+      39.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      45.0,
+      0.0
+     ],
+     [
+      45.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      45.0,
+      5.0
+     ],
+     [
+      45.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      45.0,
+      10.0
+     ],
+     [
+      45.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      45.0,
+      15.0
+     ],
+     [
+      45.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      45.0,
+      20.0
+     ],
+     [
+      45.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      45.0,
+      25.0
+     ],
+     [
+      45.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      45.0,
+      30.0
+     ],
+     [
+      45.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-AB-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      51.0,
+      0.0
+     ],
+     [
+      51.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-BC-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      51.0,
+      5.0
+     ],
+     [
+      51.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-CD-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      51.0,
+      10.0
+     ],
+     [
+      51.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-DE-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      51.0,
+      15.0
+     ],
+     [
+      51.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-EF-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      51.0,
+      20.0
+     ],
+     [
+      51.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-FG-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      51.0,
+      25.0
+     ],
+     [
+      51.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-GH-N6",
+    "planta": "N6",
+    "puntos": [
+     [
+      51.0,
+      30.0
+     ],
+     [
+      51.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VA-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      5.0
+     ],
+     [
+      54.0,
+      5.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      10.0
+     ],
+     [
+      54.0,
+      10.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      15.0
+     ],
+     [
+      54.0,
+      15.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      20.0
+     ],
+     [
+      54.0,
+      20.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      25.0
+     ],
+     [
+      54.0,
+      25.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      30.0
+     ],
+     [
+      54.0,
+      30.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      35.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V1-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V2-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      6.0,
+      0.0
+     ],
+     [
+      6.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V3-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      12.0,
+      0.0
+     ],
+     [
+      12.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V4-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      18.0,
+      0.0
+     ],
+     [
+      18.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V5-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      24.0,
+      0.0
+     ],
+     [
+      24.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V6-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      30.0,
+      0.0
+     ],
+     [
+      30.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V7-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      36.0,
+      0.0
+     ],
+     [
+      36.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V8-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      42.0,
+      0.0
+     ],
+     [
+      42.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V9-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      48.0,
+      0.0
+     ],
+     [
+      48.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V10-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VT12-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      3.0,
+      0.0
+     ],
+     [
+      3.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      3.0,
+      5.0
+     ],
+     [
+      3.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      3.0,
+      10.0
+     ],
+     [
+      3.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      3.0,
+      15.0
+     ],
+     [
+      3.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      3.0,
+      20.0
+     ],
+     [
+      3.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      3.0,
+      25.0
+     ],
+     [
+      3.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      3.0,
+      30.0
+     ],
+     [
+      3.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      9.0,
+      0.0
+     ],
+     [
+      9.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      9.0,
+      5.0
+     ],
+     [
+      9.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      9.0,
+      10.0
+     ],
+     [
+      9.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      9.0,
+      15.0
+     ],
+     [
+      9.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      9.0,
+      20.0
+     ],
+     [
+      9.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      9.0,
+      25.0
+     ],
+     [
+      9.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      9.0,
+      30.0
+     ],
+     [
+      9.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      15.0,
+      0.0
+     ],
+     [
+      15.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      15.0,
+      5.0
+     ],
+     [
+      15.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      15.0,
+      10.0
+     ],
+     [
+      15.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      15.0,
+      15.0
+     ],
+     [
+      15.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      15.0,
+      20.0
+     ],
+     [
+      15.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      15.0,
+      25.0
+     ],
+     [
+      15.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      15.0,
+      30.0
+     ],
+     [
+      15.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      21.0,
+      0.0
+     ],
+     [
+      21.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      21.0,
+      5.0
+     ],
+     [
+      21.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      21.0,
+      10.0
+     ],
+     [
+      21.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      21.0,
+      15.0
+     ],
+     [
+      21.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      21.0,
+      20.0
+     ],
+     [
+      21.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      21.0,
+      25.0
+     ],
+     [
+      21.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      21.0,
+      30.0
+     ],
+     [
+      21.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      27.0,
+      0.0
+     ],
+     [
+      27.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      27.0,
+      5.0
+     ],
+     [
+      27.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      27.0,
+      10.0
+     ],
+     [
+      27.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      27.0,
+      15.0
+     ],
+     [
+      27.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      27.0,
+      20.0
+     ],
+     [
+      27.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      27.0,
+      25.0
+     ],
+     [
+      27.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      27.0,
+      30.0
+     ],
+     [
+      27.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      33.0,
+      0.0
+     ],
+     [
+      33.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      33.0,
+      5.0
+     ],
+     [
+      33.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      33.0,
+      10.0
+     ],
+     [
+      33.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      33.0,
+      15.0
+     ],
+     [
+      33.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      33.0,
+      20.0
+     ],
+     [
+      33.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      33.0,
+      25.0
+     ],
+     [
+      33.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      33.0,
+      30.0
+     ],
+     [
+      33.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      39.0,
+      0.0
+     ],
+     [
+      39.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      39.0,
+      5.0
+     ],
+     [
+      39.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      39.0,
+      10.0
+     ],
+     [
+      39.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      39.0,
+      15.0
+     ],
+     [
+      39.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      39.0,
+      20.0
+     ],
+     [
+      39.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      39.0,
+      25.0
+     ],
+     [
+      39.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      39.0,
+      30.0
+     ],
+     [
+      39.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      45.0,
+      0.0
+     ],
+     [
+      45.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      45.0,
+      5.0
+     ],
+     [
+      45.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      45.0,
+      10.0
+     ],
+     [
+      45.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      45.0,
+      15.0
+     ],
+     [
+      45.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      45.0,
+      20.0
+     ],
+     [
+      45.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      45.0,
+      25.0
+     ],
+     [
+      45.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      45.0,
+      30.0
+     ],
+     [
+      45.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-AB-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      51.0,
+      0.0
+     ],
+     [
+      51.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-BC-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      51.0,
+      5.0
+     ],
+     [
+      51.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-CD-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      51.0,
+      10.0
+     ],
+     [
+      51.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-DE-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      51.0,
+      15.0
+     ],
+     [
+      51.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-EF-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      51.0,
+      20.0
+     ],
+     [
+      51.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-FG-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      51.0,
+      25.0
+     ],
+     [
+      51.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-GH-N5",
+    "planta": "N5",
+    "puntos": [
+     [
+      51.0,
+      30.0
+     ],
+     [
+      51.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VA-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      5.0
+     ],
+     [
+      54.0,
+      5.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      10.0
+     ],
+     [
+      54.0,
+      10.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      15.0
+     ],
+     [
+      54.0,
+      15.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      20.0
+     ],
+     [
+      54.0,
+      20.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      25.0
+     ],
+     [
+      54.0,
+      25.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      30.0
+     ],
+     [
+      54.0,
+      30.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      35.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V1-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V2-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      6.0,
+      0.0
+     ],
+     [
+      6.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V3-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      12.0,
+      0.0
+     ],
+     [
+      12.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V4-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      18.0,
+      0.0
+     ],
+     [
+      18.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V5-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      24.0,
+      0.0
+     ],
+     [
+      24.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V6-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      30.0,
+      0.0
+     ],
+     [
+      30.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V7-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      36.0,
+      0.0
+     ],
+     [
+      36.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V8-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      42.0,
+      0.0
+     ],
+     [
+      42.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V9-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      48.0,
+      0.0
+     ],
+     [
+      48.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V10-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VT12-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      3.0,
+      0.0
+     ],
+     [
+      3.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      3.0,
+      5.0
+     ],
+     [
+      3.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      3.0,
+      10.0
+     ],
+     [
+      3.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      3.0,
+      15.0
+     ],
+     [
+      3.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      3.0,
+      20.0
+     ],
+     [
+      3.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      3.0,
+      25.0
+     ],
+     [
+      3.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      3.0,
+      30.0
+     ],
+     [
+      3.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      9.0,
+      0.0
+     ],
+     [
+      9.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      9.0,
+      5.0
+     ],
+     [
+      9.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      9.0,
+      10.0
+     ],
+     [
+      9.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      9.0,
+      15.0
+     ],
+     [
+      9.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      9.0,
+      20.0
+     ],
+     [
+      9.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      9.0,
+      25.0
+     ],
+     [
+      9.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      9.0,
+      30.0
+     ],
+     [
+      9.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      15.0,
+      0.0
+     ],
+     [
+      15.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      15.0,
+      5.0
+     ],
+     [
+      15.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      15.0,
+      10.0
+     ],
+     [
+      15.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      15.0,
+      15.0
+     ],
+     [
+      15.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      15.0,
+      20.0
+     ],
+     [
+      15.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      15.0,
+      25.0
+     ],
+     [
+      15.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      15.0,
+      30.0
+     ],
+     [
+      15.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      21.0,
+      0.0
+     ],
+     [
+      21.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      21.0,
+      5.0
+     ],
+     [
+      21.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      21.0,
+      10.0
+     ],
+     [
+      21.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      21.0,
+      15.0
+     ],
+     [
+      21.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      21.0,
+      20.0
+     ],
+     [
+      21.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      21.0,
+      25.0
+     ],
+     [
+      21.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      21.0,
+      30.0
+     ],
+     [
+      21.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      27.0,
+      0.0
+     ],
+     [
+      27.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      27.0,
+      5.0
+     ],
+     [
+      27.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      27.0,
+      10.0
+     ],
+     [
+      27.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      27.0,
+      15.0
+     ],
+     [
+      27.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      27.0,
+      20.0
+     ],
+     [
+      27.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      27.0,
+      25.0
+     ],
+     [
+      27.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      27.0,
+      30.0
+     ],
+     [
+      27.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      33.0,
+      0.0
+     ],
+     [
+      33.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      33.0,
+      5.0
+     ],
+     [
+      33.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      33.0,
+      10.0
+     ],
+     [
+      33.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      33.0,
+      15.0
+     ],
+     [
+      33.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      33.0,
+      20.0
+     ],
+     [
+      33.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      33.0,
+      25.0
+     ],
+     [
+      33.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      33.0,
+      30.0
+     ],
+     [
+      33.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      39.0,
+      0.0
+     ],
+     [
+      39.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      39.0,
+      5.0
+     ],
+     [
+      39.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      39.0,
+      10.0
+     ],
+     [
+      39.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      39.0,
+      15.0
+     ],
+     [
+      39.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      39.0,
+      20.0
+     ],
+     [
+      39.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      39.0,
+      25.0
+     ],
+     [
+      39.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      39.0,
+      30.0
+     ],
+     [
+      39.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      45.0,
+      0.0
+     ],
+     [
+      45.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      45.0,
+      5.0
+     ],
+     [
+      45.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      45.0,
+      10.0
+     ],
+     [
+      45.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      45.0,
+      15.0
+     ],
+     [
+      45.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      45.0,
+      20.0
+     ],
+     [
+      45.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      45.0,
+      25.0
+     ],
+     [
+      45.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      45.0,
+      30.0
+     ],
+     [
+      45.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-AB-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      51.0,
+      0.0
+     ],
+     [
+      51.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-BC-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      51.0,
+      5.0
+     ],
+     [
+      51.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-CD-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      51.0,
+      10.0
+     ],
+     [
+      51.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-DE-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      51.0,
+      15.0
+     ],
+     [
+      51.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-EF-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      51.0,
+      20.0
+     ],
+     [
+      51.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-FG-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      51.0,
+      25.0
+     ],
+     [
+      51.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-GH-N4",
+    "planta": "N4",
+    "puntos": [
+     [
+      51.0,
+      30.0
+     ],
+     [
+      51.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VA-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      5.0
+     ],
+     [
+      54.0,
+      5.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      10.0
+     ],
+     [
+      54.0,
+      10.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      15.0
+     ],
+     [
+      54.0,
+      15.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      20.0
+     ],
+     [
+      54.0,
+      20.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      25.0
+     ],
+     [
+      54.0,
+      25.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      30.0
+     ],
+     [
+      54.0,
+      30.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      35.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V1-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V2-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      6.0,
+      0.0
+     ],
+     [
+      6.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V3-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      12.0,
+      0.0
+     ],
+     [
+      12.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V4-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      18.0,
+      0.0
+     ],
+     [
+      18.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V5-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      24.0,
+      0.0
+     ],
+     [
+      24.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V6-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      30.0,
+      0.0
+     ],
+     [
+      30.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V7-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      36.0,
+      0.0
+     ],
+     [
+      36.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V8-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      42.0,
+      0.0
+     ],
+     [
+      42.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V9-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      48.0,
+      0.0
+     ],
+     [
+      48.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V10-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VT12-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      3.0,
+      0.0
+     ],
+     [
+      3.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      3.0,
+      5.0
+     ],
+     [
+      3.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      3.0,
+      10.0
+     ],
+     [
+      3.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      3.0,
+      15.0
+     ],
+     [
+      3.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      3.0,
+      20.0
+     ],
+     [
+      3.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      3.0,
+      25.0
+     ],
+     [
+      3.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      3.0,
+      30.0
+     ],
+     [
+      3.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      9.0,
+      0.0
+     ],
+     [
+      9.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      9.0,
+      5.0
+     ],
+     [
+      9.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      9.0,
+      10.0
+     ],
+     [
+      9.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      9.0,
+      15.0
+     ],
+     [
+      9.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      9.0,
+      20.0
+     ],
+     [
+      9.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      9.0,
+      25.0
+     ],
+     [
+      9.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      9.0,
+      30.0
+     ],
+     [
+      9.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      15.0,
+      0.0
+     ],
+     [
+      15.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      15.0,
+      5.0
+     ],
+     [
+      15.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      15.0,
+      10.0
+     ],
+     [
+      15.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      15.0,
+      15.0
+     ],
+     [
+      15.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      15.0,
+      20.0
+     ],
+     [
+      15.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      15.0,
+      25.0
+     ],
+     [
+      15.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      15.0,
+      30.0
+     ],
+     [
+      15.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      21.0,
+      0.0
+     ],
+     [
+      21.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      21.0,
+      5.0
+     ],
+     [
+      21.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      21.0,
+      10.0
+     ],
+     [
+      21.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      21.0,
+      15.0
+     ],
+     [
+      21.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      21.0,
+      20.0
+     ],
+     [
+      21.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      21.0,
+      25.0
+     ],
+     [
+      21.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      21.0,
+      30.0
+     ],
+     [
+      21.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      27.0,
+      0.0
+     ],
+     [
+      27.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      27.0,
+      5.0
+     ],
+     [
+      27.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      27.0,
+      10.0
+     ],
+     [
+      27.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      27.0,
+      15.0
+     ],
+     [
+      27.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      27.0,
+      20.0
+     ],
+     [
+      27.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      27.0,
+      25.0
+     ],
+     [
+      27.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      27.0,
+      30.0
+     ],
+     [
+      27.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      33.0,
+      0.0
+     ],
+     [
+      33.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      33.0,
+      5.0
+     ],
+     [
+      33.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      33.0,
+      10.0
+     ],
+     [
+      33.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      33.0,
+      15.0
+     ],
+     [
+      33.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      33.0,
+      20.0
+     ],
+     [
+      33.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      33.0,
+      25.0
+     ],
+     [
+      33.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      33.0,
+      30.0
+     ],
+     [
+      33.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      39.0,
+      0.0
+     ],
+     [
+      39.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      39.0,
+      5.0
+     ],
+     [
+      39.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      39.0,
+      10.0
+     ],
+     [
+      39.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      39.0,
+      15.0
+     ],
+     [
+      39.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      39.0,
+      20.0
+     ],
+     [
+      39.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      39.0,
+      25.0
+     ],
+     [
+      39.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      39.0,
+      30.0
+     ],
+     [
+      39.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      45.0,
+      0.0
+     ],
+     [
+      45.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      45.0,
+      5.0
+     ],
+     [
+      45.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      45.0,
+      10.0
+     ],
+     [
+      45.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      45.0,
+      15.0
+     ],
+     [
+      45.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      45.0,
+      20.0
+     ],
+     [
+      45.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      45.0,
+      25.0
+     ],
+     [
+      45.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      45.0,
+      30.0
+     ],
+     [
+      45.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-AB-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      51.0,
+      0.0
+     ],
+     [
+      51.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-BC-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      51.0,
+      5.0
+     ],
+     [
+      51.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-CD-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      51.0,
+      10.0
+     ],
+     [
+      51.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-DE-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      51.0,
+      15.0
+     ],
+     [
+      51.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-EF-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      51.0,
+      20.0
+     ],
+     [
+      51.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-FG-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      51.0,
+      25.0
+     ],
+     [
+      51.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-GH-N3",
+    "planta": "N3",
+    "puntos": [
+     [
+      51.0,
+      30.0
+     ],
+     [
+      51.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VA-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      5.0
+     ],
+     [
+      54.0,
+      5.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      10.0
+     ],
+     [
+      54.0,
+      10.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      15.0
+     ],
+     [
+      54.0,
+      15.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      20.0
+     ],
+     [
+      54.0,
+      20.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      25.0
+     ],
+     [
+      54.0,
+      25.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      30.0
+     ],
+     [
+      54.0,
+      30.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      35.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V1-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V2-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      6.0,
+      0.0
+     ],
+     [
+      6.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V3-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      12.0,
+      0.0
+     ],
+     [
+      12.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V4-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      18.0,
+      0.0
+     ],
+     [
+      18.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V5-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      24.0,
+      0.0
+     ],
+     [
+      24.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V6-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      30.0,
+      0.0
+     ],
+     [
+      30.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V7-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      36.0,
+      0.0
+     ],
+     [
+      36.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V8-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      42.0,
+      0.0
+     ],
+     [
+      42.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V9-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      48.0,
+      0.0
+     ],
+     [
+      48.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V10-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VT12-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      3.0,
+      0.0
+     ],
+     [
+      3.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      3.0,
+      5.0
+     ],
+     [
+      3.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      3.0,
+      10.0
+     ],
+     [
+      3.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      3.0,
+      15.0
+     ],
+     [
+      3.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      3.0,
+      20.0
+     ],
+     [
+      3.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      3.0,
+      25.0
+     ],
+     [
+      3.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      3.0,
+      30.0
+     ],
+     [
+      3.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      9.0,
+      0.0
+     ],
+     [
+      9.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      9.0,
+      5.0
+     ],
+     [
+      9.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      9.0,
+      10.0
+     ],
+     [
+      9.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      9.0,
+      15.0
+     ],
+     [
+      9.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      9.0,
+      20.0
+     ],
+     [
+      9.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      9.0,
+      25.0
+     ],
+     [
+      9.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      9.0,
+      30.0
+     ],
+     [
+      9.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      15.0,
+      0.0
+     ],
+     [
+      15.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      15.0,
+      5.0
+     ],
+     [
+      15.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      15.0,
+      10.0
+     ],
+     [
+      15.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      15.0,
+      15.0
+     ],
+     [
+      15.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      15.0,
+      20.0
+     ],
+     [
+      15.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      15.0,
+      25.0
+     ],
+     [
+      15.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      15.0,
+      30.0
+     ],
+     [
+      15.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      21.0,
+      0.0
+     ],
+     [
+      21.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      21.0,
+      5.0
+     ],
+     [
+      21.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      21.0,
+      10.0
+     ],
+     [
+      21.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      21.0,
+      15.0
+     ],
+     [
+      21.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      21.0,
+      20.0
+     ],
+     [
+      21.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      21.0,
+      25.0
+     ],
+     [
+      21.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      21.0,
+      30.0
+     ],
+     [
+      21.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      27.0,
+      0.0
+     ],
+     [
+      27.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      27.0,
+      5.0
+     ],
+     [
+      27.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      27.0,
+      10.0
+     ],
+     [
+      27.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      27.0,
+      15.0
+     ],
+     [
+      27.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      27.0,
+      20.0
+     ],
+     [
+      27.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      27.0,
+      25.0
+     ],
+     [
+      27.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      27.0,
+      30.0
+     ],
+     [
+      27.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      33.0,
+      0.0
+     ],
+     [
+      33.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      33.0,
+      5.0
+     ],
+     [
+      33.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      33.0,
+      10.0
+     ],
+     [
+      33.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      33.0,
+      15.0
+     ],
+     [
+      33.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      33.0,
+      20.0
+     ],
+     [
+      33.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      33.0,
+      25.0
+     ],
+     [
+      33.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      33.0,
+      30.0
+     ],
+     [
+      33.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      39.0,
+      0.0
+     ],
+     [
+      39.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      39.0,
+      5.0
+     ],
+     [
+      39.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      39.0,
+      10.0
+     ],
+     [
+      39.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      39.0,
+      15.0
+     ],
+     [
+      39.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      39.0,
+      20.0
+     ],
+     [
+      39.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      39.0,
+      25.0
+     ],
+     [
+      39.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      39.0,
+      30.0
+     ],
+     [
+      39.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      45.0,
+      0.0
+     ],
+     [
+      45.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      45.0,
+      5.0
+     ],
+     [
+      45.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      45.0,
+      10.0
+     ],
+     [
+      45.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      45.0,
+      15.0
+     ],
+     [
+      45.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      45.0,
+      20.0
+     ],
+     [
+      45.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      45.0,
+      25.0
+     ],
+     [
+      45.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      45.0,
+      30.0
+     ],
+     [
+      45.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-AB-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      51.0,
+      0.0
+     ],
+     [
+      51.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-BC-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      51.0,
+      5.0
+     ],
+     [
+      51.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-CD-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      51.0,
+      10.0
+     ],
+     [
+      51.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-DE-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      51.0,
+      15.0
+     ],
+     [
+      51.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-EF-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      51.0,
+      20.0
+     ],
+     [
+      51.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-FG-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      51.0,
+      25.0
+     ],
+     [
+      51.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-GH-N2",
+    "planta": "N2",
+    "puntos": [
+     [
+      51.0,
+      30.0
+     ],
+     [
+      51.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VA-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      5.0
+     ],
+     [
+      54.0,
+      5.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      10.0
+     ],
+     [
+      54.0,
+      10.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      15.0
+     ],
+     [
+      54.0,
+      15.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      20.0
+     ],
+     [
+      54.0,
+      20.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      25.0
+     ],
+     [
+      54.0,
+      25.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      30.0
+     ],
+     [
+      54.0,
+      30.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      35.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V1-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V2-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      6.0,
+      0.0
+     ],
+     [
+      6.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V3-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      12.0,
+      0.0
+     ],
+     [
+      12.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V4-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      18.0,
+      0.0
+     ],
+     [
+      18.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V5-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      24.0,
+      0.0
+     ],
+     [
+      24.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V6-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      30.0,
+      0.0
+     ],
+     [
+      30.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V7-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      36.0,
+      0.0
+     ],
+     [
+      36.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V8-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      42.0,
+      0.0
+     ],
+     [
+      42.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V9-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      48.0,
+      0.0
+     ],
+     [
+      48.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "V10-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ]
+    ],
+    "seccion": "V30x60"
+   },
+   {
+    "id": "VT12-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      3.0,
+      0.0
+     ],
+     [
+      3.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      3.0,
+      5.0
+     ],
+     [
+      3.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      3.0,
+      10.0
+     ],
+     [
+      3.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      3.0,
+      15.0
+     ],
+     [
+      3.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      3.0,
+      20.0
+     ],
+     [
+      3.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      3.0,
+      25.0
+     ],
+     [
+      3.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT12-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      3.0,
+      30.0
+     ],
+     [
+      3.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      9.0,
+      0.0
+     ],
+     [
+      9.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      9.0,
+      5.0
+     ],
+     [
+      9.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      9.0,
+      10.0
+     ],
+     [
+      9.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      9.0,
+      15.0
+     ],
+     [
+      9.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      9.0,
+      20.0
+     ],
+     [
+      9.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      9.0,
+      25.0
+     ],
+     [
+      9.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT23-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      9.0,
+      30.0
+     ],
+     [
+      9.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      15.0,
+      0.0
+     ],
+     [
+      15.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      15.0,
+      5.0
+     ],
+     [
+      15.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      15.0,
+      10.0
+     ],
+     [
+      15.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      15.0,
+      15.0
+     ],
+     [
+      15.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      15.0,
+      20.0
+     ],
+     [
+      15.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      15.0,
+      25.0
+     ],
+     [
+      15.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT34-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      15.0,
+      30.0
+     ],
+     [
+      15.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      21.0,
+      0.0
+     ],
+     [
+      21.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      21.0,
+      5.0
+     ],
+     [
+      21.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      21.0,
+      10.0
+     ],
+     [
+      21.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      21.0,
+      15.0
+     ],
+     [
+      21.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      21.0,
+      20.0
+     ],
+     [
+      21.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      21.0,
+      25.0
+     ],
+     [
+      21.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT45-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      21.0,
+      30.0
+     ],
+     [
+      21.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      27.0,
+      0.0
+     ],
+     [
+      27.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      27.0,
+      5.0
+     ],
+     [
+      27.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      27.0,
+      10.0
+     ],
+     [
+      27.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      27.0,
+      15.0
+     ],
+     [
+      27.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      27.0,
+      20.0
+     ],
+     [
+      27.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      27.0,
+      25.0
+     ],
+     [
+      27.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT56-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      27.0,
+      30.0
+     ],
+     [
+      27.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      33.0,
+      0.0
+     ],
+     [
+      33.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      33.0,
+      5.0
+     ],
+     [
+      33.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      33.0,
+      10.0
+     ],
+     [
+      33.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      33.0,
+      15.0
+     ],
+     [
+      33.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      33.0,
+      20.0
+     ],
+     [
+      33.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      33.0,
+      25.0
+     ],
+     [
+      33.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT67-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      33.0,
+      30.0
+     ],
+     [
+      33.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      39.0,
+      0.0
+     ],
+     [
+      39.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      39.0,
+      5.0
+     ],
+     [
+      39.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      39.0,
+      10.0
+     ],
+     [
+      39.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      39.0,
+      15.0
+     ],
+     [
+      39.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      39.0,
+      20.0
+     ],
+     [
+      39.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      39.0,
+      25.0
+     ],
+     [
+      39.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT78-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      39.0,
+      30.0
+     ],
+     [
+      39.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      45.0,
+      0.0
+     ],
+     [
+      45.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      45.0,
+      5.0
+     ],
+     [
+      45.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      45.0,
+      10.0
+     ],
+     [
+      45.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      45.0,
+      15.0
+     ],
+     [
+      45.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      45.0,
+      20.0
+     ],
+     [
+      45.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      45.0,
+      25.0
+     ],
+     [
+      45.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT89-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      45.0,
+      30.0
+     ],
+     [
+      45.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-AB-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      51.0,
+      0.0
+     ],
+     [
+      51.0,
+      5.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-BC-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      51.0,
+      5.0
+     ],
+     [
+      51.0,
+      10.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-CD-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      51.0,
+      10.0
+     ],
+     [
+      51.0,
+      15.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-DE-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      51.0,
+      15.0
+     ],
+     [
+      51.0,
+      20.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-EF-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      51.0,
+      20.0
+     ],
+     [
+      51.0,
+      25.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-FG-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      51.0,
+      25.0
+     ],
+     [
+      51.0,
+      30.0
+     ]
+    ],
+    "seccion": "V25x40"
+   },
+   {
+    "id": "VT910-GH-N1",
+    "planta": "N1",
+    "puntos": [
+     [
+      51.0,
+      30.0
+     ],
+     [
+      51.0,
+      35.0
+     ]
+    ],
+    "seccion": "V25x40"
+   }
+  ],
+  "losas": [
+   {
+    "id": "L-N7",
+    "planta": "N7",
+    "contorno": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "huecos": [
+     [
+      [
+       24.6,
+       15.4
+      ],
+      [
+       29.4,
+       15.4
+      ],
+      [
+       29.4,
+       19.6
+      ],
+      [
+       24.6,
+       19.6
+      ]
+     ]
+    ],
+    "espesor": 0.25,
+    "material": "HA-30"
+   },
+   {
+    "id": "L-N6",
+    "planta": "N6",
+    "contorno": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "huecos": [
+     [
+      [
+       24.6,
+       15.4
+      ],
+      [
+       29.4,
+       15.4
+      ],
+      [
+       29.4,
+       19.6
+      ],
+      [
+       24.6,
+       19.6
+      ]
+     ]
+    ],
+    "espesor": 0.25,
+    "material": "HA-30"
+   },
+   {
+    "id": "L-N5",
+    "planta": "N5",
+    "contorno": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "huecos": [
+     [
+      [
+       24.6,
+       15.4
+      ],
+      [
+       29.4,
+       15.4
+      ],
+      [
+       29.4,
+       19.6
+      ],
+      [
+       24.6,
+       19.6
+      ]
+     ]
+    ],
+    "espesor": 0.25,
+    "material": "HA-30"
+   },
+   {
+    "id": "L-N4",
+    "planta": "N4",
+    "contorno": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "huecos": [
+     [
+      [
+       24.6,
+       15.4
+      ],
+      [
+       29.4,
+       15.4
+      ],
+      [
+       29.4,
+       19.6
+      ],
+      [
+       24.6,
+       19.6
+      ]
+     ]
+    ],
+    "espesor": 0.25,
+    "material": "HA-30"
+   },
+   {
+    "id": "L-N3",
+    "planta": "N3",
+    "contorno": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "huecos": [
+     [
+      [
+       24.6,
+       15.4
+      ],
+      [
+       29.4,
+       15.4
+      ],
+      [
+       29.4,
+       19.6
+      ],
+      [
+       24.6,
+       19.6
+      ]
+     ]
+    ],
+    "espesor": 0.25,
+    "material": "HA-30"
+   },
+   {
+    "id": "L-N2",
+    "planta": "N2",
+    "contorno": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "huecos": [
+     [
+      [
+       24.6,
+       15.4
+      ],
+      [
+       29.4,
+       15.4
+      ],
+      [
+       29.4,
+       19.6
+      ],
+      [
+       24.6,
+       19.6
+      ]
+     ]
+    ],
+    "espesor": 0.25,
+    "material": "HA-30"
+   },
+   {
+    "id": "L-N1",
+    "planta": "N1",
+    "contorno": [
+     [
+      0.0,
+      0.0
+     ],
+     [
+      54.0,
+      0.0
+     ],
+     [
+      54.0,
+      35.0
+     ],
+     [
+      0.0,
+      35.0
+     ]
+    ],
+    "huecos": [
+     [
+      [
+       24.6,
+       15.4
+      ],
+      [
+       29.4,
+       15.4
+      ],
+      [
+       29.4,
+       19.6
+      ],
+      [
+       24.6,
+       19.6
+      ]
+     ]
+    ],
+    "espesor": 0.25,
+    "material": "HA-30"
+   }
+  ],
+  "casos": [
+   {
+    "id": "G",
+    "pesoPropio": true
+   },
+   {
+    "id": "Q"
+   },
+   {
+    "id": "Vx"
+   },
+   {
+    "id": "Vy"
+   }
+  ],
+  "cargas": [
+   {
+    "tipo": "superficie",
+    "id": "SOL-N7",
+    "caso": "G",
+    "planta": "N7",
+    "losa": "L-N7",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "lineal",
+    "id": "TAB-N7",
+    "caso": "G",
+    "planta": "N7",
+    "puntos": [
+     [
+      1.5,
+      7.5
+     ],
+     [
+      22.5,
+      7.5
+     ],
+     [
+      22.5,
+      21.5
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -7.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SU-N7",
+    "caso": "Q",
+    "planta": "N7",
+    "losa": "L-N7",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "BIB-N7",
+    "caso": "Q",
+    "planta": "N7",
+    "losa": "L-N7",
+    "zona": [
+     [
+      6.8,
+      2.6
+     ],
+     [
+      17.2,
+      2.6
+     ],
+     [
+      17.2,
+      12.4
+     ],
+     [
+      6.8,
+      12.4
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -3.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SOL-N6",
+    "caso": "G",
+    "planta": "N6",
+    "losa": "L-N6",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "lineal",
+    "id": "TAB-N6",
+    "caso": "G",
+    "planta": "N6",
+    "puntos": [
+     [
+      1.5,
+      7.5
+     ],
+     [
+      22.5,
+      7.5
+     ],
+     [
+      22.5,
+      21.5
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -7.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SU-N6",
+    "caso": "Q",
+    "planta": "N6",
+    "losa": "L-N6",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "BIB-N6",
+    "caso": "Q",
+    "planta": "N6",
+    "losa": "L-N6",
+    "zona": [
+     [
+      6.8,
+      2.6
+     ],
+     [
+      17.2,
+      2.6
+     ],
+     [
+      17.2,
+      12.4
+     ],
+     [
+      6.8,
+      12.4
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -3.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SOL-N5",
+    "caso": "G",
+    "planta": "N5",
+    "losa": "L-N5",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "lineal",
+    "id": "TAB-N5",
+    "caso": "G",
+    "planta": "N5",
+    "puntos": [
+     [
+      1.5,
+      7.5
+     ],
+     [
+      22.5,
+      7.5
+     ],
+     [
+      22.5,
+      21.5
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -7.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SU-N5",
+    "caso": "Q",
+    "planta": "N5",
+    "losa": "L-N5",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "BIB-N5",
+    "caso": "Q",
+    "planta": "N5",
+    "losa": "L-N5",
+    "zona": [
+     [
+      6.8,
+      2.6
+     ],
+     [
+      17.2,
+      2.6
+     ],
+     [
+      17.2,
+      12.4
+     ],
+     [
+      6.8,
+      12.4
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -3.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SOL-N4",
+    "caso": "G",
+    "planta": "N4",
+    "losa": "L-N4",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "lineal",
+    "id": "TAB-N4",
+    "caso": "G",
+    "planta": "N4",
+    "puntos": [
+     [
+      1.5,
+      7.5
+     ],
+     [
+      22.5,
+      7.5
+     ],
+     [
+      22.5,
+      21.5
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -7.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SU-N4",
+    "caso": "Q",
+    "planta": "N4",
+    "losa": "L-N4",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "BIB-N4",
+    "caso": "Q",
+    "planta": "N4",
+    "losa": "L-N4",
+    "zona": [
+     [
+      6.8,
+      2.6
+     ],
+     [
+      17.2,
+      2.6
+     ],
+     [
+      17.2,
+      12.4
+     ],
+     [
+      6.8,
+      12.4
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -3.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SOL-N3",
+    "caso": "G",
+    "planta": "N3",
+    "losa": "L-N3",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "lineal",
+    "id": "TAB-N3",
+    "caso": "G",
+    "planta": "N3",
+    "puntos": [
+     [
+      1.5,
+      7.5
+     ],
+     [
+      22.5,
+      7.5
+     ],
+     [
+      22.5,
+      21.5
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -7.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SU-N3",
+    "caso": "Q",
+    "planta": "N3",
+    "losa": "L-N3",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "BIB-N3",
+    "caso": "Q",
+    "planta": "N3",
+    "losa": "L-N3",
+    "zona": [
+     [
+      6.8,
+      2.6
+     ],
+     [
+      17.2,
+      2.6
+     ],
+     [
+      17.2,
+      12.4
+     ],
+     [
+      6.8,
+      12.4
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -3.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SOL-N2",
+    "caso": "G",
+    "planta": "N2",
+    "losa": "L-N2",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "lineal",
+    "id": "TAB-N2",
+    "caso": "G",
+    "planta": "N2",
+    "puntos": [
+     [
+      1.5,
+      7.5
+     ],
+     [
+      22.5,
+      7.5
+     ],
+     [
+      22.5,
+      21.5
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -7.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SU-N2",
+    "caso": "Q",
+    "planta": "N2",
+    "losa": "L-N2",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "BIB-N2",
+    "caso": "Q",
+    "planta": "N2",
+    "losa": "L-N2",
+    "zona": [
+     [
+      6.8,
+      2.6
+     ],
+     [
+      17.2,
+      2.6
+     ],
+     [
+      17.2,
+      12.4
+     ],
+     [
+      6.8,
+      12.4
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -3.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SOL-N1",
+    "caso": "G",
+    "planta": "N1",
+    "losa": "L-N1",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "lineal",
+    "id": "TAB-N1",
+    "caso": "G",
+    "planta": "N1",
+    "puntos": [
+     [
+      1.5,
+      7.5
+     ],
+     [
+      22.5,
+      7.5
+     ],
+     [
+      22.5,
+      21.5
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -7.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "SU-N1",
+    "caso": "Q",
+    "planta": "N1",
+    "losa": "L-N1",
+    "q": [
+     0,
+     0,
+     -2.0
+    ]
+   },
+   {
+    "tipo": "superficie",
+    "id": "BIB-N1",
+    "caso": "Q",
+    "planta": "N1",
+    "losa": "L-N1",
+    "zona": [
+     [
+      6.8,
+      2.6
+     ],
+     [
+      17.2,
+      2.6
+     ],
+     [
+      17.2,
+      12.4
+     ],
+     [
+      6.8,
+      12.4
+     ]
+    ],
+    "q": [
+     0,
+     0,
+     -3.0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VX-A1",
+    "caso": "Vx",
+    "pilar": "A1",
+    "ejes": "global",
+    "q": [
+     3.0,
+     0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VX-B1",
+    "caso": "Vx",
+    "pilar": "B1",
+    "ejes": "global",
+    "q": [
+     3.0,
+     0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VX-C1",
+    "caso": "Vx",
+    "pilar": "C1",
+    "ejes": "global",
+    "q": [
+     3.0,
+     0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VX-D1",
+    "caso": "Vx",
+    "pilar": "D1",
+    "ejes": "global",
+    "q": [
+     3.0,
+     0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VX-E1",
+    "caso": "Vx",
+    "pilar": "E1",
+    "ejes": "global",
+    "q": [
+     3.0,
+     0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VX-F1",
+    "caso": "Vx",
+    "pilar": "F1",
+    "ejes": "global",
+    "q": [
+     3.0,
+     0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VX-G1",
+    "caso": "Vx",
+    "pilar": "G1",
+    "ejes": "global",
+    "q": [
+     3.0,
+     0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VX-H1",
+    "caso": "Vx",
+    "pilar": "H1",
+    "ejes": "global",
+    "q": [
+     3.0,
+     0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A1",
+    "caso": "Vy",
+    "pilar": "A1",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A2",
+    "caso": "Vy",
+    "pilar": "A2",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A3",
+    "caso": "Vy",
+    "pilar": "A3",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A4",
+    "caso": "Vy",
+    "pilar": "A4",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A5",
+    "caso": "Vy",
+    "pilar": "A5",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A6",
+    "caso": "Vy",
+    "pilar": "A6",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A7",
+    "caso": "Vy",
+    "pilar": "A7",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A8",
+    "caso": "Vy",
+    "pilar": "A8",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A9",
+    "caso": "Vy",
+    "pilar": "A9",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   },
+   {
+    "tipo": "pilar",
+    "id": "VY-A10",
+    "caso": "Vy",
+    "pilar": "A10",
+    "ejes": "global",
+    "q": [
+     0,
+     3.0,
+     0
+    ]
+   }
+  ]
+ }
+}

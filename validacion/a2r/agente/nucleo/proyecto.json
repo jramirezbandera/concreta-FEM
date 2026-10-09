@@ -1,0 +1,458 @@
+{
+  "esquema": "concreta-fem/proyecto@1",
+  "nombre": "Edificio de instalaciones, parcela 4",
+  "descripcion": "Una planta sobre cimentación (1,50 m), retícula 3x3 (6 m en X, 5 m en Y), núcleo de muros e=0,25 en x=6-12, y=5-10.",
+  "modelo": {
+    "plantas": [
+      {
+        "id": "P1",
+        "altura": null
+      },
+      {
+        "id": "CIM",
+        "altura": 1.5
+      }
+    ],
+    "materiales": [
+      {
+        "id": "HA-25",
+        "tipo": "hormigon",
+        "fck": 25
+      }
+    ],
+    "secciones": [
+      {
+        "id": "P50x50",
+        "material": "HA-25",
+        "forma": "rectangular",
+        "b": 0.5,
+        "h": 0.5
+      },
+      {
+        "id": "V30x50",
+        "material": "HA-25",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.5
+      }
+    ],
+    "pilares": [
+      {
+        "id": "PA1",
+        "x": 0,
+        "y": 0,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PA2",
+        "x": 6,
+        "y": 0,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PA3",
+        "x": 12,
+        "y": 0,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PA4",
+        "x": 18,
+        "y": 0,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PB1",
+        "x": 0,
+        "y": 5,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PB2",
+        "x": 6,
+        "y": 5,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PB3",
+        "x": 12,
+        "y": 5,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PB4",
+        "x": 18,
+        "y": 5,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PC1",
+        "x": 0,
+        "y": 10,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PC2",
+        "x": 6,
+        "y": 10,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PC3",
+        "x": 12,
+        "y": 10,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PC4",
+        "x": 18,
+        "y": 10,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PD1",
+        "x": 0,
+        "y": 15,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PD2",
+        "x": 6,
+        "y": 15,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PD3",
+        "x": 12,
+        "y": 15,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      },
+      {
+        "id": "PD4",
+        "x": 18,
+        "y": 15,
+        "desde": "CIM",
+        "hasta": "P1",
+        "seccion": "P50x50"
+      }
+    ],
+    "vigas": [
+      {
+        "id": "VX1",
+        "planta": "P1",
+        "puntos": [
+          [
+            -0.25,
+            0.1
+          ],
+          [
+            18.25,
+            0.1
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX2",
+        "planta": "P1",
+        "puntos": [
+          [
+            -0.25,
+            5
+          ],
+          [
+            18.25,
+            5
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX3",
+        "planta": "P1",
+        "puntos": [
+          [
+            -0.25,
+            10
+          ],
+          [
+            18.25,
+            10
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VX4",
+        "planta": "P1",
+        "puntos": [
+          [
+            -0.25,
+            14.9
+          ],
+          [
+            18.25,
+            14.9
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VY1",
+        "planta": "P1",
+        "puntos": [
+          [
+            0.1,
+            -0.25
+          ],
+          [
+            0.1,
+            15.25
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VY2",
+        "planta": "P1",
+        "puntos": [
+          [
+            6,
+            -0.25
+          ],
+          [
+            6,
+            15.25
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VY3",
+        "planta": "P1",
+        "puntos": [
+          [
+            12,
+            -0.25
+          ],
+          [
+            12,
+            15.25
+          ]
+        ],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "VY4",
+        "planta": "P1",
+        "puntos": [
+          [
+            17.9,
+            -0.25
+          ],
+          [
+            17.9,
+            15.25
+          ]
+        ],
+        "seccion": "V30x50"
+      }
+    ],
+    "losas": [
+      {
+        "id": "L1",
+        "planta": "P1",
+        "contorno": [
+          [
+            -0.25,
+            -0.25
+          ],
+          [
+            18.25,
+            -0.25
+          ],
+          [
+            18.25,
+            15.25
+          ],
+          [
+            -0.25,
+            15.25
+          ]
+        ],
+        "huecos": [
+          [
+            [
+              6.6,
+              5.4
+            ],
+            [
+              11.4,
+              5.4
+            ],
+            [
+              11.4,
+              9.6
+            ],
+            [
+              6.6,
+              9.6
+            ]
+          ]
+        ],
+        "espesor": 0.22,
+        "material": "HA-25"
+      }
+    ],
+    "muros": [
+      {
+        "id": "NUCLEO",
+        "puntos": [
+          [
+            6,
+            5
+          ],
+          [
+            12,
+            5
+          ],
+          [
+            12,
+            10
+          ],
+          [
+            6,
+            10
+          ],
+          [
+            6,
+            5
+          ]
+        ],
+        "desde": "CIM",
+        "hasta": "P1",
+        "espesor": 0.25,
+        "material": "HA-25",
+        "base": "empotrado",
+        "huecos": [
+          {
+            "desde": 2.4,
+            "hasta": 3.4,
+            "z0": 0,
+            "z1": 1.2
+          }
+        ]
+      }
+    ],
+    "casos": [
+      {
+        "id": "G",
+        "nombre": "Peso propio",
+        "pesoPropio": true
+      },
+      {
+        "id": "Q",
+        "nombre": "Sobrecarga de uso (oficinas, con tabiquería)"
+      },
+      {
+        "id": "V",
+        "nombre": "Viento +X"
+      }
+    ],
+    "cargas": [
+      {
+        "tipo": "superficie",
+        "id": "SU-L1",
+        "caso": "Q",
+        "planta": "P1",
+        "losa": "L1",
+        "q": [
+          0,
+          0,
+          -3
+        ]
+      },
+      {
+        "tipo": "pilar",
+        "id": "V-PA1",
+        "caso": "V",
+        "pilar": "PA1",
+        "ejes": "global",
+        "q": [
+          2,
+          0,
+          0
+        ]
+      },
+      {
+        "tipo": "pilar",
+        "id": "V-PB1",
+        "caso": "V",
+        "pilar": "PB1",
+        "ejes": "global",
+        "q": [
+          2,
+          0,
+          0
+        ]
+      },
+      {
+        "tipo": "pilar",
+        "id": "V-PC1",
+        "caso": "V",
+        "pilar": "PC1",
+        "ejes": "global",
+        "q": [
+          2,
+          0,
+          0
+        ]
+      },
+      {
+        "tipo": "pilar",
+        "id": "V-PD1",
+        "caso": "V",
+        "pilar": "PD1",
+        "ejes": "global",
+        "q": [
+          2,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "opciones": {
+    "tamanoMalla": 1
+  }
+}
