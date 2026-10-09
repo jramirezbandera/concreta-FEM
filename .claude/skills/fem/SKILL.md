@@ -1,6 +1,6 @@
 ---
 name: fem
-description: Modelar, calcular y consultar una estructura con el motor FEM 3D de Concreta mediante la CLI `fem` y un fichero proyecto.json. Úsala cuando haya que crear o editar un modelo estructural (plantas, pilares, vigas, losas, muros, forjados, cargas), validarlo, calcularlo o leer sus resultados (envolventes, flechas, deriva, reacciones, esfuerzos de una pieza o de una banda).
+description: Modelar, calcular, consultar y revisar una estructura con el motor FEM 3D de Concreta mediante la CLI `fem` y un fichero proyecto.json. Úsala cuando haya que crear o editar un modelo estructural (plantas, pilares, vigas, losas, muros, forjados, cargas), validarlo, calcularlo, leer sus resultados (envolventes, flechas, deriva, reacciones, esfuerzos de una pieza o de una banda) o preparar su informe de revisión.
 ---
 
 # fem: modelar y calcular con Concreta FEM 3D
@@ -16,6 +16,8 @@ Trabajas sobre **un único fichero `proyecto.json`**: es la única fuente de ver
    - No te inventes cargas que no te han dado.
 3. **No decides por el ingeniero.** Si la descripción es ambigua (una luz, una sección, un apoyo), pregunta o dilo; no elijas en silencio. Las opciones de compilación por defecto (`opciones`) ya están decididas: no las cambies si no te lo piden. Si te lo piden («sin modificadores de rigidez», «malla de 1 m»), búscalas en el esquema: `"modificadores": {}` quita los de por defecto.
 4. **Ningún resultado vale si `ok` no es `true`.** Los errores se corrigen en el fichero, por el `id` que nombra cada diagnóstico. Los avisos se leen todos y se explican al usuario si afectan al modelo.
+5. **Ningún resultado se da por bueno sin `fem revisar`.** Sus avisos de sensatez (`sensatez/…`) se corrigen si son un error del modelo o se explican al usuario si son legítimos. Nunca los silencies cambiando el modelo para que desaparezcan.
+6. **Nunca ejecutas `fem firmar`.** Firmar es del ingeniero, después de leer el informe. Tú le dices dónde está el informe y qué avisos tiene.
 
 ## Flujo
 
@@ -25,6 +27,7 @@ fem validar proyecto.json                    # esquema + compilación; corrige h
 fem resumen proyecto.json                    # comprueba el modelo: plantas, piezas, cargas por planta y caso
 fem calcular proyecto.json                   # calcula (o reutiliza los resultados de la misma huella)
 fem consultar proyecto.json <consulta> …     # resultados acotados
+fem revisar proyecto.json                    # sensatez e informe de revisión (Markdown y HTML) de esta huella
 ```
 
 - `fem` es `bun "<repo>/cli/fem.ts"`; dentro del repo, también `bun run fem`.
@@ -33,7 +36,20 @@ fem consultar proyecto.json <consulta> …     # resultados acotados
 - **Códigos de salida:** 0 bien; 1 errores del modelo o del cálculo; 2 orden mal dada; 3 error interno.
 - **Números:** la salida va a 6 cifras significativas; con `--exacto`, completos.
 
-**Tras validar, lee `fem resumen`** antes de calcular: la carga vertical de cada planta y caso (`cargas`, en kN, con el peso propio) y el total por caso (`casos[].F`) delatan una carga olvidada, duplicada o en otras unidades.
+**Tras validar, lee `fem resumen`** antes de calcular: la carga vertical de cada planta y caso (`cargas`, en kN, con el peso propio), la horizontal (`horizontales`, [ΣFx, ΣFy]) y el total por caso (`casos[].F`) delatan una carga olvidada, duplicada, en la planta equivocada o en otras unidades.
+
+**`validar` ya da los avisos de sensatez que no necesitan el cálculo** (alturas, espesores, secciones, materiales, pp, cargas duplicadas o hacia arriba, arranques de pilares). Si un error del compilador no se entiende, mira si hay uno de esos avisos: un espesor o un canto en cm suele acabar en `pilar/tramo-flexible-nulo`.
+
+### Revisión
+
+`fem revisar` calcula (o reutiliza) y pasa las comprobaciones de sensatez del modelo:
+- unidades y magnitudes de los datos;
+- carga por m² de cada planta y por tipo de acción, y plantas a las que les falta la carga de un caso;
+- peso propio del cálculo frente al esperado (Σ V·γ);
+- axil de cada pilar frente a su bajada por áreas tributarias;
+- luz/canto de vigas y losas, flechas, desplomes y axil reducido.
+
+Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe en `.fem/<huella>/informe.md` e `informe.html`, y dice si esa huella está firmada (`firma`). Un aviso legítimo (una transición, un voladizo) se explica; uno que delata un error del modelo, se corrige en el fichero.
 
 ## El fichero
 
