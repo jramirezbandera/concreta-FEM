@@ -499,13 +499,46 @@ export interface DesglosePesoPropio {
 }
 
 /**
+ * A-9: trozos [desde, hasta] del tramo `t` de una viga de la planta k que corren por el eje de un
+ * muro que llega a esa planta desde abajo (los extremos del tramo del muro a ≤ eps de su recta),
+ * con el espesor del muro.
+ */
+export function sobreMuros(t: { A: Vec2; L: number; u: Vec2 }, k: number, f: ModeloFisico, P: Plantas, eps: number): { desde: number; hasta: number; t: number }[] {
+  const r: { desde: number; hasta: number; t: number }[] = [];
+  const pr = (q: Vec2) => {
+    const [dx, dy] = [q[0] - t.A[0], q[1] - t.A[1]];
+    return { s: dx * t.u[0] + dy * t.u[1], d: Math.abs(dx * t.u[1] - dy * t.u[0]) };
+  };
+  for (const m of f.muros ?? []) {
+    if (!P.tramosVertical(m).includes(k)) continue;
+    for (const tm of tramos(m.puntos)) {
+      const [a, b] = [pr(tm.A), pr(tm.B)];
+      if (a.d > eps || b.d > eps) continue;
+      const [desde, hasta] = [Math.max(0, Math.min(a.s, b.s)), Math.min(t.L, Math.max(a.s, b.s))];
+      if (hasta - desde > eps) r.push({ desde, hasta, t: m.espesor });
+    }
+  }
+  return r;
+}
+
+/** Canto de una viga de canto h que queda en el punto q de la planta bajo su losa o su paño (C2-g): h menos lo que ocupan ellos. */
+export function cantoLibre(f: ModeloFisico, planta: string, q: Vec2, h: number): number {
+  const l = (f.losas ?? []).find((x) => x.planta === planta && puntoEnRegion(q, regionDe(x)));
+  if (l) return h - Math.min(h, l.espesor);
+  const pn = (f.panos ?? []).find((x) => x.planta === planta && puntoEnRegion(q, regionDe(x)));
+  const s = pn && f.secciones.find((x) => x.id === pn.seccion);
+  const hv = s ? cantoSeccion(s) : null;
+  return hv ? h - Math.min(h, hv) : h;
+}
+
+/**
  * Peso propio esperado por planta y tipo de pieza, sin la malla: Σ V·γ con el pp de las losas y
  * los paños, menos los solapes que el compilador descuenta (C2-g: una viga rectangular de
  * hormigón bajo una losa o un paño pesa sólo su descuelgue; C3-g: el muro, menos su solape con
  * las losas, la mitad por cada lado de la planta al que llega). Estos se estiman por la huella de
  * la pieza (su eje con su ancho) dentro de las losas. El pilar no descuenta su solape (A-9).
  */
-export function pesoPropioEsperado(f: ModeloFisico, P: Plantas): Omit<PesoPropioPlanta, "calculado">[] {
+export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05): Omit<PesoPropioPlanta, "calculado">[] {
   const material = new Map(f.materiales.map((m) => [m.id, m]));
   const seccion = new Map(f.secciones.map((s) => [s.id, s]));
   const r = new Map(P.ids.map((id) => [id, { planta: id, pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, solapes: 0, esperado: 0 }]));
@@ -529,6 +562,7 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas): Omit<PesoPropio
     if (w.s.forma !== "rectangular" || w.m.tipo !== "hormigon") continue;
     // C2-g: bajo una losa o un paño, sólo el descuelgue
     const gamma = gammaMaterial(w.m);
+    const k = P.indice.get(v.planta)!;
     for (const t of tramos(v.puntos)) {
       const huella = huellaTramo(t, w.s.b);
       for (const l of losasEn(v.planta)) x.solapes += momentosInterseccion(regionDe(l), huella).A * Math.min(w.s.h, l.espesor) * gamma;
@@ -536,6 +570,13 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas): Omit<PesoPropio
         const h = seccion.get(pn.seccion);
         const hv = h ? cantoSeccion(h) : null;
         if (hv) x.solapes += momentosInterseccion(regionDe(pn), huella).A * Math.min(w.s.h, hv) * gamma;
+      }
+      // A-9: por el eje de un muro que le llega desde abajo, sólo lo que sobresale de él
+      for (const o of sobreMuros(t, k, f, P, eps)) {
+        const sm = (o.desde + o.hasta) / 2;
+        const { b, h } = w.s;
+        const hl = [1, -1].reduce((suma, lado) => suma + cantoLibre(f, v.planta, [t.A[0] + t.u[0] * sm - (lado * t.u[1] * b) / 4, t.A[1] + t.u[1] * sm + (lado * t.u[0] * b) / 4], h), 0);
+        x.solapes += ((gamma * Math.min(b, o.t)) / 2) * hl * (o.hasta - o.desde);
       }
     }
   }
@@ -607,7 +648,7 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
   const caso = f.casos.find((c) => c.pesoPropio);
   if (!caso) return { registro: reg, desglose: null };
   const calc = pesoPropioCalculado(f, opciones);
-  const plantas: PesoPropioPlanta[] = pesoPropioEsperado(f, P).map((x) => ({ ...x, calculado: calc ? (calc.get(x.planta) ?? 0) : null }));
+  const plantas: PesoPropioPlanta[] = pesoPropioEsperado(f, P, opciones?.epsSnap).map((x) => ({ ...x, calculado: calc ? (calc.get(x.planta) ?? 0) : null }));
   const total = { pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, solapes: 0, esperado: 0, calculado: calc ? 0 : null } as DesglosePesoPropio["total"];
   for (const x of plantas)
     for (const k of ["pilares", "vigas", "losas", "panos", "muros", "solapes", "esperado"] as const) total[k] += x[k];

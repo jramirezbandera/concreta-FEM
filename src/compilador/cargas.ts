@@ -37,7 +37,7 @@ import type { Topologia } from "./topologia.ts";
 import { cotaNudo, seccionTramo } from "./topologia.ts";
 import { RepartoPano, trozosEnPanos, type BordePano, type EmisorPano, type NudosBorde, type PanosU, type Receptor } from "./unidireccional.ts";
 import { distanciaARegion } from "./topologia.ts";
-import type { Contexto } from "./validar.ts";
+import type { Contexto, MuroCompilado } from "./validar.ts";
 
 export const TOL_SIN_PERDIDAS = 1e-9;
 
@@ -142,6 +142,51 @@ function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: reado
     else tramos.push({ desde: cs[i]!, hasta: cs[i + 1]!, w: wi });
   }
   return tramos;
+}
+
+/**
+ * A-9: trozos [desde, hasta] de la recta r de una viga de la planta k que corren por el eje de un
+ * muro que llega a esa planta desde abajo (los dos extremos del tramo del muro a ≤ ε de la recta),
+ * con el espesor del muro. La viga cuelga del forjado dentro del muro, que pesa de forjado a forjado.
+ */
+export function tramosSobreMuros(r: Recta, k: number, muros: readonly MuroCompilado[], eps: number): { desde: number; hasta: number; t: number }[] {
+  const res: { desde: number; hasta: number; t: number }[] = [];
+  const L = Math.hypot(r.e[0], r.e[1]);
+  if (!(L > 0)) return res;
+  const u: Vec2 = [r.e[0] / L, r.e[1] / L];
+  const pr = (Q: Vec2) => {
+    const dx = Q[0] - r.O[0];
+    const dy = Q[1] - r.O[1];
+    return { s: (dx * u[0] + dy * u[1]) / L, d: Math.abs(dx * u[1] - dy * u[0]) };
+  };
+  for (const m of muros) {
+    if (!(k >= m.kh && k < m.kb)) continue;
+    const p = m.muro.puntos;
+    for (let i = 1; i < p.length; i++) {
+      const [a, b] = [pr(p[i - 1]!), pr(p[i]!)];
+      if (a.d > eps || b.d > eps) continue;
+      const desde = Math.max(0, Math.min(a.s, b.s));
+      const hasta = Math.min(r.len, Math.max(a.s, b.s));
+      if (hasta - desde > eps) res.push({ desde, hasta, t: m.material.t });
+    }
+  }
+  return res.sort((x, y) => x.desde - y.desde);
+}
+
+/** Los tramos de peso de una viga de ancho b con lo que corre por un muro de espesor t reducido a lo que sobresale de él: w·max(0, b − t)/b. */
+function quitarMuros(tramos: readonly { desde: number; hasta: number; w: number }[], muros: readonly { desde: number; hasta: number; t: number }[], b: number): { desde: number; hasta: number; w: number }[] {
+  if (!muros.length) return [...tramos];
+  const r: { desde: number; hasta: number; w: number }[] = [];
+  for (const t of tramos) {
+    const cortes = [...new Set([t.desde, t.hasta, ...muros.flatMap((m) => [m.desde, m.hasta]).filter((s) => s > t.desde && s < t.hasta)])].sort((x, y) => x - y);
+    for (let i = 0; i + 1 < cortes.length; i++) {
+      const [a, c] = [cortes[i]!, cortes[i + 1]!];
+      const sm = (a + c) / 2;
+      const m = muros.find((x) => sm > x.desde && sm < x.hasta);
+      r.push({ desde: a, hasta: c, w: m ? (t.w * Math.max(0, b - m.t)) / b : t.w });
+    }
+  }
+  return r;
 }
 
 export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, losas: Losas, centro: Vec3, diag: Diagnosticos, panos: PanosU | null = null): CargasCompiladas {
@@ -403,12 +448,20 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       const w = sc.peso;
       if (!(w > 0)) continue;
       const regiones = regionesBajo(v);
+      const k = ctx.planta.get(v.planta)!;
       for (const r of piezas.rectasDe.get(v.id) ?? []) {
-        if (!regiones.length || sc.material !== "hormigon" || sc.forma !== "rectangular" || sc.huella?.tipo !== "rectangulo") {
+        if (sc.material !== "hormigon" || sc.forma !== "rectangular" || sc.huella?.tipo !== "rectangulo") {
           repartir(cPeso, r, 0, r.len, [0, 0, -w], [0, 0, -w]);
           continue;
         }
-        for (const t of pesoBajoLosa(r, w, sc.huella.b, sc.canto, regiones, ctx.op.epsGeom)) if (t.w > 0) repartir(cPeso, r, t.desde, t.hasta, [0, 0, -t.w], [0, 0, -t.w]);
+        const enMuros = tramosSobreMuros(r, k, ctx.muros, ctx.op.epsSnap);
+        if (!regiones.length && !enMuros.length) {
+          repartir(cPeso, r, 0, r.len, [0, 0, -w], [0, 0, -w]);
+          continue;
+        }
+        // C2-g bajo las losas y los paños; A-9 sobre los muros
+        const bajo = regiones.length ? pesoBajoLosa(r, w, sc.huella.b, sc.canto, regiones, ctx.op.epsGeom) : [{ desde: 0, hasta: r.len, w }];
+        for (const t of quitarMuros(bajo, enMuros, sc.huella.b)) if (t.w > 0) repartir(cPeso, r, t.desde, t.hasta, [0, 0, -t.w], [0, 0, -t.w]);
       }
     }
     // Losas: su pp, por lámina (C2-g); en un reticular, el de la zona aligerada o el de los ábacos (C4-i)

@@ -469,7 +469,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       `Unión pilar–losa por la huella del pilar, rígida (${losas.huellas.length} huellas, H09). Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas, y la zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
     );
     h.push(
-      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos, con casetón recuperable (C4-i)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).`,
+      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos, con casetón recuperable (C4-i)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).${ctx.pilares.length ? " Los pilares pesan de forjado a forjado, sin descontar su cruce con las losas (A-9): del lado de la seguridad, como es habitual." : ""}`,
     );
     for (const l of ctx.losas) {
       const r = l.reticular;
@@ -495,7 +495,9 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     h.push(
       `Las vigas que corren por el eje de un muro se parten en sus nudos${aux ? `; las que acaban en el extremo de un muro en su plano se prolongan dentro con ${aux} barras auxiliares de su sección a lo largo de su canto (C3-e, H05)` : ""}. Las vigas perpendiculares que acaban en un muro se unen a él por su huella: los nudos del muro a lo largo de su canto y de su ancho van con su extremo en un enlace rígido (C3-i).`,
     );
-    h.push("Peso propio de los muros: γ·t por m² de alzado sin huecos, de forjado a forjado, menos el solape con las losas (C3-g).");
+    h.push(
+      `Peso propio de los muros: γ·t por m² de alzado sin huecos, de forjado a forjado, menos el solape con las losas (C3-g).${ctx.vigas.length ? " Las vigas rectangulares de hormigón que corren por el eje de un muro que les llega desde abajo pesan sólo lo que sobresalen de él, w·(b − t)/b, porque cuelgan del forjado dentro del muro (A-9)." : ""}`,
+    );
   }
   if (panos.viguetas.length) {
     const lista = ctx.panos
