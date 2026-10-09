@@ -96,6 +96,8 @@ export interface ResumenPlanta {
   muros?: { n: number; m: number };
   /** Carga vertical por caso (−ΣFz de lo que recibe la planta, kN; el peso propio incluido). */
   cargas: Record<string, number>;
+  /** Carga horizontal por caso, [ΣFx, ΣFy] (kN), sólo de los casos que la tienen en la planta (A-8). */
+  horizontales?: Record<string, [number, number]>;
 }
 
 export interface Resumen {
@@ -116,7 +118,7 @@ export interface Resumen {
  * Planta de cada carga analítica: la del nudo más alto del elemento que la recibe (un tramo de
  * pilar o un paño de muro cargan la planta de su cabeza, como en `TramoPilar`).
  */
-function cargasPorPlanta(c: Extract<ResultadoCompilacion, { valido: true }>, plantas: readonly string[]): Map<string, ModeloAnalitico> {
+export function cargasPorPlanta(c: Extract<ResultadoCompilacion, { valido: true }>, plantas: readonly string[]): Map<string, ModeloAnalitico> {
   const { modelo, mapeo } = c;
   const plantaNudos = (ns: readonly number[]) => {
     let mejor = ns[0]!;
@@ -163,10 +165,13 @@ export function resumen(p: Proyecto, c: Extract<ResultadoCompilacion, { valido: 
     const muros = (f.muros ?? []).filter((m) => i >= k.get(m.hasta)! && i < k.get(m.desde)!);
     if (muros.length) r.muros = { n: muros.length, m: muros.reduce((s, m) => s + longitud(m.puntos), 0) };
     const sub = porPlanta.get(pl.id)!;
+    const hz: Record<string, [number, number]> = {};
     c.modelo.casos.forEach((caso, kc) => {
       const R = resultanteAnalitica(sub, kc, [0, 0, 0]);
       if (R.F[2] !== 0) r.cargas[caso.id] = -R.F[2];
+      if (R.F[0] !== 0 || R.F[1] !== 0) hz[caso.id] = [R.F[0], R.F[1]];
     });
+    if (Object.keys(hz).length) r.horizontales = hz;
     return r;
   });
   const avisos: Record<string, number> = {};
