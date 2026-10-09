@@ -217,8 +217,20 @@
   - Los tres modelos coinciden con la referencia a ≤ 3e-13, y los agentes revisaron sin firmar.
   - **R-2:** la viga de fachada enrasada por fuera, con la losa hasta la cara exterior del pilar, es error por C2-c. **Pendiente del usuario:** la opción B (admitirla y llevar la franja a la viga).
   - Corregido: la hipótesis de zona rígida cuando ninguna barra la tiene (R-3).
+- **2026-10-09: fase A4 de la capa de agente superada** (render y revisión visual). Pasan sus cinco criterios. El informe está en `docs/fem3d/fase-a4.md`, con criterios, hallazgos A4-1…A4-8 y pendientes; lo fijado al empezar, en `agente.md` §10.
+  - **Ya en `src/agente/render/`** (puro): escena, SVG determinista e isovalores con bandas fundidas.
+    - Vistas por planta: `modelo`, `cargas` y `diagnosticos` (sin calcular, también si no compila); `malla`; `uz`, `m11`, `m22`, `m12`, `v13` y `v23`; `vigas-my`, `vigas-vz` y `pilares-n`.
+    - Todo número rotulado sale de una consulta y va también en el JSON.
+  - **CLI:**
+    - `fem render` escribe SVG y PNG en `.fem/<huella>/render/`. El PNG sale con `@resvg/resvg-wasm` 2.6.2 (MPL-2.0) y Roboto 2.138 (Apache-2.0), versionada en `cli/fuentes/`: los mismos bytes en Bun y en Node;
+    - el informe de `fem revisar` lleva, por planta, el modelo y la uz, con el sha256 de cada SVG en el Markdown;
+    - la skill dice que un número nunca se lee de una imagen.
+  - **Puerta visual:** diez subagentes con sólo la descripción y las PNG encontraron 7 de 8 mutaciones que sólo se ven en el dibujo, sin ninguna discrepancia falsa (`validacion/a4/spike.md`).
+    - Se les escapó el pilar girado, aunque su rótulo lo decía (A4-4): una lista de 80 pilares se comprueba mejor con una consulta.
+  - **Rendimiento:** ≤ 1,2 s por planta y vista en los edificios objetivo, e informe de ≤ 1,4 MB.
+  - **Pendiente del usuario:** mirar las imágenes y decir si le sirven para revisar.
 - **Siguiente paso:**
-  - A4 de la capa de agente (render y revisión visual);
+  - A5 de la capa de agente (entrada desde planos). Antes, decidir A-e (confidencialidad de los planos de clientes);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - el resto de la capa de agente (A5–A7). A-e (confidencialidad de los planos de clientes) queda aplazada hasta antes de A5.
+  - el resto de la capa de agente (A6–A7).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
