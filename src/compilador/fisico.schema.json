@@ -1,0 +1,1446 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:concreta-fem:fisico@1",
+  "title": "Modelo físico de Concreta FEM 3D (estructura)",
+  "$ref": "#/$defs/ModeloFisico",
+  "$defs": {
+    "ApoyoFisico": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "coartados": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "x",
+        "y",
+        "coartados"
+      ],
+      "additionalProperties": false
+    },
+    "ApoyoLineal": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "puntos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          }
+        },
+        "coartados": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "puntos",
+        "coartados"
+      ],
+      "additionalProperties": false
+    },
+    "Banda": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "desde": {
+          "$ref": "#/$defs/Vec2"
+        },
+        "hasta": {
+          "$ref": "#/$defs/Vec2"
+        },
+        "ancho": {
+          "type": "number"
+        },
+        "tipo": {
+          "enum": [
+            "central",
+            "pilares"
+          ]
+        },
+        "origen": {
+          "enum": [
+            "propuesta",
+            "usuario"
+          ]
+        },
+        "apoyos": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "desde",
+        "hasta",
+        "ancho"
+      ],
+      "additionalProperties": false
+    },
+    "CargaFisica": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "puntual"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "planta": {
+              "type": "string"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "F": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "M": {
+              "$ref": "#/$defs/Vec3"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "planta",
+            "x",
+            "y"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "viga"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "viga": {
+              "type": "string"
+            },
+            "ejes": {
+              "enum": [
+                "global",
+                "local"
+              ]
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "qb": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "desde": {
+              "type": "number"
+            },
+            "hasta": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "viga",
+            "ejes",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "pilar"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "pilar": {
+              "type": "string"
+            },
+            "ejes": {
+              "enum": [
+                "global",
+                "local"
+              ]
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "qb": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "desde": {
+              "type": "number"
+            },
+            "hasta": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "pilar",
+            "ejes",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "superficie"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "planta": {
+              "type": "string"
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "losa": {
+              "type": "string"
+            },
+            "pano": {
+              "type": "string"
+            },
+            "zona": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Vec2"
+              }
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "planta",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "lineal"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "planta": {
+              "type": "string"
+            },
+            "puntos": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Vec2"
+              }
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "planta",
+            "puntos",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "empuje"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "muro": {
+              "type": "string"
+            },
+            "lado": {
+              "enum": [
+                "derecho",
+                "izquierdo"
+              ]
+            },
+            "z0": {
+              "type": "number"
+            },
+            "z1": {
+              "type": "number"
+            },
+            "p0": {
+              "type": "number"
+            },
+            "p1": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "muro",
+            "lado",
+            "z0",
+            "z1",
+            "p0",
+            "p1"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CasoFisico": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "pesoPropio": {
+          "type": "boolean"
+        },
+        "accion": {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "$ref": "#/$defs/TipoAccion"
+            },
+            "familia": {
+              "type": "string"
+            },
+            "psi": {
+              "$ref": "#/$defs/Psi"
+            },
+            "permanente": {
+              "enum": [
+                "agua",
+                "empuje",
+                "peso"
+              ]
+            },
+            "direccion": {
+              "enum": [
+                "X",
+                "Y"
+              ]
+            },
+            "signo": {
+              "enum": [
+                -1,
+                1
+              ]
+            },
+            "derivadoDe": {
+              "type": "string"
+            },
+            "duracion": {
+              "$ref": "#/$defs/Duracion"
+            }
+          },
+          "required": [
+            "tipo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Duracion": {
+      "enum": [
+        "corta",
+        "instantanea",
+        "larga",
+        "media",
+        "permanente"
+      ]
+    },
+    "HuecoMuro": {
+      "type": "object",
+      "properties": {
+        "desde": {
+          "type": "number"
+        },
+        "hasta": {
+          "type": "number"
+        },
+        "z0": {
+          "type": "number"
+        },
+        "z1": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "desde",
+        "hasta",
+        "z0",
+        "z1"
+      ],
+      "additionalProperties": false
+    },
+    "Liberacion": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "boolean"
+        }
+      ],
+      "items": false,
+      "minItems": 6,
+      "maxItems": 6
+    },
+    "Losa": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "contorno": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          }
+        },
+        "huecos": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Vec2"
+            }
+          }
+        },
+        "espesor": {
+          "type": "number"
+        },
+        "material": {
+          "type": "string"
+        },
+        "pp": {
+          "type": "number"
+        },
+        "eje1": {
+          "type": "number"
+        },
+        "reticular": {
+          "$ref": "#/$defs/Reticular"
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "contorno",
+        "espesor",
+        "material"
+      ],
+      "additionalProperties": false
+    },
+    "Material": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "tipo": {
+              "const": "hormigon"
+            },
+            "fck": {
+              "type": "number"
+            },
+            "nu": {
+              "type": "number"
+            },
+            "peso": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "tipo",
+            "fck"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "tipo": {
+              "const": "acero"
+            },
+            "E": {
+              "type": "number"
+            },
+            "peso": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "tipo"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "tipo": {
+              "const": "general"
+            },
+            "E": {
+              "type": "number"
+            },
+            "G": {
+              "type": "number"
+            },
+            "peso": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "tipo",
+            "E",
+            "G",
+            "peso"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ModeloFisico": {
+      "type": "object",
+      "properties": {
+        "plantas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Planta"
+          }
+        },
+        "materiales": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Material"
+          }
+        },
+        "secciones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Seccion"
+          }
+        },
+        "pilares": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Pilar"
+          }
+        },
+        "vigas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Viga"
+          }
+        },
+        "apoyos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ApoyoFisico"
+          }
+        },
+        "losas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Losa"
+          }
+        },
+        "apoyosLineales": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ApoyoLineal"
+          }
+        },
+        "bandas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Banda"
+          }
+        },
+        "muros": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Muro"
+          }
+        },
+        "panos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PanoUnidireccional"
+          }
+        },
+        "casos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CasoFisico"
+          }
+        },
+        "cargas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CargaFisica"
+          }
+        }
+      },
+      "required": [
+        "plantas",
+        "materiales",
+        "secciones",
+        "casos"
+      ],
+      "additionalProperties": false
+    },
+    "ModificadoresBarra": {
+      "type": "object",
+      "properties": {
+        "A": {
+          "type": "number"
+        },
+        "Avy": {
+          "type": "number"
+        },
+        "Avz": {
+          "type": "number"
+        },
+        "J": {
+          "type": "number"
+        },
+        "Iy": {
+          "type": "number"
+        },
+        "Iz": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModificadoresPieza": {
+      "type": "object",
+      "properties": {
+        "todos": {
+          "$ref": "#/$defs/ModificadoresBarra"
+        },
+        "hormigon": {
+          "$ref": "#/$defs/ModificadoresBarra"
+        },
+        "acero": {
+          "$ref": "#/$defs/ModificadoresBarra"
+        },
+        "general": {
+          "$ref": "#/$defs/ModificadoresBarra"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModificadoresPiezas": {
+      "type": "object",
+      "properties": {
+        "pilares": {
+          "$ref": "#/$defs/ModificadoresPieza"
+        },
+        "vigas": {
+          "$ref": "#/$defs/ModificadoresPieza"
+        },
+        "viguetas": {
+          "$ref": "#/$defs/ModificadoresPieza"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MultiplicadoresLamina": {
+      "type": "object",
+      "properties": {
+        "f11": {
+          "type": "number"
+        },
+        "f22": {
+          "type": "number"
+        },
+        "f12": {
+          "type": "number"
+        },
+        "m11": {
+          "type": "number"
+        },
+        "m22": {
+          "type": "number"
+        },
+        "m12": {
+          "type": "number"
+        },
+        "v13": {
+          "type": "number"
+        },
+        "v23": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Muro": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "puntos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          }
+        },
+        "desde": {
+          "type": "string"
+        },
+        "hasta": {
+          "type": "string"
+        },
+        "espesor": {
+          "type": "number"
+        },
+        "material": {
+          "type": "string"
+        },
+        "base": {
+          "enum": [
+            "articulado",
+            "empotrado",
+            "ninguno"
+          ]
+        },
+        "huecos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HuecoMuro"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "puntos",
+        "desde",
+        "hasta",
+        "espesor",
+        "material"
+      ],
+      "additionalProperties": false
+    },
+    "OpcionesCompilacion": {
+      "type": "object",
+      "properties": {
+        "epsGeom": {
+          "type": "number"
+        },
+        "epsSnap": {
+          "type": "number"
+        },
+        "factorZonaRigida": {
+          "type": "number"
+        },
+        "cortante": {
+          "type": "boolean"
+        },
+        "modificadores": {
+          "$ref": "#/$defs/ModificadoresPiezas"
+        },
+        "tamanoMalla": {
+          "type": "number"
+        },
+        "rejilla": {
+          "type": "boolean"
+        },
+        "torsionEquilibrio": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PanoUnidireccional": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "contorno": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          }
+        },
+        "huecos": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Vec2"
+            }
+          }
+        },
+        "direccion": {
+          "type": "number"
+        },
+        "intereje": {
+          "type": "number"
+        },
+        "seccion": {
+          "type": "string"
+        },
+        "pp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "contorno",
+        "direccion",
+        "intereje",
+        "seccion",
+        "pp"
+      ],
+      "additionalProperties": false
+    },
+    "PerfilCatalogo": {
+      "type": "object",
+      "properties": {
+        "A": {
+          "type": "number"
+        },
+        "Iy": {
+          "type": "number"
+        },
+        "Iz": {
+          "type": "number"
+        },
+        "It": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
+        },
+        "b": {
+          "type": "number"
+        },
+        "tf": {
+          "type": "number"
+        },
+        "tw": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "A",
+        "Iy",
+        "Iz",
+        "It",
+        "h",
+        "b",
+        "tf",
+        "tw"
+      ],
+      "additionalProperties": false
+    },
+    "Pilar": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "desde": {
+          "type": "string"
+        },
+        "hasta": {
+          "type": "string"
+        },
+        "seccion": {
+          "type": "string"
+        },
+        "tramos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "planta": {
+                "type": "string"
+              },
+              "seccion": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "planta",
+              "seccion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "giro": {
+          "type": "number"
+        },
+        "base": {
+          "enum": [
+            "articulado",
+            "empotrado",
+            "ninguno"
+          ]
+        },
+        "liberaciones": {
+          "type": "object",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/Liberacion"
+            },
+            "cabeza": {
+              "$ref": "#/$defs/Liberacion"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "x",
+        "y",
+        "desde",
+        "hasta",
+        "seccion"
+      ],
+      "additionalProperties": false
+    },
+    "Planta": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "tipo": {
+          "$ref": "#/$defs/TipoPlanta"
+        },
+        "altura": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "diafragma": {
+          "enum": [
+            "ninguno",
+            "rigido"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "altura"
+      ],
+      "additionalProperties": false
+    },
+    "Psi": {
+      "type": "object",
+      "properties": {
+        "psi0": {
+          "type": "number"
+        },
+        "psi1": {
+          "type": "number"
+        },
+        "psi2": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "psi0",
+        "psi1",
+        "psi2"
+      ],
+      "additionalProperties": false
+    },
+    "Reticular": {
+      "type": "object",
+      "properties": {
+        "intereje": {
+          "type": "number"
+        },
+        "nervio": {
+          "type": "number"
+        },
+        "capa": {
+          "type": "number"
+        },
+        "caseton": {
+          "enum": [
+            "perdido",
+            "recuperable"
+          ]
+        },
+        "abacos": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Vec2"
+            }
+          }
+        },
+        "multiplicadores": {
+          "$ref": "#/$defs/MultiplicadoresLamina"
+        }
+      },
+      "required": [
+        "intereje",
+        "nervio",
+        "capa"
+      ],
+      "additionalProperties": false
+    },
+    "Seccion": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "rectangular"
+            },
+            "b": {
+              "type": "number"
+            },
+            "h": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "b",
+            "h"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "circular"
+            },
+            "D": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "D"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "I"
+            },
+            "perfil": {
+              "$ref": "#/$defs/PerfilCatalogo"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "perfil"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "T"
+            },
+            "bf": {
+              "type": "number"
+            },
+            "hf": {
+              "type": "number"
+            },
+            "bw": {
+              "type": "number"
+            },
+            "h": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "bf",
+            "hf",
+            "bw",
+            "h"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "material": {
+              "type": "string"
+            },
+            "forma": {
+              "const": "general"
+            },
+            "A": {
+              "type": "number"
+            },
+            "Iy": {
+              "type": "number"
+            },
+            "Iz": {
+              "type": "number"
+            },
+            "J": {
+              "type": "number"
+            },
+            "Avy": {
+              "type": "number"
+            },
+            "Avz": {
+              "type": "number"
+            },
+            "b": {
+              "type": "number"
+            },
+            "h": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "material",
+            "forma",
+            "A",
+            "Iy",
+            "Iz",
+            "J"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TipoAccion": {
+      "enum": [
+        "A",
+        "E",
+        "G",
+        "N",
+        "Q",
+        "S",
+        "T",
+        "W"
+      ]
+    },
+    "TipoPlanta": {
+      "enum": [
+        "cubierta",
+        "planta",
+        "sotano"
+      ]
+    },
+    "Vec2": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "Vec3": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "Viga": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "planta": {
+          "type": "string"
+        },
+        "puntos": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vec2"
+          }
+        },
+        "seccion": {
+          "type": "string"
+        },
+        "liberaciones": {
+          "type": "object",
+          "properties": {
+            "inicio": {
+              "$ref": "#/$defs/Liberacion"
+            },
+            "fin": {
+              "$ref": "#/$defs/Liberacion"
+            }
+          },
+          "additionalProperties": false
+        },
+        "insercion": {
+          "enum": [
+            "plano",
+            "superior"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "planta",
+        "puntos",
+        "seccion"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

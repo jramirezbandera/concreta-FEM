@@ -121,7 +121,7 @@ export const CATALOGO: Caso[] = [
   ["reticular con el nervio más ancho que el intereje", (f) => (ret(f).nervio = 0.9), "fisico/valor-no-valido", "L2"],
   ["reticular con la capa más gruesa que el canto", (f) => (ret(f).capa = 0.4), "fisico/valor-no-valido", "L2"],
   ["reticular con un intereje que no es un número", (f) => (ret(f).intereje = m("0.82")), "fisico/valor-no-valido", "L2"],
-  ["reticular con un multiplicador desconocido", (f) => (ret(f).multiplicadores = { k11: 0.5 }), "fisico/valor-no-valido", "L2"],
+  ["reticular con un multiplicador desconocido", (f) => (ret(f).multiplicadores = { k11: 0.5 }), "fisico/campo-desconocido", "L2"], // A-1: antes, fisico/valor-no-valido
   ["reticular con casetón perdido sin pp (su peso depende del casetón)", (f) => delete ret(f).caseton, "reticular/sin-pp", "L2"],
   ["reticular con un casetón que no es perdido ni recuperable", (f) => (ret(f).caseton = "corcho"), "fisico/valor-no-valido", "L2"],
   ["reticular con un multiplicador nulo", (f) => (ret(f).multiplicadores = { m11: 0 }), "fisico/valor-no-valido", "L2"],

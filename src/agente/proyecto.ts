@@ -8,7 +8,7 @@
  */
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import { validarEsquema, type EsquemaRaiz } from "./esquema.ts";
+import { validarEsquema, type EsquemaRaiz } from "../compilador/esquema.ts";
 import esquemaProyecto from "./proyecto.schema.json" with { type: "json" };
 
 /** Versión del esquema del fichero: un cambio incompatible sube el número. */

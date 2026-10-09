@@ -1,6 +1,6 @@
 /**
- * Validador del esquema de `proyecto.json` (A0): el subconjunto de JSON Schema 2020-12 que genera
- * `scripts/generar-esquema.ts` (`$ref` a `$defs`, `type`, `const`, `enum`, `properties`,
+ * Validador de los esquemas de `proyecto.json` (A0) y del modelo físico (A-1, `campos.ts`): el
+ * subconjunto de JSON Schema 2020-12 que genera `scripts/generar-esquema.ts` (`$ref` a `$defs`, `type`, `const`, `enum`, `properties`,
  * `required`, `additionalProperties`, `items`, `prefixItems`, `minItems`, `maxItems` y `anyOf`).
  * Una palabra clave fuera de él es un error del programa, no del proyecto.
  *

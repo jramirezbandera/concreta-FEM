@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { RUTA_ESQUEMA, textoEsquema } from "../../scripts/generar-esquema.ts";
+import { generarEsquema, RUTA_ESQUEMA, RUTA_ESQUEMA_FISICO, textoEsquemaFisico } from "../../scripts/generar-esquema.ts";
 import { modelosValidos } from "../../validacion/a0/modelos.ts";
 import { compilar } from "../compilador/compilar.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
@@ -19,8 +19,10 @@ import { comprobarProyecto, leerProyecto, VERSION_ESQUEMA, type Proyecto } from 
 const proyecto = (modelo: unknown, opciones?: OpcionesCompilacion): Proyecto => ({ esquema: VERSION_ESQUEMA, modelo: modelo as ModeloFisico, ...(opciones ? { opciones } : {}) });
 
 describe("criterio 1 de A0: el esquema", () => {
-  it("el versionado es el que sale de los tipos (bun scripts/generar-esquema.ts)", () => {
-    expect(readFileSync(RUTA_ESQUEMA, "utf8").replace(/\r\n/g, "\n")).toBe(textoEsquema());
+  it("los versionados (el del proyecto y el estructural del compilador, A-1) son los que salen de los tipos (bun run esquema)", () => {
+    const e = generarEsquema();
+    expect(readFileSync(RUTA_ESQUEMA, "utf8").replace(/\r\n/g, "\n")).toBe(`${JSON.stringify(e, null, 2)}\n`);
+    expect(readFileSync(RUTA_ESQUEMA_FISICO, "utf8").replace(/\r\n/g, "\n")).toBe(textoEsquemaFisico(e));
   }, 120_000);
 
   it("el ejemplo de la skill (.claude/skills/fem/ejemplo.json) es válido y compila sin avisos", () => {

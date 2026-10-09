@@ -92,7 +92,7 @@ export const CATALOGO: Caso[] = [
   ["giro no numérico", (f) => (f.pilares![1] = m({ ...f.pilares![1], giro: "30" })), "fisico/valor-no-valido", "B"],
   ["vínculo de base desconocido", (f) => (f.pilares![3] = m({ ...f.pilares![3], base: "deslizante" })), "fisico/valor-no-valido", "E"],
   ["liberaciones con 5 valores", (f) => (f.pilares![0] = m({ ...f.pilares![0], liberaciones: { base: [true, false, false, false, false] } })), "fisico/valor-no-valido", "A"],
-  ["liberaciones con una clave desconocida", (f) => (f.pilares![0] = m({ ...f.pilares![0], liberaciones: { medio: [true, false, false, false, false, false] } })), "fisico/valor-no-valido", "A"],
+  ["liberaciones con una clave desconocida", (f) => (f.pilares![0] = m({ ...f.pilares![0], liberaciones: { medio: [true, false, false, false, false, false] } })), "fisico/campo-desconocido", "A"], // A-1: antes, fisico/valor-no-valido
   ["pilares solapados", (f) => f.pilares!.push({ id: "A2", x: 0.02, y: 0, desde: "C", hasta: "P1", seccion: "p30" }), "topologia/pilares-solapados", "A2"],
   ["pilar apeado sin nada que le llegue", (f) => f.pilares!.push({ id: "Ap", x: 3, y: 2.5, desde: "P1", hasta: "P2", seccion: "p30", base: "ninguno" }), "pilar/arranque-sin-apoyo", "Ap"],
   ["cabeza de pilar entera dentro del canto de la viga", (f) => (f.plantas[0] = { ...f.plantas[0]! }) && (f.plantas[1] = { ...f.plantas[1]!, altura: 0.4 }), "pilar/tramo-flexible-nulo", "A", { factorZonaRigida: 1 }],

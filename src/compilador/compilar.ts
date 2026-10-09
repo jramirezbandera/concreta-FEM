@@ -3,7 +3,7 @@
  * reglas y decisiones por defecto en `docs/fem3d/compilador.md`.
  *
  * Pasos, cada uno con sus diagnósticos (si alguno deja un error, la compilación no sigue):
- * 1. Esquema, referencias y cotas (`validar.ts`).
+ * 1. Campos desconocidos (`campos.ts`, A-1); esquema, referencias y cotas (`validar.ts`).
  * 2. Topología por planta con dos tolerancias (`topologia.ts`).
  * 2b. Vértices de los muros ajustados (`muros.ts`) y viguetas de los paños unidireccionales, con
  *     sus nudos (`unidireccional.ts`, C4): son nudos de C1 más para las losas y los muros.
@@ -19,6 +19,7 @@
  */
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, ModeloAnalitico, NudoAnalitico, Restriccion, Vec3 } from "../motor/modelo.ts";
+import { camposDesconocidos } from "./campos.ts";
 import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PERDIDAS } from "./cargas.ts";
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type OpcionesResueltas } from "./fisico.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
@@ -116,7 +117,7 @@ export function compilar(fisico: ModeloFisico, opciones: OpcionesCompilacion = {
   try {
     const op = resolverOpciones(opciones);
     huella = huellaCompilacion(fisico, op);
-    return compilarModelo(fisico, op, huella);
+    return compilarModelo(fisico, op, huella, opciones);
   } catch (e) {
     const texto = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
     return {
@@ -135,7 +136,7 @@ export function compilar(fisico: ModeloFisico, opciones: OpcionesCompilacion = {
 
 const ahora = () => performance.now();
 
-function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: string): ResultadoCompilacion {
+function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: string, opciones: OpcionesCompilacion): ResultadoCompilacion {
   const diag = new Diagnosticos();
   const tiempos: Record<string, number> = {};
   let t0 = ahora();
@@ -146,9 +147,10 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   };
   const fallo = (): ResultadoCompilacion => ({ valido: false, diagnosticos: diag.lista, huella });
 
+  camposDesconocidos(fisico, opciones, diag);
   const ctx = validar(fisico, op, diag);
   marca("validacion");
-  if (!ctx) return fallo();
+  if (!ctx || diag.hayErrores) return fallo();
   const topo = construirTopologia(ctx, diag);
   marca("topologia");
   if (diag.hayErrores) return fallo();
