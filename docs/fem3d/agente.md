@@ -2,7 +2,7 @@
 
 > **Qué es.** Una capa para que un agente de IA (Claude Code u otro) pueda manejar el motor de punta a punta: crear y editar el modelo físico, compilar, calcular, consultar resultados, revisarlos y, más adelante, leer planos y exportar a CAD. **Fecha:** 2026-10-05.
 >
-> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). A3 superada el 2026-10-09; el informe está en `fase-a3.md` y lo fijado al empezar, en §8. Lo siguiente es A4.
+> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). A3 superada el 2026-10-09; el informe está en `fase-a3.md` y lo fijado al empezar, en §8. A4 en curso: lo fijado al empezar está en §10.
 >
 > **Veredicto.** Es viable, y el repositorio está mejor preparado de lo habitual (§1). El objetivo realista no es «todo con IA», sino que **la IA haga casi todo el tecleo y la iteración, y el ingeniero revise y firme** sobre un informe y un visor. Lo difícil no es la interfaz con el agente. Son los extremos de la cadena (leer planos en imagen y sacar planos de armado) y un riesgo nuevo: **el fallo silencioso pasa del motor al modelo**. El motor puede estar perfecto y el modelo tener una carga, un pilar o una unidad mal puestos (§4, regla A3).
 
@@ -286,3 +286,62 @@ Una trampa N **sólo cuenta si se pregunta** (o el agente deja la carga fuera y 
 3. Tras las respuestas, cada modelo coincide con la referencia a 1e-6 (`validacion/a2/comparar.ts`).
 4. El agente ejecuta `fem revisar`, explica sus avisos y no ejecuta `fem firmar`.
 5. Se registran las rondas, las preguntas (pertinentes o no), el tiempo y los tokens.
+
+## 10. A4: lo que se fija al empezar (2026-10-09)
+
+Lo propuso el agente y el usuario lo aceptó el 2026-10-09, antes de escribir código: el rasterizado, las vistas, la puerta de detección visual y las figuras del informe. La axonometría del edificio queda fuera (decisión del usuario).
+
+**Qué es.**
+- `src/agente/render/` (puro): una **escena** por planta y vista, con primitivas (polígonos con huecos, polilíneas, marcas y textos) en coordenadas del modelo, y su SVG. Todo número rotulado sale de las consultas de A1 o de las de C5, nunca de la imagen.
+- `fem render <proyecto> [--planta P] [--vista V]… [--caso C | --combinacion E | --situacion S]`: escribe `.fem/<huella>/render/<planta>-<vista>.svg` y `.png`, y devuelve un JSON con las rutas, la combinación, la escala y los extremos rotulados.
+  - Las vistas del modelo no necesitan el cálculo, y `modelo` y `diagnosticos` se dibujan también si el modelo no compila.
+  - La skill dice que un número se cita del JSON o de una consulta, nunca leído de la imagen.
+- **PNG:** sólo en la CLI, con `@resvg/resvg-wasm` 2.6.2 (MPL-2.0, ya admitida) y Roboto 2.138 regular y negrita (Apache-2.0, de `googlefonts/roboto`). Las fuentes van versionadas en `cli/fuentes/` con su sha256, sin fuentes del sistema, así que el PNG es determinista. Medido: los mismos bytes en Bun y en Node.
+
+**Vistas** (en planta, vistas desde arriba, con X a la derecha e Y hacia arriba):
+
+| Vista | Qué dibuja |
+|---|---|
+| `modelo` | Losas (con huecos; reticular con sus ábacos), paños con la dirección de las viguetas, vigas con su ancho, pilares con su sección orientada, muros con su espesor y sus huecos, apoyos y bandas, con los ids. Los pilares y muros que llegan desde abajo, rellenos; los que sólo arrancan hacia arriba, en contorno |
+| `cargas` | Las cargas de un caso en la planta: de superficie (su zona o su losa), lineales, de viga, de pilar y puntuales, con su valor. Si el caso lleva el peso propio, lo dice |
+| `diagnosticos` | El modelo atenuado y una marca numerada en cada objeto con un error o un aviso (compilación y sensatez previa), con la lista al lado. Lo que no tiene sitio en planta va sólo en la lista |
+| `malla` | Las láminas y barras de la planta; ábacos y huellas rígidas, sombreados |
+| `uz`, `m11`, `m22`, `m12`, `v13`, `v23` | Isovalores en bandas sobre las losas y los paños de la planta (uz también en las viguetas, por sus nudos), en una combinación. Con varias, la que da el mayor valor absoluto en la planta, y se dice cuál. Con los extremos rotulados |
+| `vigas-my`, `vigas-vz` | Diagrama de cada viga y vigueta de la planta, en su envolvente sobre las combinaciones, con el máximo y el mínimo de cada vano rotulados |
+| `pilares-n` | Axil de cada tramo de pilar que llega a la planta, en su envolvente (máximo y mínimo) |
+
+Combinaciones por defecto: las de las consultas de A1 (`combinaciones.ts`); si los casos no llevan su acción, la «gravedad» de A3 (factor 1 en uz, 1,4 en los esfuerzos).
+
+**Isovalores.**
+- Bandas por triángulos (cada lámina en dos), con los valores nodales: uz de los desplazamientos, y los momentos y cortantes de los campos SPR (`CamposLaminas`, E5) en los ejes de la lámina.
+- Las bandas iguales se funden en un solo contorno por banda, sin las costuras del antialias entre triángulos.
+- Diez bandas con límites redondos. Paleta secuencial para uz y divergente, centrada en 0, para los esfuerzos.
+
+**Criterios de paso.**
+1. **Fidelidad.** Lo dibujado es exactamente lo de las consultas:
+   - las losas, pilares, vigas, muros y cargas de la escena son los del modelo físico de la planta, ni uno más;
+   - las bandas cubren cada losa sin huecos ni solapes (suma de áreas a 1e-9), y un punto al azar cae en la banda de su valor interpolado;
+   - los extremos rotulados coinciden con `flechas`, `pieza` y `Consultas.pilar`; las ordenadas de los diagramas, con `Consultas.diagrama`.
+2. **Determinismo.** El mismo proyecto da el mismo SVG byte a byte, aunque se reordene su JSON, y el mismo sha256 del PNG en Bun, en Node y en el CI. Un PNG queda congelado en un test.
+3. **Tamaño.**
+   - El lado mayor del PNG mide ≤ 1568 px y ningún texto baja de 11 px.
+   - En el edificio objetivo: ≤ 2 s por planta y vista (con el cálculo hecho) e `informe.html` ≤ 8 MB.
+4. **Puerta: detección visual.** Un subagente recibe la descripción de A2 y sólo las PNG del modelo (`modelo` y `cargas` de cada caso, de cada planta), sin el JSON ni la CLI, y lista lo que no cuadra.
+   - Ocho mutaciones, cada una en un proyecto aparte, que el compilador acepta y A3 no avisa (se comprueba). Tiene que encontrar al menos seis:
+     - edificio objetivo con losas:
+       1. un pilar interior desplazado 1 m en X en toda su altura;
+       2. el hueco de la escalera olvidado en una planta;
+       3. una viga secundaria que acaba 0,6 m antes de la principal;
+       4. la zona de 3 kN/m² de Q de una planta, desplazada un vano en X;
+       5. un pilar de 30 × 50 de una columna girada con giro 0;
+       6. la tabiquería de una planta con un vértice errado (22,5, 21,5 → 22,5, 15,5);
+     - retícula con núcleo:
+       7. el hueco de la losa fuera del núcleo (desplazado 6 m en X);
+       8. la puerta del núcleo en el tercer lado.
+   - En los dos proyectos sin mutar, ninguna discrepancia falsa, o cada una justificada.
+   - Se registran los tokens y el tiempo.
+5. **Informe.**
+   - `informe.html` lleva, por planta, el SVG de `modelo` y el de `uz` de la combinación de flechas de A3.
+   - `informe.md` lista cada figura con el sha256 de su SVG, así que la firma también cubre las figuras.
+
+**Fuera de A4:** la axonometría; el plano de fondo, que va con A5; las vistas en alzado de muros y pórticos.
