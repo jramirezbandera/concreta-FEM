@@ -19,6 +19,7 @@ Trabajas sobre **un único fichero `proyecto.json`**: es la única fuente de ver
 4. **Ningún resultado vale si `ok` no es `true`.** Los errores se corrigen en el fichero, por el `id` que nombra cada diagnóstico. Los avisos se leen todos y se explican al usuario si afectan al modelo.
 5. **Ningún resultado se da por bueno sin `fem revisar`.** Sus avisos de sensatez (`sensatez/…`) se corrigen si son un error del modelo o se explican al usuario si son legítimos. Nunca los silencies cambiando el modelo para que desaparezcan.
 6. **Nunca ejecutas `fem firmar`.** Firmar es del ingeniero, después de leer el informe. Tú le dices dónde está el informe y qué avisos tiene.
+7. **Un número nunca se lee de una imagen.** Las figuras de `fem render` sirven para ver el modelo y encontrar lo raro. El valor que cites sale del JSON de `render` (`extremos`) o de una consulta.
 
 ## Flujo
 
@@ -28,6 +29,7 @@ fem validar proyecto.json                    # esquema + compilación; corrige h
 fem resumen proyecto.json                    # comprueba el modelo: plantas, piezas, cargas por planta y caso
 fem calcular proyecto.json                   # calcula (o reutiliza los resultados de la misma huella)
 fem consultar proyecto.json <consulta> …     # resultados acotados
+fem render proyecto.json [--vista V] [--planta P]   # PNG y SVG de cada planta, para mirarlos
 fem revisar proyecto.json                    # sensatez e informe de revisión (Markdown y HTML) de esta huella
 ```
 
@@ -51,6 +53,32 @@ fem revisar proyecto.json                    # sensatez e informe de revisión (
 - luz/canto de vigas y losas, flechas, desplomes y axil reducido.
 
 Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe en `.fem/<huella>/informe.md` e `informe.html`, y dice si esa huella está firmada (`firma`). Un aviso legítimo (una transición, un voladizo) se explica; uno que delata un error del modelo, se corrige en el fichero.
+
+### Render
+
+`fem render` dibuja cada planta vista desde arriba (X a la derecha, Y hacia arriba). Escribe un PNG (de 1568 px de lado como mucho, para mirarlo con tu herramienta de lectura de imágenes) y un SVG por planta y vista en `.fem/<huella>/render/`, y devuelve la lista en `figuras`, con la carpeta en `carpeta`.
+
+| Vista | Qué dibuja |
+|---|---|
+| `modelo` (por defecto) | Losas, paños con la dirección de sus viguetas, vigas con su ancho, pilares con su sección orientada (rellenos los que llegan desde abajo; en blanco los que arrancan), muros con sus huecos del piso de debajo, apoyos y bandas, con sus ids |
+| `cargas` | Las cargas de cada caso (`--caso C` para uno) en la planta, con su valor |
+| `diagnosticos` | Una marca numerada en cada objeto con un error o un aviso, con la lista al lado |
+| `malla` | Láminas y barras de la planta |
+| `uz`, `m11`, `m22`, `m12`, `v13`, `v23` | Isovalores en las losas, en la combinación que gobierna en la planta |
+| `vigas-my`, `vigas-vz` | Diagramas envolventes de vigas y viguetas, con el máximo y el mínimo de cada vano |
+| `pilares-n` | Axil de cada pilar que llega a la planta |
+
+- `--vista` y `--planta` admiten varias, separadas por comas o repetidas; sin `--planta`, todas.
+- `modelo`, `cargas` y `diagnosticos` se dibujan aunque el modelo no compile: así se ve dónde está el error.
+- Las combinaciones son las de `consultar`; sin acciones en los casos, la suma de los gravitatorios (×1 en uz y ×1,4 en los esfuerzos). Con `--caso` y `--combinacion`, como en las consultas.
+
+**Mira `modelo` y `cargas` de cada planta antes de calcular, y compáralos con la descripción:**
+- pilares fuera de su alineación o girados;
+- vigas que no llegan a su apoyo;
+- huecos que faltan o están fuera de sitio;
+- cargas en la zona, la planta o el caso equivocados.
+
+Lo que no cuadre, pregúntalo o corrígelo en el fichero, como un diagnóstico.
 
 ## El fichero
 
