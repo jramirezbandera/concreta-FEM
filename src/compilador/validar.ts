@@ -3,6 +3,7 @@
  * diagnóstico que nombra el objeto físico por su `id`; nada lanza, ni con datos basura (la
  * entrada puede venir de un fichero). Si hay errores, la compilación no sigue.
  */
+import { PSI_NOMBRES, type PsiNombrado } from "../combinaciones/psi.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
@@ -924,7 +925,9 @@ function validarAcciones(casos: readonly CasoFisico[], caso: ReadonlyMap<string,
     const variable = a.tipo === "Q" || a.tipo === "S" || a.tipo === "W" || a.tipo === "T";
     if (a.psi !== undefined) {
       const p = a.psi;
-      if (!esObjeto(p) || !["psi0", "psi1", "psi2"].every((k) => num(p[k]) && (p[k] as number) >= 0 && (p[k] as number) <= 1)) mal(c.id, "ψ tiene que ser { psi0, psi1, psi2 }, números entre 0 y 1");
+      if (typeof p === "string") {
+        if (!PSI_NOMBRES.includes(p as PsiNombrado)) mal(c.id, `ψ «${p}» no es ninguno de los nombres admitidos (${PSI_NOMBRES.join(", ")})`);
+      } else if (!esObjeto(p) || !["psi0", "psi1", "psi2"].every((k) => num(p[k]) && (p[k] as number) >= 0 && (p[k] as number) <= 1)) mal(c.id, `ψ tiene que ser un nombre (${PSI_NOMBRES.join(", ")}) o { psi0, psi1, psi2 }, números entre 0 y 1`);
     } else if (variable) mal(c.id, `la acción variable (${a.tipo}) necesita sus ψ`);
     if (a.familia !== undefined && typeof a.familia !== "string") mal(c.id, "la familia tiene que ser un texto");
     if (a.permanente !== undefined && a.permanente !== "peso" && a.permanente !== "empuje" && a.permanente !== "agua") mal(c.id, "permanente tiene que ser peso, empuje o agua");

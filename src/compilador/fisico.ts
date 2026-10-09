@@ -40,6 +40,7 @@
  *   180° son las mismas), y z = +Z; sus estaciones van desde su primer extremo.
  */
 import type { CasoCarga } from "../combinaciones/generador.ts";
+import type { Psi, PsiNombrado } from "../combinaciones/psi.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
@@ -179,8 +180,21 @@ export interface CasoFisico {
    * familia, dirección…), para generar las combinaciones CTE/NCSE de las consultas. No cambia la
    * compilación. Sin ella, las consultas van por caso o con combinaciones dadas por sus factores.
    */
-  accion?: Omit<CasoCarga, "id">;
+  accion?: AccionCaso;
 }
+
+/**
+ * La acción de un caso: los datos de `CasoCarga` con ψ por su nombre o por sus valores (A-2).
+ */
+export type AccionCaso = Omit<CasoCarga, "id" | "psi"> & {
+  /**
+   * ψ de la tabla 4.2 del DB SE (Q, S, W y T). Mejor por su nombre, para no escribir los números de
+   * la norma: "uso-A" … "uso-G" (la categoría de uso de la tabla 3.1 del DB SE-AE), "nieve-hasta-1000"
+   * o "nieve-mas-de-1000" (por la altitud del emplazamiento), "viento" o "temperatura". O sus valores,
+   * { psi0, psi1, psi2 }, si son otros.
+   */
+  psi?: Psi | PsiNombrado;
+};
 
 /**
  * Cargas físicas (C1). Las repartidas van por unidad de longitud de la pieza (kN/m), en ejes

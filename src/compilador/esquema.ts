@@ -183,12 +183,15 @@ export function validarEsquema(raiz: EsquemaRaiz, dato: unknown): Diagnostico[] 
         return validar(rama, v, lugar, errores);
       }
     }
+    // Antes que una variante que no admite el tipo del dato, una que sí (un nombre mal escrito en
+    // `Psi | "uso-A" | …` es un valor que no está en la lista, no un objeto que falta)
+    const coste = (e: Error_[]) => e.length + (e.every((x) => x.codigo === "esquema/tipo" && x.lugar.ruta === lugar.ruta) ? 1000 : 0);
     let mejor: Error_[] | null = null;
     for (const r of ramas) {
       const e: Error_[] = [];
       validar(r, v, lugar, e);
       if (!e.length) return;
-      if (!mejor || e.length < mejor.length) mejor = e;
+      if (!mejor || coste(e) < coste(mejor)) mejor = e;
     }
     // Si ninguna variante admite el tipo del dato, un solo error con los tipos admitidos
     const tipos = resueltas.flatMap((r) => (r.type === undefined ? (r.anyOf ? ["varios"] : []) : Array.isArray(r.type) ? r.type : [r.type]));

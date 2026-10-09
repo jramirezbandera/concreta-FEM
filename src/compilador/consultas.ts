@@ -26,6 +26,7 @@
  * diagnóstico con el id (`Respuesta`).
  */
 import { generarCombinaciones, type CasoCarga, type Combinacion, type OpcionesCombinaciones } from "../combinaciones/generador.ts";
+import { psiDe } from "../combinaciones/psi.ts";
 import { DiagramaBarra } from "../elementos/cargasBarra.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "../motor/modelo.ts";
@@ -701,7 +702,11 @@ export class Consultas {
   combinaciones(opciones: OpcionesCombinaciones = {}): Respuesta<Combinacion[]> {
     const sin = this.ctx.casos.filter((c) => !c.accion).map((c) => c.id);
     if (sin.length) return this.no("consulta/sin-accion", `Para generar las combinaciones, todos los casos tienen que llevar su acción (tipo, ψ…); no la llevan: ${sin.join(", ")}.`, sin);
-    const casos: CasoCarga[] = this.ctx.casos.map((c) => ({ ...c.accion!, id: c.id }));
+    // A-2: ψ por su nombre, a sus valores
+    const casos: CasoCarga[] = this.ctx.casos.map((c) => {
+      const { psi, ...a } = c.accion!;
+      return { ...a, ...(psi !== undefined ? { psi: psiDe(psi) } : {}), id: c.id };
+    });
     try {
       return { valido: true, valor: generarCombinaciones(casos, opciones), diagnosticos: [] };
     } catch (e) {

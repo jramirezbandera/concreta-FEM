@@ -150,6 +150,12 @@ export function generarEsquema(): Esquema {
       const ORDEN = ["string", "number", "boolean", "null"];
       if (primitivos)
         return { type: [...ramas.map((u) => (u.flags & ts.TypeFlags.String ? "string" : u.flags & ts.TypeFlags.Number ? "number" : "null")), ...(conBoolean ? ["boolean"] : [])].sort((a, b) => ORDEN.indexOf(a) - ORDEN.indexOf(b)) };
+      // Los literales de una unión con objetos (`Psi | "uso-A" | …`, A-2), en un solo enum
+      const literales = conBoolean ? [] : ramas.filter((u) => literal(u) !== undefined && literal(u) !== null);
+      if (literales.length > 1 && literales.length < ramas.length) {
+        const otras = ramas.filter((u) => !literales.includes(u)).map((u) => aEsquema(u));
+        return { anyOf: [...otras, { enum: literales.map(literal).sort((a, b) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0)) }] };
+      }
       const variantes = ramas.map((u) => {
         const e = aEsquema(u);
         const s = u.getSymbol();
@@ -170,7 +176,8 @@ export function generarEsquema(): Esquema {
       const [el] = tc.getTypeArguments(t as ts.TypeReference);
       return { type: "array", items: aEsquema(el!) };
     }
-    if (t.flags & ts.TypeFlags.Object) {
+    // Objetos y sus intersecciones (`Omit<CasoCarga, …> & { psi?: … }`, A-2)
+    if (t.flags & (ts.TypeFlags.Object | ts.TypeFlags.Intersection)) {
       const propiedades: Record<string, Esquema> = {};
       const obligatorias: string[] = [];
       for (const p of tc.getPropertiesOfType(t)) {

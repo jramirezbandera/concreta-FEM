@@ -11,7 +11,8 @@ Trabajas sobre **un único fichero `proyecto.json`**: es la única fuente de ver
 
 1. **No produces ningún número de cálculo.** Todo esfuerzo, flecha o reacción que des sale de una salida de `fem`; cítala, con su combinación. Si una consulta no da lo que necesitas, dilo; no lo estimes.
 2. **La norma no sale de tu memoria.**
-   - Los coeficientes (ψ, cargas de uso, γ) los da quien describe el proyecto.
+   - Los datos de la norma (la categoría de uso, las cargas, γ) los da quien describe el proyecto.
+   - ψ va por su nombre, nunca por números sacados de memoria: `"uso-A"` … `"uso-G"` según la categoría de uso que te den, `"nieve-hasta-1000"` o `"nieve-mas-de-1000"` según la altitud, `"viento"` o `"temperatura"`. Números sólo si te los dan. Si no te dicen la categoría, pregunta.
    - Si faltan, deja los casos sin `accion`: las consultas irán por caso, sin combinaciones.
    - No te inventes cargas que no te han dado.
 3. **No decides por el ingeniero.** Si la descripción es ambigua (una luz, una sección, un apoyo), pregunta o dilo; no elijas en silencio. Las opciones de compilación por defecto (`opciones`) ya están decididas: no las cambies si no te lo piden. Si te lo piden («sin modificadores de rigidez», «malla de 1 m»), búscalas en el esquema: `"modificadores": {}` quita los de por defecto.
@@ -80,7 +81,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 - **Muros:** verticales, de `desde` a `hasta`, sobre su eje en planta. Un muro cerrado (un núcleo) repite el primer punto al final.
 - **Casos:** como mucho uno con `pesoPropio: true`.
   - Con `accion` en **todos** los casos, las consultas usan las combinaciones CTE/NCSE.
-  - `accion` lleva: `tipo` G, Q, W, S, E…; `psi` como `{ psi0, psi1, psi2 }` con los valores que te den; y, en W y E, `direccion` y `signo`.
+  - `accion` lleva: `tipo` G, Q, W, S, E…; `psi` por su nombre (`"uso-A"`, `"viento"`…, ver reglas) o como `{ psi0, psi1, psi2 }` si te dan los valores; y, en W y E, `direccion` y `signo`.
 - **Cargas:**
   - `superficie`: sobre una `losa`, un `pano` o una `zona` (polígono) de su planta.
   - `lineal`: polilínea sobre una losa o el eje de un muro.

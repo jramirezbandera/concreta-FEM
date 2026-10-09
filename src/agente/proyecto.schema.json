@@ -35,6 +35,74 @@
   ],
   "additionalProperties": false,
   "$defs": {
+    "AccionCaso": {
+      "type": "object",
+      "properties": {
+        "tipo": {
+          "$ref": "#/$defs/TipoAccion"
+        },
+        "familia": {
+          "type": "string",
+          "description": "Familia excluyente: como mucho un caso de la familia por combinación."
+        },
+        "permanente": {
+          "enum": [
+            "agua",
+            "empuje",
+            "peso"
+          ],
+          "description": "G: fila de la tabla 4.1 (peso propio y del terreno por defecto)."
+        },
+        "direccion": {
+          "enum": [
+            "X",
+            "Y"
+          ],
+          "description": "W, E y N: dirección horizontal; W y N, además, el signo."
+        },
+        "signo": {
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "derivadoDe": {
+          "type": "string",
+          "description": "N: id del caso vertical del que deriva (Hi = φ·Ni)."
+        },
+        "duracion": {
+          "$ref": "#/$defs/Duracion",
+          "description": "Por defecto: G permanente, Q media, S corta, W y T corta, E y A instantánea; N la de su origen."
+        },
+        "psi": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Psi"
+            },
+            {
+              "enum": [
+                "nieve-hasta-1000",
+                "nieve-mas-de-1000",
+                "temperatura",
+                "uso-A",
+                "uso-B",
+                "uso-C",
+                "uso-D",
+                "uso-E",
+                "uso-G",
+                "viento"
+              ]
+            }
+          ],
+          "description": "ψ de la tabla 4.2 del DB SE (Q, S, W y T). Mejor por su nombre, para no escribir los números de\nla norma: \"uso-A\" … \"uso-G\" (la categoría de uso de la tabla 3.1 del DB SE-AE), \"nieve-hasta-1000\"\no \"nieve-mas-de-1000\" (por la altitud del emplazamiento), \"viento\" o \"temperatura\". O sus valores,\n{ psi0, psi1, psi2 }, si son otros."
+        }
+      },
+      "required": [
+        "tipo"
+      ],
+      "additionalProperties": false,
+      "description": "La acción de un caso: los datos de `CasoCarga` con ψ por su nombre o por sus valores (A-2)."
+    },
     "ApoyoFisico": {
       "type": "object",
       "properties": {
@@ -473,53 +541,7 @@
           "description": "El peso propio de las piezas (γ·A) va a este caso. Como mucho, uno."
         },
         "accion": {
-          "type": "object",
-          "properties": {
-            "tipo": {
-              "$ref": "#/$defs/TipoAccion"
-            },
-            "familia": {
-              "type": "string",
-              "description": "Familia excluyente: como mucho un caso de la familia por combinación."
-            },
-            "psi": {
-              "$ref": "#/$defs/Psi",
-              "description": "ψ de la tabla 4.2 (Q, S, W y T)."
-            },
-            "permanente": {
-              "enum": [
-                "agua",
-                "empuje",
-                "peso"
-              ],
-              "description": "G: fila de la tabla 4.1 (peso propio y del terreno por defecto)."
-            },
-            "direccion": {
-              "enum": [
-                "X",
-                "Y"
-              ],
-              "description": "W, E y N: dirección horizontal; W y N, además, el signo."
-            },
-            "signo": {
-              "enum": [
-                -1,
-                1
-              ]
-            },
-            "derivadoDe": {
-              "type": "string",
-              "description": "N: id del caso vertical del que deriva (Hi = φ·Ni)."
-            },
-            "duracion": {
-              "$ref": "#/$defs/Duracion",
-              "description": "Por defecto: G permanente, Q media, S corta, W y T corta, E y A instantánea; N la de su origen."
-            }
-          },
-          "required": [
-            "tipo"
-          ],
-          "additionalProperties": false,
+          "$ref": "#/$defs/AccionCaso",
           "description": "C5.4 (C5-f): la acción del caso, con los datos de `CasoCarga` de `src/combinaciones/` (tipo, ψ,\nfamilia, dirección…), para generar las combinaciones CTE/NCSE de las consultas. No cambia la\ncompilación. Sin ella, las consultas van por caso o con combinaciones dadas por sus factores."
         }
       },

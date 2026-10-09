@@ -34,3 +34,29 @@ export function psiNieve(altitudMayorDe1000m: boolean): Psi {
 export const PSI_VIENTO: Readonly<Psi> = { psi0: 0.6, psi1: 0.5, psi2: 0 };
 export const PSI_TEMPERATURA: Readonly<Psi> = { psi0: 0.6, psi1: 0.5, psi2: 0 };
 export const PSI_TERRENO: Readonly<Psi> = { psi0: 0.7, psi1: 0.7, psi2: 0.7 };
+
+/**
+ * ψ por su nombre (A-2): la fila de la tabla 4.2 sin escribir sus números, para que quien modela
+ * (un agente) no los saque de memoria. "uso-X" es la categoría de uso X de la tabla 3.1 del DB SE-AE.
+ */
+export type PsiNombrado = "uso-A" | "uso-B" | "uso-C" | "uso-D" | "uso-E" | "uso-G" | "nieve-hasta-1000" | "nieve-mas-de-1000" | "viento" | "temperatura";
+
+const NOMBRADOS: Record<PsiNombrado, () => Psi> = {
+  "uso-A": () => psiUso("A"),
+  "uso-B": () => psiUso("B"),
+  "uso-C": () => psiUso("C"),
+  "uso-D": () => psiUso("D"),
+  "uso-E": () => psiUso("E"),
+  "uso-G": () => psiUso("G"),
+  "nieve-hasta-1000": () => psiNieve(false),
+  "nieve-mas-de-1000": () => psiNieve(true),
+  viento: () => ({ ...PSI_VIENTO }),
+  temperatura: () => ({ ...PSI_TEMPERATURA }),
+};
+
+export const PSI_NOMBRES = Object.keys(NOMBRADOS) as PsiNombrado[];
+
+/** Los ψ de un nombre o de sus valores. */
+export function psiDe(p: Psi | PsiNombrado): Psi {
+  return typeof p === "string" ? NOMBRADOS[p]() : p;
+}

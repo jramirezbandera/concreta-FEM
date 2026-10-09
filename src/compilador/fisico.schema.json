@@ -4,6 +4,67 @@
   "title": "Modelo físico de Concreta FEM 3D (estructura)",
   "$ref": "#/$defs/ModeloFisico",
   "$defs": {
+    "AccionCaso": {
+      "type": "object",
+      "properties": {
+        "tipo": {
+          "$ref": "#/$defs/TipoAccion"
+        },
+        "familia": {
+          "type": "string"
+        },
+        "permanente": {
+          "enum": [
+            "agua",
+            "empuje",
+            "peso"
+          ]
+        },
+        "direccion": {
+          "enum": [
+            "X",
+            "Y"
+          ]
+        },
+        "signo": {
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "derivadoDe": {
+          "type": "string"
+        },
+        "duracion": {
+          "$ref": "#/$defs/Duracion"
+        },
+        "psi": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Psi"
+            },
+            {
+              "enum": [
+                "nieve-hasta-1000",
+                "nieve-mas-de-1000",
+                "temperatura",
+                "uso-A",
+                "uso-B",
+                "uso-C",
+                "uso-D",
+                "uso-E",
+                "uso-G",
+                "viento"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "tipo"
+      ],
+      "additionalProperties": false
+    },
     "ApoyoFisico": {
       "type": "object",
       "properties": {
@@ -427,47 +488,7 @@
           "type": "boolean"
         },
         "accion": {
-          "type": "object",
-          "properties": {
-            "tipo": {
-              "$ref": "#/$defs/TipoAccion"
-            },
-            "familia": {
-              "type": "string"
-            },
-            "psi": {
-              "$ref": "#/$defs/Psi"
-            },
-            "permanente": {
-              "enum": [
-                "agua",
-                "empuje",
-                "peso"
-              ]
-            },
-            "direccion": {
-              "enum": [
-                "X",
-                "Y"
-              ]
-            },
-            "signo": {
-              "enum": [
-                -1,
-                1
-              ]
-            },
-            "derivadoDe": {
-              "type": "string"
-            },
-            "duracion": {
-              "$ref": "#/$defs/Duracion"
-            }
-          },
-          "required": [
-            "tipo"
-          ],
-          "additionalProperties": false
+          "$ref": "#/$defs/AccionCaso"
         }
       },
       "required": [
