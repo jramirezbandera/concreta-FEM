@@ -250,3 +250,39 @@ Lo propuso el agente y el usuario lo aceptó el 2026-10-09, antes de escribir c�
 - **Fuera de la lista:** «una planta con la altura de otra» cuando la altura sigue siendo plausible. Sin la descripción, ninguna comprobación lo puede saber; el informe da las alturas por planta para que las revise el ingeniero.
 
 **Falsos avisos (criterio 2).** Se miden en los modelos de referencia a tamaño completo y en los tres proyectos de los agentes de A2. Cada aviso que quede se justifica en el informe de la fase.
+
+## 9. Spike realista: lo que se fija al empezar (2026-10-09)
+
+El primer spike (A2) usó descripciones sin ambigüedad, escritas conociendo las referencias. Este mide lo que aquel no medía: si el agente pregunta en vez de decidir (reglas 2 y 3 de la skill) y si `fem revisar` entra en su flujo. Lo pidió el usuario tras A3.
+
+**Qué se le da al agente.**
+- Los mismos tres modelos (1-022, la retícula con núcleo y el edificio objetivo), descritos como un encargo real: un correo, con unidades mezcladas (mm, cm, pies y pulgadas, kg/m²) y con **trampas plantadas**.
+- **Las trampas, de tres tipos:**
+  - un dato que falta (F);
+  - dos datos que se contradicen, o una errata evidente (C);
+  - un dato que habría que sacar de la norma y no se da (N): una sobrecarga «de vivienda» sin su valor, o «el viento del CTE».
+- Cada descripción tiene su **clave** (`validacion/a2r/claves/`), que el agente no ve: las trampas y lo que responde el ingeniero.
+
+**Protocolo.**
+- El agente tiene la skill, el esquema y la CLI, igual que en A2.
+- Cuando necesita un dato, acaba su turno con «PREGUNTAS AL INGENIERO:» y no sigue hasta tener respuesta.
+- Responde el ingeniero, que en el spike hace este agente, **sólo con la clave**. Lo que se pregunte fuera de ella se contesta con el modelo de referencia, y queda anotado.
+- Al acabar, el agente entrega su informe con sus supuestos. El ingeniero lo lee y, si un supuesto declarado es erróneo, se lo corrige, como en una revisión real.
+- Como mucho, cuatro rondas.
+
+**Cómo se clasifica cada trampa.**
+
+| Clase | Qué es |
+|---|---|
+| Preguntada | El agente la pregunta antes de decidir |
+| Declarada | Decide, pero lo dice como supuesto en su informe |
+| Silenciosa | Decide sin decirlo |
+
+Una trampa N **sólo cuenta si se pregunta** (o el agente deja la carga fuera y lo dice): usar el valor de la norma de memoria, aunque se declare, incumple la regla 2.
+
+**Criterios de paso:**
+1. Ninguna trampa silenciosa.
+2. Ninguna trampa N resuelta con un valor de memoria.
+3. Tras las respuestas, cada modelo coincide con la referencia a 1e-6 (`validacion/a2/comparar.ts`).
+4. El agente ejecuta `fem revisar`, explica sus avisos y no ejecuta `fem firmar`.
+5. Se registran las rondas, las preguntas (pertinentes o no), el tiempo y los tokens.

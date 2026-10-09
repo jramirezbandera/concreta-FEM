@@ -2,9 +2,9 @@
  * Spike A2 (criterio 2): compara el proyecto que hace un agente desde la descripción en texto
  * (`descripciones/`) con el modelo de referencia, a 1e-6. Los `id` del agente pueden ser otros
  * (salvo los de los casos, que da la descripción), así que todo se empareja por posición:
- * - reacciones totales por caso: ΣF y ΣM respecto al origen;
+ * - reacciones totales por caso: ΣF y ΣM respecto al punto (0, 0) de la planta más baja;
  * - desplazamiento del maestro de cada planta [ux, uy, rz] por caso, con las plantas emparejadas
- *   por su cota;
+ *   por su altura sobre la más baja (marcar la cimentación como sótano sólo mueve el origen);
  * - flecha máxima de la losa de cada planta por caso;
  * - cinco piezas elegidas:
  *   · un pilar, por su (x, y) y la cota de la cabeza de su tramo: [N, Vy, Vz, T, My, Mz] en la
@@ -34,7 +34,11 @@ export const TOLERANCIA_A2 = 1e-6;
 interface Punto {
   x: number;
   y: number;
-  /** Cota de la cabeza del tramo (pilar) o de la planta (viga), m. */
+  /**
+   * Altura sobre la planta más baja (la de los arranques) de la cabeza del tramo (pilar) o de la
+   * planta (viga), m. Relativa, porque marcar la cimentación como sótano sólo mueve el origen de
+   * las cotas.
+   */
   cota: number;
 }
 
@@ -67,26 +71,26 @@ export const REFERENCIAS: Record<string, Referencia> = {
     fisico: reticulaConNucleo,
     opciones: { tamanoMalla: 1 },
     pilares: [
-      { x: 0, y: 0, cota: 0 },
-      { x: 6, y: 5, cota: 0 },
-      { x: 18, y: 15, cota: 0 },
+      { x: 0, y: 0, cota: 1.5 },
+      { x: 6, y: 5, cota: 1.5 },
+      { x: 18, y: 15, cota: 1.5 },
     ],
     vigas: [
-      { x: 3, y: 5, cota: 0 },
-      { x: 12, y: 12.5, cota: 0 },
+      { x: 3, y: 5, cota: 1.5 },
+      { x: 12, y: 12.5, cota: 1.5 },
     ],
   },
   edificio: {
     descripcion: "edificio.md",
     fisico: () => edificioObjetivoLosas(7),
     pilares: [
-      { x: 24, y: 15, cota: 0 },
-      { x: 54, y: 0, cota: 18 },
+      { x: 24, y: 15, cota: 1.5 },
+      { x: 54, y: 0, cota: 19.5 },
     ],
     vigas: [
-      { x: 21, y: 10, cota: 6 },
-      { x: 30, y: 12.5, cota: 12 },
-      { x: 9, y: 17.5, cota: 0 },
+      { x: 21, y: 10, cota: 7.5 },
+      { x: 30, y: 12.5, cota: 13.5 },
+      { x: 9, y: 17.5, cota: 1.5 },
     ],
   },
 };
@@ -94,7 +98,7 @@ export const REFERENCIAS: Record<string, Referencia> = {
 export interface Magnitudes {
   casos: string[];
   reacciones: number[][];
-  /** Por cota (redondeada a mm): [ux, uy, rz] por caso. */
+  /** Por altura sobre la planta más baja (redondeada a mm): [ux, uy, rz] por caso. */
   maestros: Map<string, number[][]>;
   /** Por cota: la flecha máxima de las losas de la planta, por caso. */
   flechas: Map<string, number[]>;
@@ -124,8 +128,11 @@ export function magnitudes(f: ModeloFisico, o: OpcionesCompilacion | undefined, 
   const casos = casosValidos(calcular(c.modelo));
   const q = new Consultas(f, c, casos, o);
   const nc = casos.length;
-  const cotas = cotasPlantas(f.plantas) as number[];
+  const absolutas = cotasPlantas(f.plantas) as number[];
+  const cotas = absolutas.map((z) => z - absolutas[absolutas.length - 1]!);
   const plantaEn = (z: number) => f.plantas.find((_, i) => Math.abs(cotas[i]! - z) < 1e-6)?.id;
+  // Momentos respecto al punto (0, 0) de la planta más baja: no dependen del origen de las cotas
+  const z0 = absolutas[absolutas.length - 1]!;
   const reacciones = casos.map((cs) => {
     const T = [0, 0, 0, 0, 0, 0];
     c.modelo.nudos.forEach((nd, n) => {
@@ -134,8 +141,8 @@ export function magnitudes(f: ModeloFisico, o: OpcionesCompilacion | undefined, 
       T[0]! += Fx;
       T[1]! += Fy;
       T[2]! += Fz;
-      T[3]! += R[6 * n + 3]! + nd.y * Fz - nd.z * Fy;
-      T[4]! += R[6 * n + 4]! + nd.z * Fx - nd.x * Fz;
+      T[3]! += R[6 * n + 3]! + nd.y * Fz - (nd.z - z0) * Fy;
+      T[4]! += R[6 * n + 4]! + (nd.z - z0) * Fx - nd.x * Fz;
       T[5]! += R[6 * n + 5]! + nd.x * Fy - nd.y * Fx;
     });
     return T;
