@@ -230,3 +230,49 @@ describe("A3: revisar y firmar", () => {
     expect((v.json.diagnosticos as { codigo: string }[]).map((d) => d.codigo)).toContain("sensatez/espesor");
   });
 });
+
+describe("A4: render", () => {
+  it("render escribe el PNG y el SVG de cada planta y vista, igual en Node y en Bun; el informe lleva las figuras", () => {
+    const f = reticulaConNucleo();
+    const ruta = escribir(f, undefined, { nombre: "Retícula" });
+    const r = fem(["render", ruta, "--vista", "modelo,uz", "--vista", "cargas", "--planta", "N1"]);
+    expect(r.codigo).toBe(0);
+    const j = r.json as { ok: boolean; huella: string; valido: boolean; figuras: { planta: string; vista: string; caso?: string; png: string; svg: string; ancho: number; alto: number; extremos: { que: string; valor: number }[] }[] };
+    expect(j.ok && j.valido).toBe(true);
+    expect(j.figuras.map((x) => `${x.vista}${x.caso ? `-${x.caso}` : ""}`)).toEqual(["modelo", "uz", ...f.casos.map((c) => `cargas-${c.id}`)]);
+    const carpeta = join(ruta, "..", ".fem", j.huella, "render");
+    for (const x of j.figuras) {
+      const png = readFileSync(join(carpeta, x.png));
+      expect(png.subarray(1, 4).toString()).toBe("PNG");
+      expect(png.readUInt32BE(16)).toBe(x.ancho);
+      expect(png.readUInt32BE(20)).toBe(x.alto);
+      expect(readFileSync(join(carpeta, x.svg), "utf8").startsWith("<svg")).toBe(true);
+    }
+    expect(j.figuras[1]!.extremos.map((x) => x.que)).toEqual(["uz máximo", "uz mínimo"]);
+    if (bun) {
+      const png = readFileSync(join(carpeta, j.figuras[1]!.png));
+      expect(fem(["render", ruta, "--vista", "uz", "--planta", "N1"], "bun").codigo).toBe(0);
+      expect(readFileSync(join(carpeta, j.figuras[1]!.png)).equals(png)).toBe(true);
+    }
+    const rev = fem(["revisar", ruta]).json as { huella: string };
+    const md = readFileSync(join(ruta, "..", ".fem", rev.huella, "informe.md"), "utf8");
+    expect(md).toMatch(/Figura: Planta N1: modelo\. SVG, sha256 [0-9a-f]{64}\./);
+    expect(md).toMatch(/Figura: Planta N1: uz \(mm\) en .+\. SVG, sha256 [0-9a-f]{64}\./);
+    expect(readFileSync(join(ruta, "..", ".fem", rev.huella, "informe.html"), "utf8")).toContain("<figure><figcaption>Planta N1: modelo</figcaption>\n<svg");
+  });
+
+  it("las vistas del modelo se dibujan aunque no compile; las de resultados, no; una vista o una planta desconocidas son orden mal dada", () => {
+    const f = reticulaConNucleo();
+    const mal = { ...f, pilares: [{ ...f.pilares![0]!, seccion: "no-existe" }, ...f.pilares!.slice(1)] };
+    const ruta = escribir(mal);
+    const m = fem(["render", ruta, "--vista", "modelo,diagnosticos", "--planta", "N1"]);
+    expect(m.codigo).toBe(0);
+    expect(m.json.valido).toBe(false);
+    expect((m.json.figuras as unknown[]).length).toBe(2);
+    const u = fem(["render", ruta, "--vista", "uz"]);
+    expect(u.codigo).toBe(1);
+    expect((u.json.diagnosticos as { codigo: string }[]).some((d) => d.codigo === "fisico/referencia")).toBe(true);
+    expect(fem(["render", ruta, "--vista", "planta-3d"]).codigo).toBe(2);
+    expect(fem(["render", ruta, "--planta", "N9"]).codigo).toBe(2);
+  });
+});

@@ -321,6 +321,37 @@ function geometriaPieza(c: Compilado, pieza: string): (s: number) => { p: Vec2; 
   };
 }
 
+/** Un punto de la envolvente de un esfuerzo a lo largo de una pieza (en un salto, uno por cada lado). */
+export interface PuntoEnvolvente {
+  s: number;
+  max: number;
+  min: number;
+}
+
+/**
+ * Envolvente de la componente `comp` de [N, Vy, Vz, T, My, Mz] a lo largo de una pieza, por tramos
+ * flexibles: en las estaciones de su diagrama en cada combinación (las de `Consultas.diagrama`) y en
+ * DIVISIONES partes iguales, por los dos lados de cada estación.
+ */
+export function envolventePieza(r: ResultadosRender, id: string, conjunto: ConjuntoCombinaciones, comp: number): PuntoEnvolvente[] {
+  const curva: PuntoEnvolvente[] = [];
+  for (const t of r.ep.tramos(id)) {
+    const D = conjunto.factores.map((f) => diagramaCombinado(r.ep, t.barra, f));
+    const L = t.s1 - t.s0;
+    const xs = [...new Set([...D.flatMap((x) => x.estaciones()), ...Array.from({ length: DIVISIONES + 1 }, (_, i) => (L * i) / DIVISIONES)])].filter((x) => x >= 0 && x <= L).sort((a, b) => a - b);
+    for (const x of xs)
+      for (const lado of [-1, 1] as const) {
+        if ((x === 0 && lado < 0) || (x === L && lado > 0)) continue;
+        const vs = D.map((dg) => dg.esfuerzosEn(x, lado)[comp]!);
+        const e = { s: t.s0 + x, max: Math.max(...vs), min: Math.min(...vs) };
+        const prev = curva[curva.length - 1];
+        if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
+        curva.push(e);
+      }
+  }
+  return curva;
+}
+
 export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "My" | "Vz", conjunto: ConjuntoCombinaciones, d: DatosVista): Escena {
   const pl = new PlantaFisica(r.q.fisico, planta);
   const c = r.c;
@@ -329,28 +360,8 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
   const fondo = fondoModelo(pl, { atenuado: true });
   const P: Primitiva[] = [...fondo.primitivas];
   const piezas = [...pl.enPlanta(pl.f.vigas).map((v) => v.id), ...pl.enPlanta(pl.f.panos).flatMap((p) => c.mapeo.panos?.[p.id] ?? [])];
-  // Envolventes por tramo flexible: estaciones de todas las combinaciones y divisiones regulares
-  type Curva = { s: number; max: number; min: number }[];
-  const curvas: { pieza: string; curva: Curva }[] = [];
-  let maxAbs = 0;
-  for (const id of piezas)
-    for (const t of r.ep.tramos(id)) {
-      const D = conjunto.factores.map((f) => diagramaCombinado(r.ep, t.barra, f));
-      const L = t.s1 - t.s0;
-      const xs = [...new Set([...D.flatMap((x) => x.estaciones()), ...Array.from({ length: DIVISIONES + 1 }, (_, i) => (L * i) / DIVISIONES)])].filter((x) => x >= 0 && x <= L).sort((a, b) => a - b);
-      const curva: Curva = [];
-      for (const x of xs)
-        for (const lado of [-1, 1] as const) {
-          if ((x === 0 && lado < 0) || (x === L && lado > 0)) continue;
-          const vs = D.map((dg) => dg.esfuerzosEn(x, lado)[comp]!);
-          const e = { s: t.s0 + x, max: Math.max(...vs), min: Math.min(...vs) };
-          const prev = curva[curva.length - 1];
-          if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
-          curva.push(e);
-          maxAbs = Math.max(maxAbs, Math.abs(e.max), Math.abs(e.min));
-        }
-      curvas.push({ pieza: id, curva });
-    }
+  const curvas = piezas.map((id) => ({ pieza: id, curva: envolventePieza(r, id, conjunto, comp) }));
+  const maxAbs = Math.max(0, ...curvas.flatMap((x) => x.curva.map((e) => Math.max(Math.abs(e.max), Math.abs(e.min)))));
   const [x0, y0, x1, y1] = caja(pl);
   const k = maxAbs > 0 ? (ORDENADA * Math.hypot(x1 - x0, y1 - y0)) / maxAbs : 0;
   const geo = new Map<string, ReturnType<typeof geometriaPieza>>();

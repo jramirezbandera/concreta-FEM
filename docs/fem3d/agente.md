@@ -306,7 +306,7 @@ Lo propuso el agente y el usuario lo aceptó el 2026-10-09, antes de escribir c�
 | `cargas` | Las cargas de un caso en la planta: de superficie (su zona o su losa), lineales, de viga, de pilar y puntuales, con su valor. Si el caso lleva el peso propio, lo dice |
 | `diagnosticos` | El modelo atenuado y una marca numerada en cada objeto con un error o un aviso (compilación y sensatez previa), con la lista al lado. Lo que no tiene sitio en planta va sólo en la lista |
 | `malla` | Las láminas y barras de la planta; ábacos y huellas rígidas, sombreados |
-| `uz`, `m11`, `m22`, `m12`, `v13`, `v23` | Isovalores en bandas sobre las losas y los paños de la planta (uz también en las viguetas, por sus nudos), en una combinación. Con varias, la que da el mayor valor absoluto en la planta, y se dice cuál. Con los extremos rotulados |
+| `uz`, `m11`, `m22`, `m12`, `v13`, `v23` | Isovalores en bandas sobre las losas de la planta, en una combinación. Con varias, la que da el mayor valor absoluto en la planta, y se dice cuál. Con los extremos rotulados. Los paños no tienen láminas: van en gris, y sus viguetas se consultan con `pieza` |
 | `vigas-my`, `vigas-vz` | Diagrama de cada viga y vigueta de la planta, en su envolvente sobre las combinaciones, con el máximo y el mínimo de cada vano rotulados |
 | `pilares-n` | Axil de cada tramo de pilar que llega a la planta, en su envolvente (máximo y mínimo) |
 

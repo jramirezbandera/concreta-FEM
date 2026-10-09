@@ -17,7 +17,10 @@ import { bandaPolilinea, cajaDe, longitud, puntoEnPolilinea, puntoInterior, punt
 
 export const VISTAS_MODELO = ["modelo", "cargas", "diagnosticos"] as const;
 
-/** Lo que una vista necesita de la planta: qué hay en ella y dónde. */
+/** Por id: el orden de dibujo (y con él el SVG y qué rótulo gana un solape) no depende del de las listas. */
+export const porId = <T extends { id: string }>(xs: readonly T[]): T[] => [...xs].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+/** Lo que una vista necesita de la planta: qué hay en ella y dónde, por id. */
 export class PlantaFisica {
   readonly f: ModeloFisico;
   readonly id: string;
@@ -56,7 +59,7 @@ export class PlantaFisica {
 
   pilares(): { p: Pilar; llega: boolean; seccion: Seccion | undefined }[] {
     const r: { p: Pilar; llega: boolean; seccion: Seccion | undefined }[] = [];
-    for (const p of this.f.pilares ?? []) {
+    for (const p of porId(this.f.pilares ?? [])) {
       const { llega, arranca } = this.vertical(p);
       if (!llega && !arranca) continue;
       // La sección del tramo con la cabeza aquí (si llega) o en la planta de encima (si arranca)
@@ -69,15 +72,15 @@ export class PlantaFisica {
 
   muros(): { m: Muro; llega: boolean }[] {
     const r: { m: Muro; llega: boolean }[] = [];
-    for (const m of this.f.muros ?? []) {
+    for (const m of porId(this.f.muros ?? [])) {
       const { llega, arranca } = this.vertical(m);
       if (llega || arranca) r.push({ m, llega });
     }
     return r;
   }
 
-  enPlanta<T extends { planta: string }>(xs: readonly T[] | undefined): T[] {
-    return (xs ?? []).filter((x) => x.planta === this.id);
+  enPlanta<T extends { planta: string; id: string }>(xs: readonly T[] | undefined): T[] {
+    return porId((xs ?? []).filter((x) => x.planta === this.id));
   }
 }
 
@@ -360,7 +363,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
   const pilares = new Map(pl.pilares().map((x) => [x.p.id, x]));
   const muros = new Map(pl.muros().map((x) => [x.m.id, x]));
   let n = 0;
-  for (const g of (f.cargas ?? []).filter((x) => x.caso === caso)) {
+  for (const g of porId((f.cargas ?? []).filter((x) => x.caso === caso))) {
     const antes = P.length;
     dibujarCarga(g);
     if (P.length > antes) n++;
@@ -520,8 +523,11 @@ export function vistaDiagnosticos(f: ModeloFisico, planta: string, diagnosticos:
   const plantaIds = new Set((f.plantas ?? []).map((p) => p.id));
   const lista: { n: number; dg: Diagnostico; aqui: boolean }[] = [];
   const marcas = new Map<string, { p: Vec2; ns: number[]; error: boolean }>();
-  const errores = diagnosticos.filter((x) => x.severidad === "error");
-  const avisos = diagnosticos.filter((x) => x.severidad === "aviso");
+  // En un orden que no depende del de las listas del modelo
+  const clave = (x: Diagnostico) => `${x.codigo}|${x.mensaje}|${(x.ids ?? []).join(",")}`;
+  const ordenados = [...diagnosticos].sort((a, b) => (clave(a) < clave(b) ? -1 : clave(a) > clave(b) ? 1 : 0));
+  const errores = ordenados.filter((x) => x.severidad === "error");
+  const avisos = ordenados.filter((x) => x.severidad === "aviso");
   for (const dg of [...errores, ...avisos]) {
     const objs = objetosDe(dg, ids);
     const aqui = objs.map((o) => [o, situar(pl, o)] as const).filter((x): x is readonly [string, Vec2] => x[1] !== null);
