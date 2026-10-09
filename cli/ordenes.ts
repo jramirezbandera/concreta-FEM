@@ -9,11 +9,13 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { conjuntoCombinaciones, seleccionPorDefecto, type Proposito, type Seleccion } from "../src/agente/combinaciones.ts";
 import { consultar, CONSULTAS, resumen, type OpcionesConsulta } from "../src/agente/consultas.ts";
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../src/agente/proyecto.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../src/agente/resultados.ts";
+import { anadirFirma, estadoFirma, leerFirmas, revisar, type FicheroFirmas, type Revision } from "../src/agente/revision.ts";
+import { sensatezPrevia } from "../src/agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
 import { Consultas } from "../src/compilador/consultas.ts";
@@ -46,7 +48,7 @@ export interface Argumentos {
   banderas: Map<string, string[]>;
 }
 
-const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras"]);
+const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por"]);
 const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda"]);
 
 export function analizarArgumentos(argv: readonly string[]): Argumentos | { error: string } {
@@ -79,6 +81,8 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem calcular <proyecto.json> [--recalcular]
   fem resumen <proyecto.json>
   fem consultar <proyecto.json> <consulta> [opciones]   (consultas: ${CONSULTAS.join(", ")})
+  fem revisar <proyecto.json> [--recalcular]   sensatez e informe de revisión (A3)
+  fem firmar <proyecto.json> --por "<nombre>"   sólo el ingeniero: firma el informe revisado
   fem esquema
 
 Combinaciones de las consultas: --casos | --situacion ELU-PT[,ELS-C…] | --combinacion "1.35*G+1.5*Q" (repetible) | --caso G
@@ -150,6 +154,12 @@ async function nucleo(): Promise<void> {
 /** Carpeta de resultados de una huella, junto al proyecto. */
 export const carpetaResultados = (rutaProyecto: string, huella: string) => join(dirname(rutaProyecto), ".fem", huella);
 
+/** Fichero de firmas de un proyecto: `<nombre>.revision.json`, junto a él (y en git). */
+export const rutaFirmas = (rutaProyecto: string) => join(dirname(rutaProyecto), `${basename(rutaProyecto).replace(/\.json$/i, "")}.revision.json`);
+
+const sha256 = (texto: string) => createHash("sha256").update(texto, "utf8").digest("hex");
+const rel = (ruta: string) => relative(process.cwd(), ruta).split(sep).join("/");
+
 interface Calculado {
   compilacion: Extract<ResultadoCompilacion, { valido: true }>;
   casos: ResultadoCaso[];
@@ -203,6 +213,25 @@ function guardar(carpeta: string, cabecera: object, bytes: Uint8Array): void {
   for (const d of otras.slice(RESULTADOS_CONSERVADOS - 1)) rmSync(d, { recursive: true, force: true });
 }
 
+// ─── Revisión ───────────────────────────────────────────────────────────────────────────────────
+
+function revision(l: { ruta: string; proyecto: Proyecto }, r: Calculado): Revision {
+  const q = new Consultas(l.proyecto.modelo, r.compilacion, r.casos, l.proyecto.opciones);
+  return revisar(l.proyecto, r.compilacion, q, {
+    motor: huellaMotor(),
+    diagnosticos: [...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos],
+    equilibrio: r.cabecera.casos.map((c) => ({ id: c.id, ...c.equilibrio })),
+    ficheroFirmas: basename(rutaFirmas(l.ruta)),
+  });
+}
+
+function firmasDe(orden: string, ruta: string): FicheroFirmas | Salida {
+  const f = rutaFirmas(ruta);
+  const x = leerFirmas(existsSync(f) ? readFileSync(f, "utf8") : "");
+  if ("error" in x) return { codigo: CODIGO.errores, json: { orden, ok: false, diagnosticos: [{ codigo: "cli/firmas", severidad: "error", mensaje: `El fichero de firmas ${f} ${x.error}.` }] } };
+  return x;
+}
+
 // ─── Órdenes ────────────────────────────────────────────────────────────────────────────────────
 
 function seleccionDe(a: Argumentos): Seleccion | { error: string } | null {
@@ -240,7 +269,9 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       if ("codigo" in l) return l;
       const c = compilar(l.proyecto.modelo, l.proyecto.opciones);
       const ok = c.valido && !hayErrores(c.diagnosticos);
-      const json: Record<string, unknown> = { orden, ok, huella: c.huella, ...listaDiagnosticos(c.diagnosticos) };
+      // A3: las comprobaciones de sensatez que no necesitan el cálculo, también si no compila
+      const previa = sensatezPrevia(l.proyecto.modelo, l.proyecto.opciones).flatMap((x) => x.avisos);
+      const json: Record<string, unknown> = { orden, ok, huella: c.huella, ...listaDiagnosticos([...c.diagnosticos, ...previa]) };
       if (orden === "compilar" && c.valido) {
         const { tiempos, ...estadisticas } = c.estadisticas;
         json.estadisticas = { ...estadisticas, segundos: Object.values(tiempos).reduce((s, t) => s + t, 0) / 1000 };
@@ -310,6 +341,54 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
         codigo: res.valido ? CODIGO.bien : CODIGO.errores,
         json: { orden, consulta, ok: res.valido, huella: r.compilacion.huella, ...(res.valido ? { valor: res.valor } : {}), ...listaDiagnosticos(res.diagnosticos) },
       };
+    }
+    case "revisar": {
+      const l = leer(orden, a.posicionales[0]);
+      if ("codigo" in l) return l;
+      const r = await calculado(orden, l.ruta, l.proyecto, a.banderas.has("recalcular"));
+      if ("codigo" in r) return r;
+      const rev = revision(l, r);
+      const carpeta = carpetaResultados(l.ruta, r.compilacion.huella);
+      mkdirSync(carpeta, { recursive: true });
+      writeFileSync(join(carpeta, "informe.md"), rev.markdown);
+      writeFileSync(join(carpeta, "informe.html"), rev.html);
+      const firmas = firmasDe(orden, l.ruta);
+      if ("codigo" in firmas) return firmas;
+      const sha = sha256(rev.markdown);
+      return {
+        codigo: CODIGO.bien,
+        json: {
+          orden,
+          ok: true,
+          huella: r.compilacion.huella,
+          informe: { markdown: rel(join(carpeta, "informe.md")), html: rel(join(carpeta, "informe.html")), sha256: sha },
+          firma: estadoFirma(firmas, r.compilacion.huella, sha),
+          avisos: rev.avisos.length,
+          comprobaciones: rev.comprobaciones.map((c) => ({ codigo: c.codigo, estado: c.estado, avisos: c.avisos.length, ...(c.peor ? { peor: c.peor } : {}) })),
+          ...listaDiagnosticos([...rev.avisos, ...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos]),
+        },
+      };
+    }
+    case "firmar": {
+      const por = a.banderas.get("por")?.[0]?.trim();
+      if (!por) return mal('fem firmar necesita --por "<nombre>": quién firma el informe.');
+      const l = leer(orden, a.posicionales[0]);
+      if ("codigo" in l) return l;
+      const r = await calculado(orden, l.ruta, l.proyecto, false);
+      if ("codigo" in r) return r;
+      const huella = r.compilacion.huella;
+      const guardado = join(carpetaResultados(l.ruta, huella), "informe.md");
+      const no = (codigo: string, mensaje: string): Salida => ({ codigo: CODIGO.errores, json: { orden, ok: false, huella, diagnosticos: [{ codigo, severidad: "error", mensaje }] } });
+      if (!existsSync(guardado)) return no("cli/sin-revisar", "No hay informe de revisión de esta huella: revise el proyecto con «fem revisar» y lea el informe antes de firmarlo.");
+      // Se firma el informe que se ha leído, y sólo si es el que sale ahora del proyecto
+      const rev = revision(l, r);
+      if (readFileSync(guardado, "utf8") !== rev.markdown) return no("cli/informe-cambiado", "El informe guardado no es el que sale ahora del proyecto (otro núcleo de cálculo u otras comprobaciones): vuelva a revisarlo con «fem revisar».");
+      const firmas = firmasDe(orden, l.ruta);
+      if ("codigo" in firmas) return firmas;
+      const firma = { huella, por, fecha: new Date().toISOString(), informe: sha256(rev.markdown) };
+      const fichero = rutaFirmas(l.ruta);
+      writeFileSync(fichero, `${JSON.stringify(anadirFirma(firmas, firma), null, 2)}\n`);
+      return { codigo: CODIGO.bien, json: { orden, ok: true, huella, firma, fichero: rel(fichero), diagnosticos: [] } };
     }
     default:
       return mal(`orden desconocida «${orden}». ${AYUDA}`);

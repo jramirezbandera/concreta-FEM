@@ -187,3 +187,46 @@ describe("códigos de salida y forma de la salida", () => {
     expect(y.valor.totales[0]!.F[2]).toBe(Number(F.toPrecision(6)));
   });
 });
+
+describe("A3: revisar y firmar", () => {
+  it("revisar escribe el informe de la huella; firmar lo firma sólo si se ha revisado y con --por; un cambio del proyecto quita la firma", () => {
+    const f = reticulaConNucleo();
+    const ruta = escribir(f, undefined, { nombre: "Retícula" });
+    // Firmar antes de revisar: no hay informe
+    expect(fem(["firmar", ruta, "--por", "Ingeniero"]).codigo).toBe(1);
+    const r = fem(["revisar", ruta]);
+    expect(r.codigo).toBe(0);
+    const j = r.json as { ok: boolean; huella: string; informe: { markdown: string; html: string; sha256: string }; firma: { firmado: boolean }; avisos: number; comprobaciones: { codigo: string; estado: string }[] };
+    expect(j.ok).toBe(true);
+    expect(j.firma).toEqual({ firmado: false });
+    expect(j.avisos).toBe(0);
+    expect(j.comprobaciones.length).toBe(20);
+    const md = readFileSync(join(ruta, "..", ".fem", j.huella, "informe.md"), "utf8");
+    expect(md).toContain(j.huella);
+    expect(md).toContain("# Informe de revisión: Retícula");
+    expect(readFileSync(join(ruta, "..", ".fem", j.huella, "informe.html"), "utf8")).toContain("<table>");
+    // Sin --por, orden mal dada
+    expect(fem(["firmar", ruta]).codigo).toBe(2);
+    const fi = fem(["firmar", ruta, "--por", "Ingeniero"]);
+    expect(fi.codigo).toBe(0);
+    const firmas = JSON.parse(readFileSync(join(ruta, "..", "proyecto.revision.json"), "utf8")) as { firmas: { huella: string; por: string; informe: string }[] };
+    expect(firmas.firmas).toHaveLength(1);
+    expect(firmas.firmas[0]).toMatchObject({ huella: j.huella, por: "Ingeniero", informe: j.informe.sha256 });
+    expect((fem(["revisar", ruta]).json as { firma: unknown }).firma).toMatchObject({ firmado: true, por: "Ingeniero", mismoInforme: true });
+    // Otro modelo: otra huella, sin firma
+    const g = structuredClone(f) as ModeloFisico;
+    (g.losas![0] as { espesor: number }).espesor = 0.25;
+    writeFileSync(ruta, JSON.stringify({ esquema: VERSION_ESQUEMA, modelo: g }));
+    const r2 = fem(["revisar", ruta]).json as { huella: string; firma: unknown };
+    expect(r2.huella).not.toBe(j.huella);
+    expect(r2.firma).toEqual({ firmado: false });
+  });
+
+  it("validar da los avisos de sensatez previos aunque el modelo no compile", () => {
+    const f = structuredClone(reticulaConNucleo()) as ModeloFisico;
+    (f.losas![0] as { espesor: number }).espesor = 22;
+    const v = fem(["validar", escribir(f)]);
+    expect(v.codigo).toBe(1);
+    expect((v.json.diagnosticos as { codigo: string }[]).map((d) => d.codigo)).toContain("sensatez/espesor");
+  });
+});
