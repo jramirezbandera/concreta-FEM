@@ -59,3 +59,14 @@ Licencia ISC. Copyright 2020, Marco Gunnink
 robust-predicates 3.0.3 — https://github.com/mourner/robust-predicates
 Unlicense (dominio público), admitida el 2026-10-04 sólo para esta dependencia.
 Port de los predicados geométricos adaptativos de J. R. Shewchuk (dominio público).
+
+--------------------------------------------------------------------------------
+Render de la capa de agente (fase A4), sólo en la CLI (cli/png.ts), sin modificar.
+
+@resvg/resvg-wasm 2.6.2 — https://github.com/thx/resvg-js (resvg: https://github.com/linebender/resvg)
+Licencia MPL-2.0. Se usa como dependencia (package.json, versión exacta) para pasar SVG a PNG.
+El código fuente se puede obtener en https://github.com/thx/resvg-js.
+
+Roboto 2.138 (Regular y Bold) — https://github.com/googlefonts/roboto
+Licencia Apache-2.0. Copyright 2011 Google Inc. Ficheros sin modificar en cli/fuentes/, con su
+licencia en cli/fuentes/LICENSE-Roboto.txt.

@@ -11,6 +11,7 @@
  * Puro: entran los datos y salen textos.
  */
 import { resolverOpciones } from "../compilador/fisico.ts";
+import { sha256 } from "../compilador/huella.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { Resumen } from "./consultas.ts";
 import type { Proyecto } from "./proyecto.ts";
@@ -21,7 +22,9 @@ export type Bloque =
   | { tipo: "titulo"; nivel: 1 | 2 | 3; texto: string }
   | { tipo: "parrafo"; texto: string }
   | { tipo: "lista"; items: string[] }
-  | { tipo: "tabla"; cabecera: string[]; filas: string[][]; numericas?: number[] };
+  | { tipo: "tabla"; cabecera: string[]; filas: string[][]; numericas?: number[] }
+  /** Figura (A4): su SVG va en el HTML; en el Markdown, su título y el sha256 del SVG, que la firma cubre. */
+  | { tipo: "figura"; titulo: string; svg: string };
 
 /** Avisos que se listan de cada comprobación en el informe; del resto se dice cuántos hay. */
 export const AVISOS_POR_COMPROBACION = 25;
@@ -53,6 +56,8 @@ export interface DatosInforme {
   resultados: SensatezResultados;
   /** Nombre del fichero de firmas, para decirlo en el informe. */
   ficheroFirmas: string;
+  /** Figuras del render (A4): la planta del modelo y la uz de las losas de cada planta. */
+  figuras?: readonly { titulo: string; svg: string }[];
 }
 
 const ESTADO: Record<Comprobacion["estado"], string> = { bien: "bien", avisos: "AVISOS", "no-aplica": "no aplica" };
@@ -226,6 +231,12 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
     b.push({ tipo: "tabla", cabecera: ["Pilar", "Planta (cabeza)", "Axil (kN)", "Bajada (kN)", "Axil / bajada"], numericas: [2, 3, 4], filas: orden.map((x) => [x.pilar, x.planta, kN(x.axil), kN(x.bajada), num(x.cociente!)]) });
   }
 
+  if (d.figuras?.length) {
+    titulo(2, "Figuras");
+    parrafo("La planta del modelo y el desplazamiento vertical de las losas de cada planta, en la combinación de las flechas. Las figuras van en el informe HTML; aquí, el sha256 de cada SVG, así que la firma también las cubre. Todas las vistas, con «fem render».");
+    for (const x of d.figuras) b.push({ tipo: "figura", titulo: x.titulo, svg: x.svg });
+  }
+
   // ─── Hipótesis y avisos ────────────────────────────────────────────────────────────────────
   titulo(2, "Hipótesis de modelado");
   b.push({ tipo: "lista", items: d.hipotesis.length ? [...d.hipotesis] : ["Ninguna."] });
@@ -257,6 +268,7 @@ export function markdown(doc: readonly Bloque[]): string {
     if (x.tipo === "titulo") r.push(`${"#".repeat(x.nivel)} ${x.texto}`);
     else if (x.tipo === "parrafo") r.push(x.texto);
     else if (x.tipo === "lista") r.push(x.items.map((i) => `- ${i}`).join("\n"));
+    else if (x.tipo === "figura") r.push(`Figura: ${x.titulo}. SVG, sha256 ${sha256(x.svg)}.`);
     else {
       const sep = x.cabecera.map((_, i) => (x.numericas?.includes(i) ? "---:" : "---"));
       r.push([x.cabecera, sep, ...x.filas].map((f) => `| ${f.map(celdaMd).join(" | ")} |`).join("\n"));
@@ -273,7 +285,8 @@ const CSS = `:root{--fondo:#fff;--texto:#1d1f23;--suave:#5b616e;--linea:#d9dce3;
 *{box-sizing:border-box}body{margin:0;background:var(--fondo);color:var(--texto);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}h1{font-size:1.6em;margin:.2em 0 .6em}h2{font-size:1.25em;margin:1.8em 0 .5em;padding-bottom:.2em;border-bottom:1px solid var(--linea)}h3{font-size:1.05em;margin:1.3em 0 .4em}
 p,li{max-width:80ch}ul{padding-left:1.3em}li{margin:.2em 0}.tabla{overflow-x:auto;margin:.6em 0}table{border-collapse:collapse;font-size:.92em}th,td{border:1px solid var(--linea);padding:4px 8px;vertical-align:top;text-align:left}
-th{background:var(--cabecera);font-weight:600}td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.avisos{color:var(--aviso);background:var(--aviso-fondo);font-weight:600}.bien{color:var(--bien)}code{font-size:.92em}`;
+th{background:var(--cabecera);font-weight:600}td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.avisos{color:var(--aviso);background:var(--aviso-fondo);font-weight:600}.bien{color:var(--bien)}code{font-size:.92em}
+figure{margin:1em 0 1.6em}figure svg{display:block;max-width:100%;height:auto;border:1px solid var(--linea)}figcaption{color:var(--suave);font-size:.92em;margin-bottom:.4em}`;
 
 export function html(doc: readonly Bloque[]): string {
   const titulo = doc.find((x) => x.tipo === "titulo" && x.nivel === 1);
@@ -282,6 +295,7 @@ export function html(doc: readonly Bloque[]): string {
     if (x.tipo === "titulo") r.push(`<h${x.nivel}>${esc(x.texto)}</h${x.nivel}>`);
     else if (x.tipo === "parrafo") r.push(`<p>${esc(x.texto)}</p>`);
     else if (x.tipo === "lista") r.push(`<ul>${x.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>`);
+    else if (x.tipo === "figura") r.push(`<figure><figcaption>${esc(x.titulo)}</figcaption>\n${x.svg}</figure>`);
     else {
       const celda = (s: string, i: number) => {
         const clase = [x.numericas?.includes(i) ? "n" : "", s.startsWith("AVISOS") ? "avisos" : s === "bien" ? "bien" : ""].filter(Boolean).join(" ");

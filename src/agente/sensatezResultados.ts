@@ -56,7 +56,8 @@ export function casosGravedad(f: ModeloFisico, res: Resumen): string[] {
     .map((c) => c.id);
 }
 
-function gravedad(q: Consultas, casos: readonly string[], factor: number): ConjuntoCombinaciones {
+/** La «gravedad»: la suma de los casos gravitatorios por un factor, como una sola combinación. */
+export function gravedad(q: Consultas, casos: readonly string[], factor: number): ConjuntoCombinaciones {
   const f = new Float64Array(q.fisico.casos.length);
   q.fisico.casos.forEach((c, k) => {
     if (casos.includes(c.id)) f[k] = factor;
@@ -77,17 +78,30 @@ const mediana = (xs: number[]) => {
 
 const fraccion = (x: number) => (x > 0 ? `1/${num(1 / x)}` : "0");
 
+/**
+ * Las combinaciones de las comprobaciones con resultados (`agente.md` §8): si todos los casos llevan
+ * su acción, la ELS característica (flechas y desplome) y las ELU (axil); si no, la «gravedad» con
+ * factor 1 y 1,4, y el desplome caso a caso. null si no hay casos gravitatorios.
+ */
+export function conjuntosSensatez(q: Consultas, res: Resumen): { flechas: ConjuntoCombinaciones | null; axil: ConjuntoCombinaciones | null; desplome: ConjuntoCombinaciones | null } {
+  const f = q.fisico;
+  const grav = casosGravedad(f, res);
+  const conAccion = f.casos.length > 0 && f.casos.every((c) => c.accion);
+  const elsC = conAccion ? conjunto(q, { tipo: "situaciones", situaciones: ["ELS-C"] }) : null;
+  const elu = conAccion ? conjunto(q, seleccionPorDefecto(f.casos, "esfuerzos")) : null;
+  return {
+    flechas: elsC ?? (grav.length ? gravedad(q, grav, 1) : null),
+    axil: elu ?? (grav.length ? gravedad(q, grav, FACTOR_GRAVEDAD_ELU) : null),
+    desplome: elsC ?? conjunto(q, { tipo: "casos" }),
+  };
+}
+
 export function sensatezResultados(q: Consultas, res: Resumen, opciones?: OpcionesCompilacion): SensatezResultados {
   const f = q.fisico;
   const U = UMBRALES;
   const P = new Plantas(f);
   const grav = casosGravedad(f, res);
-  const conAccion = f.casos.length > 0 && f.casos.every((c) => c.accion);
-  const elsC = conAccion ? conjunto(q, { tipo: "situaciones", situaciones: ["ELS-C"] }) : null;
-  const elu = conAccion ? conjunto(q, seleccionPorDefecto(f.casos, "esfuerzos")) : null;
-  const cjFlechas = elsC ?? (grav.length ? gravedad(q, grav, 1) : null);
-  const cjAxil = elu ?? (grav.length ? gravedad(q, grav, FACTOR_GRAVEDAD_ELU) : null);
-  const cjDesplome = elsC ?? conjunto(q, { tipo: "casos" });
+  const { flechas: cjFlechas, axil: cjAxil, desplome: cjDesplome } = conjuntosSensatez(q, res);
   const ep = new EsfuerzosPiezas(q.modelo, q.mapeo, q.casos);
   const seccion = new Map(f.secciones.map((s) => [s.id, s]));
   const material = new Map(f.materiales.map((m) => [m.id, m]));

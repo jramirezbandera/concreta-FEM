@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@kninnug/constrainautor": "4.1.0",
+    "@resvg/resvg-wasm": "2.6.2",
     "delaunator": "5.1.0",
     "robust-predicates": "3.0.3"
   }

@@ -10,11 +10,12 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { conjuntoCombinaciones, seleccionPorDefecto, type Proposito, type Seleccion } from "../src/agente/combinaciones.ts";
-import { consultar, CONSULTAS, resumen, type OpcionesConsulta } from "../src/agente/consultas.ts";
+import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito, type Seleccion } from "../src/agente/combinaciones.ts";
+import { consultar, CONSULTAS, resumen, TOP_POR_DEFECTO, type OpcionesConsulta } from "../src/agente/consultas.ts";
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../src/agente/proyecto.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../src/agente/resultados.ts";
 import { anadirFirma, estadoFirma, leerFirmas, revisar, type FicheroFirmas, type Revision } from "../src/agente/revision.ts";
+import { CAMPOS, conjuntoPorDefecto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type Vista } from "../src/agente/render/index.ts";
 import { sensatezPrevia } from "../src/agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
@@ -24,6 +25,7 @@ import { calcular } from "../src/motor/calcular.ts";
 import type { Diagnostico } from "../src/motor/diagnosticos.ts";
 import type { ResultadoCaso } from "../src/motor/modelo.ts";
 import { iniciarNucleo } from "../src/nucleo/index.ts";
+import { svgAPng } from "./png.ts";
 
 export const RAIZ = resolve(import.meta.dirname, "..");
 const WASM = join(RAIZ, "src", "nucleo", "pkg", "nucleo_bg.wasm");
@@ -48,7 +50,7 @@ export interface Argumentos {
   banderas: Map<string, string[]>;
 }
 
-const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por"]);
+const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por", "vista"]);
 const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda"]);
 
 export function analizarArgumentos(argv: readonly string[]): Argumentos | { error: string } {
@@ -81,6 +83,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem calcular <proyecto.json> [--recalcular]
   fem resumen <proyecto.json>
   fem consultar <proyecto.json> <consulta> [opciones]   (consultas: ${CONSULTAS.join(", ")})
+  fem render <proyecto.json> [--vista V] [--planta P] [--caso C]   PNG y SVG de cada planta (A4; vistas: ${VISTAS.join(", ")})
   fem revisar <proyecto.json> [--recalcular]   sensatez e informe de revisión (A3)
   fem firmar <proyecto.json> --por "<nombre>"   sólo el ingeniero: firma el informe revisado
   fem esquema
@@ -340,6 +343,83 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       return {
         codigo: res.valido ? CODIGO.bien : CODIGO.errores,
         json: { orden, consulta, ok: res.valido, huella: r.compilacion.huella, ...(res.valido ? { valor: res.valor } : {}), ...listaDiagnosticos(res.diagnosticos) },
+      };
+    }
+    case "render": {
+      const l = leer(orden, a.posicionales[0]);
+      if ("codigo" in l) return l;
+      const vistas = (a.banderas.get("vista") ?? ["modelo"]).flatMap((x) => x.split(",")).map((x) => x.trim()) as Vista[];
+      const malas = vistas.filter((v) => !VISTAS.includes(v));
+      if (malas.length) return mal(`vista desconocida: ${malas.join(", ")} (${VISTAS.join(", ")})`);
+      const f = l.proyecto.modelo;
+      const plantas = (a.banderas.get("planta") ?? f.plantas.map((p) => p.id)).flatMap((x) => x.split(","));
+      const sinPlanta = plantas.filter((p) => !f.plantas.some((x) => x.id === p));
+      if (sinPlanta.length) return mal(`planta desconocida: ${sinPlanta.join(", ")} (${f.plantas.map((p) => p.id).join(", ")})`);
+      const seleccion = seleccionDe(a);
+      if (seleccion && "error" in seleccion) return mal(seleccion.error);
+      const casos = a.banderas.get("caso") ?? f.casos.map((c) => c.id);
+      const c = compilar(f, l.proyecto.opciones);
+      const d = { nombre: l.proyecto.nombre, huella: c.huella };
+      // Lo que necesita el cálculo, y sus combinaciones
+      let rr: ResultadosRender | null = null;
+      let diags: Diagnostico[] = [...c.diagnosticos];
+      const conjuntos = new Map<string, ConjuntoCombinaciones>();
+      if (vistas.some(necesitaCalculo)) {
+        const r = await calculado(orden, l.ruta, l.proyecto, a.banderas.has("recalcular"));
+        if ("codigo" in r) return r;
+        const q = new Consultas(f, r.compilacion, r.casos, l.proyecto.opciones);
+        rr = new ResultadosRender(q, r.compilacion);
+        diags = [...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos];
+        const res = resumen(l.proyecto, r.compilacion);
+        if (!res.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos(res.diagnosticos) } };
+        for (const proposito of ["desplazamientos", "esfuerzos"] as const) {
+          if (seleccion) {
+            const x = conjuntoCombinaciones(q, seleccion);
+            if (!x.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos(x.diagnosticos) } };
+            conjuntos.set(proposito, x.valor);
+          } else conjuntos.set(proposito, conjuntoPorDefecto(q, res.valor, proposito));
+        }
+      }
+      const previa = sensatezPrevia(f, l.proyecto.opciones).flatMap((x) => x.avisos);
+      const carpeta = join(carpetaResultados(l.ruta, c.huella), "render");
+      mkdirSync(carpeta, { recursive: true });
+      const figuras: Record<string, unknown>[] = [];
+      for (const planta of plantas)
+        for (const vista of vistas) {
+          const escenas: [Escena, string | undefined][] = [];
+          if (vista === "modelo") escenas.push([vistaModelo(f, planta, d), undefined]);
+          else if (vista === "cargas") for (const caso of casos) escenas.push([vistaCargas(f, planta, caso, d), caso]);
+          else if (vista === "diagnosticos") escenas.push([vistaDiagnosticos(f, planta, [...diags, ...previa], d), undefined]);
+          else if (vista === "malla") escenas.push([vistaMalla(rr!, planta, d), undefined]);
+          else if (vista === "vigas-my" || vista === "vigas-vz") escenas.push([vistaDiagramas(rr!, planta, vista === "vigas-my" ? "My" : "Vz", conjuntos.get("esfuerzos")!, d), undefined]);
+          else if (vista === "pilares-n") escenas.push([vistaAxiles(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
+          else escenas.push([vistaCampo(rr!, planta, vista as Campo, conjuntos.get(propositoDe(vista))!, d), undefined]);
+          for (const [e, caso] of escenas) {
+            const s = escenaASvg(e);
+            const base = join(carpeta, nombreFigura(planta, vista, caso));
+            writeFileSync(`${base}.svg`, s.svg);
+            writeFileSync(`${base}.png`, await svgAPng(s.svg));
+            const comb = e.extremos.find((x) => x.comb)?.comb;
+            figuras.push({
+              planta,
+              vista,
+              ...(caso ? { caso } : {}),
+              png: `${basename(base)}.png`,
+              svg: `${basename(base)}.svg`,
+              ancho: s.encuadre.ancho,
+              alto: s.encuadre.alto,
+              pxPorM: s.encuadre.escala,
+              ...(necesitaCalculo(vista) && vista !== "malla" ? { combinaciones: conjuntos.get(propositoDe(vista))!.descripcion } : {}),
+              ...(comb && (CAMPOS as readonly string[]).includes(vista) ? { combinacion: comb } : {}),
+              extremos: e.extremos.slice(0, TOP_POR_DEFECTO).map((x) => ({ que: x.que, valor: x.valor, unidad: x.unidad, ...(x.objeto ? { objeto: x.objeto } : {}), ...(x.punto ? { punto: x.punto } : {}), ...(x.comb ? { comb: x.comb } : {}) })),
+              ...(e.extremos.length > TOP_POR_DEFECTO ? { extremosOmitidos: e.extremos.length - TOP_POR_DEFECTO } : {}),
+              ...(s.omitidos ? { rotulosOmitidos: s.omitidos } : {}),
+            });
+          }
+        }
+      return {
+        codigo: CODIGO.bien,
+        json: { orden, ok: true, huella: c.huella, valido: c.valido, carpeta: rel(carpeta), figuras, ...listaDiagnosticos(vistas.includes("diagnosticos") ? [] : diags.filter((x) => x.severidad === "error")) },
       };
     }
     case "revisar": {
