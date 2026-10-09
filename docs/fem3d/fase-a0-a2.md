@@ -134,10 +134,7 @@ bun run fem consultar proyecto.json pieza X15-N3 --combinacion "1.35*G+1.5*Q" --
 
 ## 4. Pendiente
 
-**Del usuario:**
-- **A-1:** que `compilar` rechace también los campos desconocidos. Hoy sólo lo hace el esquema, en la CLI. Es lo que protege a quien lo llame desde Concreta.
-- **A-9:** el peso propio de las vigas sobre el eje de un muro y el solape de los pilares con la losa.
-- **A-2:** admitir ψ por la categoría de uso (`"psi": "uso-A"`), que el código ya tiene (`psiUso`), para que el agente no tenga que dar números de la norma.
+**Del usuario:** A-1, A-2 y A-9 se decidieron e hicieron el 2026-10-09, tras A3 (`fase-a3.md` §5).
 
 **Técnico:**
 - La recuperación SPR de C5-4, por decisión del usuario.

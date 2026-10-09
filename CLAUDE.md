@@ -206,7 +206,12 @@
   - **Criterios:** detecta las 46 mutaciones graves aplicables. En las referencias sólo avisa el axil reducido de los edificios objetivo de 7 plantas, y es verdadero: sus pilares no están dimensionados (A3-3).
   - **A3-1:** el peso propio esperado coincide con el del compilador a precisión de máquina (≤ 0,01 % con muros), lo que contrasta C2-g y C3-g.
   - **Validación:** `validacion/a3/` (mutaciones, referencias e informe de ejemplo).
-  - **Pendiente del usuario:** revisar el informe de ejemplo y el nombre del fichero de firmas. Siguen abiertas A-1, A-2 y A-9.
+  - **Pendiente del usuario:** revisar el informe de ejemplo.
+- **2026-10-09: decisiones tras A3** (`fase-a3.md` §5):
+  - **A-1:** `compilar` rechaza los campos desconocidos del modelo y de las opciones (`src/compilador/campos.ts`, con el esquema estructural `fisico.schema.json` que se genera de los tipos);
+  - **A-9:** una viga por el eje de un muro pesa sólo lo que sobresale de él; el pilar sigue sin descontar su cruce con la losa (hipótesis del lado de la seguridad);
+  - **A-2:** ψ por su nombre (`"uso-A"`, `"viento"`…);
+  - el fichero de firmas se queda como `<proyecto>.revision.json`, y el informe da las cargas en cimentación.
 - **Siguiente paso:**
   - A4 de la capa de agente (render y revisión visual);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);

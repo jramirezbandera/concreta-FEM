@@ -139,6 +139,7 @@ bun run fem firmar proyecto.json --por "Nombre"       # sólo el ingeniero, tras
   - los avisos;
   - el modelo por planta, con las opciones efectivas;
   - las cargas por caso y por planta, verticales y horizontales;
+  - las cargas en cimentación de cada pilar, muro y apoyo (desde §5);
   - el desglose del peso propio;
   - los tramos de la bajada que más se separan;
   - las hipótesis y los avisos del compilador y del cálculo.
@@ -154,7 +155,7 @@ bun run fem firmar proyecto.json --por "Nombre"       # sólo el ingeniero, tras
 
 | ID | Hallazgo | Consecuencia |
 |---|---|---|
-| A3-1 | **El peso propio esperado, sin la malla, es el del compilador:** ≤ 4e-14 relativo por planta en la retícula con núcleo y en los edificios con losas, reticular y unidireccional; ≤ 0,01 % con muros. La diferencia con muros son las esquinas de sus huellas, que cuentan dos veces en un muro cerrado | Contrasta los descuentos de C2-g y C3-g por un camino independiente. Lo que el compilador no descuenta (el solape pilar–losa, A-9) tampoco lo descuenta la estimación, así que A3 no lo ve: es una decisión pendiente, no un error |
+| A3-1 | **El peso propio esperado, sin la malla, es el del compilador:** ≤ 4e-14 relativo por planta en la retícula con núcleo y en los edificios con losas, reticular y unidireccional; ≤ 0,01 % con muros. La diferencia con muros son las esquinas de sus huellas, que cuentan dos veces en un muro cerrado | Contrasta los descuentos de C2-g y C3-g por un camino independiente. Desde A-9 (§5) la estimación descuenta también la viga que corre por el eje de un muro, como el compilador. El solape pilar–losa no lo descuenta ninguno, por decisión del usuario |
 | A3-2 | **Los pilares embebidos en un muro llevan la mitad de su bajada** (0,45–0,50 en los de fachada sobre el muro de sótano del edificio con muros): el muro, mucho más rígido, se lleva su carga | Esos tramos (el eje del pilar a menos de t/2 + ε_snap del eje de un muro en la misma planta) no se comparan; el informe dice cuántos son |
 | A3-3 | **Los edificios objetivo de 7 plantas tienen pilares que no resisten su axil:** ν = 1,46 bajo N1 con secciones de 30 × 50 y 40 × 40 cm en toda la altura (Nd ≈ 4 400 kN en el pilar interior P12-10, de 30 × 50). Es el único aviso de las referencias | Es verdadero: el modelo es sintético (se hizo para medir tamaño y tiempo, D9) y no está dimensionado. No se cambia, para no mover sus referencias congeladas |
 | A3-4 | **La «gravedad» ×1,4 da el mismo ν que la ELU del generador** a ≤ 1,5 % en el edificio objetivo (1,28 frente a 1,27 en P6-5) | El axil reducido de los modelos sin acciones sirve como aviso. Los tres proyectos de A2 no llevan acciones |
@@ -165,9 +166,7 @@ bun run fem firmar proyecto.json --por "Nombre"       # sólo el ingeniero, tras
 ## 4. Pendiente
 
 **Del usuario:**
-- Revisar el informe de ejemplo (`validacion/a3/informe-edificio.md`) y decir si falta o sobra algo antes de usarlo con un proyecto real.
-- El nombre del fichero de firmas, `<proyecto>.revision.json` (§2).
-- Siguen abiertas A-1, A-2 y A-9 de `fase-a0-a2.md`.
+- Revisar el informe de ejemplo (`validacion/a3/informe-edificio.md`), ya con las cargas en cimentación (§5), antes de usarlo con un proyecto real.
 
 **Técnico:**
 - Un caché de la compilación (A-5): `fem revisar` compila dos veces, la segunda sin cargas para el peso propio.
@@ -175,6 +174,18 @@ bun run fem firmar proyecto.json --por "Nombre"       # sólo el ingeniero, tras
 - El segundo spike de A2, con una descripción con datos que falten o se contradigan, ahora con `fem revisar` en el flujo.
 
 **Siguiente:** A4 (render y revisión visual), según `agente.md` §3.
+
+## 5. Decisiones del usuario tras A3 (2026-10-09)
+
+El usuario aceptó las recomendaciones sobre lo que quedaba abierto de A0–A2 y pidió una sección más en el informe.
+
+| Decisión | Qué se hizo | Evidencia |
+|---|---|---|
+| **A-1:** `compilar` rechaza los campos desconocidos, como error | El validador del esquema pasa a `src/compilador/esquema.ts`, y el generador escribe un esquema estructural del modelo y las opciones (`src/compilador/fisico.schema.json`, sin descripciones). `compilar` sólo se queda con sus campos desconocidos (`fisico/campo-desconocido`, `opciones/campo-desconocido`), con el campo más parecido; lo demás lo siguen diciendo sus códigos. Las 9 erratas de A-1 son ahora errores. Cuesta 5–6 ms en el edificio objetivo. Dos entradas del catálogo de no válidos que ya rechazaban una clave desconocida lo hacen ahora con el código nuevo. Ninguna huella cambia | `src/compilador/campos.test.ts` |
+| **A-9:** la viga por el eje de un muro pesa sólo lo que sobresale de él; el solape pilar–losa se queda | Una viga rectangular de hormigón que corre por el eje de un muro que le llega desde abajo pesa w·max(0, b − t)/b sobre él: cuelga del forjado dentro del muro, que pesa de forjado a forjado. El pilar sigue pesando de forjado a forjado, sin descontar su cruce con la losa (del lado de la seguridad, como es habitual), y las dos cosas van en las hipótesis. Cambia sólo el caso de peso propio de dos referencias congeladas de C3 (la retícula con núcleo, −38,5 kN, a mano; el modelo al azar 3, −19,3 kN), con la malla, el mapeo y los demás casos iguales a ≤ 3e-13. El peso esperado de A3 y la bajada tributaria siguen la misma regla | `src/compilador/vigasSobreMuros.test.ts`; `congelado-c3.json` |
+| **A-2:** ψ por su nombre | `psi` admite `"uso-A"` … `"uso-G"`, `"nieve-hasta-1000"`, `"nieve-mas-de-1000"`, `"viento"` y `"temperatura"`, además de los números; se traducen con la tabla de `src/combinaciones/psi.ts` al armar las combinaciones, y dan las mismas que sus valores. La skill pide los nombres (y preguntar la categoría si no la dan), y el ejemplo los usa. El esquema agrupa los literales de una unión mixta en un `enum`, y su validador prefiere la variante que admite el tipo del dato: un nombre mal escrito dice cuáles valen | `src/compilador/psiNombrado.test.ts` |
+| **Fichero de firmas:** `<proyecto>.revision.json` | Sin cambios | — |
+| **Informe:** cargas en cimentación | Nueva sección con las reacciones en la base de cada pilar, muro y apoyo por caso: una tabla de Fz por caso con su total y, por caso, las seis componentes en ejes globales, con el convenio escrito (Fz > 0 hacia arriba) | `src/agente/sensatez.test.ts` |
 
 ## Cómo reproducir
 
