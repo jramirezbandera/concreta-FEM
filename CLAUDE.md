@@ -230,7 +230,7 @@
   - **Rendimiento:** ≤ 1,2 s por planta y vista en los edificios objetivo, e informe de ≤ 1,4 MB.
   - **Pendiente del usuario:** mirar las imágenes y decir si le sirven para revisar.
 - **Siguiente paso:**
-  - A5 de la capa de agente (entrada desde planos). Antes, decidir A-e (confidencialidad de los planos de clientes);
+  - A5 de la capa de agente (entrada desde planos), con A-e decidida el 2026-10-10 (`agente.md` §6): los planos fuera del repo, el agente sólo ve la geometría extraída en local (sin cajetín, textos ni metadatos) y el ingeniero acepta un aviso antes de la primera extracción;
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - el resto de la capa de agente (A6–A7).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

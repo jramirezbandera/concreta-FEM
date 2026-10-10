@@ -2,7 +2,7 @@
 
 > **Qué es.** Una capa para que un agente de IA (Claude Code u otro) pueda manejar el motor de punta a punta: crear y editar el modelo físico, compilar, calcular, consultar resultados, revisarlos y, más adelante, leer planos y exportar a CAD. **Fecha:** 2026-10-05.
 >
-> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). A3 superada el 2026-10-09; el informe está en `fase-a3.md` y lo fijado al empezar, en §8. A4 superada el 2026-10-09; el informe está en `fase-a4.md` y lo fijado al empezar, en §10. Lo siguiente es A5, con la decisión A-e antes.
+> **Estado:** A0–A2 superadas el 2026-10-09; el informe está en `fase-a0-a2.md`. Decisiones A-a…A-d tomadas el 2026-10-05; A-e, aplazada (§6). A3 superada el 2026-10-09; el informe está en `fase-a3.md` y lo fijado al empezar, en §8. A4 superada el 2026-10-09; el informe está en `fase-a4.md` y lo fijado al empezar, en §10. A-e decidida el 2026-10-10 (§6). Lo siguiente es A5.
 >
 > **Veredicto.** Es viable, y el repositorio está mejor preparado de lo habitual (§1). El objetivo realista no es «todo con IA», sino que **la IA haga casi todo el tecleo y la iteración, y el ingeniero revise y firme** sobre un informe y un visor. Lo difícil no es la interfaz con el agente. Son los extremos de la cadena (leer planos en imagen y sacar planos de armado) y un riesgo nuevo: **el fallo silencioso pasa del motor al modelo**. El motor puede estar perfecto y el modelo tener una carga, un pilar o una unidad mal puestos (§4, regla A3).
 
@@ -134,6 +134,10 @@ Los rangos se fijan con el usuario. Igual que las metamórficas, se validan con 
 - **A-c. Procedencia:** en un fichero aparte (`proyecto.origen.json`), fuera del modelo físico y de su huella.
 - **A-d. Cuándo:** A0–A2 justo después de C5, porque el spike A2 dice pronto si merece la pena seguir. A3 tiene que estar antes de usarlo con un proyecto real.
 - **A-e. Confidencialidad: aplazada.** Se decidirá más adelante, y en todo caso antes de A5. Hasta entonces, el agente sólo trabaja con modelos de prueba y de validación, no con planos de clientes.
+- **A-e. Confidencialidad: decidida el 2026-10-10.** Los detalles (comandos, capas, formato del aviso) se fijan al empezar A5:
+  - **Los planos no viven en el repo.** Ni los planos de clientes ni lo que se extrae de ellos se versionan. La CLI se niega a leer un plano que esté dentro de un repositorio git sin ignorar, y lo extraído queda en `.fem/`, que git ya ignora.
+  - **El agente no ve el plano, sólo su geometría.** El lector de la CLI (DXF, IFC, PDF vectorial) trabaja en local y extrae sólo las capas que se le indican (ejes, pilares, muros…). Descarta el cajetín, los textos, los bloques de rótulo y los metadatos (autor, rutas, propiedades de proyecto y cliente del IFC). El agente trabaja con ese extracto; la skill le prohíbe abrir el plano original con sus herramientas, y la superposición de A4 se dibuja con el extracto.
+  - **Aviso que hay que aceptar.** Antes de la primera extracción de cada proyecto, la CLI explica qué sale del equipo (el extracto y lo que el agente lea de él pasan por el servicio de Claude; el plano no) y exige que el usuario lo acepte. Como `fem firmar`, aceptar es sólo del ingeniero: la skill lo prohíbe al agente. La aceptación (quién, cuándo, qué ficheros) queda en `proyecto.origen.json` (A-c).
 
 ## 7. A0–A2: lo que se fija al empezar (2026-10-09)
 
