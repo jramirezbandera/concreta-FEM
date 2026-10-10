@@ -197,8 +197,8 @@ export function vistaMalla(r: ResultadosRender, planta: string, d: DatosVista): 
 
 // ─── Isovalores ─────────────────────────────────────────────────────────────────────────────────
 
-/** Valores del campo en los nudos de cada lámina (4 por lámina; NaN si no tiene) en una combinación. */
-function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, f: ArrayLike<number>): { laminas: number[]; v: Float64Array } {
+/** Valores del campo en los nudos de cada lámina (4 por lámina; NaN si no tiene) en una combinación. El visor interpola con ellos el valor de un punto. */
+export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, f: ArrayLike<number>): { laminas: number[]; v: Float64Array } {
   if (campo === "uz") {
     const { laminas } = r.laminas(planta);
     const v = new Float64Array(4 * laminas.length);

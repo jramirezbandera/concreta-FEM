@@ -1,0 +1,355 @@
+/**
+ * Sesión del visor (V1, `docs/fem3d/visor.md` §3.1): un proyecto abierto con su compilación, sus
+ * resultados y sus consultas. Vive en el worker de sesión, que la guarda entre pedidos para que
+ * compilar, calcular y consultar no bloqueen la interfaz; los tests la usan directamente en Node.
+ *
+ * Todo número que la sesión da sale de las mismas funciones que la CLI (`cli/ordenes.ts`): las
+ * consultas de C5 y de A1, las escenas de A4 y la revisión de A3. La sesión no escribe nada.
+ *
+ * Regla del visor: un resultado sólo existe si viene de un cálculo válido de esta misma huella. Los
+ * resultados guardados por la CLI se usan si su huella, su núcleo (sha256 del WASM) y el sha256 de
+ * sus bytes casan; si no, se dice por qué y se recalcula.
+ *
+ * Puro: sin IO (el núcleo WASM lo inicia quien crea la sesión).
+ */
+import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
+import { resumen, type Resumen } from "../agente/consultas.ts";
+import { leerProyecto, type Proyecto } from "../agente/proyecto.ts";
+import { conjuntoPorDefecto, ResultadosRender, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena } from "../agente/render/index.ts";
+import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
+import { sensatezPrevia } from "../agente/sensatez.ts";
+import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
+import { compilar, type ResultadoCompilacion } from "../compilador/compilar.ts";
+import { Consultas } from "../compilador/consultas.ts";
+import { cotasPlantas } from "../compilador/cotas.ts";
+import { traducirDiagnosticos } from "../compilador/mapeo.ts";
+import { calcular } from "../motor/calcular.ts";
+import type { Diagnostico } from "../motor/diagnosticos.ts";
+import type { ResultadoCaso } from "../motor/modelo.ts";
+import { elegir, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
+
+export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
+
+/** Qué combinaciones usa una pantalla. */
+export type EleccionCombinaciones =
+  /** Las de las consultas de A1 y del render de A4 para el propósito de la vista. */
+  | { tipo: "defecto" }
+  /** Todas las de unas situaciones del generador (la envolvente, o la que gobierna en un mapa). */
+  | { tipo: "situaciones"; situaciones: Situacion[] }
+  /** Una sola combinación del generador, por su nombre. */
+  | { tipo: "combinacion"; situaciones: Situacion[]; nombre: string }
+  /** Un caso suelto. */
+  | { tipo: "caso"; caso: string };
+
+export type VistaPlanta =
+  | { vista: "modelo" }
+  | { vista: "cargas"; caso: string }
+  | { vista: "diagnosticos" }
+  | { vista: "malla" }
+  | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones }
+  | { vista: "vigas"; esfuerzo: "My" | "Vz"; combinaciones: EleccionCombinaciones }
+  | { vista: "pilares-n"; combinaciones: EleccionCombinaciones };
+
+export interface PlantaVisor {
+  id: string;
+  nombre?: string;
+  cota: number | null;
+  /** Altura de la planta (la del modelo físico; null en la cimentación). */
+  altura: number | null;
+  /** Diagnósticos (errores y avisos) de objetos de la planta. */
+  avisos: number;
+  errores: number;
+}
+
+export interface CombinacionDisponible {
+  situacion: Situacion;
+  nombre: string;
+  etiqueta: string;
+}
+
+export interface EstadoSesion {
+  huella: string;
+  nombre?: string;
+  descripcion?: string;
+  compila: boolean;
+  /** Compilación y sensatez previa y, si se calculó, avisos del cálculo; errores primero. */
+  diagnosticos: Diagnostico[];
+  hipotesis: string[];
+  plantas: PlantaVisor[];
+  casos: { id: string; nombre?: string; accion?: string; pesoPropio?: boolean }[];
+  resumen: Resumen | null;
+  estadisticas: { nudos: number; barras: number; laminas: number; ecuaciones?: number } | null;
+  /** Hay resultados válidos de esta huella. */
+  calculado: boolean;
+  /** De dónde salen: un cálculo en esta sesión o los guardados por la CLI. */
+  origen: "calculo" | "guardados" | null;
+  equilibrio: { id: string; fuerzas: number; momentos: number }[];
+  combinaciones: CombinacionDisponible[];
+}
+
+export type Apertura = { valido: true; sesion: Sesion } | { valido: false; diagnosticos: Diagnostico[] };
+
+const ordenSeveridad = (ds: readonly Diagnostico[]) => [...ds].sort((a, b) => (a.severidad === "error" ? 0 : 1) - (b.severidad === "error" ? 0 : 1));
+
+/** Plantas de cada objeto físico (las que atraviesa, para los verticales), para contar los avisos por planta. */
+function plantasDeObjetos(p: Proyecto): Map<string, string[]> {
+  const f = p.modelo;
+  const ids = f.plantas.map((x) => x.id);
+  const idx = new Map(ids.map((id, i) => [id, i]));
+  const rango = (desde: string, hasta: string) => {
+    const a = idx.get(desde);
+    const b = idx.get(hasta);
+    return a === undefined || b === undefined ? [] : ids.slice(Math.min(a, b), Math.max(a, b) + 1);
+  };
+  const m = new Map<string, string[]>();
+  for (const x of f.pilares ?? []) m.set(x.id, rango(x.desde, x.hasta));
+  for (const x of f.muros ?? []) m.set(x.id, rango(x.desde, x.hasta));
+  for (const lista of [f.vigas, f.losas, f.panos, f.bandas, f.apoyosLineales] as ({ id: string; planta?: string }[] | undefined)[]) for (const x of lista ?? []) if (x.planta) m.set(x.id, [x.planta]);
+  for (const id of ids) m.set(id, [id]);
+  return m;
+}
+
+export class Sesion {
+  readonly proyecto: Proyecto;
+  readonly compilacion: ResultadoCompilacion;
+  /** sha256 del núcleo WASM con el que se calcula (el de los resultados guardados tiene que coincidir). */
+  readonly motor: string;
+  private readonly previa: Diagnostico[];
+  private readonly res: Resumen | null;
+  private casosR: ResultadoCaso[] | null = null;
+  private cabecera: CabeceraResultados | null = null;
+  private origenR: "calculo" | "guardados" | null = null;
+  private qC: Consultas | null = null;
+  private rrC: ResultadosRender | null = null;
+  /** Escenas ya hechas, por su clave (las mismas que pide la interfaz al moverse). */
+  private readonly escenas = new Map<string, Escena>();
+
+  private constructor(proyecto: Proyecto, compilacion: ResultadoCompilacion, motor: string) {
+    this.proyecto = proyecto;
+    this.compilacion = compilacion;
+    this.motor = motor;
+    this.previa = sensatezPrevia(proyecto.modelo, proyecto.opciones).flatMap((x) => x.avisos);
+    if (compilacion.valido) {
+      const r = resumen(proyecto, compilacion);
+      this.res = r.valido ? r.valor : null;
+    } else this.res = null;
+  }
+
+  /** Lee y compila un proyecto. No valido: el JSON o su esquema (lo que un modelo que no compila sí tiene: una huella y su dibujo). */
+  static abrir(texto: string, motor: string): Apertura {
+    const l = leerProyecto(texto);
+    if (!l.valido) return { valido: false, diagnosticos: l.diagnosticos };
+    return { valido: true, sesion: new Sesion(l.proyecto, compilar(l.proyecto.modelo, l.proyecto.opciones), motor) };
+  }
+
+  get huella(): string {
+    return this.compilacion.huella;
+  }
+
+  get compilado(): Compilado | null {
+    return this.compilacion.valido ? this.compilacion : null;
+  }
+
+  get calculado(): boolean {
+    return this.casosR !== null;
+  }
+
+  get casos(): ResultadoCaso[] | null {
+    return this.casosR;
+  }
+
+  /** Las consultas de C5 sobre el cálculo (null sin resultados). */
+  get q(): Consultas | null {
+    if (!this.qC && this.casosR && this.compilacion.valido) this.qC = new Consultas(this.proyecto.modelo, this.compilacion, this.casosR, this.proyecto.opciones);
+    return this.qC;
+  }
+
+  get rr(): ResultadosRender | null {
+    const q = this.q;
+    if (!this.rrC && q && this.compilacion.valido) this.rrC = new ResultadosRender(q, this.compilacion);
+    return this.rrC;
+  }
+
+  get resumen(): Resumen | null {
+    return this.res;
+  }
+
+  get cabeceraResultados(): CabeceraResultados | null {
+    return this.cabecera;
+  }
+
+  /** Todos los diagnósticos que se enseñan: compilación, sensatez previa y cálculo. */
+  get diagnosticos(): Diagnostico[] {
+    return ordenSeveridad([...this.compilacion.diagnosticos, ...this.previa, ...(this.cabecera?.diagnosticos ?? [])]);
+  }
+
+  estado(): EstadoSesion {
+    const f = this.proyecto.modelo;
+    const cotas = cotasPlantas(f.plantas);
+    const porObjeto = plantasDeObjetos(this.proyecto);
+    const cuenta = new Map<string, { avisos: number; errores: number }>();
+    for (const d of this.diagnosticos) {
+      const plantas = new Set((d.ids ?? []).flatMap((id) => porObjeto.get(id) ?? []));
+      for (const p of plantas) {
+        const c = cuenta.get(p) ?? { avisos: 0, errores: 0 };
+        if (d.severidad === "error") c.errores++;
+        else c.avisos++;
+        cuenta.set(p, c);
+      }
+    }
+    const c = this.compilacion;
+    return {
+      huella: c.huella,
+      ...(this.proyecto.nombre ? { nombre: this.proyecto.nombre } : {}),
+      ...(this.proyecto.descripcion ? { descripcion: this.proyecto.descripcion } : {}),
+      compila: c.valido,
+      diagnosticos: this.diagnosticos,
+      hipotesis: c.valido ? c.hipotesis : [],
+      plantas: f.plantas.map((p, i) => ({ id: p.id, ...(p.nombre ? { nombre: p.nombre } : {}), cota: cotas[i] ?? null, altura: p.altura, avisos: cuenta.get(p.id)?.avisos ?? 0, errores: cuenta.get(p.id)?.errores ?? 0 })),
+      casos: f.casos.map((x) => ({ id: x.id, ...(x.nombre ? { nombre: x.nombre } : {}), ...(x.accion ? { accion: x.accion.tipo } : {}), ...(x.pesoPropio ? { pesoPropio: true } : {}) })),
+      resumen: this.res,
+      estadisticas: c.valido ? { nudos: c.estadisticas.nudos, barras: c.estadisticas.barras, laminas: c.estadisticas.laminas, ...(this.cabecera ? { ecuaciones: this.cabecera.estadisticas.ecuaciones } : {}) } : null,
+      calculado: this.calculado,
+      origen: this.origenR,
+      equilibrio: (this.cabecera?.casos ?? []).map((x) => ({ id: x.id, ...x.equilibrio })),
+      combinaciones: this.combinacionesDisponibles(),
+    };
+  }
+
+  // ─── Resultados ───────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Usa los resultados que guardó la CLI en `.fem/<huella>/`. Se rechazan (con el motivo) si no son
+   * de esta huella, de este núcleo o si sus bytes no son los que se guardaron.
+   */
+  async usarGuardados(textoCabecera: string, bytes: Uint8Array): Promise<{ ok: true } | { ok: false; motivo: string }> {
+    if (!this.compilacion.valido) return { ok: false, motivo: "el modelo no compila" };
+    let cab: CabeceraResultados & { motor?: string; sha256?: string };
+    try {
+      cab = JSON.parse(textoCabecera) as typeof cab;
+    } catch {
+      return { ok: false, motivo: "resultados.json no es JSON" };
+    }
+    if (cab.huella !== this.huella) return { ok: false, motivo: `son de otra huella (${String(cab.huella).slice(0, 8)})` };
+    if (cab.motor !== this.motor) return { ok: false, motivo: "se calcularon con otro núcleo de cálculo" };
+    if (typeof cab.sha256 !== "string") return { ok: false, motivo: "no llevan el sha256 de sus datos (los guardó una versión anterior de la CLI)" };
+    if ((await sha256Bytes(bytes)) !== cab.sha256) return { ok: false, motivo: "resultados.bin no es el que se guardó (su sha256 no coincide)" };
+    const casos = desempaquetarResultados(cab, bytes);
+    if (!casos) return { ok: false, motivo: "resultados.bin no casa con su cabecera" };
+    if (casos.map((x) => x.id).join("\n") !== this.proyecto.modelo.casos.map((x) => x.id).join("\n")) return { ok: false, motivo: "sus casos no son los del proyecto" };
+    this.fijar(casos, cab, "guardados");
+    return { ok: true };
+  }
+
+  /** Calcula (el núcleo ya iniciado). No válido: el modelo no compila o el cálculo falló (sin equilibrio, mecanismo…). */
+  calcular(): { ok: true; cabecera: CabeceraResultados; bytes: Uint8Array } | { ok: false; diagnosticos: Diagnostico[] } {
+    const c = this.compilacion;
+    if (!c.valido) return { ok: false, diagnosticos: c.diagnosticos.filter((d) => d.severidad === "error") };
+    const r = calcular(c.modelo);
+    const diags = traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo);
+    if (!r.valido) return { ok: false, diagnosticos: ordenSeveridad(diags) };
+    const { cabecera, bytes } = empaquetarResultados(c.huella, r.casos, r.estadisticas, diags);
+    this.fijar(r.casos, cabecera, "calculo");
+    return { ok: true, cabecera, bytes };
+  }
+
+  private fijar(casos: ResultadoCaso[], cabecera: CabeceraResultados, origen: "calculo" | "guardados"): void {
+    this.casosR = casos;
+    this.cabecera = cabecera;
+    this.origenR = origen;
+    this.qC = null;
+    this.rrC = null;
+    this.escenas.clear();
+  }
+
+  // ─── Combinaciones ────────────────────────────────────────────────────────────────────────────
+
+  combinacionesDisponibles(): CombinacionDisponible[] {
+    const q = this.q;
+    if (!q) return [];
+    const r: CombinacionDisponible[] = [];
+    for (const situacion of SITUACIONES) {
+      const x = q.combinaciones({ situaciones: [situacion] });
+      if (x.valido) for (const c of x.valor) r.push({ situacion, nombre: c.id, etiqueta: c.etiqueta });
+    }
+    return r;
+  }
+
+  /** El conjunto de combinaciones de una elección, para un propósito. */
+  conjunto(e: EleccionCombinaciones, proposito: Proposito): { valido: true; valor: ConjuntoCombinaciones } | { valido: false; diagnosticos: Diagnostico[] } {
+    const q = this.q;
+    if (!q || !this.res) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
+    switch (e.tipo) {
+      case "defecto":
+        return proposito === "lineal" ? conjuntoCombinaciones(q, seleccionPorDefecto(q.fisico.casos, "lineal")) : { valido: true, valor: conjuntoPorDefecto(q, this.res, proposito) };
+      case "situaciones":
+        return conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: e.situaciones });
+      case "combinacion": {
+        const r = conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: e.situaciones });
+        if (!r.valido) return r;
+        const k = r.valor.nombres.indexOf(e.nombre);
+        if (k < 0) return { valido: false, diagnosticos: [{ codigo: "visor/combinacion", severidad: "error", mensaje: `No hay ninguna combinación ${e.nombre}.` }] };
+        const v = r.valor;
+        return { valido: true, valor: { descripcion: e.nombre, nombres: [v.nombres[k]!], etiquetas: [v.etiquetas[k]!], factores: [v.factores[k]!] } };
+      }
+      case "caso":
+        return conjuntoCombinaciones(q, { tipo: "expresiones", expresiones: [e.caso] });
+    }
+  }
+
+  // ─── Escenas de planta ────────────────────────────────────────────────────────────────────────
+
+  /** La escena de A4 de una planta (la misma que `fem render`), o por qué no se puede dibujar. */
+  escenaA4(planta: string, v: VistaPlanta): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
+    const f = this.proyecto.modelo;
+    if (!f.plantas.some((p) => p.id === planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${planta} no existe.` }] };
+    const clave = JSON.stringify([planta, v]);
+    const hecha = this.escenas.get(clave);
+    if (hecha) return { valido: true, valor: hecha };
+    const d = { ...(this.proyecto.nombre ? { nombre: this.proyecto.nombre } : {}), huella: this.huella };
+    let e: Escena;
+    switch (v.vista) {
+      case "modelo":
+        e = vistaModelo(f, planta, d);
+        break;
+      case "cargas":
+        if (!f.casos.some((c) => c.id === v.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${v.caso} no existe.` }] };
+        e = vistaCargas(f, planta, v.caso, d);
+        break;
+      case "diagnosticos":
+        e = vistaDiagnosticos(f, planta, this.diagnosticos, d);
+        break;
+      default: {
+        const rr = this.rr;
+        if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Esta vista necesita el cálculo." }] };
+        if (v.vista === "malla") e = vistaMalla(rr, planta, d);
+        else {
+          const conj = this.conjunto(v.combinaciones, v.vista === "campo" && v.campo === "uz" ? "desplazamientos" : "esfuerzos");
+          if (!conj.valido) return conj;
+          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
+        }
+      }
+    }
+    this.escenas.set(clave, e);
+    return { valido: true, valor: e };
+  }
+
+  escena(planta: string, v: VistaPlanta): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
+    const e = this.escenaA4(planta, v);
+    return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
+  }
+
+  /** El objeto bajo un punto de una escena ya pedida (o el objeto dado, para resaltarlo). */
+  elegir(planta: string, v: VistaPlanta, punto: [number, number] | null, radio: number, objeto?: string): Eleccion | null {
+    const e = this.escenaA4(planta, v);
+    if (!e.valido) return null;
+    if (objeto !== undefined) return resaltar(e.valor, objeto);
+    return punto ? elegir(e.valor, punto, radio) : null;
+  }
+}
+
+/** sha256 en hexadecimal de unos bytes, con el SubtleCrypto del entorno (navegador, worker, Node o Bun). */
+export async function sha256Bytes(bytes: Uint8Array): Promise<string> {
+  const h = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>));
+  return Array.from(h, (b) => b.toString(16).padStart(2, "0")).join("");
+}

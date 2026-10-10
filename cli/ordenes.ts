@@ -161,6 +161,7 @@ export const carpetaResultados = (rutaProyecto: string, huella: string) => join(
 export const rutaFirmas = (rutaProyecto: string) => join(dirname(rutaProyecto), `${basename(rutaProyecto).replace(/\.json$/i, "")}.revision.json`);
 
 const sha256 = (texto: string) => createHash("sha256").update(texto, "utf8").digest("hex");
+const sha256Bytes = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const rel = (ruta: string) => relative(process.cwd(), ruta).split(sep).join("/");
 
 interface Calculado {
@@ -181,8 +182,10 @@ async function calculado(orden: string, ruta: string, p: Proyecto, recalcular: b
   const [fCab, fBin] = [join(carpeta, "resultados.json"), join(carpeta, "resultados.bin")];
   if (!recalcular && existsSync(fCab) && existsSync(fBin)) {
     try {
-      const cabecera = JSON.parse(readFileSync(fCab, "utf8")) as CabeceraResultados & { motor?: string };
-      const casos = cabecera.huella === c.huella && cabecera.motor === huellaMotor() ? desempaquetarResultados(cabecera, new Uint8Array(readFileSync(fBin))) : null;
+      const cabecera = JSON.parse(readFileSync(fCab, "utf8")) as CabeceraResultados & { motor?: string; sha256?: string };
+      const bin = new Uint8Array(readFileSync(fBin));
+      // Misma huella, mismo núcleo y los mismos bytes que se guardaron (el visor comprueba lo mismo, V1)
+      const casos = cabecera.huella === c.huella && cabecera.motor === huellaMotor() && cabecera.sha256 === sha256Bytes(bin) ? desempaquetarResultados(cabecera, bin) : null;
       if (casos) return { compilacion: c, casos, cabecera, reutilizados: true, tiempos: { compilar: tCompilar } };
     } catch {
       // resultados rotos: se recalculan
@@ -195,7 +198,7 @@ async function calculado(orden: string, ruta: string, p: Proyecto, recalcular: b
   const diags = traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo);
   if (!r.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos([...c.diagnosticos, ...diags]) } };
   const { cabecera, bytes } = empaquetarResultados(c.huella, r.casos, r.estadisticas, diags);
-  guardar(carpeta, { ...cabecera, motor: huellaMotor() }, bytes);
+  guardar(carpeta, { ...cabecera, motor: huellaMotor(), sha256: sha256Bytes(bytes) }, bytes);
   return { compilacion: c, casos: r.casos, cabecera, reutilizados: false, tiempos: { compilar: tCompilar, calcular: tCalcular } };
 }
 
