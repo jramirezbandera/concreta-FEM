@@ -249,6 +249,7 @@
   - `bun run visor <fichero> --nuevo` crea un proyecto con la plantilla. La skill dice al agente que lea el fichero justo antes de cambiarlo.
   - **Validación:** `src/editor/*.test.ts`, `app/src/test/editor.test.tsx` y `servidor.test.ts`, y el banco en Chrome `validacion/v2a/chrome.ts` (`out_chrome.txt`).
   - **Pendiente del usuario:** el criterio 6 (meter desde cero un proyecto suyo real, calcularlo y revisarlo) y probar a mano guardar en una carpeta.
+- **2026-10-11: la app, en GitHub Pages** (https://jramirezbandera.github.io/concreta-FEM/), desplegada en cada push a `main` por `.github/workflows/pages.yml`. Allí no hay servidor local: se abre una carpeta (Chrome y Edge) o se empieza un proyecto nuevo, que se descarga al guardar.
 - **Siguiente paso:**
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
