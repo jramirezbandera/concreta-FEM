@@ -241,7 +241,7 @@
   - **Pendiente del usuario:** el criterio 6 (usarlo con los tres proyectos de A2), probar «Abrir la carpeta» a mano y decidir sobre el criterio 4 (aceptarlo o adelantar C5-4).
 - **2026-10-11: V2 antes que la capa de agente** (decisión del usuario): sin una app web en la que el ingeniero meta los datos y vea los resultados, no se sigue con A5–A7. Decisiones V-d (se guarda en el `proyecto.json` del disco), V-e (primero tablas y coordenadas, después el ratón) y V-f (primer tramo: plantas, pilares, vigas, losas y cargas), en `visor.md` §5.
 - **Siguiente paso:**
-  - V2a, el editor por tablas: la propuesta está en `visor.md` §6, pendiente de que el usuario la acepte antes de escribir código;
+  - V2a, el editor por tablas, en curso: el plan está en `visor.md` §6, aceptado tal cual el 2026-10-11;
   - después, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).

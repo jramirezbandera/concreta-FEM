@@ -4,7 +4,7 @@
 >
 > **Estado:** §3 aceptada por el usuario el 2026-10-11, con las decisiones de §5. V1 hecha el 2026-10-11: pasa los criterios 1, 2, 3 y 5; el 4 queda a medias (la primera magnitud SPR de una planta, V1-3) y el 6 es del usuario. El informe está en `fase-v1.md`.
 >
-> **V2 (2026-10-11):** el usuario la pone antes que A5: sin una app en la que meter los datos y ver los resultados, la capa de agente no tiene sobre qué apoyarse. Decisiones V-d, V-e y V-f en §5; propuesta de V2a en §6, pendiente de aceptar.
+> **V2 (2026-10-11):** el usuario la pone antes que A5: sin una app en la que meter los datos y ver los resultados, la capa de agente no tiene sobre qué apoyarse. Decisiones V-d, V-e y V-f en §5; propuesta de V2a en §6, aceptada tal cual el 2026-10-11.
 >
 > **Por qué ahora y no después de A5.** La capa de agente da por hecho que el ingeniero revisa y firma «sobre un informe y un visor» (`agente.md`, veredicto), y la superposición con la que A5 confirma un plano se ve mucho mejor en un visor que en una PNG. Hasta ahora sólo existen los prototipos (lienzo «FEM 3D · Interfaz», v3) y los SVG/PNG de `fem render`.
 
@@ -107,7 +107,7 @@ Las de los prototipos v3 (1, 3, 4, 5, 6 y 7), sin lo que es de edición.
 
 ## 6. V2a: lo que se fija al empezar
 
-Lo propone el agente; está pendiente de que el usuario lo acepte antes de escribir código.
+Lo propuso el agente y el usuario lo aceptó tal cual el 2026-10-11, antes de escribir código.
 
 ### 6.1 Arquitectura
 
