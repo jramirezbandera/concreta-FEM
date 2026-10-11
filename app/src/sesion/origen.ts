@@ -121,7 +121,9 @@ export function origenUrl(url: string): Origen {
   const pedir = async (nombre: string, metodo: "GET" | "HEAD") => {
     try {
       const r = await fetch(base + nombre.split("/").map(encodeURIComponent).join("/"), { method: metodo, cache: "no-store" });
-      return r.ok ? r : null;
+      // El servidor del visor contesta a un HEAD de un fichero que no existe con 204 y «x-existe: no»
+      // (un 404 por segundo, al vigilar las firmas, llenaría la consola de errores)
+      return r.ok && r.headers.get("x-existe") !== "no" ? r : null;
     } catch {
       return null;
     }

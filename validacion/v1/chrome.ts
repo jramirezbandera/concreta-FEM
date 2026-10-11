@@ -65,7 +65,8 @@ const servidor = createServer((req, res) => {
   const ruta = decodeURIComponent(url.pathname);
   const fichero = ruta.startsWith("/p/") ? normalize(join(datos, ruta.slice(3))) : normalize(join(DIST, ruta === "/" ? "index.html" : ruta));
   if (!(fichero.startsWith(datos) || fichero.startsWith(DIST)) || !existsSync(fichero) || !statSync(fichero).isFile()) {
-    res.writeHead(404).end();
+    // Como el servidor del visor (app/visor.ts): un HEAD de lo que no existe, 204 con «x-existe: no»
+    res.writeHead(req.method === "HEAD" ? 204 : 404, req.method === "HEAD" ? { "x-existe": "no" } : {}).end();
     return;
   }
   const st = statSync(fichero);

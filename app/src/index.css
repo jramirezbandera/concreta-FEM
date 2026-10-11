@@ -112,11 +112,12 @@ html.theme-switching *::after {
   --color-scrollbar: #94a3b8;
   --color-scrollbar-hover: #64748b;
 
-  /* Diagramas por signo (como fem2d-diag-pos/neg de Concreta) */
-  --color-diag-pos: #2563eb;
-  --color-diag-neg: #dc2626;
-  --color-diag-pos-f: #e3ecfd;
-  --color-diag-neg-f: #fde8e8;
+  /* Envolventes del alzado de vigas: máximo en rojo y mínimo en azul, como lo positivo y lo negativo
+     de los diagramas en planta de A4 (diagrama-positivo y -negativo de src/agente/render/svg.ts) */
+  --color-env-max: #dc2626;
+  --color-env-min: #2563eb;
+  --color-env-max-f: #fde8e8;
+  --color-env-min-f: #e3ecfd;
   --color-uy: #0e7490;
 
   --color-tint-accent: color-mix(in srgb, var(--color-accent) 8%, transparent);
@@ -153,10 +154,10 @@ html[data-theme="dark"] {
   --color-dot-grid: #1f1f26;
   --color-scrollbar: #34343c;
   --color-scrollbar-hover: #4b4f59;
-  --color-diag-pos: #38bdf8;
-  --color-diag-neg: #f87171;
-  --color-diag-pos-f: #0f2a38;
-  --color-diag-neg-f: #3a1717;
+  --color-env-max: #f87171;
+  --color-env-min: #38bdf8;
+  --color-env-max-f: #3a1717;
+  --color-env-min-f: #0f2a38;
   --color-uy: #2dd4bf;
 }
 

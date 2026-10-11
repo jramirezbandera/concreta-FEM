@@ -37,7 +37,9 @@ const servirCarpeta: Plugin = {
       const f = normalize(join(carpeta, decodeURIComponent((req.url ?? "").split("?")[0]!)));
       const valido = (req.method === "GET" || req.method === "HEAD") && f.startsWith(carpeta + sep) && existsSync(f) && statSync(f).isFile();
       if (!valido) {
-        res.statusCode = req.method === "GET" || req.method === "HEAD" ? 404 : 405;
+        // Un HEAD de lo que no existe es la vigilancia (las firmas aún sin firmar): 204, sin error en la consola
+        if (req.method === "HEAD") res.setHeader("x-existe", "no");
+        res.statusCode = req.method === "HEAD" ? 204 : req.method === "GET" ? 404 : 405;
         res.end();
         return;
       }

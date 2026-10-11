@@ -82,10 +82,10 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
           {v.id} · {v.esfuerzo} · envolvente de {v.combinaciones.nombres.length}
         </span>
         <span className="flex items-center gap-1">
-          <i className="inline-block h-[3px] w-4 bg-[var(--color-diag-pos)]" /> máximo
+          <i className="inline-block h-[3px] w-4 bg-[var(--color-env-max)]" /> máximo
         </span>
         <span className="flex items-center gap-1">
-          <i className="inline-block h-[3px] w-4 bg-[var(--color-diag-neg)]" /> mínimo
+          <i className="inline-block h-[3px] w-4 bg-[var(--color-env-min)]" /> mínimo
         </span>
         <span className="flex items-center gap-1">
           <i className="inline-block h-[10px] w-4 bg-bg-elevated" /> apoyo (zona rígida)
@@ -106,11 +106,11 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
             </text>
           </g>
         ))}
-        <path d={area("max")} fill="var(--color-diag-pos-f)" opacity={0.9} />
-        <path d={area("min")} fill="var(--color-diag-neg-f)" opacity={0.9} />
+        <path d={area("max")} fill="var(--color-env-max-f)" opacity={0.9} />
+        <path d={area("min")} fill="var(--color-env-min-f)" opacity={0.9} />
         <line x1={ml} x2={w - mr} y1={y0} y2={y0} stroke="var(--color-text-disabled)" strokeWidth={1} />
-        <path d={camino("max")} fill="none" stroke="var(--color-diag-pos)" strokeWidth={1.4} />
-        <path d={camino("min")} fill="none" stroke="var(--color-diag-neg)" strokeWidth={1.4} />
+        <path d={camino("max")} fill="none" stroke="var(--color-env-max)" strokeWidth={1.4} />
+        <path d={camino("min")} fill="none" stroke="var(--color-env-min)" strokeWidth={1.4} />
         {picos.map((p, i) => (
           <text key={i} x={X(p.s)} y={Y(p.v) + (Y(p.v) > y0 ? 13 : -5)} fontSize={10.5} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)" className="halo">
             {fmt(p.v, 1)}
@@ -135,7 +135,8 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
           <td data-estacion={x.max.v}>
             {fmt(x.max.v, 2)}
             <small>
-              {x.max.comb} · {x.max.etiqueta}
+              {x.max.comb}
+              {x.max.etiqueta !== x.max.comb ? ` · ${x.max.etiqueta}` : ""}
             </small>
           </td>
         </tr>
@@ -144,7 +145,8 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
           <td>
             {fmt(x.min.v, 2)}
             <small>
-              {x.min.comb} · {x.min.etiqueta}
+              {x.min.comb}
+              {x.min.etiqueta !== x.min.comb ? ` · ${x.min.etiqueta}` : ""}
             </small>
           </td>
         </tr>

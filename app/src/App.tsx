@@ -73,21 +73,20 @@ export function App() {
     <ContextoVisor.Provider value={{ proyecto, planta: plantaValida, setPlanta, seleccion, setSeleccion, irA: setPantalla }}>
       <div className="flex h-full flex-col">
         <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border-main bg-bg-primary px-3">
-          <span className="flex items-center gap-1.5 text-[15px] font-semibold">
+          <span className="flex shrink-0 items-center gap-1.5 text-[15px] font-semibold">
             <span className="inline-block h-[7px] w-[7px] rounded-full bg-accent" aria-hidden="true" />
             Concreta
           </span>
-          <span className="truncate text-[11px] uppercase tracking-[0.06em] text-text-disabled">
+          <span className="min-w-0 flex-1 truncate text-[11px] uppercase tracking-[0.06em] text-text-disabled">
             Análisis / FEM 3D / <span className="normal-case tracking-normal text-text-primary">{e?.nombre ?? (proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? ""))}</span>
           </span>
-          <nav className="seg ml-2" aria-label="Pantallas">
+          <nav className="seg ml-2 shrink-0" aria-label="Pantallas">
             {PANTALLAS.map((x) => (
               <button key={x.id} type="button" data-on={pantalla === x.id} aria-current={pantalla === x.id ? "page" : undefined} disabled={x.calculo && !e?.calculado} title={x.calculo && !e?.calculado ? "Necesita el cálculo" : undefined} onClick={() => setPantalla(x.id)}>
                 {x.nombre}
               </button>
             ))}
           </nav>
-          <span className="flex-1" />
           <span className="pill neu" title="El visor sólo lee: el modelo se edita en el proyecto.json (agente o a mano) y se firma con «fem firmar»">
             SÓLO LECTURA
           </span>
@@ -122,20 +121,19 @@ export function App() {
         </main>
 
         <footer className="flex h-7 shrink-0 items-center gap-4 border-t border-border-main bg-bg-surface px-3 font-mono text-[11px] text-text-disabled">
-          <span className="truncate">{pie}</span>
-          <span className="truncate">{resultados}</span>
-          <span className="flex-1" />
+          <span className="min-w-0 shrink truncate">{pie}</span>
+          <span className="min-w-0 flex-1 truncate">{resultados}</span>
           {e?.estadisticas && (
-            <span>
+            <span className="shrink-0 whitespace-nowrap">
               {e.estadisticas.nudos} nudos{e.estadisticas.ecuaciones ? ` · ${e.estadisticas.ecuaciones} ecuaciones` : ""} · {e.estadisticas.barras} barras · {e.estadisticas.laminas} láminas
             </span>
           )}
           {e?.sha256Resultados && (
-            <span title={`sha256 de resultados.bin: ${e.sha256Resultados}`} data-sha={e.sha256Resultados} data-origen={e.origen}>
+            <span className="shrink-0 whitespace-nowrap" title={`sha256 de resultados.bin: ${e.sha256Resultados}`} data-sha={e.sha256Resultados} data-origen={e.origen}>
               resultados {e.sha256Resultados.slice(0, 8)}
             </span>
           )}
-          {proyecto.cliente?.motor && <span title="sha256 del núcleo WASM">núcleo {proyecto.cliente.motor.slice(0, 8)}</span>}
+          {proyecto.cliente?.motor && <span className="shrink-0 whitespace-nowrap" title="sha256 del núcleo WASM">núcleo {proyecto.cliente.motor.slice(0, 8)}</span>}
         </footer>
       </div>
     </ContextoVisor.Provider>
