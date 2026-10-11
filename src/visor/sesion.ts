@@ -39,7 +39,9 @@ export type EleccionCombinaciones =
   /** Una sola combinación del generador, por su nombre. */
   | { tipo: "combinacion"; situaciones: Situacion[]; nombre: string }
   /** Un caso suelto. */
-  | { tipo: "caso"; caso: string };
+  | { tipo: "caso"; caso: string }
+  /** Una combinación, por su nombre, de las de otra elección (la pésima de un conjunto, para la deformada). */
+  | { tipo: "una"; de: EleccionCombinaciones; nombre: string };
 
 export type VistaPlanta =
   | { vista: "modelo" }
@@ -294,6 +296,14 @@ export class Sesion {
       }
       case "caso":
         return conjuntoCombinaciones(q, { tipo: "expresiones", expresiones: [e.caso] });
+      case "una": {
+        const r = this.conjunto(e.de, proposito);
+        if (!r.valido) return r;
+        const k = r.valor.nombres.indexOf(e.nombre);
+        if (k < 0) return { valido: false, diagnosticos: [{ codigo: "visor/combinacion", severidad: "error", mensaje: `No hay ninguna combinación ${e.nombre}.` }] };
+        const v = r.valor;
+        return { valido: true, valor: { descripcion: e.nombre, nombres: [v.nombres[k]!], etiquetas: [v.etiquetas[k]!], factores: [v.factores[k]!] } };
+      }
     }
   }
 

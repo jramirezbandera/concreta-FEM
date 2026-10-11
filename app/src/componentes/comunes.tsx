@@ -77,7 +77,7 @@ export function SelectorCombinaciones({ estado, valor, onCambio, etiqueta, soloU
     <label className="flex flex-col gap-1 px-3.5 py-2">
       <span className="text-[11px] text-text-secondary">{etiqueta}</span>
       <select className="sel w-full" value={codificar(valor)} onChange={(e) => onCambio(JSON.parse(e.target.value) as EleccionCombinaciones)}>
-        {!soloUna && <option value={codificar({ tipo: "defecto" })}>Por defecto (las de las consultas)</option>}
+        {!soloUna && <option value={codificar({ tipo: "defecto" })}>Por defecto</option>}
         {!soloUna && porSituacion.size > 0 && (
           <optgroup label="Envolvente de una situación">
             {[...porSituacion].map(([s, cs]) => (

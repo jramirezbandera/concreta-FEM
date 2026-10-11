@@ -183,7 +183,7 @@ body {
   font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
   color: var(--color-text-disabled);
 }
-.sec > span:last-child { letter-spacing: 0; text-transform: none; font-weight: 500; font-family: var(--font-mono); }
+.sec > span + span { letter-spacing: 0; text-transform: none; font-weight: 500; font-family: var(--font-mono); }
 
 .fila {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -262,7 +262,9 @@ body {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; vertical-align: top;
   color: var(--color-text-primary); white-space: nowrap;
 }
-.tb td small { display: block; font-size: 10px; color: var(--color-text-disabled); }
+.tb td small { display: block; font-size: 10px; color: var(--color-text-disabled); white-space: normal; }
+/* Sin mayúsculas: ν pasaría a Ν, que se lee N */
+.tb th.nu { text-transform: none; font-size: 11px; }
 .tb td.txt { font-family: var(--font-sans); white-space: normal; }
 .tb tr.max td, .tb tr[data-on="true"] td { background: var(--color-tint-accent); }
 .tb tr.clic { cursor: pointer; }
