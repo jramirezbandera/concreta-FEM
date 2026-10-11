@@ -80,6 +80,16 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 
 Lo que no cuadre, pregúntalo o corrígelo en el fichero, como un diagnóstico.
 
+### Visor (para el ingeniero)
+
+El ingeniero revisa el modelo y los resultados en el visor de sólo lectura (V1). Si quiere verlo, dile que lo abra él con:
+
+```
+bun run visor proyecto.json    # escribe una URL local (127.0.0.1) que abre el visor sobre ese fichero
+```
+
+El visor vigila el fichero: cada vez que lo editas, se recarga y recalcula solo (o usa lo que dejó `fem calcular` en `.fem/`). No escribe nada y no firma. Tú no lo necesitas: tus números salen de la CLI.
+
 ## El fichero
 
 ```json

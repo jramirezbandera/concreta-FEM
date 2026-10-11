@@ -128,7 +128,7 @@ export function origenUrl(url: string): Origen {
   };
   const selloDe = (r: Response) => r.headers.get("etag") ?? `${r.headers.get("last-modified") ?? ""}/${r.headers.get("content-length") ?? ""}`;
   return {
-    descripcion: `servidor local / ${decodeURIComponent(url).replace(/^\/@fs\//, "")}`,
+    descripcion: `servidor local / ${decodeURIComponent(url).replace(/^\/(@fs|proyecto)\//, "")}`,
     fichero,
     async leer(nombre) {
       const r = await pedir(nombre, "GET");

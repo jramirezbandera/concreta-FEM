@@ -134,7 +134,8 @@ describe("criterio 1 de A1: cada consulta da lo mismo que las llamadas a mano", 
     for (const g of r.grupos) comprobarGrupo(M.q, cj, g);
     // Las vigas en el diafragma rígido no dan axil
     expect(r.grupos.find((g) => g.tipo === "viga")!.axilSinValor).toBe(13);
-  });
+    // Unos 40 s solo; con la batería entera en paralelo (los tests del visor, V1) pasaba de 60
+  }, 180_000);
 
   it("envolventes: viguetas, por caso, y los filtros por tipo y planta", () => {
     const cj = conjunto(U.q, "esfuerzos");
