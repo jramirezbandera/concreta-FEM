@@ -239,8 +239,10 @@
   - **Validación:** `src/visor/visor.test.ts`, `app/src/test/pantallas.test.tsx` y el banco en Chrome `validacion/v1/chrome.ts` (`out_chrome.txt`).
   - **Licencias:** código de Concreta copiado (V-a) y Geist con OFL (V-b), en `NOTICE`.
   - **Pendiente del usuario:** el criterio 6 (usarlo con los tres proyectos de A2), probar «Abrir la carpeta» a mano y decidir sobre el criterio 4 (aceptarlo o adelantar C5-4).
+- **2026-10-11: V2 antes que la capa de agente** (decisión del usuario): sin una app web en la que el ingeniero meta los datos y vea los resultados, no se sigue con A5–A7. Decisiones V-d (se guarda en el `proyecto.json` del disco), V-e (primero tablas y coordenadas, después el ratón) y V-f (primer tramo: plantas, pilares, vigas, losas y cargas), en `visor.md` §5.
 - **Siguiente paso:**
-  - A5 de la capa de agente (entrada desde planos), con A-e decidida el 2026-10-10 (`agente.md` §6): los planos fuera del repo, el agente sólo ve la geometría extraída en local (sin cajetín, textos ni metadatos) y el ingeniero acepta un aviso antes de la primera extracción;
+  - V2a, el editor por tablas: la propuesta está en `visor.md` §6, pendiente de que el usuario la acepte antes de escribir código;
+  - después, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - el resto de la capa de agente (A6–A7).
+  - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

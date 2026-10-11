@@ -4,6 +4,8 @@
 >
 > **Estado:** §3 aceptada por el usuario el 2026-10-11, con las decisiones de §5. V1 hecha el 2026-10-11: pasa los criterios 1, 2, 3 y 5; el 4 queda a medias (la primera magnitud SPR de una planta, V1-3) y el 6 es del usuario. El informe está en `fase-v1.md`.
 >
+> **V2 (2026-10-11):** el usuario la pone antes que A5: sin una app en la que meter los datos y ver los resultados, la capa de agente no tiene sobre qué apoyarse. Decisiones V-d, V-e y V-f en §5; propuesta de V2a en §6, pendiente de aceptar.
+>
 > **Por qué ahora y no después de A5.** La capa de agente da por hecho que el ingeniero revisa y firma «sobre un informe y un visor» (`agente.md`, veredicto), y la superposición con la que A5 confirma un plano se ve mucho mejor en un visor que en una PNG. Hasta ahora sólo existen los prototipos (lienzo «FEM 3D · Interfaz», v3) y los SVG/PNG de `fem render`.
 
 ## 1. Fases
@@ -11,7 +13,7 @@
 | Fase | Contenido |
 |---|---|
 | **V1 Visor de sólo lectura** | Abrir, calcular o reutilizar `.fem/`, recargar al cambiar el fichero. Pantallas: modelo (planta y 3D), losas, vigas, pilares, desplomes y revisión. No escribe nada |
-| **V2 Editor por plantas** | Editar el modelo físico en la interfaz (pantalla 1 completa) y aceptar o rechazar los cambios que propone el agente (pantalla 2). Necesita decidir cómo conviven las ediciones del agente y las del ingeniero sobre el mismo fichero |
+| **V2 Editor por plantas** | Meter y editar el modelo físico en la interfaz (pantalla 1 completa) y guardarlo en el `proyecto.json`, para que el ingeniero use la app sin el agente. Por tramos: V2a (tablas: plantas, pilares, vigas, losas y cargas), V2b (muros, forjados y bandas) y V2c (dibujo con el ratón). Va antes que A5 (decisión del usuario, 2026-10-11). La pantalla 2 (propuestas del agente) sale de V2 y va con la capa de agente. Lo fijado al empezar está en §6 |
 | **V3 Móvil y Concreta** | Pantalla 8 (consulta en obra), persistencia en IndexedDB (H44), offline, y llevarlo a `src/features/fem3d/` de Concreta con el PR que decida el usuario |
 
 ## 2. Lo que ya está decidido y se usa
@@ -99,3 +101,83 @@ Las de los prototipos v3 (1, 3, 4, 5, 6 y 7), sin lo que es de edición.
 - **V-a. Código de Concreta:** se copian aquí los ficheros de §4, que son sólo del usuario, citando el origen en cada uno y en `NOTICE`. Quedan publicados con el repo.
 - **V-b. Tipografía:** Geist y Geist Mono, como Concreta. SIL OFL 1.1 se admite sólo para fuentes (regla 6).
 - **V-c. Móvil:** fuera de V1; va con V3.
+- **V-d. Dónde se guarda (2026-10-11):** en el `proyecto.json` del disco, que sigue siendo la única fuente de verdad (regla A2). Se escribe con la File System Access API (Chrome y Edge) o con el servidor local de `bun run visor`. IndexedDB sigue en V3.
+- **V-e. Cómo se mete el modelo (2026-10-11):** primero con tablas y coordenadas, con el dibujo sólo para ver y elegir (V2a y V2b). Después, el dibujo con el ratón (V2c).
+- **V-f. Primer tramo (2026-10-11):** plantas, pilares, vigas, losas y cargas (V2a). Muros y forjados, en un segundo tramo (V2b).
+
+## 6. V2a: lo que se fija al empezar
+
+Lo propone el agente; está pendiente de que el usuario lo acepte antes de escribir código.
+
+### 6.1 Arquitectura
+
+Es la de V1 (§3.1) con dos piezas nuevas: las operaciones de edición, puras, y la escritura del fichero.
+
+```
+             ┌─ hilo principal (React) ─────────────┐      ┌─ worker de sesión ────────────────┐
+tablas ─────►│ operación → proyecto' (src/editor/)  │─────►│ validar + compilar (sin calcular) │
+inspector    │ deshacer / rehacer, «sin guardar»    │◄─────│ diagnósticos y escena, por huella │
+             │ Guardar ─► proyecto.json (V-d)       │      │ Calcular: igual que en V1         │
+             └──────────────────────────────────────┘      └───────────────────────────────────┘
+```
+
+- **`src/editor/` (puro, como el motor):** cada cambio es una operación (`crear`, `cambiar`, `borrar`, `renombrar`, `copiarAPlantas`, `pegarTabla`) que toma un `Proyecto` y devuelve el proyecto nuevo y su inversa. Sin React ni DOM, así que se prueba en Node y se llevará a Concreta tal cual.
+  - **Integridad referencial:**
+    - renombrar un id cambia todas sus referencias (`pilar.desde`, `viga.seccion`, `carga.caso`, `carga.viga`…);
+    - borrar algo que otro usa (una planta, una sección, un caso) dice qué lo usa y sólo se hace si se confirma, borrando o reasignando esas referencias;
+    - los ids nuevos salen solos (`P1`, `V1`, `L1`…) y se pueden cambiar.
+  - **Lo que se escribe en una celda** se comprueba en el campo (número, signo, unidad, id que existe) y no entra si no vale. Lo que sólo puede ver el compilador (un pilar fuera de las losas, una viga suelta…) sí entra, y se enseña como diagnóstico.
+  - **Deshacer y rehacer** en memoria, por operación. Deshacer devuelve el proyecto anterior bit a bit.
+- **Validación en vivo:** con cada cambio, el worker valida el esquema, compila y pasa la sensatez sin cálculo (A3), con la última versión y descartando las anteriores por su huella. Los diagnósticos y avisos salen en la tabla, en el inspector y sobre el dibujo.
+  - **No calcula solo:** compilar tarda 0,85 s en el edificio objetivo, y calcular, 3–4 s. Calcular es un botón.
+  - **Resultados desactualizados:** al primer cambio, antes de cualquier otra cosa, como en V1 (criterio 3).
+- **Guardar (V-d):**
+  - **Explícito,** con Ctrl+S y el botón, y la marca «sin guardar». Al cerrar con cambios sin guardar, se avisa.
+  - **Formato canónico:** JSON con 2 espacios y las claves en el orden de los tipos. Un proyecto escrito a mano o por el agente cambia de formato la primera vez que se guarda, pero no de contenido ni de huella.
+  - **Nunca se guarda un fichero que no pase `leerProyecto`.** Un modelo que no compila sí se guarda (es trabajo a medias): `validar` y `compilar` lo dirán.
+  - **Carpeta (Chrome y Edge):** se pide permiso de escritura al guardar por primera vez. `createWritable` escribe un fichero temporal y lo cambia por el anterior al cerrar, así que nunca queda medio escrito.
+  - **Servidor local:** `PUT /proyecto/<fichero>` sólo para el proyecto abierto. Sólo atiende en 127.0.0.1 y comprueba `Origin` y `Host`, para que otra web no pueda escribir. Escribe un temporal y lo renombra.
+  - **Proyecto arrastrado (sin carpeta), o en Firefox y Safari:** guardar descarga el fichero.
+  - **Conflicto:** si el fichero cambió en el disco desde que se leyó (por el agente o a mano), no se sobrescribe en silencio. Se dice, y hay que elegir entre recargar (y perder lo propio) o sobrescribir. Si cambia con cambios sin guardar, tampoco se recarga solo. No hay fusión: con la pantalla 2 fuera de V2, basta con no perder nada sin avisar.
+- **Nuevo proyecto:** con una carpeta, el nombre del fichero y una plantilla mínima (una planta, HA-30 y los casos G y Q con su acción).
+
+### 6.2 Pantalla Modelo en modo edición
+
+Es la pantalla 1 de los prototipos v3, en el estilo denso de Concreta: lista de plantas a la izquierda, la planta en el centro y la tabla del tipo de objeto elegido. El inspector es el formulario del objeto seleccionado.
+
+| Tabla | Columnas |
+|---|---|
+| **Plantas** | id, nombre, tipo, altura, cota (calculada), diafragma; insertar encima o debajo |
+| **Materiales y secciones** | id, tipo, fck o E, ν, peso; forma y dimensiones, con A, I y J calculadas al lado (`seccion3D`) |
+| **Pilares** | id, x, y, desde, hasta, sección, giro, base, tramos por planta (sección distinta por tramo) |
+| **Vigas** | id, planta, puntos (`x1,y1; x2,y2; …`), sección, inserción, liberaciones |
+| **Losas** | id, planta, contorno, huecos, espesor, material, pp |
+| **Apoyos** | id, planta, x, y, GDL coartados |
+| **Casos** | id, nombre, peso propio, acción (tipo, ψ por su nombre, familia, dirección), con las combinaciones CTE/NCSE que salen al lado (sólo lectura) |
+| **Cargas** | por tipo: puntual, en viga, en pilar, de superficie (losa o zona) y lineal; con caso, valores y extensión |
+
+- **Tabla y dibujo, enlazados:** elegir una fila resalta el objeto en la planta y lo centra, y elegir en la planta lleva a su fila. La tabla se filtra por la planta activa (salvo plantas, materiales, secciones y casos).
+- **Pegar desde Excel:** un bloque de celdas separado por tabuladores crea o cambia filas, de una vez y con un solo deshacer. Si una fila no vale, no entra nada y se dice qué fila falla y por qué.
+- **Copiar a otras plantas:** los objetos elegidos (o la planta entera) a las plantas que se marquen. Los ids nuevos llevan la planta.
+- **Las opciones de compilación** se ven, pero no se editan en V2a.
+
+**Fuera de V2a:** muros y empujes, reticular, unidireccional, apoyos lineales y bandas editables (V2b); dibujar y mover con el ratón, ejes y enganches (V2c); la pantalla 2 (con la capa de agente); editar las opciones de compilación; IndexedDB y móvil (V3).
+
+### 6.3 Criterios de paso
+
+1. **Ida y vuelta.** Abrir y guardar sin cambios `ejemplo.json` y los tres proyectos de A2 da el mismo modelo, comparado en profundidad, y la misma huella. Guardar otra vez da los mismos bytes.
+2. **Las operaciones nunca rompen el fichero.** Con sucesiones al azar de operaciones (también renombrar y borrar con referencias) sobre los proyectos de ejemplo y modelos al azar (tests de propiedades):
+   - el proyecto pasa siempre `leerProyecto`;
+   - no queda ninguna referencia a un id que no existe, salvo que el usuario lo haya confirmado al borrar, y entonces sale su diagnóstico;
+   - deshacer toda la sucesión devuelve los bytes del principio.
+3. **Se puede meter un edificio de verdad.** 1-022 y el edificio objetivo se reconstruyen desde un proyecto vacío sólo con operaciones del editor (las mismas que lanzan la tabla, el pegado y «copiar a plantas»), y dan la huella de su `proyecto.json`. Un test de DOM mete un modelo pequeño escribiendo en las tablas y comprueba la misma huella.
+4. **Nunca se pierde ni se pisa nada en silencio.** Con tests:
+   - un cambio en el disco con cambios sin guardar no recarga ni se sobrescribe: avisa;
+   - un guardado que falla (sin permiso, disco lleno) lo dice y conserva los cambios;
+   - los resultados se marcan como desactualizados con el primer cambio, y una compilación o un cálculo de una versión anterior se descarta por su huella;
+   - el servidor local rechaza un `PUT` de otro fichero, de fuera de la carpeta o con otro `Origin`.
+5. **Fluidez, en el edificio objetivo** (en sobremesa, en Chrome):
+   - escribir en una celda o pegar 80 filas no da tareas largas de más de 50 ms en el hilo principal;
+   - los diagnósticos de un cambio salen en ≤ 1,5 s;
+   - guardar tarda ≤ 0,5 s.
+6. **Puerta de uso.** El usuario mete desde cero un proyecto suyo real con la app, lo calcula y revisa los resultados en las pantallas de V1. Lo que le falte se apunta para V2a.1, V2b o V2c.
