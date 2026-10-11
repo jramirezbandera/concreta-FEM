@@ -2,7 +2,7 @@
 
 > **Qué es.** Rehacer la interfaz de la app (V1 + V2a) para que se parezca a CYPECAD y SAP2000, pero como una aplicación actual: el dibujo manda, hay barra de herramientas, varias vistas de la estructura (planta, alzados por eje y 3D), un 3D con las secciones extruidas y los resultados dibujados sobre el 3D alámbrico. **Fecha:** 2026-10-11.
 >
-> **Estado:** propuesta del agente. El 2026-10-12 el usuario decidió I-a, I-f e I-g (§12); quedan I-b, I-c, I-d, I-e e I-h. No hay código.
+> **Estado:** decisiones I-a…I-h tomadas por el usuario el 2026-10-12, todas como se proponían (§12). Lo que se fija para I1, en §13.
 >
 > **Prototipo:** lienzo «FEM 3D · Interfaz v4» (https://claude.ai/artifact/EhCxgYTvYMsfKzcLph4Wsp), con cinco pantallas. Los dibujos 3D, la planta y el alzado salen del edificio objetivo (`validacion/a2/agente/edificio`) con sus resultados reales (envolvente de My, ν por tramo), dibujados con Three.js en Chrome: son también un primer spike de I3 e I4.
 >
@@ -262,13 +262,13 @@ Hoy el modelo no tiene ejes de replanteo, y hacen falta para:
 | | Pregunta | Propuesta |
 |---|---|---|
 | **I-a** | Ejes de replanteo | **Decidido (2026-10-12):** objeto del modelo, opcional, y propuestos desde los pilares si no los hay (§9) |
-| **I-b** | ¿Quién pinta la planta? | WebGL, como el 3D y el alzado; la escena de A4 sigue siendo la fuente (§10) |
-| **I-c** | Espacios de trabajo | Cuatro: Modelo, Cargas, Resultados y Revisión (§4) |
-| **I-d** | Fondo del lienzo | Claro por defecto, con tema oscuro, y no negro siempre como en CYPECAD |
-| **I-e** | Navegación con el ratón | La de SAP2000, Revit y la mayoría de CAD (§5.5) |
+| **I-b** | ¿Quién pinta la planta? | **Decidido (2026-10-12):** WebGL, como el 3D y el alzado; la escena de A4 sigue siendo la fuente (§10) |
+| **I-c** | Espacios de trabajo | **Decidido (2026-10-12):** Cuatro: Modelo, Cargas, Resultados y Revisión (§4) |
+| **I-d** | Fondo del lienzo | **Decidido (2026-10-12):** Claro por defecto, con tema oscuro, y no negro siempre como en CYPECAD |
+| **I-e** | Navegación con el ratón | **Decidido (2026-10-12):** La de SAP2000, Revit y la mayoría de CAD (§5.5) |
 | **I-f** | Orden | **Decidido (2026-10-12):** I1–I3 antes de V2b y V2c (§11) |
 | **I-g** | Nombres de las piezas | **Decidido (2026-10-12):** se numera como CYPECAD (§12.1) |
-| **I-h** | Densidad | 13 px de base y paneles plegables, con un modo compacto opcional para pantallas grandes |
+| **I-h** | Densidad | **Decidido (2026-10-12):** 13 px de base y paneles plegables, sin modo compacto por ahora |
 
 ### 12.1 Numeración como CYPECAD (I-g)
 
@@ -280,3 +280,51 @@ Hoy el modelo no tiene ejes de replanteo, y hacen falta para:
 - **Integridad:** renombrar ya cambia todas las referencias (V2a). Si un objeto tiene `nombre`, no se toca: el rótulo enseña el `nombre` si lo hay y, si no, el id.
 - **Nunca de forma automática:** sólo cuando el usuario lo pide, porque cambia el proyecto y su huella, y los resultados guardados dejan de valer. Los proyectos de validación conservan sus ids (`P-x24-y0`), que son los de sus referencias congeladas.
 - **Copiar a plantas** sigue dando ids nuevos con la planta de destino. Después, «Renumerar» los deja cortos.
+
+## 13. I1: lo que se fija al empezar
+
+El armazón de §3 y §4 con el lienzo de hoy: la planta sigue en SVG y el 3D sigue siendo el de V1 hasta I2. Lo que cambia es dónde está cada cosa, no qué se calcula ni qué se enseña.
+
+- **Disposición común** (`app/src/armazon/`): barra superior, barra de herramientas del espacio, navegador, vista, propiedades, panel inferior y barra de estado.
+  - Cada espacio de trabajo da el contenido de cada hueco.
+  - El navegador y las propiedades se pliegan a un carril. El panel inferior se pliega a sus pestañas y su altura se ajusta.
+  - Cómo se dejan se recuerda en el navegador (localStorage), por espacio y por modo.
+- **Por defecto:**
+  - **Modelo y Cargas:** el navegador abierto y las propiedades plegadas. Se abren solas al elegir un objeto.
+  - **Resultados y Revisión:** las propiedades abiertas.
+  - **Panel inferior:** plegado, salvo en un proyecto sin pilares, que abre las tablas.
+- **Qué va en cada sitio:**
+
+| Espacio | Barra | Navegador | Vista | Propiedades | Panel inferior |
+|---|---|---|---|---|---|
+| **Modelo** | Pilar, Viga, Losa y Apoyo (abren su tabla en la fila nueva) · A plantas y Borrar (lo elegido) · Plantas, Materiales y Secciones · Planta o 3D | Proyecto, plantas y objetos por tipo (los de la planta activa) | Planta (modelo, diagnósticos o malla) o 3D | Lo elegido (formulario o datos) o, sin nada, la planta: resumen, cargas por caso, equilibrio e hipótesis | Tablas, Diagnósticos y Combinaciones |
+| **Cargas** | Caso activo · Nueva carga · Casos | Proyecto, plantas y casos | Planta con las cargas del caso activo | Como en Modelo | Como en Modelo |
+| **Resultados** | Combinación · Losas, Diagramas, Pilares, Deformada · magnitud o esfuerzo del modo · escala | Plantas y, en Diagramas, las vigas de la planta | Lo de las pantallas de V1 | Losas: valor en el punto, extremos y flechas. Diagramas: la pieza, la estación y los vanos. Pilares: el pilar elegido por tramos. Deformada: desplomes y perfil | Combinaciones. Diagramas: el alzado de la pieza con su cursor. Pilares: el cuadro de la planta |
+| **Revisión** | Estado de la firma · copiar la orden de firmar | Índice del informe | El informe | Firma, identidad y comprobaciones | — |
+
+- **Cambio respecto a §7:** el alzado de la viga elegida va en el panel inferior y no en Propiedades. Con 300 px de ancho no se lee un diagrama de 50 m.
+- **Sin botones que no hacen nada:**
+  - las herramientas de V2b y V2c (Ejes, Muro, Hueco, Forjado, Banda, Mover, Girar y Simetría) no salen hasta que existan;
+  - Reacciones y Bandas no salen en Resultados hasta I4;
+  - las disposiciones de 2 y 4 vistas, hasta I2.
+- **Teclado:**
+  - Ctrl+K abre la paleta de órdenes: espacios, modos, plantas, tablas, cualquier objeto por su id, calcular, guardar, deshacer, tema y paneles;
+  - AvPág y RePág cambian de planta;
+  - Esc suelta lo elegido;
+  - Ctrl+S, Ctrl+Z y Ctrl+Y, como en V2a.
+- **Estilo:**
+  - 13 px de base, con las clases de paneles y tablas un punto más grandes;
+  - el acento, azul (#2563eb en claro, #5b9bff en oscuro);
+  - el lienzo, con un fondo propio, distinto del de los paneles.
+
+  El grafismo del dibujo no cambia: es de I2.
+
+### 13.1 Criterios de paso de I1
+
+1. **El dibujo manda.** En Modelo, con los paneles por defecto y nada elegido, la vista ocupa ≥ 70 % de la ventana en 1920×1080 y ≥ 60 % en 1366×768. Se mide en Chrome (`validacion/i1/chrome.ts`).
+2. **No se pierde nada de V1 ni de V2a:**
+   - los tests de DOM de V1 y V2a (criterios 1 y 3) pasan, cambiando sólo cómo se llega a cada pantalla o tabla;
+   - los bancos de Chrome de V1 y V2a se adaptan a los nuevos sitios y dan los mismos resultados (los mismos bits, huellas y sha256);
+   - hay una lista, en el informe, de cada función de las pantallas de V1 y V2a y de dónde está ahora.
+3. **Lo que no vale nunca se enseña como válido:** las mismas reglas que en V1 (resultados desactualizados al primer cambio, respuestas viejas descartadas por su huella). Resultados y Revisión no se abren sin un cálculo de esta huella.
+4. **Fluidez:** cambiar de espacio, de modo o de panel no da tareas largas de más de 50 ms en el edificio objetivo.
