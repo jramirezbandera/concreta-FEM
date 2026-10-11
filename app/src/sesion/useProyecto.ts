@@ -89,8 +89,12 @@ export interface ProyectoAbierto {
 
 /** Cada cuánto se mira si el fichero cambió (criterio 5 de V1: detectarlo en ≤ 2 s). */
 export const VIGILANCIA_MS = 1000;
-/** Pausa tras un cambio del editor antes de compilar la versión nueva. */
-export const PAUSA_COMPILAR_MS = 250;
+/**
+ * Pausa tras un cambio del editor antes de compilar la versión nueva. Corta: una celda se confirma
+ * con Intro (no a cada tecla) y un pegado es una sola operación; la pausa sólo junta los cambios
+ * seguidos (Tab, Tab…) en una compilación.
+ */
+export const PAUSA_COMPILAR_MS = 150;
 
 export function useProyecto(): ProyectoAbierto {
   const [fase, setFase] = useState<Fase>("vacio");

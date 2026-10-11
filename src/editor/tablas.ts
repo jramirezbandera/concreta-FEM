@@ -130,8 +130,10 @@ const materiales: DefTabla = {
     id,
     { clave: "tipo", titulo: "tipo", ayuda: "hormigon, acero o general" },
     { clave: "fck", titulo: "fck", unidad: "MPa", ayuda: "hormigón: E = 8500·∛(fck + 8)" },
-    { clave: "E", titulo: "E", ayuda: "acero: MPa (por defecto, 210 000); general: kN/m²" },
-    { clave: "G", titulo: "G", unidad: "kN/m²", ayuda: "sólo general" },
+    // El modelo físico da el E del acero en MPa y el de un material general en kN/m²: dos columnas, cada una con su unidad
+    { clave: "Eacero", titulo: "E acero", unidad: "MPa", ayuda: "sólo acero; por defecto, 210 000" },
+    { clave: "E", titulo: "E general", unidad: "kN/m²", ayuda: "sólo general" },
+    { clave: "G", titulo: "G general", unidad: "kN/m²", ayuda: "sólo general" },
     { clave: "nu", titulo: "ν", ayuda: "sólo hormigón; por defecto, 0,2" },
     { clave: "peso", titulo: "γ", unidad: "kN/m³", ayuda: "por defecto, 25 (hormigón) o 78,5 (acero)" },
   ],
@@ -141,7 +143,8 @@ const materiales: DefTabla = {
       id: m.id,
       tipo: m.tipo,
       fck: m.tipo === "hormigon" ? n(m.fck) : "",
-      E: m.tipo !== "hormigon" ? n(m.E) : "",
+      Eacero: m.tipo === "acero" ? n(m.E) : "",
+      E: m.tipo === "general" ? n(m.E) : "",
       G: m.tipo === "general" ? n(m.G) : "",
       nu: m.tipo === "hormigon" ? n(m.nu) : "",
       peso: n(m.peso),
@@ -153,15 +156,15 @@ const materiales: DefTabla = {
     const comun = { id: L.texto("id") ?? "", tipo };
     const sinBase = (b: Objeto | undefined) => (b && b.tipo === tipo ? b : undefined);
     if (tipo === "hormigon") {
-      L.vacias(["E", "G"], "al hormigón (su E sale de fck)");
+      L.vacias(["Eacero", "E", "G"], "al hormigón (su E sale de fck)");
       return resultado(L, { ...sinBase(base), ...comun, fck: L.numero("fck", { obligatorio: true, mayorQue: 0 }), nu: L.numero("nu", { min: 0, max: 0.5 }), peso: L.numero("peso", { min: 0 }) });
     }
     if (tipo === "acero") {
-      L.vacias(["fck", "G", "nu"], "al acero");
-      return resultado(L, { ...sinBase(base), ...comun, E: L.numero("E", { mayorQue: 0 }), peso: L.numero("peso", { min: 0 }) });
+      L.vacias(["fck", "E", "G", "nu"], "al acero (su E va en «E acero», en MPa)");
+      return resultado(L, { ...sinBase(base), ...comun, E: L.numero("Eacero", { mayorQue: 0 }), peso: L.numero("peso", { min: 0 }) });
     }
     if (tipo === "general") {
-      L.vacias(["fck", "nu"], "a un material general (E y G en kN/m²)");
+      L.vacias(["fck", "Eacero", "nu"], "a un material general (E y G en kN/m²)");
       return resultado(L, { ...sinBase(base), ...comun, E: L.numero("E", { obligatorio: true, mayorQue: 0 }), G: L.numero("G", { obligatorio: true, mayorQue: 0 }), peso: L.numero("peso", { obligatorio: true, min: 0 }) });
     }
     return { ok: false, errores: L.errores };

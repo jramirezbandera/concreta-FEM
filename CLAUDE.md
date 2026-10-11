@@ -233,16 +233,24 @@
 - **2026-10-11: fase V1 terminada** (visor de sólo lectura). Pasan los criterios 1, 2, 3 y 5; el 4 queda a medias y el 6 (puerta de uso) es del usuario. El plan está en `docs/fem3d/visor.md` (lo fijado al empezar y las decisiones V-a, V-b y V-c) y el informe, en `docs/fem3d/fase-v1.md`, con criterios, hallazgos V1-1…V1-11 y pendientes.
   - **Ya en el repo:**
     - `src/visor/` (puro): la sesión del worker (abrir, compilar, calcular o usar `.fem/`, escenas de A4, datos de cada pantalla con las consultas existentes) y su protocolo;
-    - `app/`: el visor (Vite + React + Tailwind, como Concreta, y Three.js directo), paquete aparte con su `package.json`. Pantallas Modelo (planta y 3D), Losas, Vigas, Pilares, Desplomes y Revisión. Se abre con `bun run visor <proyecto.json>` (servidor local con la carpeta del proyecto en `/proyecto/`) o, en Chrome y Edge, eligiendo la carpeta. Vigila el fichero y se recarga solo; no escribe nada.
+    - `app/`: el visor (Vite + React + Tailwind, como Concreta, y Three.js directo), paquete aparte con su `package.json`. Pantallas Modelo (planta y 3D), Losas, Vigas, Pilares, Desplomes y Revisión. Se abre con `bun run visor <proyecto.json>` (servidor local con la carpeta del proyecto en `/proyecto/`) o, en Chrome y Edge, eligiendo la carpeta. Vigila el fichero y se recarga solo; no escribe nada (desde V2a, edita y guarda el proyecto).
   - **Reglas del visor:** cada número sale de una consulta (la escena de una planta da el SVG de `fem render` byte a byte); un resultado sólo existe si es de esta huella y este núcleo, y lo de una versión anterior del proyecto se descarta; el hilo principal sólo dibuja.
   - **Cambio en `.fem/` (V1-7):** `resultados.json` lleva el sha256 de `resultados.bin`, y la CLI y el visor no reutilizan unos resultados sin él o que no casan.
   - **Validación:** `src/visor/visor.test.ts`, `app/src/test/pantallas.test.tsx` y el banco en Chrome `validacion/v1/chrome.ts` (`out_chrome.txt`).
   - **Licencias:** código de Concreta copiado (V-a) y Geist con OFL (V-b), en `NOTICE`.
   - **Pendiente del usuario:** el criterio 6 (usarlo con los tres proyectos de A2), probar «Abrir la carpeta» a mano y decidir sobre el criterio 4 (aceptarlo o adelantar C5-4).
 - **2026-10-11: V2 antes que la capa de agente** (decisión del usuario): sin una app web en la que el ingeniero meta los datos y vea los resultados, no se sigue con A5–A7. Decisiones V-d (se guarda en el `proyecto.json` del disco), V-e (primero tablas y coordenadas, después el ratón) y V-f (primer tramo: plantas, pilares, vigas, losas y cargas), en `visor.md` §5.
+- **2026-10-11: fase V2a terminada** (editor por tablas). Pasan los criterios 1 a 5; el 6 (puerta de uso) es del usuario. El plan está en `visor.md` §6 y el informe, en `docs/fem3d/fase-v2a.md`, con criterios, hallazgos V2a-1…V2a-6 y pendientes.
+  - **Ya en `src/editor/` (puro):**
+    - operaciones sobre el proyecto (crear, cambiar con renombrado, borrar en cascada o reasignando, mover), que sólo dejan pasar un proyecto que cumple el esquema y sin referencias rotas;
+    - nueve tablas (objeto ↔ fila de textos, en el formato que pega Excel en español), pegar por id o por posición, copiar a plantas, deshacer por instantáneas y formato canónico del fichero.
+  - **En la app:** la hoja editable bajo la planta (teclado de hoja de cálculo, Ctrl+C/V con Excel), el inspector como formulario, deshacer, rehacer, guardar, calcular a demanda y proyecto nuevo. Al editar, el worker compila sin calcular.
+  - **Guardar (V-d):** en el `proyecto.json` de la carpeta (File System Access) o por `PUT` al servidor local (`app/servidor.ts`: sólo el proyecto abierto, desde la página, con `If-Match` y un proyecto válido); sin carpeta, se descarga. Si el fichero cambia en el disco con cambios sin guardar, se avisa y no se pisa nada.
+  - `bun run visor <fichero> --nuevo` crea un proyecto con la plantilla. La skill dice al agente que lea el fichero justo antes de cambiarlo.
+  - **Validación:** `src/editor/*.test.ts`, `app/src/test/editor.test.tsx` y `servidor.test.ts`, y el banco en Chrome `validacion/v2a/chrome.ts` (`out_chrome.txt`).
+  - **Pendiente del usuario:** el criterio 6 (meter desde cero un proyecto suyo real, calcularlo y revisarlo) y probar a mano guardar en una carpeta.
 - **Siguiente paso:**
-  - V2a, el editor por tablas, en curso: el plan está en `visor.md` §6, aceptado tal cual el 2026-10-11;
-  - después, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
+  - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

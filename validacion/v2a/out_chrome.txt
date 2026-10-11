@@ -1,0 +1,20 @@
+Criterio 5 · edificio objetivo (7 plantas, 80 pilares)
+  pilares en la tabla de la planta activa: 80
+BIEN  escribir una celda: los diagnósticos de la versión nueva salen en 1.30 s (≤ 1,5 s)
+BIEN  escribir una celda: tareas largas > 50 ms en el hilo principal: 0 (máx. 0 ms)
+BIEN  pegar 80 filas: «Pegadas 80 filas.»
+BIEN  pegar 80 filas: los diagnósticos salen en 1.23 s (≤ 1,5 s)
+BIEN  pegar 80 filas: tareas largas > 50 ms: 0 (máx. 0 ms)
+BIEN  guardar: 30 ms (≤ 0,5 s)
+BIEN  guardar: tareas largas > 50 ms: 0 (máx. 0 ms)
+BIEN  lo guardado tiene la huella que enseña la página (310c29cf)
+BIEN  lo guardado está en el formato canónico
+BIEN  lo guardado lleva lo pegado (giro 90 en los 80 pilares)
+Criterio 4 · cambio en el disco con cambios sin guardar (ejemplo)
+BIEN  el aviso de conflicto sale en 1.0 s
+BIEN  el fichero del disco no se ha tocado
+BIEN  lo editado sigue en la tabla (x = 0,25)
+BIEN  Guardar con el conflicto abierto no pisa el fichero
+BIEN  «Sobrescribir» escribe lo de la página
+
+Todo bien

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../agente/proyecto.ts";
 import { huellaCompilacion } from "../compilador/compilar.ts";
 import { resolverOpciones } from "../compilador/fisico.ts";
-import { azar } from "../pruebas/fisicoAleatorio.ts";
+import { azar, fisicoAleatorio } from "../pruebas/fisicoAleatorio.ts";
 import { leerTsv } from "./celdas.ts";
 import { copiarAPlantas, escribirFila, exportar, filas, objetosDePlanta, operacionFila, pegar } from "./edicion.ts";
 import { deshacer, hacer, historial, rehacer } from "./historial.ts";
@@ -211,40 +211,64 @@ describe("sucesiones al azar (criterio 2)", () => {
     return pl ? { op: { op: "mover", coleccion: "plantas", id: pl.id, antesDe: antes?.id ?? null }, etiqueta: `mover ${pl.id}` } : null;
   }
 
+  /** Sucesión al azar sobre un proyecto: el esquema siempre pasa, sin referencias rotas, y deshacer devuelve los bytes. */
+  function sucesiones(proyecto: Proyecto, semillas: readonly number[]) {
+    for (const semilla of semillas) {
+      const r = azar(semilla);
+      let h = historial(proyecto);
+      const inicio = serializar(proyecto);
+      let hechas = 0;
+      for (let i = 0; i < 40; i++) {
+        const x = paso(h.actual, r);
+        if (!x) continue;
+        const a = aplicar(h.actual, x.op);
+        if (!a.ok) continue;
+        hechas++;
+        h = hacer(h, a.proyecto, x.etiqueta);
+        expect(leerProyecto(serializar(h.actual)).valido, `semilla ${semilla}, paso ${i}: ${x.etiqueta}`).toBe(true);
+        expect(referenciasRotas(h.actual.modelo), `semilla ${semilla}, paso ${i}: ${x.etiqueta}`).toEqual([]);
+        if (r() < 0.1) {
+          const d = deshacer(h);
+          expect(rehacer(d).actual).toBe(h.actual);
+        }
+      }
+      expect(hechas).toBeGreaterThan(5);
+      while (h.pasado.length) h = deshacer(h);
+      expect(serializar(h.actual)).toBe(inicio);
+    }
+  }
+
   for (const [nombre, semillas] of [
     ["ejemplo", [1, 2, 3, 4, 5, 6, 7, 8]],
     ["1022", [11, 12, 13, 14]],
     ["edificio", [21, 22]],
   ] as const)
-    it(`${nombre}: el esquema siempre pasa, sin referencias rotas, y deshacer devuelve los bytes`, () => {
-      const { proyecto } = leerEjemplo(nombre);
-      for (const semilla of semillas) {
-        const r = azar(semilla);
-        let h = historial(proyecto);
-        const inicio = serializar(proyecto);
-        let hechas = 0;
-        for (let i = 0; i < 40; i++) {
-          const x = paso(h.actual, r);
-          if (!x) continue;
-          const a = aplicar(h.actual, x.op);
-          if (!a.ok) continue;
-          hechas++;
-          h = hacer(h, a.proyecto, x.etiqueta);
-          expect(leerProyecto(serializar(h.actual)).valido, `semilla ${semilla}, paso ${i}: ${x.etiqueta}`).toBe(true);
-          expect(referenciasRotas(h.actual.modelo), `semilla ${semilla}, paso ${i}: ${x.etiqueta}`).toEqual([]);
-          if (r() < 0.1) {
-            const d = deshacer(h);
-            expect(rehacer(d).actual).toBe(h.actual);
-          }
-        }
-        expect(hechas).toBeGreaterThan(5);
-        while (h.pasado.length) h = deshacer(h);
-        expect(serializar(h.actual)).toBe(inicio);
-      }
+    it(`${nombre}: el esquema siempre pasa, sin referencias rotas, y deshacer devuelve los bytes`, () => sucesiones(leerEjemplo(nombre).proyecto, semillas));
+
+  for (const semilla of [101, 102, 103, 104, 105, 106])
+    it(`modelo físico al azar ${semilla}: lo mismo`, () => {
+      const p: Proyecto = { esquema: VERSION_ESQUEMA, modelo: fisicoAleatorio(semilla) };
+      expect(leerProyecto(serializar(p)).valido).toBe(true);
+      sucesiones(p, [semilla, semilla + 1000]);
     });
 
   it("las colecciones con id del catálogo son las de validar.ts", () => {
     expect([...COLECCIONES].sort()).toEqual(["apoyos", "apoyosLineales", "bandas", "cargas", "casos", "losas", "materiales", "muros", "panos", "pilares", "plantas", "secciones", "vigas"]);
+  });
+});
+
+describe("materiales: el E de cada tipo, en su unidad", () => {
+  const ctx = contexto(vacio().modelo);
+  const def = DEF_TABLAS.materiales;
+  it("el acero en MPa y el general en kN/m², en columnas distintas; una en la columna del otro no entra", () => {
+    const acero = def.objeto({ id: "S275", tipo: "acero", Eacero: "210000" }, ctx);
+    expect(acero.ok && acero.objeto).toStrictEqual({ id: "S275", tipo: "acero", E: 210000 });
+    expect(def.fila(acero.ok ? acero.objeto : ({} as never), ctx)).toMatchObject({ Eacero: "210000", E: "" });
+    const mal = def.objeto({ id: "S275", tipo: "acero", E: "210000" }, ctx);
+    expect(mal.ok ? null : mal.errores[0]!.columna).toBe("E");
+    const gen = def.objeto({ id: "X", tipo: "general", E: "2,1e8", G: "8,1e7", peso: "78,5" }, ctx);
+    expect(gen.ok && gen.objeto).toStrictEqual({ id: "X", tipo: "general", E: 2.1e8, G: 8.1e7, peso: 78.5 });
+    expect(def.objeto({ id: "X", tipo: "general", Eacero: "210000", G: "1", peso: "1" }, ctx).ok).toBe(false);
   });
 });
 

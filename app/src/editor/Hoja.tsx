@@ -454,7 +454,7 @@ export function PanelTablas({ tabla, setTabla }: { tabla: NombreTabla; setTabla:
       </div>
 
       <div className={`flex h-7 shrink-0 items-center gap-2 border-t border-border-sub px-3 text-[11.5px] ${mensaje?.tono === "fail" ? "text-state-fail" : mensaje?.tono === "ok" ? "text-state-ok" : "text-text-secondary"}`} role="status" aria-live="polite">
-        <span className="min-w-0 flex-1 truncate" title={mensaje?.texto}>
+        <span className="min-w-0 flex-1 truncate" title={mensaje?.texto} data-mensaje-hoja>
           {mensaje ? (
             mensaje.texto
           ) : (

@@ -80,15 +80,22 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 
 Lo que no cuadre, pregúntalo o corrígelo en el fichero, como un diagnóstico.
 
-### Visor (para el ingeniero)
+### La app (para el ingeniero)
 
-El ingeniero revisa el modelo y los resultados en el visor de sólo lectura (V1). Si quiere verlo, dile que lo abra él con:
+El ingeniero mete y revisa el modelo en la app: tablas por tipo de objeto, la planta, el cálculo y los resultados (V1 y V2a). Si quiere verla, dile que la abra él con:
 
 ```
-bun run visor proyecto.json    # escribe una URL local (127.0.0.1) que abre el visor sobre ese fichero
+bun run visor proyecto.json            # escribe una URL local (127.0.0.1) que abre la app sobre ese fichero
+bun run visor nuevo.json --nuevo       # crea un proyecto con la plantilla y lo abre
 ```
 
-El visor vigila el fichero: cada vez que lo editas, se recarga y recalcula solo (o usa lo que dejó `fem calcular` en `.fem/`). No escribe nada y no firma. Tú no lo necesitas: tus números salen de la CLI.
+La app vigila el fichero: cada vez que lo editas, se recarga sola (o usa lo que dejó `fem calcular` en `.fem/`). El ingeniero también puede editar y guardar el mismo `proyecto.json` desde ella, así que:
+
+- **Lee el fichero justo antes de cambiarlo**, nunca de memoria: puede que el ingeniero lo haya guardado desde la app.
+- Si cambias el fichero mientras él tiene cambios sin guardar, la app no pisa nada: le avisa y elige él. Díselo cuando cambies algo que podría estar editando.
+- Al guardar, la app escribe el fichero en su formato canónico (2 espacios y las claves en el orden de los tipos). El contenido y la huella no cambian.
+
+La app no firma. Tú no la necesitas: tus números salen de la CLI.
 
 ## El fichero
 
