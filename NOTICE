@@ -70,3 +70,28 @@ El código fuente se puede obtener en https://github.com/thx/resvg-js.
 Roboto 2.138 (Regular y Bold) — https://github.com/googlefonts/roboto
 Licencia Apache-2.0. Copyright 2011 Google Inc. Ficheros sin modificar en cli/fuentes/, con su
 licencia en cli/fuentes/LICENSE-Roboto.txt.
+
+--------------------------------------------------------------------------------
+Visor de sólo lectura (fase V1, app/), sin modificar salvo lo que se indica.
+
+Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a
+(docs/fem3d/visor.md §5), con la cita del fichero de origen en cada uno:
+  app/src/index.css (tokens, fuentes y lienzo)  ←  src/index.css
+  app/src/tema/*                                ←  src/lib/theme/*
+  app/src/lienzo/transform.ts                   ←  src/lib/canvas/transform.ts (ZOOM_MAX = 64)
+  app/src/lienzo/useCanvasView2D.ts             ←  src/hooks/useCanvasView2D.ts (encuadre con el botón izquierdo)
+  app/src/lienzo/ZoomControls.tsx               ←  src/components/ui/ZoomControls.tsx
+  app/index.html (script de tema)               ←  index.html
+Copyright (c) Javier Ramírez Bandera.
+
+Geist y Geist Mono (Regular, Medium, SemiBold) — https://github.com/vercel/geist-font
+SIL Open Font License 1.1, admitida el 2026-10-11 sólo para fuentes (V-b). Copyright (c) 2023
+Vercel, in collaboration with basement.studio. Ficheros sin modificar en app/public/fonts/, con su
+licencia en app/public/fonts/Geist-OFL.txt.
+
+Dependencias del visor (app/package.json), por bun:
+  three 0.186.1 — https://github.com/mrdoob/three.js — Licencia MIT (incluye OrbitControls)
+  react y react-dom 19.3.0 — https://github.com/facebook/react — Licencia MIT
+  vite 8.3.4, @vitejs/plugin-react, babel-plugin-react-compiler — Licencia MIT
+  tailwindcss 4.3.3 — https://github.com/tailwindlabs/tailwindcss — Licencia MIT
+  lucide-react 1.55.0 — https://github.com/lucide-icons/lucide — Licencia ISC

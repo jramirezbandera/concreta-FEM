@@ -340,7 +340,7 @@ export class Sesion {
   }
 
   /** El objeto bajo un punto de una escena ya pedida (o el objeto dado, para resaltarlo). */
-  elegir(planta: string, v: VistaPlanta, punto: [number, number] | null, radio: number, objeto?: string): Eleccion | null {
+  elegir(planta: string, v: VistaPlanta, punto: readonly [number, number] | null, radio: number, objeto?: string): Eleccion | null {
     const e = this.escenaA4(planta, v);
     if (!e.valido) return null;
     if (objeto !== undefined) return resaltar(e.valor, objeto);

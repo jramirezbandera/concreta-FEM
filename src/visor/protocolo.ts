@@ -18,7 +18,7 @@ export type Pedido =
   | { tipo: "calcular" }
   | { tipo: "estado" }
   | { tipo: "escena"; planta: string; vista: VistaPlanta }
-  | { tipo: "elegir"; planta: string; vista: VistaPlanta; punto: [number, number] | null; radio: number; objeto?: string }
+  | { tipo: "elegir"; planta: string; vista: VistaPlanta; punto: readonly [number, number] | null; radio: number; objeto?: string }
   | { tipo: "objeto"; id: string }
   | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones }
   | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number }

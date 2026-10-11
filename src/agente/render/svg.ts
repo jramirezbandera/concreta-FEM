@@ -20,7 +20,7 @@ const LINEA_LEYENDA = 18;
 const TAM_LEYENDA = 13;
 const FUENTE = "Roboto";
 
-interface Pintura {
+export interface Pintura {
   fill?: string;
   stroke?: string;
   sw?: number;
@@ -28,7 +28,8 @@ interface Pintura {
   opacity?: number;
 }
 
-const ESTILOS: Record<Estilo, Pintura> = {
+/** Pintura de cada estilo (el visor de V1 usa la misma en el tema claro). */
+export const ESTILOS: Record<Estilo, Pintura> = {
   losa: { fill: "#e9edf2", stroke: "#7d8794", sw: 1 },
   "losa-reticular": { fill: "#dfe9df", stroke: "#6f8a6f", sw: 1 },
   abaco: { fill: "#b9cdb9", stroke: "#58745a", sw: 1 },
