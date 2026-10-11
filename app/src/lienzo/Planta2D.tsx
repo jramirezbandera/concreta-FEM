@@ -32,6 +32,8 @@ interface Props {
   leyenda?: boolean;
   /** Etiqueta accesible del dibujo. */
   titulo: string;
+  /** Hay un pedido en curso (lo que se ve puede ser del anterior); para el banco, `data-cargando`. */
+  cargando?: boolean;
 }
 
 /** Radio de elección, px. */
@@ -62,7 +64,7 @@ function GlifoSvg({ g, x, y, tema }: { g: Glifo; x: number; y: number; tema: "li
   );
 }
 
-export function Planta2D({ escena, resaltado, marcas, onClic, aviso, leyenda = true, titulo }: Props) {
+export function Planta2D({ escena, resaltado, marcas, onClic, aviso, leyenda = true, titulo, cargando = false }: Props) {
   const { theme: tema } = useTheme();
   const caja = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -135,7 +137,7 @@ export function Planta2D({ escena, resaltado, marcas, onClic, aviso, leyenda = t
   };
 
   return (
-    <div ref={caja} className="lienzo canvas-dot-grid" style={{ background: "var(--color-bg-canvas)" }}>
+    <div ref={caja} className="lienzo canvas-dot-grid" style={{ background: "var(--color-bg-canvas)" }} data-cargando={cargando || !escena}>
       <svg ref={svgRef} role="img" aria-label={titulo} onPointerMove={alPuntero} onPointerLeave={() => {
           if (pista.current) pista.current.textContent = AYUDA;
         }} onClick={alClic} style={{ cursor: api.isPanning() ? "grabbing" : onClic ? "crosshair" : "grab" }}>

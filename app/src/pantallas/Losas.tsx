@@ -4,7 +4,7 @@
  * bandas (la consulta `valor-punto`, no el color); a la derecha, los extremos, las flechas de
  * `fem consultar flechas` y las combinaciones.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Campo } from "../../../src/agente/render/resultados.ts";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
@@ -37,6 +37,11 @@ export function PantallaLosas() {
   const d = usePedido(proyecto.cliente, planta ? { tipo: "losas", planta, campo, combinaciones: eleccion } : null);
   const x = d.datos;
   const clave = JSON.stringify([planta, campo, eleccion, proyecto.version]);
+  // Con uz en pantalla, el worker adelanta el SPR de la planta: M11, M22… salen luego sin esperarlo
+  const listo = !!x && !d.cargando;
+  useEffect(() => {
+    if (listo && planta && proyecto.cliente) void proyecto.cliente.pedir({ tipo: "precalentar", planta }).catch(() => {});
+  }, [listo, planta, proyecto.cliente]);
   const puntoValido = punto && punto.clave === clave ? punto : null;
 
   const clic = async (p: Vec2) => {
@@ -79,7 +84,7 @@ export function PantallaLosas() {
           {planta} · {cota(e.plantas.find((p) => p.id === planta)?.cota)} m · {CAMPOS.find((c) => c.id === campo)!.nombre} · {x?.dibujada ? `${x.dibujada.nombre} = ${x.dibujada.etiqueta}` : "—"}
           {d.ms !== null ? ` · ${fmt(d.ms, 0)} ms` : ""}
         </BarraLienzo>
-        <Planta2D escena={x?.escena ?? null} marcas={marcas} onClic={(p) => void clic(p)} aviso={aviso} titulo={`Mapa de ${campo} en la planta ${planta}`} />
+        <Planta2D escena={x?.escena ?? null} marcas={marcas} onClic={(p) => void clic(p)} aviso={aviso} titulo={`Mapa de ${campo} en la planta ${planta}`} cargando={d.cargando} />
       </section>
 
       <Panel lado="der" etiqueta="Valores">

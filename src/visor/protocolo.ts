@@ -30,7 +30,9 @@ export type Pedido =
   | { tipo: "desplomes"; combinaciones: EleccionCombinaciones }
   | { tipo: "geometria" }
   | { tipo: "deformada"; combinaciones: EleccionCombinaciones }
-  | { tipo: "revision"; firmas: string; ficheroFirmas: string };
+  | { tipo: "revision"; firmas: string; ficheroFirmas: string }
+  /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
+  | { tipo: "precalentar"; planta: string };
 
 /** Lo que devuelve cada pedido cuando sale bien. */
 export interface Respuestas {
@@ -52,6 +54,7 @@ export interface Respuestas {
   geometria: Geometria3D;
   deformada: { comb: string; etiqueta: string; u: Float32Array };
   revision: DatosRevision;
+  precalentar: null;
 }
 
 export type TipoPedido = Pedido["tipo"];

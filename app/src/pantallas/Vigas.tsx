@@ -246,7 +246,7 @@ export function PantallaVigas() {
         <BarraLienzo>
           {planta} · {cota(e.plantas.find((p) => p.id === planta)?.cota)} m · {vista.vista === "vigas" ? `diagramas de ${esfuerzo}` : "modelo"} · {id ?? "—"}
         </BarraLienzo>
-        <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Vigas de la planta ${planta}`} />
+        <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Vigas de la planta ${planta}`} cargando={escena.cargando || viga.cargando} />
         {v && (
           <>
             <Alzado v={v} s={sValida} onS={setS} />

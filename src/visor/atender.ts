@@ -80,6 +80,9 @@ export class Atendedor {
         return de(desplazamientos(s, p.combinaciones));
       case "revision":
         return de(datosRevision(s, p.firmas, p.ficheroFirmas));
+      case "precalentar":
+        if (s.proyecto.modelo.plantas.some((x) => x.id === p.planta)) s.rr?.valores(p.planta);
+        return bien("precalentar", null);
     }
   }
 }

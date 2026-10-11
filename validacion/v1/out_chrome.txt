@@ -1,0 +1,57 @@
+# validacion/v1/chrome.ts — 2026-10-11, Ryzen 9 5900X, Windows 11; Chrome/154.0.8037.98 headless; todo BIEN
+## Criterios 2 y 3: los bits de la CLI y los resultados guardados
+BIEN  ejemplo: sha256 en Chrome 1c410cae2dd7879c = fem calcular 1c410cae2dd7879c
+BIEN  ejemplo: abierto con .fem/ (guardados), mismo sha256
+BIEN  1022: sha256 en Chrome 8043b62e35f198bb = fem calcular 8043b62e35f198bb
+BIEN  1022: abierto con .fem/ (guardados), mismo sha256
+BIEN  nucleo: sha256 en Chrome bd91c4921ef325c8 = fem calcular bd91c4921ef325c8
+BIEN  nucleo: abierto con .fem/ (guardados), mismo sha256
+BIEN  edificio: sha256 en Chrome 89e82f448e62ca28 = fem calcular 89e82f448e62ca28
+BIEN  edificio: abierto con .fem/ (guardados), mismo sha256
+BIEN  alterado: no se usa y se dice por qué («.fem no se usó: resultados.bin no es el que se guardó (su sha256 no coincide)»)
+
+## Criterio 4: fluidez en el edificio objetivo
+1022: abrir y calcular 0.10 s (compilar y calcular en el worker 0.05 s, resto 0.05 s); abrir con .fem 0.09 s
+ejemplo: abrir y calcular 0.42 s (compilar y calcular en el worker 0.11 s, resto 0.31 s); abrir con .fem 0.12 s
+nucleo: abrir y calcular 0.30 s (compilar y calcular en el worker 0.26 s, resto 0.04 s); abrir con .fem 0.16 s
+edificio: abrir y calcular 3.32 s (compilar y calcular en el worker 3.27 s, resto 0.05 s); abrir con .fem 1.09 s
+BIEN  abrir con .fem/ 1.09 s ≤ 2 s
+BIEN  abrir y calcular: el cálculo (3.27 s) más 0.05 s ≤ 1 s
+  planta N3 (modelo): 5 ms
+  planta N5 (modelo): 6 ms
+  vista cargas: 5 ms
+  vista malla: 22 ms
+  pantalla losas: 81 ms
+  magnitud M11: 490 ms
+  magnitud M22: 114 ms
+  planta N2 (losas): 377 ms
+  combinación: un caso (losas): 64 ms
+  combinación: por defecto (losas): 16 ms
+  clic en el mapa (valor del punto): 19 ms
+  pantalla vigas: 447 ms
+  otra viga: 20 ms
+  esfuerzo Vz: 84 ms
+  cursor de la viga (30 pasos): 489 ms
+  pantalla pilares: 36 ms
+  planta N1 (pilares): 19 ms
+  elegir un pilar: 1 ms
+  pantalla desplomes (3D y deformada): 14 ms
+  girar el 3D (40 pasos): 458 ms
+  pantalla revisión: 1849 ms
+  pantalla modelo: 25 ms
+  3D del modelo: 2 ms
+  girar el 3D del modelo (40 pasos): 402 ms
+BIEN  planta N3 (modelo): 5 ms ≤ 500 ms
+BIEN  planta N5 (modelo): 6 ms ≤ 500 ms
+BIEN  magnitud M11: 490 ms ≤ 500 ms
+BIEN  magnitud M22: 114 ms ≤ 500 ms
+BIEN  planta N2 (losas): 377 ms ≤ 500 ms
+BIEN  combinación: un caso (losas): 64 ms ≤ 500 ms
+BIEN  combinación: por defecto (losas): 16 ms ≤ 500 ms
+BIEN  planta N1 (pilares): 19 ms ≤ 500 ms
+Tareas largas del hilo principal en todo el recorrido (desde la navegación): 0
+BIEN  ninguna tarea larga (> 50 ms) en el hilo principal
+
+## Criterio 5: recarga al cambiar el fichero
+BIEN  cambio visto en 659 ms ≤ 2 s (recalculado en 3728 ms)
+BIEN  conserva pantalla (Pilares), planta (N3) y selección (P-x0-y20, era P-x0-y20)

@@ -98,11 +98,13 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
   const cjF = campo === "uz" ? conj : s.conjunto({ tipo: "defecto" }, "desplazamientos");
   if (!cjF.valido) return cjF;
   const q = s.q!;
-  const losas = new Set([...(q.fisico.losas ?? []), ...(q.fisico.panos ?? [])].filter((l) => l.planta === planta).map((l) => l.id));
-  const flr = flechas(q, cjF.valor);
-  // Un modelo sin losas ni paños no tiene flechas, pero sí mapa (vacío) y planta
-  const fl = flr.valido ? flr : flr.diagnosticos.every((d) => d.codigo === "consulta/sin-losas") ? { valido: true as const, valor: [] } : flr;
-  if (!fl.valido) return fl;
+  // Las de las losas y paños de la planta, una a una (todas las del edificio cuestan ×70 en el objetivo)
+  const fl: FlechasLosa[] = [];
+  for (const l of [...(q.fisico.losas ?? []), ...(q.fisico.panos ?? [])].filter((x) => x.planta === planta)) {
+    const r = flechas(q, cjF.valor, { losa: l.id });
+    if (!r.valido) return r;
+    fl.push(...r.valor);
+  }
   const comb = esc.valor.extremos[0]?.comb;
   const k = comb === undefined ? -1 : conj.valor.nombres.indexOf(comb);
   return {
@@ -112,7 +114,7 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
       campo,
       combinaciones: resumenConjunto(conj.valor),
       dibujada: k >= 0 ? { nombre: conj.valor.nombres[k]!, etiqueta: conj.valor.etiquetas[k]! } : null,
-      flechas: fl.valor.filter((x) => losas.has(x.id)),
+      flechas: fl,
       combinacionesFlechas: resumenConjunto(cjF.valor),
     },
   };

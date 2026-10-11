@@ -130,7 +130,7 @@ export function PantallaPilares() {
         <BarraLienzo>
           {planta} · {cota(e.plantas.find((p) => p.id === planta)?.cota)} m · axil de los tramos que llegan · {d.datos?.combinaciones.descripcion ?? ""}
         </BarraLienzo>
-        <Planta2D escena={d.datos?.escena ?? null} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Pilares de la planta ${planta}`} />
+        <Planta2D escena={d.datos?.escena ?? null} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Pilares de la planta ${planta}`} cargando={d.cargando} />
       </section>
 
       <Panel lado="der" ancho={400} etiqueta="Cuadros de pilares">

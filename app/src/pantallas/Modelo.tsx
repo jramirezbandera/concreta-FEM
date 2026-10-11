@@ -156,7 +156,7 @@ export function PantallaModelo() {
         >
           {tresD ? `Edificio · planta ${planta ?? "—"} resaltada` : `${planta ?? "—"} · ${cota(plantaV?.cota)} m · vista ${vistaValida}${vistaValida === "cargas" ? ` · caso ${casoValido}` : ""}${escena.ms !== null ? ` · ${fmt(escena.ms, 0)} ms` : ""}`}
         </BarraLienzo>
-        {tresD ? <Vista3D geometria={geometria.datos} plantaActiva={planta} titulo="Edificio en 3D" /> : <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Planta ${planta}, vista ${vistaValida}`} />}
+        {tresD ? <Vista3D geometria={geometria.datos} plantaActiva={planta} titulo="Edificio en 3D" /> : <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Planta ${planta}, vista ${vistaValida}`} cargando={escena.cargando} />}
       </section>
 
       <Panel lado="der" etiqueta="Inspector">

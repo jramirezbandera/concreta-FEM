@@ -25,6 +25,14 @@ const PANTALLAS: { id: Pantalla; nombre: string; calculo: boolean }[] = [
 ];
 
 function Estado({ p }: { p: ProyectoAbierto }) {
+  return (
+    <span data-estado={p.desactualizado ? "desactualizado" : p.fase === "error" ? "error" : !p.estado ? "vacio" : !p.estado.compila ? "no-compila" : p.estado.calculado ? "calculado" : "sin-calcular"} data-huella={p.estado?.huella ?? ""}>
+      <TextoEstado p={p} />
+    </span>
+  );
+}
+
+function TextoEstado({ p }: { p: ProyectoAbierto }) {
   const e = p.estado;
   if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "CALCULANDO" : "ABRIENDO"} · RESULTADOS DESACTUALIZADOS</span>;
   if (p.fase === "error") return <span className="pill fail">{e && e.compila ? "EL CÁLCULO FALLÓ" : "NO SE PUEDE ABRIR"}</span>;
@@ -59,7 +67,7 @@ export function App() {
     ? ""
     : e.origen === "guardados"
       ? `resultados de .fem/${e.huella.slice(0, 8)} (CLI) · leídos en ${(proyecto.tiempos.guardados ?? 0).toFixed(2)} s`
-      : `calculado en el visor en ${(proyecto.tiempos.calcular ?? 0).toFixed(1)} s${proyecto.motivoGuardados ? ` · .fem no se usó: ${proyecto.motivoGuardados}` : ""}`;
+      : `compilado en ${(proyecto.tiempos.abrir ?? 0).toFixed(2)} s y calculado en el visor en ${(proyecto.tiempos.calcular ?? 0).toFixed(2)} s${proyecto.motivoGuardados ? ` · .fem no se usó: ${proyecto.motivoGuardados}` : ""}`;
 
   return (
     <ContextoVisor.Provider value={{ proyecto, planta: plantaValida, setPlanta, seleccion, setSeleccion, irA: setPantalla }}>
@@ -122,7 +130,11 @@ export function App() {
               {e.estadisticas.nudos} nudos{e.estadisticas.ecuaciones ? ` · ${e.estadisticas.ecuaciones} ecuaciones` : ""} · {e.estadisticas.barras} barras · {e.estadisticas.laminas} láminas
             </span>
           )}
-          {e?.sha256Resultados && <span title={`sha256 de resultados.bin: ${e.sha256Resultados}`}>resultados {e.sha256Resultados.slice(0, 8)}</span>}
+          {e?.sha256Resultados && (
+            <span title={`sha256 de resultados.bin: ${e.sha256Resultados}`} data-sha={e.sha256Resultados} data-origen={e.origen}>
+              resultados {e.sha256Resultados.slice(0, 8)}
+            </span>
+          )}
           {proyecto.cliente?.motor && <span title="sha256 del núcleo WASM">núcleo {proyecto.cliente.motor.slice(0, 8)}</span>}
         </footer>
       </div>
