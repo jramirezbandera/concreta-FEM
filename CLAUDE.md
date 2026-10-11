@@ -230,6 +230,15 @@
     - Se les escapó el pilar girado, aunque su rótulo lo decía (A4-4): una lista de 80 pilares se comprueba mejor con una consulta.
   - **Rendimiento:** ≤ 1,2 s por planta y vista en los edificios objetivo, e informe de ≤ 1,4 MB.
   - **Pendiente del usuario:** mirar las imágenes y decir si le sirven para revisar.
+- **2026-10-11: fase V1 terminada** (visor de sólo lectura). Pasan los criterios 1, 2, 3 y 5; el 4 queda a medias y el 6 (puerta de uso) es del usuario. El plan está en `docs/fem3d/visor.md` (lo fijado al empezar y las decisiones V-a, V-b y V-c) y el informe, en `docs/fem3d/fase-v1.md`, con criterios, hallazgos V1-1…V1-11 y pendientes.
+  - **Ya en el repo:**
+    - `src/visor/` (puro): la sesión del worker (abrir, compilar, calcular o usar `.fem/`, escenas de A4, datos de cada pantalla con las consultas existentes) y su protocolo;
+    - `app/`: el visor (Vite + React + Tailwind, como Concreta, y Three.js directo), paquete aparte con su `package.json`. Pantallas Modelo (planta y 3D), Losas, Vigas, Pilares, Desplomes y Revisión. Se abre con `bun run visor <proyecto.json>` (servidor local con la carpeta del proyecto en `/proyecto/`) o, en Chrome y Edge, eligiendo la carpeta. Vigila el fichero y se recarga solo; no escribe nada.
+  - **Reglas del visor:** cada número sale de una consulta (la escena de una planta da el SVG de `fem render` byte a byte); un resultado sólo existe si es de esta huella y este núcleo, y lo de una versión anterior del proyecto se descarta; el hilo principal sólo dibuja.
+  - **Cambio en `.fem/` (V1-7):** `resultados.json` lleva el sha256 de `resultados.bin`, y la CLI y el visor no reutilizan unos resultados sin él o que no casan.
+  - **Validación:** `src/visor/visor.test.ts`, `app/src/test/pantallas.test.tsx` y el banco en Chrome `validacion/v1/chrome.ts` (`out_chrome.txt`).
+  - **Licencias:** código de Concreta copiado (V-a) y Geist con OFL (V-b), en `NOTICE`.
+  - **Pendiente del usuario:** el criterio 6 (usarlo con los tres proyectos de A2), probar «Abrir la carpeta» a mano y decidir sobre el criterio 4 (aceptarlo o adelantar C5-4).
 - **Siguiente paso:**
   - A5 de la capa de agente (entrada desde planos), con A-e decidida el 2026-10-10 (`agente.md` §6): los planos fuera del repo, el agente sólo ve la geometría extraída en local (sin cajetín, textos ni metadatos) y el ingeniero acepta un aviso antes de la primera extracción;
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);

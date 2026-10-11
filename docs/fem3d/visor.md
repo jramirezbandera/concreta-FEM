@@ -2,7 +2,7 @@
 
 > **Qué es.** La interfaz web del motor, en fases V1–V3. V1 es un visor de sólo lectura: abre un `proyecto.json`, lo calcula (o lee lo que la CLI dejó en `.fem/<huella>/`) y enseña el modelo y los resultados en las pantallas de los prototipos v3. El modelo lo sigue editando el agente, o el ingeniero, en el JSON, y el visor se recarga solo. **Fecha:** 2026-10-11.
 >
-> **Estado:** §3 aceptada por el usuario el 2026-10-11, con las decisiones de §5. V1 en curso.
+> **Estado:** §3 aceptada por el usuario el 2026-10-11, con las decisiones de §5. V1 hecha el 2026-10-11: pasa los criterios 1, 2, 3 y 5; el 4 queda a medias (la primera magnitud SPR de una planta, V1-3) y el 6 es del usuario. El informe está en `fase-v1.md`.
 >
 > **Por qué ahora y no después de A5.** La capa de agente da por hecho que el ingeniero revisa y firma «sobre un informe y un visor» (`agente.md`, veredicto), y la superposición con la que A5 confirma un plano se ve mucho mejor en un visor que en una PNG. Hasta ahora sólo existen los prototipos (lienzo «FEM 3D · Interfaz», v3) y los SVG/PNG de `fem render`.
 
