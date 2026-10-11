@@ -2,7 +2,7 @@
 
 > **Qué es.** Rehacer la interfaz de la app (V1 + V2a) para que se parezca a CYPECAD y SAP2000, pero como una aplicación actual: el dibujo manda, hay barra de herramientas, varias vistas de la estructura (planta, alzados por eje y 3D), un 3D con las secciones extruidas y los resultados dibujados sobre el 3D alámbrico. **Fecha:** 2026-10-11.
 >
-> **Estado:** propuesta del agente, pendiente del usuario: las decisiones I-a…I-h de §12. No hay código.
+> **Estado:** propuesta del agente. El 2026-10-12 el usuario decidió I-a, I-f e I-g (§12); quedan I-b, I-c, I-d, I-e e I-h. No hay código.
 >
 > **Prototipo:** lienzo «FEM 3D · Interfaz v4» (https://claude.ai/artifact/EhCxgYTvYMsfKzcLph4Wsp), con cinco pantallas. Los dibujos 3D, la planta y el alzado salen del edificio objetivo (`validacion/a2/agente/edificio`) con sus resultados reales (envolvente de My, ν por tramo), dibujados con Three.js en Chrome: son también un primer spike de I3 e I4.
 >
@@ -261,11 +261,22 @@ Hoy el modelo no tiene ejes de replanteo, y hacen falta para:
 
 | | Pregunta | Propuesta |
 |---|---|---|
-| **I-a** | Ejes de replanteo | Objeto del modelo, opcional, y propuestos desde los pilares si no los hay (§9) |
+| **I-a** | Ejes de replanteo | **Decidido (2026-10-12):** objeto del modelo, opcional, y propuestos desde los pilares si no los hay (§9) |
 | **I-b** | ¿Quién pinta la planta? | WebGL, como el 3D y el alzado; la escena de A4 sigue siendo la fuente (§10) |
 | **I-c** | Espacios de trabajo | Cuatro: Modelo, Cargas, Resultados y Revisión (§4) |
 | **I-d** | Fondo del lienzo | Claro por defecto, con tema oscuro, y no negro siempre como en CYPECAD |
 | **I-e** | Navegación con el ratón | La de SAP2000, Revit y la mayoría de CAD (§5.5) |
-| **I-f** | Orden | I1–I3 antes de V2b y V2c (§11) |
-| **I-g** | Nombres de las piezas | Enseñar el `nombre` si lo tienen y, si no, el id. Y decidir si el editor numera solo (P1…P80, como CYPECAD), porque `P-x24-y0` es largo para rotular |
+| **I-f** | Orden | **Decidido (2026-10-12):** I1–I3 antes de V2b y V2c (§11) |
+| **I-g** | Nombres de las piezas | **Decidido (2026-10-12):** se numera como CYPECAD (§12.1) |
 | **I-h** | Densidad | 13 px de base y paneles plegables, con un modo compacto opcional para pantallas grandes |
+
+### 12.1 Numeración como CYPECAD (I-g)
+
+- **Los ids nuevos ya son cortos:** el editor de V2a da `P1`, `V1`, `L1`… al crear (`idNuevo`). Se mantiene.
+- **Orden «Renumerar»** (`src/editor/`, pura, con su inversa y un solo deshacer), como la de CYPECAD:
+  - los pilares quedan `P1…Pn` por su posición en planta: por filas de arriba abajo y, en cada fila, de izquierda a derecha, con la tolerancia de las alineaciones (la misma que propone los ejes);
+  - las vigas, `V1…Vn`, por plantas de abajo arriba y en cada planta por la misma regla, con el punto medio de cada una;
+  - losas, muros y paños, igual, con su centroide.
+- **Integridad:** renombrar ya cambia todas las referencias (V2a). Si un objeto tiene `nombre`, no se toca: el rótulo enseña el `nombre` si lo hay y, si no, el id.
+- **Nunca de forma automática:** sólo cuando el usuario lo pide, porque cambia el proyecto y su huella, y los resultados guardados dejan de valer. Los proyectos de validación conservan sus ids (`P-x24-y0`), que son los de sus referencias congeladas.
+- **Copiar a plantas** sigue dando ids nuevos con la planta de destino. Después, «Renumerar» los deja cortos.

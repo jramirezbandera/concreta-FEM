@@ -256,9 +256,14 @@
   - 3D con las secciones extruidas y resultados sobre el 3D alámbrico;
   - fases I1–I4.
 
-  **Pendiente del usuario:** las decisiones I-a…I-h (§12), entre ellas los ejes de replanteo en el modelo y hacer I1–I3 antes de V2b y V2c.
+  **Decididas el 2026-10-12:**
+  - I-a: los ejes de replanteo van en el modelo;
+  - I-f: I1–I3 antes de V2b y V2c;
+  - I-g: numeración como CYPECAD, con una orden «Renumerar» (§12.1).
+
+  **Pendientes:** I-b, I-c, I-d, I-e e I-h.
 - **Siguiente paso:**
-  - las decisiones de la interfaz v4 y, con ellas, I1 (armazón);
+  - las decisiones que quedan de la interfaz v4 (I-b…I-e, I-h) y, con ellas, I1 (armazón);
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
