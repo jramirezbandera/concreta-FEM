@@ -122,6 +122,7 @@ export function App() {
               {e.estadisticas.nudos} nudos{e.estadisticas.ecuaciones ? ` · ${e.estadisticas.ecuaciones} ecuaciones` : ""} · {e.estadisticas.barras} barras · {e.estadisticas.laminas} láminas
             </span>
           )}
+          {e?.sha256Resultados && <span title={`sha256 de resultados.bin: ${e.sha256Resultados}`}>resultados {e.sha256Resultados.slice(0, 8)}</span>}
           {proyecto.cliente?.motor && <span title="sha256 del núcleo WASM">núcleo {proyecto.cliente.motor.slice(0, 8)}</span>}
         </footer>
       </div>

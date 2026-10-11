@@ -45,7 +45,7 @@ export class Atendedor {
         return bien("guardados", r.ok ? { usados: true, estado: s.estado() } : { usados: false, motivo: r.motivo });
       }
       case "calcular": {
-        const r = s.calcular();
+        const r = await s.calcular();
         return r.ok ? bien("calcular", s.estado()) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "estado":

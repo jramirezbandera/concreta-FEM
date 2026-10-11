@@ -99,7 +99,9 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
   if (!cjF.valido) return cjF;
   const q = s.q!;
   const losas = new Set([...(q.fisico.losas ?? []), ...(q.fisico.panos ?? [])].filter((l) => l.planta === planta).map((l) => l.id));
-  const fl = flechas(q, cjF.valor);
+  const flr = flechas(q, cjF.valor);
+  // Un modelo sin losas ni paños no tiene flechas, pero sí mapa (vacío) y planta
+  const fl = flr.valido ? flr : flr.diagnosticos.every((d) => d.codigo === "consulta/sin-losas") ? { valido: true as const, valor: [] } : flr;
   if (!fl.valido) return fl;
   const comb = esc.valor.extremos[0]?.comb;
   const k = comb === undefined ? -1 : conj.valor.nombres.indexOf(comb);
@@ -123,6 +125,11 @@ export interface ValorPunto {
   /** Lámina del modelo analítico que contiene el punto. */
   lamina: number;
   comb: string;
+  /**
+   * Los otros valores del punto si cae en el borde de láminas de regiones distintas (el pliegue
+   * losa–muro, el borde de un ábaco, E5-7): ahí el campo salta y no se promedia.
+   */
+  otros?: number[];
 }
 
 const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m", m12: "kN·m/m", v13: "kN/m", v23: "kN/m" };
@@ -143,6 +150,8 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
   const rr = s.rr!;
   const c = s.compilado!;
   const { laminas, v } = valoresCampo(rr, planta, campo, conj.valor.factores[k]!);
+  let hallado: ValorPunto | null = null;
+  const otros: number[] = [];
   for (let i = 0; i < laminas.length; i++) {
     const ns = c.modelo.laminas![laminas[i]!]!.nudos;
     const p = ns.map((n) => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y] as const);
@@ -161,12 +170,15 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
       const eps = -1e-9;
       if (l0 < eps || l1 < eps || l2 < eps) continue;
       const w = [v[4 * i + a]!, v[4 * i + b]!, v[4 * i + cc]!];
-      const losa = c.mapeo.laminas![laminas[i]!]!.losa ?? "";
-      if (w.some(Number.isNaN)) return { valido: true, valor: null };
-      return { valido: true, valor: { valor: l0 * w[0]! + l1 * w[1]! + l2 * w[2]!, unidad: UNIDAD[campo], losa, lamina: laminas[i]!, comb: dib.nombre } };
+      // Una lámina sin mapa (rígida): el punto puede estar también en una vecina que sí lo tiene
+      if (w.some(Number.isNaN)) break;
+      const valor = l0 * w[0]! + l1 * w[1]! + l2 * w[2]!;
+      if (!hallado) hallado = { valor, unidad: UNIDAD[campo], losa: c.mapeo.laminas![laminas[i]!]!.losa ?? "", lamina: laminas[i]!, comb: dib.nombre };
+      else if (valor !== hallado.valor && !otros.includes(valor)) otros.push(valor);
+      break;
     }
   }
-  return { valido: true, valor: null };
+  return { valido: true, valor: hallado && otros.length ? { ...hallado, otros } : hallado };
 }
 
 // ─── Vigas ──────────────────────────────────────────────────────────────────────────────────────

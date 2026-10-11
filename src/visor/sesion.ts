@@ -87,6 +87,8 @@ export interface EstadoSesion {
   origen: "calculo" | "guardados" | null;
   equilibrio: { id: string; fuerzas: number; momentos: number }[];
   combinaciones: CombinacionDisponible[];
+  /** sha256 de los resultados empaquetados como `resultados.bin` (el mismo que guarda la CLI): criterio 2 de V1. */
+  sha256Resultados: string | null;
 }
 
 export type Apertura = { valido: true; sesion: Sesion } | { valido: false; diagnosticos: Diagnostico[] };
@@ -121,6 +123,7 @@ export class Sesion {
   private casosR: ResultadoCaso[] | null = null;
   private cabecera: CabeceraResultados | null = null;
   private origenR: "calculo" | "guardados" | null = null;
+  private shaR: string | null = null;
   private qC: Consultas | null = null;
   private rrC: ResultadosRender | null = null;
   /** Escenas ya hechas, por su clave (las mismas que pide la interfaz al moverse). */
@@ -215,6 +218,7 @@ export class Sesion {
       origen: this.origenR,
       equilibrio: (this.cabecera?.casos ?? []).map((x) => ({ id: x.id, ...x.equilibrio })),
       combinaciones: this.combinacionesDisponibles(),
+      sha256Resultados: this.shaR,
     };
   }
 
@@ -239,24 +243,25 @@ export class Sesion {
     const casos = desempaquetarResultados(cab, bytes);
     if (!casos) return { ok: false, motivo: "resultados.bin no casa con su cabecera" };
     if (casos.map((x) => x.id).join("\n") !== this.proyecto.modelo.casos.map((x) => x.id).join("\n")) return { ok: false, motivo: "sus casos no son los del proyecto" };
-    this.fijar(casos, cab, "guardados");
+    this.fijar(casos, cab, "guardados", cab.sha256);
     return { ok: true };
   }
 
   /** Calcula (el núcleo ya iniciado). No válido: el modelo no compila o el cálculo falló (sin equilibrio, mecanismo…). */
-  calcular(): { ok: true; cabecera: CabeceraResultados; bytes: Uint8Array } | { ok: false; diagnosticos: Diagnostico[] } {
+  async calcular(): Promise<{ ok: true; cabecera: CabeceraResultados; bytes: Uint8Array } | { ok: false; diagnosticos: Diagnostico[] }> {
     const c = this.compilacion;
     if (!c.valido) return { ok: false, diagnosticos: c.diagnosticos.filter((d) => d.severidad === "error") };
     const r = calcular(c.modelo);
     const diags = traducirDiagnosticos(r.diagnosticos, c.modelo, c.mapeo);
     if (!r.valido) return { ok: false, diagnosticos: ordenSeveridad(diags) };
     const { cabecera, bytes } = empaquetarResultados(c.huella, r.casos, r.estadisticas, diags);
-    this.fijar(r.casos, cabecera, "calculo");
+    this.fijar(r.casos, cabecera, "calculo", await sha256Bytes(bytes));
     return { ok: true, cabecera, bytes };
   }
 
-  private fijar(casos: ResultadoCaso[], cabecera: CabeceraResultados, origen: "calculo" | "guardados"): void {
+  private fijar(casos: ResultadoCaso[], cabecera: CabeceraResultados, origen: "calculo" | "guardados", sha: string): void {
     this.casosR = casos;
+    this.shaR = sha;
     this.cabecera = cabecera;
     this.origenR = origen;
     this.qC = null;

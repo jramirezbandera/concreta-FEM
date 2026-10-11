@@ -93,8 +93,14 @@ export function PantallaLosas() {
                 <div className="mono text-[17px] font-medium" data-valor-punto={puntoValido.v.valor}>
                   {fmt(puntoValido.v.valor, dec)} {unidad}
                 </div>
+                {puntoValido.v.otros && (
+                  <div className="mono text-[12px] text-state-warn">
+                    salto: también {puntoValido.v.otros.map((o) => fmt(o, dec)).join(" · ")} {unidad}
+                  </div>
+                )}
                 <div className="text-[11px] text-text-secondary">
-                  {puntoValido.v.comb} · interpolado en la lámina {puntoValido.v.lamina}, como las bandas
+                  {puntoValido.v.comb} · {puntoValido.v.lamina >= 0 ? `interpolado en la lámina ${puntoValido.v.lamina}, como las bandas` : "el extremo rotulado"}
+                  {puntoValido.v.otros ? ". En el borde de dos regiones (pliegue, ábaco) el campo salta y no se promedia (E5-7)." : ""}
                 </div>
               </div>
             ) : (
