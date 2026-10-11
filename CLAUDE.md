@@ -250,7 +250,15 @@
   - **Validación:** `src/editor/*.test.ts`, `app/src/test/editor.test.tsx` y `servidor.test.ts`, y el banco en Chrome `validacion/v2a/chrome.ts` (`out_chrome.txt`).
   - **Pendiente del usuario:** el criterio 6 (meter desde cero un proyecto suyo real, calcularlo y revisarlo) y probar a mano guardar en una carpeta.
 - **2026-10-11: la app, en GitHub Pages** (https://jramirezbandera.github.io/concreta-FEM/), desplegada en cada push a `main` por `.github/workflows/pages.yml`. Allí no hay servidor local: se abre una carpeta (Chrome y Edge) o se empieza un proyecto nuevo, que se descarga al guardar.
+- **2026-10-11: propuesta de la interfaz v4** (`docs/fem3d/interfaz.md`, prototipo en el lienzo «FEM 3D · Interfaz v4»). El usuario ve la app de V1/V2a ultradensa, con el dibujo pequeño y mal grafiada, y pide algo como CYPECAD o SAP2000 pero moderno. Se propone:
+  - espacios de trabajo (Modelo, Cargas, Resultados y Revisión) con barra de herramientas;
+  - 1, 2 o 4 vistas (planta, alzado por eje y 3D) que ocupan al menos el 70 % de la pantalla;
+  - 3D con las secciones extruidas y resultados sobre el 3D alámbrico;
+  - fases I1–I4.
+
+  **Pendiente del usuario:** las decisiones I-a…I-h (§12), entre ellas los ejes de replanteo en el modelo y hacer I1–I3 antes de V2b y V2c.
 - **Siguiente paso:**
+  - las decisiones de la interfaz v4 y, con ellas, I1 (armazón);
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).

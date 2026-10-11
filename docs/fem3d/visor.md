@@ -23,7 +23,7 @@
 - **Resultados por Transferable, nunca en JSON** (H27), con la huella como identidad: una respuesta sólo se acepta si su huella es la del modelo abierto (PLA-15).
 - **Color sin interpolar** (H43): bandas con valores, sin degradados entre vértices; cada región SPR con sus valores, sin promediar los saltos (E5-7).
 - **Todo número rotulado sale de una consulta** (A4): de `Consultas` (C5) o de las consultas de A1, nunca del dibujo.
-- **Estilo de Concreta, denso y con todo a la vista** (decisión del usuario sobre los prototipos): paneles fijos, tablas con la combinación de cada valor, y nada escondido tras pestañas.
+- **Estilo de Concreta, denso y con todo a la vista** (decisión del usuario sobre los prototipos): paneles fijos, tablas con la combinación de cada valor, y nada escondido tras pestañas. *Revisado el 2026-10-11:* el usuario la ve ultradensa y con el dibujo pequeño; la propuesta de la interfaz v4 (`interfaz.md`) cambia «todo a la vista» por «todo a un clic, y el dibujo siempre a la vista».
 
 ## 3. V1: lo que se fija al empezar
 
