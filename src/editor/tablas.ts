@@ -507,7 +507,7 @@ const cargas: DefTabla = {
     { clave: "tipo", titulo: "tipo", ayuda: "puntual, viga, pilar, superficie o lineal (los empujes, en V2b)" },
     { clave: "caso", titulo: "caso" },
     { clave: "planta", titulo: "planta", ayuda: "puntual, superficie y lineal" },
-    { clave: "sobre", titulo: "sobre", ayuda: "viga, pilar, o la losa o el paño de una de superficie (vacío: toda la planta o la zona)" },
+    { clave: "sobre", titulo: "sobre", ayuda: "la viga, el pilar, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)" },
     { clave: "ejes", titulo: "ejes", ayuda: "viga y pilar: global o local" },
     { clave: "x", titulo: "x", unidad: "m", ayuda: "puntual" },
     { clave: "y", titulo: "y", unidad: "m", ayuda: "puntual" },
@@ -517,7 +517,7 @@ const cargas: DefTabla = {
     { clave: "qb", titulo: "qb", ayuda: "viga y pilar: q al final del tramo, si varía" },
     { clave: "desde", titulo: "desde", unidad: "m", ayuda: "viga y pilar: estación de inicio; por defecto, la pieza entera" },
     { clave: "hasta", titulo: "hasta", unidad: "m", ayuda: "viga y pilar: estación final" },
-    { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "lineal: la polilínea; superficie: la zona (vacía: la losa o el paño enteros)" },
+    { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "lineal: la polilínea; superficie: la zona (vacía: la losa o el paño de «sobre» enteros)" },
   ],
   fila(o) {
     const c = o as unknown as CargaFisica;

@@ -5,8 +5,10 @@
  *   ?ejemplo=<nombre>                                    (uno de EJEMPLOS)
  */
 import { useState } from "react";
-import { FileJson, FolderOpen } from "lucide-react";
-import { elegirCarpeta, hayCarpetas, origenCarpeta, origenUrl, proyectosEn, type Directorio } from "./sesion/origen.ts";
+import { FileJson, FilePlus, FolderOpen } from "lucide-react";
+import { proyectoNuevo } from "../../src/editor/plantilla.ts";
+import { serializar } from "../../src/editor/serializar.ts";
+import { crearEnCarpeta, elegirCarpeta, hayCarpetas, origenCarpeta, origenUrl, proyectosEn, type Directorio } from "./sesion/origen.ts";
 import type { ProyectoAbierto } from "./sesion/useProyecto.ts";
 
 /** Proyectos de ejemplo del repositorio (la skill y los tres de A2). */
@@ -29,6 +31,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
   const [elegir, setElegir] = useState<{ dir: Directorio; ficheros: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [encima, setEncima] = useState(false);
+  const [nuevo, setNuevo] = useState<{ dir: Directorio | null; nombre: string } | null>(null);
   const ocupado = proyecto.fase === "abriendo" || proyecto.fase === "calculando";
 
   const carpeta = async () => {
@@ -43,6 +46,29 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  /** Proyecto nuevo: con carpeta, se crea el fichero en ella; sin carpeta, se abre y guardar lo descarga. */
+  const empezarNuevo = async () => {
+    setError(null);
+    if (!hayCarpetas()) return setNuevo({ dir: null, nombre: "proyecto.json" });
+    try {
+      const dir = await elegirCarpeta("readwrite");
+      if (dir) setNuevo({ dir, nombre: "proyecto.json" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const crearNuevo = async () => {
+    if (!nuevo) return;
+    const nombre = /\.json$/i.test(nuevo.nombre.trim()) ? nuevo.nombre.trim() : `${nuevo.nombre.trim()}.json`;
+    if (!/^[^\\/:*?"<>|]+$/.test(nombre)) return setError(`«${nombre}» no vale como nombre de fichero.`);
+    const texto = serializar(proyectoNuevo(nombre.replace(/\.json$/i, "")));
+    if (!nuevo.dir) return proyecto.abrirTexto(texto, nombre);
+    const mal = await crearEnCarpeta(nuevo.dir, nombre, texto);
+    if (mal) return setError(mal);
+    proyecto.abrirOrigen(origenCarpeta(nuevo.dir, nombre));
   };
 
   const fichero = async (f: File | undefined) => {
@@ -69,13 +95,31 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
             <span className="inline-block h-[7px] w-[7px] rounded-full bg-accent" aria-hidden="true" />
             Concreta · FEM 3D
           </div>
-          <h1 className="mt-1 text-[13px] font-normal text-text-secondary">Visor de sólo lectura (V1). El modelo se edita en el proyecto.json, con el agente o a mano; el visor lo calcula, o usa los resultados que dejó la CLI, y se recarga solo cuando el fichero cambia.</h1>
+          <h1 className="mt-1 text-[13px] font-normal text-text-secondary">Meter el modelo por tablas, calcularlo y revisar los resultados (V1 y V2a). Todo se guarda en el proyecto.json, el mismo que usan la CLI y el agente; si el fichero cambia fuera, se recarga solo (o avisa, si hay cambios sin guardar).</h1>
         </div>
         <div className="flex flex-col gap-2 px-5 py-4">
           <button type="button" className="btn btn-p justify-start" style={{ height: 34 }} onClick={() => void carpeta()} disabled={!hayCarpetas() || ocupado}>
             <FolderOpen size={15} /> Abrir la carpeta del proyecto…
           </button>
           {!hayCarpetas() && <p className="text-[11px] text-state-warn">Este navegador no permite abrir carpetas (hace falta Chrome o Edge): sin ella no se vigila el fichero ni se leen los resultados de .fem/.</p>}
+          <button type="button" className="btn justify-start" style={{ height: 34 }} onClick={() => void empezarNuevo()} disabled={ocupado}>
+            <FilePlus size={15} /> Proyecto nuevo…
+          </button>
+          {nuevo && (
+            <form
+              className="flex items-center gap-2 rounded border border-border-main p-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void crearNuevo();
+              }}
+            >
+              <span className="text-[12px] text-text-secondary">{nuevo.dir ? `En ${nuevo.dir.name} /` : "Sin carpeta (guardar lo descargará):"}</span>
+              <input className="sel flex-1" autoFocus aria-label="Nombre del fichero" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} />
+              <button type="submit" className="btn btn-p">
+                Crear
+              </button>
+            </form>
+          )}
           <label className="btn justify-start" style={{ height: 34 }}>
             <FileJson size={15} /> Abrir un proyecto.json suelto (o arrastrarlo aquí)…
             <input type="file" accept=".json,application/json" className="sr-only" onChange={(e) => void fichero(e.target.files?.[0])} disabled={ocupado} />

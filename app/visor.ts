@@ -1,52 +1,56 @@
 /**
- * Abre el visor (V1) sobre un proyecto, desde la línea de órdenes:
+ * Abre el visor sobre un proyecto, desde la línea de órdenes:
  *
- *   bun run visor <proyecto.json>     (desde la raíz del repo)
+ *   bun run visor <proyecto.json>            (desde la raíz del repo)
+ *   bun run visor <nuevo.json> --nuevo       (crea el proyecto con la plantilla de V2a y lo abre)
  *
  * Levanta el servidor local del visor (sólo en 127.0.0.1), que sirve además la carpeta del proyecto
- * en `/proyecto/` (sólo lectura, sólo esa carpeta), y escribe la URL que lo abre: el visor lo vigila y
- * se recarga cuando el fichero cambia (lo edite el agente o el ingeniero), y usa los resultados que
- * dejó `fem calcular` en `.fem/`. El visor no escribe nada.
+ * en `/proyecto/` (`servidor.ts`): se leen sus ficheros y se escribe sólo el proyecto abierto, desde
+ * la página del visor (V2a, V-d). El visor lo vigila y se recarga cuando el fichero cambia (lo
+ * edite el agente o el ingeniero), y usa los resultados que dejó `fem calcular` en `.fem/`.
  *
  * No se usa `/@fs/` de Vite: en Windows, una ruta de otra unidad que la del repo devuelve el
  * index.html en vez del fichero (Vite 8.3).
  */
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, join, normalize, resolve, sep } from "node:path";
+import { existsSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { createServer, type Plugin } from "vite";
+import { proyectoNuevo } from "../src/editor/plantilla.ts";
+import { serializar } from "../src/editor/serializar.ts";
+import { manejadorCarpeta } from "./servidor.ts";
 
 const APP = import.meta.dirname;
-const RAIZ = join(APP, "..");
-const arg = process.argv[2];
+const args = process.argv.slice(2);
+const nuevo = args.includes("--nuevo");
+const arg = args.find((x) => !x.startsWith("--"));
 if (!arg) {
-  console.error("Uso: bun run visor <proyecto.json>");
+  console.error("Uso: bun run visor <proyecto.json> [--nuevo]");
   process.exit(2);
 }
 const ruta = resolve(process.cwd(), arg);
+if (nuevo) {
+  if (existsSync(ruta)) {
+    console.error(`Ya existe ${ruta}: no se sobrescribe. Ábralo sin --nuevo.`);
+    process.exit(2);
+  }
+  if (!existsSync(dirname(ruta))) {
+    console.error(`No existe la carpeta ${dirname(ruta)}.`);
+    process.exit(2);
+  }
+  writeFileSync(ruta, serializar(proyectoNuevo(basename(ruta).replace(/\.json$/i, ""))), "utf8");
+  console.log(`Creado ${ruta} con la plantilla de un proyecto nuevo.`);
+}
 if (!existsSync(ruta) || !statSync(ruta).isFile()) {
-  console.error(`No existe el fichero ${ruta}.`);
+  console.error(`No existe el fichero ${ruta}. Para empezar uno: bun run visor ${arg} --nuevo`);
   process.exit(2);
 }
 const carpeta = dirname(ruta);
 
-/** La carpeta del proyecto en /proyecto/: GET y HEAD de sus ficheros, nada fuera de ella. */
+/** La carpeta del proyecto en /proyecto/ (`servidor.ts`). */
 const servirCarpeta: Plugin = {
   name: "carpeta-del-proyecto",
   configureServer(s) {
-    s.middlewares.use("/proyecto/", (req, res) => {
-      const f = normalize(join(carpeta, decodeURIComponent((req.url ?? "").split("?")[0]!)));
-      const valido = (req.method === "GET" || req.method === "HEAD") && f.startsWith(carpeta + sep) && existsSync(f) && statSync(f).isFile();
-      if (!valido) {
-        // Un HEAD de lo que no existe es la vigilancia (las firmas aún sin firmar): 204, sin error en la consola
-        if (req.method === "HEAD") res.setHeader("x-existe", "no");
-        res.statusCode = req.method === "HEAD" ? 204 : req.method === "GET" ? 404 : 405;
-        res.end();
-        return;
-      }
-      const st = statSync(f);
-      res.writeHead(200, { "content-type": f.endsWith(".json") ? "application/json" : "application/octet-stream", "cache-control": "no-store", etag: `"${st.mtimeMs}-${st.size}"`, "content-length": st.size });
-      res.end(req.method === "HEAD" ? undefined : readFileSync(f));
-    });
+    s.middlewares.use("/proyecto/", manejadorCarpeta(carpeta, basename(ruta)));
   },
 };
 

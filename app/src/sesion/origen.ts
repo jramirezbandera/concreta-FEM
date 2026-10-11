@@ -1,7 +1,11 @@
 /**
  * De dónde lee el visor un proyecto (V1, §3.1): el `proyecto.json`, los resultados que guardó la CLI
- * en `.fem/<huella>/` y el fichero de firmas `<proyecto>.revision.json`. Sólo se lee: el visor no
- * escribe nada.
+ * en `.fem/<huella>/` y el fichero de firmas `<proyecto>.revision.json`. Desde V2a (V-d) se escribe
+ * también el proyecto, y sólo él: nunca `.fem/` ni las firmas.
+ *
+ * Al escribir se compara el sello del fichero con el que tenía al leerlo: si cambió (el agente, o el
+ * ingeniero a mano), no se escribe y se dice (conflicto, criterio 4 de V2a); «sobrescribir» es
+ * escribir con `forzar` después de avisar.
  *
  * - Carpeta: la File System Access API (Chrome y Edge), elegida por el usuario.
  * - URL: un fichero que sirve el servidor local del visor (`?proyecto=<ruta>`), para abrirlo desde la
@@ -17,13 +21,16 @@ interface Entrada {
 }
 export interface Directorio extends Entrada {
   kind: "directory";
-  getFileHandle(nombre: string): Promise<Fichero>;
+  getFileHandle(nombre: string, o?: { create?: boolean }): Promise<Fichero>;
+  queryPermission?(o: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+  requestPermission?(o: { mode: "read" | "readwrite" }): Promise<PermissionState>;
   getDirectoryHandle(nombre: string): Promise<Directorio>;
   values(): AsyncIterable<Entrada>;
 }
 interface Fichero extends Entrada {
   kind: "file";
   getFile(): Promise<File>;
+  createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void>; abort(): Promise<void> }>;
 }
 
 declare global {
@@ -37,6 +44,13 @@ export interface Leido {
   sello: string;
 }
 
+/** Resultado de escribir el proyecto. */
+export type Escritura =
+  | { ok: true; sello: string }
+  /** El fichero cambió en el disco desde que se leyó: no se escribió. */
+  | { ok: false; conflicto: true; mensaje: string }
+  | { ok: false; conflicto: false; mensaje: string };
+
 export interface Origen {
   /** Lo que se enseña al pie («carpeta Edificio / proyecto.json»). */
   descripcion: string;
@@ -47,6 +61,8 @@ export interface Origen {
   sello(nombre: string): Promise<string | null>;
   /** Los resultados guardados de una huella, si la CLI los dejó. */
   guardados(huella: string): Promise<{ cabecera: string; bytes: Uint8Array } | null>;
+  /** Escribe el proyecto si su sello sigue siendo `sello` (o siempre, con `forzar`). */
+  escribir(texto: string, o: { sello: string | null; forzar?: boolean }): Promise<Escritura>;
 }
 
 /** Fichero de firmas de un proyecto: `<nombre>.revision.json`, junto a él (como `rutaFirmas` de la CLI). */
@@ -56,9 +72,10 @@ export const nombreFirmas = (proyecto: string): string => `${proyecto.replace(/\
 
 export const hayCarpetas = (): boolean => typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
 
-export async function elegirCarpeta(): Promise<Directorio | null> {
+/** Elegir una carpeta: para leer (abrir; la escritura se pide al guardar) o para escribir (proyecto nuevo). */
+export async function elegirCarpeta(modo: "read" | "readwrite" = "read"): Promise<Directorio | null> {
   try {
-    return (await window.showDirectoryPicker!({ mode: "read", id: "concreta-fem" })) ?? null;
+    return (await window.showDirectoryPicker!({ mode: modo, id: "concreta-fem" })) ?? null;
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") return null;
     throw e;
@@ -98,6 +115,30 @@ export function origenCarpeta(dir: Directorio, fichero: string): Origen {
       const f = await archivo(nombre);
       return f ? `${f.lastModified}/${f.size}` : null;
     },
+    async escribir(texto, o) {
+      try {
+        // El permiso de escritura se pide al guardar por primera vez (con el clic del usuario)
+        const permiso = (await dir.queryPermission?.({ mode: "readwrite" })) ?? "granted";
+        if (permiso !== "granted" && (await dir.requestPermission?.({ mode: "readwrite" })) !== "granted") return { ok: false, conflicto: false, mensaje: `No hay permiso para escribir en la carpeta ${dir.name}.` };
+        const antes = await archivo(fichero);
+        const actual = antes ? `${antes.lastModified}/${antes.size}` : null;
+        if (!o.forzar && actual !== o.sello) return { ok: false, conflicto: true, mensaje: `${fichero} cambió en el disco desde que se leyó.` };
+        const h = await dir.getFileHandle(fichero, { create: true });
+        // createWritable escribe en un temporal y lo cambia por el fichero al cerrar: nunca queda medio escrito
+        const w = await h.createWritable();
+        try {
+          await w.write(texto);
+          await w.close();
+        } catch (e) {
+          await w.abort().catch(() => {});
+          throw e;
+        }
+        const f = await h.getFile();
+        return { ok: true, sello: `${f.lastModified}/${f.size}` };
+      } catch (e) {
+        return { ok: false, conflicto: false, mensaje: `No se pudo escribir ${fichero}: ${e instanceof Error ? e.message : String(e)}` };
+      }
+    },
     async guardados(huella) {
       try {
         const d = await (await dir.getDirectoryHandle(".fem")).getDirectoryHandle(huella);
@@ -109,6 +150,25 @@ export function origenCarpeta(dir: Directorio, fichero: string): Origen {
       }
     },
   };
+}
+
+/** Crea `fichero` en la carpeta con `texto`; no sobrescribe uno que ya exista. */
+export async function crearEnCarpeta(dir: Directorio, fichero: string, texto: string): Promise<string | null> {
+  try {
+    await dir.getFileHandle(fichero);
+    return `Ya existe ${fichero} en ${dir.name}: no se sobrescribe. Ábralo o elija otro nombre.`;
+  } catch {
+    // No existe: se crea
+  }
+  try {
+    const h = await dir.getFileHandle(fichero, { create: true });
+    const w = await h.createWritable();
+    await w.write(texto);
+    await w.close();
+    return null;
+  } catch (e) {
+    return `No se pudo crear ${fichero}: ${e instanceof Error ? e.message : String(e)}`;
+  }
 }
 
 // ─── URL del servidor local ─────────────────────────────────────────────────────────────────────
@@ -145,5 +205,31 @@ export function origenUrl(url: string): Origen {
       const bin = cab && (await pedir(`.fem/${huella}/resultados.bin`, "GET"));
       return cab && bin ? { cabecera: await cab.text(), bytes: new Uint8Array(await bin.arrayBuffer()) } : null;
     },
+    async escribir(texto, o) {
+      try {
+        const cab: Record<string, string> = { "content-type": "application/json" };
+        if (o.forzar) cab["x-forzar"] = "si";
+        else if (o.sello) cab["if-match"] = o.sello;
+        const r = await fetch(base + encodeURIComponent(fichero), { method: "PUT", body: texto, headers: cab, cache: "no-store" });
+        const j = (await r.json().catch(() => ({}))) as { mensaje?: string; sello?: string };
+        if (r.ok && j.sello) return { ok: true, sello: r.headers.get("etag") ?? j.sello };
+        if (r.status === 412) return { ok: false, conflicto: true, mensaje: j.mensaje ?? `${fichero} cambió en el disco desde que se leyó.` };
+        return { ok: false, conflicto: false, mensaje: j.mensaje ?? `El servidor no guardó ${fichero} (${r.status}).` };
+      } catch (e) {
+        return { ok: false, conflicto: false, mensaje: `No se pudo hablar con el servidor del visor: ${e instanceof Error ? e.message : String(e)}` };
+      }
+    },
   };
+}
+
+/** Guardar sin carpeta (un proyecto arrastrado, o en Firefox y Safari): se descarga el fichero. */
+export function descargar(texto: string, nombre: string): void {
+  const url = URL.createObjectURL(new Blob([texto], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

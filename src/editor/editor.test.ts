@@ -247,3 +247,30 @@ describe("sucesiones al azar (criterio 2)", () => {
     expect([...COLECCIONES].sort()).toEqual(["apoyos", "apoyosLineales", "bandas", "cargas", "casos", "losas", "materiales", "muros", "panos", "pilares", "plantas", "secciones", "vigas"]);
   });
 });
+
+describe("pegar en una celda, como en Excel", () => {
+  const { proyecto: ej } = leerEjemplo("ejemplo");
+  const ids = filas(ej.modelo, "pilares").map((f) => f.id);
+  const col = DEF_TABLAS.pilares.columnas.findIndex((c) => c.clave === "x");
+
+  it("sobrescribe desde la fila y la columna elegidas y crea filas pasada la última", () => {
+    const r = pegar(ej.modelo, "pilares", "10\t11\n12\t13\n", col, { ids, fila: 3 });
+    expect(r.ok).toBe(false); // la fila nueva no tiene desde, hasta ni sección
+    const s = pegar(ej.modelo, "pilares", "10\t11\n12\t13\n", col, { ids, fila: 2 });
+    expect(s.ok).toBe(true);
+    if (!s.ok) return;
+    const p = aplicado(ej, s.operacion);
+    const ps = lista(p.modelo, "pilares");
+    expect([ps[2]!.x, ps[2]!.y, ps[3]!.x, ps[3]!.y]).toEqual([10, 11, 12, 13]);
+    expect(ps[2]!.id).toBe(ids[2]);
+  });
+
+  it("pegar en la columna del id renombra, con sus referencias", () => {
+    const r = pegar(ej.modelo, "vigas", "VA\n", 0, { ids: filas(ej.modelo, "vigas").map((f) => f.id), fila: 0 });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const p = aplicado(ej, r.operacion);
+    expect(lista(p.modelo, "vigas")[0]!.id).toBe("VA");
+    expect(referenciasRotas(p.modelo)).toEqual([]);
+  });
+});

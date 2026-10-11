@@ -1,9 +1,13 @@
 /**
- * Visor de sólo lectura (V1, docs/fem3d/visor.md). Cabecera con las seis pantallas y el estado del
- * cálculo, la pantalla elegida y un pie que dice de dónde salen los resultados.
+ * Visor y editor (V1 y V2a, docs/fem3d/visor.md). Cabecera con las seis pantallas, el estado del
+ * cálculo y, si el proyecto se puede editar, deshacer, rehacer, guardar y calcular; la pantalla
+ * elegida y un pie que dice de dónde salen los resultados.
+ *
+ * Atajos: Ctrl+S guarda; Ctrl+Z y Ctrl+Y (o Ctrl+Mayús+Z) deshacen y rehacen fuera de un campo de
+ * texto (dentro, deshacen lo escrito en el campo).
  */
 import { useEffect, useState } from "react";
-import { FolderOpen, Moon, RefreshCw, Sun } from "lucide-react";
+import { FolderOpen, Moon, Play, Redo2, RefreshCw, Save, Sun, Undo2 } from "lucide-react";
 import { ContextoVisor, type Pantalla } from "./contexto.ts";
 import { useProyecto, type ProyectoAbierto } from "./sesion/useProyecto.ts";
 import { useTheme } from "./tema/useTheme.ts";
@@ -34,7 +38,8 @@ function Estado({ p }: { p: ProyectoAbierto }) {
 
 function TextoEstado({ p }: { p: ProyectoAbierto }) {
   const e = p.estado;
-  if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "CALCULANDO" : "ABRIENDO"} · RESULTADOS DESACTUALIZADOS</span>;
+  if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "CALCULANDO" : p.edicion?.pendiente ? "COMPILANDO LO EDITADO" : "ABRIENDO"} · RESULTADOS DESACTUALIZADOS</span>;
+  if (p.fase === "calculando") return <span className="pill warn">CALCULANDO · {e?.huella.slice(0, 8)}</span>;
   if (p.fase === "error") return <span className="pill fail">{e && e.compila ? "EL CÁLCULO FALLÓ" : "NO SE PUEDE ABRIR"}</span>;
   if (!e) return null;
   if (!e.compila) return <span className="pill fail">NO COMPILA · {e.huella.slice(0, 8)}</span>;
@@ -55,6 +60,29 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al cargar la página
   }, []);
 
+  // Atajos del editor
+  const ed = proyecto.edicion;
+  useEffect(() => {
+    if (!ed) return;
+    const f = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      const enCampo = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+      if (k === "s") {
+        e.preventDefault();
+        void ed.guardar();
+      } else if (!enCampo && k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        ed.deshacer();
+      } else if (!enCampo && (k === "y" || (k === "z" && e.shiftKey))) {
+        e.preventDefault();
+        ed.rehacer();
+      }
+    };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [ed]);
+
   // La planta elegida se conserva al recargar si sigue existiendo; si no, la primera
   const plantas = proyecto.estado?.plantas;
   const plantaValida = plantas?.some((p) => p.id === planta) ? planta : (plantas?.[0]?.id ?? null);
@@ -62,7 +90,12 @@ export function App() {
   if (!proyecto.estado && proyecto.fase !== "error") return <Inicio proyecto={proyecto} />;
 
   const e = proyecto.estado;
-  const pie = proyecto.fuente?.tipo === "origen" ? `${proyecto.fuente.origen.descripcion} · vigilando cambios` : proyecto.fuente ? `${proyecto.fuente.nombre} · sin vigilancia (ábralo desde su carpeta para recargarlo solo)` : "";
+  const pie =
+    proyecto.fuente?.tipo === "origen"
+      ? `${proyecto.fuente.origen.descripcion} · vigilando cambios${ed?.guardado.tipo === "guardado" ? ` · guardado en ${ed.guardado.ms.toFixed(0)} ms` : ""}`
+      : proyecto.fuente
+        ? `${proyecto.fuente.nombre} · sin vigilancia (ábralo desde su carpeta para recargarlo solo y guardar en él)`
+        : "";
   const resultados = !e?.calculado
     ? ""
     : e.origen === "guardados"
@@ -87,13 +120,41 @@ export function App() {
               </button>
             ))}
           </nav>
-          <span className="pill neu" title="El visor sólo lee: el modelo se edita en el proyecto.json (agente o a mano) y se firma con «fem firmar»">
-            SÓLO LECTURA
-          </span>
+          {ed ? (
+            <>
+              <button type="button" className="btn" style={{ width: 28, padding: 0 }} onClick={ed.deshacer} disabled={!ed.deshacerEtiqueta} title={ed.deshacerEtiqueta ? `Deshacer: ${ed.deshacerEtiqueta} (Ctrl+Z)` : "Nada que deshacer"} aria-label="Deshacer">
+                <Undo2 size={14} />
+              </button>
+              <button type="button" className="btn" style={{ width: 28, padding: 0 }} onClick={ed.rehacer} disabled={!ed.rehacerEtiqueta} title={ed.rehacerEtiqueta ? `Rehacer: ${ed.rehacerEtiqueta} (Ctrl+Y)` : "Nada que rehacer"} aria-label="Rehacer">
+                <Redo2 size={14} />
+              </button>
+              <button
+                type="button"
+                className={`btn ${ed.sinGuardar ? "btn-p" : ""}`}
+                onClick={() => void ed.guardar()}
+                disabled={!ed.sinGuardar || ed.guardado.tipo === "guardando"}
+                data-sin-guardar={ed.sinGuardar}
+                title={ed.modo === "escribir" ? `Guardar en ${proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : ""} (Ctrl+S)` : "Sin carpeta: guardar descarga el fichero (Ctrl+S)"}
+              >
+                <Save size={14} /> {ed.guardado.tipo === "guardando" ? "Guardando…" : ed.modo === "escribir" ? "Guardar" : "Descargar"}
+                {ed.sinGuardar && <span aria-label="sin guardar">●</span>}
+              </button>
+            </>
+          ) : (
+            <span className="pill neu" title="Este fichero no es un proyecto válido: no se puede editar">
+              SÓLO LECTURA
+            </span>
+          )}
           <Estado p={proyecto} />
-          <button type="button" className="btn" onClick={proyecto.recalcular} disabled={!e?.compila || proyecto.fase === "calculando"} title="Calcular de nuevo, sin usar los resultados de .fem/">
-            <RefreshCw size={14} /> Recalcular
-          </button>
+          {ed && e?.compila && !e.calculado && !proyecto.desactualizado ? (
+            <button type="button" className="btn btn-p" onClick={proyecto.calcular} disabled={proyecto.fase === "calculando"} title="Calcular esta versión del proyecto">
+              <Play size={14} /> {proyecto.fase === "calculando" ? "Calculando…" : "Calcular"}
+            </button>
+          ) : (
+            <button type="button" className="btn" onClick={proyecto.recalcular} disabled={!e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado)} title="Calcular de nuevo, sin usar los resultados de .fem/">
+              <RefreshCw size={14} /> Recalcular
+            </button>
+          )}
           <button type="button" className="btn" onClick={() => location.assign(location.pathname)} title="Abrir otro proyecto">
             <FolderOpen size={14} /> Abrir
           </button>
@@ -101,6 +162,30 @@ export function App() {
             {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
           </button>
         </header>
+
+        {ed?.conflicto && (
+          <div className="banda warn" role="alert">
+            <span className="min-w-0 flex-1">
+              <strong>{ed.conflicto}</strong> No se ha recargado ni sobrescrito nada.
+            </span>
+            <button type="button" className="btn" onClick={ed.recargarDisco}>
+              Recargar del disco (se pierden los cambios de aquí)
+            </button>
+            <button type="button" className="btn" onClick={() => void ed.guardar({ forzar: true })}>
+              Sobrescribir el del disco
+            </button>
+          </div>
+        )}
+        {ed?.guardado.tipo === "error" && (
+          <div className="banda fail" role="alert">
+            <span className="min-w-0 flex-1">
+              <strong>No se guardó.</strong> {ed.guardado.mensaje} Los cambios siguen aquí.
+            </span>
+            <button type="button" className="btn" onClick={() => void ed.guardar()}>
+              Reintentar
+            </button>
+          </div>
+        )}
 
         <main className="flex min-h-0 flex-1">
           {proyecto.fase === "error" && !e ? (

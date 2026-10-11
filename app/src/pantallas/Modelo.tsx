@@ -1,8 +1,8 @@
 /**
- * Pantalla 1 · Modelo (prototipo v3 «Modelo por plantas», sin lo que es de edición). A la izquierda,
- * el proyecto, las plantas, la vista y el resumen de la planta; en el centro, la planta (la escena de
- * A4: modelo, cargas, diagnósticos o malla) o el edificio en 3D; a la derecha, el objeto elegido con
- * sus datos tal como están en el proyecto, o la lista de diagnósticos.
+ * Pantalla 1 · Modelo (prototipo v3 «Modelo por plantas»). A la izquierda, el proyecto, las plantas,
+ * la vista y el resumen de la planta; en el centro, la planta (la escena de A4: modelo, cargas,
+ * diagnósticos o malla) o el edificio en 3D y, debajo, las tablas del editor (V2a, §6.2); a la
+ * derecha, el objeto elegido (su formulario) o la lista de diagnósticos.
  */
 import { useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
@@ -16,6 +16,8 @@ import { Vista3D } from "../lienzo/Vista3D.tsx";
 import { usePedido } from "../sesion/usePedido.ts";
 import { useEleccion } from "./useEleccion.ts";
 import { Inspector } from "./Inspector.tsx";
+import { PanelTablas } from "../editor/Hoja.tsx";
+import type { NombreTabla } from "../../../src/editor/tablas.ts";
 
 type Vista = "modelo" | "cargas" | "diagnosticos" | "malla";
 
@@ -25,6 +27,8 @@ export function PantallaModelo() {
   const [vista, setVista] = useState<Vista>("modelo");
   const [caso, setCaso] = useState<string | null>(null);
   const [tresD, setTresD] = useState(false);
+  const [tabla, setTabla] = useState<NombreTabla>("pilares");
+  const ed = proyecto.edicion;
   const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
   const vistaValida: Vista = vista === "malla" && !e.calculado ? "modelo" : vista;
   const vp: VistaPlanta = vistaValida === "cargas" ? { vista: "cargas", caso: casoValido } : { vista: vistaValida };
@@ -40,7 +44,9 @@ export function PantallaModelo() {
     setSeleccion(r.ok && r.valor ? (r.valor as Eleccion).objeto : null);
   };
 
-  const aviso = proyecto.desactualizado ? (
+  const aviso = proyecto.desactualizado && ed?.pendiente ? (
+    <Aviso tono="warn">Compilando la versión editada…</Aviso>
+  ) : proyecto.desactualizado ? (
     <Aviso tono="warn">El fichero cambió: abriendo la versión nueva…</Aviso>
   ) : escena.diagnosticos ? (
     <Aviso tono="fail">{escena.diagnosticos.map((d) => d.mensaje).join(" ")}</Aviso>
@@ -52,10 +58,14 @@ export function PantallaModelo() {
     <>
       <Panel lado="izq" etiqueta="Proyecto y plantas">
         <Seccion titulo="Proyecto" valor={e.huella.slice(0, 12)}>
-          <div className="px-3.5 py-2">
-            <div className="text-[13px] font-semibold">{e.nombre ?? "Sin nombre"}</div>
-            {e.descripcion && <p className="mt-1 text-[11.5px] leading-snug text-text-secondary">{e.descripcion}</p>}
-          </div>
+          {ed ? (
+            <DatosProyecto />
+          ) : (
+            <div className="px-3.5 py-2">
+              <div className="text-[13px] font-semibold">{e.nombre ?? "Sin nombre"}</div>
+              {e.descripcion && <p className="mt-1 text-[11.5px] leading-snug text-text-secondary">{e.descripcion}</p>}
+            </div>
+          )}
           {e.resumen && (
             <div className="grid grid-cols-2 px-0">
               {Object.entries(e.resumen.objetos).map(([k, n]) => (
@@ -63,7 +73,7 @@ export function PantallaModelo() {
               ))}
             </div>
           )}
-          {!e.compila && <p className="nota text-state-fail">El modelo no compila: se dibuja con sus diagnósticos. Corríjalo en el proyecto.json.</p>}
+          {!e.compila && <p className="nota text-state-fail">El modelo no compila: se dibuja con sus diagnósticos. {ed ? "Corríjalo en las tablas (los errores, a la derecha)." : "Corríjalo en el proyecto.json."}</p>}
           {proyecto.fase === "error" && e.compila && <p className="nota text-state-fail">El cálculo falló: {proyecto.errores.map((d) => d.mensaje).join(" ")}</p>}
         </Seccion>
         <ListaPlantas estado={e} planta={planta} onPlanta={setPlanta} />
@@ -156,7 +166,14 @@ export function PantallaModelo() {
         >
           {tresD ? `Edificio · planta ${planta ?? "—"} resaltada` : `${planta ?? "—"} · ${cota(plantaV?.cota)} m · vista ${vistaValida}${vistaValida === "cargas" ? ` · caso ${casoValido}` : ""}${escena.ms !== null ? ` · ${fmt(escena.ms, 0)} ms` : ""}`}
         </BarraLienzo>
-        {tresD ? <Vista3D geometria={geometria.datos} plantaActiva={planta} titulo="Edificio en 3D" /> : <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Planta ${planta}, vista ${vistaValida}`} cargando={escena.cargando} />}
+        <div className="flex min-h-0 flex-[3] flex-col">
+          {tresD ? <Vista3D geometria={geometria.datos} plantaActiva={planta} titulo="Edificio en 3D" /> : <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Planta ${planta}, vista ${vistaValida}`} cargando={escena.cargando} />}
+        </div>
+        {ed && (
+          <div className="flex min-h-[220px] flex-[2] flex-col">
+            <PanelTablas tabla={tabla} setTabla={setTabla} />
+          </div>
+        )}
       </section>
 
       <Panel lado="der" etiqueta="Inspector">
@@ -170,5 +187,28 @@ export function PantallaModelo() {
         )}
       </Panel>
     </>
+  );
+}
+
+/** Nombre y descripción del proyecto, editables (no entran en la huella). */
+function DatosProyecto() {
+  const { proyecto } = useVisor();
+  const ed = proyecto.edicion!;
+  const p = ed.proyecto;
+  const [nombre, setNombre] = useState<string | null>(null);
+  const [descripcion, setDescripcion] = useState<string | null>(null);
+  const escribir = () => {
+    const cambio: { nombre?: string; descripcion?: string } = {};
+    if (nombre !== null && nombre !== (p.nombre ?? "")) cambio.nombre = nombre.trim();
+    if (descripcion !== null && descripcion !== (p.descripcion ?? "")) cambio.descripcion = descripcion.trim();
+    if (Object.keys(cambio).length) ed.editar({ op: "datos", ...cambio }, "Datos del proyecto");
+    setNombre(null);
+    setDescripcion(null);
+  };
+  return (
+    <div className="flex flex-col gap-1.5 px-3.5 py-2">
+      <input className="sel w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600 }} aria-label="Nombre del proyecto" placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+      <textarea className="sel w-full" style={{ height: 52, padding: 6, fontFamily: "var(--font-sans)", fontSize: 11.5, resize: "vertical" }} aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={escribir} />
+    </div>
   );
 }

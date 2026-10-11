@@ -44,7 +44,7 @@ export function operacionFila(m: ModeloFisico, tabla: NombreTabla, id: string | 
 /** Escribe una fila y aplica la operación. */
 export function escribirFila(p: Proyecto, tabla: NombreTabla, id: string | null, fila: Fila): Aplicacion {
   const t = operacionFila(p.modelo, tabla, id, fila);
-  if (!t.ok) return { ok: false, errores: t.errores.map((e) => ({ codigo: "editor/celda", severidad: "error" as const, mensaje: `${e.columna ? `${e.columna}: ` : ""}${e.mensaje}`, ...(e.id ? { objetos: [e.id] } : {}), detalles: { columna: e.columna } })) };
+  if (!t.ok) return { ok: false, errores: t.errores.map((e) => ({ codigo: "editor/celda", severidad: "error" as const, mensaje: `${e.columna ? `${e.columna}: ` : ""}${e.mensaje}`, ...(e.id ? { ids: [e.id] } : {}), detalles: { columna: e.columna } })) };
   return aplicar(p, t.operacion);
 }
 
@@ -68,12 +68,19 @@ export function exportar(m: ModeloFisico, tabla: NombreTabla, planta?: string): 
 }
 
 /**
- * Pega un bloque de una hoja de cálculo en una tabla: una fila con un id de la tabla la cambia (lo
- * que no se pega se queda como estaba); una fila con un id nuevo, o sin id, crea un objeto. Si la
- * primera fila son los nombres de las columnas (su clave o su título), dice qué es cada columna; si
- * no, van en el orden de la tabla desde la columna `desde`.
+ * Pega un bloque de una hoja de cálculo en una tabla.
+ *
+ * - Con cabecera (la primera fila son los nombres de las columnas, por su clave o su título): una
+ *   fila con un id de la tabla la cambia (lo que no se pega se queda como estaba); una con un id
+ *   nuevo, o sin id, crea un objeto.
+ * - Sin cabecera, las columnas van en el orden de la tabla desde la columna `desde`. Con `destino`
+ *   (las filas que se ven, por su id, y la fila donde se pega), como en Excel: cada fila pegada
+ *   sobrescribe la fila de la tabla que le toca y, pasada la última, crea una nueva. Sin `destino`,
+ *   por el id, como con cabecera.
+ *
+ * Todo o nada: si una fila no vale, no entra ninguna.
  */
-export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde = 0): Traduccion {
+export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde = 0, destino?: { ids: readonly string[]; fila: number }): Traduccion {
   const def = DEF_TABLAS[tabla];
   const ctx = contexto(m);
   const celdas = leerTsv(texto);
@@ -89,6 +96,7 @@ export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde 
   const idx = indiceIds(m);
   const ops: Operacion[] = [];
   const vistos = new Set<string>();
+  const enPosicion = !cabecera && destino !== undefined;
   datos.forEach((celdasFila, i) => {
     const num = i + 1;
     const pegada: Record<string, string> = {};
@@ -96,16 +104,23 @@ export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde 
       const c = columnas[j];
       if (c && !def.columnas.find((x) => x.clave === c)?.calculada) pegada[c] = v;
     });
-    const id = (pegada.id ?? "").trim();
+    // La fila de la tabla que se cambia: la de su posición o la de su id
+    let baseId: string | undefined;
+    if (enPosicion) baseId = destino.ids[destino.fila + i];
+    else {
+      const id = (pegada.id ?? "").trim();
+      const ya = id === "" ? undefined : idx.get(id);
+      if (ya && ya.coleccion !== def.coleccion) return errores.push({ fila: num, id, columna: "id", mensaje: `«${id}» ya es un id de ${ya.coleccion}` });
+      if (ya) baseId = id;
+    }
+    const base = baseId === undefined ? undefined : lista(m, def.coleccion).find((o) => o.id === baseId);
+    const fila = base ? { ...def.fila(base, ctx), ...pegada } : pegada;
+    const id = (fila.id ?? "").trim();
     if (id !== "") {
       if (vistos.has(id)) return errores.push({ fila: num, id, columna: "id", mensaje: `el id «${id}» está repetido en lo pegado` });
       vistos.add(id);
     }
-    const ya = id === "" ? undefined : idx.get(id);
-    if (ya && ya.coleccion !== def.coleccion) return errores.push({ fila: num, id, columna: "id", mensaje: `«${id}» ya es un id de ${ya.coleccion}` });
-    const base = ya ? lista(m, def.coleccion)[ya.indice]! : undefined;
-    const fila = base ? { ...def.fila(base, ctx), ...pegada } : pegada;
-    const t = operacionFila(m, tabla, base ? id : null, fila, vistos, num);
+    const t = operacionFila(m, tabla, base ? base.id : null, fila, vistos, num);
     if (!t.ok) return errores.push(...t.errores);
     if (t.operacion.op === "crear") vistos.add(t.operacion.objeto.id);
     ops.push(t.operacion);

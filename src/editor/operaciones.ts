@@ -44,7 +44,7 @@ export type Aplicacion =
   /** `usos`: con `editor/en-uso`, quién usa lo que se quería borrar (para preguntar qué hacer). */
   | { ok: false; errores: Diagnostico[]; usos?: Uso[] };
 
-const error = (codigo: string, mensaje: string, objetos: string[] = [], detalles?: Record<string, unknown>): Diagnostico => ({ codigo, severidad: "error", mensaje, ...(objetos.length ? { objetos } : {}), ...(detalles ? { detalles } : {}) });
+const error = (codigo: string, mensaje: string, objetos: string[] = [], detalles?: Record<string, unknown>): Diagnostico => ({ codigo, severidad: "error", mensaje, ...(objetos.length ? { ids: objetos } : {}), ...(detalles ? { detalles } : {}) });
 
 const NOMBRES: Record<Coleccion, string> = {
   plantas: "planta",
