@@ -3,7 +3,11 @@
  * Cada familia, con la malla por defecto (rejilla, h = 0,75), con la triangulación sola (h = 0,75) y
  * con la referencia fina (triangulación, h = 0,3): validez, diagnósticos, nudos, cobertura de la
  * rejilla, plantillas, jacobiano, equilibrio, reacciones de los pilares (G + Q), flecha máxima por
- * planta (G + Q) y desplome medio de la planta de arriba (Vx).
+ * planta (G + Q), desplome medio de la planta de arriba (Vx) y momentos de los pilares (G + Q) en
+ * los extremos de cada tramo, relativos al mayor del modelo: lo que más depende de la malla de
+ * alrededor de cada pilar.
+ *
+ * Lo mismo con las retículas al azar de `reticulasAleatorias.ts`, en las que entra la rejilla.
  *
  * Uso: bun validacion/geom/sondeo.ts > validacion/geom/out_sondeo.txt
  */
@@ -14,6 +18,9 @@ import type { ModeloFisico, OpcionesCompilacion } from "../../src/compilador/fis
 import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { edificioGeometria, FAMILIAS, type OpcionesGeometria } from "../../src/pruebas/geometrias.ts";
+import { reticulaAleatoria } from "../../src/pruebas/reticulasAleatorias.ts";
+
+const SEMILLAS = 24;
 
 interface Medida {
   valido: boolean;
@@ -27,12 +34,14 @@ interface Medida {
   reac: Map<string, number>;
   flecha: Map<string, number>;
   deriva: number;
+  /** Momento flector (G + Q) en los dos extremos de cada barra de los pilares, por clave `pilar#barra#extremo`. */
+  mpil: Map<string, number>;
 }
 
 function medir(f: ModeloFisico, op: OpcionesCompilacion): Medida {
   const r = compilar(f, op);
   const codigos = (sev: string) => [...new Set(r.diagnosticos.filter((d) => d.severidad === sev).map((d) => d.codigo))];
-  const vacia: Medida = { valido: false, errores: codigos("error"), avisos: codigos("aviso"), nudos: 0, cobertura: 0, plantillas: 0, jac: 0, eq: NaN, reac: new Map(), flecha: new Map(), deriva: NaN };
+  const vacia: Medida = { valido: false, errores: codigos("error"), avisos: codigos("aviso"), nudos: 0, cobertura: 0, plantillas: 0, jac: 0, eq: NaN, reac: new Map(), flecha: new Map(), deriva: NaN, mpil: new Map() };
   if (!r.valido) {
     vacia.errores.push(...r.diagnosticos.filter((d) => d.severidad === "error").slice(0, 3).map((d) => `  · ${d.mensaje}`));
     return vacia;
@@ -46,11 +55,22 @@ function medir(f: ModeloFisico, op: OpcionesCompilacion): Medida {
   for (const [clave, n] of Object.entries(r.mapeo.nudosPilar)) if (clave.endsWith("@C")) reac.set(clave, G.reacciones[6 * n + 2]! + Q.reacciones[6 * n + 2]!);
   const cotas = new Map<number, number>();
   m.nudos.forEach((n, i) => cotas.set(n.z, Math.min(cotas.get(n.z) ?? 0, G.u[6 * i + 2]! + Q.u[6 * i + 2]!)));
-  const flecha = new Map([...cotas].filter(([z]) => z > 0).map(([z, w]) => [z.toFixed(2), w]));
+  // Todas las plantas menos la de cimentación (la de abajo)
+  const zmin = Math.min(...cotas.keys());
+  const flecha = new Map([...cotas].filter(([z]) => z > zmin).map(([z, w]) => [z.toFixed(2), w]));
   const zmax = Math.max(...m.nudos.map((n) => n.z));
   const arriba = Object.entries(r.mapeo.nudosPilar).filter(([, n]) => m.nudos[n]!.z === zmax).map(([, n]) => n);
+  const mpil = new Map<string, number>();
+  for (const p of f.pilares ?? [])
+    r.mapeo.piezas[p.id]!.forEach((b, i) => {
+      for (const ext of [0, 6]) {
+        const [My, Mz] = [G.esfuerzosBarras[12 * b + ext + 4]! + Q.esfuerzosBarras[12 * b + ext + 4]!, G.esfuerzosBarras[12 * b + ext + 5]! + Q.esfuerzosBarras[12 * b + ext + 5]!];
+        mpil.set(`${p.id}#${i}#${ext}`, Math.sqrt(My * My + Mz * Mz));
+      }
+    });
   const e = r.estadisticas;
   return {
+    mpil,
     valido: true,
     errores: [],
     avisos: codigos("aviso"),
@@ -72,7 +92,14 @@ function frente(a: Medida, ref: Medida) {
   for (const [id, x] of ref.reac) dr = Math.max(dr, Math.abs((a.reac.get(id) ?? NaN) - x) / media);
   let df = 0;
   for (const [z, w] of ref.flecha) df = Math.max(df, Math.abs((a.flecha.get(z) ?? NaN) / w - 1));
-  return { dr, df, dd: a.deriva / ref.deriva - 1 };
+  // Momentos de los pilares: peor diferencia relativa al mayor momento del modelo
+  const mmax = Math.max(...ref.mpil.values());
+  let [dm, peor] = [0, ""];
+  for (const [k, x] of ref.mpil) {
+    const d = Math.abs((a.mpil.get(k) ?? NaN) - x) / mmax;
+    if (!(d <= dm)) [dm, peor] = [d, k.split("#")[0]!];
+  }
+  return { dr, df, dd: a.deriva / ref.deriva - 1, dm, peor };
 }
 
 if (import.meta.main) {
@@ -84,27 +111,33 @@ if (import.meta.main) {
     ["girada 23°", { giro: 23 }],
     ["pilares circulares", { circulares: true }],
   ];
-  console.log(`# validacion/geom/sondeo.ts — ${new Date().toLocaleDateString("sv-SE")}: plantas no ortogonales, 2 plantas`);
-  console.log("");
-  console.log("| familia | variante | malla | válido | nudos | rejilla | plantillas | jac. mín. | equilibrio | reacciones | flechas | desplome | avisos |");
-  console.log("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
   const fallos: string[] = [];
-  for (const fam of FAMILIAS)
-    for (const [nv, ov] of variantes) {
-      const f = edificioGeometria(fam, ov);
-      const ref = medir(f, { tamanoMalla: 0.3, rejilla: false });
-      for (const [nm, op] of [
-        ["ref. triangulación 0,3", null],
-        ["triangulación 0,75", { tamanoMalla: 0.75, rejilla: false }],
-        ["rejilla 0,75", { tamanoMalla: 0.75 }],
-      ] as const) {
-        const x = op ? medir(f, op) : ref;
-        if (!x.valido) fallos.push(`${fam} ${nv} ${nm}:\n${x.errores.join("\n")}`);
-        const d = x.valido && ref.valido && op ? frente(x, ref) : null;
-        console.log(
-          `| ${fam} | ${nv} | ${nm} | ${x.valido ? "sí" : "**no**"} | ${x.nudos} | ${pc(x.cobertura)} | ${x.plantillas} | ${x.jac.toFixed(3)} | ${x.eq.toExponential(1)} | ${d ? pc(d.dr) : ""} | ${d ? pc(d.df) : ""} | ${d ? pc(d.dd) : ""} | ${[...x.avisos, ...x.errores.filter((e) => !e.startsWith(" "))].join(", ")} |`,
-        );
-      }
+  const cabecera = (primera: string) => {
+    console.log(`| ${primera} | malla | válido | nudos | rejilla | plantillas | jac. mín. | equilibrio | reacciones | flechas | desplome | M pilares | avisos |`);
+    console.log("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|".slice(4));
+  };
+  /** Las tres mallas de un modelo, frente a la referencia fina. */
+  const filas = (nombre: string, f: ModeloFisico) => {
+    const ref = medir(f, { tamanoMalla: 0.3, rejilla: false });
+    for (const [nm, op] of [
+      ["ref. triangulación 0,3", null],
+      ["triangulación 0,75", { tamanoMalla: 0.75, rejilla: false }],
+      ["rejilla 0,75", { tamanoMalla: 0.75 }],
+    ] as const) {
+      const x = op ? medir(f, op) : ref;
+      if (!x.valido) fallos.push(`${nombre} ${nm}:\n${x.errores.join("\n")}`);
+      const d = x.valido && ref.valido && op ? frente(x, ref) : null;
+      console.log(
+        `| ${nombre} | ${nm} | ${x.valido ? "sí" : "**no**"} | ${x.nudos} | ${pc(x.cobertura)} | ${x.plantillas} | ${x.jac.toFixed(3)} | ${x.eq.toExponential(1)} | ${d ? pc(d.dr) : ""} | ${d ? pc(d.df) : ""} | ${d ? pc(d.dd) : ""} | ${d ? `${pc(d.dm)} (${d.peor})` : ""} | ${[...x.avisos, ...x.errores.filter((e) => !e.startsWith(" "))].join(", ")} |`,
+      );
     }
+  };
+  console.log(`# validacion/geom/sondeo.ts — ${new Date().toLocaleDateString("sv-SE")}: plantas no ortogonales y retículas al azar`);
+  console.log(["", "## 1. Plantas no ortogonales (2 plantas)", ""].join("\n"));
+  cabecera("familia, variante");
+  for (const fam of FAMILIAS) for (const [nv, ov] of variantes) filas(`${fam}${nv ? `, ${nv}` : ""}`, edificioGeometria(fam, ov));
+  console.log(["", "## 2. Retículas al azar (`reticulaAleatoria`)", ""].join("\n"));
+  cabecera("semilla");
+  for (let s = 1; s <= SEMILLAS; s++) filas(String(s), reticulaAleatoria(s));
   if (fallos.length) console.log(["", "## Fallos", "", ...fallos].join("\n"));
 }

@@ -284,6 +284,10 @@
   - **Regla del motor (I2-4):** los materiales de Three.js son de la página y no se liberan, y no se comprueban los shaders en producción; si no, cambiar de modo recompila en mitad de un fotograma.
   - **Validación:** `validacion/i2/chrome.ts` (los búferes de Chrome con el sha256 de Node, 120 fps, selección en las cuatro vistas y la tabla) y `perfil.ts` (perfil de CPU). Los bancos de I1, V1 y V2a, adaptados y sin tareas largas.
   - **Pendiente:** la puerta de uso del usuario; medir en una GPU integrada; no recalcular en la app cuando un cambio no mueve la huella.
+- **2026-10-12: G, el compilador fuera de la retícula ortogonal** (en paralelo a I2). El informe está en `docs/fem3d/geometria.md`, con hallazgos G-1…G-5 y pendientes.
+  - **Respaldo (G-1):** si la rejilla falla en una planta, se malla con la triangulación sola y se avisa (`malla/sin-rejilla`); antes, el modelo no compilaba.
+  - **Probado:** 5 familias de planta no ortogonal (rombo, circular con vigas curvas, abanico, dos alas en ángulo, triangular) × 4 variantes, y 24 retículas al azar en las que entra la rejilla (`src/pruebas/geometrias.ts`, `reticulasAleatorias.ts`, `src/compilador/geometrias.test.ts`). Todas compilan y calculan. Frente a la triangulación con h = 0,3 (`validacion/geom/sondeo.ts`), la triangulación de 0,75 queda a ≤ 2,3 % en todo; la rejilla, a ≤ 4,65 % en los momentos de los pilares y ≤ 3,7 % en el desplome, siempre más rígido (G-3).
+  - **Pendiente del usuario:** G-3. **Pendiente técnico:** el aviso `malla/calidad`, que salta en casi todos los modelos por las vigas que llegan en ángulo a un pilar y los pilares circulares (G-4); muros, reticular, unidireccional y bandas en planta no ortogonal.
 - **Siguiente paso:**
   - las puertas de uso de I1 e I2 y después I3 (sólido, translúcido, filtros y caja de sección) e I4 (resultados en 3D);
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);

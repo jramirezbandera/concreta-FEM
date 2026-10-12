@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { Arreglo } from "./arreglo.ts";
 import { distanciaABorde } from "./poligonos.ts";
 import type { Vec2 } from "./fisico.ts";
-import { COBERTURA_MINIMA, jacobianoEscalado, mallarPlanta, mallarPlantaCon, type LosaMallar, type ResultadoMalla } from "./mallado.ts";
+import { COBERTURA_MINIMA, conRespaldo, jacobianoEscalado, mallarPlanta, mallarPlantaCon, type LosaMallar, type ResultadoMalla } from "./mallado.ts";
 
 type Ok = Extract<ResultadoMalla, { ok: true }>;
 const ok = (r: ResultadoMalla): Ok => {
@@ -266,5 +266,47 @@ describe("rejilla alineada (H52)", () => {
         expect(otros.some((o) => Math.abs(o[0] - q[0]) < 1e-9 && Math.abs(o[1] - q[1]) < 1e-9)).toBe(true);
       }
     }
+  });
+
+  describe("respaldo de la triangulación sola (G-1)", () => {
+    const escena = { losas: [{ id: "L", contorno: rect(0, 0, 12, 10) }], ...RETICULA };
+    const con = () => mallar(escena, 0.75).m;
+    const sin = () => mallar(escena, 0.75, undefined, undefined, false).m;
+    const aviso = (r: ResultadoMalla) => (r.ok ? r.problemas.filter((p) => p.codigo === "malla/sin-rejilla") : []);
+
+    it("si la rejilla va bien, no se toca", () => {
+      const r = conRespaldo(con, sin);
+      expect(ok(r).nudos.length).toBe(con().nudos.length);
+      expect(aviso(r)).toEqual([]);
+    });
+
+    it("si la rejilla lanza, falla o no pasa el validador, la triangulación sola con un aviso", () => {
+      const roto = (): ResultadoMalla => {
+        const m = con();
+        return { ...m, problemas: [...m.problemas, { losa: -1, severidad: "error", codigo: "malla/conformidad", mensaje: "" }] };
+      };
+      for (const malla of [
+        () => {
+          throw new Error("índice fuera de rango");
+        },
+        (): ResultadoMalla => ({ ok: false, mensaje: "sin celdas" }),
+        roto,
+      ]) {
+        const r = ok(conRespaldo(malla, sin));
+        expect(r.nudos.length).toBe(sin().nudos.length);
+        expect(r.rejilla.quads).toBe(0);
+        expect(aviso(r)).toHaveLength(1);
+        expect(r.problemas.filter((p) => p.severidad === "error")).toEqual([]);
+      }
+      expect(aviso(conRespaldo(roto, sin))[0]!.mensaje).toContain("malla/conformidad");
+    });
+
+    it("si la triangulación sola también falla, queda el fallo", () => {
+      const r = conRespaldo(() => ({ ok: false, mensaje: "rejilla" }), () => ({ ok: false, mensaje: "cdt" }));
+      expect(r).toEqual({ ok: false, mensaje: "cdt" });
+      const roto = con();
+      roto.problemas.push({ losa: -1, severidad: "error", codigo: "malla/area", mensaje: "" });
+      expect(conRespaldo(() => roto, () => ({ ok: false, mensaje: "cdt" }))).toBe(roto);
+    });
   });
 });

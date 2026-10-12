@@ -90,7 +90,7 @@ function abanico(o: OpcionesGeometria): Planta2D {
   const exterior = arco(c, 24, 0, 90, 16);
   const interior = arco(c, 6, 90, 0, 8);
   const huecos = o.hueco ? [huecoEn(polar(c, 12, 45), [Math.cos(R(45)), Math.sin(R(45))], [-Math.sin(R(45)), Math.cos(R(45))])] : [];
-  return { pilares, vigas, contorno: [...exterior, ...interior.slice(0, -1)], huecos };
+  return { pilares, vigas, contorno: [...exterior, ...interior], huecos };
 }
 
 /**

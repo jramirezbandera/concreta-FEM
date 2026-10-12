@@ -295,10 +295,38 @@ export function siembraGraduada(L: number, sa: number, sb: number, s: number, nF
  * menos nudos (a igualdad, la de la rejilla).
  */
 export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>, rejilla = true): ResultadoMalla {
-  const r = mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, rejilla);
-  if (!rejilla || !r.ok || r.rejilla.cobertura >= COBERTURA_MINIMA) return r;
-  const sin = mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false);
-  return sin.ok && sin.nudos.length < r.nudos.length ? sin : r;
+  const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false);
+  if (!rejilla) return sin();
+  const r = conRespaldo(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true), sin);
+  if (!r.ok || r.rejilla.cobertura >= COBERTURA_MINIMA || r.problemas.some((p) => p.codigo === "malla/sin-rejilla")) return r;
+  const s = sin();
+  return s.ok && s.nudos.length < r.nudos.length ? s : r;
+}
+
+/**
+ * G-1: si la malla con rejilla falla (una excepción, o no pasa el validador), la planta se malla con
+ * la triangulación sola, que no depende de la rejilla, y se avisa. Un fallo de la rejilla no puede
+ * impedir el cálculo. Si la triangulación sola también falla, queda el fallo de la rejilla (o el
+ * de la triangulación, si la rejilla lanzó una excepción).
+ */
+export function conRespaldo(conRejilla: () => ResultadoMalla, sinRejilla: () => ResultadoMalla): ResultadoMalla {
+  let r: ResultadoMalla;
+  try {
+    r = conRejilla();
+  } catch (e) {
+    r = { ok: false, mensaje: e instanceof Error ? e.message : String(e) };
+  }
+  const fallo = !r.ok ? r.mensaje || "error" : [...new Set(r.problemas.filter((p) => p.severidad === "error").map((p) => p.codigo))].join(", ");
+  if (!fallo) return r;
+  const sin = sinRejilla();
+  if (!sin.ok || sin.problemas.some((p) => p.severidad === "error")) return r.ok ? r : sin;
+  sin.problemas.push({
+    losa: -1,
+    severidad: "aviso",
+    codigo: "malla/sin-rejilla",
+    mensaje: `La rejilla alineada ha fallado en esta planta (${fallo}) y se ha mallado con la triangulación sola, con más nudos y sin plantillas de pilar. El cálculo es válido; el fallo es del compilador: avise para corregirlo.`,
+  });
+  return sin;
 }
 
 /** `mallarPlanta` sin comparar con la CDT sola cuando la rejilla cubre poco (para las pruebas). */
