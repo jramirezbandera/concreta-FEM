@@ -23,7 +23,7 @@ import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { diagramaCombinado } from "../consultas.ts";
 import { bandaPolilinea, cajaDe, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
-import { bandas, coloresBandas, limitesRedondos, type Triangulo } from "./isovalores.ts";
+import { bandas, coloresBandas, isolineas, limitesRedondos, triangulosCuadrilatero, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
 import { anchoViga, fondoModelo, huellaSeccion, PlantaFisica, type DatosVista } from "./modelo.ts";
 
@@ -267,14 +267,23 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
       if (x < vmin) [vmin, pmin, omin] = [x, pts[a]!, losa];
       if (x > vmax) [vmax, pmax, omax] = [x, pts[a]!, losa];
     });
-    tris.push({ p: [pts[0], pts[1], pts[2]], v: [w[0]!, w[1]!, w[2]!] }, { p: [pts[0], pts[2], pts[3]], v: [w[0]!, w[2]!, w[3]!] });
+    tris.push(...triangulosCuadrilatero(pts, w));
   });
   const leyenda: EntradaLeyenda[] = [];
   if (tris.length) {
     const L = limitesRedondos(vmin, vmax, 10, true);
     const colores = coloresBandas(L);
     for (const b of bandas(tris, L)) P.push({ tipo: "region", anillos: b.anillos, estilo: "isobanda", relleno: colores[b.banda]!, banda: b.banda });
+    // Las isolíneas de los límites, rotuladas con su valor; la del 0, más gruesa
+    let cero = false;
+    for (const iso of isolineas(tris, L)) {
+      const estilo = iso.valor === 0 ? "isolinea-cero" : "isolinea";
+      cero ||= iso.valor === 0;
+      for (const puntos of iso.lineas) P.push({ tipo: "linea", puntos, estilo, rotulo: rotulo(iso.valor, 4) });
+    }
     for (let b = L.length - 2; b >= 0; b--) leyenda.push({ relleno: colores[b]!, texto: `${rotulo(L[b]!, 4)} a ${rotulo(L[b + 1]!, 4)}` });
+    leyenda.push({ estilo: "isolinea", texto: "Isolínea en cada límite, con su valor" });
+    if (cero) leyenda.push({ estilo: "isolinea-cero", texto: "Isolínea de valor 0" });
   }
   P.push(...trazoModelo(pl));
   const ejes = capaEjes(pl.f, { cotas: false });
@@ -296,8 +305,8 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   if (paños.length) notas.push(`Los paños (${paños.map((p) => p.id).join(", ")}) no tienen láminas: sus viguetas, con «fem consultar pieza».`);
   if (sinMapa) notas.push(`${sinMapa} láminas sin mapa (gris): las rígidas de las huellas de los pilares, que no se deforman.`);
   if (!laminas.length) notas.push("La planta no tiene losas.");
-  if (campo === "uz") notas.push("Valores en los nudos de las láminas; la flecha relativa de cada recuadro, con «fem consultar flechas».");
-  else notas.push("Campos recuperados por SPR (E5) en los nudos de cada lámina, en los ejes de su losa (eje 1 = su eje1, X por defecto). Para dimensionar, las bandas.");
+  if (campo === "uz") notas.push("Valores en los nudos de las láminas, interpolados en cada una como en un cuadrilátero bilineal; la flecha relativa de cada recuadro, con «fem consultar flechas».");
+  else notas.push("Campos recuperados por SPR (E5) en los nudos de cada lámina, en los ejes de su losa (eje 1 = su eje1, X por defecto), interpolados en cada una como en un cuadrilátero bilineal. Para dimensionar, las bandas.");
   if (conjunto.factores.length > 1) notas.push(`Combinación ${comb}: la del mayor |valor| en la planta de las ${conjunto.factores.length} de ${conjunto.descripcion}.`);
   return {
     titulo: d.nombre ?? "Proyecto",

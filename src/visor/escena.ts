@@ -15,12 +15,13 @@
  * Las coordenadas van en Float32 respecto a `origen` (el centro de la caja de la escena), para no
  * perder precisión lejos del origen del modelo. Los glifos y los textos tienen tamaño en píxeles,
  * así que pasan tal cual, en coordenadas del modelo: el visor los coloca en pantalla en cada
- * encuadre. Elegir un objeto con el ratón y su resaltado se resuelven aquí, sobre las primitivas
- * exactas de la escena.
+ * encuadre; también los de las líneas rotuladas (las isolíneas), que dependen de la escala. Elegir
+ * un objeto con el ratón y su resaltado se resuelven aquí, sobre las primitivas exactas de la escena.
  *
  * Puro: sin IO.
  */
 import { dentro, type Escena, type Estilo, type Primitiva, type Texto, type Vec2 } from "../agente/render/escena.ts";
+import type { LineaRotulada } from "../agente/render/isovalores.ts";
 
 type Caja = [number, number, number, number];
 
@@ -48,6 +49,8 @@ export interface EscenaPreparada {
   capas: Capa[];
   glifos: Glifo[];
   textos: Texto[];
+  /** Las líneas con un rótulo que se repite (isolíneas): sus rótulos, con `rotulosLineas` en cada escala. */
+  lineasRotuladas: LineaRotulada[];
   leyenda: Escena["leyenda"];
   notas: string[];
   extremos: Escena["extremos"];
@@ -96,6 +99,7 @@ export function prepararEscena(e: Escena): EscenaPreparada {
   const capas: (Omit<Capa, "abanicos" | "segmentos" | "caja"> & { a: Acumulador })[] = [];
   const glifos: Glifo[] = [];
   const textos: Texto[] = [];
+  const lineasRotuladas: LineaRotulada[] = [];
   const capa = (estilo: Estilo, forma: Capa["forma"], relleno: string | undefined): Acumulador => {
     const ult = capas[capas.length - 1];
     if (ult && ult.estilo === estilo && ult.forma === forma && ult.relleno === relleno) return ult.a;
@@ -117,6 +121,7 @@ export function prepararEscena(e: Escena): EscenaPreparada {
       }
       case "linea":
         capa(p.estilo, "trazo", undefined).linea(p.puntos);
+        if (p.rotulo) lineasRotuladas.push({ puntos: p.puntos, texto: p.rotulo });
         break;
       case "marca":
       case "flecha":
@@ -134,6 +139,7 @@ export function prepararEscena(e: Escena): EscenaPreparada {
     capas: capas.map(({ a, ...c }) => ({ ...c, abanicos: new Float32Array(a.abanicos), segmentos: new Float32Array(a.segmentos), caja: a.caja })),
     glifos,
     textos,
+    lineasRotuladas,
     leyenda: e.leyenda,
     notas: e.notas,
     extremos: e.extremos,

@@ -8,7 +8,8 @@
  * encuadra la escena entera.
  */
 import { Group, OrthographicCamera, Scene, type WebGLRenderer } from "three";
-import { rotulo, type Vec2 } from "../../../src/agente/render/escena.ts";
+import { rotulo, type Texto, type Vec2 } from "../../../src/agente/render/escena.ts";
+import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
 import type { Eleccion, EscenaPreparada, Glifo } from "../../../src/visor/escena.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { Capas2D, MATERIALES, relleno, trazo } from "./capas.ts";
@@ -65,6 +66,8 @@ export class Vista2D extends Vista {
   /** Rótulos que no cupieron en el último fotograma. */
   omitidos = 0;
   private temaCapas: string | null = null;
+  /** Los rótulos de las isolíneas de la escena, con la escala en que se colocaron. */
+  private isolineas: { lineas: EscenaPreparada["lineasRotuladas"]; s: number; textos: Texto[] } | null = null;
 
   constructor(entorno: Entorno, camara?: Camara2D | null) {
     super(entorno);
@@ -256,7 +259,10 @@ export class Vista2D extends Vista {
       }
     }
     // Rótulos
-    const { puestos, omitidos } = colocarRotulos(burbujas.textos, px, this.rect.w, this.rect.h, this.entorno.medir, this.s, this.elegidos, burbujas.obstaculos);
+    // Los de las isolíneas: sólo cambian con la escala (al desplazar la vista, no)
+    if (this.isolineas?.lineas !== e.lineasRotuladas || this.isolineas.s !== this.s) this.isolineas = { lineas: e.lineasRotuladas, s: this.s, textos: rotulosLineas(e.lineasRotuladas, this.s, (t, tam) => this.entorno.medir(t, tam, false)) };
+    const isolineas = this.isolineas.textos;
+    const { puestos, omitidos } = colocarRotulos(isolineas.length ? [...burbujas.textos, ...isolineas] : burbujas.textos, px, this.rect.w, this.rect.h, this.entorno.medir, this.s, this.elegidos, burbujas.obstaculos);
     this.omitidos = omitidos;
     ctx.textBaseline = "alphabetic";
     for (const p of puestos) {

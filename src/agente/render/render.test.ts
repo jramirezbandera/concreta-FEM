@@ -18,8 +18,8 @@ import { CamposLaminas } from "../../motor/campos.ts";
 import { calcular } from "../../motor/calcular.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { pieza, resumen, type VanoEnvolvente } from "../consultas.ts";
-import { area, dentro, type Escena, type Primitiva, type Vec2 } from "./escena.ts";
-import { bandaDe, bandas, limitesRedondos, trozosTriangulo, type Triangulo } from "./isovalores.ts";
+import { anchoTexto, area, dentro, type Escena, type Primitiva, type Vec2 } from "./escena.ts";
+import { bandaDe, bandas, isolineas, limitesRedondos, PRIORIDAD_ISOLINEA, rotulosLineas, SEPARACION_ROTULOS, triangulosCuadrilatero, trozosTriangulo, type Triangulo } from "./isovalores.ts";
 import { envolventePieza } from "./resultados.ts";
 import {
   conjuntoPorDefecto,
@@ -184,6 +184,136 @@ describe("A4, criterio 1: lo dibujado es lo del modelo y de las consultas", () =
     expect(probados).toBeGreaterThan(1900);
     // Un trozo de un triángulo con un vértice justo en un límite no se duplica
     expect([...trozosTriangulo({ p: [[0, 0], [1, 0], [0, 1]], v: [0, 5, 10] }, [0, 5, 10]).keys()]).toEqual([0, 1]);
+  });
+
+  /** Malla de cuadriláteros irregulares (nx × ny) con el valor f en cada nudo, subdividida para dibujar. */
+  const mallaCampo = (nx: number, ny: number, f: (p: Vec2) => number) => {
+    const P = (i: number, j: number): Vec2 => [i * 0.7 + 0.13 * j + 0.05 * Math.sin(3 * i + j), j * 0.55 + 0.04 * Math.cos(i - 2 * j)];
+    const tris: Triangulo[] = [];
+    for (let i = 0; i < nx; i++)
+      for (let j = 0; j < ny; j++) {
+        const q = [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)];
+        tris.push(...triangulosCuadrilatero(q, q.map(f)));
+      }
+    return tris;
+  };
+
+  it("subdivisión de una lámina: cubre el cuadrilátero, reproduce un campo lineal y casa con la vecina bit a bit", () => {
+    const q: Vec2[] = [[0, 0], [2, 0.3], [2.4, 1.9], [-0.2, 1.5]];
+    const lineal = (p: Vec2) => 3 * p[0] - 2 * p[1] + 1;
+    for (const niveles of [0, 1, 2]) {
+      const ts = triangulosCuadrilatero(q, q.map(lineal), niveles);
+      expect(ts).toHaveLength(4 * 4 ** niveles);
+      expect(Math.abs(ts.reduce((s, t) => s + Math.abs(area(t.p)), 0) - Math.abs(area(q)))).toBeLessThan(1e-12);
+      for (const t of ts) for (let i = 0; i < 3; i++) expect(Math.abs(t.v[i]! - lineal(t.p[i]!))).toBeLessThan(1e-12);
+    }
+    // El centro, con la media de los cuatro (el bilineal en ξ = η = 0)
+    const v = [1, 7, -3, 4];
+    const c = triangulosCuadrilatero(q, v, 0);
+    expect(c[0]!.v[2]).toBe((1 + 7 - 3 + 4) / 4);
+    // Dos láminas con un lado común, recorrido en sentidos opuestos: sus bandas se funden sin costura
+    const r: Vec2[] = [[2, 0.3], [4.1, 0.2], [4.3, 2.2], [2.4, 1.9]];
+    const valor = (p: Vec2) => Math.sin(p[0]) * 10 + p[1] * p[1] * 4;
+    const total = Math.abs(area(q)) + Math.abs(area(r));
+    for (const niveles of [0, 1]) {
+      const tris = [...triangulosCuadrilatero(q, q.map(valor), niveles), ...triangulosCuadrilatero(r, r.map(valor), niveles)];
+      const L = limitesRedondos(Math.min(...tris.flatMap((t) => t.v)), Math.max(...tris.flatMap((t) => t.v)));
+      const bs = bandas(tris, L);
+      expect(Math.abs(bs.reduce((s, b) => s + b.anillos.reduce((x, a) => x + area(a), 0), 0) - total) / total).toBeLessThan(1e-12);
+      // Fundidas, ningún lado de un anillo va por el lado común: sus puntos casan y se cancelan
+      const enComun = (x: Vec2) => Math.abs((2.4 - 2) * (x[1] - 0.3) - (1.9 - 0.3) * (x[0] - 2)) < 1e-12;
+      for (const b of bs) for (const a of b.anillos) for (let i = 0; i < a.length; i++) expect(enComun(a[i]!) && enComun(a[(i + 1) % a.length]!)).toBe(false);
+    }
+  });
+
+  it("isolíneas: en su valor, en el borde entre sus dos bandas, rectas con un campo lineal y cerradas alrededor de un pico", () => {
+    // Campo lineal: cada isolínea es un solo segmento recto (los puntos alineados se quitan) de borde a borde
+    const lineal = (p: Vec2) => 3 * p[0] - 2 * p[1] + 1;
+    const tl = mallaCampo(10, 8, lineal);
+    const Ll = limitesRedondos(Math.min(...tl.flatMap((t) => t.v)), Math.max(...tl.flatMap((t) => t.v)));
+    const il = isolineas(tl, Ll);
+    expect(il.map((x) => x.limite)).toEqual(Ll.slice(1, -1).map((_, i) => i + 1));
+    for (const x of il) {
+      expect(x.lineas, `${x.valor}`).toHaveLength(1);
+      expect(x.lineas[0]!).toHaveLength(2);
+      for (const p of x.lineas[0]!) expect(Math.abs(lineal(p) - x.valor)).toBeLessThan(1e-9);
+    }
+    // Un pico: anillos cerrados (el último punto es el primero)
+    const pico = (p: Vec2) => 10 - (p[0] - 3.6) ** 2 - (p[1] - 2.3) ** 2;
+    const tp = mallaCampo(10, 8, pico);
+    const ip = isolineas(tp, [-100, 7, 8.5, 100]);
+    expect(ip).toHaveLength(2);
+    for (const x of ip) {
+      expect(x.lineas).toHaveLength(1);
+      const l = x.lineas[0]!;
+      expect(l[0]).toEqual(l[l.length - 1]);
+    }
+    // Campo al azar: a un lado y a otro de cada tramo, las dos bandas de su límite
+    let semilla = 777;
+    const azar = () => ((semilla = (semilla * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const vals = new Map<string, number>();
+    const tz = mallaCampo(12, 9, (p) => {
+      const k = `${p[0]},${p[1]}`;
+      if (!vals.has(k)) vals.set(k, azar() * 30 - 8);
+      return vals.get(k)!;
+    });
+    const L = limitesRedondos(Math.min(...tz.flatMap((t) => t.v)), Math.max(...tz.flatMap((t) => t.v)));
+    const bs = bandas(tz, L);
+    let probados = 0;
+    for (const x of isolineas(tz, L))
+      for (const l of x.lineas)
+        for (let i = 1; i < l.length; i++) {
+          const [a, b] = [l[i - 1]!, l[i]!];
+          const n = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          if (n < 1e-6) continue;
+          const m: Vec2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+          const e = 1e-7;
+          const lados = [-1, 1].map((sg): Vec2 => [m[0] - (sg * e * (b[1] - a[1])) / n, m[1] + (sg * e * (b[0] - a[0])) / n]);
+          const en = lados.map((q) => bs.filter((bb) => vueltas(q, bb.anillos) === 1).map((bb) => bb.banda).sort());
+          // Un lado en la banda de debajo del límite y el otro en la de encima (o en el borde de la malla)
+          const todas = [...en[0]!, ...en[1]!].sort();
+          expect(todas.every((k) => k === x.limite - 1 || k === x.limite), `límite ${x.valor}`).toBe(true);
+          expect(new Set(todas).size, `límite ${x.valor}`).toBe(2);
+          probados++;
+        }
+    expect(probados).toBeGreaterThan(200);
+    // Donde el campo salta (dos regiones), no hay isolínea: el campo no pasa por el límite
+    const salto: Triangulo[] = [
+      { p: [[0, 0], [1, 0], [1, 1]], v: [0, 0, 0] },
+      { p: [[1, 0], [2, 0], [1, 1]], v: [10, 10, 10] },
+    ];
+    expect(isolineas(salto, [0, 5, 10])).toEqual([]);
+  });
+
+  it("rótulos de las isolíneas: a lo largo de la línea, derechos, y sólo donde es recta y larga", () => {
+    const medir = (t: string, tam: number) => anchoTexto(t, tam);
+    // Recta horizontal de 100 m a 10 px/m: 1000 px, 4 rótulos, del revés también derechos
+    for (const puntos of [[[0, 0], [100, 0]], [[100, 0], [0, 0]]] as Vec2[][]) {
+      const r = rotulosLineas([{ puntos, texto: "-10" }], 10, medir);
+      expect(r).toHaveLength(Math.floor(1000 / SEPARACION_ROTULOS));
+      for (const t of r) {
+        expect(t.giro).toBe(0);
+        expect(t.p[1]).toBe(0);
+        expect(t.prioridad).toBe(PRIORIDAD_ISOLINEA);
+      }
+    }
+    // Vertical, en los dos sentidos: de abajo arriba
+    for (const puntos of [[[0, 0], [0, 50]], [[0, 50], [0, 0]]] as Vec2[][]) for (const t of rotulosLineas([{ puntos, texto: "5" }], 10, medir)) expect(t.giro).toBe(90);
+    // Corta: nada; en zigzag cerrado: nada; fuera de la ventana: nada
+    expect(rotulosLineas([{ puntos: [[0, 0], [1, 0]], texto: "-10" }], 10, medir)).toEqual([]);
+    const zigzag: Vec2[] = Array.from({ length: 200 }, (_, i) => [i * 0.1, i % 2 ? 0.5 : 0]);
+    expect(rotulosLineas([{ puntos: zigzag, texto: "10" }], 10, medir)).toEqual([]);
+    expect(rotulosLineas([{ puntos: [[0, 0], [100, 0]], texto: "10" }], 10, medir, [200, 200, 300, 300])).toEqual([]);
+    // En el SVG: las líneas con rótulo de un mapa de momentos los llevan, con su valor de un límite de la leyenda
+    const { r: rr, cj } = calculados.get("edificio con losas (2 plantas, con acciones)")!;
+    const e = vistaCampo(rr, "N1", "m11", cj.esfuerzos, d);
+    const lineas = e.primitivas.filter((p): p is Extract<Primitiva, { tipo: "linea" }> => p.tipo === "linea" && !!p.rotulo);
+    expect(lineas.length).toBeGreaterThan(0);
+    expect(lineas.some((p) => p.estilo === "isolinea-cero" && p.rotulo === "0")).toBe(true);
+    const limites = new Set(e.leyenda.flatMap((x) => (x.relleno ? x.texto.split(" a ") : [])));
+    for (const p of lineas) expect(limites.has(p.rotulo!), p.rotulo).toBe(true);
+    const svg = escenaASvg(e).svg;
+    expect(svg).toMatch(/<text [^>]*rotate\([^>]*>0<\/text>/);
   });
 
   it("uz: el mínimo de cada planta es la flecha máxima de sus losas (Consultas.flechas) en la combinación que gobierna", () => {

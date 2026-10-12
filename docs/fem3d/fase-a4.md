@@ -68,11 +68,12 @@ fem render proyecto.json --vista vigas-my,pilares-n      # envolventes ELU (o la
 - Los huecos de un muro que caen en el piso de debajo.
 
 **Isovalores.**
-- Cada lámina se parte en dos triángulos con sus valores nodales:
+- Cada lámina se dibuja con la interpolación bilineal de sus valores nodales:
   - uz, de los desplazamientos;
   - m11…v23, de los campos SPR en los ejes de la lámina.
 
-  Los campos se evalúan una vez por caso y planta y se combinan linealmente.
+  Los campos se evalúan una vez por caso y planta y se combinan linealmente. Desde el 2026-10-12, la lámina se parte en 4 triángulos por su centro, con la media de sus cuatro valores (el bilineal en el centro); antes eran dos por una diagonal fija, y los bordes de las bandas salían serrados con el paso de la malla, siempre hacia el mismo lado. El valor de un punto en el visor (`valor-punto`) se interpola en los mismos triángulos, así que siempre cae en la banda de su color.
+- **Isolíneas (2026-10-12):** en cada límite interior de las bandas, una isolínea fina (por triángulos, con los mismos cortes canónicos que las bandas, así que va justo por su borde) y la del 0 más gruesa, que separa el armado superior del inferior. Donde el campo salta (entre regiones del SPR) no hay isolínea. Llevan su valor rotulado a lo largo, como en CYPECAD: uno por cada 240 px de línea, girado con ella y derecho, con fondo, sólo donde la línea es casi recta a lo largo del texto y detrás de todos los demás rótulos. La escena guarda la línea y su texto; cada dibujo (el SVG o el visor, en cada zoom) coloca los rótulos con su escala (`rotulosLineas`).
 - Un corte se calcula siempre desde los extremos ordenados de su lado, así que dos triángulos vecinos dan el mismo punto bit a bit. Los lados repetidos en sentidos opuestos se cancelan y el resto se encadena en anillos («nonzero»).
 - Hay como mucho diez bandas, con límites redondos que incluyen el 0. Rojos los positivos y azules los negativos, más oscuros cuanto más lejos del 0; dos bandas nunca tienen el mismo color.
 - Con varias combinaciones, el mapa es el de la que da el mayor |valor| en la planta.

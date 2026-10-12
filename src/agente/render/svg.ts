@@ -10,6 +10,7 @@
  * Puro: sin IO.
  */
 import { anchoTexto, TEXTO_MINIMO, type Escena, type Estilo, type Texto, type Vec2 } from "./escena.ts";
+import { rotulosLineas, type LineaRotulada } from "./isovalores.ts";
 
 export const LADO_MAXIMO = 1568;
 const PANEL = 380;
@@ -70,6 +71,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "malla-barra": { stroke: "#b45309", sw: 1.6 },
   "sin-mapa": { fill: "#e5e7eb", stroke: "#9ca3af", sw: 0.6 },
   isobanda: {},
+  isolinea: { stroke: "#2b313a", sw: 0.7 },
+  "isolinea-cero": { stroke: "#111827", sw: 1.6 },
   contorno: { stroke: "#374151", sw: 1.2 },
   "diagrama-positivo": { fill: "#dc2626", stroke: "#b91c1c", sw: 0.8, opacity: 0.55 },
   "diagrama-negativo": { fill: "#2563eb", stroke: "#1d4ed8", sw: 0.8, opacity: 0.55 },
@@ -204,6 +207,7 @@ export function escenaASvg(e: Escena): Svg {
   // Formas
   const formas: string[] = [];
   const textos: Texto[] = [];
+  const rotuladas: LineaRotulada[] = [];
   const d = (anillos: readonly (readonly Vec2[])[]) =>
     anillos
       .map((r) => {
@@ -224,6 +228,7 @@ export function escenaASvg(e: Escena): Svg {
       case "linea": {
         const q = p.puntos.map(px);
         formas.push(`<path d="M${q.map(([a, b]) => `${f(a)} ${f(b)}`).join("L")}" ${atributos({ ...pin, fill: undefined })} stroke-linecap="round"/>`);
+        if (p.rotulo) rotuladas.push({ puntos: p.puntos, texto: p.rotulo });
         break;
       }
       case "marca": {
@@ -256,6 +261,8 @@ export function escenaASvg(e: Escena): Svg {
     }
   }
 
+  // Los de las líneas rotuladas (isolíneas), con la escala del dibujo
+  textos.push(...rotulosLineas(rotuladas, escala, (t, tam) => anchoTexto(t, tam)));
   // Rótulos: por prioridad, sin solapes y dentro del plano
   const puestos: [number, number, number, number][] = [];
   const rotulos: string[] = [];

@@ -11,6 +11,8 @@
  */
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { deriva, diagramaCombinado, flechas, pieza, type DerivaPlanta, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
+import type { Vec2 } from "../agente/render/escena.ts";
+import { triangulosCuadrilatero, valorEnTriangulo } from "../agente/render/isovalores.ts";
 import { envolventePieza, valoresCampo, type Campo, type PuntoEnvolvente } from "../agente/render/resultados.ts";
 import { estadoFirma, leerFirmas, revisar, type EstadoFirma } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
@@ -144,8 +146,8 @@ export interface ValorPunto {
 const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m", m12: "kN·m/m", v13: "kN/m", v23: "kN/m" };
 
 /**
- * Valor del mapa en un punto: el de la combinación dibujada, interpolado como las bandas de A4
- * (lineal en los triángulos 0-1-2 y 0-2-3 de cada lámina, con los valores de `valoresCampo`).
+ * Valor del mapa en un punto: el de la combinación dibujada, interpolado como las bandas de A4 (en
+ * los triángulos de `triangulosCuadrilatero` de cada lámina, con los valores de `valoresCampo`).
  * null fuera de las losas o en una lámina sin mapa (las rígidas de las huellas).
  */
 export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, x: number, y: number): Resultado<ValorPunto | null> {
@@ -161,27 +163,18 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
   const { laminas, v } = valoresCampo(rr, planta, campo, conj.valor.factores[k]!);
   let hallado: ValorPunto | null = null;
   const otros: number[] = [];
+  const q: Vec2 = [x, y];
   for (let i = 0; i < laminas.length; i++) {
     const ns = c.modelo.laminas![laminas[i]!]!.nudos;
-    const p = ns.map((n) => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y] as const);
-    for (const [a, b, cc] of [
-      [0, 1, 2],
-      [0, 2, 3],
-    ] as const) {
-      const [x0, y0] = p[a]!;
-      const [x1, y1] = p[b]!;
-      const [x2, y2] = p[cc]!;
-      const det = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
-      if (det === 0) continue;
-      const l0 = ((y1 - y2) * (x - x2) + (x2 - x1) * (y - y2)) / det;
-      const l1 = ((y2 - y0) * (x - x2) + (x0 - x2) * (y - y2)) / det;
-      const l2 = 1 - l0 - l1;
-      const eps = -1e-9;
-      if (l0 < eps || l1 < eps || l2 < eps) continue;
-      const w = [v[4 * i + a]!, v[4 * i + b]!, v[4 * i + cc]!];
+    const p = ns.map((n): Vec2 => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y]);
+    // Fuera de la caja de la lámina, ni se subdivide
+    if (q[0] < Math.min(...p.map((a) => a[0])) - 1e-9 || q[0] > Math.max(...p.map((a) => a[0])) + 1e-9 || q[1] < Math.min(...p.map((a) => a[1])) - 1e-9 || q[1] > Math.max(...p.map((a) => a[1])) + 1e-9) continue;
+    const w = ns.map((_, a) => v[4 * i + a]!);
+    for (const t of triangulosCuadrilatero(p, w)) {
+      const valor = valorEnTriangulo(t, q);
+      if (valor === null) continue;
       // Una lámina sin mapa (rígida): el punto puede estar también en una vecina que sí lo tiene
-      if (w.some(Number.isNaN)) break;
-      const valor = l0 * w[0]! + l1 * w[1]! + l2 * w[2]!;
+      if (Number.isNaN(valor)) break;
       if (!hallado) hallado = { valor, unidad: UNIDAD[campo], losa: c.mapeo.laminas![laminas[i]!]!.losa ?? "", lamina: laminas[i]!, comb: dib.nombre };
       else if (valor !== hallado.valor && !otros.includes(valor)) otros.push(valor);
       break;

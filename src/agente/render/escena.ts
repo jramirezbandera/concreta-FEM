@@ -55,6 +55,8 @@ export type Estilo =
   | "malla-barra"
   | "sin-mapa"
   | "isobanda"
+  | "isolinea"
+  | "isolinea-cero"
   | "contorno"
   | "diagrama-positivo"
   | "diagrama-negativo"
@@ -68,7 +70,8 @@ export type Primitiva =
   | { tipo: "poligono"; anillos: Vec2[][]; estilo: Estilo; objeto?: string; relleno?: string }
   /** Varios anillos con la regla «nonzero»: las bandas de isovalores fundidas (`isovalores.ts`). */
   | { tipo: "region"; anillos: Vec2[][]; estilo: Estilo; relleno: string; banda: number }
-  | { tipo: "linea"; puntos: Vec2[]; estilo: Estilo; objeto?: string }
+  /** `rotulo`: un texto que se repite a lo largo de la línea (el valor de una isolínea), colocado con la escala de cada dibujo (`rotulosLineas`). */
+  | { tipo: "linea"; puntos: Vec2[]; estilo: Estilo; objeto?: string; rotulo?: string }
   /** Marca de tamaño fijo en píxeles en un punto del modelo. */
   | { tipo: "marca"; p: Vec2; forma: "circulo" | "cuadrado" | "triangulo"; radio: number; estilo: Estilo; objeto?: string }
   /**

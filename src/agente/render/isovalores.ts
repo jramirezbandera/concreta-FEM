@@ -1,7 +1,11 @@
 /**
  * Isovalores en bandas (A4): un campo lineal por triángulos, partido en bandas entre unos límites, y
  * las bandas iguales fundidas en un solo contorno por banda (sin las costuras del antialias entre
- * triángulos vecinos).
+ * triángulos vecinos); las isolíneas de los límites, y dónde rotularlas.
+ *
+ * - Los triángulos de una lámina salen de subdividir su cuadrilátero con la interpolación bilineal
+ *   de los valores de sus nudos (`triangulosCuadrilatero`): partido en dos por una diagonal fija, el
+ *   campo dibujado tenía un serrado del tamaño de la malla, siempre orientado igual.
  *
  * - En un triángulo, el campo es lineal, así que la parte entre dos límites es un polígono convexo
  *   cuyos vértices son los del triángulo con el valor dentro y los cortes de sus lados con los dos
@@ -14,11 +18,65 @@
  *
  * Puro: sin IO.
  */
-import type { Vec2 } from "./escena.ts";
+import { TEXTO_MINIMO, type Texto, type Vec2 } from "./escena.ts";
 
 export interface Triangulo {
   p: readonly [Vec2, Vec2, Vec2];
   v: readonly [number, number, number];
+}
+
+// ─── Subdivisión de una lámina ──────────────────────────────────────────────────────────────────
+
+/**
+ * Niveles de subdivisión de una lámina: 0, en 4 triángulos por su centro; 1, en 2×2 cuadriláteros y
+ * cada uno en 4 (16). Con 1, la escena de un mapa del edificio objetivo tardaba 3 veces más, y a la
+ * escala de la planta entera no se distingue.
+ */
+export const SUBDIVISION = 0;
+
+/** Punto y valor medios de un lado: la suma es conmutativa, así que dos láminas que lo comparten dan los mismos bits. */
+const medio = (a: Vec2, b: Vec2): Vec2 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
+/**
+ * Triángulos de una lámina de 4 nudos para dibujar el campo bilineal de los valores de sus nudos:
+ * `niveles` veces partida en 2×2 por los puntos medios de sus lados y su centro (el bilineal de un
+ * subcuadrilátero es el de sus esquinas, así que los puntos son exactos), y cada parte, en 4
+ * triángulos por su centro, con la media de sus 4 valores (el bilineal en el centro). Sin diagonal,
+ * no hay dirección preferida. Los puntos de un lado sólo dependen de sus extremos, así que las
+ * láminas vecinas casan bit a bit.
+ */
+export function triangulosCuadrilatero(p: readonly Vec2[], v: readonly number[], niveles = SUBDIVISION): Triangulo[] {
+  const r: Triangulo[] = [];
+  const partir = (q: readonly Vec2[], w: readonly number[], k: number) => {
+    const c: Vec2 = [(q[0]![0] + q[1]![0] + q[2]![0] + q[3]![0]) / 4, (q[0]![1] + q[1]![1] + q[2]![1] + q[3]![1]) / 4];
+    const wc = (w[0]! + w[1]! + w[2]! + w[3]!) / 4;
+    if (k === 0) {
+      for (let i = 0; i < 4; i++) r.push({ p: [q[i]!, q[(i + 1) % 4]!, c], v: [w[i]!, w[(i + 1) % 4]!, wc] });
+      return;
+    }
+    const m = [0, 1, 2, 3].map((i) => medio(q[i]!, q[(i + 1) % 4]!));
+    const wm = [0, 1, 2, 3].map((i) => (w[i]! + w[(i + 1) % 4]!) / 2);
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 3) % 4;
+      partir([q[i]!, m[i]!, c, m[j]!], [w[i]!, wm[i]!, wc, wm[j]!], k - 1);
+    }
+  };
+  if (p.length === 4) partir(p, v, niveles);
+  else if (p.length === 3) r.push({ p: [p[0]!, p[1]!, p[2]!], v: [v[0]!, v[1]!, v[2]!] });
+  return r;
+}
+
+/** Valor en q del campo lineal de un triángulo, o null si q no está en él (con una tolerancia relativa). */
+export function valorEnTriangulo(t: Triangulo, q: Vec2): number | null {
+  const [[x0, y0], [x1, y1], [x2, y2]] = t.p;
+  const det = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
+  if (det === 0) return null;
+  const l0 = ((y1 - y2) * (q[0] - x2) + (x2 - x1) * (q[1] - y2)) / det;
+  const l1 = ((y2 - y0) * (q[0] - x2) + (x0 - x2) * (q[1] - y2)) / det;
+  const l2 = 1 - l0 - l1;
+  const eps = -1e-9;
+  if (l0 < eps || l1 < eps || l2 < eps) return null;
+  return l0 * t.v[0] + l1 * t.v[1] + l2 * t.v[2];
 }
 
 /**
@@ -59,7 +117,29 @@ function corte(pa: Vec2, va: number, pb: Vec2, vb: number, L: number): Vec2 {
   return [p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])];
 }
 
-const clave = (p: Vec2) => `${p[0]},${p[1]}`;
+const igual = (p: Vec2, q: Vec2) => p[0] === q[0] && p[1] === q[1];
+
+/**
+ * Un número por punto, por sus coordenadas exactas (como `${x},${y}`: −0 y 0 son el mismo), sin
+ * crear textos: con las claves de texto, fundir las bandas costaba 2,5 veces más.
+ */
+class Puntos {
+  private readonly m = new Map<number, Map<number, number>>();
+  readonly p: Vec2[] = [];
+  id(q: Vec2): number {
+    let f = this.m.get(q[0]);
+    if (!f) this.m.set(q[0], (f = new Map()));
+    let i = f.get(q[1]);
+    if (i === undefined) {
+      f.set(q[1], (i = this.p.length));
+      this.p.push(q);
+    }
+    return i;
+  }
+}
+
+/** Clave de un lado orientado (a, b) por los números de sus puntos. */
+const LADO = 2 ** 26;
 
 /**
  * Trozos de cada banda en un triángulo (antihorarios). Los valores fuera de [L₀, Lₙ] van a la banda
@@ -92,7 +172,7 @@ export function trozosTriangulo(t: Triangulo, L: readonly number[]): Map<number,
     const hi = b === nb - 1 ? Infinity : L[b + 1]!;
     const pts = contorno.filter((x) => x.v >= lo && x.v <= hi).map((x) => x.p);
     // Sin duplicados seguidos (un vértice en un límite)
-    const q = pts.filter((x, i) => clave(x) !== clave(pts[(i + pts.length - 1) % pts.length]!));
+    const q = pts.filter((x, i) => !igual(x, pts[(i + pts.length - 1) % pts.length]!));
     if (q.length >= 3 && Math.abs(areaAnillo(q)) > 0) r.set(b, q);
   }
   return r;
@@ -113,22 +193,24 @@ export interface BandaFundida {
 
 /** Las bandas de unos triángulos, cada una fundida en sus anillos. */
 export function bandas(triangulos: readonly Triangulo[], L: readonly number[]): BandaFundida[] {
-  const lados = new Map<number, Map<string, { a: Vec2; b: Vec2; n: number }>>();
+  const P = new Puntos();
+  const lados = new Map<number, Map<number, { a: number; b: number; n: number }>>();
   const areas = new Map<number, number>();
   for (const t of triangulos)
     for (const [b, q] of trozosTriangulo(t, L)) {
       let m = lados.get(b);
       if (!m) lados.set(b, (m = new Map()));
       areas.set(b, (areas.get(b) ?? 0) + areaAnillo(q));
-      for (let i = 0; i < q.length; i++) {
-        const [a, c] = [q[i]!, q[(i + 1) % q.length]!];
-        const [ka, kc] = [clave(a), clave(c)];
-        const inverso = m.get(`${kc}|${ka}`);
+      const ids = q.map((x) => P.id(x));
+      for (let i = 0; i < ids.length; i++) {
+        const [a, c] = [ids[i]!, ids[(i + 1) % ids.length]!];
+        const kInverso = c * LADO + a;
+        const inverso = m.get(kInverso);
         if (inverso) {
-          if (--inverso.n === 0) m.delete(`${kc}|${ka}`);
+          if (--inverso.n === 0) m.delete(kInverso);
           continue;
         }
-        const k = `${ka}|${kc}`;
+        const k = a * LADO + c;
         const x = m.get(k);
         if (x) x.n++;
         else m.set(k, { a, b: c, n: 1 });
@@ -138,17 +220,16 @@ export function bandas(triangulos: readonly Triangulo[], L: readonly number[]): 
   for (const b of [...lados.keys()].sort((x, y) => x - y)) {
     const m = lados.get(b)!;
     // Encadenar: de cada punto, sus lados de salida en el orden en que aparecieron
-    const salida = new Map<string, { a: Vec2; b: Vec2 }[]>();
+    const salida = new Map<number, { a: number; b: number }[]>();
     for (const e of m.values())
       for (let i = 0; i < e.n; i++) {
-        const k = clave(e.a);
-        let l = salida.get(k);
-        if (!l) salida.set(k, (l = []));
+        let l = salida.get(e.a);
+        if (!l) salida.set(e.a, (l = []));
         l.push(e);
       }
     const anillos: Vec2[][] = [];
     for (const e0 of m.values()) {
-      const inicio = clave(e0.a);
+      const inicio = e0.a;
       while (salida.get(inicio)?.length) {
         const anillo: Vec2[] = [];
         let k = inicio;
@@ -156,8 +237,8 @@ export function bandas(triangulos: readonly Triangulo[], L: readonly number[]): 
           const l = salida.get(k);
           if (!l?.length) break;
           const e = l.shift()!;
-          anillo.push(e.a);
-          k = clave(e.b);
+          anillo.push(P.p[e.a]!);
+          k = e.b;
           if (k === inicio) break;
         }
         if (anillo.length >= 3) anillos.push(simplificar(anillo));
@@ -179,6 +260,184 @@ function simplificar(p: Vec2[]): Vec2[] {
     if (Math.abs(cruz) > 1e-12 * escala) r.push(b);
   }
   return r.length >= 3 ? r : p;
+}
+
+// ─── Isolíneas ──────────────────────────────────────────────────────────────────────────────────
+
+export interface Isolinea {
+  /** Índice del límite en L. */
+  limite: number;
+  valor: number;
+  /** Polilíneas; las cerradas repiten el primer punto al final. */
+  lineas: Vec2[][];
+}
+
+/**
+ * Punto del lado (a, b) donde el campo vale l, con a y b a distinto lado de l («encima» es ≥ l): el
+ * extremo mismo si vale l, y si no, el corte canónico de las bandas. Así un trozo de isolínea acaba
+ * exactamente en el borde de su banda, y dos triángulos vecinos dan el mismo punto.
+ */
+function corteNivel(pa: Vec2, va: number, pb: Vec2, vb: number, l: number): Vec2 {
+  if (va === l) return pa;
+  if (vb === l) return pb;
+  return corte(pa, va, pb, vb, l);
+}
+
+/**
+ * Las isolíneas de los límites interiores de L en unos triángulos (marching triangles): en cada
+ * triángulo con vértices a los dos lados del límite, el segmento entre los cortes de sus lados; los
+ * repetidos (un lado justo en el límite) una vez, y encadenados en polilíneas. Donde el campo salta
+ * (entre regiones), no hay isolínea: el campo no pasa por el límite, salta por encima.
+ */
+export function isolineas(triangulos: readonly Triangulo[], L: readonly number[]): Isolinea[] {
+  const r: Isolinea[] = [];
+  for (let k = 1; k < L.length - 1; k++) {
+    const l = L[k]!;
+    const P = new Puntos();
+    const segs = new Map<number, [number, number]>();
+    for (const t of triangulos) {
+      const enc = t.v.map((x) => x >= l);
+      if (enc[0] === enc[1] && enc[1] === enc[2]) continue;
+      const pts: Vec2[] = [];
+      for (let i = 0; i < 3; i++) {
+        const j = (i + 1) % 3;
+        if (enc[i] !== enc[j]) pts.push(corteNivel(t.p[i]!, t.v[i]!, t.p[j]!, t.v[j]!, l));
+      }
+      const [a, b] = [P.id(pts[0]!), P.id(pts[1]!)];
+      if (a === b) continue;
+      segs.set(a < b ? a * LADO + b : b * LADO + a, [a, b]);
+    }
+    if (segs.size) r.push({ limite: k, valor: l, lineas: encadenar([...segs.values()], P.p) });
+  }
+  return r;
+}
+
+/** Segmentos (por los números de sus puntos) en polilíneas: primero las abiertas (desde un extremo con un solo segmento), después los anillos. */
+function encadenar(segs: readonly [number, number][], P: readonly Vec2[]): Vec2[][] {
+  const de = new Map<number, number[]>();
+  segs.forEach(([a, b], i) => {
+    for (const k of [a, b]) {
+      const l = de.get(k);
+      if (l) l.push(i);
+      else de.set(k, [i]);
+    }
+  });
+  const usado = new Uint8Array(segs.length);
+  const r: Vec2[][] = [];
+  const seguir = (inicio: number) => {
+    const linea: Vec2[] = [P[inicio]!];
+    let k = inicio;
+    for (;;) {
+      const i = de.get(k)!.find((x) => !usado[x]);
+      if (i === undefined) break;
+      usado[i] = 1;
+      const [a, b] = segs[i]!;
+      k = a === k ? b : a;
+      linea.push(P[k]!);
+    }
+    if (linea.length >= 2) r.push(simplificarLinea(linea));
+  };
+  for (const [k, l] of de) if (l.length === 1 && !usado[l[0]!]) seguir(k);
+  for (let i = 0; i < segs.length; i++) if (!usado[i]) seguir(segs[i]![0]);
+  return r;
+}
+
+/** Quita los puntos interiores alineados con sus vecinos (conserva los extremos). */
+function simplificarLinea(p: Vec2[]): Vec2[] {
+  if (p.length <= 2) return p;
+  const r: Vec2[] = [p[0]!];
+  for (let i = 1; i < p.length - 1; i++) {
+    const [a, b, c] = [r[r.length - 1]!, p[i]!, p[i + 1]!];
+    const cruz = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    const escala = Math.hypot(b[0] - a[0], b[1] - a[1]) * Math.hypot(c[0] - b[0], c[1] - b[1]);
+    if (Math.abs(cruz) > 1e-12 * escala) r.push(b);
+  }
+  r.push(p[p.length - 1]!);
+  return r;
+}
+
+// ─── Rótulos de las isolíneas ───────────────────────────────────────────────────────────────────
+
+/** Una polilínea con un texto que se repite a lo largo de ella (las isolíneas). */
+export interface LineaRotulada {
+  puntos: readonly Vec2[];
+  texto: string;
+}
+
+/** Separación entre los rótulos de una misma línea, px. */
+export const SEPARACION_ROTULOS = 240;
+/** Prioridad de los rótulos de las isolíneas: detrás de todos los demás. */
+export const PRIORIDAD_ISOLINEA = 5;
+
+/**
+ * Los rótulos de unas líneas con `escala` px/m, como en CYPECAD: repartidos a lo largo de cada
+ * línea, uno por cada SEPARACION_ROTULOS px (al desplazar la vista no se mueven), centrados en ella,
+ * girados con ella y derechos, con fondo para que la corten. Sólo donde la línea es casi
+ * recta a lo largo del texto (si no, se prueba un poco antes o después); una línea más corta que
+ * 3 veces su texto no se rotula. Con `ventana` (m), sólo los que caen en ella. `medir` da el ancho
+ * de un texto en px.
+ */
+export function rotulosLineas(lineas: readonly LineaRotulada[], escala: number, medir: (texto: string, tamano: number) => number, ventana?: readonly [number, number, number, number]): Texto[] {
+  const tam = TEXTO_MINIMO;
+  const r: Texto[] = [];
+  if (!(escala > 0)) return r;
+  for (const { puntos: p, texto } of lineas) {
+    if (p.length < 2) continue;
+    // Longitudes acumuladas, m
+    const s: number[] = [0];
+    for (let i = 1; i < p.length; i++) s.push(s[i - 1]! + Math.hypot(p[i]![0] - p[i - 1]![0], p[i]![1] - p[i - 1]![1]));
+    const total = s[s.length - 1]!;
+    const w = (medir(texto, tam) + 8) / escala;
+    if (total < 3 * w) continue;
+    // El primer índice i ≥ 1 con s[i] ≥ x (o el último)
+    const tras = (x: number): number => {
+      let [a, b] = [1, p.length - 1];
+      while (a < b) {
+        const m = (a + b) >> 1;
+        if (s[m]! < x) a = m + 1;
+        else b = m;
+      }
+      return a;
+    };
+    const en = (x: number): Vec2 => {
+      const i = tras(x);
+      const l = s[i]! - s[i - 1]!;
+      const t = l > 0 ? Math.max(0, Math.min(1, (x - s[i - 1]!) / l)) : 0;
+      return [p[i - 1]![0] + t * (p[i]![0] - p[i - 1]![0]), p[i - 1]![1] + t * (p[i]![1] - p[i - 1]![1])];
+    };
+    // Recta a lo largo del texto: ningún punto de la línea entre sus extremos se separa de la cuerda más de un tercio de su altura
+    const recta = (x: number): { q: Vec2; giro: number } | null => {
+      const [x0, x1] = [x - w / 2, x + w / 2];
+      if (x0 < 0 || x1 > total) return null;
+      const [a, b] = [en(x0), en(x1)];
+      const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (d < 0.8 * w) return null;
+      const tol = (0.35 * tam) / escala;
+      for (let i = tras(x0); i < p.length && s[i]! < x1; i++) {
+        if (s[i]! <= x0) continue;
+        const c = p[i]!;
+        if (Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / d > tol) return null;
+      }
+      // Derecho: en (−80°, 100°], así que los de las líneas casi verticales se leen todos de abajo arriba
+      let giro = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+      if (giro > 100) giro -= 180;
+      else if (giro <= -80) giro += 180;
+      return { q: en(x), giro: Math.round(giro * 10) / 10 };
+    };
+    const paso = SEPARACION_ROTULOS / escala;
+    const n = Math.max(1, Math.floor(total / paso));
+    const sep = total / n;
+    for (let k = 0; k < n; k++) {
+      const x = (k + 0.5) * sep;
+      let hallado: { q: Vec2; giro: number } | null = null;
+      for (const dx of [0, -0.5, 0.5, -1, 1, -1.5, 1.5]) if ((hallado = recta(x + dx * w))) break;
+      if (!hallado) continue;
+      const { q, giro } = hallado;
+      if (ventana && (q[0] < ventana[0] || q[0] > ventana[2] || q[1] < ventana[1] || q[1] > ventana[3])) continue;
+      r.push({ tipo: "texto", p: q, texto, tamano: tam, ancla: "medio", dy: Math.round(0.28 * tam * 10) / 10, giro, prioridad: PRIORIDAD_ISOLINEA, fondo: true, clase: "dato" });
+    }
+  }
+  return r;
 }
 
 // ─── Paletas ────────────────────────────────────────────────────────────────────────────────────
