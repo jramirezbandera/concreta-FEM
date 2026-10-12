@@ -346,14 +346,16 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       origen.set(n, id);
     }
   };
+  // Nudos de pilar unidos a una losa o a un muro: por su huella (C2-d) o, sin dimensiones, en un punto de la malla
+  const enLaminas = new Set<number>([...losas.huellas.map((h) => h.maestro), ...losas.laminas.flatMap((l) => l.nudos)]);
   for (const p of ctx.pilares) {
     const n = topo.nudoPilar.get(`${p.id}@${ctx.planta.get(p.desde)!}`);
     if (n === undefined) continue;
     const base = p.base ?? "empotrado";
     if (base === "empotrado") apoyar(n, [true, true, true, true, true, true], p.id);
     else if (base === "articulado") apoyar(n, [true, true, true, false, false, false], p.id);
-    else if (!arranqueSobrePieza(topo, n, p)) {
-      diag.error("pilar/arranque-sin-apoyo", `El pilar ${p.id} nace en la planta ${p.desde} sin vínculo («ninguno») y no le llega ninguna viga ni otro pilar.`, [p.id]);
+    else if (!arranqueSobrePieza(topo, n, p, enLaminas)) {
+      diag.error("pilar/arranque-sin-apoyo", `El pilar ${p.id} nace en la planta ${p.desde} sin vínculo («ninguno») y no le llega ninguna viga, losa, muro ni otro pilar.`, [p.id]);
     }
   }
   for (const a of ctx.apoyos) {
@@ -434,9 +436,9 @@ export function diafragmaDe(ctx: Contexto, k: number): "rigido" | "ninguno" {
   return ctx.plantas[k]!.diafragma ?? (k === ctx.plantaBaja ? "ninguno" : "rigido");
 }
 
-/** ¿Al nudo de arranque de un pilar «ninguno» le llega otra pieza? */
-function arranqueSobrePieza(topo: Topologia, n: number, p: Pilar): boolean {
-  if (topo.vigasEn.has(n)) return true;
+/** ¿Al nudo de arranque de un pilar «ninguno» le llega otra pieza (una viga, otro pilar, o una losa o un muro por su huella)? */
+function arranqueSobrePieza(topo: Topologia, n: number, p: Pilar, enLaminas: ReadonlySet<number>): boolean {
+  if (topo.vigasEn.has(n) || enLaminas.has(n)) return true;
   const nd = topo.nudos[n]!;
   return (nd.pilar?.pilares.length ?? 0) > 1 || [...nd.fisicos].some((f) => f !== p.id);
 }

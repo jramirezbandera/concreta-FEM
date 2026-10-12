@@ -288,7 +288,7 @@ const pilares: DefTabla = {
     { clave: "seccion", titulo: "sección", opciones: ids("secciones") },
     { clave: "tramos", titulo: "tramos", ayuda: "sección de los tramos que cambian, por la planta de su cabeza: «N3: P30x30; N5: P25x25»" },
     { clave: "giro", titulo: "giro", unidad: "°", ayuda: "del canto h desde +X; por defecto, 0" },
-    { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (apeado: nace sobre una viga u otro pilar)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
+    { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (apeado: nace sobre una viga, una losa, un muro u otro pilar)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
     { clave: "libBase", titulo: "lib. base", ayuda: GDL },
     { clave: "libCabeza", titulo: "lib. cabeza", ayuda: GDL },
   ],

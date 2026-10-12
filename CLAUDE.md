@@ -291,7 +291,11 @@
   - **Pendiente del usuario:** G-3. **Pendiente técnico:** muros, reticular, unidireccional y bandas en planta no ortogonal.
 - **2026-10-12: «Renumerar» (I-g) adelantado** a petición del usuario (`interfaz.md` §12.1): botón en la barra de Modelo que deja `P1…Pn` (y `V`, `L`, `F`, `M`) por filas de arriba abajo y de izquierda a derecha, con las referencias detrás. Los proyectos de validación conservan sus ids. La vista `pilares-n` dibuja la huella a escala en vez del círculo en píxeles.
 - **2026-10-12: desplegables en las tablas** (a petición del usuario): cada columna que es una lista cerrada o una referencia (plantas con su cota, secciones, materiales, casos, base, tipo…) declara sus `opciones` en `src/editor/tablas.ts`. La hoja las ofrece con doble clic, Intro, Alt+↓ o la flecha de la celda activa, y el inspector, como `<select>`. Escribir (F2 o teclear) y pegar siguen igual.
-  - **Visto al probarlo:** un pilar apeado (`base: "ninguno"`) sobre una losa sin viga debajo da `pilar/arranque-sin-apoyo`, porque esa comprobación sólo mira vigas y pilares. **Pendiente del usuario:** si se admite el apeo sobre losa.
+- **2026-10-12: pilares apeados sobre una losa o un muro** (decisión del usuario). El arranque «ninguno» se une por la huella rígida del pilar (C2-d), como un pilar que atraviesa la losa; antes, `pilar/arranque-sin-apoyo` sólo admitía una viga u otro pilar. Validado en `src/compilador/apeo.test.ts`:
+  - axil exacto;
+  - la carga en la cabeza da en la losa lo mismo que en el arranque (≤ 1e-12);
+  - con un pilar casi puntual, la flecha a ≥ 1 m queda a ≤ 0,6 % de Navier con la carga en su huella (la serie admite ya un parche);
+  - con 30 × 30 cm, la huella rígida da −10 % de flecha bajo el pilar frente a la carga repartida, como en cualquier pilar continuo.
 - **Siguiente paso:**
   - las puertas de uso de I1 e I2 y después I3 (sólido, translúcido, filtros y caja de sección) e I4 (resultados en 3D);
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);

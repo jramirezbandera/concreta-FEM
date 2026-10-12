@@ -30,18 +30,26 @@ export interface PlacaOrtotropa {
   /** Rigideces a cortante en xz (K55) y en yz (K44), kN/m. */
   K55: number;
   K44: number;
+  /**
+   * Con él, q sólo actúa en el rectángulo u × v centrado en (x, y) (la carga de un pilar que apea):
+   * q_mn = 16q/(π²mn)·sin(αx)·sin(βy)·sin(αu/2)·sin(βv/2), con todos los términos (Timoshenko y
+   * Woinowsky-Krieger, Theory of Plates and Shells, §30).
+   */
+  parche?: { x: number; y: number; u: number; v: number };
 }
 
-/** [w, Mx, My, Mxy, Qx, Qy] en (x, y), sumando los términos impares hasta `terminos`. */
+/** [w, Mx, My, Mxy, Qx, Qy] en (x, y), sumando los términos impares (todos, con parche) hasta `terminos`. */
 export function navierMindlin(p: PlacaOrtotropa, x: number, y: number, terminos = 301): [number, number, number, number, number, number] {
   const r: [number, number, number, number, number, number] = [0, 0, 0, 0, 0, 0];
-  for (let m = 1; m <= terminos; m += 2) {
+  const pa = p.parche;
+  const paso = pa ? 1 : 2;
+  for (let m = 1; m <= terminos; m += paso) {
     const al = (m * Math.PI) / p.a;
     const sx = Math.sin(al * x);
     const cx = Math.cos(al * x);
-    for (let n = 1; n <= terminos; n += 2) {
+    for (let n = 1; n <= terminos; n += paso) {
       const be = (n * Math.PI) / p.b;
-      const qmn = (16 * p.q) / (Math.PI * Math.PI * m * n);
+      const qmn = ((16 * p.q) / (Math.PI * Math.PI * m * n)) * (pa ? Math.sin(al * pa.x) * Math.sin(be * pa.y) * Math.sin((al * pa.u) / 2) * Math.sin((be * pa.v) / 2) : 1);
       const s11 = p.K55 * al * al + p.K44 * be * be;
       const s12 = p.K55 * al;
       const s13 = p.K44 * be;

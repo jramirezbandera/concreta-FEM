@@ -137,7 +137,8 @@ export interface Pilar {
   giro?: number;
   /**
    * Vínculo de la base. Por defecto, "empotrado". "ninguno" es un pilar que nace sobre otra pieza
-   * (apeado), que tiene que llegarle en esa planta.
+   * (apeado), que tiene que llegarle en esa planta: una viga, otro pilar, o una losa o un muro, a los
+   * que se une por su huella (C2-d).
    */
   base?: "empotrado" | "articulado" | "ninguno";
   /** Liberaciones en la base física (tramo inferior) y en la cabeza física (tramo superior). */

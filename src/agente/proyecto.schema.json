@@ -1230,7 +1230,7 @@
             "empotrado",
             "ninguno"
           ],
-          "description": "Vínculo de la base. Por defecto, \"empotrado\". \"ninguno\" es un pilar que nace sobre otra pieza\n(apeado), que tiene que llegarle en esa planta."
+          "description": "Vínculo de la base. Por defecto, \"empotrado\". \"ninguno\" es un pilar que nace sobre otra pieza\n(apeado), que tiene que llegarle en esa planta: una viga, otro pilar, o una losa o un muro, a los\nque se une por su huella (C2-d)."
         },
         "liberaciones": {
           "type": "object",
