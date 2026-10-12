@@ -1,11 +1,12 @@
 /**
  * Diálogos del editor (V2a): borrar (si otros objetos usan lo que se borra, se dice cuáles y se
- * elige entre borrarlos también o pasarlos a otro) y copiar a otras plantas.
+ * elige entre borrarlos también o pasarlos a otro), copiar a otras plantas y renumerar (I-g).
  */
 import { useMemo, useState } from "react";
 import { copiarAPlantas, objetosDePlanta } from "../../../src/editor/edicion.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
+import { PREFIJOS, propuestaRenumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
 import type { ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { useVisor } from "../contexto.ts";
 
@@ -167,6 +168,67 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
         ))}
       </div>
       <p className="mt-2 text-[11.5px] text-text-secondary">Los ids nuevos llevan la planta de destino. Las cargas van a la copia de su viga o su losa. Los pilares no se copian: se alargan con su «desde» y su «hasta».</p>
+      {error && <p className="mt-2 text-state-fail">{error}</p>}
+    </Dialogo>
+  );
+}
+
+/** Renumerar como CYPECAD (I-g, `interfaz.md` §12.1): dice qué cambia antes de hacerlo. */
+export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => void }) {
+  const { proyecto, seleccion, setSeleccion, elegidos, setElegidos } = useVisor();
+  const ed = proyecto.edicion!;
+  const m = ed.proyecto.modelo;
+  const mapa = useMemo(() => propuestaRenumerar(m), [m]);
+  const idx = useMemo(() => indiceIds(m), [m]);
+  const [error, setError] = useState<string | null>(null);
+  const porColeccion = RENUMERABLES.map((c) => ({ c, n: [...mapa.keys()].filter((id) => idx.get(id)?.coleccion === c).length })).filter((x) => x.n > 0);
+  const ejemplos = [...mapa].slice(0, 8);
+
+  const hacer = () => {
+    const r = ed.editar({ op: "renumerar" }, "Renumerar");
+    if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
+    const nuevo = (id: string) => mapa.get(id) ?? id;
+    if (elegidos.length) setElegidos(elegidos.map(nuevo));
+    else if (seleccion) setSeleccion(nuevo(seleccion));
+    onCerrar(`Renumerados ${mapa.size} objetos.`);
+  };
+
+  return (
+    <Dialogo
+      titulo="Renumerar"
+      onCerrar={() => onCerrar()}
+      pie={
+        <>
+          <button type="button" className="btn" onClick={() => onCerrar()}>
+            {mapa.size ? "Cancelar" : "Cerrar"}
+          </button>
+          <button type="button" className="btn btn-p" autoFocus onClick={hacer} disabled={!mapa.size}>
+            Renumerar
+          </button>
+        </>
+      }
+    >
+      <p>
+        Como en CYPECAD: pilares <span className="mono">{PREFIJOS.pilares}1…</span>, vigas <span className="mono">{PREFIJOS.vigas}1…</span>, losas <span className="mono">{PREFIJOS.losas}1…</span>, paños <span className="mono">{PREFIJOS.panos}1…</span> y muros <span className="mono">{PREFIJOS.muros}1…</span>, por filas de arriba abajo y de izquierda a derecha (las vigas, losas, paños y muros, por plantas de abajo arriba).
+      </p>
+      {mapa.size === 0 ? (
+        <p className="mt-2">Ya están numerados así: no cambia nada.</p>
+      ) : (
+        <>
+          <p className="mt-2">
+            Cambian {porColeccion.map((x) => `${x.n} ${nombreColeccion(x.c)}${x.n > 1 ? (/[aeiou]$/.test(nombreColeccion(x.c)) ? "s" : "es") : ""}`).join(", ")}:
+          </p>
+          <ul className="mono my-2 max-h-[180px] list-none overflow-y-auto rounded border border-border-sub p-2 text-[11.5px]">
+            {ejemplos.map(([a, b]) => (
+              <li key={a}>
+                {a} → {b}
+              </li>
+            ))}
+            {mapa.size > ejemplos.length && <li className="text-text-disabled">… y {mapa.size - ejemplos.length} más</li>}
+          </ul>
+          <p className="text-[11.5px] text-text-secondary">Las cargas y demás referencias siguen a su objeto. Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
+        </>
+      )}
       {error && <p className="mt-2 text-state-fail">{error}</p>}
     </Dialogo>
   );

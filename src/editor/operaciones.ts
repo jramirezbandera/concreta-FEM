@@ -24,6 +24,7 @@ import { comprobarProyecto, type Proyecto } from "../agente/proyecto.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { conValor, indiceIds, lista, referenciasDe, usos, type Coleccion, type Objeto, type Uso } from "./referencias.ts";
+import { propuestaRenumerar, renombrarIds, type Renumerable } from "./renumerar.ts";
 
 export type Operacion =
   /** Crea un objeto al final de su colección, o antes del objeto `antesDe` (las plantas y los casos tienen orden). */
@@ -34,6 +35,8 @@ export type Operacion =
   | { op: "borrar"; ids: readonly string[]; dependientes?: "borrar" | { reasignar: Readonly<Record<string, string>> } }
   /** Lleva el objeto `id` antes de `antesDe` (al final con null). */
   | { op: "mover"; coleccion: Coleccion; id: string; antesDe: string | null }
+  /** Ids cortos por su posición en planta, como en CYPECAD (`renumerar.ts`); por defecto, de pilares, vigas, losas, paños y muros. */
+  | { op: "renumerar"; colecciones?: readonly Renumerable[] }
   /** Nombre y descripción del proyecto (no entran en la huella). */
   | { op: "datos"; nombre?: string; descripcion?: string }
   /** Varias operaciones como una sola: o entran todas o ninguna (y se deshacen de una vez). */
@@ -232,6 +235,8 @@ function paso(m: ModeloFisico, o: Operacion, datos: Partial<Pick<Proyecto, "nomb
       return borrar(m, o);
     case "mover":
       return mover(m, o);
+    case "renumerar":
+      return { ok: true, modelo: renombrarIds(m, propuestaRenumerar(m, o.colecciones)) };
     case "datos":
       return { ok: true, modelo: m, proyecto: { ...datos, ...("nombre" in o ? { nombre: o.nombre } : {}), ...("descripcion" in o ? { descripcion: o.descripcion } : {}) } };
     case "lote": {

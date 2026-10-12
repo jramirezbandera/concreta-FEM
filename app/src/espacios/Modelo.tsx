@@ -13,7 +13,7 @@
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { ListOrdered, Trash2 } from "lucide-react";
 import { lista } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
@@ -21,7 +21,7 @@ import { IcAPlantas, IcApoyo, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcLosa,
 import { usePaneles } from "../armazon/paneles.ts";
 import { Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
-import { DialogoBorrar, DialogoCopiar } from "../editor/Dialogos.tsx";
+import { DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
 import { tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
 import { cota, fmt } from "../fmt.ts";
@@ -33,6 +33,7 @@ import { FuenteEscena, plantaVista, ZonaVistas } from "../vistas/Zona.tsx";
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
 const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "apoyos", "cargas"]);
 const IcBorrar: Icono = ({ size }) => <Trash2 size={size} strokeWidth={1.5} aria-hidden="true" />;
+const IcRenumerar: Icono = ({ size }) => <ListOrdered size={size} strokeWidth={1.5} aria-hidden="true" />;
 
 let ultimoPedido = 0;
 
@@ -49,7 +50,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const [caso, setCaso] = useState<string | null>(null);
   const [tabla, setTabla] = useState<NombreTabla>(cargas ? "cargas" : "pilares");
   const [nueva, setNueva] = useState(0);
-  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | null>(null);
+  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | null>(null);
 
   const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
   // Lo elegido que está en el proyecto (un eje propuesto no lo está) y lo que de ello se copia
@@ -108,6 +109,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Separador />
           <Herramienta icono={IcAPlantas} nombre="A plantas" disabled={!copiables.length} onClick={() => setDialogo("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : "Elija vigas, losas, apoyos o cargas"} />
           <Herramienta icono={IcBorrar} nombre="Borrar" disabled={!enTablas.length} onClick={() => setDialogo("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : "Elija un objeto"} />
+          <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
           <Separador />
           <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirTabla("plantas")} />
           <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirTabla("materiales")} />
@@ -174,7 +176,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         props={{ titulo: "Propiedades", contenido: elegidos.length > 1 ? <ListaElegidos /> : seleccion ? <Inspector id={seleccion} /> : <ResumenPlanta /> }}
         dock={dock}
       />
-      {dialogo && (dialogo === "borrar" ? enTablas.length > 0 && <DialogoBorrar ids={enTablas} onCerrar={() => setDialogo(null)} /> : copiables.length > 0 && <DialogoCopiar ids={copiables} onCerrar={() => setDialogo(null)} />)}
+      {dialogo === "borrar" && enTablas.length > 0 && <DialogoBorrar ids={enTablas} onCerrar={() => setDialogo(null)} />}
+      {dialogo === "copiar" && copiables.length > 0 && <DialogoCopiar ids={copiables} onCerrar={() => setDialogo(null)} />}
+      {dialogo === "renumerar" && ed && <DialogoRenumerar onCerrar={() => setDialogo(null)} />}
     </>
   );
 }

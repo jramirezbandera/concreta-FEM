@@ -281,6 +281,8 @@ Hoy el modelo no tiene ejes de replanteo, y hacen falta para:
 - **Integridad:** renombrar ya cambia todas las referencias (V2a). Si un objeto tiene `nombre`, no se toca: el rótulo enseña el `nombre` si lo hay y, si no, el id.
 - **Nunca de forma automática:** sólo cuando el usuario lo pide, porque cambia el proyecto y su huella, y los resultados guardados dejan de valer. Los proyectos de validación conservan sus ids (`P-x24-y0`), que son los de sus referencias congeladas.
 - **Copiar a plantas** sigue dando ids nuevos con la planta de destino. Después, «Renumerar» los deja cortos.
+- **Hecho el 2026-10-12** (adelantado a petición del usuario): `src/editor/renumerar.ts` y la operación `{ op: "renumerar" }`, con el botón «Renumerar» en la barra de Modelo, que enseña qué cambia antes de hacerlo. Prefijos: `P`, `V`, `L`, `F` (paños) y `M` (muros); un número que ya es el id de otro objeto se salta. En el edificio objetivo da la misma malla (las barras sólo cambian de orden, porque van por el id de su pieza, y algún nudo se mueve un ulp): `renumerar.test.ts`.
+- **Axiles de pilares (`pilares-n`)**, en el mismo cambio: la huella del pilar a escala, del color del signo, en vez de un círculo en píxeles proporcional a |N|, y el rótulo con el pilar y su mayor |N| (el mínimo y el máximo, en el cuadro de la planta).
 
 ## 13. I1: lo que se fija al empezar
 
@@ -381,7 +383,7 @@ El motor de vistas de §5 y §10 con el grafismo de §8 y los ejes de §9. Lo qu
   - elegir en una vista elige en todas, en el navegador y en la tabla;
   - con varias, Propiedades da la lista por tipo, y Borrar y A plantas trabajan con todas;
   - en Resultados, el clic sigue siendo el de cada modo (el valor del punto, la viga o el pilar).
-- **Fuera de I2:** sólido, translúcido, filtros, rango de plantas, aislar y caja de sección (I3); resultados en 3D y en el alzado, y el valor bajo el cursor (I4); vistas guardadas en el proyecto (I3); «Renumerar» (I-g, con V2b); táctil (V3); la planta de abajo en gris.
+- **Fuera de I2:** sólido, translúcido, filtros, rango de plantas, aislar y caja de sección (I3); resultados en 3D y en el alzado, y el valor bajo el cursor (I4); vistas guardadas en el proyecto (I3); táctil (V3); la planta de abajo en gris.
 
 ### 14.1 Criterios de paso de I2
 
