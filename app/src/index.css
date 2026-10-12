@@ -516,3 +516,44 @@ body {
 .paleta li .grupo { width: 92px; flex-shrink: 0; font-size: 11.5px; color: var(--color-text-disabled); }
 .paleta li .atajo { margin-left: auto; font: 11px var(--font-mono); color: var(--color-text-disabled); }
 .paleta .vacia { padding: 14px 16px; font-size: 13px; color: var(--color-text-secondary); }
+
+/*
+ * Desplegables: la lista abierta con el estilo de la app, como un menú (select personalizable,
+ * Chrome y Edge ≥ 135). Sigue siendo el <select> nativo: teclado, accesibilidad y formularios no
+ * cambian. En los navegadores sin él, la lista del sistema.
+ */
+@supports (appearance: base-select) {
+  select.sel, select.sel-chip, select.sel::picker(select), select.sel-chip::picker(select) { appearance: base-select; }
+  select.sel { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; cursor: pointer; }
+  select.sel:hover { border-color: var(--color-text-disabled); }
+  select.sel:focus-visible, select.sel:open { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-tint-accent); }
+  select.sel::picker-icon { color: var(--color-text-secondary); transition: rotate .15s; }
+  select.sel:open::picker-icon { rotate: 180deg; }
+  select.sel-chip::picker-icon { display: none; }
+  /* Los de los chips: más específico que «.chip.sel .sel-chip», que les quita la apariencia */
+  .chip.sel select.sel-chip { appearance: base-select; display: inline-flex; align-items: center; }
+  .chip.sel select.sel-chip:open { color: var(--color-accent); }
+  select.sel::picker(select), select.sel-chip::picker(select) {
+    margin-block: 4px; padding: 4px; min-width: max(anchor-size(width), 160px); max-height: min(440px, 70vh); overflow-y: auto;
+    border: 1px solid var(--color-border-main); border-radius: 8px;
+    background: var(--color-bg-primary); color: var(--color-text-primary);
+    box-shadow: 0 10px 28px rgb(16 24 40 / .16), 0 2px 6px rgb(16 24 40 / .08);
+    scrollbar-width: thin;
+  }
+  select.sel-chip::picker(select) { margin-left: -10px; }
+  select.sel option, select.sel-chip option {
+    display: flex; align-items: center; gap: 10px; min-height: 28px; padding: 0 10px; border-radius: 5px;
+    font: 500 12.5px var(--font-sans); text-transform: none; letter-spacing: normal; color: var(--color-text-primary);
+    white-space: nowrap; cursor: pointer;
+  }
+  select.sel option:hover, select.sel-chip option:hover, select.sel option:focus-visible, select.sel-chip option:focus-visible { background: var(--color-bg-elevated); outline: none; }
+  select.sel option:checked, select.sel-chip option:checked { background: var(--color-tint-accent); color: var(--color-accent); font-weight: 600; }
+  select.sel option::checkmark, select.sel-chip option::checkmark { order: 1; margin-left: auto; color: var(--color-accent); }
+  select.sel option:disabled, select.sel-chip option:disabled { opacity: .45; cursor: default; background: none; }
+  select.sel optgroup, select.sel-chip optgroup {
+    padding: 8px 0 2px; font: 600 10.5px var(--font-sans); letter-spacing: .05em; text-transform: uppercase; color: var(--color-text-disabled);
+  }
+  select.sel optgroup + optgroup, select.sel option + optgroup { margin-top: 4px; border-top: 1px solid var(--color-border-sub); }
+  /* Las plantas, con su cota en columna */
+  .planta-sel-campo select.sel-chip option { font-family: var(--font-mono); white-space: pre; }
+}
