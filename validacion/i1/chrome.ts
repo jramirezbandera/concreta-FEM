@@ -157,7 +157,7 @@ try {
     if (cap) await captura(cap);
   };
   const espacio = (n: string) => `__i1.boton("${n}", document.querySelector("nav")).click()`;
-  const planta = (id: string) => `[...document.querySelectorAll('.carril [role=option]')].find((b) => b.firstChild.textContent === "${id}").click()`;
+  const planta = (id: string) => `{ const s = document.querySelector('select[aria-label=Planta]'); s.value = "${id}"; s.dispatchEvent(new Event("change", { bubbles: true })); }`;
   await medir("planta N3", planta("N3"), "true", "1-modelo");
   await medir("3D", `__i1.boton("3D").click()`, `document.querySelector('.celda[data-tipo="3d"]')`, "2-modelo-3d");
   await medir("planta", `__i1.boton("Planta").click()`);

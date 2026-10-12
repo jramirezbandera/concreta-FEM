@@ -194,7 +194,7 @@ try {
   await abrir("edificio", 1920, 1080);
   const gpu = await pagina<string>(`const g = document.createElement("canvas").getContext("webgl2"); const d = g.getExtension("WEBGL_debug_renderer_info"); return d ? g.getParameter(d.UNMASKED_RENDERER_WEBGL) : "?";`);
   log(`GPU de Chrome: ${gpu}`);
-  const planta = (id: string) => `[...document.querySelectorAll('.celda[data-vista="0"] .carril [role=option]')].find((b) => b.firstChild.textContent === "${id}").click()`;
+  const planta = (id: string) => `{ const s = document.querySelector('.celda[data-vista="0"] select[aria-label=Planta]'); s.value = "${id}"; s.dispatchEvent(new Event("change", { bubbles: true })); }`;
 
   // ─── Criterio 1 ───────────────────────────────────────────────────────────────────────────────
   log("\n## Criterio 1: los búferes que pinta el motor, los de la escena de fem render");
@@ -204,7 +204,7 @@ try {
   const d1 = await pagina<{ sha256: string; capas: number }>(`return await __i2.dep(0);`);
   comprobar(d1.sha256 === ESPERADO.modelo, `planta N3, modelo: ${d1.capas} capas, sha256 ${d1.sha256?.slice(0, 16)} = Node ${ESPERADO.modelo.slice(0, 16)}`);
   await pagina(`__i2.boton("Alzado").click()`);
-  await pagina(`await __i2.esperar(() => document.querySelector('.celda[data-vista="0"][data-tipo="alzado"] select')); const s = document.querySelector('.celda[data-vista="0"] select'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set; set.call(s, "3"); s.dispatchEvent(new Event("change", { bubbles: true }));`);
+  await pagina(`await __i2.esperar(() => document.querySelector('.celda[data-vista="0"][data-tipo="alzado"] select[aria-label="Eje del alzado"]')); const s = document.querySelector('.celda[data-vista="0"] select[aria-label="Eje del alzado"]'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set; set.call(s, "3"); s.dispatchEvent(new Event("change", { bubbles: true }));`);
   await quietos();
   await captura("2-alzado-3");
   const d2 = await pagina<{ sha256: string; capas: number }>(`return await __i2.dep(0);`);
@@ -242,13 +242,13 @@ try {
   await marca("desplazar 3D");
   const pan3 = await pagina<number[]>(`const s = __i2.sup(0).getBoundingClientRect(); return await __i2.arrastre(0, s.width * 0.5, s.height * 0.5, s.width * 0.4, s.height * 0.55, 60, { boton: 1 });`);
   await marca("pasar a analítico");
-  await pagina(`document.querySelector('.celda[data-vista="0"] [aria-label="Modo del 3D"] button:nth-child(2)').click()`);
+  await pagina(`{ const s = document.querySelector('.celda[data-vista="0"] select[aria-label="Modo del 3D"]'); s.value = "analitico"; s.dispatchEvent(new Event("change", { bubbles: true })); }`);
   await quietos();
   await captura("7-3d-analitico");
   await marca("orbitar analítico");
   const orbitaA = await pagina<number[]>(`const s = __i2.sup(0).getBoundingClientRect(); return await __i2.arrastre(0, s.width * 0.4, s.height * 0.5, s.width * 0.6, s.height * 0.45, 90, { boton: 1, mayus: true });`);
   await marca("volver a planta");
-  await pagina(`document.querySelector('.celda[data-vista="0"] [aria-label="Modo del 3D"] button:nth-child(1)').click()`);
+  await pagina(`{ const s = document.querySelector('.celda[data-vista="0"] select[aria-label="Modo del 3D"]'); s.value = "alambrico"; s.dispatchEvent(new Event("change", { bubbles: true })); }`);
   await pagina(`__i2.boton("Planta").click()`);
   await quietos();
   for (const [que, t] of [
@@ -285,8 +285,8 @@ try {
       const nav = [...document.querySelectorAll(".arbol-fila.sub[data-on=true]")].map((b) => b.firstChild.textContent).sort();
       const tabla = [...document.querySelectorAll("tr[data-elegido=true]")].map((t) => t.dataset.id).sort();
       return { vistas, nav, tabla };`);
-  const ponerSelect = (i: number, v: string) => `{ const s = document.querySelector('.celda[data-vista="${i}"] select'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set; set.call(s, "${v}"); s.dispatchEvent(new Event("change", { bubbles: true })); }`;
-  await pagina(`await __i2.esperar(() => document.querySelector('.celda[data-vista="2"] select')); ${ponerSelect(2, "3")} ${ponerSelect(3, "eje-C")}`);
+  const ponerSelect = (i: number, v: string) => `{ const s = document.querySelector('.celda[data-vista="${i}"] select[aria-label="Eje del alzado"]'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set; set.call(s, "${v}"); s.dispatchEvent(new Event("change", { bubbles: true })); }`;
+  await pagina(`await __i2.esperar(() => document.querySelector('.celda[data-vista="2"] select[aria-label="Eje del alzado"]')); ${ponerSelect(2, "3")} ${ponerSelect(3, "eje-C")}`);
   // La tabla de pilares abierta, sin el filtro de la planta, y los pilares del navegador desplegados
   await pagina(`[...document.querySelectorAll(".dock-tab")].find((b) => b.textContent.startsWith("Tablas")).click(); await __i2.esperar(() => document.querySelector("[role=grid]")); [...document.querySelectorAll("[role=tab]")].find((b) => b.textContent.trim().startsWith("Pilares")).click(); const c = [...document.querySelectorAll("label.chk input")].find((x) => x.checked); if (c) c.click(); [...document.querySelectorAll(".arbol-fila")].find((b) => b.textContent.includes("Pilares")).click();`);
   await quietos();

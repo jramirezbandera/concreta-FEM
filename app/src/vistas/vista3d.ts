@@ -104,7 +104,7 @@ const ESQUINAS: { p: [number, number, number]; vista: VistaEstandar }[] = [
 ];
 const FOV = 35;
 const RADIO_CLIC = 6;
-const CUBO = { margen: 62, lado: 26 };
+const CUBO = { margen: 44, lado: 17 };
 
 /** Vértices de cada lámina: dos triángulos, 0-1-2 y 0-2-3. */
 const ESQ_LAMINA = [0, 1, 2, 0, 2, 3];
@@ -759,7 +759,7 @@ export class Vista3D extends Vista {
     const { px } = this.cubo();
     for (const e of ESQUINAS) {
       const q = px(e.p);
-      if (q[2] > px([0, 0, 0])[2] && Math.hypot(x - q[0], y - q[1]) <= 6) return e.vista;
+      if (q[2] > px([0, 0, 0])[2] && Math.hypot(x - q[0], y - q[1]) <= 5) return e.vista;
     }
     const caras = this.carasVisibles();
     for (let i = caras.length - 1; i >= 0; i--) {
@@ -789,8 +789,8 @@ export class Vista3D extends Vista {
       ctx.stroke();
       const [cx, cy] = [poligono.reduce((s, p) => s + p[0], 0) / 4, poligono.reduce((s, p) => s + p[1], 0) / 4];
       const area = Math.abs(poligono.reduce((s, p, i) => s + p[0] * poligono[(i + 1) % 4]![1] - poligono[(i + 1) % 4]![0] * p[1], 0)) / 2;
-      if (area > 260) {
-        ctx.font = fuente(11, true);
+      if (area > 200) {
+        ctx.font = fuente(9, true);
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = col.textoSuave;
@@ -801,27 +801,27 @@ export class Vista3D extends Vista {
       const q = px(e.p);
       if (q[2] <= px([0, 0, 0])[2]) continue;
       ctx.beginPath();
-      ctx.arc(q[0], q[1], 3.5, 0, 2 * Math.PI);
+      ctx.arc(q[0], q[1], 2.5, 0, 2 * Math.PI);
       ctx.fillStyle = col.acento;
       ctx.fill();
     }
     // Los ejes X, Y, Z bajo el cubo
     const o = px([0, 0, 0]);
-    const base: [number, number] = [this.rect.w - CUBO.margen - 44, CUBO.margen + 46];
+    const base: [number, number] = [this.rect.w - CUBO.margen - 30, CUBO.margen + 32];
     for (const [v, t, c] of [
       [[1, 0, 0], "X", "#dc2626"],
       [[0, 1, 0], "Y", "#16a34a"],
       [[0, 0, 1], "Z", "#2563eb"],
     ] as const) {
       const q = px(v);
-      const [dx, dy] = [(q[0] - o[0]) * 0.7, (q[1] - o[1]) * 0.7];
+      const [dx, dy] = [(q[0] - o[0]) * 0.75, (q[1] - o[1]) * 0.75];
       ctx.beginPath();
       ctx.moveTo(base[0], base[1]);
       ctx.lineTo(base[0] + dx, base[1] + dy);
       ctx.strokeStyle = c;
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.font = fuente(10, true);
+      ctx.font = fuente(9, true);
       ctx.fillStyle = c;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";

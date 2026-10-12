@@ -134,7 +134,8 @@ export abstract class Vista {
   rueda(e: WheelEvent, x: number, y: number): void {
     const pasos = e.deltaMode === 1 ? e.deltaY / 3 : e.deltaY / 100;
     this.ajustada = false;
-    this.acercar(Math.pow(0.85, -pasos), x, y);
+    // Rueda hacia delante (deltaY < 0) acerca, como en CAD
+    this.acercar(Math.pow(0.85, pasos), x, y);
     this.camaraCambiada();
   }
 

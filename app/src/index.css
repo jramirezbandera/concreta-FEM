@@ -293,7 +293,8 @@ body {
 .zona-vistas > .celda[data-activa="true"] { box-shadow: inset 0 0 0 2px var(--color-accent); }
 .celda-superficie { position: absolute; inset: 0; touch-action: none; user-select: none; }
 .celda .vista-cab { right: 216px; flex-wrap: nowrap; overflow: hidden; }
-.celda:has(.leyenda-vista[data-abierta="false"]) .vista-cab, .celda[data-tipo="3d"] .vista-cab { right: 140px; }
+.celda:has(.leyenda-vista[data-abierta="false"]) .vista-cab { right: 140px; }
+.celda[data-tipo="3d"] .vista-cab { right: 104px; }
 .vista-cab-2 { top: 48px; }
 .vista-barra {
   position: absolute; right: 10px; bottom: 10px; z-index: 15; display: flex; gap: 2px; padding: 3px;
@@ -453,24 +454,21 @@ body {
 .chip.seg-chip > button[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
 .chip.seg-chip > button:disabled { opacity: .4; cursor: default; }
 
-.carril {
-  position: absolute; left: 10px; top: 52px; z-index: 15; display: flex; flex-direction: column; gap: 1px;
-  max-height: calc(100% - 110px); overflow-y: auto; padding: 4px; scrollbar-width: none;
-  border: 1px solid var(--color-border-main); border-radius: 10px;
-  background: color-mix(in srgb, var(--color-bg-primary) 94%, transparent); box-shadow: 0 1px 3px rgb(16 24 40 / .08);
-}
-.carril > button {
-  position: relative; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px;
-  min-width: 100px; height: 26px; padding: 0 8px; border: 0; border-radius: 6px; background: none;
-  font: 12.5px var(--font-sans); color: var(--color-text-secondary); cursor: pointer; text-align: left;
-}
-.carril > button > .mono { font-size: 11.5px; color: var(--color-text-disabled); text-align: right; }
-.carril > button:hover { background: var(--color-bg-elevated); color: var(--color-text-primary); }
-.carril > button[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); font-weight: 600; }
-.carril > button[data-on="true"] > .mono { color: var(--color-accent); }
-.carril > button > i { position: absolute; left: 2px; top: 10px; width: 5px; height: 5px; border-radius: 3px; }
-.carril > button > i.f { background: var(--color-state-fail); }
-.carril > button > i.w { background: var(--color-state-warn); }
+/* Desplegables de la cabecera de la vista (tipo, planta, eje, modo) */
+.chip.sel { position: relative; gap: 4px; padding: 0 6px 0 10px; cursor: pointer; }
+.chip.sel:hover { border-color: var(--color-border-strong, var(--color-text-disabled)); }
+.chip.sel .sel-chip { appearance: none; -webkit-appearance: none; padding: 0 16px 0 0; height: 28px; }
+.chip.sel .sel-chip:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 4px; }
+.chip.sel .sel-flecha { position: absolute; right: 6px; pointer-events: none; color: var(--color-text-secondary); }
+.chip.planta-sel { padding: 0 3px; gap: 0; }
+.planta-sel-campo { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 0 2px 0 6px; }
+.planta-sel-campo .sel-flecha { right: 2px; }
+.planta-sel-campo > i { width: 6px; height: 6px; border-radius: 3px; flex-shrink: 0; }
+.planta-sel-campo > i.f { background: var(--color-state-fail); }
+.planta-sel-campo > i.w { background: var(--color-state-warn); }
+.ib-chip { display: inline-grid; place-items: center; width: 22px; height: 24px; border: 0; border-radius: 5px; background: none; color: var(--color-text-secondary); cursor: pointer; }
+.ib-chip:hover:not(:disabled) { background: var(--color-bg-elevated); color: var(--color-text-primary); }
+.ib-chip:disabled { opacity: .35; cursor: default; }
 
 .dock { position: relative; display: flex; flex-direction: column; flex-shrink: 0; border-top: 1px solid var(--color-border-main); background: var(--color-bg-primary); }
 .dock-asa { position: absolute; top: -3px; left: 0; right: 0; z-index: 5; height: 6px; cursor: ns-resize; }

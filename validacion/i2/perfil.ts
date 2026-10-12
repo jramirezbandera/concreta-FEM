@@ -152,7 +152,7 @@ try {
   await abrir("edificio", 1440, 900);
   await pagina(`window.__largas = [];`);
   const espacio = (n: string) => `__i1.boton("${n}", document.querySelector("nav")).click()`;
-  await accion(`[...document.querySelectorAll('.carril [role=option]')].find((b) => b.firstChild.textContent === "N3").click()`);
+  await accion(`{ const s = document.querySelector('select[aria-label=Planta]'); s.value = "N3"; s.dispatchEvent(new Event("change", { bubbles: true })); }`);
   await accion(espacio("Resultados"), "document.querySelector('[data-extremo]')");
   await accion(`__i1.boton("M11").click()`);
   await pagina(`window.__largas = [];`);

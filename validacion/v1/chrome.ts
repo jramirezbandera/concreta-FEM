@@ -188,7 +188,7 @@ try {
     pasos.push([que, await pagina<number>(`return performance.now();`)]);
     cambios.push([que, await accion(js, cond)]);
   };
-  const planta = (id: string) => `[...document.querySelectorAll('[role=option]')].find((b) => b.firstChild.textContent === "${id}").click()`;
+  const planta = (id: string) => `{ const s = document.querySelector('select[aria-label=Planta]'); s.value = "${id}"; s.dispatchEvent(new Event("change", { bubbles: true })); }`;
   // Desde I1 (docs/fem3d/interfaz.md §13), las pantallas de resultados de V1 son modos de Resultados
   const MODO: Record<string, string> = { Losas: "Losas", Vigas: "Diagramas", Pilares: "Pilares", Desplomes: "Deformada" };
   const pantalla = (n: string) =>
@@ -198,7 +198,7 @@ try {
   await medir("planta N3 (modelo)", planta("N3"));
   await medir("planta N5 (modelo)", planta("N5"));
   await medir("vista cargas", `__v1.boton("Cargas").click()`);
-  await medir("vista malla", `__v1.boton("Modelo", document.querySelector("nav")).click(); await __v1.esperar(() => __v1.boton("Malla")); __v1.boton("Malla").click()`);
+  await medir("vista malla", `__v1.boton("Modelo", document.querySelector("nav")).click(); await __v1.esperar(() => document.querySelector('select[aria-label="Qué se dibuja"]')); { const s = document.querySelector('select[aria-label="Qué se dibuja"]'); s.value = "malla"; s.dispatchEvent(new Event("change", { bubbles: true })); }`);
   await medir("pantalla losas", pantalla("Losas"));
   await medir("magnitud M11", `__v1.boton("M11").click()`);
   await medir("magnitud M22", `__v1.boton("M22").click()`);
@@ -206,7 +206,7 @@ try {
   const elegirComb = (i: number) => `const s = document.querySelector("select"); const o = s.options[${i}]; const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set; set.call(s, o.value); s.dispatchEvent(new Event("change", { bubbles: true }))`;
   await medir("combinación: un caso (losas)", elegirComb(-1).replace("[-1]", "[s.options.length - 1]"));
   await medir("combinación: por defecto (losas)", elegirComb(0));
-  await medir("clic en el mapa (valor del punto)", `const s = document.querySelector(".celda-superficie"); const r = s.getBoundingClientRect(); for (const t of ["pointerdown", "pointerup"]) s.dispatchEvent(new PointerEvent(t, { bubbles: true, pointerId: 1, pointerType: "mouse", button: 0, buttons: t === "pointerup" ? 0 : 1, clientX: r.left + r.width * 0.4, clientY: r.top + r.height * 0.5 }))`, `document.querySelector("[data-valor-punto]")`);
+  await medir("clic en el mapa (valor del punto)", `const s = document.querySelector(".celda-superficie"); const r = s.getBoundingClientRect(); for (const t of ["pointerdown", "pointerup"]) s.dispatchEvent(new PointerEvent(t, { bubbles: true, pointerId: 1, pointerType: "mouse", button: 0, buttons: t === "pointerup" ? 0 : 1, clientX: r.left + r.width * 0.3, clientY: r.top + r.height * 0.5 }))`, `document.querySelector("[data-valor-punto]")`);
   await medir("pantalla vigas", pantalla("Vigas"));
   await medir("otra viga", `[...document.querySelectorAll(".lista-fila")].filter((b) => !b.getAttribute("role"))[3].click()`);
   await medir("esfuerzo Vz", `__v1.boton("Vz").click()`);
@@ -253,7 +253,7 @@ try {
   const visto = await pagina<number>(`await __v1.esperar(() => __v1.estado() === "desactualizado", 10000); return performance.now() - window.__t0;`);
   const recargado = await pagina<number>(`await __v1.esperar(() => __v1.estado() === "calculado" && __v1.huella() !== "${huella0}"); await __v1.esperar(() => __v1.quietos() && document.querySelector("tr.clic")); return performance.now() - window.__t0;`);
   comprobar(visto <= 2000, `cambio visto en ${visto.toFixed(0)} ms ≤ 2 s (recalculado en ${recargado.toFixed(0)} ms)`);
-  const [pant, plantaSel, sel] = await pagina<[string, string, string | null]>(`return [document.querySelector("nav [aria-current=page]").textContent, document.querySelector("[role=option][aria-selected=true]").firstChild.textContent, document.querySelector("tr.clic[data-on=true] td")?.firstChild.textContent ?? null];`);
+  const [pant, plantaSel, sel] = await pagina<[string, string, string | null]>(`return [document.querySelector("nav [aria-current=page]").textContent, document.querySelector("select[aria-label=Planta]").value, document.querySelector("tr.clic[data-on=true] td")?.firstChild.textContent ?? null];`);
   const modo = await pagina<string | null>(`return document.querySelector("[role=toolbar] .herr[data-on=true]")?.textContent ?? null;`);
   comprobar(pant === "Resultados" && modo === "Pilares" && plantaSel === "N3" && sel === elegido, `conserva espacio y modo (${pant} · ${modo}), planta (${plantaSel}) y selección (${sel}, era ${elegido})`);
 } finally {

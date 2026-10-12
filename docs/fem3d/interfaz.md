@@ -70,7 +70,7 @@ Medido sobre la captura de la pantalla Modelo (1920×1080, 1-022):
   - el árbol del proyecto: plantas, ejes, materiales, secciones, pilares, vigas, losas, muros, casos y combinaciones, cada uno con su número y sus diagnósticos;
   - debajo, las vistas guardadas;
   - elegir en el árbol elige en las vistas, y al revés.
-- **Vistas (centro):** una, dos o cuatro (§5). Cada una tiene su cabecera flotante con el tipo y la planta, el eje o la cámara, y el modo. Las de planta y las 3D tienen también un carril de plantas a la izquierda; las 3D, el ViewCube.
+- **Vistas (centro):** una, dos o cuatro (§5). Cada una tiene su cabecera flotante con desplegables: el tipo, la planta (con flechas a la de encima y la de debajo) o el eje, y el modo. Las 3D llevan además el ViewCube. Hasta el 2026-10-12 la planta se elegía con un carril a la izquierda de la vista; el usuario lo vio como demasiados botones y pasó a un desplegable.
 - **Propiedades (derecha, 300 px, plegable):**
   - **con algo elegido:** sus datos editables (lo que hoy hacen el inspector y el formulario de V2a), lo que le llega, sus diagnósticos y, si hay cálculo, su resultado: el detalle de la pieza (§7);
   - **sin nada elegido:** las opciones de la vista (capas, rótulos, escala y filtros).
@@ -98,13 +98,13 @@ Medido sobre la captura de la pantalla Modelo (1920×1080, 1-022):
 
 - **Planta:** ortográfica desde arriba, con una planta activa.
   - La planta de abajo se puede ver en gris, como la «planta de referencia» de CYPECAD.
-  - Se cambia con el carril o con AvPág y RePág.
+  - Se cambia con el desplegable de la cabecera, sus flechas o AvPág y RePág.
 - **Alzado:** el plano vertical de un eje de replanteo (o el que pasa por dos puntos), con una profundidad ±d.
   - Es la vista natural de un pórtico: la de SAP2000.
   - Se elige en la cabecera («Alzado · eje A ▾») o pulsando una burbuja de eje en la planta.
 - **3D:** en perspectiva o en ortográfica, con órbita.
   - El ViewCube lleva a las vistas estándar: superior, frente, atrás, izquierda, derecha y las cuatro isométricas.
-  - Tiene el mismo carril de plantas, que resalta la planta activa y limita el rango de plantas que se ven.
+  - Tiene el mismo desplegable de plantas, que resalta una planta (o ninguna) y limitará el rango de plantas que se ven.
 
 ### 5.2 Modos de representación
 
@@ -117,7 +117,7 @@ Medido sobre la captura de la pantalla Modelo (1920×1080, 1-022):
 
 ### 5.3 Filtros
 
-- **Rango de plantas:** por ejemplo, de N1 a N3, con el carril.
+- **Rango de plantas:** por ejemplo, de N1 a N3, desde la cabecera de la vista.
 - **Tipos de objeto:** en las opciones de la vista.
 - **Aislar lo elegido (H) y ocultar (Ctrl+H):** como en CYPECAD y en Revit.
 - **Caja de sección en 3D** y profundidad del corte en un alzado.
@@ -164,7 +164,8 @@ Medido sobre la captura de la pantalla Modelo (1920×1080, 1-022):
   - relleno translúcido por signo: azul el positivo y naranja el negativo, que se distinguen también en luminosidad;
   - con una envolvente, las dos curvas;
   - escala automática: el mayor valor visible ocupa 1,5 m, y se puede ajustar;
-  - los vértices son los de la consulta (`Consultas.diagrama` para una combinación y `envolventePieza` para una envolvente), nunca una curva suavizada.
+  - los vértices son los de la consulta (`Consultas.diagrama` para una combinación y `envolventePieza` para una envolvente), nunca una curva suavizada;
+  - en la planta (A4 y el visor, desde el 2026-10-12), como en el alzado de la pieza: con la pieza leída en X creciente (o en Y creciente si va más en Y), My > 0 a su derecha (abajo en las vigas en X, a la derecha en las vigas en Y) y My < 0 al otro lado; Vz > 0 a su izquierda. Antes el lado dependía del sentido en que se dibujó la pieza y los positivos de las vigas en X salían arriba.
 - **Láminas:** isovalores por bandas sobre losas y muros en 3D, con los colores y los límites de la planta (H43, E5-7), e isolíneas opcionales.
 - **Pilares:** N o ν por tramo, como color por bandas, como un mapa de calor (en el prototipo, ν), o como diagrama.
 - **Deformada:** con escala, la original en gris y animación opcional.
@@ -367,11 +368,11 @@ El motor de vistas de §5 y §10 con el grafismo de §8 y los ejes de §9. Lo qu
   - Perspectiva u ortográfica, y ViewCube con las seis vistas y las cuatro isométricas.
 - **Vistas:**
   - planta, alzado y 3D, en 1, 1|1, 1/1 o 2×2 (barra de Modelo y Ctrl+1…4);
-  - cada vista tiene su tipo, su planta o su eje, su modo y su cámara; la activa (la del último clic) va con el borde de acento y es la que siguen el carril de plantas, AvPág y RePág y la barra de estado;
+  - cada vista tiene su tipo, su planta o su eje, su modo y su cámara; la activa (la del último clic) va con el borde de acento y es la que siguen AvPág y RePág y la barra de estado;
   - las vistas no cambian con el espacio de trabajo. En Resultados, una planta enseña lo del modo (Losas, Diagramas o Pilares) y un 3D, la deformada en su modo; un alzado, el modelo. Si el modo no tiene dónde verse, la vista activa cambia de tipo;
   - disposición, vistas y cámaras se recuerdan en el navegador, por proyecto.
 - **Navegación** (§5.5, I-e):
-  - la rueda acerca hacia el cursor; el botón central (o el derecho) desplaza y, con Mayús, orbita alrededor del punto bajo el cursor;
+  - la rueda hacia delante acerca hacia el cursor, y hacia atrás aleja (como en AutoCAD y SAP2000); el botón central (o el derecho) desplaza y, con Mayús, orbita alrededor del punto bajo el cursor;
   - la barra de la vista tiene Encuadrar (F), Desplazar y Orbitar con el botón izquierdo (para el panel táctil), y en 3D, la proyección;
   - clic elige; Ctrl+clic añade o quita; arrastrar elige por ventana (de izquierda a derecha, lo que queda dentro; de derecha a izquierda, lo que toca); Esc suelta;
   - doble clic en un eje abre su alzado en otra vista.

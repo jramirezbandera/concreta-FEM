@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { lista } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
-import { Chip, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
+import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
 import { IcAPlantas, IcApoyo, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcLosa, IcMateriales, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
@@ -129,16 +129,17 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               Cargas del caso <strong className="font-semibold">{casoValido || "—"}</strong>
             </Chip>
           ) : (
-            <span className="chip seg-chip" role="group" aria-label="Qué se dibuja">
-              {(["modelo", "diagnosticos", "malla"] as DibujoPlanta[]).map((d) => {
-                const on = plantaVista(v, e.calculado).vista === d;
-                return (
-                  <button key={d} type="button" data-on={on} aria-pressed={on} disabled={d === "malla" && !e.calculado} title={d === "malla" && !e.calculado ? "Necesita el cálculo" : undefined} onClick={() => vistas.poner(i, { dibujo: d })}>
-                    {d === "diagnosticos" ? "Diagnósticos" : d === "malla" ? "Malla" : "Modelo"}
-                  </button>
-                );
-              })}
-            </span>
+            <Desplegable
+              etiqueta="Qué se dibuja"
+              valor={v.dibujo === "malla" && !e.calculado ? "modelo" : v.dibujo}
+              onCambio={(d) => vistas.poner(i, { dibujo: d })}
+              opciones={(["modelo", "diagnosticos", "malla"] as DibujoPlanta[]).map((d) => ({
+                id: d,
+                nombre: d === "diagnosticos" ? "Diagnósticos" : d === "malla" ? "Malla" : "Modelo",
+                disabled: d === "malla" && !e.calculado,
+                title: d === "malla" && !e.calculado ? "Necesita el cálculo" : undefined,
+              }))}
+            />
           ),
       }}
     />

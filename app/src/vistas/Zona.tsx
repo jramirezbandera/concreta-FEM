@@ -1,7 +1,7 @@
 /**
  * La zona de vistas (I2, `docs/fem3d/interfaz.md` §5 y §14): 1, 2 o 4 celdas sobre un solo lienzo
- * WebGL (`motor.ts`). Cada celda tiene su cabecera (tipo, planta o eje, modo), su carril de plantas
- * (planta y 3D), su barra (encuadrar, desplazar, orbitar, proyección) y una fuente que le da lo que
+ * WebGL (`motor.ts`). Cada celda tiene su cabecera de desplegables (tipo, planta o eje, modo), su
+ * barra (encuadrar, desplazar, orbitar, proyección) y una fuente que le da lo que
  * dibuja: cada espacio de trabajo dice qué fuente va en cada tipo de vista (`FuentesVistas`); sin
  * ella, la del modelo.
  *
@@ -15,10 +15,9 @@ import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
 import type { FuenteEscena, VistaPlanta } from "../../../src/visor/sesion.ts";
-import { CarrilPlantas, Chip } from "../armazon/Disposicion.tsx";
+import { Desplegable, SelectorPlanta } from "../armazon/Disposicion.tsx";
 import { Aviso } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
-import { cota } from "../fmt.ts";
 import { atributos, pintura } from "../lienzo/pintura.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { useTheme } from "../tema/useTheme.ts";
@@ -75,7 +74,7 @@ export interface FuentesVistas {
   cabeceraPlanta?: (v: EstadoVista, i: number) => ReactNode;
 }
 
-const MARGENES_PLANTA: Margenes = { izq: 124, arriba: 52, der: 24, abajo: 44 };
+const MARGENES_PLANTA: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
 const MARGENES_ALZADO: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
 
 export function ZonaVistas({ fuentes = {} }: { fuentes?: FuentesVistas }) {
@@ -161,7 +160,6 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   const eje = e.ejes.some((x) => x.id === v.eje) ? v.eje! : (e.ejes[0]?.id ?? null);
   const vv = useMemo(() => ({ ...v, planta, eje }), [v, planta, eje]);
   const celda = useMemo(() => ({ i, varias, v: vv, vista }), [i, varias, vv, vista]);
-  const plantaV = e.plantas.find((p) => p.id === planta);
 
   const contenido = tipo === "planta" ? (fuentes.planta?.(vv, i) ?? <FuenteEscena fuente={planta ? { tipo: "planta", planta, vista: { vista: "modelo" } } : null} />) : tipo === "alzado" ? <FuenteEscena fuente={eje ? { tipo: "alzado", plano: { eje } } : null} /> : (fuentes.tresD?.(vv, i) ?? <Fuente3DModelo />);
 
@@ -169,46 +167,44 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
     <div className="celda" data-activa={activa} data-tipo={tipo} data-vista={i}>
       <div ref={superficie} className="celda-superficie" style={{ cursor: herramienta === "elegir" ? "crosshair" : "grab" }} aria-label={tipo === "planta" ? `Planta ${planta ?? ""}` : tipo === "alzado" ? `Alzado del eje ${eje ?? ""}` : "Edificio en 3D"} role="img" />
       <div className="vista-cab">
-        <span className="chip seg-chip" role="group" aria-label="Tipo de vista">
-          {(["planta", "alzado", "3d"] as const).map((t) => (
-            <button key={t} type="button" data-on={tipo === t} aria-pressed={tipo === t} disabled={t === "alzado" && !e.ejes.length} title={t === "alzado" && !e.ejes.length ? "Sin ejes de replanteo" : undefined} onClick={() => poner(i, { tipo: t })}>
-              {NOMBRE_TIPO[t]}
-            </button>
-          ))}
-        </span>
+        <Desplegable
+          etiqueta="Tipo de vista"
+          valor={tipo}
+          onCambio={(t) => poner(i, { tipo: t })}
+          opciones={(["planta", "alzado", "3d"] as const).map((t) => ({ id: t, nombre: NOMBRE_TIPO[t], disabled: t === "alzado" && !e.ejes.length, title: t === "alzado" && !e.ejes.length ? "Sin ejes de replanteo" : undefined }))}
+        />
         {tipo === "planta" && (
           <>
-            <Chip>
-              <strong className="font-semibold">Planta {planta ?? "—"}</strong>
-              <span className="mono text-text-secondary">{cota(plantaV?.cota)}</span>
-            </Chip>
+            <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => p && poner(i, { planta: p })} />
             {fuentes.cabeceraPlanta?.(vv, i)}
           </>
         )}
         {tipo === "alzado" && (
-          <label className="chip" title="El eje del alzado">
-            <strong className="font-semibold">Eje</strong>
-            <select className="sel-chip" value={eje ?? ""} onChange={(x) => poner(i, { eje: x.target.value })} aria-label="Eje del alzado">
-              {e.ejes.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.nombre ?? x.id}
-                  {x.propuesto ? " (propuesto)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Desplegable
+            etiqueta="Eje del alzado"
+            prefijo={<span className="text-text-secondary">Eje</span>}
+            valor={eje ?? ""}
+            onCambio={(x) => poner(i, { eje: x })}
+            opciones={e.ejes.map((x) => ({ id: x.id, nombre: `${x.nombre ?? x.id}${x.propuesto ? " (propuesto)" : ""}` }))}
+          />
         )}
         {tipo === "3d" && (
-          <span className="chip seg-chip" role="group" aria-label="Modo del 3D">
-            {(["alambrico", "analitico"] as Modo3D[]).map((m) => (
-              <button key={m} type="button" data-on={v.modo3d === m} aria-pressed={v.modo3d === m} disabled={m === "analitico" && !e.compila} title={m === "analitico" ? (e.compila ? "El modelo que se calcula: barras y láminas" : "El modelo no compila") : "Los ejes de las barras y los contornos de las losas y los muros"} onClick={() => poner(i, { modo3d: m })}>
-                {m === "alambrico" ? "Alámbrico" : "Analítico"}
-              </button>
-            ))}
-          </span>
+          <>
+            <Desplegable
+              etiqueta="Modo del 3D"
+              valor={v.modo3d}
+              onCambio={(m) => poner(i, { modo3d: m })}
+              opciones={(["alambrico", "analitico"] as Modo3D[]).map((m) => ({
+                id: m,
+                nombre: m === "alambrico" ? "Alámbrico" : "Analítico",
+                disabled: m === "analitico" && !e.compila,
+                title: m === "analitico" ? (e.compila ? "El modelo que se calcula: barras y láminas" : "El modelo no compila") : "Los ejes de las barras y los contornos de las losas y los muros",
+              }))}
+            />
+            <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: p })} ninguna="Sin resaltar" />
+          </>
         )}
       </div>
-      {tipo !== "alzado" && <CarrilPlantas estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: tipo === "3d" && p === planta ? null : p })} />}
       <div className="vista-barra" role="toolbar" aria-label="Barra de la vista">
         <button type="button" className="ib" title="Encuadrar (F)" aria-label="Encuadrar" onClick={() => vista?.encuadrar()}>
           <Maximize size={15} />

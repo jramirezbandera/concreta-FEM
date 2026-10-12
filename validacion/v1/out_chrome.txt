@@ -11,47 +11,47 @@ BIEN  edificio: abierto con .fem/ (guardados), mismo sha256
 BIEN  alterado: no se usa y se dice por qué («.fem no se usó: resultados.bin no es el que se guardó (su sha256 no coincide)»)
 
 ## Criterio 4: fluidez en el edificio objetivo
-1022: abrir y calcular 0.13 s (compilar y calcular en el worker 0.07 s, resto 0.06 s); abrir con .fem 0.12 s
-ejemplo: abrir y calcular 0.62 s (compilar y calcular en el worker 0.22 s, resto 0.40 s); abrir con .fem 0.17 s
-nucleo: abrir y calcular 0.33 s (compilar y calcular en el worker 0.26 s, resto 0.07 s); abrir con .fem 0.19 s
-edificio: abrir y calcular 3.35 s (compilar y calcular en el worker 3.28 s, resto 0.07 s); abrir con .fem 1.15 s
-BIEN  abrir con .fem/ 1.15 s ≤ 2 s
-BIEN  abrir y calcular: el cálculo (3.28 s) más 0.07 s ≤ 1 s
-  planta N3 (modelo): 18 ms
+1022: abrir y calcular 0.10 s (compilar y calcular en el worker 0.05 s, resto 0.05 s); abrir con .fem 0.12 s
+ejemplo: abrir y calcular 0.48 s (compilar y calcular en el worker 0.20 s, resto 0.28 s); abrir con .fem 0.17 s
+nucleo: abrir y calcular 0.32 s (compilar y calcular en el worker 0.25 s, resto 0.07 s); abrir con .fem 0.19 s
+edificio: abrir y calcular 4.29 s (compilar y calcular en el worker 4.21 s, resto 0.08 s); abrir con .fem 1.70 s
+BIEN  abrir con .fem/ 1.70 s ≤ 2 s
+BIEN  abrir y calcular: el cálculo (4.21 s) más 0.08 s ≤ 1 s
+  planta N3 (modelo): 29 ms
   planta N5 (modelo): 17 ms
-  vista cargas: 24 ms
-  vista malla: 40 ms
-  pantalla losas: 104 ms
-  magnitud M11: 559 ms
-  magnitud M22: 109 ms
-  planta N2 (losas): 400 ms
-  combinación: un caso (losas): 65 ms
-  combinación: por defecto (losas): 20 ms
-  clic en el mapa (valor del punto): 16 ms
-  pantalla vigas: 507 ms
-  otra viga: 39 ms
-  esfuerzo Vz: 115 ms
-  cursor de la viga (30 pasos): 444 ms
-  pantalla pilares: 55 ms
-  planta N1 (pilares): 25 ms
-  elegir un pilar: 2 ms
-  pantalla desplomes (3D y deformada): 65 ms
-  girar el 3D (40 pasos): 327 ms
-  pantalla revisión: 1940 ms
-  pantalla modelo: 29 ms
-  3D del modelo: 4 ms
+  vista cargas: 22 ms
+  vista malla: 39 ms
+  pantalla losas: 85 ms
+  magnitud M11: 546 ms
+  magnitud M22: 116 ms
+  planta N2 (losas): 421 ms
+  combinación: un caso (losas): 50 ms
+  combinación: por defecto (losas): 6 ms
+  clic en el mapa (valor del punto): 23 ms
+  pantalla vigas: 539 ms
+  otra viga: 18 ms
+  esfuerzo Vz: 126 ms
+  cursor de la viga (30 pasos): 437 ms
+  pantalla pilares: 59 ms
+  planta N1 (pilares): 21 ms
+  elegir un pilar: 5 ms
+  pantalla desplomes (3D y deformada): 26 ms
+  girar el 3D (40 pasos): 342 ms
+  pantalla revisión: 1971 ms
+  pantalla modelo: 27 ms
+  3D del modelo: 6 ms
   girar el 3D del modelo (40 pasos): 333 ms
-BIEN  planta N3 (modelo): 18 ms ≤ 500 ms
+BIEN  planta N3 (modelo): 29 ms ≤ 500 ms
 BIEN  planta N5 (modelo): 17 ms ≤ 500 ms
-FALLA magnitud M11: 559 ms ≤ 500 ms
-BIEN  magnitud M22: 109 ms ≤ 500 ms
-BIEN  planta N2 (losas): 400 ms ≤ 500 ms
-BIEN  combinación: un caso (losas): 65 ms ≤ 500 ms
-BIEN  combinación: por defecto (losas): 20 ms ≤ 500 ms
-BIEN  planta N1 (pilares): 25 ms ≤ 500 ms
+FALLA magnitud M11: 546 ms ≤ 500 ms
+BIEN  magnitud M22: 116 ms ≤ 500 ms
+BIEN  planta N2 (losas): 421 ms ≤ 500 ms
+BIEN  combinación: un caso (losas): 50 ms ≤ 500 ms
+BIEN  combinación: por defecto (losas): 6 ms ≤ 500 ms
+BIEN  planta N1 (pilares): 21 ms ≤ 500 ms
 Tareas largas del hilo principal en todo el recorrido (desde la navegación): 0
 BIEN  ninguna tarea larga (> 50 ms) en el hilo principal
 
 ## Criterio 5: recarga al cambiar el fichero
-BIEN  cambio visto en 435 ms ≤ 2 s (recalculado en 3644 ms)
+BIEN  cambio visto en 462 ms ≤ 2 s (recalculado en 3632 ms)
 BIEN  conserva espacio y modo (Resultados · Pilares), planta (N3) y selección (P-x0-y20, era P-x0-y20)

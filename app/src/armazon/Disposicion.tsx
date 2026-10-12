@@ -55,7 +55,7 @@ export function Campo({ etiqueta, children, ancho }: { etiqueta: string; childre
   );
 }
 
-// ─── Vista: cabecera y carril de plantas ────────────────────────────────────────────────────────
+// ─── Vista: cabecera y selector de plantas ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** Lo que dice qué se ve, arriba a la izquierda de la vista. */
 export function CabeceraVista({ children }: { children: ReactNode }) {
@@ -70,21 +70,63 @@ export function Chip({ children, acento, title }: { children: ReactNode; acento?
   );
 }
 
-/**
- * Las plantas, de arriba abajo, en el borde izquierdo de la vista (§5.1). AvPág y RePág hacen lo
- * mismo (en `App`). Los errores y avisos de cada planta, como en V1.
- */
-export function CarrilPlantas({ estado, planta, onPlanta }: { estado: EstadoSesion; planta: string | null; onPlanta: (id: string) => void }) {
+export interface Opcion<T extends string> {
+  id: T;
+  nombre: string;
+  title?: string;
+  disabled?: boolean;
+}
+
+/** Elegir uno de varios valores en la cabecera de una vista: un desplegable en un chip. */
+export function Desplegable<T extends string>({ etiqueta, opciones, valor, onCambio, prefijo }: { etiqueta: string; opciones: readonly Opcion<T>[]; valor: T; onCambio: (v: T) => void; prefijo?: ReactNode }) {
   return (
-    <div className="carril" role="listbox" aria-label="Plantas">
-      {estado.plantas.map((p) => (
-        <button key={p.id} type="button" role="option" aria-selected={p.id === planta} data-on={p.id === planta} title={p.nombre ? `${p.id} · ${p.nombre}` : p.id} onClick={() => onPlanta(p.id)}>
-          <span>{p.id}</span>
-          <span className="mono">{cota(p.cota)}</span>
-          {p.errores ? <i className="f" aria-label={`${p.errores} errores`} /> : p.avisos ? <i className="w" aria-label={`${p.avisos} avisos`} /> : null}
-        </button>
-      ))}
-    </div>
+    <label className="chip sel" title={opciones.find((o) => o.id === valor)?.title}>
+      {prefijo}
+      <select className="sel-chip" value={valor} onChange={(x) => onCambio(x.target.value as T)} aria-label={etiqueta}>
+        {opciones.map((o) => (
+          <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
+            {o.nombre}
+          </option>
+        ))}
+      </select>
+      <ChevronDown size={13} className="sel-flecha" aria-hidden="true" />
+    </label>
+  );
+}
+
+/**
+ * La planta de la vista (§5.1), de arriba abajo, en un desplegable con su cota y los errores y
+ * avisos de cada una, y dos flechas para la de encima y la de debajo (AvPág y RePág, en `App`).
+ * Con `ninguna`, se puede no elegir ninguna (el 3D: sin planta resaltada).
+ */
+export function SelectorPlanta({ estado, planta, onPlanta, ninguna }: { estado: EstadoSesion; planta: string | null; onPlanta: (id: string | null) => void; ninguna?: string }) {
+  const k = estado.plantas.findIndex((p) => p.id === planta);
+  const actual = estado.plantas[k];
+  const ir = (d: number) => {
+    const p = k < 0 ? estado.plantas[d > 0 ? 0 : estado.plantas.length - 1] : estado.plantas[k + d];
+    if (p) onPlanta(p.id);
+  };
+  return (
+    <span className="chip sel planta-sel">
+      <button type="button" className="ib-chip" disabled={k === 0} onClick={() => ir(-1)} title="Planta de encima (RePág)" aria-label="Planta de encima">
+        <ChevronUp size={14} />
+      </button>
+      <span className="planta-sel-campo">
+        {actual && (actual.errores ? <i className="f" aria-label={`${actual.errores} errores`} /> : actual.avisos ? <i className="w" aria-label={`${actual.avisos} avisos`} /> : null)}
+        <select className="sel-chip" value={planta ?? ""} onChange={(x) => onPlanta(x.target.value || null)} aria-label="Planta" title={actual?.nombre ? `${actual.id} · ${actual.nombre}` : undefined}>
+          {ninguna !== undefined && <option value="">{ninguna}</option>}
+          {estado.plantas.map((p) => (
+            <option key={p.id} value={p.id}>
+              {`${p.id}  ${cota(p.cota)}${p.errores ? ` · ${p.errores} errores` : p.avisos ? ` · ${p.avisos} avisos` : ""}`}
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={13} className="sel-flecha" aria-hidden="true" />
+      </span>
+      <button type="button" className="ib-chip" disabled={k === estado.plantas.length - 1} onClick={() => ir(1)} title="Planta de debajo (AvPág)" aria-label="Planta de debajo">
+        <ChevronDown size={14} />
+      </button>
+    </span>
   );
 }
 
