@@ -43,6 +43,16 @@
 - **I4-5. Las reacciones por defecto son los casos sueltos.** Como `fem consultar reacciones` (propósito «lineal»), por defecto se ven los casos y cada objeto con el de su mayor \|Fz\|; en el edificio objetivo, G en todos. Para una combinación, el selector.
 - **I4-6. Con la sonda, la vista avisa sólo si cambia lo de debajo.** Cada movimiento quieto busca de nuevo, pero sólo se pide la consulta si el objetivo cambia (la pieza y la estación al milímetro, la lámina y el punto al centímetro, el tramo o la flecha). En el banco, la búsqueda en el mapa de N3 (29 408 triángulos) no hizo ninguna tarea larga; con el de todas las plantas (207 318) no se ha medido.
 
+## 3.1 Después de I4: reacciones en planta y en alzado (2026-10-12)
+
+A petición del usuario, que veía las reacciones sólo en el 3D (`interfaz.md` §15, la viñeta de Reacciones):
+
+- **`src/agente/render/reacciones.ts`:** `reaccionesObjetos` (la combinación de cada objeto, la que usa también `reacciones3d`), `vistaReacciones` (planta; la vista `reacciones` de `fem render`) y `vistaAlzadoReacciones` (alzado). `vistaAlzado` admite `abajo`, el sitio libre bajo la planta más baja antes de las burbujas de los ejes.
+- **En la sesión:** la vista de planta `reacciones` y el alzado con `reacciones` (como con `diagramas`). En la app, el modo Reacciones ya no pasa una vista al 3D al entrar: la planta y el alzado tienen las suyas, la escala de las flechas va en la barra, la tabla dice la planta de cada objeto y una planta sin apoyos ofrece ir a las que los tienen.
+- **Selector de combinaciones:** sin combinaciones del generador, `EstadoSesion.sinCombinaciones` dice por qué (el mensaje de la consulta y los casos sin acción), y el selector lo enseña como una opción desactivada.
+- **Validación:** en `src/visor/i4.test.ts`, en los cuatro proyectos de V1, cada Fz y cada (Fx, Fy) de la planta, y Fz y la componente en el plano del alzado, son los de las flechas del 3D, bit a bit; cada objeto sale en una sola planta; con cada caso, la suma de las Fz de todas las plantas es el total de la consulta a 1e-9; las verticales del alzado acaban en la cota de su objeto. En `visor.test.ts`, la escena de planta da el SVG de `fem render` byte a byte. En la app, la tabla con la planta y el aviso del selector.
+- **No medido:** el banco de Chrome (`validacion/i4/chrome.ts`) no se ha vuelto a pasar con las vistas nuevas.
+
 ## 4. Validación
 
 - `src/visor/i4.test.ts` (37 tests en los cuatro proyectos de V1): pilares, reacciones, muros, sonda, deformada, alzado de un pilar, ejes de los diagramas, F11…F12 en la planta y el protocolo sin resultados.

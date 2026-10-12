@@ -6,7 +6,8 @@
  *   flecha vertical con Fz y la horizontal con (Fx, Fy), en el sentido de la fuerza que el apoyo hace
  *   sobre la estructura (la punta en el punto; Fz > 0, hacia arriba). Mx, My y Mz no se dibujan: van
  *   en la tabla y bajo el cursor.
- * - Con varias combinaciones, la de mayor |Fz| de cada objeto (la primera, si empatan); con una, esa.
+ * - Con varias combinaciones, la de mayor |Fz| de cada objeto (la primera, si empatan); con una, esa
+ *   (`reaccionesObjetos`, la misma de la planta y el alzado de A4).
  * - Escala: la mayor |F| (vertical u horizontal) que se ve ocupa ORDENADA_DIAGRAMA m por la pedida.
  * - Rótulos: la mayor reacción hacia arriba y, si hay, la mayor hacia abajo (un apoyo que tira).
  *
@@ -15,26 +16,15 @@
  * Puro: sin IO.
  */
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
-import { reacciones } from "../agente/consultas.ts";
 import { ORDENADA_DIAGRAMA } from "../agente/render/diagramas.ts";
 import { rotulo, type EntradaLeyenda } from "../agente/render/escena.ts";
+import { COLOR_REACCION, notaCombinaciones, reaccionesObjetos, type ReaccionObjeto } from "../agente/render/reacciones.ts";
 import type { ResultadosRender } from "../agente/render/resultados.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 
 type V3 = [number, number, number];
 
-/** Los colores de las flechas (los mismos en los dos temas: se leen sobre el claro y el oscuro). */
-export const COLOR_REACCION = { vertical: "#0d9488", horizontal: "#d97706" } as const;
-
-export interface ReaccionObjeto {
-  id: string;
-  tipo: "pilar" | "muro" | "apoyo" | "apoyo lineal";
-  /** El centro de sus nudos coartados (m, globales). */
-  punto: V3;
-  /** [Fx, Fy, Fz] (kN) y [Mx, My, Mz] (kN·m) respecto a `punto`, en la combinación dibujada. */
-  R: number[];
-  comb: string;
-}
+export { COLOR_REACCION, type ReaccionObjeto };
 
 export interface Reacciones3D {
   origen: [number, number, number];
@@ -56,24 +46,9 @@ export interface Reacciones3D {
 }
 
 export function reacciones3D(r: ResultadosRender, origen: [number, number, number], conjunto: ConjuntoCombinaciones, escala = 1): { valido: true; valor: Reacciones3D } | { valido: false; diagnosticos: Diagnostico[] } {
-  const q = reacciones(r.q, conjunto, { todos: true });
+  const q = reaccionesObjetos(r, conjunto);
   if (!q.valido) return q;
-  const f = r.q.fisico;
-  const tipos = new Map<string, ReaccionObjeto["tipo"]>();
-  for (const [lista, t] of [
-    [f.pilares, "pilar"],
-    [f.muros, "muro"],
-    [f.apoyos, "apoyo"],
-    [f.apoyosLineales, "apoyo lineal"],
-  ] as const)
-    for (const x of lista ?? []) tipos.set(x.id, t);
-  const objetos: ReaccionObjeto[] = q.valor.objetos.map((o) => {
-    let k = 0;
-    o.R.forEach((v, j) => {
-      if (Math.abs(v[2]!) > Math.abs(o.R[k]![2]!)) k = j;
-    });
-    return { id: o.id, tipo: tipos.get(o.id) ?? "apoyo", punto: [o.punto[0]!, o.punto[1]!, o.punto[2]!], R: o.R[k]!, comb: conjunto.nombres[k]! };
-  });
+  const objetos = q.valor.objetos;
   let maxF = 0;
   for (const o of objetos) maxF = Math.max(maxF, Math.abs(o.R[2]!), Math.hypot(o.R[0]!, o.R[1]!));
   const m = ORDENADA_DIAGRAMA * escala;
@@ -120,7 +95,7 @@ export function reacciones3D(r: ResultadosRender, origen: [number, number, numbe
     if (abajo.R[2]! < 0) extremos.push({ que: "mayor hacia abajo", valor: abajo.R[2]!, id: abajo.id, comb: abajo.comb, punto: abajo.punto });
   }
   const notas = [
-    conjunto.factores.length > 1 ? `De las ${conjunto.factores.length} combinaciones de ${conjunto.descripcion}, la de mayor |Fz| de cada objeto (dicha en su fila).` : `Combinación ${conjunto.etiquetas[0] ?? conjunto.nombres[0] ?? ""}.`,
+    conjunto.factores.length > 1 ? `${notaCombinaciones(conjunto).slice(0, -1)} (dicha en su fila).` : notaCombinaciones(conjunto),
     `Escala: ${rotulo(maxF)} kN = ${rotulo(m)} m. Cada flecha, la resultante de la consulta «reacciones» en el centro de los nudos coartados de su objeto, en el sentido de la fuerza que el apoyo hace sobre la estructura.`,
     "Mx, My y Mz (los empotramientos), en la tabla y bajo el cursor.",
     ...(objetos.length ? [] : ["No hay objetos con reacciones."]),
@@ -142,7 +117,7 @@ export function reacciones3D(r: ResultadosRender, origen: [number, number, numbe
         { relleno: COLOR_REACCION.horizontal, texto: "(Fx, Fy): la reacción horizontal" },
       ],
       notas,
-      diagnosticos: q.diagnosticos,
+      diagnosticos: q.valor.diagnosticos,
     },
   };
 }

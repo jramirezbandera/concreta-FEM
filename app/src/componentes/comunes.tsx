@@ -27,6 +27,9 @@ export function Fila({ k, v, clase }: { k: ReactNode; v: ReactNode; clase?: stri
   );
 }
 
+/** Qué hacer para tener combinaciones: dar la acción de cada caso. */
+const AYUDA_ACCION = "Dé la acción de cada caso (tipo, ψ, familia, dirección) en Cargas › Casos: las combinaciones salen solas.";
+
 /** Valor del selector de combinaciones, en texto. */
 const codificar = (e: EleccionCombinaciones) => JSON.stringify(e);
 
@@ -37,11 +40,19 @@ const codificar = (e: EleccionCombinaciones) => JSON.stringify(e);
  */
 export function ComboCombinaciones({ estado, valor, onCambio, etiqueta, soloUna }: { estado: EstadoSesion; valor: EleccionCombinaciones; onCambio: (e: EleccionCombinaciones) => void; etiqueta: string; soloUna?: boolean }) {
   const porSituacion = new Map<string, CombinacionDisponible[]>();
+  const sin = estado.sinCombinaciones;
   for (const c of estado.combinaciones) porSituacion.set(c.situacion, [...(porSituacion.get(c.situacion) ?? []), c]);
   return (
     <Campo etiqueta={`Combinaciones · ${etiqueta}`} ancho={280}>
-      <select className="sel w-full" value={codificar(valor)} onChange={(e) => onCambio(JSON.parse(e.target.value) as EleccionCombinaciones)}>
+      <select className="sel w-full" value={codificar(valor)} title={sin ? `Sin combinaciones CTE/NCSE. ${sin.mensaje}${sin.sinAccion.length ? ` ${AYUDA_ACCION}` : ""}` : undefined} onChange={(e) => onCambio(JSON.parse(e.target.value) as EleccionCombinaciones)}>
         {!soloUna && <option value={codificar({ tipo: "defecto" })}>Por defecto</option>}
+        {sin && (
+          <optgroup label="Sin combinaciones CTE/NCSE">
+            <option disabled value="">
+              {sin.sinAccion.length ? `Casos sin acción: ${sin.sinAccion.join(", ")} (Cargas › Casos)` : sin.mensaje}
+            </option>
+          </optgroup>
+        )}
         {!soloUna && porSituacion.size > 0 && (
           <optgroup label="Envolvente de una situación">
             {[...porSituacion].map(([s, cs]) => (

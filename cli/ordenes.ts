@@ -15,7 +15,7 @@ import { consultar, CONSULTAS, resumen, TOP_POR_DEFECTO, type OpcionesConsulta }
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../src/agente/proyecto.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../src/agente/resultados.ts";
 import { anadirFirma, estadoFirma, leerFirmas, revisar, type FicheroFirmas, type Revision } from "../src/agente/revision.ts";
-import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type Vista } from "../src/agente/render/index.ts";
+import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaAxiles, vistaCampo, vistaReacciones, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type Vista } from "../src/agente/render/index.ts";
 import { sensatezPrevia } from "../src/agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
@@ -380,9 +380,10 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
         diags = [...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos];
         const res = resumen(l.proyecto, r.compilacion);
         if (!res.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos(res.diagnosticos) } };
-        for (const proposito of ["desplazamientos", "esfuerzos"] as const) {
-          if (seleccion) {
-            const x = conjuntoCombinaciones(q, seleccion);
+        for (const proposito of ["desplazamientos", "esfuerzos", "lineal"] as const) {
+          if (seleccion || proposito === "lineal") {
+            // Las reacciones, por defecto, por casos (como `fem consultar reacciones`)
+            const x = conjuntoCombinaciones(q, seleccion ?? seleccionPorDefecto(f.casos, "lineal"));
             if (!x.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos(x.diagnosticos) } };
             conjuntos.set(proposito, x.valor);
           } else conjuntos.set(proposito, conjuntoPorDefecto(q, res.valor, proposito));
@@ -401,6 +402,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
           else if (vista === "malla") escenas.push([vistaMalla(rr!, planta, d), undefined]);
           else if (vista === "vigas-my" || vista === "vigas-vz") escenas.push([vistaDiagramas(rr!, planta, vista === "vigas-my" ? "My" : "Vz", conjuntos.get("esfuerzos")!, d), undefined]);
           else if (vista === "pilares-n") escenas.push([vistaAxiles(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
+          else if (vista === "reacciones") escenas.push([vistaReacciones(rr!, planta, conjuntos.get("lineal")!, d), undefined]);
           else escenas.push([vistaCampo(rr!, planta, vista as Campo, conjuntos.get(propositoDe(vista))!, d, escala), undefined]);
           for (const [e, caso] of escenas) {
             const s = escenaASvg(e);

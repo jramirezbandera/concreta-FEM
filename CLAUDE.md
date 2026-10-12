@@ -311,6 +311,10 @@
   - **Validación:** el volumen de cada pieza es el de sus datos menos lo tapado (con `poligonos.ts`, a 1e-9), y por planta coincide con el peso esperado de A3 (I3-1 explica por qué se compara lo dibujado más lo tapado); en Chrome, los búferes tienen el sha256 de Node y lo filtrado es lo de Node.
   - **En la app:** modos sólido (por defecto), translúcido, alámbrico y analítico; color por material, sección o planta; rango de plantas y tipos en las opciones de la vista; H, Ctrl+H y Mayús+H (aislar, ocultar, mostrar todo); caja de sección con asas; profundidad del alzado; vistas guardadas en el `proyecto.json` (`vistas`, fuera del modelo: no cambian la huella), con la operación `vistas` del editor y su sección en el navegador.
   - **Pendiente del usuario:** la puerta de uso y las propuestas de §16 (qué se recorta bajo la losa, el sólido translúcido en Resultados).
+- **2026-10-12: reacciones en planta y en alzado** (a petición del usuario; `interfaz.md` §15 y `fase-i4.md` §3.1). Antes sólo se veían en el 3D:
+  - la vista `reacciones` de A4 (también en `fem render`): Fz y (Fx, Fy) de los objetos que arrancan de la planta y de sus apoyos;
+  - el alzado con las reacciones de los objetos del plano;
+  - sin acciones en los casos no hay combinaciones CTE/NCSE, y el selector lo dice y nombra los casos.
 - **Siguiente paso:**
   - las puertas de uso de I1, I2, I3 e I4;
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);

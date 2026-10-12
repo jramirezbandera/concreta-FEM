@@ -31,7 +31,8 @@ import { anchoViga, fondoModelo, huellaSeccion, PlantaFisica, type DatosVista } 
 
 export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12"] as const;
 export type Campo = (typeof CAMPOS)[number];
-export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-vz", "pilares-n"] as const;
+/** `reacciones` (I4) está en `reacciones.ts`. */
+export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-vz", "pilares-n", "reacciones"] as const;
 
 /** Componente de los campos SPR ([Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy]) de cada campo de láminas. */
 const COMPONENTE: Record<Exclude<Campo, "uz">, number> = { f11: 0, f22: 1, f12: 2, m11: 3, m22: 4, m12: 5, v13: 6, v23: 7 };

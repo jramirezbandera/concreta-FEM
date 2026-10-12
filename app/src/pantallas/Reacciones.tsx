@@ -1,16 +1,22 @@
 /**
- * Resultados · Reacciones (I4, `docs/fem3d/interfaz.md` §15): las de `fem consultar reacciones`.
- * En el 3D, una flecha por objeto con reacciones (`reacciones3d`): la vertical con Fz y la horizontal
- * con (Fx, Fy), en el sentido de la fuerza del apoyo sobre la estructura, en el centro de sus nudos
- * coartados. Abajo, la tabla de la consulta y sus totales por combinación; en Propiedades, el objeto
- * elegido.
+ * Resultados · Reacciones (I4, `docs/fem3d/interfaz.md` §15): las de `fem consultar
+ * reacciones`, en las tres vistas:
+ * - en el 3D, una flecha por objeto con reacciones (`reacciones3d`): la vertical con Fz y la
+ *   horizontal con (Fx, Fy), en el sentido de la fuerza del apoyo sobre la estructura, en el centro
+ *   de sus nudos coartados;
+ * - en planta, la escena `reacciones` de A4 (la de `fem render`): Fz rotulada y (Fx, Fy) a escala en
+ *   los objetos de la planta (los que arrancan de ella y sus apoyos);
+ * - en alzado, los objetos del plano con Fz y la componente en el plano, a la escala del 3D.
+ * Abajo, la tabla de la consulta y sus totales por combinación; en Propiedades, el objeto elegido.
  *
  * Con varias combinaciones, cada objeto con la de su mayor |Fz| (dicha en su fila). Cada número es
  * de la consulta; bajo el cursor, los de la flecha.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import type { Vec2 } from "../../../src/agente/render/escena.ts";
+import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { Reacciones3D, ReaccionObjeto } from "../../../src/visor/reacciones3d.ts";
-import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
+import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
 import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, Equilibrio, Seccion } from "../componentes/comunes.tsx";
@@ -19,9 +25,10 @@ import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { useVistas, vistasDe } from "../vistas/estado.ts";
+import { useVistas } from "../vistas/estado.ts";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
-import { Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente2D, Fuente3DModelo, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
+import { useEleccion } from "./useEleccion.ts";
 
 const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
 type Escala = (typeof ESCALAS)[number];
@@ -37,27 +44,60 @@ function TresDReacciones({ d, aviso, cargando }: { d: Reacciones3D | null; aviso
   return <Fuente3DModelo resultados={{ reacciones: d, leyenda: d, aviso, cargando, alPasar, sonda }} />;
 }
 
+/**
+ * Las reacciones en una escena 2D (la planta o el alzado de una vista): un clic elige el objeto (si
+ * tiene reacción), y lo elegido se resalta.
+ */
+function EscenaReacciones({ fuente, objetos }: { fuente: FuenteEscena | null; objetos: ReadonlySet<string> | null }) {
+  const { proyecto, seleccion, setSeleccion } = useVisor();
+  const pedido = !fuente || proyecto.desactualizado ? null : fuente.tipo === "planta" ? { tipo: "escena" as const, planta: fuente.planta, vista: fuente.vista } : { tipo: "alzado" as const, plano: fuente.plano, ...(fuente.reacciones ? { reacciones: fuente.reacciones } : {}) };
+  const d = usePedido(proyecto.cliente, pedido);
+  const resaltado = useEleccion(fuente, seleccion && objetos?.has(seleccion) ? seleccion : null);
+  const clic = async (p: Vec2, radio: number) => {
+    if (!proyecto.cliente || !fuente) return;
+    const r = await proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio });
+    const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
+    setSeleccion(o && objetos?.has(o) ? o : null);
+  };
+  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Sumando las reacciones…</Aviso> : null;
+  return <Fuente2D escena={proyecto.desactualizado ? null : d.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} />;
+}
+
+/** En la cabecera de una planta sin apoyos: a cuáles ir (las plantas con reacciones). */
+function PlantasConReacciones({ d, planta, onPlanta }: { d: Reacciones3D | null; planta: string | null; onPlanta: (p: string) => void }) {
+  if (!d || !planta || d.objetos.some((o) => o.planta === planta)) return null;
+  const n = new Map<string, number>();
+  for (const o of d.objetos) n.set(o.planta, (n.get(o.planta) ?? 0) + 1);
+  if (!n.size) return <Chip>Sin reacciones</Chip>;
+  return (
+    <>
+      <Chip>Sin apoyos aquí</Chip>
+      {[...n].map(([p, k]) => (
+        <button key={p} type="button" className="chip" data-acento title={`${k} objetos con reacción`} onClick={() => onPlanta(p)}>
+          Ir a {p}
+        </button>
+      ))}
+    </>
+  );
+}
+
 export function ModoReacciones() {
   const { proyecto, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:reacciones", { props: true, dock: true, pestana: "reacciones" });
-  const vistas = useVistas();
-  // Las flechas se ven en 3D: si no hay ninguno, la vista activa pasa a serlo
-  const sin3D = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "3d");
-  useEffect(() => {
-    if (sin3D) vistas.irATipo("3d");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
-  }, []);
+  const { poner } = useVistas();
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [escala, setEscala] = useState<Escala>("1");
   const r = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "reacciones3d", combinaciones: eleccion, escala: Number(escala) });
   const d = proyecto.desactualizado ? null : r.datos;
   const elegido = d?.objetos.find((o) => o.id === seleccion) ?? null;
+  const ids = d ? new Set(d.objetos.map((o) => o.id)) : null;
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : r.diagnosticos ? <Aviso tono="fail">{r.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !r.datos && r.cargando ? <Aviso>Sumando las reacciones…</Aviso> : null;
 
   const herramientas = (
     <>
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="reacciones" />
+      <Desplegable etiqueta="Escala de las flechas" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
       <Separador />
       <BarraModos />
       <Separador />
@@ -65,18 +105,26 @@ export function ModoReacciones() {
     </>
   );
 
+  const cabecera = (
+    <Chip acento title={d?.notas[0]}>
+      Reacciones · {queCombinaciones(d?.conjunto)}
+    </Chip>
+  );
+
   const vista = (
     <ZonaVistas
       fuentes={{
         tresD: () => <TresDReacciones d={d} aviso={aviso} cargando={r.cargando} />,
-        cabecera3D: () => (
+        planta: (v) => <EscenaReacciones fuente={v.planta ? { tipo: "planta", planta: v.planta, vista: { vista: "reacciones", combinaciones: eleccion, escala: Number(escala) } } : null} objetos={ids} />,
+        alzado: (v) => <EscenaReacciones fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), reacciones: { combinaciones: eleccion, escala: Number(escala) } } : null} objetos={ids} />,
+        cabecera3D: () => cabecera,
+        cabeceraPlanta: (v, i) => (
           <>
-            <Chip acento title={d?.notas[0]}>
-              Reacciones · {queCombinaciones(d?.conjunto)}
-            </Chip>
-            <Desplegable etiqueta="Escala de las flechas" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
+            {cabecera}
+            <PlantasConReacciones d={d} planta={v.planta} onPlanta={(p) => poner(i, { planta: p })} />
           </>
         ),
+        cabeceraAlzado: () => cabecera,
       }}
     />
   );
@@ -101,7 +149,7 @@ export function ModoReacciones() {
               <td>
                 {o.id}
                 <small>
-                  {o.tipo}
+                  {o.tipo} · {o.planta}
                   {d.conjunto.n > 1 ? ` · ${o.comb}` : ""}
                 </small>
               </td>
@@ -153,7 +201,7 @@ export function ModoReacciones() {
       {elegido ? (
         <Seccion titulo={elegido.id} valor={elegido.tipo}>
           <div className="px-3.5 py-1.5 text-[12px] text-text-secondary">
-            {elegido.comb} · en ({fmt(elegido.punto[0], 2)}; {fmt(elegido.punto[1], 2)}; {fmt(elegido.punto[2], 2)}) m
+            {elegido.comb} · planta {elegido.planta} · en ({fmt(elegido.punto[0], 2)}; {fmt(elegido.punto[1], 2)}; {fmt(elegido.punto[2], 2)}) m
           </div>
           <table className="tb">
             <tbody>
@@ -170,7 +218,7 @@ export function ModoReacciones() {
           </table>
         </Seccion>
       ) : (
-        <p className="nota">Elija un pilar, un muro o un apoyo (en el 3D o en la tabla) para ver su reacción. Bajo el cursor, la de cada flecha.</p>
+        <p className="nota">Elija un pilar, un muro o un apoyo (en una vista o en la tabla) para ver su reacción. En el 3D, bajo el cursor, la de cada flecha.</p>
       )}
       {d && d.extremos.length > 0 && (
         <Seccion titulo="Extremos">

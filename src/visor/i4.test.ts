@@ -3,6 +3,8 @@
  * - pilares por colores: el valor de cada tramo es el del cuadro de pilares, bit a bit;
  * - reacciones: cada flecha es la resultante de la consulta, en su sentido, y en una combinación la
  *   suma de las Fz es el total de la consulta;
+ * - reacciones en planta y en alzado (tras I4): los valores de las flechas del 3D, cada objeto en su
+ *   planta, y la suma de todas las plantas es el total de cada caso;
  * - muros: sus valores son los del SPR en sus ejes; F22 < 0 en la base de un muro cargado;
  * - deformada: sus extremos son los de sus desplazamientos;
  * - bajo el cursor: `valor-lamina` en las losas es `valor-punto`; la estación de un pilar existe;
@@ -14,8 +16,10 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { reacciones } from "../agente/consultas.ts";
 import { canonico3D, tramosEspacio } from "../agente/render/diagramas.ts";
+import { PROFUNDIDAD_ALZADO, planoDeEje } from "../agente/render/alzado.ts";
 import { envolventePieza, valoresCampo, vistaCampo } from "../agente/render/resultados.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { ejesDe } from "../compilador/ejes.ts";
 import { sha256 } from "../compilador/huella.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { Atendedor } from "./atender.ts";
@@ -133,6 +137,61 @@ describe.each(PROYECTOS)("I4 (resto) con %s", (_nombre, ruta) => {
       const suma = x.objetos.reduce((t, o) => t + o.R[2]!, 0);
       const total = x.totales[0]!.F[2]!;
       expect(Math.abs(suma - total)).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(total)));
+    }
+  });
+
+  it("reacciones en planta y en alzado: cada valor es el de la flecha del 3D; las plantas suman el total de cada caso", () => {
+    const f = s.proyecto.modelo;
+    const d3 = valido(s.reacciones3D(D));
+    const porId = new Map(d3.objetos.map((o) => [o.id, o]));
+    const enPlanta = new Set<string>();
+    for (const p of f.plantas) {
+      const e = valido(s.escenaA4(p.id, { vista: "reacciones", combinaciones: D }));
+      const fz = e.extremos.filter((x) => x.que === "Fz");
+      // Los objetos de la planta (la de su base o la suya), cada uno una vez
+      expect(fz.map((x) => x.objeto).sort()).toEqual(d3.objetos.filter((o) => o.planta === p.id).map((o) => o.id).sort());
+      for (const x of fz) {
+        const o = porId.get(x.objeto!)!;
+        expect(x.valor).toBe(o.R[2]);
+        expect(x.comb).toBe(o.comb);
+        enPlanta.add(o.id);
+      }
+      for (const x of e.extremos.filter((y) => y.que === "|(Fx, Fy)|")) {
+        const o = porId.get(x.objeto!)!;
+        expect(x.valor).toBe(Math.hypot(o.R[0]!, o.R[1]!));
+      }
+      // Sin apoyos, la nota dice dónde están
+      if (!fz.length && d3.objetos.length) expect(e.notas.some((n) => n.startsWith("En esta planta no hay apoyos"))).toBe(true);
+    }
+    expect(enPlanta.size).toBe(d3.objetos.length);
+    // Con un caso, la suma de las Fz de todas las plantas es el total de la consulta
+    for (const c of f.casos) {
+      const e: EleccionCombinaciones = { tipo: "caso", caso: c.id };
+      const total = valido(s.reacciones3D(e)).totales[0]!.F[2]!;
+      let suma = 0;
+      for (const p of f.plantas) for (const x of valido(s.escenaA4(p.id, { vista: "reacciones", combinaciones: e })).extremos) if (x.que === "Fz") suma += x.valor;
+      expect(Math.abs(suma - total)).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(total)));
+    }
+    // Alzado: los objetos a menos de la profundidad del plano, con Fz y la componente en el plano
+    for (const eje of ejesDe(f).ejes) {
+      const plano = planoDeEje(f, eje.id)!;
+      const L = Math.hypot(plano.hasta[0] - plano.desde[0], plano.hasta[1] - plano.desde[1]);
+      const dir = [(plano.hasta[0] - plano.desde[0]) / L, (plano.hasta[1] - plano.desde[1]) / L];
+      const w = (q: readonly number[]) => -(q[0]! - plano.desde[0]) * dir[1]! + (q[1]! - plano.desde[1]) * dir[0]!;
+      const e = valido(s.alzadoA4({ eje: eje.id }, undefined, { combinaciones: D }));
+      const fz = e.extremos.filter((x) => x.que === "Fz");
+      expect(fz.map((x) => x.objeto).sort()).toEqual(d3.objetos.filter((o) => Math.abs(w(o.punto)) <= PROFUNDIDAD_ALZADO).map((o) => o.id).sort());
+      for (const x of fz) expect(x.valor).toBe(porId.get(x.objeto!)!.R[2]);
+      for (const x of e.extremos.filter((y) => y.que === "F en el plano")) {
+        const o = porId.get(x.objeto!)!;
+        expect(x.valor).toBe(o.R[0]! * dir[0]! + o.R[1]! * dir[1]!);
+      }
+      // Las flechas verticales acaban en su objeto, a la altura de su punto
+      for (const x of fz) {
+        const o = porId.get(x.objeto!)!;
+        const fuste = e.primitivas.find((q) => q.tipo === "linea" && q.estilo === "reaccion-vertical" && q.objeto === o.id);
+        if (o.R[2] !== 0) expect(fuste && fuste.tipo === "linea" && fuste.puntos[1]![1]).toBe(o.punto[2]);
+      }
     }
   });
 

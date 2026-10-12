@@ -18,6 +18,7 @@ export { ESFUERZOS_PLANO, vistaAlzadoDiagramas, type EsfuerzoPlano } from "./alz
 export { PlantaFisica, vistaCargas, vistaDiagnosticos, vistaModelo, type DatosVista } from "./modelo.ts";
 export { CAMPOS, ResultadosRender, vistaAxiles, vistaCampo, vistaDiagramas, vistaMalla, type Campo } from "./resultados.ts";
 export { escalaDeTexto, type EscalaMapa } from "./isovalores.ts";
+export { COLOR_REACCION, reaccionesObjetos, vistaAlzadoReacciones, vistaReacciones, type ReaccionObjeto } from "./reacciones.ts";
 
 export const VISTAS = [...VISTAS_MODELO, ...VISTAS_RESULTADOS] as const;
 export type Vista = (typeof VISTAS)[number];
@@ -25,8 +26,8 @@ export type Vista = (typeof VISTAS)[number];
 /** Las vistas del modelo se dibujan sin calcular, también si no compila; las demás necesitan el cálculo. */
 export const necesitaCalculo = (v: Vista): boolean => !(VISTAS_MODELO as readonly string[]).includes(v);
 
-/** Qué combinaciones busca cada vista: los desplazamientos (uz) o los esfuerzos. */
-export const propositoDe = (v: Vista): "desplazamientos" | "esfuerzos" => (v === "uz" ? "desplazamientos" : "esfuerzos");
+/** Qué combinaciones busca cada vista: los desplazamientos (uz), lo lineal (las reacciones: por defecto, los casos) o los esfuerzos. */
+export const propositoDe = (v: Vista): "desplazamientos" | "esfuerzos" | "lineal" => (v === "uz" ? "desplazamientos" : v === "reacciones" ? "lineal" : "esfuerzos");
 
 /**
  * Combinaciones por defecto de una vista con resultados: las de las consultas de A1 si todos los

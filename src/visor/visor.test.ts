@@ -308,7 +308,7 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
 
   it("la escena da el mismo SVG que fem render, byte a byte", async () => {
     const planta = s.proyecto.modelo.plantas[0]!.id;
-    const r = await ejecutar(["render", proyecto, "--planta", planta, "--vista", "modelo,uz,vigas-my,pilares-n"]);
+    const r = await ejecutar(["render", proyecto, "--planta", planta, "--vista", "modelo,uz,vigas-my,pilares-n,reacciones"]);
     expect(r.codigo, JSON.stringify(r.json)).toBe(0);
     const carpeta = join(dir, nombre, ".fem", s.huella, "render");
     for (const [vista, v] of [
@@ -316,6 +316,7 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
       ["uz", { vista: "campo", campo: "uz", combinaciones: D }],
       ["vigas-my", { vista: "vigas", esfuerzo: "My", combinaciones: D }],
       ["pilares-n", { vista: "pilares-n", combinaciones: D }],
+      ["reacciones", { vista: "reacciones", combinaciones: D }],
     ] as const) {
       const cli = readFileSync(join(carpeta, `${nombreFigura(planta, vista)}.svg`), "utf8");
       expect(escenaASvg(valido(s.escenaA4(planta, v))).svg, vista).toBe(cli);

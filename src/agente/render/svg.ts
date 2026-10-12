@@ -81,6 +81,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "extremo-maximo": { fill: "#ffffff", stroke: "#111827", sw: 2 },
   "extremo-minimo": { fill: "#111827", stroke: "#111827", sw: 2 },
   "valor-pilar": { fill: "#1f2933", stroke: "#1f2933", sw: 1 },
+  "reaccion-vertical": { fill: "#0d9488", stroke: "#0d9488", sw: 2 },
+  "reaccion-horizontal": { stroke: "#d97706", sw: 2 },
 };
 
 /** Número en px con un decimal, sin «-0» ni «.0». */

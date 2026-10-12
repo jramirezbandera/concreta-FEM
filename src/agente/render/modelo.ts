@@ -334,13 +334,13 @@ function huecosEnPiso(pl: PlantaFisica, m: Muro): Vec2[][] {
 
 const titulo = (nombre: string | undefined) => nombre ?? "Proyecto";
 
-function cabeceraPlanta(pl: PlantaFisica): string {
+export function cabeceraPlanta(pl: PlantaFisica): string {
   const p = pl.f.plantas[pl.k];
   return `Planta ${pl.id}${p?.nombre ? ` (${p.nombre})` : ""}${pl.cota !== null ? `, cota ${pl.cota >= 0 ? "+" : ""}${rotulo(pl.cota, 4)} m` : ""}`;
 }
 
 /** Caja de la planta: la de todo lo dibujado del modelo, para que todas sus vistas encuadren igual. */
-function cajaPlanta(prims: readonly Primitiva[]): [number, number, number, number] {
+export function cajaPlanta(prims: readonly Primitiva[]): [number, number, number, number] {
   return cajaDe(prims.filter((p) => p.tipo !== "texto").flatMap(puntosDe));
 }
 

@@ -313,6 +313,7 @@ Lo propuso el agente y el usuario lo aceptó el 2026-10-09, antes de escribir c�
 | `uz`, `m11`, `m22`, `m12`, `v13`, `v23` | Isovalores en bandas sobre las losas de la planta, en una combinación. Con varias, la que da el mayor valor absoluto en la planta, y se dice cuál. Con los extremos rotulados. Los paños no tienen láminas: van en gris, y sus viguetas se consultan con `pieza` |
 | `vigas-my`, `vigas-vz` | Diagrama de cada viga y vigueta de la planta, en su envolvente sobre las combinaciones, con el máximo y el mínimo de cada vano rotulados |
 | `pilares-n` | Axil de cada tramo de pilar que llega a la planta, en su envolvente (máximo y mínimo) |
+| `reacciones` | (I4, 2026-10-12) Las de `consultar reacciones` de los pilares y muros que arrancan de la planta y de sus apoyos: Fz rotulada (círculo con aspa hacia arriba, con punto hacia abajo) y (Fx, Fy) como flecha a escala con la punta en el objeto. Por defecto, por casos; con varias combinaciones, la de mayor \|Fz\| de cada objeto |
 
 Combinaciones por defecto: las de las consultas de A1 (`combinaciones.ts`); si los casos no llevan su acción, la «gravedad» de A3 (factor 1 en uz, 1,4 en los esfuerzos).
 

@@ -94,7 +94,8 @@ const rect = (u0: number, u1: number, z0: number, z1: number): Vec2[] => [
   [u0, z1],
 ];
 
-export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista): Escena {
+/** `abajo`: lo que se deja libre (m) entre la planta más baja y las burbujas de los ejes (I4: las flechas de las reacciones). */
+export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, o: { abajo?: number } = {}): Escena {
   const P: Primitiva[] = [];
   const usados = new Set<Estilo>();
   const notas: string[] = [];
@@ -254,7 +255,7 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista):
     poner({ tipo: "linea", puntos: [[u0 - 1, z], [u1 + 1, z]], estilo: "nivel", objeto: p.id });
     P.push({ tipo: "texto", p: [u0 - 1, z], texto: `${p.id} ${z >= 0 ? "+" : ""}${rotulo(z, 4)}`, tamano: 11, negrita: true, dx: 2, dy: -4, prioridad: 90, clase: "eje", objeto: p.id });
   });
-  const ejes = capaEjesAlzado(f, plano, { u: (p) => u(p), w: (p) => w(p) }, [u0 - 1, u1 + 1], [zmin - 1.2, zmax + 1.6]);
+  const ejes = capaEjesAlzado(f, plano, { u: (p) => u(p), w: (p) => w(p) }, [u0 - 1, u1 + 1], [zmin - 1.2 - (o.abajo ?? 0), zmax + 1.6]);
   for (const x of ejes) poner(x);
 
   const leyenda: EntradaLeyenda[] = [];

@@ -15,7 +15,7 @@
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
-import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
+import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { UNIDADES_CAMPO } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
@@ -59,7 +59,9 @@ export type VistaPlanta =
   /** `escala`: la del mapa (`EscalaMapa`); sin ella, la completa. */
   | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa }
   | { vista: "vigas"; esfuerzo: "My" | "Vz"; combinaciones: EleccionCombinaciones }
-  | { vista: "pilares-n"; combinaciones: EleccionCombinaciones };
+  | { vista: "pilares-n"; combinaciones: EleccionCombinaciones }
+  /** Las reacciones de los objetos de la planta (I4); `escala`, la de las flechas horizontales. */
+  | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number };
 
 /** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
 export type PlanoPedido = { eje: string; profundidad?: number } | { desde: Vec2; hasta: Vec2; profundidad?: number };
@@ -72,8 +74,15 @@ export interface DiagramasAlzado {
   escala?: number;
 }
 
-/** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado (con diagramas, en I4). */
-export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado };
+/** Las reacciones de los objetos del plano de un alzado (I4). */
+export interface ReaccionesAlzado {
+  combinaciones: EleccionCombinaciones;
+  /** Por la que se multiplica la escala automática. */
+  escala?: number;
+}
+
+/** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado (con diagramas o reacciones, en I4). */
+export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado };
 
 /** Los diagramas de las barras en el 3D (I4). */
 export interface PedidoDiagramas3D {
@@ -156,6 +165,8 @@ export interface EstadoSesion {
   origen: "calculo" | "guardados" | null;
   equilibrio: { id: string; fuerzas: number; momentos: number }[];
   combinaciones: CombinacionDisponible[];
+  /** Sin combinaciones del generador, por qué: el mensaje de la consulta y los casos sin acción. */
+  sinCombinaciones?: { mensaje: string; sinAccion: string[] };
   /** sha256 de los resultados empaquetados como `resultados.bin` (el mismo que guarda la CLI): criterio 2 de V1. */
   sha256Resultados: string | null;
   /** I2: los ejes de replanteo que se dibujan (los del modelo o, si no tiene, los propuestos). */
@@ -290,7 +301,7 @@ export class Sesion {
       calculado: this.calculado,
       origen: this.origenR,
       equilibrio: (this.cabecera?.casos ?? []).map((x) => ({ id: x.id, ...x.equilibrio })),
-      combinaciones: this.combinacionesDisponibles(),
+      ...this.combinacionesEstado(),
       sha256Resultados: this.shaR,
       ejes: (() => {
         const x = ejesDe(f);
@@ -360,6 +371,16 @@ export class Sesion {
     return r;
   }
 
+  /** Las combinaciones del generador y, si no hay ninguna (y compila), por qué. */
+  private combinacionesEstado(): Pick<EstadoSesion, "combinaciones" | "sinCombinaciones"> {
+    const combinaciones = this.combinacionesDisponibles();
+    const q = this.q;
+    if (combinaciones.length || !q) return { combinaciones };
+    const x = q.combinaciones();
+    const mensaje = x.valido ? "Los casos no dan ninguna combinación CTE/NCSE." : x.diagnosticos.map((d) => d.mensaje).join(" ");
+    return { combinaciones, sinCombinaciones: { mensaje, sinAccion: q.fisico.casos.filter((c) => !c.accion).map((c) => c.id) } };
+  }
+
   /** El conjunto de combinaciones de una elección, para un propósito. */
   conjunto(e: EleccionCombinaciones, proposito: Proposito): { valido: true; valor: ConjuntoCombinaciones } | { valido: false; diagnosticos: Diagnostico[] } {
     const q = this.q;
@@ -416,7 +437,11 @@ export class Sesion {
         const rr = this.rr;
         if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Esta vista necesita el cálculo." }] };
         if (v.vista === "malla") e = vistaMalla(rr, planta, d);
-        else {
+        else if (v.vista === "reacciones") {
+          const conj = this.conjunto(v.combinaciones, "lineal");
+          if (!conj.valido) return conj;
+          e = vistaReacciones(rr, planta, conj.valor, d, v.escala);
+        } else {
           const conj = this.conjunto(v.combinaciones, v.vista === "campo" && v.campo === "uz" ? "desplazamientos" : "esfuerzos");
           if (!conj.valido) return conj;
           e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
@@ -432,10 +457,10 @@ export class Sesion {
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
-  /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico; con diagramas (I4), el cálculo. */
-  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
+  /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico; con diagramas o reacciones (I4), el cálculo. */
+  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
     const f = this.proyecto.modelo;
-    const clave = JSON.stringify(["alzado", p, diagramas ?? null]);
+    const clave = JSON.stringify(["alzado", p, diagramas ?? null, ...(reacciones ? [reacciones] : [])]);
     const hecha = this.escenas.get(clave);
     if (hecha) return { valido: true, valor: hecha };
     let plano: PlanoAlzado | null;
@@ -450,13 +475,19 @@ export class Sesion {
       const conj = this.conjunto(diagramas.combinaciones, "esfuerzos");
       if (!conj.valido) return conj;
       e = vistaAlzadoDiagramas(rr, plano, diagramas.esfuerzo, conj.valor, d, diagramas.escala);
+    } else if (reacciones) {
+      const rr = this.rr;
+      if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Las reacciones necesitan el cálculo." }] };
+      const conj = this.conjunto(reacciones.combinaciones, "lineal");
+      if (!conj.valido) return conj;
+      e = vistaAlzadoReacciones(rr, plano, conj.valor, d, reacciones.escala);
     } else e = vistaAlzado(f, plano, d);
     this.escenas.set(clave, e);
     return { valido: true, valor: e };
   }
 
-  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
-    const e = this.alzadoA4(p, diagramas);
+  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
+    const e = this.alzadoA4(p, diagramas, reacciones);
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
@@ -527,7 +558,7 @@ export class Sesion {
   }
 
   escenaDe(fu: FuenteEscena): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
-    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas);
+    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas, fu.reacciones);
   }
 
   /** El objeto bajo un punto de una escena (o, con `objetos`, esos objetos), resaltado. */

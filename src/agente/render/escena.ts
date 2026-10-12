@@ -64,7 +64,9 @@ export type Estilo =
   | "diagrama-eje"
   | "extremo-maximo"
   | "extremo-minimo"
-  | "valor-pilar";
+  | "valor-pilar"
+  | "reaccion-vertical"
+  | "reaccion-horizontal";
 
 export type Primitiva =
   /** Polígono con huecos: el primer anillo es el contorno (relleno par-impar). `relleno` sustituye al del estilo. */

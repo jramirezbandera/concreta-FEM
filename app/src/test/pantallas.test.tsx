@@ -134,10 +134,18 @@ describe("V1 · DOM", () => {
     const filas = within(seccion("Reacciones por objeto")).getAllByRole("row").slice(1);
     d.objetos.forEach((o, i) => {
       const celdas = within(filas[i]!).getAllByRole("cell");
-      expect(celdas[0]!.textContent).toBe(`${o.id}${o.tipo}${d.conjunto.n > 1 ? ` · ${o.comb}` : ""}`);
+      expect(celdas[0]!.textContent).toBe(`${o.id}${o.tipo} · ${o.planta}${d.conjunto.n > 1 ? ` · ${o.comb}` : ""}`);
       o.R.forEach((v, k) => expect(celdas[k + 1]!.textContent).toBe(fmt(v, 1)));
       expect(lineasReaccion(o)[1]).toBe(`Fz ${fmt(o.R[2], 1)} kN · Fx ${fmt(o.R[0], 1)} · Fy ${fmt(o.R[1], 1)}`);
     });
+    // Sin acciones no hay combinaciones, y el selector dice por qué
+    const sin = estado.sinCombinaciones;
+    expect(estado.combinaciones.length === 0).toBe(!!sin);
+    if (sin) {
+      const opcion = within(screen.getByRole("combobox", { name: /Combinaciones · reacciones/ })).getByRole("option", { name: /^Casos sin acción/ }) as HTMLOptionElement;
+      expect(opcion.disabled).toBe(true);
+      expect(opcion.textContent).toBe(`Casos sin acción: ${sin.sinAccion.join(", ")} (Cargas › Casos)`);
+    }
   }, 60_000);
 
   it("sondas (I4): un tramo de pilar y una estación dicen los valores de su consulta", async () => {

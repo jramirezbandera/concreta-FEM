@@ -438,7 +438,11 @@ Lo que falta de §7 tras el adelanto de §7.1. Las propuestas de esta sección s
   - con varias combinaciones, la de mayor |Fz| de cada objeto (dicha en su rótulo); con una, esa;
   - rótulos: Fz de cada objeto, con prioridad por |Fz| y sin pisarse; Mx, My y Mz, en la tabla y bajo el cursor;
   - abajo, la tabla de la consulta (objeto, Fx…Mz y combinación) y sus totales;
-  - la suma de las flechas de una combinación es su total de la consulta.
+  - la suma de las flechas de una combinación es su total de la consulta;
+  - *añadido tras I4, a petición del usuario (2026-10-12):* también **en planta y en alzado**, con las escenas de A4 (`src/agente/render/reacciones.ts`; en planta, la vista `reacciones` de `fem render`), y la misma combinación por objeto que en el 3D (`reaccionesObjetos`):
+    - en planta, los objetos de la planta (los pilares y muros que arrancan de ella y sus apoyos): Fz rotulada, con un círculo con aspa si empuja hacia arriba (con punto, hacia abajo), como las cargas puntuales, y (Fx, Fy) en una flecha con la punta en el objeto, a la escala de la planta (al lado de Fz no se verían). Una planta sin apoyos lo dice y ofrece ir a las que los tienen;
+    - en alzado, los objetos a menos de la profundidad del plano, con Fz y la componente en el plano, a la escala del 3D; las burbujas de los ejes bajan para dejarles sitio. La componente normal al plano y los momentos, en la tabla;
+    - sin combinaciones (los casos no llevan su acción), el selector lo dice y nombra los casos que no la llevan.
 - **Muros con mapa** (Resultados · Losas, en el 3D; `isovalores3d`):
   - la cabecera del 3D elige qué superficies: «Losas» (por defecto: el 3D de una planta sigue siendo su mapa en planta), «Muros» o «Losas y muros» (una escala común);
   - los campos de los muros, por SPR en sus ejes (eje 1 a lo largo del eje del muro desde su primer punto, eje 2 hacia arriba, eje 3 a su derecha);

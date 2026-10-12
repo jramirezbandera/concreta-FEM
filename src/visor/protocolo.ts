@@ -17,7 +17,7 @@ import type { Diagramas3D } from "./diagramas3d.ts";
 import type { Isovalores3D } from "./isovalores3d.ts";
 import type { Pilares3D } from "./pilares3d.ts";
 import type { Reacciones3D } from "./reacciones3d.ts";
-import type { DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorLamina, PlanoPedido, ValorLamina, VistaPlanta } from "./sesion.ts";
+import type { DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
   | { tipo: "abrir"; texto: string }
@@ -25,8 +25,8 @@ export type Pedido =
   | { tipo: "calcular" }
   | { tipo: "estado" }
   | { tipo: "escena"; planta: string; vista: VistaPlanta }
-  /** Un alzado; con `diagramas`, los de las barras del plano (I4). */
-  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado }
+  /** Un alzado; con `diagramas`, los de las barras del plano, y con `reacciones`, las de sus objetos (I4). */
+  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado }
   /** El objeto bajo un punto de una escena, o (con `objetos`) esos objetos, resaltados. */
   | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[] }
   /** Los objetos de una ventana (m) de una escena: «dentro», de izquierda a derecha; «toca», de derecha a izquierda. */

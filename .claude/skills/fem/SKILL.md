@@ -68,6 +68,7 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 | `f11`, `f22`, `f12` | Fuerzas de membrana de las losas (kN/m, tracción positiva). En una planta con diafragma rígido son nulas (las lleva el diafragma): el mapa sale de una sola banda y lo dice |
 | `vigas-my`, `vigas-vz` | Diagramas envolventes de vigas y viguetas, con el máximo y el mínimo de cada vano |
 | `pilares-n` | Axil de cada pilar que llega a la planta |
+| `reacciones` | Reacciones de los pilares y muros que arrancan de la planta y de sus apoyos: Fz rotulada y (Fx, Fy) a escala; por defecto, cada objeto en el caso de su mayor \|Fz\| (como `consultar reacciones`) |
 
 - `--vista` y `--planta` admiten varias, separadas por comas o repetidas; sin `--planta`, todas.
 - `modelo`, `cargas` y `diagnosticos` se dibujan aunque el modelo no compile: así se ve dónde está el error.
