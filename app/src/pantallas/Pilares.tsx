@@ -1,6 +1,7 @@
 /**
- * Pantalla 5 · Pilares: en planta, el axil de cada tramo que llega (escena `pilares-n` de A4); a la
- * derecha, el cuadro de los tramos de la planta y el del pilar elegido en toda su altura, con los
+ * Resultados · Pilares (la pantalla 5 de V1): en planta, el axil de cada tramo que llega (escena
+ * `pilares-n` de A4); en el panel inferior, el cuadro de los tramos de la planta, y en Propiedades,
+ * el del pilar elegido en toda su altura, con los
  * extremos de `fem consultar pieza` (N, |My|, |Mz| en la base y en la cabeza de cada tramo, cada uno
  * con su combinación) y el axil reducido ν de A3 (un aviso de orden de magnitud, no la comprobación
  * de norma, que hace el módulo de pilares de Concreta).
@@ -10,7 +11,11 @@ import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { FilaPilar } from "../../../src/visor/datos.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
-import { Aviso, BarraLienzo, ListaPlantas, Panel, Seccion, SelectorCombinaciones, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { CabeceraVista, CarrilPlantas, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { usePaneles } from "../armazon/paneles.ts";
+import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { BarraModos } from "../espacios/BarraModos.tsx";
+import { MARGENES_VISTA } from "../espacios/Modelo.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt } from "../fmt.ts";
 import { Planta2D } from "../lienzo/Planta2D.tsx";
@@ -89,8 +94,9 @@ function GraficoAxil({ filas }: { filas: FilaPilar[] }) {
   );
 }
 
-export function PantallaPilares() {
+export function ModoPilares() {
   const { proyecto, planta, setPlanta, seleccion, setSeleccion } = useVisor();
+  const pan = usePaneles("resultados:pilares", { props: true, dock: true, pestana: "cuadro" });
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const d = usePedido(proyecto.cliente, planta ? { tipo: "pilares", planta, combinaciones: eleccion } : null);
@@ -110,32 +116,76 @@ export function PantallaPilares() {
 
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
 
-  return (
+  const herramientas = (
     <>
-      <Panel lado="izq" etiqueta="Plantas">
-        <ListaPlantas estado={e} planta={planta} onPlanta={setPlanta} />
-        <Seccion titulo="Combinaciones">
-          <SelectorCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="Esfuerzos" />
-        </Seccion>
-        <Seccion titulo={`Tramos bajo ${planta}`} valor={filas.length}>
-          <div className="fila">
-            <span>ν &gt; {fmt(LIMITE_NU, 2)}</span>
-            <span className={`v ${pasan ? "text-state-warn" : ""}`}>{pasan}</span>
-          </div>
-          <p className="nota">ν = Nd/(Ac·fcd), fcd = fck/1,5, en los tramos de hormigón: el aviso de A3 (orden de magnitud). La comprobación de norma es la del módulo de pilares de Concreta.</p>
-        </Seccion>
-      </Panel>
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
+      <Separador />
+      <BarraModos />
+    </>
+  );
 
-      <section className="flex min-w-0 flex-1 flex-col" aria-label="Planta">
-        <BarraLienzo>
-          {planta} · {cota(e.plantas.find((p) => p.id === planta)?.cota)} m · axil de los tramos que llegan · {d.datos?.combinaciones.descripcion ?? ""}
-        </BarraLienzo>
-        <Planta2D escena={d.datos?.escena ?? null} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Pilares de la planta ${planta}`} cargando={d.cargando} />
-      </section>
+  const vistaPlanta = (
+    <>
+      <CabeceraVista>
+        <Chip>
+          <strong className="font-semibold">Planta {planta}</strong>
+          <span className="mono text-text-secondary">{cota(e.plantas.find((p) => p.id === planta)?.cota)}</span>
+        </Chip>
+        <Chip acento title={d.datos?.combinaciones.descripcion}>
+          Axil de los tramos que llegan
+        </Chip>
+      </CabeceraVista>
+      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
+      <Planta2D escena={d.datos?.escena ?? null} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Pilares de la planta ${planta}`} cargando={d.cargando} margenes={MARGENES_VISTA} />
+    </>
+  );
 
-      <Panel lado="der" ancho={400} etiqueta="Cuadros de pilares">
-        {id && pilar.datos && (
-          <>
+  const cuadro = (
+    <Seccion titulo={`Cuadro bajo ${planta}`} valor={filas.length}>
+          <table className="tb">
+            <thead>
+              <tr>
+                <th>Pilar</th>
+                <th>N kN</th>
+                <th>|My|</th>
+                <th>|Mz|</th>
+                <th className="nu">ν</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((f) => (
+                <tr key={f.pilar} className="clic" data-on={f.pilar === id} onClick={() => setSeleccion(f.pilar)}>
+                  <td>
+                    {f.pilar}
+                    <small>{f.tramo.seccion}</small>
+                  </td>
+                  <td>
+                    <Celda x={compresion(f)} dec={0} />
+                  </td>
+                  <td>
+                    <Celda x={peor(f, "My")} />
+                  </td>
+                  <td>
+                    <Celda x={peor(f, "Mz")} />
+                  </td>
+                  <CeldaNu f={f} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Seccion>
+  );
+
+  const propiedades = (
+    <>
+      <Seccion titulo={`Tramos bajo ${planta}`} valor={filas.length}>
+        <div className="fila">
+          <span>ν &gt; {fmt(LIMITE_NU, 2)}</span>
+          <span className={`v ${pasan ? "text-state-warn" : ""}`}>{pasan}</span>
+        </div>
+        <p className="nota">ν = Nd/(Ac·fcd), fcd = fck/1,5, en los tramos de hormigón: el aviso de A3 (orden de magnitud). La comprobación de norma es la del módulo de pilares de Concreta. El cuadro de la planta, abajo; elija un pilar para ver todos sus tramos.</p>
+      </Seccion>
+      {id && pilar.datos && (
             <Seccion titulo={`Pilar ${id}`} valor={`${pilar.datos.filas.length} tramos`}>
               <GraficoAxil filas={pilar.datos.filas} />
               <table className="tb">
@@ -173,43 +223,21 @@ export function PantallaPilares() {
               </table>
               <p className="nota">N: la mayor compresión (negativa) de la base y la cabeza; |My| y |Mz|: el mayor de las dos, con su signo. Ejes de la sección (giro desde +X).</p>
             </Seccion>
-          </>
-        )}
-        <Seccion titulo={`Cuadro bajo ${planta}`} valor={filas.length}>
-          <table className="tb">
-            <thead>
-              <tr>
-                <th>Pilar</th>
-                <th>N kN</th>
-                <th>|My|</th>
-                <th>|Mz|</th>
-                <th className="nu">ν</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((f) => (
-                <tr key={f.pilar} className="clic" data-on={f.pilar === id} onClick={() => setSeleccion(f.pilar)}>
-                  <td>
-                    {f.pilar}
-                    <small>{f.tramo.seccion}</small>
-                  </td>
-                  <td>
-                    <Celda x={compresion(f)} dec={0} />
-                  </td>
-                  <td>
-                    <Celda x={peor(f, "My")} />
-                  </td>
-                  <td>
-                    <Celda x={peor(f, "Mz")} />
-                  </td>
-                  <CeldaNu f={f} />
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Seccion>
-        {d.datos && <TablaCombinaciones c={d.datos.combinaciones} />}
-      </Panel>
+      )}
     </>
+  );
+
+  return (
+    <Disposicion
+      paneles={pan}
+      etiquetaHerramientas="Herramientas de Resultados"
+      herramientas={herramientas}
+      vista={vistaPlanta}
+      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 400 }}
+      dock={[
+        { id: "cuadro", titulo: `Cuadro bajo ${planta ?? ""}`, insignia: filas.length, contenido: cuadro },
+        { id: "combinaciones", titulo: "Combinaciones", insignia: d.datos?.combinaciones.nombres.length, contenido: d.datos ? <TablaCombinaciones c={d.datos.combinaciones} /> : <p className="nota">…</p> },
+      ]}
+    />
   );
 }

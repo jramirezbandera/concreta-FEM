@@ -92,7 +92,11 @@ const FilaHoja = memo(function FilaHoja({
   );
 });
 
-export function PanelTablas({ tabla, setTabla }: { tabla: NombreTabla; setTabla: (t: NombreTabla) => void }) {
+/**
+ * `nueva`: cada vez que cambia (y no es 0), el cursor va a la fila nueva de la tabla (las herramientas
+ * Pilar, Viga… de la barra de Modelo).
+ */
+export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla; setTabla: (t: NombreTabla) => void; nueva?: number }) {
   const { proyecto, planta, seleccion, setSeleccion } = useVisor();
   const ed = proyecto.edicion!;
   const m = ed.proyecto.modelo;
@@ -156,6 +160,18 @@ export function PanelTablas({ tabla, setTabla }: { tabla: NombreTabla; setTabla:
     hoja.current?.querySelector(`tr[data-id="${CSS.escape(seleccion)}"]`)?.scrollIntoView?.({ block: "nearest" });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando cambia la selección
   }, [seleccion]);
+
+  // Una herramienta de la barra pide la fila nueva
+  useEffect(() => {
+    if (!nueva) return;
+    setCursor({ f: nBorrador, c: 0 });
+    setAncla(null);
+    requestAnimationFrame(() => {
+      hoja.current?.focus();
+      hoja.current?.querySelector("tbody tr:last-child")?.scrollIntoView?.({ block: "nearest" });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando se pide
+  }, [nueva]);
 
   const rango: [number, number] = ancla === null ? [f0, f0] : [Math.min(ancla, f0), Math.max(ancla, f0)];
   const elegidas = filas.slice(rango[0], Math.min(rango[1], nBorrador - 1) + 1).map((x) => x.id);

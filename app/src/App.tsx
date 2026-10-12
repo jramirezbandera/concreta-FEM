@@ -1,32 +1,53 @@
 /**
- * Visor y editor (V1 y V2a, docs/fem3d/visor.md). Cabecera con las seis pantallas, el estado del
- * cálculo y, si el proyecto se puede editar, deshacer, rehacer, guardar y calcular; la pantalla
- * elegida y un pie que dice de dónde salen los resultados.
+ * La app (interfaz v4, `docs/fem3d/interfaz.md` §3 y §13): barra superior con los espacios de
+ * trabajo, el estado del cálculo y las acciones del proyecto; el espacio elegido (Modelo, Cargas,
+ * Resultados o Revisión) en la disposición común, y una barra de estado que dice de dónde salen los
+ * resultados.
  *
- * Atajos: Ctrl+S guarda; Ctrl+Z y Ctrl+Y (o Ctrl+Mayús+Z) deshacen y rehacen fuera de un campo de
- * texto (dentro, deshacen lo escrito en el campo).
+ * Atajos:
+ * - Ctrl+K: la paleta de órdenes;
+ * - Ctrl+S guarda; Ctrl+Z y Ctrl+Y (o Ctrl+Mayús+Z) deshacen y rehacen fuera de un campo de texto
+ *   (dentro, deshacen lo escrito en el campo);
+ * - AvPág y RePág: la planta de arriba o la de abajo; Esc: soltar lo elegido.
  */
-import { useEffect, useState } from "react";
-import { FolderOpen, Moon, Play, Redo2, RefreshCw, Save, Sun, Undo2 } from "lucide-react";
-import { ContextoVisor, type Pantalla } from "./contexto.ts";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FolderOpen, Moon, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
+import { lista, indiceIds } from "../../src/editor/referencias.ts";
+import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
+import { Paleta, type Orden } from "./armazon/Paleta.tsx";
+import { ContextoPaneles, useAlmacenPaneles, type EstadoPaneles } from "./armazon/paneles.ts";
+import { ContextoVisor, type Espacio, type ModoResultados } from "./contexto.ts";
+import { EspacioModelo } from "./espacios/Modelo.tsx";
+import { EspacioResultados } from "./espacios/Resultados.tsx";
+import { cota } from "./fmt.ts";
+import { Inicio, abrirDesdeUrl } from "./Inicio.tsx";
+import { EspacioRevision } from "./pantallas/Revision.tsx";
 import { useProyecto, type ProyectoAbierto } from "./sesion/useProyecto.ts";
 import { useTheme } from "./tema/useTheme.ts";
-import { Inicio, abrirDesdeUrl } from "./Inicio.tsx";
-import { PantallaModelo } from "./pantallas/Modelo.tsx";
-import { PantallaLosas } from "./pantallas/Losas.tsx";
-import { PantallaVigas } from "./pantallas/Vigas.tsx";
-import { PantallaPilares } from "./pantallas/Pilares.tsx";
-import { PantallaDesplomes } from "./pantallas/Desplomes.tsx";
-import { PantallaRevision } from "./pantallas/Revision.tsx";
 
-const PANTALLAS: { id: Pantalla; nombre: string; calculo: boolean }[] = [
+const ESPACIOS: { id: Espacio; nombre: string; calculo: boolean }[] = [
   { id: "modelo", nombre: "Modelo", calculo: false },
-  { id: "losas", nombre: "Losas", calculo: true },
-  { id: "vigas", nombre: "Vigas", calculo: true },
-  { id: "pilares", nombre: "Pilares", calculo: true },
-  { id: "desplomes", nombre: "Desplomes", calculo: true },
+  { id: "cargas", nombre: "Cargas", calculo: false },
+  { id: "resultados", nombre: "Resultados", calculo: true },
   { id: "revision", nombre: "Revisión", calculo: true },
 ];
+
+const MODOS: { id: ModoResultados; nombre: string }[] = [
+  { id: "losas", nombre: "Losas" },
+  { id: "diagramas", nombre: "Diagramas de vigas" },
+  { id: "pilares", nombre: "Pilares" },
+  { id: "deformada", nombre: "Deformada y desplomes" },
+];
+
+/** `?espacio=…&modo=…` o, como en V1, `?pantalla=…`. */
+function inicial(): { espacio: Espacio; modo: ModoResultados } {
+  const q = new URLSearchParams(location.search);
+  const viejo: Record<string, [Espacio, ModoResultados?]> = { modelo: ["modelo"], losas: ["resultados", "losas"], vigas: ["resultados", "diagramas"], pilares: ["resultados", "pilares"], desplomes: ["resultados", "deformada"], revision: ["revision"] };
+  const p = viejo[q.get("pantalla") ?? ""];
+  const espacio = (q.get("espacio") as Espacio | null) ?? p?.[0] ?? "modelo";
+  const modo = (q.get("modo") as ModoResultados | null) ?? p?.[1] ?? "losas";
+  return { espacio: ESPACIOS.some((x) => x.id === espacio) ? espacio : "modelo", modo: MODOS.some((x) => x.id === modo) ? modo : "losas" };
+}
 
 function Estado({ p }: { p: ProyectoAbierto }) {
   return (
@@ -47,12 +68,17 @@ function TextoEstado({ p }: { p: ProyectoAbierto }) {
   return <span className="pill neu">SIN CALCULAR · {e.huella.slice(0, 8)}</span>;
 }
 
+const enCampo = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
+
 export function App() {
   const proyecto = useProyecto();
   const { theme, toggleTheme } = useTheme();
-  const [pantalla, setPantalla] = useState<Pantalla>(() => (new URLSearchParams(location.search).get("pantalla") as Pantalla | null) ?? "modelo");
+  const paneles = useAlmacenPaneles();
+  const [{ espacio, modo }, setDonde] = useState(inicial);
   const [planta, setPlanta] = useState<string | null>(null);
-  const [seleccion, setSeleccion] = useState<string | null>(null);
+  const [seleccion, setSel] = useState<string | null>(null);
+  const [paleta, setPaleta] = useState(false);
+  const [tablaPedida, setTablaPedida] = useState<{ tabla: NombreTabla; n: number } | null>(null);
 
   // ?proyecto=<url> o ?ejemplo=<nombre>: abrir al cargar
   useEffect(() => {
@@ -60,36 +86,116 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al cargar la página
   }, []);
 
-  // Atajos del editor
+  const e = proyecto.estado;
   const ed = proyecto.edicion;
+  // Resultados y Revisión sólo con un cálculo de esta huella (criterio 3 de I1)
+  const espacioValido: Espacio = (espacio === "resultados" || espacio === "revision") && !e?.calculado ? "modelo" : espacio;
+  const clave = espacioValido === "resultados" ? `resultados:${modo}` : espacioValido;
+
+  const irA = useCallback((x: Espacio, m?: ModoResultados) => setDonde((d) => ({ espacio: x, modo: m ?? d.modo })), []);
+  const { cambiar } = paneles;
+  const setSeleccion = useCallback(
+    (id: string | null) => {
+      setSel(id);
+      if (id) cambiar(clave, { props: true });
+    },
+    [cambiar, clave],
+  );
+  const pedirTabla = useCallback((t: NombreTabla) => {
+    setTablaPedida((x) => ({ tabla: t, n: (x?.n ?? 0) + 1 }));
+    setDonde((d) => ({ ...d, espacio: d.espacio === "cargas" ? "cargas" : "modelo" }));
+  }, []);
+
+  // La planta elegida se conserva al recargar si sigue existiendo; si no, la primera
+  const plantas = e?.plantas;
+  const plantaValida = plantas?.some((p) => p.id === planta) ? planta : (plantas?.[0]?.id ?? null);
+
+  // Atajos
   useEffect(() => {
-    if (!ed) return;
-    const f = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-      const k = e.key.toLowerCase();
-      const enCampo = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
-      if (k === "s") {
-        e.preventDefault();
-        void ed.guardar();
-      } else if (!enCampo && k === "z" && !e.shiftKey) {
-        e.preventDefault();
-        ed.deshacer();
-      } else if (!enCampo && (k === "y" || (k === "z" && e.shiftKey))) {
-        e.preventDefault();
-        ed.rehacer();
+    const f = (x: KeyboardEvent) => {
+      const mod = x.ctrlKey || x.metaKey;
+      const k = x.key.toLowerCase();
+      if (mod && !x.altKey && k === "k") {
+        x.preventDefault();
+        setPaleta((v) => !v);
+        return;
       }
+      if (paleta || document.querySelector("[role=dialog]")) return;
+      if (mod && !x.altKey && ed) {
+        if (k === "s") {
+          x.preventDefault();
+          void ed.guardar();
+        } else if (!enCampo(x.target) && k === "z" && !x.shiftKey) {
+          x.preventDefault();
+          ed.deshacer();
+        } else if (!enCampo(x.target) && (k === "y" || (k === "z" && x.shiftKey))) {
+          x.preventDefault();
+          ed.rehacer();
+        }
+        return;
+      }
+      if (mod || x.altKey || enCampo(x.target) || (x.target as HTMLElement | null)?.closest?.("[role=grid]")) return;
+      if ((x.key === "PageUp" || x.key === "PageDown") && plantas?.length) {
+        x.preventDefault();
+        const i = plantas.findIndex((p) => p.id === plantaValida);
+        const j = Math.max(0, Math.min(plantas.length - 1, i + (x.key === "PageUp" ? -1 : 1)));
+        setPlanta(plantas[j]!.id);
+      } else if (x.key === "Escape") setSel(null);
     };
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
-  }, [ed]);
+  }, [ed, paleta, plantas, plantaValida]);
 
-  // La planta elegida se conserva al recargar si sigue existiendo; si no, la primera
-  const plantas = proyecto.estado?.plantas;
-  const plantaValida = plantas?.some((p) => p.id === planta) ? planta : (plantas?.[0]?.id ?? null);
+  // Órdenes de la paleta
+  const ordenes = useMemo<Orden[]>(() => {
+    const r: Orden[] = [];
+    for (const x of ESPACIOS) r.push({ id: `esp-${x.id}`, grupo: "Espacio", nombre: x.nombre, hacer: () => irA(x.id), deshabilitada: x.calculo && !e?.calculado });
+    for (const m of MODOS) r.push({ id: `modo-${m.id}`, grupo: "Resultados", nombre: m.nombre, hacer: () => irA("resultados", m.id), deshabilitada: !e?.calculado });
+    for (const p of e?.plantas ?? []) r.push({ id: `planta-${p.id}`, grupo: "Planta", nombre: `${p.id} ${cota(p.cota)}${p.nombre ? ` · ${p.nombre}` : ""}`, hacer: () => setPlanta(p.id) });
+    if (ed) for (const t of TABLAS) r.push({ id: `tabla-${t}`, grupo: "Tabla", nombre: DEF_TABLAS[t].titulo, hacer: () => pedirTabla(t) });
+    const vivo: Partial<EstadoPaneles> = paneles.vivos.get(clave) ?? {};
+    r.push(
+      { id: "calcular", grupo: "Proyecto", nombre: e?.calculado ? "Recalcular" : "Calcular", hacer: () => (e?.calculado || !proyecto.calcular ? proyecto.recalcular() : proyecto.calcular()), deshabilitada: !e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado) },
+      { id: "guardar", grupo: "Proyecto", nombre: ed?.modo === "escribir" ? "Guardar" : "Descargar", atajo: "Ctrl S", hacer: () => void ed?.guardar(), deshabilitada: !ed?.sinGuardar },
+      { id: "deshacer", grupo: "Proyecto", nombre: ed?.deshacerEtiqueta ? `Deshacer: ${ed.deshacerEtiqueta}` : "Deshacer", atajo: "Ctrl Z", hacer: () => ed?.deshacer(), deshabilitada: !ed?.deshacerEtiqueta },
+      { id: "rehacer", grupo: "Proyecto", nombre: ed?.rehacerEtiqueta ? `Rehacer: ${ed.rehacerEtiqueta}` : "Rehacer", atajo: "Ctrl Y", hacer: () => ed?.rehacer(), deshabilitada: !ed?.rehacerEtiqueta },
+      { id: "abrir", grupo: "Proyecto", nombre: "Abrir otro proyecto", hacer: () => location.assign(location.pathname) },
+      { id: "nav", grupo: "Paneles", nombre: vivo.nav === false ? "Abrir el navegador" : "Plegar el navegador", hacer: () => cambiar(clave, { nav: vivo.nav === false }) },
+      { id: "props", grupo: "Paneles", nombre: vivo.props === false ? "Abrir las propiedades" : "Plegar las propiedades", hacer: () => cambiar(clave, { props: vivo.props === false }) },
+      { id: "dock", grupo: "Paneles", nombre: vivo.dock ? "Plegar el panel inferior" : "Abrir el panel inferior", hacer: () => cambiar(clave, { dock: !vivo.dock }) },
+      { id: "tema", grupo: "Vista", nombre: theme === "dark" ? "Tema claro" : "Tema oscuro", hacer: toggleTheme },
+      { id: "soltar", grupo: "Vista", nombre: "Soltar lo elegido", atajo: "Esc", hacer: () => setSel(null), deshabilitada: !seleccion },
+    );
+    return r;
+  }, [e, ed, proyecto, irA, pedirTabla, paneles, clave, cambiar, theme, toggleTheme, seleccion]);
 
-  if (!proyecto.estado && proyecto.fase !== "error") return <Inicio proyecto={proyecto} />;
+  // Los objetos del proyecto, para la paleta: elegirlo y llevar su planta
+  const m = ed?.proyecto.modelo;
+  const objetos = useCallback(
+    (consulta: string): Orden[] => {
+      if (!m || consulta.trim().length < 1) return [];
+      const r: Orden[] = [];
+      for (const [id, { coleccion }] of indiceIds(m)) {
+        if (coleccion === "plantas") continue;
+        r.push({
+          id: `obj-${id}`,
+          grupo: coleccion,
+          nombre: id,
+          hacer: () => {
+            const o = lista(m, coleccion).find((x) => x.id === id) as { planta?: unknown; hasta?: unknown } | undefined;
+            if (typeof o?.planta === "string") setPlanta(o.planta);
+            else if (typeof o?.hasta === "string") setPlanta(o.hasta);
+            setSeleccion(id);
+          },
+        });
+      }
+      return r;
+    },
+    [m, setSeleccion],
+  );
 
-  const e = proyecto.estado;
+  if (!e && proyecto.fase !== "error") return <Inicio proyecto={proyecto} />;
+
   const pie =
     proyecto.fuente?.tipo === "origen"
       ? `${proyecto.fuente.origen.descripcion} · vigilando cambios${ed?.guardado.tipo === "guardado" ? ` · guardado en ${ed.guardado.ms.toFixed(0)} ms` : ""}`
@@ -103,125 +209,130 @@ export function App() {
       : `compilado en ${(proyecto.tiempos.abrir ?? 0).toFixed(2)} s y calculado en el visor en ${(proyecto.tiempos.calcular ?? 0).toFixed(2)} s${proyecto.motivoGuardados ? ` · .fem no se usó: ${proyecto.motivoGuardados}` : ""}`;
 
   return (
-    <ContextoVisor.Provider value={{ proyecto, planta: plantaValida, setPlanta, seleccion, setSeleccion, irA: setPantalla }}>
-      <div className="flex h-full flex-col">
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border-main bg-bg-primary px-3">
-          <span className="flex shrink-0 items-center gap-1.5 text-[15px] font-semibold">
-            <span className="inline-block h-[7px] w-[7px] rounded-full bg-accent" aria-hidden="true" />
-            Concreta
-          </span>
-          <span className="min-w-0 flex-1 truncate text-[11px] uppercase tracking-[0.06em] text-text-disabled">
-            Análisis / FEM 3D / <span className="normal-case tracking-normal text-text-primary">{e?.nombre ?? (proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? ""))}</span>
-          </span>
-          <nav className="seg ml-2 shrink-0" aria-label="Pantallas">
-            {PANTALLAS.map((x) => (
-              <button key={x.id} type="button" data-on={pantalla === x.id} aria-current={pantalla === x.id ? "page" : undefined} disabled={x.calculo && !e?.calculado} title={x.calculo && !e?.calculado ? "Necesita el cálculo" : undefined} onClick={() => setPantalla(x.id)}>
-                {x.nombre}
-              </button>
-            ))}
-          </nav>
-          {ed ? (
-            <>
-              <button type="button" className="btn" style={{ width: 28, padding: 0 }} onClick={ed.deshacer} disabled={!ed.deshacerEtiqueta} title={ed.deshacerEtiqueta ? `Deshacer: ${ed.deshacerEtiqueta} (Ctrl+Z)` : "Nada que deshacer"} aria-label="Deshacer">
-                <Undo2 size={14} />
-              </button>
-              <button type="button" className="btn" style={{ width: 28, padding: 0 }} onClick={ed.rehacer} disabled={!ed.rehacerEtiqueta} title={ed.rehacerEtiqueta ? `Rehacer: ${ed.rehacerEtiqueta} (Ctrl+Y)` : "Nada que rehacer"} aria-label="Rehacer">
-                <Redo2 size={14} />
-              </button>
-              <button
-                type="button"
-                className={`btn ${ed.sinGuardar ? "btn-p" : ""}`}
-                onClick={() => void ed.guardar()}
-                disabled={!ed.sinGuardar || ed.guardado.tipo === "guardando"}
-                data-sin-guardar={ed.sinGuardar}
-                title={ed.modo === "escribir" ? `Guardar en ${proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : ""} (Ctrl+S)` : "Sin carpeta: guardar descarga el fichero (Ctrl+S)"}
-              >
-                <Save size={14} /> {ed.guardado.tipo === "guardando" ? "Guardando…" : ed.modo === "escribir" ? "Guardar" : "Descargar"}
-                {ed.sinGuardar && <span aria-label="sin guardar">●</span>}
-              </button>
-            </>
-          ) : (
-            <span className="pill neu" title="Este fichero no es un proyecto válido: no se puede editar">
-              SÓLO LECTURA
+    <ContextoPaneles.Provider value={paneles}>
+      <ContextoVisor.Provider value={{ proyecto, planta: plantaValida, setPlanta, seleccion, setSeleccion, espacio: espacioValido, modo, irA, tablaPedida, pedirTabla }}>
+        <div className="flex h-full flex-col">
+          <header className="barra-sup">
+            <span className="flex shrink-0 items-center gap-1.5 text-[15px] font-semibold">
+              <span className="inline-block h-[8px] w-[8px] rounded-full bg-accent" aria-hidden="true" />
+              Concreta
             </span>
-          )}
-          <Estado p={proyecto} />
-          {ed && e?.compila && !e.calculado && !proyecto.desactualizado ? (
-            <button type="button" className="btn btn-p" onClick={proyecto.calcular} disabled={proyecto.fase === "calculando"} title="Calcular esta versión del proyecto">
-              <Play size={14} /> {proyecto.fase === "calculando" ? "Calculando…" : "Calcular"}
+            <span className="min-w-0 max-w-[340px] shrink truncate px-1 text-[13px] text-text-primary" title={e?.nombre ?? undefined}>
+              {e?.nombre ?? (proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? ""))}
+            </span>
+            <nav className="espacios" aria-label="Espacios de trabajo">
+              {ESPACIOS.map((x) => (
+                <button key={x.id} type="button" aria-current={espacioValido === x.id ? "page" : undefined} disabled={x.calculo && !e?.calculado} title={x.calculo && !e?.calculado ? "Necesita el cálculo" : undefined} onClick={() => irA(x.id)}>
+                  {x.nombre}
+                </button>
+              ))}
+            </nav>
+            <span className="flex-1" />
+            {ed ? (
+              <>
+                <button type="button" className="ib" onClick={ed.deshacer} disabled={!ed.deshacerEtiqueta} title={ed.deshacerEtiqueta ? `Deshacer: ${ed.deshacerEtiqueta} (Ctrl+Z)` : "Nada que deshacer"} aria-label="Deshacer">
+                  <Undo2 size={16} />
+                </button>
+                <button type="button" className="ib" onClick={ed.rehacer} disabled={!ed.rehacerEtiqueta} title={ed.rehacerEtiqueta ? `Rehacer: ${ed.rehacerEtiqueta} (Ctrl+Y)` : "Nada que rehacer"} aria-label="Rehacer">
+                  <Redo2 size={16} />
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${ed.sinGuardar ? "btn-p" : ""}`}
+                  onClick={() => void ed.guardar()}
+                  disabled={!ed.sinGuardar || ed.guardado.tipo === "guardando"}
+                  data-sin-guardar={ed.sinGuardar}
+                  title={ed.modo === "escribir" ? `Guardar en ${proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : ""} (Ctrl+S)` : "Sin carpeta: guardar descarga el fichero (Ctrl+S)"}
+                >
+                  <Save size={15} /> {ed.guardado.tipo === "guardando" ? "Guardando…" : ed.modo === "escribir" ? "Guardar" : "Descargar"}
+                  {ed.sinGuardar && <span aria-label="sin guardar">●</span>}
+                </button>
+              </>
+            ) : (
+              <span className="pill neu" title="Este fichero no es un proyecto válido: no se puede editar">
+                SÓLO LECTURA
+              </span>
+            )}
+            <Estado p={proyecto} />
+            {ed && e?.compila && !e.calculado && !proyecto.desactualizado ? (
+              <button type="button" className="btn btn-p" onClick={proyecto.calcular} disabled={proyecto.fase === "calculando"} title="Calcular esta versión del proyecto">
+                <Play size={15} /> {proyecto.fase === "calculando" ? "Calculando…" : "Calcular"}
+              </button>
+            ) : (
+              <button type="button" className="btn" onClick={proyecto.recalcular} disabled={!e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado)} title="Calcular de nuevo, sin usar los resultados de .fem/">
+                <RefreshCw size={15} /> Recalcular
+              </button>
+            )}
+            <button type="button" className="btn" style={{ gap: 14, color: "var(--color-text-disabled)" }} onClick={() => setPaleta(true)} title="Paleta de órdenes (Ctrl+K)">
+              <span className="flex items-center gap-1.5">
+                <Search size={15} /> Buscar u ordenar
+              </span>
+              <span className="kbd">Ctrl K</span>
             </button>
-          ) : (
-            <button type="button" className="btn" onClick={proyecto.recalcular} disabled={!e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado)} title="Calcular de nuevo, sin usar los resultados de .fem/">
-              <RefreshCw size={14} /> Recalcular
+            <button type="button" className="btn" onClick={() => location.assign(location.pathname)} title="Abrir otro proyecto">
+              <FolderOpen size={15} /> Abrir
             </button>
-          )}
-          <button type="button" className="btn" onClick={() => location.assign(location.pathname)} title="Abrir otro proyecto">
-            <FolderOpen size={14} /> Abrir
-          </button>
-          <button type="button" className="btn" style={{ width: 28, padding: 0 }} onClick={toggleTheme} aria-label={theme === "dark" ? "Tema claro" : "Tema oscuro"}>
-            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-        </header>
+            <button type="button" className="ib" onClick={toggleTheme} aria-label={theme === "dark" ? "Tema claro" : "Tema oscuro"} title={theme === "dark" ? "Tema claro" : "Tema oscuro"}>
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </header>
 
-        {ed?.conflicto && (
-          <div className="banda warn" role="alert">
-            <span className="min-w-0 flex-1">
-              <strong>{ed.conflicto}</strong> No se ha recargado ni sobrescrito nada.
-            </span>
-            <button type="button" className="btn" onClick={ed.recargarDisco}>
-              Recargar del disco (se pierden los cambios de aquí)
-            </button>
-            <button type="button" className="btn" onClick={() => void ed.guardar({ forzar: true })}>
-              Sobrescribir el del disco
-            </button>
-          </div>
-        )}
-        {ed?.guardado.tipo === "error" && (
-          <div className="banda fail" role="alert">
-            <span className="min-w-0 flex-1">
-              <strong>No se guardó.</strong> {ed.guardado.mensaje} Los cambios siguen aquí.
-            </span>
-            <button type="button" className="btn" onClick={() => void ed.guardar()}>
-              Reintentar
-            </button>
-          </div>
-        )}
+          {ed?.conflicto && (
+            <div className="banda warn" role="alert">
+              <span className="min-w-0 flex-1">
+                <strong>{ed.conflicto}</strong> No se ha recargado ni sobrescrito nada.
+              </span>
+              <button type="button" className="btn" onClick={ed.recargarDisco}>
+                Recargar del disco (se pierden los cambios de aquí)
+              </button>
+              <button type="button" className="btn" onClick={() => void ed.guardar({ forzar: true })}>
+                Sobrescribir el del disco
+              </button>
+            </div>
+          )}
+          {ed?.guardado.tipo === "error" && (
+            <div className="banda fail" role="alert">
+              <span className="min-w-0 flex-1">
+                <strong>No se guardó.</strong> {ed.guardado.mensaje} Los cambios siguen aquí.
+              </span>
+              <button type="button" className="btn" onClick={() => void ed.guardar()}>
+                Reintentar
+              </button>
+            </div>
+          )}
 
-        <main className="flex min-h-0 flex-1">
-          {proyecto.fase === "error" && !e ? (
-            <PantallaError p={proyecto} />
-          ) : pantalla === "modelo" || !e?.calculado ? (
-            <PantallaModelo />
-          ) : pantalla === "losas" ? (
-            <PantallaLosas />
-          ) : pantalla === "vigas" ? (
-            <PantallaVigas />
-          ) : pantalla === "pilares" ? (
-            <PantallaPilares />
-          ) : pantalla === "desplomes" ? (
-            <PantallaDesplomes />
-          ) : (
-            <PantallaRevision />
-          )}
-        </main>
+          <main className="flex min-h-0 flex-1">
+            {proyecto.fase === "error" && !e ? (
+              <PantallaError p={proyecto} />
+            ) : espacioValido === "resultados" ? (
+              <EspacioResultados />
+            ) : espacioValido === "revision" ? (
+              <EspacioRevision />
+            ) : (
+              <EspacioModelo key={espacioValido} espacio={espacioValido} />
+            )}
+          </main>
 
-        <footer className="flex h-7 shrink-0 items-center gap-4 border-t border-border-main bg-bg-surface px-3 font-mono text-[11px] text-text-disabled">
-          <span className="min-w-0 shrink truncate">{pie}</span>
-          <span className="min-w-0 flex-1 truncate">{resultados}</span>
-          {e?.estadisticas && (
-            <span className="shrink-0 whitespace-nowrap">
-              {e.estadisticas.nudos} nudos{e.estadisticas.ecuaciones ? ` · ${e.estadisticas.ecuaciones} ecuaciones` : ""} · {e.estadisticas.barras} barras · {e.estadisticas.laminas} láminas
-            </span>
-          )}
-          {e?.sha256Resultados && (
-            <span className="shrink-0 whitespace-nowrap" title={`sha256 de resultados.bin: ${e.sha256Resultados}`} data-sha={e.sha256Resultados} data-origen={e.origen}>
-              resultados {e.sha256Resultados.slice(0, 8)}
-            </span>
-          )}
-          {proyecto.cliente?.motor && <span className="shrink-0 whitespace-nowrap" title="sha256 del núcleo WASM">núcleo {proyecto.cliente.motor.slice(0, 8)}</span>}
-        </footer>
-      </div>
-    </ContextoVisor.Provider>
+          <footer className="barra-estado">
+            <span className="min-w-0 shrink truncate">{pie}</span>
+            <span className="min-w-0 flex-1 truncate">{resultados}</span>
+            <span className="shrink-0">kN · m</span>
+            {e?.estadisticas && (
+              <span className="shrink-0 whitespace-nowrap">
+                {e.estadisticas.nudos} nudos{e.estadisticas.ecuaciones ? ` · ${e.estadisticas.ecuaciones} ecuaciones` : ""} · {e.estadisticas.barras} barras · {e.estadisticas.laminas} láminas
+              </span>
+            )}
+            {e?.sha256Resultados && (
+              <span className="shrink-0 whitespace-nowrap" title={`sha256 de resultados.bin: ${e.sha256Resultados}`} data-sha={e.sha256Resultados} data-origen={e.origen}>
+                resultados {e.sha256Resultados.slice(0, 8)}
+              </span>
+            )}
+            {proyecto.cliente?.motor && <span className="shrink-0 whitespace-nowrap" title="sha256 del núcleo WASM">núcleo {proyecto.cliente.motor.slice(0, 8)}</span>}
+          </footer>
+        </div>
+        {paleta && <Paleta ordenes={ordenes} objetos={objetos} onCerrar={() => setPaleta(false)} />}
+      </ContextoVisor.Provider>
+    </ContextoPaneles.Provider>
   );
 }
 
@@ -229,7 +340,7 @@ function PantallaError({ p }: { p: ProyectoAbierto }) {
   return (
     <div className="mx-auto mt-16 w-[640px] max-w-full">
       <h1 className="text-[15px] font-semibold">No se pudo abrir el proyecto</h1>
-      <p className="mt-1 text-text-secondary">El fichero no es un proyecto válido (JSON o esquema). Corríjalo y el visor lo recargará solo si lo abrió desde su carpeta.</p>
+      <p className="mt-1 text-text-secondary">El fichero no es un proyecto válido (JSON o esquema). Corríjalo y la app lo recargará sola si lo abrió desde su carpeta.</p>
       <ul className="mt-4 list-none p-0">
         {p.errores.map((d, i) => (
           <li key={i} className="border-b border-border-sub py-2 text-[12px]">

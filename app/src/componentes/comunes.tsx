@@ -1,9 +1,10 @@
-/** Piezas comunes de los paneles: secciones, filas, lista de plantas, combinaciones y diagnósticos. */
+/** Piezas comunes de los paneles: secciones, filas, combinaciones, diagnósticos y equilibrio. */
 import type { ReactNode } from "react";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { CombinacionDisponible, EleccionCombinaciones, EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { Combinaciones } from "../../../src/visor/datos.ts";
-import { cota, fmt } from "../fmt.ts";
+import { Campo } from "../armazon/Disposicion.tsx";
+import { fmt } from "../fmt.ts";
 
 export function Seccion({ titulo, valor, children }: { titulo: string; valor?: ReactNode; children?: ReactNode }) {
   return (
@@ -26,56 +27,19 @@ export function Fila({ k, v, clase }: { k: ReactNode; v: ReactNode; clase?: stri
   );
 }
 
-/** Panel lateral de anchura fija con su propio scroll (prototipos: 288 a la izquierda, 320 a la derecha). */
-export function Panel({ lado, ancho, children, etiqueta }: { lado: "izq" | "der"; ancho?: number; children: ReactNode; etiqueta: string }) {
-  const w = ancho ?? (lado === "izq" ? 288 : 340);
-  return (
-    <aside aria-label={etiqueta} className={`scroll-hide flex shrink-0 flex-col overflow-y-auto bg-bg-surface pb-6 ${lado === "izq" ? "border-r" : "border-l"} border-border-main`} style={{ width: w }}>
-      {children}
-    </aside>
-  );
-}
-
-/** Barra de 36 px sobre el lienzo, con el contexto de lo que se ve. */
-export function BarraLienzo({ children, derecha }: { children: ReactNode; derecha?: ReactNode }) {
-  return (
-    <div className="flex h-9 shrink-0 items-center gap-3 border-b border-border-main bg-bg-surface px-3">
-      <div className="min-w-0 flex-1 truncate font-mono text-[12px] text-text-secondary">{children}</div>
-      {derecha}
-    </div>
-  );
-}
-
-export function ListaPlantas({ estado, planta, onPlanta, extra }: { estado: EstadoSesion; planta: string | null; onPlanta: (id: string) => void; extra?: (id: string) => ReactNode }) {
-  return (
-    <Seccion titulo="Plantas" valor={estado.plantas.length}>
-      <div role="listbox" aria-label="Plantas">
-        {estado.plantas.map((p) => (
-          <button key={p.id} type="button" role="option" aria-selected={p.id === planta} data-on={p.id === planta} className="lista-fila" style={{ gridTemplateColumns: "minmax(36px,auto) 1fr auto auto" }} onClick={() => onPlanta(p.id)}>
-            <span className="font-medium text-text-primary">{p.id}</span>
-            <span className="truncate text-[11px]">{p.nombre ?? ""}</span>
-            <span className="mono text-[12px]">{cota(p.cota)}</span>
-            <span className="mono min-w-[24px] text-right text-[11px]">{extra ? extra(p.id) : p.errores ? <span className="text-state-fail">{p.errores}!</span> : p.avisos ? <span className="text-state-warn">{p.avisos}</span> : ""}</span>
-          </button>
-        ))}
-      </div>
-    </Seccion>
-  );
-}
-
 /** Valor del selector de combinaciones, en texto. */
 const codificar = (e: EleccionCombinaciones) => JSON.stringify(e);
 
 /**
- * Selector de combinaciones: las de por defecto (las de A1/A4 para la vista), la envolvente de una
- * situación, una combinación suelta o un caso. Todas las opciones a la vista en un solo desplegable.
+ * Selector de combinaciones, en la barra de herramientas de Resultados: las de por defecto (las de
+ * A1/A4 para la vista), la envolvente de una situación, una combinación suelta o un caso. Todas las
+ * opciones a la vista en un solo desplegable.
  */
-export function SelectorCombinaciones({ estado, valor, onCambio, etiqueta, soloUna }: { estado: EstadoSesion; valor: EleccionCombinaciones; onCambio: (e: EleccionCombinaciones) => void; etiqueta: string; soloUna?: boolean }) {
+export function ComboCombinaciones({ estado, valor, onCambio, etiqueta, soloUna }: { estado: EstadoSesion; valor: EleccionCombinaciones; onCambio: (e: EleccionCombinaciones) => void; etiqueta: string; soloUna?: boolean }) {
   const porSituacion = new Map<string, CombinacionDisponible[]>();
   for (const c of estado.combinaciones) porSituacion.set(c.situacion, [...(porSituacion.get(c.situacion) ?? []), c]);
   return (
-    <label className="flex flex-col gap-1 px-3.5 py-2">
-      <span className="text-[11px] text-text-secondary">{etiqueta}</span>
+    <Campo etiqueta={`Combinaciones · ${etiqueta}`} ancho={280}>
       <select className="sel w-full" value={codificar(valor)} onChange={(e) => onCambio(JSON.parse(e.target.value) as EleccionCombinaciones)}>
         {!soloUna && <option value={codificar({ tipo: "defecto" })}>Por defecto</option>}
         {!soloUna && porSituacion.size > 0 && (
@@ -105,15 +69,15 @@ export function SelectorCombinaciones({ estado, valor, onCambio, etiqueta, soloU
           ))}
         </optgroup>
       </select>
-    </label>
+    </Campo>
   );
 }
 
-/** Las combinaciones que entran en lo que se ve, con su expresión. */
+/** Las combinaciones que entran en lo que se ve, con su expresión (en el panel inferior). */
 export function TablaCombinaciones({ c, resaltar }: { c: Combinaciones; resaltar?: string | null }) {
   return (
     <Seccion titulo="Combinaciones" valor={`${c.nombres.length} · ${c.descripcion}`}>
-      <div className="max-h-[220px] overflow-y-auto scroll-hide">
+      <div>
         <table className="tb">
           <thead>
             <tr>

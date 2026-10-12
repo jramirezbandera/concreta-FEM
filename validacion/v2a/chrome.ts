@@ -119,7 +119,12 @@ window.__v2 = {
   huella: () => document.querySelector("[data-estado]")?.dataset.huella ?? null,
   pie: () => document.querySelector("footer")?.innerText ?? "",
   boton: (texto) => [...document.querySelectorAll("button")].find((b) => b.textContent.trim().startsWith(texto)),
-  tabla: (titulo) => { [...document.querySelectorAll("[role=tab]")].find((b) => b.textContent.trim().startsWith(titulo)).click(); },
+  // Desde I1, las tablas están en el panel inferior, plegado si el proyecto ya tiene pilares
+  tabla: async (titulo) => {
+    if (!document.querySelector("[role=grid]")) [...document.querySelectorAll(".dock-tab")].find((b) => b.textContent.startsWith("Tablas")).click();
+    const t = await __v2.esperar(() => [...document.querySelectorAll("[role=tab]")].find((b) => b.textContent.trim().startsWith(titulo)));
+    t.click();
+  },
   hoja: () => document.querySelector("[role=grid]"),
   celda: (fila, col) => __v2.hoja().querySelectorAll("tbody tr")[fila].querySelectorAll("td")[col + 1],
   escribir: async (fila, col, valor) => {
@@ -174,7 +179,7 @@ try {
   const ruta = copiar("edificio", "validacion/a2/agente/edificio/proyecto.json");
   await abrir("edificio");
   const h0 = await pagina<string>(`return __v2.huella();`);
-  await pagina(`__v2.tabla("Pilares"); await __v2.esperar(() => __v2.hoja()?.getAttribute("aria-label") === "Tabla de pilares");`);
+  await pagina(`await __v2.tabla("Pilares"); await __v2.esperar(() => __v2.hoja()?.getAttribute("aria-label") === "Tabla de pilares");`);
   const nPilares = await pagina<number>(`return __v2.hoja().querySelectorAll("tbody tr").length - 1;`);
   log(`  pilares en la tabla de la planta activa: ${nPilares}`);
   await new Promise((r) => setTimeout(r, 500));
@@ -231,7 +236,7 @@ try {
   log("Criterio 4 · cambio en el disco con cambios sin guardar (ejemplo)");
   const rutaE = copiar("ejemplo", ".claude/skills/fem/ejemplo.json");
   await abrir("ejemplo");
-  await pagina(`__v2.tabla("Pilares"); await __v2.esperar(() => __v2.hoja()?.getAttribute("aria-label") === "Tabla de pilares"); await __v2.escribir(0, 2, "0,25");`);
+  await pagina(`await __v2.tabla("Pilares"); await __v2.esperar(() => __v2.hoja()?.getAttribute("aria-label") === "Tabla de pilares"); await __v2.escribir(0, 2, "0,25");`);
   await pagina(`await __v2.esperar(() => __v2.boton("Guardar")?.dataset.sinGuardar === "true");`);
   const fuera = readFileSync(rutaE, "utf8").replace("Ejemplo: pórtico", "Cambiado fuera: pórtico");
   writeFileSync(rutaE, fuera);

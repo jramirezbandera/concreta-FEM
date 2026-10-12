@@ -1,0 +1,448 @@
+/**
+ * Espacios Modelo y Cargas (`docs/fem3d/interfaz.md` §4 y §13): lo que era la pantalla Modelo de V1
+ * y V2a, repartido en la disposición común.
+ *
+ * - Barra: en Modelo, las herramientas de los objetos (abren su tabla en la fila nueva), A plantas y
+ *   Borrar (lo elegido), las tablas de datos y Planta o 3D; en Cargas, el caso activo, Nueva carga y
+ *   Casos. Sin proyecto editable, sólo lo que mira.
+ * - Navegador: el proyecto y los objetos de la planta activa (en Cargas, los casos y las cargas).
+ * - Vista: la planta (modelo, diagnósticos o malla; en Cargas, las del caso activo) o el 3D.
+ * - Propiedades: lo elegido o, sin nada, la planta (resumen, cargas por caso, equilibrio, hipótesis).
+ * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
+ */
+import { useEffect, useMemo, useState } from "react";
+import { Trash2 } from "lucide-react";
+import type { Vec2 } from "../../../src/agente/render/escena.ts";
+import { lista } from "../../../src/editor/referencias.ts";
+import { DEF_TABLAS, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
+import type { Eleccion } from "../../../src/visor/escena.ts";
+import type { VistaPlanta } from "../../../src/visor/sesion.ts";
+import { CabeceraVista, CarrilPlantas, Chip, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
+import { Ic3D, IcAPlantas, IcApoyo, IcCarga, IcCasos, IcCombinaciones, IcLosa, IcMateriales, IcPilar, IcPlanta, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { usePaneles } from "../armazon/paneles.ts";
+import { Aviso, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { useVisor } from "../contexto.ts";
+import { DialogoBorrar, DialogoCopiar } from "../editor/Dialogos.tsx";
+import { tablaDe } from "../editor/Formulario.tsx";
+import { PanelTablas } from "../editor/Hoja.tsx";
+import { cota, fmt } from "../fmt.ts";
+import { Planta2D } from "../lienzo/Planta2D.tsx";
+import { Vista3D } from "../lienzo/Vista3D.tsx";
+import { Inspector } from "../pantallas/Inspector.tsx";
+import { useEleccion } from "../pantallas/useEleccion.ts";
+import { usePedido } from "../sesion/usePedido.ts";
+
+type Dibujo = "modelo" | "diagnosticos" | "malla";
+
+/** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
+const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "apoyos", "cargas"]);
+const IcBorrar: Icono = ({ size }) => <Trash2 size={size} strokeWidth={1.5} aria-hidden="true" />;
+
+let ultimoPedido = 0;
+
+/** Margen del dibujo para el carril de plantas y la cabecera de la vista. */
+export const MARGENES_VISTA = { izq: 128, arriba: 36 };
+
+export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
+  const { proyecto, planta, setPlanta, seleccion, setSeleccion, tablaPedida } = useVisor();
+  const e = proyecto.estado!;
+  const ed = proyecto.edicion;
+  // Un proyecto sin pilares abre las tablas; se decide al entrar, no con cada objeto que se mete
+  const [vacio] = useState(() => !!ed && !(ed.proyecto.modelo.pilares?.length ?? 0));
+  const pan = usePaneles(espacio, { nav: true, props: false, dock: vacio, pestana: ed ? "tablas" : "diagnosticos" });
+  const cargas = espacio === "cargas";
+
+  const [dibujo, setDibujo] = useState<Dibujo>("modelo");
+  const [caso, setCaso] = useState<string | null>(null);
+  const [tresD, setTresD] = useState(false);
+  const [tabla, setTabla] = useState<NombreTabla>(cargas ? "cargas" : "pilares");
+  const [nueva, setNueva] = useState(0);
+  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | null>(null);
+
+  const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
+  const dibujoValido: Dibujo = dibujo === "malla" && !e.calculado ? "modelo" : dibujo;
+  const en3D = tresD && !cargas && e.compila;
+  const vp: VistaPlanta = cargas ? { vista: "cargas", caso: casoValido } : { vista: dibujoValido };
+  const escena = usePedido(proyecto.cliente, planta && !en3D ? { tipo: "escena", planta, vista: vp } : null);
+  const resaltado = useEleccion(planta, vp, seleccion, !en3D);
+  const geometria = usePedido(proyecto.cliente, en3D ? { tipo: "geometria" } : null);
+  const tablaSel = ed && seleccion ? tablaDe(ed.proyecto.modelo, seleccion) : null;
+
+  const abrirTabla = (t: NombreTabla, filaNueva = false) => {
+    setTabla(t);
+    pan.abrirPestana("tablas");
+    if (filaNueva) setNueva((n) => n + 1);
+  };
+
+  // La paleta pide una tabla (cada pedido, una vez: no al volver a este espacio)
+  const pedido = tablaPedida?.n ?? 0;
+  useEffect(() => {
+    if (!pedido || !tablaPedida || pedido === ultimoPedido) return;
+    ultimoPedido = pedido;
+    abrirTabla(tablaPedida.tabla);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo con cada pedido
+  }, [pedido]);
+
+  const clic = async (p: Vec2, radio: number) => {
+    if (!proyecto.cliente || !planta) return;
+    const r = await proyecto.cliente.pedir({ tipo: "elegir", planta, vista: vp, punto: p, radio });
+    setSeleccion(r.ok && r.valor ? (r.valor as Eleccion).objeto : null);
+  };
+
+  const aviso = proyecto.desactualizado && ed?.pendiente ? (
+    <Aviso tono="warn">Compilando la versión editada…</Aviso>
+  ) : proyecto.desactualizado ? (
+    <Aviso tono="warn">El fichero cambió: abriendo la versión nueva…</Aviso>
+  ) : escena.diagnosticos ? (
+    <Aviso tono="fail">{escena.diagnosticos.map((d) => d.mensaje).join(" ")}</Aviso>
+  ) : !escena.datos && escena.cargando ? (
+    <Aviso>Preparando la planta…</Aviso>
+  ) : null;
+
+  const herramientas = cargas ? (
+    <>
+      <Campo etiqueta="Caso activo" ancho={240}>
+        <select className="sel w-full" value={casoValido} onChange={(x) => setCaso(x.target.value)} aria-label="Caso activo">
+          {e.casos.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.id}
+              {c.nombre ? ` · ${c.nombre}` : ""}
+              {c.pesoPropio ? " · con peso propio" : ""}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      {ed && (
+        <>
+          <Separador />
+          <Herramienta icono={IcCarga} nombre="Nueva carga" onClick={() => abrirTabla("cargas", true)} title="Una carga nueva en la tabla de cargas" />
+          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirTabla("casos")} title="La tabla de casos de carga" />
+        </>
+      )}
+      <Separador />
+      <Herramienta icono={IcCombinaciones} nombre="Combinaciones" onClick={() => pan.abrirPestana("combinaciones")} title="Las combinaciones que salen de los casos" />
+    </>
+  ) : (
+    <>
+      {ed && (
+        <>
+          <Herramienta icono={IcPilar} nombre="Pilar" onClick={() => abrirTabla("pilares", true)} title="Un pilar nuevo en la tabla de pilares" />
+          <Herramienta icono={IcViga} nombre="Viga" onClick={() => abrirTabla("vigas", true)} title="Una viga nueva en la tabla de vigas" />
+          <Herramienta icono={IcLosa} nombre="Losa" onClick={() => abrirTabla("losas", true)} title="Una losa nueva en la tabla de losas" />
+          <Herramienta icono={IcApoyo} nombre="Apoyo" onClick={() => abrirTabla("apoyos", true)} title="Un apoyo nuevo en la tabla de apoyos" />
+          <Separador />
+          <Herramienta icono={IcAPlantas} nombre="A plantas" disabled={!tablaSel || !COPIABLES.has(tablaSel)} onClick={() => setDialogo("copiar")} title={seleccion ? `Copiar ${seleccion} a otras plantas` : "Elija una viga, losa, apoyo o carga"} />
+          <Herramienta icono={IcBorrar} nombre="Borrar" disabled={!tablaSel} onClick={() => setDialogo("borrar")} title={seleccion ? `Borrar ${seleccion}` : "Elija un objeto"} />
+          <Separador />
+          <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirTabla("plantas")} />
+          <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirTabla("materiales")} />
+          <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirTabla("secciones")} />
+        </>
+      )}
+      <Hueco />
+      <Herramienta icono={IcPlanta} nombre="Planta" activa={!en3D} onClick={() => setTresD(false)} />
+      <Herramienta icono={Ic3D} nombre="3D" activa={en3D} disabled={!e.compila} onClick={() => setTresD(true)} />
+    </>
+  );
+
+  const plantaV = e.plantas.find((p) => p.id === planta);
+  const vista = (
+    <>
+      <CabeceraVista>
+        {en3D ? (
+          <Chip>
+            <strong className="font-semibold">Edificio</strong> · planta {planta ?? "—"} resaltada
+          </Chip>
+        ) : (
+          <Chip>
+            <strong className="font-semibold">Planta {planta ?? "—"}</strong>
+            <span className="mono text-text-secondary">{cota(plantaV?.cota)}</span>
+            {escena.ms !== null && <span className="mono text-text-disabled">{fmt(escena.ms, 0)} ms</span>}
+          </Chip>
+        )}
+        {!en3D && !cargas && (
+          <span className="chip seg-chip" role="group" aria-label="Qué se dibuja">
+            {(["modelo", "diagnosticos", "malla"] as const).map((v) => (
+              <button key={v} type="button" data-on={dibujoValido === v} aria-pressed={dibujoValido === v} disabled={v === "malla" && !e.calculado} title={v === "malla" && !e.calculado ? "Necesita el cálculo" : undefined} onClick={() => setDibujo(v)}>
+                {v === "diagnosticos" ? "Diagnósticos" : v === "malla" ? "Malla" : "Modelo"}
+              </button>
+            ))}
+          </span>
+        )}
+        {cargas && (
+          <Chip acento>
+            Cargas del caso <strong className="font-semibold">{casoValido || "—"}</strong>
+          </Chip>
+        )}
+      </CabeceraVista>
+      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
+      {en3D ? <Vista3D geometria={geometria.datos} plantaActiva={planta} titulo="Edificio en 3D" /> : <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Planta ${planta}, ${cargas ? `cargas del caso ${casoValido}` : `vista ${dibujoValido}`}`} cargando={escena.cargando} margenes={MARGENES_VISTA} />}
+    </>
+  );
+
+  const errores = e.diagnosticos.filter((d) => d.severidad === "error").length;
+  const avisos = e.diagnosticos.length - errores;
+  const dock: Pestana[] = [
+    ...(ed ? [{ id: "tablas", titulo: "Tablas", contenido: <PanelTablas tabla={tabla} setTabla={setTabla} nueva={nueva} /> }] : []),
+    {
+      id: "diagnosticos",
+      titulo: "Diagnósticos",
+      insignia: errores ? <span className="text-state-fail">{errores} errores</span> : avisos ? <span className="text-state-warn">{avisos} avisos</span> : "0",
+      contenido: (
+        <>
+          <p className="nota">Los de `fem validar` y `fem calcular`. Un clic en un id lo elige.</p>
+          <ListaDiagnosticos ds={e.diagnosticos} onObjeto={setSeleccion} />
+        </>
+      ),
+    },
+    { id: "combinaciones", titulo: "Combinaciones", insignia: e.combinaciones.length, contenido: <ListaCombinaciones /> },
+  ];
+
+  return (
+    <>
+      <Disposicion
+        paneles={pan}
+        etiquetaHerramientas={cargas ? "Herramientas de Cargas" : "Herramientas de Modelo"}
+        herramientas={herramientas}
+        nav={{ titulo: "Navegador", contenido: cargas ? <NavCargas caso={casoValido} setCaso={setCaso} /> : <NavModelo /> }}
+        vista={vista}
+        props={{ titulo: "Propiedades", contenido: seleccion ? <Inspector id={seleccion} /> : <ResumenPlanta /> }}
+        dock={dock}
+      />
+      {dialogo && seleccion && (dialogo === "borrar" ? <DialogoBorrar ids={[seleccion]} onCerrar={() => setDialogo(null)} /> : <DialogoCopiar ids={[seleccion]} onCerrar={() => setDialogo(null)} />)}
+    </>
+  );
+}
+
+// ─── Navegador ──────────────────────────────────────────────────────────────────────────────────
+
+function Proyecto() {
+  const { proyecto } = useVisor();
+  const e = proyecto.estado!;
+  const ed = proyecto.edicion;
+  return (
+    <Seccion titulo="Proyecto" valor={e.huella.slice(0, 12)}>
+      {ed ? (
+        <DatosProyecto />
+      ) : (
+        <div className="px-3.5 py-2">
+          <div className="text-[13px] font-semibold">{e.nombre ?? "Sin nombre"}</div>
+          {e.descripcion && <p className="mt-1 text-[12px] leading-snug text-text-secondary">{e.descripcion}</p>}
+        </div>
+      )}
+      {!e.compila && <p className="nota text-state-fail">El modelo no compila: se dibuja con sus diagnósticos. {ed ? "Corríjalo en las tablas (los errores, en Diagnósticos, abajo)." : "Corríjalo en el proyecto.json."}</p>}
+      {proyecto.fase === "error" && e.compila && <p className="nota text-state-fail">El cálculo falló: {proyecto.errores.map((d) => d.mensaje).join(" ")}</p>}
+    </Seccion>
+  );
+}
+
+/** Los objetos por tipo; desplegando un tipo, los de la planta activa (o todos, si no van por plantas). */
+function Objetos({ tablas }: { tablas: NombreTabla[] }) {
+  const { proyecto, planta, seleccion, setSeleccion } = useVisor();
+  const e = proyecto.estado!;
+  const ed = proyecto.edicion;
+  const [abiertos, setAbiertos] = useState<Set<NombreTabla>>(() => new Set());
+  const m = ed?.proyecto.modelo;
+  const porTabla = useMemo(() => {
+    if (!m) return null;
+    const ctx = contexto(m);
+    return tablas.map((t) => {
+      const def = DEF_TABLAS[t];
+      const todos = lista(m, def.coleccion);
+      const aqui = todos.filter((o) => {
+        const ps = def.plantas(o, ctx);
+        return ps === null || (planta !== null && ps.includes(planta));
+      });
+      return { t, total: todos.length, aqui };
+    });
+  }, [m, tablas, planta]);
+
+  if (!porTabla)
+    return e.resumen ? (
+      <Seccion titulo="Objetos">
+        {Object.entries(e.resumen.objetos).map(([k, n]) => (
+          <Fila key={k} k={k} v={n} />
+        ))}
+      </Seccion>
+    ) : null;
+
+  return (
+    <Seccion titulo="Objetos" valor={planta ? `en ${planta}` : undefined}>
+      {porTabla.map(({ t, total, aqui }) => {
+        const abierto = abiertos.has(t);
+        return (
+          <div key={t}>
+            <button
+              type="button"
+              className="arbol-fila"
+              aria-expanded={abierto}
+              onClick={() =>
+                setAbiertos((s) => {
+                  const n = new Set(s);
+                  if (abierto) n.delete(t);
+                  else n.add(t);
+                  return n;
+                })
+              }
+            >
+              <span className="w-3 text-text-disabled" aria-hidden="true">
+                {abierto ? "▾" : "▸"}
+              </span>
+              {DEF_TABLAS[t].titulo}
+              <span className="n">{aqui.length === total ? total : `${aqui.length} de ${total}`}</span>
+            </button>
+            {abierto &&
+              aqui.slice(0, 300).map((o) => (
+                <button key={o.id} type="button" className="arbol-fila sub" data-on={o.id === seleccion} onClick={() => setSeleccion(o.id)}>
+                  <span className="truncate">{o.id}</span>
+                  {"seccion" in o && typeof o.seccion === "string" && <span className="n">{o.seccion}</span>}
+                  {"caso" in o && typeof o.caso === "string" && <span className="n">{o.caso}</span>}
+                </button>
+              ))}
+            {abierto && aqui.length > 300 && <p className="nota">… y {aqui.length - 300} más: búsquelos con Ctrl+K o en su tabla.</p>}
+          </div>
+        );
+      })}
+    </Seccion>
+  );
+}
+
+function NavModelo() {
+  return (
+    <>
+      <Proyecto />
+      <Objetos tablas={["pilares", "vigas", "losas", "apoyos"]} />
+    </>
+  );
+}
+
+function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => void }) {
+  const { proyecto } = useVisor();
+  const e = proyecto.estado!;
+  return (
+    <>
+      <Proyecto />
+      <Seccion titulo="Casos" valor={e.casos.length}>
+        {e.casos.map((c) => (
+          <button key={c.id} type="button" className="arbol-fila" data-on={c.id === caso} onClick={() => setCaso(c.id)}>
+            <span className="mono">{c.id}</span>
+            <span className="truncate text-text-secondary">{c.nombre ?? ""}</span>
+            <span className="n">
+              {c.accion ?? "sin acción"}
+              {c.pesoPropio ? " · pp" : ""}
+            </span>
+          </button>
+        ))}
+      </Seccion>
+      <Objetos tablas={["cargas"]} />
+    </>
+  );
+}
+
+/** Nombre y descripción del proyecto, editables (no entran en la huella). */
+function DatosProyecto() {
+  const { proyecto } = useVisor();
+  const ed = proyecto.edicion!;
+  const p = ed.proyecto;
+  const [nombre, setNombre] = useState<string | null>(null);
+  const [descripcion, setDescripcion] = useState<string | null>(null);
+  const escribir = () => {
+    const cambio: { nombre?: string; descripcion?: string } = {};
+    if (nombre !== null && nombre !== (p.nombre ?? "")) cambio.nombre = nombre.trim();
+    if (descripcion !== null && descripcion !== (p.descripcion ?? "")) cambio.descripcion = descripcion.trim();
+    if (Object.keys(cambio).length) ed.editar({ op: "datos", ...cambio }, "Datos del proyecto");
+    setNombre(null);
+    setDescripcion(null);
+  };
+  return (
+    <div className="flex flex-col gap-1.5 px-3.5 py-2">
+      <input className="sel w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600 }} aria-label="Nombre del proyecto" placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+      <textarea className="sel w-full" style={{ height: 52, padding: 6, fontFamily: "var(--font-sans)", fontSize: 12, resize: "vertical" }} aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={escribir} />
+    </div>
+  );
+}
+
+// ─── Propiedades sin nada elegido: la planta ────────────────────────────────────────────────────
+
+function ResumenPlanta() {
+  const { proyecto, planta } = useVisor();
+  const e = proyecto.estado!;
+  const r = e.resumen?.plantas.find((p) => p.id === planta) ?? null;
+  return (
+    <>
+      <p className="nota">Nada elegido: un clic en el dibujo, en el navegador o en una tabla elige un objeto.</p>
+      {r && (
+        <Seccion titulo={`Planta ${r.id}`} valor={`${cota(r.cota)} m`}>
+          <Fila k="Altura" v={r.altura === null ? "—" : `${fmt(r.altura, 2)} m`} />
+          <Fila k="Diafragma" v={r.diafragma === "rigido" ? "rígido" : "ninguno"} />
+          {r.pilares && <Fila k="Pilares (cabeza aquí)" v={Object.entries(r.pilares).map(([s, n]) => `${n}×${s}`).join(" · ")} />}
+          {r.vigas && <Fila k="Vigas" v={`${r.vigas.n} · ${fmt(r.vigas.m, 1)} m`} />}
+          {r.muros && <Fila k="Muros" v={`${r.muros.n} · ${fmt(r.muros.m, 1)} m`} />}
+          {r.losas?.map((l) => <Fila key={l.id} k={`Losa ${l.id}`} v={`${fmt(l.m2, 1)} m² · ${fmt(l.espesor, 2)} m · ${l.tipo}`} />)}
+          {r.panos?.map((l) => <Fila key={l.id} k={`Paño ${l.id}`} v={`${fmt(l.m2, 1)} m² · ${fmt(l.direccion, 0)}° · ${fmt(l.intereje, 2)} m`} />)}
+          <table className="tb mt-1">
+            <thead>
+              <tr>
+                <th>Caso</th>
+                <th>Vertical kN</th>
+                <th>Horizontal kN</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(r.cargas).map(([c, v]) => (
+                <tr key={c}>
+                  <td>{c}</td>
+                  <td>{fmt(v, 1)}</td>
+                  <td>{r.horizontales?.[c] ? `${fmt(r.horizontales[c]![0], 1)}; ${fmt(r.horizontales[c]![1], 1)}` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="nota">Lo que recibe la planta, con el peso propio (−ΣFz de sus cargas, de `fem resumen`).</p>
+        </Seccion>
+      )}
+      <Equilibrio estado={e} />
+      {e.hipotesis.length > 0 && (
+        <Seccion titulo="Hipótesis del compilador" valor={e.hipotesis.length}>
+          <ol className="m-0 list-decimal py-1 pl-8 pr-3.5 text-[12px] leading-snug text-text-secondary">
+            {e.hipotesis.map((h, i) => (
+              <li key={i} className="py-0.5">
+                {h}
+              </li>
+            ))}
+          </ol>
+        </Seccion>
+      )}
+    </>
+  );
+}
+
+// ─── Panel inferior: combinaciones ──────────────────────────────────────────────────────────────
+
+function ListaCombinaciones() {
+  const { proyecto } = useVisor();
+  const e = proyecto.estado!;
+  if (!e.combinaciones.length) return <p className="nota">Sin combinaciones: los casos no llevan su acción (tipo, ψ y familia), así que no hay combinaciones CTE/NCSE. Se pueden ver los casos sueltos.</p>;
+  return (
+    <table className="tb">
+      <thead>
+        <tr>
+          <th>Situación</th>
+          <th>Nombre</th>
+          <th style={{ textAlign: "left" }}>Expresión</th>
+        </tr>
+      </thead>
+      <tbody>
+        {e.combinaciones.map((c) => (
+          <tr key={`${c.situacion}·${c.nombre}`}>
+            <td>{c.situacion}</td>
+            <td>{c.nombre}</td>
+            <td className="txt" style={{ textAlign: "left" }}>
+              {c.etiqueta}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}

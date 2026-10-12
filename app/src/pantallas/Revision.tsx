@@ -1,11 +1,15 @@
 /**
- * Pantalla 7 · Revisión: el informe de A3 (`revisar`, el mismo de `fem revisar`) con su índice, y el
- * estado de su firma en `<proyecto>.revision.json`. El visor no firma: firmar es `fem firmar`, sólo
+ * Espacio Revisión (la pantalla 7 de V1): el informe de A3 (`revisar`, el mismo de `fem revisar`)
+ * con su índice en el navegador, y el estado de su firma en `<proyecto>.revision.json`. El visor no firma: firmar es `fem firmar`, sólo
  * del ingeniero, y el fichero de firmas se vuelve a leer cuando cambia.
  */
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ClipboardCopy } from "lucide-react";
 import type { Bloque } from "../../../src/agente/informe.ts";
-import { Aviso, Panel, Seccion } from "../componentes/comunes.tsx";
+import { Disposicion, Herramienta, Separador } from "../armazon/Disposicion.tsx";
+import { IcFirma, type Icono } from "../armazon/iconos.tsx";
+import { usePaneles } from "../armazon/paneles.ts";
+import { Aviso, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { nombreFirmas } from "../sesion/origen.ts";
 import { usePedido } from "../sesion/usePedido.ts";
@@ -91,16 +95,48 @@ function Documento({ doc }: { doc: Bloque[] }) {
 const TONO = { bien: "ok", avisos: "warn", "no-aplica": "neu" } as const;
 const TEXTO = { bien: "BIEN", avisos: "AVISOS", "no-aplica": "NO APLICA" } as const;
 
-export function PantallaRevision() {
+const IcCopiar: Icono = ({ size }) => <ClipboardCopy size={size} strokeWidth={1.5} aria-hidden="true" />;
+
+export function EspacioRevision() {
   const { proyecto } = useVisor();
+  const pan = usePaneles("revision", { nav: true, props: true });
+  const [copiada, setCopiada] = useState(false);
   const e = proyecto.estado!;
   const fichero = proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? "proyecto.json");
   const r = usePedido(proyecto.cliente, { tipo: "revision", firmas: proyecto.firmas, ficheroFirmas: nombreFirmas(fichero) });
   const x = r.datos;
 
-  return (
+  const orden = `bun run fem firmar ${fichero} --por "Nombre"`;
+  const estadoFirma = !x ? null : "error" in x.firma ? { tono: "fail", texto: "FICHERO DE FIRMAS CON ERRORES" } : x.firma.firmado ? (x.firma.mismoInforme ? { tono: "ok", texto: "FIRMADO" } : { tono: "warn", texto: "FIRMADO OTRO INFORME" }) : { tono: "neu", texto: "SIN FIRMAR" };
+  const herramientas = (
     <>
-      <Panel lado="izq" ancho={248} etiqueta="Índice del informe">
+      <span className="flex items-center gap-2 px-2 text-[13px] text-text-secondary">
+        <IcFirma size={20} />
+        {estadoFirma ? <span className={`pill ${estadoFirma.tono}`}>{estadoFirma.texto}</span> : "Revisando…"}
+      </span>
+      <Separador />
+      <Herramienta
+        icono={IcCopiar}
+        nombre={copiada ? "Copiada" : "Orden de firmar"}
+        title={`Copiar la orden: ${orden}`}
+        onClick={() => {
+          void navigator.clipboard?.writeText(orden).then(() => setCopiada(true));
+          window.setTimeout(() => setCopiada(false), 1500);
+        }}
+      />
+      <span className="self-center px-2 text-[12px] text-text-disabled">Firmar es sólo del ingeniero, en la línea de órdenes, después de leer el informe.</span>
+    </>
+  );
+
+  return (
+    <Disposicion
+      paneles={pan}
+      etiquetaHerramientas="Herramientas de Revisión"
+      herramientas={herramientas}
+      nav={{
+        titulo: "Índice",
+        contenido: (
+          <>
         <Seccion titulo="Índice">
           {x ? (
             <nav className="py-1">
@@ -116,9 +152,11 @@ export function PantallaRevision() {
             <p className="nota">…</p>
           )}
         </Seccion>
-      </Panel>
-
-      <section className="scroll-hide min-w-0 flex-1 overflow-y-auto bg-bg-primary" aria-label="Informe de revisión">
+          </>
+        ),
+      }}
+      vista={
+      <section className="scroll-hide min-h-0 flex-1 overflow-y-auto bg-bg-primary" aria-label="Informe de revisión">
         {proyecto.desactualizado ? (
           <div className="mt-10 grid place-items-center">
             <Aviso tono="warn">El fichero cambió: este informe ya no es el del proyecto.</Aviso>
@@ -135,8 +173,12 @@ export function PantallaRevision() {
           </div>
         )}
       </section>
-
-      <Panel lado="der" etiqueta="Firma">
+      }
+      props={{
+        titulo: "Firma",
+        ancho: 320,
+        contenido: (
+          <>
         <Seccion titulo="Firma">
           {x &&
             ("error" in x.firma ? (
@@ -193,7 +235,9 @@ export function PantallaRevision() {
             </Seccion>
           </>
         )}
-      </Panel>
-    </>
+          </>
+        ),
+      }}
+    />
   );
 }

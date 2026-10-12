@@ -1,8 +1,9 @@
 /**
- * Pantalla 4 · Vigas: la planta con los diagramas de A4 (`vistaDiagramas`) y, debajo, el alzado de la
- * pieza elegida con su envolvente (`envolventePieza`) y un cursor por estaciones que da el máximo y
- * el mínimo con su combinación (`estacion`). A la derecha, los vanos de cara a cara de
- * `fem consultar pieza` y las combinaciones.
+ * Resultados · Diagramas (la pantalla 4 de V1, Vigas): la planta con los diagramas de A4
+ * (`vistaDiagramas`) y, en el panel inferior, el alzado de la pieza elegida con su envolvente
+ * (`envolventePieza`) y un cursor por estaciones que da el máximo y el mínimo con su combinación
+ * (`estacion`). En Propiedades, la estación y los vanos de cara a cara de `fem consultar pieza`; en el
+ * navegador, las vigas de la planta.
  *
  * Convenio (cabecera de src/motor/modelo.ts): My > 0 tracciona la cara inferior y se dibuja hacia
  * abajo, del lado de las tracciones; Vz, T y N, positivos hacia arriba.
@@ -12,7 +13,11 @@ import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { DatosEstacion, DatosViga, Esfuerzo } from "../../../src/visor/datos.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
-import { Aviso, BarraLienzo, ListaPlantas, Panel, Seccion, SelectorCombinaciones, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { CabeceraVista, CarrilPlantas, Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { usePaneles } from "../armazon/paneles.ts";
+import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { BarraModos } from "../espacios/BarraModos.tsx";
+import { MARGENES_VISTA } from "../espacios/Modelo.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt } from "../fmt.ts";
 import { Planta2D } from "../lienzo/Planta2D.tsx";
@@ -76,7 +81,7 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
   const picos: typeof todos = [];
   for (const p of [...todos].sort((a, b) => Math.abs(b.v) - Math.abs(a.v))) if (!picos.some((q) => Math.abs(X(q.s) - X(p.s)) < 40 && Math.sign(q.v) === Math.sign(p.v))) picos.push(p);
   return (
-    <div ref={caja} className="relative shrink-0 border-t border-border-main bg-bg-canvas" style={{ height: H + 34 }}>
+    <div ref={caja} className="relative shrink-0 bg-bg-canvas" style={{ height: H + 34 }}>
       <div className="flex h-[30px] items-center gap-4 border-b border-border-sub px-3 text-[11px] text-text-secondary">
         <span className="font-mono text-text-primary">
           {v.id} · {v.esfuerzo} · envolvente de {v.combinaciones.nombres.length}
@@ -168,8 +173,9 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
   );
 }
 
-export function PantallaVigas() {
+export function ModoDiagramas() {
   const { proyecto, planta, setPlanta, seleccion, setSeleccion } = useVisor();
+  const pan = usePaneles("resultados:diagramas", { nav: true, props: true, dock: true, pestana: "alzado", alto: 300 });
   const e = proyecto.estado!;
   const [esfuerzo, setEsfuerzo] = useState<Esfuerzo>("My");
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
@@ -212,58 +218,70 @@ export function PantallaVigas() {
 
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : escena.diagnosticos ? <Aviso tono="fail">{escena.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !escena.datos && escena.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
 
-  return (
+  const herramientas = (
     <>
-      <Panel lado="izq" etiqueta="Plantas y piezas">
-        <ListaPlantas estado={e} planta={planta} onPlanta={setPlanta} />
-        <Seccion titulo="Esfuerzo" valor={unidad}>
-          <div className="px-3.5 py-2">
-            <div className="seg grid grid-cols-4" role="group" aria-label="Esfuerzo">
-              {ESFUERZOS.map((x) => (
-                <button key={x.id} type="button" data-on={esfuerzo === x.id} disabled={x.id === "N" && v?.axilSinValor} title={x.id === "N" && v?.axilSinValor ? "Sin valor: la viga está en un diafragma rígido (C1-d)" : undefined} onClick={() => setEsfuerzo(x.id)}>
-                  {x.id}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Seccion>
-        <Seccion titulo="Combinaciones">
-          <SelectorCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="Esfuerzos" />
-        </Seccion>
-        {grupos.map(([g, ps]) => (
-          <Seccion key={g} titulo={g === "Vigas" ? "Vigas" : `Viguetas del paño ${g}`} valor={ps.length}>
-            {ps.map((p) => (
-              <button key={p.id} type="button" className="lista-fila" data-on={p.id === id} style={{ gridTemplateColumns: "1fr auto auto" }} onClick={() => setSeleccion(p.id)}>
-                <span className="mono truncate">{p.id}</span>
-                <span className="text-[11px]">{p.seccion ?? ""}</span>
-                <span className="mono text-[11px]">{fmt(p.longitud, 2)} m</span>
-              </button>
-            ))}
-          </Seccion>
-        ))}
-        {!lista.length && !piezas.cargando && <p className="nota">La planta no tiene vigas ni viguetas.</p>}
-      </Panel>
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
+      <Separador />
+      <BarraModos />
+      <Separador />
+      <Segmentado
+        etiqueta="Esfuerzo"
+        opciones={ESFUERZOS.map((x) => ({ id: x.id, nombre: x.id, title: x.id === "N" && v?.axilSinValor ? "Sin valor: la viga está en un diafragma rígido (C1-d)" : undefined }))}
+        valor={esfuerzo}
+        onCambio={setEsfuerzo}
+        deshabilitada={(x) => x === "N" && !!v?.axilSinValor}
+      />
+    </>
+  );
 
-      <section className="flex min-w-0 flex-1 flex-col" aria-label="Planta y alzado">
-        <BarraLienzo>
-          {planta} · {cota(e.plantas.find((p) => p.id === planta)?.cota)} m · {vista.vista === "vigas" ? `diagramas de ${esfuerzo}` : "modelo"} · {id ?? "—"}
-        </BarraLienzo>
-        <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Vigas de la planta ${planta}`} cargando={escena.cargando || viga.cargando} />
-        {v && (
-          <>
-            <Alzado v={v} s={sValida} onS={setS} />
-            <div className="flex h-9 shrink-0 items-center gap-3 border-t border-border-sub bg-bg-surface px-3">
-              <label htmlFor="estacion" className="text-[11px] text-text-secondary">
-                Estación
-              </label>
-              <input id="estacion" type="range" min={0} max={v.longitud} step={v.longitud / 400} value={sValida} onChange={(x) => setS(Number(x.target.value))} className="flex-1" style={{ accentColor: "var(--color-accent)" }} />
-              <span className="mono w-[90px] text-right text-[12px]">s = {fmt(sValida, 2)} m</span>
-            </div>
-          </>
-        )}
-      </section>
+  const navegador = (
+    <>
+      {grupos.map(([g, ps]) => (
+        <Seccion key={g} titulo={g === "Vigas" ? `Vigas de ${planta}` : `Viguetas del paño ${g}`} valor={ps.length}>
+          {ps.map((p) => (
+            <button key={p.id} type="button" className="lista-fila" data-on={p.id === id} style={{ gridTemplateColumns: "1fr auto auto" }} onClick={() => setSeleccion(p.id)}>
+              <span className="mono truncate">{p.id}</span>
+              <span className="text-[11.5px]">{p.seccion ?? ""}</span>
+              <span className="mono text-[11.5px]">{fmt(p.longitud, 2)} m</span>
+            </button>
+          ))}
+        </Seccion>
+      ))}
+      {!lista.length && !piezas.cargando && <p className="nota">La planta no tiene vigas ni viguetas.</p>}
+    </>
+  );
 
-      <Panel lado="der" ancho={420} etiqueta="Pieza">
+  const vistaPlanta = (
+    <>
+      <CabeceraVista>
+        <Chip>
+          <strong className="font-semibold">Planta {planta}</strong>
+          <span className="mono text-text-secondary">{cota(e.plantas.find((p) => p.id === planta)?.cota)}</span>
+        </Chip>
+        <Chip acento>{vista.vista === "vigas" ? `Diagramas de ${esfuerzo}` : `${esfuerzo}: sólo en el alzado de la pieza`}</Chip>
+      </CabeceraVista>
+      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
+      <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Vigas de la planta ${planta}`} cargando={escena.cargando || viga.cargando} margenes={MARGENES_VISTA} />
+    </>
+  );
+
+  const alzado = v ? (
+    <>
+      <Alzado v={v} s={sValida} onS={setS} />
+      <div className="flex h-9 shrink-0 items-center gap-3 border-t border-border-sub bg-bg-surface px-3">
+        <label htmlFor="estacion" className="text-[12px] text-text-secondary">
+          Estación
+        </label>
+        <input id="estacion" type="range" min={0} max={v.longitud} step={v.longitud / 400} value={sValida} onChange={(x) => setS(Number(x.target.value))} className="flex-1" style={{ accentColor: "var(--color-accent)" }} />
+        <span className="mono w-[90px] text-right text-[12px]">s = {fmt(sValida, 2)} m</span>
+      </div>
+    </>
+  ) : (
+    <p className="nota">Elija una viga en la planta o en el navegador.</p>
+  );
+
+  const propiedades = (
+    <>
         {viga.diagnosticos && <p className="nota text-state-fail">{viga.diagnosticos.map((x) => x.mensaje).join(" ")}</p>}
         {v && (
           <>
@@ -314,10 +332,23 @@ export function PantallaVigas() {
               </table>
               <p className="nota">Máximos exactos del diagrama combinado dentro de cada vano, de cara a cara de sus apoyos.</p>
             </Seccion>
-            <TablaCombinaciones c={v.combinaciones} />
           </>
         )}
-      </Panel>
     </>
+  );
+
+  return (
+    <Disposicion
+      paneles={pan}
+      etiquetaHerramientas="Herramientas de Resultados"
+      herramientas={herramientas}
+      nav={{ titulo: "Piezas", contenido: navegador }}
+      vista={vistaPlanta}
+      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 400 }}
+      dock={[
+        { id: "alzado", titulo: v ? `Alzado · ${v.id}` : "Alzado", contenido: alzado },
+        { id: "combinaciones", titulo: "Combinaciones", insignia: v?.combinaciones.nombres.length, contenido: v ? <TablaCombinaciones c={v.combinaciones} /> : <p className="nota">…</p> },
+      ]}
+    />
   );
 }

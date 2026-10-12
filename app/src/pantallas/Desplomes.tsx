@@ -1,12 +1,15 @@
 /**
- * Pantalla 6 · Desplomes: `fem consultar deriva` por planta (el mayor desplome relativo d/h con su
+ * Resultados · Deformada (la pantalla 6 de V1, Desplomes): `fem consultar deriva` por planta (el mayor desplome relativo d/h con su
  * pilar y su combinación, y el desplazamiento del maestro de su diafragma), frente al límite de A3,
  * y la deformada 3D en la combinación pésima (o en la elegida, si es una sola).
  */
 import { useState } from "react";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { DatosDesplomes } from "../../../src/visor/datos.ts";
-import { Aviso, BarraLienzo, Panel, Seccion, SelectorCombinaciones, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { CabeceraVista, CarrilPlantas, Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { usePaneles } from "../armazon/paneles.ts";
+import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt, fraccion, mm } from "../fmt.ts";
 import { Vista3D } from "../lienzo/Vista3D.tsx";
@@ -46,8 +49,9 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
   );
 }
 
-export function PantallaDesplomes() {
-  const { proyecto, planta } = useVisor();
+export function ModoDeformada() {
+  const { proyecto, planta, setPlanta } = useVisor();
+  const pan = usePaneles("resultados:deformada", { props: true, dock: true, pestana: "desplomes" });
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [escalaDada, setEscalaDada] = useState<number | null>(null);
@@ -66,106 +70,134 @@ export function PantallaDesplomes() {
   const escala = escalaDada ?? escalaAuto;
   const pasan = x?.plantas.filter((p) => p.desplome && p.desplome.v > x.limiteRelativo).length ?? 0;
 
-  return (
+  const herramientas = (
     <>
-      <Panel lado="izq" etiqueta="Combinaciones y escala">
-        <Seccion titulo="Combinaciones">
-          <SelectorCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="Desplazamientos" />
-          <p className="nota">Por defecto, las de `fem consultar deriva` (la ELS característica si los casos llevan su acción). Para el viento solo, elija su caso.</p>
-        </Seccion>
-        <Seccion titulo="Deformada" valor={deformada.datos?.comb ?? ""}>
-          <label className="fila">
-            <span>Escala ×</span>
-            <input type="number" min={1} step={10} className="sel w-[110px] text-right" value={escala} onChange={(v) => setEscalaDada(Number(v.target.value) || 1)} />
-          </label>
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="desplazamientos" />
+      <Separador />
+      <BarraModos />
+      <Separador />
+      <Campo etiqueta="Escala de la deformada" ancho={190}>
+        <span className="flex items-center gap-1.5">
+          <input type="number" min={1} step={10} className="sel w-[90px] text-right" aria-label="Escala de la deformada" value={escala} onChange={(v) => setEscalaDada(Number(v.target.value) || 1)} />
           {escalaDada !== null && (
-            <button type="button" className="btn mx-3.5 my-1" onClick={() => setEscalaDada(null)}>
-              Escala automática ({fmt(escalaAuto, 0)})
+            <button type="button" className="btn" style={{ height: 28 }} onClick={() => setEscalaDada(null)} title="Volver a la escala automática">
+              auto ({fmt(escalaAuto, 0)})
             </button>
           )}
-          <p className="nota">{deformada.datos ? `${deformada.datos.comb} = ${deformada.datos.etiqueta}` : ""}{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}</p>
-        </Seccion>
-      </Panel>
-
-      <section className="flex min-w-0 flex-1 flex-col" aria-label="Deformada">
-        <BarraLienzo>
-          deformada ×{fmt(escala, 0)} · {deformada.datos?.comb ?? "—"} · desplazamiento máximo {mm(umax)} mm
-        </BarraLienzo>
-        {proyecto.desactualizado ? (
-          <div className="lienzo grid place-items-center">
-            <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
-          </div>
-        ) : (
-          <Vista3D geometria={geometria.datos} plantaActiva={planta} deformada={deformada.datos ? { u: deformada.datos.u, escala } : null} titulo="Deformada del edificio" />
-        )}
-      </section>
-
-      <Panel lado="der" ancho={380} etiqueta="Desplomes por planta">
-        {d.diagnosticos && <p className="nota text-state-fail">{d.diagnosticos.map((y) => y.mensaje).join(" ")}</p>}
-        {x && (
-          <>
-            <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)} (A3)`}>
-              <div className="fila">
-                <span>Plantas que lo pasan</span>
-                <span className={`v ${pasan ? "text-state-warn" : ""}`}>{pasan}</span>
-              </div>
-              <table className="tb">
-                <thead>
-                  <tr>
-                    <th>Planta</th>
-                    <th>d mm</th>
-                    <th>d/h</th>
-                    <th>ux mm</th>
-                    <th>uy mm</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {x.plantas.map((p) => {
-                    const pasa = !!p.desplome && p.desplome.v > x.limiteRelativo;
-                    return (
-                      <tr key={p.planta} data-on={p.planta === planta}>
-                        <td>
-                          {p.planta}
-                          <small>h {fmt(p.altura, 2)} m</small>
-                        </td>
-                        <td>
-                          {p.desplome ? mm(p.desplome.d) : "—"}
-                          <small>{p.desplome?.pieza ?? ""}</small>
-                        </td>
-                        <td className={pasa ? "w" : undefined}>
-                          {p.desplome ? fraccion(p.desplome.v) : "—"}
-                          <small>{p.desplome?.comb ?? ""}</small>
-                        </td>
-                        <td>
-                          {p.maestro ? mm(p.maestro.ux.v) : "—"}
-                          <small>{p.maestro?.ux.comb ?? ""}</small>
-                        </td>
-                        <td>
-                          {p.maestro ? mm(p.maestro.uy.v) : "—"}
-                          <small>{p.maestro?.uy.comb ?? ""}</small>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <p className="nota">d: el mayor desplome de un pilar respecto a la planta de abajo (su pilar debajo); ux, uy: los del maestro del diafragma, el mayor |·| de cada uno, cada uno con su combinación.</p>
-            </Seccion>
-            <Seccion titulo="Perfil del maestro">
-              <Perfil d={x} cotas={cotas} />
-              <div className="flex gap-4 px-3.5 pb-2 text-[11px] text-text-secondary">
-                <span className="flex items-center gap-1">
-                  <i className="inline-block h-[2px] w-4 bg-accent" /> ux
-                </span>
-                <span className="flex items-center gap-1">
-                  <i className="inline-block h-[2px] w-4" style={{ background: "var(--color-uy)" }} /> |uy|
-                </span>
-              </div>
-            </Seccion>
-            <TablaCombinaciones c={x.combinaciones} resaltar={x.pesima} />
-          </>
-        )}
-      </Panel>
+        </span>
+      </Campo>
     </>
+  );
+
+  const vista = (
+    <>
+      <CabeceraVista>
+        <Chip>
+          <strong className="font-semibold">Deformada</strong> ×{fmt(escala, 0)}
+        </Chip>
+        <Chip acento title={deformada.datos?.etiqueta}>
+          <span className="mono">{deformada.datos?.comb ?? "—"}</span> · máx. {mm(umax)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
+        </Chip>
+      </CabeceraVista>
+      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
+      {proyecto.desactualizado ? (
+        <div className="lienzo grid place-items-center">
+          <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
+        </div>
+      ) : (
+        <Vista3D geometria={geometria.datos} plantaActiva={planta} deformada={deformada.datos ? { u: deformada.datos.u, escala } : null} titulo="Deformada del edificio" />
+      )}
+    </>
+  );
+
+  const tabla = x ? (
+    <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)} (A3)`}>
+      <table className="tb">
+        <thead>
+          <tr>
+            <th>Planta</th>
+            <th>d mm</th>
+            <th>d/h</th>
+            <th>ux mm</th>
+            <th>uy mm</th>
+          </tr>
+        </thead>
+        <tbody>
+          {x.plantas.map((p) => {
+            const pasa = !!p.desplome && p.desplome.v > x.limiteRelativo;
+            return (
+              <tr key={p.planta} data-on={p.planta === planta}>
+                <td>
+                  {p.planta}
+                  <small>h {fmt(p.altura, 2)} m</small>
+                </td>
+                <td>
+                  {p.desplome ? mm(p.desplome.d) : "—"}
+                  <small>{p.desplome?.pieza ?? ""}</small>
+                </td>
+                <td className={pasa ? "w" : undefined}>
+                  {p.desplome ? fraccion(p.desplome.v) : "—"}
+                  <small>{p.desplome?.comb ?? ""}</small>
+                </td>
+                <td>
+                  {p.maestro ? mm(p.maestro.ux.v) : "—"}
+                  <small>{p.maestro?.ux.comb ?? ""}</small>
+                </td>
+                <td>
+                  {p.maestro ? mm(p.maestro.uy.v) : "—"}
+                  <small>{p.maestro?.uy.comb ?? ""}</small>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="nota">d: el mayor desplome de un pilar respecto a la planta de abajo (su pilar debajo); ux, uy: los del maestro del diafragma, el mayor |·| de cada uno, cada uno con su combinación.</p>
+    </Seccion>
+  ) : (
+    <p className="nota">…</p>
+  );
+
+  const propiedades = (
+    <>
+      {d.diagnosticos && <p className="nota text-state-fail">{d.diagnosticos.map((y) => y.mensaje).join(" ")}</p>}
+      <p className="nota">Por defecto, las combinaciones de `fem consultar deriva` (la ELS característica si los casos llevan su acción). Para el viento solo, elija su caso.</p>
+      {x && (
+        <>
+          <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)} (A3)`}>
+            <div className="fila">
+              <span>Plantas que lo pasan</span>
+              <span className={`v ${pasan ? "text-state-warn" : ""}`}>{pasan}</span>
+            </div>
+            <p className="nota">La tabla por planta, abajo.</p>
+          </Seccion>
+          <Seccion titulo="Perfil del maestro">
+            <Perfil d={x} cotas={cotas} />
+            <div className="flex gap-4 px-3.5 pb-2 text-[12px] text-text-secondary">
+              <span className="flex items-center gap-1">
+                <i className="inline-block h-[2px] w-4 bg-accent" /> ux
+              </span>
+              <span className="flex items-center gap-1">
+                <i className="inline-block h-[2px] w-4" style={{ background: "var(--color-uy)" }} /> |uy|
+              </span>
+            </div>
+          </Seccion>
+        </>
+      )}
+    </>
+  );
+
+  return (
+    <Disposicion
+      paneles={pan}
+      etiquetaHerramientas="Herramientas de Resultados"
+      herramientas={herramientas}
+      vista={vista}
+      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 320 }}
+      dock={[
+        { id: "desplomes", titulo: "Desplomes por planta", contenido: tabla },
+        { id: "combinaciones", titulo: "Combinaciones", insignia: x?.combinaciones.nombres.length, contenido: x ? <TablaCombinaciones c={x.combinaciones} resaltar={x.pesima} /> : <p className="nota">…</p> },
+      ]}
+    />
   );
 }

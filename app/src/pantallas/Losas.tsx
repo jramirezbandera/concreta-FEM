@@ -1,15 +1,19 @@
 /**
- * Pantalla 3 · Losas: uz, M11, M22, M12, V13 y V23 por planta (la escena `vistaCampo` de A4, en la
- * combinación de mayor |valor| de las elegidas). Un clic da el valor del punto interpolado como las
- * bandas (la consulta `valor-punto`, no el color); a la derecha, los extremos, las flechas de
- * `fem consultar flechas` y las combinaciones.
+ * Resultados · Losas (la pantalla 3 de V1): uz, M11, M22, M12, V13 y V23 por planta (la escena
+ * `vistaCampo` de A4, en la combinación de mayor |valor| de las elegidas). Un clic da el valor del
+ * punto interpolado como las bandas (la consulta `valor-punto`, no el color); en Propiedades, ese
+ * valor, los extremos y las flechas de `fem consultar flechas`; abajo, las combinaciones.
  */
 import { useEffect, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Campo } from "../../../src/agente/render/resultados.ts";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { ValorPunto } from "../../../src/visor/datos.ts";
-import { Aviso, BarraLienzo, Equilibrio, ListaPlantas, Panel, Seccion, SelectorCombinaciones, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { CabeceraVista, CarrilPlantas, Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { usePaneles } from "../armazon/paneles.ts";
+import { Aviso, ComboCombinaciones, Equilibrio, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { BarraModos } from "../espacios/BarraModos.tsx";
+import { MARGENES_VISTA } from "../espacios/Modelo.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt, mm } from "../fmt.ts";
 import { Planta2D, type MarcaExtra } from "../lienzo/Planta2D.tsx";
@@ -24,8 +28,9 @@ const CAMPOS: { id: Campo; nombre: string; dec: number }[] = [
   { id: "v23", nombre: "V23", dec: 1 },
 ];
 
-export function PantallaLosas() {
+export function ModoLosas() {
   const { proyecto, planta, setPlanta } = useVisor();
+  const pan = usePaneles("resultados:losas", { props: true, pestana: "combinaciones" });
   const e = proyecto.estado!;
   const [campo, setCampo] = useState<Campo>("uz");
   const [elDesp, setElDesp] = useState<EleccionCombinaciones>({ tipo: "defecto" });
@@ -54,40 +59,41 @@ export function PantallaLosas() {
   const marcas: MarcaExtra[] = puntoValido ? [{ p: puntoValido.p, texto: puntoValido.v ? `${fmt(puntoValido.v.valor, dec)} ${unidad}` : "sin mapa" }] : [];
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !x && d.cargando ? <Aviso>Recuperando los campos (SPR)…</Aviso> : null;
 
-  return (
+  const nombreCampo = CAMPOS.find((c) => c.id === campo)!.nombre;
+  const herramientas = (
     <>
-      <Panel lado="izq" etiqueta="Plantas y magnitud">
-        <ListaPlantas estado={e} planta={planta} onPlanta={setPlanta} />
-        <Seccion titulo="Magnitud" valor={unidad}>
-          <div className="grid grid-cols-3 gap-1 px-3.5 py-2" role="group" aria-label="Magnitud">
-            {CAMPOS.map((c) => (
-              <button key={c.id} type="button" className="btn mono" data-on={campo === c.id} style={campo === c.id ? { background: "var(--color-tint-accent)", color: "var(--color-accent)", borderColor: "var(--color-accent)" } : undefined} aria-pressed={campo === c.id} onClick={() => setCampo(c.id)}>
-                {c.nombre}
-              </button>
-            ))}
-          </div>
-          <p className="nota">uz de los nudos; momentos y cortantes recuperados por SPR (E5) en los ejes de cada losa. Bandas sin interpolar el color (H43): el número de un punto, con un clic.</p>
-        </Seccion>
-        <Seccion titulo="Combinaciones">
-          <SelectorCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta={campo === "uz" ? "Desplazamientos" : "Esfuerzos"} />
-          {x && (
-            <p className="nota">
-              Se dibuja <b className="mono">{x.dibujada?.nombre ?? "—"}</b>
-              {x.combinaciones.nombres.length > 1 ? `: la de mayor |valor| en la planta de las ${x.combinaciones.nombres.length} de ${x.combinaciones.descripcion}.` : "."}
-            </p>
-          )}
-        </Seccion>
-      </Panel>
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta={campo === "uz" ? "desplazamientos" : "esfuerzos"} />
+      <Separador />
+      <BarraModos />
+      <Separador />
+      <Segmentado etiqueta="Magnitud" opciones={CAMPOS.map((c) => ({ id: c.id, nombre: c.nombre }))} valor={campo} onCambio={setCampo} />
+    </>
+  );
+  const vista = (
+    <>
+      <CabeceraVista>
+        <Chip>
+          <strong className="font-semibold">Planta {planta}</strong>
+          <span className="mono text-text-secondary">{cota(e.plantas.find((p) => p.id === planta)?.cota)}</span>
+        </Chip>
+        <Chip acento title={x?.dibujada?.etiqueta}>
+          {nombreCampo} · {unidad} · <span className="mono">{x?.dibujada?.nombre ?? "—"}</span>
+          {d.ms !== null && <span className="mono text-text-disabled">{fmt(d.ms, 0)} ms</span>}
+        </Chip>
+      </CabeceraVista>
+      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
+      <Planta2D escena={x?.escena ?? null} marcas={marcas} onClic={(p) => void clic(p)} aviso={aviso} titulo={`Mapa de ${campo} en la planta ${planta}`} cargando={d.cargando} margenes={MARGENES_VISTA} />
+    </>
+  );
 
-      <section className="flex min-w-0 flex-1 flex-col" aria-label="Mapa">
-        <BarraLienzo>
-          {planta} · {cota(e.plantas.find((p) => p.id === planta)?.cota)} m · {CAMPOS.find((c) => c.id === campo)!.nombre} · {x?.dibujada ? `${x.dibujada.nombre} = ${x.dibujada.etiqueta}` : "—"}
-          {d.ms !== null ? ` · ${fmt(d.ms, 0)} ms` : ""}
-        </BarraLienzo>
-        <Planta2D escena={x?.escena ?? null} marcas={marcas} onClic={(p) => void clic(p)} aviso={aviso} titulo={`Mapa de ${campo} en la planta ${planta}`} cargando={d.cargando} />
-      </section>
-
-      <Panel lado="der" etiqueta="Valores">
+  const propiedades = (
+    <>
+      {x && (
+        <p className="nota">
+          Se dibuja <b className="mono">{x.dibujada?.nombre ?? "—"}</b>
+          {x.combinaciones.nombres.length > 1 ? `: la de mayor |valor| en la planta de las ${x.combinaciones.nombres.length} de ${x.combinaciones.descripcion}.` : "."} uz de los nudos; momentos y cortantes recuperados por SPR (E5) en los ejes de cada losa. Bandas sin interpolar el color (H43): el número de un punto, con un clic.
+        </p>
+      )}
         <Seccion titulo="Valor en el punto">
           {puntoValido ? (
             puntoValido.v ? (
@@ -167,11 +173,20 @@ export function PantallaLosas() {
               )}
               <p className="nota">Hacia abajo, positivas. Relativa: a las esquinas de su recuadro de pilares (losas) o a los extremos del vano (paños), como `fem consultar flechas`.</p>
             </Seccion>
-            <TablaCombinaciones c={x.combinaciones} resaltar={x.dibujada?.nombre} />
           </>
         )}
         <Equilibrio estado={e} />
-      </Panel>
     </>
+  );
+
+  return (
+    <Disposicion
+      paneles={pan}
+      etiquetaHerramientas="Herramientas de Resultados"
+      herramientas={herramientas}
+      vista={vista}
+      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 340 }}
+      dock={[{ id: "combinaciones", titulo: "Combinaciones", insignia: x?.combinaciones.nombres.length, contenido: x ? <TablaCombinaciones c={x.combinaciones} resaltar={x.dibujada?.nombre} /> : <p className="nota">…</p> }]}
+    />
   );
 }

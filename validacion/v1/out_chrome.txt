@@ -1,4 +1,4 @@
-# validacion/v1/chrome.ts — 2026-10-11, Ryzen 9 5900X, Windows 11; Chrome/154.0.8037.98 headless; 1 FALLOS
+# validacion/v1/chrome.ts — 2026-10-12, Ryzen 9 5900X, Windows 11; Chrome/154.0.8037.98 headless; 1 FALLOS
 ## Criterios 2 y 3: los bits de la CLI y los resultados guardados
 BIEN  ejemplo: sha256 en Chrome 1c410cae2dd7879c = fem calcular 1c410cae2dd7879c
 BIEN  ejemplo: abierto con .fem/ (guardados), mismo sha256
@@ -11,47 +11,47 @@ BIEN  edificio: abierto con .fem/ (guardados), mismo sha256
 BIEN  alterado: no se usa y se dice por qué («.fem no se usó: resultados.bin no es el que se guardó (su sha256 no coincide)»)
 
 ## Criterio 4: fluidez en el edificio objetivo
-1022: abrir y calcular 0.10 s (compilar y calcular en el worker 0.04 s, resto 0.06 s); abrir con .fem 0.11 s
-ejemplo: abrir y calcular 0.34 s (compilar y calcular en el worker 0.11 s, resto 0.23 s); abrir con .fem 0.12 s
-nucleo: abrir y calcular 0.28 s (compilar y calcular en el worker 0.24 s, resto 0.04 s); abrir con .fem 0.15 s
-edificio: abrir y calcular 3.71 s (compilar y calcular en el worker 3.65 s, resto 0.06 s); abrir con .fem 1.37 s
-BIEN  abrir con .fem/ 1.37 s ≤ 2 s
-BIEN  abrir y calcular: el cálculo (3.65 s) más 0.06 s ≤ 1 s
-  planta N3 (modelo): 7 ms
-  planta N5 (modelo): 5 ms
-  vista cargas: 5 ms
-  vista malla: 22 ms
-  pantalla losas: 124 ms
-  magnitud M11: 592 ms
-  magnitud M22: 128 ms
-  planta N2 (losas): 460 ms
-  combinación: un caso (losas): 81 ms
-  combinación: por defecto (losas): 24 ms
+1022: abrir y calcular 0.10 s (compilar y calcular en el worker 0.06 s, resto 0.04 s); abrir con .fem 0.08 s
+ejemplo: abrir y calcular 0.40 s (compilar y calcular en el worker 0.09 s, resto 0.31 s); abrir con .fem 0.12 s
+nucleo: abrir y calcular 0.32 s (compilar y calcular en el worker 0.25 s, resto 0.07 s); abrir con .fem 0.15 s
+edificio: abrir y calcular 3.55 s (compilar y calcular en el worker 3.49 s, resto 0.06 s); abrir con .fem 1.31 s
+BIEN  abrir con .fem/ 1.31 s ≤ 2 s
+BIEN  abrir y calcular: el cálculo (3.49 s) más 0.06 s ≤ 1 s
+  planta N3 (modelo): 19 ms
+  planta N5 (modelo): 18 ms
+  vista cargas: 7 ms
+  vista malla: 35 ms
+  pantalla losas: 105 ms
+  magnitud M11: 579 ms
+  magnitud M22: 125 ms
+  planta N2 (losas): 408 ms
+  combinación: un caso (losas): 64 ms
+  combinación: por defecto (losas): 16 ms
   clic en el mapa (valor del punto): 16 ms
-  pantalla vigas: 568 ms
-  otra viga: 15 ms
-  esfuerzo Vz: 118 ms
-  cursor de la viga (30 pasos): 458 ms
-  pantalla pilares: 55 ms
-  planta N1 (pilares): 27 ms
-  elegir un pilar: 2 ms
-  pantalla desplomes (3D y deformada): 17 ms
-  girar el 3D (40 pasos): 524 ms
-  pantalla revisión: 2372 ms
-  pantalla modelo: 23 ms
-  3D del modelo: 3 ms
-  girar el 3D del modelo (40 pasos): 365 ms
-BIEN  planta N3 (modelo): 7 ms ≤ 500 ms
-BIEN  planta N5 (modelo): 5 ms ≤ 500 ms
-FALLA magnitud M11: 592 ms ≤ 500 ms
-BIEN  magnitud M22: 128 ms ≤ 500 ms
-BIEN  planta N2 (losas): 460 ms ≤ 500 ms
-BIEN  combinación: un caso (losas): 81 ms ≤ 500 ms
-BIEN  combinación: por defecto (losas): 24 ms ≤ 500 ms
-BIEN  planta N1 (pilares): 27 ms ≤ 500 ms
+  pantalla vigas: 518 ms
+  otra viga: 24 ms
+  esfuerzo Vz: 122 ms
+  cursor de la viga (30 pasos): 457 ms
+  pantalla pilares: 40 ms
+  planta N1 (pilares): 20 ms
+  elegir un pilar: 3 ms
+  pantalla desplomes (3D y deformada): 20 ms
+  girar el 3D (40 pasos): 418 ms
+  pantalla revisión: 2206 ms
+  pantalla modelo: 21 ms
+  3D del modelo: 5 ms
+  girar el 3D del modelo (40 pasos): 356 ms
+BIEN  planta N3 (modelo): 19 ms ≤ 500 ms
+BIEN  planta N5 (modelo): 18 ms ≤ 500 ms
+FALLA magnitud M11: 579 ms ≤ 500 ms
+BIEN  magnitud M22: 125 ms ≤ 500 ms
+BIEN  planta N2 (losas): 408 ms ≤ 500 ms
+BIEN  combinación: un caso (losas): 64 ms ≤ 500 ms
+BIEN  combinación: por defecto (losas): 16 ms ≤ 500 ms
+BIEN  planta N1 (pilares): 20 ms ≤ 500 ms
 Tareas largas del hilo principal en todo el recorrido (desde la navegación): 0
 BIEN  ninguna tarea larga (> 50 ms) en el hilo principal
 
 ## Criterio 5: recarga al cambiar el fichero
-BIEN  cambio visto en 249 ms ≤ 2 s (recalculado en 3912 ms)
-BIEN  conserva pantalla (Pilares), planta (N3) y selección (P-x0-y20, era P-x0-y20)
+BIEN  cambio visto en 242 ms ≤ 2 s (recalculado en 4037 ms)
+BIEN  conserva espacio y modo (Resultados · Pilares), planta (N3) y selección (P-x0-y20, era P-x0-y20)

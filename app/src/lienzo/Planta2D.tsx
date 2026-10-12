@@ -34,6 +34,8 @@ interface Props {
   titulo: string;
   /** Hay un pedido en curso (lo que se ve puede ser del anterior); para el banco, `data-cargando`. */
   cargando?: boolean;
+  /** Margen de más, px, para lo que flota sobre el lienzo: el carril de plantas y la cabecera de la vista. */
+  margenes?: { izq?: number; arriba?: number };
 }
 
 /** Radio de elección, px. */
@@ -64,7 +66,7 @@ function GlifoSvg({ g, x, y, tema }: { g: Glifo; x: number; y: number; tema: "li
   );
 }
 
-export function Planta2D({ escena, resaltado, marcas, onClic, aviso, leyenda = true, titulo, cargando = false }: Props) {
+export function Planta2D({ escena, resaltado, marcas, onClic, aviso, leyenda = true, titulo, cargando = false, margenes }: Props) {
   const { theme: tema } = useTheme();
   const caja = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -93,6 +95,8 @@ export function Planta2D({ escena, resaltado, marcas, onClic, aviso, leyenda = t
     setView(IDENTITY_VIEW);
   }
 
+  const mIzq = margenes?.izq ?? 0;
+  const mArriba = margenes?.arriba ?? 0;
   const base = useMemo(() => {
     const [x0, y0, x1, y1] = escena?.caja ?? [0, 0, 10, 10];
     const insetDerecho = leyenda && verLeyenda && escena?.leyenda.length ? 216 : 0;
@@ -103,9 +107,9 @@ export function Planta2D({ escena, resaltado, marcas, onClic, aviso, leyenda = t
       ],
       tam.w,
       tam.h,
-      { ...uniformInsets(MARGEN), right: MARGEN + insetDerecho },
+      { ...uniformInsets(MARGEN), right: MARGEN + insetDerecho, left: MARGEN + mIzq, top: MARGEN + mArriba },
     );
-  }, [escena?.caja, tam.w, tam.h, leyenda, verLeyenda, escena?.leyenda.length]);
+  }, [escena?.caja, tam.w, tam.h, leyenda, verLeyenda, escena?.leyenda.length, mIzq, mArriba]);
 
   const bounds = useMemo(() => {
     const [x0, y0, x1, y1] = escena?.caja ?? [0, 0, 10, 10];

@@ -85,18 +85,18 @@ export function Inspector({ id }: { id: string }) {
             <Seccion titulo="Resultados">
               <div className="flex flex-wrap gap-2 px-3.5 py-2">
                 {o.tipo === "pilar" && (
-                  <button type="button" className="btn" onClick={() => irA("pilares")}>
-                    Ver en Pilares
+                  <button type="button" className="btn" onClick={() => irA("resultados", "pilares")}>
+                    Ver en Resultados
                   </button>
                 )}
                 {(o.tipo === "viga" || o.tipo === "vigueta") && (
-                  <button type="button" className="btn" onClick={() => irA("vigas")}>
-                    Ver en Vigas
+                  <button type="button" className="btn" onClick={() => irA("resultados", "diagramas")}>
+                    Ver en Resultados
                   </button>
                 )}
                 {o.tipo === "losa" && (
-                  <button type="button" className="btn" onClick={() => irA("losas")}>
-                    Ver en Losas
+                  <button type="button" className="btn" onClick={() => irA("resultados", "losas")}>
+                    Ver en Resultados
                   </button>
                 )}
               </div>

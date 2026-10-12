@@ -1,6 +1,6 @@
 /**
- * Criterio 1 de V1, en el DOM: el texto de las tablas es el valor de la consulta con su formato. Las
- * pantallas se montan en jsdom con una sesión de verdad en este proceso (el `Atendedor` del worker,
+ * Criterio 1 de V1, en el DOM: el texto de las tablas es el valor de la consulta con su formato.
+ * Desde I1, las pantallas de V1 son modos de Resultados (`docs/fem3d/interfaz.md` §13); se montan en jsdom con una sesión de verdad en este proceso (el `Atendedor` del worker,
  * sin worker), y cada celda se compara con el dato que la sesión da para ella.
  */
 import { readFileSync } from "node:fs";
@@ -13,10 +13,11 @@ import { Atendedor } from "../../../src/visor/atender.ts";
 import type { DatosLosas, DatosPilares } from "../../../src/visor/datos.ts";
 import type { Pedido } from "../../../src/visor/protocolo.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
-import { ContextoVisor, type Pantalla } from "../contexto.ts";
+import { ContextoPaneles, useAlmacenPaneles } from "../armazon/paneles.ts";
+import { ContextoVisor, type ModoResultados } from "../contexto.ts";
 import { fmt, mm } from "../fmt.ts";
-import { PantallaLosas } from "../pantallas/Losas.tsx";
-import { PantallaPilares } from "../pantallas/Pilares.tsx";
+import { ModoLosas } from "../pantallas/Losas.tsx";
+import { ModoPilares } from "../pantallas/Pilares.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
 import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
@@ -55,13 +56,19 @@ const cliente = () =>
     },
   }) as unknown as ClienteSesion;
 
-function montar(pantalla: React.ReactNode, planta: string) {
+function Paneles({ children }: { children: React.ReactNode }) {
+  return <ContextoPaneles.Provider value={useAlmacenPaneles()}>{children}</ContextoPaneles.Provider>;
+}
+
+function montar(pantalla: React.ReactNode, planta: string, modo: ModoResultados) {
   const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(), fuente: { tipo: "texto", nombre: "nucleo.json" }, desactualizado: false, errores: [], motivoGuardados: null, firmas: "", tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {} };
   return render(
     <ThemeProvider>
-      <ContextoVisor.Provider value={{ proyecto, planta, setPlanta() {}, seleccion: null, setSeleccion() {}, irA(_p: Pantalla) {} }}>
-        <div style={{ display: "flex" }}>{pantalla}</div>
-      </ContextoVisor.Provider>
+      <Paneles>
+        <ContextoVisor.Provider value={{ proyecto, planta, setPlanta() {}, seleccion: null, setSeleccion() {}, espacio: "resultados", modo, irA() {}, tablaPedida: null, pedirTabla() {} }}>
+          <div style={{ display: "flex" }}>{pantalla}</div>
+        </ContextoVisor.Provider>
+      </Paneles>
     </ThemeProvider>,
   );
 }
@@ -73,7 +80,7 @@ describe("V1 · DOM", () => {
     const planta = estado.plantas[0]!.id;
     const r = await at.atender({ tipo: "pilares", planta, combinaciones: { tipo: "defecto" } });
     const d = (r as { valor: DatosPilares }).valor;
-    montar(<PantallaPilares />, planta);
+    montar(<ModoPilares />, planta, "pilares");
     const cuadro = await waitFor(() => {
       const s = seccion(`Cuadro bajo ${planta}`);
       expect(within(s).getAllByRole("row").length).toBe(d.filas.length + 1);
@@ -96,7 +103,7 @@ describe("V1 · DOM", () => {
     const planta = estado.plantas[0]!.id;
     const r = await at.atender({ tipo: "losas", planta, campo: "uz", combinaciones: { tipo: "defecto" } });
     const d = (r as { valor: DatosLosas }).valor;
-    montar(<PantallaLosas />, planta);
+    montar(<ModoLosas />, planta, "losas");
     await waitFor(() => expect(document.querySelectorAll("[data-extremo]").length).toBe(d.escena.extremos.length));
     const ex = [...document.querySelectorAll("[data-extremo]")];
     d.escena.extremos.forEach((e, i) => expect(ex[i]!.textContent).toBe(`${fmt(e.valor, 2)} ${e.unidad}`));

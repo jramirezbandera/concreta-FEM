@@ -1,0 +1,31 @@
+## Criterio 1: el dibujo manda (Modelo, paneles por defecto, nada elegido)
+BIEN  1920×1080: la vista ocupa el 72.8 % de la ventana (≥ 70 %)
+BIEN  1366×768: la vista ocupa el 63.0 % de la ventana (≥ 60 %)
+
+## Criterio 4: espacios, modos, paneles y paleta en el edificio objetivo (1440×900)
+  planta N3: 34 ms
+  3D: 114 ms
+  planta: 34 ms
+  elegir un pilar (navegador): 91 ms
+  Esc: 33 ms
+  tablas: 46 ms
+  plegar el panel inferior: 35 ms
+  espacio Cargas: 34 ms
+  espacio Resultados (losas): 105 ms
+  M11: 593 ms
+  modo Diagramas: 603 ms
+  modo Pilares: 80 ms
+  elegir un pilar (cuadro): 33 ms
+  modo Deformada: 54 ms
+  plegar las propiedades: 53 ms
+  abrir las propiedades: 33 ms
+  espacio Revisión: 2244 ms
+  paleta: 35 ms
+  buscar en la paleta: 33 ms
+  elegir desde la paleta: 32 ms
+  espacio Modelo: 39 ms
+  tema oscuro: 37 ms
+  tema claro: 35 ms
+BIEN  ninguna tarea larga de más de 50 ms en el recorrido (la peor, 0 ms; 0 en total)
+
+TODO BIEN

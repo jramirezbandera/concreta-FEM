@@ -271,6 +271,12 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Nombre del fichero" }), { target: { value: "portico" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+    // I1: la paleta de órdenes (Ctrl+K) lleva a las tablas
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar una orden" }), { target: { value: "tabla secc" } });
+    expect(screen.getAllByRole("option", { name: /Secciones/ }).length).toBe(1);
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Buscar una orden" }), { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Paleta de órdenes" })).toBeNull();
 
     elegirTabla("secciones");
     escribirFilaNueva("secciones", { id: "P30", material: "HA-30", forma: "rectangular", b: "0,3", h: "0,3" });
@@ -312,6 +318,9 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(h), { timeout: 30_000 });
     // Y compila: el estado no es «no compila»
     expect(container.querySelector("[data-estado]")?.getAttribute("data-estado")).toBe("sin-calcular");
+    // I1, criterio 3: sin cálculo de esta huella no se entra en Resultados ni en Revisión
+    expect(screen.getByRole("button", { name: "Resultados" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Revisión" }).hasAttribute("disabled")).toBe(true);
     // Guardar está activo (hay cambios sin guardar)
     expect(screen.getByRole("button", { name: /Descargar/ }).getAttribute("data-sin-guardar")).toBe("true");
   }, 120_000);
