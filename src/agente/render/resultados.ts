@@ -108,6 +108,9 @@ export class ResultadosRender {
   }
 }
 
+/** Huella de un pilar circular, como polígono (la de `fondoModelo`). */
+const circuloPilar = (c: Vec2, r: number, n = 32): Vec2[] => Array.from({ length: n }, (_, i) => [c[0] + r * Math.cos((2 * Math.PI * i) / n), c[1] + r * Math.sin((2 * Math.PI * i) / n)] as Vec2);
+
 const punto = (c: Compilado, n: number): Vec2 => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y];
 
 /** Contornos del modelo sobre un mapa: losas, paños, vigas y muros en línea; pilares rellenos. */
@@ -511,8 +514,8 @@ export function vistaAxiles(r: ResultadosRender, planta: string, conjunto: Conju
   const nc = q.nc;
   const fondo = fondoModelo(pl, { atenuado: true });
   const P: Primitiva[] = [...fondo.primitivas];
-  const datos: { id: string; p: Vec2; min: { v: number; comb: string }; max: { v: number; comb: string } }[] = [];
-  for (const { p, llega } of pl.pilares()) {
+  const datos: { id: string; p: Vec2; huella: ReturnType<typeof huellaSeccion>; min: { v: number; comb: string }; max: { v: number; comb: string } }[] = [];
+  for (const { p, llega, seccion } of pl.pilares()) {
     if (!llega) continue;
     const t = q.pilar(p.id);
     if (!t.valido) continue;
@@ -528,15 +531,34 @@ export function vistaAxiles(r: ResultadosRender, planta: string, conjunto: Conju
         if (n > max.v) max = { v: n, comb: conjunto.nombres[kc]! };
       }
     });
-    datos.push({ id: p.id, p: [p.x, p.y], min, max });
+    datos.push({ id: p.id, p: [p.x, p.y], huella: huellaSeccion(p, seccion), min, max });
   }
-  const maxAbs = Math.max(0, ...datos.map((x) => Math.max(Math.abs(x.min.v), Math.abs(x.max.v))));
   const extremos: ExtremoRotulado[] = [];
   for (const x of datos) {
+    // La huella del pilar a escala, del color del signo del mayor |N|; el rótulo, junto a una esquina
     const n = Math.abs(x.min.v) >= Math.abs(x.max.v) ? x.min.v : x.max.v;
-    const radio = 4 + 14 * Math.sqrt(Math.abs(n) / (maxAbs || 1));
-    P.push({ tipo: "marca", p: x.p, forma: "circulo", radio, estilo: n < 0 ? "diagrama-negativo" : "diagrama-positivo", objeto: x.id });
-    P.push({ tipo: "texto", p: x.p, texto: `${x.id}: ${rotulo(x.min.v)} / ${rotulo(x.max.v)}`, tamano: 11, dx: radio + 2, dy: -radio / 2, fondo: true, prioridad: 50, alternativas: [{ dx: -radio - 2, dy: -radio / 2, ancla: "fin" }, { dx: 0, dy: radio + 12, ancla: "medio" }], objeto: x.id });
+    const estilo = n < 0 ? "diagrama-negativo" : "diagrama-positivo";
+    const h = x.huella;
+    if (!h) P.push({ tipo: "marca", p: x.p, forma: "cuadrado", radio: 4, estilo, objeto: x.id });
+    else P.push({ tipo: "poligono", anillos: ["anillo" in h ? h.anillo : circuloPilar(h.centro, h.radio)], estilo, objeto: x.id });
+    const [px, py] = x.p;
+    const r = h ? ("anillo" in h ? Math.max(...h.anillo.map((q) => Math.max(Math.abs(q[0] - px), Math.abs(q[1] - py)))) : h.radio) : 0;
+    P.push({
+      tipo: "texto",
+      p: [px + r, py + r],
+      texto: `${x.id} ${rotulo(n)}`,
+      tamano: 11,
+      dx: 3,
+      dy: -3,
+      fondo: true,
+      prioridad: 50,
+      alternativas: [
+        { p: [px - r, py + r], dx: -3, dy: -3, ancla: "fin" },
+        { p: [px + r, py - r], dx: 3, dy: 13 },
+        { p: [px - r, py - r], dx: -3, dy: 13, ancla: "fin" },
+      ],
+      objeto: x.id,
+    });
     extremos.push({ que: "N mínimo del tramo", valor: x.min.v, unidad: "kN", objeto: x.id, punto: x.p, comb: x.min.comb });
     extremos.push({ que: "N máximo del tramo", valor: x.max.v, unidad: "kN", objeto: x.id, punto: x.p, comb: x.max.comb });
   }
@@ -545,10 +567,10 @@ export function vistaAxiles(r: ResultadosRender, planta: string, conjunto: Conju
     cabecera: cabecera(pl, `Vista: axil de los tramos de pilar que llegan a la planta (kN), envolvente de ${conjunto.descripcion}`, d),
     primitivas: P,
     leyenda: [
-      { estilo: "diagrama-negativo", texto: "Compresión (N < 0); el área del círculo, proporcional al mayor |N|" },
+      { estilo: "diagrama-negativo", texto: "Compresión (N < 0)" },
       { estilo: "diagrama-positivo", texto: "Tracción (N > 0)" },
     ],
-    notas: [`Rótulo: pilar, N mínimo / N máximo del tramo (en su base y su cabeza, sobre todas las combinaciones). N > 0 es tracción.`, ...(datos.length ? [] : ["Ningún pilar llega a esta planta."])],
+    notas: [`Rótulo: pilar y su mayor |N| del tramo (en su base y su cabeza, sobre todas las combinaciones). N > 0 es tracción. El mínimo y el máximo de cada tramo, en el cuadro de la planta.`, ...(datos.length ? [] : ["Ningún pilar llega a esta planta."])],
     extremos: extremos.sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor)),
     caja: caja(pl),
   };
