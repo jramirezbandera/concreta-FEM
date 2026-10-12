@@ -56,7 +56,7 @@ export class Atendedor {
         return r.valido ? bien("escena", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "alzado": {
-        const r = s.alzado(p.plano, p.diagramas, p.reacciones);
+        const r = s.alzado(p.plano, p.diagramas, p.reacciones, p.cargas);
         return r.valido ? bien("alzado", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "elegir":
@@ -97,6 +97,8 @@ export class Atendedor {
         return de(s.pilares3D(p));
       case "reacciones3d":
         return de(s.reacciones3D(p.combinaciones, p.escala));
+      case "cargas3d":
+        return de(s.cargas3D(p.caso, p.escala));
       case "valor-lamina":
         return de(s.valorLamina(p));
       case "revision":

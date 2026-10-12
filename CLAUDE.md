@@ -315,6 +315,10 @@
   - la vista `reacciones` de A4 (también en `fem render`): Fz y (Fx, Fy) de los objetos que arrancan de la planta y de sus apoyos;
   - el alzado con las reacciones de los objetos del plano;
   - sin acciones en los casos no hay combinaciones CTE/NCSE, y el selector lo dice y nombra los casos.
+- **2026-10-13: cargas en el alzado y en el 3D** (a petición del usuario; `interfaz.md` §17). En Cargas, el alzado y el 3D dibujan las del caso activo, con escala en la barra:
+  - `src/agente/render/cargas.ts`: `geometriaCargas` (cada carga en el espacio, como la lee el compilador) y `vistaAlzadoCargas` (bloques a escala con la punta de las flechas en la pieza; lo normal al plano, rotulado);
+  - `src/visor/cargas3d.ts` (pedido `cargas3d`): bloques translúcidos con flechas sobre el sólido, rotulados en la planta resaltada;
+  - validación: la resultante de lo dibujado es la del modelo analítico a 1e-9 (salvo lo que une ε_snap, acotado) en `cargas.test.ts`, y Chrome pinta lo de Node (`validacion/cargas/chrome.ts`).
 - **Siguiente paso:**
   - las puertas de uso de I1, I2, I3 e I4;
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);

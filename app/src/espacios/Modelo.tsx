@@ -7,7 +7,9 @@
  *   Casos. Sin proyecto editable, sólo lo que mira.
  * - Navegador: el proyecto y los objetos de la planta activa (en Cargas, los casos y las cargas).
  * - Vistas (I2): 1, 2 o 4, de planta (modelo, diagnósticos o malla; en Cargas, las del caso activo),
- *   alzado o 3D (`vistas/Zona.tsx`). La barra cambia el tipo de la vista activa y la disposición.
+ *   alzado o 3D (`vistas/Zona.tsx`). En Cargas, el alzado y el 3D también dibujan las del caso activo
+ *   (`agente/render/cargas.ts` y `visor/cargas3d.ts`), a la escala de la barra. La barra cambia el
+ *   tipo de la vista activa y la disposición.
  * - Propiedades: lo elegido (con varios, la lista por tipo) o, sin nada, la planta (resumen, cargas
  *   por caso, equilibrio, hipótesis).
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
@@ -19,7 +21,7 @@ import { DEF_TABLAS, TABLAS, contexto, type NombreTabla } from "../../../src/edi
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBanda, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcForjado, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlantas, IcProponerBandas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { Aviso, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { DialogoBorrar, DialogoCopiar, DialogoProponerBandas, DialogoRenumerar } from "../editor/Dialogos.tsx";
 import { tablaDe } from "../editor/Formulario.tsx";
@@ -28,11 +30,15 @@ import { cota, fmt } from "../fmt.ts";
 import { Inspector } from "../pantallas/Inspector.tsx";
 import { NavVistas } from "../armazon/VistasGuardadas.tsx";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { useVistas, type DibujoPlanta } from "../vistas/estado.ts";
-import { FuenteEscena, plantaVista, ZonaVistas } from "../vistas/Zona.tsx";
+import { useVistas, type DibujoPlanta, type EstadoVista } from "../vistas/estado.ts";
+import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, ZonaVistas } from "../vistas/Zona.tsx";
+import { usePedido } from "../sesion/usePedido.ts";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
 const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "panos", "apoyos", "apoyosLineales", "bandas", "cargas"]);
+/** La escala de las cargas en el alzado y el 3D (por la que se multiplica la automática). */
+const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
+type Escala = (typeof ESCALAS)[number];
 const IcBorrar: Icono = ({ size }) => <Trash2 size={size} strokeWidth={1.5} aria-hidden="true" />;
 const IcRenumerar: Icono = ({ size }) => <ListOrdered size={size} strokeWidth={1.5} aria-hidden="true" />;
 
@@ -49,6 +55,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const cargas = espacio === "cargas";
 
   const [caso, setCaso] = useState<string | null>(null);
+  const [escala, setEscala] = useState<Escala>("1");
   const [tabla, setTabla] = useState<NombreTabla>(cargas ? "cargas" : "pilares");
   const [nueva, setNueva] = useState(0);
   const [plantilla, setPlantilla] = useState<Record<string, string> | undefined>(undefined);
@@ -97,6 +104,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         </>
       )}
       <Separador />
+      <Desplegable etiqueta="Escala de las cargas en el alzado y el 3D" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
+      <Separador />
       <Herramienta icono={IcCombinaciones} nombre="Combinaciones" onClick={() => pan.abrirPestana("combinaciones")} title="Las combinaciones que salen de los casos" />
       <Hueco />
       <BarraVistas />
@@ -131,15 +140,26 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     </>
   );
 
+  const chipCaso = (
+    <Chip acento>
+      Cargas del caso <strong className="font-semibold">{casoValido || "—"}</strong>
+    </Chip>
+  );
   const vista = (
     <ZonaVistas
       fuentes={{
         planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} /> : null),
+        ...(cargas && casoValido
+          ? {
+              alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), cargas: { caso: casoValido, escala: Number(escala) } } : null} />,
+              tresD: () => <TresDCargas caso={casoValido} escala={Number(escala)} />,
+              cabeceraAlzado: () => chipCaso,
+              cabecera3DModelo: () => chipCaso,
+            }
+          : {}),
         cabeceraPlanta: (v, i) =>
           cargas ? (
-            <Chip acento>
-              Cargas del caso <strong className="font-semibold">{casoValido || "—"}</strong>
-            </Chip>
+            chipCaso
           ) : (
             <Desplegable
               etiqueta="Qué se dibuja"
@@ -295,6 +315,18 @@ function NavModelo() {
       <Objetos tablas={["pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "bandas", "ejes"]} />
     </>
   );
+}
+
+/** Las cargas del caso en un 3D, sobre el modelo (también en sólido): sólo necesitan el modelo físico. */
+function TresDCargas({ caso, escala }: { caso: string; escala: number }) {
+  const { proyecto } = useVisor();
+  const r = usePedido(proyecto.cliente, { tipo: "cargas3d", caso, escala });
+  const aviso = proyecto.desactualizado ? (
+    <Aviso tono="warn">{proyecto.edicion?.pendiente ? "Compilando la versión editada…" : "El fichero cambió: abriendo la versión nueva…"}</Aviso>
+  ) : r.diagnosticos ? (
+    <Aviso tono="fail">{r.diagnosticos.map((d) => d.mensaje).join(" ")}</Aviso>
+  ) : null;
+  return <Fuente3DModelo cargas={{ datos: r.datos, aviso, cargando: r.cargando }} />;
 }
 
 function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => void }) {

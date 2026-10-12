@@ -516,3 +516,20 @@ El sólido de §6, los modos de §5.2 y los filtros de §5.3, y las vistas guard
 3. **En Chrome, lo pintado es lo de Node:** los triángulos y las aristas del sólido tienen el sha256 de Node; con un rango de plantas, un tipo oculto, aislar u ocultar, los triángulos que se pintan son los de Node con ese filtro; un clic en el sólido elige la pieza que se ve.
 4. **Vistas guardadas:** guardar, renombrar y borrar son operaciones del editor que pasan el esquema y se deshacen; no cambian la huella; abrir una vista guardada deja la vista activa como se guardó.
 5. **No se pierde nada:** los tests de DOM y los bancos de I1, I2 e I4 dan lo mismo.
+
+## 17. Cargas en el alzado y en el 3D (2026-10-13, a petición del usuario)
+
+Hasta ahora las cargas sólo se veían en planta (la vista `cargas` de A4). En Cargas, el alzado y el 3D dibujan también las del caso activo, con una escala en la barra (×0,25 a ×4). Sólo necesitan el modelo físico: se ven también si el modelo no compila.
+
+- **Dónde está cada carga** (`geometriaCargas`, `src/agente/render/cargas.ts`), como la lee el compilador: la de superficie, en la parte de su losa o su paño dentro de su zona (o la de su zona dentro de las losas y los paños de la planta, C2-h); la lineal, la puntual y la de una viga, a la cota de su planta; la de un pilar, de su base hacia arriba; las locales, giradas con los ejes de su pieza; el empuje, en cada tramo del muro entre su base y su cabeza, sin los huecos, empujando hacia el lado contrario al del terreno.
+- **Alzado:** lo que está a menos de la profundidad del plano, sobre el modelo atenuado, como un bloque a escala con la punta de sus flechas en la pieza y en el sentido de la carga:
+  - las de superficie, con su componente Z, donde su región está a menos de la profundidad (en un eje de fachada el borde de la losa cae en el plano);
+  - las lineales y las de vigas y pilares paralelos al plano, con su componente en el plano perpendicular a la pieza; las que lo cruzan, una flecha en el cruce;
+  - las puntuales, una flecha de largo fijo con su componente en el plano;
+  - el empuje de un muro que cruza el plano, su diagrama de presiones; el de uno paralelo, sólo un rótulo;
+  - lo que es normal al plano (el viento según X en un pórtico según Y), un círculo y su rótulo con «normal al plano».
+  - Escalas: la mayor carga de superficie que se ve ocupa 1,5 m por la escala, y la mayor por metro, lo mismo con la suya. Las burbujas de los ejes suben para dejar sitio a la planta de arriba.
+- **3D** (`src/visor/cargas3d.ts`, pedido `cargas3d`): bloques translúcidos con sus flechas, en el color de la planta (superficie azul, lineal y puntual rojo, piezas y empujes naranja). Las de superficie, la tapa del bloque sobre su región y una flecha cada ≥ 1 m; las de barra, una valla con una flecha cada ≤ 0,75 m; los empujes, la tapa del bloque de presiones de cada tramo. Las cargas no son resultados: el 3D sigue en sólido. Se rotulan las de la planta resaltada y las elegidas (en sólido, las de las plantas de abajo quedan dentro del edificio).
+- **Lo dibujado es lo que se calcula** (`src/agente/render/cargas.test.ts`): la resultante (F y M) de lo dibujado, integrada exacta, es la del modelo analítico caso a caso, sin el peso propio, a 1e-9, en modelos al azar con losas, muros con huecos y empujes, reticular y unidireccional. Donde el compilador une a ε_snap una zona o una polilínea (C2-b) o ajusta el eje o los huecos de un muro, la diferencia es la de mover sus vértices hasta ε_snap: el dibujo enseña el dato, como la planta, y la nota lo dice.
+- **En Chrome** (`validacion/cargas/chrome.ts`, `out_chrome.txt`): los segmentos del 3D son los de Node con cada caso y escala, el alzado del eje 3 tiene los búferes de Node, el 3D sigue en sólido y orbitar con las cargas va a 60 fps.
+- **Fuera:** elegir una carga en el 3D (se elige en la planta, el alzado, el navegador o la tabla); los momentos de las puntuales (van en su rótulo); el peso propio (lo calcula el programa); filtrar las cargas con el rango de plantas del 3D (la caja de sección sí las recorta).

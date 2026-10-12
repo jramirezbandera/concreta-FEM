@@ -18,6 +18,7 @@ export { ESFUERZOS_PLANO, vistaAlzadoDiagramas, type EsfuerzoPlano } from "./alz
 export { PlantaFisica, vistaCargas, vistaDiagnosticos, vistaModelo, type DatosVista } from "./modelo.ts";
 export { CAMPOS, ResultadosRender, vistaAxiles, vistaCampo, vistaDiagramas, vistaMalla, type Campo } from "./resultados.ts";
 export { escalaDeTexto, type EscalaMapa } from "./isovalores.ts";
+export { CLASE_CARGA, geometriaCargas, presionEn, textoCarga, vistaAlzadoCargas, type ClaseCarga, type GeometriaCarga } from "./cargas.ts";
 export { COLOR_REACCION, reaccionesObjetos, vistaAlzadoReacciones, vistaReacciones, type ReaccionObjeto } from "./reacciones.ts";
 
 export const VISTAS = [...VISTAS_MODELO, ...VISTAS_RESULTADOS] as const;

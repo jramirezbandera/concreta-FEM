@@ -17,6 +17,7 @@ import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
 import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
 import type { Pilares3D } from "../../../src/visor/pilares3d.ts";
 import type { Reacciones3D } from "../../../src/visor/reacciones3d.ts";
+import type { Cargas3D } from "../../../src/visor/cargas3d.ts";
 import type { Solido } from "../../../src/visor/solido.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
@@ -83,6 +84,8 @@ export interface FuentesVistas {
   cabeceraPlanta?: (v: EstadoVista, i: number) => ReactNode;
   /** Lo mismo en un 3D y en un alzado (I4: qué resultado se ve). */
   cabecera3D?: (v: EstadoVista, i: number) => ReactNode;
+  /** La cabecera de un 3D del modelo, sin resultados (Cargas): con ella, el sólido se puede seguir eligiendo. */
+  cabecera3DModelo?: (v: EstadoVista, i: number) => ReactNode;
   cabeceraAlzado?: (v: EstadoVista, i: number) => ReactNode;
 }
 
@@ -227,7 +230,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
               }))}
             />
             <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: p })} ninguna={fuentes.cabecera3D ? "Todas las plantas" : "Sin resaltar"} />
-            {fuentes.cabecera3D?.(vv, i)}
+            {fuentes.cabecera3D?.(vv, i) ?? fuentes.cabecera3DModelo?.(vv, i)}
             <ChipsFiltro filtro={v.filtro} onCambio={(f) => poner(i, { filtro: f })} />
           </>
         )}
@@ -548,7 +551,7 @@ export function FuenteEscena({ fuente }: { fuente: FuenteEscena | null }) {
   // La clave estable: el objeto cambia en cada render
   const clave = JSON.stringify(fuente);
   const fu = useMemo(() => (clave === "null" ? null : (JSON.parse(clave) as FuenteEscena)), [clave]);
-  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}) }) : null);
+  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}), ...(fu.cargas ? { cargas: fu.cargas } : {}) }) : null);
   const { eventos, resaltado } = useEleccionEscena(fu);
   // Con resultados (los diagramas de un alzado), lo de una versión anterior no se enseña
   const resultados = fu?.tipo === "alzado" && !!fu.diagramas;
@@ -598,6 +601,8 @@ export interface Deformada3D {
 
 interface PropsFuente3D extends Resultados3D {
   alambrico: Alambrico | null;
+  /** Las cargas de un caso (Cargas): no son resultados, así que el sólido sigue. */
+  cargas?: Cargas3D | null;
   /** I3: el sólido, en sólido y translúcido. */
   solido?: Solido | null;
   analitico?: Geometria3D | null;
@@ -608,7 +613,7 @@ interface PropsFuente3D extends Resultados3D {
 }
 
 /** Un 3D en la vista de la celda. */
-export function Fuente3D({ alambrico, solido = null, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, leyenda = null, alPasar, sonda = null }: PropsFuente3D) {
+export function Fuente3D({ alambrico, solido = null, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, cargas = null, leyenda = null, alPasar, sonda = null }: PropsFuente3D) {
   const { vista, v, varias, i } = useCelda();
   const { poner } = useVistas();
   const x = vista instanceof Vista3D ? vista : null;
@@ -622,6 +627,7 @@ export function Fuente3D({ alambrico, solido = null, analitico = null, deformada
   useEffect(() => x?.ponerIsovalores(isovalores), [x, isovalores]);
   useEffect(() => x?.ponerPilares(pilares), [x, pilares]);
   useEffect(() => x?.ponerReacciones(reacciones), [x, reacciones]);
+  useEffect(() => x?.ponerCargas(cargas), [x, cargas]);
   useEffect(() => x?.ponerAnalitico(analitico), [x, analitico]);
   useEffect(() => x?.ponerDeformada(deformada?.u ?? null, deformada?.escala ?? 1, deformada?.extremos), [x, deformada]);
   useEffect(() => x?.ponerAnimacion(!!deformada?.animada), [x, deformada?.animada]);
@@ -641,8 +647,8 @@ export function Fuente3D({ alambrico, solido = null, analitico = null, deformada
   );
 }
 
-/** El 3D del modelo: el alámbrico (y el analítico si se pide), con elegir; con resultados (I4), encima. */
-export function Fuente3DModelo({ deformada, modo, resultados }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D }) {
+/** El 3D del modelo: el alámbrico (y el analítico si se pide), con elegir; con resultados (I4) o con las cargas de un caso, encima. */
+export function Fuente3DModelo({ deformada, modo, resultados, cargas }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D; cargas?: { datos: Cargas3D | null; aviso?: ReactNode; cargando?: boolean } }) {
   const { proyecto, elegidos, setElegidos } = useVisor();
   const { v } = useCelda();
   const e = proyecto.estado!;
@@ -666,7 +672,19 @@ export function Fuente3DModelo({ deformada, modo, resultados }: { deformada?: De
     }),
     [setElegidos],
   );
-  return <Fuente3D alambrico={alamb.datos} solido={quiereSolido ? sol.datos : null} analitico={quiereAnalitico ? geo.datos : null} deformada={deformada} modo={modoEf} eventos={eventos} {...resultados} cargando={alamb.cargando || (quiereSolido && sol.cargando) || (quiereAnalitico && geo.cargando) || !!resultados?.cargando} />;
+  return (
+    <Fuente3D
+      alambrico={alamb.datos}
+      solido={quiereSolido ? sol.datos : null}
+      analitico={quiereAnalitico ? geo.datos : null}
+      deformada={deformada}
+      modo={modoEf}
+      eventos={eventos}
+      {...(cargas ? { cargas: cargas.datos, leyenda: cargas.datos, aviso: cargas.aviso } : {})}
+      {...resultados}
+      cargando={alamb.cargando || (quiereSolido && sol.cargando) || (quiereAnalitico && geo.cargando) || !!resultados?.cargando || !!cargas?.cargando}
+    />
+  );
 }
 
 // ─── Leyenda ────────────────────────────────────────────────────────────────────────────────────

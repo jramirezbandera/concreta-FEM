@@ -45,6 +45,8 @@ export type Estilo =
   | "carga-lineal"
   | "carga-puntual"
   | "carga-pieza"
+  | "carga-banda-lineal"
+  | "carga-banda-pieza"
   | "atenuado"
   | "atenuado-linea"
   | "diagnostico-error"

@@ -23,7 +23,7 @@ import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { reacciones } from "../consultas.ts";
 import { PROFUNDIDAD_ALZADO, vistaAlzado, type PlanoAlzado } from "./alzado.ts";
 import { ORDENADA_DIAGRAMA } from "./diagramas.ts";
-import { cajaDe, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
+import { cajaDe, rotulo, type EntradaLeyenda, type Escena, type Estilo, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { cabeceraPlanta, cajaPlanta, fondoModelo, PlantaFisica, porId, type DatosVista } from "./modelo.ts";
 import type { ResultadosRender } from "./resultados.ts";
 
@@ -83,7 +83,7 @@ export function notaCombinaciones(conjunto: ConjuntoCombinaciones): string {
 const queCombinaciones = (conjunto: ConjuntoCombinaciones) => (conjunto.factores.length > 1 ? `envolvente de ${conjunto.descripcion} (la de mayor |Fz| de cada objeto)` : `combinación ${conjunto.etiquetas[0] ?? conjunto.nombres[0] ?? ""}`);
 
 /** Una flecha plana de F (en m del dibujo) con la punta en P: el fuste y la punta, en dos líneas. */
-function flecha2D(P: Vec2, F: Vec2, m: number, estilo: "reaccion-vertical" | "reaccion-horizontal", objeto: string): Primitiva[] {
+export function flecha2D(P: Vec2, F: Vec2, m: number, estilo: Estilo, objeto: string): Primitiva[] {
   const L = Math.hypot(F[0], F[1]);
   if (!(L > 0)) return [];
   const d: Vec2 = [F[0] / L, F[1] / L];

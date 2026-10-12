@@ -367,7 +367,8 @@ export function vistaModelo(f: ModeloFisico, planta: string, d: DatosVista): Esc
 
 // ─── Vista «cargas» ─────────────────────────────────────────────────────────────────────────────
 
-const vector = (q: readonly number[]) => (q[0] === 0 && q[1] === 0 ? rotulo(q[2]!) : `(${q.map((x) => rotulo(x)).join("; ")})`);
+/** Un vector de carga rotulado: sólo su Z si es vertical; si no, sus tres componentes. */
+export const vector = (q: readonly number[]) => (q[0] === 0 && q[1] === 0 ? rotulo(q[2]!) : `(${q.map((x) => rotulo(x)).join("; ")})`);
 
 /** Cargas de un caso en la planta, dibujadas sobre el modelo atenuado. */
 export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: DatosVista): Escena {

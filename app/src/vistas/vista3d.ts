@@ -20,7 +20,8 @@
  * por signo con sus curvas; los isovalores de las losas y los muros (`src/visor/isovalores3d.ts`),
  * bandas de color sin sombrear (el color es el de la leyenda) con sus isolíneas; los pilares por
  * colores (`pilares3d.ts`), líneas gruesas del color de su banda; las reacciones
- * (`reacciones3d.ts`), flechas; y la deformada, animada si se pide, con la original en gris. Los
+ * (`reacciones3d.ts`), flechas; y la deformada, animada si se pide, con la original en gris. Las
+ * cargas de un caso (`cargas3d.ts`, en Cargas), bloques translúcidos con sus flechas. Los
  * rótulos, en el lienzo 2D: los extremos de lo que se ve y los de las piezas elegidas, sin pisarse.
  *
  * Bajo el cursor (I4): al quedarse quieto el ratón, la vista busca lo que hay debajo (la estación de
@@ -67,6 +68,7 @@ import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
 import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
 import { SIN_BANDA, type Pilares3D } from "../../../src/visor/pilares3d.ts";
 import { COLOR_REACCION, type Reacciones3D } from "../../../src/visor/reacciones3d.ts";
+import { CLASES_CARGA, COLOR_CARGA, type Cargas3D } from "../../../src/visor/cargas3d.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { fuente, textoConHalo, Vista, type Entorno } from "./motor.ts";
@@ -226,6 +228,9 @@ const MAT = {
   ceros: new LineBasicMaterial({ color: 0x111827, transparent: true, opacity: 0.8 }),
   pilares: new LineMaterial({ vertexColors: true, linewidth: 7, worldUnits: false }),
   reacciones: new LineMaterial({ vertexColors: true, linewidth: 2.5, worldUnits: false }),
+  // Las cargas: flechas y bloques translúcidos
+  cargas: new LineMaterial({ vertexColors: true, linewidth: 1.5, worldUnits: false }),
+  bloques: new MeshBasicMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity: 0.2, depthWrite: false }),
   /** El alámbrico sin deformar, bajo la deformada. */
   original: new LineMaterial({ linewidth: 1, worldUnits: false, transparent: true, opacity: 0.55 }),
   // I3: el sólido, opaco y translúcido, y sus aristas
@@ -289,6 +294,8 @@ export class Vista3D extends Vista {
   private reac: Reacciones3D | null = null;
   private objsPil: LineSegments2[] = [];
   private objsReac: LineSegments2[] = [];
+  private carg: Cargas3D | null = null;
+  private objsCarg: (Mesh | LineSegments2)[] = [];
   private lineasOriginal: LineSegments2 | null = null;
   private extremosDef: ExtremoDeformada[] = [];
   private animar = false;
@@ -476,6 +483,14 @@ export class Vista3D extends Vista {
     this.reac = r;
     if (r) this.fijarOrigen(r.origen);
     this.enTarea("reacciones", () => this.construirReacciones());
+  }
+
+  /** Las cargas de un caso; null las quita. */
+  ponerCargas(c: Cargas3D | null): void {
+    if (c === this.carg) return;
+    this.carg = c;
+    if (c) this.fijarOrigen(c.origen);
+    this.enTarea("cargas", () => this.construirCargas());
   }
 
   /** Lo que se dice del punto bajo el cursor (null: nada). */
@@ -756,6 +771,41 @@ export class Vista3D extends Vista {
       const o = this.situar(new LineSegments2(g, MAT.reacciones), r.origen);
       o.renderOrder = 7;
       this.objsReac.push(o);
+    }
+    this.entorno.pintar();
+  }
+
+  private construirCargas(): void {
+    this.quitar(this.objsCarg);
+    const c = this.carg;
+    if (c) {
+      const color = CLASES_CARGA.map((k) => new Color(COLOR_CARGA[k]));
+      if (c.triangulos.length) {
+        const g = new BufferGeometry();
+        g.setAttribute("position", new BufferAttribute(c.triangulos, 3));
+        const col = new Float32Array(c.triangulos.length);
+        for (let i = 0; i < c.claseTriangulo.length; i++) {
+          const k = color[c.claseTriangulo[i]!]!;
+          for (let j = 0; j < 3; j++) col.set([k.r, k.g, k.b], 9 * i + 3 * j);
+        }
+        g.setAttribute("color", new BufferAttribute(col, 3));
+        const o = this.situar(new Mesh(g, MAT.bloques), c.origen);
+        o.renderOrder = 5;
+        this.objsCarg.push(o);
+      }
+      if (c.segmentos.length) {
+        const g = new LineSegmentsGeometry();
+        g.setPositions(c.segmentos);
+        const col = new Float32Array(c.segmentos.length);
+        for (let i = 0; i < c.claseSegmento.length; i++) {
+          const k = color[c.claseSegmento[i]!]!;
+          for (let j = 0; j < 2; j++) col.set([k.r, k.g, k.b], 6 * i + 3 * j);
+        }
+        g.setColors(col);
+        const o = this.situar(new LineSegments2(g, MAT.cargas), c.origen);
+        o.renderOrder = 6;
+        this.objsCarg.push(o);
+      }
     }
     this.entorno.pintar();
   }
@@ -1683,7 +1733,7 @@ export class Vista3D extends Vista {
       this.colores();
       this.construirElegidos();
     }
-    if (!this.alamb && !this.geo && !this.diag && !this.iso && !this.pil && !this.reac && !this.sol) return;
+    if (!this.alamb && !this.geo && !this.diag && !this.iso && !this.pil && !this.reac && !this.carg && !this.sol) return;
     this.actualizarCamaras();
     // La caja de sección de esta vista (los planos son de todos los materiales del 3D)
     const c = this.filtro.caja;
@@ -1695,6 +1745,7 @@ export class Vista3D extends Vista {
     MAT.curvas.resolution.set(w, h);
     MAT.pilares.resolution.set(w, h);
     MAT.reacciones.resolution.set(w, h);
+    MAT.cargas.resolution.set(w, h);
     MAT.original.resolution.set(w, h);
     // Los colores de los rellenos, los del tema de esta vista (las vistas comparten los materiales)
     const t = this.entorno.tema();
@@ -1869,6 +1920,15 @@ export class Vista3D extends Vista {
       for (const e of re.extremos) r.push({ p: e.punto, texto: `${e.que}: Fz ${rotulo(e.valor)} kN · ${e.id}${re.conjunto.n > 1 ? ` · ${e.comb}` : ""}`, signo: 0, prioridad: 100 });
       for (const o of re.objetos) if (o.R[2]) r.push({ p: [o.punto[0], o.punto[1], o.punto[2] - (o.R[2]! * re.escala.m) / (re.escala.valor || 1)], texto: rotulo(o.R[2]!), signo: 0, prioridad: 10 + 50 * (Math.abs(o.R[2]!) / (re.escala.valor || 1)) });
     }
+    const ca = this.carg;
+    if (ca) {
+      // Las de la planta resaltada y las elegidas (en sólido, las de abajo están dentro del edificio)
+      const max = Math.max(...ca.objetos.map((o) => o.peso), 1e-30);
+      for (const o of ca.objetos) {
+        const elegida = this.elegidos.has(o.id);
+        if (elegida || (this.activa !== null && o.plantas.includes(this.activa))) r.push({ p: o.punto, texto: o.texto, signo: 0, prioridad: elegida ? 90 : 10 + (50 * o.peso) / max });
+      }
+    }
     if (this.u && this.modo === "analitico" && this.geo)
       for (const e of this.extremosDef) {
         const k = this.escalaU * (this.animar ? this.fase : 1);
@@ -1907,7 +1967,7 @@ export class Vista3D extends Vista {
   }
 
   /** Para el banco de Chrome: lo que dibuja y lo elegido. */
-  async depuracion(): Promise<{ tipo: "3d"; segmentos: number; elegidos: string[]; modo: Modo3D; pintado: Modo3D; proyeccion: Proyeccion; diagramas: number; isovalores: number; pilares: number; reacciones: number; sonda: string[] | null; objetivo: Objetivo3D | null; animada: boolean; solido: { triangulos: number; aristas: number } | null; color: Color3D; filtro: FiltroVista }> {
+  async depuracion(): Promise<{ tipo: "3d"; segmentos: number; elegidos: string[]; modo: Modo3D; pintado: Modo3D; proyeccion: Proyeccion; diagramas: number; isovalores: number; pilares: number; reacciones: number; cargas: number; sonda: string[] | null; objetivo: Objetivo3D | null; animada: boolean; solido: { triangulos: number; aristas: number } | null; color: Color3D; filtro: FiltroVista }> {
     const d = this.diag;
     return {
       tipo: "3d",
@@ -1923,6 +1983,7 @@ export class Vista3D extends Vista {
       isovalores: (this.iso?.triangulos.length ?? 0) / 9,
       pilares: (this.pil?.segmentos.length ?? 0) / 6,
       reacciones: (this.reac?.segmentos.length ?? 0) / 6,
+      cargas: (this.carg?.segmentos.length ?? 0) / 6,
       sonda: this.sonda?.lineas ?? null,
       objetivo: this.objetivo,
       animada: this.animar,
@@ -1966,6 +2027,7 @@ export class Vista3D extends Vista {
     this.quitar(this.objsIso);
     this.quitar(this.objsPil);
     this.quitar(this.objsReac);
+    this.quitar(this.objsCarg);
     if (this.lineasOriginal) {
       this.escena3.remove(this.lineasOriginal);
       this.lineasOriginal.geometry.dispose();
@@ -1982,6 +2044,7 @@ export class Vista3D extends Vista {
     this.diag = this.iso = null;
     this.pil = null;
     this.reac = null;
+    this.carg = null;
     this.alamb = null;
     this.segVis = new Uint32Array(0);
     this.construirAlambrico();

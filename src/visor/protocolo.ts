@@ -17,7 +17,8 @@ import type { Diagramas3D } from "./diagramas3d.ts";
 import type { Isovalores3D } from "./isovalores3d.ts";
 import type { Pilares3D } from "./pilares3d.ts";
 import type { Reacciones3D } from "./reacciones3d.ts";
-import type { DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
+import type { Cargas3D } from "./cargas3d.ts";
+import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
   | { tipo: "abrir"; texto: string }
@@ -25,8 +26,8 @@ export type Pedido =
   | { tipo: "calcular" }
   | { tipo: "estado" }
   | { tipo: "escena"; planta: string; vista: VistaPlanta }
-  /** Un alzado; con `diagramas`, los de las barras del plano, y con `reacciones`, las de sus objetos (I4). */
-  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado }
+  /** Un alzado; con `diagramas`, los de las barras del plano, y con `reacciones`, las de sus objetos (I4); con `cargas`, las de un caso. */
+  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado }
   /** El objeto bajo un punto de una escena, o (con `objetos`) esos objetos, resaltados. */
   | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[] }
   /** Los objetos de una ventana (m) de una escena: «dentro», de izquierda a derecha; «toca», de derecha a izquierda. */
@@ -52,6 +53,8 @@ export type Pedido =
   /** I4: los pilares por colores, las reacciones y el valor de un mapa bajo el cursor. */
   | ({ tipo: "pilares3d" } & PedidoPilares3D)
   | { tipo: "reacciones3d"; combinaciones: EleccionCombinaciones; escala?: number }
+  /** Las cargas de un caso en el 3D. */
+  | { tipo: "cargas3d"; caso: string; escala?: number }
   | ({ tipo: "valor-lamina" } & PedidoValorLamina)
   | { tipo: "revision"; firmas: string; ficheroFirmas: string }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
@@ -84,6 +87,7 @@ export interface Respuestas {
   isovalores3d: Isovalores3D;
   pilares3d: Pilares3D;
   reacciones3d: Reacciones3D;
+  cargas3d: Cargas3D;
   "valor-lamina": ValorLamina | null;
   revision: DatosRevision;
   precalentar: null;

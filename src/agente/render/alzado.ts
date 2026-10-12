@@ -68,7 +68,7 @@ export function cantoSeccion(s: Seccion | undefined): number {
 }
 
 /** Intervalos [a, b] del parámetro de la recta p0 + λ·d dentro de unos anillos (par-impar). */
-function intervalosRecta(anillos: readonly (readonly Vec2[])[], p0: Vec2, d: Vec2): [number, number][] {
+export function intervalosRecta(anillos: readonly (readonly Vec2[])[], p0: Vec2, d: Vec2): [number, number][] {
   const n: Vec2 = [-d[1], d[0]];
   const ls: number[] = [];
   for (const r of anillos)
@@ -94,12 +94,19 @@ const rect = (u0: number, u1: number, z0: number, z1: number): Vec2[] => [
   [u0, z1],
 ];
 
-/** `abajo`: lo que se deja libre (m) entre la planta más baja y las burbujas de los ejes (I4: las flechas de las reacciones). */
-export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, o: { abajo?: number } = {}): Escena {
+/**
+ * `abajo`: lo que se deja libre (m) entre la planta más baja y las burbujas de los ejes (I4: las
+ * flechas de las reacciones); `arriba`, lo mismo sobre la más alta (las cargas). `atenuado`: las
+ * piezas en gris y sin sus ids, de fondo (las cargas); las plantas y los ejes no cambian.
+ */
+export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, o: { abajo?: number; arriba?: number; atenuado?: boolean } = {}): Escena {
   const P: Primitiva[] = [];
   const usados = new Set<Estilo>();
   const notas: string[] = [];
+  const FONDO: ReadonlySet<Estilo> = new Set(["nivel", "eje", "eje-burbuja"]);
   const poner = (p: Primitiva) => {
+    if (o.atenuado && p.tipo !== "texto" && !FONDO.has(p.estilo)) p = { ...p, estilo: p.tipo === "linea" ? "atenuado-linea" : "atenuado" } as Primitiva;
+    else if (o.atenuado && p.tipo === "texto" && p.clase === "id") return;
     if (p.tipo !== "texto") usados.add(p.estilo);
     P.push(p);
   };
@@ -158,7 +165,7 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
         }
       } else if (base === "articulado") poner({ tipo: "marca", p: [up, zb], forma: "triangulo", radio: 7, estilo: "apoyo", objeto: p.id });
     }
-    if (Number.isFinite(arriba)) P.push({ tipo: "texto", p: [up, arriba], texto: p.id, tamano: 11, negrita: true, ancla: "medio", dy: -6, fondo: true, prioridad: 50, clase: "id", objeto: p.id });
+    if (Number.isFinite(arriba)) poner({ tipo: "texto", p: [up, arriba], texto: p.id, tamano: 11, negrita: true, ancla: "medio", dy: -6, fondo: true, prioridad: 50, clase: "id", objeto: p.id });
   }
 
   // ─── Muros ────────────────────────────────────────────────────────────────────────────────────
@@ -195,7 +202,7 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
       s0 += l;
     }
     const centro = puntoEnPolilinea(m.puntos, longitud(m.puntos) / 2).p;
-    if (Math.abs(w(centro)) <= prof + m.espesor / 2) P.push({ tipo: "texto", p: [u(centro), (zb + zc) / 2], texto: m.id, tamano: 11, ancla: "medio", fondo: true, prioridad: 40, clase: "id", objeto: m.id });
+    if (Math.abs(w(centro)) <= prof + m.espesor / 2) poner({ tipo: "texto", p: [u(centro), (zb + zc) / 2], texto: m.id, tamano: 11, ancla: "medio", fondo: true, prioridad: 40, clase: "id", objeto: m.id });
   }
 
   // ─── Losas y paños, cortados ─────────────────────────────────────────────────────────────────
@@ -227,7 +234,7 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
         if (Math.abs(wa) > prof + b / 2 || Math.abs(wb) > prof + b / 2) continue;
         poner({ tipo: "poligono", anillos: [rect(Math.min(ua, ub), Math.max(ua, ub), z - h, z)], estilo: "viga-alzado", objeto: v.id });
         if (!rotulada) {
-          P.push({ tipo: "texto", p: [(ua + ub) / 2, z - h / 2], texto: `${v.id}`, tamano: 11, ancla: "medio", dy: 4, fondo: true, prioridad: 30, clase: "id", objeto: v.id });
+          poner({ tipo: "texto", p: [(ua + ub) / 2, z - h / 2], texto: `${v.id}`, tamano: 11, ancla: "medio", dy: 4, fondo: true, prioridad: 30, clase: "id", objeto: v.id });
           rotulada = true;
         }
       } else if (wa > 0 !== wb > 0 || wa === 0 || wb === 0) {
@@ -255,7 +262,7 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
     poner({ tipo: "linea", puntos: [[u0 - 1, z], [u1 + 1, z]], estilo: "nivel", objeto: p.id });
     P.push({ tipo: "texto", p: [u0 - 1, z], texto: `${p.id} ${z >= 0 ? "+" : ""}${rotulo(z, 4)}`, tamano: 11, negrita: true, dx: 2, dy: -4, prioridad: 90, clase: "eje", objeto: p.id });
   });
-  const ejes = capaEjesAlzado(f, plano, { u: (p) => u(p), w: (p) => w(p) }, [u0 - 1, u1 + 1], [zmin - 1.2 - (o.abajo ?? 0), zmax + 1.6]);
+  const ejes = capaEjesAlzado(f, plano, { u: (p) => u(p), w: (p) => w(p) }, [u0 - 1, u1 + 1], [zmin - 1.2 - (o.abajo ?? 0), zmax + 1.6 + (o.arriba ?? 0)]);
   for (const x of ejes) poner(x);
 
   const leyenda: EntradaLeyenda[] = [];

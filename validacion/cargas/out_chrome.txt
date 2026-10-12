@@ -1,0 +1,13 @@
+## Cargas de G en el 3D (sólido)
+BIEN  segmentos de las cargas de G: 5019 = Node 5019
+BIEN  el 3D sigue en sólido con las cargas: solido
+BIEN  orbitar con las cargas: mediana 9.3 ms entre fotogramas (120)
+
+## Otro caso y otra escala
+BIEN  segmentos de las cargas de Vx: 1088 = Node 1088
+BIEN  los segmentos de G a escala ×2 son los de Node: 9e27b6bc4ed7caad = 9e27b6bc4ed7caad
+
+## Alzado del eje 3 con las cargas de G
+BIEN  alzado del eje 3 con G: 34 capas, sha256 b9f446d7c00721fa = Node b9f446d7c00721fa
+
+TODO BIEN

@@ -15,7 +15,7 @@
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
-import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
+import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { UNIDADES_CAMPO } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
@@ -35,6 +35,7 @@ import { elegir, elegirVentana, prepararEscena, resaltar, type Eleccion, type Es
 import { isovalores3D, valorEnLamina, type Isovalores3D, type SuperficiesMapa } from "./isovalores3d.ts";
 import { pilares3D, type MagnitudPilares, type Pilares3D } from "./pilares3d.ts";
 import { reacciones3D, type Reacciones3D } from "./reacciones3d.ts";
+import { cargas3D, type Cargas3D } from "./cargas3d.ts";
 
 export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
 
@@ -81,8 +82,15 @@ export interface ReaccionesAlzado {
   escala?: number;
 }
 
-/** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado (con diagramas o reacciones, en I4). */
-export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado };
+/** Las cargas de un caso en un alzado (tras I4). */
+export interface CargasAlzado {
+  caso: string;
+  /** Por la que se multiplica la escala automática. */
+  escala?: number;
+}
+
+/** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado (con diagramas o reacciones, en I4; con las cargas de un caso, tras I4). */
+export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado; reacciones?: ReaccionesAlzado; cargas?: CargasAlzado };
 
 /** Los diagramas de las barras en el 3D (I4). */
 export interface PedidoDiagramas3D {
@@ -457,10 +465,10 @@ export class Sesion {
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
-  /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico; con diagramas o reacciones (I4), el cálculo. */
-  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
+  /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico (también con las cargas); con diagramas o reacciones (I4), el cálculo. */
+  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
     const f = this.proyecto.modelo;
-    const clave = JSON.stringify(["alzado", p, diagramas ?? null, ...(reacciones ? [reacciones] : [])]);
+    const clave = JSON.stringify(["alzado", p, diagramas ?? null, ...(reacciones ? [reacciones] : []), ...(cargas ? [{ cargas }] : [])]);
     const hecha = this.escenas.get(clave);
     if (hecha) return { valido: true, valor: hecha };
     let plano: PlanoAlzado | null;
@@ -481,13 +489,16 @@ export class Sesion {
       const conj = this.conjunto(reacciones.combinaciones, "lineal");
       if (!conj.valido) return conj;
       e = vistaAlzadoReacciones(rr, plano, conj.valor, d, reacciones.escala);
+    } else if (cargas) {
+      if (!f.casos.some((c) => c.id === cargas.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${cargas.caso} no existe.` }] };
+      e = vistaAlzadoCargas(f, plano, cargas.caso, d, cargas.escala);
     } else e = vistaAlzado(f, plano, d);
     this.escenas.set(clave, e);
     return { valido: true, valor: e };
   }
 
-  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
-    const e = this.alzadoA4(p, diagramas, reacciones);
+  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado, reacciones?: ReaccionesAlzado, cargas?: CargasAlzado): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
+    const e = this.alzadoA4(p, diagramas, reacciones, cargas);
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
@@ -509,6 +520,13 @@ export class Sesion {
   solido(): Solido {
     const x = (this.solidoC ??= solido(this.proyecto.modelo, this.origen3D, this.compilado));
     return { ...x, triangulos: x.triangulos.slice(), objeto: x.objeto.slice(), planta: x.planta.slice(), aristas: x.aristas.slice(), objetoArista: x.objetoArista.slice(), plantaArista: x.plantaArista.slice() };
+  }
+
+  /** Las cargas de un caso en el 3D (tras I4): sólo necesitan el modelo físico. */
+  cargas3D(caso: string, escala?: number): { valido: true; valor: Cargas3D } | { valido: false; diagnosticos: Diagnostico[] } {
+    const f = this.proyecto.modelo;
+    if (!f.casos.some((c) => c.id === caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${caso} no existe.` }] };
+    return { valido: true, valor: cargas3D(f, this.origen3D, caso, escala) };
   }
 
   diagramas3D(p: PedidoDiagramas3D): { valido: true; valor: Diagramas3D } | { valido: false; diagnosticos: Diagnostico[] } {
@@ -558,7 +576,7 @@ export class Sesion {
   }
 
   escenaDe(fu: FuenteEscena): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
-    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas, fu.reacciones);
+    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas, fu.reacciones, fu.cargas);
   }
 
   /** El objeto bajo un punto de una escena (o, con `objetos`, esos objetos), resaltado. */
