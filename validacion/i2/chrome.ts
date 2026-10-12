@@ -234,6 +234,8 @@ try {
   await captura("4-planta-tras-desplazar");
   await marca("pasar a 3D");
   await pagina(`__i2.boton("3D").click()`);
+  // I3: el 3D nace en sólido; este banco mide el alámbrico de I2
+  await pagina(`await __i2.esperar(() => document.querySelector('.celda[data-vista="0"] select[aria-label="Modo del 3D"]')); { const s = document.querySelector('.celda[data-vista="0"] select[aria-label="Modo del 3D"]'); s.value = "alambrico"; s.dispatchEvent(new Event("change", { bubbles: true })); }`);
   await quietos();
   await captura("5-3d");
   await marca("orbitar");

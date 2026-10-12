@@ -27,6 +27,52 @@ export interface Proyecto {
   modelo: ModeloFisico;
   /** Opciones de compilación; por defecto, las decididas (C1-a, D4, C2-a…). */
   opciones?: OpcionesCompilacion;
+  /**
+   * I3: vistas guardadas del visor (`docs/fem3d/interfaz.md` §16), con su nombre. Sólo para mirar el
+   * modelo: no entran en la huella ni en el cálculo.
+   */
+  vistas?: VistaGuardada[];
+}
+
+/**
+ * Una vista guardada del visor (I3): su tipo, lo que enseña, su cámara y sus filtros. Lo que no se
+ * dice toma el valor por defecto del visor. Una planta o un eje que ya no existen se cambian por el
+ * primero al abrirla.
+ */
+export interface VistaGuardada {
+  /** Lo que se ve en el navegador; único entre las vistas del proyecto. */
+  nombre: string;
+  tipo: "planta" | "alzado" | "3d";
+  /** La planta que se ve (planta) o la que se resalta (3D). */
+  planta?: string;
+  /** El eje del alzado. */
+  eje?: string;
+  /** Lo que dibuja una planta en Modelo. */
+  dibujo?: "modelo" | "diagnosticos" | "malla";
+  modo3d?: "alambrico" | "solido" | "translucido" | "analitico";
+  proyeccion?: "perspectiva" | "ortografica";
+  /** El color del sólido. */
+  color3d?: "material" | "seccion" | "planta";
+  /** ±d de un alzado, m. */
+  profundidad?: number;
+  /** La cámara de un 3D: su posición C y el punto al que mira T, m. */
+  camara3d?: { C: [number, number, number]; T: [number, number, number] };
+  /** La cámara de una planta o un alzado: el centro de la vista (m) y la escala (px/m). */
+  camara2d?: { cx: number; cy: number; escala: number };
+  filtro?: FiltroGuardado;
+}
+
+/** Los filtros de un 3D guardado (I3): rango de plantas, tipos que no se ven, aislados, ocultos y caja de sección (m). */
+export interface FiltroGuardado {
+  /** La planta de abajo del rango. */
+  desde?: string;
+  /** La planta de arriba del rango. */
+  hasta?: string;
+  sinTipos?: ("pilar" | "viga" | "losa" | "pano" | "muro" | "apoyo")[];
+  aislados?: string[];
+  ocultos?: string[];
+  /** [xmin, ymin, zmin, xmax, ymax, zmax]. */
+  caja?: [number, number, number, number, number, number];
 }
 
 export type Lectura = { valido: true; proyecto: Proyecto; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };

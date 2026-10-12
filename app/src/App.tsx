@@ -11,7 +11,7 @@
  * - AvPág y RePág: la planta de arriba o la de abajo; Esc: soltar lo elegido;
  * - desde I2: F encuadra la vista activa y Ctrl+1…4 cambian la disposición de las vistas.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FolderOpen, Moon, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
 import { lista, indiceIds } from "../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
@@ -96,6 +96,10 @@ export function App() {
   const vistas = useEstadoVistas(e?.nombre ?? (proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? "")));
   const planta = vistas.vistas[vistas.activa]!.planta;
   const { poner: ponerVista, activa: vistaActiva, setDisposicion } = vistas;
+  const vistasRef = useRef(vistas);
+  vistasRef.current = vistas;
+  const elegidosRef = useRef(elegidos);
+  elegidosRef.current = elegidos;
   const setPlanta = useCallback((p: string) => ponerVista(vistaActiva, { planta: p }), [ponerVista, vistaActiva]);
   // Resultados y Revisión sólo con un cálculo de esta huella (criterio 3 de I1)
   const espacioValido: Espacio = (espacio === "resultados" || espacio === "revision") && !e?.calculado ? "modelo" : espacio;
@@ -136,6 +140,20 @@ export function App() {
         return;
       }
       if (paleta || document.querySelector("[role=dialog]")) return;
+      // I3: H aísla lo elegido en el 3D activo (otra vez, lo suelta); Ctrl+H lo oculta; Mayús+H lo muestra todo
+      if (k === "h" && !x.altKey && !enCampo(x.target) && !(x.target as HTMLElement | null)?.closest?.("[role=grid]")) {
+        const v = vistasRef.current.vistas[vistasRef.current.activa];
+        if (v?.tipo !== "3d") return;
+        x.preventDefault();
+        const f = v.filtro ?? {};
+        const ids = elegidosRef.current;
+        if (x.shiftKey) ponerVista(vistaActiva, { filtro: { caja: f.caja ?? null } });
+        else if (mod) {
+          if (ids.length) ponerVista(vistaActiva, { filtro: { ...f, ocultos: [...new Set([...(f.ocultos ?? []), ...ids])] } });
+        } else if (f.aislados) ponerVista(vistaActiva, { filtro: { ...f, aislados: null } });
+        else if (ids.length) ponerVista(vistaActiva, { filtro: { ...f, aislados: [...ids] } });
+        return;
+      }
       if (mod && !x.altKey && ed) {
         if (k === "s") {
           x.preventDefault();
@@ -160,7 +178,7 @@ export function App() {
     };
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
-  }, [ed, paleta, plantas, plantaValida, setPlanta, setDisposicion]);
+  }, [ed, paleta, plantas, plantaValida, setPlanta, setDisposicion, ponerVista, vistaActiva]);
 
   // Órdenes de la paleta
   const ordenes = useMemo<Orden[]>(() => {

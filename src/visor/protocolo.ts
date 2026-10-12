@@ -12,6 +12,7 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { DatosDeformada, DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ValorPunto } from "./datos.ts";
 import type { Eleccion, EscenaPreparada } from "./escena.ts";
 import type { Alambrico } from "./alambrico.ts";
+import type { Solido } from "./solido.ts";
 import type { Diagramas3D } from "./diagramas3d.ts";
 import type { Isovalores3D } from "./isovalores3d.ts";
 import type { Pilares3D } from "./pilares3d.ts";
@@ -32,6 +33,8 @@ export type Pedido =
   | { tipo: "ventana"; fuente: FuenteEscena; caja: [number, number, number, number]; modo: "dentro" | "toca" }
   /** El 3D alámbrico del modelo físico (I2). */
   | { tipo: "alambrico" }
+  /** El 3D sólido: las secciones extruidas, con sus aristas (I3). */
+  | { tipo: "solido" }
   | { tipo: "objeto"; id: string }
   | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa }
   | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number; escala?: EscalaMapa }
@@ -65,6 +68,7 @@ export interface Respuestas {
   elegir: Eleccion | null;
   ventana: string[];
   alambrico: Alambrico;
+  solido: Solido;
   objeto: DatosObjeto;
   losas: DatosLosas;
   "valor-punto": ValorPunto | null;

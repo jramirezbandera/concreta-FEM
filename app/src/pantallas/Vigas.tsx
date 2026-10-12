@@ -31,7 +31,7 @@ import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
-import { Fuente2D, Fuente3DModelo, FuenteEscena, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 /** Los diagramas de las vigas de una planta, en una vista: un clic elige la viga o la vigueta. */
@@ -397,7 +397,7 @@ export function ModoDiagramas() {
         planta: (x) => (x.planta ? <PlantaDiagramas planta={x.planta} vista={vista} id={id} cargando={x.planta === planta && viga.cargando} /> : null),
         cabeceraPlanta: () => <Chip acento>{vista.vista === "vigas" ? `Diagramas de ${esfuerzo}` : `${esfuerzo}: en el 3D, el alzado y el de la pieza`}</Chip>,
         tresD: (x) => <TresDDiagramas planta={x.planta} esfuerzo={esfuerzo} eleccion={eleccion} piezas={piezas3D} escala={Number(escala)} />,
-        alzado: (x) => <FuenteEscena fuente={x.eje ? { tipo: "alzado", plano: { eje: x.eje }, diagramas: { esfuerzo: plano, combinaciones: eleccion, escala: Number(escala) } } : null} />,
+        alzado: (x) => <FuenteEscena fuente={x.eje ? { tipo: "alzado", plano: planoAlzado(x.eje, x), diagramas: { esfuerzo: plano, combinaciones: eleccion, escala: Number(escala) } } : null} />,
         cabecera3D: () => (
           <>
             <Chip acento title={v ? v.combinaciones.etiquetas.join("\n") : undefined}>

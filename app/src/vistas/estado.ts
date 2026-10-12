@@ -5,8 +5,9 @@
  * así que sin almacenamiento todo sigue funcionando.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { FiltroGuardado, VistaGuardada } from "../../../src/agente/proyecto.ts";
 import type { Camara2D } from "./vista2d.ts";
-import type { Camara3D, Modo3D, Proyeccion } from "./vista3d.ts";
+import type { CajaSeccion, Camara3D, Color3D, FiltroVista, Modo3D, Proyeccion } from "./vista3d.ts";
 
 export type TipoVista = "planta" | "alzado" | "3d";
 export type Disposicion = "1" | "1|1" | "1/1" | "2x2";
@@ -31,6 +32,14 @@ export interface EstadoVista {
   dibujo: DibujoPlanta;
   modo3d: Modo3D;
   proyeccion: Proyeccion;
+  /** I3: el color del sólido. */
+  color3d?: Color3D;
+  /** I3: los filtros de un 3D (rango de plantas, tipos, aislados, ocultos y caja de sección). */
+  filtro?: FiltroVista;
+  /** I3: ±d de un alzado, m (por defecto, 0,5). */
+  profundidad?: number;
+  /** I3: sube al abrir una vista guardada, para que la celda rehaga su vista con la cámara guardada. */
+  salto?: number;
   /** La cámara de cada tipo (al cambiar de tipo y volver, se recupera). */
   camaras?: { planta?: Camara2D; alzado?: Camara2D; "3d"?: Camara3D };
 }
@@ -41,7 +50,7 @@ export interface EstadoVistas {
   activa: number;
 }
 
-const base = (tipo: TipoVista): EstadoVista => ({ tipo, planta: null, eje: null, dibujo: "modelo", modo3d: "alambrico", proyeccion: "perspectiva" });
+const base = (tipo: TipoVista): EstadoVista => ({ tipo, planta: null, eje: null, dibujo: "modelo", modo3d: "solido", proyeccion: "perspectiva" });
 
 /** Por defecto: una planta; con cuatro, la planta, el 3D y dos alzados. */
 export const POR_DEFECTO: EstadoVistas = { disposicion: "1", vistas: [base("planta"), base("3d"), base("alzado"), base("alzado")], activa: 0 };
@@ -75,6 +84,61 @@ export interface Vistas extends EstadoVistas {
   irATipo: (t: TipoVista) => void;
   /** Abre el alzado de un eje: en la vista de alzado que haya o, si no, en una segunda vista. */
   abrirAlzado: (eje: string) => void;
+  /** I3: deja la vista activa como una vista guardada (con su cámara). */
+  abrirGuardada: (g: VistaGuardada) => void;
+}
+
+/** Los filtros de una vista, sin lo vacío, para guardarlos (I3). */
+function filtroAGuardar(f: FiltroVista | undefined): FiltroGuardado | undefined {
+  if (!f) return undefined;
+  const r: FiltroGuardado = {
+    ...(f.desde ? { desde: f.desde } : {}),
+    ...(f.hasta ? { hasta: f.hasta } : {}),
+    ...(f.sinTipos?.length ? { sinTipos: [...f.sinTipos] } : {}),
+    ...(f.aislados ? { aislados: [...f.aislados] } : {}),
+    ...(f.ocultos?.length ? { ocultos: [...f.ocultos] } : {}),
+    ...(f.caja ? { caja: [...f.caja] as FiltroGuardado["caja"] } : {}),
+  };
+  return Object.keys(r).length ? r : undefined;
+}
+
+/** Una vista como vista guardada (I3), con la cámara que tiene ahora. */
+export function aGuardada(v: EstadoVista, nombre: string, camara: unknown): VistaGuardada {
+  const filtro = v.tipo === "3d" ? filtroAGuardar(v.filtro) : undefined;
+  const c = camara as Partial<Camara3D & Camara2D> | null;
+  return {
+    nombre,
+    tipo: v.tipo,
+    ...(v.planta && v.tipo !== "alzado" ? { planta: v.planta } : {}),
+    ...(v.eje && v.tipo === "alzado" ? { eje: v.eje } : {}),
+    ...(v.tipo === "planta" ? { dibujo: v.dibujo } : {}),
+    ...(v.tipo === "3d" ? { modo3d: v.modo3d, proyeccion: v.proyeccion, ...(v.color3d && v.color3d !== "material" ? { color3d: v.color3d } : {}) } : {}),
+    ...(v.tipo === "alzado" && v.profundidad !== undefined ? { profundidad: v.profundidad } : {}),
+    ...(v.tipo === "3d" && c?.C && c.T ? { camara3d: { C: [...c.C] as [number, number, number], T: [...c.T] as [number, number, number] } } : {}),
+    ...(v.tipo !== "3d" && c?.escala !== undefined ? { camara2d: { cx: c.cx!, cy: c.cy!, escala: c.escala } } : {}),
+    ...(filtro ? { filtro } : {}),
+  };
+}
+
+/** Lo que una vista guardada cambia de una vista (I3). */
+function desdeGuardada(v: EstadoVista, g: VistaGuardada): EstadoVista {
+  const b = base(g.tipo);
+  const cam = g.tipo === "3d" ? g.camara3d : g.camara2d;
+  const f = g.filtro;
+  return {
+    ...v,
+    tipo: g.tipo,
+    planta: g.planta ?? (g.tipo === "3d" ? null : v.planta),
+    eje: g.eje ?? v.eje,
+    dibujo: g.dibujo ?? b.dibujo,
+    modo3d: g.modo3d ?? b.modo3d,
+    proyeccion: g.proyeccion ?? b.proyeccion,
+    color3d: g.color3d ?? "material",
+    profundidad: g.profundidad,
+    filtro: f ? { desde: f.desde ?? null, hasta: f.hasta ?? null, sinTipos: f.sinTipos ? [...f.sinTipos] : [], aislados: f.aislados ? [...f.aislados] : null, ocultos: f.ocultos ? [...f.ocultos] : [], caja: f.caja ? ([...f.caja] as CajaSeccion) : null } : {},
+    camaras: { ...v.camaras, ...(cam ? { [g.tipo]: cam } : {}) },
+    salto: (v.salto ?? 0) + 1,
+  };
 }
 
 /** El estado de las vistas de un proyecto (`clave`: su nombre o su fichero). */
@@ -116,7 +180,8 @@ export function useEstadoVistas(clave: string): Vistas {
       }),
     [],
   );
-  return useMemo(() => ({ ...e, poner, setDisposicion, activar, irATipo, abrirAlzado }), [e, poner, setDisposicion, activar, irATipo, abrirAlzado]);
+  const abrirGuardada = useCallback((g: VistaGuardada) => setE((x) => ({ ...x, vistas: x.vistas.map((v, k) => (k === x.activa ? desdeGuardada(v, g) : v)) })), []);
+  return useMemo(() => ({ ...e, poner, setDisposicion, activar, irATipo, abrirAlzado, abrirGuardada }), [e, poner, setDisposicion, activar, irATipo, abrirAlzado, abrirGuardada]);
 }
 
 export const ContextoVistas = createContext<Vistas | null>(null);

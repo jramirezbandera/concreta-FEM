@@ -27,6 +27,13 @@
     "opciones": {
       "$ref": "#/$defs/OpcionesCompilacion",
       "description": "Opciones de compilación; por defecto, las decididas (C1-a, D4, C2-a…)."
+    },
+    "vistas": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/VistaGuardada"
+      },
+      "description": "I3: vistas guardadas del visor (`docs/fem3d/interfaz.md` §16), con su nombre. Sólo para mirar el\nmodelo: no entran en la huella ni en el cálculo."
     }
   },
   "required": [
@@ -585,6 +592,73 @@
       ],
       "additionalProperties": false,
       "description": "Eje de replanteo (I2, `docs/fem3d/interfaz.md` §9): una recta en planta para los alzados, las\nburbujas y las cotas del dibujo, y para nombrar posiciones. Se ve en todas las plantas. El\ncompilador lo ignora, así que no cambia la huella ni los resultados; sin ejes, el dibujo usa los\nque propone `ejes.ts` con las alineaciones de los pilares."
+    },
+    "FiltroGuardado": {
+      "type": "object",
+      "properties": {
+        "desde": {
+          "type": "string",
+          "description": "La planta de abajo del rango."
+        },
+        "hasta": {
+          "type": "string",
+          "description": "La planta de arriba del rango."
+        },
+        "sinTipos": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "apoyo",
+              "losa",
+              "muro",
+              "pano",
+              "pilar",
+              "viga"
+            ]
+          }
+        },
+        "aislados": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ocultos": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "caja": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6,
+          "description": "[xmin, ymin, zmin, xmax, ymax, zmax]."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Los filtros de un 3D guardado (I3): rango de plantas, tipos que no se ven, aislados, ocultos y caja de sección (m)."
     },
     "HuecoMuro": {
       "type": "object",
@@ -1625,6 +1699,139 @@
         "seccion"
       ],
       "additionalProperties": false
+    },
+    "VistaGuardada": {
+      "type": "object",
+      "properties": {
+        "nombre": {
+          "type": "string",
+          "description": "Lo que se ve en el navegador; único entre las vistas del proyecto."
+        },
+        "tipo": {
+          "enum": [
+            "3d",
+            "alzado",
+            "planta"
+          ]
+        },
+        "planta": {
+          "type": "string",
+          "description": "La planta que se ve (planta) o la que se resalta (3D)."
+        },
+        "eje": {
+          "type": "string",
+          "description": "El eje del alzado."
+        },
+        "dibujo": {
+          "enum": [
+            "diagnosticos",
+            "malla",
+            "modelo"
+          ],
+          "description": "Lo que dibuja una planta en Modelo."
+        },
+        "modo3d": {
+          "enum": [
+            "alambrico",
+            "analitico",
+            "solido",
+            "translucido"
+          ]
+        },
+        "proyeccion": {
+          "enum": [
+            "ortografica",
+            "perspectiva"
+          ]
+        },
+        "color3d": {
+          "enum": [
+            "material",
+            "planta",
+            "seccion"
+          ],
+          "description": "El color del sólido."
+        },
+        "profundidad": {
+          "type": "number",
+          "description": "±d de un alzado, m."
+        },
+        "camara3d": {
+          "type": "object",
+          "properties": {
+            "C": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "T": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            }
+          },
+          "required": [
+            "C",
+            "T"
+          ],
+          "additionalProperties": false,
+          "description": "La cámara de un 3D: su posición C y el punto al que mira T, m."
+        },
+        "camara2d": {
+          "type": "object",
+          "properties": {
+            "cx": {
+              "type": "number"
+            },
+            "cy": {
+              "type": "number"
+            },
+            "escala": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "cx",
+            "cy",
+            "escala"
+          ],
+          "additionalProperties": false,
+          "description": "La cámara de una planta o un alzado: el centro de la vista (m) y la escala (px/m)."
+        },
+        "filtro": {
+          "$ref": "#/$defs/FiltroGuardado"
+        }
+      },
+      "required": [
+        "nombre",
+        "tipo"
+      ],
+      "additionalProperties": false,
+      "description": "Una vista guardada del visor (I3): su tipo, lo que enseña, su cámara y sus filtros. Lo que no se\ndice toma el valor por defecto del visor. Una planta o un eje que ya no existen se cambian por el\nprimero al abrirla."
     }
   }
 }

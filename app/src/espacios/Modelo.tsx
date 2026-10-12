@@ -26,6 +26,7 @@ import { tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
 import { cota, fmt } from "../fmt.ts";
 import { Inspector } from "../pantallas/Inspector.tsx";
+import { NavVistas } from "../armazon/VistasGuardadas.tsx";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, type DibujoPlanta } from "../vistas/estado.ts";
 import { FuenteEscena, plantaVista, ZonaVistas } from "../vistas/Zona.tsx";
@@ -280,6 +281,7 @@ function NavModelo() {
   return (
     <>
       <Proyecto />
+      <NavVistas />
       <Objetos tablas={["pilares", "vigas", "losas", "apoyos", "ejes"]} />
     </>
   );
@@ -304,6 +306,7 @@ function NavCargas({ caso, setCaso }: { caso: string; setCaso: (c: string) => vo
         ))}
       </Seccion>
       <Objetos tablas={["cargas"]} />
+      <NavVistas />
     </>
   );
 }

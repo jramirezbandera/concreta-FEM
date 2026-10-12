@@ -65,6 +65,8 @@ export class Atendedor {
         return bien("ventana", s.ventana(p.fuente, p.caja, p.modo));
       case "alambrico":
         return bien("alambrico", alambrico(s.proyecto.modelo));
+      case "solido":
+        return bien("solido", s.solido());
       case "objeto":
         return de(datosObjeto(s, p.id));
       case "losas":

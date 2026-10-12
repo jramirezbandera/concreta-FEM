@@ -1,8 +1,8 @@
 GPU de Chrome: ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Ti (0x00002803) Direct3D11 vs_5_0 ps_5_0, D3D11)
 
 ## Diagramas en el 3D: My de todas las barras
-     hasta verlos: 721 ms
-     tareas largas al cargarlos: 0
+     hasta verlos: 795 ms
+     tareas largas al cargarlos: 1 (la mayor, 58 ms)
 BIEN  triángulos de los diagramas: 266926 = Node 266926
 BIEN  orbitar el 3D con los diagramas: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
      tareas largas al orbitar: 0

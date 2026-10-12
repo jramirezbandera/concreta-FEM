@@ -466,3 +466,48 @@ Lo que falta de §7 tras el adelanto de §7.1. Las propuestas de esta sección s
 3. **Validez:** sin el cálculo de la huella abierta, ningún pedido de resultados en 3D devuelve nada, y la vista no pinta resultados con el fichero cambiado.
 4. **En Chrome, con el edificio objetivo y el núcleo:** lo pintado es lo de Node (los triángulos, los segmentos y las flechas); la sonda bajo el cursor da el valor de su consulta; orbitar con cada capa (y con la deformada animada) a 60 fps, y ninguna tarea larga de más de 50 ms, tampoco al pasar el ratón.
 5. **No se pierde nada:** los tests de DOM y los bancos de I1, I2 y del adelanto de I4 dan lo mismo.
+
+## 16. I3: lo que se fija al empezar (2026-10-12)
+
+El sólido de §6, los modos de §5.2 y los filtros de §5.3, y las vistas guardadas que I2 dejó para aquí. Las propuestas de esta sección son del agente; el usuario las revisa en la puerta de uso.
+
+- **El sólido** (`src/visor/solido.ts`, puro, en el worker; pedido `solido`):
+  - **Cotas:** la de una planta es la cara superior de su forjado, como en el alzado de I2.
+  - **Piezas:** las de §6, con estas precisiones:
+    - el pilar llega a la cara inferior de la losa o el paño de su cabeza **por la parte de su huella que tapan** (un pilar de fachada con la losa hasta su eje, la mitad);
+    - el muro, igual en la cabeza de cada tramo, y sin sus huecos; sus quiebros y los de las vigas, a inglete;
+    - la viga, con la cara superior en la cota y, bajo una losa o un paño, sólo lo que queda bajo su cara inferior: las rectangulares (y las generales con b y h), por la parte de su huella tapada, que es el solape que A3 descuenta (C2-g); las demás, por su eje;
+    - el reticular, con la capa, los ábacos y los nervios a su intereje desde el origen de coordenadas (su sitio es ilustrativo: el cálculo usa multiplicadores);
+    - el paño, con las viguetas del compilador; sin compilar, una placa del canto de la vigueta, y una nota lo dice;
+    - el apoyo, una pirámide invertida de 0,3 m.
+  - **Secciones con su área:** la circular, un polígono de 32 lados de la misma área; el perfil en I, con el alma ensanchada hasta el A del catálogo (sin acuerdos); la `general`, b×h, o sin ellos una barra de 5 cm marcada «sin forma».
+  - **Cómo:** cada prisma sale de una descomposición en trapecios de su huella con las losas de la planta como capas, con los intervalos de cota de cada celda; así la superficie es cerrada y su volumen, exacto. Las aristas son los bordes de la unión de las caras de cada pieza, sin los quiebros de menos de 30°.
+  - **Búferes:** triángulos con su objeto y su planta (el sombreado, plano, sale en el shader), y aristas, en Float32 respecto al origen del alámbrico. Por Transferable; la sesión guarda el suyo y da una copia.
+- **Modos del 3D:** alámbrico, **sólido** (por defecto en las vistas nuevas), **translúcido** (el sólido al 35 % con el alámbrico encima) y analítico.
+  - **Color del sólido:** por material (por defecto), por sección o por planta. Con una planta resaltada, el resto, atenuado; lo elegido, en el color de acento.
+  - **Elegir:** en sólido, la pieza que se ve bajo el cursor (un rayo contra los triángulos); en los demás modos, el eje más cercano, como en I2; la ventana, por los ejes en todos.
+- **Filtros de cada vista 3D** (se recuerdan con la vista):
+  - **rango de plantas** (de … a …) y **tipos de objeto** (pilares, vigas, losas, paños, muros y apoyos), en las opciones de la vista;
+  - **aislar lo elegido (H)**, **ocultar lo elegido (Ctrl+H)** y **mostrarlo todo (Mayús+H)**, en la vista activa si es un 3D;
+  - **caja de sección:** se enciende en la barra de la vista (empieza en la caja de lo elegido, con 0,5 m de margen, o en la del modelo) y se mueve arrastrando las asas de sus seis caras; recorta todo lo que dibuja la vista, también los resultados;
+  - la cabecera dice qué está filtrado y lo quita con un clic;
+  - el rango, los tipos, aislar y ocultar valen para el modelo (alámbrico, sólido y analítico), no para las capas de resultados, que tienen su planta.
+- **Profundidad del alzado** (±d), en su cabecera: 0,25, 0,5, 1, 2 o 5 m.
+- **Vistas guardadas, en el proyecto:**
+  - `vistas` en el `proyecto.json`, fuera del modelo (no cambian la huella): nombre, tipo, planta o eje, modo, proyección, color, cámara, filtros y profundidad;
+  - se guardan desde la barra de la vista, con un nombre, como una operación del editor (se deshace);
+  - el navegador las lista; un clic lleva la vista activa a ella, y se pueden renombrar y borrar.
+- **Fuera de I3:** tapar el corte de la caja (se ve hueco); la cimentación y los símbolos de los arranques; los apoyos lineales en el sólido; aislar en la planta y el alzado; el valor bajo el cursor sobre el sólido.
+
+### 16.1 Criterios de paso de I3
+
+1. **Volumen, en Node** (proyectos de V1, los edificios de C3 y C4, las cinco familias de G y un modelo con todas las formas de sección, vigas por bordes y huecos, reticular con ábacos que se salen y muros con quiebros, huecos y cerrados):
+   - cada pieza es una superficie cerrada con la normal hacia fuera (su volumen no depende del origen);
+   - su volumen es el de sus datos (A·L, e·A, t·(L·H − huecos)) menos lo que tapa la losa, con las intersecciones de `poligonos.ts`, a 1e-9;
+   - por planta, Σ γ·V de lo dibujado más lo que tapa la losa es el peso propio esperado de A3 de pilares, vigas, losas macizas y muros, a 1e-9; y lo que se quita a las vigas rectangulares de hormigón es el solape de C2-g de A3 (a 1e-9 con vigas rectas, a 0,5 % con quiebros, que A3 mide a escuadra);
+   - el reticular, a ≤ 2,5 % de la fórmula de A3 (los bordes);
+   - los búferes son los de las piezas y no dependen del orden de las listas.
+2. **Rendimiento, como en I2** (edificio objetivo y reticular grande en sobremesa): orbitar el sólido y el translúcido a 60 fps, y ninguna tarea larga de más de 50 ms en el hilo principal, tampoco al llegar el sólido, al filtrar o al mover la caja.
+3. **En Chrome, lo pintado es lo de Node:** los triángulos y las aristas del sólido tienen el sha256 de Node; con un rango de plantas, un tipo oculto, aislar u ocultar, los triángulos que se pintan son los de Node con ese filtro; un clic en el sólido elige la pieza que se ve.
+4. **Vistas guardadas:** guardar, renombrar y borrar son operaciones del editor que pasan el esquema y se deshacen; no cambian la huella; abrir una vista guardada deja la vista activa como se guardó.
+5. **No se pierde nada:** los tests de DOM y los bancos de I1, I2 e I4 dan lo mismo.

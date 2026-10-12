@@ -357,3 +357,47 @@ describe("pegar en una celda, como en Excel", () => {
     expect(referenciasRotas(p.modelo)).toEqual([]);
   });
 });
+
+describe("vistas guardadas (I3, criterio 4 de interfaz.md §16.1)", () => {
+  const g3d = { nombre: "Fachada", tipo: "3d" as const, modo3d: "solido" as const, proyeccion: "perspectiva" as const, camara3d: { C: [-30, -45, 30] as [number, number, number], T: [10, 8, 9] as [number, number, number] }, filtro: { desde: "C", hasta: "N3", sinTipos: ["losa" as const], caja: [0, 0, -2, 10, 10, 12] as [number, number, number, number, number, number] } };
+  const gPlanta = { nombre: "Planta 2", tipo: "planta" as const, planta: "N2", dibujo: "modelo" as const, camara2d: { cx: 20, cy: 15, escala: 18 } };
+
+  it("guardar, renombrar y borrar pasan el esquema, no cambian la huella y se deshacen", () => {
+    const { proyecto: p } = leerEjemplo("edificio");
+    const h0 = huella(p);
+    let h = historial(p);
+    const p1 = aplicado(p, { op: "vistas", vistas: [g3d, gPlanta] });
+    h = hacer(h, p1, "guardar");
+    expect(huella(p1)).toBe(h0);
+    expect(p1.vistas).toEqual([g3d, gPlanta]);
+    // El fichero las lleva, en el orden del esquema (tras las opciones), y se vuelve a leer igual
+    const texto = serializar(p1);
+    const l = leerProyecto(texto);
+    expect(l.valido && l.proyecto.vistas).toEqual([g3d, gPlanta]);
+    expect(texto.indexOf('"vistas"')).toBeGreaterThan(texto.indexOf('"modelo"'));
+    const p2 = aplicado(p1, { op: "vistas", vistas: [{ ...g3d, nombre: "  Fachada sur " }, gPlanta] });
+    h = hacer(h, p2, "renombrar");
+    expect(p2.vistas![0]!.nombre).toBe("Fachada sur");
+    const p3 = aplicado(p2, { op: "vistas", vistas: [] });
+    h = hacer(h, p3, "borrar");
+    // Sin vistas, el fichero no lleva la clave: los bytes del principio
+    expect(p3.vistas).toBeUndefined();
+    expect(serializar(p3)).toBe(serializar(p));
+    h = deshacer(deshacer(h));
+    expect(serializar(h.actual)).toBe(texto);
+    h = deshacer(h);
+    expect(serializar(h.actual)).toBe(serializar(p));
+  });
+
+  it("un nombre vacío o repetido, o un dato que no pasa el esquema, no entran", () => {
+    const { proyecto: p } = leerEjemplo("ejemplo");
+    const r1 = aplicar(p, { op: "vistas", vistas: [{ ...gPlanta, nombre: "  " }] });
+    expect(r1.ok ? null : r1.errores[0]!.codigo).toBe("editor/vista-sin-nombre");
+    const r2 = aplicar(p, { op: "vistas", vistas: [gPlanta, { ...g3d, nombre: "Planta 2" }] });
+    expect(r2.ok ? null : r2.errores[0]!.codigo).toBe("editor/vista-repetida");
+    const r3 = aplicar(p, { op: "vistas", vistas: [{ ...gPlanta, tipo: "isometrica" } as never] });
+    expect(r3.ok).toBe(false);
+    const r4 = aplicar(p, { op: "vistas", vistas: [{ ...g3d, filtro: { caja: [0, 0, 0] } } as never] });
+    expect(r4.ok).toBe(false);
+  });
+});

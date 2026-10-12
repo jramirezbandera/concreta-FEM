@@ -468,6 +468,14 @@ export interface Geometria3D {
   plantaLamina: Uint16Array;
   esMuro: Uint8Array;
   plantas: string[];
+  /**
+   * I3: el objeto físico de cada barra y de cada lámina (índices en `objetos`), para los filtros: la
+   * pieza de una barra (el paño, en una vigueta), la losa o el muro de una lámina; −1 (0xffffffff) si
+   * no tiene (una barra auxiliar).
+   */
+  objetos: string[];
+  objetoBarra: Uint32Array;
+  objetoLamina: Uint32Array;
 }
 
 export function geometria3D(s: Sesion): Resultado<Geometria3D> {
@@ -479,7 +487,20 @@ export function geometria3D(s: Sesion): Resultado<Geometria3D> {
   const nudos = new Float32Array(3 * m.nudos.length);
   m.nudos.forEach((n, i) => nudos.set([n.x, n.y, n.z], 3 * i));
   const plantaNudo = (n: number) => idx.get(c.mapeo.nudos[n]?.planta ?? "") ?? 0;
+  const objetos: string[] = [];
+  const indiceObj = new Map<string, number>();
+  const objeto = (id: string | undefined) => {
+    if (!id) return 0xffffffff;
+    let k = indiceObj.get(id);
+    if (k === undefined) {
+      k = objetos.length;
+      objetos.push(id);
+      indiceObj.set(id, k);
+    }
+    return k;
+  };
   const nb = m.barras?.length ?? 0;
+  const objetoBarra = new Uint32Array(nb);
   const barras = new Uint32Array(2 * nb);
   const tipoBarra = new Uint8Array(nb);
   const plantaBarra = new Uint16Array(nb);
@@ -489,17 +510,20 @@ export function geometria3D(s: Sesion): Resultado<Geometria3D> {
     const t = TIPOS_BARRA.indexOf(mb.tipo as (typeof TIPOS_BARRA)[number]);
     tipoBarra[i] = t < 0 ? 3 : t;
     plantaBarra[i] = mb.tipo === "pilar" ? mb.tramo : Math.min(plantaNudo(b.nudos[0]), plantaNudo(b.nudos[1]));
+    objetoBarra[i] = objeto(mb.pano ?? mb.pieza);
   });
   const nl = m.laminas?.length ?? 0;
   const laminas = new Uint32Array(4 * nl);
   const plantaLamina = new Uint16Array(nl);
   const esMuro = new Uint8Array(nl);
+  const objetoLamina = new Uint32Array(nl);
   (m.laminas ?? []).forEach((l, i) => {
     laminas.set(l.nudos, 4 * i);
     plantaLamina[i] = Math.min(...l.nudos.map(plantaNudo));
     esMuro[i] = c.mapeo.laminas?.[i]?.muro ? 1 : 0;
+    objetoLamina[i] = objeto(c.mapeo.laminas?.[i]?.muro ?? c.mapeo.laminas?.[i]?.losa);
   });
-  return { valido: true, valor: { nudos, barras, tipoBarra, plantaBarra, laminas, plantaLamina, esMuro, plantas } };
+  return { valido: true, valor: { nudos, barras, tipoBarra, plantaBarra, laminas, plantaLamina, esMuro, plantas, objetos, objetoBarra, objetoLamina } };
 }
 
 export interface ExtremoDeformada {

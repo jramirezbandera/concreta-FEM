@@ -1,0 +1,50 @@
+Edificio objetivo: 19936 triángulos y 15372 aristas en Node; pilar de prueba P-x0-y0; rango N1 → N3 (8544 triángulos)
+Reticular V2: 300790 triángulos y 166397 aristas, 1247 ms en Node
+GPU de Chrome: ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Ti (0x00002803) Direct3D11 vs_5_0 ps_5_0, D3D11)
+
+## El sólido del edificio objetivo
+     hasta verlo: 183 ms
+     tareas largas al llegar el sólido: 0
+BIEN  ninguna tarea de más de 50 ms al llegar el sólido
+BIEN  los triángulos y las aristas tienen el sha256 de Node (142c630e9679…, 62323415878e…)
+BIEN  sin filtros se pintan todos (19936)
+BIEN  orbitar el sólido: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas al orbitar: 0
+BIEN  ninguna tarea larga al orbitar el sólido
+
+## Translúcido
+BIEN  orbitar el translúcido: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas al orbitar: 0
+
+## Elegir en el sólido
+BIEN  un clic sobre el pilar de la fachada lo elige: P-x0-y0 (P-x0-y0)
+
+## Filtros
+BIEN  aislar P-x0-y0 (H): los triángulos que se pintan son los de Node (210)
+BIEN  mostrarlo todo (Mayús+H): los triángulos que se pintan son los de Node (19936)
+BIEN  ocultar P-x0-y0 (Ctrl+H): los triángulos que se pintan son los de Node (19726)
+BIEN  mostrarlo todo otra vez: los triángulos que se pintan son los de Node (19936)
+BIEN  plantas de N1 a N3: los triángulos que se pintan son los de Node (8544)
+BIEN  y sin las losas: los triángulos que se pintan son los de Node (8424)
+     tareas largas al filtrar: 0
+BIEN  ninguna tarea de más de 50 ms al filtrar
+BIEN  Mostrar todo: los triángulos que se pintan son los de Node (19936)
+
+## Caja de sección
+BIEN  empieza alrededor de lo elegido: x -0.75…0.75, y -0.65…0.65, z -2.00…18.50
+BIEN  mover la caja: mediana 8.3 ms, p95 8.4 ms entre fotogramas (60)
+BIEN  arrastrar el asa de la cara de mayor x mueve esa cara 10 m: 0.75 → 10.75
+     tareas largas al mover la caja: 0
+BIEN  ninguna tarea de más de 50 ms al mover la caja
+BIEN  orbitar con la caja: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas al orbitar con la caja: 0
+
+## El reticular grande (V2 de C4)
+     hasta verlo: 1219 ms
+     tareas largas al llegar el sólido: 0
+BIEN  ninguna tarea de más de 50 ms al llegar el sólido
+BIEN  los triángulos (300790) y las aristas del reticular tienen el sha256 de Node
+BIEN  orbitar el reticular: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas al orbitar el reticular: 0
+
+TODO BIEN

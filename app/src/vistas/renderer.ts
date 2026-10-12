@@ -6,12 +6,18 @@
  * Sin WebGL (jsdom en los tests, un navegador sin él) no hay renderer: el motor lo dice en cada
  * vista y todo lo demás sigue funcionando.
  */
-import { AmbientLight, BufferAttribute, BufferGeometry, DirectionalLight, DoubleSide, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import { AmbientLight, BufferAttribute, BufferGeometry, DirectionalLight, DoubleSide, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, Scene, WebGLRenderer, type Material } from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 
 let compartido: WebGLRenderer | null | undefined;
+
+/**
+ * Los materiales del 3D (`vista3d.ts`), para precalentarlos tal cual: llevan los planos de la caja
+ * de sección (I3), que cambian su programa.
+ */
+export const MATERIALES_3D: Material[] = [];
 
 export function rendererCompartido(): WebGLRenderer | null {
   if (compartido !== undefined) return compartido;
@@ -21,6 +27,8 @@ export function rendererCompartido(): WebGLRenderer | null {
     const r = new WebGLRenderer({ antialias: true, stencil: true, alpha: false });
     r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     r.autoClear = false;
+    // La caja de sección (I3): planos de recorte por material
+    r.localClippingEnabled = true;
     r.domElement.style.display = "block";
     // Comprobar los errores de un shader espera a que el driver lo compile (decenas de ms en el
     // hilo principal la primera vez): sólo al desarrollar
@@ -57,6 +65,14 @@ function precalentar(r: WebGLRenderer): void {
       const l = new LineSegments2(lg, m);
       if (m.dashed) l.computeLineDistances();
       escena.add(l);
+    }
+    // Los del 3D, los mismos objetos (con sus planos de recorte)
+    for (const m of MATERIALES_3D) {
+      if (m instanceof LineMaterial) {
+        const l = new LineSegments2(lg, m);
+        escena.add(l);
+      } else if (m instanceof LineBasicMaterial) escena.add(new LineSegments(tri, m));
+      else escena.add(new Mesh(tri, m));
     }
     void r.compileAsync(escena, new PerspectiveCamera()).catch(() => {});
   };

@@ -14,7 +14,7 @@
  */
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
-import { leerProyecto, type Proyecto } from "../agente/proyecto.ts";
+import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { UNIDADES_CAMPO } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
@@ -29,6 +29,7 @@ import { calcular } from "../motor/calcular.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { ResultadoCaso } from "../motor/modelo.ts";
 import { alambrico } from "./alambrico.ts";
+import { solido, type Solido } from "./solido.ts";
 import { diagramas3D, type Diagramas3D, type Esfuerzo3D, type PiezasDiagrama } from "./diagramas3d.ts";
 import { elegir, elegirVentana, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
 import { isovalores3D, valorEnLamina, type Isovalores3D, type SuperficiesMapa } from "./isovalores3d.ts";
@@ -159,6 +160,8 @@ export interface EstadoSesion {
   sha256Resultados: string | null;
   /** I2: los ejes de replanteo que se dibujan (los del modelo o, si no tiene, los propuestos). */
   ejes: { id: string; nombre?: string; desde: Vec2; hasta: Vec2; propuesto: boolean }[];
+  /** I3: las vistas guardadas en el proyecto. */
+  vistas: VistaGuardada[];
 }
 
 export type Apertura = { valido: true; sesion: Sesion } | { valido: false; diagnosticos: Diagnostico[] };
@@ -293,6 +296,7 @@ export class Sesion {
         const x = ejesDe(f);
         return x.ejes.map((e) => ({ id: e.id, ...(e.nombre ? { nombre: e.nombre } : {}), desde: e.desde, hasta: e.hasta, propuesto: x.propuestos }));
       })(),
+      vistas: this.proyecto.vistas ?? [],
     };
   }
 
@@ -463,6 +467,17 @@ export class Sesion {
   /** El origen de las coordenadas del 3D: el del alámbrico, para que todo se pinte en las mismas. */
   get origen3D(): [number, number, number] {
     return (this.origenC ??= alambrico(this.proyecto.modelo).origen);
+  }
+
+  private solidoC: Solido | null = null;
+
+  /**
+   * El 3D sólido (I3), en el origen del 3D y con las viguetas de la compilación si compila. Se hace
+   * una vez (en el reticular grande, ~1,5 s) y se da una copia: la respuesta se va por Transferable.
+   */
+  solido(): Solido {
+    const x = (this.solidoC ??= solido(this.proyecto.modelo, this.origen3D, this.compilado));
+    return { ...x, triangulos: x.triangulos.slice(), objeto: x.objeto.slice(), planta: x.planta.slice(), aristas: x.aristas.slice(), objetoArista: x.objetoArista.slice(), plantaArista: x.plantaArista.slice() };
   }
 
   diagramas3D(p: PedidoDiagramas3D): { valido: true; valor: Diagramas3D } | { valido: false; diagnosticos: Diagnostico[] } {

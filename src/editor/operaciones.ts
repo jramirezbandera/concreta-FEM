@@ -20,7 +20,7 @@
  *
  * Puro: sin IO, sin React ni DOM.
  */
-import { comprobarProyecto, type Proyecto } from "../agente/proyecto.ts";
+import { comprobarProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { conValor, indiceIds, lista, referenciasDe, usos, type Coleccion, type Objeto, type Uso } from "./referencias.ts";
@@ -39,6 +39,8 @@ export type Operacion =
   | { op: "renumerar"; colecciones?: readonly Renumerable[] }
   /** Nombre y descripción del proyecto (no entran en la huella). */
   | { op: "datos"; nombre?: string; descripcion?: string }
+  /** I3: la lista de vistas guardadas, entera (no entra en la huella). Los nombres, no vacíos y sin repetir. */
+  | { op: "vistas"; vistas: readonly VistaGuardada[] }
   /** Varias operaciones como una sola: o entran todas o ninguna (y se deshacen de una vez). */
   | { op: "lote"; operaciones: readonly Operacion[] };
 
@@ -69,7 +71,8 @@ export const nombreColeccion = (c: Coleccion): string => NOMBRES[c];
 
 const conLista = (m: ModeloFisico, c: Coleccion, l: readonly Objeto[]): ModeloFisico => ({ ...m, [c]: l }) as ModeloFisico;
 
-type Paso = { ok: true; modelo: ModeloFisico; proyecto?: Partial<Pick<Proyecto, "nombre" | "descripcion">> } | { ok: false; errores: Diagnostico[]; usos?: Uso[] };
+type DatosProyecto = Partial<Pick<Proyecto, "nombre" | "descripcion" | "vistas">>;
+type Paso = { ok: true; modelo: ModeloFisico; proyecto?: DatosProyecto } | { ok: false; errores: Diagnostico[]; usos?: Uso[] };
 
 /** Las referencias de `o` que no apuntan a un objeto de su colección. */
 function referenciasMalas(m: ModeloFisico, c: Coleccion, o: Objeto, extra?: Map<string, Coleccion>): Diagnostico[] {
@@ -225,7 +228,7 @@ function mover(m: ModeloFisico, o: Extract<Operacion, { op: "mover" }>): Paso {
   return { ok: true, modelo: conLista(m, o.coleccion, l) };
 }
 
-function paso(m: ModeloFisico, o: Operacion, datos: Partial<Pick<Proyecto, "nombre" | "descripcion">>): Paso {
+function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto): Paso {
   switch (o.op) {
     case "crear":
       return crear(m, o);
@@ -239,6 +242,16 @@ function paso(m: ModeloFisico, o: Operacion, datos: Partial<Pick<Proyecto, "nomb
       return { ok: true, modelo: renombrarIds(m, propuestaRenumerar(m, o.colecciones)) };
     case "datos":
       return { ok: true, modelo: m, proyecto: { ...datos, ...("nombre" in o ? { nombre: o.nombre } : {}), ...("descripcion" in o ? { descripcion: o.descripcion } : {}) } };
+    case "vistas": {
+      const vistos = new Set<string>();
+      for (const v of o.vistas) {
+        const n = v.nombre.trim();
+        if (!n) return { ok: false, errores: [error("editor/vista-sin-nombre", "Una vista guardada necesita un nombre.")] };
+        if (vistos.has(n)) return { ok: false, errores: [error("editor/vista-repetida", `Ya hay una vista guardada que se llama «${n}».`, [], { nombre: n })] };
+        vistos.add(n);
+      }
+      return { ok: true, modelo: m, proyecto: { ...datos, vistas: o.vistas.map((v) => ({ ...v, nombre: v.nombre.trim() })) } };
+    }
     case "lote": {
       let r = m;
       let d = datos;
@@ -255,7 +268,7 @@ function paso(m: ModeloFisico, o: Operacion, datos: Partial<Pick<Proyecto, "nomb
 
 /** Aplica una operación. El proyecto que sale pasa el esquema; si no, no se aplica. */
 export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
-  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion });
+  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas });
   if (!s.ok) return s.usos ? { ok: false, errores: s.errores, usos: s.usos } : { ok: false, errores: s.errores };
   const q: Proyecto = { ...p, modelo: s.modelo };
   if (s.proyecto) {
@@ -264,6 +277,9 @@ export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
       if (v === undefined || v === "") delete q[k];
       else q[k] = v;
     }
+    const vs = s.proyecto.vistas;
+    if (!vs?.length) delete q.vistas;
+    else q.vistas = [...vs];
   }
   const c = comprobarProyecto(q);
   if (!c.valido) return { ok: false, errores: c.diagnosticos.map((d) => ({ ...d, severidad: "error" as const })) };

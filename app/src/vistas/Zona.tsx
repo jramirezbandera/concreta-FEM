@@ -9,7 +9,7 @@
  * (`Fuente2D`, `Fuente3D`); también pintan lo que va en el DOM de la celda (la leyenda, un aviso).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Box, Hand, Maximize, Move3d, MousePointer2, Rotate3d } from "lucide-react";
+import { BookmarkPlus, Box, BoxSelect, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
 import type { EntradaLeyenda, Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
@@ -17,6 +17,8 @@ import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
 import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
 import type { Pilares3D } from "../../../src/visor/pilares3d.ts";
 import type { Reacciones3D } from "../../../src/visor/reacciones3d.ts";
+import type { Solido } from "../../../src/visor/solido.ts";
+import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
 import type { FuenteEscena, VistaPlanta } from "../../../src/visor/sesion.ts";
@@ -26,10 +28,10 @@ import { useVisor } from "../contexto.ts";
 import { atributos, pintura } from "../lienzo/pintura.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { useTheme } from "../tema/useTheme.ts";
-import { useVistas, vistasDe, type EstadoVista, type TipoVista } from "./estado.ts";
+import { aGuardada, useVistas, vistasDe, type EstadoVista, type TipoVista } from "./estado.ts";
 import { Motor, type Herramienta, type Vista } from "./motor.ts";
 import { Vista2D, type Eventos2D, type Marca, type Margenes } from "./vista2d.ts";
-import { Vista3D, type Eventos3D, type Modo3D, type Objetivo3D, type Sonda } from "./vista3d.ts";
+import { TIPOS_FILTRO, Vista3D, type Color3D, type Eventos3D, type FiltroVista, type Modo3D, type Objetivo3D, type Sonda, type TipoFiltro } from "./vista3d.ts";
 
 // ─── La celda y su contexto ─────────────────────────────────────────────────────────────────────
 
@@ -131,6 +133,8 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   const superficie = useRef<HTMLDivElement>(null);
   const [vista, setVista] = useState<Vista | null>(null);
   const [herramienta, setHerramienta] = useState<Herramienta>("elegir");
+  const [opciones, setOpciones] = useState(false);
+  const [guardar, setGuardar] = useState(false);
   const camaras = useRef(v.camaras);
   camaras.current = v.camaras;
   const { poner, activar } = vistas;
@@ -149,7 +153,8 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
       motor.quitar(i);
       setVista(null);
     };
-  }, [motor, tipo, i, poner, activar]);
+    // Al abrir una vista guardada (`salto`), la vista se rehace con su cámara
+  }, [motor, tipo, i, poner, activar, v.salto]);
 
   useEffect(() => {
     if (vista) vista.herramienta = herramienta;
@@ -171,7 +176,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   const vv = useMemo(() => ({ ...v, planta, eje }), [v, planta, eje]);
   const celda = useMemo(() => ({ i, varias, v: vv, vista }), [i, varias, vv, vista]);
 
-  const contenido = tipo === "planta" ? (fuentes.planta?.(vv, i) ?? <FuenteEscena fuente={planta ? { tipo: "planta", planta, vista: { vista: "modelo" } } : null} />) : tipo === "alzado" ? (fuentes.alzado?.(vv, i) ?? <FuenteEscena fuente={eje ? { tipo: "alzado", plano: { eje } } : null} />) : (fuentes.tresD?.(vv, i) ?? <Fuente3DModelo />);
+  const contenido = tipo === "planta" ? (fuentes.planta?.(vv, i) ?? <FuenteEscena fuente={planta ? { tipo: "planta", planta, vista: { vista: "modelo" } } : null} />) : tipo === "alzado" ? (fuentes.alzado?.(vv, i) ?? <FuenteEscena fuente={eje ? { tipo: "alzado", plano: planoAlzado(eje, vv) } : null} />) : (fuentes.tresD?.(vv, i) ?? <Fuente3DModelo />);
 
   return (
     <div className="celda" data-activa={activa} data-tipo={tipo} data-vista={i}>
@@ -198,6 +203,15 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             opciones={e.ejes.map((x) => ({ id: x.id, nombre: `${x.nombre ?? x.id}${x.propuesto ? " (propuesto)" : ""}` }))}
           />
         )}
+        {tipo === "alzado" && (
+          <Desplegable
+            etiqueta="Profundidad del alzado"
+            prefijo={<span className="text-text-secondary">±</span>}
+            valor={String(v.profundidad ?? PROFUNDIDAD_POR_DEFECTO)}
+            onCambio={(x) => poner(i, { profundidad: Number(x) })}
+            opciones={PROFUNDIDADES.map((d) => ({ id: String(d), nombre: `${String(d).replace(".", ",")} m`, title: "Lo que se ve a cada lado del plano del alzado" }))}
+          />
+        )}
         {tipo === "alzado" && fuentes.cabeceraAlzado?.(vv, i)}
         {tipo === "3d" && (
           <>
@@ -205,15 +219,16 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
               etiqueta="Modo del 3D"
               valor={v.modo3d}
               onCambio={(m) => poner(i, { modo3d: m })}
-              opciones={(["alambrico", "analitico"] as Modo3D[]).map((m) => ({
-                id: m,
-                nombre: m === "alambrico" ? "Alámbrico" : "Analítico",
-                disabled: m === "analitico" && !e.compila,
-                title: m === "analitico" ? (e.compila ? "El modelo que se calcula: barras y láminas" : "El modelo no compila") : "Los ejes de las barras y los contornos de las losas y los muros",
+              opciones={MODOS_3D.map((m) => ({
+                id: m.id,
+                nombre: m.nombre,
+                disabled: m.id === "analitico" && !e.compila,
+                title: m.id === "analitico" && !e.compila ? "El modelo no compila" : m.title,
               }))}
             />
             <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: p })} ninguna={fuentes.cabecera3D ? "Todas las plantas" : "Sin resaltar"} />
             {fuentes.cabecera3D?.(vv, i)}
+            <ChipsFiltro filtro={v.filtro} onCambio={(f) => poner(i, { filtro: f })} />
           </>
         )}
       </div>
@@ -227,6 +242,9 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         <button type="button" className="ib" data-on={herramienta === "desplazar"} aria-pressed={herramienta === "desplazar"} title="Desplazar con el botón izquierdo (siempre: botón central o derecho)" aria-label="Desplazar" onClick={() => setHerramienta("desplazar")}>
           <Hand size={15} />
         </button>
+        <button type="button" className="ib" data-on={guardar} aria-expanded={guardar} disabled={!proyecto.edicion} title={proyecto.edicion ? "Guardar esta vista en el proyecto, con un nombre" : "Sólo con un proyecto editable"} aria-label="Guardar la vista" onClick={() => setGuardar((x) => !x)}>
+          <BookmarkPlus size={15} />
+        </button>
         {tipo === "3d" && (
           <>
             <button type="button" className="ib" data-on={herramienta === "orbitar"} aria-pressed={herramienta === "orbitar"} title="Orbitar con el botón izquierdo (siempre: Mayús y botón central o derecho)" aria-label="Orbitar" onClick={() => setHerramienta("orbitar")}>
@@ -235,9 +253,28 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             <button type="button" className="ib" data-on={v.proyeccion === "ortografica"} aria-pressed={v.proyeccion === "ortografica"} title={v.proyeccion === "perspectiva" ? "Pasar a ortográfica" : "Pasar a perspectiva"} aria-label="Ortográfica" onClick={() => poner(i, { proyeccion: v.proyeccion === "perspectiva" ? "ortografica" : "perspectiva" })}>
               {v.proyeccion === "perspectiva" ? <Move3d size={15} /> : <Box size={15} />}
             </button>
+            <button
+              type="button"
+              className="ib"
+              data-on={!!v.filtro?.caja}
+              aria-pressed={!!v.filtro?.caja}
+              title={v.filtro?.caja ? "Quitar la caja de sección" : "Caja de sección: empieza en lo elegido (o en todo) y se mueve arrastrando las asas de sus caras"}
+              aria-label="Caja de sección"
+              onClick={() => {
+                const caja = v.filtro?.caja ? null : vista instanceof Vista3D ? vista.cajaPropuesta(new Set(elegidos)) : null;
+                poner(i, { filtro: { ...v.filtro, caja } });
+              }}
+            >
+              <BoxSelect size={15} />
+            </button>
+            <button type="button" className="ib" data-on={opciones} aria-expanded={opciones} title="Opciones de la vista: color, lo que se ve y las plantas" aria-label="Opciones de la vista" onClick={() => setOpciones((x) => !x)}>
+              <SlidersHorizontal size={15} />
+            </button>
           </>
         )}
       </div>
+      {tipo === "3d" && opciones && <OpcionesVista3D v={v} estado={e} onCambio={(c) => poner(i, c)} onCerrar={() => setOpciones(false)} />}
+      {guardar && <GuardarVista v={vv} camara={() => vista?.camara() ?? null} onCerrar={() => setGuardar(false)} />}
       <ContextoCelda.Provider value={celda}>{contenido}</ContextoCelda.Provider>
       {motor && !motor.disponible && (
         <div className="velo">
@@ -249,6 +286,172 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
 }
 
 const NOMBRE_TIPO: Record<TipoVista, string> = { planta: "Planta", alzado: "Alzado", "3d": "3D" };
+
+const MODOS_3D: { id: Modo3D; nombre: string; title: string }[] = [
+  { id: "solido", nombre: "Sólido", title: "Las secciones extruidas, con sus aristas" },
+  { id: "translucido", nombre: "Translúcido", title: "El sólido al 35 %, con los ejes encima: para ver lo de dentro" },
+  { id: "alambrico", nombre: "Alámbrico", title: "Los ejes de las barras y los contornos de las losas y los muros" },
+  { id: "analitico", nombre: "Analítico", title: "El modelo que se calcula: barras y láminas" },
+];
+
+/** ±d de un alzado (I3). */
+const PROFUNDIDADES = [0.25, 0.5, 1, 2, 5];
+const PROFUNDIDAD_POR_DEFECTO = 0.5;
+
+/** El plano del alzado de una vista: su eje y, si no es la de por defecto, su profundidad. */
+export function planoAlzado(eje: string, v: EstadoVista): { eje: string; profundidad?: number } {
+  return v.profundidad !== undefined && v.profundidad !== PROFUNDIDAD_POR_DEFECTO ? { eje, profundidad: v.profundidad } : { eje };
+}
+
+const NOMBRE_FILTRO: Record<TipoFiltro, string> = { pilar: "Pilares", viga: "Vigas", losa: "Losas", pano: "Paños", muro: "Muros", apoyo: "Apoyos" };
+
+/** Lo que filtra un 3D, en chips que lo quitan con un clic (I3). */
+function ChipsFiltro({ filtro, onCambio }: { filtro: FiltroVista | undefined; onCambio: (f: FiltroVista) => void }) {
+  if (!filtro) return null;
+  const chips: { texto: string; title: string; sin: FiltroVista }[] = [];
+  if (filtro.desde || filtro.hasta) chips.push({ texto: `Plantas ${filtro.desde ?? "abajo"} → ${filtro.hasta ?? "arriba"}`, title: "Sólo esas plantas (los tramos de pilares y muros, por la planta de su cabeza)", sin: { ...filtro, desde: null, hasta: null } });
+  if (filtro.sinTipos?.length) chips.push({ texto: `Sin ${filtro.sinTipos.map((t) => NOMBRE_FILTRO[t].toLowerCase()).join(", ")}`, title: "Tipos de objeto que no se ven", sin: { ...filtro, sinTipos: [] } });
+  if (filtro.aislados) chips.push({ texto: `Aislados: ${filtro.aislados.length}`, title: `Sólo se ven ${filtro.aislados.slice(0, 12).join(", ")}${filtro.aislados.length > 12 ? "…" : ""} (H)`, sin: { ...filtro, aislados: null } });
+  if (filtro.ocultos?.length) chips.push({ texto: `Ocultos: ${filtro.ocultos.length}`, title: `No se ven ${filtro.ocultos.slice(0, 12).join(", ")}${filtro.ocultos.length > 12 ? "…" : ""} (Ctrl+H)`, sin: { ...filtro, ocultos: [] } });
+  if (filtro.caja) chips.push({ texto: "Caja de sección", title: "Recorta lo que se ve; se mueve con las asas de sus caras", sin: { ...filtro, caja: null } });
+  return (
+    <>
+      {chips.map((c) => (
+        <span key={c.texto} className="chip chip-filtro" data-acento title={c.title}>
+          <span>{c.texto}</span>
+          <button type="button" className="ib-chip" aria-label={`Quitar: ${c.texto}`} onClick={() => onCambio(c.sin)}>
+            <X size={13} />
+          </button>
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** Guardar la vista en el proyecto con un nombre (I3): una operación del editor, que se deshace. */
+function GuardarVista({ v, camara, onCerrar }: { v: EstadoVista; camara: () => unknown; onCerrar: () => void }) {
+  const { proyecto } = useVisor();
+  const ed = proyecto.edicion;
+  const actuales = ed?.proyecto.vistas ?? [];
+  const [nombre, setNombre] = useState(() => {
+    let n = actuales.length + 1;
+    while (actuales.some((x) => x.nombre === `Vista ${n}`)) n++;
+    return `Vista ${n}`;
+  });
+  const limpio = nombre.trim();
+  const existe = actuales.some((x) => x.nombre === limpio);
+  const hacer = () => {
+    if (!ed || !limpio) return;
+    const g = aGuardada(v, limpio, camara());
+    ed.editar({ op: "vistas", vistas: existe ? actuales.map((x) => (x.nombre === limpio ? g : x)) : [...actuales, g] }, `${existe ? "Sustituir" : "Guardar"} la vista «${limpio}»`);
+    onCerrar();
+  };
+  return (
+    <div className="opciones-vista" role="group" aria-label="Guardar la vista">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">Guardar la vista</span>
+        <button type="button" className="ib-chip" aria-label="Cerrar" onClick={onCerrar}>
+          <X size={14} />
+        </button>
+      </div>
+      <label className="mt-2">
+        <input className="sel w-full" aria-label="Nombre de la vista" value={nombre} autoFocus onChange={(x) => setNombre(x.target.value)} onKeyDown={(x) => x.key === "Enter" && hacer()} />
+      </label>
+      <p className="mt-1 text-[11px] leading-snug text-text-disabled">Con su tipo, su planta o su eje, su modo, su cámara y sus filtros. Se guarda en el proyecto (no cambia la huella) y se abre desde el navegador.</p>
+      <div className="mt-2 flex items-center gap-2">
+        <button type="button" className="btn" disabled={!limpio} onClick={hacer}>
+          {existe ? "Sustituir" : "Guardar"}
+        </button>
+        {existe && <span className="text-[11px] text-state-warn">Ya hay una con ese nombre</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Las opciones de un 3D (I3): el color del sólido, los tipos que se ven y el rango de plantas. */
+function OpcionesVista3D({ v, estado, onCambio, onCerrar }: { v: EstadoVista; estado: EstadoSesion; onCambio: (c: Partial<EstadoVista>) => void; onCerrar: () => void }) {
+  const f = v.filtro ?? {};
+  const set = (c: Partial<FiltroVista>) => onCambio({ filtro: { ...f, ...c } });
+  const sin = new Set(f.sinTipos ?? []);
+  const color = v.color3d ?? "material";
+  const plantas = estado.plantas;
+  return (
+    <div className="opciones-vista" role="group" aria-label="Opciones de la vista">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">Opciones de la vista</span>
+        <button type="button" className="ib-chip" aria-label="Cerrar las opciones" onClick={onCerrar}>
+          <X size={14} />
+        </button>
+      </div>
+      <fieldset>
+        <legend>Color del sólido</legend>
+        {(
+          [
+            ["material", "Por material"],
+            ["seccion", "Por sección"],
+            ["planta", "Por planta"],
+          ] as [Color3D, string][]
+        ).map(([id, nombre]) => (
+          <label key={id}>
+            <input type="radio" name={`color-${v.tipo}`} checked={color === id} onChange={() => onCambio({ color3d: id })} />
+            {nombre}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset>
+        <legend>Se ven</legend>
+        <div className="grid grid-cols-2">
+          {TIPOS_FILTRO.map((t) => (
+            <label key={t}>
+              <input
+                type="checkbox"
+                checked={!sin.has(t)}
+                onChange={(x) => {
+                  const n = new Set(sin);
+                  if (x.target.checked) n.delete(t);
+                  else n.add(t);
+                  set({ sinTipos: TIPOS_FILTRO.filter((y) => n.has(y)) });
+                }}
+              />
+              {NOMBRE_FILTRO[t]}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Plantas</legend>
+        <label>
+          <span className="w-8">De</span>
+          <select className="sel flex-1" aria-label="Planta de abajo" value={f.desde ?? ""} onChange={(x) => set({ desde: x.target.value || null })}>
+            <option value="">la de abajo</option>
+            {plantas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.id}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="w-8">a</span>
+          <select className="sel flex-1" aria-label="Planta de arriba" value={f.hasta ?? ""} onChange={(x) => set({ hasta: x.target.value || null })}>
+            <option value="">la de arriba</option>
+            {plantas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      </fieldset>
+      <div className="mt-2 flex items-center gap-2">
+        <button type="button" className="btn" onClick={() => onCambio({ filtro: { caja: f.caja ?? null } })}>
+          Mostrar todo
+        </button>
+      </div>
+      <p className="mt-2 text-[11px] leading-snug text-text-disabled">H aísla lo elegido (otra vez, lo suelta); Ctrl+H lo oculta; Mayús+H lo muestra todo. La caja de sección no se quita con ellos.</p>
+    </div>
+  );
+}
 
 // ─── Fuentes ────────────────────────────────────────────────────────────────────────────────────
 
@@ -387,6 +590,8 @@ export interface Deformada3D {
 
 interface PropsFuente3D extends Resultados3D {
   alambrico: Alambrico | null;
+  /** I3: el sólido, en sólido y translúcido. */
+  solido?: Solido | null;
   analitico?: Geometria3D | null;
   deformada?: Deformada3D | null;
   /** Fuerza un modo (la deformada, sobre el analítico). */
@@ -395,10 +600,16 @@ interface PropsFuente3D extends Resultados3D {
 }
 
 /** Un 3D en la vista de la celda. */
-export function Fuente3D({ alambrico, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, leyenda = null, alPasar, sonda = null }: PropsFuente3D) {
-  const { vista, v, varias } = useCelda();
+export function Fuente3D({ alambrico, solido = null, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, leyenda = null, alPasar, sonda = null }: PropsFuente3D) {
+  const { vista, v, varias, i } = useCelda();
+  const { poner } = useVistas();
   const x = vista instanceof Vista3D ? vista : null;
   useEffect(() => x?.ponerAlambrico(alambrico), [x, alambrico]);
+  useEffect(() => x?.ponerSolido(solido), [x, solido]);
+  useEffect(() => x?.ponerFiltro(v.filtro), [x, v.filtro]);
+  useEffect(() => x?.ponerColor(v.color3d ?? "material"), [x, v.color3d]);
+  const filtro = useRef(v.filtro);
+  filtro.current = v.filtro;
   useEffect(() => x?.ponerDiagramas(diagramas), [x, diagramas]);
   useEffect(() => x?.ponerIsovalores(isovalores), [x, isovalores]);
   useEffect(() => x?.ponerPilares(pilares), [x, pilares]);
@@ -411,7 +622,7 @@ export function Fuente3D({ alambrico, analitico = null, deformada = null, modo, 
   useEffect(() => x?.ponerPlantaActiva(v.planta), [x, v.planta]);
   useEffect(() => x?.ponerSonda(sonda), [x, sonda]);
   useEffect(() => {
-    if (x) x.eventos = { ...(eventos ?? {}), ...(alPasar ? { pasar: alPasar } : {}) };
+    if (x) x.eventos = { ...(eventos ?? {}), ...(alPasar ? { pasar: alPasar } : {}), caja: (c) => poner(i, { filtro: { ...filtro.current, caja: c } }) };
   });
   return (
     <>
@@ -428,7 +639,11 @@ export function Fuente3DModelo({ deformada, modo, resultados }: { deformada?: De
   const { v } = useCelda();
   const e = proyecto.estado!;
   const alamb = usePedido(proyecto.cliente, { tipo: "alambrico" });
-  const quiereAnalitico = (modo ?? v.modo3d) === "analitico" && e.compila;
+  // Con resultados, el sólido se pinta translúcido: si no, los taparía
+  const modoEf: Modo3D = modo ?? (resultados && v.modo3d === "solido" ? "translucido" : v.modo3d);
+  const quiereSolido = modoEf === "solido" || modoEf === "translucido";
+  const sol = usePedido(proyecto.cliente, quiereSolido ? { tipo: "solido" } : null);
+  const quiereAnalitico = modoEf === "analitico" && e.compila;
   const geo = usePedido(proyecto.cliente, quiereAnalitico ? { tipo: "geometria" } : null);
   const ultimo = useRef(elegidos);
   ultimo.current = elegidos;
@@ -443,7 +658,7 @@ export function Fuente3DModelo({ deformada, modo, resultados }: { deformada?: De
     }),
     [setElegidos],
   );
-  return <Fuente3D alambrico={alamb.datos} analitico={quiereAnalitico ? geo.datos : null} deformada={deformada} modo={modo} eventos={eventos} {...resultados} cargando={alamb.cargando || (quiereAnalitico && geo.cargando) || !!resultados?.cargando} />;
+  return <Fuente3D alambrico={alamb.datos} solido={quiereSolido ? sol.datos : null} analitico={quiereAnalitico ? geo.datos : null} deformada={deformada} modo={modoEf} eventos={eventos} {...resultados} cargando={alamb.cargando || (quiereSolido && sol.cargando) || (quiereAnalitico && geo.cargando) || !!resultados?.cargando} />;
 }
 
 // ─── Leyenda ────────────────────────────────────────────────────────────────────────────────────
