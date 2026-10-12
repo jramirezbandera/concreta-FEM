@@ -8,10 +8,13 @@
  * - Por prioridad (lo elegido primero, después la de A4), cada texto en su posición o en la primera
  *   alternativa que no se solapa con otro ya puesto; los que no caben se omiten y se cuentan. Al
  *   acercarse se separan, así que caben más.
+ * - Con poco zoom, las burbujas de los ejes se ralean para no tocarse (`ralearBurbujas`), y las que
+ *   quedan son obstáculos para las cotas y los demás rótulos.
  * - Los solapes se buscan en una rejilla de celdas de CELDA px, para no comparar cada caja con
  *   todas en cada fotograma.
  */
 import { TEXTO_MINIMO, type Texto, type Vec2 } from "../../../src/agente/render/escena.ts";
+import type { Glifo } from "../../../src/visor/escena.ts";
 
 export const ESCALA_COTAS = 10;
 export const ESCALA_IDS = 40;
@@ -34,26 +37,93 @@ export function visible(t: Texto, escala: number, elegidos: ReadonlySet<string>)
   return true;
 }
 
+type Caja = [number, number, number, number];
+
+/** Separación mínima entre dos burbujas de eje, px. */
+const HUECO_BURBUJAS = 3;
+
 /**
- * `px`: del modelo a la pantalla. `medir`: el ancho de un texto en px con su fuente. Devuelve los
- * puestos y cuántos de los que se intentaron no cupieron.
+ * Las burbujas de los ejes que caben sin tocarse, como en CAD al alejarse. Se decide por eje (sus
+ * burbujas de los dos extremos, juntas), por grupos de ejes paralelos ordenados a lo largo de su
+ * normal: primero los elegidos, después el primero y el último de cada grupo y luego los demás en
+ * orden; cada eje se queda si ninguna de sus burbujas toca a otra ya puesta. Con los ejes a
+ * distancias iguales quedan los extremos y uno de cada dos, de cada tres…
+ * Devuelve las que se ocultan, los textos sin el de cada burbuja oculta, y la caja de cada burbuja
+ * que se ve, para que las cotas y los demás rótulos no se pongan encima.
  */
-export function colocarRotulos(textos: readonly Texto[], px: (q: Vec2) => [number, number], ancho: number, alto: number, medir: (texto: string, tam: number, negrita: boolean) => number, escala: number, elegidos: ReadonlySet<string> = new Set()): { puestos: RotuloPuesto[]; omitidos: number } {
-  const rejilla = new Map<number, [number, number, number, number][]>();
+export function ralearBurbujas(glifos: readonly Glifo[], textos: readonly Texto[], px: (q: Vec2) => [number, number], elegidos: ReadonlySet<string> = new Set()): { ocultos: Set<Glifo>; textos: Texto[]; obstaculos: Caja[] } {
+  type Burbuja = { g: Extract<Glifo, { tipo: "marca" }>; q: [number, number] };
+  const porEje = new Map<string, Burbuja[]>();
+  glifos.forEach((g, i) => {
+    if (g.tipo !== "marca" || g.estilo !== "eje-burbuja") return;
+    const k = g.objeto ?? `#${i}`;
+    const l = porEje.get(k);
+    const b = { g, q: px(g.p) };
+    if (l) l.push(b);
+    else porEje.set(k, [b]);
+  });
+  // Grupos de ejes paralelos (por la dirección en pantalla entre sus dos burbujas, en grados)
+  const grupos = new Map<number, { id: string; bs: Burbuja[]; t: number }[]>();
+  for (const [id, bs] of porEje) {
+    const [a, b] = [bs[0]!.q, bs[bs.length - 1]!.q];
+    const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+    const ang = bs.length > 1 && Math.hypot(dx, dy) > 1e-6 ? (((Math.round((Math.atan2(dy, dx) * 180) / Math.PI) % 180) + 180) % 180) : -1;
+    const r = (ang * Math.PI) / 180;
+    // Posición a lo largo de la normal del grupo, en orden de lectura (sin dirección, por x)
+    let [nx, ny] = [-Math.sin(r), Math.cos(r)];
+    if (nx < -1e-9 || (Math.abs(nx) <= 1e-9 && ny < 0)) [nx, ny] = [-nx, -ny];
+    const t = ang < 0 ? a[0] : nx * a[0] + ny * a[1];
+    const l = grupos.get(ang);
+    if (l) l.push({ id, bs, t });
+    else grupos.set(ang, [{ id, bs, t }]);
+  }
+  const ordenados = [...grupos.entries()].sort((a, b) => b[1].length - a[1].length || a[0] - b[0]).map(([, l]) => l.sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1)));
+  const orden = [
+    ...ordenados.flat().filter((x) => elegidos.has(x.id)),
+    ...ordenados.flatMap((l) => (l.length > 1 ? [l[0]!, l[l.length - 1]!] : l)),
+    ...ordenados.flatMap((l) => l.slice(1, -1)),
+  ];
+  const puestas: Burbuja[] = [];
+  const ocultos = new Set<Glifo>();
+  const vistos = new Set<string>();
+  for (const x of orden) {
+    if (vistos.has(x.id)) continue;
+    vistos.add(x.id);
+    if (x.bs.some((b) => puestas.some((o) => Math.hypot(o.q[0] - b.q[0], o.q[1] - b.q[1]) < o.g.radio + b.g.radio + HUECO_BURBUJAS))) for (const b of x.bs) ocultos.add(b.g);
+    else puestas.push(...x.bs);
+  }
+  // El rótulo de una burbuja es el texto de clase «eje» de su objeto en su mismo punto
+  const oculta = (t: Texto) => t.clase === "eje" && [...ocultos].some((g) => g.objeto === t.objeto && g.p[0] === t.p[0] && g.p[1] === t.p[1]);
+  return {
+    ocultos,
+    textos: ocultos.size ? textos.filter((t) => !oculta(t)) : [...textos],
+    obstaculos: puestas.map(({ g, q }) => [q[0] - g.radio - 1, q[1] - g.radio - 1, q[0] + g.radio + 1, q[1] + g.radio + 1]),
+  };
+}
+
+/**
+ * `px`: del modelo a la pantalla. `medir`: el ancho de un texto en px con su fuente. `obstaculos`:
+ * cajas en px donde no se pone ningún rótulo salvo los de clase `eje` (las burbujas, que llevan el
+ * suyo dentro). Devuelve los puestos y cuántos de los que se intentaron no cupieron.
+ */
+export function colocarRotulos(textos: readonly Texto[], px: (q: Vec2) => [number, number], ancho: number, alto: number, medir: (texto: string, tam: number, negrita: boolean) => number, escala: number, elegidos: ReadonlySet<string> = new Set(), obstaculos: readonly Caja[] = []): { puestos: RotuloPuesto[]; omitidos: number } {
+  const rejilla = new Map<number, Caja[]>();
+  const fija = new Map<number, Caja[]>();
   const clave = (i: number, j: number) => i * 100003 + j;
   const celdas = (c: readonly [number, number, number, number]) => {
     const r: number[] = [];
     for (let i = Math.floor(c[0] / CELDA); i <= Math.floor(c[2] / CELDA); i++) for (let j = Math.floor(c[1] / CELDA); j <= Math.floor(c[3] / CELDA); j++) r.push(clave(i, j));
     return r;
   };
-  const solapa = (c: readonly [number, number, number, number]) => celdas(c).some((k) => rejilla.get(k)?.some((q) => c[0] < q[2] && c[2] > q[0] && c[1] < q[3] && c[3] > q[1]));
-  const guardar = (c: [number, number, number, number]) => {
+  const toca = (r: Map<number, Caja[]>, c: readonly [number, number, number, number]) => celdas(c).some((k) => r.get(k)?.some((q) => c[0] < q[2] && c[2] > q[0] && c[1] < q[3] && c[3] > q[1]));
+  const guardar = (r: Map<number, Caja[]>, c: Caja) => {
     for (const k of celdas(c)) {
-      const l = rejilla.get(k);
+      const l = r.get(k);
       if (l) l.push(c);
-      else rejilla.set(k, [c]);
+      else r.set(k, [c]);
     }
   };
+  for (const c of obstaculos) guardar(fija, c);
   const puestos: RotuloPuesto[] = [];
   let omitidos = 0;
   const prioridad = (t: Texto) => t.prioridad + (t.objeto !== undefined && elegidos.has(t.objeto) ? 1000 : 0);
@@ -73,7 +143,7 @@ export function colocarRotulos(textos: readonly Texto[], px: (q: Vec2) => [numbe
       const [a, b] = [a0 + ox * c - oy * s, b0 + ox * s + oy * c];
       const ancla = pos.ancla ?? "inicio";
       const xi = ancla === "inicio" ? 0 : ancla === "medio" ? -w / 2 : -w;
-      let caja: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+      let caja: Caja = [Infinity, Infinity, -Infinity, -Infinity];
       for (const [u, v] of [
         [xi - 2, -0.8 * tam],
         [xi + w + 2, -0.8 * tam],
@@ -88,8 +158,8 @@ export function colocarRotulos(textos: readonly Texto[], px: (q: Vec2) => [numbe
         puesto = true;
         break;
       }
-      if (solapa(caja)) continue;
-      guardar(caja);
+      if (toca(rejilla, caja) || (t.clase !== "eje" && obstaculos.length && toca(fija, caja))) continue;
+      guardar(rejilla, caja);
       puestos.push({ t, x: a, y: b, ancla, tam, fondo: t.fondo ? [a + xi - 2, b - 0.8 * tam, w + 4, 1.05 * tam] : null });
       puesto = true;
       break;

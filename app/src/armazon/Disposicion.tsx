@@ -108,9 +108,6 @@ export function SelectorPlanta({ estado, planta, onPlanta, ninguna }: { estado: 
   };
   return (
     <span className="chip sel planta-sel">
-      <button type="button" className="ib-chip" disabled={k === 0} onClick={() => ir(-1)} title="Planta de encima (RePág)" aria-label="Planta de encima">
-        <ChevronUp size={14} />
-      </button>
       <span className="planta-sel-campo">
         {actual && (actual.errores ? <i className="f" aria-label={`${actual.errores} errores`} /> : actual.avisos ? <i className="w" aria-label={`${actual.avisos} avisos`} /> : null)}
         <select className="sel-chip" value={planta ?? ""} onChange={(x) => onPlanta(x.target.value || null)} aria-label="Planta" title={actual?.nombre ? `${actual.id} · ${actual.nombre}` : undefined}>
@@ -123,6 +120,10 @@ export function SelectorPlanta({ estado, planta, onPlanta, ninguna }: { estado: 
         </select>
         <ChevronDown size={13} className="sel-flecha" aria-hidden="true" />
       </span>
+      <span className="planta-sel-sep" aria-hidden="true" />
+      <button type="button" className="ib-chip" disabled={k === 0} onClick={() => ir(-1)} title="Planta de encima (RePág)" aria-label="Planta de encima">
+        <ChevronUp size={14} />
+      </button>
       <button type="button" className="ib-chip" disabled={k === estado.plantas.length - 1} onClick={() => ir(1)} title="Planta de debajo (AvPág)" aria-label="Planta de debajo">
         <ChevronDown size={14} />
       </button>

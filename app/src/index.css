@@ -292,7 +292,7 @@ body {
 .zona-vistas > .celda { position: relative; z-index: 3; min-width: 0; min-height: 0; overflow: hidden; }
 .zona-vistas > .celda[data-activa="true"] { box-shadow: inset 0 0 0 2px var(--color-accent); }
 .celda-superficie { position: absolute; inset: 0; touch-action: none; user-select: none; }
-.celda .vista-cab { right: 216px; flex-wrap: nowrap; overflow: hidden; }
+.celda .vista-cab { right: 216px; flex-wrap: wrap; }
 .celda:has(.leyenda-vista[data-abierta="false"]) .vista-cab { right: 140px; }
 .celda[data-tipo="3d"] .vista-cab { right: 104px; }
 .vista-cab-2 { top: 48px; }
@@ -455,14 +455,15 @@ body {
 .chip.seg-chip > button:disabled { opacity: .4; cursor: default; }
 
 /* Desplegables de la cabecera de la vista (tipo, planta, eje, modo) */
-.chip.sel { position: relative; gap: 4px; padding: 0 6px 0 10px; cursor: pointer; }
+.chip.sel { position: relative; flex-shrink: 0; gap: 4px; padding: 0 6px 0 10px; cursor: pointer; }
 .chip.sel:hover { border-color: var(--color-border-strong, var(--color-text-disabled)); }
-.chip.sel .sel-chip { appearance: none; -webkit-appearance: none; padding: 0 16px 0 0; height: 28px; }
+.chip.sel .sel-chip { appearance: none; -webkit-appearance: none; field-sizing: content; padding: 0 18px 0 0; height: 28px; }
 .chip.sel .sel-chip:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 4px; }
 .chip.sel .sel-flecha { position: absolute; right: 6px; pointer-events: none; color: var(--color-text-secondary); }
 .chip.planta-sel { padding: 0 3px; gap: 0; }
-.planta-sel-campo { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 0 2px 0 6px; }
+.planta-sel-campo { position: relative; display: inline-flex; align-items: center; gap: 5px; padding: 0 0 0 7px; }
 .planta-sel-campo .sel-flecha { right: 2px; }
+.planta-sel-sep { width: 1px; height: 18px; margin: 0 3px 0 2px; background: var(--color-border-main); }
 .planta-sel-campo > i { width: 6px; height: 6px; border-radius: 3px; flex-shrink: 0; }
 .planta-sel-campo > i.f { background: var(--color-state-fail); }
 .planta-sel-campo > i.w { background: var(--color-state-warn); }

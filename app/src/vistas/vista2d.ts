@@ -13,7 +13,7 @@ import type { Eleccion, EscenaPreparada, Glifo } from "../../../src/visor/escena
 import { pintura } from "../lienzo/pintura.ts";
 import { Capas2D, MATERIALES, relleno, trazo } from "./capas.ts";
 import { fuente, textoConHalo, Vista, type Entorno } from "./motor.ts";
-import { colocarRotulos } from "./rotulos.ts";
+import { colocarRotulos, ralearBurbujas } from "./rotulos.ts";
 
 export interface Marca {
   p: Vec2;
@@ -241,7 +241,9 @@ export class Vista2D extends Vista {
     }
     const col = this.entorno.colores();
     const tema = this.entorno.tema();
-    for (const g of e.glifos) this.glifo(ctx, g, tema, col.fondo);
+    const px = (q: Vec2) => this.aPx(q);
+    const burbujas = ralearBurbujas(e.glifos, e.textos, px, this.elegidos);
+    for (const g of e.glifos) if (!burbujas.ocultos.has(g)) this.glifo(ctx, g, tema, col.fondo);
     const acento = col.acento;
     if (this.resaltado) {
       ctx.strokeStyle = acento;
@@ -254,7 +256,7 @@ export class Vista2D extends Vista {
       }
     }
     // Rótulos
-    const { puestos, omitidos } = colocarRotulos(e.textos, (q) => this.aPx(q), this.rect.w, this.rect.h, this.entorno.medir, this.s, this.elegidos);
+    const { puestos, omitidos } = colocarRotulos(burbujas.textos, px, this.rect.w, this.rect.h, this.entorno.medir, this.s, this.elegidos, burbujas.obstaculos);
     this.omitidos = omitidos;
     ctx.textBaseline = "alphabetic";
     for (const p of puestos) {
