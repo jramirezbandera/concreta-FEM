@@ -2,7 +2,7 @@
 
 > **Qué es.** Rehacer la interfaz de la app (V1 + V2a) para que se parezca a CYPECAD y SAP2000, pero como una aplicación actual: el dibujo manda, hay barra de herramientas, varias vistas de la estructura (planta, alzados por eje y 3D), un 3D con las secciones extruidas y los resultados dibujados sobre el 3D alámbrico. **Fecha:** 2026-10-11.
 >
-> **Estado:** decisiones I-a…I-h tomadas por el usuario el 2026-10-12, todas como se proponían (§12). Lo que se fija para I1, en §13. **I1 hecha el 2026-10-12:** pasan sus cuatro criterios; el informe está en `fase-i1.md`.
+> **Estado:** decisiones I-a…I-h tomadas por el usuario el 2026-10-12, todas como se proponían (§12). Lo que se fija para I1, en §13. **I1 hecha el 2026-10-12:** pasan sus cuatro criterios; el informe está en `fase-i1.md`. Lo que se fija para I2, en §14.
 >
 > **Prototipo:** lienzo «FEM 3D · Interfaz v4» (https://claude.ai/artifact/EhCxgYTvYMsfKzcLph4Wsp), con cinco pantallas. Los dibujos 3D, la planta y el alzado salen del edificio objetivo (`validacion/a2/agente/edificio`) con sus resultados reales (envolvente de My, ν por tramo), dibujados con Three.js en Chrome: son también un primer spike de I3 e I4.
 >
@@ -328,3 +328,67 @@ El armazón de §3 y §4 con el lienzo de hoy: la planta sigue en SVG y el 3D si
    - hay una lista, en el informe, de cada función de las pantallas de V1 y V2a y de dónde está ahora.
 3. **Lo que no vale nunca se enseña como válido:** las mismas reglas que en V1 (resultados desactualizados al primer cambio, respuestas viejas descartadas por su huella). Resultados y Revisión no se abren sin un cálculo de esta huella.
 4. **Fluidez:** cambiar de espacio, de modo o de panel no da tareas largas de más de 50 ms en el edificio objetivo.
+
+## 14. I2: lo que se fija al empezar
+
+El motor de vistas de §5 y §10 con el grafismo de §8 y los ejes de §9. Lo que se dibuja de la planta sigue saliendo de la escena de A4; cambia quién lo pinta (WebGL en vez de SVG) y se añaden el alzado, el 3D alámbrico del modelo físico y las vistas múltiples.
+
+- **Motor de vistas** (`app/src/vistas/`), fuera de React (H41) y alimentado por efectos:
+  - un `WebGLRenderer` con stencil y antialias y un solo `<canvas>` para toda la zona de vistas; cada vista se pinta en su rectángulo (`setViewport` y `setScissor`);
+  - encima, un lienzo 2D para lo que tiene tamaño en píxeles: glifos, rótulos, la ventana de elegir y el ViewCube;
+  - se pinta sólo cuando algo cambia;
+  - sin WebGL (jsdom, un navegador sin él) la vista lo dice y todo lo demás sigue funcionando.
+- **La planta en WebGL** (I-b):
+  - el worker pasa la escena de A4 a búferes (`src/visor/escena.ts`, puro): por capa (las mismas de V1: primitivas seguidas con el mismo estilo), los abanicos de triángulos de sus anillos y los segmentos de sus contornos y líneas; glifos y textos, tal cual;
+  - los rellenos van por stencil (par-impar en las áreas y «nonzero» en las bandas de isovalores): la misma regla que el SVG, sin triangular, así que no puede fallar con un polígono raro;
+  - las coordenadas, en Float32 respecto al centro de la caja de la escena, para no perder precisión;
+  - las líneas, con grosor en píxeles (`LineSegments2` de Three.js, MIT).
+- **Grafismo de §8, en la escena de A4** (y por tanto también en `fem render`):
+  - ejes de replanteo con burbujas en los dos extremos, en todas las vistas de planta, y cadenas de cotas entre ejes paralelos en la vista `modelo`;
+  - huecos de losa con aspa;
+  - vigas con relleno claro y borde fino, y losas con borde de 1,2 px; lo cortado (pilares y muros que llegan) sigue relleno y oscuro;
+  - cada rótulo lleva su clase (`eje`, `cota`, `id` o `dato`) para el zoom. `fem render` no la usa.
+- **Rótulos por zoom:**
+  - los de los ejes y los datos (cargas, diagnósticos, extremos, valores), siempre;
+  - las cotas, desde 10 px/m; los ids y las secciones, desde 40 px/m o si su objeto está elegido;
+  - prioridad: lo elegido, después la de A4; con halo y sin pisarse, con la misma regla de A4 (el que no cabe no se dibuja), medidos con la fuente de verdad.
+- **Ejes de replanteo** (§9, I-a):
+  - `ejes` opcional en el modelo físico: id, nombre opcional y dos puntos (`desde` y `hasta`). Las plantas en las que se ven, más adelante;
+  - no entran en la huella ni en el cálculo: el compilador los ignora;
+  - si no hay, se proponen (`src/compilador/ejes.ts`) con las alineaciones de pilares de las bandas (C5-b), en la dirección del eje 1 de la primera losa (X si no hay losas) y en la perpendicular: números a lo largo de la primera y letras a lo largo de la segunda, de menor a mayor coordenada, y de lado a lado de los pilares con 2 m de más;
+  - el editor tiene una tabla Ejes (la décima). Sin ejes en el proyecto, se ven los propuestos y la tabla ofrece guardarlos (un solo deshacer).
+- **Alzado** (`src/agente/render/alzado.ts`, una escena de A4 en coordenadas u, z):
+  - el plano vertical de un eje, con una profundidad ±d (0,5 m por defecto);
+  - las cotas de las plantas, los ejes que lo cruzan con sus burbujas, los pilares y muros a menos de d con el ancho que se ve desde ese lado, las vigas paralelas con su canto (cara superior en la planta), las que lo cruzan cortadas, las losas cortadas con su espesor y los apoyos;
+  - se elige con el ratón como en la planta.
+- **3D alámbrico del modelo físico** (`src/visor/alambrico.ts`, puro): el eje de cada pilar, viga y muro y el contorno de cada losa, paño y muro, con el objeto de cada segmento. Se dibuja aunque el modelo no compile, como la planta.
+  - Modos de I2: alámbrico y analítico (la malla de V1, para no perder lo que daba el 3D de Modelo). Sólido y translúcido son de I3.
+  - La deformada de Resultados pasa a este motor, sobre el analítico.
+  - Perspectiva u ortográfica, y ViewCube con las seis vistas y las cuatro isométricas.
+- **Vistas:**
+  - planta, alzado y 3D, en 1, 1|1, 1/1 o 2×2 (barra de Modelo y Ctrl+1…4);
+  - cada vista tiene su tipo, su planta o su eje, su modo y su cámara; la activa (la del último clic) va con el borde de acento y es la que siguen el carril de plantas, AvPág y RePág y la barra de estado;
+  - las vistas no cambian con el espacio de trabajo. En Resultados, una planta enseña lo del modo (Losas, Diagramas o Pilares) y un 3D, la deformada en su modo; un alzado, el modelo. Si el modo no tiene dónde verse, la vista activa cambia de tipo;
+  - disposición, vistas y cámaras se recuerdan en el navegador, por proyecto.
+- **Navegación** (§5.5, I-e):
+  - la rueda acerca hacia el cursor; el botón central (o el derecho) desplaza y, con Mayús, orbita alrededor del punto bajo el cursor;
+  - la barra de la vista tiene Encuadrar (F), Desplazar y Orbitar con el botón izquierdo (para el panel táctil), y en 3D, la proyección;
+  - clic elige; Ctrl+clic añade o quita; arrastrar elige por ventana (de izquierda a derecha, lo que queda dentro; de derecha a izquierda, lo que toca); Esc suelta;
+  - doble clic en un eje abre su alzado en otra vista.
+- **Selección compartida:**
+  - la del visor pasa a ser una lista; la última elegida es la principal (la del inspector);
+  - elegir en una vista elige en todas, en el navegador y en la tabla;
+  - con varias, Propiedades da la lista por tipo, y Borrar y A plantas trabajan con todas;
+  - en Resultados, el clic sigue siendo el de cada modo (el valor del punto, la viga o el pilar).
+- **Fuera de I2:** sólido, translúcido, filtros, rango de plantas, aislar y caja de sección (I3); resultados en 3D y en el alzado, y el valor bajo el cursor (I4); vistas guardadas en el proyecto (I3); «Renumerar» (I-g, con V2b); táctil (V3); la planta de abajo en gris.
+
+### 14.1 Criterios de paso de I2
+
+1. **Las primitivas de la planta, iguales a las de `fem render`.** En los cuatro proyectos de V1 y en todas las vistas de planta, los búferes que pinta el visor son, capa a capa y en orden, los vértices de las primitivas de la escena de `fem render` (en Float32 respecto al centro), con su estilo, y ningún glifo ni texto se pierde. En Chrome, los búferes que llegan al motor tienen el mismo sha256 que en Node.
+2. **Fluidez, con el edificio objetivo en sobremesa:** orbitar el 3D y desplazar y acercar la planta a 60 fps (la mediana del intervalo entre fotogramas ≤ 17 ms) y ninguna tarea larga de más de 50 ms; pasar de 1 a 4 vistas en ≤ 0,3 s.
+3. **Elegir en una vista elige en todas y en la tabla:** un clic en la planta, en el alzado y en el 3D, una ventana y Ctrl+clic dan la misma lista en las cuatro vistas, en el navegador y en las filas de la tabla.
+4. **Lo nuevo, validado en Node:**
+   - ejes: la propuesta no depende del orden de las listas ni de una traslación o un giro de la planta, y los ejes no cambian la huella;
+   - alzado: lo dibujado es lo del modelo (pilares con su posición, su ancho visto y sus cotas; vigas con su canto; losas con su espesor);
+   - 3D alámbrico: cada segmento es de su objeto, con su cota.
+5. **No se pierde nada de I1:** los tests de DOM de V1 y V2a pasan, y los bancos de Chrome de V1, V2a e I1, adaptados, dan los mismos resultados.
