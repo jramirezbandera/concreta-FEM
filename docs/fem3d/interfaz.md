@@ -2,7 +2,7 @@
 
 > **Qué es.** Rehacer la interfaz de la app (V1 + V2a) para que se parezca a CYPECAD y SAP2000, pero como una aplicación actual: el dibujo manda, hay barra de herramientas, varias vistas de la estructura (planta, alzados por eje y 3D), un 3D con las secciones extruidas y los resultados dibujados sobre el 3D alámbrico. **Fecha:** 2026-10-11.
 >
-> **Estado:** decisiones I-a…I-h tomadas por el usuario el 2026-10-12, todas como se proponían (§12). Lo que se fija para I1, en §13.
+> **Estado:** decisiones I-a…I-h tomadas por el usuario el 2026-10-12, todas como se proponían (§12). Lo que se fija para I1, en §13. **I1 hecha el 2026-10-12:** pasan sus cuatro criterios; el informe está en `fase-i1.md`.
 >
 > **Prototipo:** lienzo «FEM 3D · Interfaz v4» (https://claude.ai/artifact/EhCxgYTvYMsfKzcLph4Wsp), con cinco pantallas. Los dibujos 3D, la planta y el alzado salen del edificio objetivo (`validacion/a2/agente/edificio`) con sus resultados reales (envolvente de My, ν por tramo), dibujados con Three.js en Chrome: son también un primer spike de I3 e I4.
 >

@@ -262,8 +262,16 @@
   - I-g: numeración como CYPECAD, con una orden «Renumerar» (§12.1).
 
   **Pendientes:** I-b, I-c, I-d, I-e e I-h.
+- **2026-10-12: decisiones I-b…I-h tomadas** como se proponían: planta en WebGL, cuatro espacios, lienzo claro con tema oscuro, navegación como SAP2000/Revit y 13 px sin modo compacto.
+- **2026-10-12: fase I1 terminada** (armazón de la interfaz v4). Pasan sus cuatro criterios. El informe está en `docs/fem3d/fase-i1.md`, con criterios, la lista de dónde quedó cada función de V1/V2a, hallazgos I1-1…I1-5 y pendientes.
+  - **Ya en `app/src/`:**
+    - `armazon/`: disposición común (barra de herramientas, navegador y propiedades plegables, panel inferior con pestañas y altura ajustable, recordados por espacio en localStorage), carril de plantas, iconos y paleta de órdenes (Ctrl+K);
+    - `espacios/`: Modelo y Cargas, y Resultados con cuatro modos (Losas, Diagramas, Pilares y Deformada: las pantallas de V1, en `pantallas/`); Revisión.
+  - **Resultado:** la vista ocupa el 72,8 % en 1920×1080 y el 63,0 % en 1366×768. Los bancos de V1 y V2a, adaptados, dan los mismos bits; el único fallo es V1-3, como antes.
+  - **Validación:** `validacion/i1/chrome.ts` y los tests de DOM de `app/`.
+  - **Pendiente del usuario:** la puerta de uso.
 - **Siguiente paso:**
-  - las decisiones que quedan de la interfaz v4 (I-b…I-e, I-h) y, con ellas, I1 (armazón);
+  - la puerta de uso de I1 y después I2 (motor de vistas: planta y alzado en WebGL, ViewCube, 1/2/4 vistas, rótulos por zoom y ejes de replanteo), I3 (sólido) e I4 (resultados en 3D);
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).

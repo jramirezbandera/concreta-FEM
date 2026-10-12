@@ -6,6 +6,8 @@
 >
 > **V2 (2026-10-11):** el usuario la pone antes que A5: sin una app en la que meter los datos y ver los resultados, la capa de agente no tiene sobre qué apoyarse. Decisiones V-d, V-e y V-f en §5; propuesta de V2a en §6, aceptada tal cual el 2026-10-11. **V2a hecha el 2026-10-11:** pasa los criterios 1 a 5; el 6 (puerta de uso) es del usuario. El informe está en `fase-v2a.md`.
 >
+> **Interfaz v4 (2026-10-12):** desde I1, las pantallas de V1 y V2a viven en los espacios de trabajo de `interfaz.md` (Modelo, Cargas, Resultados y Revisión). Lo que hace cada una no cambia; dónde está, en `fase-i1.md` §2.
+>
 > **Por qué ahora y no después de A5.** La capa de agente da por hecho que el ingeniero revisa y firma «sobre un informe y un visor» (`agente.md`, veredicto), y la superposición con la que A5 confirma un plano se ve mucho mejor en un visor que en una PNG. Hasta ahora sólo existen los prototipos (lienzo «FEM 3D · Interfaz», v3) y los SVG/PNG de `fem render`.
 
 ## 1. Fases
