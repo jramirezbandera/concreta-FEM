@@ -13,6 +13,7 @@ import { VISTAS_RESULTADOS } from "./resultados.ts";
 
 export * from "./escena.ts";
 export { escenaASvg, LADO_MAXIMO } from "./svg.ts";
+export { cantoSeccion, planoDeEje, PROFUNDIDAD_ALZADO, vistaAlzado, type PlanoAlzado } from "./alzado.ts";
 export { PlantaFisica, vistaCargas, vistaDiagnosticos, vistaModelo, type DatosVista } from "./modelo.ts";
 export { CAMPOS, ResultadosRender, vistaAxiles, vistaCampo, vistaDiagramas, vistaMalla, type Campo } from "./resultados.ts";
 

@@ -86,3 +86,30 @@ function cotas(ejes: readonly EjeReplanteo[]): Primitiva[] {
   }
   return P;
 }
+
+/**
+ * Los ejes que cruzan el plano de un alzado (`alzado.ts`): una vertical en su cruce, de `z[0]` a
+ * `z[1]`, con una burbuja en cada extremo. `plano.eje` (el eje del alzado) no se dibuja.
+ */
+export function capaEjesAlzado(f: ModeloFisico, plano: { eje?: string }, c: { u: (p: Vec2) => number; w: (p: Vec2) => number }, u: [number, number], z: [number, number]): Primitiva[] {
+  const P: Primitiva[] = [];
+  const ejes = [...ejesDe(f).ejes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const e of ejes) {
+    if (e.id === plano.eje || degenerado(e)) continue;
+    const [wa, wb] = [c.w(e.desde), c.w(e.hasta)];
+    if (wa === wb || (wa > 0 && wb > 0) || (wa < 0 && wb < 0)) continue;
+    const t = wa / (wa - wb);
+    const uc = c.u(e.desde) + t * (c.u(e.hasta) - c.u(e.desde));
+    if (uc < u[0] || uc > u[1]) continue;
+    const [p0, p1]: Vec2[] = [
+      [uc, z[0]],
+      [uc, z[1]],
+    ];
+    P.push({ tipo: "linea", puntos: [p0, p1], estilo: "eje", objeto: e.id });
+    for (const p of [p0, p1]) {
+      P.push({ tipo: "marca", p, forma: "circulo", radio: RADIO_BURBUJA, estilo: "eje-burbuja", objeto: e.id });
+      P.push({ tipo: "texto", p, texto: e.nombre ?? e.id, tamano: 12, negrita: true, ancla: "medio", dy: 4, prioridad: 95, clase: "eje", objeto: e.id });
+    }
+  }
+  return P;
+}
