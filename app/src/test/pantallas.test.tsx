@@ -26,6 +26,7 @@ import type { ClienteSesion } from "../sesion/cliente.ts";
 import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
 import { ContextoVistas, useEstadoVistas } from "../vistas/estado.ts";
+import { modo3dVisto } from "../vistas/Zona.tsx";
 
 const RAIZ = join(__dirname, "..", "..", "..");
 let at: Atendedor;
@@ -138,6 +139,10 @@ describe("V1 · DOM", () => {
       o.R.forEach((v, k) => expect(celdas[k + 1]!.textContent).toBe(fmt(v, 1)));
       expect(lineasReaccion(o)[1]).toBe(`Fz ${fmt(o.R[2], 1)} kN · Fx ${fmt(o.R[0], 1)} · Fy ${fmt(o.R[1], 1)}`);
     });
+    // En Resultados, el sólido se pinta alámbrico (el translúcido, si se pide); fuera, como se pida
+    expect(modo3dVisto("solido", true)).toBe("alambrico");
+    expect(modo3dVisto("translucido", true)).toBe("translucido");
+    expect(modo3dVisto("solido", false)).toBe("solido");
     // Sin acciones no hay combinaciones, y el selector dice por qué
     const sin = estado.sinCombinaciones;
     expect(estado.combinaciones.length === 0).toBe(!!sin);

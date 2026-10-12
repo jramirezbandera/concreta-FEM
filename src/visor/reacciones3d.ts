@@ -8,7 +8,8 @@
  *   en la tabla y bajo el cursor.
  * - Con varias combinaciones, la de mayor |Fz| de cada objeto (la primera, si empatan); con una, esa
  *   (`reaccionesObjetos`, la misma de la planta y el alzado de A4).
- * - Escala: la mayor |F| (vertical u horizontal) que se ve ocupa ORDENADA_DIAGRAMA m por la pedida.
+ * - Escalas: la mayor |Fz| ocupa ORDENADA_DIAGRAMA m por la pedida, y la mayor |(Fx, Fy)|, lo mismo
+ *   con la suya (decisión del usuario tras I4: con una común, al lado de Fz no se verían).
  * - Rótulos: la mayor reacción hacia arriba y, si hay, la mayor hacia abajo (un apoyo que tira).
  *
  * Las coordenadas, en Float32 respecto a `origen` (el del alámbrico), Z hacia arriba.
@@ -38,7 +39,10 @@ export interface Reacciones3D {
   objetos: ReaccionObjeto[];
   /** Totales de la consulta por combinación (la suma de todas las reacciones respecto al origen). */
   totales: { comb: string; F: number[]; M: number[] }[];
+  /** La de las verticales: `valor` kN ocupan `m` metros. */
   escala: { m: number; valor: number };
+  /** La de las horizontales, la suya. */
+  escalaH: { m: number; valor: number };
   extremos: { que: "mayor hacia arriba" | "mayor hacia abajo"; valor: number; id: string; comb: string; punto: V3 }[];
   leyenda: EntradaLeyenda[];
   notas: string[];
@@ -50,9 +54,14 @@ export function reacciones3D(r: ResultadosRender, origen: [number, number, numbe
   if (!q.valido) return q;
   const objetos = q.valor.objetos;
   let maxF = 0;
-  for (const o of objetos) maxF = Math.max(maxF, Math.abs(o.R[2]!), Math.hypot(o.R[0]!, o.R[1]!));
+  let maxH = 0;
+  for (const o of objetos) {
+    maxF = Math.max(maxF, Math.abs(o.R[2]!));
+    maxH = Math.max(maxH, Math.hypot(o.R[0]!, o.R[1]!));
+  }
   const m = ORDENADA_DIAGRAMA * escala;
   const k = maxF > 0 ? m / maxF : 0;
+  const kH = maxH > 0 ? m / maxH : 0;
 
   const seg: number[] = [];
   const tipo: number[] = [];
@@ -84,7 +93,7 @@ export function reacciones3D(r: ResultadosRender, origen: [number, number, numbe
   };
   objetos.forEach((o, i) => {
     flecha(o.punto, [0, 0, o.R[2]! * k], 0, i);
-    flecha(o.punto, [o.R[0]! * k, o.R[1]! * k, 0], 1, i);
+    flecha(o.punto, [o.R[0]! * kH, o.R[1]! * kH, 0], 1, i);
   });
 
   const extremos: Reacciones3D["extremos"] = [];
@@ -96,7 +105,7 @@ export function reacciones3D(r: ResultadosRender, origen: [number, number, numbe
   }
   const notas = [
     conjunto.factores.length > 1 ? `${notaCombinaciones(conjunto).slice(0, -1)} (dicha en su fila).` : notaCombinaciones(conjunto),
-    `Escala: ${rotulo(maxF)} kN = ${rotulo(m)} m. Cada flecha, la resultante de la consulta «reacciones» en el centro de los nudos coartados de su objeto, en el sentido de la fuerza que el apoyo hace sobre la estructura.`,
+    `Escalas: verticales, ${rotulo(maxF)} kN = ${rotulo(m)} m; horizontales, la suya, ${rotulo(maxH)} kN = ${rotulo(m)} m (con la de Fz no se verían). Cada flecha, la resultante de la consulta «reacciones» en el centro de los nudos coartados de su objeto, en el sentido de la fuerza que el apoyo hace sobre la estructura.`,
     "Mx, My y Mz (los empotramientos), en la tabla y bajo el cursor.",
     ...(objetos.length ? [] : ["No hay objetos con reacciones."]),
   ];
@@ -111,10 +120,11 @@ export function reacciones3D(r: ResultadosRender, origen: [number, number, numbe
       objetos,
       totales: q.valor.totales,
       escala: { m, valor: maxF },
+      escalaH: { m, valor: maxH },
       extremos,
       leyenda: [
         { relleno: COLOR_REACCION.vertical, texto: "Fz: la reacción vertical (hacia arriba, positiva)" },
-        { relleno: COLOR_REACCION.horizontal, texto: "(Fx, Fy): la reacción horizontal" },
+        { relleno: COLOR_REACCION.horizontal, texto: "(Fx, Fy): la reacción horizontal, a su propia escala" },
       ],
       notas,
       diagnosticos: q.valor.diagnosticos,

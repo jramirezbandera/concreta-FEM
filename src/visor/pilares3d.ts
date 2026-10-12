@@ -112,7 +112,7 @@ export function pilares3D(r: ResultadosRender, origen: [number, number, number],
     const lm = (magnitud === "nu" ? limitesMapa(vmin, vmax, { min: 0, max: Math.max(PASO_NU, Math.ceil(vmax / PASO_NU - 1e-9) * PASO_NU), paso: PASO_NU }) : limitesMapa(vmin, vmax)) as LimitesMapa;
     L = lm.L;
     colores = coloresBandas(L, { abajo: lm.fueraAbajo, arriba: lm.fueraArriba });
-    for (let b = L.length - 2; b >= 0; b--) leyenda.push({ relleno: colores[b]!, texto: `${rotulo(L[b]!, 4)} a ${rotulo(L[b + 1]!, 4)}${magnitud === "nu" && L[b]! >= LIMITE_AXIL_REDUCIDO - 1e-12 ? " (pasa el límite de A3)" : ""}` });
+    for (let b = L.length - 2; b >= 0; b--) leyenda.push({ relleno: colores[b]!, texto: `${rotulo(L[b]!, 4)} a ${rotulo(L[b + 1]!, 4)}${magnitud === "nu" && L[b]! >= LIMITE_AXIL_REDUCIDO - 1e-12 ? " (pasa el aviso de A3; no es la comprobación de norma)" : ""}` });
   }
   const banda = new Uint16Array(tramos.length).fill(SIN_BANDA);
   tramos.forEach((t, i) => {

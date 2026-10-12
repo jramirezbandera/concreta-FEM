@@ -53,6 +53,7 @@
 
 ## 5. Pendiente
 
-- **Del usuario:** la puerta de uso de I3 y las propuestas de §16: qué se recorta bajo la losa (I3-1), el sólido translúcido en Resultados (I3-8), los colores y la caja.
+- **Decidido (2026-10-13, I-i):** las propuestas de §16, aceptadas, salvo I3-8: en Resultados el sólido se pinta alámbrico (`modo3dVisto`), y el translúcido queda a elección.
+- **Del usuario:** la puerta de uso de I3. Antes, también las propuestas de §16: qué se recorta bajo la losa (I3-1), el sólido translúcido en Resultados (I3-8), los colores y la caja.
 - **Fuera de I3 (§16):** tapar el corte de la caja; la cimentación y los símbolos de los arranques; los apoyos lineales en el sólido; aislar en la planta y el alzado; el valor bajo el cursor sobre el sólido.
 - **Técnico:** medir el sólido del reticular grande en un móvil (I3-7); que las vistas guardadas sigan los renombrados (I3-9).

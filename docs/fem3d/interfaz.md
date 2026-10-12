@@ -294,6 +294,7 @@ Hoy el modelo no tiene ejes de replanteo, y hacen falta para:
 | **I-f** | Orden | **Decidido (2026-10-12):** I1–I3 antes de V2b y V2c (§11) |
 | **I-g** | Nombres de las piezas | **Decidido (2026-10-12):** se numera como CYPECAD (§12.1) |
 | **I-h** | Densidad | **Decidido (2026-10-12):** 13 px de base y paneles plegables, sin modo compacto por ahora |
+| **I-i** | Propuestas de I3 e I4 (§15 y §16) | **Decidido (2026-10-13):** se aceptan todas, con tres cambios: en el 3D de Reacciones, las horizontales a su propia escala (con la de Fz no se veían); en Resultados, el sólido se pinta **alámbrico** (como SAP2000 y ETABS; el translúcido, si se pide), y en ν, el 0,65 se rotula como aviso de A3, no como comprobación de norma |
 
 ### 12.1 Numeración como CYPECAD (I-g)
 

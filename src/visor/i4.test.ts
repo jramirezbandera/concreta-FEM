@@ -130,6 +130,16 @@ describe.each(PROYECTOS)("I4 (resto) con %s", (_nombre, ruta) => {
       // El sentido, en las que se ven (una de menos de 1 mm se pierde en el Float32)
       if ((Math.abs(o.R[2]!) * d.escala.m) / d.escala.valor > 1e-3) expect(Math.sign(z1 - z0)).toBe(Math.sign(o.R[2]!));
     }
+    // Las horizontales, a su propia escala: la mayor |(Fx, Fy)| mide lo mismo que la mayor |Fz|
+    expect(d.escalaH.valor).toBe(Math.max(0, ...d.objetos.map((o) => Math.hypot(o.R[0]!, o.R[1]!))));
+    expect(d.escalaH.m).toBe(d.escala.m);
+    let mayor = 0;
+    for (let i = 0; i < d.tipoSegmento.length; i++) {
+      // El fuste es el primer segmento horizontal de cada objeto
+      if (d.tipoSegmento[i] !== 1 || (i > 0 && d.tipoSegmento[i - 1] === 1 && d.objetoSegmento[i - 1] === d.objetoSegmento[i])) continue;
+      mayor = Math.max(mayor, Math.hypot(d.segmentos[6 * i + 3]! - d.segmentos[6 * i]!, d.segmentos[6 * i + 4]! - d.segmentos[6 * i + 1]!));
+    }
+    if (d.escalaH.valor > 0) expect(mayor).toBeCloseTo(d.escalaH.m, 4);
     // Con una sola combinación (cada caso), la suma de las Fz es el total de la consulta
     for (const c of s.proyecto.modelo.casos) {
       const e: EleccionCombinaciones = { tipo: "caso", caso: c.id };

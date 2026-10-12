@@ -217,13 +217,13 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           <>
             <Desplegable
               etiqueta="Modo del 3D"
-              valor={v.modo3d}
+              valor={modo3dVisto(v.modo3d, !!fuentes.cabecera3D)}
               onCambio={(m) => poner(i, { modo3d: m })}
               opciones={MODOS_3D.map((m) => ({
                 id: m.id,
                 nombre: m.nombre,
-                disabled: m.id === "analitico" && !e.compila,
-                title: m.id === "analitico" && !e.compila ? "El modelo no compila" : m.title,
+                disabled: (m.id === "analitico" && !e.compila) || (m.id === "solido" && !!fuentes.cabecera3D),
+                title: m.id === "analitico" && !e.compila ? "El modelo no compila" : m.id === "solido" && fuentes.cabecera3D ? "En Resultados, el sólido taparía los resultados: el translúcido lo deja ver detrás" : m.title,
               }))}
             />
             <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: p })} ninguna={fuentes.cabecera3D ? "Todas las plantas" : "Sin resaltar"} />
@@ -283,6 +283,14 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
       )}
     </div>
   );
+}
+
+/**
+ * El modo con que se pinta un 3D: en Resultados (las vistas con cabecera de resultados), el sólido
+ * pasa a alámbrico, como en SAP2000 y ETABS; el translúcido, si se pide, da el contexto detrás.
+ */
+export function modo3dVisto(modo: Modo3D, resultados: boolean): Modo3D {
+  return resultados && modo === "solido" ? "alambrico" : modo;
 }
 
 const NOMBRE_TIPO: Record<TipoVista, string> = { planta: "Planta", alzado: "Alzado", "3d": "3D" };
@@ -639,8 +647,8 @@ export function Fuente3DModelo({ deformada, modo, resultados }: { deformada?: De
   const { v } = useCelda();
   const e = proyecto.estado!;
   const alamb = usePedido(proyecto.cliente, { tipo: "alambrico" });
-  // Con resultados, el sólido se pinta translúcido: si no, los taparía
-  const modoEf: Modo3D = modo ?? (resultados && v.modo3d === "solido" ? "translucido" : v.modo3d);
+  // Con resultados, el sólido taparía lo pintado: pasa a alámbrico (`modo3dVisto`)
+  const modoEf: Modo3D = modo ?? modo3dVisto(v.modo3d, !!resultados);
   const quiereSolido = modoEf === "solido" || modoEf === "translucido";
   const sol = usePedido(proyecto.cliente, quiereSolido ? { tipo: "solido" } : null);
   const quiereAnalitico = modoEf === "analitico" && e.compila;

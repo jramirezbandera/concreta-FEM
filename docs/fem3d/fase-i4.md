@@ -62,6 +62,7 @@ A petición del usuario, que veía las reacciones sólo en el 3D (`interfaz.md` 
 
 ## 5. Pendiente
 
-- **Del usuario:** la puerta de uso de I4 y las propuestas de §15: las flechas de las reacciones (en el centro de los nudos coartados, la vertical y la horizontal con la misma escala), la combinación de cada objeto con varias, el campo nulo (I4-1) y las bandas de ν.
+- **Decidido (2026-10-13, I-i):** las propuestas de §15, aceptadas; las horizontales del 3D de Reacciones, a su propia escala (`escalaH`), y el 0,65 de ν, rotulado como aviso de A3.
+- **Del usuario:** la puerta de uso de I4. Antes, también las propuestas de §15: las flechas de las reacciones (en el centro de los nudos coartados, la vertical y la horizontal con la misma escala), la combinación de cada objeto con varias, el campo nulo (I4-1) y las bandas de ν.
 - **Fuera de I4 (§15):** el valor bajo el cursor en la planta y en el alzado (allí sigue siendo el clic); isolíneas rotuladas en el 3D; las reacciones de los muros nudo a nudo; la deformada en el alzado.
 - **Técnico:** la primera M11 de todas las plantas del edificio sigue costando ~3,5 s (la recuperación SPR, C5-4); medir la sonda sobre el mapa de todas las plantas (I4-6).
