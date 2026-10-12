@@ -10,9 +10,11 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Box, Hand, Maximize, Move3d, MousePointer2, Rotate3d } from "lucide-react";
-import type { Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
+import type { EntradaLeyenda, Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
+import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
+import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
 import type { FuenteEscena, VistaPlanta } from "../../../src/visor/sesion.ts";
 import { Desplegable, SelectorPlanta } from "../armazon/Disposicion.tsx";
@@ -70,8 +72,13 @@ export interface FuentesVistas {
   planta?: (v: EstadoVista, i: number) => ReactNode;
   /** Lo que dibuja un 3D (por defecto, el alámbrico o el analítico). */
   tresD?: (v: EstadoVista, i: number) => ReactNode;
+  /** Lo que dibuja un alzado (por defecto, el modelo). */
+  alzado?: (v: EstadoVista, i: number) => ReactNode;
   /** Lo que va en la cabecera de una planta, tras la planta (qué se dibuja). */
   cabeceraPlanta?: (v: EstadoVista, i: number) => ReactNode;
+  /** Lo mismo en un 3D y en un alzado (I4: qué resultado se ve). */
+  cabecera3D?: (v: EstadoVista, i: number) => ReactNode;
+  cabeceraAlzado?: (v: EstadoVista, i: number) => ReactNode;
 }
 
 const MARGENES_PLANTA: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
@@ -161,7 +168,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   const vv = useMemo(() => ({ ...v, planta, eje }), [v, planta, eje]);
   const celda = useMemo(() => ({ i, varias, v: vv, vista }), [i, varias, vv, vista]);
 
-  const contenido = tipo === "planta" ? (fuentes.planta?.(vv, i) ?? <FuenteEscena fuente={planta ? { tipo: "planta", planta, vista: { vista: "modelo" } } : null} />) : tipo === "alzado" ? <FuenteEscena fuente={eje ? { tipo: "alzado", plano: { eje } } : null} /> : (fuentes.tresD?.(vv, i) ?? <Fuente3DModelo />);
+  const contenido = tipo === "planta" ? (fuentes.planta?.(vv, i) ?? <FuenteEscena fuente={planta ? { tipo: "planta", planta, vista: { vista: "modelo" } } : null} />) : tipo === "alzado" ? (fuentes.alzado?.(vv, i) ?? <FuenteEscena fuente={eje ? { tipo: "alzado", plano: { eje } } : null} />) : (fuentes.tresD?.(vv, i) ?? <Fuente3DModelo />);
 
   return (
     <div className="celda" data-activa={activa} data-tipo={tipo} data-vista={i}>
@@ -188,6 +195,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             opciones={e.ejes.map((x) => ({ id: x.id, nombre: `${x.nombre ?? x.id}${x.propuesto ? " (propuesto)" : ""}` }))}
           />
         )}
+        {tipo === "alzado" && fuentes.cabeceraAlzado?.(vv, i)}
         {tipo === "3d" && (
           <>
             <Desplegable
@@ -201,7 +209,8 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
                 title: m === "analitico" ? (e.compila ? "El modelo que se calcula: barras y láminas" : "El modelo no compila") : "Los ejes de las barras y los contornos de las losas y los muros",
               }))}
             />
-            <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: p })} ninguna="Sin resaltar" />
+            <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: p })} ninguna={fuentes.cabecera3D ? "Todas las plantas" : "Sin resaltar"} />
+            {fuentes.cabecera3D?.(vv, i)}
           </>
         )}
       </div>
@@ -267,7 +276,7 @@ export function Fuente2D({ escena, resaltado = null, marcas, eventos, aviso, car
   return (
     <>
       <Cargando si={cargando || !escena || !v} />
-      {escena && leyenda && escena.leyenda.length > 0 && <Leyenda key={String(varias)} escena={escena} abierta={!varias} />}
+      {escena && leyenda && escena.leyenda.length > 0 && <Leyenda key={String(varias)} contenido={escena} abierta={!varias} />}
       {aviso && <div className="velo">{aviso}</div>}
     </>
   );
@@ -325,19 +334,23 @@ export function FuenteEscena({ fuente }: { fuente: FuenteEscena | null }) {
   // La clave estable: el objeto cambia en cada render
   const clave = JSON.stringify(fuente);
   const fu = useMemo(() => (clave === "null" ? null : (JSON.parse(clave) as FuenteEscena)), [clave]);
-  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano }) : null);
+  const escena = usePedido(proyecto.cliente, fu ? (fu.tipo === "planta" ? { tipo: "escena", planta: fu.planta, vista: fu.vista } : { tipo: "alzado", plano: fu.plano, ...(fu.diagramas ? { diagramas: fu.diagramas } : {}) }) : null);
   const { eventos, resaltado } = useEleccionEscena(fu);
-  const aviso = proyecto.desactualizado && ed?.pendiente ? (
+  // Con resultados (los diagramas de un alzado), lo de una versión anterior no se enseña
+  const resultados = fu?.tipo === "alzado" && !!fu.diagramas;
+  const aviso = resultados && proyecto.desactualizado ? (
+    <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
+  ) : proyecto.desactualizado && ed?.pendiente ? (
     <Aviso tono="warn">Compilando la versión editada…</Aviso>
   ) : proyecto.desactualizado ? (
     <Aviso tono="warn">El fichero cambió: abriendo la versión nueva…</Aviso>
   ) : escena.diagnosticos ? (
     <Aviso tono="fail">{escena.diagnosticos.map((d) => d.mensaje).join(" ")}</Aviso>
   ) : !escena.datos && escena.cargando ? (
-    <Aviso>Preparando la vista…</Aviso>
+    <Aviso>{resultados ? "Preparando los diagramas…" : "Preparando la vista…"}</Aviso>
   ) : null;
   const cursor = useMemo(() => (fu?.tipo === "alzado" ? (q: Vec2) => `u ${rot(q[0])} · z ${rot(q[1])} m` : undefined), [fu?.tipo]);
-  return <Fuente2D escena={escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} />;
+  return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} />;
 }
 
 const rot = (x: number) => (Math.round(x * 1000) / 1000).toString().replace(".", ",");
@@ -347,22 +360,31 @@ export function plantaVista(v: EstadoVista, calculado: boolean): VistaPlanta {
   return { vista: v.dibujo === "malla" && !calculado ? "modelo" : v.dibujo };
 }
 
-interface PropsFuente3D {
+/** Lo que añade un 3D con resultados (I4): diagramas o isovalores, su leyenda y su estado. */
+export interface Resultados3D {
+  diagramas?: Diagramas3D | null;
+  isovalores?: Isovalores3D | null;
+  leyenda?: ContenidoLeyenda | null;
+  aviso?: ReactNode;
+  cargando?: boolean;
+}
+
+interface PropsFuente3D extends Resultados3D {
   alambrico: Alambrico | null;
   analitico?: Geometria3D | null;
   deformada?: { u: Float32Array; escala: number } | null;
   /** Fuerza un modo (la deformada, sobre el analítico). */
   modo?: Modo3D;
   eventos?: Eventos3D;
-  cargando?: boolean;
-  aviso?: ReactNode;
 }
 
 /** Un 3D en la vista de la celda. */
-export function Fuente3D({ alambrico, analitico = null, deformada = null, modo, eventos, cargando = false, aviso }: PropsFuente3D) {
-  const { vista, v } = useCelda();
+export function Fuente3D({ alambrico, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, leyenda = null }: PropsFuente3D) {
+  const { vista, v, varias } = useCelda();
   const x = vista instanceof Vista3D ? vista : null;
   useEffect(() => x?.ponerAlambrico(alambrico), [x, alambrico]);
+  useEffect(() => x?.ponerDiagramas(diagramas), [x, diagramas]);
+  useEffect(() => x?.ponerIsovalores(isovalores), [x, isovalores]);
   useEffect(() => x?.ponerAnalitico(analitico), [x, analitico]);
   useEffect(() => x?.ponerDeformada(deformada?.u ?? null, deformada?.escala ?? 1), [x, deformada]);
   useEffect(() => x?.ponerModo(modo ?? v.modo3d), [x, modo, v.modo3d]);
@@ -374,13 +396,14 @@ export function Fuente3D({ alambrico, analitico = null, deformada = null, modo, 
   return (
     <>
       <Cargando si={cargando || (!alambrico && !analitico) || !x} />
+      {leyenda && leyenda.leyenda.length > 0 && <Leyenda key={String(varias)} contenido={leyenda} abierta={!varias} />}
       {aviso && <div className="velo">{aviso}</div>}
     </>
   );
 }
 
-/** El 3D del modelo: el alámbrico (y el analítico si se pide), con elegir. */
-export function Fuente3DModelo({ deformada, modo }: { deformada?: { u: Float32Array; escala: number } | null; modo?: Modo3D }) {
+/** El 3D del modelo: el alámbrico (y el analítico si se pide), con elegir; con resultados (I4), encima. */
+export function Fuente3DModelo({ deformada, modo, resultados }: { deformada?: { u: Float32Array; escala: number } | null; modo?: Modo3D; resultados?: Resultados3D }) {
   const { proyecto, elegidos, setElegidos } = useVisor();
   const { v } = useCelda();
   const e = proyecto.estado!;
@@ -400,7 +423,7 @@ export function Fuente3DModelo({ deformada, modo }: { deformada?: { u: Float32Ar
     }),
     [setElegidos],
   );
-  return <Fuente3D alambrico={alamb.datos} analitico={quiereAnalitico ? geo.datos : null} deformada={deformada} modo={modo} eventos={eventos} cargando={alamb.cargando || (quiereAnalitico && geo.cargando)} />;
+  return <Fuente3D alambrico={alamb.datos} analitico={quiereAnalitico ? geo.datos : null} deformada={deformada} modo={modo} eventos={eventos} {...resultados} cargando={alamb.cargando || (quiereAnalitico && geo.cargando) || !!resultados?.cargando} />;
 }
 
 // ─── Leyenda ────────────────────────────────────────────────────────────────────────────────────
@@ -413,7 +436,13 @@ const SOBRE_BANDAS: ReadonlySet<Estilo> = new Set<Estilo>(["isolinea", "isolinea
 /** La banda más clara de la paleta de los mapas (`coloresBandas`). */
 const FONDO_BANDA = "#fddbc7";
 
-function Leyenda({ escena, abierta }: { escena: EscenaPreparada; abierta: boolean }) {
+/** Lo que enseña una leyenda: sus entradas y sus notas (las de una escena o las de un 3D con resultados). */
+export interface ContenidoLeyenda {
+  leyenda: readonly EntradaLeyenda[];
+  notas: readonly string[];
+}
+
+function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; abierta: boolean }) {
   const { theme: tema } = useTheme();
   const [ver, setVer] = useState(abierta);
   return (

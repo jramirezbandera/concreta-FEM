@@ -181,6 +181,30 @@ Medido sobre la captura de la pantalla Modelo (1920×1080, 1-022):
   - si los resultados están desactualizados, la capa de resultados no se pinta: la vista enseña «Resultados desactualizados · Calcular»;
   - si el equilibrio no cuadra o el modelo no compila, se ven el error y los diagnósticos, como en V1.
 
+### 7.1 Adelantado de I4 (2026-10-12)
+
+A petición del usuario, los diagramas de las barras en el 3D y en el alzado, y los isovalores de las losas en el 3D. El resto de I4 (deformada con escala y original, N y ν por tramo como color, reacciones, valor bajo el cursor, detalle en Propiedades y muros con mapa) sigue pendiente.
+
+- **Diagramas en el 3D** (`src/visor/diagramas3d.ts`, sobre `src/agente/render/diagramas.ts`), en Resultados · Diagramas:
+  - todas las barras (vigas, viguetas y pilares) o las de la planta de la cabecera, y en la cabecera, «Vigas y pilares», «Vigas» o «Pilares» y la escala (×0,25 a ×4);
+  - en los ejes locales de cada tramo: My en el plano x-z y Mz en el x-y, del lado de las tracciones; Vz, N y T hacia +z y Vy hacia +y, con la pieza leída en Z, X o Y crecientes. El selector de esfuerzo gana Mz y Vy (para los pilares);
+  - **relleno por signo** (§7): lo positivo de la curva máxima y lo negativo de la mínima; lo de dentro de la envolvente, sólo como línea. La planta de A4 sigue coloreando por curva (máxima y mínima);
+  - los valores son los de `envolventeTramo` (la parte de un tramo de `envolventePieza`, A4): los mismos de la planta y del alzado de la pieza, bit a bit;
+  - rótulos: el máximo y el mínimo de lo que se ve, con su pieza y su combinación, y los de las piezas elegidas;
+  - en N no se dibujan las vigas de un diafragma rígido: su axil no tiene valor (C1-d).
+- **Diagramas en el alzado** (`src/agente/render/alzadoDiagramas.ts`, una escena de A4): las barras con sus dos extremos a menos de d del plano y paralelas a él, con el esfuerzo **en el plano**:
+  - M, el momento de eje normal al plano (My en las vigas del pórtico, bit a bit; My o Mz en los pilares, según su giro), del lado de las tracciones;
+  - V, el cortante en el plano (Vz en las vigas); N y T, como en la pieza;
+  - My y Mz del selector dan M; Vz y Vy, V. Rotulados, el máximo y el mínimo de cada pieza.
+- **Isovalores en el 3D** (`src/visor/isovalores3d.ts`), en Resultados · Losas:
+  - con una planta en la cabecera, su mapa en planta: la misma combinación, los mismos límites, colores y extremos;
+  - con todas, una escala común y la combinación del mayor |valor| en todas;
+  - bandas sin sombrear, para que el color sea el de la leyenda, con sus isolíneas. Los muros, todavía sin mapa.
+- **Validación:**
+  - `src/visor/resultados3d.test.ts` en los cuatro proyectos de V1: extremos de cada pieza y de lo que se ve, iguales a los de `envolventePieza`; My > 0 bajo las vigas en el 3D y en el alzado; M del alzado = My de las vigas del pórtico, bit a bit; el 3D de una planta es su mapa (combinación, límites, colores, extremos y área); sin resultados, nada;
+  - `validacion/i4/chrome.ts` (`out_chrome.txt`): con el edificio objetivo, Chrome pinta los mismos triángulos y el mismo alzado (sha256) que Node, se orbita a 120 fps con los diagramas o los isovalores y ninguna tarea larga.
+- **Tiempos en el worker, con el edificio objetivo:** los diagramas de todas las barras, ~1,2 s la primera vez (luego ~0,2 s, guardados); uz en todas las plantas, ~0,9 s, y M11, ~3,5 s (la recuperación SPR de las siete plantas). Con una planta, la séptima parte.
+
 ## 8. Grafismo de la planta y el alzado
 
 - **Jerarquía de líneas:**

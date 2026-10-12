@@ -15,7 +15,7 @@
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto } from "../agente/proyecto.ts";
-import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type EscalaMapa, type Escena, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
+import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
@@ -27,7 +27,10 @@ import { traducirDiagnosticos } from "../compilador/mapeo.ts";
 import { calcular } from "../motor/calcular.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { ResultadoCaso } from "../motor/modelo.ts";
+import { alambrico } from "./alambrico.ts";
+import { diagramas3D, type Diagramas3D, type Esfuerzo3D, type PiezasDiagrama } from "./diagramas3d.ts";
 import { elegir, elegirVentana, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
+import { isovalores3D, type Isovalores3D } from "./isovalores3d.ts";
 
 export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
 
@@ -57,8 +60,34 @@ export type VistaPlanta =
 /** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
 export type PlanoPedido = { eje: string; profundidad?: number } | { desde: Vec2; hasta: Vec2; profundidad?: number };
 
-/** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado. */
-export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido };
+/** Los diagramas de las barras del plano de un alzado (I4): el esfuerzo en el plano y sus combinaciones. */
+export interface DiagramasAlzado {
+  esfuerzo: EsfuerzoPlano;
+  combinaciones: EleccionCombinaciones;
+  /** Por la que se multiplica la escala automática. */
+  escala?: number;
+}
+
+/** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado (con diagramas, en I4). */
+export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado };
+
+/** Los diagramas de las barras en el 3D (I4). */
+export interface PedidoDiagramas3D {
+  esfuerzo: Esfuerzo3D;
+  combinaciones: EleccionCombinaciones;
+  /** Sólo los de una planta; null, todos. */
+  planta: string | null;
+  piezas: PiezasDiagrama;
+  escala?: number;
+}
+
+/** Los isovalores de las losas en el 3D (I4). */
+export interface PedidoIsovalores3D {
+  campo: Campo;
+  combinaciones: EleccionCombinaciones;
+  planta: string | null;
+  escala?: EscalaMapa;
+}
 
 export interface PlantaVisor {
   id: string;
@@ -368,28 +397,63 @@ export class Sesion {
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
-  /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico. */
-  alzadoA4(p: PlanoPedido): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
+  /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico; con diagramas (I4), el cálculo. */
+  alzadoA4(p: PlanoPedido, diagramas?: DiagramasAlzado): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
     const f = this.proyecto.modelo;
-    const clave = JSON.stringify(["alzado", p]);
+    const clave = JSON.stringify(["alzado", p, diagramas ?? null]);
     const hecha = this.escenas.get(clave);
     if (hecha) return { valido: true, valor: hecha };
     let plano: PlanoAlzado | null;
     if ("eje" in p) plano = planoDeEje(f, p.eje, p.profundidad);
     else plano = p.desde[0] === p.hasta[0] && p.desde[1] === p.hasta[1] ? null : { desde: p.desde, hasta: p.hasta, ...(p.profundidad !== undefined ? { profundidad: p.profundidad } : {}) };
     if (!plano) return { valido: false, diagnosticos: [{ codigo: "visor/alzado", severidad: "error", mensaje: "eje" in p ? `No hay ningún eje ${p.eje}.` : "Los dos puntos del alzado son el mismo." }] };
-    const e = vistaAlzado(f, plano, { ...(this.proyecto.nombre ? { nombre: this.proyecto.nombre } : {}), huella: this.huella });
+    const d = { ...(this.proyecto.nombre ? { nombre: this.proyecto.nombre } : {}), huella: this.huella };
+    let e: Escena;
+    if (diagramas) {
+      const rr = this.rr;
+      if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Los diagramas necesitan el cálculo." }] };
+      const conj = this.conjunto(diagramas.combinaciones, "esfuerzos");
+      if (!conj.valido) return conj;
+      e = vistaAlzadoDiagramas(rr, plano, diagramas.esfuerzo, conj.valor, d, diagramas.escala);
+    } else e = vistaAlzado(f, plano, d);
     this.escenas.set(clave, e);
     return { valido: true, valor: e };
   }
 
-  alzado(p: PlanoPedido): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
-    const e = this.alzadoA4(p);
+  alzado(p: PlanoPedido, diagramas?: DiagramasAlzado): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
+    const e = this.alzadoA4(p, diagramas);
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
+  // ─── 3D con resultados (I4) ───────────────────────────────────────────────────────────────────
+
+  private origenC: [number, number, number] | null = null;
+
+  /** El origen de las coordenadas del 3D: el del alámbrico, para que todo se pinte en las mismas. */
+  get origen3D(): [number, number, number] {
+    return (this.origenC ??= alambrico(this.proyecto.modelo).origen);
+  }
+
+  diagramas3D(p: PedidoDiagramas3D): { valido: true; valor: Diagramas3D } | { valido: false; diagnosticos: Diagnostico[] } {
+    const rr = this.rr;
+    if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Los diagramas necesitan el cálculo." }] };
+    if (p.planta !== null && !this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
+    const conj = this.conjunto(p.combinaciones, "esfuerzos");
+    if (!conj.valido) return conj;
+    return { valido: true, valor: diagramas3D(rr, this.origen3D, p.esfuerzo, conj.valor, { planta: p.planta, piezas: p.piezas, ...(p.escala !== undefined ? { escala: p.escala } : {}) }) };
+  }
+
+  isovalores3D(p: PedidoIsovalores3D): { valido: true; valor: Isovalores3D } | { valido: false; diagnosticos: Diagnostico[] } {
+    const rr = this.rr;
+    if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Los isovalores necesitan el cálculo." }] };
+    if (p.planta !== null && !this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
+    const conj = this.conjunto(p.combinaciones, p.campo === "uz" ? "desplazamientos" : "esfuerzos");
+    if (!conj.valido) return conj;
+    return { valido: true, valor: isovalores3D(rr, this.origen3D, p.campo, conj.valor, p.planta, p.escala) };
+  }
+
   escenaDe(fu: FuenteEscena): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
-    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano);
+    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano, fu.diagramas);
   }
 
   /** El objeto bajo un punto de una escena (o, con `objetos`, esos objetos), resaltado. */

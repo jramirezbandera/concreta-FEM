@@ -15,6 +15,11 @@
  * Los colores del alámbrico y del analítico se reescriben en sitio (bucles planos sobre arrays): ni
  * la planta activa ni lo elegido rehacen la geometría (H42). Los materiales son de la página y no se
  * liberan, como los de la planta (`capas.ts`, I2-4).
+ *
+ * Resultados (I4): los diagramas de las barras (`src/visor/diagramas3d.ts`), rellenos translúcidos
+ * por signo con sus curvas, y los isovalores de las losas (`src/visor/isovalores3d.ts`), bandas de
+ * color sin sombrear (el color es el de la leyenda) con sus isolíneas. Los rótulos, en el lienzo 2D:
+ * el máximo y el mínimo de lo que se ve y los de las piezas elegidas, sin pisarse.
  */
 import {
   AmbientLight,
@@ -27,6 +32,7 @@ import {
   LineSegments,
   Matrix4,
   Mesh,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   OrthographicCamera,
   PerspectiveCamera,
@@ -40,7 +46,10 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import { rotulo } from "../../../src/agente/render/escena.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
-import { fuente, Vista, type Entorno } from "./motor.ts";
+import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
+import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
+import { pintura } from "../lienzo/pintura.ts";
+import { fuente, textoConHalo, Vista, type Entorno } from "./motor.ts";
 
 export type Modo3D = "alambrico" | "analitico";
 export type Proyeccion = "perspectiva" | "ortografica";
@@ -116,7 +125,23 @@ const MAT = {
   laminas: new MeshLambertMaterial({ vertexColors: true, side: DoubleSide, transparent: true, opacity: 0.82, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
   barras: new LineBasicMaterial({ vertexColors: true }),
   originales: new LineBasicMaterial({ transparent: true, opacity: 0.45 }),
+  // I4: diagramas e isovalores
+  positivo: new MeshBasicMaterial({ side: DoubleSide, transparent: true, opacity: 0.5, depthWrite: false }),
+  negativo: new MeshBasicMaterial({ side: DoubleSide, transparent: true, opacity: 0.5, depthWrite: false }),
+  curvas: new LineMaterial({ vertexColors: true, linewidth: 1.25, worldUnits: false }),
+  bandas: new MeshBasicMaterial({ vertexColors: true, side: DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
+  sinMapa: new MeshBasicMaterial({ side: DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
+  isolineas: new LineBasicMaterial({ color: 0x1f2937, transparent: true, opacity: 0.35 }),
+  ceros: new LineBasicMaterial({ color: 0x111827, transparent: true, opacity: 0.8 }),
 };
+
+/** Un rótulo de resultados: un punto del modelo (m) y su texto. */
+interface Rotulo3D {
+  p: readonly [number, number, number];
+  texto: string;
+  signo: number;
+  prioridad: number;
+}
 
 export class Vista3D extends Vista {
   private readonly escena3 = new Scene();
@@ -139,6 +164,10 @@ export class Vista3D extends Vista {
   private originales: LineSegments<BufferGeometry, LineBasicMaterial> | null = null;
   private activa: string | null = null;
   private elegidos: ReadonlySet<string> = new Set();
+  private diag: Diagramas3D | null = null;
+  private iso: Isovalores3D | null = null;
+  private objsDiag: (Mesh | LineSegments2)[] = [];
+  private objsIso: (Mesh | LineSegments)[] = [];
   private encuadrada = false;
   private temaColores: string | null = null;
 
@@ -238,6 +267,22 @@ export class Vista3D extends Vista {
     });
   }
 
+  /** Los diagramas de las barras (I4); null los quita. */
+  ponerDiagramas(d: Diagramas3D | null): void {
+    if (d === this.diag) return;
+    this.diag = d;
+    if (d) this.fijarOrigen(d.origen);
+    this.enTarea("diagramas", () => this.construirDiagramas());
+  }
+
+  /** Los isovalores de las losas (I4); null los quita. */
+  ponerIsovalores(i: Isovalores3D | null): void {
+    if (i === this.iso) return;
+    this.iso = i;
+    if (i) this.fijarOrigen(i.origen);
+    this.enTarea("isovalores", () => this.construirIsovalores());
+  }
+
   ponerModo(m: Modo3D): void {
     if (m === this.modo) return;
     this.modo = m;
@@ -308,6 +353,98 @@ export class Vista3D extends Vista {
     this.lineasElegidas.renderOrder = 10;
     this.lineasElegidas.frustumCulled = false;
     this.escena3.add(this.lineasElegidas);
+  }
+
+  /** Un objeto de resultados en el origen de la vista (los datos traen el suyo, que es el del alámbrico). */
+  private situar<T extends Mesh | LineSegments | LineSegments2>(o: T, origen: readonly [number, number, number]): T {
+    const v = this.origen ?? origen;
+    o.position.set(origen[0] - v[0], origen[1] - v[1], origen[2] - v[2]);
+    o.frustumCulled = false;
+    this.escena3.add(o);
+    return o;
+  }
+
+  private quitar(os: (Mesh | LineSegments | LineSegments2)[]): void {
+    for (const o of os) {
+      this.escena3.remove(o);
+      o.geometry.dispose();
+    }
+    os.length = 0;
+  }
+
+  private construirDiagramas(): void {
+    this.quitar(this.objsDiag);
+    const d = this.diag;
+    if (d) {
+      for (const [a, m] of [
+        [d.positivo, MAT.positivo],
+        [d.negativo, MAT.negativo],
+      ] as const) {
+        if (!a.length) continue;
+        const g = new BufferGeometry();
+        g.setAttribute("position", new BufferAttribute(a, 3));
+        const o = this.situar(new Mesh(g, m), d.origen);
+        o.renderOrder = 5;
+        this.objsDiag.push(o);
+      }
+      if (d.lineas.length) {
+        const g = new LineSegmentsGeometry();
+        g.setPositions(d.lineas);
+        g.setColors(this.coloresCurvas(d));
+        const o = this.situar(new LineSegments2(g, MAT.curvas), d.origen);
+        o.renderOrder = 6;
+        this.objsDiag.push(o);
+      }
+    }
+    this.entorno.pintar();
+  }
+
+  /** El color de cada segmento de las curvas: el trazo de su signo. */
+  private coloresCurvas(d: Diagramas3D): Float32Array {
+    const t = this.entorno.tema();
+    const [cp, cn] = [new Color(pintura("diagrama-positivo", t).stroke ?? "#b91c1c"), new Color(pintura("diagrama-negativo", t).stroke ?? "#1d4ed8")];
+    const col = new Float32Array(d.lineas.length);
+    for (let i = 0; i < d.signoLinea.length; i++) {
+      const c = d.signoLinea[i] ? cp : cn;
+      for (let j = 0; j < 2; j++) col.set([c.r, c.g, c.b], 6 * i + 3 * j);
+    }
+    return col;
+  }
+
+  private construirIsovalores(): void {
+    this.quitar(this.objsIso);
+    const i = this.iso;
+    if (i) {
+      if (i.triangulos.length) {
+        const g = new BufferGeometry();
+        g.setAttribute("position", new BufferAttribute(i.triangulos, 3));
+        const col = new Float32Array(i.triangulos.length);
+        const cs = i.colores.map((x) => new Color(x));
+        for (let t = 0; t < i.banda.length; t++) {
+          const c = cs[i.banda[t]!]!;
+          for (let v = 0; v < 3; v++) col.set([c.r, c.g, c.b], 9 * t + 3 * v);
+        }
+        g.setAttribute("color", new BufferAttribute(col, 3));
+        this.objsIso.push(this.situar(new Mesh(g, MAT.bandas), i.origen));
+      }
+      if (i.sinMapa.length) {
+        const g = new BufferGeometry();
+        g.setAttribute("position", new BufferAttribute(i.sinMapa, 3));
+        this.objsIso.push(this.situar(new Mesh(g, MAT.sinMapa), i.origen));
+      }
+      for (const [a, m] of [
+        [i.isolineas, MAT.isolineas],
+        [i.ceros, MAT.ceros],
+      ] as const) {
+        if (!a.length) continue;
+        const g = new BufferGeometry();
+        g.setAttribute("position", new BufferAttribute(a, 3));
+        const o = this.situar(new LineSegments(g, m), i.origen);
+        o.renderOrder = 1;
+        this.objsIso.push(o);
+      }
+    }
+    this.entorno.pintar();
   }
 
   private quitarAnalitico(): void {
@@ -467,6 +604,9 @@ export class Vista3D extends Vista {
       (this.barras.geometry.getAttribute("color") as BufferAttribute).needsUpdate = true;
       MAT.originales.color.set(c.original);
     }
+    MAT.sinMapa.color.set(this.entorno.tema() === "dark" ? "#4b5563" : "#d1d5db");
+    const curvas = this.objsDiag.find((o): o is LineSegments2 => o instanceof LineSegments2);
+    if (curvas && this.diag) curvas.geometry.setColors(this.coloresCurvas(this.diag));
     this.entorno.pintar();
   }
 
@@ -837,24 +977,77 @@ export class Vista3D extends Vista {
       this.colores();
       this.construirElegidos();
     }
-    if (!this.alamb && !this.geo) return;
+    if (!this.alamb && !this.geo && !this.diag && !this.iso) return;
     this.actualizarCamaras();
     const { w, h } = this.rect;
     MAT.lineas.resolution.set(w, h);
     MAT.elegidas.resolution.set(w, h);
+    MAT.curvas.resolution.set(w, h);
+    // Los colores de los rellenos, los del tema de esta vista (las vistas comparten los materiales)
+    const t = this.entorno.tema();
+    MAT.positivo.color.set(pintura("diagrama-positivo", t).fill ?? "#dc2626");
+    MAT.negativo.color.set(pintura("diagrama-negativo", t).fill ?? "#2563eb");
     // El color de lo elegido es el de esta vista (el acento del tema)
     MAT.elegidas.color.set(this.entorno.colores().acento);
     r.render(this.escena3, this.camaraActiva);
   }
 
   superponer(ctx: CanvasRenderingContext2D): void {
+    this.dibujarRotulos(ctx);
     if (this.alamb || this.geo) this.dibujarCubo(ctx);
     this.dibujarVentana(ctx);
   }
 
+  /** Los rótulos de resultados: los extremos de lo que se ve y los de las piezas elegidas. */
+  private rotulos(): Rotulo3D[] {
+    const r: Rotulo3D[] = [];
+    const d = this.diag;
+    if (d) {
+      for (const e of d.extremos) r.push({ p: e.punta, texto: `${e.que} ${rotulo(e.valor)} ${d.unidad} · ${e.pieza}${e.comb ? ` · ${e.comb}` : ""}`, signo: Math.sign(e.valor), prioridad: 100 });
+      if (this.elegidos.size)
+        for (const x of d.piezas) {
+          if (!this.elegidos.has(x.id)) continue;
+          if (x.max && x.max.valor > 0) r.push({ p: x.max.punta, texto: rotulo(x.max.valor), signo: 1, prioridad: 80 });
+          if (x.min && x.min.valor < 0) r.push({ p: x.min.punta, texto: rotulo(x.min.valor), signo: -1, prioridad: 80 });
+        }
+    }
+    const i = this.iso;
+    if (i) for (const e of i.extremos) r.push({ p: e.punto, texto: `${e.que} ${rotulo(e.valor)} ${i.unidad} · ${e.losa}`, signo: Math.sign(e.valor), prioridad: 100 });
+    return r.sort((a, b) => b.prioridad - a.prioridad);
+  }
+
+  /** Con halo y sin pisarse: el que no cabe no se dibuja (el de más prioridad, antes). */
+  private dibujarRotulos(ctx: CanvasRenderingContext2D): void {
+    const rs = this.rotulos();
+    if (!rs.length || !this.origen) return;
+    const col = this.entorno.colores();
+    const oscuro = this.entorno.tema() === "dark";
+    const ocupados: [number, number, number, number][] = [];
+    ctx.save();
+    ctx.font = fuente(11, true);
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    for (const r of rs) {
+      const q = this.aPantalla(r.p[0], r.p[1], r.p[2]);
+      if (!q || q[0] < 0 || q[1] < 0 || q[0] > this.rect.w || q[1] > this.rect.h) continue;
+      const ancho = this.entorno.medir(r.texto, 11, true);
+      const caja: [number, number, number, number] = [q[0] - 4, q[1] - 8, q[0] + 10 + ancho, q[1] + 8];
+      if (ocupados.some((o) => caja[0] < o[2] && caja[2] > o[0] && caja[1] < o[3] && caja[3] > o[1])) continue;
+      ocupados.push(caja);
+      const color = r.signo > 0 ? (oscuro ? "#fca5a5" : "#b91c1c") : r.signo < 0 ? (oscuro ? "#93c5fd" : "#1d4ed8") : col.texto;
+      ctx.beginPath();
+      ctx.arc(q[0], q[1], 3, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+      textoConHalo(ctx, r.texto, q[0] + 8, q[1], color, col.fondo);
+    }
+    ctx.restore();
+  }
+
   /** Para el banco de Chrome: lo que dibuja y lo elegido. */
-  async depuracion(): Promise<{ tipo: "3d"; segmentos: number; elegidos: string[]; modo: Modo3D; proyeccion: Proyeccion }> {
-    return { tipo: "3d", segmentos: this.alamb?.objeto.length ?? 0, elegidos: [...this.elegidos], modo: this.modo, proyeccion: this.proyeccion };
+  async depuracion(): Promise<{ tipo: "3d"; segmentos: number; elegidos: string[]; modo: Modo3D; proyeccion: Proyeccion; diagramas: number; isovalores: number }> {
+    const d = this.diag;
+    return { tipo: "3d", segmentos: this.alamb?.objeto.length ?? 0, elegidos: [...this.elegidos], modo: this.modo, proyeccion: this.proyeccion, diagramas: d ? (d.positivo.length + d.negativo.length) / 9 : 0, isovalores: (this.iso?.triangulos.length ?? 0) / 9 };
   }
 
   /** Un punto del modelo (m) en px de la vista (para el banco). */
@@ -863,6 +1056,8 @@ export class Vista3D extends Vista {
     if (!o) return null;
     this.actualizarCamaras();
     const v = new Vector3(x - o[0], y - o[1], z - o[2]).project(this.camaraActiva);
+    // Detrás de la cámara (o fuera de sus planos): no está en pantalla
+    if (v.z < -1 || v.z > 1) return null;
     return [((v.x + 1) / 2) * this.rect.w, ((1 - v.y) / 2) * this.rect.h];
   }
 
@@ -870,6 +1065,9 @@ export class Vista3D extends Vista {
     for (const t of this.tareas.values()) clearTimeout(t);
     this.tareas.clear();
     this.quitarAnalitico();
+    this.quitar(this.objsDiag);
+    this.quitar(this.objsIso);
+    this.diag = this.iso = null;
     this.alamb = null;
     this.construirAlambrico();
     this.elegidos = new Set();

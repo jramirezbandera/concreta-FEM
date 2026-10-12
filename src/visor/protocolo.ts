@@ -12,7 +12,9 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ValorPunto } from "./datos.ts";
 import type { Eleccion, EscenaPreparada } from "./escena.ts";
 import type { Alambrico } from "./alambrico.ts";
-import type { EleccionCombinaciones, EstadoSesion, FuenteEscena, PlanoPedido, VistaPlanta } from "./sesion.ts";
+import type { Diagramas3D } from "./diagramas3d.ts";
+import type { Isovalores3D } from "./isovalores3d.ts";
+import type { DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PlanoPedido, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
   | { tipo: "abrir"; texto: string }
@@ -20,7 +22,8 @@ export type Pedido =
   | { tipo: "calcular" }
   | { tipo: "estado" }
   | { tipo: "escena"; planta: string; vista: VistaPlanta }
-  | { tipo: "alzado"; plano: PlanoPedido }
+  /** Un alzado; con `diagramas`, los de las barras del plano (I4). */
+  | { tipo: "alzado"; plano: PlanoPedido; diagramas?: DiagramasAlzado }
   /** El objeto bajo un punto de una escena, o (con `objetos`) esos objetos, resaltados. */
   | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[] }
   /** Los objetos de una ventana (m) de una escena: «dentro», de izquierda a derecha; «toca», de derecha a izquierda. */
@@ -38,6 +41,9 @@ export type Pedido =
   | { tipo: "desplomes"; combinaciones: EleccionCombinaciones }
   | { tipo: "geometria" }
   | { tipo: "deformada"; combinaciones: EleccionCombinaciones }
+  /** I4: los diagramas de las barras y los isovalores de las losas en el 3D. */
+  | ({ tipo: "diagramas3d" } & PedidoDiagramas3D)
+  | ({ tipo: "isovalores3d" } & PedidoIsovalores3D)
   | { tipo: "revision"; firmas: string; ficheroFirmas: string }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
   | { tipo: "precalentar"; planta: string };
@@ -64,6 +70,8 @@ export interface Respuestas {
   desplomes: DatosDesplomes;
   geometria: Geometria3D;
   deformada: { comb: string; etiqueta: string; u: Float32Array };
+  diagramas3d: Diagramas3D;
+  isovalores3d: Isovalores3D;
   revision: DatosRevision;
   precalentar: null;
 }

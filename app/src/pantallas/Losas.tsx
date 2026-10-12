@@ -5,7 +5,9 @@
  * valor, los extremos y las flechas de `fem consultar flechas`; abajo, las combinaciones.
  *
  * Desde I2, cada vista de planta pide el mapa de su planta; Propiedades enseña los datos de la planta
- * de la vista activa. Un 3D enseña el modelo (los resultados en 3D son de I4).
+ * de la vista activa. Desde I4, un 3D enseña los mismos mapas sobre las losas en su sitio
+ * (`isovalores3d`): los de la planta elegida en su cabecera (con su combinación y su escala, como en
+ * la planta) o los de todas, con una escala común.
  *
  * La escala de cada magnitud (`EscalaMapa`), en Propiedades: completa, sin picos o manual (mínimo,
  * máximo y paso); lo de fuera, rayado.
@@ -26,7 +28,7 @@ import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import type { Marca } from "../vistas/vista2d.ts";
-import { Fuente2D, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
 
 type Punto = { p: Vec2; v: ValorPunto | null; planta: string; clave: string };
 
@@ -45,6 +47,15 @@ function PlantaLosas({ planta, campo, eleccion, escala, punto, onPunto, dec, uni
   return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} marcas={marcas} eventos={{ clic: (p) => onPunto(p, planta) }} aviso={aviso} cargando={d.cargando} />;
 }
 
+/** El mapa en un 3D (I4): el de la planta de su cabecera, o los de todas. */
+function TresDLosas({ planta, campo, eleccion, escala }: { planta: string | null; campo: Campo; eleccion: EleccionCombinaciones; escala: EscalaMapa | undefined }) {
+  const { proyecto } = useVisor();
+  const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "isovalores3d", campo, combinaciones: eleccion, planta, ...(escala ? { escala } : {}) });
+  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>{campo === "uz" ? "Preparando el mapa…" : "Recuperando los campos (SPR)…"}</Aviso> : null;
+  const datos = proyecto.desactualizado ? null : d.datos;
+  return <Fuente3DModelo resultados={{ isovalores: datos, leyenda: datos, aviso, cargando: d.cargando }} />;
+}
+
 const CAMPOS: { id: Campo; nombre: string; dec: number }[] = [
   { id: "uz", nombre: "uz", dec: 2 },
   { id: "m11", nombre: "M11", dec: 1 },
@@ -58,8 +69,8 @@ export function ModoLosas() {
   const { proyecto, planta } = useVisor();
   const pan = usePaneles("resultados:losas", { props: true, pestana: "combinaciones" });
   const vistas = useVistas();
-  // El mapa se ve en planta: si no hay ninguna, la vista activa pasa a serlo
-  const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta");
+  // El mapa se ve en planta y en 3D: si no hay ninguna, la vista activa pasa a ser una planta
+  const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta" || v.tipo === "3d");
   useEffect(() => {
     if (sinPlanta) vistas.irATipo("planta");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
@@ -122,6 +133,13 @@ export function ModoLosas() {
                 {d.ms !== null && <span className="mono text-text-disabled">{fmt(d.ms, 0)} ms</span>}
               </>
             )}
+          </Chip>
+        ),
+        tresD: (v) => <TresDLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} />,
+        cabecera3D: () => (
+          <Chip acento>
+            {nombreCampo} · {unidad}
+            {elegida.modo !== "completa" && ` · ${elegida.modo === "sin-picos" ? "sin picos" : "escala manual"}`}
           </Chip>
         ),
       }}

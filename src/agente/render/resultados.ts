@@ -18,7 +18,7 @@
  */
 import type { ResultadoCompilacion } from "../../compilador/compilar.ts";
 import type { Consultas } from "../../compilador/consultas.ts";
-import { EsfuerzosPiezas } from "../../compilador/resultados.ts";
+import { EsfuerzosPiezas, type TramoFlexible } from "../../compilador/resultados.ts";
 import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { diagramaCombinado } from "../consultas.ts";
@@ -390,20 +390,35 @@ export interface PuntoEnvolvente {
  */
 export function envolventePieza(r: ResultadosRender, id: string, conjunto: ConjuntoCombinaciones, comp: number): PuntoEnvolvente[] {
   const curva: PuntoEnvolvente[] = [];
-  for (const t of r.ep.tramos(id)) {
-    const D = conjunto.factores.map((f) => diagramaCombinado(r.ep, t.barra, f));
-    const L = t.s1 - t.s0;
-    const xs = [...new Set([...D.flatMap((x) => x.estaciones()), ...Array.from({ length: DIVISIONES + 1 }, (_, i) => (L * i) / DIVISIONES)])].filter((x) => x >= 0 && x <= L).sort((a, b) => a - b);
-    for (const x of xs)
-      for (const lado of [-1, 1] as const) {
-        if ((x === 0 && lado < 0) || (x === L && lado > 0)) continue;
-        const vs = D.map((dg) => dg.esfuerzosEn(x, lado)[comp]!);
-        const e = { s: t.s0 + x, max: Math.max(...vs), min: Math.min(...vs) };
-        const prev = curva[curva.length - 1];
-        if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
-        curva.push(e);
-      }
-  }
+  for (const t of r.ep.tramos(id))
+    for (const e of envolventeTramo(r, t, conjunto, comp)) {
+      const prev = curva[curva.length - 1];
+      if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
+      curva.push(e);
+    }
+  return curva;
+}
+
+/**
+ * La envolvente de un tramo flexible (la parte de `envolventePieza` de ese tramo, con las mismas
+ * estaciones). `comp`: una componente de [N, Vy, Vz, T, My, Mz] o una función de las seis (el
+ * momento en el plano de un alzado, que combina My, Mz y T).
+ */
+export function envolventeTramo(r: ResultadosRender, t: TramoFlexible, conjunto: ConjuntoCombinaciones, comp: number | ((e: readonly number[]) => number)): PuntoEnvolvente[] {
+  const curva: PuntoEnvolvente[] = [];
+  const D = conjunto.factores.map((f) => diagramaCombinado(r.ep, t.barra, f));
+  const L = t.s1 - t.s0;
+  const xs = [...new Set([...D.flatMap((x) => x.estaciones()), ...Array.from({ length: DIVISIONES + 1 }, (_, i) => (L * i) / DIVISIONES)])].filter((x) => x >= 0 && x <= L).sort((a, b) => a - b);
+  const valor = typeof comp === "number" ? (e: readonly number[]) => e[comp]! : comp;
+  for (const x of xs)
+    for (const lado of [-1, 1] as const) {
+      if ((x === 0 && lado < 0) || (x === L && lado > 0)) continue;
+      const vs = D.map((dg) => valor(dg.esfuerzosEn(x, lado)));
+      const e = { s: t.s0 + x, max: Math.max(...vs), min: Math.min(...vs) };
+      const prev = curva[curva.length - 1];
+      if (prev && prev.s === e.s && prev.max === e.max && prev.min === e.min) continue;
+      curva.push(e);
+    }
   return curva;
 }
 
@@ -575,3 +590,5 @@ export function vistaAxiles(r: ResultadosRender, planta: string, conjunto: Conju
     caja: caja(pl),
   };
 }
+
+export { NOMBRE as NOMBRES_CAMPO, UNIDAD as UNIDADES_CAMPO };

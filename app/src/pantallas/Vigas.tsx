@@ -7,13 +7,19 @@
  *
  * Convenio (cabecera de src/motor/modelo.ts): My > 0 tracciona la cara inferior y se dibuja hacia
  * abajo, del lado de las tracciones; Vz, T y N, positivos hacia arriba.
+ *
+ * I4: un 3D dibuja los diagramas de todas las barras (o los de la planta elegida en su cabecera) en
+ * sus ejes locales (`diagramas3d`), y un alzado, los de las barras de su plano con el esfuerzo en el
+ * plano (`vistaAlzadoDiagramas`: My y Mz dan M; Vz y Vy, V). Un clic en una pieza la elige.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
+import type { EsfuerzoPlano } from "../../../src/agente/render/index.ts";
 import type { DatosEstacion, DatosViga, Esfuerzo } from "../../../src/visor/datos.ts";
+import type { PiezasDiagrama } from "../../../src/visor/diagramas3d.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
-import { Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
@@ -21,8 +27,7 @@ import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
-import { useVistas, vistasDe } from "../vistas/estado.ts";
-import { Fuente2D, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente2D, Fuente3DModelo, FuenteEscena, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 /** Los diagramas de las vigas de una planta, en una vista: un clic elige la viga o la vigueta. */
@@ -42,12 +47,31 @@ function PlantaDiagramas({ planta, vista, id, cargando }: { planta: string; vist
   return <Fuente2D escena={proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={escena.cargando || cargando} />;
 }
 
-const ESFUERZOS: { id: Esfuerzo; unidad: string; abajo: boolean }[] = [
-  { id: "My", unidad: "kN·m", abajo: true },
-  { id: "Vz", unidad: "kN", abajo: false },
-  { id: "T", unidad: "kN·m", abajo: false },
-  { id: "N", unidad: "kN", abajo: false },
+const ESFUERZOS: { id: Esfuerzo; unidad: string; abajo: boolean; plano: EsfuerzoPlano; title: string }[] = [
+  { id: "My", unidad: "kN·m", abajo: true, plano: "M", title: "My: flexión en el plano x-z de la barra (la vertical de las vigas)" },
+  { id: "Mz", unidad: "kN·m", abajo: true, plano: "M", title: "Mz: flexión en el plano x-y de la barra (la otra de los pilares)" },
+  { id: "Vz", unidad: "kN", abajo: false, plano: "V", title: "Vz: cortante según z (el vertical de las vigas)" },
+  { id: "Vy", unidad: "kN", abajo: false, plano: "V", title: "Vy: cortante según y" },
+  { id: "T", unidad: "kN·m", abajo: false, plano: "T", title: "T: torsor" },
+  { id: "N", unidad: "kN", abajo: false, plano: "N", title: "N: axil; positivo, tracción" },
 ];
+
+const PIEZAS: { id: PiezasDiagrama; nombre: string }[] = [
+  { id: "todas", nombre: "Vigas y pilares" },
+  { id: "vigas", nombre: "Vigas" },
+  { id: "pilares", nombre: "Pilares" },
+];
+const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
+type Escala = (typeof ESCALAS)[number];
+
+/** Los diagramas en un 3D (I4): los de la planta de su cabecera, o los de todas. */
+function TresDDiagramas({ planta, esfuerzo, eleccion, piezas, escala }: { planta: string | null; esfuerzo: Esfuerzo; eleccion: EleccionCombinaciones; piezas: PiezasDiagrama; escala: number }) {
+  const { proyecto } = useVisor();
+  const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "diagramas3d", esfuerzo, combinaciones: eleccion, planta, piezas, escala });
+  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
+  const datos = proyecto.desactualizado ? null : d.datos;
+  return <Fuente3DModelo resultados={{ diagramas: datos, leyenda: datos, aviso, cargando: d.cargando }} />;
+}
 
 function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => void }) {
   const caja = useRef<HTMLDivElement>(null);
@@ -194,14 +218,11 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
 export function ModoDiagramas() {
   const { proyecto, planta, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:diagramas", { nav: true, props: true, dock: true, pestana: "alzado", alto: 300 });
-  const vistas = useVistas();
-  const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta");
-  useEffect(() => {
-    if (sinPlanta) vistas.irATipo("planta");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
-  }, []);
   const e = proyecto.estado!;
   const [esfuerzo, setEsfuerzo] = useState<Esfuerzo>("My");
+  const [piezas3D, setPiezas3D] = useState<PiezasDiagrama>("todas");
+  const [escala, setEscala] = useState<Escala>("1");
+  const plano = ESFUERZOS.find((x) => x.id === esfuerzo)!.plano;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [s, setS] = useState(0);
   const piezas = usePedido(proyecto.cliente, planta ? { tipo: "piezas", planta } : null);
@@ -239,10 +260,9 @@ export function ModoDiagramas() {
       <Separador />
       <Segmentado
         etiqueta="Esfuerzo"
-        opciones={ESFUERZOS.map((x) => ({ id: x.id, nombre: x.id, title: x.id === "N" && v?.axilSinValor ? "Sin valor: la viga está en un diafragma rígido (C1-d)" : undefined }))}
+        opciones={ESFUERZOS.map((x) => ({ id: x.id, nombre: x.id, title: x.id === "N" && v?.axilSinValor ? `${x.title}. En ${v.id}, sin valor: está en un diafragma rígido (C1-d)` : x.title }))}
         valor={esfuerzo}
         onCambio={setEsfuerzo}
-        deshabilitada={(x) => x === "N" && !!v?.axilSinValor}
       />
       <Separador />
       <BarraVistas />
@@ -270,7 +290,24 @@ export function ModoDiagramas() {
     <ZonaVistas
       fuentes={{
         planta: (x) => (x.planta ? <PlantaDiagramas planta={x.planta} vista={vista} id={id} cargando={x.planta === planta && viga.cargando} /> : null),
-        cabeceraPlanta: () => <Chip acento>{vista.vista === "vigas" ? `Diagramas de ${esfuerzo}` : `${esfuerzo}: sólo en el alzado de la pieza`}</Chip>,
+        cabeceraPlanta: () => <Chip acento>{vista.vista === "vigas" ? `Diagramas de ${esfuerzo}` : `${esfuerzo}: en el 3D, el alzado y el de la pieza`}</Chip>,
+        tresD: (x) => <TresDDiagramas planta={x.planta} esfuerzo={esfuerzo} eleccion={eleccion} piezas={piezas3D} escala={Number(escala)} />,
+        alzado: (x) => <FuenteEscena fuente={x.eje ? { tipo: "alzado", plano: { eje: x.eje }, diagramas: { esfuerzo: plano, combinaciones: eleccion, escala: Number(escala) } } : null} />,
+        cabecera3D: () => (
+          <>
+            <Chip acento>{esfuerzo}</Chip>
+            <Desplegable etiqueta="Piezas con diagrama" valor={piezas3D} onCambio={setPiezas3D} opciones={PIEZAS} />
+            <Desplegable etiqueta="Escala de los diagramas" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
+          </>
+        ),
+        cabeceraAlzado: () => (
+          <>
+            <Chip acento title={plano === "M" ? "El momento de eje normal al plano: My en las vigas del plano; My o Mz en los pilares, según su giro" : plano === "V" ? "El cortante en el plano: Vz en las vigas del plano" : undefined}>
+              {plano === "M" || plano === "V" ? `${plano} en el plano` : plano}
+            </Chip>
+            <Desplegable etiqueta="Escala de los diagramas" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
+          </>
+        ),
       }}
     />
   );

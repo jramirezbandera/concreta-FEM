@@ -42,7 +42,7 @@ export interface PlanoAlzado {
 
 export const PROFUNDIDAD_ALZADO = 0.5;
 /** Un tramo es paralelo al plano si forma con él menos de este ángulo (seno). */
-const SENO_PARALELO = Math.sin((10 * Math.PI) / 180);
+export const SENO_PARALELO = Math.sin((10 * Math.PI) / 180);
 
 /** El plano del alzado de un eje (los del modelo o los propuestos), o null si no hay ningún eje con ese id. */
 export function planoDeEje(f: ModeloFisico, eje: string, profundidad?: number): PlanoAlzado | null {

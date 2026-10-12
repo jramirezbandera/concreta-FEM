@@ -1,0 +1,20 @@
+GPU de Chrome: ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Ti (0x00002803) Direct3D11 vs_5_0 ps_5_0, D3D11)
+
+## Diagramas en el 3D: My de todas las barras
+     hasta verlos: 889 ms
+     tareas largas al cargarlos: 0
+BIEN  triángulos de los diagramas: 266926 = Node 266926
+BIEN  orbitar el 3D con los diagramas: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas al orbitar: 0
+
+## Diagramas en el alzado del eje 3: M en el plano
+BIEN  alzado del eje 3 con M: 226 capas, sha256 149c844b378c0b60 = Node 149c844b378c0b60
+
+## Isovalores en el 3D: uz
+     tareas largas al cargarlos: 0
+BIEN  triángulos de las bandas, todas las plantas: 207318 = Node 207318
+BIEN  orbitar el 3D con los isovalores: mediana 8.3 ms, p95 8.5 ms entre fotogramas (120)
+     tareas largas al orbitar: 0
+BIEN  triángulos de las bandas de N3: 29408 = Node 29408
+
+TODO BIEN

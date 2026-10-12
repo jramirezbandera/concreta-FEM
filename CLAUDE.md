@@ -296,6 +296,10 @@
   - la carga en la cabeza da en la losa lo mismo que en el arranque (≤ 1e-12);
   - con un pilar casi puntual, la flecha a ≥ 1 m queda a ≤ 0,6 % de Navier con la carga en su huella (la serie admite ya un parche);
   - con 30 × 30 cm, la huella rígida da −10 % de flecha bajo el pilar frente a la carga repartida, como en cualquier pilar continuo.
+- **2026-10-12: parte de I4 adelantada** a petición del usuario (`interfaz.md` §7.1):
+  - diagramas de las barras en el 3D (`src/visor/diagramas3d.ts`: ejes locales, relleno por signo, todas las barras o las de una planta) y en el alzado (`src/agente/render/alzadoDiagramas.ts`: M y V en el plano del pórtico), en Resultados · Diagramas;
+  - isovalores de las losas en el 3D (`src/visor/isovalores3d.ts`), en Resultados · Losas: con una planta, su mapa en planta; con todas, una escala común;
+  - validación: `src/visor/resultados3d.test.ts` (los valores, los de `envolventePieza`, bit a bit) y `validacion/i4/chrome.ts`.
 - **Siguiente paso:**
   - las puertas de uso de I1 e I2 y después I3 (sólido, translúcido, filtros y caja de sección) e I4 (resultados en 3D);
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);

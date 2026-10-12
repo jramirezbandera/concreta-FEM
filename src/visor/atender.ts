@@ -56,7 +56,7 @@ export class Atendedor {
         return r.valido ? bien("escena", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "alzado": {
-        const r = s.alzado(p.plano);
+        const r = s.alzado(p.plano, p.diagramas);
         return r.valido ? bien("alzado", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
       case "elegir":
@@ -87,6 +87,10 @@ export class Atendedor {
         return de(geometria3D(s));
       case "deformada":
         return de(desplazamientos(s, p.combinaciones));
+      case "diagramas3d":
+        return de(s.diagramas3D(p));
+      case "isovalores3d":
+        return de(s.isovalores3D(p));
       case "revision":
         return de(datosRevision(s, p.firmas, p.ficheroFirmas));
       case "precalentar":
