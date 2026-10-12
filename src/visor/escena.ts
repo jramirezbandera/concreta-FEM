@@ -6,10 +6,12 @@
  * reordenan.
  *
  * Cada capa lleva:
- * - los abanicos de triángulos de sus anillos (v0, vi, vi+1), para rellenarlos por stencil: con la
- *   paridad, «par-impar» (las áreas); con el número de vueltas, «nonzero» (las bandas de
- *   isovalores). Es la misma regla que el `<path>` del SVG de toda la capa, sin triangular, así que
- *   no falla con ningún polígono;
+ * - los abanicos de triángulos de sus anillos (v0, vi, vi+1), para rellenarlos por stencil con el
+ *   número de vueltas («nonzero»), sin triangular, así que no falla con ningún polígono. Las bandas
+ *   de isovalores ya vienen orientadas; en las áreas, los anillos de cada polígono se orientan por
+ *   su profundidad (`orientarAnillos`), para que cada uno salga como su `<path>` par-impar del SVG y
+ *   los de la capa que se solapan se sumen (con la paridad de toda la capa, el cruce de dos vigas
+ *   quedaba hueco);
  * - los segmentos de sus contornos (los anillos, cerrados) o de sus líneas, para los trazos.
  *
  * Las coordenadas van en Float32 respecto a `origen` (el centro de la caja de la escena), para no
@@ -28,10 +30,10 @@ type Caja = [number, number, number, number];
 /** Una capa: primitivas seguidas con el mismo estilo, relleno y forma. */
 export interface Capa {
   estilo: Estilo;
-  /** «area»: polígonos par-impar; «region»: bandas de isovalores (nonzero); «trazo»: líneas abiertas. */
+  /** «area»: polígonos con huecos; «region»: bandas de isovalores; «trazo»: líneas abiertas. */
   forma: "area" | "region" | "trazo";
   relleno?: string;
-  /** Triángulos en abanico de sus anillos: x, y de 3 vértices por triángulo, respecto al origen. Vacío en los trazos. */
+  /** Triángulos en abanico de sus anillos (regla «nonzero»): x, y de 3 vértices por triángulo, respecto al origen. Vacío en los trazos. */
   abanicos: Float32Array;
   /** Segmentos de sus contornos o sus líneas: x0, y0, x1, y1, respecto al origen. */
   segmentos: Float32Array;
@@ -61,6 +63,27 @@ export interface EscenaPreparada {
 /** El origen de las capas de una escena: el centro de su caja. */
 export const origenDe = (e: Pick<Escena, "caja">): Vec2 => [(e.caja[0] + e.caja[2]) / 2, (e.caja[1] + e.caja[3]) / 2];
 
+const areaConSigno = (r: readonly Vec2[]): number => {
+  let a = 0;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j]![0] + r[i]![0]) * (r[i]![1] - r[j]![1]);
+  return a / 2;
+};
+
+/**
+ * Qué anillos de un polígono par-impar hay que recorrer al revés para que su número de vueltas sea
+ * su paridad: antihorario los de profundidad par (el contorno, una isla en un hueco), horario los de
+ * profundidad impar (los huecos). Así, con la regla «nonzero», cada polígono se rellena como en el
+ * SVG y los de una misma capa que se solapan se suman en vez de anularse (dos vigas que se cruzan).
+ */
+export function orientarAnillos(anillos: readonly (readonly Vec2[])[]): boolean[] {
+  return anillos.map((r, i) => {
+    if (!r.length) return false;
+    let prof = 0;
+    for (let j = 0; j < anillos.length; j++) if (j !== i && anillos[j]!.length && dentro(r[0]!, anillos[j]!)) prof++;
+    return areaConSigno(r) > 0 === (prof % 2 === 1);
+  });
+}
+
 /** Lo que se va juntando de una capa, en números de JS (se pasa a Float32 al final). */
 class Acumulador {
   readonly abanicos: number[] = [];
@@ -79,7 +102,8 @@ class Acumulador {
     if (y > this.caja[3]) this.caja[3] = y;
     return [x, y];
   }
-  anillo(r: readonly Vec2[], relleno: boolean): void {
+  /** Un anillo: su contorno y, con `relleno`, su abanico; `invertir` lo recorre al revés (v0, vi+1, vi). */
+  anillo(r: readonly Vec2[], relleno: boolean, invertir = false): void {
     if (!r.length) return;
     const p = r.map((q) => this.punto(q));
     for (let i = 0; i < p.length; i++) {
@@ -87,7 +111,16 @@ class Acumulador {
       const b = p[(i + 1) % p.length]!;
       this.segmentos.push(a[0], a[1], b[0], b[1]);
     }
-    if (relleno) for (let i = 1; i + 1 < p.length; i++) this.abanicos.push(p[0]![0], p[0]![1], p[i]![0], p[i]![1], p[i + 1]![0], p[i + 1]![1]);
+    if (relleno)
+      for (let i = 1; i + 1 < p.length; i++) {
+        const [b, c] = invertir ? [p[i + 1]!, p[i]!] : [p[i]!, p[i + 1]!];
+        this.abanicos.push(p[0]![0], p[0]![1], b[0], b[1], c[0], c[1]);
+      }
+  }
+  /** Un polígono con huecos (par-impar), con sus anillos orientados para la regla «nonzero» (`orientarAnillos`). */
+  poligono(anillos: readonly (readonly Vec2[])[]): void {
+    const inv = orientarAnillos(anillos);
+    anillos.forEach((r, i) => this.anillo(r, true, inv[i]));
   }
   linea(r: readonly Vec2[]): void {
     const p = r.map((q) => this.punto(q));
@@ -111,8 +144,7 @@ export function prepararEscena(e: Escena): EscenaPreparada {
   for (const p of e.primitivas) {
     switch (p.tipo) {
       case "poligono": {
-        const a = capa(p.estilo, "area", p.relleno);
-        for (const r of p.anillos) a.anillo(r, true);
+        capa(p.estilo, "area", p.relleno).poligono(p.anillos);
         break;
       }
       case "region": {
@@ -234,7 +266,7 @@ export function resaltar(e: Escena, objetos: readonly string[]): Eleccion | null
   for (const p of e.primitivas) {
     if (!("objeto" in p) || p.objeto === undefined || !ids.has(p.objeto)) continue;
     vistos.add(p.objeto);
-    if (p.tipo === "poligono") for (const r of p.anillos) a.anillo(r, true);
+    if (p.tipo === "poligono") a.poligono(p.anillos);
     else if (p.tipo === "linea") a.linea(p.puntos);
     else if (p.tipo === "marca" || p.tipo === "flecha") puntos.push(p.p);
   }

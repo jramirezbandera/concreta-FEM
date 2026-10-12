@@ -1,17 +1,17 @@
 GPU de Chrome: ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Ti (0x00002803) Direct3D11 vs_5_0 ps_5_0, D3D11)
 
 ## Criterio 1: los búferes que pinta el motor, los de la escena de fem render
-BIEN  planta N3, modelo: 6 capas, sha256 4c0d713e2d3236a5 = Node 4c0d713e2d3236a5
+BIEN  planta N3, modelo: 6 capas, sha256 06af2a8dab08fa05 = Node 06af2a8dab08fa05
 BIEN  alzado del eje 3: 21 capas, sha256 3eea5a9c9aecc325 = Node 3eea5a9c9aecc325
-BIEN  mapa de uz de N3: 11 capas, sha256 83a420030cf8b4f5 = Node 83a420030cf8b4f5
+BIEN  mapa de uz de N3: 11 capas, sha256 6174f8898b1e6785 = Node 6174f8898b1e6785
 
 ## Criterio 2: fluidez con el edificio objetivo (1920×1080)
-BIEN  desplazar la planta: mediana 8.3 ms entre fotogramas (p95 8.4 ms, 90 fotogramas)
-BIEN  acercar y alejar la planta: mediana 8.3 ms entre fotogramas (p95 8.4 ms, 60 fotogramas)
+BIEN  desplazar la planta: mediana 8.3 ms entre fotogramas (p95 8.5 ms, 90 fotogramas)
+BIEN  acercar y alejar la planta: mediana 8.3 ms entre fotogramas (p95 8.5 ms, 60 fotogramas)
 BIEN  orbitar el 3D alámbrico: mediana 8.3 ms entre fotogramas (p95 8.4 ms, 120 fotogramas)
 BIEN  desplazar el 3D: mediana 8.3 ms entre fotogramas (p95 8.5 ms, 60 fotogramas)
 BIEN  orbitar el 3D analítico: mediana 8.3 ms entre fotogramas (p95 8.5 ms, 90 fotogramas)
-BIEN  pasar de 1 a 4 vistas: 41 ms (≤ 300)
+BIEN  pasar de 1 a 4 vistas: 52 ms (≤ 300)
 BIEN  ninguna tarea larga de más de 50 ms (la peor, 0 ms; 0 en total)
 
 ## Criterio 3: elegir en una vista elige en todas, en el navegador y en la tabla

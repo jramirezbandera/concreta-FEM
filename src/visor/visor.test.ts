@@ -21,7 +21,7 @@ import { sensatezResultados } from "../agente/sensatezResultados.ts";
 import { sha256 } from "../compilador/huella.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { COMPONENTE, datosDesplomes, datosLosas, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, valorEnPunto } from "./datos.ts";
-import { origenDe, prepararEscena, type EscenaPreparada } from "./escena.ts";
+import { orientarAnillos, origenDe, prepararEscena, type EscenaPreparada } from "./escena.ts";
 import { alambrico } from "./alambrico.ts";
 import { ejesDe } from "../compilador/ejes.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
@@ -67,11 +67,14 @@ export function comprobarBuferes(e: Escena, p: EscenaPreparada, que: string): vo
     let g = grupos[grupos.length - 1];
     if (!g || g.estilo !== x.estilo || g.forma !== forma || g.relleno !== relleno) grupos.push((g = { estilo: x.estilo, forma, ...(relleno !== undefined ? { relleno } : {}), seg: [], tri: [] }));
     if (x.tipo === "linea") for (let i = 1; i < x.puntos.length; i++) g.seg.push(...f(x.puntos[i - 1]!), ...f(x.puntos[i]!));
-    else
-      for (const r of x.anillos) {
+    else {
+      // Los polígonos, con sus anillos orientados para la regla «nonzero»; las bandas, tal cual
+      const inv = x.tipo === "poligono" ? orientarAnillos(x.anillos) : x.anillos.map(() => false);
+      x.anillos.forEach((r, k) => {
         r.forEach((q, i) => g!.seg.push(...f(q), ...f(r[(i + 1) % r.length]!)));
-        for (let i = 1; i + 1 < r.length; i++) g.tri.push(...f(r[0]!), ...f(r[i]!), ...f(r[i + 1]!));
-      }
+        for (let i = 1; i + 1 < r.length; i++) g!.tri.push(...f(r[0]!), ...f(r[inv[k] ? i + 1 : i]!), ...f(r[inv[k] ? i : i + 1]!));
+      });
+    }
   }
   expect(p.origen, que).toEqual(o);
   expect(p.capas.map((c) => [c.estilo, c.forma, c.relleno]), que).toEqual(grupos.map((g) => [g.estilo, g.forma, g.relleno]));
@@ -83,6 +86,60 @@ export function comprobarBuferes(e: Escena, p: EscenaPreparada, que: string): vo
   expect(p.textos).toEqual(e.primitivas.filter((x) => x.tipo === "texto"));
   expect(p.extremos).toEqual(e.extremos);
 }
+
+/** Número de vueltas de unos abanicos alrededor de un punto: lo que deja la regla «nonzero» en el stencil. */
+function vueltas(ab: Float32Array, q: Vec2): number {
+  let n = 0;
+  for (let t = 0; t < ab.length; t += 6) {
+    const [ax, ay, bx, by, cx, cy] = Array.from(ab.subarray(t, t + 6)) as [number, number, number, number, number, number];
+    const d = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+    if (d === 0) continue;
+    const u = ((bx - q[0]) * (cy - q[1]) - (by - q[1]) * (cx - q[0])) / d;
+    const v = ((cx - q[0]) * (ay - q[1]) - (cy - q[1]) * (ax - q[0])) / d;
+    if (u > 0 && v > 0 && 1 - u - v > 0) n += Math.sign(d);
+  }
+  return n;
+}
+
+describe("I2: relleno de las áreas", () => {
+  const rect = (x0: number, y0: number, x1: number, y1: number, horario = false): Vec2[] => {
+    const r: Vec2[] = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    return horario ? r.reverse() : r;
+  };
+  const escena = (polis: Vec2[][][]): Escena => ({
+    titulo: "",
+    cabecera: [],
+    primitivas: polis.map((anillos, i) => ({ tipo: "poligono", anillos, estilo: "viga", objeto: `V${i}` })),
+    leyenda: [],
+    notas: [],
+    extremos: [],
+    caja: [-10, -10, 10, 10],
+  }) as unknown as Escena;
+
+  it("dos vigas que se cruzan, en la misma capa, rellenan el cruce (con cualquier sentido de sus anillos)", () => {
+    const p = prepararEscena(escena([[rect(-5, -0.15, 5, 0.15)], [rect(-0.15, -5, 0.15, 5, true)]]));
+    expect(p.capas).toHaveLength(1);
+    const ab = p.capas[0]!.abanicos;
+    const o = p.origen;
+    const en = (x: number, y: number) => vueltas(ab, [x - o[0], y - o[1]]);
+    expect(en(0.01, 0.02)).not.toBe(0);
+    expect(en(3, 0.02)).not.toBe(0);
+    expect(en(0.02, 3)).not.toBe(0);
+    expect(en(3, 3)).toBe(0);
+  });
+
+  it("un polígono con un hueco y una isla dentro: par-impar, con cualquier sentido de sus anillos", () => {
+    for (const h of [false, true]) {
+      const p = prepararEscena(escena([[rect(-4, -4, 4, 4, h), rect(-2, -2, 2, 2, h), rect(-1, -1, 1, 1, !h)]]));
+      const ab = p.capas[0]!.abanicos;
+      const o = p.origen;
+      const en = (x: number, y: number) => vueltas(ab, [x - o[0], y - o[1]]);
+      expect(Math.abs(en(3, 0.1))).toBe(1);
+      expect(en(1.5, 0.1)).toBe(0);
+      expect(Math.abs(en(0.1, 0.2))).toBe(1);
+    }
+  });
+});
 
 describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
   let proyecto = "";

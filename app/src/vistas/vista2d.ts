@@ -154,7 +154,7 @@ export class Vista2D extends Vista {
     const g = new Group();
     const acento = this.entorno.colores().acento;
     const orden = { n: 100000 };
-    if (r.objetos.length === 1) for (const m of relleno(r.abanicos, r.caja, acento, 0.22, "par-impar", orden, this.matResaltado)) g.add(m);
+    if (r.objetos.length === 1) for (const m of relleno(r.abanicos, r.caja, acento, 0.22, orden, this.matResaltado)) g.add(m);
     const l = trazo(r.segmentos, acento, 3, orden, this.matResaltado, undefined, 0.85);
     if (l) g.add(l);
     // Sus coordenadas son respecto a su origen; las de la escena, respecto al suyo

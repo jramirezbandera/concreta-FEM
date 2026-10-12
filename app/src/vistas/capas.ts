@@ -2,9 +2,9 @@
  * Las capas de una escena preparada (`src/visor/escena.ts`) como objetos de Three.js (I2,
  * `docs/fem3d/interfaz.md` §14): un relleno y un trazo por capa, en el orden de la escena.
  *
- * - Relleno por stencil, sin triangular: los abanicos de la capa invierten el stencil (par-impar) o
- *   lo suben y bajan según su sentido (nonzero, las bandas de isovalores); después, el rectángulo de
- *   la capa pinta donde el stencil no es 0 y lo deja a 0. Es la regla del `<path>` del SVG.
+ * - Relleno por stencil, sin triangular: los abanicos de la capa suben y bajan el stencil según su
+ *   sentido (nonzero; `src/visor/escena.ts` orienta los anillos de las áreas); después, el
+ *   rectángulo de la capa pinta donde el stencil no es 0 y lo deja a 0.
  * - Trazo con grosor en píxeles (`LineSegments2`, MIT), y las rayas en píxeles: `dashScale` es la
  *   escala (px/m) en cada encuadre.
  *
@@ -31,7 +31,6 @@ import {
   FrontSide,
   Group,
   IncrementWrapStencilOp,
-  InvertStencilOp,
   KeepStencilOp,
   Mesh,
   MeshBasicMaterial,
@@ -73,7 +72,7 @@ export class Materiales {
     return x;
   }
 
-  /** El que escribe en el stencil (par-impar: invierte; nonzero: sube por delante y baja por detrás). */
+  /** El que escribe en el stencil: sube por delante y baja por detrás (nonzero). */
   escribir(side: Side, op: StencilOp): MeshBasicMaterial {
     return this.de(`e${side}|${op}`, () => new MeshBasicMaterial({ colorWrite: false, depthTest: false, depthWrite: false, transparent: true, side, stencilWrite: true, stencilFunc: AlwaysStencilFunc, stencilRef: 0, stencilZPass: op, stencilZFail: op, stencilFail: KeepStencilOp }));
   }
@@ -105,8 +104,8 @@ export class Materiales {
 /** Los de la página: nunca se liberan (así sus programas de WebGL tampoco). */
 export const MATERIALES = new Materiales();
 
-/** Un relleno por stencil: los abanicos (par-impar o nonzero) y el rectángulo que cubre. */
-export function relleno(abanicos: Float32Array, caja: readonly [number, number, number, number], color: string, opacidad: number, regla: "par-impar" | "nonzero", orden: { n: number }, mat: Materiales): Mesh[] {
+/** Un relleno por stencil: los abanicos (nonzero) y el rectángulo que cubre. */
+export function relleno(abanicos: Float32Array, caja: readonly [number, number, number, number], color: string, opacidad: number, orden: { n: number }, mat: Materiales): Mesh[] {
   if (!abanicos.length) return [];
   const g = geometria(a3D(abanicos));
   const escribir = (side: Side, op: StencilOp) => {
@@ -115,7 +114,7 @@ export function relleno(abanicos: Float32Array, caja: readonly [number, number, 
     m.frustumCulled = false;
     return m;
   };
-  const r = regla === "par-impar" ? [escribir(DoubleSide, InvertStencilOp)] : [escribir(FrontSide, IncrementWrapStencilOp), escribir(BackSide, DecrementWrapStencilOp)];
+  const r = [escribir(FrontSide, IncrementWrapStencilOp), escribir(BackSide, DecrementWrapStencilOp)];
   const [x0, y0, x1, y1] = caja;
   const tapa = new Mesh(geometria(new Float32Array([x0, y0, 0, x1, y0, 0, x1, y1, 0, x0, y0, 0, x1, y1, 0, x0, y1, 0])), mat.tapa(color, opacidad));
   tapa.renderOrder = orden.n++;
@@ -157,7 +156,7 @@ export class Capas2D {
     const p = pintura(c.estilo, tema);
     if (c.forma !== "trazo") {
       const color = c.relleno ?? p.fill;
-      if (color && color !== "none") for (const m of relleno(c.abanicos, c.caja, color, p.opacity ?? 1, c.forma === "region" ? "nonzero" : "par-impar", orden, this.mat)) this.grupo.add(m);
+      if (color && color !== "none") for (const m of relleno(c.abanicos, c.caja, color, p.opacity ?? 1, orden, this.mat)) this.grupo.add(m);
     }
     // Las bandas, con un trazo de su color que tapa las juntas del antialias (como el SVG de V1)
     const color = c.forma === "region" ? c.relleno : p.stroke;
