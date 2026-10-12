@@ -428,6 +428,23 @@ export interface ModeloFisico {
   panos?: readonly PanoUnidireccional[];
   casos: readonly CasoFisico[];
   cargas?: readonly CargaFisica[];
+  /** I2: ejes de replanteo, sólo para el dibujo. No entran en el cálculo ni en la huella. */
+  ejes?: readonly EjeReplanteo[];
+}
+
+/**
+ * Eje de replanteo (I2, `docs/fem3d/interfaz.md` §9): una recta en planta para los alzados, las
+ * burbujas y las cotas del dibujo, y para nombrar posiciones. Se ve en todas las plantas. El
+ * compilador lo ignora, así que no cambia la huella ni los resultados; sin ejes, el dibujo usa los
+ * que propone `ejes.ts` con las alineaciones de los pilares.
+ */
+export interface EjeReplanteo {
+  /** Lo que dicen sus burbujas, si no tiene `nombre` («A», «1»). Único en todo el modelo, como los demás ids. */
+  id: string;
+  nombre?: string;
+  /** Sus dos extremos en planta, m (distintos); las burbujas van en ellos. */
+  desde: Vec2;
+  hasta: Vec2;
 }
 
 /**

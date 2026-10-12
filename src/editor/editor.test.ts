@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../agente/proyecto.ts";
 import { huellaCompilacion } from "../compilador/compilar.ts";
+import { proponerEjes } from "../compilador/ejes.ts";
 import { resolverOpciones } from "../compilador/fisico.ts";
 import { azar, fisicoAleatorio } from "../pruebas/fisicoAleatorio.ts";
 import { leerTsv } from "./celdas.ts";
@@ -15,7 +16,7 @@ import { copiarAPlantas, escribirFila, exportar, filas, objetosDePlanta, operaci
 import { deshacer, hacer, historial, rehacer } from "./historial.ts";
 import { aplicar, type Operacion } from "./operaciones.ts";
 import { proyectoNuevo } from "./plantilla.ts";
-import { COLECCIONES, lista, referenciasRotas, usos } from "./referencias.ts";
+import { COLECCIONES, lista, referenciasRotas, usos, type Objeto } from "./referencias.ts";
 import { serializar } from "./serializar.ts";
 import { leerEjemplo } from "./serializar.test.ts";
 import { DEF_TABLAS, TABLAS, contexto } from "./tablas.ts";
@@ -62,6 +63,32 @@ describe("tablas: ida y vuelta (criterio 3)", () => {
       expect(p.modelo).toStrictEqual(proyecto.modelo);
       expect(huella(p)).toBe(huella(proyecto));
     });
+});
+
+describe("ejes de replanteo (I2)", () => {
+  const { proyecto } = leerEjemplo("edificio");
+  const propuestos = proponerEjes(proyecto.modelo, proyecto.opciones).ejes;
+
+  it("guardar los propuestos es un lote de altas: cada uno sale igual de su fila, y la huella no cambia", () => {
+    const p = aplicado(proyecto, { op: "lote", operaciones: propuestos.map((objeto) => ({ op: "crear", coleccion: "ejes", objeto: objeto as unknown as Objeto })) });
+    expect(p.modelo.ejes).toEqual(propuestos);
+    expect(huella(p)).toBe(huella(proyecto));
+    const ctx = contexto(p.modelo);
+    const def = DEF_TABLAS.ejes;
+    for (const o of lista(p.modelo, "ejes")) {
+      const l = def.objeto(def.fila(o, ctx), ctx);
+      expect(l.ok ? l.objeto : l.errores, o.id).toStrictEqual(o);
+    }
+    // Pegar su tabla en el proyecto sin ejes da los mismos
+    const r = pegar(proyecto.modelo, "ejes", exportar(p.modelo, "ejes"));
+    if (!r.ok) throw new Error(JSON.stringify(r.errores));
+    expect(aplicado(proyecto, r.operacion).modelo.ejes).toEqual(propuestos);
+  });
+
+  it("un eje con los dos extremos iguales no entra", () => {
+    const l = DEF_TABLAS.ejes.objeto({ id: "Z", nombre: "", x0: "1", y0: "2", x1: "1", y1: "2" }, contexto(proyecto.modelo));
+    expect(l.ok).toBe(false);
+  });
 });
 
 describe("operaciones", () => {
@@ -252,8 +279,8 @@ describe("sucesiones al azar (criterio 2)", () => {
       sucesiones(p, [semilla, semilla + 1000]);
     });
 
-  it("las colecciones con id del catálogo son las de validar.ts", () => {
-    expect([...COLECCIONES].sort()).toEqual(["apoyos", "apoyosLineales", "bandas", "cargas", "casos", "losas", "materiales", "muros", "panos", "pilares", "plantas", "secciones", "vigas"]);
+  it("las colecciones con id del catálogo son las de validar.ts, y los ejes de replanteo (I2), que el compilador no ve", () => {
+    expect([...COLECCIONES].sort()).toEqual(["apoyos", "apoyosLineales", "bandas", "cargas", "casos", "ejes", "losas", "materiales", "muros", "panos", "pilares", "plantas", "secciones", "vigas"]);
   });
 });
 

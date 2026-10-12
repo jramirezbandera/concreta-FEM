@@ -30,6 +30,10 @@ export type Estilo =
   | "apoyo"
   | "apoyo-lineal"
   | "banda"
+  | "hueco-aspa"
+  | "eje"
+  | "eje-burbuja"
+  | "cota"
   | "carga-superficie"
   | "carga-lineal"
   | "carga-puntual"
@@ -88,6 +92,12 @@ export interface Texto {
   alternativas?: { p?: Vec2; dx?: number; dy?: number; ancla?: "inicio" | "medio" | "fin" }[];
   color?: string;
   objeto?: string;
+  /**
+   * Qué rotula (I2), para que el visor decida con el zoom: `eje` (las burbujas) y `dato` (cargas,
+   * diagnósticos, valores) siempre; `cota`, `id` (ids y secciones), al acercarse. Sin clase, `dato`.
+   * `fem render` no la usa.
+   */
+  clase?: "eje" | "cota" | "id" | "dato";
 }
 
 /** Tamaño mínimo de cualquier texto (criterio 3 de A4). */

@@ -24,6 +24,7 @@ import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { diagramaCombinado } from "../consultas.ts";
 import { bandaPolilinea, cajaDe, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { bandas, coloresBandas, limitesRedondos, type Triangulo } from "./isovalores.ts";
+import { capaEjes } from "./ejes.ts";
 import { anchoViga, fondoModelo, huellaSeccion, PlantaFisica, type DatosVista } from "./modelo.ts";
 
 export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23"] as const;
@@ -184,12 +185,15 @@ export function vistaMalla(r: ResultadosRender, planta: string, d: DatosVista): 
     ...(barras ? [{ estilo: "malla-barra" as const, texto: "Barra de viga o vigueta" }] : []),
     { estilo: "pilar-llega", texto: "Nudo de pilar" },
   ];
+  const ejes = capaEjes(pl.f, { cotas: false });
+  P.push(...ejes.primitivas);
+  leyenda.push(...ejes.leyenda);
   return {
     titulo: d.nombre ?? "Proyecto",
     cabecera: cabecera(pl, "Vista: malla", d),
     primitivas: P,
     leyenda,
-    notas: [`${laminas.length} láminas (${rigidas} rígidas, ${abacos} de ábaco), ${barras} barras de vigas y viguetas y ${nudos.size} nudos de láminas en la planta.`],
+    notas: [`${laminas.length} láminas (${rigidas} rígidas, ${abacos} de ábaco), ${barras} barras de vigas y viguetas y ${nudos.size} nudos de láminas en la planta.`, ...ejes.notas],
     extremos: [],
     caja: caja(pl),
   };
@@ -273,6 +277,9 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
     for (let b = L.length - 2; b >= 0; b--) leyenda.push({ relleno: colores[b]!, texto: `${rotulo(L[b]!, 4)} a ${rotulo(L[b + 1]!, 4)}` });
   }
   P.push(...trazoModelo(pl));
+  const ejes = capaEjes(pl.f, { cotas: false });
+  P.push(...ejes.primitivas);
+  notas.push(...ejes.notas);
   const extremos: ExtremoRotulado[] = [];
   const u = UNIDAD[campo];
   if (pmax && pmin) {

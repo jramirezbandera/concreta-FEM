@@ -9,11 +9,15 @@ import type { Estilo } from "../../../src/agente/render/escena.ts";
 import type { Theme } from "../tema/types.ts";
 
 const OSCURO: Partial<Record<Estilo, Pintura>> = {
-  losa: { fill: "#1d2430", stroke: "#6b7686", sw: 1 },
+  losa: { fill: "#1d2430", stroke: "#6b7686", sw: 1.2 },
   "losa-reticular": { fill: "#1c2a1f", stroke: "#5f7f63", sw: 1 },
   abaco: { fill: "#2e4532", stroke: "#7da682", sw: 1 },
   pano: { fill: "#2b2518", stroke: "#a08a5e", sw: 1 },
-  viga: { fill: "#4f5966", stroke: "#a3adba", sw: 0.8 },
+  viga: { fill: "#3a4350", stroke: "#a3adba", sw: 0.8 },
+  "hueco-aspa": { stroke: "#6b7686", sw: 0.8 },
+  eje: { stroke: "#6b7686", sw: 0.8, dash: "14 3 2 3" },
+  "eje-burbuja": { fill: "#0c0c0e", stroke: "#a3adba", sw: 1.2 },
+  cota: { stroke: "#8b95a3", sw: 0.8 },
   vigueta: { stroke: "#b49a68", sw: 1.4 },
   "pilar-llega": { fill: "#d4d6db", stroke: "#d4d6db", sw: 1 },
   "pilar-arranca": { fill: "#0c0c0e", stroke: "#d4d6db", sw: 1.6 },

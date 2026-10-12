@@ -86,6 +86,7 @@ export type ResultadoCompilacion =
  * Canónico: las listas cuyo orden no significa nada (materiales, secciones, pilares, vigas, apoyos
  * y cargas, y los tramos de cada pilar) van ordenadas por id; las plantas, los casos y los puntos
  * de las vigas conservan el suyo. Así la huella no cambia al reordenar, como el modelo analítico.
+ * Los ejes de replanteo no entran: son sólo del dibujo.
  */
 export function huellaCompilacion(fisico: ModeloFisico, op: OpcionesResueltas): string {
   return huellaDe({ compilador: VERSION_COMPILADOR, mallador: VERSIONES_MALLADOR, fisico: fisicoCanonico(fisico), opciones: op });
@@ -96,6 +97,8 @@ function fisicoCanonico(f: ModeloFisico): unknown {
   const clave = (x: unknown, campo = "id") => (typeof x === "object" && x !== null ? String((x as Record<string, unknown>)[campo]) : "");
   const ordenar = (v: unknown, campo = "id") => (Array.isArray(v) ? [...v].sort((a, b) => (clave(a, campo) < clave(b, campo) ? -1 : clave(a, campo) > clave(b, campo) ? 1 : 0)) : v);
   const r: Record<string, unknown> = { ...f };
+  // Los ejes de replanteo son sólo del dibujo (I2): no cambian el modelo analítico
+  delete r.ejes;
   for (const k of ["materiales", "secciones", "vigas", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos"]) if (r[k] !== undefined) r[k] = ordenar(r[k]);
   // Los ábacos de un reticular, por su vértice menor (C4): su orden no significa nada
   if (Array.isArray(r.losas))

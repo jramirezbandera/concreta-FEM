@@ -168,8 +168,8 @@ export function carasComunes(pilares: readonly { id: string; p: Vec2; huella: Hu
   return r;
 }
 
-/** Agrupa los pilares por t (C5-b). */
-function alineaciones(pilares: PilarEnLosa[], d: Vec2, n: Vec2, epsSnap: number): { id: string; s: number; t: number }[][] {
+/** Agrupa los pilares por t (C5-b). También propone los ejes de replanteo (`ejes.ts`). */
+export function alineaciones(pilares: readonly { id: string; p: Vec2 }[], d: Vec2, n: Vec2, epsSnap: number, minimo = 2): { id: string; s: number; t: number }[][] {
   const pts = pilares.map((p) => ({ id: p.id, s: p.p[0] * d[0] + p.p[1] * d[1], t: p.p[0] * n[0] + p.p[1] * n[1] })).sort((a, b) => a.t - b.t || a.s - b.s || (a.id < b.id ? -1 : 1));
   const huecos = pts.slice(1).map((q, i) => q.t - pts[i]!.t);
   const S = Math.min(...huecos.filter((g) => g > SEPARACION_MINIMA_ALINEACIONES));
@@ -180,7 +180,7 @@ function alineaciones(pilares: PilarEnLosa[], d: Vec2, n: Vec2, epsSnap: number)
     if (g && q.t - g[g.length - 1]!.t <= tau) g.push(q);
     else grupos.push([q]);
   }
-  return grupos.filter((g) => g.length >= 2).map((g) => g.sort((a, b) => a.s - b.s || (a.id < b.id ? -1 : 1)));
+  return grupos.filter((g) => g.length >= minimo).map((g) => g.sort((a, b) => a.s - b.s || (a.id < b.id ? -1 : 1)));
 }
 
 /** Rectángulo de una banda (para medir su área en la losa). */

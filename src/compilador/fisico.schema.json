@@ -505,6 +505,29 @@
         "permanente"
       ]
     },
+    "EjeReplanteo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "desde": {
+          "$ref": "#/$defs/Vec2"
+        },
+        "hasta": {
+          "$ref": "#/$defs/Vec2"
+        }
+      },
+      "required": [
+        "id",
+        "desde",
+        "hasta"
+      ],
+      "additionalProperties": false
+    },
     "HuecoMuro": {
       "type": "object",
       "properties": {
@@ -766,6 +789,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/CargaFisica"
+          }
+        },
+        "ejes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EjeReplanteo"
           }
         }
       },

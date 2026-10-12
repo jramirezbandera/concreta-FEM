@@ -30,12 +30,12 @@ export interface Pintura {
 
 /** Pintura de cada estilo (el visor de V1 usa la misma en el tema claro). */
 export const ESTILOS: Record<Estilo, Pintura> = {
-  losa: { fill: "#e9edf2", stroke: "#7d8794", sw: 1 },
+  losa: { fill: "#e9edf2", stroke: "#7d8794", sw: 1.2 },
   "losa-reticular": { fill: "#dfe9df", stroke: "#6f8a6f", sw: 1 },
   abaco: { fill: "#b9cdb9", stroke: "#58745a", sw: 1 },
   pano: { fill: "#f3ead9", stroke: "#97835c", sw: 1 },
   "pano-viguetas": { stroke: "#b49a68", sw: 1 },
-  viga: { fill: "#8b96a3", stroke: "#4c5560", sw: 0.8 },
+  viga: { fill: "#c3cbd4", stroke: "#4c5560", sw: 0.8 },
   vigueta: { stroke: "#7a6a4a", sw: 1.4 },
   "pilar-llega": { fill: "#1f2933", stroke: "#1f2933", sw: 1 },
   "pilar-arranca": { fill: "#ffffff", stroke: "#1f2933", sw: 1.6 },
@@ -45,6 +45,10 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   apoyo: { fill: "#0f766e", stroke: "#0f766e", sw: 1 },
   "apoyo-lineal": { stroke: "#0f766e", sw: 3, dash: "8 4" },
   banda: { stroke: "#6d28d9", sw: 1.2, dash: "10 5" },
+  "hueco-aspa": { stroke: "#7d8794", sw: 0.8 },
+  eje: { stroke: "#8794a3", sw: 0.8, dash: "14 3 2 3" },
+  "eje-burbuja": { fill: "#ffffff", stroke: "#475569", sw: 1.2 },
+  cota: { stroke: "#6b7280", sw: 0.8 },
   "carga-superficie": { fill: "#2563eb", stroke: "#1d4ed8", sw: 1.4, opacity: 0.16 },
   "carga-lineal": { stroke: "#dc2626", sw: 3 },
   "carga-puntual": { fill: "#dc2626", stroke: "#dc2626", sw: 2 },

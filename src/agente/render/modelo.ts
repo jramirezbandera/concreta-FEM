@@ -13,6 +13,7 @@
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import type { CargaFisica, Losa, ModeloFisico, Muro, PanoUnidireccional, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
+import { capaEjes } from "./ejes.ts";
 import { bandaPolilinea, cajaDe, longitud, puntoEnPolilinea, puntoInterior, puntosDe, rayado, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
 
 export const VISTAS_MODELO = ["modelo", "cargas", "diagnosticos"] as const;
@@ -170,8 +171,10 @@ const SECCION = (s: Seccion | undefined): string => {
 // ─── Fondo: el modelo de la planta ──────────────────────────────────────────────────────────────
 
 interface OpcionesFondo {
-  /** Todo en gris, sin rótulos (el fondo de las cargas y los diagnósticos). */
+  /** Todo en gris, sin rótulos (el fondo de las cargas y los diagnósticos). Los ejes de replanteo no cambian. */
   atenuado: boolean;
+  /** Las cadenas de cotas entre ejes (sólo en la vista `modelo`). */
+  cotas?: boolean;
 }
 
 /** Las primitivas del modelo de la planta y las entradas de su leyenda. */
@@ -180,12 +183,12 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   const P: Primitiva[] = [];
   const usados = new Set<Estilo>();
   const est = (e: Estilo): Estilo => {
-    const r = o.atenuado ? (["pano-viguetas", "vigueta", "apoyo-lineal", "banda"].includes(e) ? "atenuado-linea" : "atenuado") : e;
+    const r = o.atenuado ? (["pano-viguetas", "vigueta", "apoyo-lineal", "banda", "hueco-aspa"].includes(e) ? "atenuado-linea" : "atenuado") : e;
     usados.add(r);
     return r;
   };
   const texto = (p: Vec2, t: string, prioridad: number, extra: Partial<Extract<Primitiva, { tipo: "texto" }>> = {}) => {
-    if (!o.atenuado) P.push({ tipo: "texto", p, texto: t, tamano: 12, prioridad, ...extra });
+    if (!o.atenuado) P.push({ tipo: "texto", p, texto: t, tamano: 12, prioridad, clase: "id", ...extra });
   };
   const notas: string[] = [];
 
@@ -194,6 +197,8 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     const anillos = [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])];
     P.push({ tipo: "poligono", anillos, estilo: est(l.reticular ? "losa-reticular" : "losa"), objeto: l.id });
     for (const a of l.reticular?.abacos ?? []) P.push({ tipo: "poligono", anillos: [a as Vec2[]], estilo: est("abaco"), objeto: l.id });
+    // Los huecos, con aspa (los de cuatro vértices: sus diagonales)
+    for (const h of l.huecos ?? []) if (h.length === 4) for (const [a, b] of [[0, 2], [1, 3]] as const) P.push({ tipo: "linea", puntos: [h[a]!, h[b]!], estilo: est("hueco-aspa") });
     texto(puntoInterior(anillos), etiquetaLosa(l), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });
   }
   for (const p of pl.enPlanta(f.panos)) {
@@ -273,6 +278,11 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     texto(b.desde, b.id, 10, { dx: 4, dy: -4, color: "#6d28d9" });
   }
 
+  // Los ejes de replanteo, encima del modelo
+  const ejes = capaEjes(f, { cotas: !!o.cotas });
+  P.push(...ejes.primitivas);
+  notas.push(...ejes.notas);
+
   const leyenda: EntradaLeyenda[] = [];
   const entrada = (e: Estilo, t: string) => {
     if (usados.has(e)) leyenda.push({ estilo: e, texto: t });
@@ -280,6 +290,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   entrada("losa", "Losa maciza (id y espesor)");
   entrada("losa-reticular", "Forjado reticular (zona aligerada)");
   entrada("abaco", "Ábaco macizo");
+  entrada("hueco-aspa", "Hueco de losa (con aspa)");
   entrada("pano", "Paño unidireccional; las rayas, en la dirección de sus viguetas");
   entrada("viga", "Viga, con su ancho y su sección (cm)");
   entrada("vigueta", "Viga sin ancho conocido");
@@ -291,6 +302,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   entrada("apoyo", "Apoyo");
   entrada("apoyo-lineal", "Apoyo lineal");
   entrada("banda", "Banda de dimensionado");
+  leyenda.push(...ejes.leyenda);
   return { primitivas: P, leyenda: o.atenuado ? [] : leyenda, notas };
 }
 
@@ -341,7 +353,7 @@ export interface DatosVista {
 
 export function vistaModelo(f: ModeloFisico, planta: string, d: DatosVista): Escena {
   const pl = new PlantaFisica(f, planta);
-  const fondo = fondoModelo(pl, { atenuado: false });
+  const fondo = fondoModelo(pl, { atenuado: false, cotas: true });
   return {
     titulo: titulo(d.nombre),
     cabecera: [cabeceraPlanta(pl), "Vista: modelo", `Huella ${d.huella.slice(0, 12)}`],
@@ -369,7 +381,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
     if (p.tipo !== "texto") usados.add(p.estilo);
     P.push(p);
   };
-  const rot = (p: Vec2, t: string, extra: Partial<Extract<Primitiva, { tipo: "texto" }>> = {}) => poner({ tipo: "texto", p, texto: t, tamano: 12, prioridad: 70, fondo: true, ...extra });
+  const rot = (p: Vec2, t: string, extra: Partial<Extract<Primitiva, { tipo: "texto" }>> = {}) => poner({ tipo: "texto", p, texto: t, tamano: 12, prioridad: 70, fondo: true, clase: "dato", ...extra });
   const vigas = new Map((f.vigas ?? []).map((v) => [v.id, v]));
   const losas = new Map((f.losas ?? []).map((l) => [l.id, l]));
   const panos = new Map((f.panos ?? []).map((p) => [p.id, p]));

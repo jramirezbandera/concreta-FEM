@@ -560,6 +560,32 @@
       ],
       "description": "Clase de duración (DB SE-M tabla 2.2), para el kmod de la madera."
     },
+    "EjeReplanteo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Lo que dicen sus burbujas, si no tiene `nombre` («A», «1»). Único en todo el modelo, como los demás ids."
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "desde": {
+          "$ref": "#/$defs/Vec2",
+          "description": "Sus dos extremos en planta, m (distintos); las burbujas van en ellos."
+        },
+        "hasta": {
+          "$ref": "#/$defs/Vec2"
+        }
+      },
+      "required": [
+        "id",
+        "desde",
+        "hasta"
+      ],
+      "additionalProperties": false,
+      "description": "Eje de replanteo (I2, `docs/fem3d/interfaz.md` §9): una recta en planta para los alzados, las\nburbujas y las cotas del dibujo, y para nombrar posiciones. Se ve en todas las plantas. El\ncompilador lo ignora, así que no cambia la huella ni los resultados; sin ejes, el dibujo usa los\nque propone `ejes.ts` con las alineaciones de los pilares."
+    },
     "HuecoMuro": {
       "type": "object",
       "properties": {
@@ -842,6 +868,13 @@
           "items": {
             "$ref": "#/$defs/CargaFisica"
           }
+        },
+        "ejes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EjeReplanteo"
+          },
+          "description": "I2: ejes de replanteo, sólo para el dibujo. No entran en el cálculo ni en la huella."
         }
       },
       "required": [

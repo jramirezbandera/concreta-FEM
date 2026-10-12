@@ -11,6 +11,7 @@ import { reticulaConNucleo } from "../../../validacion/c3/modelos.ts";
 import { edificioUnidireccional } from "../../../validacion/c4/modelos.ts";
 import { prepararNucleo, proyectoDe } from "../../../validacion/a3/revisar.ts";
 import { compilar, type ResultadoCompilacion } from "../../compilador/compilar.ts";
+import { ejesDe } from "../../compilador/ejes.ts";
 import { Consultas } from "../../compilador/consultas.ts";
 import type { CasoFisico, ModeloFisico } from "../../compilador/fisico.ts";
 import { CamposLaminas } from "../../motor/campos.ts";
@@ -105,8 +106,14 @@ describe("A4, criterio 1: lo dibujado es lo del modelo y de las consultas", () =
         const idx = new Map(f.plantas.map((p, i) => [p.id, i]));
         const k = idx.get(pl.id)!;
         const muros = (f.muros ?? []).filter((m) => idx.get(m.hasta)! <= k && k <= idx.get(m.desde)! && idx.get(m.hasta)! < idx.get(m.desde)!).map((m) => m.id);
-        const esperados = new Set([...enPlanta(f.losas), ...enPlanta(f.panos), ...enPlanta(f.vigas), ...enPlanta(f.apoyos), ...enPlanta(f.apoyosLineales), ...enPlanta(f.bandas), ...pilares, ...muros]);
+        // Y los ejes de replanteo (I2): los propuestos, que estos modelos no tienen, en todas las plantas
+        const ejes = ejesDe(f).ejes;
+        const esperados = new Set([...enPlanta(f.losas), ...enPlanta(f.panos), ...enPlanta(f.vigas), ...enPlanta(f.apoyos), ...enPlanta(f.apoyosLineales), ...enPlanta(f.bandas), ...pilares, ...muros, ...ejes.map((x) => x.id)]);
         expect(objetos(e), `${nombre}, ${pl.id}`).toEqual(esperados);
+        for (const x of ejes) {
+          const p = e.primitivas.find((q) => q.tipo === "linea" && q.objeto === x.id && q.estilo === "eje");
+          expect(p && p.tipo === "linea" ? p.puntos : null).toEqual([x.desde, x.hasta]);
+        }
         for (const l of (f.losas ?? []).filter((x) => x.planta === pl.id)) {
           const p = e.primitivas.find((x) => x.tipo === "poligono" && x.objeto === l.id && x.estilo.startsWith("losa"));
           expect(p && p.tipo === "poligono" ? p.anillos : null).toEqual([l.contorno, ...(l.huecos ?? [])]);
@@ -331,8 +338,8 @@ describe("A4, criterio 2: determinismo", () => {
   });
 });
 
-const SVG_CONGELADO = "71f0b353b5f5fb73200321210124f2f03c96c7fc0617db69cf321662e7ec8183";
-const PNG_CONGELADO = "054d7cd8964a073efc8dc874a556244b650e3c47579024cff5ddf1b28c8eb6e0";
+const SVG_CONGELADO = "dc5b1b84081fe90e2e3de2fce1655af1277db27623959204249c492e305e61f3";
+const PNG_CONGELADO = "3fe954bbf7091efff8e93d1c988c5b0069c28befd1eb5730d97d82d90ec85f74";
 
 describe("A4, criterio 3: tamaño de la imagen y del texto", () => {
   it(`el lado mayor no pasa de ${LADO_MAXIMO} px y ningún texto baja de 11 px, en todas las vistas`, () => {

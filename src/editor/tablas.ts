@@ -1,5 +1,5 @@
 /**
- * Tablas del editor (V2a, `docs/fem3d/visor.md` §6.2): plantas, materiales, secciones, pilares,
+ * Tablas del editor (V2a, `docs/fem3d/visor.md` §6.2): plantas, ejes (I2), materiales, secciones, pilares,
  * vigas, losas, apoyos, casos y cargas. Cada tabla pasa de un objeto del modelo físico a una fila de
  * textos (`fila`) y de una fila a un objeto (`objeto`); escribir en una celda, pegar desde Excel y
  * copiar a Excel usan las mismas dos funciones, así que lo que se ve es lo que se guarda.
@@ -12,12 +12,12 @@
  *
  * Puro: sin IO.
  */
-import type { CargaFisica, CasoFisico, Losa, Material, ModeloFisico, Pilar, Planta, Seccion, Viga, ApoyoFisico, AccionCaso } from "../compilador/fisico.ts";
+import type { CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Pilar, Planta, Seccion, Viga, ApoyoFisico, AccionCaso } from "../compilador/fisico.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { Lector, textoBooleano, textoGdl, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
-export const TABLAS = ["plantas", "materiales", "secciones", "pilares", "vigas", "losas", "apoyos", "casos", "cargas"] as const;
+export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "losas", "apoyos", "casos", "cargas"] as const;
 export type NombreTabla = (typeof TABLAS)[number];
 
 export interface Columna {
@@ -405,6 +405,34 @@ const losas: DefTabla = {
   plantas: (o) => [o.planta as string],
 };
 
+// ─── Ejes de replanteo ──────────────────────────────────────────────────────────────────────────
+
+const ejes: DefTabla = {
+  nombre: "ejes",
+  titulo: "Ejes",
+  coleccion: "ejes",
+  prefijo: "E",
+  columnas: [
+    { ...id, ayuda: "lo que dicen sus burbujas si no tiene nombre («A», «1»); único en todo el modelo" },
+    { ...nombre, ayuda: "lo que dicen sus burbujas, si no es el id" },
+    { clave: "x0", titulo: "x desde", unidad: "m" },
+    { clave: "y0", titulo: "y desde", unidad: "m" },
+    { clave: "x1", titulo: "x hasta", unidad: "m" },
+    { clave: "y1", titulo: "y hasta", unidad: "m" },
+  ],
+  fila(o) {
+    const e = o as unknown as EjeReplanteo;
+    return { id: e.id, nombre: s(e.nombre), x0: n(e.desde[0]), y0: n(e.desde[1]), x1: n(e.hasta[0]), y1: n(e.hasta[1]) };
+  },
+  objeto(f, _ctx, base) {
+    const L = new Lector(f);
+    const [x0, y0, x1, y1] = (["x0", "y0", "x1", "y1"] as const).map((c) => L.numero(c, { obligatorio: true }));
+    if (x0 !== undefined && y0 !== undefined && x1 === x0 && y1 === y0) L.errores.push({ columna: "x1", mensaje: "los dos extremos del eje son el mismo punto" });
+    return resultado(L, { ...base, id: L.texto("id") ?? "", nombre: L.texto("nombre"), desde: [x0, y0], hasta: [x1, y1] });
+  },
+  plantas: () => null,
+};
+
 // ─── Apoyos ─────────────────────────────────────────────────────────────────────────────────────
 
 const apoyos: DefTabla = {
@@ -597,7 +625,7 @@ const cargas: DefTabla = {
   },
 };
 
-export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, materiales, secciones, pilares, vigas, losas, apoyos, casos, cargas };
+export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, losas, apoyos, casos, cargas };
 
 /** Un id libre con el prefijo de la tabla: el primero de `<prefijo>1`, `<prefijo>2`… que no está en el modelo. */
 export function idNuevo(m: ModeloFisico, prefijo: string, ocupados: ReadonlySet<string> = new Set()): string {

@@ -12,7 +12,7 @@
 import type { CargaFisica, ModeloFisico } from "../compilador/fisico.ts";
 
 /** Las listas con id del modelo físico, en el orden de `validar.ts`. */
-export const COLECCIONES = ["plantas", "materiales", "secciones", "pilares", "vigas", "apoyos", "casos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos"] as const;
+export const COLECCIONES = ["plantas", "materiales", "secciones", "pilares", "vigas", "apoyos", "casos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos", "ejes"] as const;
 export type Coleccion = (typeof COLECCIONES)[number];
 
 export type Objeto = { readonly id: string } & Record<string, unknown>;
@@ -91,6 +91,7 @@ export function referenciasDe(coleccion: Coleccion, o: Objeto): Referencia[] {
     }
     case "plantas":
     case "materiales":
+    case "ejes":
       break;
   }
   return r;

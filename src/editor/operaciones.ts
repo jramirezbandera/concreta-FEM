@@ -60,6 +60,7 @@ const NOMBRES: Record<Coleccion, string> = {
   bandas: "banda",
   muros: "muro",
   panos: "paño",
+  ejes: "eje",
 };
 export const nombreColeccion = (c: Coleccion): string => NOMBRES[c];
 
