@@ -8,17 +8,20 @@
  * su cabecera (o la celda); Ctrl+V pega un bloque de Excel desde la celda activa (o por id, si trae
  * cabecera). La última fila es la nueva: el objeto se crea cuando tiene lo que necesita.
  *
+ * Las columnas con opciones (las plantas, las secciones, la base…) se eligen en un desplegable: doble
+ * clic, Intro, Alt+↓ o la flecha de la celda activa. F2 o escribir directamente, y pegar, siguen igual.
+ *
  * Cada celda se lee y se escribe con las funciones puras de `src/editor/` (`tablas.ts`,
  * `edicion.ts`): lo que se ve es lo que se guarda, y un dato que no vale no entra (se dice por qué).
  */
 import { memo, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
-import { ArrowDown, ArrowUp, ClipboardCopy, CopyPlus, Layers, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ClipboardCopy, CopyPlus, Layers, Plus, Trash2 } from "lucide-react";
 import type { Fila as FilaTexto } from "../../../src/editor/celdas.ts";
 import { escribirTsv } from "../../../src/editor/celdas.ts";
 import { proponerEjes } from "../../../src/compilador/ejes.ts";
 import { operacionFila, pegar } from "../../../src/editor/edicion.ts";
 import { lista, type Objeto } from "../../../src/editor/referencias.ts";
-import { DEF_TABLAS, TABLAS, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
+import { DEF_TABLAS, TABLAS, conActual, contexto, type NombreTabla, type Opcion } from "../../../src/editor/tablas.ts";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import { useVisor } from "../contexto.ts";
 import { DialogoBorrar, DialogoCopiar } from "./Dialogos.tsx";
@@ -68,15 +71,100 @@ function EjesPropuestos() {
   );
 }
 
+/** El desplegable abierto en la celda activa (sólo en una fila a la vez). */
+interface DesplegableCelda {
+  opciones: readonly Opcion[];
+  onElegir: (v: string) => void;
+  onCerrar: () => void;
+}
+
+/**
+ * El desplegable de una celda con opciones. Se abre solo; elegir escribe la celda, y Esc, Tab o
+ * salir de él lo cierran sin tocarla.
+ */
+function Desplegable({ valor, etiqueta, d }: { valor: string; etiqueta: string; d: DesplegableCelda }) {
+  const ref = useRef<HTMLSelectElement>(null);
+  useEffect(() => {
+    const s = ref.current;
+    if (!s) return;
+    s.focus();
+    try {
+      s.showPicker?.();
+    } catch {
+      // Sin gesto del usuario o sin soporte: queda enfocado, y Alt+↓ o Espacio lo abren
+    }
+  }, []);
+  return (
+    <select
+      ref={ref}
+      className="sel sel-celda"
+      value={valor}
+      aria-label={etiqueta}
+      onChange={(e) => d.onElegir(e.target.value)}
+      onKeyDown={(e) => {
+        // El teclado es del desplegable, no de la hoja
+        e.stopPropagation();
+        if (e.key === "Escape") d.onCerrar();
+        else if (e.key === "Tab") {
+          e.preventDefault();
+          d.onCerrar();
+        } else if (e.key === "Enter" && e.target === e.currentTarget) {
+          // Intro en el desplegable (no en una opción de la lista abierta): vale lo que tenga
+          e.preventDefault();
+          d.onElegir(e.currentTarget.value);
+        }
+      }}
+      onBlur={(e) => {
+        // Con la lista abierta, el foco pasa a sus opciones, que están dentro
+        if (!e.currentTarget.contains(e.relatedTarget)) d.onCerrar();
+      }}
+    >
+      {conActual(d.opciones, valor).map((o) => (
+        <option key={o.valor} value={o.valor}>
+          {o.texto ?? o.valor}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** Lo que va dentro de una celda: su texto (con la flecha del desplegable), el campo en el que se escribe, o el desplegable. */
+function contenidoCelda(o: { texto: string; editando: string | null; etiqueta: string; desplegable: DesplegableCelda | null; flecha: boolean; onValor: (v: string) => void; onDesplegar: () => void }) {
+  if (o.editando !== null) return o.desplegable ? <Desplegable valor={o.editando} etiqueta={o.etiqueta} d={o.desplegable} /> : <input autoFocus value={o.editando} onChange={(e) => o.onValor(e.target.value)} aria-label={o.etiqueta} />;
+  if (!o.flecha) return o.texto;
+  return (
+    <>
+      {o.texto}
+      <button
+        type="button"
+        className="desplegar"
+        tabIndex={-1}
+        aria-label={`Elegir ${o.etiqueta}`}
+        title="Elegir de la lista (Alt+↓)"
+        // Se abre en el click: si se abriera en mousedown, el click caería en el desplegable y lo cerraría
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onClick={o.onDesplegar}
+      >
+        <ChevronDown size={12} />
+      </button>
+    </>
+  );
+}
+
 const FilaHoja = memo(function FilaHoja({
   vista,
   indice,
   claves,
   calculadas,
+  conOpciones,
   sel,
   elegido,
   activa,
   editando,
+  desplegable,
   error,
   diag,
   onCelda,
@@ -88,17 +176,21 @@ const FilaHoja = memo(function FilaHoja({
   indice: number;
   claves: readonly string[];
   calculadas: readonly boolean[];
+  /** Columnas que se eligen en un desplegable. */
+  conOpciones: readonly boolean[];
   sel: boolean;
   /** Elegido en las vistas o en el navegador (I2). */
   elegido: boolean;
   /** Columna activa en esta fila (−1 si no lo es). */
   activa: number;
   editando: string | null;
+  desplegable: DesplegableCelda | null;
   error: boolean;
   diag: { sev: "f" | "w"; textos: string[] } | undefined;
   onCelda: (f: number, c: number, mayus: boolean) => void;
   onMarca: (f: number, mayus: boolean) => void;
-  onEditar: (f: number, c: number) => void;
+  /** `desplegar`: con el desplegable, si la columna lo tiene. */
+  onEditar: (f: number, c: number, inicial?: string, desplegar?: boolean) => void;
   onValor: (v: string) => void;
 }) {
   return (
@@ -107,8 +199,16 @@ const FilaHoja = memo(function FilaHoja({
         {diag ? (diag.sev === "f" ? "!" : "·") : indice + 1}
       </td>
       {claves.map((k, c) => (
-        <td key={k} className={calculadas[c] ? "calc" : undefined} data-activa={activa === c && !error} data-error={activa === c && error} title={vista.fila[k] || undefined} onMouseDown={(e) => onCelda(indice, c, e.shiftKey)} onDoubleClick={() => onEditar(indice, c)}>
-          {activa === c && editando !== null ? <input autoFocus value={editando} onChange={(e) => onValor(e.target.value)} aria-label={`${vista.id} · ${k}`} /> : vista.fila[k]}
+        <td key={k} className={calculadas[c] ? "calc" : undefined} data-activa={activa === c && !error} data-error={activa === c && error} title={vista.fila[k] || undefined} onMouseDown={(e) => onCelda(indice, c, e.shiftKey)} onDoubleClick={() => onEditar(indice, c, undefined, true)}>
+          {contenidoCelda({
+            texto: vista.fila[k] ?? "",
+            editando: activa === c ? editando : null,
+            etiqueta: `${vista.id} · ${k}`,
+            desplegable: activa === c ? desplegable : null,
+            flecha: activa === c && conOpciones[c]!,
+            onValor,
+            onDesplegar: () => onEditar(indice, c, undefined, true),
+          })}
         </td>
       ))}
     </tr>
@@ -128,6 +228,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
   const cols = def.columnas;
   const claves = useMemo(() => cols.map((c) => c.clave), [cols]);
   const calculadas = useMemo(() => cols.map((c) => !!c.calculada), [cols]);
+  const conOpciones = useMemo(() => cols.map((c) => !!c.opciones && !c.calculada), [cols]);
   const [soloPlanta, setSoloPlanta] = useState(true);
   const filtro = POR_PLANTA.has(tabla) && soloPlanta && planta ? planta : null;
 
@@ -155,6 +256,8 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
   const [cursor, setCursor] = useState<{ f: number; c: number }>({ f: 0, c: 0 });
   const [ancla, setAncla] = useState<number | null>(null);
   const [editando, setEditando] = useState<string | null>(null);
+  /** Se edita con el desplegable (no escribiendo). */
+  const [desplegado, setDesplegado] = useState(false);
   const [error, setError] = useState(false);
   const [borrador, setBorrador] = useState<Record<string, string>>({});
   const [mensaje, setMensaje] = useState<Mensaje>(null);
@@ -169,6 +272,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
     setCursor({ f: 0, c: 0 });
     setAncla(null);
     setEditando(null);
+    setDesplegado(false);
     setError(false);
     setBorrador({});
     setMensaje(null);
@@ -266,12 +370,34 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
     return true;
   };
 
-  const empezar = (f: number, c: number, inicial?: string) => {
+  /** Edita una celda: escribiendo (con `inicial`, lo tecleado) o, con `desplegar`, en su desplegable. */
+  const empezar = (f: number, c: number, inicial?: string, desplegar = false) => {
     if (cols[c]?.calculada) return;
     setCursor({ f, c });
     setEditando(inicial ?? textoCelda(f, c));
+    setDesplegado(desplegar && inicial === undefined && conOpciones[c]!);
     setError(false);
   };
+
+  /** Cierra el desplegable sin escribir. */
+  const cerrar = () => {
+    setEditando(null);
+    setDesplegado(false);
+    hoja.current?.focus();
+  };
+
+  /** Lo elegido en el desplegable se escribe en la celda, y el cursor se queda en ella. */
+  const elegir = (v: string) => {
+    const r = escribir(f0, c0, v);
+    setEditando(null);
+    setDesplegado(false);
+    if (!r) setError(true);
+    else if (r === "creado") setCursor({ f: nBorrador + 1, c: 0 });
+    hoja.current?.focus();
+  };
+
+  const opcionesActiva = useMemo(() => (desplegado ? (cols[c0]?.opciones?.(contexto(m)) ?? null) : null), [desplegado, cols, c0, m]);
+  const desplegable: DesplegableCelda | null = opcionesActiva ? { opciones: opcionesActiva, onElegir: elegir, onCerrar: cerrar } : null;
 
   const confirmar = (df: number, dc: number) => {
     if (editando === null) return;
@@ -303,6 +429,10 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
       return;
     }
     const mod = e.ctrlKey || e.metaKey;
+    if (e.altKey && e.key === "ArrowDown") {
+      e.preventDefault();
+      return empezar(f0, c0, undefined, true);
+    }
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
@@ -324,6 +454,8 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
       case "End":
         return mover(mod ? nBorrador : f0, cols.length - 1);
       case "Enter":
+        e.preventDefault();
+        return empezar(f0, c0, undefined, true);
       case "F2":
         e.preventDefault();
         return empezar(f0, c0);
@@ -471,14 +603,19 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
                 indice={i}
                 claves={claves}
                 calculadas={calculadas}
+                conOpciones={conOpciones}
                 sel={i >= rango[0] && i <= rango[1]}
                 elegido={elegidosS.has(v.id)}
                 activa={i === f0 ? c0 : -1}
                 editando={i === f0 ? editando : null}
+                desplegable={i === f0 ? desplegable : null}
                 error={i === f0 && error}
                 diag={diag.get(v.id)}
                 onCelda={(f, c, mayus) => {
-                  if (editando !== null && !(f === f0 && c === c0)) confirmar(0, 0);
+                  if (editando !== null && !(f === f0 && c === c0)) {
+                    if (desplegado) cerrar();
+                    else confirmar(0, 0);
+                  }
                   mover(f, c, mayus);
                 }}
                 onMarca={(f, mayus) => mover(f, c0, mayus)}
@@ -491,8 +628,26 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
                 +
               </td>
               {cols.map((c, j) => (
-                <td key={c.clave} className={`${c.calculada ? "calc" : ""} ${faltanBorrador.has(c.clave) ? "falta" : ""}`} data-activa={f0 === nBorrador && c0 === j && !error} data-error={f0 === nBorrador && c0 === j && error} onMouseDown={() => mover(nBorrador, j)} onDoubleClick={() => empezar(nBorrador, j)}>
-                  {f0 === nBorrador && c0 === j && editando !== null ? <input autoFocus value={editando} onChange={(e) => setEditando(e.target.value)} aria-label={`Fila nueva · ${c.clave}`} /> : (borrador[c.clave] ?? "")}
+                <td
+                  key={c.clave}
+                  className={`${c.calculada ? "calc" : ""} ${faltanBorrador.has(c.clave) ? "falta" : ""}`}
+                  data-activa={f0 === nBorrador && c0 === j && !error}
+                  data-error={f0 === nBorrador && c0 === j && error}
+                  onMouseDown={() => {
+                    if (editando !== null && desplegado && !(f0 === nBorrador && c0 === j)) cerrar();
+                    mover(nBorrador, j);
+                  }}
+                  onDoubleClick={() => empezar(nBorrador, j, undefined, true)}
+                >
+                  {contenidoCelda({
+                    texto: borrador[c.clave] ?? "",
+                    editando: f0 === nBorrador && c0 === j ? editando : null,
+                    etiqueta: `Fila nueva · ${c.clave}`,
+                    desplegable: f0 === nBorrador && c0 === j ? desplegable : null,
+                    flecha: f0 === nBorrador && c0 === j && conOpciones[j]!,
+                    onValor: setEditando,
+                    onDesplegar: () => empezar(nBorrador, j, undefined, true),
+                  })}
                 </td>
               ))}
             </tr>
@@ -512,7 +667,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
             </>
           )}
         </span>
-        <span className="kbd shrink-0">Intro editar · Tab · Esc · Supr vaciar · Ctrl+C/V con Excel · Ctrl+Z</span>
+        <span className="kbd shrink-0">Intro editar o elegir · F2 escribir · Tab · Esc · Supr vaciar · Ctrl+C/V con Excel · Ctrl+Z</span>
       </div>
 
       {dialogo?.tipo === "borrar" && (

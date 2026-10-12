@@ -28,6 +28,23 @@ export interface Columna {
   ayuda?: string;
   /** Sólo se ve: sale del modelo (la cota de una planta). */
   calculada?: boolean;
+  /**
+   * Los valores que admite (una lista cerrada o los ids de otra colección), para elegirlos en un
+   * desplegable; la celda se sigue pudiendo escribir y pegar. En una columna opcional, la primera
+   * es «» (sin dar: el valor por defecto).
+   */
+  opciones?: (ctx: Contexto) => readonly Opcion[];
+}
+
+/** Una opción de un desplegable: el texto de la celda y, si es otro, lo que se ve en la lista. */
+export interface Opcion {
+  valor: string;
+  texto?: string;
+}
+
+/** Las opciones con el valor actual delante si no está entre ellas (escrito o pegado), para que se vea lo que hay. */
+export function conActual(opciones: readonly Opcion[], valor: string): readonly Opcion[] {
+  return opciones.some((o) => o.valor === valor) ? opciones : [{ valor, texto: valor || "—" }, ...opciones];
 }
 
 export type Lectura = { ok: true; objeto: Objeto } | { ok: false; errores: ErrorCelda[] };
@@ -81,6 +98,28 @@ function rango(m: ModeloFisico, desde: unknown, hasta: unknown): string[] {
   return a < 0 || b < 0 ? [] : ids.slice(Math.min(a, b), Math.max(a, b) + 1);
 }
 
+/** Opciones de una lista cerrada; con `defecto`, la columna es opcional y la vacía va primero. */
+const fijas =
+  (valores: readonly string[], defecto?: string) =>
+  (): readonly Opcion[] => [...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]), ...valores.map((valor) => ({ valor }))];
+
+/** Las plantas, de arriba abajo como en el modelo, con su cota. */
+function opcionesPlantas(ctx: Contexto): Opcion[] {
+  const cotas = cotasPlantas(ctx.modelo.plantas);
+  return ctx.modelo.plantas.map((p, i) => {
+    const z = cotas[i];
+    return { valor: p.id, texto: `${p.id}${p.nombre ? ` · ${p.nombre}` : ""}${z === null || z === undefined ? "" : ` (${z > 0 ? "+" : ""}${z.toFixed(2).replace(".", ",")} m)`}` };
+  });
+}
+
+/** Los ids de una colección (con su nombre, si lo tiene); con `defecto`, la columna es opcional. */
+const ids =
+  (c: Coleccion, defecto?: string) =>
+  (ctx: Contexto): Opcion[] => [
+    ...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]),
+    ...lista(ctx.modelo, c).map((o) => ({ valor: o.id, texto: typeof o.nombre === "string" && o.nombre ? `${o.id} · ${o.nombre}` : undefined })),
+  ];
+
 const id: Columna = { clave: "id", titulo: "id", ayuda: "único en todo el modelo; vacío en una fila nueva: se pone solo" };
 const nombre: Columna = { clave: "nombre", titulo: "nombre" };
 
@@ -94,10 +133,10 @@ const plantas: DefTabla = {
   columnas: [
     id,
     nombre,
-    { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sotano o cubierta" },
+    { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sotano o cubierta", opciones: fijas(["planta", "sotano", "cubierta"], "planta") },
     { clave: "altura", titulo: "altura", unidad: "m", ayuda: "de forjado a forjado hasta la planta de encima; vacía en la de arriba" },
     { clave: "cota", titulo: "cota", unidad: "m", calculada: true },
-    { clave: "diafragma", titulo: "diafragma", ayuda: "rigido o ninguno; por defecto, rígido salvo en la más baja (C1-d)" },
+    { clave: "diafragma", titulo: "diafragma", ayuda: "rigido o ninguno; por defecto, rígido salvo en la más baja (C1-d)", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
   ],
   fila(o, ctx) {
     const p = o as unknown as Planta;
@@ -128,7 +167,7 @@ const materiales: DefTabla = {
   prefijo: "M",
   columnas: [
     id,
-    { clave: "tipo", titulo: "tipo", ayuda: "hormigon, acero o general" },
+    { clave: "tipo", titulo: "tipo", ayuda: "hormigon, acero o general", opciones: fijas(["hormigon", "acero", "general"]) },
     { clave: "fck", titulo: "fck", unidad: "MPa", ayuda: "hormigón: E = 8500·∛(fck + 8)" },
     // El modelo físico da el E del acero en MPa y el de un material general en kN/m²: dos columnas, cada una con su unidad
     { clave: "Eacero", titulo: "E acero", unidad: "MPa", ayuda: "sólo acero; por defecto, 210 000" },
@@ -182,8 +221,8 @@ const secciones: DefTabla = {
   prefijo: "S",
   columnas: [
     id,
-    { clave: "material", titulo: "material" },
-    { clave: "forma", titulo: "forma", ayuda: "rectangular, circular, T o general (los perfiles I, en el JSON por ahora)" },
+    { clave: "material", titulo: "material", opciones: ids("materiales") },
+    { clave: "forma", titulo: "forma", ayuda: "rectangular, circular, T o general (los perfiles I, en el JSON por ahora)", opciones: fijas(["rectangular", "circular", "T", "general"]) },
     { clave: "b", titulo: "b", unidad: "m", ayuda: "ancho (según y local); en general, la huella del pilar" },
     { clave: "h", titulo: "h", unidad: "m", ayuda: "canto (según z local)" },
     { clave: "D", titulo: "D", unidad: "m", ayuda: "diámetro" },
@@ -244,12 +283,12 @@ const pilares: DefTabla = {
     nombre,
     { clave: "x", titulo: "x", unidad: "m" },
     { clave: "y", titulo: "y", unidad: "m" },
-    { clave: "desde", titulo: "desde", ayuda: "planta de la base" },
-    { clave: "hasta", titulo: "hasta", ayuda: "planta de la cabeza" },
-    { clave: "seccion", titulo: "sección" },
+    { clave: "desde", titulo: "desde", ayuda: "planta de la base", opciones: opcionesPlantas },
+    { clave: "hasta", titulo: "hasta", ayuda: "planta de la cabeza", opciones: opcionesPlantas },
+    { clave: "seccion", titulo: "sección", opciones: ids("secciones") },
     { clave: "tramos", titulo: "tramos", ayuda: "sección de los tramos que cambian, por la planta de su cabeza: «N3: P30x30; N5: P25x25»" },
     { clave: "giro", titulo: "giro", unidad: "°", ayuda: "del canto h desde +X; por defecto, 0" },
-    { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno" },
+    { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (apeado: nace sobre una viga u otro pilar)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
     { clave: "libBase", titulo: "lib. base", ayuda: GDL },
     { clave: "libCabeza", titulo: "lib. cabeza", ayuda: GDL },
   ],
@@ -315,10 +354,10 @@ const vigas: DefTabla = {
   columnas: [
     id,
     nombre,
-    { clave: "planta", titulo: "planta" },
+    { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
     { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "eje en planta: «x y; x y; …» (al menos 2)" },
-    { clave: "seccion", titulo: "sección" },
-    { clave: "insercion", titulo: "inserción", ayuda: "plano (por defecto: el eje en el plano del forjado, C1-c) o superior" },
+    { clave: "seccion", titulo: "sección", opciones: ids("secciones") },
+    { clave: "insercion", titulo: "inserción", ayuda: "plano (por defecto: el eje en el plano del forjado, C1-c) o superior", opciones: fijas(["plano", "superior"], "plano") },
     { clave: "libInicio", titulo: "lib. inicio", ayuda: GDL },
     { clave: "libFin", titulo: "lib. fin", ayuda: GDL },
   ],
@@ -363,11 +402,11 @@ const losas: DefTabla = {
   columnas: [
     id,
     nombre,
-    { clave: "planta", titulo: "planta" },
+    { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
     { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes: «x y; x y; …» (al menos 3, sin repetir el primero)" },
     { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»" },
     { clave: "espesor", titulo: "espesor", unidad: "m" },
-    { clave: "material", titulo: "material" },
+    { clave: "material", titulo: "material", opciones: ids("materiales") },
     { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio; por defecto, γ·espesor" },
     { clave: "eje1", titulo: "eje 1", unidad: "°", ayuda: "dirección del eje 1 de las láminas desde +X; por defecto, 0" },
     { clave: "reticular", titulo: "reticular", calculada: true, ayuda: "los reticulares se editan en V2b" },
@@ -440,7 +479,7 @@ const apoyos: DefTabla = {
   titulo: "Apoyos",
   coleccion: "apoyos",
   prefijo: "A",
-  columnas: [id, { clave: "planta", titulo: "planta" }, { clave: "x", titulo: "x", unidad: "m" }, { clave: "y", titulo: "y", unidad: "m" }, { clave: "coartados", titulo: "coartados", ayuda: COARTADOS }],
+  columnas: [id, { clave: "planta", titulo: "planta", opciones: opcionesPlantas }, { clave: "x", titulo: "x", unidad: "m" }, { clave: "y", titulo: "y", unidad: "m" }, { clave: "coartados", titulo: "coartados", ayuda: COARTADOS }],
   fila(o) {
     const a = o as unknown as ApoyoFisico;
     return { id: a.id, planta: a.planta, x: n(a.x), y: n(a.y), coartados: textoGdl(a.coartados) };
@@ -463,15 +502,15 @@ const casos: DefTabla = {
   columnas: [
     id,
     nombre,
-    { clave: "pesoPropio", titulo: "peso propio", ayuda: "«sí» en el caso al que va el peso de las piezas (como mucho, uno)" },
-    { clave: "tipo", titulo: "acción", ayuda: "G, Q, S, W, T, E, A o N; vacía: el caso no entra en las combinaciones CTE/NCSE" },
-    { clave: "psi", titulo: "ψ", ayuda: `por su nombre (${PSI.join(", ")}) o «ψ0 ψ1 ψ2»` },
+    { clave: "pesoPropio", titulo: "peso propio", ayuda: "«sí» en el caso al que va el peso de las piezas (como mucho, uno)", opciones: fijas(["sí", "no"], "no") },
+    { clave: "tipo", titulo: "acción", ayuda: "G, Q, S, W, T, E, A o N; vacía: el caso no entra en las combinaciones CTE/NCSE", opciones: fijas(["G", "Q", "S", "W", "T", "E", "A", "N"], "sin acción") },
+    { clave: "psi", titulo: "ψ", ayuda: `por su nombre (${PSI.join(", ")}) o «ψ0 ψ1 ψ2»`, opciones: fijas(PSI, "sin dar") },
     { clave: "familia", titulo: "familia", ayuda: "excluyente: como mucho un caso de la familia por combinación" },
-    { clave: "permanente", titulo: "permanente", ayuda: "G: peso (por defecto), empuje o agua" },
-    { clave: "direccion", titulo: "dirección", ayuda: "W, E y N: X o Y" },
-    { clave: "signo", titulo: "signo", ayuda: "W y N: 1 o -1" },
-    { clave: "derivadoDe", titulo: "deriva de", ayuda: "N: id del caso vertical" },
-    { clave: "duracion", titulo: "duración", ayuda: "permanente, larga, media, corta o instantanea; por defecto, la del tipo" },
+    { clave: "permanente", titulo: "permanente", ayuda: "G: peso (por defecto), empuje o agua", opciones: fijas(["peso", "empuje", "agua"], "peso") },
+    { clave: "direccion", titulo: "dirección", ayuda: "W, E y N: X o Y", opciones: fijas(["X", "Y"], "sin dirección") },
+    { clave: "signo", titulo: "signo", ayuda: "W y N: 1 o -1", opciones: fijas(["1", "-1"], "sin signo") },
+    { clave: "derivadoDe", titulo: "deriva de", ayuda: "N: id del caso vertical", opciones: ids("casos", "ninguno") },
+    { clave: "duracion", titulo: "duración", ayuda: "permanente, larga, media, corta o instantanea; por defecto, la del tipo", opciones: fijas(["permanente", "larga", "media", "corta", "instantanea"], "la del tipo") },
   ],
   fila(o) {
     const c = o as unknown as CasoFisico;
@@ -535,11 +574,11 @@ const cargas: DefTabla = {
   prefijo: "Q",
   columnas: [
     id,
-    { clave: "tipo", titulo: "tipo", ayuda: "puntual, viga, pilar, superficie o lineal (los empujes, en V2b)" },
-    { clave: "caso", titulo: "caso" },
-    { clave: "planta", titulo: "planta", ayuda: "puntual, superficie y lineal" },
+    { clave: "tipo", titulo: "tipo", ayuda: "puntual, viga, pilar, superficie o lineal (los empujes, en V2b)", opciones: fijas(["puntual", "viga", "pilar", "superficie", "lineal"]) },
+    { clave: "caso", titulo: "caso", opciones: ids("casos") },
+    { clave: "planta", titulo: "planta", ayuda: "puntual, superficie y lineal", opciones: (ctx) => [{ valor: "", texto: "(viga y pilar)" }, ...opcionesPlantas(ctx)] },
     { clave: "sobre", titulo: "sobre", ayuda: "la viga, el pilar, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)" },
-    { clave: "ejes", titulo: "ejes", ayuda: "viga y pilar: global o local" },
+    { clave: "ejes", titulo: "ejes", ayuda: "viga y pilar: global o local", opciones: fijas(["global", "local"], "puntual, superficie y lineal") },
     { clave: "x", titulo: "x", unidad: "m", ayuda: "puntual" },
     { clave: "y", titulo: "y", unidad: "m", ayuda: "puntual" },
     { clave: "F", titulo: "F", unidad: "kN", ayuda: "puntual: «Fx Fy Fz» en ejes globales" },

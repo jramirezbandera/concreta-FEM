@@ -347,6 +347,19 @@ body {
   width: 100%; min-width: 60px; height: 22px; padding: 0; border: 0; outline: 0;
   background: transparent; color: var(--color-text-primary); font: inherit;
 }
+/* Columnas con opciones: la flecha de la celda activa y el desplegable en la celda */
+.hoja td[data-activa="true"]:has(> .desplegar), .hoja td[data-error="true"]:has(> .desplegar) { position: relative; padding-right: 22px; }
+.hoja td > .desplegar {
+  position: absolute; top: 3px; right: 3px; width: 17px; height: 17px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: var(--color-tint-accent); color: var(--color-accent); cursor: pointer;
+}
+.hoja td > .desplegar:hover { background: var(--color-accent); color: var(--color-bg-primary); }
+.hoja td > select.sel-celda {
+  width: 100%; min-width: 80px; height: 22px; padding: 0; margin: 0;
+  border: 0; outline: 0; box-shadow: none; border-radius: 0;
+  background: transparent; color: var(--color-text-primary); font: inherit; cursor: pointer;
+}
 .hoja tr.borrador td { background: var(--color-bg-surface); color: var(--color-text-secondary); }
 .hoja tr.borrador td.falta { box-shadow: inset 0 -2px 0 var(--color-tint-warn); }
 .hoja td.marca.f { color: var(--color-state-fail); font-weight: 600; }
@@ -355,13 +368,14 @@ body {
 .campo { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: start; padding: 3px 14px; }
 .campo > span { padding-top: 5px; font-size: 11.5px; color: var(--color-text-secondary); }
 .campo > span small { display: block; font: 10px var(--font-mono); color: var(--color-text-disabled); }
-.campo input {
+.campo input, .campo select {
   width: 100%; height: 26px; padding: 0 6px;
   border: 1px solid var(--color-border-main); border-radius: 4px;
   background: var(--color-bg-primary); color: var(--color-text-primary); font: 12px var(--font-mono);
 }
+.campo select { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .campo input:read-only { background: var(--color-bg-surface); color: var(--color-text-disabled); }
-.campo input[data-error="true"] { border-color: var(--color-state-fail); }
+.campo input[data-error="true"], .campo select[data-error="true"] { border-color: var(--color-state-fail); }
 .campo p { grid-column: 2; margin: 2px 0 0; font-size: 10.5px; color: var(--color-text-disabled); }
 
 .dialogo-fondo { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: color-mix(in srgb, #000 35%, transparent); }

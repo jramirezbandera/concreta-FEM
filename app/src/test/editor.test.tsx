@@ -244,7 +244,10 @@ function elegirTabla(tabla: NombreTabla) {
   fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${DEF_TABLAS[tabla].titulo}`) }));
 }
 
-/** Escribe en la fila nueva de una tabla, celda a celda, como el ingeniero: doble clic, escribir, Intro. */
+/**
+ * Escribe en la fila nueva de una tabla, celda a celda, como el ingeniero: doble clic, escribir, Intro;
+ * en una columna con opciones, doble clic y elegir en el desplegable.
+ */
 function escribirFilaNueva(tabla: NombreTabla, valores: Record<string, string>) {
   const g = hoja(tabla);
   for (const [clave, v] of Object.entries(valores)) {
@@ -254,6 +257,13 @@ function escribirFilaNueva(tabla: NombreTabla, valores: Record<string, string>) 
     const td = nueva.querySelectorAll("td")[j + 1]!;
     fireEvent.mouseDown(td);
     fireEvent.doubleClick(td);
+    const lista = within(td as HTMLElement).queryByRole("combobox");
+    if (DEF_TABLAS[tabla].columnas[j]!.opciones) {
+      expect(lista, `${tabla}.${clave}: sin desplegable`).toBeTruthy();
+      expect([...(lista as HTMLSelectElement).options].map((o) => o.value), `${tabla}.${clave}`).toContain(v);
+      fireEvent.change(lista!, { target: { value: v } });
+      continue;
+    }
     const input = within(td as HTMLElement).getByRole("textbox");
     fireEvent.change(input, { target: { value: v } });
     fireEvent.keyDown(input, { key: "Enter" });

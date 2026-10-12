@@ -65,6 +65,38 @@ describe("tablas: ida y vuelta (criterio 3)", () => {
     });
 });
 
+describe("tablas: desplegables", () => {
+  for (const nombre of ["ejemplo", "1022", "edificio"] as const)
+    it(`${nombre}: cada valor de una columna con desplegable está entre sus opciones, y cada opción se lee sin error en esa columna`, () => {
+      const { proyecto } = leerEjemplo(nombre);
+      const ctx = contexto(proyecto.modelo);
+      let probadas = 0;
+      for (const t of TABLAS) {
+        const def = DEF_TABLAS[t];
+        for (const col of def.columnas) {
+          if (!col.opciones) continue;
+          const valores = col.opciones(ctx).map((o) => o.valor);
+          expect(new Set(valores).size, `${t}.${col.clave}: opciones repetidas`).toBe(valores.length);
+          for (const o of lista(proyecto.modelo, def.coleccion)) {
+            const fila = def.fila(o, ctx);
+            // ψ también admite «ψ0 ψ1 ψ2», que no es una opción
+            if (!(col.clave === "psi" && /\d/.test(fila.psi ?? ""))) expect(valores, `${t} ${o.id} · ${col.clave}`).toContain(fila[col.clave] ?? "");
+            // Una columna vacía puede no aplicar a la fila (el ψ de un caso sin acción); una con valor
+            // tiene que admitir cualquier otra opción con valor
+            if (!fila[col.clave]) continue;
+            for (const v of valores) {
+              if (v === "") continue;
+              const l = def.objeto({ ...fila, [col.clave]: v }, ctx, o);
+              expect(l.ok ? [] : l.errores.filter((e) => e.columna === col.clave), `${t} ${o.id} · ${col.clave} = «${v}»`).toEqual([]);
+              probadas++;
+            }
+          }
+        }
+      }
+      expect(probadas).toBeGreaterThan(0);
+    });
+});
+
 describe("ejes de replanteo (I2)", () => {
   const { proyecto } = leerEjemplo("edificio");
   const propuestos = proponerEjes(proyecto.modelo, proyecto.opciones).ejes;
