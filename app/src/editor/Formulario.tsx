@@ -10,7 +10,7 @@ import { DEF_TABLAS, TABLAS, conActual, contexto, type NombreTabla } from "../..
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 
-/** La tabla del editor de un objeto (null si su tipo no se edita en V2a: muros, paños…). */
+/** La tabla del editor de un objeto (null si no está en el proyecto: un eje propuesto). */
 export function tablaDe(m: Parameters<typeof indiceIds>[0], id: string): NombreTabla | null {
   const c = indiceIds(m).get(id)?.coleccion;
   return TABLAS.find((t) => DEF_TABLAS[t].coleccion === c) ?? null;

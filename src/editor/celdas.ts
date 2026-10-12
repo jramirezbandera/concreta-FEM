@@ -6,6 +6,8 @@
  *   escriben con coma y todas sus cifras (el valor exacto que se guarda).
  * - Puntos: «x y; x y; …» (las coordenadas separadas por espacios, los puntos por «;»).
  * - Polígonos (huecos): los de puntos separados por «|».
+ * - Grupos de números (huecos de un muro): «a b c d | a b c d».
+ * - Valores con nombre (multiplicadores): «m11=0,32 m22=0,27», sólo los que se dan.
  * - Vectores (F, M, q): «x y z».
  * - GDL (coartados, liberaciones): seis cifras 1 o 0, «111000», en el orden del tipo.
  * - Sí o no: «sí» o «no»; vacío es «sin dar» (el valor por defecto).
@@ -40,6 +42,13 @@ export const textoPuntos = (p: readonly Vec2[]): string => p.map(([x, y]) => `${
 export const textoPoligonos = (p: readonly (readonly Vec2[])[]): string => p.map(textoPuntos).join(" | ");
 export const textoVector = (v: readonly number[]): string => v.map(textoNumero).join(" ");
 export const textoGdl = (v: readonly boolean[]): string => v.map((x) => (x ? "1" : "0")).join("");
+export const textoGrupos = (g: readonly (readonly number[])[]): string => g.map(textoVector).join(" | ");
+/** Los valores de `claves` que hay en `o`, en ese orden: «m11=0,32 m22=0,27». */
+export const textoClaves = (o: Readonly<Record<string, number | undefined>>, claves: readonly string[]): string =>
+  claves
+    .filter((k) => o[k] !== undefined)
+    .map((k) => `${k}=${textoNumero(o[k]!)}`)
+    .join(" ");
 export const textoBooleano = (v: boolean | undefined): string => (v === undefined ? "" : v ? "sí" : "no");
 
 /** Lee las celdas de una fila y acumula los errores, columna a columna. */
@@ -133,6 +142,37 @@ export class Lector {
       r.push(v);
     }
     return r;
+  }
+
+  /** Grupos de `n` números separados por «|» (los huecos de un muro: «desde hasta z0 z1 | …»). */
+  grupos(c: string, n: number): number[][] | undefined {
+    const t = this.texto(c);
+    if (t === undefined) return undefined;
+    const r: number[][] = [];
+    for (const g of t.split("|")) {
+      const v = this.numeros(c, g.trim(), n);
+      if (!v) return undefined;
+      r.push(v);
+    }
+    return r;
+  }
+
+  /** Valores con nombre, «m11=0,32 m22=0,27», de entre `claves`, cada uno > 0 y ≤ `max`. */
+  claves(c: string, claves: readonly string[], o: { max?: number } = {}): Record<string, number> | undefined {
+    const t = this.texto(c);
+    if (t === undefined) return undefined;
+    const r: Record<string, number> = {};
+    for (const x of t.replace(/\s*=\s*/g, "=").split(/\s+/).filter(Boolean)) {
+      const m = /^([^=]+)=(.+)$/.exec(x);
+      const k = m ? claves.find((y) => y.toLowerCase() === m[1]!.toLowerCase()) : undefined;
+      if (!m || !k) return this.mal(c, `«${x}» tiene que ser «nombre=valor», con un nombre de ${claves.join(", ")}`);
+      if (k in r) return this.mal(c, `${k} está dos veces`);
+      const v = leerNumero(m[2]!);
+      if (typeof v === "string") return this.mal(c, v);
+      if (!(v > 0) || (o.max !== undefined && v > o.max)) return this.mal(c, `${k} tiene que estar en (0, ${textoNumero(o.max ?? Infinity)}]`);
+      r[k] = v;
+    }
+    return Object.keys(r).length ? Object.fromEntries(claves.filter((k) => k in r).map((k) => [k, r[k]!])) : undefined;
   }
 
   gdl(c: string, o: { obligatorio?: boolean } = {}): [boolean, boolean, boolean, boolean, boolean, boolean] | undefined {

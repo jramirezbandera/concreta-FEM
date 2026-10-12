@@ -20,6 +20,7 @@ import { COLECCIONES, lista, referenciasRotas, usos, type Objeto } from "./refer
 import { serializar } from "./serializar.ts";
 import { leerEjemplo } from "./serializar.test.ts";
 import { DEF_TABLAS, TABLAS, contexto } from "./tablas.ts";
+import { proyectoV2b } from "../../validacion/v2b/modelos.ts";
 
 const huella = (p: Proyecto) => huellaCompilacion(p.modelo, resolverOpciones(p.opciones));
 const vacio = (): Proyecto => ({ esquema: VERSION_ESQUEMA, modelo: { plantas: [], materiales: [], secciones: [], casos: [] } });
@@ -233,7 +234,7 @@ describe("operaciones", () => {
 });
 
 describe("sucesiones al azar (criterio 2)", () => {
-  const TABLAS_EDITABLES = ["pilares", "vigas", "losas", "cargas", "secciones", "casos", "plantas"] as const;
+  const TABLAS_EDITABLES = ["pilares", "vigas", "losas", "cargas", "secciones", "casos", "plantas", "muros", "panos", "apoyosLineales", "bandas"] as const;
 
   function paso(p: Proyecto, r: () => number): { op: Operacion; etiqueta: string } | null {
     const elegir = <T>(xs: readonly T[]): T | undefined => (xs.length ? xs[Math.floor(r() * xs.length)] : undefined);
@@ -303,6 +304,17 @@ describe("sucesiones al azar (criterio 2)", () => {
     ["edificio", [21, 22]],
   ] as const)
     it(`${nombre}: el esquema siempre pasa, sin referencias rotas, y deshacer devuelve los bytes`, () => sucesiones(leerEjemplo(nombre).proyecto, semillas));
+
+  // V2b (criterio 2 de visor.md §7.3): muros con empujes, reticular, paños, apoyos lineales y bandas
+  for (const [nombre, semillas] of [
+    ["muros", [31, 32]],
+    ["nucleo", [41, 42]],
+    ["reticular", [51]],
+    ["unidireccional", [61, 62]],
+    ["bandas", [71, 72, 73]],
+    ["variado", [81, 82, 83]],
+  ] as const)
+    it(`V2b ${nombre}: lo mismo`, () => sucesiones(proyectoV2b(nombre), semillas));
 
   for (const semilla of [101, 102, 103, 104, 105, 106])
     it(`modelo físico al azar ${semilla}: lo mismo`, () => {

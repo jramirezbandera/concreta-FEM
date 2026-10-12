@@ -35,8 +35,8 @@ interface FilaVista {
 }
 
 /** Tablas que se pueden filtrar por la planta activa. */
-const POR_PLANTA: ReadonlySet<NombreTabla> = new Set(["pilares", "vigas", "losas", "apoyos", "cargas"]);
-const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "apoyos", "cargas"]);
+const POR_PLANTA: ReadonlySet<NombreTabla> = new Set(["pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "bandas", "cargas"]);
+const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "panos", "apoyos", "apoyosLineales", "bandas", "cargas"]);
 const CON_ORDEN: ReadonlySet<NombreTabla> = new Set(["plantas", "casos"]);
 
 /** Peor severidad y mensajes de los diagnósticos de cada objeto. */
@@ -219,7 +219,7 @@ const FilaHoja = memo(function FilaHoja({
  * `nueva`: cada vez que cambia (y no es 0), el cursor va a la fila nueva de la tabla (las herramientas
  * Pilar, Viga… de la barra de Modelo).
  */
-export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla; setTabla: (t: NombreTabla) => void; nueva?: number }) {
+export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: NombreTabla; setTabla: (t: NombreTabla) => void; nueva?: number; plantilla?: Record<string, string> }) {
   const { proyecto, planta, seleccion, setSeleccion, elegidos, setElegidos } = useVisor();
   const ed = proyecto.edicion!;
   const elegidosS = useMemo(() => new Set(elegidos), [elegidos]);
@@ -294,6 +294,8 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
     if (!nueva) return;
     setCursor({ f: nBorrador, c: 0 });
     setAncla(null);
+    // La herramienta que la pide puede dar ya algunas celdas (Empuje: el tipo)
+    if (plantilla) setBorrador(plantilla);
     requestAnimationFrame(() => {
       hoja.current?.focus();
       hoja.current?.querySelector("tbody tr:last-child")?.scrollIntoView?.({ block: "nearest" });
@@ -539,7 +541,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
   return (
     <div className="flex min-h-0 flex-1 flex-col border-t border-border-main bg-bg-primary" aria-label="Tablas del modelo">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border-sub bg-bg-surface px-2 py-1.5">
-        <div className="seg" role="tablist" aria-label="Tabla">
+        <div className="seg max-w-full" style={{ overflowX: "auto" }} role="tablist" aria-label="Tabla">
           {TABLAS.map((t) => (
             <button key={t} type="button" role="tab" aria-selected={t === tabla} data-on={t === tabla} onClick={() => setTabla(t)}>
               {DEF_TABLAS[t].titulo} <span className="mono text-[10.5px] text-text-disabled">{contar(t)}</span>

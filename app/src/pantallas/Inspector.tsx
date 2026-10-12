@@ -1,8 +1,8 @@
 /**
  * Inspector de un objeto físico: sus datos tal como están en el proyecto (nada se resume ni se
  * esconde), sus diagnósticos y, con el cálculo, el acceso a sus resultados. Desde V2a, los datos de
- * lo que se edita por tablas son un formulario (`FormularioObjeto`); los demás (muros, paños…), de
- * sólo lectura hasta V2b.
+ * lo que se edita por tablas son un formulario (`FormularioObjeto`); desde V2b, todo el modelo
+ * físico (sin tablas, sólo un proyecto de sólo lectura).
  */
 import { X } from "lucide-react";
 import { ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";

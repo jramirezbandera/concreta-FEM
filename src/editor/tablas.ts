@@ -1,23 +1,26 @@
 /**
- * Tablas del editor (V2a, `docs/fem3d/visor.md` §6.2): plantas, ejes (I2), materiales, secciones, pilares,
- * vigas, losas, apoyos, casos y cargas. Cada tabla pasa de un objeto del modelo físico a una fila de
+ * Tablas del editor (V2a, `docs/fem3d/visor.md` §6.2; V2b, §7.2): plantas, ejes (I2), materiales,
+ * secciones, pilares, vigas, losas (con su reticular), paños, muros, apoyos, apoyos lineales, bandas,
+ * casos y cargas (con los empujes). Cada tabla pasa de un objeto del modelo físico a una fila de
  * textos (`fila`) y de una fila a un objeto (`objeto`); escribir en una celda, pegar desde Excel y
  * copiar a Excel usan las mismas dos funciones, así que lo que se ve es lo que se guarda.
  *
  * - Ida y vuelta: `objeto(fila(o))` es `o` para todo lo que la tabla edita.
- * - Lo que la tabla no edita (un reticular, un perfil I, un empuje…; son de V2b) se conserva del
- *   objeto anterior (`base`), y una fila nueva no puede crearlo.
+ * - Lo que la tabla no edita (un perfil I del catálogo) se conserva del objeto anterior (`base`), y
+ *   una fila nueva no puede crearlo. Desde V2b es lo único: lo demás se ve y se edita.
+ * - Los apoyos de una banda no se escriben: se recalculan al cambiar su geometría (V2b-a).
  * - Las columnas que no aplican a la variante de una fila (el D de una sección rectangular) tienen
  *   que estar vacías: así un dato no se pierde en silencio.
  *
  * Puro: sin IO.
  */
-import type { CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Pilar, Planta, Seccion, Viga, ApoyoFisico, AccionCaso } from "../compilador/fisico.ts";
+import type { AccionCaso, ApoyoFisico, ApoyoLineal, Banda, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Vec2, Viga } from "../compilador/fisico.ts";
+import { apoyosBanda } from "../compilador/bandas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
-import { Lector, textoBooleano, textoGdl, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
+import { Lector, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
-export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "losas", "apoyos", "casos", "cargas"] as const;
+export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "bandas", "casos", "cargas"] as const;
 export type NombreTabla = (typeof TABLAS)[number];
 
 export interface Columna {
@@ -394,6 +397,9 @@ const vigas: DefTabla = {
 
 // ─── Losas ──────────────────────────────────────────────────────────────────────────────────────
 
+/** Multiplicadores de lámina de un reticular, en su orden (H47). */
+const MULT = ["f11", "f22", "f12", "m11", "m22", "m12", "v13", "v23"] as const;
+
 const losas: DefTabla = {
   nombre: "losas",
   titulo: "Losas",
@@ -408,11 +414,17 @@ const losas: DefTabla = {
     { clave: "espesor", titulo: "espesor", unidad: "m" },
     { clave: "material", titulo: "material", opciones: ids("materiales") },
     { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio; por defecto, γ·espesor" },
-    { clave: "eje1", titulo: "eje 1", unidad: "°", ayuda: "dirección del eje 1 de las láminas desde +X; por defecto, 0" },
-    { clave: "reticular", titulo: "reticular", calculada: true, ayuda: "los reticulares se editan en V2b" },
+    { clave: "eje1", titulo: "eje 1", unidad: "°", ayuda: "dirección del eje 1 de las láminas desde +X; por defecto, 0. En un reticular, la de sus nervios" },
+    { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "reticular: distancia entre ejes de nervios; vacío en una losa maciza" },
+    { clave: "nervio", titulo: "nervio", unidad: "m", ayuda: "reticular: ancho del nervio (bw)" },
+    { clave: "capa", titulo: "capa", unidad: "m", ayuda: "reticular: espesor de la capa de compresión (hf)" },
+    { clave: "caseton", titulo: "casetón", ayuda: "reticular: perdido (por defecto; entonces el pp es obligatorio) o recuperable", opciones: fijas(["perdido", "recuperable"], "perdido") },
+    { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse de la losa" },
+    { clave: "multiplicadores", titulo: "multiplicadores", ayuda: `reticular: los que sustituyen a los calculados, «m11=0,32 m22=0,27 …» (${MULT.join(", ")}), cada uno en (0, 100]` },
   ],
   fila(o) {
     const l = o as unknown as Losa;
+    const r = l.reticular;
     return {
       id: l.id,
       nombre: s(l.nombre),
@@ -423,13 +435,29 @@ const losas: DefTabla = {
       material: l.material,
       pp: n(l.pp),
       eje1: n(l.eje1),
-      reticular: l.reticular ? `nervio ${n(l.reticular.nervio)} cada ${n(l.reticular.intereje)}` : "",
+      intereje: n(r?.intereje),
+      nervio: n(r?.nervio),
+      capa: n(r?.capa),
+      caseton: s(r?.caseton),
+      abacos: r?.abacos?.length ? textoPoligonos(r.abacos) : "",
+      multiplicadores: r?.multiplicadores ? textoClaves(r.multiplicadores as Record<string, number>, MULT) : "",
     };
   },
-  objeto(f, _ctx, base) {
+  objeto(f) {
     const L = new Lector(f);
+    const intereje = L.numero("intereje", { mayorQue: 0 });
+    let reticular: Losa["reticular"];
+    if (intereje === undefined) L.vacias(["nervio", "capa", "caseton", "abacos", "multiplicadores"], "a una losa maciza (sin intereje)");
+    else
+      reticular = limpio({
+        intereje,
+        nervio: L.numero("nervio", { obligatorio: true, mayorQue: 0 }),
+        capa: L.numero("capa", { obligatorio: true, mayorQue: 0 }),
+        caseton: L.opcion("caseton", ["perdido", "recuperable"] as const),
+        abacos: L.poligonos("abacos"),
+        multiplicadores: L.claves("multiplicadores", MULT, { max: 100 }),
+      }) as Losa["reticular"];
     return resultado(L, {
-      ...base,
       id: L.texto("id") ?? "",
       nombre: L.texto("nombre"),
       planta: L.texto("planta", { obligatorio: true }),
@@ -439,7 +467,189 @@ const losas: DefTabla = {
       material: L.texto("material", { obligatorio: true }),
       pp: L.numero("pp", { min: 0 }),
       eje1: L.numero("eje1"),
+      reticular,
     });
+  },
+  plantas: (o) => [o.planta as string],
+};
+
+// ─── Paños unidireccionales ─────────────────────────────────────────────────────────────────────
+
+const panos: DefTabla = {
+  nombre: "panos",
+  titulo: "Paños",
+  coleccion: "panos",
+  prefijo: "F",
+  columnas: [
+    id,
+    nombre,
+    { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
+    { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes de las vigas y los muros en que se apoya: «x y; x y; …» (al menos 3)" },
+    { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»" },
+    { clave: "direccion", titulo: "dirección", unidad: "°", ayuda: "de las viguetas, desde +X" },
+    { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "distancia entre ejes de viguetas" },
+    { clave: "seccion", titulo: "sección", ayuda: "de una vigueta (la T bruta u otra); no pesa: el peso es el pp", opciones: ids("secciones") },
+    { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio del forjado, con las bovedillas" },
+  ],
+  fila(o) {
+    const p = o as unknown as PanoUnidireccional;
+    return {
+      id: p.id,
+      nombre: s(p.nombre),
+      planta: p.planta,
+      contorno: textoPuntos(p.contorno),
+      huecos: p.huecos?.length ? textoPoligonos(p.huecos) : "",
+      direccion: n(p.direccion),
+      intereje: n(p.intereje),
+      seccion: p.seccion,
+      pp: n(p.pp),
+    };
+  },
+  objeto(f) {
+    const L = new Lector(f);
+    return resultado(L, {
+      id: L.texto("id") ?? "",
+      nombre: L.texto("nombre"),
+      planta: L.texto("planta", { obligatorio: true }),
+      contorno: L.puntos("contorno", { obligatorio: true, min: 3 }),
+      huecos: L.poligonos("huecos"),
+      direccion: L.numero("direccion", { obligatorio: true }),
+      intereje: L.numero("intereje", { obligatorio: true, mayorQue: 0 }),
+      seccion: L.texto("seccion", { obligatorio: true }),
+      pp: L.numero("pp", { obligatorio: true, min: 0 }),
+    });
+  },
+  plantas: (o) => [o.planta as string],
+};
+
+// ─── Muros ──────────────────────────────────────────────────────────────────────────────────────
+
+const muros: DefTabla = {
+  nombre: "muros",
+  titulo: "Muros",
+  coleccion: "muros",
+  prefijo: "M",
+  columnas: [
+    id,
+    nombre,
+    { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "eje en planta: «x y; x y; …» (al menos 2); un núcleo cerrado repite el primero al final" },
+    { clave: "desde", titulo: "desde", ayuda: "planta de la base", opciones: opcionesPlantas },
+    { clave: "hasta", titulo: "hasta", ayuda: "planta de la cabeza", opciones: opcionesPlantas },
+    { clave: "espesor", titulo: "espesor", unidad: "m" },
+    { clave: "material", titulo: "material", opciones: ids("materiales") },
+    { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (nace sobre una viga, una losa u otro muro)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
+    { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "rectángulos en alzado, «desde hasta z0 z1 | …»: estaciones a lo largo del eje y alturas sobre la base" },
+  ],
+  fila(o) {
+    const w = o as unknown as Muro;
+    return {
+      id: w.id,
+      nombre: s(w.nombre),
+      puntos: textoPuntos(w.puntos),
+      desde: w.desde,
+      hasta: w.hasta,
+      espesor: n(w.espesor),
+      material: w.material,
+      base: s(w.base),
+      huecos: w.huecos?.length ? textoGrupos(w.huecos.map((h) => [h.desde, h.hasta, h.z0, h.z1])) : "",
+    };
+  },
+  objeto(f) {
+    const L = new Lector(f);
+    const h = L.grupos("huecos", 4);
+    return resultado(L, {
+      id: L.texto("id") ?? "",
+      nombre: L.texto("nombre"),
+      puntos: L.puntos("puntos", { obligatorio: true, min: 2 }),
+      desde: L.texto("desde", { obligatorio: true }),
+      hasta: L.texto("hasta", { obligatorio: true }),
+      espesor: L.numero("espesor", { obligatorio: true, mayorQue: 0 }),
+      material: L.texto("material", { obligatorio: true }),
+      base: L.opcion("base", ["empotrado", "articulado", "ninguno"] as const),
+      huecos: h?.map(([desde, hasta, z0, z1]) => ({ desde, hasta, z0, z1 })),
+    });
+  },
+  plantas: (o, ctx) => rango(ctx.modelo, o.desde, o.hasta),
+};
+
+// ─── Apoyos lineales ────────────────────────────────────────────────────────────────────────────
+
+const apoyosLineales: DefTabla = {
+  nombre: "apoyosLineales",
+  titulo: "Apoyos lineales",
+  coleccion: "apoyosLineales",
+  prefijo: "AL",
+  columnas: [
+    id,
+    { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
+    { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "polilínea sobre una losa o el eje de un muro: «x y; x y; …» (al menos 2)" },
+    { clave: "coartados", titulo: "coartados", ayuda: COARTADOS },
+  ],
+  fila(o) {
+    const a = o as unknown as ApoyoLineal;
+    return { id: a.id, planta: a.planta, puntos: textoPuntos(a.puntos), coartados: textoGdl(a.coartados) };
+  },
+  objeto(f) {
+    const L = new Lector(f);
+    return resultado(L, { id: L.texto("id") ?? "", planta: L.texto("planta", { obligatorio: true }), puntos: L.puntos("puntos", { obligatorio: true, min: 2 }), coartados: L.gdl("coartados", { obligatorio: true }) });
+  },
+  plantas: (o) => [o.planta as string],
+};
+
+// ─── Bandas ─────────────────────────────────────────────────────────────────────────────────────
+
+/** Lo que define una banda: si cambia, la banda pasa a ser del usuario y sus apoyos se recalculan (V2b-a). */
+const GEOMETRIA_BANDA = ["planta", "desde", "hasta", "ancho", "tipo"] as const;
+
+const bandas: DefTabla = {
+  nombre: "bandas",
+  titulo: "Bandas",
+  coleccion: "bandas",
+  prefijo: "B",
+  columnas: [
+    id,
+    { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
+    { clave: "x0", titulo: "x desde", unidad: "m", ayuda: "un extremo del eje de la banda" },
+    { clave: "y0", titulo: "y desde", unidad: "m" },
+    { clave: "x1", titulo: "x hasta", unidad: "m", ayuda: "el otro extremo del eje" },
+    { clave: "y1", titulo: "y hasta", unidad: "m" },
+    { clave: "ancho", titulo: "ancho", unidad: "m" },
+    { clave: "tipo", titulo: "tipo", ayuda: "de pilares o central (Anejo I); sin tipo, no entra en el reparto", opciones: fijas(["pilares", "central"], "sin tipo") },
+    { clave: "origen", titulo: "origen", calculada: true, ayuda: "propuesta (la dio «Proponer bandas» y no se ha tocado) o usuario" },
+    { clave: "apoyos", titulo: "apoyos", unidad: "m", calculada: true, ayuda: "tramos del eje ocupados por pilares, desde «desde»; se recalculan al cambiar la banda" },
+  ],
+  fila(o) {
+    const b = o as unknown as Banda;
+    return {
+      id: b.id,
+      planta: b.planta,
+      x0: n(b.desde[0]),
+      y0: n(b.desde[1]),
+      x1: n(b.hasta[0]),
+      y1: n(b.hasta[1]),
+      ancho: n(b.ancho),
+      tipo: s(b.tipo),
+      origen: b.origen ?? "usuario",
+      apoyos: b.apoyos ? textoGrupos(b.apoyos) : "",
+    };
+  },
+  objeto(f, ctx, base) {
+    const L = new Lector(f);
+    const [x0, y0, x1, y1] = (["x0", "y0", "x1", "y1"] as const).map((c) => L.numero(c, { obligatorio: true }));
+    if (x0 !== undefined && y0 !== undefined && x1 === x0 && y1 === y0) L.errores.push({ columna: "x1", mensaje: "los dos extremos del eje son el mismo punto" });
+    const b = limpio({
+      id: L.texto("id") ?? "",
+      planta: L.texto("planta", { obligatorio: true }),
+      desde: [x0, y0] as unknown as Vec2,
+      hasta: [x1, y1] as unknown as Vec2,
+      ancho: L.numero("ancho", { obligatorio: true, mayorQue: 0 }),
+      tipo: L.opcion("tipo", ["pilares", "central"] as const),
+    }) as unknown as Banda;
+    if (L.errores.length) return { ok: false, errores: L.errores };
+    // Sin tocar su geometría (un id nuevo), se queda como estaba; si no, es del usuario y sus apoyos se recalculan
+    const igual = base !== undefined && GEOMETRIA_BANDA.every((k) => JSON.stringify((b as unknown as Record<string, unknown>)[k]) === JSON.stringify(base[k]));
+    if (igual) return resultado(L, { ...b, origen: base.origen, apoyos: base.apoyos });
+    return resultado(L, { ...b, origen: "usuario", apoyos: apoyosBanda(ctx.modelo, b) ?? undefined });
   },
   plantas: (o) => [o.planta as string],
 };
@@ -566,7 +776,7 @@ const casos: DefTabla = {
 
 // ─── Cargas ─────────────────────────────────────────────────────────────────────────────────────
 
-const CARGA = ["planta", "sobre", "ejes", "x", "y", "F", "M", "q", "qb", "desde", "hasta", "puntos"] as const;
+const CARGA = ["planta", "sobre", "ejes", "x", "y", "F", "M", "q", "qb", "desde", "hasta", "puntos", "lado", "z0", "z1", "p0", "p1"] as const;
 const cargas: DefTabla = {
   nombre: "cargas",
   titulo: "Cargas",
@@ -574,10 +784,10 @@ const cargas: DefTabla = {
   prefijo: "Q",
   columnas: [
     id,
-    { clave: "tipo", titulo: "tipo", ayuda: "puntual, viga, pilar, superficie o lineal (los empujes, en V2b)", opciones: fijas(["puntual", "viga", "pilar", "superficie", "lineal"]) },
+    { clave: "tipo", titulo: "tipo", ayuda: "puntual, viga, pilar, superficie, lineal o empuje", opciones: fijas(["puntual", "viga", "pilar", "superficie", "lineal", "empuje"]) },
     { clave: "caso", titulo: "caso", opciones: ids("casos") },
     { clave: "planta", titulo: "planta", ayuda: "puntual, superficie y lineal", opciones: (ctx) => [{ valor: "", texto: "(viga y pilar)" }, ...opcionesPlantas(ctx)] },
-    { clave: "sobre", titulo: "sobre", ayuda: "la viga, el pilar, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)" },
+    { clave: "sobre", titulo: "sobre", ayuda: "la viga, el pilar, el muro de un empuje, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)" },
     { clave: "ejes", titulo: "ejes", ayuda: "viga y pilar: global o local", opciones: fijas(["global", "local"], "puntual, superficie y lineal") },
     { clave: "x", titulo: "x", unidad: "m", ayuda: "puntual" },
     { clave: "y", titulo: "y", unidad: "m", ayuda: "puntual" },
@@ -588,6 +798,11 @@ const cargas: DefTabla = {
     { clave: "desde", titulo: "desde", unidad: "m", ayuda: "viga y pilar: estación de inicio; por defecto, la pieza entera" },
     { clave: "hasta", titulo: "hasta", unidad: "m", ayuda: "viga y pilar: estación final" },
     { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "lineal: la polilínea; superficie: la zona (vacía: la losa o el paño de «sobre» enteros)" },
+    { clave: "lado", titulo: "lado", ayuda: "empuje: la cara del muro donde está el terreno, mirando de su primer punto al último; empuja hacia la otra", opciones: fijas(["izquierdo", "derecho"], "sólo empuje") },
+    { clave: "z0", titulo: "z0", unidad: "m", ayuda: "empuje: altura sobre la base del muro donde vale p0" },
+    { clave: "z1", titulo: "z1", unidad: "m", ayuda: "empuje: altura donde vale p1; nula fuera de z0–z1" },
+    { clave: "p0", titulo: "p0", unidad: "kN/m²", ayuda: "empuje: presión en z0" },
+    { clave: "p1", titulo: "p1", unidad: "kN/m²", ayuda: "empuje: presión en z1" },
   ],
   fila(o) {
     const c = o as unknown as CargaFisica;
@@ -608,12 +823,12 @@ const cargas: DefTabla = {
         Object.assign(r, { planta: c.planta, q: textoVector(c.q), puntos: textoPuntos(c.puntos) });
         break;
       case "empuje":
-        r.sobre = c.muro;
+        Object.assign(r, { sobre: c.muro, lado: c.lado, z0: n(c.z0), z1: n(c.z1), p0: n(c.p0), p1: n(c.p1) });
         break;
     }
     return r;
   },
-  objeto(f, ctx, base) {
+  objeto(f, ctx) {
     const L = new Lector(f);
     const tipo = L.opcion("tipo", ["puntual", "viga", "pilar", "superficie", "lineal", "empuje"] as const, { obligatorio: true });
     const comun = { tipo, id: L.texto("id") ?? "", caso: L.texto("caso", { obligatorio: true }) };
@@ -643,9 +858,13 @@ const cargas: DefTabla = {
       case "lineal":
         usa(["planta", "puntos", "q"]);
         return resultado(L, { ...comun, planta: L.texto("planta", { obligatorio: true }), puntos: L.puntos("puntos", { obligatorio: true, min: 2 }), q: L.vector("q", { obligatorio: true }) });
-      case "empuje":
-        if (!base || base.tipo !== "empuje") L.errores.push({ columna: "tipo", mensaje: "los empujes se meten por ahora en el JSON (llegan con los muros, en V2b)" });
-        return resultado(L, { ...base, ...comun });
+      case "empuje": {
+        usa(["sobre", "lado", "z0", "z1", "p0", "p1"]);
+        const z0 = L.numero("z0", { obligatorio: true, min: 0 });
+        const z1 = L.numero("z1", { obligatorio: true, min: 0 });
+        if (z0 !== undefined && z1 !== undefined && !(z1 > z0)) L.errores.push({ columna: "z1", mensaje: "tiene que ser mayor que z0" });
+        return resultado(L, { ...comun, muro: L.texto("sobre", { obligatorio: true }), lado: L.opcion("lado", ["izquierdo", "derecho"] as const, { obligatorio: true }), z0, z1, p0: L.numero("p0", { obligatorio: true }), p1: L.numero("p1", { obligatorio: true }) });
+      }
     }
     return { ok: false, errores: L.errores };
   },
@@ -664,7 +883,7 @@ const cargas: DefTabla = {
   },
 };
 
-export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, losas, apoyos, casos, cargas };
+export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, losas, panos, muros, apoyos, apoyosLineales, bandas, casos, cargas };
 
 /** Un id libre con el prefijo de la tabla: el primero de `<prefijo>1`, `<prefijo>2`… que no está en el modelo. */
 export function idNuevo(m: ModeloFisico, prefijo: string, ocupados: ReadonlySet<string> = new Set()): string {

@@ -255,7 +255,8 @@ function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[]
 
   const bandas: Banda[] = [];
   // Apoyos de una banda (C5.2): el tramo de cada pilar a lo largo de d, con las caras comunes de su
-  // línea transversal (C5-g), desde el comienzo s0 de la banda
+  // línea transversal (C5-g), desde el comienzo s0 de la banda (el de su `desde` guardado, como en
+  // `apoyosBandaEn`)
   const apoyosDe = (ps: { id: string; s: number }[], s0: number, s1: number): [number, number][] =>
     ps
       .map((q) => {
@@ -265,10 +266,11 @@ function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[]
       .filter(([a, c]) => c >= a)
       .filter(([a, c], i, todos) => todos.findIndex(([x, y]) => x === a && y === c) === i)
       .sort((x, y) => x[0] - y[0] || x[1] - y[1]);
-  const nueva = (id: string, tipo: "pilares" | "central", s0: number, s1: number, tMenos: number, tMas: number, apoyos: [number, number][]) => {
+  const nueva = (id: string, tipo: "pilares" | "central", s0: number, s1: number, tMenos: number, tMas: number, pilares: { id: string; s: number }[]) => {
     const tc = (tMenos + tMas) / 2;
     const desde = punto(d, n, s0, tc).map(redondear) as unknown as Vec2;
     const hasta = punto(d, n, s1, tc).map(redondear) as unknown as Vec2;
+    const apoyos = apoyosDe(pilares, desde[0] * d[0] + desde[1] * d[1], hasta[0] * d[0] + hasta[1] * d[1]);
     const b: Banda = { id, planta: l.losa.planta, desde, hasta, ancho: redondear(tMas - tMenos), tipo, origen: "propuesta", apoyos };
     if (!(b.ancho > eps) || !(s1 - s0 > eps)) return;
     const rect: Region = { contorno: rectangulo(b), huecos: [] };
@@ -279,13 +281,13 @@ function bandasDireccion(ctx: Contexto, l: LosaCompilada, pilares: PilarEnLosa[]
     }
     bandas.push(b);
   };
-  al.forEach((a, i) => nueva(`${l.losa.id}:${etiqueta}:P${i + 1}`, "pilares", a.s0, a.s1, a.t - a.wMenos, a.t + a.wMas, apoyosDe(a.pilares, a.s0, a.s1)));
+  al.forEach((a, i) => nueva(`${l.losa.id}:${etiqueta}:P${i + 1}`, "pilares", a.s0, a.s1, a.t - a.wMenos, a.t + a.wMas, a.pilares));
   al.forEach((a, i) => {
     const b = vecina(i, 1);
     if (!b) return;
     const j = al.indexOf(b);
     const [s0, s1] = [Math.max(a.s0, b.s0), Math.min(a.s1, b.s1)];
-    nueva(`${l.losa.id}:${etiqueta}:C${i + 1}-${j + 1}`, "central", s0, s1, a.t + a.wMas, b.t - b.wMenos, apoyosDe([...a.pilares, ...b.pilares], s0, s1));
+    nueva(`${l.losa.id}:${etiqueta}:C${i + 1}-${j + 1}`, "central", s0, s1, a.t + a.wMas, b.t - b.wMenos, [...a.pilares, ...b.pilares]);
   });
   return bandas;
 }
@@ -335,4 +337,118 @@ export function proponerBandas(fisico: ModeloFisico, opciones: OpcionesCompilaci
     bandas.push(...bandasDireccion(ctx, l, pilares, carasComunes(todos, d), d, n, "1", diag), ...bandasDireccion(ctx, l, pilares, carasComunes(todos, n), n, d, "2", diag));
   });
   return { bandas, diagnosticos: diag.lista };
+}
+
+/**
+ * Direcciones (d a lo largo, n transversal) de una banda: si su eje es paralelo a una de las dos
+ * direcciones de la losa (su eje 1 o la perpendicular), exactamente ésa, como en la propuesta; si
+ * no, la de su eje.
+ */
+function direccionesBanda(b: Banda, eje1: number): { d: Vec2; n: Vec2 } {
+  const dx = b.hasta[0] - b.desde[0];
+  const dy = b.hasta[1] - b.desde[1];
+  const L = Math.sqrt(dx * dx + dy * dy);
+  const u: Vec2 = [dx / L, dy / L];
+  const d1 = direccionEje1(eje1);
+  const n1: Vec2 = [-d1[1], d1[0]];
+  for (const [a, b2] of [
+    [d1, n1],
+    [n1, d1],
+  ] as const) {
+    const c = u[0] * a[0] + u[1] * a[1];
+    if (Math.abs(Math.abs(c) - 1) < 1e-9) return { d: c > 0 ? a : [-a[0], -a[1]], n: b2 };
+  }
+  return { d: u, n: [-u[1], u[0]] };
+}
+
+/** La losa de la planta de la banda con más área bajo ella (la primera, si empatan); null si ninguna. */
+function losaDeBanda(ctx: Contexto, b: Banda): LosaCompilada | null {
+  let mejor: LosaCompilada | null = null;
+  let area = 1e-12;
+  const rect: Region = { contorno: rectangulo(b), huecos: [] };
+  for (const l of ctx.losas) {
+    if (l.losa.planta !== b.planta) continue;
+    const a = areaInterseccionRegiones(rect, l.region);
+    if (a > area) [mejor, area] = [l, a];
+  }
+  return mejor;
+}
+
+/**
+ * Apoyos de una banda cualquiera (V2b, decisión a): los tramos de su eje ocupados por pilares, con
+ * las caras comunes de C5-g, igual que en la propuesta. Cuentan las alineaciones de pilares de su
+ * losa (la de más área bajo la banda) en su dirección (C5-b: de al menos dos pilares) cuyo eje cae en
+ * el ancho de la banda; si no cae ninguna (una banda central), la más cercana a cada lado. Con la
+ * banda de una propuesta sin tocar, da sus `apoyos`. Sin losa, o con una dirección sin alineaciones,
+ * ninguno.
+ */
+export function apoyosBandaEn(ctx: Contexto, b: Banda): [number, number][] {
+  const l = losaDeBanda(ctx, b);
+  if (!l) return [];
+  const { d, n } = direccionesBanda(b, l.losa.eje1 ?? 0);
+  const todos = new Map<string, PilarEnLosa>();
+  for (const o of ctx.losas) if (o.losa.planta === b.planta) for (const p of pilaresEnLosa(ctx, o)) todos.set(p.id, p);
+  const tramos = carasComunes([...todos.values()], d);
+  const grupos = alineaciones(pilaresEnLosa(ctx, l), d, n, ctx.op.epsSnap).map((g) => ({ t: g.reduce((a, q) => a + q.t, 0) / g.length, pilares: g }));
+  const tc = b.desde[0] * n[0] + b.desde[1] * n[1];
+  const tol = ctx.op.epsSnap;
+  const [t0, t1] = [tc - b.ancho / 2 - tol, tc + b.ancho / 2 + tol];
+  let elegidas = grupos.filter((g) => g.t >= t0 && g.t <= t1);
+  if (!elegidas.length) {
+    const menos = grupos.filter((g) => g.t < t0).sort((x, y) => y.t - x.t)[0];
+    const mas = grupos.filter((g) => g.t > t1).sort((x, y) => x.t - y.t)[0];
+    elegidas = [menos, mas].filter((g) => g !== undefined);
+  }
+  const s0 = b.desde[0] * d[0] + b.desde[1] * d[1];
+  const s1 = b.hasta[0] * d[0] + b.hasta[1] * d[1];
+  return elegidas
+    .flatMap((g) => g.pilares)
+    .map((q) => {
+      const [a, c] = tramos.get(q.id)!;
+      return [redondear(Math.max(0, a - s0)), redondear(Math.min(s1 - s0, c - s0))] as [number, number];
+    })
+    .filter(([a, c]) => c >= a)
+    .filter(([a, c], i, x) => x.findIndex(([p, q]) => p === a && q === c) === i)
+    .sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+}
+
+/**
+ * Apoyos de una banda del modelo `fisico` (V2b): los de `apoyosBandaEn` con lo que la banda necesita
+ * del modelo (plantas, materiales, secciones, sus pilares y las losas de su planta), así que no depende
+ * de lo demás ni lo valida. null si eso no es válido (el compilador lo dirá).
+ */
+export function apoyosBanda(fisico: ModeloFisico, b: Banda, opciones: OpcionesCompilacion = {}): [number, number][] | null {
+  const reducido: ModeloFisico = {
+    plantas: fisico.plantas,
+    materiales: fisico.materiales,
+    secciones: fisico.secciones,
+    pilares: fisico.pilares ?? [],
+    losas: (fisico.losas ?? []).filter((l) => l.planta === b.planta),
+    casos: [{ id: "_" }],
+  };
+  const diag = new Diagnosticos();
+  const ctx = validar(reducido, resolverOpciones(opciones), diag);
+  if (!ctx || diag.hayErrores) return null;
+  return apoyosBandaEn(ctx, b);
+}
+
+/** Tolerancia al comparar los apoyos guardados con los recalculados, m. */
+const TOLERANCIA_APOYOS = 1e-6;
+
+/**
+ * Aviso de las bandas cuyos apoyos guardados ya no son los de sus pilares (V2b, decisión a): un pilar
+ * se movió o cambió de sección después de proponerlas o de editarlas.
+ */
+export function avisarApoyosBandas(ctx: Contexto, diag: Diagnosticos): void {
+  for (const b of ctx.bandas) {
+    if (b.apoyos === undefined || !ctx.losas.some((l) => l.losa.planta === b.planta)) continue;
+    const r = apoyosBandaEn(ctx, b);
+    const iguales = r.length === b.apoyos.length && r.every(([a, c], i) => Math.abs(a - b.apoyos![i]![0]) <= TOLERANCIA_APOYOS && Math.abs(c - b.apoyos![i]![1]) <= TOLERANCIA_APOYOS);
+    if (!iguales)
+      diag.aviso(
+        "banda/apoyos-desfasados",
+        `Los apoyos de la banda ${b.id} no son los de los pilares de ahora (${JSON.stringify(b.apoyos)} frente a ${JSON.stringify(r)}): se usan los guardados. Vuelva a proponer las bandas o edite ésta para recalcularlos.`,
+        [b.id],
+      );
+  }
 }

@@ -38,6 +38,46 @@ export const IcApoyo = icono(
     <path d="M4 18h16M6 18l-2 3M10 18l-2 3M14 18l-2 3M18 18l-2 3" />
   </>,
 );
+export const IcMuro = icono(
+  <>
+    <rect x="4" y="3" width="16" height="16" rx="1" />
+    <path d="M4 8h16M4 13h16M10 3v5M15 8v5M10 13v6" />
+    <path d="M2 21h20" />
+  </>,
+);
+export const IcForjado = icono(
+  <>
+    <path d="M3 13l5-6h13l-5 6z" />
+    <path d="M7 13l5-6M11 13l5-6M15 13l5-6" />
+  </>,
+);
+export const IcApoyoLineal = icono(
+  <>
+    <path d="M3 12h18" />
+    <path d="M6 12l-2 4h4zM12 12l-2 4h4zM18 12l-2 4h4z" />
+    <path d="M3 19h18" />
+  </>,
+);
+export const IcBanda = icono(
+  <>
+    <rect x="3" y="8" width="18" height="8" rx="1" strokeDasharray="3 2" />
+    <path d="M7 12h10" />
+  </>,
+);
+export const IcProponerBandas = icono(
+  <>
+    <rect x="3" y="4" width="18" height="6" rx="1" strokeDasharray="3 2" />
+    <rect x="3" y="14" width="18" height="6" rx="1" strokeDasharray="3 2" />
+    <path d="M12 6.5v1M12 16.5v1" />
+  </>,
+);
+export const IcEmpuje = icono(
+  <>
+    <path d="M17 3v18" />
+    <path d="M4 6h10M4 11h8M4 16h6" />
+    <path d="M12 4l2 2-2 2M10 9l2 2-2 2M8 14l2 2-2 2" />
+  </>,
+);
 export const IcAPlantas = icono(
   <>
     <path d="M12 3l9 5-9 5-9-5z" />

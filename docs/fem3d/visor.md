@@ -183,3 +183,50 @@ Es la pantalla 1 de los prototipos v3, en el estilo denso de Concreta: lista de 
    - los diagnósticos de un cambio salen en ≤ 1,5 s;
    - guardar tarda ≤ 0,5 s.
 6. **Puerta de uso.** El usuario mete desde cero un proyecto suyo real con la app, lo calcula y revisa los resultados en las pantallas de V1. Lo que le falte se apunta para V2a.1, V2b o V2c.
+
+## 7. V2b: lo que se fija al empezar
+
+Propuesta del agente, aceptada por el usuario el 2026-10-13 con las decisiones de §7.4. Completa lo que V2a dejó fuera (§6.2): muros y empujes, reticular, unidireccional, apoyos lineales y bandas editables. Con V2b, todo el modelo físico se edita en la app; sólo quedan fuera las opciones de compilación y los perfiles I del catálogo.
+
+### 7.1 Arquitectura
+
+Es la de V2a (§6.1), sin piezas nuevas: más tablas en `src/editor/tablas.ts`, una operación nueva y los botones de la barra. El dibujo de planta, alzado, 3D y sólido ya sabe pintar todo esto (A4, I2, I3).
+
+- **Las mismas reglas que en V2a:** `objeto(fila(o))` es `o`; las columnas que no aplican a la variante de una fila van vacías; un dato que no vale no entra, y lo que sólo ve el compilador entra y sale como diagnóstico.
+- **Lo que hoy se conserva sin verse** (el reticular de una losa, un empuje) pasa a editarse. Así, con V2b, ninguna tabla guarda nada que no enseñe.
+- **Listas dentro de un objeto** (huecos de un muro, ábacos, apoyos de una banda), en una celda, como los huecos de las losas: elementos separados por «|». El inspector las enseña igual.
+- **Operación nueva `proponerBandas`** (puro, en `src/editor/`): llama a `proponerBandas` del compilador (C5.1) para unas plantas y aplica §7.4 b. Un solo deshacer.
+- **Al editar una banda** su `origen` pasa a «usuario» y sus `apoyos` se tratan como diga §7.4 a.
+
+### 7.2 Tablas y barra
+
+| Tabla | Columnas |
+|---|---|
+| **Muros** | id, nombre, puntos (`x y; x y; …`, cerrado si repite el primero), desde, hasta, espesor, material, base, huecos (`desde hasta z0 z1 \| …`) |
+| **Paños** (unidireccional) | id, nombre, planta, contorno, huecos, dirección, intereje, sección, pp |
+| **Losas** | las de V2a y, si es reticular, su nervio según §7.4 c: intereje, nervio, capa, casetón, ábacos (polígonos con «\|»), multiplicadores (`m11=0,32 m22=0,27 …`, sólo los que se den) |
+| **Apoyos lineales** | id, planta, puntos, coartados |
+| **Bandas** | id, planta, x e y desde, x e y hasta, ancho, tipo (pilares, central o ninguno), origen (sólo lectura), apoyos (`a b \| …`, según §7.4 a) |
+| **Cargas** | la variante «empuje»: muro (en «sobre»), lado, z0, z1, p0, p1 |
+
+- **Barra de Modelo:** Muro, Forjado (un paño nuevo), Apoyo lineal y Banda abren su tabla en una fila nueva, como Pilar o Viga; «Proponer bandas» enseña qué añade, cambia y quita antes de hacerlo, como «Renumerar». En Cargas, «Empuje».
+- **Copiar a plantas:** paños, apoyos lineales y bandas, como las losas; los muros, como los pilares (se cambian su desde y su hasta). Los empujes no se copian (van sobre un muro).
+- **Lo que existe y no cambia:** renumerar ya cubre paños (F) y muros (M); borrar un muro en cascada ya se lleva sus empujes, y borrar un paño, sus cargas.
+
+### 7.3 Criterios de paso
+
+1. **Ida y vuelta.** Abrir y guardar sin cambios los modelos con muros, reticular, paños, apoyos lineales, bandas y empujes (`reticulaConNucleo`, `edificioReticular`, `edificioUnidireccional`, `reticularH25` con su propuesta, y las cinco familias de G) da el mismo modelo, comparado en profundidad, y la misma huella; guardar otra vez, los mismos bytes. Y para cada tabla, `objeto(fila(o))` es `o` en todos sus campos, sin `base`: nada se conserva a escondidas.
+2. **Las operaciones nunca rompen el fichero.** Los tests de propiedades de V2a, con las colecciones nuevas en el generador (también renombrar y borrar un muro con empujes, un paño con cargas, una planta con bandas).
+3. **Se puede meter un edificio de verdad.** `reticulaConNucleo`, `edificioReticular` (ábacos incluidos) y `edificioUnidireccional` se reconstruyen desde un proyecto vacío sólo con operaciones del editor, con su huella. Con bandas: desde `reticularH25` sin bandas, «Proponer bandas» da las de `conPropuesta` bit a bit, y mover una y cambiar su ancho da la banda esperada con `origen: "usuario"`. Un test de DOM mete un muro con un hueco y su empuje, y un paño con su carga, escribiendo en las tablas.
+4. **Las bandas del usuario nunca se pierden en silencio.** Proponer otra vez no toca las bandas de origen «usuario»; si una propuesta se solapa con una del usuario, se dice, y aplicar §7.4 b. Proponer dos veces seguidas no cambia nada.
+5. **Fluidez, en el edificio reticular de V2 (52 125 nudos)** en sobremesa y Chrome: escribir o pegar sin tareas largas de más de 50 ms; diagnósticos de un cambio en ≤ 1,5 s (V2a-3 dejó este riesgo abierto: si no llega, se adelanta una de las dos salidas de `fase-v2a.md` §5); proponer bandas en ≤ 1 s.
+6. **Puerta de uso.** El usuario mete un proyecto suyo con muros y un forjado reticular o unidireccional, propone y retoca las bandas, lo calcula y revisa los resultados.
+
+### 7.4 Decisiones del usuario (2026-10-13)
+
+Las cuatro, como se proponían:
+
+- **a. Los apoyos de una banda editada se recalculan solos.** Con los pilares de la planta y las caras comunes de C5-g, como en la propuesta (`apoyosBanda` en `bandas.ts`): los de las alineaciones de pilares que caen dentro de la banda o, si no cae ninguna (una banda central), los de la alineación más cercana a cada lado. La columna «apoyos» es de sólo lectura. En una banda propuesta sin tocar dan sus `apoyos` bit a bit. Si los pilares cambian después, el compilador avisa de los apoyos que ya no casan (`banda/apoyos-desfasados`).
+- **b. «Proponer bandas» rehace sólo las propuestas.** Sustituye las de origen «propuesta» de las plantas elegidas y deja las del usuario. Una propuesta que se solapa con una del usuario no se añade, y se dice.
+- **c. El reticular, en columnas de la tabla de losas.** Una losa es reticular si tiene intereje.
+- **d. Los esfuerzos de las bandas, dentro de V2b.** Modo «Bandas» en Resultados: las bandas de la planta coloreadas por el momento de diseño de la combinación (con la escala de los mapas) y la tabla de sus estaciones (caras y vanos) con `EsfuerzosBandas`: momento medio y por nervio, Wood–Armer y reparto pilares/central con su aviso (C5-d). Todo número, de su consulta. Criterio de paso nuevo (7): los valores de la pantalla son los de `fem consultar banda` bit a bit, y la primera banda de una planta sale en ≤ 1 s en el edificio objetivo.

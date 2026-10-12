@@ -21,9 +21,10 @@
  * Puro: sin IO, sin React ni DOM.
  */
 import { comprobarProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
-import type { ModeloFisico } from "../compilador/fisico.ts";
+import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { conValor, indiceIds, lista, referenciasDe, usos, type Coleccion, type Objeto, type Uso } from "./referencias.ts";
+import { conPropuestaBandas, propuestaBandas } from "./bandas.ts";
 import { propuestaRenumerar, renombrarIds, type Renumerable } from "./renumerar.ts";
 
 export type Operacion =
@@ -37,6 +38,8 @@ export type Operacion =
   | { op: "mover"; coleccion: Coleccion; id: string; antesDe: string | null }
   /** Ids cortos por su posición en planta, como en CYPECAD (`renumerar.ts`); por defecto, de pilares, vigas, losas, paños y muros. */
   | { op: "renumerar"; colecciones?: readonly Renumerable[] }
+  /** V2b: las bandas del Anejo I que propone el compilador en unas plantas (todas, si no se dan), sin tocar las del usuario (`bandas.ts`). */
+  | { op: "proponerBandas"; plantas?: readonly string[] }
   /** Nombre y descripción del proyecto (no entran en la huella). */
   | { op: "datos"; nombre?: string; descripcion?: string }
   /** I3: la lista de vistas guardadas, entera (no entra en la huella). Los nombres, no vacíos y sin repetir. */
@@ -228,7 +231,7 @@ function mover(m: ModeloFisico, o: Extract<Operacion, { op: "mover" }>): Paso {
   return { ok: true, modelo: conLista(m, o.coleccion, l) };
 }
 
-function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto): Paso {
+function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: OpcionesCompilacion): Paso {
   switch (o.op) {
     case "crear":
       return crear(m, o);
@@ -240,6 +243,12 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto): Paso {
       return mover(m, o);
     case "renumerar":
       return { ok: true, modelo: renombrarIds(m, propuestaRenumerar(m, o.colecciones)) };
+    case "proponerBandas": {
+      const pb = propuestaBandas(m, o.plantas, opciones);
+      const errores = pb.diagnosticos.filter((d) => d.severidad === "error");
+      if (errores.length) return { ok: false, errores: [error("editor/bandas", `No se pueden proponer bandas: el modelo no vale (${errores[0]!.mensaje}${errores.length > 1 ? ` y ${errores.length - 1} errores más` : ""}).`), ...errores] };
+      return { ok: true, modelo: conPropuestaBandas(m, pb) };
+    }
     case "datos":
       return { ok: true, modelo: m, proyecto: { ...datos, ...("nombre" in o ? { nombre: o.nombre } : {}), ...("descripcion" in o ? { descripcion: o.descripcion } : {}) } };
     case "vistas": {
@@ -256,7 +265,7 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto): Paso {
       let r = m;
       let d = datos;
       for (const [k, x] of o.operaciones.entries()) {
-        const s = paso(r, x, d);
+        const s = paso(r, x, d, opciones);
         if (!s.ok) return { ...s, errores: s.errores.map((e) => ({ ...e, detalles: { ...e.detalles, operacion: k } })) };
         r = s.modelo;
         d = s.proyecto ?? d;
@@ -268,7 +277,7 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto): Paso {
 
 /** Aplica una operación. El proyecto que sale pasa el esquema; si no, no se aplica. */
 export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
-  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas });
+  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas }, p.opciones ?? {});
   if (!s.ok) return s.usos ? { ok: false, errores: s.errores, usos: s.usos } : { ok: false, errores: s.errores };
   const q: Proyecto = { ...p, modelo: s.modelo };
   if (s.proyecto) {

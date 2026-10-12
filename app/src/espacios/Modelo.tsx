@@ -17,11 +17,11 @@ import { ListOrdered, Trash2 } from "lucide-react";
 import { lista } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
-import { IcAPlantas, IcApoyo, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcLosa, IcMateriales, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBanda, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcForjado, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlantas, IcProponerBandas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
-import { DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
+import { DialogoBorrar, DialogoCopiar, DialogoProponerBandas, DialogoRenumerar } from "../editor/Dialogos.tsx";
 import { tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
 import { cota, fmt } from "../fmt.ts";
@@ -32,7 +32,7 @@ import { useVistas, type DibujoPlanta } from "../vistas/estado.ts";
 import { FuenteEscena, plantaVista, ZonaVistas } from "../vistas/Zona.tsx";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
-const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "apoyos", "cargas"]);
+const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "panos", "apoyos", "apoyosLineales", "bandas", "cargas"]);
 const IcBorrar: Icono = ({ size }) => <Trash2 size={size} strokeWidth={1.5} aria-hidden="true" />;
 const IcRenumerar: Icono = ({ size }) => <ListOrdered size={size} strokeWidth={1.5} aria-hidden="true" />;
 
@@ -51,16 +51,18 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const [caso, setCaso] = useState<string | null>(null);
   const [tabla, setTabla] = useState<NombreTabla>(cargas ? "cargas" : "pilares");
   const [nueva, setNueva] = useState(0);
-  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | null>(null);
+  const [plantilla, setPlantilla] = useState<Record<string, string> | undefined>(undefined);
+  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "bandas" | null>(null);
 
   const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
   // Lo elegido que está en el proyecto (un eje propuesto no lo está) y lo que de ello se copia
   const enTablas = ed ? elegidos.filter((id) => tablaDe(ed.proyecto.modelo, id)) : [];
   const copiables = ed ? enTablas.filter((id) => COPIABLES.has(tablaDe(ed.proyecto.modelo, id)!)) : [];
 
-  const abrirTabla = (t: NombreTabla, filaNueva = false) => {
+  const abrirTabla = (t: NombreTabla, filaNueva = false, celdas?: Record<string, string>) => {
     setTabla(t);
     pan.abrirPestana("tablas");
+    setPlantilla(celdas);
     if (filaNueva) setNueva((n) => n + 1);
   };
 
@@ -90,6 +92,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         <>
           <Separador />
           <Herramienta icono={IcCarga} nombre="Nueva carga" onClick={() => abrirTabla("cargas", true)} title="Una carga nueva en la tabla de cargas" />
+          <Herramienta icono={IcEmpuje} nombre="Empuje" onClick={() => abrirTabla("cargas", true, { tipo: "empuje", caso: casoValido })} title="Un empuje nuevo sobre un muro (terreno o agua), en la tabla de cargas" />
           <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirTabla("casos")} title="La tabla de casos de carga" />
         </>
       )}
@@ -106,9 +109,15 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcPilar} nombre="Pilar" onClick={() => abrirTabla("pilares", true)} title="Un pilar nuevo en la tabla de pilares" />
           <Herramienta icono={IcViga} nombre="Viga" onClick={() => abrirTabla("vigas", true)} title="Una viga nueva en la tabla de vigas" />
           <Herramienta icono={IcLosa} nombre="Losa" onClick={() => abrirTabla("losas", true)} title="Una losa nueva en la tabla de losas" />
+          <Herramienta icono={IcForjado} nombre="Forjado" onClick={() => abrirTabla("panos", true)} title="Un paño de forjado unidireccional nuevo en la tabla de paños (el reticular es una losa con intereje)" />
+          <Herramienta icono={IcMuro} nombre="Muro" onClick={() => abrirTabla("muros", true)} title="Un muro nuevo en la tabla de muros" />
           <Herramienta icono={IcApoyo} nombre="Apoyo" onClick={() => abrirTabla("apoyos", true)} title="Un apoyo nuevo en la tabla de apoyos" />
+          <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" onClick={() => abrirTabla("apoyosLineales", true)} title="Un apoyo lineal nuevo en la tabla de apoyos lineales" />
           <Separador />
-          <Herramienta icono={IcAPlantas} nombre="A plantas" disabled={!copiables.length} onClick={() => setDialogo("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : "Elija vigas, losas, apoyos o cargas"} />
+          <Herramienta icono={IcBanda} nombre="Banda" onClick={() => abrirTabla("bandas", true)} title="Una banda de dimensionado nueva en la tabla de bandas" />
+          <Herramienta icono={IcProponerBandas} nombre="Proponer bandas" onClick={() => setDialogo("bandas")} title="Las bandas del Anejo I a partir de los pilares, sin tocar las del usuario" />
+          <Separador />
+          <Herramienta icono={IcAPlantas} nombre="A plantas" disabled={!copiables.length} onClick={() => setDialogo("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : "Elija vigas, losas, paños, apoyos, bandas o cargas"} />
           <Herramienta icono={IcBorrar} nombre="Borrar" disabled={!enTablas.length} onClick={() => setDialogo("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : "Elija un objeto"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
           <Separador />
@@ -151,7 +160,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const errores = e.diagnosticos.filter((d) => d.severidad === "error").length;
   const avisos = e.diagnosticos.length - errores;
   const dock: Pestana[] = [
-    ...(ed ? [{ id: "tablas", titulo: "Tablas", contenido: <PanelTablas tabla={tabla} setTabla={setTabla} nueva={nueva} /> }] : []),
+    ...(ed ? [{ id: "tablas", titulo: "Tablas", contenido: <PanelTablas tabla={tabla} setTabla={setTabla} nueva={nueva} plantilla={plantilla} /> }] : []),
     {
       id: "diagnosticos",
       titulo: "Diagnósticos",
@@ -180,6 +189,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       {dialogo === "borrar" && enTablas.length > 0 && <DialogoBorrar ids={enTablas} onCerrar={() => setDialogo(null)} />}
       {dialogo === "copiar" && copiables.length > 0 && <DialogoCopiar ids={copiables} onCerrar={() => setDialogo(null)} />}
       {dialogo === "renumerar" && ed && <DialogoRenumerar onCerrar={() => setDialogo(null)} />}
+      {dialogo === "bandas" && ed && <DialogoProponerBandas onCerrar={() => setDialogo(null)} />}
     </>
   );
 }
@@ -282,7 +292,7 @@ function NavModelo() {
     <>
       <Proyecto />
       <NavVistas />
-      <Objetos tablas={["pilares", "vigas", "losas", "apoyos", "ejes"]} />
+      <Objetos tablas={["pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "bandas", "ejes"]} />
     </>
   );
 }

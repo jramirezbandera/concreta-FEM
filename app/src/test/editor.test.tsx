@@ -5,7 +5,8 @@
  *   guardar, guardado que falla, resultados desactualizados con el primer cambio, respuesta tardía
  *   de una versión anterior);
  * - criterio 3: un modelo pequeño metido escribiendo en las tablas (y pegando) da la huella del
- *   mismo modelo escrito a mano.
+ *   mismo modelo escrito a mano; en V2b (`visor.md` §7.3), también un muro con un hueco y su empuje y
+ *   un paño unidireccional con su carga.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -241,7 +242,8 @@ function hoja(tabla: NombreTabla) {
 }
 
 function elegirTabla(tabla: NombreTabla) {
-  fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${DEF_TABLAS[tabla].titulo}`) }));
+  // El título y su número («Apoyos 3», no «Apoyos lineales 1»)
+  fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${DEF_TABLAS[tabla].titulo}\\s*\\d`) }));
 }
 
 /**
@@ -333,5 +335,63 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     expect(screen.getByRole("button", { name: "Revisión" }).hasAttribute("disabled")).toBe(true);
     // Guardar está activo (hay cambios sin guardar)
     expect(screen.getByRole("button", { name: /Descargar/ }).getAttribute("data-sin-guardar")).toBe("true");
+  }, 120_000);
+
+  it("V2b: un paño con su carga y un muro con un hueco y su empuje, tecleados, dan la huella del mismo modelo escrito a mano", async () => {
+    const { container } = render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Proyecto nuevo/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del fichero" }), { target: { value: "muro" } });
+    fireEvent.click(screen.getByRole("button", { name: "Crear" }));
+    await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+
+    elegirTabla("secciones");
+    escribirFilaNueva("secciones", { id: "P30", material: "HA-30", forma: "rectangular", b: "0,3", h: "0,3" });
+    escribirFilaNueva("secciones", { id: "V30x50", material: "HA-30", forma: "rectangular", b: "0,3", h: "0,5" });
+    escribirFilaNueva("secciones", { id: "T25", material: "HA-30", forma: "T", bf: "0,7", hf: "0,05", bw: "0,12", h: "0,3" });
+    elegirTabla("pilares");
+    fireEvent.click(screen.getByRole("checkbox", { name: /sólo/ }));
+    const g = hoja("pilares");
+    const jx = DEF_TABLAS.pilares.columnas.findIndex((c) => c.clave === "x");
+    fireEvent.mouseDown(g.querySelectorAll("tbody tr")[0]!.querySelectorAll("td")[jx + 1]!);
+    fireEvent.paste(g, { clipboardData: { getData: () => "0\t0\tCim\tN1\tP30\n6\t0\tCim\tN1\tP30\n0\t5\tCim\tN1\tP30\n6\t5\tCim\tN1\tP30\n" } });
+    elegirTabla("vigas");
+    escribirFilaNueva("vigas", { planta: "N1", puntos: "0 0; 6 0", seccion: "V30x50" });
+    escribirFilaNueva("vigas", { planta: "N1", puntos: "0 5; 6 5", seccion: "V30x50" });
+    elegirTabla("panos");
+    escribirFilaNueva("panos", { planta: "N1", contorno: "0 0; 6 0; 6 5; 0 5", direccion: "90", intereje: "0,7", seccion: "T25", pp: "3,5" });
+    elegirTabla("muros");
+    fireEvent.click(screen.getByRole("checkbox", { name: /sólo/ }));
+    // Los huecos antes que el material: con él, el muro tiene lo que necesita y se crea
+    escribirFilaNueva("muros", { puntos: "10 0; 10 5", huecos: "1 2 0,5 1,5", desde: "Cim", hasta: "N1", espesor: "0,25", material: "HA-30" });
+    elegirTabla("cargas");
+    fireEvent.click(screen.getByRole("checkbox", { name: /sólo/ }));
+    escribirFilaNueva("cargas", { tipo: "superficie", caso: "Q", planta: "N1", sobre: "F1", q: "0 0 -2" });
+    escribirFilaNueva("cargas", { tipo: "empuje", caso: "G", sobre: "M1", lado: "derecho", z0: "0", z1: "1,5", p0: "15", p1: "0" });
+
+    const esperado: Proyecto = proyectoNuevo("muro");
+    const sec = (id: string, h: number) => ({ id, material: "HA-30", forma: "rectangular" as const, b: 0.3, h });
+    const pil = (id: string, x: number, y: number) => ({ id, x, y, desde: "Cim", hasta: "N1", seccion: "P30" });
+    esperado.modelo = {
+      ...esperado.modelo,
+      secciones: [sec("P30", 0.3), sec("V30x50", 0.5), { id: "T25", material: "HA-30", forma: "T", bf: 0.7, hf: 0.05, bw: 0.12, h: 0.3 }],
+      pilares: [pil("P1", 0, 0), pil("P2", 6, 0), pil("P3", 0, 5), pil("P4", 6, 5)],
+      vigas: [
+        { id: "V1", planta: "N1", puntos: [[0, 0], [6, 0]], seccion: "V30x50" },
+        { id: "V2", planta: "N1", puntos: [[0, 5], [6, 5]], seccion: "V30x50" },
+      ],
+      panos: [{ id: "F1", planta: "N1", contorno: [[0, 0], [6, 0], [6, 5], [0, 5]], direccion: 90, intereje: 0.7, seccion: "T25", pp: 3.5 }],
+      muros: [{ id: "M1", puntos: [[10, 0], [10, 5]], desde: "Cim", hasta: "N1", espesor: 0.25, material: "HA-30", huecos: [{ desde: 1, hasta: 2, z0: 0.5, z1: 1.5 }] }],
+      cargas: [
+        { tipo: "superficie", id: "Q1", caso: "Q", planta: "N1", q: [0, 0, -2], pano: "F1" },
+        { tipo: "empuje", id: "Q2", caso: "G", muro: "M1", lado: "derecho", z0: 0, z1: 1.5, p0: 15, p1: 0 },
+      ],
+    };
+    const h = huella(esperado);
+    await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(h), { timeout: 30_000 });
+    expect(container.querySelector("[data-estado]")?.getAttribute("data-estado")).toBe("sin-calcular");
   }, 120_000);
 });

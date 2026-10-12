@@ -19,6 +19,7 @@
  */
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, ModeloAnalitico, NudoAnalitico, Restriccion, Vec3 } from "../motor/modelo.ts";
+import { avisarApoyosBandas } from "./bandas.ts";
 import { camposDesconocidos } from "./campos.ts";
 import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PERDIDAS } from "./cargas.ts";
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type OpcionesResueltas } from "./fisico.ts";
@@ -154,6 +155,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   const ctx = validar(fisico, op, diag);
   marca("validacion");
   if (!ctx || diag.hayErrores) return fallo();
+  avisarApoyosBandas(ctx, diag);
   const topo = construirTopologia(ctx, diag);
   marca("topologia");
   if (diag.hayErrores) return fallo();
