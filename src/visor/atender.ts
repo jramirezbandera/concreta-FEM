@@ -6,6 +6,7 @@
  */
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, valorEnPunto, type Resultado } from "./datos.ts";
+import { alambrico } from "./alambrico.ts";
 import type { Pedido, Respuestas } from "./protocolo.ts";
 import { Sesion } from "./sesion.ts";
 
@@ -54,8 +55,16 @@ export class Atendedor {
         const r = s.escena(p.planta, p.vista);
         return r.valido ? bien("escena", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
       }
+      case "alzado": {
+        const r = s.alzado(p.plano);
+        return r.valido ? bien("alzado", r.valor) : { ok: false, diagnosticos: r.diagnosticos };
+      }
       case "elegir":
-        return bien("elegir", s.elegir(p.planta, p.vista, p.punto, p.radio, p.objeto));
+        return bien("elegir", s.elegir(p.fuente, p.punto, p.radio, p.objetos));
+      case "ventana":
+        return bien("ventana", s.ventana(p.fuente, p.caja, p.modo));
+      case "alambrico":
+        return bien("alambrico", alambrico(s.proyecto.modelo));
       case "objeto":
         return de(datosObjeto(s, p.id));
       case "losas":

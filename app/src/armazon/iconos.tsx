@@ -102,3 +102,35 @@ export const IcFirma = icono(
     <path d="M3 21h18" />
   </>,
 );
+export const IcEjes = icono(
+  <>
+    <circle cx="6" cy="5" r="2.5" />
+    <circle cx="18" cy="5" r="2.5" />
+    <path d="M6 7.5V21M18 7.5V21M3 15h18" strokeDasharray="3 2" />
+  </>,
+);
+export const IcAlzado = icono(
+  <>
+    <path d="M4 20h16M6 20V6M18 20V6M4 6h16M4 13h16" />
+  </>,
+);
+/** Disposiciones de las vistas: una, dos lado a lado, dos una encima de otra y cuatro. */
+export const IcDisp1 = icono(<rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />);
+export const IcDisp2 = icono(
+  <>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+    <path d="M12 4.5v15" />
+  </>,
+);
+export const IcDisp3 = icono(
+  <>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+    <path d="M3.5 12h17" />
+  </>,
+);
+export const IcDisp4 = icono(
+  <>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+    <path d="M12 4.5v15M3.5 12h17" />
+  </>,
+);

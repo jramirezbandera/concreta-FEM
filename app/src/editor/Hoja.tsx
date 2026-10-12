@@ -15,6 +15,7 @@ import { memo, useEffect, useMemo, useRef, useState, type ClipboardEvent, type K
 import { ArrowDown, ArrowUp, ClipboardCopy, CopyPlus, Layers, Plus, Trash2 } from "lucide-react";
 import type { Fila as FilaTexto } from "../../../src/editor/celdas.ts";
 import { escribirTsv } from "../../../src/editor/celdas.ts";
+import { proponerEjes } from "../../../src/compilador/ejes.ts";
 import { operacionFila, pegar } from "../../../src/editor/edicion.ts";
 import { lista, type Objeto } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
@@ -48,12 +49,32 @@ function diagnosticosPorObjeto(ds: readonly Diagnostico[]): Map<string, { sev: "
   return r;
 }
 
+/**
+ * Sin ejes en el proyecto, el dibujo usa los propuestos (I2, `src/compilador/ejes.ts`): esto los
+ * guarda en el proyecto, de una vez y con un solo deshacer, para cambiarlos en la tabla.
+ */
+function EjesPropuestos() {
+  const { proyecto } = useVisor();
+  const ed = proyecto.edicion!;
+  const propuestos = useMemo(() => proponerEjes(ed.proyecto.modelo).ejes, [ed.proyecto.modelo]);
+  if (!propuestos.length) return <span className="text-[12px] text-text-secondary">Sin ejes: no hay alineaciones de pilares que proponer.</span>;
+  return (
+    <span className="flex items-center gap-2 text-[12px] text-text-secondary">
+      El proyecto no tiene ejes: se dibujan {propuestos.length} propuestos.
+      <button type="button" className="btn btn-p" onClick={() => ed.editar({ op: "lote", operaciones: propuestos.map((objeto) => ({ op: "crear", coleccion: "ejes", objeto: objeto as unknown as Objeto })) }, "Ejes propuestos")}>
+        Guardarlos en el proyecto
+      </button>
+    </span>
+  );
+}
+
 const FilaHoja = memo(function FilaHoja({
   vista,
   indice,
   claves,
   calculadas,
   sel,
+  elegido,
   activa,
   editando,
   error,
@@ -68,6 +89,8 @@ const FilaHoja = memo(function FilaHoja({
   claves: readonly string[];
   calculadas: readonly boolean[];
   sel: boolean;
+  /** Elegido en las vistas o en el navegador (I2). */
+  elegido: boolean;
   /** Columna activa en esta fila (−1 si no lo es). */
   activa: number;
   editando: string | null;
@@ -79,7 +102,7 @@ const FilaHoja = memo(function FilaHoja({
   onValor: (v: string) => void;
 }) {
   return (
-    <tr data-sel={sel} data-id={vista.id}>
+    <tr data-sel={sel} data-elegido={elegido} data-id={vista.id}>
       <td className={`marca ${diag?.sev ?? ""}`} title={diag ? diag.textos.join("\n") : `Fila ${indice + 1}`} onClick={(e) => onMarca(indice, e.shiftKey)}>
         {diag ? (diag.sev === "f" ? "!" : "·") : indice + 1}
       </td>
@@ -97,8 +120,9 @@ const FilaHoja = memo(function FilaHoja({
  * Pilar, Viga… de la barra de Modelo).
  */
 export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla; setTabla: (t: NombreTabla) => void; nueva?: number }) {
-  const { proyecto, planta, seleccion, setSeleccion } = useVisor();
+  const { proyecto, planta, seleccion, setSeleccion, elegidos, setElegidos } = useVisor();
   const ed = proyecto.edicion!;
+  const elegidosS = useMemo(() => new Set(elegidos), [elegidos]);
   const m = ed.proyecto.modelo;
   const def = DEF_TABLAS[tabla];
   const cols = def.columnas;
@@ -184,7 +208,12 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
     setCursor({ f: nf, c: nc });
     setError(false);
     const id = filas[nf]?.id;
-    if (id && id !== seleccion) setSeleccion(id);
+    if (extender) {
+      // Mayús: lo elegido es el rango de filas, con la del cursor como principal
+      const [a, b] = [Math.min(ancla ?? f0, nf), Math.max(ancla ?? f0, nf)];
+      const ids = filas.slice(a, Math.min(b, nBorrador - 1) + 1).map((x) => x.id);
+      if (id) setElegidos([...ids.filter((x) => x !== id), id]);
+    } else if (id && id !== seleccion) setSeleccion(id);
     requestAnimationFrame(() => hoja.current?.querySelector(`tbody tr:nth-child(${nf + 1}) td:nth-child(${nc + 2})`)?.scrollIntoView?.({ block: "nearest", inline: "nearest" }));
   };
 
@@ -390,6 +419,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
             <input type="checkbox" checked={soloPlanta} onChange={(e) => setSoloPlanta(e.target.checked)} /> sólo {planta ?? "la planta activa"}
           </label>
         )}
+        {tabla === "ejes" && !m.ejes && <EjesPropuestos />}
         <span className="flex-1" />
         <button type="button" className="btn" onClick={() => mover(nBorrador, 0)} title="Ir a la fila nueva (la última)">
           <Plus size={13} /> Nueva
@@ -442,6 +472,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0 }: { tabla: NombreTabla
                 claves={claves}
                 calculadas={calculadas}
                 sel={i >= rango[0] && i <= rango[1]}
+                elegido={elegidosS.has(v.id)}
                 activa={i === f0 ? c0 : -1}
                 editando={i === f0 ? editando : null}
                 error={i === f0 && error}

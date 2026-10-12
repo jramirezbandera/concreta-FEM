@@ -17,8 +17,11 @@ const ambito = globalThis as unknown as AmbitoWorker;
 let atendedor: Atendedor | null = null;
 let cola: Promise<void> = Promise.resolve();
 
-/** Sólo los pedidos que devuelven arrays recién hechos van por Transferable (los de la sesión se quedan en ella). */
-const TRANSFERIR = new Set(["geometria", "deformada"]);
+/**
+ * Sólo los pedidos que devuelven arrays recién hechos van por Transferable (los de la sesión se
+ * quedan en ella). Las escenas preparadas se hacen en cada pedido; la sesión guarda las de A4.
+ */
+const TRANSFERIR = new Set(["geometria", "deformada", "escena", "alzado", "elegir", "alambrico", "losas", "pilares"]);
 
 async function procesar(m: MensajeAlWorker): Promise<void> {
   const t0 = performance.now();

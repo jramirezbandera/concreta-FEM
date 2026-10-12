@@ -78,11 +78,10 @@ Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a
 (docs/fem3d/visor.md §5), con la cita del fichero de origen en cada uno:
   app/src/index.css (tokens, fuentes y lienzo)  ←  src/index.css
   app/src/tema/*                                ←  src/lib/theme/*
-  app/src/lienzo/transform.ts                   ←  src/lib/canvas/transform.ts (ZOOM_MAX = 64)
-  app/src/lienzo/useCanvasView2D.ts             ←  src/hooks/useCanvasView2D.ts (encuadre con el botón izquierdo)
-  app/src/lienzo/ZoomControls.tsx               ←  src/components/ui/ZoomControls.tsx
   app/index.html (script de tema)               ←  index.html
-Copyright (c) Javier Ramírez Bandera.
+Copyright (c) Javier Ramírez Bandera. El lienzo 2D que se copió para V1 (transform.ts,
+useCanvasView2D.ts y ZoomControls.tsx) se quitó en I2: la planta se dibuja con el motor de vistas
+propio (app/src/vistas/).
 
 Geist y Geist Mono (Regular, Medium, SemiBold) — https://github.com/vercel/geist-font
 SIL Open Font License 1.1, admitida el 2026-10-11 sólo para fuentes (V-b). Copyright (c) 2023
@@ -90,7 +89,7 @@ Vercel, in collaboration with basement.studio. Ficheros sin modificar en app/pub
 licencia en app/public/fonts/Geist-OFL.txt.
 
 Dependencias del visor (app/package.json), por bun:
-  three 0.186.1 — https://github.com/mrdoob/three.js — Licencia MIT (incluye OrbitControls)
+  three 0.186.1 — https://github.com/mrdoob/three.js — Licencia MIT (incluye LineSegments2, LineSegmentsGeometry y LineMaterial, de examples/jsm/lines)
   react y react-dom 19.3.0 — https://github.com/facebook/react — Licencia MIT
   vite 8.3.4, @vitejs/plugin-react, babel-plugin-react-compiler — Licencia MIT
   tailwindcss 4.3.3 — https://github.com/tailwindlabs/tailwindcss — Licencia MIT

@@ -15,13 +15,17 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ejecutar } from "../../cli/ordenes.ts";
 import { deriva, flechas, pieza } from "../agente/consultas.ts";
 import { envolventePieza } from "../agente/render/resultados.ts";
-import { conjuntoPorDefecto, escenaASvg, nombreFigura, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo } from "../agente/render/index.ts";
-import type { Escena, Primitiva } from "../agente/render/escena.ts";
+import { conjuntoPorDefecto, escenaASvg, nombreFigura, planoDeEje, vistaAlzado, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo } from "../agente/render/index.ts";
+import type { Escena, Vec2 } from "../agente/render/escena.ts";
 import { sensatezResultados } from "../agente/sensatezResultados.ts";
 import { sha256 } from "../compilador/huella.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { COMPONENTE, datosDesplomes, datosLosas, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, valorEnPunto } from "./datos.ts";
-import { prepararEscena } from "./escena.ts";
+import { origenDe, prepararEscena, type EscenaPreparada } from "./escena.ts";
+import { alambrico } from "./alambrico.ts";
+import { ejesDe } from "../compilador/ejes.ts";
+import { cotasPlantas } from "../compilador/cotas.ts";
+import { cajaDe, dentro } from "../agente/render/escena.ts";
 import { Sesion, type EleccionCombinaciones } from "./sesion.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
@@ -47,15 +51,37 @@ const valido = <T>(r: { valido: true; valor: T } | { valido: false; diagnosticos
   return r.valor;
 };
 
-/** Coordenadas de las formas de una escena (áreas y trazos), redondeadas como las de la escena preparada. */
-function coordsPrimitivas(e: Escena): string[] {
-  const r = (v: number) => String(Object.is(Math.round(v * 1e4) / 1e4, -0) ? 0 : Math.round(v * 1e4) / 1e4);
-  const out: string[] = [];
-  for (const p of e.primitivas as Primitiva[]) {
-    if (p.tipo === "poligono" || p.tipo === "region") for (const a of p.anillos) for (const q of a) out.push(`${r(q[0])} ${r(q[1])}`);
-    if (p.tipo === "linea") for (const q of p.puntos) out.push(`${r(q[0])} ${r(q[1])}`);
+/**
+ * Criterio 1 de I2: los búferes de la escena preparada son, capa a capa y en orden, los vértices de
+ * las primitivas de la escena de A4 (en Float32 respecto al centro de su caja), con su estilo.
+ */
+export function comprobarBuferes(e: Escena, p: EscenaPreparada, que: string): void {
+  const o = origenDe(e);
+  const f = (q: Vec2) => [Math.fround(q[0] - o[0]), Math.fround(q[1] - o[1])];
+  // Las capas: las primitivas de forma seguidas con el mismo estilo, forma y relleno
+  const grupos: { estilo: string; forma: string; relleno?: string; seg: number[]; tri: number[] }[] = [];
+  for (const x of e.primitivas) {
+    if (x.tipo !== "poligono" && x.tipo !== "region" && x.tipo !== "linea") continue;
+    const forma = x.tipo === "poligono" ? "area" : x.tipo === "region" ? "region" : "trazo";
+    const relleno = x.tipo === "linea" ? undefined : x.relleno;
+    let g = grupos[grupos.length - 1];
+    if (!g || g.estilo !== x.estilo || g.forma !== forma || g.relleno !== relleno) grupos.push((g = { estilo: x.estilo, forma, ...(relleno !== undefined ? { relleno } : {}), seg: [], tri: [] }));
+    if (x.tipo === "linea") for (let i = 1; i < x.puntos.length; i++) g.seg.push(...f(x.puntos[i - 1]!), ...f(x.puntos[i]!));
+    else
+      for (const r of x.anillos) {
+        r.forEach((q, i) => g!.seg.push(...f(q), ...f(r[(i + 1) % r.length]!)));
+        for (let i = 1; i + 1 < r.length; i++) g.tri.push(...f(r[0]!), ...f(r[i]!), ...f(r[i + 1]!));
+      }
   }
-  return out;
+  expect(p.origen, que).toEqual(o);
+  expect(p.capas.map((c) => [c.estilo, c.forma, c.relleno]), que).toEqual(grupos.map((g) => [g.estilo, g.forma, g.relleno]));
+  p.capas.forEach((c, i) => {
+    expect(Array.from(c.segmentos), `${que} capa ${i}`).toEqual(grupos[i]!.seg);
+    expect(Array.from(c.abanicos), `${que} capa ${i}`).toEqual(grupos[i]!.tri);
+  });
+  expect(p.glifos).toEqual(e.primitivas.filter((x) => x.tipo === "marca" || x.tipo === "flecha"));
+  expect(p.textos).toEqual(e.primitivas.filter((x) => x.tipo === "texto"));
+  expect(p.extremos).toEqual(e.extremos);
 }
 
 describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
@@ -147,14 +173,80 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
       for (const [v, directa] of pares) {
         const e = valido(s.escenaA4(planta, v));
         expect(e, `${planta} ${JSON.stringify(v)}`).toEqual(directa);
-        // La preparada: las mismas coordenadas en el mismo orden, todos los glifos y textos
-        const p = prepararEscena(e);
-        const enCapas = p.capas.flatMap((c) => c.d.split(/[MLZ]/).filter(Boolean).map((t) => t.trim()));
-        expect(enCapas, `${planta} ${v.vista}`).toEqual(coordsPrimitivas(e));
-        expect(p.glifos.length + p.textos.length).toBe(e.primitivas.filter((x) => x.tipo === "marca" || x.tipo === "flecha" || x.tipo === "texto").length);
-        expect(p.extremos).toEqual(e.extremos);
+        // La preparada (I2): los mismos vértices en el mismo orden, todos los glifos y textos
+        comprobarBuferes(e, prepararEscena(e), `${planta} ${v.vista}`);
       }
     }
+  });
+
+  it("I2: los alzados de cada eje, preparados sin perder ni mover nada; elegir y resaltar en ellos", () => {
+    const f = s.proyecto.modelo;
+    const d = { ...(s.proyecto.nombre ? { nombre: s.proyecto.nombre } : {}), huella: s.huella };
+    for (const eje of ejesDe(f).ejes) {
+      const e = valido(s.alzadoA4({ eje: eje.id }));
+      expect(e).toEqual(vistaAlzado(f, planoDeEje(f, eje.id)!, d));
+      comprobarBuferes(e, valido(s.alzado({ eje: eje.id })), `alzado ${eje.id}`);
+      // Un clic en el centro de cada pilar dibujado lo elige; resaltarlo da sus formas
+      for (const x of e.primitivas.filter((q) => q.tipo === "poligono" && q.estilo === "pilar-alzado").slice(0, 3)) {
+        if (x.tipo !== "poligono") continue;
+        const [u0, z0, u1, z1] = cajaDe(x.anillos[0]!);
+        const q: Vec2 = [(u0 + u1) / 2, (z0 + z1) / 2];
+        const r = s.elegir({ tipo: "alzado", plano: { eje: eje.id } }, q, 0.01);
+        // El pilar o algo más pequeño que lo tapa (un muro o una viga cortados delante), nunca un eje
+        const area = (a: readonly Vec2[]) => Math.abs(a.reduce((t, p, i) => t + p[0] * a[(i + 1) % a.length]![1] - a[(i + 1) % a.length]![0] * p[1], 0)) / 2;
+        const tapa = e.primitivas.some((y) => y.tipo === "poligono" && y.objeto === r?.objeto && y.estilo === "seccion-cortada" && area(y.anillos[0]!) <= area(x.anillos[0]!) && dentro(q, y.anillos[0]!));
+        expect(r?.objeto === x.objeto || tapa, `${eje.id}: ${r?.objeto} en ${x.objeto}`).toBe(true);
+      }
+    }
+  });
+
+  it("I2: ventana (dentro y toca) y resaltar varios", () => {
+    const planta = s.proyecto.modelo.plantas[0]!.id;
+    const fu = { tipo: "planta" as const, planta, vista: { vista: "modelo" as const } };
+    const e = valido(s.escenaA4(planta, { vista: "modelo" }));
+    // Toda la caja: «dentro» da todos los objetos dibujados; una ventana vacía, ninguno
+    const todos = [...new Set(e.primitivas.flatMap((p) => (p.tipo !== "texto" && "objeto" in p && p.objeto ? [p.objeto] : [])))];
+    const [x0, y0, x1, y1] = e.caja;
+    expect(new Set(s.ventana(fu, [x0 - 1, y0 - 1, x1 + 1, y1 + 1], "dentro"))).toEqual(new Set(todos));
+    expect(s.ventana(fu, [x1 + 100, y1 + 100, x1 + 101, y1 + 101], "toca")).toEqual([]);
+    // Una ventana pequeña en el centro de un pilar: «toca» lo da a él (y a lo que lo rodea); «dentro», a ninguno de ellos
+    const pil = s.proyecto.modelo.pilares?.find((p) => e.primitivas.some((q) => q.tipo === "poligono" && q.objeto === p.id));
+    if (pil) {
+      const v: [number, number, number, number] = [pil.x - 0.01, pil.y - 0.01, pil.x + 0.01, pil.y + 0.01];
+      expect(s.ventana(fu, v, "toca")).toContain(pil.id);
+      expect(s.ventana(fu, v, "dentro")).not.toContain(pil.id);
+      const r = s.elegir(fu, null, 0, [pil.id, "no-existe"]);
+      expect(r?.objetos).toEqual([pil.id]);
+    }
+  });
+
+  it("I2: 3D alámbrico, cada segmento de su objeto y con su cota", () => {
+    const f = s.proyecto.modelo;
+    const a = alambrico(f);
+    const cotas = cotasPlantas(f.plantas);
+    const z = (i: number) => a.segmentos[i]! + a.origen[2];
+    const n = a.objeto.length;
+    for (let i = 0; i < n; i++) {
+      const o = a.objetos[a.objeto[i]!]!;
+      const [za, zb] = [z(6 * i + 2), z(6 * i + 5)];
+      const x = (k: number) => a.segmentos[6 * i + k]! + a.origen[k % 3]!;
+      if (o.tipo === "pilar") {
+        const p = f.pilares!.find((q) => q.id === o.id)!;
+        for (const [k, v] of [[0, p.x], [1, p.y], [3, p.x], [4, p.y]] as const) expect(x(k)).toBeCloseTo(v, 5);
+        expect(zb).toBeCloseTo(cotas[a.planta[i]!]!, 5);
+        expect(za).toBeCloseTo(cotas[a.planta[i]! + 1]!, 5);
+      } else if (o.tipo === "viga" || o.tipo === "losa" || o.tipo === "pano") {
+        const c = cotas[a.planta[i]!]!;
+        expect(za).toBeCloseTo(c, 5);
+        expect(zb).toBeCloseTo(c, 5);
+      }
+    }
+    // Todos los objetos con sitio, una vez cada uno
+    const ids = a.objetos.map((o) => o.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const p of f.pilares ?? []) expect(ids).toContain(p.id);
+    for (const v of f.vigas ?? []) expect(ids).toContain(v.id);
+    for (const l of f.losas ?? []) expect(ids).toContain(l.id);
   });
 
   it("la escena da el mismo SVG que fem render, byte a byte", async () => {

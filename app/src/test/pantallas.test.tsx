@@ -21,6 +21,7 @@ import { ModoPilares } from "../pantallas/Pilares.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
 import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
+import { ContextoVistas, useEstadoVistas } from "../vistas/estado.ts";
 
 const RAIZ = join(__dirname, "..", "..", "..");
 let at: Atendedor;
@@ -57,7 +58,11 @@ const cliente = () =>
   }) as unknown as ClienteSesion;
 
 function Paneles({ children }: { children: React.ReactNode }) {
-  return <ContextoPaneles.Provider value={useAlmacenPaneles()}>{children}</ContextoPaneles.Provider>;
+  return (
+    <ContextoPaneles.Provider value={useAlmacenPaneles()}>
+      <ContextoVistas.Provider value={useEstadoVistas("test")}>{children}</ContextoVistas.Provider>
+    </ContextoPaneles.Provider>
+  );
 }
 
 function montar(pantalla: React.ReactNode, planta: string, modo: ModoResultados) {
@@ -65,7 +70,7 @@ function montar(pantalla: React.ReactNode, planta: string, modo: ModoResultados)
   return render(
     <ThemeProvider>
       <Paneles>
-        <ContextoVisor.Provider value={{ proyecto, planta, setPlanta() {}, seleccion: null, setSeleccion() {}, espacio: "resultados", modo, irA() {}, tablaPedida: null, pedirTabla() {} }}>
+        <ContextoVisor.Provider value={{ proyecto, planta, setPlanta() {}, seleccion: null, setSeleccion() {}, elegidos: [], setElegidos() {}, espacio: "resultados", modo, irA() {}, tablaPedida: null, pedirTabla() {} }}>
           <div style={{ display: "flex" }}>{pantalla}</div>
         </ContextoVisor.Provider>
       </Paneles>

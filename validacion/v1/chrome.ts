@@ -206,7 +206,7 @@ try {
   const elegirComb = (i: number) => `const s = document.querySelector("select"); const o = s.options[${i}]; const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set; set.call(s, o.value); s.dispatchEvent(new Event("change", { bubbles: true }))`;
   await medir("combinación: un caso (losas)", elegirComb(-1).replace("[-1]", "[s.options.length - 1]"));
   await medir("combinación: por defecto (losas)", elegirComb(0));
-  await medir("clic en el mapa (valor del punto)", `const r = document.querySelector(".lienzo svg").getBoundingClientRect(); document.querySelector(".lienzo svg").dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: r.left + r.width * 0.4, clientY: r.top + r.height * 0.5 }))`, `document.querySelector("[data-valor-punto]")`);
+  await medir("clic en el mapa (valor del punto)", `const s = document.querySelector(".celda-superficie"); const r = s.getBoundingClientRect(); for (const t of ["pointerdown", "pointerup"]) s.dispatchEvent(new PointerEvent(t, { bubbles: true, pointerId: 1, pointerType: "mouse", button: 0, buttons: t === "pointerup" ? 0 : 1, clientX: r.left + r.width * 0.4, clientY: r.top + r.height * 0.5 }))`, `document.querySelector("[data-valor-punto]")`);
   await medir("pantalla vigas", pantalla("Vigas"));
   await medir("otra viga", `[...document.querySelectorAll(".lista-fila")].filter((b) => !b.getAttribute("role"))[3].click()`);
   await medir("esfuerzo Vz", `__v1.boton("Vz").click()`);
@@ -219,13 +219,13 @@ try {
   await medir("pantalla pilares", pantalla("Pilares"));
   await medir("planta N1 (pilares)", planta("N1"));
   await medir("elegir un pilar", `document.querySelectorAll("tr.clic")[5].click()`);
-  const girar = `const c = document.querySelector(".lienzo canvas"); const r = c.getBoundingClientRect(); const ev = (t, x, y) => c.dispatchEvent(new PointerEvent(t, { bubbles: true, pointerId: 1, pointerType: "mouse", button: 0, buttons: t === "pointerup" ? 0 : 1, clientX: r.left + x, clientY: r.top + y })); ev("pointerdown", 300, 300); for (let i = 0; i < 40; i++) { ev("pointermove", 300 + i * 6, 300 + i * 2); await new Promise((x) => requestAnimationFrame(() => x())); } ev("pointerup", 540, 380);`;
-  await medir("pantalla desplomes (3D y deformada)", pantalla("Desplomes"), `document.querySelector(".lienzo canvas")`);
+  const girar = `const c = document.querySelector('.celda[data-tipo="3d"] .celda-superficie'); const r = c.getBoundingClientRect(); const ev = (t, x, y) => c.dispatchEvent(new PointerEvent(t, { bubbles: true, pointerId: 1, pointerType: "mouse", button: 1, buttons: t === "pointerup" ? 0 : 4, shiftKey: true, clientX: r.left + x, clientY: r.top + y })); ev("pointerdown", 300, 300); for (let i = 0; i < 40; i++) { ev("pointermove", 300 + i * 6, 300 + i * 2); await new Promise((x) => requestAnimationFrame(() => x())); } ev("pointerup", 540, 380);`;
+  await medir("pantalla desplomes (3D y deformada)", pantalla("Desplomes"), `document.querySelector('.celda[data-tipo="3d"]')`);
   pasos.push(["girar el 3D", await pagina<number>(`return performance.now();`)]);
   cambios.push(["girar el 3D (40 pasos)", await pagina<number>(`const t0 = performance.now(); ${girar} return performance.now() - t0;`)]);
   await medir("pantalla revisión", pantalla("Revisión"), `document.querySelector("article")`);
   await medir("pantalla modelo", pantalla("Modelo"));
-  await medir("3D del modelo", `__v1.boton("3D").click()`, `document.querySelector(".lienzo canvas")`);
+  await medir("3D del modelo", `__v1.boton("3D").click()`, `document.querySelector('.celda[data-tipo="3d"]')`);
   cambios.push(["girar el 3D del modelo (40 pasos)", await pagina<number>(`const t0 = performance.now(); ${girar} return performance.now() - t0;`)]);
   for (const [que, ms] of cambios) log(`  ${que}: ${ms.toFixed(0)} ms`);
   const limite = new Set(["planta N3 (modelo)", "planta N5 (modelo)", "magnitud M11", "magnitud M22", "planta N2 (losas)", "combinación: un caso (losas)", "combinación: por defecto (losas)", "planta N1 (pilares)"]);

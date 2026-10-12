@@ -3,21 +3,37 @@
  * `vistaCampo` de A4, en la combinación de mayor |valor| de las elegidas). Un clic da el valor del
  * punto interpolado como las bandas (la consulta `valor-punto`, no el color); en Propiedades, ese
  * valor, los extremos y las flechas de `fem consultar flechas`; abajo, las combinaciones.
+ *
+ * Desde I2, cada vista de planta pide el mapa de su planta; Propiedades enseña los datos de la planta
+ * de la vista activa. Un 3D enseña el modelo (los resultados en 3D son de I4).
  */
 import { useEffect, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Campo } from "../../../src/agente/render/resultados.ts";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { ValorPunto } from "../../../src/visor/datos.ts";
-import { CabeceraVista, CarrilPlantas, Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, Equilibrio, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
-import { MARGENES_VISTA } from "../espacios/Modelo.tsx";
 import { useVisor } from "../contexto.ts";
-import { cota, fmt, mm } from "../fmt.ts";
-import { Planta2D, type MarcaExtra } from "../lienzo/Planta2D.tsx";
+import { fmt, mm } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
+import { BarraVistas } from "../vistas/BarraVistas.tsx";
+import { useVistas, vistasDe } from "../vistas/estado.ts";
+import type { Marca } from "../vistas/vista2d.ts";
+import { Fuente2D, ZonaVistas } from "../vistas/Zona.tsx";
+
+type Punto = { p: Vec2; v: ValorPunto | null; planta: string; clave: string };
+
+/** El mapa de una planta en una vista: un clic da el valor del punto. */
+function PlantaLosas({ planta, campo, eleccion, punto, onPunto, dec, unidad }: { planta: string; campo: Campo; eleccion: EleccionCombinaciones; punto: Punto | null; onPunto: (p: Vec2, planta: string) => void; dec: number; unidad: string }) {
+  const { proyecto } = useVisor();
+  const d = usePedido(proyecto.cliente, { tipo: "losas", planta, campo, combinaciones: eleccion });
+  const marcas: Marca[] = punto && punto.planta === planta ? [{ p: punto.p, texto: punto.v ? `${fmt(punto.v.valor, dec)} ${unidad}` : "sin mapa" }] : [];
+  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Recuperando los campos (SPR)…</Aviso> : null;
+  return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} marcas={marcas} eventos={{ clic: (p) => onPunto(p, planta) }} aviso={aviso} cargando={d.cargando} />;
+}
 
 const CAMPOS: { id: Campo; nombre: string; dec: number }[] = [
   { id: "uz", nombre: "uz", dec: 2 },
@@ -29,13 +45,20 @@ const CAMPOS: { id: Campo; nombre: string; dec: number }[] = [
 ];
 
 export function ModoLosas() {
-  const { proyecto, planta, setPlanta } = useVisor();
+  const { proyecto, planta } = useVisor();
   const pan = usePaneles("resultados:losas", { props: true, pestana: "combinaciones" });
+  const vistas = useVistas();
+  // El mapa se ve en planta: si no hay ninguna, la vista activa pasa a serlo
+  const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta");
+  useEffect(() => {
+    if (sinPlanta) vistas.irATipo("planta");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
+  }, []);
   const e = proyecto.estado!;
   const [campo, setCampo] = useState<Campo>("uz");
   const [elDesp, setElDesp] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [elEsf, setElEsf] = useState<EleccionCombinaciones>({ tipo: "defecto" });
-  const [punto, setPunto] = useState<{ p: Vec2; v: ValorPunto | null; planta: string; clave: string } | null>(null);
+  const [punto, setPunto] = useState<Punto | null>(null);
   const eleccion = campo === "uz" ? elDesp : elEsf;
   const setEleccion = campo === "uz" ? setElDesp : setElEsf;
   const dec = CAMPOS.find((c) => c.id === campo)!.dec;
@@ -47,17 +70,17 @@ export function ModoLosas() {
   useEffect(() => {
     if (listo && planta && proyecto.cliente) void proyecto.cliente.pedir({ tipo: "precalentar", planta }).catch(() => {});
   }, [listo, planta, proyecto.cliente]);
-  const puntoValido = punto && punto.clave === clave ? punto : null;
+  // El punto es de la planta activa (un clic en una vista la activa)
+  const puntoValido = punto && punto.clave === clave && punto.planta === planta ? punto : null;
+  const claveDe = (pl: string) => JSON.stringify([pl, campo, eleccion, proyecto.version]);
 
-  const clic = async (p: Vec2) => {
-    if (!proyecto.cliente || !planta) return;
-    const r = await proyecto.cliente.pedir({ tipo: "valor-punto", planta, campo, combinaciones: eleccion, x: p[0], y: p[1] });
-    setPunto({ p, v: r.ok ? (r.valor as ValorPunto | null) : null, planta, clave });
+  const clic = async (p: Vec2, pl: string) => {
+    if (!proyecto.cliente) return;
+    const r = await proyecto.cliente.pedir({ tipo: "valor-punto", planta: pl, campo, combinaciones: eleccion, x: p[0], y: p[1] });
+    setPunto({ p, v: r.ok ? (r.valor as ValorPunto | null) : null, planta: pl, clave: claveDe(pl) });
   };
 
   const unidad = campo === "uz" ? "mm" : campo.startsWith("m") ? "kN·m/m" : "kN/m";
-  const marcas: MarcaExtra[] = puntoValido ? [{ p: puntoValido.p, texto: puntoValido.v ? `${fmt(puntoValido.v.valor, dec)} ${unidad}` : "sin mapa" }] : [];
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !x && d.cargando ? <Aviso>Recuperando los campos (SPR)…</Aviso> : null;
 
   const nombreCampo = CAMPOS.find((c) => c.id === campo)!.nombre;
   const herramientas = (
@@ -67,23 +90,28 @@ export function ModoLosas() {
       <BarraModos />
       <Separador />
       <Segmentado etiqueta="Magnitud" opciones={CAMPOS.map((c) => ({ id: c.id, nombre: c.nombre }))} valor={campo} onCambio={setCampo} />
+      <Separador />
+      <BarraVistas />
     </>
   );
   const vista = (
-    <>
-      <CabeceraVista>
-        <Chip>
-          <strong className="font-semibold">Planta {planta}</strong>
-          <span className="mono text-text-secondary">{cota(e.plantas.find((p) => p.id === planta)?.cota)}</span>
-        </Chip>
-        <Chip acento title={x?.dibujada?.etiqueta}>
-          {nombreCampo} · {unidad} · <span className="mono">{x?.dibujada?.nombre ?? "—"}</span>
-          {d.ms !== null && <span className="mono text-text-disabled">{fmt(d.ms, 0)} ms</span>}
-        </Chip>
-      </CabeceraVista>
-      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
-      <Planta2D escena={x?.escena ?? null} marcas={marcas} onClic={(p) => void clic(p)} aviso={aviso} titulo={`Mapa de ${campo} en la planta ${planta}`} cargando={d.cargando} margenes={MARGENES_VISTA} />
-    </>
+    <ZonaVistas
+      fuentes={{
+        planta: (v) => (v.planta ? <PlantaLosas planta={v.planta} campo={campo} eleccion={eleccion} punto={punto && punto.clave === claveDe(v.planta) ? punto : null} onPunto={(p, pl) => void clic(p, pl)} dec={dec} unidad={unidad} /> : null),
+        cabeceraPlanta: (v) => (
+          <Chip acento title={v.planta === planta ? x?.dibujada?.etiqueta : undefined}>
+            {nombreCampo} · {unidad}
+            {v.planta === planta && (
+              <>
+                {" · "}
+                <span className="mono">{x?.dibujada?.nombre ?? "—"}</span>
+                {d.ms !== null && <span className="mono text-text-disabled">{fmt(d.ms, 0)} ms</span>}
+              </>
+            )}
+          </Chip>
+        ),
+      }}
+    />
   );
 
   const propiedades = (

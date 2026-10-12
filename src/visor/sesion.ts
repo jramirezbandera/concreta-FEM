@@ -15,18 +15,19 @@
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto } from "../agente/proyecto.ts";
-import { conjuntoPorDefecto, ResultadosRender, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena } from "../agente/render/index.ts";
+import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../compilador/compilar.ts";
 import { Consultas } from "../compilador/consultas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { ejesDe } from "../compilador/ejes.ts";
 import { traducirDiagnosticos } from "../compilador/mapeo.ts";
 import { calcular } from "../motor/calcular.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { ResultadoCaso } from "../motor/modelo.ts";
-import { elegir, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
+import { elegir, elegirVentana, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
 
 export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
 
@@ -51,6 +52,12 @@ export type VistaPlanta =
   | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones }
   | { vista: "vigas"; esfuerzo: "My" | "Vz"; combinaciones: EleccionCombinaciones }
   | { vista: "pilares-n"; combinaciones: EleccionCombinaciones };
+
+/** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
+export type PlanoPedido = { eje: string; profundidad?: number } | { desde: Vec2; hasta: Vec2; profundidad?: number };
+
+/** Una escena que se puede pedir, elegir y resaltar (I2): la de una planta en una vista, o un alzado. */
+export type FuenteEscena = { tipo: "planta"; planta: string; vista: VistaPlanta } | { tipo: "alzado"; plano: PlanoPedido };
 
 export interface PlantaVisor {
   id: string;
@@ -89,6 +96,8 @@ export interface EstadoSesion {
   combinaciones: CombinacionDisponible[];
   /** sha256 de los resultados empaquetados como `resultados.bin` (el mismo que guarda la CLI): criterio 2 de V1. */
   sha256Resultados: string | null;
+  /** I2: los ejes de replanteo que se dibujan (los del modelo o, si no tiene, los propuestos). */
+  ejes: { id: string; nombre?: string; desde: Vec2; hasta: Vec2; propuesto: boolean }[];
 }
 
 export type Apertura = { valido: true; sesion: Sesion } | { valido: false; diagnosticos: Diagnostico[] };
@@ -219,6 +228,10 @@ export class Sesion {
       equilibrio: (this.cabecera?.casos ?? []).map((x) => ({ id: x.id, ...x.equilibrio })),
       combinaciones: this.combinacionesDisponibles(),
       sha256Resultados: this.shaR,
+      ejes: (() => {
+        const x = ejesDe(f);
+        return x.ejes.map((e) => ({ id: e.id, ...(e.nombre ? { nombre: e.nombre } : {}), desde: e.desde, hasta: e.hasta, propuesto: x.propuestos }));
+      })(),
     };
   }
 
@@ -354,12 +367,42 @@ export class Sesion {
     return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
   }
 
-  /** El objeto bajo un punto de una escena ya pedida (o el objeto dado, para resaltarlo). */
-  elegir(planta: string, v: VistaPlanta, punto: readonly [number, number] | null, radio: number, objeto?: string): Eleccion | null {
-    const e = this.escenaA4(planta, v);
+  /** El alzado de un plano (I2), o por qué no se puede dibujar. Sólo necesita el modelo físico. */
+  alzadoA4(p: PlanoPedido): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
+    const f = this.proyecto.modelo;
+    const clave = JSON.stringify(["alzado", p]);
+    const hecha = this.escenas.get(clave);
+    if (hecha) return { valido: true, valor: hecha };
+    let plano: PlanoAlzado | null;
+    if ("eje" in p) plano = planoDeEje(f, p.eje, p.profundidad);
+    else plano = p.desde[0] === p.hasta[0] && p.desde[1] === p.hasta[1] ? null : { desde: p.desde, hasta: p.hasta, ...(p.profundidad !== undefined ? { profundidad: p.profundidad } : {}) };
+    if (!plano) return { valido: false, diagnosticos: [{ codigo: "visor/alzado", severidad: "error", mensaje: "eje" in p ? `No hay ningún eje ${p.eje}.` : "Los dos puntos del alzado son el mismo." }] };
+    const e = vistaAlzado(f, plano, { ...(this.proyecto.nombre ? { nombre: this.proyecto.nombre } : {}), huella: this.huella });
+    this.escenas.set(clave, e);
+    return { valido: true, valor: e };
+  }
+
+  alzado(p: PlanoPedido): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
+    const e = this.alzadoA4(p);
+    return e.valido ? { valido: true, valor: prepararEscena(e.valor) } : e;
+  }
+
+  escenaDe(fu: FuenteEscena): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {
+    return fu.tipo === "planta" ? this.escenaA4(fu.planta, fu.vista) : this.alzadoA4(fu.plano);
+  }
+
+  /** El objeto bajo un punto de una escena (o, con `objetos`, esos objetos), resaltado. */
+  elegir(fu: FuenteEscena, punto: readonly [number, number] | null, radio: number, objetos?: readonly string[]): Eleccion | null {
+    const e = this.escenaDe(fu);
     if (!e.valido) return null;
-    if (objeto !== undefined) return resaltar(e.valor, objeto);
+    if (objetos !== undefined) return objetos.length ? resaltar(e.valor, objetos) : null;
     return punto ? elegir(e.valor, punto, radio) : null;
+  }
+
+  /** Los objetos de una ventana de una escena (`elegirVentana`). */
+  ventana(fu: FuenteEscena, caja: [number, number, number, number], modo: "dentro" | "toca"): string[] {
+    const e = this.escenaDe(fu);
+    return e.valido ? elegirVentana(e.valor, caja, modo) : [];
   }
 }
 

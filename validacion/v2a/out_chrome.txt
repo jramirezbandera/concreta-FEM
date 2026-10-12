@@ -1,11 +1,11 @@
 Criterio 5 · edificio objetivo (7 plantas, 80 pilares)
   pilares en la tabla de la planta activa: 80
-BIEN  escribir una celda: los diagnósticos de la versión nueva salen en 1.38 s (≤ 1,5 s)
+BIEN  escribir una celda: los diagnósticos de la versión nueva salen en 1.12 s (≤ 1,5 s)
 BIEN  escribir una celda: tareas largas > 50 ms en el hilo principal: 0 (máx. 0 ms)
 BIEN  pegar 80 filas: «Pegadas 80 filas.»
-BIEN  pegar 80 filas: los diagnósticos salen en 1.24 s (≤ 1,5 s)
+BIEN  pegar 80 filas: los diagnósticos salen en 1.10 s (≤ 1,5 s)
 BIEN  pegar 80 filas: tareas largas > 50 ms: 0 (máx. 0 ms)
-BIEN  guardar: 32 ms (≤ 0,5 s)
+BIEN  guardar: 30 ms (≤ 0,5 s)
 BIEN  guardar: tareas largas > 50 ms: 0 (máx. 0 ms)
 BIEN  lo guardado tiene la huella que enseña la página (310c29cf)
 BIEN  lo guardado está en el formato canónico

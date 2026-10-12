@@ -13,16 +13,34 @@ import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { DatosEstacion, DatosViga, Esfuerzo } from "../../../src/visor/datos.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
-import { CabeceraVista, CarrilPlantas, Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
-import { MARGENES_VISTA } from "../espacios/Modelo.tsx";
 import { useVisor } from "../contexto.ts";
-import { cota, fmt } from "../fmt.ts";
-import { Planta2D } from "../lienzo/Planta2D.tsx";
+import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
+import { BarraVistas } from "../vistas/BarraVistas.tsx";
+import { useVistas, vistasDe } from "../vistas/estado.ts";
+import { Fuente2D, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
+
+/** Los diagramas de las vigas de una planta, en una vista: un clic elige la viga o la vigueta. */
+function PlantaDiagramas({ planta, vista, id, cargando }: { planta: string; vista: VistaPlanta; id: string | null; cargando: boolean }) {
+  const { proyecto, setSeleccion } = useVisor();
+  const fuente = { tipo: "planta" as const, planta, vista };
+  const escena = usePedido(proyecto.cliente, { tipo: "escena", planta, vista });
+  const resaltado = useEleccion(fuente, id);
+  const clic = async (p: Vec2, radio: number) => {
+    if (!proyecto.cliente) return;
+    const r = await proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio });
+    const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
+    // Sólo las piezas con diagrama: vigas y viguetas
+    if (o && ((proyecto.edicion?.proyecto.modelo.vigas ?? []).some((v) => v.id === o) || o.includes(":v") || !proyecto.edicion)) setSeleccion(o);
+  };
+  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : escena.diagnosticos ? <Aviso tono="fail">{escena.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !escena.datos && escena.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
+  return <Fuente2D escena={proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={escena.cargando || cargando} />;
+}
 
 const ESFUERZOS: { id: Esfuerzo; unidad: string; abajo: boolean }[] = [
   { id: "My", unidad: "kN·m", abajo: true },
@@ -174,8 +192,14 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
 }
 
 export function ModoDiagramas() {
-  const { proyecto, planta, setPlanta, seleccion, setSeleccion } = useVisor();
+  const { proyecto, planta, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:diagramas", { nav: true, props: true, dock: true, pestana: "alzado", alto: 300 });
+  const vistas = useVistas();
+  const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta");
+  useEffect(() => {
+    if (sinPlanta) vistas.irATipo("planta");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
+  }, []);
   const e = proyecto.estado!;
   const [esfuerzo, setEsfuerzo] = useState<Esfuerzo>("My");
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
@@ -184,8 +208,6 @@ export function ModoDiagramas() {
   const lista = piezas.datos ?? [];
   const id = lista.some((p) => p.id === seleccion) ? seleccion! : (lista.find((p) => p.tipo === "viga")?.id ?? lista[0]?.id ?? null);
   const vista: VistaPlanta = esfuerzo === "My" || esfuerzo === "Vz" ? { vista: "vigas", esfuerzo, combinaciones: eleccion } : { vista: "modelo" };
-  const escena = usePedido(proyecto.cliente, planta ? { tipo: "escena", planta, vista } : null);
-  const resaltado = useEleccion(planta, vista, id);
   const viga = usePedido(proyecto.cliente, id ? { tipo: "viga", id, esfuerzo, combinaciones: eleccion } : null);
   const v = viga.datos && viga.datos.id === id ? viga.datos : null;
   // Otra pieza: el cursor, en el centro de su primer vano (no en un apoyo)
@@ -209,15 +231,6 @@ export function ModoDiagramas() {
     return [...g];
   }, [lista]);
 
-  const clic = async (p: Vec2, radio: number) => {
-    if (!proyecto.cliente || !planta) return;
-    const r = await proyecto.cliente.pedir({ tipo: "elegir", planta, vista, punto: p, radio });
-    const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
-    if (o && lista.some((x) => x.id === o)) setSeleccion(o);
-  };
-
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : escena.diagnosticos ? <Aviso tono="fail">{escena.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !escena.datos && escena.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
-
   const herramientas = (
     <>
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
@@ -231,6 +244,8 @@ export function ModoDiagramas() {
         onCambio={setEsfuerzo}
         deshabilitada={(x) => x === "N" && !!v?.axilSinValor}
       />
+      <Separador />
+      <BarraVistas />
     </>
   );
 
@@ -252,17 +267,12 @@ export function ModoDiagramas() {
   );
 
   const vistaPlanta = (
-    <>
-      <CabeceraVista>
-        <Chip>
-          <strong className="font-semibold">Planta {planta}</strong>
-          <span className="mono text-text-secondary">{cota(e.plantas.find((p) => p.id === planta)?.cota)}</span>
-        </Chip>
-        <Chip acento>{vista.vista === "vigas" ? `Diagramas de ${esfuerzo}` : `${esfuerzo}: sólo en el alzado de la pieza`}</Chip>
-      </CabeceraVista>
-      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
-      <Planta2D escena={escena.datos} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Vigas de la planta ${planta}`} cargando={escena.cargando || viga.cargando} margenes={MARGENES_VISTA} />
-    </>
+    <ZonaVistas
+      fuentes={{
+        planta: (x) => (x.planta ? <PlantaDiagramas planta={x.planta} vista={vista} id={id} cargando={x.planta === planta && viga.cargando} /> : null),
+        cabeceraPlanta: () => <Chip acento>{vista.vista === "vigas" ? `Diagramas de ${esfuerzo}` : `${esfuerzo}: sólo en el alzado de la pieza`}</Chip>,
+      }}
+    />
   );
 
   const alzado = v ? (

@@ -8,7 +8,8 @@
  * - Ctrl+K: la paleta de órdenes;
  * - Ctrl+S guarda; Ctrl+Z y Ctrl+Y (o Ctrl+Mayús+Z) deshacen y rehacen fuera de un campo de texto
  *   (dentro, deshacen lo escrito en el campo);
- * - AvPág y RePág: la planta de arriba o la de abajo; Esc: soltar lo elegido.
+ * - AvPág y RePág: la planta de arriba o la de abajo; Esc: soltar lo elegido;
+ * - desde I2: F encuadra la vista activa y Ctrl+1…4 cambian la disposición de las vistas.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FolderOpen, Moon, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
@@ -23,6 +24,8 @@ import { cota } from "./fmt.ts";
 import { Inicio, abrirDesdeUrl } from "./Inicio.tsx";
 import { EspacioRevision } from "./pantallas/Revision.tsx";
 import { useProyecto, type ProyectoAbierto } from "./sesion/useProyecto.ts";
+import { ContextoVistas, DISPOSICIONES, useEstadoVistas } from "./vistas/estado.ts";
+import { encuadrarActiva } from "./vistas/Zona.tsx";
 import { useTheme } from "./tema/useTheme.ts";
 
 const ESPACIOS: { id: Espacio; nombre: string; calculo: boolean }[] = [
@@ -75,8 +78,8 @@ export function App() {
   const { theme, toggleTheme } = useTheme();
   const paneles = useAlmacenPaneles();
   const [{ espacio, modo }, setDonde] = useState(inicial);
-  const [planta, setPlanta] = useState<string | null>(null);
-  const [seleccion, setSel] = useState<string | null>(null);
+  const [elegidos, setElegidosE] = useState<string[]>([]);
+  const seleccion = elegidos[elegidos.length - 1] ?? null;
   const [paleta, setPaleta] = useState(false);
   const [tablaPedida, setTablaPedida] = useState<{ tabla: NombreTabla; n: number } | null>(null);
 
@@ -88,19 +91,25 @@ export function App() {
 
   const e = proyecto.estado;
   const ed = proyecto.edicion;
+  // Las vistas, recordadas por proyecto (I2); la planta es la de la vista activa
+  const vistas = useEstadoVistas(e?.nombre ?? (proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? "")));
+  const planta = vistas.vistas[vistas.activa]!.planta;
+  const { poner: ponerVista, activa: vistaActiva, setDisposicion } = vistas;
+  const setPlanta = useCallback((p: string) => ponerVista(vistaActiva, { planta: p }), [ponerVista, vistaActiva]);
   // Resultados y Revisión sólo con un cálculo de esta huella (criterio 3 de I1)
   const espacioValido: Espacio = (espacio === "resultados" || espacio === "revision") && !e?.calculado ? "modelo" : espacio;
   const clave = espacioValido === "resultados" ? `resultados:${modo}` : espacioValido;
 
   const irA = useCallback((x: Espacio, m?: ModoResultados) => setDonde((d) => ({ espacio: x, modo: m ?? d.modo })), []);
   const { cambiar } = paneles;
-  const setSeleccion = useCallback(
-    (id: string | null) => {
-      setSel(id);
-      if (id) cambiar(clave, { props: true });
+  const setElegidos = useCallback(
+    (ids: string[]) => {
+      setElegidosE((x) => (x.length === ids.length && x.every((y, i) => y === ids[i]) ? x : ids));
+      if (ids.length) cambiar(clave, { props: true });
     },
     [cambiar, clave],
   );
+  const setSeleccion = useCallback((id: string | null) => setElegidos(id ? [id] : []), [setElegidos]);
   const pedirTabla = useCallback((t: NombreTabla) => {
     setTablaPedida((x) => ({ tabla: t, n: (x?.n ?? 0) + 1 }));
     setDonde((d) => ({ ...d, espacio: d.espacio === "cargas" ? "cargas" : "modelo" }));
@@ -118,6 +127,11 @@ export function App() {
       if (mod && !x.altKey && k === "k") {
         x.preventDefault();
         setPaleta((v) => !v);
+        return;
+      }
+      if (mod && !x.altKey && !x.shiftKey && ["1", "2", "3", "4"].includes(x.key) && !document.querySelector("[role=dialog]")) {
+        x.preventDefault();
+        setDisposicion(DISPOSICIONES[Number(x.key) - 1]!.id);
         return;
       }
       if (paleta || document.querySelector("[role=dialog]")) return;
@@ -140,11 +154,12 @@ export function App() {
         const i = plantas.findIndex((p) => p.id === plantaValida);
         const j = Math.max(0, Math.min(plantas.length - 1, i + (x.key === "PageUp" ? -1 : 1)));
         setPlanta(plantas[j]!.id);
-      } else if (x.key === "Escape") setSel(null);
+      } else if (x.key === "Escape") setElegidosE([]);
+      else if (x.key === "f" || x.key === "F") encuadrarActiva();
     };
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
-  }, [ed, paleta, plantas, plantaValida]);
+  }, [ed, paleta, plantas, plantaValida, setPlanta, setDisposicion]);
 
   // Órdenes de la paleta
   const ordenes = useMemo<Orden[]>(() => {
@@ -164,10 +179,14 @@ export function App() {
       { id: "props", grupo: "Paneles", nombre: vivo.props === false ? "Abrir las propiedades" : "Plegar las propiedades", hacer: () => cambiar(clave, { props: vivo.props === false }) },
       { id: "dock", grupo: "Paneles", nombre: vivo.dock ? "Plegar el panel inferior" : "Abrir el panel inferior", hacer: () => cambiar(clave, { dock: !vivo.dock }) },
       { id: "tema", grupo: "Vista", nombre: theme === "dark" ? "Tema claro" : "Tema oscuro", hacer: toggleTheme },
-      { id: "soltar", grupo: "Vista", nombre: "Soltar lo elegido", atajo: "Esc", hacer: () => setSel(null), deshabilitada: !seleccion },
+      { id: "soltar", grupo: "Vista", nombre: "Soltar lo elegido", atajo: "Esc", hacer: () => setElegidosE([]), deshabilitada: !seleccion },
+      { id: "encuadrar", grupo: "Vista", nombre: "Encuadrar la vista activa", atajo: "F", hacer: encuadrarActiva },
+      ...DISPOSICIONES.map((d) => ({ id: `disp-${d.id}`, grupo: "Vistas", nombre: d.nombre, atajo: d.atajo, hacer: () => vistas.setDisposicion(d.id) })),
+      ...(["planta", "alzado", "3d"] as const).map((t) => ({ id: `tipo-${t}`, grupo: "Vistas", nombre: `La vista activa, ${t === "3d" ? "en 3D" : `en ${t}`}`, hacer: () => vistas.irATipo(t), deshabilitada: t === "alzado" && !e?.ejes.length })),
+      ...(e?.ejes ?? []).map((x) => ({ id: `alzado-${x.id}`, grupo: "Alzado", nombre: `Eje ${x.nombre ?? x.id}${x.propuesto ? " (propuesto)" : ""}`, hacer: () => vistas.abrirAlzado(x.id) })),
     );
     return r;
-  }, [e, ed, proyecto, irA, pedirTabla, paneles, clave, cambiar, theme, toggleTheme, seleccion]);
+  }, [e, ed, proyecto, irA, pedirTabla, paneles, clave, cambiar, theme, toggleTheme, seleccion, vistas]);
 
   // Los objetos del proyecto, para la paleta: elegirlo y llevar su planta
   const m = ed?.proyecto.modelo;
@@ -210,7 +229,8 @@ export function App() {
 
   return (
     <ContextoPaneles.Provider value={paneles}>
-      <ContextoVisor.Provider value={{ proyecto, planta: plantaValida, setPlanta, seleccion, setSeleccion, espacio: espacioValido, modo, irA, tablaPedida, pedirTabla }}>
+      <ContextoVistas.Provider value={vistas}>
+      <ContextoVisor.Provider value={{ proyecto, planta: plantaValida, setPlanta, seleccion, setSeleccion, elegidos, setElegidos, espacio: espacioValido, modo, irA, tablaPedida, pedirTabla }}>
         <div className="flex h-full flex-col">
           <header className="barra-sup">
             <span className="flex shrink-0 items-center gap-1.5 text-[15px] font-semibold">
@@ -314,6 +334,7 @@ export function App() {
           </main>
 
           <footer className="barra-estado">
+            <span className="shrink-0 whitespace-nowrap mono" data-cursor="" aria-live="off" />
             <span className="min-w-0 shrink truncate">{pie}</span>
             <span className="min-w-0 flex-1 truncate">{resultados}</span>
             <span className="shrink-0">kN · m</span>
@@ -332,6 +353,7 @@ export function App() {
         </div>
         {paleta && <Paleta ordenes={ordenes} objetos={objetos} onCerrar={() => setPaleta(false)} />}
       </ContextoVisor.Provider>
+      </ContextoVistas.Provider>
     </ContextoPaneles.Provider>
   );
 }

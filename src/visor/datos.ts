@@ -15,6 +15,7 @@ import { envolventePieza, valoresCampo, type Campo, type PuntoEnvolvente } from 
 import { estadoFirma, leerFirmas, revisar, type EstadoFirma } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion } from "../agente/sensatez.ts";
+import { proponerEjes } from "../compilador/ejes.ts";
 import { sha256 } from "../compilador/huella.ts";
 import type { ApoyoPieza } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
@@ -62,6 +63,7 @@ const LISTAS = [
   ["casos", "caso"],
   ["secciones", "sección"],
   ["materiales", "material"],
+  ["ejes", "eje"],
 ] as const;
 
 export function datosObjeto(s: Sesion, id: string): Resultado<DatosObjeto> {
@@ -69,6 +71,11 @@ export function datosObjeto(s: Sesion, id: string): Resultado<DatosObjeto> {
   for (const [lista, tipo] of LISTAS) {
     const x = f[lista]?.find((o) => o.id === id);
     if (x) return { valido: true, valor: { id, tipo, datos: x as unknown as Record<string, unknown>, diagnosticos: s.diagnosticos.filter((d) => d.ids?.includes(id)) } };
+  }
+  // Un eje propuesto (el modelo no tiene ejes): se enseña, pero no está en el proyecto
+  if (!s.proyecto.modelo.ejes) {
+    const e = proponerEjes(s.proyecto.modelo).ejes.find((x) => x.id === id);
+    if (e) return { valido: true, valor: { id, tipo: "eje propuesto", datos: e as unknown as Record<string, unknown>, diagnosticos: [] } };
   }
   // Las viguetas de un paño son piezas del compilador (C4: «<paño>:v<n>»)
   const c = s.compilado;

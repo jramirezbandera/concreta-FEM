@@ -1,25 +1,41 @@
 /**
- * Escena preparada para el visor (V1, `docs/fem3d/visor.md` §3.1): la misma escena de A4
- * (`agente/render/escena.ts`), con las formas agrupadas en trazados SVG en coordenadas del modelo
- * para que el hilo principal sólo inserte unos pocos `<path>`. El orden de dibujo se conserva: se
- * agrupan las primitivas seguidas con el mismo estilo y relleno, nunca se reordenan.
+ * Escena preparada para el visor (V1, `docs/fem3d/visor.md` §3.1; desde I2, para WebGL,
+ * `docs/fem3d/interfaz.md` §14): la misma escena de A4 (`agente/render/escena.ts`), con las formas
+ * agrupadas en capas listas para la GPU, para que el hilo principal sólo las suba. El orden de
+ * dibujo se conserva: se agrupan las primitivas seguidas con el mismo estilo y relleno, nunca se
+ * reordenan.
  *
- * Los textos, las marcas y las flechas tienen tamaño en píxeles, así que pasan tal cual: el visor
- * los coloca en pantalla en cada encuadre. Elegir un objeto con el ratón y su resaltado se resuelven
- * aquí, sobre las primitivas exactas de la escena.
+ * Cada capa lleva:
+ * - los abanicos de triángulos de sus anillos (v0, vi, vi+1), para rellenarlos por stencil: con la
+ *   paridad, «par-impar» (las áreas); con el número de vueltas, «nonzero» (las bandas de
+ *   isovalores). Es la misma regla que el `<path>` del SVG de toda la capa, sin triangular, así que
+ *   no falla con ningún polígono;
+ * - los segmentos de sus contornos (los anillos, cerrados) o de sus líneas, para los trazos.
+ *
+ * Las coordenadas van en Float32 respecto a `origen` (el centro de la caja de la escena), para no
+ * perder precisión lejos del origen del modelo. Los glifos y los textos tienen tamaño en píxeles,
+ * así que pasan tal cual, en coordenadas del modelo: el visor los coloca en pantalla en cada
+ * encuadre. Elegir un objeto con el ratón y su resaltado se resuelven aquí, sobre las primitivas
+ * exactas de la escena.
  *
  * Puro: sin IO.
  */
 import { dentro, type Escena, type Estilo, type Primitiva, type Texto, type Vec2 } from "../agente/render/escena.ts";
 
-/** Una capa: primitivas seguidas con el mismo estilo, relleno y forma, en un solo trazado. */
+type Caja = [number, number, number, number];
+
+/** Una capa: primitivas seguidas con el mismo estilo, relleno y forma. */
 export interface Capa {
   estilo: Estilo;
   /** «area»: polígonos par-impar; «region»: bandas de isovalores (nonzero); «trazo»: líneas abiertas. */
   forma: "area" | "region" | "trazo";
   relleno?: string;
-  /** Trazado en m, con Y hacia arriba (el visor lo voltea). */
-  d: string;
+  /** Triángulos en abanico de sus anillos: x, y de 3 vértices por triángulo, respecto al origen. Vacío en los trazos. */
+  abanicos: Float32Array;
+  /** Segmentos de sus contornos o sus líneas: x0, y0, x1, y1, respecto al origen. */
+  segmentos: Float32Array;
+  /** Caja de sus vértices, respecto al origen (el rectángulo que cubre el stencil). */
+  caja: Caja;
 }
 
 export type Glifo = Extract<Primitiva, { tipo: "marca" } | { tipo: "flecha" }>;
@@ -27,6 +43,8 @@ export type Glifo = Extract<Primitiva, { tipo: "marca" } | { tipo: "flecha" }>;
 export interface EscenaPreparada {
   titulo: string;
   cabecera: string[];
+  /** Centro de la caja de la escena, en coordenadas del modelo: el origen de las capas. */
+  origen: Vec2;
   capas: Capa[];
   glifos: Glifo[];
   textos: Texto[];
@@ -36,43 +54,69 @@ export interface EscenaPreparada {
   caja: Escena["caja"];
 }
 
-/** Coordenada en m con 0,1 mm, sin ceros de más. */
-export function coord(v: number): string {
-  const r = Math.round(v * 1e4) / 1e4;
-  return Object.is(r, -0) ? "0" : String(r);
-}
+/** El origen de las capas de una escena: el centro de su caja. */
+export const origenDe = (e: Pick<Escena, "caja">): Vec2 => [(e.caja[0] + e.caja[2]) / 2, (e.caja[1] + e.caja[3]) / 2];
 
-/** Trazado SVG de unos anillos cerrados (o de una línea abierta). */
-export function trazado(anillos: readonly (readonly Vec2[])[], cerrado: boolean): string {
-  let d = "";
-  for (const r of anillos) {
-    if (!r.length) continue;
-    d += `M${coord(r[0]![0])} ${coord(r[0]![1])}`;
-    for (let i = 1; i < r.length; i++) d += `L${coord(r[i]![0])} ${coord(r[i]![1])}`;
-    if (cerrado) d += "Z";
+/** Lo que se va juntando de una capa, en números de JS (se pasa a Float32 al final). */
+class Acumulador {
+  readonly abanicos: number[] = [];
+  readonly segmentos: number[] = [];
+  readonly caja: Caja = [Infinity, Infinity, -Infinity, -Infinity];
+  private readonly o: Vec2;
+  constructor(o: Vec2) {
+    this.o = o;
   }
-  return d;
+  private punto(q: Vec2): [number, number] {
+    const x = q[0] - this.o[0];
+    const y = q[1] - this.o[1];
+    if (x < this.caja[0]) this.caja[0] = x;
+    if (y < this.caja[1]) this.caja[1] = y;
+    if (x > this.caja[2]) this.caja[2] = x;
+    if (y > this.caja[3]) this.caja[3] = y;
+    return [x, y];
+  }
+  anillo(r: readonly Vec2[], relleno: boolean): void {
+    if (!r.length) return;
+    const p = r.map((q) => this.punto(q));
+    for (let i = 0; i < p.length; i++) {
+      const a = p[i]!;
+      const b = p[(i + 1) % p.length]!;
+      this.segmentos.push(a[0], a[1], b[0], b[1]);
+    }
+    if (relleno) for (let i = 1; i + 1 < p.length; i++) this.abanicos.push(p[0]![0], p[0]![1], p[i]![0], p[i]![1], p[i + 1]![0], p[i + 1]![1]);
+  }
+  linea(r: readonly Vec2[]): void {
+    const p = r.map((q) => this.punto(q));
+    for (let i = 1; i < p.length; i++) this.segmentos.push(p[i - 1]![0], p[i - 1]![1], p[i]![0], p[i]![1]);
+  }
 }
 
 export function prepararEscena(e: Escena): EscenaPreparada {
-  const capas: Capa[] = [];
+  const origen = origenDe(e);
+  const capas: (Omit<Capa, "abanicos" | "segmentos" | "caja"> & { a: Acumulador })[] = [];
   const glifos: Glifo[] = [];
   const textos: Texto[] = [];
-  const anadir = (estilo: Estilo, forma: Capa["forma"], relleno: string | undefined, d: string) => {
+  const capa = (estilo: Estilo, forma: Capa["forma"], relleno: string | undefined): Acumulador => {
     const ult = capas[capas.length - 1];
-    if (ult && ult.estilo === estilo && ult.forma === forma && ult.relleno === relleno) ult.d += d;
-    else capas.push({ estilo, forma, ...(relleno !== undefined ? { relleno } : {}), d });
+    if (ult && ult.estilo === estilo && ult.forma === forma && ult.relleno === relleno) return ult.a;
+    const a = new Acumulador(origen);
+    capas.push({ estilo, forma, ...(relleno !== undefined ? { relleno } : {}), a });
+    return a;
   };
   for (const p of e.primitivas) {
     switch (p.tipo) {
-      case "poligono":
-        anadir(p.estilo, "area", p.relleno, trazado(p.anillos, true));
+      case "poligono": {
+        const a = capa(p.estilo, "area", p.relleno);
+        for (const r of p.anillos) a.anillo(r, true);
         break;
-      case "region":
-        anadir(p.estilo, "region", p.relleno, trazado(p.anillos, true));
+      }
+      case "region": {
+        const a = capa(p.estilo, "region", p.relleno);
+        for (const r of p.anillos) a.anillo(r, true);
         break;
+      }
       case "linea":
-        anadir(p.estilo, "trazo", undefined, trazado([p.puntos], false));
+        capa(p.estilo, "trazo", undefined).linea(p.puntos);
         break;
       case "marca":
       case "flecha":
@@ -83,7 +127,18 @@ export function prepararEscena(e: Escena): EscenaPreparada {
         break;
     }
   }
-  return { titulo: e.titulo, cabecera: e.cabecera, capas, glifos, textos, leyenda: e.leyenda, notas: e.notas, extremos: e.extremos, caja: e.caja };
+  return {
+    titulo: e.titulo,
+    cabecera: e.cabecera,
+    origen,
+    capas: capas.map(({ a, ...c }) => ({ ...c, abanicos: new Float32Array(a.abanicos), segmentos: new Float32Array(a.segmentos), caja: a.caja })),
+    glifos,
+    textos,
+    leyenda: e.leyenda,
+    notas: e.notas,
+    extremos: e.extremos,
+    caja: e.caja,
+  };
 }
 
 // ─── Elegir con el ratón ────────────────────────────────────────────────────────────────────────
@@ -104,20 +159,28 @@ function areaAbs(r: readonly Vec2[]): number {
 /** Dentro de un polígono con huecos (par-impar). */
 const dentroAnillos = (q: Vec2, anillos: readonly (readonly Vec2[])[]) => anillos.reduce((c, r) => (dentro(q, r) ? !c : c), false);
 
+/** Lo que se resalta de unos objetos: sus formas como capas (relleno y trazo) y sus glifos. */
 export interface Eleccion {
+  /** El primero de `objetos` (el principal). */
   objeto: string;
-  /** Trazados de todo lo que la escena dibuja de ese objeto: áreas (m) y glifos (puntos). */
-  areas: string;
-  trazos: string;
+  objetos: string[];
+  origen: Vec2;
+  /** Abanicos de sus polígonos y segmentos de sus contornos y líneas, respecto al origen. */
+  abanicos: Float32Array;
+  segmentos: Float32Array;
+  caja: Caja;
+  /** Dónde están sus glifos (m). */
   puntos: Vec2[];
 }
 
 /**
  * El objeto de la escena bajo el punto q (m), con una tolerancia de `radio` m para las líneas y los
  * glifos. Gana lo más pequeño: un glifo o una línea cercanos antes que un polígono, y de los
- * polígonos que lo contienen, el de menor área (un pilar antes que la losa que lo rodea).
+ * polígonos que lo contienen, el de menor área (un pilar antes que la losa que lo rodea). Las
+ * rectas de los ejes de replanteo y de los niveles pasan por todo, así que van detrás de todo
+ * (sus burbujas, no).
  */
-export function elegir(e: Escena, q: Vec2, radio: number): Eleccion | null {
+export function objetoEn(e: Escena, q: Vec2, radio: number): string | null {
   let mejor: { objeto: string; prioridad: number; medida: number } | null = null;
   const proponer = (objeto: string | undefined, prioridad: number, medida: number) => {
     if (!objeto) return;
@@ -134,7 +197,7 @@ export function elegir(e: Escena, q: Vec2, radio: number): Eleccion | null {
       case "linea":
         for (let i = 1; i < p.puntos.length; i++) {
           const d = distanciaSegmento(q, p.puntos[i - 1]!, p.puntos[i]!);
-          if (d <= radio) proponer(p.objeto, 2, d);
+          if (d <= radio) proponer(p.objeto, p.estilo === "eje" || p.estilo === "nivel" ? 0 : 2, d);
         }
         break;
       case "poligono":
@@ -144,20 +207,98 @@ export function elegir(e: Escena, q: Vec2, radio: number): Eleccion | null {
         break;
     }
   }
-  if (!mejor) return null;
-  return resaltar(e, (mejor as { objeto: string }).objeto);
+  return mejor ? (mejor as { objeto: string }).objeto : null;
 }
 
-/** Todo lo que la escena dibuja de un objeto, para resaltarlo. */
-export function resaltar(e: Escena, objeto: string): Eleccion | null {
-  let areas = "";
-  let trazos = "";
+/** El objeto bajo un punto, ya resaltado (null si no hay ninguno). */
+export function elegir(e: Escena, q: Vec2, radio: number): Eleccion | null {
+  const o = objetoEn(e, q, radio);
+  return o ? resaltar(e, [o]) : null;
+}
+
+/** Todo lo que la escena dibuja de unos objetos, para resaltarlo (null si no dibuja ninguno). */
+export function resaltar(e: Escena, objetos: readonly string[]): Eleccion | null {
+  const ids = new Set(objetos);
+  const origen = origenDe(e);
+  const a = new Acumulador(origen);
   const puntos: Vec2[] = [];
+  const vistos = new Set<string>();
   for (const p of e.primitivas) {
-    if (!("objeto" in p) || p.objeto !== objeto) continue;
-    if (p.tipo === "poligono") areas += trazado(p.anillos, true);
-    else if (p.tipo === "linea") trazos += trazado([p.puntos], false);
+    if (!("objeto" in p) || p.objeto === undefined || !ids.has(p.objeto)) continue;
+    vistos.add(p.objeto);
+    if (p.tipo === "poligono") for (const r of p.anillos) a.anillo(r, true);
+    else if (p.tipo === "linea") a.linea(p.puntos);
     else if (p.tipo === "marca" || p.tipo === "flecha") puntos.push(p.p);
   }
-  return areas || trazos || puntos.length ? { objeto, areas, trazos, puntos } : null;
+  const presentes = objetos.filter((o) => vistos.has(o));
+  if (!presentes.length) return null;
+  return { objeto: presentes[0]!, objetos: presentes, origen, abanicos: new Float32Array(a.abanicos), segmentos: new Float32Array(a.segmentos), caja: a.caja, puntos };
+}
+
+// ─── Elegir por ventana ─────────────────────────────────────────────────────────────────────────
+
+/** ¿Corta el segmento ab el rectángulo? */
+function segmentoToca(a: Vec2, b: Vec2, c: Caja): boolean {
+  const en = (q: Vec2) => q[0] >= c[0] && q[0] <= c[2] && q[1] >= c[1] && q[1] <= c[3];
+  if (en(a) || en(b)) return true;
+  // Liang–Barsky
+  let [t0, t1] = [0, 1];
+  const d: Vec2 = [b[0] - a[0], b[1] - a[1]];
+  for (const [p, q] of [
+    [-d[0], a[0] - c[0]],
+    [d[0], c[2] - a[0]],
+    [-d[1], a[1] - c[1]],
+    [d[1], c[3] - a[1]],
+  ] as const) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
+/**
+ * Los objetos de una ventana (m): con «dentro», los que tienen todo lo dibujado dentro de ella (de
+ * izquierda a derecha, como CYPECAD y AutoCAD); con «toca», los que tienen algo dentro o la cortan
+ * (de derecha a izquierda). En el orden de la escena.
+ */
+export function elegirVentana(e: Escena, c: Caja, modo: "dentro" | "toca"): string[] {
+  const en = (q: Vec2) => q[0] >= c[0] && q[0] <= c[2] && q[1] >= c[1] && q[1] <= c[3];
+  const estado = new Map<string, boolean>();
+  const orden: string[] = [];
+  const marcar = (o: string, v: boolean) => {
+    if (!estado.has(o)) orden.push(o);
+    estado.set(o, modo === "dentro" ? (estado.get(o) ?? true) && v : (estado.get(o) ?? false) || v);
+  };
+  const esquinas: Vec2[] = [
+    [c[0], c[1]],
+    [c[2], c[1]],
+    [c[2], c[3]],
+    [c[0], c[3]],
+  ];
+  for (const p of e.primitivas) {
+    if (!("objeto" in p) || p.objeto === undefined || p.tipo === "texto") continue;
+    if (p.tipo === "marca" || p.tipo === "flecha") {
+      marcar(p.objeto, en(p.p));
+      continue;
+    }
+    const anillos = p.tipo === "linea" ? [p.puntos] : p.anillos;
+    if (modo === "dentro") marcar(p.objeto, anillos.every((r) => r.every(en)));
+    else {
+      let toca = false;
+      for (const r of anillos) {
+        const n = p.tipo === "linea" ? r.length - 1 : r.length;
+        for (let i = 0; i < n && !toca; i++) toca = segmentoToca(r[i]!, r[(i + 1) % r.length]!, c);
+      }
+      // La ventana entera dentro de un polígono también lo toca
+      if (!toca && p.tipo !== "linea") toca = esquinas.some((q) => dentroAnillos(q, p.anillos));
+      marcar(p.objeto, toca);
+    }
+  }
+  return orden.filter((o) => estado.get(o));
 }

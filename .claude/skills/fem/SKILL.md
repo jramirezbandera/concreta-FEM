@@ -60,7 +60,7 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 
 | Vista | Qué dibuja |
 |---|---|
-| `modelo` (por defecto) | Losas, paños con la dirección de sus viguetas, vigas con su ancho, pilares con su sección orientada (rellenos los que llegan desde abajo; en blanco los que arrancan), muros con sus huecos del piso de debajo, apoyos y bandas, con sus ids |
+| `modelo` (por defecto) | Losas (sus huecos, con aspa), paños con la dirección de sus viguetas, vigas con su ancho, pilares con su sección orientada (rellenos los que llegan desde abajo; en blanco los que arrancan), muros con sus huecos del piso de debajo, apoyos y bandas, con sus ids; los ejes de replanteo con sus burbujas y las cotas entre ellos |
 | `cargas` | Las cargas de cada caso (`--caso C` para uno) en la planta, con su valor |
 | `diagnosticos` | Una marca numerada en cada objeto con un error o un aviso, con la lista al lado |
 | `malla` | Láminas y barras de la planta |
@@ -70,6 +70,7 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 
 - `--vista` y `--planta` admiten varias, separadas por comas o repetidas; sin `--planta`, todas.
 - `modelo`, `cargas` y `diagnosticos` se dibujan aunque el modelo no compile: así se ve dónde está el error.
+- Todas las vistas llevan los ejes de replanteo (los de `ejes` o, sin ellos, los propuestos con las alineaciones de los pilares): úsalos para comprobar que cada pilar está en su eje.
 - Las combinaciones son las de `consultar`; sin acciones en los casos, la suma de los gravitatorios (×1 en uz y ×1,4 en los esfuerzos). Con `--caso` y `--combinacion`, como en las consultas.
 
 **Mira `modelo` y `cargas` de cada planta antes de calcular, y compáralos con la descripción:**
@@ -82,7 +83,7 @@ Lo que no cuadre, pregúntalo o corrígelo en el fichero, como un diagnóstico.
 
 ### La app (para el ingeniero)
 
-El ingeniero mete y revisa el modelo en la app: tablas por tipo de objeto, la planta, el cálculo y los resultados (V1 y V2a). Si quiere verla, dile que la abra él con:
+El ingeniero mete y revisa el modelo en la app: tablas por tipo de objeto, vistas de planta, alzado por eje y 3D (una, dos o cuatro a la vez), el cálculo y los resultados. Si quiere verla, dile que la abra él con:
 
 ```
 bun run visor proyecto.json            # escribe una URL local (127.0.0.1) que abre la app sobre ese fichero
@@ -124,6 +125,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
   - El peso propio de una losa maciza se calcula solo (γ·espesor).
   - Un paño unidireccional necesita su `pp`, y un reticular, el `pp` (casetón perdido por defecto).
 - **Muros:** verticales, de `desde` a `hasta`, sobre su eje en planta. Un muro cerrado (un núcleo) repite el primer punto al final.
+- **Ejes de replanteo** (`ejes`, opcional): `id` (lo que dicen sus burbujas: «A», «1»), `nombre` si las burbujas tienen que decir otra cosa, y `desde` y `hasta` en planta. Son sólo del dibujo: no entran en el cálculo ni cambian la huella. Sin `ejes`, el dibujo usa los propuestos (números según la dirección de las losas, letras en la perpendicular). Pon los del plano si te los dan; si no, no los inventes.
 - **Casos:** como mucho uno con `pesoPropio: true`.
   - Con `accion` en **todos** los casos, las consultas usan las combinaciones CTE/NCSE.
   - `accion` lleva: `tipo` G, Q, W, S, E…; `psi` por su nombre (`"uso-A"`, `"viento"`…, ver reglas) o como `{ psi0, psi1, psi2 }` si te dan los valores; y, en W y E, `direccion` y `signo`.

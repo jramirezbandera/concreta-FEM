@@ -15,10 +15,16 @@ export interface Visor {
   proyecto: ProyectoAbierto;
   planta: string | null;
   setPlanta: (p: string) => void;
-  /** Objeto físico elegido (pilar, viga, losa…), que se conserva entre espacios y al recargar si sigue existiendo. */
+  /**
+   * Objeto físico elegido principal (pilar, viga, losa…): el último de `elegidos`, el del inspector.
+   * Se conserva entre espacios y al recargar si sigue existiendo.
+   */
   seleccion: string | null;
-  /** Elegir abre las propiedades del espacio (si estaban plegadas); null suelta. */
+  /** Elegir uno (abre las propiedades del espacio si estaban plegadas); null suelta todo. */
   setSeleccion: (id: string | null) => void;
+  /** I2: todo lo elegido, en el orden en que se eligió (en todas las vistas, el navegador y la tabla). */
+  elegidos: string[];
+  setElegidos: (ids: string[]) => void;
   espacio: Espacio;
   modo: ModoResultados;
   /** Ir a un espacio (y, en Resultados, a un modo). */

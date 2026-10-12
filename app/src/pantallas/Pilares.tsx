@@ -6,21 +6,40 @@
  * con su combinación) y el axil reducido ν de A3 (un aviso de orden de magnitud, no la comprobación
  * de norma, que hace el módulo de pilares de Concreta).
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { FilaPilar } from "../../../src/visor/datos.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
-import { CabeceraVista, CarrilPlantas, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
-import { MARGENES_VISTA } from "../espacios/Modelo.tsx";
 import { useVisor } from "../contexto.ts";
-import { cota, fmt } from "../fmt.ts";
-import { Planta2D } from "../lienzo/Planta2D.tsx";
+import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
+import { BarraVistas } from "../vistas/BarraVistas.tsx";
+import { useVistas, vistasDe } from "../vistas/estado.ts";
+import { Fuente2D, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
+
+/** El axil de los tramos que llegan a una planta, en una vista: un clic elige el pilar. */
+function PlantaPilares({ planta, eleccion, id }: { planta: string; eleccion: EleccionCombinaciones; id: string | null }) {
+  const { proyecto, setSeleccion } = useVisor();
+  const d = usePedido(proyecto.cliente, { tipo: "pilares", planta, combinaciones: eleccion });
+  const vista: VistaPlanta = { vista: "pilares-n", combinaciones: eleccion };
+  const fuente = { tipo: "planta" as const, planta, vista };
+  const resaltado = useEleccion(fuente, id);
+  const filas = d.datos?.filas;
+  const clic = async (p: Vec2, radio: number) => {
+    if (!proyecto.cliente) return;
+    const r = await proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio });
+    const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
+    setSeleccion(o && filas?.some((f) => f.pilar === o) ? o : null);
+  };
+  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
+  return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} />;
+}
 
 const LIMITE_NU = 0.65;
 
@@ -95,49 +114,43 @@ function GraficoAxil({ filas }: { filas: FilaPilar[] }) {
 }
 
 export function ModoPilares() {
-  const { proyecto, planta, setPlanta, seleccion, setSeleccion } = useVisor();
+  const { proyecto, planta, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:pilares", { props: true, dock: true, pestana: "cuadro" });
+  const vistas = useVistas();
+  const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta");
+  useEffect(() => {
+    if (sinPlanta) vistas.irATipo("planta");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
+  }, []);
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const d = usePedido(proyecto.cliente, planta ? { tipo: "pilares", planta, combinaciones: eleccion } : null);
   const filas = d.datos?.filas ?? [];
   const id = filas.some((f) => f.pilar === seleccion) ? seleccion : null;
-  const vista: VistaPlanta = { vista: "pilares-n", combinaciones: eleccion };
-  const resaltado = useEleccion(planta, vista, id);
   const pilar = usePedido(proyecto.cliente, id ? { tipo: "pilar", id, combinaciones: eleccion } : null);
   const pasan = filas.filter((f) => (f.nu?.nu ?? 0) > LIMITE_NU).length;
-
-  const clic = async (p: Vec2, radio: number) => {
-    if (!proyecto.cliente || !planta) return;
-    const r = await proyecto.cliente.pedir({ tipo: "elegir", planta, vista, punto: p, radio });
-    const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
-    setSeleccion(o && filas.some((f) => f.pilar === o) ? o : null);
-  };
-
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
 
   const herramientas = (
     <>
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
       <Separador />
       <BarraModos />
+      <Separador />
+      <BarraVistas />
     </>
   );
 
   const vistaPlanta = (
-    <>
-      <CabeceraVista>
-        <Chip>
-          <strong className="font-semibold">Planta {planta}</strong>
-          <span className="mono text-text-secondary">{cota(e.plantas.find((p) => p.id === planta)?.cota)}</span>
-        </Chip>
-        <Chip acento title={d.datos?.combinaciones.descripcion}>
-          Axil de los tramos que llegan
-        </Chip>
-      </CabeceraVista>
-      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
-      <Planta2D escena={d.datos?.escena ?? null} resaltado={resaltado} onClic={(p, r) => void clic(p, r)} aviso={aviso} titulo={`Pilares de la planta ${planta}`} cargando={d.cargando} margenes={MARGENES_VISTA} />
-    </>
+    <ZonaVistas
+      fuentes={{
+        planta: (v) => (v.planta ? <PlantaPilares planta={v.planta} eleccion={eleccion} id={id} /> : null),
+        cabeceraPlanta: (v) => (
+          <Chip acento title={v.planta === planta ? d.datos?.combinaciones.descripcion : undefined}>
+            Axil de los tramos que llegan
+          </Chip>
+        ),
+      }}
+    />
   );
 
   const cuadro = (

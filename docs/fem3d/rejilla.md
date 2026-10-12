@@ -107,6 +107,7 @@ Medidas en `validacion/c2/out_rejilla.txt` y `out_decisiones.txt`.
   - estaciones de los muros en las líneas de la rejilla: hoy los ejes de los muros son rasgos ajenos y dejan una franja de triangulación a su lado (el muro de sótano perimetral cuesta un 5 % de nudos);
   - ejes de la rejilla cuando el eje 1 de la primera losa no sigue la geometría (un edificio girado con el eje 1 por defecto se queda sin rejilla), y losas de una misma planta con ejes distintos;
   - plantillas para huellas circulares (octógono) y para pilares girados respecto a la rejilla, que hoy van en un parche de triangulación;
+  - plantilla con la esquina de un hueco dentro de su bloque (visto en el visor el 2026-10-12): en el edificio de A2, P-x24-y20 tiene la esquina de la escalera (24,6; 19,6) a ~0,4 m de sus caras, así que se queda sin plantilla en sus 7 plantas (553 de 560) y deja un parche de triangulación que se extiende a las celdas de alrededor. Es R-6 y su calidad es aceptable (N7, 6×6 m alrededor: 218 láminas frente a 88, jacobiano mínimo 0,322, aspecto 4,1), pero se ve raro. Propuesta: meter los lados del hueco como ejes de la red de la plantilla, como sus caras, y comparar el corte en la cara de ese pilar con la triangulación fina;
   - las referencias congeladas pesan 3,4 MB (C2) y 3,9 MB (C3).
 - **Validación externa:** la comparación «en sombra» con SAP2000 o CYPE de un edificio con la rejilla.
 

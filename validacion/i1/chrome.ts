@@ -159,7 +159,7 @@ try {
   const espacio = (n: string) => `__i1.boton("${n}", document.querySelector("nav")).click()`;
   const planta = (id: string) => `[...document.querySelectorAll('.carril [role=option]')].find((b) => b.firstChild.textContent === "${id}").click()`;
   await medir("planta N3", planta("N3"), "true", "1-modelo");
-  await medir("3D", `__i1.boton("3D").click()`, `document.querySelector(".lienzo canvas")`, "2-modelo-3d");
+  await medir("3D", `__i1.boton("3D").click()`, `document.querySelector('.celda[data-tipo="3d"]')`, "2-modelo-3d");
   await medir("planta", `__i1.boton("Planta").click()`);
   await medir("elegir un pilar (navegador)", `[...document.querySelectorAll(".arbol-fila")].find((b) => b.textContent.includes("Pilares")).click(); await new Promise((r) => setTimeout(r, 50)); document.querySelector(".arbol-fila.sub").click()`, `document.querySelector(".panel.der")`, "3-modelo-elegido");
   await medir("Esc", `document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
@@ -171,7 +171,7 @@ try {
   await medir("modo Diagramas", `__i1.boton("Diagramas").click()`, `document.querySelector("#estacion")`, "7-resultados-diagramas");
   await medir("modo Pilares", `__i1.boton("Pilares").click()`, `document.querySelector("tr.clic")`, "8-resultados-pilares");
   await medir("elegir un pilar (cuadro)", `document.querySelectorAll("tr.clic")[5].click()`, `document.querySelector(".panel.der svg")`, "9-resultados-pilar");
-  await medir("modo Deformada", `__i1.boton("Deformada").click()`, `document.querySelector(".lienzo canvas")`, "10-resultados-deformada");
+  await medir("modo Deformada", `__i1.boton("Deformada").click()`, `document.querySelector('.celda[data-tipo="3d"]')`, "10-resultados-deformada");
   await medir("plegar las propiedades", `__i1.boton("Plegar propiedades").click()`);
   await medir("abrir las propiedades", `__i1.boton("Abrir propiedades").click()`);
   await medir("espacio Revisión", espacio("Revisión"), `document.querySelector("article")`, "11-revision");

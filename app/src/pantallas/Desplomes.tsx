@@ -3,17 +3,19 @@
  * pilar y su combinación, y el desplazamiento del maestro de su diafragma), frente al límite de A3,
  * y la deformada 3D en la combinación pésima (o en la elegida, si es una sola).
  */
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { DatosDesplomes } from "../../../src/visor/datos.ts";
-import { CabeceraVista, CarrilPlantas, Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt, fraccion, mm } from "../fmt.ts";
-import { Vista3D } from "../lienzo/Vista3D.tsx";
 import { usePedido } from "../sesion/usePedido.ts";
+import { BarraVistas } from "../vistas/BarraVistas.tsx";
+import { useVistas, vistasDe } from "../vistas/estado.ts";
+import { Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
 
 function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | null> }) {
   const pts = d.plantas.filter((p) => p.maestro && cotas.get(p.planta) !== null).map((p) => ({ z: cotas.get(p.planta)!, ux: p.maestro!.ux.v * 1000, uy: Math.abs(p.maestro!.uy.v * 1000) }));
@@ -50,8 +52,15 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
 }
 
 export function ModoDeformada() {
-  const { proyecto, planta, setPlanta } = useVisor();
+  const { proyecto, planta } = useVisor();
   const pan = usePaneles("resultados:deformada", { props: true, dock: true, pestana: "desplomes" });
+  const vistas = useVistas();
+  // La deformada se ve en 3D: si no hay ninguno, la vista activa pasa a serlo
+  const sin3D = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "3d");
+  useEffect(() => {
+    if (sin3D) vistas.irATipo("3d");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
+  }, []);
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [escalaDada, setEscalaDada] = useState<number | null>(null);
@@ -59,7 +68,6 @@ export function ModoDeformada() {
   const x = d.datos;
   const unaSola = eleccion.tipo === "combinacion" || eleccion.tipo === "caso";
   const def: EleccionCombinaciones | null = unaSola ? eleccion : x?.pesima ? { tipo: "una", de: eleccion, nombre: x.pesima } : null;
-  const geometria = usePedido(proyecto.cliente, e.compila ? { tipo: "geometria" } : null);
   const deformada = usePedido(proyecto.cliente, def ? { tipo: "deformada", combinaciones: def } : null);
   const cotas = new Map(e.plantas.map((p) => [p.id, p.cota]));
   const zs = e.plantas.map((p) => p.cota ?? 0);
@@ -86,28 +94,35 @@ export function ModoDeformada() {
           )}
         </span>
       </Campo>
+      <Separador />
+      <BarraVistas />
     </>
   );
 
+  const def3D = useMemo(() => (deformada.datos && !proyecto.desactualizado ? { u: deformada.datos.u, escala } : null), [deformada.datos, escala, proyecto.desactualizado]);
   const vista = (
-    <>
-      <CabeceraVista>
-        <Chip>
-          <strong className="font-semibold">Deformada</strong> ×{fmt(escala, 0)}
-        </Chip>
-        <Chip acento title={deformada.datos?.etiqueta}>
-          <span className="mono">{deformada.datos?.comb ?? "—"}</span> · máx. {mm(umax)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
-        </Chip>
-      </CabeceraVista>
-      <CarrilPlantas estado={e} planta={planta} onPlanta={setPlanta} />
-      {proyecto.desactualizado ? (
-        <div className="lienzo grid place-items-center">
-          <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
-        </div>
-      ) : (
-        <Vista3D geometria={geometria.datos} plantaActiva={planta} deformada={deformada.datos ? { u: deformada.datos.u, escala } : null} titulo="Deformada del edificio" />
-      )}
-    </>
+    <ZonaVistas
+      fuentes={{
+        tresD: () =>
+          proyecto.desactualizado ? (
+            <div className="velo">
+              <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
+            </div>
+          ) : (
+            <>
+              <Fuente3DModelo deformada={def3D} modo="analitico" />
+              <div className="vista-cab vista-cab-2">
+                <Chip>
+                  <strong className="font-semibold">Deformada</strong> ×{fmt(escala, 0)}
+                </Chip>
+                <Chip acento title={deformada.datos?.etiqueta}>
+                  <span className="mono">{deformada.datos?.comb ?? "—"}</span> · máx. {mm(umax)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
+                </Chip>
+              </div>
+            </>
+          ),
+      }}
+    />
   );
 
   const tabla = x ? (

@@ -10,7 +10,8 @@ import type { Campo } from "../agente/render/resultados.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ValorPunto } from "./datos.ts";
 import type { Eleccion, EscenaPreparada } from "./escena.ts";
-import type { EleccionCombinaciones, EstadoSesion, VistaPlanta } from "./sesion.ts";
+import type { Alambrico } from "./alambrico.ts";
+import type { EleccionCombinaciones, EstadoSesion, FuenteEscena, PlanoPedido, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
   | { tipo: "abrir"; texto: string }
@@ -18,7 +19,13 @@ export type Pedido =
   | { tipo: "calcular" }
   | { tipo: "estado" }
   | { tipo: "escena"; planta: string; vista: VistaPlanta }
-  | { tipo: "elegir"; planta: string; vista: VistaPlanta; punto: readonly [number, number] | null; radio: number; objeto?: string }
+  | { tipo: "alzado"; plano: PlanoPedido }
+  /** El objeto bajo un punto de una escena, o (con `objetos`) esos objetos, resaltados. */
+  | { tipo: "elegir"; fuente: FuenteEscena; punto: readonly [number, number] | null; radio: number; objetos?: string[] }
+  /** Los objetos de una ventana (m) de una escena: «dentro», de izquierda a derecha; «toca», de derecha a izquierda. */
+  | { tipo: "ventana"; fuente: FuenteEscena; caja: [number, number, number, number]; modo: "dentro" | "toca" }
+  /** El 3D alámbrico del modelo físico (I2). */
+  | { tipo: "alambrico" }
   | { tipo: "objeto"; id: string }
   | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones }
   | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number }
@@ -41,7 +48,10 @@ export interface Respuestas {
   calcular: EstadoSesion;
   estado: EstadoSesion;
   escena: EscenaPreparada;
+  alzado: EscenaPreparada;
   elegir: Eleccion | null;
+  ventana: string[];
+  alambrico: Alambrico;
   objeto: DatosObjeto;
   losas: DatosLosas;
   "valor-punto": ValorPunto | null;

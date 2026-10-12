@@ -278,9 +278,36 @@ body {
 
 .kbd { font: 11px var(--font-mono); color: var(--color-text-disabled); }
 
-/* Lienzo: el SVG ocupa su caja */
+/* Lienzo: lo que dibuja ocupa su caja */
 .lienzo { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .lienzo > svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; }
+
+/* ── Zona de vistas (I2): 1, 2 o 4 celdas sobre un lienzo WebGL ─────────── */
+.zona-vistas { position: relative; flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--color-border-main); }
+.zona-vistas[data-disposicion="1"] { grid-template: 1fr / 1fr; }
+.zona-vistas[data-disposicion="1|1"] { grid-template: 1fr / 1fr 1fr; }
+.zona-vistas[data-disposicion="1/1"] { grid-template: 1fr 1fr / 1fr; }
+.zona-vistas[data-disposicion="2x2"] { grid-template: 1fr 1fr / 1fr 1fr; }
+/* Las celdas son transparentes: debajo está el lienzo de toda la zona (z-index 1 y 2) */
+.zona-vistas > .celda { position: relative; z-index: 3; min-width: 0; min-height: 0; overflow: hidden; }
+.zona-vistas > .celda[data-activa="true"] { box-shadow: inset 0 0 0 2px var(--color-accent); }
+.celda-superficie { position: absolute; inset: 0; touch-action: none; user-select: none; }
+.celda .vista-cab { right: 216px; flex-wrap: nowrap; overflow: hidden; }
+.celda:has(.leyenda-vista[data-abierta="false"]) .vista-cab, .celda[data-tipo="3d"] .vista-cab { right: 140px; }
+.vista-cab-2 { top: 48px; }
+.vista-barra {
+  position: absolute; right: 10px; bottom: 10px; z-index: 15; display: flex; gap: 2px; padding: 3px;
+  border: 1px solid var(--color-border-main); border-radius: 9px;
+  background: color-mix(in srgb, var(--color-bg-primary) 94%, transparent); box-shadow: 0 1px 3px rgb(16 24 40 / .08);
+}
+.vista-barra > .ib { width: 28px; height: 28px; }
+.vista-barra > .ib[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
+.leyenda-vista[data-abierta="false"] { width: 112px; }
+.leyenda-vista {
+  position: absolute; right: 10px; top: 10px; z-index: 14; width: 196px; max-height: calc(100% - 64px); overflow-y: auto;
+  border: 1px solid var(--color-border-main); border-radius: 8px; background: color-mix(in srgb, var(--color-bg-primary) 95%, transparent); font-size: 11px;
+}
+.sel-chip { border: 0; background: none; font: 600 12.5px var(--font-sans); color: var(--color-text-primary); cursor: pointer; padding: 0 2px; }
 
 /* Superposición de «resultados desactualizados» */
 .velo {
@@ -311,6 +338,8 @@ body {
 .hoja td.calc { color: var(--color-text-disabled); background: var(--color-bg-surface); cursor: default; }
 .hoja tr[data-sel="true"] td:not(.marca) { background: var(--color-tint-accent); }
 .hoja tr[data-sel="true"] td.marca { color: var(--color-accent); }
+/* Elegido en las vistas o en el navegador (I2) */
+.hoja tr[data-elegido="true"] td.marca { box-shadow: inset 3px 0 0 var(--color-accent); color: var(--color-accent); font-weight: 600; }
 .hoja td[data-activa="true"] { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 .hoja td[data-error="true"] { outline: 2px solid var(--color-state-fail); outline-offset: -2px; }
 .hoja td > input {
