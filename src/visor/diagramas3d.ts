@@ -71,6 +71,12 @@ export interface Diagramas3D {
   extremos: ExtremoDiagrama[];
   /** Los de cada pieza que se ve (para rotular las elegidas). */
   piezas: { id: string; tipo: TramoEspacio["tipo"]; max: ExtremoDiagrama | null; min: ExtremoDiagrama | null }[];
+  /** El eje de cada tramo que se ve (i', j' respecto al origen), su pieza (índice en `piezas`) y sus estaciones s0, s1: para el valor bajo el cursor. */
+  ejes: Float32Array;
+  ejePieza: Uint32Array;
+  ejeS: Float64Array;
+  /** De qué conjunto de combinaciones sale. */
+  conjunto: { descripcion: string; n: number };
   leyenda: { estilo: "diagrama-positivo" | "diagrama-negativo"; texto: string }[];
   notas: string[];
 }
@@ -167,6 +173,19 @@ export function diagramas3D(r: ResultadosRender, origen: [number, number, number
     if (pmax && (!gmax || pmax.e.valor > gmax.e.valor)) gmax = pmax;
     if (pmin && (!gmin || pmin.e.valor < gmin.e.valor)) gmin = pmin;
   }
+  const indicePieza = new Map(piezas.map((x, i) => [x.id, i]));
+  const ejes = new Float32Array(6 * vistos.length);
+  const ejePieza = new Uint32Array(vistos.length);
+  const ejeS = new Float64Array(2 * vistos.length);
+  vistos.forEach(({ tr }, i) => {
+    for (let k = 0; k < 3; k++) {
+      ejes[6 * i + k] = tr.a[k]! - origen[k]!;
+      ejes[6 * i + 3 + k] = tr.b[k]! - origen[k]!;
+    }
+    ejePieza[i] = indicePieza.get(tr.pieza)!;
+    ejeS[2 * i] = tr.t.s0;
+    ejeS[2 * i + 1] = tr.t.s1;
+  });
   const extremos: ExtremoDiagrama[] = [];
   for (const g of [gmax, gmin]) {
     // Sólo un máximo positivo y un mínimo negativo
@@ -194,6 +213,10 @@ export function diagramas3D(r: ResultadosRender, origen: [number, number, number
     signoLinea: Uint8Array.from(sl),
     extremos,
     piezas,
+    ejes,
+    ejePieza,
+    ejeS,
+    conjunto: { descripcion: conjunto.descripcion, n: conjunto.factores.length },
     leyenda: [
       { estilo: "diagrama-positivo", texto: LEYENDA[esfuerzo][0] },
       { estilo: "diagrama-negativo", texto: LEYENDA[esfuerzo][1] },

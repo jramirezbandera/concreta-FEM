@@ -9,7 +9,7 @@ import type { ProyectoAbierto } from "./sesion/useProyecto.ts";
 export type Espacio = "modelo" | "cargas" | "resultados" | "revision";
 
 /** Los modos de Resultados: lo que eran las pantallas Losas, Vigas, Pilares y Desplomes de V1. */
-export type ModoResultados = "losas" | "diagramas" | "pilares" | "deformada";
+export type ModoResultados = "losas" | "diagramas" | "pilares" | "deformada" | "reacciones";
 
 export interface Visor {
   proyecto: ProyectoAbierto;

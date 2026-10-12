@@ -9,12 +9,14 @@
 import type { EscalaMapa } from "../agente/render/isovalores.ts";
 import type { Campo } from "../agente/render/resultados.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import type { DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ValorPunto } from "./datos.ts";
+import type { DatosDeformada, DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ValorPunto } from "./datos.ts";
 import type { Eleccion, EscenaPreparada } from "./escena.ts";
 import type { Alambrico } from "./alambrico.ts";
 import type { Diagramas3D } from "./diagramas3d.ts";
 import type { Isovalores3D } from "./isovalores3d.ts";
-import type { DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PlanoPedido, VistaPlanta } from "./sesion.ts";
+import type { Pilares3D } from "./pilares3d.ts";
+import type { Reacciones3D } from "./reacciones3d.ts";
+import type { DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorLamina, PlanoPedido, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
   | { tipo: "abrir"; texto: string }
@@ -44,6 +46,10 @@ export type Pedido =
   /** I4: los diagramas de las barras y los isovalores de las losas en el 3D. */
   | ({ tipo: "diagramas3d" } & PedidoDiagramas3D)
   | ({ tipo: "isovalores3d" } & PedidoIsovalores3D)
+  /** I4: los pilares por colores, las reacciones y el valor de un mapa bajo el cursor. */
+  | ({ tipo: "pilares3d" } & PedidoPilares3D)
+  | { tipo: "reacciones3d"; combinaciones: EleccionCombinaciones; escala?: number }
+  | ({ tipo: "valor-lamina" } & PedidoValorLamina)
   | { tipo: "revision"; firmas: string; ficheroFirmas: string }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
   | { tipo: "precalentar"; planta: string };
@@ -69,9 +75,12 @@ export interface Respuestas {
   pilar: { combinaciones: Combinaciones; filas: FilaPilar[] };
   desplomes: DatosDesplomes;
   geometria: Geometria3D;
-  deformada: { comb: string; etiqueta: string; u: Float32Array };
+  deformada: DatosDeformada;
   diagramas3d: Diagramas3D;
   isovalores3d: Isovalores3D;
+  pilares3d: Pilares3D;
+  reacciones3d: Reacciones3D;
+  "valor-lamina": ValorLamina | null;
   revision: DatosRevision;
   precalentar: null;
 }

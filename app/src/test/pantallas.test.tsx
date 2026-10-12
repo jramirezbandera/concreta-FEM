@@ -10,14 +10,18 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
 import { sha256 } from "../../../src/compilador/huella.ts";
 import { Atendedor } from "../../../src/visor/atender.ts";
-import type { DatosLosas, DatosPilares } from "../../../src/visor/datos.ts";
+import type { DatosEstacion, DatosLosas, DatosPilares } from "../../../src/visor/datos.ts";
+import type { Pilares3D } from "../../../src/visor/pilares3d.ts";
+import type { Reacciones3D } from "../../../src/visor/reacciones3d.ts";
 import type { Pedido } from "../../../src/visor/protocolo.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { ContextoPaneles, useAlmacenPaneles } from "../armazon/paneles.ts";
 import { ContextoVisor, type ModoResultados } from "../contexto.ts";
 import { fmt, mm } from "../fmt.ts";
 import { ModoLosas } from "../pantallas/Losas.tsx";
-import { ModoPilares } from "../pantallas/Pilares.tsx";
+import { lineasTramo, ModoPilares } from "../pantallas/Pilares.tsx";
+import { lineasReaccion, ModoReacciones } from "../pantallas/Reacciones.tsx";
+import { lineasEstacion } from "../pantallas/Vigas.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
 import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
@@ -118,5 +122,33 @@ describe("V1 · DOM", () => {
       const celdas = within(fl[i]!).getAllByRole("cell");
       expect(celdas[1]!.textContent).toBe(`${mm(f.maxima.v)}${f.maxima.comb}`);
     });
+  }, 60_000);
+
+  it("reacciones (I4): la tabla dice los valores de la consulta, y la sonda de cada flecha también", async () => {
+    const planta = estado.plantas[0]!.id;
+    const r = await at.atender({ tipo: "reacciones3d", combinaciones: { tipo: "defecto" }, escala: 1 });
+    const d = (r as { valor: Reacciones3D }).valor;
+    expect(d.objetos.length).toBeGreaterThan(0);
+    montar(<ModoReacciones />, planta, "reacciones");
+    await waitFor(() => expect(document.querySelectorAll("[data-reaccion]").length).toBe(d.objetos.length));
+    const filas = within(seccion("Reacciones por objeto")).getAllByRole("row").slice(1);
+    d.objetos.forEach((o, i) => {
+      const celdas = within(filas[i]!).getAllByRole("cell");
+      expect(celdas[0]!.textContent).toBe(`${o.id}${o.tipo}${d.conjunto.n > 1 ? ` · ${o.comb}` : ""}`);
+      o.R.forEach((v, k) => expect(celdas[k + 1]!.textContent).toBe(fmt(v, 1)));
+      expect(lineasReaccion(o)[1]).toBe(`Fz ${fmt(o.R[2], 1)} kN · Fx ${fmt(o.R[0], 1)} · Fy ${fmt(o.R[1], 1)}`);
+    });
+  }, 60_000);
+
+  it("sondas (I4): un tramo de pilar y una estación dicen los valores de su consulta", async () => {
+    const r = await at.atender({ tipo: "pilares3d", magnitud: "N", combinaciones: { tipo: "defecto" }, planta: null });
+    const d = (r as { valor: Pilares3D }).valor;
+    d.tramos.forEach((t, k) => expect(lineasTramo(d, k)![1]).toBe(`N ${fmt(t.valor, 1)} kN · ${t.comb}${t.donde ? ` (en la ${t.donde})` : ""}`));
+    const p = d.tramos[0]!.pilar;
+    const e = await at.atender({ tipo: "estacion", id: p, esfuerzo: "N", combinaciones: { tipo: "defecto" }, s: 1 });
+    const x = (e as { valor: DatosEstacion }).valor;
+    const l = lineasEstacion(p, x, "N", "kN");
+    expect(l[0]).toBe(`${p} · s = ${fmt(1, 2)} m`);
+    if (!x.rigida) expect(l[1]).toBe(`N máx. ${fmt(x.derecha!.max.v, 1)} kN · ${x.derecha!.max.comb}`);
   }, 60_000);
 });

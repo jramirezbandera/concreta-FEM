@@ -15,6 +15,9 @@ import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
 import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
 import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
+import type { Pilares3D } from "../../../src/visor/pilares3d.ts";
+import type { Reacciones3D } from "../../../src/visor/reacciones3d.ts";
+import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
 import type { FuenteEscena, VistaPlanta } from "../../../src/visor/sesion.ts";
 import { Desplegable, SelectorPlanta } from "../armazon/Disposicion.tsx";
@@ -26,7 +29,7 @@ import { useTheme } from "../tema/useTheme.ts";
 import { useVistas, vistasDe, type EstadoVista, type TipoVista } from "./estado.ts";
 import { Motor, type Herramienta, type Vista } from "./motor.ts";
 import { Vista2D, type Eventos2D, type Marca, type Margenes } from "./vista2d.ts";
-import { Vista3D, type Eventos3D, type Modo3D } from "./vista3d.ts";
+import { Vista3D, type Eventos3D, type Modo3D, type Objetivo3D, type Sonda } from "./vista3d.ts";
 
 // ─── La celda y su contexto ─────────────────────────────────────────────────────────────────────
 
@@ -360,38 +363,55 @@ export function plantaVista(v: EstadoVista, calculado: boolean): VistaPlanta {
   return { vista: v.dibujo === "malla" && !calculado ? "modelo" : v.dibujo };
 }
 
-/** Lo que añade un 3D con resultados (I4): diagramas o isovalores, su leyenda y su estado. */
+/** Lo que añade un 3D con resultados (I4): diagramas, isovalores, pilares o reacciones, su leyenda, su estado y lo que hay bajo el cursor. */
 export interface Resultados3D {
   diagramas?: Diagramas3D | null;
   isovalores?: Isovalores3D | null;
+  pilares?: Pilares3D | null;
+  reacciones?: Reacciones3D | null;
   leyenda?: ContenidoLeyenda | null;
   aviso?: ReactNode;
   cargando?: boolean;
+  /** Lo que hay bajo el cursor quieto: quien lo recibe pide su consulta y da la sonda. */
+  alPasar?: (o: Objetivo3D | null) => void;
+  sonda?: Sonda | null;
+}
+
+/** La deformada de un 3D: desplazamientos (m), escala, extremos rotulados y si se anima. */
+export interface Deformada3D {
+  u: Float32Array;
+  escala: number;
+  extremos?: ExtremoDeformada[];
+  animada?: boolean;
 }
 
 interface PropsFuente3D extends Resultados3D {
   alambrico: Alambrico | null;
   analitico?: Geometria3D | null;
-  deformada?: { u: Float32Array; escala: number } | null;
+  deformada?: Deformada3D | null;
   /** Fuerza un modo (la deformada, sobre el analítico). */
   modo?: Modo3D;
   eventos?: Eventos3D;
 }
 
 /** Un 3D en la vista de la celda. */
-export function Fuente3D({ alambrico, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, leyenda = null }: PropsFuente3D) {
+export function Fuente3D({ alambrico, analitico = null, deformada = null, modo, eventos, cargando = false, aviso, diagramas = null, isovalores = null, pilares = null, reacciones = null, leyenda = null, alPasar, sonda = null }: PropsFuente3D) {
   const { vista, v, varias } = useCelda();
   const x = vista instanceof Vista3D ? vista : null;
   useEffect(() => x?.ponerAlambrico(alambrico), [x, alambrico]);
   useEffect(() => x?.ponerDiagramas(diagramas), [x, diagramas]);
   useEffect(() => x?.ponerIsovalores(isovalores), [x, isovalores]);
+  useEffect(() => x?.ponerPilares(pilares), [x, pilares]);
+  useEffect(() => x?.ponerReacciones(reacciones), [x, reacciones]);
   useEffect(() => x?.ponerAnalitico(analitico), [x, analitico]);
-  useEffect(() => x?.ponerDeformada(deformada?.u ?? null, deformada?.escala ?? 1), [x, deformada]);
+  useEffect(() => x?.ponerDeformada(deformada?.u ?? null, deformada?.escala ?? 1, deformada?.extremos), [x, deformada]);
+  useEffect(() => x?.ponerAnimacion(!!deformada?.animada), [x, deformada?.animada]);
   useEffect(() => x?.ponerModo(modo ?? v.modo3d), [x, modo, v.modo3d]);
   useEffect(() => x?.ponerProyeccion(v.proyeccion), [x, v.proyeccion]);
   useEffect(() => x?.ponerPlantaActiva(v.planta), [x, v.planta]);
+  useEffect(() => x?.ponerSonda(sonda), [x, sonda]);
   useEffect(() => {
-    if (x) x.eventos = eventos ?? {};
+    if (x) x.eventos = { ...(eventos ?? {}), ...(alPasar ? { pasar: alPasar } : {}) };
   });
   return (
     <>
@@ -403,7 +423,7 @@ export function Fuente3D({ alambrico, analitico = null, deformada = null, modo, 
 }
 
 /** El 3D del modelo: el alámbrico (y el analítico si se pide), con elegir; con resultados (I4), encima. */
-export function Fuente3DModelo({ deformada, modo, resultados }: { deformada?: { u: Float32Array; escala: number } | null; modo?: Modo3D; resultados?: Resultados3D }) {
+export function Fuente3DModelo({ deformada, modo, resultados }: { deformada?: Deformada3D | null; modo?: Modo3D; resultados?: Resultados3D }) {
   const { proyecto, elegidos, setElegidos } = useVisor();
   const { v } = useCelda();
   const e = proyecto.estado!;

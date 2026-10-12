@@ -10,6 +10,11 @@
  *   eje 3 con M en el plano (sha256).
  * - Fluidez con los resultados puestos: orbitar el 3D con los diagramas y con los isovalores a 60 fps
  *   (la mediana del intervalo entre fotogramas ≤ 17 ms); las tareas largas, contadas.
+ * - El resto de I4 (§15): los pilares por colores, las flechas de las reacciones y las bandas de los
+ *   muros (el núcleo) son los de Node; la sonda bajo el cursor (un tramo, una flecha, una estación de
+ *   un diagrama y un punto de un mapa) dice lo que su consulta da en Node para ese mismo objetivo;
+ *   orbitar con cada capa y con la deformada animada a 60 fps, sin tareas largas, tampoco al pasar el
+ *   ratón.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -21,6 +26,8 @@ import { sha256 } from "../../src/compilador/huella.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import type { EscenaPreparada } from "../../src/visor/escena.ts";
 import { Sesion } from "../../src/visor/sesion.ts";
+import { estacionViga } from "../../src/visor/datos.ts";
+import { fmt } from "../../app/src/fmt.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const APP = join(RAIZ, "app");
@@ -65,7 +72,18 @@ const D = { tipo: "defecto" } as const;
 const dMy = valor(ses.diagramas3D({ esfuerzo: "My", combinaciones: D, planta: null, piezas: "todas", escala: 1 }));
 const isoTodas = valor(ses.isovalores3D({ campo: "uz", combinaciones: D, planta: null }));
 const isoN3 = valor(ses.isovalores3D({ campo: "uz", combinaciones: D, planta: "N3" }));
+const pilN = valor(ses.pilares3D({ magnitud: "N", combinaciones: D, planta: null }));
+const reac = valor(ses.reacciones3D(D, 1));
+const NUCLEO = "validacion/a2/agente/nucleo/proyecto.json";
+const abN = Sesion.abrir(readFileSync(join(RAIZ, NUCLEO), "utf8"), sha256(new Uint8Array(wasm)));
+if (!abN.valido) throw new Error("el núcleo no abre");
+const sesN = abN.sesion;
+if (!(await sesN.calcular()).ok) throw new Error("el núcleo no calcula");
+const isoMuros = valor(sesN.isovalores3D({ campo: "f22", combinaciones: D, planta: null, superficies: "muros" }));
 const ESPERADO = {
+  pilares: pilN.tramos.length,
+  reacciones: reac.segmentos.length / 6,
+  muros: isoMuros.triangulos.length / 9,
   diagramas: (dMy.positivo.length + dMy.negativo.length) / 9,
   isoTodas: isoTodas.triangulos.length / 9,
   isoN3: isoN3.triangulos.length / 9,
@@ -79,6 +97,8 @@ const DIST = join(APP, "dist");
 const datos = mkdtempSync(join(tmpdir(), "i4-proyectos-"));
 mkdirSync(join(datos, "edificio"), { recursive: true });
 copyFileSync(join(RAIZ, EDIFICIO), join(datos, "edificio", "proyecto.json"));
+mkdirSync(join(datos, "nucleo"), { recursive: true });
+copyFileSync(join(RAIZ, NUCLEO), join(datos, "nucleo", "proyecto.json"));
 
 const TIPOS: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".woff2": "font/woff2", ".json": "application/json", ".txt": "text/plain", ".svg": "image/svg+xml" };
 const servidor = createServer((req, res) => {
@@ -136,7 +156,7 @@ const AYUDAS = `
 window.__largas = [];
 new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__largas.push({ t: e.startTime, ms: e.duration }); }).observe({ type: "longtask", buffered: true });
 window.__i2 = {
-  esperar: async (f, ms = 120000) => { const t0 = performance.now(); for (;;) { const v = await f(); if (v) return v; if (performance.now() - t0 > ms) throw new Error("tiempo agotado: " + f); await new Promise((r) => setTimeout(r, 15)); } },
+  esperar: async (f, ms = 120000) => { const t0 = performance.now(); for (;;) { let v = null; try { v = await f(); } catch { v = null; } if (v) return v; if (performance.now() - t0 > ms) throw new Error("tiempo agotado: " + f); await new Promise((r) => setTimeout(r, 15)); } },
   estado: () => document.querySelector("[data-estado]")?.dataset.estado ?? null,
   boton: (texto, raiz = document) => [...raiz.querySelectorAll("button")].find((b) => b.textContent.trim() === texto || b.textContent.trim().startsWith(texto + " ") || b.getAttribute("aria-label") === texto),
   quietos: () => [...document.querySelectorAll(".lienzo[data-cargando]")].every((x) => x.dataset.cargando === "false"),
@@ -146,6 +166,16 @@ window.__i2 = {
   ev: (i, tipo, x, y, o = {}) => { const s = __i2.sup(i); const r = s.getBoundingClientRect(); const E = tipo === "wheel" ? WheelEvent : PointerEvent; s.dispatchEvent(new E(tipo, { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse", button: o.boton ?? 0, buttons: tipo === "pointerup" ? 0 : 1 << (o.boton === 1 ? 2 : o.boton === 2 ? 1 : 0), clientX: r.left + x, clientY: r.top + y, shiftKey: !!o.mayus, ctrlKey: !!o.ctrl, deltaY: o.deltaY ?? 0 })); },
   clic: async (i, x, y, o = {}) => { __i2.ev(i, "pointerdown", x, y, o); __i2.ev(i, "pointerup", x, y, o); await new Promise((r) => setTimeout(r, 30)); },
   fotograma: () => new Promise((r) => requestAnimationFrame(() => r())),
+  /** El cursor quieto sobre un punto del modelo (m) en la vista i; espera a que la vista diga qué hay debajo. */
+  pasarSobre: async (i, x, y, z) => {
+    const q = window.__motorVistas.vista(i).aPantalla(x, y, z);
+    if (!q) return null;
+    const s = __i2.sup(i); const r = s.getBoundingClientRect();
+    s.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, pointerId: 1, pointerType: "mouse", buttons: 0, clientX: r.left + q[0], clientY: r.top + q[1] }));
+    await new Promise((r) => setTimeout(r, 200));
+    await __i2.esperar(async () => (await __i2.dep(i)).sonda, 20000).catch(() => null);
+    return await __i2.dep(i);
+  },
   /** Un arrastre de (x0, y0) a (x1, y1) en n pasos, uno por fotograma, midiendo los intervalos entre fotogramas. */
   arrastre: async (i, x0, y0, x1, y1, n, o = {}) => {
     const t = []; let vivo = true; const bucle = (ts) => { t.push(ts); if (vivo) requestAnimationFrame(bucle); }; requestAnimationFrame(bucle);
@@ -263,6 +293,152 @@ try {
   await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).isovalores !== ${ESPERADO.isoN3}, 60000).catch(() => null);`);
   await quietos();
   await captura("7-3d-m11-N3");
+
+  // ─── El resto de I4 (§15) ───────────────────────────────────────────────────────────────────
+  type Dep = { sonda: string[] | null; objetivo: { tipo: string; pieza?: string; s?: number; lamina?: number; k?: number; p: [number, number, number] } | null; pilares: number; reacciones: number; isovalores: number; animada: boolean };
+  const sondaIgual = (que: string, d: Dep | null, esperado: (o: NonNullable<Dep["objetivo"]>) => string[] | null, lineas: number[]) => {
+    const o = d?.objetivo ?? null;
+    const e = o ? esperado(o) : null;
+    const bien = !!d?.sonda && !!e && lineas.every((k) => d.sonda![k] === e[k]);
+    comprobar(bien, `sonda ${que}: «${d?.sonda?.join(" | ") ?? "—"}»${bien ? "" : ` (Node: «${e?.join(" | ") ?? "—"}»)`}`);
+  };
+
+  log("\n## Sonda sobre los isovalores (uz de N3)");
+  {
+    // El centro de una lámina de N3 en la vista que ya enseña su mapa
+    const c = ses.compilado!;
+    const l = ses.rr!.laminas("N3").laminas[Math.floor(ses.rr!.laminas("N3").laminas.length / 3)]!;
+    const P = c.modelo.laminas![l]!.nudos.map((n) => c.modelo.nudos[n]!);
+    await pagina(`__i2.boton("uz").click()`);
+    await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).isovalores === ${ESPERADO.isoN3}, 60000).catch(() => null);`);
+    await quietos();
+    await pagina(`window.__largas = [];`);
+    const d = await pagina<Dep>(`return await __i2.pasarSobre(0, ${(P[0]!.x + P[2]!.x) / 2}, ${(P[0]!.y + P[2]!.y) / 2}, ${P[0]!.z});`);
+    await captura("8-sonda-uz");
+    sondaIgual("de uz en N3", d, (o) => {
+      if (o.tipo !== "lamina") return null;
+      const v = valor(ses.valorLamina({ campo: "uz", combinaciones: D, nombre: isoN3.combinacion!.nombre, lamina: o.lamina!, punto: o.p }));
+      return v ? [`${fmt(v.valor, 2)} ${v.unidad}`, `${v.objeto} · ${v.planta} · ${v.comb}`] : null;
+    }, [0, 1]);
+    await largas("al pasar el ratón");
+  }
+
+  log("\n## Sonda sobre los diagramas (My)");
+  {
+    await pagina(`__i2.boton("Diagramas").click()`);
+    await quietos();
+    await pagina(elegir("Planta", ""));
+    await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).diagramas === ${ESPERADO.diagramas}, 120000).catch(() => null);`);
+    await quietos();
+    // El punto del eje en la estación del máximo
+    const ex = dMy.extremos.find((x) => x.que === "máximo")!;
+    const k = dMy.piezas.findIndex((x) => x.id === ex.pieza);
+    let q: [number, number, number] | null = null;
+    for (let i = 0; i < dMy.ejePieza.length && !q; i++) {
+      const [s0, s1] = [dMy.ejeS[2 * i]!, dMy.ejeS[2 * i + 1]!];
+      if (dMy.ejePieza[i] !== k || ex.s < s0 - 1e-9 || ex.s > s1 + 1e-9) continue;
+      const t = s1 > s0 ? (ex.s - s0) / (s1 - s0) : 0;
+      q = [0, 1, 2].map((a) => dMy.origen[a]! + dMy.ejes[6 * i + a]! + t * (dMy.ejes[6 * i + 3 + a]! - dMy.ejes[6 * i + a]!)) as [number, number, number];
+    }
+    await pagina(`window.__largas = [];`);
+    const d = await pagina<Dep>(`return await __i2.pasarSobre(0, ${q![0]}, ${q![1]}, ${q![2]});`);
+    await captura("9-sonda-my");
+    sondaIgual("de My", d, (o) => {
+      if (o.tipo !== "barra") return null;
+      const e = valor(estacionViga(ses, o.pieza!, "My", D, o.s!));
+      if (e.rigida) return [`${o.pieza} · s = ${fmt(e.s, 2)} m`, "En un apoyo (zona rígida): sin esfuerzos de la barra"];
+      // La primera línea de valores: la del lado derecho o, si salta, la del izquierdo
+      const iguales = JSON.stringify(e.izquierda) === JSON.stringify(e.derecha);
+      const x = iguales ? e.derecha! : e.izquierda!;
+      return [`${o.pieza} · s = ${fmt(e.s, 2)} m`, `${iguales ? "" : "izq. "}My máx. ${fmt(x.max.v, 1)} kN·m · ${x.max.comb}`];
+    }, [0, 1]);
+    await largas("al pasar el ratón");
+  }
+
+  log("\n## Pilares por colores: N");
+  {
+    await pagina(`__i2.boton("Pilares").click()`);
+    await quietos();
+    await pagina(`__i2.boton("3D").click()`);
+    await pagina(`window.__largas = [];`);
+    await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).pilares > 0, 120000);`);
+    await quietos();
+    await largas("al cargarlos");
+    await captura("10-3d-pilares-n");
+    const d = await pagina<Dep>(`return await __i2.dep(0);`);
+    comprobar(d.pilares === ESPERADO.pilares, `tramos de pilar: ${d.pilares} = Node ${ESPERADO.pilares}`);
+    fps("orbitar el 3D con los pilares", await orbitar());
+    await largas("al orbitar");
+    const ex = pilN.extremos[0]!;
+    await pagina(`window.__largas = [];`);
+    const h = await pagina<Dep>(`return await __i2.pasarSobre(0, ${ex.punto[0]}, ${ex.punto[1]}, ${ex.punto[2]});`);
+    await captura("11-sonda-pilar");
+    sondaIgual("de un tramo", h, (o) => {
+      if (o.tipo !== "pilar") return null;
+      const t = pilN.tramos[o.k!]!;
+      return [`${t.pilar} · de ${t.plantaBase} a ${t.planta}`, `N ${fmt(t.valor, 1)} kN · ${t.comb}${t.donde ? ` (en la ${t.donde})` : ""}`];
+    }, [0, 1]);
+    await largas("al pasar el ratón");
+  }
+
+  log("\n## Reacciones");
+  {
+    await pagina(`__i2.boton("Reacciones").click()`);
+    await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).reacciones > 0, 120000);`);
+    await quietos();
+    await captura("12-3d-reacciones");
+    const d = await pagina<Dep>(`return await __i2.dep(0);`);
+    comprobar(d.reacciones === ESPERADO.reacciones, `segmentos de las flechas: ${d.reacciones} = Node ${ESPERADO.reacciones}`);
+    fps("orbitar el 3D con las reacciones", await orbitar());
+    await largas("al orbitar");
+    // La punta de la mayor
+    const ex = reac.extremos[0]!;
+    const o = reac.objetos.find((x) => x.id === ex.id)!;
+    const k = reac.escala.m / reac.escala.valor;
+    await pagina(`window.__largas = [];`);
+    const h = await pagina<Dep>(`return await __i2.pasarSobre(0, ${o.punto[0]}, ${o.punto[1]}, ${o.punto[2] - 0.5 * o.R[2]! * k});`);
+    await captura("13-sonda-reaccion");
+    sondaIgual("de una flecha", h, (x) => {
+      if (x.tipo !== "reaccion") return null;
+      const r = reac.objetos[x.k!]!;
+      return [`${r.id} · ${r.tipo} · ${r.comb}`, `Fz ${fmt(r.R[2], 1)} kN · Fx ${fmt(r.R[0], 1)} · Fy ${fmt(r.R[1], 1)}`, `Mx ${fmt(r.R[3], 1)} · My ${fmt(r.R[4], 1)} · Mz ${fmt(r.R[5], 1)} kN·m`];
+    }, [0, 1, 2]);
+    await largas("al pasar el ratón");
+  }
+
+  log("\n## Deformada animada");
+  {
+    await pagina(`__i2.boton("Deformada").click()`);
+    await pagina(`await __i2.esperar(() => __i2.boton("Animar"), 60000);`);
+    await quietos();
+    await pagina(`__i2.boton("Animar").click()`);
+    await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).animada, 20000);`);
+    await pagina(`await new Promise((r) => setTimeout(r, 800)); window.__largas = [];`);
+    await captura("14-deformada-animada");
+    fps("orbitar el 3D con la deformada animada", await orbitar());
+    await largas("animando y orbitando");
+    await pagina(`__i2.boton("Parar").click()`);
+  }
+
+  log("\n## Muros: F22 del núcleo");
+  {
+    await abrir("nucleo", 1920, 1080);
+    await pagina(`__i2.boton("Resultados", document.querySelector("nav")).click()`);
+    await pagina(`await __i2.esperar(() => __i2.boton("Losas")); __i2.boton("Losas").click()`);
+    await quietos();
+    await pagina(`__i2.boton("3D").click()`);
+    await pagina(`await __i2.esperar(() => document.querySelector('.celda[data-vista="0"] select[aria-label="Superficies del mapa"]'), 60000);`);
+    await pagina(`__i2.boton("F22").click()`);
+    await pagina(elegir("Superficies del mapa", "muros"));
+    await pagina(elegir("Planta", ""));
+    await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).isovalores === ${ESPERADO.muros}, 120000).catch(() => null);`);
+    await quietos();
+    await captura("15-3d-f22-muros");
+    const d = await pagina<Dep>(`return await __i2.dep(0);`);
+    comprobar(d.isovalores === ESPERADO.muros, `triángulos de las bandas de los muros: ${d.isovalores} = Node ${ESPERADO.muros}`);
+    fps("orbitar el 3D con los muros", await orbitar());
+    await largas("al orbitar");
+  }
 } finally {
   writeFileSync(join(import.meta.dirname, "out_chrome.txt"), `${salida.join("\n")}\n\n${fallos ? `${fallos} FALLOS` : "TODO BIEN"}\n`);
   ws.close();

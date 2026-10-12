@@ -1,7 +1,7 @@
 GPU de Chrome: ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Ti (0x00002803) Direct3D11 vs_5_0 ps_5_0, D3D11)
 
 ## Diagramas en el 3D: My de todas las barras
-     hasta verlos: 889 ms
+     hasta verlos: 721 ms
      tareas largas al cargarlos: 0
 BIEN  triángulos de los diagramas: 266926 = Node 266926
 BIEN  orbitar el 3D con los diagramas: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
@@ -13,8 +13,40 @@ BIEN  alzado del eje 3 con M: 226 capas, sha256 149c844b378c0b60 = Node 149c844b
 ## Isovalores en el 3D: uz
      tareas largas al cargarlos: 0
 BIEN  triángulos de las bandas, todas las plantas: 207318 = Node 207318
-BIEN  orbitar el 3D con los isovalores: mediana 8.3 ms, p95 8.5 ms entre fotogramas (120)
+BIEN  orbitar el 3D con los isovalores: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
      tareas largas al orbitar: 0
 BIEN  triángulos de las bandas de N3: 29408 = Node 29408
+
+## Sonda sobre los isovalores (uz de N3)
+BIEN  sonda de uz en N3: «−1,94 mm | L-N3 · N3 · (G + Q)»
+     tareas largas al pasar el ratón: 0
+
+## Sonda sobre los diagramas (My)
+BIEN  sonda de My: «P-x0-y10 · s = 19,20 m | My máx. 131,1 kN·m · 1,4·(G + Q) | My mín. 131,1 kN·m · 1,4·(G + Q)»
+     tareas largas al pasar el ratón: 0
+
+## Pilares por colores: N
+     tareas largas al cargarlos: 0
+BIEN  tramos de pilar: 560 = Node 560
+BIEN  orbitar el 3D con los pilares: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas al orbitar: 0
+BIEN  sonda de un tramo: «P-x12-y5 · de C a N1 | N −4574,2 kN · 1,4·(G + Q) (en la base) | P40x40»
+     tareas largas al pasar el ratón: 0
+
+## Reacciones
+BIEN  segmentos de las flechas: 800 = Node 800
+BIEN  orbitar el 3D con las reacciones: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas al orbitar: 0
+BIEN  sonda de una flecha: «P-x6-y5 · pilar · G | Fz 2280,2 kN · Fx −5,8 · Fy 4,4 | Mx −2,0 · My −2,6 · Mz 0,0 kN·m»
+     tareas largas al pasar el ratón: 0
+
+## Deformada animada
+BIEN  orbitar el 3D con la deformada animada: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas animando y orbitando: 0
+
+## Muros: F22 del núcleo
+BIEN  triángulos de las bandas de los muros: 2614 = Node 2614
+BIEN  orbitar el 3D con los muros: mediana 8.3 ms, p95 8.4 ms entre fotogramas (120)
+     tareas largas al orbitar: 0
 
 TODO BIEN

@@ -5,13 +5,18 @@
  * extremos de `fem consultar pieza` (N, |My|, |Mz| en la base y en la cabeza de cada tramo, cada uno
  * con su combinación) y el axil reducido ν de A3 (un aviso de orden de magnitud, no la comprobación
  * de norma, que hace el módulo de pilares de Concreta).
+ *
+ * I4: un 3D pinta cada tramo del color de su N o su ν (`pilares3d`, los valores del cuadro), los de
+ * todas las plantas o los de la de su cabecera; bajo el cursor, los del tramo. Se puede elegir
+ * cualquier pilar, en el 3D o en un alzado, aunque no llegue a la planta activa.
  */
 import { useEffect, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { FilaPilar } from "../../../src/visor/datos.ts";
+import type { MagnitudPilares, Pilares3D } from "../../../src/visor/pilares3d.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
-import { Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
@@ -20,7 +25,8 @@ import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
-import { Fuente2D, ZonaVistas } from "../vistas/Zona.tsx";
+import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
+import { Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 /** El axil de los tramos que llegan a una planta, en una vista: un clic elige el pilar. */
@@ -42,6 +48,29 @@ function PlantaPilares({ planta, eleccion, id }: { planta: string; eleccion: Ele
 }
 
 const LIMITE_NU = 0.65;
+
+const MAGNITUDES: { id: MagnitudPilares; nombre: string; title: string }[] = [
+  { id: "N", nombre: "N", title: "La mayor compresión de cada tramo (la columna N del cuadro)" },
+  { id: "nu", nombre: "ν", title: "El axil reducido de A3 en los tramos de hormigón" },
+];
+
+/** Las líneas de la sonda de un tramo: sus valores, los del cuadro. */
+export function lineasTramo(d: Pilares3D, k: number): string[] | null {
+  const t = d.tramos[k];
+  if (!t) return null;
+  const v = t.valor === null ? "sin ν: no es de hormigón" : d.magnitud === "nu" ? `ν ${fmt(t.valor, 3)} · ${t.comb}` : `N ${fmt(t.valor, 1)} kN · ${t.comb}${t.donde ? ` (en la ${t.donde})` : ""}`;
+  return [`${t.pilar} · de ${t.plantaBase} a ${t.planta}`, v, t.seccion];
+}
+
+/** Los tramos por colores en un 3D (I4): los de todas las plantas o los de la de su cabecera. */
+function TresDPilares({ planta, magnitud, eleccion }: { planta: string | null; magnitud: MagnitudPilares; eleccion: EleccionCombinaciones }) {
+  const { proyecto } = useVisor();
+  const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "pilares3d", magnitud, combinaciones: eleccion, planta });
+  const datos = proyecto.desactualizado ? null : d.datos;
+  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
+  const { alPasar, sonda } = useSonda(datos ? (o) => (o.tipo === "pilar" ? lineasTramo(datos, o.k) : null) : null, JSON.stringify([planta, magnitud, eleccion, !!datos]));
+  return <Fuente3DModelo resultados={{ pilares: datos, leyenda: datos, aviso, cargando: d.cargando, alPasar, sonda }} />;
+}
 
 type Extremos = FilaPilar["tramo"]["base"];
 
@@ -117,16 +146,19 @@ export function ModoPilares() {
   const { proyecto, planta, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:pilares", { props: true, dock: true, pestana: "cuadro" });
   const vistas = useVistas();
-  const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta");
+  const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta" || v.tipo === "3d");
   useEffect(() => {
     if (sinPlanta) vistas.irATipo("planta");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
   }, []);
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
+  const [magnitud, setMagnitud] = useState<MagnitudPilares>("N");
   const d = usePedido(proyecto.cliente, planta ? { tipo: "pilares", planta, combinaciones: eleccion } : null);
   const filas = d.datos?.filas ?? [];
-  const id = filas.some((f) => f.pilar === seleccion) ? seleccion : null;
+  // Cualquier pilar elegido (en el 3D o en un alzado), aunque no llegue a la planta activa
+  const obj = usePedido(proyecto.cliente, seleccion && !filas.some((f) => f.pilar === seleccion) ? { tipo: "objeto", id: seleccion } : null);
+  const id = filas.some((f) => f.pilar === seleccion) || (obj.datos?.id === seleccion && obj.datos.tipo === "pilar") ? seleccion : null;
   const pilar = usePedido(proyecto.cliente, id ? { tipo: "pilar", id, combinaciones: eleccion } : null);
   const pasan = filas.filter((f) => (f.nu?.nu ?? 0) > LIMITE_NU).length;
 
@@ -148,6 +180,13 @@ export function ModoPilares() {
           <Chip acento title={v.planta === planta ? d.datos?.combinaciones.descripcion : undefined}>
             Axil de los tramos que llegan
           </Chip>
+        ),
+        tresD: (v) => <TresDPilares planta={v.planta} magnitud={magnitud} eleccion={eleccion} />,
+        cabecera3D: () => (
+          <>
+            <Desplegable etiqueta="Magnitud de los pilares" valor={magnitud} onCambio={setMagnitud} opciones={MAGNITUDES} />
+            <Chip acento>{queCombinaciones(d.datos ? { descripcion: d.datos.combinaciones.descripcion, n: d.datos.combinaciones.nombres.length } : undefined, d.datos?.combinaciones.nombres[0])}</Chip>
+          </>
         ),
       }}
     />
@@ -200,6 +239,7 @@ export function ModoPilares() {
       </Seccion>
       {id && pilar.datos && (
             <Seccion titulo={`Pilar ${id}`} valor={`${pilar.datos.filas.length} tramos`}>
+              {!filas.some((f) => f.pilar === id) && <p className="nota">No llega a {planta}: su cuadro completo, aquí.</p>}
               <GraficoAxil filas={pilar.datos.filas} />
               <table className="tb">
                 <thead>

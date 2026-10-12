@@ -17,9 +17,15 @@
  * liberan, como los de la planta (`capas.ts`, I2-4).
  *
  * Resultados (I4): los diagramas de las barras (`src/visor/diagramas3d.ts`), rellenos translúcidos
- * por signo con sus curvas, y los isovalores de las losas (`src/visor/isovalores3d.ts`), bandas de
- * color sin sombrear (el color es el de la leyenda) con sus isolíneas. Los rótulos, en el lienzo 2D:
- * el máximo y el mínimo de lo que se ve y los de las piezas elegidas, sin pisarse.
+ * por signo con sus curvas; los isovalores de las losas y los muros (`src/visor/isovalores3d.ts`),
+ * bandas de color sin sombrear (el color es el de la leyenda) con sus isolíneas; los pilares por
+ * colores (`pilares3d.ts`), líneas gruesas del color de su banda; las reacciones
+ * (`reacciones3d.ts`), flechas; y la deformada, animada si se pide, con la original en gris. Los
+ * rótulos, en el lienzo 2D: los extremos de lo que se ve y los de las piezas elegidas, sin pisarse.
+ *
+ * Bajo el cursor (I4): al quedarse quieto el ratón, la vista busca lo que hay debajo (la estación de
+ * un diagrama, el punto de un mapa, un tramo de pilar o una flecha) y lo dice por `eventos.pasar`;
+ * quien la alimenta pide su consulta y le devuelve la sonda que dibuja (`ponerSonda`).
  */
 import {
   AmbientLight,
@@ -48,6 +54,9 @@ import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
 import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
 import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
+import { SIN_BANDA, type Pilares3D } from "../../../src/visor/pilares3d.ts";
+import { COLOR_REACCION, type Reacciones3D } from "../../../src/visor/reacciones3d.ts";
+import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { fuente, textoConHalo, Vista, type Entorno } from "./motor.ts";
 
@@ -59,9 +68,24 @@ export interface Camara3D {
   T: [number, number, number];
 }
 
+/** Lo que hay bajo el cursor (I4): `p`, el punto del modelo (m, globales). */
+export type Objetivo3D =
+  | { tipo: "barra"; pieza: string; s: number; p: [number, number, number] }
+  | { tipo: "lamina"; lamina: number; p: [number, number, number] }
+  | { tipo: "pilar"; k: number; p: [number, number, number] }
+  | { tipo: "reaccion"; k: number; p: [number, number, number] };
+
+/** Lo que dice la vista de un punto bajo el cursor: sus líneas de texto (de una consulta). */
+export interface Sonda {
+  p: readonly [number, number, number];
+  lineas: string[];
+}
+
 export interface Eventos3D {
   /** Lo elegido con un clic (null: nada bajo el cursor) o con una ventana. */
   elegir?: (ids: string[], ctrl: boolean, doble: boolean) => void;
+  /** Lo que hay bajo el cursor quieto (null: nada, o el cursor se fue). */
+  pasar?: (o: Objetivo3D | null) => void;
 }
 
 interface Paleta3D {
@@ -113,6 +137,12 @@ const ESQUINAS: { p: [number, number, number]; vista: VistaEstandar }[] = [
 ];
 const FOV = 35;
 const RADIO_CLIC = 6;
+/** Distancia (px) a la que el cursor está sobre una barra, un pilar o una flecha. */
+const RADIO_SONDA = 8;
+/** Lo que el cursor tiene que estar quieto para buscar lo que hay debajo (ms). */
+const PAUSA_SONDA = 90;
+/** Un ciclo de la animación de la deformada (ms). */
+const CICLO_DEFORMADA = 1500;
 const CUBO = { margen: 44, lado: 17 };
 
 /** Vértices de cada lámina: dos triángulos, 0-1-2 y 0-2-3. */
@@ -133,6 +163,10 @@ const MAT = {
   sinMapa: new MeshBasicMaterial({ side: DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
   isolineas: new LineBasicMaterial({ color: 0x1f2937, transparent: true, opacity: 0.35 }),
   ceros: new LineBasicMaterial({ color: 0x111827, transparent: true, opacity: 0.8 }),
+  pilares: new LineMaterial({ vertexColors: true, linewidth: 7, worldUnits: false }),
+  reacciones: new LineMaterial({ vertexColors: true, linewidth: 2.5, worldUnits: false }),
+  /** El alámbrico sin deformar, bajo la deformada. */
+  original: new LineMaterial({ linewidth: 1, worldUnits: false, transparent: true, opacity: 0.55 }),
 };
 
 /** Un rótulo de resultados: un punto del modelo (m) y su texto. */
@@ -168,6 +202,20 @@ export class Vista3D extends Vista {
   private iso: Isovalores3D | null = null;
   private objsDiag: (Mesh | LineSegments2)[] = [];
   private objsIso: (Mesh | LineSegments)[] = [];
+  private pil: Pilares3D | null = null;
+  private reac: Reacciones3D | null = null;
+  private objsPil: LineSegments2[] = [];
+  private objsReac: LineSegments2[] = [];
+  private lineasOriginal: LineSegments2 | null = null;
+  private extremosDef: ExtremoDeformada[] = [];
+  private animar = false;
+  private fase = 1;
+  private reloj = 0;
+  private sonda: Sonda | null = null;
+  private pausaSonda = 0;
+  private ultimoObjetivo = "";
+  /** Lo último que se dijo que había bajo el cursor (para el banco). */
+  private objetivo: Objetivo3D | null = null;
   private encuadrada = false;
   private temaColores: string | null = null;
 
@@ -255,16 +303,61 @@ export class Vista3D extends Vista {
     if (!this.encuadrada) this.encuadrar();
   }
 
-  /** Desplazamientos (3 por nudo, m) y su escala; null quita la deformada. */
-  ponerDeformada(u: Float32Array | null, escala: number): void {
-    if (u === this.u && escala === this.escalaU) return;
+  /** Desplazamientos (3 por nudo, m), su escala y sus extremos (para rotularlos); null quita la deformada. */
+  ponerDeformada(u: Float32Array | null, escala: number, extremos: ExtremoDeformada[] = []): void {
+    this.extremosDef = extremos;
+    if (u === this.u && escala === this.escalaU) return this.entorno.pintar();
     this.u = u;
     this.escalaU = escala;
     // Sólo las posiciones y las barras sin deformar: la malla es la misma
     this.enTarea("deformada", () => {
       this.originalesAnalitico();
+      this.construirOriginal();
       this.posicionesAnalitico();
     });
+  }
+
+  /** La deformada animada (la escala va de 0 a la dada y vuelve) o quieta. */
+  ponerAnimacion(si: boolean): void {
+    if (si === this.animar) return;
+    this.animar = si;
+    cancelAnimationFrame(this.reloj);
+    this.reloj = 0;
+    if (!si) {
+      this.fase = 1;
+      this.posicionesAnalitico();
+      return;
+    }
+    const t0 = performance.now();
+    const paso = (t: number) => {
+      if (!this.animar) return;
+      this.fase = (1 - Math.cos((2 * Math.PI * (t - t0)) / CICLO_DEFORMADA)) / 2;
+      if (this.u) this.posicionesAnalitico();
+      this.reloj = requestAnimationFrame(paso);
+    };
+    this.reloj = requestAnimationFrame(paso);
+  }
+
+  /** Los pilares por colores (I4); null los quita. */
+  ponerPilares(p: Pilares3D | null): void {
+    if (p === this.pil) return;
+    this.pil = p;
+    if (p) this.fijarOrigen(p.origen);
+    this.enTarea("pilares", () => this.construirPilares());
+  }
+
+  /** Las flechas de las reacciones (I4); null las quita. */
+  ponerReacciones(r: Reacciones3D | null): void {
+    if (r === this.reac) return;
+    this.reac = r;
+    if (r) this.fijarOrigen(r.origen);
+    this.enTarea("reacciones", () => this.construirReacciones());
+  }
+
+  /** Lo que se dice del punto bajo el cursor (null: nada). */
+  ponerSonda(x: Sonda | null): void {
+    this.sonda = x;
+    this.entorno.pintar();
   }
 
   /** Los diagramas de las barras (I4); null los quita. */
@@ -311,6 +404,66 @@ export class Vista3D extends Vista {
   private visibilidad(): void {
     if (this.lineas) this.lineas.visible = this.modo === "alambrico";
     for (const o of [this.laminas, this.barras, this.originales]) if (o) o.visible = this.modo === "analitico";
+    if (this.lineasOriginal) this.lineasOriginal.visible = this.modo === "analitico" && !!this.u;
+  }
+
+  /** El alámbrico sin deformar, en gris, bajo la deformada (si la hay). */
+  private construirOriginal(): void {
+    if (this.lineasOriginal) {
+      this.escena3.remove(this.lineasOriginal);
+      this.lineasOriginal.geometry.dispose();
+      this.lineasOriginal = null;
+    }
+    const a = this.alamb;
+    if (!a || !a.objeto.length || !this.u) return;
+    const g = new LineSegmentsGeometry();
+    g.setPositions(a.segmentos);
+    MAT.original.color.set(this.paleta.original);
+    this.lineasOriginal = new LineSegments2(g, MAT.original);
+    this.lineasOriginal.frustumCulled = false;
+    this.escena3.add(this.lineasOriginal);
+    this.visibilidad();
+  }
+
+  private construirPilares(): void {
+    this.quitar(this.objsPil);
+    const p = this.pil;
+    if (p && p.segmentos.length) {
+      const g = new LineSegmentsGeometry();
+      g.setPositions(p.segmentos);
+      const cs = p.colores.map((x) => new Color(x));
+      const gris = new Color("#9ca3af");
+      const col = new Float32Array(p.segmentos.length);
+      for (let i = 0; i < p.banda.length; i++) {
+        const c = p.banda[i] === SIN_BANDA ? gris : cs[p.banda[i]!]!;
+        for (let j = 0; j < 2; j++) col.set([c.r, c.g, c.b], 6 * i + 3 * j);
+      }
+      g.setColors(col);
+      const o = this.situar(new LineSegments2(g, MAT.pilares), p.origen);
+      o.renderOrder = 4;
+      this.objsPil.push(o);
+    }
+    this.entorno.pintar();
+  }
+
+  private construirReacciones(): void {
+    this.quitar(this.objsReac);
+    const r = this.reac;
+    if (r && r.segmentos.length) {
+      const g = new LineSegmentsGeometry();
+      g.setPositions(r.segmentos);
+      const [cv, ch] = [new Color(COLOR_REACCION.vertical), new Color(COLOR_REACCION.horizontal)];
+      const col = new Float32Array(r.segmentos.length);
+      for (let i = 0; i < r.tipoSegmento.length; i++) {
+        const c = r.tipoSegmento[i] ? ch : cv;
+        for (let j = 0; j < 2; j++) col.set([c.r, c.g, c.b], 6 * i + 3 * j);
+      }
+      g.setColors(col);
+      const o = this.situar(new LineSegments2(g, MAT.reacciones), r.origen);
+      o.renderOrder = 7;
+      this.objsReac.push(o);
+    }
+    this.entorno.pintar();
   }
 
   private construirAlambrico(): void {
@@ -512,7 +665,7 @@ export class Vista3D extends Vista {
     const o = this.origen ?? [0, 0, 0];
     const X = g.nudos;
     const u = this.u;
-    const k = u ? this.escalaU : 0;
+    const k = u ? this.escalaU * (this.animar ? this.fase : 1) : 0;
     const v = (n: number, a: number) => X[n + a]! - o[a]! + (u ? k * u[n + a]! : 0);
     const pos = this.laminas.geometry.getAttribute("position") as BufferAttribute;
     const nor = this.laminas.geometry.getAttribute("normal") as BufferAttribute;
@@ -604,6 +757,7 @@ export class Vista3D extends Vista {
       (this.barras.geometry.getAttribute("color") as BufferAttribute).needsUpdate = true;
       MAT.originales.color.set(c.original);
     }
+    MAT.original.color.set(c.original);
     MAT.sinMapa.color.set(this.entorno.tema() === "dark" ? "#4b5563" : "#d1d5db");
     const curvas = this.objsDiag.find((o): o is LineSegments2 => o instanceof LineSegments2);
     if (curvas && this.diag) curvas.geometry.setColors(this.coloresCurvas(this.diag));
@@ -847,6 +1001,159 @@ export class Vista3D extends Vista {
     this.eventos.elegir?.(ids, ctrl, false);
   }
 
+  // ─── Bajo el cursor ─────────────────────────────────────────────────────────────────────────
+
+  protected override pasar(x: number, y: number): void {
+    if (!this.eventos.pasar) return;
+    clearTimeout(this.pausaSonda);
+    this.pausaSonda = window.setTimeout(() => this.avisarObjetivo(this.objetivoEn(x, y)), PAUSA_SONDA);
+  }
+
+  override salir(): void {
+    clearTimeout(this.pausaSonda);
+    this.avisarObjetivo(null);
+  }
+
+  private avisarObjetivo(o: Objetivo3D | null): void {
+    const clave = o ? `${o.tipo}|${"pieza" in o ? `${o.pieza}|${o.s.toFixed(3)}` : "lamina" in o ? `${o.lamina}|${o.p.map((v) => v.toFixed(2)).join(",")}` : o.k}` : "";
+    if (clave === this.ultimoObjetivo) return;
+    this.ultimoObjetivo = clave;
+    this.objetivo = o;
+    if (!o && this.sonda) this.ponerSonda(null);
+    this.eventos.pasar?.(o);
+  }
+
+  /** Un punto de la escena (relativo al origen de la vista) en px de la vista y su profundidad; null detrás de la cámara. */
+  private proyector(): (x: number, y: number, z: number) => [number, number, number] | null {
+    this.actualizarCamaras();
+    const cam = this.camaraActiva;
+    const m = new Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements;
+    const { w, h } = this.rect;
+    return (x, y, z) => {
+      const cw = m[3]! * x + m[7]! * y + m[11]! * z + m[15]!;
+      if (cw <= 1e-6) return null;
+      return [(((m[0]! * x + m[4]! * y + m[8]! * z + m[12]!) / cw + 1) / 2) * w, ((1 - (m[1]! * x + m[5]! * y + m[9]! * z + m[13]!) / cw) / 2) * h, (m[2]! * x + m[6]! * y + m[10]! * z + m[14]!) / cw];
+    };
+  }
+
+  /**
+   * El segmento (de a pares de puntos, relativos a `origen` de sus datos) más cercano al cursor a
+   * menos de `radio` px: su índice y el parámetro t (0 en a, 1 en b) del punto más cercano.
+   */
+  private segmentoEn(seg: Float32Array, origen: readonly number[], x: number, y: number, radio: number): { i: number; t: number } | null {
+    const o = this.origen;
+    if (!o) return null;
+    const pr = this.proyector();
+    const d = [origen[0]! - o[0], origen[1]! - o[1], origen[2]! - o[2]];
+    let mejor: { i: number; t: number; d: number; z: number } | null = null;
+    for (let i = 0; 6 * i < seg.length; i++) {
+      const a = pr(seg[6 * i]! + d[0]!, seg[6 * i + 1]! + d[1]!, seg[6 * i + 2]! + d[2]!);
+      const b = pr(seg[6 * i + 3]! + d[0]!, seg[6 * i + 4]! + d[1]!, seg[6 * i + 5]! + d[2]!);
+      if (!a || !b) continue;
+      const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+      const l2 = dx * dx + dy * dy;
+      const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)) : 0;
+      const dd = Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
+      const z = a[2] + t * (b[2] - a[2]);
+      if (dd <= radio && (!mejor || dd < mejor.d - 0.5 || (dd < mejor.d + 0.5 && z < mejor.z))) mejor = { i, t, d: dd, z };
+    }
+    return mejor && { i: mejor.i, t: mejor.t };
+  }
+
+  /** Lo que hay bajo un píxel: una flecha, un pilar, una barra con diagrama o un punto de un mapa. */
+  objetivoEn(x: number, y: number): Objetivo3D | null {
+    const entre = (seg: Float32Array, i: number, t: number, o: readonly number[]): [number, number, number] => [o[0]! + seg[6 * i]! + t * (seg[6 * i + 3]! - seg[6 * i]!), o[1]! + seg[6 * i + 1]! + t * (seg[6 * i + 4]! - seg[6 * i + 1]!), o[2]! + seg[6 * i + 2]! + t * (seg[6 * i + 5]! - seg[6 * i + 2]!)];
+    const re = this.reac;
+    if (re) {
+      const h = this.segmentoEn(re.segmentos, re.origen, x, y, RADIO_SONDA);
+      if (h) return { tipo: "reaccion", k: re.objetoSegmento[h.i]!, p: [...re.objetos[re.objetoSegmento[h.i]!]!.punto] as [number, number, number] };
+    }
+    const pl = this.pil;
+    if (pl) {
+      const h = this.segmentoEn(pl.segmentos, pl.origen, x, y, RADIO_SONDA);
+      if (h) return { tipo: "pilar", k: h.i, p: entre(pl.segmentos, h.i, h.t, pl.origen) };
+    }
+    const d = this.diag;
+    if (d) {
+      const h = this.segmentoEn(d.ejes, d.origen, x, y, RADIO_SONDA);
+      if (h) {
+        const [s0, s1] = [d.ejeS[2 * h.i]!, d.ejeS[2 * h.i + 1]!];
+        return { tipo: "barra", pieza: d.piezas[d.ejePieza[h.i]!]!.id, s: s0 + h.t * (s1 - s0), p: entre(d.ejes, h.i, h.t, d.origen) };
+      }
+    }
+    const iso = this.iso;
+    if (iso && iso.triangulos.length && this.origen) {
+      this.actualizarCamaras();
+      const ndc = new Vector3((x / this.rect.w) * 2 - 1, -((y / this.rect.h) * 2 - 1), -1);
+      const cam = this.camaraActiva;
+      const a = ndc.clone().unproject(cam);
+      const b = ndc.clone().setZ(1).unproject(cam);
+      const dir = b.sub(a).normalize();
+      // El rayo en las coordenadas de los datos (relativas a su origen)
+      const o = this.origen;
+      const O = [a.x + o[0] - iso.origen[0], a.y + o[1] - iso.origen[1], a.z + o[2] - iso.origen[2]];
+      const D = [dir.x, dir.y, dir.z];
+      const T = iso.triangulos;
+      let [mejor, tMin] = [-1, Infinity];
+      for (let k = 0; k < T.length; k += 9) {
+        // Möller–Trumbore
+        const e1 = [T[k + 3]! - T[k]!, T[k + 4]! - T[k + 1]!, T[k + 5]! - T[k + 2]!];
+        const e2 = [T[k + 6]! - T[k]!, T[k + 7]! - T[k + 1]!, T[k + 8]! - T[k + 2]!];
+        const pv = [D[1]! * e2[2]! - D[2]! * e2[1]!, D[2]! * e2[0]! - D[0]! * e2[2]!, D[0]! * e2[1]! - D[1]! * e2[0]!];
+        const det = e1[0]! * pv[0]! + e1[1]! * pv[1]! + e1[2]! * pv[2]!;
+        if (Math.abs(det) < 1e-12) continue;
+        const inv = 1 / det;
+        const tv = [O[0]! - T[k]!, O[1]! - T[k + 1]!, O[2]! - T[k + 2]!];
+        const u = (tv[0]! * pv[0]! + tv[1]! * pv[1]! + tv[2]! * pv[2]!) * inv;
+        if (u < 0 || u > 1) continue;
+        const qv = [tv[1]! * e1[2]! - tv[2]! * e1[1]!, tv[2]! * e1[0]! - tv[0]! * e1[2]!, tv[0]! * e1[1]! - tv[1]! * e1[0]!];
+        const v = (D[0]! * qv[0]! + D[1]! * qv[1]! + D[2]! * qv[2]!) * inv;
+        if (v < 0 || u + v > 1) continue;
+        const t = (e2[0]! * qv[0]! + e2[1]! * qv[1]! + e2[2]! * qv[2]!) * inv;
+        if (t > 0 && t < tMin) [mejor, tMin] = [k / 9, t];
+      }
+      if (mejor >= 0) return { tipo: "lamina", lamina: iso.lamina[mejor]!, p: [O[0]! + tMin * D[0]! + iso.origen[0], O[1]! + tMin * D[1]! + iso.origen[1], O[2]! + tMin * D[2]! + iso.origen[2]] };
+    }
+    return null;
+  }
+
+  /** La sonda: un punto y un recuadro con sus líneas, dentro de la vista. */
+  private dibujarSonda(ctx: CanvasRenderingContext2D): void {
+    const so = this.sonda;
+    if (!so || !so.lineas.length) return;
+    const q = this.aPantalla(so.p[0], so.p[1], so.p[2]);
+    if (!q) return;
+    const col = this.entorno.colores();
+    const anchos = so.lineas.map((t, i) => this.entorno.medir(t, 11, i === 0));
+    const [w, h] = [Math.max(...anchos) + 16, so.lineas.length * 15 + 8];
+    let [bx, by] = [q[0] + 12, q[1] - h - 8];
+    if (bx + w > this.rect.w - 4) bx = q[0] - 12 - w;
+    if (by < 4) by = q[1] + 12;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(q[0], q[1], 3.5, 0, 2 * Math.PI);
+    ctx.fillStyle = col.acento;
+    ctx.fill();
+    ctx.strokeStyle = col.fondo;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = col.panel;
+    ctx.globalAlpha = 0.96;
+    ctx.fillRect(bx, by, w, h);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = col.borde;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, w - 1, h - 1);
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    so.lineas.forEach((t, i) => {
+      ctx.font = fuente(11, i === 0);
+      ctx.fillStyle = i === 0 ? col.texto : col.textoSuave;
+      ctx.fillText(t, bx + 8, by + 4 + 7.5 + 15 * i);
+    });
+    ctx.restore();
+  }
+
   cursor(): string | null {
     const T = this.T;
     const o = this.origen;
@@ -977,12 +1284,15 @@ export class Vista3D extends Vista {
       this.colores();
       this.construirElegidos();
     }
-    if (!this.alamb && !this.geo && !this.diag && !this.iso) return;
+    if (!this.alamb && !this.geo && !this.diag && !this.iso && !this.pil && !this.reac) return;
     this.actualizarCamaras();
     const { w, h } = this.rect;
     MAT.lineas.resolution.set(w, h);
     MAT.elegidas.resolution.set(w, h);
     MAT.curvas.resolution.set(w, h);
+    MAT.pilares.resolution.set(w, h);
+    MAT.reacciones.resolution.set(w, h);
+    MAT.original.resolution.set(w, h);
     // Los colores de los rellenos, los del tema de esta vista (las vistas comparten los materiales)
     const t = this.entorno.tema();
     MAT.positivo.color.set(pintura("diagrama-positivo", t).fill ?? "#dc2626");
@@ -994,6 +1304,7 @@ export class Vista3D extends Vista {
 
   superponer(ctx: CanvasRenderingContext2D): void {
     this.dibujarRotulos(ctx);
+    this.dibujarSonda(ctx);
     if (this.alamb || this.geo) this.dibujarCubo(ctx);
     this.dibujarVentana(ctx);
   }
@@ -1012,7 +1323,25 @@ export class Vista3D extends Vista {
         }
     }
     const i = this.iso;
-    if (i) for (const e of i.extremos) r.push({ p: e.punto, texto: `${e.que} ${rotulo(e.valor)} ${i.unidad} · ${e.losa}`, signo: Math.sign(e.valor), prioridad: 100 });
+    if (i) for (const e of i.extremos) r.push({ p: e.punto, texto: `${e.que} ${rotulo(e.valor)} ${i.unidad} · ${e.objeto}`, signo: Math.sign(e.valor), prioridad: 100 });
+    const pl = this.pil;
+    if (pl)
+      for (const e of pl.extremos) {
+        const v = pl.magnitud === "nu" ? `ν ${rotulo(e.valor, 3)}` : `N ${rotulo(e.valor)} kN`;
+        r.push({ p: e.punto, texto: `${e.que === "pasa el límite" ? "" : `${e.que} `}${v} · ${e.pilar} bajo ${e.planta}${e.que === "pasa el límite" ? "" : ` · ${e.comb}`}`, signo: e.que === "mayor compresión" ? -1 : 1, prioridad: e.que === "pasa el límite" ? 70 : 100 });
+      }
+    const re = this.reac;
+    if (re) {
+      // En el color del texto: el rojo y el azul son los signos de los diagramas, no los de una fuerza
+      for (const e of re.extremos) r.push({ p: e.punto, texto: `${e.que}: Fz ${rotulo(e.valor)} kN · ${e.id}${re.conjunto.n > 1 ? ` · ${e.comb}` : ""}`, signo: 0, prioridad: 100 });
+      for (const o of re.objetos) if (o.R[2]) r.push({ p: [o.punto[0], o.punto[1], o.punto[2] - (o.R[2]! * re.escala.m) / (re.escala.valor || 1)], texto: rotulo(o.R[2]!), signo: 0, prioridad: 10 + 50 * (Math.abs(o.R[2]!) / (re.escala.valor || 1)) });
+    }
+    if (this.u && this.modo === "analitico" && this.geo)
+      for (const e of this.extremosDef) {
+        const k = this.escalaU * (this.animar ? this.fase : 1);
+        const n = 3 * e.nudo;
+        r.push({ p: [e.punto[0] + k * this.u[n]!, e.punto[1] + k * this.u[n + 1]!, e.punto[2] + k * this.u[n + 2]!], texto: `${e.que} ${rotulo(e.valor)} mm${e.objeto ? ` · ${e.objeto}` : ""}`, signo: e.que === "menor uz" ? -1 : 0, prioridad: 100 });
+      }
     return r.sort((a, b) => b.prioridad - a.prioridad);
   }
 
@@ -1045,9 +1374,22 @@ export class Vista3D extends Vista {
   }
 
   /** Para el banco de Chrome: lo que dibuja y lo elegido. */
-  async depuracion(): Promise<{ tipo: "3d"; segmentos: number; elegidos: string[]; modo: Modo3D; proyeccion: Proyeccion; diagramas: number; isovalores: number }> {
+  async depuracion(): Promise<{ tipo: "3d"; segmentos: number; elegidos: string[]; modo: Modo3D; proyeccion: Proyeccion; diagramas: number; isovalores: number; pilares: number; reacciones: number; sonda: string[] | null; objetivo: Objetivo3D | null; animada: boolean }> {
     const d = this.diag;
-    return { tipo: "3d", segmentos: this.alamb?.objeto.length ?? 0, elegidos: [...this.elegidos], modo: this.modo, proyeccion: this.proyeccion, diagramas: d ? (d.positivo.length + d.negativo.length) / 9 : 0, isovalores: (this.iso?.triangulos.length ?? 0) / 9 };
+    return {
+      tipo: "3d",
+      segmentos: this.alamb?.objeto.length ?? 0,
+      elegidos: [...this.elegidos],
+      modo: this.modo,
+      proyeccion: this.proyeccion,
+      diagramas: d ? (d.positivo.length + d.negativo.length) / 9 : 0,
+      isovalores: (this.iso?.triangulos.length ?? 0) / 9,
+      pilares: (this.pil?.segmentos.length ?? 0) / 6,
+      reacciones: (this.reac?.segmentos.length ?? 0) / 6,
+      sonda: this.sonda?.lineas ?? null,
+      objetivo: this.objetivo,
+      animada: this.animar,
+    };
   }
 
   /** Un punto del modelo (m) en px de la vista (para el banco). */
@@ -1064,10 +1406,22 @@ export class Vista3D extends Vista {
   liberar(): void {
     for (const t of this.tareas.values()) clearTimeout(t);
     this.tareas.clear();
+    this.animar = false;
+    cancelAnimationFrame(this.reloj);
+    clearTimeout(this.pausaSonda);
     this.quitarAnalitico();
     this.quitar(this.objsDiag);
     this.quitar(this.objsIso);
+    this.quitar(this.objsPil);
+    this.quitar(this.objsReac);
+    if (this.lineasOriginal) {
+      this.escena3.remove(this.lineasOriginal);
+      this.lineasOriginal.geometry.dispose();
+      this.lineasOriginal = null;
+    }
     this.diag = this.iso = null;
+    this.pil = null;
+    this.reac = null;
     this.alamb = null;
     this.construirAlambrico();
     this.elegidos = new Set();

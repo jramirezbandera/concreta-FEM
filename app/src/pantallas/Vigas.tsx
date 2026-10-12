@@ -10,12 +10,15 @@
  *
  * I4: un 3D dibuja los diagramas de todas las barras (o los de la planta elegida en su cabecera) en
  * sus ejes locales (`diagramas3d`), y un alzado, los de las barras de su plano con el esfuerzo en el
- * plano (`vistaAlzadoDiagramas`: My y Mz dan M; Vz y Vy, V). Un clic en una pieza la elige.
+ * plano (`vistaAlzadoDiagramas`: My y Mz dan M; Vz y Vy, V). Un clic en una pieza la elige; bajo el
+ * cursor, en el 3D, el máximo y el mínimo de la estación más cercana de la barra (`estacion`). Se puede
+ * elegir cualquier viga, vigueta o pilar, de cualquier planta: el de un pilar es su alzado a lo largo
+ * de su altura y, en Propiedades, su cuadro por tramos.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { EsfuerzoPlano } from "../../../src/agente/render/index.ts";
-import type { DatosEstacion, DatosViga, Esfuerzo } from "../../../src/visor/datos.ts";
+import type { DatosEstacion, DatosViga, Esfuerzo, FilaPilar } from "../../../src/visor/datos.ts";
 import type { PiezasDiagrama } from "../../../src/visor/diagramas3d.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
@@ -27,6 +30,7 @@ import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
+import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
 import { Fuente2D, Fuente3DModelo, FuenteEscena, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
@@ -70,7 +74,29 @@ function TresDDiagramas({ planta, esfuerzo, eleccion, piezas, escala }: { planta
   const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "diagramas3d", esfuerzo, combinaciones: eleccion, planta, piezas, escala });
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
   const datos = proyecto.desactualizado ? null : d.datos;
-  return <Fuente3DModelo resultados={{ diagramas: datos, leyenda: datos, aviso, cargando: d.cargando }} />;
+  const cliente = proyecto.cliente;
+  const unidad = ESFUERZOS.find((x) => x.id === esfuerzo)!.unidad;
+  // Bajo el cursor: la estación más cercana de la barra, con la consulta del cursor del alzado
+  const { alPasar, sonda } = useSonda(
+    cliente && datos
+      ? async (o) => {
+          if (o.tipo !== "barra") return null;
+          const r = await cliente.pedir({ tipo: "estacion", id: o.pieza, esfuerzo, combinaciones: eleccion, s: o.s });
+          return r.ok ? lineasEstacion(o.pieza, r.valor as DatosEstacion, esfuerzo, unidad) : null;
+        }
+      : null,
+    JSON.stringify([planta, esfuerzo, eleccion, piezas, !!datos]),
+  );
+  return <Fuente3DModelo resultados={{ diagramas: datos, leyenda: datos, aviso, cargando: d.cargando, alPasar, sonda }} />;
+}
+
+/** Las líneas de la sonda de una estación: su máximo y su mínimo con su combinación (los dos lados, si saltan). */
+export function lineasEstacion(pieza: string, d: DatosEstacion, esfuerzo: Esfuerzo, unidad: string): string[] {
+  const r = [`${pieza} · s = ${fmt(d.s, 2)} m`];
+  if (d.rigida) return [...r, "En un apoyo (zona rígida): sin esfuerzos de la barra"];
+  const lado = (t: string, x: DatosEstacion["izquierda"]) => (x ? [`${t}${esfuerzo} máx. ${fmt(x.max.v, 1)} ${unidad} · ${x.max.comb}`, `${t}${esfuerzo} mín. ${fmt(x.min.v, 1)} ${unidad} · ${x.min.comb}`] : []);
+  const iguales = JSON.stringify(d.izquierda) === JSON.stringify(d.derecha);
+  return [...r, ...(iguales ? lado("", d.derecha) : [...lado("izq. ", d.izquierda), ...lado("der. ", d.derecha)])];
 }
 
 function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => void }) {
@@ -119,6 +145,13 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
     if (v.esfuerzo === "Vz" && ex.Vz) r.push({ s: ex.Vz.s!, v: ex.Vz.v, comb: ex.Vz.comb });
     return r;
   });
+  // En un pilar no hay vanos: su máximo y su mínimo
+  if (v.tipo === "pilar" && v.envolvente.length) {
+    const mx = v.envolvente.reduce((a, b) => (b.max > a.max ? b : a));
+    const mn = v.envolvente.reduce((a, b) => (b.min < a.min ? b : a));
+    if (mx.max > 0) todos.push({ s: mx.s, v: mx.max, comb: "" });
+    if (mn.min < 0) todos.push({ s: mn.s, v: mn.min, comb: "" });
+  }
   // Dos picos juntos (los de los vanos a cada lado de un apoyo) en el mismo lado: sólo el mayor
   const picos: typeof todos = [];
   for (const p of [...todos].sort((a, b) => Math.abs(b.v) - Math.abs(a.v))) if (!picos.some((q) => Math.abs(X(q.s) - X(p.s)) < 40 && Math.sign(q.v) === Math.sign(p.v))) picos.push(p);
@@ -135,8 +168,9 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
           <i className="inline-block h-[3px] w-4 bg-[var(--color-env-min)]" /> mínimo
         </span>
         <span className="flex items-center gap-1">
-          <i className="inline-block h-[10px] w-4 bg-bg-elevated" /> apoyo (zona rígida)
+          <i className="inline-block h-[10px] w-4 bg-bg-elevated" /> {v.tipo === "pilar" ? "planta (zona rígida)" : "apoyo (zona rígida)"}
         </span>
+        {v.tipo === "pilar" && <span>desde la base, hacia arriba a la derecha</span>}
         {v.esfuerzo === "My" && <span>positivo hacia abajo (tracciones)</span>}
       </div>
       <svg width={w} height={H} role="img" aria-label={`Envolvente de ${v.esfuerzo} de ${v.id}`}
@@ -150,6 +184,14 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
             <rect x={X(a.caras[0])} y={mt - 6} width={Math.max(1, X(a.caras[1]) - X(a.caras[0]))} height={H - mt - mb + 12} fill="var(--color-bg-elevated)" />
             <text x={X(a.s)} y={H - 6} fontSize={10.5} textAnchor="middle" fill="var(--color-text-disabled)" fontFamily="var(--font-mono)">
               {a.objeto}
+            </text>
+          </g>
+        ))}
+        {(v.plantas ?? []).map((p) => (
+          <g key={p.planta}>
+            <line x1={X(p.s)} x2={X(p.s)} y1={mt - 6} y2={H - mb + 4} stroke="var(--color-border-main)" strokeDasharray="3 3" />
+            <text x={X(p.s)} y={H - 6} fontSize={10.5} textAnchor="middle" fill="var(--color-text-disabled)" fontFamily="var(--font-mono)">
+              {p.planta}
             </text>
           </g>
         ))}
@@ -215,6 +257,65 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
   );
 }
 
+/** El cuadro de un pilar por tramos (el de la pantalla Pilares): N, |My| y |Mz| en la base y la cabeza, con su combinación. */
+function CuadroPilar({ filas }: { filas: FilaPilar[] | null }) {
+  if (!filas) return <p className="nota">…</p>;
+  const ext = (f: FilaPilar, k: "N-" | "My" | "Mz") => {
+    const c = k === "My" ? 4 : k === "Mz" ? 5 : 0;
+    const xs = [f.tramo.base[k], f.tramo.cabeza[k]].filter((x): x is { comb: string; esfuerzos: number[] } => !!x);
+    if (!xs.length) return null;
+    // Los empates, la base (como el cuadro de Pilares)
+    return xs.reduce((a, b) => (k === "N-" ? (b.esfuerzos[0]! < a.esfuerzos[0]! ? b : a) : Math.abs(b.esfuerzos[c]!) > Math.abs(a.esfuerzos[c]!) ? b : a));
+  };
+  const celda = (f: FilaPilar, k: "N-" | "My" | "Mz") => {
+    const x = ext(f, k);
+    const c = k === "My" ? 4 : k === "Mz" ? 5 : 0;
+    return x ? (
+      <>
+        {fmt(x.esfuerzos[c], 1)}
+        <small>{x.comb}</small>
+      </>
+    ) : (
+      "—"
+    );
+  };
+  return (
+    <Seccion titulo="Tramos" valor="fem consultar pieza">
+      <table className="tb">
+        <thead>
+          <tr>
+            <th>Tramo</th>
+            <th>N kN</th>
+            <th>|My| kN·m</th>
+            <th>|Mz| kN·m</th>
+            <th className="nu">ν</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => (
+            <tr key={f.planta}>
+              <td>
+                bajo {f.planta}
+                <small>
+                  {f.tramo.seccion} · {fmt(f.tramo.longitud, 2)} m
+                </small>
+              </td>
+              <td>{celda(f, "N-")}</td>
+              <td>{celda(f, "My")}</td>
+              <td>{celda(f, "Mz")}</td>
+              <td>
+                {f.nu ? fmt(f.nu.nu, 2) : "—"}
+                <small>{f.nu?.comb ?? ""}</small>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="nota">N: la mayor compresión de la base y la cabeza; |My| y |Mz|: el mayor de las dos, con su signo. Como el cuadro de Pilares.</p>
+    </Seccion>
+  );
+}
+
 export function ModoDiagramas() {
   const { proyecto, planta, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:diagramas", { nav: true, props: true, dock: true, pestana: "alzado", alto: 300 });
@@ -227,7 +328,10 @@ export function ModoDiagramas() {
   const [s, setS] = useState(0);
   const piezas = usePedido(proyecto.cliente, planta ? { tipo: "piezas", planta } : null);
   const lista = piezas.datos ?? [];
-  const id = lista.some((p) => p.id === seleccion) ? seleccion! : (lista.find((p) => p.tipo === "viga")?.id ?? lista[0]?.id ?? null);
+  // Cualquier viga, vigueta o pilar elegido (en el 3D o en un alzado), de cualquier planta
+  const obj = usePedido(proyecto.cliente, seleccion && !lista.some((p) => p.id === seleccion) ? { tipo: "objeto", id: seleccion } : null);
+  const otra = obj.datos?.id === seleccion && ["viga", "vigueta", "pilar"].includes(obj.datos.tipo) ? seleccion : null;
+  const id = lista.some((p) => p.id === seleccion) ? seleccion! : (otra ?? lista.find((p) => p.tipo === "viga")?.id ?? lista[0]?.id ?? null);
   const vista: VistaPlanta = esfuerzo === "My" || esfuerzo === "Vz" ? { vista: "vigas", esfuerzo, combinaciones: eleccion } : { vista: "modelo" };
   const viga = usePedido(proyecto.cliente, id ? { tipo: "viga", id, esfuerzo, combinaciones: eleccion } : null);
   const v = viga.datos && viga.datos.id === id ? viga.datos : null;
@@ -245,6 +349,7 @@ export function ModoDiagramas() {
     return () => window.clearTimeout(t);
   }, [sValida]);
   const est = usePedido(proyecto.cliente, id && v ? { tipo: "estacion", id, esfuerzo, combinaciones: eleccion, s: sPedida } : null);
+  const cuadro = usePedido(proyecto.cliente, v?.tipo === "pilar" ? { tipo: "pilar", id: v.id, combinaciones: eleccion } : null);
   const unidad = ESFUERZOS.find((x) => x.id === esfuerzo)!.unidad;
   const grupos = useMemo(() => {
     const g = new Map<string, typeof lista>();
@@ -295,7 +400,9 @@ export function ModoDiagramas() {
         alzado: (x) => <FuenteEscena fuente={x.eje ? { tipo: "alzado", plano: { eje: x.eje }, diagramas: { esfuerzo: plano, combinaciones: eleccion, escala: Number(escala) } } : null} />,
         cabecera3D: () => (
           <>
-            <Chip acento>{esfuerzo}</Chip>
+            <Chip acento title={v ? v.combinaciones.etiquetas.join("\n") : undefined}>
+              {esfuerzo} · {queCombinaciones(v ? { descripcion: v.combinaciones.descripcion, n: v.combinaciones.nombres.length } : undefined, v?.combinaciones.nombres[0])}
+            </Chip>
             <Desplegable etiqueta="Piezas con diagrama" valor={piezas3D} onCambio={setPiezas3D} opciones={PIEZAS} />
             <Desplegable etiqueta="Escala de los diagramas" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
           </>
@@ -332,14 +439,23 @@ export function ModoDiagramas() {
         {viga.diagnosticos && <p className="nota text-state-fail">{viga.diagnosticos.map((x) => x.mensaje).join(" ")}</p>}
         {v && (
           <>
-            <Seccion titulo={v.tipo === "vigueta" ? "Vigueta" : "Viga"} valor={v.id}>
+            <Seccion titulo={v.tipo === "vigueta" ? "Vigueta" : v.tipo === "pilar" ? "Pilar" : "Viga"} valor={v.id}>
               <div className="px-3.5 py-1.5 text-[12px] text-text-secondary">
-                {fmt(v.longitud, 2)} m · {v.vanos.length} vano{v.vanos.length === 1 ? "" : "s"} · apoyos {v.apoyos.map((a) => a.objeto).join(", ") || "—"}
+                {v.tipo === "pilar" ? (
+                  <>
+                    {fmt(v.longitud, 2)} m · {(v.plantas ?? []).map((p) => p.planta).join(", ")}
+                  </>
+                ) : (
+                  <>
+                    {fmt(v.longitud, 2)} m · {v.vanos.length} vano{v.vanos.length === 1 ? "" : "s"} · apoyos {v.apoyos.map((a) => a.objeto).join(", ") || "—"}
+                  </>
+                )}
                 {v.axilSinValor && <div className="mt-1">Axil sin valor: está en el plano de un diafragma rígido (C1-d).</div>}
               </div>
             </Seccion>
             <Seccion titulo="En la estación">{est.datos ? <Estacion d={est.datos} unidad={unidad} /> : <p className="nota">…</p>}</Seccion>
-            <Seccion titulo="Vanos de cara a cara" valor="fem consultar pieza">
+            {v.tipo === "pilar" && <CuadroPilar filas={cuadro.datos?.filas ?? null} />}
+            {v.tipo !== "pilar" && <Seccion titulo="Vanos de cara a cara" valor="fem consultar pieza">
               <table className="tb">
                 <thead>
                   <tr>
@@ -378,7 +494,7 @@ export function ModoDiagramas() {
                 </tbody>
               </table>
               <p className="nota">Máximos exactos del diagrama combinado dentro de cada vano, de cara a cara de sus apoyos.</p>
-            </Seccion>
+            </Seccion>}
           </>
         )}
     </>

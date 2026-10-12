@@ -183,7 +183,7 @@ Medido sobre la captura de la pantalla Modelo (1920×1080, 1-022):
 
 ### 7.1 Adelantado de I4 (2026-10-12)
 
-A petición del usuario, los diagramas de las barras en el 3D y en el alzado, y los isovalores de las losas en el 3D. El resto de I4 (deformada con escala y original, N y ν por tramo como color, reacciones, valor bajo el cursor, detalle en Propiedades y muros con mapa) sigue pendiente.
+A petición del usuario, los diagramas de las barras en el 3D y en el alzado, y los isovalores de las losas en el 3D. El resto de I4 (deformada con escala y original, N y ν por tramo como color, reacciones, valor bajo el cursor, detalle en Propiedades y muros con mapa) se fijó en §15 y está en `fase-i4.md`.
 
 - **Diagramas en el 3D** (`src/visor/diagramas3d.ts`, sobre `src/agente/render/diagramas.ts`), en Resultados · Diagramas:
   - todas las barras (vigas, viguetas y pilares) o las de la planta de la cabecera, y en la cabecera, «Vigas y pilares», «Vigas» o «Pilares» y la escala (×0,25 a ×4);
@@ -419,3 +419,50 @@ El motor de vistas de §5 y §10 con el grafismo de §8 y los ejes de §9. Lo qu
    - alzado: lo dibujado es lo del modelo (pilares con su posición, su ancho visto y sus cotas; vigas con su canto; losas con su espesor);
    - 3D alámbrico: cada segmento es de su objeto, con su cota.
 5. **No se pierde nada de I1:** los tests de DOM de V1 y V2a pasan, y los bancos de Chrome de V1, V2a e I1, adaptados, dan los mismos resultados.
+
+## 15. I4: lo que se fija al empezar (2026-10-12)
+
+Lo que falta de §7 tras el adelanto de §7.1. Las propuestas de esta sección son del agente; el usuario las revisa en la puerta de uso.
+
+- **Deformada** (Resultados · Deformada), sobre el analítico:
+  - la original, en gris: las barras sin deformar (como ya) y el alámbrico del modelo físico;
+  - escala automática o dada (como ya) y animación opcional (la escala va de 0 a la dada y vuelve, en ~1,5 s);
+  - rótulos: el nudo con el mayor |u| y el del menor uz, con su valor en mm y su objeto, de la misma consulta (`deformada`).
+- **Pilares en el 3D** (Resultados · Pilares; `src/visor/pilares3d.ts`): cada tramo, de cota a cota en el eje del pilar, como una línea gruesa del color de su banda:
+  - magnitud: N (la mayor compresión de la base y la cabeza, la del cuadro) o ν (sólo en los de hormigón; los demás, en gris);
+  - bandas con la paleta y los límites de los mapas (`limitesMapa`, `coloresBandas`), y en ν, el límite de A3 como uno de ellos;
+  - los valores son los del cuadro de pilares (`pieza` y `Consultas.pilar`), bit a bit; rótulos, la mayor compresión y la mayor ν con su pilar, su tramo y su combinación;
+  - el diagrama de N a lo largo del pilar ya está en Diagramas.
+- **Reacciones** (un modo nuevo de Resultados, «Reacciones»; `src/visor/reacciones3d.ts`), de `fem consultar reacciones`:
+  - una flecha por objeto con reacciones (pilar, muro, apoyo, apoyo lineal) en el centro de sus nudos coartados, que es donde la consulta da su resultante: la vertical con Fz y la horizontal con (Fx, Fy), en el sentido de la fuerza que el apoyo hace sobre la estructura y con la misma escala (la mayor |F|, 1,5 m por la escala elegida);
+  - con varias combinaciones, la de mayor |Fz| de cada objeto (dicha en su rótulo); con una, esa;
+  - rótulos: Fz de cada objeto, con prioridad por |Fz| y sin pisarse; Mx, My y Mz, en la tabla y bajo el cursor;
+  - abajo, la tabla de la consulta (objeto, Fx…Mz y combinación) y sus totales;
+  - la suma de las flechas de una combinación es su total de la consulta.
+- **Muros con mapa** (Resultados · Losas, en el 3D; `isovalores3d`):
+  - la cabecera del 3D elige qué superficies: «Losas» (por defecto: el 3D de una planta sigue siendo su mapa en planta), «Muros» o «Losas y muros» (una escala común);
+  - los campos de los muros, por SPR en sus ejes (eje 1 a lo largo del eje del muro desde su primer punto, eje 2 hacia arriba, eje 3 a su derecha);
+  - se añaden **F11, F22 y F12** (fuerzas de membrana, kN/m, positivas de tracción) a los campos de A4: en los muros, F22 es el axil vertical por metro. En las losas de una planta con diafragma rígido salen nulas (las lleva el diafragma, C1-d), y la nota lo dice. Con ellas, `fem render` gana las vistas `f11`, `f22` y `f12`.
+- **Valor bajo el cursor** en el 3D (al quedarse quieto el ratón, ~0,1 s):
+  - en un diagrama, la estación más cercana de la barra: la consulta `estacion` (máximo y mínimo con su combinación), como el cursor del alzado de la pieza;
+  - en un mapa (losas o muros), el valor del punto en la combinación dibujada, interpolado como las bandas: una consulta nueva, `valor-lamina`, que en las losas es `valor-punto` bit a bit;
+  - en un pilar o una flecha de reacción, sus valores (los de la consulta).
+- **Detalle en Propiedades** (Diagramas y Pilares): elegir en el 3D o en un alzado cualquier viga, vigueta o pilar, de cualquier planta, enseña su detalle:
+  - una viga o una vigueta, como ya (el alzado con su envolvente abajo, la estación y los vanos);
+  - un pilar, su alzado con la envolvente a lo largo de su altura (las plantas como apoyos) y su cuadro por tramos (el de la pantalla Pilares).
+- **Cabecera de la vista:** el esfuerzo o la magnitud, la combinación (o «envolvente de …» y cuántas) y la planta o «todas».
+- **Validez:** con el modelo cambiado o sin el cálculo de esta huella no se pinta ningún resultado (criterio 3 de V1); la vista lo dice y, si se puede calcular, ofrece Calcular.
+- **Fuera de I4:** el valor bajo el cursor en la planta y en el alzado (allí, el clic); isolíneas rotuladas en el 3D; reacciones repartidas nudo a nudo en los muros; la deformada en el alzado.
+
+### 15.1 Criterios de paso de I4
+
+1. **Cada número, de su consulta, bit a bit** (en Node, con los cuatro proyectos de V1):
+   - pilares: el valor de cada tramo es el del cuadro (`pilar`);
+   - reacciones: cada flecha es la resultante de `fem consultar reacciones` de su objeto y su combinación, y en cada combinación la suma de las Fz dibujadas es el total de la consulta (a 1e-9 relativo);
+   - muros: los valores de cada lámina son los del SPR de su muro en sus ejes, y con «Losas» el 3D de una planta sigue siendo su mapa;
+   - deformada: los rótulos son los extremos de `deformada`;
+   - bajo el cursor: el texto es el de su consulta, y `valor-lamina` da en las losas lo mismo que `valor-punto`.
+2. **Convenio:** las flechas de las reacciones van en el sentido de su fuerza (Fz > 0, hacia arriba); F22 < 0 en la base de un muro cargado; ν sólo en el hormigón.
+3. **Validez:** sin el cálculo de la huella abierta, ningún pedido de resultados en 3D devuelve nada, y la vista no pinta resultados con el fichero cambiado.
+4. **En Chrome, con el edificio objetivo y el núcleo:** lo pintado es lo de Node (los triángulos, los segmentos y las flechas); la sonda bajo el cursor da el valor de su consulta; orbitar con cada capa (y con la deformada animada) a 60 fps, y ninguna tarea larga de más de 50 ms, tampoco al pasar el ratón.
+5. **No se pierde nada:** los tests de DOM y los bancos de I1, I2 y del adelanto de I4 dan lo mismo.

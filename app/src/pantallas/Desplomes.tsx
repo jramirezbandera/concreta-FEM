@@ -2,6 +2,9 @@
  * Resultados · Deformada (la pantalla 6 de V1, Desplomes): `fem consultar deriva` por planta (el mayor desplome relativo d/h con su
  * pilar y su combinación, y el desplazamiento del maestro de su diafragma), frente al límite de A3,
  * y la deformada 3D en la combinación pésima (o en la elegida, si es una sola).
+ *
+ * I4: la deformada lleva debajo la original (las barras y el alámbrico, en gris), se puede animar
+ * (de 0 a la escala y vuelta) y rotula el nudo del mayor |u| y el del menor uz, de su consulta.
  */
 import { useEffect, useMemo, useState } from "react";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
@@ -64,6 +67,7 @@ export function ModoDeformada() {
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [escalaDada, setEscalaDada] = useState<number | null>(null);
+  const [animada, setAnimada] = useState(false);
   const d = usePedido(proyecto.cliente, { tipo: "desplomes", combinaciones: eleccion });
   const x = d.datos;
   const unaSola = eleccion.tipo === "combinacion" || eleccion.tipo === "caso";
@@ -94,12 +98,15 @@ export function ModoDeformada() {
           )}
         </span>
       </Campo>
+      <button type="button" className="btn" style={{ height: 28 }} aria-pressed={animada} data-on={animada} onClick={() => setAnimada((x) => !x)} title="La deformada de 0 a la escala y vuelta, en bucle">
+        {animada ? "Parar" : "Animar"}
+      </button>
       <Separador />
       <BarraVistas />
     </>
   );
 
-  const def3D = useMemo(() => (deformada.datos && !proyecto.desactualizado ? { u: deformada.datos.u, escala } : null), [deformada.datos, escala, proyecto.desactualizado]);
+  const def3D = useMemo(() => (deformada.datos && !proyecto.desactualizado ? { u: deformada.datos.u, escala, extremos: deformada.datos.extremos, animada } : null), [deformada.datos, escala, proyecto.desactualizado, animada]);
   const vista = (
     <ZonaVistas
       fuentes={{

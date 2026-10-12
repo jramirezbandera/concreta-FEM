@@ -96,6 +96,12 @@ export const IcDeformada = icono(
     <path d="M3 18h18" strokeDasharray="2 2" />
   </>,
 );
+export const IcReacciones = icono(
+  <>
+    <path d="M3 21h18" />
+    <path d="M7 18V8M4.5 10.5 7 8l2.5 2.5M17 18V5M14.5 7.5 17 5l2.5 2.5" />
+  </>,
+);
 export const IcFirma = icono(
   <>
     <path d="M3 17c3 0 4-6 6-6s1 5 3 5 2-3 4-3 2 2 5 2" />

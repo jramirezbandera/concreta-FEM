@@ -160,6 +160,10 @@ export interface EscalaDibujada {
   maximo: number;
   /** El rango sin los picos (`rangoSinPicos`). */
   sinPicos?: [number, number];
+  /** El campo es nulo (su mayor |valor|, menos de `CAMPO_NULO`): una sola banda neutra. */
+  nulo?: true;
+  /** La combinación dibujada (la de los extremos; también cuando un campo nulo no los rotula). */
+  combinacion?: string;
 }
 
 /** Caja de unos puntos (la vacía si no hay ninguno). */

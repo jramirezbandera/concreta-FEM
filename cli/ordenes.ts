@@ -84,7 +84,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem resumen <proyecto.json>
   fem consultar <proyecto.json> <consulta> [opciones]   (consultas: ${CONSULTAS.join(", ")})
   fem render <proyecto.json> [--vista V] [--planta P] [--caso C] [--escala E]   PNG y SVG de cada planta (A4; vistas: ${VISTAS.join(", ")})
-      --escala de los mapas (uz…v23): completa (por defecto), sin-picos o mín:máx:paso («-40:20:5», «::5»)
+      --escala de los mapas (uz…v23, f11…f12): completa (por defecto), sin-picos o mín:máx:paso («-40:20:5», «::5»)
   fem revisar <proyecto.json> [--recalcular]   sensatez e informe de revisión (A3)
   fem firmar <proyecto.json> --por "<nombre>"   sólo el ingeniero: firma el informe revisado
   fem esquema
@@ -417,7 +417,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
               ancho: s.encuadre.ancho,
               alto: s.encuadre.alto,
               pxPorM: s.encuadre.escala,
-              ...(e.mapa ? { escala: { limites: e.mapa.limites, ...(e.mapa.fueraAbajo ? { fueraAbajo: true } : {}), ...(e.mapa.fueraArriba ? { fueraArriba: true } : {}), ...(e.mapa.picos ? { picos: true } : {}), ...(e.mapa.sinPicos ? { sinPicos: e.mapa.sinPicos.map((x) => Number(x.toPrecision(6))) } : {}) } } : {}),
+              ...(e.mapa ? { escala: { limites: e.mapa.limites, ...(e.mapa.fueraAbajo ? { fueraAbajo: true } : {}), ...(e.mapa.fueraArriba ? { fueraArriba: true } : {}), ...(e.mapa.picos ? { picos: true } : {}), ...(e.mapa.nulo ? { nulo: true } : {}), ...(e.mapa.sinPicos ? { sinPicos: e.mapa.sinPicos.map((x) => Number(x.toPrecision(6))) } : {}) } } : {}),
               ...(necesitaCalculo(vista) && vista !== "malla" ? { combinaciones: conjuntos.get(propositoDe(vista))!.descripcion } : {}),
               ...(comb && (CAMPOS as readonly string[]).includes(vista) ? { combinacion: comb } : {}),
               extremos: e.extremos.slice(0, TOP_POR_DEFECTO).map((x) => ({ que: x.que, valor: x.valor, unidad: x.unidad, ...(x.objeto ? { objeto: x.objeto } : {}), ...(x.punto ? { punto: x.punto } : {}), ...(x.comb ? { comb: x.comb } : {}) })),

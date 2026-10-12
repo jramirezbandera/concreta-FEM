@@ -300,8 +300,14 @@
   - diagramas de las barras en el 3D (`src/visor/diagramas3d.ts`: ejes locales, relleno por signo, todas las barras o las de una planta) y en el alzado (`src/agente/render/alzadoDiagramas.ts`: M y V en el plano del pórtico), en Resultados · Diagramas;
   - isovalores de las losas en el 3D (`src/visor/isovalores3d.ts`), en Resultados · Losas: con una planta, su mapa en planta; con todas, una escala común;
   - validación: `src/visor/resultados3d.test.ts` (los valores, los de `envolventePieza`, bit a bit) y `validacion/i4/chrome.ts`.
+- **2026-10-12: fase I4 terminada** (resultados en 3D). Pasan los cinco criterios; falta la puerta de uso. Lo fijado al empezar está en `interfaz.md` §15 y el informe, en `docs/fem3d/fase-i4.md`, con criterios, hallazgos I4-1…I4-6 y pendientes.
+  - **Ya en `src/visor/`:** `pilares3d.ts` (N o ν de cada tramo por colores, los valores del cuadro), `reacciones3d.ts` (flechas de `fem consultar reacciones`), muros en `isovalores3d.ts` (superficies «losas», «muros» o «todas») y `valorEnLamina`; la deformada con sus extremos y el alzado de un pilar en `datos.ts`. Pedidos nuevos: `pilares3d`, `reacciones3d` y `valor-lamina`.
+  - **A4:** campos F11, F22 y F12 (también en `fem render`) y la regla del campo nulo (I4-1: si el mayor |valor| es < 1e-9, una sola banda neutra; las fuerzas de membrana de las losas con diafragma rígido son ruido).
+  - **En la app:** modo Reacciones; Pilares en 3D (N/ν); muros y F11…F12 en Losas; cualquier viga, vigueta o pilar con su detalle en Diagramas; deformada animada con la original en gris; la sonda bajo el cursor en el 3D (`vistas/sonda.ts`), que pide su consulta.
+  - **Validación:** `src/visor/i4.test.ts`, `app/src/test/pantallas.test.tsx` y el banco `validacion/i4/chrome.ts`, ampliado con el núcleo.
+  - **Pendiente del usuario:** la puerta de uso y las propuestas de §15 (cómo van las flechas, el campo nulo, las bandas de ν).
 - **Siguiente paso:**
-  - las puertas de uso de I1 e I2 y después I3 (sólido, translúcido, filtros y caja de sección) e I4 (resultados en 3D);
+  - las puertas de uso de I1, I2 e I4 y después I3 (sólido, translúcido, filtros y caja de sección);
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).

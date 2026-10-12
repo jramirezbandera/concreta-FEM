@@ -161,7 +161,7 @@ describe.each(PROYECTOS)("I4 con %s", (_nombre, ruta) => {
         expect(i.combinacion?.nombre).toBe(e.extremos[0]?.comb);
         const max = e.extremos.find((x) => x.que.endsWith("máximo"))!;
         const min = e.extremos.find((x) => x.que.endsWith("mínimo"))!;
-        expect(i.extremos.map((x) => [x.valor, x.losa, x.punto[0], x.punto[1]])).toEqual([
+        expect(i.extremos.map((x) => [x.valor, x.objeto, x.punto[0], x.punto[1]])).toEqual([
           [max.valor, max.objeto, max.punto![0], max.punto![1]],
           [min.valor, min.objeto, min.punto![0], min.punto![1]],
         ]);

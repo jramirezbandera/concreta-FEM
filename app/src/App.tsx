@@ -40,6 +40,7 @@ const MODOS: { id: ModoResultados; nombre: string }[] = [
   { id: "diagramas", nombre: "Diagramas de vigas" },
   { id: "pilares", nombre: "Pilares" },
   { id: "deformada", nombre: "Deformada y desplomes" },
+  { id: "reacciones", nombre: "Reacciones" },
 ];
 
 /** `?espacio=…&modo=…` o, como en V1, `?pantalla=…`. */

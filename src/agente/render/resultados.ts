@@ -5,8 +5,9 @@
  *
  * De dónde sale cada número (criterio 1 de A4):
  * - uz, de los desplazamientos de los nudos de las láminas de la planta (los de `Consultas.flechas`);
- * - m11…v23, de los campos SPR (`CamposLaminas`, E5) en los nudos de cada lámina, en sus ejes (los de
- *   su losa: 1 = `eje1`, X por defecto). Son lineales en los casos: se evalúan por caso y se combinan;
+ * - m11…v23 y f11…f12 (las fuerzas de membrana, I4), de los campos SPR (`CamposLaminas`, E5) en los
+ *   nudos de cada lámina, en sus ejes (los de su losa: 1 = `eje1`, X por defecto; en un muro, 1 a lo
+ *   largo de su eje, 2 hacia arriba). Son lineales en los casos: se evalúan por caso y se combinan;
  * - los diagramas, de `diagramaCombinado` (A1) en las estaciones de cada tramo flexible; sus extremos
  *   rotulados, de `Consultas.vano` en cada combinación;
  * - los axiles, de `Consultas.pilar`.
@@ -18,22 +19,23 @@
  */
 import type { ResultadoCompilacion } from "../../compilador/compilar.ts";
 import type { Consultas } from "../../compilador/consultas.ts";
+import { cotasPlantas } from "../../compilador/cotas.ts";
 import { EsfuerzosPiezas, type TramoFlexible } from "../../compilador/resultados.ts";
 import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { diagramaCombinado } from "../consultas.ts";
 import { area, bandaPolilinea, cajaDe, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
-import { AVISO_PICOS, bandas, coloresBandas, FRACCION_PICOS, isolineas, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
+import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
 import { anchoViga, fondoModelo, huellaSeccion, PlantaFisica, type DatosVista } from "./modelo.ts";
 
-export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23"] as const;
+export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12"] as const;
 export type Campo = (typeof CAMPOS)[number];
 export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-vz", "pilares-n"] as const;
 
 /** Componente de los campos SPR ([Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy]) de cada campo de láminas. */
-const COMPONENTE: Record<Exclude<Campo, "uz">, number> = { m11: 3, m22: 4, m12: 5, v13: 6, v23: 7 };
-const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m", m12: "kN·m/m", v13: "kN/m", v23: "kN/m" };
+const COMPONENTE: Record<Exclude<Campo, "uz">, number> = { f11: 0, f22: 1, f12: 2, m11: 3, m22: 4, m12: 5, v13: 6, v23: 7 };
+const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m", m12: "kN·m/m", v13: "kN/m", v23: "kN/m", f11: "kN/m", f22: "kN/m", f12: "kN/m" };
 const NOMBRE: Record<Campo, string> = {
   uz: "uz, desplazamiento vertical (mm; negativo hacia abajo)",
   m11: "M11 (kN·m/m), flexión según el eje 1 de la losa; positivo tracciona la cara inferior",
@@ -41,7 +43,15 @@ const NOMBRE: Record<Campo, string> = {
   m12: "M12 (kN·m/m), momento torsor de la losa",
   v13: "V13 (kN/m), cortante en las caras normales al eje 1 (por equilibrio, del SPR)",
   v23: "V23 (kN/m), cortante en las caras normales al eje 2 (por equilibrio, del SPR)",
+  f11: "F11 (kN/m), fuerza de membrana según el eje 1; positiva de tracción",
+  f22: "F22 (kN/m), fuerza de membrana según el eje 2; positiva de tracción",
+  f12: "F12 (kN/m), fuerza de membrana tangencial",
 };
+
+/** Las láminas de un mapa: las de las losas de una planta o las de los muros (las que van de la planta de debajo a ella). */
+export type SuperficieMapa = "losas" | "muros";
+/** Lo que hay que saber de las fuerzas de membrana de las losas. */
+export const NOTA_MEMBRANA = "Fuerzas de membrana recuperadas por SPR (E5) en los ejes de cada losa. En una planta con diafragma rígido salen nulas en las losas: el atado lo lleva el diafragma (C1-d).";
 /** Ordenada máxima de un diagrama, como fracción de la diagonal de la planta. */
 const ORDENADA = 0.035;
 /** Divisiones de cada tramo flexible que se añaden a sus estaciones para dibujar el diagrama. */
@@ -71,24 +81,42 @@ export class ResultadosRender {
     return (this.epC ??= new EsfuerzosPiezas(this.c.modelo, this.c.mapeo, this.q.casos));
   }
 
-  /** Láminas de las losas de la planta (en el orden del modelo). */
-  laminas(planta: string): { laminas: number[]; region: boolean[]; valores?: Float64Array[] } {
-    let x = this.porPlanta.get(planta);
+  /**
+   * Láminas de las losas de la planta o, con «muros», las de los muros entre ella y la planta de
+   * debajo (por la cota de su centro), en el orden del modelo.
+   */
+  laminas(planta: string, de: SuperficieMapa = "losas"): { laminas: number[]; region: boolean[]; valores?: Float64Array[] } {
+    const clave = de === "losas" ? planta : `muros
+${planta}`;
+    let x = this.porPlanta.get(clave);
     if (!x) {
-      const losas = new Set((this.q.fisico.losas ?? []).filter((l) => l.planta === planta).map((l) => l.id));
       const laminas: number[] = [];
-      (this.c.mapeo.laminas ?? []).forEach((m, i) => {
-        if (m.losa && losas.has(m.losa)) laminas.push(i);
-      });
+      if (de === "losas") {
+        const losas = new Set((this.q.fisico.losas ?? []).filter((l) => l.planta === planta).map((l) => l.id));
+        (this.c.mapeo.laminas ?? []).forEach((m, i) => {
+          if (m.losa && losas.has(m.losa)) laminas.push(i);
+        });
+      } else {
+        const plantas = this.q.fisico.plantas;
+        const k = plantas.findIndex((p) => p.id === planta);
+        const cotas = cotasPlantas(plantas);
+        const [z0, z1] = [cotas[k + 1], cotas[k]];
+        if (k >= 0 && z0 !== null && z0 !== undefined && z1 !== null && z1 !== undefined)
+          (this.c.mapeo.laminas ?? []).forEach((m, i) => {
+            if (!m.muro) return;
+            const zc = this.c.modelo.laminas![i]!.nudos.reduce((s, n) => s + this.c.modelo.nudos[n]!.z, 0) / 4;
+            if (zc > z0 && zc <= z1) laminas.push(i);
+          });
+      }
       x = { laminas, region: [] };
-      this.porPlanta.set(planta, x);
+      this.porPlanta.set(clave, x);
     }
     return x;
   }
 
-  /** Campos SPR por caso en los nudos de las láminas de la planta. */
-  valores(planta: string): { laminas: number[]; region: boolean[]; valores: Float64Array[] } {
-    const x = this.laminas(planta);
+  /** Campos SPR por caso en los nudos de las láminas de la planta (o de sus muros). */
+  valores(planta: string, de: SuperficieMapa = "losas"): { laminas: number[]; region: boolean[]; valores: Float64Array[] } {
+    const x = this.laminas(planta, de);
     if (!x.valores) {
       const ls = x.laminas;
       x.region = ls.map((l) => this.campos.region(l) >= 0);
@@ -205,9 +233,9 @@ export function vistaMalla(r: ResultadosRender, planta: string, d: DatosVista): 
 // ─── Isovalores ─────────────────────────────────────────────────────────────────────────────────
 
 /** Valores del campo en los nudos de cada lámina (4 por lámina; NaN si no tiene) en una combinación. El visor interpola con ellos el valor de un punto. */
-export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, f: ArrayLike<number>): { laminas: number[]; v: Float64Array } {
+export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, f: ArrayLike<number>, de: SuperficieMapa = "losas"): { laminas: number[]; v: Float64Array } {
   if (campo === "uz") {
-    const { laminas } = r.laminas(planta);
+    const { laminas } = r.laminas(planta, de);
     const v = new Float64Array(4 * laminas.length);
     laminas.forEach((l, i) => {
       r.c.modelo.laminas![l]!.nudos.forEach((n, a) => {
@@ -218,7 +246,7 @@ export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, 
     });
     return { laminas, v };
   }
-  const { laminas, region, valores } = r.valores(planta);
+  const { laminas, region, valores } = r.valores(planta, de);
   const comp = COMPONENTE[campo];
   const v = new Float64Array(4 * laminas.length);
   laminas.forEach((_, i) => {
@@ -287,7 +315,14 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   const leyenda: EntradaLeyenda[] = [];
   let mapa: Escena["mapa"];
   const u = UNIDAD[campo];
-  if (tris.length) {
+  const nulo = tris.length > 0 && Math.max(Math.abs(vmin), Math.abs(vmax)) < CAMPO_NULO;
+  if (nulo) {
+    for (const b of bandas(tris, LIMITES_NULO)) P.push({ tipo: "region", anillos: b.anillos, estilo: "isobanda", relleno: COLOR_NULO, banda: 0 });
+    leyenda.push({ relleno: COLOR_NULO, texto: `0: campo nulo (|valor| < ${CAMPO_NULO})` });
+    notas.push(`El campo es nulo en la planta: su mayor |valor| es ${Math.max(Math.abs(vmin), Math.abs(vmax)).toExponential(1)} ${u}, ruido de redondeo. No se rotulan extremos.`);
+    mapa = { limites: [...LIMITES_NULO], paso: 2 * CAMPO_NULO, fueraAbajo: false, fueraArriba: false, picos: false, minimo: vmin, maximo: vmax, nulo: true, combinacion: comb };
+    [pmax, pmin] = [null, null];
+  } else if (tris.length) {
     const robusto = rangoSinPicos(valoresNudos, pesos);
     let lm = limitesMapa(vmin, vmax, escala, robusto);
     if ("error" in lm) {
@@ -322,7 +357,7 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
     // Picos: con la escala completa, si unos pocos puntos marcan la escala, se dice
     const picos = !!robusto && !(fueraAbajo || fueraArriba) && Math.max(Math.abs(vmin), Math.abs(vmax)) > AVISO_PICOS * Math.max(Math.abs(robusto[0]), Math.abs(robusto[1]));
     if (picos) notas.push(`La escala la marcan picos en menos del ${rotulo(2 * FRACCION_PICOS * 100)} % del área (hasta ${rotulo(Math.abs(vmin) > Math.abs(vmax) ? vmin : vmax)} ${u}); sin ellos, el campo va de ${rotulo(robusto![0])} a ${rotulo(robusto![1])} ${u} (escala «sin picos»).`);
-    mapa = { limites: dentro, paso: lm.paso, fueraAbajo, fueraArriba, picos, minimo: vmin, maximo: vmax, ...(robusto ? { sinPicos: robusto } : {}) };
+    mapa = { limites: dentro, paso: lm.paso, fueraAbajo, fueraArriba, picos, minimo: vmin, maximo: vmax, ...(robusto ? { sinPicos: robusto } : {}), combinacion: comb };
   }
   P.push(...trazoModelo(pl));
   const ejes = capaEjes(pl.f, { cotas: false });
@@ -344,6 +379,7 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   if (sinMapa) notas.push(`${sinMapa} láminas sin mapa (gris): las rígidas de las huellas de los pilares, que no se deforman.`);
   if (!laminas.length) notas.push("La planta no tiene losas.");
   if (campo === "uz") notas.push("Valores en los nudos de las láminas, interpolados en cada una como en un cuadrilátero bilineal; la flecha relativa de cada recuadro, con «fem consultar flechas».");
+  else if (campo.startsWith("f")) notas.push(NOTA_MEMBRANA);
   else notas.push("Campos recuperados por SPR (E5) en los nudos de cada lámina, en los ejes de su losa (eje 1 = su eje1, X por defecto), interpolados en cada una como en un cuadrilátero bilineal. Para dimensionar, las bandas.");
   if (conjunto.factores.length > 1) notas.push(`Combinación ${comb}: la del mayor |valor| en la planta de las ${conjunto.factores.length} de ${conjunto.descripcion}.`);
   return {

@@ -7,7 +7,9 @@
  * Desde I2, cada vista de planta pide el mapa de su planta; Propiedades enseña los datos de la planta
  * de la vista activa. Desde I4, un 3D enseña los mismos mapas sobre las losas en su sitio
  * (`isovalores3d`): los de la planta elegida en su cabecera (con su combinación y su escala, como en
- * la planta) o los de todas, con una escala común.
+ * la planta) o los de todas, con una escala común; en su cabecera, las losas, los muros o los dos, y
+ * bajo el cursor, el valor del punto (`valor-lamina`, la misma interpolación que las bandas). Las
+ * fuerzas de membrana F11, F22 y F12, desde I4 (en los muros, F22 es su axil vertical por metro).
  *
  * La escala de cada magnitud (`EscalaMapa`), en Propiedades: completa, sin picos o manual (mínimo,
  * máximo y paso); lo de fuera, rayado.
@@ -18,7 +20,8 @@ import { limitesMapa, type EscalaMapa } from "../../../src/agente/render/isovalo
 import type { Campo } from "../../../src/agente/render/resultados.ts";
 import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { ValorPunto } from "../../../src/visor/datos.ts";
-import { Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import type { SuperficiesMapa } from "../../../src/visor/isovalores3d.ts";
+import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, Equilibrio, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
@@ -28,6 +31,7 @@ import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import type { Marca } from "../vistas/vista2d.ts";
+import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
 import { Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
 
 type Punto = { p: Vec2; v: ValorPunto | null; planta: string; clave: string };
@@ -47,14 +51,33 @@ function PlantaLosas({ planta, campo, eleccion, escala, punto, onPunto, dec, uni
   return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} marcas={marcas} eventos={{ clic: (p) => onPunto(p, planta) }} aviso={aviso} cargando={d.cargando} />;
 }
 
-/** El mapa en un 3D (I4): el de la planta de su cabecera, o los de todas. */
-function TresDLosas({ planta, campo, eleccion, escala }: { planta: string | null; campo: Campo; eleccion: EleccionCombinaciones; escala: EscalaMapa | undefined }) {
+/** El mapa en un 3D (I4): el de la planta de su cabecera, o los de todas; bajo el cursor, el valor del punto. */
+function TresDLosas({ planta, campo, eleccion, escala, superficies, dec }: { planta: string | null; campo: Campo; eleccion: EleccionCombinaciones; escala: EscalaMapa | undefined; superficies: SuperficiesMapa; dec: number }) {
   const { proyecto } = useVisor();
-  const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "isovalores3d", campo, combinaciones: eleccion, planta, ...(escala ? { escala } : {}) });
+  const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "isovalores3d", campo, combinaciones: eleccion, planta, superficies, ...(escala ? { escala } : {}) });
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>{campo === "uz" ? "Preparando el mapa…" : "Recuperando los campos (SPR)…"}</Aviso> : null;
   const datos = proyecto.desactualizado ? null : d.datos;
-  return <Fuente3DModelo resultados={{ isovalores: datos, leyenda: datos, aviso, cargando: d.cargando }} />;
+  const cliente = proyecto.cliente;
+  const comb = datos?.combinacion?.nombre;
+  const { alPasar, sonda } = useSonda(
+    cliente && comb
+      ? async (o) => {
+          if (o.tipo !== "lamina") return null;
+          const r = await cliente.pedir({ tipo: "valor-lamina", campo, combinaciones: eleccion, nombre: comb, lamina: o.lamina, punto: o.p });
+          const v = r.ok ? (r.valor as { valor: number; unidad: string; objeto: string; planta: string; comb: string } | null) : null;
+          return v ? [`${fmt(v.valor, dec)} ${v.unidad}`, `${v.objeto} · ${v.planta} · ${v.comb}`] : ["sin mapa"];
+        }
+      : null,
+    JSON.stringify([planta, campo, eleccion, escala, superficies, comb]),
+  );
+  return <Fuente3DModelo resultados={{ isovalores: datos, leyenda: datos, aviso, cargando: d.cargando, alPasar, sonda }} />;
 }
+
+const SUPERFICIES: { id: SuperficiesMapa; nombre: string; title: string }[] = [
+  { id: "losas", nombre: "Losas", title: "Las losas: con una planta, su mapa en planta" },
+  { id: "muros", nombre: "Muros", title: "Los muros, en sus ejes (1 a lo largo, 2 hacia arriba, 3 a su derecha)" },
+  { id: "todas", nombre: "Losas y muros", title: "Las losas y los muros, con una escala común" },
+];
 
 const CAMPOS: { id: Campo; nombre: string; dec: number }[] = [
   { id: "uz", nombre: "uz", dec: 2 },
@@ -63,6 +86,9 @@ const CAMPOS: { id: Campo; nombre: string; dec: number }[] = [
   { id: "m12", nombre: "M12", dec: 1 },
   { id: "v13", nombre: "V13", dec: 1 },
   { id: "v23", nombre: "V23", dec: 1 },
+  { id: "f11", nombre: "F11", dec: 1 },
+  { id: "f22", nombre: "F22", dec: 1 },
+  { id: "f12", nombre: "F12", dec: 1 },
 ];
 
 export function ModoLosas() {
@@ -81,6 +107,7 @@ export function ModoLosas() {
   const [elEsf, setElEsf] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [punto, setPunto] = useState<Punto | null>(null);
   const [escalas, setEscalas] = useState<Partial<Record<Campo, EscalaElegida>>>({});
+  const [superficies, setSuperficies] = useState<SuperficiesMapa>("losas");
   const elegida = escalas[campo] ?? { modo: "completa" };
   const escala = escalaDe(elegida);
   const eleccion = campo === "uz" ? elDesp : elEsf;
@@ -105,6 +132,7 @@ export function ModoLosas() {
   };
 
   const unidad = campo === "uz" ? "mm" : campo.startsWith("m") ? "kN·m/m" : "kN/m";
+  const resumenComb = queCombinaciones(x ? { descripcion: x.combinaciones.descripcion, n: x.combinaciones.nombres.length } : undefined, x?.dibujada?.nombre);
 
   const nombreCampo = CAMPOS.find((c) => c.id === campo)!.nombre;
   const herramientas = (
@@ -135,12 +163,15 @@ export function ModoLosas() {
             )}
           </Chip>
         ),
-        tresD: (v) => <TresDLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} />,
+        tresD: (v) => <TresDLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} superficies={superficies} dec={dec} />,
         cabecera3D: () => (
-          <Chip acento>
-            {nombreCampo} · {unidad}
-            {elegida.modo !== "completa" && ` · ${elegida.modo === "sin-picos" ? "sin picos" : "escala manual"}`}
-          </Chip>
+          <>
+            <Desplegable etiqueta="Superficies del mapa" valor={superficies} onCambio={setSuperficies} opciones={SUPERFICIES} />
+            <Chip acento title={resumenComb}>
+              {nombreCampo} · {unidad}
+              {elegida.modo !== "completa" && ` · ${elegida.modo === "sin-picos" ? "sin picos" : "escala manual"}`}
+            </Chip>
+          </>
         ),
       }}
     />
@@ -301,7 +332,7 @@ function SeccionEscala({ mapa, unidad, elegida, onCambio }: { mapa: EscalaDibuja
     </label>
   );
   return (
-    <Seccion titulo="Escala" valor={mapa ? `${rotulo(mapa.limites[0]!, 4)} a ${rotulo(mapa.limites[mapa.limites.length - 1]!, 4)} ${unidad}` : undefined}>
+    <Seccion titulo="Escala" valor={mapa?.nulo ? "campo nulo" : mapa ? `${rotulo(mapa.limites[0]!, 4)} a ${rotulo(mapa.limites[mapa.limites.length - 1]!, 4)} ${unidad}` : undefined}>
       <div className="flex flex-col gap-2 px-3.5 py-2">
         <Segmentado
           etiqueta="Escala del mapa"

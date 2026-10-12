@@ -13,13 +13,14 @@ import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { deriva, diagramaCombinado, flechas, pieza, type DerivaPlanta, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
 import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
-import { envolventePieza, valoresCampo, type Campo, type PuntoEnvolvente } from "../agente/render/resultados.ts";
+import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type PuntoEnvolvente } from "../agente/render/resultados.ts";
 import { estadoFirma, leerFirmas, revisar, type EstadoFirma } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion } from "../agente/sensatez.ts";
+import { cotasPlantas } from "../compilador/cotas.ts";
 import { proponerEjes } from "../compilador/ejes.ts";
 import { sha256 } from "../compilador/huella.ts";
-import type { ApoyoPieza } from "../compilador/consultas.ts";
+import type { ApoyoPieza, Consultas } from "../compilador/consultas.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { EleccionCombinaciones, Sesion } from "./sesion.ts";
 import type { EscenaPreparada } from "./escena.ts";
@@ -114,7 +115,7 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
     if (!r.valido) return r;
     fl.push(...r.valor);
   }
-  const comb = esc.valor.extremos[0]?.comb;
+  const comb = esc.valor.mapa?.combinacion ?? esc.valor.extremos[0]?.comb;
   const k = comb === undefined ? -1 : conj.valor.nombres.indexOf(comb);
   return {
     valido: true,
@@ -143,7 +144,7 @@ export interface ValorPunto {
   otros?: number[];
 }
 
-const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m", m12: "kN·m/m", v13: "kN/m", v23: "kN/m" };
+const UNIDAD = UNIDADES_CAMPO;
 
 /**
  * Valor del mapa en un punto: el de la combinación dibujada, interpolado como las bandas de A4 (en
@@ -213,7 +214,8 @@ export function piezasPlanta(s: Sesion, planta: string): PiezaListada[] {
 
 export interface DatosViga {
   id: string;
-  tipo: "viga" | "vigueta";
+  /** Desde I4, también un pilar: su envolvente a lo largo de su altura, desde su base. */
+  tipo: "viga" | "vigueta" | "pilar";
   esfuerzo: Esfuerzo;
   combinaciones: Combinaciones;
   /** Longitud de la pieza (estación final), m. */
@@ -226,6 +228,8 @@ export interface DatosViga {
   vanos: VanoEnvolvente[];
   /** Tramos flexibles: fuera de ellos (las zonas rígidas, dentro de los apoyos) no hay esfuerzos. */
   flexibles: [number, number][];
+  /** En un pilar: la estación de cada planta que atraviesa (la de su base, 0). */
+  plantas?: { planta: string; s: number }[];
 }
 
 export function datosViga(s: Sesion, id: string, esfuerzo: Esfuerzo, e: EleccionCombinaciones): Resultado<DatosViga> {
@@ -234,6 +238,7 @@ export function datosViga(s: Sesion, id: string, esfuerzo: Esfuerzo, e: Eleccion
   if (!q || !rr) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const conj = s.conjunto(e, "esfuerzos");
   if (!conj.valido) return conj;
+  if (q.fisico.pilares?.some((p) => p.id === id)) return datosPilarAlzado(s, id, esfuerzo, conj.valor);
   const v = q.viga(id);
   if (!v.valido) return v;
   const p = pieza(q, conj.valor, id);
@@ -253,6 +258,41 @@ export function datosViga(s: Sesion, id: string, esfuerzo: Esfuerzo, e: Eleccion
       envolvente: envolventePieza(rr, id, conj.valor, COMPONENTE[esfuerzo]),
       vanos: (p.valor as { vanos: VanoEnvolvente[] }).vanos,
       flexibles: rr.ep.tramos(id).map((t) => [t.s0, t.s1]),
+    },
+  };
+}
+
+/** Un pilar como pieza: su envolvente a lo largo de la altura y las plantas que atraviesa. */
+function datosPilarAlzado(s: Sesion, id: string, esfuerzo: Esfuerzo, conj: ConjuntoCombinaciones): Resultado<DatosViga> {
+  const rr = s.rr!;
+  const c = s.compilado!;
+  const bs = c.mapeo.piezas[id] ?? [];
+  if (!bs.length) return no("visor/objeto", `${id} no tiene barras.`);
+  const f = s.proyecto.modelo;
+  const cotas = cotasPlantas(f.plantas);
+  const enCota = (z: number) => f.plantas.find((_, i) => cotas[i] !== null && Math.abs(cotas[i]! - z) < 1e-6)?.id;
+  const plantas: { planta: string; s: number }[] = [];
+  const b0 = c.modelo.barras![bs[0]!]!;
+  const p0 = enCota(c.modelo.nudos[b0.nudos[0]]!.z);
+  if (p0) plantas.push({ planta: p0, s: c.mapeo.barras[bs[0]!]!.s[0] });
+  for (const b of bs) {
+    const p = enCota(c.modelo.nudos[c.modelo.barras![b]!.nudos[1]]!.z);
+    if (p && !plantas.some((x) => x.planta === p)) plantas.push({ planta: p, s: c.mapeo.barras[b]!.s[3] });
+  }
+  return {
+    valido: true,
+    valor: {
+      id,
+      tipo: "pilar",
+      esfuerzo,
+      combinaciones: resumenConjunto(conj),
+      longitud: c.mapeo.barras[bs[bs.length - 1]!]!.s[3],
+      apoyos: [],
+      axilSinValor: false,
+      envolvente: envolventePieza(rr, id, conj, COMPONENTE[esfuerzo]),
+      vanos: [],
+      flexibles: rr.ep.tramos(id).map((t) => [t.s0, t.s1]),
+      plantas,
     },
   };
 }
@@ -317,13 +357,13 @@ export interface FilaPilar {
 
 export const LIMITE_AXIL_REDUCIDO = UMBRALES.axilReducido;
 
-function filasPilar(s: Sesion, id: string, conj: ConjuntoCombinaciones): Resultado<FilaPilar[]> {
-  const q = s.q!;
+/** Los tramos de un pilar con sus extremos (`pieza`) y su ν: las filas del cuadro de pilares y los colores de su 3D. */
+export function filasPilarQ(q: Consultas, conj: ConjuntoCombinaciones, id: string): Resultado<FilaPilar[]> {
   const p = pieza(q, conj, id);
   if (!p.valido) return p;
   const r = q.pilar(id);
   if (!r.valido) return r;
-  const f = s.proyecto.modelo;
+  const f = q.fisico;
   const tramos = (p.valor as { tramos: TramoEnvolvente[] }).tramos;
   return {
     valido: true,
@@ -347,6 +387,15 @@ function filasPilar(s: Sesion, id: string, conj: ConjuntoCombinaciones): Resulta
   };
 }
 
+/** La mayor compresión de un tramo (el N más negativo de la base y la cabeza), con su combinación: la columna N del cuadro. */
+export function compresionTramo(f: FilaPilar): { v: number; comb: string; donde: "base" | "cabeza" } | null {
+  const a = f.tramo.base["N-"];
+  const b = f.tramo.cabeza["N-"];
+  const x = (e: { comb: string; esfuerzos: number[] }, donde: "base" | "cabeza") => ({ v: e.esfuerzos[0]!, comb: e.comb, donde });
+  if (!a && !b) return null;
+  return !b || (a && a.esfuerzos[0]! <= b.esfuerzos[0]!) ? x(a!, "base") : x(b, "cabeza");
+}
+
 export interface DatosPilares {
   escena: EscenaPreparada;
   combinaciones: Combinaciones;
@@ -361,7 +410,7 @@ export function datosPilares(s: Sesion, planta: string, e: EleccionCombinaciones
   if (!conj.valido) return conj;
   const filas: FilaPilar[] = [];
   for (const p of s.proyecto.modelo.pilares ?? []) {
-    const r = filasPilar(s, p.id, conj.valor);
+    const r = filasPilarQ(s.q!, conj.valor, p.id);
     if (!r.valido) continue;
     const fila = r.valor.find((x) => x.planta === planta);
     if (fila) filas.push(fila);
@@ -374,7 +423,7 @@ export function datosPilar(s: Sesion, id: string, e: EleccionCombinaciones): Res
   if (!s.q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const conj = s.conjunto(e, "esfuerzos");
   if (!conj.valido) return conj;
-  const r = filasPilar(s, id, conj.valor);
+  const r = filasPilarQ(s.q!, conj.valor, id);
   return r.valido ? { valido: true, valor: { combinaciones: resumenConjunto(conj.valor), filas: r.valor } } : r;
 }
 
@@ -453,8 +502,27 @@ export function geometria3D(s: Sesion): Resultado<Geometria3D> {
   return { valido: true, valor: { nudos, barras, tipoBarra, plantaBarra, laminas, plantaLamina, esMuro, plantas } };
 }
 
-/** Desplazamientos ux, uy, uz de cada nudo en una combinación (m). */
-export function desplazamientos(s: Sesion, e: EleccionCombinaciones): Resultado<{ comb: string; etiqueta: string; u: Float32Array }> {
+export interface ExtremoDeformada {
+  que: "mayor |u|" | "menor uz";
+  /** mm: |u| o uz. */
+  valor: number;
+  nudo: number;
+  /** El nudo sin deformar (m) y sus objetos físicos. */
+  punto: [number, number, number];
+  objeto: string;
+}
+
+export interface DatosDeformada {
+  comb: string;
+  etiqueta: string;
+  /** ux, uy, uz de cada nudo (m). */
+  u: Float32Array;
+  /** El nudo con el mayor |u| y el del menor uz, con sus valores en doble precisión. */
+  extremos: ExtremoDeformada[];
+}
+
+/** Desplazamientos ux, uy, uz de cada nudo en una combinación (m), y sus extremos. */
+export function desplazamientos(s: Sesion, e: EleccionCombinaciones): Resultado<DatosDeformada> {
   const casos = s.casos;
   if (!casos) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const conj = s.conjunto(e, "desplazamientos");
@@ -463,13 +531,27 @@ export function desplazamientos(s: Sesion, e: EleccionCombinaciones): Resultado<
   const f = conj.valor.factores[0]!;
   const n = casos[0]!.u.length / 6;
   const u = new Float32Array(3 * n);
-  for (let i = 0; i < n; i++)
+  let [nmax, umax, nmin, zmin] = [-1, -1, -1, Infinity];
+  for (let i = 0; i < n; i++) {
+    const w = [0, 0, 0];
     for (let a = 0; a < 3; a++) {
       let v = 0;
       for (let k = 0; k < f.length; k++) if (f[k]) v += f[k]! * casos[k]!.u[6 * i + a]!;
       u[3 * i + a] = v;
+      w[a] = v;
     }
-  return { valido: true, valor: { comb: conj.valor.nombres[0]!, etiqueta: conj.valor.etiquetas[0]!, u } };
+    const m = Math.hypot(w[0]!, w[1]!, w[2]!);
+    if (m > umax) [nmax, umax] = [i, m];
+    if (w[2]! < zmin) [nmin, zmin] = [i, w[2]!];
+  }
+  const c = s.compilado!;
+  const ext = (que: ExtremoDeformada["que"], nudo: number, v: number): ExtremoDeformada => {
+    const nd = c.modelo.nudos[nudo]!;
+    const m = c.mapeo.nudos[nudo];
+    return { que, valor: v * 1000, nudo, punto: [nd.x, nd.y, nd.z], objeto: m?.maestro ? (m.planta ?? "") : (m?.fisicos ?? []).join(", ") };
+  };
+  const extremos = [...(nmax >= 0 ? [ext("mayor |u|", nmax, umax)] : []), ...(nmin >= 0 && zmin < 0 ? [ext("menor uz", nmin, zmin)] : [])];
+  return { valido: true, valor: { comb: conj.valor.nombres[0]!, etiqueta: conj.valor.etiquetas[0]!, u, extremos } };
 }
 
 // ─── Revisión ───────────────────────────────────────────────────────────────────────────────────

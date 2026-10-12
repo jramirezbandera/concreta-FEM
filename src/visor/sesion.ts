@@ -16,6 +16,7 @@ import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones,
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto } from "../agente/proyecto.ts";
 import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
+import { UNIDADES_CAMPO } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
@@ -30,7 +31,9 @@ import type { ResultadoCaso } from "../motor/modelo.ts";
 import { alambrico } from "./alambrico.ts";
 import { diagramas3D, type Diagramas3D, type Esfuerzo3D, type PiezasDiagrama } from "./diagramas3d.ts";
 import { elegir, elegirVentana, prepararEscena, resaltar, type Eleccion, type EscenaPreparada } from "./escena.ts";
-import { isovalores3D, type Isovalores3D } from "./isovalores3d.ts";
+import { isovalores3D, valorEnLamina, type Isovalores3D, type SuperficiesMapa } from "./isovalores3d.ts";
+import { pilares3D, type MagnitudPilares, type Pilares3D } from "./pilares3d.ts";
+import { reacciones3D, type Reacciones3D } from "./reacciones3d.ts";
 
 export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
 
@@ -81,12 +84,40 @@ export interface PedidoDiagramas3D {
   escala?: number;
 }
 
-/** Los isovalores de las losas en el 3D (I4). */
+/** Los isovalores de las losas y los muros en el 3D (I4). */
 export interface PedidoIsovalores3D {
   campo: Campo;
   combinaciones: EleccionCombinaciones;
   planta: string | null;
+  /** Por defecto, las losas. */
+  superficies?: SuperficiesMapa;
   escala?: EscalaMapa;
+}
+
+/** Los pilares en el 3D por colores (I4): N o ν de cada tramo. */
+export interface PedidoPilares3D {
+  magnitud: MagnitudPilares;
+  combinaciones: EleccionCombinaciones;
+  planta: string | null;
+}
+
+/** El valor de un mapa bajo el cursor (I4): en un punto de una lámina, en una combinación. */
+export interface PedidoValorLamina {
+  campo: Campo;
+  /** Las del mapa y, de ellas, la dibujada (`nombre`). */
+  combinaciones: EleccionCombinaciones;
+  nombre: string;
+  lamina: number;
+  punto: readonly [number, number, number];
+}
+
+export interface ValorLamina {
+  valor: number;
+  unidad: string;
+  objeto: string;
+  planta: string;
+  lamina: number;
+  comb: string;
 }
 
 export interface PlantaVisor {
@@ -449,7 +480,35 @@ export class Sesion {
     if (p.planta !== null && !this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
     const conj = this.conjunto(p.combinaciones, p.campo === "uz" ? "desplazamientos" : "esfuerzos");
     if (!conj.valido) return conj;
-    return { valido: true, valor: isovalores3D(rr, this.origen3D, p.campo, conj.valor, p.planta, p.escala) };
+    return { valido: true, valor: isovalores3D(rr, this.origen3D, p.campo, conj.valor, { planta: p.planta, ...(p.superficies ? { superficies: p.superficies } : {}), ...(p.escala ? { escala: p.escala } : {}) }) };
+  }
+
+  pilares3D(p: PedidoPilares3D): { valido: true; valor: Pilares3D } | { valido: false; diagnosticos: Diagnostico[] } {
+    const rr = this.rr;
+    if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Los pilares por colores necesitan el cálculo." }] };
+    if (p.planta !== null && !this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
+    const conj = this.conjunto(p.combinaciones, "esfuerzos");
+    if (!conj.valido) return conj;
+    return { valido: true, valor: pilares3D(rr, this.origen3D, p.magnitud, conj.valor, p.planta) };
+  }
+
+  reacciones3D(e: EleccionCombinaciones, escala?: number): { valido: true; valor: Reacciones3D } | { valido: false; diagnosticos: Diagnostico[] } {
+    const rr = this.rr;
+    if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Las reacciones necesitan el cálculo." }] };
+    const conj = this.conjunto(e, "lineal");
+    if (!conj.valido) return conj;
+    return reacciones3D(rr, this.origen3D, conj.valor, escala);
+  }
+
+  /** El valor de un mapa en un punto de una lámina, en la combinación dibujada (null: sin mapa o fuera de ella). */
+  valorLamina(p: PedidoValorLamina): { valido: true; valor: ValorLamina | null } | { valido: false; diagnosticos: Diagnostico[] } {
+    const rr = this.rr;
+    if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
+    if (!Number.isInteger(p.lamina) || p.lamina < 0 || p.lamina >= (rr.c.modelo.laminas?.length ?? 0)) return { valido: false, diagnosticos: [{ codigo: "visor/lamina", severidad: "error", mensaje: `No hay ninguna lámina ${p.lamina}.` }] };
+    const conj = this.conjunto({ tipo: "una", de: p.combinaciones, nombre: p.nombre }, p.campo === "uz" ? "desplazamientos" : "esfuerzos");
+    if (!conj.valido) return conj;
+    const v = valorEnLamina(rr, p.campo, conj.valor.factores[0]!, p.lamina, p.punto);
+    return { valido: true, valor: v ? { ...v, unidad: UNIDADES_CAMPO[p.campo], lamina: p.lamina, comb: p.nombre } : null };
   }
 
   escenaDe(fu: FuenteEscena): { valido: true; valor: Escena } | { valido: false; diagnosticos: Diagnostico[] } {

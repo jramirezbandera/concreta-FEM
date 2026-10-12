@@ -122,6 +122,17 @@ export interface EscalaMapa {
 
 /** Fracción del área que se deja fuera por cada lado con `sin-picos`. */
 export const FRACCION_PICOS = 0.01;
+/**
+ * Un campo cuyo mayor |valor| no llega a esto es nulo (ruido de redondeo: las fuerzas de membrana de
+ * las losas de una planta con diafragma rígido salen ~1e-13): se dibuja con una sola banda neutra, sin
+ * extremos ni aviso de picos.
+ */
+export const CAMPO_NULO = 1e-9;
+/** El color de la banda de un campo nulo. */
+export const COLOR_NULO = "#e6e9ee";
+/** Los límites de la banda de un campo nulo. */
+export const LIMITES_NULO: readonly number[] = [-CAMPO_NULO, CAMPO_NULO];
+
 /** Bandas como mucho con un paso dado. */
 export const MAXIMO_BANDAS = 40;
 /** Con la escala completa, se avisa de los picos si el mayor |valor| pasa de este múltiplo del de `sin-picos`. */

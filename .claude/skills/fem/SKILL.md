@@ -65,6 +65,7 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 | `diagnosticos` | Una marca numerada en cada objeto con un error o un aviso, con la lista al lado |
 | `malla` | Láminas y barras de la planta |
 | `uz`, `m11`, `m22`, `m12`, `v13`, `v23` | Isovalores en las losas, en la combinación que gobierna en la planta, con las isolíneas rotuladas con su valor (la del 0, más gruesa) |
+| `f11`, `f22`, `f12` | Fuerzas de membrana de las losas (kN/m, tracción positiva). En una planta con diafragma rígido son nulas (las lleva el diafragma): el mapa sale de una sola banda y lo dice |
 | `vigas-my`, `vigas-vz` | Diagramas envolventes de vigas y viguetas, con el máximo y el mínimo de cada vano |
 | `pilares-n` | Axil de cada pilar que llega a la planta |
 

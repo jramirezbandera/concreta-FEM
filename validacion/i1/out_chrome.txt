@@ -3,29 +3,29 @@ BIEN  1920×1080: la vista ocupa el 72.8 % de la ventana (≥ 70 %)
 BIEN  1366×768: la vista ocupa el 63.0 % de la ventana (≥ 60 %)
 
 ## Criterio 4: espacios, modos, paneles y paleta en el edificio objetivo (1440×900)
-  planta N3: 35 ms
-  3D: 36 ms
-  planta: 34 ms
-  elegir un pilar (navegador): 85 ms
-  Esc: 35 ms
-  tablas: 57 ms
-  plegar el panel inferior: 34 ms
-  espacio Cargas: 43 ms
-  espacio Resultados (losas): 119 ms
-  M11: 746 ms
-  modo Diagramas: 734 ms
-  modo Pilares: 74 ms
-  elegir un pilar (cuadro): 36 ms
-  modo Deformada: 77 ms
-  plegar las propiedades: 45 ms
-  abrir las propiedades: 36 ms
-  espacio Revisión: 2701 ms
+  planta N3: 37 ms
+  3D: 45 ms
+  planta: 46 ms
+  elegir un pilar (navegador): 99 ms
+  Esc: 38 ms
+  tablas: 52 ms
+  plegar el panel inferior: 39 ms
+  espacio Cargas: 41 ms
+  espacio Resultados (losas): 161 ms
+  M11: 689 ms
+  modo Diagramas: 662 ms
+  modo Pilares: 83 ms
+  elegir un pilar (cuadro): 42 ms
+  modo Deformada: 79 ms
+  plegar las propiedades: 55 ms
+  abrir las propiedades: 46 ms
+  espacio Revisión: 2383 ms
   paleta: 38 ms
-  buscar en la paleta: 34 ms
-  elegir desde la paleta: 33 ms
+  buscar en la paleta: 45 ms
+  elegir desde la paleta: 46 ms
   espacio Modelo: 44 ms
-  tema oscuro: 35 ms
-  tema claro: 35 ms
+  tema oscuro: 40 ms
+  tema claro: 52 ms
 BIEN  ninguna tarea larga de más de 50 ms en el recorrido (la peor, 0 ms; 0 en total)
 
 TODO BIEN

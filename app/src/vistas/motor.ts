@@ -96,7 +96,7 @@ export abstract class Vista {
 
   pointermove(_e: PointerEvent, x: number, y: number): void {
     const a = this.arrastre;
-    if (!a) return;
+    if (!a) return this.pasar(x, y);
     const [dx, dy] = [x - a.x, y - a.y];
     if (!a.movido && Math.hypot(x - a.x0, y - a.y0) > 4) a.movido = true;
     if (!a.movido) return;
@@ -126,6 +126,12 @@ export abstract class Vista {
       this.entorno.pintar();
     }
   }
+
+  /** El cursor se mueve sin arrastrar (I4: lo que hay debajo). */
+  protected pasar(_x: number, _y: number): void {}
+
+  /** El cursor sale de la vista. */
+  salir(): void {}
 
   dobleclic(e: MouseEvent, x: number, y: number): void {
     this.clic(x, y, e.ctrlKey || e.metaKey, true);
@@ -269,7 +275,10 @@ export class Motor {
       vista.rueda(e, ...rel(e));
     };
     const menu = (e: Event) => e.preventDefault();
-    const fuera = () => this.alCursor?.(null);
+    const fuera = () => {
+      this.alCursor?.(null);
+      vista.salir();
+    };
     superficie.addEventListener("pointerdown", down);
     superficie.addEventListener("pointermove", move);
     superficie.addEventListener("pointerup", up);

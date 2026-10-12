@@ -91,6 +91,12 @@ export class Atendedor {
         return de(s.diagramas3D(p));
       case "isovalores3d":
         return de(s.isovalores3D(p));
+      case "pilares3d":
+        return de(s.pilares3D(p));
+      case "reacciones3d":
+        return de(s.reacciones3D(p.combinaciones, p.escala));
+      case "valor-lamina":
+        return de(s.valorLamina(p));
       case "revision":
         return de(datosRevision(s, p.firmas, p.ficheroFirmas));
       case "precalentar":
