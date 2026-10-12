@@ -15,7 +15,7 @@
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto } from "../agente/proyecto.ts";
-import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
+import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type EscalaMapa, type Escena, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
@@ -49,7 +49,8 @@ export type VistaPlanta =
   | { vista: "cargas"; caso: string }
   | { vista: "diagnosticos" }
   | { vista: "malla" }
-  | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones }
+  /** `escala`: la del mapa (`EscalaMapa`); sin ella, la completa. */
+  | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa }
   | { vista: "vigas"; esfuerzo: "My" | "Vz"; combinaciones: EleccionCombinaciones }
   | { vista: "pilares-n"; combinaciones: EleccionCombinaciones };
 
@@ -354,7 +355,7 @@ export class Sesion {
         else {
           const conj = this.conjunto(v.combinaciones, v.vista === "campo" && v.campo === "uz" ? "desplazamientos" : "esfuerzos");
           if (!conj.valido) return conj;
-          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
+          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
         }
       }
     }

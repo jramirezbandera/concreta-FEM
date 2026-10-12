@@ -12,7 +12,7 @@
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { deriva, diagramaCombinado, flechas, pieza, type DerivaPlanta, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
-import { triangulosCuadrilatero, valorEnTriangulo } from "../agente/render/isovalores.ts";
+import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
 import { envolventePieza, valoresCampo, type Campo, type PuntoEnvolvente } from "../agente/render/resultados.ts";
 import { estadoFirma, leerFirmas, revisar, type EstadoFirma } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
@@ -99,8 +99,8 @@ export interface DatosLosas {
 }
 
 /** El propósito de las flechas: el de la elección si el mapa es de uz, si no las de desplazamientos por defecto. */
-export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones): Resultado<DatosLosas> {
-  const esc = s.escena(planta, { vista: "campo", campo, combinaciones: e });
+export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, escala?: EscalaMapa): Resultado<DatosLosas> {
+  const esc = s.escena(planta, { vista: "campo", campo, combinaciones: e, ...(escala ? { escala } : {}) });
   if (!esc.valido) return esc;
   const conj = s.conjunto(e, campo === "uz" ? "desplazamientos" : "esfuerzos");
   if (!conj.valido) return conj;
@@ -150,8 +150,8 @@ const UNIDAD: Record<Campo, string> = { uz: "mm", m11: "kN·m/m", m22: "kN·m/m"
  * los triángulos de `triangulosCuadrilatero` de cada lámina, con los valores de `valoresCampo`).
  * null fuera de las losas o en una lámina sin mapa (las rígidas de las huellas).
  */
-export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, x: number, y: number): Resultado<ValorPunto | null> {
-  const d = datosLosas(s, planta, campo, e);
+export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, x: number, y: number, escala?: EscalaMapa): Resultado<ValorPunto | null> {
+  const d = datosLosas(s, planta, campo, e, escala);
   if (!d.valido) return d;
   const dib = d.valor.dibujada;
   if (!dib) return { valido: true, valor: null };

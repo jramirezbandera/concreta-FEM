@@ -274,5 +274,7 @@ describe("A4: render", () => {
     expect((u.json.diagnosticos as { codigo: string }[]).some((d) => d.codigo === "fisico/referencia")).toBe(true);
     expect(fem(["render", ruta, "--vista", "planta-3d"]).codigo).toBe(2);
     expect(fem(["render", ruta, "--planta", "N9"]).codigo).toBe(2);
+    expect(fem(["render", ruta, "--vista", "uz", "--escala", "5:1:1"]).codigo).toBe(2);
+    expect(fem(["render", ruta, "--vista", "uz", "--escala", "a lo bestia"]).codigo).toBe(2);
   });
 });

@@ -6,6 +6,7 @@
  * Abrir otro proyecto, o el mismo cambiado, es crear otro worker: así cancelar es `terminate`, una
  * respuesta tardía de la sesión anterior no puede llegar, y la memoria de la anterior se libera.
  */
+import type { EscalaMapa } from "../agente/render/isovalores.ts";
 import type { Campo } from "../agente/render/resultados.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ValorPunto } from "./datos.ts";
@@ -27,8 +28,8 @@ export type Pedido =
   /** El 3D alámbrico del modelo físico (I2). */
   | { tipo: "alambrico" }
   | { tipo: "objeto"; id: string }
-  | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones }
-  | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number }
+  | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa }
+  | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number; escala?: EscalaMapa }
   | { tipo: "piezas"; planta: string }
   | { tipo: "viga"; id: string; esfuerzo: Esfuerzo; combinaciones: EleccionCombinaciones }
   | { tipo: "estacion"; id: string; esfuerzo: Esfuerzo; combinaciones: EleccionCombinaciones; s: number }

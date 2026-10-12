@@ -68,9 +68,9 @@ export class Atendedor {
       case "objeto":
         return de(datosObjeto(s, p.id));
       case "losas":
-        return de(datosLosas(s, p.planta, p.campo, p.combinaciones));
+        return de(datosLosas(s, p.planta, p.campo, p.combinaciones, p.escala));
       case "valor-punto":
-        return de(valorEnPunto(s, p.planta, p.campo, p.combinaciones, p.x, p.y));
+        return de(valorEnPunto(s, p.planta, p.campo, p.combinaciones, p.x, p.y, p.escala));
       case "piezas":
         return bien("piezas", piezasPlanta(s, p.planta));
       case "viga":

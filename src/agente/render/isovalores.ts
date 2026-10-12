@@ -109,7 +109,8 @@ export function limitesRedondos(min: number, max: number, n = 10, cero = true): 
  * - `completa` (por defecto): del mínimo al máximo, en límites redondos que incluyen el 0;
  * - `sin-picos`: sin la fracción FRACCION_PICOS del área por cada lado, para que un pico local (la
  *   esquina de un hueco, el borde de un pilar) no deje el resto en una o dos bandas;
- * - `min` y `max` (uno o los dos) fijan el rango, y `paso` la separación de los límites.
+ * - `min` y `max` (uno o los dos) fijan el rango, tal cual (la banda del extremo puede quedar más
+ *   estrecha que las demás), y `paso` la separación de los límites, en sus múltiplos.
  * Lo que queda fuera del rango va a una banda más por cada lado («menos de…», «más de…»).
  */
 export interface EscalaMapa {
@@ -204,9 +205,14 @@ export function limitesMapa(vmin: number, vmax: number, escala: EscalaMapa = {},
     L = [];
     for (let i = i0; i <= i1; i++) L.push(Number((i * paso).toPrecision(12)));
   } else L = limitesRedondos(a, b, 10, cero);
+  // Un mínimo o un máximo dados son el borde de la escala, aunque la banda del extremo quede más estrecha
+  const eps = 1e-9 * (b - a);
+  if (escala.min !== undefined) L = [a, ...L.filter((x) => x > a + eps)];
+  if (escala.max !== undefined) L = [...L.filter((x) => x < b - eps), b];
   const fueraAbajo = vmin < L[0]!;
   const fueraArriba = vmax > L[L.length - 1]!;
-  const paso = L.length > 1 ? L[1]! - L[0]! : 1;
+  // El paso de los límites interiores (los de los extremos pueden estar más cerca)
+  const paso = escala.paso ?? (L.length > 2 ? L[2]! - L[1]! : L.length > 1 ? L[1]! - L[0]! : 1);
   if (fueraAbajo) L.unshift(vmin);
   if (fueraArriba) L.push(vmax);
   return { L, fueraAbajo, fueraArriba, paso };

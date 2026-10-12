@@ -15,7 +15,7 @@ import { consultar, CONSULTAS, resumen, TOP_POR_DEFECTO, type OpcionesConsulta }
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../src/agente/proyecto.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../src/agente/resultados.ts";
 import { anadirFirma, estadoFirma, leerFirmas, revisar, type FicheroFirmas, type Revision } from "../src/agente/revision.ts";
-import { CAMPOS, conjuntoPorDefecto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type Vista } from "../src/agente/render/index.ts";
+import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Campo, type Escena, type Vista } from "../src/agente/render/index.ts";
 import { sensatezPrevia } from "../src/agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
@@ -50,7 +50,7 @@ export interface Argumentos {
   banderas: Map<string, string[]>;
 }
 
-const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por", "vista"]);
+const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por", "vista", "escala"]);
 const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda"]);
 
 export function analizarArgumentos(argv: readonly string[]): Argumentos | { error: string } {
@@ -83,7 +83,8 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem calcular <proyecto.json> [--recalcular]
   fem resumen <proyecto.json>
   fem consultar <proyecto.json> <consulta> [opciones]   (consultas: ${CONSULTAS.join(", ")})
-  fem render <proyecto.json> [--vista V] [--planta P] [--caso C]   PNG y SVG de cada planta (A4; vistas: ${VISTAS.join(", ")})
+  fem render <proyecto.json> [--vista V] [--planta P] [--caso C] [--escala E]   PNG y SVG de cada planta (A4; vistas: ${VISTAS.join(", ")})
+      --escala de los mapas (uz…v23): completa (por defecto), sin-picos o mín:máx:paso («-40:20:5», «::5»)
   fem revisar <proyecto.json> [--recalcular]   sensatez e informe de revisión (A3)
   fem firmar <proyecto.json> --por "<nombre>"   sólo el ingeniero: firma el informe revisado
   fem esquema
@@ -360,6 +361,10 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       if (sinPlanta.length) return mal(`planta desconocida: ${sinPlanta.join(", ")} (${f.plantas.map((p) => p.id).join(", ")})`);
       const seleccion = seleccionDe(a);
       if (seleccion && "error" in seleccion) return mal(seleccion.error);
+      const escalas = a.banderas.get("escala") ?? [];
+      if (escalas.length > 1) return mal("--escala sólo una vez");
+      const escala = escalaDeTexto(escalas[0] ?? "");
+      if ("error" in escala) return mal(escala.error);
       const casos = a.banderas.get("caso") ?? f.casos.map((c) => c.id);
       const c = compilar(f, l.proyecto.opciones);
       const d = { nombre: l.proyecto.nombre, huella: c.huella };
@@ -396,7 +401,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
           else if (vista === "malla") escenas.push([vistaMalla(rr!, planta, d), undefined]);
           else if (vista === "vigas-my" || vista === "vigas-vz") escenas.push([vistaDiagramas(rr!, planta, vista === "vigas-my" ? "My" : "Vz", conjuntos.get("esfuerzos")!, d), undefined]);
           else if (vista === "pilares-n") escenas.push([vistaAxiles(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
-          else escenas.push([vistaCampo(rr!, planta, vista as Campo, conjuntos.get(propositoDe(vista))!, d), undefined]);
+          else escenas.push([vistaCampo(rr!, planta, vista as Campo, conjuntos.get(propositoDe(vista))!, d, escala), undefined]);
           for (const [e, caso] of escenas) {
             const s = escenaASvg(e);
             const base = join(carpeta, nombreFigura(planta, vista, caso));
@@ -412,6 +417,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
               ancho: s.encuadre.ancho,
               alto: s.encuadre.alto,
               pxPorM: s.encuadre.escala,
+              ...(e.mapa ? { escala: { limites: e.mapa.limites, ...(e.mapa.fueraAbajo ? { fueraAbajo: true } : {}), ...(e.mapa.fueraArriba ? { fueraArriba: true } : {}), ...(e.mapa.picos ? { picos: true } : {}), ...(e.mapa.sinPicos ? { sinPicos: e.mapa.sinPicos.map((x) => Number(x.toPrecision(6))) } : {}) } } : {}),
               ...(necesitaCalculo(vista) && vista !== "malla" ? { combinaciones: conjuntos.get(propositoDe(vista))!.descripcion } : {}),
               ...(comb && (CAMPOS as readonly string[]).includes(vista) ? { combinacion: comb } : {}),
               extremos: e.extremos.slice(0, TOP_POR_DEFECTO).map((x) => ({ que: x.que, valor: x.valor, unidad: x.unidad, ...(x.objeto ? { objeto: x.objeto } : {}), ...(x.punto ? { punto: x.punto } : {}), ...(x.comb ? { comb: x.comb } : {}) })),

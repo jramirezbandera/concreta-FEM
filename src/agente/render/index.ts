@@ -16,6 +16,7 @@ export { escenaASvg, LADO_MAXIMO } from "./svg.ts";
 export { cantoSeccion, planoDeEje, PROFUNDIDAD_ALZADO, vistaAlzado, type PlanoAlzado } from "./alzado.ts";
 export { PlantaFisica, vistaCargas, vistaDiagnosticos, vistaModelo, type DatosVista } from "./modelo.ts";
 export { CAMPOS, ResultadosRender, vistaAxiles, vistaCampo, vistaDiagramas, vistaMalla, type Campo } from "./resultados.ts";
+export { escalaDeTexto, type EscalaMapa } from "./isovalores.ts";
 
 export const VISTAS = [...VISTAS_MODELO, ...VISTAS_RESULTADOS] as const;
 export type Vista = (typeof VISTAS)[number];

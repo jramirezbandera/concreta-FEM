@@ -18,8 +18,8 @@ import { CamposLaminas } from "../../motor/campos.ts";
 import { calcular } from "../../motor/calcular.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { pieza, resumen, type VanoEnvolvente } from "../consultas.ts";
-import { anchoTexto, area, dentro, type Escena, type Primitiva, type Vec2 } from "./escena.ts";
-import { bandaDe, bandas, isolineas, limitesRedondos, PRIORIDAD_ISOLINEA, rotulosLineas, SEPARACION_ROTULOS, triangulosCuadrilatero, trozosTriangulo, type Triangulo } from "./isovalores.ts";
+import { anchoTexto, area, dentro, rotulo, type Escena, type Primitiva, type Vec2 } from "./escena.ts";
+import { bandaDe, bandas, coloresBandas, escalaDeTexto, isolineas, limitesMapa, limitesRedondos, PRIORIDAD_ISOLINEA, rangoSinPicos, rotulosLineas, SEPARACION_ROTULOS, triangulosCuadrilatero, trozosTriangulo, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { envolventePieza } from "./resultados.ts";
 import {
   conjuntoPorDefecto,
@@ -314,6 +314,75 @@ describe("A4, criterio 1: lo dibujado es lo del modelo y de las consultas", () =
     for (const p of lineas) expect(limites.has(p.rotulo!), p.rotulo).toBe(true);
     const svg = escenaASvg(e).svg;
     expect(svg).toMatch(/<text [^>]*rotate\([^>]*>0<\/text>/);
+  });
+
+  it("escala de un mapa: completa, sin picos y manual, con lo de fuera en una banda más por cada lado", () => {
+    // Completa: los límites redondos de siempre
+    const c = limitesMapa(-44.4, 19.2) as LimitesMapa;
+    expect(c.L).toEqual(limitesRedondos(-44.4, 19.2, 10, true));
+    expect([c.fueraAbajo, c.fueraArriba]).toEqual([false, false]);
+    // Sin picos: el rango robusto, redondeado, y los picos fuera
+    const sp = limitesMapa(-69, 134, { modo: "sin-picos" }, [-21.6, 22]) as LimitesMapa;
+    expect(sp.L[0]).toBe(-69);
+    expect(sp.L[sp.L.length - 1]).toBe(134);
+    expect(sp.L.slice(1, -1)).toEqual(limitesRedondos(-21.6, 22, 10, true));
+    expect([sp.fueraAbajo, sp.fueraArriba]).toEqual([true, true]);
+    // Manual: el mínimo y el máximo dados son los bordes; el paso, en sus múltiplos
+    const m = limitesMapa(-44.4, 19.2, { min: -37, max: 15, paso: 10 }) as LimitesMapa;
+    expect(m.L).toEqual([-44.4, -37, -30, -20, -10, 0, 10, 15, 19.2]);
+    expect(m.paso).toBe(10);
+    // Sólo el paso: el rango del mapa, con el 0
+    expect((limitesMapa(-44.4, 19.2, { paso: 20 }) as LimitesMapa).L).toEqual([-60, -40, -20, 0, 20]);
+    // Errores
+    expect("error" in limitesMapa(0, 1, { min: 5, max: 1 })).toBe(true);
+    expect("error" in limitesMapa(0, 1, { paso: 0 })).toBe(true);
+    expect("error" in limitesMapa(0, 100, { paso: 1 })).toBe(true);
+    // Texto de la CLI
+    expect(escalaDeTexto("sin-picos")).toEqual({ modo: "sin-picos" });
+    expect(escalaDeTexto("completa")).toEqual({});
+    expect(escalaDeTexto("-40:20:5")).toEqual({ min: -40, max: 20, paso: 5 });
+    expect(escalaDeTexto("::2,5")).toEqual({ paso: 2.5 });
+    expect(escalaDeTexto(":15:")).toEqual({ max: 15 });
+    for (const t of ["5:1:1", "a:b:c", "1:2", "::0"]) expect("error" in escalaDeTexto(t), t).toBe(true);
+    // Rango sin picos: con un 1 % del área en un pico, el pico queda fuera
+    const v = [...Array.from({ length: 990 }, (_, i) => (i % 21) - 10), ...Array.from({ length: 10 }, () => 500)];
+    expect(rangoSinPicos(v, v.map(() => 1))).toEqual([-10, 10]);
+    // Colores: las de fuera, el más oscuro de su signo y distinto de todas las de dentro
+    const col = coloresBandas(sp.L, { abajo: true, arriba: true });
+    expect(new Set(col).size).toBe(col.length);
+    expect(col[0]).toBe("#053061");
+    expect(col[col.length - 1]).toBe("#67001f");
+    expect(coloresBandas(c.L)).toEqual(coloresBandas(c.L, {}));
+  });
+
+  it("escala en la vista: la leyenda dice lo de fuera, va rayado, y los extremos rotulados son los reales", () => {
+    const { r: rr, cj } = calculados.get("edificio con losas (2 plantas, con acciones)")!;
+    const completa = vistaCampo(rr, "N1", "m11", cj.esfuerzos, d);
+    const mapa = completa.mapa!;
+    expect(mapa.fueraAbajo || mapa.fueraArriba).toBe(false);
+    expect(completa.primitivas.some((p) => p.tipo === "linea" && p.estilo === "fuera-escala")).toBe(false);
+    // Manual, más estrecha que el mapa
+    const [a, b] = [mapa.limites[1]!, mapa.limites[mapa.limites.length - 2]!];
+    const e = vistaCampo(rr, "N1", "m11", cj.esfuerzos, d, { min: a, max: b });
+    expect(e.mapa!.limites[0]).toBe(a);
+    expect(e.mapa!.limites[e.mapa!.limites.length - 1]).toBe(b);
+    expect(e.mapa!.fueraAbajo && e.mapa!.fueraArriba).toBe(true);
+    expect(e.leyenda[0]!.texto).toMatch(/^más de .* \(fuera de la escala, rayado\)$/);
+    expect(e.leyenda.find((x) => x.texto.startsWith("menos de"))).toBeTruthy();
+    expect(e.primitivas.some((p) => p.tipo === "linea" && p.estilo === "fuera-escala")).toBe(true);
+    expect(e.extremos).toEqual(completa.extremos);
+    expect(e.notas.some((n) => n.startsWith(`Escala de ${rotulo(a, 4)} a ${rotulo(b, 4)}`))).toBe(true);
+    // El rayado cae dentro de las bandas de fuera
+    const fuera = e.primitivas.filter((p): p is Extract<Primitiva, { tipo: "region" }> => p.tipo === "region" && (p.banda === 0 || p.banda === e.leyenda.filter((x) => x.relleno).length - 1));
+    for (const p of e.primitivas)
+      if (p.tipo === "linea" && p.estilo === "fuera-escala") {
+        const m: Vec2 = [(p.puntos[0]![0] + p.puntos[1]![0]) / 2, (p.puntos[0]![1] + p.puntos[1]![1]) / 2];
+        expect(fuera.some((f) => vueltas(m, f.anillos) === 1)).toBe(true);
+      }
+    // Una escala no válida: la completa, y se dice
+    const mala = vistaCampo(rr, "N1", "m11", cj.esfuerzos, d, { min: 5, max: 1 });
+    expect(mala.mapa).toEqual(completa.mapa);
+    expect(mala.notas[0]).toMatch(/^Escala no válida/);
   });
 
   it("uz: el mínimo de cada planta es la flecha máxima de sus losas (Consultas.flechas) en la combinación que gobierna", () => {
