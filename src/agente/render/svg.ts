@@ -73,6 +73,7 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   isobanda: {},
   isolinea: { stroke: "#2b313a", sw: 0.7 },
   "isolinea-cero": { stroke: "#111827", sw: 1.6 },
+  "fuera-escala": { stroke: "#ffffff", sw: 0.8 },
   contorno: { stroke: "#374151", sw: 1.2 },
   "diagrama-positivo": { fill: "#dc2626", stroke: "#b91c1c", sw: 0.8, opacity: 0.55 },
   "diagrama-negativo": { fill: "#2563eb", stroke: "#1d4ed8", sw: 0.8, opacity: 0.55 },

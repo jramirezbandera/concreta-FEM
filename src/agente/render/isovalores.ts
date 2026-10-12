@@ -102,6 +102,116 @@ export function limitesRedondos(min: number, max: number, n = 10, cero = true): 
     }
 }
 
+// ─── Escala de un mapa ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Escala de un mapa:
+ * - `completa` (por defecto): del mínimo al máximo, en límites redondos que incluyen el 0;
+ * - `sin-picos`: sin la fracción FRACCION_PICOS del área por cada lado, para que un pico local (la
+ *   esquina de un hueco, el borde de un pilar) no deje el resto en una o dos bandas;
+ * - `min` y `max` (uno o los dos) fijan el rango, y `paso` la separación de los límites.
+ * Lo que queda fuera del rango va a una banda más por cada lado («menos de…», «más de…»).
+ */
+export interface EscalaMapa {
+  modo?: "completa" | "sin-picos";
+  min?: number;
+  max?: number;
+  paso?: number;
+}
+
+/** Fracción del área que se deja fuera por cada lado con `sin-picos`. */
+export const FRACCION_PICOS = 0.01;
+/** Bandas como mucho con un paso dado. */
+export const MAXIMO_BANDAS = 40;
+/** Con la escala completa, se avisa de los picos si el mayor |valor| pasa de este múltiplo del de `sin-picos`. */
+export const AVISO_PICOS = 2.5;
+
+/** Los valores v de los puntos de pesos w (áreas) entre los que queda todo salvo la fracción f por cada lado. */
+export function rangoSinPicos(v: ArrayLike<number>, w: ArrayLike<number>, f = FRACCION_PICOS): [number, number] | null {
+  const idx: number[] = [];
+  let total = 0;
+  for (let i = 0; i < v.length; i++)
+    if (Number.isFinite(v[i]!) && w[i]! > 0) {
+      idx.push(i);
+      total += w[i]!;
+    }
+  if (!idx.length || !(total > 0)) return null;
+  idx.sort((a, b) => v[a]! - v[b]! || a - b);
+  const cuantil = (q: number, desde: "abajo" | "arriba") => {
+    let acum = 0;
+    const orden = desde === "abajo" ? idx : [...idx].reverse();
+    for (const i of orden) {
+      acum += w[i]!;
+      if (acum > q * total) return v[i]!;
+    }
+    return v[orden[orden.length - 1]!]!;
+  };
+  return [cuantil(f, "abajo"), cuantil(f, "arriba")];
+}
+
+/**
+ * Una escala escrita: «completa», «sin-picos» o «mín:máx:paso», con cualquiera de los tres vacío
+ * («-40:20:», «::5») y coma o punto decimal.
+ */
+export function escalaDeTexto(t: string): EscalaMapa | { error: string } {
+  const x = t.trim();
+  if (x === "" || x === "completa") return {};
+  if (x === "sin-picos") return { modo: "sin-picos" };
+  const partes = x.split(":");
+  if (partes.length !== 3) return { error: `escala «${t}»: completa, sin-picos o mín:máx:paso` };
+  const r: EscalaMapa = {};
+  const nombres = ["min", "max", "paso"] as const;
+  for (let i = 0; i < 3; i++) {
+    const p = partes[i]!.trim().replace(",", ".").replace("−", "-");
+    if (!p) continue;
+    const n = Number(p);
+    if (!Number.isFinite(n)) return { error: `escala «${t}»: «${partes[i]}» no es un número` };
+    r[nombres[i]!] = n;
+  }
+  const v = limitesMapa(r.min ?? -1, r.max ?? 1, r);
+  return "error" in v ? { error: `escala «${t}»: ${v.error}` } : r;
+}
+
+export interface LimitesMapa {
+  /** Límites de las bandas; con `fueraAbajo`, L[0] es el mínimo del campo (la banda 0 es la de fuera), y con `fueraArriba`, el último es el máximo. */
+  L: number[];
+  fueraAbajo: boolean;
+  fueraArriba: boolean;
+  /** Separación de los límites interiores. */
+  paso: number;
+}
+
+/**
+ * Los límites de un mapa de valores en [vmin, vmax] con una escala (`robusto`: el rango de
+ * `rangoSinPicos`). Sin `min` ni `max`, el 0 es uno de los límites (paleta divergente).
+ */
+export function limitesMapa(vmin: number, vmax: number, escala: EscalaMapa = {}, robusto: [number, number] | null = null): LimitesMapa | { error: string } {
+  for (const [k, x] of [["min", escala.min], ["max", escala.max], ["paso", escala.paso]] as const) if (x !== undefined && !Number.isFinite(x)) return { error: `${k} no es un número` };
+  if (escala.paso !== undefined && !(escala.paso > 0)) return { error: "el paso tiene que ser mayor que 0" };
+  let [a, b] = escala.modo === "sin-picos" && robusto ? robusto : [vmin, vmax];
+  if (escala.min !== undefined) a = escala.min;
+  if (escala.max !== undefined) b = escala.max;
+  if (!(a < b) && (escala.min !== undefined || escala.max !== undefined)) return { error: `el mínimo (${a}) tiene que ser menor que el máximo (${b})` };
+  const cero = escala.min === undefined && escala.max === undefined;
+  let L: number[];
+  if (escala.paso !== undefined) {
+    const paso = escala.paso;
+    if (cero) [a, b] = [Math.min(a, 0), Math.max(b, 0)];
+    const i0 = Math.floor(a / paso + 1e-9);
+    let i1 = Math.ceil(b / paso - 1e-9);
+    if (i1 <= i0) i1 = i0 + 1;
+    if (i1 - i0 > MAXIMO_BANDAS) return { error: `con un paso de ${paso} salen ${i1 - i0} bandas (como mucho ${MAXIMO_BANDAS})` };
+    L = [];
+    for (let i = i0; i <= i1; i++) L.push(Number((i * paso).toPrecision(12)));
+  } else L = limitesRedondos(a, b, 10, cero);
+  const fueraAbajo = vmin < L[0]!;
+  const fueraArriba = vmax > L[L.length - 1]!;
+  const paso = L.length > 1 ? L[1]! - L[0]! : 1;
+  if (fueraAbajo) L.unshift(vmin);
+  if (fueraArriba) L.push(vmax);
+  return { L, fueraAbajo, fueraArriba, paso };
+}
+
 /** Banda de un valor (índice del intervalo [L_i, L_i+1]; los de fuera, a la primera o la última). */
 export function bandaDe(v: number, L: readonly number[]): number {
   let i = 0;
@@ -460,13 +570,20 @@ function enRampa(rampa: readonly string[], t: number): string {
  * Color de cada banda en una paleta divergente centrada en 0 (los límites incluyen el 0): rojos los
  * positivos y azules los negativos, más oscuros cuanto más se aleja del 0 el límite exterior de la
  * banda respecto al mayor |límite|. Dos bandas distintas nunca tienen el mismo color.
+ *
+ * Con bandas fuera de la escala (`fuera`: la primera, la última), éstas llevan el color más oscuro
+ * de su signo y las de dentro se reparten hasta el 80 % de la rampa, para que no se confundan.
  */
-export function coloresBandas(L: readonly number[]): string[] {
-  const m = Math.max(Math.abs(L[0]!), Math.abs(L[L.length - 1]!)) || 1;
+export function coloresBandas(L: readonly number[], fuera: { abajo?: boolean; arriba?: boolean } = {}): string[] {
+  const nb = L.length - 1;
+  const [i0, i1] = [fuera.abajo ? 1 : 0, fuera.arriba ? nb - 1 : nb];
+  const m = Math.max(Math.abs(L[i0]!), Math.abs(L[i1]!)) || 1;
+  const f = fuera.abajo || fuera.arriba ? 0.8 : 1;
   return L.slice(0, -1).map((l, i) => {
     const h = L[i + 1]!;
     const positiva = l + h >= 0;
+    if (i < i0 || i >= i1) return enRampa(positiva ? ROJOS : AZULES, 1);
     const exterior = positiva ? h : -l;
-    return enRampa(positiva ? ROJOS : AZULES, exterior / m);
+    return enRampa(positiva ? ROJOS : AZULES, (f * exterior) / m);
   });
 }

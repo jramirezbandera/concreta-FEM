@@ -57,6 +57,7 @@ export type Estilo =
   | "isobanda"
   | "isolinea"
   | "isolinea-cero"
+  | "fuera-escala"
   | "contorno"
   | "diagrama-positivo"
   | "diagrama-negativo"
@@ -142,6 +143,23 @@ export interface Escena {
   extremos: ExtremoRotulado[];
   /** Caja del modelo que se encuadra: [xmin, ymin, xmax, ymax]. */
   caja: [number, number, number, number];
+  /** La escala de un mapa de isovalores (`vistaCampo`), para que el visor la enseñe y la cambie. */
+  mapa?: EscalaDibujada;
+}
+
+export interface EscalaDibujada {
+  /** Límites de las bandas de dentro de la escala (sin las de fuera). */
+  limites: number[];
+  paso: number;
+  /** Hay una banda por debajo (o por encima) de la escala, rayada. */
+  fueraAbajo: boolean;
+  fueraArriba: boolean;
+  /** Con la escala completa, la marcan picos en muy poca área (`AVISO_PICOS`). */
+  picos: boolean;
+  minimo: number;
+  maximo: number;
+  /** El rango sin los picos (`rangoSinPicos`). */
+  sinPicos?: [number, number];
 }
 
 /** Caja de unos puntos (la vacía si no hay ninguno). */
@@ -281,7 +299,8 @@ export function rayado(anillos: readonly (readonly Vec2[])[], d: Vec2, paso: num
   const giro = (q: Vec2): Vec2 => [q[0] * d[0] + q[1] * d[1], q[0] * n[0] + q[1] * n[1]];
   const vuelta = (u: number, v: number): Vec2 => [u * d[0] + v * n[0], u * d[1] + v * n[1]];
   const a = anillos.map((r) => r.map(giro));
-  const [, v0, , v1] = cajaDe(a[0]!);
+  // La caja de todos los anillos: una banda de isovalores puede tener varios separados
+  const [, v0, , v1] = cajaDe(a.flat());
   const r: [Vec2, Vec2][] = [];
   const primero = Math.ceil(v0 / paso + 1e-9);
   for (let k = primero; k * paso < v1 - 1e-9; k++) {

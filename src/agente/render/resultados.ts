@@ -22,8 +22,8 @@ import { EsfuerzosPiezas } from "../../compilador/resultados.ts";
 import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { diagramaCombinado } from "../consultas.ts";
-import { bandaPolilinea, cajaDe, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
-import { bandas, coloresBandas, isolineas, limitesRedondos, triangulosCuadrilatero, type Triangulo } from "./isovalores.ts";
+import { area, bandaPolilinea, cajaDe, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
+import { AVISO_PICOS, bandas, coloresBandas, FRACCION_PICOS, isolineas, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
 import { anchoViga, fondoModelo, huellaSeccion, PlantaFisica, type DatosVista } from "./modelo.ts";
 
@@ -232,7 +232,11 @@ export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, 
   return { laminas, v };
 }
 
-export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, conjunto: ConjuntoCombinaciones, d: DatosVista): Escena {
+/**
+ * Mapa de isovalores de un campo en una planta. `escala` (`EscalaMapa`): la completa por defecto;
+ * una no válida se cambia por la completa y se dice en las notas.
+ */
+export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, conjunto: ConjuntoCombinaciones, d: DatosVista, escala: EscalaMapa = {}): Escena {
   const pl = new PlantaFisica(r.q.fisico, planta);
   const c = r.c;
   // La combinación que gobierna en la planta: la del mayor |valor|
@@ -253,6 +257,9 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   let [pmin, pmax]: [Vec2 | null, Vec2 | null] = [null, null];
   let [omin, omax] = ["", ""];
   let sinMapa = 0;
+  // Valores y pesos (un cuarto del área de la lámina por nudo), para la escala sin picos
+  const valoresNudos: number[] = [];
+  const pesos: number[] = [];
   laminas.forEach((l, i) => {
     const ns = c.modelo.laminas![l]!.nudos;
     const pts = ns.map((n) => punto(c, n)) as [Vec2, Vec2, Vec2, Vec2];
@@ -268,12 +275,32 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
       if (x > vmax) [vmax, pmax, omax] = [x, pts[a]!, losa];
     });
     tris.push(...triangulosCuadrilatero(pts, w));
+    const a4 = Math.abs(area(pts)) / 4;
+    for (const x of w) {
+      valoresNudos.push(x);
+      pesos.push(a4);
+    }
   });
   const leyenda: EntradaLeyenda[] = [];
+  let mapa: Escena["mapa"];
+  const u = UNIDAD[campo];
   if (tris.length) {
-    const L = limitesRedondos(vmin, vmax, 10, true);
-    const colores = coloresBandas(L);
-    for (const b of bandas(tris, L)) P.push({ tipo: "region", anillos: b.anillos, estilo: "isobanda", relleno: colores[b.banda]!, banda: b.banda });
+    const robusto = rangoSinPicos(valoresNudos, pesos);
+    let lm = limitesMapa(vmin, vmax, escala, robusto);
+    if ("error" in lm) {
+      notas.push(`Escala no válida (${lm.error}): se dibuja la completa.`);
+      lm = limitesMapa(vmin, vmax) as LimitesMapa;
+    }
+    const { L, fueraAbajo, fueraArriba } = lm;
+    const colores = coloresBandas(L, { abajo: fueraAbajo, arriba: fueraArriba });
+    const nb = L.length - 1;
+    const [x0, y0, x1, y1] = cajaDe(tris.flatMap((t) => t.p));
+    const pasoRayado = Math.max(x1 - x0, y1 - y0) / 120;
+    for (const b of bandas(tris, L)) {
+      P.push({ tipo: "region", anillos: b.anillos, estilo: "isobanda", relleno: colores[b.banda]!, banda: b.banda });
+      // Las de fuera de la escala, rayadas
+      if ((fueraAbajo && b.banda === 0) || (fueraArriba && b.banda === nb - 1)) for (const [p, q] of rayado(b.anillos, [Math.SQRT1_2, Math.SQRT1_2], pasoRayado)) P.push({ tipo: "linea", puntos: [p, q], estilo: "fuera-escala" });
+    }
     // Las isolíneas de los límites, rotuladas con su valor; la del 0, más gruesa
     let cero = false;
     for (const iso of isolineas(tris, L)) {
@@ -281,16 +308,24 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
       cero ||= iso.valor === 0;
       for (const puntos of iso.lineas) P.push({ tipo: "linea", puntos, estilo, rotulo: rotulo(iso.valor, 4) });
     }
-    for (let b = L.length - 2; b >= 0; b--) leyenda.push({ relleno: colores[b]!, texto: `${rotulo(L[b]!, 4)} a ${rotulo(L[b + 1]!, 4)}` });
+    for (let b = nb - 1; b >= 0; b--) {
+      const texto = fueraArriba && b === nb - 1 ? `más de ${rotulo(L[b]!, 4)} (fuera de la escala, rayado)` : fueraAbajo && b === 0 ? `menos de ${rotulo(L[1]!, 4)} (fuera de la escala, rayado)` : `${rotulo(L[b]!, 4)} a ${rotulo(L[b + 1]!, 4)}`;
+      leyenda.push({ relleno: colores[b]!, texto });
+    }
     leyenda.push({ estilo: "isolinea", texto: "Isolínea en cada límite, con su valor" });
     if (cero) leyenda.push({ estilo: "isolinea-cero", texto: "Isolínea de valor 0" });
+    const dentro = L.slice(fueraAbajo ? 1 : 0, fueraArriba ? nb : nb + 1);
+    if (fueraAbajo || fueraArriba) notas.push(`Escala de ${rotulo(dentro[0]!, 4)} a ${rotulo(dentro[dentro.length - 1]!, 4)} ${u}${escala.modo === "sin-picos" ? `, sin picos (sin el ${rotulo(FRACCION_PICOS * 100)} % del área por cada lado)` : ""}: lo de fuera, rayado. Los extremos rotulados son los reales.`);
+    // Picos: con la escala completa, si unos pocos puntos marcan la escala, se dice
+    const picos = !!robusto && !(fueraAbajo || fueraArriba) && Math.max(Math.abs(vmin), Math.abs(vmax)) > AVISO_PICOS * Math.max(Math.abs(robusto[0]), Math.abs(robusto[1]));
+    if (picos) notas.push(`La escala la marcan picos en menos del ${rotulo(2 * FRACCION_PICOS * 100)} % del área (hasta ${rotulo(Math.abs(vmin) > Math.abs(vmax) ? vmin : vmax)} ${u}); sin ellos, el campo va de ${rotulo(robusto![0])} a ${rotulo(robusto![1])} ${u} (escala «sin picos»).`);
+    mapa = { limites: dentro, paso: lm.paso, fueraAbajo, fueraArriba, picos, minimo: vmin, maximo: vmax, ...(robusto ? { sinPicos: robusto } : {}) };
   }
   P.push(...trazoModelo(pl));
   const ejes = capaEjes(pl.f, { cotas: false });
   P.push(...ejes.primitivas);
   notas.push(...ejes.notas);
   const extremos: ExtremoRotulado[] = [];
-  const u = UNIDAD[campo];
   if (pmax && pmin) {
     for (const [que, x, p, o, estilo, dy] of [
       ["máximo", vmax, pmax, omax, "extremo-maximo", -10],
@@ -316,6 +351,7 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
     notas,
     extremos,
     caja: caja(pl),
+    ...(mapa ? { mapa } : {}),
   };
 }
 

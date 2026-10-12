@@ -55,6 +55,7 @@ export interface EscenaPreparada {
   notas: string[];
   extremos: Escena["extremos"];
   caja: Escena["caja"];
+  mapa?: Escena["mapa"];
 }
 
 /** El origen de las capas de una escena: el centro de su caja. */
@@ -144,6 +145,7 @@ export function prepararEscena(e: Escena): EscenaPreparada {
     notas: e.notas,
     extremos: e.extremos,
     caja: e.caja,
+    ...(e.mapa ? { mapa: e.mapa } : {}),
   };
 }
 
