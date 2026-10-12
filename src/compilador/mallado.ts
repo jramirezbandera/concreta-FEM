@@ -18,6 +18,10 @@
  *    menudo) y los casi empates por redondeo o por un ruido de ε_geom se deshacen con una
  *    perturbación simbólica ligada a los ejes de la losa (`Restringidor`), no con el orden de
  *    barrido de delaunator: así la malla no cambia al trasladar o girar la planta.
+ *    Después, refinamiento de Delaunay (G-4): mientras un triángulo que se queda, fuera de las
+ *    huellas, dé un cuadrilátero con el jacobiano escalado < JACOBIANO_OBJETIVO, se añade su
+ *    circuncentro (o su «off-center»); los tramos sembrados invadidos se parten por la mitad
+ *    (Ruppert). Los tramos de los muros, la rejilla, la interfaz y las plantillas no se parten.
  * 4. Se quedan los triángulos cuyo centroide cae en una losa (fuera de sus huecos) y no en una celda
  *    regular: como los contornos y la interfaz son aristas obligatorias, cada triángulo está entero
  *    dentro o fuera. Los de área de redondeo (entre un borde sembrado y la envolvente convexa) se
@@ -53,6 +57,15 @@ export const JACOBIANO_BAJO = 0.2;
 
 /** Pendiente con que crece el paso de la siembra desde un rasgo pequeño (m por m). */
 const CRECIMIENTO = 2;
+
+/** Refinamiento de Delaunay (G-4): jacobiano escalado mínimo de los 3 cuadriláteros de cada triángulo que se queda. */
+export const JACOBIANO_OBJETIVO = 0.3;
+/** Refinamiento: distancia mínima de un punto nuevo a los demás, en fracciones de su circunradio (o de la media arista que parte). */
+export const SEPARACION = 0.5;
+/** Refinamiento: no se refina un triángulo con el circunradio (o una arista con la mitad) por debajo de esta fracción del tamaño local. */
+export const PISO = 0.1;
+/** Refinamiento: rondas como mucho (cada una vuelve a triangular la planta). */
+export const RONDAS_MAXIMAS = 40;
 
 /** Fracción de paso que se tolera antes de añadir un tramo más a la siembra de un lado. */
 const HOLGURA_SIEMBRA = 1e-4;
@@ -259,6 +272,14 @@ export function jacobianoEscalado(X: readonly Vec2[]): number {
     min = Math.min(min, det / (Math.sqrt(xx * xx + xy * xy) * Math.sqrt(ex * ex + ey * ey)));
   }
   return min;
+}
+
+/** Jacobiano escalado mínimo de los 3 cuadriláteros en que se divide un triángulo (paso 5). */
+export function jacobianoTriangulo(A: Vec2, B: Vec2, C: Vec2): number {
+  const m = (P1: Vec2, P2: Vec2): Vec2 => [(P1[0] + P2[0]) / 2, (P1[1] + P2[1]) / 2];
+  const g: Vec2 = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3];
+  const [mab, mbc, mca] = [m(A, B), m(B, C), m(C, A)];
+  return Math.min(jacobianoEscalado([A, mab, g, mca]), jacobianoEscalado([B, mbc, g, mab]), jacobianoEscalado([C, mca, g, mbc]));
 }
 
 /**
@@ -482,6 +503,9 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     restringidas.add(k);
     restricciones.push([p, q]);
   };
+  // Tramos sembrados de la CDT (clave «p,q» → su lado): los únicos que el refinamiento puede partir.
+  // Los de los muros, la rejilla, la interfaz y las plantillas no se tocan
+  const partible = new Map<string, number>();
   // Cadena de cada lado: sus extremos, los nudos de la rejilla que son esquina de una celda regular
   // y la siembra de los tramos que van por la CDT
   const cadenas: number[][] = lados.map((l, k) => {
@@ -532,6 +556,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       let ant = x.p;
       for (const q of [...sembrar(x.p, y.p), y.p]) {
         restringir(ant, q);
+        partible.set(ant < q ? `${ant},${q}` : `${q},${ant}`, k);
         c.push(q);
         ant = q;
       }
@@ -633,21 +658,24 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
 
   // 3. Triangulación restringida de los puntos que necesita, ordenados por (x, y): sin rejilla,
   // todos; con ella, los del arreglo que no son nudos de la rejilla rodeados de celdas regulares,
-  // los de las aristas obligatorias y la retícula
-  const enCDT = new Uint8Array(P.length);
+  // los de las aristas obligatorias y la retícula (y los que añada el refinamiento)
+  const enCDT: number[] = Array.from({ length: P.length }, () => 0);
   for (let p = 0; p < nPuntos; p++) enCDT[p] = !rj || (!rj.absorbidos[p] && (rj.nudoPunto[p]! < 0 || rj.toca(rj.nudoPunto[p]!, IRREGULAR))) ? 1 : 0;
   for (const [p, q] of restricciones) enCDT[p] = enCDT[q] = 1;
   for (const p of reticula) enCDT[p] = 1;
   for (let p = nPuntos; p < P.length; p++) if (!rj) enCDT[p] = 1;
   const usarCDT = !rj || rj.estado.some((x) => x === IRREGULAR);
-  const orden = P.map((_, i) => i)
-    .filter((i) => usarCDT && enCDT[i])
-    .sort((a, b) => P[a]![0] - P[b]![0] || P[a]![1] - P[b]![1]);
-  const pos = new Int32Array(P.length).fill(-1);
-  orden.forEach((p, i) => (pos[p] = i));
+  let orden: number[] = [];
   let tri: Uint32Array = new Uint32Array(0);
   let pasadas = 1;
-  if (orden.length >= 3) {
+  const triangular = (): string | null => {
+    orden = P.map((_, i) => i)
+      .filter((i) => usarCDT && enCDT[i])
+      .sort((a, b) => P[a]![0] - P[b]![0] || P[a]![1] - P[b]![1]);
+    tri = new Uint32Array(0);
+    if (orden.length < 3) return null;
+    const pos = new Int32Array(P.length).fill(-1);
+    orden.forEach((p, i) => (pos[p] = i));
     const coords = new Float64Array(2 * orden.length);
     orden.forEach((p, i) => {
       coords[2 * i] = P[p]![0];
@@ -661,38 +689,236 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       pasadas = new Restringidor(d).restringir(aristas, losas[0]?.eje1 ?? [1, 0], origenes[0] ?? [0, 0], epsGeom);
       tri = d.triangles;
     } catch (e) {
-      return { ok: false, mensaje: e instanceof Error ? e.message : String(e) };
+      return e instanceof Error ? e.message : String(e);
     }
-  }
+    return null;
+  };
 
   // 4. Triángulos dentro de las losas y fuera de las celdas regulares (índices en P)
   const Q = (p: number) => P[p]!;
-  const triangulos: { v: [number, number, number]; c: Vec2; losa: number }[] = [];
-  for (let t = 0; t < tri.length; t += 3) {
-    let [a, b, c] = [orden[tri[t]!]!, orden[tri[t + 1]!]!, orden[tri[t + 2]!]!];
-    const [A, B, C] = [Q(a), Q(b), Q(c)];
-    const area2 = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
-    // Degenerados: entre la cadena sembrada de un lado recto (que en una dirección cualquiera no es
-    // exactamente recta) y la envolvente convexa quedan triángulos de área de redondeo cuyo
-    // centroide cae en el borde. Dentro de una losa no los hay: su lado libre se voltea.
-    let L2 = 0;
-    for (const [P1, P2] of [
-      [A, B],
-      [B, C],
-      [C, A],
-    ] as const)
-      L2 = Math.max(L2, (P2[0] - P1[0]) * (P2[0] - P1[0]) + (P2[1] - P1[1]) * (P2[1] - P1[1]));
-    if (!(Math.abs(area2) > 1e-10 * L2)) continue;
-    if (area2 < 0) [b, c] = [c, b];
-    const g: Vec2 = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3];
-    if (enRejilla(g)) continue;
-    let losa = -1;
-    for (let k = 0; k < losas.length && losa < 0; k++) {
-      const cj = cajas[k]!;
-      if (g[0] < cj[0] || g[0] > cj[2] || g[1] < cj[1] || g[1] > cj[3]) continue;
-      if (puntoEnRegion(g, regiones[k]!)) losa = k;
+  type Triangulo = { v: [number, number, number]; c: Vec2; losa: number };
+  const quedan = (): Triangulo[] => {
+    const r: Triangulo[] = [];
+    for (let t = 0; t < tri.length; t += 3) {
+      let [a, b, c] = [orden[tri[t]!]!, orden[tri[t + 1]!]!, orden[tri[t + 2]!]!];
+      const [A, B, C] = [Q(a), Q(b), Q(c)];
+      const area2 = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+      // Degenerados: entre la cadena sembrada de un lado recto (que en una dirección cualquiera no es
+      // exactamente recta) y la envolvente convexa quedan triángulos de área de redondeo cuyo
+      // centroide cae en el borde. Dentro de una losa no los hay: su lado libre se voltea.
+      let L2 = 0;
+      for (const [P1, P2] of [
+        [A, B],
+        [B, C],
+        [C, A],
+      ] as const)
+        L2 = Math.max(L2, (P2[0] - P1[0]) * (P2[0] - P1[0]) + (P2[1] - P1[1]) * (P2[1] - P1[1]));
+      if (!(Math.abs(area2) > 1e-10 * L2)) continue;
+      if (area2 < 0) [b, c] = [c, b];
+      const g: Vec2 = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3];
+      if (enRejilla(g)) continue;
+      let losa = -1;
+      for (let k = 0; k < losas.length && losa < 0; k++) {
+        const cj = cajas[k]!;
+        if (g[0] < cj[0] || g[0] > cj[2] || g[1] < cj[1] || g[1] > cj[3]) continue;
+        if (puntoEnRegion(g, regiones[k]!)) losa = k;
+      }
+      if (losa >= 0) r.push({ v: [a, b, c], c: g, losa });
     }
-    if (losa >= 0) triangulos.push({ v: [a, b, c], c: g, losa });
+    return r;
+  };
+  const falloCDT = triangular();
+  if (falloCDT) return { ok: false, mensaje: falloCDT };
+  let triangulos = quedan();
+
+  // 3b. Refinamiento de Delaunay (G-4). La siembra sólo se gradúa a lo largo de los lados y la
+  // retícula es de 2h, así que junto a un rasgo pequeño (la huella de un pilar, el cruce de una viga,
+  // un borde que pasa cerca) la CDT unía segmentos de centímetros con puntos a metros: triángulos
+  // agudos que dan cuadriláteros con el jacobiano casi nulo. Mientras un triángulo que se queda
+  // (fuera de las huellas, que son rígidas) dé un cuadrilátero con el jacobiano escalado por debajo
+  // de JACOBIANO_OBJETIVO, se añade su circuncentro; si éste cae en el círculo diametral de una
+  // arista obligatoria, se parte esa arista por su punto medio (Ruppert), si es un tramo sembrado
+  // por la CDT. Nada se refina por debajo de PISO·tamaño local: con eso el bucle acaba aunque haya
+  // ángulos pequeños en el arreglo. Los candidatos de cada ronda se aceptan en el
+  // orden de los ejes de la primera losa, así que la malla no depende de la posición de la planta.
+  let rondas = 0;
+  if (usarCDT && orden.length >= 3) {
+    const celdaDe = (q: Vec2) => `${Math.floor(q[0] / s)},${Math.floor(q[1] / s)}`;
+    // Lo que hay en las celdas a menos de `radio` de q (todas las que toca el cuadrado de lado 2·radio):
+    // la respuesta no depende de cómo caen las celdas, así que tampoco de la posición de la planta
+    const alrededor = <T>(m: Map<string, T[]>, q: Vec2, radio: number): T[] => {
+      const r: T[] = [];
+      for (let a = Math.floor((q[0] - radio) / s); a <= Math.floor((q[0] + radio) / s); a++)
+        for (let b = Math.floor((q[1] - radio) / s); b <= Math.floor((q[1] + radio) / s); b++) for (const x of m.get(`${a},${b}`) ?? []) r.push(x);
+      return r;
+    };
+    const meter = <T>(m: Map<string, T[]>, k: string, x: T) => {
+      let v = m.get(k);
+      if (!v) m.set(k, (v = []));
+      v.push(x);
+    };
+    // Tamaño local: el de cada punto del arreglo es la distancia al punto o al lado más cercano que
+    // no es suyo (≤ 2h), y crece con pendiente CRECIMIENTO; lo más que vale es 2h
+    const fuentes = new Map<string, { q: Vec2; t: number }[]>();
+    for (let p = 0; p < nPuntos; p++) {
+      let t = tam[p]!;
+      for (const i of celdas.get(celda(P[p]![0], P[p]![1])) ?? []) {
+        if (i >= lados.length || lados[i]!.a === p || lados[i]!.b === p) continue;
+        t = Math.min(t, distanciaASegmento(P[p]!, segs[i]![0], segs[i]![1]));
+      }
+      if (t < s) meter(fuentes, celdaDe(P[p]!), { q: P[p]!, t });
+    }
+    const tamano = (q: Vec2): number => {
+      let t = s;
+      for (const f of alrededor(fuentes, q, s / CRECIMIENTO)) {
+        const dx = f.q[0] - q[0];
+        const dy = f.q[1] - q[1];
+        t = Math.min(t, f.t + CRECIMIENTO * Math.sqrt(dx * dx + dy * dy));
+      }
+      return t;
+    };
+    // Huellas de los pilares (rígidas: su malla no importa)
+    const huellas = arreglo.trazos
+      .filter((t) => t.tipo === "huella")
+      .map((t) => {
+        const contorno = t.puntos.map((i) => P[i]!);
+        return { r: { contorno, huecos: [] } as Region, caja: cajaDe(contorno) };
+      });
+    const enHuella = (q: Vec2) => huellas.some((x) => !(q[0] < x.caja[0] || q[0] > x.caja[2] || q[1] < x.caja[1] || q[1] > x.caja[3]) && puntoEnRegion(q, x.r));
+    const [e1x, e1y] = losas[0]!.eje1;
+    const O = origenes[0]!;
+    const cuanto = 1e-6 * s;
+    const claveCanonica = (q: Vec2): [number, number] => {
+      const [dx, dy] = [q[0] - O[0], q[1] - O[1]];
+      return [Math.round((-dx * e1y + dy * e1x) / cuanto), Math.round((dx * e1x + dy * e1y) / cuanto)];
+    };
+    for (; rondas < RONDAS_MAXIMAS; rondas++) {
+      // Aristas obligatorias y puntos de la CDT por celdas de 2h
+      const aristasCelda = new Map<string, number[]>();
+      restricciones.forEach(([p, q], i) => {
+        const [A, B] = [P[p]!, P[q]!];
+        for (let cx = Math.floor(Math.min(A[0], B[0]) / s); cx <= Math.floor(Math.max(A[0], B[0]) / s); cx++)
+          for (let cy = Math.floor(Math.min(A[1], B[1]) / s); cy <= Math.floor(Math.max(A[1], B[1]) / s); cy++) meter(aristasCelda, `${cx},${cy}`, i);
+      });
+      // La mitad de la arista obligatoria más larga: el radio de búsqueda de los círculos diametrales
+      let mediaMax = 0;
+      for (const [p, q] of restricciones) mediaMax = Math.max(mediaMax, Math.sqrt((P[q]![0] - P[p]![0]) * (P[q]![0] - P[p]![0]) + (P[q]![1] - P[p]![1]) * (P[q]![1] - P[p]![1])) / 2);
+      const puntosCelda = new Map<string, Vec2[]>();
+      for (const p of orden) meter(puntosCelda, celdaDe(P[p]!), P[p]!);
+      const candidatos: { q: Vec2; parte: number; r: number; k: [number, number] }[] = [];
+      // Primero, los tramos sembrados con un punto dentro de su círculo diametral (invadidos): un
+      // triángulo apoyado en ellos es agudo, y su circuncentro cae fuera de la losa
+      restricciones.forEach(([p, q], i) => {
+        const k = partible.get(p < q ? `${p},${q}` : `${q},${p}`);
+        if (k === undefined) return;
+        const [U, V] = [P[p]!, P[q]!];
+        const m: Vec2 = [(U[0] + V[0]) / 2, (U[1] + V[1]) / 2];
+        const r2 = ((V[0] - U[0]) * (V[0] - U[0]) + (V[1] - U[1]) * (V[1] - U[1])) / 4;
+        const invadido = alrededor(puntosCelda, m, Math.sqrt(r2)).some((o) => o !== U && o !== V && (o[0] - m[0]) * (o[0] - m[0]) + (o[1] - m[1]) * (o[1] - m[1]) < r2 * (1 - 1e-6));
+        if (invadido && (lados[k]!.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!)) || enLosa(m) >= 0)) candidatos.push({ q: m, parte: i, r: Math.sqrt(r2), k: claveCanonica(m) });
+      });
+      /** La arista obligatoria más cercana en cuyo círculo diametral cae q, o −1. */
+      const invasora = (q: Vec2): number => {
+        let [i0, d0] = [-1, Infinity];
+        for (const i of new Set(alrededor(aristasCelda, q, mediaMax))) {
+          const [U, V] = [P[restricciones[i]![0]]!, P[restricciones[i]![1]]!];
+          const [mx, my] = [(U[0] + V[0]) / 2 - q[0], (U[1] + V[1]) / 2 - q[1]];
+          const r2 = ((V[0] - U[0]) * (V[0] - U[0]) + (V[1] - U[1]) * (V[1] - U[1])) / 4;
+          if (mx * mx + my * my < r2 * (1 - 1e-6) && mx * mx + my * my < d0) [i0, d0] = [i, mx * mx + my * my];
+        }
+        return i0;
+      };
+      for (const t of triangulos) {
+        if (enHuella(t.c)) continue;
+        const [A, B, C] = t.v.map(Q) as [Vec2, Vec2, Vec2];
+        const [ax, ay, bx, by] = [B[0] - A[0], B[1] - A[1], C[0] - A[0], C[1] - A[1]];
+        const d = 2 * (ax * by - ay * bx);
+        const [la, lb] = [ax * ax + ay * ay, bx * bx + by * by];
+        const cc: Vec2 = [A[0] + (by * la - ay * lb) / d, A[1] + (ax * lb - bx * la) / d];
+        const R = Math.sqrt((cc[0] - A[0]) * (cc[0] - A[0]) + (cc[1] - A[1]) * (cc[1] - A[1]));
+        if (!(jacobianoTriangulo(A, B, C) < JACOBIANO_OBJETIVO * (1 - 1e-6))) continue;
+        const invade = invasora(cc);
+        if (invade >= 0) {
+          // Invade una arista: se parte, si es un tramo sembrado
+          const [p, q] = restricciones[invade]!;
+          if (partible.has(p < q ? `${p},${q}` : `${q},${p}`)) {
+            const m: Vec2 = [(P[p]![0] + P[q]![0]) / 2, (P[p]![1] + P[q]![1]) / 2];
+            const r = Math.sqrt((P[q]![0] - P[p]![0]) * (P[q]![0] - P[p]![0]) + (P[q]![1] - P[p]![1]) * (P[q]![1] - P[p]![1])) / 2;
+            candidatos.push({ q: m, parte: invade, r, k: claveCanonica(m) });
+            continue;
+          }
+        } else if (enLosa(cc) >= 0 && !enRejilla(cc) && !enHuella(cc)) {
+          candidatos.push({ q: cc, parte: -1, r: R, k: claveCanonica(cc) });
+          continue;
+        }
+        // Si el circuncentro no vale (invade una arista que no se parte: la interfaz con la rejilla,
+        // un muro o una plantilla), el «off-center» (Üngör): sobre la mediatriz de la arista más
+        // corta, hacia el triángulo, a la altura del equilátero sobre ella (o en el circuncentro, si
+        // está más cerca)
+        const lados3: [Vec2, Vec2, Vec2][] = [
+          [A, B, C],
+          [B, C, A],
+          [C, A, B],
+        ];
+        const largo2 = (x: Vec2, y: Vec2) => (y[0] - x[0]) * (y[0] - x[0]) + (y[1] - x[1]) * (y[1] - x[1]);
+        const [X1, X2, X3] = lados3.reduce((a, b) => (largo2(b[0], b[1]) < largo2(a[0], a[1]) ? b : a));
+        const l = Math.sqrt(largo2(X1, X2));
+        const M: Vec2 = [(X1[0] + X2[0]) / 2, (X1[1] + X2[1]) / 2];
+        let [nx, ny] = [-(X2[1] - X1[1]) / l, (X2[0] - X1[0]) / l];
+        if (nx * (X3[0] - M[0]) + ny * (X3[1] - M[1]) < 0) [nx, ny] = [-nx, -ny];
+        const dist = Math.min((l * Math.sqrt(3)) / 2, Math.sqrt(largo2(M, cc)));
+        const oc: Vec2 = [M[0] + nx * dist, M[1] + ny * dist];
+        if (invasora(oc) < 0 && enLosa(oc) >= 0 && !enRejilla(oc) && !enHuella(oc)) candidatos.push({ q: oc, parte: -1, r: Math.sqrt(largo2(oc, X1)), k: claveCanonica(oc) });
+      }
+      // En el mismo sitio (a 1e-6·2h), primero la arista partida y luego el menor r: el orden no
+      // depende del de los triángulos, que sí depende de la posición de la planta
+      candidatos.sort((x, y) => x.k[0] - y.k[0] || x.k[1] - y.k[1] || Number(y.parte >= 0) - Number(x.parte >= 0) || x.r - y.r);
+      const aceptados: typeof candidatos = [];
+      const nuevosCelda = new Map<string, Vec2[]>();
+      for (const c of candidatos) {
+        // Suelo: nada por debajo de PISO·tamaño local (con ángulos pequeños en el arreglo, Ruppert
+        // no acaba). Separación: SEPARACION·r (r, el circunradio o media arista)
+        if (c.r < PISO * tamano(c.q) * (1 - 1e-4)) continue;
+        const dmin = SEPARACION * c.r;
+        const cerca = (o: Vec2) => (o[0] - c.q[0]) * (o[0] - c.q[0]) + (o[1] - c.q[1]) * (o[1] - c.q[1]) < dmin * dmin * (1 - 1e-4);
+        // Una arista invadida se parte siempre (Ruppert): su punto medio sólo se separa de los nuevos
+        if ((c.parte < 0 && alrededor(puntosCelda, c.q, dmin).some(cerca)) || alrededor(nuevosCelda, c.q, dmin).some(cerca)) continue;
+        aceptados.push(c);
+        meter(nuevosCelda, celdaDe(c.q), c.q);
+      }
+      if (!aceptados.length) break;
+      for (const c of aceptados) {
+        P.push(c.q);
+        origen.push(-1);
+        enCDT.push(1);
+        if (c.parte < 0) continue;
+        // La arista partida: dos tramos sembrados, en la cadena de su lado
+        const m = P.length - 1;
+        const [p, q] = restricciones[c.parte]!;
+        const viejo = p < q ? `${p},${q}` : `${q},${p}`;
+        const k = partible.get(viejo)!;
+        partible.delete(viejo);
+        restringidas.delete(viejo);
+        restricciones[c.parte] = [p, m];
+        restricciones.push([m, q]);
+        for (const [x, y] of [
+          [p, m],
+          [m, q],
+        ] as const) {
+          restringidas.add(x < y ? `${x},${y}` : `${y},${x}`);
+          partible.set(x < y ? `${x},${y}` : `${y},${x}`, k);
+        }
+        const cad = cadenas[k]!;
+        for (let i = 0; i + 1 < cad.length; i++)
+          if ((cad[i] === p && cad[i + 1] === q) || (cad[i] === q && cad[i + 1] === p)) {
+            cad.splice(i + 1, 0, m);
+            break;
+          }
+      }
+      const fallo = triangular();
+      if (fallo) return { ok: false, mensaje: fallo };
+      triangulos = quedan();
+    }
   }
 
   // 5. Cuadriláteros: 3 por triángulo y 4, 2 o 1 por celda regular

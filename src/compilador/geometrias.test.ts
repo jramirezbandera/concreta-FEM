@@ -2,8 +2,9 @@
  * G: el compilador con plantas no ortogonales (rombo, circular con vigas curvas, abanico, dos alas
  * en ángulo y triangular, con huecos, giradas y con pilares circulares) y con retículas al azar en
  * las que entra la rejilla (huecos junto a pilares, voladizos, fachadas enrasadas, chaflanes):
- * todas compilan, con y sin rejilla, sin errores ni respaldo de la triangulación. La precisión
- * frente a la malla fina se mide en `validacion/geom/sondeo.ts`.
+ * todas compilan, con y sin rejilla, sin errores, sin respaldo de la triangulación y sin el aviso
+ * de calidad de malla (G-4). La precisión frente a la malla fina se mide en
+ * `validacion/geom/sondeo.ts`.
  */
 import { describe, expect, it } from "vitest";
 import { edificioGeometria, FAMILIAS, type OpcionesGeometria } from "../pruebas/geometrias.ts";
@@ -19,6 +20,8 @@ function compila(f: ModeloFisico, rejilla: boolean) {
   expect(errores).toEqual([]);
   expect(r.valido).toBe(true);
   expect(r.diagnosticos.filter((d) => d.codigo === "malla/sin-rejilla")).toEqual([]);
+  // G-4: con el refinamiento de Delaunay, ningún cuadrilátero con el jacobiano bajo
+  expect(r.diagnosticos.filter((d) => d.codigo === "malla/calidad").map((d) => d.mensaje)).toEqual([]);
   return r;
 }
 

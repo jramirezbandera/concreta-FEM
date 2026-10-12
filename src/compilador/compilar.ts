@@ -36,7 +36,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "C5";
+export const VERSION_COMPILADOR = "C5.1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -470,8 +470,8 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     const enRejilla = losas.malla.laminasRejilla;
     h.push(
       op.rejilla
-        ? `Losas malladas con láminas DKMQ (h = ${coma(op.tamanoMalla)} m; ${losas.laminas.length} láminas; jacobiano escalado mínimo ${coma(Number(losas.malla.jacobianoMin.toFixed(3)))}): rejilla alineada con los ejes de la losa en las zonas regulares, con cuadriláteros de ≤ ${coma(op.tamanoMalla)} m y ${losas.malla.plantillas} plantillas de pilar (${enRejilla} láminas, el ${coma(Number(((100 * enRejilla) / Math.max(1, losas.laminas.length)).toFixed(0)))} %), y triangulación restringida de lado ${coma(2 * op.tamanoMalla)} m dividida en 3 cuadriláteros alrededor de lo que no cae en ella (H52, C2-a).`
-        : `Losas malladas con láminas DKMQ: triangulación restringida de lado ${coma(2 * op.tamanoMalla)} m dividida en 3 cuadriláteros (h = ${coma(op.tamanoMalla)} m; ${losas.laminas.length} láminas; jacobiano escalado mínimo ${coma(Number(losas.malla.jacobianoMin.toFixed(3)))}).`,
+        ? `Losas malladas con láminas DKMQ (h = ${coma(op.tamanoMalla)} m; ${losas.laminas.length} láminas; jacobiano escalado mínimo ${coma(Number(losas.malla.jacobianoMin.toFixed(3)))}): rejilla alineada con los ejes de la losa en las zonas regulares, con cuadriláteros de ≤ ${coma(op.tamanoMalla)} m y ${losas.malla.plantillas} plantillas de pilar (${enRejilla} láminas, el ${coma(Number(((100 * enRejilla) / Math.max(1, losas.laminas.length)).toFixed(0)))} %), y triangulación restringida de lado ${coma(2 * op.tamanoMalla)} m, refinada junto a los rasgos pequeños (con el objetivo de un jacobiano escalado ≥ 0,3) y dividida en 3 cuadriláteros, alrededor de lo que no cae en ella (H52, C2-a, G-4).`
+        : `Losas malladas con láminas DKMQ: triangulación restringida de lado ${coma(2 * op.tamanoMalla)} m, refinada junto a los rasgos pequeños (G-4) y dividida en 3 cuadriláteros (h = ${coma(op.tamanoMalla)} m; ${losas.laminas.length} láminas; jacobiano escalado mínimo ${coma(Number(losas.malla.jacobianoMin.toFixed(3)))}).`,
     );
     h.push(
       `Unión pilar–losa por la huella del pilar, rígida (${losas.huellas.length} huellas, H09). Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas, y la zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
