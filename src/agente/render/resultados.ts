@@ -373,18 +373,39 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
   const k = maxAbs > 0 ? (ORDENADA * Math.hypot(x1 - x0, y1 - y0)) / maxAbs : 0;
   const geo = new Map<string, ReturnType<typeof geometriaPieza>>();
   const g = (id: string) => geo.get(id) ?? geo.set(id, geometriaPieza(c, id)).get(id)!;
+  // Lado de los positivos, como en el alzado: con la pieza leída en X creciente (o en Y creciente si
+  // va más en Y), My > 0 a su derecha (abajo en las vigas en X) y Vz > 0 a su izquierda (arriba).
+  const lados = new Map<string, number>();
+  const lado = (id: string): number => {
+    let l = lados.get(id);
+    if (l === undefined) {
+      const ts = r.ep.tramos(id);
+      let [dx, dy] = [0, 0];
+      if (ts.length) {
+        const [a, b] = [g(id)(ts[0]!.s0).p, g(id)(ts[ts.length - 1]!.s1).p];
+        [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+        if (Math.hypot(dx, dy) < 1e-9) [dx, dy] = g(id)(ts[0]!.s0).d;
+      }
+      const directa = Math.abs(dx) >= Math.abs(dy) ? dx > 0 : dy > 0;
+      l = (directa ? 1 : -1) * (esfuerzo === "My" ? -1 : 1);
+      lados.set(id, l);
+    }
+    return l;
+  };
+  /** La ordenada v en planta: a la izquierda de la barra si `lado` y v tienen el mismo signo. */
   const ordenada = (id: string, s: number, v: number): Vec2 => {
     const { p, d: dir } = g(id)(s);
-    return [p[0] - dir[1] * v * k, p[1] + dir[0] * v * k];
+    const f = lado(id) * v * k;
+    return [p[0] - dir[1] * f, p[1] + dir[0] * f];
   };
   for (const { pieza, curva } of curvas) {
     if (curva.length < 2) continue;
     const eje = [g(pieza)(curva[0]!.s).p, g(pieza)(curva[curva.length - 1]!.s).p];
-    for (const [lado, estilo] of [
+    for (const [cual, estilo] of [
       ["max", "diagrama-positivo"],
       ["min", "diagrama-negativo"],
     ] as const) {
-      const pts = curva.map((e) => ordenada(pieza, e.s, e[lado]));
+      const pts = curva.map((e) => ordenada(pieza, e.s, e[cual]));
       P.push({ tipo: "poligono", anillos: [[eje[0]!, ...pts, eje[1]!]], estilo, objeto: pieza });
     }
     P.push({ tipo: "linea", puntos: eje as Vec2[], estilo: "diagrama-eje", objeto: pieza });
@@ -412,7 +433,8 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
         const x = e as { v: number; s: number; comb: string } | null;
         if (!x || x.v === 0 || (que === "máximo" && x.v < 0) || (que === "mínimo" && x.v > 0)) continue;
         const p = ordenada(id, x.s, x.v);
-        P.push({ tipo: "texto", p, texto: rotulo(x.v), tamano: 11, color, fondo: true, ancla: "medio", dy: x.v > 0 ? -3 : 12, prioridad: Math.abs(x.v) / (maxAbs || 1) * 50 + 10, objeto: id });
+        const arriba = p[1] >= g(id)(x.s).p[1];
+        P.push({ tipo: "texto", p, texto: rotulo(x.v), tamano: 11, color, fondo: true, ancla: "medio", dy: arriba ? -3 : 12, prioridad: Math.abs(x.v) / (maxAbs || 1) * 50 + 10, objeto: id });
         extremos.push({ que: `${esfuerzo} ${que} del vano ${i + 1}`, valor: x.v, unidad, objeto: id, punto: g(id)(x.s).p, comb: x.comb });
       }
     });
@@ -423,8 +445,8 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
     cabecera: cabecera(pl, `Vista: ${esfuerzo} de vigas y viguetas (${unidad}), envolvente de ${conjunto.descripcion}`, d),
     primitivas: P,
     leyenda: [
-      { estilo: "diagrama-positivo", texto: `Envolvente máxima de ${esfuerzo}, a la izquierda del sentido de la pieza si es positiva` },
-      { estilo: "diagrama-negativo", texto: `Envolvente mínima de ${esfuerzo}, a la derecha si es negativa` },
+      { estilo: "diagrama-positivo", texto: `Envolvente máxima de ${esfuerzo}; positiva, ${esfuerzo === "My" ? "abajo en las piezas en X y a la derecha en las piezas en Y" : "arriba en las piezas en X y a la izquierda en las piezas en Y"}` },
+      { estilo: "diagrama-negativo", texto: `Envolvente mínima de ${esfuerzo}; negativa, al otro lado (como en el alzado)` },
     ],
     notas: [
       esfuerzo === "My" ? "My > 0 tracciona la cara inferior (momento de vano)." : "Vz: cortante vertical de la pieza, con el convenio de las barras.",
