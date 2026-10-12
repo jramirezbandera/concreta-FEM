@@ -270,8 +270,22 @@
   - **Resultado:** la vista ocupa el 72,8 % en 1920×1080 y el 63,0 % en 1366×768. Los bancos de V1 y V2a, adaptados, dan los mismos bits; el único fallo es V1-3, como antes.
   - **Validación:** `validacion/i1/chrome.ts` y los tests de DOM de `app/`.
   - **Pendiente del usuario:** la puerta de uso.
+- **2026-10-12: fase I2 terminada** (motor de vistas). Pasan sus cinco criterios. Lo fijado al empezar está en `interfaz.md` §14 y el informe, en `docs/fem3d/fase-i2.md`, con criterios, hallazgos I2-1…I2-8 y pendientes.
+  - **Ya en `app/src/vistas/`:** un `WebGLRenderer` con stencil para toda la zona de vistas y un lienzo 2D encima.
+    - Planta y alzado en WebGL con la escena de A4: rellenos por stencil (la regla del SVG, sin triangular) y trazos con grosor en px.
+    - 3D alámbrico del modelo físico o analítico (con la deformada), perspectiva u ortográfica, ViewCube.
+    - 1, 1|1, 1/1 y 2×2 vistas (Ctrl+1…4), cada una con su tipo, planta o eje, modo y cámara, recordados por proyecto.
+    - Navegación de CAD (I-e), elegir por ventana y Ctrl+clic, rótulos por zoom.
+    - Selección compartida: la lista `elegidos` en las vistas, el navegador y la tabla.
+  - **Ya en `src/`:**
+    - `ejes` en el modelo físico, fuera de la huella; propuesta con las alineaciones de los pilares (`compilador/ejes.ts`); tabla Ejes del editor;
+    - A4: ejes con burbujas y cotas, huecos con aspa, clase de cada rótulo, y la vista de alzado (`agente/render/alzado.ts`);
+    - `visor/escena.ts` (búferes para la GPU, ventana) y `visor/alambrico.ts`.
+  - **Regla del motor (I2-4):** los materiales de Three.js son de la página y no se liberan, y no se comprueban los shaders en producción; si no, cambiar de modo recompila en mitad de un fotograma.
+  - **Validación:** `validacion/i2/chrome.ts` (los búferes de Chrome con el sha256 de Node, 120 fps, selección en las cuatro vistas y la tabla) y `perfil.ts` (perfil de CPU). Los bancos de I1, V1 y V2a, adaptados y sin tareas largas.
+  - **Pendiente:** la puerta de uso del usuario; medir en una GPU integrada; no recalcular en la app cuando un cambio no mueve la huella.
 - **Siguiente paso:**
-  - la puerta de uso de I1 y después I2 (motor de vistas: planta y alzado en WebGL, ViewCube, 1/2/4 vistas, rótulos por zoom y ejes de replanteo), I3 (sólido) e I4 (resultados en 3D);
+  - las puertas de uso de I1 e I2 y después I3 (sólido, translúcido, filtros y caja de sección) e I4 (resultados en 3D);
   - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
