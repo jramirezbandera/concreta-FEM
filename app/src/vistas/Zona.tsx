@@ -10,7 +10,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Box, Hand, Maximize, Move3d, MousePointer2, Rotate3d } from "lucide-react";
-import type { Vec2 } from "../../../src/agente/render/escena.ts";
+import type { Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
@@ -405,6 +405,14 @@ export function Fuente3DModelo({ deformada, modo }: { deformada?: { u: Float32Ar
 
 // ─── Leyenda ────────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Los trazos que sólo se dibujan sobre las bandas de un mapa (las isolíneas, oscuras): su muestra va
+ * sobre una banda clara, como en el mapa; sobre el fondo del tema oscuro no se verían.
+ */
+const SOBRE_BANDAS: ReadonlySet<Estilo> = new Set<Estilo>(["isolinea", "isolinea-cero"]);
+/** La banda más clara de la paleta de los mapas (`coloresBandas`). */
+const FONDO_BANDA = "#fddbc7";
+
 function Leyenda({ escena, abierta }: { escena: EscenaPreparada; abierta: boolean }) {
   const { theme: tema } = useTheme();
   const [ver, setVer] = useState(abierta);
@@ -420,7 +428,14 @@ function Leyenda({ escena, abierta }: { escena: EscenaPreparada; abierta: boolea
             return (
               <div key={i} className="flex items-start gap-2 py-[2px] text-text-secondary">
                 <svg width={18} height={12} className="mt-[1px] shrink-0" aria-hidden="true">
-                  {l.relleno || p.fill ? <rect x={0.5} y={0.5} width={17} height={11} {...atributos({ ...p, sw: Math.min(p.sw ?? 1, 1.5) }, l.relleno)} /> : <path d="M0 6h18" {...atributos(p)} />}
+                  {l.relleno || p.fill ? (
+                    <rect x={0.5} y={0.5} width={17} height={11} {...atributos({ ...p, sw: Math.min(p.sw ?? 1, 1.5) }, l.relleno)} />
+                  ) : (
+                    <>
+                      {l.estilo && SOBRE_BANDAS.has(l.estilo) && <rect x={0} y={0} width={18} height={12} rx={2} fill={FONDO_BANDA} />}
+                      <path d="M0 6h18" {...atributos(p)} />
+                    </>
+                  )}
                 </svg>
                 <span className={l.relleno ? "mono" : undefined}>{l.texto}</span>
               </div>
