@@ -90,11 +90,11 @@ export class EsfuerzosBandas {
    * @param fisico el modelo físico con sus bandas (las que se compilaron).
    * @param modelo el modelo analítico compilado, y `casos`, sus resultados (válidos).
    */
-  constructor(fisico: ModeloFisico, modelo: ModeloAnalitico, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; epsGeom?: number } = {}) {
+  constructor(fisico: ModeloFisico, modelo: ModeloAnalitico, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; epsGeom?: number } = {}) {
     this.fisico = fisico;
     this.modelo = modelo;
     this.casos = casos;
-    this.cortes = new Cortes(modelo);
+    this.cortes = opciones.cortes ?? new Cortes(modelo);
     this.campos = opciones.campos ?? new CamposLaminas(modelo);
     this.eps = opciones.epsGeom ?? 1e-6;
     const cotas = cotasPlantas(fisico.plantas);

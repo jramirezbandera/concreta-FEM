@@ -7,6 +7,7 @@
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, valorEnPunto, type Resultado } from "./datos.ts";
 import { alambrico } from "./alambrico.ts";
+import { datosBanda, datosBandas } from "./bandas.ts";
 import type { Pedido, Respuestas } from "./protocolo.ts";
 import { Sesion } from "./sesion.ts";
 
@@ -83,6 +84,10 @@ export class Atendedor {
         return de(datosPilares(s, p.planta, p.combinaciones));
       case "pilar":
         return de(datosPilar(s, p.id, p.combinaciones));
+      case "bandas":
+        return de(datosBandas(s, p.planta, p.combinaciones, p.direccion));
+      case "banda":
+        return de(datosBanda(s, p.id, p.combinaciones));
       case "desplomes":
         return de(datosDesplomes(s, p.combinaciones));
       case "geometria":

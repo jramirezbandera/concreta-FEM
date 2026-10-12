@@ -554,6 +554,16 @@ export class CamposLaminas implements IntegradorCampos {
     return new EvaluadorCampos(this, u);
   }
 
+  /**
+   * El evaluador de `u` que comparten los cortes y quien lo pida (los mapas de A4): lo que uno ya
+   * recuperó lo reutilizan los demás, con los mismos valores. Uno por objeto `u`.
+   */
+  evaluadorCompartido(u: ArrayLike<number>): EvaluadorCampos {
+    let ev = this.deCortes.get(u as object);
+    if (!ev) this.deCortes.set(u as object, (ev = this.evaluador(u)));
+    return ev;
+  }
+
   /** Valores nodales (8 por plaza, en el triedro de su región) de todas las plazas. */
   nodales(u: ArrayLike<number>): Float64Array {
     const ev = this.evaluador(u);
@@ -853,8 +863,7 @@ export class CamposLaminas implements IntegradorCampos {
     casos.forEach((r, kc) => {
       // El evaluador de estos desplazamientos, con lo que ya calcularon los cortes anteriores (los
       // mismos valores); cuenta las plazas degradadas que usa este corte
-      let ev = this.deCortes.get(r.u as object);
-      if (!ev) this.deCortes.set(r.u as object, (ev = this.evaluador(r.u)));
+      const ev = this.evaluadorCompartido(r.u);
       ev.empezar();
       const val = new Float64Array(8 * ns);
       for (let j = 0; j < ns; j++) {

@@ -96,12 +96,12 @@ export class EsfuerzosMuros {
   private readonly cortes: Cortes;
   private readonly campos: CamposLaminas;
 
-  constructor(fisico: ModeloFisico, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: OpcionesCompilacion & { campos?: CamposLaminas } = {}) {
+  constructor(fisico: ModeloFisico, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: OpcionesCompilacion & { campos?: CamposLaminas; cortes?: Cortes } = {}) {
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
     this.casos = casos;
     this.ctx = validar(fisico, resolverOpciones(opciones), new Diagnosticos());
-    this.cortes = new Cortes(this.modelo);
+    this.cortes = opciones.cortes ?? new Cortes(this.modelo);
     this.campos = opciones.campos ?? new CamposLaminas(this.modelo);
   }
 

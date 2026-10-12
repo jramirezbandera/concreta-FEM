@@ -319,9 +319,19 @@
   - `src/agente/render/cargas.ts`: `geometriaCargas` (cada carga en el espacio, como la lee el compilador) y `vistaAlzadoCargas` (bloques a escala con la punta de las flechas en la pieza; lo normal al plano, rotulado);
   - `src/visor/cargas3d.ts` (pedido `cargas3d`): bloques translúcidos con flechas sobre el sólido, rotulados en la planta resaltada;
   - validación: la resultante de lo dibujado es la del modelo analítico a 1e-9 (salvo lo que une ε_snap, acotado) en `cargas.test.ts`, y Chrome pinta lo de Node (`validacion/cargas/chrome.ts`).
+- **2026-10-13: fase V2b terminada** (muros, forjados y bandas en la app). Pasan los criterios 1 a 4, y el 7 en sus valores; los tiempos del 5 y del 7 quedan a medias, y el 6 (puerta de uso) es del usuario. El plan está en `visor.md` §7, con las decisiones del usuario (§7.4), y el informe, en `docs/fem3d/fase-v2b.md`, con hallazgos V2b-1…V2b-5 y pendientes.
+  - **Editor:** tablas de muros, paños, apoyos lineales y bandas; el reticular, en columnas de Losas, y los empujes, en Cargas. Con V2b todo el modelo físico se edita en la app, salvo las opciones de compilación y los perfiles I.
+  - **Bandas:**
+    - al cambiar una banda, pasa a ser del usuario y sus apoyos se recalculan (`apoyosBanda`, bit a bit con la propuesta);
+    - «Proponer bandas» rehace las propuestas y deja las del usuario (operación `proponerBandas`);
+    - aviso `banda/apoyos-desfasados` si los pilares cambian después.
+  - **Resultados · Bandas:** vista `bandas` de A4 (también en `fem render`), tabla por planta, estaciones con Wood–Armer y momento por nervio, y reparto pilares/central; todo de las consultas, bit a bit.
+  - **Motor y consultas, con los mismos bits:** SPR, cortes y diagramas compartidos entre los mapas y las bandas; las equivalentes de cada lámina se preparan cuando se piden. La primera banda pasa de 2,6 s a ~1 s en Bun.
+  - **Validación:** `src/editor/v2b.test.ts`, `src/compilador/apoyosBanda.test.ts`, `src/visor/bandas.test.ts`, los tests de DOM y el banco en Chrome `validacion/v2b/chrome.ts`.
+  - **Pendiente del usuario:** la puerta de uso, y decidir sobre los tiempos: los diagnósticos del reticular de V2 tardan 2,0 s (lo que tarda en compilar) y la primera tabla de bandas, 2,17 s en Chrome.
 - **Siguiente paso:**
-  - las puertas de uso de I1, I2, I3 e I4;
-  - la puerta de uso de V2a (del usuario) y, con lo que salga, V2b (muros, reticular, unidireccional y bandas editables) y V2c (dibujar con el ratón);
+  - las puertas de uso de I1, I2, I3 e I4, de V2a y de V2b;
+  - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

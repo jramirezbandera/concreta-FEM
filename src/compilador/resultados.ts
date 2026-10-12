@@ -17,7 +17,8 @@ export interface TramoFlexible {
 }
 
 export class EsfuerzosPiezas {
-  private readonly diagramas: DiagramasBarras;
+  /** Los diagramas de las barras del modelo (también los usan los cortes de las bandas, `Consultas.cortes`). */
+  readonly diagramas: DiagramasBarras;
   private readonly cache = new Map<string, DiagramaBarra>();
   readonly modelo: ModeloAnalitico;
   readonly mapeo: Mapeo;

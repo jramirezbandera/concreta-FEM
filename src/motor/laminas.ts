@@ -190,7 +190,9 @@ function coeficientesJacobiano(xy: ArrayLike<number>): [number, number, number] 
  * calcula por otro camino (integrales cerradas de la carga sobre el cuadrilátero, el tramo o el
  * punto) para que un error en las equivalentes rompa el equilibrio. Los defectos van a `diag`.
  * Con `porLamina`, deja además en él las equivalentes de cada lámina cargada (24, globales), que
- * son las que necesitan sus fuerzas nodales (E5).
+ * son las que necesitan sus fuerzas nodales (E5). Con `sinGlobales`, sólo eso: no monta el vector
+ * global de equivalentes (`equivalentes` sale null), para preparar unas pocas láminas sin recorrer
+ * el modelo (V2b, las caras de las bandas).
  */
 export function cargasDeLaminasDelCaso(
   idCaso: string,
@@ -200,13 +202,14 @@ export function cargasDeLaminasDelCaso(
   geo: Geometria,
   diag: Diagnosticos,
   porLamina?: Map<number, Float64Array>,
+  sinGlobales = false,
 ): CargasDeLaminas {
   const res: Resultante = { F: [0, 0, 0], M: [0, 0, 0], escalaF: 0, escalaM: 0 };
   if (cargas.length === 0) return { equivalentes: null, resultante: res };
   const tol = TOL_GEOMETRICA * geo.tamano;
   const C = geo.centro;
   const { xyz } = geo;
-  const eq = new Float64Array(6 * modelo.nudos.length);
+  const eq = sinGlobales ? null : new Float64Array(6 * modelo.nudos.length);
   const N = new Float64Array(4);
   const f = new Float64Array(24);
   const sumarResultante = (F: readonly number[], M: readonly number[], escF: number, escM: number) => {
@@ -361,7 +364,7 @@ export function cargasDeLaminasDelCaso(
       diag.error("carga/no-valida", `El caso ${idCaso} tiene una carga de lámina de un tipo desconocido en la lámina ${la.id}.`, ids);
       continue;
     }
-    for (let a = 0; a < 4; a++) for (let k = 0; k < 6; k++) eq[6 * la.nudos[a]! + k] += f[6 * a + k]!;
+    if (eq) for (let a = 0; a < 4; a++) for (let k = 0; k < 6; k++) eq[6 * la.nudos[a]! + k] += f[6 * a + k]!;
     if (porLamina) {
       let fl = porLamina.get(c.lamina);
       if (!fl) porLamina.set(c.lamina, (fl = new Float64Array(24)));

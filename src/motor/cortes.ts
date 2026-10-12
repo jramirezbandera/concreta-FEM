@@ -229,9 +229,11 @@ export class Cortes {
   private epocas = new Uint32Array(0);
   private epoca = 0;
 
-  constructor(modelo: ModeloAnalitico) {
+  /** `diagramas`: los de las barras del modelo, si ya se tienen (se preparan una sola vez). */
+  constructor(modelo: ModeloAnalitico, opciones: { diagramas?: DiagramasBarras } = {}) {
     this.modelo = modelo;
     this.fuerzas = new FuerzasNodales(modelo);
+    if (opciones.diagramas) this.diagramas = opciones.diagramas;
   }
 
   private guardado(casos: readonly ResultadoCaso[]) {

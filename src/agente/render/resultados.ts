@@ -32,7 +32,7 @@ import { anchoViga, fondoModelo, huellaSeccion, PlantaFisica, type DatosVista } 
 export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12"] as const;
 export type Campo = (typeof CAMPOS)[number];
 /** `reacciones` (I4) está en `reacciones.ts`. */
-export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-vz", "pilares-n", "reacciones"] as const;
+export const VISTAS_RESULTADOS = ["malla", ...CAMPOS, "vigas-my", "vigas-vz", "pilares-n", "reacciones", "bandas"] as const;
 
 /** Componente de los campos SPR ([Nx, Ny, Nxy, Mx, My, Mxy, Qx, Qy]) de cada campo de láminas. */
 const COMPONENTE: Record<Exclude<Campo, "uz">, number> = { f11: 0, f22: 1, f12: 2, m11: 3, m22: 4, m12: 5, v13: 6, v23: 7 };
@@ -75,7 +75,8 @@ export class ResultadosRender {
   }
 
   get campos(): CamposLaminas {
-    return (this.camposC ??= new CamposLaminas(this.c.modelo));
+    // Los de las consultas: los cortes de las bandas y los mapas comparten lo recuperado
+    return (this.camposC ??= this.q.modelo === this.c.modelo ? this.q.campos : new CamposLaminas(this.c.modelo));
   }
 
   get ep(): EsfuerzosPiezas {
@@ -124,7 +125,7 @@ ${planta}`;
       const XI = [-1, 1, 1, -1];
       const ETA = [-1, -1, 1, 1];
       x.valores = this.q.casos.map((r) => {
-        const ev: EvaluadorCampos = this.campos.evaluador(r.u);
+        const ev: EvaluadorCampos = this.campos.evaluadorCompartido(r.u);
         const v = new Float64Array(32 * ls.length);
         ls.forEach((l, i) => {
           if (!x!.region[i]) return;
@@ -160,12 +161,12 @@ function trazoModelo(pl: PlantaFisica): Primitiva[] {
   return P;
 }
 
-const cabecera = (pl: PlantaFisica, vista: string, d: DatosVista): string[] => {
+export const cabecera = (pl: PlantaFisica, vista: string, d: DatosVista): string[] => {
   const p = pl.f.plantas[pl.k];
   return [`Planta ${pl.id}${p?.nombre ? ` (${p.nombre})` : ""}${pl.cota !== null ? `, cota ${pl.cota >= 0 ? "+" : ""}${rotulo(pl.cota, 4)} m` : ""}`, vista, `Huella ${d.huella.slice(0, 12)}`];
 };
 
-function caja(pl: PlantaFisica): [number, number, number, number] {
+export function caja(pl: PlantaFisica): [number, number, number, number] {
   return cajaDe(
     fondoModelo(pl, { atenuado: true })
       .primitivas.filter((p) => p.tipo === "poligono" || p.tipo === "linea")

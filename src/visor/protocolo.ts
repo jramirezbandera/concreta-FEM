@@ -18,6 +18,8 @@ import type { Isovalores3D } from "./isovalores3d.ts";
 import type { Pilares3D } from "./pilares3d.ts";
 import type { Reacciones3D } from "./reacciones3d.ts";
 import type { Cargas3D } from "./cargas3d.ts";
+import type { DatosBanda, DatosBandas } from "./bandas.ts";
+import type { DireccionBanda } from "../agente/render/bandas.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
@@ -44,6 +46,9 @@ export type Pedido =
   | { tipo: "estacion"; id: string; esfuerzo: Esfuerzo; combinaciones: EleccionCombinaciones; s: number }
   | { tipo: "pilares"; planta: string; combinaciones: EleccionCombinaciones }
   | { tipo: "pilar"; id: string; combinaciones: EleccionCombinaciones }
+  /** V2b: las bandas de una planta (de una dirección, o de las dos con null) y el detalle de una. */
+  | { tipo: "bandas"; planta: string; combinaciones: EleccionCombinaciones; direccion: DireccionBanda | null }
+  | { tipo: "banda"; id: string; combinaciones: EleccionCombinaciones }
   | { tipo: "desplomes"; combinaciones: EleccionCombinaciones }
   | { tipo: "geometria" }
   | { tipo: "deformada"; combinaciones: EleccionCombinaciones }
@@ -80,6 +85,8 @@ export interface Respuestas {
   estacion: DatosEstacion;
   pilares: DatosPilares;
   pilar: { combinaciones: Combinaciones; filas: FilaPilar[] };
+  bandas: DatosBandas;
+  banda: DatosBanda;
   desplomes: DatosDesplomes;
   geometria: Geometria3D;
   deformada: DatosDeformada;

@@ -28,6 +28,8 @@
 import { generarCombinaciones, type CasoCarga, type Combinacion, type OpcionesCombinaciones } from "../combinaciones/generador.ts";
 import { psiDe } from "../combinaciones/psi.ts";
 import { DiagramaBarra } from "../elementos/cargasBarra.ts";
+import { CamposLaminas } from "../motor/campos.ts";
+import { Cortes } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "../motor/modelo.ts";
 import { alineacionesLosa, semiextension } from "./bandas.ts";
@@ -186,6 +188,8 @@ export class Consultas {
   private readonly opciones: OpcionesCompilacion;
   private piezasC?: EsfuerzosPiezas;
   private bandasC?: EsfuerzosBandas;
+  private camposC?: CamposLaminas;
+  private cortesC?: Cortes;
   private murosC?: EsfuerzosMuros;
   private readonly flechasGeo = new Map<string, GeometriaFlechas>();
   private readonly apoyoEnNudo = new Map<number, string>();
@@ -454,9 +458,19 @@ export class Consultas {
 
   // ─── Bandas, machones y dinteles ────────────────────────────────────────────────────────────
 
+  /** Los campos SPR del modelo (E5), los mismos para las bandas, los muros y los mapas de A4. */
+  get campos(): CamposLaminas {
+    return (this.camposC ??= new CamposLaminas(this.modelo));
+  }
+
+  /** Los cortes del modelo, con los diagramas de las barras de las piezas: los mismos para las bandas y los muros. */
+  get cortes(): Cortes {
+    return (this.cortesC ??= new Cortes(this.modelo, { diagramas: this.piezas().diagramas }));
+  }
+
   /** Estaciones de una banda con sus esfuerzos por caso (C5.2). */
   banda(id: string): Respuesta<EstacionResultado[]> {
-    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom });
+    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom, campos: this.campos, cortes: this.cortes });
     const r = this.bandasC.estaciones(id);
     return r ? { valido: true, valor: r, diagnosticos: r.flatMap((e) => e.diagnosticos) } : this.noExiste("La banda", id);
   }
@@ -470,13 +484,13 @@ export class Consultas {
     if (!this.ctx.losaDe.has(losa)) return this.noExiste("La losa", losa);
     const mal = this.factoresMal<LineaReparto[]>(factores, losa);
     if (mal) return mal;
-    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom });
+    this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom, campos: this.campos, cortes: this.cortes });
     const r = this.bandasC.reparto(losa, direccion, factores);
     return { valido: true, valor: r.lineas, diagnosticos: r.diagnosticos };
   }
 
   private muros(): EsfuerzosMuros {
-    return (this.murosC ??= new EsfuerzosMuros(this.fisico, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, this.opciones));
+    return (this.murosC ??= new EsfuerzosMuros(this.fisico, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { ...this.opciones, campos: this.campos, cortes: this.cortes }));
   }
 
   /** Machones del muro (C5.3). */

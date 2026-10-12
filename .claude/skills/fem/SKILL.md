@@ -69,6 +69,7 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 | `vigas-my`, `vigas-vz` | Diagramas envolventes de vigas y viguetas, con el máximo y el mínimo de cada vano |
 | `pilares-n` | Axil de cada pilar que llega a la planta |
 | `reacciones` | Reacciones de los pilares y muros que arrancan de la planta y de sus apoyos: Fz rotulada y (Fx, Fy) a escala; por defecto, cada objeto en el caso de su mayor \|Fz\| (como `consultar reacciones`) |
+| `bandas` | Las bandas de dimensionado de la planta con su My en cada estación (caras y centros de vano), de `consultar banda`: el máximo a un lado del eje y el mínimo al otro, rotulado el que gobierna; en las dos direcciones a la vez |
 
 - `--vista` y `--planta` admiten varias, separadas por comas o repetidas; sin `--planta`, todas.
 - `modelo`, `cargas` y `diagnosticos` se dibujan aunque el modelo no compile: así se ve dónde está el error.
@@ -98,6 +99,7 @@ La app vigila el fichero: cada vez que lo editas, se recarga sola (o usa lo que 
 - **Lee el fichero justo antes de cambiarlo**, nunca de memoria: puede que el ingeniero lo haya guardado desde la app.
 - Si cambias el fichero mientras él tiene cambios sin guardar, la app no pisa nada: le avisa y elige él. Díselo cuando cambies algo que podría estar editando.
 - Al guardar, la app escribe el fichero en su formato canónico (2 espacios y las claves en el orden de los tipos). El contenido y la huella no cambian.
+- Las bandas de dimensionado las propone la app («Proponer bandas», con las del Anejo I) y el ingeniero las retoca. Sus `apoyos` no se escriben a mano: la app los recalcula con los pilares al cambiar una banda. Si mueves un pilar o cambias su sección después, el compilador avisa con `banda/apoyos-desfasados`: díselo para que vuelva a proponerlas o las retoque.
 
 La app no firma. Tú no la necesitas: tus números salen de la CLI.
 

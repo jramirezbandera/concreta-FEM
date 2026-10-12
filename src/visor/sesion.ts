@@ -16,6 +16,7 @@ import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones,
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
+import { vistaBandas, type DireccionBanda } from "../agente/render/bandas.ts";
 import { UNIDADES_CAMPO } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
@@ -61,6 +62,8 @@ export type VistaPlanta =
   | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa }
   | { vista: "vigas"; esfuerzo: "My" | "Vz"; combinaciones: EleccionCombinaciones }
   | { vista: "pilares-n"; combinaciones: EleccionCombinaciones }
+  /** V2b: el My de las bandas de la planta (de una dirección, o de las dos). */
+  | { vista: "bandas"; combinaciones: EleccionCombinaciones; direccion?: DireccionBanda }
   /** Las reacciones de los objetos de la planta (I4); `escala`, la de las flechas horizontales. */
   | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number };
 
@@ -452,7 +455,7 @@ export class Sesion {
         } else {
           const conj = this.conjunto(v.combinaciones, v.vista === "campo" && v.campo === "uz" ? "desplazamientos" : "esfuerzos");
           if (!conj.valido) return conj;
-          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
+          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : v.vista === "bandas" ? vistaBandas(rr, planta, conj.valor, d, v.direccion) : vistaAxiles(rr, planta, conj.valor, d);
         }
       }
     }

@@ -23,7 +23,7 @@ import { equivalentesEnNudos, cargasDeBarrasDelCaso, type BarraPreparada } from 
 import { Diagnosticos } from "./diagnosticos.ts";
 import { elementosDelModelo, esMuelleATierra, geometria, rigidezGlobal, type ElementoMotor, type Geometria } from "./elementos.ts";
 import { cargasDeLaminasDelCaso, rigidezLamina, type LaminaPreparada } from "./laminas.ts";
-import type { ModeloAnalitico, ResultadoCaso } from "./modelo.ts";
+import type { CargaLamina, ModeloAnalitico, ResultadoCaso } from "./modelo.ts";
 
 /** Componentes de un nudo que fija cada tipo de restricción (sobre las demás no hace fuerza). */
 const COMPONENTES_RESTRICCION = {
@@ -37,8 +37,11 @@ export type FuerzasRestriccion = Float64Array;
 interface CargasCaso {
   /** Equivalentes por barra (12, globales en los nudos). */
   barras: Map<number, Float64Array>;
-  /** Equivalentes por lámina (24, globales). */
-  laminas: Map<number, Float64Array>;
+  /**
+   * Equivalentes por lámina (24, globales), preparadas la primera vez que se pide cada una: una cara
+   * de banda sólo toca unas pocas, y prepararlas todas costaba ~0,5 s en el edificio objetivo (V2b).
+   */
+  lamina(l: number): Float64Array | undefined;
   /** Cargas nodales (6 por nudo). */
   nodales: Float64Array;
 }
@@ -95,14 +98,34 @@ export class FuerzasNodales {
       if (e.lamina) preparadasL[e.indice] = e.lamina;
     }
     const deBarras = cargasDeBarrasDelCaso(caso.id, caso.barras ?? [], preparadasB, this.modelo, this.geo, diag).porBarra;
-    const laminas = new Map<number, Float64Array>();
-    cargasDeLaminasDelCaso(caso.id, caso.laminas ?? [], preparadasL, this.modelo, this.geo, diag, laminas);
     if (diag.hayErrores) throw new Error(`FuerzasNodales: el caso ${caso.id} tiene cargas no válidas (${diag.lista[0]!.mensaje})`);
+    // Las cargas de cada lámina, en su orden (la suma de sus equivalentes es la misma, bit a bit)
+    const deLamina = new Map<number, CargaLamina[]>();
+    for (const cl of caso.laminas ?? []) {
+      let l = deLamina.get(cl.lamina);
+      if (!l) deLamina.set(cl.lamina, (l = []));
+      l.push(cl);
+    }
+    const hechas = new Map<number, Float64Array | undefined>();
+    const lamina = (l: number): Float64Array | undefined => {
+      if (hechas.has(l)) return hechas.get(l);
+      const cs = deLamina.get(l);
+      let r: Float64Array | undefined;
+      if (cs) {
+        const d = new Diagnosticos();
+        const m = new Map<number, Float64Array>();
+        cargasDeLaminasDelCaso(caso.id, cs, preparadasL, this.modelo, this.geo, d, m, true);
+        if (d.hayErrores) throw new Error(`FuerzasNodales: el caso ${caso.id} tiene cargas no válidas (${d.lista[0]!.mensaje})`);
+        r = m.get(l);
+      }
+      hechas.set(l, r);
+      return r;
+    };
     const eqB = new Map<number, Float64Array>();
     for (const [ib, cb] of deBarras) eqB.set(ib, equivalentesEnNudos(preparadasB[ib]!, cb.ferC));
     const nodales = new Float64Array(6 * this.modelo.nudos.length);
     for (const cn of caso.nodales ?? []) for (let g = 0; g < 6; g++) nodales[6 * cn.nudo + g]! += cn.f[g]!;
-    c = { barras: eqB, laminas, nodales };
+    c = { barras: eqB, lamina, nodales };
     this.cargas[k] = c;
     return c;
   }
@@ -127,7 +150,7 @@ export class FuerzasNodales {
       g[a] = s;
     }
     if (k === null) return g;
-    const eq = e.tipo === "barra" ? this.cargasCaso(k).barras.get(e.indice) : e.tipo === "lamina" ? this.cargasCaso(k).laminas.get(e.indice) : undefined;
+    const eq = e.tipo === "barra" ? this.cargasCaso(k).barras.get(e.indice) : e.tipo === "lamina" ? this.cargasCaso(k).lamina(e.indice) : undefined;
     if (eq) for (let a = 0; a < m; a++) g[a] -= eq[a]!;
     return g;
   }
@@ -204,7 +227,7 @@ export class FuerzasNodales {
       casos.forEach((r, k) => {
         const o = out[k]!;
         for (let b = 0; b < m; b++) ue[b] = r.u[6 * e.nudos[(b / 6) | 0]! + (b % 6)]!;
-        const eq = e.tipo === "barra" ? this.cargasCaso(k).barras.get(e.indice) : e.tipo === "lamina" ? this.cargasCaso(k).laminas.get(e.indice) : undefined;
+        const eq = e.tipo === "barra" ? this.cargasCaso(k).barras.get(e.indice) : e.tipo === "lamina" ? this.cargasCaso(k).lamina(e.indice) : undefined;
         // Sólo las filas de los nudos de la lista: g = k·u − f_eq
         for (let a = 0; a < e.nudos.length; a++) {
           const i = pos[e.nudos[a]!]!;

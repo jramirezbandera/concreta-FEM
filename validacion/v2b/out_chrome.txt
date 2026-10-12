@@ -1,0 +1,16 @@
+Criterio 5 · edificio reticular de V2 (C4: 7 plantas, 80 pilares, reticular con ábacos)
+  abierto y calculado en 5.5 s
+FALLA escribir el intereje de una losa: los diagnósticos de la versión nueva salen en 2.03 s (≤ 1,5 s)
+BIEN  escribir una celda: tareas largas > 50 ms en el hilo principal: 0 (máx. 0 ms)
+BIEN  pegar 80 filas: entran todas
+FALLA pegar 80 filas: los diagnósticos salen en 2.01 s (≤ 1,5 s)
+BIEN  pegar 80 filas: tareas largas > 50 ms: 0 (máx. 0 ms)
+BIEN  «Proponer bandas» enseña lo que cambia en 0.10 s (≤ 1 s)
+BIEN  con las bandas propuestas, la huella de la página es la de Node (86ba62da; 238 bandas)
+Criterio 7 · Resultados · Bandas en el edificio objetivo de A2 con sus bandas propuestas
+FALLA la tabla de las bandas de la planta sale en 2.17 s (≤ 1 s)
+  tareas largas > 50 ms en el hilo principal: 0 (máx. 0 ms)
+BIEN  los My de las 15 bandas de N7 (dirección 1) son los de Node bit a bit
+BIEN  el detalle de L-N7:1:P1 (estaciones y Wood–Armer) sale en 0.05 s (≤ 1 s)
+
+3 comprobaciones fallan
