@@ -10,7 +10,10 @@
  * Puro: sin IO.
  */
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
-import { franja as consultaFranja, franjas as consultaFranjas, type DemandaFranja, type EstacionFranjaEnvolvente } from "../agente/consultas.ts";
+import { baseDe, type ArmadoProyecto } from "../agente/armaduraBase.ts";
+import { franja as consultaFranja, franjas as consultaFranjas, type DemandaFranja, type EstacionFranjaEnvolvente, type FilaRefuerzo } from "../agente/consultas.ts";
+import { losasDe, zonasRefuerzo } from "../agente/refuerzos.ts";
+import { tramosPlanta } from "./armado.ts";
 import type { Armadura } from "../agente/render/armado.ts";
 import type { EscalaMapa } from "../agente/render/isovalores.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
@@ -43,6 +46,10 @@ export interface FilaArmado {
 
 export interface DatosArmado {
   escena: EscenaPreparada;
+  /** AB: las zonas de refuerzo de la planta con la base (las de «fem consultar refuerzos»). */
+  zonas: FilaRefuerzo[];
+  /** Las losas de la planta sin base en esta armadura. */
+  sinBase: string[];
   combinaciones: CombinacionesArmado;
   filas: FilaArmado[];
   /** Las plantas que tienen franjas (las de losas macizas o reticulares). */
@@ -50,11 +57,11 @@ export interface DatosArmado {
   diagnosticos: Diagnostico[];
 }
 
-/** El mapa de una armadura en una planta y la tabla de sus franjas. */
-export function datosArmado(s: Sesion, planta: string, e: EleccionCombinaciones, armadura: Armadura, escala?: EscalaMapa): Resultado<DatosArmado> {
+/** El mapa de una armadura en una planta, la tabla de sus franjas y sus zonas de refuerzo. */
+export function datosArmado(s: Sesion, planta: string, e: EleccionCombinaciones, armadura: Armadura, op: { escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean } = {}): Resultado<DatosArmado> {
   const q = s.q;
   if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
-  const esc = s.escena(planta, { vista: "armado", combinaciones: e, armadura, ...(escala ? { escala } : {}) });
+  const esc = s.escena(planta, { vista: "armado", combinaciones: e, armadura, ...op });
   if (!esc.valido) return esc;
   const conj = s.conjunto(e, "esfuerzos");
   if (!conj.valido) return conj;
@@ -63,7 +70,13 @@ export function datosArmado(s: Sesion, planta: string, e: EleccionCombinaciones,
   const direccion = armadura[0] === "x" ? 1 : 2;
   const filas = r.valor.franjas.filter((f) => f.direccion === direccion).map((f): FilaArmado => ({ ...f, ancho: f.t[1] - f.t[0] }));
   const plantas = q.fisico.plantas.map((p) => p.id).filter((p) => (q.fisico.losas ?? []).some((l) => l.planta === p));
-  return { valido: true, valor: { escena: esc.valor, combinaciones: resumen(conj.valor), filas, plantas, diagnosticos: r.diagnosticos } };
+  // Las zonas, con los tramos que ya calculó el mapa (las mismas que «fem consultar refuerzos»)
+  const fs = tramosPlanta(q, planta, armadura, conj.valor);
+  if (!fs.valido) return fs;
+  const losas = losasDe(q, { planta });
+  const conBase = losas.filter((l) => baseDe(op.armado, l, armadura) !== null);
+  const zonas = conBase.flatMap((l) => zonasRefuerzo(l, armadura, baseDe(op.armado, l, armadura)!, fs.valor)).map(({ tramos: _t, contorno: _c, ...z }): FilaRefuerzo => z);
+  return { valido: true, valor: { escena: esc.valor, zonas, sinBase: losas.filter((l) => !conBase.includes(l)), combinaciones: resumen(conj.valor), filas, plantas, diagnosticos: r.diagnosticos } };
 }
 
 export interface DatosFranja {

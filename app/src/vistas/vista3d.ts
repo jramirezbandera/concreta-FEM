@@ -68,7 +68,7 @@ import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Solido } from "../../../src/visor/solido.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
 import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
-import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
+import type { MallaIsovalores } from "../../../src/visor/isovalores3d.ts";
 import { SIN_BANDA, type Pilares3D } from "../../../src/visor/pilares3d.ts";
 import { COLOR_REACCION, type Reacciones3D } from "../../../src/visor/reacciones3d.ts";
 import { CLASES_CARGA, COLOR_CARGA, type Cargas3D } from "../../../src/visor/cargas3d.ts";
@@ -290,7 +290,7 @@ export class Vista3D extends Vista {
   private activa: string | null = null;
   private elegidos: ReadonlySet<string> = new Set();
   private diag: Diagramas3D | null = null;
-  private iso: Isovalores3D | null = null;
+  private iso: MallaIsovalores | null = null;
   private objsDiag: (Mesh | LineSegments2)[] = [];
   private objsIso: (Mesh | LineSegments)[] = [];
   private pil: Pilares3D | null = null;
@@ -513,7 +513,7 @@ export class Vista3D extends Vista {
   }
 
   /** Los isovalores de las losas (I4); null los quita. */
-  ponerIsovalores(i: Isovalores3D | null): void {
+  ponerIsovalores(i: MallaIsovalores | null): void {
     if (i === this.iso) return;
     this.iso = i;
     if (i) this.fijarOrigen(i.origen);

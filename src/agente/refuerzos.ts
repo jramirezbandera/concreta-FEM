@@ -137,6 +137,8 @@ export interface ZonaRefuerzo {
   longitud: number;
   /** Área de sus tramos, m². */
   area: number;
+  /** Su caja en planta: [xmin, ymin, xmax, ymax], m. */
+  caja: [number, number, number, number];
   /** La mayor demanda (kN·m/m): su franja, su estación, su combinación y el exceso sobre la base. */
   maximo: { v: number; franja: string; s: number; comb: string; exceso: number };
   /** Sus tramos, en orden de franja y de s. */
@@ -198,6 +200,7 @@ export function zonasRefuerzo(losa: string, armadura: Armadura, base: number, fs
       t: [t0, t1] as [number, number],
       longitud: s1 - s0,
       area: ts.reduce((x, t) => x + (t.b - t.a) * (t.t1 - t.t0), 0),
+      caja: cajaTramos(ts),
       maximo: { v: m.v, franja: m.franja, s: m.s, comb: m.comb, exceso: m.v - base },
       tramos: ts,
       contorno: f0 ? contornoZona(ts, f0.d, f0.n) : [],
@@ -205,6 +208,18 @@ export function zonasRefuerzo(losa: string, armadura: Armadura, base: number, fs
   });
   zonas.sort((x, y) => x.s[0] - y.s[0] || x.t[0] - y.t[0]);
   return zonas.map((z, i) => ({ id: `${losa}:${armadura}:R${i + 1}`, ...z }));
+}
+
+function cajaTramos(ts: readonly TramoArmado[]): [number, number, number, number] {
+  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const t of ts)
+    for (const [x, y] of t.rectangulo) {
+      if (x < x0) x0 = x;
+      if (y < y0) y0 = y;
+      if (x > x1) x1 = x;
+      if (y > y1) y1 = y;
+    }
+  return [x0, y0, x1, y1];
 }
 
 /** Tramos seguidos de una franja, fundidos: [a, b]. */

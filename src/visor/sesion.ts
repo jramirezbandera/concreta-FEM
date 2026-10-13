@@ -17,7 +17,9 @@ import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { vistaArmado, type Armadura } from "../agente/render/armado.ts";
+import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
+import { armado3D, tramosPlanta, valorArmado, type Armado3D, type ValorArmado } from "./armado.ts";
 import { UNIDADES_CAMPO } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
@@ -115,6 +117,26 @@ export interface PedidoIsovalores3D {
   /** Por defecto, las losas. */
   superficies?: SuperficiesMapa;
   escala?: EscalaMapa;
+}
+
+/** AB: el armado en el 3D, de una planta o de todas (null), con la base del proyecto que se edita. */
+export interface PedidoArmado3D {
+  armadura: Armadura;
+  combinaciones: EleccionCombinaciones;
+  planta: string | null;
+  escala?: EscalaMapa;
+  armado?: ArmadoProyecto;
+  soloExceso?: boolean;
+}
+
+/** AB: el valor del mapa de armado en un punto (m, globales) de una planta. */
+export interface PedidoValorArmado {
+  planta: string;
+  armadura: Armadura;
+  combinaciones: EleccionCombinaciones;
+  x: number;
+  y: number;
+  armado?: ArmadoProyecto;
 }
 
 /** Los pilares en el 3D por colores (I4): N o ν de cada tramo. */
@@ -457,12 +479,17 @@ export class Sesion {
         } else {
           const conj = this.conjunto(v.combinaciones, v.vista === "campo" && v.campo === "uz" ? "desplazamientos" : "esfuerzos");
           if (!conj.valido) return conj;
-          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : v.vista === "armado" ? vistaArmado(rr, planta, v.armadura, conj.valor, d, { ...(v.escala ? { escala: v.escala } : {}), ...(v.armado ? { armado: v.armado } : {}), ...(v.soloExceso !== undefined ? { soloExceso: v.soloExceso } : {}) }) : vistaAxiles(rr, planta, conj.valor, d);
+          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : v.vista === "armado" ? this.vistaArmado(rr, planta, v, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
         }
       }
     }
     this.escenas.set(clave, e);
     return { valido: true, valor: e };
+  }
+
+  private vistaArmado(rr: ResultadosRender, planta: string, v: Extract<VistaPlanta, { vista: "armado" }>, conj: ConjuntoCombinaciones, d: DatosVista): Escena {
+    const fs = tramosPlanta(rr.q, planta, v.armadura, conj);
+    return vistaArmado(rr, planta, v.armadura, conj, d, { ...(v.escala ? { escala: v.escala } : {}), ...(v.armado ? { armado: v.armado } : {}), ...(v.soloExceso !== undefined ? { soloExceso: v.soloExceso } : {}), ...(fs.valido ? { franjas: fs.valor } : {}) });
   }
 
   escena(planta: string, v: VistaPlanta): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
@@ -567,6 +594,26 @@ export class Sesion {
     const conj = this.conjunto(e, "lineal");
     if (!conj.valido) return conj;
     return reacciones3D(rr, this.origen3D, conj.valor, escala);
+  }
+
+  /** AB: el armado en el 3D (`armado.ts`): una planta o todas, con la base del pedido. */
+  armado3D(p: PedidoArmado3D): { valido: true; valor: Armado3D } | { valido: false; diagnosticos: Diagnostico[] } {
+    const rr = this.rr;
+    if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "El armado necesita el cálculo." }] };
+    if (p.planta !== null && !this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
+    const conj = this.conjunto(p.combinaciones, "esfuerzos");
+    if (!conj.valido) return conj;
+    return armado3D(rr, this.origen3D, p.armadura, conj.valor, { planta: p.planta, ...(p.escala ? { escala: p.escala } : {}), ...(p.armado ? { armado: p.armado } : {}), ...(p.soloExceso !== undefined ? { soloExceso: p.soloExceso } : {}) });
+  }
+
+  /** AB: el valor del mapa de armado en un punto de una planta (null: fuera de las franjas). */
+  valorArmado(p: PedidoValorArmado): { valido: true; valor: ValorArmado | null } | { valido: false; diagnosticos: Diagnostico[] } {
+    const q = this.q;
+    if (!q) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
+    if (!this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
+    const conj = this.conjunto(p.combinaciones, "esfuerzos");
+    if (!conj.valido) return conj;
+    return valorArmado(q, p.planta, p.armadura, conj.valor, p.x, p.y, p.armado);
   }
 
   /** El valor de un mapa en un punto de una lámina, en la combinación dibujada (null: sin mapa o fuera de ella). */

@@ -163,13 +163,14 @@ export class Vista2D extends Vista {
     this.escena3.add(g);
   }
 
-  encuadrar(): void {
+  /** Encuadra la escena entera o, con `caja` (AB: una zona de refuerzo), esa caja del modelo (m). */
+  encuadrar(caja?: readonly [number, number, number, number]): void {
     const e = this.escena;
     if (!e || this.rect.w < 2) {
       this.encuadrada = false;
       return;
     }
-    const [x0, y0, x1, y1] = e.caja;
+    const [x0, y0, x1, y1] = caja ?? e.caja;
     const m = this.margenes;
     const w = Math.max(20, this.rect.w - m.izq - m.der);
     const h = Math.max(20, this.rect.h - m.arriba - m.abajo);
@@ -178,7 +179,8 @@ export class Vista2D extends Vista {
     this.cx = (x0 + x1) / 2 - (m.izq - m.der) / 2 / this.s;
     this.cy = (y0 + y1) / 2 + (m.arriba - m.abajo) / 2 / this.s;
     this.encuadrada = true;
-    this.ajustada = true;
+    // Una caja elegida no es el encuadre automático: una escena nueva no la deshace
+    this.ajustada = !caja;
     this.camaraCambiada();
   }
 

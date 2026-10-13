@@ -14,7 +14,7 @@ import type { EntradaLeyenda, Estilo, Vec2 } from "../../../src/agente/render/es
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
 import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
-import type { Isovalores3D } from "../../../src/visor/isovalores3d.ts";
+import type { MallaIsovalores } from "../../../src/visor/isovalores3d.ts";
 import type { Pilares3D } from "../../../src/visor/pilares3d.ts";
 import type { Reacciones3D } from "../../../src/visor/reacciones3d.ts";
 import type { Cargas3D } from "../../../src/visor/cargas3d.ts";
@@ -65,6 +65,15 @@ let motorVisible: { motor: Motor; activa: () => number } | null = null;
 export function encuadrarActiva(): void {
   if (!motorVisible) return;
   motorVisible.motor.vista(motorVisible.activa())?.encuadrar();
+}
+
+/** AB: lleva la vista activa, si es una planta, a una caja del modelo (m) con un margen. */
+export function encuadrarCajaActiva(caja: readonly [number, number, number, number]): void {
+  const v = motorVisible?.motor.vista(motorVisible.activa());
+  if (!(v instanceof Vista2D)) return;
+  const [x0, y0, x1, y1] = caja;
+  const m = 0.25 * Math.max(x1 - x0, y1 - y0, 2);
+  v.encuadrar([x0 - m, y0 - m, x1 + m, y1 + m]);
 }
 
 /** Para el banco de Chrome: el motor y sus vistas. */
@@ -611,7 +620,7 @@ export function plantaVista(v: EstadoVista, calculado: boolean): VistaPlanta {
 /** Lo que añade un 3D con resultados (I4): diagramas, isovalores, pilares o reacciones, su leyenda, su estado y lo que hay bajo el cursor. */
 export interface Resultados3D {
   diagramas?: Diagramas3D | null;
-  isovalores?: Isovalores3D | null;
+  isovalores?: MallaIsovalores | null;
   pilares?: Pilares3D | null;
   reacciones?: Reacciones3D | null;
   leyenda?: ContenidoLeyenda | null;
@@ -731,6 +740,8 @@ const FONDO_BANDA = "#fddbc7";
 /** Lo que enseña una leyenda: sus entradas y sus notas (las de una escena o las de un 3D con resultados). */
 export interface ContenidoLeyenda {
   leyenda: readonly EntradaLeyenda[];
+  /** AB: lo que dibuja, con su unidad. */
+  tituloLeyenda?: string;
   notas: readonly string[];
 }
 
@@ -744,6 +755,11 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
       </button>
       {ver && (
         <div className="px-2.5 pb-2">
+          {escena.tituloLeyenda && (
+            <div className="mb-1 text-[11px] font-medium text-text-primary" data-titulo-leyenda>
+              {escena.tituloLeyenda}
+            </div>
+          )}
           {escena.leyenda.map((l, i) => {
             const p = l.estilo ? pintura(l.estilo, tema) : {};
             return (

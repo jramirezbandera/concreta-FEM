@@ -68,6 +68,9 @@ export interface Isovalores3D {
   notas: string[];
 }
 
+/** Lo que dibuja el 3D de unos isovalores: también el armado de AB (`armado.ts`), que no es un campo. */
+export type MallaIsovalores = Pick<Isovalores3D, "origen" | "unidad" | "triangulos" | "banda" | "lamina" | "colores" | "sinMapa" | "isolineas" | "ceros" | "extremos">;
+
 /** Un grupo de láminas que se evalúa junto: las losas de una planta o sus muros. */
 interface Grupo {
   planta: string;

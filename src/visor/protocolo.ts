@@ -15,12 +15,14 @@ import type { Alambrico } from "./alambrico.ts";
 import type { Solido } from "./solido.ts";
 import type { Diagramas3D } from "./diagramas3d.ts";
 import type { Isovalores3D } from "./isovalores3d.ts";
+import type { Armado3D, ValorArmado } from "./armado.ts";
 import type { Pilares3D } from "./pilares3d.ts";
 import type { Reacciones3D } from "./reacciones3d.ts";
 import type { Cargas3D } from "./cargas3d.ts";
 import type { DatosArmado, DatosFranja } from "./franjas.ts";
 import type { Armadura } from "../agente/render/armado.ts";
-import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
+import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
+import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
   | { tipo: "abrir"; texto: string }
@@ -47,7 +49,7 @@ export type Pedido =
   | { tipo: "pilares"; planta: string; combinaciones: EleccionCombinaciones }
   | { tipo: "pilar"; id: string; combinaciones: EleccionCombinaciones }
   /** Fase F: el mapa de una armadura de las franjas de una planta, con su tabla, y el detalle de una franja. */
-  | { tipo: "armado"; planta: string; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa }
+  | { tipo: "armado"; planta: string; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean }
   | { tipo: "franja"; id: string; combinaciones: EleccionCombinaciones }
   | { tipo: "desplomes"; combinaciones: EleccionCombinaciones }
   | { tipo: "geometria" }
@@ -61,6 +63,9 @@ export type Pedido =
   /** Las cargas de un caso en el 3D. */
   | { tipo: "cargas3d"; caso: string; escala?: number }
   | ({ tipo: "valor-lamina" } & PedidoValorLamina)
+  /** AB: el armado en el 3D y el valor de un punto de su mapa. */
+  | ({ tipo: "armado3d" } & PedidoArmado3D)
+  | ({ tipo: "valor-armado" } & PedidoValorArmado)
   | { tipo: "revision"; firmas: string; ficheroFirmas: string }
   /** Adelanta la recuperación SPR de una planta (la primera vez cuesta ~0,3 s en el edificio objetivo). */
   | { tipo: "precalentar"; planta: string };
@@ -96,6 +101,8 @@ export interface Respuestas {
   reacciones3d: Reacciones3D;
   cargas3d: Cargas3D;
   "valor-lamina": ValorLamina | null;
+  armado3d: Armado3D;
+  "valor-armado": ValorArmado | null;
   revision: DatosRevision;
   precalentar: null;
 }

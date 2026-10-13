@@ -301,9 +301,12 @@ export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
       if (v === undefined || v === "") delete q[k];
       else q[k] = v;
     }
+    // Sólo si cambian: lo que no cambia sigue siendo el mismo objeto (la app compara referencias)
     const vs = s.proyecto.vistas;
-    if (!vs?.length) delete q.vistas;
-    else q.vistas = [...vs];
+    if (vs !== p.vistas) {
+      if (!vs?.length) delete q.vistas;
+      else q.vistas = [...vs];
+    }
     if (s.proyecto.armado) q.armado = s.proyecto.armado;
     else delete q.armado;
   }

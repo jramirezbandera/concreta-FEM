@@ -11,6 +11,8 @@
  *   cada tecla), pero no calcula: calcular es un botón.
  * - El proyecto que se edita está en el hilo principal (`historial`); el worker recibe su texto
  *   canónico. Deshacer devuelve el proyecto anterior tal cual.
+ * - AB: un cambio que sólo toca la armadura base (`armado`) no reabre el proyecto ni pierde los
+ *   resultados: no entra en la huella, y las pantallas la mandan en sus pedidos.
  * - Nunca se pisa nada en silencio: si el fichero cambia en el disco con cambios sin guardar, no se
  *   recarga ni se sobrescribe; se avisa (`conflicto`) y el ingeniero elige.
  */
@@ -96,6 +98,15 @@ export const VIGILANCIA_MS = 1000;
  */
 export const PAUSA_COMPILAR_MS = 150;
 
+/** ¿Difieren dos proyectos sólo en la armadura base? (el editor copia sólo lo que cambia: basta comparar referencias) */
+export function soloArmado(a: Proyecto | null, b: Proyecto): boolean {
+  if (!a) return false;
+  const claves = new Set([...Object.keys(a), ...Object.keys(b)]);
+  claves.delete("armado");
+  for (const k of claves) if ((a as unknown as Record<string, unknown>)[k] !== (b as unknown as Record<string, unknown>)[k]) return false;
+  return true;
+}
+
 export function useProyecto(): ProyectoAbierto {
   const [fase, setFase] = useState<Fase>("vacio");
   const [estado, setEstado] = useState<EstadoSesion | null>(null);
@@ -119,6 +130,8 @@ export function useProyecto(): ProyectoAbierto {
   const histRef = useRef<Historial | null>(null);
   const sinGuardarRef = useRef(false);
   const temporizador = useRef<number | null>(null);
+  /** El proyecto que tiene el worker (el último que se le mandó a abrir). */
+  const cargado = useRef<Proyecto | null>(null);
 
   const sinGuardar = !!hist && hist.actual !== enDisco;
   sinGuardarRef.current = sinGuardar;
@@ -206,6 +219,7 @@ export function useProyecto(): ProyectoAbierto {
     const l = leerProyecto(texto);
     const h = l.valido ? nuevoHistorial(l.proyecto) : null;
     histRef.current = h;
+    cargado.current = h?.actual ?? null;
     setHist(h);
     setEnDisco(h?.actual ?? null);
     setConflicto(null);
@@ -250,6 +264,7 @@ export function useProyecto(): ProyectoAbierto {
   const recalcular = useCallback(() => {
     const h = histRef.current;
     const texto = h ? serializar(h.actual) : ultimo.current?.texto;
+    if (h) cargado.current = h.actual;
     if (texto !== undefined && fuente) void cargar(texto, fuente, { sinGuardados: true });
   }, [cargar, fuente]);
 
@@ -283,6 +298,9 @@ export function useProyecto(): ProyectoAbierto {
   /** Compila la versión editada tras una pausa; los resultados se marcan como desactualizados ya. */
   const programar = useCallback(
     (p: Proyecto) => {
+      // Sólo cambió la armadura base: el worker sigue con su proyecto y sus resultados
+      if (soloArmado(cargado.current, p)) return;
+      cargado.current = p;
       // Antes de nada: lo que se ve ya no es de esta versión, y lo que llegue de antes se descarta
       gen.current++;
       setDesactualizado(true);

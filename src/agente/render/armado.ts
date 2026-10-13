@@ -55,6 +55,8 @@ export interface OpcionesArmado {
   armado?: ArmadoProyecto;
   /** Con base, sólo lo que no cubre (AB-g; por defecto, sí). */
   soloExceso?: boolean;
+  /** Los tramos de la planta ya calculados (`franjasTramos`), para no repetirlos (el visor los guarda). */
+  franjas?: FranjaTramos[];
 }
 
 /** Lo que dibuja el mapa de armado de una planta: tramos, zonas y la escala; lo comparten la planta y el 3D. */
@@ -137,7 +139,7 @@ export function mapaArmado(fs: FranjaTramos[], armadura: Armadura, op: OpcionesA
 export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armadura, conjunto: ConjuntoCombinaciones, d: DatosVista, op: OpcionesArmado = {}): Escena {
   const pl = new PlantaFisica(r.q.fisico, planta);
   const P: Primitiva[] = [...fondoModelo(pl, { atenuado: true }).primitivas];
-  const fs = franjasTramos(r.q, losasDe(r.q, { planta }), armadura, conjunto);
+  const fs = op.franjas ? { valido: true as const, valor: op.franjas } : franjasTramos(r.q, losasDe(r.q, { planta }), armadura, conjunto);
   const m = mapaArmado(fs.valido ? fs.valor : [], armadura, op);
   const superior = caraDe(armadura) === "superior";
   const notas: string[] = [...m.notas];

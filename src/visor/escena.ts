@@ -54,6 +54,7 @@ export interface EscenaPreparada {
   /** Las líneas con un rótulo que se repite (isolíneas): sus rótulos, con `rotulosLineas` en cada escala. */
   lineasRotuladas: LineaRotulada[];
   leyenda: Escena["leyenda"];
+  tituloLeyenda?: string;
   notas: string[];
   extremos: Escena["extremos"];
   caja: Escena["caja"];
@@ -174,6 +175,7 @@ export function prepararEscena(e: Escena): EscenaPreparada {
     textos,
     lineasRotuladas,
     leyenda: e.leyenda,
+    ...(e.tituloLeyenda ? { tituloLeyenda: e.tituloLeyenda } : {}),
     notas: e.notas,
     extremos: e.extremos,
     caja: e.caja,
