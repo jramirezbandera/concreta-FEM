@@ -85,7 +85,7 @@ export class Atendedor {
       case "pilar":
         return de(datosPilar(s, p.id, p.combinaciones));
       case "armado":
-        return de(datosArmado(s, p.planta, p.combinaciones, p.armadura, { ...(p.escala ? { escala: p.escala } : {}), ...(p.armado ? { armado: p.armado } : {}), ...(p.soloExceso !== undefined ? { soloExceso: p.soloExceso } : {}) }));
+        return de(datosArmado(s, p.planta, p.combinaciones, p.armadura, { ...(p.escala ? { escala: p.escala } : {}), ...(p.armado ? { armado: p.armado } : {}), ...(p.soloExceso !== undefined ? { soloExceso: p.soloExceso } : {}), ...(p.filtro ? { filtro: p.filtro } : {}) }));
       case "armado3d":
         return de(s.armado3D(p));
       case "valor-armado":

@@ -16,7 +16,7 @@ import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones,
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
-import { vistaArmado, type Armadura } from "../agente/render/armado.ts";
+import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/armado.ts";
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { armado3D, tramosPlanta, valorArmado, type Armado3D, type ValorArmado } from "./armado.ts";
@@ -67,7 +67,7 @@ export type VistaPlanta =
   | { vista: "pilares-n"; combinaciones: EleccionCombinaciones }
   /** Fase F: la demanda de Wood–Armer de una armadura de las franjas de la planta. */
   /** AB: la armadura base va en el pedido (la del proyecto que se edita), así que cambiarla no reabre la sesión. */
-  | { vista: "armado"; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean }
+  | { vista: "armado"; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean; filtro?: FiltroArmado }
   /** Las reacciones de los objetos de la planta (I4); `escala`, la de las flechas horizontales. */
   | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number };
 
@@ -127,6 +127,7 @@ export interface PedidoArmado3D {
   escala?: EscalaMapa;
   armado?: ArmadoProyecto;
   soloExceso?: boolean;
+  filtro?: FiltroArmado;
 }
 
 /** AB: el valor del mapa de armado en un punto (m, globales) de una planta. */
@@ -489,7 +490,7 @@ export class Sesion {
 
   private vistaArmado(rr: ResultadosRender, planta: string, v: Extract<VistaPlanta, { vista: "armado" }>, conj: ConjuntoCombinaciones, d: DatosVista): Escena {
     const fs = tramosPlanta(rr.q, planta, v.armadura, conj);
-    return vistaArmado(rr, planta, v.armadura, conj, d, { ...(v.escala ? { escala: v.escala } : {}), ...(v.armado ? { armado: v.armado } : {}), ...(v.soloExceso !== undefined ? { soloExceso: v.soloExceso } : {}), ...(fs.valido ? { franjas: fs.valor } : {}) });
+    return vistaArmado(rr, planta, v.armadura, conj, d, { ...(v.escala ? { escala: v.escala } : {}), ...(v.armado ? { armado: v.armado } : {}), ...(v.soloExceso !== undefined ? { soloExceso: v.soloExceso } : {}), ...(v.filtro ? { filtro: v.filtro } : {}), ...(fs.valido ? { franjas: fs.valor } : {}) });
   }
 
   escena(planta: string, v: VistaPlanta): { valido: true; valor: EscenaPreparada } | { valido: false; diagnosticos: Diagnostico[] } {
@@ -603,7 +604,7 @@ export class Sesion {
     if (p.planta !== null && !this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
     const conj = this.conjunto(p.combinaciones, "esfuerzos");
     if (!conj.valido) return conj;
-    return armado3D(rr, this.origen3D, p.armadura, conj.valor, { planta: p.planta, ...(p.escala ? { escala: p.escala } : {}), ...(p.armado ? { armado: p.armado } : {}), ...(p.soloExceso !== undefined ? { soloExceso: p.soloExceso } : {}) });
+    return armado3D(rr, this.origen3D, p.armadura, conj.valor, { planta: p.planta, ...(p.escala ? { escala: p.escala } : {}), ...(p.armado ? { armado: p.armado } : {}), ...(p.soloExceso !== undefined ? { soloExceso: p.soloExceso } : {}), ...(p.filtro ? { filtro: p.filtro } : {}) });
   }
 
   /** AB: el valor del mapa de armado en un punto de una planta (null: fuera de las franjas). */

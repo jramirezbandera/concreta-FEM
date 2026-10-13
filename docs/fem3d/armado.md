@@ -97,13 +97,14 @@
   - su área.
 - **La extensión es la de sus tramos** (AB-d): cada estación cubre hasta la mitad de sus vecinas, así que el borde tiene una precisión de ±Δs/2 = 0,125 m. No incluye anclajes ni solapes.
 - **Interruptor** «Todo / Lo que no cubre la base»: con base, empieza en lo segundo (AB-g).
+  - **Sustituido el 2026-10-13** (decisión del usuario, §2.9): el mapa sale siempre entero. «Lo que no cubre» queda como opción `soloExceso` del motor, pero la app no la usa.
 
 ### 2.7 Consulta, CLI y app
 
 - **`Consultas.refuerzos`** (planta o losa, y armadura) con las bases del proyecto: las zonas de §2.6. En la CLI, `fem consultar refuerzos --planta <p> --armadura x-inf`.
 - **`fem render`** de las vistas `armado-…` lee la base del proyecto.
 - **En la app:**
-  - en la barra, el selector de armadura y el interruptor de §2.6;
+  - en la barra, el selector de armadura (el interruptor de §2.6, quitado el 2026-10-13: §2.9);
   - en Propiedades, sin nada elegido, la sección «Armadura base»: la común y una fila por losa de la planta, con las cuatro armaduras. Una celda vacía usa la común;
   - en el panel inferior, junto a Franjas, la pestaña «Refuerzos»: una fila por zona. Un clic la elige y la encuadra.
 - **Skill del agente:** la base es una decisión del ingeniero. El agente la lee y la usa en las consultas, pero no la inventa.
@@ -115,6 +116,25 @@
 - Proponer automáticamente la base.
 - El título de leyenda en los demás mapas (Losas, Vigas…): se propondrá aparte, porque cambia sus SVG.
 
+### 2.9 Escala y filtro (2026-10-13, a petición del usuario)
+
+Con demandas de órdenes muy distintos (un pico de 1 000 kN·m/m junto a losas de 20), la escala completa deja casi todo en la primera banda. Y el interruptor de §2.6 escondía el mapa entero.
+
+- **Siempre todo:** sin interruptor. Con base, las zonas de refuerzo llevan su contorno sobre el mapa entero, con los picos rotulados.
+- **Escala,** en Propiedades, la misma de Losas (`componentes/escala.tsx`):
+  - completa;
+  - sin picos: sin el 1 % del área de lo que se colorea, sólo por arriba (por abajo, la escala sigue en 0). Los tramos pesan por su área. Con la completa se avisa si el máximo pasa de 2,5 veces el de sin picos;
+  - manual: mínimo, máximo y paso.
+
+  Lo que se sale va rayado, en la banda «más de…» o «menos de…», como en los mapas de las losas.
+- **Filtro,** en Propiedades: «desde» y «hasta» (kN·m/m; cualquiera vacío, sin límite).
+  - Se colorea sólo lo que está dentro, con su escala; lo demás, en gris y sin rótulos.
+  - Con una base común en la planta, el botón «Desde la base» da lo que había que ver con «Lo que no cubre».
+  - La leyenda lo dice («filtrado (menos de 15)»).
+- La escala y el filtro son de cada armadura, van en cada pedido (planta y 3D) y no recalculan.
+- **Motor:** `OpcionesArmado.filtro` y la escala `sin-picos` en `mapaArmado`; `soloExceso` pasa a ser por defecto `false`, también en `fem render`.
+- **Validación:** `src/agente/refuerzos.test.ts` (filtro, sin picos y manual), `src/visor/armado.test.ts` (el área en gris del 3D es la de lo filtrado y lo cubierto), `app/src/test/armado.test.tsx` (el filtro y la escala van en el pedido) y el banco de Chrome de AB, en verde.
+
 ## 3. Decisiones por defecto
 
 | # | Decisión | Por defecto | Por qué | Alternativa |
@@ -125,7 +145,7 @@
 | AB-d | Extensión de una zona | **La de sus tramos** (±0,125 m) | Es lo que se dibuja y no inventa un valor entre estaciones | Interpolar dónde la demanda cruza la base |
 | AB-e | Dónde se da la base | **Común y por losa** (decisión del usuario) | — | — |
 | AB-f | Rótulo con base | **«v (+exceso)»** (decisión del usuario) | — | — |
-| AB-g | Qué se ve con base | **Lo que no cubre**, con un interruptor | Es para lo que se pone la base | Todo |
+| AB-g | Qué se ve con base | ~~Lo que no cubre, con un interruptor~~ **Todo**, con un filtro (el usuario, 2026-10-13, §2.9) | Con el interruptor no se veía el resto del mapa | Lo que no cubre |
 
 ## 4. Criterios de paso
 

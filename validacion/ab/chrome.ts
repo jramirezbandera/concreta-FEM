@@ -196,7 +196,7 @@ try {
   const planta = await pagina<string>(`return document.querySelector("table[aria-label='Franjas de la planta']").closest("section").querySelector("h2 span").textContent.replace("Franjas de ", "");`);
   await pagina(`[...document.querySelectorAll(".dock-tab")].find((b) => b.textContent.startsWith("Refuerzos")).click(); await __ab.esperar(() => document.querySelector("table[aria-label='Zonas de refuerzo']"));`);
   const zp = await pagina<{ id: string; maximo: string; exceso: string }[]>(`return __ab.zonas();`);
-  const dn = datosArmado(ses, planta, { tipo: "defecto" }, "x-sup", { armado: BASE, soloExceso: true });
+  const dn = datosArmado(ses, planta, { tipo: "defecto" }, "x-sup", { armado: BASE });
   if (!dn.valido) throw new Error(JSON.stringify(dn.diagnosticos));
   const zn = dn.valor.zonas;
   comprobar(zn.length > 0 && zn.length === zp.length && zn.every((z, i) => z.id === zp[i]!.id && String(z.maximo.v) === zp[i]!.maximo && String(z.maximo.exceso) === zp[i]!.exceso), `las ${zp.length} zonas de refuerzo de ${planta} (X superior, base 20) son las de Node bit a bit`);
@@ -240,7 +240,7 @@ try {
   const huella1 = await pagina<string>(`return __ab.huella();`);
   comprobar(huella1 === huella0 && estados.every((e) => e === "calculado"), `la huella sigue (${huella1.slice(0, 12)}) y la app no pasa por otro estado que «calculado» (${estados.join(" → ")})`);
   const zp2 = await pagina<{ id: string; maximo: string; exceso: string }[]>(`return __ab.zonas();`);
-  const dn2 = datosArmado(ses, planta, { tipo: "defecto" }, "x-sup", { armado: { base: { "x-sup": 25 } }, soloExceso: true });
+  const dn2 = datosArmado(ses, planta, { tipo: "defecto" }, "x-sup", { armado: { base: { "x-sup": 25 } } });
   if (!dn2.valido) throw new Error(JSON.stringify(dn2.diagnosticos));
   comprobar(dn2.valor.zonas.length === zp2.length && dn2.valor.zonas.every((z, i) => z.id === zp2[i]!.id && String(z.maximo.v) === zp2[i]!.maximo && String(z.maximo.exceso) === zp2[i]!.exceso), `con la base en 25, las ${zp2.length} zonas son las de Node bit a bit; salen en ${(ms5 / 1000).toFixed(2)} s`);
   comprobar((await largasDesde(tb)).every((x) => x.ms <= 50), `cambiar la base, sin tareas largas > 50 ms`);
@@ -249,7 +249,7 @@ try {
   // ─── 6. Criterio 6: el 3D ─────────────────────────────────────────────────────────────────────
   log("\nCriterio 6 · El armado en 3D");
   // Al pasar la vista a 3D, enseña todas las plantas (como Losas): la escala común
-  const n3 = ses.armado3D({ armadura: "x-sup", combinaciones: { tipo: "defecto" }, planta: null, armado: { base: { "x-sup": 25 } }, soloExceso: true });
+  const n3 = ses.armado3D({ armadura: "x-sup", combinaciones: { tipo: "defecto" }, planta: null, armado: { base: { "x-sup": 25 } } });
   if (!n3.valido) throw new Error(JSON.stringify(n3.diagnosticos));
   const tri = n3.valor.triangulos.length / 9;
   const t6 = await ahora();

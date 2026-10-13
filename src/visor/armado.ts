@@ -13,7 +13,7 @@
 import { baseDe, type ArmadoProyecto } from "../agente/armaduraBase.ts";
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { franja as consultaFranja, type EstacionFranjaEnvolvente } from "../agente/consultas.ts";
-import { mapaArmado, tituloArmado, UNIDAD_ARMADO, type OpcionesArmado } from "../agente/render/armado.ts";
+import { escalaArmado, mapaArmado, tituloArmado, UNIDAD_ARMADO, type OpcionesArmado } from "../agente/render/armado.ts";
 import type { EntradaLeyenda, EscalaDibujada } from "../agente/render/escena.ts";
 import type { ResultadosRender } from "../agente/render/resultados.ts";
 import { franjasTramos, losasDe, type Armadura, type FranjaTramos, type TramoArmado } from "../agente/refuerzos.ts";
@@ -153,13 +153,12 @@ export function armado3D(r: ResultadosRender, origen: [number, number, number], 
       for (const f of fs.valor)
         if (f.franja.planta === p)
           for (const t of f.tramos)
-            if (t.v > (mx?.v ?? 0)) {
+            if (t.v > (mx?.v ?? 0) && !m.filtrado(t)) {
               mx = t;
               objeto = t.franja;
             }
     if (mx) extremos.push({ que: "máximo", valor: mx.v, objeto, punto: centro(mx) });
   }
-  const lm = m.limites;
   const notas = [...m.notas, op.planta === null ? `Todas las plantas con losas macizas o reticulares (${plantas.length}), con una escala común.` : `Planta ${op.planta}: la misma escala que su vista en planta.`];
   return {
     valido: true,
@@ -179,20 +178,7 @@ export function armado3D(r: ResultadosRender, origen: [number, number, number], 
       ceros: new Float32Array(0),
       extremos,
       zonas: m.zonas.length,
-      ...(lm
-        ? {
-            mapa: {
-              limites: lm.L.slice(lm.fueraAbajo ? 1 : 0, lm.fueraArriba ? lm.L.length - 1 : lm.L.length),
-              paso: lm.paso,
-              fueraAbajo: lm.fueraAbajo,
-              fueraArriba: lm.fueraArriba,
-              picos: false,
-              minimo: Math.min(...m.coloreados.map((x) => x.t.v)),
-              maximo: Math.max(...m.coloreados.map((x) => x.t.v)),
-              combinacion: "",
-            },
-          }
-        : {}),
+      ...escalaArmado(m),
       leyenda: m.leyenda,
       notas,
     },

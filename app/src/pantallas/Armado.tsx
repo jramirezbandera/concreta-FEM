@@ -15,16 +15,17 @@
  */
 import { useEffect, useState } from "react";
 import { ARMADURAS as LISTA_ARMADURAS, baseDe, hayBase, type ArmadoProyecto, type BasesArmado } from "../../../src/agente/armaduraBase.ts";
-import { NOMBRE_CORTO, UNIDAD_ARMADO, type Armadura } from "../../../src/agente/render/armado.ts";
+import { NOMBRE_CORTO, UNIDAD_ARMADO, type Armadura, type FiltroArmado, type OpcionesArmado } from "../../../src/agente/render/armado.ts";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { DemandaFranja, EstacionFranjaEnvolvente, FilaRefuerzo } from "../../../src/agente/consultas.ts";
 import { leerNumero, textoNumero } from "../../../src/editor/celdas.ts";
 import type { ValorArmado } from "../../../src/visor/armado.ts";
 import type { DatosFranja } from "../../../src/visor/franjas.ts";
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
-import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
+import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, ComboCombinaciones, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { escalaDe, SeccionEscala, type EscalaElegida } from "../componentes/escala.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
@@ -39,7 +40,8 @@ import { useEleccion } from "./useEleccion.ts";
 const ARMADURAS: { id: Armadura; nombre: string }[] = LISTA_ARMADURAS.map((id) => ({ id, nombre: NOMBRE_CORTO[id] }));
 const U = UNIDAD_ARMADO;
 
-type Ver = "exceso" | "todo";
+/** Lo que va en cada pedido del mapa: la base, la escala y el filtro (no reabren la sesión). */
+type OpMapa = Pick<OpcionesArmado, "armado" | "escala" | "filtro">;
 type Punto = { p: Vec2; v: ValorArmado | null; planta: string; clave: string };
 
 /** Una demanda con su estación y su combinación (si hay más de una). */
@@ -85,9 +87,10 @@ function EscenaArmado({ fuente, objetos, marcas, onPunto }: { fuente: FuenteEsce
 }
 
 /** El armado en un 3D: el de la planta de su cabecera o el de todas; bajo el cursor, el valor del punto. */
-function TresDArmado({ planta, armadura, eleccion, armado, soloExceso }: { planta: string | null; armadura: Armadura; eleccion: EleccionCombinaciones; armado: ArmadoProyecto | undefined; soloExceso: boolean | undefined }) {
+function TresDArmado({ planta, armadura, eleccion, op }: { planta: string | null; armadura: Armadura; eleccion: EleccionCombinaciones; op: OpMapa }) {
   const { proyecto } = useVisor();
-  const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "armado3d", armadura, combinaciones: eleccion, planta, ...(armado ? { armado } : {}), ...(soloExceso !== undefined ? { soloExceso } : {}) });
+  const armado = op.armado;
+  const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "armado3d", armadura, combinaciones: eleccion, planta, ...op });
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Cortando las franjas…</Aviso> : null;
   const datos = proyecto.desactualizado ? null : d.datos;
   const cliente = proyecto.cliente;
@@ -102,7 +105,7 @@ function TresDArmado({ planta, armadura, eleccion, armado, soloExceso }: { plant
           return v ? [`${fmt(v.valor, 1)} ${U}${v.exceso !== null ? ` (${v.exceso > 0 ? "+" : ""}${fmt(v.exceso, 1)} sobre la base)` : ""}`, `${v.franja} · s = ${fmt(v.s, 2)} m · ${v.comb}`] : ["fuera de las franjas"];
         }
       : null,
-    JSON.stringify([planta, armadura, eleccion, armado, soloExceso, datos?.plantas]),
+    JSON.stringify([planta, armadura, eleccion, op, datos?.plantas]),
   );
   return <Fuente3DModelo resultados={{ isovalores: datos, leyenda: datos, aviso, cargando: d.cargando, alPasar, sonda }} />;
 }
@@ -354,7 +357,7 @@ function SeccionBase({ planta, armadura }: { planta: string | null; armadura: Ar
           {losas.map(fila)}
         </tbody>
       </table>
-      <p className="nota">El momento que cubre la armadura base de cada losa. Vacía, la de «Todas» (en gris). Con base, el mapa deja en gris lo cubierto y marca las zonas de refuerzo. Se guarda en el proyecto, fuera del cálculo: cambiarla no recalcula.</p>
+      <p className="nota">El momento que cubre la armadura base de cada losa. Vacía, la de «Todas» (en gris). Con base, el mapa contornea las zonas de refuerzo (lo que la supera); para ver sólo eso, el filtro «desde la base». Se guarda en el proyecto, fuera del cálculo: cambiarla no recalcula.</p>
     </Seccion>
   );
 }
@@ -383,6 +386,83 @@ function DetalleZona({ z, varias }: { z: FilaRefuerzo; varias: boolean }) {
   );
 }
 
+/** La base de la armadura si todas las losas de la lista tienen la misma (null si no hay o varía). */
+function numeroBase(armado: ArmadoProyecto | undefined, losas: readonly string[], a: Armadura): number | null {
+  const bs = [...new Set(losas.map((l) => baseDe(armado, l, a)))];
+  return bs.length === 1 ? bs[0]! : null;
+}
+
+/** «≥ 15», «≤ 40» o «15 a 40», en kN·m/m. */
+const textoFiltro = (f: FiltroArmado): string => (f.min !== undefined && f.max !== undefined ? `${fmt(f.min, 1)} a ${fmt(f.max, 1)}` : f.min !== undefined ? `≥ ${fmt(f.min, 1)}` : `≤ ${fmt(f.max!, 1)}`);
+
+/**
+ * El filtro del mapa: se colorea sólo lo que está entre «desde» y «hasta» (cualquiera vacío, sin
+ * límite); lo demás, en gris. Se aplica con Intro o al salir del campo.
+ */
+function SeccionFiltro({ filtro, base, onCambio }: { filtro: FiltroArmado | undefined; base: number | null; onCambio: (f: FiltroArmado | undefined) => void }) {
+  const texto = (n: number | undefined) => (n === undefined ? "" : textoNumero(n));
+  const [borrador, setBorrador] = useState({ min: texto(filtro?.min), max: texto(filtro?.max) });
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setBorrador({ min: texto(filtro?.min), max: texto(filtro?.max) }), [filtro?.min, filtro?.max]);
+  const poner = (min: number | undefined, max: number | undefined) => {
+    if (min !== undefined && max !== undefined && !(min < max)) return setError(`«Desde» (${fmt(min, 1)}) tiene que ser menor que «hasta» (${fmt(max, 1)}).`);
+    setError(null);
+    const nuevo: FiltroArmado | undefined = min === undefined && max === undefined ? undefined : { ...(min !== undefined ? { min } : {}), ...(max !== undefined ? { max } : {}) };
+    if (nuevo?.min !== filtro?.min || nuevo?.max !== filtro?.max) onCambio(nuevo);
+  };
+  const aplicar = () => {
+    const v: (number | undefined)[] = [];
+    for (const k of ["min", "max"] as const) {
+      const t = borrador[k].trim();
+      if (t === "") v.push(undefined);
+      else {
+        const x = leerNumero(t);
+        if (typeof x === "string") return setError(x);
+        v.push(x);
+      }
+    }
+    poner(v[0], v[1]);
+  };
+  const entrada = (k: "min" | "max", etiqueta: string) => (
+    <label className="flex flex-col gap-0.5 text-[11px] text-text-secondary">
+      {etiqueta}
+      <input
+        type="text"
+        inputMode="decimal"
+        className="sel w-[84px] text-right mono"
+        aria-label={`${etiqueta} del filtro`}
+        placeholder="—"
+        value={borrador[k]}
+        onChange={(ev) => setBorrador({ ...borrador, [k]: ev.target.value })}
+        onBlur={aplicar}
+        onKeyDown={(ev) => ev.key === "Enter" && aplicar()}
+      />
+    </label>
+  );
+  return (
+    <Seccion titulo="Filtro" valor={filtro ? `${textoFiltro(filtro)} ${U}` : "todo"}>
+      <div className="flex flex-col gap-2 px-3.5 py-2">
+        <div className="flex items-end gap-2">
+          {entrada("min", "Desde")}
+          {entrada("max", "Hasta")}
+          {filtro && (
+            <button type="button" className="btn" style={{ height: 28 }} onClick={() => poner(undefined, undefined)}>
+              Quitar
+            </button>
+          )}
+        </div>
+        {base !== null && filtro?.min !== base && (
+          <button type="button" className="btn self-start" onClick={() => poner(base, filtro?.max)} title="Colorea sólo lo que supera la armadura base: lo que hay que reforzar">
+            Desde la base ({fmt(base, 1)})
+          </button>
+        )}
+        {error && <Aviso tono="fail">{error}</Aviso>}
+      </div>
+      <p className="nota">Se colorea sólo lo que está en el rango ({U}), con la escala de eso; lo demás, en gris. Vacío, sin límite.</p>
+    </Seccion>
+  );
+}
+
 export function ModoArmado() {
   const { proyecto, planta, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:armado", { props: true, dock: true, pestana: "franjas" });
@@ -396,13 +476,18 @@ export function ModoArmado() {
   const e = proyecto.estado!;
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [armadura, setArmadura] = useState<Armadura>("x-sup");
-  const [ver, setVer] = useState<Ver>("exceso");
+  // La escala y el filtro de cada armadura (sus valores son de órdenes distintos)
+  const [escalas, setEscalas] = useState<Partial<Record<Armadura, EscalaElegida>>>({});
+  const [filtros, setFiltros] = useState<Partial<Record<Armadura, FiltroArmado>>>({});
   const [punto, setPunto] = useState<Punto | null>(null);
   // La base es la del proyecto que se edita (va en cada pedido: cambiarla no reabre la sesión)
   const armado = proyecto.edicion?.proyecto.armado;
   const conBase = hayBase(armado, armadura);
-  const opBase = { ...(armado ? { armado } : {}), ...(conBase ? { soloExceso: ver === "exceso" } : {}) };
-  const r = usePedido(proyecto.cliente, proyecto.desactualizado || !planta ? null : { tipo: "armado", planta, combinaciones: eleccion, armadura, ...opBase });
+  const escalaElegida: EscalaElegida = escalas[armadura] ?? { modo: "completa" };
+  const escala = escalaDe(escalaElegida);
+  const filtro = filtros[armadura];
+  const op: OpMapa = { ...(armado ? { armado } : {}), ...(escala ? { escala } : {}), ...(filtro ? { filtro } : {}) };
+  const r = usePedido(proyecto.cliente, proyecto.desactualizado || !planta ? null : { tipo: "armado", planta, combinaciones: eleccion, armadura, ...op });
   const d = proyecto.desactualizado ? null : r.datos;
   const ids = d ? new Set(d.filas.map((f) => f.id)) : null;
   const zonas = d?.zonas ?? [];
@@ -432,16 +517,6 @@ export function ModoArmado() {
     <>
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
       <Desplegable etiqueta="Armadura" valor={armadura} onCambio={setArmadura} opciones={ARMADURAS} />
-      <Segmentado
-        etiqueta="Base"
-        opciones={[
-          { id: "exceso", nombre: "Lo que no cubre", title: "Con armadura base: lo cubierto en gris y las zonas de refuerzo, con su máximo y el exceso" },
-          { id: "todo", nombre: "Todo", title: "El mapa entero, con los picos de cada franja (y el contorno de las zonas de refuerzo, si hay base)" },
-        ]}
-        valor={conBase ? ver : "todo"}
-        onCambio={setVer}
-        deshabilitada={() => !conBase}
-      />
       <Separador />
       <BarraModos />
       <Separador />
@@ -453,6 +528,8 @@ export function ModoArmado() {
     <Chip acento title="Momento de dimensionado de Wood–Armer por metro de franja. X es la dirección 1 de cada losa (su eje 1) e Y, la perpendicular">
       Armado · {NOMBRE_CORTO[armadura]} · {U}
       {conBase && base !== null && ` · base ${base}`}
+      {filtro && ` · ${textoFiltro(filtro)}`}
+      {escalaElegida.modo !== "completa" && ` · ${escalaElegida.modo === "sin-picos" ? "sin picos" : "escala manual"}`}
     </Chip>
   );
 
@@ -478,10 +555,10 @@ export function ModoArmado() {
         planta: (v) => {
           const pl = v.planta;
           const marcas: Marca[] = punto && pl && punto.planta === pl && punto.clave === clave(pl) ? [{ p: punto.p, texto: punto.v ? `${fmt(punto.v.valor, 1)} ${U}` : "fuera" }] : [];
-          return <EscenaArmado fuente={pl ? { tipo: "planta", planta: pl, vista: { vista: "armado", combinaciones: eleccion, armadura, ...opBase } } : null} objetos={objetos} marcas={marcas} onPunto={(p, x) => void clic(p, x)} />;
+          return <EscenaArmado fuente={pl ? { tipo: "planta", planta: pl, vista: { vista: "armado", combinaciones: eleccion, armadura, ...op } } : null} objetos={objetos} marcas={marcas} onPunto={(p, x) => void clic(p, x)} />;
         },
         cabeceraPlanta: (v, i) => cabecera(v, i),
-        tresD: (v) => <TresDArmado planta={v.planta} armadura={armadura} eleccion={eleccion} armado={armado} soloExceso={opBase.soloExceso} />,
+        tresD: (v) => <TresDArmado planta={v.planta} armadura={armadura} eleccion={eleccion} op={op} />,
         cabecera3D: () => chip,
       }}
     />
@@ -604,6 +681,8 @@ export function ModoArmado() {
       <Seccion titulo="Valor en el punto">
         <ValorPunto punto={puntoValido} armadura={armadura} varias={varias} />
       </Seccion>
+      <SeccionEscala key={armadura} mapa={d?.escena.mapa} unidad={U} elegida={escalaElegida} onCambio={(x) => setEscalas((m) => ({ ...m, [armadura]: x }))} lados="arriba" />
+      <SeccionFiltro key={`f${armadura}`} filtro={filtro} base={numeroBase(armado, losasPlanta, armadura)} onCambio={(x) => setFiltros((m) => ({ ...m, [armadura]: x }))} />
       {zona && <DetalleZona z={zona} varias={varias} />}
       {detalle ? <DetalleFranja d={detalle} varias={varias} base={baseFranja(detalle.franja.losa)} /> : elegida && rf.cargando ? <p className="nota">Cortando la franja…</p> : null}
       {!zona && !detalle && <SeccionBase planta={planta} armadura={armadura} />}

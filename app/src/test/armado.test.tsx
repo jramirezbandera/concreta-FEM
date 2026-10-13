@@ -186,6 +186,48 @@ describe("Fase AB · la armadura base y las zonas de refuerzo en el DOM", () => 
     expect(comun.getAttribute("aria-invalid")).toBe("true");
   }, 60_000);
 
+  it("siempre todo (sin «Lo que no cubre»); el filtro y la escala de Propiedades van en el pedido del mapa", async () => {
+    const planta = MODELO.losas![0]!.planta;
+    const pedidos: Pedido[] = [];
+    const original = at.atender.bind(at);
+    at.atender = (p: Pedido) => {
+      pedidos.push(p);
+      return original(p);
+    };
+    try {
+      montar(planta, null, edicion(proyectoBase({ base: { "x-sup": 15 } }), () => {}));
+      const mapas = () => pedidos.filter((p): p is Extract<Pedido, { tipo: "armado" }> => p.tipo === "armado");
+      await waitFor(() => expect(mapas().length).toBeGreaterThan(0));
+      expect(screen.queryByRole("button", { name: "Lo que no cubre" })).toBeNull();
+      expect(mapas().every((p) => p.soloExceso === undefined && p.filtro === undefined && p.escala === undefined)).toBe(true);
+      // «Desde la base»: el filtro desde 15
+      (await waitFor(() => screen.getByRole("button", { name: /^Desde la base \(15/ }))).click();
+      await waitFor(() => expect(mapas().some((p) => p.filtro?.min === 15 && p.filtro.max === undefined)).toBe(true));
+      expect((screen.getByRole("textbox", { name: "Desde del filtro" }) as HTMLInputElement).value).toBe("15");
+      // Un «hasta» por debajo del «desde» no se manda
+      const n = mapas().length;
+      const hasta = screen.getByRole("textbox", { name: "Hasta del filtro" });
+      fireEvent.change(hasta, { target: { value: "10" } });
+      fireEvent.blur(hasta);
+      expect(screen.getByText(/tiene que ser menor que «hasta»/)).toBeTruthy();
+      expect(mapas().length).toBe(n);
+      fireEvent.change(hasta, { target: { value: "40" } });
+      fireEvent.blur(hasta);
+      await waitFor(() => expect(mapas().some((p) => p.filtro?.min === 15 && p.filtro.max === 40)).toBe(true));
+      // La escala sin picos, y quitar el filtro
+      within(screen.getByRole("group", { name: "Escala del mapa" })).getByRole("button", { name: "Sin picos" }).click();
+      await waitFor(() => expect(mapas().some((p) => p.escala?.modo === "sin-picos" && p.filtro?.max === 40)).toBe(true));
+      screen.getByRole("button", { name: "Quitar" }).click();
+      await waitFor(() => {
+        const u = mapas()[mapas().length - 1]!;
+        expect(u.filtro).toBeUndefined();
+        expect(u.escala).toEqual({ modo: "sin-picos" });
+      });
+    } finally {
+      at.atender = original;
+    }
+  }, 60_000);
+
   it("sólo la base no reabre el proyecto (soloArmado)", () => {
     const p = proyectoBase(undefined);
     const r = aplicar(p, { op: "armado", armado: { base: { "x-inf": 5 } } });

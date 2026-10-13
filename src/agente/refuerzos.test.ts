@@ -167,7 +167,7 @@ describe("consulta refuerzos y vista (criterios 1, 2 y 4)", () => {
     const nPicos = tramos(a).reduce((s, f) => s + picos(f.tramos, 0.05 * Math.max(...tramos(a).flatMap((g) => g.tramos.map((t) => t.v)))).length, 0);
     expect(sin.primitivas.filter((p) => p.tipo === "texto" && p.color === "#1d4ed8").length).toBe(nPicos);
     expect(sin.extremos.length).toBe(nPicos);
-    const con = vistaArmado(rr, planta, a, conj, d, { armado });
+    const con = vistaArmado(rr, planta, a, conj, d, { armado, soloExceso: true });
     const zonas = (consultar(q, "refuerzos", { armadura: a, armado, combinaciones: () => ({ valido: true, valor: conj, diagnosticos: [] }) }) as { valor: { zonas: FilaRefuerzo[] } }).valor.zonas;
     const rotulos = con.primitivas.filter((p): p is Extract<typeof p, { tipo: "texto" }> => p.tipo === "texto" && p.color === "#1d4ed8");
     expect(rotulos.length).toBe(zonas.length);
@@ -176,10 +176,54 @@ describe("consulta refuerzos y vista (criterios 1, 2 y 4)", () => {
     expect(con.leyenda.some((l) => l.estilo === "armado-cubierto" && l.texto.startsWith("cubierto por la base (≤ "))).toBe(true);
     // Lo coloreado empieza en la base
     expect(con.mapa!.minimo).toBeGreaterThan(armado.base![a]!);
-    // «Todo»: el mapa entero, con los picos y el contorno de las zonas
-    const todo = vistaArmado(rr, planta, a, conj, d, { armado, soloExceso: false });
-    expect(todo.primitivas.some((p) => p.tipo === "poligono" && p.estilo === "armado-cubierto")).toBe(false);
-    expect(todo.primitivas.some((p) => p.tipo === "linea" && p.estilo === "zona-refuerzo")).toBe(true);
-    expect(todo.extremos.length).toBe(nPicos);
+    // Por defecto (desde el 2026-10-13), con base también todo: el mapa entero, con los picos y el contorno de las zonas
+    for (const todo of [vistaArmado(rr, planta, a, conj, d, { armado }), vistaArmado(rr, planta, a, conj, d, { armado, soloExceso: false })]) {
+      expect(todo.primitivas.some((p) => p.tipo === "poligono" && p.estilo === "armado-cubierto")).toBe(false);
+      expect(todo.primitivas.some((p) => p.tipo === "linea" && p.estilo === "zona-refuerzo")).toBe(true);
+      expect(todo.extremos.length).toBe(nPicos);
+    }
+  });
+
+  it("el filtro: lo de fuera, en gris y sin rótulos; la escala, la de lo que se colorea", () => {
+    const planta = MODELO.losas![0]!.planta;
+    const d = { huella: "x" };
+    const ts = tramos(a).flatMap((f) => f.tramos);
+    const vmax = Math.max(...ts.map((t) => t.v));
+    const filtro = { min: 0.2 * vmax, max: 0.6 * vmax };
+    const v = vistaArmado(rr, planta, a, conj, d, { filtro });
+    const dentro = ts.filter((t) => t.v >= filtro.min && t.v <= filtro.max);
+    expect(dentro.length).toBeGreaterThan(0);
+    expect(dentro.length).toBeLessThan(ts.length);
+    expect(v.mapa!.minimo).toBe(Math.min(...dentro.map((t) => t.v)));
+    expect(v.mapa!.maximo).toBe(Math.max(...dentro.map((t) => t.v)));
+    expect(v.mapa!.limites[v.mapa!.limites.length - 1]!).toBeLessThan(vmax);
+    expect(v.primitivas.some((p) => p.tipo === "poligono" && p.estilo === "armado-cubierto")).toBe(true);
+    expect(v.leyenda.some((l) => l.estilo === "armado-cubierto" && l.texto.startsWith("filtrado ("))).toBe(true);
+    // Los rótulos, sólo de lo que se colorea
+    for (const x of v.extremos) expect(x.valor >= filtro.min && x.valor <= filtro.max).toBe(true);
+    // Sólo «desde»: lo de arriba entero
+    const desde = vistaArmado(rr, planta, a, conj, d, { filtro: { min: filtro.min } });
+    expect(desde.mapa!.maximo).toBe(vmax);
+  });
+
+  it("la escala: sin picos deja fuera el 1 % del área de arriba, rayado; manual, la dada", () => {
+    const planta = MODELO.losas![0]!.planta;
+    const d = { huella: "x" };
+    const completa = vistaArmado(rr, planta, a, conj, d);
+    expect(completa.mapa!.fueraArriba).toBe(false);
+    expect(completa.mapa!.sinPicos).toBeDefined();
+    const sp = vistaArmado(rr, planta, a, conj, d, { escala: { modo: "sin-picos" } });
+    const ts = tramos(a).flatMap((f) => f.tramos);
+    const area = (t: TramoArmado) => (t.b - t.a) * (t.t1 - t.t0);
+    const total = ts.reduce((s, t) => s + area(t), 0);
+    const tope = sp.mapa!.limites[sp.mapa!.limites.length - 1]!;
+    // Por encima del rango sin picos, como mucho el 1 % del área; la escala llega a él (redondeada)
+    expect(ts.filter((t) => t.v > completa.mapa!.sinPicos![1]).reduce((s, t) => s + area(t), 0) / total).toBeLessThanOrEqual(0.01);
+    expect(tope).toBeGreaterThanOrEqual(completa.mapa!.sinPicos![1]);
+    if (sp.mapa!.fueraArriba) expect(sp.primitivas.some((p) => p.tipo === "linea" && p.estilo === "fuera-escala")).toBe(true);
+    const man = vistaArmado(rr, planta, a, conj, d, { escala: { min: 0, max: 10, paso: 2 } });
+    expect(man.mapa!.limites).toEqual([0, 2, 4, 6, 8, 10]);
+    expect(man.mapa!.fueraArriba).toBe(Math.max(...ts.map((t) => t.v)) > 10);
+    if (man.mapa!.fueraArriba) expect(man.leyenda[0]!.texto).toBe("más de 10 (fuera de la escala, rayado)");
   });
 });

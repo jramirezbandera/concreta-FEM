@@ -19,7 +19,7 @@ export { ESFUERZOS_PLANO, vistaAlzadoDiagramas, type EsfuerzoPlano } from "./alz
 export { PlantaFisica, vistaCargas, vistaDiagnosticos, vistaModelo, type DatosVista } from "./modelo.ts";
 export { CAMPOS, ResultadosRender, vistaAxiles, vistaCampo, vistaDiagramas, vistaMalla, type Campo } from "./resultados.ts";
 export { escalaDeTexto, type EscalaMapa } from "./isovalores.ts";
-export { ARMADURAS, mapaArmado, NOMBRE_CORTO, tituloArmado, tramosArmado, UNIDAD_ARMADO, vistaArmado, VISTAS_ARMADO, type Armadura, type MapaArmado, type OpcionesArmado, type TramoArmado } from "./armado.ts";
+export { ARMADURAS, escalaArmado, mapaArmado, NOMBRE_CORTO, tituloArmado, tramosArmado, UNIDAD_ARMADO, vistaArmado, VISTAS_ARMADO, type Armadura, type FiltroArmado, type MapaArmado, type OpcionesArmado, type TramoArmado } from "./armado.ts";
 export { direccionBanda, envolventesBandas, gobierna, vistaBandas, type BandaEnvolvente, type DireccionBanda } from "./bandas.ts";
 export { CLASE_CARGA, geometriaCargas, presionEn, textoCarga, vistaAlzadoCargas, type ClaseCarga, type GeometriaCarga } from "./cargas.ts";
 export { COLOR_REACCION, reaccionesObjetos, vistaAlzadoReacciones, vistaReacciones, type ReaccionObjeto } from "./reacciones.ts";

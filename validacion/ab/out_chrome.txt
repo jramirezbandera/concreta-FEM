@@ -1,20 +1,20 @@
 Criterio 7 · Resultados · Armado en el edificio objetivo de A2, sin base y con base (X superior, 20 kN·m/m)
-BIEN  el mapa con base sale en 1.50 s, sin base en 1.68 s (≤ 0,2 s más)
+BIEN  el mapa con base sale en 1.94 s, sin base en 1.94 s (≤ 0,2 s más)
 BIEN  tareas largas > 50 ms en el hilo principal: sin base 0 (máx. 0 ms), con base 0 (máx. 0 ms)
 
 Criterio 2 · Zonas de refuerzo y valor de un punto, frente a Node
 BIEN  las 71 zonas de refuerzo de N7 (X superior, base 20) son las de Node bit a bit
 BIEN  un clic en (17.978; 10.030) da 20.474397319109855 kN·m/m: el de Node bit a bit (L-N7:X11, s = 17.978)
-BIEN  el valor del punto sale en 7 ms (≤ 50 ms)
+BIEN  el valor del punto sale en 9 ms (≤ 50 ms)
 
 Criterio 5 · Cambiar la base en Propiedades
 BIEN  la huella sigue (275dd4b4ac99) y la app no pasa por otro estado que «calculado» (calculado)
-BIEN  con la base en 25, las 11 zonas son las de Node bit a bit; salen en 0.03 s
+BIEN  con la base en 25, las 11 zonas son las de Node bit a bit; salen en 0.04 s
 BIEN  cambiar la base, sin tareas largas > 50 ms
 
 Criterio 6 · El armado en 3D
-BIEN  triángulos de las franjas de todas las plantas en el 3D: 366 = Node 366; salen en 2.67 s
+BIEN  triángulos de las franjas de todas las plantas en el 3D: 112840 = Node 112840; salen en 3.55 s
 BIEN  el 3D, sin tareas largas > 50 ms: 0 (máx. 0 ms)
-BIEN  la sonda en el máximo de L-N7:x-sup:R6: «28,2 kN·m/m (+3,2 sobre la base) · L-N7:X6 · s = 17,75 m · 1,4·(G + Q)» (Node: 28,2 kN·m/m)
+BIEN  la sonda en el máximo de L-N7:X6: «28,2 kN·m/m (+3,2 sobre la base) · L-N7:X6 · s = 17,75 m · 1,4·(G + Q)» (Node: 28,2 kN·m/m)
 
 Todo bien

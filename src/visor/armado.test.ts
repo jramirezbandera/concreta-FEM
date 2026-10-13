@@ -95,19 +95,29 @@ describe("armado en 3D (criterio 6)", () => {
     return s;
   };
 
-  for (const [nombre, armado] of [
-    ["sin base", undefined],
-    ["con base", { base: { "x-inf": 8, "x-sup": 15, "y-inf": 8, "y-sup": 15 } }],
-  ] as [string, ArmadoProyecto | undefined][])
+  const BASE: ArmadoProyecto = { base: { "x-inf": 8, "x-sup": 15, "y-inf": 8, "y-sup": 15 } };
+  for (const [nombre, op] of [
+    ["sin base", {}],
+    ["con base", { armado: BASE }],
+    ["con base, sólo lo que no cubre", { armado: BASE, soloExceso: true }],
+    ["con filtro", { filtro: { min: 5, max: 20 } }],
+  ] as [string, { armado?: ArmadoProyecto; soloExceso?: boolean; filtro?: { min?: number; max?: number } }][])
     it(`${nombre}: el área de los tramos, la cota de las losas y los colores de la planta`, async () => {
+      const armado = op.armado;
       for (const a of ["x-inf", "y-sup"] as Armadura[]) {
-        const d = await pedir<Armado3D>({ tipo: "armado3d", armadura: a, combinaciones: { tipo: "defecto" }, planta, ...(armado ? { armado } : {}) });
+        const d = await pedir<Armado3D>({ tipo: "armado3d", armadura: a, combinaciones: { tipo: "defecto" }, planta, ...op });
         const fs = tramosPlanta(sesion().q!, planta, a, conjunto());
         if (!fs.valido) throw new Error();
-        const total = fs.valor.flatMap((f) => f.tramos).reduce((s, t) => s + (t.b - t.a) * (t.t1 - t.t0), 0);
+        const ts = fs.valor.flatMap((f) => f.tramos);
+        const aT = (t: (typeof ts)[number]) => (t.b - t.a) * (t.t1 - t.t0);
+        const total = ts.reduce((s, t) => s + aT(t), 0);
+        // En gris, lo cubierto por la base (con «sólo lo que no cubre») y lo de fuera del filtro
+        const gris = (t: (typeof ts)[number]) => (op.soloExceso === true && !(t.v > armado!.base![a]!)) || (op.filtro?.min !== undefined && t.v < op.filtro.min) || (op.filtro?.max !== undefined && t.v > op.filtro.max);
+        const enGris = ts.filter(gris).reduce((s, t) => s + aT(t), 0);
         // Los búferes son Float32 (respecto al origen): el área, a su precisión
         expect(Math.abs(area(d.triangulos) + area(d.sinMapa) - total) / total).toBeLessThan(1e-6);
-        expect(d.sinMapa.length > 0).toBe(!!armado);
+        expect(Math.abs(area(d.sinMapa) - enGris) / total).toBeLessThan(1e-6);
+        if (op.soloExceso || op.filtro) expect(enGris).toBeGreaterThan(0);
         expect(d.isolineas.length > 0).toBe(!!armado);
         expect(d.plantas).toEqual([planta]);
         expect(d.tituloLeyenda).toContain("kN·m/m");
@@ -117,7 +127,7 @@ describe("armado en 3D (criterio 6)", () => {
         const z = c.modelo.nudos[c.modelo.laminas![(c.mapeo.laminas ?? []).findIndex((m) => m.losa === MODELO.losas![0]!.id)]!.nudos[0]!]!.z - d.origen[2];
         for (let i = 2; i < d.triangulos.length; i += 3) expect(d.triangulos[i]).toBe(Math.fround(z));
         // Con una planta, la leyenda y la escala de su vista en planta
-        const e = await pedir<DatosArmado>({ tipo: "armado", planta, combinaciones: { tipo: "defecto" }, armadura: a, ...(armado ? { armado } : {}) });
+        const e = await pedir<DatosArmado>({ tipo: "armado", planta, combinaciones: { tipo: "defecto" }, armadura: a, ...op });
         const esc: EscenaPreparada = e.escena;
         expect(d.leyenda).toEqual(esc.leyenda);
         expect(d.mapa).toEqual(esc.mapa);

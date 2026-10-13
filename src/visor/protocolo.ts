@@ -20,7 +20,7 @@ import type { Pilares3D } from "./pilares3d.ts";
 import type { Reacciones3D } from "./reacciones3d.ts";
 import type { Cargas3D } from "./cargas3d.ts";
 import type { DatosArmado, DatosFranja } from "./franjas.ts";
-import type { Armadura } from "../agente/render/armado.ts";
+import type { Armadura, FiltroArmado } from "../agente/render/armado.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
@@ -49,7 +49,7 @@ export type Pedido =
   | { tipo: "pilares"; planta: string; combinaciones: EleccionCombinaciones }
   | { tipo: "pilar"; id: string; combinaciones: EleccionCombinaciones }
   /** Fase F: el mapa de una armadura de las franjas de una planta, con su tabla, y el detalle de una franja. */
-  | { tipo: "armado"; planta: string; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean }
+  | { tipo: "armado"; planta: string; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean; filtro?: FiltroArmado }
   | { tipo: "franja"; id: string; combinaciones: EleccionCombinaciones }
   | { tipo: "desplomes"; combinaciones: EleccionCombinaciones }
   | { tipo: "geometria" }

@@ -14,7 +14,7 @@ import { baseDe, type ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { franja as consultaFranja, franjas as consultaFranjas, type DemandaFranja, type EstacionFranjaEnvolvente, type FilaRefuerzo } from "../agente/consultas.ts";
 import { losasDe, zonasRefuerzo } from "../agente/refuerzos.ts";
 import { tramosPlanta } from "./armado.ts";
-import type { Armadura } from "../agente/render/armado.ts";
+import type { Armadura, FiltroArmado } from "../agente/render/armado.ts";
 import type { EscalaMapa } from "../agente/render/isovalores.ts";
 import type { Vec2 } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
@@ -58,7 +58,7 @@ export interface DatosArmado {
 }
 
 /** El mapa de una armadura en una planta, la tabla de sus franjas y sus zonas de refuerzo. */
-export function datosArmado(s: Sesion, planta: string, e: EleccionCombinaciones, armadura: Armadura, op: { escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean } = {}): Resultado<DatosArmado> {
+export function datosArmado(s: Sesion, planta: string, e: EleccionCombinaciones, armadura: Armadura, op: { escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean; filtro?: FiltroArmado } = {}): Resultado<DatosArmado> {
   const q = s.q;
   if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
   const esc = s.escena(planta, { vista: "armado", combinaciones: e, armadura, ...op });
