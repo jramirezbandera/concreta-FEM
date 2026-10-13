@@ -1,0 +1,20 @@
+# Fase F3: tamaño y tiempo del edificio objetivo (7 plantas, losa plana, h = 0,75)
+
+compilador | nudos | ecuaciones | perfil móvil (≤ 200 000) | plantillas (refinadas) | avisos de malla | compilar (s) | calcular (s) | franjas (s) | total (s)
+F3 | 67371 | 185262 | cabe | 532 (308) | — | 2.52 | 6.45 | 10.02 | 18.77
+
+Tiempos: la mediana de tres, en este equipo (Bun).
+
+Comparación con F2 (el commit fbe56ac en un árbol de trabajo aparte, `bun validacion/f3/banco.ts <raíz>`),
+medidos uno detrás de otro el 2026-10-14; cada fila, la mediana de tres:
+
+compilador | compilar (s) | calcular (s) | franjas (s) | total (s)
+F2.1 | 2.30 | 5.52 | 8.55 | 16.83
+F2.1 | 2.29 | 4.99 | 8.84 | 16.00
+F2.1 | 2.40 | 5.50 | 8.84 | 16.47
+F3 | 2.65 | 6.79 | 10.02 | 19.60
+F3 | 2.74 | 6.58 | 10.26 | 19.89
+F3 | 2.52 | 6.45 | 10.02 | 18.77
+
+F3 frente a F2: +10 % de ecuaciones (185 262 frente a 167 118) y +17–20 % de tiempo total. Antes de
+limitar los cortes del escalón a la ventana (con un margen de 2,5h), las franjas tardaban 14,1 s.

@@ -73,7 +73,7 @@ Coste: unos 37 nudos por pilar interior con las cuatro caras.
   - validarlo con una referencia que siembre las caras propias (la triangulación sola admite trazos parciales);
   - que la cara propia esté en la malla también con h ≤ 0,5 (hoy, sólo en la plantilla con el h por defecto).
 
-  Sería la fase siguiente.
+  Sería la fase siguiente. **Hecho en F3** (`fase-f3.md`, 2026-10-14): el metro se mide en la cara propia por un contorno en escalón, sin sembrar nada en la malla.
 - **F2-9, los nudos rígidos a ε_snap de la huella.** Hay dos salidas:
   - esclavizar sólo los nudos sobre la huella (cambia C2–C5, y por sí solo no basta junto al hueco);
   - o que el mallador no ponga nudos a menos de ε_snap de una huella.

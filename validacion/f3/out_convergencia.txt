@@ -1,0 +1,66 @@
+# Fase F3: el metro de cada pilar en su cara
+
+## Criterio 3: convergencia frente a la malla fina
+
+Caras con demanda (|m| ≥ 20 % de la mayor de la referencia); media y máximo de |error|, y el peor con su signo. Sin las caras propias cuya estación de referencia pierde por F2-9: nudos rígidos delante de la cara, por los que pasa momento que no cuenta (el corte por la cara cambia más de un 0,5 % con la huella), o láminas con los cuatro nudos rígidos.
+
+modelo | malla | estación | grupo | caras | media | máx. | peor | nudos | avisos
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | referencia h = 0,1 | F3 | — | 64 | — | — | — | 34062 | —
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | h = 0,75 con F3 | F3 | común por dentro | 6 | 0.75 % | 1.23 % | -1.23 % | 1642 | —
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | h = 0,75 con F3 | F3 | propia | 26 | 1.03 % | 4.49 % | 4.49 % | 1642 | —
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | — | — | sin comparar: la referencia pierde ancho por F2-9 | 12 | — | — | — | — | propia
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | h = 0,75 con F3 | antes (cara común, F2) | común por dentro | 6 | 46.37 % | 53.02 % | -53.02 % | 1642 | —
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | h = 0,75 con F3 | antes (cara común, F2) | propia | 26 | 1.03 % | 4.49 % | 4.49 % | 1642 | —
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | h = 0,75 sin refinar | F3 | común por dentro | 6 | 6.05 % | 13.97 % | -13.97 % | 994 | —
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | h = 0,75 sin refinar | F3 | propia | 26 | 6.38 % | 20.21 % | -20.21 % | 994 | —
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | h = 0,5 | F3 | común por dentro | 6 | 0.35 % | 0.64 % | 0.64 % | 2272 | —
+3 × 3 vanos con P6-5 de 40 × 40 y P12-10 de 30 × 50 | h = 0,5 | F3 | propia | 26 | 1.24 % | 6.01 % | 6.01 % | 2272 | —
+edificio objetivo, 1 planta, losa plana | referencia h = 0,15 | F3 | — | 192 | — | — | — | 103617 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 con F3 | F3 | común por dentro | 66 | 2.27 % | 5.03 % | -5.03 % | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 con F3 | F3 | propia | 91 | 1.41 % | 3.88 % | -3.88 % | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 con F3 | F3 | junto a un hueco | 11 | 12.37 % | 43.07 % | -43.07 % | 9693 | —
+edificio objetivo, 1 planta, losa plana | — | — | sin comparar: la referencia pierde ancho por F2-9 | 24 | — | — | — | — | junto a un hueco, propia
+edificio objetivo, 1 planta, losa plana | h = 0,75 con F3 | antes (cara común, F2) | común por dentro | 66 | 48.97 % | 52.03 % | -52.03 % | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 con F3 | antes (cara común, F2) | propia | 91 | 1.41 % | 3.88 % | -3.88 % | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 con F3 | antes (cara común, F2) | junto a un hueco | 11 | 20.49 % | 52.29 % | -52.29 % | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 sin refinar | F3 | común por dentro | 66 | 12.98 % | 18.83 % | -18.83 % | 7037 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 sin refinar | F3 | propia | 91 | 10.33 % | 25.15 % | -25.15 % | 7037 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 sin refinar | F3 | junto a un hueco | 11 | 12.36 % | 42.97 % | -42.97 % | 7037 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | F3 | común por dentro | 66 | 1.54 % | 5.95 % | -5.95 % | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | F3 | propia | 91 | 0.88 % | 2.85 % | -2.85 % | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | F3 | junto a un hueco | 11 | 2.07 % | 4.92 % | -4.92 % | 15162 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | referencia h = 0,1 | F3 | — | 24 | — | — | — | 37236 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 con F3 | F3 | común por dentro | 8 | 1.94 % | 3.63 % | -3.63 % | 3341 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 con F3 | F3 | propia | 9 | 1.59 % | 3.30 % | -3.30 % | 3341 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 con F3 | F3 | junto a un hueco | 4 | 6.20 % | 17.77 % | 17.77 % | 3341 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | — | — | sin comparar: la referencia pierde ancho por F2-9 | 3 | — | — | — | — | propia
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 con F3 | antes (cara común, F2) | común por dentro | 8 | 47.97 % | 49.07 % | -49.07 % | 3341 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 con F3 | antes (cara común, F2) | propia | 9 | 1.59 % | 3.30 % | -3.30 % | 3341 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 con F3 | antes (cara común, F2) | junto a un hueco | 4 | 29.65 % | 52.70 % | -52.70 % | 3341 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 sin refinar | F3 | común por dentro | 8 | 9.25 % | 15.52 % | -15.52 % | 3029 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 sin refinar | F3 | propia | 9 | 9.11 % | 18.68 % | -18.68 % | 3029 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,75 sin refinar | F3 | junto a un hueco | 4 | 6.13 % | 17.65 % | 17.65 % | 3029 | —
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,5 | F3 | común por dentro | 8 | 2.34 % | 5.06 % | -5.06 % | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,5 | F3 | propia | 9 | 1.42 % | 3.65 % | 3.65 % | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos), 1 planta, losa plana | h = 0,5 | F3 | junto a un hueco | 4 | 2.76 % | 5.70 % | -5.70 % | 4539 | malla/calidad
+
+## Criterio 2: el escalón frente al corte recto por la cara propia
+
+1. El método: con h = 0,75, en la red de la plantilla refinada (que lleva las dos rectas), los dos cortes con la misma ventana, de nudo a nudo, sin el reparto de F-6.
+
+modelo | cara | ventana (m) | recto (kN·m/m) | escalón | diferencia
+3 × 3 mezclada | P12-10, x = 11.75 | 9.458 a 10.542 | -60.78 | -60.01 | -1.27 %
+3 × 3 mezclada | P12-10, x = 12.25 | 9.458 a 10.542 | -72.86 | -72.60 | -0.35 %
+edificio objetivo, 1 planta | P42-15, x = 41.80 | 14.400 a 15.588 | -53.41 | -52.85 | -1.05 %
+edificio objetivo, 1 planta | P48-10, x = 47.75 | 9.458 a 10.525 | -56.15 | -55.49 | -1.19 %
+edificio objetivo, 1 planta | P18-10, y = 10.25 | 17.525 a 18.392 | -62.13 | -61.09 | -1.67 %
+
+2. La estación: en la triangulación con h = 0,2 y una banda de 0,3 m que siembra la cara propia en la ventana (con sus bordes del lado del vano), el corte recto por la cara propia, de borde a borde, y la estación, con el reparto de F-6 en los bordes de la ventana por la recta común.
+
+modelo | cara | recto (kN·m/m) | estación | diferencia
+3 × 3 mezclada | P6-5, x = 5.80 | -80.49 | -80.70 | 0.26 %
+3 × 3 mezclada | P6-5, y = 5.20 | -62.37 | -61.42 | -1.53 %
+3 × 3 mezclada | P12-10, x = 12.25 | -80.42 | -80.26 | -0.19 %
+edificio objetivo, 1 planta | P42-15, x = 41.80 | -60.75 | -60.76 | 0.01 %
+edificio objetivo, 1 planta | P48-10, x = 47.75 | -62.70 | -62.71 | 0.03 %
+edificio objetivo, 1 planta | P18-10, y = 10.25 | -60.63 | -59.70 | -1.53 %

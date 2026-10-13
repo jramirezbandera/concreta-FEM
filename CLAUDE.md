@@ -382,8 +382,14 @@
   - los grupos de rectas comunes sólo se forman por los lados que cruzan las viguetas.
 
   Con esto, el unidireccional de SAP2000 del usuario sale idéntico: 48 viguetas y 0,0 % en todo con las cargas por la palanca (E6-14). Oráculos a mano de C4 y referencia congelada rehechos.
+- **2026-10-14: fase F3 terminada** (la cara propia de los pilares, F2-8). Pasan los criterios 1, 3, 4, 5, 6 y 7; el 2 (1,7 % frente al 1 %) y el 8 (+17–20 % de tiempo frente al +15 %) quedan a medias. El plan está en `docs/fem3d/cara-propia.md` y el informe, en `docs/fem3d/fase-f3.md`, con hallazgos F3-1…F3-7 y lo que decide el usuario.
+  - **El escalón** (`esfuerzosFranjas.ts`): en un pilar mayor que el menor de su línea, la cara común de C5-g cae dentro de su huella y su metro salía un 46–49 % bajo. Ahora se mide por la recta común con lo que transmite el enlace de la huella (opción `restricciones` de los cortes del motor), trasladado a la cara propia. Siempre sigue la malla. Sin enlace, la de antes con el aviso `franja/cara-comun-dentro`.
+  - **La malla** (`rejilla.ts`, sólo en las plantillas refinadas): los tercios junto a la cara, de un largo de h como mucho, y la esquina fina con la transición en su tramo exterior. Con h = 0,75, esas caras quedan a 0,75 / 1,23 % (3 × 3 mezclada) y 1,94 / 3,63 % (edificio reducido) de la malla fina. Si la plantilla no tiene calidad, se rehace como en F2.
+  - **Coste:** el edificio objetivo con losa plana, 185 262 ecuaciones (+10 %) y +17–20 % de tiempo. Compilador F3; las referencias congeladas de C2–C5 y de F no cambian, y la de F tiene un caso mezclado.
+  - **Para el usuario, F3-5 (de F2-9, previo):** con h fino y tamaños mezclados, el metro de los pilares menores también sale hasta un 52 % bajo, sin aviso. La propuesta F3-d: contar la huella en todos los metros, como en el escalón.
 - **Siguiente paso:**
-  - las decisiones de F2-8 y F2-9 (`fase-f2.md` §4);
+  - las decisiones de F3 (`fase-f3.md` §4: F3-d y el coste) y de F2-9 (`fase-f2.md` §4);
+  - el punto fijo de los pilares (propuesto el 2026-10-14);
   - las puertas de uso de AB, de F, de I1, I2, I3 e I4, de V2a y de V2b;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
