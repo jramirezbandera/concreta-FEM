@@ -468,8 +468,8 @@ function ResumenPlanta() {
           {r.pilares && <Fila k="Pilares (cabeza aquí)" v={Object.entries(r.pilares).map(([s, n]) => `${n}×${s}`).join(" · ")} />}
           {r.vigas && <Fila k="Vigas" v={`${r.vigas.n} · ${fmt(r.vigas.m, 1)} m`} />}
           {r.muros && <Fila k="Muros" v={`${r.muros.n} · ${fmt(r.muros.m, 1)} m`} />}
-          {r.losas?.map((l) => <Fila key={l.id} k={`Losa ${l.id}`} v={`${fmt(l.m2, 1)} m² · ${fmt(l.espesor, 2)} m · ${l.tipo}`} />)}
-          {r.panos?.map((l) => <Fila key={l.id} k={`Paño ${l.id}`} v={`${fmt(l.m2, 1)} m² · ${fmt(l.direccion, 0)}° · ${fmt(l.intereje, 2)} m`} />)}
+          {r.losas?.map((l) => <Fila key={l.id} k={`Forjado ${l.id}`} v={`${l.tipo} · ${fmt(l.m2, 1)} m² · ${fmt(l.espesor, 2)} m`} />)}
+          {r.panos?.map((l) => <Fila key={l.id} k={`Forjado ${l.id}`} v={`unidireccional · ${fmt(l.m2, 1)} m² · ${fmt(l.direccion, 0)}° · ${fmt(l.intereje, 2)} m`} />)}
           <table className="tb mt-1">
             <thead>
               <tr>

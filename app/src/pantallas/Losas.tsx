@@ -252,7 +252,7 @@ export function ModoLosas() {
                       <tr key={f.id}>
                         <td>
                           {f.id}
-                          <small>{f.tipo === "pano" ? "paño" : "losa"}</small>
+                          <small>{f.tipo === "pano" ? "unidireccional" : "losa"}</small>
                         </td>
                         <td>
                           {mm(f.maxima.v)}

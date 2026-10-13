@@ -335,7 +335,7 @@ export function planoAlzado(eje: string, v: EstadoVista): { eje: string; profund
   return v.profundidad !== undefined && v.profundidad !== PROFUNDIDAD_POR_DEFECTO ? { eje, profundidad: v.profundidad } : { eje };
 }
 
-const NOMBRE_FILTRO: Record<TipoFiltro, string> = { pilar: "Pilares", viga: "Vigas", losa: "Losas", pano: "Paños", muro: "Muros", apoyo: "Apoyos" };
+const NOMBRE_FILTRO: Record<TipoFiltro, string> = { pilar: "Pilares", viga: "Vigas", losa: "Losas", pano: "Unidireccionales", muro: "Muros", apoyo: "Apoyos" };
 
 /** Lo que filtra un 3D, en chips que lo quitan con un clic (I3). */
 function ChipsFiltro({ filtro, onCambio }: { filtro: FiltroVista | undefined; onCambio: (f: FiltroVista) => void }) {

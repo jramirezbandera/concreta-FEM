@@ -38,6 +38,7 @@
  */
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
+import { puntoEnPoligono, puntoEnRegion } from "../compilador/poligonos.ts";
 import type { Material, ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 
@@ -63,6 +64,12 @@ export interface PiezaSolida {
   caras: Cara[];
   /** Sección sin forma conocida (una `general` sin b ni h): dibujada como barra fina. */
   sinForma?: true;
+  /**
+   * Líneas que se dibujan con las aristas sin serlo: en la cara superior de un reticular, los ejes de
+   * sus nervios y el contorno de sus ábacos, que desde arriba quedan bajo la capa (como las rayas de
+   * las viguetas de un paño). No son geometría: no cuentan en el volumen.
+   */
+  marcas?: [Vec3, Vec3][];
 }
 
 /** Lo que el sólido necesita de la compilación: las viguetas de los paños. */
@@ -697,6 +704,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const d = cosSen(l.eje1 ?? 0);
     const n: Vec2 = [-d[1], d[0]];
     const caras: Cara[] = [];
+    const marcas: [Vec3, Vec3][] = [];
     const ret = l.reticular;
     const e = l.espesor;
     if (!ret || !(ret.capa > 0 && ret.capa < e && ret.nervio > 0 && ret.intereje > ret.nervio)) {
@@ -721,8 +729,17 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
         const fr2 = franja(i * s - bw / 2, i * s + bw / 2, y0 - 1, y1 + 1);
         prismas(descomponer([fr2], [region, abacos, dir1], n), n, (fr) => (fr.capas[0] && !fr.capas[1] && !fr.capas[2] ? [[zc - e, zc - hf]] : []), caras);
       }
+      // Marcas en la cara superior: los ejes de los nervios (en la losa y fuera de los ábacos) y el contorno de los ábacos
+      const R = { contorno: l.contorno as Vec2[], huecos: (l.huecos ?? []) as Vec2[][] };
+      const enLosa = (q: Vec2) => puntoEnRegion(q, R);
+      const marca = (a: Vec2, b: Vec2) => marcas.push([[a[0], a[1], zc], [b[0], b[1], zc]]);
+      const todos = [...region, ...abacos];
+      const fuera = (q: Vec2) => enLosa(q) && !abacos.some((ab) => puntoEnPoligono(q, ab));
+      for (let j = Math.ceil(y0 / s); j * s < y1; j++) for (const [a, b] of trozosSegmento(g(x0, j * s), g(x1, j * s), todos, fuera)) marca(a, b);
+      for (let i = Math.ceil(x0 / s); i * s < x1; i++) for (const [a, b] of trozosSegmento(g(i * s, y0), g(i * s, y1), todos, fuera)) marca(a, b);
+      for (const ab of abacos) for (let i = 0; i < ab.length; i++) for (const [a, b] of trozosSegmento(ab[i]!, ab[(i + 1) % ab.length]!, region, enLosa)) marca(a, b);
     }
-    piezas.push({ id: l.id, tipo: "losa", planta: k, material: material.get(l.material)?.tipo ?? null, seccion: null, caras });
+    piezas.push({ id: l.id, tipo: "losa", planta: k, material: material.get(l.material)?.tipo ?? null, seccion: null, caras, ...(marcas.length ? { marcas } : {}) });
   }
   if ((f.losas ?? []).some((l) => l.reticular)) notas.push("Los nervios de los reticulares se dibujan a su intereje desde el origen de coordenadas, en la dirección de su eje 1 y la perpendicular: su sitio es ilustrativo, porque el cálculo usa multiplicadores (D3).");
 
@@ -832,6 +849,38 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
 
   if (sinForma.size) notas.push(`Sin forma (sección general sin b ni h), dibujadas como barras de ${LADO_SIN_FORMA * 100} cm: ${[...sinForma].sort().join(", ")}.`);
   return { piezas, notas };
+}
+
+/**
+ * Los trozos del segmento ab en los que `dentro` es cierto, partido por los lados de `poligonos`
+ * (se mira el punto medio de cada trozo; los contiguos se unen).
+ */
+export function trozosSegmento(a: Vec2, b: Vec2, poligonos: readonly (readonly Vec2[])[], dentro: (q: Vec2) => boolean): [Vec2, Vec2][] {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const ts = [0, 1];
+  for (const p of poligonos)
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const c = p[j]!;
+      const ex = p[i]![0] - c[0];
+      const ey = p[i]![1] - c[1];
+      const den = dx * ey - dy * ex;
+      if (Math.abs(den) < 1e-14) continue;
+      const t = ((c[0] - a[0]) * ey - (c[1] - a[1]) * ex) / den;
+      const u = ((c[0] - a[0]) * dy - (c[1] - a[1]) * dx) / den;
+      if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
+    }
+  ts.sort((x, y) => x - y);
+  const P = (t: number): Vec2 => [a[0] + t * dx, a[1] + t * dy];
+  const r: [number, number][] = [];
+  for (let k = 0; k + 1 < ts.length; k++) {
+    const [t0, t1] = [ts[k]!, ts[k + 1]!];
+    if (t1 - t0 < 1e-9 || !dentro(P((t0 + t1) / 2))) continue;
+    const u = r[r.length - 1];
+    if (u && Math.abs(u[1] - t0) < 1e-9) u[1] = t1;
+    else r.push([t0, t1]);
+  }
+  return r.map(([t0, t1]) => [P(t0), P(t1)]);
 }
 
 // ─── Volumen, aristas y búferes ─────────────────────────────────────────────────────────────────
@@ -1031,7 +1080,7 @@ export function solido(f: ModeloFisico, origen: [number, number, number], compil
         t++;
       }
     }
-    for (const [a, b] of aristasDe(p.caras)) {
+    for (const [a, b] of [...aristasDe(p.caras), ...(p.marcas ?? [])]) {
       for (const v of [a, b]) for (let i = 0; i < 3; i++) ar.push(v[i]! - origen[i]!);
       oa.push(k);
       pa.push(p.planta);

@@ -12,6 +12,13 @@ import { usePedido } from "../sesion/usePedido.ts";
 import { FormularioObjeto, tablaDe } from "../editor/Formulario.tsx";
 import { objetosTabla } from "../../../src/editor/tablas.ts";
 
+/** El tipo de un objeto como lo llama la app: losas y paños son forjados, con su tipo (la tabla Forjados). */
+export function etiquetaTipo(o: { tipo: string; datos: Record<string, unknown> }): string {
+  if (o.tipo === "losa") return `forjado · ${o.datos.reticular ? "reticular" : "losa maciza"}`;
+  if (o.tipo === "paño") return "forjado · unidireccional";
+  return o.tipo;
+}
+
 /** Un valor del proyecto en texto: números como están, puntos como (x; y), lo demás en JSON. */
 export function valorCampo(v: unknown): string {
   if (typeof v === "number") return String(v).replace(".", ",");
@@ -47,7 +54,7 @@ export function Inspector({ id }: { id: string }) {
     <>
       <div className="flex items-center gap-2 border-b border-border-sub px-3.5 py-2.5">
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-disabled">{o?.tipo ?? "objeto"}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-disabled">{o ? etiquetaTipo(o) : "objeto"}</div>
           <div className="mono truncate text-[14px] font-medium">{id}</div>
         </div>
         <button type="button" className="btn" onClick={localizar} disabled={!o && !tabla}>
