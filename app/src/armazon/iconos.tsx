@@ -38,11 +38,16 @@ export const IcApoyo = icono(
     <path d="M4 18h16M6 18l-2 3M10 18l-2 3M14 18l-2 3M18 18l-2 3" />
   </>,
 );
+/** Muro de hormigón: un paño vertical con su espesor y el rayado del hormigón (árido), no de fábrica. */
 export const IcMuro = icono(
   <>
-    <rect x="4" y="3" width="16" height="16" rx="1" />
-    <path d="M4 8h16M4 13h16M10 3v5M15 8v5M10 13v6" />
-    <path d="M2 21h20" />
+    <path d="M3 8h14v12H3z" />
+    <path d="M3 8l1.5-1.5h14L17 8M17 20l1.5-1.5v-12" />
+    <path d="M6.5 11.5l1 1.7h-2zM12 15l1 1.7h-2z" />
+    <circle cx="11" cy="11.5" r="0.45" fill="currentColor" stroke="none" />
+    <circle cx="7.5" cy="16.5" r="0.45" fill="currentColor" stroke="none" />
+    <circle cx="14.5" cy="12" r="0.45" fill="currentColor" stroke="none" />
+    <path d="M1.5 21.5h19" />
   </>,
 );
 export const IcForjado = icono(
