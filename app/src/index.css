@@ -295,7 +295,6 @@ body {
 .celda .vista-cab { right: 216px; flex-wrap: wrap; }
 .celda:has(.leyenda-vista[data-abierta="false"]) .vista-cab { right: 140px; }
 .celda[data-tipo="3d"] .vista-cab { right: 104px; }
-.vista-cab-2 { top: 48px; }
 .vista-barra {
   position: absolute; right: 10px; bottom: 10px; z-index: 15; display: flex; gap: 2px; padding: 3px;
   border: 1px solid var(--color-border-main); border-radius: 9px;

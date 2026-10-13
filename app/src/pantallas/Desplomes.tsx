@@ -88,7 +88,7 @@ export function ModoDeformada() {
       <Separador />
       <BarraModos />
       <Separador />
-      <Campo etiqueta="Escala de la deformada" ancho={190}>
+      <Campo etiqueta="Escala de la deformada">
         <span className="flex items-center gap-1.5">
           <input type="number" min={1} step={10} className="sel w-[90px] text-right" aria-label="Escala de la deformada" value={escala} onChange={(v) => setEscalaDada(Number(v.target.value) || 1)} />
           {escalaDada !== null && (
@@ -96,11 +96,11 @@ export function ModoDeformada() {
               auto ({fmt(escalaAuto, 0)})
             </button>
           )}
+          <button type="button" className="btn" style={{ height: 28 }} aria-pressed={animada} data-on={animada} onClick={() => setAnimada((x) => !x)} title="La deformada de 0 a la escala y vuelta, en bucle">
+            {animada ? "Parar" : "Animar"}
+          </button>
         </span>
       </Campo>
-      <button type="button" className="btn" style={{ height: 28 }} aria-pressed={animada} data-on={animada} onClick={() => setAnimada((x) => !x)} title="La deformada de 0 a la escala y vuelta, en bucle">
-        {animada ? "Parar" : "Animar"}
-      </button>
       <Separador />
       <BarraVistas />
     </>
@@ -116,16 +116,17 @@ export function ModoDeformada() {
               <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
             </div>
           ) : (
+            <Fuente3DModelo deformada={def3D} modo="analitico" />
+          ),
+        cabecera3D: () =>
+          proyecto.desactualizado ? null : (
             <>
-              <Fuente3DModelo deformada={def3D} modo="analitico" />
-              <div className="vista-cab vista-cab-2">
-                <Chip>
-                  <strong className="font-semibold">Deformada</strong> ×{fmt(escala, 0)}
-                </Chip>
-                <Chip acento title={deformada.datos?.etiqueta}>
-                  <span className="mono">{deformada.datos?.comb ?? "—"}</span> · máx. {mm(umax)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
-                </Chip>
-              </div>
+              <Chip>
+                <strong className="font-semibold">Deformada</strong> ×{fmt(escala, 0)}
+              </Chip>
+              <Chip acento title={deformada.datos?.etiqueta}>
+                <span className="mono">{deformada.datos?.comb ?? "—"}</span> · máx. {mm(umax)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
+              </Chip>
             </>
           ),
       }}
