@@ -2,8 +2,8 @@
  * Espacios Modelo y Cargas (`docs/fem3d/interfaz.md` §4 y §13): lo que era la pantalla Modelo de V1
  * y V2a, repartido en la disposición común.
  *
- * - Barra: en Modelo, las herramientas de los objetos (abren su tabla en la fila nueva), A plantas y
- *   Borrar (lo elegido), las tablas de datos y Planta o 3D; en Cargas, el caso activo, Nueva carga y
+ * - Barra: en Modelo, las herramientas de los objetos (abren su tabla en la fila nueva), Copiar (a
+ *   otras plantas) y Borrar (lo elegido o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o 3D; en Cargas, el caso activo, Nueva carga y
  *   Casos. Sin proyecto editable, sólo lo que mira.
  * - Navegador: el proyecto y los objetos de la planta activa (en Cargas, los casos y las cargas).
  * - Vistas (I2): 1, 2 o 4, de planta (modelo, diagnósticos o malla; en Cargas, las del caso activo),
@@ -14,7 +14,7 @@
  *   por caso, equilibrio, hipótesis).
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ListOrdered, Trash2 } from "lucide-react";
 import { lista } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
@@ -68,6 +68,41 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   // Lo elegido que está en el proyecto (un eje propuesto no lo está) y lo que de ello se copia
   const enTablas = ed ? elegidos.filter((id) => tablaDe(ed.proyecto.modelo, id)) : [];
   const copiables = ed ? enTablas.filter((id) => COPIABLES.has(tablaDe(ed.proyecto.modelo, id)!)) : [];
+
+  // Copiar y Borrar sin nada que les sirva elegido esperan a que se elija: un clic (o una ventana)
+  // abre su diálogo con lo elegido; con Ctrl se van sumando, e Intro o la herramienta lo abren.
+  const [eligiendo, setEligiendo] = useState<"copiar" | "borrar" | null>(null);
+  const alEmpezar = useRef(elegidos);
+  const conCtrl = useRef(false);
+  const paraAccion = (a: "copiar" | "borrar") => (a === "copiar" ? copiables : enTablas);
+  const usar = (a: "copiar" | "borrar") => {
+    if (paraAccion(a).length) return setDialogo(a);
+    if (eligiendo === a) return setEligiendo(null);
+    alEmpezar.current = elegidos;
+    setEligiendo(a);
+  };
+  const cerrarDialogo = () => {
+    setDialogo(null);
+    setEligiendo(null);
+  };
+  useEffect(() => {
+    if (!eligiendo) return;
+    const puntero = (x: PointerEvent) => void (conCtrl.current = x.ctrlKey || x.metaKey);
+    const tecla = (x: KeyboardEvent) => {
+      if (x.key === "Escape") setEligiendo(null);
+      else if (x.key === "Enter" && !(x.target as HTMLElement | null)?.closest?.("input, textarea, select, [role=grid], [role=dialog]") && paraAccion(eligiendo).length) setDialogo(eligiendo);
+    };
+    window.addEventListener("pointerdown", puntero, true);
+    window.addEventListener("keydown", tecla);
+    return () => {
+      window.removeEventListener("pointerdown", puntero, true);
+      window.removeEventListener("keydown", tecla);
+    };
+  });
+  useEffect(() => {
+    if (eligiendo && elegidos !== alEmpezar.current && !conCtrl.current && paraAccion(eligiendo).length) setDialogo(eligiendo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando cambia lo elegido
+  }, [elegidos]);
 
   const abrirTabla = (t: NombreTabla, filaNueva = false, celdas?: Record<string, string>) => {
     setTabla(t);
@@ -124,8 +159,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcApoyo} nombre="Apoyo" onClick={() => abrirTabla("apoyos", true)} title="Un apoyo nuevo en la tabla de apoyos" />
           <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" onClick={() => abrirTabla("apoyosLineales", true)} title="Un apoyo lineal nuevo en la tabla de apoyos lineales" />
           <Separador />
-          <Herramienta icono={IcAPlantas} nombre="A plantas" disabled={!copiables.length} onClick={() => setDialogo("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : "Elija vigas, losas, paños, apoyos o cargas"} />
-          <Herramienta icono={IcBorrar} nombre="Borrar" disabled={!enTablas.length} onClick={() => setDialogo("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : "Elija un objeto"} />
+          <Herramienta icono={IcAPlantas} nombre="Copiar" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, losas, paños, apoyos o cargas"} />
+          <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
           <Separador />
           <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirTabla("plantas")} />
@@ -200,12 +235,22 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         etiquetaHerramientas={cargas ? "Herramientas de Cargas" : "Herramientas de Modelo"}
         herramientas={herramientas}
         nav={{ titulo: "Navegador", contenido: cargas ? <NavCargas caso={casoValido} setCaso={setCaso} /> : <NavModelo /> }}
-        vista={vista}
+        vista={
+          <>
+            {vista}
+            {eligiendo && (
+              <span className="chip aviso-herr" data-acento="true" role="status">
+                {eligiendo === "copiar" ? "Copiar a otras plantas: elija las vigas, losas, paños, apoyos o cargas" : "Borrar: elija lo que quiere borrar"} (clic o ventana; con Ctrl+clic, varios e Intro). Esc cancela.
+                {paraAccion(eligiendo).length > 0 && <strong className="font-semibold"> {paraAccion(eligiendo).length} elegidos.</strong>}
+              </span>
+            )}
+          </>
+        }
         props={{ titulo: "Propiedades", contenido: elegidos.length > 1 ? <ListaElegidos /> : seleccion ? <Inspector id={seleccion} /> : <ResumenPlanta /> }}
         dock={dock}
       />
-      {dialogo === "borrar" && enTablas.length > 0 && <DialogoBorrar ids={enTablas} onCerrar={() => setDialogo(null)} />}
-      {dialogo === "copiar" && copiables.length > 0 && <DialogoCopiar ids={copiables} onCerrar={() => setDialogo(null)} />}
+      {dialogo === "borrar" && enTablas.length > 0 && <DialogoBorrar ids={enTablas} onCerrar={cerrarDialogo} />}
+      {dialogo === "copiar" && copiables.length > 0 && <DialogoCopiar ids={copiables} onCerrar={cerrarDialogo} />}
       {dialogo === "renumerar" && ed && <DialogoRenumerar onCerrar={() => setDialogo(null)} />}
     </>
   );

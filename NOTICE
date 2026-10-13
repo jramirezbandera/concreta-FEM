@@ -79,6 +79,7 @@ Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a
   app/src/index.css (tokens, fuentes y lienzo)  ←  src/index.css
   app/src/tema/*                                ←  src/lib/theme/*
   app/index.html (script de tema)               ←  index.html
+  app/public/favicon.svg y icons/apple-touch-icon-180.png  ←  public/ (el icono de Concreta)
 Copyright (c) Javier Ramírez Bandera. El lienzo 2D que se copió para V1 (transform.ts,
 useCanvasView2D.ts y ZoomControls.tsx) se quitó en I2: la planta se dibuja con el motor de vistas
 propio (app/src/vistas/).

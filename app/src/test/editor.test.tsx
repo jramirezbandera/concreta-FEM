@@ -335,6 +335,39 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     expect(screen.getByRole("button", { name: "Revisión" }).hasAttribute("disabled")).toBe(true);
     // Guardar está activo (hay cambios sin guardar)
     expect(screen.getByRole("button", { name: /Descargar/ }).getAttribute("data-sin-guardar")).toBe("true");
+
+    // Copiar y Borrar sin nada elegido esperan a que se elija: un clic abre su diálogo con lo elegido
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar una orden" }), { target: { value: "planta N1" } });
+    fireEvent.click(screen.getAllByRole("option", { name: /N1/ })[0]!);
+    const objetos = () => screen.getByText("Objetos", { selector: "h2 span" }).closest("section")!;
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^Vigas/ }));
+    const copiar = within(screen.getByRole("toolbar", { name: "Herramientas de Modelo" })).getByRole("button", { name: "Copiar" });
+    fireEvent.click(copiar);
+    expect(copiar.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelector(".aviso-herr")?.textContent).toMatch(/elija las vigas/);
+    // Un pilar no se copia: sigue esperando
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^Pilares/ }));
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^P1/ }));
+    expect(screen.queryByRole("dialog", { name: "Copiar a otras plantas" })).toBeNull();
+    // Con Ctrl se suman; Intro abre el diálogo con las dos
+    fireEvent.pointerDown(window, { ctrlKey: true });
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^V1/ }), { ctrlKey: true });
+    fireEvent.pointerDown(window, { ctrlKey: true });
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^V2/ }), { ctrlKey: true });
+    expect(screen.queryByRole("dialog", { name: "Copiar a otras plantas" })).toBeNull();
+    expect(container.querySelector(".aviso-herr")?.textContent).toMatch(/2 elegidos/);
+    fireEvent.keyDown(window, { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Copiar a otras plantas" }), { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Copiar a otras plantas" })).toBeNull();
+    expect(copiar.getAttribute("aria-pressed")).toBe("false");
+    // Borrar: Esc suelta lo elegido; un clic sin Ctrl abre el diálogo
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(within(screen.getByRole("toolbar", { name: "Herramientas de Modelo" })).getByRole("button", { name: "Borrar" }));
+    fireEvent.pointerDown(window);
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^V1/ }));
+    expect(screen.getByRole("dialog", { name: "Borrar V1" })).toBeTruthy();
   }, 120_000);
 
   it("V2b: un paño con su carga y un muro con un hueco y su empuje, tecleados, dan la huella del mismo modelo escrito a mano", async () => {

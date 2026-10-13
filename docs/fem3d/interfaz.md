@@ -325,7 +325,7 @@ El armazón de §3 y §4 con el lienzo de hoy: la planta sigue en SVG y el 3D si
 
 | Espacio | Barra | Navegador | Vista | Propiedades | Panel inferior |
 |---|---|---|---|---|---|
-| **Modelo** | Pilar, Viga, Losa y Apoyo (abren su tabla en la fila nueva) · A plantas y Borrar (lo elegido) · Plantas, Materiales y Secciones · Planta o 3D | Proyecto, plantas y objetos por tipo (los de la planta activa) | Planta (modelo, diagnósticos o malla) o 3D | Lo elegido (formulario o datos) o, sin nada, la planta: resumen, cargas por caso, equilibrio e hipótesis | Tablas, Diagnósticos y Combinaciones |
+| **Modelo** | Pilar, Viga, Losa y Apoyo (abren su tabla en la fila nueva) · Copiar (a otras plantas) y Borrar (lo elegido; sin nada que les sirva, esperan a que se elija: un clic abre su diálogo, Ctrl+clic suma e Intro lo abre) · Plantas, Materiales y Secciones · Planta o 3D | Proyecto, plantas y objetos por tipo (los de la planta activa) | Planta (modelo, diagnósticos o malla) o 3D | Lo elegido (formulario o datos) o, sin nada, la planta: resumen, cargas por caso, equilibrio e hipótesis | Tablas, Diagnósticos y Combinaciones |
 | **Cargas** | Caso activo · Nueva carga · Casos | Proyecto, plantas y casos | Planta con las cargas del caso activo | Como en Modelo | Como en Modelo |
 | **Resultados** | Combinación · Losas, Diagramas, Pilares, Deformada · magnitud o esfuerzo del modo · escala | Plantas y, en Diagramas, las vigas de la planta | Lo de las pantallas de V1 | Losas: valor en el punto, extremos y flechas. Diagramas: la pieza, la estación y los vanos. Pilares: el pilar elegido por tramos. Deformada: desplomes y perfil | Combinaciones. Diagramas: el alzado de la pieza con su cursor. Pilares: el cuadro de la planta |
 | **Revisión** | Estado de la firma · copiar la orden de firmar | Índice del informe | El informe | Firma, identidad y comprobaciones | — |
@@ -406,7 +406,7 @@ El motor de vistas de §5 y §10 con el grafismo de §8 y los ejes de §9. Lo qu
 - **Selección compartida:**
   - la del visor pasa a ser una lista; la última elegida es la principal (la del inspector);
   - elegir en una vista elige en todas, en el navegador y en la tabla;
-  - con varias, Propiedades da la lista por tipo, y Borrar y A plantas trabajan con todas;
+  - con varias, Propiedades da la lista por tipo, y Borrar y Copiar trabajan con todas;
   - en Resultados, el clic sigue siendo el de cada modo (el valor del punto, la viga o el pilar).
 - **Fuera de I2:** sólido, translúcido, filtros, rango de plantas, aislar y caja de sección (I3); resultados en 3D y en el alzado, y el valor bajo el cursor (I4); vistas guardadas en el proyecto (I3); táctil (V3); la planta de abajo en gris.
 

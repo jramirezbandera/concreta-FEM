@@ -469,6 +469,11 @@ body {
 .vista { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; background: var(--color-bg-canvas); }
 .vista-cab { position: absolute; top: 10px; left: 10px; right: 220px; z-index: 15; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; pointer-events: none; }
 .vista-cab > * { pointer-events: auto; }
+/* Lo que pide una herramienta que espera a que se elija (Copiar, Borrar), abajo en el centro */
+.chip.aviso-herr {
+  position: absolute; left: 50%; bottom: 12px; z-index: 16; transform: translateX(-50%);
+  max-width: calc(100% - 340px); white-space: normal; height: auto; min-height: 30px; padding: 5px 12px; text-align: center; pointer-events: none;
+}
 .chip {
   display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
   border: 1px solid var(--color-border-main); border-radius: 8px;
