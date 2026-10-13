@@ -346,6 +346,9 @@ body {
   background: var(--color-bg-primary); cursor: cell;
 }
 .hoja td.calc { color: var(--color-text-disabled); background: var(--color-bg-surface); cursor: default; }
+/* Lo que no aplica al tipo de la fila (Forjados): rayado tenue; se puede escribir, y si se escribe, la fila da error */
+.hoja td.na { background: repeating-linear-gradient(135deg, var(--color-bg-surface) 0 5px, var(--color-bg-primary) 5px 9px); }
+.hoja tr.borrador td.na { background: repeating-linear-gradient(135deg, var(--color-bg-surface) 0 5px, var(--color-bg-primary) 5px 9px); }
 .hoja tr[data-sel="true"] td:not(.marca) { background: var(--color-tint-accent); }
 .hoja tr[data-sel="true"] td.marca { color: var(--color-accent); }
 /* Elegido en las vistas o en el navegador (I2) */
@@ -370,7 +373,7 @@ body {
   background: transparent; color: var(--color-text-primary); font: inherit; cursor: pointer;
 }
 .hoja tr.borrador td { background: var(--color-bg-surface); color: var(--color-text-secondary); }
-.hoja tr.borrador td.falta { box-shadow: inset 0 -2px 0 var(--color-tint-warn); }
+.hoja tr.borrador td.falta, .hoja tr[data-pendiente="true"] td.falta { box-shadow: inset 0 -2px 0 var(--color-tint-warn); }
 .hoja td.marca.f { color: var(--color-state-fail); font-weight: 600; }
 .hoja td.marca.w { color: var(--color-state-warn); font-weight: 600; }
 

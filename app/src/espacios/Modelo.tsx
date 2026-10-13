@@ -16,10 +16,9 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ListOrdered, Trash2 } from "lucide-react";
-import { lista } from "../../../src/editor/referencias.ts";
-import { DEF_TABLAS, TABLAS, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
+import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
-import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcForjado, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
@@ -35,7 +34,7 @@ import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, ZonaVistas } fr
 import { usePedido } from "../sesion/usePedido.ts";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
-const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "panos", "apoyos", "apoyosLineales", "cargas"]);
+const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "forjados", "apoyos", "apoyosLineales", "cargas"]);
 /** La escala de las cargas en el alzado y el 3D (por la que se multiplica la automática). */
 const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
 type Escala = (typeof ESCALAS)[number];
@@ -153,8 +152,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcEjes} nombre="Ejes" onClick={() => abrirTabla("ejes")} title="La tabla de ejes de replanteo (sin ejes en el proyecto, los propuestos)" />
           <Herramienta icono={IcPilar} nombre="Pilar" onClick={() => abrirTabla("pilares", true)} title="Un pilar nuevo en la tabla de pilares" />
           <Herramienta icono={IcViga} nombre="Viga" onClick={() => abrirTabla("vigas", true)} title="Una viga nueva en la tabla de vigas" />
-          <Herramienta icono={IcLosa} nombre="Losa" onClick={() => abrirTabla("losas", true)} title="Una losa nueva en la tabla de losas" />
-          <Herramienta icono={IcForjado} nombre="Forjado" onClick={() => abrirTabla("panos", true)} title="Un paño de forjado unidireccional nuevo en la tabla de paños (el reticular es una losa con intereje)" />
+          <Herramienta icono={IcLosa} nombre="Forjado" onClick={() => abrirTabla("forjados", true, { tipo: "maciza" })} title="Un forjado nuevo en la tabla de forjados: losa maciza, reticular o unidireccional, según su columna «tipo»" />
           <Herramienta icono={IcMuro} nombre="Muro" onClick={() => abrirTabla("muros", true)} title="Un muro nuevo en la tabla de muros" />
           <Herramienta icono={IcApoyo} nombre="Apoyo" onClick={() => abrirTabla("apoyos", true)} title="Un apoyo nuevo en la tabla de apoyos" />
           <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" onClick={() => abrirTabla("apoyosLineales", true)} title="Un apoyo lineal nuevo en la tabla de apoyos lineales" />
@@ -290,7 +288,7 @@ function Objetos({ tablas }: { tablas: NombreTabla[] }) {
     const ctx = contexto(m);
     return tablas.map((t) => {
       const def = DEF_TABLAS[t];
-      const todos = lista(m, def.coleccion);
+      const todos = objetosTabla(m, t);
       const aqui = todos.filter((o) => {
         const ps = def.plantas(o, ctx);
         return ps === null || (planta !== null && ps.includes(planta));
@@ -354,7 +352,7 @@ function NavModelo() {
     <>
       <Proyecto />
       <NavVistas />
-      <Objetos tablas={["pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "ejes"]} />
+      <Objetos tablas={["pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "ejes"]} />
     </>
   );
 }

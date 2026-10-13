@@ -17,9 +17,8 @@ import { resolverOpciones, type ModeloFisico } from "../compilador/fisico.ts";
 import { leerTsv } from "./celdas.ts";
 import { copiarAPlantas, escribirFila, exportar, pegar } from "./edicion.ts";
 import { aplicar, type Operacion } from "./operaciones.ts";
-import { lista } from "./referencias.ts";
 import { serializar } from "./serializar.ts";
-import { DEF_TABLAS, TABLAS, contexto } from "./tablas.ts";
+import { DEF_TABLAS, TABLAS, contexto, objetosTabla } from "./tablas.ts";
 
 const huella = (p: Proyecto) => huellaCompilacion(p.modelo, resolverOpciones(p.opciones));
 const vacio = (): Proyecto => ({ esquema: VERSION_ESQUEMA, modelo: { plantas: [], materiales: [], secciones: [], casos: [] } });
@@ -39,7 +38,7 @@ describe("V2b: ida y vuelta (criterio 1)", () => {
       let vistos = 0;
       for (const t of TABLAS) {
         const def = DEF_TABLAS[t];
-        for (const o of lista(modelo, def.coleccion)) {
+        for (const o of objetosTabla(modelo, t)) {
           const l = def.objeto(def.fila(o, ctx), ctx);
           expect(l.ok ? l.objeto : l.errores, `${t} ${o.id}`).toStrictEqual(o);
           // Con su base, sale igual
@@ -63,15 +62,17 @@ describe("V2b: ida y vuelta (criterio 1)", () => {
     });
 
   it("las tablas de V2b son de las colecciones nuevas, y ninguna columna de una tabla queda sin leer", () => {
-    for (const t of ["muros", "panos", "apoyosLineales"] as const) expect(DEF_TABLAS[t].coleccion).toBe(t);
-    expect((TABLAS as readonly string[]).includes("bandas")).toBe(false);
+    for (const t of ["muros", "apoyosLineales"] as const) expect(DEF_TABLAS[t].colecciones).toEqual([t]);
+    // Losas (macizas y reticulares) y paños, en una sola tabla con su tipo, como en CYPECAD
+    expect(DEF_TABLAS.forjados.colecciones).toEqual(["losas", "panos"]);
+    for (const x of ["bandas", "losas", "panos"]) expect((TABLAS as readonly string[]).includes(x), x).toBe(false);
     // Cada clave que da la fila de un objeto es una columna de su tabla
     for (const nombre of NOMBRES) {
       const { modelo } = proyectoV2b(nombre);
       const ctx = contexto(modelo);
       for (const t of TABLAS) {
         const claves = new Set(DEF_TABLAS[t].columnas.map((c) => c.clave));
-        for (const o of lista(modelo, DEF_TABLAS[t].coleccion)) for (const k of Object.keys(DEF_TABLAS[t].fila(o, ctx))) expect(claves.has(k), `${t}.${k}`).toBe(true);
+        for (const o of objetosTabla(modelo, t)) for (const k of Object.keys(DEF_TABLAS[t].fila(o, ctx))) expect(claves.has(k), `${t}.${k}`).toBe(true);
       }
     }
   });
@@ -87,7 +88,7 @@ describe("V2b: desplegables", () => {
         for (const col of def.columnas) {
           if (!col.opciones) continue;
           const valores = col.opciones(ctx).map((o) => o.valor);
-          for (const o of lista(modelo, def.coleccion)) {
+          for (const o of objetosTabla(modelo, t)) {
             const fila = def.fila(o, ctx);
             if (!(col.clave === "psi" && /\d/.test(fila.psi ?? ""))) expect(valores, `${t} ${o.id} · ${col.clave}`).toContain(fila[col.clave] ?? "");
             if (!fila[col.clave]) continue;
@@ -106,8 +107,8 @@ describe("V2b: celdas que no valen", () => {
   const p = proyectoV2b("variado");
   const m = p.modelo;
   const ctx = contexto(m);
-  const fila = (t: "losas" | "muros" | "cargas", id: string) => DEF_TABLAS[t].fila(lista(m, DEF_TABLAS[t].coleccion).find((o) => o.id === id)!, ctx);
-  const errores = (t: "losas" | "muros" | "cargas", f: Record<string, string>) => {
+  const fila = (t: "forjados" | "muros" | "cargas", id: string) => DEF_TABLAS[t].fila(objetosTabla(m, t).find((o) => o.id === id)!, ctx);
+  const errores = (t: "forjados" | "muros" | "cargas", f: Record<string, string>) => {
     const l = DEF_TABLAS[t].objeto(f, ctx);
     return l.ok ? [] : l.errores.map((e) => e.columna);
   };
@@ -115,13 +116,13 @@ describe("V2b: celdas que no valen", () => {
   const maciza = m.losas![1]!.id;
 
   it("un dato de reticular en una losa sin intereje no entra; con intereje, nervio y capa son obligatorios", () => {
-    expect(errores("losas", { ...fila("losas", maciza), nervio: "0,12" })).toEqual(["nervio"]);
-    expect(errores("losas", { ...fila("losas", losa), nervio: "", capa: "" })).toEqual(["nervio", "capa"]);
+    expect(errores("forjados", { ...fila("forjados", maciza), nervio: "0,12" })).toEqual(["nervio"]);
+    expect(errores("forjados", { ...fila("forjados", losa), nervio: "", capa: "" })).toEqual(["nervio", "capa"]);
   });
 
   it("los multiplicadores, por su nombre, en (0, 100] y sin repetir", () => {
-    for (const x of ["m11=0", "m33=0,5", "m11=0,3 m11=0,4", "m11 0,3", "m11=101"]) expect(errores("losas", { ...fila("losas", losa), multiplicadores: x }), x).toEqual(["multiplicadores"]);
-    const l = DEF_TABLAS.losas.objeto({ ...fila("losas", losa), multiplicadores: "v23 = 0,15  M11=0,5" }, ctx);
+    for (const x of ["m11=0", "m33=0,5", "m11=0,3 m11=0,4", "m11 0,3", "m11=101"]) expect(errores("forjados", { ...fila("forjados", losa), multiplicadores: x }), x).toEqual(["multiplicadores"]);
+    const l = DEF_TABLAS.forjados.objeto({ ...fila("forjados", losa), multiplicadores: "v23 = 0,15  M11=0,5" }, ctx);
     expect(l.ok && (l.objeto.reticular as { multiplicadores: unknown }).multiplicadores).toStrictEqual({ m11: 0.5, v23: 0.15 });
   });
 
@@ -146,7 +147,7 @@ describe("V2b: celdas que no valen", () => {
 });
 
 describe("V2b: se reconstruye desde un proyecto vacío (criterio 3)", () => {
-  const ORDEN = ["plantas", "materiales", "secciones", "casos", "pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "cargas"] as const;
+  const ORDEN = ["plantas", "materiales", "secciones", "casos", "pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "cargas"] as const;
 
   for (const nombre of NOMBRES)
     it(`${nombre}: pegando sus tablas, el mismo modelo (sin sus bandas, que ya no tienen tabla) y la misma huella`, () => {
@@ -171,8 +172,8 @@ describe("Fase F: las bandas, fuera de la app", () => {
 
   it("editar lo demás y guardar deja las bandas como estaban", () => {
     const losa = base.modelo.losas![0]!;
-    const f = DEF_TABLAS.losas.fila(losa as never, contexto(base.modelo));
-    const r = escribirFila(base, "losas", losa.id, { ...f, espesor: "0,3" });
+    const f = DEF_TABLAS.forjados.fila(losa as never, contexto(base.modelo));
+    const r = escribirFila(base, "forjados", losa.id, { ...f, espesor: "0,3" });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.proyecto.modelo.bandas).toStrictEqual(base.modelo.bandas);

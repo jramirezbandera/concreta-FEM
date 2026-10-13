@@ -5,15 +5,15 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { operacionFila } from "../../../src/editor/edicion.ts";
-import { indiceIds, lista } from "../../../src/editor/referencias.ts";
-import { DEF_TABLAS, TABLAS, conActual, contexto, type NombreTabla } from "../../../src/editor/tablas.ts";
+import { indiceIds } from "../../../src/editor/referencias.ts";
+import { DEF_TABLAS, conActual, contexto, filaConValor, objetosTabla, tablaDeColeccion, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 
 /** La tabla del editor de un objeto (null si no está en el proyecto: un eje propuesto). */
 export function tablaDe(m: Parameters<typeof indiceIds>[0], id: string): NombreTabla | null {
   const c = indiceIds(m).get(id)?.coleccion;
-  return TABLAS.find((t) => DEF_TABLAS[t].coleccion === c) ?? null;
+  return c ? tablaDeColeccion(c) : null;
 }
 
 export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla }) {
@@ -21,7 +21,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
   const ed = proyecto.edicion!;
   const m = ed.proyecto.modelo;
   const def = DEF_TABLAS[tabla];
-  const objeto = lista(m, def.coleccion).find((o) => o.id === id);
+  const objeto = objetosTabla(m, tabla).find((o) => o.id === id);
   const ctx = useMemo(() => contexto(m), [m]);
   const fila = useMemo(() => (objeto ? def.fila(objeto, ctx) : null), [objeto, def, ctx]);
   const [borrador, setBorrador] = useState<Record<string, string>>({});
@@ -34,12 +34,23 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
 
   if (!objeto || !fila) return <p className="nota">Este objeto ya no está en el proyecto.</p>;
 
+  /** Cambia de tipo (Forjados) y aún le falta algo: el borrador es la fila entera, que se guarda al completarla. */
+  const pendiente = borrador.tipo !== undefined && borrador.tipo !== fila.tipo;
+  const actual = { ...fila, ...borrador };
+
   /** `elegido`: lo elegido en un desplegable (si no, lo escrito en el campo). */
   const escribir = (clave: string, elegido?: string) => {
     const v = elegido ?? borrador[clave];
-    if (v === undefined || v === (fila[clave] ?? "")) return;
-    const t = operacionFila(m, tabla, id, { ...fila, [clave]: v });
-    if (!t.ok) return setErrores({ ...errores, [clave]: t.errores.map((e) => e.mensaje).join(" · ") });
+    if (v === undefined || (v === (fila[clave] ?? "") && !pendiente)) return;
+    const nueva = filaConValor(def, pendiente ? actual : fila, clave, v);
+    const t = operacionFila(m, tabla, id, nueva);
+    if (!t.ok) {
+      if (t.errores.every((e) => e.mensaje === "falta el dato") && ((clave === "tipo" && def.conValor) || pendiente)) {
+        setBorrador(nueva);
+        return setErrores(Object.fromEntries(t.errores.map((e) => [e.columna ?? "", "falta el dato: se guarda en cuanto esté completo"])));
+      }
+      return setErrores({ ...errores, [clave]: t.errores.map((e) => e.mensaje).join(" · ") });
+    }
     const col = def.columnas.find((c) => c.clave === clave)!;
     const r = ed.editar(t.operacion, `${id} · ${col.titulo} = ${v || "(vacío)"}`);
     if (!r.ok) return setErrores({ ...errores, [clave]: r.errores.map((e) => e.mensaje).join(" ") });
@@ -49,8 +60,18 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
   return (
     <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`} valor="editable">
       <div className="py-1.5">
+        {pendiente && (
+          <p className="nota">
+            {id} pasa a ser {actual.tipo}: falta lo marcado.{" "}
+            <button type="button" className="text-accent hover:underline" onClick={() => (setBorrador({}), setErrores({}))}>
+              Dejarlo como estaba
+            </button>
+          </p>
+        )}
         {def.columnas.map((c) => {
           const valor = borrador[c.clave] ?? fila[c.clave] ?? "";
+          // Lo que no aplica al tipo (Forjados) no se enseña si está vacío
+          if (def.aplica && !valor && !def.aplica(c.clave, actual)) return null;
           const err = errores[c.clave];
           const opciones = c.opciones && !c.calculada ? c.opciones(ctx) : null;
           return (

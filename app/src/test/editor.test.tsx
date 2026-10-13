@@ -307,8 +307,8 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     elegirTabla("vigas");
     escribirFilaNueva("vigas", { planta: "N1", puntos: "0 0; 6 0", seccion: "V30x50" });
     escribirFilaNueva("vigas", { planta: "N1", puntos: "0 5; 6 5", seccion: "V30x50" });
-    elegirTabla("losas");
-    escribirFilaNueva("losas", { planta: "N1", contorno: "0 0; 6 0; 6 5; 0 5", espesor: "0,2", material: "HA-30" });
+    elegirTabla("forjados");
+    escribirFilaNueva("forjados", { planta: "N1", contorno: "0 0; 6 0; 6 5; 0 5", espesor: "0,2", material: "HA-30" });
     elegirTabla("cargas");
     escribirFilaNueva("cargas", { tipo: "superficie", caso: "Q", planta: "N1", sobre: "L1", q: "0 0 -2" });
 
@@ -394,8 +394,8 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     elegirTabla("vigas");
     escribirFilaNueva("vigas", { planta: "N1", puntos: "0 0; 6 0", seccion: "V30x50" });
     escribirFilaNueva("vigas", { planta: "N1", puntos: "0 5; 6 5", seccion: "V30x50" });
-    elegirTabla("panos");
-    escribirFilaNueva("panos", { planta: "N1", contorno: "0 0; 6 0; 6 5; 0 5", direccion: "90", intereje: "0,7", seccion: "T25", pp: "3,5" });
+    elegirTabla("forjados");
+    escribirFilaNueva("forjados", { planta: "N1", tipo: "unidireccional", contorno: "0 0; 6 0; 6 5; 0 5", direccion: "90", intereje: "0,7", seccion: "T25", pp: "3,5" });
     elegirTabla("muros");
     fireEvent.click(screen.getByRole("checkbox", { name: /sólo/ }));
     // Los huecos antes que el material: con él, el muro tiene lo que necesita y se crea
@@ -426,5 +426,67 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     const h = huella(esperado);
     await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(h), { timeout: 30_000 });
     expect(container.querySelector("[data-estado]")?.getAttribute("data-estado")).toBe("sin-calcular");
+  }, 120_000);
+});
+
+/** Escribe en las celdas de la fila de un objeto, como en la fila nueva. */
+function escribirEnFila(tabla: NombreTabla, id: string, valores: Record<string, string>) {
+  const g = hoja(tabla);
+  for (const [clave, v] of Object.entries(valores)) {
+    const j = DEF_TABLAS[tabla].columnas.findIndex((c) => c.clave === clave);
+    const td = g.querySelector(`tr[data-id="${id}"]`)!.querySelectorAll("td")[j + 1]!;
+    fireEvent.mouseDown(td);
+    fireEvent.doubleClick(td);
+    const lista = within(td as HTMLElement).queryByRole("combobox");
+    if (DEF_TABLAS[tabla].columnas[j]!.opciones) {
+      fireEvent.change(lista!, { target: { value: v } });
+      continue;
+    }
+    const input = within(td as HTMLElement).getByRole("textbox");
+    fireEvent.change(input, { target: { value: v } });
+    fireEvent.keyDown(input, { key: "Enter" });
+  }
+}
+
+describe("Forjados: cambiar el tipo en la tabla", () => {
+  it("de reticular a unidireccional: la fila queda pendiente hasta tener lo que necesita y entonces pasa a los paños", async () => {
+    const texto = readFileSync(join(RAIZ, "ejemplos", "muestrario", "proyecto.json"), "utf8");
+    const p = JSON.parse(texto) as Proyecto;
+    const { container } = render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Muestrario/ }));
+    await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(huella(p)), { timeout: 30_000 });
+    // Una sola herramienta «Forjado» y una sola tabla, sin Losas ni Paños
+    expect(screen.queryByRole("button", { name: /^Losa$/ })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /^Paños/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Forjado" }));
+    await waitFor(() => expect(hoja("forjados")).toBeTruthy());
+    fireEvent.click(screen.getByRole("checkbox", { name: /sólo/ }));
+
+    escribirEnFila("forjados", "L2", { tipo: "unidireccional" });
+    const fila = () => hoja("forjados").querySelector('tr[data-id="L2"]')!;
+    const celda = (clave: string) => fila().querySelectorAll("td")[DEF_TABLAS.forjados.columnas.findIndex((c) => c.clave === clave) + 1]!;
+    // Pendiente: se ve como queda (sin canto ni nervio, la vigueta y la dirección por poner) y el modelo no cambia
+    expect(fila().getAttribute("data-pendiente")).toBe("true");
+    expect(celda("tipo").textContent).toContain("unidireccional");
+    expect(celda("espesor").textContent).toBe("");
+    expect(celda("seccion").className).toContain("falta");
+    expect(celda("nervio").className).toContain("na");
+    expect(screen.getByText(/L2: falta/)).toBeTruthy();
+    expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(huella(p));
+
+    escribirEnFila("forjados", "L2", { direccion: "90", pp: "3,5", seccion: "VT-70" });
+    const { escribirFila } = await import("../../../src/editor/edicion.ts");
+    const f = DEF_TABLAS.forjados.fila(p.modelo.losas!.find((x) => x.id === "L2")! as never, (await import("../../../src/editor/tablas.ts")).contexto(p.modelo));
+    const r = escribirFila(p, "forjados", "L2", { ...f, tipo: "unidireccional", espesor: "", material: "", pp: "3,5", direccion: "90", nervio: "", capa: "", caseton: "", abacos: "", multiplicadores: "", seccion: "VT-70" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.proyecto.modelo.panos!.map((x) => x.id)).toEqual(["F1", "L2"]);
+    await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(huella(r.proyecto)), { timeout: 30_000 });
+    expect(fila().getAttribute("data-pendiente")).toBe("false");
+    expect(screen.getByText(/L2 es ahora unidireccional/)).toBeTruthy();
   }, 120_000);
 });

@@ -10,8 +10,7 @@ import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { FormularioObjeto, tablaDe } from "../editor/Formulario.tsx";
-import { lista } from "../../../src/editor/referencias.ts";
-import { DEF_TABLAS } from "../../../src/editor/tablas.ts";
+import { objetosTabla } from "../../../src/editor/tablas.ts";
 
 /** Un valor del proyecto en texto: números como están, puntos como (x; y), lo demás en JSON. */
 export function valorCampo(v: unknown): string {
@@ -33,7 +32,7 @@ export function Inspector({ id }: { id: string }) {
   /** Planta donde mirar el objeto: la suya o, en un pilar o un muro, la actual si la atraviesa (si no, la de arriba). */
   const localizar = () => {
     // Lo editado manda: el worker puede ir aún por la versión anterior
-    const local = ed && tabla ? lista(ed.proyecto.modelo, DEF_TABLAS[tabla].coleccion).find((x) => x.id === id) : undefined;
+    const local = ed && tabla ? objetosTabla(ed.proyecto.modelo, tabla).find((x) => x.id === id) : undefined;
     const d = (local ?? o?.datos) as { planta?: string; desde?: string; hasta?: string } | undefined;
     if (!d) return;
     if (d.planta) setPlanta(d.planta);

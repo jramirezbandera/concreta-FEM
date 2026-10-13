@@ -1,7 +1,7 @@
 /**
  * Tablas del editor (V2a, `docs/fem3d/visor.md` §6.2; V2b, §7.2): plantas, ejes (I2), materiales,
- * secciones, pilares, vigas, losas (con su reticular), paños, muros, apoyos, apoyos lineales, bandas,
- * casos y cargas (con los empujes). Cada tabla pasa de un objeto del modelo físico a una fila de
+ * secciones, pilares, vigas, forjados (losas macizas, reticulares y paños unidireccionales, con su
+ * tipo, como los paños de CYPECAD), muros, apoyos, apoyos lineales, casos y cargas (con los empujes). Cada tabla pasa de un objeto del modelo físico a una fila de
  * textos (`fila`) y de una fila a un objeto (`objeto`); escribir en una celda, pegar desde Excel y
  * copiar a Excel usan las mismas dos funciones, así que lo que se ve es lo que se guarda.
  *
@@ -18,7 +18,7 @@ import { cotasPlantas } from "../compilador/cotas.ts";
 import { Lector, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
-export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "casos", "cargas"] as const;
+export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "casos", "cargas"] as const;
 export type NombreTabla = (typeof TABLAS)[number];
 
 export interface Columna {
@@ -48,7 +48,8 @@ export function conActual(opciones: readonly Opcion[], valor: string): readonly 
   return opciones.some((o) => o.valor === valor) ? opciones : [{ valor, texto: valor || "—" }, ...opciones];
 }
 
-export type Lectura = { ok: true; objeto: Objeto } | { ok: false; errores: ErrorCelda[] };
+/** Lo leído de una fila; `coleccion`, la lista del modelo en que va (en una tabla de varias, como Forjados). */
+export type Lectura = { ok: true; objeto: Objeto; coleccion?: Coleccion } | { ok: false; errores: ErrorCelda[] };
 
 /** Lo que una tabla necesita del modelo: de qué colección es un id. */
 export interface Contexto {
@@ -64,14 +65,34 @@ export function contexto(modelo: ModeloFisico): Contexto {
 export interface DefTabla {
   nombre: NombreTabla;
   titulo: string;
-  coleccion: Coleccion;
+  /**
+   * Las listas del modelo que enseña, en este orden. Casi todas, una; Forjados, las losas (macizas y
+   * reticulares) y los paños unidireccionales, porque para el ingeniero son la misma cosa con otro
+   * tipo. En una de varias, `objeto` dice en cuál va cada fila.
+   */
+  colecciones: readonly Coleccion[];
   /** Prefijo de los ids nuevos. */
   prefijo: string;
+  /** El prefijo de un id nuevo según la fila (Forjados: «F» para un unidireccional, como Renumerar). */
+  prefijoDe?(f: Fila): string;
   columnas: readonly Columna[];
   fila(o: Objeto, ctx: Contexto): Fila;
   objeto(f: Fila, ctx: Contexto, base?: Objeto): Lectura;
   /** Las plantas en las que se ve el objeto (null: en todas, como las plantas o los casos). */
   plantas(o: Objeto, ctx: Contexto): string[] | null;
+  /** ¿La columna aplica a la fila? Lo que no aplica va vacío y la hoja lo apaga (Forjados: según su tipo). Sin ella, todas. */
+  aplica?(clave: string, f: Fila): boolean;
+  /**
+   * La fila con `valor` escrito en `clave`. Por defecto, sólo esa celda; en Forjados, cambiar el tipo
+   * vacía lo que deja de aplicar y el pp (que es otro en cada tipo), para no arrastrar un dato que ya
+   * no significa lo mismo.
+   */
+  conValor?(f: Fila, clave: string, valor: string): Fila;
+}
+
+/** La fila con `valor` escrito en `clave`, con lo que la tabla haga al cambiarla (`DefTabla.conValor`). */
+export function filaConValor(def: DefTabla, f: Fila, clave: string, valor: string): Fila {
+  return def.conValor ? def.conValor(f, clave, valor) : { ...f, [clave]: valor };
 }
 
 // ─── Utilidades ─────────────────────────────────────────────────────────────────────────────────
@@ -129,7 +150,7 @@ const nombre: Columna = { clave: "nombre", titulo: "nombre" };
 const plantas: DefTabla = {
   nombre: "plantas",
   titulo: "Plantas",
-  coleccion: "plantas",
+  colecciones: ["plantas"],
   prefijo: "N",
   columnas: [
     id,
@@ -164,7 +185,7 @@ const plantas: DefTabla = {
 const materiales: DefTabla = {
   nombre: "materiales",
   titulo: "Materiales",
-  coleccion: "materiales",
+  colecciones: ["materiales"],
   prefijo: "M",
   columnas: [
     id,
@@ -218,7 +239,7 @@ const DIM = ["b", "h", "D", "bf", "hf", "bw", "A", "Iy", "Iz", "J", "Avy", "Avz"
 const secciones: DefTabla = {
   nombre: "secciones",
   titulo: "Secciones",
-  coleccion: "secciones",
+  colecciones: ["secciones"],
   prefijo: "S",
   columnas: [
     id,
@@ -277,7 +298,7 @@ const secciones: DefTabla = {
 const pilares: DefTabla = {
   nombre: "pilares",
   titulo: "Pilares",
-  coleccion: "pilares",
+  colecciones: ["pilares"],
   prefijo: "P",
   columnas: [
     id,
@@ -350,7 +371,7 @@ const pilares: DefTabla = {
 const vigas: DefTabla = {
   nombre: "vigas",
   titulo: "Vigas",
-  coleccion: "vigas",
+  colecciones: ["vigas"],
   prefijo: "V",
   columnas: [
     id,
@@ -393,131 +414,167 @@ const vigas: DefTabla = {
   plantas: (o) => [o.planta as string],
 };
 
-// ─── Losas ──────────────────────────────────────────────────────────────────────────────────────
+// ─── Forjados: losas macizas, reticulares y paños unidireccionales ────────────────────────────────
 
 /** Multiplicadores de lámina de un reticular, en su orden (H47). */
 const MULT = ["f11", "f22", "f12", "m11", "m22", "m12", "v13", "v23"] as const;
 
-const losas: DefTabla = {
-  nombre: "losas",
-  titulo: "Losas",
-  coleccion: "losas",
+/** Tipos de forjado de la tabla: los dos primeros son losas (láminas) y el último, un paño (viguetas como barras, D2). */
+export const TIPOS_FORJADO = ["maciza", "reticular", "unidireccional"] as const;
+export type TipoForjado = (typeof TIPOS_FORJADO)[number];
+
+const DEL_RETICULAR = ["nervio", "capa", "caseton", "abacos", "multiplicadores"] as const;
+
+/** Las columnas propias de cada tipo; las demás (id, planta, contorno, pp, dirección…) son de todos. */
+const PROPIAS: Readonly<Record<TipoForjado, readonly string[]>> = {
+  maciza: ["espesor", "material"],
+  reticular: ["espesor", "material", "intereje", ...DEL_RETICULAR],
+  unidireccional: ["intereje", "seccion"],
+};
+const DE_ALGUNO = new Set(Object.values(PROPIAS).flat());
+
+/** El tipo de un forjado del modelo. */
+export function tipoForjado(o: Objeto, ctx: Contexto): TipoForjado {
+  if (ctx.coleccionDe(o.id) === "panos") return "unidireccional";
+  return (o as unknown as Losa).reticular ? "reticular" : "maciza";
+}
+
+/** El tipo de una fila: el de su celda o, vacía, maciza. */
+const tipoFila = (f: Fila): string => (f.tipo ?? "").trim().toLowerCase() || "maciza";
+
+/**
+ * Forjados (como los paños de CYPECAD): una sola tabla con una columna «tipo». En el modelo siguen
+ * siendo dos listas, las losas (maciza o reticular: láminas) y los paños unidireccionales (viguetas
+ * como barras, D2), así que el fichero y el cálculo no cambian. Cambiar el tipo de una fila pasa el
+ * objeto de una lista a la otra con su id y sus cargas (`convertir` en `operaciones.ts`).
+ *
+ * «dirección» es el eje 1 de una losa (la dirección de los nervios de un reticular) o la de las
+ * viguetas de un unidireccional. Lo que no aplica al tipo de una fila tiene que estar vacío.
+ */
+const forjados: DefTabla = {
+  nombre: "forjados",
+  titulo: "Forjados",
+  colecciones: ["losas", "panos"],
   prefijo: "L",
+  prefijoDe: (f) => (tipoFila(f) === "unidireccional" ? "F" : "L"),
   columnas: [
     id,
     nombre,
     { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
-    { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes: «x y; x y; …» (al menos 3, sin repetir el primero)" },
+    { clave: "tipo", titulo: "tipo", ayuda: "maciza (por defecto), reticular o unidireccional; cambiarlo cambia las columnas que tocan", opciones: fijas(TIPOS_FORJADO) },
+    { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes de las vigas y los muros en que se apoya: «x y; x y; …» (al menos 3, sin repetir el primero)" },
     { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»" },
-    { clave: "espesor", titulo: "espesor", unidad: "m" },
-    { clave: "material", titulo: "material", opciones: ids("materiales") },
-    { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio; por defecto, γ·espesor" },
-    { clave: "eje1", titulo: "eje 1", unidad: "°", ayuda: "dirección del eje 1 de las láminas desde +X; por defecto, 0. En un reticular, la de sus nervios" },
-    { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "reticular: distancia entre ejes de nervios; vacío en una losa maciza" },
+    { clave: "espesor", titulo: "canto", unidad: "m", ayuda: "maciza y reticular: el canto total; vacío en un unidireccional (lo da la sección de la vigueta)" },
+    { clave: "material", titulo: "material", ayuda: "maciza y reticular; vacío en un unidireccional", opciones: ids("materiales", "ninguno: unidireccional") },
+    { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio. Maciza: por defecto, γ·canto. Reticular con casetón perdido y unidireccional (con las bovedillas): obligatorio" },
+    { clave: "direccion", titulo: "dirección", unidad: "°", ayuda: "desde +X. Maciza: la del eje 1 de las láminas (por defecto, 0). Reticular: la de los nervios y su perpendicular. Unidireccional: la de las viguetas (obligatoria)" },
+    { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "reticular: entre ejes de nervios; unidireccional: entre ejes de viguetas; vacío en una maciza" },
     { clave: "nervio", titulo: "nervio", unidad: "m", ayuda: "reticular: ancho del nervio (bw)" },
     { clave: "capa", titulo: "capa", unidad: "m", ayuda: "reticular: espesor de la capa de compresión (hf)" },
     { clave: "caseton", titulo: "casetón", ayuda: "reticular: perdido (por defecto; entonces el pp es obligatorio) o recuperable", opciones: fijas(["perdido", "recuperable"], "perdido") },
-    { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse de la losa" },
+    { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse del forjado" },
     { clave: "multiplicadores", titulo: "multiplicadores", ayuda: `reticular: los que sustituyen a los calculados, «m11=0,32 m22=0,27 …» (${MULT.join(", ")}), cada uno en (0, 100]` },
+    { clave: "seccion", titulo: "vigueta", ayuda: "unidireccional: sección de una vigueta (la T bruta u otra); no pesa: el peso es el pp", opciones: ids("secciones", "ninguna: losa") },
   ],
-  fila(o) {
+  fila(o, ctx) {
+    const tipo = tipoForjado(o, ctx);
+    if (tipo === "unidireccional") {
+      const p = o as unknown as PanoUnidireccional;
+      return {
+        id: p.id,
+        nombre: s(p.nombre),
+        planta: p.planta,
+        tipo,
+        contorno: textoPuntos(p.contorno),
+        huecos: p.huecos?.length ? textoPoligonos(p.huecos) : "",
+        espesor: "",
+        material: "",
+        pp: n(p.pp),
+        direccion: n(p.direccion),
+        intereje: n(p.intereje),
+        nervio: "",
+        capa: "",
+        caseton: "",
+        abacos: "",
+        multiplicadores: "",
+        seccion: p.seccion,
+      };
+    }
     const l = o as unknown as Losa;
     const r = l.reticular;
     return {
       id: l.id,
       nombre: s(l.nombre),
       planta: l.planta,
+      tipo,
       contorno: textoPuntos(l.contorno),
       huecos: l.huecos?.length ? textoPoligonos(l.huecos) : "",
       espesor: n(l.espesor),
       material: l.material,
       pp: n(l.pp),
-      eje1: n(l.eje1),
+      direccion: n(l.eje1),
       intereje: n(r?.intereje),
       nervio: n(r?.nervio),
       capa: n(r?.capa),
       caseton: s(r?.caseton),
       abacos: r?.abacos?.length ? textoPoligonos(r.abacos) : "",
       multiplicadores: r?.multiplicadores ? textoClaves(r.multiplicadores as Record<string, number>, MULT) : "",
+      seccion: "",
     };
   },
   objeto(f) {
     const L = new Lector(f);
-    const intereje = L.numero("intereje", { mayorQue: 0 });
+    const tipo = tipoFila(f);
+    const comun = { id: L.texto("id") ?? "", nombre: L.texto("nombre"), planta: L.texto("planta", { obligatorio: true }), contorno: L.puntos("contorno", { obligatorio: true, min: 3 }), huecos: L.poligonos("huecos") };
+    if (tipo === "unidireccional") {
+      L.vacias(["espesor", "material", ...DEL_RETICULAR], "a un unidireccional");
+      const r = resultado(L, {
+        ...comun,
+        direccion: L.numero("direccion", { obligatorio: true }),
+        intereje: L.numero("intereje", { obligatorio: true, mayorQue: 0 }),
+        seccion: L.texto("seccion", { obligatorio: true }),
+        pp: L.numero("pp", { obligatorio: true, min: 0 }),
+      });
+      return r.ok ? { ...r, coleccion: "panos" } : r;
+    }
+    if (tipo !== "maciza" && tipo !== "reticular") {
+      L.errores.push({ columna: "tipo", mensaje: `«${f.tipo}» no es un tipo de forjado: ${TIPOS_FORJADO.join(", ")}` });
+      return { ok: false, errores: L.errores };
+    }
+    L.vacias(["seccion"], `a una losa ${tipo}`);
     let reticular: Losa["reticular"];
-    if (intereje === undefined) L.vacias(["nervio", "capa", "caseton", "abacos", "multiplicadores"], "a una losa maciza (sin intereje)");
+    if (tipo === "maciza") L.vacias(["intereje", ...DEL_RETICULAR], "a una losa maciza");
     else
       reticular = limpio({
-        intereje,
+        intereje: L.numero("intereje", { obligatorio: true, mayorQue: 0 }),
         nervio: L.numero("nervio", { obligatorio: true, mayorQue: 0 }),
         capa: L.numero("capa", { obligatorio: true, mayorQue: 0 }),
         caseton: L.opcion("caseton", ["perdido", "recuperable"] as const),
         abacos: L.poligonos("abacos"),
         multiplicadores: L.claves("multiplicadores", MULT, { max: 100 }),
       }) as Losa["reticular"];
-    return resultado(L, {
-      id: L.texto("id") ?? "",
-      nombre: L.texto("nombre"),
-      planta: L.texto("planta", { obligatorio: true }),
-      contorno: L.puntos("contorno", { obligatorio: true, min: 3 }),
-      huecos: L.poligonos("huecos"),
+    const r = resultado(L, {
+      ...comun,
       espesor: L.numero("espesor", { obligatorio: true, mayorQue: 0 }),
       material: L.texto("material", { obligatorio: true }),
       pp: L.numero("pp", { min: 0 }),
-      eje1: L.numero("eje1"),
+      eje1: L.numero("direccion"),
       reticular,
     });
+    return r.ok ? { ...r, coleccion: "losas" } : r;
   },
   plantas: (o) => [o.planta as string],
-};
-
-// ─── Paños unidireccionales ─────────────────────────────────────────────────────────────────────
-
-const panos: DefTabla = {
-  nombre: "panos",
-  titulo: "Paños",
-  coleccion: "panos",
-  prefijo: "F",
-  columnas: [
-    id,
-    nombre,
-    { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
-    { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes de las vigas y los muros en que se apoya: «x y; x y; …» (al menos 3)" },
-    { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»" },
-    { clave: "direccion", titulo: "dirección", unidad: "°", ayuda: "de las viguetas, desde +X" },
-    { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "distancia entre ejes de viguetas" },
-    { clave: "seccion", titulo: "sección", ayuda: "de una vigueta (la T bruta u otra); no pesa: el peso es el pp", opciones: ids("secciones") },
-    { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio del forjado, con las bovedillas" },
-  ],
-  fila(o) {
-    const p = o as unknown as PanoUnidireccional;
-    return {
-      id: p.id,
-      nombre: s(p.nombre),
-      planta: p.planta,
-      contorno: textoPuntos(p.contorno),
-      huecos: p.huecos?.length ? textoPoligonos(p.huecos) : "",
-      direccion: n(p.direccion),
-      intereje: n(p.intereje),
-      seccion: p.seccion,
-      pp: n(p.pp),
-    };
+  aplica(clave, f) {
+    const propias = PROPIAS[tipoFila(f) as TipoForjado];
+    return !propias || !DE_ALGUNO.has(clave) || propias.includes(clave);
   },
-  objeto(f) {
-    const L = new Lector(f);
-    return resultado(L, {
-      id: L.texto("id") ?? "",
-      nombre: L.texto("nombre"),
-      planta: L.texto("planta", { obligatorio: true }),
-      contorno: L.puntos("contorno", { obligatorio: true, min: 3 }),
-      huecos: L.poligonos("huecos"),
-      direccion: L.numero("direccion", { obligatorio: true }),
-      intereje: L.numero("intereje", { obligatorio: true, mayorQue: 0 }),
-      seccion: L.texto("seccion", { obligatorio: true }),
-      pp: L.numero("pp", { obligatorio: true, min: 0 }),
-    });
+  conValor(f, clave, valor) {
+    const r: Record<string, string> = { ...f, [clave]: valor };
+    if (clave !== "tipo" || tipoFila(r) === tipoFila(f)) return r;
+    for (const k of DE_ALGUNO) if (forjados.aplica!(k, f) && !forjados.aplica!(k, r)) r[k] = "";
+    r.pp = "";
+    return r;
   },
-  plantas: (o) => [o.planta as string],
 };
 
 // ─── Muros ──────────────────────────────────────────────────────────────────────────────────────
@@ -525,7 +582,7 @@ const panos: DefTabla = {
 const muros: DefTabla = {
   nombre: "muros",
   titulo: "Muros",
-  coleccion: "muros",
+  colecciones: ["muros"],
   prefijo: "M",
   columnas: [
     id,
@@ -575,7 +632,7 @@ const muros: DefTabla = {
 const apoyosLineales: DefTabla = {
   nombre: "apoyosLineales",
   titulo: "Apoyos lineales",
-  coleccion: "apoyosLineales",
+  colecciones: ["apoyosLineales"],
   prefijo: "AL",
   columnas: [
     id,
@@ -599,7 +656,7 @@ const apoyosLineales: DefTabla = {
 const ejes: DefTabla = {
   nombre: "ejes",
   titulo: "Ejes",
-  coleccion: "ejes",
+  colecciones: ["ejes"],
   prefijo: "E",
   columnas: [
     { ...id, ayuda: "lo que dicen sus burbujas si no tiene nombre («A», «1»); único en todo el modelo" },
@@ -627,7 +684,7 @@ const ejes: DefTabla = {
 const apoyos: DefTabla = {
   nombre: "apoyos",
   titulo: "Apoyos",
-  coleccion: "apoyos",
+  colecciones: ["apoyos"],
   prefijo: "A",
   columnas: [id, { clave: "planta", titulo: "planta", opciones: opcionesPlantas }, { clave: "x", titulo: "x", unidad: "m" }, { clave: "y", titulo: "y", unidad: "m" }, { clave: "coartados", titulo: "coartados", ayuda: COARTADOS }],
   fila(o) {
@@ -658,7 +715,7 @@ const PSI = ["uso-A", "uso-B", "uso-C", "uso-D", "uso-E", "uso-G", "nieve-hasta-
 const casos: DefTabla = {
   nombre: "casos",
   titulo: "Casos",
-  coleccion: "casos",
+  colecciones: ["casos"],
   prefijo: "C",
   columnas: [
     id,
@@ -736,7 +793,7 @@ const CARGA = ["planta", "sobre", "ejes", "x", "y", "F", "M", "q", "qb", "desde"
 const cargas: DefTabla = {
   nombre: "cargas",
   titulo: "Cargas",
-  coleccion: "cargas",
+  colecciones: ["cargas"],
   prefijo: "Q",
   columnas: [
     id,
@@ -839,7 +896,7 @@ const cargas: DefTabla = {
   },
 };
 
-export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, losas, panos, muros, apoyos, apoyosLineales, casos, cargas };
+export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, forjados, muros, apoyos, apoyosLineales, casos, cargas };
 
 /** Un id libre con el prefijo de la tabla: el primero de `<prefijo>1`, `<prefijo>2`… que no está en el modelo. */
 export function idNuevo(m: ModeloFisico, prefijo: string, ocupados: ReadonlySet<string> = new Set()): string {
@@ -848,4 +905,14 @@ export function idNuevo(m: ModeloFisico, prefijo: string, ocupados: ReadonlySet<
     const x = `${prefijo}${i}`;
     if (!idx.has(x) && !ocupados.has(x)) return x;
   }
+}
+
+/** Los objetos de una tabla, de todas sus listas y en el orden del modelo (las losas antes que los paños). */
+export function objetosTabla(m: ModeloFisico, t: NombreTabla): Objeto[] {
+  return DEF_TABLAS[t].colecciones.flatMap((c) => lista(m, c));
+}
+
+/** La tabla en la que se edita una colección (losas y paños, en Forjados). */
+export function tablaDeColeccion(c: Coleccion): NombreTabla | null {
+  return TABLAS.find((t) => DEF_TABLAS[t].colecciones.includes(c)) ?? null;
 }

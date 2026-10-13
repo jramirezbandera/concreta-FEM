@@ -32,6 +32,12 @@ export type Operacion =
   | { op: "crear"; coleccion: Coleccion; objeto: Objeto; antesDe?: string | null }
   /** Sustituye el objeto `id` por `objeto`; si cambia el id, cambia también todas sus referencias. */
   | { op: "cambiar"; coleccion: Coleccion; id: string; objeto: Objeto }
+  /**
+   * Pasa el objeto `id` de la lista `de` a la `coleccion` como `objeto` (al final): un forjado que
+   * cambia de tipo, de losa a paño unidireccional o al revés. Sus cargas de superficie lo siguen
+   * (`losa` ↔ `pano`); si cambia el id, cambian todas sus referencias.
+   */
+  | { op: "convertir"; de: Coleccion; coleccion: Coleccion; id: string; objeto: Objeto }
   /** Borra unos objetos; si otros los usan, `dependientes` dice qué hacer con ellos. */
   | { op: "borrar"; ids: readonly string[]; dependientes?: "borrar" | { reasignar: Readonly<Record<string, string>> } }
   /** Lleva el objeto `id` antes de `antesDe` (al final con null). */
@@ -162,6 +168,49 @@ function cambiar(m: ModeloFisico, o: Extract<Operacion, { op: "cambiar" }>): Pas
   return { ok: true, modelo: r };
 }
 
+/** El campo con que una carga de superficie apunta a un objeto de cada colección que se puede convertir. */
+const CAMPO_SUPERFICIE: Partial<Record<Coleccion, string>> = { losas: "losa", panos: "pano" };
+
+function convertir(m: ModeloFisico, o: Extract<Operacion, { op: "convertir" }>): Paso {
+  if (o.de === o.coleccion) return cambiar(m, { op: "cambiar", coleccion: o.coleccion, id: o.id, objeto: o.objeto });
+  const l = lista(m, o.de);
+  const i = l.findIndex((x) => x.id === o.id);
+  if (i < 0) return { ok: false, errores: [error("editor/no-existe", `No hay ninguna ${nombreColeccion(o.de)} «${o.id}».`, [o.id])] };
+  const nuevo = o.objeto.id;
+  const mal = idValido(nuevo);
+  if (mal) return { ok: false, errores: [error("editor/id", `${nombreColeccion(o.de)} ${o.id}: ${mal}.`, [o.id])] };
+  if (nuevo !== o.id) {
+    const ya = indiceIds(m).get(nuevo);
+    if (ya) return { ok: false, errores: [error("editor/id-repetido", `El id «${nuevo}» ya es de ${nombreColeccion(ya.coleccion)}: los ids son únicos en todo el modelo.`, [o.id])] };
+  }
+  const antes = CAMPO_SUPERFICIE[o.de];
+  const despues = CAMPO_SUPERFICIE[o.coleccion];
+  let r = conLista(m, o.de, l.filter((_, k) => k !== i));
+  // Lo que apuntaba al objeto en su lista vieja: las cargas de superficie cambian de campo; otra cosa no se puede
+  const errores: Diagnostico[] = [];
+  for (const c of Object.keys(NOMBRES) as Coleccion[]) {
+    let cambio = false;
+    const n = lista(r, c).map((x) => {
+      const refs = referenciasDe(c, x).filter((y) => y.id === o.id && y.destino === o.de);
+      if (!refs.length) return x;
+      if (c === "cargas" && antes && despues && refs.every((y) => y.ruta.length === 1 && y.ruta[0] === antes)) {
+        const { [antes]: _v, ...resto } = x;
+        cambio = true;
+        return { ...resto, [despues]: o.id } as Objeto;
+      }
+      errores.push(error("editor/convertir", `${nombreColeccion(c)} ${x.id} usa ${o.id} como ${nombreColeccion(o.de)}, y no puede usarlo como ${nombreColeccion(o.coleccion)}.`, [x.id]));
+      return x;
+    });
+    if (cambio) r = conLista(r, c, n);
+  }
+  if (errores.length) return { ok: false, errores };
+  r = conLista(r, o.coleccion, [...lista(r, o.coleccion), o.objeto]);
+  if (nuevo !== o.id) r = renombrarReferencias(r, o.id, nuevo);
+  const malas = referenciasMalas(r, o.coleccion, lista(r, o.coleccion).find((x) => x.id === nuevo)!);
+  if (malas.length) return { ok: false, errores: malas };
+  return { ok: true, modelo: r };
+}
+
 function borrar(m: ModeloFisico, o: Extract<Operacion, { op: "borrar" }>): Paso {
   const idx = indiceIds(m);
   const faltan = o.ids.filter((id) => !idx.has(id));
@@ -246,6 +295,8 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
       return crear(m, o);
     case "cambiar":
       return conArmado(cambiar(m, o), m, datos, new Map([[o.id, o.objeto.id]]));
+    case "convertir":
+      return conArmado(convertir(m, o), m, datos, new Map([[o.id, o.objeto.id]]));
     case "borrar":
       return conArmado(borrar(m, o), m, datos);
     case "mover":

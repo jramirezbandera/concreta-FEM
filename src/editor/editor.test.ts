@@ -19,7 +19,7 @@ import { proyectoNuevo } from "./plantilla.ts";
 import { COLECCIONES, lista, referenciasRotas, usos, type Objeto } from "./referencias.ts";
 import { serializar } from "./serializar.ts";
 import { leerEjemplo } from "./serializar.test.ts";
-import { DEF_TABLAS, TABLAS, contexto } from "./tablas.ts";
+import { DEF_TABLAS, TABLAS, contexto, objetosTabla } from "./tablas.ts";
 import { proyectoV2b } from "../../validacion/v2b/modelos.ts";
 
 const huella = (p: Proyecto) => huellaCompilacion(p.modelo, resolverOpciones(p.opciones));
@@ -32,7 +32,7 @@ function aplicado(p: Proyecto, o: Operacion): Proyecto {
 }
 
 /** Orden en el que se pegan las tablas: lo referido antes que lo que refiere. */
-const ORDEN = ["plantas", "materiales", "secciones", "casos", "pilares", "vigas", "losas", "apoyos", "cargas"] as const;
+const ORDEN = ["plantas", "materiales", "secciones", "casos", "pilares", "vigas", "forjados", "apoyos", "cargas"] as const;
 
 describe("tablas: ida y vuelta (criterio 3)", () => {
   for (const nombre of ["ejemplo", "1022", "edificio"] as const)
@@ -41,7 +41,7 @@ describe("tablas: ida y vuelta (criterio 3)", () => {
       const ctx = contexto(proyecto.modelo);
       for (const t of TABLAS) {
         const def = DEF_TABLAS[t];
-        for (const o of lista(proyecto.modelo, def.coleccion)) {
+        for (const o of objetosTabla(proyecto.modelo, t)) {
           const l = def.objeto(def.fila(o, ctx), ctx);
           expect(l.ok ? l.objeto : l.errores, `${t} ${o.id}`).toStrictEqual(o);
         }
@@ -78,7 +78,7 @@ describe("tablas: desplegables", () => {
           if (!col.opciones) continue;
           const valores = col.opciones(ctx).map((o) => o.valor);
           expect(new Set(valores).size, `${t}.${col.clave}: opciones repetidas`).toBe(valores.length);
-          for (const o of lista(proyecto.modelo, def.coleccion)) {
+          for (const o of objetosTabla(proyecto.modelo, t)) {
             const fila = def.fila(o, ctx);
             // ψ también admite «ψ0 ψ1 ψ2», que no es una opción
             if (!(col.clave === "psi" && /\d/.test(fila.psi ?? ""))) expect(valores, `${t} ${o.id} · ${col.clave}`).toContain(fila[col.clave] ?? "");
@@ -234,16 +234,18 @@ describe("operaciones", () => {
 });
 
 describe("sucesiones al azar (criterio 2)", () => {
-  const TABLAS_EDITABLES = ["pilares", "vigas", "losas", "cargas", "secciones", "casos", "plantas", "muros", "panos", "apoyosLineales"] as const;
+  // Forjados, dos veces: eran dos tablas (losas y paños), y así se eligen con la misma frecuencia
+  const TABLAS_EDITABLES = ["pilares", "vigas", "forjados", "cargas", "secciones", "casos", "plantas", "muros", "forjados", "apoyosLineales"] as const;
 
   function paso(p: Proyecto, r: () => number): { op: Operacion; etiqueta: string } | null {
     const elegir = <T>(xs: readonly T[]): T | undefined => (xs.length ? xs[Math.floor(r() * xs.length)] : undefined);
     const m = p.modelo;
     const t = elegir(TABLAS_EDITABLES)!;
     const def = DEF_TABLAS[t];
-    const o = elegir(lista(m, def.coleccion));
+    const o = elegir(objetosTabla(m, t));
     const k = r();
     if (!o) return null;
+    const coleccion = contexto(m).coleccionDe(o.id)!;
     if (k < 0.35) {
       // Cambiar una celda numérica
       const f = def.fila(o, contexto(m));
@@ -252,9 +254,9 @@ describe("sucesiones al azar (criterio 2)", () => {
       const tr = operacionFila(m, t, o.id, { ...f, [col.clave]: String(Math.round(r() * 80) / 10).replace(".", ",") });
       return tr.ok ? { op: tr.operacion, etiqueta: `${o.id}.${col.clave}` } : null;
     }
-    if (k < 0.55) return { op: { op: "cambiar", coleccion: def.coleccion, id: o.id, objeto: { ...o, id: `${o.id}~${Math.floor(r() * 1000)}` } }, etiqueta: `renombrar ${o.id}` };
+    if (k < 0.55) return { op: { op: "cambiar", coleccion, id: o.id, objeto: { ...o, id: `${o.id}~${Math.floor(r() * 1000)}` } }, etiqueta: `renombrar ${o.id}` };
     if (k < 0.75) {
-      const otros = lista(m, def.coleccion).filter((x) => x.id !== o.id);
+      const otros = lista(m, coleccion).filter((x) => x.id !== o.id);
       const otro = elegir(otros);
       if (r() < 0.5 || !otro) return { op: { op: "borrar", ids: [o.id], dependientes: "borrar" }, etiqueta: `borrar ${o.id}` };
       return { op: { op: "borrar", ids: [o.id], dependientes: { reasignar: { [o.id]: otro.id } } }, etiqueta: `borrar ${o.id} → ${otro.id}` };

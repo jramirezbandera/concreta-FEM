@@ -12,7 +12,7 @@ import type { ModeloFisico } from "../compilador/fisico.ts";
 import { escribirTsv, leerTsv, type ErrorCelda, type Fila } from "./celdas.ts";
 import { aplicar, type Aplicacion, type Operacion } from "./operaciones.ts";
 import { indiceIds, lista, referenciasDe, type Coleccion, type Objeto } from "./referencias.ts";
-import { contexto, DEF_TABLAS, idNuevo, type NombreTabla } from "./tablas.ts";
+import { contexto, DEF_TABLAS, idNuevo, objetosTabla, type NombreTabla } from "./tablas.ts";
 
 export interface ErrorFila {
   /** Fila del bloque pegado, desde 1 (sin contar la cabecera), o null en una sola fila. */
@@ -33,12 +33,16 @@ const deCeldas = (fila: number | null, id: string | undefined, es: readonly Erro
 export function operacionFila(m: ModeloFisico, tabla: NombreTabla, id: string | null, fila: Fila, ocupados: ReadonlySet<string> = new Set(), numero: number | null = null): Traduccion {
   const def = DEF_TABLAS[tabla];
   const ctx = contexto(m);
-  const base = id === null ? undefined : lista(m, def.coleccion).find((o) => o.id === id);
+  const base = id === null ? undefined : objetosTabla(m, tabla).find((o) => o.id === id);
   if (id !== null && !base) return { ok: false, errores: [{ fila: numero, id, mensaje: `No hay ningún objeto «${id}» en ${def.titulo.toLowerCase()}.` }] };
-  const f = id === null && (fila.id ?? "").trim() === "" ? { ...fila, id: idNuevo(m, def.prefijo, ocupados) } : fila;
+  const f = id === null && (fila.id ?? "").trim() === "" ? { ...fila, id: idNuevo(m, def.prefijoDe?.(fila) ?? def.prefijo, ocupados) } : fila;
   const l = def.objeto(f, ctx, base);
   if (!l.ok) return { ok: false, errores: deCeldas(numero, f.id || id || undefined, l.errores) };
-  return { ok: true, operacion: id === null ? { op: "crear", coleccion: def.coleccion, objeto: l.objeto } : { op: "cambiar", coleccion: def.coleccion, id, objeto: l.objeto } };
+  const coleccion = l.coleccion ?? def.colecciones[0]!;
+  if (id === null) return { ok: true, operacion: { op: "crear", coleccion, objeto: l.objeto } };
+  // En Forjados, un cambio de tipo pasa el objeto de las losas a los paños o al revés
+  const de = ctx.coleccionDe(id)!;
+  return { ok: true, operacion: de === coleccion ? { op: "cambiar", coleccion, id, objeto: l.objeto } : { op: "convertir", de, coleccion, id, objeto: l.objeto } };
 }
 
 /** Escribe una fila y aplica la operación. */
@@ -52,7 +56,7 @@ export function escribirFila(p: Proyecto, tabla: NombreTabla, id: string | null,
 export function filas(m: ModeloFisico, tabla: NombreTabla, planta?: string): { id: string; fila: Fila }[] {
   const def = DEF_TABLAS[tabla];
   const ctx = contexto(m);
-  return lista(m, def.coleccion)
+  return objetosTabla(m, tabla)
     .filter((o) => {
       if (planta === undefined) return true;
       const ps = def.plantas(o, ctx);
@@ -110,10 +114,10 @@ export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde 
     else {
       const id = (pegada.id ?? "").trim();
       const ya = id === "" ? undefined : idx.get(id);
-      if (ya && ya.coleccion !== def.coleccion) return errores.push({ fila: num, id, columna: "id", mensaje: `«${id}» ya es un id de ${ya.coleccion}` });
+      if (ya && !def.colecciones.includes(ya.coleccion)) return errores.push({ fila: num, id, columna: "id", mensaje: `«${id}» ya es un id de ${ya.coleccion}` });
       if (ya) baseId = id;
     }
-    const base = baseId === undefined ? undefined : lista(m, def.coleccion).find((o) => o.id === baseId);
+    const base = baseId === undefined ? undefined : objetosTabla(m, tabla).find((o) => o.id === baseId);
     const fila = base ? { ...def.fila(base, ctx), ...pegada } : pegada;
     const id = (fila.id ?? "").trim();
     if (id !== "") {

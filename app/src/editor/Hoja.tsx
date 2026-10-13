@@ -21,7 +21,7 @@ import { escribirTsv } from "../../../src/editor/celdas.ts";
 import { proponerEjes } from "../../../src/compilador/ejes.ts";
 import { operacionFila, pegar } from "../../../src/editor/edicion.ts";
 import { lista, type Objeto } from "../../../src/editor/referencias.ts";
-import { DEF_TABLAS, TABLAS, conActual, contexto, type NombreTabla, type Opcion } from "../../../src/editor/tablas.ts";
+import { DEF_TABLAS, TABLAS, conActual, contexto, filaConValor, objetosTabla, type NombreTabla, type Opcion } from "../../../src/editor/tablas.ts";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import { useVisor } from "../contexto.ts";
 import { DialogoBorrar, DialogoCopiar } from "./Dialogos.tsx";
@@ -35,8 +35,8 @@ interface FilaVista {
 }
 
 /** Tablas que se pueden filtrar por la planta activa. */
-const POR_PLANTA: ReadonlySet<NombreTabla> = new Set(["pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "cargas"]);
-const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "panos", "apoyos", "apoyosLineales", "cargas"]);
+const POR_PLANTA: ReadonlySet<NombreTabla> = new Set(["pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "cargas"]);
+const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "forjados", "apoyos", "apoyosLineales", "cargas"]);
 const CON_ORDEN: ReadonlySet<NombreTabla> = new Set(["plantas", "casos"]);
 
 /** Peor severidad y mensajes de los diagnósticos de cada objeto. */
@@ -159,6 +159,8 @@ const FilaHoja = memo(function FilaHoja({
   indice,
   claves,
   calculadas,
+  aplica,
+  faltan,
   conOpciones,
   sel,
   elegido,
@@ -176,6 +178,10 @@ const FilaHoja = memo(function FilaHoja({
   indice: number;
   claves: readonly string[];
   calculadas: readonly boolean[];
+  /** ¿La columna aplica a la fila? (Forjados: según su tipo.) Lo que no aplica y está vacío se apaga. */
+  aplica?: (clave: string, fila: FilaTexto) => boolean;
+  /** En una fila pendiente (que cambia de tipo), lo que le falta para guardarse. */
+  faltan?: ReadonlySet<string>;
   /** Columnas que se eligen en un desplegable. */
   conOpciones: readonly boolean[];
   sel: boolean;
@@ -194,12 +200,12 @@ const FilaHoja = memo(function FilaHoja({
   onValor: (v: string) => void;
 }) {
   return (
-    <tr data-sel={sel} data-elegido={elegido} data-id={vista.id}>
+    <tr data-sel={sel} data-elegido={elegido} data-id={vista.id} data-pendiente={!!faltan}>
       <td className={`marca ${diag?.sev ?? ""}`} title={diag ? diag.textos.join("\n") : `Fila ${indice + 1}`} onClick={(e) => onMarca(indice, e.shiftKey)}>
         {diag ? (diag.sev === "f" ? "!" : "·") : indice + 1}
       </td>
       {claves.map((k, c) => (
-        <td key={k} className={calculadas[c] ? "calc" : undefined} data-activa={activa === c && !error} data-error={activa === c && error} title={vista.fila[k] || undefined} onMouseDown={(e) => onCelda(indice, c, e.shiftKey)} onDoubleClick={() => onEditar(indice, c, undefined, true)}>
+        <td key={k} className={calculadas[c] ? "calc" : faltan?.has(k) ? "falta" : aplica && !vista.fila[k] && !aplica(k, vista.fila) ? "na" : undefined} data-activa={activa === c && !error} data-error={activa === c && error} title={vista.fila[k] || undefined} onMouseDown={(e) => onCelda(indice, c, e.shiftKey)} onDoubleClick={() => onEditar(indice, c, undefined, true)}>
           {contenidoCelda({
             texto: vista.fila[k] ?? "",
             editando: activa === c ? editando : null,
@@ -232,12 +238,18 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
   const [soloPlanta, setSoloPlanta] = useState(true);
   const filtro = POR_PLANTA.has(tabla) && soloPlanta && planta ? planta : null;
 
+  /**
+   * Una fila que cambia de tipo (Forjados) y aún no tiene lo que necesita: se ve como queda y se
+   * guarda en cuanto está completa (un objeto del modelo es siempre válido). Esc la deja como estaba.
+   */
+  const [pendiente, setPendiente] = useState<{ id: string; fila: FilaTexto } | null>(null);
+
   // Una fila por objeto, reutilizada mientras el objeto no cambie (aplicar conserva los que no toca)
   const cache = useRef(new WeakMap<Objeto, FilaTexto>());
-  const filas = useMemo<FilaVista[]>(() => {
+  const filasModelo = useMemo<FilaVista[]>(() => {
     const ctx = contexto(m);
     const r: FilaVista[] = [];
-    for (const o of lista(m, def.coleccion)) {
+    for (const o of objetosTabla(m, tabla)) {
       if (filtro) {
         const ps = def.plantas(o, ctx);
         if (ps !== null && !ps.includes(filtro)) continue;
@@ -252,6 +264,12 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     }
     return r;
   }, [m, def, filtro, tabla]);
+  const filas = useMemo(() => (pendiente ? filasModelo.map((v) => (v.id === pendiente.id ? { ...v, fila: pendiente.fila } : v)) : filasModelo), [filasModelo, pendiente]);
+  const faltanPendiente = useMemo(() => {
+    if (!pendiente) return new Set<string>();
+    const t = operacionFila(m, tabla, pendiente.id, pendiente.fila);
+    return new Set(t.ok ? [] : t.errores.filter((e) => e.mensaje === "falta el dato").map((e) => e.columna ?? ""));
+  }, [pendiente, m, tabla]);
 
   const [cursor, setCursor] = useState<{ f: number; c: number }>({ f: 0, c: 0 });
   const [ancla, setAncla] = useState<number | null>(null);
@@ -275,6 +293,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     setDesplegado(false);
     setError(false);
     setBorrador({});
+    setPendiente(null);
     setMensaje(null);
   }, [tabla, filtro]);
 
@@ -330,7 +349,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     const col = cols[c]!;
     if (col.calculada) return true;
     if (f === nBorrador) {
-      const nb = { ...borrador, [col.clave]: valor };
+      const nb = filaConValor(def, borrador, col.clave, valor);
       setBorrador(nb);
       if (Object.values(nb).every((x) => x.trim() === "")) return true;
       const t = operacionFila(m, tabla, null, nb);
@@ -357,8 +376,16 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     }
     const v = filas[f]!;
     if ((v.fila[col.clave] ?? "") === valor) return true;
-    const t = operacionFila(m, tabla, v.id, { ...v.fila, [col.clave]: valor });
+    const nueva = filaConValor(def, v.fila, col.clave, valor);
+    const t = operacionFila(m, tabla, v.id, nueva);
     if (!t.ok) {
+      // Cambiar el tipo deja la fila a medias: queda pendiente hasta que tenga lo que necesita
+      if (t.errores.every((e) => e.mensaje === "falta el dato") && ((col.clave === "tipo" && def.conValor) || pendiente?.id === v.id)) {
+        setPendiente({ id: v.id, fila: nueva });
+        const faltan = t.errores.map((e) => cols.find((x) => x.clave === e.columna)?.titulo ?? e.columna);
+        setMensaje({ tono: "neu", texto: `${v.id}: falta ${faltan.join(", ")}. Se guarda en cuanto esté completa; Esc la deja como estaba.` });
+        return true;
+      }
       setMensaje({ tono: "fail", texto: t.errores.map((e) => `${cols.find((x) => x.clave === e.columna)?.titulo ?? e.columna ?? ""}: ${e.mensaje}`).join(" · ") });
       return false;
     }
@@ -367,8 +394,9 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
       setMensaje({ tono: "fail", texto: r.errores.map((e) => e.mensaje).join(" ") });
       return false;
     }
-    setMensaje(null);
-    if (t.operacion.op === "cambiar" && t.operacion.objeto.id !== v.id && seleccion === v.id) setSeleccion(t.operacion.objeto.id);
+    setMensaje(pendiente?.id === v.id ? { tono: "ok", texto: `${t.operacion.op === "convertir" ? `${v.id} es ahora ${nueva.tipo}` : `${v.id} completa`}.` } : null);
+    if (pendiente?.id === v.id) setPendiente(null);
+    if ((t.operacion.op === "cambiar" || t.operacion.op === "convertir") && t.operacion.objeto.id !== v.id && seleccion === v.id) setSeleccion(t.operacion.objeto.id);
     return true;
   };
 
@@ -468,6 +496,10 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         return;
       case "Escape":
         setAncla(null);
+        if (pendiente) {
+          setMensaje({ tono: "neu", texto: `${pendiente.id} se queda como estaba.` });
+          setPendiente(null);
+        }
         return;
     }
     if (!mod && !e.altKey && e.key.length === 1) {
@@ -519,12 +551,14 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
   const moverOrden = (d: -1 | 1) => {
     const v = filas[f0];
     if (!v) return;
-    const todos = lista(m, def.coleccion).map((x) => x.id);
+    // Sólo en las tablas con orden (plantas y casos), que son de una colección
+    const coleccion = def.colecciones[0]!;
+    const todos = lista(m, coleccion).map((x) => x.id);
     const i = todos.indexOf(v.id);
     const j = i + d;
     if (j < 0 || j >= todos.length) return;
     const antesDe = d < 0 ? todos[j]! : (todos[j + 1] ?? null);
-    const r = ed.editar({ op: "mover", coleccion: def.coleccion, id: v.id, antesDe }, `Mover ${v.id}`);
+    const r = ed.editar({ op: "mover", coleccion, id: v.id, antesDe }, `Mover ${v.id}`);
     if (r.ok) setCursor({ f: f0 + d, c: c0 });
   };
 
@@ -536,7 +570,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     return new Set(t.ok ? [] : t.errores.filter((e) => e.mensaje === "falta el dato").map((e) => e.columna ?? ""));
   }, [borrador, m, tabla]);
 
-  const contar = (t: NombreTabla) => lista(m, DEF_TABLAS[t].coleccion).length;
+  const contar = (t: NombreTabla) => objetosTabla(m, t).length;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col border-t border-border-main bg-bg-primary" aria-label="Tablas del modelo">
@@ -605,6 +639,8 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
                 indice={i}
                 claves={claves}
                 calculadas={calculadas}
+                aplica={def.aplica}
+                faltan={pendiente?.id === v.id ? faltanPendiente : undefined}
                 conOpciones={conOpciones}
                 sel={i >= rango[0] && i <= rango[1]}
                 elegido={elegidosS.has(v.id)}
@@ -632,7 +668,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
               {cols.map((c, j) => (
                 <td
                   key={c.clave}
-                  className={`${c.calculada ? "calc" : ""} ${faltanBorrador.has(c.clave) ? "falta" : ""}`}
+                  className={`${c.calculada ? "calc" : ""} ${faltanBorrador.has(c.clave) ? "falta" : ""} ${def.aplica && !borrador[c.clave] && !def.aplica(c.clave, borrador) ? "na" : ""}`}
                   data-activa={f0 === nBorrador && c0 === j && !error}
                   data-error={f0 === nBorrador && c0 === j && error}
                   onMouseDown={() => {
