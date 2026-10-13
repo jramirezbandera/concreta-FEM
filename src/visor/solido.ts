@@ -7,7 +7,9 @@
  * - Losa: su región (contorno menos huecos) de c − e a c. Un reticular, la capa de compresión, los
  *   ábacos y los nervios en las dos direcciones a su intereje (su sitio es ilustrativo: el cálculo
  *   usa multiplicadores, D3), con los de la segunda dirección partidos en los cruces.
- * - Paño: sus viguetas, las del compilador (C4-a), con su sección y la cara superior en c. Sin
+ * - Paño: sus viguetas, las del compilador (C4-a), con su sección y la cara superior en c, y macizo
+ *   del canto de la vigueta lo que no cae en la banda de un intereje de ninguna (junto a una viga
+ *   o un muro paralelos, donde el compilador no pone vigueta, o el sobrante del ancho). Sin
  *   compilar, una placa del canto de la vigueta (y una nota).
  * - Viga: su sección a lo largo de cada tramo, con la cara superior en c y los tramos rectos unidos
  *   a inglete. Bajo una losa o un paño se dibuja sólo lo que queda bajo su cara inferior (C2-g): las
@@ -738,6 +740,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       const S = fs.poligono.map(([x, u]) => [x, u - fs.h / 2] as Vec2);
       const nudos = compilado.modelo.nudos;
       const barras = compilado.modelo.barras ?? [];
+      const bandas: Vec2[][] = [];
       for (const id of ids) {
         const bs = compilado.mapeo.piezas[id] ?? [];
         if (!bs.length) continue;
@@ -751,6 +754,20 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
         const [s0, s1] = [Math.min(...ss), Math.max(...ss)];
         const A: Vec2 = [a[0] + s0 * dv[0], a[1] + s0 * dv[1]];
         barrido(S, A, dv, zc, [{ s0: 0, s1: s1 - s0, techo: 0 }], caras);
+        const [L, m] = [s1 - s0, p.intereje / 2];
+        const nv: Vec2 = [-dv[1] * m, dv[0] * m];
+        bandas.push([
+          [A[0] - nv[0], A[1] - nv[1]],
+          [A[0] + L * dv[0] - nv[0], A[1] + L * dv[1] - nv[1]],
+          [A[0] + L * dv[0] + nv[0], A[1] + L * dv[1] + nv[1]],
+          [A[0] + nv[0], A[1] + nv[1]],
+        ]);
+      }
+      // Lo que no cubre la banda de ninguna vigueta (junto a una viga o un muro paralelos, o el
+      // sobrante del ancho que no llega a un intereje), macizo con el canto de la vigueta
+      if (!fs.sinForma && p.intereje > 0) {
+        const d = cosSen(p.direccion);
+        prismas(descomponer([p.contorno as Vec2[], ...((p.huecos ?? []) as Vec2[][])], [bandas], d), d, (fr) => (fr.capas[0] ? [] : [[zc - fs.h, zc]]), caras);
       }
     } else {
       sinViguetas = true;

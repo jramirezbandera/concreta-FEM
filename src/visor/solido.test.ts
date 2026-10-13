@@ -193,12 +193,27 @@ function esperado(f: ModeloFisico, p: PiezaSolida, compilado: CompiladoSolido | 
     const s = sec(x.seccion);
     if (!compilado) return { nominal: formaSeccion(s)!.h * areaRegion(x), quitado: 0 };
     let L = 0;
-    for (const id of compilado.mapeo.panos![x.id]!)
+    // El macizo: la región menos lo que cubre la banda de un intereje de cada vigueta (no se solapan)
+    let cubierta = 0;
+    const region = { contorno: x.contorno, huecos: x.huecos ?? [] };
+    for (const id of compilado.mapeo.panos![x.id]!) {
+      const ns: Vec2[] = [];
       for (const b of compilado.mapeo.piezas[id]!) {
         const [n0, n1] = compilado.modelo.barras![b]!.nudos.map((n) => compilado.modelo.nudos[n]!);
         L += Math.hypot(n1!.x - n0!.x, n1!.y - n0!.y);
+        ns.push([n0!.x, n0!.y], [n1!.x, n1!.y]);
       }
-    return { nominal: areaDibujada(s) * L, quitado: 0 };
+      const [a, c] = [ns[0]!, ns[ns.length - 1]!];
+      const Lv = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      const u: Vec2 = [(c[0] - a[0]) / Lv, (c[1] - a[1]) / Lv];
+      const ss = ns.map((q) => (q[0] - a[0]) * u[0] + (q[1] - a[1]) * u[1]);
+      const [s0, s1] = [Math.min(...ss), Math.max(...ss)];
+      const w: Vec2 = [(-u[1] * x.intereje) / 2, (u[0] * x.intereje) / 2];
+      const P = (t: number, sg: number): Vec2 => [a[0] + t * u[0] + sg * w[0], a[1] + t * u[1] + sg * w[1]];
+      cubierta += momentosInterseccion(region, [P(s0, -1), P(s1, -1), P(s1, 1), P(s0, 1)]).A;
+    }
+    const macizo = formaSeccion(s)!.h * (areaRegion(x) - cubierta);
+    return { nominal: areaDibujada(s) * L + macizo, quitado: 0 };
   }
   if (p.tipo === "muro") {
     const m = f.muros!.find((y) => y.id === p.id)!;
