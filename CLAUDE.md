@@ -367,5 +367,6 @@
   - las puertas de uso de AB, de F, de I1, I2, I3 e I4, de V2a y de V2b;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
+  - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
