@@ -20,6 +20,7 @@
  *
  * Puro: sin IO, sin React ni DOM.
  */
+import { comprobarArmado, limpiarArmado, seguirLosas, type ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { comprobarProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
@@ -41,6 +42,8 @@ export type Operacion =
   | { op: "datos"; nombre?: string; descripcion?: string }
   /** I3: la lista de vistas guardadas, entera (no entra en la huella). Los nombres, no vacíos y sin repetir. */
   | { op: "vistas"; vistas: readonly VistaGuardada[] }
+  /** AB: la armadura base de las losas, entera (no entra en la huella). Valores ≥ 0 y losas del modelo. */
+  | { op: "armado"; armado: ArmadoProyecto | null }
   /** Varias operaciones como una sola: o entran todas o ninguna (y se deshacen de una vez). */
   | { op: "lote"; operaciones: readonly Operacion[] };
 
@@ -71,7 +74,7 @@ export const nombreColeccion = (c: Coleccion): string => NOMBRES[c];
 
 const conLista = (m: ModeloFisico, c: Coleccion, l: readonly Objeto[]): ModeloFisico => ({ ...m, [c]: l }) as ModeloFisico;
 
-type DatosProyecto = Partial<Pick<Proyecto, "nombre" | "descripcion" | "vistas">>;
+type DatosProyecto = Partial<Pick<Proyecto, "nombre" | "descripcion" | "vistas" | "armado">>;
 type Paso = { ok: true; modelo: ModeloFisico; proyecto?: DatosProyecto } | { ok: false; errores: Diagnostico[]; usos?: Uso[] };
 
 /** Las referencias de `o` que no apuntan a un objeto de su colección. */
@@ -228,18 +231,36 @@ function mover(m: ModeloFisico, o: Extract<Operacion, { op: "mover" }>): Paso {
   return { ok: true, modelo: conLista(m, o.coleccion, l) };
 }
 
+/** AB: la armadura base sigue a sus losas cuando una operación las renombra o las borra. */
+function conArmado(s: Paso, antes: ModeloFisico, datos: DatosProyecto, renombres: ReadonlyMap<string, string> = new Map()): Paso {
+  if (!s.ok || !datos.armado?.losas) return s;
+  const armado = seguirLosas(datos.armado, renombres, antes, s.modelo);
+  if (armado === datos.armado) return s;
+  const { armado: _a, ...resto } = datos;
+  return { ...s, proyecto: armado ? { ...resto, armado } : resto };
+}
+
 function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: OpcionesCompilacion): Paso {
   switch (o.op) {
     case "crear":
       return crear(m, o);
     case "cambiar":
-      return cambiar(m, o);
+      return conArmado(cambiar(m, o), m, datos, new Map([[o.id, o.objeto.id]]));
     case "borrar":
-      return borrar(m, o);
+      return conArmado(borrar(m, o), m, datos);
     case "mover":
       return mover(m, o);
-    case "renumerar":
-      return { ok: true, modelo: renombrarIds(m, propuestaRenumerar(m, o.colecciones)) };
+    case "renumerar": {
+      const mapa = propuestaRenumerar(m, o.colecciones);
+      return conArmado({ ok: true, modelo: renombrarIds(m, mapa) }, m, datos, mapa);
+    }
+    case "armado": {
+      const errores = comprobarArmado(o.armado ?? undefined, m);
+      if (errores.length) return { ok: false, errores };
+      const { armado: _a, ...resto } = datos;
+      const armado = limpiarArmado(o.armado ?? undefined);
+      return { ok: true, modelo: m, proyecto: armado ? { ...resto, armado } : resto };
+    }
     case "datos":
       return { ok: true, modelo: m, proyecto: { ...datos, ...("nombre" in o ? { nombre: o.nombre } : {}), ...("descripcion" in o ? { descripcion: o.descripcion } : {}) } };
     case "vistas": {
@@ -271,7 +292,7 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
 
 /** Aplica una operación. El proyecto que sale pasa el esquema; si no, no se aplica. */
 export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
-  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas }, p.opciones ?? {});
+  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas, armado: p.armado }, p.opciones ?? {});
   if (!s.ok) return s.usos ? { ok: false, errores: s.errores, usos: s.usos } : { ok: false, errores: s.errores };
   const q: Proyecto = { ...p, modelo: s.modelo };
   if (s.proyecto) {
@@ -283,6 +304,8 @@ export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
     const vs = s.proyecto.vistas;
     if (!vs?.length) delete q.vistas;
     else q.vistas = [...vs];
+    if (s.proyecto.armado) q.armado = s.proyecto.armado;
+    else delete q.armado;
   }
   const c = comprobarProyecto(q);
   if (!c.valido) return { ok: false, errores: c.diagnosticos.map((d) => ({ ...d, severidad: "error" as const })) };

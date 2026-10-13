@@ -10,6 +10,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { comprobarArmado } from "../src/agente/armaduraBase.ts";
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito, type Seleccion } from "../src/agente/combinaciones.ts";
 import { consultar, CONSULTAS, resumen, TOP_POR_DEFECTO, type OpcionesConsulta } from "../src/agente/consultas.ts";
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../src/agente/proyecto.ts";
@@ -275,10 +276,12 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       const l = leer(orden, a.posicionales[0]);
       if ("codigo" in l) return l;
       const c = compilar(l.proyecto.modelo, l.proyecto.opciones);
-      const ok = c.valido && !hayErrores(c.diagnosticos);
       // A3: las comprobaciones de sensatez que no necesitan el cálculo, también si no compila
       const previa = sensatezPrevia(l.proyecto.modelo, l.proyecto.opciones).flatMap((x) => x.avisos);
-      const json: Record<string, unknown> = { orden, ok, huella: c.huella, ...listaDiagnosticos([...c.diagnosticos, ...previa]) };
+      // AB: la armadura base, fuera del modelo (no impide compilar, pero es un error del fichero)
+      const armado = comprobarArmado(l.proyecto.armado, l.proyecto.modelo);
+      const ok = c.valido && !hayErrores(c.diagnosticos) && !armado.length;
+      const json: Record<string, unknown> = { orden, ok, huella: c.huella, ...listaDiagnosticos([...c.diagnosticos, ...armado, ...previa]) };
       if (orden === "compilar" && c.valido) {
         const { tiempos, ...estadisticas } = c.estadisticas;
         json.estadisticas = { ...estadisticas, segundos: Object.values(tiempos).reduce((s, t) => s + t, 0) / 1000 };

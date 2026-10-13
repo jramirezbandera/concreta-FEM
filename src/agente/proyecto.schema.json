@@ -34,6 +34,10 @@
         "$ref": "#/$defs/VistaGuardada"
       },
       "description": "I3: vistas guardadas del visor (`docs/fem3d/interfaz.md` §16), con su nombre. Sólo para mirar el\nmodelo: no entran en la huella ni en el cálculo."
+    },
+    "armado": {
+      "$ref": "#/$defs/ArmadoProyecto",
+      "description": "AB: la armadura base de las losas (`docs/fem3d/armado.md` §2.5), el momento que cubre en kN·m/m:\nla común y la de cada losa. Para ver sólo lo que queda por encima (las zonas de refuerzo); no\nentra en la huella ni en el cálculo."
     }
   },
   "required": [
@@ -214,6 +218,24 @@
       "additionalProperties": false,
       "description": "Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa o del eje de un muro (C3)."
     },
+    "ArmadoProyecto": {
+      "type": "object",
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/BasesArmado",
+          "description": "La base común a todas las losas, por armadura."
+        },
+        "losas": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/BasesArmado"
+          },
+          "description": "Por losa (su id), lo que difiere de la común."
+        }
+      },
+      "additionalProperties": false,
+      "description": "AB: la armadura base de las losas (kN·m/m). No entra en la huella ni en el cálculo."
+    },
     "Banda": {
       "type": "object",
       "properties": {
@@ -274,6 +296,25 @@
       ],
       "additionalProperties": false,
       "description": "Banda de dimensionado (D5): el rectángulo de eje `desde` → `hasta` y anchura `ancho`. En C2 sólo\nse siembran sus lados en la malla, para que los cortes por fuerzas nodales en sus extremos (las\ncaras de los apoyos) y en sus bordes sean exactos (E5-5); las automáticas y su integración son\nde C5."
+    },
+    "BasesArmado": {
+      "type": "object",
+      "properties": {
+        "x-inf": {
+          "type": "number"
+        },
+        "x-sup": {
+          "type": "number"
+        },
+        "y-inf": {
+          "type": "number"
+        },
+        "y-sup": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "description": "El momento que cubre la armadura base de cada armadura, kN·m/m (≥ 0). La que no se da, no hay."
     },
     "CargaFisica": {
       "anyOf": [

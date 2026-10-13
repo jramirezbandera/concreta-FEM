@@ -7,6 +7,7 @@
  * (`cli/fem.ts`) es la que lee y escribe ficheros.
  */
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
+import type { ArmadoProyecto } from "./armaduraBase.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { validarEsquema, type EsquemaRaiz } from "../compilador/esquema.ts";
 import esquemaProyecto from "./proyecto.schema.json" with { type: "json" };
@@ -32,6 +33,12 @@ export interface Proyecto {
    * modelo: no entran en la huella ni en el cálculo.
    */
   vistas?: VistaGuardada[];
+  /**
+   * AB: la armadura base de las losas (`docs/fem3d/armado.md` §2.5), el momento que cubre en kN·m/m:
+   * la común y la de cada losa. Para ver sólo lo que queda por encima (las zonas de refuerzo); no
+   * entra en la huella ni en el cálculo.
+   */
+  armado?: ArmadoProyecto;
 }
 
 /**
