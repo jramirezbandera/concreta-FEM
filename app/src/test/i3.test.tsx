@@ -143,6 +143,15 @@ describe("I3 · DOM", () => {
     await waitFor(() => expect(selectEn("Modo del 3D").value).toBe("translucido"));
     expect(chips()).toEqual(["Sin losas"]);
 
+    // También desde la barra de la vista (en cualquier espacio, sin el navegador)
+    fireEvent.click(within(celda()).getByRole("button", { name: "Mostrar todo" }));
+    fireEvent.change(selectEn("Modo del 3D"), { target: { value: "alambrico" } });
+    fireEvent.click(within(celda()).getByRole("button", { name: "Guardar la vista" }));
+    fireEvent.click(within(within(celda()).getByRole("group", { name: "Guardar la vista" })).getByRole("button", { name: /^Sin losas/ }));
+    await waitFor(() => expect(selectEn("Modo del 3D").value).toBe("translucido"));
+    expect(chips()).toEqual(["Sin losas"]);
+    expect(within(celda()).queryByRole("group", { name: "Guardar la vista" })).toBeNull();
+
     // Renombrar y borrar; deshacer devuelve la borrada
     fireEvent.click(within(nav()).getByRole("button", { name: "Renombrar la vista Sin losas" }));
     const entrada = within(nav()).getByRole("textbox", { name: "Nuevo nombre de la vista Sin losas" });

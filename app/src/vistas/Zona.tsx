@@ -29,6 +29,7 @@ import { useVisor } from "../contexto.ts";
 import { atributos, pintura } from "../lienzo/pintura.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { useTheme } from "../tema/useTheme.ts";
+import type { VistaGuardada } from "../../../src/agente/proyecto.ts";
 import { aGuardada, useVistas, vistasDe, type EstadoVista, type TipoVista } from "./estado.ts";
 import { Motor, type Herramienta, type Vista } from "./motor.ts";
 import { Vista2D, type Eventos2D, type Marca, type Margenes } from "./vista2d.ts";
@@ -245,7 +246,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         <button type="button" className="ib" data-on={herramienta === "desplazar"} aria-pressed={herramienta === "desplazar"} title="Desplazar con el botón izquierdo (siempre: botón central o derecho)" aria-label="Desplazar" onClick={() => setHerramienta("desplazar")}>
           <Hand size={15} />
         </button>
-        <button type="button" className="ib" data-on={guardar} aria-expanded={guardar} disabled={!proyecto.edicion} title={proyecto.edicion ? "Guardar esta vista en el proyecto, con un nombre" : "Sólo con un proyecto editable"} aria-label="Guardar la vista" onClick={() => setGuardar((x) => !x)}>
+        <button type="button" className="ib" data-on={guardar} aria-expanded={guardar} disabled={!proyecto.edicion && !proyecto.estado?.vistas?.length} title="Vistas guardadas: abrir una aquí o guardar esta con un nombre" aria-label="Guardar la vista" onClick={() => setGuardar((x) => !x)}>
           <BookmarkPlus size={15} />
         </button>
         {tipo === "3d" && (
@@ -277,7 +278,18 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         )}
       </div>
       {tipo === "3d" && opciones && <OpcionesVista3D v={v} estado={e} onCambio={(c) => poner(i, c)} onCerrar={() => setOpciones(false)} />}
-      {guardar && <GuardarVista v={vv} camara={() => vista?.camara() ?? null} onCerrar={() => setGuardar(false)} />}
+      {guardar && (
+        <GuardarVista
+          v={vv}
+          camara={() => vista?.camara() ?? null}
+          onAbrir={(g) => {
+            activar(i);
+            vistas.abrirGuardada(g);
+            setGuardar(false);
+          }}
+          onCerrar={() => setGuardar(false)}
+        />
+      )}
       <ContextoCelda.Provider value={celda}>{contenido}</ContextoCelda.Provider>
       {motor && !motor.disponible && (
         <div className="velo">
@@ -339,11 +351,15 @@ function ChipsFiltro({ filtro, onCambio }: { filtro: FiltroVista | undefined; on
   );
 }
 
-/** Guardar la vista en el proyecto con un nombre (I3): una operación del editor, que se deshace. */
-function GuardarVista({ v, camara, onCerrar }: { v: EstadoVista; camara: () => unknown; onCerrar: () => void }) {
+/**
+ * Las vistas guardadas desde la barra de la celda (I3): abrir una en esta celda (en cualquier
+ * espacio; el navegador sólo las lista en Modelo y Cargas) o guardar esta con un nombre, una
+ * operación del editor que se deshace.
+ */
+function GuardarVista({ v, camara, onAbrir, onCerrar }: { v: EstadoVista; camara: () => unknown; onAbrir: (g: VistaGuardada) => void; onCerrar: () => void }) {
   const { proyecto } = useVisor();
   const ed = proyecto.edicion;
-  const actuales = ed?.proyecto.vistas ?? [];
+  const actuales = ed?.proyecto.vistas ?? proyecto.estado?.vistas ?? [];
   const [nombre, setNombre] = useState(() => {
     let n = actuales.length + 1;
     while (actuales.some((x) => x.nombre === `Vista ${n}`)) n++;
@@ -360,21 +376,36 @@ function GuardarVista({ v, camara, onCerrar }: { v: EstadoVista; camara: () => u
   return (
     <div className="opciones-vista" role="group" aria-label="Guardar la vista">
       <div className="flex items-center justify-between">
-        <span className="font-semibold">Guardar la vista</span>
+        <span className="font-semibold">Vistas guardadas</span>
         <button type="button" className="ib-chip" aria-label="Cerrar" onClick={onCerrar}>
           <X size={14} />
         </button>
       </div>
-      <label className="mt-2">
-        <input className="sel w-full" aria-label="Nombre de la vista" value={nombre} autoFocus onChange={(x) => setNombre(x.target.value)} onKeyDown={(x) => x.key === "Enter" && hacer()} />
-      </label>
-      <p className="mt-1 text-[11px] leading-snug text-text-disabled">Con su tipo, su planta o su eje, su modo, su cámara y sus filtros. Se guarda en el proyecto (no cambia la huella) y se abre desde el navegador.</p>
-      <div className="mt-2 flex items-center gap-2">
-        <button type="button" className="btn" disabled={!limpio} onClick={hacer}>
-          {existe ? "Sustituir" : "Guardar"}
-        </button>
-        {existe && <span className="text-[11px] text-state-warn">Ya hay una con ese nombre</span>}
-      </div>
+      {actuales.length > 0 && (
+        <div className="mt-1 flex flex-col">
+          {actuales.map((g) => (
+            <button key={g.nombre} type="button" className="arbol-fila" title={`Abrir «${g.nombre}» en esta vista`} onClick={() => onAbrir(g)}>
+              <span className="truncate">{g.nombre}</span>
+              <span className="n">{NOMBRE_TIPO[g.tipo]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {ed && (
+        <>
+          <span className="mt-2 block font-semibold">Guardar esta</span>
+          <label className="mt-1">
+            <input className="sel w-full" aria-label="Nombre de la vista" value={nombre} autoFocus onChange={(x) => setNombre(x.target.value)} onKeyDown={(x) => x.key === "Enter" && hacer()} />
+          </label>
+          <p className="mt-1 text-[11px] leading-snug text-text-disabled">Con su tipo, su planta o su eje, su modo, su cámara y sus filtros. Se guarda en el proyecto (no cambia la huella; al disco, al guardar el proyecto) y se abre desde aquí o desde el navegador.</p>
+          <div className="mt-2 flex items-center gap-2">
+            <button type="button" className="btn" disabled={!limpio} onClick={hacer}>
+              {existe ? "Sustituir" : "Guardar"}
+            </button>
+            {existe && <span className="text-[11px] text-state-warn">Ya hay una con ese nombre</span>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
