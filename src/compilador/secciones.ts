@@ -17,6 +17,8 @@ export interface SeccionCompilada {
   canto: number;
   /** Huella en planta si es la sección de un pilar; null si no se conoce. */
   huella: FormaHuella | null;
+  /** Ancho del alma (bw de una T, tw de una I, b, D), m; 0 si no se conoce (C4-a.1: la vigueta que toca una viga paralela). */
+  alma: number;
   /** Tipo de material (para los modificadores por material, D4). */
   material: Material["tipo"];
   /** Forma de la sección física (C2-g: sólo las rectangulares de hormigón solapan su peso con la losa). */
@@ -73,5 +75,6 @@ export function compilarSeccion(s: Seccion, m: Material, cortante: boolean): Sec
     delete barra.Avy;
     delete barra.Avz;
   }
-  return { barra, peso: peso * barra.A, canto, huella, material: m.tipo, forma: s.forma };
+  const alma = s.forma === "T" ? s.bw : s.forma === "I" ? s.perfil.tw * 1e-3 : s.forma === "circular" ? s.D : (s.b ?? 0);
+  return { barra, peso: peso * barra.A, canto, huella, alma, material: m.tipo, forma: s.forma };
 }

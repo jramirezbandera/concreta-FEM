@@ -8,8 +8,8 @@
  *    - las cargas por la regla de la palanca (C4-e): el usuario da a las vigas paralelas a las
  *      viguetas la carga de una vigueta entera;
  *    - además, la torsión de las viguetas liberada en un extremo (C4-c).
- * 2. El mismo edificio como modelo físico, compilado (las viguetas las coloca el compilador: rectas
- *    centradas, n = round(W/s), C4-a):
+ * 2. El mismo edificio como modelo físico, compilado (las viguetas las coloca el compilador: desde el
+ *    lado del primer vértice de cada paño a un intereje y cada intereje, C4-a.1):
  *    - con las elecciones del usuario: sin modificadores, de eje a eje (zona rígida 0), sin diafragma;
  *    - y añadiendo, uno a uno, el diafragma rígido (C4-g), los modificadores de D4 y la zona rígida
  *      de 0,5 (C1-a); al final, el compilador con sus valores por defecto.
@@ -42,7 +42,10 @@ const INTEREJE = 0.72;
 
 /** Las cargas de las rectas según Y (viguetas y vigas paralelas) por la palanca: q/intereje × ancho. */
 function conPalanca(t: Tablas): Tablas {
-  const xy = new Map((t.get("JOINT COORDINATES") ?? []).map((r) => [r.Joint!, [num(r, "GlobalX"), num(r, "GlobalY"), num(r, "GlobalZ")] as const]));
+  // Coordenadas globales o, en otras exportaciones, las del sistema GLOBAL (como `importar.ts`)
+  const xy = new Map(
+    (t.get("JOINT COORDINATES") ?? []).map((r) => [r.Joint!, (r.GlobalX !== undefined ? [num(r, "GlobalX"), num(r, "GlobalY"), num(r, "GlobalZ")] : [num(r, "XorR"), num(r, "Y"), num(r, "Z")]) as readonly [number, number, number]] as const),
+  );
   const xDe = new Map<string, number>();
   for (const r of t.get("CONNECTIVITY - FRAME") ?? []) {
     const [a, b] = [xy.get(r.JointI!)!, xy.get(r.JointJ!)!];

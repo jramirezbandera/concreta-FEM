@@ -82,10 +82,11 @@ describe("criterio 4 de C4: metamórficas con forjados", () => {
     }
   });
 
-  it("invertir el sentido del contorno de los paños y girar su dirección 180° da los mismos resultados", () => {
+  it("invertir el sentido del contorno de los paños (con el mismo primer vértice, C4-a.1) y girar su dirección 180° da los mismos resultados", () => {
+    const invertir = (c: readonly Vec2[]): Vec2[] => [c[0]!, ...c.slice(1).reverse()];
     for (const s of SEMILLAS) {
       const f = unidireccional(s);
-      const panos: PanoUnidireccional[] = f.panos!.map((p) => ({ ...p, contorno: [...p.contorno].reverse(), huecos: p.huecos?.map((h) => [...h].reverse()), direccion: p.direccion + 180 }));
+      const panos: PanoUnidireccional[] = f.panos!.map((p) => ({ ...p, contorno: invertir(p.contorno), huecos: p.huecos?.map((h) => [...h].reverse()), direccion: p.direccion + 180 }));
       const e = mismosResultados(f, { ...f, panos });
       expect(e.u, `semilla ${s}`).toBeLessThan(1e-9);
       expect(e.reacciones, `semilla ${s}`).toBeLessThan(1e-9);

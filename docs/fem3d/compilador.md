@@ -166,6 +166,10 @@
   - **C4-i:** el casetón por defecto es el perdido, el caso más común en obra, y entonces el `pp` es obligatorio (`reticular/sin-pp`). Sin `pp`, sólo con `caseton: "recuperable"`.
   - **C4-e:** los muros paralelos a las viguetas en un lado del paño también son receptores de borde. Las losas paralelas, más adelante.
   - **C4-k, nueva:** cuando las viguetas en voladizo no tienen vano detrás, porque no lo hay o porque un hueco lo corta, la viga que las sujeta trabaja a torsión de equilibrio, y su torsión no se reduce. Con el vano detrás en la misma recta, el voladizo se compensa sin torsión, y se ha medido.
+- **C4-a.1, viguetas desde una esquina** (decidida el 2026-10-14, compilador F2.1; `fase-c4.md` §7). Sustituye el centrado de C4-a, como se colocan en obra:
+  - la primera vigueta, a un intereje del lado del paño más cercano a su primer vértice; las demás, cada intereje hasta el otro lado, donde queda el sobrante;
+  - no va ninguna que toque una viga o un muro paralelos: su eje a menos del semiancho de la viga (o del muro) más el del alma de la vigueta;
+  - los grupos de C4-a (rectas comunes para que las viguetas sean continuas) se forman sólo por los lados que cruzan las viguetas: al otro lado de una viga paralela, cada paño empieza de nuevo.
 
 ## C3: alcance y decisiones
 
@@ -268,7 +272,7 @@
 
 | # | Decisión | Por defecto | Por qué | Alternativa |
 |---|---|---|---|---|
-| C4-a | Posición de las viguetas | Rectas comunes por grupo de paños contiguos con la misma dirección e intereje, centradas en su ancho (n = round(W/s)) | Las viguetas de dos vanos seguidos tienen que caer en la misma recta para ser continuas: si no, el momento del apoyo pasa por la torsión de la viga (×0,1) y la vigueta queda casi articulada. Centrar deja los bordes a ~s/2 | — |
+| C4-a | Posición de las viguetas | Rectas comunes por grupo de paños contiguos con la misma dirección e intereje, centradas en su ancho (n = round(W/s)). **Sustituida el 2026-10-14 por C4-a.1** (abajo) | Las viguetas de dos vanos seguidos tienen que caer en la misma recta para ser continuas: si no, el momento del apoyo pasa por la torsión de la viga (×0,1) y la vigueta queda casi articulada. Centrar deja los bordes a ~s/2 | — |
 | C4-b | Apoyos de las viguetas | Vigas, muros, huellas de pilar y bordes de losa; voladizo con aviso si sólo hay un apoyo; error sin ninguno o en el borde de otro paño sin viga | Un mecanismo no puede llegar al motor sin decirlo, y dos paños se separan siempre por una viga o un zuncho | — |
 | C4-c | Torsión de las viguetas | **Liberada en un extremo** de cada tramo entre apoyos (E2-3); los voladizos la conservan. Sin zona rígida en las vigas (como C1) | La torsión de una vigueta fisurada no cuenta, y con ella haría de muelle al giro de flexión de la viga. Liberarla en los dos extremos dejaría el giro de un nudo sin rigidez | `modificadores.viguetas` |
 | C4-d | Unión de los extremos | Reutiliza el nudo a ≤ ε_snap; si no, un nudo nuevo sobre la viga o el muro, o en el borde de la losa. En una huella de pilar, el nudo del pilar con offset y zona rígida (C1-a, C1-b) | Sin penalizaciones y sin mover la vigueta | — |

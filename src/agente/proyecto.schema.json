@@ -1219,7 +1219,7 @@
           "items": {
             "$ref": "#/$defs/Vec2"
           },
-          "description": "Contorno exterior en planta, m: polígono simple de al menos 3 vértices."
+          "description": "Contorno exterior en planta, m: polígono simple de al menos 3 vértices. Las viguetas empiezan\nen el lado más cercano a su primer vértice, a un intereje, y siguen hasta el otro (C4-a.1)."
         },
         "huecos": {
           "type": "array",

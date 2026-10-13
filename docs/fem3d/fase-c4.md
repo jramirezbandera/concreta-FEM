@@ -139,6 +139,30 @@
 - **El balancín** es un mecanismo sin la torsión de la viga en cuanto la carga no es simétrica. Antes no se avisaba (C4-12).
 - **Sin cambios en el resto:** las referencias congeladas de C1–C3 y las de C4 sin voladizos (paño girado, dos vanos con voladizo continuo, reticular y mixto al azar) son idénticas. Cambian sólo el paño con hueco sin brochales y la planta al azar 7 (con un balancín), y en su modelo analítico sólo cambia el J de los tramos marcados. Se han regenerado a sabiendas.
 
+## 7. C4-a.1: viguetas desde una esquina (2026-10-14, compilador F2.1)
+
+**Por qué.** El usuario, mirando el sólido de un unidireccional: «lo normal es empezar en una esquina y continuar con el mismo intereje hasta el final». Las rectas de C4-a estaban centradas en el ancho del grupo, así que el sobrante se repartía a los dos lados. Además, el grupo unía también los paños que comparten un lado paralelo a las viguetas (los de la fila de al lado, al otro lado de una viga), y la retícula seguía de una fila a la siguiente: en el edificio unidireccional de `validacion/c4/modelos.ts`, una vigueta quedaba a 0,10 m del eje de una viga de 30 cm.
+
+**La regla** (decidida por el usuario; `unidireccional.ts`, paso 3):
+- **Arranque:** el lado del grupo más cercano a su primer vértice (el del primer paño por id). La primera vigueta va a un intereje de ese lado y las demás, cada intereje. El sobrante queda en el otro lado. No depende de una traslación ni de un giro, y quien dibuja el paño elige el lado.
+- **No va ninguna vigueta que toque una viga o un muro paralelos:** su eje a menos de b/2 + b_w/2 del de la viga, o de e/2 + b_w/2 del del muro. Vale para la última junto a la viga del otro lado y también para la primera junto a una viga plana ancha. `SeccionCompilada.alma` da b_w.
+- **Grupos:** sólo por un lado que cruzan las viguetas. Al otro lado de una viga paralela, cada paño empieza de nuevo.
+- **Si no cabe ninguna en un paño,** va una en su centro, si cabe ahí, como antes.
+
+**Contraste con el unidireccional de SAP2000 del usuario** (`validacion/e6/sap2000/out_unidireccional_d2.txt`, E6-14). En cada vano de 6 m, el usuario pone la primera vigueta a 0,72 de la viga de la izquierda y la última a 0,24 del eje de la de la derecha: 8 por vano, 48 en total.
+- **Con C4-a.1,** el compilado con las elecciones del usuario da las mismas 48 viguetas y su modelo con las cargas por la palanca al **0,0 %** en todo: flechas, momentos de viguetas y vigas, y axiles de los pilares.
+- **Con C4-a** salían 46. En las vigas paralelas a las viguetas, −17 %.
+- **Con una regla de «quitar la última si queda a menos de s/2»,** que se probó, salían 42 viguetas, +12,8 % en el M− de vigueta y +56 % en las vigas Y. Por eso la regla mira si la vigueta toca la viga.
+- **Corregido en el script de E6-14:** el fichero del usuario da las coordenadas como `XorR`/`Y`/`Z`, así que la fila «cargas por la palanca» no cambiaba nada (salía 0,0 %, también en HEAD). Ahora lee las dos formas, como `importar.ts`, y vuelve a dar lo de E6-14.
+
+**Qué cambia:**
+- Los paños de 6 m con intereje 0,75 de los oráculos a mano (`validacion/c4/mano.ts`) pasan de 8 viguetas (0,375 + 0,75·j) a 7 (0,75·j). Las vigas paralelas reciben 0,375 m de franja (antes, 0,1875) y cada vigueta, 0,75.
+- En el caso de la vigueta en la huella, los pilares pasan de 80 a 160 cm para que la primera vigueta, a 0,75, siga cayendo dentro.
+- Los cinco casos vuelven a cuadrar a ≤ 1e-10.
+- La metamórfica «invertir el contorno» lo invierte ahora conservando el primer vértice, que ya es un dato.
+- La referencia congelada de C4 se ha regenerado a sabiendas. Las de C1–C3, C5 y F no tienen paños unidireccionales y no cambian.
+- `VERSION_COMPILADOR` pasa a F2.1 (F-10): los resultados de `.fem/` de antes no se reutilizan.
+
 ## Cómo reproducir
 
 ```sh

@@ -1,6 +1,6 @@
 /**
  * Criterio 1 de C4: paños unidireccionales con su modelo analítico escrito a mano a partir de la
- * descripción física (rectas de viguetas centradas en el ancho, nudos en los ejes de las vigas,
+ * descripción física (rectas de viguetas desde un lado a un intereje, C4-a.1; nudos en los ejes de las vigas,
  * torsión liberada en un extremo, zonas rígidas en las huellas y reparto por la regla de la
  * palanca), sin llamar al compilador. Los compara `src/compilador/oraculo-c4.test.ts` (a ≤ 1e-10).
  *
@@ -21,13 +21,16 @@ const dl = (barra: number, q: Vec3, a: number, b: number): CargaBarra => ({ tipo
 const MATERIALES: ModeloFisico["materiales"] = [{ id: "HA", tipo: "hormigon", fck: 25 }];
 const SECCIONES: ModeloFisico["secciones"] = [
   { id: "P30", material: "HA", forma: "rectangular", b: 0.3, h: 0.3 },
-  { id: "P80", material: "HA", forma: "rectangular", b: 0.8, h: 0.8 },
+  { id: "P160", material: "HA", forma: "rectangular", b: 1.6, h: 1.6 },
   { id: "V", material: "HA", forma: "rectangular", b: 0.3, h: 0.5 },
   { id: "T", material: "HA", forma: "T", bf: 0.75, hf: 0.05, bw: 0.12, h: 0.3 },
 ];
 
-/** Las rectas de las viguetas de un paño de ancho 6 con intereje 0,75: 8, centradas (la primera a 0,375). */
-const Y = Array.from({ length: 8 }, (_, j) => 0.375 + 0.75 * j);
+/**
+ * Las rectas de las viguetas de un paño de ancho 6 con intereje 0,75, desde y = 0 (su primer
+ * vértice): 7, de 0,75 a 5,25 (la de 6 iría por el eje de la viga).
+ */
+const Y = Array.from({ length: 7 }, (_, j) => 0.75 * (j + 1));
 
 export function casosManoC4(): CasoMano[] {
   return [unPano(0), unPano(30), dosVanosConVoladizo(), viguetaEnHuella(), panoConHueco()];
@@ -90,9 +93,9 @@ function cargarViga(
 
 /**
  * Paño de 5 × 6 m entre cuatro vigas sobre cuatro pilares, viguetas según su lado de 5 m, girado
- * `giro` grados (0 o 30: el paño oblicuo). 8 viguetas de 5 m (n = round(6/0,75)), sus 16 nudos
+ * `giro` grados (0 o 30: el paño oblicuo). 7 viguetas de 5 m (de y = 0,75 a 5,25), sus 14 nudos
  * sobre las vigas de los lados de 6 m y la torsión liberada en su primer extremo. Las vigas de los
- * lados de 5 m son paralelas a las viguetas: reciben la franja hasta la primera (0,375/2 m).
+ * lados de 5 m son paralelas a las viguetas: reciben la mitad de la franja hasta la primera (0,375 m).
  * Cargas: peso propio (pilares, vigas por su descuelgue y el pp del paño), una de superficie, una
  * puntual entre dos viguetas y una lineal paralela a ellas, entre otras dos.
  */
@@ -177,22 +180,21 @@ function unPano(giro: number): CasoMano {
   cargarViga(VD, cadD, G([0, 6]), uX, z, 0, 5, wv, bG, nG);
   // Viguetas
   const vig = Y.map((_, j) => m.barra(nA[j]!, nB[j]!, T, [0, 0, 1], { liberaciones: LIB_T }));
-  // Palanca: las de borde, 0,375/2 + 0,75/2 = 0,5625 m; las demás, 0,75; las vigas paralelas, 0,1875
-  const ancho = (j: number) => (j === 0 || j === 7 ? 0.5625 : 0.75);
+  // Palanca: cada vigueta, 0,75 m (también las de borde: 0,375 + 0,375); las vigas paralelas, 0,375
   for (const [q, lista, nodales] of [
     [-3, bG, nG],
     [-2, bQ, nQ],
   ] as const) {
-    vig.forEach((b, j) => lista.push(dl(b, g(q * ancho(j)), 0, 5)));
-    cargarViga(VC, cadC, G([0, 0]), uX, z, 0, 5, g(q * 0.1875), lista, nodales);
-    cargarViga(VD, cadD, G([0, 6]), uX, z, 0, 5, g(q * 0.1875), lista, nodales);
+    vig.forEach((b) => lista.push(dl(b, g(q * 0.75), 0, 5)));
+    cargarViga(VC, cadC, G([0, 0]), uX, z, 0, 5, g(q * 0.375), lista, nodales);
+    cargarViga(VD, cadD, G([0, 6]), uX, z, 0, 5, g(q * 0.375), lista, nodales);
   }
-  // Puntual en (2,2; 2,0): entre las viguetas de 1,875 y 2,625, a 1/6 de la primera
-  bQ.push({ tipo: "puntual", barra: vig[2]!, ejes: "global", x: 2.2, F: [0, 0, (-10 * 5) / 6] });
-  bQ.push({ tipo: "puntual", barra: vig[3]!, ejes: "global", x: 2.2, F: [0, 0, -10 / 6] });
-  // Lineal en y = 4,0 de x = 1 a 4: entre las de 3,375 y 4,125, a 5/6 de la primera
-  bQ.push(dl(vig[4]!, g(-4 / 6), 1, 4));
-  bQ.push(dl(vig[5]!, g((-4 * 5) / 6), 1, 4));
+  // Puntual en (2,2; 2,0): entre las viguetas de 1,5 y 2,25, a 2/3 de la primera
+  bQ.push({ tipo: "puntual", barra: vig[1]!, ejes: "global", x: 2.2, F: [0, 0, -10 / 3] });
+  bQ.push({ tipo: "puntual", barra: vig[2]!, ejes: "global", x: 2.2, F: [0, 0, (-10 * 2) / 3] });
+  // Lineal en y = 4,0 de x = 1 a 4: entre las de 3,75 y 4,5, a 1/3 de la primera
+  bQ.push(dl(vig[4]!, g((-4 * 2) / 3), 1, 4));
+  bQ.push(dl(vig[5]!, g(-4 / 3), 1, 4));
   m.diafragma(nudo(2.5, 3), [...Object.values(cab), ...nA, ...nB]);
   m.caso("G", nG, [], bG);
   m.caso("Q", nQ, [], bQ);
@@ -268,32 +270,32 @@ function dosVanosConVoladizo(): CasoMano {
     ];
   }
   const q = -5;
-  const ancho = (j: number) => (j === 0 || j === 7 ? 0.5625 : 0.75);
   Y.forEach((_, j) => {
     const v1 = m.barra(enX[0]![j]!, enX[5]![j]!, T, [0, 0, 1], { liberaciones: LIB_T });
     const v2 = m.barra(enX[5]![j]!, enX[10]![j]!, T, [0, 0, 1], { liberaciones: LIB_T });
     const v3 = m.barra(enX[10]![j]!, libres[j]!, T, [0, 0, 1]);
-    bG.push(dl(v1, g(q * ancho(j)), 0, 5), dl(v2, g(q * ancho(j)), 0, 5), dl(v3, g(q * 0.75), 0, 1.5));
-    // Voladizo: la franja de borde (0,375 m) a la vigueta extrema, con su transporte n × q
-    if (j === 0 || j === 7) {
-      const brazo = j === 0 ? -0.375 / 2 : 0.375 / 2;
-      // ∫(η − η_j) dA = brazo·0,375·1,5; n = +Y, n × (0, 0, q) = (q, 0, 0). Con su centroide en el
+    const extrema = j === 0 || j === 6;
+    bG.push(dl(v1, g(q * 0.75), 0, 5), dl(v2, g(q * 0.75), 0, 5), dl(v3, g(q * (extrema ? 1.125 : 0.75)), 0, 1.5));
+    // Voladizo: la franja de borde (0,75 m) a la vigueta extrema, con su transporte n × q
+    if (extrema) {
+      const brazo = j === 0 ? -0.75 / 2 : 0.75 / 2;
+      // ∫(η − η_j) dA = brazo·0,75·1,5; n = +Y, n × (0, 0, q) = (q, 0, 0). Con su centroide en el
       // centro del voladizo, la mitad a cada nudo de la vigueta (interpolación lineal, C4-e)
-      const Mx = (q * brazo * 0.375 * 1.5) / 2;
+      const Mx = (q * brazo * 0.75 * 1.5) / 2;
       nG.push({ nudo: enX[10]![j]!, f: [0, 0, 0, Mx, 0, 0] }, { nudo: libres[j]!, f: [0, 0, 0, Mx, 0, 0] });
     }
   });
   // Franjas de borde de los dos vanos a las vigas en y = 0 y 6 (de x = 0 a 10)
-  for (const y of [0, 6]) cargarViga(vy[y]!, cadY[y]!, [0, y], [1, 0], z, 0, 10, g(q * 0.1875), bG, nG);
+  for (const y of [0, 6]) cargarViga(vy[y]!, cadY[y]!, [0, y], [1, 0], z, 0, 10, g(q * 0.375), bG, nG);
   m.diafragma(m.nudo(5.75, 3, z), [...Object.values(cab), ...enX[0]!, ...enX[5]!, ...enX[10]!, ...libres]);
   m.caso("G", nG, [], bG);
   return { nombre: "dos vanos y un voladizo: viguetas continuas sobre las vigas comunes y torsión en el voladizo", fisico: f, mano: m.modelo(), avisos: [], opciones: OPCIONES_MANO };
 }
 
 /**
- * Pilares de 80 × 80 en las esquinas: la primera y la última vigueta acaban dentro de su huella
- * (a 0,375 del eje), así que van al nudo del pilar con un offset hasta su extremo y la zona rígida
- * de C1-a (toda la huella, con el nudo entero rígido): del eje x = 0 a la cara x = 0,4.
+ * Pilares de 160 × 160 en las esquinas: la primera y la última vigueta acaban dentro de su huella
+ * (a 0,75 del eje), así que van al nudo del pilar con un offset hasta su extremo y la zona rígida
+ * de C1-a (toda la huella, con el nudo entero rígido): del eje x = 0 a la cara x = 0,8.
  */
 function viguetaEnHuella(): CasoMano {
   const f: ModeloFisico = {
@@ -310,7 +312,7 @@ function viguetaEnHuella(): CasoMano {
         ["C3", 5, 6],
         ["C4", 0, 6],
       ] as const
-    ).map(([id, x, y]) => ({ id, x, y, desde: "P0", hasta: "P1", seccion: "P80" })),
+    ).map(([id, x, y]) => ({ id, x, y, desde: "P0", hasta: "P1", seccion: "P160" })),
     vigas: [
       { id: "VA", planta: "P1", puntos: [[0, 0], [0, 6]], seccion: "V" },
       { id: "VB", planta: "P1", puntos: [[5, 0], [5, 6]], seccion: "V" },
@@ -333,31 +335,32 @@ function viguetaEnHuella(): CasoMano {
     const base = m.nudo(x, y, 0);
     cab[id] = m.nudo(x, y, z);
     m.apoyo(base, EMPOTRADO);
-    m.barra(base, cab[id]!, rectangular(0.8, 0.8, HA), [1, 0, 0], { offsets: { j: [0, 0, -0.5] } });
+    m.barra(base, cab[id]!, rectangular(1.6, 1.6, HA), [1, 0, 0], { offsets: { j: [0, 0, -0.5] } });
   }
   const V = rectangular(0.3, 0.5, HA);
-  const interior = Y.slice(1, 7);
+  const interior = Y.slice(1, 6);
   const nA = interior.map((y) => m.nudo(0, y, z));
   const nB = interior.map((y) => m.nudo(5, y, z));
-  // Las vigas, con su zona rígida de 0,4 dentro de los pilares
-  viga(m, [{ n: cab.C1!, s: 0 }, ...nA.map((n, j) => ({ n, s: interior[j]! })), { n: cab.C4!, s: 6 }], [0, 1], V, 0.4, 0.4);
-  viga(m, [{ n: cab.C2!, s: 0 }, ...nB.map((n, j) => ({ n, s: interior[j]! })), { n: cab.C3!, s: 6 }], [0, 1], V, 0.4, 0.4);
+  // Las vigas, con su zona rígida de 0,8 dentro de los pilares
+  viga(m, [{ n: cab.C1!, s: 0 }, ...nA.map((n, j) => ({ n, s: interior[j]! })), { n: cab.C4!, s: 6 }], [0, 1], V, 0.8, 0.8);
+  viga(m, [{ n: cab.C2!, s: 0 }, ...nB.map((n, j) => ({ n, s: interior[j]! })), { n: cab.C3!, s: 6 }], [0, 1], V, 0.8, 0.8);
   const q = -5;
-  // Sin vigas paralelas: las franjas de borde (0,375) van enteras a las viguetas extremas, con su transporte
+  // Sin vigas paralelas: las franjas de borde (0,75) van enteras a las viguetas extremas, con su transporte
   Y.forEach((y, j) => {
-    const extremo = j === 0 || j === 7;
+    const extremo = j === 0 || j === 6;
     const [i0, i1] = extremo ? [cab[j === 0 ? "C1" : "C4"]!, cab[j === 0 ? "C2" : "C3"]!] : [nA[j - 1]!, nB[j - 1]!];
-    const off = extremo ? { offsets: { i: [0.4, y - (j === 0 ? 0 : 6), 0] as Vec3, j: [-0.4, y - (j === 0 ? 0 : 6), 0] as Vec3 } } : {};
+    const off = extremo ? { offsets: { i: [0.8, y - (j === 0 ? 0 : 6), 0] as Vec3, j: [-0.8, y - (j === 0 ? 0 : 6), 0] as Vec3 } } : {};
     const b = m.barra(i0, i1, T, [0, 0, 1], { ...off, liberaciones: LIB_T });
-    // Flexible de x = 0,4 a 4,6 en las extremas; el resto de la vigueta (dentro de las huellas) va a su pilar
-    const [a, L] = extremo ? [0.4, 4.2] : [0, 5];
-    bG.push(dl(b, g(q * 0.75), 0, L));
+    // Flexible de x = 0,8 a 4,2 en las extremas; el resto de la vigueta (dentro de las huellas) va a su pilar
+    const [a, L] = extremo ? [0.8, 3.4] : [0, 5];
+    const w = g(q * (extremo ? 1.125 : 0.75));
+    bG.push(dl(b, w, 0, L));
     if (extremo) {
-      nG.push(uniformeANudo(i0, [0, j === 0 ? 0 : 6, z], [0, y, z], [a, y, z], g(q * 0.75)));
-      nG.push(uniformeANudo(i1, [5, j === 0 ? 0 : 6, z], [5 - a, y, z], [5, y, z], g(q * 0.75)));
-      // Transporte de la franja de borde: ∫(η − η_j) dA = ∓(0,375²/2)·5, n × q = (q, 0, 0), con su
+      nG.push(uniformeANudo(i0, [0, j === 0 ? 0 : 6, z], [0, y, z], [a, y, z], w));
+      nG.push(uniformeANudo(i1, [5, j === 0 ? 0 : 6, z], [5 - a, y, z], [5, y, z], w));
+      // Transporte de la franja de borde: ∫(η − η_j) dA = ∓(0,75²/2)·5, n × q = (q, 0, 0), con su
       // centroide en x = 2,5: la mitad a cada nudo de la vigueta (interpolación lineal, C4-e)
-      const brazo = j === 0 ? -(0.375 ** 2) / 2 : 0.375 ** 2 / 2;
+      const brazo = j === 0 ? -(0.75 ** 2) / 2 : 0.75 ** 2 / 2;
       nG.push({ nudo: i0, f: [0, 0, 0, (q * brazo * 5) / 2, 0, 0] }, { nudo: i1, f: [0, 0, 0, (q * brazo * 5) / 2, 0, 0] });
     }
   });
@@ -367,9 +370,9 @@ function viguetaEnHuella(): CasoMano {
 }
 
 /**
- * El paño de `unPano` con un hueco de 1 × 1 m (x de 2 a 3, y de 2,5 a 3,5) sin brochales: corta las
- * viguetas de y = 2,625 y 3,375, que quedan en voladizo desde cada viga (aviso). En x ∈ [2, 3], la
- * franja entre el hueco y las viguetas de 1,875 y 4,125 va entera a ellas, con su transporte.
+ * El paño de `unPano` con un hueco de 1 × 1 m (x de 2 a 3, y de 2,5 a 3,5) sin brochales: corta la
+ * vigueta de y = 3, que queda en voladizo desde cada viga (aviso). En x ∈ [2, 3], la franja entre
+ * el hueco y las viguetas de 2,25 y 3,75 va entera a ellas, con su transporte.
  */
 function panoConHueco(): CasoMano {
   const base = unPano(0);
@@ -411,10 +414,9 @@ function panoConHueco(): CasoMano {
   const VC = viga(m, cadC, [1, 0], V, 0.15, 0.15);
   const VD = viga(m, cadD, [1, 0], V, 0.15, 0.15);
   const q = -5;
-  const ancho = (j: number) => (j === 0 || j === 7 ? 0.5625 : 0.75);
   const libres: number[] = [];
   Y.forEach((y, j) => {
-    if (j === 3 || j === 4) {
+    if (j === 3) {
       // Cortadas por el hueco: dos voladizos (con su torsión), de 0 a 2 y de 3 a 5
       const l1 = m.nudo(2, y, z);
       const l2 = m.nudo(3, y, z);
@@ -425,17 +427,17 @@ function panoConHueco(): CasoMano {
       return;
     }
     const b = m.barra(nA[j]!, nB[j]!, T, [0, 0, 1], { liberaciones: LIB_T });
-    if (j === 2 || j === 5) {
+    if (j === 2 || j === 4) {
       // Fuera del hueco, la palanca normal (0,75); en x ∈ [2, 3], 0,375 de la palanca con su vecina
-      // de fuera más la franja hasta el hueco (0,625), con el transporte ±0,625²/2
-      bG.push(dl(b, g(q * 0.75), 0, 2), dl(b, g(q * 0.75), 3, 5), dl(b, g(q * (0.375 + 0.625)), 2, 3));
-      const brazo = j === 2 ? 0.625 ** 2 / 2 : -(0.625 ** 2) / 2;
+      // de fuera más la franja hasta el hueco (0,25), con el transporte ±0,25²/2
+      bG.push(dl(b, g(q * 0.75), 0, 2), dl(b, g(q * 0.75), 3, 5), dl(b, g(q * (0.375 + 0.25)), 2, 3));
+      const brazo = j === 2 ? 0.25 ** 2 / 2 : -(0.25 ** 2) / 2;
       // centrado en x = 2,5: la mitad a cada nudo de la vigueta (interpolación lineal, C4-e)
       nG.push({ nudo: nA[j]!, f: [0, 0, 0, (q * brazo) / 2, 0, 0] }, { nudo: nB[j]!, f: [0, 0, 0, (q * brazo) / 2, 0, 0] });
-    } else bG.push(dl(b, g(q * ancho(j)), 0, 5));
+    } else bG.push(dl(b, g(q * 0.75), 0, 5));
   });
-  cargarViga(VC, cadC, [0, 0], [1, 0], z, 0, 5, g(q * 0.1875), bG, nG);
-  cargarViga(VD, cadD, [0, 6], [1, 0], z, 0, 5, g(q * 0.1875), bG, nG);
+  cargarViga(VC, cadC, [0, 0], [1, 0], z, 0, 5, g(q * 0.375), bG, nG);
+  cargarViga(VD, cadD, [0, 6], [1, 0], z, 0, 5, g(q * 0.375), bG, nG);
   m.diafragma(m.nudo(2.5, 3, z), [...Object.values(cab), ...nA, ...nB, ...libres]);
   m.caso("G", nG, [], bG);
   return { nombre: "paño con un hueco sin brochales: viguetas en voladizo y franjas junto al hueco", fisico: f, mano: m.modelo(), avisos: ["pano/vigueta-en-voladizo"], opciones: OPCIONES_MANO };

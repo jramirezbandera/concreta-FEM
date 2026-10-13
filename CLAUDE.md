@@ -376,6 +376,12 @@
   - **Para el usuario, graves y previos a F2:**
     - **F2-8:** con pilares de dos tamaños en una alineación, la cara común (C5-g) cae dentro del mayor y su metro sale ~45 % bajo, del lado inseguro, sin converger;
     - **F2-9:** los nudos a ≤ ε_snap de una huella se hacen rígidos (C2-d), y junto al hueco del edificio la cara sale hasta un −44 %.
+- **2026-10-14: C4-a.1, viguetas desde una esquina** (decisión del usuario; compilador F2.1, `fase-c4.md` §7). Sustituye el centrado de C4-a:
+  - la primera, a un intereje del lado más cercano al primer vértice del paño; las demás, cada intereje hasta el otro lado, donde queda el sobrante;
+  - no va ninguna que toque una viga o un muro paralelos (eje a menos de b/2 + b_w/2);
+  - los grupos de rectas comunes sólo se forman por los lados que cruzan las viguetas.
+
+  Con esto, el unidireccional de SAP2000 del usuario sale idéntico: 48 viguetas y 0,0 % en todo con las cargas por la palanca (E6-14). Oráculos a mano de C4 y referencia congelada rehechos.
 - **Siguiente paso:**
   - las decisiones de F2-8 y F2-9 (`fase-f2.md` §4);
   - las puertas de uso de AB, de F, de I1, I2, I3 e I4, de V2a y de V2b;

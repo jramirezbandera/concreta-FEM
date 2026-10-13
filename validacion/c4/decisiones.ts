@@ -162,7 +162,7 @@ function c4e(): string[] {
   }
   for (const cn of r.modelo.casos[0]!.nodales ?? []) paralelas += cn.f[2];
   return [
-    `C4-e, de 3,5 kN/m² sobre el recuadro de 5 × 6 (105 kN), lo que va a las vigas paralelas a las viguetas (VC y VD): ${(-paralelas).toFixed(3)} kN, el ${((-100 * paralelas) / 105).toFixed(2)} % (franjas de 0,1875 m, la mitad de la de borde de 0,375 m); con toda la franja de borde a la última vigueta, 0`,
+    `C4-e, de 3,5 kN/m² sobre el recuadro de 5 × 6 (105 kN), lo que va a las vigas paralelas a las viguetas (VC y VD): ${(-paralelas).toFixed(3)} kN, el ${((-100 * paralelas) / 105).toFixed(2)} % (franjas de 0,375 m, la mitad de la de borde de 0,75 m, C4-a.1); con toda la franja de borde a la última vigueta, 0`,
   ];
 }
 

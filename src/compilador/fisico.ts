@@ -328,7 +328,10 @@ export interface PanoUnidireccional {
   id: string;
   nombre?: string;
   planta: string;
-  /** Contorno exterior en planta, m: polígono simple de al menos 3 vértices. */
+  /**
+   * Contorno exterior en planta, m: polígono simple de al menos 3 vértices. Las viguetas empiezan
+   * en el lado más cercano a su primer vértice, a un intereje, y siguen hasta el otro (C4-a.1).
+   */
   contorno: readonly Vec2[];
   /** Huecos: polígonos simples dentro del contorno, sin tocarse entre sí ni tocarlo. */
   huecos?: readonly (readonly Vec2[])[];

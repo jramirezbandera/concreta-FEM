@@ -7,12 +7,16 @@
  *    si no, a ≤ ε_snap del eje de una viga o de un muro, a él (al cruce, si son dos). Aviso si se
  *    mueve más de ε_geom.
  * 2. Grupos (C4-a): los paños de una planta con la misma dirección (salvo el sentido) y el mismo
- *    intereje que comparten un lado. Cada grupo tiene un marco (d, n): d, la dirección de las
+ *    intereje que comparten un lado no paralelo a d (uno que cruzan las viguetas; al otro lado de
+ *    uno paralelo, cada paño empieza de nuevo). Cada grupo tiene un marco (d, n): d, la dirección de las
  *    viguetas con su ángulo en [0°, 180°); n, d girada 90°. En ese marco, σ = X·d y η = X·n.
- * 3. Rectas: η_j = η_c + (j − (n_v − 1)/2)·s, con η_c el centro del ancho W del grupo en η y
- *    n_v = máx(1, round(W/s)). Cada recta se recorta a cada paño (sin huecos) por la regla del
- *    semiplano, y cada trozo de más de 2·ε_snap es una vigueta, salvo si va por el eje de una viga o
- *    de un muro paralelos (ya está ahí).
+ * 3. Rectas (C4-a.1): como en obra, desde un lado del grupo y con el intereje hasta el otro. El
+ *    lado es el más cercano en η al primer vértice del contorno de su primer paño (η_0, lo o hi
+ *    del ancho W): η_j = η_0 ± j·s, j ≥ 1, mientras η_j quede a más de 2·ε_snap del otro lado (el
+ *    sobrante va allí). Cada recta se recorta a cada paño (sin huecos) por la regla del semiplano, y
+ *    cada trozo de más de 2·ε_snap es una vigueta, salvo si toca una viga o un muro paralelos: su
+ *    eje a menos del semiancho de la viga (o del muro) más el del alma de la vigueta (o a ≤ ε_snap:
+ *    por el eje ya están ahí). Un paño sin ninguna lleva una en su centro, si cabe ahí.
  * 4. Apoyos de cada vigueta (C4-b): sus extremos y los cruces con ejes de vigas y muros y con las
  *    huellas de pilar por las que pasa. Nudo de cada uno (C4-d): el del pilar (en su huella); si no,
  *    uno a ≤ ε_snap que ya exista; si no, uno nuevo sobre la viga (que se parte), sobre el muro (en
@@ -38,8 +42,14 @@ import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Vec2 } from "./fisico.ts";
 import { cortarTramos, cuerdaHuella, dist, distanciaAHuella, RejillaHash, tramo, type Tramo2D } from "./geometria2d.ts";
 import { defectoPoligono, distanciaASegmento, momentos2Interseccion, momentos2Poligono, type Momentos2, type Region } from "./poligonos.ts";
+import type { FormaHuella } from "./secciones.ts";
 import { distanciaARegion, ordenarCadena, type PuntoPilar, type Topologia, type TramoViga } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
+
+/** Ancho en planta de una viga por la huella de su sección (b, o D); 0 si no se conoce. */
+function anchoPlanta(h: FormaHuella | null): number {
+  return !h ? 0 : h.tipo === "rectangulo" ? h.b : h.D;
+}
 
 /** Qué sujeta un nudo de vigueta. */
 export type ApoyoVigueta = "pilar" | "viga" | "muro" | "losa" | "nudo" | "libre";
@@ -286,10 +296,13 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
     const [si, sj] = [ctx.panos[i]!.pano.intereje, ctx.panos[j]!.pano.intereje];
     return Math.abs(a[0] - b[0]) <= 1e-12 && Math.abs(a[1] - b[1]) <= 1e-12 && Math.abs(si - sj) <= 1e-12 * si;
   };
-  const compartenLado = (x: Region, y: Region): boolean => {
+  // Sólo un lado que cruzan las viguetas: al otro lado de uno paralelo (una viga entre dos filas de
+  // paños) las viguetas no siguen, y cada paño empieza en su lado (C4-a.1)
+  const compartenLado = (x: Region, y: Region, d: Vec2): boolean => {
     for (const p of anillos(x))
       for (let i = 0; i < p.length; i++) {
         const t = tramo(p[i]!, p[(i + 1) % p.length]!);
+        if (Math.abs(t.u[0] * d[1] - t.u[1] * d[0]) <= 1e-9) continue;
         for (const q of anillos(y))
           for (let j = 0; j < q.length; j++) {
             const [C, D] = [q[j]!, q[(j + 1) % q.length]!];
@@ -305,7 +318,7 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
   };
   for (let i = 0; i < ctx.panos.length; i++)
     for (let j = i + 1; j < ctx.panos.length; j++)
-      if (validos[i] && validos[j] && ctx.panos[i]!.k === ctx.panos[j]!.k && mismoMarco(i, j) && compartenLado(r.regiones[i]!, r.regiones[j]!)) uf.unir(i, j);
+      if (validos[i] && validos[j] && ctx.panos[i]!.k === ctx.panos[j]!.k && mismoMarco(i, j) && compartenLado(r.regiones[i]!, r.regiones[j]!, r.marcos[i]!.d)) uf.unir(i, j);
   const grupos = new Map<number, number[]>();
   ctx.panos.forEach((_, i) => {
     if (!validos[i]) return;
@@ -403,27 +416,44 @@ export function construirPanos(ctx: Contexto, topo: Topologia, puntosMuros: read
         [lo, hi] = [Math.min(lo, e), Math.max(hi, e)];
       }
     const W = hi - lo;
-    const nv = Math.max(1, Math.floor(W / s + 0.5 + 1e-9));
-    const ec = (lo + hi) / 2;
-    const etas = Array.from({ length: nv }, (_, j) => ec + (j - (nv - 1) / 2) * s);
+    // Desde el lado del grupo más cercano al primer vértice de su primer paño, cada s hasta el otro
+    // lado; las que tocan una viga o un muro paralelos se quitan abajo
+    const V0 = r.regiones[g[0]!]!.contorno[0]!;
+    const e0 = V0[0] * n[0] + V0[1] * n[1];
+    const desdeLo = e0 - lo <= hi - e0;
+    const etas: number[] = [];
+    for (let j = 1; j * s < W - 2 * epsSnap; j++) etas.push(desdeLo ? lo + j * s : hi - j * s);
+    etas.sort((x, y) => x - y);
     for (const i of g) {
       const pc = ctx.panos[i]!;
       const k = pc.k;
       const pl = plantas.get(k)!;
       const se = anillos(r.regiones[i]!).map((p) => p.map((V) => [V[0] * d[0] + V[1] * d[1], V[0] * n[0] + V[1] * n[1]] as Vec2));
-      const tramosV: { eta: number; a: number; b: number }[] = [];
-      for (const eta of etas) {
+      // Ejes de las vigas y de los muros paralelos, con lo que no puede acercarse a ellos el de una
+      // vigueta: su semiancho más el de su alma (al menos ε_snap: por el eje ya están ahí)
+      const paralelos = [
+        ...pl.tramos.map((tv) => ({ t: tv.t, m: anchoPlanta(ctx.secciones.get(tv.viga.seccion)?.huella ?? null) / 2 })),
+        ...pl.ejesMuros.map((x) => ({ t: x.t, m: ctx.muros[x.w]!.muro.espesor / 2 })),
+      ]
+        .filter(({ t }) => Math.abs(t.u[0] * d[1] - t.u[1] * d[0]) <= 1e-9)
+        .map(({ t, m }) => ({ t, m: Math.max(epsSnap, m + pc.seccion.alma / 2) }));
+      const tramosEn = (eta: number) => {
+        const out: { eta: number; a: number; b: number }[] = [];
         const c = cortesRecta(se, eta);
         for (let j = 0; j + 1 < c.length; j += 2) {
           const [a, b] = [c[j]!, c[j + 1]!];
           if (!(b - a > 2 * epsSnap)) continue;
-          // Por el eje de una viga o de un muro paralelos: ya están ahí
           const M = punto(d, n, (a + b) / 2, eta);
-          const sobreEje = [...pl.tramos.map((tv) => tv.t), ...pl.ejesMuros.map((x) => x.t)].some(
-            (t) => Math.abs(t.u[0] * d[1] - t.u[1] * d[0]) <= 1e-9 && distanciaASegmento(M, t.A, t.B) <= epsSnap,
-          );
-          if (!sobreEje) tramosV.push({ eta, a, b });
+          if (!paralelos.some(({ t, m }) => distanciaASegmento(M, t.A, t.B) < m)) out.push({ eta, a, b });
         }
+        return out;
+      };
+      const tramosV = etas.flatMap(tramosEn);
+      // Un paño en el que no cabe ninguna: una en su centro, si cabe ahí
+      if (!tramosV.length) {
+        let [l0, h0] = [Infinity, -Infinity];
+        for (const V of r.regiones[i]!.contorno) [l0, h0] = [Math.min(l0, V[0] * n[0] + V[1] * n[1]), Math.max(h0, V[0] * n[0] + V[1] * n[1])];
+        tramosV.push(...tramosEn((l0 + h0) / 2));
       }
       tramosV.sort((x, y) => x.eta - y.eta || x.a - y.a);
       for (const tv0 of tramosV) {

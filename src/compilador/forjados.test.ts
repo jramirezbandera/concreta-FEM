@@ -89,20 +89,46 @@ describe("criterio 3 de C4: batería de plantas al azar con forjados", () => {
 });
 
 describe("C4: unidireccional", () => {
-  it("las viguetas: rectas centradas, piezas en el mapeo, nudos sobre las vigas y la torsión liberada en su primer extremo", () => {
+  it("las viguetas: desde el primer vértice a un intereje y cada intereje (C4-a.1), piezas en el mapeo, nudos sobre las vigas y la torsión liberada en su primer extremo", () => {
     const r = valido(compilar(recuadro()));
     const ids = r.mapeo.panos!.F!;
-    expect(ids.length).toBe(8);
-    expect(r.estadisticas.forjados).toMatchObject({ panos: 1, viguetas: 8, nudosViguetas: 16, voladizos: 0 });
+    expect(ids.length).toBe(7);
+    expect(r.estadisticas.forjados).toMatchObject({ panos: 1, viguetas: 7, nudosViguetas: 14, voladizos: 0 });
     ids.forEach((v, j) => {
       const [b] = r.mapeo.piezas[v]!;
       const barra = r.modelo.barras![b!]!;
       expect(r.mapeo.barras[b!]).toMatchObject({ pieza: v, tipo: "vigueta", pano: "F" });
       expect(barra.liberaciones).toEqual({ i: [false, false, false, true, false, false] });
       const [ni, nj] = barra.nudos.map((n) => r.modelo.nudos[n]!);
-      expect([ni!.x, ni!.y, nj!.x, nj!.y]).toEqual([0, 0.375 + 0.75 * j, 5, 0.375 + 0.75 * j]);
+      expect([ni!.x, ni!.y, nj!.x, nj!.y]).toEqual([0, 0.75 * (j + 1), 5, 0.75 * (j + 1)]);
     });
     expect(r.hipotesis.some((h) => h.includes("viguetas-barra"))).toBe(true);
+  });
+
+  it("C4-a.1: el lado de arranque es el del primer vértice, y la última vigueta va si no toca la viga del otro lado", () => {
+    const etas = (f: ModeloFisico) => {
+      const r = valido(compilar(f));
+      return r.mapeo.panos!.F!.map((v) => r.modelo.nudos[r.modelo.barras![r.mapeo.piezas[v]![0]!]!.nudos[0]]!.y);
+    };
+    const f = recuadro();
+    const conContorno = (c: Vec2[]): ModeloFisico => ({ ...f, panos: [{ ...f.panos![0]!, contorno: c }] });
+    // Desde y = 6 (primer vértice arriba): las mismas rectas, por simetría de un múltiplo exacto
+    expect(etas(conContorno([[0, 6], [0, 0], [5, 0], [5, 6]]))).toEqual([0.75, 1.5, 2.25, 3, 3.75, 4.5, 5.25]);
+    /** El recuadro con el lado de y = 6 en y = Y. */
+    const ancho = (Y: number, c: Vec2[] = rect(0, 0, 5, Y)): ModeloFisico => ({
+      ...f,
+      pilares: f.pilares!.map((p) => (p.y === 6 ? { ...p, y: Y } : p)),
+      vigas: f.vigas!.map((v) => ({ ...v, puntos: v.puntos.map(([x, y]) => [x, y === 6 ? Y : y] as Vec2) })),
+      panos: [{ ...f.panos![0]!, contorno: c }],
+    });
+    // Viga de 30 y alma de 12: la vigueta toca la viga a menos de 0,15 + 0,06 = 0,21 de su eje.
+    // Ancho 5,6: la de 5,25 queda a 0,35 y va; ancho 5,4: la de 5,25, a 0,15, no
+    expect(etas(ancho(5.6))).toEqual([0.75, 1.5, 2.25, 3, 3.75, 4.5, 5.25]);
+    expect(etas(ancho(5.4))).toEqual([0.75, 1.5, 2.25, 3, 3.75, 4.5]);
+    // Desde y = 5,4: cada 0,75 hacia abajo, y la última, a 0,15 de y = 0, tampoco va
+    const desdeArriba = etas(ancho(5.4, [[5, 5.4], [0, 5.4], [0, 0], [5, 0]]));
+    expect(desdeArriba.length).toBe(6);
+    desdeArriba.forEach((y, j) => expect(y).toBeCloseTo(5.4 - 0.75 * (6 - j), 12));
   });
 
   it("el diafragma rígido de la planta abarca los nudos de las viguetas; sin él, aviso (C4-g)", () => {
@@ -188,10 +214,10 @@ describe("C4: unidireccional", () => {
     const g: ModeloFisico = { ...f, cargas: [{ tipo: "lineal", id: "L", caso: "Q", planta: "P1", puntos: [[1, 2], [4, 2]], q: [0, 0, -6] }] };
     const r = valido(compilar(g));
     const ep = new EsfuerzosPiezas(r.modelo, r.mapeo, casosValidos(calcular(r.modelo)));
-    // Entre las viguetas de 1,875 (v3) y 2,625 (v4), a 1/6 de la primera
+    // Entre las viguetas de 1,5 (v2) y 2,25 (v3), a 2/3 de la primera
     const reaccion = (v: string) => ep.en(v, 1, 5)![2]! - ep.en(v, 1, 0)![2]!;
-    expect(reaccion(r.mapeo.panos!.F![2]!)).toBeCloseTo(6 * 3 * (5 / 6), 9);
-    expect(reaccion(r.mapeo.panos!.F![3]!)).toBeCloseTo(6 * 3 * (1 / 6), 9);
+    expect(reaccion(r.mapeo.panos!.F![1]!)).toBeCloseTo(6 * 3 * (1 / 3), 9);
+    expect(reaccion(r.mapeo.panos!.F![2]!)).toBeCloseTo(6 * 3 * (2 / 3), 9);
   });
 });
 
@@ -241,7 +267,7 @@ describe("C4-k: viguetas en voladizo y torsión de equilibrio", () => {
 
   it("sin vano detrás (las viguetas de atrás van en la otra dirección): torsión de equilibrio en VY5, de pilar a pilar", () => {
     const r = valido(compilar(voladizo({ vano: "girado" })));
-    expect(r.estadisticas.forjados.voladizos).toBe(8);
+    expect(r.estadisticas.forjados.voladizos).toBe(7);
     expect(r.diagnosticos.find((d) => d.codigo === "pano/vigueta-en-voladizo")?.mensaje).toContain("torsión de equilibrio");
     const eq = tramosEq(r);
     expect(eq.length).toBeGreaterThan(0);
@@ -274,13 +300,13 @@ describe("C4-k: viguetas en voladizo y torsión de equilibrio", () => {
   it("un balancín (viguetas en voladizo a los dos lados de VY5, sin otro apoyo) también es torsión de equilibrio", () => {
     const f = voladizo({ vano: "ninguno" });
     const r = valido(compilar({ ...f, vigas: f.vigas!.filter((v) => v.id === "VY0" || v.id === "VY5") }));
-    expect(r.estadisticas.forjados.voladizos).toBe(16);
+    expect(r.estadisticas.forjados.voladizos).toBe(14);
     expect(tramosEq(r).length).toBe(r.mapeo.piezas.VY5!.length);
   });
 
   it("un voladizo que sale de un muro no hace trabajar ninguna viga a torsión", () => {
     const r = valido(compilar(voladizo({ vano: "girado", muro: true })));
-    expect(r.estadisticas.forjados.voladizos).toBe(8);
+    expect(r.estadisticas.forjados.voladizos).toBe(7);
     expect(tramosEq(r)).toEqual([]);
     expect(r.hipotesis.find((h) => h.includes("C4-k"))).toContain("Las sujetan pilares, muros o losas");
   });
@@ -304,7 +330,7 @@ describe("C4-e: un muro paralelo a las viguetas en un lado del paño recibe su f
       muros: [{ id: "M", puntos: [[0, 0], [hasta, 0]], desde: "P0", hasta: "P1", espesor: 0.25, material: "HA" }],
     };
   };
-  // De 2 kN/m², la mitad de la franja de borde (0,375 m) en 5 m: 1,875 kN por lado. Lo que va a un
+  // De 2 kN/m², la mitad de la franja de borde (0,375 de 0,75 m) en 5 m: 3,75 kN por lado. Lo que va a un
   // lado: las cargas nodales en sus nudos (el muro, y la viga dentro de las zonas rígidas de los
   // pilares) y las distribuidas en las barras que van por él
   const lado = (r: ReturnType<typeof valido>, y: number, pieza?: string) => {
@@ -320,8 +346,8 @@ describe("C4-e: un muro paralelo a las viguetas en un lado del paño recibe su f
 
   it("el muro entero: la misma carga que la viga del otro lado, sin pérdidas y en equilibrio", () => {
     const r = valido(compilar(conMuro(5)));
-    expect(lado(r, 0)).toBeCloseTo(-1.875, 9);
-    expect(lado(r, 6)).toBeCloseTo(-1.875, 9);
+    expect(lado(r, 0)).toBeCloseTo(-3.75, 9);
+    expect(lado(r, 6)).toBeCloseTo(-3.75, 9);
     // Al muro, en sus nudos de la cota (los de dentro, fuera de los pilares)
     const dentro = (r.modelo.casos[1]!.nodales ?? []).filter((c) => Math.abs(r.modelo.nudos[c.nudo]!.y) <= 1e-9 && r.modelo.nudos[c.nudo]!.x > 0.5 && r.modelo.nudos[c.nudo]!.x < 4.5);
     expect(dentro.length).toBeGreaterThan(3);
@@ -331,8 +357,8 @@ describe("C4-e: un muro paralelo a las viguetas en un lado del paño recibe su f
 
   it("un muro hasta x = 3 y una viga de 3 a 5: cada uno su parte (la viga, salvo su zona rígida en el pilar)", () => {
     const r = valido(compilar(conMuro(3)));
-    expect(lado(r, 0)).toBeCloseTo(-1.875, 9);
-    expect(lado(r, 0, "VC")).toBeCloseTo(-0.375 * (2 - 0.5 * 0.15), 9);
+    expect(lado(r, 0)).toBeCloseTo(-3.75, 9);
+    expect(lado(r, 0, "VC")).toBeCloseTo(-0.75 * (2 - 0.5 * 0.15), 9);
     casosValidos(calcular(r.modelo));
   });
 });
