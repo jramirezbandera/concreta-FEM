@@ -11,8 +11,9 @@ import { serializar } from "../../src/editor/serializar.ts";
 import { crearEnCarpeta, elegirCarpeta, hayCarpetas, origenCarpeta, origenUrl, proyectosEn, type Directorio } from "./sesion/origen.ts";
 import type { ProyectoAbierto } from "./sesion/useProyecto.ts";
 
-/** Proyectos de ejemplo del repositorio (la skill y los tres de A2). */
+/** Proyectos de ejemplo del repositorio (el muestrario de `ejemplos/`, la skill y los tres de A2). */
 export const EJEMPLOS: Record<string, { titulo: string; cargar: () => Promise<string> }> = {
+  muestrario: { titulo: "Muestrario: sótano con empuje, núcleo, porche con apoyo lineal, reticular y unidireccional (con combinaciones)", cargar: () => import("../../ejemplos/muestrario/proyecto.json?raw").then((m) => m.default) },
   ejemplo: { titulo: "Pórtico de dos plantas con losa (ejemplo de la skill)", cargar: () => import("../../.claude/skills/fem/ejemplo.json?raw").then((m) => m.default) },
   "1022": { titulo: "Pórtico de acero de 7 plantas (SAP2000 1-022, A2)", cargar: () => import("../../validacion/a2/agente/1022/proyecto.json?raw").then((m) => m.default) },
   nucleo: { titulo: "Retícula con núcleo de muros (A2)", cargar: () => import("../../validacion/a2/agente/nucleo/proyecto.json?raw").then((m) => m.default) },

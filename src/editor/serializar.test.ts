@@ -13,6 +13,7 @@ import { serializar } from "./serializar.ts";
 const RAIZ = join(import.meta.dirname, "..", "..");
 export const EJEMPLOS = {
   ejemplo: ".claude/skills/fem/ejemplo.json",
+  muestrario: "ejemplos/muestrario/proyecto.json",
   "1022": "validacion/a2/agente/1022/proyecto.json",
   nucleo: "validacion/a2/agente/nucleo/proyecto.json",
   edificio: "validacion/a2/agente/edificio/proyecto.json",

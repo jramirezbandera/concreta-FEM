@@ -1,0 +1,764 @@
+{
+  "$schema": "../../src/agente/proyecto.schema.json",
+  "esquema": "concreta-fem/proyecto@1",
+  "nombre": "Muestrario: sótano, núcleo, reticular, unidireccional y porche",
+  "descripcion": "Ejemplo para ver en la app lo de V2b y F: muro de sótano con empuje, núcleo en U con huecos y dinteles, pilares de fachada apeados sobre el muro, losa de planta baja con un porche sobre un apoyo lineal y un vuelo de 1,5 m, reticular con ábacos, cubierta unidireccional con viguetas, ejes de replanteo y casos con su acción (G, empuje, uso, cubierta, nieve, viento en 4 direcciones y sismo en X e Y) para las combinaciones CTE/NCSE. Los valores son de ejemplo, no de un proyecto real.",
+  "modelo": {
+    "plantas": [
+      {
+        "id": "CUB",
+        "nombre": "Cubierta",
+        "tipo": "cubierta",
+        "altura": null
+      },
+      {
+        "id": "PL1",
+        "nombre": "Planta 1",
+        "altura": 3
+      },
+      {
+        "id": "PB",
+        "nombre": "Planta baja",
+        "altura": 3.2
+      },
+      {
+        "id": "CIM",
+        "nombre": "Cimentación",
+        "tipo": "sotano",
+        "altura": 3.5
+      }
+    ],
+    "materiales": [
+      {
+        "id": "HA-30",
+        "tipo": "hormigon",
+        "fck": 30
+      }
+    ],
+    "secciones": [
+      {
+        "id": "P30x30",
+        "material": "HA-30",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.3
+      },
+      {
+        "id": "P40x40",
+        "material": "HA-30",
+        "forma": "rectangular",
+        "b": 0.4,
+        "h": 0.4
+      },
+      {
+        "id": "V30x40",
+        "material": "HA-30",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.4
+      },
+      {
+        "id": "V30x50",
+        "material": "HA-30",
+        "forma": "rectangular",
+        "b": 0.3,
+        "h": 0.5
+      },
+      {
+        "id": "VT-70",
+        "material": "HA-30",
+        "forma": "T",
+        "bf": 0.7,
+        "hf": 0.05,
+        "bw": 0.12,
+        "h": 0.3
+      }
+    ],
+    "pilares": [
+      {
+        "id": "P1",
+        "x": 0,
+        "y": 11,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P2",
+        "x": 6,
+        "y": 11,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P3",
+        "x": 12,
+        "y": 11,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P4",
+        "x": 18,
+        "y": 11,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P5",
+        "x": 0,
+        "y": 5.5,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P6",
+        "x": 6,
+        "y": 5.5,
+        "desde": "CIM",
+        "hasta": "CUB",
+        "seccion": "P30x30",
+        "tramos": [
+          {
+            "planta": "PB",
+            "seccion": "P40x40"
+          }
+        ]
+      },
+      {
+        "id": "P7",
+        "x": 12,
+        "y": 5.5,
+        "desde": "CIM",
+        "hasta": "CUB",
+        "seccion": "P30x30",
+        "tramos": [
+          {
+            "planta": "PB",
+            "seccion": "P40x40"
+          }
+        ]
+      },
+      {
+        "id": "P8",
+        "x": 18,
+        "y": 5.5,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P9",
+        "x": 0,
+        "y": 0,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P10",
+        "x": 6,
+        "y": 0,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P11",
+        "x": 12,
+        "y": 0,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      },
+      {
+        "id": "P12",
+        "x": 18,
+        "y": 0,
+        "desde": "PB",
+        "hasta": "CUB",
+        "seccion": "P40x40",
+        "base": "ninguno"
+      }
+    ],
+    "vigas": [
+      {
+        "id": "V1",
+        "planta": "PB",
+        "puntos": [[13.4, 7], [16.4, 7]],
+        "seccion": "V30x40"
+      },
+      {
+        "id": "V2",
+        "planta": "PL1",
+        "puntos": [[0, 11], [18, 11]],
+        "seccion": "V30x40"
+      },
+      {
+        "id": "V3",
+        "planta": "PL1",
+        "puntos": [[13.4, 7], [16.4, 7]],
+        "seccion": "V30x40"
+      },
+      {
+        "id": "V4",
+        "planta": "PL1",
+        "puntos": [[0, 0], [18, 0]],
+        "seccion": "V30x40"
+      },
+      {
+        "id": "V5",
+        "planta": "PL1",
+        "puntos": [[0, 0], [0, 11]],
+        "seccion": "V30x40"
+      },
+      {
+        "id": "V6",
+        "planta": "PL1",
+        "puntos": [[18, 0], [18, 11]],
+        "seccion": "V30x40"
+      },
+      {
+        "id": "V7",
+        "planta": "CUB",
+        "puntos": [[0, 11], [18, 11]],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "V8",
+        "planta": "CUB",
+        "puntos": [[13.4, 7], [16.4, 7]],
+        "seccion": "V30x40"
+      },
+      {
+        "id": "V9",
+        "planta": "CUB",
+        "puntos": [[0, 5.5], [18, 5.5]],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "V10",
+        "planta": "CUB",
+        "puntos": [[0, 0], [18, 0]],
+        "seccion": "V30x50"
+      },
+      {
+        "id": "V11",
+        "planta": "CUB",
+        "puntos": [[0, 0], [0, 11]],
+        "seccion": "V30x40"
+      },
+      {
+        "id": "V12",
+        "planta": "CUB",
+        "puntos": [[18, 0], [18, 11]],
+        "seccion": "V30x40"
+      }
+    ],
+    "losas": [
+      {
+        "id": "L1",
+        "nombre": "Losa de planta baja con porche",
+        "planta": "PB",
+        "contorno": [[0, 0], [22.5, 0], [22.5, 11], [0, 11]],
+        "huecos": [
+          [[13.4, 7], [16.4, 7], [16.4, 10], [13.4, 10]]
+        ],
+        "espesor": 0.25,
+        "material": "HA-30"
+      },
+      {
+        "id": "L2",
+        "nombre": "Reticular de planta 1",
+        "planta": "PL1",
+        "contorno": [[0, 0], [18, 0], [18, 11], [0, 11]],
+        "huecos": [
+          [[13.4, 7], [16.4, 7], [16.4, 10], [13.4, 10]]
+        ],
+        "espesor": 0.3,
+        "material": "HA-30",
+        "pp": 4.6,
+        "reticular": {
+          "intereje": 0.8,
+          "nervio": 0.12,
+          "capa": 0.05,
+          "caseton": "perdido",
+          "abacos": [
+            [[-1.2, 9.8], [1.2, 9.8], [1.2, 12.2], [-1.2, 12.2]],
+            [[4.8, 9.8], [7.2, 9.8], [7.2, 12.2], [4.8, 12.2]],
+            [[10.8, 9.8], [13.2, 9.8], [13.2, 12.2], [10.8, 12.2]],
+            [[16.8, 9.8], [19.2, 9.8], [19.2, 12.2], [16.8, 12.2]],
+            [[-1.2, 4.3], [1.2, 4.3], [1.2, 6.7], [-1.2, 6.7]],
+            [[4.8, 4.3], [7.2, 4.3], [7.2, 6.7], [4.8, 6.7]],
+            [[10.8, 4.3], [13.2, 4.3], [13.2, 6.7], [10.8, 6.7]],
+            [[16.8, 4.3], [19.2, 4.3], [19.2, 6.7], [16.8, 6.7]],
+            [[-1.2, -1.2], [1.2, -1.2], [1.2, 1.2], [-1.2, 1.2]],
+            [[4.8, -1.2], [7.2, -1.2], [7.2, 1.2], [4.8, 1.2]],
+            [[10.8, -1.2], [13.2, -1.2], [13.2, 1.2], [10.8, 1.2]],
+            [[16.8, -1.2], [19.2, -1.2], [19.2, 1.2], [16.8, 1.2]]
+          ]
+        }
+      }
+    ],
+    "apoyosLineales": [
+      {
+        "id": "AL1",
+        "planta": "PB",
+        "puntos": [[21, 0], [21, 11]],
+        "coartados": [false, false, true, false, false, false]
+      }
+    ],
+    "muros": [
+      {
+        "id": "M1",
+        "nombre": "Muro de sótano",
+        "puntos": [[0, 0], [18, 0], [18, 11], [0, 11], [0, 0]],
+        "desde": "CIM",
+        "hasta": "PB",
+        "espesor": 0.3,
+        "material": "HA-30"
+      },
+      {
+        "id": "M2",
+        "nombre": "Núcleo de escalera",
+        "puntos": [[13.4, 7], [13.4, 10], [16.4, 10], [16.4, 7]],
+        "desde": "CIM",
+        "hasta": "CUB",
+        "espesor": 0.25,
+        "material": "HA-30",
+        "huecos": [
+          {
+            "desde": 4,
+            "hasta": 5,
+            "z0": 0,
+            "z1": 2.1
+          },
+          {
+            "desde": 7,
+            "hasta": 8,
+            "z0": 4.4,
+            "z1": 5.6
+          },
+          {
+            "desde": 7,
+            "hasta": 8,
+            "z0": 7.6,
+            "z1": 8.8
+          }
+        ]
+      }
+    ],
+    "panos": [
+      {
+        "id": "F1",
+        "nombre": "Forjado de cubierta",
+        "planta": "CUB",
+        "contorno": [[0, 0], [18, 0], [18, 11], [0, 11]],
+        "huecos": [
+          [[13.4, 7], [16.4, 7], [16.4, 10], [13.4, 10]]
+        ],
+        "direccion": 90,
+        "intereje": 0.7,
+        "seccion": "VT-70",
+        "pp": 3.5
+      }
+    ],
+    "casos": [
+      {
+        "id": "G",
+        "nombre": "Peso propio",
+        "pesoPropio": true,
+        "accion": {
+          "tipo": "G"
+        }
+      },
+      {
+        "id": "CM",
+        "nombre": "Cargas muertas",
+        "accion": {
+          "tipo": "G"
+        }
+      },
+      {
+        "id": "ET",
+        "nombre": "Empuje del terreno",
+        "accion": {
+          "tipo": "G",
+          "permanente": "empuje"
+        }
+      },
+      {
+        "id": "Q",
+        "nombre": "Uso residencial",
+        "accion": {
+          "tipo": "Q",
+          "psi": "uso-A"
+        }
+      },
+      {
+        "id": "QC",
+        "nombre": "Cubierta de conservación",
+        "accion": {
+          "tipo": "Q",
+          "psi": "uso-G"
+        }
+      },
+      {
+        "id": "S",
+        "nombre": "Nieve",
+        "accion": {
+          "tipo": "S",
+          "psi": "nieve-hasta-1000"
+        }
+      },
+      {
+        "id": "WX+",
+        "nombre": "Viento +X",
+        "accion": {
+          "tipo": "W",
+          "familia": "viento",
+          "direccion": "X",
+          "signo": 1,
+          "psi": "viento"
+        }
+      },
+      {
+        "id": "WX-",
+        "nombre": "Viento −X",
+        "accion": {
+          "tipo": "W",
+          "familia": "viento",
+          "direccion": "X",
+          "signo": -1,
+          "psi": "viento"
+        }
+      },
+      {
+        "id": "WY+",
+        "nombre": "Viento +Y",
+        "accion": {
+          "tipo": "W",
+          "familia": "viento",
+          "direccion": "Y",
+          "signo": 1,
+          "psi": "viento"
+        }
+      },
+      {
+        "id": "WY-",
+        "nombre": "Viento −Y",
+        "accion": {
+          "tipo": "W",
+          "familia": "viento",
+          "direccion": "Y",
+          "signo": -1,
+          "psi": "viento"
+        }
+      },
+      {
+        "id": "EX",
+        "nombre": "Sismo X",
+        "accion": {
+          "tipo": "E",
+          "direccion": "X"
+        }
+      },
+      {
+        "id": "EY",
+        "nombre": "Sismo Y",
+        "accion": {
+          "tipo": "E",
+          "direccion": "Y"
+        }
+      }
+    ],
+    "cargas": [
+      {
+        "tipo": "superficie",
+        "id": "CM-PB",
+        "caso": "CM",
+        "planta": "PB",
+        "q": [0, 0, -2],
+        "losa": "L1"
+      },
+      {
+        "tipo": "superficie",
+        "id": "CM-P1",
+        "caso": "CM",
+        "planta": "PL1",
+        "q": [0, 0, -2],
+        "losa": "L2"
+      },
+      {
+        "tipo": "superficie",
+        "id": "CM-CUB",
+        "caso": "CM",
+        "planta": "CUB",
+        "q": [0, 0, -1.5],
+        "pano": "F1"
+      },
+      {
+        "tipo": "lineal",
+        "id": "FACH-P1",
+        "caso": "CM",
+        "planta": "PL1",
+        "puntos": [[0, 0], [18, 0], [18, 11], [0, 11], [0, 0]],
+        "q": [0, 0, -7]
+      },
+      {
+        "tipo": "lineal",
+        "id": "FACH-PB",
+        "caso": "CM",
+        "planta": "PB",
+        "puntos": [[0, 11], [0, 0], [18, 0]],
+        "q": [0, 0, -7]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-1",
+        "caso": "CM",
+        "viga": "V7",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-2",
+        "caso": "CM",
+        "viga": "V10",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-3",
+        "caso": "CM",
+        "viga": "V11",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-4",
+        "caso": "CM",
+        "viga": "V12",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "empuje",
+        "id": "EMP-M1",
+        "caso": "ET",
+        "muro": "M1",
+        "lado": "derecho",
+        "z0": 0,
+        "z1": 3.5,
+        "p0": 36.5,
+        "p1": 5
+      },
+      {
+        "tipo": "superficie",
+        "id": "SU-PB",
+        "caso": "Q",
+        "planta": "PB",
+        "q": [0, 0, -3],
+        "losa": "L1"
+      },
+      {
+        "tipo": "superficie",
+        "id": "SU-P1",
+        "caso": "Q",
+        "planta": "PL1",
+        "q": [0, 0, -2],
+        "losa": "L2"
+      },
+      {
+        "tipo": "superficie",
+        "id": "SU-CUB",
+        "caso": "QC",
+        "planta": "CUB",
+        "q": [0, 0, -1],
+        "pano": "F1"
+      },
+      {
+        "tipo": "superficie",
+        "id": "NI-CUB",
+        "caso": "S",
+        "planta": "CUB",
+        "q": [0, 0, -0.4],
+        "pano": "F1"
+      },
+      {
+        "tipo": "puntual",
+        "id": "WX+P1",
+        "caso": "WX+",
+        "planta": "PL1",
+        "x": 9,
+        "y": 5.5,
+        "F": [27, 0, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "WX+CUB",
+        "caso": "WX+",
+        "planta": "CUB",
+        "x": 9,
+        "y": 5.5,
+        "F": [13, 0, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "WX-P1",
+        "caso": "WX-",
+        "planta": "PL1",
+        "x": 9,
+        "y": 5.5,
+        "F": [-27, 0, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "WX-CUB",
+        "caso": "WX-",
+        "planta": "CUB",
+        "x": 9,
+        "y": 5.5,
+        "F": [-13, 0, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "WY+P1",
+        "caso": "WY+",
+        "planta": "PL1",
+        "x": 9,
+        "y": 5.5,
+        "F": [0, 45, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "WY+CUB",
+        "caso": "WY+",
+        "planta": "CUB",
+        "x": 9,
+        "y": 5.5,
+        "F": [0, 22, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "WY-P1",
+        "caso": "WY-",
+        "planta": "PL1",
+        "x": 9,
+        "y": 5.5,
+        "F": [0, -45, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "WY-CUB",
+        "caso": "WY-",
+        "planta": "CUB",
+        "x": 9,
+        "y": 5.5,
+        "F": [0, -22, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "EX-P1",
+        "caso": "EX",
+        "planta": "PL1",
+        "x": 9,
+        "y": 5.5,
+        "F": [60, 0, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "EX-CUB",
+        "caso": "EX",
+        "planta": "CUB",
+        "x": 9,
+        "y": 5.5,
+        "F": [45, 0, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "EY-P1",
+        "caso": "EY",
+        "planta": "PL1",
+        "x": 9,
+        "y": 5.5,
+        "F": [0, 60, 0]
+      },
+      {
+        "tipo": "puntual",
+        "id": "EY-CUB",
+        "caso": "EY",
+        "planta": "CUB",
+        "x": 9,
+        "y": 5.5,
+        "F": [0, 45, 0]
+      }
+    ],
+    "ejes": [
+      {
+        "id": "A",
+        "desde": [0, -1.5],
+        "hasta": [0, 12.5]
+      },
+      {
+        "id": "B",
+        "desde": [6, -1.5],
+        "hasta": [6, 12.5]
+      },
+      {
+        "id": "C",
+        "desde": [12, -1.5],
+        "hasta": [12, 12.5]
+      },
+      {
+        "id": "D",
+        "desde": [18, -1.5],
+        "hasta": [18, 12.5]
+      },
+      {
+        "id": "E",
+        "desde": [21, -1.5],
+        "hasta": [21, 12.5]
+      },
+      {
+        "id": "1",
+        "desde": [-1.5, 0],
+        "hasta": [24, 0]
+      },
+      {
+        "id": "2",
+        "desde": [-1.5, 5.5],
+        "hasta": [24, 5.5]
+      },
+      {
+        "id": "3",
+        "desde": [-1.5, 11],
+        "hasta": [24, 11]
+      }
+    ]
+  },
+  "armado": {
+    "base": {
+      "x-inf": 15,
+      "x-sup": 15,
+      "y-inf": 15,
+      "y-sup": 15
+    }
+  }
+}
