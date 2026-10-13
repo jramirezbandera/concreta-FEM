@@ -1,9 +1,11 @@
 /**
  * Diálogos del editor (V2a): borrar (si otros objetos usan lo que se borra, se dice cuáles y se
- * elige entre borrarlos también o pasarlos a otro), copiar a otras plantas y renumerar (I-g).
+ * elige entre borrarlos también o pasarlos a otro), copiar a otras plantas, renumerar (I-g) y
+ * los ábacos en los pilares de un reticular.
  */
 import { useMemo, useState } from "react";
 import { copiarAPlantas, objetosDePlanta } from "../../../src/editor/edicion.ts";
+import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
 import { PREFIJOS, propuestaRenumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
@@ -234,3 +236,82 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
   );
 }
 
+
+const numero = (s: string) => Number(s.trim().replace(",", "."));
+
+/**
+ * Ábacos en los pilares de un forjado reticular (decisión del usuario, 2026-10-13): dice qué crea
+ * antes de hacerlo. Los ábacos quedan como polígonos en la tabla Forjados.
+ */
+export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void }) {
+  const { proyecto, planta, seleccion } = useVisor();
+  const ed = proyecto.edicion!;
+  const m = ed.proyecto.modelo;
+  const reticulares = (m.losas ?? []).filter((l) => l.reticular);
+  const inicial = reticulares.find((l) => l.id === seleccion) ?? reticulares.find((l) => l.planta === planta) ?? reticulares[0];
+  const [losa, setLosa] = useState(inicial?.id ?? "");
+  const [a, setA] = useState("2,4");
+  const [b, setB] = useState("2,4");
+  const [error, setError] = useState<string | null>(null);
+  const p = useMemo(() => (losa ? proponerAbacos(m, losa, numero(a), numero(b)) : { error: "No hay ningún forjado reticular." }), [m, losa, a, b]);
+  const op = "error" in p ? null : operacionAbacos(m, p);
+
+  const hacer = () => {
+    if (!op || "error" in p) return;
+    const r = ed.editar(op, `Ábacos en los pilares de ${losa}`);
+    if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
+    onCerrar(`${p.nuevos.length} ábacos en ${losa}.`);
+  };
+
+  return (
+    <Dialogo
+      titulo="Ábacos en los pilares"
+      onCerrar={() => onCerrar()}
+      pie={
+        <>
+          <button type="button" className="btn" onClick={() => onCerrar()}>
+            Cancelar
+          </button>
+          <button type="button" className="btn btn-p" onClick={hacer} disabled={!op}>
+            Crear
+          </button>
+        </>
+      }
+    >
+      {reticulares.length === 0 ? (
+        <p>No hay ningún forjado reticular. Un forjado es reticular por su columna «tipo» en la tabla Forjados.</p>
+      ) : (
+        <>
+          <p>Un ábaco macizo centrado en cada pilar que llega al forjado, con sus lados según los nervios (la dirección del forjado) y su perpendicular. Quedan en la columna «ábacos» de la tabla Forjados, donde se pueden retocar.</p>
+          <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+            <label htmlFor="abacos-losa">Forjado</label>
+            <select id="abacos-losa" className="sel" value={losa} onChange={(e) => setLosa(e.target.value)}>
+              {reticulares.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.id} · {l.planta}
+                  {l.nombre ? ` · ${l.nombre}` : ""}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="abacos-a">Según los nervios (m)</label>
+            <input id="abacos-a" className="sel mono" value={a} onChange={(e) => setA(e.target.value)} />
+            <label htmlFor="abacos-b">En perpendicular (m)</label>
+            <input id="abacos-b" className="sel mono" value={b} onChange={(e) => setB(e.target.value)} />
+          </div>
+          {"error" in p ? (
+            <p className="mt-3 text-state-fail">{p.error}</p>
+          ) : (
+            <ul className="mt-3 list-disc pl-5" aria-label="Lo que se va a hacer">
+              <li>{p.nuevos.length ? `${p.nuevos.length} ábacos nuevos: ${p.nuevos.map((x) => x.pilar).join(", ")}.` : "Ningún ábaco nuevo."}</li>
+              {p.conAbaco.length > 0 && <li>Ya tienen ábaco, y se dejan: {p.conAbaco.join(", ")}.</li>}
+              {p.solapados.length > 0 && <li className="text-state-warn">Se solaparían con otro, y no se crean: {p.solapados.join(", ")}.</li>}
+              {p.fuera.length > 0 && <li className="text-text-secondary">Se salen del forjado (cuenta lo de dentro): {p.fuera.join(", ")}.</li>}
+            </ul>
+          )}
+          <p className="mt-2 text-[11.5px] text-text-secondary">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
+        </>
+      )}
+      {error && <p className="mt-2 text-state-fail">{error}</p>}
+    </Dialogo>
+  );
+}

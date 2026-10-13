@@ -18,11 +18,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ListOrdered, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
-import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcAbacos, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
-import { DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
+import { DialogoAbacos, DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
 import { tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
 import { cota, fmt } from "../fmt.ts";
@@ -61,7 +61,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const [tabla, setTabla] = useState<NombreTabla>(cargas ? "cargas" : "pilares");
   const [nueva, setNueva] = useState(0);
   const [plantilla, setPlantilla] = useState<Record<string, string> | undefined>(undefined);
-  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | null>(null);
+  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | null>(null);
 
   const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
   // Lo elegido que está en el proyecto (un eje propuesto no lo está) y lo que de ello se copia
@@ -153,11 +153,12 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcPilar} nombre="Pilar" onClick={() => abrirTabla("pilares", true)} title="Un pilar nuevo en la tabla de pilares" />
           <Herramienta icono={IcViga} nombre="Viga" onClick={() => abrirTabla("vigas", true)} title="Una viga nueva en la tabla de vigas" />
           <Herramienta icono={IcLosa} nombre="Forjado" onClick={() => abrirTabla("forjados", true, { tipo: "maciza" })} title="Un forjado nuevo en la tabla de forjados: losa maciza, reticular o unidireccional, según su columna «tipo»" />
+          <Herramienta icono={IcAbacos} nombre="Ábacos" onClick={() => setDialogo("abacos")} title="Ábacos macizos en los pilares de un forjado reticular, del tamaño que diga" />
           <Herramienta icono={IcMuro} nombre="Muro" onClick={() => abrirTabla("muros", true)} title="Un muro nuevo en la tabla de muros" />
           <Herramienta icono={IcApoyo} nombre="Apoyo" onClick={() => abrirTabla("apoyos", true)} title="Un apoyo nuevo en la tabla de apoyos" />
           <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" onClick={() => abrirTabla("apoyosLineales", true)} title="Un apoyo lineal nuevo en la tabla de apoyos lineales" />
           <Separador />
-          <Herramienta icono={IcAPlantas} nombre="Copiar" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, losas, paños, apoyos o cargas"} />
+          <Herramienta icono={IcAPlantas} nombre="Copiar" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, forjados, apoyos o cargas"} />
           <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
           <Separador />
@@ -250,6 +251,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       {dialogo === "borrar" && enTablas.length > 0 && <DialogoBorrar ids={enTablas} onCerrar={cerrarDialogo} />}
       {dialogo === "copiar" && copiables.length > 0 && <DialogoCopiar ids={copiables} onCerrar={cerrarDialogo} />}
       {dialogo === "renumerar" && ed && <DialogoRenumerar onCerrar={() => setDialogo(null)} />}
+      {dialogo === "abacos" && ed && <DialogoAbacos onCerrar={() => setDialogo(null)} />}
     </>
   );
 }

@@ -56,6 +56,15 @@ export const IcForjado = icono(
     <path d="M7 13l5-6M11 13l5-6M15 13l5-6" />
   </>,
 );
+/** Ábacos: la planta de un reticular con su cuadrícula y un cuadrado macizo en el pilar. */
+export const IcAbacos = icono(
+  <>
+    <rect x="3" y="3" width="18" height="18" rx="1" />
+    <path d="M3 9h4M17 9h4M3 15h4M17 15h4M9 3v4M15 3v4M9 17v4M15 17v4" strokeWidth={1} />
+    <rect x="8" y="8" width="8" height="8" fill="currentColor" fillOpacity={0.35} />
+    <rect x="10.5" y="10.5" width="3" height="3" fill="currentColor" />
+  </>,
+);
 export const IcApoyoLineal = icono(
   <>
     <path d="M3 12h18" />

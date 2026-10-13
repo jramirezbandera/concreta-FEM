@@ -490,3 +490,25 @@ describe("Forjados: cambiar el tipo en la tabla", () => {
     expect(screen.getByText(/L2 es ahora unidireccional/)).toBeTruthy();
   }, 120_000);
 });
+
+describe("Ábacos en los pilares", () => {
+  it("el diálogo dice qué haría antes de hacerlo: en el muestrario todos los pilares ya tienen ábaco", async () => {
+    const p = JSON.parse(readFileSync(join(RAIZ, "ejemplos", "muestrario", "proyecto.json"), "utf8")) as Proyecto;
+    const { container } = render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Muestrario/ }));
+    await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(huella(p)), { timeout: 30_000 });
+    fireEvent.click(screen.getByRole("button", { name: "Ábacos" }));
+    const d = screen.getByRole("dialog", { name: "Ábacos en los pilares" });
+    expect(within(d).getByRole("combobox", { name: "Forjado" })).toHaveProperty("value", "L2");
+    expect(within(d).getByText(/Ningún ábaco nuevo/)).toBeTruthy();
+    expect(within(d).getByText(/Ya tienen ábaco/).textContent).toContain("P12");
+    expect(within(d).getByRole("button", { name: "Crear" })).toHaveProperty("disabled", true);
+    // Más grandes, chocan con los que hay: se sigue sin crear ninguno
+    fireEvent.change(within(d).getByRole("textbox", { name: /Según los nervios/ }), { target: { value: "8" } });
+    expect(within(d).getByText(/Ningún ábaco nuevo/)).toBeTruthy();
+  }, 120_000);
+});
