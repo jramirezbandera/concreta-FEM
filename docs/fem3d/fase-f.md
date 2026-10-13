@@ -105,6 +105,14 @@ Las baterías completas pasan: 1 634 tests en la raíz y 31 en la app.
 - **El reticular de SAP2000 (criterio 3).** No se ha comparado franja a franja. E6-12 ya compara el campo de momentos en la misma malla (M11 y M22 a ≤ 1,4 %), y las franjas son medias de ese campo; si quiere la comparación directa, hay que exportar de SAP2000 los momentos por nudo con el modelo (`validacion/e6/sap2000/LEEME.md`).
 - **La puerta de uso:** armar con los mapas una losa de un proyecto suyo y decir si le sirve. Se abre en Resultados · Armado.
 
+### 4.1 Decisiones del usuario (2026-10-13)
+
+Las cuatro, como las recomendó el agente:
+- **Malla:** se refina sólo alrededor de los pilares con cara, sin bajar h en toda la losa. Con h = 0,5, la losa plana del edificio objetivo pasaría del perfil móvil. Hasta que esté hecho, lo que se arme de verdad se calcula con `tamanoMalla: 0.5`.
+- **Tiempo:** se acepta. C5-4 se hará cuando moleste.
+- **SAP2000:** la comparación va al periodo en sombra, armadura contra armadura, con proyectos reales.
+- **Puerta de uso:** se hace ya, sin esperar al refinamiento.
+
 ## 5. Pendiente
 
 - Lo de §4.

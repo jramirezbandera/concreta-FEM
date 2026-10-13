@@ -347,12 +347,13 @@
     - Frente a OpenSeesPy ASDShellQ4 en H25, las caras a ≤ 1,5 % con h = 0,375 (≤ 3,2 % con 0,75).
     - Banco de Chrome: el mapa en 1,8 s, sin tareas largas, bit a bit.
     - Referencia congelada.
-  - **Pendiente del usuario** (`fase-f.md` §4):
-    - el h de las losas con franjas: con 0,75, el metro junto a un pilar sale un 6 % bajo; con 0,5, −0,7 %;
-    - el tiempo: las franjas de 7 plantas cuestan 1,7–2,1 veces el cálculo;
-    - la comparación con el reticular de SAP2000;
-    - la puerta de uso.
+  - **Decidido por el usuario el 2026-10-13** (`fase-f.md` §4.1):
+    - refinar la malla sólo alrededor de los pilares con cara (no bajar h en toda la losa: con 0,5 no cabría en el perfil móvil);
+    - el tiempo de las franjas se acepta (C5-4, cuando moleste);
+    - el reticular de SAP2000 se compara en el periodo en sombra, armadura contra armadura;
+    - la puerta de uso de F se hace ya, sin esperar al refinamiento.
 - **Siguiente paso:**
+  - el refinamiento local junto a los pilares con cara (F-6), con su plan y sus criterios;
   - las puertas de uso de F, de I1, I2, I3 e I4, de V2a y de V2b;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
