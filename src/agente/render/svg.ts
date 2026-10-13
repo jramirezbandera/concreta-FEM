@@ -85,6 +85,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "valor-pilar": { fill: "#1f2933", stroke: "#1f2933", sw: 1 },
   "reaccion-vertical": { fill: "#0d9488", stroke: "#0d9488", sw: 2 },
   "reaccion-horizontal": { stroke: "#d97706", sw: 2 },
+  "armado-cubierto": { fill: "#e5e7eb" },
+  "zona-refuerzo": { stroke: "#111827", sw: 1.8 },
 };
 
 /** Número en px con un decimal, sin «-0» ni «.0». */
@@ -178,6 +180,13 @@ export function escenaASvg(e: Escena): Svg {
   if (e.leyenda.length) {
     leyenda.push(`<text x="${xb}" y="${f(y + 14)}" font-size="${TAM_LEYENDA}" font-weight="bold">Leyenda</text>`);
     y += 24;
+    if (e.tituloLeyenda) {
+      for (const l of partir(e.tituloLeyenda, TAM_LEYENDA, anchoUtil)) {
+        leyenda.push(`<text x="${xb}" y="${f(y + 13)}" font-size="${TAM_LEYENDA}">${esc(l)}</text>`);
+        y += LINEA_LEYENDA;
+      }
+      y += 6;
+    }
     for (const it of e.leyenda) {
       const lineas = partir(it.texto, TAM_LEYENDA, anchoUtil - 34);
       if (y + lineas.length * LINEA_LEYENDA > maxY) {

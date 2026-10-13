@@ -28,10 +28,12 @@ import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 import type { ConjuntoCombinaciones, Proposito } from "./combinaciones.ts";
 import type { Proyecto } from "./proyecto.ts";
+import type { ArmadoProyecto } from "./armaduraBase.ts";
+import { ARMADURAS, losasDe, refuerzosDe, type Armadura, type ZonaRefuerzo } from "./refuerzos.ts";
 
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
-export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "combinaciones"] as const;
+export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "refuerzos", "combinaciones"] as const;
 export type NombreConsulta = (typeof CONSULTAS)[number];
 
 /** Elementos de una lista que se dan por defecto (los mayores); `todos` los da todos. */
@@ -52,6 +54,10 @@ export interface OpcionesConsulta {
   todos?: boolean;
   /** pieza: el diagrama por estaciones (con una sola combinación). */
   estaciones?: boolean;
+  /** refuerzos: la armadura (x-inf, x-sup, y-inf o y-sup). */
+  armadura?: string;
+  /** refuerzos: la armadura base del proyecto (AB). */
+  armado?: ArmadoProyecto;
   /** El conjunto de combinaciones de cada propósito (el elegido o el de por defecto). */
   combinaciones: (p: Proposito) => Respuesta<ConjuntoCombinaciones>;
 }
@@ -735,6 +741,26 @@ export function franja(q: Consultas, conjunto: ConjuntoCombinaciones, id: string
   return si({ franja: id, losa: f.losa, direccion: f.direccion, ancho: f.ancho, intereje: f.intereje, combinaciones: conjunto.descripcion, estaciones }, r.diagnosticos);
 }
 
+// ─── Zonas de refuerzo (fase AB) ────────────────────────────────────────────────────────────────
+
+/** Una zona de refuerzo sin sus tramos ni su contorno (los que dibuja la vista `armado`). */
+export type FilaRefuerzo = Omit<ZonaRefuerzo, "tramos" | "contorno">;
+
+/**
+ * Las zonas de refuerzo de una armadura en una losa, una planta o todas (`docs/fem3d/armado.md`
+ * §2.6): lo que supera la armadura base del proyecto, conexo, con su extensión y su máximo. Las losas
+ * sin base en esa armadura se dicen aparte.
+ */
+export function refuerzos(q: Consultas, conjunto: ConjuntoCombinaciones, o: Pick<OpcionesConsulta, "losa" | "planta" | "armadura" | "armado">): Respuesta<{ combinaciones: string; armadura: Armadura; zonas: FilaRefuerzo[]; sinBase: string[] }> {
+  const a = o.armadura;
+  if (!a || !ARMADURAS.includes(a as Armadura)) return no("consulta/armadura", `La consulta «refuerzos» necesita la armadura: --armadura ${ARMADURAS.join(" | ")}.`);
+  if (o.losa !== undefined && !(q.fisico.losas ?? []).some((l) => l.id === o.losa)) return no("consulta/no-existe", `La losa «${o.losa}» no existe en el modelo (las franjas son de las losas macizas y reticulares).`, [o.losa]);
+  const r = refuerzosDe(q, losasDe(q, o), a as Armadura, conjunto, o.armado);
+  if (!r.valido) return r;
+  const zonas = r.valor.zonas.map(({ tramos: _t, contorno: _c, ...z }) => z);
+  return si({ combinaciones: conjunto.descripcion, armadura: a as Armadura, zonas, sinBase: r.valor.sinBase });
+}
+
 // ─── Entrada común ──────────────────────────────────────────────────────────────────────────────
 
 const PROPOSITO: Record<NombreConsulta, Proposito> = {
@@ -746,6 +772,7 @@ const PROPOSITO: Record<NombreConsulta, Proposito> = {
   banda: "esfuerzos",
   franjas: "esfuerzos",
   franja: "esfuerzos",
+  refuerzos: "esfuerzos",
   combinaciones: "esfuerzos",
 };
 
@@ -772,5 +799,7 @@ export function consultar(q: Consultas, consulta: NombreConsulta, o: OpcionesCon
       return franjas(q, conjunto, o);
     case "franja":
       return franja(q, conjunto, o.id);
+    case "refuerzos":
+      return refuerzos(q, conjunto, o);
   }
 }

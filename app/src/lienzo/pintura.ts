@@ -42,6 +42,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "extremo-maximo": { fill: "#0c0c0e", stroke: "#fafafa", sw: 2 },
   "extremo-minimo": { fill: "#fafafa", stroke: "#fafafa", sw: 2 },
   "valor-pilar": { fill: "#d4d6db", stroke: "#d4d6db", sw: 1 },
+  "armado-cubierto": { fill: "#2a2e35" },
+  "zona-refuerzo": { stroke: "#f8fafc", sw: 1.8 },
 };
 
 export function pintura(estilo: Estilo, tema: Theme): Pintura {

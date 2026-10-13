@@ -68,7 +68,9 @@ export type Estilo =
   | "extremo-minimo"
   | "valor-pilar"
   | "reaccion-vertical"
-  | "reaccion-horizontal";
+  | "reaccion-horizontal"
+  | "armado-cubierto"
+  | "zona-refuerzo";
 
 export type Primitiva =
   /** Polígono con huecos: el primer anillo es el contorno (relleno par-impar). `relleno` sustituye al del estilo. */
@@ -142,6 +144,8 @@ export interface Escena {
   cabecera: string[];
   primitivas: Primitiva[];
   leyenda: EntradaLeyenda[];
+  /** AB: lo que dibuja la leyenda, con su unidad (en un mapa de armado, «X inferior · M_Ed (Wood–Armer) · kN·m/m»). */
+  tituloLeyenda?: string;
   /** Notas al pie de la leyenda (lo que no tiene sitio en planta, convenios). */
   notas: string[];
   extremos: ExtremoRotulado[];

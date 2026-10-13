@@ -51,7 +51,7 @@ export interface Argumentos {
   banderas: Map<string, string[]>;
 }
 
-const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por", "vista", "escala"]);
+const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por", "vista", "escala", "armadura"]);
 const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda"]);
 
 export function analizarArgumentos(argv: readonly string[]): Argumentos | { error: string } {
@@ -91,7 +91,7 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem esquema
 
 Combinaciones de las consultas: --casos | --situacion ELU-PT[,ELS-C…] | --combinacion "1.35*G+1.5*Q" (repetible) | --caso G
-Otras: --planta P --tipo pilar|viga|vigueta --objeto id --losa id --top N --todos --estaciones --exacto --cifras N
+Otras: --planta P --tipo pilar|viga|vigueta --objeto id --losa id --armadura x-inf|x-sup|y-inf|y-sup (refuerzos, con la base del proyecto) --top N --todos --estaciones --exacto --cifras N
 Salida: un objeto JSON. Códigos: 0 bien, 1 errores del modelo o del cálculo, 2 orden mal dada, 3 error interno.`;
 
 // ─── Diagnósticos y números ─────────────────────────────────────────────────────────────────────
@@ -343,6 +343,8 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
         ...(top !== undefined ? { top: Number(top) } : {}),
         ...(a.banderas.has("todos") ? { todos: true } : {}),
         ...(a.banderas.has("estaciones") ? { estaciones: true } : {}),
+        ...(a.banderas.get("armadura") ? { armadura: a.banderas.get("armadura")![0]! } : {}),
+        ...(l.proyecto.armado ? { armado: l.proyecto.armado } : {}),
         id: a.posicionales[2],
         combinaciones: (proposito: Proposito) => conjuntoCombinaciones(q, seleccion ?? seleccionPorDefecto(l.proyecto.modelo.casos, proposito)),
       };
@@ -407,7 +409,7 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
           else if (vista === "pilares-n") escenas.push([vistaAxiles(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
           else if (vista === "reacciones") escenas.push([vistaReacciones(rr!, planta, conjuntos.get("lineal")!, d), undefined]);
           else if (vista === "bandas") escenas.push([vistaBandas(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
-          else if (vista.startsWith("armado-")) escenas.push([vistaArmado(rr!, planta, vista.slice("armado-".length) as Armadura, conjuntos.get("esfuerzos")!, d, escala), undefined]);
+          else if (vista.startsWith("armado-")) escenas.push([vistaArmado(rr!, planta, vista.slice("armado-".length) as Armadura, conjuntos.get("esfuerzos")!, d, { ...(escala ? { escala } : {}), ...(l.proyecto.armado ? { armado: l.proyecto.armado } : {}) }), undefined]);
           else escenas.push([vistaCampo(rr!, planta, vista as Campo, conjuntos.get(propositoDe(vista))!, d, escala), undefined]);
           for (const [e, caso] of escenas) {
             const s = escenaASvg(e);

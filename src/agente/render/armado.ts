@@ -1,31 +1,32 @@
 /**
  * Vistas `armado-x-inf`, `armado-x-sup`, `armado-y-inf` y `armado-y-sup` de una planta (fase F,
- * `docs/fem3d/franjas.md` §2.5): las franjas de armado de sus losas en una dirección, coloreadas por
- * tramos según la demanda de Wood–Armer de su armadura inferior o superior (kN·m/m), que es la de
- * «fem consultar franja» bit a bit.
+ * `docs/fem3d/franjas.md` §2.5; fase AB, `armado.md` §2): las franjas de armado de sus losas en una
+ * dirección, coloreadas por tramos según la demanda de Wood–Armer de su armadura inferior o superior
+ * (kN·m/m), que es la de «fem consultar franja» bit a bit.
  *
  * - X es la dirección 1 de cada losa (su eje 1) e Y, la 2 (la perpendicular).
- * - Cada estación colorea su tramo de la franja: de la mitad hasta la estación anterior a la mitad
- *   hasta la siguiente, y no más de un paso (junto a un hueco); las dos de una línea de apoyo, cada
- *   una hacia su lado. Entre las caras de un pilar que toca la franja no hay estaciones: ese tramo lo
- *   cubren las de las caras.
+ * - Cada estación colorea su tramo de la franja (`refuerzos.ts`).
  * - Inferior en rojos y superior en azules, con la escala de los mapas (`limitesMapa`).
- * - Rotulado, el mayor de cada franja, con prioridad por su valor (los que no caben, fuera).
+ * - La leyenda lleva su título con la unidad (AB, §2.1).
+ * - Sin base: se rotulan los picos de cada franja (prominencia ≥ 5 % del mayor de la planta, AB-a).
+ * - Con la base del proyecto (§2.6) y `soloExceso`: lo cubierto, en gris; lo demás, por la demanda
+ *   total desde la base; cada zona de refuerzo, con su contorno y su máximo rotulado con el exceso.
+ *   Sin `soloExceso`, el mapa entero con los picos, y el contorno de las zonas encima.
  *
  * Puro: sin IO.
  */
-import { franjas as consultaFranjas, franja as consultaFranja } from "../consultas.ts";
+import type { ArmadoProyecto } from "../armaduraBase.ts";
+import { baseDe, hayBase } from "../armaduraBase.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import type { Vec2 } from "../../compilador/fisico.ts";
-import { PASO_ESTACIONES } from "../../compilador/franjas.ts";
+import { ARMADURAS, caraDe, franjasTramos, losasDe, picos, PROMINENCIA_PICOS, zonasRefuerzo, type Armadura, type FranjaTramos, type TramoArmado, type ZonaRefuerzo } from "../refuerzos.ts";
 import { rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva } from "./escena.ts";
 import { coloresBandas, limitesMapa, type EscalaMapa, type LimitesMapa } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
 import { fondoModelo, PlantaFisica, type DatosVista } from "./modelo.ts";
 import { cabecera, caja, trazoModelo, type ResultadosRender } from "./resultados.ts";
 
-export const ARMADURAS = ["x-inf", "x-sup", "y-inf", "y-sup"] as const;
-export type Armadura = (typeof ARMADURAS)[number];
+export { ARMADURAS, type Armadura, type TramoArmado };
 export const VISTAS_ARMADO = ARMADURAS.map((a) => `armado-${a}` as const);
 
 const NOMBRE: Record<Armadura, string> = {
@@ -35,129 +36,184 @@ const NOMBRE: Record<Armadura, string> = {
   "y-sup": "armadura superior en Y (dirección 2 de cada losa)",
 };
 
-/** Un tramo coloreado de una franja: su rectángulo en planta y su demanda. */
-export interface TramoArmado {
-  franja: string;
-  /** Estación que lo colorea (a lo largo, m). */
-  s: number;
-  v: number;
-  comb: string;
-  rectangulo: Vec2[];
-}
+/** El nombre corto de una armadura («X inferior»). */
+export const NOMBRE_CORTO: Record<Armadura, string> = { "x-inf": "X inferior", "x-sup": "X superior", "y-inf": "Y inferior", "y-sup": "Y superior" };
+export const UNIDAD_ARMADO = "kN·m/m";
+/** El título de la leyenda de una armadura (AB, §2.1). */
+export const tituloArmado = (a: Armadura): string => `${NOMBRE_CORTO[a]} · M_Ed (Wood–Armer) · ${UNIDAD_ARMADO}`;
 
 /** Los tramos de las franjas de la planta en una armadura, con su demanda (de «fem consultar franja»). */
 export function tramosArmado(r: ResultadosRender, planta: string, armadura: Armadura, conjunto: ConjuntoCombinaciones): { tramos: TramoArmado[]; franjas: number } {
-  const q = r.q;
-  const direccion = armadura[0] === "x" ? 1 : 2;
-  const cara = armadura.endsWith("inf") ? "inferior" : "superior";
-  const tramos: TramoArmado[] = [];
-  let nf = 0;
-  const lista = consultaFranjas(q, conjunto, { planta });
-  if (!lista.valido) return { tramos, franjas: 0 };
-  for (const fila of lista.valor.franjas) {
-    if (fila.direccion !== direccion) continue;
-    const g = q.franja(fila.id);
-    const c = consultaFranja(q, conjunto, fila.id);
-    if (!g.valido || !c.valido) continue;
-    nf++;
-    const f = g.valor.franja;
-    const es = c.valor.estaciones;
-    const P = (s: number, t: number): Vec2 => [s * f.d[0] + t * f.n[0], s * f.d[1] + t * f.n[1]];
-    es.forEach((e, i) => {
-      if (e.valido === false) return;
-      // Hasta la mitad de sus vecinas, y no más de un paso (junto a un hueco, la vecina no vale)
-      const a = Math.max(i > 0 ? (es[i - 1]!.s + e.s) / 2 : f.s0, e.s - PASO_ESTACIONES);
-      const b = Math.min(i + 1 < es.length ? (e.s + es[i + 1]!.s) / 2 : f.s1, e.s + PASO_ESTACIONES);
-      if (!(b > a)) return;
-      const [v, comb] = e[cara];
-      tramos.push({ franja: f.id, s: e.s, v, comb, rectangulo: [P(a, f.t0), P(b, f.t0), P(b, f.t1), P(a, f.t1)] });
-    });
-  }
-  return { tramos, franjas: nf };
+  const fs = franjasTramos(r.q, losasDe(r.q, { planta }), armadura, conjunto);
+  if (!fs.valido) return { tramos: [], franjas: 0 };
+  return { tramos: fs.valor.flatMap((f) => f.tramos), franjas: fs.valor.length };
 }
 
-export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armadura, conjunto: ConjuntoCombinaciones, d: DatosVista, escala: EscalaMapa = {}): Escena {
-  const pl = new PlantaFisica(r.q.fisico, planta);
-  const P: Primitiva[] = [...fondoModelo(pl, { atenuado: true }).primitivas];
-  const { tramos, franjas } = tramosArmado(r, planta, armadura, conjunto);
-  const superior = armadura.endsWith("sup");
+export interface OpcionesArmado {
+  escala?: EscalaMapa;
+  /** La armadura base del proyecto (AB, §2.5). */
+  armado?: ArmadoProyecto;
+  /** Con base, sólo lo que no cubre (AB-g; por defecto, sí). */
+  soloExceso?: boolean;
+}
+
+/** Lo que dibuja el mapa de armado de una planta: tramos, zonas y la escala; lo comparten la planta y el 3D. */
+export interface MapaArmado {
+  franjas: FranjaTramos[];
+  zonas: ZonaRefuerzo[];
+  /** Los tramos que se colorean (los demás, cubiertos por la base) y su banda. */
+  coloreados: { t: TramoArmado; banda: number }[];
+  cubiertos: TramoArmado[];
+  limites: LimitesMapa | null;
+  colores: string[];
+  leyenda: EntradaLeyenda[];
+  notas: string[];
+  /** Con base y `soloExceso`. */
+  conBase: boolean;
+  vmax: number;
+}
+
+/**
+ * Tramos, zonas, límites y colores de unas franjas (las de una planta, o las de todas para el 3D, con
+ * una escala común).
+ */
+export function mapaArmado(fs: FranjaTramos[], armadura: Armadura, op: OpcionesArmado = {}): MapaArmado {
+  const superior = caraDe(armadura) === "superior";
+  const armado = op.armado;
+  const conBase = hayBase(armado, armadura) && op.soloExceso !== false;
+  const base = (losa: string) => baseDe(armado, losa, armadura);
   const notas: string[] = [];
   const leyenda: EntradaLeyenda[] = [];
-  let mapa: Escena["mapa"];
+  const tramos = fs.flatMap((f) => f.tramos);
+  const losas = [...new Set(fs.map((f) => f.franja.losa))];
+  const zonas = hayBase(armado, armadura) ? losas.filter((l) => base(l) !== null).flatMap((l) => zonasRefuerzo(l, armadura, base(l)!, fs)) : [];
+  const cubierto = (t: TramoArmado) => conBase && base(t.losa) !== null && !(t.v > base(t.losa)!);
+  const cubiertos = tramos.filter(cubierto);
+  const visibles = tramos.filter((t) => !cubierto(t));
   const vmax = Math.max(0, ...tramos.map((t) => t.v));
-  const u = "kN·m/m";
-  if (tramos.length) {
-    let lm = limitesMapa(0, vmax > 0 ? vmax : 1, escala);
+  let limites: LimitesMapa | null = null;
+  let colores: string[] = [];
+  const coloreados: { t: TramoArmado; banda: number }[] = [];
+  if (visibles.length) {
+    // Con base, las bandas empiezan en la menor base de lo que se colorea (0 en las losas sin base)
+    const desde = conBase ? Math.min(...visibles.map((t) => base(t.losa) ?? 0)) : 0;
+    const hasta = Math.max(...visibles.map((t) => t.v));
+    const sup = hasta > desde ? hasta : desde + 1;
+    let lm = limitesMapa(desde, sup, op.escala ?? {});
     if ("error" in lm) {
       notas.push(`Escala no válida (${lm.error}): se dibuja la completa.`);
-      lm = limitesMapa(0, vmax > 0 ? vmax : 1) as LimitesMapa;
+      lm = limitesMapa(desde, sup) as LimitesMapa;
     }
+    limites = lm;
     const { L, fueraAbajo, fueraArriba } = lm;
     const nb = L.length - 1;
     // Superior en azules: los colores de los límites cambiados de signo, en el mismo orden
-    const colores = superior
-      ? coloresBandas(
-          L.map((x) => -x).reverse(),
-          { abajo: fueraArriba, arriba: fueraAbajo },
-        ).reverse()
-      : coloresBandas(L, { abajo: fueraAbajo, arriba: fueraArriba });
+    colores = superior ? coloresBandas(L.map((x) => -x).reverse(), { abajo: fueraArriba, arriba: fueraAbajo }).reverse() : coloresBandas(L, { abajo: fueraAbajo, arriba: fueraArriba });
     const banda = (v: number) => {
       for (let b = 0; b < nb; b++) if (v <= L[b + 1]! || b === nb - 1) return b;
       return nb - 1;
     };
-    // Los tramos seguidos de una franja en la misma banda, en un solo rectángulo, y los de cada banda
-    // en una sola región con un anillo por rectángulo (no se solapan): el mismo dibujo con una región
-    // por banda, como los mapas, en vez de miles
-    const porBanda = new Map<number, Vec2[][]>();
-    for (let i = 0; i < tramos.length; ) {
-      const t = tramos[i]!;
-      const b = banda(t.v);
-      let j = i + 1;
-      while (j < tramos.length && tramos[j]!.franja === t.franja && banda(tramos[j]!.v) === b && tramos[j]!.rectangulo[0]![0] === tramos[j - 1]!.rectangulo[1]![0] && tramos[j]!.rectangulo[0]![1] === tramos[j - 1]!.rectangulo[1]![1]) j++;
-      const u = tramos[j - 1]!;
-      const anillos = porBanda.get(b) ?? [];
-      anillos.push([t.rectangulo[0]!, u.rectangulo[1]!, u.rectangulo[2]!, t.rectangulo[3]!]);
-      porBanda.set(b, anillos);
-      i = j;
-    }
-    for (const [b, anillos] of [...porBanda].sort((x, y) => x[0] - y[0])) P.push({ tipo: "region", anillos, estilo: "isobanda", relleno: colores[b]!, banda: b });
+    for (const t of visibles) coloreados.push({ t, banda: banda(t.v) });
     for (let b = nb - 1; b >= 0; b--) {
       const texto = fueraArriba && b === nb - 1 ? `más de ${rotulo(L[b]!, 4)} (fuera de la escala)` : fueraAbajo && b === 0 ? `menos de ${rotulo(L[1]!, 4)} (fuera de la escala)` : `${rotulo(L[b]!, 4)} a ${rotulo(L[b + 1]!, 4)}`;
       leyenda.push({ relleno: colores[b]!, texto });
     }
-    const dentro = L.slice(fueraAbajo ? 1 : 0, fueraArriba ? nb : nb + 1);
-    mapa = { limites: dentro, paso: lm.paso, fueraAbajo, fueraArriba, picos: false, minimo: Math.min(...tramos.map((t) => t.v)), maximo: vmax, combinacion: "" };
   }
+  if (conBase) {
+    const bs = [...new Set(losas.map(base).filter((x): x is number => x !== null))].sort((a, b) => a - b);
+    const que = bs.length === 1 ? `≤ ${rotulo(bs[0]!, 4)}` : `≤ su base, de ${rotulo(bs[0]!, 4)} a ${rotulo(bs[bs.length - 1]!, 4)}`;
+    leyenda.push({ estilo: "armado-cubierto", texto: `cubierto por la base (${que})` });
+    if (zonas.length) leyenda.push({ estilo: "zona-refuerzo", texto: "zona de refuerzo" });
+    notas.push(`Lo que supera la base, por la demanda total; rotulado, el máximo de cada zona de refuerzo con el exceso entre paréntesis (${zonas.length} zonas).`);
+    const sin = losas.filter((l) => base(l) === null);
+    if (sin.length) notas.push(`Sin base (el mapa entero): ${sin.join(", ")}.`);
+  } else {
+    if (zonas.length) leyenda.push({ estilo: "zona-refuerzo", texto: "zona de refuerzo (supera la base)" });
+    notas.push("Rotulados: los picos de cada franja (prominencia ≥ 5 % del mayor de la planta). Acerque para ver más.");
+  }
+  return { franjas: fs, zonas, coloreados, cubiertos, limites, colores, leyenda, notas, conBase, vmax };
+}
+
+export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armadura, conjunto: ConjuntoCombinaciones, d: DatosVista, op: OpcionesArmado = {}): Escena {
+  const pl = new PlantaFisica(r.q.fisico, planta);
+  const P: Primitiva[] = [...fondoModelo(pl, { atenuado: true }).primitivas];
+  const fs = franjasTramos(r.q, losasDe(r.q, { planta }), armadura, conjunto);
+  const m = mapaArmado(fs.valido ? fs.valor : [], armadura, op);
+  const superior = caraDe(armadura) === "superior";
+  const notas: string[] = [...m.notas];
+  const u = UNIDAD_ARMADO;
+  // Los tramos seguidos de una franja en la misma banda, en un solo rectángulo, y los de cada banda
+  // en una sola región con un anillo por rectángulo (no se solapan): el mismo dibujo con una región
+  // por banda, como los mapas, en vez de miles
+  const porBanda = new Map<number, Vec2[][]>();
+  const cs = m.coloreados;
+  for (let i = 0; i < cs.length; ) {
+    const { t, banda: b } = cs[i]!;
+    let j = i + 1;
+    while (j < cs.length && cs[j]!.t.franja === t.franja && cs[j]!.banda === b && cs[j]!.t.a === cs[j - 1]!.t.b) j++;
+    const w = cs[j - 1]!.t;
+    const anillos = porBanda.get(b) ?? [];
+    anillos.push([t.rectangulo[0]!, w.rectangulo[1]!, w.rectangulo[2]!, t.rectangulo[3]!]);
+    porBanda.set(b, anillos);
+    i = j;
+  }
+  if (m.cubiertos.length) P.push({ tipo: "poligono", anillos: m.cubiertos.map((t) => t.rectangulo), estilo: "armado-cubierto" });
+  for (const [b, anillos] of [...porBanda].sort((x, y) => x[0] - y[0])) P.push({ tipo: "region", anillos, estilo: "isobanda", relleno: m.colores[b]!, banda: b });
   P.push(...trazoModelo(pl));
+  for (const z of m.zonas) for (const [a, b] of z.contorno) P.push({ tipo: "linea", puntos: [a, b], estilo: "zona-refuerzo", objeto: z.id });
   const ejes = capaEjes(pl.f, { cotas: false });
   P.push(...ejes.primitivas);
   notas.push(...ejes.notas);
-  // El mayor de cada franja, rotulado
-  const mayor = new Map<string, TramoArmado>();
-  for (const t of tramos) if (t.v > (mayor.get(t.franja)?.v ?? 0)) mayor.set(t.franja, t);
+  // Rótulos: con base, el máximo de cada zona con su exceso; sin ella, los picos de cada franja
   const extremos: ExtremoRotulado[] = [];
-  for (const t of mayor.values()) {
-    const c: Vec2 = [t.rectangulo.reduce((a, p) => a + p[0], 0) / 4, t.rectangulo.reduce((a, p) => a + p[1], 0) / 4];
-    P.push({ tipo: "texto", p: c, texto: rotulo(t.v), tamano: 10, color: superior ? "#1d4ed8" : "#b91c1c", fondo: true, ancla: "medio", dy: 4, prioridad: (t.v / (vmax || 1)) * 60 + 5, objeto: t.franja });
-    extremos.push({ que: `${superior ? "Superior" : "Inferior"} máxima de ${t.franja}`, valor: t.v, unidad: u, objeto: t.franja, punto: c, comb: t.comb });
+  const color = superior ? "#1d4ed8" : "#b91c1c";
+  const centro = (t: TramoArmado): Vec2 => [t.rectangulo.reduce((a, p) => a + p[0], 0) / 4, t.rectangulo.reduce((a, p) => a + p[1], 0) / 4];
+  const vmax = m.vmax || 1;
+  if (m.conBase) {
+    for (const z of m.zonas) {
+      const t = z.tramos.find((x) => x.franja === z.maximo.franja && x.s === z.maximo.s && x.v === z.maximo.v)!;
+      const c = centro(t);
+      P.push({ tipo: "texto", p: c, texto: `${rotulo(z.maximo.v)} (+${rotulo(z.maximo.exceso)})`, tamano: 10, color, fondo: true, ancla: "medio", dy: 4, prioridad: (z.maximo.v / vmax) * 60 + 5, objeto: z.id });
+      extremos.push({ que: `Máximo de ${z.id} (base ${rotulo(z.base)})`, valor: z.maximo.v, unidad: u, objeto: z.id, punto: c, comb: z.maximo.comb });
+    }
+  } else {
+    const minima = PROMINENCIA_PICOS * m.vmax;
+    for (const f of m.franjas)
+      for (const t of picos(f.tramos, minima)) {
+        const c = centro(t);
+        P.push({ tipo: "texto", p: c, texto: rotulo(t.v), tamano: 10, color, fondo: true, ancla: "medio", dy: 4, prioridad: (t.v / vmax) * 60 + 5, objeto: t.franja });
+        extremos.push({ que: `${superior ? "Superior" : "Inferior"}: pico de ${t.franja} en s = ${rotulo(t.s, 4)} m`, valor: t.v, unidad: u, objeto: t.franja, punto: c, comb: t.comb });
+      }
   }
-  const ordenados = extremos.sort((a, b) => b.valor - a.valor || ((a.objeto ?? "") < (b.objeto ?? "") ? -1 : 1));
-  notas.push(
-    "Momento de dimensionado de Wood–Armer por metro de la franja (kN·m/m), por combinación con los momentos medios de su ancho, en la dirección de la franja (fase F): de «fem consultar franja». En las caras de los pilares y en las líneas de apoyo, exacto (por fuerzas nodales); entre ellas, cada 0,25 m, por campos.",
-    "Cada estación colorea su tramo de la franja, hasta la mitad de sus vecinas. Rotulado, el mayor de cada franja.",
-  );
+  const ordenados = extremos.sort((a, b) => b.valor - a.valor || ((a.objeto ?? "") < (b.objeto ?? "") ? -1 : (a.objeto ?? "") > (b.objeto ?? "") ? 1 : 0));
   const paños = pl.enPlanta(pl.f.panos);
   if (paños.length) notas.push(`Los paños (${paños.map((p) => p.id).join(", ")}) no llevan franjas: sus viguetas, con «fem consultar pieza».`);
-  if (!franjas) notas.push("La planta no tiene losas macizas ni reticulares: no hay franjas.");
-  if (ordenados.length) notas.push(`Mayor: ${rotulo(ordenados[0]!.valor)} ${u} en ${ordenados[0]!.objeto} (${ordenados[0]!.comb}).`);
+  if (!m.franjas.length) notas.push("La planta no tiene losas macizas ni reticulares: no hay franjas.");
+  const mayor = m.franjas.flatMap((f) => f.tramos).reduce<TramoArmado | null>((a, t) => (t.v > (a?.v ?? 0) ? t : a), null);
+  if (mayor) notas.push(`Mayor: ${rotulo(mayor.v)} ${u} en ${mayor.franja} (${mayor.comb}).`);
+  const lm = m.limites;
   return {
     titulo: d.nombre ?? "Proyecto",
-    cabecera: cabecera(pl, `Vista: ${NOMBRE[armadura]}, momento de dimensionado (kN·m/m), envolvente de ${conjunto.descripcion}`, d),
+    cabecera: cabecera(pl, `Vista: ${NOMBRE[armadura]}, momento de dimensionado (${u}), envolvente de ${conjunto.descripcion}${m.conBase ? ", sobre la armadura base" : ""}`, d),
     primitivas: P,
-    leyenda,
+    leyenda: m.leyenda,
+    tituloLeyenda: tituloArmado(armadura),
     notas,
     extremos: ordenados,
     caja: caja(pl),
-    ...(mapa ? { mapa } : {}),
+    ...(lm
+      ? {
+          mapa: {
+            limites: lm.L.slice(lm.fueraAbajo ? 1 : 0, lm.fueraArriba ? lm.L.length - 1 : lm.L.length),
+            paso: lm.paso,
+            fueraAbajo: lm.fueraAbajo,
+            fueraArriba: lm.fueraArriba,
+            picos: false,
+            minimo: Math.min(...m.coloreados.map((x) => x.t.v)),
+            maximo: Math.max(...m.coloreados.map((x) => x.t.v)),
+            combinacion: "",
+          },
+        }
+      : {}),
   };
 }
