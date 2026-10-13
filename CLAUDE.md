@@ -319,6 +319,7 @@
   - `src/agente/render/cargas.ts`: `geometriaCargas` (cada carga en el espacio, como la lee el compilador) y `vistaAlzadoCargas` (bloques a escala con la punta de las flechas en la pieza; lo normal al plano, rotulado);
   - `src/visor/cargas3d.ts` (pedido `cargas3d`): bloques translúcidos con flechas sobre el sólido, rotulados en la planta resaltada;
   - validación: la resultante de lo dibujado es la del modelo analítico a 1e-9 (salvo lo que une ε_snap, acotado) en `cargas.test.ts`, y Chrome pinta lo de Node (`validacion/cargas/chrome.ts`).
+  - después: las cargas se eligen en el 3D (clic y ventana), los filtros del 3D las tratan como a su pieza (lo de pilares y muros, por plantas) y los momentos de las puntuales se dibujan en planta, alzado y 3D (`momento2D`).
 - **2026-10-13: fase V2b terminada** (muros, forjados y bandas en la app). Pasan los criterios 1 a 4, y el 7 en sus valores; los tiempos del 5 y del 7 quedan a medias, y el 6 (puerta de uso) es del usuario. El plan está en `visor.md` §7, con las decisiones del usuario (§7.4), y el informe, en `docs/fem3d/fase-v2b.md`, con hallazgos V2b-1…V2b-5 y pendientes.
   - **Editor:** tablas de muros, paños, apoyos lineales y bandas; el reticular, en columnas de Losas, y los empujes, en Cargas. Con V2b todo el modelo físico se edita en la app, salvo las opciones de compilación y los perfiles I.
   - **Bandas:**

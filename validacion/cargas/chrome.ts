@@ -9,6 +9,8 @@
  *   sólido y con cada caso; la escala de la barra los cambia.
  * - El alzado del eje 3 con las cargas de G tiene los búferes de Node (sha256).
  * - Orbitar el 3D con las cargas a 60 fps.
+ * - Elegir una carga con un clic y por ventana; ocultarla (Ctrl+H); el rango de plantas deja las de
+ *   Node con ese rango (lo de los pilares, por la planta de la cabeza de cada tramo).
  */
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -60,8 +62,15 @@ const shaBuferes = (e: EscenaPreparada) => {
   return h.digest("hex");
 };
 const shaSeg = (x: Float32Array) => createHash("sha256").update(new Uint8Array(x.buffer, x.byteOffset, x.byteLength)).digest("hex");
+const g3 = valor(ses.cargas3D("G"));
+const TAB = g3.objetos.findIndex((o) => o.id === "G-tab-N7");
+if (TAB < 0) throw new Error("no está G-tab-N7");
+const RANGO = { desde: "N3", hasta: "N4" };
 const ESPERADO = {
-  G: valor(ses.cargas3D("G")).segmentos.length / 6,
+  G: g3.segmentos.length / 6,
+  sinTab: [...g3.objetoSegmento].filter((k) => k !== TAB).length,
+  rango: [...g3.plantaSegmento].filter((k) => k === g3.plantas.indexOf(RANGO.desde) || k === g3.plantas.indexOf(RANGO.hasta)).length,
+  tab: g3.objetos[TAB]!.punto,
   Vx: valor(ses.cargas3D("Vx")).segmentos.length / 6,
   G2: shaSeg(valor(ses.cargas3D("G", 2)).segmentos),
   alzado: shaBuferes(valor(ses.alzado({ eje: "3" }, undefined, undefined, { caso: "G" }))),
@@ -160,6 +169,7 @@ window.__i2 = {
     await __i2.fotograma(); vivo = false;
     return t.slice(1).map((x, k) => x - t[k]);
   },
+  tecla: (key, o = {}) => window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ctrlKey: !!o.ctrl, shiftKey: !!o.mayus })),
   rueda: async (i, x, y, n, deltaY) => {
     const t = []; let vivo = true; const bucle = (ts) => { t.push(ts); if (vivo) requestAnimationFrame(bucle); }; requestAnimationFrame(bucle);
     for (let k = 0; k < n; k++) { __i2.ev(i, "wheel", x, y, { deltaY }); await __i2.fotograma(); }
@@ -217,6 +227,42 @@ try {
   await pagina(`__i2.motor().vista(0).encuadrar()`);
   await quietos();
   await captura("2b-3d-G-N4");
+  await pagina(elegir("Planta", ""));
+
+  log("\n## Elegir, ocultar y filtrar las cargas");
+  await pagina(`__i2.motor().vista(0).vistaEstandar("so"); __i2.motor().vista(0).encuadrar();`);
+  await quietos();
+  const q = await pagina<[number, number] | null>(`return __i2.motor().vista(0).aPantalla(${ESPERADO.tab.join(", ")});`);
+  if (q) await pagina(`await __i2.clic(0, ${q[0]}, ${q[1]});`);
+  await quietos();
+  const e1 = await pagina<{ elegidos: string[] }>(`return await __i2.dep(0);`);
+  comprobar(e1.elegidos.length === 1 && e1.elegidos[0] === "G-tab-N7", `un clic sobre la tabiquería de N7 la elige: ${e1.elegidos.join(", ") || "nada"}`);
+  await captura("2c-3d-G-elegida");
+  await pagina(`__i2.tecla("h", { ctrl: true });`);
+  await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).cargasVisibles === ${ESPERADO.sinTab}, 30000).catch(() => null);`);
+  const e2 = await pagina<{ cargasVisibles: number }>(`return await __i2.dep(0);`);
+  comprobar(e2.cargasVisibles === ESPERADO.sinTab, `ocultarla (Ctrl+H) quita sus segmentos: ${e2.cargasVisibles} = Node ${ESPERADO.sinTab}`);
+  await pagina(`__i2.tecla("H", { mayus: true });`);
+  await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).cargasVisibles === ${ESPERADO.G}, 30000).catch(() => null);`);
+  // De derecha a izquierda: «toca» (mostrarlo todo reencuadra: el punto, otra vez)
+  await quietos();
+  const q2 = await pagina<[number, number] | null>(`return __i2.motor().vista(0).aPantalla(${ESPERADO.tab.join(", ")});`);
+  if (q2) await pagina(`const [x0, y0, x1, y1] = [${q2[0] + 6}, ${q2[1] + 6}, ${q2[0] - 6}, ${q2[1] - 6}]; __i2.ev(0, "pointerdown", x0, y0); for (let k = 1; k <= 8; k++) { __i2.ev(0, "pointermove", x0 + (x1 - x0) * k / 8, y0 + (y1 - y0) * k / 8); await __i2.fotograma(); } __i2.ev(0, "pointerup", x1, y1); await new Promise((r) => setTimeout(r, 200));`);
+  await quietos();
+  const e3 = await pagina<{ elegidos: string[] }>(`return await __i2.dep(0);`);
+  comprobar(e3.elegidos.includes("G-tab-N7"), `una ventana que la toca la elige: ${e3.elegidos.join(", ") || "nada"}`);
+  await pagina(`__i2.tecla("Escape");`);
+  await pagina(`__i2.boton("Opciones de la vista").click();`);
+  await pagina(`await __i2.esperar(() => document.querySelector('.opciones-vista'));`);
+  await pagina(elegir("Planta de abajo", RANGO.desde));
+  await pagina(elegir("Planta de arriba", RANGO.hasta));
+  await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).cargasVisibles === ${ESPERADO.rango}, 30000).catch(() => null);`);
+  await quietos();
+  await captura("2d-3d-G-N3-N4");
+  const e4 = await pagina<{ cargasVisibles: number }>(`return await __i2.dep(0);`);
+  comprobar(e4.cargasVisibles === ESPERADO.rango, `con las plantas de ${RANGO.desde} a ${RANGO.hasta}, las de Node: ${e4.cargasVisibles} = ${ESPERADO.rango}`);
+  await pagina(`__i2.boton("Mostrar todo").click(); __i2.boton("Opciones de la vista").click();`);
+  await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).cargasVisibles === ${ESPERADO.G}, 30000).catch(() => null);`);
 
   log("\n## Otro caso y otra escala");
   await pagina(elegirEn('select[aria-label="Caso activo"]', "Vx"));

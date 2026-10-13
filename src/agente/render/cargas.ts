@@ -24,7 +24,9 @@
  * - las lineales y las de vigas y pilares, en los tramos paralelos al plano a menos de la
  *   profundidad, con su componente en el plano perpendicular a la pieza; en los que lo cruzan, una
  *   flecha en el cruce con su componente en el plano;
- * - las puntuales a menos de la profundidad, una flecha de largo fijo con su componente en el plano;
+ * - las puntuales a menos de la profundidad, una flecha de largo fijo con su componente en el plano, y
+ *   su momento: la componente normal al plano, un arco (antihorario positivo tal como se mira), y la
+ *   del plano, una flecha de doble punta (`momento2D`);
  * - los empujes, en los muros que cruzan el plano (su componente en él); en los paralelos, un rótulo.
  * Lo que es normal al plano (el viento según X en un pórtico según Y) se rotula, sin bloque.
  * Escalas: la mayor carga de superficie que se ve ocupa ORDENADA_DIAGRAMA m por la pedida, y la
@@ -36,7 +38,7 @@ import { cotasPlantas } from "../../compilador/cotas.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
 import { intervalosRecta, PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type PlanoAlzado } from "./alzado.ts";
 import { ORDENADA_DIAGRAMA } from "./diagramas.ts";
-import { cajaDe, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
+import { cajaDe, momento2D, R_MOMENTO, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
 import { giroTexto, porId, vector, type DatosVista } from "./modelo.ts";
 import { flecha2D } from "./reacciones.ts";
 
@@ -303,7 +305,8 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
   /** Las cargas que sólo tienen componente normal al plano, donde van. */
   const normales: { g: CargaFisica; p: Vec2 }[] = [];
   const cruces: { g: CargaFisica; p: Vec2; v: Vec2 }[] = [];
-  const puntuales: { g: CargaFisica; p: Vec2; v: Vec2 }[] = [];
+  /** v: F en el plano; giro y M: el momento normal al plano (hacia quien mira) y en el plano. */
+  const puntuales: { g: CargaFisica; p: Vec2; v: Vec2; giro: number; M: Vec2 }[] = [];
   const paralelos: { g: CargaFisica; p: Vec2 }[] = [];
   let horizontales = false;
   for (const x of geo.cargas) {
@@ -350,7 +353,8 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
     }
     for (const p of x.puntos) {
       if (Math.abs(w(p.p)) > prof) continue;
-      puntuales.push({ g, p: [u(p.p), p.p[2]], v: enPlano(p.F) });
+      // Hacia quien mira (u a la derecha, z arriba): u × z = −nor
+      puntuales.push({ g, p: [u(p.p), p.p[2]], v: enPlano(p.F), giro: -(p.M[0] * nor[0] + p.M[1] * nor[1]), M: enPlano(p.M) });
     }
     for (const pr of x.presiones) {
       const l = Math.hypot(pr.B[0] - pr.A[0], pr.B[1] - pr.A[1]);
@@ -396,7 +400,7 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
   let cima = zs.length ? Math.max(...zs) : 0;
   for (const b of bloques) for (let i = 0; i < 2; i++) cima = Math.max(cima, b.base[i]![1] + b.ord[i]![1] * (b.porArea ? kS : kL));
   for (const x of cruces) cima = Math.max(cima, x.p[1] - x.v[1] * kL);
-  for (const x of puntuales) cima = Math.max(cima, x.p[1] + (Math.hypot(...x.v) > 0 ? (-x.v[1] / Math.hypot(...x.v)) * m : 0));
+  for (const x of puntuales) cima = Math.max(cima, x.p[1] + (Math.hypot(...x.v) > 0 ? (-x.v[1] / Math.hypot(...x.v)) * m : 0), x.giro || Math.hypot(...x.M) ? x.p[1] + 2 * R_MOMENTO : -Infinity);
   const base = vistaAlzado(f, plano, d, { atenuado: true, arriba: zs.length && cima > Math.max(...zs) ? cima - Math.max(...zs) + 0.3 : 0 });
 
   const P: Primitiva[] = [...base.primitivas];
@@ -448,12 +452,16 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
   }
   for (const x of puntuales) {
     const l = Math.hypot(...x.v);
+    const momento = momento2D(x.p, x.giro, x.M, "carga-puntual", x.g.id);
+    for (const y of momento) poner(y);
+    if (momento.length) nuevos.push([x.p[0] - 2 * R_MOMENTO, x.p[1] - 2 * R_MOMENTO], [x.p[0] + 2 * R_MOMENTO, x.p[1] + 2 * R_MOMENTO]);
     if (l > 0) {
       const F: Vec2 = [(x.v[0] / l) * m, (x.v[1] / l) * m];
       for (const y of flecha2D(x.p, F, m, "carga-puntual", x.g.id)) poner(y);
       nuevos.push([x.p[0] - F[0], x.p[1] - F[1]]);
       anclar(x.g.id, [x.p[0] - F[0], x.p[1] - F[1]], [-F[0], -F[1]], 0);
-    } else {
+    } else if (momento.length) anclar(x.g.id, [x.p[0], x.p[1] + R_MOMENTO], [0, 1], 0);
+    else {
       poner({ tipo: "marca", p: x.p, forma: "circulo", radio: 5, estilo: "carga-puntual", objeto: x.g.id });
       normales.push({ g: x.g, p: x.p });
       anclar(x.g.id, x.p, [0, 1], 0);
@@ -464,7 +472,7 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
   const textos = new Map(geo.cargas.map((x) => [x.carga.id, x.carga]));
   for (const [id, r] of rotulos) {
     const g = textos.get(id)!;
-    const dibujada = bloques.some((b) => b.g === g) || cruces.some((x) => x.g === g && Math.hypot(...x.v) > 0) || puntuales.some((x) => x.g === g && Math.hypot(...x.v) > 0);
+    const dibujada = bloques.some((b) => b.g === g) || cruces.some((x) => x.g === g && Math.hypot(...x.v) > 0) || puntuales.some((x) => x.g === g && (Math.hypot(...x.v) > 0 || x.giro !== 0 || Math.hypot(...x.M) > 0));
     const texto = paralelos.some((x) => x.g === g) && !dibujada ? `${id}: empuje normal al plano, ${rotulo(g.tipo === "empuje" ? g.p0 : 0)} a ${rotulo(g.tipo === "empuje" ? g.p1 : 0)} kN/m²` : `${textoCarga(g)}${!dibujada && normales.some((x) => x.g === g) ? ", normal al plano" : ""}`;
     // Más allá de la cola, en el sentido de la ordenada; a lo largo del bloque si lo hay
     let extra: Partial<Extract<Primitiva, { tipo: "texto" }>>;
@@ -485,11 +493,11 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
   entrada("carga-superficie", "Carga de superficie (kN/m²) donde su zona está junto al plano, y empuje de un muro que lo cruza: el bloque a escala, con la punta de las flechas en la pieza");
   entrada("carga-banda-lineal", "Carga lineal (kN/m): en los tramos paralelos al plano, su componente perpendicular a ellos; en los que lo cruzan, una flecha");
   entrada("carga-banda-pieza", "Carga en una viga o un pilar (kN/m), igual");
-  entrada("carga-puntual", "Carga puntual (kN): su componente en el plano, de largo fijo (un círculo si no tiene)");
+  entrada("carga-puntual", "Carga puntual (kN): su componente en el plano, de largo fijo (un círculo si no tiene). Su momento (kN·m): el normal al plano, un arco en su sentido (antihorario, positivo hacia quien mira); el del plano, una flecha de doble punta (regla de la mano derecha)");
   const vistas = new Set([...bloques.map((b) => b.g.id), ...normales.map((x) => x.g.id), ...cruces.map((x) => x.g.id), ...puntuales.map((x) => x.g.id), ...paralelos.map((x) => x.g.id)]);
   const notas = [
     ...(maxS > 0 || maxL > 0 ? [`Escalas: ${[maxS > 0 ? `${rotulo(maxS)} kN/m² = ${rotulo(m)} m` : "", maxL > 0 ? `${rotulo(maxL)} kN/m = ${rotulo(m)} m` : ""].filter(Boolean).join("; ")}. Las puntuales, de ${rotulo(m)} m.`] : []),
-    `Se dibuja la componente de cada carga en el plano; lo normal a él y los momentos, en el rótulo. Las cargas de superficie, donde su zona está a menos de ${rotulo(prof)} m del plano, con su componente Z.`,
+    `Se dibuja la componente de cada carga en el plano; lo normal a él, en el rótulo. Las cargas de superficie, donde su zona está a menos de ${rotulo(prof)} m del plano, con su componente Z.`,
     "Cada carga, como está en el modelo: el cálculo une a ε_snap sus zonas y polilíneas a lo que tienen cerca (C2-b).",
     ...(horizontales ? ["Las componentes horizontales de las cargas de superficie no se dibujan (van en el rótulo)."] : []),
     ...(paralelos.length ? ["El empuje de un muro paralelo al plano es normal a él: sólo se rotula."] : []),

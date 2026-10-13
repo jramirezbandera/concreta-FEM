@@ -21,7 +21,10 @@
  * bandas de color sin sombrear (el color es el de la leyenda) con sus isolíneas; los pilares por
  * colores (`pilares3d.ts`), líneas gruesas del color de su banda; las reacciones
  * (`reacciones3d.ts`), flechas; y la deformada, animada si se pide, con la original en gris. Las
- * cargas de un caso (`cargas3d.ts`, en Cargas), bloques translúcidos con sus flechas. Los
+ * cargas de un caso (`cargas3d.ts`, en Cargas), bloques translúcidos con sus flechas: los filtros las
+ * tratan como a su pieza (rango de plantas, tipos, aislar y ocultar), se eligen con un clic (la más
+ * cercana a menos de 6 px, o su bloque bajo el cursor; en sólido, si no la tapa una pieza) o por
+ * ventana, y las elegidas se resaltan encima como las piezas elegidas (gruesas, en el acento). Los
  * rótulos, en el lienzo 2D: los extremos de lo que se ve y los de las piezas elegidas, sin pisarse.
  *
  * Bajo el cursor (I4): al quedarse quieto el ratón, la vista busca lo que hay debajo (la estación de
@@ -296,6 +299,8 @@ export class Vista3D extends Vista {
   private objsReac: LineSegments2[] = [];
   private carg: Cargas3D | null = null;
   private objsCarg: (Mesh | LineSegments2)[] = [];
+  /** Lo que se ve de las cargas con los filtros (para elegir): segmentos y triángulos, con su carga. */
+  private cargVis: { segmentos: Float32Array; objeto: Uint32Array; triangulos: Float32Array; objetoTri: Uint32Array; visibles: Set<number> } | null = null;
   private lineasOriginal: LineSegments2 | null = null;
   private extremosDef: ExtremoDeformada[] = [];
   private animar = false;
@@ -537,6 +542,7 @@ export class Vista3D extends Vista {
   ponerElegidos(ids: ReadonlySet<string>): void {
     this.elegidos = ids;
     this.construirElegidos();
+    if (this.carg) this.construirCargas(false);
     if (this.malla) this.colores();
     this.entorno.pintar();
   }
@@ -658,6 +664,7 @@ export class Vista3D extends Vista {
     } else this.segVis = new Uint32Array(0);
     this.construirAlambrico();
     this.filtrarAnalitico();
+    if (this.carg) this.construirCargas(false);
     this.colores();
     this.visibilidad();
     this.entorno.pintar();
@@ -775,39 +782,86 @@ export class Vista3D extends Vista {
     this.entorno.pintar();
   }
 
-  private construirCargas(): void {
+  /** ¿Se ve cada carga con los filtros? Como su pieza: por su tipo, y aislada u oculta ella o su pieza. */
+  private cargasVisibles(c: Cargas3D): boolean[] {
+    const f = this.filtro;
+    const sin = new Set<string>(f.sinTipos ?? []);
+    const aislados = f.aislados ? new Set(f.aislados) : null;
+    const ocultos = new Set(f.ocultos ?? []);
+    return c.objetos.map((o) => !(o.tipoPieza && sin.has(o.tipoPieza)) && !ocultos.has(o.id) && !(o.pieza && ocultos.has(o.pieza)) && (!aislados || aislados.has(o.id) || (!!o.pieza && aislados.has(o.pieza))));
+  }
+
+  /** Las cargas que se ven con los filtros (y las plantas del rango), en su color; las elegidas, además, encima como lo elegido. */
+  private construirCargas(pintar = true): void {
     this.quitar(this.objsCarg);
+    this.cargVis = null;
     const c = this.carg;
     if (c) {
       const color = CLASES_CARGA.map((k) => new Color(COLOR_CARGA[k]));
-      if (c.triangulos.length) {
+      const vo = this.cargasVisibles(c);
+      const [a, b] = this.rangoPlantas(c.plantas);
+      const elegida = c.objetos.map((o) => this.elegidos.has(o.id));
+      const ve = (obj: number, pl: number) => vo[obj]! && pl >= a && pl <= b;
+      const nt = c.claseTriangulo.length;
+      const ns = c.claseSegmento.length;
+      let [kt, ks] = [0, 0];
+      for (let i = 0; i < nt; i++) if (ve(c.objetoTriangulo[i]!, c.plantaTriangulo[i]!)) kt++;
+      for (let i = 0; i < ns; i++) if (ve(c.objetoSegmento[i]!, c.plantaSegmento[i]!)) ks++;
+      const tri = new Float32Array(9 * kt);
+      const colT = new Float32Array(9 * kt);
+      const objT = new Uint32Array(kt);
+      const seg = new Float32Array(6 * ks);
+      const colS = new Float32Array(6 * ks);
+      const objS = new Uint32Array(ks);
+      const visibles = new Set<number>();
+      kt = 0;
+      for (let i = 0; i < nt; i++) {
+        const k = c.objetoTriangulo[i]!;
+        if (!ve(k, c.plantaTriangulo[i]!)) continue;
+        tri.set(c.triangulos.subarray(9 * i, 9 * i + 9), 9 * kt);
+        const q = color[c.claseTriangulo[i]!]!;
+        for (let j = 0; j < 3; j++) colT.set([q.r, q.g, q.b], 9 * kt + 3 * j);
+        objT[kt++] = k;
+        visibles.add(k);
+      }
+      ks = 0;
+      const elegidos: number[] = [];
+      for (let i = 0; i < ns; i++) {
+        const k = c.objetoSegmento[i]!;
+        if (!ve(k, c.plantaSegmento[i]!)) continue;
+        seg.set(c.segmentos.subarray(6 * i, 6 * i + 6), 6 * ks);
+        if (elegida[k]) for (let j = 0; j < 6; j++) elegidos.push(c.segmentos[6 * i + j]!);
+        const q = color[c.claseSegmento[i]!]!;
+        for (let j = 0; j < 2; j++) colS.set([q.r, q.g, q.b], 6 * ks + 3 * j);
+        objS[ks++] = k;
+        visibles.add(k);
+      }
+      this.cargVis = { segmentos: seg, objeto: objS, triangulos: tri, objetoTri: objT, visibles };
+      if (tri.length) {
         const g = new BufferGeometry();
-        g.setAttribute("position", new BufferAttribute(c.triangulos, 3));
-        const col = new Float32Array(c.triangulos.length);
-        for (let i = 0; i < c.claseTriangulo.length; i++) {
-          const k = color[c.claseTriangulo[i]!]!;
-          for (let j = 0; j < 3; j++) col.set([k.r, k.g, k.b], 9 * i + 3 * j);
-        }
-        g.setAttribute("color", new BufferAttribute(col, 3));
+        g.setAttribute("position", new BufferAttribute(tri, 3));
+        g.setAttribute("color", new BufferAttribute(colT, 3));
         const o = this.situar(new Mesh(g, MAT.bloques), c.origen);
         o.renderOrder = 5;
         this.objsCarg.push(o);
       }
-      if (c.segmentos.length) {
+      if (seg.length) {
         const g = new LineSegmentsGeometry();
-        g.setPositions(c.segmentos);
-        const col = new Float32Array(c.segmentos.length);
-        for (let i = 0; i < c.claseSegmento.length; i++) {
-          const k = color[c.claseSegmento[i]!]!;
-          for (let j = 0; j < 2; j++) col.set([k.r, k.g, k.b], 6 * i + 3 * j);
-        }
-        g.setColors(col);
+        g.setPositions(seg);
+        g.setColors(colS);
         const o = this.situar(new LineSegments2(g, MAT.cargas), c.origen);
         o.renderOrder = 6;
         this.objsCarg.push(o);
       }
+      if (elegidos.length) {
+        const g = new LineSegmentsGeometry();
+        g.setPositions(elegidos);
+        const o = this.situar(new LineSegments2(g, MAT.elegidas), c.origen);
+        o.renderOrder = 10;
+        this.objsCarg.push(o);
+      }
     }
-    this.entorno.pintar();
+    if (pintar) this.entorno.pintar();
   }
 
   private construirAlambrico(): void {
@@ -1344,6 +1398,11 @@ export class Vista3D extends Vista {
 
   /** El objeto del sólido que se ve bajo un píxel: el triángulo visible más cercano que corta su rayo dentro de la caja. */
   objetoSolidoEn(x: number, y: number): string | null {
+    return this.solidoEn(x, y)?.id ?? null;
+  }
+
+  /** Lo mismo, con la distancia (m) del corte al origen del rayo. */
+  private solidoEn(x: number, y: number): { id: string; t: number } | null {
     const so = this.sol;
     const r = so && this.malla ? this.rayo(x, y, so.origen) : null;
     if (!so || !this.malla || !r) return null;
@@ -1373,7 +1432,51 @@ export class Vista3D extends Vista {
       if (!this.enCaja(O[0]! + t * D[0]! + so.origen[0], O[1]! + t * D[1]! + so.origen[1], O[2]! + t * D[2]! + so.origen[2])) continue;
       [mejor, tMin] = [iv / 3, t];
     }
-    return mejor < 0 ? null : so.objetos[so.objeto[mejor]!]!.id;
+    return mejor < 0 ? null : { id: so.objetos[so.objeto[mejor]!]!.id, t: tMin };
+  }
+
+  /**
+   * La carga bajo un píxel: la de la flecha o el contorno más cercano a menos de 6 px o, si no, la del
+   * bloque que corta su rayo; en sólido, sólo si no la tapa una pieza. Lo que recorta la caja, no.
+   */
+  cargaEn(x: number, y: number): string | null {
+    const c = this.carg;
+    const v = this.cargVis;
+    const r = c ? this.rayo(x, y, c.origen) : null;
+    if (!c || !v || !r) return null;
+    const [O, D] = r;
+    const solido = this.modoPintado === "solido" ? this.solidoEn(x, y) : null;
+    const delante = (P: number[]) => {
+      const t = (P[0]! - O[0]!) * D[0]! + (P[1]! - O[1]!) * D[1]! + (P[2]! - O[2]!) * D[2]!;
+      return this.enCaja(P[0]! + c.origen[0], P[1]! + c.origen[1], P[2]! + c.origen[2]) && (!solido || t <= solido.t + 0.05);
+    };
+    const h = this.segmentoEn(v.segmentos, c.origen, x, y, RADIO_CLIC);
+    if (h) {
+      const S = v.segmentos;
+      const P = [0, 1, 2].map((j) => S[6 * h.i + j]! + h.t * (S[6 * h.i + 3 + j]! - S[6 * h.i + j]!));
+      if (delante(P)) return c.objetos[v.objeto[h.i]!]!.id;
+    }
+    // Los bloques (Möller–Trumbore)
+    const T = v.triangulos;
+    let [mejor, tMin] = [-1, Infinity];
+    for (let k = 0; k < T.length; k += 9) {
+      const e1 = [T[k + 3]! - T[k]!, T[k + 4]! - T[k + 1]!, T[k + 5]! - T[k + 2]!];
+      const e2 = [T[k + 6]! - T[k]!, T[k + 7]! - T[k + 1]!, T[k + 8]! - T[k + 2]!];
+      const pv = [D[1]! * e2[2]! - D[2]! * e2[1]!, D[2]! * e2[0]! - D[0]! * e2[2]!, D[0]! * e2[1]! - D[1]! * e2[0]!];
+      const det = e1[0]! * pv[0]! + e1[1]! * pv[1]! + e1[2]! * pv[2]!;
+      if (Math.abs(det) < 1e-12) continue;
+      const inv = 1 / det;
+      const tv = [O[0]! - T[k]!, O[1]! - T[k + 1]!, O[2]! - T[k + 2]!];
+      const u = (tv[0]! * pv[0]! + tv[1]! * pv[1]! + tv[2]! * pv[2]!) * inv;
+      if (u < 0 || u > 1) continue;
+      const qv = [tv[1]! * e1[2]! - tv[2]! * e1[1]!, tv[2]! * e1[0]! - tv[0]! * e1[2]!, tv[0]! * e1[1]! - tv[1]! * e1[0]!];
+      const w = (D[0]! * qv[0]! + D[1]! * qv[1]! + D[2]! * qv[2]!) * inv;
+      if (w < 0 || u + w > 1) continue;
+      const t = (e2[0]! * qv[0]! + e2[1]! * qv[1]! + e2[2]! * qv[2]!) * inv;
+      if (!(t > 0 && t < tMin) || !delante([O[0]! + t * D[0]!, O[1]! + t * D[1]!, O[2]! + t * D[2]!])) continue;
+      [mejor, tMin] = [k / 9, t];
+    }
+    return mejor < 0 ? null : c.objetos[v.objetoTri[mejor]!]!.id;
   }
 
   /** El objeto bajo un píxel: en sólido, la pieza que se ve; si no, el eje del alámbrico más cercano a menos de 6 px. */
@@ -1405,7 +1508,8 @@ export class Vista3D extends Vista {
   protected clic(x: number, y: number, ctrl: boolean, doble: boolean): void {
     const v = this.cuboEn(x, y);
     if (v) return this.vistaEstandar(v);
-    const o = this.objetoEn(x, y);
+    // Las cargas, antes que las piezas que cargan
+    const o = this.cargaEn(x, y) ?? this.objetoEn(x, y);
     this.eventos.elegir?.(o ? [o] : [], ctrl, doble);
   }
 
@@ -1415,10 +1519,7 @@ export class Vista3D extends Vista {
     if (!a || !p) return;
     const en = (x: number, y: number) => x >= c[0] && x <= c[2] && y >= c[1] && y <= c[3];
     const estado = new Map<number, boolean>();
-    for (const i of this.segVis) {
-      const k = a.objeto[i]!;
-      const [x0, y0, x1, y1] = [p[6 * i]!, p[6 * i + 1]!, p[6 * i + 3]!, p[6 * i + 4]!];
-      const visible = !Number.isNaN(x0) && !Number.isNaN(x1);
+    const evaluar = (x0: number, y0: number, x1: number, y1: number, visible: boolean): boolean => {
       let v: boolean;
       if (modo === "dentro") v = visible && en(x0, y0) && en(x1, y1);
       else {
@@ -1444,9 +1545,31 @@ export class Vista3D extends Vista {
           }
         }
       }
+      return v;
+    };
+    for (const i of this.segVis) {
+      const k = a.objeto[i]!;
+      const [x0, y0, x1, y1] = [p[6 * i]!, p[6 * i + 1]!, p[6 * i + 3]!, p[6 * i + 4]!];
+      const v = evaluar(x0, y0, x1, y1, !Number.isNaN(x0) && !Number.isNaN(x1));
       estado.set(k, modo === "dentro" ? (estado.get(k) ?? true) && v : (estado.get(k) ?? false) || v);
     }
     const ids = [...estado].filter(([, v]) => v).map(([k]) => a.objetos[k]!.id);
+    // Las cargas, por sus flechas y contornos
+    const cg = this.carg;
+    const cv = this.cargVis;
+    if (cg && cv) {
+      const ec = new Map<number, boolean>();
+      const S = cv.segmentos;
+      const o = cg.origen;
+      for (let i = 0; 6 * i < S.length; i++) {
+        const k = cv.objeto[i]!;
+        const q0 = this.aPantalla(S[6 * i]! + o[0], S[6 * i + 1]! + o[1], S[6 * i + 2]! + o[2]);
+        const q1 = this.aPantalla(S[6 * i + 3]! + o[0], S[6 * i + 4]! + o[1], S[6 * i + 5]! + o[2]);
+        const v = evaluar(q0?.[0] ?? NaN, q0?.[1] ?? NaN, q1?.[0] ?? NaN, q1?.[1] ?? NaN, !!q0 && !!q1);
+        ec.set(k, modo === "dentro" ? (ec.get(k) ?? true) && v : (ec.get(k) ?? false) || v);
+      }
+      for (const [k, v] of ec) if (v) ids.push(cg.objetos[k]!.id);
+    }
     this.eventos.elegir?.(ids, ctrl, false);
   }
 
@@ -1732,6 +1855,7 @@ export class Vista3D extends Vista {
     if (this.temaColores !== this.entorno.tema()) {
       this.colores();
       this.construirElegidos();
+      if (this.carg) this.construirCargas(false);
     }
     if (!this.alamb && !this.geo && !this.diag && !this.iso && !this.pil && !this.reac && !this.carg && !this.sol) return;
     this.actualizarCamaras();
@@ -1924,7 +2048,9 @@ export class Vista3D extends Vista {
     if (ca) {
       // Las de la planta resaltada y las elegidas (en sólido, las de abajo están dentro del edificio)
       const max = Math.max(...ca.objetos.map((o) => o.peso), 1e-30);
-      for (const o of ca.objetos) {
+      const vis = this.cargVis?.visibles;
+      for (const [k, o] of ca.objetos.entries()) {
+        if (vis && !vis.has(k)) continue;
         const elegida = this.elegidos.has(o.id);
         if (elegida || (this.activa !== null && o.plantas.includes(this.activa))) r.push({ p: o.punto, texto: o.texto, signo: 0, prioridad: elegida ? 90 : 10 + (50 * o.peso) / max });
       }
@@ -1967,7 +2093,7 @@ export class Vista3D extends Vista {
   }
 
   /** Para el banco de Chrome: lo que dibuja y lo elegido. */
-  async depuracion(): Promise<{ tipo: "3d"; segmentos: number; elegidos: string[]; modo: Modo3D; pintado: Modo3D; proyeccion: Proyeccion; diagramas: number; isovalores: number; pilares: number; reacciones: number; cargas: number; sonda: string[] | null; objetivo: Objetivo3D | null; animada: boolean; solido: { triangulos: number; aristas: number } | null; color: Color3D; filtro: FiltroVista }> {
+  async depuracion(): Promise<{ tipo: "3d"; segmentos: number; elegidos: string[]; modo: Modo3D; pintado: Modo3D; proyeccion: Proyeccion; diagramas: number; isovalores: number; pilares: number; reacciones: number; cargas: number; cargasVisibles: number; sonda: string[] | null; objetivo: Objetivo3D | null; animada: boolean; solido: { triangulos: number; aristas: number } | null; color: Color3D; filtro: FiltroVista }> {
     const d = this.diag;
     return {
       tipo: "3d",
@@ -1984,6 +2110,7 @@ export class Vista3D extends Vista {
       pilares: (this.pil?.segmentos.length ?? 0) / 6,
       reacciones: (this.reac?.segmentos.length ?? 0) / 6,
       cargas: (this.carg?.segmentos.length ?? 0) / 6,
+      cargasVisibles: (this.cargVis?.segmentos.length ?? 0) / 6,
       sonda: this.sonda?.lineas ?? null,
       objetivo: this.objetivo,
       animada: this.animar,
@@ -2045,6 +2172,7 @@ export class Vista3D extends Vista {
     this.pil = null;
     this.reac = null;
     this.carg = null;
+    this.cargVis = null;
     this.alamb = null;
     this.segVis = new Uint32Array(0);
     this.construirAlambrico();

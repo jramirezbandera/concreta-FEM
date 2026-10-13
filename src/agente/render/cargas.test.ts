@@ -5,7 +5,10 @@
  *   con empujes y huecos, reticulares y unidireccionales). Donde el compilador une a ε_snap una zona
  *   o una polilínea (C2-b) o ajusta el eje o los huecos de un muro (el dibujo, como la planta,
  *   enseña el dato), la diferencia es la de mover sus vértices hasta ε_snap.
- * - El 3D tiene los trapecios de cada región con su área, y una flecha por punto.
+ * - El 3D: un objeto por carga dibujada, y cada segmento de un pilar o un muro, en la planta de la
+ *   cabeza de su tramo (para filtrar por plantas).
+ * - Los momentos de las puntuales: un arco para la componente normal al dibujo y una flecha de doble
+ *   punta para la del plano, en planta y en alzado.
  * - El alzado de un modelo hecho a mano: cada bloque, con su ordenada a escala y hacia donde va la
  *   carga; lo que cruza el plano, en el cruce; lo que queda fuera, nada.
  */
@@ -21,7 +24,9 @@ import { cargas3D } from "../../visor/cargas3d.ts";
 import { descomponer } from "../../visor/solido.ts";
 import { geometriaCargas, presionEn, vistaAlzadoCargas, type GeometriaCarga, type V3 } from "./cargas.ts";
 import { ORDENADA_DIAGRAMA } from "./diagramas.ts";
-import { cajaDe, type Escena, type Primitiva } from "./escena.ts";
+import { cajaDe, R_MOMENTO, type Escena, type Primitiva } from "./escena.ts";
+import { vistaCargas } from "./modelo.ts";
+import { cotasPlantas } from "../../compilador/cotas.ts";
 import { escenaASvg } from "./svg.ts";
 
 const cruz = (a: readonly number[], b: readonly number[]): V3 => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
@@ -157,8 +162,25 @@ describe.each(MODELOS)("cargas dibujadas de %s", (_nombre, modelo, unidas) => {
       expect(r.triangulos.length).toBe(9 * r.claseTriangulo.length);
       expect(r.segmentos.every(Number.isFinite) && r.triangulos.every(Number.isFinite)).toBe(true);
       for (const k of r.objetoSegmento) expect(k).toBeLessThan(r.objetos.length);
-      const ids = new Set(geometriaCargas(f, caso.id).cargas.filter((x) => x.regiones.length || x.lineas.length || x.presiones.length || x.puntos.some((p) => Math.hypot(...p.F) > 0)).map((x) => x.carga.id));
+      const ids = new Set(geometriaCargas(f, caso.id).cargas.filter((x) => x.regiones.length || x.lineas.length || x.presiones.length || x.puntos.some((p) => Math.hypot(...p.F) + Math.hypot(...p.M) > 0)).map((x) => x.carga.id));
       expect(new Set(r.objetos.map((o) => o.id))).toEqual(ids);
+      expect(r.plantaSegmento.length).toBe(r.claseSegmento.length);
+      expect(r.objetoTriangulo.length).toBe(r.claseTriangulo.length);
+      expect(r.plantaTriangulo.length).toBe(r.claseTriangulo.length);
+      // Lo de un pilar o un muro, entre la cota de la planta de su segmento y la de debajo (más lo que
+      // sobresalen las puntas de las flechas horizontales: 0,4 · 0,12 · ORDENADA_DIAGRAMA)
+      const cotas = cotasPlantas(f.plantas);
+      const tol = 0.4 * 0.12 * ORDENADA_DIAGRAMA + 1e-5;
+      for (let i = 0; i < r.claseSegmento.length; i++) {
+        const o = r.objetos[r.objetoSegmento[i]!]!;
+        if (o.tipo !== "pilar" && o.tipo !== "empuje") continue;
+        const k = r.plantaSegmento[i]!;
+        for (const z of [r.segmentos[6 * i + 2]!, r.segmentos[6 * i + 5]!]) {
+          expect(z, `${o.id} en ${r.plantas[k]}`).toBeLessThanOrEqual(cotas[k]! + tol);
+          expect(z, `${o.id} en ${r.plantas[k]}`).toBeGreaterThanOrEqual((cotas[k + 1] ?? -Infinity) - tol);
+        }
+        expect(o.plantas).toContain(r.plantas[k]);
+      }
     }
   });
 });
@@ -168,7 +190,7 @@ describe.each(MODELOS)("cargas dibujadas de %s", (_nombre, modelo, unidas) => {
 /**
  * Dos plantas (C a ±0 y N1 a +3); el plano del alzado, y = 0 de x = 0 a 10. En él: la viga VA (q −10 kN/m), el
  * pilar PA (viento 2 kN/m según X), la puntual F1 (−20 kN) y el borde de la losa LA (−3 kN/m², de y = 0
- * a 5, con su borde en el plano, como en una fachada); el viento PA-wy, normal al plano; cruzándolo, la lineal T1 (−5 kN/m, en x = 2) y el muro MU (empuje 30 a 0 kN/m², en x = 8);
+ * a 5, con su borde en el plano, como en una fachada), la puntual M2 (sólo un momento según X); el viento PA-wy, normal al plano; cruzándolo, la lineal T1 (−5 kN/m, en x = 2) y el muro MU (empuje 30 a 0 kN/m², en x = 8);
  * fuera, la viga VB (y = 5).
  */
 const MANO: ModeloFisico = {
@@ -191,7 +213,8 @@ const MANO: ModeloFisico = {
     { tipo: "viga", id: "VB-q", caso: "Q", viga: "VB", ejes: "global", q: [0, 0, -10] },
     { tipo: "pilar", id: "PA-w", caso: "Q", pilar: "PA", ejes: "global", q: [2, 0, 0] },
     { tipo: "pilar", id: "PA-wy", caso: "Q", pilar: "PA", ejes: "global", q: [0, 1, 0] },
-    { tipo: "puntual", id: "F1", caso: "Q", planta: "N1", x: 3, y: 0, F: [0, 0, -20] },
+    { tipo: "puntual", id: "F1", caso: "Q", planta: "N1", x: 3, y: 0, F: [0, 0, -20], M: [0, 5, 0] },
+    { tipo: "puntual", id: "M2", caso: "Q", planta: "N1", x: 5, y: 0, F: [0, 0, 0], M: [4, 0, 0] },
     { tipo: "superficie", id: "S1", caso: "Q", planta: "N1", losa: "LA", q: [0, 0, -3] },
     { tipo: "lineal", id: "T1", caso: "Q", planta: "N1", puntos: [[2, -2], [2, 2]], q: [0, 0, -5] },
     { tipo: "empuje", id: "E1", caso: "Q", muro: "MU", lado: "derecho", z0: 0, z1: 3, p0: 30, p1: 0 },
@@ -238,7 +261,7 @@ describe("alzado de las cargas, a mano", () => {
   it("lo que está fuera del plano no se dibuja; cada carga dibujada lleva su rótulo", () => {
     expect(de(e, "VB-q")).toEqual([]);
     const rotulos = e.primitivas.filter((p) => p.tipo === "texto" && p.clase === "dato").map((p) => (p as { objeto?: string }).objeto);
-    expect(new Set(rotulos)).toEqual(new Set(["VA-q", "PA-w", "PA-wy", "F1", "S1", "T1", "E1"]));
+    expect(new Set(rotulos)).toEqual(new Set(["VA-q", "PA-w", "PA-wy", "F1", "M2", "S1", "T1", "E1"]));
   });
 
   it("lo normal al plano no tiene bloque: se rotula", () => {
@@ -262,6 +285,46 @@ describe("alzado de las cargas, a mano", () => {
   it("no depende del orden de las cargas y su SVG se dibuja", () => {
     const g: ModeloFisico = { ...MANO, cargas: [...(MANO.cargas ?? [])].reverse() };
     expect(escenaASvg(vistaAlzadoCargas(g, PLANO, "Q", d)).svg).toBe(escenaASvg(e).svg);
+  });
+
+  it("los momentos: My, normal al plano y = 0, un arco horario; Mx, en el plano, una flecha de doble punta", () => {
+    const lineas = (e: Escena, id: string) => de(e, id).filter((p): p is Extract<Primitiva, { tipo: "linea" }> => p.tipo === "linea");
+    // F1: M = (0, 5, 0), hacia +Y; quien mira el plano lo hace desde −Y, así que gira en sentido horario
+    const arco = lineas(e, "F1").find((p) => p.puntos.length === 25)!;
+    expect(arco.puntos.every((q) => Math.abs(Math.hypot(q[0] - 3, q[1] - 3) - R_MOMENTO) < 1e-9)).toBe(true);
+    const ang = (q: Vec2) => Math.atan2(q[1] - 3, q[0] - 3);
+    expect(ang(arco.puntos[1]!)).toBeLessThan(ang(arco.puntos[0]!));
+    // M2: M = (4, 0, 0), según u: de (5, 3) hacia +u, con dos puntas; sin arco, y no es «normal al plano»
+    const m2 = lineas(e, "M2");
+    expect(m2.some((p) => p.puntos.length === 2 && cerca(p.puntos[0]!, [5, 3]) && cerca(p.puntos[1]!, [5 + 2 * R_MOMENTO, 3]))).toBe(true);
+    expect(m2.filter((p) => p.puntos.length === 3).length).toBe(2);
+    expect(m2.some((p) => p.puntos.length === 25)).toBe(false);
+    expect(e.primitivas.some((p) => p.tipo === "texto" && p.objeto === "M2" && !p.texto.includes("normal al plano"))).toBe(true);
+  });
+
+  it("los momentos en planta: (Mx, My) de doble punta y Mz en un arco antihorario si es positivo", () => {
+    const g: ModeloFisico = { ...MANO, cargas: [{ tipo: "puntual", id: "F3", caso: "Q", planta: "N1", x: 3, y: 2, F: [0, 0, -1], M: [0, 5, 2] }] } as ModeloFisico;
+    const x = vistaCargas(g, "N1", "Q", d);
+    const ls = x.primitivas.filter((p): p is Extract<Primitiva, { tipo: "linea" }> => p.tipo === "linea" && p.objeto === "F3");
+    expect(ls.some((p) => p.puntos.length === 2 && cerca(p.puntos[0]!, [3, 2]) && cerca(p.puntos[1]!, [3, 2 + 2 * R_MOMENTO]))).toBe(true);
+    const arco = ls.find((p) => p.puntos.length === 25)!;
+    const ang = (q: Vec2) => Math.atan2(q[1] - 2, q[0] - 3);
+    expect(ang(arco.puntos[1]!)).toBeGreaterThan(ang(arco.puntos[0]!));
+  });
+
+  it("los momentos en el 3D: una flecha de doble punta en la dirección de M, que sale del punto", () => {
+    const r = cargas3D(MANO, [0, 0, 0], "Q");
+    const k = r.objetos.findIndex((o) => o.id === "M2");
+    expect(k).toBeGreaterThanOrEqual(0);
+    const S = r.segmentos;
+    // En Float32
+    const cerca32 = (a: readonly number[], b: readonly number[]) => a.every((x, j) => Math.abs(x - b[j]!) < 1e-5);
+    const fuste = [...r.objetoSegmento.keys()].filter((i) => r.objetoSegmento[i] === k && cerca32([S[6 * i]!, S[6 * i + 1]!, S[6 * i + 2]!], [5, 0, 3]));
+    expect(fuste.length).toBe(1);
+    const i = fuste[0]!;
+    expect(cerca32([S[6 * i + 3]!, S[6 * i + 4]!, S[6 * i + 5]!], [5 + 0.6 * m, 0, 3])).toBe(true);
+    // Fuste y dos puntas de cuatro trazos
+    expect([...r.objetoSegmento].filter((x) => x === k).length).toBe(9);
   });
 
   it("la escala pedida multiplica las ordenadas", () => {

@@ -300,6 +300,41 @@ export function bandaPolilinea(p: readonly Vec2[], ancho: number): Vec2[][] {
   return r;
 }
 
+/** Radio del arco de un momento y medio largo de su flecha de doble punta, m del dibujo. */
+export const R_MOMENTO = 0.5;
+
+/**
+ * El momento de una carga puntual en un dibujo plano (m del dibujo): su componente normal al dibujo
+ * (`giro`, positiva antihoraria tal como se mira: hacia quien mira, por la regla de la mano derecha)
+ * como un arco de tres cuartos de vuelta alrededor de P con su punta, y la del plano del dibujo
+ * (`enPlano`) como una flecha de doble punta que sale de P en su dirección.
+ */
+export function momento2D(P: Vec2, giro: number, enPlano: Vec2, estilo: Estilo, objeto: string, r = R_MOMENTO): Primitiva[] {
+  const out: Primitiva[] = [];
+  const punta = (E: Vec2, d: Vec2, h: number): Primitiva => {
+    const n: Vec2 = [-d[1], d[0]];
+    const w = 0.45 * h;
+    return { tipo: "linea", puntos: [[E[0] - h * d[0] + w * n[0], E[1] - h * d[1] + w * n[1]], E, [E[0] - h * d[0] - w * n[0], E[1] - h * d[1] - w * n[1]]], estilo, objeto };
+  };
+  if (giro !== 0) {
+    const s = Math.sign(giro);
+    const t0 = Math.PI / 4;
+    const arco: Vec2[] = Array.from({ length: 25 }, (_, i) => {
+      const t = t0 + (s * 1.5 * Math.PI * i) / 24;
+      return [P[0] + r * Math.cos(t), P[1] + r * Math.sin(t)];
+    });
+    const te = t0 + s * 1.5 * Math.PI;
+    out.push({ tipo: "linea", puntos: arco, estilo, objeto }, punta(arco[24]!, [-s * Math.sin(te), s * Math.cos(te)], 0.4 * r));
+  }
+  const l = Math.hypot(enPlano[0], enPlano[1]);
+  if (l > 0) {
+    const d: Vec2 = [enPlano[0] / l, enPlano[1] / l];
+    const Q: Vec2 = [P[0] + 2 * r * d[0], P[1] + 2 * r * d[1]];
+    out.push({ tipo: "linea", puntos: [P, Q], estilo, objeto }, punta(Q, d, 0.4 * r), punta([Q[0] - 0.3 * r * d[0], Q[1] - 0.3 * r * d[1]], d, 0.4 * r));
+  }
+  return out;
+}
+
 /** Tramos de las rectas paralelas a `d` separadas `paso` que caen dentro de unos anillos (par-impar). */
 export function rayado(anillos: readonly (readonly Vec2[])[], d: Vec2, paso: number): [Vec2, Vec2][] {
   // En ejes (u a lo largo de d, v perpendicular): las rectas son v = cte

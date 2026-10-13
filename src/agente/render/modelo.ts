@@ -14,7 +14,7 @@ import { cotasPlantas } from "../../compilador/cotas.ts";
 import type { CargaFisica, Losa, ModeloFisico, Muro, PanoUnidireccional, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
 import { capaEjes } from "./ejes.ts";
-import { bandaPolilinea, cajaDe, longitud, puntoEnPolilinea, puntoInterior, puntosDe, rayado, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
+import { bandaPolilinea, cajaDe, longitud, momento2D, puntoEnPolilinea, puntoInterior, puntosDe, rayado, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
 
 export const VISTAS_MODELO = ["modelo", "cargas", "diagnosticos"] as const;
 
@@ -421,6 +421,8 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         const F = g.F ?? [0, 0, 0];
         const h = Math.hypot(F[0], F[1]);
         poner({ tipo: "flecha", p: [g.x, g.y], d: h > 0 ? [F[0], F[1]] : null, abajo: F[2] <= 0, estilo: "carga-puntual", objeto: g.id });
+        // Su momento: Mz en un arco (antihorario visto desde arriba) y (Mx, My), de doble punta
+        if (g.M) for (const x of momento2D([g.x, g.y], g.M[2], [g.M[0], g.M[1]], "carga-puntual", g.id)) poner(x);
         rot([g.x, g.y], `${g.id}: F ${vector(F)} kN${g.M ? `, M ${vector(g.M)} kN·m` : ""}`, { dx: 10, dy: 18 });
         return;
       }
@@ -460,7 +462,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
   };
   entrada("carga-superficie", "Carga de superficie (kN/m²), sobre su zona, su losa o su paño. Las que se solapan se suman");
   entrada("carga-lineal", "Carga lineal (kN/m)");
-  entrada("carga-puntual", "Carga puntual (kN): círculo con punto si va hacia abajo, con aspa si va hacia arriba, flecha si es horizontal");
+  entrada("carga-puntual", "Carga puntual (kN): círculo con punto si va hacia abajo, con aspa si va hacia arriba, flecha si es horizontal. Su momento (kN·m): Mz, un arco en su sentido (antihorario, positivo); (Mx, My), una flecha de doble punta (regla de la mano derecha)");
   entrada("carga-pieza", "Carga en una viga, un pilar que llega a la planta o un muro (kN/m o kN/m²)");
   if (!c) notas.push(`El caso «${caso}» no existe.`);
   else if (c.pesoPropio) notas.push("Este caso lleva además el peso propio de la estructura, que calcula el programa y no se dibuja.");

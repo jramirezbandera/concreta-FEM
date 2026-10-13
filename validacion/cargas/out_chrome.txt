@@ -1,10 +1,16 @@
 ## Cargas de G en el 3D (sólido)
 BIEN  segmentos de las cargas de G: 5019 = Node 5019
 BIEN  el 3D sigue en sólido con las cargas: solido
-BIEN  orbitar con las cargas: mediana 9.3 ms entre fotogramas (120)
+BIEN  orbitar con las cargas: mediana 8.3 ms entre fotogramas (120)
+
+## Elegir, ocultar y filtrar las cargas
+BIEN  un clic sobre la tabiquería de N7 la elige: G-tab-N7
+BIEN  ocultarla (Ctrl+H) quita sus segmentos: 4772 = Node 4772
+BIEN  una ventana que la toca la elige: VS-x21-y15-N4, VS-x27-y20-N2, VX-y15-N5, VX-y25-N2, VY-x24-N3, VY-x30-N1, G-sup-N6, G-tab-N3, G-tab-N7
+BIEN  con las plantas de N3 a N4, las de Node: 1434 = 1434
 
 ## Otro caso y otra escala
-BIEN  segmentos de las cargas de Vx: 1088 = Node 1088
+BIEN  segmentos de las cargas de Vx: 1136 = Node 1136
 BIEN  los segmentos de G a escala ×2 son los de Node: 9e27b6bc4ed7caad = 9e27b6bc4ed7caad
 
 ## Alzado del eje 3 con las cargas de G
