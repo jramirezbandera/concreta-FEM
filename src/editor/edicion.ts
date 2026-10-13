@@ -8,8 +8,7 @@
  * Puro: sin IO.
  */
 import type { Proyecto } from "../agente/proyecto.ts";
-import { apoyosBanda } from "../compilador/bandas.ts";
-import type { Banda, ModeloFisico } from "../compilador/fisico.ts";
+import type { ModeloFisico } from "../compilador/fisico.ts";
 import { escribirTsv, leerTsv, type ErrorCelda, type Fila } from "./celdas.ts";
 import { aplicar, type Aplicacion, type Operacion } from "./operaciones.ts";
 import { indiceIds, lista, referenciasDe, type Coleccion, type Objeto } from "./referencias.ts";
@@ -133,7 +132,7 @@ export function pegar(m: ModeloFisico, tabla: NombreTabla, texto: string, desde 
 // ─── Copiar a otras plantas ─────────────────────────────────────────────────────────────────────
 
 /** Las colecciones que se copian de planta a planta: las que están en una sola planta. */
-const COPIABLES: readonly Coleccion[] = ["vigas", "losas", "apoyos", "apoyosLineales", "bandas", "panos", "cargas"];
+const COPIABLES: readonly Coleccion[] = ["vigas", "losas", "apoyos", "apoyosLineales", "panos", "cargas"];
 
 /** El id de la copia en otra planta: el id con la planta de origen cambiada por la de destino, o «<id>-<destino>». */
 function idCopia(id: string, origen: string, destino: string, usado: (x: string) => boolean): string {
@@ -213,13 +212,6 @@ export function copiarAPlantas(m: ModeloFisico, ids: readonly string[], destinos
       if (origen === destino) continue;
       let c: Record<string, unknown> = { ...o, id: mapa.get(o.id)! };
       if ("planta" in c) c.planta = destino;
-      // Una banda en otra planta tiene otros pilares: es del usuario y sus apoyos se recalculan (V2b-a)
-      if (coleccion === "bandas") {
-        const ap = apoyosBanda(m, c as unknown as Banda);
-        c.origen = "usuario";
-        if (ap) c.apoyos = ap;
-        else delete c.apoyos;
-      }
       for (const k of ["viga", "losa", "pano"]) if (typeof c[k] === "string" && mapa.has(c[k] as string)) c[k] = mapa.get(c[k] as string);
       ops.push({ op: "crear", coleccion, objeto: c as Objeto });
       c = {};

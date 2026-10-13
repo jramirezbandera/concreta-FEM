@@ -1,8 +1,8 @@
 /**
- * Resultados · Bandas (V2b, `docs/fem3d/visor.md` §7.4 d, criterio 7), en el DOM: la tabla de las
- * bandas y el detalle de la elegida dicen los valores de su consulta con su formato. Con la sesión de
- * verdad en este proceso (el `Atendedor` del worker), sobre el reticular de H25 con sus bandas
- * propuestas.
+ * Resultados · Armado (fase F, `docs/fem3d/franjas.md` §2.6, criterio 8), en el DOM: la tabla de las
+ * franjas y el detalle de la elegida dicen los valores de sus consultas (`fem consultar franjas` y
+ * `franja`) con su formato. Con la sesión de verdad en este proceso (el `Atendedor` del worker),
+ * sobre el reticular de H25 (las bandas que trae no se dibujan ni se usan).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,13 +14,13 @@ import { sha256 } from "../../../src/compilador/huella.ts";
 import { serializar } from "../../../src/editor/serializar.ts";
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
 import { Atendedor } from "../../../src/visor/atender.ts";
-import type { DatosBanda, DatosBandas } from "../../../src/visor/bandas.ts";
+import type { DatosArmado, DatosFranja } from "../../../src/visor/franjas.ts";
 import type { Pedido } from "../../../src/visor/protocolo.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { ContextoPaneles, useAlmacenPaneles } from "../armazon/paneles.ts";
 import { ContextoVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
-import { ModoBandas } from "../pantallas/Bandas.tsx";
+import { ModoArmado } from "../pantallas/Armado.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
 import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
@@ -62,7 +62,7 @@ const cliente = () =>
 function Paneles({ children }: { children: React.ReactNode }) {
   return (
     <ContextoPaneles.Provider value={useAlmacenPaneles()}>
-      <ContextoVistas.Provider value={useEstadoVistas("test-bandas")}>{children}</ContextoVistas.Provider>
+      <ContextoVistas.Provider value={useEstadoVistas("test-armado")}>{children}</ContextoVistas.Provider>
     </ContextoPaneles.Provider>
   );
 }
@@ -72,9 +72,9 @@ function montar(planta: string, seleccion: string | null) {
   return render(
     <ThemeProvider>
       <Paneles>
-        <ContextoVisor.Provider value={{ proyecto, planta, setPlanta() {}, seleccion, setSeleccion() {}, elegidos: [], setElegidos() {}, espacio: "resultados", modo: "bandas", irA() {}, tablaPedida: null, pedirTabla() {} }}>
+        <ContextoVisor.Provider value={{ proyecto, planta, setPlanta() {}, seleccion, setSeleccion() {}, elegidos: [], setElegidos() {}, espacio: "resultados", modo: "armado", irA() {}, tablaPedida: null, pedirTabla() {} }}>
           <div style={{ display: "flex" }}>
-            <ModoBandas />
+            <ModoArmado />
           </div>
         </ContextoVisor.Provider>
       </Paneles>
@@ -82,43 +82,42 @@ function montar(planta: string, seleccion: string | null) {
   );
 }
 
-const conComb = (v: [number, string] | null, n: number, varias: boolean) => (v ? `${fmt(v[0], n)}${varias ? v[1] : ""}` : "—");
+const conComb = (v: [number, string], n: number, varias: boolean) => (Number.isFinite(v[0]) ? `${fmt(v[0], n)}${varias ? v[1] : ""}` : "—");
 
-describe("V2b · Resultados · Bandas en el DOM", () => {
-  it("la tabla de la planta (dirección 1) y el detalle de la banda elegida dicen los valores de su consulta", async () => {
-    const planta = MODELO.bandas![0]!.planta;
-    const d = ((await at.atender({ tipo: "bandas", planta, combinaciones: { tipo: "defecto" }, direccion: "1" })) as { valor: DatosBandas }).valor;
+describe("Fase F · Resultados · Armado en el DOM", () => {
+  it("la tabla de la planta (X superior) y el detalle de la franja elegida dicen los valores de sus consultas", async () => {
+    const planta = MODELO.losas![0]!.planta;
+    const d = ((await at.atender({ tipo: "armado", planta, combinaciones: { tipo: "defecto" }, armadura: "x-sup" })) as { valor: DatosArmado }).valor;
     const varias = d.combinaciones.nombres.length > 1;
-    const id = d.filas[1]!.id;
-    const b = ((await at.atender({ tipo: "banda", id, combinaciones: { tipo: "defecto" } })) as { valor: DatosBanda }).valor;
+    expect(d.filas.length).toBeGreaterThan(3);
+    expect(d.filas.every((f) => f.direccion === 1)).toBe(true);
+    const id = d.filas[2]!.id;
+    const fr = ((await at.atender({ tipo: "franja", id, combinaciones: { tipo: "defecto" } })) as { valor: DatosFranja }).valor;
     montar(planta, id);
     const tabla = await waitFor(() => {
-      const t = screen.getByRole("table", { name: "Bandas de la planta" });
+      const t = screen.getByRole("table", { name: "Franjas de la planta" });
       expect(within(t).getAllByRole("row").length).toBe(d.filas.length + 1);
       return t;
     });
     const filas = within(tabla).getAllByRole("row").slice(1);
     d.filas.forEach((f, i) => {
       const c = within(filas[i]!).getAllByRole("cell");
-      expect(c[2]!.textContent).toBe(conComb(f.cara, 1, varias));
-      expect(c[3]!.textContent).toBe(conComb(f.vano, 1, varias));
+      expect(Number(c[3]!.getAttribute("data-superior"))).toBe(f.superior?.v ?? 0);
+      expect(c[3]!.textContent!.startsWith(f.superior ? fmt(f.superior.v, 1) : "0")).toBe(true);
     });
     const est = await waitFor(() => screen.getByRole("table", { name: `Estaciones de ${id}` }));
     const filasE = within(est).getAllByRole("row").slice(1);
-    expect(filasE.length).toBe(b.estaciones.length);
-    b.estaciones.forEach((x, i) => {
+    expect(filasE.length).toBe(fr.estaciones.length);
+    fr.estaciones.forEach((x, i) => {
       const c = within(filasE[i]!).getAllByRole("cell");
-      if (!x.valido) return;
-      expect(c[1]!.textContent).toBe(conComb(x.max, 1, varias));
-      expect(c[2]!.textContent).toBe(conComb(x.min, 1, varias));
+      expect(c[1]!.textContent).toBe(fmt(x.max[0], 1));
+      expect(c[4]!.textContent).toBe(fmt(x.superior[0], 1));
     });
-    const wa = screen.getByRole("table", { name: `Wood–Armer de ${id}` });
-    const filasW = within(wa).getAllByRole("row").slice(1);
-    b.estaciones.forEach((x, i) => {
-      if (!x.woodArmer) return;
-      expect(within(filasW[i]!).getAllByRole("cell")[1]!.textContent).toBe(conComb(x.woodArmer.inferiorX, 1, varias));
-    });
-    // Reticular: el momento por nervio
-    expect(screen.getByRole("table", { name: `Momento por nervio de ${id}` })).toBeTruthy();
+    const caras = screen.getByRole("table", { name: `Caras y apoyos de ${id}` });
+    const exactas = fr.estaciones.filter((x) => x.tipo !== "paso");
+    const filasC = within(caras).getAllByRole("row").slice(1);
+    expect(filasC.length).toBe(exactas.length);
+    exactas.forEach((x, i) => expect(within(filasC[i]!).getAllByRole("cell")[3]!.textContent).toBe(conComb(x.superior, 1, varias)));
+    expect(screen.getByRole("img", { name: `Diagrama de ${id}` })).toBeTruthy();
   }, 60_000);
 });

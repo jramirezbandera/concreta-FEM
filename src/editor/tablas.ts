@@ -8,19 +8,17 @@
  * - Ida y vuelta: `objeto(fila(o))` es `o` para todo lo que la tabla edita.
  * - Lo que la tabla no edita (un perfil I del catálogo) se conserva del objeto anterior (`base`), y
  *   una fila nueva no puede crearlo. Desde V2b es lo único: lo demás se ve y se edita.
- * - Los apoyos de una banda no se escriben: se recalculan al cambiar su geometría (V2b-a).
  * - Las columnas que no aplican a la variante de una fila (el D de una sección rectangular) tienen
  *   que estar vacías: así un dato no se pierde en silencio.
  *
  * Puro: sin IO.
  */
-import type { AccionCaso, ApoyoFisico, ApoyoLineal, Banda, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Vec2, Viga } from "../compilador/fisico.ts";
-import { apoyosBanda } from "../compilador/bandas.ts";
+import type { AccionCaso, ApoyoFisico, ApoyoLineal, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Viga } from "../compilador/fisico.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { Lector, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
-export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "bandas", "casos", "cargas"] as const;
+export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "casos", "cargas"] as const;
 export type NombreTabla = (typeof TABLAS)[number];
 
 export interface Columna {
@@ -596,64 +594,6 @@ const apoyosLineales: DefTabla = {
   plantas: (o) => [o.planta as string],
 };
 
-// ─── Bandas ─────────────────────────────────────────────────────────────────────────────────────
-
-/** Lo que define una banda: si cambia, la banda pasa a ser del usuario y sus apoyos se recalculan (V2b-a). */
-const GEOMETRIA_BANDA = ["planta", "desde", "hasta", "ancho", "tipo"] as const;
-
-const bandas: DefTabla = {
-  nombre: "bandas",
-  titulo: "Bandas",
-  coleccion: "bandas",
-  prefijo: "B",
-  columnas: [
-    id,
-    { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
-    { clave: "x0", titulo: "x desde", unidad: "m", ayuda: "un extremo del eje de la banda" },
-    { clave: "y0", titulo: "y desde", unidad: "m" },
-    { clave: "x1", titulo: "x hasta", unidad: "m", ayuda: "el otro extremo del eje" },
-    { clave: "y1", titulo: "y hasta", unidad: "m" },
-    { clave: "ancho", titulo: "ancho", unidad: "m" },
-    { clave: "tipo", titulo: "tipo", ayuda: "de pilares o central (Anejo I); sin tipo, no entra en el reparto", opciones: fijas(["pilares", "central"], "sin tipo") },
-    { clave: "origen", titulo: "origen", calculada: true, ayuda: "propuesta (la dio «Proponer bandas» y no se ha tocado) o usuario" },
-    { clave: "apoyos", titulo: "apoyos", unidad: "m", calculada: true, ayuda: "tramos del eje ocupados por pilares, desde «desde»; se recalculan al cambiar la banda" },
-  ],
-  fila(o) {
-    const b = o as unknown as Banda;
-    return {
-      id: b.id,
-      planta: b.planta,
-      x0: n(b.desde[0]),
-      y0: n(b.desde[1]),
-      x1: n(b.hasta[0]),
-      y1: n(b.hasta[1]),
-      ancho: n(b.ancho),
-      tipo: s(b.tipo),
-      origen: b.origen ?? "usuario",
-      apoyos: b.apoyos ? textoGrupos(b.apoyos) : "",
-    };
-  },
-  objeto(f, ctx, base) {
-    const L = new Lector(f);
-    const [x0, y0, x1, y1] = (["x0", "y0", "x1", "y1"] as const).map((c) => L.numero(c, { obligatorio: true }));
-    if (x0 !== undefined && y0 !== undefined && x1 === x0 && y1 === y0) L.errores.push({ columna: "x1", mensaje: "los dos extremos del eje son el mismo punto" });
-    const b = limpio({
-      id: L.texto("id") ?? "",
-      planta: L.texto("planta", { obligatorio: true }),
-      desde: [x0, y0] as unknown as Vec2,
-      hasta: [x1, y1] as unknown as Vec2,
-      ancho: L.numero("ancho", { obligatorio: true, mayorQue: 0 }),
-      tipo: L.opcion("tipo", ["pilares", "central"] as const),
-    }) as unknown as Banda;
-    if (L.errores.length) return { ok: false, errores: L.errores };
-    // Sin tocar su geometría (un id nuevo), se queda como estaba; si no, es del usuario y sus apoyos se recalculan
-    const igual = base !== undefined && GEOMETRIA_BANDA.every((k) => JSON.stringify((b as unknown as Record<string, unknown>)[k]) === JSON.stringify(base[k]));
-    if (igual) return resultado(L, { ...b, origen: base.origen, apoyos: base.apoyos });
-    return resultado(L, { ...b, origen: "usuario", apoyos: apoyosBanda(ctx.modelo, b) ?? undefined });
-  },
-  plantas: (o) => [o.planta as string],
-};
-
 // ─── Ejes de replanteo ──────────────────────────────────────────────────────────────────────────
 
 const ejes: DefTabla = {
@@ -883,7 +823,7 @@ const cargas: DefTabla = {
   },
 };
 
-export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, losas, panos, muros, apoyos, apoyosLineales, bandas, casos, cargas };
+export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, losas, panos, muros, apoyos, apoyosLineales, casos, cargas };
 
 /** Un id libre con el prefijo de la tabla: el primero de `<prefijo>1`, `<prefijo>2`… que no está en el modelo. */
 export function idNuevo(m: ModeloFisico, prefijo: string, ocupados: ReadonlySet<string> = new Set()): string {

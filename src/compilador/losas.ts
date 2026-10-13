@@ -33,6 +33,7 @@ import { CUANTO_ORDEN } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type LosaMallar, type ResultadoMalla } from "./mallado.ts";
 import { estacionesBanda, ladoEstacion } from "./estaciones.ts";
+import { carasFranjas, ejesArmado, segmentosCara } from "./franjas.ts";
 import { estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
 import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { distanciaARegion, ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
@@ -422,13 +423,25 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       });
       trazoAbaco.set(i, ts);
     }
+    // Las caras de los pilares para las franjas de armado (fase F), de lado a lado de la losa:
+    // trazos exactos, como las de las bandas (C5-g)
+    const caras: { id: string; seg: [Vec2, Vec2] }[] = [];
+    if (ctx.op.franjas)
+      for (const { l } of losasK) {
+        const ejes = ejesArmado(l.losa);
+        for (const c of carasFranjas(ctx, l)) for (const seg of segmentosCara(c, ejes[c.direccion])) caras.push({ id: l.losa.id, seg });
+      }
     for (const b of ctx.bandas) {
       if (b.planta !== idPlanta) continue;
       a.trazo(b.id, "banda", -1, rectanguloBanda(b.desde, b.hasta, b.ancho), true);
       // Las caras de sus apoyos, a lo ancho (C5.2): sus cortes por fuerzas nodales son exactos. Son
-      // trazos exactos (C5-g): ni se doblan hacia la esquina de un pilar cercano ni la mueven
-      for (const e of estacionesBanda(b, epsGeom)) if (e.tipo === "cara") a.trazo(b.id, "banda", -1, ladoEstacion(b, e.s), false, true);
+      // trazos exactos (C5-g): ni se doblan hacia la esquina de un pilar cercano ni la mueven. Con las
+      // franjas, sus caras son las de las franjas (las mismas caras comunes de C5-g, de lado a lado):
+      // sembrar también las de las bandas, con sus extremos en los bordes de las bandas, rompía la
+      // rejilla y la malla dejaba de no depender de una traslación
+      if (!ctx.op.franjas) for (const e of estacionesBanda(b, epsGeom)) if (e.tipo === "cara") a.trazo(b.id, "banda", -1, ladoEstacion(b, e.s), false, true);
     }
+    for (const { id, seg } of caras) a.trazo(id, "cara", -1, seg, false, true);
     const trazoCarga = new Map<string, Trazo>();
     for (const c of cargas) {
       if (c.tipo === "superficie" && c.planta === idPlanta && c.zona) {

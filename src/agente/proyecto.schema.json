@@ -1145,6 +1145,14 @@
         "torsionEquilibrio": {
           "type": "boolean",
           "description": "Torsión de equilibrio (C4-k): en los tramos de viga que sujetan viguetas en voladizo sin otro\napoyo en su línea (ni vano de atrás ni otra vigueta que compense su momento), la torsión no se\nreduce: los modificadores de J menores que 1 (D4) no se aplican. Por defecto, sí."
+        },
+        "franjas": {
+          "type": "boolean",
+          "description": "Franjas de armado (fase F): las caras de los pilares se siembran en la malla de las losas, de lo\nancho de las franjas que tocan, para que el momento de esas franjas en la cara sea exacto. Por\ndefecto, sí; sin ellas, la malla de C1–C5."
+        },
+        "anchoFranja": {
+          "type": "number",
+          "description": "Ancho de las franjas de armado de las losas macizas, m (F-a). Por defecto, 1. En un reticular, el intereje."
         }
       },
       "additionalProperties": false

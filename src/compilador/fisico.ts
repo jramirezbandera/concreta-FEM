@@ -480,6 +480,8 @@ export const MODIFICADORES_D4: ModificadoresPiezas = { pilares: { todos: { A: 2 
 
 /** Factor de zona rígida por defecto (C1-a, decidido el 2026-10-04): la mitad del nudo es rígida. */
 export const FACTOR_ZONA_RIGIDA = 0.5;
+/** Ancho de las franjas de armado de una losa maciza por defecto, m (fase F, F-a). */
+export const ANCHO_FRANJA = 1;
 
 /**
  * Tamaño de malla por defecto de las losas, m (C2-a): triángulos de 2h divididos en 3
@@ -530,6 +532,14 @@ export interface OpcionesCompilacion {
    * reduce: los modificadores de J menores que 1 (D4) no se aplican. Por defecto, sí.
    */
   torsionEquilibrio?: boolean;
+  /**
+   * Franjas de armado (fase F): las caras de los pilares se siembran en la malla de las losas, de lo
+   * ancho de las franjas que tocan, para que el momento de esas franjas en la cara sea exacto. Por
+   * defecto, sí; sin ellas, la malla de C1–C5.
+   */
+  franjas?: boolean;
+  /** Ancho de las franjas de armado de las losas macizas, m (F-a). Por defecto, 1. En un reticular, el intereje. */
+  anchoFranja?: number;
 }
 
 export interface OpcionesResueltas {
@@ -541,6 +551,8 @@ export interface OpcionesResueltas {
   tamanoMalla: number;
   rejilla: boolean;
   torsionEquilibrio: boolean;
+  franjas: boolean;
+  anchoFranja: number;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -553,5 +565,7 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     tamanoMalla: o.tamanoMalla ?? TAMANO_MALLA,
     rejilla: o.rejilla ?? true,
     torsionEquilibrio: o.torsionEquilibrio ?? true,
+    franjas: o.franjas ?? true,
+    anchoFranja: o.anchoFranja ?? ANCHO_FRANJA,
   };
 }

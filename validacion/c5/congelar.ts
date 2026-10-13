@@ -39,10 +39,10 @@ import { murosEtabs15 } from "../e6/etabs15.ts";
 import { conAcciones, conPropuesta, losaPilaresMezclados, reticularH25 } from "./modelos.ts";
 
 export const MODELOS_CONGELADOS_C5: Record<string, () => ModeloCongelado> = {
-  "pilares-mezclados": () => ({ fisico: conAcciones(conPropuesta(losaPilaresMezclados())), opciones: {} }),
-  "reticular-h25": () => ({ fisico: conPropuesta(reticularH25()), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.5 } }),
-  "etabs-15c-3-60": () => ({ fisico: fisicoEtabs(murosEtabs15().find((m) => m.id === "15c-3-60")!), opciones: { tamanoMalla: 20 * IN } }),
-  "aleatorio-3": () => ({ fisico: conPropuesta(conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" })), opciones: {} }),
+  "pilares-mezclados": () => ({ fisico: conAcciones(conPropuesta(losaPilaresMezclados())), opciones: { franjas: false } }),
+  "reticular-h25": () => ({ fisico: conPropuesta(reticularH25()), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.5 } }),
+  "etabs-15c-3-60": () => ({ fisico: fisicoEtabs(murosEtabs15().find((m) => m.id === "15c-3-60")!), opciones: { franjas: false, tamanoMalla: 20 * IN } }),
+  "aleatorio-3": () => ({ fisico: conPropuesta(conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" })), opciones: { franjas: false } }),
 };
 
 export interface ReferenciaC5 {

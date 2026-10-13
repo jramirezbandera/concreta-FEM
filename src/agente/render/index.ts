@@ -9,6 +9,7 @@ import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones 
 import type { Resumen } from "../consultas.ts";
 import { casosGravedad, FACTOR_GRAVEDAD_ELU, gravedad } from "../sensatezResultados.ts";
 import { VISTAS_MODELO } from "./modelo.ts";
+import { VISTAS_ARMADO } from "./armado.ts";
 import { VISTAS_RESULTADOS } from "./resultados.ts";
 
 export * from "./escena.ts";
@@ -18,11 +19,12 @@ export { ESFUERZOS_PLANO, vistaAlzadoDiagramas, type EsfuerzoPlano } from "./alz
 export { PlantaFisica, vistaCargas, vistaDiagnosticos, vistaModelo, type DatosVista } from "./modelo.ts";
 export { CAMPOS, ResultadosRender, vistaAxiles, vistaCampo, vistaDiagramas, vistaMalla, type Campo } from "./resultados.ts";
 export { escalaDeTexto, type EscalaMapa } from "./isovalores.ts";
+export { ARMADURAS, tramosArmado, vistaArmado, VISTAS_ARMADO, type Armadura, type TramoArmado } from "./armado.ts";
 export { direccionBanda, envolventesBandas, gobierna, vistaBandas, type BandaEnvolvente, type DireccionBanda } from "./bandas.ts";
 export { CLASE_CARGA, geometriaCargas, presionEn, textoCarga, vistaAlzadoCargas, type ClaseCarga, type GeometriaCarga } from "./cargas.ts";
 export { COLOR_REACCION, reaccionesObjetos, vistaAlzadoReacciones, vistaReacciones, type ReaccionObjeto } from "./reacciones.ts";
 
-export const VISTAS = [...VISTAS_MODELO, ...VISTAS_RESULTADOS] as const;
+export const VISTAS = [...VISTAS_MODELO, ...VISTAS_RESULTADOS, ...VISTAS_ARMADO] as const;
 export type Vista = (typeof VISTAS)[number];
 
 /** Las vistas del modelo se dibujan sin calcular, también si no compila; las demás necesitan el cálculo. */

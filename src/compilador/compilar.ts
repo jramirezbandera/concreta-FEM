@@ -37,7 +37,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "C5.1";
+export const VERSION_COMPILADOR = "F1";
 
 export interface EstadisticasCompilacion {
   nudos: number;

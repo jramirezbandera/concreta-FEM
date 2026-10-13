@@ -127,9 +127,14 @@ describe("pilar apeado sobre una losa", () => {
         { tipo: "puntual", id: "H", caso: "G", planta: "P2", x: 6, y: 3, F: [10, 0, 0] },
       ],
     };
-    const x = calculado(f);
+    // El axil congelado es el de la malla sin las caras de las franjas (fase F); con ellas, la malla
+    // cambia y el axil, un 0,5 %
+    const x = calculado(f, { franjas: false });
     expect(x.r.diagnosticos).toEqual([]);
     expect(Math.abs(axil(x.c, "X") / -77.7670356602357 - 1)).toBeLessThan(1e-6);
+    const y = calculado(f);
+    expect(y.r.diagnosticos).toEqual([]);
+    expect(Math.abs(axil(y.c, "X") / -77.7670356602357 - 1)).toBeLessThan(0.01);
   });
 
   it("fuera de la losa sigue siendo un error", () => {

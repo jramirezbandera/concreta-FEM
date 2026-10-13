@@ -970,6 +970,12 @@
         },
         "torsionEquilibrio": {
           "type": "boolean"
+        },
+        "franjas": {
+          "type": "boolean"
+        },
+        "anchoFranja": {
+          "type": "number"
         }
       },
       "additionalProperties": false

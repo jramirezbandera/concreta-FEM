@@ -93,7 +93,7 @@ function seccionEn(p: Pilar, planta: string): string {
   return p.tramos?.find((t) => t.planta === planta)?.seccion ?? p.seccion;
 }
 
-function pilaresEnLosa(ctx: Contexto, l: LosaCompilada): PilarEnLosa[] {
+export function pilaresEnLosa(ctx: Contexto, l: LosaCompilada): PilarEnLosa[] {
   const k = ctx.planta.get(l.losa.planta)!;
   const r: PilarEnLosa[] = [];
   for (const p of ctx.pilares) {

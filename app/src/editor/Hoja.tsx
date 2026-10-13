@@ -35,8 +35,8 @@ interface FilaVista {
 }
 
 /** Tablas que se pueden filtrar por la planta activa. */
-const POR_PLANTA: ReadonlySet<NombreTabla> = new Set(["pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "bandas", "cargas"]);
-const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "panos", "apoyos", "apoyosLineales", "bandas", "cargas"]);
+const POR_PLANTA: ReadonlySet<NombreTabla> = new Set(["pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "cargas"]);
+const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "losas", "panos", "apoyos", "apoyosLineales", "cargas"]);
 const CON_ORDEN: ReadonlySet<NombreTabla> = new Set(["plantas", "casos"]);
 
 /** Peor severidad y mensajes de los diagnósticos de cada objeto. */

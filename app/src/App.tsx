@@ -39,7 +39,7 @@ const MODOS: { id: ModoResultados; nombre: string }[] = [
   { id: "losas", nombre: "Losas" },
   { id: "diagramas", nombre: "Diagramas de vigas" },
   { id: "pilares", nombre: "Pilares" },
-  { id: "bandas", nombre: "Bandas" },
+  { id: "armado", nombre: "Armado de losas" },
   { id: "deformada", nombre: "Deformada y desplomes" },
   { id: "reacciones", nombre: "Reacciones" },
 ];

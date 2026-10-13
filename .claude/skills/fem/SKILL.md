@@ -1,6 +1,6 @@
 ---
 name: fem
-description: Modelar, calcular, consultar y revisar una estructura con el motor FEM 3D de Concreta mediante la CLI `fem` y un fichero proyecto.json. Úsala cuando haya que crear o editar un modelo estructural (plantas, pilares, vigas, losas, muros, forjados, cargas), validarlo, calcularlo, leer sus resultados (envolventes, flechas, deriva, reacciones, esfuerzos de una pieza o de una banda) o preparar su informe de revisión.
+description: Modelar, calcular, consultar y revisar una estructura con el motor FEM 3D de Concreta mediante la CLI `fem` y un fichero proyecto.json. Úsala cuando haya que crear o editar un modelo estructural (plantas, pilares, vigas, losas, muros, forjados, cargas), validarlo, calcularlo, leer sus resultados (envolventes, flechas, deriva, reacciones, esfuerzos de una pieza, armado de las losas por franjas) o preparar su informe de revisión.
 ---
 
 # fem: modelar y calcular con Concreta FEM 3D
@@ -69,7 +69,8 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 | `vigas-my`, `vigas-vz` | Diagramas envolventes de vigas y viguetas, con el máximo y el mínimo de cada vano |
 | `pilares-n` | Axil de cada pilar que llega a la planta |
 | `reacciones` | Reacciones de los pilares y muros que arrancan de la planta y de sus apoyos: Fz rotulada y (Fx, Fy) a escala; por defecto, cada objeto en el caso de su mayor \|Fz\| (como `consultar reacciones`) |
-| `bandas` | Las bandas de dimensionado de la planta con su My en cada estación (caras y centros de vano), de `consultar banda`: el máximo a un lado del eje y el mínimo al otro, rotulado el que gobierna; en las dos direcciones a la vez |
+| `armado-x-inf`, `armado-x-sup`, `armado-y-inf`, `armado-y-sup` | Las franjas de armado de las losas, coloreadas por tramos según la demanda de Wood–Armer (kN·m/m) de su armadura inferior o superior en X (el eje 1 de cada losa) o en Y, de `consultar franja`; rotulado, el mayor de cada franja |
+| `bandas` | Las bandas de dimensionado del proyecto (si las tiene) con su My en cada estación, de `consultar banda` |
 
 - `--vista` y `--planta` admiten varias, separadas por comas o repetidas; sin `--planta`, todas.
 - `modelo`, `cargas` y `diagnosticos` se dibujan aunque el modelo no compile: así se ve dónde está el error.
@@ -99,7 +100,7 @@ La app vigila el fichero: cada vez que lo editas, se recarga sola (o usa lo que 
 - **Lee el fichero justo antes de cambiarlo**, nunca de memoria: puede que el ingeniero lo haya guardado desde la app.
 - Si cambias el fichero mientras él tiene cambios sin guardar, la app no pisa nada: le avisa y elige él. Díselo cuando cambies algo que podría estar editando.
 - Al guardar, la app escribe el fichero en su formato canónico (2 espacios y las claves en el orden de los tipos). El contenido y la huella no cambian.
-- Las bandas de dimensionado las propone la app («Proponer bandas», con las del Anejo I) y el ingeniero las retoca. Sus `apoyos` no se escriben a mano: la app los recalcula con los pilares al cambiar una banda. Si mueves un pilar o cambias su sección después, el compilador avisa con `banda/apoyos-desfasados`: díselo para que vuelva a proponerlas o las retoque.
+- Las losas macizas y reticulares se arman con **franjas** de ancho fijo (1 m, o el intereje en un reticular) que cubren toda la losa en sus dos direcciones (X, el `eje1` de la losa, e Y). No se escriben: salen solas de la losa, y sus esfuerzos, de `consultar franjas` y `consultar franja`. La app ya no propone ni edita bandas; las `bandas` del proyecto, si las hay, son cortes de comprobación tuyos: no las quites ni las cambies sin que el ingeniero lo pida.
 
 La app no firma. Tú no la necesitas: tus números salen de la CLI.
 
@@ -152,7 +153,9 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 | `deriva [--planta P]` | Por planta: el mayor desplome relativo (d/h) con su pilar, y el desplazamiento del maestro del diafragma |
 | `reacciones [--objeto id] [--top N \| --todos]` | Totales por caso (ΣF y ΣM respecto al origen) y los apoyos con más carga |
 | `pieza <id> [--estaciones]` | Una viga o vigueta, por vanos (de cara a cara de apoyo); o un pilar, por tramos (base y cabeza, con los esfuerzos concomitantes) |
-| `banda <id>` | My máximo y mínimo en cada estación de una banda (caras y vanos) |
+| `franjas [--losa L \| --planta P]` | Las franjas de armado de las losas (ids `<losa>:X<i>` y `<losa>:Y<i>`), con su mayor demanda de Wood–Armer inferior y superior (kN·m/m), dónde está y su combinación |
+| `franja <id>` | Una franja, estación a estación (caras de pilares y líneas de apoyo exactas; cada 0,25 m por campos): mx máximo y mínimo y Wood–Armer inferior y superior por metro |
+| `banda <id>` | My máximo y mínimo en cada estación de una banda del proyecto (caras y vanos) |
 | `combinaciones` | Las combinaciones en uso, con sus factores |
 
 **Combinaciones:**

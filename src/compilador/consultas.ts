@@ -34,7 +34,9 @@ import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "../motor/modelo.ts";
 import { alineacionesLosa, semiextension } from "./bandas.ts";
 import { EsfuerzosBandas, type EstacionResultado, type LineaReparto } from "./esfuerzosBandas.ts";
+import { EsfuerzosFranjas, type EnvolventeEstacionFranja, type ResultadoFranja } from "./esfuerzosFranjas.ts";
 import { EsfuerzosMuros, type Dintel, type Machon } from "./esfuerzosMuros.ts";
+import type { Franja } from "./franjas.ts";
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type Pilar, type Seccion, type Vec2 } from "./fisico.ts";
 import { huellaPilar } from "./geometria2d.ts";
 import type { Mapeo } from "./mapeo.ts";
@@ -188,6 +190,7 @@ export class Consultas {
   private readonly opciones: OpcionesCompilacion;
   private piezasC?: EsfuerzosPiezas;
   private bandasC?: EsfuerzosBandas;
+  private franjasC?: EsfuerzosFranjas;
   private camposC?: CamposLaminas;
   private cortesC?: Cortes;
   private murosC?: EsfuerzosMuros;
@@ -487,6 +490,38 @@ export class Consultas {
     this.bandasC ??= new EsfuerzosBandas(this.fisico, this.modelo, this.casos, { epsGeom: this.ctx.op.epsGeom, campos: this.campos, cortes: this.cortes });
     const r = this.bandasC.reparto(losa, direccion, factores);
     return { valido: true, valor: r.lineas, diagnosticos: r.diagnosticos };
+  }
+
+  // ─── Franjas de armado (fase F) ─────────────────────────────────────────────────────────────
+
+  private esfuerzosFranjas(): EsfuerzosFranjas {
+    return (this.franjasC ??= new EsfuerzosFranjas(this.ctx, { modelo: this.modelo, mapeo: this.mapeo }, this.casos, { campos: this.campos, cortes: this.cortes }));
+  }
+
+  /** Las franjas de armado de una losa maciza o reticular, o de todas (fase F). */
+  franjas(losa?: string): Respuesta<Franja[]> {
+    if (losa !== undefined && !this.ctx.losaDe.has(losa)) return this.noExiste("La losa", losa);
+    return { valido: true, valor: this.esfuerzosFranjas().franjas(losa), diagnosticos: [] };
+  }
+
+  /** Estaciones de una franja con sus momentos medios por caso (fase F). */
+  franja(id: string): Respuesta<ResultadoFranja> {
+    const r = this.esfuerzosFranjas().estaciones(id);
+    return r ? { valido: true, valor: r, diagnosticos: [...r.diagnosticos, ...r.estaciones.flatMap((e) => e.diagnosticos)] } : this.noExiste("La franja", id);
+  }
+
+  /**
+   * Wood–Armer de una franja en las combinaciones dadas (factores por caso), por combinación y con
+   * los momentos medios: en cada estación, la mayor demanda inferior y superior de su dirección y el
+   * mx máximo y mínimo, con la combinación (su índice) que los da.
+   */
+  armadoFranja(id: string, combinaciones: readonly ArrayLike<number>[]): Respuesta<EnvolventeEstacionFranja[]> {
+    for (const f of combinaciones) {
+      const mal = this.factoresMal<EnvolventeEstacionFranja[]>(f, id);
+      if (mal) return mal;
+    }
+    const r = this.esfuerzosFranjas().envolvente(id, combinaciones);
+    return r ? { valido: true, valor: r, diagnosticos: [] } : this.noExiste("La franja", id);
   }
 
   private muros(): EsfuerzosMuros {

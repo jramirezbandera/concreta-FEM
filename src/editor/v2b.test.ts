@@ -1,23 +1,21 @@
 /**
- * V2b (`docs/fem3d/visor.md` §7.3): muros y empujes, reticular, paños, apoyos lineales y bandas en
- * las tablas del editor.
- * - criterio 1: cada objeto sale igual de su fila, sin conservar nada a escondidas (las bandas, con
- *   su origen y sus apoyos recalculados), y guardar sin cambios da los mismos bytes y la huella;
- * - criterio 3: los modelos se reconstruyen desde un proyecto vacío pegando sus tablas y, las
- *   bandas, con «Proponer bandas»;
- * - criterio 4: proponer bandas no pierde las del usuario y proponer dos veces no cambia nada;
- * - decisión a: los apoyos de una banda editada se recalculan.
+ * V2b (`docs/fem3d/visor.md` §7.3): muros y empujes, reticular, paños y apoyos lineales en las
+ * tablas del editor.
+ * - criterio 1: cada objeto sale igual de su fila, sin conservar nada a escondidas, y guardar sin
+ *   cambios da los mismos bytes y la huella;
+ * - criterio 3: los modelos se reconstruyen desde un proyecto vacío pegando sus tablas.
  * El criterio 2 (sucesiones al azar) está en `editor.test.ts`, con estos proyectos.
+ *
+ * Desde la fase F (`docs/fem3d/franjas.md` §2.6), las bandas no se proponen ni se editan en la app:
+ * un proyecto con bandas (las del agente) las conserva tal cual al editar lo demás y al guardar.
  */
 import { describe, expect, it } from "vitest";
 import { MODELOS_V2B, proyectoV2b } from "../../validacion/v2b/modelos.ts";
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../agente/proyecto.ts";
-import { apoyosBanda, proponerBandas } from "../compilador/bandas.ts";
 import { huellaCompilacion } from "../compilador/compilar.ts";
-import { resolverOpciones, type Banda } from "../compilador/fisico.ts";
-import { propuestaBandas, solapan } from "./bandas.ts";
+import { resolverOpciones, type ModeloFisico } from "../compilador/fisico.ts";
 import { leerTsv } from "./celdas.ts";
-import { copiarAPlantas, escribirFila, exportar, operacionFila, pegar } from "./edicion.ts";
+import { copiarAPlantas, escribirFila, exportar, pegar } from "./edicion.ts";
 import { aplicar, type Operacion } from "./operaciones.ts";
 import { lista } from "./referencias.ts";
 import { serializar } from "./serializar.ts";
@@ -35,7 +33,7 @@ function aplicado(p: Proyecto, o: Operacion): Proyecto {
 
 describe("V2b: ida y vuelta (criterio 1)", () => {
   for (const nombre of NOMBRES)
-    it(`${nombre}: cada objeto sale igual de su fila, sin base (las bandas, con sus apoyos recalculados)`, () => {
+    it(`${nombre}: cada objeto sale igual de su fila, sin base`, () => {
       const { modelo } = proyectoV2b(nombre);
       const ctx = contexto(modelo);
       let vistos = 0;
@@ -43,11 +41,8 @@ describe("V2b: ida y vuelta (criterio 1)", () => {
         const def = DEF_TABLAS[t];
         for (const o of lista(modelo, def.coleccion)) {
           const l = def.objeto(def.fila(o, ctx), ctx);
-          // Una banda leída de nuevo es del usuario, con los apoyos de sus pilares: los de la propuesta, bit a bit
-          const esperado = t === "bandas" ? { ...o, origen: "usuario", apoyos: apoyosBanda(modelo, o as unknown as Banda) } : o;
-          expect(l.ok ? l.objeto : l.errores, `${t} ${o.id}`).toStrictEqual(esperado);
-          if (t === "bandas" && (o as unknown as Banda).apoyos) expect((l.ok ? l.objeto : o).apoyos, `${o.id}`).toStrictEqual(o.apoyos);
-          // Con su base y la misma geometría, sale igual, también su origen
+          expect(l.ok ? l.objeto : l.errores, `${t} ${o.id}`).toStrictEqual(o);
+          // Con su base, sale igual
           const b = def.objeto(def.fila(o, ctx), ctx, o);
           expect(b.ok ? b.objeto : b.errores, `${t} ${o.id} con base`).toStrictEqual(o);
           vistos++;
@@ -68,7 +63,8 @@ describe("V2b: ida y vuelta (criterio 1)", () => {
     });
 
   it("las tablas de V2b son de las colecciones nuevas, y ninguna columna de una tabla queda sin leer", () => {
-    for (const t of ["muros", "panos", "apoyosLineales", "bandas"] as const) expect(DEF_TABLAS[t].coleccion).toBe(t);
+    for (const t of ["muros", "panos", "apoyosLineales"] as const) expect(DEF_TABLAS[t].coleccion).toBe(t);
+    expect((TABLAS as readonly string[]).includes("bandas")).toBe(false);
     // Cada clave que da la fila de un objeto es una columna de su tabla
     for (const nombre of NOMBRES) {
       const { modelo } = proyectoV2b(nombre);
@@ -150,18 +146,15 @@ describe("V2b: celdas que no valen", () => {
 });
 
 describe("V2b: se reconstruye desde un proyecto vacío (criterio 3)", () => {
-  const ORDEN = ["plantas", "materiales", "secciones", "casos", "pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "bandas", "cargas"] as const;
+  const ORDEN = ["plantas", "materiales", "secciones", "casos", "pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "cargas"] as const;
 
   for (const nombre of NOMBRES)
-    it(`${nombre}: pegando sus tablas${nombre === "bandas" ? " y proponiendo las bandas" : ""}, el mismo modelo y la misma huella`, () => {
-      const proyecto = proyectoV2b(nombre);
+    it(`${nombre}: pegando sus tablas, el mismo modelo (sin sus bandas, que ya no tienen tabla) y la misma huella`, () => {
+      const proyecto = { ...proyectoV2b(nombre) };
+      const { bandas: _b, ...sin } = proyecto.modelo;
+      proyecto.modelo = sin as ModeloFisico;
       let p = vacio();
       for (const t of ORDEN) {
-        // Las bandas propuestas salen de «Proponer bandas»; las del usuario se pegan
-        if (t === "bandas" && nombre === "bandas") {
-          p = aplicado(p, { op: "proponerBandas" });
-          continue;
-        }
         const tsv = exportar(proyecto.modelo, t);
         if (leerTsv(tsv).length <= 1) continue;
         const r = pegar(p.modelo, t, tsv);
@@ -173,93 +166,23 @@ describe("V2b: se reconstruye desde un proyecto vacío (criterio 3)", () => {
     });
 });
 
-describe("V2b: bandas (decisiones a y b, criterio 4)", () => {
+describe("Fase F: las bandas, fuera de la app", () => {
   const base = proyectoV2b("bandas");
-  const propuestas = base.modelo.bandas!;
-  const p2 = propuestas.find((b) => b.id.endsWith(":1:P2"))!;
-  const p3 = propuestas.find((b) => b.id.endsWith(":1:P3"))!;
-  const filaDe = (p: Proyecto, id: string) => DEF_TABLAS.bandas.fila(p.modelo.bandas!.find((b) => b.id === id)! as never, contexto(p.modelo));
 
-  it("mover una banda a otra alineación la hace del usuario, con los apoyos de ésa", () => {
-    const f = filaDe(base, p2.id);
-    const r = escribirFila(base, "bandas", p2.id, { ...f, y0: String(p3.desde[1]).replace(".", ","), y1: String(p3.hasta[1]).replace(".", ",") });
+  it("editar lo demás y guardar deja las bandas como estaban", () => {
+    const losa = base.modelo.losas![0]!;
+    const f = DEF_TABLAS.losas.fila(losa as never, contexto(base.modelo));
+    const r = escribirFila(base, "losas", losa.id, { ...f, espesor: "0,3" });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    const b = r.proyecto.modelo.bandas!.find((x) => x.id === p2.id)!;
-    expect(b.origen).toBe("usuario");
-    expect(b.apoyos).toStrictEqual(p3.apoyos);
+    expect(r.proyecto.modelo.bandas).toStrictEqual(base.modelo.bandas);
+    const l = leerProyecto(serializar(r.proyecto));
+    expect(l.valido && l.proyecto.modelo.bandas).toStrictEqual(base.modelo.bandas);
   });
 
-  it("cambiar su ancho la hace del usuario y deja sus apoyos; cambiar sólo su id, no", () => {
-    const f = filaDe(base, p2.id);
-    const r = escribirFila(base, "bandas", p2.id, { ...f, ancho: "2" });
-    expect(r.ok && r.proyecto.modelo.bandas!.find((x) => x.id === p2.id)).toMatchObject({ ancho: 2, origen: "usuario", apoyos: p2.apoyos });
-    const s = escribirFila(base, "bandas", p2.id, { ...f, id: "BX" });
-    expect(s.ok && s.proyecto.modelo.bandas!.find((x) => x.id === "BX")).toStrictEqual({ ...p2, id: "BX" });
-  });
-
-  it("una banda nueva escrita en la tabla es del usuario y tiene los apoyos de sus pilares", () => {
-    const t = operacionFila(base.modelo, "bandas", null, { id: "", planta: p2.planta, x0: String(p2.desde[0]), y0: String(p2.desde[1]), x1: String(p2.hasta[0]), y1: String(p2.hasta[1]), ancho: "1", tipo: "" });
-    expect(t.ok && t.operacion.op === "crear" && t.operacion.objeto).toMatchObject({ id: "B1", origen: "usuario", apoyos: p2.apoyos });
-  });
-
-  it("proponer dos veces seguidas no cambia nada", () => {
-    const p = aplicado(base, { op: "proponerBandas" });
-    expect(serializar(p)).toBe(serializar(base));
-    const sin = { ...base, modelo: { ...base.modelo, bandas: undefined } };
-    const a = aplicado(sin, { op: "proponerBandas" });
-    expect(serializar(aplicado(a, { op: "proponerBandas" }))).toBe(serializar(a));
-  });
-
-  it("proponer otra vez rehace las propuestas y deja las del usuario; la que se solapa con una del usuario no entra", () => {
-    // P2, retocada por el usuario (más estrecha); P3, quitada; y una del usuario lejos de todo
-    const f = filaDe(base, p2.id);
-    let p = (() => {
-      const r = escribirFila(base, "bandas", p2.id, { ...f, ancho: "2" });
-      if (!r.ok) throw new Error("no");
-      return r.proyecto;
-    })();
-    p = aplicado(p, { op: "borrar", ids: [p3.id] });
-    const pb = propuestaBandas(p.modelo);
-    expect(pb.omitidas.map((x) => [x.banda.id, x.solapa])).toEqual([[p2.id, p2.id]]);
-    expect(pb.quitar.sort()).toEqual(propuestas.filter((b) => b.id !== p2.id && b.id !== p3.id).map((b) => b.id).sort());
-    const q = aplicado(p, { op: "proponerBandas" });
-    const bs = q.modelo.bandas!;
-    expect(bs.find((b) => b.id === p2.id)).toMatchObject({ ancho: 2, origen: "usuario" });
-    expect(bs.find((b) => b.id === p3.id)).toStrictEqual(p3);
-    expect(bs).toHaveLength(propuestas.length);
-    // Ninguna propuesta se solapa con una del usuario
-    for (const b of bs) if (b.origen === "propuesta") expect(bs.filter((u) => u.origen !== "propuesta").some((u) => solapan(u, b)), b.id).toBe(false);
-  });
-
-  it("proponer en una planta no toca las de las demás", () => {
-    const m = proyectoV2b("muros");
-    const todas = aplicado(m, { op: "proponerBandas" });
-    const [n1, n2] = [m.modelo.plantas.find((x) => x.id === "N1")!.id, m.modelo.plantas.find((x) => x.id === "N2")!.id];
-    const solo1 = aplicado(m, { op: "proponerBandas", plantas: [n1] });
-    expect(solo1.modelo.bandas!.every((b) => b.planta === n1)).toBe(true);
-    expect(solo1.modelo.bandas).toStrictEqual(todas.modelo.bandas!.filter((b) => b.planta === n1));
-    const luego2 = aplicado(solo1, { op: "proponerBandas", plantas: [n2] });
-    expect(new Set(luego2.modelo.bandas)).toStrictEqual(new Set(todas.modelo.bandas));
-    expect(proponerBandas(m.modelo).bandas.length).toBe(todas.modelo.bandas!.length);
-  });
-
-  it("un modelo que no vale no propone nada y lo dice", () => {
-    const malo = { ...base, modelo: { ...base.modelo, pilares: [{ ...base.modelo.pilares![0]!, desde: base.modelo.pilares![0]!.hasta }] } };
-    const r = aplicar(malo, { op: "proponerBandas" });
-    expect(r.ok).toBe(false);
-    expect(!r.ok && r.errores[0]!.codigo).toBe("editor/bandas");
-  });
-
-  it("copiar una banda a otra planta la hace del usuario, con los apoyos de los pilares de allí", () => {
-    const m = aplicado(proyectoV2b("muros"), { op: "proponerBandas", plantas: ["N1"] });
-    const b = m.modelo.bandas![0]!;
-    const c = copiarAPlantas(m.modelo, [b.id], ["N2"]);
-    expect(c.ok).toBe(true);
-    if (!c.ok) return;
-    const q = aplicado(m, c.operacion);
-    const copia = q.modelo.bandas!.find((x) => x.planta === "N2")!;
-    expect(copia).toMatchObject({ desde: b.desde, hasta: b.hasta, ancho: b.ancho, origen: "usuario" });
-    expect(copia.apoyos).toStrictEqual(apoyosBanda(q.modelo, copia));
+  it("no hay operación para proponer bandas, ni se copian a otras plantas", () => {
+    expect(aplicar(base, { op: "proponerBandas" } as unknown as Operacion).ok).toBe(false);
+    const c = copiarAPlantas(base.modelo, [base.modelo.bandas![0]!.id], [base.modelo.plantas[0]!.id]);
+    expect(c.ok && c.operacion.op === "lote" ? c.operacion.operaciones.length : 0).toBe(0);
   });
 });

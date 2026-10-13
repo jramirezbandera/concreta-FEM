@@ -31,7 +31,7 @@ import type { Proyecto } from "./proyecto.ts";
 
 export type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
-export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "combinaciones"] as const;
+export const CONSULTAS = ["envolventes", "flechas", "deriva", "reacciones", "pieza", "banda", "franjas", "franja", "combinaciones"] as const;
 export type NombreConsulta = (typeof CONSULTAS)[number];
 
 /** Elementos de una lista que se dan por defecto (los mayores); `todos` los da todos. */
@@ -46,7 +46,7 @@ export interface OpcionesConsulta {
   objeto?: string;
   /** Sólo esta losa o paño (flechas). */
   losa?: string;
-  /** Id de la pieza o de la banda (pieza, banda). */
+  /** Id de la pieza, de la banda o de la franja (pieza, banda, franja). */
   id?: string;
   top?: number;
   todos?: boolean;
@@ -635,6 +635,106 @@ export function banda(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
   return si({ banda: id, combinaciones: conjunto.descripcion, ancho, estaciones }, r.diagnosticos);
 }
 
+// ─── Franjas de armado (fase F) ─────────────────────────────────────────────────────────────────
+
+/** Un máximo de Wood–Armer en una franja: kN·m/m, su estación s (m, a lo largo) y su combinación. */
+export interface DemandaFranja {
+  v: number;
+  s: number;
+  comb: string;
+}
+
+export interface FilaFranja {
+  id: string;
+  losa: string;
+  direccion: 1 | 2;
+  /** Extensión transversal [t0, t1], m (t = p·n, `franjas.ts`). */
+  t: [number, number];
+  /** La mayor demanda de Wood–Armer de su armadura inferior y de la superior (null si no pide). */
+  inferior: DemandaFranja | null;
+  superior: DemandaFranja | null;
+}
+
+/**
+ * Las franjas de armado de una losa, de una planta o de todas, con la mayor demanda de Wood–Armer
+ * de su armadura inferior y superior en las combinaciones del conjunto (kN·m/m).
+ */
+export function franjas(q: Consultas, conjunto: ConjuntoCombinaciones, o: Pick<OpcionesConsulta, "losa" | "planta">): Respuesta<{ combinaciones: string; franjas: FilaFranja[] }> {
+  if (o.losa !== undefined && !(q.fisico.losas ?? []).some((l) => l.id === o.losa)) return no("consulta/no-existe", `La losa «${o.losa}» no existe en el modelo (las franjas son de las losas macizas y reticulares).`, [o.losa]);
+  const losas = (q.fisico.losas ?? []).filter((l) => (o.losa === undefined || l.id === o.losa) && (o.planta === undefined || l.planta === o.planta));
+  const filas: FilaFranja[] = [];
+  const diagnosticos: Diagnostico[] = [];
+  for (const l of losas) {
+    const fs = q.franjas(l.id);
+    if (!fs.valido) return fs;
+    for (const f of fs.valor) {
+      const r = q.franja(f.id);
+      const a = q.armadoFranja(f.id, conjunto.factores);
+      if (!r.valido) return r;
+      if (!a.valido) return a;
+      diagnosticos.push(...r.diagnosticos);
+      let inferior: DemandaFranja | null = null;
+      let superior: DemandaFranja | null = null;
+      a.valor.forEach((e, i) => {
+        const s = r.valor.estaciones[i]!.s;
+        if (e.inferior > (inferior?.v ?? 0)) inferior = { v: e.inferior, s, comb: conjunto.nombres[e.combInferior]! };
+        if (e.superior > (superior?.v ?? 0)) superior = { v: e.superior, s, comb: conjunto.nombres[e.combSuperior]! };
+      });
+      filas.push({ id: f.id, losa: f.losa, direccion: f.direccion, t: [f.t0, f.t1], inferior, superior });
+    }
+  }
+  return si({ combinaciones: conjunto.descripcion, franjas: filas }, diagnosticos);
+}
+
+export interface EstacionFranjaEnvolvente {
+  /** A lo largo de la franja (s = p·d), m. */
+  s: number;
+  tipo: "cara" | "apoyo" | "paso";
+  /** En una cara o un apoyo, el lado que se toma (−1: s menores). */
+  lado?: -1 | 1;
+  /** Pilares de la cara que tocan la franja, o la pieza de la línea de apoyo. */
+  piezas?: string[];
+  /** Ancho en losa, m, si no es el de la franja (un hueco, un borde o una huella). */
+  anchoEnLosa?: number;
+  /** mx medio (kN·m/m; > 0 tracciona la cara inferior): [máximo, su combinación] y [mínimo, la suya]. */
+  max: [number, string];
+  min: [number, string];
+  /** Wood–Armer de la armadura de su dirección (kN·m/m): inferior y superior, con su combinación. */
+  inferior: [number, string];
+  superior: [number, string];
+  /** En un reticular, la parte del ancho en ábacos (fuera de ellos, el momento por nervio es el medio por el intereje). */
+  fraccionAbaco?: number;
+  /** Sólo si la estación no vale. */
+  valido?: false;
+}
+
+export function franja(q: Consultas, conjunto: ConjuntoCombinaciones, id: string | undefined): Respuesta<{ franja: string; losa: string; direccion: 1 | 2; ancho: number; intereje: number | null; combinaciones: string; estaciones: EstacionFranjaEnvolvente[] }> {
+  if (!id) return no("consulta/sin-id", "La consulta «franja» necesita el id de la franja (fem consultar <proyecto> franja <losa>:X<i> o <losa>:Y<i>).");
+  const r = q.franja(id);
+  if (!r.valido) return r;
+  const a = q.armadoFranja(id, conjunto.factores);
+  if (!a.valido) return a;
+  const f = r.valor.franja;
+  const nombre = (c: number) => (c >= 0 ? conjunto.nombres[c]! : "");
+  const estaciones = r.valor.estaciones.map((e, i): EstacionFranjaEnvolvente => {
+    const w = a.valor[i]!;
+    return {
+      s: e.s,
+      tipo: e.tipo,
+      ...(e.lado ? { lado: e.lado } : {}),
+      ...(e.piezas.length ? { piezas: e.piezas } : {}),
+      ...(Math.abs(e.anchoEnLosa - f.ancho) > 1e-9 ? { anchoEnLosa: e.anchoEnLosa } : {}),
+      max: [w.mxMax, nombre(w.combMax)],
+      min: [w.mxMin, nombre(w.combMin)],
+      inferior: [w.inferior, nombre(w.combInferior)],
+      superior: [w.superior, nombre(w.combSuperior)],
+      ...(e.fraccionAbaco !== null ? { fraccionAbaco: e.fraccionAbaco } : {}),
+      ...(e.valido ? {} : { valido: false as const }),
+    };
+  });
+  return si({ franja: id, losa: f.losa, direccion: f.direccion, ancho: f.ancho, intereje: f.intereje, combinaciones: conjunto.descripcion, estaciones }, r.diagnosticos);
+}
+
 // ─── Entrada común ──────────────────────────────────────────────────────────────────────────────
 
 const PROPOSITO: Record<NombreConsulta, Proposito> = {
@@ -644,6 +744,8 @@ const PROPOSITO: Record<NombreConsulta, Proposito> = {
   reacciones: "lineal",
   pieza: "esfuerzos",
   banda: "esfuerzos",
+  franjas: "esfuerzos",
+  franja: "esfuerzos",
   combinaciones: "esfuerzos",
 };
 
@@ -666,5 +768,9 @@ export function consultar(q: Consultas, consulta: NombreConsulta, o: OpcionesCon
       return pieza(q, conjunto, o.id, o);
     case "banda":
       return banda(q, conjunto, o.id);
+    case "franjas":
+      return franjas(q, conjunto, o);
+    case "franja":
+      return franja(q, conjunto, o.id);
   }
 }

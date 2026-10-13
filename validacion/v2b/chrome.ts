@@ -8,26 +8,18 @@
  *
  * - 5, en el edificio reticular de V2 (C4, 7 plantas, 52 125 nudos): escribir en la tabla de losas y
  *   pegar 80 filas no dan tareas largas de más de 50 ms en el hilo principal; los diagnósticos de un
- *   cambio salen en ≤ 1,5 s; «Proponer bandas» calcula lo que cambia en ≤ 1 s, y aplicarlo da la
- *   huella del modelo con la propuesta de Node.
- * - 7, en el edificio objetivo de A2 con sus bandas propuestas: la primera banda de la planta sale
- *   en Resultados · Bandas en ≤ 1 s, y los My de la tabla son los de Node bit a bit.
+ *   cambio salen en ≤ 1,5 s.
+ *
+ * Desde la fase F (`docs/fem3d/franjas.md`), «Proponer bandas» y Resultados · Bandas ya no están en
+ * la app: su parte del banco la sustituye Resultados · Armado, en `validacion/f/chrome.ts`.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { extname, join, normalize } from "node:path";
-import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../../src/agente/proyecto.ts";
-import { proponerBandas } from "../../src/compilador/bandas.ts";
-import { huellaCompilacion } from "../../src/compilador/compilar.ts";
-import { resolverOpciones } from "../../src/compilador/fisico.ts";
-import { sha256 } from "../../src/compilador/huella.ts";
-import { aplicar } from "../../src/editor/operaciones.ts";
+import { VERSION_ESQUEMA, type Proyecto } from "../../src/agente/proyecto.ts";
 import { serializar } from "../../src/editor/serializar.ts";
-import { iniciarNucleo } from "../../src/nucleo/index.ts";
-import { datosBandas } from "../../src/visor/bandas.ts";
-import { Sesion } from "../../src/visor/sesion.ts";
 import { manejadorCarpeta } from "../../app/servidor.ts";
 import { edificioReticular } from "../c4/modelos.ts";
 
@@ -46,7 +38,6 @@ const comprobar = (ok: boolean, que: string) => {
   if (!ok) fallos++;
   log(`${ok ? "BIEN " : "FALLA"} ${que}`);
 };
-const huella = (p: Proyecto) => huellaCompilacion(p.modelo, resolverOpciones(p.opciones));
 
 // ─── 1. La app compilada y los proyectos ────────────────────────────────────────────────────────
 
@@ -61,10 +52,6 @@ const escribirProyecto = (nombre: string, p: Proyecto) => {
 };
 const reticular: Proyecto = { esquema: VERSION_ESQUEMA, nombre: "Edificio reticular (V2 de C4)", modelo: edificioReticular() };
 escribirProyecto("reticular", reticular);
-const a2 = leerProyecto(readFileSync(join(RAIZ, "validacion/a2/agente/edificio/proyecto.json"), "utf8"));
-if (!a2.valido) throw new Error("el edificio de A2 no es válido");
-const conBandas: Proyecto = { ...a2.proyecto, modelo: { ...a2.proyecto.modelo, bandas: proponerBandas(a2.proyecto.modelo, a2.proyecto.opciones).bandas } };
-escribirProyecto("edificio", conBandas);
 
 const TIPOS: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".woff2": "font/woff2", ".json": "application/json", ".txt": "text/plain", ".svg": "image/svg+xml" };
 const servidor = createServer((req, res) => {
@@ -187,7 +174,6 @@ try {
   // Escribir en una celda: el intereje del reticular de la primera losa de la planta activa
   await pagina(`await __v2.tabla("Losas"); await __v2.esperar(() => __v2.hoja()?.getAttribute("aria-label") === "Tabla de losas");`);
   const col = await pagina<number>(`return [...__v2.hoja().querySelectorAll("thead th")].findIndex((th) => th.textContent.trim().startsWith("intereje")) - 1;`);
-  const losa = await pagina<string>(`return __v2.hoja().querySelector("tbody tr[data-id]").dataset.id;`);
   const t1 = await ahora();
   const ms1 = await pagina<number>(`
     const t0 = performance.now();
@@ -215,63 +201,8 @@ try {
   comprobar((await pagina<string>(`return __v2.mensaje();`)).startsWith(`Pegadas ${ids.length} filas`), `pegar ${ids.length} filas: entran todas`);
   comprobar(ms2 <= 1500, `pegar ${ids.length} filas: los diagnósticos salen en ${(ms2 / 1000).toFixed(2)} s (≤ 1,5 s)`);
   comprobar(l2.every((x) => x.ms <= 50), `pegar ${ids.length} filas: tareas largas > 50 ms: ${largas(l2)}`);
+  await captura("reticular-pegar");
 
-  // Proponer bandas: el diálogo calcula lo que cambia, y aplicarlo da la propuesta de Node
-  const h2 = await pagina<string>(`return __v2.huella();`);
-  const ms3 = await pagina<number>(`
-    const t0 = performance.now();
-    __v2.boton("Proponer bandas").click();
-    await __v2.esperar(() => document.querySelector("[role=dialog] table[aria-label='Lo que cambia']"));
-    return performance.now() - t0;`);
-  comprobar(ms3 <= 1000, `«Proponer bandas» enseña lo que cambia en ${(ms3 / 1000).toFixed(2)} s (≤ 1 s)`);
-  await captura("reticular-proponer");
-  await pagina(`document.querySelector("[role=dialog] .btn-p").click(); await __v2.esperar(() => __v2.estado() !== "desactualizado" && __v2.huella() !== ${JSON.stringify(h2)});`);
-  // En Node: el mismo proyecto con lo editado (intereje y giros) y la operación
-  const p: Proyecto = { ...reticular, modelo: { ...reticular.modelo, losas: reticular.modelo.losas!.map((l) => (l.id === losa ? { ...l, reticular: { ...l.reticular!, intereje: 0.8 } } : l)), pilares: reticular.modelo.pilares!.map((x) => (ids.includes(x.id) ? { ...x, giro: 90 } : x)) } };
-  const a = aplicar(p, { op: "proponerBandas" });
-  if (!a.ok) throw new Error(a.errores[0]!.mensaje);
-  const hNode = huella(a.proyecto);
-  const hPagina = await pagina<string>(`return __v2.huella();`);
-  comprobar(hPagina === hNode, `con las bandas propuestas, la huella de la página es la de Node (${hPagina.slice(0, 8)}; ${a.proyecto.modelo.bandas!.length} bandas)`);
-
-  // ─── 4. Criterio 7: Resultados · Bandas en el edificio objetivo ──────────────────────────────
-  log("Criterio 7 · Resultados · Bandas en el edificio objetivo de A2 con sus bandas propuestas");
-  await abrir("edificio");
-  await pagina(`__v2.boton("Resultados").click(); await __v2.esperar(() => __v2.boton("Bandas"));`);
-  const t4 = await ahora();
-  const ms4 = await pagina<number>(`
-    const t0 = performance.now();
-    __v2.boton("Bandas").click();
-    await __v2.esperar(() => document.querySelectorAll("table[aria-label='Bandas de la planta'] tbody tr").length > 0);
-    return performance.now() - t0;`);
-  const l4 = await largasDesde(t4);
-  comprobar(ms4 <= 1000, `la tabla de las bandas de la planta sale en ${(ms4 / 1000).toFixed(2)} s (≤ 1 s)`);
-  log(`  tareas largas > 50 ms en el hilo principal: ${largas(l4)}`);
-  await new Promise((r) => setTimeout(r, 500));
-  await captura("edificio-bandas");
-  const enPagina = await pagina<{ planta: string; filas: { id: string; cara: string | null; vano: string | null }[] }>(`
-    const t = document.querySelector("table[aria-label='Bandas de la planta']");
-    const planta = t.closest("section").querySelector("h2 span").textContent.replace("Bandas de ", "");
-    return { planta, filas: [...t.querySelectorAll("tbody tr")].map((tr) => ({ id: tr.querySelector("td").firstChild.textContent, cara: tr.querySelector("[data-my-cara]")?.dataset.myCara ?? null, vano: tr.querySelector("[data-my-vano]")?.dataset.myVano ?? null })) };`);
-  // En Node, la misma sesión
-  const wasm = readFileSync(join(RAIZ, "src", "nucleo", "pkg", "nucleo_bg.wasm"));
-  await iniciarNucleo(wasm);
-  const sa = Sesion.abrir(serializar(conBandas), sha256(new Uint8Array(wasm)));
-  if (!sa.valido) throw new Error("no abre en Node");
-  if (!(await sa.sesion.calcular()).ok) throw new Error("no calcula en Node");
-  const dn = datosBandas(sa.sesion, enPagina.planta, { tipo: "defecto" }, "1");
-  if (!dn.valido) throw new Error(JSON.stringify(dn.diagnosticos));
-  const iguales = dn.valor.filas.length === enPagina.filas.length && dn.valor.filas.every((f, i) => f.id === enPagina.filas[i]!.id && (f.cara ? String(f.cara[0]) : null) === enPagina.filas[i]!.cara && (f.vano ? String(f.vano[0]) : null) === enPagina.filas[i]!.vano);
-  comprobar(iguales, `los My de las ${enPagina.filas.length} bandas de ${enPagina.planta} (dirección 1) son los de Node bit a bit`);
-  // El detalle de una banda
-  const id = enPagina.filas[0]!.id;
-  const ms5 = await pagina<number>(`
-    const t0 = performance.now();
-    [...document.querySelectorAll("table[aria-label='Bandas de la planta'] tbody tr")][0].click();
-    await __v2.esperar(() => document.querySelector("table[aria-label='Estaciones de ${id}']"));
-    return performance.now() - t0;`);
-  comprobar(ms5 <= 1000, `el detalle de ${id} (estaciones y Wood–Armer) sale en ${(ms5 / 1000).toFixed(2)} s (≤ 1 s)`);
-  await captura("edificio-banda");
 } catch (e) {
   fallos++;
   log(`FALLA ${e instanceof Error ? e.stack : String(e)}`);

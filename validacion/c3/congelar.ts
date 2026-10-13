@@ -34,12 +34,12 @@ import { sotanoFisico, vigaMuroFisico } from "./oraculos.ts";
 const etabs = (id: string) => fisicoEtabs(murosEtabs15().find((m) => m.id === id)!);
 
 export const MODELOS_CONGELADOS_C3: Record<string, () => ModeloCongelado> = {
-  "etabs-15c-3-60": () => ({ fisico: etabs("15c-3-60"), opciones: { tamanoMalla: 20 * IN } }),
-  "etabs-15f-1": () => ({ fisico: fisicoEtabs({ ...murosEtabs15().find((m) => m.id === "15f-3")!, plantas: 1 }), opciones: { tamanoMalla: 20 * IN } }),
-  "sotano-empuje": () => ({ fisico: sotanoFisico(), opciones: { modificadores: {} } }),
-  "viga-en-muro": () => ({ fisico: vigaMuroFisico(), opciones: { modificadores: {} } }),
-  "aleatorio-3-muros": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { tamanoMalla: 1.25, rejilla: false } }),
-  "reticula-nucleo": () => ({ fisico: reticulaConNucleo(), opciones: { tamanoMalla: 1 } }),
+  "etabs-15c-3-60": () => ({ fisico: etabs("15c-3-60"), opciones: { franjas: false, tamanoMalla: 20 * IN } }),
+  "etabs-15f-1": () => ({ fisico: fisicoEtabs({ ...murosEtabs15().find((m) => m.id === "15f-3")!, plantas: 1 }), opciones: { franjas: false, tamanoMalla: 20 * IN } }),
+  "sotano-empuje": () => ({ fisico: sotanoFisico(), opciones: { franjas: false, modificadores: {} } }),
+  "viga-en-muro": () => ({ fisico: vigaMuroFisico(), opciones: { franjas: false, modificadores: {} } }),
+  "aleatorio-3-muros": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false } }),
+  "reticula-nucleo": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1 } }),
 };
 
 if (import.meta.main) {

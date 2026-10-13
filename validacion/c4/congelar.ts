@@ -29,12 +29,12 @@ import { casosManoC4 } from "./mano.ts";
 const mano = (i: number) => casosManoC4()[i]!.fisico;
 
 export const MODELOS_CONGELADOS_C4: Record<string, () => ModeloCongelado> = {
-  "pano-oblicuo": () => ({ fisico: mano(1), opciones: {} }),
-  "dos-vanos-voladizo": () => ({ fisico: mano(2), opciones: {} }),
-  "pano-hueco": () => ({ fisico: mano(4), opciones: {} }),
-  "aleatorio-7-unidireccional": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(7), 7, { tipo: "unidireccional" }), opciones: {} }),
-  "aleatorio-6-reticular": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(6), 6, { tipo: "reticular" }), opciones: { tamanoMalla: 1.25 } }),
-  "aleatorio-5-mixto": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { tamanoMalla: 1.25 } }),
+  "pano-oblicuo": () => ({ fisico: mano(1), opciones: { franjas: false } }),
+  "dos-vanos-voladizo": () => ({ fisico: mano(2), opciones: { franjas: false } }),
+  "pano-hueco": () => ({ fisico: mano(4), opciones: { franjas: false } }),
+  "aleatorio-7-unidireccional": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(7), 7, { tipo: "unidireccional" }), opciones: { franjas: false } }),
+  "aleatorio-6-reticular": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(6), 6, { tipo: "reticular" }), opciones: { franjas: false, tamanoMalla: 1.25 } }),
+  "aleatorio-5-mixto": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25 } }),
 };
 
 if (import.meta.main) {

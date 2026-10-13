@@ -64,13 +64,6 @@ export const IcBanda = icono(
     <path d="M7 12h10" />
   </>,
 );
-export const IcProponerBandas = icono(
-  <>
-    <rect x="3" y="4" width="18" height="6" rx="1" strokeDasharray="3 2" />
-    <rect x="3" y="14" width="18" height="6" rx="1" strokeDasharray="3 2" />
-    <path d="M12 6.5v1M12 16.5v1" />
-  </>,
-);
 export const IcEmpuje = icono(
   <>
     <path d="M17 3v18" />

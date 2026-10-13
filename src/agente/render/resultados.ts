@@ -144,7 +144,7 @@ const circuloPilar = (c: Vec2, r: number, n = 32): Vec2[] => Array.from({ length
 const punto = (c: Compilado, n: number): Vec2 => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y];
 
 /** Contornos del modelo sobre un mapa: losas, paños, vigas y muros en línea; pilares rellenos. */
-function trazoModelo(pl: PlantaFisica): Primitiva[] {
+export function trazoModelo(pl: PlantaFisica): Primitiva[] {
   const P: Primitiva[] = [];
   const f = pl.f;
   for (const l of [...pl.enPlanta(f.losas), ...pl.enPlanta(f.panos)]) for (const a of [l.contorno, ...(l.huecos ?? [])]) P.push({ tipo: "linea", puntos: [...a, a[0]!] as Vec2[], estilo: "contorno", objeto: l.id });

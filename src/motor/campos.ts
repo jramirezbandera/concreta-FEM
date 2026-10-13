@@ -43,6 +43,9 @@ import type { LaminaAnalitica, ModeloAnalitico, ResultadoCaso } from "./modelo.t
 /** Gauss–Legendre de 4 puntos en [0, 1]: abscisas y pesos. */
 const GL4_S = [0.0694318442029737, 0.3300094782075719, 0.6699905217924281, 0.9305681557970263];
 const GL4_W = [0.1739274225687269, 0.3260725774312731, 0.3260725774312731, 0.1739274225687269];
+/** Gauss–Legendre de 2 puntos en [0, 1] (cortes con `cuadratura: 2`). */
+const GL2_S = [0.21132486540518713, 0.7886751345948129];
+const GL2_W = [0.5, 0.5];
 
 /** Base del polinomio de los parches. */
 export type BaseSpr = "cuadratica" | "bilineal";
@@ -771,9 +774,20 @@ export class CamposLaminas implements IntegradorCampos {
       const en = (t: number) => [0, 1, 2].map((c) => P[0]!.x[c]! + t * (P[1]!.x[c]! - P[0]!.x[c]!));
       const esLibre = (q: { lados: number[] }) => q.lados.some((e) => libres.has(claveLado(l, e)));
       const integra = cruza || lados;
-      tramos.push({ k, A: en(Math.max(0, t0)), B: en(Math.min(1, t1)), cruza, integra, libreA: integra && t0 <= 0 && esLibre(P[0]!), libreB: integra && t1 >= 1 && esLibre(P[1]!) });
+      // Partido en los quiebres del corte que caen dentro (los bordes de las franjas, F)
+      const ta = Math.max(0, t0);
+      const tb = Math.min(1, t1);
+      const partes = [ta];
+      const qs = cp.corte.quiebres;
+      if (qs?.length && Math.abs(yb - ya) > 1e-15) partes.push(...qs.map((q) => (q - ya) / (yb - ya)).filter((t) => (t - ta) * L > 10 * TOL_CORTE && (tb - t) * L > 10 * TOL_CORTE).sort((x, y) => x - y));
+      partes.push(tb);
+      const primero = tramos.length;
+      for (let i = 0; i + 1 < partes.length; i++) {
+        const ultimo = i + 2 === partes.length;
+        tramos.push({ k, A: en(partes[i]!), B: en(partes[i + 1]!), cruza, integra, libreA: i === 0 && integra && t0 <= 0 && esLibre(P[0]!), libreB: ultimo && integra && t1 >= 1 && esLibre(P[1]!) });
+      }
       if (integra) info.laminas.push(k);
-      for (const q of [tramos.at(-1)!.A, tramos.at(-1)!.B]) {
+      for (const q of [tramos[primero]!.A, tramos.at(-1)!.B]) {
         const [, cy, cz] = cp.coordenadas(q);
         ext.y = [Math.min(ext.y[0], cy), Math.max(ext.y[1], cy)];
         ext.z = [Math.min(ext.z[0], cz), Math.max(ext.z[1], cz)];
@@ -782,7 +796,9 @@ export class CamposLaminas implements IntegradorCampos {
     if (tramos.length) info.extension = ext;
 
     // 2. Puntos de integración, ejes de franja y extremos libres (no dependen del caso)
-    const ns = 4 * tramos.length;
+    const [GS, GW] = cp.corte.cuadratura === 2 ? [GL2_S, GL2_W] : [GL4_S, GL4_W];
+    const npt = GS.length;
+    const ns = npt * tramos.length;
     const m: MuestrasCorte = {
       laminas: new Int32Array(ns),
       puntos: new Float64Array(3 * ns),
@@ -818,14 +834,14 @@ export class CamposLaminas implements IntegradorCampos {
       const n = [0, 1, 2].map((c) => sigma * s3[c]!);
       const t = cruz(n, nu);
       const mr = [pr(nu, s1), pr(nu, s2), pr(t, s1), pr(t, s2), sigma];
-      for (let q = 0; q < 4; q++) {
-        const j = 4 * i + q;
-        const P = [0, 1, 2].map((c) => A[c]! + GL4_S[q]! * (B[c]! - A[c]!));
+      for (let q = 0; q < npt; q++) {
+        const j = npt * i + q;
+        const P = [0, 1, 2].map((c) => A[c]! + GS[q]! * (B[c]! - A[c]!));
         m.laminas[j] = k;
         m.puntos.set(P, 3 * j);
         const [, cy, cz] = cp.coordenadas(P);
         m.yz.set([cy, cz], 2 * j);
-        m.pesos[j] = GL4_W[q]! * L;
+        m.pesos[j] = GW[q]! * L;
         m.ejes.set([...nu, ...t, ...n], 9 * j);
         natural.set(naturales(k, P), 2 * j);
         marco.set(mr, 5 * j);
@@ -860,38 +876,64 @@ export class CamposLaminas implements IntegradorCampos {
       suma[o + 4]! += w * (mm[1]! + rz * f[0]! - rx * f[2]!);
       suma[o + 5]! += w * (mm[2]! + rx * f[1]! - ry * f[0]!);
     };
+    /** T' = B·T·Bᵀ con B = [ν; t], por s, en out[o…o+2]. */
+    const girar = (out: Float64Array, o: number, xx: number, yy: number, xy: number, s: number, nx: number, ny: number, tx: number, ty: number) => {
+      const b11 = nx * xx + ny * xy;
+      const b12 = nx * xy + ny * yy;
+      const b21 = tx * xx + ty * xy;
+      const b22 = tx * xy + ty * yy;
+      out[o] = s * (b11 * nx + b12 * ny);
+      out[o + 1] = s * (b21 * tx + b22 * ty);
+      out[o + 2] = s * (b11 * tx + b12 * ty);
+    };
     casos.forEach((r, kc) => {
       // El evaluador de estos desplazamientos, con lo que ya calcularon los cortes anteriores (los
       // mismos valores); cuenta las plazas degradadas que usa este corte
       const ev = this.evaluadorCompartido(r.u);
       ev.empezar();
       const val = new Float64Array(8 * ns);
+      const pts = m.puntos;
+      // Sin crear arrays por punto (los cortes de las franjas piden cientos de miles): las mismas
+      // cuentas, en el mismo orden, que con vectores
       for (let j = 0; j < ns; j++) {
         const k = m.laminas[j]!;
-        const g = this.regiones[this.regionDe[k]!]!;
+        const R = this.regiones[this.regionDe[k]!]!.R;
         const v = ev.enRegion(k, natural[2 * j]!, natural[2 * j + 1]!);
-        const [nx, ny, tx, ty, sg] = marco.subarray(5 * j, 5 * j + 5);
-        const Qn = v[6]! * nx! + v[7]! * ny!;
-        if (tramos[j >> 2]!.integra) {
+        const nx = marco[5 * j]!;
+        const ny = marco[5 * j + 1]!;
+        const tx = marco[5 * j + 2]!;
+        const ty = marco[5 * j + 3]!;
+        const sg = marco[5 * j + 4]!;
+        const Qn = v[6]! * nx + v[7]! * ny;
+        if (tramos[(j / npt) | 0]!.integra) {
           // Tracción en el triedro de la región: N·ν, Q·ν y M·ν; m = (M·ν) × e₃ = (Mν)_y·s₁ − (Mν)_x·s₂
-          const Nn = [v[0]! * nx! + v[2]! * ny!, v[2]! * nx! + v[1]! * ny!];
-          const Mn = [v[3]! * nx! + v[5]! * ny!, v[5]! * nx! + v[4]! * ny!];
-          const f = [0, 1, 2].map((c) => Nn[0]! * g.R[c]! + Nn[1]! * g.R[3 + c]! + Qn * g.R[6 + c]!);
-          const mm = [0, 1, 2].map((c) => Mn[1]! * g.R[c]! - Mn[0]! * g.R[3 + c]!);
-          agregar(6 * kc, m.puntos.subarray(3 * j, 3 * j + 3), f, mm, m.pesos[j]!);
+          const Nn0 = v[0]! * nx + v[2]! * ny;
+          const Nn1 = v[2]! * nx + v[1]! * ny;
+          const Mn0 = v[3]! * nx + v[5]! * ny;
+          const Mn1 = v[5]! * nx + v[4]! * ny;
+          const f0 = Nn0 * R[0]! + Nn1 * R[3]! + Qn * R[6]!;
+          const f1 = Nn0 * R[1]! + Nn1 * R[4]! + Qn * R[7]!;
+          const f2 = Nn0 * R[2]! + Nn1 * R[5]! + Qn * R[8]!;
+          const m0 = Mn1 * R[0]! - Mn0 * R[3]!;
+          const m1 = Mn1 * R[1]! - Mn0 * R[4]!;
+          const m2 = Mn1 * R[2]! - Mn0 * R[5]!;
+          const w = m.pesos[j]!;
+          const o = 6 * kc;
+          const rx = pts[3 * j]! - O[0]!;
+          const ry = pts[3 * j + 1]! - O[1]!;
+          const rz = pts[3 * j + 2]! - O[2]!;
+          suma[o]! += w * f0;
+          suma[o + 1]! += w * f1;
+          suma[o + 2]! += w * f2;
+          suma[o + 3]! += w * (m0 + ry * f2 - rz * f1);
+          suma[o + 4]! += w * (m1 + rz * f0 - rx * f2);
+          suma[o + 5]! += w * (m2 + rx * f1 - ry * f0);
         }
         // Valores en los ejes de franja: T' = B·T·Bᵀ con B = [ν; t] (M y Q, con σ)
-        const ten = (xx: number, yy: number, xy: number, s: number) => {
-          const b11 = nx! * xx + ny! * xy;
-          const b12 = nx! * xy + ny! * yy;
-          const b21 = tx! * xx + ty! * xy;
-          const b22 = tx! * xy + ty! * yy;
-          return [s * (b11 * nx! + b12 * ny!), s * (b21 * tx! + b22 * ty!), s * (b11 * tx! + b12 * ty!)];
-        };
-        val.set(ten(v[0]!, v[1]!, v[2]!, 1), 8 * j);
-        val.set(ten(v[3]!, v[4]!, v[5]!, sg!), 8 * j + 3);
-        val[8 * j + 6] = sg! * Qn;
-        val[8 * j + 7] = sg! * (v[6]! * tx! + v[7]! * ty!);
+        girar(val, 8 * j, v[0]!, v[1]!, v[2]!, 1, nx, ny, tx, ty);
+        girar(val, 8 * j + 3, v[3]!, v[4]!, v[5]!, sg, nx, ny, tx, ty);
+        val[8 * j + 6] = sg * Qn;
+        val[8 * j + 7] = sg * (v[6]! * tx + v[7]! * ty);
       }
       // Fuerza de borde de Kirchhoff en los extremos libres: ±Mxy·n
       for (const e of extremos) {

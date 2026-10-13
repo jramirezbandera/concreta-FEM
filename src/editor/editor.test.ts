@@ -234,7 +234,7 @@ describe("operaciones", () => {
 });
 
 describe("sucesiones al azar (criterio 2)", () => {
-  const TABLAS_EDITABLES = ["pilares", "vigas", "losas", "cargas", "secciones", "casos", "plantas", "muros", "panos", "apoyosLineales", "bandas"] as const;
+  const TABLAS_EDITABLES = ["pilares", "vigas", "losas", "cargas", "secciones", "casos", "plantas", "muros", "panos", "apoyosLineales"] as const;
 
   function paso(p: Proyecto, r: () => number): { op: Operacion; etiqueta: string } | null {
     const elegir = <T>(xs: readonly T[]): T | undefined => (xs.length ? xs[Math.floor(r() * xs.length)] : undefined);

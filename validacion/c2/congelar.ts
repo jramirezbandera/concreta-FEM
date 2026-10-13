@@ -34,13 +34,13 @@ import { reticulaEnrasada } from "./modelos.ts";
 import { navierFisico } from "./navier.ts";
 
 export const MODELOS_CONGELADOS_C2: Record<string, () => ModeloCongelado> = {
-  "losa-plana": () => ({ fisico: losaPlanaFisica(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, rejilla: false } }),
-  "navier-delgada": () => ({ fisico: navierFisico(CASOS_NAVIER[0]!), opciones: { tamanoMalla: 0.5, rejilla: false } }),
-  "aleatorio-8-losas": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { tamanoMalla: 1, rejilla: false } }),
-  "aleatorio-11-losas-sin-diafragma": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(11, { diafragma: false }), 11), opciones: { tamanoMalla: 1, rejilla: false } }),
-  "losa-plana-rejilla": () => ({ fisico: losaPlanaFisica(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 1 } }),
-  "aleatorio-8-losas-rejilla": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { tamanoMalla: 1 } }),
-  "reticula-enrasada": () => ({ fisico: reticulaEnrasada(1), opciones: {} }),
+  "losa-plana": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, rejilla: false } }),
+  "navier-delgada": () => ({ fisico: navierFisico(CASOS_NAVIER[0]!), opciones: { franjas: false, tamanoMalla: 0.5, rejilla: false } }),
+  "aleatorio-8-losas": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, rejilla: false } }),
+  "aleatorio-11-losas-sin-diafragma": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(11, { diafragma: false }), 11), opciones: { franjas: false, tamanoMalla: 1, rejilla: false } }),
+  "losa-plana-rejilla": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1 } }),
+  "aleatorio-8-losas-rejilla": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1 } }),
+  "reticula-enrasada": () => ({ fisico: reticulaEnrasada(1), opciones: { franjas: false } }),
 };
 
 export interface ReferenciaC2 {

@@ -1,6 +1,9 @@
 /**
  * C5.2: esfuerzos de las bandas (criterio 2, integración exacta) y Wood–Armer por combinación
  * (criterio 3), en la losa plana de 3 × 3 vanos de 6 × 5 m con las bandas propuestas.
+ *
+ * Con `franjas: false` (fase F): con las franjas, las caras de las bandas son las de las franjas y no
+ * se siembran a lo ancho de cada banda; estas pruebas son las de C5, con las caras de las bandas.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -55,7 +58,7 @@ let cortes: Cortes;
 beforeAll(() => {
   const f = losaPlana();
   fisico = { ...f, bandas: proponerBandas(f).bandas };
-  const r = compilar(fisico, { tamanoMalla: 0.5 });
+  const r = compilar(fisico, { tamanoMalla: 0.5, franjas: false });
   if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
   casos = casosValidos(calcular(r.modelo));
   eb = new EsfuerzosBandas(fisico, r.modelo, casos);
@@ -113,7 +116,7 @@ describe("integración exacta (C5, criterio 2)", () => {
       pilares: base.pilares!.map((p) => ((p.x / 6 + p.y / 5) % 2 ? { ...p, seccion: "p40" } : p)),
     };
     const f = { ...f0, bandas: proponerBandas(f0).bandas };
-    const r = compilar(f);
+    const r = compilar(f, { franjas: false });
     if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
     expect(r.estadisticas.malla.plantillas).toBe(16);
     const cs = casosValidos(calcular(r.modelo));
@@ -180,7 +183,7 @@ describe("huecos y bandas editadas (C5, criterio 1)", () => {
     const base = losaPlana();
     const f0: ModeloFisico = { ...base, losas: [{ ...base.losas![0]!, huecos: [rect(8, 6, 10, 9)] }], cargas: [] };
     const f = { ...f0, bandas: proponerBandas(f0).bandas };
-    const r = compilar(f, { tamanoMalla: 0.5 });
+    const r = compilar(f, { tamanoMalla: 0.5, franjas: false });
     if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
     const cs = casosValidos(calcular(r.modelo));
     const e2 = new EsfuerzosBandas(f, r.modelo, cs);
@@ -213,7 +216,7 @@ describe("huecos y bandas editadas (C5, criterio 1)", () => {
     const bandas = propuestas.map((b) => (b.id === "L:1:P2" ? { ...b, desde: [0, 5.5] as Vec2, hasta: [18, 5.5] as Vec2, ancho: 2, origen: "usuario" as const } : b));
     bandas.push({ id: "U", planta: "P1", desde: [1, 13], hasta: [17, 13], ancho: 1, origen: "usuario" });
     const f = { ...f0, bandas };
-    const r = compilar(f, { tamanoMalla: 0.5 });
+    const r = compilar(f, { tamanoMalla: 0.5, franjas: false });
     if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
     // Sus bordes, en la malla (y = 4,5 y 6,5; y = 12,5 y 13,5 de x = 1 a 17)
     const enLinea = (y: number, x0: number, x1: number) => r.modelo.nudos.filter((n) => Math.abs(n.y - y) < 1e-9 && n.x > x0 + 0.1 && n.x < x1 - 0.1).length;
@@ -235,7 +238,7 @@ describe("reticular: momento por nervio (C4-j)", () => {
     const abacos = base.pilares!.map((p) => rect(p.x - 1, p.y - 1, p.x + 1, p.y + 1));
     const f0: ModeloFisico = { ...base, losas: [{ ...base.losas![0]!, espesor: 0.35, reticular: { intereje: 0.82, nervio: 0.12, capa: 0.05, caseton: "recuperable", abacos } }] };
     const f = { ...f0, bandas: proponerBandas(f0).bandas };
-    const r = compilar(f, { tamanoMalla: 0.5 });
+    const r = compilar(f, { tamanoMalla: 0.5, franjas: false });
     if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
     const e2 = new EsfuerzosBandas(f, r.modelo, casosValidos(calcular(r.modelo)));
     const est = e2.estaciones("L:1:P2")!;

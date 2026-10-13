@@ -70,6 +70,31 @@ export interface Corte {
   /** Extensión del corte según z (m, respecto al origen). Por defecto, [0, 0]. */
   z?: readonly [number, number];
   metodo?: MetodoCorte;
+  /**
+   * Sólo las láminas (F): sin barras ni restricciones, ni las láminas rígidas (con sus 4 nudos en un
+   * mismo enlace rígido: la huella de un pilar), que pueden atravesar el plano. Es el corte de la losa
+   * de una franja de armado: las vigas se dimensionan con sus diagramas, y lo que pasa por la huella
+   * de un pilar no es de la losa.
+   */
+  soloLaminas?: boolean;
+  /**
+   * Método «campos»: coordenadas y en las que se parten los tramos de lámina antes de integrarlos
+   * (los bordes de las franjas de una estación, F), para que cada punto de integración caiga entero
+   * a un lado. Sin ellas, los tramos de siempre.
+   */
+  quiebres?: readonly number[];
+  /**
+   * Por fuerzas nodales: devuelve también lo que aporta cada lámina que toca el plano desde el lado
+   * A (`porLamina` del resultado), para repartir el corte entre franjas cuyos bordes no siguen la
+   * malla (F).
+   */
+  porLamina?: boolean;
+  /**
+   * Método «campos»: puntos de Gauss por tramo de lámina, 4 (por defecto) o 2. Con 2, exacto si el
+   * campo es cuadrático a lo largo del tramo (una lámina paralelogramo, como las de la rejilla), y
+   * la mitad de puntos: lo usan las estaciones de paso de las franjas (F).
+   */
+  cuadratura?: 2 | 4;
 }
 
 /**
@@ -145,6 +170,12 @@ export interface ResultadoCorte extends InfoCorte {
   valido: boolean;
   /** Sólo con el método «campos»: los puntos de integración de las láminas. */
   muestras?: MuestrasCorte;
+  /**
+   * Con `porLamina` (y sin láminas que atraviesen el plano): lo que aporta cada lámina que toca el
+   * plano desde el lado A, [N, Vy, Vz, T, My, Mz] por caso (6·nc) en los ejes del corte y respecto a
+   * su origen, y el tramo y de sus nudos en el corte. Suman las láminas de `esfuerzos`.
+   */
+  porLamina?: { lamina: number; y: [number, number]; esfuerzos: Float64Array }[];
 }
 
 const norma = (v: ArrayLike<number>) => Math.hypot(v[0]!, v[1]!, v[2]!);
@@ -292,8 +323,9 @@ export class Cortes {
     const id = corte.id ?? "(sin id)";
     const y = corte.y ?? [0, 0];
     const z = corte.z ?? [0, 0];
-    if (!vec(corte.origen) || !vec(corte.x) || !vec(corte.vz) || !rango(y) || !rango(z) || (corte.metodo !== undefined && corte.metodo !== "fuerzas-nodales" && corte.metodo !== "campos")) {
-      diag.error("corte/no-valido", `El corte ${id} no está bien definido: origen, x y vz son vectores finitos, y e z rangos [mín, máx] finitos, y el método "fuerzas-nodales" o "campos".`, [id]);
+    const quiebres = corte.quiebres;
+    if (!vec(corte.origen) || !vec(corte.x) || !vec(corte.vz) || !rango(y) || !rango(z) || (corte.metodo !== undefined && corte.metodo !== "fuerzas-nodales" && corte.metodo !== "campos") || (quiebres !== undefined && !(Array.isArray(quiebres) && quiebres.every((q) => typeof q === "number" && Number.isFinite(q)))) || (corte.cuadratura !== undefined && corte.cuadratura !== 2 && corte.cuadratura !== 4)) {
+      diag.error("corte/no-valido", `El corte ${id} no está bien definido: origen, x y vz son vectores finitos, y e z rangos [mín, máx] finitos, el método "fuerzas-nodales" o "campos", los quiebres, números finitos, y la cuadratura, 2 o 4.`, [id]);
       return null;
     }
     const nx = norma(corte.x);
@@ -382,12 +414,14 @@ export class Cortes {
     // atraviesan, error por fuerzas nodales o integral de campos. Si el método es «campos» y alguna lo
     // atraviesa, todas van por campos (corte mixto, C2-2).
     let mixto = false;
+    const porLamina: { lamina: number; y: [number, number]; suma: Float64Array }[] = [];
     {
       const atraviesan: string[] = [];
       const bordes: string[] = [];
       const tocan: ElementoMotor[] = [];
+      const rigida = corte.soloLaminas ? this.laminaRigida() : null;
       for (const e of cerca) {
-        if (e.tipo !== "lamina") continue;
+        if (e.tipo !== "lamina" || rigida?.(e.nudos)) continue;
         let menos = 0;
         let mas = 0;
         const c = [0, 0, 0];
@@ -410,9 +444,17 @@ export class Cortes {
         if (enCorte.length === 0) continue;
         info.laminas.push(e.indice);
         if (enCorte.some(([v]) => !cp.dentro(X(v)))) bordes.push(e.id);
+        const propia = corte.porLamina ? new Suma(nc, O) : null;
         this.guardado(casos).lamina(e.indice).forEach((g, k) => {
-          for (const [v, a] of enCorte) suma.agregar(k, X(v), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6));
+          for (const [v, a] of enCorte) {
+            suma.agregar(k, X(v), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6));
+            propia?.agregar(k, X(v), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6));
+          }
         });
+        if (propia) {
+          const ys = enCorte.map(([v]) => cp.coordenadas(X(v))[1]);
+          porLamina.push({ lamina: e.indice, y: [Math.min(...ys), Math.max(...ys)], suma: propia.v });
+        }
         for (const [v] of enCorte) extender(X(v));
       }
       if (atraviesan.length) {
@@ -442,12 +484,13 @@ export class Cortes {
       }
     }
 
-    // Barras
+    // Barras (no con `soloLaminas`)
+    const conBarras = !corte.soloLaminas;
     const ladoDe = (d: number) => (Math.abs(d) <= TOL_CORTE ? 0 : d < 0 ? -1 : 1);
     // Con los dos nudos del mismo lado (o los dos en el plano), una barra sólo cruza si un offset saca
     // el tramo flexible al otro lado: se mira en todas las que tienen offsets, estén donde estén
     const ambiguas: string[] = [];
-    for (const p of ind.conOffsets) {
+    for (const p of conBarras ? ind.conOffsets : []) {
       const e = this.fuerzas.elementos[p]!;
       const [i, j] = e.nudos as [number, number];
       const si = lado(i);
@@ -455,7 +498,7 @@ export class Cortes {
       if (ladoDe(this.distancia(cp, e.barra!.ip)) === -si || ladoDe(this.distancia(cp, e.barra!.jp)) === -si) ambiguas.push(e.id);
     }
     for (const e of cerca) {
-      if (e.tipo !== "barra") continue;
+      if (e.tipo !== "barra" || !conBarras) continue;
       const [i, j] = e.nudos as [number, number];
       const si = lado(i);
       const sj = lado(j);
@@ -526,7 +569,7 @@ export class Cortes {
       );
     }
 
-    // Restricciones que atraviesan el plano
+    // Restricciones que atraviesan el plano (no con `soloLaminas`)
     const lista = this.modelo.restricciones ?? [];
     const incluidas: number[] = [];
     const nan = new Uint8Array(6);
@@ -549,7 +592,7 @@ export class Cortes {
       }
       return true;
     };
-    for (const ir of ind.restricciones.buscar(caja.min, caja.max)) {
+    for (const ir of conBarras ? ind.restricciones.buscar(caja.min, caja.max) : []) {
       if (!yz(ir)) continue;
       const rs = lista[ir]!;
       // Sus nudos del lado A, dentro y fuera del rectángulo, y los demás; se para en cuanto está
@@ -607,22 +650,47 @@ export class Cortes {
       diag.aviso("corte/vacio", `El corte ${id} no atraviesa ningún elemento: sus esfuerzos son nulos.`, [id]);
     }
     // A los ejes del corte, con el convenio de las barras: My = −m_y, Mz = m_z
-    const esfuerzos = new Float64Array(6 * nc);
-    for (let k = 0; k < nc; k++) {
-      const o = 6 * k;
-      const F = suma.v.subarray(o, o + 3);
-      const M = suma.v.subarray(o + 3, o + 6);
-      const pr = (v: ArrayLike<number>, e: number) => v[0]! * ejes[3 * e]! + v[1]! * ejes[3 * e + 1]! + v[2]! * ejes[3 * e + 2]!;
-      esfuerzos[o] = pr(F, 0);
-      esfuerzos[o + 1] = pr(F, 1);
-      esfuerzos[o + 2] = pr(F, 2);
-      esfuerzos[o + 3] = pr(M, 0);
-      esfuerzos[o + 4] = -pr(M, 1);
-      esfuerzos[o + 5] = pr(M, 2);
-      for (let c = 0; c < 6; c++) if (nan[c]) esfuerzos[o + c] = NaN;
-    }
+    const aEjes = (v: Float64Array, nan?: Uint8Array) => {
+      const esfuerzos = new Float64Array(6 * nc);
+      for (let k = 0; k < nc; k++) {
+        const o = 6 * k;
+        const F = v.subarray(o, o + 3);
+        const M = v.subarray(o + 3, o + 6);
+        const pr = (w: ArrayLike<number>, e: number) => w[0]! * ejes[3 * e]! + w[1]! * ejes[3 * e + 1]! + w[2]! * ejes[3 * e + 2]!;
+        esfuerzos[o] = pr(F, 0);
+        esfuerzos[o + 1] = pr(F, 1);
+        esfuerzos[o + 2] = pr(F, 2);
+        esfuerzos[o + 3] = pr(M, 0);
+        esfuerzos[o + 4] = -pr(M, 1);
+        esfuerzos[o + 5] = pr(M, 2);
+        if (nan) for (let c = 0; c < 6; c++) if (nan[c]) esfuerzos[o + c] = NaN;
+      }
+      return esfuerzos;
+    };
+    const esfuerzos = aEjes(suma.v, nan);
     info.extension = Number.isFinite(ext.y[0]) ? ext : null;
-    return { ...info, esfuerzos, ejes, diagnosticos: diag.lista, valido: true, muestras };
+    const r: ResultadoCorte = { ...info, esfuerzos, ejes, diagnosticos: diag.lista, valido: true, muestras };
+    if (corte.porLamina && !mixto) r.porLamina = porLamina.map((p) => ({ lamina: p.lamina, y: p.y, esfuerzos: aEjes(p.suma) }));
+    return r;
+  }
+
+  private enlaceDe: Int32Array | null = null;
+
+  /** ¿Están los nudos (los de una lámina) en un mismo enlace rígido? */
+  private laminaRigida(): (nudos: readonly number[]) => boolean {
+    if (!this.enlaceDe) {
+      const e = new Int32Array(this.modelo.nudos.length).fill(-1);
+      (this.modelo.restricciones ?? []).forEach((r, i) => {
+        if (r.tipo !== "enlace-rigido") return;
+        for (const v of [r.maestro, ...r.esclavos]) e[v] = i;
+      });
+      this.enlaceDe = e;
+    }
+    const e = this.enlaceDe;
+    return (nudos) => {
+      const k = e[nudos[0]!]!;
+      return k >= 0 && nudos.every((v) => e[v] === k);
+    };
   }
 
   /** Distancia con signo de un punto al plano del corte. */
