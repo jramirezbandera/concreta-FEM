@@ -35,9 +35,13 @@
  *    costura con la rejilla y la CDT es la de siempre. Los nudos nuevos se interpolan en su
  *    cuadrilátero de la red; un lado del arreglo que va por una arista partida sigue por sus nudos
  *    (`subdivididas`). Un lado cuyo primer tercio no llega a `separacionRefino` (2·ε_snap: un nudo
- *    más cerca sería de la huella) no se refina. Una plantilla refinada con algún cuadrilátero no
- *    convexo o por debajo de UMBRAL_REFINO se queda sin refinar (`sinRefinar`, con aviso); una sin
- *    refinar por debajo de JACOBIANO_PLANTILLA no se usa (su pilar va por la CDT).
+ *    más cerca sería de la huella) no se refina. Con la cara dentro de una celda, a unos centímetros
+ *    de su línea interior (un pilar mayor que el menor de su alineación, F3), el primer tramo mide
+ *    casi la celda: los tercios se toman de un largo de h como mucho, y si la transición de la
+ *    esquina no cabe más allá en una dirección, la esquina va fina salvo su tramo exterior, que la
+ *    lleva hasta el borde del bloque. Una plantilla refinada con algún cuadrilátero no convexo o por
+ *    debajo de UMBRAL_REFINO se rehace como en F2 y, si tampoco, se queda sin refinar (`sinRefinar`,
+ *    con aviso); una sin refinar por debajo de JACOBIANO_PLANTILLA no se usa (su pilar va por la CDT).
  * 6. Celdas: regular si su centro cae en una losa, no es del anillo y no tiene a menos de δ ningún
  *    rasgo ajeno (salvo los de una huella con plantilla), para que la CDT de al lado no tenga que unir
  *    un rasgo con una arista larga; fuera, si su centro no cae en una losa y no tiene rasgos cerca;
@@ -741,7 +745,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
   const enRejilla = (x: EjePlantilla) => x.t !== "f" && x.t !== "m";
   /** Celda (en una dirección) del cuadrilátero a de la red: la de la última línea de la rejilla ≤ a. */
   const celdaEje = (m: ModoPlantilla, a: number) => m.celdas[m.ejes.slice(0, a + 1).filter(enRejilla).length - 1]!;
-  const redDe = (k: number, mu0: ModoPlantilla, mv0: ModoPlantilla, refino: RefinoHuella | null): Plantilla => {
+  const redDe = (k: number, mu0: ModoPlantilla, mv0: ModoPlantilla, refino: RefinoHuella | null, f3 = true): Plantilla => {
     // El punto medio de una celda sin cara, sólo si su tramo va partido (en el borde del bloque es el
     // punto medio de la arista de la rejilla). Las celdas del bloque en las losas son un solo tramo,
     // así que vale cualquiera de sus líneas (la primera puede caer fuera de las losas)
@@ -825,8 +829,13 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       return { huella: k, red, quads, anillo: anilloH, bordes, subdivididas: [], huellaLados: E.huellas[k]!.lados, refinada: false };
     };
     const sep = (E.separacionRefino ?? 0) / PARTICION_REFINO[0];
+    // Los tercios se toman de un largo de h como mucho (F3): con la cara dentro de una celda, a unos
+    // centímetros de su línea interior, el primer tramo mide casi la celda (hasta 2h)
+    const largo = (d: number) => (f3 && Math.abs(d) > E.h * (1 + HOLGURA) ? Math.sign(d) * E.h : d);
     // Con holgura (R-7): un tramo de justo el mínimo no puede depender del redondeo de una traslación
-    const cabe = (ejes: readonly EjePlantilla[], i: number, j: number) => Math.abs(ejes[j]!.x - ejes[i]!.x) >= sep * (1 - HOLGURA);
+    const cabe = (ejes: readonly EjePlantilla[], i: number, j: number) => Math.abs(largo(ejes[j]!.x - ejes[i]!.x)) >= sep * (1 - HOLGURA);
+    /** ¿Es largo el primer tramo junto a la cara (tercios de h y un tramo exterior más ancho)? */
+    const ancho_ = (ejes: readonly EjePlantilla[], i: number, j: number) => f3 && Math.abs(ejes[j]!.x - ejes[i]!.x) > E.h * (1 + HOLGURA);
     const refL = !!refino?.u[0] && a0 > 0 && cabe(mu.ejes, a0 - 1, a0);
     const refR = !!refino?.u[1] && a1 < A - 1 && cabe(mu.ejes, a1, a1 + 1);
     const refB = !!refino?.v[0] && b0 > 0 && cabe(mv.ejes, b0 - 1, b0);
@@ -842,13 +851,13 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       const de: number[] = [];
       ejes.forEach((e, i) => {
         if (lo && i === i0) {
-          const d = e.x - ejes[i - 1]!.x;
+          const d = largo(e.x - ejes[i - 1]!.x);
           x.push(e.x - PARTICION_REFINO[1] * d, e.x - PARTICION_REFINO[0] * d);
         }
         de.push(x.length);
         x.push(e.x);
         if (hi && i === i1) {
-          const d = ejes[i + 1]!.x - e.x;
+          const d = largo(ejes[i + 1]!.x - e.x);
           x.push(e.x + PARTICION_REFINO[0] * d, e.x + PARTICION_REFINO[1] * d);
         }
       });
@@ -930,8 +939,10 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     // esquina, también si cabe la transición más allá, dentro del bloque: la de 3 a 1 en el siguiente
     // hacia fuera, por cada lado fino. Si no cabe, la transición va en el de esquina. Así la columna
     // pegada a la cara es fina hasta la mitad de la celda, donde cae el borde de la ventana de la
-    // franja del otro sentido
-    type Plan = { t: "fino" } | { t: "transicion"; dosLados: boolean; porU: boolean; su: number; sv: number };
+    // franja del otro sentido. Si no cabe en una sola dirección y allí el primer tramo es largo (con
+    // tercios de h, F3), la esquina va fina salvo su tramo exterior, que lleva la transición hasta el
+    // borde del bloque
+    type Plan = { t: "fino" } | { t: "transicion"; dosLados: boolean; porU: boolean; su: number; sv: number } | { t: "finoBorde"; porU: boolean; su: number; sv: number };
     const plan = new Map<number, Plan>();
     const idq = (a: number, b: number) => a + (A - 1) * b;
     for (let b = b0; b < b1; b++) {
@@ -960,6 +971,10 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
           plan.set(idq(ac, bc), { t: "fino" });
           if (enU && bn >= 0 && bn <= B - 2 && losas[idq(ac, bn)]! >= 0) plan.set(idq(ac, bn), { t: "transicion", dosLados: false, porU: true, su, sv });
           if (enV && an >= 0 && an <= A - 2 && losas[idq(an, bc)]! >= 0) plan.set(idq(an, bc), { t: "transicion", dosLados: false, porU: false, su, sv });
+        } else if (enU && enV && libreV !== libreU && (libreV ? ancho_(mu.ejes, ac, ac + 1) : ancho_(mv.ejes, bc, bc + 1))) {
+          plan.set(idq(ac, bc), { t: "finoBorde", porU: !libreU, su, sv });
+          if (libreV && bn >= 0 && bn <= B - 2 && losas[idq(ac, bn)]! >= 0) plan.set(idq(ac, bn), { t: "transicion", dosLados: false, porU: true, su, sv });
+          if (libreU && an >= 0 && an <= A - 2 && losas[idq(an, bc)]! >= 0) plan.set(idq(an, bc), { t: "transicion", dosLados: false, porU: false, su, sv });
         } else plan.set(idq(ac, bc), { t: "transicion", dosLados: enU && enV, porU: enU, su, sv });
       }
     for (let b = 0; b < B - 1; b++)
@@ -970,6 +985,31 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
         if (!pq) cuad([a + A * b, a + 1 + A * b, a + 1 + A * (b + 1), a + A * (b + 1)], false, kq);
         else if (pq.t === "fino") {
           for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) cuad([nudoF(i, j), nudoF(i + 1, j), nudoF(i + 1, j + 1), nudoF(i, j + 1)], false, kq);
+        } else if (pq.t === "finoBorde") {
+          // Fina salvo el tramo exterior (la columna, con `porU`, o la fila junto al borde del bloque),
+          // que lleva la transición de 3 a 1 de las filas (columnas) finas hasta el borde
+          const { su, sv, porU } = pq;
+          const [ie, je] = [su > 0 ? i1 - 1 : i0, sv > 0 ? j1 - 1 : j0];
+          for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) if (porU ? i !== ie : j !== je) cuad([nudoF(i, j), nudoF(i + 1, j), nudoF(i + 1, j + 1), nudoF(i, j + 1)], false, kq);
+          /** Fracción en el cuadrilátero (a o b) del punto medio del tramo fino [q, q + 1]. */
+          const enMedio = (f: typeof fu, ejes: readonly EjePlantilla[], q: number, c: number) => {
+            const [c1, t1] = tramoFino(f, ejes, q + 1);
+            return (tramoFino(f, ejes, q)[1] + (c1 > c ? 1 : t1)) / 2;
+          };
+          if (porU) {
+            // ξ a lo largo de v desde la cara de la huella; η en u, de la columna fina al borde
+            const iu = (t: number) => (su > 0 ? ie : ie + 1) + su * (t / 3);
+            const jv = (s: number) => (sv > 0 ? j0 : j1) + sv * s;
+            const fm = enMedio(fu, mu.ejes, ie, a);
+            const medio = (s: number) => nudoExtra(`${ie},${ie + 1},${jv(s)}`, enCuad(a, b, fm, tramoFino(fv, mv.ejes, jv(s))[1]));
+            transicion((s, t) => nudoF(iu(t), jv(s)), medio, false, su * sv > 0, kq);
+          } else {
+            const iu = (s: number) => (su > 0 ? i0 : i1) + su * s;
+            const jv = (t: number) => (sv > 0 ? je : je + 1) + sv * (t / 3);
+            const fm = enMedio(fv, mv.ejes, je, b);
+            const medio = (s: number) => nudoExtra(`${iu(s)},${je},${je + 1}`, enCuad(a, b, tramoFino(fu, mu.ejes, iu(s))[1], fm));
+            transicion((s, t) => nudoF(iu(s), jv(t)), medio, false, su * sv < 0, kq);
+          }
         } else {
           // Ejes de la transición desde su esquina más cercana a la de la huella: ξ a lo largo del
           // lado fino (u si `porU`) y η en la otra; en una dirección sin tercios, s/3 salta de 0 a 1
@@ -1056,6 +1096,8 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     for (const p of E.huellas[k]!.puntos) absorbidos[p] = 1;
     const ref = E.refino?.[k] ?? null;
     let pl = redDe(k, mu, mv, ref);
+    // Si la de F3 no tiene calidad (sus transiciones, más apretadas), la de F2; si tampoco, sin refinar
+    if (pl.refinada && jacobianoMin(pl) < UMBRAL_REFINO.jacobiano) pl = redDe(k, mu, mv, ref, false);
     if (pl.refinada && jacobianoMin(pl) < UMBRAL_REFINO.jacobiano) {
       pl = redDe(k, mu, mv, null);
       sinRefinar.push(k);

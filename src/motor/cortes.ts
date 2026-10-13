@@ -78,6 +78,12 @@ export interface Corte {
    */
   soloLaminas?: boolean;
   /**
+   * Con `soloLaminas`, las restricciones (por su id) que sí entran: lo que transmiten a través del
+   * plano, como sin `soloLaminas`. Es la huella de un pilar cuya cara común cae dentro de ella (F2-8):
+   * el corte por la cara común con la huella da el de su cara propia, siguiendo la malla.
+   */
+  restricciones?: readonly string[];
+  /**
    * Método «campos»: coordenadas y en las que se parten los tramos de lámina antes de integrarlos
    * (los bordes de las franjas de una estación, F), para que cada punto de integración caiga entero
    * a un lado. Sin ellas, los tramos de siempre.
@@ -330,8 +336,8 @@ export class Cortes {
     const y = corte.y ?? [0, 0];
     const z = corte.z ?? [0, 0];
     const quiebres = corte.quiebres;
-    if (!vec(corte.origen) || !vec(corte.x) || !vec(corte.vz) || !rango(y) || !rango(z) || (corte.metodo !== undefined && corte.metodo !== "fuerzas-nodales" && corte.metodo !== "campos") || (quiebres !== undefined && !(Array.isArray(quiebres) && quiebres.every((q) => typeof q === "number" && Number.isFinite(q)))) || (corte.cuadratura !== undefined && corte.cuadratura !== 2 && corte.cuadratura !== 4)) {
-      diag.error("corte/no-valido", `El corte ${id} no está bien definido: origen, x y vz son vectores finitos, y e z rangos [mín, máx] finitos, el método "fuerzas-nodales" o "campos", los quiebres, números finitos, y la cuadratura, 2 o 4.`, [id]);
+    if (!vec(corte.origen) || !vec(corte.x) || !vec(corte.vz) || !rango(y) || !rango(z) || (corte.metodo !== undefined && corte.metodo !== "fuerzas-nodales" && corte.metodo !== "campos") || (quiebres !== undefined && !(Array.isArray(quiebres) && quiebres.every((q) => typeof q === "number" && Number.isFinite(q)))) || (corte.cuadratura !== undefined && corte.cuadratura !== 2 && corte.cuadratura !== 4) || (corte.restricciones !== undefined && !(Array.isArray(corte.restricciones) && corte.restricciones.every((r) => typeof r === "string")))) {
+      diag.error("corte/no-valido", `El corte ${id} no está bien definido: origen, x y vz son vectores finitos, y e z rangos [mín, máx] finitos, el método "fuerzas-nodales" o "campos", los quiebres, números finitos, la cuadratura, 2 o 4, y las restricciones, ids.`, [id]);
       return null;
     }
     const nx = norma(corte.x);
@@ -577,8 +583,9 @@ export class Cortes {
       );
     }
 
-    // Restricciones que atraviesan el plano (no con `soloLaminas`)
+    // Restricciones que atraviesan el plano (con `soloLaminas`, sólo las de `restricciones`)
     const lista = this.modelo.restricciones ?? [];
+    const soloEstas = corte.soloLaminas && corte.restricciones?.length ? new Set(corte.restricciones) : null;
     const incluidas: number[] = [];
     const nan = new Uint8Array(6);
     // Sólo las que pueden tener un nudo del lado A dentro del rectángulo: las cercanas (índice) cuya
@@ -600,7 +607,8 @@ export class Cortes {
       }
       return true;
     };
-    for (const ir of conBarras ? ind.restricciones.buscar(caja.min, caja.max) : []) {
+    for (const ir of conBarras || soloEstas ? ind.restricciones.buscar(caja.min, caja.max) : []) {
+      if (soloEstas && !soloEstas.has(lista[ir]!.id)) continue;
       if (!yz(ir)) continue;
       const rs = lista[ir]!;
       // Sus nudos del lado A, dentro y fuera del rectángulo, y los demás; se para en cuanto está

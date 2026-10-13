@@ -76,6 +76,35 @@ describe("criterio 2 de E5: soluciones cerradas sin error de malla", () => {
   });
 });
 
+describe("F3: con soloLaminas, las restricciones nombradas sí entran", () => {
+  it("ménsula con un enlace rígido en medio: por la recta que lo cruza, My = −F·b(L − x) con él, y sin él falta lo suyo", () => {
+    const [L, b, F] = [3, 1.5, 4];
+    const base = mensulaPlaca(6, 3, L, b, F);
+    // Malla de 0,5 m: el enlace une los nudos de x ∈ [1, 2] e y ∈ [0,5, 1] (una «huella» en medio)
+    const enHuella = base.nudos.flatMap((n, i) => (n.x >= 1 - 1e-9 && n.x <= 2 + 1e-9 && n.y >= 0.5 - 1e-9 && n.y <= 1 + 1e-9 ? [i] : []));
+    const maestro = enHuella.find((i) => Math.abs(base.nudos[i]!.x - 1.5) < 1e-9 && Math.abs(base.nudos[i]!.y - 0.5) < 1e-9)!;
+    const modelo = { ...base, restricciones: [{ tipo: "enlace-rigido" as const, id: "H", maestro, esclavos: enHuella.filter((i) => i !== maestro) }] };
+    const casos = casosValidos(calcular(modelo));
+    const ct = new Cortes(modelo);
+    for (const x of [1, 1.5]) {
+      const corte: Corte = { origen: [x, 0, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [0, b], soloLaminas: true };
+      const con = ct.cortar({ ...corte, restricciones: ["H"] }, casos);
+      const sin = ct.cortar(corte, casos);
+      expect(con.valido && sin.valido).toBe(true);
+      expect(con.restricciones).toHaveLength(x === 1.5 ? 1 : 0);
+      const [, , Vz, , My] = con.esfuerzos;
+      expect(Math.abs(My! + F * b * (L - x)) / (F * b * L)).toBeLessThan(1e-12);
+      expect(Math.abs(Vz! + F * b) / (F * b)).toBeLessThan(1e-12);
+      // Sin la restricción, lo que pasa por el enlace no está (en x = 1 sus nudos del corte son del lado B: no transmite)
+      if (x === 1.5) expect(Math.abs(sin.esfuerzos[4]! + F * b * (L - x)) / (F * b * L)).toBeGreaterThan(0.05);
+      else expect(sin.esfuerzos[4]).toBeCloseTo(con.esfuerzos[4]!, 10);
+    }
+    // Una restricción que no existe no cambia nada
+    const c: Corte = { origen: [1.5, 0, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [0, b], soloLaminas: true };
+    expect([...ct.cortar({ ...c, restricciones: ["otra"] }, casos).esfuerzos]).toEqual([...ct.cortar(c, casos).esfuerzos]);
+  });
+});
+
 describe("criterio 2 de E5: convenio de las barras", () => {
   it("una barra cortada da su diagrama; con la normal al revés, Vz y Mz cambian de signo", () => {
     const modelo = portico();

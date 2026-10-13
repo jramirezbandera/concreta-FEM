@@ -9,7 +9,8 @@
  * - su reticular con ábacos (h = 0,75);
  * - pilares mezclados (30 × 50 girados y 40 × 40, 3 × 2 vanos, hueco de escalera) con acciones;
  * - un modelo al azar (semilla 3) con el eje 1 cualquiera;
- * - fase F2: la losa de 3 × 3 vanos con las caras refinadas, y la de H25 sin refinar (`refinoCaras: false`).
+ * - fase F2: la losa de 3 × 3 vanos con las caras refinadas, y la de H25 sin refinar (`refinoCaras: false`);
+ * - fase F3: la de 3 × 3 con dos pilares mayores que el resto de su línea (el metro en su cara propia).
  * Los números se guardan con 13 cifras significativas, como en C2–C5. El test
  * (src/compilador/congelado-f.test.ts) lo recalcula con el núcleo.
  *
@@ -17,6 +18,7 @@
  *   bun validacion/f/congelar.ts
  */
 import { losa3x3 } from "../f2/convergencia.ts";
+import { losa3x3Mezclada } from "../f3/modelos.ts";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { compilar } from "../../src/compilador/compilar.ts";
@@ -39,6 +41,7 @@ export const MODELOS_CONGELADOS_F: Record<string, () => ModeloCongelado> = {
   "aleatorio-3": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: {} }),
   "losa-3x3-refinada": () => ({ fisico: losa3x3(), opciones: {} }),
   "h25-plana-sin-refinar": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, refinoCaras: false } }),
+  "losa-3x3-mezclada": () => ({ fisico: losa3x3Mezclada(), opciones: {} }),
 };
 
 export interface ReferenciaF {
