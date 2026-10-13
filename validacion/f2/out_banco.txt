@@ -1,0 +1,9 @@
+# Fase F2: tamaño y tiempo del edificio objetivo (7 plantas, h = 0,75)
+
+modelo | malla | nudos | ecuaciones | perfil móvil (≤ 200 000) | plantillas (refinadas) | avisos de malla | compilar (s) | calcular (s)
+losa plana | F1.1 + R0 (refinoCaras: false) | 48779 | 129486 | cabe | 532 (0) | — | 2.22 | 2.97
+losa plana | F2 | 61323 | 167118 | cabe | 532 (308) | — | 2.81 | 3.53
+maciza con vigas | F1.1 + R0 (refinoCaras: false) | 34779 | 90783 | cabe | 553 (0) | — | 1.70 | 2.37
+maciza con vigas | F2 | 34779 | 90783 | cabe | 553 (0) | — | 2.01 | 2.93
+reticular con ábacos (V2 de C4) | F1.1 + R0 (refinoCaras: false) | 53287 | 145551 | cabe | 539 (0) | — | 6.60 | 5.26
+reticular con ábacos (V2 de C4) | F2 | 53287 | 145551 | cabe | 539 (0) | — | 5.59 | 4.66

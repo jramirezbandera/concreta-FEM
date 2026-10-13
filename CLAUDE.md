@@ -362,8 +362,21 @@
   - **App:** un clic da el valor del punto bit a bit con `fem consultar franja` (`valor-armado`). El 3D pinta las franjas en su cota (`armado3d`), con la sonda. El diagrama de la franja dibuja la base.
   - **Validación:** `validacion/ab/chrome.ts`. Con base, el mapa tarda lo mismo que sin ella (1,5 s), y el valor de un clic, 7 ms.
   - **Pendiente del usuario:** la puerta de uso, y decidir si se agrupan las zonas pequeñas (AB-5). **Más adelante:** Ø y separación como atajo de la base.
+- **2026-10-13: fase F2 terminada** (refinamiento de la malla junto a los pilares con cara, F-6). Pasan los criterios 1–4 y 6–8; el 5, en el metro del pilar (0,35 % frente a OpenSees), pero no en las demás franjas de la recta de la cara. El plan está en `docs/fem3d/refinamiento.md` y el informe, en `docs/fem3d/fase-f2.md`, con criterios, hallazgos F2-1…F2-10 y lo que decide el usuario.
+  - **Resultado:** con h = 0,75, el metro centrado en el pilar a 0,86 / 1,35 % (media / máximo) de la malla fina en la 3 × 3 y a ≤ 1,25 % en H25; antes, 5,4 / 10,8 % y ~11 %.
+  - **R0** (`franjas.ts`): la cara común sigue por el lado de un pilar ajeno y se corta en su huella si pasa por dentro. Los pilares de borde vuelven a su plantilla, y el edificio objetivo de 7 plantas con losa plana queda en 167 118 ecuaciones (F: 183 876).
+  - **Ya en `rejilla.ts`:**
+    - en la plantilla de cada pilar con cara, tercios del primer tramo junto a cada cara (la cruz y, si cabe, la esquina), con transiciones de 3 a 1 y de esquina;
+    - el borde del bloque no cambia;
+    - guarda de calidad (convexo y jacobiano ≥ 0,2) con respaldo por pilar y por planta (`malla/cara-sin-refinar`).
+
+    Opción `refinoCaras` (por defecto, sí) y compilador F2. El validador del mallador exige ya la convexidad estricta, como el motor.
+  - **Validación:** `src/compilador/refino.test.ts` y `validacion/f2/` (convergencia, banco y OpenSees). La referencia congelada de F se regeneró, con dos casos nuevos.
+  - **Para el usuario, graves y previos a F2:**
+    - **F2-8:** con pilares de dos tamaños en una alineación, la cara común (C5-g) cae dentro del mayor y su metro sale ~45 % bajo, del lado inseguro, sin converger;
+    - **F2-9:** los nudos a ≤ ε_snap de una huella se hacen rígidos (C2-d), y junto al hueco del edificio la cara sale hasta un −44 %.
 - **Siguiente paso:**
-  - el refinamiento local junto a los pilares con cara (F-6), con su plan y sus criterios;
+  - las decisiones de F2-8 y F2-9 (`fase-f2.md` §4);
   - las puertas de uso de AB, de F, de I1, I2, I3 e I4, de V2a y de V2b;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);

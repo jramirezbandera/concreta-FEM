@@ -11,7 +11,8 @@ globales) y la misma definición que cortes.ts y esfuerzosFranjas.ts:
 - lo de cada nudo de cada lámina (el My de sus fuerzas en él, My = −m·y) se reparte en su mitad del
   lado de la lámina sobre la recta, y cuenta la parte que cae en el intervalo de la estación.
 
-Uso: .venv312/Scripts/python.exe validacion/f/oraculo_franjas.py → validacion/f/out_opensees.txt
+Uso: .venv312/Scripts/python.exe validacion/f/oraculo_franjas.py [carpeta] → <carpeta>/out_opensees.txt
+(por defecto, validacion/f; la fase F2 usa validacion/f2, con su opensees-modelos.json).
 """
 import json
 import math
@@ -101,8 +102,9 @@ def estacion(modelo, rigidas, e, fuerzas):
 
 
 def main():
-    entrada = json.load(open(os.path.join(AQUI, "opensees-modelos.json"), encoding="utf-8"))
-    lineas = ["# Fase F, criterio 3: franjas de la losa plana de H25 frente a OpenSeesPy ASDShellQ4", ""]
+    carpeta = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else AQUI
+    entrada = json.load(open(os.path.join(carpeta, "opensees-modelos.json"), encoding="utf-8"))
+    lineas = [("# Fase F2, criterio 5" if os.path.basename(carpeta) == "f2" else "# Fase F, criterio 3") + ": franjas de la losa plana de H25 frente a OpenSeesPy ASDShellQ4", ""]
     lineas.append("Mismo modelo en los dos (pilares como apoyos articulados en su cabeza, cargas nodales consistentes). Diferencia del My de cada estación sobre el mayor |My| de las estaciones del mismo tipo de la losa.")
     lineas.append("")
     lineas.append("modelo | tipo | estaciones comparadas (de) | diferencia media | máxima | máxima sobre su propio valor (|My| > 20 % del máx.)")
@@ -142,8 +144,14 @@ def main():
                     d2 = [abs(c - n) / mx for n, _, c in nod]
                     lineas.append(f"{nombre} | paso, motor por fuerzas nodales frente a OpenSees | {len(nod)} | {100 * sum(d1) / len(d1):.2f} % | {100 * max(d1):.2f} % | —")
                     lineas.append(f"{nombre} | paso, motor por campos frente a por fuerzas nodales | {len(nod)} | {100 * sum(d2) / len(d2):.2f} % | {100 * max(d2):.2f} % | —")
+        # Las caras juntas (las de la ventana del pilar y las de las demás franjas), sobre el mayor de todas, como en F
+        juntas = [(e["my"][0], v) for tipo, lista in por_tipo.items() if tipo.startswith("cara") for e, v in lista if v is not None]
+        if len(por_tipo.keys() & {"cara", "cara (ventana del pilar)"}) == 2:
+            mx = max(abs(m) for m, _ in juntas)
+            ds = [abs(m - v) / mx for m, v in juntas]
+            lineas.append(f"{nombre} | cara, todas | {len(juntas)} | {100 * sum(ds) / len(ds):.2f} % | {100 * max(ds):.2f} % | —")
         print(nombre, f"{time.perf_counter() - t:.1f} s", flush=True)
-    open(os.path.join(AQUI, "out_opensees.txt"), "w", encoding="utf-8", newline="").write("\n".join(lineas) + "\n")
+    open(os.path.join(carpeta, "out_opensees.txt"), "w", encoding="utf-8", newline="").write("\n".join(lineas) + "\n")
     print("\n".join(lineas))
 
 

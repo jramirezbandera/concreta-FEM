@@ -4,11 +4,11 @@
 >
 > **Objetivo:** con el h por defecto (0,75 m), el metro centrado en un pilar, en su cara, a unos −1 % del valor convergido (hoy, −6 %), sin salir del perfil móvil.
 >
-> **Este documento** fija, antes de empezar, lo medido, cómo se hace y qué tiene que pasar. El resultado irá en `fase-f2.md`.
+> **Este documento** fija, antes de empezar, lo medido, cómo se hace y qué tiene que pasar. El resultado está en `fase-f2.md`, con lo que cambió durante la fase: la esquina fina con la transición más allá (F2-4), la calidad mínima de 0,2 (F2-10) y los dos hallazgos previos para el usuario (F2-8 y F2-9).
 
 ## 1. Lo medido antes de empezar
 
-Exploración en `validacion/refino/` con la losa de 3 × 3 vanos de F (pilar P6-5, caras x = 6,15 e y = 5,15). La referencia es h = 0,125: 22 690 nudos, mx = −68,62 y my = −62,64 kN·m/m. Para medir sólo la precisión, se añadieron líneas de rejilla de lado a lado; el coste no cuenta aquí.
+Exploración con scripts provisionales (no se guardan: usaban ganchos temporales en la rejilla) con la losa de 3 × 3 vanos de F (pilar P6-5, caras x = 6,15 e y = 5,15). La referencia es h = 0,125: 22 690 nudos, mx = −68,62 y my = −62,64 kN·m/m. Para medir sólo la precisión, se añadieron líneas de rejilla de lado a lado; el coste no cuenta aquí.
 
 | Malla junto al pilar | mx | my |
 |---|---|---|

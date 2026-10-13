@@ -1,0 +1,23 @@
+# Fase F2, criterio 5: franjas de la losa plana de H25 frente a OpenSeesPy ASDShellQ4
+
+Mismo modelo en los dos (pilares como apoyos articulados en su cabeza, cargas nodales consistentes). Diferencia del My de cada estación sobre el mayor |My| de las estaciones del mismo tipo de la losa.
+
+modelo | tipo | estaciones comparadas (de) | diferencia media | máxima | máxima sobre su propio valor (|My| > 20 % del máx.)
+h25-plana@0.75 sin refinar | paso | 68 de 1116 | 5.55 % | 34.14 % | 19.27 %
+h25-plana@0.75 sin refinar | paso, motor por fuerzas nodales frente a OpenSees | 68 | 2.28 % | 4.38 % | —
+h25-plana@0.75 sin refinar | paso, motor por campos frente a por fuerzas nodales | 68 | 4.54 % | 29.86 % | —
+h25-plana@0.75 sin refinar | cara | 40 de 40 | 3.33 % | 6.68 % | 6.26 %
+h25-plana@0.75 sin refinar | cara (ventana del pilar) | 8 de 8 | 1.60 % | 1.60 % | 1.57 %
+h25-plana@0.75 sin refinar | cara, todas | 48 | 1.83 % | 3.77 % | —
+h25-plana@0.75 con F2 | paso | 68 de 1116 | 4.36 % | 31.71 % | 19.16 %
+h25-plana@0.75 con F2 | paso, motor por fuerzas nodales frente a OpenSees | 68 | 2.06 % | 3.97 % | —
+h25-plana@0.75 con F2 | paso, motor por campos frente a por fuerzas nodales | 68 | 3.63 % | 27.74 % | —
+h25-plana@0.75 con F2 | cara | 40 de 40 | 2.88 % | 7.00 % | 6.55 %
+h25-plana@0.75 con F2 | cara (ventana del pilar) | 8 de 8 | 0.35 % | 0.35 % | 0.35 %
+h25-plana@0.75 con F2 | cara, todas | 48 | 1.25 % | 3.47 % | —
+h25-plana@0.375 | paso | 68 de 1116 | 2.02 % | 16.86 % | 5.05 %
+h25-plana@0.375 | paso, motor por fuerzas nodales frente a OpenSees | 68 | 0.44 % | 1.87 % | —
+h25-plana@0.375 | paso, motor por campos frente a por fuerzas nodales | 68 | 1.68 % | 14.99 % | —
+h25-plana@0.375 | cara | 40 de 40 | 0.64 % | 1.46 % | 2.79 %
+h25-plana@0.375 | cara (ventana del pilar) | 8 de 8 | 0.59 % | 0.59 % | 0.58 %
+h25-plana@0.375 | cara, todas | 48 | 0.35 % | 0.70 % | —

@@ -144,7 +144,7 @@ export function estacionesOraculo(nombre: string, f: ModeloFisico, op: OpcionesC
         ...(mn ? { myNodal: mn } : {}),
         franja: fr.id,
         s: e.s,
-        tipo: e.tipo,
+        tipo: e.tipo === "cara" && e.ventana ? "cara (ventana del pilar)" : e.tipo,
         lado: e.lado,
         corte: { origen: O, x: [sx * d[0], sx * d[1], 0], vz: [0, 0, 1], y: [Math.min(0, yb), Math.max(0, yb)] },
         intervalo: [Math.min(ya, yb2), Math.max(ya, yb2)],
