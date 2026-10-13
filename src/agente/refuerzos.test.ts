@@ -44,7 +44,7 @@ const tramos = (a: Armadura): FranjaTramos[] => {
 
 /** ¿Están unidos dos tramos por la regla de las zonas (AB-b)? */
 const unidos = (x: TramoArmado, y: TramoArmado) =>
-  (x.franja === y.franja && (Math.abs(x.b - y.a) <= 1e-9 || Math.abs(y.b - x.a) <= 1e-9)) || ((Math.abs(x.t1 - y.t0) <= 1e-9 || Math.abs(y.t1 - x.t0) <= 1e-9) && Math.min(x.b, y.b) - Math.max(x.a, y.a) > 1e-3);
+  (x.franja === y.franja && (Math.abs(x.b - y.a) <= 1e-9 || Math.abs(y.b - x.a) <= 1e-9 || Math.abs(x.estacion - y.estacion) === 1)) || ((Math.abs(x.t1 - y.t0) <= 1e-9 || Math.abs(y.t1 - x.t0) <= 1e-9) && Math.min(x.b, y.b) - Math.max(x.a, y.a) > 1e-3);
 
 describe("zonas de refuerzo (criterio 3)", () => {
   for (const a of ARMADURAS)
@@ -97,6 +97,21 @@ describe("zonas de refuerzo (criterio 3)", () => {
     expect(z!.maximo).toEqual({ v: 7, franja: "L:X2", s: 0.5, comb: "", exceso: 5 });
     const largo = z!.contorno.reduce((s, [p, r]) => s + Math.hypot(r[0] - p[0], r[1] - p[1]), 0);
     expect(largo).toBe(10);
+  });
+});
+
+describe("zonas a través de un pilar ancho", () => {
+  it("las dos caras de un pilar, sin estaciones entre ellas, son una zona; a través de una estación que no vale, no", () => {
+    const d: Vec2 = [1, 0];
+    const n: Vec2 = [0, 1];
+    // Caras en s = 2,7 y 3,3 (pilar de 0,6): con el tope de un paso, sus tramos dejan un hueco de 2,95 a 3,05
+    const T = (estacion: number, a: number, b: number, v: number): TramoArmado => ({ franja: "L:X1", losa: "L", estacion, s: (a + b) / 2, a, b, t0: 0, t1: 1, v, comb: "", rectangulo: [] });
+    const f = (ts: TramoArmado[]): FranjaTramos[] => [{ franja: { id: "L:X1", losa: "L", planta: "P", direccion: 1, d, n, t0: 0, t1: 1, ancho: 1, s0: 0, s1: 10, intereje: null }, tramos: ts }];
+    const caras = [T(10, 2.45, 2.7, 25), T(11, 2.7, 2.95, 30), T(12, 3.05, 3.3, 28), T(13, 3.3, 3.55, 24)];
+    expect(zonasRefuerzo("L", "x-sup", 20, f(caras)).map((z) => [z.s, z.tramos.length])).toEqual([[[2.45, 3.55], 4]]);
+    // Con una estación entre ellas que no vale (índice 12 sin tramo), dos zonas
+    const hueco = [T(10, 2.45, 2.7, 25), T(11, 2.7, 2.95, 30), T(13, 3.05, 3.3, 28), T(14, 3.3, 3.55, 24)];
+    expect(zonasRefuerzo("L", "x-sup", 20, f(hueco)).length).toBe(2);
   });
 });
 

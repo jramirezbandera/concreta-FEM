@@ -138,17 +138,27 @@ export function armado3D(r: ResultadosRender, origen: [number, number, number], 
   }
   const extremos: ExtremoIsovalores[] = [];
   const centro = (t: TramoArmado): [number, number, number] => [(t.rectangulo[0]![0] + t.rectangulo[2]![0]) / 2, (t.rectangulo[0]![1] + t.rectangulo[2]![1]) / 2, z.get(t.losa) ?? 0];
-  if (m.conBase)
-    for (const zn of m.zonas) {
-      const t = zn.tramos.find((x) => x.franja === zn.maximo.franja && x.s === zn.maximo.s && x.v === zn.maximo.v)!;
-      extremos.push({ que: "máximo", valor: zn.maximo.v, objeto: zn.id, punto: centro(t) });
-    }
-  else
-    for (const p of plantas) {
-      let mx: TramoArmado | null = null;
-      for (const f of fs.valor) if (f.franja.planta === p) for (const t of f.tramos) if (t.v > (mx?.v ?? 0)) mx = t;
-      if (mx) extremos.push({ que: "máximo", valor: mx.v, objeto: mx.franja, punto: centro(mx) });
-    }
+  // El mayor de cada planta (con base, de lo que no cubre: el máximo de su mayor zona); rotular todas
+  // las zonas de todas las plantas taparía el dibujo
+  for (const p of plantas) {
+    let mx: TramoArmado | null = null;
+    let objeto = "";
+    if (m.conBase) {
+      for (const zn of m.zonas)
+        if (plantaDe.get(zn.losa) === p && zn.maximo.v > (mx?.v ?? -Infinity)) {
+          mx = zn.tramos.find((x) => x.franja === zn.maximo.franja && x.s === zn.maximo.s && x.v === zn.maximo.v)!;
+          objeto = zn.id;
+        }
+    } else
+      for (const f of fs.valor)
+        if (f.franja.planta === p)
+          for (const t of f.tramos)
+            if (t.v > (mx?.v ?? 0)) {
+              mx = t;
+              objeto = t.franja;
+            }
+    if (mx) extremos.push({ que: "máximo", valor: mx.v, objeto, punto: centro(mx) });
+  }
   const lm = m.limites;
   const notas = [...m.notas, op.planta === null ? `Todas las plantas con losas macizas o reticulares (${plantas.length}), con una escala común.` : `Planta ${op.planta}: la misma escala que su vista en planta.`];
   return {

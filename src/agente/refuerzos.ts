@@ -9,8 +9,10 @@
  * - **Pico:** un máximo local de la demanda a lo largo de una franja con prominencia ≥ 5 % del mayor
  *   de la planta (AB-a).
  * - **Zona de refuerzo:** una componente conexa de los tramos de una losa que superan su base (AB-b):
- *   dos tramos seguidos de una franja, o de dos franjas vecinas que se solapan en s más de 1 mm. Su
- *   extensión es la de sus tramos (AB-d, ±Δs/2), sin anclajes ni solapes.
+ *   dos tramos de estaciones seguidas de una franja (también entre las dos caras de un pilar ancho,
+ *   donde el tope de un paso deja un hueco sin estaciones; no a través de una estación que no vale,
+ *   un hueco de la losa), o de dos franjas vecinas que se solapan en s más de 1 mm. Su extensión es
+ *   la de sus tramos (AB-d, ±Δs/2), sin anclajes ni solapes.
  *
  * Puro: sin IO.
  */
@@ -167,8 +169,8 @@ export function zonasRefuerzo(losa: string, armadura: Armadura, base: number, fs
     if (x !== y) padre[Math.max(x, y)] = Math.min(x, y);
   };
   sobre.forEach((ts, k) => {
-    // Seguidos en la franja
-    for (let i = 1; i < ts.length; i++) if (Math.abs(ts[i]!.a - ts[i - 1]!.b) <= JUNTO) unir(id.get(ts[i - 1]!)!, id.get(ts[i]!)!);
+    // Seguidos en la franja: tramos que se tocan, o de estaciones seguidas (entre las caras de un pilar)
+    for (let i = 1; i < ts.length; i++) if (Math.abs(ts[i]!.a - ts[i - 1]!.b) <= JUNTO || ts[i]!.estacion === ts[i - 1]!.estacion + 1) unir(id.get(ts[i - 1]!)!, id.get(ts[i]!)!);
     // Con la franja vecina (la de t mayor), si se tocan y se solapan en s
     const sig = sobre[k + 1];
     if (!sig || Math.abs(franjas[k + 1]!.franja.t0 - franjas[k]!.franja.t1) > JUNTO) return;

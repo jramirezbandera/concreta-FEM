@@ -69,7 +69,7 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 | `vigas-my`, `vigas-vz` | Diagramas envolventes de vigas y viguetas, con el máximo y el mínimo de cada vano |
 | `pilares-n` | Axil de cada pilar que llega a la planta |
 | `reacciones` | Reacciones de los pilares y muros que arrancan de la planta y de sus apoyos: Fz rotulada y (Fx, Fy) a escala; por defecto, cada objeto en el caso de su mayor \|Fz\| (como `consultar reacciones`) |
-| `armado-x-inf`, `armado-x-sup`, `armado-y-inf`, `armado-y-sup` | Las franjas de armado de las losas, coloreadas por tramos según la demanda de Wood–Armer (kN·m/m) de su armadura inferior o superior en X (el eje 1 de cada losa) o en Y, de `consultar franja`; rotulado, el mayor de cada franja |
+| `armado-x-inf`, `armado-x-sup`, `armado-y-inf`, `armado-y-sup` | Las franjas de armado de las losas, coloreadas por tramos según la demanda de Wood–Armer (kN·m/m) de su armadura inferior o superior en X (el eje 1 de cada losa) o en Y, de `consultar franja`; rotulados, los picos de cada franja. Con la armadura base del proyecto, lo cubierto en gris y las zonas de refuerzo con su máximo y el exceso |
 | `bandas` | Las bandas de dimensionado del proyecto (si las tiene) con su My en cada estación, de `consultar banda` |
 
 - `--vista` y `--planta` admiten varias, separadas por comas o repetidas; sin `--planta`, todas.
@@ -101,6 +101,7 @@ La app vigila el fichero: cada vez que lo editas, se recarga sola (o usa lo que 
 - Si cambias el fichero mientras él tiene cambios sin guardar, la app no pisa nada: le avisa y elige él. Díselo cuando cambies algo que podría estar editando.
 - Al guardar, la app escribe el fichero en su formato canónico (2 espacios y las claves en el orden de los tipos). El contenido y la huella no cambian.
 - Las losas macizas y reticulares se arman con **franjas** de ancho fijo (1 m, o el intereje en un reticular) que cubren toda la losa en sus dos direcciones (X, el `eje1` de la losa, e Y). No se escriben: salen solas de la losa, y sus esfuerzos, de `consultar franjas` y `consultar franja`. La app ya no propone ni edita bandas; las `bandas` del proyecto, si las hay, son cortes de comprobación tuyos: no las quites ni las cambies sin que el ingeniero lo pida.
+- La **armadura base** (`armado` del proyecto, fuera del `modelo`: no cambia la huella ni obliga a recalcular) es el momento en kN·m/m que cubre la armadura base de cada losa: `{ "base": { "x-sup": 20 }, "losas": { "<losa>": { "x-inf": 15 } } }` (la de la losa manda sobre la común; las armaduras son `x-inf`, `x-sup`, `y-inf` e `y-sup`). Es una decisión del ingeniero: léela y úsala, pero no la pongas ni la cambies si no te la da.
 
 La app no firma. Tú no la necesitas: tus números salen de la CLI.
 
@@ -155,6 +156,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 | `pieza <id> [--estaciones]` | Una viga o vigueta, por vanos (de cara a cara de apoyo); o un pilar, por tramos (base y cabeza, con los esfuerzos concomitantes) |
 | `franjas [--losa L \| --planta P]` | Las franjas de armado de las losas (ids `<losa>:X<i>` y `<losa>:Y<i>`), con su mayor demanda de Wood–Armer inferior y superior (kN·m/m), dónde está y su combinación |
 | `franja <id>` | Una franja, estación a estación (caras de pilares y líneas de apoyo exactas; cada 0,25 m por campos): mx máximo y mínimo y Wood–Armer inferior y superior por metro |
+| `refuerzos --armadura x-inf\|x-sup\|y-inf\|y-sup [--losa L \| --planta P]` | Las zonas de refuerzo: lo que supera la armadura base del proyecto, conexo, con sus franjas, su extensión (s, t, longitud, área, caja), su máximo con el exceso y su combinación; y las losas sin base. La extensión es la de las estaciones (±0,125 m), sin anclajes ni solapes |
 | `banda <id>` | My máximo y mínimo en cada estación de una banda del proyecto (caras y vanos) |
 | `combinaciones` | Las combinaciones en uso, con sus factores |
 

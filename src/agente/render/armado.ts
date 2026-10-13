@@ -39,6 +39,9 @@ const NOMBRE: Record<Armadura, string> = {
 /** El nombre corto de una armadura («X inferior»). */
 export const NOMBRE_CORTO: Record<Armadura, string> = { "x-inf": "X inferior", "x-sup": "X superior", "y-inf": "Y inferior", "y-sup": "Y superior" };
 export const UNIDAD_ARMADO = "kN·m/m";
+/** El exceso sobre la base de un rótulo, con un decimal: «+4,5». */
+export const textoExceso = (x: number): string => `+${(Math.round(x * 10) / 10).toFixed(1).replace(".", ",")}`;
+
 /** El título de la leyenda de una armadura (AB, §2.1). */
 export const tituloArmado = (a: Armadura): string => `${NOMBRE_CORTO[a]} · M_Ed (Wood–Armer) · ${UNIDAD_ARMADO}`;
 
@@ -159,7 +162,16 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
     porBanda.set(b, anillos);
     i = j;
   }
-  if (m.cubiertos.length) P.push({ tipo: "poligono", anillos: m.cubiertos.map((t) => t.rectangulo), estilo: "armado-cubierto" });
+  // Lo cubierto, por corridas de tramos seguidos de cada franja, un polígono de un anillo por corrida
+  // (uno con miles de anillos se orienta en tiempo cuadrático)
+  const cu = m.cubiertos;
+  for (let i = 0; i < cu.length; ) {
+    let j = i + 1;
+    while (j < cu.length && cu[j]!.franja === cu[i]!.franja && cu[j]!.a === cu[j - 1]!.b) j++;
+    const [a, b] = [cu[i]!, cu[j - 1]!];
+    P.push({ tipo: "poligono", anillos: [[a.rectangulo[0]!, b.rectangulo[1]!, b.rectangulo[2]!, a.rectangulo[3]!]], estilo: "armado-cubierto" });
+    i = j;
+  }
   for (const [b, anillos] of [...porBanda].sort((x, y) => x[0] - y[0])) P.push({ tipo: "region", anillos, estilo: "isobanda", relleno: m.colores[b]!, banda: b });
   P.push(...trazoModelo(pl));
   for (const z of m.zonas) for (const [a, b] of z.contorno) P.push({ tipo: "linea", puntos: [a, b], estilo: "zona-refuerzo", objeto: z.id });
@@ -175,7 +187,7 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
     for (const z of m.zonas) {
       const t = z.tramos.find((x) => x.franja === z.maximo.franja && x.s === z.maximo.s && x.v === z.maximo.v)!;
       const c = centro(t);
-      P.push({ tipo: "texto", p: c, texto: `${rotulo(z.maximo.v)} (+${rotulo(z.maximo.exceso)})`, tamano: 10, color, fondo: true, ancla: "medio", dy: 4, prioridad: (z.maximo.v / vmax) * 60 + 5, objeto: z.id });
+      P.push({ tipo: "texto", p: c, texto: `${rotulo(z.maximo.v)} (${textoExceso(z.maximo.exceso)})`, tamano: 10, color, fondo: true, ancla: "medio", dy: 4, prioridad: (z.maximo.v / vmax) * 60 + 5, objeto: z.id });
       extremos.push({ que: `Máximo de ${z.id} (base ${rotulo(z.base)})`, valor: z.maximo.v, unidad: u, objeto: z.id, punto: c, comb: z.maximo.comb });
     }
   } else {

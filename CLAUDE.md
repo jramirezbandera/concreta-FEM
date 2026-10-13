@@ -352,9 +352,19 @@
     - el tiempo de las franjas se acepta (C5-4, cuando moleste);
     - el reticular de SAP2000 se compara en el periodo en sombra, armadura contra armadura;
     - la puerta de uso de F se hace ya, sin esperar al refinamiento.
+- **2026-10-13: fase AB terminada** (mapas de armado y armadura base, a petición del usuario tras usar Resultados · Armado). Pasan los criterios 1 a 7; el 6, con el área del 3D a la precisión de Float32 (AB-4). El 8 (puerta de uso) es del usuario. El plan está en `docs/fem3d/armado.md` y el informe, en `docs/fem3d/fase-ab.md`, con hallazgos AB-1…AB-7 y pendientes.
+  - **Armadura base:** el campo `armado` del proyecto (común y por losa, en kN·m/m), fuera de la huella. Tiene la operación `armado` del editor y se comprueba en `fem validar`. Cambiarla no recalcula: la base va en cada pedido.
+  - **Mapa:**
+    - leyenda con su título y la unidad;
+    - sin base, los picos de cada franja rotulados (prominencia ≥ 5 %);
+    - con base, lo cubierto en gris y las zonas de refuerzo con su contorno y «máximo (+exceso)».
+  - **Zonas de refuerzo** (`src/agente/refuerzos.ts`): lo que supera la base, conexo. Están en `fem consultar refuerzos --armadura` y en la pestaña Refuerzos, donde un clic las encuadra.
+  - **App:** un clic da el valor del punto bit a bit con `fem consultar franja` (`valor-armado`). El 3D pinta las franjas en su cota (`armado3d`), con la sonda. El diagrama de la franja dibuja la base.
+  - **Validación:** `validacion/ab/chrome.ts`. Con base, el mapa tarda lo mismo que sin ella (1,5 s), y el valor de un clic, 7 ms.
+  - **Pendiente del usuario:** la puerta de uso, y decidir si se agrupan las zonas pequeñas (AB-5). **Más adelante:** Ø y separación como atajo de la base.
 - **Siguiente paso:**
   - el refinamiento local junto a los pilares con cara (F-6), con su plan y sus criterios;
-  - las puertas de uso de F, de I1, I2, I3 e I4, de V2a y de V2b;
+  - las puertas de uso de AB, de F, de I1, I2, I3 e I4, de V2a y de V2b;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
