@@ -320,3 +320,33 @@ export function fraccionEnRegiones(a: Vec2, b: Vec2, regiones: readonly Region[]
   }
   return s;
 }
+
+/** Jacobiano escalado mínimo de un cuadrilátero bilineal en sus 4 puntos de Gauss. */
+export function jacobianoEscalado(X: readonly Vec2[]): number {
+  const g = 1 / Math.sqrt(3);
+  const xi = [-1, 1, 1, -1];
+  const eta = [-1, -1, 1, 1];
+  let min = Infinity;
+  for (const [a, b] of [
+    [-g, -g],
+    [g, -g],
+    [g, g],
+    [-g, g],
+  ] as const) {
+    let xx = 0;
+    let xy = 0;
+    let ex = 0;
+    let ey = 0;
+    for (let i = 0; i < 4; i++) {
+      const dxi = (xi[i]! * (1 + b * eta[i]!)) / 4;
+      const deta = (eta[i]! * (1 + a * xi[i]!)) / 4;
+      xx += dxi * X[i]![0];
+      xy += dxi * X[i]![1];
+      ex += deta * X[i]![0];
+      ey += deta * X[i]![1];
+    }
+    const det = xx * ey - ex * xy;
+    min = Math.min(min, det / (Math.sqrt(xx * xx + xy * xy) * Math.sqrt(ex * ex + ey * ey)));
+  }
+  return min;
+}

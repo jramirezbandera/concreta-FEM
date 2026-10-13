@@ -1194,6 +1194,10 @@
         "anchoFranja": {
           "type": "number",
           "description": "Ancho de las franjas de armado de las losas macizas, m (F-a). Por defecto, 1. En un reticular, el intereje."
+        },
+        "refinoCaras": {
+          "type": "boolean",
+          "description": "Refinamiento de la malla junto a las caras de los pilares de las franjas (fase F2): en su\nplantilla de la rejilla, el primer tramo a cada lado de la cara se parte en tercios. Por defecto,\nsí; sin él, la malla de F1.1 (con R0)."
         }
       },
       "additionalProperties": false

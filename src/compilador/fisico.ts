@@ -540,6 +540,12 @@ export interface OpcionesCompilacion {
   franjas?: boolean;
   /** Ancho de las franjas de armado de las losas macizas, m (F-a). Por defecto, 1. En un reticular, el intereje. */
   anchoFranja?: number;
+  /**
+   * Refinamiento de la malla junto a las caras de los pilares de las franjas (fase F2): en su
+   * plantilla de la rejilla, el primer tramo a cada lado de la cara se parte en tercios. Por defecto,
+   * sí; sin él, la malla de F1.1 (con R0).
+   */
+  refinoCaras?: boolean;
 }
 
 export interface OpcionesResueltas {
@@ -553,6 +559,7 @@ export interface OpcionesResueltas {
   torsionEquilibrio: boolean;
   franjas: boolean;
   anchoFranja: number;
+  refinoCaras: boolean;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -567,5 +574,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     torsionEquilibrio: o.torsionEquilibrio ?? true,
     franjas: o.franjas ?? true,
     anchoFranja: o.anchoFranja ?? ANCHO_FRANJA,
+    refinoCaras: o.refinoCaras ?? true,
   };
 }

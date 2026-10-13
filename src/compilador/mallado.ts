@@ -7,6 +7,9 @@
  *    como obligatorias; la CDT las parte por su punto medio, igual que la rejilla, y la malla es
  *    conforme. Los lados que van por una línea se cortan en los nudos de la rejilla y sólo se
  *    siembran sus tramos fuera de ella. Sin rejilla (o si no hay ninguna celda regular), todo es CDT.
+ *    Con `refino` (F2), las plantillas de los pilares con caras de franja se refinan junto a ellas
+ *    (`rejilla.ts`); si la planta refinada no pasa el validador, se malla sin refinar y se avisa
+ *    (`malla/cara-sin-refinar`), antes de recurrir a la CDT sola.
  * 1. Siembra: cada lado del arreglo se divide en partes iguales de ≤ 2h.
  * 2. Retícula de Steiner por losa: triangular (sin puntos cocirculares, COM-11) de lado 2h,
  *    orientada con el `eje1` de la losa y anclada en su vértice canónico (el menor en la dirección
@@ -40,8 +43,10 @@ import Delaunator from "delaunator";
 import { incircle } from "robust-predicates";
 import type { Arreglo, Trazo } from "./arreglo.ts";
 import type { Vec2 } from "./fisico.ts";
-import { distanciaASegmento, momentosRegion, puntoEnRegion, type Region } from "./poligonos.ts";
-import { cubierta, IRREGULAR, REGULAR, rejillaPlanta, type Rejilla } from "./rejilla.ts";
+import { distanciaASegmento, jacobianoEscalado, momentosRegion, puntoEnRegion, type Region } from "./poligonos.ts";
+import { cubierta, IRREGULAR, REGULAR, rejillaPlanta, type RefinoHuella, type Rejilla } from "./rejilla.ts";
+
+export { jacobianoEscalado };
 
 /** Versiones de las bibliotecas del mallador (entran en la huella de compilación, H23). */
 export const VERSIONES_MALLADOR = { delaunator: "5.1.0", constrainautor: "4.1.0", "robust-predicates": "3.0.3" } as const;
@@ -123,7 +128,7 @@ export type ResultadoMalla =
        * Celdas regulares de la rejilla, plantillas de pilar, cuadriláteros que salen de ellas y
        * fracción del área de las losas que cubren.
        */
-      rejilla: { celdas: number; plantillas: number; quads: number; cobertura: number };
+      rejilla: { celdas: number; plantillas: number; refinadas: number; quads: number; cobertura: number };
       problemas: ProblemaMalla[];
     }
   | { ok: false; mensaje: string };
@@ -244,36 +249,6 @@ const cajaDe = (p: readonly Vec2[]): [number, number, number, number] => {
   return [x0, y0, x1, y1];
 };
 
-/** Jacobiano escalado mínimo de un cuadrilátero bilineal en sus 4 puntos de Gauss. */
-export function jacobianoEscalado(X: readonly Vec2[]): number {
-  const g = 1 / Math.sqrt(3);
-  const xi = [-1, 1, 1, -1];
-  const eta = [-1, -1, 1, 1];
-  let min = Infinity;
-  for (const [a, b] of [
-    [-g, -g],
-    [g, -g],
-    [g, g],
-    [-g, g],
-  ] as const) {
-    let xx = 0;
-    let xy = 0;
-    let ex = 0;
-    let ey = 0;
-    for (let i = 0; i < 4; i++) {
-      const dxi = (xi[i]! * (1 + b * eta[i]!)) / 4;
-      const deta = (eta[i]! * (1 + a * xi[i]!)) / 4;
-      xx += dxi * X[i]![0];
-      xy += dxi * X[i]![1];
-      ex += deta * X[i]![0];
-      ey += deta * X[i]![1];
-    }
-    const det = xx * ey - ex * xy;
-    min = Math.min(min, det / (Math.sqrt(xx * xx + xy * xy) * Math.sqrt(ex * ex + ey * ey)));
-  }
-  return min;
-}
-
 /** Jacobiano escalado mínimo de los 3 cuadriláteros en que se divide un triángulo (paso 5). */
 export function jacobianoTriangulo(A: Vec2, B: Vec2, C: Vec2): number {
   const m = (P1: Vec2, P2: Vec2): Vec2 => [(P1[0] + P2[0]) / 2, (P1[1] + P2[1]) / 2];
@@ -315,10 +290,11 @@ export function siembraGraduada(L: number, sa: number, sb: number, s: number, nF
  * losas (una planta pequeña y llena de rasgos), se malla también sin ella y se queda la malla con
  * menos nudos (a igualdad, la de la rejilla).
  */
-export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>, rejilla = true): ResultadoMalla {
+export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>, rejilla = true, refino?: RefinoCaras): ResultadoMalla {
   const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false);
   if (!rejilla) return sin();
-  const r = conRespaldo(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true), sin);
+  const conRejilla = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true);
+  const r = conRespaldo(refino?.caras.size ? () => conRespaldoRefino(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, refino), conRejilla, [...refino.caras.keys()]) : conRejilla, sin);
   if (!r.ok || r.rejilla.cobertura >= COBERTURA_MINIMA || r.problemas.some((p) => p.codigo === "malla/sin-rejilla")) return r;
   const s = sin();
   return s.ok && s.nudos.length < r.nudos.length ? s : r;
@@ -350,8 +326,48 @@ export function conRespaldo(conRejilla: () => ResultadoMalla, sinRejilla: () => 
   return sin;
 }
 
+/**
+ * F2: si la planta con las caras refinadas falla (una excepción, o no pasa el validador), se malla
+ * con la rejilla sin refinar y se avisa de que en las caras de sus pilares el momento puede salir
+ * bajo. Si también falla, queda el fallo, y `conRespaldo` pasa a la triangulación sola.
+ */
+export function conRespaldoRefino(conRefino: () => ResultadoMalla, sinRefino: () => ResultadoMalla, pilares: readonly string[]): ResultadoMalla {
+  let r: ResultadoMalla;
+  try {
+    r = conRefino();
+  } catch (e) {
+    r = { ok: false, mensaje: e instanceof Error ? e.message : String(e) };
+  }
+  const fallo = !r.ok ? r.mensaje || "error" : [...new Set(r.problemas.filter((p) => p.severidad === "error").map((p) => p.codigo))].join(", ");
+  if (!fallo) return r;
+  const sin = sinRefino();
+  if (!sin.ok || sin.problemas.some((p) => p.severidad === "error")) return sin;
+  sin.problemas.push(avisoSinRefinar(pilares, `el refinamiento ha fallado en esta planta (${fallo})`));
+  return sin;
+}
+
+/** Aviso de los pilares cuyas caras se quedan sin refinar (F2). */
+function avisoSinRefinar(pilares: readonly string[], porque: string): ProblemaMalla {
+  return {
+    losa: -1,
+    severidad: "aviso",
+    codigo: "malla/cara-sin-refinar",
+    mensaje: `La malla junto a las caras de ${[...pilares].sort().join(", ")} no se ha refinado: ${porque}. Con el tamaño de malla por defecto, el momento de las franjas en esas caras puede salir hasta un 6 % bajo. El cálculo es válido; el fallo es del compilador: avise para corregirlo.`,
+  };
+}
+
+/**
+ * Caras de pilares que se refinan (F2), por el id del pilar de la huella: la normal d de su recta y
+ * el lado (−1: el de s = d·x menores).
+ */
+export interface RefinoCaras {
+  caras: ReadonlyMap<string, readonly { d: Vec2; lado: -1 | 1 }[]>;
+  /** Distancia mínima a la cara de un nudo nuevo (2·ε_snap: más cerca, sería de la huella). */
+  separacion: number;
+}
+
 /** `mallarPlanta` sin comparar con la CDT sola cuando la rejilla cubre poco (para las pruebas). */
-export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom: number, presembrados: ReadonlySet<string> | undefined, rejilla: boolean): ResultadoMalla {
+export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom: number, presembrados: ReadonlySet<string> | undefined, rejilla: boolean, refino?: RefinoCaras): ResultadoMalla {
   const s = 2 * h;
   const lados = arreglo.lados();
   const regiones = losas.map((l) => regionDe(arreglo, l));
@@ -385,6 +401,8 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   // Rejilla alineada de las zonas regulares
   const nPuntos = P.length;
   let rj: Rejilla | null = null;
+  /** Id (el del pilar) de cada huella, en el orden de la rejilla. */
+  const idHuella: string[] = [];
   if (rejilla && losas.length) {
     const ladoEnLosa = lados.map((l) => {
       const [A, B] = [P[l.a]!, P[l.b]!];
@@ -396,8 +414,26 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     });
     // Huellas de los pilares: sus puntos y sus lados
     const huellas = arreglo.trazos.flatMap((t, ti) => (t.tipo === "huella" ? [{ puntos: t.puntos, lados: lados.flatMap((l, k) => (l.trazos.includes(ti) ? [k] : [])) }] : []));
+    idHuella.push(...arreglo.trazos.filter((t) => t.tipo === "huella").map((t) => t.id));
     const exactos = lados.map((l) => l.trazos.some((t) => arreglo.trazos[t]!.exacto));
-    rj = rejillaPlanta({ P, lados, ladoEnLosa, puntoEnLosa, fijos, exactos, huellas, regiones, enLosa, O: origenes[0]!, e: losas[0]!.eje1, h, epsGeom });
+    // Caras que se refinan, en los ejes de la rejilla: u a lo largo del eje 1 de la primera losa
+    const e = losas[0]!.eje1;
+    const refinoH = refino?.caras.size
+      ? idHuella.map((id): RefinoHuella | null => {
+          const cs = refino.caras.get(id);
+          if (!cs?.length) return null;
+          const u: [boolean, boolean] = [false, false];
+          const v: [boolean, boolean] = [false, false];
+          for (const { d, lado } of cs) {
+            const du = d[0] * e[0] + d[1] * e[1];
+            const dv = -d[0] * e[1] + d[1] * e[0];
+            if (Math.abs(du) > 1 - 1e-9) u[lado * du > 0 ? 1 : 0] = true;
+            else if (Math.abs(dv) > 1 - 1e-9) v[lado * dv > 0 ? 1 : 0] = true;
+          }
+          return u[0] || u[1] || v[0] || v[1] ? { u, v } : null;
+        })
+      : undefined;
+    rj = rejillaPlanta({ P, lados, ladoEnLosa, puntoEnLosa, fijos, exactos, huellas, ...(refinoH ? { refino: refinoH, separacionRefino: refino!.separacion } : {}), regiones, enLosa, O: origenes[0]!, e, h, epsGeom });
   }
   // Punto (índice en P) de cada nudo de la rejilla que se usa
   const pNudo = new Map<number, number>();
@@ -426,16 +462,22 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   );
   const aristasPlantilla = new Set<string>();
   const cadenaHuella = new Map<number, number[]>();
+  // Aristas de la rejilla que una plantilla refinada parte en más de dos (F2): sus nudos de una
+  // punta a la otra, por la clave «p,q» de sus extremos en P
+  const subdividida = new Map<string, number[]>();
   redes.forEach((red, t) => {
-    const { A, B } = rj!.plantillas[t]!;
-    for (let b = 0; b < B; b++)
-      for (let a = 0; a < A; a++) {
-        const x = red[a + A * b]!;
-        for (const y of [a < A - 1 ? red[a + 1 + A * b]! : null, b < B - 1 ? red[a + A * (b + 1)]! : null]) {
-          if (y === null || typeof x !== "number" || typeof y !== "number") continue;
-          aristasPlantilla.add(x < y ? `${x},${y}` : `${y},${x}`);
-        }
+    for (const { n } of rj!.plantillas[t]!.quads)
+      for (let m = 0; m < 4; m++) {
+        const [x, y] = [red[n[m]!]!, red[n[(m + 1) % 4]!]!];
+        if (typeof x !== "number" || typeof y !== "number") continue;
+        aristasPlantilla.add(x < y ? `${x},${y}` : `${y},${x}`);
       }
+    for (const sd of rj!.plantillas[t]!.subdivididas) {
+      const [p, q] = [red[sd.a] as number, red[sd.b] as number];
+      const medio = sd.nudos.map((i) => red[i] as number);
+      subdividida.set(`${p},${q}`, medio);
+      subdividida.set(`${q},${p}`, [...medio].reverse());
+    }
     const anillo = rj!.plantillas[t]!.anillo.map((i) => red[i] as number);
     const n = anillo.length;
     const dePunto = new Set(anillo.filter((p) => p < nPuntos));
@@ -537,6 +579,17 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     const c = [l.a];
     for (let m = 0; m + 1 < cortes.length; m++) {
       const [x, y] = [cortes[m]!, cortes[m + 1]!];
+      const sub = subdividida.get(`${x.p},${y.p}`);
+      if (sub) {
+        // Arista de la rejilla partida por una plantilla refinada: por sus nudos
+        let ant = x.p;
+        for (const q of [...sub, y.p]) {
+          if (borde) restringir(ant, q);
+          c.push(q);
+          ant = q;
+        }
+        continue;
+      }
       if (aristasPlantilla.has(x.p < y.p ? `${x.p},${y.p}` : `${y.p},${x.p}`)) {
         // Arista dentro de una plantilla (el tramo de viga entre la cara del pilar y el borde). Si va
         // por el borde de una losa (un pilar de esquina o de fachada), fuera de ella puede haber CDT
@@ -1005,13 +1058,11 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     // Plantillas de pilar: los cuadriláteros de su red en una losa, una pieza cada uno
     redes.forEach((red, t) => {
       const pl = rj!.plantillas[t]!;
-      const { A, B } = pl;
       const nd = (x: number | [number, number]) => (typeof x === "number" ? vertice(x) : medio(x[0], x[1]));
       const X = (x: number | [number, number]): Vec2 => (typeof x === "number" ? Q(x) : [(Q(x[0])[0] + Q(x[1])[0]) / 2, (Q(x[0])[1] + Q(x[1])[1]) / 2]);
-      for (let b = 0; b < B - 1; b++)
-        for (let a = 0; a < A - 1; a++) {
-          const v = [red[a + A * b]!, red[a + 1 + A * b]!, red[a + 1 + A * (b + 1)]!, red[a + A * (b + 1)]!];
-          const k = pl.losas[a + (A - 1) * b]!;
+      for (const cq of pl.quads) {
+          const v = cq.n.map((i) => red[i]!);
+          const k = cq.losa;
           if (k < 0) continue;
           const g = v.map(X).reduce((s, q) => [s[0] + q[0] / 4, s[1] + q[1] / 4] as Vec2, [0, 0] as Vec2);
           quads.push({ nudos: v.map(nd) as [number, number, number, number], losa: k, pieza: piezas.length });
@@ -1046,6 +1097,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   // 6. Validador
   const problemas: ProblemaMalla[] = [];
   if (!conformes) problemas.push({ losa: -1, severidad: "error", codigo: "malla/conformidad", mensaje: "La rejilla y la triangulación no parten igual una arista de la interfaz. Es un fallo del compilador." });
+  if (rj?.sinRefinar.length) problemas.push(avisoSinRefinar(rj.sinRefinar.map((k) => idHuella[k]!), "su plantilla no admite el refinamiento con calidad"));
   const areas = losas.map(() => 0);
   let jacobianoMin = Infinity;
   let peor: Vec2 = [0, 0];
@@ -1060,7 +1112,14 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     if (q.pieza >= triangulos.length) areaRejilla += a / 2;
     const j = jacobianoEscalado(X);
     if (j < jacobianoMin) [jacobianoMin, peor] = [j, [(X[0]![0] + X[1]![0] + X[2]![0] + X[3]![0]) / 4, (X[0]![1] + X[1]![1] + X[2]![1] + X[3]![1]) / 4]];
-    if (j <= 0) malos[q.losa]!++;
+    // El motor exige además que sea estrictamente convexo (un ángulo de 180° deja el jacobiano
+    // positivo en los puntos de Gauss)
+    let convexo = true;
+    for (let m = 0; m < 4; m++) {
+      const [A, B, C] = [X[m]!, X[(m + 1) % 4]!, X[(m + 2) % 4]!];
+      if (!((B[0] - A[0]) * (C[1] - B[1]) - (B[1] - A[1]) * (C[0] - B[0]) > 0)) convexo = false;
+    }
+    if (j <= 0 || !convexo) malos[q.losa]!++;
     else if (j < JACOBIANO_BAJO) bajos++;
   }
   losas.forEach((l, k) => {
@@ -1069,7 +1128,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     if (!(e <= 1e-9))
       problemas.push({ losa: k, severidad: "error", codigo: "malla/area", mensaje: `La malla de la losa ${l.id} no cubre su área: ${areas[k]!.toPrecision(10)} m² frente a ${A.toPrecision(10)} m² (error ${e.toExponential(2)}).` });
     if (malos[k]! > 0)
-      problemas.push({ losa: k, severidad: "error", codigo: "malla/jacobiano", mensaje: `La malla de la losa ${l.id} tiene ${malos[k]} cuadriláteros con el jacobiano ≤ 0 (invertidos o degenerados).` });
+      problemas.push({ losa: k, severidad: "error", codigo: "malla/jacobiano", mensaje: `La malla de la losa ${l.id} tiene ${malos[k]} cuadriláteros con el jacobiano ≤ 0 o no convexos (invertidos o degenerados).` });
   });
   // Lados y puntos que tienen que estar en la malla
   lados.forEach((l, i) => {
@@ -1107,7 +1166,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     nudosLado,
     regiones,
     calidad: { jacobianoMin: quads.length ? jacobianoMin : 1, bajos },
-    rejilla: { celdas: celdasRejilla, plantillas, quads: quads.length - 3 * triangulos.length, cobertura: areaRejilla / Math.max(1e-300, areas.reduce((s, a) => s + a, 0)) },
+    rejilla: { celdas: celdasRejilla, plantillas, refinadas: rj?.plantillas.filter((p) => p.refinada).length ?? 0, quads: quads.length - 3 * triangulos.length, cobertura: areaRejilla / Math.max(1e-300, areas.reduce((s, a) => s + a, 0)) },
     problemas,
   };
 }

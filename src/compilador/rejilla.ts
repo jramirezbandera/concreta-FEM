@@ -27,6 +27,17 @@
  *    bloque, los nudos son los de la rejilla partida; dentro, las esquinas de la huella, los puntos
  *    de sus caras sobre las líneas que la cruzan (por donde llegan las vigas) y, en el interior
  *    rígido, lo que haga falta. Sus celdas en una losa quedan cubiertas.
+ *    Refinamiento (F2): junto a cada cara de un pilar de las franjas (`refino`), el primer tramo de
+ *    la red se parte en tercios (PARTICION_REFINO) a lo largo de la huella (la cruz); el cuadrilátero
+ *    de cada esquina va también en tercios si la transición cabe más allá dentro del bloque (la de 3
+ *    a 1 en el siguiente) o fuera hay sólo celdas fuera de las losas, y si no lleva él la transición
+ *    (la de esquina, de 5 cuadriláteros, o la de 3 a 1). El borde del bloque no cambia, así que la
+ *    costura con la rejilla y la CDT es la de siempre. Los nudos nuevos se interpolan en su
+ *    cuadrilátero de la red; un lado del arreglo que va por una arista partida sigue por sus nudos
+ *    (`subdivididas`). Un lado cuyo primer tercio no llega a `separacionRefino` (2·ε_snap: un nudo
+ *    más cerca sería de la huella) no se refina. Una plantilla refinada con algún cuadrilátero no
+ *    convexo o por debajo de UMBRAL_REFINO se queda sin refinar (`sinRefinar`, con aviso); una sin
+ *    refinar por debajo de JACOBIANO_PLANTILLA no se usa (su pilar va por la CDT).
  * 6. Celdas: regular si su centro cae en una losa, no es del anillo y no tiene a menos de δ ningún
  *    rasgo ajeno (salvo los de una huella con plantilla), para que la CDT de al lado no tenga que unir
  *    un rasgo con una arista larga; fuera, si su centro no cae en una losa y no tiene rasgos cerca;
@@ -45,7 +56,7 @@
  * redondeo de un giro no cambien la rejilla.
  */
 import type { Vec2 } from "./fisico.ts";
-import type { Region } from "./poligonos.ts";
+import { jacobianoEscalado, type Region } from "./poligonos.ts";
 
 /** Separación mínima entre dos líneas de la rejilla, en fracciones de h. */
 export const SEPARACION_MINIMA = 0.4;
@@ -91,6 +102,14 @@ export interface EntradaRejilla {
   exactos?: readonly boolean[];
   /** Huellas de los pilares: sus puntos, en orden, y sus lados. */
   huellas: readonly { puntos: readonly number[]; lados: readonly number[] }[];
+  /** Caras que se refinan de cada huella (F2), o null. Sin él, ninguna. */
+  refino?: readonly (RefinoHuella | null)[];
+  /**
+   * Distancia mínima a la cara del primer nudo nuevo del refinamiento (F2): un lado cuyo primer
+   * tramo no llega a tres veces ella no se refina (el tramo ya es corto, y un nudo más cerca de la
+   * huella que ε_snap sería de ella).
+   */
+  separacionRefino?: number;
   regiones: readonly Region[];
   /** Losa que contiene un punto, o −1. */
   enLosa: (q: Vec2) => number;
@@ -136,12 +155,13 @@ interface ModoPlantilla {
 
 export interface Plantilla {
   huella: number;
-  /** Nudos de la red por ejes (A × B), a + A·b, con a a lo largo del eje 1. */
-  A: number;
-  B: number;
+  /** Nudos de la red. Sin refinar, los de la red por ejes (A × B), a + A·b, con a a lo largo del eje 1. */
   red: NudoPlantilla[];
-  /** Losa de cada cuadrilátero de la red (a + (A − 1)·b), o −1 fuera de las losas. */
-  losas: number[];
+  /**
+   * Cuadriláteros de la red (índices en `red`, antihorarios) con su losa, o −1 fuera de las losas.
+   * Sin refinar, los de la red por ejes en orden (a + (A − 1)·b).
+   */
+  quads: { n: [number, number, number, number]; losa: number }[];
   /** Anillo de la huella en la red (índices), en sentido antihorario. */
   anillo: number[];
   /**
@@ -149,9 +169,39 @@ export interface Plantilla {
    * celda ganada por una cara de banda), y la losa de su celda.
    */
   bordes: { n1: number; n2: number; losa: number }[];
+  /**
+   * Tramos de las líneas de la rejilla dentro del bloque que la red refinada parte en más de dos
+   * (los de las caras), entre dos nudos de la rejilla o puntos del arreglo: sus extremos y sus nudos
+   * intermedios, de a a b (índices en `red`). Un lado que va por ellos sigue entero por la red.
+   */
+  subdivididas: { a: number; b: number; nudos: number[] }[];
   /** Lados del arreglo de la huella. */
   huellaLados: readonly number[];
+  /** ¿Lleva el refinamiento de sus caras (F2)? */
+  refinada: boolean;
 }
+
+/**
+ * Caras de una huella que se refinan (F2): en u y en v, el lado de menor y el de mayor coordenada.
+ */
+export interface RefinoHuella {
+  u: readonly [boolean, boolean];
+  v: readonly [boolean, boolean];
+}
+
+/** Posición de los dos nudos nuevos en el primer tramo junto a una cara refinada, desde la cara (F2). */
+export const PARTICION_REFINO: [number, number] = [1 / 3, 2 / 3];
+
+/**
+ * Jacobiano escalado mínimo de una plantilla refinada; por debajo, se queda sin refinar (F2). El
+ * mismo que el aviso de calidad de la malla (`JACOBIANO_BAJO` de `mallado.ts`): el refinamiento
+ * nunca deja un cuadrilátero que lo dispare. Es un objeto para que las pruebas puedan forzar el
+ * respaldo.
+ */
+export const UMBRAL_REFINO = { jacobiano: 0.2 };
+
+/** Jacobiano escalado mínimo de una plantilla; por debajo, el pilar va por la triangulación (F2). */
+export const JACOBIANO_PLANTILLA = 0.2;
 
 export interface Rejilla {
   /** Coordenadas de las líneas (u a lo largo del eje 1, v a lo largo del eje 2). */
@@ -172,6 +222,8 @@ export interface Rejilla {
   /** Aristas de la interfaz (pares de nudos). */
   interfaz: [number, number][];
   plantillas: Plantilla[];
+  /** Huellas con caras que refinar que se quedan con la plantilla sin refinar (F2: no cabía con calidad). */
+  sinRefinar: number[];
   posicion(n: number): Vec2;
   /** Celda que contiene un punto (interior), o −1. */
   celdaDe(q: Vec2): number;
@@ -298,8 +350,21 @@ function rectanguloHuella(W: readonly Vec2[], puntos: readonly number[], tol: nu
   return esquinas.every((x) => x === 1) ? { u0, v0, u1, v1 } : null;
 }
 
-/** Rejilla de una planta, o null si no tiene ninguna celda cubierta. */
+/**
+ * Rejilla de una planta, o null si no tiene ninguna celda cubierta. Una plantilla con algún
+ * cuadrilátero por debajo de JACOBIANO_PLANTILLA no se usa: se vuelve a montar la rejilla con ese
+ * pilar en la triangulación (F2).
+ */
 export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
+  const excluidas = new Set<number>();
+  for (;;) {
+    const r = montarRejilla(E, excluidas);
+    if (!r || !("excluir" in r)) return r;
+    for (const k of r.excluir) excluidas.add(k);
+  }
+}
+
+function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejilla | { excluir: number[] } | null {
   const { P, lados, h, O, e } = E;
   const s = 2 * h;
   const tol = 10 * E.epsGeom;
@@ -472,7 +537,7 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
   const candidatas: { k: number; mu: ModoPlantilla; mv: ModoPlantilla }[] = [];
   const dentroDeLosa = (a: number, b: number) => a >= 0 && b >= 0 && a <= nu - 2 && b <= nv - 2 && losaCelda[celda(a, b)]! >= 0;
   rects.forEach((r, k) => {
-    if (!r) return;
+    if (!r || excluidas.has(k)) return;
     // Una cara sobre una línea de cara de banda con losa al otro lado: el bloque crece por ese lado
     // (cada lado crece una vez como mucho, así que acaba)
     const crecerU: [boolean, boolean] = [false, false];
@@ -648,12 +713,35 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
     }
   }
 
+  const posicion = (n: number): Vec2 => {
+    const p = puntoNudo[n]!;
+    if (p >= 0) return P[p]!;
+    const [i, j] = [n % nu, Math.floor(n / nu)];
+    const k = nudoEnLado.get(n);
+    if (k !== undefined) {
+      // Exactamente sobre el lado
+      const l = lados[k]!;
+      const [A, B] = [P[l.a]!, P[l.b]!];
+      const [WA, WB] = [W[l.a]!, W[l.b]!];
+      const t = enLinea[k]!.horizontal ? (U[i]! - WA[0]) / (WB[0] - WA[0]) : (V[j]! - WA[1]) / (WB[1] - WA[1]);
+      return [A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])];
+    }
+    return xy(U[i]!, V[j]!);
+  };
+  /** Posición de un nudo de la red de una plantilla. */
+  const posRed = (x: NudoPlantilla): Vec2 => {
+    if (x.tipo === "nudo") return posicion(x.n);
+    if (x.tipo === "punto") return P[x.p]!;
+    if (x.tipo === "nuevo") return x.q;
+    const [A, B] = [posicion(x.n1), posicion(x.n2)];
+    return [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+  };
   // Redes de las plantillas
   const absorbidos = new Uint8Array(P.length);
   const enRejilla = (x: EjePlantilla) => x.t !== "f" && x.t !== "m";
   /** Celda (en una dirección) del cuadrilátero a de la red: la de la última línea de la rejilla ≤ a. */
   const celdaEje = (m: ModoPlantilla, a: number) => m.celdas[m.ejes.slice(0, a + 1).filter(enRejilla).length - 1]!;
-  const plantillas: Plantilla[] = elegidas.map(({ k, mu: mu0, mv: mv0 }) => {
+  const redDe = (k: number, mu0: ModoPlantilla, mv0: ModoPlantilla, refino: RefinoHuella | null): Plantilla => {
     // El punto medio de una celda sin cara, sólo si su tramo va partido (en el borde del bloque es el
     // punto medio de la arista de la rejilla). Las celdas del bloque en las losas son un solo tramo,
     // así que vale cualquiera de sus líneas (la primera puede caer fuera de las losas)
@@ -665,7 +753,6 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
     const mv = { ...mv0, ejes: mv0.ejes.filter((e) => (enRejilla(e) ? (q++, true) : e.t === "f" || lineasU.some((i) => partidaV[i + mv0.celdas[q]! * nu] === 1))) };
     const r = rects[k]!;
     const pts = E.huellas[k]!.puntos;
-    for (const p of pts) absorbidos[p] = 1;
     const [A, B] = [mu.ejes.length, mv.ejes.length];
     const g = (eu: EjePlantilla, ev: EjePlantilla) => eu.g + ev.g * nu;
     const punto = (u: number, v: number) => pts.find((p) => Math.abs(W[p]![0] - u) <= tol && Math.abs(W[p]![1] - v) <= tol);
@@ -732,24 +819,252 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
     for (let b = b0; b < b1; b++) anilloH.push(a1 + A * b);
     for (let a = a1; a > a0; a--) anilloH.push(a + A * b1);
     for (let b = b1; b > b0; b--) anilloH.push(a0 + A * b);
-    return { huella: k, A, B, red, losas, anillo: anilloH, bordes, huellaLados: E.huellas[k]!.lados };
-  });
+    const quads: Plantilla["quads"] = [];
+    const sinRef = (): Plantilla => {
+      for (let b = 0; b < B - 1; b++) for (let a = 0; a < A - 1; a++) quads.push({ n: [a + A * b, a + 1 + A * b, a + 1 + A * (b + 1), a + A * (b + 1)], losa: losas[a + (A - 1) * b]! });
+      return { huella: k, red, quads, anillo: anilloH, bordes, subdivididas: [], huellaLados: E.huellas[k]!.lados, refinada: false };
+    };
+    const sep = (E.separacionRefino ?? 0) / PARTICION_REFINO[0];
+    // Con holgura (R-7): un tramo de justo el mínimo no puede depender del redondeo de una traslación
+    const cabe = (ejes: readonly EjePlantilla[], i: number, j: number) => Math.abs(ejes[j]!.x - ejes[i]!.x) >= sep * (1 - HOLGURA);
+    const refL = !!refino?.u[0] && a0 > 0 && cabe(mu.ejes, a0 - 1, a0);
+    const refR = !!refino?.u[1] && a1 < A - 1 && cabe(mu.ejes, a1, a1 + 1);
+    const refB = !!refino?.v[0] && b0 > 0 && cabe(mv.ejes, b0 - 1, b0);
+    const refT = !!refino?.v[1] && b1 < B - 1 && cabe(mv.ejes, b1, b1 + 1);
+    if (!(refL || refR || refB || refT)) return sinRef();
 
-  const posicion = (n: number): Vec2 => {
-    const p = puntoNudo[n]!;
-    if (p >= 0) return P[p]!;
-    const [i, j] = [n % nu, Math.floor(n / nu)];
-    const k = nudoEnLado.get(n);
-    if (k !== undefined) {
-      // Exactamente sobre el lado
-      const l = lados[k]!;
-      const [A, B] = [P[l.a]!, P[l.b]!];
-      const [WA, WB] = [W[l.a]!, W[l.b]!];
-      const t = enLinea[k]!.horizontal ? (U[i]! - WA[0]) / (WB[0] - WA[0]) : (V[j]! - WA[1]) / (WB[1] - WA[1]);
-      return [A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])];
+    // F2: en el primer tramo de la red junto a cada cara que se refina, sus tercios. La cruz (los
+    // tramos junto a las caras, a lo largo de la huella) es una red por ejes; en las cuatro esquinas,
+    // el cuadrilátero que toca la cruz por uno o dos lados lleva una plantilla de transición, así que
+    // el borde del bloque no cambia
+    const finos = (ejes: readonly EjePlantilla[], lo: boolean, i0: number, hi: boolean, i1: number) => {
+      const x: number[] = [];
+      const de: number[] = [];
+      ejes.forEach((e, i) => {
+        if (lo && i === i0) {
+          const d = e.x - ejes[i - 1]!.x;
+          x.push(e.x - PARTICION_REFINO[1] * d, e.x - PARTICION_REFINO[0] * d);
+        }
+        de.push(x.length);
+        x.push(e.x);
+        if (hi && i === i1) {
+          const d = ejes[i + 1]!.x - e.x;
+          x.push(e.x + PARTICION_REFINO[0] * d, e.x + PARTICION_REFINO[1] * d);
+        }
+      });
+      const eje = new Int32Array(x.length).fill(-1);
+      de.forEach((f, i) => (eje[f] = i));
+      return { x, de, eje };
+    };
+    const fu = finos(mu.ejes, refL, a0, refR, a1);
+    const fv = finos(mv.ejes, refB, b0, refT, b1);
+    const NF = fu.x.length;
+    const nodos: NudoPlantilla[] = [...red];
+    const indice = new Map<number, number>();
+    for (let b = 0; b < B; b++) for (let a = 0; a < A; a++) indice.set(fu.de[a]! + NF * fv.de[b]!, a + A * b);
+    /** Nudo (i, j) de la red fina: el de la red por ejes o uno nuevo, sobre el lado que va por su línea. */
+    // Eje de la red por ejes a la izquierda (o en) un índice fino, y la fracción del tramo hasta el
+    // siguiente
+    const tramoFino = (f: typeof fu, ejes: readonly EjePlantilla[], i: number): [number, number] => {
+      let a = 0;
+      while (a + 1 < f.de.length && f.de[a + 1]! <= i) a++;
+      return f.eje[i]! >= 0 ? [a, 0] : [a, (f.x[i]! - ejes[a]!.x) / (ejes[a + 1]!.x - ejes[a]!.x)];
+    };
+    const lerp = (P0: Vec2, P1: Vec2, t: number): Vec2 => [P0[0] + t * (P1[0] - P0[0]), P0[1] + t * (P1[1] - P0[1])];
+    const esquina = (a: number, b: number) => posRed(red[a + A * b]!);
+    /**
+     * Punto (tu, tv) del cuadrilátero (a, b) de la red por ejes, por interpolación bilineal de sus
+     * cuatro nudos: no es siempre un rectángulo (con una cara dentro de una celda, sus nudos del
+     * borde del bloque son los puntos medios de las aristas de la rejilla). En una arista sólo
+     * cuentan sus dos extremos, así que un nudo nuevo en ella es el mismo desde los dos lados y, si la
+     * arista va por un lado del arreglo, queda sobre él.
+     */
+    const enCuad = (a: number, b: number, tu: number, tv: number): Vec2 => {
+      if (tv === 0) return tu === 0 ? esquina(a, b) : lerp(esquina(a, b), esquina(a + 1, b), tu);
+      if (tu === 0) return lerp(esquina(a, b), esquina(a, b + 1), tv);
+      return lerp(lerp(esquina(a, b), esquina(a + 1, b), tu), lerp(esquina(a, b + 1), esquina(a + 1, b + 1), tu), tv);
+    };
+    /** Nudo (i, j) de la red fina: el de la red por ejes o uno nuevo en su cuadrilátero. */
+    const nudoF = (i: number, j: number): number => {
+      const clave = i + NF * j;
+      let n = indice.get(clave);
+      if (n !== undefined) return n;
+      const [a, tu] = tramoFino(fu, mu.ejes, i);
+      const [b, tv] = tramoFino(fv, mv.ejes, j);
+      nodos.push({ tipo: "nuevo", q: enCuad(a, b, tu, tv) });
+      indice.set(clave, (n = nodos.length - 1));
+      return n;
+    };
+    const cuad = (n: number[], invertir: boolean, losaQ: number) => quads.push({ n: (invertir ? [n[0]!, n[3]!, n[2]!, n[1]!] : n) as [number, number, number, number], losa: losaQ });
+    /**
+     * Plantilla de transición de un cuadrilátero de esquina, en sus ejes (ξ, η) desde la esquina de la
+     * cruz: N(s, t) es el nudo en ξ = s/3, η = t/3 (los tercios, sólo en un lado fino). Con los dos
+     * lados finos, la de esquina (5 cuadriláteros); con uno (el de ξ), la de 3 a 1 (4), con los dos
+     * nudos de en medio a media altura (`medio`).
+     */
+    const transicion = (N: (s: number, t: number) => number, medio: (s: number) => number, dosLados: boolean, invertir: boolean, losaQ: number) => {
+      if (dosLados) {
+        cuad([N(0, 0), N(1, 0), N(1, 1), N(0, 1)], invertir, losaQ);
+        cuad([N(1, 0), N(2, 0), N(2, 2), N(1, 1)], invertir, losaQ);
+        cuad([N(2, 0), N(3, 0), N(3, 3), N(2, 2)], invertir, losaQ);
+        cuad([N(2, 2), N(3, 3), N(0, 3), N(0, 2)], invertir, losaQ);
+        cuad([N(1, 1), N(2, 2), N(0, 2), N(0, 1)], invertir, losaQ);
+      } else {
+        const [x1, x2] = [medio(1), medio(2)];
+        cuad([N(0, 0), N(1, 0), x1, N(0, 3)], invertir, losaQ);
+        cuad([N(1, 0), N(2, 0), x2, x1], invertir, losaQ);
+        cuad([N(2, 0), N(3, 0), N(3, 3), x2], invertir, losaQ);
+        cuad([x1, x2, N(3, 3), N(0, 3)], invertir, losaQ);
+      }
+    };
+    const extra = new Map<string, number>();
+    const nudoExtra = (clave: string, q: Vec2) => {
+      let n = extra.get(clave);
+      if (n === undefined) {
+        nodos.push({ tipo: "nuevo", q });
+        extra.set(clave, (n = nodos.length - 1));
+      }
+      return n;
+    };
+    // Qué lleva cada cuadrilátero de la red por ejes. La cruz va fina (con los tercios). El de cada
+    // esquina, también si cabe la transición más allá, dentro del bloque: la de 3 a 1 en el siguiente
+    // hacia fuera, por cada lado fino. Si no cabe, la transición va en el de esquina. Así la columna
+    // pegada a la cara es fina hasta la mitad de la celda, donde cae el borde de la ventana de la
+    // franja del otro sentido
+    type Plan = { t: "fino" } | { t: "transicion"; dosLados: boolean; porU: boolean; su: number; sv: number };
+    const plan = new Map<number, Plan>();
+    const idq = (a: number, b: number) => a + (A - 1) * b;
+    for (let b = b0; b < b1; b++) {
+      if (refR) plan.set(idq(a1, b), { t: "fino" });
+      if (refL) plan.set(idq(a0 - 1, b), { t: "fino" });
     }
-    return xy(U[i]!, V[j]!);
+    for (let a = a0; a < a1; a++) {
+      if (refT) plan.set(idq(a, b1), { t: "fino" });
+      if (refB) plan.set(idq(a, b0 - 1), { t: "fino" });
+    }
+    for (const su of [1, -1])
+      for (const sv of [1, -1]) {
+        const [ac, bc] = [su > 0 ? a1 : a0 - 1, sv > 0 ? b1 : b0 - 1];
+        if (ac < 0 || ac > A - 2 || bc < 0 || bc > B - 2) continue;
+        // Lado fino de la esquina a lo largo de u (el de la cruz en u) y a lo largo de v
+        const [enU, enV] = [su > 0 ? refR : refL, sv > 0 ? refT : refB];
+        if (!enU && !enV) continue;
+        const [an, bn] = [ac + su, bc + sv];
+        // Más allá de la esquina en cada dirección: un cuadrilátero de la red (la transición va en él
+        // si está en una losa) o, pasado el borde del bloque, una celda fuera de las losas (la
+        // esquina llega fina hasta el borde de la losa: no hay nada con lo que coserla)
+        const masAlla = (enRed: boolean, fuera: () => boolean) => enRed || fuera();
+        const libreV = masAlla(bn >= 0 && bn <= B - 2, () => est(celdaEje(mu, ac), sv > 0 ? mv.celdas[mv.celdas.length - 1]! + 1 : mv.celdas[0]! - 1) === FUERA);
+        const libreU = masAlla(an >= 0 && an <= A - 2, () => est(su > 0 ? mu.celdas[mu.celdas.length - 1]! + 1 : mu.celdas[0]! - 1, celdaEje(mv, bc)) === FUERA);
+        if ((!enU || libreV) && (!enV || libreU)) {
+          plan.set(idq(ac, bc), { t: "fino" });
+          if (enU && bn >= 0 && bn <= B - 2 && losas[idq(ac, bn)]! >= 0) plan.set(idq(ac, bn), { t: "transicion", dosLados: false, porU: true, su, sv });
+          if (enV && an >= 0 && an <= A - 2 && losas[idq(an, bc)]! >= 0) plan.set(idq(an, bc), { t: "transicion", dosLados: false, porU: false, su, sv });
+        } else plan.set(idq(ac, bc), { t: "transicion", dosLados: enU && enV, porU: enU, su, sv });
+      }
+    for (let b = 0; b < B - 1; b++)
+      for (let a = 0; a < A - 1; a++) {
+        const kq = losas[a + (A - 1) * b]!;
+        const [i0, i1, j0, j1] = [fu.de[a]!, fu.de[a + 1]!, fv.de[b]!, fv.de[b + 1]!];
+        const pq = plan.get(idq(a, b));
+        if (!pq) cuad([a + A * b, a + 1 + A * b, a + 1 + A * (b + 1), a + A * (b + 1)], false, kq);
+        else if (pq.t === "fino") {
+          for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) cuad([nudoF(i, j), nudoF(i + 1, j), nudoF(i + 1, j + 1), nudoF(i, j + 1)], false, kq);
+        } else {
+          // Ejes de la transición desde su esquina más cercana a la de la huella: ξ a lo largo del
+          // lado fino (u si `porU`) y η en la otra; en una dirección sin tercios, s/3 salta de 0 a 1
+          const { su, sv, porU, dosLados } = pq;
+          const finaU = porU || dosLados;
+          const finaV = !porU || dosLados;
+          const iu = (s: number) => (su > 0 ? i0 : i1) + su * (finaU ? s : s / 3);
+          const jv = (t: number) => (sv > 0 ? j0 : j1) + sv * (finaV ? t : t / 3);
+          if (porU) {
+            const N = (s: number, t: number) => nudoF(iu(s), jv(t));
+            const medio = (s: number) => nudoExtra(`${iu(s)},${j0},${j1}`, enCuad(a, b, tramoFino(fu, mu.ejes, iu(s))[1], 0.5));
+            transicion(N, medio, dosLados, su * sv < 0, kq);
+          } else {
+            const N = (s: number, t: number) => nudoF(iu(t), jv(s));
+            const medio = (s: number) => nudoExtra(`${i0},${i1},${jv(s)}`, enCuad(a, b, 0.5, tramoFino(fv, mv.ejes, jv(s))[1]));
+            transicion(N, medio, false, su * sv > 0, kq);
+          }
+        }
+      }
+
+    // Tramos de las líneas de la rejilla del bloque, entre nudos de la rejilla o puntos del arreglo
+    // (las esquinas de la huella), partidos en más de dos: sus nudos intermedios (los puntos medios
+    // que caen en ellos pasan a ser nudos de la red, y dejan de ser bordes)
+    const subdivididas: Plantilla["subdivididas"] = [];
+    const quitarBorde = new Set<string>();
+    const recorrer = (enLaLinea: (m: number) => number | undefined, largo: number) => {
+      let ini = -1;
+      let medio: number[] = [];
+      for (let m = 0; m < largo; m++) {
+        const n = enLaLinea(m);
+        if (n === undefined) continue;
+        const x = nodos[n]!;
+        if (x.tipo !== "nudo" && x.tipo !== "punto") {
+          if (ini >= 0) medio.push(n);
+          continue;
+        }
+        if (ini >= 0 && (medio.length > 1 || (medio.length === 1 && nodos[medio[0]!]!.tipo !== "medio"))) {
+          for (const y of medio) {
+            const z = nodos[y]!;
+            if (z.tipo === "medio") {
+              quitarBorde.add(`${z.n1},${z.n2}`);
+              nodos[y] = { tipo: "nuevo", q: posRed(z) };
+            }
+          }
+          subdivididas.push({ a: ini, b: n, nudos: medio });
+        }
+        ini = n;
+        medio = [];
+      }
+    };
+    const NV = fv.x.length;
+    mv.ejes.forEach((e, b) => {
+      if (enRejilla(e)) recorrer((i) => indice.get(i + NF * fv.de[b]!), NF);
+    });
+    mu.ejes.forEach((e, a) => {
+      if (enRejilla(e)) recorrer((j) => indice.get(fu.de[a]! + NF * j), NV);
+    });
+    const bordesR = bordes.filter((x) => !quitarBorde.has(`${x.n1},${x.n2}`));
+    return { huella: k, red: nodos, quads, anillo: anilloH, bordes: bordesR, subdivididas, huellaLados: E.huellas[k]!.lados, refinada: true };
   };
+  /**
+   * Jacobiano escalado mínimo de los cuadriláteros de una plantilla en las losas, o −1 si alguno no
+   * es estrictamente convexo (el motor lo rechazaría: un ángulo de 180° deja el jacobiano positivo
+   * en los puntos de Gauss).
+   */
+  const jacobianoMin = (pl: Plantilla) => {
+    let j = Infinity;
+    for (const q of pl.quads) {
+      if (q.losa < 0) continue;
+      const X = q.n.map((n) => posRed(pl.red[n]!));
+      for (let m = 0; m < 4; m++) {
+        const [A0, B0, C0] = [X[m]!, X[(m + 1) % 4]!, X[(m + 2) % 4]!];
+        const [e1, e2] = [Math.hypot(B0[0] - A0[0], B0[1] - A0[1]), Math.hypot(C0[0] - B0[0], C0[1] - B0[1])];
+        if (!((B0[0] - A0[0]) * (C0[1] - B0[1]) - (B0[1] - A0[1]) * (C0[0] - B0[0]) > 1e-6 * e1 * e2)) return -1;
+      }
+      j = Math.min(j, jacobianoEscalado(X));
+    }
+    return j;
+  };
+  const plantillas: Plantilla[] = [];
+  const sinRefinar: number[] = [];
+  const malas: number[] = [];
+  for (const { k, mu, mv } of elegidas) {
+    for (const p of E.huellas[k]!.puntos) absorbidos[p] = 1;
+    const ref = E.refino?.[k] ?? null;
+    let pl = redDe(k, mu, mv, ref);
+    if (pl.refinada && jacobianoMin(pl) < UMBRAL_REFINO.jacobiano) {
+      pl = redDe(k, mu, mv, null);
+      sinRefinar.push(k);
+    }
+    if (jacobianoMin(pl) < JACOBIANO_PLANTILLA) malas.push(k);
+    plantillas.push(pl);
+  }
+  if (malas.length) return { excluir: malas };
+
   const celdaDe = (q: Vec2): number => {
     const [u, v] = uv(q);
     const i = tramo(U, u);
@@ -774,5 +1089,5 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
     const [i, j] = [n % nu, Math.floor(n / nu)];
     return Math.abs(n1 - n2) === 1 ? partidaH[i + j * (nu - 1)] === 1 : partidaV[i + j * nu] === 1;
   };
-  return { U, V, estado, losa, puntoNudo, nudoPunto, absorbidos, enLinea, interfaz, plantillas, posicion, celdaDe, toca, cubre, estadosArista, partida };
+  return { U, V, estado, losa, puntoNudo, nudoPunto, absorbidos, enLinea, interfaz, plantillas, sinRefinar, posicion, celdaDe, toca, cubre, estadosArista, partida };
 }

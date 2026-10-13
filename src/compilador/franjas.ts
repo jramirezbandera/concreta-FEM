@@ -221,7 +221,9 @@ function conApoyoLineal(P: Vec2, d: Vec2, n: Vec2, ed: number, en: number, linea
  * oblicuas a un ángulo pequeño (astillas en la malla) ni la crecen sin necesidad.
  *
  * Una cara no pasa a menos de h (el tamaño de malla) de la huella de un pilar que no es suyo, ni de
- * una viga o un muro casi paralelos a ella (a menos de 45°): ahí se corta. En una planta no
+ * una viga o un muro casi paralelos a ella (a menos de 45°): ahí se corta. Junto a un pilar ajeno
+ * con los lados según los ejes, la cara que va por un lado de su huella sigue por él, y la que pasa
+ * por dentro se corta en la huella (R0 de F2). En una planta no
  * ortogonal (circular, en abanico) la recta de una cara rozaba la huella de otro pilar o una viga
  * curva a unos centímetros, y la malla quedaba con astillas (G-4). Una viga a menos de h/2 de la
  * huella (enrasada con una cara) cuenta como su apoyo.
@@ -265,15 +267,22 @@ export function carasFranjas(ctx: Contexto, l: LosaCompilada): CaraFranja[] {
         c.pilares.push({ id: p.id, t0: tc - e, t1: tc + e });
       }
     }
-    // Fuera de los pilares ajenos, con su holgura
+    // Fuera de los pilares ajenos, con su holgura. Junto a uno alineado no hay astilla posible si la
+    // recta va por un lado de su huella (corre por él) o por dentro (se corta en la huella, como en
+    // los suyos): cortarla a h dejaba su extremo suelto junto al pilar, y la plantilla de un pilar de
+    // borde se iba a la triangulación (F2, R0)
+    const tolLado = 10 * ctx.op.epsGeom;
     for (const c of porRecta.values()) {
       const suyos = new Set(c.pilares.map((p) => p.id));
       for (const p of todos) {
         if (suyos.has(p.id)) continue;
         const sp = p.p[0] * d[0] + p.p[1] * d[1];
-        if (Math.abs(sp - c.s) > semiextension(p.huella, d) + h) continue;
+        const ed = semiextension(p.huella, d);
+        if (Math.abs(sp - c.s) > ed + h) continue;
+        const recto = alineada(p.huella, d);
+        if (recto && Math.abs(Math.abs(sp - c.s) - ed) <= tolLado) continue;
         const tp = p.p[0] * n[0] + p.p[1] * n[1];
-        const en = semiextension(p.huella, n) + h;
+        const en = semiextension(p.huella, n) + (recto && Math.abs(sp - c.s) < ed ? 0 : h);
         c.tramos = c.tramos.flatMap(([a, b]): [number, number][] => [...(tp - en > a ? [[a, Math.min(b, tp - en)] as [number, number]] : []), ...(tp + en < b ? [[Math.max(a, tp + en), b] as [number, number]] : [])].filter(([x, y]) => y - x > 1e-9));
       }
       // Ni por dentro de las huellas de sus pilares (la cara común de C5-g de uno mayor que el menor

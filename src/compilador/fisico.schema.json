@@ -976,6 +976,9 @@
         },
         "anchoFranja": {
           "type": "number"
+        },
+        "refinoCaras": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

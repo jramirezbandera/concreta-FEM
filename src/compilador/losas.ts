@@ -31,7 +31,7 @@ import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
-import { mallarPlanta, type LosaMallar, type ResultadoMalla } from "./mallado.ts";
+import { mallarPlanta, type LosaMallar, type ResultadoMalla, type RefinoCaras } from "./mallado.ts";
 import { estacionesBanda, ladoEstacion } from "./estaciones.ts";
 import { carasFranjas, ejesArmado, segmentosCara } from "./franjas.ts";
 import { estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
@@ -86,7 +86,7 @@ export interface Losas {
   /** Nudos que entran en el diafragma de su planta (C2-f), por planta. */
   diafragma: Map<number, number[]>;
   /** Estadísticas de la malla. */
-  malla: { nudos: number; laminas: number; jacobianoMin: number; bajos: number; laminasRejilla: number; plantillas: number };
+  malla: { nudos: number; laminas: number; jacobianoMin: number; bajos: number; laminasRejilla: number; plantillas: number; plantillasRefinadas: number };
   /** C3: láminas de los muros (van tras las de las losas en el modelo analítico). */
   muros: LaminaMuro[];
   /** Nudos de la base de cada muro con vínculo. */
@@ -272,6 +272,8 @@ interface PlantaL extends PlantaMuros {
   puntoDe: Map<string, { i: number; Q: Vec2 }>;
   /** Trazos de los ábacos de cada losa reticular de la planta (C4). */
   trazoAbaco: Map<number, Trazo[]>;
+  /** Caras de los pilares que se refinan en la malla (F2). */
+  refino: RefinoCaras;
 }
 
 /**
@@ -294,7 +296,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     puntos: new Map(),
     regiones: ctx.losas.map((l) => l.region),
     diafragma: new Map(),
-    malla: { nudos: 0, laminas: 0, jacobianoMin: 1, bajos: 0, laminasRejilla: 0, plantillas: 0 },
+    malla: { nudos: 0, laminas: 0, jacobianoMin: 1, bajos: 0, laminasRejilla: 0, plantillas: 0, plantillasRefinadas: 0 },
     muros: [],
     apoyosMuros: new Map(),
     auxiliares: [],
@@ -426,10 +428,20 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // Las caras de los pilares para las franjas de armado (fase F), de lado a lado de la losa:
     // trazos exactos, como las de las bandas (C5-g)
     const caras: { id: string; seg: [Vec2, Vec2] }[] = [];
+    // Y las caras que se refinan (F2): por pilar, la normal de su recta y su lado
+    const refino = new Map<string, { d: Vec2; lado: -1 | 1 }[]>();
     if (ctx.op.franjas)
       for (const { l } of losasK) {
         const ejes = ejesArmado(l.losa);
-        for (const c of carasFranjas(ctx, l)) for (const seg of segmentosCara(c, ejes[c.direccion])) caras.push({ id: l.losa.id, seg });
+        for (const c of carasFranjas(ctx, l)) {
+          for (const seg of segmentosCara(c, ejes[c.direccion])) caras.push({ id: l.losa.id, seg });
+          if (ctx.op.refinoCaras)
+            for (const p of c.pilares) {
+              let v = refino.get(p.id);
+              if (!v) refino.set(p.id, (v = []));
+              v.push({ d: ejes[c.direccion].d, lado: c.lado });
+            }
+        }
       }
     for (const b of ctx.bandas) {
       if (b.planta !== idPlanta) continue;
@@ -475,7 +487,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       diag.error("malla/arreglo", `No se ha podido ordenar la geometría de la planta ${idPlanta} para mallarla: hay rasgos más pequeños que ${cm(epsSnap)} que se cruzan entre sí.`, [idPlanta, ...losasK.map(({ l }) => l.losa.id)]);
       return null;
     }
-    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco };
+    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco, refino: { caras: refino, separacion: 2 * epsSnap } };
   };
   const montarTodas = (fijos: ReadonlyMap<number, Vec2[]>, d: Diagnosticos): Map<number, PlantaL> => {
     const e = new Map<number, PlantaL>();
@@ -506,7 +518,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
   const esclavosTodos = new Set<number>();
   for (const k of plantas) {
     const e = estado.get(k)!;
-    const { a, idPlanta, mallar, losaDeMallar, huellasK, nudosK } = e;
+    const { a, idPlanta, mallar, losaDeMallar, huellasK, nudosK, refino } = e;
     const defecto = a.defecto();
     if (defecto) {
       diag.error("malla/arreglo", `La geometría de la planta ${idPlanta} no se ha podido preparar para mallarla (${defecto}). Es un fallo del compilador.`, [idPlanta]);
@@ -538,7 +550,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // Malla de las losas (los lados de los muros ya van sembrados)
     let m: Extract<ResultadoMalla, { ok: true }> | null = null;
     if (mallar.length) {
-      const res = mallarPlanta(a, mallar, h, epsGeom, est?.presembrados.get(k), rejilla);
+      const res = mallarPlanta(a, mallar, h, epsGeom, est?.presembrados.get(k), rejilla, refino);
       if (!res.ok) {
         diag.error("malla/triangulacion", `La triangulación de la planta ${idPlanta} ha fallado (${res.mensaje}). Es un fallo del compilador.`, [idPlanta, ...mallar.map((x) => x.id)]);
         continue;
@@ -552,6 +564,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       r.malla.bajos += res.calidad.bajos;
       r.malla.laminasRejilla += res.rejilla.quads;
       r.malla.plantillas += res.rejilla.plantillas;
+      r.malla.plantillasRefinadas += res.rejilla.refinadas;
       if (res.problemas.some((p) => p.severidad === "error")) continue;
       mallar.forEach((_, j) => (r.regiones[losaDeMallar[j]!] = res.regiones[j]!));
       m = res;

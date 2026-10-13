@@ -37,7 +37,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "F1.1";
+export const VERSION_COMPILADOR = "F2";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -53,7 +53,8 @@ export interface EstadisticasCompilacion {
    * Malla de las losas: jacobiano escalado mínimo, cuadriláteros bajo el umbral, láminas de la
    * rejilla alineada (H52) y plantillas de pilar.
    */
-  malla: { jacobianoMin: number; bajos: number; laminasRejilla: number; plantillas: number };
+  /** `plantillasRefinadas`: las de pilares con las caras refinadas (F2). */
+  malla: { jacobianoMin: number; bajos: number; laminasRejilla: number; plantillas: number; plantillasRefinadas: number };
   /** Muros (C3): relación de aspecto máxima de sus elementos, cuántos pasan de 4, y barras auxiliares (C3-e). */
   muros: { aspectoMax: number; altos: number; auxiliares: number };
   /**
@@ -385,7 +386,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       laminas: laminas.length,
       diafragmas: piezas.diafragmas.length,
       huellas: losas.huellas.length,
-      malla: { jacobianoMin: losas.malla.jacobianoMin, bajos: losas.malla.bajos, laminasRejilla: losas.malla.laminasRejilla, plantillas: losas.malla.plantillas },
+      malla: { jacobianoMin: losas.malla.jacobianoMin, bajos: losas.malla.bajos, laminasRejilla: losas.malla.laminasRejilla, plantillas: losas.malla.plantillas, plantillasRefinadas: losas.malla.plantillasRefinadas },
       laminasMuros: losas.muros.length,
       muros: { aspectoMax: losas.aspectoMuros.max, altos: losas.aspectoMuros.altos, auxiliares: piezas.barras.filter((b) => b.auxiliar).length },
       forjados: { panos: ctx.panos.length, viguetas: panos.viguetas.length, nudosViguetas: panos.nudosNuevos, voladizos: panos.voladizos, laminasAbaco: losas.laminas.filter((l) => l.abaco).length },
