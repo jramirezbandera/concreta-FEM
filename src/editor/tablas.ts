@@ -643,6 +643,17 @@ const apoyos: DefTabla = {
 
 // ─── Casos ──────────────────────────────────────────────────────────────────────────────────────
 
+/** Las acciones de las combinaciones (`TipoAccion`), con lo que es cada una. */
+const ACCIONES = [
+  ["G", "permanente (peso, empuje o agua)"],
+  ["Q", "sobrecarga de uso"],
+  ["S", "nieve"],
+  ["W", "viento"],
+  ["T", "temperatura"],
+  ["E", "sismo"],
+  ["A", "accidental"],
+  ["N", "nocional (de un caso vertical)"],
+] as const;
 const PSI = ["uso-A", "uso-B", "uso-C", "uso-D", "uso-E", "uso-G", "nieve-hasta-1000", "nieve-mas-de-1000", "viento", "temperatura"] as const;
 const casos: DefTabla = {
   nombre: "casos",
@@ -653,7 +664,12 @@ const casos: DefTabla = {
     id,
     nombre,
     { clave: "pesoPropio", titulo: "peso propio", ayuda: "«sí» en el caso al que va el peso de las piezas (como mucho, uno)", opciones: fijas(["sí", "no"], "no") },
-    { clave: "tipo", titulo: "acción", ayuda: "G, Q, S, W, T, E, A o N; vacía: el caso no entra en las combinaciones CTE/NCSE", opciones: fijas(["G", "Q", "S", "W", "T", "E", "A", "N"], "sin acción") },
+    {
+      clave: "tipo",
+      titulo: "acción",
+      ayuda: "G permanente, Q sobrecarga de uso, S nieve, W viento, T temperatura, E sismo, A accidental o N nocional; vacía: el caso no entra en las combinaciones CTE/NCSE",
+      opciones: () => [{ valor: "", texto: "(sin acción: fuera de las combinaciones)" }, ...ACCIONES.map(([valor, nombre]) => ({ valor, texto: `${valor} · ${nombre}` }))],
+    },
     { clave: "psi", titulo: "ψ", ayuda: `por su nombre (${PSI.join(", ")}) o «ψ0 ψ1 ψ2»`, opciones: fijas(PSI, "sin dar") },
     { clave: "familia", titulo: "familia", ayuda: "excluyente: como mucho un caso de la familia por combinación" },
     { clave: "permanente", titulo: "permanente", ayuda: "G: peso (por defecto), empuje o agua", opciones: fijas(["peso", "empuje", "agua"], "peso") },

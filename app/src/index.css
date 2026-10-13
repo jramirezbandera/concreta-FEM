@@ -439,6 +439,8 @@ body {
 .herr[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
 .herr:disabled { opacity: .4; cursor: default; }
 .herr-sep { width: 1px; margin: 12px 6px; flex-shrink: 0; background: var(--color-border-main); }
+/* Un chip en la barra (la escala), centrado: con su altura fija, «stretch» lo deja arriba */
+.herramientas > .chip { align-self: center; }
 .herr-campo { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 6px; flex-shrink: 0; }
 .herr-campo > span, .herr-seg-et { font: 600 10.5px var(--font-sans); letter-spacing: .05em; text-transform: uppercase; color: var(--color-text-disabled); }
 .herr-seg { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 6px; flex-shrink: 0; }
@@ -548,7 +550,8 @@ body {
  */
 @supports (appearance: base-select) {
   select.sel, select.sel-chip, select.sel::picker(select), select.sel-chip::picker(select) { appearance: base-select; }
-  select.sel { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; cursor: pointer; }
+  /* El texto elegido, en una línea: lo que no cabe se corta (el nativo hace lo mismo) */
+  select.sel { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; cursor: pointer; white-space: nowrap; overflow: hidden; }
   select.sel:hover { border-color: var(--color-text-disabled); }
   select.sel:focus-visible, select.sel:open { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-tint-accent); }
   select.sel::picker-icon { color: var(--color-text-secondary); transition: rotate .15s; }

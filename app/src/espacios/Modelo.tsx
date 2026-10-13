@@ -44,6 +44,9 @@ const IcRenumerar: Icono = ({ size }) => <ListOrdered size={size} strokeWidth={1
 
 let ultimoPedido = 0;
 
+/** Un caso en el selector de la barra: su id, su nombre y si lleva el peso propio. */
+const textoCaso = (c: { id: string; nombre?: string; pesoPropio?: boolean } | undefined) => (c ? `${c.id}${c.nombre ? ` · ${c.nombre}` : ""}${c.pesoPropio ? " · con peso propio" : ""}` : undefined);
+
 export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const { proyecto, seleccion, setSeleccion, elegidos, tablaPedida } = useVisor();
   const vistas = useVistas();
@@ -84,13 +87,11 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
 
   const herramientas = cargas ? (
     <>
-      <Campo etiqueta="Caso activo" ancho={240}>
-        <select className="sel w-full" value={casoValido} onChange={(x) => setCaso(x.target.value)} aria-label="Caso activo">
+      <Campo etiqueta="Caso activo" ancho={300}>
+        <select className="sel w-full" value={casoValido} onChange={(x) => setCaso(x.target.value)} aria-label="Caso activo" title={textoCaso(e.casos.find((c) => c.id === casoValido))}>
           {e.casos.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.id}
-              {c.nombre ? ` · ${c.nombre}` : ""}
-              {c.pesoPropio ? " · con peso propio" : ""}
+              {textoCaso(c)}
             </option>
           ))}
         </select>
