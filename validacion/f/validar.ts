@@ -36,6 +36,9 @@ import { A, B, CASOS_NAVIER, placaNavier } from "../e3/navier.ts";
 
 await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "..", "src", "nucleo", "pkg", "nucleo_bg.wasm")));
 const rapido = process.argv.includes("--rapido");
+/** Con «--solo=4», sólo ese criterio (y no se escribe el fichero de salida). */
+const solo = process.argv.find((a) => a.startsWith("--solo="))?.slice(7);
+const hacer = (c: string) => !solo || solo === c;
 const lineas: string[] = [];
 const decir = (s = "") => {
   console.log(s);
@@ -68,6 +71,7 @@ function calculado(f: ModeloFisico, op: OpcionesCompilacion = {}, desfase = 0): 
 
 // ─── Criterio 2: Navier ───────────────────────────────────────────────────────────────────────
 decir("# Fase F: validación de las franjas de armado");
+if (hacer("2")) {
 decir();
 decir("## Criterio 2: placa de Navier (E3, 6 × 4 m apoyada en su contorno, q = −10 kN/m²)");
 decir();
@@ -115,45 +119,50 @@ for (const caso of CASOS_NAVIER.slice(0, 2)) {
   }
 }
 
+}
+
 // ─── Criterio 4: convergencia y posición ─────────────────────────────────────────────────────
 interface Demandas {
-  /** Por franja: mayor demanda superior en caras y apoyos, e inferior en las de paso. */
-  porFranja: Map<string, { cara: number; vano: number }>;
+  /** Por franja: mayor demanda inferior en las de paso, y la superior de cada cara o apoyo (por su s y su lado). */
+  porFranja: Map<string, { caras: Map<string, number>; vano: number }>;
   /** Por pilar y dirección: mayor demanda superior en las caras de las franjas que lo tocan. */
   porPilar: Map<string, number>;
 }
 
 function demandas(c: Calculado, combs: number[][]): Demandas {
-  const porFranja = new Map<string, { cara: number; vano: number }>();
+  const porFranja = new Map<string, { caras: Map<string, number>; vano: number }>();
   const porPilar = new Map<string, number>();
   for (const f of c.ef.franjas()) {
     const r = c.ef.estaciones(f.id)!;
     const env = c.ef.envolvente(f.id, combs)!;
-    let [cara, vano] = [0, 0];
+    let vano = 0;
+    const caras = new Map<string, number>();
     r.estaciones.forEach((e, i) => {
       if (!e.valido) return;
       if (e.tipo === "paso") vano = Math.max(vano, env[i]!.inferior);
-      else cara = Math.max(cara, env[i]!.superior);
+      else caras.set(`${e.tipo}${e.s.toFixed(6)}:${e.lado}`, env[i]!.superior);
       if (e.tipo === "cara")
         for (const p of e.piezas) {
           const k = `${p}:${f.direccion}`;
           porPilar.set(k, Math.max(porPilar.get(k) ?? 0, env[i]!.superior));
         }
     });
-    porFranja.set(f.id, { cara, vano });
+    porFranja.set(f.id, { caras, vano });
   }
   return { porFranja, porPilar };
 }
 
+if (hacer("4")) {
 decir();
 decir("## Criterio 4: convergencia y posición");
 decir();
-decir("Mayor demanda de cada franja (Wood–Armer): superior en caras y apoyos, inferior en los vanos; con la suma de los casos. Se comparan las franjas con una demanda de al menos el 20 % de la mayor de la losa.");
+decir("Demanda de Wood–Armer con la suma de los casos: la superior de cada cara o apoyo (los que hay con las dos mallas: el recorte de las caras junto a otros pilares y a los vuelos depende de h) y la mayor inferior de los vanos de cada franja. Se comparan las de al menos el 20 % de la mayor de la losa.");
 decir();
-decir("losa | nudos h = 0,75 / 0,375 | caras: media / máx. | vanos: media / máx. | posición: pilares con demanda | media / máx. al correr media franja");
+decir("losa | nudos h = 0,75 / 0,375 | caras y apoyos: comparadas, media / máx. | vanos: media / máx. | posición: pilares con demanda | media / máx. al correr media franja");
 for (const [nombre, f, op] of [
-  ["H25 losa plana", losaPlanaFisica(), { ...OPCIONES_LOSA_PLANA }],
+  ["H25 losa plana (2 × 2 vanos, pilares en el borde)", losaPlanaFisica(), { ...OPCIONES_LOSA_PLANA }],
   ["H25 reticular con ábacos", reticularH25(), { ...OPCIONES_LOSA_PLANA }],
+  ["losa plana de 3 × 3 vanos con vuelos de 0,5 m", losa3x3(), {}],
 ] as [string, ModeloFisico, OpcionesCompilacion][]) {
   const sinBandas = { ...f, bandas: undefined };
   const c1 = calculado(sinBandas, { ...op, tamanoMalla: 0.75 });
@@ -161,14 +170,22 @@ for (const [nombre, f, op] of [
   const combs = [c1.casos.map(() => 1)];
   const d1 = demandas(c1, combs);
   const d2 = demandas(c2, combs);
-  const dif = (que: "cara" | "vano") => {
-    const max = Math.max(...[...d2.porFranja.values()].map((x) => x[que]));
+  const resumen = (ds: number[]) => `${pc(ds.reduce((a, b) => a + b, 0) / Math.max(1, ds.length), 1)} / ${pc(Math.max(0, ...ds), 1)}`;
+  const difVanos = () => {
+    const max = Math.max(...[...d2.porFranja.values()].map((x) => x.vano));
     const ds: number[] = [];
-    for (const [id, v] of d2.porFranja) {
-      if (v[que] < 0.2 * max) continue;
-      ds.push(Math.abs(d1.porFranja.get(id)![que] / v[que] - 1));
-    }
-    return `${pc(ds.reduce((a, b) => a + b, 0) / Math.max(1, ds.length), 1)} / ${pc(Math.max(0, ...ds), 1)}`;
+    for (const [id, v] of d2.porFranja) if (v.vano >= 0.2 * max) ds.push(Math.abs(d1.porFranja.get(id)!.vano / v.vano - 1));
+    return resumen(ds);
+  };
+  const difCaras = () => {
+    const max = Math.max(...[...d2.porFranja.values()].flatMap((x) => [...x.caras.values()]));
+    const ds: number[] = [];
+    for (const [id, v] of d2.porFranja)
+      for (const [k, x] of v.caras) {
+        const y = d1.porFranja.get(id)!.caras.get(k);
+        if (y !== undefined && x >= 0.2 * max) ds.push(Math.abs(y / x - 1));
+      }
+    return `${ds.length}, ${resumen(ds)}`;
   };
   // Posición: las mismas franjas corridas media franja (la malla no cambia: las caras van de lado a lado)
   const ctx = validar(sinBandas, resolverOpciones({ ...op, tamanoMalla: 0.75 }), new Diagnosticos())!;
@@ -183,16 +200,37 @@ for (const [nombre, f, op] of [
     const w = dc.porPilar.get(k);
     if (w !== undefined) ps.push(w / v - 1);
   }
-  decir(`${nombre} | ${c1.nudos} / ${c2.nudos} | ${dif("cara")} | ${dif("vano")} | ${ps.length} | ${pc(ps.reduce((a, b) => a + b, 0) / Math.max(1, ps.length), 1)} / ${pc(Math.min(0, ...ps), 1)} … ${pc(Math.max(0, ...ps), 1)}`);
+  decir(`${nombre} | ${c1.nudos} / ${c2.nudos} | ${difCaras()} | ${difVanos()} | ${ps.length} | ${pc(ps.reduce((a, b) => a + b, 0) / Math.max(1, ps.length), 1)} / ${pc(Math.min(0, ...ps), 1)} … ${pc(Math.max(0, ...ps), 1)}`);
+}
+
+}
+
+/** La losa plana de los tests (`franjas.test.ts`): 3 × 3 vanos de 6 × 5 m, 16 pilares de 30 × 30 y vuelos de 0,5 m. */
+function losa3x3(): ModeloFisico {
+  const pilares = [];
+  for (const x of [0, 6, 12, 18]) for (const y of [0, 5, 10, 15]) pilares.push({ id: `P${x}-${y}`, x, y, desde: "C", hasta: "P1", seccion: "p" });
+  return {
+    plantas: [
+      { id: "P1", altura: null },
+      { id: "C", tipo: "sotano", altura: 3 },
+    ],
+    materiales: [{ id: "HA", tipo: "hormigon", fck: 25 }],
+    secciones: [{ id: "p", material: "HA", forma: "rectangular", b: 0.3, h: 0.3 }],
+    pilares,
+    losas: [{ id: "L", planta: "P1", contorno: [[-0.5, -0.5], [18.5, -0.5], [18.5, 15.5], [-0.5, 15.5]], espesor: 0.25, material: "HA" }],
+    casos: [{ id: "G", pesoPropio: true }, { id: "Q" }],
+    cargas: [{ tipo: "superficie", id: "q", caso: "Q", planta: "P1", losa: "L", q: [0, 0, -10] }],
+  };
 }
 
 // ─── Criterio 5: malla ───────────────────────────────────────────────────────────────────────
+const sinVigas = (f: ModeloFisico): ModeloFisico => ({ ...f, vigas: [], cargas: f.cargas!.filter((c) => c.tipo !== "viga") });
+const plantas = rapido ? 2 : 7;
+if (hacer("5")) {
 decir();
 decir("## Criterio 5: malla del edificio objetivo (7 plantas, h = 0,75)");
 decir();
 decir("modelo | sin caras: nudos / ecuaciones | con caras: nudos / ecuaciones | crecimiento (ecuaciones) | perfil móvil (≤ 200 000) | avisos de malla sin / con");
-const sinVigas = (f: ModeloFisico): ModeloFisico => ({ ...f, vigas: [], cargas: f.cargas!.filter((c) => c.tipo !== "viga") });
-const plantas = rapido ? 2 : 7;
 for (const [nombre, f] of [
   ["losa plana", sinVigas(edificioObjetivoLosas(plantas))],
   ["maciza con vigas", edificioObjetivoLosas(plantas)],
@@ -214,7 +252,10 @@ for (const [nombre, f] of [
   eqs = [];
 }
 
+}
+
 // ─── Criterio 7: rendimiento ─────────────────────────────────────────────────────────────────
+if (hacer("7")) {
 decir();
 decir("## Criterio 7: rendimiento en el edificio objetivo (losa plana y con vigas, 7 plantas)");
 decir();
@@ -249,4 +290,6 @@ for (const [nombre, f] of [
   decir(`${nombre} | ${nf} | ${estaciones} | ${combs.length} | ${tCalc.toFixed(1)} | ${t1.toFixed(2)} | ${t2.toFixed(2)} | ${total.toFixed(1)} | ${pc(total / tCalc, 0)}`);
 }
 
-if (!rapido) writeFileSync(join(import.meta.dirname, "out_validacion.txt"), lineas.join("\n") + "\n", { encoding: "utf8" });
+}
+
+if (!rapido && !solo) writeFileSync(join(import.meta.dirname, "out_validacion.txt"), lineas.join("\n") + "\n", { encoding: "utf8" });

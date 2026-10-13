@@ -105,6 +105,7 @@ describe("Fase F · Resultados · Armado en el DOM", () => {
       expect(Number(c[3]!.getAttribute("data-superior"))).toBe(f.superior?.v ?? 0);
       expect(c[3]!.textContent!.startsWith(f.superior ? fmt(f.superior.v, 1) : "0")).toBe(true);
     });
+    (await waitFor(() => screen.getByRole("button", { name: `Ver las ${fr.estaciones.length} estaciones` }))).click();
     const est = await waitFor(() => screen.getByRole("table", { name: `Estaciones de ${id}` }));
     const filasE = within(est).getAllByRole("row").slice(1);
     expect(filasE.length).toBe(fr.estaciones.length);

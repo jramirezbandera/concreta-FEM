@@ -232,3 +232,5 @@ Las cuatro, como se proponían:
 - **b. «Proponer bandas» rehace sólo las propuestas.** Sustituye las de origen «propuesta» de las plantas elegidas y deja las del usuario. Una propuesta que se solapa con una del usuario no se añade, y se dice.
 - **c. El reticular, en columnas de la tabla de losas.** Una losa es reticular si tiene intereje.
 - **d. Los esfuerzos de las bandas, dentro de V2b.** Modo «Bandas» en Resultados: las bandas de la planta coloreadas por el momento de diseño de la combinación (con la escala de los mapas) y la tabla de sus estaciones (caras y vanos) con `EsfuerzosBandas`: momento medio y por nervio, Wood–Armer y reparto pilares/central con su aviso (C5-d). Todo número, de su consulta. Criterio de paso nuevo (7): los valores de la pantalla son los de `fem consultar banda` bit a bit, y la primera banda de una planta sale en ≤ 1 s en el edificio objetivo.
+
+> **Desde la fase F** (2026-10-13, `franjas.md`): «Proponer bandas», la tabla Bandas y Resultados · Bandas salen de la app; las decisiones a, b y d de §7.4 quedan sin efecto. El armado de las losas va por franjas (Resultados · Armado).

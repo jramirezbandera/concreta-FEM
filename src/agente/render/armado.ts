@@ -105,10 +105,22 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
       for (let b = 0; b < nb; b++) if (v <= L[b + 1]! || b === nb - 1) return b;
       return nb - 1;
     };
-    for (const t of tramos) {
+    // Los tramos seguidos de una franja en la misma banda, en un solo rectángulo, y los de cada banda
+    // en una sola región con un anillo por rectángulo (no se solapan): el mismo dibujo con una región
+    // por banda, como los mapas, en vez de miles
+    const porBanda = new Map<number, Vec2[][]>();
+    for (let i = 0; i < tramos.length; ) {
+      const t = tramos[i]!;
       const b = banda(t.v);
-      P.push({ tipo: "region", anillos: [t.rectangulo], estilo: "isobanda", relleno: colores[b]!, banda: b });
+      let j = i + 1;
+      while (j < tramos.length && tramos[j]!.franja === t.franja && banda(tramos[j]!.v) === b && tramos[j]!.rectangulo[0]![0] === tramos[j - 1]!.rectangulo[1]![0] && tramos[j]!.rectangulo[0]![1] === tramos[j - 1]!.rectangulo[1]![1]) j++;
+      const u = tramos[j - 1]!;
+      const anillos = porBanda.get(b) ?? [];
+      anillos.push([t.rectangulo[0]!, u.rectangulo[1]!, u.rectangulo[2]!, t.rectangulo[3]!]);
+      porBanda.set(b, anillos);
+      i = j;
     }
+    for (const [b, anillos] of [...porBanda].sort((x, y) => x[0] - y[0])) P.push({ tipo: "region", anillos, estilo: "isobanda", relleno: colores[b]!, banda: b });
     for (let b = nb - 1; b >= 0; b--) {
       const texto = fueraArriba && b === nb - 1 ? `más de ${rotulo(L[b]!, 4)} (fuera de la escala)` : fueraAbajo && b === 0 ? `menos de ${rotulo(L[1]!, 4)} (fuera de la escala)` : `${rotulo(L[b]!, 4)} a ${rotulo(L[b + 1]!, 4)}`;
       leyenda.push({ relleno: colores[b]!, texto });

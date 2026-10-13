@@ -291,18 +291,28 @@ export class EsfuerzosFranjas {
         const [a, b] = [Math.min(ya, yb), Math.max(ya, yb)];
         const largo = b - a;
         const abaco = lam[p.lamina]!.abaco === true;
-        // Lo de su lado sobre la recta que cae en [lo, hi] (un lado de largo nulo, un nudo suelto, va entero a la que lo tiene)
+        const m = (a + b) / 2;
+        // Lo de cada nudo, en su mitad del lado sobre la recta (el de un lado de largo nulo, un nudo
+        // suelto, entero a la que lo tiene): el total es exacto y el pico junto a un pilar se queda
+        // cerca de su nudo (F-6)
+        const trozos = p.nudos.map((x) => {
+          const t = ta + sigma * x.y;
+          return { lo: largo > EPS ? (t < m ? a : m) : t, hi: largo > EPS ? (t < m ? m : b) : t, e: x.esfuerzos };
+        });
         const sumar = (q: PorFranja, lo: number, hi: number, suyo: boolean) => {
           const ov = largo > EPS ? Math.max(0, Math.min(b, hi) - Math.max(a, lo)) : suyo ? 1 : 0;
-          const f = largo > EPS ? ov / largo : ov;
-          if (!(f > 0)) return;
+          if (!(ov > 0)) return;
           q.w += largo > EPS ? ov : 0;
           if (abaco) q.wAbaco += largo > EPS ? ov : 0;
-          for (let kc = 0; kc < nc; kc++) q.m[3 * kc]! += f * p.esfuerzos[6 * kc + 4]!;
+          for (const z of trozos) {
+            const f = largo > EPS ? Math.max(0, Math.min(z.hi, hi) - Math.max(z.lo, lo)) / (z.hi - z.lo) : 1;
+            if (!(f > 0)) continue;
+            for (let kc = 0; kc < nc; kc++) q.m[3 * kc]! += f * z.e[6 * kc + 4]!;
+          }
         };
-        const im = franjaDe((a + b) / 2);
+        const im = franjaDe(m);
         for (let i = Math.max(0, franjaDe(a)); i < fr.length && bordes[i]! < b + EPS; i++) sumar(r[i]!, bordes[i]!, bordes[i + 1]!, i === im);
-        ventanas.forEach(([lo, hi], v) => sumar(rv[v]!, lo, hi, (a + b) / 2 > lo && (a + b) / 2 < hi));
+        ventanas.forEach(([lo, hi], v) => sumar(rv[v]!, lo, hi, m > lo && m < hi));
       }
       return { r, rv, diag: res.diagnosticos.filter((x) => x.codigo !== "corte/borde-no-sigue-malla" && x.codigo !== "corte/vacio") };
     };

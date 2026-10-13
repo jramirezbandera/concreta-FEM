@@ -175,7 +175,13 @@ export interface ResultadoCorte extends InfoCorte {
    * plano desde el lado A, [N, Vy, Vz, T, My, Mz] por caso (6·nc) en los ejes del corte y respecto a
    * su origen, y el tramo y de sus nudos en el corte. Suman las láminas de `esfuerzos`.
    */
-  porLamina?: { lamina: number; y: [number, number]; esfuerzos: Float64Array }[];
+  porLamina?: {
+    lamina: number;
+    y: [number, number];
+    esfuerzos: Float64Array;
+    /** Lo de cada uno de sus nudos en el corte (suman `esfuerzos`), con su y. */
+    nudos: { y: number; esfuerzos: Float64Array }[];
+  }[];
 }
 
 const norma = (v: ArrayLike<number>) => Math.hypot(v[0]!, v[1]!, v[2]!);
@@ -414,7 +420,7 @@ export class Cortes {
     // atraviesan, error por fuerzas nodales o integral de campos. Si el método es «campos» y alguna lo
     // atraviesa, todas van por campos (corte mixto, C2-2).
     let mixto = false;
-    const porLamina: { lamina: number; y: [number, number]; suma: Float64Array }[] = [];
+    const porLamina: { lamina: number; y: [number, number]; suma: Float64Array; nudos: { y: number; suma: Float64Array }[] }[] = [];
     {
       const atraviesan: string[] = [];
       const bordes: string[] = [];
@@ -445,15 +451,17 @@ export class Cortes {
         info.laminas.push(e.indice);
         if (enCorte.some(([v]) => !cp.dentro(X(v)))) bordes.push(e.id);
         const propia = corte.porLamina ? new Suma(nc, O) : null;
+        const deNudo = corte.porLamina ? enCorte.map(() => new Suma(nc, O)) : null;
         this.guardado(casos).lamina(e.indice).forEach((g, k) => {
-          for (const [v, a] of enCorte) {
+          enCorte.forEach(([v, a], i) => {
             suma.agregar(k, X(v), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6));
             propia?.agregar(k, X(v), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6));
-          }
+            deNudo?.[i]!.agregar(k, X(v), g.subarray(6 * a, 6 * a + 3), g.subarray(6 * a + 3, 6 * a + 6));
+          });
         });
         if (propia) {
           const ys = enCorte.map(([v]) => cp.coordenadas(X(v))[1]);
-          porLamina.push({ lamina: e.indice, y: [Math.min(...ys), Math.max(...ys)], suma: propia.v });
+          porLamina.push({ lamina: e.indice, y: [Math.min(...ys), Math.max(...ys)], suma: propia.v, nudos: deNudo!.map((d, i) => ({ y: ys[i]!, suma: d.v })) });
         }
         for (const [v] of enCorte) extender(X(v));
       }
@@ -670,7 +678,7 @@ export class Cortes {
     const esfuerzos = aEjes(suma.v, nan);
     info.extension = Number.isFinite(ext.y[0]) ? ext : null;
     const r: ResultadoCorte = { ...info, esfuerzos, ejes, diagnosticos: diag.lista, valido: true, muestras };
-    if (corte.porLamina && !mixto) r.porLamina = porLamina.map((p) => ({ lamina: p.lamina, y: p.y, esfuerzos: aEjes(p.suma) }));
+    if (corte.porLamina && !mixto) r.porLamina = porLamina.map((p) => ({ lamina: p.lamina, y: p.y, esfuerzos: aEjes(p.suma), nudos: p.nudos.map((x) => ({ y: x.y, esfuerzos: aEjes(x.suma) })) }));
     return r;
   }
 

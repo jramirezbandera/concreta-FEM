@@ -20,7 +20,7 @@
 - **D2 – Forjado unidireccional:** se introduce como paño con reparto de cargas, pero se discretiza en viguetas como barras y se ven los esfuerzos por vigueta.
 - **D3 – Reticular:** multiplicadores por dirección sobre la losa maciza (f11…v23 y peso), calculados a partir de nervios y casetones. Los ábacos van macizos, con multiplicador 1. Hay que validarlo contra un modelo de SAP2000 del usuario.
 - **D4 – Modificadores de rigidez (2026-10-04):** por defecto, axil de todos los pilares ×2 y torsión de las vigas de hormigón ×0,1, por material (`MODIFICADORES_D4`); la flexión no se toca. Con ellos, el factor de zona rígida por defecto pasa a 0,5 (C1-a). Medidas en `validacion/c1/out_decisiones.txt`.
-- **D5 – Bandas de dimensionado de las losas:** automáticas y editables. El compilador propone las del Ap. I del CE A19 a partir de los ejes de los pilares, y el usuario puede moverlas, cambiar su anchura, partirlas o añadir otras. Sus bordes y las caras de los apoyos se siembran en la malla (E5-5), así que editar una banda obliga a recalcular.
+- **D5 – Armado de las losas (sustituida el 2026-10-13 por la fase F):** franjas de ancho fijo (1 m; el intereje en un reticular) que cubren toda la losa en su eje 1 y en el perpendicular, sin proponer ni editar nada (`franjas.md`, `fase-f.md`). Las bandas del Anejo I salen de la app; el campo `bandas` del proyecto queda para el agente, como cortes de comprobación.
 - **D9 – Tope de tamaño:** unas 7 plantas con 80 pilares por planta, que en sobremesa son ≈ 50 000 nudos y 300 000 GDL. El límite se fija en GDL según el dispositivo.
 - **D11 – Motor propio:**
   - TypeScript para elementos, restricciones, ensamblado y recuperación de esfuerzos;
@@ -330,8 +330,30 @@
   - **Motor y consultas, con los mismos bits:** SPR, cortes y diagramas compartidos entre los mapas y las bandas; las equivalentes de cada lámina se preparan cuando se piden. La primera banda pasa de 2,6 s a ~1 s en Bun.
   - **Validación:** `src/editor/v2b.test.ts`, `src/compilador/apoyosBanda.test.ts`, `src/visor/bandas.test.ts`, los tests de DOM y el banco en Chrome `validacion/v2b/chrome.ts`.
   - **Pendiente del usuario:** la puerta de uso, y decidir sobre los tiempos: los diagnósticos del reticular de V2 tardan 2,0 s (lo que tarda en compilar) y la primera tabla de bandas, 2,17 s en Chrome.
+- **2026-10-13: fase F terminada** (franjas de armado, en lugar de las bandas del Anejo I; D5 sustituida). Pasan los criterios 1, 2, 5, 6, 8 y 9; el 3, el 4 y el 7 quedan a medias, y el 10 (puerta de uso) es del usuario. El plan está en `docs/fem3d/franjas.md` y el informe, en `docs/fem3d/fase-f.md`, con criterios, hallazgos F-1…F-10, decisiones y pendientes.
+  - **Franjas:** de 1 m (el intereje en un reticular) de borde a borde, en el eje 1 de la losa (X) y en el perpendicular (Y). No se proponen ni se guardan.
+    - Estaciones: las caras de los pilares y las líneas de apoyo (vigas, muros y apoyos lineales perpendiculares) por fuerzas nodales, y cada 0,25 m por campos.
+    - En cada estación, el momento medio por metro y Wood–Armer por combinación.
+    - En la cara de un pilar, la franja que lo toca toma el metro centrado en él (F-h, por F-2: con el reparto fijo, hasta un 35 % menos).
+  - **Caras de los pilares en la malla:** de lado a lado de la losa (opción `franjas`, por defecto sí; compilador F1.1).
+    - Sólo las de los pilares rectangulares alineados, dentro de la losa y sin una viga o un muro que los atraviese.
+    - Con vigas, la malla no crece; en la losa plana del edificio objetivo, ×2,04 (cabe en el perfil móvil).
+    - Con `franjas: false`, la malla de C1–C5 sale bit a bit.
+  - **Motor:** cortes `soloLaminas`, `porLamina` (por nudo), `quiebres` y `cuadratura: 2`. El bucle de los campos ya no crea arrays (los mismos bits).
+  - **Consultas, CLI y A4:** `fem consultar franjas|franja` y las vistas `armado-x-inf|x-sup|y-inf|y-sup`.
+  - **App:** Resultados · Armado (mapa, tabla y diagrama de la franja). Fuera: el modo Bandas, la tabla y la herramienta Banda, y «Proponer bandas» con su operación.
+  - **Validación:** `validacion/f/`.
+    - Flexión cilíndrica a ≤ 0,5 %; Navier a ≤ 0,57 %.
+    - Frente a OpenSeesPy ASDShellQ4 en H25, las caras a ≤ 1,5 % con h = 0,375 (≤ 3,2 % con 0,75).
+    - Banco de Chrome: el mapa en 1,8 s, sin tareas largas, bit a bit.
+    - Referencia congelada.
+  - **Pendiente del usuario** (`fase-f.md` §4):
+    - el h de las losas con franjas: con 0,75, el metro junto a un pilar sale un 6 % bajo; con 0,5, −0,7 %;
+    - el tiempo: las franjas de 7 plantas cuestan 1,7–2,1 veces el cálculo;
+    - la comparación con el reticular de SAP2000;
+    - la puerta de uso.
 - **Siguiente paso:**
-  - las puertas de uso de I1, I2, I3 e I4, de V2a y de V2b;
+  - las puertas de uso de F, de I1, I2, I3 e I4, de V2a y de V2b;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).

@@ -4,7 +4,7 @@
 >
 > **Qué cambia:** las losas macizas y reticulares se arman con **franjas de ancho fijo que cubren toda la losa**, en sus dos direcciones. Las bandas del Anejo I salen de la app: ni «Proponer bandas» ni su edición. **Sustituye a D5** en la app; las bandas siguen en el `proyecto.json` como cortes de comprobación para el agente.
 >
-> **Este documento** fija, antes de empezar, cómo se hace y qué tiene que pasar (§2–§4). El resultado irá en `fase-f.md`.
+> **Este documento** fija, antes de empezar, cómo se hace y qué tiene que pasar (§2–§4). El resultado está en `fase-f.md`, con lo que cambió durante la fase: la ventana centrada en el pilar (F-h), las caras de lado a lado de la losa y los pilares que no las tienen (F-1, F-3, F-4).
 
 ## 1. Por qué
 

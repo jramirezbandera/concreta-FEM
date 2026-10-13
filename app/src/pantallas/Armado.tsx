@@ -109,6 +109,8 @@ function DiagramaFranja({ d }: { d: DatosFranja }) {
 /** La franja elegida: su diagrama y sus estaciones. */
 function DetalleFranja({ d, varias }: { d: DatosFranja; varias: boolean }) {
   const f = d.franja;
+  // La tabla de todas las estaciones (cientos de filas), sólo si se pide
+  const [todas, setTodas] = useState(false);
   const exactas = d.estaciones.filter((x) => x.tipo !== "paso");
   const reticular = f.intereje !== null;
   return (
@@ -155,6 +157,11 @@ function DetalleFranja({ d, varias }: { d: DatosFranja; varias: boolean }) {
         <p className="nota">De «fem consultar franja»: exactas, por fuerzas nodales, del lado de la flecha. Momento medio por metro de la franja; mx &gt; 0 tracciona la cara inferior.</p>
       </Seccion>
       <Seccion titulo="Todas las estaciones" valor={d.estaciones.length}>
+        {!todas ? (
+          <button type="button" className="btn mx-3.5 my-1.5" onClick={() => setTodas(true)}>
+            Ver las {d.estaciones.length} estaciones
+          </button>
+        ) : (
         <table className="tb" aria-label={`Estaciones de ${f.id}`}>
           <thead>
             <tr>
@@ -180,6 +187,7 @@ function DetalleFranja({ d, varias }: { d: DatosFranja; varias: boolean }) {
             ))}
           </tbody>
         </table>
+        )}
         {reticular && <p className="nota">Reticular: el momento por nervio es el medio por el intereje ({fmt(f.intereje!, 2)} m), fuera de los ábacos.</p>}
       </Seccion>
       {d.diagnosticos.length > 0 && (

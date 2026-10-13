@@ -8,8 +8,8 @@ globales) y la misma definición que cortes.ts y esfuerzosFranjas.ts:
 - láminas no rígidas (no todos sus nudos en un mismo enlace) que tocan el plano desde el lado A con
   el centroide dentro del rectángulo de la recta entera; una que lo atraviese hace que la estación no
   se compare (una de paso que no cae en una recta de la malla);
-- lo de cada lámina (el My de sus fuerzas en sus nudos del plano, My = −m·y) se reparte en el
-  intervalo de la estación por la parte de su lado sobre la recta que cae en él.
+- lo de cada nudo de cada lámina (el My de sus fuerzas en él, My = −m·y) se reparte en su mitad del
+  lado de la lámina sobre la recta, y cuenta la parte que cae en el intervalo de la estación.
 
 Uso: .venv312/Scripts/python.exe validacion/f/oraculo_franjas.py → validacion/f/out_opensees.txt
 """
@@ -77,27 +77,26 @@ def estacion(modelo, rigidas, e, fuerzas):
         if mas > 0:
             return None
         g = fuerzas[k]
-        M = [0.0, 0.0, 0.0]
-        ys = []
+        nod = []
         for a, v in enumerate(vs):
             if ls[a] != 0:
                 continue
             f = g[6 * a: 6 * a + 3]
             m = g[6 * a + 3: 6 * a + 6]
             r = [X[v][q] - O[q] for q in range(3)]
-            M[0] += m[0] + r[1] * f[2] - r[2] * f[1]
-            M[1] += m[1] + r[2] * f[0] - r[0] * f[2]
-            M[2] += m[2] + r[0] * f[1] - r[1] * f[0]
-            ys.append(coord(X[v])[1])
-        if not ys:
+            M = [m[0] + r[1] * f[2] - r[2] * f[1], m[1] + r[2] * f[0] - r[0] * f[2], m[2] + r[0] * f[1] - r[1] * f[0]]
+            nod.append((coord(X[v])[1], -sum(M[i] * ey[i] for i in range(3))))
+        if not nod:
             continue
-        myl = -sum(M[i] * ey[i] for i in range(3))
-        ya, yb = min(ys), max(ys)
+        ya, yb = min(y for y, _ in nod), max(y for y, _ in nod)
         largo = yb - ya
-        if largo > TOL:
-            my += myl * max(0.0, min(yb, a1) - max(ya, a0)) / largo
-        elif a0 < (ya + yb) / 2 < a1:
-            my += myl
+        mid = (ya + yb) / 2
+        for y, myn in nod:
+            if largo > TOL:
+                lo, hi = (ya, mid) if y < mid else (mid, yb)
+                my += myn * max(0.0, min(hi, a1) - max(lo, a0)) / (hi - lo)
+            elif a0 < y < a1:
+                my += myn
     return my
 
 

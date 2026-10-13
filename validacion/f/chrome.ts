@@ -200,7 +200,7 @@ try {
   const ms5 = await pagina<number>(`
     const t0 = performance.now();
     [...document.querySelectorAll("table[aria-label='Franjas de la planta'] tbody tr")].find((tr) => tr.querySelector("td").firstChild.textContent === ${JSON.stringify(id)}).click();
-    await __v2.esperar(() => document.querySelector("table[aria-label='Estaciones de ${id}']"));
+    await __v2.esperar(() => document.querySelector("table[aria-label='Caras y apoyos de ${id}']"));
     return performance.now() - t0;`);
   comprobar(ms5 <= 1000, `el detalle de ${id} (diagrama y estaciones) sale en ${(ms5 / 1000).toFixed(2)} s (≤ 1 s)`);
   comprobar((await largasDesde(t5)).every((x) => x.ms <= 50), `el detalle, sin tareas largas > 50 ms`);
