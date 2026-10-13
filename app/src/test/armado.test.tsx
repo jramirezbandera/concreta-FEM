@@ -22,7 +22,10 @@ import { ContextoVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { ModoArmado } from "../pantallas/Armado.tsx";
 import type { ClienteSesion } from "../sesion/cliente.ts";
-import type { ProyectoAbierto } from "../sesion/useProyecto.ts";
+import { soloArmado, type Edicion, type ProyectoAbierto } from "../sesion/useProyecto.ts";
+import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
+import type { Proyecto } from "../../../src/agente/proyecto.ts";
+import { fireEvent } from "@testing-library/react";
 import { ThemeProvider } from "../tema/ThemeProvider.tsx";
 import { ContextoVistas, useEstadoVistas } from "../vistas/estado.ts";
 
@@ -67,8 +70,8 @@ function Paneles({ children }: { children: React.ReactNode }) {
   );
 }
 
-function montar(planta: string, seleccion: string | null) {
-  const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(), fuente: { tipo: "texto", nombre: "h25.json" }, desactualizado: false, errores: [], motivoGuardados: null, firmas: "", tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {} };
+function montar(planta: string, seleccion: string | null, edicion?: Edicion) {
+  const proyecto: ProyectoAbierto = { fase: "listo", estado, cliente: cliente(), fuente: { tipo: "texto", nombre: "h25.json" }, desactualizado: false, errores: [], motivoGuardados: null, firmas: "", tiempos: {}, version: 1, abrirOrigen() {}, abrirTexto() {}, recalcular() {}, ...(edicion ? { edicion } : {}) };
   return render(
     <ThemeProvider>
       <Paneles>
@@ -121,4 +124,79 @@ describe("Fase F · Resultados · Armado en el DOM", () => {
     exactas.forEach((x, i) => expect(within(filasC[i]!).getAllByRole("cell")[3]!.textContent).toBe(conComb(x.superior, 1, varias)));
     expect(screen.getByRole("img", { name: `Diagrama de ${id}` })).toBeTruthy();
   }, 60_000);
+});
+
+describe("Fase AB · la armadura base y las zonas de refuerzo en el DOM", () => {
+  const proyectoBase = (armado: Proyecto["armado"]): Proyecto => ({ esquema: VERSION_ESQUEMA, modelo: MODELO, ...(armado ? { armado } : {}) });
+  const edicion = (p: Proyecto, editar: (o: Operacion) => void): Edicion => ({
+    proyecto: p,
+    sinGuardar: false,
+    deshacerEtiqueta: null,
+    rehacerEtiqueta: null,
+    editar: (o) => {
+      editar(o);
+      return aplicar(p, o);
+    },
+    deshacer() {},
+    rehacer() {},
+    guardar: async () => {},
+    guardado: { tipo: "nada" },
+    conflicto: null,
+    recargarDisco() {},
+    modo: "descargar",
+    pendiente: false,
+  });
+
+  it("la pestaña Refuerzos dice las zonas de su consulta, y la base se edita con la operación «armado»", async () => {
+    const planta = MODELO.losas![0]!.planta;
+    const losa = MODELO.losas![0]!.id;
+    const armado = { base: { "x-sup": 15 } };
+    const d = ((await at.atender({ tipo: "armado", planta, combinaciones: { tipo: "defecto" }, armadura: "x-sup", armado, soloExceso: true })) as { valor: DatosArmado }).valor;
+    expect(d.zonas.length).toBeGreaterThan(0);
+    const ops: Operacion[] = [];
+    montar(planta, null, edicion(proyectoBase(armado), (o) => ops.push(o)));
+    (await waitFor(() => screen.getByRole("tab", { name: /Refuerzos/ }))).click();
+    const tabla = await waitFor(() => {
+      const t = screen.getByRole("table", { name: "Zonas de refuerzo" });
+      expect(within(t).getAllByRole("row").length).toBe(d.zonas.length + 1);
+      return t;
+    });
+    within(tabla)
+      .getAllByRole("row")
+      .slice(1)
+      .forEach((f, i) => {
+        const c = within(f).getAllByRole("cell");
+        expect(c[0]!.textContent!.startsWith(d.zonas[i]!.id)).toBe(true);
+        expect(Number(c[5]!.getAttribute("data-maximo"))).toBe(d.zonas[i]!.maximo.v);
+        expect(Number(c[6]!.getAttribute("data-exceso"))).toBe(d.zonas[i]!.maximo.exceso);
+      });
+    // La base común se ve y se cambia; la de la losa, vacía, hereda la común
+    const comun = screen.getByRole("textbox", { name: "Base X superior de todas las losas" }) as HTMLInputElement;
+    expect(comun.value).toBe("15");
+    const propia = screen.getByRole("textbox", { name: `Base X superior de ${losa}` }) as HTMLInputElement;
+    expect(propia.value).toBe("");
+    expect(propia.placeholder).toBe("15");
+    fireEvent.change(propia, { target: { value: "22,5" } });
+    fireEvent.blur(propia);
+    expect(ops).toEqual([{ op: "armado", armado: { base: { "x-sup": 15 }, losas: { [losa]: { "x-sup": 22.5 } } } }]);
+    // Un número negativo no se manda
+    fireEvent.change(comun, { target: { value: "-3" } });
+    fireEvent.blur(comun);
+    expect(ops.length).toBe(1);
+    expect(comun.getAttribute("aria-invalid")).toBe("true");
+  }, 60_000);
+
+  it("sólo la base no reabre el proyecto (soloArmado)", () => {
+    const p = proyectoBase(undefined);
+    const r = aplicar(p, { op: "armado", armado: { base: { "x-inf": 5 } } });
+    if (!r.ok) throw new Error();
+    expect(soloArmado(p, r.proyecto)).toBe(true);
+    const r2 = aplicar(r.proyecto, { op: "datos", nombre: "otro" });
+    if (!r2.ok) throw new Error();
+    expect(soloArmado(r.proyecto, r2.proyecto)).toBe(false);
+    const l = MODELO.losas![0]!;
+    const r3 = aplicar(r.proyecto, { op: "cambiar", coleccion: "losas", id: l.id, objeto: { ...l, espesor: l.espesor + 0.01 } });
+    if (!r3.ok) throw new Error();
+    expect(soloArmado(r.proyecto, r3.proyecto)).toBe(false);
+  });
 });
