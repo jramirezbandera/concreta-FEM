@@ -53,6 +53,15 @@
  * se perdía sin aviso (hasta un 50 % junto al hueco del edificio o con h fino). Sin nudos delante, el
  * corte es el de la recta sin el enlace, el de siempre.
  *
+ * Un pilar sin cara de franja en una dirección (uno de borde, o uno que atraviesa una viga o un muro
+ * según la transversal: `carasFranjas`) tiene también su metro en cada cara (SP-3, SP-4), en las
+ * franjas que lo tocan: por la recta de la cara con lo que transmite su enlace, si sigue la malla en
+ * su ventana, o por el escalón desde una recta de la malla que atraviese su huella (la línea de apoyo
+ * de la viga o el muro, o la cara común de otros pilares de su línea). Entre sus caras no hay estaciones. Antes la franja sólo tenía allí la estación de apoyo en
+ * el eje, sin lo que pasa por la huella, y estaciones de paso por campos pegadas a la esquina del
+ * pilar, que no convergen: con h = 0,75, el máximo salía hasta un 40 % bajo. Sin ninguna de las dos,
+ * el aviso `franja/pilar-sin-cara` de siempre.
+ *
  * Wood–Armer (H34, C5-c a): por combinación, con los momentos medios. Una franja de la dirección 1
  * da la armadura de esa dirección (m*x en sus ejes) y una de la 2, la de la suya.
  *
@@ -67,7 +76,7 @@ import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/model
 import { combinar } from "./envolventes.ts";
 import { ANCHO_FRANJA, type Vec2 } from "./fisico.ts";
 import { pilaresEnLosa, semiextension } from "./bandas.ts";
-import { anchoNominal, carasFranjas, ejesArmado, franjasLosa, PASO_ESTACIONES, pilaresSinCara, tramosRecta, type Franja } from "./franjas.ts";
+import { alineada, anchoNominal, carasFranjas, ejesArmado, franjasLosa, PASO_ESTACIONES, pilaresSinCara, tramosRecta, type Franja } from "./franjas.ts";
 import type { Mapeo } from "./mapeo.ts";
 import type { Contexto, LosaCompilada } from "./validar.ts";
 
@@ -409,13 +418,13 @@ export class EsfuerzosFranjas {
      * Con sp = c.s (un pilar con la cara común por su cara, F3-d) es el corte por la recta con el
      * enlace, sin traslado; my y mxy, los de la recta (`muestras`).
      */
-    const escalon = (c: { s: number; lado: -1 | 1 }, p: { id: string; t0: number; t1: number }, sp: number, ventana: readonly [number, number], muestras?: PorFranja): { principal: PorFranja; muestras: PorFranja; diag: Diagnostico[] } | null => {
+    const escalon = (c: { s: number; lado: -1 | 1 }, p: { id: string; t0: number; t1: number }, sp: number, ventana: readonly [number, number], muestras?: PorFranja, soloVentana = false): { principal: PorFranja; muestras: PorFranja; diag: Diagnostico[] } | null => {
       const restriccion = enlace.get(p.id)?.id;
       if (restriccion === undefined) return null;
       const sx = c.lado === -1 ? 1 : -1;
       // Sólo el tramo de la recta que puede tocar la ventana o la huella: las láminas que tienen un
       // nudo en ella, con un margen mayor que su lado (≤ 2h), y los nudos de la huella con ε_snap
-      const margen = 2.5 * this.ctx.op.tamanoMalla + this.ctx.op.epsSnap;
+      const margen = soloVentana ? EPS : 2.5 * this.ctx.op.tamanoMalla + this.ctx.op.epsSnap;
       const rango: [number, number] = [Math.max(T0, Math.min(ventana[0], p.t0) - margen), Math.min(T1, Math.max(ventana[1], p.t1) + margen)];
       const nod = porNodales(c.s, c.lado, rango[0], rango[1], [ventana], { restriccion, dx: sp === c.s ? 0 : (sp - c.s) * sx });
       if (!nod) return null;
@@ -482,9 +491,6 @@ export class EsfuerzosFranjas {
         exactas[i]!.push(c.s);
       }
     }
-    const enApoyo = (i: number, s: number) => zonas[i]!.some(([a, b]) => s > a + EPS && s < b - EPS);
-    const cercaDeExacta = (i: number, s: number) => exactas[i]!.some((x) => Math.abs(x - s) <= EPS);
-
     // Líneas de apoyo perpendiculares a d: vigas de la planta, muros que llegan a ella y apoyos lineales
     const lineas: LineaApoyo[] = [];
     const kp = this.ctx.planta.get(l.losa.planta)!;
@@ -501,6 +507,48 @@ export class EsfuerzosFranjas {
     for (const m of this.ctx.muros) if (kp >= m.kh && kp <= m.kb) tramosDe(m.muro.id, m.muro.puntos);
     for (const a of this.ctx.apoyosLineales) if (a.planta === l.losa.planta) tramosDe(a.id, a.puntos);
     lineas.sort((a, b) => a.s - b.s || a.ta - b.ta || (a.id < b.id ? -1 : 1));
+
+    // Pilares sin cara de franja en esta dirección (de borde, o atravesados por una viga o un muro
+    // según n: SP-3, SP-4): su metro en cada cara, por la recta de la cara si sigue la malla en su
+    // ventana o, si no, por el escalón desde una recta de la malla que atraviese su huella, con lo que
+    // transmite su enlace en los dos casos. Sin ello, la franja sólo tenía allí estaciones por campos
+    // pegadas a la esquina del pilar, hasta un 40 % bajas, y la de apoyo en el eje sin la huella
+    const conCaraExacta = new Set<string>();
+    for (const p of huellas.values()) {
+      if (porPilar.has(p.id) || !enlace.has(p.id) || !alineada(p.huella, d)) continue;
+      const ed = semiextension(p.huella, d);
+      const en = semiextension(p.huella, n);
+      const sc = p.p[0] * d[0] + p.p[1] * d[1];
+      const tc = p.p[0] * n[0] + p.p[1] * n[1];
+      const pz = { id: p.id, t0: tc - en, t1: tc + en };
+      const ventana: [number, number] = [tc - bNominal / 2, tc + bNominal / 2];
+      // Rectas de la malla que atraviesan su huella: líneas de apoyo y caras comunes de otros pilares
+      const bases = [...new Set([...lineas.filter((ln) => ln.ta <= tc + EPS && ln.tb >= tc - EPS).map((ln) => ln.s), ...caras.map((c) => c.s)])].filter((x) => Math.abs(x - sc) < ed - EPS);
+      const hechas: { sp: number; lado: -1 | 1; e: NonNullable<ReturnType<typeof escalon>> }[] = [];
+      for (const lado of [-1, 1] as const) {
+        const sp = sc + lado * ed;
+        // Sin losa al otro lado de la cara (la de fuera de un pilar de borde): sin estación
+        const fuera = tramosRecta(l.region, d, n, sp + lado * this.ctx.op.tamanoMalla).reduce((a, [x, y]) => a + Math.max(0, Math.min(y, ventana[1]) - Math.max(x, ventana[0])), 0);
+        if (!(fuera > EPS)) continue;
+        let e = escalon({ s: sp, lado }, pz, sp, ventana, undefined, true);
+        // Desde la más cercana a la cara: en la tira entre las dos, lo que se lleva una viga a lo largo no lo cuenta el corte
+        for (const b of [...bases].sort((x, y) => Math.abs(x - sp) - Math.abs(y - sp) || x - y)) e ??= escalon({ s: b, lado }, pz, sp, ventana);
+        if (e) hechas.push({ sp, lado, e });
+      }
+      if (!hechas.length) continue;
+      conCaraExacta.add(p.id);
+      for (let i = 0; i < fr.length; i++) {
+        if (!toca(i, pz.t0, pz.t1)) continue;
+        zonas[i]!.push([sc - ed, sc + ed]);
+        for (const { sp, lado, e } of hechas) {
+          est[i]!.push(estacion(i, sp, "cara", lado, e.principal, e.muestras, "fuerzas-nodales", [p.id], e.diag, [...ventana]));
+          exactas[i]!.push(sp);
+        }
+      }
+    }
+    const enApoyo = (i: number, s: number) => zonas[i]!.some(([a, b]) => s > a + EPS && s < b - EPS);
+    const cercaDeExacta = (i: number, s: number) => exactas[i]!.some((x) => Math.abs(x - s) <= EPS);
+
     for (const ln of lineas) {
       const tramos = tramosRecta(l.region, d, n, ln.s);
       for (const lado of [-1, 1] as const) {
@@ -534,7 +582,7 @@ export class EsfuerzosFranjas {
       });
     }
 
-    const sinCara = pilaresSinCara(this.ctx, l, k);
+    const sinCara = pilaresSinCara(this.ctx, l, k).filter((p) => !conCaraExacta.has(p.id));
     fr.forEach((f, i) => {
       const e = est[i]!.sort((a, b) => a.s - b.s || a.lado - b.lado);
       const diag = new Diagnosticos();
