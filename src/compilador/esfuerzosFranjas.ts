@@ -70,6 +70,11 @@
  * la misma malla difieren un ~5 % por cara, hasta un ±10–13 % en los momentos que dimensionan (SP-6,
  * `docs/fem3d/spr-abacos.md` §10).
  *
+ * Junto a una esquina entrante de la losa (las de sus huecos y las cóncavas de su contorno) el momento
+ * es singular: las estaciones que pasan a menos de máx(h, b/2) de una (b, el ancho nominal) dependen
+ * de la malla y, pegadas a ella, no convergen. La franja lleva el aviso `franja/esquina-entrante` con
+ * esos tramos (§12).
+ *
  * Wood–Armer (H34, C5-c a): por combinación, con los momentos medios. Una franja de la dirección 1
  * da la armadura de esa dirección (m*x en sus ejes) y una de la 2, la de la suya.
  *
@@ -84,7 +89,7 @@ import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/model
 import { combinar } from "./envolventes.ts";
 import { ANCHO_FRANJA, type Vec2 } from "./fisico.ts";
 import { pilaresEnLosa, semiextension } from "./bandas.ts";
-import { alineada, anchoNominal, carasFranjas, ejesArmado, franjasLosa, PASO_ESTACIONES, pilaresSinCara, tramosRecta, type Franja } from "./franjas.ts";
+import { alineada, anchoNominal, carasFranjas, ejesArmado, esquinasEntrantes, franjasLosa, PASO_ESTACIONES, pilaresSinCara, tramosRecta, type Franja } from "./franjas.ts";
 import type { Mapeo } from "./mapeo.ts";
 import type { Contexto, LosaCompilada } from "./validar.ts";
 
@@ -632,9 +637,31 @@ export class EsfuerzosFranjas {
     }
 
     const sinCara = pilaresSinCara(this.ctx, l, k).filter((p) => !conCaraExacta.has(p.id));
+    // Esquinas entrantes de la losa, en (s, t), y el radio en el que sus estaciones no valen
+    const esquinas = esquinasEntrantes(l.region).map((q) => ({ ...q, s: q.p[0] * d[0] + q.p[1] * d[1], t: q.p[0] * n[0] + q.p[1] * n[1] }));
+    const radio = Math.max(this.ctx.op.tamanoMalla, bNominal / 2);
     fr.forEach((f, i) => {
       const e = est[i]!.sort((a, b) => a.s - b.s || a.lado - b.lado);
       const diag = new Diagnosticos();
+      // Estaciones cuya recta (en la franja, o en su ventana) pasa a ≤ radio de una esquina entrante
+      const junto = (x: EstacionFranja, q: (typeof esquinas)[number]) => {
+        const [t0, t1] = x.ventana ?? [f.t0, f.t1];
+        return Math.hypot(x.s - q.s, Math.max(0, t0 - q.t, q.t - t1)) <= radio + EPS;
+      };
+      // Por esquina, el tramo de estaciones que pasa junto a ella
+      const tramos = esquinas.flatMap((q) => {
+        const xs = e.filter((x) => junto(x, q));
+        return xs.length ? [{ q, s0: xs[0]!.s, s1: xs[xs.length - 1]!.s }] : [];
+      });
+      if (tramos.length) {
+        const deHueco = tramos.some((x) => x.q.hueco);
+        const lista = tramos.map(({ q, s0, s1 }) => `${s0 === s1 ? `en s = ${s0.toFixed(3)} m` : `de s = ${s0.toFixed(3)} a ${s1.toFixed(3)} m`}, junto a (${q.p[0].toFixed(2)}; ${q.p[1].toFixed(2)})`).join("; ");
+        diag.aviso(
+          "franja/esquina-entrante",
+          `La franja ${f.id} pasa a menos de ${radio.toFixed(2)} m de ${tramos.length > 1 ? "esquinas entrantes" : "una esquina entrante"} de la losa ${l.losa.id}${deHueco ? " (de un hueco)" : ""}: ${lista}. Junto a una esquina entrante el momento es singular: ahí los valores de la franja dependen de la malla (con h = 0,75, del −40 % al +100 % de los de una malla fina) y, pegados a la esquina, no convergen. No los lea como la demanda de la franja: arme la esquina con su refuerzo (barras de borde y en diagonal) y compruebe el resto.`,
+          [f.id, l.losa.id],
+        );
+      }
       const ids = sinCara.filter((p) => toca(i, p.t0, p.t1)).map((p) => p.id);
       if (ids.length)
         diag.aviso(

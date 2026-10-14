@@ -226,4 +226,25 @@ Las peores de §9 (`out_vecinas.txt`, `out_vecinas_trozo.txt`):
    - (b) Siempre el escalón donde haya una recta para hacerlo, y el directo sólo sin ella (los de borde de una losa plana). Un solo método por cara, pero distinto del de las demás caras, y bajo en algunas interiores (−8,7 %).
    - (c) Sembrar la cara de estos pilares en la malla para que siempre haya corte directo. Medido sembrando la ventana y su margen: con h = 0,75 rompe la rejilla y la malla pasa de 3 620 a 18 906 nudos. Haría falta otra forma de sembrarla.
 2. **Las franjas vecinas de un pilar** (L-N2:Y29, −12 % con h = 0,75): (a) aceptarlo, como el resto del error de malla de SP-3/4; (b) que una franja que entra en la ventana de un pilar sin tocarlo tome también su metro en la cara (F-h extendido: del lado seguro, pero puede doblar la armadura de esa franja; habría que medirlo).
-3. **Las esquinas de los huecos.** La estación de una franja que casi no tiene losa junto a la esquina entrante de un hueco da la media de una singularidad: no converge. Propuesta: un aviso (`franja/esquina-hueco`) que remita al armado de refuerzo del hueco, en vez de leerla como demanda de la franja.
+3. **Las esquinas de los huecos.** La estación de una franja que casi no tiene losa junto a la esquina entrante de un hueco da la media de una singularidad: no converge. Propuesta: un aviso que remita al armado de refuerzo del hueco, en vez de leerla como demanda de la franja. **Decidido el 2026-10-15: hecho (§12), como `franja/esquina-entrante`.**
+
+## 12. El aviso de las esquinas entrantes (decisión del usuario, 2026-10-15)
+
+**Qué se midió** (`validacion/abacos/esquinas.ts`, `out_esquinas.txt`): en el trozo reticular, cada estación de franja a ≤ 1,5 m de una esquina del hueco, con h de 0,75 a 0,1 (ε_snap 0,01). Error de h = 0,75 frente a h = 0,1 en la superior (≥ 20 kN·m/m), por la distancia de la recta de la estación (en su franja o su ventana) a la esquina:
+
+| Distancia | Estaciones | Media | \|Media\| | Peor |
+|---|---|---|---|---|
+| 0–0,25 m | 15 | −6,3 % | 13,2 % | −39,7 % |
+| 0,25–0,5 m | 36 | +0,2 % | 15,2 % | +94,1 % |
+| 0,5–0,75 m | 12 | −6,1 % | 6,3 % | −13,7 % |
+| 0,75–1 m | 20 | +1,1 % | 7,9 % | −25,2 % |
+| 1–1,5 m | 32 | +0,4 % | 5,0 % | +11,0 % |
+
+- **A menos de ~0,75 m de la esquina, con h = 0,75 los valores salen mal en los dos sentidos** (de −40 % a +100 %); más allá, como el resto de la losa (~5 %).
+- **Pegadas a la esquina y con la franja cortada por el hueco, no convergen**: L-N2:Y16 en s = 10,5 (a 10 cm, con el 40 % de su ancho en losa) da 39,5 / 44,3 / 46,1 / 50,1 / 52,2 con h = 0,75 / 0,375 / 0,25 / 0,15 / 0,1, y sigue subiendo. Las que tienen la franja entera en losa convergen (L-N2:Y16 en s = 10,25: 32,8 … 30,7).
+
+**El aviso** (`esfuerzosFranjas.ts`; las esquinas, con `esquinasEntrantes` de `franjas.ts`): una franja con estaciones cuya recta pasa a menos de máx(h, b/2) de una esquina entrante de la losa lleva `franja/esquina-entrante`, uno por franja, con el tramo de estaciones de cada esquina. Esquinas entrantes son los vértices de los huecos que entran en la losa y los cóncavos del contorno: la esquina interior de una losa en L es la misma singularidad, así que el aviso no se queda en los huecos. El texto pide no leer esos valores como la demanda de la franja y armar la esquina con su refuerzo (barras de borde y en diagonal). No se quita ninguna estación ni se cambia ningún valor.
+
+- En el trozo reticular, con h = 0,75: 10 de las 41 franjas de cada losa.
+- Referencia congelada de F: sólo el aviso nuevo, en 19 franjas de `pilares-mezclados` y `reticular-2x2-abacos` (los que tienen hueco); estaciones y valores, idénticos.
+- Tests: `src/compilador/esquinaEntrante.test.ts`.

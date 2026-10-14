@@ -165,6 +165,37 @@ export function tramosRecta(region: Region, d: Vec2, n: Vec2, s: number, eps = 1
 }
 
 /**
+ * Esquinas entrantes de una región: los vértices de sus huecos que entran en la losa (convexos en el
+ * hueco) y los cóncavos de su contorno. Junto a ellas el momento es singular (crece sin límite al
+ * acercarse), así que la media de una franja que pasa por ellas no converge con la malla (SP-6,
+ * `docs/fem3d/spr-abacos.md` §12). Sin los vértices alineados con sus vecinos (a ≤ 1e-9 rad). `hueco`: si
+ * es de un hueco.
+ */
+export function esquinasEntrantes(region: Region): { p: Vec2; hueco: boolean }[] {
+  const r: { p: Vec2; hueco: boolean }[] = [];
+  const de = (p: readonly Vec2[], hueco: boolean) => {
+    let area = 0;
+    for (let i = 0; i < p.length; i++) {
+      const [A, B] = [p[i]!, p[(i + 1) % p.length]!];
+      area += A[0] * B[1] - B[0] * A[1];
+    }
+    if (area === 0) return;
+    for (let i = 0; i < p.length; i++) {
+      const [A, B, C] = [p[(i + p.length - 1) % p.length]!, p[i]!, p[(i + 1) % p.length]!];
+      const u: Vec2 = [B[0] - A[0], B[1] - A[1]];
+      const v: Vec2 = [C[0] - B[0], C[1] - B[1]];
+      const giro = u[0] * v[1] - u[1] * v[0];
+      if (!(Math.abs(giro) > 1e-9 * Math.hypot(...u) * Math.hypot(...v))) continue;
+      // Convexo en su polígono si gira como él: entrante para la losa en un hueco; en el contorno, al revés
+      if (giro > 0 === area > 0 === hueco) r.push({ p: B, hueco });
+    }
+  };
+  de(region.contorno, false);
+  for (const h of region.huecos) de(h, true);
+  return r;
+}
+
+/**
  * Coseno mínimo con n (la transversal de la franja) de una viga o un muro que atraviesa la huella de
  * un pilar para que sea el apoyo de la losa en esa dirección (60°).
  */
