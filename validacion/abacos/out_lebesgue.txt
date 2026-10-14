@@ -1,0 +1,30 @@
+
+muestrario: 6559 plazas, 21 regiones (0.1 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         5017  4264     0     0     0     0     1.95
+  propio-4         14    14    14    14     0     0     4.55
+  vecinos        1528  1477  1363  1022    74     0     9.17
+
+reticulaEnrasada: 966 plazas, 2 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          710   650     0     0     0     0     1.79
+  vecinos         256   256   256    80     8     0     5.07
+
+reticulaConNucleo: 1859 plazas, 5 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1391  1111     0     0     0     0     1.83
+  vecinos         468   452   407   200     4     0     5.07
+
+edificioReticular(2): 20980 plazas, 162 regiones (0.3 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro        14400 11554    50     0     0     0     2.71
+  propio-4        130   130   130   126     4     0     5.37
+  vecinos        6450  5498  4948  3554  1628     0     9.99
+
+edificioObjetivoLosas(2): 9572 plazas, 2 regiones (0.1 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         8060  7756     0     0     0     0     1.81
+  vecinos        1512  1488  1344   430     0     0     4.52
+
+edificioUnidireccional(2): 0 plazas, 0 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx

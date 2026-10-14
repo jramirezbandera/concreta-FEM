@@ -392,6 +392,11 @@
   - Junto al hueco del edificio, con h = 0,75: de −25…−43 % a −6,3…+3,5 % de la malla fina.
   - **F3-8:** lo que queda de F2-9 es la rigidez. Donde hay nudos rígidos delante (las mallas finas de referencia), la cara sale un 6–8,5 % alta, del lado seguro, como la de un pilar 5 cm mayor.
   - La malla y el compilador no cambian. Medida en `validacion/f3/f3d.ts`.
+- **2026-10-14: ábacos de borde, SPR y malla (SP-1, SP-2;** `docs/fem3d/spr-abacos.md`**),** tras la puerta de uso con el muestrario: el mapa daba hasta 1767 kN·m/m junto a los medianeros, y las franjas de armado, 583–1030.
+  - **SP-1 (motor):** en una región SPR sin nudos interiores (el ábaco de un pilar de borde, de 8 láminas), el respaldo extrapolaba hasta 30 veces el rango de las láminas. Ahora ningún nudo usa un ajuste con constante de Lebesgue > 10 (`LEBESGUE_MAXIMO`): baja de base hasta la media. Las referencias congeladas no cambian.
+  - **SP-2 (compilador F3.1):** en un reticular, la plantilla de todo pilar que cae en un ábaco se refina por sus cuatro caras, con o sin caras de franja. El edificio reticular objetivo pasa a 185 115 ecuaciones (+27 %).
+  - **Validación:** `src/compilador/abacos.test.ts` (falla con el código de antes), un caso nuevo en la referencia congelada de F y `validacion/abacos/`.
+  - **Pendiente del usuario:** SP-3 (con h = 0,75, las franjas del edificio reticular, −6,6 % de media frente a h = 0,375 y −21 % en las caras con viga embebida; antes, −12,7 / −36 %) y SP-5 (llevar las puntuales horizontales al maestro del diafragma, sin nudo en la losa).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **ahora:** la puerta de uso de F y AB con un proyecto real del usuario (cubre también buena parte de las de I1–I4, V2a y V2b);

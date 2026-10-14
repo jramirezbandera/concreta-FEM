@@ -1,0 +1,90 @@
+# Ábacos de borde: el SPR y su malla (SP-1, SP-2)
+
+> **Fecha:** 2026-10-14. **Origen:** la puerta de uso de F y AB con el muestrario (`ejemplos/muestrario`, reticular L2 de PL1). El usuario vio en Resultados · Losas momentos «altísimos» junto a los pilares medianeros (hasta 1767 kN·m/m), positivos al lado del pilar y negativos delante, y valores razonables en los centrales y en las esquinas.
+>
+> **Veredicto: era un fallo de la recuperación SPR (SP-1), no de la solución, agravado por una malla pobre en esos ábacos (SP-2). Están corregidos los dos, con tests y referencia congelada.**
+> - **SP-1 (motor):** ningún nudo usa ya un ajuste que amplifique sus muestras más de 10 veces (constante de Lebesgue). En el ábaco de P5, el M11 del mapa pasa de +127…+164 kN·m/m a −19…−37, junto a los −21…−44 de las láminas. **Las franjas de armado también estaban contaminadas**: L2:X7 daba 583 kN·m/m de inferior (ahora 21,8) y L2:X1, 1030.
+> - **SP-2 (compilador F3.1):** la plantilla de todo pilar que cae en un ábaco se refina por sus cuatro caras (los tercios de F2), tenga o no caras de franja. El ábaco de P5 pasa de 12 láminas (8 deformables, algunas en cuña) a 32.
+> - **Lo que queda para el usuario** (§4): en el edificio reticular objetivo, con h = 0,75, las envolventes de las franjas siguen un 6,6 % por debajo de la malla fina de media (antes, 12,7 %), con un máximo de −21 % en las caras de pilares con viga embebida en la franja. Y el coste: +27 % de ecuaciones en ese edificio (185 115, dentro del perfil móvil).
+
+## 1. Qué pasaba (SP-1)
+
+El ábaco es una región SPR aparte del aligerado, porque el momento tangente salta en su borde (E5). En un pilar medianero, el ábaco de 2,4 × 2,4 m queda en 1,2 × 2,4 m dentro de la losa, y menos la huella. La plantilla de un pilar sin caras de franja (de borde o atravesado por una viga, `franjas.ts`) lo dejaba en 8 láminas deformables, así que **ningún nudo de esa región era interior**.
+
+Sin parches interiores, el respaldo del SPR ajustaba cada nudo con su propio parche y la mayor base que admitiera: un bilineal de 4 términos con 4 o 5 muestras. Eso es interpolar los centroides y extrapolar al nudo. En el muestrario, con 1,35 G + 1,35 CM + 1,5 Q (`validacion/abacos/diagnostico.ts`):
+
+| Nudo (x, y) | M11 del SPR | M22 del SPR | Láminas que lo rodean |
+|---|---|---|---|
+| (1,20; 5,35) | −783 | −1552 | −41 |
+| (0,20; 5,35) | +699 | +1457 | −41 |
+
+Por eso el mapa daba lóbulos positivos junto al pilar y negativos delante, y un salto en el borde del ábaco. Las franjas integran por campos en los vanos, así que los heredaban.
+
+**La medida que lo separa:** el valor de un nudo es Σ wₛ·vₛ sobre sus muestras, y la constante de Lebesgue Λ = Σ|wₛ| acota cuánto puede salirse de su rango (|valor| ≤ Λ·máx|vₛ|). En los modelos de validación y los congelados (`out_lebesgue.txt`, `out_lebesgue_congelados.txt`, `out_exceso.txt`):
+
+- **Modelos sin ábacos:** el techo es Λ ≈ 7,6 (pilares mezclados). Hasta ahí es la extrapolación normal de un parche cuadrático al borde, y el exceso real no pasa de 1,9 veces: el momento crece hacia el borde.
+- **Ábacos pequeños:** Λ de 137 a 188, con excesos reales de hasta 31 veces. Con Λ > 10 había 32 nudos en el muestrario y 1 140 en el edificio reticular de 2 plantas.
+
+## 2. El arreglo del SPR (SP-1, `src/motor/campos.ts`)
+
+`LEBESGUE_MAXIMO = 10`. Para cada nudo, por orden:
+
+1. su parche interior, si Λ ≤ 10;
+2. en el borde, la media de los parches interiores vecinos; si pasa de 10, sólo los vecinos que no pasan;
+3. si no queda ninguno, el parche propio con la mayor base que dé Λ ≤ 10 (cuadrática, bilineal, lineal, a lo largo de la fila);
+4. al final, la media de sus muestras (Λ = 1, degradado, con el Q de la DKMQ).
+
+Lo decide la geometría, no u: los campos siguen siendo lineales en u. `lebesgueEn(p)` da la Λ de cada nudo.
+
+**Ninguna referencia congelada cambia.** Las que tienen ábacos se quedaban en Λ ≤ 9,2, y la de C4 no guarda campos. En el ábaco de P5, el SPR queda junto a la lámina (por ejemplo, −22 frente a −24 y −37 frente a −44).
+
+## 3. La malla de los ábacos (SP-2, `src/compilador/losas.ts`, compilador F3.1)
+
+En un reticular, cada pilar cuyo centro cae en un ábaco pide el refinamiento de F2 (los tercios del primer tramo de la plantilla junto a la cara) en sus cuatro caras, con o sin caras de franja. Va con el mismo respaldo por pilar si la plantilla pierde calidad. Sólo con `franjas` y `refinoCaras` (los dos por defecto): con `franjas: false` la malla de C1–C5 sale bit a bit, como antes.
+
+**Muestrario (L2):** el ábaco de P5 pasa de 12 a 32 láminas, y las 8 plantillas de PL1 van refinadas, sin avisos de malla. Las envolventes de las franjas con h = 0,75, frente a h = 0,25 (`out_convergencia.txt`):
+
+| Franja | Antes de SP-1 | Sólo SP-1 | SP-1 y SP-2 | h = 0,25 |
+|---|---|---|---|---|
+| X7 inferior (por P5) | 583 | 21,5 | 21,8 | 22,5 |
+| X1 superior (borde inferior, cara de P11) | 271 (y 1030 de inferior) | 64,0 (−30 %) | 78,2 (−14 %) | 91,0 |
+| X14 superior (borde superior) | — | 67,0 (−7 %) | 75,0 (+4 %) | 72,0 |
+| Y1 superior (borde izquierdo, cara de P5) | — | 67,6 (−10 %) | 78,3 (+5 %) | 74,8 |
+
+De las 25 envolventes que dimensionan (≥ 20 kN·m/m), la media queda en +0,7 % y la |media| en 4,6 %.
+
+**Edificio reticular de C4 con 2 plantas** (vigas por todos los ejes, ábacos de 2,5 m en los 80 pilares), frente a h = 0,375:
+
+| Malla con h = 0,75 | Media | Peor | Por debajo de −10 % |
+|---|---|---|---|
+| Antes (con SP-1) | −12,7 % | −36 % | 54 de 98 |
+| Refinando sólo los pilares de borde y de esquina | −12,4 % | −36 % | 54 de 98 |
+| **SP-2: todos los pilares en ábaco** | **−6,6 %** | **−21 %** | **35 de 98** |
+
+Refinar sólo los de borde no sirve: en este edificio ningún pilar tiene caras de franja (las vigas los atraviesan), y lo que pesa son los interiores.
+
+**Coste** en el edificio reticular objetivo de 7 plantas: de 53 287 a 66 475 nudos y de 145 551 a 185 115 ecuaciones (+27 %; perfil móvil, 200 000). El cálculo pasa de 4,2 a 5,7 s en sobremesa.
+
+## 4. Hallazgos
+
+- **SP-1:** el respaldo del SPR para regiones sin nudos interiores interpolaba con 4 o 5 muestras y extrapolaba hasta 30 veces. Afectaba al mapa y a las franjas en todos los ábacos pequeños (de borde, de esquina y, en el edificio reticular, también interiores). Corregido (§2).
+- **SP-2:** las plantillas de los pilares sin caras de franja no se refinaban, y en un ábaco dejaban unas pocas láminas en cuña. Corregido (§3).
+- **SP-3, para el usuario:** con h = 0,75, en un reticular con vigas embebidas por los ejes, las envolventes de las franjas siguen un 6,6 % bajas de media. Las peores (−17…−21 %) son superiores en la cara del pilar, en franjas con la viga a lo largo (L-N1:Y37, Y52, X19). Es un punto de gradiente fuerte entre viga, pilar y losa que converge despacio; no es del ábaco. **Opciones:** (a) aceptarlo y compararlo en el periodo en sombra con el reticular de SAP2000 (ya decidido para F), (b) un h menor sólo en los ábacos, o (c) refinar también el primer tramo a lo largo de las vigas embebidas junto al pilar. Antes de elegir convendría una referencia más fina que 0,375 en un trozo del edificio.
+- **SP-4:** L2:X1 (la franja del borde inferior del muestrario, en la cara de P11, en el escalón de F3 con la viga de fachada dentro) oscila con la malla: 79,8 / 91,0 / 86,6 / 86,9 con h = 0,375 / 0,25 / 0,15 / 0,1. Con h = 0,75 queda en 78,2, un 10–14 % bajo. Es de la familia de F2-9 / F3-8 (aparcada).
+- **SP-5, la malla «caótica» del muestrario** (pregunta del usuario): no es un error. La triangulación entra donde la rejilla no puede:
+  - alrededor de las puntuales de viento y sismo en (9; 5,5), que siembran un nudo fuera de la rejilla (+120 láminas: sin ellas, o en (6; 5,5), la losa pasa de 1331 a 1211);
+  - junto al núcleo, cuyos muros (x = 13,4 / 16,4; y = 7 / 10) quedan a menos de 0,4·h = 0,30 m de los bordes de los ábacos (13,2 / 16,8; 6,7 / 9,8).
+
+  **Propuesta, sin decidir:** una puntual sólo horizontal en una planta con diafragma rígido no necesita nudo en la losa. Puede ir al maestro del diafragma con su momento torsor, con el mismo resultado.
+
+## 5. Validación
+
+| Qué | Dónde |
+|---|---|
+| Plantillas en ábaco refinadas, Λ ≤ 10 en todos los nudos y el SPR de cada ábaco dentro de 2,5 veces el mayor \|M\| de sus láminas (con el código de antes: 19 y 33 veces), en el reticular de 2 × 2 y en el muestrario. Los 6 tests fallan con el código de antes | `src/compilador/abacos.test.ts` |
+| Referencia congelada de F con `reticular-2x2-abacos`; las otras siete entradas, idénticas | `validacion/f/congelar.ts`, `congelado-f.test.ts` |
+| Λ por modelo y por vía, y exceso real por tramos de Λ | `validacion/abacos/lebesgue.ts`, `exceso.ts` |
+| El caso del usuario: lámina frente a SPR junto a P5 | `validacion/abacos/diagnostico.ts`, `desvio.ts` |
+| Convergencia de las franjas | `validacion/abacos/convergencia.ts` |
+
+Baterías: en la raíz pasan los 1 729 tests y en la app, los 36.

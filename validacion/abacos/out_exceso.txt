@@ -1,0 +1,57 @@
+
+muestrario: 6559 plazas, 21 regiones (0.1 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         5017  4264     0     0     0     0     1.95
+  propio-4         14    14    14    14     0     0     4.55
+  vecinos        1528  1477  1363  1022    74     0     9.17
+
+reticulaEnrasada: 966 plazas, 2 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          710   650     0     0     0     0     1.79
+  vecinos         256   256   256    80     8     0     5.07
+
+reticulaConNucleo: 1859 plazas, 5 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1391  1111     0     0     0     0     1.83
+  vecinos         468   452   407   200     4     0     5.07
+
+edificioReticular(2): 20980 plazas, 162 regiones (0.3 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro        14400 11554    50     0     0     0     2.71
+  propio-4        130   130   130   126     4     0     5.37
+  vecinos        6450  5498  4948  3554  1628     0     9.99
+
+edificioObjetivoLosas(2): 9572 plazas, 2 regiones (0.1 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         8060  7756     0     0     0     0     1.81
+  vecinos        1512  1488  1344   430     0     0     4.52
+
+edificioUnidireccional(2): 0 plazas, 0 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+
+muestrario
+  Λ en [0, 2):   5182 nudos  exceso p95 0.91  máx 1.10
+  Λ en [2, 3):    341 nudos  exceso p95 1.08  máx 1.33
+  Λ en [3, 5):    962 nudos  exceso p95 1.31  máx 1.82
+  Λ en [5, 7):     56 nudos  exceso p95 1.42  máx 1.54
+  Λ en [7, 10):     18 nudos  exceso p95 0.35  máx 0.35
+
+edificioReticular(2)
+  Λ en [0, 2):  15852 nudos  exceso p95 0.97  máx 1.10
+  Λ en [2, 3):   1448 nudos  exceso p95 1.00  máx 1.14
+  Λ en [3, 5):   2048 nudos  exceso p95 0.93  máx 1.59
+  Λ en [5, 7):   1210 nudos  exceso p95 0.68  máx 1.11
+  Λ en [7, 10):    422 nudos  exceso p95 0.52  máx 0.85
+
+h25-reticular
+  Λ en [0, 2):    524 nudos  exceso p95 0.94  máx 0.99
+  Λ en [2, 3):     92 nudos  exceso p95 1.22  máx 1.22
+  Λ en [3, 5):    156 nudos  exceso p95 1.68  máx 1.68
+  Λ en [5, 7):     16 nudos  exceso p95 1.38  máx 1.38
+  Λ en [7, 10):      4 nudos  exceso p95 0.49  máx 0.49
+
+pilares-mezclados
+  Λ en [0, 2):   1149 nudos  exceso p95 0.98  máx 1.00
+  Λ en [2, 3):    106 nudos  exceso p95 0.99  máx 1.24
+  Λ en [3, 5):     76 nudos  exceso p95 1.55  máx 1.65
+  Λ en [5, 7):     42 nudos  exceso p95 1.02  máx 1.87

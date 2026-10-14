@@ -1,0 +1,178 @@
+
+E5 e3-diafragma: 226 plazas, 9 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro           68    64     0     0     0     0     1.59
+  propio-4         14    14    10     4     0     0     4.00
+  vecinos         144   112   112   112     0     0     4.76
+
+E5 lamina-plegada: 55 plazas, 3 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro           15    12     0     0     0     0     1.63
+  propio-4         12    12    10     4     0     0     4.25
+  vecinos          28    28    28    28     0     0     4.50
+
+E5 losa-plana: 1672 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1496  1496     0     0     0     0     1.75
+  vecinos         176   160   160   152     0     0     4.76
+
+C2 losa-plana: 628 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          488   337     0     0     0     0     1.84
+  vecinos         140   132    97    23     1     0     5.15
+
+C2 navier-delgada: 207 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          167   124     0     0     0     0     1.76
+  vecinos          40    40    40    17     4     0     5.88
+
+C2 aleatorio-8-losas: 807 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          701   478     0     0     0     0     1.83
+  vecinos         106    99    82    38     2     0     5.40
+
+C2 aleatorio-11-losas-sin-diafragma: 1073 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          881   565     0     0     0     0     1.86
+  vecinos         192   174   133    31     2     0     5.60
+
+C2 losa-plana-rejilla: 537 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          415   312     0     0     0     0     1.85
+  vecinos         122   114    94    36     3     0     5.66
+
+C2 aleatorio-8-losas-rejilla: 807 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          701   478     0     0     0     0     1.83
+  vecinos         106    99    82    38     2     0     5.40
+
+C2 reticula-enrasada: 483 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          355   325     0     0     0     0     1.79
+  vecinos         128   128   128    40     4     0     5.07
+
+C3 etabs-15c-3-60: 785 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          605   605     0     0     0     0     1.76
+  vecinos         180   170   170   145     0     0     4.50
+
+C3 etabs-15f-1: 520 plazas, 4 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          352   352     0     0     0     0     1.75
+  vecinos         168   168   168   168     0     0     4.50
+
+C3 sotano-empuje: 429 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          341   341     0     0     0     0     1.75
+  vecinos          88    88    88    88     0     0     4.50
+
+C3 viga-en-muro: 153 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          105   105     0     0     0     0     1.75
+  vecinos          48    48    48    48     0     0     4.50
+
+C3 aleatorio-3-muros: 1486 plazas, 6 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1136   806     0     0     0     0     1.93
+  propio-3          6     2     0     0     0     0     1.99
+  propio-4          3     3     3     2     0     0     4.00
+  vecinos         341   323   286   204     6     0     6.07
+
+C3 reticula-nucleo: 1449 plazas, 5 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1033   761     0     0     0     0     1.81
+  vecinos         416   397   353   186     0     0     4.96
+
+C4 pano-oblicuo: 0 plazas, 0 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+
+C4 dos-vanos-voladizo: 0 plazas, 0 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+
+C4 pano-hueco: 0 plazas, 0 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+
+C4 aleatorio-7-unidireccional: 0 plazas, 0 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+
+C4 aleatorio-6-reticular: 2585 plazas, 25 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1687  1012     0     0     0     0     1.87
+  propio-3         88    88    88    18     0     0     3.31
+  propio-4         10     5     5     0     0     0     2.65
+  vecinos         800   718   618   321    74     0     8.10
+
+C4 aleatorio-5-mixto: 1108 plazas, 10 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          720   404     0     0     0     0     1.84
+  propio-3         22    22    22     6     0     0     3.32
+  propio-4          4     3     3     0     0     0     2.65
+  vecinos         362   328   289   138    34     0     7.22
+
+C5 pilares-mezclados: 1912 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1570  1134     0     0     0     0     1.92
+  vecinos         342   327   274    88     5     0     7.64
+
+C5 reticular-h25: 936 plazas, 10 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          616   608     0     0     0     0     1.77
+  vecinos         320   300   288   176    16     0     5.65
+
+C5 etabs-15c-3-60: 785 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          605   605     0     0     0     0     1.76
+  vecinos         180   170   170   145     0     0     4.50
+
+C5 aleatorio-3: 3196 plazas, 1 regiones (0.1 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         2848  1910     3     0     0     0     2.05
+  propio-4          6     4     4     2     0     0     3.75
+  vecinos         342   314   267    93     4     0     5.62
+
+F h25-plana: 504 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          408   320     0     0     0     0     1.83
+  vecinos          96    92    80    16     0     0     3.83
+
+F h25-reticular: 792 plazas, 10 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          488   468     0     0     0     0     1.82
+  vecinos         304   284   268   176    20     0     9.17
+
+F pilares-mezclados: 1373 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1113   836     0     0     0     0     1.93
+  vecinos         260   246   224   118    42     0     6.41
+
+F aleatorio-3: 943 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          787   528     0     0     0     0     1.84
+  vecinos         156   141   110    33     3     0     6.21
+
+F losa-3x3-refinada: 1633 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1401  1083     0     0     0     0     1.83
+  propio-3          4     4     4     4     0     0     3.04
+  propio-4          8     8     8     0     0     0     2.06
+  propio-6          4     4     4     0     0     0     2.36
+  vecinos         216   180   156   150     0     0     4.66
+
+F h25-plana-sin-refinar: 432 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          336   280     0     0     0     0     1.77
+  vecinos          96    96    84    16     0     0     3.83
+
+F losa-3x3-mezclada: 1605 plazas, 1 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro         1361  1035     0     0     0     0     1.83
+  propio-3          4     4     4     4     0     0     3.04
+  propio-4          8     8     8     0     0     0     2.06
+  propio-6          4     4     4     0     0     0     2.36
+  vecinos         228   200   168   150     0     0     4.66
+
+F reticular-2x2-abacos: 1308 plazas, 12 regiones (0.0 s)
+  vía            nudos   Λ>1,5   Λ>2   Λ>3   Λ>5  Λ>10   Λ máx
+  centro          936   620     8     0     0     0     2.65
+  propio-4         43    43    19    17     2     0     5.49
+  vecinos         329   310   275   187    67     0     9.52

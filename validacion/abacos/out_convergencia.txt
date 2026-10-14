@@ -1,0 +1,36 @@
+
+Muestrario, L2 (frente a h = 0,25)
+  h = 0.75: 6347 nudos, 8 de 8 plantillas refinadas
+  h = 0.25: 18325 nudos, 0 de 4 plantillas refinadas
+  25 envolventes ≥ 20 kN·m/m: media 0.7 %, |media| 4.6 %, por debajo de −10 %: 1, de −5 %: 2
+  Las peores (h = 0,75 frente a la referencia):
+    L2:X1      superior     78.2 frente a    91.0 ( -14.1 %)  s = 12.25 / 12.25
+    L2:Y8      inferior     19.3 frente a    20.8 (  -7.0 %)  s = 2.75 / 8.50
+    L2:Y9      superior     65.3 frente a    67.7 (  -3.6 %)  s = 5.75 / 5.35
+    L2:X7      inferior     21.8 frente a    22.5 (  -3.1 %)  s = 3.00 / 2.75
+    L2:X8      inferior     21.8 frente a    22.5 (  -3.0 %)  s = 3.00 / 2.75
+    L2:Y16     superior    102.4 frente a   105.2 (  -2.7 %)  s = 5.35 / 5.35
+    L2:Y17     superior     45.4 frente a    46.6 (  -2.7 %)  s = 5.50 / 5.50
+    L2:Y17     inferior     20.9 frente a    21.4 (  -2.2 %)  s = 2.75 / 2.75
+  Las más altas:
+    L2:Y15     superior     64.4 frente a    58.8 (   9.5 %)  s = 5.65 / 5.65
+    L2:Y10     superior     25.6 frente a    21.7 (  17.9 %)  s = 5.65 / 5.50
+    L2:Y23     superior     81.3 frente a    68.1 (  19.3 %)  s = 5.25 / 5.25
+
+Edificio reticular de C4, 2 plantas (frente a h = 0,375)
+  h = 0.75: 19050 nudos, 154 de 154 plantillas refinadas
+  h = 0.375: 68702 nudos, 0 de 0 plantillas refinadas
+  98 envolventes ≥ 20 kN·m/m: media -6.6 %, |media| 8.3 %, por debajo de −10 %: 35, de −5 %: 61
+  Las peores (h = 0,75 frente a la referencia):
+    L-N2:Y52   superior     31.4 frente a    39.8 ( -20.9 %)  s = 30.25 / 4.75
+    L-N1:Y52   superior     30.9 frente a    39.1 ( -20.9 %)  s = 30.25 / 4.75
+    L-N1:Y37   superior     31.9 frente a    39.8 ( -20.0 %)  s = 4.75 / 4.75
+    L-N2:Y37   superior     32.6 frente a    40.6 ( -19.9 %)  s = 4.75 / 4.75
+    L-N1:X19   superior     41.6 frente a    51.1 ( -18.5 %)  s = 5.75 / 5.75
+    L-N2:X19   superior     43.7 frente a    53.3 ( -18.1 %)  s = 5.75 / 5.75
+    L-N2:Y23   superior     36.1 frente a    43.6 ( -17.3 %)  s = 4.75 / 4.75
+    L-N1:Y22   superior     38.1 frente a    45.8 ( -16.7 %)  s = 5.25 / 5.25
+  Las más altas:
+    L-N1:Y21   superior     21.9 frente a    20.3 (   7.4 %)  s = 5.00 / 5.00
+    L-N1:X24   superior     35.4 frente a    31.9 (  10.9 %)  s = 6.00 / 5.75
+    L-N2:X24   superior     37.5 frente a    33.7 (  11.4 %)  s = 6.00 / 5.75
