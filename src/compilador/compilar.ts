@@ -37,7 +37,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "F3.1";
+export const VERSION_COMPILADOR = "F3.2";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -378,7 +378,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     modelo,
     mapeo,
     diagnosticos: diag.lista,
-    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets)),
+    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets), cargas.alDiafragma),
     huella,
     estadisticas: {
       nudos: nudos.length,
@@ -435,7 +435,7 @@ function avisarDintelesEnDiafragma(ctx: Contexto, diag: Diagnosticos): void {
   }
 }
 
-function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>, conZonas: boolean): string[] {
+function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>, conZonas: boolean, alDiafragma: readonly string[]): string[] {
   const h: string[] = [];
   // Sin ninguna barra con zona rígida (perfiles dados por sus propiedades, sin b ni h), el factor no actúa
   h.push(
@@ -463,6 +463,10 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
   const conDiafragma = [...new Set(piezas.diafragmas.map((d) => ctx.plantas[d.k]!.id))];
   const sin = ctx.plantas.filter((p, k) => usadas.has(p.id) && diafragmaDe(ctx, k) !== "rigido").map((p) => (conLosa.has(p.id) ? `${p.id} (semirrígido: la membrana de sus losas)` : p.id));
   h.push(`Diafragma rígido en ${conDiafragma.length ? conDiafragma.join(", ") : "ninguna planta"}${sin.length ? `; sin diafragma en ${sin.join(", ")}` : ""}.`);
+  if (alDiafragma.length)
+    h.push(
+      `Las cargas puntuales sólo horizontales en una losa con diafragma rígido (${alDiafragma.join(", ")}) van al nudo del diafragma más cercano con su momento de transporte, sin nudo propio en la malla: con el diafragma rígido es la misma carga (SP-5).`,
+    );
   if (conDiafragma.some((p) => conLosa.has(p) || conPano.has(p)))
     h.push(
       `En las plantas con ${conPano.size ? "losas o paños unidireccionales" : "losas"}, el diafragma rígido abarca los nudos sobre ${conPano.size ? "ellos" : "las losas"} (los de las huellas, por su pilar); los que quedan fuera, como los pilares de una doble altura, no entran (C2-f${conPano.size ? ", C4-g" : ""}).`,

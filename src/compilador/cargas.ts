@@ -29,7 +29,7 @@
 import type { CargaBarra, ModeloAnalitico, Vec3 } from "../motor/modelo.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Vec2, Viga } from "./fisico.ts";
-import type { Losas } from "./losas.ts";
+import { alDiafragma, type Losas } from "./losas.ts";
 import { franjas, franjasLibres } from "./muros.ts";
 import type { Piezas, Recta } from "./piezas.ts";
 import { areaConSigno, momentosInterseccion, momentosRegion, puntoEnRegion, type Momentos, type Region } from "./poligonos.ts";
@@ -88,6 +88,8 @@ export interface CargasCompiladas {
   casos: { nodales: Map<number, number[]>; barras: CargaBarra[]; laminas: Map<number, number[]>; laminasNodos: Map<number, number[][]> }[];
   /** Por caso: resultante física respecto a `centro`. */
   fisicas: Resultante[];
+  /** Puntuales que van al diafragma sin nudo propio (SP-5). */
+  alDiafragma: string[];
 }
 
 /** Suma una carga de superficie uniforme q sobre una figura de momentos m, a la cota z (relativa al centro). */
@@ -191,6 +193,7 @@ function quitarMuros(tramos: readonly { desde: number; hasta: number; w: number 
 
 export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, losas: Losas, centro: Vec3, diag: Diagnosticos, panos: PanosU | null = null): CargasCompiladas {
   const casos = ctx.casos.map(() => ({ nodales: new Map<number, number[]>(), barras: [] as CargaBarra[], laminas: new Map<number, number[]>(), laminasNodos: new Map<number, number[][]>() }));
+  const deDiafragma: string[] = [];
   const lamina = (c: number, l: number, q: readonly number[]) => {
     const m = casos[c]!.laminas;
     let v = m.get(l);
@@ -533,6 +536,22 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       const enLosa = losas.puntos.get(carga.id);
       // En un paño (C4-e): a sus viguetas
       const enPano = !destino && enLosa === undefined ? panosDe(carga.planta).find((i) => distanciaARegion([carga.x, carga.y], panos!.regiones[i]!) <= 1e-9) : undefined;
+      // SP-5: una puntual sólo horizontal en una losa con diafragma rígido, al nudo del diafragma más
+      // cercano con su momento de transporte (Mz: el nudo está en la cota de la planta)
+      const diafragma = !destino && enLosa === undefined && enPano === undefined && alDiafragma(ctx, k, carga) ? piezas.diafragmas.find((d) => d.k === k) : undefined;
+      if (diafragma) {
+        let n = diafragma.nudos[0]!;
+        let dmin = Infinity;
+        for (const m of diafragma.nudos) {
+          const d = Math.hypot(Xn(m)[0] - Q[0], Xn(m)[1] - Q[1]);
+          if (d < dmin) [dmin, n] = [d, m];
+        }
+        const [dx, dy] = [Q[0] - Xn(n)[0], Q[1] - Xn(n)[1]];
+        sumarPuntual(fisicas[c]!, menos(Q, centro), F, M);
+        nodal(c, n, F, [M[0], M[1], M[2] + dx * F[1] - dy * F[0]]);
+        deDiafragma.push(carga.id);
+        continue;
+      }
       if (!destino && enLosa === undefined && enPano === undefined) {
         diag.error("carga/sin-destino", `La carga ${carga.id} no cae sobre ningún pilar, nudo, viga, losa ni paño de la planta ${carga.planta} (tolerancia ${ctx.op.epsSnap} m).`, [carga.id]);
         continue;
@@ -638,7 +657,7 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       sobrePieza(c, carga.pilar, piezas.rectasDe.get(carga.pilar) ?? [], carga.ejes, carga.q, carga.qb, carga.desde, carga.hasta, carga.id);
     }
   }
-  return { casos, fisicas };
+  return { casos, fisicas, alDiafragma: deDiafragma };
 }
 
 /**

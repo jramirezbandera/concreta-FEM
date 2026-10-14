@@ -38,7 +38,21 @@ import { estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaci
 import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { distanciaARegion, ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
 import type { PanosU } from "./unidireccional.ts";
+import { diafragmaDe } from "./piezas.ts";
 import type { Contexto } from "./validar.ts";
+
+/**
+ * ¿Va la carga al diafragma de su planta, sin nudo propio en la losa (SP-5)? Una puntual sólo
+ * horizontal (Fz, Mx y My nulos) que cae en una losa de una planta con diafragma rígido: ux, uy y rz
+ * de todos los nudos de la losa dependen del maestro, así que en cualquiera de ellos, con su momento
+ * de transporte, da al maestro la misma carga que en su punto. Sembrar el punto sacaba la rejilla de
+ * su alrededor y llenaba de triángulos el vano (las del viento y el sismo en el centro de masas).
+ */
+export function alDiafragma(ctx: Contexto, k: number, c: CargaFisica): boolean {
+  if (c.tipo !== "puntual" || (c.F?.[2] ?? 0) !== 0 || (c.M?.[0] ?? 0) !== 0 || (c.M?.[1] ?? 0) !== 0) return false;
+  if (diafragmaDe(ctx, k) !== "rigido") return false;
+  return ctx.losas.some((l) => l.losa.planta === c.planta && distanciaARegion([c.x, c.y], l.region) <= 1e-9);
+}
 
 export interface LaminaL {
   /** Nudos de la topología, antihorario (normal +Z). */
@@ -492,7 +506,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     }
     const puntoDe = new Map<string, { i: number; Q: Vec2 }>();
     for (const c of cargas) {
-      if (c.tipo !== "puntual" || c.planta !== idPlanta || topo.localizar(k, [c.x, c.y]) || enPano(k, [c.x, c.y])) continue;
+      if (c.tipo !== "puntual" || c.planta !== idPlanta || topo.localizar(k, [c.x, c.y]) || enPano(k, [c.x, c.y]) || alDiafragma(ctx, k, c)) continue;
       puntoDe.set(c.id, { i: a.punto([c.x, c.y], c.id, "punto", "su punto"), Q: [c.x, c.y] });
     }
     for (const ap of ctx.apoyos) {
