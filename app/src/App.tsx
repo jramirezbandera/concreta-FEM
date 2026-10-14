@@ -254,7 +254,7 @@ export function App() {
         <div className="flex h-full flex-col">
           <header className="barra-sup">
             <span className="flex shrink-0 items-center gap-1.5 text-[15px] font-semibold">
-              <span className="inline-block h-[8px] w-[8px] rounded-full bg-accent" aria-hidden="true" />
+              <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-[18px] w-[18px]" aria-hidden="true" />
               Concreta
             </span>
             <span className="min-w-0 max-w-[340px] shrink truncate px-1 text-[13px] text-text-primary" title={e?.nombre ?? undefined}>

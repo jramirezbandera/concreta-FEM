@@ -93,7 +93,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
       <div className="mt-[8vh] w-[620px] max-w-full rounded-md border border-border-main bg-bg-primary">
         <div className="border-b border-border-sub px-5 py-4">
           <div className="flex items-center gap-1.5 text-[15px] font-semibold">
-            <span className="inline-block h-[7px] w-[7px] rounded-full bg-accent" aria-hidden="true" />
+            <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-[18px] w-[18px]" aria-hidden="true" />
             Concreta · FEM 3D
           </div>
           <h1 className="mt-1 text-[13px] font-normal text-text-secondary">Meter el modelo por tablas, calcularlo y revisar los resultados (V1 y V2a). Todo se guarda en el proyecto.json, el mismo que usan la CLI y el agente; si el fichero cambia fuera, se recarga solo (o avisa, si hay cambios sin guardar).</h1>
