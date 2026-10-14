@@ -127,3 +127,41 @@ Un trozo del edificio reticular (3 × 3 vanos de 6 × 5 m, vigas por todos los e
    - **(a) Malla graduada** hacia la esquina pilar–viga hasta unos 6 cm. Mide lo mismo que ahora, bien convergido, pero es caro y persigue un pico que en la realidad reparten la fisuración y la plasticidad.
    - **(b) La franja sin el ancho de la viga.** En la cara se mide la losa fuera de b_w, y lo que la losa lleva dentro de b_w va a la viga (sección en T, como CSI). Hay que medir si converge rápido, y cambia también el armado de la viga.
    - **(c) La cara a una distancia** (por ejemplo, d o h_losa de la cara del pilar), donde el campo ya es regular. Lo admiten algunas normas para los apoyos monolíticos, pero hay que justificarlo con el CTE / EC2.
+
+## 9. SP-3 y SP-4 resueltos: el metro de los pilares sin cara (decisión del usuario, 2026-10-14)
+
+El usuario eligió la opción (b). **Medida, no resolvía:** quitando de la franja el ancho de la viga, el trozo reticular pasaba de −8,7 / −28,5 % a −7,2 / −22,9 %, y las caras seguían convergiendo igual de despacio. Al mirar estación a estación salió la causa real, que no era el solape de la losa con la viga:
+
+- **Esos pilares no tienen cara de franja.** `carasFranjas` no la da a un pilar que atraviesa una viga o un muro según la transversal (su apoyo es esa línea), ni a uno de borde.
+- **La estación de apoyo en el eje de la viga no cuenta lo que pasa por la huella.** En la franja que toca el pilar de (6; 5), da sólo 26–30 kN·m/m.
+- **El máximo salía de una estación de paso por campos a 5 cm de la cara** (s = 4,75 con la cara en 4,8), pegada a la esquina del pilar, donde el SPR no converge: 41 / 53 / 58 con h = 0,75 / 0,25 / 0,1.
+
+**Arreglo** (`esfuerzosFranjas.ts`; sin cambiar la malla): un pilar sin cara de franja tiene su metro en cada cara, en las franjas que lo tocan:
+
+1. por la recta de la cara, con lo que transmite su enlace (F3-d), si sigue la malla en su ventana;
+2. si no, por el escalón de F3 desde una recta de la malla que atraviese su huella, trasladado a la cara: la línea de apoyo de la viga o el muro, o la cara común de otros pilares de su alineación (la de un pilar de borde, P10 y P11 del muestrario). Se toma la más cercana a la cara: en la tira entre las dos rectas, lo que se lleva una viga a lo largo (la de fachada) no lo cuenta el corte. Desde la más lejana, la cara de P10 salía el doble;
+3. sin ninguna de las dos, el aviso `franja/pilar-sin-cara` de siempre.
+
+Entre sus caras no hay estaciones, como en los demás pilares. En los modelos medidos, todas salen por el escalón, y en el muestrario ya no queda ningún aviso de pilar sin cara.
+
+**Resultado** con h = 0,75 (`out_sp3.txt`, `out_convergencia.txt`):
+
+| Modelo | Antes: media / peor | Ahora: media / peor |
+|---|---|---|
+| Trozo reticular 3 × 3, frente a h = 0,1 con ε_snap 0,01 | −8,7 % / −28,5 % | −1,0 % / −22,9 % |
+| Edificio reticular de 2 plantas, frente a h = 0,375 | −6,6 % / −21 % (35 bajo −10 %) | −1,8 % / −14,5 % (10 bajo −10 %) |
+| Muestrario, frente a h = 0,25 | +0,7 % (X1, −14 %) | +0,6 %, ninguna bajo −10 % |
+
+Las caras nuevas convergen:
+
+- en el trozo reticular, el pilar de (6; 5) da 70,9 / 66,0 / 68,1 con h = 0,75 / 0,25 / 0,1 (antes, el máximo de la franja era 41) y el de (12; 5), 85,3 / 84,2 / 84,6 (antes, 52);
+- en el muestrario, las de los pilares de borde y de esquina atravesados por una viga de fachada quedan a ±3 % entre h = 0,75 y h = 0,15 (por ejemplo, X1, en la cara de P12: 138,7 / 137,1 / 137,9 / 139,9). Las de P10 y P11 en X1 (desde la cara común), un 7 % por debajo de h = 0,15 con ε_snap 0,01: 132,8 / 113,7 y 120,3 / 140,1, frente a 142,9 / 122,9 y 129,4 / 149,4.
+
+**Lo que esto dice de la pregunta del usuario:** los 1767 kN·m/m del mapa eran un artefacto (SP-1), pero en la cara de los medianeros y de las esquinas la losa sí transmite unos 115–140 kN·m/m, que las franjas antes no medían (daban 64–91).
+
+**Referencia congelada de F:** el modelo analítico y los resultados, idénticos. En `aleatorio-3`, `reticular-2x2-abacos` y `pilares-mezclados` (un pilar de borde de losa maciza) aparecen 33 estaciones de cara y desaparecen las de paso y de apoyo que quedaban entre las caras de esos pilares; las otras 3 316, bit a bit. Test: `src/compilador/caraSinFranja.test.ts` (falla con el código de antes).
+
+**Queda:**
+- **SP-6:** el escalón desde el eje de la viga frente al corte directo por la cara. Con h = 0,1, el experimento con las caras sembradas daba 93,1 en el pilar de (12; 5), frente a 84,6. Pero era otra malla (con ella, el paso a 5 cm de la cara ya salía un 5 % más alto), así que la diferencia del método está por medir en la misma malla.
+- **Franjas vecinas del pilar** (que no lo tocan): su máximo es de paso por campos a ~30 cm de la esquina, y converge despacio (el peor, −14,5 % en el edificio de 2 plantas).
+
