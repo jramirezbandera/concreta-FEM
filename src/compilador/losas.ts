@@ -443,6 +443,23 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
             }
         }
       }
+    // Y, en un reticular, las cuatro caras de los pilares que caen en un ábaco (SP-2): sin caras de
+    // franja (los de borde y de esquina, y los que atraviesa una viga), su plantilla dejaba el ábaco
+    // medianero en 8 láminas, algunas en cuña, sin nudos interiores para el SPR, y las franjas en las
+    // caras, bajas (un 26 % en el muestrario; un 12,7 % de media en el edificio reticular)
+    if (ctx.op.franjas && ctx.op.refinoCaras)
+      for (const { l } of losasK) {
+        if (!l.reticular?.abacos.length) continue;
+        const ejes = ejesArmado(l.losa);
+        for (const n of huellasK.keys()) {
+          const nudo = topo.nudos[n]!;
+          if (!l.reticular.abacos.some((ab) => puntoEnPoligono([nudo.x, nudo.y], ab))) continue;
+          const id = nudo.pilar!.pilares[0]!;
+          let v = refino.get(id);
+          if (!v) refino.set(id, (v = []));
+          for (const k of [1, 2] as const) for (const lado of [-1, 1] as const) v.push({ d: ejes[k].d, lado });
+        }
+      }
     for (const b of ctx.bandas) {
       if (b.planta !== idPlanta) continue;
       a.trazo(b.id, "banda", -1, rectanguloBanda(b.desde, b.hasta, b.ancho), true);

@@ -10,7 +10,9 @@
  * - pilares mezclados (30 × 50 girados y 40 × 40, 3 × 2 vanos, hueco de escalera) con acciones;
  * - un modelo al azar (semilla 3) con el eje 1 cualquiera;
  * - fase F2: la losa de 3 × 3 vanos con las caras refinadas, y la de H25 sin refinar (`refinoCaras: false`);
- * - fase F3: la de 3 × 3 con dos pilares mayores que el resto de su línea (el metro en su cara propia).
+ * - fase F3: la de 3 × 3 con dos pilares mayores que el resto de su línea (el metro en su cara propia);
+ * - SP-1 y SP-2: un reticular de 2 × 2 vanos con vigas por todos los ejes y ábacos en todos los
+ *   pilares (los de borde y de esquina se salen de la losa), con acciones (`spr-abacos.md`).
  * Los números se guardan con 13 cifras significativas, como en C2–C5. El test
  * (src/compilador/congelado-f.test.ts) lo recalcula con el núcleo.
  *
@@ -33,6 +35,7 @@ import { referenciaC2, type ReferenciaC2 } from "../c2/congelar.ts";
 import { losaPlanaFisica, OPCIONES_LOSA_PLANA } from "../c2/losaPlana.ts";
 import { redondeo } from "../c5/congelar.ts";
 import { conAcciones, losaPilaresMezclados, reticularH25 } from "../c5/modelos.ts";
+import { edificioReticular } from "../c4/modelos.ts";
 
 export const MODELOS_CONGELADOS_F: Record<string, () => ModeloCongelado> = {
   "h25-plana": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75 } }),
@@ -42,6 +45,8 @@ export const MODELOS_CONGELADOS_F: Record<string, () => ModeloCongelado> = {
   "losa-3x3-refinada": () => ({ fisico: losa3x3(), opciones: {} }),
   "h25-plana-sin-refinar": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, refinoCaras: false } }),
   "losa-3x3-mezclada": () => ({ fisico: losa3x3Mezclada(), opciones: {} }),
+  // SP-1 y SP-2: ábacos de pilares de borde, de esquina y atravesados por vigas
+  "reticular-2x2-abacos": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: {} }),
 };
 
 export interface ReferenciaF {
