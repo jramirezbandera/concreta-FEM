@@ -393,9 +393,10 @@
   - **F3-8:** lo que queda de F2-9 es la rigidez. Donde hay nudos rígidos delante (las mallas finas de referencia), la cara sale un 6–8,5 % alta, del lado seguro, como la de un pilar 5 cm mayor.
   - La malla y el compilador no cambian. Medida en `validacion/f3/f3d.ts`.
 - **Siguiente paso:**
-  - las decisiones de F3 (`fase-f3.md` §4: el coste) y de F2-9 (`fase-f2.md` §4: ya sólo la rigidez, F3-8);
-  - el punto fijo de los pilares (propuesto el 2026-10-14);
-  - las puertas de uso de AB, de F, de I1, I2, I3 e I4, de V2a y de V2b;
+  - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
+  - **ahora:** la puerta de uso de F y AB con un proyecto real del usuario (cubre también buena parte de las de I1–I4, V2a y V2b);
+  - después, el punto fijo de los pilares (propuesto el 2026-10-14);
+  - las puertas de uso que queden;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;

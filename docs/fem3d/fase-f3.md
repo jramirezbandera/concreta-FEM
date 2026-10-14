@@ -88,6 +88,7 @@ Como el enlace incluye los nudos rígidos a ≤ ε_snap de la huella (F2-9), su 
   - **No arregla** la rigidez que esos nudos dan a la losa (el pilar «crece» 5 cm). Eso sigue siendo la decisión de F2-9.
   - Con h = 0,75 casi no hay esclavos delante de una cara. Habría que medir cuánto cambia la referencia congelada de F, y junto al hueco del edificio, que es donde F2-9 pesa.
 - **El coste (criterio 8):** +17–20 % de tiempo y +10 % de ecuaciones en el edificio objetivo con losa plana (185 262, aún en el perfil móvil). Es el precio de la esquina fina en los pilares mayores. La alternativa es quitarla: entonces el error con h = 0,75 en esas caras es del 5 % de media y hasta el 10 %, bajo, del lado inseguro, aunque lejos del −50 % de antes. Por defecto la dejo.
+  - **Decidido por el usuario el 2026-10-14:** se acepta el coste y se deja la esquina fina.
 - **F2-9** sigue pendiente, como en `fase-f2.md` §4.
 - **El punto fijo de los pilares** (la recomendación de la conversación del 2026-10-14): la fase siguiente, si te parece.
 
