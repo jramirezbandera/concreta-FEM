@@ -102,3 +102,28 @@ Una puntual sólo horizontal (Fz, Mx y My nulos) que cae en una losa de una plan
 | SP-5: malla sin la carga, exactitud al moverla y caso apeado | `src/compilador/diafragmaCargas.test.ts`, `apeo.test.ts`, `validacion/abacos/diafragma.ts` |
 
 Baterías, con SP-5: en la raíz pasan 1 731 de 1 732 tests y en la app, los 36. El que falla es `aleatorio-6-reticular (perfil)` de C4, por el tiempo de espera de 60 s con la batería en paralelo (ya pasaba en F3). Solo, pasa.
+
+## 7. SP-3 y SP-4: la referencia fina
+
+Un trozo del edificio reticular (3 × 3 vanos de 6 × 5 m, vigas por todos los ejes, ábacos de 2,5 m, 2 plantas), con h de 0,75 a 0,1 y, en las finas, también ε_snap = 0,01 para quitar F3-8 (`validacion/abacos/sp3.ts`, `out_sp3.txt`). Referencia: h = 0,1 con ε_snap = 0,01 (60 012 nudos). Las 42 envolventes de ≥ 20 kN·m/m:
+
+| Malla | Media | \|Media\| | Peor | Más alta |
+|---|---|---|---|---|
+| 0,75 (la de uso) | −8,7 % | 10,2 % | −28,5 % | +7,3 % |
+| 0,5 | −7,4 % | 7,7 % | −24,7 % | +1,2 % |
+| 0,375 (la referencia de §3) | −4,9 % | 5,2 % | −17,4 % | +1,9 % |
+| 0,25, ε_snap 0,01 | −3,1 % | 4,3 % | −17,3 % | +10,0 % |
+| 0,15, ε_snap 0,01 | −1,0 % | 2,2 % | −7,5 % | +6,1 % |
+
+- **El error es real y mayor de lo que daba h = 0,375 como referencia:** −8,7 % de media y −28,5 % como máximo con h = 0,75.
+- **Está concentrado.** Las franjas sin viga ni pilar convergen a ±2 % ya con h = 0,75 (X6, X8, X12, Y9, Y14, Y21). Las malas son superiores en la cara de un pilar, en franjas con una viga embebida a lo largo (Y8, Y15, Y16, X7, X13, X19, Y22, Y1), justo como SP-4 en el muestrario.
+- **Y convergen despacio, como una singularidad.** L-N1:Y8 da 41,3 / 46,0 / 50,8 / 53,4 / 56,2 / 57,8 con h = 0,75 / 0,5 / 0,375 / 0,25 / 0,15 / 0,1, un orden de ~0,75 en h. Extrapolado, el límite está en ~62: con h = 0,75 falta un tercio, y con 0,1, un 7 %. Es la esquina entrante de la losa entre el pilar y la viga. Algunas caras (X13) dependen además de ε_snap: 67 frente a 80 con h = 0,25.
+- **Consecuencia:** refinar sólo el primer tramo junto a la viga (la opción c) las mejoraría, pero no las cerraría. Con orden 0,75, para quedarse a un 5 % harían falta elementos de ~6 cm junto a la esquina, con una gradación. Antes conviene decidir qué debe medir la franja ahí (§8).
+
+## 8. Lo que decide el usuario sobre SP-3 y SP-4
+
+1. **Aviso ya**, sea cual sea el arreglo (regla de oro 2: nada silencioso): la estación de la cara de un pilar en una franja con una viga embebida a lo largo lleva `franja/cara-con-viga`, que dice que con h = 0,75 puede salir hasta un ~30 % baja.
+2. **Qué mide la franja ahí.** La losa y la viga se solapan en el ancho de la viga, y la barra lleva el momento de la viga. Hay tres caminos:
+   - **(a) Malla graduada** hacia la esquina pilar–viga hasta unos 6 cm. Mide lo mismo que ahora, bien convergido, pero es caro y persigue un pico que en la realidad reparten la fisuración y la plasticidad.
+   - **(b) La franja sin el ancho de la viga.** En la cara se mide la losa fuera de b_w, y lo que la losa lleva dentro de b_w va a la viga (sección en T, como CSI). Hay que medir si converge rápido, y cambia también el armado de la viga.
+   - **(c) La cara a una distancia** (por ejemplo, d o h_losa de la cara del pilar), donde el campo ya es regular. Lo admiten algunas normas para los apoyos monolíticos, pero hay que justificarlo con el CTE / EC2.
