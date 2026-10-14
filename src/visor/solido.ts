@@ -761,9 +761,16 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       for (const id of ids) {
         const bs = compilado.mapeo.piezas[id] ?? [];
         if (!bs.length) continue;
-        const pts: Vec2[] = bs.flatMap((b) => barras[b]!.nudos.map((nn): Vec2 => [nudos[nn]!.x, nudos[nn]!.y]));
-        // Sus extremos: los puntos más alejados a lo largo de ella
-        const [a, b] = [pts[0]!, pts[pts.length - 1]!];
+        // Su eje es el del tramo flexible (i'→j'): la que pasa por una huella de pilar cuelga de su
+        // nudo con un offset rígido, y por los nudos saldría corrida hasta el centro del pilar
+        const ext: Vec2[] = bs.flatMap((b) => {
+          const br = barras[b]!;
+          const o = [br.offsets?.i, br.offsets?.j];
+          return br.nudos.map((nn, i): Vec2 => [nudos[nn]!.x + (o[i]?.[0] ?? 0), nudos[nn]!.y + (o[i]?.[1] ?? 0)]);
+        });
+        const pts: Vec2[] = [...ext, ...bs.flatMap((b) => barras[b]!.nudos.map((nn): Vec2 => [nudos[nn]!.x, nudos[nn]!.y]))];
+        // Sus extremos: los puntos más alejados a lo largo de ella (también los nudos: llega a su apoyo)
+        const [a, b] = [ext[0]!, ext[ext.length - 1]!];
         const L0 = Math.hypot(b[0] - a[0], b[1] - a[1]);
         if (L0 <= EPS) continue;
         const dv: Vec2 = [(b[0] - a[0]) / L0, (b[1] - a[1]) / L0];

@@ -197,13 +197,19 @@ function esperado(f: ModeloFisico, p: PiezaSolida, compilado: CompiladoSolido | 
     let cubierta = 0;
     const region = { contorno: x.contorno, huecos: x.huecos ?? [] };
     for (const id of compilado.mapeo.panos![x.id]!) {
+      // La banda va centrada en el eje del tramo flexible (con los offsets), de apoyo a apoyo
       const ns: Vec2[] = [];
+      const ext: Vec2[] = [];
       for (const b of compilado.mapeo.piezas[id]!) {
-        const [n0, n1] = compilado.modelo.barras![b]!.nudos.map((n) => compilado.modelo.nudos[n]!);
+        const br = compilado.modelo.barras![b]!;
+        const [n0, n1] = br.nudos.map((n) => compilado.modelo.nudos[n]!);
+        const [oi, oj] = [br.offsets?.i ?? [0, 0, 0], br.offsets?.j ?? [0, 0, 0]];
         L += Math.hypot(n1!.x - n0!.x, n1!.y - n0!.y);
         ns.push([n0!.x, n0!.y], [n1!.x, n1!.y]);
+        ext.push([n0!.x + oi[0], n0!.y + oi[1]], [n1!.x + oj[0], n1!.y + oj[1]]);
       }
-      const [a, c] = [ns[0]!, ns[ns.length - 1]!];
+      ns.push(...ext);
+      const [a, c] = [ext[0]!, ext[ext.length - 1]!];
       const Lv = Math.hypot(c[0] - a[0], c[1] - a[1]);
       const u: Vec2 = [(c[0] - a[0]) / Lv, (c[1] - a[1]) / Lv];
       const ss = ns.map((q) => (q[0] - a[0]) * u[0] + (q[1] - a[1]) * u[1]);
@@ -378,5 +384,27 @@ describe("I3: las aristas", () => {
     // V1 va por el borde de la losa: media huella con el canto entero y media con el descuelgue
     const z = new Set(aristasDe(v1.caras).flatMap(([a, b]) => [a[2], b[2]].map((x) => x.toFixed(6))));
     expect([...z].sort()).toEqual(["2.500000", "2.750000", "3.000000"]);
+  });
+});
+
+describe("I3: las viguetas de un paño", () => {
+  it("la que pasa por la huella de un pilar se dibuja en su eje (el offset), no en el del pilar", () => {
+    // Muestrario, cubierta: la vigueta de x = 11,9 cruza P3, P7 y P11 (x = 12) y cuelga de sus nudos
+    // con un offset de −0,10 m. Antes salía en x = 12, a 0,6 y 0,8 m de sus vecinas.
+    const f = leer("ejemplos/muestrario/proyecto.json");
+    const c = compilar(f);
+    expect(c.valido).toBe(true);
+    if (!c.valido) return;
+    const ids = c.mapeo.panos!.F1!;
+    const ejes = ids.map((id) => {
+      const b = c.modelo.barras![c.mapeo.piezas[id]![0]!]!;
+      return c.modelo.nudos[b.nudos[0]!]!.x + (b.offsets?.i?.[0] ?? 0);
+    });
+    expect(ejes.some((x) => Math.abs(x - 11.9) < 1e-9)).toBe(true);
+    const F1 = piezasSolido(f, c).piezas.find((p) => p.id === "F1")!;
+    const xs = new Set(F1.caras.flatMap((k) => k.p.map((v) => Math.round(v[0] * 1e6))));
+    // Las caras del alma (bw = 0,12) de cada vigueta, a su eje ± 0,06
+    for (const x of ejes) for (const s of [-1, 1]) expect(xs.has(Math.round((x + s * 0.06) * 1e6)), `vigueta en ${x}`).toBe(true);
+    expect(xs.has(Math.round(12.06 * 1e6))).toBe(false);
   });
 });
