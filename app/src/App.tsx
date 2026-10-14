@@ -8,13 +8,15 @@
  * - Ctrl+K: la paleta de órdenes;
  * - Ctrl+S guarda; Ctrl+Z y Ctrl+Y (o Ctrl+Mayús+Z) deshacen y rehacen fuera de un campo de texto
  *   (dentro, deshacen lo escrito en el campo);
- * - AvPág y RePág: la planta de arriba o la de abajo; Esc: soltar lo elegido;
+ * - AvPág y RePág: la planta de arriba o la de abajo (con un alzado activo, el eje siguiente o el
+ *   anterior de su dirección); Esc: soltar lo elegido;
  * - desde I2: F encuadra la vista activa y Ctrl+1…4 cambian la disposición de las vistas.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FolderOpen, Moon, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
 import { lista, indiceIds } from "../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
+import { ejeVecino } from "./armazon/Disposicion.tsx";
 import { Paleta, type Orden } from "./armazon/Paleta.tsx";
 import { ContextoPaneles, useAlmacenPaneles, type EstadoPaneles } from "./armazon/paneles.ts";
 import { ContextoVisor, type Espacio, type ModoResultados } from "./contexto.ts";
@@ -169,7 +171,13 @@ export function App() {
         return;
       }
       if (mod || x.altKey || enCampo(x.target) || (x.target as HTMLElement | null)?.closest?.("[role=grid]")) return;
-      if ((x.key === "PageUp" || x.key === "PageDown") && plantas?.length) {
+      const va = vistasRef.current.vistas[vistasRef.current.activa];
+      if ((x.key === "PageUp" || x.key === "PageDown") && va?.tipo === "alzado" && e?.ejes.length) {
+        x.preventDefault();
+        const actual = e.ejes.some((y) => y.id === va.eje) ? va.eje! : e.ejes[0]!.id;
+        const otro = ejeVecino(e.ejes, actual, x.key === "PageUp" ? -1 : 1);
+        if (otro) ponerVista(vistaActiva, { eje: otro });
+      } else if ((x.key === "PageUp" || x.key === "PageDown") && plantas?.length) {
         x.preventDefault();
         const i = plantas.findIndex((p) => p.id === plantaValida);
         const j = Math.max(0, Math.min(plantas.length - 1, i + (x.key === "PageUp" ? -1 : 1)));
@@ -179,7 +187,7 @@ export function App() {
     };
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
-  }, [ed, paleta, plantas, plantaValida, setPlanta, setDisposicion, ponerVista, vistaActiva]);
+  }, [ed, e, paleta, plantas, plantaValida, setPlanta, setDisposicion, ponerVista, vistaActiva]);
 
   // Órdenes de la paleta
   const ordenes = useMemo<Orden[]>(() => {

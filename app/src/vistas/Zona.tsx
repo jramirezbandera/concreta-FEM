@@ -23,7 +23,7 @@ import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
 import type { FuenteEscena, VistaPlanta } from "../../../src/visor/sesion.ts";
-import { Desplegable, SelectorPlanta } from "../armazon/Disposicion.tsx";
+import { Desplegable, SelectorEje, SelectorPlanta } from "../armazon/Disposicion.tsx";
 import { Aviso } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { atributos, pintura } from "../lienzo/pintura.ts";
@@ -208,13 +208,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           </>
         )}
         {tipo === "alzado" && (
-          <Desplegable
-            etiqueta="Eje del alzado"
-            prefijo={<span className="text-text-secondary">Eje</span>}
-            valor={eje ?? ""}
-            onCambio={(x) => poner(i, { eje: x })}
-            opciones={e.ejes.map((x) => ({ id: x.id, nombre: `${x.nombre ?? x.id}${x.propuesto ? " (propuesto)" : ""}` }))}
-          />
+          <SelectorEje ejes={e.ejes} eje={eje} onEje={(x) => poner(i, { eje: x })} />
         )}
         {tipo === "alzado" && (
           <Desplegable

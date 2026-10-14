@@ -131,6 +131,66 @@ export function SelectorPlanta({ estado, planta, onPlanta, ninguna }: { estado: 
   );
 }
 
+/** Un eje de replanteo como lo da la sesión: basta su id, su nombre y su recta. */
+type EjeVista = EstadoSesion["ejes"][number];
+
+/**
+ * Los ejes paralelos a uno (su familia: los de letra o los de número), en el orden de la lista:
+ * las flechas del alzado recorren los pórticos de una dirección sin saltar a la otra.
+ */
+export function ejesParalelos(ejes: readonly EjeVista[], id: string): EjeVista[] {
+  const dir = (x: EjeVista) => {
+    const [dx, dy] = [x.hasta[0] - x.desde[0], x.hasta[1] - x.desde[1]];
+    const l = Math.hypot(dx, dy) || 1;
+    return [dx / l, dy / l] as const;
+  };
+  const e = ejes.find((x) => x.id === id);
+  if (!e) return [];
+  const [ux, uy] = dir(e);
+  return ejes.filter((x) => {
+    const [vx, vy] = dir(x);
+    return Math.abs(ux * vy - uy * vx) < 1e-3;
+  });
+}
+
+/** El eje de antes (−1) o el de después (+1) entre los paralelos a `id`; null en los extremos. */
+export function ejeVecino(ejes: readonly EjeVista[], id: string, d: -1 | 1): string | null {
+  const f = ejesParalelos(ejes, id);
+  return f[f.findIndex((x) => x.id === id) + d]?.id ?? null;
+}
+
+/**
+ * El eje del alzado (I2), en un desplegable con todos, y dos flechas para el anterior y el
+ * siguiente de su dirección (RePág y AvPág con el alzado activo, en `App`), como las plantas.
+ */
+export function SelectorEje({ ejes, eje, onEje }: { ejes: readonly EjeVista[]; eje: string | null; onEje: (id: string) => void }) {
+  const antes = eje ? ejeVecino(ejes, eje, -1) : null;
+  const despues = eje ? ejeVecino(ejes, eje, 1) : null;
+  const nombre = (x: EjeVista) => `${x.nombre ?? x.id}${x.propuesto ? " (propuesto)" : ""}`;
+  return (
+    <span className="chip sel planta-sel">
+      <span className="planta-sel-campo">
+        <span className="text-text-secondary">Eje</span>
+        <select className="sel-chip" value={eje ?? ""} onChange={(x) => onEje(x.target.value)} aria-label="Eje del alzado">
+          {ejes.map((x) => (
+            <option key={x.id} value={x.id}>
+              {nombre(x)}
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={13} className="sel-flecha" aria-hidden="true" />
+      </span>
+      <span className="planta-sel-sep" aria-hidden="true" />
+      <button type="button" className="ib-chip" disabled={!antes} onClick={() => antes && onEje(antes)} title="Eje anterior de esta dirección (RePág)" aria-label="Eje anterior">
+        <ChevronUp size={14} />
+      </button>
+      <button type="button" className="ib-chip" disabled={!despues} onClick={() => despues && onEje(despues)} title="Eje siguiente de esta dirección (AvPág)" aria-label="Eje siguiente">
+        <ChevronDown size={14} />
+      </button>
+    </span>
+  );
+}
+
 // ─── Paneles laterales e inferior ───────────────────────────────────────────────────────────────
 
 export interface Lateral {
