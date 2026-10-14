@@ -51,9 +51,10 @@ En `Losa.reticular.abacos`, además de la lista de polígonos, `{ "lado": 2.0 }`
 
 ### 2.3 MA3 — el peso del reticular por zonas con casetón perdido
 
-Campo nuevo `ppAligerado` en la losa reticular: el peso de la zona aligerada (el dato que da el ingeniero o el fabricante). Los ábacos pesan γ·h, como ya hace el casetón recuperable (C4-i). El `pp` actual (medio de toda la losa) sigue valiendo; dar los dos es error.
+**Cambia el significado de `pp`** en una losa reticular con casetón perdido (decisión MA-b): pasa a ser el peso de la zona aligerada (el dato que da el ingeniero o el fabricante), y los ábacos pesan γ·h, como ya hace el casetón recuperable (C4-i). Hasta ahora era el peso medio de toda la losa con los ábacos.
 
-- La sensatez de A3 (peso esperado frente al calculado) y el informe lo reconocen.
+- La sensatez de A3 (peso esperado frente al calculado), el informe, la descripción del campo en el esquema y la skill lo dicen así.
+- Rompe los proyectos guardados con reticular de casetón perdido; no hay usuarios, así que sólo se actualizan los ejemplos: el muestrario (L2, `pp` 4,6, que pasa a ser el de su zona aligerada: el usuario confirma el valor) y la vivienda (sin sus 21 cargas de los ábacos). Las referencias congeladas con ese caso se regeneran, con su diferencia medida.
 
 ### 2.4 MA4 — la carga de borde de losa
 
@@ -85,16 +86,18 @@ Carga `lineal` con `losa` y `borde` en lugar de `puntos`: a lo largo del contorn
 |---|---|
 | 1 | **Puerta de la fase (como A2):** tres subagentes con sólo la skill, la CLI, el DXF de la vivienda y las respuestas del usuario por escrito (las de esta conversación, en un solo texto) llegan a un proyecto equivalente al de `ejemplos/vivienda`: pilares a ≤ 1 cm, las mismas losas y ábacos, y el resumen de cargas por planta y caso a ≤ 0,5 %. **En una ronda de preguntas como mucho y sin escribir código propio** (sólo órdenes `fem`). |
 | 2 | MA2: la vivienda con `"abacos": { "lado": 2.0 }` da los mismos ábacos que a mano (los unidos incluidos) y el mismo modelo analítico. Los ábacos solapados de un modelo al azar se unen y el modelo calcula; los proyectos que ya validaban salen bit a bit. |
-| 3 | MA3: la vivienda con `ppAligerado: 4.5` y sin las 21 cargas de los ábacos da las mismas fuerzas nodales de peso propio + carga que hoy (a 1e-9) y la sensatez de peso sin aviso. |
+| 3 | MA3: la vivienda con `pp` 4,5 como peso de la zona aligerada y sin las 21 cargas de los ábacos da las mismas fuerzas nodales de peso propio + carga que hoy (a 1e-9) y la sensatez de peso sin aviso. |
 | 4 | MA4: los petos de la vivienda como `borde` dan el mismo vector de cargas que las polilíneas a mano (a 1e-9), y la malla no cambia. |
 | 5 | MA5: la vivienda con `escalon` no da `sensatez/altura`; `fem alinear` sobre las coordenadas crudas del DXF da las del ejemplo y no mueve nada más que la tolerancia (test con ruido al azar). |
 | 6 | MA6: **ida y vuelta** con los proyectos de ejemplo: exportar sus pilares, losas y ejes a un DXF (un exportador de prueba, sólo para los tests) e importarlo da los mismos pilares, contornos y ejes. Con el DXF real de la vivienda (que no se sube: datos del cliente; el test usa un DXF sintético con sus mismas entidades: líneas dobles, cotas, `$INSUNITS` erróneo), los 23 pilares y los dos contornos. |
-| 7 | Sin regresión: las referencias congeladas de C1–C5 y F, idénticas; el esquema de `proyecto.json` sólo gana campos opcionales. |
+| 7 | Sin regresión: las referencias congeladas de C1–C5 y F, idénticas salvo las de reticulares con casetón perdido y `pp` (MA3), regeneradas con su diferencia medida; el esquema de `proyecto.json` sólo gana campos opcionales. |
 
-## 4. Lo que decide el usuario (propuestas por defecto)
+## 4. Lo que decide el usuario
+
+**Decidido el 2026-10-15:** todo como se proponía, salvo MA-b: se cambia el significado de `pp` (no hay usuarios; se actualizan los ejemplos).
 
 - **MA-a, orden:** MA1 → MA3 → MA2 → MA4 → MA5 → MA6, y la puerta (criterio 1) al final. MA1–MA3 son pequeñas y quitan los errores más fáciles de cometer; MA6 es la que más cambia las cosas y la más larga.
-- **MA-b, peso del reticular:** campo nuevo `ppAligerado` (propuesto) o cambiar el significado de `pp` con casetón perdido (rompe proyectos guardados: no).
+- **MA-b, peso del reticular:** ~~campo nuevo `ppAligerado`~~. **Decidido: con casetón perdido, `pp` es el peso de la zona aligerada.**
 - **MA-c, ábacos unidos:** unirlos con aviso (propuesto) o seguir rechazándolos y que lo haga el agente.
 - **MA-d, tolerancia de unión de ábacos:** h/2 (propuesta).
 - **MA-e, `fem alinear`:** sólo propone por defecto y escribe con `--escribir` (propuesto), con tolerancia de 3 cm por defecto.
