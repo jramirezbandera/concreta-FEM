@@ -18,6 +18,12 @@
  *   lineal). Si sus centroides están alineados (una región de una sola fila de láminas), el nudo
  *   queda «degradado»: un polinomio a lo largo de la fila, suponiendo que nada varía a través de
  *   ella; y con un único centroide, su valor y el Q de la DKMQ.
+ * - Estabilidad (SP-1): el valor de un nudo es Σ wₛ·vₛ sobre sus muestras, y ningún ajuste se usa
+ *   con una constante de Lebesgue Λ = Σ|wₛ| mayor que LEBESGUE_MAXIMO: si la media de los vecinos
+ *   la pasa, sólo los vecinos que no; si no queda ninguno, la siguiente base del parche propio, y al
+ *   final la media de sus muestras (Λ = 1, degradado). Lo decide la geometría, no u: sigue lineal.
+ *   En una región pequeña (el ábaco de un pilar de borde, de 8 láminas) un bilineal de 4 muestras
+ *   daba Λ ≈ 170 y nudos 30 veces fuera del rango de las láminas.
  * - Muestreo en el centroide y no en los 4 puntos de Gauss (E5-2): dentro de cada lámina, la DKMQ da
  *   a M una pendiente espuria (un diente de sierra entre los puntos de Gauss que se reduce con h al
  *   mismo ritmo que h), que no afecta al valor del centroide (orden 2, H10) pero sí a la derivada:
@@ -71,6 +77,13 @@ const CENTROIDE = 4;
 const SENO_COPLANAR = 1e-3;
 /** Cociente mínimo entre el menor y el mayor pivote de la matriz normal de un parche. */
 const PIVOTE_MINIMO = 1e-8;
+/**
+ * Constante de Lebesgue máxima del ajuste de un nudo (Λ = Σ|wₛ|, valor = Σ wₛ·vₛ): por encima, el
+ * polinomio extrapola de más y se pasa a una base menor (SP-1, `spr-abacos.md`). Con Λ < 10 el
+ * nudo no se sale más de ~1,9 veces del rango de sus muestras; en un ábaco medianero de 8 láminas,
+ * el bilineal de 4 muestras daba Λ ≈ 170 y 31 veces. En los modelos congelados, fuera de esos ábacos, Λ ≤ 9,2.
+ */
+export const LEBESGUE_MAXIMO = 10;
 
 type Base = { n: number; p: (x: number, y: number, o: Float64Array) => void; px: (x: number, y: number, o: Float64Array) => void; py: (x: number, y: number, o: Float64Array) => void };
 
@@ -490,14 +503,46 @@ export class CamposLaminas implements IntegradorCampos {
     return c;
   }
 
+  /**
+   * Constante de Lebesgue en la plaza p de la media de unos parches: Λ = Σ|wₛ|, con el valor del
+   * nudo Σ wₛ·vₛ sobre sus muestras. |valor| ≤ Λ·máx|vₛ|: lo que puede salirse del rango de las muestras.
+   */
+  private lebesgue(p: number, parches: readonly Parche[]): number {
+    const x = this.xyPlaza[2 * p]!;
+    const y = this.xyPlaza[2 * p + 1]!;
+    const w = new Map<number, number>();
+    for (const c of parches) {
+      const n = c.base.n;
+      const z = new Float64Array(n);
+      c.base.p((x - c.x) / c.h, (y - c.y) / c.h, z);
+      resolverCholesky(c.L, n, z, 1);
+      for (let s = 0; s < c.muestras.length; s++) {
+        let ws = 0;
+        for (let j = 0; j < n; j++) ws += c.p[n * s + j]! * z[j]!;
+        const m = c.muestras[s]!;
+        w.set(m, (w.get(m) ?? 0) + ws / parches.length);
+      }
+    }
+    let l = 0;
+    for (const v of w.values()) l += Math.abs(v);
+    return l;
+  }
+
+  /** Constante de Lebesgue del ajuste de la plaza p (≤ LEBESGUE_MAXIMO, o 1 con la media de sus muestras). */
+  lebesgueEn(p: number): number {
+    return this.lebesgue(p, this.plan(p).parches);
+  }
+
   /** Cómo se calcula el valor de la plaza p. */
   private plan(p: number): PlanNudo {
     let pl = this.planes[p];
     if (pl) return pl;
+    const estable = (ps: readonly Parche[]) => ps.length > 0 && this.lebesgue(p, ps) <= LEBESGUE_MAXIMO;
     let parches: Parche[] = [];
     const propio = this.centro(p);
-    if (propio) parches = [propio];
-    else {
+    if (propio) {
+      if (estable([propio])) parches = [propio];
+    } else {
       // Borde: parches interiores de los nudos de sus láminas
       const vistos = new Set<number>();
       for (let q = this.ptrPlaza[p]!; q < this.ptrPlaza[p + 1]!; q++) {
@@ -510,14 +555,19 @@ export class CamposLaminas implements IntegradorCampos {
           if (c) parches.push(c);
         }
       }
+      // Si su media amplifica de más, sólo los que no lo hacen en p
+      if (parches.length && !estable(parches)) {
+        parches = parches.filter((c) => estable([c]));
+        if (!estable(parches)) parches = [];
+      }
     }
     let degradado = false;
     let qDkmq = false;
     if (!parches.length) {
-      // Sin parches interiores: el propio, con la mayor base que admita
+      // Sin parches interiores estables: el propio, con la mayor base que admita sin amplificar de más
       for (const b of [this.base, BASES.bilineal, BASES.lineal, "1d-cuadratica", "1d-lineal"] as const) {
         const c = this.parche(p, b);
-        if (c) {
+        if (c && estable([c])) {
           parches = [c];
           degradado = typeof b === "string";
           break;
