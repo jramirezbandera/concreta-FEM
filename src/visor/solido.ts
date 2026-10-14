@@ -5,10 +5,10 @@
  *
  * Convenio de cotas, el del alzado de I2: la cota de una planta es la cara superior de su forjado.
  * - Losa: su región (contorno menos huecos) de c − e a c. Un reticular, maciza menos sus casetones:
- *   los que caben enteros a su intereje, centrados en la losa, a ≥ `ZUNCHO_RETICULAR` de sus bordes
- *   (el zuncho) y sin pisar ábacos ni huellas de pilares, vigas y muros (su sitio es ilustrativo: el
- *   cálculo usa multiplicadores, D3). Con casetón perdido (por defecto), su cara inferior aparte
- *   (`casetones`), que no cuenta en el volumen.
+ *   una retícula a su intereje, centrada en la losa y recortada por sus bordes, sus ábacos y las
+ *   huellas de pilares, vigas y muros (su sitio es ilustrativo: el cálculo usa multiplicadores, D3).
+ *   No lleva un zuncho que no esté en el modelo: un borde sin viga se ve abierto. Con casetón
+ *   perdido (por defecto), su cara inferior aparte (`casetones`), que no cuenta en el volumen.
  * - Paño: sus viguetas, las del compilador (C4-a), con su sección y la cara superior en c, y macizo
  *   del canto de la vigueta lo que no cae en la banda de un intereje de ninguna (junto a una viga
  *   o un muro paralelos, donde el compilador no pone vigueta, o el sobrante del ancho). Sin
@@ -554,83 +554,6 @@ export function huellaPilarSolido(p: { x: number; y: number; giro?: number }, po
   return poligono.map(([v, u]) => [p.x + v * ey[0] + u * ez[0], p.y + v * ey[1] + u * ez[1]] as Vec2);
 }
 
-// ─── Reticular ──────────────────────────────────────────────────────────────────────────────────
-
-/** Ancho mínimo del zuncho de borde de un reticular en el sólido, m: lo que queda entre el borde y el primer casetón. */
-export const ZUNCHO_RETICULAR = 0.25;
-
-/** ¿Entra el segmento ab en el rectángulo abierto (x0, x1) × (y0, y1)? Tocar su borde no es entrar (Liang–Barsky). */
-function entraEnRect(a: readonly number[], b: readonly number[], x0: number, y0: number, x1: number, y1: number): boolean {
-  let [t0, t1] = [0, 1];
-  const [dx, dy] = [b[0]! - a[0]!, b[1]! - a[1]!];
-  for (const [p, q] of [[-dx, a[0]! - x0], [dx, x1 - a[0]!], [-dy, a[1]! - y0], [dy, y1 - a[1]!]] as const) {
-    if (p === 0) {
-      if (q <= 0) return false;
-      continue;
-    }
-    const t = q / p;
-    if (p < 0) t0 = Math.max(t0, t);
-    else t1 = Math.min(t1, t);
-    if (t0 >= t1) return false;
-  }
-  return true;
-}
-
-/**
- * Los casetones de un reticular en el sólido: la retícula de celdas de lado c a su intereje s, según
- * d y su perpendicular, centrada en la caja de la losa, y de ella las celdas que caben enteras a ≥ w
- * de los bordes de la región (contorno y huecos) y no pisan los ábacos ni los `macizos` (huellas de
- * pilares, vigas y muros). Lo que queda fuera de los casetones es macizo: así el reticular acaba en
- * un zuncho de borde, no en nervios sueltos, y se maciza alrededor de los ábacos y las huellas.
- *
- * En coordenadas locales (x según d, y a su izquierda): la celda (i, j) va de (x0 + i·s, y0 + j·s) a
- * (x0 + i·s + c, y0 + j·s + c), y `dentro[j·nx + i]` dice si es casetón.
- */
-export function casetonesReticular(
-  region: readonly (readonly Vec2[])[],
-  abacos: readonly (readonly Vec2[])[],
-  macizos: readonly (readonly Vec2[])[],
-  d: Vec2,
-  s: number,
-  c: number,
-  w: number,
-): { x0: number; y0: number; nx: number; ny: number; c: number; dentro: Uint8Array } {
-  const n: Vec2 = [-d[1], d[0]];
-  const loc = (q: Vec2): Vec2 => [q[0] * d[0] + q[1] * d[1], q[0] * n[0] + q[1] * n[1]];
-  const R = region.map((r) => r.map(loc));
-  const [X0, Y0, X1, Y1] = cajaAnillos(R);
-  const reparto = (L: number): [number, number] => {
-    if (!(c > 0) || L - 2 * w < c) return [0, 0];
-    const k = Math.floor((L - 2 * w - c) / s + 1e-9) + 1;
-    return [k, (L - ((k - 1) * s + c)) / 2];
-  };
-  const [nx, ax] = reparto(X1 - X0);
-  const [ny, ay] = reparto(Y1 - Y0);
-  const [x0, y0] = [X0 + ax, Y0 + ay];
-  const dentro = new Uint8Array(nx * ny);
-  if (!nx || !ny) return { x0, y0, nx, ny, c, dentro };
-  const caja = [x0, y0, x0 + (nx - 1) * s + c, y0 + (ny - 1) * s + c];
-  const cerca = [...abacos, ...macizos].map((p) => p.map(loc)).filter((p) => tocan(cajaAnillos([p]), caja));
-  const cajas = cerca.map((p) => cajaAnillos([p]));
-  const lados = R.flatMap((r) => r.map((q, i) => [q, r[(i + 1) % r.length]!] as const));
-  for (let j = 0; j < ny; j++)
-    for (let i = 0; i < nx; i++) {
-      const [a0, b0] = [x0 + i * s, y0 + j * s];
-      const [a1, b1] = [a0 + c, b0 + c];
-      const centro: Vec2 = [(a0 + a1) / 2, (b0 + b1) / 2];
-      // Entero en la región, a ≥ w de sus bordes
-      if (!dentroAnillos(centro, R) || lados.some(([p, q]) => entraEnRect(p, q, a0 - w, b0 - w, a1 + w, b1 + w))) continue;
-      // Sin pisar un ábaco ni una huella
-      const pisa = cerca.some((p, k) => {
-        const b = cajas[k]!;
-        if (b[0] >= a1 || b[2] <= a0 || b[1] >= b1 || b[3] <= b0) return false;
-        return dentroAnillos(centro, [p]) || p.some((q, t) => entraEnRect(q, p[(t + 1) % p.length]!, a0, b0, a1, b1));
-      });
-      if (!pisa) dentro[j * nx + i] = 1;
-    }
-  return { x0, y0, nx, ny, c, dentro };
-}
-
 // ─── Piezas ─────────────────────────────────────────────────────────────────────────────────────
 
 const porId = <T extends { id: string }>(xs: readonly T[] | undefined): T[] => [...(xs ?? [])].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -823,46 +746,63 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     } else {
       const { intereje: s, nervio: bw, capa: hf } = ret;
       const abacos = (ret.abacos ?? []) as Vec2[][];
-      // Los casetones que caben enteros; bajo la capa, todo lo demás es macizo (nervios, zuncho de borde, ábacos)
-      const cs = casetonesReticular(region, abacos, macizosEn(k), d, s, s - bw, ZUNCHO_RETICULAR);
+      // La retícula de casetones, centrada en la caja de la losa y recortada por la zona aligerada: la
+      // región menos los ábacos y las huellas de pilares, vigas y muros. Sin zuncho: si el borde no lleva
+      // una viga en el modelo, se ve abierto, como se calcula
+      const c = s - bw;
+      const loc = region.flat().map((q): Vec2 => [q[0] * d[0] + q[1] * d[1], q[0] * n[0] + q[1] * n[1]]);
+      const [X0, X1] = [Math.min(...loc.map((q) => q[0])), Math.max(...loc.map((q) => q[0]))];
+      const [Y0, Y1] = [Math.min(...loc.map((q) => q[1])), Math.max(...loc.map((q) => q[1]))];
+      /** Inicio de las celdas (las enteras, centradas) y la primera y la última que tocan [a, b]. */
+      const reticula = (a: number, b: number): [number, number, number] => {
+        const k = Math.max(1, Math.floor((b - a - c) / s + 1e-9) + 1);
+        const x0 = (a + b) / 2 - ((k - 1) * s + c) / 2;
+        return [x0, Math.floor((a - x0) / s), Math.ceil((b - x0 - c) / s)];
+      };
+      const [ax, i0, i1] = reticula(X0, X1);
+      const [ay, j0, j1] = reticula(Y0, Y1);
       const g = (x: number, y: number): Vec2 => [x * d[0] + y * n[0], x * d[1] + y * n[1]];
-      const rect = (i: number, j: number): Vec2[] => {
-        const [x, y] = [cs.x0 + i * s, cs.y0 + j * s];
-        return [g(x, y), g(x + cs.c, y), g(x + cs.c, y + cs.c), g(x, y + cs.c)];
-      };
-      const huecosCaseton: Vec2[][] = [];
-      for (let j = 0; j < cs.ny; j++) for (let i = 0; i < cs.nx; i++) if (cs.dentro[j * cs.nx + i]) huecosCaseton.push(rect(i, j));
-      prismas(descomponer(region, [huecosCaseton], d), d, (fr) => (fr.capas[0] ? [[zc - hf, zc]] : [[zc - e, zc]]), caras);
-      // Casetón perdido: su cara inferior, enrasada con la de los nervios
-      if ((ret.caseton ?? "perdido") === "perdido") for (const r of huecosCaseton) casetones.push({ p: r.map((q): Vec3 => [q[0], q[1], zc - e]).reverse() });
-      // Marcas en la cara superior: los ejes de los nervios junto a un casetón y el contorno de los ábacos
-      const marca = (a: Vec2, b: Vec2) => marcas.push([[a[0], a[1], zc], [b[0], b[1], zc]]);
-      const hay = (i: number, j: number) => i >= 0 && j >= 0 && i < cs.nx && j < cs.ny && cs.dentro[j * cs.nx + i] === 1;
-      const ejes = (na: number, nb: number, junto: (a: number, b: number) => boolean, seg: (a: number, b0: number, b1: number) => void) => {
-        for (let a = 0; a <= na; a++) {
-          let b0 = -1;
-          for (let b = 0; b <= nb; b++) {
-            const si = b < nb && junto(a, b);
-            if (si && b0 < 0) b0 = b;
-            if (!si && b0 >= 0) {
-              seg(a, b0, b);
-              b0 = -1;
-            }
-          }
+      const celdas: Vec2[][] = [];
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) {
+          const [x, y] = [ax + i * s, ay + j * s];
+          celdas.push([g(x, y), g(x + c, y), g(x + c, y + c), g(x, y + c)]);
         }
-      };
-      const [m0, m1] = [-bw / 2, bw / 2 - s];
-      ejes(cs.nx, cs.ny, (i, j) => hay(i - 1, j) || hay(i, j), (i, j0, j1) => marca(g(cs.x0 + i * s - bw / 2, cs.y0 + j0 * s + m0), g(cs.x0 + i * s - bw / 2, cs.y0 + j1 * s + m1 + cs.c)));
-      ejes(cs.ny, cs.nx, (j, i) => hay(i, j - 1) || hay(i, j), (j, i0, i1) => marca(g(cs.x0 + i0 * s + m0, cs.y0 + j * s - bw / 2), g(cs.x0 + i1 * s + m1 + cs.c, cs.y0 + j * s - bw / 2)));
+      const macizos = [...abacos, ...macizosEn(k)].filter((m) => tocan(cajaAnillos([m]), cajaAnillos(region)));
+      const cols = descomponer(region, [celdas, ...macizos.map((m) => [m])], d);
+      const hueco = (fr: Franja) => fr.capas[0]! && !fr.capas.some((x, i) => i > 0 && x);
+      prismas(cols, d, (fr) => (hueco(fr) ? [[zc - hf, zc]] : [[zc - e, zc]]), caras);
+      // Casetón perdido: su cara inferior, enrasada con la de los nervios
+      if ((ret.caseton ?? "perdido") === "perdido")
+        for (const col of cols)
+          for (const fr of col.franjas) {
+            if (!fr.enP || !hueco(fr)) continue;
+            const plano: Vec2[] = [g(col.xa, fr.a0), g(col.xb, fr.b0)];
+            if (fr.b1 - fr.b0 > EPS) plano.push(g(col.xb, fr.b1));
+            if (fr.a1 - fr.a0 > EPS) plano.push(g(col.xa, fr.a1));
+            if (plano.length >= 3) casetones.push({ p: plano.map((q): Vec3 => [q[0], q[1], zc - e]).reverse() });
+          }
+      // Marcas en la cara superior: los ejes de los nervios en la zona aligerada y el contorno de los ábacos
+      const marca = (a: Vec2, b: Vec2) => marcas.push([[a[0], a[1], zc], [b[0], b[1], zc]]);
       const R = { contorno: l.contorno as Vec2[], huecos: (l.huecos ?? []) as Vec2[][] };
       const enLosa = (q: Vec2) => puntoEnRegion(q, R);
+      const aligerada = (q: Vec2) => enLosa(q) && !macizos.some((m) => dentroAnillos(q, [m]));
+      const todos = [...region, ...macizos];
+      for (let i = i0; i <= i1 + 1; i++) {
+        const x = ax + i * s - bw / 2;
+        if (x > X0 && x < X1) for (const [a, b] of trozosSegmento(g(x, Y0), g(x, Y1), todos, aligerada)) marca(a, b);
+      }
+      for (let j = j0; j <= j1 + 1; j++) {
+        const y = ay + j * s - bw / 2;
+        if (y > Y0 && y < Y1) for (const [a, b] of trozosSegmento(g(X0, y), g(X1, y), todos, aligerada)) marca(a, b);
+      }
       for (const ab of abacos) for (let i = 0; i < ab.length; i++) for (const [a, b] of trozosSegmento(ab[i]!, ab[(i + 1) % ab.length]!, region, enLosa)) marca(a, b);
     }
     piezas.push({ id: l.id, tipo: "losa", planta: k, material: material.get(l.material)?.tipo ?? null, seccion: null, caras, ...(marcas.length ? { marcas } : {}), ...(casetones.length ? { casetones } : {}) });
   }
   if ((f.losas ?? []).some((l) => l.reticular))
     notas.push(
-      `Los reticulares se dibujan con sus casetones enteros, centrados en la losa y en la dirección de su eje 1 y la perpendicular, y macizo lo demás: un zuncho de ${String(ZUNCHO_RETICULAR).replace(".", ",")} m como mínimo junto a los bordes y los huecos, los ábacos y las huellas de pilares, vigas y muros. Es ilustrativo: el cálculo usa multiplicadores en toda la zona aligerada (D3), sin el zuncho.`,
+      "Los reticulares se dibujan con sus casetones a su intereje, centrados en la losa y en la dirección de su eje 1 y la perpendicular, recortados por los bordes, los ábacos y las huellas de pilares, vigas y muros. Su sitio es ilustrativo: el cálculo usa multiplicadores en toda la zona aligerada (D3). No se dibuja un zuncho que no esté en el modelo: un borde sin viga se ve abierto.",
     );
 
   // Paños: las viguetas del compilador; sin él, una placa del canto de la vigueta

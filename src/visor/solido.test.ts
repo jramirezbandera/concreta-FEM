@@ -16,12 +16,12 @@ import { areaRegion, gammaMaterial, pesoPropioEsperado, Plantas } from "../agent
 import { compilar } from "../compilador/compilar.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
-import { areaConSigno, distanciaABorde, fraccionEnRegiones, momentosInterseccion, puntoEnPoligono, type Region } from "../compilador/poligonos.ts";
+import { areaConSigno, distanciaABorde, fraccionEnRegiones, momentosInterseccion, puntoEnPoligono, puntoEnRegion, type Region } from "../compilador/poligonos.ts";
 import { edificioGeometria, FAMILIAS } from "../pruebas/geometrias.ts";
 import { edificioObjetivoMuros, reticulaConNucleo } from "../../validacion/c3/modelos.ts";
 import { edificioReticular, edificioUnidireccional } from "../../validacion/c4/modelos.ts";
 import { alambrico } from "./alambrico.ts";
-import { aristasDe, formaSeccion, huellaPilarSolido, huellasInglete, LADO_SIN_FORMA, piezasSolido, recortarBanda, solido, tramosDe, volumen, ZUNCHO_RETICULAR, type CompiladoSolido, type PiezaSolida } from "./solido.ts";
+import { aristasDe, formaSeccion, huellaPilarSolido, huellasInglete, LADO_SIN_FORMA, piezasSolido, recortarBanda, solido, tramosDe, volumen, type CompiladoSolido, type PiezaSolida } from "./solido.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const leer = (r: string): ModeloFisico => JSON.parse(readFileSync(join(RAIZ, r), "utf8")).modelo;
@@ -265,7 +265,7 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
     expect(n).toBeGreaterThan(0);
   });
 
-  it("el reticular, macizo menos sus casetones: a ≥ el zuncho de los bordes, fuera de los ábacos, y el perdido con su cara inferior", () => {
+  it("el reticular, macizo menos sus casetones: dentro de la losa, fuera de los ábacos y las huellas, sin zuncho, y el perdido con su cara inferior", () => {
     const cotas = cotasPlantas(f.plantas);
     let n = 0;
     for (const l of f.losas ?? []) {
@@ -281,13 +281,21 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
       const A = areaRegion(l);
       expect(rel(volumen(p.caras), l.espesor * A - (l.espesor - ret.capa) * Ac), l.id).toBeLessThan(1e-9);
       expect(Ac / A, `${l.id}: aligerado`).toBeGreaterThan(0.2);
+      const R = { contorno: l.contorno, huecos: l.huecos ?? [] } as Region;
       const reg = [l.contorno, ...(l.huecos ?? [])] as Vec2[][];
-      for (const c of techos)
-        for (const q of c.p) {
-          const v: Vec2 = [q[0]!, q[1]!];
-          expect(Math.min(...reg.map((r) => distanciaABorde(v, r))), `${l.id}: casetón a menos del zuncho`).toBeGreaterThanOrEqual(ZUNCHO_RETICULAR - 1e-9);
-          for (const ab of (ret.abacos ?? []) as Vec2[][]) expect(puntoEnPoligono(v, ab) && distanciaABorde(v, ab) > 1e-9, `${l.id}: casetón en un ábaco`).toBe(false);
-        }
+      const pilares = (f.pilares ?? []).filter((x) => x.hasta === l.planta).map((x) => [x.x, x.y] as Vec2);
+      let alBorde = false;
+      for (const c of techos) {
+        const q = c.p.map((v) => [v[0]!, v[1]!] as Vec2);
+        const m: Vec2 = [q.reduce((t, v) => t + v[0], 0) / q.length, q.reduce((t, v) => t + v[1], 0) / q.length];
+        expect(puntoEnRegion(m, R), `${l.id}: casetón fuera de la losa`).toBe(true);
+        for (const ab of (ret.abacos ?? []) as Vec2[][]) expect(puntoEnPoligono(m, ab), `${l.id}: casetón en un ábaco`).toBe(false);
+        for (const p of pilares) expect(Math.hypot(m[0] - p[0], m[1] - p[1]), `${l.id}: casetón en un pilar`).toBeGreaterThan(0.05);
+        if (q.some((v) => Math.min(...reg.map((r) => distanciaABorde(v, r))) < 1e-9)) alBorde = true;
+      }
+      // Sin zuncho en el modelo, ninguno en el dibujo: donde el borde no lleva viga, los casetones llegan a él
+      const conViga = (f.vigas ?? []).some((v) => v.planta === l.planta);
+      if (!conViga) expect(alBorde, `${l.id}: borde macizo sin viga`).toBe(true);
       // Casetón perdido: su cara inferior cubre los huecos, en la cara inferior de la losa y mirando abajo
       const perdido = (ret.caseton ?? "perdido") === "perdido";
       const cs = p.casetones ?? [];
