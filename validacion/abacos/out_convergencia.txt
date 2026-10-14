@@ -2,7 +2,7 @@
 Muestrario, L2 (frente a h = 0,25)
   h = 0.75: 6227 nudos, 8 de 8 plantillas refinadas
   h = 0.25: 18325 nudos, 0 de 4 plantillas refinadas
-  25 envolventes ≥ 20 kN·m/m: media 0.6 %, |media| 3.6 %, por debajo de −10 %: 0, de −5 %: 2
+  25 envolventes ≥ 20 kN·m/m: media 0.8 %, |media| 3.8 %, por debajo de −10 %: 0, de −5 %: 2
   Las peores (h = 0,75 frente a la referencia):
     L2:Y8      inferior     19.3 frente a    20.8 (  -7.0 %)  s = 2.75 / 8.50
     L2:X1      superior    140.1 frente a   147.9 (  -5.3 %)  s = 12.20 / 12.20
@@ -13,14 +13,14 @@ Muestrario, L2 (frente a h = 0,25)
     L2:Y17     inferior     20.9 frente a    21.4 (  -2.2 %)  s = 2.75 / 2.75
     L2:Y15     inferior     19.7 frente a    20.2 (  -2.2 %)  s = 2.75 / 2.75
   Las más altas:
-    L2:Y1      superior    135.6 frente a   124.8 (   8.6 %)  s = 5.70 / 5.70
     L2:Y15     superior     64.6 frente a    58.8 (   9.8 %)  s = 5.65 / 5.65
+    L2:Y23     superior    129.8 frente a   116.3 (  11.6 %)  s = 5.30 / 0.20
     L2:Y10     superior     24.7 frente a    21.7 (  14.1 %)  s = 5.65 / 5.50
 
 Edificio reticular de C4, 2 plantas (frente a h = 0,375)
   h = 0.75: 19050 nudos, 154 de 154 plantillas refinadas
   h = 0.375: 68702 nudos, 0 de 0 plantillas refinadas
-  98 envolventes ≥ 20 kN·m/m: media -1.8 %, |media| 5.2 %, por debajo de −10 %: 10, de −5 %: 32
+  98 envolventes ≥ 20 kN·m/m: media -1.9 %, |media| 5.1 %, por debajo de −10 %: 10, de −5 %: 31
   Las peores (h = 0,75 frente a la referencia):
     L-N2:Y31   superior     26.2 frente a    30.7 ( -14.5 %)  s = 15.50 / 15.50
     L-N1:Y31   superior     24.2 frente a    27.7 ( -12.6 %)  s = 30.00 / 15.50

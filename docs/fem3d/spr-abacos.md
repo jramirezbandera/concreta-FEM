@@ -161,7 +161,69 @@ Las caras nuevas convergen:
 
 **Referencia congelada de F:** el modelo analítico y los resultados, idénticos. En `aleatorio-3`, `reticular-2x2-abacos` y `pilares-mezclados` (un pilar de borde de losa maciza) aparecen 33 estaciones de cara y desaparecen las de paso y de apoyo que quedaban entre las caras de esos pilares; las otras 3 316, bit a bit. Test: `src/compilador/caraSinFranja.test.ts` (falla con el código de antes).
 
-**Queda:**
+**Queda** (medido en §10):
 - **SP-6:** el escalón desde el eje de la viga frente al corte directo por la cara. Con h = 0,1, el experimento con las caras sembradas daba 93,1 en el pilar de (12; 5), frente a 84,6. Pero era otra malla (con ella, el paso a 5 cm de la cara ya salía un 5 % más alto), así que la diferencia del método está por medir en la misma malla.
 - **Franjas vecinas del pilar** (que no lo tocan): su máximo es de paso por campos a ~30 cm de la esquina, y converge despacio (el peor, −14,5 % en el edificio de 2 plantas).
 
+## 10. SP-6: el escalón frente al corte directo, y las franjas vecinas (2026-10-14)
+
+### 10.1 Un fallo previo: el corte directo no entraba nunca
+
+Para comparar los dos métodos en la misma malla, la cara de los pilares sin cara de franja se sembró con una carga lineal nula (`validacion/abacos/sp6.ts`). Aun así, las 96 caras del trozo reticular salían idénticas en bits: **el camino 1 de §9 (por la recta de la cara) no entraba nunca.** Cortaba la recta con el enlace de la huella, y sin nudos rígidos delante de la cara (F2-9) el enlace no la cruza: el corte no valía y se pasaba al escalón. Con ello, **un pilar sin recta para el escalón se quedaba sin metro aunque su cara siguiera la malla**: los de borde de una losa plana sin vigas, con sólo el aviso `franja/pilar-sin-cara`.
+
+Al arreglarlo salieron otros dos fallos del mismo camino, que no se veían porque no entraba:
+
+- **El corte no ve una lámina que cruza la recta con el centroide fuera de su rectángulo.** Si la recta de la cara sólo sigue la malla delante de la huella, el corte valía con medio ancho: P0-5 de `reticular-2x2-abacos` daba 0,2 m en vez de 0,41 y el medio, el doble. Ahora las láminas tienen que cubrir la ventana en la losa (salvo la huella y sus nudos rígidos), y si no, se usa el escalón.
+- **En la ventana justa, las láminas de sus extremos tampoco entran**, así que la cobertura casi nunca llegaba. Se corta con márgenes de más a menos (2,5h + ε_snap, h, h/2 y la ventana justa), el mayor con el que la recta sigue la malla.
+
+`esfuerzosFranjas.ts`, sin cambiar la malla. Tests en `caraSinFranja.test.ts`: el primero falla con el código de antes.
+
+**Efecto** (`out_sp6congelados.txt`, `out_h25borde.txt`):
+
+| Modelo | Estaciones | Qué cambia |
+|---|---|---|
+| H25, losa plana (y sin refinar) | 24 nuevas | los pilares de borde tienen su metro: las franjas de borde pasan de 56,1 a 77,0 kN·m/m de máximo (+37 %) |
+| H25, reticular | 20 nuevas | ídem: de 88,0 a 112,8 (+28 %) |
+| `pilares-mezclados` | 6 nuevas | P18-5, de borde, en su cara de y = 5,2 (en la de 4,8 la recta sale de la malla al final de la ventana y no hay escalón): −15,9 frente a −12,0 de la franja; el máximo de la franja no cambia |
+| `reticular-2x2-abacos` | 1 cambia | P0-5 en y = 5,2, del escalón al corte directo: +10 % |
+| El resto | — | bit a bit |
+
+Las caras nuevas de H25 convergen: la de P6-0 da −77,0 / −84,0 / −86,4 / −87,9 / −86,9 con h = 0,75 / 0,5 / 0,375 / 0,25 / 0,15 (la reticular, −112,8 … −126,7). **Con h = 0,75 quedan un 11 % por debajo de la malla fina**, frente al 36 % de antes. Las caras de los pilares interiores siguen a ≤ 0,3 %.
+
+En los modelos con vigas casi no cambia nada, porque con h = 0,75 la recta de la cara rara vez sigue la malla en la ventana: en el trozo reticular, 6 de 96 caras van por el corte directo (32 con h = 0,375 y las 96 con h = 0,1). El trozo pasa de −1,0 / −22,9 % a −1,2 / −22,9 % (media / peor), y el edificio de 2 plantas, igual (`out_sp3.txt`, `out_convergencia.txt`).
+
+### 10.2 El escalón frente al corte directo, en la misma malla
+
+Trozo reticular con las caras sembradas (`out_sp6.txt`), escalón menos directo en la envolvente superior de cada cara (≥ 20 kN·m/m):
+
+| Malla | Media | \|Media\| | Mín | Máx |
+|---|---|---|---|---|
+| 0,75 | −0,5 % | 4,8 % | −27,6 % | +23,7 % |
+| 0,375 | −0,0 % | 5,8 % | −27,9 % | +26,7 % |
+| 0,25, ε_snap 0,01 | −0,4 % | 5,6 % | −41,2 % | +16,1 % |
+| 0,15, ε_snap 0,01 | +0,1 % | 5,0 % | −27,2 % | +13,1 % |
+| 0,1, ε_snap 0,01 | −0,6 % | 4,5 % | −28,2 % | +12,7 % |
+
+- **No miden lo mismo, y la diferencia no baja al refinar**: es del método (lo que pasa en la tira de losa entre las dos rectas, de 15–25 cm, a lo ancho de la ventana), no de la malla.
+- **En los momentos que dimensionan** (≥ 50 kN·m/m con h = 0,1, 69 caras): −0,6 % de media, 3,8 % en valor absoluto, de −8,7 % a +11,7 %. El escalón sale **más alto en los pilares de esquina y de borde** con la viga de fachada como recta del escalón (+7…+12 %: P0-0, P18-0, P18-5, P0-15) y **más bajo en algunas caras interiores** (P6-10 en y = 9,75, −8,7 %; P12-10 en x = 12,25, −6,8 %).
+- Los extremos (−28…+27 %) son caras de momento pequeño (17–30 kN·m/m).
+- **El 84,6 frente a 93,1 de §9 era sobre todo la malla:** en la cara de P12-5 en x = 11,8 (L-N1:X7), con h = 0,1, el escalón y el directo dan 99,8 y 102,4 en la malla sembrada (un 2,6 %), mientras que el mismo corte directo da 93,7 en la malla de uso (la siembra lo sube un 9 %).
+
+### 10.3 Las franjas vecinas
+
+Las peores de §9 (`out_vecinas.txt`, `out_vecinas_trozo.txt`):
+
+| Franja | h = 0,75 frente a la fina | Dónde está el pico | Qué es |
+|---|---|---|---|
+| L-N2:Y16 del trozo | 40,2 frente a 52,2 (−23 %) | s = 10,5, con 33 cm de losa junto a la esquina del hueco de la escalera (12,6; 10,4) | **la esquina entrante del hueco**, no el pilar. No converge ni con h = 0,1: 39,5 / 44,3 / 46,1 / 52,2 |
+| L-N2:Y31 del edificio | 26,2 frente a 30,7 (−14,5 %) | s = 15,5, con 5 cm de losa junto a la esquina del hueco (24,6; 15,4) | ídem |
+| L-N2:Y29 del edificio | 31,6 frente a 35,9 (−12 %) | s = 19,75, a 10 cm de la cara de P24-20 y con la franja a 2 cm de su lado | **la vecina de un pilar**: paso por campos junto a su esquina. Converge desde h = 0,375 (35,9 / 35,7). La estación de apoyo en el eje de la viga converge (31,0 / 30,7 / 31,4), pero no recoge el pico |
+
+## 11. Lo que decide el usuario sobre SP-6
+
+1. **Qué método vale para el metro de un pilar sin cara de franja.** Hoy (tras §10.1): el corte directo si la recta de la cara sigue la malla en la ventana y, si no, el escalón. Así, la estación de una misma cara cambia de método al refinar (±5 %, hasta ±12 % en las que dimensionan).
+   - **(a) Como está.** El corte directo es la definición de las demás caras (F, F-h), y el escalón, su sustituto cuando la malla no lo permite. **Recomendado**: con h = 0,75 la diferencia de método es del orden del error de malla que queda (4,4 % de media en valor absoluto en el trozo).
+   - (b) Siempre el escalón donde haya una recta para hacerlo, y el directo sólo sin ella (los de borde de una losa plana). Un solo método por cara, pero distinto del de las demás caras, y bajo en algunas interiores (−8,7 %).
+   - (c) Sembrar la cara de estos pilares en la malla para que siempre haya corte directo. Medido sembrando la ventana y su margen: con h = 0,75 rompe la rejilla y la malla pasa de 3 620 a 18 906 nudos. Haría falta otra forma de sembrarla.
+2. **Las franjas vecinas de un pilar** (L-N2:Y29, −12 % con h = 0,75): (a) aceptarlo, como el resto del error de malla de SP-3/4; (b) que una franja que entra en la ventana de un pilar sin tocarlo tome también su metro en la cara (F-h extendido: del lado seguro, pero puede doblar la armadura de esa franja; habría que medirlo).
+3. **Las esquinas de los huecos.** La estación de una franja que casi no tiene losa junto a la esquina entrante de un hueco da la media de una singularidad: no converge. Propuesta: un aviso (`franja/esquina-hueco`) que remita al armado de refuerzo del hueco, en vez de leerla como demanda de la franja.

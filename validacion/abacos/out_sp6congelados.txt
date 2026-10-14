@@ -1,0 +1,13 @@
+modelo | estaciones | cambian | nuevas | directas | escalón − directo en mx: media |·|, mín, máx | la mayor
+  h25-plana: el mayor |mx| de las 8 franjas con estaciones nuevas, antes → ahora: LOSA:X12: 56.1 → 77.0 (+37.4 %); LOSA:Y12: 56.1 → 77.0 (+37.4 %); LOSA:X1: 56.1 → 77.0 (+37.4 %); LOSA:Y1: 56.1 → 77.0 (+37.4 %); sin cambio: 4
+h25-plana | 1160 | 0 | 24 | 24 | — | —
+  h25-reticular: el mayor |mx| de las 6 franjas con estaciones nuevas, antes → ahora: LOSA:Y15: 88.0 → 112.8 (+28.2 %); LOSA:X15: 88.0 → 112.8 (+28.2 %); LOSA:X1: 88.0 → 112.8 (+28.2 %); LOSA:Y1: 88.0 → 112.8 (+28.2 %); sin cambio: 2
+h25-reticular | 1460 | 0 | 20 | 20 | — | —
+  pilares-mezclados: el mayor |mx| de las 2 franjas con estaciones nuevas, antes → ahora: L-N1:X5: 78.1 → 78.1 (+0.0 %); L-N1:X6: 78.1 → 78.1 (+0.0 %); sin cambio: 2
+pilares-mezclados | 1353 | 0 | 6 | 6 | — | —
+aleatorio-3 | 909 | 0 | 0 | 0 | — | —
+losa-3x3-refinada | 2591 | 0 | 0 | 0 | — | —
+  h25-plana-sin-refinar: el mayor |mx| de las 8 franjas con estaciones nuevas, antes → ahora: LOSA:X12: 56.0 → 76.9 (+37.4 %); LOSA:Y12: 56.0 → 76.9 (+37.4 %); LOSA:Y1: 56.0 → 76.9 (+37.4 %); LOSA:X1: 56.0 → 76.9 (+37.4 %); sin cambio: 4
+h25-plana-sin-refinar | 1160 | 0 | 24 | 24 | — | —
+losa-3x3-mezclada | 2589 | 0 | 0 | 0 | — | —
+reticular-2x2-abacos | 1091 | 1 | 0 | 1 | +10.1 %, +10.1 %, +10.1 % | L-N1:Y1 s = 5.200 (P0-5): -30.26 → -33.66
