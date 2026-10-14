@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Vec2 } from "./fisico.ts";
-import { areaInterseccionRegiones, defectoPoligono, momentosInterseccion, momentosRegion, puntoEnRegion, type Region } from "./poligonos.ts";
+import { areaConSigno, areaInterseccionRegiones, defectoPoligono, momentosInterseccion, momentosRegion, puntoEnRegion, recorteRegionConvexo, trozosSegmento, type Region } from "./poligonos.ts";
 import { azar } from "../pruebas/fisicoAleatorio.ts";
 
 const rect = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
@@ -96,6 +96,42 @@ describe("intersección por triángulos en abanico", () => {
       // Simétrica en sus argumentos
       expect(Math.abs(areaInterseccionRegiones(region(P), region(Z)) - areaInterseccionRegiones(region(Z), region(P)))).toBeLessThan(1e-12);
     }
+  });
+});
+
+describe("recorte de una región por un convexo (A4: los ábacos en planta)", () => {
+  /** Área par-impar de unos anillos anidados: el primero menos los demás. */
+  const areaAnillos = (a: Vec2[][]) => a.reduce((t, p, i) => t + (i ? -1 : 1) * Math.abs(areaConSigno(p)), 0);
+  it("ábacos de esquina, de borde y dentro de una losa rectangular", () => {
+    const losa = region(rect(0, 0, 12, 11));
+    const ab = (x: number, y: number) => rect(x - 1, y - 1, x + 1, y + 1);
+    expect(areaAnillos(recorteRegionConvexo(losa, ab(0, 0))!)).toBeCloseTo(1, 12);
+    expect(areaAnillos(recorteRegionConvexo(losa, ab(6, 0))!)).toBeCloseTo(2, 12);
+    expect(areaAnillos(recorteRegionConvexo(losa, ab(12, 11))!)).toBeCloseTo(1, 12);
+    expect(areaAnillos(recorteRegionConvexo(losa, ab(6, 5))!)).toBeCloseTo(4, 12);
+    expect(recorteRegionConvexo(losa, ab(20, 5))).toEqual([]);
+    // En sentido horario, igual; uno no convexo, null
+    expect(areaAnillos(recorteRegionConvexo(losa, [...ab(0, 0)].reverse())!)).toBeCloseTo(1, 12);
+    expect(recorteRegionConvexo(losa, L)).toBeNull();
+  });
+  it("regiones no convexas con hueco al azar: el área es la de la intersección", () => {
+    const r = azar(11);
+    for (let k = 0; k < 20; k++) {
+      const P = estrellado(r, [0, 0], 9, 3);
+      const H = estrellado(r, [0, 0], 6, 0.6);
+      const c: Vec2 = [-2 + 4 * r(), -2 + 4 * r()];
+      const g = Math.PI * r();
+      const [a, b] = [0.5 + 2 * r(), 0.5 + 2 * r()];
+      const Z: Vec2[] = [[-a, -b], [a, -b], [a, b], [-a, b]].map(([x, y]) => [c[0] + x * Math.cos(g) - y * Math.sin(g), c[1] + x * Math.sin(g) + y * Math.cos(g)] as Vec2);
+      const reg = region(P, [H]);
+      const anillos = recorteRegionConvexo(reg, Z)!;
+      expect(Math.abs(areaAnillos(anillos) - areaInterseccionRegiones(reg, region(Z)))).toBeLessThan(1e-12 * 30);
+    }
+  });
+  it("trozos de un segmento dentro de una región", () => {
+    const losa = region(rect(0, 0, 12, 11));
+    const t = trozosSegmento([-1, 1], [1, 1], [losa.contorno], (q) => puntoEnRegion(q, losa));
+    expect(t).toEqual([[[0, 1], [1, 1]]]);
   });
 });
 

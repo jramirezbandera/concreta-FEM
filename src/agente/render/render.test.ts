@@ -8,10 +8,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { svgAPng } from "../../../cli/png.ts";
 import { edificioObjetivoLosas } from "../../../validacion/c2/modelos.ts";
 import { reticulaConNucleo } from "../../../validacion/c3/modelos.ts";
-import { edificioUnidireccional } from "../../../validacion/c4/modelos.ts";
+import { edificioReticular, edificioUnidireccional } from "../../../validacion/c4/modelos.ts";
 import { prepararNucleo, proyectoDe } from "../../../validacion/a3/revisar.ts";
 import { compilar, type ResultadoCompilacion } from "../../compilador/compilar.ts";
 import { ejesDe } from "../../compilador/ejes.ts";
+import { momentosInterseccion } from "../../compilador/poligonos.ts";
 import { Consultas } from "../../compilador/consultas.ts";
 import type { CasoFisico, ModeloFisico } from "../../compilador/fisico.ts";
 import { CamposLaminas } from "../../motor/campos.ts";
@@ -499,6 +500,37 @@ function alReves(f: ModeloFisico): ModeloFisico {
   for (const k of ["materiales", "secciones", "pilares", "vigas", "apoyos", "losas", "apoyosLineales", "bandas", "muros", "panos", "cargas"]) if (Array.isArray(r[k])) r[k] = [...(r[k] as unknown[])].reverse();
   return r as unknown as ModeloFisico;
 }
+
+describe("A4: los ábacos en planta, sólo en lo que cae en la losa", () => {
+  it("el área rellena de cada ábaco es la que cuenta el compilador (un cuarto en una esquina, la mitad en un borde)", () => {
+    const f = edificioReticular(1, 3, 3);
+    const l = f.losas![0]!;
+    const region = { contorno: l.contorno, huecos: l.huecos ?? [] };
+    const e = vistaModelo(f, l.planta, d);
+    const rellenos = e.primitivas.filter((p) => p.tipo === "poligono" && p.estilo === "abaco-relleno");
+    const abacos = l.reticular!.abacos!;
+    expect(rellenos.length).toBe(abacos.length);
+    const llena = (abacos[0]![2]![0] - abacos[0]![0]![0]) * (abacos[0]![2]![1] - abacos[0]![0]![1]);
+    const fracciones = new Set<number>();
+    rellenos.forEach((p, i) => {
+      if (p.tipo !== "poligono") return;
+      const A = p.anillos.reduce((t, q, j) => t + (j ? -1 : 1) * Math.abs(area(q)), 0);
+      expect(A).toBeCloseTo(momentosInterseccion(region, abacos[i]!).A, 12);
+      fracciones.add(Math.round((4 * A) / llena));
+    });
+    expect([...fracciones].sort()).toEqual([1, 2, 4]);
+    // Ningún trazo del ábaco fuera de la losa (rectangular)
+    const xs = l.contorno.map((q) => q[0]);
+    const ys = l.contorno.map((q) => q[1]);
+    const trazos = e.primitivas.filter((p) => p.tipo === "linea" && p.estilo === "abaco-borde");
+    expect(trazos.length).toBeGreaterThan(0);
+    for (const p of trazos) {
+      if (p.tipo !== "linea") continue;
+      const [x, y] = [(p.puntos[0]![0] + p.puntos[1]![0]) / 2, (p.puntos[0]![1] + p.puntos[1]![1]) / 2];
+      expect(x >= Math.min(...xs) - 1e-9 && x <= Math.max(...xs) + 1e-9 && y >= Math.min(...ys) - 1e-9 && y <= Math.max(...ys) + 1e-9).toBe(true);
+    }
+  });
+});
 
 describe("A4, criterio 2: determinismo", () => {
   it("el SVG no depende del orden de las listas del modelo", () => {

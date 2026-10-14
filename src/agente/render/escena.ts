@@ -18,6 +18,8 @@ export type Estilo =
   | "losa"
   | "losa-reticular"
   | "abaco"
+  | "abaco-relleno"
+  | "abaco-borde"
   | "pano"
   | "pano-viguetas"
   | "viga"

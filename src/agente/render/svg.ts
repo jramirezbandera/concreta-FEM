@@ -34,6 +34,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   losa: { fill: "#e9edf2", stroke: "#7d8794", sw: 1.2 },
   "losa-reticular": { fill: "#dfe9df", stroke: "#6f8a6f", sw: 1 },
   abaco: { fill: "#b9cdb9", stroke: "#58745a", sw: 1 },
+  "abaco-relleno": { fill: "#b9cdb9" },
+  "abaco-borde": { stroke: "#58745a", sw: 1 },
   pano: { fill: "#f3ead9", stroke: "#97835c", sw: 1 },
   "pano-viguetas": { stroke: "#b49a68", sw: 1 },
   viga: { fill: "#c3cbd4", stroke: "#4c5560", sw: 0.8 },

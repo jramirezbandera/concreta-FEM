@@ -11,6 +11,7 @@
  * Puro: sin IO.
  */
 import { cotasPlantas } from "../../compilador/cotas.ts";
+import { puntoEnPoligono, puntoEnRegion, recorteRegionConvexo, trozosSegmento, type Region } from "../../compilador/poligonos.ts";
 import type { CargaFisica, Losa, ModeloFisico, Muro, PanoUnidireccional, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
 import { capaEjes } from "./ejes.ts";
@@ -183,7 +184,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   const P: Primitiva[] = [];
   const usados = new Set<Estilo>();
   const est = (e: Estilo): Estilo => {
-    const r = o.atenuado ? (["pano-viguetas", "vigueta", "apoyo-lineal", "banda", "hueco-aspa"].includes(e) ? "atenuado-linea" : "atenuado") : e;
+    const r = o.atenuado ? (["pano-viguetas", "vigueta", "apoyo-lineal", "banda", "hueco-aspa", "abaco-borde"].includes(e) ? "atenuado-linea" : "atenuado") : e;
     usados.add(r);
     return r;
   };
@@ -196,7 +197,27 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   for (const l of pl.enPlanta(f.losas)) {
     const anillos = [l.contorno as Vec2[], ...((l.huecos ?? []) as Vec2[][])];
     P.push({ tipo: "poligono", anillos, estilo: est(l.reticular ? "losa-reticular" : "losa"), objeto: l.id });
-    for (const a of l.reticular?.abacos ?? []) P.push({ tipo: "poligono", anillos: [a as Vec2[]], estilo: est("abaco"), objeto: l.id });
+    // Los ábacos, sólo en lo que cae en la losa, que es lo que cuenta el compilador (en una esquina,
+    // un cuarto; en un borde, la mitad); uno no convexo, entero
+    const region: Region = { contorno: l.contorno, huecos: l.huecos ?? [] };
+    for (const a of (l.reticular?.abacos ?? []) as Vec2[][]) {
+      const dentro = recorteRegionConvexo(region, a);
+      if (!dentro) {
+        P.push({ tipo: "poligono", anillos: [a], estilo: est("abaco"), objeto: l.id });
+        continue;
+      }
+      if (!dentro.length) continue;
+      usados.add("abaco");
+      P.push({ tipo: "poligono", anillos: dentro, estilo: est("abaco-relleno"), objeto: l.id });
+      // El borde, sin los puentes del recorte: los lados del ábaco dentro de la losa y los de la losa
+      // dentro del ábaco (el relleno tapa la mitad de su trazo)
+      const lados = (p: readonly Vec2[], otros: readonly (readonly Vec2[])[], dentro: (q: Vec2) => boolean) => {
+        for (let i = 0; i < p.length; i++)
+          for (const s of trozosSegmento(p[i]!, p[(i + 1) % p.length]!, otros, dentro)) P.push({ tipo: "linea", puntos: s, estilo: est("abaco-borde"), objeto: l.id });
+      };
+      lados(a, anillos, (q) => puntoEnRegion(q, region));
+      for (const p of anillos) lados(p, [a], (q) => puntoEnPoligono(q, a));
+    }
     // Los huecos, con aspa (los de cuatro vértices: sus diagonales)
     for (const h of l.huecos ?? []) if (h.length === 4) for (const [a, b] of [[0, 2], [1, 3]] as const) P.push({ tipo: "linea", puntos: [h[a]!, h[b]!], estilo: est("hueco-aspa") });
     texto(puntoInterior(anillos), etiquetaLosa(l), 60, { negrita: true, ancla: "medio", fondo: true, tamano: 13 });

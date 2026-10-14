@@ -12,6 +12,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   losa: { fill: "#1d2430", stroke: "#6b7686", sw: 1.2 },
   "losa-reticular": { fill: "#1c2a1f", stroke: "#5f7f63", sw: 1 },
   abaco: { fill: "#2e4532", stroke: "#7da682", sw: 1 },
+  "abaco-relleno": { fill: "#2e4532" },
+  "abaco-borde": { stroke: "#7da682", sw: 1 },
   pano: { fill: "#2b2518", stroke: "#a08a5e", sw: 1 },
   viga: { fill: "#3a4350", stroke: "#a3adba", sw: 0.8 },
   "hueco-aspa": { stroke: "#6b7686", sw: 0.8 },

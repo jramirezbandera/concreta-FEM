@@ -38,7 +38,7 @@
  */
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
-import { puntoEnPoligono, puntoEnRegion } from "../compilador/poligonos.ts";
+import { puntoEnPoligono, puntoEnRegion, trozosSegmento } from "../compilador/poligonos.ts";
 import type { Material, ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 
@@ -849,38 +849,6 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
 
   if (sinForma.size) notas.push(`Sin forma (sección general sin b ni h), dibujadas como barras de ${LADO_SIN_FORMA * 100} cm: ${[...sinForma].sort().join(", ")}.`);
   return { piezas, notas };
-}
-
-/**
- * Los trozos del segmento ab en los que `dentro` es cierto, partido por los lados de `poligonos`
- * (se mira el punto medio de cada trozo; los contiguos se unen).
- */
-export function trozosSegmento(a: Vec2, b: Vec2, poligonos: readonly (readonly Vec2[])[], dentro: (q: Vec2) => boolean): [Vec2, Vec2][] {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const ts = [0, 1];
-  for (const p of poligonos)
-    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
-      const c = p[j]!;
-      const ex = p[i]![0] - c[0];
-      const ey = p[i]![1] - c[1];
-      const den = dx * ey - dy * ex;
-      if (Math.abs(den) < 1e-14) continue;
-      const t = ((c[0] - a[0]) * ey - (c[1] - a[1]) * ex) / den;
-      const u = ((c[0] - a[0]) * dy - (c[1] - a[1]) * dx) / den;
-      if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
-    }
-  ts.sort((x, y) => x - y);
-  const P = (t: number): Vec2 => [a[0] + t * dx, a[1] + t * dy];
-  const r: [number, number][] = [];
-  for (let k = 0; k + 1 < ts.length; k++) {
-    const [t0, t1] = [ts[k]!, ts[k + 1]!];
-    if (t1 - t0 < 1e-9 || !dentro(P((t0 + t1) / 2))) continue;
-    const u = r[r.length - 1];
-    if (u && Math.abs(u[1] - t0) < 1e-9) u[1] = t1;
-    else r.push([t0, t1]);
-  }
-  return r.map(([t0, t1]) => [P(t0), P(t1)]);
 }
 
 // ─── Volumen, aristas y búferes ─────────────────────────────────────────────────────────────────

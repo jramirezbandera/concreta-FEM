@@ -350,3 +350,54 @@ export function jacobianoEscalado(X: readonly Vec2[]): number {
   }
   return min;
 }
+
+/**
+ * Lo que queda de la región `r` dentro del polígono convexo `c` (cualquier sentido), en anillos para
+ * rellenar con la regla par-impar: cada anillo de `r` recortado por `c` (Sutherland–Hodgman). Si la
+ * región no es convexa, sus trozos pueden quedar unidos por puentes de área nula sobre el borde de
+ * `c`: no cambian el relleno, pero no se deben trazar. null si `c` no es convexo.
+ */
+export function recorteRegionConvexo(r: Region, c: readonly Vec2[]): Vec2[][] | null {
+  let signo = 0;
+  for (let i = 0, n = c.length; i < n; i++) {
+    const o = orient(c[i]!, c[(i + 1) % n]!, c[(i + 2) % n]!);
+    if (o === 0) continue;
+    if (signo !== 0 && Math.sign(o) !== signo) return null;
+    signo = Math.sign(o);
+  }
+  if (signo === 0) return [];
+  const cc = signo > 0 ? c : [...c].reverse();
+  return [r.contorno, ...r.huecos].map((p) => recortarConvexo([...p], cc)).filter((p) => p.length >= 3 && areaConSigno(p) !== 0);
+}
+
+/**
+ * Los trozos del segmento ab en los que `dentro` es cierto, partido por los lados de `poligonos`
+ * (se mira el punto medio de cada trozo; los contiguos se unen).
+ */
+export function trozosSegmento(a: Vec2, b: Vec2, poligonos: readonly (readonly Vec2[])[], dentro: (q: Vec2) => boolean): [Vec2, Vec2][] {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const ts = [0, 1];
+  for (const p of poligonos)
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const c = p[j]!;
+      const ex = p[i]![0] - c[0];
+      const ey = p[i]![1] - c[1];
+      const den = dx * ey - dy * ex;
+      if (Math.abs(den) < 1e-14) continue;
+      const t = ((c[0] - a[0]) * ey - (c[1] - a[1]) * ex) / den;
+      const u = ((c[0] - a[0]) * dy - (c[1] - a[1]) * dx) / den;
+      if (t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t);
+    }
+  ts.sort((x, y) => x - y);
+  const P = (t: number): Vec2 => [a[0] + t * dx, a[1] + t * dy];
+  const r: [number, number][] = [];
+  for (let k = 0; k + 1 < ts.length; k++) {
+    const [t0, t1] = [ts[k]!, ts[k + 1]!];
+    if (t1 - t0 < 1e-9 || !dentro(P((t0 + t1) / 2))) continue;
+    const u = r[r.length - 1];
+    if (u && Math.abs(u[1] - t0) < 1e-9) u[1] = t1;
+    else r.push([t0, t1]);
+  }
+  return r.map(([t0, t1]) => [P(t0), P(t1)]);
+}
