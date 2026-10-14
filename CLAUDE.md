@@ -396,7 +396,8 @@
   - **SP-1 (motor):** en una región SPR sin nudos interiores (el ábaco de un pilar de borde, de 8 láminas), el respaldo extrapolaba hasta 30 veces el rango de las láminas. Ahora ningún nudo usa un ajuste con constante de Lebesgue > 10 (`LEBESGUE_MAXIMO`): baja de base hasta la media. Las referencias congeladas no cambian.
   - **SP-2 (compilador F3.1):** en un reticular, la plantilla de todo pilar que cae en un ábaco se refina por sus cuatro caras, con o sin caras de franja. El edificio reticular objetivo pasa a 185 115 ecuaciones (+27 %).
   - **Validación:** `src/compilador/abacos.test.ts` (falla con el código de antes), un caso nuevo en la referencia congelada de F y `validacion/abacos/`.
-  - **Pendiente del usuario:** SP-3 (con h = 0,75, las franjas del edificio reticular, −6,6 % de media frente a h = 0,375 y −21 % en las caras con viga embebida; antes, −12,7 / −36 %) y SP-5 (llevar las puntuales horizontales al maestro del diafragma, sin nudo en la losa).
+  - **SP-5 (compilador F3.2, decisión del usuario):** una puntual sólo horizontal en una losa con diafragma rígido va al nudo del diafragma más cercano con su Mz de transporte, sin sembrar su punto (exacto). En el muestrario, L2 pasa de 1431 a 1311 láminas, y viento y sismo cambian ≤ 0,006 %.
+  - **Siguiente, decidido:** SP-3 y SP-4 juntos (caras de pilar en franjas con una viga embebida a lo largo: −6,6 % de media y −21 % como máximo en el edificio reticular con h = 0,75). Primero, una referencia más fina en un trozo de 3 × 3 vanos con vigas; con ella, refinar el primer tramo a lo largo de la viga junto al pilar (opción c) u otra cosa si el problema es de la medida.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **ahora:** la puerta de uso de F y AB con un proyecto real del usuario (cubre también buena parte de las de I1–I4, V2a y V2b);

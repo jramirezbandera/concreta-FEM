@@ -71,11 +71,24 @@ Refinar sólo los de borde no sirve: en este edificio ningún pilar tiene caras 
 - **SP-2:** las plantillas de los pilares sin caras de franja no se refinaban, y en un ábaco dejaban unas pocas láminas en cuña. Corregido (§3).
 - **SP-3, para el usuario:** con h = 0,75, en un reticular con vigas embebidas por los ejes, las envolventes de las franjas siguen un 6,6 % bajas de media. Las peores (−17…−21 %) son superiores en la cara del pilar, en franjas con la viga a lo largo (L-N1:Y37, Y52, X19). Es un punto de gradiente fuerte entre viga, pilar y losa que converge despacio; no es del ábaco. **Opciones:** (a) aceptarlo y compararlo en el periodo en sombra con el reticular de SAP2000 (ya decidido para F), (b) un h menor sólo en los ábacos, o (c) refinar también el primer tramo a lo largo de las vigas embebidas junto al pilar. Antes de elegir convendría una referencia más fina que 0,375 en un trozo del edificio.
 - **SP-4:** L2:X1 (la franja del borde inferior del muestrario, en la cara de P11, en el escalón de F3 con la viga de fachada dentro) oscila con la malla: 79,8 / 91,0 / 86,6 / 86,9 con h = 0,375 / 0,25 / 0,15 / 0,1. Con h = 0,75 queda en 78,2, un 10–14 % bajo. Es de la familia de F2-9 / F3-8 (aparcada).
-- **SP-5, la malla «caótica» del muestrario** (pregunta del usuario): no es un error. La triangulación entra donde la rejilla no puede:
-  - alrededor de las puntuales de viento y sismo en (9; 5,5), que siembran un nudo fuera de la rejilla (+120 láminas: sin ellas, o en (6; 5,5), la losa pasa de 1331 a 1211);
-  - junto al núcleo, cuyos muros (x = 13,4 / 16,4; y = 7 / 10) quedan a menos de 0,4·h = 0,30 m de los bordes de los ábacos (13,2 / 16,8; 6,7 / 9,8).
+- **SP-5, la malla «caótica» del muestrario** (pregunta del usuario): no era un error. La triangulación entra donde la rejilla no puede:
+  - alrededor de las puntuales de viento y sismo en (9; 5,5), que sembraban un nudo fuera de la rejilla (+120 láminas);
+  - junto al núcleo, cuyos muros (x = 13,4 / 16,4; y = 7 / 10) quedan a menos de 0,4·h = 0,30 m de los bordes de los ábacos (13,2 / 16,8; 6,7 / 9,8). Esto se queda así: la malla es correcta y la geometría es la del usuario.
 
-  **Propuesta, sin decidir:** una puntual sólo horizontal en una planta con diafragma rígido no necesita nudo en la losa. Puede ir al maestro del diafragma con su momento torsor, con el mismo resultado.
+  **Hecho el mismo día** (decisión del usuario, compilador F3.2; §6).
+
+## 6. Las puntuales horizontales, al diafragma (SP-5)
+
+Una puntual sólo horizontal (Fz, Mx y My nulos) que cae en una losa de una planta con diafragma rígido ya no siembra su punto (`alDiafragma` en `losas.ts`). Va al nudo del diafragma más cercano con su momento de transporte Mz (`cargas.ts`).
+
+**Es exacto:** ux, uy y rz de todos los nudos de la losa dependen del maestro (ux = uxm − (y − ym)·rzm…), así que en cualquiera de ellos, con su Mz, da al maestro la misma carga que en su punto. La resultante física se suma en su punto, como siempre, y el control «sin pérdidas» la compara con la analítica. Con Fz, Mx o My, en una planta sin diafragma (la más baja, C1-d) o en un paño, todo sigue como antes. La lista de cargas que van así sale en las hipótesis.
+
+| Qué | Resultado |
+|---|---|
+| Malla | La de la planta no cambia con la carga. En el muestrario, L2 pasa de 1431 a 1311 láminas, y la mancha de triángulos alrededor de (9; 5,5) desaparece |
+| Exactitud | Mover la carga por la losa con el torsor que compensa su resultante da los mismos desplazamientos y reacciones a 1e-10 (`diafragmaCargas.test.ts`, que falla con el código de antes) |
+| Muestrario, viento y sismo | Reacciones y esfuerzos de extremo de los pilares, a ≤ 0,006 % de antes: lo que cambia la malla (`validacion/abacos/diafragma.ts`, `out_diafragma.txt`) |
+| Pilar apeado de `apeo.test.ts` (con una horizontal junto a él) | La malla pasa de 360 a 250 nudos (la misma que sin la carga) y el axil, de −77,767 a −77,523 kN, más cerca de la triangulación con h = 0,1 (−77,291: un 0,30 % frente a un 0,62 %). Se actualiza su valor congelado |
 
 ## 5. Validación
 
@@ -86,5 +99,6 @@ Refinar sólo los de borde no sirve: en este edificio ningún pilar tiene caras 
 | Λ por modelo y por vía, y exceso real por tramos de Λ | `validacion/abacos/lebesgue.ts`, `exceso.ts` |
 | El caso del usuario: lámina frente a SPR junto a P5 | `validacion/abacos/diagnostico.ts`, `desvio.ts` |
 | Convergencia de las franjas | `validacion/abacos/convergencia.ts` |
+| SP-5: malla sin la carga, exactitud al moverla y caso apeado | `src/compilador/diafragmaCargas.test.ts`, `apeo.test.ts`, `validacion/abacos/diafragma.ts` |
 
-Baterías: en la raíz pasan los 1 729 tests y en la app, los 36.
+Baterías, con SP-5: en la raíz pasan 1 731 de 1 732 tests y en la app, los 36. El que falla es `aleatorio-6-reticular (perfil)` de C4, por el tiempo de espera de 60 s con la batería en paralelo (ya pasaba en F3). Solo, pasa.

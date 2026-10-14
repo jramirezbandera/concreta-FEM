@@ -1,0 +1,7 @@
+Láminas de L2: 1431 → 1311; nudos del modelo: 6347 → 6227
+WX+  reacciones: máx 2.79 kN, dif. 1.27e-4 (0.005 %); extremos de pilares: máx 3.23, dif. 1.32e-4 (0.004 %, P7:1:P7:PL1)
+WX-  reacciones: máx 2.79 kN, dif. 1.27e-4 (0.005 %); extremos de pilares: máx 3.23, dif. 1.32e-4 (0.004 %, P7:1:P7:PL1)
+WY+  reacciones: máx 6.17 kN, dif. 3.34e-4 (0.005 %); extremos de pilares: máx 7.53, dif. 3.52e-4 (0.005 %, P7:1:P7:PL1)
+WY-  reacciones: máx 6.17 kN, dif. 3.34e-4 (0.005 %); extremos de pilares: máx 7.53, dif. 3.52e-4 (0.005 %, P7:1:P7:PL1)
+EX   reacciones: máx 7.80 kN, dif. 3.73e-4 (0.005 %); extremos de pilares: máx 8.63, dif. 3.87e-4 (0.004 %, P7:1:P7:PL1)
+EY   reacciones: máx 10.22 kN, dif. 5.76e-4 (0.006 %); extremos de pilares: máx 12.04, dif. 6.07e-4 (0.005 %, P7:1:P7:PL1)
