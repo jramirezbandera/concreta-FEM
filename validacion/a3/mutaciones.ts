@@ -207,10 +207,16 @@ export const MODELOS: { nombre: string; f: () => ModeloFisico }[] = [
 const clave = (d: { codigo: string; ids?: string[] }) => `${d.codigo}|${[...(d.ids ?? [])].sort().join(",")}`;
 
 /** Los avisos de la revisión mutada que la base no da, por código. */
+/**
+ * Avisos que no cuentan en el criterio de A3, que se fijó sin ellos: el borde sin viga
+ * (2026-10-15) es verdadero en los modelos de referencia, que no llevan zunchos.
+ */
+export const FUERA_DEL_CRITERIO: ReadonlySet<string> = new Set(["sensatez/borde-sin-viga"]);
+
 export function nuevos(base: Revision, mutada: Revision): Map<string, string[]> {
   const ya = new Set(base.avisos.map(clave));
   const r = new Map<string, string[]>();
-  for (const a of mutada.avisos) if (!ya.has(clave(a))) r.set(a.codigo, [...(r.get(a.codigo) ?? []), a.mensaje]);
+  for (const a of mutada.avisos) if (!FUERA_DEL_CRITERIO.has(a.codigo) && !ya.has(clave(a))) r.set(a.codigo, [...(r.get(a.codigo) ?? []), a.mensaje]);
   return r;
 }
 

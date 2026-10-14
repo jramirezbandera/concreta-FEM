@@ -667,6 +667,80 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
   return { registro: reg, desglose: { caso: caso.id, plantas, total } };
 }
 
+// ─── Bordes de forjado ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Los tramos del borde (contorno y huecos) de cada losa y cada paño que no van sobre el eje de una
+ * viga de su planta, de un muro que llega a ella o sale de ella, de un apoyo lineal de su planta ni
+ * del borde de otra losa o paño de la planta (a ≤ eps de su recta). Todo borde de forjado lleva su
+ * zuncho (decisión del usuario, 2026-10-15): un borde libre se calcula, pero suele ser un zuncho
+ * que falta en el modelo.
+ */
+export function bordesSinViga(f: ModeloFisico, P: Plantas, eps: number): { pieza: string; planta: string; tramos: [Vec2, Vec2][] }[] {
+  const forjados = [...(f.losas ?? []), ...(f.panos ?? [])];
+  const anillos = (x: { contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[] }) => [x.contorno, ...(x.huecos ?? [])];
+  const r: { pieza: string; planta: string; tramos: [Vec2, Vec2][] }[] = [];
+  for (const x of forjados) {
+    const k = P.indice.get(x.planta);
+    if (k === undefined) continue;
+    // Los ejes que atan un borde en esta planta
+    const ejes: { A: Vec2; B: Vec2 }[] = [];
+    for (const v of f.vigas ?? []) if (v.planta === x.planta) ejes.push(...tramos(v.puntos));
+    for (const a of f.apoyosLineales ?? []) if (a.planta === x.planta) ejes.push(...tramos(a.puntos));
+    for (const m of f.muros ?? []) {
+      const [kh, kb] = [P.indice.get(m.hasta), P.indice.get(m.desde)];
+      if (kh !== undefined && kb !== undefined && kh <= k && k <= kb) ejes.push(...tramos(m.puntos));
+    }
+    for (const o of forjados) if (o !== x && o.planta === x.planta) for (const an of anillos(o)) ejes.push(...tramos([...an, an[0]!]));
+    const libres: [Vec2, Vec2][] = [];
+    for (const an of anillos(x))
+      for (const t of tramos([...an, an[0]!])) {
+        const pr = (q: Vec2) => {
+          const [dx, dy] = [q[0] - t.A[0], q[1] - t.A[1]];
+          return { s: dx * t.u[0] + dy * t.u[1], d: Math.abs(dx * t.u[1] - dy * t.u[0]) };
+        };
+        // Lo cubierto, en [0, L]
+        const cub: [number, number][] = [];
+        for (const e of ejes) {
+          const [a, b] = [pr(e.A), pr(e.B)];
+          if (a.d > eps || b.d > eps) continue;
+          const [s0, s1] = [Math.max(0, Math.min(a.s, b.s)), Math.min(t.L, Math.max(a.s, b.s))];
+          if (s1 > s0) cub.push([s0, s1]);
+        }
+        cub.sort((p, q) => p[0] - q[0]);
+        let s = 0;
+        const hueco = (s0: number, s1: number) => {
+          if (s1 - s0 > eps) libres.push([[t.A[0] + s0 * t.u[0], t.A[1] + s0 * t.u[1]], [t.A[0] + s1 * t.u[0], t.A[1] + s1 * t.u[1]]]);
+        };
+        for (const [s0, s1] of cub) {
+          if (s0 > s) hueco(s, s0);
+          s = Math.max(s, s1);
+        }
+        if (s < t.L) hueco(s, t.L);
+      }
+    if (libres.length) r.push({ pieza: x.id, planta: x.planta, tramos: libres });
+  }
+  return r;
+}
+
+function bordes(f: ModeloFisico, P: Plantas, eps: number): Registro[] {
+  const reg = new Registro("sensatez/borde-sin-viga", "Bordes de forjado con su zuncho", "un tramo del borde de una losa o un paño, de más de ε_snap, sin una viga, un muro, un apoyo lineal u otro forjado debajo");
+  if ((f.losas ?? []).length + (f.panos ?? []).length === 0) return [reg];
+  reg.aplica();
+  const pt = (q: Vec2) => `(${num(q[0])}, ${num(q[1])})`;
+  for (const b of bordesSinViga(f, P, eps)) {
+    const L = b.tramos.reduce((t, [A, B]) => t + Math.hypot(B[0] - A[0], B[1] - A[1]), 0);
+    reg.peor(L, `${b.pieza}: ${num(L)} m de borde sin viga`);
+    const lista = b.tramos.slice(0, 6).map(([A, B]) => `${pt(A)}–${pt(B)}`).join(", ");
+    reg.aviso(
+      `${b.pieza} (${b.planta}): ${num(L)} m de borde sin viga, muro ni apoyo lineal debajo, en ${b.tramos.length} tramo${b.tramos.length > 1 ? "s" : ""}: ${lista}${b.tramos.length > 6 ? "…" : ""}. Todo borde de forjado lleva su zuncho: si lo tiene en obra, póngalo como viga (el borde de la losa, a su eje); si el borde es libre de verdad, este aviso se puede dejar.`,
+      [b.pieza],
+      { tramos: b.tramos },
+    );
+  }
+  return [reg];
+}
+
 // ─── Entrada ────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -676,7 +750,9 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
  * encuentran, lo saltan (el error es del compilador).
  */
 export function sensatezPrevia(f: ModeloFisico, opciones?: OpcionesCompilacion): Comprobacion[] {
-  return [...datos(f), ...cargas(f), ...pilares(f, new Plantas(f), opciones?.epsSnap ?? 0.05)].map((r) => r.c);
+  const P = new Plantas(f);
+  const eps = opciones?.epsSnap ?? 0.05;
+  return [...datos(f), ...cargas(f), ...pilares(f, P, eps), ...bordes(f, P, eps)].map((r) => r.c);
 }
 
 export interface SensatezModelo {
@@ -691,8 +767,9 @@ export interface SensatezModelo {
 export function sensatezModelo(f: ModeloFisico, opciones: OpcionesCompilacion | undefined, res: Resumen): SensatezModelo {
   const P = new Plantas(f);
   const pp = pesoPropio(f, P, opciones);
-  const regs = [...datos(f), ...cargas(f), ...cargasPorM2(f, P, res), ...pilares(f, P, opciones?.epsSnap ?? 0.05), pp.registro];
-  // El mismo orden que en el informe: datos, cargas, cargas por planta, pilares y peso propio
+  const eps = opciones?.epsSnap ?? 0.05;
+  const regs = [...datos(f), ...cargas(f), ...cargasPorM2(f, P, res), ...pilares(f, P, eps), ...bordes(f, P, eps), pp.registro];
+  // El mismo orden que en el informe: datos, cargas, cargas por planta, pilares, bordes y peso propio
   return { comprobaciones: regs.map((r) => r.c), pesoPropio: pp.desglose };
 }
 

@@ -14,7 +14,7 @@ import { fisico1022 } from "../../validacion/c1/modelos.ts";
 import { edificioObjetivoLosas } from "../../validacion/c2/modelos.ts";
 import { edificioObjetivoMuros, reticulaConNucleo } from "../../validacion/c3/modelos.ts";
 import { edificioReticular, edificioUnidireccional } from "../../validacion/c4/modelos.ts";
-import { MODELOS, MUTACIONES, nuevos } from "../../validacion/a3/mutaciones.ts";
+import { FUERA_DEL_CRITERIO, MODELOS, MUTACIONES, nuevos } from "../../validacion/a3/mutaciones.ts";
 import { prepararNucleo, proyectoDe, revisarProyecto } from "../../validacion/a3/revisar.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
@@ -29,6 +29,8 @@ beforeAll(async () => {
 });
 
 const avisos = (f: ModeloFisico) => sensatezPrevia(f).flatMap((c) => c.avisos);
+/** Sin el borde sin viga, que es verdadero en los modelos de referencia (no llevan zunchos). */
+const avisosSinBordes = (f: ModeloFisico) => avisos(f).filter((a) => !FUERA_DEL_CRITERIO.has(a.codigo));
 const codigos = (f: ModeloFisico) => new Set(avisos(f).map((a) => a.codigo));
 const copia = (f: ModeloFisico) => structuredClone(f) as ModeloFisico;
 
@@ -59,7 +61,27 @@ describe("comprobaciones previas (sin calcular)", () => {
     const ejemplo = leerProyecto(readFileSync(join(import.meta.dirname, "..", "..", ".claude", "skills", "fem", "ejemplo.json"), "utf8"));
     expect(ejemplo.valido).toBe(true);
     for (const f of [fisico1022(), reticulaConNucleo(), edificioObjetivoLosas(2, 3, 2), edificioObjetivoMuros(3, 6, 5), edificioReticular(2, 3, 2), edificioUnidireccional(2, 3, 2), losaCuatroPilares(), ...(ejemplo.valido ? [ejemplo.proyecto.modelo] : [])])
-      expect(avisos(f).map((a) => a.mensaje)).toEqual([]);
+      expect(avisosSinBordes(f).map((a) => a.mensaje)).toEqual([]);
+  });
+
+  it("el borde sin viga: avisa de los tramos libres y no de los que van sobre una viga, un muro, un apoyo lineal u otra losa", () => {
+    const f = losaCuatroPilares();
+    const borde = () => avisos(f).filter((a) => a.codigo === "sensatez/borde-sin-viga");
+    // Los cuatro lados, libres
+    expect(borde().map((a) => (a.detalles as { tramos: unknown[] }).tramos.length)).toEqual([4]);
+    expect(borde()[0]!.ids).toEqual(["L"]);
+    expect(borde()[0]!.mensaje).toContain("24 m de borde sin viga");
+    // Una viga por el sur, un apoyo lineal por el este, otra losa al norte y medio muro al oeste
+    f.secciones = [...f.secciones, { id: "Z", material: f.materiales[0]!.id, forma: "rectangular", b: 0.3, h: 0.3 }];
+    f.vigas = [{ id: "Z1", planta: "N1", puntos: [[0, 0], [6, 0]], seccion: "Z" }];
+    f.apoyosLineales = [{ id: "AL", planta: "N1", puntos: [[6, 0], [6, 6]], coartados: [false, false, true, false, false, false] }];
+    f.losas = [...f.losas!, { ...f.losas![0]!, id: "L2", contorno: [[0, 6], [6, 6], [6, 9], [0, 9]] }];
+    f.muros = [{ id: "M", puntos: [[0, 0], [0, 3]], desde: "C", hasta: "N1", espesor: 0.2, material: f.materiales[0]!.id }];
+    const L = borde().find((a) => a.ids?.[0] === "L")!;
+    expect((L.detalles as { tramos: unknown }).tramos).toEqual([[[0, 6], [0, 3]]]);
+    // Cerrado del todo: sin aviso
+    f.muros = [{ ...f.muros[0]!, puntos: [[0, 0], [0, 6]] }];
+    expect(borde().map((a) => a.ids?.[0])).toEqual(["L2"]);
   });
 
   it("cada una avisa de su error típico, nombrando el objeto", () => {
@@ -161,7 +183,7 @@ describe("criterio 1: mutaciones graves", () => {
       const f = m.f();
       const base = revisarProyecto(proyectoDe(f));
       if (!base.valido) throw new Error(m.nombre);
-      expect(base.revision.avisos.map((a) => a.mensaje), m.nombre).toEqual([]);
+      expect(base.revision.avisos.filter((a) => !FUERA_DEL_CRITERIO.has(a.codigo)).map((a) => a.mensaje), m.nombre).toEqual([]);
       for (const mu of MUTACIONES) {
         const x = mu.aplicar(f);
         if (!x) continue;
