@@ -79,6 +79,8 @@ Coste: unos 37 nudos por pilar interior con las cuatro caras.
   - o que el mallador no ponga nudos a menos de ε_snap de una huella.
 
   Hasta decidirlo: las referencias de validación con tamaños mezclados, con h ≥ 0,15.
+
+  **La parte de la estación, hecha en F3-d** (`fase-f3.md` §7, 2026-10-14): el metro cuenta lo que pasa por esos nudos. Junto al hueco, con h = 0,75, las caras pasan de −25…−43 % a −6,3…+3,5 %. Queda la rigidez: donde hay nudos rígidos delante, la cara sale un 6–8,5 % alta (F3-8).
 - **Los pilares junto al hueco van por la triangulación** (§2.3 del plan). F2 no los refina: 8,8–17,9 % de media según F2-9. Lo que domina ahí es F2-9, no el tamaño de la triangulación.
 - **El criterio 5 en las demás franjas de la recta de la cara.** Lejos del pilar, la malla sigue gruesa, y F2 no las mejora (7 % de su máximo). Es lo que se pidió: refinar sólo junto a los pilares.
 - **La puerta de uso:** armar una losa propia con el h por defecto y comparar el metro en la cara con el de antes (`refinoCaras: false`).

@@ -11,6 +11,10 @@
 >
 >   Las caras de siempre quedan como en F2, y las referencias congeladas de C2–C5 y de F no cambian ni un bit.
 > - **Un hallazgo grave, previo a F3, sobre F2-9** (§3, F3-5). Con h fino y tamaños mezclados, el metro de los pilares menores también sale hasta un 52 % bajo, sin aviso. El mismo recurso de F3 lo arregla en la estación (§4).
+> - **F3-d, hecho el mismo día** (decisión del usuario, §7): el metro de todos los pilares cuenta lo que pasa por los nudos rígidos de su huella delante de la cara.
+>   - Junto al hueco del edificio, con h = 0,75, las cuatro caras de F2-9 pasan de −25…−43 % a −6,3…+3,5 % de la malla fina.
+>   - La referencia congelada de F no cambia ni un bit, y con h = 0,75 y 0,5 no se mueve ninguna otra cara.
+>   - Lo que queda de F2-9 es la rigidez: donde hay nudos rígidos delante, la cara sale un 6–8,5 % alta (del lado seguro), como la de un pilar 5 cm mayor.
 >
 > **Cómo leerlo:** la tabla resume los criterios del plan, y cada sección da el detalle. Lo que decide el usuario está en §4.
 
@@ -76,6 +80,7 @@ Como el enlace incluye los nudos rígidos a ≤ ε_snap de la huella (F2-9), su 
 
 ## 4. Para el usuario
 
+- **F3-d: decidida por el usuario y hecha el 2026-10-14 (§7).** Lo que sigue es la propuesta tal como se hizo.
 - **F3-d (propuesta): el metro de todos los pilares, con lo que transmite su huella.** Hoy sólo el escalón cuenta lo que pasa por los nudos rígidos de F2-9. En la cara de un pilar normal, la recta de la cara es la misma, pero lo que entra en los nudos rígidos de delante no se cuenta (F3-5).
   - **Hacerlo** es el mismo corte con el enlace, con Δx = 0.
   - **No cambia la regla de los esclavos** ni las referencias de C2–C5.
@@ -93,6 +98,7 @@ Como el enlace incluye los nudos rígidos a ≤ ε_snap de la huella (F2-9), su 
 | F3-a | Dónde se mide el metro de un pilar con la cara común dentro | En su cara propia, por el escalón | 46–49 % → 0,75–2,3 % de media |
 | F3-b | Ancho de los medios en el escalón | El de la ventana en la losa, con la huella | Con el de las láminas, los nudos rígidos de F2-9 lo inflarían |
 | F3-c | Largo máximo de los tercios junto a una cara | h | F3-2 |
+| F3-d | Lo que pasa por los nudos de la huella delante de la cara de un pilar cualquiera (F2-9) | Cuenta (decisión del usuario) | §7 |
 
 ## 6. Cómo se reproduce
 
@@ -100,5 +106,68 @@ Como el enlace incluye los nudos rígidos a ≤ ε_snap de la huella (F2-9), su 
 bunx vitest run src/compilador/caraPropia.test.ts src/motor/cortes.test.ts
 bun validacion/f3/convergencia.ts      # criterios 2 y 3 (≈ 25 min)
 bun validacion/f3/banco.ts             # criterios 4 y 8
+bun validacion/f3/f3d.ts               # F3-d, §7 (≈ 10 min)
 bun validacion/f/congelar.ts           # sólo a sabiendas
 ```
+
+## 7. F3-d: el metro de todos los pilares con lo que transmite su huella
+
+> **Fecha:** 2026-10-14. **Decisión del usuario:** hacerlo ya, midiendo antes cuánto mueve la referencia congelada de F y qué pasa junto al hueco del edificio.
+
+### 7.1 Qué se hizo
+
+En `esfuerzosFranjas.ts`, la cara de un pilar cuya cara común es la suya:
+- **Con nudos de la huella delante de la cara**, del lado del vano: los que la compilación hace rígidos a ≤ ε_snap de la huella (C2-d, F2-9). Se mide con el corte del escalón, pero sin traslado (Δx = 0):
+  - la recta con lo que transmite el enlace;
+  - el ancho de la ventana en la losa, con la huella (F3-b);
+  - my y mxy, los de la recta.
+
+  Si el corte no vale, queda la estación de antes con el aviso `franja/cara-sin-huella`. Nunca en silencio.
+- **Sin nudos delante**, el enlace no transmite nada a través de la recta (el corte no lo incluye), así que es la estación de siempre y no se recalcula. Por eso nada cambia fuera de F2-9.
+- El escalón de cada pilar se calcula una vez por cara, aunque lo toquen dos franjas.
+- La opción `huellaDelante: false` de `EsfuerzosFranjas` es sólo para medir.
+
+La malla, la regla de los nudos rígidos y el compilador (F3) no cambian.
+
+### 7.2 Lo medido (`validacion/f3/out_f3d.txt`)
+
+**La referencia congelada de F no se mueve ni un bit.** En sus 7 modelos (11 232 estaciones), ninguna cambia, y ninguna da avisos nuevos. Ninguno tiene nudos de una huella delante de una cara.
+
+**Junto al hueco del edificio** (una planta, losa plana, h = 0,75), F3-d mueve las cuatro caras de F2-9 (cada una en las dos franjas que tocan el pilar). La referencia es h = 0,15 con F3-d:
+
+| Cara | Sin F3-d | Con F3-d | Referencia | Con h = 0,5 |
+|---|---|---|---|---|
+| P30-15, y− | −27,04 (−43,1 %) | −48,16 (+1,4 %) | −47,50 | −46,71 |
+| P30-15, y+ | −23,82 (−33,4 %) | −37,02 (+3,5 %) | −35,78 | −35,13 |
+| P24-20, y− | −32,17 (−24,7 %) | −41,64 (−2,5 %) | −42,70 | −40,60 |
+| P24-20, y+ | −35,04 (−32,5 %) | −48,67 (−6,3 %) | −51,94 (sin F3-d, −25,71) | −48,38 |
+
+Valores en kN·m/m, suma de los casos. La referencia de P24-20 y+ también tiene nudos rígidos delante; por F3-8, sale alta.
+
+Por grupos, con h = 0,75:
+
+| Grupo | Caras | Sin F3-d | Con F3-d |
+|---|---|---|---|
+| Junto a un hueco (referencia sin F2-9) | 15 | 11,93 / 43,07 % (peor, −43,07 %) | 5,68 / 26,68 % (peor, **+26,68 %**, P24-20 x+: F3-9) |
+| Propias | 91 | 1,41 / 3,88 % | igual, bit a bit |
+| Común por dentro | 66 | 2,27 / 5,03 % | igual, bit a bit |
+
+- **Con h = 0,75 y 0,5** F3-d no mueve ninguna otra cara: ni en la 3 × 3 mezclada, ni en el edificio reducido, ni en el resto del edificio.
+- **Donde sí actúa es en las mallas finas de referencia** (F3-5): mueve 12 caras de la 3 × 3 con h = 0,1, 3 del edificio reducido con h = 0,1 y 20 del edificio con h = 0,15, que pasan de la mitad (−50 %) a lo de §7.3.
+- **El coste es nulo** con el h por defecto: comprobar si un enlace tiene nudos delante es un recorrido de sus nudos, y el corte sólo se repite en las caras con F2-9.
+
+### 7.3 Hallazgos
+
+| ID | Hallazgo | Consecuencia |
+|---|---|---|
+| F3-8 | **Con F3-d, una cara con nudos rígidos delante sale un 6–8,5 % alta,** del lado seguro. En la 3 × 3 con h = 0,1, las 12 caras de F3-5 pasan de −25,4 a −52,0 kN·m/m (P6-0), frente a −48,8 con h = 0,15, −49,0 con 0,2, −48,8 con 0,5 y −48,6 con 0,75. Esas cuatro mallas no tienen nudos delante y coinciden entre sí a ~1 %. F3-d mide bien lo que cruza la cara, pero la malla tiene un pilar 5 cm mayor: más rígido, y con la cara 5 cm dentro de su apoyo | Lo que queda de F2-9 es la rigidez, y sigue siendo decisión del usuario (`fase-f2.md` §4). En la validación, las caras cuya referencia fina tiene F2-9 se dan aparte («ref. con F2-9»): con h = 0,75, su 7 % de media es el exceso de la referencia, no un error de la malla gruesa |
+| F3-9 | **Con h = 0,75, junto al hueco queda un +26,7 %** en P24-20 x+ (−46,59 frente a −36,78), y +17 % en P30-20 x−. F3-d no lo mueve: no es de F2-9 sino de la triangulación sin refinar junto al hueco (F2, §4). Es del lado seguro; con h = 0,5, ≤ 4,9 % | Sin cambio. El peor error del lado inseguro junto al hueco pasa de −43,1 % a −6,3 % |
+
+### 7.4 Validación
+
+- `src/compilador/caraPropia.test.ts`:
+  - en el edificio de una planta con h = 0,75, F3-d mueve sólo las cuatro caras de F2-9 junto al hueco (8 estaciones), a ≤ 7 % de la referencia (sin él, > 20 % bajas);
+  - las demás estaciones, bit a bit;
+  - ningún aviso `franja/cara-sin-huella`.
+- `src/compilador/congelado-f.test.ts`: sin cambios.
+- `validacion/f3/f3d.ts`: lo de §7.2 y F3-8.

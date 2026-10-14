@@ -387,8 +387,13 @@
   - **La malla** (`rejilla.ts`, sólo en las plantillas refinadas): los tercios junto a la cara, de un largo de h como mucho, y la esquina fina con la transición en su tramo exterior. Con h = 0,75, esas caras quedan a 0,75 / 1,23 % (3 × 3 mezclada) y 1,94 / 3,63 % (edificio reducido) de la malla fina. Si la plantilla no tiene calidad, se rehace como en F2.
   - **Coste:** el edificio objetivo con losa plana, 185 262 ecuaciones (+10 %) y +17–20 % de tiempo. Compilador F3; las referencias congeladas de C2–C5 y de F no cambian, y la de F tiene un caso mezclado.
   - **Para el usuario, F3-5 (de F2-9, previo):** con h fino y tamaños mezclados, el metro de los pilares menores también sale hasta un 52 % bajo, sin aviso. La propuesta F3-d: contar la huella en todos los metros, como en el escalón.
+- **2026-10-14: F3-d hecha** (decisión del usuario; `fase-f3.md` §7). El metro de cualquier pilar cuenta lo que pasa por los nudos rígidos de su huella delante de la cara (F2-9): es el corte del escalón, sin traslado.
+  - Sin nudos delante, la estación es la de siempre: la referencia congelada de F no cambia ni un bit (11 232 estaciones), y con h = 0,75 y 0,5 sólo se mueven las caras de F2-9.
+  - Junto al hueco del edificio, con h = 0,75: de −25…−43 % a −6,3…+3,5 % de la malla fina.
+  - **F3-8:** lo que queda de F2-9 es la rigidez. Donde hay nudos rígidos delante (las mallas finas de referencia), la cara sale un 6–8,5 % alta, del lado seguro, como la de un pilar 5 cm mayor.
+  - La malla y el compilador no cambian. Medida en `validacion/f3/f3d.ts`.
 - **Siguiente paso:**
-  - las decisiones de F3 (`fase-f3.md` §4: F3-d y el coste) y de F2-9 (`fase-f2.md` §4);
+  - las decisiones de F3 (`fase-f3.md` §4: el coste) y de F2-9 (`fase-f2.md` §4: ya sólo la rigidez, F3-8);
   - el punto fijo de los pilares (propuesto el 2026-10-14);
   - las puertas de uso de AB, de F, de I1, I2, I3 e I4, de V2a y de V2b;
   - con lo que salga, V2c (dibujar con el ratón);

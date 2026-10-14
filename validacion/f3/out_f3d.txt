@@ -1,0 +1,86 @@
+# F3-d: el metro de todos los pilares con lo que transmite su huella
+
+## A. La referencia congelada de F
+
+Cada estación de cada franja, con F3-d y sin él (la de F3). «Cambian»: las estaciones con algún momento medio distinto en algún bit; la diferencia, en mx (la suma de los casos), relativa a la mayor |mx| de cara del modelo.
+
+modelo | estaciones | cambian | pilares | mayor diferencia | dónde | avisos nuevos
+h25-plana | 1164 | 0 | — | 0.00 % | — | —
+h25-reticular | 1464 | 0 | — | 0.00 % | — | —
+pilares-mezclados | 1351 | 0 | — | 0.00 % | — | —
+aleatorio-3 | 909 | 0 | — | 0.00 % | — | —
+losa-3x3-refinada | 2591 | 0 | — | 0.00 % | — | —
+h25-plana-sin-refinar | 1164 | 0 | — | 0.00 % | — | —
+losa-3x3-mezclada | 2589 | 0 | — | 0.00 % | — | —
+
+## B. Convergencia, con el hueco del edificio
+
+El metro de cada pilar con cara y demanda (|m| ≥ 20 % de la mayor de la referencia), frente a la malla fina con F3-d; media y máximo de |error|, y el peor con su signo. «Cambian»: las caras en las que F3-d mueve la estación (tienen nudos de la huella delante). «Ref. con F2-9»: las caras en las que F3-d mueve la referencia (sus nudos rígidos delante la hacen la de un pilar 5 cm mayor).
+
+modelo | malla | F3-d | grupo | caras | cambian | media | máx. | peor | nudos | avisos
+3 × 3 mezclada | referencia h = 0,1 | sí | — | 64 | 12 | — | — | 104.96 % (L|2|-1|P18-5, frente a sin F3-d) | 34062 | —
+3 × 3 mezclada | h = 0,75 | no | común por dentro | 6 | 0 | 0.75 % | 1.23 % | -1.23 % (2 -1 P6-5) | 1642 | —
+3 × 3 mezclada | h = 0,75 | no | propia | 26 | 0 | 1.03 % | 4.49 % | 4.49 % (2 -1 P6-15) | 1642 | —
+3 × 3 mezclada | h = 0,75 | no | ref. con F2-9 | 12 | 0 | 7.24 % | 8.73 % | -8.73 % (1 1 P6-10) | 1642 | —
+3 × 3 mezclada | h = 0,75 | sí | común por dentro | 6 | 0 | 0.75 % | 1.23 % | -1.23 % (2 -1 P6-5) | 1642 | —
+3 × 3 mezclada | h = 0,75 | sí | propia | 26 | 0 | 1.03 % | 4.49 % | 4.49 % (2 -1 P6-15) | 1642 | —
+3 × 3 mezclada | h = 0,75 | sí | ref. con F2-9 | 12 | 0 | 7.24 % | 8.73 % | -8.73 % (1 1 P6-10) | 1642 | —
+3 × 3 mezclada | h = 0,5 | no | común por dentro | 6 | 0 | 0.35 % | 0.64 % | 0.64 % (1 -1 P12-10) | 2272 | —
+3 × 3 mezclada | h = 0,5 | no | propia | 26 | 0 | 1.24 % | 6.01 % | 6.01 % (2 -1 P6-15) | 2272 | —
+3 × 3 mezclada | h = 0,5 | no | ref. con F2-9 | 12 | 0 | 6.91 % | 8.32 % | -8.32 % (1 1 P6-10) | 2272 | —
+3 × 3 mezclada | h = 0,5 | sí | común por dentro | 6 | 0 | 0.35 % | 0.64 % | 0.64 % (1 -1 P12-10) | 2272 | —
+3 × 3 mezclada | h = 0,5 | sí | propia | 26 | 0 | 1.24 % | 6.01 % | 6.01 % (2 -1 P6-15) | 2272 | —
+3 × 3 mezclada | h = 0,5 | sí | ref. con F2-9 | 12 | 0 | 6.91 % | 8.32 % | -8.32 % (1 1 P6-10) | 2272 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | referencia h = 0,1 | sí | — | 24 | 3 | — | — | 94.85 % (L-N1|1|1|P6-10, frente a sin F3-d) | 37236 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,75 | no | común por dentro | 8 | 0 | 1.94 % | 3.63 % | -3.63 % (2 1 P6-10) | 3341 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,75 | no | propia | 9 | 0 | 1.59 % | 3.30 % | -3.30 % (1 -1 P12-5) | 3341 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,75 | no | junto a un hueco | 4 | 0 | 6.20 % | 17.77 % | 17.77 % (1 1 P18-10) | 3341 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,75 | no | ref. con F2-9 | 3 | 0 | 7.24 % | 7.96 % | -7.96 % (1 -1 P6-10) | 3341 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,75 | sí | común por dentro | 8 | 0 | 1.94 % | 3.63 % | -3.63 % (2 1 P6-10) | 3341 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,75 | sí | propia | 9 | 0 | 1.59 % | 3.30 % | -3.30 % (1 -1 P12-5) | 3341 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,75 | sí | junto a un hueco | 4 | 0 | 6.20 % | 17.77 % | 17.77 % (1 1 P18-10) | 3341 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,75 | sí | ref. con F2-9 | 3 | 0 | 7.24 % | 7.96 % | -7.96 % (1 -1 P6-10) | 3341 | —
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,5 | no | común por dentro | 8 | 0 | 2.34 % | 5.06 % | -5.06 % (1 -1 P12-10) | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,5 | no | propia | 9 | 0 | 1.42 % | 3.65 % | 3.65 % (2 -1 P12-10) | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,5 | no | junto a un hueco | 4 | 0 | 2.76 % | 5.70 % | -5.70 % (2 1 P18-10) | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,5 | no | ref. con F2-9 | 3 | 0 | 9.50 % | 11.15 % | -11.15 % (1 -1 P6-10) | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,5 | sí | común por dentro | 8 | 0 | 2.34 % | 5.06 % | -5.06 % (1 -1 P12-10) | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,5 | sí | propia | 9 | 0 | 1.42 % | 3.65 % | 3.65 % (2 -1 P12-10) | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,5 | sí | junto a un hueco | 4 | 0 | 2.76 % | 5.70 % | -5.70 % (2 1 P18-10) | 4539 | malla/calidad
+edificio objetivo reducido (4 × 3 vanos, hueco en el último) | h = 0,5 | sí | ref. con F2-9 | 3 | 0 | 9.50 % | 11.15 % | -11.15 % (1 -1 P6-10) | 4539 | malla/calidad
+edificio objetivo, 1 planta, losa plana | referencia h = 0,15 | sí | — | 192 | 20 | — | — | 123.43 % (L-N1|2|1|P36-30, frente a sin F3-d) | 103617 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 | no | común por dentro | 66 | 0 | 2.27 % | 5.03 % | -5.03 % (1 1 P48-30) | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 | no | propia | 91 | 0 | 1.41 % | 3.88 % | -3.88 % (2 -1 P48-20) | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 | no | junto a un hueco | 15 | 3 | 11.93 % | 43.07 % | -43.07 % (2 -1 P30-15) | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 | no | ref. con F2-9 | 20 | 1 | 7.24 % | 32.53 % | -32.53 % (2 1 P24-20) | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 | sí | común por dentro | 66 | 0 | 2.27 % | 5.03 % | -5.03 % (1 1 P48-30) | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 | sí | propia | 91 | 0 | 1.41 % | 3.88 % | -3.88 % (2 -1 P48-20) | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 | sí | junto a un hueco | 15 | 3 | 5.68 % | 26.68 % | 26.68 % (1 1 P24-20) | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,75 | sí | ref. con F2-9 | 20 | 1 | 5.92 % | 9.08 % | -9.08 % (2 -1 P24-10) | 9693 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | no | común por dentro | 66 | 0 | 1.54 % | 5.95 % | -5.95 % (1 -1 P12-20) | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | no | propia | 91 | 0 | 0.88 % | 2.85 % | -2.85 % (2 -1 P48-20) | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | no | junto a un hueco | 15 | 0 | 2.02 % | 4.92 % | -4.92 % (2 -1 P24-20) | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | no | ref. con F2-9 | 20 | 0 | 7.07 % | 8.96 % | -8.96 % (2 1 P12-10) | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | sí | común por dentro | 66 | 0 | 1.54 % | 5.95 % | -5.95 % (1 -1 P12-20) | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | sí | propia | 91 | 0 | 0.88 % | 2.85 % | -2.85 % (2 -1 P48-20) | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | sí | junto a un hueco | 15 | 0 | 2.02 % | 4.92 % | -4.92 % (2 -1 P24-20) | 15162 | —
+edificio objetivo, 1 planta, losa plana | h = 0,5 | sí | ref. con F2-9 | 20 | 0 | 7.07 % | 8.96 % | -8.96 % (2 1 P12-10) | 15162 | —
+
+## C. Lo que deja F2-9 con F3-d
+
+La 3 × 3 mezclada con h = 0,1: las caras con nudos rígidos delante (F3-5), sin F3-d y con él, y las mismas con las mallas que no los tienen. Suma de los casos, kN·m/m.
+
+cara | h = 0,1 sin F3-d | h = 0,1 con F3-d | h = 0,15 | h = 0,2 | h = 0,5 | h = 0,75 | 0,1 con F3-d frente a 0,15
+1 -1 P6-0 | -25.44 | -51.96 | -48.80 | -48.95 | -48.78 | -48.58 | 6.47 %
+1 1 P6-0 | -23.71 | -47.04 | -43.98 | -44.14 | -43.96 | -43.79 | 6.96 %
+1 -1 P6-10 | -42.11 | -78.51 | -72.62 | -72.79 | -72.22 | -71.87 | 8.11 %
+1 1 P6-10 | -40.45 | -73.06 | -67.31 | -67.52 | -66.98 | -66.68 | 8.54 %
+1 -1 P6-15 | -25.85 | -52.85 | -49.83 | -50.01 | -49.77 | -49.57 | 6.05 %
+1 1 P6-15 | -23.99 | -47.53 | -44.61 | -44.80 | -44.56 | -44.40 | 6.56 %
+2 -1 P0-5 | -19.98 | -40.95 | -38.32 | -38.47 | -38.31 | -38.21 | 6.84 %
+2 1 P0-5 | -19.02 | -38.18 | -35.60 | -35.72 | -35.56 | -35.49 | 7.24 %
+2 -1 P12-5 | -38.49 | -69.45 | -64.14 | -63.77 | -64.05 | -63.81 | 8.28 %
+2 1 P12-5 | -37.63 | -66.34 | -61.10 | -60.74 | -61.05 | -60.79 | 8.58 %
+2 -1 P18-5 | -20.09 | -41.19 | -38.65 | -38.78 | -38.62 | -38.52 | 6.57 %
+2 1 P18-5 | -19.26 | -38.71 | -36.19 | -36.32 | -36.15 | -36.07 | 6.95 %
+

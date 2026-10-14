@@ -6,7 +6,8 @@
  * Ejes de la franja: x a lo largo (d), z vertical hacia arriba e y = z × x. mx es el momento que la
  * flecta, positivo con tracción abajo (de vano), como el My de un corte o de una viga; my y mxy, los
  * de los campos en esos ejes (cabecera de modelo.ts). Sólo cuenta la losa (F-g): ni las vigas ni lo
- * que transmiten los enlaces (cortes con `soloLaminas`), ni las láminas rígidas de una huella.
+ * que transmiten los enlaces (cortes con `soloLaminas`), ni las láminas rígidas de una huella, salvo
+ * en el metro de un pilar lo que pasa por su huella (F3 y F3-d, abajo).
  *
  * Estaciones de una franja, por s = p·d creciente:
  * - **Caras** de los pilares (las rectas de `carasFranjas`, sembradas de lado a lado de la losa): por
@@ -46,6 +47,12 @@
  * Si no se puede (sin enlace), la estación queda en la cara común con el aviso
  * `franja/cara-comun-dentro`.
  *
+ * En la cara de cualquier otro pilar, el metro también cuenta lo que transmite su enlace a través de
+ * la recta (F3-d): es el mismo corte, sin traslado. Sólo transmite algo si tiene nudos delante de la
+ * cara (los que la compilación hace rígidos a ≤ ε_snap de la huella, F2-9), y lo que entra en ellos
+ * se perdía sin aviso (hasta un 50 % junto al hueco del edificio o con h fino). Sin nudos delante, el
+ * corte es el de la recta sin el enlace, el de siempre.
+ *
  * Wood–Armer (H34, C5-c a): por combinación, con los momentos medios. Una franja de la dirección 1
  * da la armadura de esa dirección (m*x en sus ejes) y una de la 2, la de la suya.
  *
@@ -54,9 +61,9 @@
  */
 import { woodArmer } from "../dimensionado/woodArmer.ts";
 import { CamposLaminas } from "../motor/campos.ts";
-import { Cortes, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
+import { Cortes, TOL_CORTE, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
-import type { ModeloAnalitico, ResultadoCaso } from "../motor/modelo.ts";
+import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/modelo.ts";
 import { combinar } from "./envolventes.ts";
 import { ANCHO_FRANJA, type Vec2 } from "./fisico.ts";
 import { pilaresEnLosa, semiextension } from "./bandas.ts";
@@ -143,6 +150,8 @@ export class EsfuerzosFranjas {
   readonly ancho: number;
   /** Sólo para medir la influencia de la posición de las franjas (`franjasLosa`). */
   readonly desfase: number;
+  /** Sólo para medir F3-d: sin lo que transmite la huella por sus nudos delante de la cara (`false`). */
+  readonly huellaDelante: boolean;
   private readonly cortes: Cortes;
   private readonly campos: CamposLaminas;
   private readonly franjasDe = new Map<string, Franja[]>();
@@ -153,13 +162,14 @@ export class EsfuerzosFranjas {
    * @param ctx el contexto del modelo físico que se compiló; `compilado`, su modelo analítico y su
    *   mapeo; `casos`, sus resultados (válidos).
    */
-  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number } = {}) {
+  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; huellaDelante?: boolean } = {}) {
     this.ctx = ctx;
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
     this.casos = casos;
     this.ancho = opciones.ancho ?? ctx.op.anchoFranja ?? ANCHO_FRANJA;
     this.desfase = opciones.desfase ?? 0;
+    this.huellaDelante = opciones.huellaDelante ?? true;
     this.cortes = opciones.cortes ?? new Cortes(this.modelo);
     this.campos = opciones.campos ?? new CamposLaminas(this.modelo);
   }
@@ -363,11 +373,18 @@ export class EsfuerzosFranjas {
       return Math.abs(sp - c.s) > EPS ? sp : c.s;
     };
     // El enlace rígido de la huella de cada pilar en la losa
-    const enlace = new Map<string, string>();
+    const enlace = new Map<string, Restriccion>();
     (this.mapeo.restricciones ?? []).forEach((r, i) => {
       const rs = this.modelo.restricciones?.[i];
-      if (r.pilar !== undefined && r.planta === l.losa.planta && rs?.tipo === "enlace-rigido") enlace.set(r.pilar, rs.id);
+      if (r.pilar !== undefined && r.planta === l.losa.planta && rs?.tipo === "enlace-rigido") enlace.set(r.pilar, rs);
     });
+    /** ¿Tiene el enlace del pilar nudos delante de la recta de la cara, del lado del vano (F2-9)? Con la holgura del corte. */
+    const conNudosDelante = (id: string, c: { s: number; lado: -1 | 1 }): boolean => {
+      const rs = enlace.get(id);
+      if (!rs) return false;
+      const nudos = this.modelo.nudos;
+      return [rs.maestro, ...rs.esclavos].some((v) => c.lado * (nudos[v]!.x * d[0] + nudos[v]!.y * d[1] - c.s) > TOL_CORTE);
+    };
     const porPilar = new Map<string, { sa: number; sb: number; t0: number; t1: number }>();
     for (const c of caras)
       for (const p of c.pilares) {
@@ -388,21 +405,25 @@ export class EsfuerzosFranjas {
      * trasladados a sp: los dos contornos sólo difieren en las tiras de losa entre las dos rectas. El
      * ancho es el de la ventana en la losa, con la huella (lo que pasa por ella es de la cara); my y
      * mxy, por campos a δ de la cara propia. null si no se puede (sin enlace, o el corte no vale).
+     *
+     * Con sp = c.s (un pilar con la cara común por su cara, F3-d) es el corte por la recta con el
+     * enlace, sin traslado; my y mxy, los de la recta (`muestras`).
      */
-    const escalon = (c: { s: number; lado: -1 | 1 }, p: { id: string; t0: number; t1: number }, sp: number, ventana: readonly [number, number]): { principal: PorFranja; muestras: PorFranja; diag: Diagnostico[] } | null => {
-      const restriccion = enlace.get(p.id);
+    const escalon = (c: { s: number; lado: -1 | 1 }, p: { id: string; t0: number; t1: number }, sp: number, ventana: readonly [number, number], muestras?: PorFranja): { principal: PorFranja; muestras: PorFranja; diag: Diagnostico[] } | null => {
+      const restriccion = enlace.get(p.id)?.id;
       if (restriccion === undefined) return null;
       const sx = c.lado === -1 ? 1 : -1;
       // Sólo el tramo de la recta que puede tocar la ventana o la huella: las láminas que tienen un
       // nudo en ella, con un margen mayor que su lado (≤ 2h), y los nudos de la huella con ε_snap
       const margen = 2.5 * this.ctx.op.tamanoMalla + this.ctx.op.epsSnap;
       const rango: [number, number] = [Math.max(T0, Math.min(ventana[0], p.t0) - margen), Math.min(T1, Math.max(ventana[1], p.t1) + margen)];
-      const nod = porNodales(c.s, c.lado, rango[0], rango[1], [ventana], { restriccion, dx: (sp - c.s) * sx });
+      const nod = porNodales(c.s, c.lado, rango[0], rango[1], [ventana], { restriccion, dx: sp === c.s ? 0 : (sp - c.s) * sx });
       if (!nod) return null;
       const principal = nod.rv[0]!;
       for (let kc = 0; kc < nc; kc++) principal.m[3 * kc]! += nod.resto[kc]!;
       // El ancho de la ventana en la losa por la cara propia
       principal.w = tramosRecta(l.region, d, n, sp).reduce((a, [p, q]) => a + Math.max(0, Math.min(q, ventana[1]) - Math.max(p, ventana[0])), 0);
+      if (muestras) return { principal, muestras, diag: nod.diag };
       const cam = porCampos(sp + c.lado * DELTA_MUESTRAS, [ventana], rango);
       return { principal, muestras: cam.rv[0]!, diag: [...nod.diag, ...(cam.valido ? [] : cam.diag)] };
     };
@@ -410,6 +431,12 @@ export class EsfuerzosFranjas {
       const ventanas = c.pilares.map((p): [number, number] => [(p.t0 + p.t1) / 2 - bNominal / 2, (p.t0 + p.t1) / 2 + bNominal / 2]);
       const nod = porNodales(c.s, c.lado, T0, T1, ventanas);
       const cam = porCampos(c.s + c.lado * DELTA_MUESTRAS, ventanas);
+      // El escalón de cada pilar de la cara, una vez aunque lo toquen varias franjas
+      const escalones = new Map<number, ReturnType<typeof escalon>>();
+      const escalonDe = (v: number, sp: number) => {
+        if (!escalones.has(v)) escalones.set(v, escalon(c, c.pilares[v]!, sp, ventanas[v]!, sp === c.s ? cam.rv[v] : undefined));
+        return escalones.get(v)!;
+      };
       for (let i = 0; i < fr.length; i++) {
         if (!c.tramos.some(([a, b]) => toca(i, a, b))) continue;
         const tocan = c.pilares.map((p, v) => ({ p, v })).filter(({ p }) => toca(i, p.t0, p.t1));
@@ -420,8 +447,22 @@ export class EsfuerzosFranjas {
         // El pilar de la ventana con la cara común dentro de su huella: su metro, en su cara propia
         const pv = v !== undefined ? c.pilares[v]! : null;
         const sp = pv ? propia(pv.id, c) : c.s;
+        // En la cara común por la del pilar, con lo que transmite su enlace si tiene nudos delante (F3-d)
+        if (pv && sp === c.s && nod && this.huellaDelante && conNudosDelante(pv.id, c)) {
+          const e = escalonDe(v!, sp);
+          if (e) {
+            est[i]!.push(estacion(i, sp, "cara", c.lado, e.principal, e.muestras, "fuerzas-nodales", piezas, [...e.diag, ...(cam.valido ? [] : cam.diag)], [...ventanas[v!]!]));
+            exactas[i]!.push(sp);
+            continue;
+          }
+          dg.aviso(
+            "franja/cara-sin-huella",
+            `En la franja ${fr[i]!.id}, lo que transmite la huella de ${pv.id} por sus nudos delante de la cara (s = ${sp.toFixed(3)} m) no se ha podido sumar: el momento puede salir bajo. Revise ahí el armado. El fallo es del compilador: avise para corregirlo.`,
+            [fr[i]!.id, pv.id],
+          );
+        }
         if (pv && sp !== c.s) {
-          const e = escalon(c, pv, sp, ventanas[v!]!);
+          const e = escalonDe(v!, sp);
           if (e) {
             est[i]!.push(estacion(i, sp, "cara", c.lado, e.principal, e.muestras, "fuerzas-nodales", piezas, e.diag, [...ventanas[v!]!]));
             exactas[i]!.push(sp);
