@@ -488,9 +488,36 @@ export class EsfuerzosFranjas {
       }
       return null;
     };
+    /**
+     * Fuerzas nodales por la recta de una cara. La recta sólo está sembrada en sus `tramos` (se corta
+     * junto a los pilares ajenos y las vigas casi paralelas, `carasFranjas`): si la recta entera no
+     * sigue la malla, un corte por tramo, y una franja o una ventana que toca un tramo que no sigue la
+     * malla queda sin corte (`falla`). Antes, la cara entera se quedaba sin estación en todas sus
+     * franjas. Con la recta entera, el corte de siempre (los mismos bits).
+     */
+    const porNodalesCara = (c: (typeof caras)[number], ventanas: readonly (readonly [number, number])[]) => {
+      const entera = porNodales(c.s, c.lado, T0, T1, ventanas);
+      if (entera) return { ...entera, falla: fr.map(() => false), fallaV: ventanas.map(() => false) };
+      const partes = c.tramos.map(([a, b]) => ({ a, b, nod: porNodales(c.s, c.lado, Math.max(T0, a), Math.min(T1, b), ventanas) }));
+      if (!partes.some((x) => x.nod)) return null;
+      const r = fr.map(vacio);
+      const rv = ventanas.map(vacio);
+      const sumar = (q: PorFranja, o: PorFranja) => {
+        q.w += o.w;
+        q.wAbaco += o.wAbaco;
+        for (let j = 0; j < q.m.length; j++) q.m[j]! += o.m[j]!;
+      };
+      for (const x of partes) {
+        if (!x.nod) continue;
+        x.nod.r.forEach((o, i) => sumar(r[i]!, o));
+        x.nod.rv.forEach((o, v) => sumar(rv[v]!, o));
+      }
+      const falla = (t0: number, t1: number) => partes.some((x) => !x.nod && x.a < t1 - EPS && x.b > t0 + EPS);
+      return { r, rv, diag: partes.flatMap((x) => x.nod?.diag ?? []), falla: fr.map((f) => falla(f.t0, f.t1)), fallaV: ventanas.map(([a, b]) => falla(a, b)) };
+    };
     for (const c of caras) {
       const ventanas = c.pilares.map((p): [number, number] => [(p.t0 + p.t1) / 2 - bNominal / 2, (p.t0 + p.t1) / 2 + bNominal / 2]);
-      const nod = porNodales(c.s, c.lado, T0, T1, ventanas);
+      const nod = porNodalesCara(c, ventanas);
       const cam = porCampos(c.s + c.lado * DELTA_MUESTRAS, ventanas);
       // El escalón de cada pilar de la cara, una vez aunque lo toquen varias franjas
       const escalones = new Map<number, ReturnType<typeof escalon>>();
@@ -536,9 +563,10 @@ export class EsfuerzosFranjas {
           );
         }
         const diag = [...(nod?.diag ?? []), ...(cam.valido ? [] : cam.diag)];
-        const principal = nod ? (v !== undefined ? nod.rv[v]! : nod.r[i]!) : vacio();
+        const sinCorte = !nod || (v !== undefined ? nod.fallaV[v]! : nod.falla[i]!);
+        const principal = !sinCorte ? (v !== undefined ? nod.rv[v]! : nod.r[i]!) : vacio();
         const muestras = v !== undefined ? cam.rv[v]! : cam.r[i]!;
-        if (!nod) dg.aviso("franja/cara-sin-corte", `La cara s = ${c.s.toFixed(3)} m de la franja ${fr[i]!.id} no sigue la malla: no tiene estación.`, [fr[i]!.id]);
+        if (sinCorte) dg.aviso("franja/cara-sin-corte", `La cara s = ${c.s.toFixed(3)} m de la franja ${fr[i]!.id} no sigue la malla: no tiene estación.`, [fr[i]!.id]);
         est[i]!.push(estacion(i, c.s, "cara", c.lado, principal, muestras, "fuerzas-nodales", piezas, [...diag, ...dg.lista], v !== undefined ? [...ventanas[v]!] : undefined));
         exactas[i]!.push(c.s);
       }

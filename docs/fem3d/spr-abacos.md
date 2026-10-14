@@ -249,3 +249,15 @@ Las peores de §9 (`out_vecinas.txt`, `out_vecinas_trozo.txt`):
 - En el trozo reticular, con h = 0,75: 10 de las 41 franjas de cada losa.
 - Referencia congelada de F: sólo el aviso nuevo, en 19 franjas de `pilares-mezclados` y `reticular-2x2-abacos` (los que tienen hueco); estaciones y valores, idénticos.
 - Tests: `src/compilador/esquinaEntrante.test.ts`.
+
+## 13. La cara de franja cortada en tramos (puerta de uso, 2026-10-15)
+
+Al modelar la vivienda de Alhaurín el Grande (primera puerta de uso con un proyecto real), la consulta de franjas dio 75 avisos `franja/cara-sin-corte`: seis rectas de cara sin estación en ninguna de las franjas que las cruzan.
+
+- **Causa (un fallo previo de F):** la recta de una cara sólo se siembra en sus `tramos`, porque `carasFranjas` la corta junto a los pilares ajenos (a menos de h) y las vigas casi paralelas. Pero su estación se medía cortando la recta entera, de lado a lado de la losa. Fuera de los tramos la recta atraviesa láminas, el corte no valía y la cara se perdía en todas sus franjas, también en las del tramo. En la vivienda pasaba en las filas de pilares cercanas entre sí (las de y = 14,56 y 15,05, a 19 cm entre caras) y en tres caras de la cubierta alta.
+- **Arreglo** (`esfuerzosFranjas.ts`, `porNodalesCara`): primero el corte de la recta entera, como antes (los mismos bits); si no vale, un corte por tramo, sumados. Una franja o una ventana que toca un tramo que no sigue la malla conserva el aviso.
+- **Efecto:**
+  - en la vivienda, ningún aviso de cara sin corte;
+  - en la referencia congelada de F, 8 franjas de `pilares-mezclados` recuperan su estación de cara (L-N1:X2, por ejemplo, de una estación sin valor a −15,7 kN·m/m con 1 m de ancho). Las demás, idénticas.
+- **Test:** `src/compilador/caraPorTramos.test.ts` (falla con el código de antes).
+

@@ -404,6 +404,7 @@
     - **Franjas vecinas:** las dos peores eran la esquina entrante del hueco de la escalera, no un pilar (singular, no converge); la vecina de verdad (L-N2:Y29) queda a −12 % con h = 0,75.
     - **Decidido el 2026-10-15** (§11): el método se queda como está (directo si la recta de la cara sigue la malla, escalón si no) y el −12 % de las vecinas se acepta.
     - **2026-10-15, aviso `franja/esquina-entrante`** (decisión del usuario, §12): junto a una esquina entrante (de un hueco o cóncava del contorno), con h = 0,75 las estaciones salen del −40 % al +100 % hasta ~0,75 m, y pegadas a ella no convergen. La franja con estaciones a menos de máx(h, b/2) lleva el aviso, con el tramo de cada esquina; no cambia ningún valor.
+    - **2026-10-15, cara de franja por tramos** (§13, de la puerta de uso con la vivienda de Alhaurín): una recta de cara cortada junto a otros pilares se medía entera y no valía, así que se perdía la estación en todas sus franjas (`franja/cara-sin-corte`). Ahora, si la recta entera no sigue la malla, un corte por tramo. Referencia congelada de F: 8 franjas de `pilares-mezclados` recuperan su cara.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **ahora:** la puerta de uso de F y AB con un proyecto real del usuario (cubre también buena parte de las de I1–I4, V2a y V2b);
