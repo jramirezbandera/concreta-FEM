@@ -12,16 +12,16 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { areaRegion, gammaMaterial, pesoLosa, pesoPropioEsperado, Plantas } from "../agente/sensatez.ts";
+import { areaRegion, gammaMaterial, pesoPropioEsperado, Plantas } from "../agente/sensatez.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
-import { fraccionEnRegiones, momentosInterseccion, type Region } from "../compilador/poligonos.ts";
+import { areaConSigno, distanciaABorde, fraccionEnRegiones, momentosInterseccion, puntoEnPoligono, type Region } from "../compilador/poligonos.ts";
 import { edificioGeometria, FAMILIAS } from "../pruebas/geometrias.ts";
 import { edificioObjetivoMuros, reticulaConNucleo } from "../../validacion/c3/modelos.ts";
 import { edificioReticular, edificioUnidireccional } from "../../validacion/c4/modelos.ts";
 import { alambrico } from "./alambrico.ts";
-import { aristasDe, formaSeccion, huellaPilarSolido, huellasInglete, LADO_SIN_FORMA, piezasSolido, recortarBanda, solido, tramosDe, volumen, type CompiladoSolido, type PiezaSolida } from "./solido.ts";
+import { aristasDe, formaSeccion, huellaPilarSolido, huellasInglete, LADO_SIN_FORMA, piezasSolido, recortarBanda, solido, tramosDe, volumen, ZUNCHO_RETICULAR, type CompiladoSolido, type PiezaSolida } from "./solido.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const leer = (r: string): ModeloFisico => JSON.parse(readFileSync(join(RAIZ, r), "utf8")).modelo;
@@ -102,6 +102,7 @@ const MODELOS: [string, () => ModeloFisico][] = [
   ["1022", () => leer("validacion/a2/agente/1022/proyecto.json")],
   ["nucleo", () => leer("validacion/a2/agente/nucleo/proyecto.json")],
   ["edificio", () => leer("validacion/a2/agente/edificio/proyecto.json")],
+  ["vivienda (reticular con casetón perdido)", () => leer("ejemplos/vivienda/proyecto.json")],
   ["reticulaConNucleo", reticulaConNucleo],
   ["edificio con muros (C3)", () => edificioObjetivoMuros(2, 4, 3)],
   ["reticular (C4)", () => edificioReticular(2, 4, 3)],
@@ -264,15 +265,43 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
     expect(n).toBeGreaterThan(0);
   });
 
-  it("el reticular, como la fórmula de A3 con casetón recuperable (sin el pp dado), salvo los bordes", () => {
+  it("el reticular, macizo menos sus casetones: a ≥ el zuncho de los bordes, fuera de los ábacos, y el perdido con su cara inferior", () => {
+    const cotas = cotasPlantas(f.plantas);
+    let n = 0;
     for (const l of f.losas ?? []) {
-      if (!l.reticular) continue;
+      const ret = l.reticular;
+      if (!ret) continue;
       const p = piezas.find((x) => x.id === l.id)!;
-      const m = f.materiales.find((x) => x.id === l.material)!;
-      const { pp: _pp, ...sin } = l;
-      const formula = pesoLosa({ ...sin, reticular: { ...l.reticular, caseton: "recuperable" } }, m) / gammaMaterial(m);
-      expect(rel(volumen(p.caras), formula), l.id).toBeLessThan(0.025);
+      const zc = cotas[f.plantas.findIndex((x) => x.id === l.planta)]!;
+      const hueco = (z: number) => p.caras.filter((c) => Math.abs(c.p[0]![2] - z) < 1e-9 && c.p.every((q) => Math.abs(q[2] - z) < 1e-9));
+      const area = (c: { p: number[][] }) => Math.abs(areaConSigno(c.p.map((q) => [q[0]!, q[1]!] as Vec2)));
+      // El techo de los huecos de los casetones, bajo la capa
+      const techos = hueco(zc - ret.capa).filter((c) => areaConSigno(c.p.map((q) => [q[0]!, q[1]!] as Vec2)) < 0);
+      const Ac = techos.reduce((t, c) => t + area(c), 0);
+      const A = areaRegion(l);
+      expect(rel(volumen(p.caras), l.espesor * A - (l.espesor - ret.capa) * Ac), l.id).toBeLessThan(1e-9);
+      expect(Ac / A, `${l.id}: aligerado`).toBeGreaterThan(0.2);
+      const reg = [l.contorno, ...(l.huecos ?? [])] as Vec2[][];
+      for (const c of techos)
+        for (const q of c.p) {
+          const v: Vec2 = [q[0]!, q[1]!];
+          expect(Math.min(...reg.map((r) => distanciaABorde(v, r))), `${l.id}: casetón a menos del zuncho`).toBeGreaterThanOrEqual(ZUNCHO_RETICULAR - 1e-9);
+          for (const ab of (ret.abacos ?? []) as Vec2[][]) expect(puntoEnPoligono(v, ab) && distanciaABorde(v, ab) > 1e-9, `${l.id}: casetón en un ábaco`).toBe(false);
+        }
+      // Casetón perdido: su cara inferior cubre los huecos, en la cara inferior de la losa y mirando abajo
+      const perdido = (ret.caseton ?? "perdido") === "perdido";
+      const cs = p.casetones ?? [];
+      expect(cs.length > 0, l.id).toBe(perdido);
+      if (perdido) {
+        expect(rel(cs.reduce((t, c) => t + area(c), 0), Ac)).toBeLessThan(1e-9);
+        for (const c of cs) {
+          expect(c.p.every((q) => Math.abs(q[2] - (zc - l.espesor)) < 1e-9)).toBe(true);
+          expect(areaConSigno(c.p.map((q) => [q[0], q[1]] as Vec2))).toBeLessThan(0);
+        }
+      }
+      n++;
     }
+    if (f.losas?.some((l) => l.reticular)) expect(n).toBeGreaterThan(0);
   });
 
   it("por planta, Σ γ·V más lo que no se repite es el peso propio esperado de A3; lo que se quita a las vigas es su solape (C2-g)", () => {
@@ -318,17 +347,19 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
   it("los búferes son los de las piezas, respecto al origen del alámbrico, y no dependen del orden de las listas", () => {
     const o = alambrico(f).origen;
     const s = solido(f, o, comp);
-    const nt = piezas.reduce((t, p) => t + p.caras.reduce((u, x) => u + x.p.length - 2, 0), 0);
+    const nt = piezas.reduce((t, p) => t + [...p.caras, ...(p.casetones ?? [])].reduce((u, x) => u + x.p.length - 2, 0), 0);
     expect(s.triangulos.length).toBe(9 * nt);
     expect(s.objeto.length).toBe(nt);
     expect(s.origen).toEqual(o);
-    // Cada triángulo, de su objeto y su planta
+    expect(s.caseton.length).toBe(nt);
+    // Cada triángulo, de su objeto y su planta, y los de los casetones marcados
     let t = 0;
     for (const p of piezas)
-      for (const x of p.caras)
+      for (const [k, x] of [...p.caras, ...(p.casetones ?? [])].entries())
         for (let i = 1; i < x.p.length - 1; i++, t++) {
           expect(s.objetos[s.objeto[t]!]!.id).toBe(p.id);
           expect(s.planta[t]).toBe(p.planta);
+          expect(s.caseton[t]).toBe(k < p.caras.length ? 0 : 1);
           const v = [x.p[0]!, x.p[i]!, x.p[i + 1]!];
           for (let j = 0; j < 3; j++) for (let a = 0; a < 3; a++) expect(s.triangulos[9 * t + 3 * j + a]).toBe(Math.fround(v[j]![a]! - o[a]!));
         }
@@ -336,6 +367,7 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
     const r: ModeloFisico = { ...f, pilares: [...(f.pilares ?? [])].reverse(), vigas: [...(f.vigas ?? [])].reverse(), losas: [...(f.losas ?? [])].reverse(), muros: [...(f.muros ?? [])].reverse(), panos: [...(f.panos ?? [])].reverse(), secciones: [...f.secciones].reverse() };
     const s2 = solido(r, o, comp);
     expect(s2.triangulos).toEqual(s.triangulos);
+    expect(s2.caseton).toEqual(s.caseton);
     expect(s2.aristas).toEqual(s.aristas);
   });
 });

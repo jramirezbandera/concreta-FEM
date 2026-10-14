@@ -4,9 +4,11 @@
  * cada triángulo.
  *
  * Convenio de cotas, el del alzado de I2: la cota de una planta es la cara superior de su forjado.
- * - Losa: su región (contorno menos huecos) de c − e a c. Un reticular, la capa de compresión, los
- *   ábacos y los nervios en las dos direcciones a su intereje (su sitio es ilustrativo: el cálculo
- *   usa multiplicadores, D3), con los de la segunda dirección partidos en los cruces.
+ * - Losa: su región (contorno menos huecos) de c − e a c. Un reticular, maciza menos sus casetones:
+ *   los que caben enteros a su intereje, centrados en la losa, a ≥ `ZUNCHO_RETICULAR` de sus bordes
+ *   (el zuncho) y sin pisar ábacos ni huellas de pilares, vigas y muros (su sitio es ilustrativo: el
+ *   cálculo usa multiplicadores, D3). Con casetón perdido (por defecto), su cara inferior aparte
+ *   (`casetones`), que no cuenta en el volumen.
  * - Paño: sus viguetas, las del compilador (C4-a), con su sección y la cara superior en c, y macizo
  *   del canto de la vigueta lo que no cae en la banda de un intereje de ninguna (junto a una viga
  *   o un muro paralelos, donde el compilador no pone vigueta, o el sobrante del ancho). Sin
@@ -38,7 +40,7 @@
  */
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
-import { puntoEnPoligono, puntoEnRegion, trozosSegmento } from "../compilador/poligonos.ts";
+import { puntoEnRegion, trozosSegmento } from "../compilador/poligonos.ts";
 import type { Material, ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 
@@ -70,6 +72,8 @@ export interface PiezaSolida {
    * las viguetas de un paño). No son geometría: no cuentan en el volumen.
    */
   marcas?: [Vec3, Vec3][];
+  /** La cara inferior de los casetones perdidos de un reticular: se pinta con su color y no cuenta en el volumen. */
+  casetones?: Cara[];
 }
 
 /** Lo que el sólido necesita de la compilación: las viguetas de los paños. */
@@ -82,6 +86,8 @@ export interface Solido {
   /** Índice en `objetos` y planta de cada triángulo. */
   objeto: Uint32Array;
   planta: Uint16Array;
+  /** 1 en los triángulos de un casetón perdido (de su losa), que se pintan con su color. */
+  caseton: Uint8Array;
   /** Las aristas (dos extremos), con su objeto y su planta. */
   aristas: Float32Array;
   objetoArista: Uint32Array;
@@ -548,6 +554,83 @@ export function huellaPilarSolido(p: { x: number; y: number; giro?: number }, po
   return poligono.map(([v, u]) => [p.x + v * ey[0] + u * ez[0], p.y + v * ey[1] + u * ez[1]] as Vec2);
 }
 
+// ─── Reticular ──────────────────────────────────────────────────────────────────────────────────
+
+/** Ancho mínimo del zuncho de borde de un reticular en el sólido, m: lo que queda entre el borde y el primer casetón. */
+export const ZUNCHO_RETICULAR = 0.25;
+
+/** ¿Entra el segmento ab en el rectángulo abierto (x0, x1) × (y0, y1)? Tocar su borde no es entrar (Liang–Barsky). */
+function entraEnRect(a: readonly number[], b: readonly number[], x0: number, y0: number, x1: number, y1: number): boolean {
+  let [t0, t1] = [0, 1];
+  const [dx, dy] = [b[0]! - a[0]!, b[1]! - a[1]!];
+  for (const [p, q] of [[-dx, a[0]! - x0], [dx, x1 - a[0]!], [-dy, a[1]! - y0], [dy, y1 - a[1]!]] as const) {
+    if (p === 0) {
+      if (q <= 0) return false;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 >= t1) return false;
+  }
+  return true;
+}
+
+/**
+ * Los casetones de un reticular en el sólido: la retícula de celdas de lado c a su intereje s, según
+ * d y su perpendicular, centrada en la caja de la losa, y de ella las celdas que caben enteras a ≥ w
+ * de los bordes de la región (contorno y huecos) y no pisan los ábacos ni los `macizos` (huellas de
+ * pilares, vigas y muros). Lo que queda fuera de los casetones es macizo: así el reticular acaba en
+ * un zuncho de borde, no en nervios sueltos, y se maciza alrededor de los ábacos y las huellas.
+ *
+ * En coordenadas locales (x según d, y a su izquierda): la celda (i, j) va de (x0 + i·s, y0 + j·s) a
+ * (x0 + i·s + c, y0 + j·s + c), y `dentro[j·nx + i]` dice si es casetón.
+ */
+export function casetonesReticular(
+  region: readonly (readonly Vec2[])[],
+  abacos: readonly (readonly Vec2[])[],
+  macizos: readonly (readonly Vec2[])[],
+  d: Vec2,
+  s: number,
+  c: number,
+  w: number,
+): { x0: number; y0: number; nx: number; ny: number; c: number; dentro: Uint8Array } {
+  const n: Vec2 = [-d[1], d[0]];
+  const loc = (q: Vec2): Vec2 => [q[0] * d[0] + q[1] * d[1], q[0] * n[0] + q[1] * n[1]];
+  const R = region.map((r) => r.map(loc));
+  const [X0, Y0, X1, Y1] = cajaAnillos(R);
+  const reparto = (L: number): [number, number] => {
+    if (!(c > 0) || L - 2 * w < c) return [0, 0];
+    const k = Math.floor((L - 2 * w - c) / s + 1e-9) + 1;
+    return [k, (L - ((k - 1) * s + c)) / 2];
+  };
+  const [nx, ax] = reparto(X1 - X0);
+  const [ny, ay] = reparto(Y1 - Y0);
+  const [x0, y0] = [X0 + ax, Y0 + ay];
+  const dentro = new Uint8Array(nx * ny);
+  if (!nx || !ny) return { x0, y0, nx, ny, c, dentro };
+  const caja = [x0, y0, x0 + (nx - 1) * s + c, y0 + (ny - 1) * s + c];
+  const cerca = [...abacos, ...macizos].map((p) => p.map(loc)).filter((p) => tocan(cajaAnillos([p]), caja));
+  const cajas = cerca.map((p) => cajaAnillos([p]));
+  const lados = R.flatMap((r) => r.map((q, i) => [q, r[(i + 1) % r.length]!] as const));
+  for (let j = 0; j < ny; j++)
+    for (let i = 0; i < nx; i++) {
+      const [a0, b0] = [x0 + i * s, y0 + j * s];
+      const [a1, b1] = [a0 + c, b0 + c];
+      const centro: Vec2 = [(a0 + a1) / 2, (b0 + b1) / 2];
+      // Entero en la región, a ≥ w de sus bordes
+      if (!dentroAnillos(centro, R) || lados.some(([p, q]) => entraEnRect(p, q, a0 - w, b0 - w, a1 + w, b1 + w))) continue;
+      // Sin pisar un ábaco ni una huella
+      const pisa = cerca.some((p, k) => {
+        const b = cajas[k]!;
+        if (b[0] >= a1 || b[2] <= a0 || b[1] >= b1 || b[3] <= b0) return false;
+        return dentroAnillos(centro, [p]) || p.some((q, t) => entraEnRect(q, p[(t + 1) % p.length]!, a0, b0, a1, b1));
+      });
+      if (!pisa) dentro[j * nx + i] = 1;
+    }
+  return { x0, y0, nx, ny, c, dentro };
+}
+
 // ─── Piezas ─────────────────────────────────────────────────────────────────────────────────────
 
 const porId = <T extends { id: string }>(xs: readonly T[] | undefined): T[] => [...(xs ?? [])].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -695,6 +778,33 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     piezas.push({ id: v.id, tipo: "viga", planta: k, material: matSec(v.seccion), seccion: v.seccion, caras, ...(fs.sinForma ? { sinForma: true as const } : {}) });
   }
 
+  /** Las huellas de lo que maciza un reticular en la planta k: los pilares y muros que llegan a ella o salen de ella, y sus vigas. */
+  const macizosEn = (k: number): Vec2[][] => {
+    const r: Vec2[][] = [];
+    const entre = (desde: string, hasta: string) => {
+      const [a, b] = [indice.get(hasta), indice.get(desde)];
+      return a !== undefined && b !== undefined && a <= k && k <= b;
+    };
+    for (const p of f.pilares ?? []) {
+      if (!entre(p.desde, p.hasta) || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+      const sec = seccion.get(p.tramos?.find((t) => t.planta === plantas[k])?.seccion ?? p.seccion);
+      const fs = sec ? formaSeccion(sec) : null;
+      if (fs) r.push(huellaPilarSolido(p, fs.poligono));
+    }
+    for (const v of f.vigas ?? []) {
+      const sec = indice.get(v.planta) === k ? seccion.get(v.seccion) : undefined;
+      const fs = sec ? formaSeccion(sec) : null;
+      if (fs) r.push(...huellasInglete(tramosDe(v.puntos), fs.b, false));
+    }
+    for (const m of f.muros ?? []) {
+      if (!(m.espesor > 0) || m.puntos.length < 2 || !entre(m.desde, m.hasta)) continue;
+      const ult = m.puntos[m.puntos.length - 1]!;
+      const cerrado = m.puntos.length > 2 && Math.abs(ult[0] - m.puntos[0]![0]) <= EPS && Math.abs(ult[1] - m.puntos[0]![1]) <= EPS;
+      r.push(...huellasInglete(tramosDe(m.puntos), m.espesor, cerrado));
+    }
+    return r;
+  };
+
   // Losas: maciza o reticular
   for (const l of porId(f.losas)) {
     const k = indice.get(l.planta);
@@ -705,6 +815,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const n: Vec2 = [-d[1], d[0]];
     const caras: Cara[] = [];
     const marcas: [Vec3, Vec3][] = [];
+    const casetones: Cara[] = [];
     const ret = l.reticular;
     const e = l.espesor;
     if (!ret || !(ret.capa > 0 && ret.capa < e && ret.nervio > 0 && ret.intereje > ret.nervio)) {
@@ -712,36 +823,47 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     } else {
       const { intereje: s, nervio: bw, capa: hf } = ret;
       const abacos = (ret.abacos ?? []) as Vec2[][];
-      // Capa de compresión
-      prismas(descomponer(region, [], d), d, () => [[zc - hf, zc]], caras);
-      // Ábacos, dentro de la losa
-      for (const ab of abacos) prismas(descomponer([ab], [region], d), d, (fr) => (fr.capas[0] ? [[zc - e, zc - hf]] : []), caras);
-      // Nervios: según d (y' = j·s) y según n (x' = i·s), en la losa y fuera de los ábacos
-      const loc = region.flat().map((q) => [q[0] * d[0] + q[1] * d[1], q[0] * n[0] + q[1] * n[1]]);
-      const [x0, x1] = [Math.min(...loc.map((q) => q[0]!)), Math.max(...loc.map((q) => q[0]!))];
-      const [y0, y1] = [Math.min(...loc.map((q) => q[1]!)), Math.max(...loc.map((q) => q[1]!))];
+      // Los casetones que caben enteros; bajo la capa, todo lo demás es macizo (nervios, zuncho de borde, ábacos)
+      const cs = casetonesReticular(region, abacos, macizosEn(k), d, s, s - bw, ZUNCHO_RETICULAR);
       const g = (x: number, y: number): Vec2 => [x * d[0] + y * n[0], x * d[1] + y * n[1]];
-      const franja = (a0: number, a1: number, b0: number, b1: number): Vec2[] => [g(a0, b0), g(a1, b0), g(a1, b1), g(a0, b1)];
-      const dir1: Vec2[][] = [];
-      for (let j = Math.ceil((y0 - bw / 2) / s); j * s - bw / 2 < y1; j++) dir1.push(franja(x0 - 1, x1 + 1, j * s - bw / 2, j * s + bw / 2));
-      for (const fr1 of dir1) prismas(descomponer([fr1], [region, abacos], d), d, (fr) => (fr.capas[0] && !fr.capas[1] ? [[zc - e, zc - hf]] : []), caras);
-      for (let i = Math.ceil((x0 - bw / 2) / s); i * s - bw / 2 < x1; i++) {
-        const fr2 = franja(i * s - bw / 2, i * s + bw / 2, y0 - 1, y1 + 1);
-        prismas(descomponer([fr2], [region, abacos, dir1], n), n, (fr) => (fr.capas[0] && !fr.capas[1] && !fr.capas[2] ? [[zc - e, zc - hf]] : []), caras);
-      }
-      // Marcas en la cara superior: los ejes de los nervios (en la losa y fuera de los ábacos) y el contorno de los ábacos
+      const rect = (i: number, j: number): Vec2[] => {
+        const [x, y] = [cs.x0 + i * s, cs.y0 + j * s];
+        return [g(x, y), g(x + cs.c, y), g(x + cs.c, y + cs.c), g(x, y + cs.c)];
+      };
+      const huecosCaseton: Vec2[][] = [];
+      for (let j = 0; j < cs.ny; j++) for (let i = 0; i < cs.nx; i++) if (cs.dentro[j * cs.nx + i]) huecosCaseton.push(rect(i, j));
+      prismas(descomponer(region, [huecosCaseton], d), d, (fr) => (fr.capas[0] ? [[zc - hf, zc]] : [[zc - e, zc]]), caras);
+      // Casetón perdido: su cara inferior, enrasada con la de los nervios
+      if ((ret.caseton ?? "perdido") === "perdido") for (const r of huecosCaseton) casetones.push({ p: r.map((q): Vec3 => [q[0], q[1], zc - e]).reverse() });
+      // Marcas en la cara superior: los ejes de los nervios junto a un casetón y el contorno de los ábacos
+      const marca = (a: Vec2, b: Vec2) => marcas.push([[a[0], a[1], zc], [b[0], b[1], zc]]);
+      const hay = (i: number, j: number) => i >= 0 && j >= 0 && i < cs.nx && j < cs.ny && cs.dentro[j * cs.nx + i] === 1;
+      const ejes = (na: number, nb: number, junto: (a: number, b: number) => boolean, seg: (a: number, b0: number, b1: number) => void) => {
+        for (let a = 0; a <= na; a++) {
+          let b0 = -1;
+          for (let b = 0; b <= nb; b++) {
+            const si = b < nb && junto(a, b);
+            if (si && b0 < 0) b0 = b;
+            if (!si && b0 >= 0) {
+              seg(a, b0, b);
+              b0 = -1;
+            }
+          }
+        }
+      };
+      const [m0, m1] = [-bw / 2, bw / 2 - s];
+      ejes(cs.nx, cs.ny, (i, j) => hay(i - 1, j) || hay(i, j), (i, j0, j1) => marca(g(cs.x0 + i * s - bw / 2, cs.y0 + j0 * s + m0), g(cs.x0 + i * s - bw / 2, cs.y0 + j1 * s + m1 + cs.c)));
+      ejes(cs.ny, cs.nx, (j, i) => hay(i, j - 1) || hay(i, j), (j, i0, i1) => marca(g(cs.x0 + i0 * s + m0, cs.y0 + j * s - bw / 2), g(cs.x0 + i1 * s + m1 + cs.c, cs.y0 + j * s - bw / 2)));
       const R = { contorno: l.contorno as Vec2[], huecos: (l.huecos ?? []) as Vec2[][] };
       const enLosa = (q: Vec2) => puntoEnRegion(q, R);
-      const marca = (a: Vec2, b: Vec2) => marcas.push([[a[0], a[1], zc], [b[0], b[1], zc]]);
-      const todos = [...region, ...abacos];
-      const fuera = (q: Vec2) => enLosa(q) && !abacos.some((ab) => puntoEnPoligono(q, ab));
-      for (let j = Math.ceil(y0 / s); j * s < y1; j++) for (const [a, b] of trozosSegmento(g(x0, j * s), g(x1, j * s), todos, fuera)) marca(a, b);
-      for (let i = Math.ceil(x0 / s); i * s < x1; i++) for (const [a, b] of trozosSegmento(g(i * s, y0), g(i * s, y1), todos, fuera)) marca(a, b);
       for (const ab of abacos) for (let i = 0; i < ab.length; i++) for (const [a, b] of trozosSegmento(ab[i]!, ab[(i + 1) % ab.length]!, region, enLosa)) marca(a, b);
     }
-    piezas.push({ id: l.id, tipo: "losa", planta: k, material: material.get(l.material)?.tipo ?? null, seccion: null, caras, ...(marcas.length ? { marcas } : {}) });
+    piezas.push({ id: l.id, tipo: "losa", planta: k, material: material.get(l.material)?.tipo ?? null, seccion: null, caras, ...(marcas.length ? { marcas } : {}), ...(casetones.length ? { casetones } : {}) });
   }
-  if ((f.losas ?? []).some((l) => l.reticular)) notas.push("Los nervios de los reticulares se dibujan a su intereje desde el origen de coordenadas, en la dirección de su eje 1 y la perpendicular: su sitio es ilustrativo, porque el cálculo usa multiplicadores (D3).");
+  if ((f.losas ?? []).some((l) => l.reticular))
+    notas.push(
+      `Los reticulares se dibujan con sus casetones enteros, centrados en la losa y en la dirección de su eje 1 y la perpendicular, y macizo lo demás: un zuncho de ${String(ZUNCHO_RETICULAR).replace(".", ",")} m como mínimo junto a los bordes y los huecos, los ábacos y las huellas de pilares, vigas y muros. Es ilustrativo: el cálculo usa multiplicadores en toda la zona aligerada (D3), sin el zuncho.`,
+    );
 
   // Paños: las viguetas del compilador; sin él, una placa del canto de la vigueta
   let sinViguetas = false;
@@ -1026,10 +1148,11 @@ export function solido(f: ModeloFisico, origen: [number, number, number], compil
   const objetos: Solido["objetos"] = [];
   const indice = new Map<string, number>();
   let nt = 0;
-  for (const p of piezas) for (const c of p.caras) nt += c.p.length - 2;
+  for (const p of piezas) for (const c of [...p.caras, ...(p.casetones ?? [])]) nt += c.p.length - 2;
   const tri = new Float32Array(9 * nt);
   const obj = new Uint32Array(nt);
   const pl = new Uint16Array(nt);
+  const cas = new Uint8Array(nt);
   const ar: number[] = [];
   const oa: number[] = [];
   const pa: number[] = [];
@@ -1042,7 +1165,7 @@ export function solido(f: ModeloFisico, origen: [number, number, number], compil
       indice.set(p.id, k);
       objetos.push({ id: p.id, tipo: p.tipo, material: p.material, seccion: p.seccion });
     }
-    for (const { p: q } of p.caras) {
+    for (const [ci, { p: q }] of [...p.caras, ...(p.casetones ?? [])].entries()) {
       for (const v of q)
         for (let a = 0; a < 3; a++) {
           if (v[a]! < caja[a]!) caja[a] = v[a]!;
@@ -1052,6 +1175,7 @@ export function solido(f: ModeloFisico, origen: [number, number, number], compil
         for (const [j, v] of [q[0]!, q[i]!, q[i + 1]!].entries()) for (let a = 0; a < 3; a++) tri[9 * t + 3 * j + a] = v[a]! - origen[a]!;
         obj[t] = k;
         pl[t] = p.planta;
+        cas[t] = ci < p.caras.length ? 0 : 1;
         t++;
       }
     }
@@ -1067,6 +1191,7 @@ export function solido(f: ModeloFisico, origen: [number, number, number], compil
     triangulos: tri,
     objeto: obj,
     planta: pl,
+    caseton: cas,
     aristas: Float32Array.from(ar),
     objetoArista: Uint32Array.from(oa),
     plantaArista: Uint16Array.from(pa),

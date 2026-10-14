@@ -137,6 +137,8 @@ interface Paleta3D {
   hormigon: string;
   acero: string;
   general: string;
+  /** La cara inferior de los casetones perdidos de un reticular. */
+  caseton: string;
   apoyo: string;
   arista: string;
   pilar: string;
@@ -152,8 +154,8 @@ interface Paleta3D {
 }
 
 const PALETAS: Record<"light" | "dark", Paleta3D> = {
-  light: { hormigon: "#c4c9d0", acero: "#8ea7c2", general: "#cdbf9c", apoyo: "#475569", arista: "#1f2937", pilar: "#1e293b", viga: "#475569", losa: "#8794a3", pano: "#97835c", muro: "#64748b", activa: "#0369a1", laminaLosa: "#c9d6e3", laminaMuro: "#9aa5b1", vigueta: "#a08a5e", original: "#94a3b8" },
-  dark: { hormigon: "#8b939e", acero: "#6d88a6", general: "#9b8c6a", apoyo: "#cbd5e1", arista: "#0b0f14", pilar: "#d4d6db", viga: "#9aa3ae", losa: "#6b7686", pano: "#b49a68", muro: "#8a94a1", activa: "#38bdf8", laminaLosa: "#33414f", laminaMuro: "#5b6573", vigueta: "#b49a68", original: "#5b6575" },
+  light: { hormigon: "#c4c9d0", acero: "#8ea7c2", general: "#cdbf9c", caseton: "#e6dcc6", apoyo: "#475569", arista: "#1f2937", pilar: "#1e293b", viga: "#475569", losa: "#8794a3", pano: "#97835c", muro: "#64748b", activa: "#0369a1", laminaLosa: "#c9d6e3", laminaMuro: "#9aa5b1", vigueta: "#a08a5e", original: "#94a3b8" },
+  dark: { hormigon: "#8b939e", acero: "#6d88a6", general: "#9b8c6a", caseton: "#a99d84", apoyo: "#cbd5e1", arista: "#0b0f14", pilar: "#d4d6db", viga: "#9aa3ae", losa: "#6b7686", pano: "#b49a68", muro: "#8a94a1", activa: "#38bdf8", laminaLosa: "#33414f", laminaMuro: "#5b6573", vigueta: "#b49a68", original: "#5b6575" },
 };
 
 /** Las vistas estándar: la dirección de T a C. */
@@ -1154,12 +1156,13 @@ export class Vista3D extends Vista {
       const C = (this.malla.geometry.getAttribute("color") as BufferAttribute).array as Uint8Array;
       const bytes = (c: [number, number, number]) => [Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255)];
       const [baseB, baseTB, plB, plTB, acB] = [base.map(bytes), baseT.map(bytes), porPlanta.map(bytes), porPlantaT.map(bytes), bytes(acento)];
+      const [casB, casTB] = [bytes(rgb(c.caseton)), bytes(tenue(rgb(c.caseton)))];
       const planta = this.color === "planta";
       for (let t = 0; t < x.objeto.length; t++) {
         const o = x.objeto[t]!;
         const p = x.planta[t]!;
         const fuera = ia >= 0 && p !== ia;
-        const cc = elegido[o] ? acB : planta && x.objetos[o]!.tipo !== "apoyo" ? (fuera ? plTB[p]! : plB[p]!) : fuera ? baseTB[o]! : baseB[o]!;
+        const cc = elegido[o] ? acB : x.caseton[t] ? (fuera ? casTB : casB) : planta && x.objetos[o]!.tipo !== "apoyo" ? (fuera ? plTB[p]! : plB[p]!) : fuera ? baseTB[o]! : baseB[o]!;
         for (let v = 0; v < 9; v += 3) {
           C[9 * t + v] = cc[0]!;
           C[9 * t + v + 1] = cc[1]!;

@@ -552,7 +552,7 @@ export class Sesion {
    */
   solido(): Solido {
     const x = (this.solidoC ??= solido(this.proyecto.modelo, this.origen3D, this.compilado));
-    return { ...x, triangulos: x.triangulos.slice(), objeto: x.objeto.slice(), planta: x.planta.slice(), aristas: x.aristas.slice(), objetoArista: x.objetoArista.slice(), plantaArista: x.plantaArista.slice() };
+    return { ...x, triangulos: x.triangulos.slice(), objeto: x.objeto.slice(), planta: x.planta.slice(), caseton: x.caseton.slice(), aristas: x.aristas.slice(), objetoArista: x.objetoArista.slice(), plantaArista: x.plantaArista.slice() };
   }
 
   /** Las cargas de un caso en el 3D (tras I4): sólo necesitan el modelo físico. */
