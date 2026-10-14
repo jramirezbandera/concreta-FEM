@@ -14,7 +14,7 @@
  *   o un muro paralelos, donde el compilador no pone vigueta, o el sobrante del ancho). Sin
  *   compilar, una placa del canto de la vigueta (y una nota).
  * - Viga: su sección a lo largo de cada tramo, con la cara superior en c y los tramos rectos unidos
- *   a inglete. Bajo una losa o un paño se dibuja sólo lo que queda bajo su cara inferior (C2-g): las
+ *   a inglete, también los de dos vigas que acaban en el mismo punto. Bajo una losa o un paño se dibuja sólo lo que queda bajo su cara inferior (C2-g): las
  *   rectangulares, por la parte de su huella que cubre la losa (como el peso de A3); las demás, por
  *   su eje.
  * - Pilar: la huella de su sección (la de cada tramo, con su giro) de la cota de su base a la de su
@@ -505,6 +505,79 @@ export function huellasInglete(t: readonly Tramo[], b: number, cerrada: boolean)
   });
 }
 
+/** Distancia a la que dos extremos de viga son el mismo punto, m. */
+const JUNTA = 1e-6;
+
+/**
+ * Las huellas de las vigas de una planta (las de `huellasInglete` de cada una), unidas también entre
+ * vigas: donde se encuentran justo dos extremos (de dos vigas o los dos de una), cada una se corta
+ * por la recta que pasa por el punto y por el cruce del borde izquierdo de cada una con el derecho
+ * de la otra, mirando las dos desde él. Así una esquina de zunchos no deja el cuarto exterior sin
+ * dibujar. Con el mismo ancho es la bisectriz y el área de cada una sigue siendo b·L; con anchos
+ * distintos, la suma de las dos. Como en `huellasInglete`, a menos de 60° entre ellas o alineadas se
+ * quedan a escuadra, y también si el corte pasa de la mitad del tramo.
+ */
+export function huellasVigas(vigas: readonly { puntos: readonly Vec2[]; b: number }[]): Vec2[][][] {
+  const tr = vigas.map((v) => tramosDe(v.puntos));
+  const hs = vigas.map((v, i) => huellasInglete(tr[i]!, v.b, false));
+  // Cada extremo, con la dirección en la que sale la viga de él
+  type Extremo = { i: number; fin: boolean; O: Vec2; u: Vec2; w: number; L: number };
+  const ex: Extremo[] = [];
+  tr.forEach((t, i) => {
+    if (!t.length) return;
+    const [a, z] = [t[0]!, t[t.length - 1]!];
+    const w = vigas[i]!.b / 2;
+    ex.push({ i, fin: false, O: a.A, u: a.d, w, L: a.L }, { i, fin: true, O: z.B, u: [-z.d[0], -z.d[1]], w, L: z.L });
+  });
+  ex.sort((p, q) => p.O[0] - q.O[0] || p.O[1] - q.O[1]);
+  const visto = new Uint8Array(ex.length);
+  /** Sus dos esquinas en el corte, desde el punto (izquierda y derecha mirando según u), o null si el corte pasa de medio tramo. */
+  const esquinas = (e: Extremo, o: Extremo): [Vec2, Vec2] | null => {
+    const [n, m]: Vec2[] = [[-e.u[1], e.u[0]], [-o.u[1], o.u[0]]];
+    const det = n[0]! * m[1]! - n[1]! * m[0]!;
+    // X con n·X = a y m·X = b: el borde a de esta, el b de la otra
+    const X = (a: number, b: number): Vec2 => [(a * m[1]! - b * n[1]!) / det, (n[0]! * b - m[0]! * a) / det];
+    const [izq, der] = [X(e.w, -o.w), X(-e.w, o.w)];
+    const lejos = Math.max(izq[0] * e.u[0] + izq[1] * e.u[1], der[0] * e.u[0] + der[1] * e.u[1]);
+    return lejos > e.L / 2 ? null : [izq, der];
+  };
+  for (let p = 0; p < ex.length; p++) {
+    if (visto[p]) continue;
+    const grupo = [p];
+    for (let q = p + 1; q < ex.length && ex[q]!.O[0] - ex[p]!.O[0] <= JUNTA; q++)
+      if (!visto[q] && Math.abs(ex[q]!.O[1] - ex[p]!.O[1]) <= JUNTA) grupo.push(q);
+    for (const q of grupo) visto[q] = 1;
+    if (grupo.length !== 2) continue;
+    const [e1, e2] = [ex[grupo[0]!]!, ex[grupo[1]!]!];
+    const cruz = e1.u[0] * e2.u[1] - e1.u[1] * e2.u[0];
+    if (Math.abs(cruz) < 1e-9 || e1.u[0] * e2.u[0] + e1.u[1] * e2.u[1] > 0.5) continue;
+    const [c1, c2] = [esquinas(e1, e2), esquinas(e2, e1)];
+    if (!c1 || !c2) continue;
+    for (const [e, [izq, der]] of [[e1, c1], [e2, c2]] as const) {
+      const h = hs[e.i]!;
+      const P = (x: Vec2): Vec2 => [e.O[0] + x[0], e.O[1] + x[1]];
+      // La huella es [A der., B der., B izq., A izq.] según su tramo; en el final, la viga sale al revés
+      if (!e.fin) [h[0]![0], h[0]![3]] = [P(der), P(izq)];
+      else [h[h.length - 1]![2], h[h.length - 1]![1]] = [P(der), P(izq)];
+    }
+  }
+  return hs;
+}
+
+/** Las huellas de las vigas rectangulares del modelo por su id, unidas por planta con `huellasVigas`. */
+export function huellasVigasDe(f: ModeloFisico): Map<string, Vec2[][]> {
+  const seccion = new Map(f.secciones.map((s) => [s.id, s]));
+  const porPlanta = new Map<string, { id: string; puntos: Vec2[]; b: number }[]>();
+  for (const v of porId(f.vigas)) {
+    const sec = seccion.get(v.seccion);
+    const fs = sec && esRectangular(sec) ? formaSeccion(sec) : null;
+    if (fs) porPlanta.set(v.planta, [...(porPlanta.get(v.planta) ?? []), { id: v.id, puntos: v.puntos as Vec2[], b: fs.b }]);
+  }
+  const r = new Map<string, Vec2[][]>();
+  for (const vs of porPlanta.values()) huellasVigas(vs).forEach((h, i) => r.set(vs[i]!.id, h));
+  return r;
+}
+
 /** Lo que tapa una pieza en una planta: losas y paños, con su región y lo que ocupan bajo la cota. */
 interface Tapa {
   id: string;
@@ -642,6 +715,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
   }
 
   // Vigas: con la cara superior en la cota; bajo una losa o un paño, sólo lo que queda debajo
+  const huellasV = huellasVigasDe(f);
   for (const v of porId(f.vigas)) {
     const k = indice.get(v.planta);
     const zc = cota(k);
@@ -653,7 +727,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const caras: Cara[] = [];
     const S = fs.poligono.map(([x, u]) => [x, u - fs.h / 2] as Vec2);
     if (esRectangular(sec)) {
-      const hs = huellasInglete(tr, fs.b, false);
+      const hs = huellasV.get(v.id)!;
       tr.forEach((t, i) => {
         const ts = tapasCerca(k, [hs[i]!]);
         prismas(

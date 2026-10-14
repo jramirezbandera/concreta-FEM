@@ -21,7 +21,7 @@ import { edificioGeometria, FAMILIAS } from "../pruebas/geometrias.ts";
 import { edificioObjetivoMuros, reticulaConNucleo } from "../../validacion/c3/modelos.ts";
 import { edificioReticular, edificioUnidireccional } from "../../validacion/c4/modelos.ts";
 import { alambrico } from "./alambrico.ts";
-import { aristasDe, formaSeccion, huellaPilarSolido, huellasInglete, LADO_SIN_FORMA, piezasSolido, recortarBanda, solido, tramosDe, volumen, type CompiladoSolido, type PiezaSolida } from "./solido.ts";
+import { aristasDe, formaSeccion, huellaPilarSolido, huellasInglete, huellasVigas, huellasVigasDe, LADO_SIN_FORMA, piezasSolido, recortarBanda, solido, tramosDe, volumen, type CompiladoSolido, type PiezaSolida } from "./solido.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const leer = (r: string): ModeloFisico => JSON.parse(readFileSync(join(RAIZ, r), "utf8")).modelo;
@@ -173,7 +173,7 @@ function esperado(f: ModeloFisico, p: PiezaSolida, compilado: CompiladoSolido | 
     const L = tr.reduce((t, x) => t + x.L, 0);
     let quitado = 0;
     if (s.forma === "rectangular" || s.forma === "general") {
-      const hs = huellasInglete(tr, fs.b, false);
+      const hs = huellasVigasDe(f).get(v.id)!;
       for (const h of hs) for (const x of tapas) quitado += momentosInterseccion(x.region, h).A * Math.min(fs.h, x.e);
     } else {
       const S = fs.poligono.map(([a, u]) => [a, u - fs.h / 2] as Vec2);
@@ -322,13 +322,14 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
     };
     const P = new Plantas(g);
     const a3 = pesoPropioEsperado(g, P);
+    const huellasV = huellasVigasDe(f);
     const gamma = (p: PiezaSolida) => {
       const id = p.tipo === "losa" ? g.losas!.find((x) => x.id === p.id)?.material : p.tipo === "muro" ? f.muros!.find((x) => x.id === p.id)!.material : p.seccion ? f.secciones.find((x) => x.id === p.seccion)!.material : null;
       const m = f.materiales.find((x) => x.id === id);
       return m ? gammaMaterial(m) : 0;
     };
     for (const [k, x] of a3.entries()) {
-      const suma = { pilares: 0, vigas: 0, losas: 0, muros: 0, quitadoVigas: 0 };
+      const suma = { pilares: 0, vigas: 0, losas: 0, muros: 0, quitadoVigas: 0, juntas: 0 };
       for (const p of piezas) {
         if (p.planta !== k || p.tipo === "pano" || p.tipo === "apoyo") continue;
         if (p.tipo === "losa" && !g.losas!.some((l) => l.id === p.id)) continue;
@@ -340,7 +341,15 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
         else if (p.tipo === "viga") {
           suma.vigas += bruto;
           const s = f.secciones.find((y) => y.id === p.seccion)!;
-          if (s.forma === "rectangular" && f.materiales.find((y) => y.id === s.material)!.tipo === "hormigon") suma.quitadoVigas += esperado(f, p, comp, g)!.quitado * w;
+          if (s.forma === "rectangular" && f.materiales.find((y) => y.id === s.material)!.tipo === "hormigon") {
+            suma.quitadoVigas += esperado(f, p, comp, g)!.quitado * w;
+            // A3 no une las vigas entre sí: lo que cambia el solape por unirlas en sus extremos
+            const v = f.vigas!.find((y) => y.id === p.id)!;
+            const fs = formaSeccion(s)!;
+            const solas = huellasInglete(tramosDe(v.puntos), fs.b, false);
+            for (const x of tapasDe(g, v.planta))
+              for (const [hs, signo] of [[huellasV.get(v.id)!, 1], [solas, -1]] as const) for (const h of hs) suma.juntas += signo * momentosInterseccion(x.region, h).A * Math.min(fs.h, x.e) * w;
+          }
         } else if (p.tipo === "losa") suma.losas += bruto;
         else if (p.tipo === "muro") suma.muros += bruto;
       }
@@ -348,7 +357,7 @@ describe.each(MODELOS)("I3: el sólido de %s", (_nombre, modelo) => {
       for (const t of ["pilares", "vigas", "losas", "muros"] as const) expect(Math.abs(suma[t] - x[t]), `${que}: ${t}`).toBeLessThan(1e-9 * Math.max(1, x[t]));
       // Sin muros, los solapes de A3 son sólo los de C2-g. A3 los mide con la huella a escuadra de cada tramo, y el dibujo une los quiebros a inglete
       const quiebros = (f.vigas ?? []).some((v) => v.planta === x.planta && v.puntos.length > 2);
-      if (!(f.muros ?? []).length) expect(Math.abs(suma.quitadoVigas - x.solapes), `${que}: solapes`).toBeLessThan((quiebros ? 5e-3 : 1e-9) * Math.max(1, x.solapes));
+      if (!(f.muros ?? []).length) expect(Math.abs(suma.quitadoVigas - suma.juntas - x.solapes), `${que}: solapes`).toBeLessThan((quiebros ? 5e-3 : 1e-9) * Math.max(1, x.solapes));
     }
   });
 
@@ -446,5 +455,68 @@ describe("I3: las viguetas de un paño", () => {
     // Las caras del alma (bw = 0,12) de cada vigueta, a su eje ± 0,06
     for (const x of ejes) for (const s of [-1, 1]) expect(xs.has(Math.round((x + s * 0.06) * 1e6)), `vigueta en ${x}`).toBe(true);
     expect(xs.has(Math.round(12.06 * 1e6))).toBe(false);
+  });
+});
+
+describe("I3: vigas que se encuentran en sus extremos", () => {
+  const dentro = (q: Vec2, hs: readonly (readonly Vec2[])[]) => hs.filter((h) => puntoEnPoligono(q, h as Vec2[]) && distanciaABorde(q, h as Vec2[]) > 1e-9).length;
+
+  it("en una esquina a 90°, a inglete: sin el cuarto exterior vacío, sin solaparse y cada una con su b·L", () => {
+    // La esquina de la vivienda: Z-CUB-1 y Z-CUB-2, una por lado
+    const [h1, h2] = huellasVigas([
+      { puntos: [[0, 0], [4.26, 0]], b: 0.3 },
+      { puntos: [[4.26, 0], [4.26, 15.67]], b: 0.3 },
+    ]).map((h) => h[0]!) as [Vec2[], Vec2[]];
+    expect(rel(areaPol(h1), 0.3 * 4.26)).toBeLessThan(1e-12);
+    expect(rel(areaPol(h2), 0.3 * 15.67)).toBeLessThan(1e-12);
+    expect(dentro([4.26 + 0.12, -0.08], [h1, h2])).toBe(1); // el cuarto exterior, que faltaba
+    expect(dentro([4.26 - 0.12, 0.08], [h1, h2])).toBe(1); // el interior, que se solapaba
+    expect(dentro([4.26 + 0.1, -0.05], [h1])).toBe(0);
+    expect(dentro([4.26 + 0.05, -0.1], [h2])).toBe(0);
+  });
+
+  it("con anchos distintos, por los cruces de sus bordes: la suma de las dos áreas, sin hueco ni solape", () => {
+    const [h1, h2] = huellasVigas([
+      { puntos: [[0, 0], [5, 0]], b: 0.3 },
+      { puntos: [[0, 4], [0, 0]], b: 0.5 },
+    ]).map((h) => h[0]!) as [Vec2[], Vec2[]];
+    expect(rel(areaPol(h1) + areaPol(h2), 0.3 * 5 + 0.5 * 4)).toBeLessThan(1e-12);
+    for (const q of [[-0.2, -0.1], [-0.05, -0.14], [0.2, 0.1], [0.05, 0.14], [-0.24, 0.01]] as Vec2[]) expect(dentro(q, [h1, h2]), `${q}`).toBe(1);
+  });
+
+  it("en ángulo cualquiera, el corte pasa por el punto y cada una sigue con su b·L; a menos de 60°, a escuadra", () => {
+    const a = (40 * Math.PI) / 180;
+    const [h1, h2] = huellasVigas([
+      { puntos: [[0, 0], [3, 0]], b: 0.3 },
+      { puntos: [[0, 0], [3 * Math.cos(2 * a), 3 * Math.sin(2 * a)]], b: 0.3 },
+    ]).map((h) => h[0]!) as [Vec2[], Vec2[]];
+    expect(rel(areaPol(h1), 0.9)).toBeLessThan(1e-12);
+    expect(rel(areaPol(h2), 0.9)).toBeLessThan(1e-12);
+    const agudo = huellasVigas([
+      { puntos: [[0, 0], [3, 0]], b: 0.3 },
+      { puntos: [[0, 0], [3, 1]], b: 0.3 },
+    ]);
+    expect(agudo[0]![0]).toEqual(huellasInglete(tramosDe([[0, 0], [3, 0]]), 0.3, false)[0]);
+  });
+
+  it("alineadas, o con tres extremos en el punto, no cambian", () => {
+    const vs = [
+      { puntos: [[0, 0], [4, 0]] as Vec2[], b: 0.3 },
+      { puntos: [[4, 0], [8, 0]] as Vec2[], b: 0.3 },
+      { puntos: [[4, 0], [4, 5]] as Vec2[], b: 0.3 },
+    ];
+    const solas = vs.map((v) => huellasInglete(tramosDe(v.puntos), v.b, false));
+    expect(huellasVigas(vs)).toEqual(solas);
+    expect(huellasVigas(vs.slice(0, 2))).toEqual(solas.slice(0, 2));
+  });
+
+  it("en el sólido de la vivienda, la esquina de Z-CUB-1 y Z-CUB-2 se cierra", () => {
+    const f = leer("ejemplos/vivienda/proyecto.json");
+    const ps = piezasSolido(f).piezas;
+    // Bajo la cara inferior de la losa, en el cuarto exterior de la esquina (4,26; 0), hay viga
+    const z = cotasPlantas(f.plantas)[f.plantas.findIndex((p) => p.id === "CUB")]!;
+    const vs = ps.filter((p) => p.id === "Z-CUB-1" || p.id === "Z-CUB-2");
+    const xs = vs.flatMap((p) => p.caras.flatMap((c) => c.p.filter((v) => v[2] < z - 1e-9).map((v) => [v[0], v[1]] as Vec2)));
+    expect(xs.some((v) => Math.abs(v[0] - 4.41) < 1e-9 && Math.abs(v[1] + 0.15) < 1e-9)).toBe(true);
   });
 });
