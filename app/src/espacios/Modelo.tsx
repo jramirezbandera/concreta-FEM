@@ -15,7 +15,7 @@
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ListOrdered, Trash2 } from "lucide-react";
+import { ChevronRight, ListOrdered, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcAbacos, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
@@ -35,6 +35,8 @@ import { usePedido } from "../sesion/usePedido.ts";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
 const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "forjados", "apoyos", "apoyosLineales", "cargas"]);
+/** El icono de cada tipo en el navegador (los de la barra de herramientas). */
+const ICONO_TABLA: Partial<Record<NombreTabla, Icono>> = { pilares: IcPilar, vigas: IcViga, forjados: IcLosa, muros: IcMuro, apoyos: IcApoyo, apoyosLineales: IcApoyoLineal, ejes: IcEjes, cargas: IcCarga };
 /** La escala de las cargas en el alzado y el 3D (por la que se multiplica la automática). */
 const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
 type Escala = (typeof ESCALAS)[number];
@@ -312,8 +314,9 @@ function Objetos({ tablas }: { tablas: NombreTabla[] }) {
     <Seccion titulo="Objetos" valor={planta ? `en ${planta}` : undefined}>
       {porTabla.map(({ t, total, aqui }) => {
         const abierto = abiertos.has(t);
+        const I = ICONO_TABLA[t];
         return (
-          <div key={t}>
+          <div key={t} className="arbol-grupo" data-abierto={abierto}>
             <button
               type="button"
               className="arbol-fila"
@@ -327,9 +330,12 @@ function Objetos({ tablas }: { tablas: NombreTabla[] }) {
                 })
               }
             >
-              <span className="w-3 text-text-disabled" aria-hidden="true">
-                {abierto ? "▾" : "▸"}
-              </span>
+              <ChevronRight size={14} className="giro" aria-hidden="true" />
+              {I && (
+                <span className="ico">
+                  <I size={15} />
+                </span>
+              )}
               {DEF_TABLAS[t].titulo}
               <span className="n">{aqui.length === total ? total : `${aqui.length} de ${total}`}</span>
             </button>
@@ -411,9 +417,9 @@ function DatosProyecto() {
     setDescripcion(null);
   };
   return (
-    <div className="flex flex-col gap-1.5 px-3.5 py-2">
-      <input className="sel w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600 }} aria-label="Nombre del proyecto" placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
-      <textarea className="sel w-full" style={{ height: 52, padding: 6, fontFamily: "var(--font-sans)", fontSize: 12, resize: "vertical" }} aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={escribir} />
+    <div className="flex flex-col gap-0.5 px-2 pb-2">
+      <input className="sel en-sitio w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 600 }} aria-label="Nombre del proyecto" placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+      <textarea className="sel en-sitio w-full" style={{ height: 56, padding: "5px 6px", fontFamily: "var(--font-sans)", fontSize: 12, lineHeight: 1.45, resize: "vertical" }} aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={escribir} />
     </div>
   );
 }

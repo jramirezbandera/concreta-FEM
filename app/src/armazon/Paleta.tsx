@@ -4,6 +4,7 @@
  * Los objetos del proyecto salen al escribir: elegir uno lo elige en el dibujo.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Search } from "lucide-react";
 
 export interface Orden {
   id: string;
@@ -54,6 +55,8 @@ export function Paleta({ ordenes, objetos, onCerrar }: { ordenes: Orden[]; objet
   return (
     <div className="paleta-fondo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()}>
       <div className="paleta" role="dialog" aria-modal="true" aria-label="Paleta de órdenes">
+        <div className="paleta-busca">
+          <Search size={17} aria-hidden="true" />
         <input
           ref={entrada}
           value={q}
@@ -83,12 +86,13 @@ export function Paleta({ ordenes, objetos, onCerrar }: { ordenes: Orden[]; objet
             }
           }}
         />
+        </div>
         {vistas.length ? (
           <ul id="paleta-lista" ref={listaRef} role="listbox" aria-label="Órdenes">
             {vistas.map((o, k) => (
               <li key={o.id} id={`paleta-${k}`} data-i={k} role="option" aria-selected={k === sel} onMouseEnter={() => setI(k)} onMouseDown={(e) => e.preventDefault()} onClick={() => hacer(o)}>
                 <span className="grupo">{o.grupo}</span>
-                <span className="truncate">{o.nombre}</span>
+                <span className="nombre truncate">{o.nombre}</span>
                 {o.atajo && <span className="atajo">{o.atajo}</span>}
               </li>
             ))}
@@ -96,6 +100,17 @@ export function Paleta({ ordenes, objetos, onCerrar }: { ordenes: Orden[]; objet
         ) : (
           <p className="vacia">Nada con «{q}».</p>
         )}
+        <div className="paleta-pie" aria-hidden="true">
+          <span>
+            <kbd>↑↓</kbd>moverse
+          </span>
+          <span>
+            <kbd>Intro</kbd>abrir
+          </span>
+          <span>
+            <kbd>Esc</kbd>cerrar
+          </span>
+        </div>
       </div>
     </div>
   );

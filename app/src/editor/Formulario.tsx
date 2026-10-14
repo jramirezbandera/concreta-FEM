@@ -76,7 +76,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
           const opciones = c.opciones && !c.calculada ? c.opciones(ctx) : null;
           return (
             <label key={c.clave} className="campo">
-              <span>
+              <span title={c.ayuda}>
                 {c.titulo}
                 {c.unidad && <small>{c.unidad}</small>}
               </span>
@@ -120,7 +120,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                   }}
                 />
               )}
-              {err ? <p className="text-state-fail" style={{ color: "var(--color-state-fail)" }}>{err}</p> : c.ayuda ? <p>{c.ayuda}</p> : null}
+              {err ? <p className="error">{err}</p> : c.ayuda ? <p className="ayuda">{c.ayuda}</p> : null}
             </label>
           );
         })}

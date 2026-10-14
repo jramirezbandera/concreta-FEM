@@ -4,7 +4,7 @@
  * lo que se edita por tablas son un formulario (`FormularioObjeto`); desde V2b, todo el modelo
  * físico (sin tablas, sólo un proyecto de sólo lectura).
  */
-import { X } from "lucide-react";
+import { Crosshair, X } from "lucide-react";
 import { ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
@@ -52,16 +52,17 @@ export function Inspector({ id }: { id: string }) {
 
   return (
     <>
-      <div className="flex items-center gap-2 border-b border-border-sub px-3.5 py-2.5">
+      <div className="insp-cab">
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-disabled">{o ? etiquetaTipo(o) : "objeto"}</div>
-          <div className="mono truncate text-[14px] font-medium">{id}</div>
+          <div className="insp-tipo">{o ? etiquetaTipo(o) : "objeto"}</div>
+          <div className="insp-id mono truncate">{id}</div>
         </div>
-        <button type="button" className="btn" onClick={localizar} disabled={!o && !tabla}>
+        <button type="button" className="btn" onClick={localizar} disabled={!o && !tabla} title="Ir a la planta del objeto">
+          <Crosshair size={14} />
           Localizar
         </button>
-        <button type="button" className="btn" style={{ width: 28, padding: 0 }} aria-label="Cerrar" onClick={() => setSeleccion(null)}>
-          <X size={14} />
+        <button type="button" className="ib" style={{ width: 28, height: 28 }} aria-label="Cerrar" title="Soltar (Esc)" onClick={() => setSeleccion(null)}>
+          <X size={16} />
         </button>
       </div>
       {ed && tabla && <FormularioObjeto id={id} tabla={tabla} />}

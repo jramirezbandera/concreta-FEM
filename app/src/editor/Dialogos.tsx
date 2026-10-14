@@ -4,6 +4,7 @@
  * los ábacos en los pilares de un reticular.
  */
 import { useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { copiarAPlantas, objetosDePlanta } from "../../../src/editor/edicion.ts";
 import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
@@ -18,8 +19,13 @@ function Dialogo({ titulo, children, pie, onCerrar }: { titulo: string; children
   return (
     <div className="dialogo-fondo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()} onKeyDown={(e) => e.key === "Escape" && onCerrar()}>
       <div className="dialogo" role="dialog" aria-modal="true" aria-label={titulo}>
-        <h2>{titulo}</h2>
-        <div className="px-4 py-3 text-[12.5px]">{children}</div>
+        <div className="dialogo-cab">
+          <h2>{titulo}</h2>
+          <button type="button" className="ib" style={{ width: 28, height: 28 }} aria-label="Cerrar" title="Cerrar (Esc)" onClick={onCerrar}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="dialogo-cuerpo">{children}</div>
         <div className="pie">{pie}</div>
       </div>
     </div>
@@ -74,28 +80,38 @@ export function DialogoBorrar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
       }
     >
       {usos.length === 0 ? (
-        <p>Nada más usa {ids.length > 1 ? "estos objetos" : "este objeto"}. Se puede deshacer con Ctrl+Z.</p>
+        <p>
+          Nada más usa {ids.length > 1 ? "estos objetos" : "este objeto"}. <span className="text-text-secondary">Se puede deshacer con Ctrl+Z.</span>
+        </p>
       ) : (
         <>
           <p>
             {porObjeto.size} objeto{porObjeto.size > 1 ? "s usan" : " usa"} lo que se borra:
           </p>
-          <ul className="mono my-2 max-h-[180px] list-none overflow-y-auto rounded border border-border-sub p-2 text-[11.5px]">
+          <ul className="dlg-lista">
             {[...porObjeto].map(([id, rs]) => (
               <li key={id}>
                 {nombreColeccion(idx.get(id)!.coleccion)} {id} <span className="text-text-disabled">({rs.join("; ")})</span>
               </li>
             ))}
           </ul>
-          <label className="chk" style={{ padding: 0 }}>
-            <input type="radio" name="modo" checked={modo === "borrar"} onChange={() => setModo("borrar")} /> Borrarlos también {cascada !== null ? `(en total se borran ${cascada} objetos; los tramos de pilar sólo pierden el tramo)` : ""}
+          <label className="opcion">
+            <input type="radio" name="modo" checked={modo === "borrar"} onChange={() => setModo("borrar")} />
+            <span>
+              Borrarlos también
+              {cascada !== null && <small>En total se borran {cascada} objetos; los tramos de pilar sólo pierden el tramo.</small>}
+            </span>
           </label>
-          <label className="chk" style={{ padding: 0 }}>
-            <input type="radio" name="modo" checked={modo === "reasignar"} onChange={() => setModo("reasignar")} /> Pasarlos a otro:
+          <label className="opcion">
+            <input type="radio" name="modo" checked={modo === "reasignar"} onChange={() => setModo("reasignar")} />
+            <span>
+              Pasarlos a otro
+              <small>Lo que los usa pasa a usar el que elija.</small>
+            </span>
           </label>
           {modo === "reasignar" &&
             usados.map((u) => (
-              <label key={u} className="ml-6 flex items-center gap-2 py-1">
+              <label key={u} className="ml-7 mt-2 flex items-center gap-2">
                 <span className="mono w-28 truncate">{u} →</span>
                 <select className="sel flex-1" value={destino[u] ?? candidatos(u)[0] ?? ""} onChange={(e) => setDestino({ ...destino, [u]: e.target.value })}>
                   {candidatos(u).map((c) => (
@@ -145,16 +161,24 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
         </>
       }
     >
-      <label className="chk" style={{ padding: 0 }}>
-        <input type="radio" checked={!entera} onChange={() => setEntera(false)} /> Las filas elegidas: <span className="mono">{ids.length > 6 ? `${ids.slice(0, 6).join(", ")}… (${ids.length})` : ids.join(", ")}</span>
+      <div className="dlg-et" style={{ marginTop: 4 }}>Qué se copia</div>
+      <label className="opcion">
+        <input type="radio" checked={!entera} onChange={() => setEntera(false)} />
+        <span>
+          Lo elegido <span className="mono text-text-secondary">· {ids.length > 6 ? `${ids.slice(0, 6).join(", ")}… (${ids.length})` : ids.join(", ")}</span>
+        </span>
       </label>
-      <label className="chk" style={{ padding: 0 }}>
-        <input type="radio" checked={entera} onChange={() => setEntera(true)} disabled={!planta} /> Toda la planta {planta}: vigas, losas, paños, apoyos, apoyos lineales y sus cargas ({todos.length} objetos)
+      <label className="opcion">
+        <input type="radio" checked={entera} onChange={() => setEntera(true)} disabled={!planta} />
+        <span>
+          Toda la planta {planta} <span className="mono text-text-secondary">· {todos.length} objetos</span>
+          <small>Vigas, losas, paños, apoyos, apoyos lineales y sus cargas.</small>
+        </span>
       </label>
-      <p className="mt-2 text-text-secondary">A las plantas:</p>
-      <div className="grid grid-cols-3 gap-x-3">
+      <div className="dlg-et">A las plantas</div>
+      <div className="fichas">
         {m.plantas.map((x) => (
-          <label key={x.id} className="chk" style={{ padding: 0 }}>
+          <label key={x.id} className="ficha" title={x.nombre}>
             <input
               type="checkbox"
               checked={destinos.has(x.id)}
@@ -165,11 +189,12 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
                 setDestinos(n);
               }}
             />
-            <span className="mono">{x.id}</span>
+            {x.id}
+            {x.id === planta && <small>esta</small>}
           </label>
         ))}
       </div>
-      <p className="mt-2 text-[11.5px] text-text-secondary">Los ids nuevos llevan la planta de destino. Las cargas van a la copia de su viga, su losa o su paño. Los pilares y los muros no se copian: se alargan con su «desde» y su «hasta».</p>
+      <p className="dlg-nota">Los ids nuevos llevan la planta de destino. Las cargas van a la copia de su viga, su losa o su paño. Los pilares y los muros no se copian: se alargan con su «desde» y su «hasta».</p>
       {error && <p className="mt-2 text-state-fail">{error}</p>}
     </Dialogo>
   );
@@ -220,7 +245,7 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
           <p className="mt-2">
             Cambian {porColeccion.map((x) => `${x.n} ${nombreColeccion(x.c)}${x.n > 1 ? (/[aeiou]$/.test(nombreColeccion(x.c)) ? "s" : "es") : ""}`).join(", ")}:
           </p>
-          <ul className="mono my-2 max-h-[180px] list-none overflow-y-auto rounded border border-border-sub p-2 text-[11.5px]">
+          <ul className="dlg-lista">
             {ejemplos.map(([a, b]) => (
               <li key={a}>
                 {a} → {b}
@@ -228,7 +253,7 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
             ))}
             {mapa.size > ejemplos.length && <li className="text-text-disabled">… y {mapa.size - ejemplos.length} más</li>}
           </ul>
-          <p className="text-[11.5px] text-text-secondary">Las cargas y demás referencias siguen a su objeto. Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
+          <p className="dlg-nota">Las cargas y demás referencias siguen a su objeto. Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
         </>
       )}
       {error && <p className="mt-2 text-state-fail">{error}</p>}
@@ -283,7 +308,7 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
       ) : (
         <>
           <p>Un ábaco macizo centrado en cada pilar que llega al forjado, con sus lados según los nervios (la dirección del forjado) y su perpendicular. Quedan en la columna «ábacos» de la tabla Forjados, donde se pueden retocar.</p>
-          <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+          <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
             <label htmlFor="abacos-losa">Forjado</label>
             <select id="abacos-losa" className="sel" value={losa} onChange={(e) => setLosa(e.target.value)}>
               {reticulares.map((l) => (
@@ -308,7 +333,7 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
               {p.fuera.length > 0 && <li className="text-text-secondary">Se salen del forjado (cuenta lo de dentro): {p.fuera.join(", ")}.</li>}
             </ul>
           )}
-          <p className="mt-2 text-[11.5px] text-text-secondary">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
+          <p className="dlg-nota">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
         </>
       )}
       {error && <p className="mt-2 text-state-fail">{error}</p>}

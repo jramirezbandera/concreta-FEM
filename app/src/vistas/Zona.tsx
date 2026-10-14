@@ -9,7 +9,7 @@
  * (`Fuente2D`, `Fuente3D`); también pintan lo que va en el DOM de la celda (la leyenda, un aviso).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BookmarkPlus, Box, BoxSelect, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
+import { BookmarkPlus, Box, BoxSelect, ChevronDown, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
 import type { EntradaLeyenda, Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
@@ -750,8 +750,8 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
   const [ver, setVer] = useState(abierta);
   return (
     <div className="leyenda-vista scroll-hide" data-abierta={ver}>
-      <button type="button" className="flex w-full items-center justify-between px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-disabled" onClick={() => setVer((x) => !x)} aria-expanded={ver}>
-        Leyenda <span aria-hidden="true">{ver ? "−" : "+"}</span>
+      <button type="button" className="leyenda-cab" onClick={() => setVer((x) => !x)} aria-expanded={ver}>
+        Leyenda <ChevronDown size={13} aria-hidden="true" className="giro" />
       </button>
       {ver && (
         <div className="px-2.5 pb-2">
