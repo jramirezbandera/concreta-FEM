@@ -35,7 +35,7 @@ Seis piezas, de la más barata a la más cara. Cada una es opcional para el mode
   - macizo: canto;
   - reticular: canto (casetón + capa), intereje, nervio, casetón (perdido o recuperable) y, si es perdido, su peso de la zona aligerada; ábacos (tamaño);
   - unidireccional: tipo de vigueta, intereje, canto, pp.
-- Bordes: vuelos y petos (en **kN/m**: si dan kN/m², pedir la altura).
+- Bordes: **todo borde de forjado lleva zuncho** (viga de atado de 20–40 cm, lo normal 30 con el canto del forjado; corrección del usuario en la vivienda, 2026-10-15: el agente no lo puso porque el plano de arquitectura no lo dibuja); vuelos y petos (en **kN/m**: si dan kN/m², pedir la altura).
 - Cargas: permanentes por zona, uso con su categoría (para ψ), nieve (valor), y si se dejan viento y sismo para después.
 - Lo dudoso del dibujo (piezas que pueden no ser estructurales): preguntarlo con su lectura propuesta.
 

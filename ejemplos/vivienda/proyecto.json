@@ -230,6 +230,102 @@
     ],
     "vigas": [
       {
+        "id": "Z-CUB-1",
+        "planta": "CUB",
+        "puntos": [[0, 0], [4.26, 0]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-2",
+        "planta": "CUB",
+        "puntos": [[4.26, 0], [4.26, 15.67]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-3",
+        "planta": "CUB",
+        "puntos": [[4.26, 15.67], [0, 15.67]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-4",
+        "planta": "CUB",
+        "puntos": [[0, 15.67], [0, 15.05]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-5",
+        "planta": "CUB",
+        "puntos": [[0, 15.05], [-8.8, 15.05]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-6",
+        "planta": "CUB",
+        "puntos": [[-8.8, 15.05], [-8.8, 12.99]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-7",
+        "planta": "CUB",
+        "puntos": [[-8.8, 12.99], [-5.75, 12.99]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-8",
+        "planta": "CUB",
+        "puntos": [[-5.75, 12.99], [-5.75, 8.79]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-9",
+        "planta": "CUB",
+        "puntos": [[-5.75, 8.79], [0, 8.79]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-10",
+        "planta": "CUB",
+        "puntos": [[0, 8.79], [0, 0]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-S-1",
+        "planta": "CUB-S",
+        "puntos": [[4.26, 5.79], [14.26, 5.79]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-S-2",
+        "planta": "CUB-S",
+        "puntos": [[14.26, 5.79], [14.26, 15.67]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-S-3",
+        "planta": "CUB-S",
+        "puntos": [[14.26, 15.67], [9, 15.67]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-S-4",
+        "planta": "CUB-S",
+        "puntos": [[9, 15.67], [9, 14.56]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-S-5",
+        "planta": "CUB-S",
+        "puntos": [[9, 14.56], [4.26, 14.56]],
+        "seccion": "V30x30"
+      },
+      {
+        "id": "Z-CUB-S-6",
+        "planta": "CUB-S",
+        "puntos": [[4.26, 14.56], [4.26, 5.79]],
+        "seccion": "V30x30"
+      },
+      {
         "id": "VPG-1",
         "planta": "CUB-S",
         "puntos": [[4.26, 1.87], [14.26, 1.87]],
@@ -247,18 +343,16 @@
         "id": "L-CUB",
         "planta": "CUB",
         "contorno": [
-          [-0.27, -0.27],
-          [4.41, -0.27],
-          [4.41, 14.82],
-          [4.53, 14.82],
-          [4.53, 15.82],
-          [-0.27, 15.82],
-          [-0.27, 15.32],
-          [-9.07, 15.32],
-          [-9.07, 12.72],
-          [-6.02, 12.72],
-          [-6.02, 8.53],
-          [-0.27, 8.53]
+          [0, 0],
+          [4.26, 0],
+          [4.26, 15.67],
+          [0, 15.67],
+          [0, 15.05],
+          [-8.8, 15.05],
+          [-8.8, 12.99],
+          [-5.75, 12.99],
+          [-5.75, 8.79],
+          [0, 8.79]
         ],
         "espesor": 0.3,
         "material": "HA-30",
@@ -286,7 +380,7 @@
       {
         "id": "L-CUB-S",
         "planta": "CUB-S",
-        "contorno": [[4.11, 5.52], [14.53, 5.52], [14.53, 15.82], [8.73, 15.82], [8.73, 14.82], [4.11, 14.82]],
+        "contorno": [[4.26, 5.79], [14.26, 5.79], [14.26, 15.67], [9, 15.67], [9, 14.56], [4.26, 14.56]],
         "espesor": 0.3,
         "material": "HA-30",
         "pp": 4.5,
@@ -340,7 +434,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[-7.8, 15.32], [-9.07, 15.32], [-9.07, 12.72], [-7.8, 12.72]]
+        "zona": [[-7.8, 15.05], [-8.8, 15.05], [-8.8, 12.99], [-7.8, 12.99]]
       },
       {
         "tipo": "superficie",
@@ -348,7 +442,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[-4.75, 14.05], [-4.75, 15.32], [-6.75, 15.32], [-6.75, 14.05]]
+        "zona": [[-4.75, 14.05], [-4.75, 15.05], [-6.75, 15.05], [-6.75, 14.05]]
       },
       {
         "tipo": "superficie",
@@ -356,7 +450,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[1, 13.56], [1, 15.56], [-0.27, 15.56], [-0.27, 15.32], [-1, 15.32], [-1, 13.56]]
+        "zona": [[1, 13.56], [1, 15.56], [0, 15.56], [0, 15.05], [-1, 15.05], [-1, 13.56]]
       },
       {
         "tipo": "superficie",
@@ -364,7 +458,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[3.26, 15.56], [3.26, 13.56], [4.41, 13.56], [4.41, 14.82], [4.53, 14.82], [4.53, 15.56]]
+        "zona": [[3.26, 15.56], [3.26, 13.56], [4.26, 13.56], [4.26, 15.56]]
       },
       {
         "tipo": "superficie",
@@ -372,7 +466,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[-4.75, 9.79], [-6.02, 9.79], [-6.02, 8.53], [-4.75, 8.53]]
+        "zona": [[-4.75, 9.79], [-5.75, 9.79], [-5.75, 8.79], [-4.75, 8.79]]
       },
       {
         "tipo": "superficie",
@@ -380,7 +474,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[-0.27, 7.79], [1, 7.79], [1, 9.79], [-1, 9.79], [-1, 8.53], [-0.27, 8.53]]
+        "zona": [[0, 7.79], [1, 7.79], [1, 9.79], [-1, 9.79], [-1, 8.79], [0, 8.79]]
       },
       {
         "tipo": "superficie",
@@ -388,7 +482,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[3.26, 9.79], [3.26, 7.79], [4.41, 7.79], [4.41, 9.79]]
+        "zona": [[3.26, 9.79], [3.26, 7.79], [4.26, 7.79], [4.26, 9.79]]
       },
       {
         "tipo": "superficie",
@@ -396,7 +490,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[-0.27, 6.79], [-0.27, 4.79], [1, 4.79], [1, 6.79]]
+        "zona": [[0, 6.79], [0, 4.79], [1, 4.79], [1, 6.79]]
       },
       {
         "tipo": "superficie",
@@ -404,7 +498,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[3.26, 6.79], [3.26, 4.79], [4.41, 4.79], [4.41, 6.79]]
+        "zona": [[3.26, 6.79], [3.26, 4.79], [4.26, 4.79], [4.26, 6.79]]
       },
       {
         "tipo": "superficie",
@@ -412,7 +506,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[-0.27, 2.87], [-0.27, -0.27], [1, -0.27], [1, 2.87]]
+        "zona": [[0, 2.87], [0, 0], [1, 0], [1, 2.87]]
       },
       {
         "tipo": "superficie",
@@ -420,7 +514,7 @@
         "caso": "G",
         "planta": "CUB",
         "q": [0, 0, -3],
-        "zona": [[3.26, 2.87], [3.26, -0.27], [4.41, -0.27], [4.41, 2.87]]
+        "zona": [[3.26, 2.87], [3.26, 0], [4.26, 0], [4.26, 2.87]]
       },
       {
         "tipo": "superficie",
@@ -428,7 +522,7 @@
         "caso": "G",
         "planta": "CUB-S",
         "q": [0, 0, -3],
-        "zona": [[4.11, 13.56], [5.26, 13.56], [5.26, 14.82], [4.11, 14.82]]
+        "zona": [[4.26, 13.56], [5.26, 13.56], [5.26, 14.56], [4.26, 14.56]]
       },
       {
         "tipo": "superficie",
@@ -436,7 +530,7 @@
         "caso": "G",
         "planta": "CUB-S",
         "q": [0, 0, -3],
-        "zona": [[8, 13.56], [10, 13.56], [10, 15.56], [8.73, 15.56], [8.73, 14.82], [8, 14.82]]
+        "zona": [[8, 13.56], [10, 13.56], [10, 15.56], [9, 15.56], [9, 14.56], [8, 14.56]]
       },
       {
         "tipo": "superficie",
@@ -444,7 +538,7 @@
         "caso": "G",
         "planta": "CUB-S",
         "q": [0, 0, -3],
-        "zona": [[13.26, 15.56], [13.26, 13.56], [14.53, 13.56], [14.53, 15.56]]
+        "zona": [[13.26, 15.56], [13.26, 13.56], [14.26, 13.56], [14.26, 15.56]]
       },
       {
         "tipo": "superficie",
@@ -460,7 +554,7 @@
         "caso": "G",
         "planta": "CUB-S",
         "q": [0, 0, -3],
-        "zona": [[13.26, 12.27], [13.26, 10.27], [14.53, 10.27], [14.53, 12.27]]
+        "zona": [[13.26, 12.27], [13.26, 10.27], [14.26, 10.27], [14.26, 12.27]]
       },
       {
         "tipo": "superficie",
@@ -468,7 +562,7 @@
         "caso": "G",
         "planta": "CUB-S",
         "q": [0, 0, -3],
-        "zona": [[4.11, 9.79], [4.11, 7.79], [5.26, 7.79], [5.26, 9.79]]
+        "zona": [[4.26, 9.79], [4.26, 7.79], [5.26, 7.79], [5.26, 9.79]]
       },
       {
         "tipo": "superficie",
@@ -484,7 +578,7 @@
         "caso": "G",
         "planta": "CUB-S",
         "q": [0, 0, -3],
-        "zona": [[4.11, 6.79], [4.11, 5.52], [5.26, 5.52], [5.26, 6.79]]
+        "zona": [[4.26, 6.79], [4.26, 5.79], [5.26, 5.79], [5.26, 6.79]]
       },
       {
         "tipo": "superficie",
@@ -492,7 +586,7 @@
         "caso": "G",
         "planta": "CUB-S",
         "q": [0, 0, -3],
-        "zona": [[6.59, 6.79], [6.59, 5.52], [8.59, 5.52], [8.59, 6.79]]
+        "zona": [[6.59, 6.79], [6.59, 5.79], [8.59, 5.79], [8.59, 6.79]]
       },
       {
         "tipo": "superficie",
@@ -500,7 +594,7 @@
         "caso": "G",
         "planta": "CUB-S",
         "q": [0, 0, -3],
-        "zona": [[13.26, 6.79], [13.26, 5.52], [14.53, 5.52], [14.53, 6.79]]
+        "zona": [[13.26, 6.79], [13.26, 5.79], [14.26, 5.79], [14.26, 6.79]]
       },
       {
         "tipo": "superficie",
@@ -517,35 +611,6 @@
         "planta": "CUB-S",
         "q": [0, 0, -2.5],
         "losa": "L-CUB-S"
-      },
-      {
-        "tipo": "lineal",
-        "id": "PETO-CUB",
-        "caso": "G",
-        "planta": "CUB",
-        "puntos": [
-          [4.41, 5.52],
-          [4.41, -0.27],
-          [-0.27, -0.27],
-          [-0.27, 8.53],
-          [-6.02, 8.53],
-          [-6.02, 12.72],
-          [-9.07, 12.72],
-          [-9.07, 15.32],
-          [-0.27, 15.32],
-          [-0.27, 15.82],
-          [4.53, 15.82],
-          [4.53, 14.82]
-        ],
-        "q": [0, 0, -3]
-      },
-      {
-        "tipo": "lineal",
-        "id": "PETO-CUB-S",
-        "caso": "G",
-        "planta": "CUB-S",
-        "puntos": [[4.11, 5.52], [14.53, 5.52], [14.53, 15.82], [8.73, 15.82], [8.73, 14.82], [4.11, 14.82], [4.11, 5.52]],
-        "q": [0, 0, -3]
       },
       {
         "tipo": "viga",
@@ -594,6 +659,506 @@
         "planta": "CUB-S",
         "q": [0, 0, -0.2],
         "losa": "L-CUB-S"
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-1",
+        "caso": "G",
+        "viga": "Z-CUB-1",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-1",
+        "caso": "G",
+        "viga": "Z-CUB-1",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-1",
+        "caso": "Q",
+        "viga": "Z-CUB-1",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-1",
+        "caso": "N",
+        "viga": "Z-CUB-1",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-2-1",
+        "caso": "G",
+        "viga": "Z-CUB-2",
+        "ejes": "global",
+        "q": [0, 0, -3],
+        "desde": 0,
+        "hasta": 5.79
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-2-2",
+        "caso": "G",
+        "viga": "Z-CUB-2",
+        "ejes": "global",
+        "q": [0, 0, -3],
+        "desde": 14.56,
+        "hasta": 15.67
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-3",
+        "caso": "G",
+        "viga": "Z-CUB-3",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-3",
+        "caso": "G",
+        "viga": "Z-CUB-3",
+        "ejes": "global",
+        "q": [0, 0, -0.375]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-3",
+        "caso": "Q",
+        "viga": "Z-CUB-3",
+        "ejes": "global",
+        "q": [0, 0, -0.15]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-3",
+        "caso": "N",
+        "viga": "Z-CUB-3",
+        "ejes": "global",
+        "q": [0, 0, -0.03]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-4",
+        "caso": "G",
+        "viga": "Z-CUB-4",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-4",
+        "caso": "G",
+        "viga": "Z-CUB-4",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-4",
+        "caso": "Q",
+        "viga": "Z-CUB-4",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-4",
+        "caso": "N",
+        "viga": "Z-CUB-4",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-5",
+        "caso": "G",
+        "viga": "Z-CUB-5",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-5",
+        "caso": "G",
+        "viga": "Z-CUB-5",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-5",
+        "caso": "Q",
+        "viga": "Z-CUB-5",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-5",
+        "caso": "N",
+        "viga": "Z-CUB-5",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-6",
+        "caso": "G",
+        "viga": "Z-CUB-6",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-6",
+        "caso": "G",
+        "viga": "Z-CUB-6",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-6",
+        "caso": "Q",
+        "viga": "Z-CUB-6",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-6",
+        "caso": "N",
+        "viga": "Z-CUB-6",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-7",
+        "caso": "G",
+        "viga": "Z-CUB-7",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-7",
+        "caso": "G",
+        "viga": "Z-CUB-7",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-7",
+        "caso": "Q",
+        "viga": "Z-CUB-7",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-7",
+        "caso": "N",
+        "viga": "Z-CUB-7",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-8",
+        "caso": "G",
+        "viga": "Z-CUB-8",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-8",
+        "caso": "G",
+        "viga": "Z-CUB-8",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-8",
+        "caso": "Q",
+        "viga": "Z-CUB-8",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-8",
+        "caso": "N",
+        "viga": "Z-CUB-8",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-9",
+        "caso": "G",
+        "viga": "Z-CUB-9",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-9",
+        "caso": "G",
+        "viga": "Z-CUB-9",
+        "ejes": "global",
+        "q": [0, 0, -1.475]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-9",
+        "caso": "Q",
+        "viga": "Z-CUB-9",
+        "ejes": "global",
+        "q": [0, 0, -0.26]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-9",
+        "caso": "N",
+        "viga": "Z-CUB-9",
+        "ejes": "global",
+        "q": [0, 0, -0.052]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-10",
+        "caso": "G",
+        "viga": "Z-CUB-10",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-10",
+        "caso": "G",
+        "viga": "Z-CUB-10",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-10",
+        "caso": "Q",
+        "viga": "Z-CUB-10",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-10",
+        "caso": "N",
+        "viga": "Z-CUB-10",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-S-1",
+        "caso": "G",
+        "viga": "Z-CUB-S-1",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-S-1",
+        "caso": "G",
+        "viga": "Z-CUB-S-1",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-S-1",
+        "caso": "Q",
+        "viga": "Z-CUB-S-1",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-S-1",
+        "caso": "N",
+        "viga": "Z-CUB-S-1",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-S-2",
+        "caso": "G",
+        "viga": "Z-CUB-S-2",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-S-2",
+        "caso": "G",
+        "viga": "Z-CUB-S-2",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-S-2",
+        "caso": "Q",
+        "viga": "Z-CUB-S-2",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-S-2",
+        "caso": "N",
+        "viga": "Z-CUB-S-2",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-S-3",
+        "caso": "G",
+        "viga": "Z-CUB-S-3",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-S-3",
+        "caso": "G",
+        "viga": "Z-CUB-S-3",
+        "ejes": "global",
+        "q": [0, 0, -0.375]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-S-3",
+        "caso": "Q",
+        "viga": "Z-CUB-S-3",
+        "ejes": "global",
+        "q": [0, 0, -0.15]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-S-3",
+        "caso": "N",
+        "viga": "Z-CUB-S-3",
+        "ejes": "global",
+        "q": [0, 0, -0.03]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-S-4",
+        "caso": "G",
+        "viga": "Z-CUB-S-4",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-S-4",
+        "caso": "G",
+        "viga": "Z-CUB-S-4",
+        "ejes": "global",
+        "q": [0, 0, -1.575]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-S-4",
+        "caso": "Q",
+        "viga": "Z-CUB-S-4",
+        "ejes": "global",
+        "q": [0, 0, -0.27]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-S-4",
+        "caso": "N",
+        "viga": "Z-CUB-S-4",
+        "ejes": "global",
+        "q": [0, 0, -0.054]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-S-5",
+        "caso": "G",
+        "viga": "Z-CUB-S-5",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-S-5",
+        "caso": "G",
+        "viga": "Z-CUB-S-5",
+        "ejes": "global",
+        "q": [0, 0, -1.475]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-S-5",
+        "caso": "Q",
+        "viga": "Z-CUB-S-5",
+        "ejes": "global",
+        "q": [0, 0, -0.26]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-S-5",
+        "caso": "N",
+        "viga": "Z-CUB-S-5",
+        "ejes": "global",
+        "q": [0, 0, -0.052]
+      },
+      {
+        "tipo": "viga",
+        "id": "PETO-Z-CUB-S-6",
+        "caso": "G",
+        "viga": "Z-CUB-S-6",
+        "ejes": "global",
+        "q": [0, 0, -3]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-G-Z-CUB-S-6",
+        "caso": "G",
+        "viga": "Z-CUB-S-6",
+        "ejes": "global",
+        "q": [0, 0, -0.375]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-Q-Z-CUB-S-6",
+        "caso": "Q",
+        "viga": "Z-CUB-S-6",
+        "ejes": "global",
+        "q": [0, 0, -0.15]
+      },
+      {
+        "tipo": "viga",
+        "id": "TIRA-N-Z-CUB-S-6",
+        "caso": "N",
+        "viga": "Z-CUB-S-6",
+        "ejes": "global",
+        "q": [0, 0, -0.03]
       }
     ]
   }
