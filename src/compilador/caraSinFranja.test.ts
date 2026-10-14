@@ -4,28 +4,34 @@
  * la cara si sigue la malla o por el escalón de F3 desde la línea de apoyo que atraviesa su huella.
  * Antes, la franja sólo tenía allí la estación de apoyo en el eje, sin lo que pasa por la huella, y
  * estaciones de paso por campos pegadas a la esquina: con h = 0,75, el máximo salía un 40 % bajo.
+ *
+ * SP-6 (§10): el corte por la recta de la cara no entraba nunca sin nudos de la huella delante (cortaba
+ * con el enlace, que no la cruza), y los pilares de borde de una losa plana sin vigas, sin recta desde
+ * la que hacer el escalón, se quedaban sin metro (sólo el aviso); en la de H25, las franjas de borde
+ * salían un 37 % bajas.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { losaPlanaFisica, OPCIONES_LOSA_PLANA } from "../../validacion/c2/losaPlana.ts";
 import { edificioReticular } from "../../validacion/c4/modelos.ts";
 import { conAcciones } from "../../validacion/c5/modelos.ts";
 import { calcular } from "../motor/calcular.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { compilar } from "./compilar.ts";
 import { Consultas } from "./consultas.ts";
-import type { OpcionesCompilacion } from "./fisico.ts";
+import type { ModeloFisico, OpcionesCompilacion } from "./fisico.ts";
 
 // 4 × 4 pilares de 40 × 40 con vigas por todos los ejes: ninguno tiene caras de franja
 const fisico = conAcciones(edificioReticular(1, 3, 3));
 const ELU = [1.35, 1.5, 0, 0];
 
-function consultas(opciones: OpcionesCompilacion): Consultas {
-  const c = compilar(fisico, opciones);
+function consultas(opciones: OpcionesCompilacion, f: ModeloFisico = fisico): Consultas {
+  const c = compilar(f, opciones);
   if (!c.valido) throw new Error(c.diagnosticos[0]!.mensaje);
   const k = calcular(c.modelo);
   if (!k.valido) throw new Error(k.diagnosticos[0]!.mensaje);
-  return new Consultas(fisico, c, k.casos, opciones);
+  return new Consultas(f, c, k.casos, opciones);
 }
 
 /** Las estaciones de cara del pilar en las franjas de la dirección 2 que lo tocan, con la superior de ELU. */
@@ -81,4 +87,49 @@ describe("el metro de los pilares sin cara de franja (SP-3, SP-4)", () => {
       }
     }
   }, 120_000);
+});
+
+describe("el corte directo por la cara de un pilar sin cara de franja (SP-6)", () => {
+  // La losa plana de H25: 12 × 12 m, pilares de 0,6 × 0,6 en x, y = 0, 6 y 12 (los de borde, con el
+  // centro en el borde), sin vigas: los de borde no tienen cara de franja ni recta para el escalón
+  const h25 = { ...losaPlanaFisica(), bandas: undefined };
+  const op = (o: OpcionesCompilacion): OpcionesCompilacion => ({ ...OPCIONES_LOSA_PLANA, ...o });
+  /** mx (el único caso) y ancho de las estaciones de cara de P6-0 en la franja X1 (y de 0 a 1). */
+  const metro = (q: Consultas) => {
+    const e = q.franja("LOSA:X1");
+    if (!e.valido) throw new Error("LOSA:X1");
+    return { diag: e.diagnosticos, caras: e.valor.estaciones.filter((x) => x.tipo === "cara" && x.piezas.join() === "P6-0") };
+  };
+
+  it("los pilares de borde de una losa plana tienen su metro en cada cara, a ≤ 15 % de la malla fina", () => {
+    const g = metro(consultas(op({ tamanoMalla: 0.75 }), h25));
+    const f = metro(consultas(op({ tamanoMalla: 0.25, epsSnap: 0.01 }), h25));
+    expect(g.diag.filter((d) => d.codigo === "franja/pilar-sin-cara")).toEqual([]);
+    expect(g.caras.map((x) => [x.s, x.lado])).toEqual([
+      [5.7, -1],
+      [6.3, 1],
+    ]);
+    for (const x of g.caras) {
+      // La ventana de 1 m centrada en el pilar, en la losa: de y = 0 a 0,5
+      expect(x.anchoEnLosa).toBeCloseTo(0.5, 9);
+      const y = f.caras.find((z) => Math.abs(z.s - x.s) < 1e-9)!;
+      expect(x.medios[0]).toBeLessThan(0);
+      expect(Math.abs(x.medios[0]! / y.medios[0]! - 1)).toBeLessThan(0.15);
+    }
+  }, 120_000);
+
+  it("el ancho de un metro por la recta de la cara es el de su ventana en la losa, aunque la recta deje la malla en su extremo", () => {
+    // P0-5, de borde (x = 0) y con la viga de fachada a lo largo: por y = 5,2 la recta sólo sigue la
+    // malla delante de la huella; una lámina la cruza con el centroide fuera de la ventana, el corte no
+    // la ve y el medio salía de 0,2 m en vez de 0,41 (el doble)
+    const q = consultas({}, conAcciones(edificioReticular(1, 2, 2)));
+    const e = q.franja("L-N1:Y1");
+    if (!e.valido) throw new Error("L-N1:Y1");
+    const caras = e.valor.estaciones.filter((x) => x.tipo === "cara" && x.piezas.join() === "P0-5");
+    expect(caras.length).toBe(2);
+    for (const x of caras) {
+      expect(x.ventana).toBeDefined();
+      expect(x.anchoEnLosa).toBeCloseTo(Math.min(x.ventana![1], 12) - Math.max(x.ventana![0], 0), 9);
+    }
+  }, 60_000);
 });

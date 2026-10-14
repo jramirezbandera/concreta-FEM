@@ -55,12 +55,20 @@
  *
  * Un pilar sin cara de franja en una dirección (uno de borde, o uno que atraviesa una viga o un muro
  * según la transversal: `carasFranjas`) tiene también su metro en cada cara (SP-3, SP-4), en las
- * franjas que lo tocan: por la recta de la cara con lo que transmite su enlace, si sigue la malla en
- * su ventana, o por el escalón desde una recta de la malla que atraviese su huella (la línea de apoyo
- * de la viga o el muro, o la cara común de otros pilares de su línea). Entre sus caras no hay estaciones. Antes la franja sólo tenía allí la estación de apoyo en
- * el eje, sin lo que pasa por la huella, y estaciones de paso por campos pegadas a la esquina del
- * pilar, que no convergen: con h = 0,75, el máximo salía hasta un 40 % bajo. Sin ninguna de las dos,
- * el aviso `franja/pilar-sin-cara` de siempre.
+ * franjas que lo tocan: por la recta de la cara, si sigue la malla en su ventana (con lo que transmite
+ * su enlace si tiene nudos delante, F3-d; si no, el corte de la recta, como en las caras de franja), o
+ * por el escalón desde una recta de la malla que atraviese su huella (la línea de apoyo de la viga o el
+ * muro, o la cara común de otros pilares de su línea). Entre sus caras no hay estaciones. Antes la
+ * franja sólo tenía allí la estación de apoyo en el eje, sin lo que pasa por la huella, y estaciones de
+ * paso por campos pegadas a la esquina del pilar, que no convergen: con h = 0,75, el máximo salía hasta
+ * un 40 % bajo. Sin ninguna de las dos, el aviso `franja/pilar-sin-cara` de siempre.
+ *
+ * Por la recta de la cara, sus láminas tienen que cubrir la ventana en la losa (salvo la huella y sus
+ * nudos rígidos): el corte no ve una lámina que cruza la recta con el centroide fuera de su rectángulo,
+ * y el medio salía de medio ancho. Por eso se corta con un margen más allá de la ventana, el mayor con
+ * el que la recta sigue la malla (`margenesCara`). El corte directo y el escalón no miden lo mismo: en
+ * la misma malla difieren un ~5 % por cara, hasta un ±10–13 % en los momentos que dimensionan (SP-6,
+ * `docs/fem3d/spr-abacos.md` §10).
  *
  * Wood–Armer (H34, C5-c a): por combinación, con los momentos medios. Una franja de la dirección 1
  * da la armadura de esa dirección (m*x en sus ejes) y una de la 2, la de la suya.
@@ -161,6 +169,8 @@ export class EsfuerzosFranjas {
   readonly desfase: number;
   /** Sólo para medir F3-d: sin lo que transmite la huella por sus nudos delante de la cara (`false`). */
   readonly huellaDelante: boolean;
+  /** Sólo para medir SP-6: el metro de un pilar sin cara de franja por el escalón aunque su cara siga la malla (`false`). */
+  readonly caraDirecta: boolean;
   private readonly cortes: Cortes;
   private readonly campos: CamposLaminas;
   private readonly franjasDe = new Map<string, Franja[]>();
@@ -171,7 +181,7 @@ export class EsfuerzosFranjas {
    * @param ctx el contexto del modelo físico que se compiló; `compilado`, su modelo analítico y su
    *   mapeo; `casos`, sus resultados (válidos).
    */
-  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; huellaDelante?: boolean } = {}) {
+  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; huellaDelante?: boolean; caraDirecta?: boolean } = {}) {
     this.ctx = ctx;
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
@@ -179,6 +189,7 @@ export class EsfuerzosFranjas {
     this.ancho = opciones.ancho ?? ctx.op.anchoFranja ?? ANCHO_FRANJA;
     this.desfase = opciones.desfase ?? 0;
     this.huellaDelante = opciones.huellaDelante ?? true;
+    this.caraDirecta = opciones.caraDirecta ?? true;
     this.cortes = opciones.cortes ?? new Cortes(this.modelo);
     this.campos = opciones.campos ?? new CamposLaminas(this.modelo);
   }
@@ -407,6 +418,16 @@ export class EsfuerzosFranjas {
     const exactas: number[][] = fr.map(() => []);
     // Ventana de cada pilar de la cara: el ancho nominal centrado en él (F-h)
     const bNominal = anchoNominal(l.losa, this.ancho);
+    /** Margen de los cortes de un pilar más allá de su ventana: mayor que el lado de una lámina (≤ 2h), con ε_snap. */
+    const margenRecta = 2.5 * this.ctx.op.tamanoMalla + this.ctx.op.epsSnap;
+    /**
+     * Por la recta de la cara, márgenes de más a menos: el mayor si la recta sigue la malla en él; si
+     * no, el que alcanza las láminas de los extremos de la ventana sin salir de ella (el corte sólo ve
+     * una lámina con el centroide dentro de su rectángulo).
+     */
+    const margenesCara = [margenRecta, this.ctx.op.tamanoMalla, this.ctx.op.tamanoMalla / 2, EPS];
+    /** Ancho en la losa de la recta s entre t0 y t1. */
+    const anchoVentana = (s: number, [t0, t1]: readonly [number, number]) => (t1 > t0 ? tramosRecta(l.region, d, n, s).reduce((a, [p, q]) => a + Math.max(0, Math.min(q, t1) - Math.max(p, t0)), 0) : 0);
     /**
      * El metro de un pilar en su cara propia sp cuando la común (c.s) cae dentro de su huella (F3): el
      * corte en escalón, por la recta de la cara común a los lados de la huella y por su cara delante
@@ -422,19 +443,45 @@ export class EsfuerzosFranjas {
       const restriccion = enlace.get(p.id)?.id;
       if (restriccion === undefined) return null;
       const sx = c.lado === -1 ? 1 : -1;
+      // El ancho de la ventana en la losa por la cara propia
+      const ancho = anchoVentana(sp, ventana);
       // Sólo el tramo de la recta que puede tocar la ventana o la huella: las láminas que tienen un
-      // nudo en ella, con un margen mayor que su lado (≤ 2h), y los nudos de la huella con ε_snap
-      const margen = soloVentana ? EPS : 2.5 * this.ctx.op.tamanoMalla + this.ctx.op.epsSnap;
-      const rango: [number, number] = [Math.max(T0, Math.min(ventana[0], p.t0) - margen), Math.min(T1, Math.max(ventana[1], p.t1) + margen)];
-      const nod = porNodales(c.s, c.lado, rango[0], rango[1], [ventana], { restriccion, dx: sp === c.s ? 0 : (sp - c.s) * sx });
+      // nudo en ella, con un margen mayor que su lado (≤ 2h), y los nudos de la huella con ε_snap. Por
+      // la recta de la cara (`soloVentana`), con `margenesCara`
+      let rango: [number, number] = [T0, T1];
+      let nod: ReturnType<typeof porNodales> = null;
+      for (const margen of soloVentana ? margenesCara : [margenRecta]) {
+        rango = [Math.max(T0, Math.min(ventana[0], p.t0) - margen), Math.min(T1, Math.max(ventana[1], p.t1) + margen)];
+        nod = porNodales(c.s, c.lado, rango[0], rango[1], [ventana], { restriccion, dx: sp === c.s ? 0 : (sp - c.s) * sx });
+        // Por la recta de la cara, las láminas tienen que cubrir la ventana salvo la huella y sus nudos
+        // rígidos (a ≤ ε_snap): el corte no ve una lámina que cruza la recta con el centroide fuera de
+        // su rectángulo, y el medio salía de medio ancho
+        if (nod && soloVentana && nod.rv[0]!.w + anchoVentana(sp, [Math.max(ventana[0], p.t0 - this.ctx.op.epsSnap), Math.min(ventana[1], p.t1 + this.ctx.op.epsSnap)]) < ancho - EPS) nod = null;
+        if (nod) break;
+      }
       if (!nod) return null;
       const principal = nod.rv[0]!;
       for (let kc = 0; kc < nc; kc++) principal.m[3 * kc]! += nod.resto[kc]!;
-      // El ancho de la ventana en la losa por la cara propia
-      principal.w = tramosRecta(l.region, d, n, sp).reduce((a, [p, q]) => a + Math.max(0, Math.min(q, ventana[1]) - Math.max(p, ventana[0])), 0);
+      principal.w = ancho;
       if (muestras) return { principal, muestras, diag: nod.diag };
       const cam = porCampos(sp + c.lado * DELTA_MUESTRAS, [ventana], rango);
       return { principal, muestras: cam.rv[0]!, diag: [...nod.diag, ...(cam.valido ? [] : cam.diag)] };
+    };
+    /**
+     * El metro de un pilar por la recta sp de una cara sin nudos de su huella delante: el corte por
+     * fuerzas nodales de la recta en su ventana, sin el enlace (no la cruza); my y mxy, por campos a δ.
+     * null si no sigue la malla: también si sus láminas no cubren la ventana en la losa (una que cruza
+     * la recta con el centroide fuera de la ventana no la ve el corte).
+     */
+    const directa = (sp: number, lado: -1 | 1, p: { t0: number; t1: number }, ventana: readonly [number, number]): { principal: PorFranja; muestras: PorFranja; diag: Diagnostico[] } | null => {
+      for (const margen of margenesCara) {
+        const rango: [number, number] = [Math.max(T0, Math.min(ventana[0], p.t0) - margen), Math.min(T1, Math.max(ventana[1], p.t1) + margen)];
+        const nod = porNodales(sp, lado, rango[0], rango[1], [ventana]);
+        if (!nod || nod.rv[0]!.w < anchoVentana(sp, ventana) - EPS) continue;
+        const cam = porCampos(sp + lado * DELTA_MUESTRAS, [ventana], rango);
+        return { principal: nod.rv[0]!, muestras: cam.rv[0]!, diag: [...nod.diag, ...(cam.valido ? [] : cam.diag)] };
+      }
+      return null;
     };
     for (const c of caras) {
       const ventanas = c.pilares.map((p): [number, number] => [(p.t0 + p.t1) / 2 - bNominal / 2, (p.t0 + p.t1) / 2 + bNominal / 2]);
@@ -530,7 +577,9 @@ export class EsfuerzosFranjas {
         // Sin losa al otro lado de la cara (la de fuera de un pilar de borde): sin estación
         const fuera = tramosRecta(l.region, d, n, sp + lado * this.ctx.op.tamanoMalla).reduce((a, [x, y]) => a + Math.max(0, Math.min(y, ventana[1]) - Math.max(x, ventana[0])), 0);
         if (!(fuera > EPS)) continue;
-        let e = escalon({ s: sp, lado }, pz, sp, ventana, undefined, true);
+        // Por la recta de la cara, si sigue la malla en la ventana: con el enlace si tiene nudos delante
+        // (F3-d) y, si no, el corte de la recta, como en las caras de franja (el enlace no la cruza)
+        let e = !this.caraDirecta ? null : conNudosDelante(p.id, { s: sp, lado }) ? escalon({ s: sp, lado }, pz, sp, ventana, undefined, true) : directa(sp, lado, pz, ventana);
         // Desde la más cercana a la cara: en la tira entre las dos, lo que se lleva una viga a lo largo no lo cuenta el corte
         for (const b of [...bases].sort((x, y) => Math.abs(x - sp) - Math.abs(y - sp) || x - y)) e ??= escalon({ s: b, lado }, pz, sp, ventana);
         if (e) hechas.push({ sp, lado, e });
