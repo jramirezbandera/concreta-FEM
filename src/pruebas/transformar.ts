@@ -179,6 +179,7 @@ export function invertirBarras(m: ModeloAnalitico): ModeloAnalitico {
       nudos: [b.nudos[1], b.nudos[0]] as const,
       offsets: b.offsets && { i: b.offsets.j, j: b.offsets.i },
       liberaciones: b.liberaciones && { i: b.liberaciones.j, j: b.liberaciones.i },
+      empotramiento: b.empotramiento && { i: b.empotramiento.j, j: b.empotramiento.i },
     })),
     casos: m.casos.map((c) => ({
       ...c,

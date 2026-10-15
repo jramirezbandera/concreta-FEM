@@ -7,6 +7,11 @@
  * del tramo flexible (globales) → ejes locales (R) → rigidez de Timoshenko con las liberaciones
  * condensadas. Las cargas de barra entran como fuerzas nodales equivalentes −Aᵀ·Rᵀ·r₀, con r₀ las
  * FER condensadas.
+ *
+ * Empotramiento parcial (CY2): la rigidez local efectiva y las FER condensadas son la mezcla
+ * Σ wₖ·(las de la barra con el juego de liberaciones k), con los juegos «tal cual» y «con los giros
+ * de flexión de un extremo, del otro o de los dos liberados» y pesos bilineales en los coeficientes.
+ * Los GDL liberados que se recuperan son sólo los de las liberaciones de verdad.
  */
 import {
   aGlobales,
@@ -48,6 +53,13 @@ export interface BarraPreparada {
   kLocal: Float64Array;
   /** Rigidez local condensada (null si no hay liberaciones: es kLocal). */
   cond: RigidezCondensada | null;
+  /**
+   * Empotramiento parcial (CY2): los términos de la mezcla, con su peso y su condensación (null: la
+   * barra sin liberaciones). null si los dos coeficientes son 1.
+   */
+  mezcla: { peso: number; cond: RigidezCondensada | null }[] | null;
+  /** Rigidez local efectiva: la de la mezcla, o la condensada, o kLocal. */
+  kEfectiva: Float64Array;
   /** Rigidez en ejes globales en los nudos (12×12). */
   kNudos: Float64Array;
   /** GDL de los nudos (12) que la barra rigidiza: filas no nulas de kNudos. */
@@ -140,14 +152,47 @@ export function prepararBarra(b: BarraAnalitica, indice: number, modelo: ModeloA
     lib = [...(li ?? new Array(6).fill(false)), ...(lj ?? new Array(6).fill(false))].map((v) => v === true);
     if (!lib.some(Boolean)) lib = null;
   }
-  if (lib) {
-    const porque = liberacionInestable(lib);
+  // Empotramiento parcial (CY2): 0 es la liberación de los dos giros de flexión de ese extremo
+  const GIROS = [
+    [4, 5],
+    [10, 11],
+  ] as const;
+  const alfa = [b.empotramiento?.i ?? 1, b.empotramiento?.j ?? 1];
+  if (!alfa.every((a) => Number.isFinite(a) && a >= 0 && a <= 1)) {
+    diag.error("modelo/propiedad-no-valida", `El empotramiento de la barra ${b.id} tiene que estar entre 0 y 1 en cada extremo.`, ids, { empotramiento: b.empotramiento });
+    return null;
+  }
+  alfa.forEach((a, e) => {
+    if (a !== 0) return;
+    lib ??= new Array(12).fill(false);
+    for (const g of GIROS[e]!) lib[g] = true;
+    alfa[e] = 1;
+  });
+  /** Juegos de liberaciones de la mezcla, con su peso (el primero, el de la barra). */
+  const juegos: { peso: number; lib: boolean[] | null }[] = [];
+  for (const ri of alfa[0]! < 1 ? [false, true] : [false])
+    for (const rj of alfa[1]! < 1 ? [false, true] : [false]) {
+      const peso = (ri ? 1 - alfa[0]! : alfa[0]!) * (rj ? 1 - alfa[1]! : alfa[1]!);
+      let l = lib ? [...lib] : null;
+      for (const [rot, e] of [
+        [ri, 0],
+        [rj, 1],
+      ] as const)
+        if (rot) {
+          l ??= new Array(12).fill(false);
+          for (const g of GIROS[e]!) l[g] = true;
+        }
+      juegos.push({ peso, lib: l });
+    }
+  for (const { lib: l } of juegos) {
+    const porque = l ? liberacionInestable(l) : null;
     if (porque) {
+      const parcial = juegos.length > 1;
       diag.error(
         "modelo/liberacion-inestable",
-        `La barra ${b.id} ${porque}: sería un mecanismo dentro de la propia barra. Quita una de esas liberaciones.`,
+        `La barra ${b.id} ${porque}${parcial ? " al liberar los giros de su empotramiento parcial" : ""}: sería un mecanismo dentro de la propia barra. Quita una de esas liberaciones.`,
         ids,
-        { liberaciones: lib },
+        { liberaciones: l },
       );
       return null;
     }
@@ -155,7 +200,17 @@ export function prepararBarra(b: BarraAnalitica, indice: number, modelo: ModeloA
   const seccion = seccionEfectiva(s, m);
   const kLocal = rigidezBarraLocal(L, seccion);
   const cond = lib ? condensarLiberaciones(kLocal, lib) : null;
-  const kNudos = aplicarOffsets(rigidezBarraGlobal(cond ? cond.k : kLocal, R), di, dj);
+  let mezcla: BarraPreparada["mezcla"] = null;
+  let kEfectiva = cond ? cond.k : kLocal;
+  if (juegos.length > 1) {
+    mezcla = juegos.map(({ peso, lib: l }, k) => ({ peso, cond: k === 0 ? cond : l ? condensarLiberaciones(kLocal, l) : null }));
+    kEfectiva = new Float64Array(144);
+    for (const { peso, cond: c } of mezcla) {
+      const kk = c ? c.k : kLocal;
+      for (let a = 0; a < 144; a++) kEfectiva[a]! += peso * kk[a]!;
+    }
+  }
+  const kNudos = aplicarOffsets(rigidezBarraGlobal(kEfectiva, R), di, dj);
   const rigidizados: boolean[] = [];
   for (let a = 0; a < 12; a++) {
     let alguno = false;
@@ -173,6 +228,8 @@ export function prepararBarra(b: BarraAnalitica, indice: number, modelo: ModeloA
     seccion,
     kLocal,
     cond,
+    mezcla,
+    kEfectiva,
     kNudos,
     rigidizados,
   };
@@ -324,9 +381,20 @@ export function cargasDeBarrasDelCaso(
     const pb = barras[ib]!;
     const dc = diagramaDeCargas(pb.L, l);
     const fer = ferBarra(pb.seccion, dc);
-    porBarra.set(ib, { cargas: l, dc, fer, ferC: pb.cond ? condensarFer(fer, pb.cond.condensaciones) : fer });
+    porBarra.set(ib, { cargas: l, dc, fer, ferC: ferCondensadas(pb, fer) });
   }
   return { porBarra, resultante: res };
+}
+
+/** FER condensadas de una barra: las de sus liberaciones o, con empotramiento parcial, la mezcla (CY2). */
+export function ferCondensadas(pb: BarraPreparada, fer: Float64Array): Float64Array {
+  if (!pb.mezcla) return pb.cond ? condensarFer(fer, pb.cond.condensaciones) : fer;
+  const f = new Float64Array(12);
+  for (const { peso, cond } of pb.mezcla) {
+    const fc = cond ? condensarFer(fer, cond.condensaciones) : fer;
+    for (let a = 0; a < 12; a++) f[a]! += peso * fc[a]!;
+  }
+  return f;
 }
 
 /** Fuerzas nodales equivalentes (globales, 12: nudo i y nudo j) de unas FER condensadas: −Aᵀ·Rᵀ·r₀. */
@@ -353,7 +421,7 @@ export function desplazamientosLocales(pb: BarraPreparada, u: ArrayLike<number>,
 
 /** Fuerzas de los extremos sobre el tramo flexible (12, locales): k_c·u_l + r₀. */
 export function fuerzasLocales(pb: BarraPreparada, ul: Float64Array, cargas?: CargasDeBarra): Float64Array {
-  const k = pb.cond ? pb.cond.k : pb.kLocal;
+  const k = pb.kEfectiva;
   const f = new Float64Array(12);
   for (let a = 0; a < 12; a++) {
     let s = cargas ? cargas.ferC[a]! : 0;

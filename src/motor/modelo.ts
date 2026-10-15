@@ -96,6 +96,14 @@ export interface BarraAnalitica {
    * (= [ux, uy, uz, rx, ry, rz] locales). Se condensan; un juego inestable es un error.
    */
   liberaciones?: { i?: Seis<boolean>; j?: Seis<boolean> };
+  /**
+   * Coeficiente de empotramiento de cada extremo del tramo flexible, en [0, 1] (CY2; el de
+   * CYPECAD). La rigidez local es la interpolación lineal α·K + (1 − α)·K′ entre la de la barra y la
+   * de la barra con los dos giros de flexión (ry, rz) de ese extremo liberados; con los dos extremos,
+   * bilineal. Las cargas de barra equivalentes se interpolan igual: cada término está en equilibrio,
+   * así que la barra también. 1 (por defecto) deja la barra tal cual; 0 libera esos dos giros.
+   */
+  empotramiento?: { i?: number; j?: number };
   /** Multiplicadores de A, Avy, Avz, J, Iy e Iz (H47). Por defecto, 1. */
   modificadores?: ModificadoresBarra;
 }

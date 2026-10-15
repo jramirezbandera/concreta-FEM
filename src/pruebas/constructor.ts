@@ -30,7 +30,7 @@ export function seccionRectangular(b: number, h: number, E = 3e7, nu = 0.2): Sec
   return { E, G: E / (2 * (1 + nu)), A: b * h, Iy: (b * h ** 3) / 12, Iz: (h * b ** 3) / 12, J };
 }
 
-export type OpcionesBarra = Partial<Pick<BarraAnalitica, "id" | "offsets" | "liberaciones" | "modificadores">>;
+export type OpcionesBarra = Partial<Pick<BarraAnalitica, "id" | "offsets" | "liberaciones" | "empotramiento" | "modificadores">>;
 export type OpcionesLamina = Partial<Pick<LaminaAnalitica, "id" | "eje1" | "multiplicadores" | "membrana">>;
 
 /** Sección rectangular con áreas de cortante 5/6·A (Timoshenko). */

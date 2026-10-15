@@ -1,0 +1,10 @@
+α = (0.3, 1): max |K − K_PyNite| / max |K_PyNite| = 5.91e-18
+α = (0.7, 1): max |K − K_PyNite| / max |K_PyNite| = 3.94e-18
+α = (1, 0.3): max |K − K_PyNite| / max |K_PyNite| = 5.91e-18
+α = (1, 0.05): max |K − K_PyNite| / max |K_PyNite| = 3.94e-18
+α = (0.4, 0.6): max |K − K_PyNite| / max |K_PyNite| = 2.95e-18
+α = (0, 0.5): max |K − K_PyNite| / max |K_PyNite| = 1.97e-18
+α = (0.3, 0): max |K − K_PyNite| / max |K_PyNite| = 2.71e-18
+
+Peor: 5.91e-18 (criterio ≤ 1e-12)
+Criterio 4: PASA
