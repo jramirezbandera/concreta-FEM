@@ -166,6 +166,18 @@ export function tramosRecta(region: Region, d: Vec2, n: Vec2, s: number, eps = 1
 }
 
 /**
+ * Como `tramosRecta`, sin lo que cae dentro del ancho de las vigas (fase LV: no es losa). Los anchos
+ * son polígonos convexos: la recta corta cada uno en un intervalo.
+ */
+export function tramosRectaLosa(region: Region, anchos: readonly (readonly Vec2[])[], d: Vec2, n: Vec2, s: number, eps = 1e-9): [number, number][] {
+  let r = tramosRecta(region, d, n, s, eps);
+  for (const p of anchos)
+    for (const [a, b] of tramosRecta({ contorno: p, huecos: [] }, d, n, s, eps))
+      r = r.flatMap(([x, y]): [number, number][] => [...(a > x ? [[x, Math.min(y, a)] as [number, number]] : []), ...(b < y ? [[Math.max(x, b), y] as [number, number]] : [])].filter(([u, v]) => v - u > eps));
+  return r;
+}
+
+/**
  * Esquinas entrantes de una región: los vértices de sus huecos que entran en la losa (convexos en el
  * hueco) y los cóncavos de su contorno. Junto a ellas el momento es singular (crece sin límite al
  * acercarse), así que la media de una franja que pasa por ellas no converge con la malla (SP-6,

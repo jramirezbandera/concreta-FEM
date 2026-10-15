@@ -201,6 +201,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", "La rigidez del reticular tiene que ser uniforme (la de CYPECAD) o bruta (C4-h).");
     return null;
   }
+  if (op.unionLosaViga !== "cara" && op.unionLosaViga !== "eje") {
+    diag.error("opciones/no-validas", "La unión de las losas con las vigas tiene que ser cara (la de CYPECAD) o eje (C2-c, C2-e).");
+    return null;
+  }
   if (!(num(op.tamanoMalla) && op.tamanoMalla >= 2 * op.epsSnap)) {
     diag.error("opciones/no-validas", `El tamaño de malla tiene que ser un número de al menos 2·ε_snap (${2 * op.epsSnap} m).`);
     return null;

@@ -39,7 +39,7 @@
 import { orient2d } from "robust-predicates";
 import type { Vec2 } from "./fisico.ts";
 
-export type TipoTrazo = "viga" | "huella" | "muro" | "losa" | "hueco" | "abaco" | "banda" | "cara" | "zona" | "linea" | "apoyo-lineal";
+export type TipoTrazo = "viga" | "huella" | "ancho" | "muro" | "losa" | "hueco" | "abaco" | "banda" | "cara" | "zona" | "linea" | "apoyo-lineal";
 
 export interface PuntoArreglo {
   x: number;
@@ -119,7 +119,11 @@ export class Arreglo {
 
   constructor(epsGeom: number, epsSnap: number) {
     this.epsGeom = epsGeom;
-    this.epsSnap = epsSnap;
+    // Con una holgura de 10·ε_geom: una distancia de justo ε_snap no se une nunca, sin que lo decida el
+    // redondeo de una traslación o un giro ni un ruido menor que ε_geom. Es frecuente en la fase LV: con
+    // un pilar 10 cm más ancho que su viga, la esquina de la huella queda a justo 5 cm de la cara del
+    // ancho, que se doblaba hacia ella y sacaba la cara de su línea de la rejilla
+    this.epsSnap = epsSnap - 10 * epsGeom;
     const lado = Math.max(1, 4 * epsSnap);
     this.gPuntos = new Celdas(lado);
     this.gSegmentos = new Celdas(lado);
@@ -174,8 +178,9 @@ export class Arreglo {
   }
 
   /**
-   * Punto más cercano a q a ≤ r, o −1 (en empate, el de menor índice). Con `sinExactos`, los puntos
-   * exactos sólo cuentan a ≤ ε_geom.
+   * Punto más cercano a q a ≤ r, o −1 (en empate, el de menor índice; dos distancias a 1e-9 relativo
+   * empatan, para que el redondeo de una traslación o un giro no decida entre dos puntos simétricos).
+   * Con `sinExactos`, los puntos exactos sólo cuentan a ≤ ε_geom.
    */
   private puntoCercano(q: Vec2, r: number, sinExactos = false): { i: number; d: number } {
     let mejor = -1;
@@ -186,7 +191,7 @@ export class Arreglo {
       const dy = p.y - q[1];
       const d = Math.sqrt(dx * dx + dy * dy);
       if (sinExactos && d > this.epsGeom && this.exactos.has(i)) continue;
-      if (d <= r && (d < dmin || (d === dmin && i < mejor))) [mejor, dmin] = [i, d];
+      if (d <= r && (d < dmin * (1 - 1e-9) || (d <= dmin * (1 + 1e-9) && i < mejor))) [mejor, dmin] = [i, Math.min(d, dmin)];
     }
     return { i: mejor, d: dmin };
   }
@@ -253,12 +258,12 @@ export class Arreglo {
       if (c.d > this.epsGeom && tipo !== "viga") this.movimientos.push({ id, tipo, que, distancia: c.d });
       return marcar(c.i);
     }
-    // Al segmento más cercano (en empate, el de menor clave)
+    // Al segmento más cercano (en empate, a 1e-9 relativo, el de menor clave)
     let mejor: { k: string; t: number; d: number; X: Vec2 } | null = null;
     for (const k of [...this.gSegmentos.buscar(q[0] - r, q[1] - r, q[0] + r, q[1] + r)].sort()) {
       const s = this.segmentos.get(k)!;
       const p = this.proyectar(q, s.a, s.b);
-      if (p.t > 0 && p.t < 1 && p.d <= r && (!mejor || p.d < mejor.d)) mejor = { k, ...p };
+      if (p.t > 0 && p.t < 1 && p.d <= r && (!mejor || p.d < mejor.d * (1 - 1e-9))) mejor = { k, ...p };
     }
     if (mejor) {
       // Si la proyección cae junto a un punto, a ese punto

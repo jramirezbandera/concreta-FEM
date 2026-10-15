@@ -114,6 +114,18 @@ export interface EntradaRejilla {
    * huella que ε_snap sería de ella).
    */
   separacionRefino?: number;
+  /**
+   * Lados que proponen una línea fuerte (fase LV: las caras del ancho de una viga, que no es losa).
+   * Una línea fuerte sólo cede ante otra fuerte más larga a menos de d_min/4, como una larga, y una
+   * normal cede ante ella a menos de d_min: las dos caras de una viga más estrecha que d_min son
+   * líneas, y las celdas entre ellas no son losa. Sin él, ninguno.
+   */
+  fuertes?: readonly boolean[];
+  /**
+   * Por huella, si su eje no propone línea en u o en v (fase LV: va por dentro del ancho de una viga
+   * en esa dirección, cuyas caras son las líneas). Sin él, todos la proponen.
+   */
+  sinEje?: readonly (readonly [boolean, boolean])[];
   regiones: readonly Region[];
   /** Losa que contiene un punto, o −1. */
   enLosa: (q: Vec2) => number;
@@ -298,29 +310,33 @@ function distanciaSegmentoRect(P: Vec2, Q: Vec2, u0: number, v0: number, u1: num
  * Líneas de una dirección: agrupadas, elegidas por prioridad, repartidas a ≤ s y con anillo. Una
  * línea larga (de al menos la mitad de `extension`) sólo cede ante otra a menos de d_min/4.
  */
-function lineas(cand: { c: number; L: number }[], tol: number, dMin: number, s: number, extension: number): number[] {
+function lineas(cand: { c: number; L: number; fuerte?: boolean }[], tol: number, dMin: number, s: number, extension: number): number[] {
   if (!cand.length) return [];
   cand.sort((x, y) => x.c - y.c);
   // Grupos de candidatos a ≤ tol: la media ponderada por longitud y la longitud total
-  const grupos: { c: number; L: number }[] = [];
+  const grupos: { c: number; L: number; fuerte: boolean }[] = [];
   for (let k = 0; k < cand.length; ) {
     let m = k;
     let suma = 0;
     let L = 0;
+    let fuerte = false;
     do {
       suma += cand[m]!.c * cand[m]!.L;
       L += cand[m]!.L;
+      fuerte ||= cand[m]!.fuerte === true;
       m++;
     } while (m < cand.length && cand[m]!.c - cand[m - 1]!.c <= tol);
-    grupos.push({ c: suma / L, L });
+    grupos.push({ c: suma / L, L, fuerte });
     k = m;
   }
-  // Una línea cede ante otra más larga a menos de d_min (a igual longitud, ante la de menor c)
+  // Una línea cede ante otra más larga a menos de d_min (a igual longitud, ante la de menor c). Una
+  // fuerte (fase LV) no cede ante una normal, y una normal cede siempre ante una fuerte
   const tolL = 1e-4;
-  const cede = (k: number, o: number) => grupos[o]!.L > grupos[k]!.L + tolL || (Math.abs(grupos[o]!.L - grupos[k]!.L) <= tolL && o < k);
+  const cede = (k: number, o: number) =>
+    grupos[o]!.fuerte !== grupos[k]!.fuerte ? grupos[o]!.fuerte : grupos[o]!.L > grupos[k]!.L + tolL || (Math.abs(grupos[o]!.L - grupos[k]!.L) <= tolL && o < k);
   const elegidas: number[] = [];
   grupos.forEach((g, k) => {
-    const lejos = (g.L >= LINEA_LARGA * extension ? dMin / 4 : dMin) * (1 - HOLGURA);
+    const lejos = (g.fuerte || g.L >= LINEA_LARGA * extension ? dMin / 4 : dMin) * (1 - HOLGURA);
     for (let o = k - 1; o >= 0 && g.c - grupos[o]!.c < lejos; o--) if (cede(k, o)) return;
     for (let o = k + 1; o < grupos.length && grupos[o]!.c - g.c < lejos; o++) if (cede(k, o)) return;
     elegidas.push(g.c);
@@ -382,22 +398,23 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
   const W = P.map(uv);
 
   // 2. Líneas
-  const candU: { c: number; L: number }[] = [];
-  const candV: { c: number; L: number }[] = [];
+  const candU: { c: number; L: number; fuerte?: boolean }[] = [];
+  const candV: { c: number; L: number; fuerte?: boolean }[] = [];
   lados.forEach((l, k) => {
     if (!E.ladoEnLosa[k] || E.fijos[k]) return;
     const [A, B] = [W[l.a]!, W[l.b]!];
     const du = Math.abs(A[0] - B[0]);
     const dv = Math.abs(A[1] - B[1]);
-    if (dv <= tol && du > tol) candV.push({ c: (A[1] + B[1]) / 2, L: du });
-    else if (du <= tol && dv > tol) candU.push({ c: (A[0] + B[0]) / 2, L: dv });
+    const f = E.fuertes?.[k] ? { fuerte: true } : {};
+    if (dv <= tol && du > tol) candV.push({ c: (A[1] + B[1]) / 2, L: du, ...f });
+    else if (du <= tol && dv > tol) candU.push({ c: (A[0] + B[0]) / 2, L: dv, ...f });
   });
   const rects = E.huellas.map((hh) => (hh.puntos.some((p) => E.puntoEnLosa[p]) ? rectanguloHuella(W, hh.puntos, tol) : null));
-  for (const r of rects) {
-    if (!r) continue;
-    candU.push({ c: (r.u0 + r.u1) / 2, L: 2 * (r.v1 - r.v0) });
-    candV.push({ c: (r.v0 + r.v1) / 2, L: 2 * (r.u1 - r.u0) });
-  }
+  rects.forEach((r, k) => {
+    if (!r) return;
+    if (!E.sinEje?.[k]?.[0]) candU.push({ c: (r.u0 + r.u1) / 2, L: 2 * (r.v1 - r.v0) });
+    if (!E.sinEje?.[k]?.[1]) candV.push({ c: (r.v0 + r.v1) / 2, L: 2 * (r.u1 - r.u0) });
+  });
   const dMin = SEPARACION_MINIMA * h;
   // Extensión de lo que toca las losas en cada dirección
   let [eu0, ev0, eu1, ev1] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -618,7 +635,9 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       } else estado[c] = k < 0 && limpia ? FUERA : IRREGULAR;
     }
   // Los grupos de menos de GRUPO_MINIMO celdas regulares seguidas (sin plantilla) van por la CDT:
-  // ahorran poco y obligan a la CDT a coserse a sus aristas
+  // ahorran poco y obligan a la CDT a coserse a sus aristas. Con el ancho de las vigas (fase LV), no
+  // el que no toca ninguna celda irregular: un recuadro de losa entre las caras de sus vigas (2 × 4
+  // celdas en el edificio objetivo) no se cose con nada
   const grupo = new Int32Array(nc).fill(-1);
   for (let c0 = 0; c0 < nc; c0++) {
     if (estado[c0] !== REGULAR || grupo[c0]! >= 0) continue;
@@ -626,6 +645,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     const celdas: number[] = [];
     grupo[c0] = c0;
     let plantilla = false;
+    let irregular = false;
     while (pila.length) {
       const c = pila.pop()!;
       celdas.push(c);
@@ -639,13 +659,14 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
         if (a < 0 || b < 0 || a > nu - 2 || b > nv - 2) continue;
         const d = celda(a, b);
         if (estado[d] === PLANTILLA) plantilla = true;
+        if (estado[d] === IRREGULAR) irregular = true;
         if (estado[d] === REGULAR && grupo[d]! < 0) {
           grupo[d] = c0;
           pila.push(d);
         }
       }
     }
-    if (!plantilla && celdas.length < GRUPO_MINIMO)
+    if (!plantilla && celdas.length < GRUPO_MINIMO && (!E.fuertes || irregular))
       for (const c of celdas) {
         estado[c] = IRREGULAR;
         losa[c] = -1;

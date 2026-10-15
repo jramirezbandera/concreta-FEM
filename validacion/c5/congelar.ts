@@ -16,6 +16,10 @@
  * Los números se guardan con 13 cifras significativas, como en C2–C4. El test
  * (src/compilador/congelado-c5.test.ts) lo recalcula con el núcleo.
  *
+ * Fase LV: los modelos llevan la unión de la losa con las vigas de antes, por el eje
+ * (`unionLosaViga: "eje"`: los mismos bits que antes de la fase). Las bandas del Anejo I ya no se
+ * usan en la app (fase F); la unión por las caras se congela en C2–C4 y F.
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/c5/congelar.ts
  */
@@ -39,10 +43,10 @@ import { murosEtabs15 } from "../e6/etabs15.ts";
 import { conAcciones, conPropuesta, losaPilaresMezclados, reticularH25 } from "./modelos.ts";
 
 export const MODELOS_CONGELADOS_C5: Record<string, () => ModeloCongelado> = {
-  "pilares-mezclados": () => ({ fisico: conAcciones(conPropuesta(losaPilaresMezclados())), opciones: { franjas: false } }),
-  "reticular-h25": () => ({ fisico: conPropuesta(reticularH25()), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.5 } }),
-  "etabs-15c-3-60": () => ({ fisico: fisicoEtabs(murosEtabs15().find((m) => m.id === "15c-3-60")!), opciones: { franjas: false, tamanoMalla: 20 * IN } }),
-  "aleatorio-3": () => ({ fisico: conPropuesta(conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" })), opciones: { franjas: false } }),
+  "pilares-mezclados": () => ({ fisico: conAcciones(conPropuesta(losaPilaresMezclados())), opciones: { franjas: false, unionLosaViga: "eje" } }),
+  "reticular-h25": () => ({ fisico: conPropuesta(reticularH25()), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.5, unionLosaViga: "eje" } }),
+  "etabs-15c-3-60": () => ({ fisico: fisicoEtabs(murosEtabs15().find((m) => m.id === "15c-3-60")!), opciones: { franjas: false, tamanoMalla: 20 * IN, unionLosaViga: "eje" } }),
+  "aleatorio-3": () => ({ fisico: conPropuesta(conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" })), opciones: { franjas: false, unionLosaViga: "eje" } }),
 };
 
 export interface ReferenciaC5 {

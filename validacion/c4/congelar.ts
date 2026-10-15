@@ -14,6 +14,10 @@
  * cifras significativas, como en C2 y C3. El test (src/compilador/congelado-c4.test.ts) los
  * recompila y recalcula con los dos solvers.
  *
+ * Fase LV: los modelos de antes llevan la unión de la losa con las vigas por el eje
+ * (`unionLosaViga: "eje"`: los mismos bits que antes de la fase); los terminados en `-lv`, la de la
+ * fase (por las caras, por defecto).
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/c4/congelar.ts
  */
@@ -29,12 +33,14 @@ import { casosManoC4 } from "./mano.ts";
 const mano = (i: number) => casosManoC4()[i]!.fisico;
 
 export const MODELOS_CONGELADOS_C4: Record<string, () => ModeloCongelado> = {
-  "pano-oblicuo": () => ({ fisico: mano(1), opciones: { franjas: false } }),
-  "dos-vanos-voladizo": () => ({ fisico: mano(2), opciones: { franjas: false } }),
-  "pano-hueco": () => ({ fisico: mano(4), opciones: { franjas: false } }),
-  "aleatorio-7-unidireccional": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(7), 7, { tipo: "unidireccional" }), opciones: { franjas: false } }),
-  "aleatorio-6-reticular": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(6), 6, { tipo: "reticular" }), opciones: { franjas: false, tamanoMalla: 1.25 } }),
-  "aleatorio-5-mixto": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25 } }),
+  "pano-oblicuo": () => ({ fisico: mano(1), opciones: { franjas: false, unionLosaViga: "eje" } }),
+  "dos-vanos-voladizo": () => ({ fisico: mano(2), opciones: { franjas: false, unionLosaViga: "eje" } }),
+  "pano-hueco": () => ({ fisico: mano(4), opciones: { franjas: false, unionLosaViga: "eje" } }),
+  "aleatorio-7-unidireccional": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(7), 7, { tipo: "unidireccional" }), opciones: { franjas: false, unionLosaViga: "eje" } }),
+  "aleatorio-6-reticular": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(6), 6, { tipo: "reticular" }), opciones: { franjas: false, tamanoMalla: 1.25, unionLosaViga: "eje" } }),
+  "aleatorio-5-mixto": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25, unionLosaViga: "eje" } }),
+  // Fase LV: con la unión de la losa con las vigas por las caras (por defecto)
+  "aleatorio-5-mixto-lv": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25 } }),
 };
 
 if (import.meta.main) {

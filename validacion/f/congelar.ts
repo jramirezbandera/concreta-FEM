@@ -16,6 +16,10 @@
  * Los números se guardan con 13 cifras significativas, como en C2–C5. El test
  * (src/compilador/congelado-f.test.ts) lo recalcula con el núcleo.
  *
+ * Fase LV: los modelos de antes llevan la unión de la losa con las vigas por el eje
+ * (`unionLosaViga: "eje"`: los mismos bits que antes de la fase); los terminados en `-lv`, la de la
+ * fase (por las caras, por defecto).
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/f/congelar.ts
  */
@@ -38,15 +42,18 @@ import { conAcciones, losaPilaresMezclados, reticularH25 } from "../c5/modelos.t
 import { edificioReticular } from "../c4/modelos.ts";
 
 export const MODELOS_CONGELADOS_F: Record<string, () => ModeloCongelado> = {
-  "h25-plana": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75 } }),
-  "h25-reticular": () => ({ fisico: reticularH25(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75 } }),
-  "pilares-mezclados": () => ({ fisico: conAcciones(losaPilaresMezclados()), opciones: {} }),
-  "aleatorio-3": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: {} }),
-  "losa-3x3-refinada": () => ({ fisico: losa3x3(), opciones: {} }),
-  "h25-plana-sin-refinar": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, refinoCaras: false } }),
-  "losa-3x3-mezclada": () => ({ fisico: losa3x3Mezclada(), opciones: {} }),
+  "h25-plana": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, unionLosaViga: "eje" } }),
+  "h25-reticular": () => ({ fisico: reticularH25(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, unionLosaViga: "eje" } }),
+  "pilares-mezclados": () => ({ fisico: conAcciones(losaPilaresMezclados()), opciones: { unionLosaViga: "eje" } }),
+  "aleatorio-3": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { unionLosaViga: "eje" } }),
+  "losa-3x3-refinada": () => ({ fisico: losa3x3(), opciones: { unionLosaViga: "eje" } }),
+  "h25-plana-sin-refinar": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, refinoCaras: false, unionLosaViga: "eje" } }),
+  "losa-3x3-mezclada": () => ({ fisico: losa3x3Mezclada(), opciones: { unionLosaViga: "eje" } }),
   // SP-1 y SP-2: ábacos de pilares de borde, de esquina y atravesados por vigas
-  "reticular-2x2-abacos": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: {} }),
+  "reticular-2x2-abacos": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { unionLosaViga: "eje" } }),
+  // Fase LV: con la unión de la losa con las vigas por las caras (por defecto)
+  "aleatorio-3-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: {} }),
+  "reticular-2x2-abacos-lv": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: {} }),
 };
 
 export interface ReferenciaF {

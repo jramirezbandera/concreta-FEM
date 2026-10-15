@@ -13,6 +13,10 @@
  *   rectangular de hormigón bajo losa pesa sólo su descuelgue (C2-g). Las cargas de superficie van
  *   por lámina entera (las zonas están sembradas en la malla), las lineales a los nudos de sus
  *   aristas y las puntuales que caen en una losa a su vértice (C2-h).
+ * - El ancho de las vigas que se unen a la losa por sus caras (fase LV): lo que cae en él (el pp de
+ *   la losa y sus cargas de superficie, por las piezas de la malla; los lados de las lineales; las
+ *   puntuales) pasa a la viga como una carga repartida exacta sobre su eje y el momento de transporte
+ *   (la torsión). El peso de la viga sigue siendo el de C2-g: el total no cambia.
  * - Muros (C3): pesan γ·t por lámina, menos su solape con las losas, que va como carga lineal hacia
  *   arriba en la cota de la planta (C3-g). Los empujes van por lámina con su valor en cada nudo
  *   (bilineal: exacto con una ley lineal en z, C3-h). Su resultante física se calcula por franjas
@@ -261,6 +265,97 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     else nodal(c, t.nudo, F, mas(M, cruz(menos(Q, Xn(t.nudo)), F)));
   };
 
+  // Fase LV: lo que cae en el ancho de una viga, a la viga
+  /** Recta del tramo de la viga de un ancho. */
+  const rectaAncho = (g: number): Recta => {
+    const x = losas.anchos[g]!;
+    return piezas.rectasDe.get(x.viga)!.find((r) => r.tramo === x.tramo)!;
+  };
+  /**
+   * Carga de superficie uniforme q (global) sobre el triángulo v del ancho g, a su viga: la fuerza
+   * repartida sobre el eje, q por el ancho del triángulo en cada σ, y el momento de transporte
+   * A·(X_c − P(σ_c)) × q en σ_c. Con los vértices por σ (s0 ≤ s1 ≤ s2), el ancho crece linealmente
+   * de 0 en s0 al del corte por el vértice central, wm, y vuelve a 0 en s2: dos cargas lineales
+   * exactas que suman A = wm·(s2 − s0)/2. wm sale de la arista larga, así que dos vértices con casi
+   * la misma σ (un giro de la planta la cambia en un redondeo) no lo alteran.
+   */
+  const piezaAViga = (c: number, g: number, v: readonly Vec2[], q: readonly number[]) => {
+    const r = rectaAncho(g);
+    const z = ctx.cotas[losas.anchos[g]!.k]!;
+    const [ex, ey] = [r.e[0], r.e[1]];
+    const sg = (X: Vec2) => (X[0] - r.O[0]) * ex + (X[1] - r.O[1]) * ey;
+    const tau = (X: Vec2) => -(X[0] - r.O[0]) * ey + (X[1] - r.O[1]) * ex;
+    const [p0, p1, p2] = v.map((X) => ({ s: sg(X), t: tau(X) })).sort((a, b) => a.s - b.s);
+    const L = p2!.s - p0!.s;
+    if (!(L > 0)) return;
+    const wm = Math.abs(p1!.t - (p0!.t + ((p2!.t - p0!.t) * (p1!.s - p0!.s)) / L));
+    if (p1!.s > p0!.s) aplicarLineal(c, r, p0!.s, p1!.s, [0, 0, 0], por(q, wm));
+    if (p2!.s > p1!.s) aplicarLineal(c, r, p1!.s, p2!.s, por(q, wm), [0, 0, 0]);
+    // El momento de transporte, m(σ) = w(σ)·(τ̄(σ)·n + Δz·ẑ) × q (τ̄, el desvío medio del corte), a los
+    // nudos del eje con las funciones lineales entre ellos, integrado exacto (Simpson: es cúbico). La
+    // suma es el momento de la pieza, y lo que recibe cada nudo no depende de cómo se triangula el
+    // ancho (con un momento puntual en el centroide de cada pieza, un giro de la planta lo cambiaba)
+    const cad = losas.anchos[g]!.tramo.cadena;
+    const nq = cruz([-ey, ex, 0], q);
+    const zq = por(cruz([0, 0, 1], q), z - r.O[2]);
+    const tl = p0!.t + ((p2!.t - p0!.t) * (p1!.s - p0!.s)) / L;
+    const tm = (p1!.t + tl) / 2;
+    for (const [a, b, wa, wb, ta, tb] of [
+      [p0!.s, p1!.s, 0, wm, p0!.t, tm],
+      [p1!.s, p2!.s, wm, 0, tm, p2!.t],
+    ] as const) {
+      if (!(b > a)) continue;
+      const lin = (x: number, ya: number, yb: number) => ya + ((yb - ya) * (x - a)) / (b - a);
+      // Coeficientes de n × q y de Δz·ẑ × q en σ = x
+      const dens = (x: number): [number, number] => {
+        const w = lin(x, wa, wb);
+        return [w * lin(x, ta, tb), w];
+      };
+      const cortes = [a, ...cad.map((x) => x.sigma).filter((x) => x > a && x < b), b];
+      for (let i = 0; i + 1 < cortes.length; i++) {
+        const [x0, x1] = [cortes[i]!, cortes[i + 1]!];
+        const xm = (x0 + x1) / 2;
+        let k = cad.length - 1;
+        while (k > 0 && cad[k]!.sigma > xm) k--;
+        // Fuera de la cadena, al nudo del extremo; dentro, a los dos que rodean el trozo
+        const fuera = xm <= cad[0]!.sigma || k === cad.length - 1;
+        const [s0, s1] = fuera ? [0, 1] : [cad[k]!.sigma, cad[k + 1]!.sigma];
+        const N = (x: number) => (fuera ? 1 : (s1 - x) / (s1 - s0));
+        const I = [0, 0, 0, 0];
+        for (const [x, peso] of [
+          [x0, 1],
+          [xm, 4],
+          [x1, 1],
+        ] as const) {
+          const [f1, f2] = dens(x);
+          I[0]! += peso * f1 * N(x);
+          I[1]! += peso * f2 * N(x);
+          I[2]! += peso * f1 * (1 - N(x));
+          I[3]! += peso * f2 * (1 - N(x));
+        }
+        const h = (x1 - x0) / 6;
+        nodal(c, cad[k]!.nudo, [0, 0, 0], mas(por(nq, h * I[0]!), por(zq, h * I[1]!)));
+        if (!fuera) nodal(c, cad[k + 1]!.nudo, [0, 0, 0], mas(por(nq, h * I[2]!), por(zq, h * I[3]!)));
+      }
+    }
+  };
+  /** Carga lineal uniforme q (global, por metro) sobre el lado AB del ancho g, a su viga. */
+  const ladoAViga = (c: number, g: number, A: Vec2, B: Vec2, q: readonly number[]) => {
+    const r = rectaAncho(g);
+    const z = ctx.cotas[losas.anchos[g]!.k]!;
+    const sg = (X: Vec2) => (X[0] - r.O[0]) * r.e[0] + (X[1] - r.O[1]) * r.e[1];
+    const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+    const [sa, sb] = [sg(A), sg(B)];
+    const Xm: V = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2, z];
+    const sm = (sa + sb) / 2;
+    const F = por(q, L);
+    if (Math.abs(sb - sa) > 1e-9 * Math.max(1, L)) {
+      const f = por(q, L / Math.abs(sb - sa));
+      aplicarLineal(c, r, Math.min(sa, sb), Math.max(sa, sb), f, f);
+      puntualEnRecta(c, r, sm, P(r, sm), [0, 0, 0], cruz(menos(Xm, P(r, sm)), F));
+    } else puntualEnRecta(c, r, sm, Xm, F, [0, 0, 0]);
+  };
+
   /** Carga repartida sobre una pieza entre dos estaciones (en sus ejes), tramo a tramo. */
   const sobrePieza = (c: number, id: string, rectas: readonly Recta[], ejes: "global" | "local", q: readonly number[], qb: readonly number[] | undefined, desde: number | undefined, hasta: number | undefined, idCarga: string) => {
     const total = rectas.reduce((s, r) => Math.max(s, r.s0 + r.len), 0);
@@ -473,6 +568,12 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       const pp = l.abaco ? lc.reticular!.ppAbaco : lc.pp;
       if (pp > 0) lamina(cPeso, i, [0, 0, -pp]);
     });
+    // Fase LV: el de las piezas en el ancho de las vigas, a la viga
+    for (const pa of losas.piezasAncho) {
+      const lc = ctx.losas[pa.losa]!;
+      const pp = pa.abaco ? lc.reticular!.ppAbaco : lc.pp;
+      if (pp > 0) piezaAViga(cPeso, pa.ancho, pa.v, [0, 0, -pp]);
+    }
     ctx.losas.forEach((l, i) => {
       if (!losas.laminas.some((x) => x.losa === i)) return;
       if (l.pp > 0) sumarSuperficie(fisicas[cPeso]!, desplazar(momentosRegion(losas.regiones[i]!)), cota(l.losa.planta), [0, 0, -l.pp]);
@@ -536,9 +637,11 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       const enLosa = losas.puntos.get(carga.id);
       // En un paño (C4-e): a sus viguetas
       const enPano = !destino && enLosa === undefined ? panosDe(carga.planta).find((i) => distanciaARegion([carga.x, carga.y], panos!.regiones[i]!) <= 1e-9) : undefined;
+      // Fase LV: en el ancho de una viga, fuera de su eje, a la viga
+      const enAncho = !destino && enLosa === undefined && enPano === undefined ? losas.puntosAncho.get(carga.id) : undefined;
       // SP-5: una puntual sólo horizontal en una losa con diafragma rígido, al nudo del diafragma más
       // cercano con su momento de transporte (Mz: el nudo está en la cota de la planta)
-      const diafragma = !destino && enLosa === undefined && enPano === undefined && alDiafragma(ctx, k, carga) ? piezas.diafragmas.find((d) => d.k === k) : undefined;
+      const diafragma = !destino && enLosa === undefined && enPano === undefined && enAncho === undefined && alDiafragma(ctx, k, carga) ? piezas.diafragmas.find((d) => d.k === k) : undefined;
       if (diafragma) {
         let n = diafragma.nudos[0]!;
         let dmin = Infinity;
@@ -552,13 +655,17 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         deDiafragma.push(carga.id);
         continue;
       }
-      if (!destino && enLosa === undefined && enPano === undefined) {
+      if (!destino && enLosa === undefined && enPano === undefined && enAncho === undefined) {
         diag.error("carga/sin-destino", `La carga ${carga.id} no cae sobre ningún pilar, nudo, viga, losa ni paño de la planta ${carga.planta} (tolerancia ${ctx.op.epsSnap} m).`, [carga.id]);
         continue;
       }
       sumarPuntual(fisicas[c]!, menos(Q, centro), F, M);
       if (enPano !== undefined) reparto(enPano).puntual([carga.x, carga.y], F, M, emisor(c, enPano));
-      else if (!destino) nodal(c, enLosa!, F, mas(M, cruz(menos(Q, Xn(enLosa!)), F)));
+      else if (enAncho !== undefined) {
+        const r = rectaAncho(enAncho);
+        const sg = (Q[0] - r.O[0]) * r.e[0] + (Q[1] - r.O[1]) * r.e[1];
+        puntualEnRecta(c, r, sg, Q, F, M);
+      } else if (!destino) nodal(c, enLosa!, F, mas(M, cruz(menos(Q, Xn(enLosa!)), F)));
       else if (destino.tipo === "nudo") nodal(c, destino.nudo, F, mas(M, cruz(menos(Q, Xn(destino.nudo)), F)));
       else {
         const r = piezas.rectasDe.get(destino.tramo.viga.id)!.find((r) => r.tramo === destino.tramo)!;
@@ -567,6 +674,7 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     } else if (carga.tipo === "superficie") {
       // C2-h: por lámina entera; la resultante física, sobre la losa (o la zona ∩ las losas) unida
       for (const l of losas.superficies.get(carga.id) ?? []) lamina(c, l, carga.q);
+      for (const j of losas.superficiesAncho.get(carga.id) ?? []) piezaAViga(c, losas.piezasAncho[j]!.ancho, losas.piezasAncho[j]!.v, carga.q);
       const zona = losas.zonasUnidas.get(carga.id) ?? (carga.zona && panosDe(carga.planta).length ? carga.zona.map((x) => [x[0], x[1]] as Vec2) : undefined);
       let A = 0;
       ctx.losas.forEach((l, i) => {
@@ -602,6 +710,8 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         nodal(c, a, por(carga.q, L / 2), [0, 0, 0]);
         nodal(c, b, por(carga.q, L / 2), [0, 0, 0]);
       }
+      // Fase LV: los lados en el ancho de una viga, a la viga
+      for (const x of losas.lineasAncho.get(carga.id) ?? []) ladoAViga(c, x.ancho, x.A, x.B, carga.q);
       // C4-e: los lados que no van sobre la malla ni sobre un muro, a los paños; en una planta sin
       // losas ni muros, toda la polilínea. Lo que no cubran se perdería: error
       const unida = losas.lineasUnidas.get(carga.id);

@@ -380,6 +380,17 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
   // Un apoyo en un esclavo de una huella: el motor no lo admite (como C1-f)
   const esclavos = new Map<number, string>();
   for (const h of losas.huellas) for (const n of h.esclavos) esclavos.set(n, h.pilar);
+  // Y en un nudo de la losa unido a la cara de una viga (fase LV)
+  const deCara = new Map<number, string>();
+  for (const h of losas.enlacesVigas) for (const n of h.esclavos) deCara.set(n, h.viga);
+  for (const n of apoyos.keys()) {
+    if (!deCara.has(n)) continue;
+    diag.error(
+      "apoyo/en-cara-viga",
+      `${origen.get(n)} apoya un nudo de la losa en la cara de la viga ${deCara.get(n)}, que se mueve con ella (la losa se une a la viga por sus caras): el motor no admite apoyos en los nudos de un enlace rígido. Apoye la viga o lleve el apoyo fuera de su cara.`,
+      [origen.get(n)!, deCara.get(n)!],
+    );
+  }
   for (const n of apoyos.keys()) {
     if (!esclavos.has(n)) continue;
     diag.error(

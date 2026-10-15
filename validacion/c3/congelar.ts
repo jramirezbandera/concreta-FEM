@@ -14,6 +14,10 @@
  * Los números se guardan con 13 cifras significativas, como en C2. El test
  * (src/compilador/congelado-c3.test.ts) los recompila y recalcula con los dos solvers.
  *
+ * Fase LV: los modelos de antes llevan la unión de la losa con las vigas por el eje
+ * (`unionLosaViga: "eje"`: los mismos bits que antes de la fase); los terminados en `-lv`, la de la
+ * fase (por las caras, por defecto).
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/c3/congelar.ts
  */
@@ -34,12 +38,14 @@ import { sotanoFisico, vigaMuroFisico } from "./oraculos.ts";
 const etabs = (id: string) => fisicoEtabs(murosEtabs15().find((m) => m.id === id)!);
 
 export const MODELOS_CONGELADOS_C3: Record<string, () => ModeloCongelado> = {
-  "etabs-15c-3-60": () => ({ fisico: etabs("15c-3-60"), opciones: { franjas: false, tamanoMalla: 20 * IN } }),
-  "etabs-15f-1": () => ({ fisico: fisicoEtabs({ ...murosEtabs15().find((m) => m.id === "15f-3")!, plantas: 1 }), opciones: { franjas: false, tamanoMalla: 20 * IN } }),
-  "sotano-empuje": () => ({ fisico: sotanoFisico(), opciones: { franjas: false, modificadores: {} } }),
-  "viga-en-muro": () => ({ fisico: vigaMuroFisico(), opciones: { franjas: false, modificadores: {} } }),
-  "aleatorio-3-muros": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false } }),
-  "reticula-nucleo": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1 } }),
+  "etabs-15c-3-60": () => ({ fisico: etabs("15c-3-60"), opciones: { franjas: false, tamanoMalla: 20 * IN, unionLosaViga: "eje" } }),
+  "etabs-15f-1": () => ({ fisico: fisicoEtabs({ ...murosEtabs15().find((m) => m.id === "15f-3")!, plantas: 1 }), opciones: { franjas: false, tamanoMalla: 20 * IN, unionLosaViga: "eje" } }),
+  "sotano-empuje": () => ({ fisico: sotanoFisico(), opciones: { franjas: false, modificadores: {}, unionLosaViga: "eje" } }),
+  "viga-en-muro": () => ({ fisico: vigaMuroFisico(), opciones: { franjas: false, modificadores: {}, unionLosaViga: "eje" } }),
+  "aleatorio-3-muros": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, unionLosaViga: "eje" } }),
+  "reticula-nucleo": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje" } }),
+  // Fase LV: con la unión de la losa con las vigas por las caras (por defecto)
+  "aleatorio-3-muros-lv": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false } }),
 };
 
 if (import.meta.main) {

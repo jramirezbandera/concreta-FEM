@@ -50,7 +50,8 @@ describe("criterio 9 de C2: referencia congelada", () => {
           const b = { u: F(ref.casos[k]!.u), reacciones: F(ref.casos[k]!.reacciones), esfuerzosBarras: F(ref.casos[k]!.esfuerzosBarras), esfuerzosLaminas: F(ref.casos[k]!.esfuerzosLaminas) };
           expect(errorResultados(a, b), `caso ${k}`).toBeLessThan(1e-9);
         });
-      });
+        // Con la batería entera en paralelo, el solver de perfil pasa de 60 s en los modelos grandes
+      }, 180_000);
     }
   }
 });

@@ -6,7 +6,9 @@
  * el muestrario, +700 kN·m/m donde las láminas daban −40.
  * - SP-1: ningún nudo con una constante de Lebesgue mayor que LEBESGUE_MAXIMO, y en cada ábaco el
  *   mayor |M| de los nudos del SPR no pasa de 2,5 veces el mayor de sus láminas (antes, 19 y 33);
- * - SP-2: la plantilla de todo pilar que cae en un ábaco va refinada.
+ * - SP-2: la plantilla de todo pilar que cae en un ábaco va refinada. Con la unión de la fase LV, las
+ *   huellas de estos modelos (con vigas por todos los ejes) quedan tapadas por el ancho de sus vigas y
+ *   no hay plantillas: SP-2 se prueba con la unión de antes (por el eje).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -68,11 +70,12 @@ describe("ábacos y campos SPR (SP-1, SP-2)", () => {
 
   for (const nombre of Object.keys(MODELOS)) {
     it(`${nombre}: las plantillas de los pilares en un ábaco van refinadas (SP-2)`, () => {
-      const { c } = hechos.get(nombre)!;
-      const m = c.estadisticas.malla!;
+      const e = compilar(MODELOS[nombre]!(), { unionLosaViga: "eje" });
+      if (!e.valido) throw new Error(`${nombre}: ${e.diagnosticos[0]?.mensaje}`);
+      const m = e.estadisticas.malla!;
       expect(m.plantillasRefinadas).toBeGreaterThan(0);
       expect(m.plantillasRefinadas).toBe(m.plantillas);
-      expect(c.diagnosticos.filter((d) => d.codigo.startsWith("malla/"))).toEqual([]);
+      expect(e.diagnosticos.filter((d) => d.codigo.startsWith("malla/"))).toEqual([]);
     });
 
     it(`${nombre}: ningún nudo amplifica sus muestras más de LEBESGUE_MAXIMO (SP-1)`, () => {

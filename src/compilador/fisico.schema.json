@@ -965,6 +965,12 @@
             "uniforme"
           ]
         },
+        "unionLosaViga": {
+          "enum": [
+            "cara",
+            "eje"
+          ]
+        },
         "cortante": {
           "type": "boolean"
         },

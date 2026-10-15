@@ -9,6 +9,10 @@
  * con el enlace, que no la cruza), y los pilares de borde de una losa plana sin vigas, sin recta desde
  * la que hacer el escalón, se quedaban sin metro (sólo el aviso); en la de H25, las franjas de borde
  * salían un 37 % bajas.
+ *
+ * Todo con la unión de la losa con las vigas de antes (`unionLosaViga: "eje"`): con la de la fase LV, un
+ * pilar dentro del ancho de una viga no tiene metro, y las estaciones de apoyo van en las caras de la
+ * viga (`unionLosaViga.test.ts`). Los pilares de borde de la losa plana no tienen vigas y no cambian.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -59,7 +63,7 @@ describe("el metro de los pilares sin cara de franja (SP-3, SP-4)", () => {
   let gruesa: Consultas;
   beforeAll(async () => {
     await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
-    gruesa = consultas({});
+    gruesa = consultas({ unionLosaViga: "eje" });
   }, 60_000);
 
   it("un pilar interior atravesado por vigas tiene su estación en cada cara, y nada entre ellas", () => {
@@ -75,7 +79,7 @@ describe("el metro de los pilares sin cara de franja (SP-3, SP-4)", () => {
   });
 
   it("con h = 0,75, la cara a ≤ 10 % de la malla fina (antes, un 40 % baja)", () => {
-    const fina = consultas({ tamanoMalla: 0.25, epsSnap: 0.01 });
+    const fina = consultas({ tamanoMalla: 0.25, epsSnap: 0.01, unionLosaViga: "eje" });
     for (const pilar of ["P6-5", "P12-10"]) {
       const g = carasDe(gruesa, pilar);
       const f = carasDe(fina, pilar);
@@ -122,7 +126,7 @@ describe("el corte directo por la cara de un pilar sin cara de franja (SP-6)", (
     // P0-5, de borde (x = 0) y con la viga de fachada a lo largo: por y = 5,2 la recta sólo sigue la
     // malla delante de la huella; una lámina la cruza con el centroide fuera de la ventana, el corte no
     // la ve y el medio salía de 0,2 m en vez de 0,41 (el doble)
-    const q = consultas({}, conAcciones(edificioReticular(1, 2, 2)));
+    const q = consultas({ unionLosaViga: "eje" }, conAcciones(edificioReticular(1, 2, 2)));
     const e = q.franja("L-N1:Y1");
     if (!e.valido) throw new Error("L-N1:Y1");
     const caras = e.valor.estaciones.filter((x) => x.tipo === "cara" && x.piezas.join() === "P0-5");

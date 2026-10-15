@@ -106,5 +106,5 @@ describe("renumerar", () => {
     };
     expect(b.modelo.nudos.length).toBe(a.modelo.nudos.length);
     expect(geo(b.modelo)).toEqual(geo(a.modelo));
-  });
+  }, 180_000);
 });

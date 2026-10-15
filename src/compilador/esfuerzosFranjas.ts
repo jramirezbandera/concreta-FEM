@@ -92,7 +92,7 @@ import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/model
 import { combinar } from "./envolventes.ts";
 import { ANCHO_FRANJA, type Vec2 } from "./fisico.ts";
 import { pilaresEnLosa, semiextension } from "./bandas.ts";
-import { alineada, anchoNominal, carasFranjas, ejesArmado, esquinasEntrantes, franjasLosa, PASO_ESTACIONES, tramosRecta, type Franja } from "./franjas.ts";
+import { alineada, anchoNominal, carasFranjas, COSENO_APOYO_PILAR, ejesArmado, esquinasEntrantes, franjasLosa, PASO_ESTACIONES, tramosRectaLosa, type Franja } from "./franjas.ts";
 import type { Mapeo } from "./mapeo.ts";
 import type { Contexto, LosaCompilada } from "./validar.ts";
 
@@ -165,6 +165,8 @@ interface LineaApoyo {
   s: number;
   ta: number;
   tb: number;
+  /** Sólo de este lado (la cara del ancho de una viga, fase LV); sin él, de los dos. */
+  lado?: -1 | 1;
 }
 
 export class EsfuerzosFranjas {
@@ -258,6 +260,11 @@ export class EsfuerzosFranjas {
     const z = this.ctx.cotas[this.ctx.planta.get(l.losa.planta)!]!;
     const T0 = fr[0]!.t0;
     const T1 = fr[fr.length - 1]!.t1;
+    // Fase LV: el ancho de las vigas que se unen a la losa por sus caras no es losa
+    const anchosL = (this.mapeo.anchos ?? []).filter((a) => a.planta === l.losa.planta);
+    const polisAncho = anchosL.map((a) => a.poligono as readonly Vec2[]);
+    /** Trozos de la recta s en la losa, sin el ancho de las vigas. */
+    const tramosLosa = (sr: number) => tramosRectaLosa(l.region, polisAncho, d, n, sr);
     const bordes = [T0, ...fr.map((f) => f.t1)];
     const est: EstacionFranja[][] = fr.map(() => []);
     const reticular = l.losa.reticular !== undefined;
@@ -435,7 +442,7 @@ export class EsfuerzosFranjas {
      */
     const margenesCara = [margenRecta, this.ctx.op.tamanoMalla, this.ctx.op.tamanoMalla / 2, EPS];
     /** Ancho en la losa de la recta s entre t0 y t1. */
-    const anchoVentana = (s: number, [t0, t1]: readonly [number, number]) => (t1 > t0 ? tramosRecta(l.region, d, n, s).reduce((a, [p, q]) => a + Math.max(0, Math.min(q, t1) - Math.max(p, t0)), 0) : 0);
+    const anchoVentana = (s: number, [t0, t1]: readonly [number, number]) => (t1 > t0 ? tramosLosa(s).reduce((a, [p, q]) => a + Math.max(0, Math.min(q, t1) - Math.max(p, t0)), 0) : 0);
     /**
      * El metro de un pilar en su cara propia sp cuando la común (c.s) cae dentro de su huella (F3): el
      * corte en escalón, por la recta de la cara común a los lados de la huella y por su cara delante
@@ -586,9 +593,33 @@ export class EsfuerzosFranjas {
         lineas.push({ id, s: (A[0] * d[0] + A[1] * d[1] + B[0] * d[0] + B[1] * d[1]) / 2, ta: Math.min(ta, tb), tb: Math.max(ta, tb) });
       }
     };
-    for (const v of this.ctx.vigas) if (v.planta === l.losa.planta) tramosDe(v.id, v.puntos);
+    const conAncho = new Set(anchosL.map((a) => a.viga));
+    for (const v of this.ctx.vigas) if (v.planta === l.losa.planta && !conAncho.has(v.id)) tramosDe(v.id, v.puntos);
     for (const m of this.ctx.muros) if (kp >= m.kh && kp <= m.kb) tramosDe(m.muro.id, m.muro.puntos);
     for (const a of this.ctx.apoyosLineales) if (a.planta === l.losa.planta) tramosDe(a.id, a.puntos);
+    // Fase LV: de una viga que se une por sus caras, cada cara con la losa de su lado (la de menor s,
+    // la de s menores); entre las caras no hay estaciones
+    for (const a of anchosL) {
+      const [d0, d1, i1, i0] = a.poligono;
+      const sc = (d0[0] + d1[0] + i1[0] + i0[0]) / 4 * d[0] + (d0[1] + d1[1] + i1[1] + i0[1]) / 4 * d[1];
+      const caras: [number, number][] = [];
+      for (const [A, B] of [
+        [d0, d1],
+        [i1, i0],
+      ] as const) {
+        const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (!(L > EPS) || Math.abs((B[0] - A[0]) * d[0] + (B[1] - A[1]) * d[1]) > 1e-9 * L) continue;
+        const sf = (A[0] * d[0] + A[1] * d[1] + B[0] * d[0] + B[1] * d[1]) / 2;
+        const [ta, tb] = [A[0] * n[0] + A[1] * n[1], B[0] * n[0] + B[1] * n[1]];
+        lineas.push({ id: a.viga, s: sf, ta: Math.min(ta, tb), tb: Math.max(ta, tb), lado: sf < sc ? -1 : 1 });
+        caras.push([sf, Math.min(ta, tb)], [sf, Math.max(ta, tb)]);
+      }
+      if (caras.length === 2) {
+        const [s0, s1] = [Math.min(caras[0]![0], caras[2]![0]), Math.max(caras[0]![0], caras[2]![0])];
+        const [t0, t1] = [Math.min(...caras.map((x) => x[1])), Math.max(...caras.map((x) => x[1]))];
+        for (let i = 0; i < fr.length; i++) if (toca(i, t0, t1)) zonas[i]!.push([s0, s1]);
+      }
+    }
     lineas.sort((a, b) => a.s - b.s || a.ta - b.ta || (a.id < b.id ? -1 : 1));
 
     // Pilares sin cara de franja en esta dirección (de borde, o atravesados por una viga o un muro
@@ -598,8 +629,26 @@ export class EsfuerzosFranjas {
     // pegadas a la esquina del pilar, hasta un 40 % bajas, y la de apoyo en el eje sin la huella
     // Los pilares que se quedan sin estación en sus caras, con la causa, para el aviso
     const sinEstacion: { id: string; t0: number; t1: number; girado: boolean }[] = [];
+    // Fase LV: un pilar dentro del ancho de una viga que va según n (la que se une a la losa por sus
+    // caras) se apoya en ella: el apoyo de la franja son las caras de la viga, con sus estaciones. El
+    // centro del pilar, en el ancho cerrado y con holgura: el de un pilar en el extremo de la viga cae
+    // en el borde del polígono, y `puntoEnPoligono` lo daba dentro en un extremo y fuera en el otro
+    const enVigaSegunN = (q: Vec2) =>
+      anchosL.some(({ poligono, b }) => {
+        const [d0, d1, i1, i0] = [poligono[0]!, poligono[1]!, poligono[2]!, poligono[3]!];
+        const A: Vec2 = [(d0[0] + i0[0]) / 2, (d0[1] + i0[1]) / 2];
+        const B: Vec2 = [(d1[0] + i1[0]) / 2, (d1[1] + i1[1]) / 2];
+        const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+        if (!(L > EPS)) return false;
+        const u: Vec2 = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
+        if (Math.abs(u[0] * n[0] + u[1] * n[1]) < COSENO_APOYO_PILAR) return false;
+        const s = (q[0] - A[0]) * u[0] + (q[1] - A[1]) * u[1];
+        const t = -(q[0] - A[0]) * u[1] + (q[1] - A[1]) * u[0];
+        return s >= -EPS && s <= L + EPS && Math.abs(t) <= b / 2 + EPS;
+      });
     for (const p of huellas.values()) {
       if (porPilar.has(p.id) || !enlace.has(p.id) || !p.huella.forma) continue;
+      if (anchosL.length && enVigaSegunN(p.p)) continue;
       const ed = semiextension(p.huella, d);
       const en = semiextension(p.huella, n);
       const sc = p.p[0] * d[0] + p.p[1] * d[1];
@@ -617,7 +666,7 @@ export class EsfuerzosFranjas {
       for (const lado of [-1, 1] as const) {
         const sp = sc + lado * ed;
         // Sin losa al otro lado de la cara (la de fuera de un pilar de borde): sin estación
-        const fuera = tramosRecta(l.region, d, n, sp + lado * this.ctx.op.tamanoMalla).reduce((a, [x, y]) => a + Math.max(0, Math.min(y, ventana[1]) - Math.max(x, ventana[0])), 0);
+        const fuera = tramosLosa(sp + lado * this.ctx.op.tamanoMalla).reduce((a, [x, y]) => a + Math.max(0, Math.min(y, ventana[1]) - Math.max(x, ventana[0])), 0);
         if (!(fuera > EPS)) continue;
         conVano = true;
         // Por la recta de la cara, si sigue la malla en la ventana: con el enlace si tiene nudos delante
@@ -644,8 +693,8 @@ export class EsfuerzosFranjas {
     const cercaDeExacta = (i: number, s: number) => exactas[i]!.some((x) => Math.abs(x - s) <= EPS);
 
     for (const ln of lineas) {
-      const tramos = tramosRecta(l.region, d, n, ln.s);
-      for (const lado of [-1, 1] as const) {
+      const tramos = tramosLosa(ln.s);
+      for (const lado of ln.lado ? [ln.lado] : ([-1, 1] as const)) {
         const nod = porNodales(ln.s, lado, ln.ta, ln.tb);
         if (!nod) continue;
         const cam = porCampos(ln.s + lado * DELTA_MUESTRAS);

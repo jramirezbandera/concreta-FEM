@@ -449,11 +449,14 @@ describe("regresiones de la malla de C2 que encontró C4", () => {
     };
   };
 
+  // Con la unión de la fase LV, las huellas de los pilares de este modelo quedan tapadas por el ancho
+  // de sus vigas y no hay plantillas: la regresión se prueba con la de antes (por el eje)
   it("una zona o una banda que se sale de la losa junto a un pilar de esquina: la malla cubre la losa (arista de plantilla por el borde, obligatoria)", () => {
     for (const como of ["zonas", "bandas"] as const) {
-      const r = valido(compilar(macizas(8, como, true)));
+      const r = valido(compilar(macizas(8, como, true), { unionLosaViga: "eje" }));
       expect(r.estadisticas.malla.plantillas, como).toBeGreaterThan(0);
       expect(r.estadisticas.sinPerdidas.fuerzas, como).toBeLessThan(1e-9);
+      expect(valido(compilar(macizas(8, como, true))).estadisticas.sinPerdidas.fuerzas, `${como}, por las caras`).toBeLessThan(1e-9);
     }
   });
 

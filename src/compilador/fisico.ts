@@ -533,6 +533,13 @@ export interface OpcionesCompilacion {
    * `multiplicadores` dados en la losa mandan sobre las dos.
    */
   rigidezReticular?: "uniforme" | "bruta";
+  /**
+   * Unión de las losas con las vigas de hormigón rectangulares (fase LV, CY-g). "cara" (por
+   * defecto), la de CYPECAD: el ancho de la viga no es losa, y los nudos de la losa en sus caras van
+   * unidos a su eje por un enlace rígido; lo que cae en el ancho pasa a la viga. "eje" (C2-c, C2-e):
+   * la losa llega al eje de la viga y la viga se parte en los nudos de la malla sobre él.
+   */
+  unionLosaViga?: "cara" | "eje";
   /** Deformación por cortante (Timoshenko). Por defecto, sí. */
   cortante?: boolean;
   /**
@@ -580,6 +587,7 @@ export interface OpcionesResueltas {
   factorZonaRigida: number;
   empotramientoCabeza: number;
   rigidezReticular: "uniforme" | "bruta";
+  unionLosaViga: "cara" | "eje";
   cortante: boolean;
   modificadores: ModificadoresPiezas;
   tamanoMalla: number;
@@ -597,6 +605,7 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     factorZonaRigida: o.factorZonaRigida ?? FACTOR_ZONA_RIGIDA,
     empotramientoCabeza: o.empotramientoCabeza ?? EMPOTRAMIENTO_CABEZA,
     rigidezReticular: o.rigidezReticular ?? "uniforme",
+    unionLosaViga: o.unionLosaViga ?? "cara",
     cortante: o.cortante ?? true,
     modificadores: o.modificadores ?? MODIFICADORES_D4,
     tamanoMalla: o.tamanoMalla ?? TAMANO_MALLA,

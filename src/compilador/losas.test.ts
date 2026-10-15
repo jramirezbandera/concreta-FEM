@@ -3,6 +3,10 @@
  * (C2-f), vigas embebidas (C2-e), peso propio y descuelgue de las vigas (C2-g, frente a un cálculo
  * a mano), bordes de losa dentro del ancho de una viga (C2-c), cargas y apoyos en losa (C2-h); y en
  * baterías al azar, el validador de la malla (criterio 3) y «sin pérdidas» (criterio 5).
+ *
+ * Las huellas, las vigas embebidas, C2-c y el validador de las áreas de las láminas, con la unión de
+ * la losa con las vigas de antes de la fase LV (`unionLosaViga: "eje"`): con la de por defecto, la
+ * losa no llega al eje de las vigas de hormigón (`unionLosaViga.test.ts`).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -17,6 +21,9 @@ import { compilar } from "./compilar.ts";
 import type { CargaFisica, Losa, ModeloFisico, Vec2, Viga } from "./fisico.ts";
 import { jacobianoEscalado } from "./mallado.ts";
 import { momentosRegion } from "./poligonos.ts";
+
+/** La unión de la losa con las vigas de antes de la fase LV. */
+const EJE = { unionLosaViga: "eje" } as const;
 
 beforeAll(async () => {
   await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
@@ -60,7 +67,7 @@ function base(extra: { vigas?: Viga[]; losas?: Losa[]; cargas?: CargaFisica[] } 
 
 describe("huellas, diafragma y vigas embebidas", () => {
   it("cada pilar se une a la losa por su huella, encadenada al diafragma (C2-d, C2-f)", () => {
-    const r = valido(compilar(base(), { tamanoMalla: 0.5 }));
+    const r = valido(compilar(base(), { tamanoMalla: 0.5, ...EJE }));
     const m = r.modelo;
     const enlaces = m.restricciones!.filter((x) => x.tipo === "enlace-rigido");
     expect(enlaces).toHaveLength(4);
@@ -108,7 +115,7 @@ describe("huellas, diafragma y vigas embebidas", () => {
   });
 
   it("una viga embebida se parte en los nudos de la malla sobre su eje (C2-e)", () => {
-    const r = valido(compilar(base({ vigas: [{ id: "VE", planta: "P1", puntos: [[0, 2.5], [6, 2.5]], seccion: "v" }] }), { tamanoMalla: 0.5 }));
+    const r = valido(compilar(base({ vigas: [{ id: "VE", planta: "P1", puntos: [[0, 2.5], [6, 2.5]], seccion: "v" }] }), { tamanoMalla: 0.5, ...EJE }));
     const m = r.modelo;
     const barras = r.mapeo.piezas["VE"]!;
     expect(barras.length).toBeGreaterThan(6);
@@ -143,7 +150,7 @@ describe("peso propio (C2-g) frente a un cálculo a mano", () => {
 
 describe("errores y avisos de C2", () => {
   it("un borde de losa dentro del ancho de una viga sin ir por su eje es un error (C2-c)", () => {
-    const r = compilar(base({ losas: [{ id: "L", planta: "P1", contorno: rect(0, 0.12, 6, 5), espesor: 0.25, material: "HA" }] }));
+    const r = compilar(base({ losas: [{ id: "L", planta: "P1", contorno: rect(0, 0.12, 6, 5), espesor: 0.25, material: "HA" }] }), EJE);
     expect(r.valido).toBe(false);
     const d = r.diagnosticos.find((x) => x.codigo === "losa/borde-en-viga")!;
     expect(d.ids).toEqual(["L", "V0"]);
@@ -165,7 +172,7 @@ describe("errores y avisos de C2", () => {
   it("un borde oblicuo que corre por dentro del ancho de una viga cuenta lo que avanza a lo largo de ella (C2-c)", () => {
     // borde de (0, 0,12) a (6, 0,14): casi paralelo a V0 (y = 0), a 12–14 cm de su eje
     const losas: Losa[] = [{ id: "L", planta: "P1", contorno: [[0, 0.12], [6, 0.14], [6, 5], [0, 5]], espesor: 0.25, material: "HA" }];
-    const r = compilar(base({ losas }));
+    const r = compilar(base({ losas }), EJE);
     expect(r.diagnosticos.find((x) => x.codigo === "losa/borde-en-viga")?.ids).toEqual(["L", "V0"]);
   });
 
@@ -200,7 +207,7 @@ describe("criterio 3 de C2: validador de la malla en plantas al azar", () => {
     let jmin = Infinity;
     for (let s = 1; s <= 12; s++) {
       const f = conLosasAleatorias(fisicoAleatorio(s), s);
-      const r = valido(compilar(f));
+      const r = valido(compilar(f, EJE));
       const m = r.modelo;
       const areas = new Map<string, number>();
       m.laminas!.forEach((l, i) => {

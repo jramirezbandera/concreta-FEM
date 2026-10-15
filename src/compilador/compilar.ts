@@ -19,6 +19,7 @@
  */
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { Apoyo, BarraAnalitica, CargaLamina, CasoCarga, LaminaAnalitica, ModeloAnalitico, NudoAnalitico, Restriccion, Vec3 } from "../motor/modelo.ts";
+import { anchoUnion } from "./anchosVigas.ts";
 import { avisarApoyosBandas } from "./bandas.ts";
 import { camposDesconocidos } from "./campos.ts";
 import { construirCargas, diferenciaResultantes, resultanteAnalitica, TOL_SIN_PERDIDAS } from "./cargas.ts";
@@ -37,7 +38,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "CY3";
+export const VERSION_COMPILADOR = "LV1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -49,6 +50,8 @@ export interface EstadisticasCompilacion {
   diafragmas: number;
   /** Huellas de pilar en losa (enlaces rígidos, C2-d). */
   huellas: number;
+  /** Enlaces rígidos de las caras de las vigas con su eje (fase LV) y nudos de la losa que unen. */
+  enlacesVigas: { enlaces: number; nudos: number };
   /**
    * Malla de las losas: jacobiano escalado mínimo, cuadriláteros bajo el umbral, láminas de la
    * rejilla alineada (H52) y plantillas de pilar.
@@ -224,6 +227,16 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     restricciones.push({ tipo: "enlace-rigido", id: `${h.pilar}@${planta}:huella`, maestro: nuevo[h.maestro]!, esclavos: h.esclavos.map((n) => nuevo[n]!).sort((a, b) => a - b) });
     mapRestr.push({ planta, pilar: h.pilar });
   }
+  // Caras de las vigas (fase LV): los nudos de la losa en ellas, con maestro en su eje
+  const cuentaEnlace = new Map<string, number>();
+  for (const h of [...losas.enlacesVigas].sort((a, b) => ctx.cotas[a.k]! - ctx.cotas[b.k]! || nuevo[a.maestro]! - nuevo[b.maestro]!)) {
+    const planta = ctx.plantas[h.k]!.id;
+    const base = `${h.viga}@${planta}:cara`;
+    const i = (cuentaEnlace.get(base) ?? 0) + 1;
+    cuentaEnlace.set(base, i);
+    restricciones.push({ tipo: "enlace-rigido", id: `${base}${i}`, maestro: nuevo[h.maestro]!, esclavos: h.esclavos.map((n) => nuevo[n]!).sort((a, b) => a - b) });
+    mapRestr.push({ planta, viga: h.viga });
+  }
   // Huellas de las vigas que acaban en un muro fuera de su plano (C3-i)
   for (const h of [...losas.huellasVigas].sort((a, b) => ctx.cotas[a.k]! - ctx.cotas[b.k]! || nuevo[a.maestro]! - nuevo[b.maestro]!)) {
     const planta = ctx.plantas[h.k]!.id;
@@ -357,6 +370,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     nudosPilar,
     apoyos: apoyosMap,
   };
+  if (losas.anchos.length) mapeo.anchos = losas.anchos.map((a) => ({ viga: a.viga, planta: ctx.plantas[a.k]!.id, b: a.b, poligono: a.poligono.map((q) => [q[0], q[1]]) }));
   if (panos.viguetas.length) {
     const porPano: Record<string, string[]> = {};
     ctx.panos.forEach((p, i) => panos.porPano[i]!.length && (porPano[p.pano.id] = panos.porPano[i]!.map((v) => panos.viguetas[v]!.id)));
@@ -389,6 +403,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
       laminas: laminas.length,
       diafragmas: piezas.diafragmas.length,
       huellas: losas.huellas.length,
+      enlacesVigas: { enlaces: losas.enlacesVigas.length, nudos: losas.enlacesVigas.reduce((a, x) => a + x.esclavos.length, 0) },
       malla: { jacobianoMin: losas.malla.jacobianoMin, bajos: losas.malla.bajos, laminasRejilla: losas.malla.laminasRejilla, plantillas: losas.malla.plantillas, plantillasRefinadas: losas.malla.plantillasRefinadas },
       laminasMuros: losas.muros.length,
       muros: { aspectoMax: losas.aspectoMuros.max, altos: losas.aspectoMuros.altos, auxiliares: piezas.barras.filter((b) => b.auxiliar).length },
@@ -499,8 +514,14 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
         ? `Losas malladas con láminas DKMQ (h = ${coma(op.tamanoMalla)} m; ${losas.laminas.length} láminas; jacobiano escalado mínimo ${coma(Number(losas.malla.jacobianoMin.toFixed(3)))}): rejilla alineada con los ejes de la losa en las zonas regulares, con cuadriláteros de ≤ ${coma(op.tamanoMalla)} m y ${losas.malla.plantillas} plantillas de pilar (${enRejilla} láminas, el ${coma(Number(((100 * enRejilla) / Math.max(1, losas.laminas.length)).toFixed(0)))} %), y triangulación restringida de lado ${coma(2 * op.tamanoMalla)} m, refinada junto a los rasgos pequeños (con el objetivo de un jacobiano escalado ≥ 0,3) y dividida en 3 cuadriláteros, alrededor de lo que no cae en ella (H52, C2-a, G-4).`
         : `Losas malladas con láminas DKMQ: triangulación restringida de lado ${coma(2 * op.tamanoMalla)} m, refinada junto a los rasgos pequeños (G-4) y dividida en 3 cuadriláteros (h = ${coma(op.tamanoMalla)} m; ${losas.laminas.length} láminas; jacobiano escalado mínimo ${coma(Number(losas.malla.jacobianoMin.toFixed(3)))}).`,
     );
+    const conAncho = losas.anchos.length > 0;
+    const otras = ctx.vigas.some((v) => ctx.losas.some((l) => l.losa.planta === v.planta) && anchoUnion(ctx, v) === null);
     h.push(
-      `Unión pilar–losa por la huella del pilar, rígida (${losas.huellas.length} huellas, H09). Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas, y la zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
+      `Unión pilar–losa por la huella del pilar, rígida (${losas.huellas.length} huellas, H09). ${
+        conAncho
+          ? `Unión losa–viga como CYPECAD (fase LV, CY-g): el ancho de las vigas de hormigón rectangulares no es losa; la losa llega a sus caras y sus nudos en ellas van unidos al eje de la viga por un enlace rígido (${losas.enlacesVigas.length} enlaces, ${losas.enlacesVigas.reduce((a, x) => a + x.esclavos.length, 0)} nudos; los que caen frente a un pilar, con su huella). Lo que cae en el ancho de la viga (el pp de la losa, sus cargas de superficie, lineales y puntuales) pasa a la viga con su momento de transporte.${otras ? " Las demás vigas (metálicas o de otras secciones) se parten en los nudos de la malla sobre su eje, con la losa continua por encima." : ""}`
+          : "Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas."
+      } La zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
     );
     h.push(
       `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos, con casetón recuperable (C4-i)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).${ctx.pilares.length ? " Los pilares pesan de forjado a forjado, sin descontar su cruce con las losas (A-9): del lado de la seguridad, como es habitual." : ""}`,

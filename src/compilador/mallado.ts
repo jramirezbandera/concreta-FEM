@@ -40,10 +40,11 @@
  */
 import Constrainautor from "@kninnug/constrainautor";
 import Delaunator from "delaunator";
-import { incircle } from "robust-predicates";
+import { incircle, orient2d } from "robust-predicates";
 import type { Arreglo, Trazo } from "./arreglo.ts";
 import type { Vec2 } from "./fisico.ts";
-import { distanciaASegmento, jacobianoEscalado, momentosRegion, puntoEnRegion, type Region } from "./poligonos.ts";
+import { CUANTO_ORDEN } from "./geometria2d.ts";
+import { distanciaASegmento, jacobianoEscalado, momentosRegion, puntoEnPoligono, puntoEnRegion, type Region } from "./poligonos.ts";
 import { cubierta, IRREGULAR, REGULAR, rejillaPlanta, type RefinoHuella, type Rejilla } from "./rejilla.ts";
 
 export { jacobianoEscalado };
@@ -83,6 +84,33 @@ export interface LosaMallar {
   eje1: Vec2;
 }
 
+/**
+ * El ancho de una viga que no es losa (fase LV, `anchosVigas.ts`): su trazo cerrado en el arreglo y
+ * los extremos de su eje.
+ */
+export interface AnchoMallar {
+  trazo: Trazo;
+  A: Vec2;
+  B: Vec2;
+  /** Ancho de la viga. */
+  b: number;
+}
+
+/**
+ * Una pieza de la triangulación en el ancho de una viga (fase LV): no es lámina, y su carga pasa a la
+ * viga. En el cruce de dos anchos, al de la viga que pasa por él (`anchoDe` en `mallarPlantaCon`).
+ */
+export interface PiezaAncho {
+  /** Vértices, antihorario. */
+  v: Vec2[];
+  c: Vec2;
+  area: number;
+  /** Losa (índice en la lista de `mallarPlanta`) en cuya región cae. */
+  losa: number;
+  /** Ancho (índice en la lista de `mallarPlanta`). */
+  ancho: number;
+}
+
 export interface NudoMalla {
   x: number;
   y: number;
@@ -117,6 +145,8 @@ export type ResultadoMalla =
        * regulares de la rejilla. Cada una está entera dentro o fuera de cada zona del arreglo.
        */
       piezas: { c: Vec2; losa: number }[];
+      /** Piezas en el ancho de las vigas (fase LV): no son láminas. */
+      piezasAncho: PiezaAncho[];
       /** Lados del arreglo (en el orden de `arreglo.lados()`). */
       lados: { a: number; b: number; trazos: number[] }[];
       /** Nudos de la malla a lo largo de cada lado, de a a b; vacío si no toca ninguna losa. */
@@ -140,6 +170,15 @@ export type ResultadoMalla =
  * siéndolo con ese ruido, o con el redondeo de una traslación o un giro.
  */
 const TOL_EMPATE = 1e-10;
+/**
+ * Tope de predicados (`inCircle` e `intersectSegments`) por punto en una triangulación restringida
+ * de `Restringidor` (más 100 000). Con unos rasgos casi degenerados (una línea de carga que cruza la
+ * cara del ancho de una viga con 2°, y los puntos que el refinamiento pone junto al cruce, fase LV),
+ * el recorrido de constrainautor ciclaba sin fin. Con el tope lanza: se repite sin los empates (el
+ * respaldo) y, si tampoco acaba, la planta no se malla (error), pero nunca se cuelga. Los modelos de
+ * las pruebas hacen ≤ 14 por punto.
+ */
+const TOPE_PREDICADOS = 200;
 
 const nextEdge = (e: number) => (e % 3 === 2 ? e - 2 : e + 1);
 const prevEdge = (e: number) => (e % 3 === 0 ? e + 2 : e - 1);
@@ -152,6 +191,9 @@ class Restringidor extends Constrainautor {
   private e1: Vec2 = [1, 0];
   private O: Vec2 = [0, 0];
   private epsGeom = 0;
+  private llamadas = 0;
+  private tope = Infinity;
+  private conEmpates = true;
 
   /**
    * Restringe las aristas y normaliza los empates; devuelve las pasadas de normalización. Los
@@ -167,6 +209,7 @@ class Restringidor extends Constrainautor {
     this.e1 = e1;
     this.O = O;
     this.epsGeom = epsGeom;
+    this.tope = TOPE_PREDICADOS * (this.del.coords.length / 2) + 100000;
     this.constrainAll(aristas);
     const del = this.del as unknown as { triangles: Uint32Array; halfedges: Int32Array };
     const giro = this as unknown as { flipDiagonal(e: number): number };
@@ -186,11 +229,40 @@ class Restringidor extends Constrainautor {
     return -1;
   }
 
-  /** ¿Hay que cambiar la diagonal p2–p3 de los triángulos (p1, p2, p3) y (p3, p2, px) por p1–px? */
+  /** Restringe las aristas con los predicados exactos, sin los empates (el respaldo), con el mismo tope. */
+  restringirSinEmpates(aristas: readonly [number, number][]): void {
+    this.conEmpates = false;
+    this.tope = TOPE_PREDICADOS * (this.del.coords.length / 2) + 100000;
+    this.constrainAll(aristas);
+  }
+
+  private contar(): void {
+    if (++this.llamadas > this.tope) throw new Error(`La triangulación restringida no acaba (${this.llamadas} predicados)`);
+  }
+
+  protected override intersectSegments(p1: number, p2: number, p3: number, p4: number): boolean {
+    this.contar();
+    return super.intersectSegments(p1, p2, p3, p4);
+  }
+
+  /**
+   * ¿Hay que cambiar la diagonal p2–p3 de los triángulos (p1, p2, p3) y (p3, p2, px) por p1–px? Nunca
+   * si el cuadrilátero no es estrictamente convexo: con puntos casi alineados (junto a un ángulo de
+   * 2° entre dos aristas obligatorias), el empate pedía girarla, la estructura de constrainautor se
+   * corrompía y sus recorridos alrededor de un vértice no acababan (fase LV).
+   */
   protected override inCircle(p1: number, p2: number, p3: number, px: number): boolean {
+    this.contar();
+    if (!this.conEmpates) return super.inCircle(p1, p2, p3, px);
     const c = this.del.coords;
     const X = (i: number): Vec2 => [c[2 * i]!, c[2 * i + 1]!];
     const [A, B, C, D] = [X(p1), X(p2), X(p3), X(px)];
+    if (!this.cambiar(A, B, C, D)) return false;
+    const [o1, o2] = [orient2d(A[0], A[1], D[0], D[1], B[0], B[1]), orient2d(A[0], A[1], D[0], D[1], C[0], C[1])];
+    return (o1 > 0 && o2 < 0) || (o1 < 0 && o2 > 0);
+  }
+
+  private cambiar(A: Vec2, B: Vec2, C: Vec2, D: Vec2): boolean {
     const v = incircle(A[0], A[1], B[0], B[1], C[0], C[1], D[0], D[1]);
     let L = 0;
     for (const P of [B, C, D]) L = Math.max(L, Math.abs(P[0] - A[0]), Math.abs(P[1] - A[1]));
@@ -290,11 +362,11 @@ export function siembraGraduada(L: number, sa: number, sb: number, s: number, nF
  * losas (una planta pequeña y llena de rasgos), se malla también sin ella y se queda la malla con
  * menos nudos (a igualdad, la de la rejilla).
  */
-export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>, rejilla = true, refino?: RefinoCaras): ResultadoMalla {
-  const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false);
+export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>, rejilla = true, refino?: RefinoCaras, anchos: readonly AnchoMallar[] = []): ResultadoMalla {
+  const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false, undefined, anchos);
   if (!rejilla) return sin();
-  const conRejilla = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true);
-  const r = conRespaldo(refino?.caras.size ? () => conRespaldoRefino(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, refino), conRejilla, [...refino.caras.keys()]) : conRejilla, sin);
+  const conRejilla = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, undefined, anchos);
+  const r = conRespaldo(refino?.caras.size ? () => conRespaldoRefino(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, refino, anchos), conRejilla, [...refino.caras.keys()]) : conRejilla, sin);
   if (!r.ok || r.rejilla.cobertura >= COBERTURA_MINIMA || r.problemas.some((p) => p.codigo === "malla/sin-rejilla")) return r;
   const s = sin();
   return s.ok && s.nudos.length < r.nudos.length ? s : r;
@@ -367,20 +439,81 @@ export interface RefinoCaras {
 }
 
 /** `mallarPlanta` sin comparar con la CDT sola cuando la rejilla cubre poco (para las pruebas). */
-export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom: number, presembrados: ReadonlySet<string> | undefined, rejilla: boolean, refino?: RefinoCaras): ResultadoMalla {
+export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom: number, presembrados: ReadonlySet<string> | undefined, rejilla: boolean, refino?: RefinoCaras, anchos: readonly AnchoMallar[] = []): ResultadoMalla {
   const s = 2 * h;
   const lados = arreglo.lados();
   const regiones = losas.map((l) => regionDe(arreglo, l));
   const cajas = regiones.map((r) => cajaDe(r.contorno));
   const P: Vec2[] = arreglo.puntos.map((p) => [p.x, p.y]);
   const origen: number[] = arreglo.puntos.map((_, i) => i);
-  const enLosa = (q: Vec2) =>
+  /** Losa en cuya región (contorno sin huecos) cae q, o −1. */
+  const enRegion = (q: Vec2) =>
     regiones.findIndex((r, k) => {
       const cj = cajas[k]!;
       return !(q[0] < cj[0] || q[0] > cj[2] || q[1] < cj[1] || q[1] > cj[3]) && puntoEnRegion(q, r);
     });
+  // El ancho de las vigas (fase LV): está en la región de la losa, pero no es losa. Su polígono es el
+  // de su trazo en el arreglo (ya unido a lo cercano), el mismo que siembra la malla
+  const conAnchos = anchos.length > 0;
+  const anchosP = anchos.map((a) => {
+    const poli = a.trazo.puntos.map((i) => P[i]!);
+    const d: Vec2 = [a.B[0] - a.A[0], a.B[1] - a.A[1]];
+    const L = Math.sqrt(d[0] * d[0] + d[1] * d[1]);
+    return { poli, caja: cajaDe(poli), A: a.A, B: a.B, u: [d[0] / L, d[1] / L] as Vec2 };
+  });
+  /** Anchos que contienen q. */
+  const enAnchos = (q: Vec2): number[] => {
+    const r: number[] = [];
+    anchosP.forEach((a, i) => {
+      const cj = a.caja;
+      if (!(q[0] < cj[0] || q[0] > cj[2] || q[1] < cj[1] || q[1] > cj[3]) && puntoEnPoligono(q, a.poli)) r.push(i);
+    });
+    return r;
+  };
+  /**
+   * De los anchos que contienen q (el cruce de dos vigas), el de la que pasa por él, no el de la que
+   * acaba en él (q a menos del medio ancho de la otra del extremo de su eje); si pasan o acaban las
+   * dos, el primero. La regla es discreta: el reparto del cruce no depende de cómo lo triangula la CDT
+   * (con el eje más cercano dependía de una diagonal, y un giro de la planta cambiaba la carga).
+   */
+  const anchoDe = (q: Vec2): number => {
+    const en = enAnchos(q);
+    if (en.length < 2) return en.length ? en[0]! : -1;
+    const acaba = (i: number) => {
+      const { A, B, u } = anchosP[i]!;
+      const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+      const sg = (q[0] - A[0]) * u[0] + (q[1] - A[1]) * u[1];
+      const otro = Math.max(...en.filter((j) => j !== i).map((j) => anchos[j]!.b / 2));
+      return Math.min(sg, L - sg) <= otro + 1e-9;
+    };
+    return en.find((i) => !acaba(i)) ?? en[0]!;
+  };
+  /** Losa en la que cae q (fuera del ancho de las vigas), o −1. */
+  const enLosa = conAnchos ? (q: Vec2) => (enAnchos(q).length ? -1 : enRegion(q)) : enRegion;
   const trazoLosa = new Set<Trazo>(losas.flatMap((l) => [l.contorno, ...l.huecos]));
   const fijos = lados.map((l) => presembrados?.has(`${l.a},${l.b}`) ?? false);
+  // Con anchos, un lado cuenta (se siembra, va en la rejilla y se valida) si toca losa por algún lado,
+  // y es borde (arista obligatoria) si lo que hay a cada lado es distinto, en la losa o en su región.
+  // Un lado dentro del ancho de una viga y de la región de una losa (un borde de losa dibujado por el
+  // eje de la viga, el de una zona de carga o de un ábaco) no cuenta, pero es arista obligatoria: las
+  // piezas del ancho no lo cruzan, y su carga es la de su lado
+  const ladoA = lados.map((l) => {
+    if (!conAnchos) return { relevante: false, borde: false, iz: false, de: false };
+    const [A, B] = [P[l.a]!, P[l.b]!];
+    const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+    const m: Vec2 = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+    const nu: Vec2 = L > 0 ? [-(B[1] - A[1]) / L, (B[0] - A[0]) / L] : [0, 0];
+    const dl = 10 * epsGeom;
+    const [Mi, Md]: [Vec2, Vec2] = [
+      [m[0] + dl * nu[0], m[1] + dl * nu[1]],
+      [m[0] - dl * nu[0], m[1] - dl * nu[1]],
+    ];
+    const [iz, de] = [enLosa(Mi), enLosa(Md)];
+    const [ri, rd] = [enRegion(Mi), enRegion(Md)];
+    return { relevante: iz >= 0 || de >= 0, borde: iz !== de || ri !== rd || (iz < 0 && de < 0 && (ri >= 0 || rd >= 0)), iz: iz >= 0, de: de >= 0 };
+  });
+  /** Puntos de los trazos de los anchos (en su borde: cuentan por sus lados). */
+  const puntoAncho = new Set<number>(anchos.flatMap((a) => a.trazo.puntos));
 
   // Vértice canónico de cada losa: el menor en v y luego en u, comparando a ε_geom (dos vértices de
   // un lado paralelo al eje 1 empatan en v, y el redondeo de un giro o un ruido no puede decidir
@@ -404,11 +537,12 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   /** Id (el del pilar) de cada huella, en el orden de la rejilla. */
   const idHuella: string[] = [];
   if (rejilla && losas.length) {
-    const ladoEnLosa = lados.map((l) => {
+    const ladoEnLosa = lados.map((l, k) => {
+      if (conAnchos) return ladoA[k]!.relevante;
       const [A, B] = [P[l.a]!, P[l.b]!];
       return l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!)) || enLosa([(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]) >= 0;
     });
-    const puntoEnLosa = P.map((q) => enLosa(q) >= 0);
+    const puntoEnLosa = P.map((q, p) => !puntoAncho.has(p) && enLosa(q) >= 0);
     lados.forEach((l, k) => {
       if (ladoEnLosa[k]) puntoEnLosa[l.a] = puntoEnLosa[l.b] = true;
     });
@@ -416,6 +550,37 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     const huellas = arreglo.trazos.flatMap((t, ti) => (t.tipo === "huella" ? [{ puntos: t.puntos, lados: lados.flatMap((l, k) => (l.trazos.includes(ti) ? [k] : [])) }] : []));
     idHuella.push(...arreglo.trazos.filter((t) => t.tipo === "huella").map((t) => t.id));
     const exactos = lados.map((l) => l.trazos.some((t) => arreglo.trazos[t]!.exacto));
+    // Fase LV: las caras de los anchos de las vigas (sus lados paralelos al eje) son líneas fuertes de
+    // la rejilla, y el eje de un pilar no lo es en la dirección de un ancho que pasa por su centro
+    const e0 = losas[0]!.eje1;
+    const traza = new Map(anchos.map((a, i) => [a.trazo, i] as const));
+    const fuertes = conAnchos
+      ? lados.map((l, k) => {
+          if (!ladoA[k]!.relevante) return false;
+          const [A, B] = [P[l.a]!, P[l.b]!];
+          const L = Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+          return l.trazos.some((t) => {
+            const i = traza.get(arreglo.trazos[t]!);
+            if (i === undefined) return false;
+            const { u } = anchosP[i]!;
+            return Math.abs((B[0] - A[0]) * u[1] - (B[1] - A[1]) * u[0]) <= 1e-6 * L;
+          });
+        })
+      : undefined;
+    const sinEje = conAnchos
+      ? huellas.map((hh): [boolean, boolean] => {
+          const c = hh.puntos.reduce((a, p) => [a[0] + P[p]![0] / hh.puntos.length, a[1] + P[p]![1] / hh.puntos.length] as Vec2, [0, 0] as Vec2);
+          const r: [boolean, boolean] = [false, false];
+          for (const i of enAnchos(c)) {
+            const { u } = anchosP[i]!;
+            const du = Math.abs(u[0] * e0[0] + u[1] * e0[1]);
+            // Un ancho a lo largo del eje 1 (u) tiene sus caras en v constante: sin la línea v del pilar
+            if (du > 1 - 1e-9) r[1] = true;
+            else if (du < 1e-9) r[0] = true;
+          }
+          return r;
+        })
+      : undefined;
     // Caras que se refinan, en los ejes de la rejilla: u a lo largo del eje 1 de la primera losa
     const e = losas[0]!.eje1;
     const refinoH = refino?.caras.size
@@ -433,7 +598,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
           return u[0] || u[1] || v[0] || v[1] ? { u, v } : null;
         })
       : undefined;
-    rj = rejillaPlanta({ P, lados, ladoEnLosa, puntoEnLosa, fijos, exactos, huellas, ...(refinoH ? { refino: refinoH, separacionRefino: refino!.separacion } : {}), regiones, enLosa, O: origenes[0]!, e, h, epsGeom });
+    rj = rejillaPlanta({ P, lados, ladoEnLosa, puntoEnLosa, fijos, exactos, huellas, ...(refinoH ? { refino: refinoH, separacionRefino: refino!.separacion } : {}), ...(fuertes ? { fuertes, sinEje } : {}), regiones, enLosa, O: origenes[0]!, e, h, epsGeom });
   }
   // Punto (índice en P) de cada nudo de la rejilla que se usa
   const pNudo = new Map<number, number>();
@@ -556,7 +721,12 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     // de las losas sí lo son, no cambia nada dentro. Con él, constrainautor fallaba en algunas
     // plantas giradas (C4)
     const [Aa, Bb] = [P[l.a]!, P[l.b]!];
-    if (!l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!)) && enLosa([(Aa[0] + Bb[0]) / 2, (Aa[1] + Bb[1]) / 2]) < 0) return [l.a, l.b];
+    if (conAnchos && !ladoA[k]!.relevante) {
+      // Un borde de la región dentro del ancho de una viga: obligatorio, sin sembrar
+      if (ladoA[k]!.borde) restringir(l.a, l.b);
+      return [l.a, l.b];
+    }
+    if (!conAnchos && !l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!)) && enLosa([(Aa[0] + Bb[0]) / 2, (Aa[1] + Bb[1]) / 2]) < 0) return [l.a, l.b];
     // Los lados de los ejes de los muros ya vienen sembrados (C3): sus puntos son las estaciones
     if (fijos[k]) {
       restringir(l.a, l.b);
@@ -565,7 +735,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     const ch = cadenaHuella.get(k);
     if (ch) return ch;
     const el = rj?.enLinea[k];
-    const borde = l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!));
+    const borde = conAnchos ? ladoA[k]!.borde : l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!));
     const cortes: { p: number; n: number }[] = [];
     if (!el) cortes.push({ p: l.a, n: -1 }, { p: l.b, n: -1 });
     else
@@ -662,7 +832,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         const a = i * s + desp;
         const b = j * fila;
         const q: Vec2 = [O[0] + a * e1x - b * e1y, O[1] + a * e1y + b * e1x];
-        if (puntoEnRegion(q, r) && lejos(q) && !enRejilla(q)) {
+        if (puntoEnRegion(q, r) && lejos(q) && !enRejilla(q) && !(conAnchos && enAnchos(q).length)) {
           P.push(q);
           origen.push(-1);
           reticula.push(P.length - 1);
@@ -717,10 +887,13 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   for (const [p, q] of restricciones) enCDT[p] = enCDT[q] = 1;
   for (const p of reticula) enCDT[p] = 1;
   for (let p = nPuntos; p < P.length; p++) if (!rj) enCDT[p] = 1;
-  const usarCDT = !rj || rj.estado.some((x) => x === IRREGULAR);
+  // Con anchos, la triangulación da también sus piezas (sus celdas no son de la rejilla)
+  const usarCDT = !rj || rj.estado.some((x) => x === IRREGULAR) || conAnchos;
+
   let orden: number[] = [];
   let tri: Uint32Array = new Uint32Array(0);
   let pasadas = 1;
+  let sinEmpates = false;
   const triangular = (): string | null => {
     orden = P.map((_, i) => i)
       .filter((i) => usarCDT && enCDT[i])
@@ -741,8 +914,18 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       // Dirección de referencia de los empates: el eje 1 de la primera losa
       pasadas = new Restringidor(d).restringir(aristas, losas[0]?.eje1 ?? [1, 0], origenes[0] ?? [0, 0], epsGeom);
       tri = d.triangles;
-    } catch (e) {
-      return e instanceof Error ? e.message : String(e);
+    } catch {
+      // Respaldo: con rasgos casi degenerados (una línea de carga que se une a la cara del ancho de una
+      // viga y sigue a 2° de ella, fase LV), los empates de `Restringidor` rompían el recorrido de
+      // constrainautor. Sin ellos triangula, aunque la malla puede depender de la posición de la planta
+      try {
+        const d = new Delaunator(coords);
+        new Restringidor(d).restringirSinEmpates(aristas);
+        tri = d.triangles;
+        sinEmpates = true;
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
     }
     return null;
   };
@@ -750,8 +933,11 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   // 4. Triángulos dentro de las losas y fuera de las celdas regulares (índices en P)
   const Q = (p: number) => P[p]!;
   type Triangulo = { v: [number, number, number]; c: Vec2; losa: number };
+  /** Los triángulos en el ancho de una viga (fase LV), con su ancho; los rehace cada `quedan`. */
+  let enAncho: (Triangulo & { ancho: number })[] = [];
   const quedan = (): Triangulo[] => {
     const r: Triangulo[] = [];
+    enAncho = [];
     for (let t = 0; t < tri.length; t += 3) {
       let [a, b, c] = [orden[tri[t]!]!, orden[tri[t + 1]!]!, orden[tri[t + 2]!]!];
       const [A, B, C] = [Q(a), Q(b), Q(c)];
@@ -776,7 +962,10 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         if (g[0] < cj[0] || g[0] > cj[2] || g[1] < cj[1] || g[1] > cj[3]) continue;
         if (puntoEnRegion(g, regiones[k]!)) losa = k;
       }
-      if (losa >= 0) r.push({ v: [a, b, c], c: g, losa });
+      if (losa < 0) continue;
+      const ancho = conAnchos ? anchoDe(g) : -1;
+      if (ancho >= 0) enAncho.push({ v: [a, b, c], c: g, losa, ancho });
+      else r.push({ v: [a, b, c], c: g, losa });
     }
     return r;
   };
@@ -867,17 +1056,40 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         const [U, V] = [P[p]!, P[q]!];
         const m: Vec2 = [(U[0] + V[0]) / 2, (U[1] + V[1]) / 2];
         const r2 = ((V[0] - U[0]) * (V[0] - U[0]) + (V[1] - U[1]) * (V[1] - U[1])) / 4;
-        const invadido = alrededor(puntosCelda, m, Math.sqrt(r2)).some((o) => o !== U && o !== V && (o[0] - m[0]) * (o[0] - m[0]) + (o[1] - m[1]) * (o[1] - m[1]) < r2 * (1 - 1e-6));
-        if (invadido && (lados[k]!.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!)) || enLosa(m) >= 0)) candidatos.push({ q: m, parte: i, r: Math.sqrt(r2), k: claveCanonica(m) });
+        // Con losa a un solo lado (la cara del ancho de una viga), sólo invade lo de ese lado: lo del
+        // otro no forma láminas con el tramo (un extremo de una carga lineal dentro del ancho, a 4 cm de
+        // la cara, la partía sin fin junto a él, fase LV)
+        const la = conAnchos ? ladoA[k]! : null;
+        const [LA, LB] = [P[lados[k]!.a]!, P[lados[k]!.b]!];
+        const delLado = (o: Vec2) => {
+          if (!la || la.iz === la.de) return true;
+          const x = (LB[0] - LA[0]) * (o[1] - LA[1]) - (LB[1] - LA[1]) * (o[0] - LA[0]);
+          return la.iz ? x > 0 : x < 0;
+        };
+        const invadido = alrededor(puntosCelda, m, Math.sqrt(r2)).some((o) => o !== U && o !== V && (o[0] - m[0]) * (o[0] - m[0]) + (o[1] - m[1]) * (o[1] - m[1]) < r2 * (1 - 1e-6) && delLado(o));
+        if (invadido && (conAnchos ? ladoA[k]!.relevante : lados[k]!.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!)) || enLosa(m) >= 0)) candidatos.push({ q: m, parte: i, r: Math.sqrt(r2), k: claveCanonica(m) });
       });
       /** La arista obligatoria más cercana en cuyo círculo diametral cae q, o −1. */
+      // A igual distancia (el centro de un rectángulo estrecho entre dos aristas paralelas, como el de
+      // una zona de carga junto a la cara de una viga), la de menor clave canónica de su punto medio: el
+      // orden de las celdas depende de la posición de la planta
+      const claveArista = (i: number): [number, number] => {
+        const [U, V] = [P[restricciones[i]![0]]!, P[restricciones[i]![1]]!];
+        return claveCanonica([(U[0] + V[0]) / 2, (U[1] + V[1]) / 2]);
+      };
       const invasora = (q: Vec2): number => {
         let [i0, d0] = [-1, Infinity];
         for (const i of new Set(alrededor(aristasCelda, q, mediaMax))) {
           const [U, V] = [P[restricciones[i]![0]]!, P[restricciones[i]![1]]!];
           const [mx, my] = [(U[0] + V[0]) / 2 - q[0], (U[1] + V[1]) / 2 - q[1]];
           const r2 = ((V[0] - U[0]) * (V[0] - U[0]) + (V[1] - U[1]) * (V[1] - U[1])) / 4;
-          if (mx * mx + my * my < r2 * (1 - 1e-6) && mx * mx + my * my < d0) [i0, d0] = [i, mx * mx + my * my];
+          const d = mx * mx + my * my;
+          if (!(d < r2 * (1 - 1e-6))) continue;
+          if (i0 < 0 || d < d0 * (1 - 1e-9)) [i0, d0] = [i, d];
+          else if (d <= d0 * (1 + 1e-9)) {
+            const [a, b] = [claveArista(i), claveArista(i0)];
+            if (a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])) [i0, d0] = [i, Math.min(d, d0)];
+          }
         }
         return i0;
       };
@@ -1094,6 +1306,18 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     return r;
   });
 
+  // Piezas en el ancho de las vigas (fase LV): sus triángulos, que no son láminas. En orden canónico,
+  // como las láminas (centroide cuantizado): el de la triangulación cambia con un redondeo de la
+  // entrada (un pilar girado difiere en un ulp entre V8 y JavaScriptCore), y con él el de sus cargas
+  const cq = (x: number) => Math.round(x / CUANTO_ORDEN);
+  const piezasAncho: PiezaAncho[] = enAncho
+    .map((t) => {
+      const v = t.v.map(Q);
+      const area = ((v[1]![0] - v[0]![0]) * (v[2]![1] - v[0]![1]) - (v[1]![1] - v[0]![1]) * (v[2]![0] - v[0]![0])) / 2;
+      return { v, c: t.c, area, losa: t.losa, ancho: t.ancho };
+    })
+    .sort((a, b) => cq(a.c[0]) - cq(b.c[0]) || cq(a.c[1]) - cq(b.c[1]) || a.losa - b.losa || a.ancho - b.ancho);
+
   // 6. Validador
   const problemas: ProblemaMalla[] = [];
   if (!conformes) problemas.push({ losa: -1, severidad: "error", codigo: "malla/conformidad", mensaje: "La rejilla y la triangulación no parten igual una arista de la interfaz. Es un fallo del compilador." });
@@ -1122,30 +1346,37 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     if (j <= 0 || !convexo) malos[q.losa]!++;
     else if (j < JACOBIANO_BAJO) bajos++;
   }
+  // Con anchos, sus piezas cuentan en el área de la losa en la que caen
+  for (const pa of piezasAncho) areas[pa.losa]! += pa.area;
   losas.forEach((l, k) => {
     const A = momentosRegion(regiones[k]!).A;
     const e = Math.abs(areas[k]! - A) / A;
     if (!(e <= 1e-9))
-      problemas.push({ losa: k, severidad: "error", codigo: "malla/area", mensaje: `La malla de la losa ${l.id} no cubre su área: ${areas[k]!.toPrecision(10)} m² frente a ${A.toPrecision(10)} m² (error ${e.toExponential(2)}).` });
+      problemas.push({ losa: k, severidad: "error", codigo: "malla/area", mensaje: `La malla de la losa ${l.id}${conAnchos ? " (con el ancho de sus vigas)" : ""} no cubre su área: ${areas[k]!.toPrecision(10)} m² frente a ${A.toPrecision(10)} m² (error ${e.toExponential(2)}).` });
     if (malos[k]! > 0)
       problemas.push({ losa: k, severidad: "error", codigo: "malla/jacobiano", mensaje: `La malla de la losa ${l.id} tiene ${malos[k]} cuadriláteros con el jacobiano ≤ 0 o no convexos (invertidos o degenerados).` });
   });
   // Lados y puntos que tienen que estar en la malla
+  // Con anchos: los lados que tocan losa, y los puntos dentro de ella o en esos lados
+  const extremoRelevante = new Set<number>();
+  if (conAnchos) lados.forEach((l, i) => ladoA[i]!.relevante && (extremoRelevante.add(l.a), extremoRelevante.add(l.b)));
   lados.forEach((l, i) => {
     if (nudosLado[i]!.length) return;
     const [A, B] = [P[l.a]!, P[l.b]!];
     const borde = l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!));
-    const k = enLosa([(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]);
-    if (borde || k >= 0)
+    const k = conAnchos ? enRegion([(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]) : enLosa([(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]);
+    if (conAnchos ? ladoA[i]!.relevante : borde || k >= 0)
       problemas.push({ losa: k, severidad: "error", codigo: "malla/lado-perdido", mensaje: `Un lado de ${l.trazos.map((t) => arreglo.trazos[t]!.id).join(", ")} entre (${A[0].toFixed(3)}, ${A[1].toFixed(3)}) y (${B[0].toFixed(3)}, ${B[1].toFixed(3)}) no es arista de la malla.` });
   });
   const usados = new Set(nudos.filter((n) => n.punto >= 0).map((n) => n.punto));
   arreglo.puntos.forEach((p, i) => {
     if (usados.has(i)) return;
-    const k = enLosa([p.x, p.y]);
-    if (k >= 0) problemas.push({ losa: k, severidad: "error", codigo: "malla/punto-perdido", mensaje: `El punto (${p.x.toFixed(3)}, ${p.y.toFixed(3)}) de la losa ${losas[k]!.id} no es vértice de la malla.` });
+    const k = conAnchos ? (extremoRelevante.has(i) || !puntoAncho.has(i) ? enRegion([p.x, p.y]) : -1) : enLosa([p.x, p.y]);
+    if (k >= 0 && (!conAnchos || extremoRelevante.has(i) || enLosa([p.x, p.y]) >= 0))
+      problemas.push({ losa: k, severidad: "error", codigo: "malla/punto-perdido", mensaje: `El punto (${p.x.toFixed(3)}, ${p.y.toFixed(3)}) de la losa ${losas[k]!.id} no es vértice de la malla.` });
   });
   if (pasadas < 0) problemas.push({ losa: -1, severidad: "aviso", codigo: "malla/empates", mensaje: "Los empates de la triangulación no se han resuelto en 50 pasadas: la malla puede depender de la posición de la planta." });
+  if (sinEmpates) problemas.push({ losa: -1, severidad: "aviso", codigo: "malla/empates", mensaje: "La triangulación de esta planta se ha hecho sin resolver los empates de Delaunay (hay rasgos casi degenerados: dos líneas a menos de ε_snap que se juntan con un ángulo muy pequeño): la malla puede depender de la posición de la planta. El cálculo es válido." });
   if (bajos > 0) {
     // Lo que pasa junto al peor: los trazos con algún lado a menos de 2h de él
     const cerca = [...new Set(lados.filter((l) => distanciaASegmento(peor, P[l.a]!, P[l.b]!) < s).flatMap((l) => l.trazos.map((t) => arreglo.trazos[t]!.id)))].sort();
@@ -1162,6 +1393,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     nudos,
     quads,
     piezas,
+    piezasAncho,
     lados,
     nudosLado,
     regiones,

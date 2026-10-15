@@ -58,6 +58,11 @@ export interface Mapeo {
   nudosPilar: Record<string, number>;
   /** Nudo de cada apoyo físico. */
   apoyos: Record<string, number>;
+  /**
+   * Fase LV: el ancho de las vigas que se unen a la losa por sus caras (no es losa), por tramo de su
+   * polilínea fuera de los muros, con su polígono en planta (sólo si hay alguno).
+   */
+  anchos?: { viga: string; planta: string; b: number; poligono: [number, number][] }[];
 }
 
 /** Objetos físicos de cada id analítico (nudos, barras, restricciones y casos). */

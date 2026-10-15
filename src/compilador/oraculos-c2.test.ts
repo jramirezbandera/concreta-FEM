@@ -73,6 +73,9 @@ describe("criterio 2 de C2: la losa plana de H25 frente a la rejilla de E5", () 
 });
 
 describe("criterio 3 de C2-a: plantillas de pilar frente a la triangulación fina", () => {
+  // Con las dos uniones de la losa con las vigas: la de antes (por el eje), con las plantillas de pilar
+  // en la rejilla, y la de la fase LV (por las caras), en la que las huellas quedan tapadas por el
+  // ancho de las vigas
   it("retícula enrasada, h = 0,75: reacciones a ≤ 1 %, flecha máxima a ≤ 2 % y deriva a ≤ 1 %", () => {
     const f = reticulaEnrasada(1);
     const medir = (op: OpcionesCompilacion) => {
@@ -91,11 +94,15 @@ describe("criterio 3 de C2-a: plantillas de pilar frente a la triangulación fin
       const deriva = arriba.reduce((s, n) => s + casos[V]!.u[6 * n]!, 0) / arriba.length;
       return { base, flecha, deriva, malla: r.estadisticas.malla, laminas: r.estadisticas.laminas };
     };
-    const [a, ref] = [medir({ tamanoMalla: 0.75 }), medir({ tamanoMalla: 0.2, rejilla: false })];
-    expect(a.malla.plantillas).toBe(12);
-    expect(a.malla.laminasRejilla).toBe(a.laminas);
-    a.base.forEach((b, i) => expect(Math.abs(b / ref.base[i]! - 1), `pilar ${i}`).toBeLessThan(0.01));
-    expect(Math.abs(a.flecha / ref.flecha - 1)).toBeLessThan(0.02);
-    expect(Math.abs(a.deriva / ref.deriva - 1)).toBeLessThan(0.01);
+    for (const union of ["eje", "cara"] as const) {
+      const [a, ref] = [medir({ tamanoMalla: 0.75, unionLosaViga: union }), medir({ tamanoMalla: 0.2, rejilla: false, unionLosaViga: union })];
+      if (union === "eje") {
+        expect(a.malla.plantillas).toBe(12);
+        expect(a.malla.laminasRejilla).toBe(a.laminas);
+      }
+      a.base.forEach((b, i) => expect(Math.abs(b / ref.base[i]! - 1), `${union}, pilar ${i}`).toBeLessThan(0.01));
+      expect(Math.abs(a.flecha / ref.flecha - 1), union).toBeLessThan(0.02);
+      expect(Math.abs(a.deriva / ref.deriva - 1), union).toBeLessThan(0.01);
+    }
   });
 });

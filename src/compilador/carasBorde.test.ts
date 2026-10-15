@@ -5,6 +5,9 @@
  * en la dirección del zuncho (no tenían cara de franja ni una recta de la malla por su huella desde la
  * que medirla), y la franja junto a ellos salía hasta un 73 % baja, con el aviso `franja/pilar-sin-cara`
  * y la causa equivocada; P3, además, perdía sus caras por la holgura de los zunchos cercanos.
+ *
+ * Con la unión de la losa con las vigas de antes (`unionLosaViga: "eje"`): con la de la fase LV, estos
+ * pilares quedan dentro del ancho de su zuncho, sin metro, y la estación va en la cara del zuncho.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -60,8 +63,8 @@ describe("caras de franja de los pilares de borde (F3.3)", () => {
   let fina: Consultas;
   beforeAll(async () => {
     await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
-    gruesa = consultas({});
-    fina = consultas({ tamanoMalla: 0.375 });
+    gruesa = consultas({ unionLosaViga: "eje" });
+    fina = consultas({ tamanoMalla: 0.375, unionLosaViga: "eje" });
   }, 120_000);
 
   it("con h = 0,75, ninguna franja se queda junto a un pilar sin estación en su cara", () => {

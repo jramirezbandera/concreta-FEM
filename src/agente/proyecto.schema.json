@@ -1178,6 +1178,13 @@
           ],
           "description": "Rigidez de los forjados reticulares (CY3, CY-c). \"uniforme\" (por defecto), la de CYPECAD: la\nzona aligerada y los ábacos con la mitad de la flexión de la maciza y la torsión de su\nemparrillado, sin Poisson; como fisurados, los ábacos no se llevan los momentos de los vanos.\n\"bruta\" (C4-h): la zona aligerada con la T bruta de sus nervios y los ábacos macizos. Los\n`multiplicadores` dados en la losa mandan sobre las dos."
         },
+        "unionLosaViga": {
+          "enum": [
+            "cara",
+            "eje"
+          ],
+          "description": "Unión de las losas con las vigas de hormigón rectangulares (fase LV, CY-g). \"cara\" (por\ndefecto), la de CYPECAD: el ancho de la viga no es losa, y los nudos de la losa en sus caras van\nunidos a su eje por un enlace rígido; lo que cae en el ancho pasa a la viga. \"eje\" (C2-c, C2-e):\nla losa llega al eje de la viga y la viga se parte en los nudos de la malla sobre él."
+        },
         "cortante": {
           "type": "boolean",
           "description": "Deformación por cortante (Timoshenko). Por defecto, sí."

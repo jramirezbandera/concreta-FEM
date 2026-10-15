@@ -30,11 +30,13 @@ function variante(f: ModeloFisico): ModeloFisico {
 describe("comparador del spike A2", () => {
   for (const nombre of ["1022", "nucleo"]) {
     const ref = REFERENCIAS[nombre]!;
-    it(`${nombre}: una variante equivalente pasa a ~1e-13 y una con otras opciones no`, () => {
+    // A 1e-11: el maestro del núcleo, sobre un sótano de muros, se mueve ≈ 1e-7 m, y con los enlaces de
+    // la losa a las vigas (fase LV) el orden de los ids cambia su redondeo en ~1e-12 relativo (1e-19 m)
+    it(`${nombre}: una variante equivalente pasa a ~1e-12 y una con otras opciones no`, () => {
       const mr = magnitudes(ref.fisico(), ref.opciones, ref);
       const filas = comparar(mr, magnitudes(variante(ref.fisico()), ref.opciones, ref));
       expect(filas.length).toBeGreaterThanOrEqual(5 + 2);
-      for (const f of filas) expect(f.error, f.grupo).toBeLessThan(1e-12);
+      for (const f of filas) expect(f.error, f.grupo).toBeLessThan(1e-11);
       const mal = comparar(mr, magnitudes(ref.fisico(), nombre === "1022" ? {} : { tamanoMalla: 0.75 }, ref));
       expect(mal.some((f) => !f.pasa)).toBe(true);
     });

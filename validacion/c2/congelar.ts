@@ -14,6 +14,10 @@
  * resultados a 1e-9), para que el fichero no pase de unos 2 MB.
  * El test (src/compilador/congelado-c2.test.ts) los recompila y recalcula con los dos solvers.
  *
+ * Fase LV: los modelos de antes llevan la unión de la losa con las vigas por el eje
+ * (`unionLosaViga: "eje"`: los mismos bits que antes de la fase); los terminados en `-lv`, la de la
+ * fase (por las caras, por defecto).
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/c2/congelar.ts
  */
@@ -34,13 +38,15 @@ import { reticulaEnrasada } from "./modelos.ts";
 import { navierFisico } from "./navier.ts";
 
 export const MODELOS_CONGELADOS_C2: Record<string, () => ModeloCongelado> = {
-  "losa-plana": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, rejilla: false } }),
-  "navier-delgada": () => ({ fisico: navierFisico(CASOS_NAVIER[0]!), opciones: { franjas: false, tamanoMalla: 0.5, rejilla: false } }),
-  "aleatorio-8-losas": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, rejilla: false } }),
-  "aleatorio-11-losas-sin-diafragma": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(11, { diafragma: false }), 11), opciones: { franjas: false, tamanoMalla: 1, rejilla: false } }),
-  "losa-plana-rejilla": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1 } }),
-  "aleatorio-8-losas-rejilla": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1 } }),
-  "reticula-enrasada": () => ({ fisico: reticulaEnrasada(1), opciones: { franjas: false } }),
+  "losa-plana": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje" } }),
+  "navier-delgada": () => ({ fisico: navierFisico(CASOS_NAVIER[0]!), opciones: { franjas: false, tamanoMalla: 0.5, rejilla: false, unionLosaViga: "eje" } }),
+  "aleatorio-8-losas": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje" } }),
+  "aleatorio-11-losas-sin-diafragma": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(11, { diafragma: false }), 11), opciones: { franjas: false, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje" } }),
+  "losa-plana-rejilla": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, unionLosaViga: "eje" } }),
+  "aleatorio-8-losas-rejilla": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje" } }),
+  "reticula-enrasada": () => ({ fisico: reticulaEnrasada(1), opciones: { franjas: false, unionLosaViga: "eje" } }),
+  // Fase LV: con la unión de la losa con las vigas por las caras (por defecto)
+  "aleatorio-8-losas-rejilla-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1 } }),
 };
 
 export interface ReferenciaC2 {

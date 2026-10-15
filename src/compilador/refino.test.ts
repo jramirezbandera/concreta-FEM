@@ -151,7 +151,7 @@ describe("respaldo", () => {
   });
 
   it("por planta: si la malla refinada falla, la de sin refinar con el aviso", () => {
-    const sinRef: ResultadoMalla = { ok: true, nudos: [], quads: [], piezas: [], lados: [], nudosLado: [], regiones: [], calidad: { jacobianoMin: 1, bajos: 0 }, rejilla: { celdas: 0, plantillas: 0, refinadas: 0, quads: 0, cobertura: 1 }, problemas: [] };
+    const sinRef: ResultadoMalla = { ok: true, nudos: [], quads: [], piezas: [], piezasAncho: [], lados: [], nudosLado: [], regiones: [], calidad: { jacobianoMin: 1, bajos: 0 }, rejilla: { celdas: 0, plantillas: 0, refinadas: 0, quads: 0, cobertura: 1 }, problemas: [] };
     const conError: ResultadoMalla = { ...sinRef, problemas: [{ losa: 0, severidad: "error", codigo: "malla/lado-perdido", mensaje: "x" }] };
     for (const intento of [() => conError, (): ResultadoMalla => { throw new Error("roto"); }]) {
       const r = conRespaldoRefino(intento, () => ({ ...sinRef, problemas: [] }), ["P2", "P1"]);

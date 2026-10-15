@@ -677,13 +677,18 @@ export const anillosForjado = (x: Forjado): (readonly Vec2[])[] => [x.contorno, 
 /**
  * Los ejes que atan el borde de un forjado: los tramos de las vigas y los apoyos lineales de su
  * planta, de los muros que llegan a ella o salen de ella, y los bordes de los otros forjados de la
- * planta.
+ * planta. Los de las vigas, con su ancho: un borde dentro de él también está atado (fase LV: la
+ * losa se une a la viga por su cara, así que el borde puede ir por el eje o hasta la cara de fuera).
  */
-export function ejesQueAtan(f: ModeloFisico, P: Plantas, x: Forjado): { A: Vec2; B: Vec2 }[] {
+export function ejesQueAtan(f: ModeloFisico, P: Plantas, x: Forjado): { A: Vec2; B: Vec2; ancho?: number }[] {
   const k = P.indice.get(x.planta);
-  const ejes: { A: Vec2; B: Vec2 }[] = [];
+  const ejes: { A: Vec2; B: Vec2; ancho?: number }[] = [];
   if (k === undefined) return ejes;
-  for (const v of f.vigas ?? []) if (v.planta === x.planta) ejes.push(...tramos(v.puntos));
+  const ancho = (id: string) => {
+    const sc = (f.secciones ?? []).find((s) => s.id === id);
+    return sc?.forma === "rectangular" ? sc.b : sc?.forma === "circular" ? sc.D : 0;
+  };
+  for (const v of f.vigas ?? []) if (v.planta === x.planta) ejes.push(...tramos(v.puntos).map((t) => ({ ...t, ancho: ancho(v.seccion) })));
   for (const a of f.apoyosLineales ?? []) if (a.planta === x.planta) ejes.push(...tramos(a.puntos));
   for (const m of f.muros ?? []) {
     const [kh, kb] = [P.indice.get(m.hasta), P.indice.get(m.desde)];
@@ -693,8 +698,11 @@ export function ejesQueAtan(f: ModeloFisico, P: Plantas, x: Forjado): { A: Vec2;
   return ejes;
 }
 
-/** Los trozos [s0, s1] del tramo t (de A a B, de largo L y dirección u) que no van sobre ninguno de los `ejes` (a ≤ eps de su recta), de más de eps. */
-export function libresTramo(t: { A: Vec2; L: number; u: Vec2 }, ejes: readonly { A: Vec2; B: Vec2 }[], eps: number): [number, number][] {
+/**
+ * Los trozos [s0, s1] del tramo t (de A a B, de largo L y dirección u) que no van sobre ninguno de los
+ * `ejes` (a ≤ eps de su recta, o dentro de su ancho), de más de eps.
+ */
+export function libresTramo(t: { A: Vec2; L: number; u: Vec2 }, ejes: readonly { A: Vec2; B: Vec2; ancho?: number }[], eps: number): [number, number][] {
   const pr = (q: Vec2) => {
     const [dx, dy] = [q[0] - t.A[0], q[1] - t.A[1]];
     return { s: dx * t.u[0] + dy * t.u[1], d: Math.abs(dx * t.u[1] - dy * t.u[0]) };
@@ -702,7 +710,8 @@ export function libresTramo(t: { A: Vec2; L: number; u: Vec2 }, ejes: readonly {
   const cub: [number, number][] = [];
   for (const e of ejes) {
     const [a, b] = [pr(e.A), pr(e.B)];
-    if (a.d > eps || b.d > eps) continue;
+    const tol = Math.max(eps, (e.ancho ?? 0) / 2 + eps);
+    if (a.d > tol || b.d > tol) continue;
     const [s0, s1] = [Math.max(0, Math.min(a.s, b.s)), Math.min(t.L, Math.max(a.s, b.s))];
     if (s1 > s0) cub.push([s0, s1]);
   }

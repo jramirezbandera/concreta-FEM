@@ -82,7 +82,10 @@ describe("criterio 4 de C2: metamórficas con losas", () => {
       const [a, b] = [valido(compilar(f)), valido(compilar(g))];
       expect(Object.keys(b.mapeo.nudosPilar).sort(), `semilla ${s}`).toEqual(Object.keys(a.mapeo.nudosPilar).sort());
       expect(Object.keys(b.mapeo.piezas).sort(), `semilla ${s}`).toEqual(Object.keys(a.mapeo.piezas).sort());
-      expect(b.estadisticas.huellas, `semilla ${s}`).toBe(a.estadisticas.huellas);
+      // Las huellas, con la unión de antes: con la de la fase LV, una huella cuyos nudos de losa van
+      // todos a las caras de las vigas no se crea, y un ruido de centímetros lo cambia
+      const eje = { unionLosaViga: "eje" } as const;
+      expect(valido(compilar(g, eje)).estadisticas.huellas, `semilla ${s}`).toBe(valido(compilar(f, eje)).estadisticas.huellas);
       expect(b.diagnosticos.some((d) => d.codigo === "topologia/fusion" || d.codigo === "losa/ajuste"), `semilla ${s}`).toBe(true);
     }
   });

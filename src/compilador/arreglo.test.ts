@@ -116,7 +116,7 @@ describe("arreglo plano", () => {
   it("un trazo exacto (cara de banda, C5-g) no se dobla hacia la esquina de un pilar a 5 cm, ni dobla nada hacia él", () => {
     // Pilar de fachada con la huella [4,75, 5,25] × [−0,15, 0,15] sobre el borde y = 0 de la losa, y
     // la cara común de su línea en x = 4,8 (la de un pilar menor), de y = 0 a y = 2
-    const montar = (exacto: boolean) => {
+    const montar = (exacto: boolean, x = 4.8) => {
       const a = new Arreglo(EG, ES);
       const h = a.trazo("P", "huella", 0, [
         [4.75, -0.15],
@@ -126,8 +126,8 @@ describe("arreglo plano", () => {
       ], true)!;
       a.trazo("L1", "losa", -1, cuadrado(0, 0, 10), true);
       const c = a.trazo("B", "banda", -1, [
-        [4.8, 0],
-        [4.8, 2],
+        [x, 0],
+        [x, 2],
       ], false, exacto)!;
       expect(a.resolver()).toBe(true);
       expect(a.defecto()).toBeNull();
@@ -148,10 +148,13 @@ describe("arreglo plano", () => {
     expect(h.puntos).toContain(en(4.8, 0.15));
     expect(c.puntos).toContain(en(4.8, 0.15));
     expect(a.movimientos).toEqual([]);
-    // Sin ser exacta, la cara se dobla hasta la esquina del pilar (lo que hacía C5.2)
-    const otro = montar(false);
+    // Sin ser exacta, la cara a 4 cm de la esquina del pilar se dobla hasta ella (lo que hacía C5.2); a
+    // justo ε_snap (5 cm), ya no: el empate no lo decide un redondeo (fase LV)
+    const otro = montar(false, 4.79);
     expect(otro.c.puntos.some((p) => Math.abs(otro.a.puntos[p]!.x - 4.75) < 1e-12)).toBe(true);
     expect(otro.a.movimientos.some((m) => m.id === "B")).toBe(true);
+    const justo = montar(false);
+    expect(justo.c.puntos.every((p) => justo.a.puntos[p]!.x === 4.8)).toBe(true);
   });
 
   it("estrés al azar: converge, sin defectos, y constrainautor lo acepta", () => {
