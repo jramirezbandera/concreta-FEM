@@ -436,10 +436,16 @@
   - **De paso (LV-5, LV-7):** cuatro dependencias del orden, de los ids o del motor de JavaScript, corregidas, y la triangulación restringida ya no puede quedarse en un bucle (sólo gira cuadriláteros convexos, con un tope de predicados y respaldo).
   - **CY-10 estaba mal medido** (LV-1): con la unión de antes, el momento de la viga en la cara es 0,87 del emparrillado, no 0,15.
   - **Validación:** `validacion/lv/` (recuadro, opciones, banco, franjas, geometrías) y `validacion/sombra/vivienda/.datos/lv-cara`. Las referencias congeladas de antes llevan `"eje"` y siguen idénticas; hay cinco nuevas con las caras (`-lv`).
-  - **Pendiente del usuario:** LV-a (con h = 0,75, el momento de la viga en la cara de un pilar sale al 0,79 y algunas franjas de borde hasta un 41 % lejos de la malla fina: propuesta, refinar junto a las caras de las vigas), LV-b (la malla crece donde la rejilla no entra: la retícula enrasada, ×4,4 ecuaciones) y LV-c (calidad de malla junto a pilares más anchos que la viga).
+  - **Decidido el 2026-10-15:** LV-a (con h = 0,75, la viga en la cara de un pilar al 0,79 y franjas hasta un 41 % lejos de la malla fina) y LV-c (calidad junto a pilares más anchos que la viga), juntas en la fase LV2; LV-b (la malla crece donde la rejilla no entra) se acepta por ahora.
+- **2026-10-15: plan de la fase LV2** (la malla junto a las vigas, `docs/fem3d/refinamiento-vigas.md`), con lo medido antes de empezar:
+  - **la primera fila partida a lo largo de toda la cara no cabe:** el edificio objetivo con vigas pasaría de 112 119 a 310 800 ecuaciones, y el reticular objetivo, de 161 049 a 323 799;
+  - **lo que manda es el ancho de la fila a través de la cara, y basta la esquina de cada paño:** en 3 × 3 recuadros, refinar sólo junto a los pilares da en sus caras lo mismo que h = 0,25 uniforme con la quinta parte de nudos. La triangulación sola ya da 0,97 en el recuadro de CY-10, porque se gradúa desde la esquina;
+  - **pero la triangulación junto a los pilares no sirve:** pone nudos a menos de ε_snap de la huella que asoma y estropea las franjas (F2-9). Se propone una plantilla de esquina estructurada;
+  - **los peores apoyos de LV-3 también están en esquinas sin pilar** (cruces con los zunchos), y el criterio «franjas no peores que la unión de antes» no lo cumple ni h = 0,5 uniforme;
+  - **pendiente del usuario, antes de seguir:** LV2-a…LV2-e (§4: refinar sólo las esquinas, criterios de vigas interiores y de franjas, esquinas sin pilar y qué hacer si el reticular objetivo no cabe).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
-  - **ahora:** el `my` de la cubierta de la vivienda y P5 (`fase-lv.md` §2), y las decisiones LV-a…LV-c;
+  - **ahora:** la fase LV2, cuando el usuario decida LV2-a…LV2-e; justo después, el `my` de la cubierta de la vivienda y P5 (`fase-lv.md` §2);
   - luego: la puerta de uso de F y AB con un proyecto real del usuario (cubre también buena parte de las de I1–I4, V2a y V2b);
   - después, el punto fijo de los pilares (propuesto el 2026-10-14);
   - las puertas de uso que queden;

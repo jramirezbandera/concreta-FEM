@@ -67,7 +67,9 @@ Las pruebas que miden un comportamiento de antes con vigas (las plantillas de SP
 - **LV-c, la calidad junto a los pilares más anchos que la viga (LV-8).** Propuesta: mirarlo junto con LV-a, porque los dos tocan las plantillas de los pilares junto a las caras.
 - **Lo que el plan dejaba fuera (§1.9):** la zona rígida 1 en la unión viga–pilar se midió en el recuadro (`out_recuadro.txt`, §2); las viguetas desde la cara, la losa hasta la cara de los muros y el peso de la viga entera en un reticular siguen sin medir.
 
-**Siguiente paso:** el `my` de la cubierta y P5 (§2).
+**Decidido por el usuario el 2026-10-15:** LV-a y LV-c, juntas en una fase corta de refinamiento junto a las vigas (fase LV2, plan en `refinamiento-vigas.md`); LV-b se acepta por ahora y se retoma cuando se vuelva a tocar la rejilla; el `my` de la cubierta y P5, justo después de LV2. Al medir el plan de LV2, la primera fila partida a lo largo de toda la cara no cabe en el perfil móvil y se propone refinar sólo la esquina de cada paño (`refinamiento-vigas.md` §1–§4).
+
+**Siguiente paso:** la fase LV2 y, después, el `my` de la cubierta y P5 (§2).
 
 ## 6. Para reproducir
 
