@@ -601,7 +601,7 @@
         "id": "CM-CUB",
         "caso": "G",
         "planta": "CUB",
-        "q": [0, 0, -2.5],
+        "q": [0, 0, -2],
         "losa": "L-CUB"
       },
       {
@@ -609,7 +609,7 @@
         "id": "CM-CUB-S",
         "caso": "G",
         "planta": "CUB-S",
-        "q": [0, 0, -2.5],
+        "q": [0, 0, -2],
         "losa": "L-CUB-S"
       },
       {
@@ -674,7 +674,7 @@
         "caso": "G",
         "viga": "Z-CUB-1",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -694,23 +694,13 @@
       },
       {
         "tipo": "viga",
-        "id": "PETO-Z-CUB-2-1",
+        "id": "PETO-Z-CUB-2",
         "caso": "G",
         "viga": "Z-CUB-2",
         "ejes": "global",
         "q": [0, 0, -3],
         "desde": 0,
-        "hasta": 5.79
-      },
-      {
-        "tipo": "viga",
-        "id": "PETO-Z-CUB-2-2",
-        "caso": "G",
-        "viga": "Z-CUB-2",
-        "ejes": "global",
-        "q": [0, 0, -3],
-        "desde": 14.56,
-        "hasta": 15.67
+        "hasta": 1.87
       },
       {
         "tipo": "viga",
@@ -726,7 +716,7 @@
         "caso": "G",
         "viga": "Z-CUB-3",
         "ejes": "global",
-        "q": [0, 0, -0.375]
+        "q": [0, 0, -0.3]
       },
       {
         "tipo": "viga",
@@ -758,7 +748,7 @@
         "caso": "G",
         "viga": "Z-CUB-4",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -790,7 +780,7 @@
         "caso": "G",
         "viga": "Z-CUB-5",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -822,7 +812,7 @@
         "caso": "G",
         "viga": "Z-CUB-6",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -854,7 +844,7 @@
         "caso": "G",
         "viga": "Z-CUB-7",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -886,7 +876,7 @@
         "caso": "G",
         "viga": "Z-CUB-8",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -918,7 +908,7 @@
         "caso": "G",
         "viga": "Z-CUB-9",
         "ejes": "global",
-        "q": [0, 0, -1.475]
+        "q": [0, 0, -1.345]
       },
       {
         "tipo": "viga",
@@ -950,7 +940,7 @@
         "caso": "G",
         "viga": "Z-CUB-10",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -982,7 +972,7 @@
         "caso": "G",
         "viga": "Z-CUB-S-1",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -1014,7 +1004,7 @@
         "caso": "G",
         "viga": "Z-CUB-S-2",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -1046,7 +1036,7 @@
         "caso": "G",
         "viga": "Z-CUB-S-3",
         "ejes": "global",
-        "q": [0, 0, -0.375]
+        "q": [0, 0, -0.3]
       },
       {
         "tipo": "viga",
@@ -1078,7 +1068,7 @@
         "caso": "G",
         "viga": "Z-CUB-S-4",
         "ejes": "global",
-        "q": [0, 0, -1.575]
+        "q": [0, 0, -1.44]
       },
       {
         "tipo": "viga",
@@ -1110,7 +1100,7 @@
         "caso": "G",
         "viga": "Z-CUB-S-5",
         "ejes": "global",
-        "q": [0, 0, -1.475]
+        "q": [0, 0, -1.345]
       },
       {
         "tipo": "viga",
@@ -1142,7 +1132,7 @@
         "caso": "G",
         "viga": "Z-CUB-S-6",
         "ejes": "global",
-        "q": [0, 0, -0.375]
+        "q": [0, 0, -0.3]
       },
       {
         "tipo": "viga",
