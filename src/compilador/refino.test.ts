@@ -36,7 +36,8 @@ beforeAll(async () => {
 
 type Compilado = Extract<ReturnType<typeof compilar>, { valido: true }>;
 function compilado(f: ModeloFisico, op: OpcionesCompilacion = {}): Compilado {
-  const r = compilar(f, op);
+  // Valores medidos con la cabeza de los pilares empotrada, antes de CY2: se comparan con ella (empotramientoCabeza: 1)
+  const r = compilar(f, { empotramientoCabeza: 1, ...op });
   if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
   return r;
 }

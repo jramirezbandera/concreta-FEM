@@ -1167,6 +1167,10 @@
           "type": "number",
           "description": "Fracción rígida de los nudos de dimensión finita, en [0, 1] (C1-a). Por defecto, 0,5. Con 1, el\nnudo es infinitamente rígido, como en CYPECAD; con 0, se calcula de eje a eje, como SAP2000 por\ndefecto."
         },
+        "empotramientoCabeza": {
+          "type": "number",
+          "description": "Coeficiente de empotramiento de la cabeza del último tramo de cada pilar, en [0, 1] (CY2, CY-b).\nPor defecto, 0,3, el que aconseja CYPECAD: la cabeza, con poco axil, fisura y no desarrolla el\nempotramiento elástico. Se multiplica por el `empotramiento.cabeza` del pilar. No se aplica al\npilar sobre el que arranca otro en su cabeza. Con 1, la cabeza empotrada de antes de CY2."
+        },
         "cortante": {
           "type": "boolean",
           "description": "Deformación por cortante (Timoshenko). Por defecto, sí."
@@ -1371,6 +1375,19 @@
           },
           "additionalProperties": false,
           "description": "Liberaciones en la base física (tramo inferior) y en la cabeza física (tramo superior)."
+        },
+        "empotramiento": {
+          "type": "object",
+          "properties": {
+            "base": {
+              "type": "number"
+            },
+            "cabeza": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Coeficientes de empotramiento, en [0, 1] (CY2, como en CYPECAD): el de la base del tramo\ninferior y el de la cabeza del tramo superior. 0 es articulado y 1, empotrado (por defecto). El\nde la cabeza se multiplica por la opción `empotramientoCabeza`."
         }
       },
       "required": [

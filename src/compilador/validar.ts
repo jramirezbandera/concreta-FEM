@@ -191,6 +191,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", "Las opciones no son válidas: hace falta 0 < ε_geom ≤ ε_snap y un factor de zona rígida en [0, 1].");
     return null;
   }
+  if (!(num(op.empotramientoCabeza) && op.empotramientoCabeza >= 0 && op.empotramientoCabeza <= 1)) {
+    diag.error("opciones/no-validas", "El coeficiente de empotramiento de la cabeza de los pilares tiene que estar entre 0 (articulado) y 1 (empotrado).");
+    return null;
+  }
   if (!(num(op.tamanoMalla) && op.tamanoMalla >= 2 * op.epsSnap)) {
     diag.error("opciones/no-validas", `El tamaño de malla tiene que ser un número de al menos 2·ε_snap (${2 * op.epsSnap} m).`);
     return null;
@@ -382,6 +386,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     if (p.giro !== undefined && !num(p.giro)) mal(p.id, "el giro tiene que ser un número (grados)");
     if (p.base !== undefined && p.base !== "empotrado" && p.base !== "articulado" && p.base !== "ninguno") mal(p.id, "la base tiene que ser empotrado, articulado o ninguno");
     liberaciones(p.id, p.liberaciones, ["base", "cabeza"]);
+    const e = p.empotramiento as unknown;
+    if (e !== undefined && (!esObjeto(e) || Object.keys(e).some((k) => k !== "base" && k !== "cabeza") || ["base", "cabeza"].some((k) => e[k] !== undefined && !(num(e[k]) && (e[k] as number) >= 0 && (e[k] as number) <= 1))))
+      mal(p.id, "el empotramiento tiene que ser { base, cabeza } con coeficientes entre 0 (articulado) y 1 (empotrado)");
   }
 
   // Vigas

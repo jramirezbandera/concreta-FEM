@@ -10,7 +10,8 @@ import { compilar } from "./compilar.ts";
 
 describe("criterio 1 de C4: paños unidireccionales frente a su modelo analítico hecho a mano", () => {
   it.each(casosManoC4().map((c) => [c.nombre, c] as const))("%s", (_n, caso) => {
-    const r = compilar(caso.fisico, caso.opciones);
+    // Los modelos hechos a mano tienen los pilares empotrados: sin el empotramiento parcial de CY2
+    const r = compilar(caso.fisico, { empotramientoCabeza: 1, ...caso.opciones });
     if (!r.valido) throw new Error(r.diagnosticos.map((d) => `${d.codigo}: ${d.mensaje}`).join("\n"));
     expect(r.diagnosticos.map((d) => d.codigo)).toEqual(caso.avisos);
     const c = compararModelos(r.modelo, caso.mano);

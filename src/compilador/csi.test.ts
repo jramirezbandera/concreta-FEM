@@ -14,7 +14,8 @@ import { compilar } from "./compilar.ts";
 
 describe("criterio 1 de C1: SAP2000 1-022 como modelo físico", () => {
   // Sin modificadores de rigidez: el modelo de SAP2000 no los tiene (sin b ni h, tampoco hay zonas rígidas)
-  const r = compilar(fisico1022(), { modificadores: {} });
+  // Como su modelo de SAP2000: sin modificadores y con los nudos rígidos (sin el empotramiento parcial de CY2)
+  const r = compilar(fisico1022(), { modificadores: {}, empotramientoCabeza: 1 });
   if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
   const { modelo, mapeo } = r;
 

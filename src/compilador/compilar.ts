@@ -37,7 +37,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "CY1";
+export const VERSION_COMPILADOR = "CY2";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -272,6 +272,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     const dj = offset(b.jp, b.j);
     if (di || dj) r.offsets = { ...(di ? { i: di } : {}), ...(dj ? { j: dj } : {}) };
     if (b.liberaciones) r.liberaciones = b.liberaciones;
+    if (b.empotramiento) r.empotramiento = b.empotramiento;
     const m = modificadoresDe(b);
     if (m) r.modificadores = m;
     return r;
@@ -456,6 +457,22 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
   }
   if (grupos.size) h.push(`Modificadores de rigidez (D4): ${[...grupos].map(([k, n]) => `${k} (${n})`).join("; ")}.`);
   else h.push("Sin modificadores de rigidez.");
+  // CY2: empotramiento parcial de los extremos de pilar, agrupado por valor
+  const emp = new Map<string, number>();
+  for (const b of piezas.barras)
+    for (const [e, que] of [
+      ["j", "cabeza"],
+      ["i", "base"],
+    ] as const) {
+      const a = b.empotramiento?.[e];
+      if (a !== undefined) emp.set(`${que} ${coma(a)}`, (emp.get(`${que} ${coma(a)}`) ?? 0) + 1);
+    }
+  if (ctx.pilares.length)
+    h.push(
+      emp.size
+        ? `Empotramiento parcial de los pilares (CY2, como CYPECAD: la rigidez es α·K_biempotrada + (1 − α)·K_articulada en ese extremo): ${[...emp].map(([k, n]) => `${k} (${n} tramos)`).join("; ")}. Por defecto, 0,3 en la cabeza del último tramo, salvo en los pilares sobre los que arranca otro.`
+        : "Pilares empotrados en sus dos extremos (sin coeficiente de empotramiento parcial).",
+    );
   const usadas = new Set<string>([...ctx.vigas.map((v) => v.planta), ...ctx.losas.map((l) => l.losa.planta), ...ctx.panos.map((p) => p.pano.planta)]);
   for (const p of ctx.pilares) for (let k = ctx.planta.get(p.hasta)!; k <= ctx.planta.get(p.desde)!; k++) usadas.add(ctx.plantas[k]!.id);
   const conLosa = new Set(ctx.losas.map((l) => l.losa.planta));

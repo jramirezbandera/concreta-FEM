@@ -131,10 +131,11 @@ describe("pilar apeado sobre una losa", () => {
     // cambia y el axil, un 0,5 %. Desde SP-5, la horizontal H va al diafragma sin sembrar su punto: la
     // malla pasa de 360 a 250 nudos (la misma que sin H) y el axil, de −77,767 a −77,523, más cerca
     // del de la triangulación con h = 0,1 (−77,291: 0,30 % frente a 0,62 %)
-    const x = calculado(f, { franjas: false });
+    // Valores medidos con la cabeza de los pilares empotrada, antes de CY2: se comparan con ella (empotramientoCabeza: 1)
+    const x = calculado(f, { franjas: false, empotramientoCabeza: 1 });
     expect(x.r.diagnosticos).toEqual([]);
     expect(Math.abs(axil(x.c, "X") / -77.52349033034625 - 1)).toBeLessThan(1e-6);
-    const y = calculado(f);
+    const y = calculado(f, { empotramientoCabeza: 1 });
     expect(y.r.diagnosticos).toEqual([]);
     expect(Math.abs(axil(y.c, "X") / -77.52349033034625 - 1)).toBeLessThan(0.01);
   });

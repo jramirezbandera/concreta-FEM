@@ -21,7 +21,8 @@ if (!lectura.valido) throw new Error("vivienda");
 const fisico: ModeloFisico = lectura.proyecto.modelo;
 
 function consultas(opciones: OpcionesCompilacion): Consultas {
-  const c = compilar(fisico, opciones);
+  // Valores medidos con la cabeza de los pilares empotrada, antes de CY2: se comparan con ella (empotramientoCabeza: 1)
+  const c = compilar(fisico, { empotramientoCabeza: 1, ...opciones });
   if (!c.valido) throw new Error(c.diagnosticos[0]!.mensaje);
   const k = calcular(c.modelo);
   if (!k.valido) throw new Error(k.diagnosticos[0]!.mensaje);

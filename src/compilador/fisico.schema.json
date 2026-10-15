@@ -956,6 +956,9 @@
         "factorZonaRigida": {
           "type": "number"
         },
+        "empotramientoCabeza": {
+          "type": "number"
+        },
         "cortante": {
           "type": "boolean"
         },
@@ -1135,6 +1138,18 @@
             },
             "cabeza": {
               "$ref": "#/$defs/Liberacion"
+            }
+          },
+          "additionalProperties": false
+        },
+        "empotramiento": {
+          "type": "object",
+          "properties": {
+            "base": {
+              "type": "number"
+            },
+            "cabeza": {
+              "type": "number"
             }
           },
           "additionalProperties": false

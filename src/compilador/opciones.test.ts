@@ -84,6 +84,7 @@ describe("valores por defecto del compilador (C1-a y D4)", () => {
     expect(compilado().hipotesis).toEqual([
       "Nudos de dimensión finita: es rígido el 50 % del nudo (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).",
       "Modificadores de rigidez (D4): tramos de pilar de hormigón: A ×2 (2); tramos de pilar de acero: A ×2 (1); tramos de viga de hormigón: J ×0,1 (1).",
+      "Empotramiento parcial de los pilares (CY2, como CYPECAD: la rigidez es α·K_biempotrada + (1 − α)·K_articulada en ese extremo): cabeza 0,3 (3 tramos). Por defecto, 0,3 en la cabeza del último tramo, salvo en los pilares sobre los que arranca otro.",
       "Diafragma rígido en P1; sin diafragma en C.",
       "Eje de las vigas en el plano del forjado.",
     ]);

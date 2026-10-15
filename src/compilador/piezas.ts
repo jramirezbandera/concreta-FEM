@@ -67,6 +67,8 @@ export interface BarraP {
   material: SeccionCompilada["material"];
   vz: Vec3;
   liberaciones?: { i?: Seis<boolean>; j?: Seis<boolean> };
+  /** Coeficientes de empotramiento de los extremos (CY2); ausentes, 1. */
+  empotramiento?: { i?: number; j?: number };
   /** Estaciones de i, i', j' y j a lo largo de la pieza. */
   s: [number, number, number, number];
   /** Barra auxiliar de C3-e: prolonga la viga dentro de un muro; no es un tramo de la pieza. */
@@ -107,6 +109,10 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     const nudoEn = (k: number) => topo.nudoPilar.get(`${p.id}@${k}`);
     if (nudoEn(kb) === undefined || nudoEn(kh) === undefined) continue; // pilar solapado: ya hay un error
     let sigmaAnt = -Infinity;
+    // CY2: la cabeza del último tramo, salvo que otro pilar arranque en ella (sigue el pilar)
+    const continua = ctx.pilares.some((q) => q !== p && q.desde === p.hasta && Math.hypot(q.x - p.x, q.y - p.y) <= ctx.op.epsSnap);
+    const empCabeza = (p.empotramiento?.cabeza ?? 1) * (continua ? 1 : ctx.op.empotramientoCabeza);
+    const empBase = p.empotramiento?.base ?? 1;
     for (let k = kb; k > kh; k--) {
       const ni = nudoEn(k)!;
       const nj = nudoEn(k - 1)!;
@@ -124,6 +130,9 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       const lib: { i?: Seis<boolean>; j?: Seis<boolean> } = {};
       if (k === kb && libera(p.liberaciones?.base)) lib.i = p.liberaciones!.base!;
       if (k - 1 === kh && libera(p.liberaciones?.cabeza)) lib.j = p.liberaciones!.cabeza!;
+      const emp: { i?: number; j?: number } = {};
+      if (k === kb && empBase !== 1) emp.i = empBase;
+      if (k - 1 === kh && empCabeza !== 1) emp.j = empCabeza;
       const sI = zi - zb;
       const sJp = jp[2] - zb;
       const sJ = zj - zb;
@@ -140,6 +149,7 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
         material: ctx.secciones.get(seccionTramo(ctx, p, k - 1))!.material,
         vz: ez,
         liberaciones: lib.i || lib.j ? lib : undefined,
+        empotramiento: emp.i !== undefined || emp.j !== undefined ? emp : undefined,
         s: [sI, sI, sJp, sJ],
       });
       recta.trozos.push({ desde: sigmaAnt, hasta: sI, nudo: ni });

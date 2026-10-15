@@ -143,6 +143,12 @@ export interface Pilar {
   base?: "empotrado" | "articulado" | "ninguno";
   /** Liberaciones en la base física (tramo inferior) y en la cabeza física (tramo superior). */
   liberaciones?: { base?: Liberacion; cabeza?: Liberacion };
+  /**
+   * Coeficientes de empotramiento, en [0, 1] (CY2, como en CYPECAD): el de la base del tramo
+   * inferior y el de la cabeza del tramo superior. 0 es articulado y 1, empotrado (por defecto). El
+   * de la cabeza se multiplica por la opción `empotramientoCabeza`.
+   */
+  empotramiento?: { base?: number; cabeza?: number };
 }
 
 export interface Viga {
@@ -481,6 +487,8 @@ export interface ModificadoresPiezas {
  */
 export const MODIFICADORES_D4: ModificadoresPiezas = { pilares: { todos: { A: 2 } }, vigas: { hormigon: { J: 0.1 } } };
 
+/** Coeficiente de empotramiento por defecto de la cabeza del último tramo de pilar (CY-b, decidido el 2026-10-15; el de CYPECAD). */
+export const EMPOTRAMIENTO_CABEZA = 0.3;
 /** Factor de zona rígida por defecto (C1-a, decidido el 2026-10-04): la mitad del nudo es rígida. */
 export const FACTOR_ZONA_RIGIDA = 0.5;
 /** Ancho de las franjas de armado de una losa maciza por defecto, m (fase F, F-a). */
@@ -510,6 +518,13 @@ export interface OpcionesCompilacion {
    * defecto.
    */
   factorZonaRigida?: number;
+  /**
+   * Coeficiente de empotramiento de la cabeza del último tramo de cada pilar, en [0, 1] (CY2, CY-b).
+   * Por defecto, 0,3, el que aconseja CYPECAD: la cabeza, con poco axil, fisura y no desarrolla el
+   * empotramiento elástico. Se multiplica por el `empotramiento.cabeza` del pilar. No se aplica al
+   * pilar sobre el que arranca otro en su cabeza. Con 1, la cabeza empotrada de antes de CY2.
+   */
+  empotramientoCabeza?: number;
   /** Deformación por cortante (Timoshenko). Por defecto, sí. */
   cortante?: boolean;
   /**
@@ -555,6 +570,7 @@ export interface OpcionesResueltas {
   epsGeom: number;
   epsSnap: number;
   factorZonaRigida: number;
+  empotramientoCabeza: number;
   cortante: boolean;
   modificadores: ModificadoresPiezas;
   tamanoMalla: number;
@@ -570,6 +586,7 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     epsGeom: o.epsGeom ?? 1e-6,
     epsSnap: o.epsSnap ?? 0.05,
     factorZonaRigida: o.factorZonaRigida ?? FACTOR_ZONA_RIGIDA,
+    empotramientoCabeza: o.empotramientoCabeza ?? EMPOTRAMIENTO_CABEZA,
     cortante: o.cortante ?? true,
     modificadores: o.modificadores ?? MODIFICADORES_D4,
     tamanoMalla: o.tamanoMalla ?? TAMANO_MALLA,
