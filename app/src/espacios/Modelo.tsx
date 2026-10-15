@@ -219,7 +219,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     {
       id: "diagnosticos",
       titulo: "Diagnósticos",
-      insignia: errores ? <span className="text-state-fail">{errores} errores</span> : avisos ? <span className="text-state-warn">{avisos} avisos</span> : "0",
+      insignia: errores ? <span className="text-state-fail">{errores} error{errores === 1 ? "" : "es"}</span> : avisos ? <span className="text-state-warn">{avisos} aviso{avisos === 1 ? "" : "s"}</span> : "0",
       contenido: (
         <>
           <p className="nota">Los de <span className="mono">fem validar</span> y <span className="mono">fem calcular</span>. Un clic en un id lo elige.</p>

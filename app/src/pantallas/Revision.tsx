@@ -222,7 +222,7 @@ export function EspacioRevision() {
               </div>
               <p className="nota">El sha256 es el del informe en Markdown que escribe <span className="mono">fem revisar</span>: el que cubre la firma.</p>
             </Seccion>
-            <Seccion titulo="Comprobaciones" valor={`${x.avisos} avisos`}>
+            <Seccion titulo="Comprobaciones" valor={`${x.avisos} aviso${x.avisos === 1 ? "" : "s"}`}>
               {x.comprobaciones.map((c) => (
                 <a key={c.codigo} href={`#${ancla(x.documento.findIndex((b) => b.tipo === "titulo" && b.texto.includes(c.titulo)))}`} className="flex items-center justify-between gap-2 border-b border-border-sub px-3.5 py-1.5 text-[12px] text-text-secondary hover:bg-bg-elevated">
                   <span className="min-w-0">

@@ -109,12 +109,12 @@ export function SelectorPlanta({ estado, planta, onPlanta, ninguna }: { estado: 
   return (
     <span className="chip sel planta-sel">
       <span className="planta-sel-campo">
-        {actual && (actual.errores ? <i className="f" aria-label={`${actual.errores} errores`} /> : actual.avisos ? <i className="w" aria-label={`${actual.avisos} avisos`} /> : null)}
+        {actual && (actual.errores ? <i className="f" aria-label={`${actual.errores} error${actual.errores === 1 ? "" : "es"}`} /> : actual.avisos ? <i className="w" aria-label={`${actual.avisos} aviso${actual.avisos === 1 ? "" : "s"}`} /> : null)}
         <select className="sel-chip" value={planta ?? ""} onChange={(x) => onPlanta(x.target.value || null)} aria-label="Planta" title={actual?.nombre ? `${actual.id} · ${actual.nombre}` : undefined}>
           {ninguna !== undefined && <option value="">{ninguna}</option>}
           {estado.plantas.map((p) => (
             <option key={p.id} value={p.id}>
-              {`${p.id}  ${cota(p.cota)}${p.errores ? ` · ${p.errores} errores` : p.avisos ? ` · ${p.avisos} avisos` : ""}`}
+              {`${p.id}  ${cota(p.cota)}${p.errores ? ` · ${p.errores} error${p.errores === 1 ? "" : "es"}` : p.avisos ? ` · ${p.avisos} aviso${p.avisos === 1 ? "" : "s"}` : ""}`}
             </option>
           ))}
         </select>
