@@ -222,7 +222,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       insignia: errores ? <span className="text-state-fail">{errores} errores</span> : avisos ? <span className="text-state-warn">{avisos} avisos</span> : "0",
       contenido: (
         <>
-          <p className="nota">Los de `fem validar` y `fem calcular`. Un clic en un id lo elige.</p>
+          <p className="nota">Los de <span className="mono">fem validar</span> y <span className="mono">fem calcular</span>. Un clic en un id lo elige.</p>
           <ListaDiagnosticos ds={e.diagnosticos} onObjeto={setSeleccion} />
         </>
       ),
@@ -498,7 +498,7 @@ function ResumenPlanta() {
               ))}
             </tbody>
           </table>
-          <p className="nota">Lo que recibe la planta, con el peso propio (−ΣFz de sus cargas, de `fem resumen`).</p>
+          <p className="nota">Lo que recibe la planta, con el peso propio (−ΣFz de sus cargas, de <span className="mono">fem resumen</span>).</p>
         </Seccion>
       )}
       <Equilibrio estado={e} />

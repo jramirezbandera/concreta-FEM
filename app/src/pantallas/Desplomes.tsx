@@ -184,7 +184,7 @@ export function ModoDeformada() {
   const propiedades = (
     <>
       {d.diagnosticos && <p className="nota text-state-fail">{d.diagnosticos.map((y) => y.mensaje).join(" ")}</p>}
-      <p className="nota">Por defecto, las combinaciones de `fem consultar deriva` (la ELS característica si los casos llevan su acción). Para el viento solo, elija su caso.</p>
+      <p className="nota">Por defecto, las combinaciones de <span className="mono">fem consultar deriva</span> (la ELS característica si los casos llevan su acción). Para el viento solo, elija su caso.</p>
       {x && (
         <>
           <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)} (A3)`}>

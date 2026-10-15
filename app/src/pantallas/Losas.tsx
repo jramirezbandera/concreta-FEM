@@ -265,7 +265,7 @@ export function ModoLosas() {
               ) : (
                 <p className="nota">La planta no tiene losas ni paños.</p>
               )}
-              <p className="nota">Hacia abajo, positivas. Relativa: a las esquinas de su recuadro de pilares (losas) o a los extremos del vano (paños), como `fem consultar flechas`.</p>
+              <p className="nota">Hacia abajo, positivas. Relativa: a las esquinas de su recuadro de pilares (losas) o a los extremos del vano (paños), como <span className="mono">fem consultar flechas</span>.</p>
             </Seccion>
           </>
         )}

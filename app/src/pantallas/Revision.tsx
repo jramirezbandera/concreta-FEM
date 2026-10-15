@@ -220,7 +220,7 @@ export function EspacioRevision() {
                 <span>Núcleo</span>
                 <span className="v">{proyecto.cliente?.motor?.slice(0, 16)}</span>
               </div>
-              <p className="nota">El sha256 es el del informe en Markdown que escribe `fem revisar`: el que cubre la firma.</p>
+              <p className="nota">El sha256 es el del informe en Markdown que escribe <span className="mono">fem revisar</span>: el que cubre la firma.</p>
             </Seccion>
             <Seccion titulo="Comprobaciones" valor={`${x.avisos} avisos`}>
               {x.comprobaciones.map((c) => (
