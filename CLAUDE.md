@@ -19,6 +19,7 @@
 - **D1 – Unidades:** kN–m, como Concreta (E en kN/m²).
 - **D2 – Forjado unidireccional:** se introduce como paño con reparto de cargas, pero se discretiza en viguetas como barras y se ven los esfuerzos por vigueta.
 - **D3 – Reticular:** multiplicadores por dirección sobre la losa maciza (f11…v23 y peso), calculados a partir de nervios y casetones. Los ábacos van macizos, con multiplicador 1. Hay que validarlo contra un modelo de SAP2000 del usuario.
+- **CY – Hipótesis de CYPECAD (2026-10-15, `hipotesis-cype.md`):** por defecto, Ecm del Código Estructural (CY-a), coeficiente de empotramiento 0,3 en la cabeza del último tramo de pilar por interpolación de matrices (CY-b) y reticular «uniforme» de CYPECAD, con 0,5 de la maciza en aligerado y ábacos (CY-c; la D3 con ábacos macizos queda como `rigidezReticular: "bruta"`).
 - **D4 – Modificadores de rigidez (2026-10-04):** por defecto, axil de todos los pilares ×2 y torsión de las vigas de hormigón ×0,1, por material (`MODIFICADORES_D4`); la flexión no se toca. Con ellos, el factor de zona rígida por defecto pasa a 0,5 (C1-a). Medidas en `validacion/c1/out_decisiones.txt`.
 - **D5 – Armado de las losas (sustituida el 2026-10-13 por la fase F):** franjas de ancho fijo (1 m; el intereje en un reticular) que cubren toda la losa en su eje 1 y en el perpendicular, sin proponer ni editar nada (`franjas.md`, `fase-f.md`). Las bandas del Anejo I salen de la app; el campo `bandas` del proyecto queda para el agente, como cortes de comprobación.
 - **D9 – Tope de tamaño:** unas 7 plantas con 80 pilares por planta, que en sobremesa son ≈ 50 000 nudos y 300 000 GDL. El límite se fija en GDL según el dispositivo.
@@ -414,6 +415,16 @@
   - Una viga paralela del todo corta la cara a menos de 0,4h, no de h.
   - `franja/pilar-sin-cara` avisa de todo pilar sin estación en sus caras, con su causa; antes callaba algunos.
   - **Resultado:** en la vivienda, todos a ≤ 10 % de h = 0,25 salvo las esquinas. La losa plana objetivo pasa a 192 066 ecuaciones (cabe en el perfil móvil). Referencia de F regenerada (`validacion/f/out_cambiosF33.txt`); test `carasBorde.test.ts`.
+- **2026-10-15: comparación con el CYPECAD del usuario y fase CY** (hipótesis de CYPECAD). El informe está en `docs/fem3d/fase-cy.md` (plan en `hipotesis-cype.md`), con hallazgos CY-1…CY-8.
+  - **El motor cuadra con CYPE** en la vivienda (equilibrio, cargas a ≤ 1 %, forma de la flecha). Con nuestras hipótesis de antes, los momentos de vano del reticular salían al 0,6–0,7 de CYPE.
+  - **Ya en `src/`:**
+    - `hormigon(fck)` con el Ecm del Código Estructural al MPa (compilador CY1). Sólo cambia los desplazamientos;
+    - `empotramiento { i, j }` en las barras del motor: α·K + (1 − α)·K con los giros liberados, como CYPECAD. En el compilador, `empotramiento { base, cabeza }` por pilar y la opción `empotramientoCabeza` (0,3; compilador CY2);
+    - la opción `rigidezReticular` (`"uniforme"` por defecto, `"bruta"` = C4-h; compilador CY3).
+  - **Validación:** `validacion/cy/` (Ecm, PyNite, emparrillado de CYPE como barras, opciones de antes bit a bit) y `validacion/sombra/vivienda/` (la réplica frente al listado y las capturas, con los datos del cliente fuera de git).
+  - **Resultado en la vivienda:** con CY1–CY3, ~0,87 de CYPE en momentos de vano y flechas, y axiles a ±10 % salvo P5. Con las vigas de borde sin rigidez a flexión (el «zuncho de borde» de CYPE, EIy·10⁻¹⁵), 0,95–1,01 en todo (CY-4).
+  - **Pendiente del usuario:** CY-f (¿son zunchos en su modelo?, ¿los imitamos?) y CY-d (CM, petos y P13 del ejemplo). P5 (+20 %) queda sin explicar.
+  - **Pendiente para la integración:** Concreta usa todavía el E de la EHE.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **ahora:** la puerta de uso de F y AB con un proyecto real del usuario (cubre también buena parte de las de I1–I4, V2a y V2b);
