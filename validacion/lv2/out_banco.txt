@@ -1,0 +1,6 @@
+## edificio objetivo con vigas (7 plantas)
+  LV1 nudos 60021, láminas 34209 (28224 en la rejilla, 0 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 3268 ms; cálculo 4014 ms, 112119 ecuaciones
+  LV2 nudos 88581, láminas 48083 (42098 en la rejilla, 2975 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 5629 ms; cálculo 4957 ms, 156177 ecuaciones
+## reticular objetivo con vigas (7 plantas)
+  LV1 nudos 80566, láminas 50085 (39984 en la rejilla, 0 plantillas), jacobiano mínimo 0.262 (0 bajos), compilación 5934 ms; cálculo 4882 ms, 161049 ecuaciones
+  LV2 nudos 108839, láminas 63791 (53690 en la rejilla, 2933 plantillas), jacobiano mínimo 0.262 (0 bajos), compilación 8529 ms; cálculo 5565 ms, 204750 ecuaciones

@@ -1216,6 +1216,10 @@
         "refinoCaras": {
           "type": "boolean",
           "description": "Refinamiento de la malla junto a las caras de los pilares de las franjas (fase F2): en su\nplantilla de la rejilla, el primer tramo a cada lado de la cara se parte en tercios. Por defecto,\nsí; sin él, la malla de F1.1 (con R0)."
+        },
+        "refinoEsquinas": {
+          "type": "boolean",
+          "description": "Refinamiento de la malla en las esquinas de los paños de losa unidos a las vigas por sus caras\n(fase LV2): en la celda de la rejilla de cada esquina en la que se encuentran dos caras de viga, el\nelemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`). En desarrollo: por\ndefecto, no (la malla de LV1)."
         }
       },
       "additionalProperties": false

@@ -442,10 +442,11 @@
   - **lo que manda es el ancho de la fila a través de la cara, y basta la esquina de cada paño:** en 3 × 3 recuadros, refinar sólo junto a los pilares da en sus caras lo mismo que h = 0,25 uniforme con la quinta parte de nudos. La triangulación sola ya da 0,97 en el recuadro de CY-10, porque se gradúa desde la esquina;
   - **pero la triangulación junto a los pilares no sirve:** pone nudos a menos de ε_snap de la huella que asoma y estropea las franjas (F2-9). Se propone una plantilla de esquina estructurada;
   - **los peores apoyos de LV-3 también están en esquinas sin pilar** (cruces con los zunchos), y el criterio «franjas no peores que la unión de antes» no lo cumple ni h = 0,5 uniforme;
-  - **pendiente del usuario, antes de seguir:** LV2-a…LV2-e (§4: refinar sólo las esquinas, criterios de vigas interiores y de franjas, esquinas sin pilar y qué hacer si el reticular objetivo no cabe).
+  - **decidido el 2026-10-15:** LV2-a…LV2-e como se proponían, salvo que manda la precisión: si sólo la plantilla precisa cumple, el reticular objetivo puede pasar del perfil móvil;
+  - **paso 1 hecho** (`refinamiento-vigas.md` §6): plantilla de esquina graduada en `rejilla.ts` (opción `refinoEsquinas`, por defecto desactivada hasta rematar). Pasan el recuadro (0,96 / 1,02 de CYPE) y las vigas interiores (≤ 7,7 % de h = 0,055); el edificio con vigas, 156 177 ecuaciones, y el reticular, 204 750. Las franjas no pasan aún: los peores, junto a pilares que asoman de la viga.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
-  - **ahora:** la fase LV2, cuando el usuario decida LV2-a…LV2-e; justo después, el `my` de la cubierta de la vivienda y P5 (`fase-lv.md` §2);
+  - **ahora:** la fase LV2, paso 2 (las huellas que asoman de la viga, para las franjas); justo después, el `my` de la cubierta de la vivienda y P5 (`fase-lv.md` §2);
   - luego: la puerta de uso de F y AB con un proyecto real del usuario (cubre también buena parte de las de I1–I4, V2a y V2b);
   - después, el punto fijo de los pilares (propuesto el 2026-10-14);
   - las puertas de uso que queden;

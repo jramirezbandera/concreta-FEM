@@ -159,9 +159,33 @@ Se mira por qué el refinamiento de Delaunay (G-4) no quita los abanicos junto a
 | LV2-d | Si el reticular objetivo no cabe | Primero la plantilla ligera (la de esquina de F2, sólo en el elemento de la esquina); si tampoco, sólo las esquinas de los pilares; y si tampoco, aceptar que el reticular objetivo pase del perfil móvil | Está en 161 049: quedan unas 39 000 ecuaciones, unas 22 por esquina con sólo las de los pilares (1 764) y unas 11 con los cruces sin pilar (3 528). La plantilla con tercios y transiciones cuesta unas 40 (estimado) y la ligera, unas 15. En el edificio con vigas (112 119) quedan 88 000: 50 y 25 por esquina |
 | LV2-e | Criterio de las franjas | El criterio 3 en lugar de «no peor que la unión de antes» | Ni la malla uniforme de 0,5 lo cumple (§1.4) |
 
+**Decidido por el usuario el 2026-10-15:** las cinco como se proponen, con un cambio en LV2-d: **manda la precisión, no el tamaño.** La plantilla se elige por los criterios 1 a 3; la ligera, sólo si los cumple. Si sólo los cumple la de tercios y el reticular objetivo pasa de 200 000 ecuaciones, se acepta que pase del perfil móvil (es un caso extremo: reticular con ábacos y vigas en todos los ejes; en sobremesa calcula sin problema, y «aun en el edificio objetivo vamos bastante bien de tiempo: CYPECAD o SAP2000 tardan mucho en calcular»). El primer paso es el prototipo de la plantilla de tercios en las esquinas de pilares y cruces, y sus números (criterios 1, 2, 3 y 5) antes de rematar.
+
 ## 5. Fuera de esta fase
 
 - **LV-b** (el tamaño donde la rejilla no entra): aceptado por ahora.
 - **El momento de vano de las vigas** con h = 0,75 (+8–11 %, del lado seguro): sólo baja con h.
 - **Las estaciones que no convergen** (la cara de un zuncho junto al cruce y la tira junto al hueco): se listan. Si hace falta, un aviso como `franja/esquina-entrante`.
 - **El `my` de la cubierta y P5** de la vivienda: justo después.
+
+## 6. Paso 1: el prototipo (2026-10-15)
+
+En `rejilla.ts` (§8 de su cabecera), con la opción `refinoEsquinas`, **por defecto desactivada hasta rematar la fase**: con ella desactivada pasan las 710 pruebas del compilador y las referencias congeladas no cambian. Se probaron dos plantillas en la celda de la esquina (partida en 4):
+- **de tercios:** el elemento de la esquina en 3 × 3 con transiciones de 3 a 1, y con dos niveles otra vez en su subelemento;
+- **graduada:** el elemento de la esquina partido en 3 hacia ella (un cuarto y dos trapecios), varias veces. Cada nivel cuesta un nudo interior y dos en las caras.
+
+Los nudos nuevos quedan a ≥ 1,5·ε_snap de la huella de cualquier pilar (también las tapadas por las vigas), para no hacerse rígidos (C2-d): con 2·ε_snap se perdía el nivel más fino incluso con una huella que sólo toca la esquina. Si no caben todos los niveles, se usan los que quepan.
+
+| | Criterio 1: recuadro, M / V en la cara frente a CYPE | Criterio 2: 3 × 3, peor cara frente a h = 0,055 (nudos) | Criterio 5: con vigas / reticular (ecuaciones) |
+|---|---|---|---|
+| LV1 | 0,79 / 1,25 | +91,1 % (1 362) | 112 119 / 161 049 |
+| Tercios, dos niveles | 0,97 / 1,02 | +5,5 % (2 706) | 365 379 / 340 998 |
+| **Graduada, tres niveles** | **0,96 / 1,02** | **+7,7 % (1 830)** | **156 177 / 204 750** |
+| h = 0,25 uniforme | 0,97 / 1,07 | +34,4 % (9 402) | — |
+
+- **La graduada de tres niveles pasa los criterios 1 y 2, y el 5 en el edificio con vigas.** El reticular objetivo pasa del perfil móvil un 2 % (204 750), lo que LV2-d acepta. Es la propuesta: casi la precisión de la de tercios con un tercio de su coste. Con cuatro niveles el último elemento ya no cabe.
+- **En el 3 × 3 sólo queda peor que h = 0,25 el momento de centro de vano** (+9 %, fuera de esta fase, §5) y un cortante a 0,6 % frente a 0,2 %.
+- **El criterio 3 (franjas) no pasa.** En la retícula de 4 × 4 (`out_franjas.txt`), el peor de los apoyos baja del 44,1 al 39,7 % y el de vano, del 28,2 al 20,3 %; junto a un pilar sigue hasta el 39,7 %. Todos los peores están en caras junto a pilares que asoman de la viga (40 × 40 y 30 × 50 bajo vigas de 30): allí lo que asoma es rígido (C2-d), la plantilla se queda en uno o dos niveles y la estación depende de esos nudos rígidos (F2-9). Es el paso 2 (§2.1, LV-c).
+- **El tiempo:** compilar y calcular el edificio con vigas pasa de 7,3 a 10,6 s (+45 %; el criterio 10 pide ≤ +25 %, a mirar al final).
+
+Medido con `validacion/lv2/recuadro.ts`, `vigas.ts`, `banco.ts` y `franjas.ts` (salidas `out_*.txt`).

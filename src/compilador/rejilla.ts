@@ -55,6 +55,16 @@
  *    CDT parte cada arista por su punto medio y un cuadrilátero con un nudo de más en un lado no
  *    existe (paridad). Así la malla es conforme: el punto medio de una arista de la interfaz es el
  *    mismo nudo a los dos lados.
+ * 8. Esquinas de los paños (fase LV2, `esquinas`): una celda regular con una línea fuerte (la cara del
+ *    ancho de una viga) en un lado u y otra en un lado v, y fuera de las losas al otro lado de las dos,
+ *    es la esquina de un paño entre vigas. Allí la losa concentra su reacción de esquina, y con un
+ *    elemento de h junto a la cara la viga sale mal en la cara del pilar. La celda, partida en 4, lleva
+ *    una plantilla (`PLANTILLA_ESQUINA`): la graduada parte el elemento de la esquina en 3 hacia ella
+ *    (un cuarto y dos trapecios) `niveles` veces; la de tercios, en 3 × 3 con transiciones de 3 a 1.
+ *    Su borde hacia la losa es el de la celda partida, así que la costura no cambia; por las caras
+ *    lleva sus nudos (`subdivididas`), sin nada al otro lado. Se usan los niveles que quepan: el
+ *    elemento más pequeño, de al menos ε_snap, y ningún nudo nuevo a menos de 1,5·ε_snap de la huella
+ *    de un pilar (`huellasPilares`, también las tapadas por las vigas), que sería rígido (C2-d).
  *
  * Puro y determinista; las comparaciones con umbral llevan holgura para que un ruido de ε_geom o el
  * redondeo de un giro no cambien la rejilla.
@@ -126,6 +136,17 @@ export interface EntradaRejilla {
    * en esa dirección, cuyas caras son las líneas). Sin él, todos la proponen.
    */
   sinEje?: readonly (readonly [boolean, boolean])[];
+  /**
+   * Refinar las esquinas de los paños (fase LV2): con `fuertes`, cada celda regular en la que se
+   * encuentran dos caras de viga lleva la plantilla de esquina (§8 de la cabecera).
+   */
+  esquinas?: boolean;
+  /**
+   * Huellas de todos los pilares de la planta, también las que tapan los anchos de las vigas (fase
+   * LV2): ningún nudo nuevo de una plantilla de esquina a menos de `separacionRefino` de ellas, que
+   * sería rígido (C2-d, F2-9).
+   */
+  huellasPilares?: readonly (readonly Vec2[])[];
   regiones: readonly Region[];
   /** Losa que contiene un punto, o −1. */
   enLosa: (q: Vec2) => number;
@@ -216,6 +237,9 @@ export const PARTICION_REFINO: [number, number] = [1 / 3, 2 / 3];
  */
 export const UMBRAL_REFINO = { jacobiano: 0.2 };
 
+/** Niveles de la plantilla de esquina (fase LV2): 1, tercios del elemento de la esquina; 2, y otra vez en su subelemento. */
+export const PLANTILLA_ESQUINA: { tipo: "tercios" | "graduada"; niveles: number } = { tipo: "graduada", niveles: 3 };
+
 /** Jacobiano escalado mínimo de una plantilla; por debajo, el pilar va por la triangulación (F2). */
 export const JACOBIANO_PLANTILLA = 0.2;
 
@@ -251,6 +275,22 @@ export interface Rejilla {
   estadosArista(n1: number, n2: number): [number, number] | null;
   /** ¿Está partida la arista entre dos nudos contiguos? */
   partida(n1: number, n2: number): boolean;
+}
+
+/** Distancia de un punto a un polígono (0 dentro). */
+function distanciaAPoligono(q: Vec2, poli: readonly Vec2[]): number {
+  let dentro = false;
+  let d = Infinity;
+  for (let i = 0, j = poli.length - 1; i < poli.length; j = i++) {
+    const [A, B] = [poli[j]!, poli[i]!];
+    if (A[1] > q[1] !== B[1] > q[1] && q[0] < ((B[0] - A[0]) * (q[1] - A[1])) / (B[1] - A[1]) + A[0]) dentro = !dentro;
+    const [dx, dy] = [B[0] - A[0], B[1] - A[1]];
+    const L2 = dx * dx + dy * dy;
+    const t = L2 > 0 ? Math.max(0, Math.min(1, ((q[0] - A[0]) * dx + (q[1] - A[1]) * dy) / L2)) : 0;
+    const [ex, ey] = [A[0] + t * dx - q[0], A[1] + t * dy - q[1]];
+    d = Math.min(d, Math.sqrt(ex * ex + ey * ey));
+  }
+  return dentro ? 0 : d;
 }
 
 /** Índice i con L[i] ≤ x < L[i + 1], o −1 / L.length − 1 fuera. */
@@ -1092,6 +1132,139 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     return { huella: k, red: nodos, quads, anillo: anilloH, bordes: bordesR, subdivididas, huellaLados: E.huellas[k]!.lados, refinada: true };
   };
   /**
+   * Plantilla de esquina (fase LV2) de la celda (i, j), con la esquina de las caras hacia su, sv. En
+   * sus ejes (x, y) desde esa esquina, en 36avos de la celda: el elemento de la esquina (hasta 18), en
+   * tercios (3 × 3); los dos tramos junto a las caras, con la transición de 3 a 1 (4 cuadriláteros
+   * cada uno, con dos nudos a 27); y el cuarto de enfrente, entero. Con dos niveles
+   * (`PLANTILLA_ESQUINA`), el subelemento de la esquina vuelve a ir en tercios, con sus transiciones.
+   * Sus lados hacia la losa son los de la celda partida (los puntos medios, como «medio»); por las
+   * caras, el primer tramo lleva sus nudos (`subdivididas`).
+   */
+  const plantillaEsquina = (i: number, j: number, su: number, sv: number, niveles: number): Plantilla => {
+    const graduada = PLANTILLA_ESQUINA.tipo === "graduada";
+    const dos = niveles > 1;
+    const D = graduada ? 2 ** (niveles + 1) : 36;
+    const g = (x: 0 | 1, y: 0 | 1) => (su < 0 ? i + x : i + 1 - x) + (sv < 0 ? j + y : j + 1 - y) * nu;
+    const [P00, P10, P01, P11] = [posicion(g(0, 0)), posicion(g(1, 0)), posicion(g(0, 1)), posicion(g(1, 1))];
+    const red: NudoPlantilla[] = [];
+    const indice = new Map<number, number>();
+    const nudo = (a: number, b: number): number => {
+      const k = a + (D + 1) * b;
+      let r = indice.get(k);
+      if (r !== undefined) return r;
+      const [x, y] = [a / D, b / D];
+      if ((a === 0 || a === D) && (b === 0 || b === D)) red.push({ tipo: "nudo", n: g(a ? 1 : 0, b ? 1 : 0) });
+      else if (a === D && 2 * b === D) red.push({ tipo: "medio", n1: g(1, 0), n2: g(1, 1) });
+      else if (b === D && 2 * a === D) red.push({ tipo: "medio", n1: g(0, 1), n2: g(1, 1) });
+      else
+        red.push({
+          tipo: "nuevo",
+          q: [(1 - y) * ((1 - x) * P00[0] + x * P10[0]) + y * ((1 - x) * P01[0] + x * P11[0]), (1 - y) * ((1 - x) * P00[1] + x * P10[1]) + y * ((1 - x) * P01[1] + x * P11[1])],
+        });
+      indice.set(k, (r = red.length - 1));
+      return r;
+    };
+    const losaQ = losa[celda(i, j)]!;
+    const quads: Plantilla["quads"] = [];
+    const cuad = (v: readonly (readonly [number, number])[]) => {
+      const n = v.map(([a, b]) => nudo(a, b)) as [number, number, number, number];
+      const X = n.map((k) => posRed(red[k]!));
+      let area = 0;
+      for (let m = 0; m < 4; m++) area += X[m]![0] * X[(m + 1) % 4]![1] - X[(m + 1) % 4]![0] * X[m]![1];
+      quads.push({ n: area > 0 ? n : [n[0], n[3], n[2], n[1]], losa: losaQ });
+    };
+    /** Transición de 3 a 1 con el lado fino en x = xa (nudos y0…y3) y el grueso en x = xb, y su simétrica. */
+    const transicion = (xa: number, xb: number, y: readonly number[]) => {
+      const xm = (xa + xb) / 2;
+      const t: [number, number][][] = [
+        [[xa, y[0]!], [xa, y[1]!], [xm, y[1]!], [xb, y[0]!]],
+        [[xa, y[1]!], [xa, y[2]!], [xm, y[2]!], [xm, y[1]!]],
+        [[xa, y[2]!], [xa, y[3]!], [xb, y[3]!], [xm, y[2]!]],
+        [[xm, y[1]!], [xm, y[2]!], [xb, y[3]!], [xb, y[0]!]],
+      ];
+      for (const q of t) {
+        cuad(q);
+        cuad(q.map(([a, b]) => [b, a] as [number, number]));
+      }
+    };
+    if (graduada) {
+      // El elemento de la esquina, partido en 3 hacia la esquina, `niveles` veces; los otros tres
+      // cuartos de la celda, enteros
+      const h2 = D / 2;
+      cuad([[h2, 0], [D, 0], [D, h2], [h2, h2]]);
+      cuad([[0, h2], [h2, h2], [h2, D], [0, D]]);
+      cuad([[h2, h2], [D, h2], [D, D], [h2, D]]);
+      const enCara: number[] = [h2];
+      for (let t = h2; t > 1; t /= 2) {
+        const m = t / 2;
+        cuad([[m, 0], [t, 0], [t, t], [m, m]]);
+        cuad([[0, m], [m, m], [t, t], [0, t]]);
+        enCara.unshift(m);
+      }
+      cuad([[0, 0], [1, 0], [1, 1], [0, 1]]);
+      return {
+        huella: -1,
+        red,
+        quads,
+        anillo: [],
+        bordes: [
+          { n1: g(1, 0), n2: g(1, 1), losa: losaQ },
+          { n1: g(0, 1), n2: g(1, 1), losa: losaQ },
+        ],
+        subdivididas: [
+          { a: nudo(0, 0), b: nudo(D, 0), nudos: enCara.map((x) => nudo(x, 0)) },
+          { a: nudo(0, 0), b: nudo(0, D), nudos: enCara.map((y) => nudo(0, y)) },
+        ],
+        huellaLados: [],
+        refinada: true,
+      };
+    }
+    const F = [0, 6, 12, 18];
+    for (let b = 0; b < 3; b++)
+      for (let a = 0; a < 3; a++) {
+        if (dos && a + b === 0) continue;
+        if (dos && a + b === 1) continue;
+        cuad([[F[a]!, F[b]!], [F[a + 1]!, F[b]!], [F[a + 1]!, F[b + 1]!], [F[a]!, F[b + 1]!]]);
+      }
+    if (dos) {
+      const f = [0, 2, 4, 6];
+      for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) cuad([[f[a]!, f[b]!], [f[a + 1]!, f[b]!], [f[a + 1]!, f[b + 1]!], [f[a]!, f[b + 1]!]]);
+      transicion(6, 12, f);
+    }
+    transicion(18, 36, F);
+    cuad([[18, 18], [36, 18], [36, 36], [18, 36]]);
+    const enCara = (dos ? [2, 4, 6, 12, 18] : [6, 12, 18]);
+    return {
+      huella: -1,
+      red,
+      quads,
+      anillo: [],
+      bordes: [
+        { n1: g(1, 0), n2: g(1, 1), losa: losaQ },
+        { n1: g(0, 1), n2: g(1, 1), losa: losaQ },
+      ],
+      subdivididas: [
+        { a: nudo(0, 0), b: nudo(36, 0), nudos: enCara.map((x) => nudo(x, 0)) },
+        { a: nudo(0, 0), b: nudo(0, 36), nudos: enCara.map((y) => nudo(0, y)) },
+      ],
+      huellaLados: [],
+      refinada: true,
+    };
+  };
+  /**
+   * ¿Todos los nudos nuevos de la plantilla, a ≥ 1,5·ε_snap (3/4 de separacionRefino) de las huellas de
+   * los pilares? A ≤ ε_snap serían rígidos (C2-d).
+   */
+  const lejosDeHuellas = (pl: Plantilla): boolean => {
+    const sep = 0.75 * (E.separacionRefino ?? 0) * (1 - HOLGURA);
+    if (!E.huellasPilares?.length || !(sep > 0)) return true;
+    for (const x of pl.red) {
+      if (x.tipo !== "nuevo") continue;
+      for (const poli of E.huellasPilares) if (distanciaAPoligono(x.q, poli) < sep) return false;
+    }
+    return true;
+  };
+  /**
    * Jacobiano escalado mínimo de los cuadriláteros de una plantilla en las losas, o −1 si alguno no
    * es estrictamente convexo (el motor lo rechazaría: un ángulo de 180° deja el jacobiano positivo
    * en los puntos de Gauss).
@@ -1127,6 +1300,42 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     plantillas.push(pl);
   }
   if (malas.length) return { excluir: malas };
+
+  // 8. Esquinas de los paños (fase LV2)
+  if (E.esquinas && E.fuertes) {
+    const fuerteEn = (cand: readonly { c: number; fuerte?: boolean }[], L: readonly number[]) => L.map((x) => cand.some((c) => c.fuerte === true && Math.abs(c.c - x) <= 2 * tol));
+    const fU = fuerteEn(candU, U);
+    const fV = fuerteEn(candV, V);
+    const sepE = (E.separacionRefino ?? 0) * (1 - HOLGURA);
+    for (let j = 0; j < nv - 1; j++)
+      for (let i = 0; i < nu - 1; i++) {
+        const c = celda(i, j);
+        if (estado[c] !== REGULAR) continue;
+        // La esquina: una línea fuerte en un lado u y en un lado v, con fuera de las losas al otro lado
+        const opciones: [number, number][] = [];
+        for (const su of [-1, 1])
+          for (const sv of [-1, 1])
+            if (fU[su < 0 ? i : i + 1] && fV[sv < 0 ? j : j + 1] && est(i + su, j) === FUERA && est(i, j + sv) === FUERA) opciones.push([su, sv]);
+        if (opciones.length !== 1) continue;
+        if (partidaH[i + j * (nu - 1)] !== 1 || partidaV[i + j * nu] !== 1) continue;
+        // El primer tercio, lejos de la huella del pilar de la esquina (F2-e)
+        // Dos niveles si el primer nudo queda a ε_snap de la esquina; uno, si el primer tercio llega a
+        // 2·ε_snap (F2-e)
+        // Los niveles que quepan: el elemento más pequeño, de al menos ε_snap, y ningún nudo nuevo a
+        // menos de 1,5·ε_snap de la huella de un pilar
+        const [su, sv] = opciones[0]!;
+        const lado = Math.min(U[i + 1]! - U[i]!, V[j + 1]! - V[j]!);
+        for (let k = PLANTILLA_ESQUINA.niveles; k >= 1; k--) {
+          const menor = PLANTILLA_ESQUINA.tipo === "graduada" ? lado / 2 ** (k + 1) : lado / (k > 1 ? 18 : 6);
+          if (menor < sepE / 2) continue;
+          const pl = plantillaEsquina(i, j, su, sv, k);
+          if (!lejosDeHuellas(pl) || jacobianoMin(pl) < UMBRAL_REFINO.jacobiano) continue;
+          estado[c] = PLANTILLA;
+          plantillas.push(pl);
+          break;
+        }
+      }
+  }
 
   const celdaDe = (q: Vec2): number => {
     const [u, v] = uv(q);

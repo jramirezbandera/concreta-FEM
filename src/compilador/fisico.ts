@@ -579,6 +579,13 @@ export interface OpcionesCompilacion {
    * sí; sin él, la malla de F1.1 (con R0).
    */
   refinoCaras?: boolean;
+  /**
+   * Refinamiento de la malla en las esquinas de los paños de losa unidos a las vigas por sus caras
+   * (fase LV2): en la celda de la rejilla de cada esquina en la que se encuentran dos caras de viga, el
+   * elemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`). En desarrollo: por
+   * defecto, no (la malla de LV1).
+   */
+  refinoEsquinas?: boolean;
 }
 
 export interface OpcionesResueltas {
@@ -596,6 +603,7 @@ export interface OpcionesResueltas {
   franjas: boolean;
   anchoFranja: number;
   refinoCaras: boolean;
+  refinoEsquinas: boolean;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -614,5 +622,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     franjas: o.franjas ?? true,
     anchoFranja: o.anchoFranja ?? ANCHO_FRANJA,
     refinoCaras: o.refinoCaras ?? true,
+    refinoEsquinas: o.refinoEsquinas ?? false,
   };
 }

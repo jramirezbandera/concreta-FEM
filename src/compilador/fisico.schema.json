@@ -994,6 +994,9 @@
         },
         "refinoCaras": {
           "type": "boolean"
+        },
+        "refinoEsquinas": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

@@ -1,0 +1,9 @@
+Recuadro de 4.32 m entre caras, vigas y pilares de 30×30, q = 10 kN/m²; entre paréntesis, frente al emparrillado de CYPECAD
+
+                                                viga: M cara        M centro          V cara  losa: w centro        m centro    w junto viga
+Emparrillado de CYPECAD (barras)              -3.471 (1.00)  12.531 (1.00) -23.328 (1.00)  -2.201 (1.00)  15.801 (1.00)  -1.426 (1.00)
+LV1 (sin esquinas), h = 0,75                  -2.742 (0.79)  12.986 (1.04) -29.261 (1.25)  -2.125 (0.97)  15.494 (0.98)  -1.386 (0.97)
+LV2, tercios, 1 nivel                         -3.295 (0.95)  12.932 (1.03) -24.877 (1.07)  -2.128 (0.97)  15.576 (0.99)  -1.383 (0.97)
+LV2, tercios, 2 niveles                       -3.351 (0.97)  12.933 (1.03) -23.715 (1.02)  -2.128 (0.97)  15.581 (0.99)  -1.383 (0.97)
+LV2, graduada, 2 niveles                      -3.325 (0.96)  12.978 (1.04) -24.305 (1.04)  -2.122 (0.96)  15.537 (0.98)  -1.379 (0.97)
+LV2, graduada, 3 niveles                      -3.333 (0.96)  12.979 (1.04) -23.727 (1.02)  -2.122 (0.96)  15.540 (0.98)  -1.379 (0.97)

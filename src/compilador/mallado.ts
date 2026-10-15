@@ -366,7 +366,7 @@ export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: 
   const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false, undefined, anchos);
   if (!rejilla) return sin();
   const conRejilla = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, undefined, anchos);
-  const r = conRespaldo(refino?.caras.size ? () => conRespaldoRefino(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, refino, anchos), conRejilla, [...refino.caras.keys()]) : conRejilla, sin);
+  const r = conRespaldo(refino?.caras.size || (refino?.esquinas && anchos.length) ? () => conRespaldoRefino(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, refino, anchos), conRejilla, [...refino.caras.keys()]) : conRejilla, sin);
   if (!r.ok || r.rejilla.cobertura >= COBERTURA_MINIMA || r.problemas.some((p) => p.codigo === "malla/sin-rejilla")) return r;
   const s = sin();
   return s.ok && s.nudos.length < r.nudos.length ? s : r;
@@ -436,6 +436,10 @@ export interface RefinoCaras {
   caras: ReadonlyMap<string, readonly { d: Vec2; lado: -1 | 1 }[]>;
   /** Distancia mínima a la cara de un nudo nuevo (2·ε_snap: más cerca, sería de la huella). */
   separacion: number;
+  /** Refinar las esquinas de los paños entre las caras de las vigas (fase LV2). */
+  esquinas?: boolean;
+  /** Huellas de todos los pilares de la planta (LV2: lejos de ellas, sin nudos nuevos). */
+  huellas?: readonly (readonly Vec2[])[];
 }
 
 /** `mallarPlanta` sin comparar con la CDT sola cuando la rejilla cubre poco (para las pruebas). */
@@ -598,7 +602,24 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
           return u[0] || u[1] || v[0] || v[1] ? { u, v } : null;
         })
       : undefined;
-    rj = rejillaPlanta({ P, lados, ladoEnLosa, puntoEnLosa, fijos, exactos, huellas, ...(refinoH ? { refino: refinoH, separacionRefino: refino!.separacion } : {}), ...(fuertes ? { fuertes, sinEje } : {}), regiones, enLosa, O: origenes[0]!, e, h, epsGeom });
+    rj = rejillaPlanta({
+      P,
+      lados,
+      ladoEnLosa,
+      puntoEnLosa,
+      fijos,
+      exactos,
+      huellas,
+      ...(refinoH ? { refino: refinoH } : {}),
+      ...(refinoH || (refino?.esquinas && fuertes) ? { separacionRefino: refino!.separacion } : {}),
+      ...(fuertes ? { fuertes, sinEje, ...(refino?.esquinas ? { esquinas: true, huellasPilares: refino.huellas ?? [] } : {}) } : {}),
+      regiones,
+      enLosa,
+      O: origenes[0]!,
+      e,
+      h,
+      epsGeom,
+    });
   }
   // Punto (índice en P) de cada nudo de la rejilla que se usa
   const pNudo = new Map<number, number>();
