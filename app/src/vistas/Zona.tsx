@@ -768,7 +768,8 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
                     </>
                   )}
                 </svg>
-                <span className={l.relleno ? "mono" : undefined}>{l.texto}</span>
+                {/* Mono sólo para los rangos de un mapa («-0,5 a 0»), no para las descripciones */}
+                <span className={l.relleno && /^[-−+]?\d/.test(l.texto) ? "mono" : undefined}>{l.texto}</span>
               </div>
             );
           })}
