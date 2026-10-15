@@ -2090,7 +2090,8 @@ export class Vista3D extends Vista {
       ctx.arc(q[0], q[1], 3, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
-      textoConHalo(ctx, r.texto, q[0] + 8, q[1], color, col.fondo);
+      // El signo, en el punto; el texto, en el color del texto: el azul sobre las bandas azules de un mapa no se leía
+      textoConHalo(ctx, r.texto, q[0] + 8, q[1], col.texto, col.fondo);
     }
     ctx.restore();
   }
