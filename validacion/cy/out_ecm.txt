@@ -1,0 +1,40 @@
+Referencias congeladas de 4c5172c frente a las de ahora
+c1 sap-1-022                            E [203395] → [203395] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c1 edificio-2x3x2                       E [28577] → [32837] MPa  un solo E  esfuerzos 3.7e-15  u escalados 1.5e-15
+c1 aleatorio-6                          E [27264] → [31476] MPa  un solo E  esfuerzos 1.6e-15  u escalados 6.1e-16
+c1 aleatorio-13                         E [27264] → [31476] MPa  un solo E  esfuerzos 6.9e-15  u escalados 6.2e-15
+c1 aleatorio-21-sin-diafragma           E [27264] → [31476] MPa  un solo E  esfuerzos 3.8e-14  u escalados 6.1e-14
+c2 losa-plana                           E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c2 navier-delgada                       E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c2 aleatorio-8-losas                    E [27264] → [31476] MPa  un solo E  esfuerzos 1.8e-12  u escalados 8.5e-13
+c2 aleatorio-11-losas-sin-diafragma     E [27264] → [31476] MPa  un solo E  esfuerzos 1.6e-12  u escalados 5.0e-13
+c2 losa-plana-rejilla                   E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c2 aleatorio-8-losas-rejilla            E [27264] → [31476] MPa  un solo E  esfuerzos 1.8e-12  u escalados 8.5e-13
+c2 reticula-enrasada                    E [27264] → [31476] MPa  un solo E  esfuerzos 3.9e-13  u escalados 3.3e-13
+c3 etabs-15c-3-60                       E [20684] → [20684] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c3 etabs-15f-1                          E [20684] → [20684] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c3 sotano-empuje                        E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c3 viga-en-muro                         E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c3 aleatorio-3-muros                    E [27264] → [31476] MPa  un solo E  esfuerzos 4.5e-13  u escalados 2.4e-13
+c3 reticula-nucleo                      E [27264] → [31476] MPa  un solo E  esfuerzos 7.1e-13  u escalados 2.9e-13
+c4 pano-oblicuo                         E [27264] → [31476] MPa  un solo E  esfuerzos 4.6e-14  u escalados 4.8e-13
+c4 dos-vanos-voladizo                   E [27264] → [31476] MPa  un solo E  esfuerzos 1.2e-13  u escalados 3.7e-13
+c4 pano-hueco                           E [27264] → [31476] MPa  un solo E  esfuerzos 3.9e-16  u escalados 2.1e-13
+c4 aleatorio-7-unidireccional           E [27264] → [31476] MPa  un solo E  esfuerzos 8.9e-14  u escalados 3.3e-13
+c4 aleatorio-6-reticular                E [27264] → [31476] MPa  un solo E  esfuerzos 1.2e-12  u escalados 7.8e-13
+c4 aleatorio-5-mixto                    E [27264] → [31476] MPa  un solo E  esfuerzos 2.5e-12  u escalados 2.4e-12
+c5 pilares-mezclados/c2                 E [28577] → [32837] MPa  un solo E  esfuerzos 1.3e-12  u escalados 1.4e-12
+c5 reticular-h25/c2                     E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c5 etabs-15c-3-60/c2                    E [20684] → [20684] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+c5 aleatorio-3/c2                       E [27264] → [31476] MPa  un solo E  esfuerzos 1.1e-12  u escalados 8.6e-13
+f  h25-plana/c2                         E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+f  h25-reticular/c2                     E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+f  pilares-mezclados/c2                 E [28577] → [32837] MPa  un solo E  esfuerzos 8.5e-13  u escalados 8.3e-13
+f  aleatorio-3/c2                       E [27264] → [31476] MPa  un solo E  esfuerzos 5.7e-13  u escalados 4.7e-13
+f  losa-3x3-refinada/c2                 E [27264] → [31476] MPa  un solo E  esfuerzos 4.7e-13  u escalados 4.8e-13
+f  h25-plana-sin-refinar/c2             E [30000] → [30000] MPa  un solo E  esfuerzos 0.0e+0  u escalados 0.0e+0
+f  losa-3x3-mezclada/c2                 E [27264] → [31476] MPa  un solo E  esfuerzos 4.1e-13  u escalados 4.8e-13
+f  reticular-2x2-abacos/c2              E [28577] → [32837] MPa  un solo E  esfuerzos 2.9e-13  u escalados 3.3e-13
+
+Peor: esfuerzos 2.5e-12 (criterio ≤ 1e-9), desplazamientos escalados 2.4e-12; modelos con varios E: 0
+Criterio 2: PASA

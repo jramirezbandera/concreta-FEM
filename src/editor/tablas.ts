@@ -190,7 +190,7 @@ const materiales: DefTabla = {
   columnas: [
     id,
     { clave: "tipo", titulo: "tipo", ayuda: "hormigon, acero o general", opciones: fijas(["hormigon", "acero", "general"]) },
-    { clave: "fck", titulo: "fck", unidad: "MPa", ayuda: "hormigón: E = 8500·∛(fck + 8)" },
+    { clave: "fck", titulo: "fck", unidad: "MPa", ayuda: "hormigón: E = 22000·((fck + 8)/10)^0,3 (Código Estructural)" },
     // El modelo físico da el E del acero en MPa y el de un material general en kN/m²: dos columnas, cada una con su unidad
     { clave: "Eacero", titulo: "E acero", unidad: "MPa", ayuda: "sólo acero; por defecto, 210 000" },
     { clave: "E", titulo: "E general", unidad: "kN/m²", ayuda: "sólo general" },

@@ -21,11 +21,13 @@ export interface Material {
 }
 
 /**
- * Hormigón con el E que usa el solver de Concreta: 8500·∛(fck + 8) MPa (copiado de
- * `src/lib/frame-core/sections.ts`, `rcElasticModulusMPa`, de wh0am1-dev/concreta), y ν = 0,2.
+ * Hormigón con el Ecm del Código Estructural (Anejo 19, tabla 3.1): 22000·(fcm/10)^0,3 MPa con
+ * fcm = fck + 8, redondeado al MPa (es el que lista CYPECAD, y así sale igual en V8 y
+ * JavaScriptCore; CY-a, `hipotesis-cype.md`), y ν = 0,2. El solver de Concreta usa todavía el de
+ * la EHE-08, 8500·∛(fck + 8) (`rcElasticModulusMPa`): pendiente para la integración.
  */
 export function hormigon(fck: number, nu = 0.2): Material {
-  const E = 8500 * Math.cbrt(fck + 8) * 1e3;
+  const E = Math.round(22000 * ((fck + 8) / 10) ** 0.3) * 1e3;
   return { E, G: E / (2 * (1 + nu)) };
 }
 

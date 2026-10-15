@@ -31,8 +31,10 @@ describe("torsión de Saint-Venant del rectángulo", () => {
 describe("secciones", () => {
   const H = hormigon(25);
 
-  it("hormigón con el E del solver de Concreta y acero de 210 GPa", () => {
-    expect(rel(H.E, 8500 * Math.cbrt(33) * 1e3)).toBeLessThan(1e-15);
+  it("hormigón con el Ecm del Código Estructural y acero de 210 GPa", () => {
+    // Anejo 19, tabla 3.1 (al MPa): C25/30 → 31 476; C30/37 → 32 837, el que lista CYPECAD (CY-a)
+    expect(H.E).toBe(31476e3);
+    expect(hormigon(30).E).toBe(32837e3);
     expect(rel(H.G, H.E / 2.4)).toBeLessThan(1e-15);
     expect(acero().E).toBe(2.1e8);
   });

@@ -828,7 +828,7 @@
             },
             "fck": {
               "type": "number",
-              "description": "Resistencia característica, MPa. E = 8500·∛(fck + 8) MPa, como el solver de Concreta."
+              "description": "Resistencia característica, MPa. E = 22000·((fck + 8)/10)^0,3 MPa al MPa (Ecm del Código Estructural, CY-a)."
             },
             "nu": {
               "type": "number",

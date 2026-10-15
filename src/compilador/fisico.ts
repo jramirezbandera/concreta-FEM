@@ -74,7 +74,7 @@ export type Material =
   | {
       id: string;
       tipo: "hormigon";
-      /** Resistencia característica, MPa. E = 8500·∛(fck + 8) MPa, como el solver de Concreta. */
+      /** Resistencia característica, MPa. E = 22000·((fck + 8)/10)^0,3 MPa al MPa (Ecm del Código Estructural, CY-a). */
       fck: number;
       /** Coeficiente de Poisson. Por defecto, 0,2. */
       nu?: number;
