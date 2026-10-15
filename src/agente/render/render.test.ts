@@ -569,7 +569,7 @@ describe("A4, criterio 2: determinismo", () => {
   });
 });
 
-const SVG_CONGELADO = "dc5b1b84081fe90e2e3de2fce1655af1277db27623959204249c492e305e61f3";
+const SVG_CONGELADO = "de23c62d1dbe6fbf5a0f47cb2ea18e166ce65ea37435a6b6b285341a51c466ce";
 const PNG_CONGELADO = "3fe954bbf7091efff8e93d1c988c5b0069c28befd1eb5730d97d82d90ec85f74";
 
 describe("A4, criterio 3: tamaño de la imagen y del texto", () => {

@@ -14,6 +14,7 @@ import { cotasPlantas } from "../../compilador/cotas.ts";
 import { puntoEnPoligono, puntoEnRegion, recorteRegionConvexo, trozosSegmento, type Region } from "../../compilador/poligonos.ts";
 import type { CargaFisica, Losa, ModeloFisico, Muro, PanoUnidireccional, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
+import { huellasInglete, huellasVigas, tramosDe } from "../../visor/solido.ts";
 import { capaEjes } from "./ejes.ts";
 import { bandaPolilinea, cajaDe, longitud, momento2D, puntoEnPolilinea, puntoInterior, puntosDe, rayado, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
 
@@ -104,6 +105,25 @@ export function huellaSeccion(p: Pilar, s: Seccion | undefined): { anillo: Vec2[
 }
 
 /** Ancho en planta de la sección de una viga (0 si no se conoce). */
+/**
+ * Las huellas de las vigas de una planta por su id, un cuadrilátero por tramo, con los tramos de cada
+ * una y las esquinas de dos vigas unidos a inglete (`huellasVigas`, las del 3D sólido): sin el cuarto
+ * exterior en blanco de una esquina de zunchos. Las de ancho nulo no tienen.
+ */
+export function huellasVigasPlanta(pl: PlantaFisica): Map<string, Vec2[][]> {
+  const vs = pl.enPlanta(pl.f.vigas).map((v) => ({ id: v.id, puntos: v.puntos as Vec2[], b: anchoViga(pl.f.secciones?.find((x) => x.id === v.seccion)) })).filter((v) => v.b > 0);
+  const r = new Map<string, Vec2[][]>();
+  huellasVigas(vs).forEach((h, i) => r.set(vs[i]!.id, h));
+  return r;
+}
+
+/** La huella de un muro (o de un hueco suyo, por su eje), un cuadrilátero por tramo unidos a inglete; cerrado si acaba donde empieza. */
+export function huellaMuro(puntos: readonly Vec2[], espesor: number): Vec2[][] {
+  const [a, z] = [puntos[0], puntos[puntos.length - 1]];
+  const cerrado = puntos.length > 2 && !!a && !!z && Math.hypot(z[0] - a[0], z[1] - a[1]) <= 1e-9;
+  return huellasInglete(tramosDe(puntos), espesor, cerrado);
+}
+
 export function anchoViga(s: Seccion | undefined): number {
   if (!s) return 0;
   switch (s.forma) {
@@ -234,10 +254,11 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   }
 
   // Vigas, con su ancho
+  const huellas = huellasVigasPlanta(pl);
   for (const v of pl.enPlanta(f.vigas)) {
     const s = f.secciones?.find((x) => x.id === v.seccion);
     const b = anchoViga(s);
-    if (b > 0) for (const q of bandaPolilinea(v.puntos, b)) P.push({ tipo: "poligono", anillos: [q], estilo: est("viga"), objeto: v.id });
+    if (b > 0) for (const q of huellas.get(v.id) ?? []) P.push({ tipo: "poligono", anillos: [q], estilo: est("viga"), objeto: v.id });
     else P.push({ tipo: "linea", puntos: v.puntos as Vec2[], estilo: est("vigueta"), objeto: v.id });
     // El rótulo, en el tramo más largo
     let mejor = 0;
@@ -255,8 +276,8 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
 
   // Muros: los que llegan, rellenos; los que arrancan, en contorno; los huecos del piso de debajo
   for (const { m, llega } of pl.muros()) {
-    for (const q of bandaPolilinea(m.puntos, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: est(llega ? "muro-llega" : "muro-arranca"), objeto: m.id });
-    if (llega) for (const h of huecosEnPiso(pl, m)) for (const q of bandaPolilinea(h, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: est("muro-hueco"), objeto: m.id });
+    for (const q of huellaMuro(m.puntos, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: est(llega ? "muro-llega" : "muro-arranca"), objeto: m.id });
+    if (llega) for (const h of huecosEnPiso(pl, m)) for (const q of huellaMuro(h, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: est("muro-hueco"), objeto: m.id });
     const { p, d } = puntoEnPolilinea(m.puntos, longitud(m.puntos) / 2);
     const al = alLado(p, d, m.espesor);
     texto(al.p, m.id, 40, al.opciones);

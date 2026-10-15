@@ -24,10 +24,10 @@ import { EsfuerzosPiezas, type TramoFlexible } from "../../compilador/resultados
 import { CamposLaminas, type EvaluadorCampos } from "../../motor/campos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { diagramaCombinado } from "../consultas.ts";
-import { area, bandaPolilinea, cajaDe, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
+import { area, cajaDe, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
-import { anchoViga, fondoModelo, huellaSeccion, PlantaFisica, type DatosVista } from "./modelo.ts";
+import { fondoModelo, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica, type DatosVista } from "./modelo.ts";
 
 export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12"] as const;
 export type Campo = (typeof CAMPOS)[number];
@@ -148,11 +148,8 @@ export function trazoModelo(pl: PlantaFisica): Primitiva[] {
   const P: Primitiva[] = [];
   const f = pl.f;
   for (const l of [...pl.enPlanta(f.losas), ...pl.enPlanta(f.panos)]) for (const a of [l.contorno, ...(l.huecos ?? [])]) P.push({ tipo: "linea", puntos: [...a, a[0]!] as Vec2[], estilo: "contorno", objeto: l.id });
-  for (const v of pl.enPlanta(f.vigas)) {
-    const b = anchoViga(f.secciones?.find((s) => s.id === v.seccion));
-    for (const q of b > 0 ? bandaPolilinea(v.puntos, b) : []) P.push({ tipo: "linea", puntos: [...q, q[0]!], estilo: "contorno", objeto: v.id });
-  }
-  for (const { m } of pl.muros()) for (const q of bandaPolilinea(m.puntos, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: "muro-llega", objeto: m.id });
+  for (const [id, hs] of huellasVigasPlanta(pl)) for (const q of hs) P.push({ tipo: "linea", puntos: [...q, q[0]!], estilo: "contorno", objeto: id });
+  for (const { m } of pl.muros()) for (const q of huellaMuro(m.puntos, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: "muro-llega", objeto: m.id });
   for (const { p, llega, seccion } of pl.pilares()) {
     const h = huellaSeccion(p, seccion);
     if (h && "anillo" in h) P.push({ tipo: "poligono", anillos: [h.anillo], estilo: llega ? "pilar-llega" : "pilar-arranca", objeto: p.id });
