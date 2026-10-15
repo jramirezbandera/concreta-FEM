@@ -460,6 +460,8 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .sel.en-sitio:hover { border-color: var(--color-border-main); }
 .sel.en-sitio:focus { background: var(--color-bg-primary); scrollbar-width: thin; }
 .sel.en-sitio::placeholder { color: var(--color-text-tertiary); }
+/* Un nombre largo se corta con «…», no a media palabra; al editarlo se ve entero */
+input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 
 /* Diálogos: cabecera con su título y la X, cuerpo con aire y pie sobre la superficie */
 @keyframes fondo-entra { from { opacity: 0; } }

@@ -420,7 +420,7 @@ function DatosProyecto() {
   };
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
-      <input className="sel en-sitio w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 600 }} aria-label="Nombre del proyecto" placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+      <input className="sel en-sitio w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 600 }} aria-label="Nombre del proyecto" title={nombre ?? p.nombre ?? undefined} placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
       <textarea className="sel en-sitio w-full" style={{ height: 56, padding: "5px 6px", fontFamily: "var(--font-sans)", fontSize: 12, lineHeight: 1.45, resize: "vertical" }} aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={escribir} />
     </div>
   );
