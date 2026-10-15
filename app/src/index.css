@@ -566,6 +566,14 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 }
 .herr-seg button[data-on="true"] { background: var(--color-bg-primary); color: var(--color-accent); box-shadow: 0 1px 2px rgb(16 24 40 / .14); }
 .herr-seg button:disabled { opacity: .4; cursor: default; }
+/* En un portátil (1366–1536 px) la barra no cabía y lo de la derecha (las disposiciones) quedaba
+   cortado sin ninguna pista: más apretada y, si aun así no cabe, con su barra de desplazamiento */
+@media (max-width: 1599px) {
+  .herramientas { scrollbar-width: thin; }
+  .herr { min-width: 44px; padding: 0 4px; }
+  .herr-sep { margin: 12px 4px; }
+  .herr-seg button { padding: 0 7px; }
+}
 
 .panel { display: flex; flex-direction: column; flex-shrink: 0; min-height: 0; background: var(--color-bg-primary); }
 .panel.izq { border-right: 1px solid var(--color-border-main); }
