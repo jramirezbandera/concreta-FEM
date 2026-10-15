@@ -60,7 +60,7 @@ function junto(f: Franja, s: number): boolean {
   for (const p of fisico.pilares ?? []) {
     const sc = fisico.secciones.find((x) => x.id === p.seccion) as { b: number; h: number };
     const girado = ((p.giro ?? 0) / 90) % 2 === 1;
-    const [bx, by] = girado ? [sc.h, sc.b] : [sc.b, sc.h];
+    const [bx, by] = girado ? [sc.b, sc.h] : [sc.h, sc.b];
     const [c, t, ancho] = f.dir === 1 ? [p.x, p.y, by] : [p.y, p.x, bx];
     if (Math.abs(s - c) <= 0.5 && f.t0 < t + ancho / 2 && f.t1 > t - ancho / 2) return true;
   }
@@ -75,7 +75,7 @@ const variantes: [string, OpcionesCompilacion][] = [
   ["LV2, h = 0,5", { tamanoMalla: 0.5, refinoEsquinas: true }],
 ];
 console.log("## Retícula de 4 × 4 (fase LV): franjas con ELU frente a h = 0,125\n");
-console.log(`${"".padEnd(24)}${"apoyos: mediana / máx".padStart(24)}${"vano: mediana / máx".padStart(24)}${"caras junto a un pilar: máx".padStart(30)}`);
+console.log(`${"".padEnd(24)}${"apoyos: mediana / máx".padStart(24)}${"vano: mediana / máx".padStart(24)}${"caras junto a un pilar: máx".padStart(30)}${"apoyos > 10 % / > 20 %".padStart(26)}`);
 const med = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)] ?? NaN;
 const pct = (v: number) => `${(100 * v).toFixed(1)} %`;
 const peores = new Map<string, [string, number, number, number, boolean][]>();
@@ -103,7 +103,7 @@ for (const [nombre, op] of variantes) {
     }
   }
   peores.set(nombre, todos.sort((a, b) => b[3] - a[3]).slice(0, 10));
-  console.log(`${nombre.padEnd(24)}${`${pct(med(ea))} / ${pct(Math.max(...ea))}`.padStart(24)}${`${pct(med(ev))} / ${pct(Math.max(...ev))}`.padStart(24)}${`${pct(Math.max(...ej))} (${ej.length})`.padStart(30)}`);
+  console.log(`${nombre.padEnd(24)}${`${pct(med(ea))} / ${pct(Math.max(...ea))}`.padStart(24)}${`${pct(med(ev))} / ${pct(Math.max(...ev))}`.padStart(24)}${`${pct(Math.max(...ej))} (${ej.length})`.padStart(30)}${`${ea.filter((x) => x > 0.1).length} / ${ea.filter((x) => x > 0.2).length} (${ea.length})`.padStart(26)}`);
 }
 for (const [nombre, t] of peores) {
   console.log(`\n### Los peores, ${nombre} (valor, referencia, error; * junto a un pilar)`);

@@ -807,8 +807,14 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     }
     return c;
   });
-  // La interfaz entre la rejilla y la CDT
-  for (const [n1, n2] of rj?.interfaz ?? []) restringir(pDe(n1), pDe(n2));
+  // La interfaz entre la rejilla y la CDT. Una arista que una plantilla parte en más de dos (la cara
+  // de una viga junto a una esquina de paño, LV2, con el ancho de la viga irregular al otro lado), por
+  // sus nudos
+  for (const [n1, n2] of rj?.interfaz ?? []) {
+    const [p, q] = [pDe(n1), pDe(n2)];
+    const c = [p, ...(subdividida.get(`${p},${q}`) ?? []), q];
+    for (let m = 0; m + 1 < c.length; m++) restringir(c[m]!, c[m + 1]!);
+  }
 
   // 2. Retícula de Steiner, lejos de los lados y de la interfaz (índice de segmentos por celdas de
   // 2h) y fuera de las celdas regulares

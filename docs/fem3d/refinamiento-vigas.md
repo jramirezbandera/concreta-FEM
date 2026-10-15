@@ -189,3 +189,58 @@ Los nudos nuevos quedan a ≥ 1,5·ε_snap de la huella de cualquier pilar (tamb
 - **El tiempo:** compilar y calcular el edificio con vigas pasa de 7,3 a 10,6 s (+45 %; el criterio 10 pide ≤ +25 %, a mirar al final).
 
 Medido con `validacion/lv2/recuadro.ts`, `vigas.ts`, `banco.ts` y `franjas.ts` (salidas `out_*.txt`).
+
+## 7. Paso 2: la plantilla a los dos lados de cada viga (2026-10-16)
+
+**Lo que estropeaba las franjas no era lo que asoma de los pilares.** El paso 1 lo atribuía a las huellas que asoman de la viga (§6). Medido en la retícula de 4 × 4:
+- **con todos los pilares de 30 × 30** (nada asoma), la plantilla quitaba lo mismo;
+- **sumando toda la cara de Y6 en un paño** (5,15 a 9,85 m), todas las mallas uniformes (de 0,75 a 0,0625) y LV1 dan −135 kN·m, y la plantilla daba −123,5: faltaba un 9 % del momento total, no se repartía distinto;
+- **la causa:** la plantilla iba sólo a un lado de la viga. La celda del otro lado no llevaba la suya por tres motivos:
+  - no estaba partida en u (0,65 m: la corta la línea de la zona de carga Qz en x = 6,8);
+  - el grupo mínimo la había devuelto a la triangulación;
+  - la celda del ancho de la viga junto a ella era «irregular» por un rasgo cercano, no «fuera».
+
+  La losa refinada toma menos momento que la del otro lado, y la viga, con la torsión ×0,1 de D4, se tuerce: torsor de 1,2 kN·m junto al pilar frente a 0,05 en la malla fina, y giro de −0,117‰ a 0,27 m del pilar frente a −0,077‰. La losa del lado refinado pierde hasta un 30 % en la cara;
+- **lo que asoma sí cortaba niveles sin motivo:** la guarda del paso 1 rechazaba todo nudo a menos de 1,5·ε_snap de una huella, también los de la cara, que van a la viga aunque toquen la huella (`unirCaras`).
+
+**Cambios en `rejilla.ts`** (detrás de `refinoEsquinas`, que sigue desactivada; §8 de su cabecera):
+1. **La guarda sigue la regla de `losas.ts`:** un nudo de la cara se rechaza sólo si cae dentro de una huella; uno de dentro de la losa, a menos de 1,2·ε_snap (antes, todos a 1,5·ε_snap).
+2. **Plantilla también en celdas partidas en 2 o en 1:** el elemento de la esquina es la mitad de la celda o la celda entera.
+3. **Por cruces:** las esquinas en diagonal con la celda de un cruce de vigas llevan todas la plantilla, con los mismos niveles, o ninguna.
+4. **Fuera de las losas, por el centro de la celda,** no por su estado.
+5. **El grupo mínimo no devuelve a la triangulación un grupo con una esquina.**
+6. **Una esquina de la triangulación no se refina.** Junto a un pilar deja su cruce sin refinar; lejos de los pilares (el cruce de un zuncho), no impide refinar las demás.
+   - Se probó a darle en la siembra el tamaño del elemento más fino de la plantilla. Salen cuadriláteros malos (0,17 en el reticular objetivo) y nudos rígidos junto a lo que asoma. Con el tamaño del primer nivel, la siembra ya no actúa.
+
+**En `mallado.ts`:** una arista de la interfaz que la plantilla parte en más de dos se restringe por sus nudos. Pasa cuando el ancho de la viga, al otro lado de la cara, es irregular; antes la triangulación fallaba con «Constraining edge intersects point».
+
+**En `validacion/lv2/franjas.ts`:** `junto` tomaba el giro de los pilares de 30 × 50 al revés (con giro 0, el canto h va según X). Ahora también cuenta las estaciones de apoyo por encima del 10 % y del 20 %.
+
+| Retícula de 4 × 4, frente a h = 0,125 | Apoyos: mediana / máx | Vano: mediana / máx | Apoyos > 10 % / > 20 % (de 352) |
+|---|---|---|---|
+| LV1, h = 0,75 | 1,2 / 44,1 % | 3,0 / 28,2 % | 58 / 13 |
+| Paso 1, h = 0,75 | 1,2 / 39,7 % | 3,0 / 20,3 % | — |
+| **Paso 2, h = 0,75** | **0,9 / 39,3 %** | **3,0 / 23,1 %** | **53 / 6** |
+| LV1, h = 0,5 uniforme | 0,8 / 25,7 % | 1,0 / 27,7 % | 33 / 6 |
+
+- **El peor que queda,** X13 en la cara derecha de P12-10 (−39 %), está en un cruce sin refinar: su esquina de arriba a la derecha cae en la triangulación por la esquina del hueco de la escalera. Converge (37 / 50 / 53 / 61 / 61 kN·m/m con h = 0,75 / 0,5 / 0,25 / 0,125 / 0,0625) y LV1 da lo mismo (37).
+- **Los siguientes, entre −24 y −25 %:**
+  - Y20, en la zona de triangulación que dejan la carga lineal T y la zona Qz;
+  - X18, en la cara de Y12 lejos de los pilares, que converge despacio (8,6 / 10,3 / 12,7 / 13,2 / 14,0);
+  - Y7, en la cara de X5 a 0,1 m de la esquina de P6-5 sin tocarlo. Empeora con la plantilla: −24 %, frente al −7 % de LV1.
+- **El máximo de vano,** del lado seguro (X2, +23 %), está también en esa zona. Allí LV1 da −14 % en X2 y −28 % en X6.
+- **Las estaciones de las caras de Y6, junto a P6-0 y P6-10, ya no están entre las peores.** Antes llegaban al −40 %.
+
+**Los otros criterios:**
+- **1 y 2:** como en el paso 1 (0,96 / 1,02 de CYPE; +7,7 % frente a h = 0,055). Esos modelos ya eran simétricos.
+- **5:** el edificio con vigas, 163 695 ecuaciones; el reticular, 213 675 (antes, 156 177 y 204 750). Ningún cuadrilátero bajo en los dos.
+- **8:** la vivienda, igual que con LV1 (`.datos/out_lv2_esquinas.txt`: axiles, momentos y flechas frente a CYPE a ±0,01).
+- **4:** en las 44 geometrías de G, 21 con el aviso de calidad (20 con LV1; el peor, 0,109 en las dos). Son los de LV-8: las esquinas de la huella que asoma 5–10 cm de la cara quedan como puntos sueltos de la triangulación, que une con astillas y cuyos nudos cercanos se hacen rígidos.
+- **Pruebas:** las 710 del compilador, sin cambios.
+
+**Para el usuario:**
+- **LV2-f, lo que asoma (LV-8):** no es lo que estropeaba las franjas, pero deja el criterio 4 sin cumplir. Propuesta: el trozo de la huella que asoma dentro del ancho de la viga se quita de la losa, como el ancho, y su borde se une al pilar. La cara de la losa sigue el contorno del pilar sin puntos sueltos. Lo que cae en él pasa al pilar, exacto, como hoy lo de la huella.
+- **LV2-g, los cruces que no se pueden refinar a la vez:** junto a un hueco o a rasgos de cargas, un cruce con pilar se queda como en LV1. Para refinarlo haría falta una versión de la plantilla para la triangulación, con la misma geometría que la de la rejilla y lejos de las huellas. Propuesta: aceptarlo y avisar (`malla/esquina-sin-refinar`, ya previsto en §2.1) en las caras de esos pilares.
+- **El criterio 3 tal como está escrito no se cumple:** máximo de apoyos 39,3 % frente al 25,7 % de h = 0,5, y junto a un pilar ≤ 5 %. El siguiente junto a un pilar es X19 junto a P12-15 (−20,9 %). Ni h = 0,5 uniforme baja de 16 %.
+
+Medido con `validacion/lv2/franjas.ts`, `recuadro.ts`, `vigas.ts` y `banco.ts` (salidas `out_*.txt`), y la variante `lv2-esquinas` de la vivienda.
