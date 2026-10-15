@@ -195,7 +195,7 @@ const RADIO_SONDA = 8;
 const PAUSA_SONDA = 90;
 /** Un ciclo de la animación de la deformada (ms). */
 const CICLO_DEFORMADA = 1500;
-const CUBO = { margen: 44, lado: 17 };
+const CUBO = { margen: 58, lado: 24 };
 
 /** Colores del sólido por sección o por planta (cíclicos). */
 const CATEGORIAS = ["#8fb3d9", "#e3a972", "#9cc59b", "#d98f8f", "#b39ddb", "#d4c27a", "#80cbc4", "#c9a6a0", "#a9b4c2", "#e6b0c8"];
@@ -1781,7 +1781,7 @@ export class Vista3D extends Vista {
     const { px } = this.cubo();
     for (const e of ESQUINAS) {
       const q = px(e.p);
-      if (q[2] > px([0, 0, 0])[2] && Math.hypot(x - q[0], y - q[1]) <= 5) return e.vista;
+      if (q[2] > px([0, 0, 0])[2] && Math.hypot(x - q[0], y - q[1]) <= 6) return e.vista;
     }
     const caras = this.carasVisibles();
     for (let i = caras.length - 1; i >= 0; i--) {
@@ -1811,8 +1811,8 @@ export class Vista3D extends Vista {
       ctx.stroke();
       const [cx, cy] = [poligono.reduce((s, p) => s + p[0], 0) / 4, poligono.reduce((s, p) => s + p[1], 0) / 4];
       const area = Math.abs(poligono.reduce((s, p, i) => s + p[0] * poligono[(i + 1) % 4]![1] - poligono[(i + 1) % 4]![0] * p[1], 0)) / 2;
-      if (area > 200) {
-        ctx.font = fuente(9, true);
+      if (area > 320) {
+        ctx.font = fuente(10.5, true);
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = col.textoSuave;
@@ -1823,13 +1823,13 @@ export class Vista3D extends Vista {
       const q = px(e.p);
       if (q[2] <= px([0, 0, 0])[2]) continue;
       ctx.beginPath();
-      ctx.arc(q[0], q[1], 2.5, 0, 2 * Math.PI);
+      ctx.arc(q[0], q[1], 3, 0, 2 * Math.PI);
       ctx.fillStyle = col.acento;
       ctx.fill();
     }
     // Los ejes X, Y, Z bajo el cubo
     const o = px([0, 0, 0]);
-    const base: [number, number] = [this.rect.w - CUBO.margen - 30, CUBO.margen + 32];
+    const base: [number, number] = [this.rect.w - CUBO.margen - 1.75 * CUBO.lado, CUBO.margen + 1.9 * CUBO.lado];
     for (const [v, t, c] of [
       [[1, 0, 0], "X", "#dc2626"],
       [[0, 1, 0], "Y", "#16a34a"],

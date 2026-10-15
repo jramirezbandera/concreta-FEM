@@ -330,7 +330,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .celda-superficie { position: absolute; inset: 0; touch-action: none; user-select: none; }
 .celda .vista-cab { right: 216px; flex-wrap: wrap; }
 .celda:has(.leyenda-vista[data-abierta="false"]) .vista-cab { right: 140px; }
-.celda[data-tipo="3d"] .vista-cab { right: 104px; }
+.celda[data-tipo="3d"] .vista-cab { right: 132px; }
 .vista-barra {
   position: absolute; right: 10px; bottom: 10px; z-index: 15; display: flex; gap: 2px; padding: 3px;
   border: 1px solid var(--color-border-main); border-radius: 10px;
@@ -355,7 +355,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
   box-shadow: var(--shadow-sm); backdrop-filter: blur(6px);
 }
 /* En un 3D, la leyenda va bajo el ViewCube y sus ejes (vista3d.ts, CUBO): si no, lo tapa */
-.celda[data-tipo="3d"] .leyenda-vista { top: 108px; max-height: calc(100% - 162px); }
+.celda[data-tipo="3d"] .leyenda-vista { top: 136px; max-height: calc(100% - 190px); }
 .leyenda-cab {
   display: flex; align-items: center; justify-content: space-between; width: 100%; height: 30px; padding: 0 8px 0 11px;
   border: 0; background: none; cursor: pointer;
