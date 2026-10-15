@@ -54,7 +54,7 @@ describe("Vigas de borde en la vivienda", () => {
     const r = propuesta(m, id);
     const dA = areaRegion(l) - areaRegion({ contorno: r.contorno, huecos: r.huecos });
     expect(dA).toBeGreaterThan(5);
-    const sup = (caso: string) => m.cargas!.filter((c) => c.tipo === "superficie" && c.losa === id && c.caso === caso).reduce((t, c) => t + (c as { q: number[] }).q[2]! * dA, 0);
+    const sup = (caso: string) => m.cargas!.filter((c) => c.tipo === "superficie" && c.losa === id && c.caso === caso).reduce((t, c) => t + (c as unknown as { q: number[] }).q[2]! * dA, 0);
     // Q y N: sólo superficie (los q, redondeados a 1e-6)
     for (const caso of ["Q", "N"]) expect(Math.abs(totalViga(r.cargas, r.vigas, caso) - sup(caso))).toBeLessThan(1e-4);
     // Los petos enteros, sin perder ni un trozo
@@ -62,7 +62,7 @@ describe("Vigas de borde en la vivienda", () => {
     expect(r.quitadas).toEqual(petos.map((c) => c.id));
     expect(r.cargas.filter((c) => c.tipo === "lineal")).toEqual([]);
     const petoViga = r.cargas.filter((c) => c.tipo === "viga" && petos.some((p) => c.id.startsWith(`${p.id}-`)));
-    const petoTotal = petos.reduce((t, c) => t + (c as { q: number[] }).q[2]! * longitud((c as { puntos: [number, number][] }).puntos), 0);
+    const petoTotal = petos.reduce((t, c) => t + (c as unknown as { q: number[] }).q[2]! * longitud((c as unknown as { puntos: [number, number][] }).puntos), 0);
     expect(Math.abs(totalViga(petoViga, r.vigas, "G") - petoTotal)).toBeLessThan(1e-4);
   });
 

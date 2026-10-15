@@ -17,7 +17,7 @@ for (const [k, f] of Object.entries(MODELOS_CONGELADOS_F)) {
   const a = antes[k]!;
   const b = referenciaF(f);
   const iguales = JSON.stringify(a.c2.modelo) === JSON.stringify(JSON.parse(JSON.stringify(b.c2.modelo)));
-  console.log(`\n== ${k}: nudos ${(a.c2.modelo as { nudos: unknown[] }).nudos.length} → ${(b.c2.modelo as { nudos: unknown[] }).nudos.length}${iguales ? " (malla idéntica)" : ""}`);
+  console.log(`\n== ${k}: nudos ${(a.c2.modelo as unknown as { nudos: unknown[] }).nudos.length} → ${(b.c2.modelo as unknown as { nudos: unknown[] }).nudos.length}${iguales ? " (malla idéntica)" : ""}`);
   let cambian = 0;
   for (const id of Object.keys(b.franjas)) {
     const x = a.franjas[id];
