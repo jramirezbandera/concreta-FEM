@@ -1,0 +1,90 @@
+familia / variante / rejilla: unión por las caras | por el eje
+
+rombo      base       rejilla  bajos   0 jmin 0.200 nudos 4466             | bajos   0 jmin 0.304 nudos 5076
+rombo      base       CDT      bajos   0 jmin 0.200 nudos 4466             | bajos   0 jmin 0.304 nudos 5076
+rombo      hueco      rejilla  bajos   0 jmin 0.200 nudos 4492             | bajos   0 jmin 0.304 nudos 5090
+rombo      hueco      CDT      bajos   0 jmin 0.200 nudos 4492             | bajos   0 jmin 0.304 nudos 5090
+rombo      giro 23°   rejilla  bajos   0 jmin 0.200 nudos 4466             | bajos   0 jmin 0.304 nudos 5076
+rombo      giro 23°   CDT      bajos   0 jmin 0.200 nudos 4466             | bajos   0 jmin 0.304 nudos 5076
+rombo      circulares rejilla  bajos   0 jmin 0.245 nudos 4038             | bajos   0 jmin 0.289 nudos 6592
+rombo      circulares CDT      bajos   0 jmin 0.245 nudos 4038             | bajos   0 jmin 0.289 nudos 6592
+circular   base       rejilla  bajos  42 jmin 0.134 nudos 9781             | bajos   0 jmin 0.300 nudos 6275
+circular   base       CDT      bajos  42 jmin 0.134 nudos 9781             | bajos   0 jmin 0.300 nudos 6275
+circular   hueco      rejilla  bajos  42 jmin 0.134 nudos 9807             | bajos   0 jmin 0.300 nudos 6289
+circular   hueco      CDT      bajos  42 jmin 0.134 nudos 9807             | bajos   0 jmin 0.300 nudos 6289
+circular   giro 23°   rejilla  bajos  42 jmin 0.134 nudos 9781             | bajos   0 jmin 0.300 nudos 6275
+circular   giro 23°   CDT      bajos  42 jmin 0.134 nudos 9781             | bajos   0 jmin 0.300 nudos 6275
+circular   circulares rejilla  bajos  86 jmin 0.120 nudos 9271             | bajos   0 jmin 0.325 nudos 6059
+circular   circulares CDT      bajos  86 jmin 0.120 nudos 9271             | bajos   0 jmin 0.325 nudos 6059
+abanico    base       rejilla  bajos   0 jmin 0.231 nudos 5258             | bajos   0 jmin 0.301 nudos 5056
+abanico    base       CDT      bajos   0 jmin 0.231 nudos 5258             | bajos   0 jmin 0.301 nudos 5056
+abanico    hueco      rejilla  bajos   0 jmin 0.231 nudos 5260             | bajos   0 jmin 0.301 nudos 5046
+abanico    hueco      CDT      bajos   0 jmin 0.231 nudos 5260             | bajos   0 jmin 0.301 nudos 5046
+abanico    giro 23°   rejilla  bajos   0 jmin 0.231 nudos 5258             | bajos   0 jmin 0.301 nudos 5056
+abanico    giro 23°   CDT      bajos   0 jmin 0.231 nudos 5258             | bajos   0 jmin 0.301 nudos 5056
+abanico    circulares rejilla  bajos   0 jmin 0.241 nudos 5218             | bajos   0 jmin 0.301 nudos 4804
+abanico    circulares CDT      bajos   0 jmin 0.241 nudos 5218             | bajos   0 jmin 0.301 nudos 4804
+alas       base       rejilla  bajos   2 jmin 0.192 nudos 3973             | bajos   0 jmin 0.301 nudos 3761
+alas       base       CDT      bajos   2 jmin 0.192 nudos 4377             | bajos   0 jmin 0.301 nudos 4789
+alas       hueco      rejilla  bajos   2 jmin 0.192 nudos 4159             | bajos   0 jmin 0.301 nudos 3911
+alas       hueco      CDT      bajos   2 jmin 0.192 nudos 4403             | bajos   0 jmin 0.301 nudos 4815
+alas       giro 23°   rejilla  bajos   2 jmin 0.192 nudos 3973             | bajos   0 jmin 0.301 nudos 3761
+alas       giro 23°   CDT      bajos   2 jmin 0.192 nudos 4377             | bajos   0 jmin 0.301 nudos 4789
+alas       circulares rejilla  bajos   0 jmin 0.202 nudos 4307             | bajos   0 jmin 0.329 nudos 4729
+alas       circulares CDT      bajos   0 jmin 0.202 nudos 4307             | bajos   0 jmin 0.329 nudos 4729
+triangular base       rejilla  bajos   2 jmin 0.191 nudos 2673             | bajos   0 jmin 0.323 nudos 2265
+triangular base       CDT      bajos   2 jmin 0.191 nudos 2709             | bajos   0 jmin 0.303 nudos 3029
+triangular hueco      rejilla  bajos   2 jmin 0.191 nudos 2735             | bajos   0 jmin 0.310 nudos 2423
+triangular hueco      CDT      bajos   2 jmin 0.191 nudos 2735             | bajos   0 jmin 0.303 nudos 3031
+triangular giro 23°   rejilla  bajos   2 jmin 0.191 nudos 2673             | bajos   0 jmin 0.323 nudos 2265
+triangular giro 23°   CDT      bajos   2 jmin 0.191 nudos 2709             | bajos   0 jmin 0.303 nudos 3029
+triangular circulares rejilla  bajos   0 jmin 0.314 nudos 2681             | bajos   0 jmin 0.326 nudos 3089
+triangular circulares CDT      bajos   2 jmin 0.189 nudos 2701             | bajos   0 jmin 0.326 nudos 3089
+retícula 1            rejilla  bajos  24 jmin 0.117 nudos 5102             | bajos   0 jmin 0.303 nudos 3678
+retícula 1            CDT      bajos  14 jmin 0.126 nudos 7298             | bajos   0 jmin 0.301 nudos 7844
+retícula 2            rejilla  bajos   0 jmin 0.241 nudos 1249             | bajos   0 jmin 0.301 nudos 1003
+retícula 2            CDT      bajos   0 jmin 0.241 nudos 1249             | bajos   0 jmin 0.304 nudos 1544
+retícula 3            rejilla  bajos   4 jmin 0.173 nudos 5838             | bajos   0 jmin 0.230 nudos 6196
+retícula 3            CDT      bajos   4 jmin 0.173 nudos 5838             | bajos   0 jmin 0.240 nudos 6284
+retícula 4            rejilla  bajos   3 jmin 0.109 nudos 1755             | bajos   0 jmin 0.330 nudos 1123
+retícula 4            CDT      bajos   5 jmin 0.142 nudos 1819             | bajos   0 jmin 0.303 nudos 1815
+retícula 5            rejilla  bajos   0 jmin 0.304 nudos 2234             | bajos   0 jmin 0.300 nudos 2076
+retícula 5            CDT      bajos   0 jmin 0.245 nudos 3200             | bajos   0 jmin 0.303 nudos 3703
+retícula 6            rejilla  bajos  16 jmin 0.122 nudos 5400             | bajos   0 jmin 0.307 nudos 4616
+retícula 6            CDT      bajos  12 jmin 0.149 nudos 6600             | bajos   0 jmin 0.302 nudos 6438
+retícula 7            rejilla  bajos   0 jmin 0.278 nudos 2696             | bajos   0 jmin 0.257 nudos 2174
+retícula 7            CDT      bajos   3 jmin 0.147 nudos 3903             | bajos   0 jmin 0.301 nudos 4171
+retícula 8            rejilla  bajos   1 jmin 0.195 nudos 1841             | bajos   0 jmin 0.327 nudos 1529
+retícula 8            CDT      bajos   1 jmin 0.195 nudos 1841             | bajos   0 jmin 0.303 nudos 2071
+retícula 9            rejilla  bajos   4 jmin 0.127 nudos 3373             | bajos   0 jmin 0.224 nudos 2960
+retícula 9            CDT      bajos   3 jmin 0.119 nudos 3682             | bajos   0 jmin 0.283 nudos 3999
+retícula 10           rejilla  bajos   0 jmin 0.279 nudos 1844             | bajos   0 jmin 0.359 nudos 1683
+retícula 10           CDT      bajos   0 jmin 0.227 nudos 2039             | bajos   0 jmin 0.304 nudos 2055
+retícula 11           rejilla  bajos   0 jmin 0.334 nudos 1688             | bajos   0 jmin 0.311 nudos 1242
+retícula 11           CDT      bajos   0 jmin 0.276 nudos 1892             | bajos   0 jmin 0.320 nudos 1736
+retícula 12           rejilla  bajos   8 jmin 0.118 nudos 3930             | bajos   0 jmin 0.261 nudos 3318
+retícula 12           CDT      bajos   8 jmin 0.141 nudos 5704             | bajos   0 jmin 0.303 nudos 6016
+retícula 13           rejilla  bajos   0 jmin 0.477 nudos 1106             | bajos   0 jmin 0.322 nudos 862
+retícula 13           CDT      bajos   0 jmin 0.261 nudos 1162             | bajos   0 jmin 0.305 nudos 1254
+retícula 14           rejilla  bajos   0 jmin 0.272 nudos 1699             | bajos   0 jmin 0.235 nudos 1379
+retícula 14           CDT      bajos   0 jmin 0.244 nudos 2081             | bajos   0 jmin 0.309 nudos 2117
+retícula 15           rejilla  bajos   0 jmin 0.539 nudos 1806             | bajos   0 jmin 0.300 nudos 2034
+retícula 15           CDT      bajos   0 jmin 0.266 nudos 2380             | bajos   0 jmin 0.319 nudos 2722
+retícula 16           rejilla  bajos   0 jmin 0.222 nudos 5351             | bajos   0 jmin 0.281 nudos 3461
+retícula 16           CDT      bajos   4 jmin 0.175 nudos 5593             | bajos   0 jmin 0.303 nudos 5295
+retícula 17           rejilla  bajos   3 jmin 0.150 nudos 1649             | bajos   0 jmin 0.332 nudos 1302
+retícula 17           CDT      bajos   1 jmin 0.165 nudos 1719             | bajos   0 jmin 0.300 nudos 1852
+retícula 18           rejilla  bajos   0 jmin 0.251 nudos 5602             | bajos   0 jmin 0.268 nudos 3788
+retícula 18           CDT      bajos   2 jmin 0.175 nudos 6742             | bajos   0 jmin 0.236 nudos 6864
+retícula 19           rejilla  bajos   0 jmin 0.317 nudos 1977             | bajos   0 jmin 0.451 nudos 1233
+retícula 19           CDT      bajos   0 jmin 0.246 nudos 2265             | bajos   0 jmin 0.315 nudos 2321
+retícula 20           rejilla  bajos   1 jmin 0.200 nudos 3628             | bajos   0 jmin 0.250 nudos 2523
+retícula 20           CDT      bajos   0 jmin 0.239 nudos 4036             | bajos   0 jmin 0.302 nudos 3597
+retícula 21           rejilla  bajos   0 jmin 0.240 nudos 3631             | bajos   0 jmin 0.318 nudos 2749
+retícula 21           CDT      bajos   4 jmin 0.182 nudos 4029             | bajos   0 jmin 0.304 nudos 4427
+retícula 22           rejilla  bajos   0 jmin 0.285 nudos 3724             | bajos   0 jmin 0.301 nudos 2682
+retícula 22           CDT      bajos   2 jmin 0.172 nudos 4398             | bajos   0 jmin 0.300 nudos 4236
+retícula 23           rejilla  bajos  10 jmin 0.126 nudos 2086             | bajos   0 jmin 0.307 nudos 1738
+retícula 23           CDT      bajos  12 jmin 0.126 nudos 2523             | bajos   0 jmin 0.283 nudos 2584
+retícula 24           rejilla  bajos   0 jmin 0.235 nudos 2582             | bajos   0 jmin 0.214 nudos 1717
+retícula 24           CDT      bajos   4 jmin 0.149 nudos 2661             | bajos   0 jmin 0.307 nudos 3349

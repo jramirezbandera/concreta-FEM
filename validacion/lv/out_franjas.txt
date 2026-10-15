@@ -1,0 +1,14 @@
+
+## Unión por las caras (fase LV). Retícula de 4 × 4 pilares de 40 × 40 con vigas por todos los ejes; ELU; frente a h = 0,25
+
+h       apoyos (cara de viga): mediana / máx |error|*  vano (máx inferior): mediana / máx |error|   estaciones de apoyo   avisos
+0.750   0.8 % / 41.3 %                                  2.1 % / 33.6 %                               352                   franja/esquina-entrante
+0.500   0.4 % / 16.7 %                                  0.7 % / 7.2 %                                352                   franja/esquina-entrante
+0.375   0.2 % / 9.7 %                                   0.6 % / 5.9 %                                352                   franja/esquina-entrante
+
+## Unión por el eje (antes). Retícula de 4 × 4 pilares de 40 × 40 con vigas por todos los ejes; ELU; frente a h = 0,25
+
+h       apoyos (cara de viga): mediana / máx |error|*  vano (máx inferior): mediana / máx |error|   estaciones de apoyo   avisos
+0.750   0.2 % / 16.3 %                                  1.0 % / 6.9 %                                238                   franja/esquina-entrante
+0.500   0.2 % / 8.5 %                                   0.6 % / 6.7 %                                238                   franja/esquina-entrante
+0.375   0.0 % / 8.0 %                                   0.4 % / 3.7 %                                238                   franja/esquina-entrante

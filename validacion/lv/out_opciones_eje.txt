@@ -1,0 +1,80 @@
+c1 sap-1-022                                                 98427bfb66f049c4 81917f3c45607aab 12ae32cb1ec02d01
+c1 edificio-2x3x2                                            40d49937d33d4881 f547ebe840693a15 12ae32cb1ec02d01
+c1 aleatorio-6                                               5f9baef62341f34b 374c0c46ec327d7b 12ae32cb1ec02d01
+c1 aleatorio-13                                              7c6f787fd009d730 07c8d83f812fa7db 12ae32cb1ec02d01
+c1 aleatorio-21-sin-diafragma                                86c2e752b64206b3 5a87d84fc22bca7f 12ae32cb1ec02d01
+c2 losa-plana                                                192d30ce027c4d37 4436c63faf33efb0 12ae32cb1ec02d01
+c2 navier-delgada                                            3b1dd84cb15c7637 f402b962293005af 9bd81706a50803a0
+c2 aleatorio-8-losas                                         a7a38960ea140b3f 769adb2a16e51fb0 d669e2fcf3cc2466
+c2 aleatorio-11-losas-sin-diafragma                          bd0993b011169dbb 575b33b044a95b2c ec6d5cd2a750652a
+c2 losa-plana-rejilla                                        aa809afc046b2790 d6ac4d86f1ea34cd 12ae32cb1ec02d01
+c2 aleatorio-8-losas-rejilla                                 a7a38960ea140b3f 769adb2a16e51fb0 d669e2fcf3cc2466
+c2 reticula-enrasada                                         5fe674408ed75650 ca39a06728d66a0b 12ae32cb1ec02d01
+c2 aleatorio-8-losas-rejilla-lv                              a7a38960ea140b3f 769adb2a16e51fb0 d669e2fcf3cc2466
+c3 etabs-15c-3-60                                            4a7b19de387a50f1 cb2fedeb84dfcb92 968257706554004a
+c3 etabs-15f-1                                               9b26de06be724324 7bcea0b1b22e4a02 8d1cc2e7b973fd04
+c3 sotano-empuje                                             3fe4fc86123e9ffa bcf34acf19c79177 12ae32cb1ec02d01
+c3 viga-en-muro                                              d233f3153ca4800b ca6967c4cc418b92 12ae32cb1ec02d01
+c3 aleatorio-3-muros                                         fe92a611afdbc468 8311f15e32540a31 2840e85ff0994c1a
+c3 reticula-nucleo                                           9daf6c2e70ed2878 e2b716378dc77389 2840e85ff0994c1a
+c3 aleatorio-3-muros-lv                                      fe92a611afdbc468 8311f15e32540a31 2840e85ff0994c1a
+c4 pano-oblicuo                                              c48a6b30f4473cd4 f790ff2c7f309efc 12ae32cb1ec02d01
+c4 dos-vanos-voladizo                                        90f80ff180c894bf 039bcc7d2ee3a17d 12ae32cb1ec02d01
+c4 pano-hueco                                                a874e6033fa75a7a ecfb96421e89ba0d 1c254ec2e786b1e8
+c4 aleatorio-7-unidireccional                                36af139d03cf82b0 1600ddf74cb3fec7 cee1bd5ba8f7c032
+c4 aleatorio-6-reticular                                     1fab40766c07c828 09a4ed506eabfe17 12ae32cb1ec02d01
+c4 aleatorio-5-mixto                                         68cbf5d85b8f0b1d c993bf7878b09261 12ae32cb1ec02d01
+c4 aleatorio-5-mixto-lv                                      68cbf5d85b8f0b1d c993bf7878b09261 12ae32cb1ec02d01
+c5 pilares-mezclados                                         0d6b0e7da67c693c 1f345ed3234800fc 55e3b143a9b41b68
+c5 reticular-h25                                             364b130d38ee7c98 b8650a7f007f1544 12ae32cb1ec02d01
+c5 etabs-15c-3-60                                            4a7b19de387a50f1 cb2fedeb84dfcb92 968257706554004a
+c5 aleatorio-3                                               f220396d5e746ef2 7ff2193be5069e3c 40acc2a2ba7047a7
+f h25-plana                                                  91eef30b81ff39cb 7b81497fdc99be37 12ae32cb1ec02d01
+f h25-reticular                                              a836cad930147257 48d22d60e90c3d81 12ae32cb1ec02d01
+f pilares-mezclados                                          79f9ccc2d96b7d89 f163d9601b4de47e 5dd3c624fb5bc502
+f aleatorio-3                                                a28f119d3e958c19 e95baa7057262489 12ae32cb1ec02d01
+f losa-3x3-refinada                                          8c68e53dc54833a2 b597515a4f9e6461 12ae32cb1ec02d01
+f h25-plana-sin-refinar                                      9c849f41b6fc7d82 0ba312e211d5cf9a 12ae32cb1ec02d01
+f losa-3x3-mezclada                                          fd86023013f7d80f 249526186ef83baa 12ae32cb1ec02d01
+f reticular-2x2-abacos                                       dc461d024a4df13b bd400a586ca06244 55e3b143a9b41b68
+f aleatorio-3-lv                                             a28f119d3e958c19 e95baa7057262489 12ae32cb1ec02d01
+f reticular-2x2-abacos-lv                                    dc461d024a4df13b bd400a586ca06244 55e3b143a9b41b68
+losa plana de H25                                            1f7f1164384ae825 7b81497fdc99be37 12ae32cb1ec02d01
+aleatorio 1 con losas, eje 1 x                               69e9015782442087 2f5428c01e516915 a257189907235c1d
+aleatorio 1 con losas, eje 1 azar                            ee274ca98e722803 e5daf33e8fbda164 cdc838fcf457a63a
+aleatorio 2 con losas, eje 1 x                               269987dde141a45a b1b59486dceb3f5e 732d6e6a16e2f691
+aleatorio 2 con losas, eje 1 azar                            bca365af1f48050d 1d0b82bfeed03f4c 3454f0e09fee5b09
+aleatorio 3 con losas, eje 1 x                               a28f119d3e958c19 e95baa7057262489 12ae32cb1ec02d01
+aleatorio 3 con losas, eje 1 azar                            a28f119d3e958c19 e95baa7057262489 12ae32cb1ec02d01
+aleatorio 5 con losas, eje 1 x                               09d463759231b0d6 e3b0084fa8b6f1ee 87127a86a3aed08e
+aleatorio 5 con losas, eje 1 azar                            64561bfe82bc9f01 caa58c490ecfb8c5 87127a86a3aed08e
+aleatorio 8 con losas, eje 1 x                               246a80a177f75696 3b7df2521948fa47 d669e2fcf3cc2466
+aleatorio 8 con losas, eje 1 azar                            17219248727cb547 1565c524ef087e34 d669e2fcf3cc2466
+aleatorio 11 con losas, eje 1 x                              14218bb5f6f2be82 283954534a419f05 ec6d5cd2a750652a
+aleatorio 11 con losas, eje 1 azar                           14218bb5f6f2be82 283954534a419f05 ec6d5cd2a750652a
+aleatorio 1 con forjados mixtos                              8c86de22b70f8b33 0f48f5bc4b566337 1c254ec2e786b1e8
+aleatorio 1 con forjados unidireccional                      6a934bd32a8a436e a3d41287bc9cdd4c 1c254ec2e786b1e8
+aleatorio 1 con forjados reticular                           74c448a743c656cb 614285ff9da3369d 773a30612e5e90e6
+aleatorio 2 con forjados mixtos                              bfcfae4ccdf57b03 8d9f645a177316de 94cd27b10421fd47
+aleatorio 2 con forjados unidireccional                      800fe298dd5e8b87 7d91e83f586bf02c 34670d613248ef60
+aleatorio 2 con forjados reticular                           cd1ecbb56520845a b79aae96404b193f 9e1557d431ec7a40
+aleatorio 3 con forjados mixtos                              7859bf5b6457fc99 4bab568e6248f555 94cd27b10421fd47
+aleatorio 3 con forjados unidireccional                      4b27e96efcce3daa 1761ccdebb4b2846 12ae32cb1ec02d01
+aleatorio 3 con forjados reticular                           b07991ef4fc31e8e f5f2991c58a9f214 12ae32cb1ec02d01
+aleatorio 4 con forjados mixtos                              2861666f84e80136 a74660e3ce196048 1c254ec2e786b1e8
+aleatorio 4 con forjados unidireccional                      205e55b3c2ec5de6 169e1da9b54eb975 34670d613248ef60
+aleatorio 4 con forjados reticular                           a5822faad6bb8752 47d2f5e3b5f7505a 12ae32cb1ec02d01
+aleatorio 5 con forjados mixtos                              a50331e923be68a2 0bb8fe72e08ca5a9 12ae32cb1ec02d01
+aleatorio 5 con forjados unidireccional                      6335853ba3b01fd5 223e7cbd1b0bcf92 027433a6bb1c892f
+aleatorio 5 con forjados reticular                           0d864b5bd84cc5d9 1f22bf692ef681ef 42b8fda4a681e863
+aleatorio 6 con forjados mixtos                              62b328bc2f8f204e 18a0980fd8449b2c 1c254ec2e786b1e8
+aleatorio 6 con forjados unidireccional                      29fcf77287bfdaad 7f4f00a3f4b9ad96 027433a6bb1c892f
+aleatorio 6 con forjados reticular                           4375ac359f627785 cc15d6d4e96110cd 12ae32cb1ec02d01
+edificio objetivo con losas (2 plantas)                      99f7ed04eb2d3499 bdf44faaf1906b2a 12ae32cb1ec02d01
+retícula enrasada (2 plantas)                                5a74d9843cd0e664 64cba7a34fffa173 12ae32cb1ec02d01
+edificio reticular 1×3×3                                     4623162f638e05a3 3aa5f2a6da5ee14d 5dd3c624fb5bc502
+muestrario                                                   75731a9b1d3b2fda df2dc8123ea33c97 12ae32cb1ec02d01
+vivienda                                                     6352dea65495e9b1 3b52fbd2e122ffd6 12ae32cb1ec02d01
+a2 1022                                                      c484fa3b7ef6aa78 d1c5567f3f1107fd 12ae32cb1ec02d01
+a2 nucleo                                                    348056329e3f4190 25d17afecdee529e 2840e85ff0994c1a
+a2 edificio                                                  387e28f8fe11496b 55f6899c33f5824a 12ae32cb1ec02d01

@@ -17,6 +17,10 @@
  * Se comparan la viga (momento en la cara del pilar y en el centro, cortante en la cara) y la losa
  * (flecha y momento en el centro, flecha junto a la viga).
  *
+ * Nuestro modelo, con la unión de antes de la fase LV (`unionLosaViga: "eje"`). La cara del pilar
+ * está a s = e del arranque de la viga: hasta la fase LV se leía en s = 2e, 15 cm dentro del vano.
+ * La unión de la fase LV, en `validacion/lv/recuadro.ts`.
+ *
  *   bun validacion/cy/borde.ts > validacion/cy/out_borde.txt
  */
 import { readFileSync } from "node:fs";
@@ -53,7 +57,7 @@ const HA = hormigon(30);
 const ALFA = 0.3;
 const TORSION_VIGA = 0.1; // D4
 
-interface Resultado {
+export interface Resultado {
   viga: { mCara: number; mCentro: number; vCara: number };
   losa: { wCentro: number; mCentro: number; wBorde: number };
 }
@@ -64,7 +68,19 @@ const xC = b / 2 + iC * b;
 const xM = xC + b / 2; // centro de la barra según X que sale de él
 const yB = b / 2; // el primer cruce junto a la viga y = −e
 
-function cype(): Resultado {
+/**
+ * Zona rígida de los nudos como C1-a con el factor f: la viga, flexible desde f·e dentro del pilar
+ * (con f = 1, desde su cara, como en el emparrillado de CYPECAD), y el pilar, rígido en su cabeza a lo
+ * largo de f veces el canto de la viga (con f = 1, la de CYPECAD no se conoce: en este recuadro, sin
+ * zona rígida en el pilar, `fPilar` = 0).
+ */
+export interface Nudos {
+  f: number;
+  fPilar: number;
+}
+const CANTO = 0.3;
+
+export function cype(z: Nudos = { f: 1, fPilar: 0 }): Resultado {
   const m = new Constructor();
   const nudos = new Map<string, number>();
   const nudo = (x: number, y: number, z = 0) => {
@@ -83,7 +99,9 @@ function cype(): Resultado {
   for (const [x, y] of esquinas) {
     const base = nudo(x, y, -H);
     m.apoyo(base);
-    m.barra(base, nudo(x, y), { ...v30, A: v30.A * 2 }, [1, 0, 0], { empotramiento: { j: ALFA } });
+    const fin = nudo(x, y, -z.fPilar * CANTO);
+    m.barra(base, fin, { ...v30, A: v30.A * 2 }, [1, 0, 0], { empotramiento: { j: ALFA } });
+    if (z.fPilar > 0) m.enlace(nudo(x, y), [fin]);
   }
   // Las cuatro vigas en su eje; cada una, de cara a cara de pilar, con nudos en los cruces y en el centro
   let barraCara = -1;
@@ -94,16 +112,20 @@ function cype(): Resultado {
     { P: (t) => [t, L + e], esq: [esquinas[3]!, esquinas[2]!] },
     { P: (t) => [-e, t], esq: [esquinas[0]!, esquinas[3]!] },
   ];
-  const ts = [0, ...pos, L / 2, L].sort((p, t) => p - t);
+  // Del extremo del tramo flexible, a f·e dentro del pilar, al otro
+  const [t0, t1] = [-e * (1 - z.f), L + e * (1 - z.f)];
+  const ts = [...new Set([t0, 0, ...pos, L / 2, L, t1].map((t) => +t.toFixed(12)))].sort((p, t) => p - t);
   for (const [k, lado] of lados.entries()) {
     for (let i = 0; i + 1 < ts.length; i++) {
       const [a, t] = [ts[i]!, ts[i + 1]!];
       const br = m.barra(nudo(...lado.P(a)), nudo(...lado.P(t)), viga, [0, 0, 1]);
-      if (k === 0 && i === 0) barraCara = br;
+      if (k === 0 && Math.abs(a) < 1e-12) barraCara = br;
       if (k === 0 && Math.abs(t - L / 2) < 1e-9) barraCentro = br;
     }
-    m.enlace(nudo(...lado.esq[0]), [nudo(...lado.P(0))]);
-    m.enlace(nudo(...lado.esq[1]), [nudo(...lado.P(L))]);
+    if (z.f > 0) {
+      m.enlace(nudo(...lado.esq[0]), [nudo(...lado.P(t0))]);
+      m.enlace(nudo(...lado.esq[1]), [nudo(...lado.P(t1))]);
+    }
   }
   // El emparrillado entre las caras, cada barra unida en la cara al eje de la viga
   const F: CargaNodal[] = [];
@@ -134,7 +156,7 @@ function cype(): Resultado {
 }
 
 /** Nuestro modelo: la losa de `desde` a L − desde en las dos direcciones (−e: hasta el eje de las vigas). */
-async function nuestro(desde: number, opciones: OpcionesCompilacion = {}): Promise<Resultado> {
+export async function nuestro(desde: number, opciones: OpcionesCompilacion = {}): Promise<Resultado> {
   const [a, z] = [desde, L - desde];
   const f: ModeloFisico = {
     plantas: [{ id: "T", altura: null }, { id: "B", altura: H }],
@@ -170,7 +192,7 @@ async function nuestro(desde: number, opciones: OpcionesCompilacion = {}): Promi
     }
     throw new Error(`estación ${sv}`);
   };
-  const cara = en(2 * e, "derecha");
+  const cara = en(e, "derecha");
   const centro = en(L / 2 + e, "derecha");
   const sesion = Sesion.abrir(JSON.stringify({ esquema: "concreta-fem/proyecto@1", nombre: "borde", modelo: f, opciones }), sha256(new Uint8Array(WASM)));
   if (!sesion.valido) throw new Error(JSON.stringify(sesion.diagnosticos));
@@ -199,7 +221,7 @@ function punto(ss: Sesion, campo: "uz" | "m11", x: number, y: number): number {
  * de la viga que tiene enfrente (los de las esquinas, a la viga según Y), y vigas y pilares como en
  * el emparrillado.
  */
-function laminasCype(): Resultado {
+export function laminasCype(z: Nudos = { f: 1, fPilar: 0 }, esquinaAlPilar = false): Resultado {
   const f: ModeloFisico = {
     plantas: [{ id: "T", altura: null, diafragma: "ninguno" }],
     materiales: [{ id: "H", tipo: "hormigon", fck: 30, peso: 0 }],
@@ -222,8 +244,10 @@ function laminasCype(): Resultado {
   const cabezas = esquinas.map(([x, y], i) => {
     const pie = nuevo(x, y, -H);
     const cab = nuevo(x, y);
+    const fin = z.fPilar > 0 ? nuevo(x, y, -z.fPilar * CANTO) : cab;
     apoyos.push({ nudo: pie, coartados: [true, true, true, true, true, true] });
-    barras.push({ id: `P${i}`, nudos: [pie, cab], seccion: { ...v30, A: v30.A * 2 }, vz: [1, 0, 0], empotramiento: { j: ALFA } });
+    barras.push({ id: `P${i}`, nudos: [pie, fin], seccion: { ...v30, A: v30.A * 2 }, vz: [1, 0, 0], empotramiento: { j: ALFA } });
+    if (z.fPilar > 0) restricciones.push({ tipo: "enlace-rigido", id: `PC${i}`, maestro: cab, esclavos: [fin] });
     return cab;
   });
   // Lados: el borde de la losa (coordenada fija c en el eje k) y el eje de la viga, a e por fuera
@@ -240,17 +264,26 @@ function laminasCype(): Resultado {
     const borde = base.nudos.map((n, i) => ({ i, t: coord(n)[0], c: coord(n)[1] })).filter((n) => Math.abs(n.c - lado.c) < tol);
     // Las esquinas de la losa, a las vigas según Y (lados 1 y 3)
     const propios = borde.filter((n) => lado.X ? n.t > tol && n.t < L - tol : true);
-    const ts = [...new Set([0, L, L / 2, ...propios.map((n) => n.t)].map((t) => +t.toFixed(9)))].sort((p, t) => p - t);
+    const [t0, t1] = [-e * (1 - z.f), L + e * (1 - z.f)];
+    const ts = [...new Set([t0, 0, L, t1, L / 2, ...propios.map((n) => n.t)].map((t) => +t.toFixed(9)))].sort((p, t) => p - t);
     const P = (t: number): [number, number] => (lado.k === 1 ? [t, lado.eje] : [lado.eje, t]);
-    const ejes = ts.map((t) => nuevo(...P(t)));
+    // Con f = 0, los extremos son las cabezas de los pilares
+    const ejes = ts.map((t, i) => (z.f === 0 && i === 0 ? cabezas[lado.esq[0]!]! : z.f === 0 && i === ts.length - 1 ? cabezas[lado.esq[1]!]! : nuevo(...P(t))));
     for (let i = 0; i + 1 < ejes.length; i++) {
       barras.push({ id: `V${il}-${i}`, nudos: [ejes[i]!, ejes[i + 1]!], seccion: viga, vz: [0, 0, 1] });
-      if (il === 0 && i === 0) barraCara = barras.length - 1;
+      if (il === 0 && Math.abs(ts[i]!) < tol) barraCara = barras.length - 1;
       if (il === 0 && Math.abs(ts[i + 1]! - L / 2) < tol) barraCentro = barras.length - 1;
     }
-    restricciones.push({ tipo: "enlace-rigido", id: `C${il}a`, maestro: cabezas[lado.esq[0]!]!, esclavos: [ejes[0]!] });
-    restricciones.push({ tipo: "enlace-rigido", id: `C${il}b`, maestro: cabezas[lado.esq[1]!]!, esclavos: [ejes[ejes.length - 1]!] });
-    for (const n of propios) restricciones.push({ tipo: "enlace-rigido", id: `E${il}-${n.i}`, maestro: ejes[ts.indexOf(+n.t.toFixed(9))]!, esclavos: [n.i] });
+    if (z.f > 0) {
+      restricciones.push({ tipo: "enlace-rigido", id: `C${il}a`, maestro: cabezas[lado.esq[0]!]!, esclavos: [ejes[0]!] });
+      restricciones.push({ tipo: "enlace-rigido", id: `C${il}b`, maestro: cabezas[lado.esq[1]!]!, esclavos: [ejes[ejes.length - 1]!] });
+    }
+    for (const n of propios) {
+      // Con `esquinaAlPilar`, la esquina de la losa va con el pilar (como C2-d), no con la viga
+      const esquina = n.t < tol || n.t > L - tol;
+      const maestro = esquinaAlPilar && esquina ? cabezas[lado.esq[n.t < tol ? 0 : 1]!]! : ejes[ts.indexOf(+n.t.toFixed(9))]!;
+      restricciones.push({ tipo: "enlace-rigido", id: `E${il}-${n.i}`, maestro, esclavos: [n.i] });
+    }
   }
   const mod: ModeloAnalitico = { ...base, nudos, barras: [...(base.barras ?? []), ...barras], apoyos: [...(base.apoyos ?? []), ...apoyos], restricciones: [...(base.restricciones ?? []), ...restricciones] };
   const [c] = casosValidos(calcular(mod));
@@ -270,20 +303,28 @@ function laminasCype(): Resultado {
   };
 }
 
-const ref = cype();
-const fila = (nombre: string, r: Resultado) => {
+export const fila = (ref: Resultado, nombre: string, r: Resultado) => {
   const c = (v: number, w: number) => `${v.toFixed(3).padStart(8)} (${(v / w).toFixed(2)})`;
   console.log(
     `${nombre.padEnd(44)}${c(r.viga.mCara, ref.viga.mCara)}${c(r.viga.mCentro, ref.viga.mCentro)}${c(r.viga.vCara, ref.viga.vCara)}` +
       `${c(r.losa.wCentro * 1e3, ref.losa.wCentro * 1e3)}${c(r.losa.mCentro, ref.losa.mCentro)}${c(r.losa.wBorde * 1e3, ref.losa.wBorde * 1e3)}`,
   );
 };
-console.log(`Recuadro de ${L.toFixed(2)} m entre caras, vigas y pilares de 30×30, q = 10 kN/m²; entre paréntesis, frente al emparrillado de CYPECAD\n`);
-console.log(`${"".padEnd(44)}${"viga: M cara".padStart(16)}${"M centro".padStart(16)}${"V cara".padStart(16)}${"losa: w centro".padStart(16)}${"m centro".padStart(16)}${"w junto viga".padStart(16)}`);
-fila("Emparrillado de CYPECAD (barras)", ref);
-fila("Nuestra lámina con la topología de CYPECAD", laminasCype());
-fila("Nuestro: losa hasta el eje (por defecto)", await nuestro(-e));
-fila("Nuestro: losa hasta el eje, malla 0,25", await nuestro(-e, { tamanoMalla: 0.25 }));
-fila("Nuestro: losa hasta el eje, zona rígida 1", await nuestro(-e, { factorZonaRigida: 1 }));
-fila("Nuestro: malla 0,12", await nuestro(-e, { tamanoMalla: 0.12 }));
-fila("Nuestro: malla 0,10", await nuestro(-e, { tamanoMalla: 0.1 }));
+export function cabecera(): void {
+  console.log(`Recuadro de ${L.toFixed(2)} m entre caras, vigas y pilares de 30×30, q = 10 kN/m²; entre paréntesis, frente al emparrillado de CYPECAD\n`);
+  console.log(`${"".padEnd(44)}${"viga: M cara".padStart(16)}${"M centro".padStart(16)}${"V cara".padStart(16)}${"losa: w centro".padStart(16)}${"m centro".padStart(16)}${"w junto viga".padStart(16)}`);
+}
+export { e as MEDIO_ANCHO };
+
+if (import.meta.main) {
+  const ref = cype();
+  const eje = { unionLosaViga: "eje" } as const;
+  cabecera();
+  fila(ref, "Emparrillado de CYPECAD (barras)", ref);
+  fila(ref, "Nuestra lámina con la topología de CYPECAD", laminasCype());
+  fila(ref, "Nuestro: losa hasta el eje", await nuestro(-e, eje));
+  fila(ref, "Nuestro: losa hasta el eje, malla 0,25", await nuestro(-e, { ...eje, tamanoMalla: 0.25 }));
+  fila(ref, "Nuestro: losa hasta el eje, zona rígida 1", await nuestro(-e, { ...eje, factorZonaRigida: 1 }));
+  fila(ref, "Nuestro: malla 0,12", await nuestro(-e, { ...eje, tamanoMalla: 0.12 }));
+  fila(ref, "Nuestro: malla 0,10", await nuestro(-e, { ...eje, tamanoMalla: 0.1 }));
+}

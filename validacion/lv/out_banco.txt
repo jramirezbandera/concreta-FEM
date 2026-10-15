@@ -1,0 +1,6 @@
+## edificio objetivo con losas (7 plantas)
+  cara  nudos 60021, láminas 34209 (28224 en la rejilla, 0 plantillas), enlaces de cara 12278 (21686 nudos), jacobiano mínimo 0.430 (0 bajos), compilación 3267 ms; cálculo 4599 ms, 112119 ecuaciones
+  eje   nudos 34779, láminas 33054 (31836 en la rejilla, 553 plantillas), enlaces de cara 0 (0 nudos), jacobiano mínimo 0.302 (0 bajos), compilación 1143 ms; cálculo 2180 ms, 90783 ecuaciones
+## retícula enrasada
+  cara  nudos 2776, láminas 1808 (308 en la rejilla, 0 plantillas), enlaces de cara 419 (618 nudos), jacobiano mínimo 0.315 (0 bajos), compilación 139 ms; cálculo 126 ms, 5574 ecuaciones
+  eje   nudos 538, láminas 468 (468 en la rejilla, 12 plantillas), enlaces de cara 0 (0 nudos), jacobiano mínimo 0.740 (0 bajos), compilación 14 ms; cálculo 22 ms, 1254 ecuaciones

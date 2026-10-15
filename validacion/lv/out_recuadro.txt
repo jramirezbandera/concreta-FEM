@@ -1,0 +1,56 @@
+
+## Factor de zona rígida 0.5 (por defecto), en la referencia y en el compilador
+
+Recuadro de 4.32 m entre caras, vigas y pilares de 30×30, q = 10 kN/m²; entre paréntesis, frente al emparrillado de CYPECAD
+
+                                                viga: M cara        M centro          V cara  losa: w centro        m centro    w junto viga
+Emparrillado de CYPECAD (barras)              -3.471 (1.00)  12.531 (1.00) -23.328 (1.00)  -2.201 (1.00)  15.801 (1.00)  -1.426 (1.00)
+Nuestra lámina, topología de CYPE a mano      -3.428 (0.99)  12.571 (1.00) -22.683 (0.97)  -2.197 (1.00)  15.783 (1.00)  -1.424 (1.00)
+Unión por las caras (fase LV, por defecto), la losa dibujada hasta el eje de las vigas:
+  malla 0.75                                  -2.742 (0.79)  12.986 (1.04) -29.261 (1.25)  -2.125 (0.97)  15.494 (0.98)  -1.386 (0.97)
+  malla 0.50                                  -3.163 (0.91)  12.746 (1.02) -26.553 (1.14)  -2.167 (0.98)  15.657 (0.99)  -1.408 (0.99)
+  malla 0.25                                  -3.362 (0.97)  12.619 (1.01) -24.867 (1.07)  -2.187 (0.99)  15.752 (1.00)  -1.418 (0.99)
+  malla 0.12                                  -3.422 (0.99)  12.570 (1.00) -23.973 (1.03)  -2.197 (1.00)  15.782 (1.00)  -1.424 (1.00)
+  malla 0.10                                  -3.425 (0.99)  12.564 (1.00) -23.828 (1.02)  -2.197 (1.00)  15.790 (1.00)  -1.423 (1.00)
+Unión por el eje (antes), la losa dibujada hasta el eje de las vigas:
+  malla 0.75                                  -2.460 (0.71)  12.033 (0.96) -13.535 (0.58)  -2.024 (0.92)  14.989 (0.95)  -1.306 (0.92)
+  malla 0.50                                  -2.558 (0.74)  11.914 (0.95) -15.822 (0.68)  -2.065 (0.94)  15.117 (0.96)  -1.331 (0.93)
+  malla 0.25                                  -2.466 (0.71)  11.841 (0.94) -17.190 (0.74)  -2.085 (0.95)  15.185 (0.96)  -1.343 (0.94)
+  malla 0.12                                  -2.348 (0.68)  11.811 (0.94) -17.691 (0.76)  -2.094 (0.95)  15.206 (0.96)  -1.349 (0.95)
+  malla 0.10                                  -2.315 (0.67)  11.807 (0.94) -17.704 (0.76)  -2.094 (0.95)  15.212 (0.96)  -1.348 (0.95)
+Unión por las caras, la losa dibujada hasta la cara exterior de las vigas:
+  malla 0.75                                  -3.364 (0.97)  12.959 (1.03) -23.796 (1.02)  -2.148 (0.98)  15.127 (0.96)  -1.392 (0.98)
+
+## Factor de zona rígida 1, en la referencia y en el compilador
+
+Recuadro de 4.32 m entre caras, vigas y pilares de 30×30, q = 10 kN/m²; entre paréntesis, frente al emparrillado de CYPECAD
+
+                                                viga: M cara        M centro          V cara  losa: w centro        m centro    w junto viga
+Emparrillado de CYPECAD (barras)              -4.592 (1.00)  12.187 (1.00) -23.328 (1.00)  -2.132 (1.00)  15.492 (1.00)  -1.373 (1.00)
+Nuestra lámina, topología de CYPE a mano      -4.308 (0.94)  12.223 (1.00) -22.289 (0.96)  -2.128 (1.00)  15.469 (1.00)  -1.371 (1.00)
+Unión por las caras (fase LV, por defecto), la losa dibujada hasta el eje de las vigas:
+  malla 0.75                                  -4.206 (0.92)  12.625 (1.04) -16.806 (0.72)  -2.056 (0.96)  15.190 (0.98)  -1.333 (0.97)
+  malla 0.50                                  -4.356 (0.95)  12.391 (1.02) -19.703 (0.84)  -2.098 (0.98)  15.346 (0.99)  -1.355 (0.99)
+  malla 0.25                                  -4.314 (0.94)  12.268 (1.01) -21.385 (0.92)  -2.118 (0.99)  15.438 (1.00)  -1.365 (0.99)
+  malla 0.12                                  -4.312 (0.94)  12.221 (1.00) -22.288 (0.96)  -2.128 (1.00)  15.468 (1.00)  -1.371 (1.00)
+  malla 0.10                                  -4.322 (0.94)  12.216 (1.00) -22.447 (0.96)  -2.128 (1.00)  15.475 (1.00)  -1.370 (1.00)
+Unión por el eje (antes), la losa dibujada hasta el eje de las vigas:
+  malla 0.75                                  -3.289 (0.72)  11.725 (0.96) -14.084 (0.60)  -1.966 (0.92)  14.731 (0.95)  -1.260 (0.92)
+  malla 0.50                                  -3.489 (0.76)  11.606 (0.95) -16.586 (0.71)  -2.005 (0.94)  14.856 (0.96)  -1.284 (0.94)
+  malla 0.25                                  -3.475 (0.76)  11.532 (0.95) -18.170 (0.78)  -2.025 (0.95)  14.924 (0.96)  -1.295 (0.94)
+  malla 0.12                                  -3.445 (0.75)  11.502 (0.94) -18.957 (0.81)  -2.034 (0.95)  14.944 (0.96)  -1.301 (0.95)
+  malla 0.10                                  -3.438 (0.75)  11.499 (0.94) -19.070 (0.82)  -2.034 (0.95)  14.949 (0.96)  -1.301 (0.95)
+Unión por las caras, la losa dibujada hasta la cara exterior de las vigas:
+  malla 0.75                                  -4.222 (0.92)  12.599 (1.03) -21.552 (0.92)  -2.081 (0.98)  14.823 (0.96)  -1.340 (0.98)
+
+## Emparrillado de CY-10: la viga flexible desde la cara del pilar y el pilar sin zona rígida
+
+Recuadro de 4.32 m entre caras, vigas y pilares de 30×30, q = 10 kN/m²; entre paréntesis, frente al emparrillado de CYPECAD
+
+                                                viga: M cara        M centro          V cara  losa: w centro        m centro    w junto viga
+Emparrillado de CYPECAD (barras)              -2.816 (1.00)  12.772 (1.00) -23.328 (1.00)  -2.249 (1.00)  16.021 (1.00)  -1.463 (1.00)
+Nuestra lámina, topología de CYPE a mano      -2.860 (1.02)  12.814 (1.00) -22.695 (0.97)  -2.246 (1.00)  16.005 (1.00)  -1.461 (1.00)
+Unión por las caras, malla 0.75               -2.742 (0.97)  12.986 (1.02) -29.261 (1.25)  -2.125 (0.94)  15.494 (0.97)  -1.386 (0.95)
+Unión por las caras, malla 0.12               -3.422 (1.22)  12.570 (0.98) -23.973 (1.03)  -2.197 (0.98)  15.782 (0.99)  -1.424 (0.97)
+Unión por el eje, malla 0.75                  -2.460 (0.87)  12.033 (0.94) -13.535 (0.58)  -2.024 (0.90)  14.989 (0.94)  -1.306 (0.89)
+Unión por el eje, malla 0.12                  -2.348 (0.83)  11.811 (0.92) -17.691 (0.76)  -2.094 (0.93)  15.206 (0.95)  -1.349 (0.92)
