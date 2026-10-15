@@ -422,7 +422,7 @@
     - `empotramiento { i, j }` en las barras del motor: α·K + (1 − α)·K con los giros liberados, como CYPECAD. En el compilador, `empotramiento { base, cabeza }` por pilar y la opción `empotramientoCabeza` (0,3; compilador CY2);
     - la opción `rigidezReticular` (`"uniforme"` por defecto, `"bruta"` = C4-h; compilador CY3).
   - **Validación:** `validacion/cy/` (Ecm, PyNite, emparrillado de CYPE como barras, opciones de antes bit a bit) y `validacion/sombra/vivienda/` (la réplica frente al listado y las capturas, con los datos del cliente fuera de git).
-  - **Resultado en la vivienda:** con CY1–CY3, ~0,87 de CYPE en momentos de vano y flechas, y axiles a ±10 % salvo P5. Cuadra (0,94–1,00) si las vigas de borde tienen un ~10 % de su rigidez a flexión (CY-9), pero en el modelo del usuario son vigas normales (CY-f: las nuestras no se tocan). Sin explicar: eso y P5 (+20 %).
+  - **Resultado en la vivienda:** con CY1–CY3, ~0,87 de CYPE en momentos de vano y flechas, y axiles a ±10 % salvo P5. Lo que falta es la unión de la losa con las vigas (CY-10): CYPE corta la losa en la cara de la viga y la une a su eje con un enlace rígido; nosotros la llevamos al eje y se solapa con media viga y con la esquina del pilar. Con su topología, nuestra lámina da lo mismo que su emparrillado (`validacion/cy/borde.ts`). **Pendiente del usuario:** CY-g (hacerlo como CYPE). Sin explicar: P5 (+20 %).
   - **CY-d hecha:** el ejemplo, con CM 2,0 y los petos de CYPE.
   - **Pendiente para la integración:** Concreta usa todavía el E de la EHE.
 - **Siguiente paso:**
