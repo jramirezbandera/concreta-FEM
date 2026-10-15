@@ -25,7 +25,7 @@ import { ARMADURAS, caraDe, franjasTramos, losasDe, picos, PROMINENCIA_PICOS, zo
 import { cajaDe, rayado, rotulo, type EntradaLeyenda, type EscalaDibujada, type Escena, type ExtremoRotulado, type Primitiva } from "./escena.ts";
 import { AVISO_PICOS, coloresBandas, limitesMapa, rangoSinPicos, type EscalaMapa, type LimitesMapa } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
-import { fondoModelo, PlantaFisica, type DatosVista } from "./modelo.ts";
+import { capaApoyos, fondoModelo, PlantaFisica, type DatosVista } from "./modelo.ts";
 import { cabecera, caja, trazoModelo, type ResultadosRender } from "./resultados.ts";
 
 export { ARMADURAS, type Armadura, type TramoArmado };
@@ -240,6 +240,8 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
   const ejes = capaEjes(pl.f, { cotas: false });
   P.push(...ejes.primitivas);
   notas.push(...ejes.notas);
+  const apoyos = capaApoyos(pl, { rotulos: false });
+  P.push(...apoyos.primitivas);
   // Rótulos: con base, el máximo de cada zona con su exceso; sin ella, los picos de cada franja
   const extremos: ExtremoRotulado[] = [];
   const color = superior ? "#1d4ed8" : "#b91c1c";
@@ -271,7 +273,7 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
     titulo: d.nombre ?? "Proyecto",
     cabecera: cabecera(pl, `Vista: ${NOMBRE[armadura]}, momento de dimensionado (${u}), envolvente de ${conjunto.descripcion}${m.conBase ? ", sobre la armadura base" : ""}`, d),
     primitivas: P,
-    leyenda: m.leyenda,
+    leyenda: [...m.leyenda, ...apoyos.leyenda],
     tituloLeyenda: tituloArmado(armadura),
     notas,
     extremos: ordenados,

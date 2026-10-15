@@ -41,6 +41,7 @@
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
 import { puntoEnRegion, trozosSegmento } from "../compilador/poligonos.ts";
+import { distanciaARegion } from "../compilador/topologia.ts";
 import type { Material, ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 
@@ -629,6 +630,33 @@ export function huellaPilarSolido(p: { x: number; y: number; giro?: number }, po
 
 // ─── Piezas ─────────────────────────────────────────────────────────────────────────────────────
 
+/** Alto (m) de la pirámide de un apoyo y de la cuña de un apoyo lineal; su base, la mitad de ancha a cada lado. */
+export const LADO_APOYO_3D = 0.3;
+
+/** Espesor de la losa de una planta en un punto (también en su borde), para dibujar un apoyo bajo ella; 0 si no cae en ninguna. */
+export function espesorLosaEn(f: ModeloFisico, planta: string, q: Vec2): number {
+  for (const l of porId(f.losas)) {
+    if (l.planta !== planta) continue;
+    const r = { contorno: l.contorno, huecos: l.huecos ?? [] };
+    if (puntoEnRegion(q, r) || distanciaARegion(q, r) <= 1e-6) return l.espesor;
+  }
+  return 0;
+}
+
+/**
+ * Cuña de un tramo de apoyo lineal: la arista en A–B a la cota z y la base, de ancho 2w, h por
+ * debajo. Superficie cerrada, con la normal hacia fuera; su volumen, w·h·|AB|.
+ */
+export function cuna(A: Vec2, B: Vec2, z: number, w: number, h: number): Cara[] {
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  const n: Vec2 = [(-(B[1] - A[1]) / L) * w, ((B[0] - A[0]) / L) * w];
+  const a: Vec3 = [A[0], A[1], z];
+  const b: Vec3 = [B[0], B[1], z];
+  const [aM, aN]: [Vec3, Vec3] = [[A[0] + n[0], A[1] + n[1], z - h], [A[0] - n[0], A[1] - n[1], z - h]];
+  const [bM, bN]: [Vec3, Vec3] = [[B[0] + n[0], B[1] + n[1], z - h], [B[0] - n[0], B[1] - n[1], z - h]];
+  return [{ p: [aM, bM, bN, aN] }, { p: [a, b, bM, aM] }, { p: [b, a, aN, bN] }, { p: [a, aM, aN] }, { p: [b, bN, bM] }];
+}
+
 const porId = <T extends { id: string }>(xs: readonly T[] | undefined): T[] => [...(xs ?? [])].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 /** El canto de las viguetas de un paño (el de su sección), o null. */
@@ -971,13 +999,15 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     }
   }
 
-  // Apoyos: una pirámide invertida con el vértice en el punto
+  // Apoyos, bajo la losa si caen en una (dentro, no se verían): el puntual, una pirámide invertida
+  // con el vértice en el punto; el lineal, una cuña por tramo con la arista en su línea
   for (const a of porId(f.apoyos)) {
     const k = indice.get(a.planta);
-    const z = cota(k);
-    if (k === undefined || z === null) continue;
+    const z0 = cota(k);
+    if (k === undefined || z0 === null) continue;
     const [x, y] = [a.x, a.y];
-    const [w, h] = [0.15, 0.3];
+    const z = z0 - espesorLosaEn(f, a.planta, [x, y]);
+    const [w, h] = [LADO_APOYO_3D / 2, LADO_APOYO_3D];
     const V: Vec3 = [x, y, z];
     const B: Vec3[] = [
       [x - w, y - w, z - h],
@@ -988,6 +1018,17 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     const caras: Cara[] = [{ p: [B[3]!, B[2]!, B[1]!, B[0]!] }];
     for (let i = 0; i < 4; i++) caras.push({ p: [B[i]!, B[(i + 1) % 4]!, V] });
     piezas.push({ id: a.id, tipo: "apoyo", planta: k, material: null, seccion: null, caras });
+  }
+  for (const a of porId(f.apoyosLineales)) {
+    const k = indice.get(a.planta);
+    const z0 = cota(k);
+    if (k === undefined || z0 === null) continue;
+    const caras: Cara[] = [];
+    for (const t of tramosDe(a.puntos)) {
+      const z = z0 - espesorLosaEn(f, a.planta, [(t.A[0] + t.B[0]) / 2, (t.A[1] + t.B[1]) / 2]);
+      caras.push(...cuna(t.A, t.B, z, LADO_APOYO_3D / 2, LADO_APOYO_3D));
+    }
+    if (caras.length) piezas.push({ id: a.id, tipo: "apoyo", planta: k, material: null, seccion: null, caras });
   }
 
   if (sinForma.size) notas.push(`Sin forma (sección general sin b ni h), dibujadas como barras de ${LADO_SIN_FORMA * 100} cm: ${[...sinForma].sort().join(", ")}.`);

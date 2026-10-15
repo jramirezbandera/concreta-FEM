@@ -14,7 +14,9 @@ import { cotasPlantas } from "../../compilador/cotas.ts";
 import { puntoEnPoligono, puntoEnRegion, recorteRegionConvexo, trozosSegmento, type Region } from "../../compilador/poligonos.ts";
 import type { CargaFisica, Losa, ModeloFisico, Muro, PanoUnidireccional, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
-import { huellasInglete, huellasVigas, tramosDe } from "../../visor/solido.ts";
+import { espesorLosaEn, huellasInglete, huellasVigas, tramosDe } from "../../visor/solido.ts";
+
+export { espesorLosaEn };
 import { capaEjes } from "./ejes.ts";
 import { bandaPolilinea, cajaDe, longitud, momento2D, puntoEnPolilinea, puntoInterior, puntosDe, rayado, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
 
@@ -304,15 +306,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     });
   }
 
-  // Apoyos, apoyos lineales y bandas
-  for (const a of pl.enPlanta(f.apoyos)) {
-    P.push({ tipo: "marca", p: [a.x, a.y], forma: "triangulo", radio: 7, estilo: est("apoyo"), objeto: a.id });
-    texto([a.x, a.y], a.id, 20, { dx: 9, dy: 14 });
-  }
-  for (const a of pl.enPlanta(f.apoyosLineales)) {
-    P.push({ tipo: "linea", puntos: a.puntos as Vec2[], estilo: est("apoyo-lineal"), objeto: a.id });
-    texto(puntoEnPolilinea(a.puntos, longitud(a.puntos) / 2).p, a.id, 20, { dy: -8, ancla: "medio" });
-  }
+  // Bandas (los apoyos, después de los ejes)
   for (const b of pl.enPlanta(f.bandas)) {
     const L = Math.hypot(b.hasta[0] - b.desde[0], b.hasta[1] - b.desde[1]);
     if (L === 0) continue;
@@ -324,6 +318,11 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   const ejes = capaEjes(f, { cotas: !!o.cotas });
   P.push(...ejes.primitivas);
   notas.push(...ejes.notas);
+
+  // Los apoyos, encima de los ejes y nunca atenuados: son condiciones de contorno, y uno sobre un eje
+  // quedaba tapado por él
+  const apoyos = capaApoyos(pl, { rotulos: !o.atenuado });
+  P.push(...apoyos.primitivas);
 
   const leyenda: EntradaLeyenda[] = [];
   const entrada = (e: Estilo, t: string) => {
@@ -341,11 +340,71 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   entrada("muro-llega", "Muro que llega desde abajo");
   entrada("muro-arranca", "Muro que arranca aquí hacia arriba");
   entrada("muro-hueco", "Hueco del muro en el piso de debajo");
-  entrada("apoyo", "Apoyo");
-  entrada("apoyo-lineal", "Apoyo lineal");
   entrada("banda", "Banda de dimensionado");
-  leyenda.push(...ejes.leyenda);
+  leyenda.push(...apoyos.leyenda, ...ejes.leyenda);
   return { primitivas: P, leyenda: o.atenuado ? [] : leyenda, notas };
+}
+
+// ─── Apoyos ─────────────────────────────────────────────────────────────────────────────────────
+
+/** Triángulos de un apoyo lineal: su lado (m del dibujo) y su separación, como mucho. */
+export const LADO_APOYO = 0.25;
+export const PASO_APOYO = 1;
+
+/** Lo que coacciona un apoyo, para su rótulo: «empotrado», «articulado» o sus GDL (ux uy uz rx ry rz). */
+export function textoCoartados(c: readonly boolean[]): string {
+  if (c.length === 6 && c.every(Boolean)) return "empotrado";
+  if (c.length === 6 && c.slice(0, 3).every(Boolean) && !c.slice(3).some(Boolean)) return "articulado";
+  return ["ux", "uy", "uz", "rx", "ry", "rz"].filter((_, i) => c[i]).join(" ");
+}
+
+/**
+ * Los triángulos de un apoyo lineal en un dibujo plano: repartidos a lo largo de la polilínea a
+ * `paso` como mucho, con el vértice en ella y la base a su derecha (en un alzado de izquierda a
+ * derecha, debajo).
+ */
+export function triangulosApoyo(puntos: readonly Vec2[], lado = LADO_APOYO, paso = PASO_APOYO): Vec2[][] {
+  const L = longitud(puntos);
+  if (!(L > 0)) return [];
+  const n = Math.max(1, Math.ceil(L / paso - 1e-9));
+  const r: Vec2[][] = [];
+  for (let i = 0; i < n; i++) {
+    const { p, d } = puntoEnPolilinea(puntos, (L * (i + 0.5)) / n);
+    const m: Vec2 = [d[1], -d[0]];
+    const [h, w] = [lado, lado / 2];
+    r.push([p, [p[0] + h * m[0] + w * d[0], p[1] + h * m[1] + w * d[1]], [p[0] + h * m[0] - w * d[0], p[1] + h * m[1] - w * d[1]]]);
+  }
+  return r;
+}
+
+/**
+ * Los apoyos y apoyos lineales de una planta, en su color en todas las vistas (también sobre un
+ * mapa o de fondo de las cargas): el puntual, un triángulo; el lineal, una línea con triángulos a un
+ * lado. `rotulos`: su id y lo que coacciona.
+ */
+export function capaApoyos(pl: PlantaFisica, o: { rotulos: boolean }): { primitivas: Primitiva[]; leyenda: EntradaLeyenda[] } {
+  const P: Primitiva[] = [];
+  const leyenda: EntradaLeyenda[] = [];
+  const lineales = pl.enPlanta(pl.f.apoyosLineales);
+  for (const a of lineales) {
+    const puntos = a.puntos as Vec2[];
+    P.push({ tipo: "linea", puntos, estilo: "apoyo-lineal", objeto: a.id });
+    for (const t of triangulosApoyo(puntos)) P.push({ tipo: "poligono", anillos: [t], estilo: "apoyo", objeto: a.id });
+    if (!o.rotulos) continue;
+    // El rótulo, del lado sin triángulos
+    const { p, d } = puntoEnPolilinea(puntos, longitud(puntos) / 2);
+    const g = giroTexto(d);
+    const arriba = -Math.sin((g * Math.PI) / 180) * d[1] + Math.cos((g * Math.PI) / 180) * -d[0] > 0;
+    P.push({ tipo: "texto", p, texto: `${a.id} · ${textoCoartados(a.coartados)}`, tamano: 12, giro: g, ancla: "medio", dy: arriba ? 16 : -6, fondo: true, prioridad: 45, clase: "dato", objeto: a.id });
+  }
+  const puntuales = pl.enPlanta(pl.f.apoyos);
+  for (const a of puntuales) {
+    P.push({ tipo: "marca", p: [a.x, a.y], forma: "triangulo", radio: 7, estilo: "apoyo", objeto: a.id });
+    if (o.rotulos) P.push({ tipo: "texto", p: [a.x, a.y], texto: `${a.id} · ${textoCoartados(a.coartados)}`, tamano: 12, dx: 9, dy: 14, prioridad: 45, clase: "dato", objeto: a.id });
+  }
+  if (puntuales.length) leyenda.push({ estilo: "apoyo", texto: "Apoyo puntual, con lo que coacciona (ux uy uz rx ry rz; articulado, las tres u; empotrado, todo)" });
+  if (lineales.length) leyenda.push({ estilo: "apoyo-lineal", texto: "Apoyo lineal, con triángulos a un lado y lo que coacciona" });
+  return { primitivas: P, leyenda };
 }
 
 const circulo = (c: Vec2, r: number, n = 32): Vec2[] => Array.from({ length: n }, (_, i) => [c[0] + r * Math.cos((2 * Math.PI * i) / n), c[1] + r * Math.sin((2 * Math.PI * i) / n)] as Vec2);

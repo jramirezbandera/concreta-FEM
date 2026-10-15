@@ -1,7 +1,9 @@
 /**
  * El 3D alámbrico del modelo físico (I2, `docs/fem3d/interfaz.md` §5.2 y §14): el eje de cada
  * pilar y de cada viga, el contorno de cada losa y de cada paño en su planta, y el de cada muro
- * (sus bordes en cada planta que atraviesa y sus aristas verticales). Cada segmento lleva el objeto
+ * (sus bordes en cada planta que atraviesa y sus aristas verticales), y los apoyos bajo la losa
+ * (las aristas de la pirámide de un puntual; la cuña de un lineal, con un triángulo cada metro
+ * como mucho). Cada segmento lleva el objeto
  * físico del que sale, para elegir y resaltar, y su planta, para la planta activa.
  *
  * Sólo necesita el modelo físico, así que se dibuja también si no compila: lo que no se puede
@@ -13,8 +15,9 @@
  */
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
+import { espesorLosaEn, LADO_APOYO_3D } from "./solido.ts";
 
-export const TIPOS_ALAMBRICO = ["pilar", "viga", "losa", "pano", "muro"] as const;
+export const TIPOS_ALAMBRICO = ["pilar", "viga", "losa", "pano", "muro", "apoyo"] as const;
 export type TipoAlambrico = (typeof TIPOS_ALAMBRICO)[number];
 
 export interface Alambrico {
@@ -114,6 +117,43 @@ export function alambrico(f: ModeloFisico): Alambrico {
       for (const [, z1, i] of t) poner([a[0], a[1], z1], [b[0], b[1], z1], i);
     }
     for (const q of m.puntos) for (const [z0, z1, i] of t) poner([q[0], q[1], z0], [q[0], q[1], z1], i);
+  }
+  // Apoyos, como en el sólido
+  const [w, h] = [LADO_APOYO_3D / 2, LADO_APOYO_3D];
+  for (const a of porId(f.apoyos)) {
+    const i = indice.get(a.planta);
+    const z0 = i === undefined ? null : cotas[i];
+    if (i === undefined || z0 === null || z0 === undefined || !Number.isFinite(a.x) || !Number.isFinite(a.y)) continue;
+    nuevo(a.id, "apoyo");
+    const z = z0 - espesorLosaEn(f, a.planta, [a.x, a.y]);
+    const B: [number, number, number][] = [[-w, -w], [w, -w], [w, w], [-w, w]].map(([dx, dy]) => [a.x + dx!, a.y + dy!, z - h]);
+    for (let j = 0; j < 4; j++) {
+      poner(B[j]!, B[(j + 1) % 4]!, i);
+      poner(B[j]!, [a.x, a.y, z], i);
+    }
+  }
+  for (const a of porId(f.apoyosLineales)) {
+    const i = indice.get(a.planta);
+    const z0 = i === undefined ? null : cotas[i];
+    if (i === undefined || z0 === null || z0 === undefined) continue;
+    nuevo(a.id, "apoyo");
+    for (let j = 1; j < a.puntos.length; j++) {
+      const [A, B] = [a.puntos[j - 1]!, a.puntos[j]!];
+      const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+      if (!(L > 0)) continue;
+      const z = z0 - espesorLosaEn(f, a.planta, [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]);
+      const [nx, ny] = [(-(B[1] - A[1]) / L) * w, ((B[0] - A[0]) / L) * w];
+      poner([A[0], A[1], z], [B[0], B[1], z], i);
+      poner([A[0] + nx, A[1] + ny, z - h], [B[0] + nx, B[1] + ny, z - h], i);
+      poner([A[0] - nx, A[1] - ny, z - h], [B[0] - nx, B[1] - ny, z - h], i);
+      const n = Math.max(1, Math.ceil(L - 1e-9));
+      for (let k = 0; k <= n; k++) {
+        const [x, y] = [A[0] + ((B[0] - A[0]) * k) / n, A[1] + ((B[1] - A[1]) * k) / n];
+        poner([x, y, z], [x + nx, y + ny, z - h], i);
+        poner([x + nx, y + ny, z - h], [x - nx, y - ny, z - h], i);
+        poner([x - nx, y - ny, z - h], [x, y, z], i);
+      }
+    }
   }
 
   const vacio = !Number.isFinite(caja[0]);

@@ -33,6 +33,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "muro-llega": { fill: "#8a94a1", stroke: "#c5ccd5", sw: 0.8 },
   "muro-arranca": { fill: "#0c0c0e", stroke: "#c5ccd5", sw: 1.4, dash: "5 3" },
   "muro-hueco": { fill: "#0c0c0e", stroke: "#fb923c", sw: 1.6 },
+  apoyo: { fill: "#2dd4bf", stroke: "#2dd4bf", sw: 1 },
+  "apoyo-lineal": { stroke: "#2dd4bf", sw: 3.5 },
   atenuado: { fill: "#1a1d23", stroke: "#3a404a", sw: 0.8 },
   "atenuado-linea": { stroke: "#3a404a", sw: 1 },
   malla: { fill: "#12151a", stroke: "#5b6575", sw: 0.6 },

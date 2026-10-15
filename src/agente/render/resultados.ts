@@ -27,7 +27,7 @@ import { diagramaCombinado } from "../consultas.ts";
 import { area, cajaDe, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
-import { fondoModelo, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica, type DatosVista } from "./modelo.ts";
+import { capaApoyos, fondoModelo, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica, type DatosVista } from "./modelo.ts";
 
 export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12"] as const;
 export type Campo = (typeof CAMPOS)[number];
@@ -217,7 +217,9 @@ export function vistaMalla(r: ResultadosRender, planta: string, d: DatosVista): 
   ];
   const ejes = capaEjes(pl.f, { cotas: false });
   P.push(...ejes.primitivas);
-  leyenda.push(...ejes.leyenda);
+  const apoyos = capaApoyos(pl, { rotulos: false });
+  P.push(...apoyos.primitivas);
+  leyenda.push(...apoyos.leyenda, ...ejes.leyenda);
   return {
     titulo: d.nombre ?? "Proyecto",
     cabecera: cabecera(pl, "Vista: malla", d),
@@ -362,6 +364,9 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   const ejes = capaEjes(pl.f, { cotas: false });
   P.push(...ejes.primitivas);
   notas.push(...ejes.notas);
+  const apoyos = capaApoyos(pl, { rotulos: false });
+  P.push(...apoyos.primitivas);
+  leyenda.push(...apoyos.leyenda);
   const extremos: ExtremoRotulado[] = [];
   if (pmax && pmin) {
     for (const [que, x, p, o, estilo, dy] of [

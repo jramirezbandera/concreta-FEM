@@ -15,7 +15,8 @@
  * - las vigas paralelas al plano con su canto, con la cara superior en la planta (C1-c), y las que
  *   lo cruzan, cortadas (su ancho medido a lo largo del plano);
  * - las losas y los paños cortados por el plano, con su espesor (el del paño, el canto de sus
- *   viguetas), y los apoyos.
+ *   viguetas), y los apoyos, bajo la losa: los lineales paralelos al plano, a lo largo de él con sus
+ *   triángulos; los que lo cruzan, como un puntual.
  *
  * No hay líneas ocultas: se dibuja en ese orden y lo cortado va encima.
  *
@@ -26,7 +27,7 @@ import { ejesDe } from "../../compilador/ejes.ts";
 import type { ModeloFisico, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import { capaEjesAlzado } from "./ejes.ts";
 import { cajaDe, longitud, puntoEnPolilinea, puntosDe, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
-import { anchoViga, huellaSeccion, porId, type DatosVista } from "./modelo.ts";
+import { anchoViga, espesorLosaEn, huellaSeccion, porId, textoCoartados, triangulosApoyo, type DatosVista } from "./modelo.ts";
 
 /** El plano de un alzado: la recta en planta de `desde` a `hasta` y lo que se ve a cada lado, m. */
 export interface PlanoAlzado {
@@ -103,7 +104,8 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
   const P: Primitiva[] = [];
   const usados = new Set<Estilo>();
   const notas: string[] = [];
-  const FONDO: ReadonlySet<Estilo> = new Set(["nivel", "eje", "eje-burbuja"]);
+  // Los apoyos, tampoco: son condiciones de contorno
+  const FONDO: ReadonlySet<Estilo> = new Set(["nivel", "eje", "eje-burbuja", "apoyo", "apoyo-lineal"]);
   const poner = (p: Primitiva) => {
     if (o.atenuado && p.tipo !== "texto" && !FONDO.has(p.estilo)) p = { ...p, estilo: p.tipo === "linea" ? "atenuado-linea" : "atenuado" } as Primitiva;
     else if (o.atenuado && p.tipo === "texto" && p.clase === "id") return;
@@ -247,10 +249,50 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
   }
 
   // ─── Apoyos ───────────────────────────────────────────────────────────────────────────────────
+  const rotuloApoyo = (p: Vec2, id: string, c: readonly boolean[]) =>
+    poner({ tipo: "texto", p, texto: `${id} · ${textoCoartados(c)}`, tamano: 11, ancla: "medio", dy: 22, fondo: true, prioridad: 45, clase: "id", objeto: id });
   for (const a of porId(f.apoyos ?? [])) {
     const z = cotaDe(a.planta);
     if (z === null || Math.abs(w([a.x, a.y])) > prof) continue;
-    poner({ tipo: "marca", p: [u([a.x, a.y]), z], forma: "triangulo", radio: 7, estilo: "apoyo", objeto: a.id });
+    // Bajo la losa, si cae en una
+    const zf = z - espesorLosaEn(f, a.planta, [a.x, a.y]);
+    poner({ tipo: "marca", p: [u([a.x, a.y]), zf], forma: "triangulo", radio: 7, estilo: "apoyo", objeto: a.id });
+    rotuloApoyo([u([a.x, a.y]), zf], a.id, a.coartados);
+  }
+  // Los lineales: lo que corre por el plano, con sus triángulos debajo; lo que lo cruza, un triángulo
+  for (const a of porId(f.apoyosLineales ?? [])) {
+    const z = cotaDe(a.planta);
+    if (z === null) continue;
+    let rotulado = false;
+    for (let i = 1; i < a.puntos.length; i++) {
+      const [A, B] = [a.puntos[i - 1]!, a.puntos[i]!];
+      const l = Math.hypot(B[0] - A[0], B[1] - A[1]);
+      if (l === 0) continue;
+      // El trozo a menos de prof del plano: |w(A) + t·(w(B) − w(A))| ≤ prof, t ∈ [0, 1]
+      const [wa, wb] = [w(A), w(B)];
+      let [t0, t1] = [0, 1];
+      if (wa !== wb) {
+        const [ta, tb] = [(-prof - wa) / (wb - wa), (prof - wa) / (wb - wa)];
+        [t0, t1] = [Math.max(0, Math.min(ta, tb)), Math.min(1, Math.max(ta, tb))];
+      } else if (Math.abs(wa) > prof) continue;
+      if (t1 < t0) continue;
+      const en = (t: number): Vec2 => [A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])];
+      const seno = Math.abs(wb - wa) / l;
+      const zf = z - espesorLosaEn(f, a.planta, en((t0 + t1) / 2));
+      if (seno < SENO_PARALELO) {
+        const [ua, ub] = [u(en(t0)), u(en(t1))].sort((x, y) => x - y) as [number, number];
+        if (ub - ua <= 1e-9) continue;
+        const linea: Vec2[] = [[ua, zf], [ub, zf]];
+        poner({ tipo: "linea", puntos: linea, estilo: "apoyo-lineal", objeto: a.id });
+        for (const t of triangulosApoyo(linea)) poner({ tipo: "poligono", anillos: [t], estilo: "apoyo", objeto: a.id });
+        if (!rotulado) rotuloApoyo([(ua + ub) / 2, zf], a.id, a.coartados);
+      } else {
+        const t = wa === wb ? (t0 + t1) / 2 : Math.max(t0, Math.min(t1, wa / (wa - wb)));
+        poner({ tipo: "marca", p: [u(en(t)), zf], forma: "triangulo", radio: 7, estilo: "apoyo", objeto: a.id });
+        if (!rotulado) rotuloApoyo([u(en(t)), zf], a.id, a.coartados);
+      }
+      rotulado = true;
+    }
   }
 
   // ─── Plantas y ejes ───────────────────────────────────────────────────────────────────────────
@@ -276,7 +318,8 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
   entrada("losa-cortada", "Losa cortada, con su espesor");
   entrada("pano-cortado", "Paño unidireccional cortado, con el canto de sus viguetas");
   entrada("vigueta", "Pilar sin sección conocida (su eje)");
-  entrada("apoyo", "Arranque empotrado (rayado), articulado o apoyo (triángulo)");
+  entrada("apoyo", "Arranque empotrado (rayado), articulado o apoyo (triángulo, bajo la losa, con lo que coacciona)");
+  entrada("apoyo-lineal", "Apoyo lineal paralelo al plano, bajo la losa, con triángulos; si lo cruza, un triángulo");
   entrada("nivel", "Planta, con su cota (m)");
   entrada("eje", "Eje de replanteo que cruza el plano");
   const caja = cajaDe(P.filter((p) => p.tipo !== "texto").flatMap(puntosDe));

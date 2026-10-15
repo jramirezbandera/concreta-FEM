@@ -46,7 +46,7 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "muro-arranca": { fill: "#ffffff", stroke: "#2a313a", sw: 1.4, dash: "5 3" },
   "muro-hueco": { fill: "#ffffff", stroke: "#c2410c", sw: 1.6 },
   apoyo: { fill: "#0f766e", stroke: "#0f766e", sw: 1 },
-  "apoyo-lineal": { stroke: "#0f766e", sw: 3, dash: "8 4" },
+  "apoyo-lineal": { stroke: "#0f766e", sw: 3.5 },
   banda: { stroke: "#6d28d9", sw: 1.2, dash: "10 5" },
   "hueco-aspa": { stroke: "#7d8794", sw: 0.8 },
   eje: { stroke: "#8794a3", sw: 0.8, dash: "14 3 2 3" },
