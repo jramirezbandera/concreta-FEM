@@ -65,6 +65,13 @@ export const IcAbacos = icono(
     <rect x="10.5" y="10.5" width="3" height="3" fill="currentColor" />
   </>,
 );
+/** Vigas de borde: la planta de un forjado con su contorno grueso (el zuncho) y la losa dentro. */
+export const IcVigaBorde = icono(
+  <>
+    <rect x="3" y="5" width="18" height="14" rx="1" strokeWidth={3} />
+    <path d="M8 10h8M8 14h8" strokeWidth={1} />
+  </>,
+);
 export const IcApoyoLineal = icono(
   <>
     <path d="M3 12h18" />

@@ -669,6 +669,54 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
 
 // ─── Bordes de forjado ──────────────────────────────────────────────────────────────────────────
 
+type Forjado = { id: string; planta: string; contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[] };
+
+/** Los anillos de un forjado: el contorno y sus huecos. */
+export const anillosForjado = (x: Forjado): (readonly Vec2[])[] => [x.contorno, ...(x.huecos ?? [])];
+
+/**
+ * Los ejes que atan el borde de un forjado: los tramos de las vigas y los apoyos lineales de su
+ * planta, de los muros que llegan a ella o salen de ella, y los bordes de los otros forjados de la
+ * planta.
+ */
+export function ejesQueAtan(f: ModeloFisico, P: Plantas, x: Forjado): { A: Vec2; B: Vec2 }[] {
+  const k = P.indice.get(x.planta);
+  const ejes: { A: Vec2; B: Vec2 }[] = [];
+  if (k === undefined) return ejes;
+  for (const v of f.vigas ?? []) if (v.planta === x.planta) ejes.push(...tramos(v.puntos));
+  for (const a of f.apoyosLineales ?? []) if (a.planta === x.planta) ejes.push(...tramos(a.puntos));
+  for (const m of f.muros ?? []) {
+    const [kh, kb] = [P.indice.get(m.hasta), P.indice.get(m.desde)];
+    if (kh !== undefined && kb !== undefined && kh <= k && k <= kb) ejes.push(...tramos(m.puntos));
+  }
+  for (const o of [...(f.losas ?? []), ...(f.panos ?? [])]) if (o.id !== x.id && o.planta === x.planta) for (const an of anillosForjado(o)) ejes.push(...tramos([...an, an[0]!]));
+  return ejes;
+}
+
+/** Los trozos [s0, s1] del tramo t (de A a B, de largo L y dirección u) que no van sobre ninguno de los `ejes` (a ≤ eps de su recta), de más de eps. */
+export function libresTramo(t: { A: Vec2; L: number; u: Vec2 }, ejes: readonly { A: Vec2; B: Vec2 }[], eps: number): [number, number][] {
+  const pr = (q: Vec2) => {
+    const [dx, dy] = [q[0] - t.A[0], q[1] - t.A[1]];
+    return { s: dx * t.u[0] + dy * t.u[1], d: Math.abs(dx * t.u[1] - dy * t.u[0]) };
+  };
+  const cub: [number, number][] = [];
+  for (const e of ejes) {
+    const [a, b] = [pr(e.A), pr(e.B)];
+    if (a.d > eps || b.d > eps) continue;
+    const [s0, s1] = [Math.max(0, Math.min(a.s, b.s)), Math.min(t.L, Math.max(a.s, b.s))];
+    if (s1 > s0) cub.push([s0, s1]);
+  }
+  cub.sort((p, q) => p[0] - q[0]);
+  const r: [number, number][] = [];
+  let s = 0;
+  for (const [s0, s1] of cub) {
+    if (s0 - s > eps) r.push([s, s0]);
+    s = Math.max(s, s1);
+  }
+  if (t.L - s > eps) r.push([s, t.L]);
+  return r;
+}
+
 /**
  * Los tramos del borde (contorno y huecos) de cada losa y cada paño que no van sobre el eje de una
  * viga de su planta, de un muro que llega a ella o sale de ella, de un apoyo lineal de su planta ni
@@ -677,47 +725,14 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
  * que falta en el modelo.
  */
 export function bordesSinViga(f: ModeloFisico, P: Plantas, eps: number): { pieza: string; planta: string; tramos: [Vec2, Vec2][] }[] {
-  const forjados = [...(f.losas ?? []), ...(f.panos ?? [])];
-  const anillos = (x: { contorno: readonly Vec2[]; huecos?: readonly (readonly Vec2[])[] }) => [x.contorno, ...(x.huecos ?? [])];
   const r: { pieza: string; planta: string; tramos: [Vec2, Vec2][] }[] = [];
-  for (const x of forjados) {
-    const k = P.indice.get(x.planta);
-    if (k === undefined) continue;
-    // Los ejes que atan un borde en esta planta
-    const ejes: { A: Vec2; B: Vec2 }[] = [];
-    for (const v of f.vigas ?? []) if (v.planta === x.planta) ejes.push(...tramos(v.puntos));
-    for (const a of f.apoyosLineales ?? []) if (a.planta === x.planta) ejes.push(...tramos(a.puntos));
-    for (const m of f.muros ?? []) {
-      const [kh, kb] = [P.indice.get(m.hasta), P.indice.get(m.desde)];
-      if (kh !== undefined && kb !== undefined && kh <= k && k <= kb) ejes.push(...tramos(m.puntos));
-    }
-    for (const o of forjados) if (o !== x && o.planta === x.planta) for (const an of anillos(o)) ejes.push(...tramos([...an, an[0]!]));
+  for (const x of [...(f.losas ?? []), ...(f.panos ?? [])]) {
+    if (!P.indice.has(x.planta)) continue;
+    const ejes = ejesQueAtan(f, P, x);
     const libres: [Vec2, Vec2][] = [];
-    for (const an of anillos(x))
-      for (const t of tramos([...an, an[0]!])) {
-        const pr = (q: Vec2) => {
-          const [dx, dy] = [q[0] - t.A[0], q[1] - t.A[1]];
-          return { s: dx * t.u[0] + dy * t.u[1], d: Math.abs(dx * t.u[1] - dy * t.u[0]) };
-        };
-        // Lo cubierto, en [0, L]
-        const cub: [number, number][] = [];
-        for (const e of ejes) {
-          const [a, b] = [pr(e.A), pr(e.B)];
-          if (a.d > eps || b.d > eps) continue;
-          const [s0, s1] = [Math.max(0, Math.min(a.s, b.s)), Math.min(t.L, Math.max(a.s, b.s))];
-          if (s1 > s0) cub.push([s0, s1]);
-        }
-        cub.sort((p, q) => p[0] - q[0]);
-        let s = 0;
-        const hueco = (s0: number, s1: number) => {
-          if (s1 - s0 > eps) libres.push([[t.A[0] + s0 * t.u[0], t.A[1] + s0 * t.u[1]], [t.A[0] + s1 * t.u[0], t.A[1] + s1 * t.u[1]]]);
-        };
-        for (const [s0, s1] of cub) {
-          if (s0 > s) hueco(s, s0);
-          s = Math.max(s, s1);
-        }
-        if (s < t.L) hueco(s, t.L);
-      }
+    for (const an of anillosForjado(x))
+      for (const t of tramos([...an, an[0]!]))
+        for (const [s0, s1] of libresTramo(t, ejes, eps)) libres.push([[t.A[0] + s0 * t.u[0], t.A[1] + s0 * t.u[1]], [t.A[0] + s1 * t.u[0], t.A[1] + s1 * t.u[1]]]);
     if (libres.length) r.push({ pieza: x.id, planta: x.planta, tramos: libres });
   }
   return r;

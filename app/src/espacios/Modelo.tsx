@@ -18,11 +18,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, ListOrdered, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
-import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcAbacos, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcAbacos, IcLosa, IcVigaBorde, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
-import { DialogoAbacos, DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
+import { DialogoAbacos, DialogoBorrar, DialogoCopiar, DialogoRenumerar, DialogoVigasBorde } from "../editor/Dialogos.tsx";
 import { tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
 import { cota, fmt } from "../fmt.ts";
@@ -63,7 +63,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const [tabla, setTabla] = useState<NombreTabla>(cargas ? "cargas" : "pilares");
   const [nueva, setNueva] = useState(0);
   const [plantilla, setPlantilla] = useState<Record<string, string> | undefined>(undefined);
-  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | null>(null);
+  const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | "vigasBorde" | null>(null);
 
   const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
   // Lo elegido que está en el proyecto (un eje propuesto no lo está) y lo que de ello se copia
@@ -156,6 +156,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcViga} nombre="Viga" onClick={() => abrirTabla("vigas", true)} title="Una viga nueva en la tabla de vigas" />
           <Herramienta icono={IcLosa} nombre="Forjado" onClick={() => abrirTabla("forjados", true, { tipo: "maciza" })} title="Un forjado nuevo en la tabla de forjados: losa maciza, reticular o unidireccional, según su columna «tipo»" />
           <Herramienta icono={IcAbacos} nombre="Ábacos" onClick={() => setDialogo("abacos")} title="Ábacos macizos en los pilares de un forjado reticular, del tamaño que diga" />
+          <Herramienta icono={IcVigaBorde} nombre="Vigas de borde" onClick={() => setDialogo("vigasBorde")} title="El zuncho de los bordes de un forjado que no van sobre una viga, un muro o un apoyo: la viga, la losa hasta su eje y la carga de la banda en la viga" />
           <Herramienta icono={IcMuro} nombre="Muro" onClick={() => abrirTabla("muros", true)} title="Un muro nuevo en la tabla de muros" />
           <Herramienta icono={IcApoyo} nombre="Apoyo" onClick={() => abrirTabla("apoyos", true)} title="Un apoyo nuevo en la tabla de apoyos" />
           <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" onClick={() => abrirTabla("apoyosLineales", true)} title="Un apoyo lineal nuevo en la tabla de apoyos lineales" />
@@ -254,6 +255,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       {dialogo === "copiar" && copiables.length > 0 && <DialogoCopiar ids={copiables} onCerrar={cerrarDialogo} />}
       {dialogo === "renumerar" && ed && <DialogoRenumerar onCerrar={() => setDialogo(null)} />}
       {dialogo === "abacos" && ed && <DialogoAbacos onCerrar={() => setDialogo(null)} />}
+      {dialogo === "vigasBorde" && ed && <DialogoVigasBorde onCerrar={() => setDialogo(null)} />}
     </>
   );
 }

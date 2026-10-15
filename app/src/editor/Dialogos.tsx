@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { copiarAPlantas, objetosDePlanta } from "../../../src/editor/edicion.ts";
 import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
+import { operacionVigasBorde, proponerVigasBorde } from "../../../src/editor/vigasBorde.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
 import { PREFIJOS, propuestaRenumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
@@ -262,6 +263,7 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
 }
 
 
+const coma = (x: number) => String(Math.round(x * 1000) / 1000).replace(".", ",");
 const numero = (s: string) => Number(s.trim().replace(",", "."));
 
 /**
@@ -331,6 +333,94 @@ export function DialogoAbacos({ onCerrar }: { onCerrar: (hecho?: string) => void
               {p.conAbaco.length > 0 && <li>Ya tienen ábaco, y se dejan: {p.conAbaco.join(", ")}.</li>}
               {p.solapados.length > 0 && <li className="text-state-warn">Se solaparían con otro, y no se crean: {p.solapados.join(", ")}.</li>}
               {p.fuera.length > 0 && <li className="text-text-secondary">Se salen del forjado (cuenta lo de dentro): {p.fuera.join(", ")}.</li>}
+            </ul>
+          )}
+          <p className="dlg-nota">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
+        </>
+      )}
+      {error && <p className="mt-2 text-state-fail">{error}</p>}
+    </Dialogo>
+  );
+}
+
+/** «Vigas de borde»: el zuncho de los bordes libres de una losa, con la regla de la skill (`editor/vigasBorde.ts`). */
+export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => void }) {
+  const { proyecto, planta, seleccion } = useVisor();
+  const ed = proyecto.edicion!;
+  const m = ed.proyecto.modelo;
+  const losas = m.losas ?? [];
+  const inicial = losas.find((l) => l.id === seleccion) ?? losas.find((l) => l.planta === planta) ?? losas[0];
+  const [losa, setLosa] = useState(inicial?.id ?? "");
+  const [b, setB] = useState("0,30");
+  const [h, setH] = useState(() => String(inicial?.espesor ?? 0.3).replace(".", ","));
+  const [error, setError] = useState<string | null>(null);
+  const p = useMemo(() => (losa ? proponerVigasBorde(m, losa, numero(b), numero(h)) : { error: "No hay ninguna losa." }), [m, losa, b, h]);
+  const op = "error" in p ? null : operacionVigasBorde(m, p);
+  const cuenta = (regla: string) => ("error" in p ? 0 : p.vigas.filter((v) => v.regla === regla).length);
+
+  const hacer = () => {
+    if (!op || "error" in p) return;
+    const r = ed.editar(op, `Vigas de borde de ${losa}`);
+    if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
+    onCerrar(`${p.vigas.length} vigas de borde en ${losa}.`);
+  };
+
+  return (
+    <Dialogo
+      titulo="Vigas de borde"
+      onCerrar={() => onCerrar()}
+      pie={
+        <>
+          <button type="button" className="btn" onClick={() => onCerrar()}>
+            Cancelar
+          </button>
+          <button type="button" className="btn btn-p" onClick={hacer} disabled={!op}>
+            Crear
+          </button>
+        </>
+      }
+    >
+      {losas.length === 0 ? (
+        <p>No hay ninguna losa.</p>
+      ) : (
+        <>
+          <p>
+            Un zuncho en cada lado del borde (contorno y huecos) que no va sobre una viga, un muro, un apoyo lineal u otro forjado. Su eje va por el de los pilares del lado; sin pilares, enrasado por fuera. La losa se lleva hasta el eje, y lo que cargaba la banda que queda fuera (cargas de superficie, petos y su peso donde no está la viga) pasa a la viga.
+          </p>
+          <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
+            <label htmlFor="vb-losa">Forjado</label>
+            <select id="vb-losa" className="sel" value={losa} onChange={(e) => setLosa(e.target.value)}>
+              {losas.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.id} · {l.planta}
+                  {l.nombre ? ` · ${l.nombre}` : ""}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="vb-b">Ancho b (m)</label>
+            <input id="vb-b" className="sel mono" value={b} onChange={(e) => setB(e.target.value)} />
+            <label htmlFor="vb-h">Canto h (m)</label>
+            <input id="vb-h" className="sel mono" value={h} onChange={(e) => setH(e.target.value)} />
+          </div>
+          {"error" in p ? (
+            <p className="mt-3 text-state-fail">{p.error}</p>
+          ) : (
+            <ul className="mt-3 list-disc pl-5" aria-label="Lo que se va a hacer">
+              <li>
+                {p.vigas.length} vigas {p.seccion.id}
+                {p.nueva ? " (sección nueva)" : ""}: {cuenta("pilares")} por el eje de los pilares, {cuenta("enrasada")} enrasadas
+                {cuenta("continua") ? ` y ${cuenta("continua")} que siguen la viga que ya ata el lado` : ""}.
+              </li>
+              <li>
+                La losa pierde una banda de {coma(Math.max(...p.vigas.map((v) => v.retranqueo)))} m como mucho; {p.cargas.filter((c) => c.tipo === "viga").length} cargas de viga la llevan a las vigas.
+              </li>
+              {p.quitadas.length > 0 && <li>Las cargas lineales {p.quitadas.join(", ")} pasan a las vigas{p.cargas.some((c) => c.tipo === "lineal") ? " (lo que queda fuera de la banda sigue como lineal)" : ""}.</li>}
+              {p.sueltas.length > 0 && <li className="text-state-warn">Las puntuales {p.sueltas.join(", ")} quedan fuera de la losa: muévalas a la viga.</li>}
+              {p.avisos.map((a) => (
+                <li key={a} className="text-state-warn">
+                  {a}
+                </li>
+              ))}
             </ul>
           )}
           <p className="dlg-nota">Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
