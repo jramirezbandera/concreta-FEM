@@ -216,7 +216,8 @@ export function ModoLosas() {
         </Seccion>
         {x && (
           <>
-            <Seccion titulo="Extremos de la planta" valor={x.dibujada?.nombre}>
+            {/* Con nombre: el 3D de todas las plantas rotula otros extremos, los de todo el edificio */}
+            <Seccion titulo={`Extremos de ${planta ?? "la planta"}`} valor={x.dibujada?.nombre}>
               {x.escena.extremos.map((ex, i) => (
                 <button key={i} type="button" className="lista-fila" style={{ gridTemplateColumns: "1fr auto", height: "auto", padding: "6px 14px" }} onClick={() => ex.punto && setPunto({ p: ex.punto, v: ex.punto ? { valor: ex.valor, unidad: ex.unidad, losa: ex.objeto ?? "", lamina: -1, comb: ex.comb ?? "" } : null, planta: planta!, clave })} title="Marcar el punto">
                   <span>
