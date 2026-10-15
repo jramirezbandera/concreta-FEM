@@ -374,7 +374,7 @@ describe("C4: reticular", () => {
   });
 
   it("la zona aligerada lleva los multiplicadores del emparrillado con ν = 0; los ábacos, macizos con el ν del material", () => {
-    const r = valido(compilar(reticular()));
+    const r = valido(compilar(reticular(), { rigidezReticular: "bruta" }));
     const m = multiplicadoresReticular({ h: 0.35, hf: 0.05, bw: 0.12, s: 0.82 }, 0.2);
     let areaAbaco = 0;
     r.modelo.laminas!.forEach((l, i) => {

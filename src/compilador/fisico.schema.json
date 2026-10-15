@@ -959,6 +959,12 @@
         "empotramientoCabeza": {
           "type": "number"
         },
+        "rigidezReticular": {
+          "enum": [
+            "bruta",
+            "uniforme"
+          ]
+        },
         "cortante": {
           "type": "boolean"
         },

@@ -1171,6 +1171,13 @@
           "type": "number",
           "description": "Coeficiente de empotramiento de la cabeza del último tramo de cada pilar, en [0, 1] (CY2, CY-b).\nPor defecto, 0,3, el que aconseja CYPECAD: la cabeza, con poco axil, fisura y no desarrolla el\nempotramiento elástico. Se multiplica por el `empotramiento.cabeza` del pilar. No se aplica al\npilar sobre el que arranca otro en su cabeza. Con 1, la cabeza empotrada de antes de CY2."
         },
+        "rigidezReticular": {
+          "enum": [
+            "bruta",
+            "uniforme"
+          ],
+          "description": "Rigidez de los forjados reticulares (CY3, CY-c). \"uniforme\" (por defecto), la de CYPECAD: la\nzona aligerada y los ábacos con la mitad de la flexión de la maciza y la torsión de su\nemparrillado, sin Poisson; como fisurados, los ábacos no se llevan los momentos de los vanos.\n\"bruta\" (C4-h): la zona aligerada con la T bruta de sus nervios y los ábacos macizos. Los\n`multiplicadores` dados en la losa mandan sobre las dos."
+        },
         "cortante": {
           "type": "boolean",
           "description": "Deformación por cortante (Timoshenko). Por defecto, sí."

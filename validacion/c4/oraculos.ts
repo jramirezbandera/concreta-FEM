@@ -1,5 +1,6 @@
 /**
  * Criterio 2 de C4 (y la comprobación de la viga continua del criterio 1): oráculos de los forjados.
+ * Validan la rigidez «bruta» del reticular (C4-h), que desde CY3 es una opción.
  *
  * 1. Multiplicadores de 25+5, 30+5 y 35+10 (nervio de 12 cm cada 82 cm) frente a la T calculada a
  *    mano (área, centro de gravedad e inercia por Steiner) y J_w por la aproximación de Roark
@@ -87,7 +88,7 @@ export function navierReticular(malla: number) {
     casos: [{ id: "q" }],
     cargas: [{ tipo: "superficie", id: "Q", caso: "q", planta: "P0", losa: "L", q: [0, 0, q] }],
   };
-  const r = valido(compilar(f, { tamanoMalla: malla }));
+  const r = valido(compilar(f, { tamanoMalla: malla, rigidezReticular: "bruta" }));
   const [c] = casosValidos(calcular(r.modelo));
   const n = r.modelo.nudos.findIndex((x) => Math.abs(x.x - A / 2) < 1e-9 && Math.abs(x.y - B / 2) < 1e-9);
   const m = multiplicadoresReticular(RET, 0.2);
@@ -134,7 +135,7 @@ export function emparrillado(N: number, abacos: boolean, malla = RET.s / 4): Emp
     casos: [{ id: "q" }],
     cargas: [{ tipo: "superficie", id: "Q", caso: "q", planta: "P0", losa: "L", q: [0, 0, q] }],
   };
-  const r = valido(compilar(f, { tamanoMalla: malla }));
+  const r = valido(compilar(f, { tamanoMalla: malla, rigidezReticular: "bruta" }));
   const [c] = casosValidos(calcular(r.modelo));
   const u = c!.u;
   const nd = (x: number, y: number) => r.modelo.nudos.findIndex((n) => Math.abs(n.x - x) < 1e-6 && Math.abs(n.y - y) < 1e-6);
@@ -243,7 +244,7 @@ export function emparrilladoPilar(N: number, conAbaco: boolean, nu0 = false, mal
       },
     ],
   };
-  const r = valido(compilar(f, { tamanoMalla: malla }));
+  const r = valido(compilar(f, { tamanoMalla: malla, rigidezReticular: "bruta" }));
   const [cl] = casosValidos(calcular(r.modelo));
   const u = cl!.u;
   const nd = (x: number, y: number) => r.modelo.nudos.findIndex((n) => Math.abs(n.x - x) < 1e-6 && Math.abs(n.y - y) < 1e-6);

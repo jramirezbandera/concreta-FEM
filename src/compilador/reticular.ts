@@ -51,6 +51,28 @@ export function multiplicadoresReticular(g: GeometriaReticular, nu: number): Req
   return { f11: f, f22: f, f12: (kG * g.hf) / g.h, m11: m, m22: m, m12: (kG * (g.hf ** 3 + (6 * Jw) / g.s)) / g.h ** 3, v13: v, v23: v };
 }
 
+/**
+ * Flexión y torsión del reticular «uniforme» (CY3, CY-c), las de CYPECAD (memoria de cálculo,
+ * ccadmc01, p. 13): un emparrillado de barras de ancho b = s/3 con «inercia a flexión (tanto en la
+ * zona maciza como en la aligerada) la mitad de la zona maciza, y la inercia a torsión el doble de
+ * la de flexión». Por unidad de ancho, E·I/b = ½·E·h³/12, así que m11 = m22 = ½; y la torsión,
+ * G·J/b = G_c·h³/12 frente a los G₀·h³/6 de la lámina con ν = 0, así que m12 = ½·G_c/G₀, como en
+ * C4-h. Igual en la zona aligerada y en los ábacos, con ν = 0 (un emparrillado no tiene Poisson).
+ */
+export function flexionUniforme(nu: number): { m11: number; m22: number; m12: number } {
+  return { m11: 0.5, m22: 0.5, m12: 0.5 / (1 + nu) };
+}
+
+/**
+ * Multiplicadores de los ábacos del reticular «uniforme» (CY3): la flexión y la torsión de
+ * `flexionUniforme`; la membrana y el cortante transversal, los de la maciza (con ν = 0 en la
+ * lámina, el cortante lleva G_c/G₀).
+ */
+export function multiplicadoresAbacoUniforme(nu: number): Required<MultiplicadoresLamina> {
+  const kG = 1 / (1 + nu);
+  return { f11: 1, f22: 1, f12: kG, ...flexionUniforme(nu), v13: kG, v23: kG };
+}
+
 /** Volumen de hormigón por m² de la zona aligerada con casetón recuperable, m³/m². */
 export function volumenReticular(g: GeometriaReticular): number {
   const c = g.s - g.bw;

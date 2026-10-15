@@ -9,7 +9,7 @@ import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
 import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
 import { areaConSigno, areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
-import { multiplicadoresReticular, volumenReticular } from "./reticular.ts";
+import { flexionUniforme, multiplicadoresAbacoUniforme, multiplicadoresReticular, volumenReticular } from "./reticular.ts";
 import { compilarSeccion, materialElastico, type SeccionCompilada } from "./secciones.ts";
 
 /** Una losa ya comprobada, con su material de lámina y su peso propio. */
@@ -34,6 +34,8 @@ export interface ReticularCompilado {
   nu: number;
   /** ¿Los ha dado el usuario? */
   dados: boolean;
+  /** Rigidez «uniforme» (CY3): la de las láminas de los ábacos, que con «bruta» van macizos. */
+  abaco?: { multiplicadores: MultiplicadoresLamina; nu: number };
   /** Peso propio de la zona aligerada y de los ábacos, kN/m². */
   ppAligerada: number;
   ppAbaco: number;
@@ -193,6 +195,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   }
   if (!(num(op.empotramientoCabeza) && op.empotramientoCabeza >= 0 && op.empotramientoCabeza <= 1)) {
     diag.error("opciones/no-validas", "El coeficiente de empotramiento de la cabeza de los pilares tiene que estar entre 0 (articulado) y 1 (empotrado).");
+    return null;
+  }
+  if (op.rigidezReticular !== "uniforme" && op.rigidezReticular !== "bruta") {
+    diag.error("opciones/no-validas", "La rigidez del reticular tiene que ser uniforme (la de CYPECAD) o bruta (C4-h).");
     return null;
   }
   if (!(num(op.tamanoMalla) && op.tamanoMalla >= 2 * op.epsSnap)) {
@@ -542,6 +548,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     const g = { h: l.espesor, hf: r.capa, bw: r.nervio, s: r.intereje };
     const dados = r.multiplicadores !== undefined;
     const ppAligerada = l.pp ?? peso * volumenReticular(g);
+    // CY3: con «uniforme», la flexión y la torsión de CYPECAD en las dos zonas; la membrana y el cortante, por zonas
+    const uniforme = !dados && op.rigidezReticular === "uniforme";
+    const calculados = multiplicadoresReticular(g, nu);
     losasC.push({
       losa: l,
       region,
@@ -549,9 +558,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       pp: ppAligerada,
       gamma: peso,
       reticular: {
-        multiplicadores: dados ? { ...r.multiplicadores } : multiplicadoresReticular(g, nu),
+        multiplicadores: dados ? { ...r.multiplicadores } : uniforme ? { ...calculados, ...flexionUniforme(nu) } : calculados,
         nu: dados ? nu : 0,
         dados,
+        ...(uniforme ? { abaco: { multiplicadores: multiplicadoresAbacoUniforme(nu), nu: 0 } } : {}),
         ppAligerada,
         ppAbaco: l.pp ?? peso * l.espesor,
         abacos: reticular.abacos,

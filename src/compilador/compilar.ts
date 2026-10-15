@@ -37,7 +37,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "CY2";
+export const VERSION_COMPILADOR = "CY3";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -241,6 +241,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     // Zona aligerada de un reticular (C4-h): sus multiplicadores y su ν
     const ret = lc.reticular;
     if (ret && !l.abaco) return { ...r, material: { ...lc.material, nu: ret.nu }, multiplicadores: ret.multiplicadores };
+    // Ábaco de un reticular «uniforme» (CY3)
+    if (ret?.abaco && l.abaco) return { ...r, material: { ...lc.material, nu: ret.abaco.nu }, multiplicadores: ret.abaco.multiplicadores };
     return r;
   });
   // Láminas de los muros (C3), tras las de las losas: eje 1 horizontal a lo largo del tramo
@@ -512,7 +514,9 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       h.push(
         r.dados
           ? `Forjado reticular ${l.losa.id}: zona aligerada con los multiplicadores dados por el usuario sobre la losa maciza de ${coma(l.material.t)} m, con el ν del material (C4-h): f11 ${f(m.f11)}, f22 ${f(m.f22)}, f12 ${f(m.f12)}, m11 ${f(m.m11)}, m22 ${f(m.m22)}, m12 ${f(m.m12)}, v13 ${f(m.v13)}, v23 ${f(m.v23)}; ${r.abacos.length} ábacos macizos.`
-          : `Forjado reticular ${l.losa.id} (nervios de ${coma(nr.nervio)} m cada ${coma(nr.intereje)} m, capa de ${coma(nr.capa)} m y canto total ${coma(l.material.t)} m): la zona aligerada es una lámina maciza con los multiplicadores del emparrillado de nervios, sin efecto Poisson (ν = 0) y con el G del hormigón (C4-h): f11 = f22 ${f(m.f11)}, f12 ${f(m.f12)}, m11 = m22 ${f(m.m11)}, m12 ${f(m.m12)}, v13 = v23 ${f(m.v13)}; ${r.abacos.length} ábacos macizos.`,
+          : r.abaco
+            ? `Forjado reticular ${l.losa.id} (nervios de ${coma(nr.nervio)} m cada ${coma(nr.intereje)} m, capa de ${coma(nr.capa)} m y canto total ${coma(l.material.t)} m), con la rigidez de CYPECAD (CY3): la zona aligerada y sus ${r.abacos.length} ábacos, con la mitad de la flexión de la maciza y la torsión de su emparrillado, sin efecto Poisson (ν = 0): m11 = m22 ${f(m.m11)}, m12 ${f(m.m12)}; la membrana y el cortante, por zonas (aligerada: f11 = f22 ${f(m.f11)}, f12 ${f(m.f12)}, v13 = v23 ${f(m.v13)}; ábacos, los de la maciza).`
+            : `Forjado reticular ${l.losa.id} (nervios de ${coma(nr.nervio)} m cada ${coma(nr.intereje)} m, capa de ${coma(nr.capa)} m y canto total ${coma(l.material.t)} m): la zona aligerada es una lámina maciza con los multiplicadores del emparrillado de nervios, sin efecto Poisson (ν = 0) y con el G del hormigón (C4-h, rigidez «bruta»): f11 = f22 ${f(m.f11)}, f12 ${f(m.f12)}, m11 = m22 ${f(m.m11)}, m12 ${f(m.m12)}, v13 = v23 ${f(m.v13)}; ${r.abacos.length} ábacos macizos.`,
       );
     }
   }

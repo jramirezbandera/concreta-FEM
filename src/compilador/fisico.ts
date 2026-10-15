@@ -525,6 +525,14 @@ export interface OpcionesCompilacion {
    * pilar sobre el que arranca otro en su cabeza. Con 1, la cabeza empotrada de antes de CY2.
    */
   empotramientoCabeza?: number;
+  /**
+   * Rigidez de los forjados reticulares (CY3, CY-c). "uniforme" (por defecto), la de CYPECAD: la
+   * zona aligerada y los ábacos con la mitad de la flexión de la maciza y la torsión de su
+   * emparrillado, sin Poisson; como fisurados, los ábacos no se llevan los momentos de los vanos.
+   * "bruta" (C4-h): la zona aligerada con la T bruta de sus nervios y los ábacos macizos. Los
+   * `multiplicadores` dados en la losa mandan sobre las dos.
+   */
+  rigidezReticular?: "uniforme" | "bruta";
   /** Deformación por cortante (Timoshenko). Por defecto, sí. */
   cortante?: boolean;
   /**
@@ -571,6 +579,7 @@ export interface OpcionesResueltas {
   epsSnap: number;
   factorZonaRigida: number;
   empotramientoCabeza: number;
+  rigidezReticular: "uniforme" | "bruta";
   cortante: boolean;
   modificadores: ModificadoresPiezas;
   tamanoMalla: number;
@@ -587,6 +596,7 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     epsSnap: o.epsSnap ?? 0.05,
     factorZonaRigida: o.factorZonaRigida ?? FACTOR_ZONA_RIGIDA,
     empotramientoCabeza: o.empotramientoCabeza ?? EMPOTRAMIENTO_CABEZA,
+    rigidezReticular: o.rigidezReticular ?? "uniforme",
     cortante: o.cortante ?? true,
     modificadores: o.modificadores ?? MODIFICADORES_D4,
     tamanoMalla: o.tamanoMalla ?? TAMANO_MALLA,
