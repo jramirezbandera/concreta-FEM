@@ -52,3 +52,6 @@ validacion/f2/opensees-modelos.json
 
 # Planos de proyectos reales del usuario (datos del cliente): no se suben
 ejemplos/Proyectos/
+
+# Prueba en sombra: los datos derivados del modelo CYPECAD del cliente (CY4)
+validacion/sombra/*/.datos/
