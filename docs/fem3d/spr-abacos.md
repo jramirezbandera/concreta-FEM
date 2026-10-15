@@ -261,3 +261,53 @@ Al modelar la vivienda de Alhaurín el Grande (primera puerta de uso con un proy
   - en la referencia congelada de F, 8 franjas de `pilares-mezclados` recuperan su estación de cara (L-N1:X2, por ejemplo, de una estación sin valor a −15,7 kN·m/m con 1 m de ancho). Las demás, idénticas.
 - **Test:** `src/compilador/caraPorTramos.test.ts` (falla con el código de antes).
 
+
+## 14. Las caras de los pilares de borde y junto a vigas paralelas (compilador F3.3, 2026-10-15)
+
+**Origen:** en la vivienda de Alhaurín el usuario vio los mapas de Losas con casi todo el negativo en P11 y casi nada en los demás pilares. P11 es correcto: es el único pilar de L-CUB que trabaja como interior (losa en tres cuadrantes, sin viga que siga hacia arriba ni hacia la derecha), está en la esquina entrante de la L y tiene el mayor axil (228 kN en G). Pero al comparar las franjas con mallas más finas salió que **con h = 0,75 casi todos los pilares de borde se quedaban sin estación en la dirección de su zuncho**, y el máximo de su franja era de paso por campos, del −30 al −73 % (`validacion/abacos/out_vivienda.txt`; con el código de antes, en la tabla de abajo).
+
+**Causas** (`carasFranjas`, `franjas.ts`):
+
+1. **Pilares centrados en el borde.** Es como se modela un forjado con zuncho (el zuncho por el eje de los pilares de borde). `carasFranjas` los descartaba en las dos direcciones, aunque las astillas sólo las dejan las caras paralelas al borde. En la dirección del zuncho su metro sólo salía por el escalón de SP-3/SP-4, desde una recta de la malla que atravesara su huella: una viga perpendicular o la cara común de un pilar interior de su fila. La vivienda no tiene ninguna (un ala de 4,26 m con pilares sólo en los bordes y sin vigas interiores), así que esos pilares se quedaban sin metro. Con h = 0,375 salía bien por casualidad: sus caras entran como líneas de la rejilla (d_min = 0,15 m).
+2. **La holgura de las vigas paralelas.** La cara se cortaba a h de cada extremo de una viga casi paralela que pasara a menos de h. El zuncho Z-CUB-4, que empieza 0,34 m más allá de P3, le quitaba la cara entera en X, y Z-CUB-5, paralelo a 0,64 m, la de Y.
+3. **Un aviso callado y otro equivocado.** Un pilar con una viga a menos de h/2 cuenta como apoyado en ella aunque la viga no atraviese su huella (Z-CUB-5 sólo llega al eje de P3). Si se quedaba sin estación, no se avisaba. En los demás, `franja/pilar-sin-cara` decía «circular, girado o de borde» aunque no fuera la causa.
+
+**Arreglo** (compilador F3.3):
+
+- Un pilar de borde tiene caras en una dirección si todos los lados del borde que tiene cerca van en esa dirección: sus caras cortan el borde en perpendicular. Para un pilar de esquina sigue sin haberlas, y tampoco en la dirección en que la cara iría paralela al borde.
+- Junto al extremo de una viga paralela, la holgura de h no se aplica si en ella hay un pilar por el que pasa la recta: la recta acaba en la huella o sigue hasta la viga. Sin esto, la cara nueva de P12 (y = 8,94) acababa suelta en x = 0,75, dentro del bloque de P11, y su plantilla se iba a la triangulación: la cara de P11 caía de 209 a 133 kN·m/m.
+- Una viga exactamente paralela sólo corta la cara a menos de d_min = 0,4h (como dos líneas de la rejilla), no a menos de h: entre las dos queda una fila de elementos de proporción normal.
+- `franja/pilar-sin-cara` avisa de todo pilar que toca la franja y se queda sin estación en sus caras, con la causa: circular o girado, o «su cara no sigue la malla ni hay una recta de la malla por su huella desde la que medirla». `pilaresSinCara` desaparece.
+
+**Efecto en la vivienda** (superior de ELU en la cara, kN·m/m; h = 0,75 frente a h = 0,25):
+
+| Franja y pilar | F3.2, h = 0,75 | F3.3, h = 0,75 | h = 0,25 |
+|---|---|---|---|
+| L-CUB:Y19, P4 / P12 | 40,1 / 39,4 (paso) | 75,9 / 74,8 | 77,0 / 74,7 |
+| L-CUB:Y19, P15 / P19 | 19,7 / 17,9 (paso) | 42,6 / 42,3 | 42,8 / 42,6 |
+| L-CUB:Y13–Y14, P14 / P18 | 6,0–11,8 / 18,3–27,2 (paso) | 22,3 / 46,2 | 23,0 / 47,2 |
+| L-CUB:X21, P3 / P2 | 63,8 / 52,1 (paso) | 109,0 / 107,4 | 114,1 / 110,1 |
+| L-CUB:Y13–Y14, P3 | 38,0–39,1 (paso) | 73,4 | 80,6 |
+| L-CUB-S:Y14, P6 / P9 | 19,2 / 54,8 (paso) | 34,9 / 94,8 | 34,6 / 98,9 |
+| L-CUB:X13, P11 (0,75 / 0,375 / 0,25) | 209 / 175 / 222 | 207 / 206 / 203 | — |
+
+- La cara de P9 en y = 11,12 tampoco existía con h = 0,25: la franja daba 79,2 en la otra cara, y ésta pide 98,9.
+- Quedan sin cara, con su aviso, los de esquina y los de borde en la dirección perpendicular al borde sin zuncho. Las peores que quedan son las de las esquinas entrantes, que ya llevan su aviso (L-CUB-S:X13, P5, −12 %), P1 en la esquina (+16 / +43 %, del lado seguro, como antes) y momentos pequeños (L-CUB-S:X8, P9, 22,7 frente a 26,1).
+
+**Coste:**
+
+- **Vivienda:** con h = 0,75, de 2 689 a 3 833 nudos.
+- **Edificio objetivo de 7 plantas con losa plana:** de 185 262 a 192 066 ecuaciones (+3,7 %), así que sigue en el perfil móvil (≤ 200 000).
+- **Con vigas y en el reticular objetivo:** la misma malla.
+
+**Referencia congelada de F** (`validacion/f/out_cambiosF33.txt`, antes de regenerarla):
+
+- **H25 plana (con y sin refinar) y H25 reticular:** la misma malla y los mismos valores. Las franjas de borde pierden una estación de cara duplicada: la del pilar de borde, que ahora es la de su cara de franja.
+- **`aleatorio-3`:** los mismos valores. Seis franjas llevan ahora el aviso por sus pilares circulares o girados atravesados por vigas: antes se callaba.
+- **`pilares-mezclados`:**
+  - la malla pasa de 1 461 a 1 346 nudos, porque las caras comunes de C5-g pasan a las de los pilares de borde de 30 cm;
+  - P6-0 y P6-10, de borde, **no tenían metro ni con h = 0,25** (45,7 y 46,1 frente a 79,3 y 79,7 con su cara). Ahora, con h = 0,75, dan 63,0 y 71,4;
+  - P0-5 pasa de 47,3 a 53,1 (59,5 con malla fina) y P12-0, de 88,7 a 95,0 (89,0).
+- **El resto:** bit a bit.
+
+**Test:** `src/compilador/carasBorde.test.ts`, con la vivienda; falla con el código de antes. Los de las 44 plantas no ortogonales de G-4 siguen sin el aviso de calidad de malla.

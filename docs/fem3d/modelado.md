@@ -109,4 +109,4 @@ Carga `lineal` con `losa` y `borde` en lugar de `puntos`: a lo largo del contorn
 - DWG directo.
 - Dibujar con el ratón en la app (V2c): `importar-dxf` cubre el caso de un plano ya hecho, no el de un modelo desde cero.
 - Generar viento y sismo desde la situación (CTE DB-SE-AE y NCSE): necesita las tablas de norma en el programa, con su propia validación.
-- Lo que la vivienda enseñó del cálculo, que no es del agente: los pilares de borde del encuentro de dos cubiertas sin cara de franja (`franja/pilar-sin-cara` en P4, P15 y P23) y la esquina de la sala de instalaciones (P1, casi sin carga). Se miran en la puerta de uso.
+- Lo que la vivienda enseñó del cálculo, que no es del agente: los pilares de borde del encuentro de dos cubiertas sin cara de franja (`franja/pilar-sin-cara` en P4, P15 y P23) (resuelto en el compilador F3.3, `spr-abacos.md` §14) y la esquina de la sala de instalaciones (P1, casi sin carga). Se miran en la puerta de uso.

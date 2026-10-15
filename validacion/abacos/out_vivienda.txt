@@ -1,0 +1,59 @@
+franja pilar | h=0.75              | h=0.375             | h=0.25               | error de la 1.ª frente a la última
+L-CUB:X1 P22     |   24.6 cara*@0.15    |   22.8 cara*@0.15   |   22.3 cara*@0.15   | 10.3 %
+L-CUB:X1 P23     |   31.2 cara*@4.11    |   29.2 cara*@4.11   |   28.6 cara*@4.11   | 8.9 %
+L-CUB:X3 P18     |   15.6 cara*@0.15    |   16.6 cara*@0.15   |   16.6 cara*@0.15   | -6.0 %
+L-CUB:X3 P19     |   28.3 cara*@4.11    |   29.2 cara*@4.11   |   29.1 cara*@4.11   | -2.7 %
+L-CUB:X8 P14     |   13.0 cara*@0.15    |   14.1 cara*@0.15   |   14.1 cara*@0.15   | -7.7 %
+L-CUB:X8 P15     |   26.1 cara*@4.11    |   27.1 cara*@4.11   |   27.2 cara*@4.11   | -3.9 %
+L-CUB:X9 P14     |   13.0 cara*@0.15    |   14.1 cara*@0.15   |   14.1 cara*@0.15   | -7.7 %
+L-CUB:X9 P15     |   26.1 cara*@4.11    |   27.1 cara*@4.11   |   27.2 cara*@4.11   | -3.9 %
+L-CUB:X13 P10    |   60.9 cara*@-5.60  esquina-entrante |   61.4 cara*@-5.60  |   61.5 cara*@-5.60  | -1.0 %
+L-CUB:X13 P11    |  207.3 cara*@-0.15  esquina-entrante |  206.0 cara*@-0.15  |  202.7 cara*@-0.15  | 2.3 %
+L-CUB:X13 P12    |   30.0 cara*@4.11   esquina-entrante |   29.5 cara*@4.11   |   29.5 cara*@4.11   | 1.8 %
+L-CUB:X19 P7     |   46.6 paso@-8.05   esquina-entrante |   49.3 cara*@-8.65  |   49.4 cara*@-8.65  | -5.7 %
+L-CUB:X21 P1     |   34.7 cara*@-8.65  esquina-entrante |   29.9 cara*@-8.65  |   29.9 cara*@-8.65  | 16.2 %
+L-CUB:X21 P2     |  106.8 cara*@-5.60  esquina-entrante |  106.5 cara*@-5.60  |  108.9 cara*@-5.60  | -1.9 %
+L-CUB:X21 P3     |  109.0 cara*@-0.15  esquina-entrante |  114.1 cara*@-0.15  |  114.1 cara*@-0.15  | -4.5 %
+L-CUB:X21 P4     |   26.2 cara*@4.11   esquina-entrante |   29.1 cara*@4.11   |   29.1 cara*@4.11   | -9.8 %
+L-CUB:X22 P1     |   34.7 cara*@-8.65  esquina-entrante |   29.9 cara*@-8.65  |   29.9 cara*@-8.65  | 16.2 %
+L-CUB:X22 P2     |  106.8 cara*@-5.60  esquina-entrante |  106.5 cara*@-5.60  |  111.0 paso@-5.55   | -3.8 %
+L-CUB:Y1 P1      |   35.0 cara*@14.90   |   24.4 cara*@14.90  |   24.4 cara*@14.90  | 43.4 %
+L-CUB:Y1 P7      |   14.9 paso@13.25    |   17.0 paso@13.25   |   17.0 paso@13.25   | -12.6 %
+L-CUB:Y5 P10     |   89.5 cara*@8.94   esquina-entrante |   87.0 cara*@8.94   |   87.2 cara*@8.94   | 2.7 %
+L-CUB:Y5 P2      |   61.4 cara*@14.90  esquina-entrante |   60.6 cara*@14.90  |   62.8 cara*@14.90  | -2.3 %
+L-CUB:Y13 P11    |  176.9 cara*@8.64   esquina-entrante |  196.5 cara@8.64    |  190.1 cara@8.64    | -7.0 %
+L-CUB:Y13 P14    |   22.3 cara*@5.64   esquina-entrante |   22.9 cara*@5.64   |   22.7 cara*@5.64   | -1.8 %
+L-CUB:Y13 P18    |   46.2 cara*@2.02   esquina-entrante |   47.0 cara*@2.02   |   47.1 cara*@2.02   | -1.9 %
+L-CUB:Y13 P22    |    7.1 paso@0.75    esquina-entrante |    6.5 cara*@0.15   |    6.5 cara*@0.15   | 8.8 %
+L-CUB:Y13 P3     |   73.4 cara*@14.41  esquina-entrante |   80.8 cara*@14.41  |   80.6 cara*@14.41  | -8.9 %
+L-CUB:Y14 P11    |  176.9 cara*@8.64   esquina-entrante |  173.2 cara*@8.64   |  171.9 cara*@8.64   | 2.9 %
+L-CUB:Y14 P14    |   22.3 cara*@5.64   esquina-entrante |   22.9 cara*@5.64   |   22.7 cara*@5.64   | -1.8 %
+L-CUB:Y14 P18    |   46.2 cara*@2.02   esquina-entrante |   47.0 cara*@2.02   |   47.1 cara*@2.02   | -1.9 %
+L-CUB:Y14 P22    |    6.5 cara*@0.15   esquina-entrante |    6.5 cara*@0.15   |    6.5 cara*@0.15   | 0.0 %
+L-CUB:Y14 P3     |   73.4 cara*@14.41  esquina-entrante |   80.8 cara*@14.41  |   80.6 cara*@14.41  | -8.9 %
+L-CUB:Y19 P12    |   74.9 cara*@8.94    |   74.8 cara*@8.94   |   74.7 cara*@8.94   | 0.3 %
+L-CUB:Y19 P15    |   42.6 cara*@5.64    |   43.2 cara*@5.64   |   42.8 cara*@5.64   | -0.7 %
+L-CUB:Y19 P19    |   42.3 cara*@2.02    |   42.9 cara*@2.02   |   42.6 cara*@2.02   | -0.5 %
+L-CUB:Y19 P23    |    6.9 cara*@0.15    |    7.2 cara*@0.15   |    7.2 cara*@0.15   | -3.3 %
+L-CUB:Y19 P4     |   75.9 cara*@14.41   |   76.8 cara*@14.41  |   77.0 cara*@14.41  | -1.4 %
+L-CUB-S:X1 P15   |   14.3 cara*@4.41    |   13.2 cara*@4.41   |   13.3 cara*@4.41   | 8.2 %
+L-CUB-S:X1 P16   |  106.2 cara*@7.74    |  114.3 cara*@7.74   |  112.6 cara*@7.74   | -5.7 %
+L-CUB-S:X1 P17   |   67.8 cara*@14.11   |   68.1 cara*@14.11  |   68.2 cara*@14.11  | -0.6 %
+L-CUB-S:X5 P12   |   14.6 cara*@4.41    |   15.8 cara*@4.41   |   15.9 cara*@4.41   | -8.2 %
+L-CUB-S:X5 P13   |  106.2 cara*@7.74    |  104.4 cara*@7.74   |  104.5 cara*@7.74   | 1.6 %
+L-CUB-S:X8 P9    |   22.7 cara*@14.11   |   22.6 cara*@14.11  |   26.0 cara*@14.11  | -12.8 %
+L-CUB-S:X9 P8    |   94.2 cara*@9.15    |   90.2 cara*@9.15   |   90.6 cara*@9.15   | 4.0 %
+L-CUB-S:X10 P8   |   94.2 cara*@9.15    |   90.2 cara*@9.15   |   90.6 cara*@9.15   | 4.0 %
+L-CUB-S:X13 P4   |   41.6 cara*@4.41   esquina-entrante |   42.1 cara*@4.41   |   42.1 cara*@4.41   | -1.3 %
+L-CUB-S:X13 P5   |   87.9 cara@8.85    esquina-entrante |   99.8 cara@8.85    |   99.9 cara@8.85    | -12.0 %
+L-CUB-S:X13 P6   |   16.7 cara*@14.11  esquina-entrante |   17.9 cara*@14.11  |   18.0 cara*@14.11  | -7.4 %
+L-CUB-S:Y1 P12   |   75.4 cara*@8.94    |   74.5 cara*@8.94   |   74.5 cara*@8.94   | 1.1 %
+L-CUB-S:Y1 P15   |   14.2 cara*@5.94    |   13.0 cara*@5.94   |   13.0 cara*@5.94   | 9.5 %
+L-CUB-S:Y1 P4    |   75.5 cara*@14.41   |   74.0 cara*@14.41  |   74.0 cara*@14.41  | 2.0 %
+L-CUB-S:Y5 P13   |   58.6 cara*@8.94    |   60.6 cara*@8.64   |   59.9 cara*@8.64   | -2.2 %
+L-CUB-S:Y5 P16   |    0.5 cara*@5.94    |    4.4 cara*@5.94   |    2.9 cara*@5.94   | -84.2 %
+L-CUB-S:Y7 P5    |   76.1 cara@14.71   esquina-entrante |   78.4 cara@14.71   |   79.0 cara@14.71   | -3.7 %
+L-CUB-S:Y7 P8    |   73.4 cara*@12.02  esquina-entrante |   67.7 cara*@12.02  |   70.5 cara*@12.02  | 4.1 %
+L-CUB-S:Y14 P17  |   79.2 cara*@5.94    |   77.8 cara*@5.94   |   77.8 cara*@5.94   | 1.7 %
+L-CUB-S:Y14 P6   |   34.9 cara*@14.71   |   34.4 cara*@14.71  |   34.6 cara*@14.71  | 0.9 %
+L-CUB-S:Y14 P9   |   94.8 cara*@11.12   |   96.8 cara*@11.12  |   98.9 cara*@11.12  | -4.1 %

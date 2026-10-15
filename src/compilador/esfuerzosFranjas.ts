@@ -61,7 +61,10 @@
  * muro, o la cara común de otros pilares de su línea). Entre sus caras no hay estaciones. Antes la
  * franja sólo tenía allí la estación de apoyo en el eje, sin lo que pasa por la huella, y estaciones de
  * paso por campos pegadas a la esquina del pilar, que no convergen: con h = 0,75, el máximo salía hasta
- * un 40 % bajo. Sin ninguna de las dos, el aviso `franja/pilar-sin-cara` de siempre.
+ * un 40 % bajo. Sin ninguna de las dos, el aviso `franja/pilar-sin-cara` con la causa (circular o
+ * girado, o su cara no sigue la malla), en las franjas que tocan cualquier pilar que se queda sin
+ * estación en sus caras: antes se callaba en los que una viga cercana hacía pasar por apoyados
+ * (F3.3, `docs/fem3d/spr-abacos.md` §14).
  *
  * Por la recta de la cara, sus láminas tienen que cubrir la ventana en la losa (salvo la huella y sus
  * nudos rígidos): el corte no ve una lámina que cruza la recta con el centroide fuera de su rectángulo,
@@ -89,7 +92,7 @@ import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/model
 import { combinar } from "./envolventes.ts";
 import { ANCHO_FRANJA, type Vec2 } from "./fisico.ts";
 import { pilaresEnLosa, semiextension } from "./bandas.ts";
-import { alineada, anchoNominal, carasFranjas, ejesArmado, esquinasEntrantes, franjasLosa, PASO_ESTACIONES, pilaresSinCara, tramosRecta, type Franja } from "./franjas.ts";
+import { alineada, anchoNominal, carasFranjas, ejesArmado, esquinasEntrantes, franjasLosa, PASO_ESTACIONES, tramosRecta, type Franja } from "./franjas.ts";
 import type { Mapeo } from "./mapeo.ts";
 import type { Contexto, LosaCompilada } from "./validar.ts";
 
@@ -593,23 +596,30 @@ export class EsfuerzosFranjas {
     // ventana o, si no, por el escalón desde una recta de la malla que atraviese su huella, con lo que
     // transmite su enlace en los dos casos. Sin ello, la franja sólo tenía allí estaciones por campos
     // pegadas a la esquina del pilar, hasta un 40 % bajas, y la de apoyo en el eje sin la huella
-    const conCaraExacta = new Set<string>();
+    // Los pilares que se quedan sin estación en sus caras, con la causa, para el aviso
+    const sinEstacion: { id: string; t0: number; t1: number; girado: boolean }[] = [];
     for (const p of huellas.values()) {
-      if (porPilar.has(p.id) || !enlace.has(p.id) || !alineada(p.huella, d)) continue;
+      if (porPilar.has(p.id) || !enlace.has(p.id) || !p.huella.forma) continue;
       const ed = semiextension(p.huella, d);
       const en = semiextension(p.huella, n);
       const sc = p.p[0] * d[0] + p.p[1] * d[1];
       const tc = p.p[0] * n[0] + p.p[1] * n[1];
       const pz = { id: p.id, t0: tc - en, t1: tc + en };
+      if (!alineada(p.huella, d)) {
+        sinEstacion.push({ ...pz, girado: true });
+        continue;
+      }
       const ventana: [number, number] = [tc - bNominal / 2, tc + bNominal / 2];
       // Rectas de la malla que atraviesan su huella: líneas de apoyo y caras comunes de otros pilares
       const bases = [...new Set([...lineas.filter((ln) => ln.ta <= tc + EPS && ln.tb >= tc - EPS).map((ln) => ln.s), ...caras.map((c) => c.s)])].filter((x) => Math.abs(x - sc) < ed - EPS);
       const hechas: { sp: number; lado: -1 | 1; e: NonNullable<ReturnType<typeof escalon>> }[] = [];
+      let conVano = false;
       for (const lado of [-1, 1] as const) {
         const sp = sc + lado * ed;
         // Sin losa al otro lado de la cara (la de fuera de un pilar de borde): sin estación
         const fuera = tramosRecta(l.region, d, n, sp + lado * this.ctx.op.tamanoMalla).reduce((a, [x, y]) => a + Math.max(0, Math.min(y, ventana[1]) - Math.max(x, ventana[0])), 0);
         if (!(fuera > EPS)) continue;
+        conVano = true;
         // Por la recta de la cara, si sigue la malla en la ventana: con el enlace si tiene nudos delante
         // (F3-d) y, si no, el corte de la recta, como en las caras de franja (el enlace no la cruza)
         let e = !this.caraDirecta ? null : conNudosDelante(p.id, { s: sp, lado }) ? escalon({ s: sp, lado }, pz, sp, ventana, undefined, true) : directa(sp, lado, pz, ventana);
@@ -617,8 +627,10 @@ export class EsfuerzosFranjas {
         for (const b of [...bases].sort((x, y) => Math.abs(x - sp) - Math.abs(y - sp) || x - y)) e ??= escalon({ s: b, lado }, pz, sp, ventana);
         if (e) hechas.push({ sp, lado, e });
       }
-      if (!hechas.length) continue;
-      conCaraExacta.add(p.id);
+      if (!hechas.length) {
+        if (conVano) sinEstacion.push({ ...pz, girado: false });
+        continue;
+      }
       for (let i = 0; i < fr.length; i++) {
         if (!toca(i, pz.t0, pz.t1)) continue;
         zonas[i]!.push([sc - ed, sc + ed]);
@@ -664,7 +676,6 @@ export class EsfuerzosFranjas {
       });
     }
 
-    const sinCara = pilaresSinCara(this.ctx, l, k).filter((p) => !conCaraExacta.has(p.id));
     // Esquinas entrantes de la losa, en (s, t), y el radio en el que sus estaciones no valen
     const esquinas = esquinasEntrantes(l.region).map((q) => ({ ...q, s: q.p[0] * d[0] + q.p[1] * d[1], t: q.p[0] * n[0] + q.p[1] * n[1] }));
     const radio = Math.max(this.ctx.op.tamanoMalla, bNominal / 2);
@@ -690,13 +701,17 @@ export class EsfuerzosFranjas {
           [f.id, l.losa.id],
         );
       }
-      const ids = sinCara.filter((p) => toca(i, p.t0, p.t1)).map((p) => p.id);
-      if (ids.length)
+      const sin = sinEstacion.filter((p) => toca(i, p.t0, p.t1));
+      if (sin.length) {
+        const causa = (g: boolean) => (g ? "circular o girado respecto a los ejes de la losa" : "su cara no sigue la malla ni hay una recta de la malla por su huella desde la que medirla");
+        const causas = [...new Set(sin.map((p) => p.girado))];
+        const lista = causas.length > 1 ? sin.map((p) => `${p.id} (${causa(p.girado)})`).join(", ") : `${sin.map((p) => p.id).join(", ")} (${causa(causas[0]!)})`;
         diag.aviso(
           "franja/pilar-sin-cara",
-          `La franja ${f.id} pasa por ${ids.length > 1 ? "los pilares" : "el pilar"} ${ids.join(", ")} sin cara en la malla (circular, girado respecto a los ejes de la losa o de borde): junto a ${ids.length > 1 ? "ellos" : "él"} sus momentos son por campos, que en la cara de un pilar se quedan cortos (C5-2). Revise ahí el armado.`,
-          [f.id, ...ids],
+          `La franja ${f.id} pasa por ${sin.length > 1 ? "los pilares" : "el pilar"} ${lista} sin estación en sus caras: junto a ${sin.length > 1 ? "ellos" : "él"} sus momentos son por campos o los de la línea de apoyo, que en la cara de un pilar se quedan cortos (C5-2; hasta un 50 % con h = 0,75). Revise ahí el armado o afine la malla.`,
+          [f.id, ...sin.map((p) => p.id)],
         );
+      }
       this.hechas.set(f.id, { franja: f, estaciones: e, diagnosticos: diag.lista });
     });
   }

@@ -1,0 +1,98 @@
+
+== h25-plana: nudos 532 → 532
+  LOSA:X1          inferior 30.4 → 30.4, superior 82.3 → 82.3
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:X12         inferior 30.4 → 30.4, superior 82.3 → 82.3
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:Y1          inferior 30.4 → 30.4, superior 82.3 → 82.3
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:Y12         inferior 30.4 → 30.4, superior 82.3 → 82.3
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  franjas que cambian: 4 de 24
+
+== h25-reticular: nudos 716 → 716
+  LOSA:X1          inferior 25.1 → 25.1, superior 113.0 → 113.0
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:X15         inferior 25.1 → 25.1, superior 113.0 → 113.0
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:Y1          inferior 25.1 → 25.1, superior 113.0 → 113.0
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:Y15         inferior 25.1 → 25.1, superior 113.0 → 113.0
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  franjas que cambian: 4 de 30
+
+== pilares-mezclados: nudos 1461 → 1346
+  L-N1:X1          inferior 26.1 → 26.2, superior 88.7 → 95.0
+      caras: [11.750 11.800 12.200 12.250] → [5.850 6.150 11.750 12.250]
+  L-N1:X2          inferior 23.6 → 23.6, superior 20.6 → 20.7
+      caras: [5.800 6.200 11.800 12.200] → [5.850 6.150 11.800 12.200]
+  L-N1:X3          inferior 23.9 → 23.9, superior 14.0 → 14.1
+      caras: [5.800 6.200 11.800 12.200] → [5.850 6.150 11.800 12.200]
+  L-N1:X4          inferior 25.1 → 25.1, superior 24.7 → 24.7
+      caras: [5.800 6.200 11.800 12.200] → [5.850 6.150 11.800 12.200]
+  L-N1:X5          inferior 27.4 → 27.4, superior 87.0 → 85.0
+  L-N1:X6          inferior 28.8 → 28.8, superior 87.0 → 85.0
+  L-N1:X7          inferior 22.2 → 22.2, superior 26.3 → 25.3
+      caras: [5.800 6.200 11.800 12.200] → [5.850 6.150 11.800 12.200]
+  L-N1:X8          inferior 20.2 → 20.2, superior 15.7 → 15.6
+      caras: [5.800 6.200 11.800 12.200] → [5.850 6.150 11.800 12.200]
+  L-N1:X9          inferior 20.4 → 20.4, superior 19.6 → 20.3
+      caras: [5.800 6.200 11.800 12.200] → [5.850 6.150 11.800 12.200]
+  L-N1:X10         inferior 22.9 → 22.9, superior 66.6 → 71.4
+      caras: [11.750 11.800 12.200 12.250] → [5.850 6.150 11.750 12.250]
+  L-N1:Y1          inferior 19.6 → 19.5, superior 51.4 → 54.8
+      caras: [4.800 4.800 5.200 5.200] → [4.800 5.200]
+  L-N1:Y2          inferior 17.3 → 17.3, superior 11.6 → 11.9
+  L-N1:Y3          inferior 16.1 → 16.1, superior 4.3 → 4.3
+  L-N1:Y4          inferior 17.4 → 17.4, superior 6.3 → 6.5
+  L-N1:Y5          inferior 19.6 → 19.5, superior 20.2 → 20.0
+  L-N1:Y6          inferior 22.0 → 22.1, superior 78.5 → 78.4
+  L-N1:Y7          inferior 22.5 → 22.6, superior 78.5 → 78.4
+  L-N1:Y8          inferior 20.9 → 21.0, superior 20.7 → 20.6
+  L-N1:Y9          inferior 18.4 → 18.4, superior 6.9 → 6.9
+  L-N1:Y10         inferior 18.7 → 18.9, superior 6.9 → 6.9
+  L-N1:Y11         inferior 23.2 → 23.4, superior 21.8 → 21.9
+  L-N1:Y12         inferior 26.5 → 26.6, superior 88.8 → 89.0
+  L-N1:Y13         inferior 27.7 → 27.8, superior 88.8 → 89.0
+  L-N1:Y14         inferior 25.7 → 25.8, superior 7.7 → 7.9
+  L-N1:Y15         inferior 23.5 → 23.6, superior 0.1 → 0.1
+  L-N1:Y16         inferior 22.5 → 22.6, superior 0.1 → 0.1
+  L-N1:Y17         inferior 22.4 → 22.4, superior 2.9 → 2.9
+  L-N1:Y18         inferior 23.7 → 23.7, superior 78.3 → 78.1
+      caras: [4.800 4.800 5.200 5.200] → [4.800 5.200]
+  franjas que cambian: 28 de 28
+
+== aleatorio-3: nudos 1035 → 1035
+  L-N1:X1          inferior 16.5 → 16.5, superior 31.8 → 31.8
+      avisos: [] → [franja/pilar-sin-cara]
+  L-N1:X6          inferior 16.2 → 16.2, superior 32.7 → 32.7
+      avisos: [] → [franja/pilar-sin-cara]
+  L-N1:X10         inferior 9.7 → 9.7, superior 13.5 → 13.5
+      avisos: [] → [franja/pilar-sin-cara]
+  L-N1:Y5          inferior 15.2 → 15.2, superior 24.0 → 24.0
+      avisos: [] → [franja/pilar-sin-cara]
+  L-N1:Y6          inferior 17.2 → 17.2, superior 30.9 → 30.9
+      avisos: [] → [franja/pilar-sin-cara]
+  L-N1:Y11         inferior 14.9 → 14.9, superior 25.1 → 25.1
+      avisos: [] → [franja/pilar-sin-cara]
+  franjas que cambian: 6 de 21
+
+== losa-3x3-refinada: nudos 1666 → 1666
+  franjas que cambian: 0 de 35
+
+== h25-plana-sin-refinar: nudos 460 → 460
+  LOSA:X1          inferior 30.4 → 30.4, superior 82.2 → 82.2
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:X12         inferior 30.4 → 30.4, superior 82.2 → 82.2
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:Y1          inferior 30.4 → 30.4, superior 82.2 → 82.2
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  LOSA:Y12         inferior 30.4 → 30.4, superior 82.2 → 82.2
+      caras: [0.300 5.700 5.700 6.300 6.300 11.700] → [0.300 5.700 6.300 11.700]
+  franjas que cambian: 4 de 24
+
+== losa-3x3-mezclada: nudos 1642 → 1642
+  franjas que cambian: 0 de 35
+
+== reticular-2x2-abacos: nudos 1255 → 1255
+  franjas que cambian: 0 de 28

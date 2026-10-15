@@ -23,9 +23,10 @@
  */
 import { carasComunes, pilaresEnLosa, semiextension } from "./bandas.ts";
 import { radioHuella, type Huella } from "./geometria2d.ts";
-import { distanciaABorde, puntoEnRegion } from "./poligonos.ts";
+import { distanciaABorde, distanciaASegmento, puntoEnRegion } from "./poligonos.ts";
 import { ANCHO_FRANJA, type Losa, type Vec2 } from "./fisico.ts";
 import { direccionEje1 } from "./losas.ts";
+import { SEPARACION_MINIMA } from "./rejilla.ts";
 import type { Region } from "./poligonos.ts";
 import type { Contexto, LosaCompilada } from "./validar.ts";
 
@@ -252,19 +253,26 @@ function conApoyoLineal(P: Vec2, d: Vec2, n: Vec2, ed: number, en: number, linea
  * oblicuas a un ángulo pequeño (astillas en la malla) ni la crecen sin necesidad.
  *
  * Una cara no pasa a menos de h (el tamaño de malla) de la huella de un pilar que no es suyo, ni de
- * una viga o un muro casi paralelos a ella (a menos de 45°): ahí se corta. Junto a un pilar ajeno
+ * una viga o un muro casi paralelos a ella (a menos de 45°; a menos de d_min de la rejilla si es
+ * paralelo del todo): ahí se corta. Junto a un pilar ajeno
  * con los lados según los ejes, la cara que va por un lado de su huella sigue por él, y la que pasa
  * por dentro se corta en la huella (R0 de F2). En una planta no
  * ortogonal (circular, en abanico) la recta de una cara rozaba la huella de otro pilar o una viga
- * curva a unos centímetros, y la malla quedaba con astillas (G-4). Una viga a menos de h/2 de la
- * huella (enrasada con una cara) cuenta como su apoyo.
+ * curva a unos centímetros, y la malla quedaba con astillas (G-4). Junto al extremo de una viga, la
+ * holgura de h no se aplica si en ella hay un pilar por el que pasa la recta: la recta acaba en su
+ * huella o sigue hasta la viga (F3.3: la holgura le quitaba la cara entera a un pilar a unos
+ * decímetros del extremo de un zuncho, o dejaba un extremo suelto que deshacía la plantilla de otro).
+ * Una viga a menos de h/2 de la huella (enrasada con una cara) cuenta como su apoyo.
  *
  * Sólo tienen caras los pilares rectangulares con los lados según los ejes de la losa y con la
- * huella dentro de la losa: la cara de uno circular o girado la toca en
- * una tangente o una esquina, y la de uno de borde, con la cara común de C5-g a unos centímetros de
- * la suya, corre casi paralela a su huella; las dos dejan astillas en la malla (G-4). Tampoco hay
- * cara del lado de un vuelo de menos de h: correría casi pegada al borde. En las franjas, junto a
- * ellos no hay estación exacta (aviso `franja/pilar-sin-cara`).
+ * huella dentro de la losa, o de borde si todos los lados del borde que tiene cerca van según d: la
+ * cara de uno circular o girado la toca en una tangente o una esquina, y la de uno de borde paralela
+ * al borde correría a unos centímetros de él; las dos dejan astillas en la malla (G-4). Las de uno de
+ * borde que cortan el borde en perpendicular no (F3.3, `docs/fem3d/spr-abacos.md` §14): sin ellas, un
+ * pilar por cuyo eje va el zuncho se quedaba sin estación en la dirección del zuncho si ninguna viga
+ * ni otro pilar de su fila daba una recta por su huella, y su franja salía hasta un 73 % baja con
+ * h = 0,75. Tampoco hay cara del lado de un vuelo de menos de h: correría casi pegada al borde. En las
+ * franjas, junto a un pilar sin estación en sus caras, el aviso `franja/pilar-sin-cara`.
  */
 export function carasFranjas(ctx: Contexto, l: LosaCompilada): CaraFranja[] {
   const pilares = pilaresEnLosa(ctx, l);
@@ -277,7 +285,21 @@ export function carasFranjas(ctx: Contexto, l: LosaCompilada): CaraFranja[] {
     const todos = pilares.filter((p) => semiextension(p.huella, d) > 0 && semiextension(p.huella, n) > 0);
     // Una viga a menos de h/2 de la huella (enrasada con una cara del pilar) también es su apoyo
     const dentro = (p: (typeof todos)[number]) => puntoEnRegion(p.p, l.region) && [l.region.contorno, ...l.region.huecos].every((q) => distanciaABorde(p.p, q) > radioHuella(p.huella) + ctx.op.epsSnap);
-    const conForma = todos.filter((p) => alineada(p.huella, d) && dentro(p) && !conApoyoLineal(p.p, d, n, semiextension(p.huella, d), semiextension(p.huella, n), lineas, ctx.op.tamanoMalla / 2));
+    // Uno de borde cuyos lados del borde cercanos van todos según d: sus caras en esta dirección cortan
+    // el borde en perpendicular, sin astillas (las paralelas al borde, en la otra, sí las dejarían)
+    const bordeSegunD = (p: (typeof todos)[number]) => {
+      const r = radioHuella(p.huella) + ctx.op.epsSnap;
+      let cerca = false;
+      for (const q of [l.region.contorno, ...l.region.huecos])
+        for (let i = 0; i < q.length; i++) {
+          const [A, B] = [q[i]!, q[(i + 1) % q.length]!];
+          if (!(distanciaASegmento(p.p, A, B) <= r)) continue;
+          if (Math.abs((B[0] - A[0]) * n[0] + (B[1] - A[1]) * n[1]) > 10 * ctx.op.epsGeom) return false;
+          cerca = true;
+        }
+      return cerca;
+    };
+    const conForma = todos.filter((p) => alineada(p.huella, d) && (dentro(p) || bordeSegunD(p)) && !conApoyoLineal(p.p, d, n, semiextension(p.huella, d), semiextension(p.huella, n), lineas, ctx.op.tamanoMalla / 2));
     const tramos = carasComunes(conForma, d);
     const porRecta = new Map<string, CaraFranja>();
     for (const p of conForma) {
@@ -291,7 +313,9 @@ export function carasFranjas(ctx: Contexto, l: LosaCompilada): CaraFranja[] {
         // Sin vano de al menos h al otro lado de la cara (un vuelo corto): sin cara, que correría casi
         // pegada al borde de la losa
         const q = s + lado * h;
-        if (!puntoEnRegion([q * d[0] + tc * n[0], q * d[1] + tc * n[1]], l.region)) continue;
+        // En uno de borde, el centro puede caer en el borde: se mira a los dos lados de él
+        const tv = dentro(p) ? [tc] : [tc - e / 2, tc + e / 2];
+        if (!tv.some((t) => puntoEnRegion([q * d[0] + t * n[0], q * d[1] + t * n[1]], l.region))) continue;
         const clave = `${lado}:${s}`;
         let c = porRecta.get(clave);
         if (!c) porRecta.set(clave, (c = { losa: l.losa.id, direccion: k, s, lado, tramos: tramosRecta(l.region, d, n, s), pilares: [] }));
@@ -326,14 +350,27 @@ export function carasFranjas(ctx: Contexto, l: LosaCompilada): CaraFranja[] {
         const en = semiextension(p.huella, n);
         c.tramos = c.tramos.flatMap(([a, b]): [number, number][] => [...(tp - en > a ? [[a, Math.min(b, tp - en)] as [number, number]] : []), ...(tp + en < b ? [[Math.max(a, tp + en), b] as [number, number]] : [])].filter(([x, y]) => y - x > 1e-9));
       }
-      // Ni junto a una viga o un muro casi paralelo a ella (a menos de 45°) a menos de h
+      // Ni junto a una viga o un muro casi paralelo a ella (a menos de 45°) a menos de h; si es
+      // paralelo del todo, a menos de d_min, como dos líneas de la rejilla: entre los dos queda una fila
+      // de elementos de proporción normal (con h, la cara de P3 de la vivienda se perdía por un zuncho
+      // paralelo a 0,64 m)
       for (const [A, B] of lineas) {
         const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
         if (!(L > 0) || Math.abs(((B[0] - A[0]) * n[0] + (B[1] - A[1]) * n[1]) / L) < Math.SQRT1_2) continue;
         const [sa, sb] = [A[0] * d[0] + A[1] * d[1] - c.s, B[0] * d[0] + B[1] * d[1] - c.s];
-        if (Math.min(Math.abs(sa), Math.abs(sb)) > h && sa * sb > 0) continue;
+        const umbral = Math.abs(sa - sb) <= tolLado ? SEPARACION_MINIMA * h : h;
+        if (Math.min(Math.abs(sa), Math.abs(sb)) > umbral && sa * sb > 0) continue;
         const [ta, tb] = [A[0] * n[0] + A[1] * n[1], B[0] * n[0] + B[1] * n[1]];
-        const [lo, hi] = [Math.min(ta, tb) - h, Math.max(ta, tb) + h];
+        const [ba, bb] = [Math.min(ta, tb), Math.max(ta, tb)];
+        // Sin la holgura de un extremo si en ella hay un pilar por el que pasa la recta: allí acaba en
+        // su huella o sigue hasta la viga, y no queda un extremo suelto junto al pilar (ni se pierde su cara)
+        const enRecta = todos.filter((p) => Math.abs(p.p[0] * d[0] + p.p[1] * d[1] - c.s) <= semiextension(p.huella, d) + tolLado).map((p) => {
+          const tp = p.p[0] * n[0] + p.p[1] * n[1];
+          const en = semiextension(p.huella, n);
+          return [tp - en, tp + en] as const;
+        });
+        const lo = enRecta.some(([x, y]) => y > ba - h && x < ba) ? ba : ba - h;
+        const hi = enRecta.some(([x, y]) => x < bb + h && y > bb) ? bb : bb + h;
         c.tramos = c.tramos.flatMap(([a, b]): [number, number][] => [...(lo > a ? [[a, Math.min(b, lo)] as [number, number]] : []), ...(hi < b ? [[Math.max(a, hi), b] as [number, number]] : [])].filter(([x, y]) => y - x > 1e-9));
       }
       // Sólo los trozos que llevan algún pilar suyo (o lo tocan, si se ha cortado su huella)
@@ -344,24 +381,6 @@ export function carasFranjas(ctx: Contexto, l: LosaCompilada): CaraFranja[] {
     r.push(...caras);
   }
   return r;
-}
-
-/**
- * Pilares con forma de la losa que no tienen caras en la dirección k sin que una viga o un muro los
- * atraviese (los circulares, los girados y los de borde, `carasFranjas`), con su extensión
- * transversal: junto a ellos, las franjas no tienen estación exacta.
- */
-export function pilaresSinCara(ctx: Contexto, l: LosaCompilada, k: 1 | 2): { id: string; t0: number; t1: number }[] {
-  const { d, n } = ejesArmado(l.losa)[k];
-  const lineas = lineasApoyo(ctx, l.losa.planta);
-  const conCara = new Set(carasFranjas(ctx, l).filter((c) => c.direccion === k).flatMap((c) => c.pilares.map((p) => p.id)));
-  return pilaresEnLosa(ctx, l)
-    .filter((p) => p.huella.forma && !conCara.has(p.id) && !conApoyoLineal(p.p, d, n, semiextension(p.huella, d), semiextension(p.huella, n), lineas, ctx.op.tamanoMalla / 2))
-    .map((p) => {
-      const tc = p.p[0] * n[0] + p.p[1] * n[1];
-      const e = semiextension(p.huella, n);
-      return { id: p.id, t0: tc - e, t1: tc + e };
-    });
 }
 
 /** Extremos en planta de los trozos de una cara. */
