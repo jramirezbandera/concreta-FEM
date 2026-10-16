@@ -1,18 +1,18 @@
 /**
- * Medida previa de LV2-f (`docs/fem3d/refinamiento-vigas.md` §9): en los pilares que asoman de la
- * viga que los atraviesa (un 40 × 40 bajo una viga de 30), los nudos de la losa a ≤ ε_snap de la huella
- * por fuera se hacen rígidos con el pilar (C2-d) y rigidizan la losa junto a él, como en F2-9. LV2-f
- * quitaría de la losa lo que asoma, y con ello esos nudos. Antes de hacerlo, cuánto mueven:
- * - A: LV2 (`refinoEsquinas`) antes de LV2-f, con los nudos de fuera a ≤ ε_snap rígidos
- *   (`MEDIDA_LV2F.rigidosFuera`);
- * - B: en los pilares que atraviesa el ancho de una viga sólo son rígidos los nudos dentro de la
- *   huella o en su borde (lo que hace LV2-f);
- * - C: la huella que asoma ≤ 0,3 m de las vigas no se siembra, como las tapadas (`MEDIDA_LV2F.tapar`):
- *   la rejilla sigue regular junto al pilar y los nudos de dentro de lo que asoma son rígidos (C2-d);
- * - D: C con la regla de B;
- * con h = 0,75, frente a B con h = 0,25 (sólo es rígido el pilar), en las 24 retículas al azar de G. Se comparan, en los pilares que asoman, el
- * momento de las vigas en sus caras y las estaciones de apoyo de las franjas junto a ellos (la
- * superior de 1,35·G + 1,5·Q), respecto al máximo de la viga o de la franja, como en `franjas.ts`.
+ * LV2-f (`docs/fem3d/refinamiento-vigas.md` §9 y §10): los pilares que asoman de la viga que los
+ * atraviesa (un 40 × 40, 30 × 50 o 25 × 60 bajo una viga de 30). En las 24 retículas al azar de G, con
+ * h = 0,75, frente a LV2 con h = 0,25: el momento de las vigas en sus caras y las estaciones de apoyo
+ * de las franjas junto a ellos (la superior de 1,35·G + 1,5·Q), respecto al máximo de la viga o de la
+ * franja, como en `franjas.ts`.
+ * - LV1 (`refinoEsquinas: false`): sin plantillas de esquina y con la regla de antes de C2-d (rígidos
+ *   también los nudos de fuera de la huella a ≤ ε_snap);
+ * - LV2: con las esquinas y, en estos pilares, sólo la huella rígida (LV2-f).
+ * Cuenta los nudos rígidos de cada huella fuera de ella, sin los de las caras de las vigas en su zona
+ * rígida en el pilar, que van a la huella a propósito (C1-a, `unirCaras`).
+ *
+ * La medida que decidió LV2-f (A: la regla de antes con las esquinas; C y D: no sembrar lo que asoma)
+ * está en §9 y en el `out_asoma.txt` del commit 1f46a20; necesitaba un interruptor en el compilador
+ * que se quitó (§10).
  *
  *   bun validacion/lv2/asoma.ts > validacion/lv2/out_asoma.txt
  */
@@ -22,7 +22,6 @@ import { compilar } from "../../src/compilador/compilar.ts";
 import { Consultas } from "../../src/compilador/consultas.ts";
 import type { ModeloFisico, OpcionesCompilacion, Pilar } from "../../src/compilador/fisico.ts";
 import { distanciaAHuella, huellaPilar } from "../../src/compilador/geometria2d.ts";
-import { MEDIDA_LV2F } from "../../src/compilador/losas.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
@@ -73,10 +72,8 @@ interface Medida {
   nudos: number;
 }
 
-function medir(f: ModeloFisico, op: OpcionesCompilacion, k: Partial<typeof MEDIDA_LV2F>): Medida {
-  Object.assign(MEDIDA_LV2F, { rigidosFuera: false, tapar: 0 }, k);
+function medir(f: ModeloFisico, op: OpcionesCompilacion): Medida {
   const c = valido(compilar(f, op));
-  Object.assign(MEDIDA_LV2F, { rigidosFuera: false, tapar: 0 });
   const q = new Consultas(f, c, casosValidos(calcular(c.modelo)), op);
   const fac = (f.casos ?? []).map((x) => (x.id === "G" ? 1.35 : x.id === "Q" ? 1.5 : 0));
   const asoman = queAsoman(f);
@@ -84,11 +81,21 @@ function medir(f: ModeloFisico, op: OpcionesCompilacion, k: Partial<typeof MEDID
   const franjas = new Map<string, { v: number; escala: number }>();
   let rigidosFuera = 0;
   for (const { pilar: p, planta, vigas: vs } of asoman) {
-    // Nudos rígidos de su huella fuera de ella
+    // Nudos rígidos de su huella fuera de ella, sin los de las caras de las vigas (a b/2 de su eje)
     const sc = f.secciones.find((x) => x.id === p.seccion) as { b: number; h: number };
     const h = huellaPilar(p.x, p.y, p.giro ?? 0, { tipo: "rectangulo", b: sc.b, h: sc.h });
+    const ejes = (f.vigas ?? []).filter((v) => v.planta === planta).map((v) => v.puntos as [[number, number], [number, number]]);
+    const enCara = (x: number, y: number) =>
+      ejes.some(([[x0, y0], [x1, y1]]) => {
+        const L = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2);
+        const t = ((x - x0) * (x1 - x0) + (y - y0) * (y1 - y0)) / (L * L);
+        return t >= 0 && t <= 1 && Math.abs(Math.abs((x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)) / L - B_VIGA / 2) < 1e-6;
+      });
     const rs = (c.modelo.restricciones ?? []).find((x) => x.id === `${p.id}@${planta}:huella`);
-    for (const n of rs?.esclavos ?? []) if (distanciaAHuella([c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y], h) > 1e-6) rigidosFuera++;
+    for (const n of rs?.esclavos ?? []) {
+      const { x, y } = c.modelo.nudos[n]!;
+      if (distanciaAHuella([x, y], h) > 1e-6 && !enCara(x, y)) rigidosFuera++;
+    }
     // Momento de las vigas en sus caras
     for (const v of vs) {
       const pz = q.viga(v);
@@ -138,30 +145,20 @@ const pct = (v: number) => `${(100 * v).toFixed(1)} %`;
 const med = (v: number[]) => [...v].map(Math.abs).sort((a, b) => a - b)[Math.floor(v.length / 2)] ?? NaN;
 const max = (v: number[]) => Math.max(0, ...v.map(Math.abs));
 const col = (v: number[]) => `${pct(med(v))} / ${pct(max(v))}`.padStart(18);
-
-const OP = (h: number): OpcionesCompilacion => ({ tamanoMalla: h, refinoEsquinas: true });
-const VARIANTES: [string, number, Partial<typeof MEDIDA_LV2F>][] = [
-  ["A", 0.75, { rigidosFuera: true }],
-  ["B", 0.75, {}],
-  ["C", 0.75, { rigidosFuera: true, tapar: 0.3 }],
-  ["D", 0.75, { tapar: 0.3 }],
-  ["A 0,25", 0.25, { rigidosFuera: true }],
-];
-const REF: [number, Partial<typeof MEDIDA_LV2F>] = [0.25, {}];
-type Dif = { s: number; k: string; d: number };
-const errV = new Map<string, Dif[]>(VARIANTES.map(([n]) => [n, []]));
-const errF = new Map<string, Dif[]>(VARIANTES.map(([n]) => [n, []]));
-const BA = { v: [] as Dif[], f: [] as Dif[] };
 const d = (x: { d: number }[]) => x.map((y) => y.d);
 
-console.log("## LV2-f, medida previa: los nudos rígidos fuera de la huella de los pilares que asoman de su viga\n");
-console.log("Retículas al azar de G con LV2 (refinoEsquinas), h = 0,75:");
-console.log("- A: hoy;");
-console.log("- B: sólo son rígidos los nudos de la huella (no los de fuera a ≤ ε_snap);");
-console.log("- C: la huella que asoma ≤ 0,3 m de las vigas no se siembra (como las tapadas); los nudos de dentro, rígidos (C2-d);");
-console.log("- D: C con la regla de B.");
-console.log("Referencia: B con h = 0,25. Diferencias respecto al máximo de la viga o de la franja; mediana / máximo.\n");
-console.log(`${"ret.".padEnd(5)}${"pil.".padStart(5)}${"rígidos fuera A / C / D".padStart(25)}${"jac. mín. A / B / C / D".padStart(29)}${"nudos A / D".padStart(14)}${"vigas B − A".padStart(18)}${"franjas B − A".padStart(18)}   vigas A | B | C | D frente a la ref.                                      franjas A | B | C | D frente a la ref.`);
+type Dif = { s: number; k: string; d: number };
+const VARIANTES: [string, OpcionesCompilacion][] = [
+  ["LV1", { refinoEsquinas: false }],
+  ["LV2", { refinoEsquinas: true }],
+];
+const REF: OpcionesCompilacion = { tamanoMalla: 0.25, refinoEsquinas: true };
+const errV = new Map<string, Dif[]>(VARIANTES.map(([n]) => [n, []]));
+const errF = new Map<string, Dif[]>(VARIANTES.map(([n]) => [n, []]));
+
+console.log("## LV2-f: los pilares que asoman de su viga, en las retículas al azar de G\n");
+console.log("h = 0,75 frente a LV2 con h = 0,25. LV1: sin esquinas y con los nudos de fuera de la huella a ≤ ε_snap rígidos; LV2: con las esquinas y sólo la huella rígida (LV2-f). Diferencias respecto al máximo de la viga o de la franja; mediana / máximo.\n");
+console.log(`${"ret.".padEnd(5)}${"pil.".padStart(5)}${"rígidos fuera LV1 / LV2".padStart(25)}${"jac. mín. LV1 / LV2".padStart(22)}${"nudos LV1 / LV2".padStart(16)}   vigas LV1 | LV2 frente a la ref.      franjas LV1 | LV2 frente a la ref.`);
 for (let s = 1; s <= 24; s++) {
   const f = reticulaAleatoria(s);
   const n = queAsoman(f).length;
@@ -170,33 +167,27 @@ for (let s = 1; s <= 24; s++) {
     continue;
   }
   process.stderr.write(`retícula ${s}\n`);
-  const ref = medir(f, OP(REF[0]), REF[1]);
-  const m = new Map(VARIANTES.map(([nombre, h, k]) => [nombre, medir(f, OP(h), k)] as const));
+  const ref = medir(f, REF);
+  const m = new Map(VARIANTES.map(([nombre, op]) => [nombre, medir(f, op)] as const));
   for (const [nombre] of VARIANTES) {
     errV.get(nombre)!.push(...difs(m.get(nombre)!.vigas, ref.vigas).map((x) => ({ s, ...x })));
     errF.get(nombre)!.push(...difs(m.get(nombre)!.franjas, ref.franjas).map((x) => ({ s, ...x })));
   }
-  const [A, B, C, D] = [m.get("A")!, m.get("B")!, m.get("C")!, m.get("D")!];
-  const ba = difs(B.vigas, A.vigas);
-  const baF = difs(B.franjas, A.franjas);
-  BA.v.push(...ba.map((x) => ({ s, ...x })));
-  BA.f.push(...baF.map((x) => ({ s, ...x })));
+  const [A, B] = [m.get("LV1")!, m.get("LV2")!];
   const e = (x: Medida, r: Map<string, { v: number; escala: number }>, cual: "vigas" | "franjas") => col(d(difs(x[cual], r)));
   console.log(
-    `${String(s).padEnd(5)}${String(n).padStart(5)}${`${A.rigidosFuera} / ${C.rigidosFuera} / ${D.rigidosFuera}`.padStart(25)}${`${A.jacobiano.toFixed(2)} / ${B.jacobiano.toFixed(2)} / ${C.jacobiano.toFixed(2)} / ${D.jacobiano.toFixed(2)}`.padStart(29)}${`${A.nudos} / ${D.nudos}`.padStart(14)}${col(d(ba))}${col(d(baF))}   ${[A, B, C, D].map((x) => e(x, ref.vigas, "vigas")).join(" |")}   ${[A, B, C, D].map((x) => e(x, ref.franjas, "franjas")).join(" |")}`,
+    `${String(s).padEnd(5)}${String(n).padStart(5)}${`${A.rigidosFuera} / ${B.rigidosFuera}`.padStart(25)}${`${A.jacobiano.toFixed(2)} / ${B.jacobiano.toFixed(2)}`.padStart(22)}${`${A.nudos} / ${B.nudos}`.padStart(16)}   ${[A, B].map((x) => e(x, ref.vigas, "vigas")).join(" |")}   ${[A, B].map((x) => e(x, ref.franjas, "franjas")).join(" |")}`,
   );
 }
-console.log(`\n### Todas (vigas: ${errV.get("A")!.length} caras; franjas: ${errF.get("A")!.length} estaciones)\n`);
+console.log(`\n### Todas (vigas: ${errV.get("LV2")!.length} caras; franjas: ${errF.get("LV2")!.length} estaciones)\n`);
 console.log(`| | Vigas en la cara | Franjas junto al pilar |`);
 console.log(`|---|---|---|`);
-console.log(`| B − A, h = 0,75 (lo que mueven los nudos rígidos de fuera) |${col(d(BA.v))} |${col(d(BA.f))} |`);
-for (const [nombre, h] of VARIANTES) console.log(`| ${nombre}${h === 0.75 ? ", h = 0,75" : ""}, frente a la referencia |${col(d(errV.get(nombre)!))} |${col(d(errF.get(nombre)!))} |`);
+for (const [nombre] of VARIANTES) console.log(`| ${nombre}, h = 0,75, frente a la referencia |${col(d(errV.get(nombre)!))} |${col(d(errF.get(nombre)!))} |`);
 const masDe = (v: number[], u: number) => v.filter((x) => Math.abs(x) > u).length;
 console.log(`\nPor encima del 10 % / 20 % frente a la referencia:`);
 for (const [nombre] of VARIANTES) console.log(`- ${nombre}: vigas ${masDe(d(errV.get(nombre)!), 0.1)} / ${masDe(d(errV.get(nombre)!), 0.2)}; franjas ${masDe(d(errF.get(nombre)!), 0.1)} / ${masDe(d(errF.get(nombre)!), 0.2)}`);
-for (const [nombre, v, err] of [["vigas", BA.v, errV], ["franjas", BA.f, errF]] as const) {
-  console.log(`\n### Las diez mayores B − A, ${nombre} (retícula, estación, B − A; A, B, C y D frente a la referencia)`);
-  const de = (x: Dif, n: string) => err.get(n)!.find((y) => y.s === x.s && y.k === x.k)?.d ?? NaN;
-  for (const x of [...v].sort((p, q) => Math.abs(q.d) - Math.abs(p.d)).slice(0, 10))
-    console.log(`   ${String(x.s).padStart(2)}  ${x.k.padEnd(34)} ${pct(x.d).padStart(8)}   A ${pct(de(x, "A")).padStart(8)}   B ${pct(de(x, "B")).padStart(8)}   C ${pct(de(x, "C")).padStart(8)}   D ${pct(de(x, "D")).padStart(8)}`);
+for (const [nombre, err] of [["vigas", errV], ["franjas", errF]] as const) {
+  console.log(`\n### Las diez peores de LV2, ${nombre} (retícula, estación; LV2 y LV1 frente a la referencia)`);
+  const lv1 = (x: Dif) => err.get("LV1")!.find((y) => y.s === x.s && y.k === x.k)?.d ?? NaN;
+  for (const x of [...err.get("LV2")!].sort((p, q) => Math.abs(q.d) - Math.abs(p.d)).slice(0, 10)) console.log(`   ${String(x.s).padStart(2)}  ${x.k.padEnd(34)} LV2 ${pct(x.d).padStart(8)}   LV1 ${pct(lv1(x)).padStart(8)}`);
 }

@@ -420,13 +420,19 @@ export function conRespaldoRefino(conRefino: () => ResultadoMalla, sinRefino: ()
   return sin;
 }
 
-/** Aviso de los pilares cuyas caras se quedan sin refinar (F2). */
+/**
+ * Aviso de los pilares cuyas caras se quedan sin refinar (F2). Sin pilares, la planta sólo refinaba
+ * las esquinas de los paños (LV2), y el aviso es el de ellas.
+ */
 function avisoSinRefinar(pilares: readonly string[], porque: string): ProblemaMalla {
+  const caras = pilares.length > 0;
   return {
     losa: -1,
     severidad: "aviso",
-    codigo: "malla/cara-sin-refinar",
-    mensaje: `La malla junto a las caras de ${[...pilares].sort().join(", ")} no se ha refinado: ${porque}. Con el tamaño de malla por defecto, el momento de las franjas en esas caras puede salir hasta un 6 % bajo. El cálculo es válido; el fallo es del compilador: avise para corregirlo.`,
+    codigo: caras ? "malla/cara-sin-refinar" : "malla/esquina-sin-refinar",
+    mensaje: `La malla ${caras ? `junto a las caras de ${[...pilares].sort().join(", ")}` : "de las esquinas de los paños entre vigas de esta planta"} no se ha refinado: ${porque}. Con el tamaño de malla por defecto, ${
+      caras ? "el momento de las franjas en esas caras puede salir hasta un 6 % bajo" : "el momento de las vigas en las caras de los pilares puede salir un 20 % bajo, y el de las franjas en ellas, hasta un 40 %"
+    }. El cálculo es válido; el fallo es del compilador: avise para corregirlo.`,
   };
 }
 

@@ -7,7 +7,8 @@
  *
  * Decisión LV2-f: en un pilar que atraviesa el ancho de una viga, sólo son rígidos los nudos de la
  * huella o su borde, no los de fuera a ≤ ε_snap (C2-d). En la retícula al azar 1 (22 pilares que asoman
- * de su viga), la regla de antes deja más de 100 fuera de las huellas.
+ * de su viga), la regla de antes (LV1) deja más de 100 fuera de las huellas.
+ * Y el respaldo de una planta que sólo refina esquinas avisa sin nombrar pilares (§10).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,7 +22,7 @@ import { reticulaAleatoria } from "../pruebas/reticulasAleatorias.ts";
 import { compilar } from "./compilar.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "./fisico.ts";
 import { distanciaAHuella, huellaPilar } from "./geometria2d.ts";
-import { MEDIDA_LV2F } from "./losas.ts";
+import { conRespaldoRefino, type ResultadoMalla } from "./mallado.ts";
 
 beforeAll(async () => {
   await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
@@ -90,13 +91,20 @@ describe("sólo la huella es rígida en los pilares que atraviesa una viga (LV2-
     expect(calcular(c.modelo).valido).toBe(true);
   });
 
-  it("con LV1, o con LV2 y la regla de antes (para medir), sí", () => {
-    expect(fuera(f, { refinoEsquinas: false }).r.conViga).toBeGreaterThan(0);
-    MEDIDA_LV2F.rigidosFuera = true;
-    try {
-      expect(fuera(f, { refinoEsquinas: true }).r.conViga).toBeGreaterThan(100);
-    } finally {
-      MEDIDA_LV2F.rigidosFuera = false;
-    }
+  it("con LV1 (la regla de antes), más de 100", () => {
+    expect(fuera(f, { refinoEsquinas: false }).r.conViga).toBeGreaterThan(100);
+  });
+});
+
+describe("respaldo de una planta que sólo refina esquinas", () => {
+  it("si el refinamiento falla, el aviso es el de las esquinas y no nombra pilares (antes salía «junto a las caras de  »)", () => {
+    const sinRef: ResultadoMalla = { ok: true, nudos: [], quads: [], piezas: [], piezasAncho: [], lados: [], nudosLado: [], regiones: [], calidad: { jacobianoMin: 1, bajos: 0 }, rejilla: { celdas: 0, plantillas: 0, refinadas: 0, quads: 0, cobertura: 1 }, problemas: [] };
+    const conError: ResultadoMalla = { ...sinRef, problemas: [{ losa: 0, severidad: "error", codigo: "malla/lado-perdido", mensaje: "x" }] };
+    const r = conRespaldoRefino(() => conError, () => ({ ...sinRef, problemas: [] }), []);
+    expect(r.ok && r.problemas.map((p) => [p.codigo, p.severidad])).toEqual([["malla/esquina-sin-refinar", "aviso"]]);
+    const mensaje = r.ok ? r.problemas[0]!.mensaje : "";
+    expect(mensaje).toContain("esquinas de los paños");
+    expect(mensaje).toContain("malla/lado-perdido");
+    expect(mensaje).not.toContain("junto a las caras de");
   });
 });

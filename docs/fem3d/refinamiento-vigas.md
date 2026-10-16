@@ -186,7 +186,7 @@ Los nudos nuevos quedan a ≥ 1,5·ε_snap de la huella de cualquier pilar (tamb
 - **La graduada de tres niveles pasa los criterios 1 y 2, y el 5 en el edificio con vigas.** El reticular objetivo pasa del perfil móvil un 2 % (204 750), lo que LV2-d acepta. Es la propuesta: casi la precisión de la de tercios con un tercio de su coste. Con cuatro niveles el último elemento ya no cabe.
 - **En el 3 × 3 sólo queda peor que h = 0,25 el momento de centro de vano** (+9 %, fuera de esta fase, §5) y un cortante a 0,6 % frente a 0,2 %.
 - **El criterio 3 (franjas) no pasa.** En la retícula de 4 × 4 (`out_franjas.txt`), el peor de los apoyos baja del 44,1 al 39,7 % y el de vano, del 28,2 al 20,3 %; junto a un pilar sigue hasta el 39,7 %. Todos los peores están en caras junto a pilares que asoman de la viga (40 × 40 y 30 × 50 bajo vigas de 30): allí lo que asoma es rígido (C2-d), la plantilla se queda en uno o dos niveles y la estación depende de esos nudos rígidos (F2-9). Es el paso 2 (§2.1, LV-c).
-- **El tiempo:** compilar y calcular el edificio con vigas pasa de 7,3 a 10,6 s (+45 %; el criterio 10 pide ≤ +25 %, a mirar al final).
+- **El tiempo:** compilar y calcular el edificio con vigas pasa de 7,3 a 10,6 s (+45 %; el criterio 10 pide ≤ +25 %, a mirar al final). *Corregido en §10: medido con la máquina cargada; con el paso 2 y en limpio, +72 %.*
 
 Medido con `validacion/lv2/recuadro.ts`, `vigas.ts`, `banco.ts` y `franjas.ts` (salidas `out_*.txt`).
 
@@ -233,7 +233,7 @@ Medido con `validacion/lv2/recuadro.ts`, `vigas.ts`, `banco.ts` y `franjas.ts` (
 
 **Los otros criterios:**
 - **1 y 2:** como en el paso 1 (0,96 / 1,02 de CYPE; +7,7 % frente a h = 0,055). Esos modelos ya eran simétricos.
-- **5:** el edificio con vigas, 163 695 ecuaciones; el reticular, 213 675 (antes, 156 177 y 204 750). Ningún cuadrilátero bajo en los dos.
+- **5:** el edificio con vigas, 163 695 ecuaciones; el reticular, 213 675 (antes, 156 177 y 204 750; con LV2-f, 213 801: menos esclavos). Ningún cuadrilátero bajo en los dos. Los dos edificios llevan el aviso `malla/esquina-sin-refinar` (§8): su hueco de escalera deja cruces sin refinar.
 - **8:** la vivienda, igual que con LV1 (`.datos/out_lv2_esquinas.txt`: axiles, momentos y flechas frente a CYPE a ±0,01).
 - **4:** en las 44 geometrías de G, 21 con el aviso de calidad (20 con LV1; el peor, 0,109 en las dos). Son los de LV-8: las esquinas de la huella que asoma 5–10 cm de la cara quedan como puntos sueltos de la triangulación, que une con astillas y cuyos nudos cercanos se hacen rígidos.
 - **Pruebas:** las 710 del compilador, sin cambios.
@@ -292,7 +292,7 @@ Ninguna deja de converger: tres están en los cruces del aviso, y las otras tres
 - **C y D mejoran la malla** (en las retículas con astillas, el jacobiano mínimo pasa de 0,12–0,13 a 0,23–0,32, y hay hasta un 20 % menos de nudos), **pero las franjas empeoran:** sin la huella sembrada se pierden estaciones de cara que hoy salen bien (hasta un 172 % en la retícula 23). Descartadas.
 - La columna «rígidos fuera» de la salida cuenta también los nudos de las caras de las vigas en su zona rígida en el pilar, que `unirCaras` une a la huella a propósito (C1-a). Con B, sólo quedan ésos.
 
-**Hecho (B), detrás de `refinoEsquinas` como el resto de LV2:** en un pilar con el ancho de una viga sobre su centro (también en su borde: el extremo de una viga o una losa que acaba en su eje), sólo son esclavos de la huella los nudos dentro de ella o en su borde (a 10·ε_geom), no los de fuera a ≤ ε_snap (`losas.ts`, C2-d). Los demás pilares siguen como estaban (F2-9 queda aparcado). La malla no cambia. `MEDIDA_LV2F` sólo sirve para reproducir A, C y D en la medida.
+**Hecho (B), detrás de `refinoEsquinas` como el resto de LV2:** en un pilar con el ancho de una viga sobre su centro (también en su borde: el extremo de una viga o una losa que acaba en su eje), sólo son esclavos de la huella los nudos dentro de ella o en su borde (a 10·ε_geom), no los de fuera a ≤ ε_snap (`losas.ts`, C2-d). Los demás pilares siguen como estaban (F2-9 queda aparcado). La malla no cambia. (`MEDIDA_LV2F`, el interruptor con el que se reprodujeron A, C y D, se quitó en §10: la tabla de arriba y el commit `1f46a20` son el registro.)
 
 **Los criterios, con LV2-f:**
 - **1 y 2:** sin cambios (en el recuadro y en el 3 × 3 no asoma ningún pilar).
@@ -300,3 +300,27 @@ Ninguna deja de converger: tres están en los cruces del aviso, y las otras tres
 - **4 (calidad):** sin cambios; LV-8 sigue abierto. El jacobiano bajo junto a lo que asoma sólo lo arreglan C y D, a costa de las franjas.
 - **8 (la vivienda):** igual (dos axiles se mueven 0,1 kN; `.datos/out_lv2_f.txt`).
 - **Pruebas:** las 714 del compilador; `src/compilador/esquinas.test.ts` comprueba que con LV2 no queda ningún nudo rígido fuera de la huella de un pilar con viga, salvo los de las caras, y que con la regla de antes quedan más de 100.
+
+## 10. Auditoría del diagnóstico de la fase (2026-10-16)
+
+Tras LV2-f se revisó contra el repo el diagnóstico de la fase y del mallador. Lo que no se sostenía tal cual:
+- **El coste no era +45 %, sino +70 %.** El +45 % era del paso 1, y el banco del paso 2 estaba medido con la máquina cargada (el reticular LV2 «calculaba» más rápido que LV1 con 50 000 ecuaciones más). En limpio (`out_banco.txt`): el edificio con vigas, de 3,2 + 3,9 s a 6,6 + 5,7 s (+72 %); el reticular, de 5,3 + 4,7 s a 10,3 + 6,8 s (+70 %). La compilación se duplica; el cálculo sube un 45 %. El criterio 10 (≤ +25 %) no se cumple.
+- **«LV2-f resuelto» era demasiado:** con la regla nueva quedan 36 de 536 estaciones de franja junto a pilares por encima del 20 % con h = 0,75 (124 por encima del 10 %).
+- **La referencia de `asoma.ts` lleva la regla que evalúa** (B con h = 0,25): «no converge» significa que A y B convergen a soluciones distintas. Que B sea la física correcta (5 cm fuera de la cara no es pilar; CYPE y SAP no rigidizan fuera de la huella) es razonable, pero no está contrastado con un oráculo externo.
+- **LV-8 no está agotado:** C y D eran atajos; la plantilla de §2.1 (los lados de lo que asoma como ejes de la red) no se ha probado. Y que C y D pierdan estaciones es en parte del medidor: el escalón (SP-3, SP-4) necesita la huella sembrada.
+- **LV2-g no es poco habitual:** el aviso salta en los dos edificios objetivo.
+- **Extender la regla de LV2-f a todos los pilares (F2-9) interactúa con el escalón de F3 y F3-d,** que cuenta lo que transmite la huella por los nudos rígidos de delante de la cara (`esfuerzosFranjas.ts`). Cambia la medida de las franjas en todos los pilares y la referencia congelada de F: es una fase con su medida, no un ajuste.
+
+Lo que faltaba:
+- **LV2-f activa los elementos malos de LV-8.** Un cuadrilátero con los cuatro nudos a ≤ ε_snap de la huella era rígido entero, inerte; ahora sus nudos de fuera son libres y ese elemento de jacobiano 0,11 trabaja. El cálculo es válido, pero LV-8 pasa de aviso de calidad a asunto de precisión.
+- **Nada de LV2 llega al usuario:** `refinoEsquinas` sigue en `false` y las referencias congeladas no lo cubren.
+- **`MEDIDA_LV2F` era un global mutable del compilador** fuera de las opciones y de la huella (misma huella, resultados distintos). Quitado. `UMBRAL_REFINO` y `PLANTILLA_ESQUINA` (`rejilla.ts`) tienen el mismo problema y quedan anotados.
+- Los criterios 2, 3 y 8 no tienen oráculo externo; sólo el 1.
+- **El aviso de respaldo salía vacío** en una planta que sólo refinaba esquinas («junto a las caras de  no se ha refinado»). Arreglado: sin pilares, el aviso es `malla/esquina-sin-refinar` y dice que son las esquinas de los paños.
+
+**Orden acordado con el usuario:**
+1. Antes de activar `refinoEsquinas` por defecto: entender Y7; LV-8 con la plantilla de §2.1, medida con `asoma.ts`; decidir el coste (+70 %; la compilación duplicada tiene margen, el cálculo no); el aviso vacío y `MEDIDA_LV2F` (hechos); referencias congeladas `-lv2`.
+2. C2-d a todos los pilares como fase propia (reabrir F2-9): `asoma.ts` ampliado a los pilares sin viga, decidir el escalón de F3-d, regenerar la referencia de F a sabiendas, y quitar la cota h ≥ 2·ε_snap si ya no hace falta.
+3. Un oráculo externo para la rigidez de la huella: un recuadro en OpenSeesPy ASDShellQ4 con `rigidLink` sólo en los nudos de la huella.
+4. Regresión de precisión local con umbrales: `asoma.ts` en CI aparte, o tres retículas en vitest con la referencia fina congelada.
+5. Mientras LV-8 no esté, avisar también en los pilares que asoman de su viga.
