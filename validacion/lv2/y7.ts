@@ -345,12 +345,13 @@ console.log(`   ${"d (m)".padEnd(12)}${distancias.map((d) => d.toFixed(3).padSta
 for (const m of m30) console.log(`   ${m.nombre.padEnd(12)}${distancias.map((d) => m.perfil(d).mxy.toFixed(2).padStart(10)).join("")}`);
 
 // Todas las estaciones de apoyo: cuánto del error de LV2 (0,75) frente a la fina es mx y cuánto mxy
-console.log("\n## Todas las estaciones de apoyo de la losa, LV2 (h = 0,75) frente a LV2 0,125: el error del superior y el de |mx| solo (respecto al máximo de la franja)\n");
+console.log("\n## Todas las estaciones de apoyo de la losa, LV2 (h = 0,75) frente a LV2 0,125: el error del superior y el del superior sin el término de mxy, max(0, −mx) («|mx|»), respecto al máximo de la franja\n");
 const filas: { k: string; eSup: number; eMx: number; sup: number; supRef: number; mxyRef: number; mxy: number }[] = [];
 for (const [k, r] of ref.apoyos) {
   const v = lv2.apoyos.get(k);
   if (!v) continue;
-  filas.push({ k, eSup: (v.superior - r.superior) / r.maxFranja, eMx: (Math.abs(v.mx) - Math.abs(r.mx)) / r.maxFranja, sup: v.superior, supRef: r.superior, mxyRef: r.mxy, mxy: v.mxy });
+  // El superior sin el término de mxy es max(0, −mx)
+  filas.push({ k, eSup: (v.superior - r.superior) / r.maxFranja, eMx: (Math.max(0, -v.mx) - Math.max(0, -r.mx)) / r.maxFranja, sup: v.superior, supRef: r.superior, mxyRef: r.mxy, mxy: v.mxy });
 }
 const med = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)] ?? NaN;
 console.log(`   ${filas.length} estaciones. Mediana del |error| del superior: ${pct(med(filas.map((f) => Math.abs(f.eSup))))}; de |mx|: ${pct(med(filas.map((f) => Math.abs(f.eMx))))}.`);

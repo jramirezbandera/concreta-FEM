@@ -29,8 +29,19 @@
  *   paralelogramo de la rejilla, donde el campo es cuadrático a lo largo de la recta).
  *
  * Momentos medios por caso: mx = ∫Mx/b con b el ancho de la franja que cae en losa (sin huecos,
- * huellas ni lo que se sale); my y mxy, medias del campo en ese ancho, en las caras y los apoyos a
- * DELTA_MUESTRAS del lado tomado.
+ * huellas ni lo que se sale); my y mxy, medias del campo en ese ancho, en la recta de la estación
+ * (a DELTA_MUESTRAS del lado tomado en una cara o un apoyo), salvo donde detrás de la recta hay un
+ * borde rígido de la losa: el ancho de una viga que se une por sus caras, la huella de un pilar (la
+ * ventana de su metro) o una línea de apoyo con algún giro coartado. Ahí van por una recta del lado
+ * tomado a un canto de la losa de la cara, o a la mitad de lo que hay libre hasta el siguiente apoyo
+ * (LV2-h, `refinamiento-vigas.md` §11–§12): junto a un borde así el torsor tiene una capa límite del
+ * orden de un canto que la malla gruesa no ve y la fina resuelve despacio (a δ de la cara de una viga,
+ * el |mxy| de Wood–Armer valía 0 con h = 0,75 y 6 kN·m/m con 0,125 en la misma estación; a un canto
+ * es el del interior, el mismo en todas las mallas). Donde la losa sigue al otro lado de la recta (la
+ * cara de franja lejos del pilar, una viga por su eje, un muro, un apoyo lineal articulado) no hay
+ * capa y el campo a δ es el de siempre, igual en todas las mallas. Si en la recta a un canto no hay
+ * losa en la franja (o en la ventana), se toma a δ. Cada estación dice a qué distancia se tomaron
+ * (`distanciaMuestras`).
  *
  * En la cara de un pilar que toca la franja, los medios no son los de la franja sino los de una
  * ventana del mismo ancho centrada en el pilar (F-h): el pico del momento está sobre el pilar, y con
@@ -96,8 +107,10 @@ import { alineada, anchoNominal, carasFranjas, COSENO_APOYO_PILAR, ejesArmado, e
 import type { Mapeo } from "./mapeo.ts";
 import type { Contexto, LosaCompilada } from "./validar.ts";
 
-/** Distancia a una cara o a un apoyo de la recta de campos de sus my y mxy, m. */
+/** Distancia mínima a una cara o a un apoyo de la recta de campos de sus my y mxy, m (y la de antes de LV2-h). */
 export const DELTA_MUESTRAS = 1e-3;
+/** Distancia de esa recta a la cara, en cantos de la losa (LV2-h): la capa límite del torsor junto a un enlace rígido. */
+export const CANTOS_MUESTRAS = 1;
 /** Parte mínima del ancho en losa de una franja que tiene que cubrir una línea de apoyo para darle estación. */
 export const COBERTURA_APOYO = 0.5;
 /** Holgura de las comparaciones de coordenadas, m. */
@@ -118,6 +131,8 @@ export interface EstacionFranja {
   /** [mx, my, mxy] medios por caso (3·nc), kN·m/m, en los ejes de la franja. */
   medios: Float64Array;
   metodo: "fuerzas-nodales" | "campos";
+  /** Distancia a la cara o al apoyo de la recta de campos de my y mxy, m (LV2-h: un canto con un borde rígido detrás, si no δ); 0 en una de paso. */
+  distanciaMuestras: number;
   /** Pilares de la cara que tocan la franja, o la pieza de la línea de apoyo. */
   piezas: string[];
   /**
@@ -157,6 +172,8 @@ interface PorFranja {
   m: Float64Array;
   w: number;
   wAbaco: number;
+  /** En las muestras de una cara o un apoyo, la distancia a la que se tomaron (LV2-h). */
+  d?: number;
 }
 
 /** Un segmento de una línea de apoyo perpendicular a d. */
@@ -167,6 +184,8 @@ interface LineaApoyo {
   tb: number;
   /** Sólo de este lado (la cara del ancho de una viga, fase LV); sin él, de los dos. */
   lado?: -1 | 1;
+  /** Es un borde rígido de la losa (LV2-h): la cara de un ancho, o un apoyo lineal con algún giro coartado. */
+  borde?: boolean;
 }
 
 export class EsfuerzosFranjas {
@@ -181,6 +200,10 @@ export class EsfuerzosFranjas {
   readonly huellaDelante: boolean;
   /** Sólo para medir SP-6: el metro de un pilar sin cara de franja por el escalón aunque su cara siga la malla (`false`). */
   readonly caraDirecta: boolean;
+  /** Sólo para medir LV2-h: my y mxy de las caras y los apoyos a δ de la cara, como antes (`true`). */
+  readonly muestrasEnCara: boolean;
+  /** Sólo para medir LV2-h: la distancia de esa recta en cantos de la losa (por defecto, CANTOS_MUESTRAS). */
+  readonly cantosMuestras: number;
   private readonly cortes: Cortes;
   private readonly campos: CamposLaminas;
   private readonly franjasDe = new Map<string, Franja[]>();
@@ -191,7 +214,7 @@ export class EsfuerzosFranjas {
    * @param ctx el contexto del modelo físico que se compiló; `compilado`, su modelo analítico y su
    *   mapeo; `casos`, sus resultados (válidos).
    */
-  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; huellaDelante?: boolean; caraDirecta?: boolean } = {}) {
+  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; huellaDelante?: boolean; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number } = {}) {
     this.ctx = ctx;
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
@@ -200,6 +223,8 @@ export class EsfuerzosFranjas {
     this.desfase = opciones.desfase ?? 0;
     this.huellaDelante = opciones.huellaDelante ?? true;
     this.caraDirecta = opciones.caraDirecta ?? true;
+    this.muestrasEnCara = opciones.muestrasEnCara ?? false;
+    this.cantosMuestras = opciones.cantosMuestras ?? CANTOS_MUESTRAS;
     this.cortes = opciones.cortes ?? new Cortes(this.modelo);
     this.campos = opciones.campos ?? new CamposLaminas(this.modelo);
   }
@@ -393,7 +418,7 @@ export class EsfuerzosFranjas {
         medios[3 * kc + 1] = valido ? muestras.m[3 * kc + 1]! / muestras.w : NaN;
         medios[3 * kc + 2] = valido ? muestras.m[3 * kc + 2]! / muestras.w : NaN;
       }
-      return { s, tipo, lado, punto: punto(s, (f.t0 + f.t1) / 2), anchoEnLosa: b, medios, metodo, piezas, ...(ventana ? { ventana } : {}), fraccionAbaco: reticular ? (b > EPS ? Math.min(1, principal.wAbaco / b) : NaN) : null, valido, diagnosticos: diag };
+      return { s, tipo, lado, punto: punto(s, (f.t0 + f.t1) / 2), anchoEnLosa: b, medios, metodo, distanciaMuestras: muestras.d ?? 0, piezas, ...(ventana ? { ventana } : {}), fraccionAbaco: reticular ? (b > EPS ? Math.min(1, principal.wAbaco / b) : NaN) : null, valido, diagnosticos: diag };
     };
 
     // Caras: una recta por cara, del lado de su vano; my y mxy a δ de ese lado
@@ -430,6 +455,115 @@ export class EsfuerzosFranjas {
       }
     const toca = (i: number, t0: number, t1: number) => fr[i]!.t0 < t1 - EPS && fr[i]!.t1 > t0 + EPS;
     for (const z0 of porPilar.values()) for (let i = 0; i < fr.length; i++) if (toca(i, z0.t0, z0.t1)) zonas[i]!.push([z0.sa, z0.sb]);
+    // Líneas de apoyo perpendiculares a d: vigas de la planta, muros que llegan a ella y apoyos lineales
+    const lineas: LineaApoyo[] = [];
+    const kp = this.ctx.planta.get(l.losa.planta)!;
+    const tramosDe = (id: string, pts: readonly Vec2[], borde = false) => {
+      for (let j = 0; j + 1 < pts.length; j++) {
+        const [A, B] = [pts[j]!, pts[j + 1]!];
+        const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (!(L > EPS) || Math.abs((B[0] - A[0]) * d[0] + (B[1] - A[1]) * d[1]) > 1e-9 * L) continue;
+        const [ta, tb] = [A[0] * n[0] + A[1] * n[1], B[0] * n[0] + B[1] * n[1]];
+        lineas.push({ id, s: (A[0] * d[0] + A[1] * d[1] + B[0] * d[0] + B[1] * d[1]) / 2, ta: Math.min(ta, tb), tb: Math.max(ta, tb), ...(borde ? { borde } : {}) });
+      }
+    };
+    const conAncho = new Set(anchosL.map((a) => a.viga));
+    for (const v of this.ctx.vigas) if (v.planta === l.losa.planta && !conAncho.has(v.id)) tramosDe(v.id, v.puntos);
+    for (const m of this.ctx.muros) if (kp >= m.kh && kp <= m.kb) tramosDe(m.muro.id, m.muro.puntos);
+    for (const a of this.ctx.apoyosLineales) if (a.planta === l.losa.planta) tramosDe(a.id, a.puntos, a.coartados.slice(3).some(Boolean));
+    // Fase LV: de una viga que se une por sus caras, cada cara con la losa de su lado (la de menor s,
+    // la de s menores); entre las caras no hay estaciones
+    for (const a of anchosL) {
+      const [d0, d1, i1, i0] = a.poligono;
+      const sc = (d0[0] + d1[0] + i1[0] + i0[0]) / 4 * d[0] + (d0[1] + d1[1] + i1[1] + i0[1]) / 4 * d[1];
+      const caras: [number, number][] = [];
+      for (const [A, B] of [
+        [d0, d1],
+        [i1, i0],
+      ] as const) {
+        const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (!(L > EPS) || Math.abs((B[0] - A[0]) * d[0] + (B[1] - A[1]) * d[1]) > 1e-9 * L) continue;
+        const sf = (A[0] * d[0] + A[1] * d[1] + B[0] * d[0] + B[1] * d[1]) / 2;
+        const [ta, tb] = [A[0] * n[0] + A[1] * n[1], B[0] * n[0] + B[1] * n[1]];
+        lineas.push({ id: a.viga, s: sf, ta: Math.min(ta, tb), tb: Math.max(ta, tb), lado: sf < sc ? -1 : 1, borde: true });
+        caras.push([sf, Math.min(ta, tb)], [sf, Math.max(ta, tb)]);
+      }
+      if (caras.length === 2) {
+        const [s0, s1] = [Math.min(caras[0]![0], caras[2]![0]), Math.max(caras[0]![0], caras[2]![0])];
+        const [t0, t1] = [Math.min(...caras.map((x) => x[1])), Math.max(...caras.map((x) => x[1]))];
+        for (let i = 0; i < fr.length; i++) if (toca(i, t0, t1)) zonas[i]!.push([s0, s1]);
+      }
+    }
+    lineas.sort((a, b) => a.s - b.s || a.ta - b.ta || (a.id < b.id ? -1 : 1));
+
+    // Obstáculos de la recta de campos de una cara o un apoyo (LV2-h): las huellas de los pilares de
+    // la losa, el ancho de las vigas, las líneas de apoyo y las caras de franja, con su rango en t.
+    // `borde`: la losa acaba ahí en un borde rígido (una huella, un ancho, un apoyo lineal con giros)
+    const obstaculos: { s0: number; s1: number; t0: number; t1: number; borde: boolean }[] = [];
+    for (const p of huellas.values()) {
+      const ed = semiextension(p.huella, d);
+      const en = semiextension(p.huella, n);
+      if (!(ed > 0) || !(en > 0)) continue;
+      const sc = p.p[0] * d[0] + p.p[1] * d[1];
+      const tc = p.p[0] * n[0] + p.p[1] * n[1];
+      obstaculos.push({ s0: sc - ed, s1: sc + ed, t0: tc - en, t1: tc + en, borde: true });
+    }
+    for (const a of anchosL) {
+      const ss = a.poligono.map((q) => q[0] * d[0] + q[1] * d[1]);
+      const ts = a.poligono.map((q) => q[0] * n[0] + q[1] * n[1]);
+      obstaculos.push({ s0: Math.min(...ss), s1: Math.max(...ss), t0: Math.min(...ts), t1: Math.max(...ts), borde: true });
+    }
+    for (const ln of lineas) obstaculos.push({ s0: ln.s, s1: ln.s, t0: ln.ta, t1: ln.tb, borde: ln.borde === true });
+    for (const c of caras) for (const [a, b] of c.tramos) obstaculos.push({ s0: c.s, s1: c.s, t0: a, t1: b, borde: false });
+    /** ¿Detrás de la recta s (hacia −lado), en [t0, t1], hay un borde rígido de la losa? */
+    const bordeDetras = (s: number, lado: -1 | 1, t0: number, t1: number): boolean =>
+      obstaculos.some((o) => o.borde && !(o.t1 <= t0 + EPS || o.t0 >= t1 - EPS) && Math.abs((lado === -1 ? o.s0 : o.s1) - s) <= EPS);
+    /** Lo que hay libre desde s hacia `lado` hasta el borde más cercano de un obstáculo que solape [t0, t1] (Infinity si ninguno). */
+    const libre = (s: number, lado: -1 | 1, t0: number, t1: number): number => {
+      let r = Infinity;
+      for (const o of obstaculos) {
+        if (o.t1 <= t0 + EPS || o.t0 >= t1 - EPS) continue;
+        for (const b of [o.s0, o.s1]) {
+          const x = lado * (b - s);
+          if (x > EPS && x < r) r = x;
+        }
+      }
+      return r;
+    };
+    const canto = this.cantosMuestras * l.losa.espesor;
+    /** Distancia a la cara de la recta de campos de my y mxy de una estación en s hacia `lado`, en el rango [t0, t1]: δ, salvo con un borde rígido detrás. */
+    const distanciaMuestras = (s: number, lado: -1 | 1, t0: number, t1: number): number => (this.muestrasEnCara || !bordeDetras(s, lado, t0, t1) ? DELTA_MUESTRAS : Math.max(DELTA_MUESTRAS, Math.min(canto, libre(s, lado, t0, t1) / 2)));
+    /**
+     * my y mxy de una cara o un apoyo en s, del lado `lado`, para las franjas y las ventanas: cada una
+     * por la recta de campos a su distancia (LV2-h) y, si allí no hay losa en ella, a δ. Las rectas
+     * distintas se cortan una vez cada una.
+     */
+    const muestrasCara = (s: number, lado: -1 | 1, ventanas: readonly (readonly [number, number])[] = [], rango?: readonly [number, number]): { r: PorFranja[]; rv: PorFranja[]; valido: boolean; diag: Diagnostico[] } => {
+      const rectas = new Map<number, ReturnType<typeof porCampos>>();
+      const recta = (dd: number) => {
+        const k = Math.round(dd * 1e6);
+        let c = rectas.get(k);
+        if (!c) rectas.set(k, (c = porCampos(s + lado * dd, ventanas, rango)));
+        return c;
+      };
+      let valido = true;
+      const diag: Diagnostico[] = [];
+      const tomar = (dd: number, de: (c: ReturnType<typeof porCampos>) => PorFranja): PorFranja => {
+        let c = recta(dd);
+        let x = de(c);
+        if (!(x.w > EPS) && dd > DELTA_MUESTRAS) {
+          dd = DELTA_MUESTRAS;
+          c = recta(dd);
+          x = de(c);
+        }
+        valido &&= c.valido;
+        for (const dg of c.diag) if (!diag.some((y) => y.codigo === dg.codigo && y.mensaje === dg.mensaje)) diag.push(dg);
+        return { ...x, d: dd };
+      };
+      const r = fr.map((f, i) => tomar(distanciaMuestras(s, lado, f.t0, f.t1), (c) => c.r[i]!));
+      const rv = ventanas.map(([a, b], v) => tomar(distanciaMuestras(s, lado, a, b), (c) => c.rv[v]!));
+      return { r, rv, valido, diag };
+    };
     const exactas: number[][] = fr.map(() => []);
     // Ventana de cada pilar de la cara: el ancho nominal centrado en él (F-h)
     const bNominal = anchoNominal(l.losa, this.ancho);
@@ -479,7 +613,7 @@ export class EsfuerzosFranjas {
       for (let kc = 0; kc < nc; kc++) principal.m[3 * kc]! += nod.resto[kc]!;
       principal.w = ancho;
       if (muestras) return { principal, muestras, diag: nod.diag };
-      const cam = porCampos(sp + c.lado * DELTA_MUESTRAS, [ventana], rango);
+      const cam = muestrasCara(sp, c.lado, [ventana], rango);
       return { principal, muestras: cam.rv[0]!, diag: [...nod.diag, ...(cam.valido ? [] : cam.diag)] };
     };
     /**
@@ -493,7 +627,7 @@ export class EsfuerzosFranjas {
         const rango: [number, number] = [Math.max(T0, Math.min(ventana[0], p.t0) - margen), Math.min(T1, Math.max(ventana[1], p.t1) + margen)];
         const nod = porNodales(sp, lado, rango[0], rango[1], [ventana]);
         if (!nod || nod.rv[0]!.w < anchoVentana(sp, ventana) - EPS) continue;
-        const cam = porCampos(sp + lado * DELTA_MUESTRAS, [ventana], rango);
+        const cam = muestrasCara(sp, lado, [ventana], rango);
         return { principal: nod.rv[0]!, muestras: cam.rv[0]!, diag: [...nod.diag, ...(cam.valido ? [] : cam.diag)] };
       }
       return null;
@@ -528,7 +662,7 @@ export class EsfuerzosFranjas {
     for (const c of caras) {
       const ventanas = c.pilares.map((p): [number, number] => [(p.t0 + p.t1) / 2 - bNominal / 2, (p.t0 + p.t1) / 2 + bNominal / 2]);
       const nod = porNodalesCara(c, ventanas);
-      const cam = porCampos(c.s + c.lado * DELTA_MUESTRAS, ventanas);
+      const cam = muestrasCara(c.s, c.lado, ventanas);
       // El escalón de cada pilar de la cara, una vez aunque lo toquen varias franjas
       const escalones = new Map<number, ReturnType<typeof escalon>>();
       const escalonDe = (v: number, sp: number) => {
@@ -581,47 +715,6 @@ export class EsfuerzosFranjas {
         exactas[i]!.push(c.s);
       }
     }
-    // Líneas de apoyo perpendiculares a d: vigas de la planta, muros que llegan a ella y apoyos lineales
-    const lineas: LineaApoyo[] = [];
-    const kp = this.ctx.planta.get(l.losa.planta)!;
-    const tramosDe = (id: string, pts: readonly Vec2[]) => {
-      for (let j = 0; j + 1 < pts.length; j++) {
-        const [A, B] = [pts[j]!, pts[j + 1]!];
-        const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
-        if (!(L > EPS) || Math.abs((B[0] - A[0]) * d[0] + (B[1] - A[1]) * d[1]) > 1e-9 * L) continue;
-        const [ta, tb] = [A[0] * n[0] + A[1] * n[1], B[0] * n[0] + B[1] * n[1]];
-        lineas.push({ id, s: (A[0] * d[0] + A[1] * d[1] + B[0] * d[0] + B[1] * d[1]) / 2, ta: Math.min(ta, tb), tb: Math.max(ta, tb) });
-      }
-    };
-    const conAncho = new Set(anchosL.map((a) => a.viga));
-    for (const v of this.ctx.vigas) if (v.planta === l.losa.planta && !conAncho.has(v.id)) tramosDe(v.id, v.puntos);
-    for (const m of this.ctx.muros) if (kp >= m.kh && kp <= m.kb) tramosDe(m.muro.id, m.muro.puntos);
-    for (const a of this.ctx.apoyosLineales) if (a.planta === l.losa.planta) tramosDe(a.id, a.puntos);
-    // Fase LV: de una viga que se une por sus caras, cada cara con la losa de su lado (la de menor s,
-    // la de s menores); entre las caras no hay estaciones
-    for (const a of anchosL) {
-      const [d0, d1, i1, i0] = a.poligono;
-      const sc = (d0[0] + d1[0] + i1[0] + i0[0]) / 4 * d[0] + (d0[1] + d1[1] + i1[1] + i0[1]) / 4 * d[1];
-      const caras: [number, number][] = [];
-      for (const [A, B] of [
-        [d0, d1],
-        [i1, i0],
-      ] as const) {
-        const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
-        if (!(L > EPS) || Math.abs((B[0] - A[0]) * d[0] + (B[1] - A[1]) * d[1]) > 1e-9 * L) continue;
-        const sf = (A[0] * d[0] + A[1] * d[1] + B[0] * d[0] + B[1] * d[1]) / 2;
-        const [ta, tb] = [A[0] * n[0] + A[1] * n[1], B[0] * n[0] + B[1] * n[1]];
-        lineas.push({ id: a.viga, s: sf, ta: Math.min(ta, tb), tb: Math.max(ta, tb), lado: sf < sc ? -1 : 1 });
-        caras.push([sf, Math.min(ta, tb)], [sf, Math.max(ta, tb)]);
-      }
-      if (caras.length === 2) {
-        const [s0, s1] = [Math.min(caras[0]![0], caras[2]![0]), Math.max(caras[0]![0], caras[2]![0])];
-        const [t0, t1] = [Math.min(...caras.map((x) => x[1])), Math.max(...caras.map((x) => x[1]))];
-        for (let i = 0; i < fr.length; i++) if (toca(i, t0, t1)) zonas[i]!.push([s0, s1]);
-      }
-    }
-    lineas.sort((a, b) => a.s - b.s || a.ta - b.ta || (a.id < b.id ? -1 : 1));
-
     // Pilares sin cara de franja en esta dirección (de borde, o atravesados por una viga o un muro
     // según n: SP-3, SP-4): su metro en cada cara, por la recta de la cara si sigue la malla en su
     // ventana o, si no, por el escalón desde una recta de la malla que atraviese su huella, con lo que
@@ -697,7 +790,7 @@ export class EsfuerzosFranjas {
       for (const lado of ln.lado ? [ln.lado] : ([-1, 1] as const)) {
         const nod = porNodales(ln.s, lado, ln.ta, ln.tb);
         if (!nod) continue;
-        const cam = porCampos(ln.s + lado * DELTA_MUESTRAS);
+        const cam = muestrasCara(ln.s, lado);
         for (let i = 0; i < fr.length; i++) {
           const f = fr[i]!;
           if (!(ln.s > f.s0 + EPS && ln.s < f.s1 - EPS) || enApoyo(i, ln.s) || cercaDeExacta(i, ln.s)) continue;

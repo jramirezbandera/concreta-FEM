@@ -9,6 +9,10 @@
  * LV2 con h = 0,75 no tiene más estaciones de apoyo por encima del 20 % que LV1 con h = 0,5 uniforme.
  * Las de LV2 por encima del 20 % se listan con su serie al refinar (h = 0,5, 0,25 y 0,125) y
  * los pilares del aviso `malla/esquina-sin-refinar` (LV2-g).
+ * Desde §11 (Y7), cada estación lleva también el error del superior sin el término de mxy de
+ * Wood–Armer, max(0, −mx) con el mx del corte por fuerzas nodales (en el texto, «|mx|»), y las de más
+ * del 20 % dicen su causa: «mx» si ese corte también pasa del 20 %, «mxy» si no (el torsor a δ de la
+ * cara, la capa límite de §11).
  *
  *   bun validacion/lv2/franjas.ts > validacion/lv2/out_franjas.txt
  */
@@ -30,7 +34,8 @@ interface Franja {
   dir: 1 | 2;
   t0: number;
   t1: number;
-  apoyos: Map<string, { s: number; v: number }>;
+  /** Por estación de apoyo: s, superior de ELU y mx de ELU (fuerzas nodales). */
+  apoyos: Map<string, { s: number; v: number; mx: number }>;
   vano: number;
 }
 
@@ -50,10 +55,10 @@ function medir(op: OpcionesCompilacion): Map<string, Franja> {
     const e = q.franja(f.id);
     const a = q.armadoFranja(f.id, [ELU]);
     if (!e.valido || !a.valido) throw new Error(f.id);
-    const apoyos = new Map<string, { s: number; v: number }>();
+    const apoyos = new Map<string, { s: number; v: number; mx: number }>();
     let vano = 0;
     e.valor.estaciones.forEach((x, i) => {
-      if (x.tipo === "apoyo") apoyos.set(`${x.s.toFixed(3)}:${x.lado}`, { s: x.s, v: a.valor[i]!.superior });
+      if (x.tipo === "apoyo") apoyos.set(`${x.s.toFixed(3)}:${x.lado}`, { s: x.s, v: a.valor[i]!.superior, mx: ELU.reduce((acc, coef, kc) => acc + coef * x.medios[3 * kc]!, 0) });
       vano = Math.max(vano, a.valor[i]!.inferior);
     });
     r.set(f.id, { dir: f.direccion as 1 | 2, t0: f.t0, t1: f.t1, apoyos, vano });
@@ -81,17 +86,21 @@ const variantes: [string, OpcionesCompilacion][] = [
   ["LV2, h = 0,5", { tamanoMalla: 0.5, refinoEsquinas: true }],
 ];
 console.log("## Retícula de 4 × 4 (fase LV): franjas con ELU frente a h = 0,125\n");
-console.log(`${"".padEnd(24)}${"apoyos: mediana / máx".padStart(24)}${"vano: mediana / máx".padStart(24)}${"caras junto a un pilar: máx".padStart(30)}${"apoyos > 10 % / > 20 %".padStart(26)}`);
+console.log("Apoyos: la superior de Wood–Armer; |mx|, el corte por fuerzas nodales solo (sin el término de mxy, §11).\n");
+console.log(`${"".padEnd(24)}${"apoyos: mediana / máx".padStart(24)}${"vano: mediana / máx".padStart(24)}${"caras junto a un pilar: máx".padStart(30)}${"apoyos > 10 % / > 20 %".padStart(26)}${"|mx| > 10 % / > 20 %".padStart(24)}`);
 const med = (v: number[]) => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)] ?? NaN;
 const pct = (v: number) => `${(100 * v).toFixed(1)} %`;
-const peores = new Map<string, [string, number, number, number, boolean][]>();
-const mas20 = new Map<string, [string, number, number][]>();
+/** [clave, valor, referencia, error, junto a un pilar, error de |mx|] */
+type Fila = [string, number, number, number, boolean, number];
+const peores = new Map<string, Fila[]>();
+const mas20 = new Map<string, Fila[]>();
 for (const [nombre, op] of variantes) {
   const g = medir(op);
   const ea: number[] = [];
+  const em: number[] = [];
   const ev: number[] = [];
   const ej: number[] = [];
-  const todos: [string, number, number, number, boolean][] = [];
+  const todos: Fila[] = [];
   for (const [id, x] of g) {
     const y = fina.get(id)!;
     const ref = Math.max(1, ...[...y.apoyos.values()].map((a) => a.v));
@@ -99,38 +108,47 @@ for (const [nombre, op] of variantes) {
       const b = y.apoyos.get(k);
       if (!b) continue;
       const err = Math.abs(a.v - b.v) / ref;
+      // El superior sin el término de mxy es max(0, −mx): el error de ese corte solo
+      const errMx = Math.abs(Math.max(0, -a.mx) - Math.max(0, -b.mx)) / ref;
       ea.push(err);
+      em.push(errMx);
       const j = junto(x, a.s);
       if (j) ej.push(err);
-      todos.push([`${id} ${k}`, a.v, b.v, err, j]);
+      todos.push([`${id} ${k}`, a.v, b.v, err, j, errMx]);
     }
     if (y.vano > 1) {
       ev.push(Math.abs(x.vano / y.vano - 1));
-      todos.push([`${id} vano`, x.vano, y.vano, Math.abs(x.vano / y.vano - 1), false]);
+      todos.push([`${id} vano`, x.vano, y.vano, Math.abs(x.vano / y.vano - 1), false, NaN]);
     }
   }
   peores.set(nombre, todos.sort((a, b) => b[3] - a[3]).slice(0, 10));
-  mas20.set(nombre, todos.filter((x) => x[3] > 0.2 && !x[0].endsWith("vano")).map((x) => [x[0], x[3], 0]));
-  console.log(`${nombre.padEnd(24)}${`${pct(med(ea))} / ${pct(Math.max(...ea))}`.padStart(24)}${`${pct(med(ev))} / ${pct(Math.max(...ev))}`.padStart(24)}${`${pct(Math.max(...ej))} (${ej.length})`.padStart(30)}${`${ea.filter((x) => x > 0.1).length} / ${ea.filter((x) => x > 0.2).length} (${ea.length})`.padStart(26)}`);
+  mas20.set(nombre, todos.filter((x) => x[3] > 0.2 && !x[0].endsWith("vano")));
+  console.log(`${nombre.padEnd(24)}${`${pct(med(ea))} / ${pct(Math.max(...ea))}`.padStart(24)}${`${pct(med(ev))} / ${pct(Math.max(...ev))}`.padStart(24)}${`${pct(Math.max(...ej))} (${ej.length})`.padStart(30)}${`${ea.filter((x) => x > 0.1).length} / ${ea.filter((x) => x > 0.2).length} (${ea.length})`.padStart(26)}${`${em.filter((x) => x > 0.1).length} / ${em.filter((x) => x > 0.2).length}`.padStart(24)}`);
 }
 const [n2, nU] = [mas20.get("LV2, h = 0,75")!.length, mas20.get("LV1, h = 0,5 uniforme")!.length];
+const causa = (f: Fila) => (f[5] > 0.2 ? "mx" : "mxy");
+const porCausa = (nombre: string) => {
+  const l = mas20.get(nombre)!;
+  return `${l.filter((f) => causa(f) === "mx").length} por mx y ${l.filter((f) => causa(f) === "mxy").length} por mxy`;
+};
 console.log(`\n**Criterio 3:** estaciones de apoyo por encima del 20 %, ${n2} con LV2 (h = 0,75) frente a ${nU} con h = 0,5 uniforme: ${n2 <= nU ? "pasa" : "no pasa"}.`);
+console.log(`Por su causa (§11): LV2, ${porCausa("LV2, h = 0,75")}; h = 0,5 uniforme, ${porCausa("LV1, h = 0,5 uniforme")}; LV1 con 0,75, ${porCausa("LV1, h = 0,75")}.`);
 console.log(`Aviso malla/esquina-sin-refinar con LV2, h = 0,75: ${sinRefinar.get(JSON.stringify({ refinoEsquinas: true }))!.join(", ") || "ninguno"}.`);
 
 // Serie al refinar de las de LV2 por encima del 20 % (con la de h = 0,125 de referencia, ya medida)
 const serie = [0.5, 0.25].map((h) => medir({ tamanoMalla: h, refinoEsquinas: true }));
 const lv2 = medir({ refinoEsquinas: true });
-console.log("\n### LV2, h = 0,75: las de apoyo por encima del 20 %, al refinar (kN·m/m; * junto a un pilar)");
-console.log(`   ${"".padEnd(30)}${["0,75", "0,5", "0,25", "0,125"].map((x) => x.padStart(9)).join("")}   0,25 → 0,125`);
-for (const [k] of mas20.get("LV2, h = 0,75")!) {
-  const [id, s] = k.split(" ") as [string, string];
+console.log("\n### LV2, h = 0,75: las de apoyo por encima del 20 %, al refinar (kN·m/m; * junto a un pilar), con el error de |mx| y la causa");
+console.log(`   ${"".padEnd(30)}${["0,75", "0,5", "0,25", "0,125"].map((x) => x.padStart(9)).join("")}   0,25 → 0,125   |mx|   causa`);
+for (const f of mas20.get("LV2, h = 0,75")!) {
+  const [id, s] = f[0].split(" ") as [string, string];
   const v = [lv2, ...serie, fina].map((g) => g.get(id)!.apoyos.get(s)!.v);
   const ref = Math.max(1, ...[...fina.get(id)!.apoyos.values()].map((a) => a.v));
   const j = junto(lv2.get(id)!, lv2.get(id)!.apoyos.get(s)!.s);
-  console.log(`   ${(k + (j ? " *" : "")).padEnd(30)}${v.map((x) => x.toFixed(2).padStart(9)).join("")}   ${pct((v[3]! - v[2]!) / ref).padStart(8)}`);
+  console.log(`   ${(f[0] + (j ? " *" : "")).padEnd(30)}${v.map((x) => x.toFixed(2).padStart(9)).join("")}   ${pct((v[3]! - v[2]!) / ref).padStart(8)}   ${pct(f[5]).padStart(7)}   ${causa(f)}`);
 }
 
 for (const [nombre, t] of peores) {
-  console.log(`\n### Los peores, ${nombre} (valor, referencia, error; * junto a un pilar)`);
-  for (const [k, v, w, err, j] of t) console.log(`   ${(k + (j ? " *" : "")).padEnd(30)} ${v.toFixed(2).padStart(8)} ${w.toFixed(2).padStart(8)} ${pct(err).padStart(8)}`);
+  console.log(`\n### Los peores, ${nombre} (valor, referencia, error, error de |mx|; * junto a un pilar)`);
+  for (const [k, v, w, err, j, errMx] of t) console.log(`   ${(k + (j ? " *" : "")).padEnd(30)} ${v.toFixed(2).padStart(8)} ${w.toFixed(2).padStart(8)} ${pct(err).padStart(8)} ${(Number.isNaN(errMx) ? "—" : pct(errMx)).padStart(8)}`);
 }

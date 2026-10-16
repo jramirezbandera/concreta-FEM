@@ -119,6 +119,10 @@ Las cuatro, como las recomendó el agente:
 - **En el compilador:** caras para los pilares circulares, girados y de borde sin astillas (F-4), y el refinamiento local junto a los pilares (F-6).
 - **Siguen:** V2c (dibujar con el ratón), las puertas de uso de V1, V2a, V2b e I1–I4, y E4-9.
 
+## 6. Cambio posterior: my y mxy de las caras y los apoyos, a un canto del borde (LV2-h, 2026-10-16)
+
+Al entender Y7 en la fase LV2 (`refinamiento-vigas.md` §11–§12) salió que el término |mxy| de Wood–Armer que se tomaba a δ = 1 mm de la cara de una viga (o de la huella de un pilar) está dentro de una capa límite del torsor del orden de un canto, que la malla gruesa no ve y la fina resuelve despacio (0 con h = 0,75 y 6 kN·m/m con 0,125 en la misma estación). Desde entonces, donde detrás de la recta de una estación de cara o de apoyo hay un borde rígido de la losa (el ancho de una viga unida por sus caras, la huella de un pilar en la ventana de su metro, un apoyo lineal con algún giro coartado), my y mxy se toman a un canto de la losa de la cara (o a la mitad de lo libre hasta el siguiente apoyo); donde la losa sigue, a δ como antes. El mx por fuerzas nodales no cambia. Medido en una losa continua de dos vanos (oráculo analítico, en `franjas.test.ts`), en H25 y en la retícula de LV2 (`validacion/f/out_muestras.txt`); la referencia congelada se regeneró a sabiendas (`validacion/f/out_cambiosMuestras.txt`: 392 de 1 062 estaciones de cara y apoyo, ninguna de paso).
+
 ## Cómo reproducir
 
 ```sh

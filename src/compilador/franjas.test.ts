@@ -266,6 +266,45 @@ describe("F: flexión cilíndrica (criterio 2)", () => {
       expect(Math.abs(e.medios[0]! / ((q * L * L) / 8) - 1)).toBeLessThanOrEqual(5e-3);
     }
   }, 60_000);
+
+  it("en una losa continua de dos vanos, my en la cara del apoyo interior es ν·M a un canto de la cara (LV2-h), y mxy, 0", () => {
+    // Flexión cilíndrica con ν ≠ 0: los bordes largos con el giro θx coartado (en w = w(x) es 0, así
+    // que no reacciona) para que my = ν·mx. Dos vanos de L: M(x) = (3qL/8)·x − q·x²/2 en el primero.
+    // El apoyo interior coarta también θx (tampoco reacciona): es un borde rígido, y la estación toma
+    // my y mxy a un canto de él; articulado, los tomaría en su recta
+    const [L, B, q, nu, t] = [5, 4, 10, 0.2, 0.3];
+    const f: ModeloFisico = {
+      plantas: [{ id: "P0", altura: null }],
+      materiales: [{ id: "H", tipo: "hormigon", fck: 25, nu, peso: 0 }],
+      secciones: [],
+      losas: [{ id: "L", planta: "P0", contorno: rect(0, 0, 2 * L, B), espesor: t, material: "H" }],
+      apoyosLineales: [
+        { id: "A", planta: "P0", puntos: [[0, 0], [0, B]], coartados: [true, true, true, false, false, false] },
+        { id: "C", planta: "P0", puntos: [[L, 0], [L, B]], coartados: [false, false, true, true, false, false] },
+        { id: "B", planta: "P0", puntos: [[2 * L, 0], [2 * L, B]], coartados: [false, false, true, false, false, false] },
+        { id: "G0", planta: "P0", puntos: [[0, 0], [2 * L, 0]], coartados: [false, false, false, true, false, false] },
+        { id: "G1", planta: "P0", puntos: [[0, B], [2 * L, B]], coartados: [false, false, false, true, false, false] },
+      ],
+      casos: [{ id: "Q" }],
+      cargas: [{ tipo: "superficie", id: "q", caso: "Q", planta: "P0", losa: "L", q: [0, 0, -q] }],
+    };
+    const M = (x: number) => ((3 * q * L) / 8) * x - (q * x * x) / 2;
+    const c = calculado(f, { tamanoMalla: 0.25 });
+    const fs = c.ef.franjas("L").filter((x) => x.direccion === 1);
+    expect(fs.length).toBe(4);
+    for (const fr of fs) {
+      const apoyos = c.ef.estaciones(fr.id)!.estaciones.filter((x) => x.tipo === "apoyo" && Math.abs(x.s - L) < 1e-9);
+      expect(apoyos.map((x) => x.lado).sort()).toEqual([-1, 1]);
+      for (const e of apoyos) {
+        expect(e.valido).toBe(true);
+        expect(e.distanciaMuestras).toBeCloseTo(t, 9);
+        // mx, el del apoyo: −qL²/8 (con h = 0,25, a 0,52 %); my, ν·M a un canto hacia el vano; mxy, 0 (sobre qL²/8)
+        expect(Math.abs(e.medios[0]! / M(L) - 1)).toBeLessThanOrEqual(1e-2);
+        expect(Math.abs(e.medios[1]! - nu * M(L - t)) / Math.abs(M(L))).toBeLessThanOrEqual(1e-2);
+        expect(Math.abs(e.medios[2]!) / Math.abs(M(L))).toBeLessThanOrEqual(1e-3);
+      }
+    }
+  }, 60_000);
 });
 
 describe("F: la opción franjas: false", () => {

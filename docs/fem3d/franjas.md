@@ -40,7 +40,7 @@ Cada franja se corta en perpendicular a su dirección, sólo por las láminas (F
 
 **Momentos medios** por metro, en los ejes de la franja:
 - mx = My/b_losa, con b_losa el ancho de la franja que cae en losa en esa estación (sin huecos ni lo que se sale). En una cara, My es exacto. Por campos, es la integral del campo SPR a lo ancho de la franja.
-- my y mxy son las medias de los campos a lo ancho de la franja. En una cara, a δ = 1 mm por fuera del apoyo, como en C5.
+- my y mxy son las medias de los campos a lo ancho de la franja. En una cara o un apoyo, a δ = 1 mm por fuera del apoyo, como en C5, salvo donde detrás de la recta hay un borde rígido de la losa (el ancho de una viga unida por sus caras, la huella de un pilar en la ventana de su metro, un apoyo lineal con algún giro coartado): ahí, a un canto de la losa de la cara, o a la mitad de lo libre hasta el siguiente apoyo, porque junto a un borde así el torsor tiene una capa límite que la malla gruesa no ve y la fina resuelve despacio (LV2-h, `refinamiento-vigas.md` §11–§12, 2026-10-16). Cada estación dice a qué distancia se tomaron (`distanciaMuestras`).
 - En un reticular, fuera de los ábacos, también el momento por nervio: mx·s.
 
 ### 2.4 Wood–Armer y envolventes

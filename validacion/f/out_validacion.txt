@@ -15,19 +15,19 @@ isótropa gruesa (a/t = 15) | 0.125 | 4 / 6 | 182 | 12.537 | 0.14 % | 0.15 % | 0
 Demanda de Wood–Armer con la suma de los casos: la superior de cada cara o apoyo (los que hay con las dos mallas: el recorte de las caras junto a otros pilares y a los vuelos depende de h) y la mayor inferior de los vanos de cada franja. Se comparan las de al menos el 20 % de la mayor de la losa.
 
 losa | nudos h = 0,75 / 0,375 | caras y apoyos: comparadas, media / máx. | vanos: media / máx. | posición: pilares con demanda | media / máx. al correr media franja
-H25 losa plana (2 × 2 vanos, pilares en el borde) | 732 / 1724 | 16, 11.5 % / 12.8 % | 1.7 % / 2.7 % | 2 | 0.0 % / 0.0 % … 0.0 %
-H25 reticular con ábacos | 1052 / 2052 | 12, 9.3 % / 12.1 % | 1.6 % / 5.2 % | 2 | 0.0 % / 0.0 % … 0.0 %
-losa plana de 3 × 3 vanos con vuelos de 0,5 m | 994 / 3160 | 70, 6.4 % / 13.9 % | 1.7 % / 3.6 % | 32 | 0.0 % / 0.0 % … 0.0 %
+H25 losa plana (2 × 2 vanos, pilares en el borde) | 532 / 1460 | 24, 5.4 % / 10.2 % | 2.0 % / 2.7 % | 6 | -16.7 % / -100.0 % … 0.0 %
+H25 reticular con ábacos | 716 / 1700 | 28, 7.7 % / 10.0 % | 1.7 % / 2.9 % | 6 | 0.0 % / 0.0 % … 0.0 %
+losa plana de 3 × 3 vanos con vuelos de 0,5 m | 1666 / 3448 | 68, 3.4 % / 10.2 % | 1.6 % / 3.9 % | 28 | 0.0 % / 0.0 % … 0.0 %
 
 ## Criterio 5: malla del edificio objetivo (7 plantas, h = 0,75)
 
 modelo | sin caras: nudos / ecuaciones | con caras: nudos / ecuaciones | crecimiento (ecuaciones) | perfil móvil (≤ 200 000) | avisos de malla sin / con
-losa plana | 34485 / 90237 | 70647 / 183876 | ×2.04 | cabe | 0 / 0
-maciza con vigas | 34779 / 90783 | 34779 / 90783 | ×1.00 | cabe | 0 / 0
-reticular con ábacos (V2 de C4) | 53287 / 145551 | 53287 / 145551 | ×1.00 | cabe | 0 / 0
+losa plana | 34485 / 90237 | 69639 / 192066 | ×2.13 | cabe | 0 / 0
+maciza con vigas | 60021 / 112119 | 60021 / 112119 | ×1.00 | cabe | 0 / 0
+reticular con ábacos (V2 de C4) | 80566 / 161049 | 80566 / 161049 | ×1.00 | cabe | 0 / 0
 
 ## Criterio 7: rendimiento en el edificio objetivo (losa plana y con vigas, 7 plantas)
 
 modelo | franjas | estaciones | combinaciones ELU-PT | calcular (s) | primera planta (s) | otra planta (s) | edificio entero (s) | franjas / cálculo
-losa plana | 623 | 111356 | 26 | 4.2 | 1.72 | 0.88 | 7.2 | 172 %
-maciza con vigas | 623 | 110754 | 26 | 2.7 | 1.31 | 0.78 | 5.7 | 214 %
+losa plana | 623 | 110614 | 26 | 4.3 | 1.89 | 1.17 | 8.4 | 195 %
+maciza con vigas | 623 | 112000 | 26 | 4.2 | 1.99 | 0.72 | 6.3 | 150 %

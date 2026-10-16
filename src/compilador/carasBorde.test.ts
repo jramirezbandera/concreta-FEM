@@ -83,7 +83,8 @@ describe("caras de franja de los pilares de borde (F3.3)", () => {
     for (const [franja, pilar] of CARAS) {
       const g = metro(gruesa, franja, pilar);
       const f = metro(fina, franja, pilar);
-      expect(f, `${franja} ${pilar} (fina)`).toBeGreaterThan(20);
+      // Un valor que dimensiona, no ruido (P14 en Y13 da 19,7 desde LV2-h: su |mxy| ya no es el de la capa límite a δ)
+      expect(f, `${franja} ${pilar} (fina)`).toBeGreaterThan(15);
       expect(Math.abs(g - f) / f, `${franja} ${pilar}: ${g} frente a ${f}`).toBeLessThan(0.1);
     }
   });

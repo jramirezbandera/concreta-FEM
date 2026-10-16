@@ -1,0 +1,43 @@
+# LV2-h: my y mxy de las estaciones de cara y de apoyo, a δ (antes) y a un número de cantos (ahora)
+
+## 1. Losa continua de dos vanos en flexión cilíndrica (L = 5 m, t = 0,3, ν = 0,2, q = 10 kN/m²): las estaciones del apoyo interior
+
+M(x) = (3qL/8)·x − q·x²/2; en el apoyo, −qL²/8 = −31,25. Error sobre qL²/8 en las 8 estaciones (4 franjas × 2 lados), con h = 0,25 y 0,125.
+
+h | regla | d (m) | mx: error máx | my frente a ν·M(L ∓ d): error máx | my frente a ν·M(L): error máx | |mxy| máx
+0.25 | antes (δ) | 0.001 | 0.52 % | 1.96 % | 1.98 % | 0.00 %   (8 estaciones)
+0.25 | 1 canto | 0.300 | 0.52 % | 0.24 % | 5.48 % | 0.00 %   (8 estaciones)
+0.25 | 1,5 cantos | 0.450 | 0.52 % | 0.07 % | 8.30 % | 0.00 %   (8 estaciones)
+0.25 | 2 cantos | 0.600 | 0.52 % | 0.02 % | 10.84 % | 0.00 %   (8 estaciones)
+0.125 | antes (δ) | 0.001 | 0.33 % | 0.99 % | 1.01 % | 0.00 %   (8 estaciones)
+0.125 | 1 canto | 0.300 | 0.33 % | 0.04 % | 5.75 % | 0.00 %   (8 estaciones)
+0.125 | 1,5 cantos | 0.450 | 0.33 % | 0.04 % | 8.39 % | 0.00 %   (8 estaciones)
+0.125 | 2 cantos | 0.600 | 0.33 % | 0.04 % | 10.89 % | 0.00 %   (8 estaciones)
+
+## 2. H25: la superior en las caras y los apoyos con h = 0,75 y 0,375 frente a 0,1875, por regla
+
+Suma de los casos; las estaciones que hay en las tres mallas y valen al menos el 20 % de la mayor con 0,1875. «Cambio en 0,75»: la superior con la regla frente a la de antes en la misma malla (mediana y rango, en las que valen al menos el 20 %). d: la distancia de las muestras con 0,75 (mín / mediana / máx) y cuántas quedan a δ.
+
+losa | regla | comparadas | 0,75 frente a 0,1875: media / máx | 0,375 frente a 0,1875: media / máx | cambio en 0,75: mediana, mín … máx | d (m)
+H25 losa plana | antes (δ) | 24 | 4.4 % / 7.1 % | 0.9 % / 1.3 % | 1.000, 1.000 … 1.000 | 0.001 / 0.001 / 0.001, 64 a δ
+H25 losa plana | 1 canto | 24 | 6.0 % / 12.1 % | 1.1 % / 2.0 % | 1.000, 1.000 … 1.036 | 0.001 / 0.250 / 0.250, 32 a δ
+H25 losa plana | 1,5 cantos | 24 | 6.5 % / 13.6 % | 1.3 % / 2.6 % | 1.000, 1.000 … 1.054 | 0.001 / 0.375 / 0.375, 32 a δ
+H25 losa plana | 2 cantos | 24 | 6.5 % / 13.5 % | 1.2 % / 2.4 % | 1.000, 1.000 … 1.072 | 0.001 / 0.500 / 0.500, 32 a δ
+H25 reticular con ábacos | antes (δ) | 28 | 7.1 % / 9.0 % | 1.2 % / 2.7 % | 1.000, 1.000 … 1.000 | 0.001 / 0.001 / 0.001, 72 a δ
+H25 reticular con ábacos | 1 canto | 28 | 7.5 % / 10.3 % | 1.5 % / 2.7 % | 1.000, 1.000 … 1.097 | 0.001 / 0.001 / 0.350, 48 a δ
+H25 reticular con ábacos | 1,5 cantos | 28 | 7.1 % / 8.8 % | 1.2 % / 2.7 % | 1.000, 1.000 … 1.127 | 0.001 / 0.001 / 0.525, 48 a δ
+H25 reticular con ábacos | 2 cantos | 28 | 6.7 % / 8.1 % | 1.1 % / 2.7 % | 1.000, 1.000 … 1.140 | 0.001 / 0.001 / 0.700, 48 a δ
+
+## 3. La retícula de 4 × 4 de LV2: el criterio 3 con cada regla
+
+Superior de ELU en las estaciones de apoyo frente a h = 0,125 (con la misma regla), sobre el máximo de la franja.
+
+malla | regla | estaciones | mediana | máx | > 10 % | > 20 %
+LV2, h = 0,75 | antes (δ) | 352 | 1.0 % | 39.3 % | 52 | 4
+LV2, h = 0,75 | 1 canto | 352 | 0.6 % | 38.2 % | 18 | 2
+LV2, h = 0,75 | 1,5 cantos | 352 | 0.7 % | 38.2 % | 17 | 3
+LV2, h = 0,75 | 2 cantos | 352 | 0.5 % | 38.2 % | 16 | 2
+LV1, h = 0,5 uniforme | antes (δ) | 352 | 0.8 % | 25.7 % | 33 | 6
+LV1, h = 0,5 uniforme | 1 canto | 352 | 0.4 % | 24.3 % | 13 | 6
+LV1, h = 0,5 uniforme | 1,5 cantos | 352 | 0.4 % | 24.3 % | 15 | 6
+LV1, h = 0,5 uniforme | 2 cantos | 352 | 0.4 % | 24.2 % | 15 | 6
