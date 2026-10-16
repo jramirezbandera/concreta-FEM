@@ -140,7 +140,7 @@ Se mira por qué el refinamiento de Delaunay (G-4) no quita los abanicos junto a
 |---|---|---|
 | 1 | **Recuadro de CY-10:** momento y cortante de la viga en la cara del pilar a ≤ 5 % del emparrillado de CYPE con h = 0,75 (hoy, 0,79 y 1,25) | `validacion/lv/recuadro.ts` |
 | 2 | **Vigas interiores:** en el 3 × 3 de §1.3, con h = 0,75, el momento y el cortante de cada viga en la cara de cada pilar a no más distancia de la malla de 0,055 que con la malla uniforme de 0,25 (hoy, el momento del lado del vano central a +91 % y el cortante del lado del vano extremo a −46 %; con 0,25, +34 % y −16 %) | Script nuevo en `validacion/lv2/` |
-| 3 | **Franjas** (la retícula de 4 × 4, con h = 0,75): no peores que la malla uniforme de 0,5, frente a h = 0,125 (21,5 % en apoyos y 17,6 % en vano); en las caras junto a un pilar, ≤ 5 %; las estaciones que no convergen, listadas con su causa | `validacion/lv2/` |
+| 3 | **Franjas** (la retícula de 4 × 4, con h = 0,75, frente a h = 0,125): no más estaciones de apoyo por encima del 20 % que con la malla uniforme de 0,5, y las que no convergen, listadas con su causa. *Cambiado el 2026-10-16:* antes pedía además ≤ 5 % en las caras junto a un pilar, que no cumple ni h = 0,5 uniforme (16,4 %) | `validacion/lv2/franjas.ts` |
 | 4 | **Calidad:** ningún aviso `malla/calidad` ni `malla/esquina-sin-refinar` en las 44 geometrías de G, el núcleo de A2, los edificios objetivo y los modelos de validación (hoy: 16 retículas, la circular, la triangular y el núcleo) | `geometrias.test.ts`, pruebas nuevas |
 | 5 | **Tamaño:** el edificio objetivo con vigas y el reticular objetivo, ≤ 200 000 ecuaciones (hoy, 112 119 y 161 049) | Banco |
 | 6 | **Determinismo:** la misma malla al trasladar, girar, reordenar, con ruido < ε_geom, en V8 y JavaScriptCore y con «Renumerar». Con `refinoEsquinas: false` o `unionLosaViga: "eje"`, bit a bit | Metamórficas, huellas |
@@ -243,4 +243,35 @@ Medido con `validacion/lv2/recuadro.ts`, `vigas.ts`, `banco.ts` y `franjas.ts` (
 - **LV2-g, los cruces que no se pueden refinar a la vez:** junto a un hueco o a rasgos de cargas, un cruce con pilar se queda como en LV1. Para refinarlo haría falta una versión de la plantilla para la triangulación, con la misma geometría que la de la rejilla y lejos de las huellas. Propuesta: aceptarlo y avisar (`malla/esquina-sin-refinar`, ya previsto en §2.1) en las caras de esos pilares.
 - **El criterio 3 tal como está escrito no se cumple:** máximo de apoyos 39,3 % frente al 25,7 % de h = 0,5, y junto a un pilar ≤ 5 %. El siguiente junto a un pilar es X19 junto a P12-15 (−20,9 %). Ni h = 0,5 uniforme baja de 16 %.
 
+**Decidido por el usuario el 2026-10-16:**
+- **LV2-g: sí, aceptarlo y avisar.** En esos cruces queda la malla de LV1, que da lo mismo que hoy; sólo pasa cuando una esquina de un cruce con pilar cae en la triangulación (junto a un hueco o a una línea de carga), y refinarlos exige una plantilla propia para la triangulación, que en la prueba dio cuadriláteros malos y nudos rígidos. El aviso dice al ingeniero dónde mirar. Hecho en §8.
+- **LV2-f: sí, pero como paso propio y midiendo antes.** No es sólo un aviso de calidad: junto a las astillas la triangulación pone nudos que se hacen rígidos con el pilar (una docena en la retícula de 4 × 4) y rigidiza la losa junto a él, como en F2-9. Un pilar de 40 × 40 bajo una viga de 30 es lo más corriente en obra. Como toca losas, cargas y mallador, primero se mide en las retículas al azar cuánto se mueven los momentos junto a esos pilares; si es poco, se deja para más adelante.
+- **El criterio 3 cambia** (§3): no más estaciones de apoyo por encima del 20 % que con h = 0,5 uniforme, y las que no convergen, listadas.
+- **Orden:** LV2-g y el criterio 3; LV2-f con la medida previa; los pasos 3 y 4 (vigas curvas, determinismo, referencias congeladas). Antes de activar `refinoEsquinas` por defecto se mira Y7, la única estación que empeora frente a LV1 (−24 % frente a −7 %).
+
 Medido con `validacion/lv2/franjas.ts`, `recuadro.ts`, `vigas.ts` y `banco.ts` (salidas `out_*.txt`), y la variante `lv2-esquinas` de la vivienda.
+
+## 8. LV2-g y el criterio 3 nuevo (2026-10-16)
+
+**El aviso `malla/esquina-sin-refinar`.** Cuando ningún nivel de la plantilla cabe en todas las esquinas de un cruce, la rejilla anota los pilares del cruce (`esquinasSinRefinar` de `rejilla.ts`): los que la triangulación tomaría como «junto a un pilar», a menos de 2·`separacionRefino` más el elemento de un nivel de alguna de sus esquinas. El mallador da un aviso por causa:
+- **una esquina cae en la triangulación** (junto a un hueco, una carga u otro rasgo que no sigue la rejilla), lo de LV2-g;
+- **la plantilla no cabe o no tiene calidad,** lo previsto en §2.1.
+
+El aviso nombra los pilares en el mensaje y en sus objetos (para que la app los señale), y no cambia ninguna malla. Un cruce sin pilar (el de un zuncho) no avisa. Prueba: `src/compilador/esquinas.test.ts`.
+
+**En la retícula de 4 × 4** con h = 0,75 avisa de P12-10, P12-15, P18-10 y P18-15, las cuatro esquinas del hueco de la escalera. Con h = 0,5 o con `refinoEsquinas: false`, de ninguno.
+
+**Criterio 3** (`validacion/lv2/franjas.ts`, `out_franjas.txt`): estaciones de apoyo por encima del 20 %, **6 con LV2 frente a 6 con h = 0,5 uniforme: pasa.** Las seis, al refinar (kN·m/m):
+
+| Estación | 0,75 | 0,5 | 0,25 | 0,125 | Causa |
+|---|---|---|---|---|---|
+| X13, cara derecha de P12-10 | 37,0 | 49,9 | 53,1 | 61,0 | Cruce sin refinar (con aviso). Converge: 61 también con 0,0625 (§7) |
+| Y20, en x = 4,85 | 9,1 | 12,4 | 12,4 | 12,4 | Triangulación por la carga lineal T y la zona Qz; converge desde 0,5 |
+| X18, cara de Y12 | 8,6 | 10,3 | 12,7 | 13,2 | Cara de la viga lejos de los pilares; converge despacio (14,0 con 0,0625, §7) |
+| Y7, cara de X5 junto a P6-5 | 25,5 | 29,0 | 31,7 | 33,4 | Empeora con la plantilla (LV1, −7 %); se mira antes de activar `refinoEsquinas` |
+| X19, cara de P12-15 | 16,1 | 24,7 | 21,9 | 22,5 | Cruce sin refinar (con aviso) |
+| X19, cara de P18-15 | 6,3 | 6,9 | 11,4 | 12,6 | Cruce sin refinar (con aviso) |
+
+Ninguna deja de converger: tres están en los cruces del aviso, y las otras tres son la triangulación junto a las cargas, una cara de viga lejos de los pilares y Y7.
+
+**Pruebas:** las 712 del compilador (710 y las dos nuevas).

@@ -133,6 +133,8 @@ export interface ProblemaMalla {
   severidad: "error" | "aviso";
   codigo: string;
   mensaje: string;
+  /** Otros objetos físicos a los que se refiere (los pilares de `malla/esquina-sin-refinar`). */
+  objetos?: readonly string[];
 }
 
 export type ResultadoMalla =
@@ -428,6 +430,18 @@ function avisoSinRefinar(pilares: readonly string[], porque: string): ProblemaMa
   };
 }
 
+/** Aviso de los pilares de los cruces de vigas cuyas esquinas se quedan sin refinar (LV2-g). */
+function avisoEsquinaSinRefinar(pilares: readonly string[], porque: string): ProblemaMalla {
+  const ids = [...new Set(pilares)].sort();
+  return {
+    objetos: ids,
+    losa: -1,
+    severidad: "aviso",
+    codigo: "malla/esquina-sin-refinar",
+    mensaje: `La malla de las esquinas de los paños junto a ${ids.join(", ")} no se ha refinado: ${porque}. Allí queda la malla de antes de refinar las esquinas, y con el tamaño de malla por defecto el momento de la viga en la cara de esos pilares puede salir un 20 % bajo, y el de las franjas en sus caras, hasta un 40 %. El cálculo es válido; revise esas caras con más cuidado o baje el tamaño de malla.`,
+  };
+}
+
 /**
  * Caras de pilares que se refinan (F2), por el id del pilar de la huella: la normal d de su recta y
  * el lado (−1: el de s = d·x menores).
@@ -440,6 +454,8 @@ export interface RefinoCaras {
   esquinas?: boolean;
   /** Huellas de todos los pilares de la planta (LV2: lejos de ellas, sin nudos nuevos). */
   huellas?: readonly (readonly Vec2[])[];
+  /** Id del pilar de cada una de `huellas`, para los avisos. */
+  idsHuellas?: readonly string[];
 }
 
 /** `mallarPlanta` sin comparar con la CDT sola cuando la rejilla cubre poco (para las pruebas). */
@@ -1349,6 +1365,10 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   const problemas: ProblemaMalla[] = [];
   if (!conformes) problemas.push({ losa: -1, severidad: "error", codigo: "malla/conformidad", mensaje: "La rejilla y la triangulación no parten igual una arista de la interfaz. Es un fallo del compilador." });
   if (rj?.sinRefinar.length) problemas.push(avisoSinRefinar(rj.sinRefinar.map((k) => idHuella[k]!), "su plantilla no admite el refinamiento con calidad"));
+  for (const triangulacion of [true, false]) {
+    const ids = (rj?.esquinasSinRefinar ?? []).filter((x) => x.triangulacion === triangulacion).map((x) => refino?.idsHuellas?.[x.huella] ?? `#${x.huella}`);
+    if (ids.length) problemas.push(avisoEsquinaSinRefinar(ids, triangulacion ? "una esquina de su cruce cae en la triangulación (junto a un hueco, una carga u otro rasgo que no sigue la rejilla)" : "la plantilla de esquina no cabe o no tiene calidad"));
+  }
   const areas = losas.map(() => 0);
   let jacobianoMin = Infinity;
   let peor: Vec2 = [0, 0];

@@ -6,6 +6,18 @@ LV2, h = 0,75                     0.9 % / 39.3 %          3.0 % / 23.1 %        
 LV1, h = 0,5 uniforme             0.8 % / 25.7 %          1.0 % / 27.7 %                   16.4 % (48)              33 / 6 (352)
 LV2, h = 0,5                      0.4 % / 20.7 %          1.1 % / 26.8 %                   20.7 % (48)              26 / 1 (352)
 
+**Criterio 3:** estaciones de apoyo por encima del 20 %, 6 con LV2 (h = 0,75) frente a 6 con h = 0,5 uniforme: pasa.
+Aviso malla/esquina-sin-refinar con LV2, h = 0,75: P12-10, P12-15, P18-10, P18-15.
+
+### LV2, h = 0,75: las de apoyo por encima del 20 %, al refinar (kN·m/m; * junto a un pilar)
+                                      0,75      0,5     0,25    0,125   0,25 → 0,125
+   L-N1:X13 12.150:1 *               37.01    49.86    53.10    60.99     13.0 %
+   L-N1:Y20 4.850:-1                  9.09    12.43    12.41    12.40     -0.0 %
+   L-N1:X18 11.850:-1                 8.63    10.28    12.67    13.20      2.9 %
+   L-N1:Y7 4.850:-1                  25.48    29.01    31.74    33.41      5.0 %
+   L-N1:X19 12.150:1 *               16.07    24.68    21.91    22.49      1.9 %
+   L-N1:X19 17.850:-1 *               6.28     6.88    11.36    12.58      4.0 %
+
 ### Los peores, LV1, h = 0,75 (valor, referencia, error; * junto a un pilar)
    L-N1:Y1 4.850:-1 *                16.18    28.92   44.1 %
    L-N1:Y19 4.850:-1                  6.64    12.39   43.7 %

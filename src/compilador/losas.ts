@@ -595,7 +595,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       diag.error("malla/arreglo", `No se ha podido ordenar la geometría de la planta ${idPlanta} para mallarla: hay rasgos más pequeños que ${cm(epsSnap)} que se cruzan entre sí.`, [idPlanta, ...losasK.map(({ l }) => l.losa.id)]);
       return null;
     }
-    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco, refino: { caras: refino, separacion: 2 * epsSnap, esquinas: ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas, huellas: [...huellasK.values()] }, anchos, puntoAncho };
+    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco, refino: { caras: refino, separacion: 2 * epsSnap, esquinas: ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas, huellas: [...huellasK.values()], idsHuellas: [...huellasK.keys()].map((n) => topo.nudos[n]!.pilar!.pilares[0]!) }, anchos, puntoAncho };
   };
   const montarTodas = (fijos: ReadonlyMap<number, Vec2[]>, d: Diagnosticos): Map<number, PlantaL> => {
     const e = new Map<number, PlantaL>();
@@ -819,7 +819,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         continue;
       }
       for (const p of res.problemas) {
-        const ids = p.losa >= 0 ? [mallar[p.losa]!.id] : mallar.map((x) => x.id);
+        const ids = [...(p.losa >= 0 ? [mallar[p.losa]!.id] : mallar.map((x) => x.id)), ...(p.objetos ?? [])];
         if (p.severidad === "error") diag.error(p.codigo, p.mensaje, ids);
         else diag.aviso(p.codigo, p.mensaje, ids);
       }

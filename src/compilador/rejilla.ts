@@ -73,7 +73,9 @@
  *    todas: el elemento más pequeño, de al menos ε_snap, y ningún nudo nuevo que se haga rígido con un
  *    pilar (`huellasPilares`, también las tapadas por las vigas; C2-d): uno de las caras va a la viga
  *    salvo que caiga dentro de la huella, y uno de dentro de la losa, a menos de 1,2·ε_snap, sería
- *    suyo.
+ *    suyo. Los pilares de un cruce que se queda sin plantilla van en `esquinasSinRefinar`, para el
+ *    aviso `malla/esquina-sin-refinar` (LV2-g: refinar una esquina de la triangulación exigiría una
+ *    plantilla propia para ella).
  *
  * Puro y determinista; las comparaciones con umbral llevan holgura para que un ruido de ε_geom o el
  * redondeo de un giro no cambien la rejilla.
@@ -273,6 +275,12 @@ export interface Rejilla {
   plantillas: Plantilla[];
   /** Huellas con caras que refinar que se quedan con la plantilla sin refinar (F2: no cabía con calidad). */
   sinRefinar: number[];
+  /**
+   * Pilares (índice en `huellasPilares`) de los cruces de vigas cuyas esquinas se quedan sin plantilla
+   * (fase LV2, LV2-g): `triangulacion` si es porque una esquina cae en la triangulación junto a él; si
+   * no, la plantilla no cabe o no tiene calidad.
+   */
+  esquinasSinRefinar: { huella: number; triangulacion: boolean }[];
   posicion(n: number): Vec2;
   /** Celda que contiene un punto (interior), o −1. */
   celdaDe(q: Vec2): number;
@@ -1344,6 +1352,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
   // 8. Esquinas de los paños (fase LV2), por cruces de vigas: las celdas en diagonal con la del cruce
   // que son esquina hacia él llevan todas la plantilla, con los mismos niveles, o ninguna (§8 de la
   // cabecera)
+  const esquinasSinRefinar: { huella: number; triangulacion: boolean }[] = [];
   if (E.esquinas && E.fuertes) {
     const sepE = (E.separacionRefino ?? 0) * (1 - HOLGURA);
     /** Partición de la celda (i, j) en u y en v (2: por los puntos medios), y su elemento más fino con k niveles. */
@@ -1381,6 +1390,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       return lejosDeHuellas(pl) && jacobianoMin(pl) >= UMBRAL_REFINO.jacobiano ? pl : false;
     };
     const vistos = new Set<number>();
+    const sinEsquina = new Map<number, boolean>();
     for (let j = 0; j < nv - 1; j++)
       for (let i = 0; i < nu - 1; i++) {
         const opciones = esquinasDe(i, j);
@@ -1404,7 +1414,19 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
           pls = grupo.map(([a, b, p, q]) => intentar(a, b, p, q, k));
           if (pls.every((pl) => pl !== false)) break;
         }
-        if (k < 1) continue;
+        if (k < 1) {
+          // LV2-g: los pilares del cruce (los que la triangulación tomaría como «junto a un pilar»)
+          for (const [a, b, p, q] of grupo) {
+            const Q = posicion((p < 0 ? a : a + 1) + (q < 0 ? b : b + 1) * nu);
+            const lejos = 2 * (E.separacionRefino ?? 0) + 2 * particion(a, b, 1).menor;
+            const triangulacion = estado[celda(a, b)] === IRREGULAR;
+            (E.huellasPilares ?? []).forEach((poli, m) => {
+              const d = bordePoligono(Q, poli);
+              if (d.dentro || d.d < lejos) sinEsquina.set(m, (sinEsquina.get(m) ?? false) || triangulacion);
+            });
+          }
+          continue;
+        }
         grupo.forEach(([a, b], m) => {
           const pl = pls[m]!;
           if (typeof pl === "boolean") return;
@@ -1412,6 +1434,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
           plantillas.push(pl);
         });
       }
+    for (const [huella, triangulacion] of [...sinEsquina].sort((a, b) => a[0] - b[0])) esquinasSinRefinar.push({ huella, triangulacion });
   }
 
   const celdaDe = (q: Vec2): number => {
@@ -1438,5 +1461,5 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     const [i, j] = [n % nu, Math.floor(n / nu)];
     return Math.abs(n1 - n2) === 1 ? partidaH[i + j * (nu - 1)] === 1 : partidaV[i + j * nu] === 1;
   };
-  return { U, V, estado, losa, puntoNudo, nudoPunto, absorbidos, enLinea, interfaz, plantillas, sinRefinar, posicion, celdaDe, toca, cubre, estadosArista, partida };
+  return { U, V, estado, losa, puntoNudo, nudoPunto, absorbidos, enLinea, interfaz, plantillas, sinRefinar, esquinasSinRefinar, posicion, celdaDe, toca, cubre, estadosArista, partida };
 }
