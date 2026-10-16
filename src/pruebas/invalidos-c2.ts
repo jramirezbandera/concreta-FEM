@@ -84,9 +84,9 @@ export const CATALOGO: Caso[] = [
   ["apoyo lineal sin coacciones", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).coartados = [false, false, false, false, false, false]), "fisico/valor-no-valido", "AL"],
   ["apoyo lineal en una planta que no existe", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).planta = "X"), "fisico/referencia", "AL"],
   ["apoyo lineal fuera de la losa", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).puntos = [[2, 1], [2, 8]]), "apoyo/fuera-de-losa", "AL"],
-  ["apoyo lineal en la huella de un pilar", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).puntos = [[0.0123, 0.0623], [0.0123, 1.5123]]), "apoyo/en-huella", "AL", { unionLosaViga: "eje" }],
-  ["apoyo lineal por dentro del ancho de una viga (fase LV)", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).puntos = [[0.0623, 1.0123], [0.0623, 3.5123]]), "apoyo/en-ancho-viga", "AL"],
-  ["apoyo puntual dentro del ancho de una viga, fuera de su eje (fase LV)", (f) => (f.apoyos = [{ id: "AP", planta: "P1", x: 3, y: 0.1, coartados: [false, false, true, false, false, false] }]), "apoyo/en-ancho-viga", "AP"],
+  // Un apoyo que entra en la huella de un pilar acaba en su cara, y uno en el ancho de una viga va a su
+  // eje (`apoyosViga.test.ts`); sólo es un error si no le queda ningún nudo
+  ["apoyo lineal entero dentro de la huella de un pilar", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).puntos = [[0.0123, 0.0623], [0.1123, 0.1623]]), "apoyo/sin-destino", "AL", { unionLosaViga: "eje" }],
   ["apoyo lineal en ux con diafragma rígido", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).coartados = [true, false, true, false, false, false]), "apoyo/en-diafragma"],
   ["apoyo puntual fuera de todo", (f) => (f.apoyos = [{ id: "AP", planta: "P1", x: 9, y: 9, coartados: [false, false, true, false, false, false] }]), "apoyo/sin-destino", "AP"],
   // Bandas

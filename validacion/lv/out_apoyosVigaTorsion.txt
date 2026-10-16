@@ -1,0 +1,23 @@
+# Apoyo lineal que llega a una viga: sólo uz frente al giro de torsión coartado y a la unión por el eje
+
+## Viga interior (VY1), murete desde un lado hasta su eje
+
+| | uz | uz+giro | eje | uz − eje | uz+giro − eje |
+|---|---|---|---|---|---|
+| franja 1, mx en la cara (kN·m/m) | -16.213 | -10.207 | -15.358 | -5.6 % | +33.5 % |
+| franja 2, mx en la cara (kN·m/m) | -13.942 | -7.926 | -13.651 | -2.1 % | +41.9 % |
+| torsor máximo de la viga (kN·m) | 0.237 | 0.980 | 0.221 | +7.2 % | +343.6 % |
+| flector máximo de la viga (kN·m) | 36.062 | 36.151 | 33.856 | +6.5 % | +6.8 % |
+| reacción del murete (kN) | 147.401 | 149.785 | 144.518 | +2.0 % | +3.6 % |
+| flecha máxima de la losa (mm) | 1.1421 | 1.1408 | 1.1568 | -1.3 % | -1.4 % |
+
+## Viga de borde (VX0), murete desde la losa hasta su eje
+
+| | uz | uz+giro | eje | uz − eje | uz+giro − eje |
+|---|---|---|---|---|---|
+| franja 1, mx en la cara (kN·m/m) | 0.503 | 0.306 | NaN | NaN % | NaN % |
+| franja 2, mx en la cara (kN·m/m) | 0.301 | 0.106 | NaN | NaN % | NaN % |
+| torsor máximo de la viga (kN·m) | 1.575 | 1.575 | 0.494 | +218.4 % | +218.4 % |
+| flector máximo de la viga (kN·m) | 31.187 | 31.186 | 27.800 | +12.2 % | +12.2 % |
+| reacción del murete (kN) | 89.997 | 90.003 | 89.235 | +0.9 % | +0.9 % |
+| flecha máxima de la losa (mm) | 1.1953 | 1.1953 | 1.1773 | +1.5 % | +1.5 % |

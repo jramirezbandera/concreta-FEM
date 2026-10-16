@@ -127,11 +127,12 @@ describe("fase LV: la losa unida a las vigas por sus caras", () => {
     expect(r.mapeo.anchos).toBeUndefined();
   });
 
-  it("un apoyo dentro del ancho de una viga y fuera de su eje es un error", () => {
+  it("un apoyo dentro del ancho de una viga y fuera de su eje va a su eje (`apoyosViga.test.ts`)", () => {
     const f = modelo();
-    const r = compilar({ ...f, apoyos: [{ id: "A", planta: "P1", x: 5.1, y: 6, coartados: [false, false, true, false, false, false] }] });
-    expect(r.valido).toBe(false);
-    expect(r.diagnosticos.some((d) => d.codigo === "apoyo/en-ancho-viga")).toBe(true);
+    const r = compilado({ ...f, apoyos: [{ id: "A", planta: "P1", x: 5.1, y: 6, coartados: [false, false, true, false, false, false] }] });
+    expect(r.diagnosticos.some((d) => d.codigo === "apoyo/a-viga")).toBe(true);
+    const n = r.modelo.nudos[r.mapeo.apoyos.A!]!;
+    expect([n.x, n.y]).toEqual([5, 6]);
   });
 
   it("un borde de losa dentro del ancho de una viga ya no es un error (C2-c)", () => {

@@ -370,6 +370,8 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     nudosPilar,
     apoyos: apoyosMap,
   };
+  const enVigas = [...losas.apoyosAViga].filter(([id, x]) => x.nudos.length && ctx.apoyosLineales.some((y) => y.id === id));
+  if (enVigas.length) mapeo.apoyosEnVigas = Object.fromEntries(enVigas.map(([id, x]) => [id, x.nudos.map((n) => nuevo[n]!).sort((p, q) => p - q)]));
   if (losas.anchos.length) mapeo.anchos = losas.anchos.map((a) => ({ viga: a.viga, planta: ctx.plantas[a.k]!.id, b: a.b, poligono: a.poligono.map((q) => [q[0], q[1]]) }));
   if (panos.viguetas.length) {
     const porPano: Record<string, string[]> = {};
@@ -523,6 +525,13 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
           : "Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas."
       } La zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
     );
+    const aViga = [...losas.apoyosAViga].filter(([, x]) => x.vigas.length).map(([id]) => id);
+    const aPilar = [...losas.apoyosAViga].filter(([, x]) => x.pilares.length).map(([id]) => id);
+    if (aViga.length)
+      h.push(
+        `Los apoyos que llegan a una viga por su ancho o su cara (${aViga.join(", ")}) apoyan el eje de la viga en su proyección, con sus mismas coacciones: como un apoyo puntual de la viga en el cruce. Con sólo uz, la viga gira libre sobre su eje en el apoyo.`,
+      );
+    if (aPilar.length) h.push(`Los apoyos que llegan a la huella de un pilar (${aPilar.join(", ")}) acaban en su cara: lo que cae en la huella, o en la zona rígida de una viga en el pilar, es del pilar.`);
     h.push(
       `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos, con casetón recuperable (C4-i)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).${ctx.pilares.length ? " Los pilares pesan de forjado a forjado, sin descontar su cruce con las losas (A-9): del lado de la seguridad, como es habitual." : ""}`,
     );

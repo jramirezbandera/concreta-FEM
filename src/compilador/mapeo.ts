@@ -63,6 +63,11 @@ export interface Mapeo {
    * polilínea fuera de los muros, con su polígono en planta (sólo si hay alguno).
    */
   anchos?: { viga: string; planta: string; b: number; poligono: [number, number][] }[];
+  /**
+   * Fase LV: los nudos del eje de las vigas que apoya cada apoyo lineal que llega a ellas por su
+   * ancho o su cara (sólo si hay alguno). No tienen por qué caer sobre su polilínea.
+   */
+  apoyosEnVigas?: Record<string, number[]>;
 }
 
 /** Objetos físicos de cada id analítico (nudos, barras, restricciones y casos). */

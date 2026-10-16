@@ -44,7 +44,23 @@ Lo que cae dentro del ancho de la viga y en la losa pasa a la viga, exacto en fu
 
 El peso de la viga sigue siendo el de C2-g (sólo su descuelgue): el peso total no cambia y A3-1 sigue valiendo. La resultante física de las cargas se sigue calculando sobre la losa dibujada, sin la malla, así que el control «sin pérdidas» comprueba también este paso.
 
-Un apoyo (puntual o lineal) dentro del ancho de una viga y fuera de su eje es un error: el motor no admite apoyos en los esclavos.
+~~Un apoyo (puntual o lineal) dentro del ancho de una viga y fuera de su eje es un error: el motor no admite apoyos en los esclavos.~~ Sustituido el 2026-10-16 (§1.4.1).
+
+#### 1.4.1 Los apoyos que llegan a la viga (2026-10-16, decisión del usuario)
+
+Un murete o un muro que no se modela y llega a una viga es muy habitual. El error dejaba sin salida un apoyo lineal que llegaba a la viga: tampoco valía acortarlo hasta la cara, porque los nudos de la cara son esclavos del enlace (`apoyo/en-cara-viga`). Ahora, como las cargas, lo que un apoyo coacciona dentro de la viga va a la viga (`losas.ts`):
+- **los nudos de la cara** que apoya pasan a su maestro en el eje, con las mismas coacciones. Un murete perpendicular que llega a la cara o al eje es un apoyo puntual de la viga en el cruce;
+- **sus lados en el ancho**, a los nudos del eje en su proyección: un punto si lo cruzan, y los nudos del trozo que recorren si van a lo largo (un apoyo por dentro del ancho y paralelo a la viga pierde su excentricidad);
+- **un apoyo puntual en el ancho**, al eje en su proyección;
+- **lo que cae en la huella de un pilar** (o en su borde, o en la zona rígida de una viga en él) es del pilar: el apoyo acaba en su cara, porque un murete que llega al pilar sostiene la losa, no el pilar. Vale también con `unionLosaViga: "eje"` (antes, `apoyo/en-huella`). Un apoyo lineal al que no le queda ningún nudo es un error (`apoyo/sin-destino`). Un apoyo puntual en el ancho, junto al pilar, apoya el pilar, como uno en su huella (C1).
+
+Los diagnósticos son `info` (`apoyo/a-viga`, `apoyo/en-pilar`), con su hipótesis. La reacción del apoyo lineal cuenta los nudos del eje aunque no caigan en su polilínea (`mapeo.apoyosEnVigas`). Llegar al eje o a la cara da los mismos apoyos y los mismos resultados, y un apoyo puntual en el ancho, los de uno puesto en el eje (≤ 1e-12, `apoyosViga.test.ts`).
+
+**Sólo uz, sin coartar la torsión de la viga.** Con la sección rígida del enlace, apoyar la cara y el eje equivaldría a coartar también el giro de torsión de la viga en el cruce. Medido en `validacion/lv/apoyosVigaTorsion.ts` (`out_apoyosVigaTorsion.txt`), con un murete que llega por un lado a una viga interior y la unión por el eje (la losa continua sobre la viga, sin sección rígida) como referencia:
+- con sólo uz, las franjas de la cara junto al murete quedan a −5,6 y −2,1 %, y el torsor de la viga, a +7 %;
+- con el giro coartado, las franjas quedan a +34 y +42 % (menos momento negativo, del lado inseguro), y el torsor, ×4,4.
+
+Ese giro sale de la sección rígida del enlace, no de la estructura, así que se queda en sólo uz. En la viga de borde, el giro no cambia nada en la viga (≤ 0,1 %).
 
 ### 1.5 C2-c
 

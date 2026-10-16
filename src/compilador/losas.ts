@@ -140,6 +140,11 @@ export interface Losas {
   puntosAncho: Map<string, number>;
   /** Enlaces rígidos de las caras de las vigas: los nudos de la losa en ellas, con maestro en el eje. */
   enlacesVigas: { viga: string; k: number; maestro: number; esclavos: number[] }[];
+  /**
+   * Por apoyo que llega a una viga por su ancho o su cara (fase LV) o a la huella de un pilar: las
+   * vigas a cuyo eje pasa y los pilares en cuya huella acaba.
+   */
+  apoyosAViga: Map<string, { vigas: string[]; pilares: string[]; nudos: number[] }>;
 }
 
 const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
@@ -312,6 +317,8 @@ interface PlantaL extends PlantaMuros {
   anchos: { a: AnchoViga; t: Trazo; g: number }[];
   /** Cargas puntuales en el ancho de una viga (índice local en `anchos`). */
   puntoAncho: Map<string, number>;
+  /** Apoyos puntuales en el ancho de una viga, fuera de su eje (índice local en `anchos`). */
+  apoyoAncho: Map<string, number>;
 }
 
 /**
@@ -349,6 +356,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     lineasAncho: new Map(),
     puntosAncho: new Map(),
     enlacesVigas: [],
+    apoyosAViga: new Map(),
   };
   const nudosAntes = topo.nudos.length;
   const indiceLosa = new Map(ctx.losas.map((l, i) => [l.losa.id, i] as const));
@@ -584,12 +592,13 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       }
       puntoDe.set(c.id, { i: a.punto([c.x, c.y], c.id, "punto", "su punto"), Q: [c.x, c.y] });
     }
+    // Y un apoyo, al eje de la viga (en la malla de la planta)
+    const apoyoAncho = new Map<string, number>();
     for (const ap of ctx.apoyos) {
       if (ap.planta !== idPlanta || topo.apoyoEn.has(ap.id)) continue;
       const en = anchos.length ? anchosPunto([ap.x, ap.y]) : [];
       if (en.length) {
-        const x = anchos[anchoMasCercano([ap.x, ap.y], en, anchos.map((y) => y.a))]!.a;
-        diag.error("apoyo/en-ancho-viga", `El apoyo ${ap.id} cae dentro del ancho de la viga ${x.viga} y fuera de su eje: ahí no hay losa (la losa se une a la viga por sus caras). Póngalo en el eje de la viga o fuera de su ancho.`, [ap.id, x.viga]);
+        apoyoAncho.set(ap.id, anchoMasCercano([ap.x, ap.y], en, anchos.map((y) => y.a)));
         continue;
       }
       puntoDe.set(ap.id, { i: a.punto([ap.x, ap.y], ap.id, "punto", "su punto"), Q: [ap.x, ap.y] });
@@ -599,7 +608,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       diag.error("malla/arreglo", `No se ha podido ordenar la geometría de la planta ${idPlanta} para mallarla: hay rasgos más pequeños que ${cm(epsSnap)} que se cruzan entre sí.`, [idPlanta, ...losasK.map(({ l }) => l.losa.id)]);
       return null;
     }
-    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco, refino: { caras: refino, separacion: 2 * epsSnap, esquinas: ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas, huellas: [...huellasK.values()], idsHuellas: [...huellasK.keys()].map((n) => topo.nudos[n]!.pilar!.pilares[0]!) }, anchos, puntoAncho };
+    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco, refino: { caras: refino, separacion: 2 * epsSnap, esquinas: ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas, huellas: [...huellasK.values()], idsHuellas: [...huellasK.keys()].map((n) => topo.nudos[n]!.pilar!.pilares[0]!) }, anchos, puntoAncho, apoyoAncho };
   };
   const montarTodas = (fijos: ReadonlyMap<number, Vec2[]>, d: Diagnosticos): Map<number, PlantaL> => {
     const e = new Map<number, PlantaL>();
@@ -624,6 +633,39 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
   if (ctx.muros.length && !est) return r;
   if (est) r.planMuros = planMuros(ctx, estado, puntosMuros, est, diag);
   const plan = r.planMuros;
+
+  /** Fase LV: el nudo de pilar del tramo en cuya zona rígida (C1-a) cae σ, si lo hay. */
+  const pilarEnZona = (tv: TramoViga, sg: number) => {
+    const f = ctx.op.factorZonaRigida;
+    return tv.cadena.find((c) => {
+      const pp = topo.nudos[c.nudo]!.pilar;
+      const cu = pp ? cuerdaEnTramo(tv, pp) : null;
+      return cu !== null && sg >= c.sigma - f * Math.max(0, c.sigma - cu[0]) - epsGeom && sg <= c.sigma + f * Math.max(0, cu[1] - c.sigma) + epsGeom;
+    });
+  };
+  /**
+   * Fase LV: el nudo del eje del tramo en σ: el de su cadena a ≤ ε_snap (con la holgura de
+   * `unirCaras`) o uno nuevo, que parte la viga.
+   */
+  const nudoEnEje = (tv: TramoViga, k: number, sg: number): number => {
+    const juntas = epsSnap + 10 * epsGeom;
+    let n = -1;
+    let dm = Infinity;
+    for (const c of tv.cadena) {
+      const d = Math.abs(c.sigma - sg);
+      if (d <= juntas && d < dm) [n, dm] = [c.nudo, d];
+    }
+    if (n >= 0) return n;
+    const { A, u } = tv.t;
+    topo.nudos.push({ k, x: A[0] + sg * u[0], y: A[1] + sg * u[1], fisicos: new Set(), pilar: null });
+    n = topo.nudos.length - 1;
+    tv.partes.push(n);
+    ordenarCadena(ctx, topo.nudos, tv, diag);
+    let s = topo.vigasEn.get(n);
+    if (!s) topo.vigasEn.set(n, (s = new Set()));
+    s.add(tv.viga.id);
+    return n;
+  };
 
   /**
    * Fase LV (§1.3 de `union-losa-viga.md`): las piezas de la malla en el ancho de las vigas, y la
@@ -679,12 +721,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       const tv = x.tramo;
       const sg = sigmaEnAncho(q, x);
       // En la zona rígida de la viga en un pilar del tramo (C1-a): con la huella del pilar
-      const f = ctx.op.factorZonaRigida;
-      const pilar = tv.cadena.find((c) => {
-        const pp = topo.nudos[c.nudo]!.pilar;
-        const cu = pp ? cuerdaEnTramo(tv, pp) : null;
-        return cu !== null && sg >= c.sigma - f * Math.max(0, c.sigma - cu[0]) - epsGeom && sg <= c.sigma + f * Math.max(0, cu[1] - c.sigma) + epsGeom;
-      });
+      const pilar = pilarEnZona(tv, sg);
       if (pilar) {
         let v = aPilar.get(pilar.nudo);
         if (!v) aPilar.set(pilar.nudo, (v = []));
@@ -1025,14 +1062,82 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       return { aristas, fuera, lados, enAncho };
     };
     const conPanos = ctx.panos.some((p) => p.k === k);
+    // Fase LV: lo que un apoyo coacciona dentro de una viga (sus lados en el ancho, y los nudos de las
+    // caras, que se mueven con ella) va al eje de la viga, con las mismas coacciones: un murete que
+    // llega a la viga la apoya en el cruce. Lo que cae en la zona rígida de un pilar del tramo, o en la
+    // huella de un pilar, es del pilar: ahí el apoyo acaba (un murete que llega al pilar sostiene la
+    // losa, no el pilar)
+    const maestroCara = new Map<number, { maestro: number; viga: string }>();
+    for (const x of caras.enlaces) for (const n of x.esclavos) maestroCara.set(n, { maestro: x.maestro, viga: x.viga });
+    const deHuella = new Map<number, string>();
+    for (const hh of huellasPlanta) for (const n of [hh.maestro, ...hh.esclavos]) deHuella.set(n, hh.pilar);
+    const regionesK = losaDeMallar.map((li) => r.regiones[li]!);
+    const ejesApoyo: number[] = [];
+    // El pilar en cuya huella (o en su borde) cae un punto
+    const huellaEn = (q: Vec2): number | undefined => {
+      for (const [pn, poli] of huellasK) if (puntoEnPoligono(q, poli) || distanciaABorde(q, poli) <= epsGeom) return pn;
+      return undefined;
+    };
+    const dePilar = (pn: number) => ({ nudo: pn, pilar: topo.nudos[pn]!.pilar!.pilares[0]! });
+    const alEje = (g: number, sg: number): { nudo: number; viga: string } | { nudo: number; pilar: string } => {
+      const x = r.anchos[g]!;
+      const p = pilarEnZona(x.tramo, sg);
+      if (p) return dePilar(p.nudo);
+      const { A, u } = x.tramo.t;
+      const ph = huellaEn([A[0] + sg * u[0], A[1] + sg * u[1]]);
+      if (ph !== undefined) return dePilar(ph);
+      const n = nudoEnEje(x.tramo, k, sg);
+      // Al diafragma, como los demás nudos de los ejes de los anchos (`unirCaras`)
+      if (!esclavoDe.has(n) && regionesK.some((rg) => distanciaARegion([topo.nudos[n]!.x, topo.nudos[n]!.y], rg) <= epsSnap)) ejesApoyo.push(n);
+      return { nudo: n, viga: x.viga };
+    };
+    const anotar = (id: string, que: "vigas" | "pilares", quien: string, nudo?: number) => {
+      let v = r.apoyosAViga.get(id);
+      if (!v) r.apoyosAViga.set(id, (v = { vigas: [], pilares: [], nudos: [] }));
+      if (!v[que].includes(quien)) v[que].push(quien);
+      if (nudo !== undefined && !v.nudos.includes(nudo)) v.nudos.push(nudo);
+    };
     for (const [id, t] of e.trazoApoyo) {
       const { aristas, fuera, enAncho } = recorrer(t);
       if (fuera) diag.error("apoyo/fuera-de-losa", `El apoyo lineal ${id} no va entero sobre las losas o los ejes de los muros de la planta ${idPlanta}.`, [id]);
-      if (enAncho.length) {
-        const v = r.anchos[enAncho[0]!.ancho]!.viga;
-        diag.error("apoyo/en-ancho-viga", `El apoyo lineal ${id} va en parte por dentro del ancho de la viga ${v}: ahí no hay losa (la losa se une a la viga por sus caras). Llévelo por el borde de la losa o fuera del ancho de la viga.`, [id, v]);
+      const nudos = new Set<number>();
+      for (const n of new Set(aristas.flat())) {
+        const c = maestroCara.get(n);
+        const ph = c ? huellaEn([topo.nudos[c.maestro]!.x, topo.nudos[c.maestro]!.y]) : undefined;
+        const pilar = deHuella.get(n) ?? (ph !== undefined ? dePilar(ph).pilar : undefined);
+        if (pilar !== undefined) anotar(id, "pilares", pilar);
+        else if (c) {
+          nudos.add(c.maestro);
+          anotar(id, "vigas", c.viga, c.maestro);
+        } else nudos.add(n);
       }
-      r.apoyosLineales.set(id, [...new Set(aristas.flat())]);
+      // Los lados en el ancho, a los nudos del eje en su proyección: un punto si lo cruzan, y los del
+      // trozo que recorren si van a lo largo
+      for (const { ancho: g, A, B } of enAncho) {
+        const x = r.anchos[g]!;
+        const [s0, s1] = [sigmaEnAncho(A, x), sigmaEnAncho(B, x)].sort((p, q) => p - q) as [number, number];
+        const puntos = s1 - s0 <= epsSnap ? [(s0 + s1) / 2] : [s0, s1];
+        for (const sg of puntos) {
+          const d = alEje(g, sg);
+          if ("pilar" in d) anotar(id, "pilares", d.pilar);
+          else {
+            nudos.add(d.nudo);
+            anotar(id, "vigas", d.viga, d.nudo);
+          }
+        }
+        if (puntos.length === 2)
+          for (const c of [...x.tramo.cadena]) {
+            if (c.sigma <= s0 || c.sigma >= s1 || nudos.has(c.nudo)) continue;
+            const d = alEje(g, c.sigma);
+            if ("pilar" in d) anotar(id, "pilares", d.pilar);
+            else {
+              nudos.add(d.nudo);
+              anotar(id, "vigas", d.viga, d.nudo);
+            }
+          }
+      }
+      if (!nudos.size && !fuera) diag.error("apoyo/sin-destino", `El apoyo lineal ${id} no apoya ningún nudo: va entero dentro de la huella de ${r.apoyosAViga.get(id)?.pilares.join(", ") ?? "un pilar"}, que es del pilar.`, [id]);
+      r.apoyosLineales.set(id, [...nudos]);
     }
     for (const [id, t] of e.trazoCarga) {
       const xy = (p: number): Vec2 => [a.puntos[p]!.x, a.puntos[p]!.y];
@@ -1084,16 +1189,47 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         continue;
       }
       if (esApoyo) {
-        r.apoyosPuntuales.set(id, n);
-        topo.nudos[n]!.fisicos.add(id);
+        // En la cara de una viga (fase LV): a su eje
+        const c = maestroCara.get(n);
+        if (c) anotar(id, "vigas", c.viga);
+        r.apoyosPuntuales.set(id, c?.maestro ?? n);
+        topo.nudos[c?.maestro ?? n]!.fisicos.add(id);
       } else r.puntos.set(id, n);
+    }
+    // Fase LV: los apoyos puntuales en el ancho de una viga, a su eje (o al pilar, en su zona rígida)
+    for (const [id, j] of e.apoyoAncho) {
+      const ap = ctx.apoyos.find((x) => x.id === id)!;
+      const g = e.anchos[j]!.g;
+      const d = alEje(g, sigmaEnAncho([ap.x, ap.y], r.anchos[g]!));
+      anotar(id, "pilar" in d ? "pilares" : "vigas", "pilar" in d ? d.pilar : d.viga);
+      r.apoyosPuntuales.set(id, d.nudo);
+      topo.nudos[d.nudo]!.fisicos.add(id);
+    }
+    for (const [id, { vigas, pilares }] of r.apoyosAViga) {
+      const lineal = e.trazoApoyo.has(id);
+      if (!lineal && !e.apoyoAncho.has(id) && !e.puntoDe.has(id)) continue;
+      const que = lineal ? "El apoyo lineal" : "El apoyo";
+      if (vigas.length)
+        diag.info(
+          "apoyo/a-viga",
+          `${que} ${id} llega a ${vigas.length > 1 ? "las vigas" : "la viga"} ${vigas.join(", ")} por su ${lineal ? "ancho o su cara" : e.apoyoAncho.has(id) ? "ancho" : "cara"}, donde la losa se mueve con la viga (fase LV): ahí apoya el eje de la viga, con sus mismas coacciones. Con sólo uz, la viga gira libre sobre su eje en el apoyo.`,
+          [id, ...vigas],
+        );
+      if (pilares.length)
+        diag.info(
+          "apoyo/en-pilar",
+          lineal
+            ? `El apoyo lineal ${id} entra en la huella de ${pilares.length > 1 ? "los pilares" : "el pilar"} ${pilares.join(", ")} (o en la zona rígida de una viga en ${pilares.length > 1 ? "ellos" : "él"}): ahí todo se mueve con el pilar, así que el apoyo acaba en su cara (sostiene la losa, no el pilar).`
+            : `El apoyo ${id} cae en el ancho de una viga junto al pilar ${pilares.join(", ")}, en su zona rígida: apoya el pilar.`,
+          [id, ...pilares],
+        );
     }
 
     // Diafragma (C2-f): con losas, los nudos de la malla que no son esclavos de una huella y los
     // maestros; sin ellas, todos los de la cota de la planta salvo los esclavos (C1-e)
     const maestros = huellasPlanta.map((x) => x.maestro);
     const enDiafragma = m ? nudosMalla : topo.nudos.flatMap((nd, n) => (nd.k === k && nd.z === undefined ? [n] : []));
-    r.diafragma.set(k, [...new Set([...enDiafragma.filter((n) => !esclavoDe.has(n)), ...maestros, ...caras.ejes])].sort((x, y) => x - y));
+    r.diafragma.set(k, [...new Set([...enDiafragma.filter((n) => !esclavoDe.has(n)), ...maestros, ...caras.ejes, ...ejesApoyo])].sort((x, y) => x - y));
   }
   if (diag.hayErrores) return r;
 

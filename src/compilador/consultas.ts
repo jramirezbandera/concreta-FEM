@@ -567,6 +567,8 @@ export class Consultas {
         const nd = this.modelo.nudos[n]!;
         if (Math.abs(nd.z - z) <= 1e-9 && this.tramoPor(al.puntos, [nd.x, nd.y])) r.push(n);
       }
+      // Fase LV: los del eje de las vigas a las que llega por su ancho o su cara
+      for (const n of this.mapeo.apoyosEnVigas?.[id] ?? []) if (!r.includes(n)) r.push(n);
       return r.sort((a, b) => a - b);
     }
     return null;
