@@ -12,7 +12,8 @@
  *
  * La medida que decidió LV2-f (A: la regla de antes con las esquinas; C y D: no sembrar lo que asoma)
  * está en §9 y en el `out_asoma.txt` del commit 1f46a20; necesitaba un interruptor en el compilador
- * que se quitó (§10).
+ * que se quitó (§10). Desde LV-8 (§13) la referencia lleva también las tiras, el ancho exacto y las
+ * caras hasta el ancho, así que el conjunto de estaciones y los números de LV1 no son los de §9.
  *
  *   bun validacion/lv2/asoma.ts > validacion/lv2/out_asoma.txt
  */

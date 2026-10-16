@@ -21,7 +21,12 @@
  *      (`refinoEsquinas`, LV2-f), en un pilar que atraviesa el ancho de una viga, sólo los de la
  *      huella o su borde: lo que asoma de la viga deja junto al pilar nudos a unos centímetros de
  *      la huella, y hacerlos rígidos rigidizaba la losa junto a él (la viga en su cara, hasta un
- *      21 % alta, y las franjas, hasta un 78 % bajas; `validacion/lv2/asoma.ts`);
+ *      21 % alta, y las franjas, hasta un 78 % bajas; `validacion/lv2/asoma.ts`). Y con LV2, lo
+ *      que siembra la malla junto a los anchos sigue sus caras (LV-8): el ancho es un trazo
+ *      exacto, lo que la huella sembrada tiene a ≤ ε_snap de una cara va sobre ella y los ejes de
+ *      las vigas se cortan en esa huella sembrada, la cara de franja de una huella tapada acaba
+ *      en la cara del ancho, y lo que asoma más de ε_snap llega a la rejilla en tiras
+ *      (`mallado.ts`, `rejilla.ts` §9). Lo rígido sigue siendo la huella de verdad;
  *    - vigas embebidas (C2-e, C3-e): sus tramos se parten en los nudos de la malla o de los muros
  *      sobre su eje, salvo en los de las huellas;
  *    - apoyos lineales, cargas lineales, zonas y puntos: los nudos, aristas o láminas que les tocan.
@@ -38,7 +43,7 @@ import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type AnchoMallar, type LosaMallar, type ResultadoMalla, type RefinoCaras } from "./mallado.ts";
 import { anchoMasCercano, anchosPlanta, anchoUnion, sigmaEnAncho, type AnchoViga } from "./anchosVigas.ts";
 import { estacionesBanda, ladoEstacion } from "./estaciones.ts";
-import { carasFranjas, ejesArmado, segmentosCara } from "./franjas.ts";
+import { carasFranjas, ejesArmado, segmentosCara, type CaraFranja } from "./franjas.ts";
 import { estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
 import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { cuerdaEnTramo, distanciaARegion, ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
@@ -447,8 +452,39 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     for (const n of nudosK) if (!huellasK.has(n)) a.fijo(topo.nudos[n]!.x, topo.nudos[n]!.y, n);
     for (const { w } of murosK) for (const P of puntosMuros[w]!) a.fijoMuro(P);
     for (const P of fijos) a.fijoMuro(P);
+    // Fase LV2 (LV-8): las caras de los anchos son trazos exactos (no se doblan), así que lo que
+    // la huella sembrada tiene a ≤ ε_snap de una cara (la esquina de un 40 bajo una viga de 30 en
+    // la que acaba, o el lado de un 60 × 25 dentro de ella) va a la cara, proyectado: es lo que el
+    // arreglo haría con un vértice que llega después (regla 1), y lo que hace `tapada` con lo que
+    // asoma ≤ ε_snap. Por las rectas de las caras de los anchos que pasan por el pilar (los de las
+    // vigas que lo cruzan o acaban en él), para que los lados de la huella sigan paralelos: en un
+    // 40 bajo una viga de 30 que acaba en su centro, las dos esquinas de cada lado van a la cara.
+    // Lo rígido sigue siendo la huella de verdad (C2-d, `unirCaras`); la sembrada sólo da la malla,
+    // y los ejes de las vigas se cortan en ella, para que acaben en su lado
+    const carasAnchoK = (anchosDe.get(k) ?? []).map((g) => {
+      const [d0, d1, i1, i0] = r.anchos[g]!.poligono as [Vec2, Vec2, Vec2, Vec2];
+      return { poli: r.anchos[g]!.poligono, caras: [[d0, d1] as const, [i0, i1] as const] };
+    });
+    const aLasCaras = (poli: readonly Vec2[], centro: Vec2): Vec2[] => {
+      const rectas = carasAnchoK.filter((x) => puntoEnPoligono(centro, x.poli) || distanciaABorde(centro, x.poli) <= epsSnap).flatMap((x) => x.caras);
+      return poli.map((q) => {
+        for (const [A, B] of rectas) {
+          const [ux, uy] = [B[0] - A[0], B[1] - A[1]];
+          const L2 = ux * ux + uy * uy;
+          if (!(L2 > 0)) continue;
+          const t = ((q[0] - A[0]) * ux + (q[1] - A[1]) * uy) / L2;
+          const X: Vec2 = [A[0] + t * ux, A[1] + t * uy];
+          const d = Math.hypot(q[0] - X[0], q[1] - X[1]);
+          if (d > 10 * epsGeom && d <= epsSnap + 10 * epsGeom) return X;
+        }
+        return q;
+      });
+    };
+    /** Huella que se siembra de cada pilar: la de verdad, o con lo que tiene a ≤ ε_snap de una cara de ancho sobre ella (LV2). */
+    const huellasSembradas = new Map<number, Vec2[]>();
+    for (const [n, poli] of huellasK) huellasSembradas.set(n, ctx.op.refinoEsquinas ? aLasCaras(poli, [topo.nudos[n]!.x, topo.nudos[n]!.y]) : poli);
     for (const tv of tramosK) {
-      const polis = tv.cadena.flatMap((c) => (huellasK.has(c.nudo) ? [huellasK.get(c.nudo)!] : []));
+      const polis = tv.cadena.flatMap((c) => (huellasSembradas.has(c.nudo) ? [huellasSembradas.get(c.nudo)!] : []));
       const { A, B } = tv.t;
       for (const [t0, t1] of fueraDeHuellas(A, B, polis)) {
         if (!((t1 - t0) * tv.t.len > epsGeom)) continue;
@@ -472,7 +508,37 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
           return polisAnchoK.some((pa) => puntoEnPoligono(q, pa) || distanciaABorde(q, pa) <= epsSnap + 10 * epsGeom);
         });
       });
-    for (const [n, poli] of huellasK) if (!tapada(poli)) a.trazo(topo.nudos[n]!.pilar!.pilares[0]!, "huella", n, poli, true);
+    /** Huellas tapadas (sin sembrar), por el id de su pilar: su nudo. */
+    const tapadas = new Map<string, number>();
+    for (const [n, poli] of huellasK) {
+      if (tapada(poli)) tapadas.set(topo.nudos[n]!.pilar!.pilares[0]!, n);
+      else a.trazo(topo.nudos[n]!.pilar!.pilares[0]!, "huella", n, huellasSembradas.get(n)!, true);
+    }
+    // Fase LV2 (LV-8): con la huella tapada por el ancho de su viga, la cara de franja que pasa por
+    // dentro de ella (la cara común de C5-g) acaba en la cara del ancho, no en la de la huella. Con un
+    // pilar más ancho que la viga (un 40 bajo una de 30), su extremo quedaba suelto a lo que asoma
+    // (≤ ε_snap) de la cara del ancho, y con uno más estrecho (un 25 × 60 bajo una de 30), un trozo
+    // de 2,5 cm dentro del ancho: la triangulación unía los dos con astillas. Lo que gana la cara
+    // cae en la huella, rígido con el pilar como su extremo en la cara del ancho (C2-d, `unirCaras`)
+    const hastaElAncho = (c: CaraFranja, { d, n }: { d: Vec2; n: Vec2 }) => {
+      for (const p of c.pilares) {
+        const pn = tapadas.get(p.id);
+        if (pn === undefined) continue;
+        const q: Vec2 = [topo.nudos[pn]!.x, topo.nudos[pn]!.y];
+        for (const g of anchosDe.get(k) ?? []) {
+          const x = r.anchos[g]!;
+          const { u } = x.tramo.t;
+          // Sólo un ancho a lo largo de d, que cruza la recta de la cara (según n) en perpendicular
+          if (Math.abs(u[0] * d[0] + u[1] * d[1]) < 1 - 1e-9 || !puntoEnPoligono(q, x.poligono)) continue;
+          const tc = q[0] * n[0] + q[1] * n[1];
+          const [lo, hi] = [tc - x.b / 2, tc + x.b / 2];
+          c.tramos = c.tramos.flatMap(([t0, t1]): [number, number][] => {
+            const [a, b] = [Math.abs(t0 - p.t1) <= 1e-9 ? hi : t0, Math.abs(t1 - p.t0) <= 1e-9 ? lo : t1];
+            return b - a > 1e-9 ? [[a, b]] : [];
+          });
+        }
+      }
+    };
     const muros: TrazoMuro[] = [];
     for (const { m, w } of murosK) {
       const t = a.trazo(m.muro.id, "muro", w, puntosMuros[w]!, false);
@@ -485,9 +551,16 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // Fase LV: el ancho de las vigas, después de los muros y antes que las losas, cuyos bordes se unen
     // a sus caras
     const anchos: PlantaL["anchos"] = [];
+    // Fase LV2 (LV-8): el trazo del ancho es exacto, para que sus caras no se tuerzan. Si no, el
+    // vértice del extremo de un ancho que acaba dentro de la huella de su pilar (una viga que llega
+    // a un pilar circular, o a uno más ancho que ella con losa por el otro lado) se unía a lo que
+    // tenía a ≤ ε_snap (la huella), y una esquina de huella a 2,5 cm de la cara la doblaba (regla 2):
+    // la cara quedaba inclinada hasta 5 cm a lo largo de toda la viga, ni era una línea de la
+    // rejilla ni acababan en ella las caras de las franjas. Lo que las huellas tienen a ≤ ε_snap de
+    // una cara ya está sobre ella (`aLasCaras`)
     for (const g of anchosDe.get(k) ?? []) {
       const x = r.anchos[g]!;
-      const t = a.trazo(x.viga, "ancho", x.tramo.id, x.poligono, true);
+      const t = a.trazo(x.viga, "ancho", x.tramo.id, x.poligono, true, ctx.op.refinoEsquinas);
       if (t) anchos.push({ a: x, t, g });
     }
     const mallar: LosaMallar[] = [];
@@ -523,6 +596,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       for (const { l } of losasK) {
         const ejes = ejesArmado(l.losa);
         for (const c of carasFranjas(ctx, l)) {
+          if (ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas && tapadas.size) hastaElAncho(c, ejes[c.direccion]);
           for (const seg of segmentosCara(c, ejes[c.direccion])) caras.push({ id: l.losa.id, seg });
           if (ctx.op.refinoCaras)
             for (const p of c.pilares) {

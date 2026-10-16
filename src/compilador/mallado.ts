@@ -562,6 +562,8 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   let rj: Rejilla | null = null;
   /** Id (el del pilar) de cada huella, en el orden de la rejilla. */
   const idHuella: string[] = [];
+  /** Si cada huella de la rejilla es una tira (LV-8), en el mismo orden. */
+  const tiraHuella: boolean[] = [];
   if (rejilla && losas.length) {
     const ladoEnLosa = lados.map((l, k) => {
       if (conAnchos) return ladoA[k]!.relevante;
@@ -572,9 +574,66 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     lados.forEach((l, k) => {
       if (ladoEnLosa[k]) puntoEnLosa[l.a] = puntoEnLosa[l.b] = true;
     });
-    // Huellas de los pilares: sus puntos y sus lados
-    const huellas = arreglo.trazos.flatMap((t, ti) => (t.tipo === "huella" ? [{ puntos: t.puntos, lados: lados.flatMap((l, k) => (l.trazos.includes(ti) ? [k] : [])) }] : []));
-    idHuella.push(...arreglo.trazos.filter((t) => t.tipo === "huella").map((t) => t.id));
+    // Huellas de los pilares: sus puntos y sus lados. Con el ancho de las vigas y las esquinas de los
+    // paños (fase LV2, LV-8): la huella que un ancho atraviesa de lado a lado va por las tiras que
+    // asoman de él, cada una como huella de su grupo (el pilar): un pilar de fachada enrasado contra
+    // el ancho, con su plantilla. Sin tiras, lo que asoma lo mallaba la triangulación con astillas
+    const huellas: { puntos: number[]; lados: number[]; grupo: number; tira?: boolean }[] = [];
+    const centroHuella: Vec2[] = [];
+    const tolTira = 10 * epsGeom;
+    let grupo = 0;
+    arreglo.trazos.forEach((t, ti) => {
+      if (t.tipo !== "huella") return;
+      const ladosT = lados.flatMap((l, k) => (l.trazos.includes(ti) ? [k] : []));
+      const c = t.puntos.reduce((a, p) => [a[0] + P[p]![0] / t.puntos.length, a[1] + P[p]![1] / t.puntos.length] as Vec2, [0, 0] as Vec2);
+      const g = grupo++;
+      // Los anchos que pasan por su centro y la atraviesan entera (todos sus puntos entre los extremos
+      // del ancho): el de una viga que acaba en el pilar deja lo que asoma sin forma de rectángulo
+      const atraviesan =
+        conAnchos && refino?.esquinas
+          ? enAnchos(c).filter((i) => {
+              const { A, B, u } = anchosP[i]!;
+              const L = (B[0] - A[0]) * u[0] + (B[1] - A[1]) * u[1];
+              return t.puntos.every((p) => {
+                const sg = (P[p]![0] - A[0]) * u[0] + (P[p]![1] - A[1]) * u[1];
+                return sg >= -tolTira && sg <= L + tolTira;
+              });
+            })
+          : [];
+      if (!atraviesan.length) {
+        huellas.push({ puntos: t.puntos, lados: ladosT, grupo: g });
+        idHuella.push(t.id);
+        tiraHuella.push(false);
+        centroHuella.push(c);
+        return;
+      }
+      // A qué lado de cada ancho cae cada punto (0: dentro); las tiras, por su firma
+      const firma = (p: number) =>
+        atraviesan.map((i) => {
+          const { A, u } = anchosP[i]!;
+          const sd = -(P[p]![0] - A[0]) * u[1] + (P[p]![1] - A[1]) * u[0];
+          const b2 = anchos[i]!.b / 2;
+          return sd >= b2 - tolTira ? 1 : sd <= -b2 + tolTira ? -1 : 0;
+        });
+      const tiras = new Map<string, number[]>();
+      for (const p of t.puntos) {
+        const f = firma(p);
+        if (f.includes(0)) continue;
+        const clave = f.join(",");
+        let v = tiras.get(clave);
+        if (!v) tiras.set(clave, (v = []));
+        v.push(p);
+      }
+      for (const [, puntos] of [...tiras].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+        // Una tira fuera de las losas (lo que asoma de un pilar de borde hacia fuera) no es huella
+        if (!puntos.some((p) => puntoEnLosa[p])) continue;
+        const en = new Set(puntos);
+        huellas.push({ puntos, lados: ladosT.filter((k) => en.has(lados[k]!.a) && en.has(lados[k]!.b)), grupo: g, tira: true });
+        idHuella.push(t.id);
+        tiraHuella.push(true);
+        centroHuella.push(c);
+      }
+    });
     const exactos = lados.map((l) => l.trazos.some((t) => arreglo.trazos[t]!.exacto));
     // Fase LV: las caras de los anchos de las vigas (sus lados paralelos al eje) son líneas fuertes de
     // la rejilla, y el eje de un pilar no lo es en la dirección de un ancho que pasa por su centro
@@ -594,8 +653,8 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         })
       : undefined;
     const sinEje = conAnchos
-      ? huellas.map((hh): [boolean, boolean] => {
-          const c = hh.puntos.reduce((a, p) => [a[0] + P[p]![0] / hh.puntos.length, a[1] + P[p]![1] / hh.puntos.length] as Vec2, [0, 0] as Vec2);
+      ? huellas.map((_, kh): [boolean, boolean] => {
+          const c = centroHuella[kh]!;
           const r: [boolean, boolean] = [false, false];
           for (const i of enAnchos(c)) {
             const { u } = anchosP[i]!;
@@ -670,6 +729,8 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   );
   const aristasPlantilla = new Set<string>();
   const cadenaHuella = new Map<number, number[]>();
+  /** Lados de las tiras de huella (LV-8): sobre la cara de un ancho, con la triangulación al otro lado. */
+  const ladosTira = new Set<number>();
   // Aristas de la rejilla que una plantilla refinada parte en más de dos (F2): sus nudos de una
   // punta a la otra, por la clave «p,q» de sus extremos en P
   const subdividida = new Map<string, number[]>();
@@ -690,6 +751,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     const n = anillo.length;
     const dePunto = new Set(anillo.filter((p) => p < nPuntos));
     for (const k of rj!.plantillas[t]!.huellaLados) {
+      if (tiraHuella[rj!.plantillas[t]!.huella]) ladosTira.add(k);
       const l = lados[k]!;
       // Del extremo a, por el anillo, hasta el siguiente punto del arreglo en un sentido u otro
       const ia = anillo.indexOf(l.a);
@@ -776,7 +838,12 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       return [l.a, l.b];
     }
     const ch = cadenaHuella.get(k);
-    if (ch) return ch;
+    if (ch) {
+      // El lado de una tira de huella sobre la cara del ancho de una viga (LV2, LV-8): al otro lado
+      // está el ancho, que malla la triangulación, así que es obligatorio
+      if (ladosTira.has(k) && ladoA[k]!.borde) for (let m = 0; m + 1 < ch.length; m++) restringir(ch[m]!, ch[m + 1]!);
+      return ch;
+    }
     const el = rj?.enLinea[k];
     const borde = conAnchos ? ladoA[k]!.borde : l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!));
     const cortes: { p: number; n: number }[] = [];
@@ -1371,6 +1438,16 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   const problemas: ProblemaMalla[] = [];
   if (!conformes) problemas.push({ losa: -1, severidad: "error", codigo: "malla/conformidad", mensaje: "La rejilla y la triangulación no parten igual una arista de la interfaz. Es un fallo del compilador." });
   if (rj?.sinRefinar.length) problemas.push(avisoSinRefinar(rj.sinRefinar.map((k) => idHuella[k]!), "su plantilla no admite el refinamiento con calidad"));
+  if (rj?.tirasSinPlantilla.length) {
+    const ids = [...new Set(rj.tirasSinPlantilla.map((k) => idHuella[k]!))].sort();
+    problemas.push({
+      objetos: ids,
+      losa: -1,
+      severidad: "aviso",
+      codigo: "malla/pilar-asoma-sin-plantilla",
+      mensaje: `${ids.join(", ")} ${ids.length > 1 ? "asoman" : "asoma"} del ancho de la viga que ${ids.length > 1 ? "los" : "lo"} atraviesa y lo que asoma no cabe en una plantilla de la rejilla (hay un hueco, una carga u otro rasgo cerca): lo malla la triangulación, con elementos peores junto a sus caras. El cálculo es válido; revise las franjas en esas caras o baje el tamaño de malla.`,
+    });
+  }
   for (const triangulacion of [true, false]) {
     const ids = (rj?.esquinasSinRefinar ?? []).filter((x) => x.triangulacion === triangulacion).map((x) => refino?.idsHuellas?.[x.huella] ?? `#${x.huella}`);
     if (ids.length) problemas.push(avisoEsquinaSinRefinar(ids, triangulacion ? "una esquina de su cruce cae en la triangulación (junto a un hueco, una carga u otro rasgo que no sigue la rejilla)" : "la plantilla de esquina no cabe o no tiene calidad"));

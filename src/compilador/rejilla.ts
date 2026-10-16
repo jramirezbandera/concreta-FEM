@@ -76,6 +76,16 @@
  *    suyo. Los pilares de un cruce que se queda sin plantilla van en `esquinasSinRefinar`, para el
  *    aviso `malla/esquina-sin-refinar` (LV2-g: refinar una esquina de la triangulación exigiría una
  *    plantilla propia para ella).
+ * 9. Tiras de huella (fase LV2, LV-8): la huella de un pilar que el ancho de una viga atraviesa de
+ *    lado a lado llega en tiras, una por lado del ancho (`tira`, del mismo `grupo`): lo que asoma de
+ *    la viga (un 30 × 50 bajo una de 30). Cada tira es una huella de pilar de fachada enrasado
+ *    contra el ancho (la cara sobre la línea fuerte de la viga, con el ancho, que no es losa, al otro
+ *    lado) y lleva la plantilla de 5, con el refinamiento de sus caras. Los rasgos de una tira no son
+ *    ajenos para las celdas de las otras, y un pilar lleva plantilla en todas sus tiras o en ninguna
+ *    (`tirasSinPlantilla`, para el aviso `malla/pilar-asoma-sin-plantilla`: lo que asoma lo malla
+ *    entonces la triangulación, con astillas). La celda de una tira cuenta como esquina refinada
+ *    para su cruce (8). Sin tiras, lo que asomaba dejaba irregulares las celdas junto al pilar y la
+ *    triangulación lo unía a las caras con astillas (jacobiano 0,11–0,19).
  *
  * Puro y determinista; las comparaciones con umbral llevan holgura para que un ruido de ε_geom o el
  * redondeo de un giro no cambien la rejilla.
@@ -125,8 +135,13 @@ export interface EntradaRejilla {
   fijos: readonly boolean[];
   /** Lados de los trazos exactos (las caras de las bandas, C5-g). Sin él, ninguno. */
   exactos?: readonly boolean[];
-  /** Huellas de los pilares: sus puntos, en orden, y sus lados. */
-  huellas: readonly { puntos: readonly number[]; lados: readonly number[] }[];
+  /**
+   * Huellas de los pilares: sus puntos, en orden, y sus lados. Con el ancho de las vigas (fase LV2,
+   * LV-8), la huella que un ancho atraviesa va en tiras, una por lado (`tira`), todas del mismo
+   * `grupo` (el pilar): un rasgo de una tira no es ajeno para las celdas de las otras, y el pilar
+   * lleva plantilla en todas sus tiras o en ninguna. Sin `grupo`, cada huella es el suyo.
+   */
+  huellas: readonly { puntos: readonly number[]; lados: readonly number[]; grupo?: number; tira?: boolean }[];
   /** Caras que se refinan de cada huella (F2), o null. Sin él, ninguna. */
   refino?: readonly (RefinoHuella | null)[];
   /**
@@ -281,6 +296,12 @@ export interface Rejilla {
    * no, la plantilla no cabe o no tiene calidad.
    */
   esquinasSinRefinar: { huella: number; triangulacion: boolean }[];
+  /**
+   * Huellas en tiras (un pilar que asoma del ancho de la viga que lo atraviesa, LV-8) sin plantilla
+   * (la primera tira de cada pilar): su bloque tiene cerca un hueco, una carga u otro rasgo, o se
+   * solapa con otra plantilla, y lo que asoma lo malla la triangulación, con astillas.
+   */
+  tirasSinPlantilla: number[];
   posicion(n: number): Vec2;
   /** Celda que contiene un punto (interior), o −1. */
   celdaDe(q: Vec2): number;
@@ -499,11 +520,13 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
   });
 
   // 4. Lados por las líneas y rasgos ajenos a la rejilla, con su huella (−2 si no son de una)
+  // (por grupos: las tiras de una huella atravesada por un ancho son del mismo pilar, LV-8)
+  const grupoDe = (k: number) => E.huellas[k]!.grupo ?? k;
   const huellaDePunto = new Int32Array(P.length).fill(-2);
   const huellaDeLado = new Int32Array(lados.length).fill(-2);
   E.huellas.forEach((hh, k) => {
-    for (const p of hh.puntos) huellaDePunto[p] = huellaDePunto[p] === -2 ? k : -3;
-    for (const l of hh.lados) huellaDeLado[l] = huellaDeLado[l] === -2 ? k : -3;
+    for (const p of hh.puntos) huellaDePunto[p] = huellaDePunto[p] === -2 ? grupoDe(k) : -3;
+    for (const l of hh.lados) huellaDeLado[l] = huellaDeLado[l] === -2 ? grupoDe(k) : -3;
   });
   const ajenos: { A: Vec2; B: Vec2; huella: number }[] = [];
   P.forEach((_, p) => {
@@ -554,7 +577,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     }
   });
 
-  // Celdas con rasgos ajenos a menos de δ: −1 ninguno, k sólo de la huella k, −2 otros
+  // Celdas con rasgos ajenos a menos de δ: −1 ninguno, g sólo del grupo de huellas g, −2 otros
   const cerca = new Int32Array(nc).fill(-1);
   for (const { A, B, huella } of ajenos) {
     const i0 = Math.max(0, tramo(U, Math.min(A[0], B[0]) - delta));
@@ -649,7 +672,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     for (const a of mu.celdas)
       for (const b of mv.celdas) {
         const c = celda(a, b);
-        if (cerca[c] !== -1 && cerca[c] !== k) return;
+        if (cerca[c] !== -1 && cerca[c] !== grupoDe(k)) return;
         if (losaCelda[c]! >= 0) {
           if (anillo(a, b)) return;
           enLosa++;
@@ -664,12 +687,34 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
   const uso = new Uint8Array(nc);
   const bloque = (x: { mu: ModoPlantilla; mv: ModoPlantilla }) => x.mu.celdas.flatMap((a) => x.mv.celdas.map((b) => celda(a, b)));
   for (const x of candidatas) for (const c of bloque(x)) uso[c]!++;
-  const conPlantilla = new Uint8Array(E.huellas.length);
+  const nGrupos = E.huellas.reduce((m, _, k) => Math.max(m, grupoDe(k) + 1), 0);
+  const conPlantilla = new Uint8Array(nGrupos);
   const estado = new Uint8Array(nc);
-  const elegidas = candidatas.filter((x) => bloque(x).every((c) => uso[c] === 1));
+  // Un pilar en tiras (LV-8) lleva plantilla en todas o en ninguna: si una no puede, las demás
+  // dejarían sus rasgos sueltos junto a la triangulación
+  const porGrupo = new Int32Array(nGrupos);
+  const elegidasGrupo = new Int32Array(nGrupos);
+  E.huellas.forEach((_, k) => porGrupo[grupoDe(k)]!++);
+  for (const x of candidatas.filter((x) => bloque(x).every((c) => uso[c] === 1))) elegidasGrupo[grupoDe(x.k)]!++;
+  const elegidas = candidatas.filter((x) => bloque(x).every((c) => uso[c] === 1) && elegidasGrupo[grupoDe(x.k)] === porGrupo[grupoDe(x.k)]);
+  const tirasSinPlantilla: number[] = [];
+  {
+    const vistos = new Set<number>();
+    E.huellas.forEach((hh, k) => {
+      if (!hh.tira || vistos.has(grupoDe(k)) || elegidas.some((x) => x.k === k)) return;
+      vistos.add(grupoDe(k));
+      tirasSinPlantilla.push(k);
+    });
+  }
+  /** Huella (índice en `E.huellas`) cuya plantilla cubre cada celda, o −1. */
+  const huellaDeCelda = new Int32Array(nc).fill(-1);
   for (const x of elegidas) {
-    conPlantilla[x.k] = 1;
-    for (const c of bloque(x)) if (losaCelda[c]! >= 0) estado[c] = PLANTILLA;
+    conPlantilla[grupoDe(x.k)] = 1;
+    for (const c of bloque(x))
+      if (losaCelda[c]! >= 0) {
+        estado[c] = PLANTILLA;
+        huellaDeCelda[c] = x.k;
+      }
   }
 
   // 6. Estados
@@ -1384,6 +1429,9 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
           return b.dentro || b.d < 2 * (E.separacionRefino ?? 0) + 2 * menor;
         });
       }
+      // La plantilla de una tira de huella (un pilar que asoma del ancho de la viga, LV-8) ya es una
+      // red estructurada en la esquina, con lo que asoma dentro: no impide refinar las demás
+      if (estado[c] === PLANTILLA) return huellaDeCelda[c]! >= 0 && E.huellas[huellaDeCelda[c]!]!.tira === true;
       if (estado[c] !== REGULAR || (PLANTILLA_ESQUINA.tipo !== "graduada" && (pu !== 2 || pv !== 2))) return false;
       // Ningún nudo nuevo que se haga rígido, y con calidad
       const pl = plantillaEsquina(i, j, su, sv, k, pu, pv);
@@ -1461,5 +1509,5 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     const [i, j] = [n % nu, Math.floor(n / nu)];
     return Math.abs(n1 - n2) === 1 ? partidaH[i + j * (nu - 1)] === 1 : partidaV[i + j * nu] === 1;
   };
-  return { U, V, estado, losa, puntoNudo, nudoPunto, absorbidos, enLinea, interfaz, plantillas, sinRefinar, esquinasSinRefinar, posicion, celdaDe, toca, cubre, estadosArista, partida };
+  return { U, V, estado, losa, puntoNudo, nudoPunto, absorbidos, enLinea, interfaz, plantillas, sinRefinar, esquinasSinRefinar, tirasSinPlantilla, posicion, celdaDe, toca, cubre, estadosArista, partida };
 }
