@@ -1,0 +1,400 @@
+## Y7: la estación de apoyo en la cara sur de X5 (y = 4,85) junto a P6-5, retícula de 4 × 4
+
+### Las franjas Y4…Y9 en esa cara: mx / my / mxy de ELU (kN·m/m), ancho en losa (m) y superior de Wood–Armer (kN·m/m)
+
+   Y4 [2.455, 3.273]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75        -4.27    24.68    -5.14   0.568      5.34           -45.3 %        79.9 %
+      LV2 0,75       -10.37    27.90     0.11   0.568     10.37             6.1 %       100.0 %
+      LV1 0,5         -7.36    20.75    -1.05   0.568      7.41           -24.2 %        99.3 %
+      LV2 0,5         -9.64    25.29     0.27   0.568      9.64            -1.3 %       100.0 %
+      LV2 0,25        -9.48    25.94     0.11   0.568      9.48            -3.0 %       100.0 %
+      LV1 0,125       -9.23    22.95     0.03   0.568      9.23            -5.6 %       100.0 %
+      LV2 0,125       -9.76    27.35     0.46   0.568      9.77             0.0 %        99.9 %
+   Y5 [3.273, 4.091]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -11.17    12.19     3.12   0.818     11.96             5.3 %        93.3 %
+      LV2 0,75       -11.17    13.83    -1.66   0.818     11.37             0.1 %        98.2 %
+      LV1 0,5        -11.23    13.56    -0.45   0.818     11.25            -1.0 %        99.9 %
+      LV2 0,5        -11.00    13.53    -2.36   0.818     11.41             0.4 %        96.4 %
+      LV2 0,25       -11.01    13.28    -2.01   0.818     11.32            -0.3 %        97.3 %
+      LV1 0,125      -11.16    12.54    -1.85   0.818     11.43             0.6 %        97.6 %
+      LV2 0,125      -11.00    12.61    -2.12   0.818     11.36             0.0 %        96.9 %
+   Y6 [4.091, 4.909]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -15.00     3.61     0.64   0.818     15.11             2.8 %        99.3 %
+      LV2 0,75       -14.85     2.57     0.35   0.818     14.89             1.3 %        99.7 %
+      LV1 0,5        -14.92     1.86     0.68   0.818     15.17             3.2 %        98.4 %
+      LV2 0,5        -14.70     1.78     0.44   0.818     14.81             0.8 %        99.3 %
+      LV2 0,25       -14.64     1.62     0.66   0.818     14.91             1.5 %        98.2 %
+      LV1 0,125      -14.46     1.51     0.65   0.818     14.74             0.3 %        98.1 %
+      LV2 0,125      -14.43     1.51     0.64   0.818     14.70             0.0 %        98.2 %
+   Y7 [4.909, 5.727]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -29.44   -19.03    -1.76   0.818     31.20            -6.6 %        94.4 %
+      LV2 0,75       -25.48   -11.33    -0.00   0.818     25.48           -23.7 %       100.0 %
+      LV1 0,5        -28.11   -17.69     2.16   0.818     30.28            -9.4 %        92.9 %
+      LV2 0,5        -26.89   -15.44     2.11   0.818     29.01           -13.2 %        92.7 %
+      LV2 0,25       -27.57   -17.15     4.17   0.818     31.74            -5.0 %        86.9 %
+      LV1 0,125      -27.38   -16.54     6.04   0.818     33.42             0.0 %        81.9 %
+      LV2 0,125      -27.37   -16.55     6.04   0.818     33.41             0.0 %        81.9 %
+   Y8 [5.727, 6.545]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -38.25   -30.99     2.49   0.518     40.74            -2.3 %        93.9 %
+      LV2 0,75       -38.42   -31.71     0.59   0.518     39.01            -6.5 %        98.5 %
+      LV1 0,5        -40.88   -32.35     0.83   0.518     41.71            -0.0 %        98.0 %
+      LV2 0,5        -39.32   -32.44     0.40   0.518     39.72            -4.8 %        99.0 %
+      LV2 0,25       -40.43   -32.56    -0.31   0.518     40.73            -2.4 %        99.2 %
+      LV1 0,125      -40.48   -32.44    -1.24   0.518     41.72             0.0 %        97.0 %
+      LV2 0,125      -40.47   -32.45    -1.25   0.518     41.72             0.0 %        97.0 %
+   Y9 [6.545, 7.364]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -24.03    -8.05     1.15   0.818     25.18            -3.9 %        95.4 %
+      LV2 0,75       -22.08    -1.73    -0.57   0.818     22.65           -13.5 %        97.5 %
+      LV1 0,5        -22.53    -6.88    -1.35   0.818     23.88            -8.8 %        94.3 %
+      LV2 0,5        -22.69    -5.02    -1.75   0.818     24.44            -6.7 %        92.8 %
+      LV2 0,25       -22.27    -7.12    -2.97   0.818     25.25            -3.6 %        88.2 %
+      LV1 0,125      -22.19    -7.41    -4.04   0.818     26.22             0.1 %        84.6 %
+      LV2 0,125      -22.16    -7.41    -4.03   0.818     26.20             0.0 %        84.6 %
+
+### La cara entera del paño (x de 3.125 a 5.85) por un corte: My total de ELU (kN·m) y ecuaciones
+
+   LV1 0,75      -50.81      0.0 %   5391 ecuaciones
+   LV2 0,75      -49.80     -2.0 %   5952 ecuaciones   sin refinar: P12-10, P12-15, P18-10, P18-15
+   LV1 0,5       -51.26      0.9 %   6528 ecuaciones
+   LV2 0,5       -50.58     -0.4 %   7398 ecuaciones
+   LV2 0,25      -51.01      0.4 %   17085 ecuaciones   sin refinar: P0-5, P12-5, P6-5
+   LV1 0,125     -50.79     -0.0 %   49989 ecuaciones
+   LV2 0,125     -50.79      0.0 %   50247 ecuaciones   sin refinar: P0-0, P0-10, P0-15, P0-5, P12-0, P12-10, P12-15, P12-5, P18-0, P18-10, P18-15, P18-5, P6-0, P6-10, P6-15, P6-5
+
+### Lo que entra por cada nudo de la cara con x ≥ 4,0 (My de ELU, kN·m; acumulado desde x = 4,0; enlace del nudo)
+
+   LV1 0,75:
+      x =   4.344   My =    -5.45   acumulado    -5.45   [X5-N1]
+      x =   4.750   My =    -8.61   acumulado   -14.06   [X5-N1]
+      x =   5.300   My =   -15.42   acumulado   -29.48   [X5-N1]
+      x =   5.850   My =   -11.26   acumulado   -40.74   [P6-5]
+   LV2 0,75:
+      x =   4.344   My =    -5.33   acumulado    -5.33   [X5-N1]
+      x =   4.750   My =    -8.64   acumulado   -13.97   [X5-N1]
+      x =   5.300   My =    -9.78   acumulado   -23.76   [X5-N1]
+      x =   5.575   My =    -5.63   acumulado   -29.39   [X5-N1]
+      x =   5.712   My =    -5.40   acumulado   -34.79   [X5-N1]
+      x =   5.850   My =    -3.53   acumulado   -38.31   [P6-5]
+   LV1 0,5:
+      x =   4.344   My =    -5.52   acumulado    -5.52   [X5-N1]
+      x =   4.750   My =    -5.59   acumulado   -11.11   [X5-N1]
+      x =   5.025   My =    -5.90   acumulado   -17.01   [X5-N1]
+      x =   5.300   My =    -7.16   acumulado   -24.17   [X5-N1]
+      x =   5.575   My =    -9.69   acumulado   -33.86   [X5-N1]
+      x =   5.850   My =    -6.49   acumulado   -40.35   [P6-5]
+   LV2 0,5:
+      x =   4.344   My =    -5.41   acumulado    -5.41   [X5-N1]
+      x =   4.750   My =    -5.54   acumulado   -10.95   [X5-N1]
+      x =   5.025   My =    -5.89   acumulado   -16.84   [X5-N1]
+      x =   5.300   My =    -7.26   acumulado   -24.09   [X5-N1]
+      x =   5.575   My =    -6.30   acumulado   -30.40   [X5-N1]
+      x =   5.712   My =    -5.44   acumulado   -35.84   [X5-N1]
+      x =   5.850   My =    -3.54   acumulado   -39.37   [P6-5]
+   LV2 0,25:
+      x =   4.141   My =    -2.57   acumulado    -2.57   [X5-N1]
+      x =   4.344   My =    -2.71   acumulado    -5.28   [X5-N1]
+      x =   4.547   My =    -2.88   acumulado    -8.16   [X5-N1]
+      x =   4.750   My =    -3.12   acumulado   -11.28   [X5-N1]
+      x =   4.933   My =    -3.59   acumulado   -14.86   [X5-N1]
+      x =   5.117   My =    -4.17   acumulado   -19.04   [X5-N1]
+      x =   5.300   My =    -4.74   acumulado   -23.77   [X5-N1]
+      x =   5.483   My =    -5.55   acumulado   -29.32   [X5-N1]
+      x =   5.667   My =    -7.18   acumulado   -36.50   [X5-N1]
+      x =   5.850   My =    -4.56   acumulado   -41.07   [P6-5]
+
+### Acumulado de la cara por tramos de x (My de ELU, kN·m): [4,0, 4,909], [4,909, 5,727] (Y7) y [5,727, 5,85]
+
+                [4.000, 4.909]    [4.909, 5.727]    [5.727, 5.850]   total x ≥ 4
+LV1 0,75                -14.06            -15.42              0.00        -29.48
+LV2 0,75                -13.97            -20.81              0.00        -34.79
+LV1 0,5                 -11.11            -22.75              0.00        -33.86
+LV2 0,5                 -10.95            -24.89              0.00        -35.84
+LV2 0,25                -11.28            -25.23              0.00        -36.50
+LV1 0,125               -13.09            -20.61             -4.78        -38.48
+LV2 0,125               -13.06            -20.60             -4.78        -38.44
+
+### El campo recuperado a δ = 0.001 m de la cara, por puntos de Gauss (ELU, ejes de la franja Y; x ≥ 4,75)
+
+    mx flecta la franja (es el My del corte); my, el transversal; mxy, el torsor. Entre corchetes, la media en Y7 por los pesos.
+
+   LV1 0,75  [Y7: mx -25.92, my -19.03, mxy -1.76, |mxy| 1.76]
+      x =   4.784   mx   -20.03   my     0.72   mxy     0.57
+      x =   4.875   mx   -21.04   my    -2.67   mxy     0.17
+      x =   4.992   mx   -22.32   my    -6.97   mxy    -0.34
+      x =   5.217   mx   -24.81   my   -15.31   mxy    -1.32
+      x =   5.390   mx   -26.71   my   -21.70   mxy    -2.07
+      x =   5.637   mx   -29.42   my   -30.81   mxy    -3.15
+      x =   5.753   mx   -30.70   my   -35.11   mxy    -3.66
+      x =   5.824   mx   -31.48   my   -37.73   mxy    -3.96
+   LV2 0,75  [Y7: mx -37.86, my -11.33, mxy -0.00, |mxy| 0.11]
+      x =   4.784   mx   -23.64   my     3.25   mxy    -0.28
+      x =   4.875   mx   -26.68   my     1.47   mxy    -0.23
+      x =   4.992   mx   -30.53   my    -0.79   mxy    -0.17
+      x =   5.217   mx   -38.01   my    -5.16   mxy    -0.06
+      x =   5.358   mx   -40.87   my    -9.81   mxy     0.03
+      x =   5.517   mx   -41.20   my   -18.15   mxy     0.14
+      x =   5.604   mx   -41.33   my   -23.78   mxy     0.17
+      x =   5.683   mx   -41.38   my   -30.84   mxy     0.12
+      x =   5.716   mx   -41.41   my   -33.80   mxy     0.09
+      x =   5.724   mx   -41.45   my   -34.83   mxy     0.05
+      x =   5.753   mx   -41.60   my   -38.31   mxy    -0.09
+      x =   5.824   mx   -41.97   my   -46.82   mxy    -0.43
+   LV1 0,5  [Y7: mx -27.99, my -17.69, mxy 2.16, |mxy| 2.16]
+      x =   4.784   mx   -18.01   my    -1.93   mxy     2.94
+      x =   4.875   mx   -19.90   my    -3.84   mxy     3.04
+      x =   4.934   mx   -21.09   my    -5.05   mxy     3.10
+      x =   5.001   mx   -22.46   my    -6.45   mxy     3.17
+      x =   5.083   mx   -24.02   my    -8.73   mxy     3.03
+      x =   5.242   mx   -26.91   my   -13.57   mxy     2.56
+      x =   5.358   mx   -28.90   my   -17.93   mxy     2.08
+      x =   5.517   mx   -31.43   my   -25.01   mxy     1.23
+      x =   5.607   mx   -32.77   my   -29.37   mxy     1.04
+      x =   5.695   mx   -33.90   my   -34.22   mxy     1.39
+      x =   5.753   mx   -34.64   my   -37.42   mxy     1.63
+      x =   5.824   mx   -35.54   my   -41.33   mxy     1.91
+   LV2 0,5  [Y7: mx -31.50, my -15.44, mxy 2.11, |mxy| 2.11]
+      x =   4.784   mx   -18.17   my    -1.83   mxy     2.84
+      x =   4.875   mx   -20.38   my    -3.40   mxy     2.94
+      x =   4.934   mx   -21.78   my    -4.40   mxy     3.01
+      x =   5.001   mx   -23.38   my    -5.54   mxy     3.09
+      x =   5.083   mx   -25.22   my    -7.60   mxy     2.96
+      x =   5.242   mx   -28.62   my   -12.08   mxy     2.53
+      x =   5.358   mx   -31.83   my   -15.66   mxy     2.13
+      x =   5.517   mx   -37.18   my   -20.95   mxy     1.46
+      x =   5.604   mx   -39.91   my   -24.96   mxy     1.07
+      x =   5.683   mx   -42.00   my   -30.61   mxy     0.68
+      x =   5.716   mx   -42.81   my   -33.13   mxy     0.51
+      x =   5.724   mx   -42.94   my   -34.37   mxy     0.43
+      x =   5.753   mx   -43.39   my   -38.58   mxy     0.15
+      x =   5.824   mx   -44.50   my   -48.86   mxy    -0.52
+   LV2 0,25  [Y7: mx -28.02, my -17.15, mxy 4.17, |mxy| 4.17]
+      x =   4.784   mx   -17.28   my    -2.87   mxy     2.66
+      x =   4.875   mx   -18.80   my    -4.74   mxy     3.50
+      x =   4.914   mx   -19.44   my    -5.53   mxy     3.86
+      x =   4.928   mx   -19.67   my    -5.82   mxy     3.99
+      x =   4.972   mx   -20.41   my    -6.81   mxy     4.28
+      x =   5.078   mx   -22.23   my    -9.24   mxy     4.95
+      x =   5.155   mx   -23.78   my   -11.05   mxy     5.21
+      x =   5.261   mx   -26.21   my   -13.59   mxy     5.28
+      x =   5.339   mx   -28.18   my   -15.86   mxy     4.99
+      x =   5.445   mx   -31.12   my   -19.54   mxy     4.15
+      x =   5.522   mx   -33.09   my   -23.22   mxy     3.45
+      x =   5.628   mx   -35.52   my   -29.60   mxy     2.40
+      x =   5.679   mx   -36.60   my   -32.95   mxy     2.09
+      x =   5.714   mx   -37.10   my   -35.72   mxy     2.31
+      x =   5.753   mx   -37.66   my   -38.78   mxy     2.56
+      x =   5.824   mx   -38.68   my   -44.39   mxy     3.01
+   LV1 0,125  [Y7: mx -27.88, my -16.54, mxy 6.04, |mxy| 6.04]
+      x =   4.773   mx   -16.55   my    -2.91   mxy     2.74
+      x =   4.837   mx   -17.76   my    -4.21   mxy     3.61
+      x =   4.870   mx   -18.39   my    -4.92   mxy     4.04
+      x =   4.899   mx   -18.88   my    -5.57   mxy     4.35
+      x =   4.922   mx   -19.28   my    -6.10   mxy     4.60
+      x =   4.957   mx   -19.89   my    -6.91   mxy     4.99
+      x =   4.993   mx   -20.50   my    -7.74   mxy     5.33
+      x =   5.057   mx   -21.55   my    -9.21   mxy     5.88
+      x =   5.103   mx   -22.32   my   -10.29   mxy     6.24
+      x =   5.167   mx   -23.39   my   -11.77   mxy     6.66
+      x =   5.213   mx   -24.21   my   -12.89   mxy     6.92
+      x =   5.277   mx   -25.39   my   -14.44   mxy     7.21
+      x =   5.323   mx   -26.39   my   -15.58   mxy     7.36
+      x =   5.387   mx   -27.93   my   -17.14   mxy     7.49
+      x =   5.433   mx   -29.37   my   -18.35   mxy     7.37
+      x =   5.497   mx   -31.76   my   -20.09   mxy     6.89
+      x =   5.543   mx   -33.70   my   -21.86   mxy     6.24
+      x =   5.607   mx   -36.61   my   -24.93   mxy     4.91
+      x =   5.651   mx   -38.45   my   -28.09   mxy     3.99
+      x =   5.707   mx   -40.56   my   -33.64   mxy     2.78
+      x =   5.730   mx   -41.43   my   -35.94   mxy     2.29
+      x =   5.737   mx   -41.71   my   -36.67   mxy     2.13
+      x =   5.763   mx   -42.28   my   -40.12   mxy     2.17
+      x =   5.827   mx   -43.56   my   -48.81   mxy     2.44
+   LV2 0,125  [Y7: mx -27.86, my -16.55, mxy 6.04, |mxy| 6.04]
+      x =   4.773   mx   -16.52   my    -2.91   mxy     2.73
+      x =   4.837   mx   -17.74   my    -4.21   mxy     3.60
+      x =   4.870   mx   -18.36   my    -4.92   mxy     4.04
+      x =   4.899   mx   -18.86   my    -5.57   mxy     4.35
+      x =   4.922   mx   -19.26   my    -6.10   mxy     4.60
+      x =   4.957   mx   -19.87   my    -6.91   mxy     4.98
+      x =   4.993   mx   -20.48   my    -7.74   mxy     5.33
+      x =   5.057   mx   -21.53   my    -9.21   mxy     5.88
+      x =   5.103   mx   -22.31   my   -10.29   mxy     6.24
+      x =   5.167   mx   -23.37   my   -11.78   mxy     6.66
+      x =   5.213   mx   -24.20   my   -12.89   mxy     6.92
+      x =   5.277   mx   -25.38   my   -14.44   mxy     7.21
+      x =   5.323   mx   -26.38   my   -15.59   mxy     7.36
+      x =   5.387   mx   -27.92   my   -17.15   mxy     7.49
+      x =   5.433   mx   -29.36   my   -18.36   mxy     7.37
+      x =   5.497   mx   -31.75   my   -20.10   mxy     6.89
+      x =   5.543   mx   -33.69   my   -21.86   mxy     6.23
+      x =   5.607   mx   -36.60   my   -24.93   mxy     4.91
+      x =   5.651   mx   -38.44   my   -28.09   mxy     3.98
+      x =   5.707   mx   -40.55   my   -33.65   mxy     2.78
+      x =   5.730   mx   -41.43   my   -35.95   mxy     2.28
+      x =   5.737   mx   -41.70   my   -36.68   mxy     2.13
+      x =   5.763   mx   -42.27   my   -40.13   mxy     2.17
+      x =   5.827   mx   -43.55   my   -48.82   mxy     2.44
+
+### Las láminas que tocan la cara (lado sur, x ≥ 4,6): centroide, [Mx, My, Mxy] brutos de ELU en ejes de lámina (X, Y) y el campo recuperado en su nudo de la cara de menor x (con la constante de Lebesgue de su plaza)
+
+    En ejes de lámina, My es el que flecta la franja Y y Mxy el torsor (su signo, el contrario al de la franja).
+
+   LV1 0,75:
+      centroide ( 5.025,  4.575)   bruto Mx    -8.41  My   -15.96  Mxy     1.46   | nudo x =  4.750: Mx     1.97  My   -19.69  Mxy    -0.72   Λ 4.0
+      centroide ( 5.575,  4.575)   bruto Mx   -26.84  My   -19.80  Mxy     2.44   | nudo x =  5.300: Mx   -18.36  My   -25.74  Mxy     1.68   Λ 2.0
+   LV2 0,75:
+      centroide ( 5.025,  4.575)   bruto Mx    -8.19  My   -15.89  Mxy     1.54   | nudo x =  4.750: Mx     3.93  My   -22.57  Mxy     0.30   Λ 4.3
+      centroide ( 5.438,  4.644)   bruto Mx   -18.39  My   -23.56  Mxy     1.07   | nudo x =  5.300: Mx    -6.75  My   -40.80  Mxy     0.01   Λ 4.8
+      centroide ( 5.644,  4.747)   bruto Mx   -26.74  My   -32.03  Mxy     0.04   | nudo x =  5.575: Mx   -21.18  My   -41.40  Mxy    -0.19   Λ 3.1
+      centroide ( 5.781,  4.781)   bruto Mx   -42.47  My   -35.05  Mxy     0.32   | nudo x =  5.712: Mx   -33.41  My   -41.49  Mxy    -0.10   Λ 2.3
+   LV1 0,5:
+      centroide ( 4.888,  4.712)   bruto Mx    -4.31  My   -17.14  Mxy     0.15   | nudo x =  4.750: Mx    -1.23  My   -17.33  Mxy    -2.92   Λ 4.5
+      centroide ( 5.163,  4.712)   bruto Mx   -11.16  My   -20.55  Mxy    -0.75   | nudo x =  5.025: Mx    -6.96  My   -22.99  Mxy    -3.22   Λ 3.6
+      centroide ( 5.438,  4.712)   bruto Mx   -19.70  My   -25.04  Mxy    -0.03   | nudo x =  5.300: Mx   -15.33  My   -28.00  Mxy    -2.40   Λ 3.5
+      centroide ( 5.712,  4.712)   bruto Mx   -34.45  My   -27.69  Mxy     1.46   | nudo x =  5.575: Mx   -27.60  My   -32.41  Mxy    -0.93   Λ 3.6
+   LV2 0,5:
+      centroide ( 4.888,  4.712)   bruto Mx    -4.34  My   -17.05  Mxy     0.20   | nudo x =  4.750: Mx    -1.26  My   -17.38  Mxy    -2.82   Λ 4.5
+      centroide ( 5.163,  4.712)   bruto Mx   -11.22  My   -20.54  Mxy    -0.68   | nudo x =  5.025: Mx    -5.96  My   -24.00  Mxy    -3.13   Λ 3.6
+      centroide ( 5.438,  4.712)   bruto Mx   -19.68  My   -25.23  Mxy     0.08   | nudo x =  5.300: Mx   -13.71  My   -29.91  Mxy    -2.39   Λ 3.4
+      centroide ( 5.644,  4.747)   bruto Mx   -25.92  My   -31.93  Mxy    -0.00   | nudo x =  5.575: Mx   -22.88  My   -39.21  Mxy    -1.23   Λ 3.3
+      centroide ( 5.781,  4.781)   bruto Mx   -42.29  My   -35.11  Mxy     0.20   | nudo x =  5.712: Mx   -32.67  My   -42.87  Mxy    -0.54   Λ 2.9
+   LV2 0,25:
+      centroide ( 4.648,  4.758)   bruto Mx     0.04  My   -14.55  Mxy    -0.08   | nudo x =  4.547: Mx     1.11  My   -14.60  Mxy    -0.49   Λ 3.6
+      centroide ( 4.842,  4.758)   bruto Mx    -3.33  My   -17.24  Mxy    -0.48   | nudo x =  4.750: Mx    -2.20  My   -16.74  Mxy    -2.38   Λ 4.5
+      centroide ( 5.025,  4.758)   bruto Mx    -7.65  My   -19.83  Mxy    -1.67   | nudo x =  4.933: Mx    -5.93  My   -19.76  Mxy    -4.06   Λ 3.6
+      centroide ( 5.208,  4.758)   bruto Mx   -12.46  My   -22.25  Mxy    -2.09   | nudo x =  5.117: Mx   -10.13  My   -22.92  Mxy    -5.22   Λ 3.5
+      centroide ( 5.392,  4.758)   bruto Mx   -17.90  My   -25.19  Mxy    -2.01   | nudo x =  5.300: Mx   -14.51  My   -27.13  Mxy    -5.34   Λ 3.5
+      centroide ( 5.575,  4.758)   bruto Mx   -24.82  My   -29.68  Mxy    -0.78   | nudo x =  5.483: Mx   -20.88  My   -32.25  Mxy    -3.87   Λ 3.5
+      centroide ( 5.758,  4.758)   bruto Mx   -39.10  My   -31.96  Mxy     0.63   | nudo x =  5.667: Mx   -31.94  My   -36.48  Mxy    -2.03   Λ 3.6
+   LV1 0,125:
+      centroide ( 4.692,  4.795)   bruto Mx    -0.78  My   -15.25  Mxy    -0.54   | nudo x =  4.634: Mx    -0.51  My   -14.86  Mxy    -0.77   Λ 3.6
+      centroide ( 4.805,  4.795)   bruto Mx    -2.64  My   -17.04  Mxy    -1.10   | nudo x =  4.750: Mx    -2.45  My   -16.10  Mxy    -2.45   Λ 4.5
+      centroide ( 4.915,  4.795)   bruto Mx    -5.15  My   -18.89  Mxy    -2.33   | nudo x =  4.860: Mx    -4.70  My   -18.21  Mxy    -3.96   Λ 3.6
+      centroide ( 5.025,  4.795)   bruto Mx    -7.81  My   -20.49  Mxy    -3.07   | nudo x =  4.970: Mx    -7.21  My   -20.13  Mxy    -5.17   Λ 3.5
+      centroide ( 5.135,  4.795)   bruto Mx   -10.55  My   -22.01  Mxy    -3.52   | nudo x =  5.080: Mx    -9.75  My   -21.95  Mxy    -6.13   Λ 3.5
+      centroide ( 5.245,  4.795)   bruto Mx   -13.47  My   -23.66  Mxy    -3.79   | nudo x =  5.190: Mx   -12.32  My   -23.80  Mxy    -6.87   Λ 3.5
+      centroide ( 5.355,  4.795)   bruto Mx   -16.62  My   -25.57  Mxy    -3.87   | nudo x =  5.300: Mx   -15.01  My   -25.84  Mxy    -7.37   Λ 3.5
+      centroide ( 5.465,  4.795)   bruto Mx   -20.12  My   -27.93  Mxy    -3.68   | nudo x =  5.410: Mx   -17.71  My   -28.53  Mxy    -7.60   Λ 3.5
+      centroide ( 5.575,  4.795)   bruto Mx   -24.20  My   -31.01  Mxy    -2.98   | nudo x =  5.520: Mx   -20.71  My   -32.68  Mxy    -6.78   Λ 3.5
+      centroide ( 5.685,  4.795)   bruto Mx   -29.83  My   -34.88  Mxy    -1.16   | nudo x =  5.630: Mx   -26.03  My   -37.75  Mxy    -4.48   Λ 3.5
+      centroide ( 5.795,  4.795)   bruto Mx   -44.95  My   -37.43  Mxy     0.26   | nudo x =  5.740: Mx   -36.93  My   -41.91  Mxy    -2.10   Λ 3.6
+   LV2 0,125:
+      centroide ( 4.692,  4.795)   bruto Mx    -0.78  My   -15.22  Mxy    -0.53   | nudo x =  4.634: Mx    -0.51  My   -14.83  Mxy    -0.76   Λ 3.6
+      centroide ( 4.805,  4.795)   bruto Mx    -2.64  My   -17.02  Mxy    -1.10   | nudo x =  4.750: Mx    -2.45  My   -16.07  Mxy    -2.44   Λ 4.5
+      centroide ( 4.915,  4.795)   bruto Mx    -5.15  My   -18.87  Mxy    -2.32   | nudo x =  4.860: Mx    -4.70  My   -18.19  Mxy    -3.96   Λ 3.6
+      centroide ( 5.025,  4.795)   bruto Mx    -7.82  My   -20.47  Mxy    -3.07   | nudo x =  4.970: Mx    -7.22  My   -20.11  Mxy    -5.16   Λ 3.5
+      centroide ( 5.135,  4.795)   bruto Mx   -10.56  My   -22.00  Mxy    -3.52   | nudo x =  5.080: Mx    -9.76  My   -21.93  Mxy    -6.13   Λ 3.5
+      centroide ( 5.245,  4.795)   bruto Mx   -13.47  My   -23.65  Mxy    -3.78   | nudo x =  5.190: Mx   -12.33  My   -23.78  Mxy    -6.87   Λ 3.5
+      centroide ( 5.355,  4.795)   bruto Mx   -16.62  My   -25.56  Mxy    -3.87   | nudo x =  5.300: Mx   -15.01  My   -25.83  Mxy    -7.37   Λ 3.5
+      centroide ( 5.465,  4.795)   bruto Mx   -20.12  My   -27.92  Mxy    -3.68   | nudo x =  5.410: Mx   -17.71  My   -28.52  Mxy    -7.60   Λ 3.5
+      centroide ( 5.575,  4.795)   bruto Mx   -24.20  My   -31.00  Mxy    -2.98   | nudo x =  5.520: Mx   -20.72  My   -32.67  Mxy    -6.78   Λ 3.5
+      centroide ( 5.685,  4.795)   bruto Mx   -29.84  My   -34.87  Mxy    -1.16   | nudo x =  5.630: Mx   -26.03  My   -37.75  Mxy    -4.48   Λ 3.5
+      centroide ( 5.795,  4.795)   bruto Mx   -44.96  My   -37.43  Mxy     0.26   | nudo x =  5.740: Mx   -36.94  My   -41.91  Mxy    -2.10   Λ 3.6
+
+### La capa límite: media de mxy (y de my) en Y7 según la distancia d a la cara, y mxy en el punto más cercano a x = 5,39 (ELU, ejes de la franja)
+
+   d (m)                  0.001           0.020           0.050           0.100           0.150           0.200           0.300           0.400           0.550
+   LV1 0,75       -1.76 / -2.07   -1.77 / -2.08   -1.80 / -2.08   -1.84 / -2.09   -1.88 / -2.09   -1.92 / -2.10   -2.00 / -2.11   -2.09 / -2.13   -2.21 / -2.15   (mxy medio / en x ≈ 5,39)
+                       my -19.0        my -19.0        my -18.9        my -18.7        my -18.6        my -18.5        my -18.2        my -17.9        my -17.4
+   LV2 0,75        -0.00 / 0.03   -0.08 / -0.06   -0.22 / -0.21   -0.43 / -0.45   -0.65 / -0.69   -0.87 / -0.94   -1.27 / -1.43   -1.66 / -1.80   -2.18 / -2.32   (mxy medio / en x ≈ 5,39)
+                       my -11.3        my -11.7        my -12.2        my -13.2        my -14.1        my -15.1        my -17.0        my -19.1        my -22.0
+   LV1 0,5          2.16 / 2.08     1.88 / 1.77     1.42 / 1.29     0.66 / 0.50   -0.10 / -0.30   -0.86 / -1.10   -2.07 / -2.36   -2.34 / -2.62   -2.75 / -3.01   (mxy medio / en x ≈ 5,39)
+                       my -17.7        my -17.7        my -17.7        my -17.7        my -17.7        my -17.6        my -17.6        my -17.4        my -17.0
+   LV2 0,5          2.11 / 2.13     1.83 / 1.82     1.38 / 1.34     0.64 / 0.54   -0.11 / -0.27   -0.85 / -1.08   -1.99 / -2.36   -2.33 / -2.68   -2.83 / -3.15   (mxy medio / en x ≈ 5,39)
+                       my -15.4        my -15.6        my -15.9        my -16.3        my -16.7        my -17.2        my -17.8        my -17.6        my -17.2
+   LV2 0,25         4.17 / 4.99     3.61 / 4.35     2.73 / 3.33     1.27 / 1.64   -0.19 / -0.05   -1.32 / -1.38   -2.21 / -2.53   -2.80 / -3.30   -2.79 / -3.34   (mxy medio / en x ≈ 5,39)
+                       my -17.2        my -17.2        my -17.2        my -17.3        my -17.3        my -17.4        my -17.3        my -17.2        my -17.1
+   LV1 0,125        6.04 / 7.49     5.06 / 6.34     3.52 / 4.51     0.96 / 1.47   -0.44 / -0.26   -1.54 / -1.68   -2.45 / -2.88   -2.76 / -3.29   -2.84 / -3.37   (mxy medio / en x ≈ 5,39)
+                       my -16.5        my -16.6        my -16.7        my -16.9        my -17.0        my -17.1        my -17.2        my -17.2        my -17.1
+   LV2 0,125        6.04 / 7.49     5.06 / 6.34     3.52 / 4.51     0.96 / 1.47   -0.44 / -0.27   -1.55 / -1.68   -2.46 / -2.88   -2.76 / -3.30   -2.85 / -3.38   (mxy medio / en x ≈ 5,39)
+                       my -16.5        my -16.6        my -16.7        my -16.9        my -17.0        my -17.1        my -17.2        my -17.2        my -17.1
+
+## Lo mismo con todos los pilares de 30 × 30 (la plantilla entra entera)
+
+   Ecuaciones: LV1 0,75 5436; LV2 0,75 6051; LV2 0,25 17193; LV2 0,125 50511; sin refinar con LV2 0,75: P12-10, P12-15, P18-10, P18-15.
+
+   Y6 [4.091, 4.909]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -14.86     4.64     0.33   0.818     14.88             1.3 %        99.8 %
+      LV2 0,75       -15.08     3.56    -0.04   0.818     15.08             2.7 %       100.0 %
+      LV2 0,25       -14.87     2.46     0.12   0.818     14.87             1.3 %       100.0 %
+      LV2 0,125      -14.69     2.32     0.08   0.818     14.69             0.0 %       100.0 %
+   Y7 [4.909, 5.727]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -29.18   -17.33    -2.45   0.818     31.63            -4.6 %        92.3 %
+      LV2 0,75       -26.44    -8.95    -1.26   0.818     27.70           -16.5 %        95.5 %
+      LV2 0,25       -28.15   -14.23     2.71   0.818     30.86            -6.9 %        91.2 %
+      LV2 0,125      -28.44   -14.99     4.72   0.818     33.16             0.0 %        85.8 %
+   Y8 [5.727, 6.545]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -37.87   -29.29     3.02   0.518     40.89            -6.6 %        92.6 %
+      LV2 0,75       -40.53   -30.15     1.59   0.518     42.12            -3.8 %        96.2 %
+      LV2 0,25       -41.57   -27.07     1.42   0.518     42.99            -1.8 %        96.7 %
+      LV2 0,125      -43.55   -27.01     0.22   0.518     43.77             0.0 %        99.5 %
+   Y9 [6.545, 7.364]:
+                         mx       my      mxy   ancho  superior  frente a la ref.   |mx| / sup.
+      LV1 0,75       -24.57    -8.15     1.77   0.818     26.34            -0.3 %        93.3 %
+      LV2 0,75       -23.07    -0.80     0.17   0.818     23.24           -12.1 %        99.3 %
+      LV2 0,25       -23.17    -7.35    -2.23   0.818     25.40            -3.9 %        91.2 %
+      LV2 0,125      -23.11    -7.92    -3.31   0.818     26.42             0.0 %        87.5 %
+
+   Nudos de la cara con LV2 0,75 (x ≥ 4,0): 4.344 (-5.42), 4.750 (-8.80), 5.300 (-10.06), 5.575 (-5.96), 5.713 (-3.92), 5.781 (-3.57), 5.850 (-1.62)
+
+   Capa límite (mxy medio en Y7 según d):
+   d (m)            0.001     0.020     0.050     0.100     0.150     0.200     0.300     0.400     0.550
+   LV1 0,75         -2.45     -2.46     -2.48     -2.52     -2.56     -2.60     -2.68     -2.75     -2.87
+   LV2 0,75         -1.26     -1.30     -1.36     -1.47     -1.57     -1.70     -1.96     -2.28     -2.70
+   LV2 0,25          2.71      2.23      1.49      0.24     -1.01     -1.98     -2.84     -3.41     -3.36
+   LV2 0,125         4.72      3.85      2.48      0.19     -1.11     -2.15     -3.05     -3.35     -3.40
+
+## Todas las estaciones de apoyo de la losa, LV2 (h = 0,75) frente a LV2 0,125: el error del superior y el de |mx| solo (respecto al máximo de la franja)
+
+   352 estaciones. Mediana del |error| del superior: 1.0 %; de |mx|: 1.4 %.
+   Por encima del 10.0 % en el superior: 52; de ellas, con |mx| también por encima: 6 (las otras 46 son del término de mxy).
+   Por encima del 20.0 % en el superior: 4; de ellas, con |mx| también por encima: 2 (las otras 2 son del término de mxy).
+   Con |mx| por encima del 10 %: 20; del 20 %: 7.
+
+   Las 12 peores del superior (error del superior, error de |mx|, superior LV2 / ref, mxy LV2 / ref):
+      L-N1:X13 12.150:1           -39.3 %  -33.4 %      37.01 /    60.99      14.88 /    18.51
+      L-N1:Y20 4.850:-1           -25.3 %  -25.4 %       9.09 /    12.40       0.56 /    -0.09
+      L-N1:X18 11.850:-1          -24.2 %    2.0 %       8.83 /    13.20      -4.64 /    -7.60
+      L-N1:Y7 4.850:-1            -23.7 %   -5.7 %      25.48 /    33.41      -0.00 /     6.04
+      L-N1:X14 11.850:-1          -19.9 %    7.6 %      29.62 /    37.77       5.64 /    16.91
+      L-N1:Y16 9.850:-1           -19.7 %   -0.2 %      21.24 /    29.55      -8.13 /   -16.36
+      L-N1:X19 11.850:-1          -19.5 %    7.2 %      23.41 /    29.41      -4.83 /   -13.05
+      L-N1:X19 6.150:1            -19.2 %   -5.5 %      24.85 /    30.76       0.28 /     4.26
+      L-N1:Y15 10.150:1           -18.9 %    0.3 %      46.65 /    57.52      -7.72 /   -18.75
+      L-N1:X1 6.150:1             -18.5 %   -5.5 %      26.76 /    32.87       0.05 /    -4.30
+      L-N1:Y1 4.850:-1            -18.2 %   -5.4 %      23.65 /    28.92      -3.49 /    -7.20
+      L-N1:Y14 10.150:1           -18.1 %    4.0 %      25.42 /    31.35      -2.58 /    -9.81
+
+   Las 12 peores de |mx| (error de |mx|, error del superior):
+      L-N1:X3 15.125:1            -53.4 %    0.0 %
+      L-N1:X3 14.875:-1           -41.4 %    0.0 %
+      L-N1:X3 2.875:-1            -38.5 %    0.0 %
+      L-N1:X13 12.150:1           -33.4 %  -39.3 %
+      L-N1:X3 3.125:1             -29.7 %    0.0 %
+      L-N1:Y20 4.850:-1           -25.4 %  -25.3 %
+      L-N1:X5 14.875:-1           -22.5 %    0.0 %
+      L-N1:Y20 5.150:1            -17.2 %  -15.0 %
+      L-N1:X4 14.875:-1            16.8 %    0.0 %
+      L-N1:X2 15.125:1             14.9 %    0.0 %
+      L-N1:X7 15.125:1            -13.3 %    0.0 %
+      L-N1:X6 14.875:-1           -12.4 %    0.0 %
+
+   En la fina, cuánto añade el término de mxy al superior en las estaciones de apoyo (1 − |mx|/superior): mediana y las 8 mayores:
+      mediana 6.1 %; 96 de 205 por encima del 10 %
+      L-N1:Y1 0.150:1              99.8 %   superior    14.01
+      L-N1:X15 17.850:-1           99.3 %   superior     1.54
+      L-N1:X16 17.850:-1           96.9 %   superior     2.95
+      L-N1:X17 17.850:-1           96.5 %   superior     4.25
+      L-N1:Y7 14.850:-1            95.3 %   superior     2.81
+      L-N1:Y22 0.150:1             94.9 %   superior    17.19
+      L-N1:X14 17.850:-1           94.7 %   superior     2.40
+      L-N1:Y21 14.850:-1           94.3 %   superior     2.90

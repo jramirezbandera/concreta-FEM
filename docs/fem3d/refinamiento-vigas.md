@@ -268,7 +268,7 @@ El aviso nombra los pilares en el mensaje y en sus objetos (para que la app los 
 | X13, cara derecha de P12-10 | 37,0 | 49,9 | 53,1 | 61,0 | Cruce sin refinar (con aviso). Converge: 61 también con 0,0625 (§7) |
 | Y20, en x = 4,85 | 9,1 | 12,4 | 12,4 | 12,4 | Triangulación por la carga lineal T y la zona Qz; converge desde 0,5 |
 | X18, cara de Y12 | 8,6 | 10,3 | 12,7 | 13,2 | Cara de la viga lejos de los pilares; converge despacio (14,0 con 0,0625, §7) |
-| Y7, cara de X5 junto a P6-5 | 25,5 | 29,0 | 31,7 | 33,4 | Empeora con la plantilla (LV1, −7 %); se mira antes de activar `refinoEsquinas` |
+| Y7, cara de X5 junto a P6-5 | 25,5 | 29,0 | 31,7 | 33,4 | La capa límite de mxy en la cara (§11): su mx está a −7 %, y el −7 % de LV1 eran dos errores compensados |
 | X19, cara de P12-15 | 16,1 | 24,7 | 21,9 | 22,5 | Cruce sin refinar (con aviso) |
 | X19, cara de P18-15 | 6,3 | 6,9 | 11,4 | 12,6 | Cruce sin refinar (con aviso) |
 
@@ -319,8 +319,42 @@ Lo que faltaba:
 - **El aviso de respaldo salía vacío** en una planta que sólo refinaba esquinas («junto a las caras de  no se ha refinado»). Arreglado: sin pilares, el aviso es `malla/esquina-sin-refinar` y dice que son las esquinas de los paños.
 
 **Orden acordado con el usuario:**
-1. Antes de activar `refinoEsquinas` por defecto: entender Y7; LV-8 con la plantilla de §2.1, medida con `asoma.ts`; decidir el coste (+70 %; la compilación duplicada tiene margen, el cálculo no); el aviso vacío y `MEDIDA_LV2F` (hechos); referencias congeladas `-lv2`.
+1. Antes de activar `refinoEsquinas` por defecto: entender Y7 (hecho, §11); LV-8 con la plantilla de §2.1, medida con `asoma.ts`; decidir el coste (+70 %; la compilación duplicada tiene margen, el cálculo no); el aviso vacío y `MEDIDA_LV2F` (hechos); referencias congeladas `-lv2`.
 2. C2-d a todos los pilares como fase propia (reabrir F2-9): `asoma.ts` ampliado a los pilares sin viga, decidir el escalón de F3-d, regenerar la referencia de F a sabiendas, y quitar la cota h ≥ 2·ε_snap si ya no hace falta.
 3. Un oráculo externo para la rigidez de la huella: un recuadro en OpenSeesPy ASDShellQ4 con `rigidLink` sólo en los nudos de la huella.
 4. Regresión de precisión local con umbrales: `asoma.ts` en CI aparte, o tres retículas en vitest con la referencia fina congelada.
 5. Mientras LV-8 no esté, avisar también en los pilares que asoman de su viga.
+
+## 11. Y7: la estación que empeoraba con la plantilla (2026-10-16)
+
+**Qué es.** `L-N1:Y7` es la franja de 0,82 m (el intereje) de x = 4,91 a 5,73, y su estación de apoyo en la cara sur de la viga X5 (y = 4,85): a 0,07 m de la huella de P6-5 (un 40 × 40 bajo la viga Y6, de 30, que asoma 5 cm de su cara) y a 0,12 m de la esquina del paño, toda ella en el ábaco. El superior de ELU con h = 0,75: LV1 31,2, LV2 25,5, la fina (0,125) 33,4 kN·m/m (−7 % y −24 %). Medido con `validacion/lv2/y7.ts` (`out_y7.txt`), que además dibuja la malla junto al pilar.
+
+**La plantilla sólo mete un nivel ahí.** Con dos o tres niveles, el nudo interior del elemento de la esquina (a 1/8 y 1/16 de la celda de 0,55 m) cae a menos de 1,2·ε_snap de la huella que asoma y `lejosDeHuellas` lo rechaza: el elemento de la esquina es de 0,14 m, no de 0,034, y el cruce entero va con un nivel. P6-5 no sale en el aviso de §8 porque la plantilla entra, aunque corta.
+
+**El superior son dos cosas, y la plantilla sólo toca una** (kN·m/m; el error, frente a la fina):
+
+| h = 0,75 | mx (fuerzas nodales) | my | mxy (campos a δ) | superior = \|mx\| + \|mxy\| |
+|---|---|---|---|---|
+| LV1 | −29,44 (+7,6 %) | −19,0 | −1,76 | 31,20 (−6,6 %) |
+| LV2 | −25,48 (−6,9 %) | −11,3 | −0,00 | 25,48 (−23,7 %) |
+| LV2, h = 0,5 / 0,25 | −26,89 / −27,57 | −15,4 / −17,2 | 2,11 / 4,17 | 29,01 / 31,74 |
+| h = 0,125 (la referencia) | −27,37 | −16,5 | 6,04 | 33,41 |
+
+Con my negativo y |mxy| < |my|, Wood–Armer da en la cara superior |mx| + |mxy|.
+
+1. **El mx de LV2 es el bueno.** La cara entera del paño (de la cara del zuncho a la de Y6) por un solo corte da −49,8 kN·m con LV2, −50,8 con LV1 y −50,8 con la fina: el total no se mueve, cambia dónde cae a lo largo de la cara. Con LV1 los nudos de la cara van cada 0,55 m, y el reparto por mitades del lado de cada lámina (F-6) lleva a Y7 el 55 % de lo que entra por el nudo de la esquina (−11,3 kN·m, en x = 5,85, rígido con el pilar) aunque la franja acaba 0,12 m antes: +7,6 %. Con LV2 la plantilla pone nudos en 5,575 y 5,71, al de la esquina le quedan −3,5, y lo que entra por el tramo de Y7 es el de la fina (−20,8 frente a −20,6 kN·m; LV1, −15,4). Los −7 % que quedan son también el reparto por mitades: el nudo de 5,71 da el 78 % de su segunda mitad a Y8.
+
+2. **Lo que falta es el término de mxy de Wood–Armer, y es una capa límite.** my y mxy de la estación salen del campo SPR a δ = 1 mm de la cara (F). En la fina, el mxy medio de Y7 cambia de signo a 0,12 m de la cara: −2,85 kN·m/m en el interior (d ≥ 0,3 m) y +6,04 pegado a ella, con el pico (7,5) en x ≈ 5,4, a 0,45 m de la esquina. En la cara converge despacio: 2,1 / 4,2 / 6,0 / 6,5 con h = 0,5 / 0,25 / 0,125 / 0,0625 (la última con ε_snap = 0,025, que siembra la huella que asoma y cambia Y8: sólo vale para este perfil; `--fino`, `out_y7_fino.txt`); el del interior está convergido en todas las mallas (−2,0…−2,85). LV1 con 0,75 da en todas las distancias el valor del interior (−1,8 a −2,2: su primera fila de láminas es de 0,55 m y no ve la capa); LV2 da 0,0 en la cara y −2,2 a 0,55 m (ve el arranque). El −7 % de LV1 eran dos errores compensados: el mx alto por el reparto y un mxy que no es el de la cara, pero entra en Wood–Armer en valor absoluto.
+
+   La capa es la de un borde «duro» de Mindlin: los nudos de la cara van al eje de la viga con un enlace rígido que ata sus dos rotaciones (la torsión de la viga, con el ×0,1 de D4, y su giro de flexión), y el torsor junto a un borde así se concentra en una franja del orden de medio canto (losa de 0,35 m; capa de 0,15 m). No es cosa de la esquina ni de la huella que asoma: con todos los pilares de 30 × 30 (nada asoma y la plantilla entra con tres niveles, elemento de la esquina de 0,034 m) Y7 queda a −16,5 % con LV2 (mx −7 %; |mxy| 1,3 frente a 4,7) y LV1, otra vez por compensación, a −4,6 %. La plantilla refina la esquina del paño y la capa corre a lo largo de toda la cara.
+
+3. **Es la causa de casi todas las estaciones de apoyo que fallan, no sólo de Y7.** En las 352 estaciones de apoyo de la retícula, LV2 con 0,75 frente a la fina (respecto al máximo de cada franja, como en el criterio 3): mediana del error del superior, 1,0 %; del |mx|, 1,4 %. Por encima del 10 % en el superior, 52, y sólo 6 de ellas también en |mx|: las otras 46 son el mxy a δ. Por encima del 20 %, 4: X13 y Y20 por el mx (el cruce sin refinar y la triangulación de las cargas, §8), X18 y Y7 por el mxy. En la fina, el término de mxy añade al superior de las estaciones de apoyo una mediana del 6 % (96 de 205 por encima del 10 %, muchas con superiores de 1,5–4 kN·m/m donde mx ≈ 0).
+
+**Para Y7:** no es la plantilla. La plantilla arregla su mx (de +8 % a −7 %) y deja al descubierto un término que la malla gruesa nunca había tenido. Sale de los pendientes de §10 como entendida, y en la tabla de §8 su causa es la capa límite. El criterio 3 no cambia (4 frente a 6).
+
+**Para el usuario, LV2-h: el mxy de Wood–Armer en las estaciones de apoyo y de cara.** Hoy se toma a 1 mm de la cara, dentro de una capa de ~0,15 m que la malla fina resuelve a duras penas (0,125 se queda un 7 % por debajo de 0,0625) y que ni el emparrillado de CYPE (sin torsor) ni las bandas de SAFE (integran la flexión) cuentan; en un apoyo lineal de Navier, en cambio, el torsor del borde es físico y está validado (F). Tres opciones, que no se excluyen:
+- **(a) dejarlo:** la fina lo da y la gruesa no, del lado inseguro en la capa (con h = 0,75, hasta un 20 % del superior en las caras de viga; mediana, 1 %);
+- **(b) tomar my y mxy de la estación fuera de la capa,** a una distancia fija de la cara (medio canto de la losa, por ejemplo: en Y7, la fina da ahí −2,8 y las tres mallas gruesas −2,0…−2,8, convergido). Toca lo que dimensiona: cambia la referencia congelada de F y las comparaciones con OpenSees en todas las caras y apoyos, y en Navier perdería el torsor del borde si no se distingue el apoyo lineal de la viga. Antes de decidirlo habría que medirlo en H25 y en Navier;
+- **(c) medir el criterio 3 también con |mx|** y listar cada estación por su causa (mx o mxy), que es lo que ya hace `y7.ts`. Cambia sólo el medidor.
+
+Propuesta: (c) ahora, y (b) como decisión aparte con su medida.
