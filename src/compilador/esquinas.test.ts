@@ -4,12 +4,28 @@
  * (`malla/esquina-sin-refinar`) con los pilares del cruce.
  * En la retícula de 4 × 4 de la fase LV, los cruces de las cuatro esquinas del hueco de la escalera
  * (P12-10, P12-15, P18-10 y P18-15): allí están las peores estaciones de las franjas de LV2 (X13 y X19).
+ *
+ * Decisión LV2-f: en un pilar que atraviesa el ancho de una viga, sólo son rígidos los nudos de la
+ * huella o su borde, no los de fuera a ≤ ε_snap (C2-d). En la retícula al azar 1 (22 pilares que asoman
+ * de su viga), la regla de antes deja más de 100 fuera de las huellas.
  */
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
 import { edificioReticular } from "../../validacion/c4/modelos.ts";
 import { conAcciones } from "../../validacion/c5/modelos.ts";
+import { calcular } from "../motor/calcular.ts";
+import { iniciarNucleo } from "../nucleo/index.ts";
+import { valido } from "../pruebas/metamorficasFisicas.ts";
+import { reticulaAleatoria } from "../pruebas/reticulasAleatorias.ts";
 import { compilar } from "./compilar.ts";
-import type { OpcionesCompilacion } from "./fisico.ts";
+import type { ModeloFisico, OpcionesCompilacion } from "./fisico.ts";
+import { distanciaAHuella, huellaPilar } from "./geometria2d.ts";
+import { MEDIDA_LV2F } from "./losas.ts";
+
+beforeAll(async () => {
+  await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
+});
 
 const fisico = conAcciones(edificioReticular(1, 3, 3));
 const avisos = (op: OpcionesCompilacion) => {
@@ -31,5 +47,56 @@ describe("cruces sin refinar (LV2-g)", () => {
   it("sin el refinamiento de las esquinas, o con h = 0,5 (todos los cruces caben), no avisa", () => {
     expect(avisos({ refinoEsquinas: false })).toEqual([]);
     expect(avisos({ refinoEsquinas: true, tamanoMalla: 0.5 })).toEqual([]);
+  });
+});
+
+describe("sólo la huella es rígida en los pilares que atraviesa una viga (LV2-f)", () => {
+  const f = reticulaAleatoria(1);
+  /**
+   * Nudos rígidos de cada huella fuera de ella, separados en pilares que atraviesa una viga o no. Sin
+   * los de las caras de las vigas (a b/2 = 0,15 de su eje), que van a la huella por estar en la zona
+   * rígida de la viga en el pilar (C1-a, `unirCaras`).
+   */
+  const fuera = (m: ModeloFisico, op: OpcionesCompilacion) => {
+    const c = valido(compilar(m, op));
+    const r = { conViga: 0, sinViga: 0 };
+    (c.modelo.restricciones ?? []).forEach((x, i) => {
+      const id = c.mapeo.restricciones[i]!.pilar;
+      if (!x.id.endsWith(":huella") || !id) return;
+      const p = m.pilares!.find((y) => y.id === id)!;
+      const planta = c.mapeo.restricciones[i]!.planta;
+      const sc = m.secciones.find((y) => y.id === p.seccion) as { forma: string; b: number; h: number; D?: number };
+      const h = huellaPilar(p.x, p.y, p.giro ?? 0, sc.forma === "circular" ? { tipo: "circulo", D: sc.D! } : { tipo: "rectangulo", b: sc.b, h: sc.h });
+      const ejes = (m.vigas ?? []).filter((v) => v.planta === planta).map((v) => v.puntos as [[number, number], [number, number]]);
+      /** Distancia de un punto al eje de cada viga, si su proyección cae en ella. */
+      const aEjes = (q: readonly [number, number]) =>
+        ejes.flatMap(([[x0, y0], [x1, y1]]) => {
+          const L = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2);
+          const t = ((q[0] - x0) * (x1 - x0) + (q[1] - y0) * (y1 - y0)) / (L * L);
+          return t >= 0 && t <= 1 ? [Math.abs((q[0] - x0) * (y1 - y0) - (q[1] - y0) * (x1 - x0)) / L] : [];
+        });
+      const conViga = aEjes([p.x, p.y]).some((d) => d < 1e-9);
+      for (const n of x.esclavos) {
+        const q = [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y] as const;
+        if (distanciaAHuella(q, h) > 1e-6 && !aEjes(q).some((d) => Math.abs(d - 0.15) < 1e-6)) r[conViga ? "conViga" : "sinViga"]++;
+      }
+    });
+    return { r, c };
+  };
+
+  it("con LV2, ninguno fuera de las huellas de los pilares con viga; el cálculo es válido", () => {
+    const { r, c } = fuera(f, { refinoEsquinas: true });
+    expect(r.conViga).toBe(0);
+    expect(calcular(c.modelo).valido).toBe(true);
+  });
+
+  it("con LV1, o con LV2 y la regla de antes (para medir), sí", () => {
+    expect(fuera(f, { refinoEsquinas: false }).r.conViga).toBeGreaterThan(0);
+    MEDIDA_LV2F.rigidosFuera = true;
+    try {
+      expect(fuera(f, { refinoEsquinas: true }).r.conViga).toBeGreaterThan(100);
+    } finally {
+      MEDIDA_LV2F.rigidosFuera = false;
+    }
   });
 });

@@ -17,7 +17,11 @@
  *    los necesita, y une todo:
  *    - los nudos de la malla que son nudos de C1 se reutilizan; los demás son nudos nuevos;
  *    - huellas (C2-d): los nudos de la malla y de los muros en la huella de un pilar, o a ≤ ε_snap
- *      de ella, son esclavos de un enlace rígido con maestro en el nudo del pilar;
+ *      de ella, son esclavos de un enlace rígido con maestro en el nudo del pilar. Con LV2
+ *      (`refinoEsquinas`, LV2-f), en un pilar que atraviesa el ancho de una viga, sólo los de la
+ *      huella o su borde: lo que asoma de la viga deja junto al pilar nudos a unos centímetros de
+ *      la huella, y hacerlos rígidos rigidizaba la losa junto a él (la viga en su cara, hasta un
+ *      21 % alta, y las franjas, hasta un 78 % bajas; `validacion/lv2/asoma.ts`);
  *    - vigas embebidas (C2-e, C3-e): sus tramos se parten en los nudos de la malla o de los muros
  *      sobre su eje, salvo en los de las huellas;
  *    - apoyos lineales, cargas lineales, zonas y puntos: los nudos, aristas o láminas que les tocan.
@@ -54,6 +58,17 @@ export function alDiafragma(ctx: Contexto, k: number, c: CargaFisica): boolean {
   if (diafragmaDe(ctx, k) !== "rigido") return false;
   return ctx.losas.some((l) => l.losa.planta === c.planta && distanciaARegion([c.x, c.y], l.region) <= 1e-9);
 }
+
+/**
+ * Sólo para medir (fase LV2, LV2-f; `validacion/lv2/asoma.ts`), en los pilares que atraviesa el ancho
+ * de una viga:
+ * - `rigidosFuera`: también son rígidos los nudos de fuera de la huella a ≤ ε_snap, como antes de
+ *   LV2-f;
+ * - `tapar` > 0: la huella que no asoma de los anchos más de `tapar` no se siembra, como la tapada
+ *   (las variantes C y D, descartadas: mejoran la malla, pero las franjas junto al pilar empeoran).
+ * Por defecto, el compilador no cambia.
+ */
+export const MEDIDA_LV2F = { rigidosFuera: false, tapar: 0 };
 
 export interface LaminaL {
   /** Nudos de la topología, antihorario (normal +Z). */
@@ -450,17 +465,21 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // (lo que cae fuera de las losas, el lado de fuera de un pilar de borde, tampoco cuenta)
     const polisAnchoK = (anchosDe.get(k) ?? []).map((g) => r.anchos[g]!.poligono);
     const regionesK = losasK.map(({ l }) => l.region);
-    const tapada = (poli: readonly Vec2[]) =>
-      polisAnchoK.length > 0 &&
-      poli.every((P0, i) => {
-        const P1 = poli[(i + 1) % poli.length]!;
-        return [0, 0.25, 0.5, 0.75].every((t) => {
-          const q: Vec2 = [P0[0] + t * (P1[0] - P0[0]), P0[1] + t * (P1[1] - P0[1])];
-          if (!regionesK.some((rg) => distanciaARegion(q, rg) <= epsSnap)) return true;
-          return polisAnchoK.some((pa) => puntoEnPoligono(q, pa) || distanciaABorde(q, pa) <= epsSnap + 10 * epsGeom);
-        });
-      });
-    for (const [n, poli] of huellasK) if (!tapada(poli)) a.trazo(topo.nudos[n]!.pilar!.pilares[0]!, "huella", n, poli, true);
+    const tapada = (poli: readonly Vec2[], c: Vec2) => {
+      const tol = MEDIDA_LV2F.tapar > 0 && polisAnchoK.some((pa) => puntoEnPoligono(c, pa)) ? Math.max(MEDIDA_LV2F.tapar, epsSnap) : epsSnap;
+      return (
+        polisAnchoK.length > 0 &&
+        poli.every((P0, i) => {
+          const P1 = poli[(i + 1) % poli.length]!;
+          return [0, 0.25, 0.5, 0.75].every((t) => {
+            const q: Vec2 = [P0[0] + t * (P1[0] - P0[0]), P0[1] + t * (P1[1] - P0[1])];
+            if (!regionesK.some((rg) => distanciaARegion(q, rg) <= epsSnap)) return true;
+            return polisAnchoK.some((pa) => puntoEnPoligono(q, pa) || distanciaABorde(q, pa) <= tol + 10 * epsGeom);
+          });
+        })
+      );
+    };
+    for (const [n, poli] of huellasK) if (!tapada(poli, [topo.nudos[n]!.x, topo.nudos[n]!.y])) a.trazo(topo.nudos[n]!.pilar!.pilares[0]!, "huella", n, poli, true);
     const muros: TrazoMuro[] = [];
     for (const { m, w } of murosK) {
       const t = a.trazo(m.muro.id, "muro", w, puntosMuros[w]!, false);
@@ -923,10 +942,16 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     const huellasPlanta: HuellaL[] = [];
     for (const [n, poli] of huellasK) {
       const pilar = topo.nudos[n]!.pilar!.pilares[0]!;
+      const cn: Vec2 = [topo.nudos[n]!.x, topo.nudos[n]!.y];
+      // LV2-f: en un pilar con el ancho de una viga sobre su centro (también en su borde: el extremo
+      // de la viga, o la losa que acaba en su eje), sólo los de la huella o su borde
+      const soloHuella =
+        ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas && !MEDIDA_LV2F.rigidosFuera && e.anchos.some(({ a: x }) => puntoEnPoligono(cn, x.poligono) || distanciaABorde(cn, x.poligono) <= 10 * epsGeom);
+      const tol = soloHuella ? 10 * epsGeom : epsSnap;
       const esclavos = candidatos.filter((x) => {
         if (x === n) return false;
         const q: Vec2 = [topo.nudos[x]!.x, topo.nudos[x]!.y];
-        return puntoEnPoligono(q, poli) || distanciaABorde(q, poli) <= epsSnap;
+        return puntoEnPoligono(q, poli) || distanciaABorde(q, poli) <= tol;
       });
       if (!esclavos.length) continue;
       const dobles = esclavos.filter((x) => esclavoDe.has(x));

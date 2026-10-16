@@ -275,3 +275,28 @@ El aviso nombra los pilares en el mensaje y en sus objetos (para que la app los 
 Ninguna deja de converger: tres están en los cruces del aviso, y las otras tres son la triangulación junto a las cargas, una cara de viga lejos de los pilares y Y7.
 
 **Pruebas:** las 712 del compilador (710 y las dos nuevas).
+
+## 9. LV2-f: los nudos rígidos junto a lo que asoma (2026-10-16)
+
+**Medida previa** (`validacion/lv2/asoma.ts`, `out_asoma.txt`). Lo que asoma un pilar de la viga que lo atraviesa (un 40 × 40, 30 × 50 o 25 × 60 bajo una viga de 30) deja junto a la huella nudos a unos centímetros de ella, y C2-d los hace rígidos con el pilar (los de fuera a ≤ ε_snap). Quitar de la losa la tira que asoma no cambia nada por sí solo: sus nudos ya eran todos rígidos. Lo que pesa son los de fuera. En las 24 retículas al azar de G, con LV2 y h = 0,75, frente a la malla de 0,25 con sólo la huella rígida (599 caras de viga y 536 estaciones de apoyo de franjas junto a los pilares que asoman, 255 entre todas las plantas; diferencias respecto al máximo de la viga o de la franja):
+
+| | Vigas en la cara: mediana / máx | > 10 % | Franjas junto al pilar: mediana / máx | > 20 % | Jacobiano mínimo |
+|---|---|---|---|---|---|
+| A: hoy (los de fuera a ≤ ε_snap, rígidos) | 1,2 / 21,1 % | 34 | 6,0 / 78,0 % | 66 | 0,11–0,50 |
+| **B: sólo la huella y su borde, rígidos** | **0,9 / 12,7 %** | **1** | **5,1 / 53,1 %** | **36** | igual que A |
+| C: la huella que asoma ≤ 0,3 m no se siembra (como las tapadas) | 1,5 / 20,8 % | 35 | 7,2 / 171,9 % | 104 | 0,12–0,50 |
+| D: C con la regla de B | 1,2 / 20,6 % | 8 | 6,5 / 171,9 % | 89 | 0,12–0,50 |
+| A con h = 0,25 | 0,1 / 15,6 % | 10 | 0,1 / 86,9 % | 22 | — |
+
+- **Los nudos rígidos de fuera importan, y no se van al refinar.** Con ellos, la viga sale en la cara del pilar hasta un 21 % alta, y las franjas, hasta un 78 % bajas (del lado inseguro: X20 de la retícula 18, en la cara de un pilar de fachada). Sin ellos, esas estaciones quedan a ±3–11 %. Con h = 0,25 el efecto sigue (87 %), como en F2-9.
+- **C y D mejoran la malla** (en las retículas con astillas, el jacobiano mínimo pasa de 0,12–0,13 a 0,23–0,32, y hay hasta un 20 % menos de nudos), **pero las franjas empeoran:** sin la huella sembrada se pierden estaciones de cara que hoy salen bien (hasta un 172 % en la retícula 23). Descartadas.
+- La columna «rígidos fuera» de la salida cuenta también los nudos de las caras de las vigas en su zona rígida en el pilar, que `unirCaras` une a la huella a propósito (C1-a). Con B, sólo quedan ésos.
+
+**Hecho (B), detrás de `refinoEsquinas` como el resto de LV2:** en un pilar con el ancho de una viga sobre su centro (también en su borde: el extremo de una viga o una losa que acaba en su eje), sólo son esclavos de la huella los nudos dentro de ella o en su borde (a 10·ε_geom), no los de fuera a ≤ ε_snap (`losas.ts`, C2-d). Los demás pilares siguen como estaban (F2-9 queda aparcado). La malla no cambia. `MEDIDA_LV2F` sólo sirve para reproducir A, C y D en la medida.
+
+**Los criterios, con LV2-f:**
+- **1 y 2:** sin cambios (en el recuadro y en el 3 × 3 no asoma ningún pilar).
+- **3:** 4 estaciones de apoyo por encima del 20 %, frente a 6 con h = 0,5 uniforme (antes de LV2-f, 6): pasa. Sale de la lista X19 junto a P12-15.
+- **4 (calidad):** sin cambios; LV-8 sigue abierto. El jacobiano bajo junto a lo que asoma sólo lo arreglan C y D, a costa de las franjas.
+- **8 (la vivienda):** igual (dos axiles se mueven 0,1 kN; `.datos/out_lv2_f.txt`).
+- **Pruebas:** las 714 del compilador; `src/compilador/esquinas.test.ts` comprueba que con LV2 no queda ningún nudo rígido fuera de la huella de un pilar con viga, salvo los de las caras, y que con la regla de antes quedan más de 100.

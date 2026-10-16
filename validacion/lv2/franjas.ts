@@ -39,7 +39,7 @@ const sinRefinar = new Map<string, string[]>();
 function medir(op: OpcionesCompilacion): Map<string, Franja> {
   const c = compilar(fisico, op);
   if (!c.valido) throw new Error(c.diagnosticos[0]!.mensaje);
-  sinRefinar.set(JSON.stringify(op), c.diagnosticos.filter((d) => d.codigo === "malla/esquina-sin-refinar").flatMap((d) => d.ids.slice(1)));
+  sinRefinar.set(JSON.stringify(op), c.diagnosticos.filter((d) => d.codigo === "malla/esquina-sin-refinar").flatMap((d) => (d.ids ?? []).slice(1)));
   const k = calcular(c.modelo);
   if (!k.valido) throw new Error(k.diagnosticos[0]!.mensaje);
   const q = new Consultas(fisico, c, k.casos, op);
