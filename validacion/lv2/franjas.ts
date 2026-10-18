@@ -80,14 +80,18 @@ function junto(f: Franja, s: number): boolean {
 }
 
 const fina = medir({ tamanoMalla: 0.125, refinoEsquinas: true });
-/** Variantes: opciones y, si se da, los niveles de la plantilla en los cruces sin pilar (§15). */
-const variantes: [string, OpcionesCompilacion, number?][] = [
-  ["LV1, h = 0,75", { refinoEsquinas: false }],
-  ["LV2, h = 0,75", { refinoEsquinas: true }],
-  ["LV2, 2 niv. sin pilar", { refinoEsquinas: true }, 2],
+/**
+ * Variantes: opciones y los niveles de la plantilla en los cruces sin pilar (§15): el valor por
+ * defecto (2 desde LV2-i), los mismos que en los cruces con pilar (`undefined`: 3 en todo) o 1.
+ */
+const defecto = PLANTILLA_ESQUINA.nivelesSinPilar;
+const variantes: [string, OpcionesCompilacion, number | undefined][] = [
+  ["LV1, h = 0,75", { refinoEsquinas: false }, defecto],
+  ["LV2, h = 0,75", { refinoEsquinas: true }, defecto],
+  ["LV2, 3 niv. en todo", { refinoEsquinas: true }, undefined],
   ["LV2, 1 niv. sin pilar", { refinoEsquinas: true }, 1],
-  ["LV1, h = 0,5 uniforme", { tamanoMalla: 0.5, refinoEsquinas: false }],
-  ["LV2, h = 0,5", { tamanoMalla: 0.5, refinoEsquinas: true }],
+  ["LV1, h = 0,5 uniforme", { tamanoMalla: 0.5, refinoEsquinas: false }, defecto],
+  ["LV2, h = 0,5", { tamanoMalla: 0.5, refinoEsquinas: true }, defecto],
 ];
 console.log("## Retícula de 4 × 4 (fase LV): franjas con ELU frente a h = 0,125\n");
 console.log("Apoyos: la superior de Wood–Armer; |mx|, el corte por fuerzas nodales solo (sin el término de mxy, §11).\n");
@@ -101,7 +105,7 @@ const mas20 = new Map<string, Fila[]>();
 for (const [nombre, op, sinPilar] of variantes) {
   PLANTILLA_ESQUINA.nivelesSinPilar = sinPilar;
   const g = medir(op);
-  delete PLANTILLA_ESQUINA.nivelesSinPilar;
+  PLANTILLA_ESQUINA.nivelesSinPilar = defecto;
   const ea: number[] = [];
   const em: number[] = [];
   const ev: number[] = [];

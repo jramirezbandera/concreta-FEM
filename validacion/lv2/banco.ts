@@ -23,13 +23,15 @@ const casos: [string, ModeloFisico][] = [
 ];
 for (const [nombre, f] of casos) {
   console.log(`## ${nombre}`);
-  // LV2 con la plantilla de 3 niveles en todos los cruces, y con 2 en los cruces sin pilar (§15)
-  for (const [n, op, sinPilar] of [["LV1", {}], ["LV2", { refinoEsquinas: true }], ["LV2, 2 niv. sin pilar", { refinoEsquinas: true }, 2]] as [string, OpcionesCompilacion, number?][]) {
+  // LV2 con la plantilla por defecto (3 niveles en los cruces con pilar y 2 en los demás, LV2-i) y con
+  // 3 niveles en todos los cruces (§15)
+  const defecto = PLANTILLA_ESQUINA.nivelesSinPilar;
+  for (const [n, op, sinPilar] of [["LV1", {}, defecto], ["LV2", { refinoEsquinas: true }, defecto], ["LV2, 3 niv. en todo", { refinoEsquinas: true }, undefined]] as [string, OpcionesCompilacion, number | undefined][]) {
     PLANTILLA_ESQUINA.nivelesSinPilar = sinPilar;
     const t0 = performance.now();
     const r = compilar(f, op);
     const ms = performance.now() - t0;
-    delete PLANTILLA_ESQUINA.nivelesSinPilar;
+    PLANTILLA_ESQUINA.nivelesSinPilar = defecto;
     if (!r.valido) {
       console.log(`  ${n}: NO compila: ${r.diagnosticos.filter((d) => d.severidad === "error").map((d) => d.codigo).join(", ")}`);
       continue;

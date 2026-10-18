@@ -508,3 +508,21 @@ En las caras de los zunchos, el tercer nivel no aporta nada medible (las mismas 
 | **Reticular, LV2, 2 niveles sin pilar** | **203 406** | **6,7 + 5,7 = 12,4 s** | **+29 %** |
 
 **Para el usuario, LV2-i:** la propuesta es la graduada de 3 niveles en los cruces con pilar y de 2 en los cruces sin pilar, por defecto. Da lo mismo en las franjas (criterio 3), no toca los criterios 1 y 2, y deja el edificio con vigas en +19 % (el criterio 10 pide ≤ +25 %: pasa) y el reticular en +29 % y 203 406 ecuaciones, un 1,7 % por encima del perfil móvil (LV2-d lo acepta). Si se decide, `nivelesSinPilar: 2` pasa a ser el valor por defecto de `PLANTILLA_ESQUINA`, y se regeneran `out_asoma.txt` y `out_calidad.txt` (las 24 retículas al azar, medidas con 3 niveles en todos los cruces) antes de las referencias `-lv2`. Queda, por fin, activar `refinoEsquinas`.
+
+## 16. LV2-i hecha y las referencias congeladas `-lv2` (2026-10-18)
+
+**Decidido por el usuario el 2026-10-18:** LV2-i como se proponía. `PLANTILLA_ESQUINA` queda en `{ tipo: "graduada", niveles: 3, nivelesSinPilar: 2 }`: 3 niveles en los cruces con pilar y 2 en los cruces sin pilar. `refinoEsquinas` sigue desactivada por defecto, así que ninguna malla de C1–C5, F ni LV cambia (sha256 de los modelos LV1: idénticos; las referencias congeladas de antes, idénticas al byte en el fixture regenerado).
+
+**Lo medido con el valor nuevo:**
+- `out_asoma.txt` y `out_calidad.txt`, regenerados: **idénticos** a los de 3 niveles en todo. En las 24 retículas al azar y las 20 geometrías no ortogonales no hay cruces sin pilar (sus vigas van de pilar a pilar), así que LV2-i no las toca.
+- `out_franjas.txt` (criterio 3, con la variante «3 niv. en todo» para comparar): LV2 por defecto, 10 / 2 estaciones de apoyo por encima del 10 % / 20 % frente a 16 / 6 con h = 0,5 uniforme: pasa. Las mismas dos de siempre (X13 junto a P12-10, en un cruce sin refinar por el hueco; Y20, en la triangulación de la carga lineal).
+- `out_banco.txt`: el edificio con vigas, 153 132 ecuaciones; el reticular, 203 406 (§15).
+
+**Referencias congeladas `-lv2`** (`validacion/f/congelar.ts`, fixture `congelado-f.json`, de 15,6 a 23,9 MB), con `refinoEsquinas: true` y lo demás por defecto:
+- `aleatorio-3-lv2` (1 188 nudos, 21 franjas, 905 estaciones): el modelo al azar de `-lv`; sin cruces de rejilla, cubre LV2-f y las tiras de LV-8 en una planta cualquiera;
+- `reticular-2x2-abacos-lv2` (1 802 nudos, 28 franjas, 1 141 estaciones): el reticular con ábacos y vigas por todos los ejes, con 17 plantillas de esquina, el aviso `malla/esquina-sin-refinar` y cruces sin pilar (las vigas secundarias);
+- `edificio-2x2-lv2` (1 491 nudos, 22 franjas, 896 estaciones), nuevo: el edificio objetivo de una planta y 2 × 2 vanos con su hueco, su carga lineal, su zona y sus vigas secundarias, con acciones; 17 plantillas, también con cruces sin pilar. Con LV2 su jacobiano mínimo sube de 0,123 a 0,257 y pierde el aviso de calidad.
+
+Las diez entradas de antes salen idénticas al byte, y el test `congelado-f.test.ts` comprueba las trece.
+
+**Visto de paso, para el criterio 4** (no cambia nada hoy): con `refinoEsquinas` la calidad empeora en dos modelos pequeños que no están en las medidas de §13: el edificio objetivo de 1 × 3 × 2 vanos (jacobiano mínimo de 0,257 a 0,161, con `malla/calidad`) y `aleatorio-3-muros-lv` (de 0,091 a 0,052, con `rejilla: false`: no es la plantilla, sino LV2-f o las tiras). Va a la lista del paso 3 junto con las vigas curvas y las cuñas.

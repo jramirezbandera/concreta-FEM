@@ -287,8 +287,14 @@ export const PARTICION_REFINO: [number, number] = [1 / 3, 2 / 3];
  */
 export const UMBRAL_REFINO = { jacobiano: 0.2 };
 
-/** Niveles de la plantilla de esquina (fase LV2): 1, tercios del elemento de la esquina; 2, y otra vez en su subelemento. */
-export const PLANTILLA_ESQUINA: { tipo: "tercios" | "graduada"; niveles: number; nivelesSinPilar?: number } = { tipo: "graduada", niveles: 3 };
+/**
+ * Plantilla de esquina (fase LV2, §8 de la cabecera): la graduada parte el elemento de la esquina en 3
+ * hacia ella `niveles` veces en los cruces con pilar y `nivelesSinPilar` veces en los cruces sin pilar
+ * (el de un zuncho o una viga secundaria con otra viga; LV2-i, 2026-10-18: allí el tercer nivel no
+ * cambia ninguna estación de franja y cuesta un 7 % de los nudos). Sin `nivelesSinPilar`, los mismos
+ * niveles en todos los cruces. Es un objeto para que las medidas puedan probar otras.
+ */
+export const PLANTILLA_ESQUINA: { tipo: "tercios" | "graduada"; niveles: number; nivelesSinPilar?: number } = { tipo: "graduada", niveles: 3, nivelesSinPilar: 2 };
 
 /** Jacobiano escalado mínimo de una plantilla; por debajo, el pilar va por la triangulación (F2). */
 export const JACOBIANO_PLANTILLA = 0.2;
