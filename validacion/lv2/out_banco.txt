@@ -1,6 +1,8 @@
 ## edificio objetivo con vigas (7 plantas)
-  LV1 nudos 60021, láminas 34209 (28224 en la rejilla, 0 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 3424 ms; cálculo 5502 ms, 112119 ecuaciones
-  LV2 nudos 95133, láminas 50778 (47166 en la rejilla, 3353 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 8739 ms; cálculo 7869 ms, 163695 ecuaciones; malla/esquina-sin-refinar
+  LV1 nudos 60021, láminas 34209 (28224 en la rejilla, 0 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 2814 ms; cálculo 4438 ms, 112119 ecuaciones
+  LV2 nudos 95133, láminas 50778 (47166 en la rejilla, 3353 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 5234 ms; cálculo 5578 ms, 163695 ecuaciones; malla/esquina-sin-refinar
+  LV2, 2 niv. sin pilar nudos 88210, láminas 47376 (43764 en la rejilla, 3353 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 4346 ms; cálculo 4789 ms, 153132 ecuaciones; malla/esquina-sin-refinar
 ## reticular objetivo con vigas (7 plantas)
-  LV1 nudos 80566, láminas 50085 (39984 en la rejilla, 0 plantillas), jacobiano mínimo 0.262 (0 bajos), compilación 7029 ms; cálculo 6026 ms, 161049 ecuaciones
-  LV2 nudos 115699, láminas 66983 (58352 en la rejilla, 3290 plantillas), jacobiano mínimo 0.256 (0 bajos), compilación 12622 ms; cálculo 8243 ms, 213801 ecuaciones; malla/esquina-sin-refinar
+  LV1 nudos 80566, láminas 50085 (39984 en la rejilla, 0 plantillas), jacobiano mínimo 0.262 (0 bajos), compilación 5086 ms; cálculo 4481 ms, 161049 ecuaciones
+  LV2 nudos 115699, láminas 66983 (58352 en la rejilla, 3290 plantillas), jacobiano mínimo 0.256 (0 bajos), compilación 8198 ms; cálculo 5975 ms, 213801 ecuaciones; malla/esquina-sin-refinar
+  LV2, 2 niv. sin pilar nudos 108902, láminas 63651 (55020 en la rejilla, 3290 plantillas), jacobiano mínimo 0.256 (0 bajos), compilación 6719 ms; cálculo 5680 ms, 203406 ecuaciones; malla/esquina-sin-refinar

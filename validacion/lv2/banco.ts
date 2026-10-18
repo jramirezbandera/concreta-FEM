@@ -8,6 +8,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { compilar } from "../../src/compilador/compilar.ts";
+import { PLANTILLA_ESQUINA } from "../../src/compilador/rejilla.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "../../src/compilador/fisico.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
@@ -22,10 +23,13 @@ const casos: [string, ModeloFisico][] = [
 ];
 for (const [nombre, f] of casos) {
   console.log(`## ${nombre}`);
-  for (const [n, op] of [["LV1", {}], ["LV2", { refinoEsquinas: true }]] as [string, OpcionesCompilacion][]) {
+  // LV2 con la plantilla de 3 niveles en todos los cruces, y con 2 en los cruces sin pilar (§15)
+  for (const [n, op, sinPilar] of [["LV1", {}], ["LV2", { refinoEsquinas: true }], ["LV2, 2 niv. sin pilar", { refinoEsquinas: true }, 2]] as [string, OpcionesCompilacion, number?][]) {
+    PLANTILLA_ESQUINA.nivelesSinPilar = sinPilar;
     const t0 = performance.now();
     const r = compilar(f, op);
     const ms = performance.now() - t0;
+    delete PLANTILLA_ESQUINA.nivelesSinPilar;
     if (!r.valido) {
       console.log(`  ${n}: NO compila: ${r.diagnosticos.filter((d) => d.severidad === "error").map((d) => d.codigo).join(", ")}`);
       continue;

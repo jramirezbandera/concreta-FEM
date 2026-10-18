@@ -233,10 +233,42 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     sumarLineal(fisicas[c]!, menos(P(r, sa), centro), r.e, sb - sa, q1, q2);
     aplicarLineal(c, r, sa, sb, q1, q2);
   };
+  /**
+   * ¿Van los trozos de la recta en orden (desde y hasta no decrecientes)? Lo están por construcción
+   * (`piezas.ts`); se comprueba una vez por recta para que la búsqueda binaria de `aplicarLineal`
+   * nunca cambie el resultado del recorrido completo.
+   */
+  const trozosOrdenados = new WeakMap<Recta, boolean>();
+  const ordenados = (r: Recta): boolean => {
+    let o = trozosOrdenados.get(r);
+    if (o === undefined) {
+      o = true;
+      for (let i = 1; i < r.trozos.length && o; i++) o = r.trozos[i]!.desde >= r.trozos[i - 1]!.desde && r.trozos[i]!.hasta >= r.trozos[i - 1]!.hasta;
+      trozosOrdenados.set(r, o);
+    }
+    return o;
+  };
   /** Lo analítico de `repartir`, sin la resultante física (C4: la de un paño sale de su polígono). */
   const aplicarLineal = (c: number, r: Recta, sa: number, sb: number, q1: V, q2: V) => {
     const q = (s: number): V => (sb === sa ? q1 : mas(q1, por(menos(q2, q1), (s - sa) / (sb - sa))));
-    for (const t of r.trozos) {
+    const tz = r.trozos;
+    // Sólo los trozos que pueden solapar [sa, sb]: desde el primero con hasta > sa (búsqueda binaria)
+    // hasta el primero con desde ≥ sb. Los demás no pasaban la comprobación de abajo; con las piezas
+    // del ancho de una viga (miles por tramo, cada una sobre uno o dos trozos) recorrerlos todos
+    // costaba la mitad de las cargas.
+    const ord = ordenados(r);
+    let i0 = 0;
+    if (ord) {
+      let hi0 = tz.length;
+      while (i0 < hi0) {
+        const mid = (i0 + hi0) >> 1;
+        if (tz[mid]!.hasta > sa) hi0 = mid;
+        else i0 = mid + 1;
+      }
+    }
+    for (let i = i0; i < tz.length; i++) {
+      const t = tz[i]!;
+      if (ord && !(t.desde < sb)) break;
       const lo = Math.max(sa, t.desde);
       const hi = Math.min(sb, t.hasta);
       if (!(hi > lo)) continue;
@@ -267,9 +299,52 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
 
   // Fase LV: lo que cae en el ancho de una viga, a la viga
   /** Recta del tramo de la viga de un ancho. */
+  const rectasAncho = new Map<number, Recta>();
   const rectaAncho = (g: number): Recta => {
-    const x = losas.anchos[g]!;
-    return piezas.rectasDe.get(x.viga)!.find((r) => r.tramo === x.tramo)!;
+    let r = rectasAncho.get(g);
+    if (!r) {
+      const x = losas.anchos[g]!;
+      rectasAncho.set(g, (r = piezas.rectasDe.get(x.viga)!.find((r) => r.tramo === x.tramo)!));
+    }
+    return r;
+  };
+  /**
+   * Las σ de la cadena de un tramo, y si van en orden (lo están por construcción): con ellas, las
+   * cortes de `piezaAViga` y el nudo de cada trozo salen por búsqueda binaria, con el mismo resultado
+   * que el recorrido completo.
+   */
+  const sigmasCadena = new WeakMap<readonly { sigma: number }[], { s: number[]; ordenada: boolean }>();
+  const sigmasDe = (cad: readonly { sigma: number }[]) => {
+    let x = sigmasCadena.get(cad);
+    if (!x) {
+      const s = cad.map((n) => n.sigma);
+      let ordenada = true;
+      for (let i = 1; i < s.length && ordenada; i++) ordenada = s[i]! >= s[i - 1]!;
+      sigmasCadena.set(cad, (x = { s, ordenada }));
+    }
+    return x;
+  };
+  /** Primer índice i con s[i] > v (s ordenada), o s.length. */
+  const cotaSuperior = (s: readonly number[], v: number): number => {
+    let lo = 0;
+    let hi = s.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (s[mid]! > v) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
+  };
+  /** Primer índice i con s[i] ≥ v (s ordenada), o s.length. */
+  const cotaInferior = (s: readonly number[], v: number): number => {
+    let lo = 0;
+    let hi = s.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (s[mid]! >= v) hi = mid;
+      else lo = mid + 1;
+    }
+    return lo;
   };
   /**
    * Carga de superficie uniforme q (global) sobre el triángulo v del ancho g, a su viga: la fuerza
@@ -311,12 +386,19 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         const w = lin(x, wa, wb);
         return [w * lin(x, ta, tb), w];
       };
-      const cortes = [a, ...cad.map((x) => x.sigma).filter((x) => x > a && x < b), b];
+      const sc = sigmasDe(cad);
+      // Las σ de la cadena dentro de (a, b): por búsqueda binaria si van en orden (las de un tramo
+      // siempre), con el mismo resultado que el filtro de toda la cadena
+      const cortes = sc.ordenada ? [a, ...sc.s.slice(cotaSuperior(sc.s, a), cotaInferior(sc.s, b)), b] : [a, ...sc.s.filter((x) => x > a && x < b), b];
       for (let i = 0; i + 1 < cortes.length; i++) {
         const [x0, x1] = [cortes[i]!, cortes[i + 1]!];
         const xm = (x0 + x1) / 2;
-        let k = cad.length - 1;
-        while (k > 0 && cad[k]!.sigma > xm) k--;
+        let k: number;
+        if (sc.ordenada) k = Math.max(0, cotaSuperior(sc.s, xm) - 1);
+        else {
+          k = cad.length - 1;
+          while (k > 0 && cad[k]!.sigma > xm) k--;
+        }
         // Fuera de la cadena, al nudo del extremo; dentro, a los dos que rodean el trozo
         const fuera = xm <= cad[0]!.sigma || k === cad.length - 1;
         const [s0, s1] = fuera ? [0, 1] : [cad[k]!.sigma, cad[k + 1]!.sigma];

@@ -23,6 +23,7 @@ import { Consultas } from "../../src/compilador/consultas.ts";
 import type { OpcionesCompilacion } from "../../src/compilador/fisico.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
+import { PLANTILLA_ESQUINA } from "../../src/compilador/rejilla.ts";
 import { edificioReticular } from "../c4/modelos.ts";
 import { conAcciones } from "../c5/modelos.ts";
 
@@ -79,9 +80,12 @@ function junto(f: Franja, s: number): boolean {
 }
 
 const fina = medir({ tamanoMalla: 0.125, refinoEsquinas: true });
-const variantes: [string, OpcionesCompilacion][] = [
+/** Variantes: opciones y, si se da, los niveles de la plantilla en los cruces sin pilar (§15). */
+const variantes: [string, OpcionesCompilacion, number?][] = [
   ["LV1, h = 0,75", { refinoEsquinas: false }],
   ["LV2, h = 0,75", { refinoEsquinas: true }],
+  ["LV2, 2 niv. sin pilar", { refinoEsquinas: true }, 2],
+  ["LV2, 1 niv. sin pilar", { refinoEsquinas: true }, 1],
   ["LV1, h = 0,5 uniforme", { tamanoMalla: 0.5, refinoEsquinas: false }],
   ["LV2, h = 0,5", { tamanoMalla: 0.5, refinoEsquinas: true }],
 ];
@@ -94,8 +98,10 @@ const pct = (v: number) => `${(100 * v).toFixed(1)} %`;
 type Fila = [string, number, number, number, boolean, number];
 const peores = new Map<string, Fila[]>();
 const mas20 = new Map<string, Fila[]>();
-for (const [nombre, op] of variantes) {
+for (const [nombre, op, sinPilar] of variantes) {
+  PLANTILLA_ESQUINA.nivelesSinPilar = sinPilar;
   const g = medir(op);
+  delete PLANTILLA_ESQUINA.nivelesSinPilar;
   const ea: number[] = [];
   const em: number[] = [];
   const ev: number[] = [];

@@ -453,3 +453,58 @@ Las diez peores son las mismas con y sin ella, y vienen de antes: los metros de 
 **Pruebas:** `pilarTapado.test.ts` (el metro de P3-1 y su convergencia; P1-2 circular), `asoma.test.ts` (la plantilla de cara y su aviso) y el criterio 7 de LV en `unionLosaViga.test.ts`, que con pilares que no cruzan las caras sigue siendo la identidad exacta y, con los que las cruzan, comprueba que los apoyos suman exactamente lo de fuera de las ventanas y los metros lo de dentro (salvo el traslado de 5 cm).
 
 **Queda:** el coste (+70 %, §10) y las referencias `-lv2` antes de activar `refinoEsquinas`; los metros de los pilares de esquina y de borde con h = 0,75 (las diez peores), que son de SP-3/SP-4 y no de LV2.
+
+## 15. El coste: perfil de la compilación y la graduada de 2 niveles en los cruces sin pilar (2026-10-18)
+
+**Lo que se iba a mirar** (§10, orden acordado): la compilación del edificio objetivo con vigas se duplicaba con LV2 (de 3,4 a 8,7 s) para una malla sólo 1,6 veces mayor, y antes de aceptar el +70 % total había que perfilarla y probar la plantilla graduada de 2 niveles en los cruces sin pilar.
+
+### 15.1 El perfil
+
+Con `bun --cpu-prof` sobre `compilar` del edificio objetivo con vigas (7 plantas), LV1 frente a LV2. Por fases (`estadisticas.tiempos`): `losas` pasaba de 2,0 a 4,0 s, `cargas` de 0,86 a 2,25 s y `sinPerdidas` de 0,21 a 0,44 s, con los nudos ×1,58 y las cargas de barra ×2,35 (las piezas del ancho de las vigas, muchas más con las caras partidas por la plantilla). Lo que crecía más que la malla eran cuatro bucles cuadráticos:
+
+| Dónde | Qué hacía | Coste en LV2 (de 6,9 s) |
+|---|---|---|
+| `rejilla.ts`, `lejosDeHuellas` | cada nudo nuevo de cada plantilla de esquina contra **todas** las huellas de la planta (`bordePoligono`) | ~1,1 s (la mitad de la rejilla) |
+| `losas.ts`, esclavos de cada huella (C2-d) | cada huella contra **todos** los nudos de la planta (`puntoEnPoligono` + `distanciaABorde`) | ~0,7 s |
+| `losas.ts`, espesor de la huella | `esclavos.includes` por cada nudo de cada cuadrilátero de la planta | ~0,45 s |
+| `cargas.ts`, `piezaAViga` y `aplicarLineal` | cada pieza del ancho recorría **todos** los trozos de la recta de su viga, y toda la cadena del tramo, dos veces | ~1,0 s |
+
+**Qué se hace** (sin cambiar un bit: la caja de un polígono acota su distancia por debajo, y los trozos y la cadena van en orden por construcción, lo que se comprueba una vez por recta y por tramo con respaldo al recorrido completo):
+- `lejosDeHuellas` filtra las huellas por la caja de los nudos nuevos de la plantilla más la separación, y cada nudo por la caja de la huella;
+- los esclavos de una huella se buscan sólo entre los nudos de su caja más la tolerancia, y el espesor usa un `Set`;
+- `aplicarLineal` empieza en el primer trozo con `hasta > σa` (búsqueda binaria) y para en el primero con `desde ≥ σb`; `piezaAViga` toma los cortes de la cadena y el nudo de cada trozo por búsqueda binaria sobre las σ del tramo, y la recta de cada ancho se busca una vez.
+
+**Medido** (sha256 del modelo analítico y de los diagnósticos de 8 modelos, LV1 y LV2, antes y después: idénticos; las 738 pruebas del compilador y las referencias congeladas, sin cambio):
+
+| Edificio objetivo con vigas, 7 plantas (en caliente) | compilación | losas | cargas | sinPerdidas |
+|---|---|---|---|---|
+| LV1, antes | 3,24 s | 1,98 | 0,86 | 0,21 |
+| LV1, ahora | **2,84 s** | 1,67 | 0,69 | 0,30 |
+| LV2, antes | 6,90 s | 3,98 | 2,25 | 0,44 |
+| LV2, ahora | **4,54 s** | 2,39 | 1,36 | 0,55 |
+
+La compilación de LV2 ya no se duplica: es ×1,6 la de LV1, lo que crece la malla (nudos ×1,58). Lo que queda es lineal en el tamaño: las piezas del ancho (×2,35 cargas de barra, que pesan también en `sinPerdidas` y en `resultanteAnalitica`) y la triangulación. Reducir las piezas del ancho (unir las cargas por barra) cambiaría los bits de todas las referencias con la unión por las caras, y no se toca.
+
+### 15.2 La graduada de 2 niveles en los cruces sin pilar
+
+`PLANTILLA_ESQUINA.nivelesSinPilar` (opcional; sin él, los mismos niveles en todos los cruces): un cruce es «con pilar» si alguna huella está a menos de `lejos` de una de sus esquinas, el mismo criterio que el aviso de LV2-g. **No es sólo cosa de zunchos:** el edificio objetivo tiene vigas secundarias a mitad de cada vano de 6 m (`S<i>-<j>`, 25 × 40), y de sus 152 cruces por planta 72 son sin pilar (248 esquinas de 500). Los modelos de los criterios 1 y 2 (el recuadro y el 3 × 3) tienen todos los cruces con pilar, así que no cambian ni un nudo.
+
+| Retícula de 4 × 4 con zunchos, frente a h = 0,125 (`out_franjas.txt`) | apoyos > 10 % / > 20 % (de 328) | \|mx\| > 10 % / > 20 % | máx apoyos | máx vano |
+|---|---|---|---|---|
+| LV2, 3 niveles | 11 / 2 | 7 / 2 | 38,2 % | 17,3 % |
+| **LV2, 2 niveles sin pilar** | **10 / 2** | **5 / 2** | 38,2 % | 17,2 % |
+| LV2, 1 nivel sin pilar | 15 / 2 | 11 / 2 | 38,2 % | 17,3 % |
+| LV1, h = 0,5 uniforme | 16 / 6 | 8 / 6 | 24,3 % | 27,6 % |
+
+En las caras de los zunchos, el tercer nivel no aporta nada medible (las mismas dos estaciones por encima del 20 %, una de ellas junto a un pilar; una menos por encima del 10 %); con un solo nivel empiezan a perderse estaciones por encima del 10 %. En la vivienda cambia 5 nudos de 3 389.
+
+| 7 plantas (`out_banco.txt`; tiempos en caliente de un script aparte) | ecuaciones | compilación + cálculo | frente a LV1 |
+|---|---|---|---|
+| Edificio con vigas, LV1 | 112 119 | 2,8 + 4,6 = 7,5 s | — |
+| Edificio con vigas, LV2, 3 niveles | 163 695 | 4,5 + 5,5 = 10,0 s | +34 % (antes del perfil, +72 %) |
+| **Edificio con vigas, LV2, 2 niveles sin pilar** | **153 132** | **4,2 + 4,7 = 8,9 s** | **+19 %** |
+| Reticular, LV1 | 161 049 | 5,1 + 4,5 = 9,6 s | — |
+| Reticular, LV2, 3 niveles | 213 801 | 8,2 + 6,0 = 14,2 s | +48 % |
+| **Reticular, LV2, 2 niveles sin pilar** | **203 406** | **6,7 + 5,7 = 12,4 s** | **+29 %** |
+
+**Para el usuario, LV2-i:** la propuesta es la graduada de 3 niveles en los cruces con pilar y de 2 en los cruces sin pilar, por defecto. Da lo mismo en las franjas (criterio 3), no toca los criterios 1 y 2, y deja el edificio con vigas en +19 % (el criterio 10 pide ≤ +25 %: pasa) y el reticular en +29 % y 203 406 ecuaciones, un 1,7 % por encima del perfil móvil (LV2-d lo acepta). Si se decide, `nivelesSinPilar: 2` pasa a ser el valor por defecto de `PLANTILLA_ESQUINA`, y se regeneran `out_asoma.txt` y `out_calidad.txt` (las 24 retículas al azar, medidas con 3 niveles en todos los cruces) antes de las referencias `-lv2`. Queda, por fin, activar `refinoEsquinas`.

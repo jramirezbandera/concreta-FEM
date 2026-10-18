@@ -1044,9 +1044,21 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       const soloHuella =
         ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas && e.anchos.some(({ a: x }) => puntoEnPoligono(cn, x.poligono) || distanciaABorde(cn, x.poligono) <= 10 * epsGeom);
       const tol = soloHuella ? 10 * epsGeom : epsSnap;
+      // Caja de la huella más tol: un nudo fuera de ella no está dentro ni a ≤ tol del borde, así que
+      // sólo los de dentro pasan por el polígono (antes, todos los nudos de la planta por cada huella)
+      const caja = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const [x, y] of poli) {
+        caja[0] = Math.min(caja[0]!, x);
+        caja[1] = Math.min(caja[1]!, y);
+        caja[2] = Math.max(caja[2]!, x);
+        caja[3] = Math.max(caja[3]!, y);
+      }
+      const holgura = tol + 1e-9;
       const esclavos = candidatos.filter((x) => {
         if (x === n) return false;
-        const q: Vec2 = [topo.nudos[x]!.x, topo.nudos[x]!.y];
+        const nd = topo.nudos[x]!;
+        if (nd.x < caja[0]! - holgura || nd.x > caja[2]! + holgura || nd.y < caja[1]! - holgura || nd.y > caja[3]! + holgura) return false;
+        const q: Vec2 = [nd.x, nd.y];
         return puntoEnPoligono(q, poli) || distanciaABorde(q, poli) <= tol;
       });
       if (!esclavos.length) continue;
@@ -1059,9 +1071,10 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         esclavoDe.set(x, pilar);
         esclavosTodos.add(x);
       }
+      const conjuntoEsclavos = new Set(esclavos);
       const espesor = Math.max(
         0,
-        ...(m?.quads ?? []).filter((q) => q.nudos.some((nn) => esclavos.includes(nudoT[nn]!))).map((q) => ctx.losas[losaDeMallar[q.losa]!]!.material.t),
+        ...(m?.quads ?? []).filter((q) => q.nudos.some((nn) => conjuntoEsclavos.has(nudoT[nn]!))).map((q) => ctx.losas[losaDeMallar[q.losa]!]!.material.t),
       );
       huellasPlanta.push({ pilar, k, maestro: n, esclavos, espesor });
     }

@@ -5,6 +5,8 @@ Apoyos: la superior de Wood–Armer; |mx|, el corte por fuerzas nodales solo (si
                            apoyos: mediana / máx     vano: mediana / máx   caras junto a un pilar: máx    apoyos > 10 % / > 20 %    |mx| > 10 % / > 20 %
 LV1, h = 0,75                     0.5 % / 48.8 %          2.1 % / 24.5 %                   38.1 % (24)              22 / 7 (328)                  19 / 7
 LV2, h = 0,75                     0.4 % / 38.2 %          3.5 % / 17.3 %                   38.2 % (24)              11 / 2 (328)                   7 / 2
+LV2, 2 niv. sin pilar             0.3 % / 38.2 %          3.5 % / 17.2 %                   38.2 % (24)              10 / 2 (328)                   5 / 2
+LV2, 1 niv. sin pilar             0.3 % / 38.2 %          3.5 % / 17.3 %                   38.2 % (24)              15 / 2 (328)                  11 / 2
 LV1, h = 0,5 uniforme             0.2 % / 24.3 %          0.8 % / 27.6 %                   13.0 % (24)              16 / 6 (328)                   8 / 6
 LV2, h = 0,5                      0.1 % / 15.7 %          0.9 % / 11.0 %                   14.6 % (24)               8 / 0 (328)                   0 / 0
 
@@ -40,6 +42,30 @@ Aviso malla/esquina-sin-refinar con LV2, h = 0,75: P12-10, P12-15, P18-10, P18-1
    L-N1:X13 vano                     28.93    25.44   13.7 %        —
    L-N1:Y19 4.850:-1                 13.91    12.32   12.2 %   11.4 %
    L-N1:Y19 9.850:-1                  4.82     6.41   12.2 %   12.1 %
+
+### Los peores, LV2, 2 niv. sin pilar (valor, referencia, error, error de |mx|; * junto a un pilar)
+   L-N1:X13 12.150:1 *               35.81    57.99   38.2 %   35.1 %
+   L-N1:Y20 4.850:-1                  9.15    12.41   24.9 %   25.1 %
+   L-N1:X2 vano                      23.16    19.75   17.2 %        —
+   L-N1:Y19 vano                     18.99    16.24   16.9 %        —
+   L-N1:Y20 5.150:1                  11.00    13.09   16.0 %   16.9 %
+   L-N1:Y4 vano                      16.33    14.24   14.7 %        —
+   L-N1:X7 vano                      40.40    46.87   13.8 %        —
+   L-N1:X13 vano                     28.93    25.44   13.7 %        —
+   L-N1:Y19 9.850:-1                  4.82     6.41   12.2 %   12.1 %
+   L-N1:X2 17.850:-1                  3.97     1.65   11.8 %    0.0 %
+
+### Los peores, LV2, 1 niv. sin pilar (valor, referencia, error, error de |mx|; * junto a un pilar)
+   L-N1:X13 12.150:1 *               35.82    57.99   38.2 %   35.1 %
+   L-N1:Y20 4.850:-1                  9.29    12.41   23.8 %   24.0 %
+   L-N1:Y19 5.150:1                  10.70    12.97   17.5 %   17.7 %
+   L-N1:X2 vano                      23.17    19.75   17.3 %        —
+   L-N1:Y19 vano                     18.99    16.24   17.0 %        —
+   L-N1:X7 vano                      39.26    46.87   16.2 %        —
+   L-N1:Y4 9.850:-1                   7.47     9.13   15.7 %   15.8 %
+   L-N1:Y4 5.150:1                    8.91    10.52   15.3 %   15.4 %
+   L-N1:Y20 5.150:1                  11.13    13.09   15.0 %   15.8 %
+   L-N1:Y4 vano                      16.33    14.24   14.7 %        —
 
 ### Los peores, LV1, h = 0,5 uniforme (valor, referencia, error, error de |mx|; * junto a un pilar)
    L-N1:X7 vano                      33.92    46.87   27.6 %        —

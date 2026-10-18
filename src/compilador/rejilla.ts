@@ -288,7 +288,7 @@ export const PARTICION_REFINO: [number, number] = [1 / 3, 2 / 3];
 export const UMBRAL_REFINO = { jacobiano: 0.2 };
 
 /** Niveles de la plantilla de esquina (fase LV2): 1, tercios del elemento de la esquina; 2, y otra vez en su subelemento. */
-export const PLANTILLA_ESQUINA: { tipo: "tercios" | "graduada"; niveles: number } = { tipo: "graduada", niveles: 3 };
+export const PLANTILLA_ESQUINA: { tipo: "tercios" | "graduada"; niveles: number; nivelesSinPilar?: number } = { tipo: "graduada", niveles: 3 };
 
 /** Jacobiano escalado mínimo de una plantilla; por debajo, el pilar va por la triangulación (F2). */
 export const JACOBIANO_PLANTILLA = 0.2;
@@ -1372,17 +1372,48 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
    * la losa, a ≤ ε_snap de una huella, sería rígido, y se pide 1,2·ε_snap (0,6 de separacionRefino):
    * la holgura es sólo para que no lo decida un redondeo.
    */
+  const cajasHuellas = (E.huellasPilares ?? []).map((poli) => {
+    const c = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, y] of poli) {
+      c[0] = Math.min(c[0]!, x);
+      c[1] = Math.min(c[1]!, y);
+      c[2] = Math.max(c[2]!, x);
+      c[3] = Math.max(c[3]!, y);
+    }
+    return c as [number, number, number, number];
+  });
   const lejosDeHuellas = (pl: Plantilla, propia = -1): boolean => {
     const sep = 0.6 * (E.separacionRefino ?? 0);
     if (!E.huellasPilares?.length || !(sep > 0)) return true;
     const enCara = new Set(pl.subdivididas.flatMap((x) => x.nudos));
+    // Sólo las huellas cuya caja queda a menos de sep de la de los nudos nuevos: la distancia al borde
+    // de una huella no baja de la distancia a su caja, así que las demás no cambian el resultado.
+    // (Antes, cada nudo nuevo contra todas las huellas de la planta: la mitad del coste de la rejilla.)
+    const holgura = sep + 1e-9;
+    const cp = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const x of pl.red) {
+      if (x.tipo !== "nuevo") continue;
+      cp[0] = Math.min(cp[0]!, x.q[0]);
+      cp[1] = Math.min(cp[1]!, x.q[1]);
+      cp[2] = Math.max(cp[2]!, x.q[0]);
+      cp[3] = Math.max(cp[3]!, x.q[1]);
+    }
+    const cerca: number[] = [];
+    for (let m = 0; m < E.huellasPilares.length; m++) {
+      const c = cajasHuellas[m]!;
+      if (c[0] > cp[2]! + holgura || c[2] < cp[0]! - holgura || c[1] > cp[3]! + holgura || c[3] < cp[1]! - holgura) continue;
+      cerca.push(m);
+    }
+    if (!cerca.length) return true;
     for (let k = 0; k < pl.red.length; k++) {
       const x = pl.red[k]!;
       if (x.tipo !== "nuevo") continue;
-      for (let m = 0; m < E.huellasPilares.length; m++) {
+      for (const m of cerca) {
         // En la plantilla de cara de un pilar tapado (§10), un nudo de la cara dentro de su huella es
         // rígido con él, como los de la rejilla que ya había en ella
         if (enCara.has(k) && m === propia) continue;
+        const c = cajasHuellas[m]!;
+        if (x.q[0] < c[0] - holgura || x.q[0] > c[2] + holgura || x.q[1] < c[1] - holgura || x.q[1] > c[3] + holgura) continue;
         const b = bordePoligono(x.q, E.huellasPilares[m]!);
         if (enCara.has(k) ? b.dentro && b.d > 2 * E.epsGeom : b.dentro || b.d < sep) return false;
       }
@@ -1488,7 +1519,19 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
             if (a < 0 || b < 0 || a > nu - 2 || b > nv - 2 || losaCelda[celda(a, b)]! < 0) continue;
             if (esquinasDe(a, b).some(([p, q]) => p === -tu && q === -tv)) grupo.push([a, b, -tu, -tv]);
           }
-        let k = PLANTILLA_ESQUINA.niveles;
+        // Niveles del cruce: los de un cruce con pilar (alguna huella a menos de `lejos` de una de sus
+        // esquinas, como en LV2-g) o, si se da, los de uno sin pilar (el cruce de un zuncho con una viga)
+        const conPilar =
+          PLANTILLA_ESQUINA.nivelesSinPilar === undefined ||
+          grupo.some(([a, b, p, q]) => {
+            const Q = posicion((p < 0 ? a : a + 1) + (q < 0 ? b : b + 1) * nu);
+            const lejos = 2 * (E.separacionRefino ?? 0) + 2 * particion(a, b, 1).menor;
+            return (E.huellasPilares ?? []).some((poli) => {
+              const d = bordePoligono(Q, poli);
+              return d.dentro || d.d < lejos;
+            });
+          });
+        let k = conPilar ? PLANTILLA_ESQUINA.niveles : PLANTILLA_ESQUINA.nivelesSinPilar!;
         let pls: (Plantilla | boolean)[] = [];
         for (; k >= 1; k--) {
           pls = grupo.map(([a, b, p, q]) => intentar(a, b, p, q, k));
