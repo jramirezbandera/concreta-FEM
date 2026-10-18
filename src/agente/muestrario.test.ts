@@ -33,7 +33,10 @@ describe("muestrario de la app", () => {
     expect(f.cargas!.some((x) => x.tipo === "empuje")).toBe(true);
 
     const c = compilar(f, l.proyecto.opciones);
-    expect(c.diagnosticos).toEqual([]);
+    // Sin avisos, salvo los de la malla junto a las vigas de la fase LV2 (`refinoEsquinas`, por
+    // defecto): junto al hueco de la escalera y a los pilares que su viga tapa, la plantilla no entra
+    // y lo dice (LV2-g; `refinamiento-vigas.md` §8 y §14)
+    expect(c.diagnosticos.filter((d) => !["malla/esquina-sin-refinar", "malla/pilar-tapado-sin-refinar"].includes(d.codigo))).toEqual([]);
     if (!c.valido) return;
     const casos = casosValidos(calcular(c.modelo));
     expect(casos.length).toBe(f.casos.length);

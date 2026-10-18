@@ -1219,7 +1219,7 @@
         },
         "refinoEsquinas": {
           "type": "boolean",
-          "description": "Refinamiento de la malla en las esquinas de los paños de losa unidos a las vigas por sus caras\n(fase LV2): en la celda de la rejilla de cada esquina en la que se encuentran dos caras de viga, el\nelemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`). En desarrollo: por\ndefecto, no (la malla de LV1)."
+          "description": "Refinamiento de la malla en las esquinas de los paños de losa unidos a las vigas por sus caras\n(fase LV2): en la celda de la rejilla de cada esquina en la que se encuentran dos caras de viga, el\nelemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`: 3 niveles en los\ncruces con pilar y 2 en los cruces sin pilar, LV2-i). Con él van también las tiras de las huellas que\nasoman del ancho de su viga (LV-8), la plantilla de cara delante de un pilar tapado y, en los pilares\nbajo una viga, sólo la huella rígida (LV2-f). Por defecto, sí (compilador LV2, 2026-10-19); sin él,\nla malla de LV1."
         }
       },
       "additionalProperties": false

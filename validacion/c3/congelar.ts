@@ -44,8 +44,10 @@ export const MODELOS_CONGELADOS_C3: Record<string, () => ModeloCongelado> = {
   "viga-en-muro": () => ({ fisico: vigaMuroFisico(), opciones: { franjas: false, modificadores: {}, unionLosaViga: "eje" } }),
   "aleatorio-3-muros": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, unionLosaViga: "eje" } }),
   "reticula-nucleo": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje" } }),
-  // Fase LV: con la unión de la losa con las vigas por las caras (por defecto)
-  "aleatorio-3-muros-lv": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false } }),
+  // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
+  "aleatorio-3-muros-lv": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, refinoEsquinas: false } }),
+  // Fase LV2: con la malla junto a las vigas (por defecto; sin rejilla, actúan las tiras y LV2-f)
+  "aleatorio-3-muros-lv2": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false } }),
 };
 
 if (import.meta.main) {

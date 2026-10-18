@@ -38,7 +38,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "LV1";
+export const VERSION_COMPILADOR = "LV2";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -521,7 +521,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     h.push(
       `Unión pilar–losa por la huella del pilar, rígida (${losas.huellas.length} huellas, H09). ${
         conAncho
-          ? `Unión losa–viga como CYPECAD (fase LV, CY-g): el ancho de las vigas de hormigón rectangulares no es losa; la losa llega a sus caras y sus nudos en ellas van unidos al eje de la viga por un enlace rígido (${losas.enlacesVigas.length} enlaces, ${losas.enlacesVigas.reduce((a, x) => a + x.esclavos.length, 0)} nudos; los que caen frente a un pilar, con su huella). Lo que cae en el ancho de la viga (el pp de la losa, sus cargas de superficie, lineales y puntuales) pasa a la viga con su momento de transporte.${otras ? " Las demás vigas (metálicas o de otras secciones) se parten en los nudos de la malla sobre su eje, con la losa continua por encima." : ""}`
+          ? `Unión losa–viga como CYPECAD (fase LV, CY-g): el ancho de las vigas de hormigón rectangulares no es losa; la losa llega a sus caras y sus nudos en ellas van unidos al eje de la viga por un enlace rígido (${losas.enlacesVigas.length} enlaces, ${losas.enlacesVigas.reduce((a, x) => a + x.esclavos.length, 0)} nudos; los que caen frente a un pilar, con su huella). Lo que cae en el ancho de la viga (el pp de la losa, sus cargas de superficie, lineales y puntuales) pasa a la viga con su momento de transporte.${op.refinoEsquinas ? ` La malla se refina en las esquinas de los paños entre vigas (fase LV2: plantillas de esquina graduadas hacia ella, con 3 niveles en los cruces con pilar y 2 en los demás), para que la viga en la cara del pilar y las franjas junto a las vigas salgan como con la malla fina.` : ""}${otras ? " Las demás vigas (metálicas o de otras secciones) se parten en los nudos de la malla sobre su eje, con la losa continua por encima." : ""}`
           : "Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas."
       } La zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
     );

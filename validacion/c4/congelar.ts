@@ -39,8 +39,10 @@ export const MODELOS_CONGELADOS_C4: Record<string, () => ModeloCongelado> = {
   "aleatorio-7-unidireccional": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(7), 7, { tipo: "unidireccional" }), opciones: { franjas: false, unionLosaViga: "eje" } }),
   "aleatorio-6-reticular": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(6), 6, { tipo: "reticular" }), opciones: { franjas: false, tamanoMalla: 1.25, unionLosaViga: "eje" } }),
   "aleatorio-5-mixto": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25, unionLosaViga: "eje" } }),
-  // Fase LV: con la unión de la losa con las vigas por las caras (por defecto)
-  "aleatorio-5-mixto-lv": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25 } }),
+  // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
+  "aleatorio-5-mixto-lv": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25, refinoEsquinas: false } }),
+  // Fase LV2: con la malla junto a las vigas (por defecto)
+  "aleatorio-5-mixto-lv2": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25 } }),
 };
 
 if (import.meta.main) {

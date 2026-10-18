@@ -582,8 +582,11 @@ export interface OpcionesCompilacion {
   /**
    * Refinamiento de la malla en las esquinas de los paños de losa unidos a las vigas por sus caras
    * (fase LV2): en la celda de la rejilla de cada esquina en la que se encuentran dos caras de viga, el
-   * elemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`). En desarrollo: por
-   * defecto, no (la malla de LV1).
+   * elemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`: 3 niveles en los
+   * cruces con pilar y 2 en los cruces sin pilar, LV2-i). Con él van también las tiras de las huellas que
+   * asoman del ancho de su viga (LV-8), la plantilla de cara delante de un pilar tapado y, en los pilares
+   * bajo una viga, sólo la huella rígida (LV2-f). Por defecto, sí (compilador LV2, 2026-10-19); sin él,
+   * la malla de LV1.
    */
   refinoEsquinas?: boolean;
 }
@@ -622,6 +625,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     franjas: o.franjas ?? true,
     anchoFranja: o.anchoFranja ?? ANCHO_FRANJA,
     refinoCaras: o.refinoCaras ?? true,
-    refinoEsquinas: o.refinoEsquinas ?? false,
+    refinoEsquinas: o.refinoEsquinas ?? true,
   };
 }

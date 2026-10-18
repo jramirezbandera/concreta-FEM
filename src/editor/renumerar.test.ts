@@ -9,6 +9,7 @@ import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { aplicar } from "./operaciones.ts";
 import { referenciasRotas } from "./referencias.ts";
 import { propuestaRenumerar } from "./renumerar.ts";
+import { emparejarTodos } from "../pruebas/metamorficasFisicas.ts";
 import { leerEjemplo } from "./serializar.test.ts";
 
 function renumerado(p: Proyecto): Proyecto {
@@ -99,12 +100,17 @@ describe("renumerar", () => {
     const b = compilar(r.modelo, r.opciones);
     expect(a.valido && b.valido).toBe(true);
     if (!a.valido || !b.valido) return;
-    // La misma malla: las barras van en el orden de los ids de sus piezas, y algún nudo se mueve un ulp
-    const geo = (m: typeof a.modelo) => {
-      const k = (n: number) => [m.nudos[n]!.x, m.nudos[n]!.y, m.nudos[n]!.z].map((v) => v.toFixed(6)).join(",");
-      return [(m.barras ?? []).map((x) => x.nudos.map(k).sort().join("|")).sort(), (m.laminas ?? []).map((x) => x.nudos.map(k).join("|")).sort()];
-    };
+    // La misma malla: las barras van en el orden de los ids de sus piezas, y los nudos se mueven ulps
+    // (el redondeo del arreglo sigue el orden de creación de sus puntos, que va por ids; con las caras
+    // de las vigas, miles de nudos a 1e-14), así que se emparejan por posición a 1e-9 (el mismo
+    // criterio que el comparador de A2) y se comparan las barras y las láminas por sus nudos
     expect(b.modelo.nudos.length).toBe(a.modelo.nudos.length);
-    expect(geo(b.modelo)).toEqual(geo(a.modelo));
+    const pares = emparejarTodos(a.modelo, b.modelo, (q) => q, 1e-9);
+    expect(pares.size).toBe(a.modelo.nudos.filter((n) => !n.id.endsWith(":maestro")).length);
+    const conjunto = (m: typeof a.modelo, mapa: (n: number) => number) => [
+      (m.barras ?? []).map((x) => x.nudos.map(mapa).sort((p, q) => p - q).join("|")).sort(),
+      (m.laminas ?? []).map((x) => x.nudos.map(mapa).join("|")).sort(),
+    ];
+    expect(conjunto(a.modelo, (n) => pares.get(n)!)).toEqual(conjunto(b.modelo, (n) => n));
   }, 180_000);
 });

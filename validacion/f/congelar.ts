@@ -18,8 +18,8 @@
  *
  * Fase LV: los modelos de antes llevan la unión de la losa con las vigas por el eje
  * (`unionLosaViga: "eje"`: los mismos bits que antes de la fase); los terminados en `-lv`, la de la
- * fase (por las caras, por defecto); los terminados en `-lv2`, además la malla junto a las vigas de la
- * fase LV2 (`refinoEsquinas: true`; `refinamiento-vigas.md` §16).
+ * fase (por las caras) sin la malla de LV2 (`refinoEsquinas: false`); los terminados en `-lv2`, la de la
+ * fase LV2 (por defecto; `refinamiento-vigas.md` §16 y §17).
  *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/f/congelar.ts
@@ -53,16 +53,16 @@ export const MODELOS_CONGELADOS_F: Record<string, () => ModeloCongelado> = {
   "losa-3x3-mezclada": () => ({ fisico: losa3x3Mezclada(), opciones: { unionLosaViga: "eje" } }),
   // SP-1 y SP-2: ábacos de pilares de borde, de esquina y atravesados por vigas
   "reticular-2x2-abacos": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { unionLosaViga: "eje" } }),
-  // Fase LV: con la unión de la losa con las vigas por las caras (por defecto)
-  "aleatorio-3-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: {} }),
-  "reticular-2x2-abacos-lv": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: {} }),
-  // Fase LV2: con la malla junto a las vigas (`refinoEsquinas`: plantillas de esquina con 3 niveles en
+  // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
+  "aleatorio-3-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { refinoEsquinas: false } }),
+  "reticular-2x2-abacos-lv": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { refinoEsquinas: false } }),
+  // Fase LV2: con la malla junto a las vigas (`refinoEsquinas`, por defecto desde el compilador LV2: plantillas de esquina con 3 niveles en
   // los cruces con pilar y 2 en los cruces sin pilar, LV2-i; tiras de las huellas que asoman, LV-8;
   // sólo la huella rígida en los pilares bajo una viga, LV2-f). El edificio objetivo de un vano de
   // 2 × 2 con su hueco y sus vigas secundarias tiene cruces sin pilar
-  "aleatorio-3-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { refinoEsquinas: true } }),
-  "reticular-2x2-abacos-lv2": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { refinoEsquinas: true } }),
-  "edificio-2x2-lv2": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { refinoEsquinas: true } }),
+  "aleatorio-3-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: {} }),
+  "reticular-2x2-abacos-lv2": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: {} }),
+  "edificio-2x2-lv2": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: {} }),
 };
 
 export interface ReferenciaF {

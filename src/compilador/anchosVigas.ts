@@ -13,7 +13,7 @@
  * Puro y determinista.
  */
 import type { Vec2, Viga } from "./fisico.ts";
-import type { Topologia, TramoViga } from "./topologia.ts";
+import { cuerdaEnTramo, type Topologia, type TramoViga } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
 
 /** Giro máximo de un quiebro que se une a inglete, en grados. */
@@ -186,7 +186,34 @@ export function anchosPlanta(ctx: Contexto, topo: Topologia, k: number, e1: Vec2
       s = Math.max(s, c);
     }
     if (len - s > eps) trozos.push([s, len]);
+    // Un corte por un muro a ≤ eps de la cara de un pilar de la cadena se lleva a la cara (fase LV2,
+    // §17): entre la cara del pilar y la del muro (5 mm con un pilar de 25 bajo un muro de 26) quedaba
+    // una franja de losa de astillas, que la triangulación refinaba en tercios y cambiaba al girar la
+    // planta. El ancho acaba donde empieza el pilar; lo que queda del muro bajo esos milímetros es suyo.
+    // Sólo con la malla de LV2 (el trazo exacto del ancho): sin ella, el arreglo ya los unía a ε_snap
+    const carasPilares: number[] = [];
+    for (const c of tv.cadena) {
+      const pp = topo.nudos[c.nudo]!.pilar;
+      const cu = pp ? cuerdaEnTramo(tv, pp) : null;
+      if (cu) carasPilares.push(cu[0], cu[1]);
+    }
+    // Sólo hacia el muro (el ancho crece hasta la cara, nunca se acorta hacia la losa)
+    const aCara = (sg: number, sentido: 1 | -1): number => {
+      let mejor = sg;
+      let dm = eps;
+      for (const x of carasPilares) {
+        const d = (sg - x) * sentido;
+        if (d > 0 && d <= eps && d < dm) [mejor, dm] = [x, d];
+      }
+      return mejor;
+    };
+    if (ctx.op.refinoEsquinas)
+      for (let i = 0; i < trozos.length; i++) {
+        const [d, h] = trozos[i]!;
+        trozos[i] = [d === 0 ? 0 : aCara(d, 1), h === len ? len : aCara(h, -1)];
+      }
     for (const [desde, hasta] of trozos) {
+      if (!(hasta - desde > eps)) continue;
       const P = (sg: number): Vec2 => (sg === 0 ? A : sg === len ? tv.t.B : [A[0] + sg * u[0], A[1] + sg * u[1]]);
       // A inglete sólo en un quiebro de la propia polilínea (no en un trozo cortado por un muro)
       const [d0, i0] = extremo(P(desde), u, b, desde === 0 ? dir(tv.indice - 1) : null);

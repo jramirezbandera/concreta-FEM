@@ -45,8 +45,10 @@ export const MODELOS_CONGELADOS_C2: Record<string, () => ModeloCongelado> = {
   "losa-plana-rejilla": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, unionLosaViga: "eje" } }),
   "aleatorio-8-losas-rejilla": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje" } }),
   "reticula-enrasada": () => ({ fisico: reticulaEnrasada(1), opciones: { franjas: false, unionLosaViga: "eje" } }),
-  // Fase LV: con la unión de la losa con las vigas por las caras (por defecto)
-  "aleatorio-8-losas-rejilla-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1 } }),
+  // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
+  "aleatorio-8-losas-rejilla-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, refinoEsquinas: false } }),
+  // Fase LV2: con la malla junto a las vigas (por defecto)
+  "aleatorio-8-losas-rejilla-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1 } }),
 };
 
 export interface ReferenciaC2 {
