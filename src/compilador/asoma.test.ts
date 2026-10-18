@@ -13,6 +13,13 @@
  *   que ella con losa por el otro lado (retícula 3); antes se torcían hasta 5 cm.
  * - Cuando las tiras no caben en la rejilla (un hueco cerca), queda la malla de antes con el aviso
  *   `malla/pilar-asoma-sin-plantilla` (retícula 6).
+ * - Plantilla de cara (§14): delante de la huella de un pilar tapado (un 40 × 40 bajo una viga de 30,
+ *   sin viga que lo cruce), la primera fila de celdas junto a las caras de la viga va en tercios hacia
+ *   ellas. En la retícula 1, P3-1 (fachada x = 15,7, bajo el zuncho Y3): con ella, su metro
+ *   perpendicular a la viga con h = 0,75 queda a un 7 % del de h = 0,25 (sin ella, a un 17 %). Si una
+ *   celda no sigue la rejilla, el pilar va en el aviso `malla/pilar-tapado-sin-refinar` (retícula 4,
+ *   P1-1, junto al hueco de la escalera). En un pilar en un cruce de vigas no hace falta: las esquinas
+ *   de los paños ya están refinadas (los edificios objetivo no cambian ni un nudo).
  * Con `refinoEsquinas: false` nada cambia (lo comprueban las referencias congeladas).
  */
 import { describe, expect, it } from "vitest";
@@ -53,6 +60,27 @@ describe("los pilares que asoman de su viga (LV-8)", () => {
       expect(enlaces.length, `retícula ${s}: los enlaces de X0`).toBeGreaterThan(0);
       for (const r of enlaces) for (const n of r.esclavos) expect(Math.abs(Math.abs(lv2.modelo.nudos[n]!.y) - 0.15), `retícula ${s}: nudo ${n}`).toBeLessThan(1e-9);
     }
+  });
+
+  it("delante de un pilar tapado sin viga que lo cruce, la primera fila junto a las caras de la viga va en tercios (retícula 1, P3-1)", () => {
+    // Nudos de la losa a menos de 0,3 m de la cara x = 15,55 delante de la huella de P3-1 (y = 6,25 ± 0,2),
+    // sin los de la propia cara: los tercios del primer tramo (de 0,72 m: a 0,24 y 0,48 de la cara)
+    // (en LV1 había ahí nudos sueltos de las astillas de la triangulación; en LV2, sólo los de la red)
+    const cerca = (c: ReturnType<typeof compila>) => c.modelo.nudos.filter((n) => n.z > 0 && 15.55 - n.x > 0.02 && 15.55 - n.x < 0.3 && Math.abs(n.y - 6.25) <= 0.25);
+    const lv2 = compila(1, { refinoEsquinas: true });
+    const xs = [...new Set(cerca(lv2).map((n) => Math.round(n.x * 1000) / 1000))].sort((a, b) => a - b);
+    expect(xs).toEqual([15.31]);
+    expect(cerca(lv2).length).toBeGreaterThanOrEqual(2);
+    expect(lv2.diagnosticos.filter((d) => d.codigo === "malla/pilar-tapado-sin-refinar").flatMap((d) => d.ids)).not.toContain("P3-1");
+  });
+
+  it("si una celda delante del pilar no sigue la rejilla, avisa con el pilar (retícula 4, P1-1 junto al hueco)", () => {
+    const lv2 = compila(4, { refinoEsquinas: true });
+    const av = lv2.diagnosticos.filter((d) => d.codigo === "malla/pilar-tapado-sin-refinar");
+    expect(av.length).toBeGreaterThanOrEqual(1);
+    expect(av[0]!.severidad).toBe("aviso");
+    expect(av[0]!.mensaje).toContain("P1-1");
+    expect(compila(4, { refinoEsquinas: false }).diagnosticos.filter((d) => d.codigo === "malla/pilar-tapado-sin-refinar")).toEqual([]);
   });
 
   it("cuando las tiras no caben en la rejilla, avisa y deja la malla de antes (retícula 6)", () => {

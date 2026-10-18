@@ -682,7 +682,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       diag.error("malla/arreglo", `No se ha podido ordenar la geometría de la planta ${idPlanta} para mallarla: hay rasgos más pequeños que ${cm(epsSnap)} que se cruzan entre sí.`, [idPlanta, ...losasK.map(({ l }) => l.losa.id)]);
       return null;
     }
-    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco, refino: { caras: refino, separacion: 2 * epsSnap, esquinas: ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas, huellas: [...huellasK.values()], idsHuellas: [...huellasK.keys()].map((n) => topo.nudos[n]!.pilar!.pilares[0]!) }, anchos, puntoAncho, apoyoAncho };
+    return { k, a, muros, idPlanta, nudosK, tramosK, huellasK, mallar, losaDeMallar, trazoCarga, trazoApoyo, puntoDe, trazoAbaco, refino: { caras: refino, separacion: 2 * epsSnap, esquinas: ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas, huellas: [...huellasK.values()], idsHuellas: [...huellasK.keys()].map((n) => topo.nudos[n]!.pilar!.pilares[0]!), tapadas: [...huellasK.keys()].flatMap((n, i) => (tapadas.get(topo.nudos[n]!.pilar!.pilares[0]!) === n ? [i] : [])) }, anchos, puntoAncho, apoyoAncho };
   };
   const montarTodas = (fijos: ReadonlyMap<number, Vec2[]>, d: Diagnosticos): Map<number, PlantaL> => {
     const e = new Map<number, PlantaL>();

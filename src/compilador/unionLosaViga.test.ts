@@ -17,7 +17,6 @@ import { edificioReticular } from "../../validacion/c4/modelos.ts";
 import { conAcciones } from "../../validacion/c5/modelos.ts";
 import { calcular } from "../motor/calcular.ts";
 import { Cortes } from "../motor/cortes.ts";
-import type { ResultadoCaso } from "../motor/modelo.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
 import { casosValidos } from "../pruebas/comparar.ts";
 import { azar } from "../pruebas/fisicoAleatorio.ts";
@@ -25,6 +24,7 @@ import { barajar, planos, relacionPlanoC2, valido } from "../pruebas/metamorfica
 import { compilar } from "./compilar.ts";
 import { Consultas } from "./consultas.ts";
 import type { ModeloFisico, OpcionesCompilacion, Vec2 } from "./fisico.ts";
+import { anchoNominal } from "./franjas.ts";
 import { areaConSigno, distanciaABorde, distanciaASegmento, puntoEnPoligono } from "./poligonos.ts";
 
 beforeAll(async () => {
@@ -162,47 +162,136 @@ describe("fase LV: la losa unida a las vigas por sus caras", () => {
 });
 
 describe("fase LV, criterio 7: las franjas en la cara de una viga", () => {
-  // La retícula de 4 × 4 pilares de 40 × 40 con vigas por todos los ejes, con h = 0,75
+  // La retícula de 4 × 4 pilares de 40 × 40 con vigas de 30 por todos los ejes, con h = 0,75, y la
+  // misma con pilares de 30 × 30 (ninguno cruza las caras de las vigas)
   const fisico = conAcciones(edificioReticular(1, 3, 3));
-  let c: Extract<ReturnType<typeof compilar>, { valido: true }>;
-  let q: Consultas;
-  let casos: ResultadoCaso[];
+  const material = fisico.secciones.find((x) => x.id === fisico.pilares![0]!.seccion)!.material;
+  const fisico30: ModeloFisico = { ...fisico, secciones: [...fisico.secciones, { id: "p30t", material, forma: "rectangular", b: 0.3, h: 0.3 }], pilares: fisico.pilares!.map((p) => ({ ...p, seccion: "p30t" })) };
+  const preparar = (f: ModeloFisico) => {
+    const c = valido(compilar(f));
+    const casos = casosValidos(calcular(c.modelo));
+    return { c, casos, q: new Consultas(f, c, casos, {}) };
+  };
+  let m40: ReturnType<typeof preparar>;
+  let m30: ReturnType<typeof preparar>;
   beforeAll(async () => {
     await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
-    c = valido(compilar(fisico));
-    casos = casosValidos(calcular(c.modelo));
-    q = new Consultas(fisico, c, casos, {});
+    m40 = preparar(fisico);
+    m30 = preparar(fisico30);
   }, 120_000);
-
-  it("en cada cara de la viga de y = 5, la suma de las franjas es el corte de la losa por la cara (lo que pasa a la viga)", () => {
-    const v = fisico.vigas!.find((x) => x.planta === "N1" && x.puntos.every((p) => Math.abs(p[1] - 5) < 1e-9))!;
-    const sc = fisico.secciones.find((s) => s.id === v.seccion)!;
-    const b = sc.forma === "rectangular" ? sc.b : NaN;
-    const z = c.modelo.nudos[c.modelo.laminas![0]!.nudos[0]]!.z;
-    const fs = q.franjas("L-N1");
+  const vigaY5 = (f: ModeloFisico) => {
+    const v = f.vigas!.find((x) => x.planta === "N1" && x.puntos.every((p) => Math.abs(p[1] - 5) < 1e-9))!;
+    const sc = f.secciones.find((s) => s.id === v.seccion)!;
+    return sc.forma === "rectangular" ? sc.b : NaN;
+  };
+  /** Σ mx·b de las franjas de la dirección 2 en su estación de apoyo de la cara yf, por caso, y las franjas sin ella. */
+  const sumaApoyos = (m: ReturnType<typeof preparar>, yf: number, lado: -1 | 1) => {
+    const fs = m.q.franjas("L-N1");
     if (!fs.valido) throw new Error("L-N1");
-    const cortes = new Cortes(c.modelo);
+    const suma = m.casos.map(() => 0);
+    const sin: string[] = [];
+    let n = 0;
+    for (const f of fs.valor) {
+      if (f.direccion !== 2) continue;
+      const e = m.q.franja(f.id);
+      if (!e.valido) throw new Error(f.id);
+      const x = e.valor.estaciones.find((s) => s.tipo === "apoyo" && s.lado === lado && Math.abs(s.punto[1] - yf) < 1e-6);
+      if (!x) {
+        sin.push(f.id);
+        continue;
+      }
+      n++;
+      m.casos.forEach((_, k) => (suma[k]! += x.medios[3 * k]! * x.anchoEnLosa));
+    }
+    return { suma, n, sin, franjas: fs.valor.filter((f) => f.direccion === 2) };
+  };
+  /** El corte por la cara yf, del lado de la losa: x = +y si la losa está en y < yf (lado −1). */
+  const corteCara = (m: ReturnType<typeof preparar>, yf: number, lado: -1 | 1) => {
+    const z = m.c.modelo.nudos[m.c.modelo.laminas![0]!.nudos[0]]!.z;
+    const r = new Cortes(m.c.modelo).cortar({ origen: [0, yf, z], x: [0, -lado, 0], vz: [0, 0, 1], y: [-1000, 1000], metodo: "fuerzas-nodales", soloLaminas: true }, m.casos);
+    expect(r.valido).toBe(true);
+    return m.casos.map((_, k) => r.esfuerzos[6 * k + 4]!);
+  };
+
+  it("con pilares que no cruzan las caras (30 × 30 bajo vigas de 30), en cada cara de la viga de y = 5 la suma de las franjas es el corte de la losa por la cara (lo que pasa a la viga)", () => {
+    const b = vigaY5(fisico30);
     for (const lado of [-1, 1] as const) {
       const yf = 5 + (lado * b) / 2;
-      // Σ mx·b de las franjas de la dirección 2 en su estación de apoyo de esa cara, por caso
-      const suma = casos.map(() => 0);
-      let n = 0;
-      for (const f of fs.valor) {
-        if (f.direccion !== 2) continue;
-        const e = q.franja(f.id);
-        if (!e.valido) throw new Error(f.id);
-        const x = e.valor.estaciones.find((s) => s.tipo === "apoyo" && s.lado === lado && Math.abs(s.punto[1] - yf) < 1e-6);
-        expect(x, `${f.id}, cara ${lado}`).toBeDefined();
-        n++;
-        casos.forEach((_, k) => (suma[k]! += x!.medios[3 * k]! * x!.anchoEnLosa));
-      }
+      const { suma, n, sin } = sumaApoyos(m30, yf, lado);
+      expect(sin, `cara ${lado}`).toEqual([]);
       expect(n).toBeGreaterThan(15);
-      // El corte por la cara, del lado de la losa: x = +y si la losa está en y < yf (lado −1)
-      const r = cortes.cortar({ origen: [0, yf, z], x: [0, -lado, 0], vz: [0, 0, 1], y: [-1000, 1000], metodo: "fuerzas-nodales", soloLaminas: true }, casos);
-      expect(r.valido).toBe(true);
-      casos.forEach((_, k) => {
-        const total = r.esfuerzos[6 * k + 4]!;
-        expect(Math.abs(suma[k]! - total) / Math.max(1, Math.abs(total)), `cara ${lado}, caso ${k}: ${suma[k]} frente a ${total}`).toBeLessThan(1e-9);
+      const total = corteCara(m30, yf, lado);
+      total.forEach((t, k) => expect(Math.abs(suma[k]! - t) / Math.max(1, Math.abs(t)), `cara ${lado}, caso ${k}: ${suma[k]} frente a ${t}`).toBeLessThan(1e-9));
+    }
+  });
+
+  it("con pilares de 40 × 40 que cruzan las caras (LV2 §14): lo de la ventana de cada pilar es su metro (una estación de cara), la franja que apoya en él no tiene estación de apoyo, y el resto suma con los metros lo que pasa por la cara", () => {
+    const b = vigaY5(fisico);
+    const enViga = fisico.pilares!.filter((p) => Math.abs(p.y - 5) < 1e-9);
+    expect(enViga.length).toBeGreaterThanOrEqual(3);
+    // La ventana de un pilar: el ancho nominal (en un reticular, el intereje) centrado en él (F-h)
+    const bN = anchoNominal(fisico.losas!.find((l) => l.id === "L-N1")!);
+    const ventanas = enViga.map((p): [number, number] => [p.x - bN / 2, p.x + bN / 2]);
+    for (const lado of [-1, 1] as const) {
+      const yf = 5 + (lado * b) / 2;
+      const { suma, sin, franjas } = sumaApoyos(m40, yf, lado);
+      // Las franjas sin estación de apoyo: las que las ventanas dejan con menos de la mitad
+      const fuera = (f: { t0: number; t1: number }) => ventanas.reduce((a, [v0, v1]) => a - Math.max(0, Math.min(f.t1, v1) - Math.max(f.t0, v0)), f.t1 - f.t0);
+      expect(sin.sort()).toEqual(
+        franjas
+          .filter((f) => fuera(f) < 0.5 * (f.t1 - f.t0) - 1e-6)
+          .map((f) => f.id)
+          .sort(),
+      );
+      // El metro de cada pilar: una estación de cara en su cara (y = 5 ± 0,2) con su ventana, en la franja que lo contiene
+      const sumaCaras = m40.casos.map(() => 0);
+      for (const p of enViga) {
+        const f = franjas.find((x) => x.t0 - 1e-9 <= p.x && p.x <= x.t1 + 1e-9)!;
+        const e = m40.q.franja(f.id);
+        if (!e.valido) throw new Error(f.id);
+        const cara = e.valor.estaciones.filter((s) => s.tipo === "cara" && s.lado === lado && s.piezas.includes(p.id) && Math.abs(s.punto[1] - (5 + lado * 0.2)) < 1e-6);
+        expect(cara, `${p.id}, cara ${lado}`).toHaveLength(1);
+        expect(cara[0]!.ventana!.map((v) => Math.round(v * 1000) / 1000)).toEqual([Math.round((p.x - bN / 2) * 1000) / 1000, Math.round((p.x + bN / 2) * 1000) / 1000]);
+        m40.casos.forEach((_, k) => (sumaCaras[k]! += cara[0]!.medios[3 * k]! * cara[0]!.anchoEnLosa));
+      }
+      // El reparto es exacto: las estaciones de apoyo suman lo que aporta cada nudo de cada lámina
+      // de la cara en las franjas con estación fuera de las ventanas (la mitad del lado de la lámina de
+      // cada nudo, como en `porNodales`); los metros, lo de las ventanas salvo el traslado de 5 cm a la
+      // cara del pilar (My − dx·Vz)
+      const z = m40.c.modelo.nudos[m40.c.modelo.laminas![0]!.nudos[0]]!.z;
+      const r = new Cortes(m40.c.modelo).cortar({ origen: [0, yf, z], x: [0, -lado, 0], vz: [0, 0, 1], y: [-1000, 1000], metodo: "fuerzas-nodales", soloLaminas: true, porLamina: true }, m40.casos);
+      expect(r.valido && r.porLamina !== undefined).toBe(true);
+      const conApoyo = franjas.filter((f) => !sin.includes(f.id));
+      const segmentos = (t0: number, t1: number): [number, number][] => {
+        let seg: [number, number][] = [[t0, t1]];
+        for (const [a, b] of ventanas) seg = seg.flatMap(([p, q]): [number, number][] => (b <= p + 1e-9 || a >= q - 1e-9 ? [[p, q]] : [...(a > p + 1e-9 ? [[p, a] as [number, number]] : []), ...(b < q - 1e-9 ? [[b, q] as [number, number]] : [])]));
+        return seg;
+      };
+      const fueraVentanas = conApoyo.flatMap((f) => segmentos(f.t0, f.t1));
+      const enApoyos = m40.casos.map(() => 0);
+      const enVentanas = m40.casos.map(() => 0);
+      for (const p of r.porLamina!) {
+        // y del corte = lado·(x − 0): la x de cada nudo
+        const xs = p.nudos.map((nd) => lado * nd.y);
+        const [a, b] = [Math.min(...xs), Math.max(...xs)];
+        const punto = !(b - a > 1e-6);
+        const mid = (a + b) / 2;
+        p.nudos.forEach((nd, q) => {
+          const [lo, hi] = xs[q]! < mid ? [a, mid] : [mid, b];
+          const aporta = (acum: number[], tramos: readonly (readonly [number, number])[]) => {
+            for (const [s0, s1] of tramos) {
+              // Una lámina que toca la cara en un solo nudo (sin lado sobre ella) va entera al tramo del nudo
+              const f = punto ? (xs[q]! > s0 - 1e-6 && xs[q]! < s1 + 1e-6 ? 1 : 0) : Math.max(0, Math.min(hi, s1) - Math.max(lo, s0)) / (hi - lo);
+              if (f > 0) m40.casos.forEach((_, k) => (acum[k]! += f * nd.esfuerzos[6 * k + 4]!));
+            }
+          };
+          aporta(enApoyos, fueraVentanas);
+          aporta(enVentanas, ventanas);
+        });
+      }
+      m40.casos.forEach((_, k) => {
+        expect(Math.abs(suma[k]! - enApoyos[k]!) / Math.max(1, Math.abs(enApoyos[k]!)), `cara ${lado}, caso ${k}: apoyos ${suma[k]} frente a ${enApoyos[k]}`).toBeLessThan(1e-9);
+        expect(Math.abs(sumaCaras[k]! - enVentanas[k]!) / Math.max(1, Math.abs(enVentanas[k]!)), `cara ${lado}, caso ${k}: metros ${sumaCaras[k]} frente a ${enVentanas[k]}`).toBeLessThan(0.2);
       });
     }
   });

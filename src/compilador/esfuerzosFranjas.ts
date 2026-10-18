@@ -15,7 +15,9 @@
  *   franjas que cruzan la recta tienen esa estación, también las que no tocan el pilar.
  * - **Apoyos:** ejes de vigas y muros y apoyos lineales perpendiculares a d (ya son rectas de la
  *   malla), por fuerzas nodales y a cada lado, en las franjas que cubren al menos en la mitad del
- *   ancho que tienen en losa. Si su corte no sigue la malla (una viga que acaba dentro), no hay.
+ *   ancho que tienen en losa. Si su corte no sigue la malla (una viga que acaba dentro), no hay. En
+ *   la cara de una viga, sin las ventanas de los pilares cuya huella cruza la cara (los que la viga
+ *   tapa): lo de ahí es del metro del pilar, medido por el escalón desde esa misma recta (LV2 §14).
  * - **Paso:** cada PASO_ESTACIONES desde el comienzo de la losa en d, por campos.
  * Entre las dos caras de un pilar que toca la franja no hay estaciones: es el apoyo.
  *
@@ -186,6 +188,8 @@ interface LineaApoyo {
   lado?: -1 | 1;
   /** Es un borde rígido de la losa (LV2-h): la cara de un ancho, o un apoyo lineal con algún giro coartado. */
   borde?: boolean;
+  /** Es la cara del ancho de una viga (LV2 §14): sus estaciones de apoyo van sin las ventanas de los pilares que la cruzan. */
+  cara?: boolean;
 }
 
 export class EsfuerzosFranjas {
@@ -354,21 +358,29 @@ export class EsfuerzosFranjas {
       return { r, rv, diag: res.diagnosticos, valido: res.valido };
     };
 
+    /** El intervalo [lo, hi] sin los tramos de `excluir`. */
+    const menos = (lo: number, hi: number, excluir: readonly (readonly [number, number])[]): [number, number][] => {
+      let r: [number, number][] = [[lo, hi]];
+      for (const [a, b] of excluir) r = r.flatMap(([p, q]): [number, number][] => (b <= p + EPS || a >= q - EPS ? [[p, q]] : [...(a > p + EPS ? [[p, a] as [number, number]] : []), ...(b < q - EPS ? [[b, q] as [number, number]] : [])]));
+      return r;
+    };
     /**
      * Fuerzas nodales por la recta s del lado `lado` (−1: s menores), de ta a tb, repartidas entre las
      * franjas por la parte del lado de cada lámina sobre la recta que cae en cada una. null si el corte
      * no sigue la malla. Con `escalon` (F3), entra también lo que transmite la huella de un pilar a
      * través de la recta (`resto`, sin repartir), y los momentos se trasladan a la recta s + dx·x.
      */
-    const porNodales = (s: number, lado: -1 | 1, ta: number, tb: number, ventanas: readonly (readonly [number, number])[] = [], escalon?: { restriccion: string; dx: number }): { r: PorFranja[]; rv: PorFranja[]; resto: Float64Array; diag: Diagnostico[] } | null => {
+    const porNodales = (s: number, lado: -1 | 1, ta: number, tb: number, ventanas: readonly (readonly [number, number])[] = [], escalon?: { restriccion: string; dx: number }, excluir: readonly (readonly [number, number])[] = []): { r: PorFranja[]; rv: PorFranja[]; resto: Float64Array; diag: Diagnostico[] } | null => {
       const sx = lado === -1 ? 1 : -1;
       const { corte: c, sigma } = corte(s, sx, ta, tb, { metodo: "fuerzas-nodales", porLamina: true, ...(escalon ? { restricciones: [escalon.restriccion] } : {}) });
       const res: ResultadoCorte = this.cortes.cortar(c, this.casos);
-      if (!res.valido || !res.porLamina || (escalon && res.restricciones.length !== 1)) return null;
-      // My en la recta trasladada, My − dx·Vz; lo de la huella, entero: el total menos las láminas
+      if (!res.valido || !res.porLamina || (escalon && res.restricciones.length > 1)) return null;
+      // My en la recta trasladada, My − dx·Vz; lo de la huella, entero: el total menos las láminas.
+      // Un enlace sin nudos detrás de la recta (el metro de un pilar tapado por su viga desde la cara
+      // de la viga, con la huella entera en el plano o al otro lado) no transmite nada: resto 0
       const dx = escalon?.dx ?? 0;
       const resto = new Float64Array(nc);
-      if (escalon) {
+      if (escalon && res.restricciones.length === 1) {
         for (let kc = 0; kc < nc; kc++) resto[kc] = res.esfuerzos[6 * kc + 4]! - dx * res.esfuerzos[6 * kc + 2]!;
         for (const p of res.porLamina) for (let kc = 0; kc < nc; kc++) resto[kc]! -= p.esfuerzos[6 * kc + 4]! - dx * p.esfuerzos[6 * kc + 2]!;
       }
@@ -401,7 +413,8 @@ export class EsfuerzosFranjas {
           }
         };
         const im = franjaDe(m);
-        for (let i = Math.max(0, franjaDe(a)); i < fr.length && bordes[i]! < b + EPS; i++) sumar(r[i]!, bordes[i]!, bordes[i + 1]!, i === im);
+        // Lo de las franjas, sin los tramos de `excluir` (las ventanas de los pilares en una estación de apoyo)
+        for (let i = Math.max(0, franjaDe(a)); i < fr.length && bordes[i]! < b + EPS; i++) for (const [lo, hi] of menos(bordes[i]!, bordes[i + 1]!, excluir)) sumar(r[i]!, lo, hi, i === im && m > lo - EPS && m < hi + EPS);
         ventanas.forEach(([lo, hi], v) => sumar(rv[v]!, lo, hi, m > lo && m < hi));
       }
       return { r, rv, resto, diag: res.diagnosticos.filter((x) => x.codigo !== "corte/borde-no-sigue-malla" && x.codigo !== "corte/vacio") };
@@ -485,7 +498,7 @@ export class EsfuerzosFranjas {
         if (!(L > EPS) || Math.abs((B[0] - A[0]) * d[0] + (B[1] - A[1]) * d[1]) > 1e-9 * L) continue;
         const sf = (A[0] * d[0] + A[1] * d[1] + B[0] * d[0] + B[1] * d[1]) / 2;
         const [ta, tb] = [A[0] * n[0] + A[1] * n[1], B[0] * n[0] + B[1] * n[1]];
-        lineas.push({ id: a.viga, s: sf, ta: Math.min(ta, tb), tb: Math.max(ta, tb), lado: sf < sc ? -1 : 1, borde: true });
+        lineas.push({ id: a.viga, s: sf, ta: Math.min(ta, tb), tb: Math.max(ta, tb), lado: sf < sc ? -1 : 1, borde: true, cara: true });
         caras.push([sf, Math.min(ta, tb)], [sf, Math.max(ta, tb)]);
       }
       if (caras.length === 2) {
@@ -723,10 +736,17 @@ export class EsfuerzosFranjas {
     // Los pilares que se quedan sin estación en sus caras, con la causa, para el aviso
     const sinEstacion: { id: string; t0: number; t1: number; girado: boolean }[] = [];
     // Fase LV: un pilar dentro del ancho de una viga que va según n (la que se une a la losa por sus
-    // caras) se apoya en ella: el apoyo de la franja son las caras de la viga, con sus estaciones. El
-    // centro del pilar, en el ancho cerrado y con holgura: el de un pilar en el extremo de la viga cae
-    // en el borde del polígono, y `puntoEnPoligono` lo daba dentro en un extremo y fuera en el otro
-    const enVigaSegunN = (q: Vec2) =>
+    // caras) se apoya en ella: el apoyo de la franja son las caras de la viga, con sus estaciones. Pero
+    // sólo si su huella no sale del ancho (LV2, `refinamiento-vigas.md` §14): si la cruza (un 40 bajo
+    // una viga de 30, tapado), los nudos de la cara delante de ella son rígidos con él y la losa está
+    // empotrada en el pilar, no apoyada en la viga; su metro va entonces como el de cualquier pilar
+    // sin cara de franja, por el escalón desde la cara de la viga (una recta de la malla por su
+    // huella), y la estación de apoyo deja fuera lo suyo. Antes la de apoyo cargaba con esa parte sólo
+    // cuando la malla no dejaba láminas rígidas enteras delante de la huella: en la misma estación,
+    // −14 kN·m/m con h = 0,25 y −53 con 0,125. El centro del pilar, en el ancho cerrado y con
+    // holgura: el de un pilar en el extremo de la viga cae en el borde del polígono, y
+    // `puntoEnPoligono` lo daba dentro en un extremo y fuera en el otro
+    const enVigaSegunN = (q: Vec2, ed: number) =>
       anchosL.some(({ poligono, b }) => {
         const [d0, d1, i1, i0] = [poligono[0]!, poligono[1]!, poligono[2]!, poligono[3]!];
         const A: Vec2 = [(d0[0] + i0[0]) / 2, (d0[1] + i0[1]) / 2];
@@ -737,17 +757,22 @@ export class EsfuerzosFranjas {
         if (Math.abs(u[0] * n[0] + u[1] * n[1]) < COSENO_APOYO_PILAR) return false;
         const s = (q[0] - A[0]) * u[0] + (q[1] - A[1]) * u[1];
         const t = -(q[0] - A[0]) * u[1] + (q[1] - A[1]) * u[0];
-        return s >= -EPS && s <= L + EPS && Math.abs(t) <= b / 2 + EPS;
+        return s >= -EPS && s <= L + EPS && Math.abs(t) + ed <= b / 2 + EPS;
       });
     for (const p of huellas.values()) {
       if (porPilar.has(p.id) || !enlace.has(p.id) || !p.huella.forma) continue;
-      if (anchosL.length && enVigaSegunN(p.p)) continue;
       const ed = semiextension(p.huella, d);
       const en = semiextension(p.huella, n);
+      if (anchosL.length && enVigaSegunN(p.p, ed)) continue;
       const sc = p.p[0] * d[0] + p.p[1] * d[1];
       const tc = p.p[0] * n[0] + p.p[1] * n[1];
       const pz = { id: p.id, t0: tc - en, t1: tc + en };
-      if (!alineada(p.huella, d)) {
+      // Un pilar girado o circular no tiene una cara recta que medir, salvo si su huella cruza las
+      // caras del ancho de una viga según n: entonces su metro va por el escalón desde la cara de la
+      // viga, como el de uno alineado (la recta es la de la viga, no la suya)
+      const recto = alineada(p.huella, d);
+      const cruzaViga = anchosL.length > 0 && enVigaSegunN(p.p, 0);
+      if (!recto && !cruzaViga) {
         sinEstacion.push({ ...pz, girado: true });
         continue;
       }
@@ -764,7 +789,7 @@ export class EsfuerzosFranjas {
         conVano = true;
         // Por la recta de la cara, si sigue la malla en la ventana: con el enlace si tiene nudos delante
         // (F3-d) y, si no, el corte de la recta, como en las caras de franja (el enlace no la cruza)
-        let e = !this.caraDirecta ? null : conNudosDelante(p.id, { s: sp, lado }) ? escalon({ s: sp, lado }, pz, sp, ventana, undefined, true) : directa(sp, lado, pz, ventana);
+        let e = !this.caraDirecta || !recto ? null : conNudosDelante(p.id, { s: sp, lado }) ? escalon({ s: sp, lado }, pz, sp, ventana, undefined, true) : directa(sp, lado, pz, ventana);
         // Desde la más cercana a la cara: en la tira entre las dos, lo que se lleva una viga a lo largo no lo cuenta el corte
         for (const b of [...bases].sort((x, y) => Math.abs(x - sp) - Math.abs(y - sp) || x - y)) e ??= escalon({ s: b, lado }, pz, sp, ventana);
         if (e) hechas.push({ sp, lado, e });
@@ -785,10 +810,29 @@ export class EsfuerzosFranjas {
     const enApoyo = (i: number, s: number) => zonas[i]!.some(([a, b]) => s > a + EPS && s < b - EPS);
     const cercaDeExacta = (i: number, s: number) => exactas[i]!.some((x) => Math.abs(x - s) <= EPS);
 
+    /**
+     * En la cara de una viga (LV2 §14): las ventanas de los pilares cuya huella cruza la recta de la
+     * cara (los que la viga tapa, un 40 bajo una de 30). Lo que cae en ellas es del metro del pilar, que
+     * se mide por el escalón desde esta misma recta: la estación de apoyo de la franja queda sin ello.
+     * Antes cargaba con la parte empotrada en el pilar sólo cuando la malla no dejaba láminas rígidas
+     * enteras delante de la huella (−14 o −53 kN·m/m en la misma estación, según h).
+     */
+    const ventanasEnCara = (ln: { s: number; ta: number; tb: number }): [number, number][] => {
+      const r: [number, number][] = [];
+      for (const p of huellas.values()) {
+        if (!enlace.has(p.id) || !p.huella.forma) continue;
+        const ed = semiextension(p.huella, d);
+        const sc = p.p[0] * d[0] + p.p[1] * d[1];
+        const tc = p.p[0] * n[0] + p.p[1] * n[1];
+        if (!(Math.abs(sc - ln.s) < ed - EPS) || tc < ln.ta - EPS || tc > ln.tb + EPS) continue;
+        r.push([tc - bNominal / 2, tc + bNominal / 2]);
+      }
+      return r;
+    };
     for (const ln of lineas) {
       const tramos = tramosLosa(ln.s);
       for (const lado of ln.lado ? [ln.lado] : ([-1, 1] as const)) {
-        const nod = porNodales(ln.s, lado, ln.ta, ln.tb);
+        const nod = porNodales(ln.s, lado, ln.ta, ln.tb, [], undefined, ln.cara ? ventanasEnCara(ln) : []);
         if (!nod) continue;
         const cam = muestrasCara(ln.s, lado);
         for (let i = 0; i < fr.length; i++) {

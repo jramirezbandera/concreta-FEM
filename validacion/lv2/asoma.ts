@@ -2,8 +2,10 @@
  * LV2-f (`docs/fem3d/refinamiento-vigas.md` §9 y §10): los pilares que asoman de la viga que los
  * atraviesa (un 40 × 40, 30 × 50 o 25 × 60 bajo una viga de 30). En las 24 retículas al azar de G, con
  * h = 0,75, frente a LV2 con h = 0,25: el momento de las vigas en sus caras y las estaciones de apoyo
- * de las franjas junto a ellos (la superior de 1,35·G + 1,5·Q), respecto al máximo de la viga o de la
- * franja, como en `franjas.ts`.
+ * y de cara de las franjas junto a ellos (la superior de 1,35·G + 1,5·Q), respecto al máximo de la
+ * viga o de la franja, como en `franjas.ts`. Desde §14, el metro de un pilar tapado cuya huella cruza
+ * la cara de la viga es una estación de cara (antes su parte iba en la de apoyo, según la malla), así
+ * que las dos se miden.
  * - LV1 (`refinoEsquinas: false`): sin plantillas de esquina y con la regla de antes de C2-d (rígidos
  *   también los nudos de fuera de la huella a ≤ ε_snap);
  * - LV2: con las esquinas y, en estos pilares, sólo la huella rígida (LV2-f).
@@ -121,14 +123,14 @@ function medir(f: ModeloFisico, op: OpcionesCompilacion): Medida {
       const est = q.franja(fr.id);
       const arm = q.armadoFranja(fr.id, [fac]);
       if (!est.valido || !arm.valido) throw new Error(fr.id);
-      const apoyos = est.valor.estaciones.flatMap((x, i) => (x.tipo === "apoyo" ? [{ x, v: arm.valor[i]!.superior }] : []));
+      const apoyos = est.valor.estaciones.flatMap((x, i) => (x.tipo === "apoyo" || x.tipo === "cara" ? [{ x, v: arm.valor[i]!.superior }] : []));
       const escala = Math.max(1, ...apoyos.map((a) => a.v));
       for (const { x, v } of apoyos)
         for (const { pilar: p, planta } of asoman) {
           if (`L-${planta}` !== losa) continue;
           const [ex, ey] = extension(f, p)!;
           const [cc, t, ancho] = fr.direccion === 1 ? [p.x, p.y, ey] : [p.y, p.x, ex];
-          if (Math.abs(x.s - cc) <= 0.5 && fr.t0 < t + ancho / 2 && fr.t1 > t - ancho / 2) franjas.set(`${fr.id} ${x.s.toFixed(3)}:${x.lado}`, { v, escala });
+          if (Math.abs(x.s - cc) <= 0.5 && fr.t0 < t + ancho / 2 && fr.t1 > t - ancho / 2) franjas.set(`${fr.id} ${x.s.toFixed(3)}:${x.lado} ${x.tipo}`, { v, escala });
         }
     }
   }
@@ -187,6 +189,11 @@ for (const [nombre] of VARIANTES) console.log(`| ${nombre}, h = 0,75, frente a l
 const masDe = (v: number[], u: number) => v.filter((x) => Math.abs(x) > u).length;
 console.log(`\nPor encima del 10 % / 20 % frente a la referencia:`);
 for (const [nombre] of VARIANTES) console.log(`- ${nombre}: vigas ${masDe(d(errV.get(nombre)!), 0.1)} / ${masDe(d(errV.get(nombre)!), 0.2)}; franjas ${masDe(d(errF.get(nombre)!), 0.1)} / ${masDe(d(errF.get(nombre)!), 0.2)}`);
+// Las franjas, por tipo de estación: las de cara (el metro de un pilar) y las de apoyo
+for (const tipo of ["cara", "apoyo"]) {
+  const de = (nombre: string) => d(errF.get(nombre)!.filter((x) => x.k.endsWith(` ${tipo}`)));
+  console.log(`- estaciones de ${tipo} (${de("LV2").length}): ${VARIANTES.map(([n]) => `${n} ${col(de(n)).trim()}, > 10 % / 20 %: ${masDe(de(n), 0.1)} / ${masDe(de(n), 0.2)}`).join("; ")}`);
+}
 for (const [nombre, err] of [["vigas", errV], ["franjas", errF]] as const) {
   console.log(`\n### Las diez peores de LV2, ${nombre} (retícula, estación; LV2 y LV1 frente a la referencia)`);
   const lv1 = (x: Dif) => err.get("LV1")!.find((y) => y.s === x.s && y.k === x.k)?.d ?? NaN;

@@ -86,6 +86,24 @@
  *    entonces la triangulación, con astillas). La celda de una tira cuenta como esquina refinada
  *    para su cruce (8). Sin tiras, lo que asomaba dejaba irregulares las celdas junto al pilar y la
  *    triangulación lo unía a las caras con astillas (jacobiano 0,11–0,19).
+ * 10. Caras delante de un pilar tapado (fase LV2, LV-8, `tapadas`): un pilar que el ancho de su viga
+ *    tapa salvo ≤ ε_snap (un 40 × 40 bajo una de 30) no se siembra ni lleva plantilla, pero los nudos
+ *    de las caras de la viga delante de su huella son rígidos con él (C2-d): la losa está empotrada
+ *    en el pilar, y su metro perpendicular a la viga (`esfuerzosFranjas.ts`, el escalón desde la cara)
+ *    salía con h = 0,75 un 17 % por debajo de la malla de 0,25 con la celda entera contra el tramo
+ *    rígido. Ahora, en cada cara de viga a ≤ `separacionRefino` de su huella, las celdas regulares de
+ *    losa delante de ella (las que cruza la huella a lo largo de la cara) llevan una plantilla de cara:
+ *    el primer tramo desde la cara (la mitad de la celda si va partida, o la celda) en tercios a lo
+ *    largo del tramo, con la transición de 3 a 1 en las celdas de los extremos (en su mitad exterior
+ *    si van partidas a lo largo de la cara, o en la celda entera). El borde hacia la losa y los extremos
+ *    no cambian (sus esquinas y, si van partidos, sus puntos medios); por la cara lleva sus nudos
+ *    (`subdivididas`), y las aristas entre dos celdas del tramo también (por ellas puede ir una cara de
+ *    franja). Una sola celda sin partir a lo largo de la cara no se cierra con cuadriláteros (su
+ *    contorno tendría un número impar de aristas): el tramo crece una celda a cada lado. Un pilar lleva
+ *    la plantilla en todas sus caras o en ninguna (a un solo lado de la viga, la viga se tuerce, como en
+ *    8); las celdas de esquina de un cruce van por 8. Si alguna celda no es regular, o la plantilla no
+ *    tiene calidad o pondría un nudo rígido, el pilar va en `tapadasSinRefinar` (aviso
+ *    `malla/pilar-tapado-sin-refinar`).
  *
  * Puro y determinista; las comparaciones con umbral llevan holgura para que un ruido de ε_geom o el
  * redondeo de un giro no cambien la rejilla.
@@ -173,6 +191,12 @@ export interface EntradaRejilla {
    * sería rígido (C2-d, F2-9).
    */
   huellasPilares?: readonly (readonly Vec2[])[];
+  /**
+   * Pilares de `huellasPilares` cuya huella tapa el ancho de su viga (fase LV2, LV-8): sin sembrar y
+   * sin plantilla, las celdas delante de su huella junto a las caras de la viga llevan la plantilla de
+   * cara (§10 de la cabecera).
+   */
+  tapadas?: readonly number[];
   regiones: readonly Region[];
   /** Losa que contiene un punto, o −1. */
   enLosa: (q: Vec2) => number;
@@ -302,6 +326,11 @@ export interface Rejilla {
    * solapa con otra plantilla, y lo que asoma lo malla la triangulación, con astillas.
    */
   tirasSinPlantilla: number[];
+  /**
+   * Pilares tapados (índice en `huellasPilares`) con alguna cara de viga delante de su huella que se
+   * queda sin la plantilla de cara (§10): una celda no es regular, o la plantilla no tiene calidad.
+   */
+  tapadasSinRefinar: number[];
   posicion(n: number): Vec2;
   /** Celda que contiene un punto (interior), o −1. */
   celdaDe(q: Vec2): number;
@@ -1343,15 +1372,18 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
    * la losa, a ≤ ε_snap de una huella, sería rígido, y se pide 1,2·ε_snap (0,6 de separacionRefino):
    * la holgura es sólo para que no lo decida un redondeo.
    */
-  const lejosDeHuellas = (pl: Plantilla): boolean => {
+  const lejosDeHuellas = (pl: Plantilla, propia = -1): boolean => {
     const sep = 0.6 * (E.separacionRefino ?? 0);
     if (!E.huellasPilares?.length || !(sep > 0)) return true;
     const enCara = new Set(pl.subdivididas.flatMap((x) => x.nudos));
     for (let k = 0; k < pl.red.length; k++) {
       const x = pl.red[k]!;
       if (x.tipo !== "nuevo") continue;
-      for (const poli of E.huellasPilares) {
-        const b = bordePoligono(x.q, poli);
+      for (let m = 0; m < E.huellasPilares.length; m++) {
+        // En la plantilla de cara de un pilar tapado (§10), un nudo de la cara dentro de su huella es
+        // rígido con él, como los de la rejilla que ya había en ella
+        if (enCara.has(k) && m === propia) continue;
+        const b = bordePoligono(x.q, E.huellasPilares[m]!);
         if (enCara.has(k) ? b.dentro && b.d > 2 * E.epsGeom : b.dentro || b.d < sep) return false;
       }
     }
@@ -1485,6 +1517,202 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     for (const [huella, triangulacion] of [...sinEsquina].sort((a, b) => a[0] - b[0])) esquinasSinRefinar.push({ huella, triangulacion });
   }
 
+  // 10. Caras de las vigas delante de un pilar tapado (fase LV2, LV-8, §10 de la cabecera): la primera
+  // fila de celdas a lo largo de la cara, en tercios hacia ella, con la transición en los extremos
+  const tapadasSinRefinar: number[] = [];
+  if (E.esquinas && E.fuertes && E.tapadas?.length && E.huellasPilares?.length) {
+    const sepT = E.separacionRefino ?? 0;
+    /**
+     * Tramo de celdas junto a una cara: con `vertical`, la cara es la línea U[linea] y el tramo recorre
+     * las filas a0…a1; si no, la línea V[linea] y las columnas. `s`: el lado de la losa.
+     */
+    interface TramoCara {
+      vertical: boolean;
+      linea: number;
+      s: 1 | -1;
+      a0: number;
+      a1: number;
+    }
+    /** Nudo de la rejilla en la línea del tramo `a` sobre la cara (lado 0) o sobre la línea de enfrente (lado 1). */
+    const nodoRej = (t: TramoCara, a: number, lado: 0 | 1) => {
+      const l = lado === 0 ? t.linea : t.linea + t.s;
+      return t.vertical ? l + a * nu : a + l * nu;
+    };
+    const celdaT = (t: TramoCara, a: number) => (t.vertical ? celda(t.s > 0 ? t.linea : t.linea - 1, a) : celda(a, t.s > 0 ? t.linea : t.linea - 1));
+    const lerp = (P0: Vec2, P1: Vec2, x: number): Vec2 => [P0[0] + x * (P1[0] - P0[0]), P0[1] + x * (P1[1] - P0[1])];
+    /** ¿Está partida la arista de la rejilla entre dos nudos contiguos? (como `partida`, que se define después) */
+    const partida = (n1: number, n2: number): boolean => {
+      const n = Math.min(n1, n2);
+      const [i, j] = [n % nu, Math.floor(n / nu)];
+      return Math.abs(n1 - n2) === 1 ? partidaH[i + j * (nu - 1)] === 1 : partidaV[i + j * nu] === 1;
+    };
+    /**
+     * La plantilla de un tramo, en las coordenadas (a, na, nb) de cada celda: na, la fracción a lo
+     * largo de la cara en cuartos; nb, la distancia a la cara en doceavos de la celda. Con la celda
+     * partida hacia la losa, el primer tramo es su mitad (tercios en 2, 4 y 6); si no, la celda entera
+     * (4, 8 y 12). O false si las celdas no van partidas igual hacia la losa, o es una sola sin partir
+     * a lo largo de la cara.
+     */
+    const plantillaCara = (t: TramoCara): Plantilla | false => {
+      const pu = partida(nodoRej(t, t.a0, 0), nodoRej(t, t.a0, 1));
+      for (let a = t.a0 + 1; a <= t.a1 + 1; a++) if (partida(nodoRej(t, a, 0), nodoRej(t, a, 1)) !== pu) return false;
+      const pv = (a: number) => partida(nodoRej(t, a, 0), nodoRej(t, a + 1, 0));
+      const sola = t.a0 === t.a1;
+      if (sola && !pv(t.a0)) return false;
+      const red: NudoPlantilla[] = [];
+      const indice = new Map<string, number>();
+      const pos = (a: number, na: number, nb: number): Vec2 => {
+        const [P00, P10, P01, P11] = [posicion(nodoRej(t, a, 0)), posicion(nodoRej(t, a, 1)), posicion(nodoRej(t, a + 1, 0)), posicion(nodoRej(t, a + 1, 1))];
+        return lerp(lerp(P00, P10, nb / 12), lerp(P01, P11, nb / 12), na / 4);
+      };
+      const nudo = (a: number, na: number, nb: number): number => {
+        if (na === 4) [a, na] = [a + 1, 0];
+        const k = `${a},${na},${nb}`;
+        let r = indice.get(k);
+        if (r !== undefined) return r;
+        if (na === 0 && nb === 0) red.push({ tipo: "nudo", n: nodoRej(t, a, 0) });
+        else if (na === 0 && nb === 12) red.push({ tipo: "nudo", n: nodoRej(t, a, 1) });
+        else if (na === 0 && nb === 6 && (a === t.a0 || a === t.a1 + 1)) red.push({ tipo: "medio", n1: nodoRej(t, a, 0), n2: nodoRej(t, a, 1) });
+        else if (na === 2 && nb === 12) red.push({ tipo: "medio", n1: nodoRej(t, a, 1), n2: nodoRej(t, a + 1, 1) });
+        else red.push({ tipo: "nuevo", q: pos(a, na, nb) });
+        indice.set(k, (r = red.length - 1));
+        return r;
+      };
+      const quads: Plantilla["quads"] = [];
+      const cuad = (v: readonly (readonly [number, number, number])[], losaQ: number) => {
+        const n = v.map(([a, na, nb]) => nudo(a, na, nb)) as [number, number, number, number];
+        const X = n.map((k) => posRed(red[k]!));
+        let area = 0;
+        for (let m = 0; m < 4; m++) area += X[m]![0] * X[(m + 1) % 4]![1] - X[(m + 1) % 4]![0] * X[m]![1];
+        quads.push({ n: area > 0 ? n : [n[0], n[3], n[2], n[1]], losa: losaQ });
+      };
+      const XF: [number, number, number, number] = pu ? [0, 2, 4, 6] : [0, 4, 8, 12];
+      const bordes: Plantilla["bordes"] = [];
+      const subdivididas: Plantilla["subdivididas"] = [];
+      if (pu) for (const a of [t.a0, t.a1 + 1]) bordes.push({ n1: nodoRej(t, a, 0), n2: nodoRej(t, a, 1), losa: losa[celdaT(t, Math.min(a, t.a1))]! });
+      for (let a = t.a0; a <= t.a1; a++) {
+        const losaQ = losa[celdaT(t, a)]!;
+        const p = pv(a);
+        // Dónde va fina (los tercios de lado a lado) y dónde la transición [lado fino, lado grueso]
+        let fino: [number, number][] = [];
+        const trans: [number, number][] = [];
+        if (sola) trans.push([2, 0], [2, 4]);
+        else if (a === t.a0) {
+          if (p) {
+            trans.push([2, 0]);
+            fino.push([2, 4]);
+          } else trans.push([4, 0]);
+        } else if (a === t.a1) {
+          if (p) {
+            fino.push([0, 2]);
+            trans.push([2, 4]);
+          } else trans.push([0, 4]);
+        } else fino = p ? [[0, 2], [2, 4]] : [[0, 4]];
+        for (const [y0, y1] of fino) for (let m = 0; m < 3; m++) cuad([[a, y0, XF[m]!], [a, y0, XF[m + 1]!], [a, y1, XF[m + 1]!], [a, y1, XF[m]!]], losaQ);
+        for (const [yf, yc] of trans) {
+          const ym = (yf + yc) / 2;
+          const [x0, x1, x2, x3] = XF;
+          cuad([[a, yf, x0], [a, yf, x1], [a, ym, x1], [a, yc, x0]], losaQ);
+          cuad([[a, yf, x1], [a, yf, x2], [a, ym, x2], [a, ym, x1]], losaQ);
+          cuad([[a, yf, x2], [a, yf, x3], [a, yc, x3], [a, ym, x2]], losaQ);
+          cuad([[a, ym, x1], [a, ym, x2], [a, yc, x3], [a, yc, x0]], losaQ);
+        }
+        // Lo que queda de la celda hacia la losa, entero
+        if (pu) {
+          const ys = p ? [0, 2, 4] : [0, 4];
+          for (let m = 0; m + 1 < ys.length; m++) cuad([[a, ys[m]!, 6], [a, ys[m]!, 12], [a, ys[m + 1]!, 12], [a, ys[m + 1]!, 6]], losaQ);
+        }
+        if (p) bordes.push({ n1: nodoRej(t, a, 1), n2: nodoRej(t, a + 1, 1), losa: losaQ });
+        if (p) subdivididas.push({ a: nudo(a, 0, 0), b: nudo(a + 1, 0, 0), nudos: [nudo(a, 2, 0)] });
+        // La arista entre dos celdas del tramo (por ella puede ir una cara de franja): por los tercios
+        if (a > t.a0) subdivididas.push({ a: nudo(a, 0, 0), b: nudo(a, 0, 12), nudos: XF.slice(1, pu ? 4 : 3).map((nb) => nudo(a, 0, nb)) });
+      }
+      return { huella: -1, red, quads, anillo: [], bordes, subdivididas, huellaLados: [], refinada: true };
+    };
+    const usadas = new Set<number>();
+    for (const m of E.tapadas) {
+      const poli = E.huellasPilares[m];
+      if (!poli) continue;
+      let [bu0, bv0, bu1, bv1] = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const q of poli) {
+        const [u, v] = uv(q);
+        [bu0, bv0, bu1, bv1] = [Math.min(bu0, u), Math.min(bv0, v), Math.max(bu1, u), Math.max(bv1, v)];
+      }
+      const tramos: TramoCara[] = [];
+      const enTramos = new Set<number>();
+      let candidatas = false;
+      let fallo = false;
+      for (const vertical of [true, false]) {
+        const [L, f, B0, B1, LA, A0, A1] = vertical ? [U, fU, bu0, bu1, V, bv0, bv1] : [V, fV, bv0, bv1, U, bu0, bu1];
+        for (let l = 1; l < L.length - 1; l++) {
+          if (!f[l] || L[l]! < B0 - sepT || L[l]! > B1 + sepT) continue;
+          for (const s of [-1, 1] as const) {
+            const t: TramoCara = { vertical, linea: l, s, a0: 0, a1: 0 };
+            /**
+             * La celda `a` junto a la cara: 0 si no es de losa con el ancho (fuera de las losas) al
+             * otro lado, o es una esquina de paño (va por 8); 1 si es regular y libre; 2 si no.
+             */
+            const vale = (a: number): 0 | 1 | 2 => {
+              if (a < 0 || a > LA.length - 2) return 0;
+              const c = celdaT(t, a);
+              const [ci, cj] = vertical ? [s > 0 ? l : l - 1, a] : [a, s > 0 ? l : l - 1];
+              const otra = vertical ? [s > 0 ? l - 1 : l, a] : [a, s > 0 ? l - 1 : l];
+              if (losaCelda[c]! < 0 || !fueraDeLosas(otra[0]!, otra[1]!) || esquinasDe(ci, cj).length) return 0;
+              return estado[c] === REGULAR && !usadas.has(c) ? 1 : 2;
+            };
+            const filas: number[] = [];
+            const lo = Math.max(0, tramo(LA, A0 + tol));
+            const hi = Math.min(LA.length - 2, tramo(LA, A1 - tol));
+            for (let a = lo; a <= hi; a++) {
+              const v = vale(a);
+              if (v === 0) continue;
+              candidatas = true;
+              if (v === 2) fallo = true;
+              else filas.push(a);
+            }
+            // Las filas seguidas, un tramo cada una. Una sola celda sin partir a lo largo de la cara
+            // no cabe: el tramo crece una celda a cada lado, si son también de losa junto al ancho y
+            // regulares
+            for (let i = 0; i < filas.length; ) {
+              let j = i;
+              while (j + 1 < filas.length && filas[j + 1] === filas[j]! + 1) j++;
+              let [a0, a1] = [filas[i]!, filas[j]!];
+              i = j + 1;
+              if (a0 === a1 && !partida(nodoRej(t, a0, 0), nodoRej(t, a0 + 1, 0))) {
+                if (vale(a0 - 1) === 1 && vale(a0 + 1) === 1 && !enTramos.has(celdaT(t, a0 - 1)) && !enTramos.has(celdaT(t, a0 + 1))) [a0, a1] = [a0 - 1, a0 + 1];
+                else {
+                  fallo = true;
+                  continue;
+                }
+              }
+              for (let a = a0; a <= a1; a++) enTramos.add(celdaT(t, a));
+              tramos.push({ ...t, a0, a1 });
+            }
+          }
+        }
+      }
+      const pls: Plantilla[] = [];
+      for (const t of tramos) {
+        if (fallo) break;
+        const pl = plantillaCara(t);
+        if (pl && lejosDeHuellas(pl, m) && jacobianoMin(pl) >= UMBRAL_REFINO.jacobiano) pls.push(pl);
+        else fallo = true;
+      }
+      if (fallo) {
+        if (candidatas) tapadasSinRefinar.push(m);
+        continue;
+      }
+      tramos.forEach((t, i) => {
+        for (let a = t.a0; a <= t.a1; a++) {
+          const c = celdaT(t, a);
+          estado[c] = PLANTILLA;
+          usadas.add(c);
+        }
+        plantillas.push(pls[i]!);
+      });
+    }
+  }
+
   const celdaDe = (q: Vec2): number => {
     const [u, v] = uv(q);
     const i = tramo(U, u);
@@ -1509,5 +1737,5 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     const [i, j] = [n % nu, Math.floor(n / nu)];
     return Math.abs(n1 - n2) === 1 ? partidaH[i + j * (nu - 1)] === 1 : partidaV[i + j * nu] === 1;
   };
-  return { U, V, estado, losa, puntoNudo, nudoPunto, absorbidos, enLinea, interfaz, plantillas, sinRefinar, esquinasSinRefinar, tirasSinPlantilla, posicion, celdaDe, toca, cubre, estadosArista, partida };
+  return { U, V, estado, losa, puntoNudo, nudoPunto, absorbidos, enLinea, interfaz, plantillas, sinRefinar, esquinasSinRefinar, tirasSinPlantilla, tapadasSinRefinar, posicion, celdaDe, toca, cubre, estadosArista, partida };
 }

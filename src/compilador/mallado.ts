@@ -462,6 +462,8 @@ export interface RefinoCaras {
   huellas?: readonly (readonly Vec2[])[];
   /** Id del pilar de cada una de `huellas`, para los avisos. */
   idsHuellas?: readonly string[];
+  /** Índices en `huellas` de los pilares tapados por el ancho de su viga (LV-8): sin sembrar, con la plantilla de cara delante de su huella. */
+  tapadas?: readonly number[];
 }
 
 /** `mallarPlanta` sin comparar con la CDT sola cuando la rejilla cubre poco (para las pruebas). */
@@ -693,7 +695,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       huellas,
       ...(refinoH ? { refino: refinoH } : {}),
       ...(refinoH || (refino?.esquinas && fuertes) ? { separacionRefino: refino!.separacion } : {}),
-      ...(fuertes ? { fuertes, sinEje, ...(refino?.esquinas ? { esquinas: true, huellasPilares: refino.huellas ?? [] } : {}) } : {}),
+      ...(fuertes ? { fuertes, sinEje, ...(refino?.esquinas ? { esquinas: true, huellasPilares: refino.huellas ?? [], tapadas: refino.tapadas ?? [] } : {}) } : {}),
       regiones,
       enLosa,
       O: origenes[0]!,
@@ -1451,6 +1453,16 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   for (const triangulacion of [true, false]) {
     const ids = (rj?.esquinasSinRefinar ?? []).filter((x) => x.triangulacion === triangulacion).map((x) => refino?.idsHuellas?.[x.huella] ?? `#${x.huella}`);
     if (ids.length) problemas.push(avisoEsquinaSinRefinar(ids, triangulacion ? "una esquina de su cruce cae en la triangulación (junto a un hueco, una carga u otro rasgo que no sigue la rejilla)" : "la plantilla de esquina no cabe o no tiene calidad"));
+  }
+  if (rj?.tapadasSinRefinar.length) {
+    const ids = [...new Set(rj.tapadasSinRefinar.map((m) => refino?.idsHuellas?.[m] ?? `#${m}`))].sort();
+    problemas.push({
+      objetos: ids,
+      losa: -1,
+      severidad: "aviso",
+      codigo: "malla/pilar-tapado-sin-refinar",
+      mensaje: `La malla de la losa junto a las caras de la viga delante de ${ids.join(", ")} (${ids.length > 1 ? "pilares que el ancho de su viga tapa" : "un pilar que el ancho de su viga tapa"}) no se ha refinado: alguna celda no sigue la rejilla (un hueco, una carga u otro rasgo cerca) o la plantilla no tiene calidad. Allí la losa apoya con un solo elemento en el tramo rígido de la cara, y con el tamaño de malla por defecto el metro del pilar perpendicular a la viga puede salir hasta un 20 % bajo. El cálculo es válido; revise ahí las franjas o baje el tamaño de malla.`,
+    });
   }
   const areas = losas.map(() => 0);
   let jacobianoMin = Infinity;

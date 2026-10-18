@@ -408,3 +408,48 @@ Propuesta: (c) ahora, y (b) como decisión aparte con su medida.
 
 **Queda** para antes de activar `refinoEsquinas`: la propuesta de arriba para las estaciones delante de un pilar tapado; las tiras que no caben (retícula 6); el coste (+70 %, §10) y las referencias `-lv2`; después, las vigas curvas (paso 3) y, aparte, las cuñas entre vigas que se juntan a menos de 45° (alas, triangular).
 
+
+## 14. Las estaciones delante de un pilar tapado: eran las estaciones, no la malla (2026-10-18)
+
+**Lo que se iba a hacer** (§13): tercios en la primera fila de celdas a lo largo de la cara de la viga donde un pilar tapado tiene nudos rígidos, para las dos estaciones de apoyo que empeoraban con LV-8 (X7 de la retícula 1 delante de P3-1, +91 %; Y5 delante de P1-4, −46 %).
+
+**Lo que había.** La plantilla de cara se hizo y se midió, y no las arreglaba: X7 pasaba de +91 % a +103 %. Descompuesta la estación (`validacion/lv2`, con las mallas de 0,75, 0,25 y 0,125):
+
+| X7 en la cara de Y3 (x = 15,55), N1 | mx (kN·m/m) | ancho en losa |
+|---|---|---|
+| LV1, h = 0,75 | −11,7 | 0,75 |
+| LV2, h = 0,75 | −44,7 | 0,98 |
+| referencia, h = 0,25 | −13,7 | 0,68 |
+| h = 0,125 | −53,3 | 0,98 |
+
+La referencia no convergía: con h = 0,25 cae una línea de nudos justo en el borde de la huella (x = 15,50, a 5 cm de la cara), las dos láminas entre esa línea y la cara quedan rígidas enteras y el corte las deja fuera (F-g); con 0,125 y con 0,75 las láminas pegadas a la cara tienen los nudos de dentro libres, cuentan, y meten en la estación de apoyo lo que la losa transmite al pilar por los nudos rígidos de la cara. El +91 % era una comparación entre dos definiciones distintas, no un error de malla. Y la de LV1 salía «bien» por lo mismo: sus astillas eran láminas rígidas enteras.
+
+La causa estaba en la fase LV: un pilar dentro del ancho de una viga según la transversal se saltaba en las caras de franja («se apoya en la viga: el apoyo de la franja son las caras de la viga»), así que P3-1 no tenía metro perpendicular a la viga y la estación de apoyo cargaba, según la malla, con la parte de la losa empotrada en él. En un pilar de fachada bajo el zuncho de borde, el caso más corriente, era la única estación de la franja en ese apoyo.
+
+Y5 no era de LV-8: P1-4 (60 × 25 dentro de la viga de 30) no tiene nudos rígidos en la cara; su estación es la de una esquina de paño junto a un cruce, con la plantilla de esquina de §7.
+
+**Qué se hace** (`esfuerzosFranjas.ts`; compilador sin cambio de versión, es una consulta):
+1. **El pilar cuya huella cruza las caras de la viga tiene su metro,** como cualquier pilar sin cara de franja (SP-3, SP-4): por el escalón desde la cara de la viga (una recta de la malla por su huella) hasta su cara propia, con la ventana del ancho nominal centrada en él (F-h). Sólo se salta el que queda entero dentro del ancho (un 25 × 60 según la viga): ése sí apoya en ella. Un pilar circular o girado que cruza las caras va igual, por la recta de la viga (antes, «girado» era sin estación). Un enlace sin nudos detrás de la recta no transmite nada (resto 0; antes el escalón exigía que el enlace cruzara el plano).
+2. **La estación de apoyo en la cara de una viga va sin las ventanas de esos pilares:** lo que cae en ellas es del metro. Es geométrico (los tramos de cada franja fuera de las ventanas), no por nudos, así que no depende de la malla. Si a la franja le queda menos de la mitad de su ancho, no tiene estación de apoyo ahí: apoya en el pilar, y su estación es el metro. Sólo en las caras de los anchos; las líneas de apoyo de muros, apoyos lineales y vigas por el eje no cambian.
+
+Con eso, el metro de P3-1 en X7 (cara x = 15,50, ventana 5,75–6,75, ancho 1,00): −42,6 con h = 0,75, −51,5 con 0,25 y −46,6 con 0,125. Converge dentro de un ±5 % entre las dos finas; la de 0,75 queda un 17 % por debajo de la de 0,25.
+
+**La plantilla de cara** (`rejilla.ts` §10, detrás de `refinoEsquinas`): delante de la huella de un pilar tapado, la primera fila de celdas junto a cada cara de la viga en tercios hacia ella, con la transición de 3 a 1 en los extremos (una sola celda sin partir a lo largo de la cara no se cierra con cuadriláteros: el tramo crece una celda a cada lado). Las celdas de esquina de un cruce van por §8, así que sólo actúa en los pilares sobre una viga sin otra que la cruce (los de fachada bajo un zuncho de borde en una losa sin vigas interiores). Con ella, el metro de P3-1 pasa de −42,6 a −47,9 (a un 7 % de la de 0,25 y un 3 % de la de 0,125). Aviso `malla/pilar-tapado-sin-refinar` si alguna celda no sigue la rejilla (retícula 4, P1-1 junto al hueco).
+
+**Medida** (`asoma.ts`, que desde ahora mide también las estaciones de cara junto a los pilares que asoman: 913 estaciones, 652 de cara y 261 de apoyo; `out_asoma.txt`):
+
+| h = 0,75 frente a 0,25 | Franjas: mediana / máx | > 10 % / > 20 % | caras > 10 % / > 20 % | apoyos > 10 % / > 20 % | vigas > 10 % / > 20 % |
+|---|---|---|---|---|---|
+| LV1 | 6,6 / 100 % | 239 / 130 | 212 / 125 | 27 / 5 | 77 / 17 |
+| LV2 sin la plantilla de cara | 4,3 / 62 % | 116 / 10 | 107 / 10 | 9 / 0 | 4 / 0 |
+| **LV2 con la plantilla de cara** | **3,9 / 62 %** | **114 / 13** | 105 / 13 | 9 / 0 | **2 / 0** |
+
+Las diez peores son las mismas con y sin ella, y vienen de antes: los metros de los pilares de esquina y de borde (Y1 en s = 0,2 de las retículas 18, 20 y 16: −62, −39 y −32 %), que son los de SP-3/SP-4 con la malla de 0,75 en la esquina. En los edificios objetivo (vigas en todos los ejes) la plantilla no cambia ni un nudo (`out_banco.txt`); en las retículas al azar añade del 1 al 7 % de nudos, sin ningún aviso de calidad nuevo (`out_calidad.txt`). Se queda, porque manda la precisión (LV2-d) donde actúa y no cuesta donde no.
+
+**Referencia congelada de F** (`validacion/f/cambiosTapados.ts`, `out_cambiosTapados.txt`), regenerada a sabiendas: sólo cambian las dos de la unión por las caras con pilares que cruzan las caras de su viga. En `aleatorio-3-lv`, 8 estaciones de cara nuevas (P1-0, girado 45°, y P1-2, circular, bajo sus vigas) por 8 de apoyo y de paso que desaparecen; en `reticular-2x2-abacos-lv`, 10 caras nuevas por 10 apoyos, y 12 apoyos que cambian hasta un 8,4 % (sin las ventanas). Las de la unión por el eje, idénticas; la malla, idéntica en todas.
+
+**Criterio 3** (`out_franjas.txt`): las estaciones de apoyo de la retícula de 4 × 4 son ahora 328 (las de las ventanas de los pilares son metros); con LV2 y h = 0,75, 11 por encima del 10 % y 2 del 20 % (antes 18 y 2) frente a 16 y 6 con h = 0,5 uniforme: sigue pasando.
+
+**Pruebas:** `pilarTapado.test.ts` (el metro de P3-1 y su convergencia; P1-2 circular), `asoma.test.ts` (la plantilla de cara y su aviso) y el criterio 7 de LV en `unionLosaViga.test.ts`, que con pilares que no cruzan las caras sigue siendo la identidad exacta y, con los que las cruzan, comprueba que los apoyos suman exactamente lo de fuera de las ventanas y los metros lo de dentro (salvo el traslado de 5 cm).
+
+**Queda:** el coste (+70 %, §10) y las referencias `-lv2` antes de activar `refinoEsquinas`; los metros de los pilares de esquina y de borde con h = 0,75 (las diez peores), que son de SP-3/SP-4 y no de LV2.
