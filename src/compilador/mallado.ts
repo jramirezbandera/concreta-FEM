@@ -641,7 +641,11 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         // Una tira fuera de las losas (lo que asoma de un pilar de borde hacia fuera) no es huella
         if (!puntos.some((p) => puntoEnLosa[p])) continue;
         const en = new Set(puntos);
-        huellas.push({ puntos, lados: ladosT.filter((k) => en.has(lados[k]!.a) && en.has(lados[k]!.b)), grupo: g, tira: true });
+        // Sus lados: los de la huella entre sus puntos y el trozo de la cara del ancho que la cierra
+        // (un lado del ancho, no de la huella). Sin él, cuando la plantilla parte la cara (la celda
+        // de la huella va partida, §7 de `rejilla.ts`) su nudo no estaba en la cadena del lado y la
+        // malla salía con `malla/lado-perdido` (la retícula 5 con muros, LV2 §19)
+        huellas.push({ puntos, lados: lados.flatMap((l, k) => (en.has(l.a) && en.has(l.b) ? [k] : [])), grupo: g, tira: true });
         idHuella.push(t.id);
         tiraHuella.push(true);
         centroHuella.push(c);

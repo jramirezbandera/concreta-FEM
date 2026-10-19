@@ -16,7 +16,8 @@ await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "..", "src", "n
 const ref = cype({ f: 0.5, fPilar: 0.5 });
 cabecera();
 fila(ref, "Emparrillado de CYPECAD (barras)", ref);
-fila(ref, "LV1 (sin esquinas), h = 0,75", await nuestro(-e, {}));
+// Desde §17 las esquinas van por defecto: LV1 es explícito
+fila(ref, "LV1 (sin esquinas), h = 0,75", await nuestro(-e, { refinoEsquinas: false }));
 const defecto = { ...PLANTILLA_ESQUINA };
 for (const [tipo, niveles] of [["tercios", 1], ["tercios", 2], ["graduada", 2], ["graduada", 3]] as const) {
   Object.assign(PLANTILLA_ESQUINA, { tipo, niveles });

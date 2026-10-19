@@ -92,7 +92,9 @@ function medir(op: OpcionesCompilacion): { r: Map<string, number>; nudos: number
 }
 
 if (import.meta.main) {
-  const ref = medir({ tamanoMalla: 0.055, epsSnap: 0.025 });
+  // La referencia es la malla uniforme (sin las plantillas de esquina, que desde §17 van por defecto):
+  // con ellas, la de 0,055 mueve hasta un 3 % los valores en la cara (§19)
+  const ref = medir({ tamanoMalla: 0.055, epsSnap: 0.025, refinoEsquinas: false });
   const claves = [...ref.r.keys()];
   const defecto = { ...PLANTILLA_ESQUINA };
   const variantes: [string, OpcionesCompilacion, typeof defecto][] = [

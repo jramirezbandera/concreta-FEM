@@ -95,7 +95,7 @@ retmuros3 LV2          jac 0.287 bajos   0 nudos   7496   calidad 0  esquina-sin
 retmuros4 LV1          jac 0.142 bajos   4 nudos   2751   calidad 1  esquina-sin-refinar 0  pilar-asoma-sin-plantilla 0  sin-rejilla 0
 retmuros4 LV2          jac 0.287 bajos   0 nudos   2599   calidad 0  esquina-sin-refinar 0  pilar-asoma-sin-plantilla 0  sin-rejilla 0
 retmuros5 LV1          jac 0.215 bajos   0 nudos   3609   calidad 0  esquina-sin-refinar 0  pilar-asoma-sin-plantilla 0  sin-rejilla 0
-retmuros5 LV2          jac 0.215 bajos   0 nudos   3236   calidad 0  esquina-sin-refinar 0  pilar-asoma-sin-plantilla 0  sin-rejilla 0
+retmuros5 LV2          jac 0.250 bajos   0 nudos   3499   calidad 0  esquina-sin-refinar 1  pilar-asoma-sin-plantilla 0  sin-rejilla 0
 retmuros6 LV1          jac 0.122 bajos  22 nudos   7792   calidad 2  esquina-sin-refinar 0  pilar-asoma-sin-plantilla 0  sin-rejilla 0
 retmuros6 LV2          jac 0.207 bajos   0 nudos   7741   calidad 0  esquina-sin-refinar 2  pilar-asoma-sin-plantilla 2  sin-rejilla 0
 retmuros7 LV1          jac 0.258 bajos   0 nudos   4710   calidad 0  esquina-sin-refinar 0  pilar-asoma-sin-plantilla 0  sin-rejilla 0

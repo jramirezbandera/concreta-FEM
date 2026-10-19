@@ -20,16 +20,28 @@
  *   celda no sigue la rejilla, el pilar va en el aviso `malla/pilar-tapado-sin-refinar` (retícula 4,
  *   P1-1, junto al hueco de la escalera). En un pilar en un cruce de vigas no hace falta: las esquinas
  *   de los paños ya están refinadas (los edificios objetivo no cambian ni un nudo).
+ * - Los lados de una tira son todos los que van entre sus puntos, también el trozo de la cara del
+ *   ancho que la cierra (§19): cuando la plantilla parte esa cara (la celda de la huella va partida),
+ *   su nudo de en medio tiene que estar en la cadena del lado; si no, `malla/lado-perdido` y la
+ *   planta entera sin refinar (la retícula 5 con muros).
  * Con `refinoEsquinas: false` nada cambia (lo comprueban las referencias congeladas).
  */
 import { describe, expect, it } from "vitest";
 import { valido } from "../pruebas/metamorficasFisicas.ts";
+import { conMurosAleatorios } from "../pruebas/murosAleatorios.ts";
 import { reticulaAleatoria } from "../pruebas/reticulasAleatorias.ts";
 import { compilar } from "./compilar.ts";
-import type { OpcionesCompilacion } from "./fisico.ts";
+import type { ModeloFisico, OpcionesCompilacion } from "./fisico.ts";
 
 const compila = (semilla: number, op: OpcionesCompilacion) => valido(compilar(reticulaAleatoria(semilla), op));
 const calidad = (c: ReturnType<typeof compila>) => c.diagnosticos.filter((d) => d.codigo === "malla/calidad");
+
+/** La retícula al azar con los muros al azar de C3, como en `geometrias.test.ts`. */
+function reticulaConMuros(semilla: number): ModeloFisico {
+  const f = reticulaAleatoria(semilla);
+  const conVb = { ...f, secciones: [...f.secciones, { id: "vb", material: "HA", forma: "rectangular" as const, b: 0.3, h: 0.5 }], casos: [...f.casos, { id: "V" }] };
+  return conMurosAleatorios(conVb, semilla);
+}
 
 describe("los pilares que asoman de su viga (LV-8)", () => {
   it("las tiras que asoman llevan plantilla: sin astillas y con menos nudos (retícula 1)", () => {
@@ -93,5 +105,22 @@ describe("los pilares que asoman de su viga (LV-8)", () => {
     // Lo que asoma lo malla la triangulación; desde §18 el refinamiento de Delaunay sí llega a esas
     // astillas (antes lo tapaba el círculo diametral del eje de la viga) y la malla sale con calidad
     expect(calidad(lv2)).toEqual([]);
+  });
+
+  it("una tira cuya cara parte la plantilla (la celda de la huella va partida) no pierde el lado de la cara (retícula 5 con muros, §19)", () => {
+    // P2-1, un 25 × 60 girado bajo X1 (de 30): con el muro MS la celda de su tira de abajo va
+    // partida, la plantilla pone un nudo en mitad de la cara y el trozo de cara dentro de la huella,
+    // que es un lado del ancho y no de la huella, se quedaba fuera de la cadena del lado:
+    // `malla/lado-perdido`, y toda la planta se quedaba sin refinar
+    const r = valido(compilar(reticulaConMuros(5)));
+    const fallo = r.diagnosticos.filter((d) => d.mensaje.includes("ha fallado en esta planta"));
+    expect(fallo.map((d) => d.mensaje)).toEqual([]);
+    expect(r.estadisticas.malla.plantillasRefinadas).toBeGreaterThan(0);
+    // La cara inferior de X1 (y = 5,70) dentro de la huella de P2-1 (x de 12,925 a 13,175), con su
+    // nudo en medio, y los tres unidos a la viga
+    const en = r.modelo.nudos.flatMap((n, i) => (Math.abs(n.y - 5.7) < 1e-9 && n.x > 12.9 && n.x < 13.2 ? [i] : []));
+    expect([...new Set(en.map((i) => r.modelo.nudos[i]!.x.toFixed(3)))].sort()).toEqual(["12.925", "13.050", "13.175"]);
+    const esclavos = new Set((r.modelo.restricciones ?? []).flatMap((x) => x.esclavos));
+    for (const i of en) expect(esclavos.has(i), `nudo ${i}`).toBe(true);
   });
 });
