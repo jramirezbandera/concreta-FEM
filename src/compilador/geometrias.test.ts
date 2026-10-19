@@ -42,7 +42,7 @@ function compila(f: ModeloFisico, rejilla: boolean) {
       // La malla de LV1, sin el refinamiento junto a las vigas: sólo se exige que no baje de 0,1
       const lv1 = compilar(f, { rejilla, unionLosaViga: union, refinoEsquinas: false });
       expect(lv1.valido, "LV1").toBe(true);
-      expect(lv1.estadisticas.malla.jacobianoMin, "LV1").toBeGreaterThanOrEqual(0.1);
+      if (lv1.valido) expect(lv1.estadisticas.malla.jacobianoMin, "LV1").toBeGreaterThanOrEqual(0.1);
     }
   }
   return r!;
@@ -79,7 +79,7 @@ describe("G: retículas al azar", () => {
       const r = compilar(reticulaConMuros(s));
       expect(r.diagnosticos.filter((d) => d.severidad === "error"), `retícula ${s}`).toEqual([]);
       expect(r.valido, `retícula ${s}`).toBe(true);
-      expect(r.estadisticas.malla.jacobianoMin, `retícula ${s}`).toBeGreaterThanOrEqual(0.1);
+      if (r.valido) expect(r.estadisticas.malla.jacobianoMin, `retícula ${s}`).toBeGreaterThanOrEqual(0.1);
       if (r.diagnosticos.some((d) => d.codigo === "malla/calidad")) conAviso.push(s);
     }
     expect(conAviso).toEqual([7, 11, 21]);

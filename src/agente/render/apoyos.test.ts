@@ -24,7 +24,7 @@ const muestrario = (): ModeloFisico => JSON.parse(readFileSync(join(RAIZ, "ejemp
 const d = { huella: "0123456789abcdef" };
 
 /** Índice de la primera primitiva de un objeto con un estilo (−1 si no hay). */
-const indice = (e: Escena, objeto: string, estilo: string) => e.primitivas.findIndex((p) => p.tipo !== "texto" && p.objeto === objeto && "estilo" in p && p.estilo === estilo);
+const indice = (e: Escena, objeto: string, estilo: string) => e.primitivas.findIndex((p) => p.tipo !== "texto" && "objeto" in p && p.objeto === objeto && "estilo" in p && p.estilo === estilo);
 const ultimoEje = (e: Escena) => e.primitivas.reduce((m, p, i) => (p.tipo !== "texto" && "estilo" in p && p.estilo === "eje" ? i : m), -1);
 const triangulos = (e: Escena, objeto: string) => e.primitivas.filter((p): p is Extract<Primitiva, { tipo: "poligono" }> => p.tipo === "poligono" && p.objeto === objeto && p.estilo === "apoyo");
 
@@ -71,7 +71,7 @@ describe("apoyos en planta: el muestrario", () => {
     const caso = f.casos[0]!.id;
     const v = vistaCargas(f, "PB", caso, d);
     expect(indice(v, "AL1", "apoyo-lineal")).toBeGreaterThan(ultimoEje(v));
-    expect(v.primitivas.some((p) => p.tipo !== "texto" && p.objeto === "AL1" && "estilo" in p && p.estilo.startsWith("atenuado"))).toBe(false);
+    expect(v.primitivas.some((p) => p.tipo !== "texto" && "objeto" in p && p.objeto === "AL1" && "estilo" in p && p.estilo.startsWith("atenuado"))).toBe(false);
   });
 
   it("en el alzado del eje 2, AL1 cruza el plano: un triángulo bajo la losa; en uno a lo largo de él, la línea con sus triángulos", () => {

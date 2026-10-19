@@ -80,12 +80,12 @@ export function malos(fisico: ModeloFisico, opciones: Opciones, umbral = JACOBIA
     const jac = jacobianoEscalado(X);
     if (!(jac < umbral)) return;
     const q: Vec2 = [(X[0]![0] + X[1]![0] + X[2]![0] + X[3]![0]) / 4, (X[0]![1] + X[1]![1] + X[2]![1] + X[3]![1]) / 4];
-    const losa = losas.get(mp.losa)!;
+    const losa = losas.get(mp.losa!)!;
     const cand: [string, number][] = [];
     for (const v of fisico.vigas ?? []) if (v.planta === losa.planta) cand.push([`viga ${v.id}`, dPoli(q, v.puntos)]);
     for (const p of fisico.pilares ?? []) {
       const s = secciones.get(p.seccion)!;
-      const rad = s.forma === "circular" ? s.D / 2 : Math.sqrt(s.b * s.b + s.h * s.h) / 2;
+      const rad = s.forma === "circular" ? s.D / 2 : s.forma === "rectangular" ? Math.sqrt(s.b * s.b + s.h * s.h) / 2 : 0;
       cand.push([`pilar ${p.id}`, Math.max(0, Math.sqrt((p.x - q[0]) * (p.x - q[0]) + (p.y - q[1]) * (p.y - q[1])) - rad)]);
     }
     for (const w of fisico.muros ?? []) cand.push([`muro ${w.id}`, dPoli(q, w.puntos)]);
@@ -114,7 +114,7 @@ if (import.meta.main) {
       continue;
     }
     const st = c.estadisticas.malla;
-    const avisos = c.diagnosticos.filter((d) => d.codigo.startsWith("malla/")).map((d) => `${d.codigo}${d.objetos?.length ? ` (${d.objetos.join(", ")})` : ""}`);
+    const avisos = c.diagnosticos.filter((d) => d.codigo.startsWith("malla/")).map((d) => `${d.codigo}${d.ids?.length ? ` (${d.ids.join(", ")})` : ""}`);
     console.log(`\n${n}${lv1 ? " LV1" : " LV2"}: ${c.modelo.nudos.length} nudos, jac mín ${st.jacobianoMin.toFixed(3)}, ${st.bajos} bajos; ${avisos.join("; ") || "sin avisos de malla"}`);
     for (const m of todo ? ms : ms.slice(0, 12)) console.log(`  ${m.jac.toFixed(3)}  (${m.c[0].toFixed(2)}, ${m.c[1].toFixed(2)})  ${m.losa}  ${m.cerca.join(" · ")}`);
     if (!todo && ms.length > 12) console.log(`  … y ${ms.length - 12} más`);

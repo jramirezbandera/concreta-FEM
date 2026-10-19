@@ -53,7 +53,7 @@ function modelo(apoyosLineales: ApoyoLineal[], apoyos: ApoyoFisico[] = []): Mode
     cargas: [{ tipo: "superficie", id: "CM", caso: "G", planta: "P1", losa: "L", q: [0, 0, -5] }],
   };
 }
-const gdl = (...g: number[]) => [0, 1, 2, 3, 4, 5].map((i) => g.includes(i)) as ApoyoLineal["coartados"];
+const gdl = (...g: number[]) => [0, 1, 2, 3, 4, 5].map((i) => g.includes(i)) as unknown as ApoyoLineal["coartados"];
 const al = (p: Vec2[]): ApoyoLineal => ({ id: "AL", planta: "P1", puntos: p, coartados: gdl(2) });
 
 interface Medida {
