@@ -48,7 +48,7 @@ import { incircle, orient2d } from "robust-predicates";
 import type { Arreglo, Trazo } from "./arreglo.ts";
 import type { Vec2 } from "./fisico.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
-import { distanciaASegmento, jacobianoEscalado, momentosRegion, puntoEnPoligono, puntoEnRegion, type Region } from "./poligonos.ts";
+import { distanciaASegmento, jacobianoEscalado, momentosRegion, puntoEnPoligono, puntoEnRegion, type Region, RegionIndexada } from "./poligonos.ts";
 import { cubierta, IRREGULAR, REGULAR, rejillaPlanta, type RefinoHuella, type Rejilla } from "./rejilla.ts";
 
 export { jacobianoEscalado };
@@ -482,14 +482,17 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   const s = 2 * h;
   const lados = arreglo.lados();
   const regiones = losas.map((l) => regionDe(arreglo, l));
+  // Los contornos en el arreglo tienen cientos de puntos y se consultan por cada triángulo de cada
+  // ronda: indexados por bandas, con el mismo resultado que `puntoEnRegion`
+  const regionesIdx = regiones.map((r) => new RegionIndexada(r));
   const cajas = regiones.map((r) => cajaDe(r.contorno));
   const P: Vec2[] = arreglo.puntos.map((p) => [p.x, p.y]);
   const origen: number[] = arreglo.puntos.map((_, i) => i);
   /** Losa en cuya región (contorno sin huecos) cae q, o −1. */
   const enRegion = (q: Vec2) =>
-    regiones.findIndex((r, k) => {
+    regiones.findIndex((_, k) => {
       const cj = cajas[k]!;
-      return !(q[0] < cj[0] || q[0] > cj[2] || q[1] < cj[1] || q[1] > cj[3]) && puntoEnRegion(q, r);
+      return !(q[0] < cj[0] || q[0] > cj[2] || q[1] < cj[1] || q[1] > cj[3]) && regionesIdx[k]!.dentro(q);
     });
   // El ancho de las vigas (fase LV): está en la región de la losa, pero no es losa. Su polígono es el
   // de su trazo en el arreglo (ya unido a lo cercano), el mismo que siembra la malla
@@ -500,13 +503,29 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     const L = Math.sqrt(d[0] * d[0] + d[1] * d[1]);
     return { poli, caja: cajaDe(poli), A: a.A, B: a.B, u: [d[0] / L, d[1] / L] as Vec2 };
   });
+  // Los anchos por celdas de su caja (de lado 2h): por cada punto se miran sólo los anchos cuya caja
+  // toca su celda, en el mismo orden, así que `enAnchos` da la misma lista que recorrerlos todos.
+  // Con los miles de triángulos de cada `quedan`, recorrerlos todos contra todos los anchos era la
+  // mitad de ese paso
+  const celdasAnchos = new Map<string, number[]>();
+  anchosP.forEach((a, i) => {
+    const cj = a.caja;
+    for (let x = Math.floor(cj[0] / s); x <= Math.floor(cj[2] / s); x++)
+      for (let y = Math.floor(cj[1] / s); y <= Math.floor(cj[3] / s); y++) {
+        const k = `${x},${y}`;
+        const v = celdasAnchos.get(k);
+        if (v) v.push(i);
+        else celdasAnchos.set(k, [i]);
+      }
+  });
   /** Anchos que contienen q. */
   const enAnchos = (q: Vec2): number[] => {
     const r: number[] = [];
-    anchosP.forEach((a, i) => {
+    for (const i of celdasAnchos.get(`${Math.floor(q[0] / s)},${Math.floor(q[1] / s)}`) ?? []) {
+      const a = anchosP[i]!;
       const cj = a.caja;
       if (!(q[0] < cj[0] || q[0] > cj[2] || q[1] < cj[1] || q[1] > cj[3]) && puntoEnPoligono(q, a.poli)) r.push(i);
-    });
+    }
     return r;
   };
   /**
@@ -955,6 +974,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   const reticula: number[] = [];
   losas.forEach((l, k) => {
     const r = regiones[k]!;
+    const rIdx = regionesIdx[k]!;
     const [e1x, e1y] = l.eje1;
     const u = (q: Vec2) => q[0] * e1x + q[1] * e1y;
     const v = (q: Vec2) => -q[0] * e1y + q[1] * e1x;
@@ -971,7 +991,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         const a = i * s + desp;
         const b = j * fila;
         const q: Vec2 = [O[0] + a * e1x - b * e1y, O[1] + a * e1y + b * e1x];
-        if (puntoEnRegion(q, r) && lejos(q) && !enRejilla(q) && !(conAnchos && enAnchos(q).length)) {
+        if (rIdx.dentro(q) && lejos(q) && !enRejilla(q) && !(conAnchos && enAnchos(q).length)) {
           P.push(q);
           origen.push(-1);
           reticula.push(P.length - 1);
@@ -1085,12 +1105,9 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       // exactamente recta) y la envolvente convexa quedan triángulos de área de redondeo cuyo
       // centroide cae en el borde. Dentro de una losa no los hay: su lado libre se voltea.
       let L2 = 0;
-      for (const [P1, P2] of [
-        [A, B],
-        [B, C],
-        [C, A],
-      ] as const)
-        L2 = Math.max(L2, (P2[0] - P1[0]) * (P2[0] - P1[0]) + (P2[1] - P1[1]) * (P2[1] - P1[1]));
+      L2 = Math.max(L2, (B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1]));
+      L2 = Math.max(L2, (C[0] - B[0]) * (C[0] - B[0]) + (C[1] - B[1]) * (C[1] - B[1]));
+      L2 = Math.max(L2, (A[0] - C[0]) * (A[0] - C[0]) + (A[1] - C[1]) * (A[1] - C[1]));
       if (!(Math.abs(area2) > 1e-10 * L2)) continue;
       if (area2 < 0) [b, c] = [c, b];
       const g: Vec2 = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3];
@@ -1099,7 +1116,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       for (let k = 0; k < losas.length && losa < 0; k++) {
         const cj = cajas[k]!;
         if (g[0] < cj[0] || g[0] > cj[2] || g[1] < cj[1] || g[1] > cj[3]) continue;
-        if (puntoEnRegion(g, regiones[k]!)) losa = k;
+        if (regionesIdx[k]!.dentro(g)) losa = k;
       }
       if (losa < 0) continue;
       const ancho = conAnchos ? anchoDe(g) : -1;

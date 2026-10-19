@@ -1,2 +1,2 @@
-edificio objetivo con vigas (mínimo de 3, compilación + cálculo): LV1 2.5 + 3.3 = 5.8 s; LV2 4.2 + 4.8 = 9.0 s; 55 %
-reticular objetivo con vigas (mínimo de 3, compilación + cálculo): LV1 5.0 + 4.4 = 9.4 s; LV2 7.2 + 5.7 = 12.9 s; 38 %
+edificio objetivo con vigas (mínimo de 3, compilación + cálculo): LV1 1.7 + 3.3 = 5.0 s; LV2 2.9 + 5.0 = 7.9 s; 59 %
+reticular objetivo con vigas (mínimo de 3, compilación + cálculo): LV1 3.8 + 4.6 = 8.3 s; LV2 4.8 + 5.2 = 10.0 s; 20 %

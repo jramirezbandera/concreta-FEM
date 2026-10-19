@@ -83,6 +83,78 @@ export function puntoEnRegion(q: Vec2, r: Region): boolean {
   return puntoEnPoligono(q, r.contorno) && !r.huecos.some((h) => puntoEnPoligono(q, h));
 }
 
+/**
+ * Un polígono indexado por bandas de y para `dentro`, que da lo mismo que `puntoEnPoligono` bit a
+ * bit: cada banda guarda los lados cuyo rango de y la toca, y un punto sólo recorre los de su banda.
+ * Un lado que no toca la banda del punto no cumple `yi > q[1] !== yj > q[1]`, y el orden de los
+ * lados no cambia la paridad. Las bandas van por `floor((y − y0) / dy)`, monótono, así que un lado
+ * con yₘᵢₙ ≤ q[1] ≤ yₘₐₓ está siempre en la banda del punto. Para los contornos de las losas en el
+ * arreglo (cientos de puntos sembrados), que el mallador consulta por cada triángulo de cada ronda.
+ */
+export class PoligonoIndexado {
+  private readonly n: number;
+  private readonly y0: number;
+  private readonly dy: number;
+  private readonly bandas: number[][];
+  private readonly p: readonly Vec2[];
+
+  constructor(p: readonly Vec2[]) {
+    this.p = p;
+    const n = (this.n = p.length);
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    for (const [, y] of p) {
+      y0 = Math.min(y0, y);
+      y1 = Math.max(y1, y);
+    }
+    const N = Math.max(1, Math.min(n, 256));
+    const dy = (y1 - y0) / N;
+    this.y0 = y0;
+    this.dy = dy > 0 ? dy : 1;
+    this.bandas = Array.from({ length: N }, () => []);
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const yi = p[i]![1];
+      const yj = p[j]![1];
+      const b0 = this.banda(Math.min(yi, yj));
+      const b1 = this.banda(Math.max(yi, yj));
+      for (let b = b0; b <= b1; b++) this.bandas[b]!.push(i);
+    }
+  }
+
+  private banda(y: number): number {
+    return Math.max(0, Math.min(this.bandas.length - 1, Math.floor((y - this.y0) / this.dy)));
+  }
+
+  /** `puntoEnPoligono(q, p)`, bit a bit. */
+  dentro(q: Vec2): boolean {
+    const lados = this.bandas[this.banda(q[1])];
+    if (!lados) return false;
+    const p = this.p;
+    let dentro = false;
+    for (const i of lados) {
+      const [xi, yi] = p[i]!;
+      const [xj, yj] = p[i === 0 ? this.n - 1 : i - 1]!;
+      if (yi > q[1] !== yj > q[1] && q[0] < ((xj - xi) * (q[1] - yi)) / (yj - yi) + xi) dentro = !dentro;
+    }
+    return dentro;
+  }
+}
+
+/** Una región con sus polígonos indexados: `dentro` es `puntoEnRegion`, bit a bit. */
+export class RegionIndexada {
+  private readonly contorno: PoligonoIndexado;
+  private readonly huecos: PoligonoIndexado[];
+
+  constructor(r: Region) {
+    this.contorno = new PoligonoIndexado(r.contorno);
+    this.huecos = r.huecos.map((h) => new PoligonoIndexado(h));
+  }
+
+  dentro(q: Vec2): boolean {
+    return this.contorno.dentro(q) && !this.huecos.some((h) => h.dentro(q));
+  }
+}
+
 /** Distancia de q al segmento ab. */
 export function distanciaASegmento(q: Vec2, a: Vec2, b: Vec2): number {
   const dx = b[0] - a[0];

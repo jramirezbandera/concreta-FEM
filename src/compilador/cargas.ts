@@ -64,10 +64,26 @@ const resultanteCero = (): Resultante => ({ F: [0, 0, 0], M: [0, 0, 0], escalaF:
 
 /** Suma una fuerza F aplicada en X (relativo al centro) y un momento M. */
 function sumarPuntual(r: Resultante, X: readonly number[], F: readonly number[], M: readonly number[]): void {
-  r.F = mas(r.F, F);
-  r.M = mas(mas(r.M, cruz(X, F)), M);
-  r.escalaF += norma(F);
-  r.escalaM += norma(X) * norma(F) + norma(M);
+  acumularPuntual(r, X[0]!, X[1]!, X[2]!, F[0]!, F[1]!, F[2]!, M[0]!, M[1]!, M[2]!);
+}
+
+/**
+ * `sumarPuntual` por componentes y sin crear arrays: las mismas operaciones, en el mismo orden, que
+ * r.F = mas(r.F, F) y r.M = mas(mas(r.M, cruz(X, F)), M), así que los mismos bits. Por aquí pasan
+ * los cientos de miles de cargas de barra de las piezas del ancho (LV) en el control sin pérdidas.
+ */
+function acumularPuntual(r: Resultante, x0: number, x1: number, x2: number, f0: number, f1: number, f2: number, m0: number, m1: number, m2: number): void {
+  const F = r.F;
+  const M = r.M;
+  F[0] = F[0] + f0;
+  F[1] = F[1] + f1;
+  F[2] = F[2] + f2;
+  M[0] = M[0] + (x1 * f2 - x2 * f1) + m0;
+  M[1] = M[1] + (x2 * f0 - x0 * f2) + m1;
+  M[2] = M[2] + (x0 * f1 - x1 * f0) + m2;
+  const nF = Math.sqrt(f0 * f0 + f1 * f1 + f2 * f2);
+  r.escalaF += nF;
+  r.escalaM += Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2) * nF + Math.sqrt(m0 * m0 + m1 * m1 + m2 * m2);
 }
 
 /**
@@ -75,12 +91,36 @@ function sumarPuntual(r: Resultante, X: readonly number[], F: readonly number[],
  * F = (q1 + q2)·Δ/2 y M = X1 × F + e × Δ²·(q1/6 + q2/3).
  */
 function sumarLineal(r: Resultante, X1: readonly number[], e: readonly number[], delta: number, q1: readonly number[], q2: readonly number[]): void {
-  const F = por(mas(q1, q2), delta / 2);
-  const S = por(mas(por(q1, 1 / 6), por(q2, 1 / 3)), delta * delta);
-  r.F = mas(r.F, F);
-  r.M = mas(r.M, mas(cruz(X1, F), cruz(e, S)));
-  r.escalaF += ((norma(q1) + norma(q2)) / 2) * delta;
-  r.escalaM += Math.max(norma(X1), norma(mas(X1, por(e, delta)))) * ((norma(q1) + norma(q2)) / 2) * delta;
+  // Por componentes y sin crear arrays, con las mismas operaciones en el mismo orden que con los
+  // vectores (los mismos bits): F = por(mas(q1, q2), delta / 2), S = por(mas(por(q1, 1 / 6), por(q2, 1 / 3)), delta²)
+  const x0 = X1[0]!;
+  const x1 = X1[1]!;
+  const x2 = X1[2]!;
+  const e0 = e[0]!;
+  const e1 = e[1]!;
+  const e2 = e[2]!;
+  const k = delta / 2;
+  const f0 = (q1[0]! + q2[0]!) * k;
+  const f1 = (q1[1]! + q2[1]!) * k;
+  const f2 = (q1[2]! + q2[2]!) * k;
+  const d2 = delta * delta;
+  const s0 = (q1[0]! * (1 / 6) + q2[0]! * (1 / 3)) * d2;
+  const s1 = (q1[1]! * (1 / 6) + q2[1]! * (1 / 3)) * d2;
+  const s2 = (q1[2]! * (1 / 6) + q2[2]! * (1 / 3)) * d2;
+  const F = r.F;
+  const M = r.M;
+  F[0] = F[0] + f0;
+  F[1] = F[1] + f1;
+  F[2] = F[2] + f2;
+  M[0] = M[0] + (x1 * f2 - x2 * f1 + (e1 * s2 - e2 * s1));
+  M[1] = M[1] + (x2 * f0 - x0 * f2 + (e2 * s0 - e0 * s2));
+  M[2] = M[2] + (x0 * f1 - x1 * f0 + (e0 * s1 - e1 * s0));
+  const m = (norma(q1) + norma(q2)) / 2;
+  r.escalaF += m * delta;
+  const y0 = x0 + e0 * delta;
+  const y1 = x1 + e1 * delta;
+  const y2 = x2 + e2 * delta;
+  r.escalaM += Math.max(Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2), Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2)) * m * delta;
 }
 
 export interface CargasCompiladas {
@@ -347,32 +387,35 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
     return lo;
   };
   /**
-   * Carga de superficie uniforme q (global) sobre el triángulo v del ancho g, a su viga: la fuerza
-   * repartida sobre el eje, q por el ancho del triángulo en cada σ, y el momento de transporte
-   * A·(X_c − P(σ_c)) × q en σ_c. Con los vértices por σ (s0 ≤ s1 ≤ s2), el ancho crece linealmente
-   * de 0 en s0 al del corte por el vértice central, wm, y vuelve a 0 en s2: dos cargas lineales
-   * exactas que suman A = wm·(s2 − s0)/2. wm sale de la arista larga, así que dos vértices con casi
-   * la misma σ (un giro de la planta la cambia en un redondeo) no lo alteran.
+   * La geometría de una pieza del ancho, que no depende de la carga ni del caso: sus σ, el ancho del
+   * corte central y, para el momento de transporte, el coeficiente de cada nudo del eje. Se calcula
+   * una vez por pieza (cada una recibe su peso y cada carga de superficie que la cubre: en el edificio
+   * objetivo, 130 000 llamadas para 43 000 piezas) y la carga entra después en `piezaAViga`, con las
+   * mismas operaciones y en el mismo orden que antes, así que los mismos bits.
    */
-  const piezaAViga = (c: number, g: number, v: readonly Vec2[], q: readonly number[]) => {
+  type GeoPieza = { s0: number; s1: number; s2: number; wm: number; nudos: number[]; cn: number[]; cz: number[] } | null;
+  const geoPiezas = new WeakMap<readonly Vec2[], GeoPieza>();
+  const geoPieza = (g: number, v: readonly Vec2[]): GeoPieza => {
+    const hecha = geoPiezas.get(v);
+    if (hecha !== undefined) return hecha;
     const r = rectaAncho(g);
-    const z = ctx.cotas[losas.anchos[g]!.k]!;
     const [ex, ey] = [r.e[0], r.e[1]];
     const sg = (X: Vec2) => (X[0] - r.O[0]) * ex + (X[1] - r.O[1]) * ey;
     const tau = (X: Vec2) => -(X[0] - r.O[0]) * ey + (X[1] - r.O[1]) * ex;
     const [p0, p1, p2] = v.map((X) => ({ s: sg(X), t: tau(X) })).sort((a, b) => a.s - b.s);
     const L = p2!.s - p0!.s;
-    if (!(L > 0)) return;
+    if (!(L > 0)) {
+      geoPiezas.set(v, null);
+      return null;
+    }
     const wm = Math.abs(p1!.t - (p0!.t + ((p2!.t - p0!.t) * (p1!.s - p0!.s)) / L));
-    if (p1!.s > p0!.s) aplicarLineal(c, r, p0!.s, p1!.s, [0, 0, 0], por(q, wm));
-    if (p2!.s > p1!.s) aplicarLineal(c, r, p1!.s, p2!.s, por(q, wm), [0, 0, 0]);
+    const geo: GeoPieza = { s0: p0!.s, s1: p1!.s, s2: p2!.s, wm, nudos: [], cn: [], cz: [] };
     // El momento de transporte, m(σ) = w(σ)·(τ̄(σ)·n + Δz·ẑ) × q (τ̄, el desvío medio del corte), a los
     // nudos del eje con las funciones lineales entre ellos, integrado exacto (Simpson: es cúbico). La
     // suma es el momento de la pieza, y lo que recibe cada nudo no depende de cómo se triangula el
-    // ancho (con un momento puntual en el centroide de cada pieza, un giro de la planta lo cambiaba)
+    // ancho (con un momento puntual en el centroide de cada pieza, un giro de la planta lo cambiaba).
+    // Aquí quedan, por nudo, los coeficientes de n × q (cn) y de Δz·ẑ × q (cz)
     const cad = losas.anchos[g]!.tramo.cadena;
-    const nq = cruz([-ey, ex, 0], q);
-    const zq = por(cruz([0, 0, 1], q), z - r.O[2]);
     const tl = p0!.t + ((p2!.t - p0!.t) * (p1!.s - p0!.s)) / L;
     const tm = (p1!.t + tl) / 2;
     for (const [a, b, wa, wb, ta, tb] of [
@@ -416,10 +459,38 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
           I[3]! += peso * f2 * (1 - N(x));
         }
         const h = (x1 - x0) / 6;
-        nodal(c, cad[k]!.nudo, [0, 0, 0], mas(por(nq, h * I[0]!), por(zq, h * I[1]!)));
-        if (!fuera) nodal(c, cad[k + 1]!.nudo, [0, 0, 0], mas(por(nq, h * I[2]!), por(zq, h * I[3]!)));
+        geo.nudos.push(cad[k]!.nudo);
+        geo.cn.push(h * I[0]!);
+        geo.cz.push(h * I[1]!);
+        if (!fuera) {
+          geo.nudos.push(cad[k + 1]!.nudo);
+          geo.cn.push(h * I[2]!);
+          geo.cz.push(h * I[3]!);
+        }
       }
     }
+    geoPiezas.set(v, geo);
+    return geo;
+  };
+  /**
+   * Carga de superficie uniforme q (global) sobre el triángulo v del ancho g, a su viga: la fuerza
+   * repartida sobre el eje, q por el ancho del triángulo en cada σ, y el momento de transporte
+   * A·(X_c − P(σ_c)) × q en σ_c. Con los vértices por σ (s0 ≤ s1 ≤ s2), el ancho crece linealmente
+   * de 0 en s0 al del corte por el vértice central, wm, y vuelve a 0 en s2: dos cargas lineales
+   * exactas que suman A = wm·(s2 − s0)/2. wm sale de la arista larga, así que dos vértices con casi
+   * la misma σ (un giro de la planta la cambia en un redondeo) no lo alteran.
+   */
+  const piezaAViga = (c: number, g: number, v: readonly Vec2[], q: readonly number[]) => {
+    const geo = geoPieza(g, v);
+    if (!geo) return;
+    const r = rectaAncho(g);
+    const z = ctx.cotas[losas.anchos[g]!.k]!;
+    const { s0, s1, s2, wm } = geo;
+    if (s1 > s0) aplicarLineal(c, r, s0, s1, [0, 0, 0], por(q, wm));
+    if (s2 > s1) aplicarLineal(c, r, s1, s2, por(q, wm), [0, 0, 0]);
+    const nq = cruz([-r.e[1], r.e[0], 0], q);
+    const zq = por(cruz([0, 0, 1], q), z - r.O[2]);
+    for (let i = 0; i < geo.nudos.length; i++) nodal(c, geo.nudos[i]!, [0, 0, 0], mas(por(nq, geo.cn[i]!), por(zq, geo.cz[i]!)));
   };
   /** Carga lineal uniforme q (global, por metro) sobre el lado AB del ancho g, a su viga. */
   const ladoAViga = (c: number, g: number, A: Vec2, B: Vec2, q: readonly number[]) => {
@@ -868,10 +939,15 @@ export function resultanteAnalitica(modelo: ModeloAnalitico, c: number, centro: 
   // Superficie uniforme y global sobre una lámina plana: q·A en su centroide (dos triángulos). Con
   // un valor por nudo, la integral del campo bilineal con 2×2 puntos de Gauss (exacta en las
   // láminas rectangulares de los muros)
+  const nudos = modelo.nudos;
+  const cx = centro[0];
+  const cy = centro[1];
+  const cz = centro[2];
   for (const cl of caso.laminas ?? []) {
     if (cl.tipo !== "superficie" || cl.ejes !== "global") throw new Error("resultanteAnalitica: sólo superficies globales");
-    const [a, b, c2, d] = modelo.laminas![cl.lamina]!.nudos.map(X) as [V, V, V, V];
+    const nl = modelo.laminas![cl.lamina]!.nudos;
     if (typeof cl.q[0] !== "number") {
+      const [a, b, c2, d] = nl.map(X) as [V, V, V, V];
       const qs = cl.q as readonly (readonly number[])[];
       const g = 1 / Math.sqrt(3);
       for (const [xi, eta] of [[-g, -g], [g, -g], [g, g], [-g, g]] as const) {
@@ -893,24 +969,72 @@ export function resultanteAnalitica(modelo: ModeloAnalitico, c: number, centro: 
       }
       continue;
     }
-    const t1 = norma(cruz(menos(b, a), menos(c2, a))) / 2;
-    const t2 = norma(cruz(menos(c2, a), menos(d, a))) / 2;
-    const g1 = por(mas(mas(a, b), c2), 1 / 3);
-    const g2 = por(mas(mas(a, c2), d), 1 / 3);
+    // Por componentes y sin crear arrays, con las mismas operaciones en el mismo orden que con los
+    // vectores (los mismos bits): t1 = |(b − a) × (c − a)| / 2, t2 = |(c − a) × (d − a)| / 2,
+    // g1 = ((a + b) + c) / 3, g2 = ((a + c) + d) / 3 y X = (g1·t1 + g2·t2) · (1 / A)
+    const na = nudos[nl[0]!]!;
+    const nb = nudos[nl[1]!]!;
+    const nc = nudos[nl[2]!]!;
+    const nd = nudos[nl[3]!]!;
+    const a0 = na.x - cx;
+    const a1 = na.y - cy;
+    const a2 = na.z - cz;
+    const b0 = nb.x - cx;
+    const b1 = nb.y - cy;
+    const b2 = nb.z - cz;
+    const c0 = nc.x - cx;
+    const c1 = nc.y - cy;
+    const c2 = nc.z - cz;
+    const d0 = nd.x - cx;
+    const d1 = nd.y - cy;
+    const d2 = nd.z - cz;
+    const ba0 = b0 - a0;
+    const ba1 = b1 - a1;
+    const ba2 = b2 - a2;
+    const ca0 = c0 - a0;
+    const ca1 = c1 - a1;
+    const ca2 = c2 - a2;
+    const da0 = d0 - a0;
+    const da1 = d1 - a1;
+    const da2 = d2 - a2;
+    const u0 = ba1 * ca2 - ba2 * ca1;
+    const u1 = ba2 * ca0 - ba0 * ca2;
+    const u2 = ba0 * ca1 - ba1 * ca0;
+    const t1 = Math.sqrt(u0 * u0 + u1 * u1 + u2 * u2) / 2;
+    const v0 = ca1 * da2 - ca2 * da1;
+    const v1 = ca2 * da0 - ca0 * da2;
+    const v2 = ca0 * da1 - ca1 * da0;
+    const t2 = Math.sqrt(v0 * v0 + v1 * v1 + v2 * v2) / 2;
     const A = t1 + t2;
-    sumarPuntual(r, por(mas(por(g1, t1), por(g2, t2)), 1 / A), por(cl.q as Vec3, A), [0, 0, 0]);
+    const iA = 1 / A;
+    const g10 = (a0 + b0 + c0) * (1 / 3);
+    const g11 = (a1 + b1 + c1) * (1 / 3);
+    const g12 = (a2 + b2 + c2) * (1 / 3);
+    const g20 = (a0 + c0 + d0) * (1 / 3);
+    const g21 = (a1 + c1 + d1) * (1 / 3);
+    const g22 = (a2 + c2 + d2) * (1 / 3);
+    const q = cl.q as Vec3;
+    acumularPuntual(r, (g10 * t1 + g20 * t2) * iA, (g11 * t1 + g21 * t2) * iA, (g12 * t1 + g22 * t2) * iA, q[0] * A, q[1] * A, q[2] * A, 0, 0, 0);
   }
+  // La geometría de cada barra (extremos con sus offsets, dirección y longitud) se calcula una vez
+  // y vale para todas sus cargas: con las piezas del ancho (LV) una barra lleva decenas
+  const geo: ({ ip: V; e: V; L: number } | undefined)[] = new Array(modelo.barras?.length ?? 0);
   for (const cb of caso.barras ?? []) {
-    const b = modelo.barras![cb.barra]!;
-    const ip = mas(X(b.nudos[0]), b.offsets?.i ?? [0, 0, 0]);
-    const jp = mas(X(b.nudos[1]), b.offsets?.j ?? [0, 0, 0]);
-    const d = menos(jp, ip);
-    const e = por(d, 1 / norma(d));
+    let gb = geo[cb.barra];
+    if (!gb) {
+      const b = modelo.barras![cb.barra]!;
+      const ip = mas(X(b.nudos[0]), b.offsets?.i ?? [0, 0, 0]);
+      const jp = mas(X(b.nudos[1]), b.offsets?.j ?? [0, 0, 0]);
+      const d = menos(jp, ip);
+      const L = norma(d);
+      geo[cb.barra] = gb = { ip, e: por(d, 1 / L), L };
+    }
     if (cb.ejes !== "global") throw new Error("resultanteAnalitica: sólo cargas globales");
+    const { ip, e, L } = gb;
     if (cb.tipo === "puntual") sumarPuntual(r, mas(ip, por(e, cb.x)), cb.F ?? [0, 0, 0], cb.M ?? [0, 0, 0]);
     else {
       const a = cb.a ?? 0;
-      const b2 = cb.b ?? norma(d);
+      const b2 = cb.b ?? L;
       sumarLineal(r, mas(ip, por(e, a)), e, b2 - a, cb.qa, cb.qb ?? cb.qa);
     }
   }

@@ -610,3 +610,48 @@ Con `refinoEsquinas: false` nada cambia: las referencias `-lv` y las de C1–C5 
 **El criterio 10 (≤ +25 %) no pasa.** El cálculo sube un 45 % con un 37 % más de ecuaciones; la compilación, un 68 %, y ésa es la parte que no es malla (§15 la bajó de 6,9 a 4,2 s, y seguirá teniendo margen). Lo decidido en LV2-i no cambia: los 2 niveles en los cruces sin pilar dan lo mismo en las franjas con 10 000 ecuaciones menos. Queda para el usuario (`fase-lv2.md` §5).
 
 **Cierre.** El informe de la fase es `docs/fem3d/fase-lv2.md`.
+
+## 20. El criterio 10 cerrado: perfil de la compilación con LV2 y el coste en ecuaciones (2026-10-19)
+
+**Decidido por el usuario el 2026-10-19:** la fase se da por cerrada con el criterio 10 como no cumplido y aceptado; un paso corto de perfil de la compilación con LV2, con `tiempos.ts` como medida y los mismos bits como condición, para compilar el edificio con vigas en menos de 3,5 s; y, de ahora en adelante, el criterio de coste de una fase se fija en ecuaciones, no en tiempo. Después, F2-9 como estaba previsto.
+
+### 20.1 El perfil
+
+Con `bun --cpu-prof` sobre `compilar` del edificio objetivo con vigas (7 plantas, LV2, dos pasadas en caliente). Partía de 4,2 s por compilación (`losas` 2,3, `cargas` 1,25, `sinPerdidas` 0,45). Lo que pesaba ya no eran bucles cuadráticos (§15), sino trabajo repetido:
+
+| Dónde | Qué hacía | Coste por compilación |
+|---|---|---|
+| `cargas.ts`, `piezaAViga` | la geometría de cada pieza del ancho (las σ de sus vértices, el ancho del corte central, los cortes de la cadena y la integral de Simpson del momento de transporte) se rehacía en cada carga: 130 522 llamadas para 42 770 piezas (el peso y cada carga de superficie que la cubre) | ~1,4 s (0,9 propio) |
+| `cargas.ts`, `resultanteAnalitica` (el control sin pérdidas) | el caso G tiene 307 552 cargas de barra y el Q 148 771 (las piezas del ancho: 14 por barra): por cada una, los extremos con sus offsets, la dirección y la longitud de la barra, y `sumarPuntual`/`sumarLineal` con una docena de arrays de 3 por carga | ~0,9 s |
+| `mallado.ts`, `quedan` | por cada triángulo de cada ronda del refinamiento (21 llamadas, 226 240 triángulos en total), `puntoEnRegion` contra el contorno de la losa en el arreglo, que lleva cientos de puntos sembrados, y `enAnchos` contra todos los anchos de la planta | ~0,5 s |
+| `losas.ts`, el espesor de cada huella | todos los cuadriláteros de la planta por cada huella | ~0,2 s |
+
+**Qué se hace**, con los mismos bits (las mismas operaciones de coma flotante en el mismo orden; sólo cambia cuántas veces se hacen y cuántos arrays se crean):
+- `geoPieza` (`cargas.ts`): la geometría de una pieza se calcula una vez (por su array de vértices, en un `WeakMap`) y guarda, por nudo del eje, los coeficientes de n × q y de Δz·ẑ × q; `piezaAViga` sólo aplica la carga, en el mismo orden de llamadas a `aplicarLineal` y `nodal`;
+- `acumularPuntual` y `sumarLineal` por componentes y en el sitio (sin `mas`, `por` ni `cruz`); las láminas uniformes de `resultanteAnalitica`, por componentes; la geometría de cada barra, una vez por caso;
+- `PoligonoIndexado` y `RegionIndexada` (`poligonos.ts`): los lados por bandas de y, de modo que un punto sólo recorre los de su banda. Un lado que no toca la banda no cumple `yi > q[1] !== yj > q[1]` y la paridad no depende del orden, así que es `puntoEnPoligono` bit a bit. El mallador los usa en `enRegion`, en la siembra de la retícula y en `quedan`; y los anchos van por celdas de 2h, en el mismo orden;
+- el espesor de la huella, del mayor de las láminas que tocan cada nudo (`espesorEnNudo`), calculado una vez por planta.
+
+**Medido** (`validacion/lv/opciones.ts`, sin argumento: el sha256 del modelo analítico, del mapeo y de los diagnósticos de 86 modelos, los congelados de C1–C5 y F, los aleatorios, los edificios objetivo, el muestrario, la vivienda y los de A2, antes y después: **idénticos**; el edificio con vigas de 7 plantas también; las 1 859 pruebas de `src/`, referencias congeladas incluidas, pasan):
+
+| Edificio objetivo con vigas, 7 plantas, LV2 (en caliente) | compilación | losas | cargas | sinPerdidas |
+|---|---|---|---|---|
+| §15 | 4,2 s | 2,3 | 1,25 | 0,45 |
+| **ahora** | **2,8–3,3 s** | 1,8–2,1 | 0,6–0,8 | 0,17 |
+
+Y con `tiempos.ts` (LV1 y LV2 alternados tres veces, el mínimo de cada uno; `out_tiempos.txt`):
+
+| 7 plantas, compilación + cálculo | LV1 | LV2 | |
+|---|---|---|---|
+| Edificio objetivo con vigas, §19 | 2,5 + 3,3 = 5,8 s | 4,2 + 4,8 = 9,0 s | +55 % |
+| **Edificio objetivo con vigas, ahora** | 1,7 + 3,3 = 5,0 s | **2,9** + 5,0 = 7,9 s | +59 % |
+| Reticular objetivo con vigas, §19 | 5,0 + 4,4 = 9,4 s | 7,2 + 5,7 = 12,9 s | +38 % |
+| **Reticular objetivo con vigas, ahora** | 3,8 + 4,6 = 8,3 s | **4,8** + 5,2 = 10,0 s | +20 % |
+
+El objetivo del paso (compilar el edificio con vigas en menos de 3,5 s) se cumple: 2,9 s en `tiempos.ts`, 2,8–3,3 en pasadas sueltas. Lo que queda es la malla (`losas`: la triangulación, la rejilla y `unirCaras`) y las piezas del ancho, que crecen con ella.
+
+### 20.2 Por qué el coste se mide en ecuaciones
+
+La tabla de arriba lo enseña: **el tanto por ciento de tiempo sube de +55 a +59 % en el edificio con vigas sin que cambie un bit,** porque la compilación baja en LV1 y en LV2 y lo que queda es el cálculo, que depende de las ecuaciones; y baja de +38 a +20 % en el reticular, donde el cálculo de LV2 pasó de 5,7 a 5,2 s con el mismo modelo y el mismo núcleo, que es el ruido de la medida (~10 %). Es la tercera vez que el tiempo engaña en esta fase: el banco medido con carga (§10), el caliente frente al frío (§19) y ahora el reparto entre compilar y calcular.
+
+**El criterio, de ahora en adelante:** el coste de una fase del compilador se fija en **ecuaciones de los edificios objetivo** (con vigas y reticular, de 7 plantas), que las decide la malla, se reproducen bit a bit en cualquier máquina y las compara `banco.ts`; y en el límite absoluto del perfil móvil (200 000). El tiempo queda como medida informativa, con `tiempos.ts` (en caliente, alternando las variantes y el mínimo de tres), y no se usa como criterio. Con esa vara, LV2 cuesta **+37 %** en el edificio con vigas (112 119 → 153 132) y **+27 %** en el reticular (161 049 → 204 288, un 2 % por encima del perfil móvil, que LV2-d admite).

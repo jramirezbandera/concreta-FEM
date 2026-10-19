@@ -1036,6 +1036,17 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     const candidatos = [...new Set([...nudosMalla, ...nudosMuros])].filter((n) => !apoyados.has(n)).sort((x, y) => x - y);
     const esclavoDe = new Map<number, string>();
     const huellasPlanta: HuellaL[] = [];
+    // El mayor espesor de las láminas que tocan cada nudo de la malla, para el espesor de cada
+    // huella (antes, todos los cuadriláteros de la planta por cada huella)
+    const espesorEnNudo = new Map<number, number>();
+    for (const q of m?.quads ?? []) {
+      const t = ctx.losas[losaDeMallar[q.losa]!]!.material.t;
+      for (const nn of q.nudos) {
+        const x = nudoT[nn]!;
+        const v = espesorEnNudo.get(x);
+        if (v === undefined || t > v) espesorEnNudo.set(x, t);
+      }
+    }
     for (const [n, poli] of huellasK) {
       const pilar = topo.nudos[n]!.pilar!.pilares[0]!;
       const cn: Vec2 = [topo.nudos[n]!.x, topo.nudos[n]!.y];
@@ -1071,11 +1082,8 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         esclavoDe.set(x, pilar);
         esclavosTodos.add(x);
       }
-      const conjuntoEsclavos = new Set(esclavos);
-      const espesor = Math.max(
-        0,
-        ...(m?.quads ?? []).filter((q) => q.nudos.some((nn) => conjuntoEsclavos.has(nudoT[nn]!))).map((q) => ctx.losas[losaDeMallar[q.losa]!]!.material.t),
-      );
+      // El mismo máximo que el de las láminas que tocan algún esclavo
+      const espesor = Math.max(0, ...esclavos.map((x) => espesorEnNudo.get(x) ?? -Infinity));
       huellasPlanta.push({ pilar, k, maestro: n, esclavos, espesor });
     }
     // Fase LV: las piezas en el ancho de las vigas y la unión de la losa a sus caras
