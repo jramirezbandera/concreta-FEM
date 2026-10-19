@@ -1,8 +1,8 @@
 ## edificio objetivo con vigas (7 plantas)
-  LV1 nudos 60021, láminas 34209 (28224 en la rejilla, 0 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 3494 ms; cálculo 4974 ms, 112119 ecuaciones
-  LV2 nudos 88210, láminas 47376 (43764 en la rejilla, 3353 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 5094 ms; cálculo 5633 ms, 153132 ecuaciones; malla/esquina-sin-refinar
-  LV2, 3 niv. en todo nudos 95133, láminas 50778 (47166 en la rejilla, 3353 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 4848 ms; cálculo 5706 ms, 163695 ecuaciones; malla/esquina-sin-refinar
+  LV1 nudos 60021, láminas 34209 (28224 en la rejilla, 0 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 3208 ms; cálculo 4365 ms, 112119 ecuaciones
+  LV2 nudos 88210, láminas 47376 (43764 en la rejilla, 3353 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 4438 ms; cálculo 5246 ms, 153132 ecuaciones; malla/esquina-sin-refinar
+  LV2, 3 niv. en todo nudos 95133, láminas 50778 (47166 en la rejilla, 3353 plantillas), jacobiano mínimo 0.430 (0 bajos), compilación 5066 ms; cálculo 5649 ms, 163695 ecuaciones; malla/esquina-sin-refinar
 ## reticular objetivo con vigas (7 plantas)
-  LV1 nudos 80566, láminas 50085 (39984 en la rejilla, 0 plantillas), jacobiano mínimo 0.262 (0 bajos), compilación 5349 ms; cálculo 5401 ms, 161049 ecuaciones
-  LV2 nudos 108902, láminas 63651 (55020 en la rejilla, 3290 plantillas), jacobiano mínimo 0.256 (0 bajos), compilación 7374 ms; cálculo 6832 ms, 203406 ecuaciones; malla/esquina-sin-refinar
-  LV2, 3 niv. en todo nudos 115699, láminas 66983 (58352 en la rejilla, 3290 plantillas), jacobiano mínimo 0.256 (0 bajos), compilación 8430 ms; cálculo 7333 ms, 213801 ecuaciones; malla/esquina-sin-refinar
+  LV1 nudos 80566, láminas 50085 (39984 en la rejilla, 0 plantillas), jacobiano mínimo 0.262 (0 bajos), compilación 6299 ms; cálculo 6318 ms, 161049 ecuaciones
+  LV2 nudos 109196, láminas 63945 (55020 en la rejilla, 3290 plantillas), jacobiano mínimo 0.316 (0 bajos), compilación 9570 ms; cálculo 6132 ms, 204288 ecuaciones; malla/esquina-sin-refinar
+  LV2, 3 niv. en todo nudos 115993, láminas 67277 (58352 en la rejilla, 3290 plantillas), jacobiano mínimo 0.316 (0 bajos), compilación 8405 ms; cálculo 7163 ms, 214683 ecuaciones; malla/esquina-sin-refinar

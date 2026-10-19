@@ -545,3 +545,44 @@ Las diez entradas de antes salen idénticas al byte, y el test `congelado-f.test
 **Lo que no cambia:** `out_asoma.txt`, `out_calidad.txt`, `out_banco.txt` y `out_franjas.txt` (sus scripts dan la opción explícita); el muestrario y la vivienda de `ejemplos/` compilan con los avisos de malla dichos.
 
 **Queda, para el paso 3** (vigas curvas y cuñas de menos de 45°): la calidad con `refinoEsquinas` en el edificio de 1 × 3 × 2 vanos (0,257 → 0,161) y en las retículas al azar con muros (`aleatorio-3-muros-lv2`, 0,052 antes de §17.4; con la cara, por medir en las 24 de G con muros), y los cruces de las secciones de calidad del criterio 4.
+
+## 18. Paso 3: las vigas curvas y las cuñas no eran la malla, sino el refinamiento (2026-10-19)
+
+**Lo que se buscaba** (§2.3 y §13): por qué el refinamiento de Delaunay (G-4) no quitaba los abanicos junto a las caras de las vigas curvas (la familia circular, jacobiano 0,120 con LV1 y LV2), las cuñas de 25–30° entre vigas (alas y triangular, 0,177 y 0,131) y lo apuntado en §16 y §17: el edificio objetivo de 1 × 3 × 2 vanos (0,257 → 0,161 con `refinoEsquinas`) y `aleatorio-3-muros-lv2` (0,052 antes de §17.4; 0,090 después).
+
+**Dónde estaba.** `validacion/lv2/malos.ts` (nuevo) lista los cuadriláteros por debajo de 0,2 de un modelo con lo que tienen cerca, y con el refinamiento instrumentado se vio que en la circular quedaban 82 triángulos malos cuyo circuncentro «invadía una arista obligatoria no partible», y lo mismo su off-center. La arista era siempre **el eje de una viga radial dentro de su ancho**: con la unión por las caras (LV1), un lado que no toca losa pero está dentro de la región se hace obligatorio y sin sembrar (`borde` en `ladoA`), así que el eje de una viga de 5,6 m es una sola arista, y su círculo diametral, de 2,8 m de radio, tapaba todo circuncentro de la losa a esa distancia. Las caras de la viga curva se siembran a 0,15–0,3 m (sus vértices tienen el eje a 0,15 m, y el tamaño local es la distancia al punto más cercano), la retícula interior va a 2h, y entre las dos quedaban los abanicos que nada podía partir. No era la cara curva: era el eje. Con la unión por el eje (C2–C5) no pasaba porque el eje estaba sembrado y era partible.
+
+Lo mismo, con otra arista, en lo que quedaba después: una **arista de la interfaz con la rejilla** de 1,4 m (`triangular-hueco`, 0,200) y una **estación de un muro** de 1,08 m con la esquina de una huella a 14 cm (las retículas con muros, 0,14). Ruppert partiría la arista invadida; estas no se parten (la rejilla es fija y las estaciones del muro vienen de C3), y el círculo diametral las protegía de más de lo que hace falta.
+
+**Qué se hace** (`mallado.ts`, sólo con `refinoEsquinas`; compilador **LV2.1**):
+1. **Las aristas obligatorias que no tocan losa no cuentan** en el refinamiento (`sinLosa`, `ignorada`): el eje de una viga dentro de su ancho y los bordes de la región dentro de él. Ningún punto nuevo puede caer en el ancho (se exige `enLosa`), así que no hay nada que proteger allí.
+2. **Una arista que no se parte sólo rechaza el punto que la estropea:** en vez de su círculo diametral, se mira el triángulo que el punto formaría con ella (`jacobianoTriangulo`, con los vértices en sentido antihorario). El punto entra si ese triángulo llega a `JACOBIANO_OBJETIVO` o si al menos mejora `MEJORA_MINIMA` (1,5) veces el triángulo que se refina: junto a la estación del muro ningún punto llega al objetivo, pero sí a 0,25 desde 0,14. Las aristas partibles siguen con Ruppert.
+3. **La triangulación sola lleva también las opciones de LV2** (`mallarPlanta`): cuando la rejilla cubre menos del 75 % de la planta (la circular, el abanico) o con `rejilla: false`, la CDT sola se mallaba sin `refino`, así que nada de LV2 le llegaba, y se quedaba con la malla de menos nudos, que era la de antes. Sin rejilla, `refino` sólo actúa en el refinamiento.
+
+Con `refinoEsquinas: false` nada cambia: las referencias `-lv` y las de C1–C5 y F salen idénticas al byte, y sólo se regeneran a sabiendas las seis `-lv2` (`aleatorio-8-losas-rejilla-lv2`, `aleatorio-3-muros-lv2`, `aleatorio-5-mixto-lv2`, `aleatorio-3-lv2`, `reticular-2x2-abacos-lv2` y `edificio-2x2-lv2`).
+
+**Calidad** (`validacion/lv2/calidad.ts`, `out_calidad.txt`, que ahora lleva también las 24 retículas con los muros al azar de C3):
+
+| | Modelos con `malla/calidad` | Jacobiano mínimo | Nudos |
+|---|---|---|---|
+| 44 geometrías de G, LV1 | 20 | 0,109 | 168 726 (LV2 de §17) |
+| 44 geometrías, LV2 de §17 | 14 | 0,120 | 168 726 |
+| **44 geometrías, LV2.1** | **0** | **0,246** (alas-circ; las demás ≥ 0,30 salvo cinco retículas en 0,22–0,29) | **173 534 (+2,8 %)** |
+| 24 retículas con muros, LV1 | 19 | 0,115 | 111 402 |
+| 24 retículas con muros, LV2 de §17 | 15 | 0,090 | 102 055 |
+| **24 retículas con muros, LV2.1** | **3** (7, 11 y 21) | **0,140** | **103 416 (+1,3 %)** |
+
+- **Las vigas curvas:** la circular pasa de 9 659 nudos y 0,120 a 10 115 y 0,308 (+4,7 %), sin aviso; el abanico, de 0,242 a 0,308 con +0,7 %.
+- **Las cuñas de menos de 45°** (alas, 30°; triangular, 25°) no eran una excepción del criterio 4: con el refinamiento que les llega se mallan con calidad (0,313 y 0,304–0,330), a cambio de un 4–12 % más de nudos. No hace falta distinguirlas en el aviso.
+- **Las retículas al azar en las que la rejilla cubre toda la planta no cambian ni un nudo;** las que tienen triangulación (hueco, carga, chaflán) suben hasta un 4,7 % (la 6, cuyas tiras no caben: de 0,122 a 0,301, así que la prueba de `asoma.test.ts` ya no espera allí el aviso de calidad).
+- **`aleatorio-3-muros-lv2`** (sin rejilla, h = 1,25): de 0,090 y 15 cuadriláteros bajos a 0,300 y ninguno (1 731 → 1 893 nudos).
+- **Lo que queda con muros** son astillas de milímetros en la esquina de una huella: en la 21, un pilar en la esquina de un muro con la cara de la viga a 4 cm (triángulos de 1–5 mm, candidatos por debajo del suelo y de la separación); en la 7 y la 11, las esquinas de la huella del pilar de la esquina enrasada del contorno (0,196). Son del arreglo, no del refinamiento, y se quedan con el aviso (lo dice `geometrias.test.ts`).
+- **El edificio objetivo de 1 × 3 × 2 vanos sigue en 0,161,** y no es de las vigas: su carga lineal T y el borde de la zona Qz van paralelos a 10 cm (los `min(…)` del modelo reducido ponen la vertical de T en x = 16,5 y la zona hasta 17,2, y la horizontal de T en y = 2,5 con la zona desde 2,6). Con LV2 la carga lineal pasa a ser interfaz de la rejilla, y un nudo de la siembra del borde de la zona a 16 cm de ella deja un triángulo de 1,125 × 0,08 m que no se puede partir (la interfaz) ni mejorar con un punto (cualquiera formaría con ella un triángulo peor). Es el caso que describe el propio aviso («dos líneas casi paralelas»), de ese modelo y no del edificio objetivo de verdad (allí T y Qz están lejos).
+
+**Los edificios objetivo** (`out_banco.txt`, con el `LV1` del banco ya explícito: desde §17 `{}` era LV2): el de vigas no cambia ni un nudo (88 210 nudos, 153 132 ecuaciones: toda su losa va por la rejilla salvo el hueco); el reticular pasa de 108 902 a 109 196 nudos y de 203 406 a 204 288 ecuaciones (+0,4 %), con el jacobiano mínimo de 0,256 a 0,316. Los criterios 5 y 10 no se mueven.
+
+**La vivienda** (criterio 8, `validacion/sombra/vivienda/.datos/lv2-malla` frente a `lv2-defecto`): los mismos números que en §17 (momentos de vano 0,92 / 0,95 / 0,91 / 0,82 de CYPE, flechas 0,91 / 0,91, axiles fuera de ±10 %: P5 +24 / +15 / +33 % y P6 en Q +10 %): no empeora.
+
+**Visto de paso, pendiente:** en la retícula 5 con muros, el refinamiento de las caras de F2 falla con `malla/lado-perdido` y la planta se queda con `malla/cara-sin-refinar` (siete pilares); pasa con LV2 desde antes de §18 y no con LV1. Es un fallo del compilador por mirar.
+
+**Pruebas:** `geometrias.test.ts` exige ya ningún `malla/calidad` también con la unión por las caras (y ≥ 0,1 con la malla de LV1), y añade las 24 retículas con muros (sólo la 7, la 11 y la 21 con el aviso, jacobiano ≥ 0,1); `asoma.test.ts` (retícula 6); las referencias congeladas. **Lo que destapó la batería completa:** la metamórfica del ruido de 1e-8 en las losas (C2, semilla 4) fallaba por el emparejador de nudos de las pruebas, no por la malla (todos los nudos a ≤ 2,6e-8): `emparejarTodos` registraba las celdas vecinas sumando ±tol a la coordenada y redondeando, y en un nudo con la coordenada justo en un empate a .5 de la celda (y = 0,9170125 con tol = 1e-6) se saltaba una celda; ahora las vecinas van por el entero de la celda. Y la prueba del visor que abre seis veces el edificio de A2 pasa de 60 a 120 s de límite, como sus hermanas (compila a 7,5 s con LV2).

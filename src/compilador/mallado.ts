@@ -25,6 +25,10 @@
  *    huellas, dé un cuadrilátero con el jacobiano escalado < JACOBIANO_OBJETIVO, se añade su
  *    circuncentro (o su «off-center»); los tramos sembrados invadidos se parten por la mitad
  *    (Ruppert). Los tramos de los muros, la rejilla, la interfaz y las plantillas no se parten.
+ *    Con las esquinas de LV2 (`refinamiento-vigas.md` §18), las aristas obligatorias que no tocan
+ *    losa (el eje de una viga dentro de su ancho) no cuentan, y las que no se parten sólo rechazan
+ *    un punto que forme con ellas un triángulo malo y no mejore MEJORA_MINIMA veces el que se
+ *    refina: antes, sus círculos diametrales dejaban sin refinar la triangulación junto a las vigas.
  * 4. Se quedan los triángulos cuyo centroide cae en una losa (fuera de sus huecos) y no en una celda
  *    regular: como los contornos y la interfaz son aristas obligatorias, cada triángulo está entero
  *    dentro o fuera. Los de área de redondeo (entre un borde sembrado y la envolvente convexa) se
@@ -72,6 +76,11 @@ export const SEPARACION = 0.5;
 export const PISO = 0.1;
 /** Refinamiento: rondas como mucho (cada una vuelve a triangular la planta). */
 export const RONDAS_MAXIMAS = 40;
+/**
+ * Junto a una arista que no se parte, un punto nuevo que no llegue a JACOBIANO_OBJETIVO sólo entra si
+ * el triángulo que formaría con ella mejora al menos esto el que se refina (LV2, §18).
+ */
+export const MEJORA_MINIMA = 1.5;
 
 /** Fracción de paso que se tolera antes de añadir un tramo más a la siembra de un lado. */
 const HOLGURA_SIEMBRA = 1e-4;
@@ -365,7 +374,9 @@ export function siembraGraduada(L: number, sa: number, sb: number, s: number, nF
  * menos nudos (a igualdad, la de la rejilla).
  */
 export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>, rejilla = true, refino?: RefinoCaras, anchos: readonly AnchoMallar[] = []): ResultadoMalla {
-  const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false, undefined, anchos);
+  // La triangulación sola lleva lo de LV2 que no depende de la rejilla (§18: el refinamiento junto a
+  // las vigas); sin esquinas, la de siempre
+  const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false, refino?.esquinas ? refino : undefined, anchos);
   if (!rejilla) return sin();
   const conRejilla = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, undefined, anchos);
   const r = conRespaldo(refino?.caras.size || (refino?.esquinas && anchos.length) ? () => conRespaldoRefino(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, refino, anchos), conRejilla, [...refino.caras.keys()]) : conRejilla, sin);
@@ -820,6 +831,9 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   // Tramos sembrados de la CDT (clave «p,q» → su lado): los únicos que el refinamiento puede partir.
   // Los de los muros, la rejilla, la interfaz y las plantillas no se tocan
   const partible = new Map<string, number>();
+  // Aristas obligatorias que no tocan losa (el eje de una viga dentro de su ancho, un borde de la
+  // región dentro de él): su círculo diametral no cuenta en el refinamiento (LV2, §18)
+  const sinLosa = new Set<string>();
   // Cadena de cada lado: sus extremos, los nudos de la rejilla que son esquina de una celda regular
   // y la siembra de los tramos que van por la CDT
   const cadenas: number[][] = lados.map((l, k) => {
@@ -830,7 +844,10 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     const [Aa, Bb] = [P[l.a]!, P[l.b]!];
     if (conAnchos && !ladoA[k]!.relevante) {
       // Un borde de la región dentro del ancho de una viga: obligatorio, sin sembrar
-      if (ladoA[k]!.borde) restringir(l.a, l.b);
+      if (ladoA[k]!.borde) {
+        restringir(l.a, l.b);
+        sinLosa.add(l.a < l.b ? `${l.a},${l.b}` : `${l.b},${l.a}`);
+      }
       return [l.a, l.b];
     }
     if (!conAnchos && !l.trazos.some((t) => trazoLosa.has(arreglo.trazos[t]!)) && enLosa([(Aa[0] + Bb[0]) / 2, (Aa[1] + Bb[1]) / 2]) < 0) return [l.a, l.b];
@@ -1195,14 +1212,43 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         const [U, V] = [P[restricciones[i]![0]]!, P[restricciones[i]![1]]!];
         return claveCanonica([(U[0] + V[0]) / 2, (U[1] + V[1]) / 2]);
       };
-      const invasora = (q: Vec2): number => {
+      // Con las esquinas de LV2, las aristas obligatorias que no tocan losa no cuentan: el eje de una
+      // viga dentro de su ancho es una arista sin sembrar de varios metros, y su círculo diametral
+      // (de radio la mitad de su largo) tapaba todo circuncentro de la losa a esa distancia, así
+      // que la triangulación junto a las vigas se quedaba sin refinar: abanicos de jacobiano 0,12
+      // desde la cara de una viga curva (sembrada a 0,15–0,3 m) hasta la retícula de 2h (§18)
+      const ignorada = (i: number) => {
+        if (!refino?.esquinas) return false;
+        const [p, q] = restricciones[i]!;
+        return sinLosa.has(p < q ? `${p},${q}` : `${q},${p}`);
+      };
+      // Una arista que no se parte (la interfaz con la rejilla, un muro, una plantilla) no puede
+      // seguir la regla de Ruppert: su círculo diametral (una arista de interfaz de 1,4 m tapa 0,7 m
+      // de losa) dejaba sin refinar la franja de triangulación junto a las vigas. Con las esquinas de
+      // LV2 sólo la protege de lo que de verdad la estropea: un punto que forme con ella un
+      // triángulo malo (§18)
+      const esPartible = (i: number) => {
+        const [p, q] = restricciones[i]!;
+        return partible.has(p < q ? `${p},${q}` : `${q},${p}`);
+      };
+      /** La arista obligatoria más cercana que q invade, o −1; `jacActual`, el del triángulo que se refina. */
+      const invasora = (q: Vec2, jacActual: number): number => {
         let [i0, d0] = [-1, Infinity];
         for (const i of new Set(alrededor(aristasCelda, q, mediaMax))) {
+          if (ignorada(i)) continue;
           const [U, V] = [P[restricciones[i]![0]]!, P[restricciones[i]![1]]!];
           const [mx, my] = [(U[0] + V[0]) / 2 - q[0], (U[1] + V[1]) / 2 - q[1]];
           const r2 = ((V[0] - U[0]) * (V[0] - U[0]) + (V[1] - U[1]) * (V[1] - U[1])) / 4;
           const d = mx * mx + my * my;
           if (!(d < r2 * (1 - 1e-6))) continue;
+          if (refino?.esquinas && !esPartible(i)) {
+            // Lo que q formaría con la arista: vale si llega al objetivo o si al menos mejora
+            // MEJORA_MINIMA veces el triángulo que se refina (una estación de un muro con la esquina de
+            // una huella a 14 cm: ningún punto llega al objetivo, pero sí a 0,25 desde 0,14)
+            // (con los vértices en sentido antihorario: el jacobiano lleva signo)
+            const j = (V[0] - U[0]) * (q[1] - U[1]) - (V[1] - U[1]) * (q[0] - U[0]) > 0 ? jacobianoTriangulo(U, V, q) : jacobianoTriangulo(V, U, q);
+            if (!(j < JACOBIANO_OBJETIVO * (1 - 1e-6)) || !(j < MEJORA_MINIMA * jacActual)) continue;
+          }
           if (i0 < 0 || d < d0 * (1 - 1e-9)) [i0, d0] = [i, d];
           else if (d <= d0 * (1 + 1e-9)) {
             const [a, b] = [claveArista(i), claveArista(i0)];
@@ -1219,8 +1265,9 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         const [la, lb] = [ax * ax + ay * ay, bx * bx + by * by];
         const cc: Vec2 = [A[0] + (by * la - ay * lb) / d, A[1] + (ax * lb - bx * la) / d];
         const R = Math.sqrt((cc[0] - A[0]) * (cc[0] - A[0]) + (cc[1] - A[1]) * (cc[1] - A[1]));
-        if (!(jacobianoTriangulo(A, B, C) < JACOBIANO_OBJETIVO * (1 - 1e-6))) continue;
-        const invade = invasora(cc);
+        const jacT = jacobianoTriangulo(A, B, C);
+        if (!(jacT < JACOBIANO_OBJETIVO * (1 - 1e-6))) continue;
+        const invade = invasora(cc, jacT);
         if (invade >= 0) {
           // Invade una arista: se parte, si es un tramo sembrado
           const [p, q] = restricciones[invade]!;
@@ -1251,7 +1298,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
         if (nx * (X3[0] - M[0]) + ny * (X3[1] - M[1]) < 0) [nx, ny] = [-nx, -ny];
         const dist = Math.min((l * Math.sqrt(3)) / 2, Math.sqrt(largo2(M, cc)));
         const oc: Vec2 = [M[0] + nx * dist, M[1] + ny * dist];
-        if (invasora(oc) < 0 && enLosa(oc) >= 0 && !enRejilla(oc) && !enHuella(oc)) candidatos.push({ q: oc, parte: -1, r: Math.sqrt(largo2(oc, X1)), k: claveCanonica(oc) });
+        if (invasora(oc, jacT) < 0 && enLosa(oc) >= 0 && !enRejilla(oc) && !enHuella(oc)) candidatos.push({ q: oc, parte: -1, r: Math.sqrt(largo2(oc, X1)), k: claveCanonica(oc) });
       }
       // En el mismo sitio (a 1e-6·2h), primero la arista partida y luego el menor r: el orden no
       // depende del de los triángulos, que sí depende de la posición de la planta

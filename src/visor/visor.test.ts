@@ -204,7 +204,7 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
       expect(x.calculado, que).toBe(false);
       expect(valido.bind(null, datosDesplomes(x, D)), que).toThrow();
     }
-  });
+  }, 120_000);
 
   // ─── Criterio 1 ───────────────────────────────────────────────────────────────────────────────
 

@@ -271,11 +271,14 @@ export function relacionPartirCargas(f: ModeloFisico): number {
  * su apoyo), y si no, en su orden.
  */
 export function emparejarTodos(a: ModeloAnalitico, b: ModeloAnalitico, p: (q: Vec2) => Vec2, tol: number): Map<number, number> {
+  // Celdas de `tol`: las vecinas, por el entero de la celda (sumar ±tol a la coordenada y redondear
+  // se saltaba una celda en un empate a .5, y un nudo a 1e-16 de él se quedaba sin pareja)
   const clave = (x: number, y: number, z: number) => `${Math.round(x / tol)},${Math.round(y / tol)},${Math.round(z / tol)}`;
   const idx = new Map<string, number[]>();
   b.nudos.forEach((n, j) => {
+    const [kx, ky, kz] = [Math.round(n.x / tol), Math.round(n.y / tol), Math.round(n.z / tol)];
     for (const dx of [-1, 0, 1]) for (const dy of [-1, 0, 1]) {
-      const k = clave(n.x + dx * tol, n.y + dy * tol, n.z);
+      const k = `${kx + dx},${ky + dy},${kz}`;
       let l = idx.get(k);
       if (!l) idx.set(k, (l = []));
       l.push(j);

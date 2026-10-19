@@ -26,7 +26,7 @@ for (const [nombre, f] of casos) {
   // LV2 con la plantilla por defecto (3 niveles en los cruces con pilar y 2 en los demás, LV2-i) y con
   // 3 niveles en todos los cruces (§15)
   const defecto = PLANTILLA_ESQUINA.nivelesSinPilar;
-  for (const [n, op, sinPilar] of [["LV1", {}, defecto], ["LV2", { refinoEsquinas: true }, defecto], ["LV2, 3 niv. en todo", { refinoEsquinas: true }, undefined]] as [string, OpcionesCompilacion, number | undefined][]) {
+  for (const [n, op, sinPilar] of [["LV1", { refinoEsquinas: false }, defecto], ["LV2", { refinoEsquinas: true }, defecto], ["LV2, 3 niv. en todo", { refinoEsquinas: true }, undefined]] as [string, OpcionesCompilacion, number | undefined][]) {
     PLANTILLA_ESQUINA.nivelesSinPilar = sinPilar;
     const t0 = performance.now();
     const r = compilar(f, op);

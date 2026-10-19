@@ -90,6 +90,8 @@ describe("los pilares que asoman de su viga (LV-8)", () => {
     expect(av[0]!.severidad).toBe("aviso");
     expect(av[0]!.mensaje).toContain("P1-2");
     expect(av[0]!.mensaje).toContain("asoman del ancho");
-    expect(calidad(lv2).length).toBeGreaterThanOrEqual(1);
+    // Lo que asoma lo malla la triangulación; desde §18 el refinamiento de Delaunay sí llega a esas
+    // astillas (antes lo tapaba el círculo diametral del eje de la viga) y la malla sale con calidad
+    expect(calidad(lv2)).toEqual([]);
   });
 });
