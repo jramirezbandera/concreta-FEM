@@ -32,6 +32,41 @@ Las mismas comparaciones de la fase CY (`comparar.py`): mediana de nuestro/CYPE 
 
 El `my` de la cubierta no cambia al refinar. Lo que falta está entre P4, P13 y P5 (x de 4 a 8 m, y de 10 a 12 m, `zonas.py`), con el 0,65–0,81 de CYPE, y P5 sigue llevando entre un 14 y un 32 % más que en CYPE, según la hipótesis. Las dos cosas apuntan a lo mismo, y es lo siguiente que hay que mirar.
 
+### 2.1 Diagnóstico del `my` de la cubierta y de P5 (2026-10-19, tras HR)
+
+Con el compilador HR1 (`.datos/hr`, `out_hr.txt`): momentos de vano 0,92 / 0,95 / 0,91 / 0,82, flechas 0,91 / 0,91, P5 +24 / +15 / +33 % (PP / CM / Q). Lo medido, con los scripts `variantes.py`, `tramos.ts`, `zonas.py … negativos` y `viga.ts` (las variantes en `.datos/d-*`, fuera de git):
+
+**Qué es lo que falta.** Es un solo recuadro, el de P4–P5–P8–P13–P12 (x 4,3–9, y 8,7–14,6), y en él todo sale a 0,6–0,8 de CYPE: la flecha en el centro (0,66–0,77), a lo largo de la viga P4–P5 (0,55–0,88) y de la de x = 4,26 (0,75–0,85), el `my` positivo del vano (0,65–0,81) y el negativo sobre los ábacos de P8 (0,42–0,76) y de P13 (0,73–0,80). El `mx` coincide (0,95). La carga total de la cubierta superior es la misma (ΣN en la base de sus tramos: CYPE 613,6 kN, nuestro 625,0, +1,9 % de PP, el cruce pilar–losa de A-9): lo que CYPE manda a P13 (+9,6 kN) y a P4 (+3,1), nosotros lo mandamos a P5 (+12,6). El recuadro trabaja menos en Y y descarga más en P5.
+
+**Lo que no es** (cada variante cambia una cosa sobre `hr`; `my` cub. / P5 PP):
+- el empotramiento de la cabeza de los pilares: con 1, 0,80 / +23 %; con 0, 0,86 / +25 %; sólo P5 rígido, 0,82 / +23 %;
+- la huella rígida: P5 como un punto, 0,82 / +22 %; todos los pilares como un punto, 0,84 / +26 % (sólo sube las flechas de 0,91 a 0,94–0,95);
+- las vigas de la cubierta baja: con ×0,1 de flexión, la baja pasa a 1,00–1,08 y la superior no se mueve (0,82 / +23 %); el borde x = 4,26 de la baja entre P19 y P4 sin flexión (en la captura de CYPE va dibujado hueco y sin número de pórtico, a diferencia de las demás vigas), 0,82 / +23 %;
+- la zona rígida 1 (`lv-zr1`): 0,79 / +25 %;
+- la longitud libre del tramo corto (abajo).
+
+**Lo que lo mueve: la flexión de las seis vigas de la cubierta superior.** Dosis (canto menor con el mismo ancho, sección embebida):
+
+| Vigas de la superior | mx cub. | my cub. | Flecha cub. | P4 PP | P5 PP | P13 PP |
+|---|---|---|---|---|---|---|
+| ×1 (hr) | 0,95 | 0,82 | 0,91 | −5 % | +24 % | −7 % |
+| ×0,5 | 0,99 | 0,92 | 0,98 | −6 % | +18 % | −7 % |
+| ×0,25 | 1,01 | 0,98 | 1,02 | −8 % | +13 % | −6 % |
+| ×0,1 | 1,02 | 1,03 | 1,06 | −9 % | +9 % | −5 % |
+
+Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0,82 / +17 %. Las dos juntas no bastan: hace falta todo el contorno. En la cubierta baja pasa lo mismo a menor escala: con sus vigas a ×0,5 queda a 0,96–0,98 en momentos y flechas, y la viga P22–P23 da +7,63 kN·m de vano frente a los +7,40 de CYPE (con ×1, +13,2); a ×0,25 se pasa (1,04). Los negativos de esa viga en las caras siguen por debajo (−3,7 / −1,5 frente a −5,45 / −4,96 de CYPE) con el mismo cortante (22,8 / 19,6 frente a 20,8): en CYPE la viga está más empotrada en relación con su vano, que es lo que se espera de una viga más flexible frente a los mismos pilares.
+
+**Lo que dice CYPE.** La tabla de rigideces de su memoria (ccadmc01, p. 20, imagen) da a las vigas de hormigón la sección bruta en EIy, ∞ en EIz y x·S.B. en torsión; sólo el «zuncho de borde» lleva EIy·10⁻¹⁵. Nada en la memoria explica que una viga plana de 30 × 30 dentro de un reticular de 30 trabaje a un cuarto o a la mitad de su inercia bruta. El modelo del usuario (listado, §12) lleva 0,3 en cabeza y 2,0 de rigidez axil, como nosotros.
+
+**De paso, el tramo corto de 0,90 m entre las dos cubiertas.** En CYPE los pilares que pasan de una cubierta a otra llevan en ese tramo cortantes horizontales grandes con peso propio (P4 35,3 kN, P12 27,0, P19 9,0; momento en la base 16,2 kN·m en P4): los dos forjados se ayudan por ahí. Nosotros tenemos el mismo mecanismo pero más flojo (27,2 / 18,5 / 8,0), porque CYPE descuenta como rígido el medio canto del forjado inferior en la base del tramo (listado: tramo 3,50/4,10, 0,60 m libres) y nosotros sólo el medio canto en la cabeza (0,75 m libres; `piezas.ts`, C1). Con 0,60 m libres (`d-stub060`) salen 34,8 / 24,5 / 9,8 kN, pero el `my` y P5 no se mueven (0,82 / +23 %). Queda como diferencia de modelado conocida: poner el offset rígido también en la base del tramo cuando hay un forjado debajo (decisión LV-d, abajo).
+
+**Para el usuario.** Lo que queda no se explica con ninguna hipótesis de modelado nuestra: el modelo de CYPE se comporta como si sus vigas de borde tuvieran un cuarto (superior) o la mitad (baja) de su rigidez a flexión. Para cerrarlo hace falta mirar en CYPECAD:
+1. los diagramas de las vigas de la cubierta superior, sobre todo la P4–P5 (Z-CUB-S-5) y la P4–P12–P15 (Z-CUB-S-6), en 1,35·PP + 1,35·CM + 1,5·Q: los nuestros son `fem consultar viga` o `viga.ts <variante> Z-CUB-S-5`. Si CYPE da momentos y cortantes mucho menores que los nuestros, es la viga; si da los mismos, es la unión;
+2. qué tipo de viga son las tres huecas de x = 4,26 en la planta 1 (P4–P12–P15–P19), y si las de la superior son «planas» o «descolgadas» de 30 × 30;
+3. si los paños tienen algún coeficiente de empotramiento en bordes distinto de 1 (memoria, p. 19).
+
+**Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias.
+
 ## 3. Hallazgos
 
 | # | Hallazgo | Consecuencia |
@@ -69,7 +104,7 @@ Las pruebas que miden un comportamiento de antes con vigas (las plantillas de SP
 
 **Decidido por el usuario el 2026-10-15:** LV-a y LV-c, juntas en una fase corta de refinamiento junto a las vigas (fase LV2, plan en `refinamiento-vigas.md`); LV-b se acepta por ahora y se retoma cuando se vuelva a tocar la rejilla; el `my` de la cubierta y P5, justo después de LV2. Al medir el plan de LV2, la primera fila partida a lo largo de toda la cara no cabe en el perfil móvil y se propone refinar sólo la esquina de cada paño (`refinamiento-vigas.md` §1–§4).
 
-**Siguiente paso:** la fase LV2 y, después, el `my` de la cubierta y P5 (§2).
+**Siguiente paso:** la fase LV2 (hecha el 2026-10-19) y, después, el `my` de la cubierta y P5 (§2.1: diagnosticado el 2026-10-19; lo que queda es de CYPE y lo tiene que mirar el usuario en su modelo).
 
 ## 6. Para reproducir
 
@@ -81,4 +116,15 @@ bun validacion/lv/geometrias.ts > validacion/lv/out_geometrias.txt
 bun validacion/lv/opciones.ts eje > validacion/lv/out_opciones_eje.txt    (y sin «eje» en un worktree del commit anterior)
 bun validacion/sombra/vivienda/muestrear.ts validacion/sombra/vivienda/.datos/lv-cara
 .venv/Scripts/python.exe validacion/sombra/vivienda/comparar.py validacion/sombra/vivienda/.datos/lv-cara
+```
+
+El diagnóstico de §2.1 (las variantes se escriben en `.datos/d-*`):
+
+```
+.venv/Scripts/python.exe validacion/sombra/vivienda/variantes.py            (todas, o las que se nombren)
+bun validacion/sombra/vivienda/muestrear.ts validacion/sombra/vivienda/.datos/d-zcubs-025
+.venv/Scripts/python.exe validacion/sombra/vivienda/comparar.py validacion/sombra/vivienda/.datos/d-zcubs-025
+.venv/Scripts/python.exe validacion/sombra/vivienda/zonas.py validacion/sombra/vivienda/.datos/d-zcubs-025 my Cubierta [negativos]
+bun validacion/sombra/vivienda/viga.ts validacion/sombra/vivienda/.datos/d-zcubs-025 [Z-CUB-S-5]
+bun validacion/sombra/vivienda/tramos.ts validacion/sombra/vivienda/.datos/d-stub060
 ```

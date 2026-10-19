@@ -5,6 +5,7 @@ máximo de CYPE) por casillas de la planta, con su número de nudos.
 
   .venv/Scripts/python.exe validacion/sombra/vivienda/zonas.py <carpeta de la variante> [<campo> <planta>]
   p. ej.: ... zonas.py validacion/sombra/vivienda/.datos/lv-cara my Cubierta
+  Con un cuarto argumento `negativos`, los «grandes negativos» (apoyos, o la flecha en uz).
 """
 import json, os, sys
 import numpy as np
@@ -14,6 +15,7 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 dir_ = sys.argv[1]
 campo = sys.argv[2] if len(sys.argv) > 2 else "my"
 planta = sys.argv[3] if len(sys.argv) > 3 else "Cubierta"
+negativos = len(sys.argv) > 4 and sys.argv[4] == "negativos"
 cy = json.load(open(os.path.join(AQUI, ".datos", "cype.json")))
 us = json.load(open(os.path.join(dir_, "nuestro.json")))
 proyecto = json.load(open(os.path.join(dir_, "proyecto.json"), encoding="utf-8"))
@@ -30,8 +32,9 @@ for n, c in zip(nod, cap["valores"]):
     if min(max(abs(n["x"] - p["x"]), abs(n["y"] - p["y"])) for p in ps) - 0.15 < 0.5: continue
     X.append(n["x"]); Y.append(n["y"]); a.append(c); b.append(sum(f * v[k] for k, f in F[cap["comb"]].items()))
 X, Y, a, b = map(np.array, (X, Y, a, b))
+if negativos: a, b = -a, -b
 g = a > 0.4 * a.max()
-print(f"{planta} {campo}: {g.sum()} nudos grandes positivos, mediana {np.median(b[g] / a[g]):.2f}")
+print(f"{planta} {campo}: {g.sum()} nudos grandes {'negativos' if negativos else 'positivos'}, mediana {np.median(b[g] / a[g]):.2f}")
 paso = 1.0
 xs = np.arange(np.floor(X[g].min()), X[g].max() + paso, paso)
 ys = np.arange(np.floor(Y[g].min()), Y[g].max() + paso, paso)
