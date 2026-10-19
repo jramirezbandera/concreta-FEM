@@ -1,0 +1,7 @@
+# Fase HR, criterio 2: la malla tensorial de la losa 3 × 3 mezclada, motor frente a OpenSeesPy ASDShellQ4
+
+Misma malla y mismo modelo en los dos. Diferencia relativa del My del metro de cada cara (sobre el valor de OpenSees; sobre el mayor |My| en las caras con poco momento).
+
+variante | nudos | estaciones comparadas (de) | diferencia máxima relativa | media | máxima sobre el mayor |My|
+tensorial-enlace | 28691 | 48 de 48 | 3.08e-03 | 1.40e-03 | 2.99e-03
+tensorial-parche | 28675 | 48 de 48 | 3.07e-03 | 1.41e-03 | 2.98e-03

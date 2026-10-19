@@ -115,6 +115,9 @@ function metros(f: ModeloFisico, op: OpcionesCompilacion, antes = false): { cara
       return res.valido ? [...Array(casos.length).keys()].reduce((a, k) => a + res.esfuerzos[6 * k + 4]!, 0) : NaN;
     };
     const [sin, con] = [m([]), m([id])];
+    // Si el corte recto por la cara propia no sigue la malla (NaN: la estación va por el escalón desde
+    // la recta común, F3), no se puede comprobar, y no es F2-9 (antes de la fase HR, NaN contaba como sí)
+    if (!Number.isFinite(con) || !Number.isFinite(sin)) return false;
     return !(Math.abs(con / sin - 1) <= 0.005);
   };
   const cps = carasPilares(f, op);
@@ -217,7 +220,7 @@ const pc = (x: number) => `${(100 * x).toFixed(2)} %`;
 
 decir("## Criterio 3: convergencia frente a la malla fina");
 decir();
-decir("Caras con demanda (|m| ≥ 20 % de la mayor de la referencia); media y máximo de |error|, y el peor con su signo. Sin las caras propias cuya estación de referencia pierde por F2-9: nudos rígidos delante de la cara, por los que pasa momento que no cuenta (el corte por la cara cambia más de un 0,5 % con la huella), o láminas con los cuatro nudos rígidos.");
+decir("Caras con demanda (|m| ≥ 20 % de la mayor de la referencia); media y máximo de |error|, y el peor con su signo. Desde la fase HR (sólo la huella es rígida) ninguna cara de la referencia pierde por F2-9 (nudos rígidos delante de la cara o láminas con los cuatro nudos rígidos): se comprueba y se dice cuántas hay, que tienen que ser 0.");
 decir();
 decir("modelo | malla | estación | grupo | caras | media | máx. | peor | nudos | avisos");
 const modelos: [string, ModeloFisico, number][] = [
@@ -243,10 +246,8 @@ for (const [nombre, f, hRef] of modelos) {
     for (const [k, c] of r.caras) {
       const v = ref.caras.get(k);
       if (!v || Math.abs(v.m) < 0.2 * mayor) continue;
-      if (v.f29) {
-        excluidas.add(k);
-        continue;
-      }
+      // Fase HR: ya no se excluye ninguna; se cuentan (tienen que ser 0)
+      if (v.f29) excluidas.add(k);
       grupos.set(c.grupo, [...(grupos.get(c.grupo) ?? []), c.m / v.m - 1]);
       if (process.env.DETALLE && !antes && malla.includes("0,75 con")) console.log(`  ${k} (${c.grupo}): ${c.m.toFixed(2)} frente a ${v.m.toFixed(2)} → ${pc(c.m / v.m - 1)}`);
     }
@@ -257,7 +258,7 @@ for (const [nombre, f, hRef] of modelos) {
       const max = Math.max(...abs);
       decir(`${nombre} | ${malla} | ${antes ? "antes (cara común, F2)" : "F3"} | ${g} | ${e.length} | ${pc(abs.reduce((a, x) => a + x, 0) / abs.length)} | ${pc(max)} | ${pc(e[abs.indexOf(max)]!)} | ${r.nudos} | ${r.avisos.join(", ") || "—"}`);
     }
-    if (excluidas.size && !antes && malla.includes("0,75 con")) decir(`${nombre} | — | — | sin comparar: la referencia pierde ancho por F2-9 | ${excluidas.size} | — | — | — | — | ${[...new Set([...excluidas].map((k) => ref.caras.get(k)!.grupo))].join(", ")}`);
+    if (!antes && malla.includes("0,75 con")) decir(`${nombre} | — | — | caras cuya referencia tiene F2-9 (tienen que ser 0) | ${excluidas.size} | — | — | — | — | ${[...excluidas].join(", ") || "—"}`);
   }
 }
 

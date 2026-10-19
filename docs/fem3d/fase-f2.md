@@ -74,7 +74,7 @@ Coste: unos 37 nudos por pilar interior con las cuatro caras.
   - que la cara propia esté en la malla también con h ≤ 0,5 (hoy, sólo en la plantilla con el h por defecto).
 
   Sería la fase siguiente. **Hecho en F3** (`fase-f3.md`, 2026-10-14): el metro se mide en la cara propia por un contorno en escalón, sin sembrar nada en la malla.
-- **F2-9, los nudos rígidos a ε_snap de la huella.** **Aparcada por el usuario el 2026-10-14**, tras F3-d (sólo queda la rigidez, F3-8, del lado seguro): se retoma cuando se vuelva a tocar el mallador, preferiblemente por la segunda salida. Hay dos salidas:
+- **F2-9, los nudos rígidos a ε_snap de la huella.** **Hecha en la fase HR el 2026-10-19** (`huella-rigida.md`, `fase-hr.md`): sólo la huella y su borde son rígidos en todos los pilares, con un oráculo externo (la 3 × 3 mezclada en malla tensorial, en OpenSeesPy) y la regresión de precisión local en las pruebas. **Aparcada por el usuario el 2026-10-14**, tras F3-d (sólo queda la rigidez, F3-8, del lado seguro): se retoma cuando se vuelva a tocar el mallador, preferiblemente por la segunda salida. Hay dos salidas:
   - esclavizar sólo los nudos sobre la huella (cambia C2–C5, y por sí solo no basta junto al hueco);
   - o que el mallador no ponga nudos a menos de ε_snap de una huella.
 

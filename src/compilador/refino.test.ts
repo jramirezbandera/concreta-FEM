@@ -130,7 +130,7 @@ describe("la plantilla refinada", () => {
     expect(calcular(con.modelo).valido).toBe(true);
   });
 
-  it("con h = 0,125 no se refina (el primer tercio quedaría a menos de 2·ε_snap de la cara)", () => {
+  it("con h = 0,125 no se refina (el primer tercio quedaría a menos de 2·ε_snap de la cara: desde la fase HR, una cota de tamaño, HR-c)", () => {
     expect(compilado(f, { tamanoMalla: 0.125 }).estadisticas.malla.plantillasRefinadas).toBe(0);
   });
 });

@@ -1,0 +1,5 @@
+| Modelo | Nudos | Ecuaciones | Antes | Cambio | Esclavos fuera | Jacobiano mín. | Avisos de malla |
+|---|---|---|---|---|---|---|---|
+| edificio objetivo con vigas | 88210 | 153132 | 153132 | 0.00 % | 0 | 0.430 | malla/esquina-sin-refinar |
+| edificio reticular objetivo | 109196 | 204288 | 204288 | 0.00 % | 0 | 0.316 | malla/esquina-sin-refinar |
+| edificio objetivo con losa plana | 69639 | 193809 | 192066 | 0.91 % | 0 | 0.217 | — |

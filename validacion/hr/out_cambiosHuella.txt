@@ -1,0 +1,193 @@
+
+# C2
+
+== losa-plana: modelo idéntico; nudos 714 → 714, barras 9 → 9, láminas 636 → 636; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 2.97e-13
+
+== navier-delgada: modelo idéntico; nudos 207 → 207, barras 0 → 0, láminas 186 → 186; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.96e-13
+
+== aleatorio-8-losas: modelo idéntico; nudos 859 → 859, barras 125 → 125, láminas 795 → 795; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.09e-13
+
+== aleatorio-11-losas-sin-diafragma: modelo idéntico; nudos 1159 → 1159, barras 184 → 184, láminas 1062 → 1062; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.16e-13
+
+== losa-plana-rejilla: modelo idéntico; nudos 604 → 604, barras 9 → 9, láminas 534 → 534; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.01e-13
+
+== aleatorio-8-losas-rejilla: modelo idéntico; nudos 859 → 859, barras 125 → 125, láminas 795 → 795; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.09e-13
+
+== reticula-enrasada: modelo idéntico; nudos 538 → 538, barras 114 → 114, láminas 468 → 468; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 2.87e-13
+
+== aleatorio-8-losas-rejilla-lv: modelo idéntico; nudos 970 → 970, barras 172 → 172, láminas 696 → 696; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.89e-13
+
+== aleatorio-8-losas-rejilla-lv2: modelo idéntico; nudos 1097 → 1097, barras 171 → 171, láminas 825 → 825; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.77e-13
+
+# C3
+
+== etabs-15c-3-60: modelo idéntico; nudos 788 → 788, barras 0 → 0, láminas 696 → 696; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.32e-13
+
+== etabs-15f-1: modelo idéntico; nudos 482 → 482, barras 0 → 0, láminas 432 → 432; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.09e-13
+
+== sotano-empuje: modelo idéntico; nudos 429 → 429, barras 0 → 0, láminas 384 → 384; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.00e-13
+
+== viga-en-muro: modelo idéntico; nudos 154 → 154, barras 3 → 3, láminas 128 → 128; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 1.51e-13
+
+== aleatorio-3-muros: modelo distinto; nudos 1489 → 1489, barras 174 → 175, láminas 1396 → 1396; esclavos de huella que cambian: P0-1@N1 17 → 15, P1-0@N1 22 → 19, P1-1@N1 29 → 27; otras restricciones cambian; peor cambio relativo de los resultados: no comparable (tamaños distintos)
+
+== reticula-nucleo: modelo idéntico; nudos 1492 → 1492, barras 178 → 178, láminas 1385 → 1385; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.07e-13
+
+== aleatorio-3-muros-lv: modelo distinto; nudos 1706 → 1706, barras 254 → 254, láminas 1314 → 1314; esclavos de huella que cambian: P1-0@N1 58 → 37; otras restricciones cambian; peor cambio relativo de los resultados: 6.31e-1
+
+== aleatorio-3-muros-lv2: modelo distinto; nudos 1893 → 1893, barras 255 → 255, láminas 1494 → 1494; esclavos de huella que cambian: P1-0@N1 40 → 33, P2-0@N1 28 → 22; otras restricciones cambian; peor cambio relativo de los resultados: 5.74e-1
+
+# C4
+
+== pano-oblicuo: modelo idéntico; nudos 23 → 23, barras 29 → 29, láminas 0 → 0; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.37e-13
+
+== dos-vanos-voladizo: modelo idéntico; nudos 41 → 41, barras 55 → 55, láminas 0 → 0; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 2.65e-13
+
+== pano-hueco: modelo idéntico; nudos 25 → 25, barras 30 → 30, láminas 0 → 0; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 1.23e-13
+
+== aleatorio-7-unidireccional: modelo idéntico; nudos 140 → 140, barras 213 → 213, láminas 0 → 0; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.34e-13
+
+== aleatorio-6-reticular: modelo distinto; nudos 2519 → 2519, barras 440 → 446, láminas 2345 → 2345; esclavos de huella que cambian: P1-1@N1 45 → 35, P2-0@N1 18 → 15, P1-1@N2 45 → 35, P2-0@N2 18 → 15; otras restricciones cambian; peor cambio relativo de los resultados: no comparable (tamaños distintos)
+
+== aleatorio-5-mixto: modelo distinto; nudos 1223 → 1223, barras 425 → 427, láminas 988 → 988; esclavos de huella que cambian: P0-1@N2 37 → 31, P2-1@N2 12 → 11; otras restricciones cambian; peor cambio relativo de los resultados: no comparable (tamaños distintos)
+
+== aleatorio-5-mixto-lv: modelo distinto; nudos 1776 → 1776, barras 556 → 556, láminas 1140 → 1140; esclavos de huella que cambian: P0-0@N2 11 → 9, P0-1@N2 3 → 2; otras restricciones cambian; peor cambio relativo de los resultados: 6.85e-1
+
+== aleatorio-5-mixto-lv2: modelo idéntico; nudos 1858 → 1858, barras 564 → 564, láminas 1212 → 1212; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.33e-13
+
+# C5
+
+== pilares-mezclados: modelo distinto; nudos 2052 → 2052, barras 12 → 12, láminas 1885 → 1885; esclavos de huella que cambian: P12-10@N1 81 → 63, P18-5@N1 59 → 51; otras restricciones cambian; peor cambio relativo de los resultados: 1.43e+0
+  las estaciones de las bandas cambian
+
+== reticular-h25: modelo idéntico; nudos 860 → 860, barras 9 → 9, láminas 784 → 784; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.89e-13
+
+== etabs-15c-3-60: modelo idéntico; nudos 788 → 788, barras 0 → 0, láminas 696 → 696; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.32e-13
+
+== aleatorio-3: modelo distinto; nudos 4001 → 4001, barras 294 → 320, láminas 3864 → 3864; esclavos de huella que cambian: P1-0@N1 79 → 51, P1-1@N1 338 → 167, P1-2@N1 183 → 83, P2-0@N1 92 → 49, P2-1@N1 165 → 79, P2-2@N1 102 → 51; otras restricciones cambian; peor cambio relativo de los resultados: no comparable (tamaños distintos)
+  las estaciones de las bandas cambian
+
+# F
+
+== h25-plana: modelo idéntico; nudos 532 → 532, barras 9 → 9, láminas 472 → 472; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 2.98e-13
+  franjas que cambian: 0 de 24
+
+== h25-reticular: modelo idéntico; nudos 716 → 716, barras 9 → 9, láminas 648 → 648; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.77e-13
+  franjas que cambian: 0 de 30
+
+== pilares-mezclados: modelo distinto; nudos 1346 → 1346, barras 12 → 12, láminas 1212 → 1212; esclavos de huella que cambian: P12-10@N1 56 → 39; otras restricciones cambian; peor cambio relativo de los resultados: 1.39e+0
+  L-N1:X1          inferior 30.0 → 30.0, superior 91.2 → 91.1
+  L-N1:X2          inferior 27.0 → 27.0, superior 18.5 → 18.5
+  L-N1:X3          inferior 26.8 → 26.8, superior 14.2 → 14.2
+  L-N1:X4          inferior 28.6 → 28.6, superior 26.7 → 26.7
+  L-N1:X5          inferior 31.4 → 31.4, superior 95.7 → 95.7
+  L-N1:X6          inferior 33.0 → 33.0, superior 95.7 → 95.7
+  L-N1:X7          inferior 23.1 → 23.1, superior 27.8 → 27.9
+  L-N1:X8          inferior 21.0 → 21.1, superior 16.1 → 16.1
+  L-N1:X9          inferior 20.7 → 20.9, superior 19.1 → 19.1
+  L-N1:X10         inferior 23.7 → 23.8, superior 64.0 → 64.3
+  L-N1:Y1          inferior 22.5 → 22.5, superior 47.7 → 47.7
+  L-N1:Y2          inferior 18.9 → 18.9, superior 9.8 → 9.8
+  L-N1:Y3          inferior 17.4 → 17.4, superior 4.1 → 4.1
+  L-N1:Y4          inferior 19.2 → 19.2, superior 7.5 → 7.5
+  L-N1:Y5          inferior 21.8 → 21.8, superior 22.9 → 22.9
+  L-N1:Y6          inferior 24.0 → 24.0, superior 84.9 → 85.0
+  L-N1:Y7          inferior 24.6 → 24.6, superior 84.9 → 85.0
+  L-N1:Y8          inferior 23.5 → 23.5, superior 23.3 → 23.3
+  L-N1:Y9          inferior 20.7 → 20.7, superior 8.5 → 8.5
+  L-N1:Y10         inferior 21.0 → 21.0, superior 8.4 → 8.4
+  L-N1:Y11         inferior 26.4 → 26.4, superior 24.0 → 24.0
+  L-N1:Y12         inferior 29.9 → 29.9, superior 87.6 → 87.6
+  L-N1:Y13         inferior 31.1 → 31.1, superior 87.6 → 87.6
+  L-N1:Y14         inferior 29.2 → 29.2, superior 10.4 → 10.4
+  L-N1:Y15         inferior 26.6 → 26.6, superior 0.4 → 0.3
+  L-N1:Y16         inferior 25.2 → 25.2, superior 0.2 → 0.2
+  L-N1:Y17         inferior 24.9 → 24.9, superior 1.5 → 1.5
+  L-N1:Y18         inferior 27.1 → 27.1, superior 56.6 → 56.6
+  franjas que cambian: 28 de 28
+
+== aleatorio-3: modelo distinto; nudos 1035 → 1035, barras 173 → 174, láminas 954 → 954; esclavos de huella que cambian: P0-1@N1 17 → 15, P1-0@N1 23 → 19, P1-1@N1 29 → 27; otras restricciones cambian; peor cambio relativo de los resultados: no comparable (tamaños distintos)
+  L-N1:X1          inferior 19.2 → 19.2, superior 25.4 → 24.7
+  L-N1:X2          inferior 17.7 → 17.7, superior 10.5 → 10.5
+  L-N1:X3          inferior 16.6 → 16.7, superior 6.1 → 6.1
+  L-N1:X4          inferior 17.8 → 17.8, superior 8.0 → 8.0
+  L-N1:X5          inferior 19.0 → 19.0, superior 19.8 → 19.9
+  L-N1:X6          inferior 18.6 → 18.6, superior 34.1 → 34.0
+  L-N1:X7          inferior 17.8 → 17.9, superior 25.7 → 26.0
+  L-N1:X8          inferior 15.4 → 15.4, superior 19.6 → 19.7
+  L-N1:X9          inferior 12.5 → 12.6, superior 11.2 → 11.2
+  L-N1:X10         inferior 10.8 → 10.8, superior 12.1 → 12.1
+  L-N1:Y1          inferior 19.7 → 19.7, superior 80.8 → 80.9
+  L-N1:Y2          inferior 16.7 → 16.7, superior 12.3 → 12.3
+  L-N1:Y3          inferior 15.1 → 15.1, superior 10.0 → 9.9
+  L-N1:Y4          inferior 16.4 → 16.4, superior 14.6 → 14.6
+  L-N1:Y5          inferior 17.9 → 18.0, superior 26.5 → 26.4
+  L-N1:Y6          inferior 19.6 → 19.6, superior 31.5 → 31.8
+  L-N1:Y7          inferior 19.4 → 19.4, superior 18.1 → 17.9
+  L-N1:Y8          inferior 17.5 → 17.5, superior 7.3 → 7.2
+  L-N1:Y9          inferior 16.5 → 16.5, superior 5.8 → 5.8
+  L-N1:Y10         inferior 16.8 → 16.8, superior 7.9 → 7.9
+  L-N1:Y11         inferior 17.1 → 17.2, superior 20.5 → 20.5
+  franjas que cambian: 21 de 21
+
+== losa-3x3-refinada: modelo idéntico; nudos 1666 → 1666, barras 16 → 16, láminas 1548 → 1548; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.87e-13
+  franjas que cambian: 0 de 35
+
+== h25-plana-sin-refinar: modelo idéntico; nudos 460 → 460, barras 9 → 9, láminas 400 → 400; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.83e-13
+  franjas que cambian: 0 de 24
+
+== losa-3x3-mezclada: modelo idéntico; nudos 1642 → 1642, barras 16 → 16, láminas 1524 → 1524; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.91e-13
+  franjas que cambian: 0 de 35
+
+== reticular-2x2-abacos: modelo idéntico; nudos 1255 → 1255, barras 213 → 213, láminas 1151 → 1151; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.67e-13
+  franjas que cambian: 0 de 28
+
+== aleatorio-3-lv: modelo idéntico; nudos 1200 → 1200, barras 254 → 254, láminas 807 → 807; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 3.64e-13
+  franjas que cambian: 0 de 21
+
+== reticular-2x2-abacos-lv: modelo distinto; nudos 1834 → 1834, barras 332 → 332, láminas 1260 → 1260; esclavos de huella que cambian: P0-5@N1 3 → 2; otras restricciones cambian; peor cambio relativo de los resultados: 1.04e+0
+  L-N1:X1          inferior 13.1 → 13.1, superior 22.1 → 22.1
+  L-N1:X2          inferior 14.4 → 14.4, superior 17.8 → 17.8
+  L-N1:X3          inferior 13.1 → 13.1, superior 15.2 → 15.2
+  L-N1:X4          inferior 14.3 → 14.3, superior 17.3 → 17.4
+  L-N1:X5          inferior 15.1 → 15.1, superior 19.4 → 19.5
+  L-N1:X6          inferior 16.8 → 16.8, superior 32.7 → 32.7
+  L-N1:X7          inferior 21.4 → 21.3, superior 35.2 → 35.2
+  L-N1:X8          inferior 18.5 → 18.5, superior 29.9 → 29.9
+  L-N1:X9          inferior 14.9 → 14.9, superior 7.3 → 7.3
+  L-N1:X10         inferior 12.9 → 12.8, superior 2.9 → 2.9
+  L-N1:X11         inferior 11.8 → 11.7, superior 2.6 → 2.6
+  L-N1:X12         inferior 11.6 → 11.6, superior 9.1 → 9.1
+  L-N1:X13         inferior 12.7 → 12.7, superior 16.5 → 16.5
+  L-N1:Y1          inferior 10.7 → 10.7, superior 29.2 → 16.1
+  L-N1:Y2          inferior 10.5 → 10.6, superior 10.3 → 10.5
+  L-N1:Y3          inferior 10.4 → 10.4, superior 7.4 → 7.5
+  L-N1:Y4          inferior 11.5 → 11.6, superior 6.0 → 6.0
+  L-N1:Y5          inferior 12.0 → 12.0, superior 9.4 → 9.4
+  L-N1:Y6          inferior 13.6 → 13.7, superior 13.3 → 13.3
+  L-N1:Y7          inferior 14.0 → 14.0, superior 27.0 → 27.0
+  L-N1:Y8          inferior 15.6 → 15.6, superior 31.7 → 31.7
+  L-N1:Y9          inferior 16.1 → 16.1, superior 29.1 → 29.1
+  L-N1:Y10         inferior 16.8 → 16.8, superior 2.0 → 2.0
+  L-N1:Y11         inferior 15.4 → 15.4, superior 3.3 → 3.4
+  L-N1:Y12         inferior 14.7 → 14.7, superior 4.9 → 4.9
+  L-N1:Y13         inferior 13.5 → 13.5, superior 0.9 → 0.9
+  L-N1:Y14         inferior 13.6 → 13.5, superior 5.7 → 5.7
+  L-N1:Y15         inferior 13.1 → 13.1, superior 19.2 → 19.2
+  franjas que cambian: 28 de 28
+
+== aleatorio-3-lv2: modelo idéntico; nudos 1256 → 1256, barras 248 → 248, láminas 870 → 870; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.35e-13
+  franjas que cambian: 0 de 21
+
+== reticular-2x2-abacos-lv2: modelo idéntico; nudos 1826 → 1826, barras 340 → 340, láminas 1229 → 1229; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.56e-13
+  franjas que cambian: 0 de 28
+
+== edificio-2x2-lv2: modelo idéntico; nudos 1503 → 1503, barras 293 → 293, láminas 991 → 991; esclavos de huella que cambian: ninguno; peor cambio relativo de los resultados: 4.26e-13
+  franjas que cambian: 0 de 22
+
+# Resumen
+- C2: bit a bit 9 (losa-plana, navier-delgada, aleatorio-8-losas, aleatorio-11-losas-sin-diafragma, losa-plana-rejilla, aleatorio-8-losas-rejilla, reticula-enrasada, aleatorio-8-losas-rejilla-lv, aleatorio-8-losas-rejilla-lv2); cambian 0
+- C3: bit a bit 5 (etabs-15c-3-60, etabs-15f-1, sotano-empuje, viga-en-muro, reticula-nucleo); cambian 3 (aleatorio-3-muros, aleatorio-3-muros-lv, aleatorio-3-muros-lv2)
+- C4: bit a bit 5 (pano-oblicuo, dos-vanos-voladizo, pano-hueco, aleatorio-7-unidireccional, aleatorio-5-mixto-lv2); cambian 3 (aleatorio-6-reticular, aleatorio-5-mixto, aleatorio-5-mixto-lv)
+- C5: bit a bit 2 (reticular-h25, etabs-15c-3-60); cambian 2 (pilares-mezclados, aleatorio-3)
+- F: bit a bit 10 (h25-plana, h25-reticular, losa-3x3-refinada, h25-plana-sin-refinar, losa-3x3-mezclada, reticular-2x2-abacos, aleatorio-3-lv, aleatorio-3-lv2, reticular-2x2-abacos-lv2, edificio-2x2-lv2); cambian 3 (pilares-mezclados, aleatorio-3, reticular-2x2-abacos-lv)

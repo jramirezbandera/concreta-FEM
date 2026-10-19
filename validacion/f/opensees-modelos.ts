@@ -43,6 +43,8 @@ export interface EstacionOraculo {
   my: number[];
   /** En una de paso sobre una recta de la malla, el My del motor por fuerzas nodales (como las caras). */
   myNodal?: number[];
+  /** Pilares de la cara que tocan la franja (fase HR: para agrupar las caras por pilar). */
+  piezas?: string[];
 }
 
 /** El modelo analítico con los pilares como apoyos en su cabeza y las cargas de superficie como nodales. */
@@ -96,18 +98,23 @@ export function sinPilares(m: ModeloAnalitico, cabezas: number[]): ModeloAnaliti
   };
 }
 
-export function estacionesOraculo(nombre: string, f: ModeloFisico, op: OpcionesCompilacion): { modelo: ModeloAnalitico; estaciones: EstacionOraculo[] } {
+export function estacionesOraculo(nombre: string, f: ModeloFisico, op: OpcionesCompilacion, preparar: (m: ModeloAnalitico) => ModeloAnalitico = (m) => m): { modelo: ModeloAnalitico; estaciones: EstacionOraculo[] } {
   const r = compilar(f, op);
   if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
   // La cabeza de cada pilar: el maestro del enlace de su huella
   const cabezas = (r.modelo.restricciones ?? []).filter((x) => x.tipo === "enlace-rigido").map((x) => x.maestro);
-  const modelo = sinPilares(r.modelo, cabezas);
+  // `preparar` (fase HR): un cambio del modelo compilado antes de quitar los pilares (la regla antigua de C2-d, emulada)
+  const modelo = sinPilares(preparar(r.modelo), cabezas);
   const c = calcular(modelo);
   if (!c.valido) throw new Error(`${nombre}: ${c.diagnosticos.map((d) => d.mensaje).join("\n")}`);
   const casos = casosValidos(c);
   const ctx = validar(f, resolverOpciones(op), new Diagnosticos())!;
   const cortes = new Cortes(modelo);
-  const ef = new EsfuerzosFranjas(ctx, { modelo, mapeo: r.mapeo }, casos, { cortes });
+  // El mapeo de las restricciones va en paralelo a la lista del modelo, y `sinPilares` ha quitado el
+  // diafragma: sin esto, el escalón de F3 (que busca el enlace de cada pilar por su índice) tomaba el
+  // enlace de otro pilar y daba el metro sin la huella, sin aviso (fase HR)
+  const mapeo = { ...r.mapeo, restricciones: r.mapeo.restricciones.filter((_, i) => r.modelo.restricciones![i]!.tipo !== "diafragma") };
+  const ef = new EsfuerzosFranjas(ctx, { modelo, mapeo }, casos, { cortes });
   /** My por fuerzas nodales del intervalo [a, b] de la recta, repartido por láminas como en esfuerzosFranjas.ts; null si la atraviesan. */
   const nodal = (corte: EstacionOraculo["corte"], [a, b]: [number, number]): number[] | null => {
     const x = cortes.cortar({ ...corte, origen: corte.origen as [number, number, number], x: corte.x as [number, number, number], vz: [0, 0, 1], metodo: "fuerzas-nodales", soloLaminas: true, porLamina: true }, casos);
@@ -142,6 +149,7 @@ export function estacionesOraculo(nombre: string, f: ModeloFisico, op: OpcionesC
       const mn = e.tipo === "paso" ? nodal(corteE, intervalo) : null;
       estaciones.push({
         ...(mn ? { myNodal: mn } : {}),
+        ...(e.piezas.length ? { piezas: [...e.piezas] } : {}),
         franja: fr.id,
         s: e.s,
         tipo: e.tipo === "cara" && e.ventana ? "cara (ventana del pilar)" : e.tipo,

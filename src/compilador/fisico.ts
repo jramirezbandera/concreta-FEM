@@ -584,8 +584,9 @@ export interface OpcionesCompilacion {
    * (fase LV2): en la celda de la rejilla de cada esquina en la que se encuentran dos caras de viga, el
    * elemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`: 3 niveles en los
    * cruces con pilar y 2 en los cruces sin pilar, LV2-i). Con él van también las tiras de las huellas que
-   * asoman del ancho de su viga (LV-8), la plantilla de cara delante de un pilar tapado y, en los pilares
-   * bajo una viga, sólo la huella rígida (LV2-f), y el refinamiento de Delaunay de la triangulación
+   * asoman del ancho de su viga (LV-8), la plantilla de cara delante de un pilar tapado (desde la fase
+   * HR, sólo la huella es rígida en todos los pilares y con todas las opciones, no sólo en los pilares
+   * bajo una viga, LV2-f), y el refinamiento de Delaunay de la triangulación
    * llega también a la losa junto a las vigas (§18: el eje de una viga dentro de su ancho y las aristas
    * que no se parten ya no lo tapan con su círculo diametral; compilador LV2.1). Por defecto, sí
    * (compilador LV2, 2026-10-19); sin él, la malla de LV1.

@@ -465,7 +465,7 @@ function avisoEsquinaSinRefinar(pilares: readonly string[], porque: string): Pro
  */
 export interface RefinoCaras {
   caras: ReadonlyMap<string, readonly { d: Vec2; lado: -1 | 1 }[]>;
-  /** Distancia mínima a la cara de un nudo nuevo (2·ε_snap: más cerca, sería de la huella). */
+  /** 2·ε_snap: la escala de «junto a un pilar» en las plantillas de esquina (LV2-g) y de las huellas tapadas por un ancho (LV-8). Hasta la fase HR, también la distancia mínima de un nudo nuevo a la cara. */
   separacion: number;
   /** Refinar las esquinas de los paños entre las caras de las vigas (fase LV2). */
   esquinas?: boolean;

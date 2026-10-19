@@ -75,7 +75,7 @@ Lo que cambia respecto a `refinamiento-vigas.md` §2–§3:
 
 **Decidido por el usuario el 2026-10-19** (`refinamiento-vigas.md` §20): el criterio 10 queda como no cumplido y aceptado; la compilación con LV2 se perfiló (de 4,2 a 2,9 s en el edificio con vigas y de 7,2 a 4,8 en el reticular, con los mismos bits en 86 modelos); y el coste de una fase se fija desde ahora en ecuaciones de los edificios objetivo, no en tiempo (LV2: +37 % y +27 %; el tiempo, sólo informativo con `tiempos.ts`). Lo siguiente es F2-9 (el punto 1).
 
-Lo acordado en §10 y lo que ha ido quedando:
+Lo acordado en §10 y lo que ha ido quedando (**los puntos 1, 2 y 3, hechos en la fase HR el 2026-10-19:** `huella-rigida.md` y `fase-hr.md`):
 1. **C2-d a todos los pilares (F2-9), como fase propia:** `asoma.ts` ampliado a los pilares sin viga, decidir el escalón de F3-d, regenerar la referencia de F a sabiendas y quitar la cota h ≥ 2·ε_snap si ya no hace falta. En los pilares sin viga, los nudos de fuera a ≤ ε_snap siguen siendo rígidos.
 2. **Un oráculo externo para la rigidez de la huella:** un recuadro en OpenSeesPy ASDShellQ4 con `rigidLink` sólo en los nudos de la huella. Los criterios 2, 3 y 8 no tienen oráculo externo; sólo el 1 (CYPE).
 3. **Regresión de precisión local con umbrales:** `asoma.ts` en un CI aparte, o tres retículas en vitest con la referencia fina congelada.

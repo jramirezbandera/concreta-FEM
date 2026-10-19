@@ -16,12 +16,16 @@
  *    con la losa. Crea los nudos de la cota de la planta sobre los ejes de los muros, donde el muro
  *    los necesita, y une todo:
  *    - los nudos de la malla que son nudos de C1 se reutilizan; los demás son nudos nuevos;
- *    - huellas (C2-d): los nudos de la malla y de los muros en la huella de un pilar, o a ≤ ε_snap
- *      de ella, son esclavos de un enlace rígido con maestro en el nudo del pilar. Con LV2
- *      (`refinoEsquinas`, LV2-f), en un pilar que atraviesa el ancho de una viga, sólo los de la
- *      huella o su borde: lo que asoma de la viga deja junto al pilar nudos a unos centímetros de
- *      la huella, y hacerlos rígidos rigidizaba la losa junto a él (la viga en su cara, hasta un
- *      21 % alta, y las franjas, hasta un 78 % bajas; `validacion/lv2/asoma.ts`). Y con LV2, lo
+ *    - huellas (C2-d): los nudos de la malla y de los muros dentro de la huella de un pilar o en su
+ *      borde (a ≤ 10·ε_geom) son esclavos de un enlace rígido con maestro en el nudo del pilar.
+ *      Hasta la fase HR (`docs/fem3d/huella-rigida.md`, F2-9) entraban también los de fuera a
+ *      ≤ ε_snap, y el pilar «crecía» 5 cm: la viga en su cara salía hasta un 21 % alta y las
+ *      franjas hasta un 78 % bajas en los pilares que asoman de su viga (LV2-f lo quitó sólo en
+ *      ellos; `validacion/lv2/asoma.ts`), y en los demás la cara un 6–8,5 % alta (F3-8), sin
+ *      bajar al refinar. La tolerancia ε_snap es la de la topología, para unir lo dibujado; aquí
+ *      el arreglo ya ha unido lo que estaba a esa distancia y un punto de la malla a centímetros
+ *      de la huella está ahí a propósito. Dos huellas que se solapan o quedan a ≤ ε_snap son un
+ *      error (`losa/huellas-solapadas`), por geometría. Con LV2, lo
  *      que siembra la malla junto a los anchos sigue sus caras (LV-8): el ancho es un trazo
  *      exacto, lo que la huella sembrada tiene a ≤ ε_snap de una cara va sobre ella y los ejes de
  *      las vigas se cortan en esa huella sembrada, la cara de franja de una huella tapada acaba
@@ -38,7 +42,7 @@
  */
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
-import { CUANTO_ORDEN } from "./geometria2d.ts";
+import { CUANTO_ORDEN, cortarTramos, tramo } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type AnchoMallar, type LosaMallar, type ResultadoMalla, type RefinoCaras } from "./mallado.ts";
 import { anchoMasCercano, anchosPlanta, anchoUnion, sigmaEnAncho, type AnchoViga } from "./anchosVigas.ts";
@@ -187,6 +191,23 @@ function poligonoHuella(nd: NudoT): Vec2[] | null {
     [cx + zx + yx, cy + zy + yy],
     [cx - zx + yx, cy - zy + yy],
   ];
+}
+
+/**
+ * ¿Dos huellas (polígonos convexos) se solapan o quedan a ≤ tol? Con un vértice de una dentro de la
+ * otra, dos lados que se cortan, o un vértice a ≤ tol del borde de la otra (en dos convexos, la
+ * distancia mínima entre bordes se da en un vértice de uno frente a un lado del otro).
+ */
+export function huellasSolapadas(p: readonly Vec2[], q: readonly Vec2[], tol: number): boolean {
+  for (const [a, b] of [[p, q], [q, p]] as const) for (const v of a) if (puntoEnPoligono(v, b) || distanciaABorde(v, b) <= tol) return true;
+  for (let i = 0; i < p.length; i++)
+    for (let j = 0; j < q.length; j++) {
+      const tp = tramo(p[i]!, p[(i + 1) % p.length]!);
+      const tq = tramo(q[j]!, q[(j + 1) % q.length]!);
+      const c = cortarTramos(tp, tq);
+      if (c && c.sp >= 0 && c.sp <= tp.len && c.sq >= 0 && c.sq <= tq.len) return true;
+    }
+  return false;
 }
 
 /**
@@ -448,6 +469,22 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     for (const n of nudosK) {
       const poli = poligonoHuella(topo.nudos[n]!);
       if (poli) huellasK.set(n, poli);
+    }
+    // Dos huellas que se solapan o quedan a ≤ ε_snap (fase HR: por geometría; antes se veía porque
+    // un nudo era esclavo de las dos, y con sólo la huella rígida puede no haber ninguno entre ellas)
+    {
+      const lista = [...huellasK].sort((x, y) => x[0] - y[0]);
+      let solapadas = false;
+      for (let i = 0; i < lista.length; i++)
+        for (let j = i + 1; j < lista.length; j++) {
+          const [n1, p1] = lista[i]!;
+          const [n2, p2] = lista[j]!;
+          if (!huellasSolapadas(p1, p2, epsSnap)) continue;
+          solapadas = true;
+          const [id1, id2] = [topo.nudos[n1]!.pilar!.pilares[0]!, topo.nudos[n2]!.pilar!.pilares[0]!];
+          diag.error("losa/huellas-solapadas", `Las huellas de los pilares ${id1} y ${id2} se solapan (o quedan a menos de ${cm(epsSnap)}) en la losa de la planta ${idPlanta}.`, [id1, id2]);
+        }
+      if (solapadas) return null;
     }
     for (const n of nudosK) if (!huellasK.has(n)) a.fijo(topo.nudos[n]!.x, topo.nudos[n]!.y, n);
     for (const { w } of murosK) for (const P of puntosMuros[w]!) a.fijoMuro(P);
@@ -1049,12 +1086,8 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     }
     for (const [n, poli] of huellasK) {
       const pilar = topo.nudos[n]!.pilar!.pilares[0]!;
-      const cn: Vec2 = [topo.nudos[n]!.x, topo.nudos[n]!.y];
-      // LV2-f: en un pilar con el ancho de una viga sobre su centro (también en su borde: el extremo
-      // de la viga, o la losa que acaba en su eje), sólo los de la huella o su borde
-      const soloHuella =
-        ctx.op.unionLosaViga === "cara" && ctx.op.refinoEsquinas && e.anchos.some(({ a: x }) => puntoEnPoligono(cn, x.poligono) || distanciaABorde(cn, x.poligono) <= 10 * epsGeom);
-      const tol = soloHuella ? 10 * epsGeom : epsSnap;
+      // Fase HR (F2-9): sólo los de la huella o su borde (antes, también los de fuera a ≤ ε_snap)
+      const tol = 10 * epsGeom;
       // Caja de la huella más tol: un nudo fuera de ella no está dentro ni a ≤ tol del borde, así que
       // sólo los de dentro pasan por el polígono (antes, todos los nudos de la planta por cada huella)
       const caja = [Infinity, Infinity, -Infinity, -Infinity];

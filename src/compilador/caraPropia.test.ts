@@ -7,8 +7,9 @@
  * - Convergencia: con h = 0,75, a ≤ 2 % de la malla fina (h = 0,1) en la losa de 3 × 3 mezclada; la
  *   estación de antes (la cara común) daba un 50 % menos.
  * - Respaldo: sin el enlace de la huella, la estación de antes con el aviso `franja/cara-comun-dentro`.
- * - F3-d: en la cara de cualquier pilar, lo que transmite su huella por los nudos rígidos delante de
- *   ella (F2-9); junto al hueco del edificio, de −25…−43 % a ≤ 7 %. Sin nudos delante, bit a bit.
+ * - Fase HR (`huella-rigida.md`, criterio 4): junto al hueco del edificio, las cuatro caras que F2-9
+ *   dejaba a −43 % quedan a ≤ 10 % de la malla fina con sólo la huella rígida (F3-d, que contaba lo
+ *   que entraba por los nudos rígidos de fuera, se fue con la fase).
  * - La malla: tercios de un largo de h como mucho y la esquina fina con la transición en su tramo
  *   exterior, sin avisos con h = 0,75, 0,5 y 0,375, conforme, y la misma al trasladar o girar.
  * La medida completa, en `validacion/f3/convergencia.ts`.
@@ -187,41 +188,45 @@ describe("el edificio objetivo de una planta con losa plana", () => {
     }
   });
 
-  it("F3-d: junto al hueco, el metro cuenta lo que pasa por los nudos de la huella delante de la cara; lo demás, bit a bit", () => {
+  it("fase HR, criterio 4: junto al hueco, las caras de F2-9 con h = 0,75 quedan a ≤ 10 % de la malla fina, y ninguna cara junto al hueco por debajo del −10 %", () => {
+    // Antes de la fase, los nudos de fuera de la huella a ≤ ε_snap eran rígidos (C2-d, F2-9): junto al
+    // hueco, P30-15 y P24-20 tenían 42 y 41, y sus caras y salían hasta un −43 % (F3-d las dejó a
+    // −6,3…+3,5 % frente a una referencia que también los tenía). Ahora sólo la huella es rígida.
     const f = edificioObjetivoLosas(1);
     const g = { ...f, vigas: [], cargas: f.cargas!.filter((c) => c.tipo !== "viga") };
-    const s = compilado(g);
+    // Con las opciones por defecto (la cabeza de los pilares al 0,3, CY2), como la referencia
+    const r = compilar(g);
+    if (!r.valido) throw new Error(r.diagnosticos.map((d) => d.mensaje).join("\n"));
+    const s = r;
     const casos = casosValidos(calcular(s.modelo));
     const ctx = validar(g, resolverOpciones({}), new Diagnosticos())!;
-    const cortes = new Cortes(s.modelo);
-    const [con, sin] = [true, false].map((huellaDelante) => new EsfuerzosFranjas(ctx, s, casos, { cortes, huellaDelante }));
+    const ef = new EsfuerzosFranjas(ctx, s, casos, { cortes: new Cortes(s.modelo) });
     const suma = (e: EstacionFranja) => casos.reduce((a, _, k) => a + e.medios[3 * k]!, 0);
-    // Referencia: h = 0,15 con F3-d, suma de los casos (validacion/f3/out_f3d.txt)
+    // Referencia: h = 0,15 con la huella rígida de todos los pilares, suma de los casos (validacion/hr/out_hueco.txt)
     const ref: [string, -1 | 1, number][] = [
-      ["P30-15", -1, -47.5],
-      ["P30-15", 1, -35.78],
-      ["P24-20", -1, -42.7],
-      ["P24-20", 1, -51.94],
+      ["P30-15", -1, -42.5],
+      ["P30-15", 1, -38.87],
+      ["P24-20", -1, -44.44],
+      ["P24-20", 1, -46.07],
     ];
-    let cambian = 0;
+    // Las demás caras junto al hueco (F3-9: la triangulación sin refinar junto al hueco, del lado seguro, hasta +18 %)
+    const hueco = new Set(["P24-15", "P24-20", "P30-15", "P30-20"]);
     const caras = new Set<string>();
-    for (const fr of con!.franjas("L-N1")) {
-      const [a, b] = [con!.estaciones(fr.id)!.estaciones, sin!.estaciones(fr.id)!.estaciones];
-      expect(a.length).toBe(b.length);
-      a.forEach((e, j) => {
-        expect(e.diagnosticos.map((d) => d.codigo)).not.toContain("franja/cara-sin-huella");
-        if (e.medios.every((v, q) => Object.is(v, b[j]!.medios[q])) && e.anchoEnLosa === b[j]!.anchoEnLosa) return;
-        cambian++;
-        const x = fr.direccion === 2 && e.ventana ? ref.find(([id, lado]) => e.piezas.includes(id) && e.lado === lado && Math.abs((e.ventana![0] + e.ventana![1]) / 2 - g.pilares!.find((p) => p.id === id)!.x) < 1e-9) : undefined;
-        expect(x, `${fr.id} s = ${e.s} (${e.piezas.join(", ")})`).toBeDefined();
-        const [, , v] = x!;
-        caras.add(`${x![0]} ${x![1]}`);
-        expect(Math.abs(suma(e) / v - 1), `${x![0]} ${x![1]}`).toBeLessThan(0.07);
-        expect(suma(b[j]!) / v - 1, `${x![0]} ${x![1]}, sin F3-d`).toBeLessThan(-0.2);
-      });
-    }
+    let junto = 0;
+    for (const fr of ef.franjas("L-N1"))
+      for (const e of ef.estaciones(fr.id)!.estaciones) {
+        if (e.tipo !== "cara" || !e.ventana) continue;
+        const pid = e.piezas.find((id) => hueco.has(id) && Math.abs((e.ventana![0] + e.ventana![1]) / 2 - (fr.direccion === 1 ? g.pilares!.find((p) => p.id === id)!.y : g.pilares!.find((p) => p.id === id)!.x)) < 1e-9);
+        if (!pid) continue;
+        junto++;
+        const x = fr.direccion === 2 ? ref.find(([id, lado]) => id === pid && e.lado === lado) : undefined;
+        if (x) {
+          caras.add(`${x[0]} ${x[1]}`);
+          expect(Math.abs(suma(e) / x[2] - 1), `${x[0]} ${x[1]}`).toBeLessThan(0.1);
+        }
+      }
     // Las cuatro caras, cada una en las dos franjas que tocan el pilar (F-h)
     expect(caras.size).toBe(4);
-    expect(cambian).toBe(8);
+    expect(junto).toBe(32);
   });
 });

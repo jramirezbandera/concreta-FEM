@@ -18,6 +18,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { edificioGeometria, FAMILIAS, type OpcionesGeometria } from "../pruebas/geometrias.ts";
+import { nudosRigidosFuera } from "../pruebas/huellasRigidas.ts";
 import { conMurosAleatorios } from "../pruebas/murosAleatorios.ts";
 import { reticulaAleatoria } from "../pruebas/reticulasAleatorias.ts";
 import { compilar } from "./compilar.ts";
@@ -35,6 +36,8 @@ function compila(f: ModeloFisico, rejilla: boolean) {
     expect(r.diagnosticos.filter((d) => d.codigo === "malla/sin-rejilla" || d.codigo === "malla/empates"), union).toEqual([]);
     // G-4: con el refinamiento de Delaunay, ningún cuadrilátero con el jacobiano bajo (criterio 4 de LV2)
     expect(r.diagnosticos.filter((d) => d.codigo === "malla/calidad").map((d) => d.mensaje), union).toEqual([]);
+    // Fase HR, criterio 1: ningún nudo rígido fuera de la huella de un pilar
+    if (r.valido) expect(nudosRigidosFuera(f, r).filter((x) => x.nudos.length).map((x) => `${x.pilar}@${x.planta}: ${x.nudos.length}`), union).toEqual([]);
     if (union === "cara") {
       // La malla de LV1, sin el refinamiento junto a las vigas: sólo se exige que no baje de 0,1
       const lv1 = compilar(f, { rejilla, unionLosaViga: union, refinoEsquinas: false });

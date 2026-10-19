@@ -34,8 +34,11 @@
  *    (la de esquina, de 5 cuadriláteros, o la de 3 a 1). El borde del bloque no cambia, así que la
  *    costura con la rejilla y la CDT es la de siempre. Los nudos nuevos se interpolan en su
  *    cuadrilátero de la red; un lado del arreglo que va por una arista partida sigue por sus nudos
- *    (`subdivididas`). Un lado cuyo primer tercio no llega a `separacionRefino` (2·ε_snap: un nudo
- *    más cerca sería de la huella) no se refina. Con la cara dentro de una celda, a unos centímetros
+ *    (`subdivididas`). Un lado cuyo primer tercio no llega a `separacionRefino` (2·ε_snap) no se
+ *    refina: F2-e lo puso porque un nudo más cerca se hacía rígido con la huella, y desde la fase HR
+ *    (sólo la huella es rígida) es una cota de tamaño, medida: sin ella, los tramos de centímetros se
+ *    parten en astillas que la guarda rechaza y el pilar se queda sin refinar. Con la cara dentro de
+ *    una celda, a unos centímetros
  *    de su línea interior (un pilar mayor que el menor de su alineación, F3), el primer tramo mide
  *    casi la celda: los tercios se toman de un largo de h como mucho, y si la transición de la
  *    esquina no cabe más allá en una dirección, la esquina va fina salvo su tramo exterior, que la
@@ -187,8 +190,10 @@ export interface EntradaRejilla {
   esquinas?: boolean;
   /**
    * Huellas de todos los pilares de la planta, también las que tapan los anchos de las vigas (fase
-   * LV2): ningún nudo nuevo de una plantilla de esquina a menos de `separacionRefino` de ellas, que
-   * sería rígido (C2-d, F2-9).
+   * LV2): ningún nudo nuevo de una plantilla de esquina dentro de ellas ni a menos de 1,2·ε_snap (una
+   * cota de coste desde la fase HR, medida: antes era porque se hacía rígido con la huella); y
+   * `separacionRefino` (2·ε_snap) mide qué está «junto a un pilar» (los niveles de un cruce, LV2-g) y
+   * qué huella tapa un ancho (§10).
    */
   huellasPilares?: readonly (readonly Vec2[])[];
   /**
@@ -1003,10 +1008,16 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       for (let b = 0; b < B - 1; b++) for (let a = 0; a < A - 1; a++) quads.push({ n: [a + A * b, a + 1 + A * b, a + 1 + A * (b + 1), a + A * (b + 1)], losa: losas[a + (A - 1) * b]! });
       return { huella: k, red, quads, anillo: anilloH, bordes, subdivididas: [], huellaLados: E.huellas[k]!.lados, refinada: false };
     };
-    const sep = (E.separacionRefino ?? 0) / PARTICION_REFINO[0];
     // Los tercios se toman de un largo de h como mucho (F3): con la cara dentro de una celda, a unos
     // centímetros de su línea interior, el primer tramo mide casi la celda (hasta 2h)
     const largo = (d: number) => (f3 && Math.abs(d) > E.h * (1 + HOLGURA) ? Math.sign(d) * E.h : d);
+    // Un lado sólo se refina si su primer tercio llega a `separacionRefino` (2·ε_snap, 0,1 m). F2-e la
+    // puso porque un tercio más cerca de la huella se hacía rígido con ella (C2-d); desde la fase HR
+    // sólo la huella es rígida, y la cota se queda como cota de tamaño, medida (HR-c): sin ella, en el
+    // edificio objetivo con h = 0,75 un tramo de 5 cm (la cara propia de un 40 × 40 junto a la línea
+    // común de los 30) se partía en tercios de 1,7 cm, la guarda de calidad tiraba la plantilla
+    // (`malla/cara-sin-refinar`) y las caras propias pasaban de 1,4 a 4,6 % de media (máximo 20 %).
+    const sep = (E.separacionRefino ?? 0) / PARTICION_REFINO[0];
     // Con holgura (R-7): un tramo de justo el mínimo no puede depender del redondeo de una traslación
     const cabe = (ejes: readonly EjePlantilla[], i: number, j: number) => Math.abs(largo(ejes[j]!.x - ejes[i]!.x)) >= sep * (1 - HOLGURA);
     /** ¿Es largo el primer tramo junto a la cara (tercios de h y un tramo exterior más ancho)? */
@@ -1373,10 +1384,14 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     };
   };
   /**
-   * ¿Ningún nudo nuevo de la plantilla se haría rígido con un pilar (C2-d, como en `losas.ts`)? Uno
-   * de las caras va a la viga aunque toque la huella, salvo que caiga dentro de ella; uno de dentro de
-   * la losa, a ≤ ε_snap de una huella, sería rígido, y se pide 1,2·ε_snap (0,6 de separacionRefino):
-   * la holgura es sólo para que no lo decida un redondeo.
+   * ¿Ningún nudo nuevo de la plantilla cae dentro de una huella ni a menos de 1,2·ε_snap de ella (0,6
+   * de separacionRefino; la holgura es sólo para que no lo decida un redondeo)? Uno de las caras va a
+   * la viga aunque toque la huella, salvo que caiga dentro de ella. La distancia la puso LV2 porque un
+   * nudo a ≤ ε_snap de la huella se hacía rígido con el pilar (C2-d); desde la fase HR sólo la huella
+   * es rígida, y la cota se queda como cota de coste, medida (HR-c): sin ella, los cruces junto a los
+   * pilares que asoman de su viga ganan niveles, el edificio objetivo con vigas crece un 3,4 % en
+   * ecuaciones y el reticular un 2,6 %, y las franjas junto a esos pilares no mejoran (en las 24
+   * retículas al azar, 3,9 → 3,8 % de mediana y 13 → 14 estaciones por encima del 20 %).
    */
   const cajasHuellas = (E.huellasPilares ?? []).map((poli) => {
     const c = [Infinity, Infinity, -Infinity, -Infinity];

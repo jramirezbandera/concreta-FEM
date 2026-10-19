@@ -7,7 +7,7 @@
  * flecta, positivo con tracción abajo (de vano), como el My de un corte o de una viga; my y mxy, los
  * de los campos en esos ejes (cabecera de modelo.ts). Sólo cuenta la losa (F-g): ni las vigas ni lo
  * que transmiten los enlaces (cortes con `soloLaminas`), ni las láminas rígidas de una huella, salvo
- * en el metro de un pilar lo que pasa por su huella (F3 y F3-d, abajo).
+ * en el metro de un pilar lo que pasa por su huella (F3, abajo).
  *
  * Estaciones de una franja, por s = p·d creciente:
  * - **Caras** de los pilares (las rectas de `carasFranjas`, sembradas de lado a lado de la losa): por
@@ -60,16 +60,15 @@
  * Si no se puede (sin enlace), la estación queda en la cara común con el aviso
  * `franja/cara-comun-dentro`.
  *
- * En la cara de cualquier otro pilar, el metro también cuenta lo que transmite su enlace a través de
- * la recta (F3-d): es el mismo corte, sin traslado. Sólo transmite algo si tiene nudos delante de la
- * cara (los que la compilación hace rígidos a ≤ ε_snap de la huella, F2-9), y lo que entra en ellos
- * se perdía sin aviso (hasta un 50 % junto al hueco del edificio o con h fino). Sin nudos delante, el
- * corte es el de la recta sin el enlace, el de siempre.
+ * En la cara de cualquier otro pilar, el corte es el de la recta sin el enlace: desde la fase HR
+ * (`huella-rigida.md`) sólo la huella y su borde son rígidos, así que el enlace no cruza la recta de
+ * la cara. (Hasta entonces, los nudos de fuera a ≤ ε_snap de la huella eran rígidos, F2-9, y el metro
+ * contaba lo que entraba por ellos con el mismo corte sin traslado, F3-d.)
  *
  * Un pilar sin cara de franja en una dirección (uno de borde, o uno que atraviesa una viga o un muro
  * según la transversal: `carasFranjas`) tiene también su metro en cada cara (SP-3, SP-4), en las
- * franjas que lo tocan: por la recta de la cara, si sigue la malla en su ventana (con lo que transmite
- * su enlace si tiene nudos delante, F3-d; si no, el corte de la recta, como en las caras de franja), o
+ * franjas que lo tocan: por la recta de la cara, si sigue la malla en su ventana (el corte de la
+ * recta, como en las caras de franja), o
  * por el escalón desde una recta de la malla que atraviese su huella (la línea de apoyo de la viga o el
  * muro, o la cara común de otros pilares de su línea). Entre sus caras no hay estaciones. Antes la
  * franja sólo tenía allí la estación de apoyo en el eje, sin lo que pasa por la huella, y estaciones de
@@ -99,7 +98,7 @@
  */
 import { woodArmer } from "../dimensionado/woodArmer.ts";
 import { CamposLaminas } from "../motor/campos.ts";
-import { Cortes, TOL_CORTE, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
+import { Cortes, type Corte, type ResultadoCorte } from "../motor/cortes.ts";
 import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import type { ModeloAnalitico, Restriccion, ResultadoCaso } from "../motor/modelo.ts";
 import { combinar } from "./envolventes.ts";
@@ -200,8 +199,6 @@ export class EsfuerzosFranjas {
   readonly ancho: number;
   /** Sólo para medir la influencia de la posición de las franjas (`franjasLosa`). */
   readonly desfase: number;
-  /** Sólo para medir F3-d: sin lo que transmite la huella por sus nudos delante de la cara (`false`). */
-  readonly huellaDelante: boolean;
   /** Sólo para medir SP-6: el metro de un pilar sin cara de franja por el escalón aunque su cara siga la malla (`false`). */
   readonly caraDirecta: boolean;
   /** Sólo para medir LV2-h: my y mxy de las caras y los apoyos a δ de la cara, como antes (`true`). */
@@ -218,14 +215,13 @@ export class EsfuerzosFranjas {
    * @param ctx el contexto del modelo físico que se compiló; `compilado`, su modelo analítico y su
    *   mapeo; `casos`, sus resultados (válidos).
    */
-  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; huellaDelante?: boolean; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number } = {}) {
+  constructor(ctx: Contexto, compilado: { modelo: ModeloAnalitico; mapeo: Mapeo }, casos: readonly ResultadoCaso[], opciones: { campos?: CamposLaminas; cortes?: Cortes; ancho?: number; desfase?: number; caraDirecta?: boolean; muestrasEnCara?: boolean; cantosMuestras?: number } = {}) {
     this.ctx = ctx;
     this.modelo = compilado.modelo;
     this.mapeo = compilado.mapeo;
     this.casos = casos;
     this.ancho = opciones.ancho ?? ctx.op.anchoFranja ?? ANCHO_FRANJA;
     this.desfase = opciones.desfase ?? 0;
-    this.huellaDelante = opciones.huellaDelante ?? true;
     this.caraDirecta = opciones.caraDirecta ?? true;
     this.muestrasEnCara = opciones.muestrasEnCara ?? false;
     this.cantosMuestras = opciones.cantosMuestras ?? CANTOS_MUESTRAS;
@@ -451,13 +447,6 @@ export class EsfuerzosFranjas {
       const rs = this.modelo.restricciones?.[i];
       if (r.pilar !== undefined && r.planta === l.losa.planta && rs?.tipo === "enlace-rigido") enlace.set(r.pilar, rs);
     });
-    /** ¿Tiene el enlace del pilar nudos delante de la recta de la cara, del lado del vano (F2-9)? Con la holgura del corte. */
-    const conNudosDelante = (id: string, c: { s: number; lado: -1 | 1 }): boolean => {
-      const rs = enlace.get(id);
-      if (!rs) return false;
-      const nudos = this.modelo.nudos;
-      return [rs.maestro, ...rs.esclavos].some((v) => c.lado * (nudos[v]!.x * d[0] + nudos[v]!.y * d[1] - c.s) > TOL_CORTE);
-    };
     const porPilar = new Map<string, { sa: number; sb: number; t0: number; t1: number }>();
     for (const c of caras)
       for (const p of c.pilares) {
@@ -598,8 +587,8 @@ export class EsfuerzosFranjas {
      * ancho es el de la ventana en la losa, con la huella (lo que pasa por ella es de la cara); my y
      * mxy, por campos a δ de la cara propia. null si no se puede (sin enlace, o el corte no vale).
      *
-     * Con sp = c.s (un pilar con la cara común por su cara, F3-d) es el corte por la recta con el
-     * enlace, sin traslado; my y mxy, los de la recta (`muestras`).
+     * Con sp = c.s es el corte por la recta con el enlace, sin traslado; my y mxy, los de la recta
+     * (`muestras`). (Lo usaba F3-d, hasta la fase HR.)
      */
     const escalon = (c: { s: number; lado: -1 | 1 }, p: { id: string; t0: number; t1: number }, sp: number, ventana: readonly [number, number], muestras?: PorFranja, soloVentana = false): { principal: PorFranja; muestras: PorFranja; diag: Diagnostico[] } | null => {
       const restriccion = enlace.get(p.id)?.id;
@@ -689,23 +678,11 @@ export class EsfuerzosFranjas {
         // La franja que toca un pilar toma la ventana centrada en él (la del que más la ocupa)
         const v = tocan.sort((x, y) => Math.min(fr[i]!.t1, y.p.t1) - Math.max(fr[i]!.t0, y.p.t0) - (Math.min(fr[i]!.t1, x.p.t1) - Math.max(fr[i]!.t0, x.p.t0)))[0]?.v;
         const dg = new Diagnosticos();
-        // El pilar de la ventana con la cara común dentro de su huella: su metro, en su cara propia
+        // El pilar de la ventana con la cara común dentro de su huella: su metro, en su cara propia.
+        // (Hasta la fase HR, en la cara común por la del pilar entraba también lo que transmitía su
+        // enlace por los nudos rígidos de fuera de la huella delante de la cara, F3-d; ya no los hay.)
         const pv = v !== undefined ? c.pilares[v]! : null;
         const sp = pv ? propia(pv.id, c) : c.s;
-        // En la cara común por la del pilar, con lo que transmite su enlace si tiene nudos delante (F3-d)
-        if (pv && sp === c.s && nod && this.huellaDelante && conNudosDelante(pv.id, c)) {
-          const e = escalonDe(v!, sp);
-          if (e) {
-            est[i]!.push(estacion(i, sp, "cara", c.lado, e.principal, e.muestras, "fuerzas-nodales", piezas, [...e.diag, ...(cam.valido ? [] : cam.diag)], [...ventanas[v!]!]));
-            exactas[i]!.push(sp);
-            continue;
-          }
-          dg.aviso(
-            "franja/cara-sin-huella",
-            `En la franja ${fr[i]!.id}, lo que transmite la huella de ${pv.id} por sus nudos delante de la cara (s = ${sp.toFixed(3)} m) no se ha podido sumar: el momento puede salir bajo. Revise ahí el armado. El fallo es del compilador: avise para corregirlo.`,
-            [fr[i]!.id, pv.id],
-          );
-        }
         if (pv && sp !== c.s) {
           const e = escalonDe(v!, sp);
           if (e) {
@@ -787,9 +764,9 @@ export class EsfuerzosFranjas {
         const fuera = tramosLosa(sp + lado * this.ctx.op.tamanoMalla).reduce((a, [x, y]) => a + Math.max(0, Math.min(y, ventana[1]) - Math.max(x, ventana[0])), 0);
         if (!(fuera > EPS)) continue;
         conVano = true;
-        // Por la recta de la cara, si sigue la malla en la ventana: con el enlace si tiene nudos delante
-        // (F3-d) y, si no, el corte de la recta, como en las caras de franja (el enlace no la cruza)
-        let e = !this.caraDirecta || !recto ? null : conNudosDelante(p.id, { s: sp, lado }) ? escalon({ s: sp, lado }, pz, sp, ventana, undefined, true) : directa(sp, lado, pz, ventana);
+        // Por la recta de la cara, si sigue la malla en la ventana: el corte de la recta, como en las
+        // caras de franja (el enlace no la cruza: sólo la huella es rígida, fase HR)
+        let e = !this.caraDirecta || !recto ? null : directa(sp, lado, pz, ventana);
         // Desde la más cercana a la cara: en la tira entre las dos, lo que se lleva una viga a lo largo no lo cuenta el corte
         for (const b of [...bases].sort((x, y) => Math.abs(x - sp) - Math.abs(y - sp) || x - y)) e ??= escalon({ s: b, lado }, pz, sp, ventana);
         if (e) hechas.push({ sp, lado, e });

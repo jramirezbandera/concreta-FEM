@@ -7,7 +7,9 @@
  *
  * Decisión LV2-f: en un pilar que atraviesa el ancho de una viga, sólo son rígidos los nudos de la
  * huella o su borde, no los de fuera a ≤ ε_snap (C2-d). En la retícula al azar 1 (22 pilares que asoman
- * de su viga), la regla de antes (LV1) deja más de 100 fuera de las huellas.
+ * de su viga), la regla de antes (LV1) dejaba más de 100 fuera de las huellas. Desde la fase HR
+ * (`huella-rigida.md`), la regla es la misma en todos los pilares y con todas las opciones
+ * (`huellaRigida.test.ts`).
  * Y el respaldo de una planta que sólo refina esquinas avisa sin nombrar pilares (§10).
  */
 import { readFileSync } from "node:fs";
@@ -17,11 +19,10 @@ import { edificioReticular } from "../../validacion/c4/modelos.ts";
 import { conAcciones } from "../../validacion/c5/modelos.ts";
 import { calcular } from "../motor/calcular.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
-import { valido } from "../pruebas/metamorficasFisicas.ts";
+import { contarRigidosFuera } from "../pruebas/huellasRigidas.ts";
 import { reticulaAleatoria } from "../pruebas/reticulasAleatorias.ts";
 import { compilar } from "./compilar.ts";
-import type { ModeloFisico, OpcionesCompilacion } from "./fisico.ts";
-import { distanciaAHuella, huellaPilar } from "./geometria2d.ts";
+import type { OpcionesCompilacion } from "./fisico.ts";
 import { conRespaldoRefino, type ResultadoMalla } from "./mallado.ts";
 
 beforeAll(async () => {
@@ -51,48 +52,14 @@ describe("cruces sin refinar (LV2-g)", () => {
   });
 });
 
-describe("sólo la huella es rígida en los pilares que atraviesa una viga (LV2-f)", () => {
+describe("sólo la huella es rígida (LV2-f, y desde la fase HR en todos los pilares y con todas las opciones)", () => {
   const f = reticulaAleatoria(1);
-  /**
-   * Nudos rígidos de cada huella fuera de ella, separados en pilares que atraviesa una viga o no. Sin
-   * los de las caras de las vigas (a b/2 = 0,15 de su eje), que van a la huella por estar en la zona
-   * rígida de la viga en el pilar (C1-a, `unirCaras`).
-   */
-  const fuera = (m: ModeloFisico, op: OpcionesCompilacion) => {
-    const c = valido(compilar(m, op));
-    const r = { conViga: 0, sinViga: 0 };
-    (c.modelo.restricciones ?? []).forEach((x, i) => {
-      const id = c.mapeo.restricciones[i]!.pilar;
-      if (!x.id.endsWith(":huella") || !id) return;
-      const p = m.pilares!.find((y) => y.id === id)!;
-      const planta = c.mapeo.restricciones[i]!.planta;
-      const sc = m.secciones.find((y) => y.id === p.seccion) as { forma: string; b: number; h: number; D?: number };
-      const h = huellaPilar(p.x, p.y, p.giro ?? 0, sc.forma === "circular" ? { tipo: "circulo", D: sc.D! } : { tipo: "rectangulo", b: sc.b, h: sc.h });
-      const ejes = (m.vigas ?? []).filter((v) => v.planta === planta).map((v) => v.puntos as [[number, number], [number, number]]);
-      /** Distancia de un punto al eje de cada viga, si su proyección cae en ella. */
-      const aEjes = (q: readonly [number, number]) =>
-        ejes.flatMap(([[x0, y0], [x1, y1]]) => {
-          const L = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2);
-          const t = ((q[0] - x0) * (x1 - x0) + (q[1] - y0) * (y1 - y0)) / (L * L);
-          return t >= 0 && t <= 1 ? [Math.abs((q[0] - x0) * (y1 - y0) - (q[1] - y0) * (x1 - x0)) / L] : [];
-        });
-      const conViga = aEjes([p.x, p.y]).some((d) => d < 1e-9);
-      for (const n of x.esclavos) {
-        const q = [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y] as const;
-        if (distanciaAHuella(q, h) > 1e-6 && !aEjes(q).some((d) => Math.abs(d - 0.15) < 1e-6)) r[conViga ? "conViga" : "sinViga"]++;
-      }
-    });
-    return { r, c };
-  };
 
-  it("con LV2, ninguno fuera de las huellas de los pilares con viga; el cálculo es válido", () => {
-    const { r, c } = fuera(f, { refinoEsquinas: true });
-    expect(r.conViga).toBe(0);
-    expect(calcular(c.modelo).valido).toBe(true);
-  });
-
-  it("con LV1 (la regla de antes), más de 100", () => {
-    expect(fuera(f, { refinoEsquinas: false }).r.conViga).toBeGreaterThan(100);
+  it("con LV2 y con LV1, ninguno fuera de las huellas (con LV1 quedaban más de 100 antes de HR); el cálculo es válido", () => {
+    const lv2 = contarRigidosFuera(f, { refinoEsquinas: true });
+    expect(lv2.total).toBe(0);
+    expect(calcular(lv2.c.modelo).valido).toBe(true);
+    expect(contarRigidosFuera(f, { refinoEsquinas: false }).total).toBe(0);
   });
 });
 

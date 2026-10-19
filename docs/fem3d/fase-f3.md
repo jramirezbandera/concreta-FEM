@@ -114,6 +114,8 @@ bun validacion/f/congelar.ts           # sólo a sabiendas
 ## 7. F3-d: el metro de todos los pilares con lo que transmite su huella
 
 > **Fecha:** 2026-10-14. **Decisión del usuario:** hacerlo ya, midiendo antes cuánto mueve la referencia congelada de F y qué pasa junto al hueco del edificio.
+>
+> **Quitado en la fase HR (2026-10-19, `fase-hr.md`, HR-b):** con sólo la huella rígida en todos los pilares (F2-9), ningún nudo rígido queda delante de una cara y F3-d no medía nada; se fue con la opción `huellaDelante` y el banco `validacion/f3/f3d.ts` (su salida, `out_f3d.txt`, queda como registro). Junto al hueco, las cuatro caras quedan a ≤ 5,4 % de la malla fina sin él (`validacion/hr/out_hueco.txt`).
 
 ### 7.1 Qué se hizo
 
