@@ -276,6 +276,7 @@ La hipótesis del informe nombra las vigas y los tramos rebajados, y dice que es
 | todas ×0,5 (`rvb-iy05`) | 0,980 / 0,979 / 0,942 / 0,927 | 0,973 / 0,972 |
 
 - **El `my` de la cubierta superior queda en 0,891, a una centésima del criterio** (≥ 0,90). La diferencia con `rvb-iy06` es sólo la pérgola, que no tiene por qué rebajarse. Es el recuadro de P4–P5 (§2.1), que sigue sin explicar del todo, como P5 (+22 % con peso propio; P6 +10 %).
+- **Decidido por el usuario el 2026-10-20: se acepta el 0,891** como lo que queda de ese recuadro, sin cambiar la regla ni el factor; el criterio 7 de la vivienda queda cumplido salvo en ese punto, que se explica por el recuadro de P4–P5.
 - Los axiles fuera de ±10 %, los de siempre (P5, P6). Los momentos de los pilares no se han vuelto a medir: sólo cambian las tres vigas de la pérgola respecto a `rvb-iy06` (§2.3).
 
 ## 3. Hallazgos
