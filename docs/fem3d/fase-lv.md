@@ -110,6 +110,22 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
   - **Ni la torsión (0,16), ni la cabeza, ni el tramo corto, ni la huella, ni la unión por el eje** reproducen a la vez la viga de la baja y los extremos de P4 y P5.
 - **Propuesta para cerrarlo:** un modelo mínimo en CYPE y en el nuestro (un recuadro de reticular 25+5 de 6 × 6 m con cuatro pilares 30 × 30 en las esquinas y vigas planas 30 × 30 en el borde, sólo peso propio, y luego el mismo con la losa saliendo 2 m más allá de un pilar), para separar la rigidez de la viga junto a la losa del efecto de nudo de P5 sin el resto del edificio.
 
+**Modelo mínimo A (2026-10-20; `validacion/sombra/minimo/`).** El usuario calculó en CYPECAD un recuadro de reticular 25+5 (casetón perdido de 70, intereje 82, 4,335 kN/m²) de 6,00 × 5,85 m a ejes, con cuatro pilares de 30 × 30 de 3 m en las esquinas, vigas planas de 30 × 30 en los bordes, ábacos en las esquinas y sólo peso propio. Mandó capturas y el listado de los 574 nudos de la losa (`ejemplos/EJEMPLO 6X6.pdf`; `leer_listado.py` saca el peso propio de la envolvente de 0,80·PP y 1,35·PP). `modelos.py` lo rehace con las cotas del listado (P1 y P2 con el centro en y = 0,15, ábacos por los nudos) y `medir.ts` lo compara nudo a nudo:
+
+| Vigas | uz | mx | my | mxy | Qx | Qy | viga: vano (como la envolvente de CYPE) | viga: V en la cara |
+|---|---|---|---|---|---|---|---|---|
+| CYPE | | | | | | | +10,84 | 36,5 |
+| ×1 | 0,94 | 0,91 | 0,92 | 0,79 | 0,82 | 0,70 | +17,98 | 36,1 |
+| ×0,7 | 1,00 | 0,97 | 0,97 | | | | +14,03 | 35,8 |
+| ×0,6 | 1,02 | 0,98 | 0,98 | | | | +12,58 | 35,7 |
+| ×0,5 | 1,05 | 1,00 | 1,00 | 1,00 | 1,00 | 0,92 | +11,04 | 35,5 |
+
+(medianas nuestro/CYPE de los nudos con más del 40 % del máximo de CYPE; mxy con el signo cambiado, por convenio).
+- **Sin el resto del edificio, el modelo de CYPE se comporta como el nuestro con las vigas planas a 0,5–0,7 de su rigidez a flexión.** Con la rigidez completa, la losa sale un 8–9 % baja en momentos y un 6 % en flecha, y la viga lleva en el vano 1,66 veces el momento de CYPE. La carga coincide (cortante de la viga a 1 %, flecha del centro con ×0,7 a 0,1 %).
+- **Lo que no encaja con ninguna rigidez es el empotramiento de la viga en el pilar de esquina:** en peso propio, −6,1 kN·m en la cara frente a unos −8,6 de CYPE (−9,85 con 1,35 y el 15 % de redistribución), y la torsión de la viga, 0,9 frente a 1,6 kN·m.
+- **En la vivienda, todas las vigas a 0,6 (`d-todos-06`)** llevan los momentos de vano de 0,92 / 0,95 / 0,91 / 0,82 a 0,97 / 0,98 / 0,94 / 0,89 de CYPE, las flechas de 0,91 a 0,96 y P5 de +23 % a +19 %. El `my` de la cubierta, de 0,82 a 0,89.
+- **Por qué, no se sabe:** la memoria de CYPE dice sección bruta para las vigas. Hace falta, del modelo A, el diagrama de la viga en la hipótesis de peso propio (sin envolvente) y los esfuerzos de los pilares, para ver el nudo de esquina.
+
 **Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias. **Decidida y hecha el 2026-10-20 (§2.2).**
 
 ### 2.2 LV-d: la zona rígida en la base de los tramos de pilar (2026-10-20; compilador LVD1)

@@ -23,7 +23,7 @@ from replica import replica  # noqa: E402
 
 DATOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".datos")
 # Canto que deja la flexión de una viga de 30 × 30 en la fracción dada
-CANTO = {1.0: 0.30, 0.5: 0.3 / 2 ** (1 / 3), 0.25: 0.3 / 4 ** (1 / 3), 0.1: 0.139, 0.001: 0.03}
+CANTO = {1.0: 0.30, 0.6: 0.3 * 0.6 ** (1 / 3), 0.5: 0.3 / 2 ** (1 / 3), 0.25: 0.3 / 4 ** (1 / 3), 0.1: 0.139, 0.001: 0.03}
 
 
 def vigas_flexibles(p, ids, fraccion):
@@ -146,6 +146,8 @@ VARIANTES = {
     "d-zcub-baja": dosis(INFERIOR, 0.1),
     "d-todos-05": dosis(TODAS, 0.5),
     "d-todos-025": dosis(TODAS, 0.25),
+    # La rigidez de viga con la que el modelo mínimo A de CYPE cuadra (validacion/sombra/minimo)
+    "d-todos-06": dosis(TODAS, 0.6),
     "d-z2-nula": z2_zuncho,
     "d-huella-punto": huella_punto(lambda p: {q["id"] for q in p["modelo"]["pilares"]}),
     "d-p5-punto": huella_punto(lambda p: {"P5"}),
