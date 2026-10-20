@@ -1,6 +1,7 @@
 /**
  * Valores por defecto del compilador decididos el 2026-10-04 (`validacion/c1/out_decisiones.txt`):
- * - C1-a: la mitad del nudo de dimensión finita es rígida (factor 0,5);
+ * - C1-a: la mitad del nudo de dimensión finita es rígida en las vigas (factor 0,5); en los pilares,
+ *   hasta la cara del nudo (ZR1, 2026-10-20: lo que daba ya el factor 0,5 con las vigas en el plano);
  * - D4: axil de todos los pilares ×2 y torsión de las vigas de hormigón ×0,1.
  * Y cómo se cambian: un factor dado, modificadores por material que completan a los de todos, `{}`
  * que los quita, y las hipótesis que lo dejan escrito para la memoria.
@@ -50,16 +51,22 @@ const offsets = (r: Extract<ResultadoCompilacion, { valido: true }>, id: string)
 };
 
 describe("valores por defecto del compilador (C1-a y D4)", () => {
-  it("por defecto es rígida la mitad del nudo: offsets de la mitad que con el nudo entero rígido", () => {
+  it("por defecto, las vigas con la mitad de lo que recorren dentro del pilar y los pilares hasta la cara del nudo", () => {
     expect(FACTOR_ZONA_RIGIDA).toBe(0.5);
     const r = compilado();
     const r1 = compilado({ factorZonaRigida: 1 });
     // viga entre pilares de 40×40: 0,10 m en vez de 0,20 m en cada cara
     expect(offsets(r, "V:1")).toEqual({ i: [0.1, 0, 0], j: [-0.1, 0, 0] });
     expect(offsets(r1, "V:1")).toEqual({ i: [0.2, 0, 0], j: [-0.2, 0, 0] });
-    // cabeza del pilar dentro del canto de la viga (0,50 m): 0,25 en vez de 0,50
+    // ZR1: la cabeza del pilar, hasta la cara inferior de la viga de 0,50 con el eje en el plano (su
+    // medio canto) con los dos factores: el de las vigas no la cambia, y nunca entra en el pilar libre
     expect(offsets(r, "A:P1")).toEqual({ i: undefined, j: [0, 0, -0.25] });
-    expect(offsets(r1, "A:P1")).toEqual({ i: undefined, j: [0, 0, -0.5] });
+    expect(offsets(r1, "A:P1")).toEqual({ i: undefined, j: [0, 0, -0.25] });
+    // el factor de los pilares es aparte; y «de eje a eje» (factor 0) lo es también en los pilares
+    expect(offsets(compilado({ factorZonaRigidaPilares: 0.5 }), "A:P1")).toEqual({ i: undefined, j: [0, 0, -0.125] });
+    expect(offsets(compilado({ factorZonaRigida: 0 }), "A:P1")).toEqual({ i: undefined, j: undefined });
+    expect(offsets(compilado({ factorZonaRigida: 0, factorZonaRigidaPilares: 1 }), "A:P1")).toEqual({ i: undefined, j: [0, 0, -0.25] });
+    expect(compilar(FISICO, { factorZonaRigidaPilares: 1.2 }).valido).toBe(false);
   });
 
   it("D4 por defecto: axil ×2 en todos los pilares y torsión ×0,1 sólo en las vigas de hormigón", () => {
@@ -82,15 +89,20 @@ describe("valores por defecto del compilador (C1-a y D4)", () => {
 
   it("las hipótesis lo dejan escrito para la memoria", () => {
     expect(compilado().hipotesis).toEqual([
-      "Nudos de dimensión finita: es rígido el 50 % del nudo (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega, en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD; LV-d).",
+      "Nudos de dimensión finita: las vigas son rígidas en el 50 % de lo que recorren dentro del pilar (hasta su cara); los pilares, hasta la cara de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD (LV-d).",
       "Modificadores de rigidez (D4): tramos de pilar de hormigón: A ×2 (2); tramos de pilar de acero: A ×2 (1); tramos de viga de hormigón: J ×0,1 (1).",
       "Empotramiento parcial de los pilares (CY2, como CYPECAD: la rigidez es α·K_biempotrada + (1 − α)·K_articulada en ese extremo): cabeza 0,3 (3 tramos). Por defecto, 0,3 en la cabeza del último tramo, salvo en los pilares sobre los que arranca otro.",
       "Diafragma rígido en P1; sin diafragma en C.",
       "Eje de las vigas en el plano del forjado.",
     ]);
     expect(compilado({ factorZonaRigida: 1, modificadores: {} }).hipotesis.slice(0, 2)).toEqual([
-      "Nudos de dimensión finita: es rígido todo el nudo (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega, en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD; LV-d).",
+      "Nudos de dimensión finita: las vigas son rígidas en todo lo que recorren dentro del pilar (hasta su cara); los pilares, hasta la cara de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD (LV-d).",
       "Sin modificadores de rigidez.",
     ]);
+    // con el factor 0, ninguna barra lleva offset (los pilares tampoco): de eje a eje
+    expect(compilado({ factorZonaRigida: 0 }).hipotesis[0]).toMatch(/^Nudos de eje a eje/);
+    expect(compilado({ factorZonaRigidaPilares: 0.5, zonaRigidaBase: false }).hipotesis[0]).toBe(
+      "Nudos de dimensión finita: las vigas son rígidas en el 50 % de lo que recorren dentro del pilar (hasta su cara); los pilares, en el 50 % del nudo hacia la cara de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo.",
+    );
   });
 });

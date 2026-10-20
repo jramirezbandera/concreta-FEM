@@ -193,6 +193,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", "Las opciones no son válidas: hace falta 0 < ε_geom ≤ ε_snap y un factor de zona rígida en [0, 1].");
     return null;
   }
+  if (!(num(op.factorZonaRigidaPilares) && op.factorZonaRigidaPilares >= 0 && op.factorZonaRigidaPilares <= 1)) {
+    diag.error("opciones/no-validas", "El factor de zona rígida de los pilares tiene que estar entre 0 (de eje a eje) y 1 (hasta la cara del nudo).");
+    return null;
+  }
   if (!(num(op.empotramientoCabeza) && op.empotramientoCabeza >= 0 && op.empotramientoCabeza <= 1)) {
     diag.error("opciones/no-validas", "El coeficiente de empotramiento de la cabeza de los pilares tiene que estar entre 0 (articulado) y 1 (empotrado).");
     return null;

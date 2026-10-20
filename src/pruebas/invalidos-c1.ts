@@ -95,7 +95,8 @@ export const CATALOGO: Caso[] = [
   ["liberaciones con una clave desconocida", (f) => (f.pilares![0] = m({ ...f.pilares![0], liberaciones: { medio: [true, false, false, false, false, false] } })), "fisico/campo-desconocido", "A"], // A-1: antes, fisico/valor-no-valido
   ["pilares solapados", (f) => f.pilares!.push({ id: "A2", x: 0.02, y: 0, desde: "C", hasta: "P1", seccion: "p30" }), "topologia/pilares-solapados", "A2"],
   ["pilar apeado sin nada que le llegue", (f) => f.pilares!.push({ id: "Ap", x: 3, y: 2.5, desde: "P1", hasta: "P2", seccion: "p30", base: "ninguno" }), "pilar/arranque-sin-apoyo", "Ap"],
-  ["cabeza de pilar entera dentro del canto de la viga", (f) => (f.plantas[0] = { ...f.plantas[0]! }) && (f.plantas[1] = { ...f.plantas[1]!, altura: 0.4 }), "pilar/tramo-flexible-nulo", "A", { factorZonaRigida: 1 }],
+  // ZR1: la cabeza llega hasta la cara inferior de la viga de 0,50 (0,25 m bajo el plano)
+  ["cabeza de pilar entera dentro del canto de la viga", (f) => (f.plantas[0] = { ...f.plantas[0]! }) && (f.plantas[1] = { ...f.plantas[1]!, altura: 0.2 }), "pilar/tramo-flexible-nulo", "A", { factorZonaRigida: 1 }],
   // Vigas
   ["viga con una planta que no existe", (f) => (f.vigas![0] = { ...f.vigas![0]!, planta: "Z" }), "fisico/referencia", "X0P1"],
   ["viga con un solo punto", (f) => (f.vigas![0] = { ...f.vigas![0]!, puntos: [[0, 0]] }), "fisico/valor-no-valido", "X0P1"],

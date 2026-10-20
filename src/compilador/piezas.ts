@@ -5,9 +5,10 @@
  * por él tiene su tramo flexible sobre su propia recta, desde la proyección del eje del pilar más
  * `factorZonaRigida` veces lo que su recta recorre dentro de la huella; el offset (del nudo al
  * extremo del tramo flexible) lleva a la vez la zona rígida y la excentricidad. El tramo de un
- * pilar es rígido en su cabeza a lo largo del canto de la viga más alta (o de la losa) que le llega
- * y, con `zonaRigidaBase` (LV-d, como CYPECAD), también en su base sobre un forjado, con el canto
- * de lo que el nudo de la base tiene encima.
+ * pilar es rígido en su cabeza en lo que el nudo físico ocupa por debajo del plano del forjado
+ * (ZR1: medio canto de la losa o de una viga con el eje en el plano, el canto entero de una viga con
+ * la cara superior en él) y, con `zonaRigidaBase` (LV-d, como CYPECAD), también en su base sobre un
+ * forjado, en lo que el nudo ocupa por encima; las dos por `factorZonaRigidaPilares`.
  *
  * Con losas (C2): los apoyos lineales y los puntuales que caen en una losa van a sus nudos de la
  * malla, y el diafragma rígido de una planta con losas abarca los nudos sobre ellas (C2-f).
@@ -95,11 +96,23 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
   const barras: BarraP[] = [];
   const rectas: Recta[] = [];
   const rectasDe = new Map<string, Recta[]>();
-  // Espesor de la losa en la huella de cada nudo de pilar (C2-e: cuenta como canto en la cabeza)
+  // Espesor de la losa en la huella de cada nudo de pilar (C2-e: cuenta en el nudo)
   const espesorHuella = new Map(losas.huellas.map((h) => [h.maestro, h.espesor] as const));
-  /** Canto de lo que llega a un nudo de pilar: la losa de su huella y sus vigas (las del plano del forjado o todas). */
-  const cantoEn = (n: number, vigas: ReadonlySet<string>, todas: boolean) =>
-    Math.max(espesorHuella.get(n) ?? 0, ...[...vigas].filter((v) => todas || ctx.vigaDe.get(v)!.insercion !== "superior").map((v) => ctx.secciones.get(ctx.vigaDe.get(v)!.seccion)!.canto));
+  const fp = ctx.op.factorZonaRigidaPilares;
+  /**
+   * ZR1: lo que el nudo físico de un pilar ocupa por debajo del plano del forjado (`bajo`, la cabeza
+   * del tramo de debajo) o por encima (la base del de encima): medio espesor de la losa de su huella
+   * y medio canto de las vigas con el eje en el plano; una viga con la cara superior en el plano
+   * cuelga entera por debajo (su canto, y nada por encima).
+   */
+  const junta = (n: number, vigas: ReadonlySet<string>, bajo: boolean) =>
+    Math.max(
+      (espesorHuella.get(n) ?? 0) / 2,
+      ...[...vigas].map((v) => {
+        const canto = ctx.secciones.get(ctx.vigaDe.get(v)!.seccion)!.canto;
+        return ctx.vigaDe.get(v)!.insercion === "superior" ? (bajo ? canto : 0) : canto / 2;
+      }),
+    );
 
   // Pilares: una recta por pilar, de su base a su cabeza; un tramo por planta
   for (const p of ctx.pilares) {
@@ -123,21 +136,18 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       const nj = nudoEn(k - 1)!;
       const zi = ctx.cotas[k]!;
       const zj = ctx.cotas[k - 1]!;
+      // La cabeza, rígida en lo que el nudo de arriba ocupa por debajo del forjado; y (LV-d) la base,
+      // sobre un forjado, en lo que el nudo de abajo ocupa por encima, como la cabeza del de debajo
       const vigas = topo.vigasEn.get(nj) ?? new Set<string>();
-      const canto = cantoEn(nj, vigas, true);
-      const rz = f * canto;
-      // LV-d: la base, sobre un forjado, es rígida como la cabeza del tramo de debajo: f veces el
-      // canto de lo que el nudo de la base tiene encima (la losa de la huella y las vigas en el
-      // plano del forjado; una viga con la cara superior en el forjado queda entera por debajo)
+      const rz = fp * junta(nj, vigas, true);
       const vigasBase = topo.vigasEn.get(ni) ?? new Set<string>();
-      const cantoBase = ctx.op.zonaRigidaBase ? cantoEn(ni, vigasBase, false) : 0;
-      const rzBase = f * cantoBase;
+      const rzBase = ctx.op.zonaRigidaBase ? fp * junta(ni, vigasBase, false) : 0;
       const ip: Vec3 = [p.x, p.y, zi + rzBase];
       const jp: Vec3 = [p.x, p.y, zj - rz];
       if (!(jp[2] - ip[2] > epsGeom)) {
         diag.error(
           "pilar/tramo-flexible-nulo",
-          `El tramo del pilar ${p.id} bajo la planta ${ctx.plantas[k - 1]!.id} queda entero dentro del canto de las vigas o de la losa que le llegan (${canto} m en la cabeza${rzBase > 0 ? ` y ${cantoBase} m en la base` : ""}).`,
+          `El tramo del pilar ${p.id} bajo la planta ${ctx.plantas[k - 1]!.id} queda entero dentro de la zona rígida del nudo con las vigas o la losa que le llegan (${rz} m en la cabeza${rzBase > 0 ? ` y ${rzBase} m en la base` : ""}).`,
           [p.id, ...vigas, ...(rzBase > 0 ? vigasBase : [])],
         );
         continue;

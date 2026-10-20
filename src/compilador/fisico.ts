@@ -513,11 +513,19 @@ export interface OpcionesCompilacion {
   /** Tolerancia de modelado, m: fusión con aviso. Por defecto, 0,05 (H28). */
   epsSnap?: number;
   /**
-   * Fracción rígida de los nudos de dimensión finita, en [0, 1] (C1-a). Por defecto, 0,5. Con 1, el
-   * nudo es infinitamente rígido, como en CYPECAD; con 0, se calcula de eje a eje, como SAP2000 por
-   * defecto.
+   * Fracción rígida de los nudos de dimensión finita en las vigas y viguetas, en [0, 1] (C1-a): de lo
+   * que su eje recorre dentro de la huella del pilar. Por defecto, 0,5. Con 1, hasta la cara del
+   * pilar, como en CYPECAD; con 0, de eje a eje, como SAP2000 por defecto.
    */
   factorZonaRigida?: number;
+  /**
+   * Fracción rígida del nudo en los tramos de pilar, en [0, 1] (ZR1): de lo que el nudo físico ocupa
+   * por debajo del plano del forjado en la cabeza (medio canto de la losa o de una viga con el eje en
+   * el plano; el canto entero de una viga con la cara superior en él) y por encima en la base (medio
+   * canto de la losa o de una viga en el plano; con `zonaRigidaBase`). Por defecto, 1 (hasta la cara,
+   * como CYPECAD), salvo con `factorZonaRigida: 0`, que deja también los pilares de eje a eje.
+   */
+  factorZonaRigidaPilares?: number;
   /**
    * Coeficiente de empotramiento de la cabeza del último tramo de cada pilar, en [0, 1] (CY2, CY-b).
    * Por defecto, 0,3, el que aconseja CYPECAD: la cabeza, con poco axil, fisura y no desarrolla el
@@ -594,11 +602,11 @@ export interface OpcionesCompilacion {
   refinoEsquinas?: boolean;
   /**
    * Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo
-   * nudo inferior está en un forjado es rígida a lo largo de `factorZonaRigida` veces el canto de lo
-   * que ese nudo tiene encima (el espesor de la losa en la huella del pilar o el canto de la viga más
-   * alta que le llega en el plano del forjado; una viga con la cara superior en el forjado no cuenta),
-   * igual que la cabeza del tramo de debajo. Con el factor 0,5, el medio canto de CYPECAD en los dos
-   * extremos. Por defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1.
+   * nudo inferior está en un forjado es rígida en lo que ese nudo ocupa por encima del plano del
+   * forjado (medio canto de la losa en la huella del pilar o de la viga más alta que le llega con el
+   * eje en el plano; una viga con la cara superior en el forjado queda entera por debajo y no cuenta),
+   * por `factorZonaRigidaPilares`. Con los valores por defecto, la cara del forjado, como CYPECAD.
+   * Por defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1.
    */
   zonaRigidaBase?: boolean;
 }
@@ -607,6 +615,7 @@ export interface OpcionesResueltas {
   epsGeom: number;
   epsSnap: number;
   factorZonaRigida: number;
+  factorZonaRigidaPilares: number;
   empotramientoCabeza: number;
   rigidezReticular: "uniforme" | "bruta";
   unionLosaViga: "cara" | "eje";
@@ -623,10 +632,13 @@ export interface OpcionesResueltas {
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
+  const factorZonaRigida = o.factorZonaRigida ?? FACTOR_ZONA_RIGIDA;
   return {
     epsGeom: o.epsGeom ?? 1e-6,
     epsSnap: o.epsSnap ?? 0.05,
-    factorZonaRigida: o.factorZonaRigida ?? FACTOR_ZONA_RIGIDA,
+    factorZonaRigida,
+    // ZR1: hasta la cara del nudo; «de eje a eje» (factor 0) lo es también en los pilares
+    factorZonaRigidaPilares: o.factorZonaRigidaPilares ?? (factorZonaRigida === 0 ? 0 : 1),
     empotramientoCabeza: o.empotramientoCabeza ?? EMPOTRAMIENTO_CABEZA,
     rigidezReticular: o.rigidezReticular ?? "uniforme",
     unionLosaViga: o.unionLosaViga ?? "cara",

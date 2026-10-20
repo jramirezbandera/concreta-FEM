@@ -38,7 +38,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "LVD1";
+export const VERSION_COMPILADOR = "ZR1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -458,14 +458,21 @@ function avisarDintelesEnDiafragma(ctx: Contexto, diag: Diagnosticos): void {
 function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>, conZonas: boolean, alDiafragma: readonly string[]): string[] {
   const h: string[] = [];
   // Sin ninguna barra con zona rígida (perfiles dados por sus propiedades, sin b ni h), el factor no actúa
+  // ZR1: las vigas, por lo que recorren dentro del pilar; los pilares, por lo que ocupa el nudo físico
+  const [fv, fp] = [op.factorZonaRigida, op.factorZonaRigidaPilares];
+  const vigasZR = fv === 0 ? "las vigas, de eje a eje" : `las vigas son rígidas en ${fv === 1 ? "todo lo que" : `el ${coma(fv * 100)} % de lo que`} recorren dentro del pilar (hasta su cara)`;
+  const pilaresZR =
+    fp === 0
+      ? "los pilares, de eje a eje"
+      : `los pilares, ${fp === 1 ? "hasta la cara" : `en el ${coma(fp * 100)} % del nudo hacia la cara`} de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo${
+          op.zonaRigidaBase ? " y, sobre un forjado, también en su base, como CYPECAD (LV-d)" : ""
+        }`;
   h.push(
     !conZonas
       ? "Nudos de eje a eje: ninguna barra tiene zona rígida ni excentricidad (las secciones no dan dimensiones al nudo), así que el factor de zona rígida no actúa."
-      : op.factorZonaRigida === 0
+      : fv === 0 && fp === 0
         ? "Nudos de eje a eje: sin zonas rígidas (factor 0), como SAP2000 por defecto."
-        : `Nudos de dimensión finita: es rígido ${op.factorZonaRigida === 1 ? "todo el nudo" : `el ${coma(op.factorZonaRigida * 100)} % del nudo`} (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega${
-            op.zonaRigidaBase ? ", en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD; LV-d" : ", sólo en la cabeza de cada tramo"
-          }).`,
+        : `Nudos de dimensión finita: ${vigasZR}; ${pilaresZR}.`,
   );
   const grupos = new Map<string, number>();
   for (const b of piezas.barras) {

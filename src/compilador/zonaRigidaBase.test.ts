@@ -78,9 +78,9 @@ describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
     expect(offsets(r, "A:P3")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.25] });
     // las estaciones [i, i', j', j] del tramo, y los esfuerzos de la base en i'
     expect(barraP(r, "A:P2").s.map((s) => Math.round(s * 1e9) / 1e9)).toEqual([3.2, 3.45, 5.95, 6.2]);
-    // con el factor 1, el canto entero en los dos extremos
-    const r1 = valido(compilar(portico(), { factorZonaRigida: 1 }));
-    expect(offsets(r1, "A:P2")).toEqual({ i: [0, 0, 0.5], j: [0, 0, -0.5] });
+    // ZR1: el factor de las vigas no la cambia (nunca entra en el pilar libre); el de los pilares, sí
+    expect(offsets(valido(compilar(portico(), { factorZonaRigida: 1 })), "A:P2")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.25] });
+    expect(offsets(valido(compilar(portico(), { factorZonaRigidaPilares: 0.5 })), "A:P2")).toEqual({ i: [0, 0, 0.125], j: [0, 0, -0.125] });
   });
 
   it("con zonaRigidaBase: false, sólo la cabeza, como antes de LV-d", () => {
@@ -94,8 +94,9 @@ describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
     const losa = valido(compilar(portico({ losaP3: true })));
     expect(offsets(losa, "A:P3")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.15] });
     const sup = valido(compilar(portico({ vigaP2: { insercion: "superior" } })));
-    // cabeza del tramo P1 → P2 dentro del canto de V2 (como en C1); base del P2 → P3, sin nada encima
-    expect(offsets(sup, "A:P2")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.25] });
+    // ZR1: cabeza del tramo P1 → P2 hasta la cara inferior de V2, que cuelga entera (0,50); base del
+    // P2 → P3, sin nada encima del plano
+    expect(offsets(sup, "A:P2")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.5] });
     expect(offsets(sup, "A:P3")).toEqual({ i: undefined, j: [0, 0, -0.25] });
   });
 
@@ -103,7 +104,7 @@ describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
     const r = compilar(portico({ alturaP2: 0.45 }));
     expect(r.valido).toBe(false);
     const d = r.diagnosticos.find((d) => d.codigo === "pilar/tramo-flexible-nulo")!;
-    expect(d.mensaje).toContain("0.5 m en la cabeza y 0.5 m en la base");
+    expect(d.mensaje).toContain("0.25 m en la cabeza y 0.25 m en la base");
     expect(d.ids).toEqual(expect.arrayContaining(["A", "V1", "V2"]));
     // sin la zona de la base cabe (0,45 − 0,25 = 0,20 m flexibles)
     expect(compilar(portico({ alturaP2: 0.45 }), { zonaRigidaBase: false }).valido).toBe(true);
@@ -137,7 +138,7 @@ describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
   });
 
   it("la hipótesis lo deja escrito", () => {
-    expect(valido(compilar(portico())).hipotesis[0]).toMatch(/también en su base, como CYPECAD; LV-d/);
-    expect(valido(compilar(portico(), { zonaRigidaBase: false })).hipotesis[0]).toMatch(/sólo en la cabeza de cada tramo/);
+    expect(valido(compilar(portico())).hipotesis[0]).toMatch(/también en su base, como CYPECAD \(LV-d\)\.$/);
+    expect(valido(compilar(portico(), { zonaRigidaBase: false })).hipotesis[0]).toMatch(/en la cabeza de cada tramo\.$/);
   });
 });

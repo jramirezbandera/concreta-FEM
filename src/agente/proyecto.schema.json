@@ -1165,7 +1165,11 @@
         },
         "factorZonaRigida": {
           "type": "number",
-          "description": "Fracción rígida de los nudos de dimensión finita, en [0, 1] (C1-a). Por defecto, 0,5. Con 1, el\nnudo es infinitamente rígido, como en CYPECAD; con 0, se calcula de eje a eje, como SAP2000 por\ndefecto."
+          "description": "Fracción rígida de los nudos de dimensión finita en las vigas y viguetas, en [0, 1] (C1-a): de lo\nque su eje recorre dentro de la huella del pilar. Por defecto, 0,5. Con 1, hasta la cara del\npilar, como en CYPECAD; con 0, de eje a eje, como SAP2000 por defecto."
+        },
+        "factorZonaRigidaPilares": {
+          "type": "number",
+          "description": "Fracción rígida del nudo en los tramos de pilar, en [0, 1] (ZR1): de lo que el nudo físico ocupa\npor debajo del plano del forjado en la cabeza (medio canto de la losa o de una viga con el eje en\nel plano; el canto entero de una viga con la cara superior en él) y por encima en la base (medio\ncanto de la losa o de una viga en el plano; con `zonaRigidaBase`). Por defecto, 1 (hasta la cara,\ncomo CYPECAD), salvo con `factorZonaRigida: 0`, que deja también los pilares de eje a eje."
         },
         "empotramientoCabeza": {
           "type": "number",
@@ -1223,7 +1227,7 @@
         },
         "zonaRigidaBase": {
           "type": "boolean",
-          "description": "Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo\nnudo inferior está en un forjado es rígida a lo largo de `factorZonaRigida` veces el canto de lo\nque ese nudo tiene encima (el espesor de la losa en la huella del pilar o el canto de la viga más\nalta que le llega en el plano del forjado; una viga con la cara superior en el forjado no cuenta),\nigual que la cabeza del tramo de debajo. Con el factor 0,5, el medio canto de CYPECAD en los dos\nextremos. Por defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1."
+          "description": "Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo\nnudo inferior está en un forjado es rígida en lo que ese nudo ocupa por encima del plano del\nforjado (medio canto de la losa en la huella del pilar o de la viga más alta que le llega con el\neje en el plano; una viga con la cara superior en el forjado queda entera por debajo y no cuenta),\npor `factorZonaRigidaPilares`. Con los valores por defecto, la cara del forjado, como CYPECAD.\nPor defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1."
         }
       },
       "additionalProperties": false

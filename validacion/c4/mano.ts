@@ -4,7 +4,8 @@
  * torsión liberada en un extremo, zonas rígidas en las huellas y reparto por la regla de la
  * palanca), sin llamar al compilador. Los compara `src/compilador/oraculo-c4.test.ts` (a ≤ 1e-10).
  *
- * Todos van con el nudo entero rígido y sin modificadores (`OPCIONES_MANO` de C1), como los de C1.
+ * Todos van con el nudo entero rígido y sin modificadores (`OPCIONES_MANO` de C1), como los de C1: desde
+ * ZR1, la cabeza de los pilares hasta la cara inferior de las vigas (su medio canto con el eje en el plano).
  */
 import type { ModeloFisico, Vec2 } from "../../src/compilador/fisico.ts";
 import type { CargaBarra, CargaNodal, Seis, Vec3 } from "../../src/motor/modelo.ts";
@@ -148,10 +149,10 @@ function unPano(giro: number): CasoMano {
     const base = nudo(x, y, 0);
     cab[id] = nudo(x, y);
     m.apoyo(base, EMPOTRADO);
-    // Cabeza rígida: el canto de la viga más alta (0,5)
-    const b = m.barra(base, cab[id]!, rectangular(0.3, 0.3, HA), [ez[0], ez[1], 0], { offsets: { j: [0, 0, -0.5] } });
-    bG.push(dl(b, g(-25 * 0.09), 0, 2.5));
-    nG.push(uniformeANudo(cab[id]!, P3(x, y), P3(x, y, 2.5), P3(x, y), g(-25 * 0.09)));
+    // Cabeza rígida hasta la cara inferior de la viga más alta (0,5 con el eje en el plano: su medio canto, ZR1)
+    const b = m.barra(base, cab[id]!, rectangular(0.3, 0.3, HA), [ez[0], ez[1], 0], { offsets: { j: [0, 0, -0.25] } });
+    bG.push(dl(b, g(-25 * 0.09), 0, 2.75));
+    nG.push(uniformeANudo(cab[id]!, P3(x, y), P3(x, y, 2.75), P3(x, y), g(-25 * 0.09)));
   }
   const nA = Y.map((y) => nudo(0, y));
   const nB = Y.map((y) => nudo(5, y));
@@ -248,7 +249,7 @@ function dosVanosConVoladizo(): CasoMano {
       const base = m.nudo(x, y, 0);
       cab[`${x},${y}`] = m.nudo(x, y, z);
       m.apoyo(base, EMPOTRADO);
-      m.barra(base, cab[`${x},${y}`]!, rectangular(0.3, 0.3, HA), [1, 0, 0], { offsets: { j: [0, 0, -0.5] } });
+      m.barra(base, cab[`${x},${y}`]!, rectangular(0.3, 0.3, HA), [1, 0, 0], { offsets: { j: [0, 0, -0.25] } });
     }
   const V = rectangular(0.3, 0.5, HA);
   const enX: Record<number, number[]> = {};
@@ -335,7 +336,7 @@ function viguetaEnHuella(): CasoMano {
     const base = m.nudo(x, y, 0);
     cab[id] = m.nudo(x, y, z);
     m.apoyo(base, EMPOTRADO);
-    m.barra(base, cab[id]!, rectangular(1.6, 1.6, HA), [1, 0, 0], { offsets: { j: [0, 0, -0.5] } });
+    m.barra(base, cab[id]!, rectangular(1.6, 1.6, HA), [1, 0, 0], { offsets: { j: [0, 0, -0.25] } });
   }
   const V = rectangular(0.3, 0.5, HA);
   const interior = Y.slice(1, 6);
@@ -396,7 +397,7 @@ function panoConHueco(): CasoMano {
     const b = m.nudo(x, y, 0);
     cab[id] = m.nudo(x, y, z);
     m.apoyo(b, EMPOTRADO);
-    m.barra(b, cab[id]!, rectangular(0.3, 0.3, HA), [1, 0, 0], { offsets: { j: [0, 0, -0.5] } });
+    m.barra(b, cab[id]!, rectangular(0.3, 0.3, HA), [1, 0, 0], { offsets: { j: [0, 0, -0.25] } });
   }
   const V = rectangular(0.3, 0.5, HA);
   const nA = Y.map((y) => m.nudo(0, y, z));
