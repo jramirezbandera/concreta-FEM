@@ -153,12 +153,18 @@ export class DiagramaBarra {
   readonly esfuerzos: Tramos[];
   /** [ux, uy, uz, rx, ry, rz] en ejes locales. */
   readonly desplazamientos: Tramos[];
+  /**
+   * Pares repartidos uniformes sumados a [T, My, Mz] (`conPares`): la pendiente que añaden. Con
+   * ellos, dMy/dx = −Vz + p[1] y dMz/dx = −Vy + p[2], y los extremos interiores se mueven.
+   */
+  readonly pares: Float64Array | null;
 
-  constructor(L: number, cortes: Float64Array, esfuerzos: Tramos[], desplazamientos: Tramos[]) {
+  constructor(L: number, cortes: Float64Array, esfuerzos: Tramos[], desplazamientos: Tramos[], pares: Float64Array | null = null) {
     this.L = L;
     this.cortes = cortes;
     this.esfuerzos = esfuerzos;
     this.desplazamientos = desplazamientos;
+    this.pares = pares;
   }
 
   /**
@@ -207,7 +213,23 @@ export class DiagramaBarra {
         });
         return t;
       });
-    return new DiagramaBarra(d0.L, cortes, sumar((d) => d.esfuerzos), sumar((d) => d.desplazamientos));
+    let pares: Float64Array | null = null;
+    diagramas.forEach((d, k) => {
+      if (!d.pares) return;
+      pares ??= new Float64Array(3);
+      for (let c = 0; c < 3; c++) pares[c]! += factores[k]! * d.pares[c]!;
+    });
+    return new DiagramaBarra(d0.L, cortes, sumar((d) => d.esfuerzos), sumar((d) => d.desplazamientos), pares);
+  }
+
+  /**
+   * El diagrama con un par repartido uniforme en T, My y Mz (en ese orden): a cada uno se le suma
+   * b0 + b1·x. Los cortantes y los desplazamientos no cambian.
+   */
+  conPares(b0: readonly number[], b1: readonly number[]): DiagramaBarra {
+    const e = this.esfuerzos.map((t, c) => (c >= 3 && (b0[c - 3] || b1[c - 3]) ? t.afin(1, b0[c - 3]!, b1[c - 3]!) : t));
+    const pares = Float64Array.from([0, 1, 2], (c) => (this.pares?.[c] ?? 0) + b1[c]!);
+    return new DiagramaBarra(this.L, this.cortes, e, this.desplazamientos, pares);
   }
 
   /**
@@ -217,13 +239,13 @@ export class DiagramaBarra {
   estaciones(): number[] {
     const L = this.L;
     const xs = new Set<number>([0, L / 4, L / 2, (3 * L) / 4, L, ...this.cortes]);
-    for (const c of [1, 2]) for (const x of this.ceros(c)) xs.add(x);
+    for (const c of [1, 2]) for (const x of this.ceros(c, this.pares?.[3 - c] ?? 0)) xs.add(x);
     return [...xs].sort((a, b) => a - b);
   }
 
-  /** Raíces interiores de la componente de esfuerzo `c` (un cortante: grado ≤ 2 por tramo). */
-  ceros(c: number): number[] {
-    const t = this.esfuerzos[c]!;
+  /** Raíces interiores de la componente de esfuerzo `c` menos `a` (un cortante: grado ≤ 2 por tramo). */
+  ceros(c: number, a = 0): number[] {
+    const t = a ? this.esfuerzos[c]!.afin(1, -a) : this.esfuerzos[c]!;
     const r: number[] = [];
     for (let k = 0; k < t.nTramos; k++) {
       const x0 = this.cortes[k]!;
