@@ -457,6 +457,31 @@ describe("A4, criterio 1: lo dibujado es lo del modelo y de las consultas", () =
     }
   });
 
+  it("diagramas: el máximo sólo donde es positivo y el mínimo sólo donde es negativo, cada uno a su lado del eje (no se pisan), sobre el eje de la viga aunque sus nudos no estén en él", () => {
+    let vistas = 0;
+    for (const [nombre, f] of MODELOS) {
+      const { r, cj } = calculados.get(nombre)!;
+      for (const pl of f.plantas) {
+        const e = vistaDiagramas(r, pl.id, "My", cj.esfuerzos, d);
+        for (const v of (f.vigas ?? []).filter((x) => x.planta === pl.id && x.puntos.length === 2)) {
+          const [A, B] = v.puntos as [Vec2, Vec2];
+          const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+          // Distancia con signo de un punto a la recta de la viga
+          const lado = (p: Vec2) => ((B[0] - A[0]) * (p[1] - A[1]) - (B[1] - A[1]) * (p[0] - A[0])) / L;
+          const signos = (estilo: string) => e.primitivas.filter((p) => p.tipo === "poligono" && p.estilo === estilo && p.objeto === v.id).flatMap((p) => (p.tipo === "poligono" ? p.anillos[0]!.map(lado) : [])).filter((x) => Math.abs(x) > 1e-9).map(Math.sign);
+          const [mas, menos] = [signos("diagrama-positivo"), signos("diagrama-negativo")];
+          expect(new Set(mas).size, `${nombre} ${v.id}`).toBeLessThanOrEqual(1);
+          expect(new Set(menos).size, `${nombre} ${v.id}`).toBeLessThanOrEqual(1);
+          if (mas.length && menos.length) {
+            expect(mas[0]).toBe(-menos[0]!);
+            vistas++;
+          }
+        }
+      }
+    }
+    expect(vistas).toBeGreaterThan(0);
+  });
+
   it("diagramas: con una combinación, las ordenadas en las estaciones son las de Consultas.diagrama", () => {
     for (const [nombre, f] of MODELOS) {
       const { q, r, cj } = calculados.get(nombre)!;

@@ -437,18 +437,23 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
 
 // ─── Diagramas de vigas ─────────────────────────────────────────────────────────────────────────
 
-/** Punto y dirección en planta de la estación s de una pieza, por sus barras (vigas y viguetas). */
-function geometriaPieza(c: Compilado, pieza: string): (s: number) => { p: Vec2; d: Vec2 } {
+/**
+ * Punto y dirección en planta de la estación s de una pieza, por sus barras (vigas y viguetas): sobre
+ * la recta del tramo flexible de cada barra (i', j'), también en sus zonas rígidas. Los nudos de la
+ * barra pueden no estar en el eje (un pilar o un muro unidos por un offset).
+ */
+function geometriaPieza(r: ResultadosRender, pieza: string): (s: number) => { p: Vec2; d: Vec2 } {
+  const c = r.c;
   const tramos = (c.mapeo.piezas[pieza] ?? []).map((b) => {
-    const [i, j] = c.modelo.barras![b]!.nudos;
     const s = c.mapeo.barras[b]!.s;
-    return { s0: s[0], s1: s[3], a: punto(c, i), b: punto(c, j) };
+    const { ip, jp } = r.ep.diagramas.barra(b);
+    return { s3: s[3], s1: s[1], s2: s[2], a: [ip[0]!, ip[1]!] as Vec2, b: [jp[0]!, jp[1]!] as Vec2 };
   });
   return (s) => {
-    const t = tramos.find((x) => s <= x.s1 + 1e-9) ?? tramos[tramos.length - 1]!;
+    const t = tramos.find((x) => s <= x.s3 + 1e-9) ?? tramos[tramos.length - 1]!;
     const l = Math.hypot(t.b[0] - t.a[0], t.b[1] - t.a[1]) || 1;
     const d: Vec2 = [(t.b[0] - t.a[0]) / l, (t.b[1] - t.a[1]) / l];
-    const u = t.s1 > t.s0 ? (s - t.s0) / (t.s1 - t.s0) : 0;
+    const u = t.s2 > t.s1 ? (s - t.s1) / (t.s2 - t.s1) : 0;
     return { p: [t.a[0] + u * (t.b[0] - t.a[0]), t.a[1] + u * (t.b[1] - t.a[1])], d };
   };
 }
@@ -512,7 +517,7 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
   const [x0, y0, x1, y1] = caja(pl);
   const k = maxAbs > 0 ? (ORDENADA * Math.hypot(x1 - x0, y1 - y0)) / maxAbs : 0;
   const geo = new Map<string, ReturnType<typeof geometriaPieza>>();
-  const g = (id: string) => geo.get(id) ?? geo.set(id, geometriaPieza(c, id)).get(id)!;
+  const g = (id: string) => geo.get(id) ?? geo.set(id, geometriaPieza(r, id)).get(id)!;
   // Lado de los positivos, como en el alzado: con la pieza leída en X creciente (o en Y creciente si
   // va más en Y), My > 0 a su derecha (abajo en las vigas en X) y Vz > 0 a su izquierda (arriba).
   const lados = new Map<string, number>();
@@ -538,6 +543,18 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
     const f = lado(id) * v * k;
     return [p[0] - dir[1] * f, p[1] + dir[0] * f];
   };
+  // Lo que dimensiona: el máximo donde es positivo y el mínimo donde es negativo (si no, las dos
+  // áreas se pisan donde tienen el mismo signo). Con el punto donde cruzan el cero, para no quebrar el borde.
+  const recortada = (curva: PuntoEnvolvente[], cual: "max" | "min"): { s: number; v: number }[] => {
+    const lado = (v: number) => (cual === "max" ? Math.max(v, 0) : Math.min(v, 0));
+    const r: { s: number; v: number }[] = [];
+    curva.forEach((e, k) => {
+      const a = curva[k - 1];
+      if (a && a[cual] !== 0 && e[cual] !== 0 && Math.sign(a[cual]) !== Math.sign(e[cual]) && e.s > a.s) r.push({ s: a.s + ((e.s - a.s) * a[cual]) / (a[cual] - e[cual]), v: 0 });
+      r.push({ s: e.s, v: lado(e[cual]) });
+    });
+    return r;
+  };
   for (const { pieza, curva } of curvas) {
     if (curva.length < 2) continue;
     const eje = [g(pieza)(curva[0]!.s).p, g(pieza)(curva[curva.length - 1]!.s).p];
@@ -545,7 +562,9 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
       ["max", "diagrama-positivo"],
       ["min", "diagrama-negativo"],
     ] as const) {
-      const pts = curva.map((e) => ordenada(pieza, e.s, e[cual]));
+      const r = recortada(curva, cual);
+      if (r.every((e) => e.v === 0)) continue;
+      const pts = r.map((e) => ordenada(pieza, e.s, e.v));
       P.push({ tipo: "poligono", anillos: [[eje[0]!, ...pts, eje[1]!]], estilo, objeto: pieza });
     }
     P.push({ tipo: "linea", puntos: eje as Vec2[], estilo: "diagrama-eje", objeto: pieza });
@@ -585,8 +604,8 @@ export function vistaDiagramas(r: ResultadosRender, planta: string, esfuerzo: "M
     cabecera: cabecera(pl, `Vista: ${esfuerzo} de vigas y viguetas (${unidad}), envolvente de ${conjunto.descripcion}`, d),
     primitivas: P,
     leyenda: [
-      { estilo: "diagrama-positivo", texto: `Envolvente máxima de ${esfuerzo}; positiva, ${esfuerzo === "My" ? "abajo en las piezas en X y a la derecha en las piezas en Y" : "arriba en las piezas en X y a la izquierda en las piezas en Y"}` },
-      { estilo: "diagrama-negativo", texto: `Envolvente mínima de ${esfuerzo}; negativa, al otro lado (como en el alzado)` },
+      { estilo: "diagrama-positivo", texto: `Envolvente máxima de ${esfuerzo} donde es positiva: ${esfuerzo === "My" ? "abajo en las piezas en X y a la derecha en las piezas en Y" : "arriba en las piezas en X y a la izquierda en las piezas en Y"}` },
+      { estilo: "diagrama-negativo", texto: `Envolvente mínima de ${esfuerzo} donde es negativa, al otro lado (como en el alzado); las dos curvas enteras, en el alzado y en la tabla de la pieza` },
     ],
     notas: [
       esfuerzo === "My" ? "My > 0 tracciona la cara inferior (momento de vano)." : "Vz: cortante vertical de la pieza, con el convenio de las barras.",
