@@ -140,6 +140,21 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
   - **El CYPE de las capturas no redistribuye en la hipótesis:** el −7,29 por 1,35 es el −9,85 de la envolvente.
   - **Queda el nudo de esquina:** la viga en la cara, −6,1 frente a −7,29 (−16 %), y el pilar, −7 % en la cabeza y −23 % en el pie. Ninguna rigidez de viga lo mueve. El pilar ya flexa en lo mismo que en CYPE (2,72 frente a 2,70 m, por los cortantes).
 - **En la vivienda, con el código de ahora** (la línea base no cambia: 0,92 / 0,95 / 0,91 / 0,82, flechas 0,91, P5 +23 %): con todas las vigas a 0,5 (`d-todos-05`), **0,99 / 0,99 / 0,95 / 0,92 y flechas 0,98: pasa el criterio 7**, y P5 baja a +17 %; con 0,6, 0,97 / 0,98 / 0,94 / 0,89.
+- **El modelo A con losa maciza de 30 (capturas del 2026-10-20; `am` en `modelos.py`):** con la rigidez completa de las vigas, la viga da el vano de CYPE (+11,27 frente a +11,20 en peso propio), la flecha del centro a 0,98 (−2,70 frente a −2,76 mm) y la losa junto a la viga a 1,02 (35,8 frente a 34,98 kN·m/m); con ×0,5, el vano cae a +6,14. **La viga a la mitad es cosa del reticular, no de la viga:** en losa maciza CYPE no la rebaja.
+- **El nudo de esquina es el brazo de la cabeza del pilar.** Con la cabeza a 0,3, el cociente entre el momento del pie y el de la cabeza depende del brazo rígido e entre el nudo y la cara del forjado: (0,3·(2 + 6e/L) + 0,7·3e/L) / (0,3·(4 + 6e/L)), que da 0,63 con e = 0,15 (el nuestro: losa a media altura; medido 0,62) y 0,74 con e = 0,30 (medido en CYPE 0,73, en maciza y en reticular). **CYPE pone el nudo del forjado en su cara superior (la cota) y el pilar rígido en todo el canto.** Con ese brazo (`brazo.ts`, que cambia el offset en el modelo analítico; la opción no pasa de 1), en peso propio:
+
+| | CYPE maciza | nuestra maciza | CYPE reticular | nuestro reticular, vigas ×0,6 |
+|---|---|---|---|---|
+| P3: pie | 7,04 / 6,74 | 6,82 / 6,47 | 7,93 / 7,48 | 7,53 / 7,13 |
+| P3: cabeza | 9,65 / 9,25 | 10,25 / 9,72 | 10,88 / 10,27 | 11,48 / 10,87 |
+| P3: cortante | 6,18 / 5,92 | 5,99 / 5,68 | 6,97 / 6,58 | 6,62 / 6,26 |
+| viga: cara / vano | −5,51 / +11,20 | −5,20 / +11,11 | −7,29 / +8,03 | −7,16 / +7,99 |
+| viga: V en la cara | 33,7 | 37,9 | 27,0 | 26,7 |
+
+  En el reticular, con ese brazo, el vano de la viga es +6,84 / +7,99 / +9,08 con las vigas a 0,5 / 0,6 / 0,7: **el ajuste es 0,6**. Todo queda a ≤ 6 % salvo el cortante de la viga en la maciza (+13 %, la carga de la losa que entra junto al pilar).
+- **Dos decisiones para el usuario:**
+  - **RV-a, la rigidez a flexión de las vigas planas embebidas en un reticular:** ×0,6 (el ajuste del modelo A y de la vivienda) o ×0,5 (el factor del emparrillado de CYPE, que la vivienda también pasa). Falta el modelo A con vigas descolgadas de 30 × 50 para saber si se aplica también a ellas.
+  - **RV-b, el plano de los nudos del forjado en su cara superior con el pilar rígido en todo el canto, como CYPE,** en lugar de a media altura con medio canto (ZR1). Es una convención de CYPE, no un hecho físico: el nudo real está a media altura. Cambia los momentos de los pilares de esquina (+12–25 % en el pie) y el empotramiento de las vigas en ellos.
 - **Hipótesis de por qué (sin confirmar):** que CYPE dé a la viga plana embebida en el reticular la misma mitad de inercia que al emparrillado («la mitad de la zona maciza, tanto en la zona maciza como en la aligerada», memoria p. 13): ×0,5 es exactamente ese factor. La memoria, en su tabla de rigideces, dice sección bruta para las vigas, sin distinguir. Para confirmarlo, el mismo modelo A en CYPE con **losa maciza de 30** en lugar del reticular (si la viga sigue a la mitad, es de la viga; si no, es del reticular) y con **vigas descolgadas de 30 × 50**.
 
 **Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias. **Decidida y hecha el 2026-10-20 (§2.2).**

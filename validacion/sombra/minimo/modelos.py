@@ -25,7 +25,7 @@ def R(x0, y0, x1, y1):
     return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
 
 
-def modelo_a(opciones=None, fraccion_vigas=1.0):
+def modelo_a(opciones=None, fraccion_vigas=1.0, maciza=False):
     abacos = [R(-0.5, -0.5, AX0, AY0), R(AX1, -0.5, LX + 0.5, AY0),
               R(-0.5, AY1, AX0, Y1 + 0.5), R(AX1, AY1, LX + 0.5, Y1 + 0.5)]
     hv = 0.30 * fraccion_vigas ** (1 / 3)
@@ -45,6 +45,13 @@ def modelo_a(opciones=None, fraccion_vigas=1.0):
         "casos": [{"id": "PP", "pesoPropio": True}],
         "cargas": [],
     }
+    if maciza:
+        # Modelo A con losa maciza de 30 (2026-10-20): el peso, el de la losa (γ·h); sin ábacos
+        del m["losas"][0]["reticular"], m["losas"][0]["pp"]
+        p = {"esquema": "concreta-fem/proyecto@1", "nombre": "Modelo mínimo A con losa maciza de 30", "modelo": m}
+        if opciones:
+            p["opciones"] = opciones
+        return p
     for i, a in enumerate(abacos):
         m["cargas"].append({"tipo": "superficie", "id": f"PPA-{i + 1}", "caso": "PP", "planta": "F1", "q": [0, 0, -(GAMMA * H - PP_ALIGERADO)], "zona": a})
     # La media viga interior fuera de los ábacos: la losa la pesa con el pp, CYPE con γ·h
@@ -66,6 +73,8 @@ VARIANTES = {
     "a-vigas-06": lambda: modelo_a(fraccion_vigas=0.6),
     "a-vigas-07": lambda: modelo_a(fraccion_vigas=0.7),
     "a-eje": lambda: modelo_a({"unionLosaViga": "eje"}),
+    "am": lambda: modelo_a(maciza=True),
+    "am-vigas-05": lambda: modelo_a(fraccion_vigas=0.5, maciza=True),
 }
 
 if __name__ == "__main__":
