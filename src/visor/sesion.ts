@@ -15,7 +15,7 @@
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
-import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
+import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, capaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/armado.ts";
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
@@ -61,6 +61,10 @@ export type VistaPlanta =
   | { vista: "cargas"; caso: string }
   | { vista: "diagnosticos" }
   | { vista: "malla" }
+  | VistaResultadosPlanta;
+
+/** Las vistas de planta con resultados. `malla`: con la malla de la planta encima (`capaMalla`). */
+export type VistaResultadosPlanta = (
   /** `escala`: la del mapa (`EscalaMapa`); sin ella, la completa. */
   | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa }
   | { vista: "vigas"; esfuerzo: "My" | "Vz"; combinaciones: EleccionCombinaciones }
@@ -69,7 +73,8 @@ export type VistaPlanta =
   /** AB: la armadura base va en el pedido (la del proyecto que se edita), así que cambiarla no reabre la sesión. */
   | { vista: "armado"; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean; filtro?: FiltroArmado }
   /** Las reacciones de los objetos de la planta (I4); `escala`, la de las flechas horizontales. */
-  | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number };
+  | { vista: "reacciones"; combinaciones: EleccionCombinaciones; escala?: number }
+) & { malla?: boolean };
 
 /** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
 export type PlanoPedido = { eje: string; profundidad?: number } | { desde: Vec2; hasta: Vec2; profundidad?: number };
@@ -472,7 +477,15 @@ export class Sesion {
       default: {
         const rr = this.rr;
         if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Esta vista necesita el cálculo." }] };
-        if (v.vista === "malla") e = vistaMalla(rr, planta, d);
+        if (v.vista !== "malla" && v.malla) {
+          // La malla encima del resultado (el de la escena sin ella), debajo de los rótulos
+          const { malla: _, ...sin } = v;
+          const r = this.escenaA4(planta, sin as VistaPlanta);
+          if (!r.valido) return r;
+          const m = capaMalla(rr, planta);
+          const textos = r.valor.primitivas.filter((p) => p.tipo === "texto");
+          e = { ...r.valor, primitivas: [...r.valor.primitivas.filter((p) => p.tipo !== "texto"), ...m.primitivas, ...textos], leyenda: [...r.valor.leyenda, ...m.leyenda], notas: [...r.valor.notas, ...m.notas] };
+        } else if (v.vista === "malla") e = vistaMalla(rr, planta, d);
         else if (v.vista === "reacciones") {
           const conj = this.conjunto(v.combinaciones, "lineal");
           if (!conj.valido) return conj;

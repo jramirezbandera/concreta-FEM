@@ -231,6 +231,43 @@ export function vistaMalla(r: ResultadosRender, planta: string, d: DatosVista): 
   };
 }
 
+/**
+ * La malla de una planta para dibujarla encima de un resultado (los diagramas, un mapa, el armado):
+ * las aristas de sus láminas, una vez cada una, y los nudos de las barras de sus vigas y viguetas,
+ * que es donde la losa les pasa sus fuerzas. Sin objeto: no se elige.
+ */
+export function capaMalla(r: ResultadosRender, planta: string): { primitivas: Primitiva[]; leyenda: EntradaLeyenda[]; notas: string[] } {
+  const pl = new PlantaFisica(r.q.fisico, planta);
+  const c = r.c;
+  const P: Primitiva[] = [];
+  const { laminas } = r.laminas(planta);
+  const aristas = new Set<string>();
+  for (const l of laminas) {
+    const ns = c.modelo.laminas![l]!.nudos;
+    for (let k = 0; k < ns.length; k++) {
+      const [a, b] = [ns[k]!, ns[(k + 1) % ns.length]!];
+      const clave = a < b ? `${a},${b}` : `${b},${a}`;
+      if (aristas.has(clave)) continue;
+      aristas.add(clave);
+      P.push({ tipo: "linea", puntos: [punto(c, a), punto(c, b)], estilo: "malla-encima" });
+    }
+  }
+  const piezas = new Set([...pl.enPlanta(pl.f.vigas).map((v) => v.id), ...pl.enPlanta(pl.f.panos).flatMap((p) => c.mapeo.panos?.[p.id] ?? [])]);
+  const nudos = new Set<number>();
+  c.mapeo.barras.forEach((m, b) => {
+    if (m.tipo !== "pilar" && piezas.has(m.pieza)) for (const n of c.modelo.barras![b]!.nudos) nudos.add(n);
+  });
+  for (const n of [...nudos].sort((a, b) => a - b)) P.push({ tipo: "marca", p: punto(c, n), forma: "circulo", radio: 1.5, estilo: "malla-nudo-barra" });
+  return {
+    primitivas: P,
+    leyenda: [
+      ...(aristas.size ? [{ estilo: "malla-encima" as const, texto: "Malla de las losas" }] : []),
+      ...(nudos.size ? [{ estilo: "malla-nudo-barra" as const, texto: "Nudo de viga o vigueta" }] : []),
+    ],
+    notas: [`Malla: ${laminas.length} láminas y ${nudos.size} nudos de vigas y viguetas en la planta.`],
+  };
+}
+
 // ─── Isovalores ─────────────────────────────────────────────────────────────────────────────────
 
 /** Valores del campo en los nudos de cada lámina (4 por lámina; NaN si no tiene) en una combinación. El visor interpola con ellos el valor de un punto. */

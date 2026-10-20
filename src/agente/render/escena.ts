@@ -57,6 +57,8 @@ export type Estilo =
   | "malla-abaco"
   | "malla-rigida"
   | "malla-barra"
+  | "malla-encima"
+  | "malla-nudo-barra"
   | "sin-mapa"
   | "isobanda"
   | "isolinea"

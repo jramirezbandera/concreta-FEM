@@ -40,6 +40,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   malla: { fill: "#12151a", stroke: "#5b6575", sw: 0.6 },
   "malla-abaco": { fill: "#1c2a1f", stroke: "#5b6575", sw: 0.6 },
   "malla-rigida": { fill: "#4b5563", stroke: "#9ca3af", sw: 0.6 },
+  "malla-encima": { stroke: "#94a3b8", sw: 0.5 },
+  "malla-nudo-barra": { fill: "#f59e0b", stroke: "#f59e0b", sw: 1 },
   "sin-mapa": { fill: "#2a2e35", stroke: "#4b5563", sw: 0.6 },
   contorno: { stroke: "#cbd5e1", sw: 1.2 },
   "diagrama-eje": { stroke: "#9ca3af", sw: 1 },

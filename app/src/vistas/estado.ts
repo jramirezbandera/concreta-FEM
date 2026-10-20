@@ -30,6 +30,8 @@ export interface EstadoVista {
   eje: string | null;
   /** Qué dibuja una planta en Modelo. */
   dibujo: DibujoPlanta;
+  /** En Resultados, la malla de la planta encima del resultado. */
+  malla?: boolean;
   modo3d: Modo3D;
   proyeccion: Proyeccion;
   /** I3: el color del sólido. */

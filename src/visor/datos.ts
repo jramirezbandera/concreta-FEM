@@ -100,8 +100,8 @@ export interface DatosLosas {
 }
 
 /** El propósito de las flechas: el de la elección si el mapa es de uz, si no las de desplazamientos por defecto. */
-export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, escala?: EscalaMapa): Resultado<DatosLosas> {
-  const esc = s.escena(planta, { vista: "campo", campo, combinaciones: e, ...(escala ? { escala } : {}) });
+export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, escala?: EscalaMapa, malla?: boolean): Resultado<DatosLosas> {
+  const esc = s.escena(planta, { vista: "campo", campo, combinaciones: e, ...(escala ? { escala } : {}), ...(malla ? { malla } : {}) });
   if (!esc.valido) return esc;
   const conj = s.conjunto(e, campo === "uz" ? "desplazamientos" : "esfuerzos");
   if (!conj.valido) return conj;
@@ -403,8 +403,8 @@ export interface DatosPilares {
   filas: FilaPilar[];
 }
 
-export function datosPilares(s: Sesion, planta: string, e: EleccionCombinaciones): Resultado<DatosPilares> {
-  const esc = s.escena(planta, { vista: "pilares-n", combinaciones: e });
+export function datosPilares(s: Sesion, planta: string, e: EleccionCombinaciones, malla?: boolean): Resultado<DatosPilares> {
+  const esc = s.escena(planta, { vista: "pilares-n", combinaciones: e, ...(malla ? { malla } : {}) });
   if (!esc.valido) return esc;
   const conj = s.conjunto(e, "esfuerzos");
   if (!conj.valido) return conj;

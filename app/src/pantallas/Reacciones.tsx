@@ -27,7 +27,7 @@ import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas } from "../vistas/estado.ts";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
-import { Fuente2D, Fuente3DModelo, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
+import { conMalla, Fuente2D, Fuente3DModelo, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
@@ -115,7 +115,8 @@ export function ModoReacciones() {
     <ZonaVistas
       fuentes={{
         tresD: () => <TresDReacciones d={d} aviso={aviso} cargando={r.cargando} />,
-        planta: (v) => <EscenaReacciones fuente={v.planta ? { tipo: "planta", planta: v.planta, vista: { vista: "reacciones", combinaciones: eleccion, escala: Number(escala) } } : null} objetos={ids} />,
+        planta: (v) => <EscenaReacciones fuente={v.planta ? { tipo: "planta", planta: v.planta, vista: conMalla({ vista: "reacciones" as const, combinaciones: eleccion, escala: Number(escala) }, v) } : null} objetos={ids} />,
+        malla: true,
         alzado: (v) => <EscenaReacciones fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), reacciones: { combinaciones: eleccion, escala: Number(escala) } } : null} objetos={ids} />,
         cabecera3D: () => cabecera,
         cabeceraPlanta: (v, i) => (

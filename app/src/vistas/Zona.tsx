@@ -22,7 +22,7 @@ import type { Solido } from "../../../src/visor/solido.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
-import type { FuenteEscena, VistaPlanta } from "../../../src/visor/sesion.ts";
+import type { FuenteEscena, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
 import { Desplegable, SelectorEje, SelectorPlanta } from "../armazon/Disposicion.tsx";
 import { Aviso } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
@@ -97,7 +97,12 @@ export interface FuentesVistas {
   /** La cabecera de un 3D del modelo, sin resultados (Cargas): con ella, el sólido se puede seguir eligiendo. */
   cabecera3DModelo?: (v: EstadoVista, i: number) => ReactNode;
   cabeceraAlzado?: (v: EstadoVista, i: number) => ReactNode;
+  /** Las plantas de resultados ofrecen ver la malla encima (`EstadoVista.malla`); la fuente la pide con `conMalla`. */
+  malla?: boolean;
 }
+
+/** La vista de resultados de una planta con la malla encima si la celda la pide. */
+export const conMalla = <T extends VistaResultadosPlanta>(vista: T, v: EstadoVista): T => (v.malla ? { ...vista, malla: true } : vista);
 
 const MARGENES_PLANTA: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
 const MARGENES_ALZADO: Margenes = { izq: 24, arriba: 52, der: 24, abajo: 44 };
@@ -205,6 +210,13 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           <>
             <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => p && poner(i, { planta: p })} />
             {fuentes.cabeceraPlanta?.(vv, i)}
+            {fuentes.malla && e.calculado && (
+              <span className="chip seg-chip">
+                <button type="button" data-on={!!v.malla} aria-pressed={!!v.malla} title="Dibujar la malla de la planta (las láminas y los nudos de las vigas) encima del resultado" onClick={() => poner(i, { malla: !v.malla })}>
+                  Malla
+                </button>
+              </span>
+            )}
           </>
         )}
         {tipo === "alzado" && (

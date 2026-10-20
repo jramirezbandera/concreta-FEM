@@ -41,12 +41,12 @@ export type Pedido =
   /** El 3D sólido: las secciones extruidas, con sus aristas (I3). */
   | { tipo: "solido" }
   | { tipo: "objeto"; id: string }
-  | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa }
+  | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa; malla?: boolean }
   | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number; escala?: EscalaMapa }
   | { tipo: "piezas"; planta: string }
   | { tipo: "viga"; id: string; esfuerzo: Esfuerzo; combinaciones: EleccionCombinaciones }
   | { tipo: "estacion"; id: string; esfuerzo: Esfuerzo; combinaciones: EleccionCombinaciones; s: number }
-  | { tipo: "pilares"; planta: string; combinaciones: EleccionCombinaciones }
+  | { tipo: "pilares"; planta: string; combinaciones: EleccionCombinaciones; malla?: boolean }
   | { tipo: "pilar"; id: string; combinaciones: EleccionCombinaciones }
   /** Fase F: el mapa de una armadura de las franjas de una planta, con su tabla, y el detalle de una franja. */
   | { tipo: "armado"; planta: string; combinaciones: EleccionCombinaciones; armadura: Armadura; escala?: EscalaMapa; armado?: ArmadoProyecto; soloExceso?: boolean; filtro?: FiltroArmado }

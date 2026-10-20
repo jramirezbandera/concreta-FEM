@@ -73,6 +73,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "malla-abaco": { fill: "#dfe9df", stroke: "#94a3b8", sw: 0.6 },
   "malla-rigida": { fill: "#9ca3af", stroke: "#4b5563", sw: 0.6 },
   "malla-barra": { stroke: "#b45309", sw: 1.6 },
+  "malla-encima": { stroke: "#64748b", sw: 0.5 },
+  "malla-nudo-barra": { fill: "#b45309", stroke: "#b45309", sw: 1 },
   "sin-mapa": { fill: "#e5e7eb", stroke: "#9ca3af", sw: 0.6 },
   isobanda: {},
   isolinea: { stroke: "#2b313a", sw: 0.7 },

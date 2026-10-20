@@ -30,9 +30,9 @@ import { Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 /** El axil de los tramos que llegan a una planta, en una vista: un clic elige el pilar. */
-function PlantaPilares({ planta, eleccion, id }: { planta: string; eleccion: EleccionCombinaciones; id: string | null }) {
+function PlantaPilares({ planta, eleccion, id, malla }: { planta: string; eleccion: EleccionCombinaciones; id: string | null; malla?: boolean }) {
   const { proyecto, setSeleccion } = useVisor();
-  const d = usePedido(proyecto.cliente, { tipo: "pilares", planta, combinaciones: eleccion });
+  const d = usePedido(proyecto.cliente, { tipo: "pilares", planta, combinaciones: eleccion, ...(malla ? { malla } : {}) });
   const vista: VistaPlanta = { vista: "pilares-n", combinaciones: eleccion };
   const fuente = { tipo: "planta" as const, planta, vista };
   const resaltado = useEleccion(fuente, id);
@@ -175,7 +175,8 @@ export function ModoPilares() {
   const vistaPlanta = (
     <ZonaVistas
       fuentes={{
-        planta: (v) => (v.planta ? <PlantaPilares planta={v.planta} eleccion={eleccion} id={id} /> : null),
+        planta: (v) => (v.planta ? <PlantaPilares planta={v.planta} eleccion={eleccion} id={id} malla={!!v.malla} /> : null),
+        malla: true,
         cabeceraPlanta: (v) => (
           <Chip acento title={v.planta === planta ? d.datos?.combinaciones.descripcion : undefined}>
             Axil de los tramos que llegan

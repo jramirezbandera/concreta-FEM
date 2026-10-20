@@ -34,7 +34,7 @@ import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import { useSonda } from "../vistas/sonda.ts";
 import type { Marca } from "../vistas/vista2d.ts";
-import { encuadrarCajaActiva, Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
+import { conMalla, encuadrarCajaActiva, Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 const ARMADURAS: { id: Armadura; nombre: string }[] = LISTA_ARMADURAS.map((id) => ({ id, nombre: NOMBRE_CORTO[id] }));
@@ -555,9 +555,10 @@ export function ModoArmado() {
         planta: (v) => {
           const pl = v.planta;
           const marcas: Marca[] = punto && pl && punto.planta === pl && punto.clave === clave(pl) ? [{ p: punto.p, texto: punto.v ? `${fmt(punto.v.valor, 1)} ${U}` : "fuera" }] : [];
-          return <EscenaArmado fuente={pl ? { tipo: "planta", planta: pl, vista: { vista: "armado", combinaciones: eleccion, armadura, ...op } } : null} objetos={objetos} marcas={marcas} onPunto={(p, x) => void clic(p, x)} />;
+          return <EscenaArmado fuente={pl ? { tipo: "planta", planta: pl, vista: conMalla({ vista: "armado" as const, combinaciones: eleccion, armadura, ...op }, v) } : null} objetos={objetos} marcas={marcas} onPunto={(p, x) => void clic(p, x)} />;
         },
         cabeceraPlanta: (v, i) => cabecera(v, i),
+        malla: true,
         tresD: (v) => <TresDArmado planta={v.planta} armadura={armadura} eleccion={eleccion} op={op} />,
         cabecera3D: () => chip,
       }}

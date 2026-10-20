@@ -38,9 +38,9 @@ import { Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
 type Punto = { p: Vec2; v: ValorPunto | null; planta: string; clave: string };
 
 /** El mapa de una planta en una vista: un clic da el valor del punto. */
-function PlantaLosas({ planta, campo, eleccion, escala, punto, onPunto, dec, unidad }: { planta: string; campo: Campo; eleccion: EleccionCombinaciones; escala: EscalaMapa | undefined; punto: Punto | null; onPunto: (p: Vec2, planta: string) => void; dec: number; unidad: string }) {
+function PlantaLosas({ planta, campo, eleccion, escala, punto, onPunto, dec, unidad, malla }: { planta: string; campo: Campo; eleccion: EleccionCombinaciones; escala: EscalaMapa | undefined; punto: Punto | null; onPunto: (p: Vec2, planta: string) => void; dec: number; unidad: string; malla?: boolean }) {
   const { proyecto } = useVisor();
-  const d = usePedido(proyecto.cliente, { tipo: "losas", planta, campo, combinaciones: eleccion, ...(escala ? { escala } : {}) });
+  const d = usePedido(proyecto.cliente, { tipo: "losas", planta, campo, combinaciones: eleccion, ...(escala ? { escala } : {}), ...(malla ? { malla } : {}) });
   const marcas: Marca[] = punto && punto.planta === planta ? [{ p: punto.p, texto: punto.v ? `${fmt(punto.v.valor, dec)} ${unidad}` : "sin mapa" }] : [];
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Recuperando los campos (SPR)…</Aviso> : null;
   return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} marcas={marcas} eventos={{ clic: (p) => onPunto(p, planta) }} aviso={aviso} cargando={d.cargando} />;
@@ -144,7 +144,8 @@ export function ModoLosas() {
   const vista = (
     <ZonaVistas
       fuentes={{
-        planta: (v) => (v.planta ? <PlantaLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} punto={punto && punto.clave === claveDe(v.planta) ? punto : null} onPunto={(p, pl) => void clic(p, pl)} dec={dec} unidad={unidad} /> : null),
+        planta: (v) => (v.planta ? <PlantaLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} punto={punto && punto.clave === claveDe(v.planta) ? punto : null} onPunto={(p, pl) => void clic(p, pl)} dec={dec} unidad={unidad} malla={!!v.malla} /> : null),
+        malla: true,
         cabeceraPlanta: (v) => (
           <Chip acento title={v.planta === planta ? x?.dibujada?.etiqueta : undefined}>
             {nombreCampo} · {unidad}

@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ejecutar } from "../../cli/ordenes.ts";
 import { deriva, flechas, pieza } from "../agente/consultas.ts";
 import { envolventePieza } from "../agente/render/resultados.ts";
-import { conjuntoPorDefecto, escenaASvg, nombreFigura, planoDeEje, vistaAlzado, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo } from "../agente/render/index.ts";
+import { conjuntoPorDefecto, escenaASvg, nombreFigura, planoDeEje, vistaAlzado, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, capaMalla, vistaModelo } from "../agente/render/index.ts";
 import type { Escena, Vec2 } from "../agente/render/escena.ts";
 import { sensatezResultados } from "../agente/sensatezResultados.ts";
 import { sha256 } from "../compilador/huella.ts";
@@ -234,6 +234,32 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
         comprobarBuferes(e, prepararEscena(e), `${planta} ${v.vista}`);
       }
     }
+  });
+
+  it("la malla encima de un resultado: la escena sin ella, la capa de la malla y los rótulos al final; no se elige", () => {
+    const rr = s.rr!;
+    // La primera planta con láminas (1-022 no tiene)
+    const planta = s.proyecto.modelo.plantas.find((p) => rr.laminas(p.id).laminas.length)?.id;
+    if (!planta) return;
+    const m = capaMalla(rr, planta);
+    expect(m.primitivas.some((p) => "estilo" in p && p.estilo === "malla-encima")).toBe(true);
+    expect(m.primitivas.every((p) => !("objeto" in p) || p.objeto === undefined)).toBe(true);
+    for (const v of [
+      { vista: "vigas", esfuerzo: "My", combinaciones: D },
+      { vista: "campo", campo: "m11", combinaciones: D },
+      { vista: "pilares-n", combinaciones: D },
+    ] as const) {
+      const sin = valido(s.escenaA4(planta, v));
+      const con = valido(s.escenaA4(planta, { ...v, malla: true }));
+      const textos = sin.primitivas.filter((p) => p.tipo === "texto");
+      expect(con.primitivas, v.vista).toEqual([...sin.primitivas.filter((p) => p.tipo !== "texto"), ...m.primitivas, ...textos]);
+      expect(con.extremos).toEqual(sin.extremos);
+      expect(con.leyenda).toEqual([...sin.leyenda, ...m.leyenda]);
+      comprobarBuferes(con, prepararEscena(con), `${planta} ${v.vista} con malla`);
+    }
+    // Cada arista de lámina, una sola vez
+    const claves = m.primitivas.filter((p) => p.tipo === "linea").map((p) => (p.tipo === "linea" ? JSON.stringify([...p.puntos].sort()) : ""));
+    expect(new Set(claves).size).toBe(claves.length);
   });
 
   it("I2: los alzados de cada eje, preparados sin perder ni mover nada; elegir y resaltar en ellos", () => {
