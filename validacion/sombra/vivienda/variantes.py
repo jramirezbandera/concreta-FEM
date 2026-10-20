@@ -153,6 +153,8 @@ VARIANTES = {
     "d-losa-s-05": losa_flexible("L-CUB-S", 0.5),
     "d-losa-s-025": losa_flexible("L-CUB-S", 0.25),
     "d-vigas-cubren": vigas_cubren,
+    # La torsión de CYPE de la obra del usuario (coeficiente de rigidez a torsión 0,16; el nuestro, 0,1)
+    "d-tors016": lambda: replica({"modificadores": {"pilares": {"todos": {"A": 2}}, "vigas": {"hormigon": {"J": 0.16}}}}),
 }
 
 if __name__ == "__main__":
