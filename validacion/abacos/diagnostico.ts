@@ -49,7 +49,7 @@ console.log(filas.join("\n"));
 
 // Plazas de la región de la lámina más cercana a (cx + 0.7, cy + 0.6)
 if (process.env.PLAZAS) {
-  const C = campos as any;
+  const C = campos.flexion as any;
   let mejor = -1, dmin = Infinity;
   (c.modelo.laminas ?? []).forEach((l, i) => {
     if (campos.region(i) < 0 || c.mapeo.laminas?.[i]?.losa !== "L2") return;

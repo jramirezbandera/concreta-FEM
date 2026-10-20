@@ -311,3 +311,40 @@ Al modelar la vivienda de Alhaurín el Grande (primera puerta de uso con un proy
 - **El resto:** bit a bit.
 
 **Test:** `src/compilador/carasBorde.test.ts`, con la vivienda; falla con el código de antes. Los de las 44 plantas no ortogonales de G-4 siguen sin el aviso de calidad de malla.
+
+## 15. SP-7: las regiones SPR por campo (2026-10-20)
+
+**Origen:** en Resultados · Losas de la vivienda de Alhaurín (M11, ELU-PT-3), el usuario vio una discontinuidad grande del mapa en el borde de los ábacos de L-CUB-S, y preguntó si era normal. No lo es: con la rigidez «uniforme» de CY3 (por defecto desde la fase CY, `hipotesis-cype.md` §2.1: fisurados, el ábaco y el aligerado tienen una rigidez parecida) el ábaco y el aligerado tienen **la misma flexión** (m11 = m22 = ½ y el mismo m12, con ν = 0 en los dos) y sólo cambian la membrana (f11, f22, f12: el ábaco es macizo) y el cortante transversal (v13, v23: los nervios). Con la misma rigidez a flexión, M es continuo al cruzar el borde; y un salto del momento normal al borde no sería físico ni con rigidez distinta, porque lo fija el equilibrio.
+
+**Qué pasaba** (`CamposLaminas`, `campos.ts`): dos láminas sólo entraban en la misma región SPR si coincidían **los ocho** multiplicadores (`mismaSeccion`). La diferencia de membrana y de cortante, que no pinta nada en M, partía cada ábaco en una región aparte de 10 a 200 láminas, y cada lado del borde se extrapolaba por su cuenta. Medido en L-CUB-S con ELU-PT-3 (`scratchpad/salto.ts`, 210 nudos en el borde ábaco–aligerado):
+
+| Nudo (x, y) | SPR del ábaco | SPR del aligerado | Centroides a cada lado |
+|---|---|---|---|
+| (9,57; 13,17) | −38,5 | −15,8 | −16,2 / −16,1 |
+| (6,59; 9,36) | **+13,0** | −6,7 | **−12,4** / −1,3 |
+| (7,74; 7,79) | −43,3 | −27,4 | −31,1 / −25,0 |
+
+Las láminas casi coinciden a los dos lados y el SPR saltaba hasta 22,6 kN·m/m; en algún ábaco cambiaba de signo frente a sus propias láminas. No era sólo del mapa: las estaciones de paso de las franjas (cada 0,25 m, por campos) y el my y el mxy de las de cara y apoyo usan el mismo SPR.
+
+**Arreglo (motor, sin cambio de versión del compilador):** dos particiones en regiones, una por campo, con sus parches y sus planes (`ParticionCampos`):
+
+- **flexión**, para M y Q: la misma sección si coinciden E, ν, t y m11, m22 y m12 (y el eje 1 si no son isótropos);
+- **membrana**, para N: E, ν, t, f11, f22, f12 y las opciones de la membrana (γ y la estabilización).
+
+El cortante transversal (v13, v23) no parte ninguna: Q sale de las derivadas de M. Cada partición ajusta sólo sus tres componentes, con los mismos parches y el mismo orden de las cuentas, así que **donde las dos particiones coinciden con la de antes los valores son los mismos bits**. Los cortes por campos toman N con sus componentes en el triedro de su región de membrana y M y Q en el de flexión; `en` y `enNudos` siguen en los ejes de la lámina. Lo que `CamposLaminas` expone sin decir la partición (`regiones`, `region`, `plazas`, `lebesgueEn`, `nodales`, `plaza`) es de la de flexión; en `plaza` y `nodales`, N viene de la plaza de membrana del mismo nudo. Con `rigidezReticular: "bruta"` (C4-h), el ábaco sigue siendo una región de flexión aparte, que es lo correcto: allí el momento tangente salta de verdad.
+
+**Resultado:**
+
+- **Vivienda, L-CUB-S:** el salto en los 210 nudos del borde pasa a 0,0; la losa es una sola región de flexión de 1 848 láminas (antes, 10 regiones de ábaco de 10 a 203 láminas más el aligerado).
+- **Test** (`src/compilador/abacos.test.ts`, SP-7): en el reticular 2 × 2 y en el muestrario, ninguna región de flexión es sólo de ábaco, y M11, M22 y M12 vistos desde una lámina del ábaco y desde una del aligerado en el mismo nudo coinciden a 1e-9. Con el código de antes, el salto llegaba a 0,42 del mayor momento en el reticular 2 × 2 (14,0 de 33,5 kN·m/m) y a 0,71 en el muestrario (12,6 de 17,7). Con «bruta», las dos particiones son la misma y el ábaco va aparte.
+- **Referencias congeladas** (`validacion/f/out_cambiosRegiones.txt`, antes de regenerar): cambian exactamente los cuatro reticulares «uniformes» de F (`h25-reticular` y `reticular-2x2-abacos`, `-lv` y `-lv2`) y el de C5 (`reticular-h25`: 40 de 60 estaciones de banda, sólo en my y mxy, que salen por campos; ningún mx). Los otros diez de F, los otros tres de C5 y las de C1–C4 y E5 quedan idénticos al byte. En los que cambian, ni la malla ni los casos se mueven, el mx de las estaciones de cara y apoyo (por fuerzas nodales) no cambia nunca, y lo que se mueve es lo que sale por campos: las estaciones de paso (de 708 a 1 108 por modelo) y el my y el mxy de las de cara y apoyo. Los cambios grandes relativos al máximo de la franja están en las estaciones de paso junto al borde del ábaco (en `h25-reticular`, cuatro de 0,83 a 10,39 kN·m/m, +38,9 %), que es justo donde el ajuste de la región pequeña fallaba. Regenerada a sabiendas.
+- **Convergencia de las franjas** (`validacion/abacos/convergencia.ts`, h = 0,75 frente a la malla fina, envolventes de ELU ≥ 20 kN·m/m; el «antes» medido con el mismo script en un árbol de trabajo en el commit anterior, HR-8):
+
+  | Modelo | Antes: media / \|media\| | Ahora: media / \|media\| | Por debajo de −5 % / −10 % | Las que más se pasan |
+  |---|---|---|---|---|
+  | Muestrario, L2 (frente a 0,25) | −0,1 % / 3,4 % | −0,4 % / 3,2 % | 3 / 0 → 3 / 0 | +14,2…+17,9 % → +9,5…+13,6 % |
+  | Edificio reticular de C4, 2 plantas (frente a 0,375) | +4,4 % / 6,0 % | +1,7 % / 4,1 % | 4 / 0 → 7 / 0 | +21…+25 % → +18…+25 % |
+
+  La sobreestimación sistemática del edificio baja y las dos medias absolutas también; en el edificio aparecen tres envolventes más entre −5 y −6,3 % (L-N2:Y44, Y45 y X37) y las peores (−9,7 % en L-N2:X13, una inferior; +25 % en L-N2:X19) son las mismas de antes y no dependen de las regiones.
+
+**Pendiente:** el momento de membrana de una losa con diafragma rígido es ruido (I4-1) y la partición de membrana no se ve en la app; si algún día importa, los mapas de F11…F12 van por ella.

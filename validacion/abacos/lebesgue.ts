@@ -16,7 +16,7 @@ import type { ModeloAnalitico } from "../../src/motor/modelo.ts";
 
 /** Λ y vía de cada plaza (vía: «centro», «vecinos» o «propio-n» con la base de n términos). */
 export function lebesgue(campos: CamposLaminas): { L: Float64Array; via: string[] } {
-  const C = campos as any;
+  const C = campos.flexion as any;
   const np = campos.nPlazas;
   const L = new Float64Array(np);
   const via: string[] = [];

@@ -35,16 +35,17 @@ for (const [nombre, f] of modelos) {
   const campos = new CamposLaminas(c.modelo);
   const { L } = lebesgue(campos);
   const ev = campos.evaluador(u);
-  const C = campos as any;
+  const C = campos.flexion as any;
   const peor = TRAMOS.slice(1).map(() => ({ n: 0, max: 0, p95: [] as number[] }));
   for (let p = 0; p < campos.nPlazas; p++) {
     const v = ev.plaza(p);
     const pl = C.plan(p);
     let m = 0;
     for (const c2 of pl.parches) for (const s of c2.muestras) {
-      const g = (ev as any).gaussDe(Math.floor(s / 5));
-      const o = 8 * (s % 5);
-      m = Math.max(m, Math.abs(g[o + 3]), Math.abs(g[o + 4]), Math.abs(g[o + 5]));
+      // Muestras de flexión de la lámina: 5 × [Mx, My, Mxy, Qx, Qy] en el triedro de su región
+      const g = (ev as any).muestrasFlexion(Math.floor(s / 5));
+      const o = 5 * (s % 5);
+      m = Math.max(m, Math.abs(g[o]), Math.abs(g[o + 1]), Math.abs(g[o + 2]));
     }
     const e = Math.max(Math.abs(v[3]!), Math.abs(v[4]!), Math.abs(v[5]!)) / (m || 1);
     const t = TRAMOS.findIndex((x, i) => L[p]! >= x && L[p]! < TRAMOS[i + 1]!);

@@ -21,7 +21,7 @@ if (!k.valido) throw new Error(k.diagnosticos[0]!.mensaje);
 const r = k.casos.find((x) => x.id === "G")!;
 const campos = new CamposLaminas(c.modelo);
 const ev = campos.evaluador(r.u);
-const C = campos as any;
+const C = campos.flexion as any;
 const filas: { d: number; t: string }[] = [];
 const maxRegion = new Map<number, number>();
 (c.modelo.laminas ?? []).forEach((_, i) => {

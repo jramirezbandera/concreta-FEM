@@ -1,0 +1,77 @@
+
+== h25-plana: idéntico al byte
+
+== h25-reticular: cambia
+  mx de cara y apoyo que se mueve: 0
+  cara  : 64 de 72 estaciones cambian
+  paso  : 1108 de 1380 estaciones cambian
+  superior: mediana 0.0 %, de -17.6 % a 38.9 %; |cambio| > 5 %: 64, > 10 %: 28
+  inferior: mediana 0.0 %, de -75.8 % a 11.4 %
+  las cinco que más cambian la superior:
+    LOSA:X2            paso7.250000:0               0.83 →    10.39     38.9 %
+    LOSA:Y14           paso7.250000:0               0.83 →    10.39     38.9 %
+    LOSA:Y2            paso7.250000:0               0.83 →    10.39     38.9 %
+    LOSA:X14           paso7.250000:0               0.83 →    10.39     38.9 %
+    LOSA:Y15           paso7.250000:0               0.78 →    21.70     21.6 %
+
+== pilares-mezclados: idéntico al byte
+
+== aleatorio-3: idéntico al byte
+
+== losa-3x3-refinada: idéntico al byte
+
+== h25-plana-sin-refinar: idéntico al byte
+
+== losa-3x3-mezclada: idéntico al byte
+
+== reticular-2x2-abacos: cambia
+  mx de cara y apoyo que se mueve: 0
+  cara  : 22 de 24 estaciones cambian
+  paso  : 732 de 979 estaciones cambian
+  apoyo : 40 de 88 estaciones cambian
+  superior: mediana 0.0 %, de -14.1 % a 11.6 %; |cambio| > 5 %: 27, > 10 %: 6
+  inferior: mediana 0.0 %, de -15.1 % a 19.9 %
+  las cinco que más cambian la superior:
+    L-N1:Y2            paso6.000000:0               2.71 →     1.29    -14.1 %
+    L-N1:Y2            paso6.250000:0               1.39 →     0.00    -13.8 %
+    L-N1:X8            paso5.000000:0               0.30 →     3.60     11.6 %
+    L-N1:Y2            paso5.750000:0               4.31 →     3.16    -11.4 %
+    L-N1:Y10           paso4.750000:0               2.04 →     2.39     10.5 %
+
+== aleatorio-3-lv: idéntico al byte
+
+== reticular-2x2-abacos-lv: cambia
+  mx de cara y apoyo que se mueve: 0
+  apoyo : 100 de 146 estaciones cambian
+  paso  : 762 de 985 estaciones cambian
+  cara  : 5 de 10 estaciones cambian
+  superior: mediana 0.0 %, de -4.6 % a 24.8 %; |cambio| > 5 %: 22, > 10 %: 4
+  inferior: mediana 0.0 %, de -15.0 % a 5.4 %
+  las cinco que más cambian la superior:
+    L-N1:X9            paso5.750000:0               7.29 →     9.10     24.8 %
+    L-N1:X11           paso5.750000:0               2.30 →     2.92     23.6 %
+    L-N1:X9            paso5.500000:0               4.54 →     5.53     13.6 %
+    L-N1:X11           paso5.500000:0               0.95 →     1.24     11.1 %
+    L-N1:X5            paso5.750000:0              18.11 →    20.03      9.9 %
+
+== aleatorio-3-lv2: idéntico al byte
+
+== reticular-2x2-abacos-lv2: cambia
+  mx de cara y apoyo que se mueve: 0
+  apoyo : 90 de 146 estaciones cambian
+  paso  : 708 de 985 estaciones cambian
+  cara  : 6 de 10 estaciones cambian
+  superior: mediana 0.0 %, de -17.1 % a 25.0 %; |cambio| > 5 %: 46, > 10 %: 14
+  inferior: mediana 0.0 %, de -13.3 % a 50.2 %
+  las cinco que más cambian la superior:
+    L-N1:X9            paso5.750000:0               7.28 →     9.09     25.0 %
+    L-N1:X11           paso5.750000:0               2.23 →     2.84     23.4 %
+    L-N1:Y2            paso4.250000:0               1.87 →     3.83     17.1 %
+    L-N1:Y9            paso0.250000:0               7.20 →     2.23    -17.1 %
+    L-N1:Y2            paso6.250000:0               2.17 →     0.21    -17.0 %
+
+== edificio-2x2-lv2: idéntico al byte
+
+== edificio-2x2-lvd: idéntico al byte
+
+En total cambian 4 de 14 modelos.
