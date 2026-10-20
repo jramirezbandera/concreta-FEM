@@ -136,7 +136,7 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
   });
   const op = resolverOpciones(d.proyecto.opciones);
   parrafo(
-    `Opciones efectivas: ε_geom ${num(op.epsGeom)} m, ε_snap ${num(op.epsSnap)} m, zona rígida ${num(op.factorZonaRigida)} (pilares ${num(op.factorZonaRigidaPilares)}), nudos del forjado en su ${op.planoForjado === "superior" ? "cara superior" : "plano medio"}, cortante ${op.cortante ? "sí" : "no"}, malla ${num(op.tamanoMalla)} m, rejilla ${op.rejilla ? "sí" : "no"}, torsión de equilibrio ${op.torsionEquilibrio ? "sí" : "no"}, modificadores ${JSON.stringify(op.modificadores)}.`,
+    `Opciones efectivas: ε_geom ${num(op.epsGeom)} m, ε_snap ${num(op.epsSnap)} m, zona rígida ${num(op.factorZonaRigida)} (pilares ${num(op.factorZonaRigidaPilares)}), nudos del forjado en su ${op.planoForjado === "superior" ? "cara superior" : "plano medio"}, vigas planas en un reticular ×${num(op.rigidezVigasPlanas)} en flexión, cortante ${op.cortante ? "sí" : "no"}, malla ${num(op.tamanoMalla)} m, rejilla ${op.rejilla ? "sí" : "no"}, torsión de equilibrio ${op.torsionEquilibrio ? "sí" : "no"}, modificadores ${JSON.stringify(op.modificadores)}.`,
   );
 
   // ─── Cargas ────────────────────────────────────────────────────────────────────────────────

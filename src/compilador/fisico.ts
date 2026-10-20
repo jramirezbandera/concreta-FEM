@@ -491,6 +491,8 @@ export const MODIFICADORES_D4: ModificadoresPiezas = { pilares: { todos: { A: 2 
 
 /** Coeficiente de empotramiento por defecto de la cabeza del último tramo de pilar (CY-b, decidido el 2026-10-15; el de CYPECAD). */
 export const EMPOTRAMIENTO_CABEZA = 0.3;
+/** RV-a: la flexión de las vigas planas en un reticular «uniforme», como en CYPECAD (`fase-lv.md` §2.4). */
+export const RIGIDEZ_VIGAS_PLANAS = 0.6;
 /** Factor de zona rígida por defecto (C1-a, decidido el 2026-10-04): la mitad del nudo es rígida. */
 export const FACTOR_ZONA_RIGIDA = 0.5;
 /** Ancho de las franjas de armado de una losa maciza por defecto, m (fase F, F-a). */
@@ -558,6 +560,16 @@ export interface OpcionesCompilacion {
    * `multiplicadores` dados en la losa mandan sobre las dos.
    */
   rigidezReticular?: "uniforme" | "bruta";
+  /**
+   * Flexión de las vigas planas en un reticular (RV-a, `fase-lv.md` §2.4), en (0, 1]: el `Iy` de los
+   * tramos de viga de hormigón rectangular con un canto no mayor que el del forjado que tienen a uno
+   * o a los dos lados un reticular «uniforme» (con `rigidezReticular: "uniforme"` y sin
+   * `multiplicadores` dados), y ninguna otra losa, se multiplica por este factor (encima de los
+   * `modificadores`). Por defecto, 0,6: el ajuste a CYPECAD, que trata así estas vigas sin decirlo
+   * en su memoria (modelo A con vigas planas de 30 y de 50: ±11 %, y del lado seguro en la viga). No
+   * rebaja las vigas descolgadas ni las de una losa maciza, como CYPECAD. Con 1, nada.
+   */
+  rigidezVigasPlanas?: number;
   /**
    * Unión de las losas con las vigas de hormigón rectangulares (fase LV, CY-g). "cara" (por
    * defecto), la de CYPECAD: el ancho de la viga no es losa, y los nudos de la losa en sus caras van
@@ -637,6 +649,7 @@ export interface OpcionesResueltas {
   planoForjado: "superior" | "medio";
   empotramientoCabeza: number;
   rigidezReticular: "uniforme" | "bruta";
+  rigidezVigasPlanas: number;
   unionLosaViga: "cara" | "eje";
   cortante: boolean;
   modificadores: ModificadoresPiezas;
@@ -661,6 +674,7 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     planoForjado: o.planoForjado ?? "superior",
     empotramientoCabeza: o.empotramientoCabeza ?? EMPOTRAMIENTO_CABEZA,
     rigidezReticular: o.rigidezReticular ?? "uniforme",
+    rigidezVigasPlanas: o.rigidezVigasPlanas ?? RIGIDEZ_VIGAS_PLANAS,
     unionLosaViga: o.unionLosaViga ?? "cara",
     cortante: o.cortante ?? true,
     modificadores: o.modificadores ?? MODIFICADORES_D4,

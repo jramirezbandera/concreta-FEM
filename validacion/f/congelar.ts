@@ -28,6 +28,10 @@
  * terminado en `-rvb`, el de por defecto (los nudos del forjado en su cara superior y la cabeza de los
  * pilares rígida en todo el canto, como CYPECAD).
  *
+ * RV-a (compilador RV2): ninguno de los de antes tiene vigas planas en un reticular «uniforme», así
+ * que salen idénticos; el terminado en `-rva` es el reticular de 2 × 2 con las vigas planas, de 40 ×
+ * 35 (el canto del forjado), con su flexión ×0,6 (por defecto).
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/f/congelar.ts
  */
@@ -42,6 +46,7 @@ import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
 import { fisicoAleatorio } from "../../src/pruebas/fisicoAleatorio.ts";
 import { conLosasAleatorias } from "../../src/pruebas/losasAleatorias.ts";
+import type { ModeloFisico } from "../../src/compilador/fisico.ts";
 import type { ModeloCongelado } from "../c1/congelar.ts";
 import { referenciaC2, type ReferenciaC2 } from "../c2/congelar.ts";
 import { losaPlanaFisica, OPCIONES_LOSA_PLANA } from "../c2/losaPlana.ts";
@@ -74,7 +79,15 @@ export const MODELOS_CONGELADOS_F: Record<string, () => ModeloCongelado> = {
   "edificio-2x2-lvd": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { planoForjado: "medio" } }),
   // RV-b (compilador RV1, 2026-10-20): los nudos del forjado en su cara superior y la cabeza de los pilares rígida en todo el canto (por defecto)
   "edificio-2x2-rvb": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: {} }),
+  // RV-a (compilador RV2, 2026-10-20): las vigas planas de un reticular «uniforme», con Iy ×0,6 (por defecto)
+  "reticular-2x2-planas-rva": () => ({ fisico: conVigasPlanas(conAcciones(edificioReticular(1, 2, 2))), opciones: {} }),
 };
+
+/** RV-a: todas las vigas, planas de 40 × 35 (el canto del reticular de `edificioReticular`). */
+function conVigasPlanas(f: ModeloFisico): ModeloFisico {
+  const mat = f.secciones.find((s) => s.id === f.vigas![0]!.seccion)!.material;
+  return { ...f, secciones: [...f.secciones, { id: "VP40x35", material: mat, forma: "rectangular", b: 0.4, h: 0.35 }], vigas: f.vigas!.map((v) => ({ ...v, seccion: "VP40x35" })) };
+}
 
 export interface ReferenciaF {
   c2: ReferenciaC2;

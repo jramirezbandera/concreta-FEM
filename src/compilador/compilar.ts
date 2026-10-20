@@ -36,9 +36,10 @@ import { construirPanos, type PanosU } from "./unidireccional.ts";
 import { ordenarPoligonos, validar, type Contexto } from "./validar.ts";
 import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
+import { puntoEnRegion } from "./poligonos.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "RV1";
+export const VERSION_COMPILADOR = "RV2";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -275,10 +276,13 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   // Modificadores de rigidez (D4): los de todos los materiales y, encima, los del material de la barra.
   // En los tramos con torsión de equilibrio (C4-k), la torsión no se reduce
   const equilibrio = new Set([...(op.torsionEquilibrio ? barrasTorsionEquilibrio(ctx, topo, piezas, panos) : [])].map((i) => piezas.barras[i]!));
+  // RV-a: la flexión de las vigas planas en un reticular «uniforme»
+  const planas = op.rigidezVigasPlanas < 1 ? vigasPlanasEnReticular(ctx, losas, piezas) : new Set<BarraP>();
   const modificadoresDe = (b: BarraP): ModificadoresBarra | undefined => {
     const g = op.modificadores[b.tipo === "pilar" ? "pilares" : b.tipo === "vigueta" ? "viguetas" : "vigas"];
     const m: ModificadoresBarra = { ...g?.todos, ...g?.[b.material] };
     if (equilibrio.has(b) && m.J !== undefined && m.J < 1) delete m.J;
+    if (planas.has(b)) m.Iy = (m.Iy ?? 1) * op.rigidezVigasPlanas;
     return Object.keys(m).length ? m : undefined;
   };
   const barras: BarraAnalitica[] = piezas.barras.map((b) => {
@@ -397,7 +401,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
     modelo,
     mapeo,
     diagnosticos: diag.lista,
-    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets), cargas.alDiafragma),
+    hipotesis: hipotesis(ctx, op, piezas, losas, panos, modificadoresDe, equilibrio, barras.some((b) => b.offsets), cargas.alDiafragma, planas),
     huella,
     estadisticas: {
       nudos: nudos.length,
@@ -455,7 +459,7 @@ function avisarDintelesEnDiafragma(ctx: Contexto, diag: Diagnosticos): void {
   }
 }
 
-function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>, conZonas: boolean, alDiafragma: readonly string[]): string[] {
+function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: Losas, panos: PanosU, modificadoresDe: (b: BarraP) => ModificadoresBarra | undefined, equilibrio: ReadonlySet<BarraP>, conZonas: boolean, alDiafragma: readonly string[], planas: ReadonlySet<BarraP>): string[] {
   const h: string[] = [];
   // Sin ninguna barra con zona rígida (perfiles dados por sus propiedades, sin b ni h), el factor no actúa
   // ZR1: las vigas, por lo que recorren dentro del pilar; los pilares, por lo que ocupa el nudo físico
@@ -488,6 +492,12 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
   }
   if (grupos.size) h.push(`Modificadores de rigidez (D4): ${[...grupos].map(([k, n]) => `${k} (${n})`).join("; ")}.`);
   else h.push("Sin modificadores de rigidez.");
+  if (planas.size) {
+    const vs = [...new Set([...planas].map((b) => b.pieza))].sort();
+    h.push(
+      `Vigas planas en un reticular (RV-a): la flexión (Iy) ×${coma(op.rigidezVigasPlanas)} en ${planas.size} tramos de ${vs.length} vigas (${vs.join(", ")}), incluida en los modificadores de arriba. Es un ajuste empírico a CYPECAD, que trata así las vigas de hormigón con el canto del forjado embebidas en un reticular «uniforme» sin decirlo en su memoria: con la sección bruta, sus vigas llevan hasta 1,6 veces el momento de vano de CYPECAD y la losa, hasta un 13 % menos.`,
+    );
+  }
   // CY2: empotramiento parcial de los extremos de pilar, agrupado por valor
   const emp = new Map<string, number>();
   for (const b of piezas.barras)
@@ -601,4 +611,39 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     }
   }
   return h;
+}
+
+/**
+ * RV-a: los tramos de viga de hormigón rectangular, con un canto no mayor que el del forjado, que
+ * tienen a sus lados (mirados a b/4 del eje en su punto medio, como C2-g) un reticular «uniforme» de
+ * su planta y ninguna otra losa ni paño. Un lado sin losa (la viga de borde) no cuenta.
+ */
+function vigasPlanasEnReticular(ctx: Contexto, losas: Losas, piezas: Piezas): Set<BarraP> {
+  const res = new Set<BarraP>();
+  const eps = ctx.op.epsGeom;
+  for (const b of piezas.barras) {
+    if (b.tipo !== "viga" || b.auxiliar) continue;
+    const v = ctx.vigaDe.get(b.pieza);
+    const sc = v && ctx.secciones.get(v.seccion);
+    if (!v || !sc || sc.material !== "hormigon" || sc.forma !== "rectangular" || sc.huella?.tipo !== "rectangulo") continue;
+    const dx = b.jp[0] - b.ip[0];
+    const dy = b.jp[1] - b.ip[1];
+    const L = Math.hypot(dx, dy);
+    if (!(L > eps)) continue;
+    const M: Vec2 = [(b.ip[0] + b.jp[0]) / 2, (b.ip[1] + b.jp[1]) / 2];
+    const n: Vec2 = [-dy / L, dx / L];
+    let reticular = false;
+    let otra = false;
+    for (const s of [1, -1]) {
+      const q: Vec2 = [M[0] + (s * sc.huella.b * n[0]) / 4, M[1] + (s * sc.huella.b * n[1]) / 4];
+      ctx.losas.forEach((l, i) => {
+        if (l.losa.planta !== v.planta || !puntoEnRegion(q, losas.regiones[i]!)) return;
+        if (l.reticular?.abaco && !l.reticular.dados && sc.canto <= l.material.t + eps) reticular = true;
+        else otra = true;
+      });
+      if (ctx.panos.some((p) => p.pano.planta === v.planta && puntoEnRegion(q, p.region))) otra = true;
+    }
+    if (reticular && !otra) res.add(b);
+  }
+  return res;
 }

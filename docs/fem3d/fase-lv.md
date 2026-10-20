@@ -231,7 +231,52 @@ Es lo esperado de un tramo flexible más corto: los pilares toman algo más del 
 - **Los tramos cortos de 0,90 m entre las cubiertas** tienen el mismo tramo flexible que con LV-d (de 3,50 a 4,10) con otro brazo, y sus cortantes con peso propio (|V| de las dos componentes) bajan un poco: 31,8 / 22,5 / 8,1 kN en P4 / P12 / P19 (plano medio 32,9 / 23,3 / 9,6; CYPE 35,6 / 27,1 / 9,1).
 - **Sigue P5** (+22–24 % con peso propio en todas las variantes), y con la rebaja asoman P6 (+10–12 %) y P21 (+12–13 % con PP: 19,5–19,7 kN frente a 17,4, un pilar poco cargado).
 
-**Para RV-a**, lo que da cada rebaja con RV-b: en el modelo A, ×0,6 clava el vano de la viga (+8,10 frente a +8,03) y deja la losa a 0,95–0,98; ×0,5 deja el vano a −13 % y la losa a 0,97–1,01. En la vivienda, ×0,5 da pilares y losa más cerca que ×0,6 (arriba). Las rebajas de las tablas se han aplicado a todas las vigas de hormigón (en el modelo A y en la vivienda todas son planas en reticular).
+**Para RV-a** (decidida y hecha en §2.4), lo que da cada rebaja con RV-b: en el modelo A, ×0,6 clava el vano de la viga (+8,10 frente a +8,03) y deja la losa a 0,95–0,98; ×0,5 deja el vano a −13 % y la losa a 0,97–1,01. En la vivienda, ×0,5 da pilares y losa más cerca que ×0,6 (arriba). Las rebajas de las tablas se han aplicado a todas las vigas de hormigón (en el modelo A y en la vivienda todas son planas en reticular).
+
+### 2.4 RV-a: la flexión de las vigas planas en un reticular (2026-10-20; compilador RV2)
+
+**La prueba con vigas más anchas.** Para saber si el 0,6 del modelo A (§2.1, §2.3) es fijo, el usuario calculó en CYPE el mismo recuadro con vigas planas de 50 × 30 enrasadas por fuera con los pilares (sólo capturas, sin listado; `modelos.py`, variantes `a50*`; la losa, con `losa50.ts`). Con RV-b y peso propio (CYPE, su envolvente entre 1,35):
+
+| Peso propio | CYPE | Iy ×1 | ×0,5 | ×0,55 | ×0,6 |
+|---|---|---|---|---|---|
+| viga P3–P4: cara / vano | −6,39 / +12,08 | −5,48 / +19,15 | −6,75 / +11,69 | −6,66 / +12,57 | −6,55 / +13,41 |
+| P3: pie | 8,42 / 8,22 | 7,39 / 7,02 | 8,40 / 8,04 | 8,29 / 7,93 | 8,19 / 7,83 |
+| P3: cabeza | 11,54 / 11,22 | 10,13 / 9,63 | 11,52 / 11,02 | 11,37 / 10,87 | 11,23 / 10,73 |
+| losa: uz en el centro (mm) | −3,46 | −3,06 | −3,55 | −3,49 | −3,43 |
+| losa: Mx / My junto a las vigas, a mitad de vano | 21,5 / 21,1 | 18,65 / 17,92 | 22,48 / 21,68 | 22,02 / 21,22 | 21,58 / 20,79 |
+
+El axil de P3 sale un 1,6 % alto (54,86 frente a 54,00) y el cortante de la viga en la cara, un 8 % (26,5 frente a 24,6 kN; con la de 30 coincidía). **El factor no es fijo: baja al ensanchar la viga.** Juntando las dos vigas, frente a CYPE:
+
+| Factor | viga de 30: vano | viga de 50: vano | losa y pilar de esquina, en las dos |
+|---|---|---|---|
+| 0,5 | −13 % | −3 % | ±5 % |
+| 0,55 | −6 % | +4 % | ±4 % |
+| 0,6 | +1 % | +11 % | hasta −5 % (la losa del modelo de 30 y su pilar de esquina) |
+
+**Decidido por el usuario el 2026-10-20: 0,6.** Con 0,55 ajusta mejor, pero el factor depende del ancho y no se sabe la regla de CYPE; 0,6 nunca deja la viga por debajo de CYPE (el error grande es la viga ancha con un 11 % más de momento de vano, del lado seguro) y apenas mueve la losa y los pilares.
+
+**Qué hace** (opción `rigidezVigasPlanas`, por defecto 0,6; compilador RV2). El `Iy` de un tramo de viga de hormigón rectangular se multiplica por el factor, encima de los modificadores (D4), si:
+- su canto no es mayor que el espesor del forjado (una viga plana; la descolgada de 30 × 50 del modelo A no se rebaja en CYPE);
+- a uno o a los dos lados tiene un reticular «uniforme» de su planta (`rigidezReticular: "uniforme"` y sin `multiplicadores` dados; con losa maciza, CYPE no las rebaja), mirado como C2-g: a b/4 del eje en el punto medio de cada barra;
+- y a ningún lado otra losa ni un paño. Un lado sin losa (la viga de borde) no cuenta; un tramo sin losa a ningún lado (una pérgola, un vuelo de la viga) no se rebaja.
+
+La hipótesis del informe nombra las vigas y los tramos rebajados, y dice que es un ajuste empírico. Con 1, el modelo de antes bit a bit. Sólo cambia el `Iy` de esas barras: ni la malla, ni las cargas, ni el mapeo (`vigasPlanas.test.ts`).
+
+**Pruebas y referencias.** `src/compilador/vigasPlanas.test.ts`: el modelo A con la rebaja en las cuatro vigas y el mismo modelo analítico salvo ese `Iy` con 1; sin rebaja con vigas descolgadas, con losa maciza, con el reticular «bruto» o con multiplicadores dados; tramo a tramo (el vuelo de una viga fuera de la losa, una viga entre el reticular y una maciza); el producto con el `Iy` de los modificadores; la validación de (0, 1] y la hipótesis. Ninguna de las referencias congeladas de antes tiene vigas planas en un reticular (las de los edificios reticulares son descolgadas), así que salen idénticas sin tocarlas; la de F tiene una nueva, `reticular-2x2-planas-rva` (el reticular de 2 × 2 de SP-1 con todas las vigas de 40 × 35: 309 tramos rebajados de 10 vigas). Los edificios objetivo no cambian: sus vigas son descolgadas o sus losas, macizas.
+
+**El modelo A** (`validacion/sombra/minimo/`): `a` y `a50` dan ya, con las opciones por defecto, lo de `a-iy06` y `a50-iy06` (§2.3 y arriba) bit a bit, y `ad` y `am` (descolgadas, maciza) no cambian. Las variantes `-iy` ponen el `Iy` a mano con `rigidezVigasPlanas: 1`.
+
+**La vivienda** (`.datos/rva`, `out_rva.txt`; la variante de por defecto). Se rebajan los 350 tramos de las 16 vigas de borde de las dos cubiertas; las tres de la pérgola (VPG-1…3), sin losa, no. Criterio 7, con tres cifras:
+
+| Variante | Momentos de vano | Flechas |
+|---|---|---|
+| RV-a (`rva`, por defecto) | 0,964 / 0,969 / 0,935 / **0,891** | 0,956 / 0,953 |
+| todas las vigas ×0,6, la pérgola también (`rvb-iy06`) | 0,964 / 0,968 / 0,935 / 0,902 | 0,956 / 0,956 |
+| todas ×0,55 (`rvb-iy055`) | 0,972 / 0,973 / 0,940 / 0,914 | 0,964 / 0,964 |
+| todas ×0,5 (`rvb-iy05`) | 0,980 / 0,979 / 0,942 / 0,927 | 0,973 / 0,972 |
+
+- **El `my` de la cubierta superior queda en 0,891, a una centésima del criterio** (≥ 0,90). La diferencia con `rvb-iy06` es sólo la pérgola, que no tiene por qué rebajarse. Es el recuadro de P4–P5 (§2.1), que sigue sin explicar del todo, como P5 (+22 % con peso propio; P6 +10 %).
+- Los axiles fuera de ±10 %, los de siempre (P5, P6). Los momentos de los pilares no se han vuelto a medir: sólo cambian las tres vigas de la pérgola respecto a `rvb-iy06` (§2.3).
 
 ## 3. Hallazgos
 

@@ -87,3 +87,4 @@ El precio es una armadura superior menor sobre los apoyos: hay que vigilar la fi
 | CY-d | Datos del ejemplo: CM 2,0 o 2,5; petos de x = 4,26; P13 | — | **Pendiente del usuario** |
 | CY-e | Aviso de fisuración en servicio sobre los apoyos | Más adelante | Propuesta |
 | RV-b | Plano de los nudos del forjado | Su cara superior (la cota de CYPE), con el pilar rígido en todo el canto por debajo; el plano medio, como opción (`planoForjado: "medio"`) | Aceptada el 2026-10-20 y hecha (compilador RV1, `fase-lv.md` §2.3) |
+| RV-a | Flexión de las vigas planas en un reticular | ×0,6 del `Iy` en los tramos de viga de hormigón rectangular con el canto del forjado junto a un reticular «uniforme» (`rigidezVigasPlanas`); ajuste empírico a CYPECAD, que no lo dice en su memoria (modelo A con vigas de 30 y de 50) | Aceptada el 2026-10-20 y hecha (compilador RV2, `fase-lv.md` §2.4) |

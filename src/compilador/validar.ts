@@ -209,6 +209,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", "La rigidez del reticular tiene que ser uniforme (la de CYPECAD) o bruta (C4-h).");
     return null;
   }
+  if (!(num(op.rigidezVigasPlanas) && op.rigidezVigasPlanas > 0 && op.rigidezVigasPlanas <= 1)) {
+    diag.error("opciones/no-validas", "La flexión de las vigas planas en un reticular (RV-a) es un factor en (0, 1]: 1 no las rebaja.");
+    return null;
+  }
   if (op.unionLosaViga !== "cara" && op.unionLosaViga !== "eje") {
     diag.error("opciones/no-validas", "La unión de las losas con las vigas tiene que ser cara (la de CYPECAD) o eje (C2-c, C2-e).");
     return null;

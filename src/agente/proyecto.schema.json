@@ -1189,6 +1189,10 @@
           ],
           "description": "Rigidez de los forjados reticulares (CY3, CY-c). \"uniforme\" (por defecto), la de CYPECAD: la\nzona aligerada y los ábacos con la mitad de la flexión de la maciza y la torsión de su\nemparrillado, sin Poisson; como fisurados, los ábacos no se llevan los momentos de los vanos.\n\"bruta\" (C4-h): la zona aligerada con la T bruta de sus nervios y los ábacos macizos. Los\n`multiplicadores` dados en la losa mandan sobre las dos."
         },
+        "rigidezVigasPlanas": {
+          "type": "number",
+          "description": "Flexión de las vigas planas en un reticular (RV-a, `fase-lv.md` §2.4), en (0, 1]: el `Iy` de los\ntramos de viga de hormigón rectangular con un canto no mayor que el del forjado que tienen a uno\no a los dos lados un reticular «uniforme» (con `rigidezReticular: \"uniforme\"` y sin\n`multiplicadores` dados), y ninguna otra losa, se multiplica por este factor (encima de los\n`modificadores`). Por defecto, 0,6: el ajuste a CYPECAD, que trata así estas vigas sin decirlo\nen su memoria (modelo A con vigas planas de 30 y de 50: ±11 %, y del lado seguro en la viga). No\nrebaja las vigas descolgadas ni las de una losa maciza, como CYPECAD. Con 1, nada."
+        },
         "unionLosaViga": {
           "enum": [
             "cara",

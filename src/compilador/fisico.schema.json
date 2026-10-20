@@ -974,6 +974,9 @@
             "uniforme"
           ]
         },
+        "rigidezVigasPlanas": {
+          "type": "number"
+        },
         "unionLosaViga": {
           "enum": [
             "cara",
