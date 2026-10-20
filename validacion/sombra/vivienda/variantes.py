@@ -122,6 +122,17 @@ def losa_flexible(losa, fraccion):
     return g
 
 
+def vigas_cubren():
+    """Las vigas de la cubierta superior que acaban en P4 y P5, hasta la cara del pilar: la esquina
+    de la huella que no tapaba ninguna (las vigas acababan en el eje) queda dentro de un ancho."""
+    p = replica({})
+    v = {x["id"]: x for x in p["modelo"]["vigas"]}
+    v["Z-CUB-S-5"]["puntos"] = [[9.15, 14.56], [4.11, 14.56]]
+    v["Z-CUB-S-6"]["puntos"][0] = [4.26, 14.71]
+    v["Z-CUB-S-4"]["puntos"][-1] = [9, 14.41]
+    return p
+
+
 VARIANTES = {
     "d-base": lambda: replica({}),
     "d-cabeza1": lambda: replica({"empotramientoCabeza": 1}),
@@ -141,6 +152,7 @@ VARIANTES = {
     "d-stub060": tramo_corto(0.75),
     "d-losa-s-05": losa_flexible("L-CUB-S", 0.5),
     "d-losa-s-025": losa_flexible("L-CUB-S", 0.25),
+    "d-vigas-cubren": vigas_cubren,
 }
 
 if __name__ == "__main__":
