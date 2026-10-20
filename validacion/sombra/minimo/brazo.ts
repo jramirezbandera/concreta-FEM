@@ -27,7 +27,7 @@ for (const b of r.modelo.barras ?? []) {
   if (j) { console.log("  ", b.id, "offset j antes", j.map((v: number) => v.toFixed(3)).join(",")); b.offsets!.j = [0, 0, -brazo]; n++; }
 }
 const idx = new Set((r.modelo.barras ?? []).map((b, i) => (/^P\d/.test(b.id) ? i : -1)).filter((i) => i >= 0));
-for (const caso of r.modelo.casos as unknown as Record<string, unknown>[]) for (const v of Object.values(caso)) if (Array.isArray(v)) for (const q of v as Record<string, number>[]) if (typeof q === "object" && q && idx.has(q.barra) && (q.b === undefined || q.b > 2.7)) { q.a = 0; q.b = 2.7; }
+for (const caso of r.modelo.casos as unknown as Record<string, unknown>[]) for (const v of Object.values(caso)) if (Array.isArray(v)) for (const q of v as Record<string, number>[]) if (typeof q === "object" && q && idx.has(q.barra) && (q.b === undefined || q.b > 3 - brazo)) { q.a = 0; q.b = 3 - brazo; }
 const c = new Consultas(p.modelo, r, casosValidos(calcular(r.modelo)), p.opciones ?? {});
 console.log("pilares cambiados", n);
 for (const id of ["P3"]) {

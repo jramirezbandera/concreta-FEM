@@ -146,14 +146,27 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
 | | CYPE maciza | nuestra maciza | CYPE reticular | nuestro reticular, vigas ×0,6 |
 |---|---|---|---|---|
 | P3: pie | 7,04 / 6,74 | 6,82 / 6,47 | 7,93 / 7,48 | 7,53 / 7,13 |
-| P3: cabeza | 9,65 / 9,25 | 10,25 / 9,72 | 10,88 / 10,27 | 11,48 / 10,87 |
+| P3: cabeza (en la cara del forjado) | 9,65 / 9,25 | 9,35 / 8,87 | 10,88 / 10,27 | 10,49 / 9,93 |
 | P3: cortante | 6,18 / 5,92 | 5,99 / 5,68 | 6,97 / 6,58 | 6,62 / 6,26 |
 | viga: cara / vano | −5,51 / +11,20 | −5,20 / +11,11 | −7,29 / +8,03 | −7,16 / +7,99 |
 | viga: V en la cara | 33,7 | 37,9 | 27,0 | 26,7 |
 
-  En el reticular, con ese brazo, el vano de la viga es +6,84 / +7,99 / +9,08 con las vigas a 0,5 / 0,6 / 0,7: **el ajuste es 0,6**. Todo queda a ≤ 6 % salvo el cortante de la viga en la maciza (+13 %, la carga de la losa que entra junto al pilar).
+  (`brazo.ts` escribe la cabeza en la cara de la compilación, 0,15 por encima de la nueva: aquí va llevada a la cara real con el cortante.) En el reticular, con ese brazo, el vano de la viga es +6,84 / +7,99 / +9,08 con las vigas a 0,5 / 0,6 / 0,7: **el ajuste es 0,6**. Todo queda a ≤ 6 % salvo el cortante de la viga en la maciza (+13 %, la carga de la losa que entra junto al pilar).
+- **El modelo A con vigas descolgadas de 30 × 50 (capturas del 2026-10-20; `ad` en `modelos.py`, la viga en el plano del forjado como en CYPE; el brazo de la cabeza, 0,50):** con la rigidez completa de las vigas, en peso propio:
+
+| | CYPE | nuestro, vigas ×1 | nuestro, vigas ×0,6 |
+|---|---|---|---|
+| viga: cara / vano | −5,39 / +33,62 | −5,20 / +32,90 | −7,20 / +24,29 |
+| viga: V en la cara | 30,4 | 31,2 | 29,6 |
+| P3: N cabeza / pie | 59,91 / 65,43 | 60,52 / 66,71 | 56,87 / 63,14 |
+| P3: cabeza (cota 2,50) | 7,69 / 7,20 | 7,68 / 7,10 | 9,26 / 8,60 |
+| P3: pie | 6,75 / 6,32 | 6,74 / 6,31 | 7,90 / 7,42 |
+| P3: cortante | 5,78 / 5,40 | 5,77 / 5,40 | 6,76 / 6,35 |
+| uz en el centro (sin el brazo) | −2,11 | −2,24 | −2,61 |
+
+  **Las descolgadas no se rebajan:** con ×1 todo queda a ≤ 4 % (la flecha, +6 %) y el pilar de esquina coincide al 1 %, lo que confirma también el brazo de RV-b. **La rebaja de RV-a es sólo de las vigas planas (del canto del forjado) embebidas en un reticular**; en losa maciza tampoco hay rebaja.
 - **Dos decisiones para el usuario:**
-  - **RV-a, la rigidez a flexión de las vigas planas embebidas en un reticular:** ×0,6 (el ajuste del modelo A y de la vivienda) o ×0,5 (el factor del emparrillado de CYPE, que la vivienda también pasa). Falta el modelo A con vigas descolgadas de 30 × 50 para saber si se aplica también a ellas.
+  - **RV-a, la rigidez a flexión de las vigas planas embebidas en un reticular:** ×0,6 (el ajuste del modelo A y de la vivienda) o ×0,5 (el factor del emparrillado de CYPE, que la vivienda también pasa). Sólo a las planas en reticular: las descolgadas y las de una losa maciza van con la sección bruta (medido).
   - **RV-b, el plano de los nudos del forjado en su cara superior con el pilar rígido en todo el canto, como CYPE,** en lugar de a media altura con medio canto (ZR1). Es una convención de CYPE, no un hecho físico: el nudo real está a media altura. Cambia los momentos de los pilares de esquina (+12–25 % en el pie) y el empotramiento de las vigas en ellos.
 - **Hipótesis de por qué (sin confirmar):** que CYPE dé a la viga plana embebida en el reticular la misma mitad de inercia que al emparrillado («la mitad de la zona maciza, tanto en la zona maciza como en la aligerada», memoria p. 13): ×0,5 es exactamente ese factor. La memoria, en su tabla de rigideces, dice sección bruta para las vigas, sin distinguir. Para confirmarlo, el mismo modelo A en CYPE con **losa maciza de 30** en lugar del reticular (si la viga sigue a la mitad, es de la viga; si no, es del reticular) y con **vigas descolgadas de 30 × 50**.
 

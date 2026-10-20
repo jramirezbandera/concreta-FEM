@@ -25,10 +25,10 @@ def R(x0, y0, x1, y1):
     return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
 
 
-def modelo_a(opciones=None, fraccion_vigas=1.0, maciza=False):
+def modelo_a(opciones=None, fraccion_vigas=1.0, maciza=False, canto_vigas=0.30):
     abacos = [R(-0.5, -0.5, AX0, AY0), R(AX1, -0.5, LX + 0.5, AY0),
               R(-0.5, AY1, AX0, Y1 + 0.5), R(AX1, AY1, LX + 0.5, Y1 + 0.5)]
-    hv = 0.30 * fraccion_vigas ** (1 / 3)
+    hv = canto_vigas * fraccion_vigas ** (1 / 3)
     m = {
         "plantas": [{"id": "F1", "nombre": "Forjado 1", "altura": None}, {"id": "PB", "nombre": "Cimentación", "altura": 2.85}],
         "materiales": [{"id": "HA-30", "tipo": "hormigon", "fck": 30}],
@@ -75,6 +75,9 @@ VARIANTES = {
     "a-eje": lambda: modelo_a({"unionLosaViga": "eje"}),
     "am": lambda: modelo_a(maciza=True),
     "am-vigas-05": lambda: modelo_a(fraccion_vigas=0.5, maciza=True),
+    # Modelo A con vigas descolgadas de 30 × 50 (2026-10-20), en el plano del forjado como en CYPE
+    "ad": lambda: modelo_a(canto_vigas=0.50),
+    "ad-vigas-06": lambda: modelo_a(canto_vigas=0.50, fraccion_vigas=0.6),
 }
 
 if __name__ == "__main__":
