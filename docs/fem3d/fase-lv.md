@@ -93,7 +93,22 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
 - **Los cortantes junto a los pilares no sirven para medir la rigidez de la viga.** Dicen por dónde entra la carga en el nudo, no cuánto lleva la viga en el vano. En la baja, el cortante de la P22–P23 no se mueve con la rigidez de las vigas (22,7 / 22,8 / 23,8 kN con ×1 / ×0,5 / ×0,25; CYPE 20,8).
 - **Lo que sí mide la rigidez relativa es el momento de vano de la viga frente al de la losa junto a ella**, porque las dos tienen la misma curvatura a lo largo de la cara: my/M ≈ D/EI. En la P4–P12, la losa a 0,15–0,40 m de la cara da 21,4 kN·m/m en CYPE y 17,5 en el nuestro, y la viga, +10,36 y +12,2: la razón es 2,07 en CYPE y 1,43 en el nuestro (×1,44). En la P22–P23 de la baja, mx de 23,3 y 21,4 frente a +7,40 y +13,2: 3,15 y 1,62 (×1,94). En el modelo de CYPE la viga es más flexible respecto a la losa que en el nuestro: la mitad en la baja (con ×0,5 la P22–P23 da +7,63) y algo menos en la superior (la P4–P5, +7,13 en CYPE frente a +8,9 con ×1 y +6,0 con ×0,5; la P4–P12, +10,36 frente a +12,2 y +7,7).
 - **Opciones de la obra de CYPE (capturas del usuario, 2026-10-20):** redistribución de negativos en vigas 0,15 (se hace después del cálculo, así que las envolventes de las capturas la llevan: los negativos mostrados son el 85 % de los elásticos y los positivos suben en lo que bajan los negativos); empotramiento en la cabeza del último tramo 0,30 y rigidez axil 2,00 (los nuestros); torsión 0,16 (la nuestra, 0,1). Con 0,16 (`d-tors016`) nada cambia: vano 0,92 / 0,95 / 0,91 / 0,82, P5 +23 %, P22–P23 +13,04. La línea roja junto a P4–P12 es una comprobación que no cumple. Con la redistribución quitada a ojo, la P22–P23 de CYPE sería en elástico −6,4 / +6,5 / −5,8 frente a −3,3 / +13,2 / −1,0 nuestro: CYPE empotra la viga mucho más en sus pilares y le da menos momento total (12,6 frente a 15,4 kN·m de M₀).
-- **Pendiente del usuario:** los diagramas de las vigas por hipótesis (peso propio), sin envolvente ni redistribución. La línea roja y los datos generales ya están contestados (arriba).
+- **Diagramas por hipótesis (peso propio) de CYPE, sin envolvente ni redistribución** (capturas del 2026-10-20), frente a variantes nuestras (kN·m y kN, en las caras):
+
+| Viga | CYPE | ×1 (`hr`) | vigas ×0,5 | vigas ×0,25 | cabeza 1 | unión por el eje |
+|---|---|---|---|---|---|---|
+| P22–P23: P22 / vano / P23 | −1,35 / +2,96 / −1,13 | −1,44 / +5,33 / −0,45 | −1,60 / +3,03 / −0,64 | −1,55 / +1,65 / −0,59 | | −0,20 / +4,80 / +0,11 |
+| P22–P23: V en las caras | 6,49 / 6,44 | 8,5 / 7,4 | 8,4 / 7,0 | 8,6 / 6,8 | | 3,9 / 4,2 |
+| P4–P5: P4 / vano / P5 | −3,40 / +2,75 / −5,38 | −2,44 / +3,20 / −10,14 | −2,16 / +2,14 / −7,04 | −1,64 / +1,51 / −4,58 | −4,01 / +2,88 / −9,56 | −0,96 / +2,78 / −6,90 |
+| P4–P5: V en P4 / P5 | 7,21 / 7,72 | 6,2 / 5,6 | 5,7 / 5,1 | 5,6 / 4,5 | 4,3 / 5,5 | |
+| P4–P12: P4 / vano / P12 | −9,46 / +4,01 / −5,60 | −7,68 / +4,44 / −7,76 | −6,15 / +2,76 / −5,24 | −4,75 / +1,82 / −3,36 | −10,57 / +4,09 / −8,09 | −4,34 / +3,98 / −5,76 |
+| P4–P12: V en P4 / P12 | 24,1 / 9,05 | 18,4 / 11,3 | 18,0 / 9,8 | 17,4 / 8,3 | 20,2 / 9,6 | |
+
+  - **No era la redistribución:** en elástico salen las mismas diferencias que en las envolventes.
+  - **La viga de la baja encaja con ×0,5** en los tres momentos (y lleva 2,5 kN más de carga que la de CYPE con cualquier rigidez).
+  - **En la superior, los vanos piden ×0,8 y los extremos no encajan con ninguna rigidez:** CYPE empotra más las vigas en P4 (−3,40 y −9,46; sólo la cabeza a 1 se acerca) y mucho menos en P5 (−5,38 frente a −10,1; sólo ×0,25 se acerca). Es un efecto de nudo, no de la viga: P4 es la esquina donde se encuentran las dos cubiertas, y en P5 la losa sigue más allá del pilar.
+  - **Ni la torsión (0,16), ni la cabeza, ni el tramo corto, ni la huella, ni la unión por el eje** reproducen a la vez la viga de la baja y los extremos de P4 y P5.
+- **Propuesta para cerrarlo:** un modelo mínimo en CYPE y en el nuestro (un recuadro de reticular 25+5 de 6 × 6 m con cuatro pilares 30 × 30 en las esquinas y vigas planas 30 × 30 en el borde, sólo peso propio, y luego el mismo con la losa saliendo 2 m más allá de un pilar), para separar la rigidez de la viga junto a la losa del efecto de nudo de P5 sin el resto del edificio.
 
 **Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias. **Decidida y hecha el 2026-10-20 (§2.2).**
 
