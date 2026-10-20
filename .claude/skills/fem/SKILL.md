@@ -119,6 +119,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 - **Ejes:** globales X e Y en planta, **Z hacia arriba**. Una carga de gravedad es `q: [0, 0, -valor]`.
 - **Plantas, de ARRIBA ABAJO.**
   - Cada una lleva su `altura` hasta la de encima; la primera de la lista (la de arriba) lleva `"altura": null`.
+  - La cota de una planta es la **cara superior de su forjado**, como en CYPECAD y en los planos: la `altura` va de cara superior a cara superior (desde la cimentación, hasta la cara superior del primer forjado). El compilador pone ahí los nudos del forjado y hace rígido el pilar en todo el canto por debajo (RV-b); no restes medio canto.
   - El nivel de cimentación es la última planta: los pilares arrancan en él (`desde`) y se empotran por defecto.
   - Las cotas no se escriben; salen de las alturas. La cota 0 es la planta más baja que no es `"tipo": "sotano"`. Marcar la cimentación como sótano sólo mueve el origen de las cotas: el cálculo es el mismo, salvo el redondeo.
 - **`id` únicos en todo el modelo** (plantas, materiales, secciones, piezas, casos y cargas).

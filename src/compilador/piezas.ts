@@ -6,9 +6,11 @@
  * `factorZonaRigida` veces lo que su recta recorre dentro de la huella; el offset (del nudo al
  * extremo del tramo flexible) lleva a la vez la zona rígida y la excentricidad. El tramo de un
  * pilar es rígido en su cabeza en lo que el nudo físico ocupa por debajo del plano del forjado
- * (ZR1: medio canto de la losa o de una viga con el eje en el plano, el canto entero de una viga con
- * la cara superior en él) y, con `zonaRigidaBase` (LV-d, como CYPECAD), también en su base sobre un
- * forjado, en lo que el nudo ocupa por encima; las dos por `factorZonaRigidaPilares`.
+ * (ZR1) y en su base en lo que ocupa por encima, las dos por `factorZonaRigidaPilares`. Con el plano
+ * en la cara superior del forjado (RV-b, como CYPECAD), todo el canto de la losa o de la viga más
+ * alta en la cabeza, y nada en la base. Con el plano medio, medio canto de la losa o de una viga con
+ * el eje en el plano (el canto entero de una viga con la cara superior en él) en la cabeza y, con
+ * `zonaRigidaBase` (LV-d), también en la base sobre un forjado.
  *
  * Con losas (C2): los apoyos lineales y los puntuales que caen en una losa van a sus nudos de la
  * malla, y el diafragma rígido de una planta con losas abarca los nudos sobre ellas (C2-f).
@@ -99,20 +101,26 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
   // Espesor de la losa en la huella de cada nudo de pilar (C2-e: cuenta en el nudo)
   const espesorHuella = new Map(losas.huellas.map((h) => [h.maestro, h.espesor] as const));
   const fp = ctx.op.factorZonaRigidaPilares;
+  const cantoViga = (v: string) => ctx.secciones.get(ctx.vigaDe.get(v)!.seccion)!.canto;
   /**
    * ZR1: lo que el nudo físico de un pilar ocupa por debajo del plano del forjado (`bajo`, la cabeza
-   * del tramo de debajo) o por encima (la base del de encima): medio espesor de la losa de su huella
-   * y medio canto de las vigas con el eje en el plano; una viga con la cara superior en el plano
-   * cuelga entera por debajo (su canto, y nada por encima).
+   * del tramo de debajo) o por encima (la base del de encima). RV-b, con el plano en la cara superior
+   * del forjado: todo el espesor de la losa de su huella y todo el canto de las vigas por debajo, y
+   * nada por encima. Con el plano medio: medio espesor de la losa y medio canto de las vigas con el eje
+   * en el plano; una viga con la cara superior en el plano cuelga entera por debajo (su canto, y nada
+   * por encima).
    */
-  const junta = (n: number, vigas: ReadonlySet<string>, bajo: boolean) =>
-    Math.max(
-      (espesorHuella.get(n) ?? 0) / 2,
-      ...[...vigas].map((v) => {
-        const canto = ctx.secciones.get(ctx.vigaDe.get(v)!.seccion)!.canto;
-        return ctx.vigaDe.get(v)!.insercion === "superior" ? (bajo ? canto : 0) : canto / 2;
-      }),
-    );
+  const junta =
+    ctx.op.planoForjado === "superior"
+      ? (n: number, vigas: ReadonlySet<string>, bajo: boolean) => (bajo ? Math.max(espesorHuella.get(n) ?? 0, ...[...vigas].map(cantoViga)) : 0)
+      : (n: number, vigas: ReadonlySet<string>, bajo: boolean) =>
+          Math.max(
+            (espesorHuella.get(n) ?? 0) / 2,
+            ...[...vigas].map((v) => {
+              const canto = cantoViga(v);
+              return ctx.vigaDe.get(v)!.insercion === "superior" ? (bajo ? canto : 0) : canto / 2;
+            }),
+          );
 
   // Pilares: una recta por pilar, de su base a su cabeza; un tramo por planta
   for (const p of ctx.pilares) {

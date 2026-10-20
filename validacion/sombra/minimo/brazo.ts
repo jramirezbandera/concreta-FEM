@@ -4,6 +4,8 @@
  * CYPECAD, en lugar de la losa a media altura con medio canto rígido. Cambia el brazo en el modelo
  * analítico ya compilado (la opción `factorZonaRigidaPilares` no pasa de 1) y recorta el peso de los
  * pilares a su tramo flexible. Escribe el pilar P3 y la viga P3–P4 en peso propio.
+ * Desde RV-b (compilador RV1, `fase-lv.md` §2.3) eso lo hace el compilador (`planoForjado: "superior"`,
+ * por defecto) y `medir.ts` escribe el pilar; este parche se queda para reproducir las tablas de §2.1.
  *
  *   bun validacion/sombra/minimo/brazo.ts <carpeta de la variante> [<brazo, m>]
  */

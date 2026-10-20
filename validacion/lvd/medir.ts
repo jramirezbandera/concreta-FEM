@@ -9,7 +9,9 @@
  *   G, Vx y la flecha máxima de la losa.
  * El tramo flexible de cada tramo intermedio pierde f · canto en la base (0,25 m con vigas de 0,50;
  * 0,15 con la losa de 0,30), así que los pilares salen algo más rígidos frente a lo horizontal y los
- * esfuerzos de la base se dan en la cara del forjado, no en el eje.
+ * esfuerzos de la base se dan en la cara del forjado, no en el eje. Desde RV-b (compilador RV1), con
+ * los nudos del forjado en su plano medio (`planoForjado: "medio"`), el único en el que la base tiene
+ * zona; lo de RV-b, en `validacion/rvb/medir.ts`.
  *
  *   bun validacion/lvd/medir.ts > validacion/lvd/out_medir.txt
  */
@@ -81,8 +83,8 @@ function medir(fisico: ModeloFisico, op: OpcionesCompilacion, pilares: string[],
 function comparar(nombre: string, fisico: ModeloFisico, pilares: string[], planta: string, viga: { id: string; s: number } | null, conLosa: boolean) {
   const G = 0;
   const Vx = fisico.casos.findIndex((x) => x.id === "Vx");
-  const con = medir(fisico, {}, pilares, planta, viga, conLosa);
-  const sin = medir(fisico, { zonaRigidaBase: false }, pilares, planta, viga, conLosa);
+  const con = medir(fisico, { planoForjado: "medio" }, pilares, planta, viga, conLosa);
+  const sin = medir(fisico, { zonaRigidaBase: false, planoForjado: "medio" }, pilares, planta, viga, conLosa);
   console.log(`\n${nombre}: nudos ${con.ecuaciones / 6} (${sin.ecuaciones / 6} sin la base)`);
   console.log(`  Deriva de cabeza con Vx (${pilares[0]}): sin ${(1000 * sin.deriva).toFixed(2)} mm, con ${(1000 * con.deriva).toFixed(2)} mm (${pct(con.deriva, sin.deriva)})`);
   console.log(`  Desplome relativo máximo con Vx: sin ${(1000 * sin.desplome).toFixed(3)} ‰, con ${(1000 * con.desplome).toFixed(3)} ‰ (${pct(con.desplome, sin.desplome)})`);

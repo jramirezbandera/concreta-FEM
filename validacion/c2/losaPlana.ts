@@ -6,7 +6,10 @@
  * Para parecerse al apoyo de E5 (la cabeza de cada pilar apoyada en z y articulada), los pilares
  * tienen la cabeza articulada (My y Mz liberados) y el axil ×100 (el máximo que se admite): su
  * acortamiento es del orden de 1e-6 m frente a flechas de milímetros. La planta lleva el diafragma
- * rígido por defecto, así que se prueba también la cadena huella → diafragma.
+ * rígido por defecto, así que se prueba también la cadena huella → diafragma. Los nudos del forjado van
+ * en su plano medio (RV-b, `planoForjado: "medio"`): con la cabeza articulada, el brazo rígido entre el
+ * nudo y la cara inferior de la losa le da un empotramiento que E5 no tiene (∝ brazo², por el cortante
+ * del pilar), y con el canto entero de la cara superior la cara se separa un 1,3 % de E5.
  *
  * Las bandas de pilar (3 m) y de pórtico (6 m) arrancan en la cara x = 6,3 del pilar central: sus
  * extremos siembran la línea de la cara en la malla, y el corte por fuerzas nodales es exacto. El
@@ -60,7 +63,7 @@ export function losaPlanaFisica(): ModeloFisico {
   };
 }
 
-export const OPCIONES_LOSA_PLANA: OpcionesCompilacion = { modificadores: { pilares: { todos: { A: 100 } } } };
+export const OPCIONES_LOSA_PLANA: OpcionesCompilacion = { modificadores: { pilares: { todos: { A: 100 } } }, planoForjado: "medio" };
 
 export interface ResultadoLosaPlana {
   /** My y Vz [banda, pórtico] en la cara, por fuerzas nodales. */

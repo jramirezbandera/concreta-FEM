@@ -38,7 +38,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "ZR1";
+export const VERSION_COMPILADOR = "RV1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -461,12 +461,15 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
   // ZR1: las vigas, por lo que recorren dentro del pilar; los pilares, por lo que ocupa el nudo físico
   const [fv, fp] = [op.factorZonaRigida, op.factorZonaRigidaPilares];
   const vigasZR = fv === 0 ? "las vigas, de eje a eje" : `las vigas son rígidas en ${fv === 1 ? "todo lo que" : `el ${coma(fv * 100)} % de lo que`} recorren dentro del pilar (hasta su cara)`;
+  // RV-b: con el plano en la cara superior del forjado, el nudo ocupa todo el canto por debajo
   const pilaresZR =
     fp === 0
       ? "los pilares, de eje a eje"
-      : `los pilares, ${fp === 1 ? "hasta la cara" : `en el ${coma(fp * 100)} % del nudo hacia la cara`} de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo${
-          op.zonaRigidaBase ? " y, sobre un forjado, también en su base, como CYPECAD (LV-d)" : ""
-        }`;
+      : op.planoForjado === "superior"
+        ? `los pilares, ${fp === 1 ? "en todo el canto" : `en el ${coma(fp * 100)} % del canto`} de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior, como CYPECAD (RV-b): la base arranca en el nudo`
+        : `los pilares, ${fp === 1 ? "hasta la cara" : `en el ${coma(fp * 100)} % del nudo hacia la cara`} de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo${
+            op.zonaRigidaBase ? " y, sobre un forjado, también en su base, como CYPECAD (LV-d)" : ""
+          }`;
   h.push(
     !conZonas
       ? "Nudos de eje a eje: ninguna barra tiene zona rígida ni excentricidad (las secciones no dan dimensiones al nudo), así que el factor de zona rígida no actúa."

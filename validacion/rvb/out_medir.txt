@@ -1,0 +1,47 @@
+RV-b: los nudos del forjado en su cara superior (superior) frente a su plano medio (medio), con las mismas cotas. kN, kN·m.
+
+Edificio objetivo de barras (7 plantas, 80 pilares): nudos 1151 (1151 con el plano medio)
+  Deriva de cabeza con Vx (P24-20): medio 0.79 mm, superior 0.79 mm (  -0.1 %)
+  Desplome relativo máximo con Vx: medio 0.068 ‰, superior 0.068 ‰ (   0.0 %)
+  Viga X5-N3 en la cara del pilar (s = 5.8), My con G: medio -99.40, superior -99.81 kN·m (   0.4 %)
+  Tramos de N1 y N3 (esfuerzos en i' y j'; s en m desde el arranque):
+  tramo       caso           s base       N      Vz      My |  s cab.       N      Vz      My
+  P24-20@N1   G    medio       0.00 -1644.6     0.4     0.5 |    1.20 -1640.1     0.4     0.0
+  P24-20@N1   G    superior    0.00 -1645.3     0.1     0.3 |    0.90 -1641.9     0.1     0.1
+  P24-20@N1   Vx   medio       0.00    -0.0     6.5     7.0 |    1.20    -0.0     6.5    -0.8
+  P24-20@N1   Vx   superior    0.00    -0.0     6.3     6.4 |    0.90    -0.0     6.3     0.7
+  P24-20@N3   G    medio       4.80 -1174.9     0.5     0.6 |    7.20 -1165.9     0.5    -0.6
+  P24-20@N3   G    superior    4.50 -1176.5     0.5     0.6 |    6.90 -1167.5     0.5    -0.6
+  P24-20@N3   Vx   medio       4.80    -0.0     4.7     5.2 |    7.20    -0.0     4.7    -6.0
+  P24-20@N3   Vx   superior    4.50    -0.0     4.7     5.2 |    6.90    -0.0     4.7    -6.0
+  P0-0@N1     G    medio       0.00  -663.8   -30.1   -11.7 |    1.20  -659.3   -30.1    24.4
+  P0-0@N1     G    superior    0.00  -665.9   -38.7   -12.5 |    0.90  -662.5   -38.7    22.4
+  P0-0@N1     Vx   medio       0.00     9.6     4.9     6.0 |    1.20     9.6     1.3     2.3
+  P0-0@N1     Vx   superior    0.00     9.2     4.5     5.6 |    0.90     9.2     1.8     2.7
+  P0-0@N3     G    medio       4.80  -478.0   -21.0   -25.2 |    7.20  -469.0   -21.0    25.1
+  P0-0@N3     G    superior    4.50  -480.1   -21.2   -25.9 |    6.90  -471.1   -21.2    25.0
+  P0-0@N3     Vx   medio       4.80     5.0     6.2     4.0 |    7.20     5.0    -1.0    -2.1
+  P0-0@N3     Vx   superior    4.50     4.9     6.9     4.9 |    6.90     4.9    -0.3    -3.1
+
+Edificio reducido con losas (2 plantas, 3 × 2 vanos): nudos 3258 (3258 con el plano medio)
+  Deriva de cabeza con Vx (P6-5): medio 0.08 mm, superior 0.08 mm (   0.7 %)
+  Desplome relativo máximo con Vx: medio 0.021 ‰, superior 0.023 ‰ (   5.7 %)
+  Flecha máxima de la losa con G: medio 1.04 mm, superior 0.97 mm (  -6.9 %)
+  Tramos de N1 y N2 (esfuerzos en i' y j'; s en m desde el arranque):
+  tramo       caso           s base       N      Vz      My |  s cab.       N      Vz      My
+  P6-5@N1     G    medio       0.00  -768.3     7.2     3.2 |    1.20  -763.5     7.2    -5.5
+  P6-5@N1     G    superior    0.00  -756.0     9.9     3.5 |    0.90  -752.4     9.9    -5.4
+  P6-5@N1     Vx   medio       0.00    -0.2     0.0     0.0 |    1.20    -0.2     0.0    -0.0
+  P6-5@N1     Vx   superior    0.00     0.2     0.0     0.0 |    0.90     0.2     0.0    -0.0
+  P6-5@N2     G    medio       1.80  -408.4     2.9     4.3 |    4.20  -398.8     2.9    -2.8
+  P6-5@N2     G    superior    1.50  -406.0     2.7     3.9 |    3.90  -396.4     2.7    -2.7
+  P6-5@N2     Vx   medio       1.80     0.2     0.0     0.0 |    4.20     0.2     0.0    -0.0
+  P6-5@N2     Vx   superior    1.50     0.4     0.0     0.0 |    3.90     0.4     0.0    -0.0
+  P0-0@N1     G    medio       0.00  -152.5   -25.5    -9.4 |    1.20  -148.0   -25.5    21.2
+  P0-0@N1     G    superior    0.00  -155.5   -32.1   -10.1 |    0.90  -152.2   -32.1    18.8
+  P0-0@N1     Vx   medio       0.00     1.0     3.2     2.8 |    1.20     1.0    -0.4     1.1
+  P0-0@N1     Vx   superior    0.00     0.9     3.0     2.6 |    0.90     0.9     0.3     1.1
+  P0-0@N2     G    medio       1.80   -73.0   -14.5   -17.8 |    4.20   -64.0   -14.5    17.0
+  P0-0@N2     G    superior    1.50   -75.0   -13.9   -16.8 |    3.90   -66.0   -13.9    16.6
+  P0-0@N2     Vx   medio       1.80     0.1     5.3     3.2 |    4.20     0.1    -1.9    -0.8
+  P0-0@N2     Vx   superior    1.50     0.1     6.0     4.4 |    3.90     0.1    -1.2    -1.3

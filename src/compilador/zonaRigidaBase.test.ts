@@ -10,6 +10,8 @@
  * - el tramo flexible más corto es más rígido: menos deriva y más cortante en el tramo corto, con el
  *   equilibrio a 1e-9; los esfuerzos de la base se dan en la cara del forjado (i'), como en la cabeza;
  * - la hipótesis lo deja escrito.
+ * Desde RV-b (compilador RV1), la base sólo tiene zona con los nudos del forjado en su plano medio: todo
+ * se compila con `planoForjado: "medio"` (con la cara superior, `planoForjado.test.ts`).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -61,6 +63,9 @@ function portico(extra: { alturaP2?: number; vigaP2?: Partial<Viga>; losaP3?: bo
   };
 }
 
+/** Con los nudos del forjado en su plano medio (RV-b), el único en el que la base tiene zona. */
+const compilarMedio = (f: ModeloFisico, op: OpcionesCompilacion = {}) => compilar(f, { planoForjado: "medio", ...op });
+
 const red = (v?: readonly number[]) => v?.map((x) => Math.round(x * 1e12) / 1e12 + 0);
 const offsets = (r: Extract<ResultadoCompilacion, { valido: true }>, id: string) => {
   const o = r.modelo.barras!.find((b) => b.id === id)!.offsets ?? {};
@@ -70,7 +75,7 @@ const barraP = (r: Extract<ResultadoCompilacion, { valido: true }>, id: string) 
 
 describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
   it("por defecto, la base de un tramo sobre un forjado es rígida como la cabeza del de debajo; el arranque no cambia", () => {
-    const r = valido(compilar(portico()));
+    const r = valido(compilarMedio(portico()));
     // arranque en P0: sin forjado debajo; cabeza dentro de la viga de 0,50 de P1: 0,25
     expect(offsets(r, "A:P1")).toEqual({ i: undefined, j: [0, 0, -0.25] });
     // tramo P1 → P2: base sobre la viga de P1 (0,25) y cabeza en la de P2 (0,25)
@@ -79,21 +84,21 @@ describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
     // las estaciones [i, i', j', j] del tramo, y los esfuerzos de la base en i'
     expect(barraP(r, "A:P2").s.map((s) => Math.round(s * 1e9) / 1e9)).toEqual([3.2, 3.45, 5.95, 6.2]);
     // ZR1: el factor de las vigas no la cambia (nunca entra en el pilar libre); el de los pilares, sí
-    expect(offsets(valido(compilar(portico(), { factorZonaRigida: 1 })), "A:P2")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.25] });
-    expect(offsets(valido(compilar(portico(), { factorZonaRigidaPilares: 0.5 })), "A:P2")).toEqual({ i: [0, 0, 0.125], j: [0, 0, -0.125] });
+    expect(offsets(valido(compilarMedio(portico(), { factorZonaRigida: 1 })), "A:P2")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.25] });
+    expect(offsets(valido(compilarMedio(portico(), { factorZonaRigidaPilares: 0.5 })), "A:P2")).toEqual({ i: [0, 0, 0.125], j: [0, 0, -0.125] });
   });
 
   it("con zonaRigidaBase: false, sólo la cabeza, como antes de LV-d", () => {
-    const r = valido(compilar(portico(), { zonaRigidaBase: false }));
+    const r = valido(compilarMedio(portico(), { zonaRigidaBase: false }));
     expect(offsets(r, "A:P2")).toEqual({ i: undefined, j: [0, 0, -0.25] });
     expect(barraP(r, "A:P2").s.map((s) => Math.round(s * 1e9) / 1e9)).toEqual([3.2, 3.2, 5.95, 6.2]);
-    expect(compilar(portico(), { zonaRigidaBase: "no" as unknown as boolean }).valido).toBe(false);
+    expect(compilarMedio(portico(), { zonaRigidaBase: "no" as unknown as boolean }).valido).toBe(false);
   });
 
   it("la losa de la huella cuenta en la base; una viga con la cara superior en el forjado, no (sí en la cabeza)", () => {
-    const losa = valido(compilar(portico({ losaP3: true })));
+    const losa = valido(compilarMedio(portico({ losaP3: true })));
     expect(offsets(losa, "A:P3")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.15] });
-    const sup = valido(compilar(portico({ vigaP2: { insercion: "superior" } })));
+    const sup = valido(compilarMedio(portico({ vigaP2: { insercion: "superior" } })));
     // ZR1: cabeza del tramo P1 → P2 hasta la cara inferior de V2, que cuelga entera (0,50); base del
     // P2 → P3, sin nada encima del plano
     expect(offsets(sup, "A:P2")).toEqual({ i: [0, 0, 0.25], j: [0, 0, -0.5] });
@@ -101,21 +106,21 @@ describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
   });
 
   it("un tramo que no cabe entre sus dos zonas rígidas es pilar/tramo-flexible-nulo", () => {
-    const r = compilar(portico({ alturaP2: 0.45 }));
+    const r = compilarMedio(portico({ alturaP2: 0.45 }));
     expect(r.valido).toBe(false);
     const d = r.diagnosticos.find((d) => d.codigo === "pilar/tramo-flexible-nulo")!;
     expect(d.mensaje).toContain("0.25 m en la cabeza y 0.25 m en la base");
     expect(d.ids).toEqual(expect.arrayContaining(["A", "V1", "V2"]));
     // sin la zona de la base cabe (0,45 − 0,25 = 0,20 m flexibles)
-    expect(compilar(portico({ alturaP2: 0.45 }), { zonaRigidaBase: false }).valido).toBe(true);
+    expect(compilarMedio(portico({ alturaP2: 0.45 }), { zonaRigidaBase: false }).valido).toBe(true);
   });
 
   it("el tramo flexible más corto es más rígido: menos deriva y más cortante en el tramo corto, con equilibrio", () => {
     const res = (op?: OpcionesCompilacion) => {
       const f = portico({ alturaP2: 0.9 });
-      const r = valido(compilar(f, op));
+      const r = valido(compilarMedio(f, op));
       const casos = casosValidos(calcular(r.modelo));
-      const c = new Consultas(f, r, casos, op ?? {});
+      const c = new Consultas(f, r, casos, { planoForjado: "medio", ...op });
       const tramos = c.pilar("A");
       if (!tramos.valido) throw new Error("sin pilar");
       const corto = tramos.valor.find((t) => t.planta === "P2")!;
@@ -138,7 +143,7 @@ describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
   });
 
   it("la hipótesis lo deja escrito", () => {
-    expect(valido(compilar(portico())).hipotesis[0]).toMatch(/también en su base, como CYPECAD \(LV-d\)\.$/);
-    expect(valido(compilar(portico(), { zonaRigidaBase: false })).hipotesis[0]).toMatch(/en la cabeza de cada tramo\.$/);
+    expect(valido(compilarMedio(portico())).hipotesis[0]).toMatch(/también en su base, como CYPECAD \(LV-d\)\.$/);
+    expect(valido(compilarMedio(portico(), { zonaRigidaBase: false })).hipotesis[0]).toMatch(/en la cabeza de cada tramo\.$/);
   });
 });

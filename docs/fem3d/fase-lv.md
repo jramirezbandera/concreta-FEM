@@ -167,7 +167,7 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
   **Las descolgadas no se rebajan:** con ×1 todo queda a ≤ 4 % (la flecha, +6 %) y el pilar de esquina coincide al 1 %, lo que confirma también el brazo de RV-b. **La rebaja de RV-a es sólo de las vigas planas (del canto del forjado) embebidas en un reticular**; en losa maciza tampoco hay rebaja.
 - **Dos decisiones para el usuario:**
   - **RV-a, la rigidez a flexión de las vigas planas embebidas en un reticular:** ×0,6 (el ajuste del modelo A y de la vivienda) o ×0,5 (el factor del emparrillado de CYPE, que la vivienda también pasa). Sólo a las planas en reticular: las descolgadas y las de una losa maciza van con la sección bruta (medido).
-  - **RV-b, el plano de los nudos del forjado en su cara superior con el pilar rígido en todo el canto, como CYPE,** en lugar de a media altura con medio canto (ZR1). Es una convención de CYPE, no un hecho físico: el nudo real está a media altura. Cambia los momentos de los pilares de esquina (+12–25 % en el pie) y el empotramiento de las vigas en ellos.
+  - **RV-b, el plano de los nudos del forjado en su cara superior con el pilar rígido en todo el canto, como CYPE,** en lugar de a media altura con medio canto (ZR1). Es una convención de CYPE, no un hecho físico: el nudo real está a media altura. Cambia los momentos de los pilares de esquina (+12–25 % en el pie) y el empotramiento de las vigas en ellos. **Decidida y hecha el 2026-10-20 (§2.3, compilador RV1).**
 - **Hipótesis de por qué (sin confirmar):** que CYPE dé a la viga plana embebida en el reticular la misma mitad de inercia que al emparrillado («la mitad de la zona maciza, tanto en la zona maciza como en la aligerada», memoria p. 13): ×0,5 es exactamente ese factor. La memoria, en su tabla de rigideces, dice sección bruta para las vigas, sin distinguir. Para confirmarlo, el mismo modelo A en CYPE con **losa maciza de 30** en lugar del reticular (si la viga sigue a la mitad, es de la viga; si no, es del reticular) y con **vigas descolgadas de 30 × 50**.
 
 **Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias. **Decidida y hecha el 2026-10-20 (§2.2).**
@@ -185,6 +185,53 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
 Es lo esperado de un tramo flexible más corto: los pilares toman algo más del momento de las vigas y la estructura es más rígida frente a lo horizontal. Para la comprobación, el momento de la base de un tramo intermedio es ahora el de la cara del forjado, no el del eje: menor, y el que se comprueba.
 
 **Pendiente para la integración:** los módulos de Concreta tienen que saber que los esfuerzos de los dos extremos de un tramo de pilar van en las caras (`s[1]` y `s[2]` del mapeo). **Visto de paso:** la cabeza de un tramo bajo una viga con `insercion: "superior"` llevaba `f · canto` cuando el pilar ocupa el canto entero por debajo del nudo, así que se quedaba corta a la mitad; y con `f` = 1 las zonas de los pilares entraban medio canto en el pilar libre. **Resuelto el 2026-10-20 con ZR1** (`compilador.md`, «Decisiones del usuario»): los pilares, hasta la cara física del nudo con su propio factor; por defecto y con vigas en el plano, los mismos bits.
+
+### 2.3 RV-b: los nudos del forjado en su cara superior (2026-10-20; compilador RV1)
+
+**Qué cambia.** Como en CYPECAD, la cota de una planta es ahora la cara superior de su forjado, y en ella van las láminas de la losa, el eje de las vigas y sus nudos (opción `planoForjado`, por defecto `"superior"`). El nudo físico de un pilar ocupa todo el canto por debajo de ese plano (el espesor de la losa de su huella o el canto de la viga más alta que le llega, con cualquier inserción) y nada por encima. Así, la cabeza de cada tramo es rígida en el canto entero (por `factorZonaRigidaPilares`, 1 por defecto) y la base arranca en el nudo: la zona de la base de LV-d (§2.2) no actúa. Con `planoForjado: "medio"`, el modelo de LVD1–ZR1 bit a bit.
+- Entre dos forjados del mismo canto, la altura libre del tramo es la misma que con el plano medio (medio canto en cada extremo); lo que cambia es dónde está: el brazo de la cabeza es el canto entero y la base no tiene. Bajo el primer forjado, el tramo flexible pierde medio canto más (la cimentación no tiene nada encima).
+- No es un hecho físico (la losa trabaja en su plano medio), sino el convenio de CYPECAD, que es también el de los planos: las cotas de los planos y de CYPE son las de la cara superior, como ya las dibujaba el visor (I3, `interfaz.md` §16). Las réplicas de CYPE dejan de restar medio canto: el modelo A va a 3,00 (antes 2,85) y la vivienda a 3,50 y 4,40 (antes 3,35 y 4,25).
+- La malla no cambia ni un nudo y las ecuaciones son las mismas. El peso del pilar dentro del canto va al nudo de su cabeza, como el de cualquier zona rígida.
+
+**Pruebas.** `src/compilador/planoForjado.test.ts`: las zonas (canto entero en la cabeza con viga, con losa o con una viga `"superior"`, ninguna en la base, `zonaRigidaBase` sin efecto, el factor de los pilares), la altura libre, `pilar/tramo-flexible-nulo`, la hipótesis, y un oráculo analítico del brazo: un pilar empotrado en el pie con la cabeza sin desplazarse y un giro en el nudo da el cociente entre los momentos del pie y de la cabeza (α·(2 + 6e/L) + (1 − α)·3e/L) / (α·(4 + 6e/L)) a 1e-9, con α = 0,3 y 1, e = 0,50 y 0,25 (el canto entero y el medio). El oráculo a mano de C1 (`validacion/c1/mano.ts`) lleva sus cuatro casos con los dos planos, y el compilador da los ocho a 1e-10. Las referencias congeladas de C1–C5 y F llevan `planoForjado: "medio"` y salen idénticas (51 modelos); hay cuatro nuevas con el valor por defecto (`edificio-2x3x2-rvb`, `aleatorio-13-rvb`, `reticula-nucleo-rvb` y `edificio-2x2-rvb`). Siguen con el plano medio las pruebas que comparan con valores medidos antes (las mallas finas congeladas de F2 y F3, el axil del apeo, la regresión de precisión de HR), el oráculo de las viguetas de C4 y los de la losa plana de H25 (`OPCIONES_LOSA_PLANA`): con la cabeza articulada para parecerse al apoyo de E5, el brazo da a la losa un empotramiento que E5 no tiene (por el cortante del pilar, ∝ e²), y con el canto entero la cara se separa un 1,3 % de E5 en vez de < 1 %.
+
+**El modelo A de CYPE** (§2.1, `validacion/sombra/minimo/`, peso propio). La rebaja de las vigas planas de RV-a se mide ahora con su `Iy` (`a-iy06`), no con un canto menor como en las variantes `-vigas-`: con RV-b el canto de la viga es el brazo de la cabeza, y con 0,253 m en lugar de 0,30 el pilar de esquina sale un 7 % bajo en el pie.
+
+| Peso propio | CYPE | RV-b, vigas Iy ×0,6 | plano medio, Iy ×0,6 | RV-b, vigas ×1 |
+|---|---|---|---|---|
+| viga P3–P4: cara / vano / V en la cara | −7,29 / +8,03 / 27,0 | −7,08 / +8,10 / 27,3 | −6,22 / +8,28 / 27,1 | −6,97 / +12,10 / 27,0 |
+| P3: momentos en el pie | 7,93 / 7,48 | 7,65 / 7,24 | 6,42 / 6,08 | 7,25 / 6,85 |
+| P3: momentos en la cabeza (cara inferior del forjado) | 10,88 / 10,27 | 10,49 / 9,94 | 10,40 / 9,86 | 9,95 / 9,40 |
+| P3: cortantes | 6,97 / 6,58 | 6,72 / 6,37 | 6,23 / 5,90 | 6,37 / 6,02 |
+| P3: N cabeza / pie | 51,19 / 57,15 | 52,31 / 58,39 | 51,97 / 58,05 | 52,31 / 58,39 |
+| losa: uz / mx / my (medianas) | | 0,98 / 0,95 / 0,96 | 1,01 / 0,98 / 0,98 | 0,90 / 0,89 / 0,89 |
+
+- **Con RV-b y las vigas planas a 0,6 de su Iy, el modelo A coincide con CYPE a ≤ 4 % en la viga y en el pilar de esquina** (con el plano medio, el pie salía un 19 % bajo y la viga en la cara, un 15 %). Con ×0,5 (`a-iy05`) la losa da 1,01 / 0,97 / 0,98, pero el vano de la viga cae a +6,97 (−13 %): el ajuste de RV-a sigue siendo 0,6.
+- **La losa sale un 2–3 % más baja que con el plano medio** (0,95–0,96 en momentos): con el brazo entero, la esquina empotra más la losa y la viga.
+- **Con losa maciza de 30** (`am`), sin rebaja: viga −5,20 / +11,11 (CYPE −5,51 / +11,20); P3, pie 6,82 / 6,47 (7,04 / 6,74), cabeza 9,35 / 8,87 (9,65 / 9,25), cortante 5,99 / 5,68 (6,18 / 5,92): el pilar a −3 %, la viga a −6 % en la cara y −1 % en el vano. Con el plano medio, el pie 5,60 / 5,31 (−20 %).
+- **Con vigas descolgadas de 30 × 50** (`ad`), sin rebaja: viga −5,20 / +32,90 / V 31,2 (CYPE −5,39 / +33,62 / 30,4); P3, pie 6,74 / 6,31 (6,75 / 6,32), cabeza 7,68 / 7,19 (7,69 / 7,20), cortante 5,77 / 5,40 (5,78 / 5,40): **el pilar de esquina, a ≤ 0,2 %**. Con el plano medio, el pie 4,92 / 4,60 (−27 %) y la viga en la cara −3,09 (−43 %).
+- Son los números de `brazo.ts` (§2.1), que parcheaba el modelo analítico, ahora con la opción del compilador.
+
+**Los edificios objetivo** (`validacion/rvb/medir.ts`, `out_medir.txt`; RV-b frente al plano medio con las mismas cotas):
+- el de barras de C1 (7 plantas, 80 pilares; vigas de 0,60): la deriva con Vx no cambia (−0,1 %), ni el desplome relativo (0,0 %); el momento de la viga X5-N3 en la cara del pilar con G sube un 0,4 %. Los tramos intermedios no se mueven (el pilar interior de N3, los mismos esfuerzos medio canto más abajo). El primer tramo, de 1,5 m sobre la cimentación, pasa de 1,20 a 0,90 m flexibles: el pilar de esquina lleva con G 38,7 kN de cortante en vez de 30,1;
+- el reducido con losas de C2 (2 plantas, 3 × 2 vanos): deriva +0,7 %, desplome +5,7 %, **flecha máxima de la losa −6,9 %** (la esquina la empotra más); en el primer tramo del pilar de esquina, el cortante con G sube de 25,5 a 32,1 kN.
+
+**La vivienda** (`validacion/sombra/vivienda/`; `replica.py` pone la planta baja a 3,50, la cota de CYPE, salvo con el plano medio, que sigue a 3,35; `.datos/rvb*`, `out_rvb*.txt`). `rvb-medio` reproduce `lvd` (§2.2) en los pilares y en el criterio 7 (las correlaciones de la losa cambian en la tercera cifra por SP-7, que es posterior). Los pilares, por la mediana nuestro/CYPE de |M| y |V| de los 22 tramos sobre la cimentación con |M| > 1,5 kN·m (`tramos.ts`, peso propio):
+
+| Variante | |M| pie | |M| cabeza | |V| | Momentos de vano | Flechas | PP total |
+|---|---|---|---|---|---|---|
+| plano medio (`rvb-medio` = `lvd`) | 0,79 | 0,89 | 0,85 | 0,92 / 0,95 / 0,91 / 0,82 | 0,91 / 0,91 | 1 477,2 |
+| RV-b (`rvb`, por defecto) | 0,92 | 0,93 | 0,94 | 0,91 / 0,93 / 0,90 / 0,81 | 0,90 / 0,90 | 1 485,0 |
+| RV-b, vigas Iy ×0,6 (`rvb-iy06`) | 0,97 | 0,99 | 0,98 | 0,96 / 0,97 / 0,94 / 0,90 | 0,96 / 0,96 | 1 485,0 |
+| RV-b, vigas Iy ×0,5 (`rvb-iy05`) | 0,99 | 1,00 | 1,00 | 0,98 / 0,98 / 0,94 / 0,93 | 0,97 / 0,97 | 1 485,0 |
+
+(CYPE: PP total 1 463,0 kN.)
+- **RV-b lleva los pilares de 0,79 a 0,92 de CYPE en el pie** (P2 4,4 → 5,2 frente a 5,55; P10 5,7 → 6,8 frente a 7,3) y la losa baja un 1–2 %, como en el modelo A. Con la rebaja de las vigas de RV-a, los pilares quedan a ≤ 3 % y pasa el criterio 7 (con ×0,6, el `my` de la cubierta, justo en 0,90).
+- **El peso propio sube 7,8 kN** (23 pilares × 0,15 m más hasta la cota de CYPE): es el cruce del pilar con la losa, que CYPE descuenta y nosotros no (A-9, del lado de la seguridad): con el pilar hasta la cara superior cuenta el canto entero, no la mitad.
+- **Los tramos cortos de 0,90 m entre las cubiertas** tienen el mismo tramo flexible que con LV-d (de 3,50 a 4,10) con otro brazo, y sus cortantes con peso propio (|V| de las dos componentes) bajan un poco: 31,8 / 22,5 / 8,1 kN en P4 / P12 / P19 (plano medio 32,9 / 23,3 / 9,6; CYPE 35,6 / 27,1 / 9,1).
+- **Sigue P5** (+22–24 % con peso propio en todas las variantes), y con la rebaja asoman P6 (+10–12 %) y P21 (+12–13 % con PP: 19,5–19,7 kN frente a 17,4, un pilar poco cargado).
+
+**Para RV-a**, lo que da cada rebaja con RV-b: en el modelo A, ×0,6 clava el vano de la viga (+8,10 frente a +8,03) y deja la losa a 0,95–0,98; ×0,5 deja el vano a −13 % y la losa a 0,97–1,01. En la vivienda, ×0,5 da pilares y losa más cerca que ×0,6 (arriba). Las rebajas de las tablas se han aplicado a todas las vigas de hormigón (en el modelo A y en la vivienda todas son planas en reticular).
 
 ## 3. Hallazgos
 
@@ -257,4 +304,20 @@ bun validacion/lvd/medir.ts > validacion/lvd/out_medir.txt
 bun validacion/sombra/vivienda/muestrear.ts validacion/sombra/vivienda/.datos/lvd   (y lvd-sin, que reproduce hr)
 .venv/Scripts/python.exe validacion/sombra/vivienda/comparar.py validacion/sombra/vivienda/.datos/lvd > validacion/sombra/vivienda/.datos/out_lvd.txt
 bun validacion/sombra/vivienda/tramos.ts validacion/sombra/vivienda/.datos/lvd "Peso propio"
+```
+
+(Desde RV-b, `lvd` y `lvd-sin` se reproducen con `"planoForjado": "medio"` en las opciones: `rvb-medio` es `lvd`.)
+
+RV-b (§2.3):
+
+```
+bun validacion/rvb/medir.ts > validacion/rvb/out_medir.txt
+.venv/Scripts/python.exe validacion/sombra/minimo/modelos.py a a-iy06 a-iy05 a-iy06-medio am am-medio ad ad-medio
+bun validacion/sombra/minimo/medir.ts validacion/sombra/minimo/.datos/a-iy06       (y las demás)
+.venv/Scripts/python.exe validacion/sombra/vivienda/replica.py '' validacion/sombra/vivienda/.datos/rvb
+.venv/Scripts/python.exe validacion/sombra/vivienda/replica.py '{"planoForjado":"medio"}' validacion/sombra/vivienda/.datos/rvb-medio
+.venv/Scripts/python.exe validacion/sombra/vivienda/replica.py '{"modificadores":{"pilares":{"todos":{"A":2}},"vigas":{"hormigon":{"J":0.1,"Iy":0.6}}}}' validacion/sombra/vivienda/.datos/rvb-iy06   (y 0,5 en rvb-iy05)
+bun validacion/sombra/vivienda/muestrear.ts validacion/sombra/vivienda/.datos/rvb
+.venv/Scripts/python.exe validacion/sombra/vivienda/comparar.py validacion/sombra/vivienda/.datos/rvb > validacion/sombra/vivienda/.datos/out_rvb.txt
+bun validacion/sombra/vivienda/tramos.ts validacion/sombra/vivienda/.datos/rvb > validacion/sombra/vivienda/.datos/rvb/tramos.txt
 ```

@@ -11,7 +11,11 @@
  *
  * LV-d (compilador LVD1): los modelos de antes llevan `zonaRigidaBase: false` (la zona rígida sólo en
  * la cabeza de los tramos de pilar: los mismos bits que antes de LV-d); los terminados en `-lvd`, la
- * de por defecto (también en la base de los tramos sobre un forjado, como CYPECAD).
+ * de LVD1 (también en la base de los tramos sobre un forjado, como CYPECAD).
+ *
+ * RV-b (compilador RV1): todos los de antes llevan `planoForjado: "medio"` (los mismos bits); los
+ * terminados en `-rvb`, el de por defecto (los nudos del forjado en su cara superior y la cabeza de los
+ * pilares rígida en todo el canto, como CYPECAD).
  *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio del generador aleatorio):
  *   bun validacion/c1/congelar.ts
@@ -35,14 +39,17 @@ export interface ModeloCongelado {
 }
 
 export const MODELOS_CONGELADOS_C1: Record<string, () => ModeloCongelado> = {
-  "sap-1-022": () => ({ fisico: JSON.parse(readFileSync(join(import.meta.dirname, "fisico-1022.json"), "utf8")) as ModeloFisico, opciones: { modificadores: {}, zonaRigidaBase: false } }),
-  "edificio-2x3x2": () => ({ fisico: edificioObjetivo(2, 3, 2), opciones: { zonaRigidaBase: false } }),
-  "aleatorio-6": () => ({ fisico: fisicoAleatorio(6), opciones: { zonaRigidaBase: false } }),
-  "aleatorio-13": () => ({ fisico: fisicoAleatorio(13), opciones: { zonaRigidaBase: false } }),
-  "aleatorio-21-sin-diafragma": () => ({ fisico: fisicoAleatorio(21, { diafragma: false }), opciones: { zonaRigidaBase: false } }),
-  // LV-d (compilador LVD1, 2026-10-20): la zona rígida también en la base de los tramos sobre un forjado (por defecto)
-  "edificio-2x3x2-lvd": () => ({ fisico: edificioObjetivo(2, 3, 2) }),
-  "aleatorio-13-lvd": () => ({ fisico: fisicoAleatorio(13) }),
+  "sap-1-022": () => ({ fisico: JSON.parse(readFileSync(join(import.meta.dirname, "fisico-1022.json"), "utf8")) as ModeloFisico, opciones: { modificadores: {}, zonaRigidaBase: false, planoForjado: "medio" } }),
+  "edificio-2x3x2": () => ({ fisico: edificioObjetivo(2, 3, 2), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-6": () => ({ fisico: fisicoAleatorio(6), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-13": () => ({ fisico: fisicoAleatorio(13), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-21-sin-diafragma": () => ({ fisico: fisicoAleatorio(21, { diafragma: false }), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
+  // LV-d (compilador LVD1, 2026-10-20): la zona rígida también en la base de los tramos sobre un forjado (la de LVD1)
+  "edificio-2x3x2-lvd": () => ({ fisico: edificioObjetivo(2, 3, 2), opciones: { planoForjado: "medio" } }),
+  "aleatorio-13-lvd": () => ({ fisico: fisicoAleatorio(13), opciones: { planoForjado: "medio" } }),
+  // RV-b (compilador RV1, 2026-10-20): los nudos del forjado en su cara superior y la cabeza de los pilares rígida en todo el canto (por defecto)
+  "edificio-2x3x2-rvb": () => ({ fisico: edificioObjetivo(2, 3, 2) }),
+  "aleatorio-13-rvb": () => ({ fisico: fisicoAleatorio(13) }),
 };
 
 export interface ReferenciaC1 {

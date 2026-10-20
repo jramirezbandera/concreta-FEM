@@ -2,7 +2,8 @@
 Prueba en sombra de la vivienda (CY4): la réplica en nuestro motor del modelo CYPECAD del usuario,
 a partir de `ejemplos/vivienda/proyecto.json` (losas, zunchos y pilares) con lo que es de CYPE:
 
-- los nudos de las losas a media losa (3,35 y 4,25: las cotas 3,50 y 4,40 de CYPE menos 15 cm);
+- los nudos de las losas en su cara superior, como CYPE (RV-b: sus cotas, 3,50 y 4,40); con
+  `planoForjado: "medio"`, a media losa (3,35 y 4,25: las cotas de CYPE menos 15 cm);
 - HA-30 (Ecm = 32 837 MPa, el del listado);
 - los pilares en los centros que da su punto fijo (P13 incluido, en (7,29; 8,64));
 - la viga de la pérgola en x = 4,26 y la de x = 14,28;
@@ -54,7 +55,7 @@ def replica(opciones=None):
     m = p["modelo"]
     p["nombre"] = "Vivienda: réplica del modelo CYPECAD (prueba en sombra)"
     for pl in m["plantas"]:
-        if pl["id"] == "PB": pl["altura"] = 3.35
+        if pl["id"] == "PB": pl["altura"] = 3.35 if (opciones or {}).get("planoForjado") == "medio" else 3.50
         if pl["id"] == "CUB": pl["altura"] = 0.90
     m["materiales"] = [{"id": "HA-30", "tipo": "hormigon", "fck": 30}]
     for pi in m["pilares"]:

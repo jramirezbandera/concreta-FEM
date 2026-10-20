@@ -22,7 +22,11 @@
  * fase LV2 (por defecto; `refinamiento-vigas.md` §16 y §17).
  *
  * LV-d (compilador LVD1): todos los de antes llevan `zonaRigidaBase: false` (los mismos bits); el
- * terminado en `-lvd`, la zona rígida también en la base de los tramos de pilar (por defecto).
+ * terminado en `-lvd`, la zona rígida también en la base de los tramos de pilar (la de LVD1).
+ *
+ * RV-b (compilador RV1): todos los de antes llevan `planoForjado: "medio"` (los mismos bits); el
+ * terminado en `-rvb`, el de por defecto (los nudos del forjado en su cara superior y la cabeza de los
+ * pilares rígida en todo el canto, como CYPECAD).
  *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/f/congelar.ts
@@ -47,27 +51,29 @@ import { edificioObjetivoLosas } from "../c2/modelos.ts";
 import { edificioReticular } from "../c4/modelos.ts";
 
 export const MODELOS_CONGELADOS_F: Record<string, () => ModeloCongelado> = {
-  "h25-plana": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "h25-reticular": () => ({ fisico: reticularH25(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "pilares-mezclados": () => ({ fisico: conAcciones(losaPilaresMezclados()), opciones: { unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "aleatorio-3": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "losa-3x3-refinada": () => ({ fisico: losa3x3(), opciones: { unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "h25-plana-sin-refinar": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, refinoCaras: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "losa-3x3-mezclada": () => ({ fisico: losa3x3Mezclada(), opciones: { unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "h25-plana": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "h25-reticular": () => ({ fisico: reticularH25(), opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "pilares-mezclados": () => ({ fisico: conAcciones(losaPilaresMezclados()), opciones: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-3": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "losa-3x3-refinada": () => ({ fisico: losa3x3(), opciones: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "h25-plana-sin-refinar": () => ({ fisico: { ...losaPlanaFisica(), bandas: undefined }, opciones: { ...OPCIONES_LOSA_PLANA, tamanoMalla: 0.75, refinoCaras: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "losa-3x3-mezclada": () => ({ fisico: losa3x3Mezclada(), opciones: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   // SP-1 y SP-2: ábacos de pilares de borde, de esquina y atravesados por vigas
-  "reticular-2x2-abacos": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "reticular-2x2-abacos": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
-  "aleatorio-3-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { refinoEsquinas: false, zonaRigidaBase: false } }),
-  "reticular-2x2-abacos-lv": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { refinoEsquinas: false, zonaRigidaBase: false } }),
+  "aleatorio-3-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio" } }),
+  "reticular-2x2-abacos-lv": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio" } }),
   // Fase LV2: con la malla junto a las vigas (`refinoEsquinas`, por defecto desde el compilador LV2: plantillas de esquina con 3 niveles en
   // los cruces con pilar y 2 en los cruces sin pilar, LV2-i; tiras de las huellas que asoman, LV-8;
   // sólo la huella rígida en los pilares bajo una viga, LV2-f). El edificio objetivo de un vano de
   // 2 × 2 con su hueco y sus vigas secundarias tiene cruces sin pilar
-  "aleatorio-3-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { zonaRigidaBase: false } }),
-  "reticular-2x2-abacos-lv2": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { zonaRigidaBase: false } }),
-  "edificio-2x2-lv2": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { zonaRigidaBase: false } }),
-  // LV-d (compilador LVD1, 2026-10-20): la zona rígida también en la base de los tramos de pilar sobre un forjado (por defecto)
-  "edificio-2x2-lvd": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: {} }),
+  "aleatorio-3-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
+  "reticular-2x2-abacos-lv2": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
+  "edificio-2x2-lv2": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
+  // LV-d (compilador LVD1, 2026-10-20): la zona rígida también en la base de los tramos de pilar sobre un forjado (la de LVD1)
+  "edificio-2x2-lvd": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { planoForjado: "medio" } }),
+  // RV-b (compilador RV1, 2026-10-20): los nudos del forjado en su cara superior y la cabeza de los pilares rígida en todo el canto (por defecto)
+  "edificio-2x2-rvb": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: {} }),
 };
 
 export interface ReferenciaF {

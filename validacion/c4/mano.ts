@@ -6,14 +6,17 @@
  *
  * Todos van con el nudo entero rígido y sin modificadores (`OPCIONES_MANO` de C1), como los de C1: desde
  * ZR1, la cabeza de los pilares hasta la cara inferior de las vigas (su medio canto con el eje en el plano).
+ * Con los nudos del forjado en su plano medio (RV-b, `planoForjado: "medio"`): miden las viguetas, y las
+ * cabezas con el nudo en la cara superior las comprueban los casos de C1.
  */
 import type { ModeloFisico, Vec2 } from "../../src/compilador/fisico.ts";
 import type { CargaBarra, CargaNodal, Seis, Vec3 } from "../../src/motor/modelo.ts";
 import { uniformeANudo } from "../../src/pruebas/compilador.ts";
 import { Constructor, EMPOTRADO } from "../../src/pruebas/constructor.ts";
 import { hormigon, rectangular, seccionT } from "../../src/secciones/seccion3D.ts";
-import { OPCIONES_MANO, type CasoMano } from "../c1/mano.ts";
+import { OPCIONES_MANO as OPCIONES_C1, type CasoMano } from "../c1/mano.ts";
 
+const OPCIONES_MANO: CasoMano["opciones"] = { ...OPCIONES_C1, planoForjado: "medio" };
 const HA = hormigon(25);
 const T = seccionT(0.75, 0.05, 0.12, 0.3, HA).seccion;
 const LIB_T: { i: Seis<boolean> } = { i: [false, false, false, true, false, false] };

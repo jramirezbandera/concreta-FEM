@@ -26,14 +26,14 @@ export interface ReferenciaFina {
 
 /**
  * Los modelos, con las opciones de la malla gruesa (la de la prueba) y de la fina (la referencia).
- * Sin la zona rígida de la base de los pilares (LV-d): la referencia fina es anterior y la medida es
- * de la malla, no de la barra del pilar.
+ * Sin la zona rígida de la base de los pilares (LV-d) y con el plano medio del forjado (RV-b): la
+ * referencia fina es anterior y la medida es de la malla, no de la barra del pilar.
  */
 export const MODELOS_PRECISION: Record<string, { fisico: () => ModeloFisico; gruesa: OpcionesCompilacion; fina: OpcionesCompilacion }> = {
-  "reticula-1": { fisico: () => reticulaAleatoria(1), gruesa: { zonaRigidaBase: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false } },
-  "reticula-12": { fisico: () => reticulaAleatoria(12), gruesa: { zonaRigidaBase: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false } },
-  "reticula-16": { fisico: () => reticulaAleatoria(16), gruesa: { zonaRigidaBase: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false } },
-  "losa-3x3-mezclada": { fisico: () => losa3x3Mezclada(), gruesa: { unionLosaViga: "eje", zonaRigidaBase: false }, fina: { unionLosaViga: "eje", tamanoMalla: 0.1, zonaRigidaBase: false } },
+  "reticula-1": { fisico: () => reticulaAleatoria(1), gruesa: { zonaRigidaBase: false, planoForjado: "medio" }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio" } },
+  "reticula-12": { fisico: () => reticulaAleatoria(12), gruesa: { zonaRigidaBase: false, planoForjado: "medio" }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio" } },
+  "reticula-16": { fisico: () => reticulaAleatoria(16), gruesa: { zonaRigidaBase: false, planoForjado: "medio" }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio" } },
+  "losa-3x3-mezclada": { fisico: () => losa3x3Mezclada(), gruesa: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" }, fina: { unionLosaViga: "eje", tamanoMalla: 0.1, zonaRigidaBase: false, planoForjado: "medio" } },
 };
 
 export function aReferencia(m: MedidaLocal): ReferenciaFina {

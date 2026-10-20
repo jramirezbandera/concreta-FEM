@@ -3,8 +3,12 @@
  * descripción física (nudos, zonas rígidas, excentricidades, liberaciones, diafragmas y cargas
  * repartidas en tramos flexibles y nudos), sin llamar al compilador. Los comparan
  * `src/compilador/oraculo-mano.test.ts` (a ≤ 1e-10) y `resumen.ts`.
+ *
+ * RV-b (compilador RV1): cada caso se escribe con los nudos del forjado en su plano medio (el de
+ * C1–ZR1: medio canto rígido en la cabeza y, sobre un forjado, en la base) y en su cara superior (el
+ * de CYPECAD, por defecto: el canto entero en la cabeza y nada en la base).
  */
-import type { ModeloFisico, OpcionesCompilacion } from "../../src/compilador/fisico.ts";
+import type { ModeloFisico, OpcionesCompilacion, OpcionesResueltas } from "../../src/compilador/fisico.ts";
 import type { CargaBarra, CargaNodal, ModeloAnalitico, Vec3 } from "../../src/motor/modelo.ts";
 import { puntualANudo, uniformeANudo } from "../../src/pruebas/compilador.ts";
 import { Constructor, EMPOTRADO } from "../../src/pruebas/constructor.ts";
@@ -34,12 +38,19 @@ const g = (q: number): Vec3 => [0, 0, q];
 const dl = (barra: number, q: Vec3, a: number, b: number): CargaBarra => ({ tipo: "distribuida", barra, ejes: "global", qa: q, a, b });
 const MATERIALES: ModeloFisico["materiales"] = [{ id: "HA", tipo: "hormigon", fck: 25 }];
 
+type Plano = OpcionesResueltas["planoForjado"];
+
+/** Los cuatro casos con el plano medio y los cuatro con la cara superior (RV-b). */
 export function casosMano(): CasoMano[] {
-  return [caso1(), caso2(), caso3(), caso4()];
+  return (["medio", "superior"] as const).flatMap((plano) =>
+    [caso1(plano), caso2(plano), caso3(plano), caso4(plano)].map((c) =>
+      plano === "medio" ? { ...c, opciones: { ...c.opciones, planoForjado: plano } } : { ...c, nombre: `${c.nombre} (nudos en la cara superior del forjado, RV-b)`, opciones: { ...c.opciones, planoForjado: plano } },
+    ),
+  );
 }
 
 /** pórtico 3D de 2 plantas: pilares rectangulares girados, zonas rígidas, diafragmas, peso propio y cargas en zonas rígidas. */
-function caso1(): CasoMano {
+function caso1(plano: Plano): CasoMano {
   const f: ModeloFisico = {
     plantas: [
       { id: "P2", altura: null },
@@ -92,9 +103,10 @@ function caso1(): CasoMano {
     for (let t = 0; t < 2; t++) {
       // cabeza rígida 0,25 m: el nudo hasta la cara inferior de la viga más alta que llega (vx, de
       // 0,50 con el eje en el plano: su medio canto, ZR1); y la base del segundo tramo, sobre el
-      // forjado de P1, hasta la cara superior, otro medio canto (LV-d); el arranque no tiene nada debajo
-      const rc = 0.25;
-      const rb = t === 1 ? 0.25 : 0;
+      // forjado de P1, hasta la cara superior, otro medio canto (LV-d); el arranque no tiene nada debajo.
+      // RV-b: con el nudo en la cara superior, la cabeza es el canto entero de vx y la base no tiene zona
+      const rc = plano === "superior" ? 0.5 : 0.25;
+      const rb = t === 1 && plano === "medio" ? 0.25 : 0;
       const b = m.barra(n[id]![t]!, n[id]![t + 1]!, sec[id]!, vz[id]!, { offsets: { ...(rb ? { i: [0, 0, rb] as Vec3 } : {}), j: [0, 0, -rc] } });
       tramoPilar[id]!.push(b);
       const w = -25 * sec[id]!.A;
@@ -108,8 +120,8 @@ function caso1(): CasoMano {
   // Viento en D: cada tramo flexible, su cabeza rígida y la base rígida del segundo tramo
   for (let t = 0; t < 2; t++) {
     const b = tramoPilar.D![t]!;
-    const rc = 0.25;
-    const rb = t === 1 ? 0.25 : 0;
+    const rc = plano === "superior" ? 0.5 : 0.25;
+    const rb = t === 1 && plano === "medio" ? 0.25 : 0;
     const H = zs[t + 1]! - zs[t]!;
     bQ.push(dl(b, [0, 2, 0], 0, H - rb - rc));
     if (rb) Q.push(uniformeANudo(n.D![t]!, [5, 4, zs[t]!], [5, 4, zs[t]!], [5, 4, zs[t]! + rb], [0, 2, 0]));
@@ -149,7 +161,7 @@ function caso1(): CasoMano {
 }
 
 /** viga excéntrica respecto a sus pilares, sin diafragma: el offset lleva la zona rígida y la excentricidad. */
-function caso2(): CasoMano {
+function caso2(plano: Plano): CasoMano {
   const f: ModeloFisico = {
     plantas: [
       { id: "P1", altura: null, diafragma: "ninguno" },
@@ -174,9 +186,11 @@ function caso2(): CasoMano {
   const m = new Constructor();
   const e1 = [m.nudo(0, 0, -3), m.nudo(0, 0, 0)];
   const e2 = [m.nudo(6, 0, -3), m.nudo(6, 0, 0)];
-  // Cabezas hasta la cara inferior de la viga de 0,60 con el eje en el plano: su medio canto (ZR1)
-  m.barra(e1[0]!, e1[1]!, rect(0.4, 0.4), [1, 0, 0], { offsets: { j: [0, 0, -0.3] } });
-  m.barra(e2[0]!, e2[1]!, rect(0.4, 0.4), [1, 0, 0], { offsets: { j: [0, 0, -0.3] } });
+  // Cabezas hasta la cara inferior de la viga de 0,60 con el eje en el plano: su medio canto (ZR1); con
+  // el nudo en la cara superior del forjado, el canto entero (RV-b)
+  const rc = plano === "superior" ? 0.6 : 0.3;
+  m.barra(e1[0]!, e1[1]!, rect(0.4, 0.4), [1, 0, 0], { offsets: { j: [0, 0, -rc] } });
+  m.barra(e2[0]!, e2[1]!, rect(0.4, 0.4), [1, 0, 0], { offsets: { j: [0, 0, -rc] } });
   m.apoyo(e1[0]!);
   m.apoyo(e2[0]!);
   // Tramo flexible sobre y = 0,15, de la cara x = 0,2 a la cara x = 5,8
@@ -194,7 +208,7 @@ function caso2(): CasoMano {
 }
 
 /** encuentro en T con hueco de 2 cm, viga en polilínea con rótula, cruce de vigas y cargas junto a un cruce. */
-function caso3(): CasoMano {
+function caso3(plano: Plano): CasoMano {
   const f: ModeloFisico = {
     plantas: [
       { id: "P1", altura: null },
@@ -234,8 +248,9 @@ function caso3(): CasoMano {
   for (const [id, x, y] of [["K1", 0, 0], ["K2", 8, 0], ["K3", 8, 6], ["K4", 0, 6]] as const) {
     const pie = m.nudo(x, y, -3);
     col[id] = m.nudo(x, y, 0);
-    // cabeza hasta la cara inferior de las vigas de 0,50 con el eje en el plano (ZR1)
-    m.barra(pie, col[id]!, rect(0.3, 0.3), [1, 0, 0], { offsets: { j: [0, 0, -0.25] } });
+    // cabeza hasta la cara inferior de las vigas de 0,50 con el eje en el plano (ZR1): su medio canto,
+    // o el entero con el nudo en la cara superior del forjado (RV-b)
+    m.barra(pie, col[id]!, rect(0.3, 0.3), [1, 0, 0], { offsets: { j: [0, 0, plano === "superior" ? -0.5 : -0.25] } });
     m.apoyo(pie);
   }
   const T1 = m.nudo(4, 0, 0);
@@ -282,7 +297,7 @@ function caso3(): CasoMano {
 }
 
 /** pilar apeado girado 30°, pilares apilados, viga con inserción superior y cargas locales y de pilar. */
-function caso4(): CasoMano {
+function caso4(plano: Plano): CasoMano {
   const f: ModeloFisico = {
     plantas: [
       { id: "P2", altura: null },
@@ -334,12 +349,14 @@ function caso4(): CasoMano {
     return b;
   };
   // ZR1: bajo VB (inserción superior, cuelga entera del plano) la cabeza es su canto, 0,60; bajo VC
-  // (eje en el plano) su medio canto, 0,25. Las bases sobre P1 no llevan zona: VB no sube del plano
+  // (eje en el plano) su medio canto, 0,25, o el entero, 0,50, con el nudo en la cara superior del
+  // forjado (RV-b). Las bases sobre P1 no llevan zona: VB no sube del plano
+  const rVC = plano === "superior" ? 0.5 : 0.25;
   pilar(n0[0]!, n0[1]!, 0, -3, rect(0.3, 0.3), 0.6, [1, 0, 0]);
-  pilar(n0[1]!, n0[2]!, 0, 0, rect(0.25, 0.25), 0.25, [1, 0, 0]);
+  pilar(n0[1]!, n0[2]!, 0, 0, rect(0.25, 0.25), rVC, [1, 0, 0]);
   const s3a = pilar(n6[0]!, n6[1]!, 6, -3, rect(0.3, 0.3), 0.6, [1, 0, 0]);
-  const s3b = pilar(n6[1]!, n6[2]!, 6, 0, rect(0.3, 0.3), 0.25, [1, 0, 0]);
-  pilar(n3[0]!, n3[1]!, 3, 0, rect(0.25, 0.4), 0.25, [c30, s30, 0]);
+  const s3b = pilar(n6[1]!, n6[2]!, 6, 0, rect(0.3, 0.3), rVC, [1, 0, 0]);
+  pilar(n3[0]!, n3[1]!, 3, 0, rect(0.25, 0.4), rVC, [c30, s30, 0]);
   // Viento en S3 entre las estaciones 1 y 5 (z = −2 a 2)
   bQ.push(dl(s3a, [1.5, 0, 0], 1, 2.4));
   Q.push(uniformeANudo(n6[1]!, [6, 0, 0], [6, 0, -0.6], [6, 0, 0], [1.5, 0, 0]));

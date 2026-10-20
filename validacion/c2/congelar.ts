@@ -38,17 +38,17 @@ import { reticulaEnrasada } from "./modelos.ts";
 import { navierFisico } from "./navier.ts";
 
 export const MODELOS_CONGELADOS_C2: Record<string, () => ModeloCongelado> = {
-  "losa-plana": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "navier-delgada": () => ({ fisico: navierFisico(CASOS_NAVIER[0]!), opciones: { franjas: false, tamanoMalla: 0.5, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "aleatorio-8-losas": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "aleatorio-11-losas-sin-diafragma": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(11, { diafragma: false }), 11), opciones: { franjas: false, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "losa-plana-rejilla": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "aleatorio-8-losas-rejilla": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje", zonaRigidaBase: false } }),
-  "reticula-enrasada": () => ({ fisico: reticulaEnrasada(1), opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "losa-plana": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "navier-delgada": () => ({ fisico: navierFisico(CASOS_NAVIER[0]!), opciones: { franjas: false, tamanoMalla: 0.5, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-8-losas": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-11-losas-sin-diafragma": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(11, { diafragma: false }), 11), opciones: { franjas: false, tamanoMalla: 1, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "losa-plana-rejilla": () => ({ fisico: losaPlanaFisica(), opciones: { franjas: false, ...OPCIONES_LOSA_PLANA, tamanoMalla: 1, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-8-losas-rejilla": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
+  "reticula-enrasada": () => ({ fisico: reticulaEnrasada(1), opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
-  "aleatorio-8-losas-rejilla-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, refinoEsquinas: false, zonaRigidaBase: false } }),
+  "aleatorio-8-losas-rejilla-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio" } }),
   // Fase LV2: con la malla junto a las vigas (por defecto)
-  "aleatorio-8-losas-rejilla-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, zonaRigidaBase: false } }),
+  "aleatorio-8-losas-rejilla-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(8), 8, { eje1: "azar" }), opciones: { franjas: false, tamanoMalla: 1, zonaRigidaBase: false, planoForjado: "medio" } }),
 };
 
 export interface ReferenciaC2 {

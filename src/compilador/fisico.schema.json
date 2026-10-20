@@ -959,6 +959,12 @@
         "factorZonaRigidaPilares": {
           "type": "number"
         },
+        "planoForjado": {
+          "enum": [
+            "medio",
+            "superior"
+          ]
+        },
         "empotramientoCabeza": {
           "type": "number"
         },

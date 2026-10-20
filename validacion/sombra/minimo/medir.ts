@@ -53,6 +53,15 @@ for (const id of ["V-P3-P4", "V-P1-P2", "V-P1-P3"]) {
   console.log(`   como la envolvente de CYPE (1,35·PP, 15 %): caras −${f(1.35 * 0.85 * neg)}, máximo ${f(1.35 * (max + 0.15 * neg))}, V ${f(1.35 * Math.abs(ci[2]!))}, T ${f(1.35 * mt)}`);
 }
 
+// El pilar de esquina P3, en las caras de su tramo flexible: el pie (el arranque) y la cabeza (bajo el
+// forjado; desde RV-b, en su cara inferior)
+{
+  const t = c.pilar("P3");
+  if (!t.valido) throw new Error(JSON.stringify(t.diagnosticos));
+  const e = (x: Float64Array) => `N ${f(-x[0]!)}, V ${f(Math.abs(x[1]!))} / ${f(Math.abs(x[2]!))}, M ${f(Math.abs(x[4]!))} / ${f(Math.abs(x[5]!))}`;
+  for (const tr of t.valor) console.log(`P3 PP: pie (s = ${f(tr.base.s)}) ${e(tr.base.esfuerzos)}; cabeza (s = ${f(tr.cabeza.s)}) ${e(tr.cabeza.esfuerzos)}`);
+}
+
 const a = Sesion.abrir(texto, sha256(new Uint8Array(WASM)));
 if (!a.valido) throw new Error(JSON.stringify(a.diagnosticos));
 const s = a.sesion;

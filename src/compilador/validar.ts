@@ -197,6 +197,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", "El factor de zona rígida de los pilares tiene que estar entre 0 (de eje a eje) y 1 (hasta la cara del nudo).");
     return null;
   }
+  if (op.planoForjado !== "superior" && op.planoForjado !== "medio") {
+    diag.error("opciones/no-validas", "El plano de los nudos del forjado tiene que ser superior (su cara superior, la de CYPECAD) o medio (el plano medio de la losa).");
+    return null;
+  }
   if (!(num(op.empotramientoCabeza) && op.empotramientoCabeza >= 0 && op.empotramientoCabeza <= 1)) {
     diag.error("opciones/no-validas", "El coeficiente de empotramiento de la cabeza de los pilares tiene que estar entre 0 (articulado) y 1 (empotrado).");
     return null;
