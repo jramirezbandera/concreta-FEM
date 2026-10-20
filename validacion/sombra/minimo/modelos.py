@@ -5,7 +5,7 @@ para separar la rigidez de la viga junto a la losa del efecto de nudo de la vivi
 Modelo A (CYPE, «prueba concreta.c3e», 2026-10-20): un recuadro de reticular 25+5 de 6 × 6 m a
 ejes en x y 5,85 m en y (el listado, «EJEMPLO 6X6.pdf»: P1 y P2 con el punto fijo en la mitad
 inferior, en y = 0, así que su centro está en y = 0,15), cuatro pilares de 30 × 30 en las esquinas
-(3 m, pie empotrado, cabeza 0,3), vigas planas de 30 × 30 en los cuatro bordes y sólo peso propio.
+(3 m hasta la cara superior del forjado, pie empotrado, cabeza 0,3; la losa, a media altura: 2,85), vigas planas de 30 × 30 en los cuatro bordes y sólo peso propio.
 Reticular 25+5 de casetón perdido, intereje 82, nervio 12, 4,335 kN/m² (listado). Los ábacos, por los
 nudos del listado: x ≤ 1,42 y x ≥ 4,58; y ≤ 1,2835 y y ≥ 4,7965. Las cargas, como en la réplica de
 la vivienda: el aligerado con su peso, los ábacos a γ·h y la media viga interior que no cae en un
@@ -30,7 +30,7 @@ def modelo_a(opciones=None, fraccion_vigas=1.0):
               R(-0.5, AY1, AX0, Y1 + 0.5), R(AX1, AY1, LX + 0.5, Y1 + 0.5)]
     hv = 0.30 * fraccion_vigas ** (1 / 3)
     m = {
-        "plantas": [{"id": "F1", "nombre": "Forjado 1", "altura": None}, {"id": "PB", "nombre": "Cimentación", "altura": 3.0}],
+        "plantas": [{"id": "F1", "nombre": "Forjado 1", "altura": None}, {"id": "PB", "nombre": "Cimentación", "altura": 2.85}],
         "materiales": [{"id": "HA-30", "tipo": "hormigon", "fck": 30}],
         "secciones": [{"id": "P30x30", "material": "HA-30", "forma": "rectangular", "b": 0.3, "h": 0.3},
                       {"id": "V30", "material": "HA-30", "forma": "rectangular", "b": 0.3, "h": hv}],

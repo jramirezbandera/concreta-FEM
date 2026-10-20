@@ -124,7 +124,23 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
 - **Sin el resto del edificio, el modelo de CYPE se comporta como el nuestro con las vigas planas a 0,5–0,7 de su rigidez a flexión.** Con la rigidez completa, la losa sale un 8–9 % baja en momentos y un 6 % en flecha, y la viga lleva en el vano 1,66 veces el momento de CYPE. La carga coincide (cortante de la viga a 1 %, flecha del centro con ×0,7 a 0,1 %).
 - **Lo que no encaja con ninguna rigidez es el empotramiento de la viga en el pilar de esquina:** en peso propio, −6,1 kN·m en la cara frente a unos −8,6 de CYPE (−9,85 con 1,35 y el 15 % de redistribución), y la torsión de la viga, 0,9 frente a 1,6 kN·m.
 - **En la vivienda, todas las vigas a 0,6 (`d-todos-06`)** llevan los momentos de vano de 0,92 / 0,95 / 0,91 / 0,82 a 0,97 / 0,98 / 0,94 / 0,89 de CYPE, las flechas de 0,91 a 0,96 y P5 de +23 % a +19 %. El `my` de la cubierta, de 0,82 a 0,89.
-- **Por qué, no se sabe:** la memoria de CYPE dice sección bruta para las vigas. Hace falta, del modelo A, el diagrama de la viga en la hipótesis de peso propio (sin envolvente) y los esfuerzos de los pilares, para ver el nudo de esquina.
+- **Segunda tanda del modelo A (diagrama de la viga en peso propio y el pilar P3), con la cota corregida** (la 3,00 de CYPE es la cara superior del forjado: nuestra losa a media altura, 2,85; con 3,00 el pilar flexaba en 2,85 m y no en los 2,70 de CYPE) **y el código con ZR1 y LV-d:**
+
+| Peso propio | CYPE | vigas ×1 | ×0,7 | ×0,6 | ×0,5 |
+|---|---|---|---|---|---|
+| uz / mx / my / Qx (medianas) | | 0,93 / 0,91 / 0,91 / 0,84 | 0,99 / 0,96 / 0,96 / 0,95 | 1,01 / 0,97 / 0,98 / 1,00 | 1,03 / 0,99 / 1,00 / 1,03 |
+| viga P3–P4: cara / vano / cara | −7,29 / +8,03 / −7,29 | −6,02 / +12,38 | −6,11 / +9,32 | −6,09 / +8,21 | −6,03 / +7,04 |
+| viga: V en la cara | 27,04 | 26,8 | 26,6 | 26,5 | 26,4 |
+| P3: N cabeza / pie | 51,19 / 57,15 | 51,97 / 58,05 | 51,19 / 57,30 | 50,88 / 57,01 | 50,53 / 56,67 |
+| P3: momentos en la cabeza | 10,88 / 10,27 | 9,79 / 9,26 | 10,10 / 9,56 | 10,17 / 9,64 | 10,23 / 9,70 |
+| P3: momentos en el pie | 7,93 / 7,48 | 6,04 / 5,71 | 6,09 / 5,76 | 6,08 / 5,75 | 6,05 / 5,73 |
+| P3: cortantes | 6,97 / 6,58 | 5,87 / 5,54 | 5,96 / 5,64 | 5,97 / 5,65 | 5,96 / 5,65 |
+
+  - **Con las vigas a 0,5–0,6 de su rigidez a flexión, el modelo A coincide con CYPE en la losa, en el vano y el cortante de la viga y en el axil de los pilares a ≤ 3 %.** Con la rigidez completa, la viga lleva en el vano 1,54 veces el momento de CYPE y la losa sale un 9 % baja.
+  - **El CYPE de las capturas no redistribuye en la hipótesis:** el −7,29 por 1,35 es el −9,85 de la envolvente.
+  - **Queda el nudo de esquina:** la viga en la cara, −6,1 frente a −7,29 (−16 %), y el pilar, −7 % en la cabeza y −23 % en el pie. Ninguna rigidez de viga lo mueve. El pilar ya flexa en lo mismo que en CYPE (2,72 frente a 2,70 m, por los cortantes).
+- **En la vivienda, con el código de ahora** (la línea base no cambia: 0,92 / 0,95 / 0,91 / 0,82, flechas 0,91, P5 +23 %): con todas las vigas a 0,5 (`d-todos-05`), **0,99 / 0,99 / 0,95 / 0,92 y flechas 0,98: pasa el criterio 7**, y P5 baja a +17 %; con 0,6, 0,97 / 0,98 / 0,94 / 0,89.
+- **Hipótesis de por qué (sin confirmar):** que CYPE dé a la viga plana embebida en el reticular la misma mitad de inercia que al emparrillado («la mitad de la zona maciza, tanto en la zona maciza como en la aligerada», memoria p. 13): ×0,5 es exactamente ese factor. La memoria, en su tabla de rigideces, dice sección bruta para las vigas, sin distinguir. Para confirmarlo, el mismo modelo A en CYPE con **losa maciza de 30** en lugar del reticular (si la viga sigue a la mitad, es de la viga; si no, es del reticular) y con **vigas descolgadas de 30 × 50**.
 
 **Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias. **Decidida y hecha el 2026-10-20 (§2.2).**
 
