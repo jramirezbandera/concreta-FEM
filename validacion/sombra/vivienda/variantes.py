@@ -108,6 +108,20 @@ def tramo_corto(altura):
     return g
 
 
+def losa_flexible(losa, fraccion):
+    """La losa con E × fracción (material general con el Ecm de HA-30, ν = 0,2): aligerado y ábacos."""
+    def g():
+        p = replica({})
+        m = p["modelo"]
+        E = 22000e3 * (38 / 10) ** 0.3 * fraccion
+        m["materiales"].append({"id": "HA-30-flex", "tipo": "general", "E": E, "G": E / 2.4, "peso": 25})
+        for l in m["losas"]:
+            if l["id"] == losa:
+                l["material"] = "HA-30-flex"
+        return p
+    return g
+
+
 VARIANTES = {
     "d-base": lambda: replica({}),
     "d-cabeza1": lambda: replica({"empotramientoCabeza": 1}),
@@ -125,6 +139,8 @@ VARIANTES = {
     "d-huella-punto": huella_punto(lambda p: {q["id"] for q in p["modelo"]["pilares"]}),
     "d-p5-punto": huella_punto(lambda p: {"P5"}),
     "d-stub060": tramo_corto(0.75),
+    "d-losa-s-05": losa_flexible("L-CUB-S", 0.5),
+    "d-losa-s-025": losa_flexible("L-CUB-S", 0.25),
 }
 
 if __name__ == "__main__":

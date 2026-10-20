@@ -65,6 +65,27 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
 2. qué tipo de viga son las tres huecas de x = 4,26 en la planta 1 (P4–P12–P15–P19), y si las de la superior son «planas» o «descolgadas» de 30 × 30;
 3. si los paños tienen algún coeficiente de empotramiento en bordes distinto de 1 (memoria, p. 19).
 
+**Capturas de CYPE de las dos vigas (2026-10-20).** El usuario mandó los diagramas de CYPECAD del grupo 2 (cubierta superior), pórticos 3 (P4–P5) y 5 (P19–P15–P12–P4), envolvente persistente, con «decalar las leyes» marcado. Frente a los nuestros (`hr`, 1,35·PP + 1,35·CM + 1,5·Q, en las caras; kN·m y kN):
+
+| Viga y punto | CYPE | Nuestro | Vigas ×0,25 | Losa superior ×0,5 |
+|---|---|---|---|---|
+| P4–P5, cara de P4 | −9,42 | −5,1 | −3,5 | −7,2 |
+| P4–P5, vano | +7,13 | +8,9 | +4,4 | +12,1 |
+| P4–P5, cara de P5 | −14,82 | −26,0 | −12,2 | −31,1 |
+| P4–P5, V en P4 / P5 | 21,6 / 22,1 | 20,2 / 12,5 | 17,2 / 10,0 | 20,6 / 15,4 |
+| P4–P12, cara de P4 | −23,83 | −17,2 | −11,5 | −23,5 |
+| P4–P12, vano | +10,36 | +12,2 | +5,1 | +17,7 |
+| P4–P12, en P12 | −14,99 | −20,3 | −9,0 | −28,5 |
+| P4–P12, V en P4 / P12 | 63,1 / 25,8 | 47,4 / 32,3 | 48,8 / 24,5 | 49,1 / 36,9 |
+| P12–P15, vano / cara de P15 | +1,39 / −4,32 | +1,4 / −2,4 | | |
+| P12–P15, V en P12 / P15 | 16,1 / 9,65 | 17,8 / 6,7 | | |
+
+- **Las vigas flexibles quedan descartadas.** Las vigas de CYPE llevan más carga que las nuestras (la P4–P5, 43,7 kN entre las dos caras frente a 32,7; la P4–P12, 88,9 frente a 79,7), y con ×0,25 llevarían menos. Ninguna dosis de rigidez da a la vez los momentos y los cortantes de CYPE.
+- **La losa más flexible, tampoco** (`d-losa-s-05`, `d-losa-s-025` en `variantes.py`): las vigas toman más momento y se alejan de CYPE.
+- **Lo que difiere es el reparto entre los extremos.** CYPE empotra más las vigas en P4, la esquina convexa (−9,4 y −23,8 frente a −5,1 y −17,2), y mete por ella mucha más carga (63 kN de cortante en P4, con la ley muy empinada en el último metro, dentro del ábaco de P4). Nosotros empotramos más en P5 y en P12 (−26,0 y −20,3 frente a −14,8 y −15,0). Junto a P5 la viga casi no recibe carga de la losa en su primer metro (el cortante pasa de −12,5 a −11,5): lo que cae ahí va al pilar por el ábaco.
+- **P5 está en una esquina entrante.** La losa superior sigue al este de P5 sin viga (la Z-CUB-S-4 va al norte y la Z-CUB-S-5 al oeste), y el ábaco de P5–P8 la rodea por tres lados. En nuestro modelo, la losa que sigue más allá de P5 da continuidad a la viga P4–P5 (−26 kN·m en su cara sin momento en la cabeza del pilar: 2,3 / 0,6 en CYPE, −0,3 / 3,4 nuestro, con peso propio) y lleva carga directa al pilar. CYPE no hace eso, o lo hace menos.
+- **Lo que queda por mirar es cómo une CYPE ese ábaco con el pilar y con el extremo de la viga en P5** (y en P12). Las variantes de la cabeza, de la huella como un punto y de las vigas no lo cambian (la P4–P5 a 0,15 m del eje de P5: −24,6 con la cabeza a 1, −20,7 con las huellas como un punto y −18,4 con las vigas ×0,5).
+
 **Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias.
 
 ## 3. Hallazgos
