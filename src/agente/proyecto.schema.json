@@ -1220,6 +1220,10 @@
         "refinoEsquinas": {
           "type": "boolean",
           "description": "Refinamiento de la malla en las esquinas de los paños de losa unidos a las vigas por sus caras\n(fase LV2): en la celda de la rejilla de cada esquina en la que se encuentran dos caras de viga, el\nelemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`: 3 niveles en los\ncruces con pilar y 2 en los cruces sin pilar, LV2-i). Con él van también las tiras de las huellas que\nasoman del ancho de su viga (LV-8), la plantilla de cara delante de un pilar tapado (desde la fase\nHR, sólo la huella es rígida en todos los pilares y con todas las opciones, no sólo en los pilares\nbajo una viga, LV2-f), y el refinamiento de Delaunay de la triangulación\nllega también a la losa junto a las vigas (§18: el eje de una viga dentro de su ancho y las aristas\nque no se parten ya no lo tapan con su círculo diametral; compilador LV2.1). Por defecto, sí\n(compilador LV2, 2026-10-19); sin él, la malla de LV1."
+        },
+        "zonaRigidaBase": {
+          "type": "boolean",
+          "description": "Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo\nnudo inferior está en un forjado es rígida a lo largo de `factorZonaRigida` veces el canto de lo\nque ese nudo tiene encima (el espesor de la losa en la huella del pilar o el canto de la viga más\nalta que le llega en el plano del forjado; una viga con la cara superior en el forjado no cuenta),\nigual que la cabeza del tramo de debajo. Con el factor 0,5, el medio canto de CYPECAD en los dos\nextremos. Por defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1."
         }
       },
       "additionalProperties": false

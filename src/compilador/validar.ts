@@ -229,6 +229,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", "La opción refinoEsquinas tiene que ser true o false.");
     return null;
   }
+  if (typeof op.zonaRigidaBase !== "boolean") {
+    diag.error("opciones/no-validas", "La opción zonaRigidaBase tiene que ser true o false.");
+    return null;
+  }
   if (!(num(op.anchoFranja) && op.anchoFranja >= 2 * op.epsSnap)) {
     diag.error("opciones/no-validas", `El ancho de las franjas tiene que ser un número de al menos 2·ε_snap (${2 * op.epsSnap} m).`);
     return null;

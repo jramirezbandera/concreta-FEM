@@ -5,7 +5,9 @@
  * por él tiene su tramo flexible sobre su propia recta, desde la proyección del eje del pilar más
  * `factorZonaRigida` veces lo que su recta recorre dentro de la huella; el offset (del nudo al
  * extremo del tramo flexible) lleva a la vez la zona rígida y la excentricidad. El tramo de un
- * pilar es rígido en su cabeza a lo largo del canto de la viga más alta (o de la losa) que le llega.
+ * pilar es rígido en su cabeza a lo largo del canto de la viga más alta (o de la losa) que le llega
+ * y, con `zonaRigidaBase` (LV-d, como CYPECAD), también en su base sobre un forjado, con el canto
+ * de lo que el nudo de la base tiene encima.
  *
  * Con losas (C2): los apoyos lineales y los puntuales que caen en una losa van a sus nudos de la
  * malla, y el diafragma rígido de una planta con losas abarca los nudos sobre ellas (C2-f).
@@ -95,6 +97,9 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
   const rectasDe = new Map<string, Recta[]>();
   // Espesor de la losa en la huella de cada nudo de pilar (C2-e: cuenta como canto en la cabeza)
   const espesorHuella = new Map(losas.huellas.map((h) => [h.maestro, h.espesor] as const));
+  /** Canto de lo que llega a un nudo de pilar: la losa de su huella y sus vigas (las del plano del forjado o todas). */
+  const cantoEn = (n: number, vigas: ReadonlySet<string>, todas: boolean) =>
+    Math.max(espesorHuella.get(n) ?? 0, ...[...vigas].filter((v) => todas || ctx.vigaDe.get(v)!.insercion !== "superior").map((v) => ctx.secciones.get(ctx.vigaDe.get(v)!.seccion)!.canto));
 
   // Pilares: una recta por pilar, de su base a su cabeza; un tramo por planta
   for (const p of ctx.pilares) {
@@ -119,12 +124,22 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       const zi = ctx.cotas[k]!;
       const zj = ctx.cotas[k - 1]!;
       const vigas = topo.vigasEn.get(nj) ?? new Set<string>();
-      const canto = Math.max(espesorHuella.get(nj) ?? 0, ...[...vigas].map((v) => ctx.secciones.get(ctx.vigaDe.get(v)!.seccion)!.canto));
+      const canto = cantoEn(nj, vigas, true);
       const rz = f * canto;
-      const ip: Vec3 = [p.x, p.y, zi];
+      // LV-d: la base, sobre un forjado, es rígida como la cabeza del tramo de debajo: f veces el
+      // canto de lo que el nudo de la base tiene encima (la losa de la huella y las vigas en el
+      // plano del forjado; una viga con la cara superior en el forjado queda entera por debajo)
+      const vigasBase = topo.vigasEn.get(ni) ?? new Set<string>();
+      const cantoBase = ctx.op.zonaRigidaBase ? cantoEn(ni, vigasBase, false) : 0;
+      const rzBase = f * cantoBase;
+      const ip: Vec3 = [p.x, p.y, zi + rzBase];
       const jp: Vec3 = [p.x, p.y, zj - rz];
       if (!(jp[2] - ip[2] > epsGeom)) {
-        diag.error("pilar/tramo-flexible-nulo", `El tramo del pilar ${p.id} bajo la planta ${ctx.plantas[k - 1]!.id} queda entero dentro del canto de las vigas o de la losa que le llegan (${canto} m).`, [p.id, ...vigas]);
+        diag.error(
+          "pilar/tramo-flexible-nulo",
+          `El tramo del pilar ${p.id} bajo la planta ${ctx.plantas[k - 1]!.id} queda entero dentro del canto de las vigas o de la losa que le llegan (${canto} m en la cabeza${rzBase > 0 ? ` y ${cantoBase} m en la base` : ""}).`,
+          [p.id, ...vigas, ...(rzBase > 0 ? vigasBase : [])],
+        );
         continue;
       }
       const lib: { i?: Seis<boolean>; j?: Seis<boolean> } = {};
@@ -134,6 +149,7 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       if (k === kb && empBase !== 1) emp.i = empBase;
       if (k - 1 === kh && empCabeza !== 1) emp.j = empCabeza;
       const sI = zi - zb;
+      const sIp = ip[2] - zb;
       const sJp = jp[2] - zb;
       const sJ = zj - zb;
       barras.push({
@@ -150,10 +166,10 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
         vz: ez,
         liberaciones: lib.i || lib.j ? lib : undefined,
         empotramiento: emp.i !== undefined || emp.j !== undefined ? emp : undefined,
-        s: [sI, sI, sJp, sJ],
+        s: [sI, sIp, sJp, sJ],
       });
-      recta.trozos.push({ desde: sigmaAnt, hasta: sI, nudo: ni });
-      recta.trozos.push({ desde: sI, hasta: sJp, barra: barras.length - 1, ip: sI });
+      recta.trozos.push({ desde: sigmaAnt, hasta: sIp, nudo: ni });
+      recta.trozos.push({ desde: sIp, hasta: sJp, barra: barras.length - 1, ip: sIp });
       sigmaAnt = sJp;
       if (k - 1 === kh) recta.trozos.push({ desde: sJp, hasta: Infinity, nudo: nj });
     }

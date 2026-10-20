@@ -592,6 +592,15 @@ export interface OpcionesCompilacion {
    * (compilador LV2, 2026-10-19); sin él, la malla de LV1.
    */
   refinoEsquinas?: boolean;
+  /**
+   * Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo
+   * nudo inferior está en un forjado es rígida a lo largo de `factorZonaRigida` veces el canto de lo
+   * que ese nudo tiene encima (el espesor de la losa en la huella del pilar o el canto de la viga más
+   * alta que le llega en el plano del forjado; una viga con la cara superior en el forjado no cuenta),
+   * igual que la cabeza del tramo de debajo. Con el factor 0,5, el medio canto de CYPECAD en los dos
+   * extremos. Por defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1.
+   */
+  zonaRigidaBase?: boolean;
 }
 
 export interface OpcionesResueltas {
@@ -610,6 +619,7 @@ export interface OpcionesResueltas {
   anchoFranja: number;
   refinoCaras: boolean;
   refinoEsquinas: boolean;
+  zonaRigidaBase: boolean;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -629,5 +639,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     anchoFranja: o.anchoFranja ?? ANCHO_FRANJA,
     refinoCaras: o.refinoCaras ?? true,
     refinoEsquinas: o.refinoEsquinas ?? true,
+    zonaRigidaBase: o.zonaRigidaBase ?? true,
   };
 }

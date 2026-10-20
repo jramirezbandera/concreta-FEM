@@ -38,16 +38,18 @@ import { sotanoFisico, vigaMuroFisico } from "./oraculos.ts";
 const etabs = (id: string) => fisicoEtabs(murosEtabs15().find((m) => m.id === id)!);
 
 export const MODELOS_CONGELADOS_C3: Record<string, () => ModeloCongelado> = {
-  "etabs-15c-3-60": () => ({ fisico: etabs("15c-3-60"), opciones: { franjas: false, tamanoMalla: 20 * IN, unionLosaViga: "eje" } }),
-  "etabs-15f-1": () => ({ fisico: fisicoEtabs({ ...murosEtabs15().find((m) => m.id === "15f-3")!, plantas: 1 }), opciones: { franjas: false, tamanoMalla: 20 * IN, unionLosaViga: "eje" } }),
-  "sotano-empuje": () => ({ fisico: sotanoFisico(), opciones: { franjas: false, modificadores: {}, unionLosaViga: "eje" } }),
-  "viga-en-muro": () => ({ fisico: vigaMuroFisico(), opciones: { franjas: false, modificadores: {}, unionLosaViga: "eje" } }),
-  "aleatorio-3-muros": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, unionLosaViga: "eje" } }),
-  "reticula-nucleo": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje" } }),
+  "etabs-15c-3-60": () => ({ fisico: etabs("15c-3-60"), opciones: { franjas: false, tamanoMalla: 20 * IN, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "etabs-15f-1": () => ({ fisico: fisicoEtabs({ ...murosEtabs15().find((m) => m.id === "15f-3")!, plantas: 1 }), opciones: { franjas: false, tamanoMalla: 20 * IN, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "sotano-empuje": () => ({ fisico: sotanoFisico(), opciones: { franjas: false, modificadores: {}, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "viga-en-muro": () => ({ fisico: vigaMuroFisico(), opciones: { franjas: false, modificadores: {}, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "aleatorio-3-muros": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "reticula-nucleo": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje", zonaRigidaBase: false } }),
   // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
-  "aleatorio-3-muros-lv": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, refinoEsquinas: false } }),
+  "aleatorio-3-muros-lv": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, refinoEsquinas: false, zonaRigidaBase: false } }),
   // Fase LV2: con la malla junto a las vigas (por defecto; sin rejilla, actúan las tiras y LV2-f)
-  "aleatorio-3-muros-lv2": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false } }),
+  "aleatorio-3-muros-lv2": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, zonaRigidaBase: false } }),
+  // LV-d (compilador LVD1, 2026-10-20): la zona rígida también en la base de los tramos de pilar sobre un forjado (por defecto)
+  "reticula-nucleo-lvd": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1 } }),
 };
 
 if (import.meta.main) {

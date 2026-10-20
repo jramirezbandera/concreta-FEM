@@ -82,14 +82,14 @@ describe("valores por defecto del compilador (C1-a y D4)", () => {
 
   it("las hipótesis lo dejan escrito para la memoria", () => {
     expect(compilado().hipotesis).toEqual([
-      "Nudos de dimensión finita: es rígido el 50 % del nudo (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).",
+      "Nudos de dimensión finita: es rígido el 50 % del nudo (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega, en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD; LV-d).",
       "Modificadores de rigidez (D4): tramos de pilar de hormigón: A ×2 (2); tramos de pilar de acero: A ×2 (1); tramos de viga de hormigón: J ×0,1 (1).",
       "Empotramiento parcial de los pilares (CY2, como CYPECAD: la rigidez es α·K_biempotrada + (1 − α)·K_articulada en ese extremo): cabeza 0,3 (3 tramos). Por defecto, 0,3 en la cabeza del último tramo, salvo en los pilares sobre los que arranca otro.",
       "Diafragma rígido en P1; sin diafragma en C.",
       "Eje de las vigas en el plano del forjado.",
     ]);
     expect(compilado({ factorZonaRigida: 1, modificadores: {} }).hipotesis.slice(0, 2)).toEqual([
-      "Nudos de dimensión finita: es rígido todo el nudo (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).",
+      "Nudos de dimensión finita: es rígido todo el nudo (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega, en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD; LV-d).",
       "Sin modificadores de rigidez.",
     ]);
   });

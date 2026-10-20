@@ -997,6 +997,9 @@
         },
         "refinoEsquinas": {
           "type": "boolean"
+        },
+        "zonaRigidaBase": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

@@ -24,12 +24,16 @@ export interface ReferenciaFina {
   nudos: number;
 }
 
-/** Los modelos, con las opciones de la malla gruesa (la de la prueba) y de la fina (la referencia). */
+/**
+ * Los modelos, con las opciones de la malla gruesa (la de la prueba) y de la fina (la referencia).
+ * Sin la zona rígida de la base de los pilares (LV-d): la referencia fina es anterior y la medida es
+ * de la malla, no de la barra del pilar.
+ */
 export const MODELOS_PRECISION: Record<string, { fisico: () => ModeloFisico; gruesa: OpcionesCompilacion; fina: OpcionesCompilacion }> = {
-  "reticula-1": { fisico: () => reticulaAleatoria(1), gruesa: {}, fina: { tamanoMalla: 0.25 } },
-  "reticula-12": { fisico: () => reticulaAleatoria(12), gruesa: {}, fina: { tamanoMalla: 0.25 } },
-  "reticula-16": { fisico: () => reticulaAleatoria(16), gruesa: {}, fina: { tamanoMalla: 0.25 } },
-  "losa-3x3-mezclada": { fisico: () => losa3x3Mezclada(), gruesa: { unionLosaViga: "eje" }, fina: { unionLosaViga: "eje", tamanoMalla: 0.1 } },
+  "reticula-1": { fisico: () => reticulaAleatoria(1), gruesa: { zonaRigidaBase: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false } },
+  "reticula-12": { fisico: () => reticulaAleatoria(12), gruesa: { zonaRigidaBase: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false } },
+  "reticula-16": { fisico: () => reticulaAleatoria(16), gruesa: { zonaRigidaBase: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false } },
+  "losa-3x3-mezclada": { fisico: () => losa3x3Mezclada(), gruesa: { unionLosaViga: "eje", zonaRigidaBase: false }, fina: { unionLosaViga: "eje", tamanoMalla: 0.1, zonaRigidaBase: false } },
 };
 
 export function aReferencia(m: MedidaLocal): ReferenciaFina {

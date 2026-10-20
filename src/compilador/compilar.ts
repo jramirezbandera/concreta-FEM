@@ -38,7 +38,7 @@ import type { Vec2 } from "./fisico.ts";
 import type { ModificadoresBarra } from "../elementos/barra.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "HR1";
+export const VERSION_COMPILADOR = "LVD1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -463,7 +463,9 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       ? "Nudos de eje a eje: ninguna barra tiene zona rígida ni excentricidad (las secciones no dan dimensiones al nudo), así que el factor de zona rígida no actúa."
       : op.factorZonaRigida === 0
         ? "Nudos de eje a eje: sin zonas rígidas (factor 0), como SAP2000 por defecto."
-        : `Nudos de dimensión finita: es rígido ${op.factorZonaRigida === 1 ? "todo el nudo" : `el ${coma(op.factorZonaRigida * 100)} % del nudo`} (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega).`,
+        : `Nudos de dimensión finita: es rígido ${op.factorZonaRigida === 1 ? "todo el nudo" : `el ${coma(op.factorZonaRigida * 100)} % del nudo`} (la viga dentro del pilar y el pilar dentro del canto de la viga más alta que le llega${
+            op.zonaRigidaBase ? ", en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD; LV-d" : ", sólo en la cabeza de cada tramo"
+          }).`,
   );
   const grupos = new Map<string, number>();
   for (const b of piezas.barras) {

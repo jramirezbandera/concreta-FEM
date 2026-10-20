@@ -1,0 +1,31 @@
+LV-d: zona rígida en la base de los tramos de pilar (con) frente a sólo en la cabeza (sin). kN, kN·m.
+
+Edificio objetivo de barras (7 plantas, 80 pilares): nudos 1151 (1151 sin la base)
+  Deriva de cabeza con Vx (P24-20): sin 0.92 mm, con 0.79 mm ( -14.4 %)
+  Desplome relativo máximo con Vx: sin 0.080 ‰, con 0.068 ‰ ( -15.7 %)
+  Viga X5-N3 en la cara del pilar (s = 5.8), My con G: sin -101.29, con -99.40 kN·m (  -1.9 %)
+  Tramo de N3 (esfuerzos en i' y j'; s en m desde el arranque):
+  pilar    caso         s base       N      Vz      My |  s cab.       N      Vz      My
+  P24-20   G    sin       4.50 -1174.9     0.6     0.8 |    7.20 -1164.8     0.6    -0.8
+  P24-20   G    con       4.80 -1174.9     0.5     0.6 |    7.20 -1165.9     0.5    -0.6
+  P24-20   Vx   sin       4.50    -0.0     4.8     6.1 |    7.20    -0.0     4.8    -6.8
+  P24-20   Vx   con       4.80    -0.0     4.7     5.2 |    7.20    -0.0     4.7    -6.0
+  P0-0     G    sin       4.50  -473.6   -20.0   -27.2 |    7.20  -463.5   -20.0    26.9
+  P0-0     G    con       4.80  -478.0   -21.0   -25.2 |    7.20  -469.0   -21.0    25.1
+  P0-0     Vx   sin       4.50     5.0     7.1     5.5 |    7.20     5.0    -1.0    -2.9
+  P0-0     Vx   con       4.80     5.0     6.2     4.0 |    7.20     5.0    -1.0    -2.1
+
+Edificio reducido con losas (2 plantas, 3 × 2 vanos): nudos 3258 (3258 sin la base)
+  Deriva de cabeza con Vx (P6-5): sin 0.10 mm, con 0.08 mm ( -17.6 %)
+  Desplome relativo máximo con Vx: sin 0.027 ‰, con 0.021 ‰ ( -22.1 %)
+  Flecha máxima de la losa con G: sin 1.06 mm, con 1.04 mm (  -1.6 %)
+  Tramo de N2 (esfuerzos en i' y j'; s en m desde el arranque):
+  pilar    caso         s base       N      Vz      My |  s cab.       N      Vz      My
+  P6-5     G    sin       1.50  -412.0     2.3     3.8 |    4.20  -401.2     2.3    -2.5
+  P6-5     G    con       1.80  -408.4     2.9     4.3 |    4.20  -398.8     2.9    -2.8
+  P6-5     Vx   sin       1.50     0.2     0.0     0.0 |    4.20     0.2     0.0    -0.0
+  P6-5     Vx   con       1.80     0.2     0.0     0.0 |    4.20     0.2     0.0    -0.0
+  P0-0     G    sin       1.50   -73.5   -11.8   -16.2 |    4.20   -63.4   -11.8    15.6
+  P0-0     G    con       1.80   -73.0   -14.5   -17.8 |    4.20   -64.0   -14.5    17.0
+  P0-0     Vx   sin       1.50     0.1     6.1     4.5 |    4.20     0.1    -2.0    -1.0
+  P0-0     Vx   con       1.80     0.1     5.3     3.2 |    4.20     0.1    -1.9    -0.8

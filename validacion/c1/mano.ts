@@ -85,21 +85,26 @@ function caso1(): CasoMano {
     const [x, y] = pos[id]!;
     tramoPilar[id] = [];
     for (let t = 0; t < 2; t++) {
-      // cabeza rígida 0,5 m: el canto de la viga más alta que llega (vx)
-      const b = m.barra(n[id]![t]!, n[id]![t + 1]!, sec[id]!, vz[id]!, { offsets: { j: [0, 0, -0.5] } });
+      // cabeza rígida 0,5 m: el canto de la viga más alta que llega (vx); y la base del segundo
+      // tramo, sobre el forjado de P1, rígida otro tanto (LV-d); el arranque no tiene nada debajo
+      const rb = t === 1 ? 0.5 : 0;
+      const b = m.barra(n[id]![t]!, n[id]![t + 1]!, sec[id]!, vz[id]!, { offsets: { ...(rb ? { i: [0, 0, rb] as Vec3 } : {}), j: [0, 0, -0.5] } });
       tramoPilar[id]!.push(b);
       const w = -25 * sec[id]!.A;
       const H = zs[t + 1]! - zs[t]!;
-      bG.push(dl(b, g(w), 0, H - 0.5));
+      bG.push(dl(b, g(w), 0, H - rb - 0.5));
+      if (rb) G.push(uniformeANudo(n[id]![t]!, [x, y, zs[t]!], [x, y, zs[t]!], [x, y, zs[t]! + rb], g(w)));
       G.push(uniformeANudo(n[id]![t + 1]!, [x, y, zs[t + 1]!], [x, y, zs[t + 1]! - 0.5], [x, y, zs[t + 1]!], g(w)));
     }
   }
   for (const id of Object.keys(pos)) m.apoyo(n[id]![0]!, EMPOTRADO);
-  // Viento en D: cada tramo flexible y su cabeza rígida
+  // Viento en D: cada tramo flexible, su cabeza rígida y la base rígida del segundo tramo
   for (let t = 0; t < 2; t++) {
     const b = tramoPilar.D![t]!;
+    const rb = t === 1 ? 0.5 : 0;
     const H = zs[t + 1]! - zs[t]!;
-    bQ.push(dl(b, [0, 2, 0], 0, H - 0.5));
+    bQ.push(dl(b, [0, 2, 0], 0, H - rb - 0.5));
+    if (rb) Q.push(uniformeANudo(n.D![t]!, [5, 4, zs[t]!], [5, 4, zs[t]!], [5, 4, zs[t]! + rb], [0, 2, 0]));
     Q.push(uniformeANudo(n.D![t + 1]!, [5, 4, zs[t + 1]!], [5, 4, zs[t + 1]! - 0.5], [5, 4, zs[t + 1]!], [0, 2, 0]));
   }
   // Vigas: zonas rígidas hasta la cara del pilar a lo largo de su eje

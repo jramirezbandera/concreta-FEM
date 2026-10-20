@@ -33,16 +33,16 @@ import { casosManoC4 } from "./mano.ts";
 const mano = (i: number) => casosManoC4()[i]!.fisico;
 
 export const MODELOS_CONGELADOS_C4: Record<string, () => ModeloCongelado> = {
-  "pano-oblicuo": () => ({ fisico: mano(1), opciones: { franjas: false, unionLosaViga: "eje" } }),
-  "dos-vanos-voladizo": () => ({ fisico: mano(2), opciones: { franjas: false, unionLosaViga: "eje" } }),
-  "pano-hueco": () => ({ fisico: mano(4), opciones: { franjas: false, unionLosaViga: "eje" } }),
-  "aleatorio-7-unidireccional": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(7), 7, { tipo: "unidireccional" }), opciones: { franjas: false, unionLosaViga: "eje" } }),
-  "aleatorio-6-reticular": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(6), 6, { tipo: "reticular" }), opciones: { franjas: false, tamanoMalla: 1.25, unionLosaViga: "eje" } }),
-  "aleatorio-5-mixto": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25, unionLosaViga: "eje" } }),
+  "pano-oblicuo": () => ({ fisico: mano(1), opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "dos-vanos-voladizo": () => ({ fisico: mano(2), opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "pano-hueco": () => ({ fisico: mano(4), opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "aleatorio-7-unidireccional": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(7), 7, { tipo: "unidireccional" }), opciones: { franjas: false, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "aleatorio-6-reticular": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(6), 6, { tipo: "reticular" }), opciones: { franjas: false, tamanoMalla: 1.25, unionLosaViga: "eje", zonaRigidaBase: false } }),
+  "aleatorio-5-mixto": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25, unionLosaViga: "eje", zonaRigidaBase: false } }),
   // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
-  "aleatorio-5-mixto-lv": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25, refinoEsquinas: false } }),
+  "aleatorio-5-mixto-lv": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25, refinoEsquinas: false, zonaRigidaBase: false } }),
   // Fase LV2: con la malla junto a las vigas (por defecto)
-  "aleatorio-5-mixto-lv2": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25 } }),
+  "aleatorio-5-mixto-lv2": () => ({ fisico: conForjadosAleatorios(fisicoAleatorio(5), 5), opciones: { franjas: false, tamanoMalla: 1.25, zonaRigidaBase: false } }),
 };
 
 if (import.meta.main) {

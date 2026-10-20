@@ -86,7 +86,21 @@ Sólo la de x = 4,26 (P4–P12–P15) a ×0,1: 0,86 / +23 %; sólo la P4–P5: 0
 - **P5 está en una esquina entrante.** La losa superior sigue al este de P5 sin viga (la Z-CUB-S-4 va al norte y la Z-CUB-S-5 al oeste), y el ábaco de P5–P8 la rodea por tres lados. En nuestro modelo, la losa que sigue más allá de P5 da continuidad a la viga P4–P5 (−26 kN·m en su cara sin momento en la cabeza del pilar: 2,3 / 0,6 en CYPE, −0,3 / 3,4 nuestro, con peso propio) y lleva carga directa al pilar. CYPE no hace eso, o lo hace menos.
 - **Lo que queda por mirar es cómo une CYPE ese ábaco con el pilar y con el extremo de la viga en P5** (y en P12). Las variantes de la cabeza, de la huella como un punto y de las vigas no lo cambian (la P4–P5 a 0,15 m del eje de P5: −24,6 con la cabeza a 1, −20,7 con las huellas como un punto y −18,4 con las vigas ×0,5).
 
-**Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias.
+**Decisión para el usuario, LV-d:** el offset rígido en la base de un tramo de pilar sobre un forjado (el medio canto del forjado inferior, como CYPE). Cambia los cortantes de los tramos cortos (aquí, de 27 a 35 kN en P4) y endurece ligeramente todos los pilares (3,20 m libres se quedan igual, porque el arranque no tiene forjado debajo). Propuesta: hacerlo, por coherencia con la cabeza (C1), y medir las referencias. **Decidida y hecha el 2026-10-20 (§2.2).**
+
+### 2.2 LV-d: la zona rígida en la base de los tramos de pilar (2026-10-20; compilador LVD1)
+
+**Qué cambia.** Hasta HR1, el tramo de un pilar era rígido sólo en su cabeza, a lo largo de `factorZonaRigida` veces el canto de la viga más alta o de la losa que le llega (C1), y su base empezaba en el nudo, en el plano medio del forjado: la mitad del nudo que queda por encima de ese plano trabajaba como pilar flexible. Ahora (`piezas.ts`, opción `zonaRigidaBase`, por defecto sí) la base de un tramo cuyo nudo inferior está en un forjado es rígida igual que la cabeza del tramo de debajo: `f` veces el canto de lo que ese nudo tiene encima, que es el espesor de la losa en la huella del pilar o el canto de la viga más alta que le llega en el plano del forjado (una viga con `insercion: "superior"` queda entera por debajo del nudo y no cuenta en la base, aunque sí en la cabeza del tramo de debajo, como en C1). Con `f` = 0,5 es el medio canto de CYPECAD en los dos extremos; con `f` = 1, el canto entero en los dos. El arranque no cambia si no tiene forjado debajo, y un pilar apeado sobre una losa o una viga lleva la zona de su huella. Los esfuerzos de la base se dan en la cara del forjado (`i'`), como los de la cabeza (`j'`), y la estación `s[1]` del mapeo lo lleva; los diagramas, las consultas y la app ya trabajaban con `s[1]…s[2]`. Un tramo que no cabe entre sus dos zonas es `pilar/tramo-flexible-nulo`, con los dos cantos en el mensaje. La malla no cambia ni un nudo y las ecuaciones son las mismas. Con `zonaRigidaBase: false`, el modelo de antes bit a bit: las referencias congeladas de C1–C5 y F lo llevan y siguen idénticas, y hay cuatro nuevas con el valor por defecto (`edificio-2x3x2-lvd`, `aleatorio-13-lvd`, `reticula-nucleo-lvd` y `edificio-2x2-lvd`). La regresión de precisión local de HR (`precision.test.ts`) se queda sin la base, porque su referencia fina es anterior y mide la malla, y el axil congelado del apeo realista (`apeo.test.ts`) se compara sin ella. Pruebas: `src/compilador/zonaRigidaBase.test.ts`, y el oráculo a mano del pórtico 3D de dos plantas (`validacion/c1/mano.ts`, criterio 2 de C1), que lleva ahora la base rígida del segundo tramo con su peso propio y el viento repartidos entre el nudo y el tramo flexible: el compilador lo da a 1e-10.
+
+**La vivienda** (`.datos/lvd`, `out_lvd.txt`, `lvd/tramos.txt`; `.datos/lvd-sin` reproduce `hr`): lo que estaba cuadrado no se mueve: momentos de vano 0,92 / 0,95 / 0,91 / 0,82, flechas 0,91 / 0,91, P5 +23 / +15 / +33 %, carga total +1,0 %. Los cortantes de los tramos cortos de 0,90 m con peso propio pasan de 27,2 / 18,5 / 8,0 kN (P4 / P12 / P19) a 32,7 / 23,0 / 9,6, frente a 35,3 / 27,0 / 9,0 de CYPE: de −23 / −31 / −11 % a −7 / −15 / +7 %. Quedan por debajo de los 34,8 / 24,5 / 9,8 de la variante `d-stub060` de §2.1, que daba los 0,60 m libres de otra forma; lo que queda es dónde está el tramo flexible dentro de los 0,90 m, y no se persigue más.
+
+**Los edificios objetivo** (`validacion/lvd/medir.ts`, `out_medir.txt`; con la base frente a sólo la cabeza):
+- el de barras de C1 (7 plantas, 80 pilares; vigas de 0,60, así que cada tramo intermedio pierde 0,30 m flexibles en la base): la deriva de cabeza con Vx baja un 14,4 % y el desplome relativo máximo, un 15,7 %; el momento de la viga X5-N3 en la cara del pilar con G, un 1,9 %; en el tramo de N3 del pilar interior, el cortante con Vx baja de 4,8 a 4,7 kN y el momento de la base, de 6,1 a 5,2 kN·m (se da 0,30 m más arriba); en el de esquina, el cortante con G sube de 20,0 a 21,0 kN;
+- el reducido con losas de C2 (2 plantas, 3 × 2 vanos): deriva −17,6 %, desplome −22,1 %, flecha máxima de la losa −1,6 %; en el pilar de esquina, el cortante con G sube de 11,8 a 14,5 kN y el momento de la base, de 16,2 a 17,8 kN·m.
+
+Es lo esperado de un tramo flexible más corto: los pilares toman algo más del momento de las vigas y la estructura es más rígida frente a lo horizontal. Para la comprobación, el momento de la base de un tramo intermedio es ahora el de la cara del forjado, no el del eje: menor, y el que se comprueba.
+
+**Pendiente para la integración:** los módulos de Concreta tienen que saber que los esfuerzos de los dos extremos de un tramo de pilar van en las caras (`s[1]` y `s[2]` del mapeo). **Visto de paso, sin tocar:** la cabeza de un tramo bajo una viga con `insercion: "superior"` lleva `f · canto` cuando el pilar ocupa el canto entero por debajo del nudo, así que se queda corta a la mitad; es de C1 y va con todas las vigas `"superior"`.
 
 ## 3. Hallazgos
 
@@ -125,7 +139,7 @@ Las pruebas que miden un comportamiento de antes con vigas (las plantillas de SP
 
 **Decidido por el usuario el 2026-10-15:** LV-a y LV-c, juntas en una fase corta de refinamiento junto a las vigas (fase LV2, plan en `refinamiento-vigas.md`); LV-b se acepta por ahora y se retoma cuando se vuelva a tocar la rejilla; el `my` de la cubierta y P5, justo después de LV2. Al medir el plan de LV2, la primera fila partida a lo largo de toda la cara no cabe en el perfil móvil y se propone refinar sólo la esquina de cada paño (`refinamiento-vigas.md` §1–§4).
 
-**Siguiente paso:** la fase LV2 (hecha el 2026-10-19) y, después, el `my` de la cubierta y P5 (§2.1: diagnosticado el 2026-10-19; lo que queda es de CYPE y lo tiene que mirar el usuario en su modelo).
+**Siguiente paso:** la fase LV2 (hecha el 2026-10-19) y, después, el `my` de la cubierta y P5 (§2.1: diagnosticado el 2026-10-19; lo que queda es de CYPE y lo tiene que mirar el usuario en su modelo). LV-d, decidida y hecha el 2026-10-20 (§2.2).
 
 ## 6. Para reproducir
 
@@ -148,4 +162,15 @@ bun validacion/sombra/vivienda/muestrear.ts validacion/sombra/vivienda/.datos/d-
 .venv/Scripts/python.exe validacion/sombra/vivienda/zonas.py validacion/sombra/vivienda/.datos/d-zcubs-025 my Cubierta [negativos]
 bun validacion/sombra/vivienda/viga.ts validacion/sombra/vivienda/.datos/d-zcubs-025 [Z-CUB-S-5]
 bun validacion/sombra/vivienda/tramos.ts validacion/sombra/vivienda/.datos/d-stub060
+```
+
+LV-d (§2.2):
+
+```
+bun validacion/lvd/medir.ts > validacion/lvd/out_medir.txt
+.venv/Scripts/python.exe validacion/sombra/vivienda/replica.py '{}' validacion/sombra/vivienda/.datos/lvd
+.venv/Scripts/python.exe validacion/sombra/vivienda/replica.py '{"zonaRigidaBase": false}' validacion/sombra/vivienda/.datos/lvd-sin
+bun validacion/sombra/vivienda/muestrear.ts validacion/sombra/vivienda/.datos/lvd   (y lvd-sin, que reproduce hr)
+.venv/Scripts/python.exe validacion/sombra/vivienda/comparar.py validacion/sombra/vivienda/.datos/lvd > validacion/sombra/vivienda/.datos/out_lvd.txt
+bun validacion/sombra/vivienda/tramos.ts validacion/sombra/vivienda/.datos/lvd "Peso propio"
 ```

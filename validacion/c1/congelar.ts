@@ -9,6 +9,10 @@
  * Los demás, con las opciones por defecto (factor de zona rígida 0,5 y modificadores de D4). El test
  * (src/compilador/congelado-c1.test.ts) los recompila y recalcula con los dos solvers.
  *
+ * LV-d (compilador LVD1): los modelos de antes llevan `zonaRigidaBase: false` (la zona rígida sólo en
+ * la cabeza de los tramos de pilar: los mismos bits que antes de LV-d); los terminados en `-lvd`, la
+ * de por defecto (también en la base de los tramos sobre un forjado, como CYPECAD).
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio del generador aleatorio):
  *   bun validacion/c1/congelar.ts
  */
@@ -31,11 +35,14 @@ export interface ModeloCongelado {
 }
 
 export const MODELOS_CONGELADOS_C1: Record<string, () => ModeloCongelado> = {
-  "sap-1-022": () => ({ fisico: JSON.parse(readFileSync(join(import.meta.dirname, "fisico-1022.json"), "utf8")) as ModeloFisico, opciones: { modificadores: {} } }),
-  "edificio-2x3x2": () => ({ fisico: edificioObjetivo(2, 3, 2) }),
-  "aleatorio-6": () => ({ fisico: fisicoAleatorio(6) }),
-  "aleatorio-13": () => ({ fisico: fisicoAleatorio(13) }),
-  "aleatorio-21-sin-diafragma": () => ({ fisico: fisicoAleatorio(21, { diafragma: false }) }),
+  "sap-1-022": () => ({ fisico: JSON.parse(readFileSync(join(import.meta.dirname, "fisico-1022.json"), "utf8")) as ModeloFisico, opciones: { modificadores: {}, zonaRigidaBase: false } }),
+  "edificio-2x3x2": () => ({ fisico: edificioObjetivo(2, 3, 2), opciones: { zonaRigidaBase: false } }),
+  "aleatorio-6": () => ({ fisico: fisicoAleatorio(6), opciones: { zonaRigidaBase: false } }),
+  "aleatorio-13": () => ({ fisico: fisicoAleatorio(13), opciones: { zonaRigidaBase: false } }),
+  "aleatorio-21-sin-diafragma": () => ({ fisico: fisicoAleatorio(21, { diafragma: false }), opciones: { zonaRigidaBase: false } }),
+  // LV-d (compilador LVD1, 2026-10-20): la zona rígida también en la base de los tramos sobre un forjado (por defecto)
+  "edificio-2x3x2-lvd": () => ({ fisico: edificioObjetivo(2, 3, 2) }),
+  "aleatorio-13-lvd": () => ({ fisico: fisicoAleatorio(13) }),
 };
 
 export interface ReferenciaC1 {
