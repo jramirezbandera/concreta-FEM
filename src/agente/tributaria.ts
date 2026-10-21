@@ -20,6 +20,7 @@
  */
 import type { CargaFisica, Losa, ModeloFisico, PanoUnidireccional, Vec2 } from "../compilador/fisico.ts";
 import { momentosInterseccion, type Region } from "../compilador/poligonos.ts";
+import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import { areaRegion, areaSeccion, cantoLibre, gammaMaterial, pesoLosa, Plantas, regionDe, sobreMuros, tramos } from "./sensatez.ts";
 
 /** Separación de los puntos de los ejes de los muros que hacen de generadores, m. */
@@ -167,13 +168,15 @@ export function bajadaTributaria(f: ModeloFisico, casos: ReadonlySet<string>, ep
     ] as Vec2[];
   })();
 
+  // El eje del tramo de un pilar con la cabeza en la planta k (PF: el centro de su sección)
+  const ejeEn = (p: NonNullable<ModeloFisico["pilares"]>[number], k: number): Vec2 => ejeSeccion(p, f.secciones?.find((s) => s.id === (p.tramos?.find((t) => t.planta === P.ids[k])?.seccion ?? p.seccion)));
   const cabeza = new Map<string, number>(); // bajada en la cabeza del tramo `${pilar}@${k}`
   const r: TramoTributario[] = [];
   const apeados = new Map<number, { p: Vec2; F: number }[]>();
   for (let k = 0; k < P.ids.length; k++) {
     const pl = P.ids[k]!;
     const gens: Generador[] = [];
-    for (const p of f.pilares ?? []) if (P.tramosVertical(p).includes(k)) gens.push({ id: p.id, pilar: true, p: [p.x, p.y] });
+    for (const p of f.pilares ?? []) if (P.tramosVertical(p).includes(k)) gens.push({ id: p.id, pilar: true, p: ejeEn(p, k) });
     for (const m of f.muros ?? []) {
       if (!P.tramosVertical(m).includes(k)) continue;
       for (const t of tramos(m.puntos)) {
@@ -260,11 +263,11 @@ export function bajadaTributaria(f: ModeloFisico, casos: ReadonlySet<string>, ep
       const arriba = ks.includes(k - 1) ? cabeza.get(`${p.id}@${k - 1}`)! + propio.get(`${p.id}@${k - 1}`)! : 0;
       const N = (recibe.get(p.id) ?? 0) + arriba;
       cabeza.set(`${p.id}@${k}`, N);
-      const muro = (f.muros ?? []).find((m) => P.tramosVertical(m).includes(k) && tramos(m.puntos).some((t) => distancia([p.x, p.y], t) <= m.espesor / 2 + epsSnap));
+      const muro = (f.muros ?? []).find((m) => P.tramosVertical(m).includes(k) && tramos(m.puntos).some((t) => distancia(ejeEn(p, k), t) <= m.espesor / 2 + epsSnap));
       r.push({ pilar: p.id, planta: pl, bajada: N, ...(muro ? { enMuro: muro.id } : {}) });
       // Un pilar apeado lleva lo suyo a la planta en la que nace
       const kb = ks[ks.length - 1]! + 1;
-      if (k === kb - 1 && (p.base ?? "empotrado") === "ninguno") apeados.set(kb, [...(apeados.get(kb) ?? []), { p: [p.x, p.y], F: N + propio.get(`${p.id}@${k}`)! }]);
+      if (k === kb - 1 && (p.base ?? "empotrado") === "ninguno") apeados.set(kb, [...(apeados.get(kb) ?? []), { p: ejeEn(p, k), F: N + propio.get(`${p.id}@${k}`)! }]);
     }
   }
   return r;

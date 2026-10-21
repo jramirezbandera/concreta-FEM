@@ -15,6 +15,7 @@
  */
 import type { Losa, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { areaConSigno, areaInterseccionRegiones, distanciaABorde, puntoEnPoligono, puntoEnRegion, type Region } from "../compilador/poligonos.ts";
+import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import type { Operacion } from "./operaciones.ts";
 
 export interface PropuestaAbacos {
@@ -51,7 +52,9 @@ export function proponerAbacos(m: ModeloFisico, losaId: string, a: number, b: nu
     // Las plantas van de arriba abajo: el pilar ocupa de la de su cabeza (hasta) a la de su base (desde)
     const [ia, ib] = [ids.indexOf(p.hasta), ids.indexOf(p.desde)];
     if (ia < 0 || ib < 0 || k < Math.min(ia, ib) || k > Math.max(ia, ib)) continue;
-    const c: Vec2 = [p.x, p.y];
+    // El ábaco, centrado en el eje del tramo que atraviesa el forjado (o, en la planta de su base, el de encima; PF)
+    const cabeza = ids[k === ib ? k - 1 : k];
+    const c = ejeSeccion(p, m.secciones.find((x) => x.id === (p.tramos?.find((t) => t.planta === cabeza)?.seccion ?? p.seccion)));
     if (!enForjado(c)) continue;
     if (existentes.some((e) => puntoEnPoligono(c, e))) {
       r.conAbaco.push(p.id);

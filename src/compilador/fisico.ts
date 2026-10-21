@@ -123,12 +123,34 @@ export type Seccion =
 /** GDL liberados de un extremo, en ejes locales: [N, Vy, Vz, T, My, Mz]. */
 export type Liberacion = Seis<boolean>;
 
+/**
+ * Punto fijo de un pilar (fase PF, como en CYPECAD): el punto de su sección que está en (x, y) en
+ * todas las plantas. Los lados, en los ejes de la sección girados con ella: «derecha» según el canto
+ * h y «superior» a 90° (con giro 0, +X y +Y). Lo explica `puntoFijo.ts`.
+ */
+export type PuntoFijo =
+  | "centro"
+  | "mitad-derecha"
+  | "mitad-izquierda"
+  | "mitad-superior"
+  | "mitad-inferior"
+  | "esquina-superior-derecha"
+  | "esquina-superior-izquierda"
+  | "esquina-inferior-derecha"
+  | "esquina-inferior-izquierda";
+
 export interface Pilar {
   id: string;
   nombre?: string;
-  /** Posición del eje en planta, m. */
+  /** Posición en planta del punto fijo (por defecto, el centro de la sección: el eje), m. */
   x: number;
   y: number;
+  /**
+   * Punto fijo (fase PF). Por defecto, "centro". Si la sección cambia entre tramos con otro punto
+   * fijo, el eje de cada tramo es el centro de su sección y la excentricidad entre tramos va en un
+   * offset rígido en la base del de encima.
+   */
+  fijo?: PuntoFijo;
   /** Planta de su base y planta de su cabeza; entre ellas, un tramo por planta. */
   desde: string;
   hasta: string;

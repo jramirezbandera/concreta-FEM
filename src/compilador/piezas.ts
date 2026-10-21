@@ -30,7 +30,7 @@ import type { Liberacion, Pilar } from "./fisico.ts";
 import type { Losas } from "./losas.ts";
 import type { SeccionCompilada } from "./secciones.ts";
 import { cuerdaHuella, proyectar } from "./geometria2d.ts";
-import { cuerdaEnTramo, distanciaARegion, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
+import { cuerdaEnTramo, distanciaARegion, ejeTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
 import type { PanosU } from "./unidireccional.ts";
 import type { Contexto } from "./validar.ts";
 
@@ -131,12 +131,21 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     const g = (((p.giro ?? 0) % 360) + 360) % 360;
     const [c, s] = g % 90 === 0 ? ([[1, 0], [0, 1], [-1, 0], [0, -1]][g / 90]! as [number, number]) : [Math.cos(rad), Math.sin(rad)];
     const ez: Vec3 = [c, s, 0];
-    const recta: Recta = { pieza: p.id, tipo: "pilar", O: [p.x, p.y, zb], e: [0, 0, 1], s0: 0, len: ctx.cotas[kh]! - zb, ex: [0, 0, 1], ey: [s, -c, 0], ez, trozos: [] };
+    // PF: una recta por cada serie de tramos seguidos con el mismo eje, desde la cota z0 (sin punto
+    // fijo, una sola desde la base). Sus σ van desde z0; las estaciones de la pieza, desde la base
+    const nuevaRecta = (x: number, y: number, z0: number): Recta => ({ pieza: p.id, tipo: "pilar", O: [x, y, z0], e: [0, 0, 1], s0: z0 - zb, len: ctx.cotas[kh]! - z0, ex: [0, 0, 1], ey: [s, -c, 0], ez, trozos: [] });
+    const lista: Recta[] = [];
+    let recta = nuevaRecta(...ejeTramo(ctx, p, kb - 1), zb);
     const nudoEn = (k: number) => topo.nudoPilar.get(`${p.id}@${k}`);
     if (nudoEn(kb) === undefined || nudoEn(kh) === undefined) continue; // pilar solapado: ya hay un error
     let sigmaAnt = -Infinity;
     // CY2: la cabeza del último tramo, salvo que otro pilar arranque en ella (sigue el pilar)
-    const continua = ctx.pilares.some((q) => q !== p && q.desde === p.hasta && Math.hypot(q.x - p.x, q.y - p.y) <= ctx.op.epsSnap);
+    const [xh, yh] = ejeTramo(ctx, p, kh);
+    const continua = ctx.pilares.some((q) => {
+      if (q === p || q.desde !== p.hasta) return false;
+      const [xq, yq] = ejeTramo(ctx, q, kh - 1);
+      return Math.hypot(xq - xh, yq - yh) <= ctx.op.epsSnap;
+    });
     const empCabeza = (p.empotramiento?.cabeza ?? 1) * (continua ? 1 : ctx.op.empotramientoCabeza);
     const empBase = p.empotramiento?.base ?? 1;
     for (let k = kb; k > kh; k--) {
@@ -150,8 +159,17 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       const rz = fp * junta(nj, vigas, true);
       const vigasBase = topo.vigasEn.get(ni) ?? new Set<string>();
       const rzBase = ctx.op.zonaRigidaBase ? fp * junta(ni, vigasBase, false) : 0;
-      const ip: Vec3 = [p.x, p.y, zi + rzBase];
-      const jp: Vec3 = [p.x, p.y, zj - rz];
+      // PF: el tramo, en su eje; si no es el de la planta de abajo, el offset de la base lo une a su nudo
+      const [x, y] = ejeTramo(ctx, p, k - 1);
+      if (x !== recta.O[0] || y !== recta.O[1]) {
+        recta.trozos.push({ desde: sigmaAnt, hasta: Infinity, nudo: ni });
+        recta.len = zi - recta.O[2];
+        lista.push(recta);
+        recta = nuevaRecta(x, y, zi);
+        sigmaAnt = -Infinity;
+      }
+      const ip: Vec3 = [x, y, zi + rzBase];
+      const jp: Vec3 = [x, y, zj - rz];
       if (!(jp[2] - ip[2] > epsGeom)) {
         diag.error(
           "pilar/tramo-flexible-nulo",
@@ -186,13 +204,15 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
         empotramiento: emp.i !== undefined || emp.j !== undefined ? emp : undefined,
         s: [sI, sIp, sJp, sJ],
       });
-      recta.trozos.push({ desde: sigmaAnt, hasta: sIp, nudo: ni });
-      recta.trozos.push({ desde: sIp, hasta: sJp, barra: barras.length - 1, ip: sIp });
-      sigmaAnt = sJp;
-      if (k - 1 === kh) recta.trozos.push({ desde: sJp, hasta: Infinity, nudo: nj });
+      const o = recta.s0;
+      recta.trozos.push({ desde: sigmaAnt, hasta: sIp - o, nudo: ni });
+      recta.trozos.push({ desde: sIp - o, hasta: sJp - o, barra: barras.length - 1, ip: sIp - o });
+      sigmaAnt = sJp - o;
+      if (k - 1 === kh) recta.trozos.push({ desde: sJp - o, hasta: Infinity, nudo: nj });
     }
-    rectas.push(recta);
-    rectasDe.set(p.id, [recta]);
+    lista.push(recta);
+    rectas.push(...lista);
+    rectasDe.set(p.id, lista);
   }
 
   // Vigas: una recta por tramo de la polilínea

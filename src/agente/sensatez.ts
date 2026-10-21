@@ -20,6 +20,7 @@ import { resultanteAnalitica } from "../compilador/cargas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesCompilacion, Seccion, Vec2 } from "../compilador/fisico.ts";
 import { momentosInterseccion, puntoEnRegion, type Region } from "../compilador/poligonos.ts";
+import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import type { TipoAccion } from "../combinaciones/generador.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { cargasPorPlanta, type Resumen } from "./consultas.ts";
@@ -467,9 +468,16 @@ function pilares(f: ModeloFisico, P: Plantas, epsSnap: number): Registro[] {
       arranque.aviso(`El pilar ${p.id} arranca ${p.base ?? "empotrado"} en la planta ${p.desde}, que no es la más baja: ¿le falta un tramo debajo o tendría que nacer sobre otra pieza (base "ninguno")?`, [p.id, p.desde]);
     if (kh === 0) continue;
     const encima = P.ids[kh - 1]!;
-    const sigue = (f.pilares ?? []).some((q) => q !== p && q.desde === p.hasta && Math.hypot(q.x - p.x, q.y - p.y) <= epsSnap);
+    // PF: el eje del último tramo de p frente al del primero de q (el centro de su sección)
+    const eje = (x: typeof p, cabeza: string) => ejeSeccion(x, f.secciones?.find((s) => s.id === (x.tramos?.find((t) => t.planta === cabeza)?.seccion ?? x.seccion)));
+    const [px, py] = eje(p, p.hasta);
+    const sigue = (f.pilares ?? []).some((q) => {
+      if (q === p || q.desde !== p.hasta) return false;
+      const [qx, qy] = eje(q, encima);
+      return Math.hypot(qx - px, qy - py) <= epsSnap;
+    });
     if (sigue) continue;
-    const cubre = [...(f.losas ?? []), ...(f.panos ?? [])].find((x) => x.planta === encima && puntoEnRegion([p.x, p.y], regionDe(x)));
+    const cubre = [...(f.losas ?? []), ...(f.panos ?? [])].find((x) => x.planta === encima && puntoEnRegion([px, py], regionDe(x)));
     if (cubre) corte.aviso(`El pilar ${p.id} acaba en la planta ${p.hasta}, pero ${"espesor" in cubre ? "la losa" : "el paño"} ${cubre.id} de la planta ${encima} pasa sobre su eje: ¿tendría que seguir hasta arriba?`, [p.id, cubre.id]);
   }
   return [arranque, corte];

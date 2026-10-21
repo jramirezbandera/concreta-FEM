@@ -8,6 +8,7 @@
 import { compilar } from "../compilador/compilar.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import { distanciaAHuella, huellaPilar, type Huella } from "../compilador/geometria2d.ts";
+import { ejePilar, medidasForma } from "../compilador/puntoFijo.ts";
 import type { FormaHuella } from "../compilador/secciones.ts";
 
 export interface RigidosFuera {
@@ -41,7 +42,10 @@ export function huellaEnPlanta(f: ModeloFisico, p: NonNullable<ModeloFisico["pil
   const kb = plantas.indexOf(p.desde);
   const kSeccion = kb < 0 || k < kb ? k : k - 1;
   const seccion = p.tramos?.find((t) => t.planta === plantas[kSeccion])?.seccion ?? p.seccion;
-  return huellaPilar(p.x, p.y, p.giro ?? 0, formaHuella(f, seccion));
+  // PF: en el eje de ese tramo, el centro de su sección
+  const forma = formaHuella(f, seccion);
+  const [x, y] = ejePilar(p, medidasForma(forma));
+  return huellaPilar(x, y, p.giro ?? 0, forma);
 }
 
 /**

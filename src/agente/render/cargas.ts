@@ -35,11 +35,12 @@
  * Puro: sin IO.
  */
 import { cotasPlantas } from "../../compilador/cotas.ts";
+import { conPuntoFijo } from "../../compilador/puntoFijo.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
 import { intervalosRecta, PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type PlanoAlzado } from "./alzado.ts";
 import { ORDENADA_DIAGRAMA } from "./diagramas.ts";
 import { cajaDe, momento2D, R_MOMENTO, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
-import { giroTexto, porId, vector, type DatosVista } from "./modelo.ts";
+import { ejeSeccion, giroTexto, porId, vector, type DatosVista } from "./modelo.ts";
 import { flecha2D } from "./reacciones.ts";
 
 export type V3 = [number, number, number];
@@ -202,7 +203,24 @@ export function geometriaCargas(f: ModeloFisico, caso: string): { cargas: Geomet
         const [c, s] = [Math.cos(t), Math.sin(t)];
         const glob = (q: readonly number[]): V3 => (g.ejes === "global" ? [q[0]!, q[1]!, q[2]!] : [q[1]! * s + q[2]! * c, -q[1]! * c + q[2]! * s, q[0]!]);
         const [a, b] = [g.desde ?? 0, g.hasta ?? zc - zb];
-        if (b > a) x.lineas.push({ a: [p.x, p.y, zb + a], b: [p.x, p.y, zb + b], qa: glob(g.q), qb: glob(g.qb ?? g.q) });
+        if (!(b > a)) break;
+        const [qa, qb] = [glob(g.q), glob(g.qb ?? g.q)];
+        if (!conPuntoFijo(p)) {
+          x.lineas.push({ a: [p.x, p.y, zb + a], b: [p.x, p.y, zb + b], qa, qb });
+          break;
+        }
+        // PF: cada tramo, en su eje (el centro de su sección), con la carga interpolada en sus extremos
+        const qEn = (z: number): V3 => qa.map((v, i) => v + ((qb[i]! - v) * (z - zb - a)) / (b - a)) as unknown as V3;
+        for (let k = (indice.get(p.desde) ?? 0) - 1; k >= (indice.get(p.hasta) ?? 0); k--) {
+          const [z0, z1] = [cotas[k + 1], cotas[k]];
+          if (z0 === null || z1 === null || z0 === undefined || z1 === undefined) continue;
+          const lo = Math.max(zb + a, z0);
+          const hi = Math.min(zb + b, z1);
+          if (!(hi > lo)) continue;
+          const sid = p.tramos?.find((t) => t.planta === plantas[k]!.id)?.seccion ?? p.seccion;
+          const [ex, ey] = ejeSeccion(p, f.secciones?.find((x) => x.id === sid));
+          x.lineas.push({ a: [ex, ey, lo], b: [ex, ey, hi], qa: lo === zb + a ? qa : qEn(lo), qb: hi === zb + b ? qb : qEn(hi) });
+        }
         break;
       }
       case "empuje": {

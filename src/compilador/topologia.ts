@@ -23,6 +23,7 @@
  */
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import type { Pilar, Vec2, Viga } from "./fisico.ts";
+import { conPuntoFijo, ejePilar, medidasForma } from "./puntoFijo.ts";
 import { cortarTramos, cuerdaHuella, dist, distanciaAHuella, huellaPilar, proyectar, radioHuella, RejillaHash, tramo, type Huella, type Tramo2D } from "./geometria2d.ts";
 import { distanciaABorde, distanciaASegmento, puntoEnRegion, type Region } from "./poligonos.ts";
 
@@ -105,6 +106,19 @@ export function seccionTramo(ctx: Contexto, p: Pilar, k: number): string {
   return p.tramos?.find((t) => t.planta === id)?.seccion ?? p.seccion;
 }
 
+/** Eje en planta del tramo de un pilar con la cabeza en la planta k: el centro de su sección (PF). */
+export function ejeTramo(ctx: Contexto, p: Pilar, k: number): Vec2 {
+  return conPuntoFijo(p) ? ejePilar(p, medidasForma(ctx.secciones.get(seccionTramo(ctx, p, k))?.huella ?? null)) : [p.x, p.y];
+}
+
+/**
+ * Eje de un pilar en la planta k, donde va su nudo: el del tramo que llega a ella desde abajo (el que
+ * atraviesa el forjado, con su huella) o, en la planta de su base, el del tramo de encima (PF).
+ */
+export function ejeEnPlanta(ctx: Contexto, p: Pilar, k: number): Vec2 {
+  return ejeTramo(ctx, p, k < ctx.planta.get(p.desde)! ? k : k - 1);
+}
+
 class UnionFind {
   private readonly padre: number[];
   constructor(n: number) {
@@ -162,11 +176,12 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
       if (k < kh || k > kb) continue;
       const abajo = k < kb;
       const arriba = k > kh;
+      const [x, y] = ejeEnPlanta(ctx, p, k);
       let destino: PuntoPilar | null = null;
       let dmin = Infinity;
-      for (const i of cerca(gEjes, [p.x, p.y], epsSnap)) {
+      for (const i of cerca(gEjes, [x, y], epsSnap)) {
         const pp = puntos[i]!;
-        const d = dist([p.x, p.y], P(pp.nudo));
+        const d = dist([x, y], P(pp.nudo));
         if (d <= epsSnap && d < dmin) [destino, dmin] = [pp, d];
       }
       if (destino) {
@@ -184,10 +199,10 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
           });
         destino.pilares.push(p.id);
       } else {
-        const pp: PuntoPilar = { nudo: -1, huella: huellaPilar(p.x, p.y, p.giro ?? 0, null), pilares: [p.id] };
-        pp.nudo = nuevoNudo(k, p.x, p.y, pp);
+        const pp: PuntoPilar = { nudo: -1, huella: huellaPilar(x, y, p.giro ?? 0, null), pilares: [p.id] };
+        pp.nudo = nuevoNudo(k, x, y, pp);
         puntos.push(pp);
-        gEjes.insertar(puntos.length - 1, p.x, p.y, p.x, p.y);
+        gEjes.insertar(puntos.length - 1, x, y, x, y);
         destino = pp;
       }
       if (abajo) abajoDe.set(destino, p);
@@ -199,9 +214,10 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
     puntos.forEach((pp, i) => {
       const p = abajoDe.get(pp) ?? arribaDe.get(pp)!;
       const kSeccion = abajoDe.has(pp) ? k : k - 1;
-      pp.huella = huellaPilar(p.x, p.y, p.giro ?? 0, ctx.secciones.get(seccionTramo(ctx, p, kSeccion))!.huella);
+      const [x, y] = ejeTramo(ctx, p, kSeccion);
+      pp.huella = huellaPilar(x, y, p.giro ?? 0, ctx.secciones.get(seccionTramo(ctx, p, kSeccion))!.huella);
       const r = radioHuella(pp.huella) + epsSnap;
-      gPilares.insertar(i, p.x - r, p.y - r, p.x + r, p.y + r);
+      gPilares.insertar(i, x - r, y - r, x + r, y + r);
       insertarNudo(pp.nudo);
     });
     const pilarCercano = (Q: Vec2): PuntoPilar | null => {

@@ -11,6 +11,7 @@
  * Puro: sin IO.
  */
 import { cotasPlantas } from "../../compilador/cotas.ts";
+import { ejePilar, ejeSeccion, medidasSeccion } from "../../compilador/puntoFijo.ts";
 import { puntoEnPoligono, puntoEnRegion, recorteRegionConvexo, trozosSegmento, type Region } from "../../compilador/poligonos.ts";
 import type { CargaFisica, Losa, ModeloFisico, Muro, PanoUnidireccional, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
@@ -89,20 +90,23 @@ export class PlantaFisica {
   }
 }
 
-/** Huella en planta de la sección de un pilar (null si no se conoce): anillo o círculo. */
+export { ejeSeccion, medidasSeccion };
+
+/** Huella en planta de la sección de un pilar (null si no se conoce): anillo o círculo, en el eje del tramo (PF). */
 export function huellaSeccion(p: Pilar, s: Seccion | undefined): { anillo: Vec2[] } | { centro: Vec2; radio: number } | null {
   if (!s) return null;
-  if (s.forma === "circular") return { centro: [p.x, p.y], radio: s.D / 2 };
-  const [b, h] =
-    s.forma === "rectangular" ? [s.b, s.h] : s.forma === "T" ? [s.bf, s.h] : s.forma === "I" ? [s.perfil.b * 1e-3, s.perfil.h * 1e-3] : s.b !== undefined && s.h !== undefined ? [s.b, s.h] : [0, 0];
-  if (!(b > 0 && h > 0)) return null;
+  const m = medidasSeccion(s);
+  const [cx, cy] = ejePilar(p, m);
+  if (s.forma === "circular") return { centro: [cx, cy], radio: s.D / 2 };
+  if (!m) return null;
+  const { b, h } = m;
   // Canto h según ez (giro desde +X), ancho b según ey = (s, −c) (cabecera de fisico.ts)
   const g = (((p.giro ?? 0) % 360) + 360) % 360;
   const q = g / 90;
   const [c, sn] = Number.isInteger(q) ? ([[1, 0], [0, 1], [-1, 0], [0, -1]][q] as [number, number]) : [Math.cos((g * Math.PI) / 180), Math.sin((g * Math.PI) / 180)];
   const ez: Vec2 = [c, sn];
   const ey: Vec2 = [sn, -c];
-  const esquina = (u: number, v: number): Vec2 => [p.x + (u * h * ez[0]) / 2 + (v * b * ey[0]) / 2, p.y + (u * h * ez[1]) / 2 + (v * b * ey[1]) / 2];
+  const esquina = (u: number, v: number): Vec2 => [cx + (u * h * ez[0]) / 2 + (v * b * ey[0]) / 2, cy + (u * h * ez[1]) / 2 + (v * b * ey[1]) / 2];
   return { anillo: [esquina(-1, -1), esquina(1, -1), esquina(1, 1), esquina(-1, 1)] };
 }
 
@@ -288,20 +292,21 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   // Pilares
   for (const { p, llega, seccion } of pl.pilares()) {
     const h = huellaSeccion(p, seccion);
+    const [cx, cy] = ejeSeccion(p, seccion);
     const e = est(llega ? "pilar-llega" : "pilar-arranca");
-    if (!h) P.push({ tipo: "marca", p: [p.x, p.y], forma: "cuadrado", radio: 4, estilo: e, objeto: p.id });
+    if (!h) P.push({ tipo: "marca", p: [cx, cy], forma: "cuadrado", radio: 4, estilo: e, objeto: p.id });
     else if ("anillo" in h) P.push({ tipo: "poligono", anillos: [h.anillo], estilo: e, objeto: p.id });
     else P.push({ tipo: "poligono", anillos: [circulo(h.centro, h.radio)], estilo: e, objeto: p.id });
     // El rótulo, junto a una esquina de la huella; si no cabe, en otra
-    const r = h ? ("anillo" in h ? Math.max(...h.anillo.map((q) => Math.max(Math.abs(q[0] - p.x), Math.abs(q[1] - p.y)))) : h.radio) : 0;
-    texto([p.x + r, p.y + r], `${p.id}${orientacion(p, seccion)}`, 50, {
+    const r = h ? ("anillo" in h ? Math.max(...h.anillo.map((q) => Math.max(Math.abs(q[0] - cx), Math.abs(q[1] - cy)))) : h.radio) : 0;
+    texto([cx + r, cy + r], `${p.id}${orientacion(p, seccion)}`, 50, {
       dx: 3,
       dy: -3,
       negrita: true,
       alternativas: [
-        { p: [p.x - r, p.y + r], dx: -3, dy: -3, ancla: "fin" },
-        { p: [p.x + r, p.y - r], dx: 3, dy: 13 },
-        { p: [p.x - r, p.y - r], dx: -3, dy: 13, ancla: "fin" },
+        { p: [cx - r, cy + r], dx: -3, dy: -3, ancla: "fin" },
+        { p: [cx + r, cy - r], dx: 3, dy: 13 },
+        { p: [cx - r, cy - r], dx: -3, dy: 13, ancla: "fin" },
       ],
     });
   }
@@ -542,9 +547,10 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         const x = pilares.get(g.pilar);
         if (!x || !x.llega) return;
         const p = x.p;
+        const [px, py] = ejeSeccion(p, x.seccion);
         const horizontal = g.ejes === "global" ? Math.hypot(g.q[0], g.q[1]) > 0 : true;
-        poner({ tipo: "flecha", p: [p.x, p.y], d: g.ejes === "global" && horizontal ? [g.q[0], g.q[1]] : null, abajo: true, estilo: "carga-pieza", objeto: g.id });
-        rot([p.x, p.y], `${g.id}: ${vector(g.q)}${g.qb ? ` a ${vector(g.qb)}` : ""} kN/m ${g.ejes}`, { dx: 10, dy: 20 });
+        poner({ tipo: "flecha", p: [px, py], d: g.ejes === "global" && horizontal ? [g.q[0], g.q[1]] : null, abajo: true, estilo: "carga-pieza", objeto: g.id });
+        rot([px, py], `${g.id}: ${vector(g.q)}${g.qb ? ` a ${vector(g.qb)}` : ""} kN/m ${g.ejes}`, { dx: 10, dy: 20 });
         return;
       }
       case "empuje": {
@@ -586,7 +592,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
 export function situar(pl: PlantaFisica, id: string): Vec2 | null {
   const f = pl.f;
   const p = pl.pilares().find((x) => x.p.id === id);
-  if (p) return [p.p.x, p.p.y];
+  if (p) return ejeSeccion(p.p, p.seccion);
   const m = pl.muros().find((x) => x.m.id === id);
   if (m) return puntoEnPolilinea(m.m.puntos, longitud(m.m.puntos) / 2).p;
   const v = pl.enPlanta(f.vigas).find((x) => x.id === id);

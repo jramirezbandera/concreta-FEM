@@ -1,0 +1,31 @@
+PF: punto fijo en la fachada (40 × 40 hasta N1, 30 × 30 encima; e = 5 cm por lado). G + Q, kN y kN·m.
+Nudos: PF 1327, eje 40 2993, eje 30 1327
+
+pilar  fijo                       modelo  | cabeza de N1:       N      My      Mz | base de N2:       N      My      Mz |    N·e
+P1     esquina-inferior-izquierda PF      |                -160.3   12.51  -12.51 |              -105.5   -8.98    8.98 |    7.46
+P1     esquina-inferior-izquierda eje 40  |                -161.7   15.11  -15.11 |              -107.9   -9.49    9.49 |        
+P1     esquina-inferior-izquierda eje 30  |                -158.4   15.26  -15.26 |              -105.6   -9.81    9.81 |        
+P2     mitad-inferior             PF      |                -356.3   -0.00  -20.98 |              -241.7    0.04   15.09 |   12.08
+P2     mitad-inferior             eje 40  |                -356.5    0.01  -25.71 |              -242.6    0.02   16.47 |        
+P2     mitad-inferior             eje 30  |                -355.0    0.02  -26.65 |              -241.6    0.03   16.83 |        
+P3     esquina-inferior-derecha   PF      |                -162.0  -12.50  -12.50 |              -107.1    8.95    8.95 |    7.58
+P3     esquina-inferior-derecha   eje 40  |                -163.3  -15.13  -15.14 |              -109.5    9.47    9.47 |        
+P3     esquina-inferior-derecha   eje 30  |                -160.0  -15.28  -15.29 |              -107.2    9.79    9.79 |        
+P4     mitad-izquierda            PF      |                -353.1   21.02   -0.00 |              -238.4  -15.13    0.01 |   11.92
+P4     mitad-izquierda            eje 40  |                -353.2   25.70    0.01 |              -239.4  -16.50    0.03 |        
+P4     mitad-izquierda            eje 30  |                -351.7   26.64    0.00 |              -238.4  -16.86    0.01 |        
+P5     centro                     PF      |                -859.7   -0.00   -0.00 |              -603.4    0.05    0.03 |        
+P5     centro                     eje 40  |                -853.5    0.02    0.01 |              -590.2    0.04    0.03 |        
+P5     centro                     eje 30  |                -872.8    0.02    0.01 |              -603.2    0.04    0.03 |        
+P6     mitad-derecha              PF      |                -359.8  -20.93    0.01 |              -245.1   15.03    0.03 |   12.26
+P6     mitad-derecha              eje 40  |                -360.0  -25.70    0.01 |              -246.1   16.44    0.02 |        
+P6     mitad-derecha              eje 30  |                -358.4  -26.65    0.02 |              -245.1   16.80    0.03 |        
+P7     esquina-superior-izquierda PF      |                -160.4   12.50   12.50 |              -105.6   -8.97   -8.97 |    7.47
+P7     esquina-superior-izquierda eje 40  |                -161.8   15.11   15.11 |              -108.0   -9.48   -9.48 |        
+P7     esquina-superior-izquierda eje 30  |                -158.5   15.26   15.26 |              -105.7   -9.80   -9.80 |        
+P8     mitad-superior             PF      |                -353.6   -0.01   21.02 |              -239.0    0.03  -15.13 |   11.95
+P8     mitad-superior             eje 40  |                -353.8    0.01   25.70 |              -239.9    0.04  -16.50 |        
+P8     mitad-superior             eje 30  |                -352.3    0.01   26.65 |              -238.9    0.02  -16.86 |        
+P9     esquina-superior-derecha   PF      |                -160.4  -12.52   12.51 |              -105.6    8.98   -8.98 |    7.46
+P9     esquina-superior-derecha   eje 40  |                -161.7  -15.11   15.12 |              -107.9    9.49   -9.50 |        
+P9     esquina-superior-derecha   eje 30  |                -158.5  -15.26   15.27 |              -105.7    9.81   -9.82 |        

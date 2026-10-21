@@ -28,6 +28,7 @@ import { Diagnosticos, type Diagnostico } from "../motor/diagnosticos.ts";
 import { FRACCION_MINIMA_BANDA, resolverOpciones, type Banda, type ModeloFisico, type OpcionesCompilacion, type Pilar, type Vec2 } from "./fisico.ts";
 import { huellaPilar, radioHuella, type Huella } from "./geometria2d.ts";
 import { direccionEje1 } from "./losas.ts";
+import { ejePilar, medidasForma } from "./puntoFijo.ts";
 import { areaConSigno, areaInterseccionRegiones, distanciaABorde, puntoEnPoligono, puntoEnRegion, type Region } from "./poligonos.ts";
 import { validar, type Contexto, type LosaCompilada } from "./validar.ts";
 
@@ -101,8 +102,8 @@ export function pilaresEnLosa(ctx: Contexto, l: LosaCompilada): PilarEnLosa[] {
     const kb = ctx.planta.get(p.desde)!;
     if (!(k >= kh && k < kb)) continue;
     const forma = ctx.secciones.get(seccionEn(p, l.losa.planta))?.huella ?? null;
-    const huella = huellaPilar(p.x, p.y, p.giro ?? 0, forma);
-    const P: Vec2 = [p.x, p.y];
+    const P = ejePilar(p, medidasForma(forma));
+    const huella = huellaPilar(P[0], P[1], p.giro ?? 0, forma);
     if (puntoEnRegion(P, l.region) || distanciaABorde(P, l.region.contorno) <= radioHuella(huella) + ctx.op.epsSnap) r.push({ id: p.id, p: P, huella });
   }
   return r;

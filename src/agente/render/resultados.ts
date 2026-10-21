@@ -27,7 +27,7 @@ import { diagramaCombinado } from "../consultas.ts";
 import { area, cajaDe, rayado, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { AVISO_PICOS, bandas, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, isolineas, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, type EscalaMapa, type LimitesMapa, type Triangulo } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
-import { capaApoyos, fondoModelo, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica, type DatosVista } from "./modelo.ts";
+import { capaApoyos, ejeSeccion, fondoModelo, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica, type DatosVista } from "./modelo.ts";
 
 export const CAMPOS = ["uz", "m11", "m22", "m12", "v13", "v23", "f11", "f22", "f12"] as const;
 export type Campo = (typeof CAMPOS)[number];
@@ -153,7 +153,7 @@ export function trazoModelo(pl: PlantaFisica): Primitiva[] {
   for (const { p, llega, seccion } of pl.pilares()) {
     const h = huellaSeccion(p, seccion);
     if (h && "anillo" in h) P.push({ tipo: "poligono", anillos: [h.anillo], estilo: llega ? "pilar-llega" : "pilar-arranca", objeto: p.id });
-    else P.push({ tipo: "marca", p: [p.x, p.y], forma: h ? "circulo" : "cuadrado", radio: 4, estilo: llega ? "pilar-llega" : "pilar-arranca", objeto: p.id });
+    else P.push({ tipo: "marca", p: ejeSeccion(p, seccion), forma: h ? "circulo" : "cuadrado", radio: 4, estilo: llega ? "pilar-llega" : "pilar-arranca", objeto: p.id });
   }
   return P;
 }
@@ -642,7 +642,7 @@ export function vistaAxiles(r: ResultadosRender, planta: string, conjunto: Conju
         if (n > max.v) max = { v: n, comb: conjunto.nombres[kc]! };
       }
     });
-    datos.push({ id: p.id, p: [p.x, p.y], huella: huellaSeccion(p, seccion), min, max });
+    datos.push({ id: p.id, p: ejeSeccion(p, seccion), huella: huellaSeccion(p, seccion), min, max });
   }
   const extremos: ExtremoRotulado[] = [];
   for (const x of datos) {

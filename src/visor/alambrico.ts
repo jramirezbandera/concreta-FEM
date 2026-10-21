@@ -15,6 +15,7 @@
  */
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
+import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import { espesorLosaEn, LADO_APOYO_3D } from "./solido.ts";
 
 export const TIPOS_ALAMBRICO = ["pilar", "viga", "losa", "pano", "muro", "apoyo"] as const;
@@ -83,7 +84,12 @@ export function alambrico(f: ModeloFisico): Alambrico {
   for (const p of porId(f.pilares)) {
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
     nuevo(p.id, "pilar");
-    for (const [z0, z1, i] of tramos(p.desde, p.hasta)) poner([p.x, p.y, z0], [p.x, p.y, z1], i);
+    // Cada tramo en su eje (PF: con un punto fijo, el centro de su sección)
+    for (const [z0, z1, i] of tramos(p.desde, p.hasta)) {
+      const sid = p.tramos?.find((t) => t.planta === plantas[i])?.seccion ?? p.seccion;
+      const [x, y] = ejeSeccion(p, f.secciones?.find((s) => s.id === sid));
+      poner([x, y, z0], [x, y, z1], i);
+    }
   }
   for (const v of porId(f.vigas)) {
     const i = indice.get(v.planta);

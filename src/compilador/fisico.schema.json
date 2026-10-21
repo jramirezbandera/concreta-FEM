@@ -1122,6 +1122,9 @@
         "y": {
           "type": "number"
         },
+        "fijo": {
+          "$ref": "#/$defs/PuntoFijo"
+        },
         "desde": {
           "type": "string"
         },
@@ -1245,6 +1248,19 @@
         "psi2"
       ],
       "additionalProperties": false
+    },
+    "PuntoFijo": {
+      "enum": [
+        "centro",
+        "esquina-inferior-derecha",
+        "esquina-inferior-izquierda",
+        "esquina-superior-derecha",
+        "esquina-superior-izquierda",
+        "mitad-derecha",
+        "mitad-inferior",
+        "mitad-izquierda",
+        "mitad-superior"
+      ]
     },
     "Reticular": {
       "type": "object",

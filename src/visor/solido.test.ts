@@ -22,6 +22,7 @@ import { edificioObjetivoMuros, reticulaConNucleo } from "../../validacion/c3/mo
 import { edificioReticular, edificioUnidireccional } from "../../validacion/c4/modelos.ts";
 import { alambrico } from "./alambrico.ts";
 import { aristasDe, formaSeccion, huellaPilarSolido, huellasInglete, huellasVigas, huellasVigasDe, LADO_SIN_FORMA, piezasSolido, recortarBanda, solido, tramosDe, volumen, type CompiladoSolido, type PiezaSolida } from "./solido.ts";
+import { edificioPuntoFijo } from "../pruebas/puntoFijo.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const leer = (r: string): ModeloFisico => JSON.parse(readFileSync(join(RAIZ, r), "utf8")).modelo;
@@ -104,6 +105,8 @@ const MODELOS: [string, () => ModeloFisico][] = [
   ["edificio", () => leer("validacion/a2/agente/edificio/proyecto.json")],
   ["vivienda (reticular con casetón perdido)", () => leer("ejemplos/vivienda/proyecto.json")],
   ["reticulaConNucleo", reticulaConNucleo],
+  ["fachada con punto fijo (PF)", () => edificioPuntoFijo()],
+  ["fachada con punto fijo, girada 30° (PF)", () => edificioPuntoFijo(30)],
   ["edificio con muros (C3)", () => edificioObjetivoMuros(2, 4, 3)],
   ["reticular (C4)", () => edificioReticular(2, 4, 3)],
   ["unidireccional (C4)", () => edificioUnidireccional(2, 4, 3)],
@@ -161,7 +164,7 @@ function esperado(f: ModeloFisico, p: PiezaSolida, compilado: CompiladoSolido | 
     const x = f.pilares!.find((y) => y.id === p.id)!;
     const s = sec(p.seccion!);
     const H = cotas[k]! - cotas[k + 1]!;
-    const huella = huellaPilarSolido(x, formaSeccion(s)!.poligono);
+    const huella = huellaPilarSolido(x, formaSeccion(s)!.poligono, s);
     expect(rel(areaPol(huella), areaDibujada(s))).toBeLessThan(1e-10);
     return { nominal: areaDibujada(s) * H, quitado: tapas.reduce((t, x) => t + momentosInterseccion(x.region, huella).A * x.e, 0) };
   }

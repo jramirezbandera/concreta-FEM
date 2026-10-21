@@ -20,6 +20,7 @@ import { rotulo, type EntradaLeyenda } from "../agente/render/escena.ts";
 import { coloresBandas, limitesMapa, type LimitesMapa } from "../agente/render/isovalores.ts";
 import type { ResultadosRender } from "../agente/render/resultados.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import { compresionTramo, filasPilarQ, LIMITE_AXIL_REDUCIDO } from "./datos.ts";
 
 type V3 = [number, number, number];
@@ -99,7 +100,8 @@ export function pilares3D(r: ResultadosRender, origen: [number, number, number],
         const c = compresionTramo(x);
         if (c) [valor, comb, donde] = [c.v, c.comb, c.donde];
       } else if (x.nu) [valor, comb] = [x.nu.nu, x.nu.comb];
-      tramos.push({ pilar: p.id, planta: x.planta, plantaBase: tp.plantaBase, seccion: x.tramo.seccion, valor, comb, ...(donde ? { donde } : {}), a: [p.x, p.y, z0], b: [p.x, p.y, z1] });
+      const [ex, ey] = ejeSeccion(p, f.secciones?.find((s) => s.id === x.tramo.seccion));
+      tramos.push({ pilar: p.id, planta: x.planta, plantaBase: tp.plantaBase, seccion: x.tramo.seccion, valor, comb, ...(donde ? { donde } : {}), a: [ex, ey, z0], b: [ex, ey, z1] });
     }
   }
   const valores = tramos.map((t) => t.valor).filter((v): v is number => v !== null);

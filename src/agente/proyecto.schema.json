@@ -1353,10 +1353,14 @@
         },
         "x": {
           "type": "number",
-          "description": "Posición del eje en planta, m."
+          "description": "Posición en planta del punto fijo (por defecto, el centro de la sección: el eje), m."
         },
         "y": {
           "type": "number"
+        },
+        "fijo": {
+          "$ref": "#/$defs/PuntoFijo",
+          "description": "Punto fijo (fase PF). Por defecto, \"centro\". Si la sección cambia entre tramos con otro punto\nfijo, el eje de cada tramo es el centro de su sección y la excentricidad entre tramos va en un\noffset rígido en la base del de encima."
         },
         "desde": {
           "type": "string",
@@ -1491,6 +1495,20 @@
       ],
       "additionalProperties": false,
       "description": "Coeficientes de simultaneidad ψ0, ψ1, ψ2 del CTE DB SE, tabla 4.2 (copiados del texto del DB SE,\nno de Concreta: `src/lib/calculations/loadGen.ts` da a la categoría E los valores de almacén\ndel Eurocódigo, 1,0/0,9/0,8, y el CTE dice 0,7/0,7/0,6)."
+    },
+    "PuntoFijo": {
+      "enum": [
+        "centro",
+        "esquina-inferior-derecha",
+        "esquina-inferior-izquierda",
+        "esquina-superior-derecha",
+        "esquina-superior-izquierda",
+        "mitad-derecha",
+        "mitad-inferior",
+        "mitad-izquierda",
+        "mitad-superior"
+      ],
+      "description": "Punto fijo de un pilar (fase PF, como en CYPECAD): el punto de su sección que está en (x, y) en\ntodas las plantas. Los lados, en los ejes de la sección girados con ella: «derecha» según el canto\nh y «superior» a 90° (con giro 0, +X y +Y). Lo explica `puntoFijo.ts`."
     },
     "Reticular": {
       "type": "object",

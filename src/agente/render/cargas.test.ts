@@ -28,6 +28,7 @@ import { cajaDe, R_MOMENTO, type Escena, type Primitiva } from "./escena.ts";
 import { vistaCargas } from "./modelo.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { escenaASvg } from "./svg.ts";
+import { edificioPuntoFijo } from "../../pruebas/puntoFijo.ts";
 
 const cruz = (a: readonly number[], b: readonly number[]): V3 => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
 const mas = (a: V3, b: readonly number[], k = 1): V3 => [a[0] + k * b[0]!, a[1] + k * b[1]!, a[2] + k * b[2]!];
@@ -119,6 +120,9 @@ const MODELOS: [string, () => ModeloFisico, boolean][] = [
   ["muros al azar 7", () => conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(7), 7), 7), false],
   ["unidireccional al azar 4", () => conForjadosAleatorios(fisicoAleatorio(4), 4, { tipo: "unidireccional" }), false],
   ["reticular al azar 6", () => conForjadosAleatorios(fisicoAleatorio(6), 6, { tipo: "reticular" }), false],
+  // PF: las cargas de pilar por los cambios de eje de los pilares con punto fijo
+  ["fachada con punto fijo", () => edificioPuntoFijo(), false],
+  ["fachada con punto fijo, girada 30°", () => edificioPuntoFijo(30), false],
   // Una zona y una polilínea unidas a otros trazos, y el eje de un muro de sótano ajustado 0,9 mm
   ["losas al azar 5", () => conLosasAleatorias(fisicoAleatorio(5), 5), true],
   ["muros al azar 6", () => conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(6), 6), 6), true],

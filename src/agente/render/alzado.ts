@@ -27,7 +27,7 @@ import { ejesDe } from "../../compilador/ejes.ts";
 import type { ModeloFisico, Pilar, Seccion, Vec2 } from "../../compilador/fisico.ts";
 import { capaEjesAlzado } from "./ejes.ts";
 import { cajaDe, longitud, puntoEnPolilinea, puntosDe, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
-import { anchoViga, espesorLosaEn, huellaSeccion, porId, textoCoartados, triangulosApoyo, type DatosVista } from "./modelo.ts";
+import { anchoViga, ejeSeccion, espesorLosaEn, huellaSeccion, porId, textoCoartados, triangulosApoyo, type DatosVista } from "./modelo.ts";
 
 /** El plano de un alzado: la recta en planta de `desde` a `hasta` y lo que se ve a cada lado, m. */
 export interface PlanoAlzado {
@@ -131,7 +131,11 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
   const anchoVisto = (p: Pilar, s: Seccion | undefined): [number, number] | null => {
     const h = huellaSeccion(p, s);
     if (!h) return null;
-    if ("radio" in h) return [-h.radio, h.radio];
+    // Desde el punto (x, y) del pilar: con un punto fijo (PF), la huella no está centrada en él
+    if ("radio" in h) {
+      const c = (h.centro[0] - p.x) * dir[0] + (h.centro[1] - p.y) * dir[1];
+      return [c - h.radio, c + h.radio];
+    }
     const us = h.anillo.map((q) => (q[0] - p.x) * dir[0] + (q[1] - p.y) * dir[1]);
     return [Math.min(...us), Math.max(...us)];
   };
@@ -156,7 +160,9 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
     }
     const zb = cotas[a];
     if (zb !== null && zb !== undefined) {
-      // El arranque: empotrado, una base rayada; articulado, un triángulo; apeado, nada
+      // El arranque: empotrado, una base rayada; articulado, un triángulo; apeado, nada. En el eje del
+      // primer tramo (PF)
+      const up = u(ejeSeccion(p, seccion(p.tramos?.find((t) => t.planta === plantas[a - 1]?.id)?.seccion ?? p.seccion)));
       const base = p.base ?? "empotrado";
       if (base === "empotrado") {
         const m = 0.45;

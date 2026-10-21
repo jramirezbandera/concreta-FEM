@@ -31,7 +31,8 @@ import { VERSIONES_MALLADOR } from "./mallado.ts";
 import type { Mapeo, NudoMapeado } from "./mapeo.ts";
 import { ajustarMuros } from "./muros.ts";
 import { barrasTorsionEquilibrio, construirPiezas, diafragmaDe, type BarraP, type Piezas } from "./piezas.ts";
-import { construirTopologia, cotaNudo } from "./topologia.ts";
+import { conPuntoFijo } from "./puntoFijo.ts";
+import { construirTopologia, cotaNudo, ejeTramo } from "./topologia.ts";
 import { construirPanos, type PanosU } from "./unidireccional.ts";
 import { ordenarPoligonos, validar, type Contexto } from "./validar.ts";
 import type { Vec2 } from "./fisico.ts";
@@ -481,6 +482,21 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
         ? "Nudos de eje a eje: sin zonas rígidas (factor 0), como SAP2000 por defecto."
         : `Nudos de dimensión finita: ${vigasZR}; ${pilaresZR}.`,
   );
+  // PF: los pilares cuyo eje cambia entre tramos
+  const excentricos = ctx.pilares.filter((p) => {
+    if (!conPuntoFijo(p)) return false;
+    const [kb, kh] = [ctx.planta.get(p.desde)!, ctx.planta.get(p.hasta)!];
+    const [x0, y0] = ejeTramo(ctx, p, kb - 1);
+    for (let k = kb - 2; k >= kh; k--) {
+      const [x, y] = ejeTramo(ctx, p, k);
+      if (x !== x0 || y !== y0) return true;
+    }
+    return false;
+  });
+  if (excentricos.length)
+    h.push(
+      `Pilares con punto fijo y cambio de sección (PF, como CYPECAD): el eje de cada tramo es el centro de su sección; el nudo de cada planta va en el eje del tramo que llega a ella desde abajo, y la excentricidad, en un offset rígido en la base del tramo de encima (${excentricos.map((p) => p.id).join(", ")}).`,
+    );
   const grupos = new Map<string, number>();
   for (const b of piezas.barras) {
     const m = modificadoresDe(b);

@@ -15,6 +15,7 @@
  */
 import type { AccionCaso, ApoyoFisico, ApoyoLineal, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Viga } from "../compilador/fisico.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
 import { Lector, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
@@ -310,6 +311,12 @@ const pilares: DefTabla = {
     { clave: "seccion", titulo: "sección", opciones: ids("secciones") },
     { clave: "tramos", titulo: "tramos", ayuda: "sección de los tramos que cambian, por la planta de su cabeza: «N3: P30x30; N5: P25x25»" },
     { clave: "giro", titulo: "giro", unidad: "°", ayuda: "del canto h desde +X; por defecto, 0" },
+    {
+      clave: "fijo",
+      titulo: "punto fijo",
+      ayuda: "el punto de la sección que está en (x, y) en todas las plantas, como CYPECAD: centro (por defecto), mitad-… o esquina-… («derecha» según el canto h; con giro 0, +X, y «superior», +Y)",
+      opciones: fijas(PUNTOS_FIJOS, "centro"),
+    },
     { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (apeado: nace sobre una viga, una losa, un muro u otro pilar)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
     { clave: "libBase", titulo: "lib. base", ayuda: GDL },
     { clave: "libCabeza", titulo: "lib. cabeza", ayuda: GDL },
@@ -326,6 +333,7 @@ const pilares: DefTabla = {
       seccion: p.seccion,
       tramos: (p.tramos ?? []).map((t) => `${t.planta}: ${t.seccion}`).join("; "),
       giro: n(p.giro),
+      fijo: s(p.fijo),
       base: s(p.base),
       libBase: p.liberaciones?.base ? textoGdl(p.liberaciones.base) : "",
       libCabeza: p.liberaciones?.cabeza ? textoGdl(p.liberaciones.cabeza) : "",
@@ -359,6 +367,7 @@ const pilares: DefTabla = {
       seccion: L.texto("seccion", { obligatorio: true }),
       tramos,
       giro: L.numero("giro"),
+      fijo: L.opcion("fijo", PUNTOS_FIJOS),
       base: L.opcion("base", ["empotrado", "articulado", "ninguno"] as const),
       liberaciones: lb || lc ? limpio({ base: lb, cabeza: lc }) : undefined,
     });

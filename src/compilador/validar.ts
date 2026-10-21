@@ -7,6 +7,7 @@ import { PSI_NOMBRES, type PsiNombrado } from "../combinaciones/psi.ts";
 import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
+import { PUNTOS_FIJOS } from "./puntoFijo.ts";
 import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
 import { areaConSigno, areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { flexionUniforme, multiplicadoresAbacoUniforme, multiplicadoresReticular, volumenReticular } from "./reticular.ts";
@@ -414,6 +415,17 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       }
     }
     if (p.giro !== undefined && !num(p.giro)) mal(p.id, "el giro tiene que ser un número (grados)");
+    // PF: el punto fijo, y las medidas de la huella para situar el eje de cada tramo
+    if (p.fijo !== undefined) {
+      if (!(PUNTOS_FIJOS as readonly unknown[]).includes(p.fijo)) mal(p.id, `el punto fijo tiene que ser ${PUNTOS_FIJOS.join(", ")}`);
+      else if (p.fijo !== "centro") {
+        const ids = [p.seccion, ...(Array.isArray(p.tramos) ? p.tramos.filter(esObjeto).map((t) => t.seccion) : [])];
+        for (const id of new Set(ids)) {
+          const sf = typeof id === "string" ? seccionFisica.get(id) : undefined;
+          if (sf?.forma === "general" && (sf.b === undefined || sf.h === undefined)) mal(p.id, `con el punto fijo ${p.fijo}, la sección ${id} necesita b y h`);
+        }
+      }
+    }
     if (p.base !== undefined && p.base !== "empotrado" && p.base !== "articulado" && p.base !== "ninguno") mal(p.id, "la base tiene que ser empotrado, articulado o ninguno");
     liberaciones(p.id, p.liberaciones, ["base", "cabeza"]);
     const e = p.empotramiento as unknown;

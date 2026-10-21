@@ -42,6 +42,7 @@ import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
 import { puntoEnRegion, trozosSegmento } from "../compilador/poligonos.ts";
 import { distanciaARegion } from "../compilador/topologia.ts";
+import { ejeSeccion, type PilarFijo } from "../compilador/puntoFijo.ts";
 import type { Material, ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
 import type { ModeloAnalitico } from "../motor/modelo.ts";
 
@@ -618,14 +619,16 @@ function dentroAnillos(q: Vec2, an: readonly (readonly Vec2[])[]): boolean {
 }
 
 /**
- * La huella en planta de un pilar con el polígono de su sección: el canto h según ez (girado `giro`
- * desde +X) y el ancho b según ey = ez × X (cabecera de `fisico.ts`).
+ * La huella en planta de un tramo de pilar con el polígono de su sección: el canto h según ez (girado
+ * `giro` desde +X) y el ancho b según ey = ez × X (cabecera de `fisico.ts`), centrada en su eje (con
+ * un punto fijo, el centro de la sección `sec` del tramo, PF).
  */
-export function huellaPilarSolido(p: { x: number; y: number; giro?: number }, poligono: readonly Vec2[]): Vec2[] {
+export function huellaPilarSolido(p: PilarFijo, poligono: readonly Vec2[], sec?: Seccion): Vec2[] {
   const [c, s] = cosSen(p.giro ?? 0);
   const ez: Vec2 = [c, s];
   const ey: Vec2 = [s, -c];
-  return poligono.map(([v, u]) => [p.x + v * ey[0] + u * ez[0], p.y + v * ey[1] + u * ez[1]] as Vec2);
+  const [x, y] = ejeSeccion(p, sec);
+  return poligono.map(([v, u]) => [x + v * ey[0] + u * ez[0], y + v * ey[1] + u * ez[1]] as Vec2);
 }
 
 // ─── Piezas ─────────────────────────────────────────────────────────────────────────────────────
@@ -726,7 +729,7 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       const fs = sec ? formaSeccion(sec) : null;
       if (!fs) continue;
       if (fs.sinForma) sinForma.add(p.id);
-      const huella = huellaPilarSolido(p, fs.poligono);
+      const huella = huellaPilarSolido(p, fs.poligono, sec);
       const ts = tapasCerca(k, [huella]);
       const caras: Cara[] = [];
       prismas(
@@ -812,9 +815,11 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
     };
     for (const p of f.pilares ?? []) {
       if (!entre(p.desde, p.hasta) || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-      const sec = seccion.get(p.tramos?.find((t) => t.planta === plantas[k])?.seccion ?? p.seccion);
+      // El tramo que llega a la planta o, en la de su base, el de encima
+      const cabeza = plantas[indice.get(p.desde) === k ? k - 1 : k];
+      const sec = seccion.get(p.tramos?.find((t) => t.planta === cabeza)?.seccion ?? p.seccion);
       const fs = sec ? formaSeccion(sec) : null;
-      if (fs) r.push(huellaPilarSolido(p, fs.poligono));
+      if (fs) r.push(huellaPilarSolido(p, fs.poligono, sec));
     }
     for (const v of f.vigas ?? []) {
       const sec = indice.get(v.planta) === k ? seccion.get(v.seccion) : undefined;

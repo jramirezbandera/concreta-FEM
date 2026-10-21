@@ -63,7 +63,7 @@
 
 **Lo que C1 deja fuera:**
 - vigas inclinadas, rampas y cargas proyectadas: todas las barras de C1 son horizontales o verticales;
-- el «punto fijo» de los pilares que cambian de sección (excentricidad entre tramos);
+- el «punto fijo» de los pilares que cambian de sección (excentricidad entre tramos; hecho en la fase PF, `punto-fijo.md`);
 - pilares que atraviesan una planta sin forjado (doble altura): en C1 entran en el diafragma, porque C1-e no puede saberlo;
 - el giro de la sección de las vigas.
 

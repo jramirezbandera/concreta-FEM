@@ -684,14 +684,16 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
   const cPeso = ctx.casos.findIndex((c) => c.pesoPropio === true);
   if (cPeso >= 0) {
     for (const p of ctx.pilares) {
-      const [r] = piezas.rectasDe.get(p.id) ?? [];
-      if (!r) continue;
+      const rs = piezas.rectasDe.get(p.id) ?? [];
+      if (!rs.length) continue;
       const kb = ctx.planta.get(p.desde)!;
       const kh = ctx.planta.get(p.hasta)!;
       const zb = ctx.cotas[kb]!;
       for (let k = kb; k > kh; k--) {
         const w = ctx.secciones.get(seccionTramo(ctx, p, k - 1))!.peso;
-        if (w > 0) repartir(cPeso, r, ctx.cotas[k]! - zb, ctx.cotas[k - 1]! - zb, [0, 0, -w], [0, 0, -w]);
+        // PF: el tramo, en la recta de su eje (la que empieza en su base o antes)
+        const r = rs.findLast((x) => x.O[2] <= ctx.cotas[k]!) ?? rs[0]!;
+        if (w > 0) repartir(cPeso, r, ctx.cotas[k]! - zb - r.s0, ctx.cotas[k - 1]! - zb - r.s0, [0, 0, -w], [0, 0, -w]);
       }
     }
     for (const v of ctx.vigas) {

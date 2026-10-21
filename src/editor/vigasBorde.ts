@@ -24,6 +24,7 @@
 import type { CargaFisica, Losa, ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
 import { areaConSigno, defectoPoligono, distanciaABorde, momentosInterseccion, puntoEnPoligono, puntoEnRegion } from "../compilador/poligonos.ts";
 import { anillosForjado, ejesQueAtan, libresTramo, pesoLosa, areaRegion, Plantas, tramos } from "../agente/sensatez.ts";
+import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import { formaSeccion, huellaPilarSolido } from "../visor/solido.ts";
 import type { Operacion } from "./operaciones.ts";
 
@@ -132,7 +133,7 @@ export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h
     if (kh === undefined || kb === undefined || k < kh || k > kb) continue;
     const s = m.secciones.find((x) => x.id === (p.tramos?.find((t) => t.planta === l.planta)?.seccion ?? p.seccion));
     const fs = s ? formaSeccion(s) : null;
-    if (fs) pilares.push({ id: p.id, c: [p.x, p.y], huella: huellaPilarSolido(p, fs.poligono) });
+    if (fs) pilares.push({ id: p.id, c: ejeSeccion(p, s), huella: huellaPilarSolido(p, fs.poligono, s) });
   }
 
   const ejes = ejesQueAtan(m, P, l);
