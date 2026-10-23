@@ -10,6 +10,12 @@
  * resultados guardados por la CLI se usan si su huella, su núcleo (sha256 del WASM) y el sha256 de
  * sus bytes casan; si no, se dice por qué y se recalcula.
  *
+ * Abierta con `diferir`, la sesión no compila hasta que algo lo necesita (`compilar()`, el estado
+ * completo, los diagnósticos, el cálculo o una consulta): lo que sólo necesita el modelo físico (la
+ * planta y el alzado del modelo y de las cargas, el alámbrico, el sólido sin paños y las cargas en
+ * el 3D) se dibuja antes, con la huella que dará la compilación (`huellaSinCompilar`). En el edificio
+ * objetivo con vigas, compilar tarda ~3 s y el dibujo, milisegundos.
+ *
  * Puro: sin IO (el núcleo WASM lo inicia quien crea la sesión).
  */
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
@@ -24,7 +30,7 @@ import { UNIDADES_CAMPO } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
-import { compilar, type ResultadoCompilacion } from "../compilador/compilar.ts";
+import { compilar, huellaSinCompilar, type ResultadoCompilacion } from "../compilador/compilar.ts";
 import { Consultas } from "../compilador/consultas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { ejesDe } from "../compilador/ejes.ts";
@@ -193,6 +199,11 @@ export interface EstadoSesion {
   nombre?: string;
   descripcion?: string;
   compila: boolean;
+  /**
+   * La sesión aún no ha compilado (abierta con `diferir`): `compila` es false sin serlo, y sólo están
+   * los diagnósticos de la sensatez previa. Lo que no necesita la compilación ya se puede pedir.
+   */
+  compilando?: true;
   /** Compilación y sensatez previa y, si se calculó, avisos del cálculo; errores primero. */
   diagnosticos: Diagnostico[];
   hipotesis: string[];
@@ -238,13 +249,31 @@ function plantasDeObjetos(p: Proyecto): Map<string, string[]> {
   return m;
 }
 
+/** Errores y avisos de cada planta: los de los objetos que la tocan. */
+function cuentaPorPlanta(p: Proyecto, diagnosticos: readonly Diagnostico[]): Map<string, { avisos: number; errores: number }> {
+  const porObjeto = plantasDeObjetos(p);
+  const cuenta = new Map<string, { avisos: number; errores: number }>();
+  for (const d of diagnosticos) {
+    const plantas = new Set((d.ids ?? []).flatMap((id) => porObjeto.get(id) ?? []));
+    for (const x of plantas) {
+      const c = cuenta.get(x) ?? { avisos: 0, errores: 0 };
+      if (d.severidad === "error") c.errores++;
+      else c.avisos++;
+      cuenta.set(x, c);
+    }
+  }
+  return cuenta;
+}
+
 export class Sesion {
   readonly proyecto: Proyecto;
-  readonly compilacion: ResultadoCompilacion;
   /** sha256 del núcleo WASM con el que se calcula (el de los resultados guardados tiene que coincidir). */
   readonly motor: string;
   private readonly previa: Diagnostico[];
-  private readonly res: Resumen | null;
+  /** null hasta compilar (sólo con `diferir`). */
+  private comp: ResultadoCompilacion | null = null;
+  private res: Resumen | null = null;
+  private huellaC: string | null = null;
   private casosR: ResultadoCaso[] | null = null;
   private cabecera: CabeceraResultados | null = null;
   private origenR: "calculo" | "guardados" | null = null;
@@ -254,26 +283,48 @@ export class Sesion {
   /** Escenas ya hechas, por su clave (las mismas que pide la interfaz al moverse). */
   private readonly escenas = new Map<string, Escena>();
 
-  private constructor(proyecto: Proyecto, compilacion: ResultadoCompilacion, motor: string) {
+  private constructor(proyecto: Proyecto, motor: string, diferir: boolean) {
     this.proyecto = proyecto;
-    this.compilacion = compilacion;
     this.motor = motor;
     this.previa = sensatezPrevia(proyecto.modelo, proyecto.opciones).flatMap((x) => x.avisos);
-    if (compilacion.valido) {
-      const r = resumen(proyecto, compilacion);
-      this.res = r.valido ? r.valor : null;
-    } else this.res = null;
+    if (!diferir) this.compilar();
   }
 
-  /** Lee y compila un proyecto. No valido: el JSON o su esquema (lo que un modelo que no compila sí tiene: una huella y su dibujo). */
-  static abrir(texto: string, motor: string): Apertura {
+  /**
+   * Lee y compila un proyecto; con `diferir`, sólo lo lee (compila cuando algo lo necesita). No
+   * valido: el JSON o su esquema (lo que un modelo que no compila sí tiene: una huella y su dibujo).
+   */
+  static abrir(texto: string, motor: string, opciones: { diferir?: boolean } = {}): Apertura {
     const l = leerProyecto(texto);
     if (!l.valido) return { valido: false, diagnosticos: l.diagnosticos };
-    return { valido: true, sesion: new Sesion(l.proyecto, compilar(l.proyecto.modelo, l.proyecto.opciones), motor) };
+    return { valido: true, sesion: new Sesion(l.proyecto, motor, !!opciones.diferir) };
   }
 
+  /** Compila, si no lo ha hecho ya. */
+  compilar(): ResultadoCompilacion {
+    if (this.comp) return this.comp;
+    const c = compilar(this.proyecto.modelo, this.proyecto.opciones);
+    if (c.valido) {
+      const r = resumen(this.proyecto, c);
+      this.res = r.valido ? r.valor : null;
+    }
+    this.comp = c;
+    return c;
+  }
+
+  /** Ya compiló (sin `diferir`, siempre). */
+  get compilada(): boolean {
+    return this.comp !== null;
+  }
+
+  /** La compilación (si la sesión aún no ha compilado, compila). */
+  get compilacion(): ResultadoCompilacion {
+    return this.compilar();
+  }
+
+  /** La de la compilación; sin compilar, la que dará (`huellaSinCompilar`). */
   get huella(): string {
-    return this.compilacion.huella;
+    return this.comp ? this.comp.huella : (this.huellaC ??= huellaSinCompilar(this.proyecto.modelo, this.proyecto.opciones));
   }
 
   get compilado(): Compilado | null {
@@ -301,6 +352,7 @@ export class Sesion {
   }
 
   get resumen(): Resumen | null {
+    this.compilar();
     return this.res;
   }
 
@@ -313,20 +365,15 @@ export class Sesion {
     return ordenSeveridad([...this.compilacion.diagnosticos, ...this.previa, ...(this.cabecera?.diagnosticos ?? [])]);
   }
 
-  estado(): EstadoSesion {
+  /**
+   * El estado de la sesión, que compila si aún no lo ha hecho; con `sinCompilar`, el que se sabe sin
+   * compilar (`compilando`: la huella, las plantas, los casos, los ejes y la sensatez previa).
+   */
+  estado(o: { sinCompilar?: boolean } = {}): EstadoSesion {
+    if (o.sinCompilar && !this.comp) return this.estadoSinCompilar();
     const f = this.proyecto.modelo;
     const cotas = cotasPlantas(f.plantas);
-    const porObjeto = plantasDeObjetos(this.proyecto);
-    const cuenta = new Map<string, { avisos: number; errores: number }>();
-    for (const d of this.diagnosticos) {
-      const plantas = new Set((d.ids ?? []).flatMap((id) => porObjeto.get(id) ?? []));
-      for (const p of plantas) {
-        const c = cuenta.get(p) ?? { avisos: 0, errores: 0 };
-        if (d.severidad === "error") c.errores++;
-        else c.avisos++;
-        cuenta.set(p, c);
-      }
-    }
+    const cuenta = cuentaPorPlanta(this.proyecto, this.diagnosticos);
     const c = this.compilacion;
     return {
       huella: c.huella,
@@ -344,12 +391,41 @@ export class Sesion {
       equilibrio: (this.cabecera?.casos ?? []).map((x) => ({ id: x.id, ...x.equilibrio })),
       ...this.combinacionesEstado(),
       sha256Resultados: this.shaR,
-      ejes: (() => {
-        const x = ejesDe(f);
-        return x.ejes.map((e) => ({ id: e.id, ...(e.nombre ? { nombre: e.nombre } : {}), desde: e.desde, hasta: e.hasta, propuesto: x.propuestos }));
-      })(),
+      ejes: this.ejesEstado(),
       vistas: this.proyecto.vistas ?? [],
     };
+  }
+
+  private estadoSinCompilar(): EstadoSesion {
+    const f = this.proyecto.modelo;
+    const cotas = cotasPlantas(f.plantas);
+    const diagnosticos = ordenSeveridad(this.previa);
+    const cuenta = cuentaPorPlanta(this.proyecto, diagnosticos);
+    return {
+      huella: this.huella,
+      ...(this.proyecto.nombre ? { nombre: this.proyecto.nombre } : {}),
+      ...(this.proyecto.descripcion ? { descripcion: this.proyecto.descripcion } : {}),
+      compila: false,
+      compilando: true,
+      diagnosticos,
+      hipotesis: [],
+      plantas: f.plantas.map((p, i) => ({ id: p.id, ...(p.nombre ? { nombre: p.nombre } : {}), cota: cotas[i] ?? null, altura: p.altura, avisos: cuenta.get(p.id)?.avisos ?? 0, errores: cuenta.get(p.id)?.errores ?? 0 })),
+      casos: f.casos.map((x) => ({ id: x.id, ...(x.nombre ? { nombre: x.nombre } : {}), ...(x.accion ? { accion: x.accion.tipo } : {}), ...(x.pesoPropio ? { pesoPropio: true } : {}) })),
+      resumen: null,
+      estadisticas: null,
+      calculado: false,
+      origen: null,
+      equilibrio: [],
+      combinaciones: [],
+      sha256Resultados: null,
+      ejes: this.ejesEstado(),
+      vistas: this.proyecto.vistas ?? [],
+    };
+  }
+
+  private ejesEstado(): EstadoSesion["ejes"] {
+    const x = ejesDe(this.proyecto.modelo);
+    return x.ejes.map((e) => ({ id: e.id, ...(e.nombre ? { nombre: e.nombre } : {}), desde: e.desde, hasta: e.hasta, propuesto: x.propuestos }));
   }
 
   // ─── Resultados ───────────────────────────────────────────────────────────────────────────────
@@ -425,10 +501,10 @@ export class Sesion {
   /** El conjunto de combinaciones de una elección, para un propósito. */
   conjunto(e: EleccionCombinaciones, proposito: Proposito): { valido: true; valor: ConjuntoCombinaciones } | { valido: false; diagnosticos: Diagnostico[] } {
     const q = this.q;
-    if (!q || !this.res) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
+    if (!q || !this.resumen) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
     switch (e.tipo) {
       case "defecto":
-        return proposito === "lineal" ? conjuntoCombinaciones(q, seleccionPorDefecto(q.fisico.casos, "lineal")) : { valido: true, valor: conjuntoPorDefecto(q, this.res, proposito) };
+        return proposito === "lineal" ? conjuntoCombinaciones(q, seleccionPorDefecto(q.fisico.casos, "lineal")) : { valido: true, valor: conjuntoPorDefecto(q, this.resumen!, proposito) };
       case "situaciones":
         return conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: e.situaciones });
       case "combinacion": {
@@ -562,9 +638,11 @@ export class Sesion {
   /**
    * El 3D sólido (I3), en el origen del 3D y con las viguetas de la compilación si compila. Se hace
    * una vez (en el reticular grande, ~1,5 s) y se da una copia: la respuesta se va por Transferable.
+   * Sin paños no usa la compilación, así que no la espera.
    */
   solido(): Solido {
-    const x = (this.solidoC ??= solido(this.proyecto.modelo, this.origen3D, this.compilado));
+    const f = this.proyecto.modelo;
+    const x = (this.solidoC ??= solido(f, this.origen3D, f.panos?.length ? this.compilado : null));
     return { ...x, triangulos: x.triangulos.slice(), objeto: x.objeto.slice(), planta: x.planta.slice(), caseton: x.caseton.slice(), aristas: x.aristas.slice(), objetoArista: x.objetoArista.slice(), plantaArista: x.plantaArista.slice() };
   }
 

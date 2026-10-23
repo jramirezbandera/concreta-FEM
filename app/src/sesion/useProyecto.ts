@@ -9,6 +9,10 @@
  *   número de generación y lo que llegue de una carga anterior se descarta.
  * - Al editar, el worker valida y compila la versión nueva (con una pausa corta para no compilar a
  *   cada tecla), pero no calcula: calcular es un botón.
+ * - Lo que sólo necesita el modelo físico se dibuja sin esperar a la compilación (en el edificio
+ *   objetivo con vigas, ~3 s): el worker abre la versión nueva sin compilar (`diferir`), las vistas
+ *   piden su dibujo y, después de ese primer pintado, se le pide `compilar`. Mientras, el estado
+ *   dice `compilando` y los diagnósticos son sólo los de la sensatez previa.
  * - El proyecto que se edita está en el hilo principal (`historial`); el worker recibe su texto
  *   canónico. Deshacer devuelve el proyecto anterior tal cual.
  * - AB: un cambio que sólo toca la armadura base (`armado`) no reabre el proyecto ni pierde los
@@ -36,7 +40,10 @@ export type Fase = "vacio" | "abriendo" | "calculando" | "listo" | "error";
 export type Fuente = { tipo: "origen"; origen: Origen } | { tipo: "texto"; nombre: string };
 
 export interface Tiempos {
+  /** Abrir y compilar. */
   abrir?: number;
+  /** Abrir sin compilar: lo que tarda el dibujo en tener su versión. */
+  dibujo?: number;
   guardados?: number;
   calcular?: number;
 }
@@ -70,7 +77,7 @@ export interface Edicion {
    * navegador, se hace solo (AL-b).
    */
   modo: "escribir" | "descargar" | "auto";
-  /** Hay un cambio que el worker aún no ha compilado. */
+  /** Hay un cambio que el worker aún no ha compilado (también mientras compila). */
   pendiente: boolean;
 }
 
@@ -168,6 +175,20 @@ export function useProyecto(): ProyectoAbierto {
   fuenteRef.current = fuente;
   /** Hay una escritura en curso: la siguiente espera (el autoguardado vuelve a mirar cuando acaba). */
   const escribiendo = useRef(false);
+  /** Lo que espera al siguiente commit, cuando ya corrieron los efectos de las vistas (los de los hijos van antes). */
+  const alCommit = useRef<(() => void)[]>([]);
+  useEffect(() => {
+    for (const f of alCommit.current.splice(0)) f();
+  });
+  /** Tras el siguiente commit; por si no lo hubiera, en 1 s. */
+  const despuesDelCommit = useCallback(
+    () =>
+      new Promise<void>((r) => {
+        alCommit.current.push(r);
+        window.setTimeout(r, 1000);
+      }),
+    [],
+  );
 
   const sinGuardar = !!hist && hist.actual !== enDisco;
   sinGuardarRef.current = sinGuardar;
@@ -183,25 +204,41 @@ export function useProyecto(): ProyectoAbierto {
     const c = new ClienteSesion();
     try {
       const t0 = performance.now();
-      const a = await c.pedir({ tipo: "abrir", texto });
+      const a = await c.pedir({ tipo: "abrir", texto, diferir: true });
       if (!vigente()) return c.cerrar();
       clienteRef.current?.cerrar();
       clienteRef.current = c;
       setCliente(c);
       setFuente(f);
       setVersion(g);
-      setPendiente(false);
-      const t: Tiempos = { abrir: (performance.now() - t0) / 1000 };
-      setTiempos(t);
+      const dibujo = (performance.now() - t0) / 1000;
+      setTiempos({ dibujo });
       if (!a.ok) {
+        setPendiente(false);
         setEstado(null);
         setErrores(a.diagnosticos);
         setFase("error");
         setDesactualizado(false);
         return;
       }
+      // Sin compilar: lo que se dibuja ya es de esta versión. Las vistas piden su dibujo en este
+      // commit y `compilar` va después en la cola del worker
       setEstado(a.valor);
-      if (!a.valor.compila) {
+      setDesactualizado(false);
+      await despuesDelCommit();
+      if (!vigente()) return;
+      const k = await c.pedir({ tipo: "compilar" });
+      if (!vigente()) return;
+      setPendiente(false);
+      const t: Tiempos = { abrir: (performance.now() - t0) / 1000, dibujo };
+      setTiempos(t);
+      if (!k.ok) {
+        setErrores(k.diagnosticos);
+        setFase("error");
+        return;
+      }
+      setEstado(k.valor);
+      if (!k.valor.compila) {
         // Se dibuja con sus diagnósticos; no hay nada que calcular
         setFase("listo");
         setDesactualizado(false);
@@ -249,7 +286,7 @@ export function useProyecto(): ProyectoAbierto {
       setFase("error");
       setDesactualizado(false);
     }
-  }, []);
+  }, [despuesDelCommit]);
 
   /** El proyecto del texto leído pasa a ser el que se edita, sin historia (null si no es válido). */
   const empezarEdicion = useCallback((texto: string) => {

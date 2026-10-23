@@ -33,18 +33,21 @@ export class Atendedor {
 
   async atender(p: Pedido): Promise<Contestacion> {
     if (p.tipo === "abrir") {
-      const a = Sesion.abrir(p.texto, this.motor);
+      const a = Sesion.abrir(p.texto, this.motor, { diferir: !!p.diferir });
       this.empaquetado = null;
       if (!a.valido) {
         this.sesion = null;
         return { ok: false, diagnosticos: a.diagnosticos };
       }
       this.sesion = a.sesion;
-      return bien("abrir", a.sesion.estado());
+      return bien("abrir", a.sesion.estado({ sinCompilar: true }));
     }
     const s = this.sesion;
     if (!s) return sin("No hay ningún proyecto abierto.");
     switch (p.tipo) {
+      case "compilar":
+        s.compilar();
+        return bien("compilar", s.estado());
       case "guardados": {
         const r = await s.usarGuardados(p.cabecera, p.bytes);
         return bien("guardados", r.ok ? { usados: true, estado: s.estado() } : { usados: false, motivo: r.motivo });

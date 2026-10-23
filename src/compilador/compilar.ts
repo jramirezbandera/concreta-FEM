@@ -122,6 +122,19 @@ function fisicoCanonico(f: ModeloFisico): unknown {
   return r;
 }
 
+/**
+ * La huella que dará `compilar` con estos datos, sin compilar: "" si las opciones no se pueden
+ * resolver, como en `compilar`. El visor la usa mientras compila (lo que sólo necesita el modelo
+ * físico se dibuja antes).
+ */
+export function huellaSinCompilar(fisico: ModeloFisico, opciones: OpcionesCompilacion = {}): string {
+  try {
+    return huellaCompilacion(fisico, resolverOpciones(opciones));
+  } catch {
+    return "";
+  }
+}
+
 export function compilar(fisico: ModeloFisico, opciones: OpcionesCompilacion = {}): ResultadoCompilacion {
   let huella = "";
   try {

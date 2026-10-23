@@ -60,7 +60,7 @@ function inicial(): { espacio: Espacio; modo: ModoResultados } {
 
 function Estado({ p }: { p: ProyectoAbierto }) {
   return (
-    <span data-estado={p.desactualizado ? "desactualizado" : p.fase === "error" ? "error" : !p.estado ? "vacio" : !p.estado.compila ? "no-compila" : p.estado.calculado ? "calculado" : "sin-calcular"} data-huella={p.estado?.huella ?? ""}>
+    <span data-estado={p.desactualizado ? "desactualizado" : p.fase === "error" ? "error" : !p.estado ? "vacio" : p.estado.compilando ? "compilando" : !p.estado.compila ? "no-compila" : p.estado.calculado ? "calculado" : "sin-calcular"} data-huella={p.estado?.huella ?? ""}>
       <TextoEstado p={p} />
     </span>
   );
@@ -68,10 +68,11 @@ function Estado({ p }: { p: ProyectoAbierto }) {
 
 function TextoEstado({ p }: { p: ProyectoAbierto }) {
   const e = p.estado;
-  if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "CALCULANDO" : p.edicion?.pendiente ? "COMPILANDO LO EDITADO" : "ABRIENDO"} · RESULTADOS DESACTUALIZADOS</span>;
+  if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "CALCULANDO" : p.edicion?.pendiente ? "LEYENDO LO EDITADO" : "ABRIENDO"} · RESULTADOS DESACTUALIZADOS</span>;
   if (p.fase === "calculando") return <span className="pill warn">CALCULANDO · {e?.huella.slice(0, 8)}</span>;
   if (p.fase === "error") return <span className="pill fail">{e && e.compila ? "EL CÁLCULO FALLÓ" : "NO SE PUEDE ABRIR"}</span>;
   if (!e) return null;
+  if (e.compilando) return <span className="pill warn" title="Lo que sólo necesita el modelo ya se dibuja; los diagnósticos, la malla y el cálculo esperan a la compilación">COMPILANDO · {e.huella.slice(0, 8)}</span>;
   if (!e.compila) return <span className="pill fail">NO COMPILA · {e.huella.slice(0, 8)}</span>;
   if (e.calculado) return <span className="pill ok">CALCULADO · {e.huella.slice(0, 8)}</span>;
   return <span className="pill neu">SIN CALCULAR · {e.huella.slice(0, 8)}</span>;

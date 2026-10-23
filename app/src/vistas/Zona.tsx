@@ -247,7 +247,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
                 id: m.id,
                 nombre: m.nombre,
                 disabled: (m.id === "analitico" && !e.compila) || (m.id === "solido" && !!fuentes.cabecera3D),
-                title: m.id === "analitico" && !e.compila ? "El modelo no compila" : m.id === "solido" && fuentes.cabecera3D ? "En Resultados, el sólido taparía los resultados: el translúcido lo deja ver detrás" : m.title,
+                title: m.id === "analitico" && !e.compila ? (e.compilando ? "Compilando…" : "El modelo no compila") : m.id === "solido" && fuentes.cabecera3D ? "En Resultados, el sólido taparía los resultados: el translúcido lo deja ver detrás" : m.title,
               }))}
             />
             <SelectorPlanta estado={e} planta={planta} onPlanta={(p) => poner(i, { planta: p })} ninguna={fuentes.cabecera3D ? "Todas las plantas" : "Sin resaltar"} />

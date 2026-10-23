@@ -276,10 +276,10 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     {
       id: "diagnosticos",
       titulo: "Diagnósticos",
-      insignia: errores ? <span className="text-state-fail">{errores} error{errores === 1 ? "" : "es"}</span> : avisos ? <span className="text-state-warn">{avisos} aviso{avisos === 1 ? "" : "s"}</span> : "0",
+      insignia: e.compilando ? <span className="text-text-secondary">…</span> : errores ? <span className="text-state-fail">{errores} error{errores === 1 ? "" : "es"}</span> : avisos ? <span className="text-state-warn">{avisos} aviso{avisos === 1 ? "" : "s"}</span> : "0",
       contenido: (
         <>
-          <p className="nota">Los de <span className="mono">fem validar</span> y <span className="mono">fem calcular</span>. Un clic en un id lo elige.</p>
+          <p className="nota">Los de <span className="mono">fem validar</span> y <span className="mono">fem calcular</span>. Un clic en un id lo elige.{e.compilando ? " Compilando: de momento, sólo los que no necesitan la compilación." : ""}</p>
           <ListaDiagnosticos ds={e.diagnosticos} onObjeto={setSeleccion} />
         </>
       ),
@@ -352,7 +352,8 @@ function Proyecto() {
           {e.descripcion && <p className="mt-1 text-[12px] leading-snug text-text-secondary">{e.descripcion}</p>}
         </div>
       )}
-      {!e.compila && <p className="nota text-state-fail">El modelo no compila: se dibuja con sus diagnósticos. {ed ? "Corríjalo en las tablas (los errores, en Diagnósticos, abajo)." : "Corríjalo en el proyecto.json."}</p>}
+      {e.compilando && <p className="nota">Compilando: los diagnósticos, la malla y el cálculo salen al terminar.</p>}
+      {!e.compila && !e.compilando && <p className="nota text-state-fail">El modelo no compila: se dibuja con sus diagnósticos. {ed ? "Corríjalo en las tablas (los errores, en Diagnósticos, abajo)." : "Corríjalo en el proyecto.json."}</p>}
       {proyecto.fase === "error" && e.compila && <p className="nota text-state-fail">El cálculo falló: {proyecto.errores.map((d) => d.mensaje).join(" ")}</p>}
     </Seccion>
   );

@@ -25,7 +25,10 @@ import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import type { CargasAlzado, DiagramasAlzado, EleccionCombinaciones, EstadoSesion, FuenteEscena, PedidoDiagramas3D, PedidoArmado3D, PedidoIsovalores3D, PedidoPilares3D, PedidoValorArmado, PedidoValorLamina, PlanoPedido, ReaccionesAlzado, ValorLamina, VistaPlanta } from "./sesion.ts";
 
 export type Pedido =
-  | { tipo: "abrir"; texto: string }
+  /** Con `diferir`, no compila: contesta con el estado `compilando` y compila con `compilar` o con lo primero que lo necesite. */
+  | { tipo: "abrir"; texto: string; diferir?: boolean }
+  /** Compila la sesión abierta con `diferir` (si no lo ha hecho ya) y da su estado. */
+  | { tipo: "compilar" }
   | { tipo: "guardados"; cabecera: string; bytes: Uint8Array }
   | { tipo: "calcular" }
   /** AL: los resultados del último cálculo empaquetados como `.fem/<huella>/` (una vez; null si no hay), para la caché del navegador. */
@@ -75,6 +78,7 @@ export type Pedido =
 /** Lo que devuelve cada pedido cuando sale bien. */
 export interface Respuestas {
   abrir: EstadoSesion;
+  compilar: EstadoSesion;
   guardados: { usados: true; estado: EstadoSesion } | { usados: false; motivo: string };
   calcular: EstadoSesion;
   paquete: { cabecera: string; bytes: Uint8Array } | null;
