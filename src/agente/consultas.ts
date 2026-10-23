@@ -22,6 +22,7 @@ import { resultanteAnalitica } from "../compilador/cargas.ts";
 import type { ResultadoCompilacion } from "../compilador/compilar.ts";
 import type { Consultas } from "../compilador/consultas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { DELTA_MUESTRAS } from "../compilador/esfuerzosFranjas.ts";
 import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { EsfuerzosPiezas } from "../compilador/resultados.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
@@ -702,6 +703,12 @@ export interface EstacionFranjaEnvolvente {
   piezas?: string[];
   /** Ancho en losa, m, si no es el de la franja (un hueco, un borde o una huella). */
   anchoEnLosa?: number;
+  /**
+   * En una cara o un apoyo, la distancia a la recta en la que se toman my y mxy, m, si no es δ (1 mm):
+   * con un borde rígido detrás (el ancho de una viga, una huella, un apoyo lineal con giros coartados),
+   * un canto de la losa o la mitad de lo libre hasta el siguiente apoyo (LV2-h). El mx es el de la recta.
+   */
+  distanciaMuestras?: number;
   /** mx medio (kN·m/m; > 0 tracciona la cara inferior): [máximo, su combinación] y [mínimo, la suya]. */
   max: [number, string];
   min: [number, string];
@@ -730,6 +737,7 @@ export function franja(q: Consultas, conjunto: ConjuntoCombinaciones, id: string
       ...(e.lado ? { lado: e.lado } : {}),
       ...(e.piezas.length ? { piezas: e.piezas } : {}),
       ...(Math.abs(e.anchoEnLosa - f.ancho) > 1e-9 ? { anchoEnLosa: e.anchoEnLosa } : {}),
+      ...(e.tipo !== "paso" && e.distanciaMuestras > DELTA_MUESTRAS + 1e-9 ? { distanciaMuestras: e.distanciaMuestras } : {}),
       max: [w.mxMax, nombre(w.combMax)],
       min: [w.mxMin, nombre(w.combMin)],
       inferior: [w.inferior, nombre(w.combInferior)],

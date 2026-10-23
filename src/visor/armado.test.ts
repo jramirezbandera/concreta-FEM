@@ -10,6 +10,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { conAcciones, reticularH25 } from "../../validacion/c5/modelos.ts";
 import { ARMADURAS, type ArmadoProyecto, type Armadura } from "../agente/armaduraBase.ts";
 import { franja as consultaFranja } from "../agente/consultas.ts";
+import { DELTA_MUESTRAS } from "../compilador/esfuerzosFranjas.ts";
 import { VERSION_ESQUEMA } from "../agente/proyecto.ts";
 import { sha256 } from "../compilador/huella.ts";
 import { serializar } from "../editor/serializar.ts";
@@ -83,6 +84,32 @@ describe("valor de un punto (criterio 2)", () => {
     expect(v.base).toBe(10);
     expect(v.exceso).toBe(v.valor - 10);
   });
+});
+
+describe("distanciaMuestras en «fem consultar franja» (LV2-h)", () => {
+  it("en las caras y los apoyos, la de la estación si no es δ; en las de paso, nunca", () => {
+    const q = sesion().q!;
+    let n = 0;
+    for (const l of MODELO.losas!) {
+      const fs = q.franjas(l.id);
+      if (!fs.valido) throw new Error();
+      for (const f of fs.valor) {
+        const g = q.franja(f.id);
+        const c = consultaFranja(q, conjunto(), f.id);
+        if (!g.valido || !c.valido) throw new Error();
+        g.valor.estaciones.forEach((e, i) => {
+          const d = c.valor.estaciones[i]!.distanciaMuestras;
+          if (e.tipo === "paso" || e.distanciaMuestras <= DELTA_MUESTRAS) expect(d).toBeUndefined();
+          else {
+            expect(d).toBe(e.distanciaMuestras);
+            n++;
+          }
+        });
+      }
+    }
+    // Las caras de los pilares tienen la huella detrás: un canto
+    expect(n).toBeGreaterThan(0);
+  }, 60_000);
 });
 
 describe("armado en 3D (criterio 6)", () => {

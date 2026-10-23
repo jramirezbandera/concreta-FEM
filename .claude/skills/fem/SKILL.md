@@ -158,7 +158,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 | `reacciones [--objeto id] [--top N \| --todos]` | Totales por caso (ΣF y ΣM respecto al origen) y los apoyos con más carga |
 | `pieza <id> [--estaciones]` | Una viga o vigueta, por vanos (de cara a cara de apoyo); o un pilar, por tramos (base y cabeza, con los esfuerzos concomitantes) |
 | `franjas [--losa L \| --planta P]` | Las franjas de armado de las losas (ids `<losa>:X<i>` y `<losa>:Y<i>`), con su mayor demanda de Wood–Armer inferior y superior (kN·m/m), dónde está y su combinación |
-| `franja <id>` | Una franja, estación a estación (caras de pilares y líneas de apoyo exactas; cada 0,25 m por campos): mx máximo y mínimo y Wood–Armer inferior y superior por metro |
+| `franja <id>` | Una franja, estación a estación (caras de pilares y líneas de apoyo exactas; cada 0,25 m por campos): mx máximo y mínimo y Wood–Armer inferior y superior por metro. En una cara o un apoyo con un borde rígido detrás, `distanciaMuestras` (m) dice a qué distancia se tomaron my y mxy (un canto de la losa) |
 | `refuerzos --armadura x-inf\|x-sup\|y-inf\|y-sup [--losa L \| --planta P]` | Las zonas de refuerzo: lo que supera la armadura base del proyecto, conexo, con sus franjas, su extensión (s, t, longitud, área, caja), su máximo con el exceso y su combinación; y las losas sin base. La extensión es la de las estaciones (±0,125 m), sin anclajes ni solapes |
 | `banda <id>` | My máximo y mínimo en cada estación de una banda del proyecto (caras y vanos) |
 | `combinaciones` | Las combinaciones en uso, con sus factores |

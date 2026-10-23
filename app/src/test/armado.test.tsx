@@ -122,6 +122,12 @@ describe("Fase F · Resultados · Armado en el DOM", () => {
     const filasC = within(caras).getAllByRole("row").slice(1);
     expect(filasC.length).toBe(exactas.length);
     exactas.forEach((x, i) => expect(within(filasC[i]!).getAllByRole("cell")[3]!.textContent).toBe(conComb(x.superior, 1, varias)));
+    // La distancia de my y mxy (LV2-h), si no es δ
+    exactas.forEach((x, i) => {
+      const t = within(filasC[i]!).getAllByRole("cell")[0]!.textContent!;
+      if (x.distanciaMuestras === undefined) expect(t).not.toContain("my, mxy");
+      else expect(t).toContain(`my, mxy a ${fmt(x.distanciaMuestras, 2)} m`);
+    });
     expect(screen.getByRole("img", { name: `Diagrama de ${id}` })).toBeTruthy();
   }, 60_000);
 });

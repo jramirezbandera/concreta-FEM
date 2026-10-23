@@ -182,6 +182,7 @@ function DetalleFranja({ d, varias, base }: { d: DatosFranja; varias: boolean; b
                   {fmt(x.s, 3)}
                   <small>
                     {x.tipo} {x.lado === -1 ? "←" : "→"} {x.piezas?.join(", ") ?? ""}
+                    {x.distanciaMuestras !== undefined ? ` · my, mxy a ${fmt(x.distanciaMuestras, 2)} m` : ""}
                   </small>
                 </td>
                 <td data-mx-min={x.min[0]}>
@@ -197,7 +198,7 @@ function DetalleFranja({ d, varias, base }: { d: DatosFranja; varias: boolean; b
             ))}
           </tbody>
         </table>
-        <p className="nota">De «fem consultar franja»: exactas, por fuerzas nodales, del lado de la flecha. Momento medio por metro de la franja; mx &gt; 0 tracciona la cara inferior.</p>
+        <p className="nota">De «fem consultar franja»: exactas, por fuerzas nodales, del lado de la flecha. Momento medio por metro de la franja; mx &gt; 0 tracciona la cara inferior. Con un borde rígido detrás (una viga, una huella), my y mxy se toman a la distancia que se indica, un canto de la losa: pegados a él, el torsor tiene una capa límite que la malla no resuelve.</p>
       </Seccion>
       <Seccion titulo="Todas las estaciones" valor={d.estaciones.length}>
         {!todas ? (
