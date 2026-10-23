@@ -94,9 +94,9 @@ export abstract class Vista {
     this.arrastre = { boton: e.button, x0: x, y0: y, x, y, movido: false, mayus: e.shiftKey, ctrl: e.ctrlKey || e.metaKey };
   }
 
-  pointermove(_e: PointerEvent, x: number, y: number): void {
+  pointermove(e: PointerEvent, x: number, y: number): void {
     const a = this.arrastre;
-    if (!a) return this.pasar(x, y);
+    if (!a) return this.pasar(x, y, e);
     const [dx, dy] = [x - a.x, y - a.y];
     if (!a.movido && Math.hypot(x - a.x0, y - a.y0) > 4) a.movido = true;
     if (!a.movido) return;
@@ -127,8 +127,8 @@ export abstract class Vista {
     }
   }
 
-  /** El cursor se mueve sin arrastrar (I4: lo que hay debajo). */
-  protected pasar(_x: number, _y: number): void {}
+  /** El cursor se mueve sin arrastrar (I4: lo que hay debajo; V2c: los enganches). */
+  protected pasar(_x: number, _y: number, _e?: PointerEvent): void {}
 
   /** El cursor sale de la vista. */
   salir(): void {}

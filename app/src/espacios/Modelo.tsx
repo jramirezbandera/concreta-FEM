@@ -2,9 +2,11 @@
  * Espacios Modelo y Cargas (`docs/fem3d/interfaz.md` §4 y §13): lo que era la pantalla Modelo de V1
  * y V2a, repartido en la disposición común.
  *
- * - Barra: en Modelo, las herramientas de los objetos (abren su tabla en la fila nueva), Copiar (a
- *   otras plantas) y Borrar (lo elegido o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o 3D; en Cargas, el caso activo, Nueva carga y
- *   Casos. Sin proyecto editable, sólo lo que mira.
+ * - Barra: en Modelo, las herramientas de dibujo (V2c-1, `docs/fem3d/dibujo.md`: Ejes, Pilar y Viga
+ *   se dibujan en la planta, con su plantilla en Propiedades; `dibujo/controlador.ts`), las de los
+ *   objetos que aún abren su tabla en la fila nueva, Copiar (a otras plantas) y Borrar (lo elegido
+ *   o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o 3D; en
+ *   Cargas, el caso activo, Nueva carga y Casos. Sin proyecto editable, sólo lo que mira.
  * - Navegador: el proyecto y los objetos de la planta activa (en Cargas, los casos y las cargas).
  * - Vistas (I2): 1, 2 o 4, de planta (modelo, diagnósticos o malla; en Cargas, las del caso activo),
  *   alzado o 3D (`vistas/Zona.tsx`). En Cargas, el alzado y el 3D también dibujan las del caso activo
@@ -14,9 +16,10 @@
  *   por caso, equilibrio, hipótesis).
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ChevronRight, ListOrdered, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
+import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcAbacos, IcLosa, IcVigaBorde, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
@@ -30,8 +33,11 @@ import { Inspector } from "../pantallas/Inspector.tsx";
 import { NavVistas } from "../armazon/VistasGuardadas.tsx";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, type DibujoPlanta, type EstadoVista } from "../vistas/estado.ts";
-import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, ZonaVistas } from "../vistas/Zona.tsx";
+import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, repintarVistas, ZonaVistas } from "../vistas/Zona.tsx";
 import { usePedido } from "../sesion/usePedido.ts";
+import type { NombreHerramienta, Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
+import { ControladorDibujo } from "../dibujo/controlador.ts";
+import { CampoTeclado, PlantillaDibujo, plantillasEfectivas } from "../dibujo/Plantilla.tsx";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
 const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "forjados", "apoyos", "apoyosLineales", "cargas"]);
@@ -45,11 +51,14 @@ const IcRenumerar: Icono = ({ size }) => <ListOrdered size={size} strokeWidth={1
 
 let ultimoPedido = 0;
 
+/** Una tecla en un campo, en una tabla o en un diálogo no es de la herramienta. */
+const enCampo = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || !!(t as HTMLElement | null)?.closest?.("[role=grid], [role=dialog]");
+
 /** Un caso en el selector de la barra: su id, su nombre y si lleva el peso propio. */
 const textoCaso = (c: { id: string; nombre?: string; pesoPropio?: boolean } | undefined) => (c ? `${c.id}${c.nombre ? ` · ${c.nombre}` : ""}${c.pesoPropio ? " · con peso propio" : ""}` : undefined);
 
 export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
-  const { proyecto, seleccion, setSeleccion, elegidos, tablaPedida } = useVisor();
+  const { proyecto, seleccion, setSeleccion, elegidos, tablaPedida, planta } = useVisor();
   const vistas = useVistas();
   const e = proyecto.estado!;
   const ed = proyecto.edicion;
@@ -65,6 +74,53 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const [plantilla, setPlantilla] = useState<Record<string, string> | undefined>(undefined);
   const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | "vigasBorde" | null>(null);
 
+  // V2c: la herramienta activa (Elegir por defecto), fuera de React; aquí, lo que cambia la barra y Propiedades
+  const [ctrl] = useState(() => new ControladorDibujo());
+  const foto = useSyncExternalStore(ctrl.suscribir, ctrl.instantanea);
+  const [plantillasDibujo, setPlantillasDibujo] = useState<Plantillas>({ pilar: {}, viga: {} });
+  const modeloEd = ed?.proyecto.modelo ?? null;
+  const plantillas = useMemo(() => plantillasEfectivas(modeloEd, plantillasDibujo), [modeloEd, plantillasDibujo]);
+  const editarDibujo = (o: Operacion, etiqueta: string): string | null => {
+    if (!ed) return "No hay ningún proyecto que editar.";
+    const a = ed.editar(o, etiqueta);
+    return a.ok ? null : a.errores.map((x) => x.mensaje).join(" ");
+  };
+  ctrl.plantillas = plantillas;
+  ctrl.aplicar = (h) => editarDibujo(h.operacion, h.etiqueta);
+  ctrl.alSalir = () => ctrl.ponerHerramienta("elegir");
+  ctrl.repintar = repintarVistas;
+  useEffect(() => ctrl.ponerModelo(modeloEd), [ctrl, modeloEd]);
+  const dibujando = foto.herramienta !== "elegir";
+  const elegirHerramienta = (h: NombreHerramienta) => {
+    const n = foto.herramienta === h ? "elegir" : h;
+    ctrl.ponerHerramienta(n);
+    if (n !== "elegir") {
+      setEligiendo(null);
+      if (!pan.props) pan.poner({ props: true });
+    }
+  };
+  // Las teclas de una herramienta: F8, Esc, Intro, Retroceso y lo que abre el campo de teclado
+  useEffect(() => {
+    if (!dibujando) return;
+    const tecla = (x: KeyboardEvent) => {
+      if (x.ctrlKey || x.metaKey || x.altKey || enCampo(x.target)) return;
+      if (x.key === "F8") {
+        x.preventDefault();
+        ctrl.alternarOrto();
+      } else if (x.key === "Escape") ctrl.anular();
+      else if (x.key === "Enter") ctrl.intro();
+      else if (x.key === "Backspace") {
+        x.preventDefault();
+        ctrl.retroceso();
+      } else if (/^[0-9@.,+-]$/.test(x.key)) {
+        x.preventDefault();
+        ctrl.abrirCampo(x.key);
+      }
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [ctrl, dibujando]);
+
   const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
   // Lo elegido que está en el proyecto (un eje propuesto no lo está) y lo que de ello se copia
   const enTablas = ed ? elegidos.filter((id) => tablaDe(ed.proyecto.modelo, id)) : [];
@@ -77,6 +133,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const conCtrl = useRef(false);
   const paraAccion = (a: "copiar" | "borrar") => (a === "copiar" ? copiables : enTablas);
   const usar = (a: "copiar" | "borrar") => {
+    ctrl.ponerHerramienta("elegir");
     if (paraAccion(a).length) return setDialogo(a);
     if (eligiendo === a) return setEligiendo(null);
     alEmpezar.current = elegidos;
@@ -151,9 +208,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     <>
       {ed && (
         <>
-          <Herramienta icono={IcEjes} nombre="Ejes" onClick={() => abrirTabla("ejes")} title="La tabla de ejes de replanteo (sin ejes en el proyecto, los propuestos)" />
-          <Herramienta icono={IcPilar} nombre="Pilar" onClick={() => abrirTabla("pilares", true)} title="Un pilar nuevo en la tabla de pilares" />
-          <Herramienta icono={IcViga} nombre="Viga" onClick={() => abrirTabla("vigas", true)} title="Una viga nueva en la tabla de vigas" />
+          <Herramienta icono={IcEjes} nombre="Ejes" activa={foto.herramienta === "ejes"} onClick={() => elegirHerramienta("ejes")} title="Dibujar ejes de replanteo: dos clics por eje (o «Proponer ejes» en Propiedades). Esc vuelve a Elegir" />
+          <Herramienta icono={IcPilar} nombre="Pilar" activa={foto.herramienta === "pilar"} onClick={() => elegirHerramienta("pilar")} title="Dibujar pilares: un clic en su punto fijo, o una ventana para uno en cada cruce de ejes. Esc vuelve a Elegir" />
+          <Herramienta icono={IcViga} nombre="Viga" activa={foto.herramienta === "viga"} onClick={() => elegirHerramienta("viga")} title="Dibujar vigas: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
           <Herramienta icono={IcLosa} nombre="Forjado" onClick={() => abrirTabla("forjados", true, { tipo: "maciza" })} title="Un forjado nuevo en la tabla de forjados: losa maciza, reticular o unidireccional, según su columna «tipo»" />
           <Herramienta icono={IcAbacos} nombre="Ábacos" onClick={() => setDialogo("abacos")} title="Ábacos macizos en los pilares de un forjado reticular, del tamaño que diga" />
           <Herramienta icono={IcVigaBorde} nombre="Vigas de borde" onClick={() => setDialogo("vigasBorde")} title="El zuncho de los bordes de un forjado que no van sobre una viga, un muro o un apoyo: la viga, la losa hasta su eje y la carga de la banda en la viga" />
@@ -183,7 +240,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const vista = (
     <ZonaVistas
       fuentes={{
-        planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} /> : null),
+        planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta) : null} dibujando={dibujando} /> : null),
         ...(cargas && casoValido
           ? {
               alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), cargas: { caso: casoValido, escala: Number(escala) } } : null} />,
@@ -240,6 +297,13 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         vista={
           <>
             {vista}
+            {dibujando && (
+              <span className="chip aviso-herr" data-acento="true" role="status">
+                {foto.ayuda}
+                {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
+              </span>
+            )}
+            {foto.campo && <CampoTeclado key={foto.campo.n} ctrl={ctrl} campo={foto.campo} />}
             {eligiendo && (
               <span className="chip aviso-herr" data-acento="true" role="status">
                 {eligiendo === "copiar" ? "Copiar a otras plantas: elija las vigas, losas, paños, apoyos o cargas" : "Borrar: elija lo que quiere borrar"} (clic o ventana; con Ctrl+clic, varios e Intro). Esc cancela.
@@ -248,7 +312,19 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
             )}
           </>
         }
-        props={{ titulo: "Propiedades", contenido: elegidos.length > 1 ? <ListaElegidos /> : seleccion ? <Inspector id={seleccion} /> : <ResumenPlanta /> }}
+        props={{
+          titulo: "Propiedades",
+          contenido:
+            dibujando && modeloEd ? (
+              <PlantillaDibujo foto={foto} ctrl={ctrl} modelo={modeloEd} planta={planta} plantillas={plantillas} setPlantillas={setPlantillasDibujo} editar={editarDibujo} abrirTabla={(t) => abrirTabla(t)} />
+            ) : elegidos.length > 1 ? (
+              <ListaElegidos />
+            ) : seleccion ? (
+              <Inspector id={seleccion} />
+            ) : (
+              <ResumenPlanta />
+            ),
+        }}
         dock={dock}
       />
       {dialogo === "borrar" && enTablas.length > 0 && <DialogoBorrar ids={enTablas} onCerrar={cerrarDialogo} />}

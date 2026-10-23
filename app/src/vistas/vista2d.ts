@@ -13,7 +13,7 @@ import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
 import type { Eleccion, EscenaPreparada, Glifo } from "../../../src/visor/escena.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { Capas2D, MATERIALES, relleno, trazo } from "./capas.ts";
-import { fuente, textoConHalo, Vista, type Entorno } from "./motor.ts";
+import { fuente, textoConHalo, Vista, type Colores, type Entorno } from "./motor.ts";
 import { colocarRotulos, ralearBurbujas } from "./rotulos.ts";
 
 export interface Marca {
@@ -26,6 +26,23 @@ export interface Eventos2D {
   clic?: (p: Vec2, radio: number, ctrl: boolean, doble: boolean) => void;
   /** Una ventana de elegir, en m. */
   ventana?: (caja: [number, number, number, number], modo: "dentro" | "toca", ctrl: boolean) => void;
+}
+
+/**
+ * Lo que dibuja con el ratón en una planta (V2c, `app/src/dibujo/controlador.ts`): recibe el cursor,
+ * los clics y la ventana en m (con el radio de enganche en m), y pinta encima del dibujo. Un clic o una
+ * ventana que no usa (con Elegir) va a `eventos`, como siempre.
+ */
+export interface Dibujo2D {
+  pasar(p: Vec2, radio: number, mayus: boolean, cliente: readonly [number, number]): void;
+  salir(): void;
+  /** true si el clic es suyo. */
+  clic(p: Vec2, radio: number, ctrl: boolean, doble: boolean): boolean;
+  /** true si la ventana es suya. */
+  ventana(caja: [number, number, number, number]): boolean;
+  /** El punto que se usaría (enganchado) y lo que dice la barra de estado. */
+  cursor(): { p: Vec2; texto: string } | null;
+  pintar(ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores): void;
 }
 
 export interface Camara2D {
@@ -44,6 +61,8 @@ export interface Margenes {
 
 /** Radio de elección, px. */
 const RADIO_CLIC = 6;
+/** Radio de enganche, px (el de `src/editor/dibujo/enganches.ts`). */
+const RADIO_ENGANCHE = 10;
 
 export class Vista2D extends Vista {
   private readonly escena3 = new Scene();
@@ -61,6 +80,8 @@ export class Vista2D extends Vista {
   private encuadrada = false;
   margenes: Margenes = { izq: 24, arriba: 24, der: 24, abajo: 24 };
   eventos: Eventos2D = {};
+  /** V2c: lo que dibuja con el ratón (sólo en las plantas editables). */
+  dibujo: Dibujo2D | null = null;
   /** Texto del cursor para la barra de estado (planta: x, y; alzado: u, z). */
   formatoCursor: (q: Vec2) => string = (q) => `x ${rotulo(q[0], 4)} · y ${rotulo(q[1], 4)} m`;
   /** Rótulos que no cupieron en el último fotograma. */
@@ -206,17 +227,39 @@ export class Vista2D extends Vista {
 
   protected clic(x: number, y: number, ctrl: boolean, doble: boolean): void {
     if (this.s <= 0) return;
-    this.eventos.clic?.(this.aModelo(x, y), RADIO_CLIC / this.s, ctrl, doble);
+    const p = this.aModelo(x, y);
+    if (this.dibujo?.clic(p, RADIO_ENGANCHE / this.s, ctrl, doble)) return;
+    this.eventos.clic?.(p, RADIO_CLIC / this.s, ctrl, doble);
   }
 
   protected soltarVentana(c: [number, number, number, number], modo: "dentro" | "toca", ctrl: boolean): void {
     if (this.s <= 0) return;
     const [a, b] = [this.aModelo(c[0], c[3]), this.aModelo(c[2], c[1])];
+    if (this.dibujo?.ventana([a[0], a[1], b[0], b[1]])) return;
     this.eventos.ventana?.([a[0], a[1], b[0], b[1]], modo, ctrl);
+  }
+
+  protected override pasar(x: number, y: number, e?: PointerEvent): void {
+    if (!this.dibujo || this.s <= 0 || !this.escena) return;
+    this.dibujo.pasar(this.aModelo(x, y), RADIO_ENGANCHE / this.s, !!e?.shiftKey, [e?.clientX ?? 0, e?.clientY ?? 0]);
+    this.entorno.pintar();
+  }
+
+  override salir(): void {
+    if (!this.dibujo) return;
+    this.dibujo.salir();
+    this.entorno.pintar();
+  }
+
+  /** Pinta en el siguiente fotograma (el dibujo cambia sin un evento de la vista: una tecla). */
+  repintar(): void {
+    this.entorno.pintar();
   }
 
   cursor(x: number, y: number): string | null {
     if (this.s <= 0 || !this.escena) return null;
+    const d = this.dibujo?.cursor();
+    if (d) return `${this.formatoCursor(d.p)}${d.texto ? ` · ${d.texto}` : ""}`;
     return this.formatoCursor(this.aModelo(x, y));
   }
 
@@ -298,6 +341,11 @@ export class Vista2D extends Vista {
         ctx.textAlign = "left";
         textoConHalo(ctx, m.texto, x + 9, y - 8, acento, col.fondo);
       }
+    }
+    if (this.dibujo) {
+      ctx.save();
+      this.dibujo.pintar(ctx, px, col);
+      ctx.restore();
     }
     this.dibujarVentana(ctx);
   }

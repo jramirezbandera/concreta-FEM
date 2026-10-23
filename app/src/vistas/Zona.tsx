@@ -32,7 +32,7 @@ import { useTheme } from "../tema/useTheme.ts";
 import type { VistaGuardada } from "../../../src/agente/proyecto.ts";
 import { aGuardada, useVistas, vistasDe, type EstadoVista, type TipoVista } from "./estado.ts";
 import { Motor, type Herramienta, type Vista } from "./motor.ts";
-import { Vista2D, type Eventos2D, type Marca, type Margenes } from "./vista2d.ts";
+import { Vista2D, type Dibujo2D, type Eventos2D, type Marca, type Margenes } from "./vista2d.ts";
 import { TIPOS_FILTRO, Vista3D, type Color3D, type Eventos3D, type FiltroVista, type Modo3D, type Objetivo3D, type Sonda, type TipoFiltro } from "./vista3d.ts";
 
 // ─── La celda y su contexto ─────────────────────────────────────────────────────────────────────
@@ -65,6 +65,11 @@ let motorVisible: { motor: Motor; activa: () => number } | null = null;
 export function encuadrarActiva(): void {
   if (!motorVisible) return;
   motorVisible.motor.vista(motorVisible.activa())?.encuadrar();
+}
+
+/** V2c: repinta las vistas que se ven (una tecla cambia lo que se dibuja sin un evento de la vista). */
+export function repintarVistas(): void {
+  motorVisible?.motor.pintar();
 }
 
 /** AB: lleva la vista activa, si es una planta, a una caja del modelo (m) con un margen. */
@@ -522,10 +527,12 @@ interface PropsFuente2D {
   cargando?: boolean;
   leyenda?: boolean;
   formatoCursor?: (q: Vec2) => string;
+  /** V2c: lo que dibuja con el ratón en una planta editable. */
+  dibujo?: Dibujo2D | null;
 }
 
 /** Una escena 2D en la vista de la celda. */
-export function Fuente2D({ escena, resaltado = null, marcas, eventos, aviso, cargando = false, leyenda = true, formatoCursor }: PropsFuente2D) {
+export function Fuente2D({ escena, resaltado = null, marcas, eventos, aviso, cargando = false, leyenda = true, formatoCursor, dibujo = null }: PropsFuente2D) {
   const { vista, varias } = useCelda();
   const v = vista instanceof Vista2D ? vista : null;
   useEffect(() => v?.ponerEscena(escena), [v, escena]);
@@ -534,6 +541,7 @@ export function Fuente2D({ escena, resaltado = null, marcas, eventos, aviso, car
   useEffect(() => {
     if (!v) return;
     v.eventos = eventos ?? {};
+    v.dibujo = dibujo;
     if (formatoCursor) v.formatoCursor = formatoCursor;
   });
   return (
@@ -590,8 +598,11 @@ export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Event
   return { eventos, resaltado };
 }
 
-/** Una escena del modelo (una planta en una vista, o un alzado), con elegir. */
-export function FuenteEscena({ fuente }: { fuente: FuenteEscena | null }) {
+/**
+ * Una escena del modelo (una planta en una vista, o un alzado), con elegir. Con `dibujando` (V2c, una
+ * herramienta de dibujo activa) no se vela la planta mientras compila lo dibujado: se sigue dibujando.
+ */
+export function FuenteEscena({ fuente, dibujo = null, dibujando = false }: { fuente: FuenteEscena | null; dibujo?: Dibujo2D | null; dibujando?: boolean }) {
   const { proyecto } = useVisor();
   const ed = proyecto.edicion;
   // La clave estable: el objeto cambia en cada render
@@ -604,7 +615,7 @@ export function FuenteEscena({ fuente }: { fuente: FuenteEscena | null }) {
   const aviso = resultados && proyecto.desactualizado ? (
     <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
   ) : proyecto.desactualizado && ed?.pendiente ? (
-    <Aviso tono="warn">Compilando la versión editada…</Aviso>
+    dibujando ? null : <Aviso tono="warn">Compilando la versión editada…</Aviso>
   ) : proyecto.desactualizado ? (
     <Aviso tono="warn">El fichero cambió: abriendo la versión nueva…</Aviso>
   ) : escena.diagnosticos ? (
@@ -613,7 +624,7 @@ export function FuenteEscena({ fuente }: { fuente: FuenteEscena | null }) {
     <Aviso>{resultados ? "Preparando los diagramas…" : "Preparando la vista…"}</Aviso>
   ) : null;
   const cursor = useMemo(() => (fu?.tipo === "alzado" ? (q: Vec2) => `u ${rot(q[0])} · z ${rot(q[1])} m` : undefined), [fu?.tipo]);
-  return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} />;
+  return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} dibujo={dibujo} />;
 }
 
 const rot = (x: number) => (Math.round(x * 1000) / 1000).toString().replace(".", ",");
