@@ -48,7 +48,7 @@ import { incircle, orient2d } from "robust-predicates";
 import type { Arreglo, Trazo } from "./arreglo.ts";
 import type { PlantillaEsquina, Vec2 } from "./fisico.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
-import { distanciaASegmento, jacobianoEscalado, momentosRegion, puntoEnPoligono, puntoEnRegion, type Region, RegionIndexada } from "./poligonos.ts";
+import { distanciaASegmento, jacobianoEscalado, momentosRegion, nudoEnHuella, puntoEnPoligono, puntoEnRegion, type Region, RegionIndexada } from "./poligonos.ts";
 import { cubierta, IRREGULAR, REGULAR, rejillaPlanta, type RefinoHuella, type Rejilla } from "./rejilla.ts";
 
 export { jacobianoEscalado };
@@ -371,15 +371,16 @@ export function siembraGraduada(L: number, sa: number, sb: number, s: number, nF
  * (por defecto), las zonas regulares van en la rejilla alineada de `rejilla.ts` y sólo el resto en
  * la CDT; sin ella, todo en la CDT. Si la rejilla cubre menos de COBERTURA_MINIMA del área de las
  * losas (una planta pequeña y llena de rasgos), se malla también sin ella y se queda la malla con
- * menos nudos (a igualdad, la de la rejilla).
+ * menos nudos (a igualdad, la de la rejilla). `huellas`: las de los pilares de la planta; un
+ * cuadrilátero con sus cuatro nudos en una de ellas es rígido (C2-d) y no cuenta en la calidad.
  */
-export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>, rejilla = true, refino?: RefinoCaras, anchos: readonly AnchoMallar[] = []): ResultadoMalla {
+export function mallarPlanta(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom = 1e-6, presembrados?: ReadonlySet<string>, rejilla = true, refino?: RefinoCaras, anchos: readonly AnchoMallar[] = [], huellas: readonly (readonly Vec2[])[] = []): ResultadoMalla {
   // La triangulación sola lleva lo de LV2 que no depende de la rejilla (§18: el refinamiento junto a
   // las vigas); sin esquinas, la de siempre
-  const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false, refino?.esquinas ? refino : undefined, anchos);
+  const sin = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, false, refino?.esquinas ? refino : undefined, anchos, huellas);
   if (!rejilla) return sin();
-  const conRejilla = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, undefined, anchos);
-  const r = conRespaldo(refino?.caras.size || (refino?.esquinas && anchos.length) ? () => conRespaldoRefino(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, refino, anchos), conRejilla, [...refino.caras.keys()]) : conRejilla, sin);
+  const conRejilla = () => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, undefined, anchos, huellas);
+  const r = conRespaldo(refino?.caras.size || (refino?.esquinas && anchos.length) ? () => conRespaldoRefino(() => mallarPlantaCon(arreglo, losas, h, epsGeom, presembrados, true, refino, anchos, huellas), conRejilla, [...refino.caras.keys()]) : conRejilla, sin);
   if (!r.ok || r.rejilla.cobertura >= COBERTURA_MINIMA || r.problemas.some((p) => p.codigo === "malla/sin-rejilla")) return r;
   const s = sin();
   return s.ok && s.nudos.length < r.nudos.length ? s : r;
@@ -482,7 +483,7 @@ export interface RefinoCaras {
 }
 
 /** `mallarPlanta` sin comparar con la CDT sola cuando la rejilla cubre poco (para las pruebas). */
-export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom: number, presembrados: ReadonlySet<string> | undefined, rejilla: boolean, refino?: RefinoCaras, anchos: readonly AnchoMallar[] = []): ResultadoMalla {
+export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], h: number, epsGeom: number, presembrados: ReadonlySet<string> | undefined, rejilla: boolean, refino?: RefinoCaras, anchos: readonly AnchoMallar[] = [], huellas: readonly (readonly Vec2[])[] = []): ResultadoMalla {
   const s = 2 * h;
   const lados = arreglo.lados();
   const regiones = losas.map((l) => regionDe(arreglo, l));
@@ -1544,6 +1545,16 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
   let bajos = 0;
   const malos = losas.map(() => 0);
   let areaRejilla = 0;
+  // Un cuadrilátero con sus cuatro nudos en la huella de un pilar es rígido con él (C2-d): su forma
+  // no cambia el resultado, y no cuenta en la calidad (las astillas de milímetros donde el círculo de
+  // un pilar corta las caras de una viga y de un muro que acaban en él, criterio 4 de LV2)
+  const cajasHuellas = huellas.map((p) => cajaDe(p));
+  const tolH = 10 * epsGeom + 1e-9;
+  const rigido = (X: readonly Vec2[]) =>
+    huellas.some((p, i) => {
+      const c = cajasHuellas[i]!;
+      return X.every((x) => x[0] >= c[0] - tolH && x[0] <= c[2] + tolH && x[1] >= c[1] - tolH && x[1] <= c[3] + tolH) && X.every((x) => nudoEnHuella(x, p, epsGeom));
+    });
   for (const q of quads) {
     const X = q.nudos.map((n) => [nudos[n]!.x, nudos[n]!.y] as Vec2);
     let a = 0;
@@ -1551,7 +1562,9 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     areas[q.losa]! += a / 2;
     if (q.pieza >= triangulos.length) areaRejilla += a / 2;
     const j = jacobianoEscalado(X);
-    if (j < jacobianoMin) [jacobianoMin, peor] = [j, [(X[0]![0] + X[1]![0] + X[2]![0] + X[3]![0]) / 4, (X[0]![1] + X[1]![1] + X[2]![1] + X[3]![1]) / 4]];
+    // (sólo hace falta saberlo si sería el mínimo o uno bajo)
+    const cuenta = (j >= jacobianoMin && j >= JACOBIANO_BAJO) || !rigido(X);
+    if (cuenta && j < jacobianoMin) [jacobianoMin, peor] = [j, [(X[0]![0] + X[1]![0] + X[2]![0] + X[3]![0]) / 4, (X[0]![1] + X[1]![1] + X[2]![1] + X[3]![1]) / 4]];
     // El motor exige además que sea estrictamente convexo (un ángulo de 180° deja el jacobiano
     // positivo en los puntos de Gauss)
     let convexo = true;
@@ -1560,7 +1573,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       if (!((B[0] - A[0]) * (C[1] - B[1]) - (B[1] - A[1]) * (C[0] - B[0]) > 0)) convexo = false;
     }
     if (j <= 0 || !convexo) malos[q.losa]!++;
-    else if (j < JACOBIANO_BAJO) bajos++;
+    else if (j < JACOBIANO_BAJO && cuenta) bajos++;
   }
   // Con anchos, sus piezas cuentan en el área de la losa en la que caen
   for (const pa of piezasAncho) areas[pa.losa]! += pa.area;
@@ -1600,7 +1613,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       losa: -1,
       severidad: "aviso",
       codigo: "malla/calidad",
-      mensaje: `${bajos} cuadriláteros tienen el jacobiano escalado por debajo de ${JACOBIANO_BAJO} (mínimo ${jacobianoMin.toFixed(3)}, en (${peor[0].toFixed(2)}, ${peor[1].toFixed(2)}), junto a ${cerca.join(", ") || "nada"}): hay rasgos de la planta a menos de un elemento entre sí, como dos líneas casi paralelas a poco más de ε_snap.`,
+      mensaje: `${bajos} cuadriláteros tienen el jacobiano escalado por debajo de ${JACOBIANO_BAJO} (mínimo ${jacobianoMin.toFixed(3)}, en (${peor[0].toFixed(2)}, ${peor[1].toFixed(2)}), junto a ${cerca.join(", ") || "nada"}; sin contar los que caen enteros en la huella de un pilar, que es rígida): hay rasgos de la planta a menos de un elemento entre sí, como dos líneas casi paralelas a poco más de ε_snap.`,
     });
   }
 
@@ -1613,7 +1626,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
     lados,
     nudosLado,
     regiones,
-    calidad: { jacobianoMin: quads.length ? jacobianoMin : 1, bajos },
+    calidad: { jacobianoMin: Number.isFinite(jacobianoMin) ? jacobianoMin : 1, bajos },
     rejilla: { celdas: celdasRejilla, plantillas, refinadas: rj?.plantillas.filter((p) => p.refinada).length ?? 0, quads: quads.length - 3 * triangulos.length, cobertura: areaRejilla / Math.max(1e-300, areas.reduce((s, a) => s + a, 0)) },
     problemas,
   };

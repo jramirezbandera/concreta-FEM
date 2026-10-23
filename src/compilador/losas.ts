@@ -49,7 +49,7 @@ import { anchoMasCercano, anchosPlanta, anchoUnion, sigmaEnAncho, type AnchoViga
 import { estacionesBanda, ladoEstacion } from "./estaciones.ts";
 import { carasFranjas, ejesArmado, segmentosCara, type CaraFranja } from "./franjas.ts";
 import { estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
-import { areaConSigno, distanciaABorde, momentosRegion, puntoEnPoligono, type Region } from "./poligonos.ts";
+import { areaConSigno, distanciaABorde, momentosRegion, nudoEnHuella, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { cuerdaEnTramo, distanciaARegion, ordenarCadena, type NudoT, type Topologia, type TramoViga } from "./topologia.ts";
 import type { PanosU } from "./unidireccional.ts";
 import { diafragmaDe } from "./piezas.ts";
@@ -965,7 +965,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         const { A, u } = x.tramo.t;
         return { trazo: t, A: [A[0] + x.desde * u[0], A[1] + x.desde * u[1]], B: [A[0] + x.hasta * u[0], A[1] + x.hasta * u[1]], b: x.b };
       });
-      const res = mallarPlanta(a, mallar, h, epsGeom, est?.presembrados.get(k), rejilla, refino, anchosM);
+      const res = mallarPlanta(a, mallar, h, epsGeom, est?.presembrados.get(k), rejilla, refino, anchosM, [...huellasK.values()]);
       if (!res.ok) {
         diag.error("malla/triangulacion", `La triangulación de la planta ${idPlanta} ha fallado (${res.mensaje}). Es un fallo del compilador.`, [idPlanta, ...mallar.map((x) => x.id)]);
         continue;
@@ -1103,7 +1103,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
         const nd = topo.nudos[x]!;
         if (nd.x < caja[0]! - holgura || nd.x > caja[2]! + holgura || nd.y < caja[1]! - holgura || nd.y > caja[3]! + holgura) return false;
         const q: Vec2 = [nd.x, nd.y];
-        return puntoEnPoligono(q, poli) || distanciaABorde(q, poli) <= tol;
+        return nudoEnHuella(q, poli, epsGeom);
       });
       if (!esclavos.length) continue;
       const dobles = esclavos.filter((x) => esclavoDe.has(x));

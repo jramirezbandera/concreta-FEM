@@ -174,6 +174,14 @@ export function distanciaABorde(q: Vec2, p: readonly Vec2[]): number {
   return d;
 }
 
+/**
+ * ¿q en la huella de un pilar o en su borde (a ≤ 10·ε_geom)? Los nudos de la losa que lo están son
+ * rígidos con el pilar (C2-d; desde la fase HR, sólo ellos).
+ */
+export function nudoEnHuella(q: Vec2, huella: readonly Vec2[], epsGeom: number): boolean {
+  return puntoEnPoligono(q, huella) || distanciaABorde(q, huella) <= 10 * epsGeom;
+}
+
 /** Distancia entre los segmentos ab y cd (0 si se cortan). */
 export function distanciaEntreSegmentos(a: Vec2, b: Vec2, c: Vec2, d: Vec2): number {
   if (seCortan(a, b, c, d)) return 0;

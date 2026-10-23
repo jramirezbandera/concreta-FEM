@@ -13,8 +13,10 @@
  * vigas curvas, los pilares que asoman y las cuñas de 25–30° entre vigas). Con `refinoEsquinas:
  * false` (la malla de LV1) sigue habiendo aviso en 20 de los 44 modelos, y se exige sólo ≥ 0,1.
  *
- * Con muros al azar en las 24 retículas, quedan tres con el aviso (astillas de milímetros en la
- * esquina de una huella pegada a un muro o al borde enrasado, §18) y el jacobiano no baja de 0,14.
+ * Con muros al azar en las 24 retículas, ninguna tiene el aviso. Las astillas de milímetros que
+ * quedaban en tres (§18: donde el círculo de un pilar corta las caras de la viga y del muro que acaban
+ * en él, a 5 mm entre sí) caen enteras en la huella del pilar, que es rígida (C2-d), y desde el
+ * 2026-10-23 no cuentan en la calidad (punto 4 de lo pendiente de `fase-lv2.md`).
  */
 import { describe, expect, it } from "vitest";
 import { edificioGeometria, FAMILIAS, type OpcionesGeometria } from "../pruebas/geometrias.ts";
@@ -73,7 +75,7 @@ describe("G: retículas al azar", () => {
     expect(conRejilla).toBeGreaterThanOrEqual(20);
   });
 
-  it("24 retículas con muros compilan, y con la unión por las caras sólo tres tienen el aviso de calidad (§18)", () => {
+  it("24 retículas con muros compilan sin el aviso de calidad (§18; los cuadriláteros malos de la 7, la 11 y la 21 son rígidos, en la huella de un pilar)", () => {
     const conAviso: number[] = [];
     for (let s = 1; s <= 24; s++) {
       const r = compilar(reticulaConMuros(s));
@@ -82,6 +84,6 @@ describe("G: retículas al azar", () => {
       if (r.valido) expect(r.estadisticas.malla.jacobianoMin, `retícula ${s}`).toBeGreaterThanOrEqual(0.1);
       if (r.diagnosticos.some((d) => d.codigo === "malla/calidad")) conAviso.push(s);
     }
-    expect(conAviso).toEqual([7, 11, 21]);
+    expect(conAviso).toEqual([]);
   });
 });

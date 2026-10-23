@@ -10,7 +10,9 @@
  * Modelos: `ret<n>` (retícula al azar), `retmuros<n>` (la misma con muros al azar), `<familia>-<base|
  * hueco|giro|circ>` (geometrías de G), `obj132` (el edificio objetivo de 1 × 3 × 2 vanos) y `muros3`
  * (`aleatorio-3-muros` de C3, con sus opciones). `--lv1` compila con `refinoEsquinas: false`; `--todo`
- * lista todos los cuadriláteros por debajo del umbral y no sólo los 12 peores.
+ * lista todos los cuadriláteros por debajo del umbral y no sólo los 12 peores. Los rígidos (sus cuatro
+ * nudos esclavos del mismo enlace rígido: en la huella de un pilar, C2-d) se marcan; desde el
+ * 2026-10-23 no cuentan en el aviso `malla/calidad`.
  */
 import { compilar } from "../../src/compilador/compilar.ts";
 import type { ModeloFisico, Vec2 } from "../../src/compilador/fisico.ts";
@@ -64,6 +66,8 @@ export interface Malo {
   jac: number;
   c: Vec2;
   cerca: string[];
+  /** ¿Sus cuatro nudos, esclavos del mismo enlace rígido (la huella de un pilar)? */
+  rigido: boolean;
 }
 
 /** Los cuadriláteros de losa por debajo de `umbral`, con lo que tienen cerca. */
@@ -73,6 +77,8 @@ export function malos(fisico: ModeloFisico, opciones: Opciones, umbral = JACOBIA
   if (!c.valido) return { c, malos: r };
   const losas = new Map(fisico.losas?.map((l) => [l.id, l]) ?? []);
   const secciones = new Map(fisico.secciones.map((s) => [s.id, s]));
+  const maestro = new Map<number, number>();
+  for (const x of c.modelo.restricciones ?? []) if (x.tipo === "enlace-rigido") for (const e of x.esclavos) maestro.set(e, x.maestro);
   c.modelo.laminas!.forEach((l, i) => {
     const mp = c.mapeo.laminas![i]!;
     if (!("losa" in mp)) return;
@@ -94,7 +100,8 @@ export function malos(fisico: ModeloFisico, opciones: Opciones, umbral = JACOBIA
     for (const a of fisico.apoyosLineales ?? []) if (a.planta === losa.planta) cand.push([`apoyo ${a.id}`, dPoli(q, a.puntos)]);
     for (const g of fisico.cargas ?? []) if (g.tipo === "lineal" && g.planta === losa.planta) cand.push([`carga ${g.id}`, dPoli(q, g.puntos)]);
     cand.sort((a, b) => a[1] - b[1]);
-    r.push({ lamina: i, losa: losa.id, jac, c: q, cerca: cand.slice(0, 3).map(([n, d]) => `${n} a ${d.toFixed(3)}`) });
+    const m0 = maestro.get(l.nudos[0]!);
+    r.push({ lamina: i, losa: losa.id, jac, c: q, cerca: cand.slice(0, 3).map(([n, d]) => `${n} a ${d.toFixed(3)}`), rigido: m0 !== undefined && l.nudos.every((n) => maestro.get(n) === m0) });
   });
   r.sort((a, b) => a.jac - b.jac);
   return { c, malos: r };
@@ -116,7 +123,7 @@ if (import.meta.main) {
     const st = c.estadisticas.malla;
     const avisos = c.diagnosticos.filter((d) => d.codigo.startsWith("malla/")).map((d) => `${d.codigo}${d.ids?.length ? ` (${d.ids.join(", ")})` : ""}`);
     console.log(`\n${n}${lv1 ? " LV1" : " LV2"}: ${c.modelo.nudos.length} nudos, jac mín ${st.jacobianoMin.toFixed(3)}, ${st.bajos} bajos; ${avisos.join("; ") || "sin avisos de malla"}`);
-    for (const m of todo ? ms : ms.slice(0, 12)) console.log(`  ${m.jac.toFixed(3)}  (${m.c[0].toFixed(2)}, ${m.c[1].toFixed(2)})  ${m.losa}  ${m.cerca.join(" · ")}`);
+    for (const m of todo ? ms : ms.slice(0, 12)) console.log(`  ${m.jac.toFixed(3)}  (${m.c[0].toFixed(2)}, ${m.c[1].toFixed(2)})  ${m.losa}  ${m.cerca.join(" · ")}${m.rigido ? "  (rígido)" : ""}`);
     if (!todo && ms.length > 12) console.log(`  … y ${ms.length - 12} más`);
   }
 }

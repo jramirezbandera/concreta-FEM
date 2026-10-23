@@ -492,6 +492,11 @@
   - **Validación** (`puntoFijo.test.ts`): ménsula frente a su modelo a mano a ≤ 1e-10 y estática exacta; pórtico frente a dos pilares unidos por la fusión de C1 a ≤ 1e-10; giros y traslación; losa plana con la fachada fija (nudos, HR, equilibrio); sólido y cargas dibujadas exactos.
   - **Medido** (`validacion/pf/out_medir.txt`): en fachada, de 40 × 40 a 30 × 30 con la cara fija, N·e ≈ 12 kN·m baja un 18 % el momento en la cabeza del tramo de abajo. El 30 × 30 en el eje del 40 dejaba una astilla de 5 cm junto al borde que doblaba la malla (PF-1).
   - **Pendiente del usuario:** confirmar PF-a…PF-e y un modelo de CYPECAD con cambio de sección y la cara o la esquina fija (mejor también uno girado) para la sombra.
+- **2026-10-23: pendientes técnicos de LV2** (`fase-lv2.md` §5, puntos 4 a 7; los 1 a 3 los hizo HR):
+  - **Punto 7:** `UMBRAL_REFINO` y `PLANTILLA_ESQUINA` dejan de ser globales mutables: son las opciones `plantillaEsquina` y `jacobianoRefino` (para medir), validadas y en la huella sólo si se dan. Los bancos de LV2 pasan opciones y dan la misma salida que antes.
+  - **Punto 6:** `fem consultar franja` da `distanciaMuestras` en las caras y los apoyos cuando no es δ, y Resultados · Armado lo dice en «Caras y apoyos».
+  - **Punto 5:** una tira de huella (LV-8) cuya plantilla refinada no tiene calidad va por la triangulación con su pilar, no sin tercios. En P2-1 de la retícula 5 con muros, las franjas de sus caras pasan de −16 % a −7 % de la malla fina y la viga, de +6 % a +2 % (`validacion/lv2/p21.ts`). De 82 modelos, sólo cambia ése.
+  - **Punto 4:** los cuadriláteros malos de las retículas 7, 11 y 21 con muros estaban enteros en la huella de un pilar (rígidos, C2-d). El aviso `malla/calidad` y el jacobiano mínimo ya no cuentan esos cuadriláteros: con LV2, 0 de 68 modelos con el aviso. Queda el del edificio reducido de 1 × 3 × 2 (0,161): habría que partir aristas de la interfaz con la rejilla.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
