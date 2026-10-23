@@ -25,7 +25,7 @@ import { comprobarProyecto, type Proyecto, type VistaGuardada } from "../agente/
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { conValor, indiceIds, lista, referenciasDe, usos, type Coleccion, type Objeto, type Uso } from "./referencias.ts";
-import { propuestaRenumerar, renombrarIds, type Renumerable } from "./renumerar.ts";
+import { renumerar, type Renumerable } from "./renumerar.ts";
 
 export type Operacion =
   /** Crea un objeto al final de su colección, o antes del objeto `antesDe` (las plantas y los casos tienen orden). */
@@ -42,7 +42,7 @@ export type Operacion =
   | { op: "borrar"; ids: readonly string[]; dependientes?: "borrar" | { reasignar: Readonly<Record<string, string>> } }
   /** Lleva el objeto `id` antes de `antesDe` (al final con null). */
   | { op: "mover"; coleccion: Coleccion; id: string; antesDe: string | null }
-  /** Ids cortos por su posición en planta, como en CYPECAD (`renumerar.ts`); por defecto, de pilares, vigas, losas, paños y muros. */
+  /** Ids cortos por su posición en planta, como en CYPECAD, y la lista de pilares en ese orden (`renumerar.ts`); por defecto, de pilares, vigas, losas, paños y muros. */
   | { op: "renumerar"; colecciones?: readonly Renumerable[] }
   /** Nombre y descripción del proyecto (no entran en la huella). */
   | { op: "datos"; nombre?: string; descripcion?: string }
@@ -302,8 +302,8 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
     case "mover":
       return mover(m, o);
     case "renumerar": {
-      const mapa = propuestaRenumerar(m, o.colecciones);
-      return conArmado({ ok: true, modelo: renombrarIds(m, mapa) }, m, datos, mapa);
+      const { modelo, mapa } = renumerar(m, o.colecciones);
+      return conArmado({ ok: true, modelo }, m, datos, mapa);
     }
     case "armado": {
       const errores = comprobarArmado(o.armado ?? undefined, m);

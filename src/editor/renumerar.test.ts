@@ -1,14 +1,14 @@
 /**
  * «Renumerar» (I-g, `docs/fem3d/interfaz.md` §12.1): el orden de CYPECAD, las referencias, los ids
- * ocupados, la idempotencia y que el modelo analítico no cambia.
+ * ocupados, la idempotencia, la lista de pilares en orden y que el modelo analítico no cambia.
  */
 import { describe, expect, it } from "vitest";
 import { VERSION_ESQUEMA, type Proyecto } from "../agente/proyecto.ts";
-import { compilar } from "../compilador/compilar.ts";
-import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
+import { compilar, huellaCompilacion } from "../compilador/compilar.ts";
+import { resolverOpciones, type ModeloFisico, type Vec2 } from "../compilador/fisico.ts";
 import { aplicar } from "./operaciones.ts";
 import { referenciasRotas } from "./referencias.ts";
-import { propuestaRenumerar } from "./renumerar.ts";
+import { propuestaRenumerar, renumerar } from "./renumerar.ts";
 import { emparejarTodos } from "../pruebas/metamorficasFisicas.ts";
 import { leerEjemplo } from "./serializar.test.ts";
 
@@ -70,6 +70,25 @@ describe("renumerar", () => {
     expect(r.modelo.vigas!.map((v) => v.id)).toEqual(["V2", "V1"]);
     expect(r.modelo.losas![0]!.id).toBe("L1");
     expect(referenciasRotas(r.modelo)).toEqual([]);
+  });
+
+  it("la lista de pilares queda en el orden de los números; sólo reordenar no cambia la huella", () => {
+    const r = renumerado(reticula());
+    const ids = r.modelo.pilares!.map((q) => q.id);
+    expect(ids).toEqual(Array.from({ length: 12 }, (_, i) => `P${i + 1}`));
+    // Idempotente también en el orden
+    expect(renumerar(r.modelo).reordena).toBe(false);
+    // Con los ids ya cortos pero la lista revuelta, sólo se reordena: mismos ids y la misma huella
+    const revuelto: Proyecto = { ...r, modelo: { ...r.modelo, pilares: [...r.modelo.pilares!].reverse() } };
+    const x = renumerar(revuelto.modelo);
+    expect(x.mapa.size).toBe(0);
+    expect(x.reordena).toBe(true);
+    const otra = renumerado(revuelto);
+    expect(otra.modelo.pilares!.map((q) => q.id)).toEqual(ids);
+    const huella = (p: Proyecto) => huellaCompilacion(p.modelo, resolverOpciones(p.opciones));
+    expect(huella(otra)).toBe(huella(revuelto));
+    // Sin los pilares en las colecciones, la lista no se toca
+    expect(renumerar(revuelto.modelo, ["vigas"]).reordena).toBe(false);
   });
 
   it("no depende del giro de la planta", () => {

@@ -10,7 +10,7 @@ import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
 import { operacionVigasBorde, proponerVigasBorde } from "../../../src/editor/vigasBorde.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
-import { PREFIJOS, propuestaRenumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
+import { PREFIJOS, renumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
 import type { ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { useVisor } from "../contexto.ts";
 
@@ -206,7 +206,8 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
   const { proyecto, seleccion, setSeleccion, elegidos, setElegidos } = useVisor();
   const ed = proyecto.edicion!;
   const m = ed.proyecto.modelo;
-  const mapa = useMemo(() => propuestaRenumerar(m), [m]);
+  const { mapa, reordena } = useMemo(() => renumerar(m), [m]);
+  const cambia = mapa.size > 0 || reordena;
   const idx = useMemo(() => indiceIds(m), [m]);
   const [error, setError] = useState<string | null>(null);
   const porColeccion = RENUMERABLES.map((c) => ({ c, n: [...mapa.keys()].filter((id) => idx.get(id)?.coleccion === c).length })).filter((x) => x.n > 0);
@@ -218,7 +219,7 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
     const nuevo = (id: string) => mapa.get(id) ?? id;
     if (elegidos.length) setElegidos(elegidos.map(nuevo));
     else if (seleccion) setSeleccion(nuevo(seleccion));
-    onCerrar(`Renumerados ${mapa.size} objetos.`);
+    onCerrar(mapa.size ? `Renumerados ${mapa.size} objetos.` : "Pilares ordenados.");
   };
 
   return (
@@ -228,19 +229,21 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
       pie={
         <>
           <button type="button" className="btn" onClick={() => onCerrar()}>
-            {mapa.size ? "Cancelar" : "Cerrar"}
+            {cambia ? "Cancelar" : "Cerrar"}
           </button>
-          <button type="button" className="btn btn-p" autoFocus onClick={hacer} disabled={!mapa.size}>
+          <button type="button" className="btn btn-p" autoFocus onClick={hacer} disabled={!cambia}>
             Renumerar
           </button>
         </>
       }
     >
       <p>
-        Como en CYPECAD: pilares <span className="mono">{PREFIJOS.pilares}1…</span>, vigas <span className="mono">{PREFIJOS.vigas}1…</span>, losas <span className="mono">{PREFIJOS.losas}1…</span>, paños <span className="mono">{PREFIJOS.panos}1…</span> y muros <span className="mono">{PREFIJOS.muros}1…</span>, por filas de arriba abajo y de izquierda a derecha (las vigas, losas, paños y muros, por plantas de abajo arriba).
+        Como en CYPECAD: pilares <span className="mono">{PREFIJOS.pilares}1…</span>, vigas <span className="mono">{PREFIJOS.vigas}1…</span>, losas <span className="mono">{PREFIJOS.losas}1…</span>, paños <span className="mono">{PREFIJOS.panos}1…</span> y muros <span className="mono">{PREFIJOS.muros}1…</span>, por filas de arriba abajo y de izquierda a derecha (las vigas, losas, paños y muros, por plantas de abajo arriba). La tabla de pilares queda en ese orden.
       </p>
-      {mapa.size === 0 ? (
+      {!cambia ? (
         <p className="mt-2">Ya están numerados así: no cambia nada.</p>
+      ) : mapa.size === 0 ? (
+        <p className="mt-2">Los ids ya están así; sólo se ordena la lista de pilares. No cambia la huella.</p>
       ) : (
         <>
           <p className="mt-2">

@@ -502,7 +502,7 @@
   - **En la app:** `app/src/dibujo/` (la herramienta activa fuera de React y su plantilla en Propiedades, con sección nueva rápida y enganches por tipo); `Vista2D.dibujo`; Ejes, Pilar y Viga de la barra de Modelo son herramientas (la tabla, desde la plantilla). El primer eje dibujado guarda también los propuestos; Pilar con ventana pone uno en cada cruce; Viga, eje a eje o alineada a una cara (V2c-b).
   - **Exactitud (V2c1-1):** el punto de un rasgo es el del modelo, y los cruces y proyecciones sobre rectas según X o Y conservan sus números; lo dibujado compila sin ajustes ni fusiones.
   - **Validación:** `src/editor/dibujo/dibujo.test.ts`, `app/src/test/dibujo.test.tsx` y el banco `validacion/v2c/chrome.ts`: una planta del edificio objetivo dibujada con ratón y teclado da, tras «Renumerar», la huella de la referencia; 180 pasos de deshacer vuelven a la de partida; el enganche, 0,2 ms p95 en el edificio de 7 plantas.
-  - **V2c1-2, para V2c-2:** el orden de la lista de pilares cuenta en la huella y «Renumerar» no lo cambia.
+  - **V2c1-2, decidido el 2026-10-23:** «Renumerar» deja también la lista de pilares en el orden P1…Pn (la huella ya ordenaba los pilares por id: el informe decía mal que su orden contaba).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

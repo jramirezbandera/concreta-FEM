@@ -12,7 +12,9 @@
  *   medio del eje del muro (en la planta de su base).
  *
  * Un número que ya es el id de otro objeto que no se renumera (un material «M1»…) se salta. El
- * `nombre` de cada objeto no se toca.
+ * `nombre` de cada objeto no se toca. La lista de pilares queda además en ese orden, P1…Pn, para que
+ * las tablas se lean así (decisión del usuario tras V2c-1); las demás listas no se reordenan. Ni el
+ * orden de los pilares ni el de las demás listas cambia la huella ni el modelo analítico.
  *
  * Nunca se aplica solo: cambia la huella y los resultados guardados dejan de valer.
  *
@@ -88,8 +90,8 @@ function porFilas(objs: readonly { id: string; p: Vec2 }[], d: Vec2, n: Vec2, ep
   return filas.reverse().flatMap((f) => f.flatMap((q) => enPunto.get(clave.get(q.id)!)!));
 }
 
-/** Los ids nuevos de los objetos de `colecciones` (sólo los que cambian). */
-export function propuestaRenumerar(m: ModeloFisico, colecciones: readonly Renumerable[] = RENUMERABLES, opciones: OpcionesCompilacion = {}): Map<string, string> {
+/** El orden de cada colección renumerable: el de los números nuevos. */
+function ordenes(m: ModeloFisico, opciones: OpcionesCompilacion): Record<Renumerable, () => string[]> {
   const theta = (direccionEjes(m) * Math.PI) / 180;
   const d: Vec2 = [Math.cos(theta), Math.sin(theta)];
   const n: Vec2 = [-d[1], d[0]];
@@ -113,7 +115,7 @@ export function propuestaRenumerar(m: ModeloFisico, colecciones: readonly Renume
     return [...r, ...objs.filter((o) => !vistos.has(o.id)).map((o) => o.id)];
   };
 
-  const orden: Record<Renumerable, () => string[]> = {
+  return {
     pilares: () => {
       const ps = [...(m.pilares ?? [])].map((p, i) => ({ p, i })).sort((a, b) => (nivel.get(a.p.desde) ?? -1) - (nivel.get(b.p.desde) ?? -1) || a.i - b.i);
       const r = porFilas(
@@ -130,7 +132,11 @@ export function propuestaRenumerar(m: ModeloFisico, colecciones: readonly Renume
     panos: () => porPlanta(m.panos ?? [], (p) => p.planta, (p) => centroide(p.contorno)),
     muros: () => porPlanta(m.muros ?? [], (x) => x.desde, (x) => puntoMedio(x.puntos)),
   };
+}
 
+/** Los ids nuevos de los objetos de `colecciones` (sólo los que cambian). */
+export function propuestaRenumerar(m: ModeloFisico, colecciones: readonly Renumerable[] = RENUMERABLES, opciones: OpcionesCompilacion = {}): Map<string, string> {
+  const orden = ordenes(m, opciones);
   const cambian = new Set<string>();
   for (const c of colecciones) for (const o of lista(m, c)) cambian.add(o.id);
   // Los ids de lo que no se renumera no se pueden usar
@@ -147,6 +153,28 @@ export function propuestaRenumerar(m: ModeloFisico, colecciones: readonly Renume
     }
   }
   return r;
+}
+
+/**
+ * «Renumerar» entero: los ids de `propuestaRenumerar` y, si se renumeran los pilares, su lista en el
+ * orden de los números nuevos. `reordena` dice si cambia el orden de la lista (aunque no cambie
+ * ningún id).
+ */
+export function renumerar(
+  m: ModeloFisico,
+  colecciones: readonly Renumerable[] = RENUMERABLES,
+  opciones: OpcionesCompilacion = {},
+): { modelo: ModeloFisico; mapa: Map<string, string>; reordena: boolean } {
+  const mapa = propuestaRenumerar(m, colecciones, opciones);
+  let r = m;
+  let reordena = false;
+  if (colecciones.includes("pilares") && m.pilares?.length) {
+    const pos = new Map(ordenes(m, opciones).pilares().map((id, i) => [id, i]));
+    const ps = [...m.pilares].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
+    reordena = ps.some((p, i) => p !== m.pilares![i]);
+    if (reordena) r = { ...m, pilares: ps };
+  }
+  return { modelo: renombrarIds(r, mapa), mapa, reordena };
 }
 
 /** El modelo con los ids de `mapa` cambiados, en los objetos y en todas sus referencias. */
