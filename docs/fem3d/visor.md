@@ -106,6 +106,7 @@ Las de los prototipos v3 (1, 3, 4, 5, 6 y 7), sin lo que es de edición.
 - **V-b. Tipografía:** Geist y Geist Mono, como Concreta. SIL OFL 1.1 se admite sólo para fuentes (regla 6).
 - **V-c. Móvil:** fuera de V1; va con V3.
 - **V-d. Dónde se guarda (2026-10-11):** en el `proyecto.json` del disco, que sigue siendo la única fuente de verdad (regla A2). Se escribe con la File System Access API (Chrome y Edge) o con el servidor local de `bun run visor`. IndexedDB sigue en V3.
+  - **Cambiada en la web el 2026-10-23 (fase AL, `almacen-local.md`):** los proyectos viven en IndexedDB, se guardan solos y se exportan; la carpeta queda para trabajar con el agente, y `bun run visor` sigue en el disco.
 - **V-e. Cómo se mete el modelo (2026-10-11):** primero con tablas y coordenadas, con el dibujo sólo para ver y elegir (V2a y V2b). Después, el dibujo con el ratón (V2c).
 - **V-f. Primer tramo (2026-10-11):** plantas, pilares, vigas, losas y cargas (V2a). Muros y forjados, en un segundo tramo (V2b).
 
