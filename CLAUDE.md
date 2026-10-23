@@ -503,7 +503,7 @@
   - **hecho el 2026-10-19:** el diagnóstico del `my` de la cubierta de la vivienda (0,82) y de P5 (`fase-lv.md` §2.1): lo que queda es del modelo de CYPE y tiene que mirarlo el usuario;
   - **hecha el 2026-10-20:** LV-d, la zona rígida en la base de los tramos de pilar (`fase-lv.md` §2.2, compilador LVD1);
   - **hecha el 2026-10-20:** RV-b, los nudos del forjado en su cara superior (`fase-lv.md` §2.3, compilador RV1); **hecha el 2026-10-20:** RV-a, las vigas planas en un reticular con la flexión ×0,6 (`fase-lv.md` §2.4, compilador RV2); el criterio 7 de la vivienda queda en 0,891 en el `my` de la cubierta superior, aceptado por el usuario;
-  - **decidido el 2026-10-23:** V2c (dibujar con el ratón) va antes de la puerta de uso de F y AB, porque sin ella el usuario no sabe modelar un proyecto suyo («no sé cómo modelarlo yo si no»). El plan está en `docs/fem3d/dibujo.md`, con las decisiones V2c-a…V2c-e;
+  - **decidido el 2026-10-23:** V2c (dibujar con el ratón) va antes de la puerta de uso de F y AB, porque sin ella el usuario no sabe modelar un proyecto suyo («no sé cómo modelarlo yo si no»). El plan está en `docs/fem3d/dibujo.md`. Decididas el mismo día: tramos V2c-1 → V2c-2 → V2c-3 y la puerta de uso al final (V2c-a), vigas eje a eje con la opción de alinearlas a una cara (V2c-b), losas por recuadro cerrado y por polígono (V2c-c) y un DXF de fondo como V2c-4 (V2c-e). V2c-d se decide al empezar V2c-3;
   - luego: la puerta de uso de F y AB con un proyecto real del usuario, dibujado con V2c (cubre también buena parte de las de I1–I4, V2a y V2b);
   - **hecha el 2026-10-21:** la fase PF, el punto fijo de los pilares (`punto-fijo.md`); falta su comparación en sombra con CYPECAD;
   - las puertas de uso que queden;

@@ -1,6 +1,6 @@
 # V2c: dibujar el modelo con el ratón (plan)
 
-> **Fecha:** 2026-10-23. **Estado:** propuesta, pendiente de las decisiones del usuario (§6).
+> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3.
 >
 > **Origen:** el usuario pide adelantar V2c a la puerta de uso de F y AB. Con las tablas sólo se modela bien si ya se tienen las coordenadas: «no sé cómo modelarlo yo si no». Se sustituye así el orden de `visor.md` (V-e: primero tablas y luego el ratón) y el de `CLAUDE.md` («con lo que salga, V2c»). La puerta de uso de F y AB va después de V2c, y con ella la fase MA.
 
@@ -161,3 +161,11 @@ La puerta de uso de V2c va al final de V2c-3 (o de V2c-4), y se puede juntar con
 | **V2c-c** | Losas por clic en un recuadro cerrado | Sí, además del polígono: el contorno por los ejes de las vigas y muros que lo cierran, y por los bordes enrasados |
 | **V2c-d** | Mover un pilar arrastra las vigas que acaban en él | Sí, como CYPECAD; con Ctrl, el pilar solo |
 | **V2c-e** | DXF de fondo para calcar (V2c-4) | Por decidir: necesita un lector de DXF con licencia admitida, que se iba a elegir en MA6 |
+
+### 6.1 Decidido por el usuario (2026-10-23)
+
+- **V2c-a:** V2c-1 → V2c-2 → V2c-3, con la puerta de uso al final, junto con la de F y AB.
+- **V2c-b:** eje a eje por defecto, con la opción de alinear la viga a una cara del pilar en la plantilla.
+- **V2c-c:** recuadro cerrado y polígono.
+- **V2c-e:** sí, el DXF de fondo como V2c-4, después de V2c-3. El lector de DXF se elige al empezar V2c-4 (lo que se iba a decidir en MA6).
+- **V2c-d** (mover un pilar arrastra sus vigas): se decide al empezar V2c-3.
