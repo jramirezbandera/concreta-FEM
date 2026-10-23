@@ -1,0 +1,14 @@
+principal de v1: index-B_ttt6GH.js; de v2: index-C8Dbv8rx.js
+BIEN  manifest: «Concreta FEM 3D», standalone, start_url ./, iconos any/any, 192x192/any, 512x512/any, 512x512/maskable
+BIEN  Chrome lee el manifest sin errores (ninguno)
+BIEN  tras la primera visita, el service worker controla la página
+BIEN  en el precache: index.html, el núcleo WASM, el worker, las fuentes y el manifest (24 entradas)
+BIEN  version.json no está en el precache (es lo que se pregunta)
+BIEN  sin red: version.json no llega
+BIEN  sin red: la app abre el ejemplo de la skill y lo calcula (estado: calculado)
+BIEN  antes de publicar: la página es v1
+BIEN  con v2 publicada, la página avisa de la versión nueva
+BIEN  y no se aplica sola: 3 s después sigue en v1, sin recargar
+BIEN  al pulsar «Actualizar», recarga con v2 (index-C8Dbv8rx.js)
+
+Todo bien

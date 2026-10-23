@@ -503,6 +503,12 @@
   - **Exactitud (V2c1-1):** el punto de un rasgo es el del modelo, y los cruces y proyecciones sobre rectas según X o Y conservan sus números; lo dibujado compila sin ajustes ni fusiones.
   - **Validación:** `src/editor/dibujo/dibujo.test.ts`, `app/src/test/dibujo.test.tsx` y el banco `validacion/v2c/chrome.ts`: una planta del edificio objetivo dibujada con ratón y teclado da, tras «Renumerar», la huella de la referencia; 180 pasos de deshacer vuelven a la de partida; el enganche, 0,2 ms p95 en el edificio de 7 plantas.
   - **V2c1-2, decidido el 2026-10-23:** «Renumerar» deja también la lista de pilares en el orden P1…Pn (la huella ya ordenaba los pilares por id: el informe decía mal que su orden contaba).
+- **2026-10-23: fase AL hecha** (los proyectos en el navegador y la app como PWA, a petición del usuario: elegir carpetas y dar permisos «es un lío»). El plan, las decisiones y el estado están en `docs/fem3d/almacen-local.md`. Cambia V-d en la web.
+  - **Decidido por el usuario:** AL-a (la carpeta del disco, secundaria: queda para trabajar con el agente, y `bun run visor` sigue en el disco), AL-b (autoguardado con versiones; exportar descarga el `proyecto.json`) y AL-c (la PWA después, en la misma fase).
+  - **AL1** (`app/src/sesion/almacen.ts`): IndexedDB con el texto canónico de cada proyecto, sello por revisión (otra pestaña da conflicto, como el disco), autoguardado a los 400 ms, versiones (30 y una por día durante 90 días), caché de resultados por huella (pedido `paquete` del worker, en el formato de `.fem/`), importar, exportar y `?local=<id>`. Pantalla de inicio «Mis proyectos».
+  - **AL2:** `vite-plugin-pwa` como Concreta, precache de todo `dist/` con el núcleo WASM, y el aviso de versión desde el service worker en espera.
+  - **Validación:** `app/src/test/almacen*.test.ts(x)` y los bancos de Chrome `validacion/al/chrome.ts` (recargar sale de la caché en 0,2 s con el mismo sha256) y `pwa.ts` (calcula sin red; una versión nueva sólo se aplica al pulsar).
+  - **Pendiente del usuario, AL-4:** el criterio 5 de V2a ya no pasa (diagnósticos del edificio objetivo en 3,3 s frente a 1,5 s); en HEAD sin AL da lo mismo, así que viene de LV2, HR o PF.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

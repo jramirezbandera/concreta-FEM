@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import { AvisoVersion } from "../armazon/AvisoVersion.tsx";
+import { pwaPrueba } from "./pwaRegistro.ts";
 
 const publicar = (version: string | null) =>
   vi.stubGlobal(
@@ -43,5 +44,23 @@ describe("AvisoVersion", () => {
     render(<AvisoVersion activo actual="a" />);
     fireEvent.click(await screen.findByRole("button", { name: "Ahora no" }));
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("AL2: con un service worker en espera avisa sin mirar version.json, y Actualizar lo activa (no se aplica solo)", async () => {
+    publicar("a");
+    pwaPrueba.enEspera = true;
+    pwaPrueba.activaciones = 0;
+    vi.useFakeTimers();
+    try {
+      render(<AvisoVersion activo actual="a" />);
+      expect(screen.getByText(/nueva versión de Concreta FEM/)).toBeInTheDocument();
+      expect(pwaPrueba.activaciones).toBe(0);
+      fireEvent.click(screen.getByRole("button", { name: /Actualizar/ }));
+      expect(pwaPrueba.activaciones).toBe(1);
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      pwaPrueba.enEspera = false;
+    }
   });
 });

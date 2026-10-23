@@ -88,6 +88,11 @@ Licencias: `fake-indexeddb` (Apache-2.0), sólo para las pruebas.
   - `Inicio.tsx` (Mis proyectos, nuevo, importar, ejemplos y la carpeta aparte) y `armazon/Versiones.tsx`; en la barra, el estado del guardado, Versiones y Exportar.
 - **Validación:** `app/src/test/almacen.test.ts` (el almacén, con `fake-indexeddb`), `almacenLocal.test.tsx` (criterios 1 a 4 en el DOM, con la sesión de verdad) y el banco `validacion/al/chrome.ts` (`out_chrome.txt`): en Chrome, lo calculado pasa del worker a IndexedDB y, al recargar, sale de la caché en 0,2 s con el mismo sha256. Las 50 pruebas de la app y las 253 de `src/visor` pasan, y el banco de V2c también.
 
+**AL2 hecha el 2026-10-23.** Pasa el criterio 7.
+
+- **Ya en `app/`:** `VitePWA` en `vite.config.ts` (precache de todo `dist/` salvo `version.json`, 28 ficheros y 2,8 MB; manifest con los iconos de Concreta), y `AvisoVersion.tsx` registra el service worker y avisa con el que queda en espera. Sin service worker, el aviso sigue saliendo de `version.json`; una página controlada no lo mira, porque recargarla sin activar el worker nuevo daría otra vez la versión de la caché. En las pruebas, `virtual:pwa-register/react` es `test/pwaRegistro.ts`.
+- **Validación:** `avisoVersion.test.tsx` (el worker en espera) y el banco `validacion/al/pwa.ts` (`out_pwa.txt`), con dos builds como dos despliegues. Chrome lee el manifest sin errores; tras la primera visita el service worker controla la página; sin red (el servidor corta cada conexión), la app abre un ejemplo y lo calcula; con la segunda versión publicada, avisa, sigue 3 s en la primera sin recargar y carga la segunda al pulsar «Actualizar». Los bancos de AL y V2c pasan igual con el service worker.
+
 **Hallazgos:**
 
 - **AL-1. Deshacer recupera los resultados.** Tras cada cambio, la sesión busca en la caché los resultados de la huella nueva. Volver con Ctrl+Z a una versión ya calculada la enseña calculada, sin recalcular (con la carpeta y el servidor ya pasaba con `.fem/`).
