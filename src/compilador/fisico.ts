@@ -528,6 +528,34 @@ export const ANCHO_FRANJA = 1;
 export const TAMANO_MALLA = 0.75;
 
 /**
+ * Plantilla de esquina (fase LV2, §8 de la cabecera de `rejilla.ts`): la graduada parte el elemento de
+ * la esquina en 3 hacia ella `niveles` veces en los cruces con pilar y `nivelesSinPilar` veces en los
+ * cruces sin pilar (el de un zuncho o una viga secundaria con otra viga); sin `nivelesSinPilar`, los
+ * mismos niveles en todos los cruces. La de tercios (sólo para medir, §6 de `refinamiento-vigas.md`)
+ * parte la celda en tercios, con uno o dos niveles.
+ */
+export interface PlantillaEsquina {
+  tipo: "tercios" | "graduada";
+  /** Entero en [1, 4]. */
+  niveles: number;
+  /** Entero en [1, niveles]. */
+  nivelesSinPilar?: number;
+}
+
+/**
+ * Plantilla de esquina por defecto (LV2-i, 2026-10-18): 3 niveles en los cruces con pilar y 2 en los
+ * demás (allí el tercer nivel no cambia ninguna estación de franja y cuesta un 7 % de los nudos).
+ */
+export const PLANTILLA_ESQUINA: Readonly<PlantillaEsquina> = Object.freeze({ tipo: "graduada", niveles: 3, nivelesSinPilar: 2 });
+
+/**
+ * Jacobiano escalado mínimo de una plantilla refinada (F2, LV2); por debajo, se queda sin refinar. El
+ * mismo que el aviso de calidad de la malla (`JACOBIANO_BAJO` de `mallado.ts`): el refinamiento nunca
+ * deja un cuadrilátero que lo dispare.
+ */
+export const JACOBIANO_REFINO = 0.2;
+
+/**
  * Fracción mínima del área de una banda en las losas de su planta (C5): la propuesta descarta las
  * que quedan por debajo, y el compilador avisa de las editadas.
  */
@@ -641,7 +669,7 @@ export interface OpcionesCompilacion {
   /**
    * Refinamiento de la malla en las esquinas de los paños de losa unidos a las vigas por sus caras
    * (fase LV2): en la celda de la rejilla de cada esquina en la que se encuentran dos caras de viga, el
-   * elemento de la esquina se parte hacia ella (`PLANTILLA_ESQUINA` de `rejilla.ts`: 3 niveles en los
+   * elemento de la esquina se parte hacia ella (`plantillaEsquina`: 3 niveles en los
    * cruces con pilar y 2 en los cruces sin pilar, LV2-i). Con él van también las tiras de las huellas que
    * asoman del ancho de su viga (LV-8), la plantilla de cara delante de un pilar tapado (desde la fase
    * HR, sólo la huella es rígida en todos los pilares y con todas las opciones, no sólo en los pilares
@@ -651,6 +679,17 @@ export interface OpcionesCompilacion {
    * (compilador LV2, 2026-10-19); sin él, la malla de LV1.
    */
   refinoEsquinas?: boolean;
+  /**
+   * Plantilla de las esquinas de `refinoEsquinas`. Por defecto, `PLANTILLA_ESQUINA`. Es para medir
+   * (los bancos de LV2); en un proyecto no hace falta.
+   */
+  plantillaEsquina?: PlantillaEsquina;
+  /**
+   * Jacobiano escalado mínimo de una plantilla refinada (de `refinoCaras` y `refinoEsquinas`), en
+   * (0, 2]; por debajo, se queda sin refinar con su aviso. Por defecto, `JACOBIANO_REFINO` (0,2). Es
+   * para medir y para forzar el respaldo en las pruebas; en un proyecto no hace falta.
+   */
+  jacobianoRefino?: number;
   /**
    * Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo
    * nudo inferior está en un forjado es rígida en lo que ese nudo ocupa por encima del plano del
@@ -682,6 +721,10 @@ export interface OpcionesResueltas {
   anchoFranja: number;
   refinoCaras: boolean;
   refinoEsquinas: boolean;
+  /** Sólo si se da: con las de por defecto, la huella no cambia. */
+  plantillaEsquina?: PlantillaEsquina;
+  /** Sólo si se da, como `plantillaEsquina`. */
+  jacobianoRefino?: number;
   zonaRigidaBase: boolean;
 }
 
@@ -707,6 +750,8 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     anchoFranja: o.anchoFranja ?? ANCHO_FRANJA,
     refinoCaras: o.refinoCaras ?? true,
     refinoEsquinas: o.refinoEsquinas ?? true,
+    ...(o.plantillaEsquina !== undefined ? { plantillaEsquina: o.plantillaEsquina } : {}),
+    ...(o.jacobianoRefino !== undefined ? { jacobianoRefino: o.jacobianoRefino } : {}),
     zonaRigidaBase: o.zonaRigidaBase ?? true,
   };
 }

@@ -116,4 +116,8 @@ export const CATALOGO: Caso[] = [
   ["tamaño de malla menor que 2·ε_snap", () => undefined, "opciones/no-validas", undefined, { tamanoMalla: 0.05 }],
   ["tamaño de malla no finito", () => undefined, "opciones/no-validas", undefined, { tamanoMalla: Number.POSITIVE_INFINITY }],
   ["rejilla que no es un booleano", () => undefined, "opciones/no-validas", undefined, { rejilla: "sí" as unknown as boolean }],
+  ["plantilla de esquina de un tipo desconocido", () => undefined, "opciones/no-validas", undefined, { plantillaEsquina: { tipo: "cuartos" as "tercios", niveles: 2 } }],
+  ["plantilla de esquina con 5 niveles", () => undefined, "opciones/no-validas", undefined, { plantillaEsquina: { tipo: "graduada", niveles: 5 } }],
+  ["plantilla de esquina con más niveles sin pilar que con pilar", () => undefined, "opciones/no-validas", undefined, { plantillaEsquina: { tipo: "graduada", niveles: 2, nivelesSinPilar: 3 } }],
+  ["jacobiano del refinamiento nulo", () => undefined, "opciones/no-validas", undefined, { jacobianoRefino: 0 }],
 ];

@@ -23,7 +23,7 @@ import { Consultas } from "../../src/compilador/consultas.ts";
 import type { OpcionesCompilacion } from "../../src/compilador/fisico.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
-import { PLANTILLA_ESQUINA } from "../../src/compilador/rejilla.ts";
+import { PLANTILLA_ESQUINA } from "../../src/compilador/fisico.ts";
 import { edificioReticular } from "../c4/modelos.ts";
 import { conAcciones } from "../c5/modelos.ts";
 
@@ -84,14 +84,13 @@ const fina = medir({ tamanoMalla: 0.125, refinoEsquinas: true });
  * Variantes: opciones y los niveles de la plantilla en los cruces sin pilar (§15): el valor por
  * defecto (2 desde LV2-i), los mismos que en los cruces con pilar (`undefined`: 3 en todo) o 1.
  */
-const defecto = PLANTILLA_ESQUINA.nivelesSinPilar;
-const variantes: [string, OpcionesCompilacion, number | undefined][] = [
-  ["LV1, h = 0,75", { refinoEsquinas: false }, defecto],
-  ["LV2, h = 0,75", { refinoEsquinas: true }, defecto],
-  ["LV2, 3 niv. en todo", { refinoEsquinas: true }, undefined],
-  ["LV2, 1 niv. sin pilar", { refinoEsquinas: true }, 1],
-  ["LV1, h = 0,5 uniforme", { tamanoMalla: 0.5, refinoEsquinas: false }, defecto],
-  ["LV2, h = 0,5", { tamanoMalla: 0.5, refinoEsquinas: true }, defecto],
+const variantes: [string, OpcionesCompilacion][] = [
+  ["LV1, h = 0,75", { refinoEsquinas: false }],
+  ["LV2, h = 0,75", { refinoEsquinas: true }],
+  ["LV2, 3 niv. en todo", { refinoEsquinas: true, plantillaEsquina: { tipo: PLANTILLA_ESQUINA.tipo, niveles: PLANTILLA_ESQUINA.niveles } }],
+  ["LV2, 1 niv. sin pilar", { refinoEsquinas: true, plantillaEsquina: { ...PLANTILLA_ESQUINA, nivelesSinPilar: 1 } }],
+  ["LV1, h = 0,5 uniforme", { tamanoMalla: 0.5, refinoEsquinas: false }],
+  ["LV2, h = 0,5", { tamanoMalla: 0.5, refinoEsquinas: true }],
 ];
 console.log("## Retícula de 4 × 4 (fase LV): franjas con ELU frente a h = 0,125\n");
 console.log("Apoyos: la superior de Wood–Armer; |mx|, el corte por fuerzas nodales solo (sin el término de mxy, §11).\n");
@@ -102,10 +101,8 @@ const pct = (v: number) => `${(100 * v).toFixed(1)} %`;
 type Fila = [string, number, number, number, boolean, number];
 const peores = new Map<string, Fila[]>();
 const mas20 = new Map<string, Fila[]>();
-for (const [nombre, op, sinPilar] of variantes) {
-  PLANTILLA_ESQUINA.nivelesSinPilar = sinPilar;
+for (const [nombre, op] of variantes) {
   const g = medir(op);
-  PLANTILLA_ESQUINA.nivelesSinPilar = defecto;
   const ea: number[] = [];
   const em: number[] = [];
   const ev: number[] = [];

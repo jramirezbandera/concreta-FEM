@@ -13,7 +13,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { edificioObjetivoLosas } from "../../validacion/c2/modelos.ts";
 import { losa3x3 } from "../../validacion/f2/convergencia.ts";
 import { calcular } from "../motor/calcular.ts";
@@ -27,7 +27,6 @@ import { EsfuerzosFranjas } from "./esfuerzosFranjas.ts";
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type Vec2 } from "./fisico.ts";
 import { carasFranjas } from "./franjas.ts";
 import { conRespaldoRefino, type ResultadoMalla } from "./mallado.ts";
-import { UMBRAL_REFINO } from "./rejilla.ts";
 import { validar } from "./validar.ts";
 
 beforeAll(async () => {
@@ -137,13 +136,8 @@ describe("la plantilla refinada", () => {
 });
 
 describe("respaldo", () => {
-  afterEach(() => {
-    UMBRAL_REFINO.jacobiano = 0.2;
-  });
-
   it("por pilar: una plantilla refinada sin calidad se queda sin refinar, con el aviso", () => {
-    UMBRAL_REFINO.jacobiano = 1.01;
-    const r = compilado(losa3x3());
+    const r = compilado(losa3x3(), { jacobianoRefino: 1.01 });
     expect(r.estadisticas.malla.plantillasRefinadas).toBe(0);
     expect(r.modelo.nudos.length).toBe(compilado(losa3x3(), { refinoCaras: false }).modelo.nudos.length);
     const av = avisosMalla(r);

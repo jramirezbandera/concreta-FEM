@@ -242,6 +242,18 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     diag.error("opciones/no-validas", "La opción refinoEsquinas tiene que ser true o false.");
     return null;
   }
+  if (op.plantillaEsquina !== undefined) {
+    const pe = op.plantillaEsquina as unknown;
+    const entero = (x: unknown, max: number): boolean => Number.isInteger(x) && (x as number) >= 1 && (x as number) <= max;
+    if (!(esObjeto(pe) && (pe.tipo === "tercios" || pe.tipo === "graduada") && entero(pe.niveles, 4) && (pe.nivelesSinPilar === undefined || entero(pe.nivelesSinPilar, pe.niveles as number)))) {
+      diag.error("opciones/no-validas", "La opción plantillaEsquina tiene que ser { tipo: \"graduada\" o \"tercios\", niveles: un entero de 1 a 4, nivelesSinPilar (opcional): un entero de 1 a niveles }.");
+      return null;
+    }
+  }
+  if (op.jacobianoRefino !== undefined && !(num(op.jacobianoRefino) && op.jacobianoRefino > 0 && op.jacobianoRefino <= 2)) {
+    diag.error("opciones/no-validas", "La opción jacobianoRefino tiene que ser un número en (0, 2].");
+    return null;
+  }
   if (typeof op.zonaRigidaBase !== "boolean") {
     diag.error("opciones/no-validas", "La opción zonaRigidaBase tiene que ser true o false.");
     return null;

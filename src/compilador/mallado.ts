@@ -46,7 +46,7 @@ import Constrainautor from "@kninnug/constrainautor";
 import Delaunator from "delaunator";
 import { incircle, orient2d } from "robust-predicates";
 import type { Arreglo, Trazo } from "./arreglo.ts";
-import type { Vec2 } from "./fisico.ts";
+import type { PlantillaEsquina, Vec2 } from "./fisico.ts";
 import { CUANTO_ORDEN } from "./geometria2d.ts";
 import { distanciaASegmento, jacobianoEscalado, momentosRegion, puntoEnPoligono, puntoEnRegion, type Region, RegionIndexada } from "./poligonos.ts";
 import { cubierta, IRREGULAR, REGULAR, rejillaPlanta, type RefinoHuella, type Rejilla } from "./rejilla.ts";
@@ -475,6 +475,10 @@ export interface RefinoCaras {
   idsHuellas?: readonly string[];
   /** Índices en `huellas` de los pilares tapados por el ancho de su viga (LV-8): sin sembrar, con la plantilla de cara delante de su huella. */
   tapadas?: readonly number[];
+  /** Plantilla de las esquinas (`plantillaEsquina` de las opciones). Sin ella, la de por defecto. */
+  plantilla?: PlantillaEsquina;
+  /** Jacobiano mínimo de una plantilla refinada (`jacobianoRefino` de las opciones). Sin él, el de por defecto. */
+  jacobiano?: number;
 }
 
 /** `mallarPlanta` sin comparar con la CDT sola cuando la rejilla cubre poco (para las pruebas). */
@@ -730,6 +734,8 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       ...(refinoH ? { refino: refinoH } : {}),
       ...(refinoH || (refino?.esquinas && fuertes) ? { separacionRefino: refino!.separacion } : {}),
       ...(fuertes ? { fuertes, sinEje, ...(refino?.esquinas ? { esquinas: true, huellasPilares: refino.huellas ?? [], tapadas: refino.tapadas ?? [] } : {}) } : {}),
+      ...(refino?.plantilla ? { plantillaEsquina: refino.plantilla } : {}),
+      ...(refino?.jacobiano !== undefined ? { jacobianoRefino: refino.jacobiano } : {}),
       regiones,
       enLosa,
       O: origenes[0]!,

@@ -43,7 +43,7 @@
  *    casi la celda: los tercios se toman de un largo de h como mucho, y si la transición de la
  *    esquina no cabe más allá en una dirección, la esquina va fina salvo su tramo exterior, que la
  *    lleva hasta el borde del bloque. Una plantilla refinada con algún cuadrilátero no convexo o por
- *    debajo de UMBRAL_REFINO se rehace como en F2 y, si tampoco, se queda sin refinar (`sinRefinar`,
+ *    debajo de `jacobianoRefino` se rehace como en F2 y, si tampoco, se queda sin refinar (`sinRefinar`,
  *    con aviso); una sin refinar por debajo de JACOBIANO_PLANTILLA no se usa (su pilar va por la CDT).
  * 6. Celdas: regular si su centro cae en una losa, no es del anillo y no tiene a menos de δ ningún
  *    rasgo ajeno (salvo los de una huella con plantilla), para que la CDT de al lado no tenga que unir
@@ -62,7 +62,7 @@
  *    del ancho de una viga) en un lado u y otra en un lado v, y fuera de las losas al otro lado de las
  *    dos (por el centro de la celda), es la esquina de un paño entre vigas. Allí la losa concentra su
  *    reacción de esquina, y con un elemento de h junto a la cara la viga sale mal en la cara del pilar.
- *    La celda lleva una plantilla (`PLANTILLA_ESQUINA`): la graduada parte el elemento de la esquina
+ *    La celda lleva una plantilla (`plantillaEsquina`): la graduada parte el elemento de la esquina
  *    (el cuarto de la celda, su mitad o la celda entera, según vaya partida) en 3 hacia ella (un cuarto
  *    y dos trapecios) `niveles` veces; la de tercios, sólo en una celda partida en 4, en 3 × 3 con
  *    transiciones de 3 a 1. Su borde hacia la losa es el de la celda, así que la costura no cambia; por
@@ -111,7 +111,7 @@
  * Puro y determinista; las comparaciones con umbral llevan holgura para que un ruido de ε_geom o el
  * redondeo de un giro no cambien la rejilla.
  */
-import type { Vec2 } from "./fisico.ts";
+import { JACOBIANO_REFINO, PLANTILLA_ESQUINA, type PlantillaEsquina, type Vec2 } from "./fisico.ts";
 import { jacobianoEscalado, type Region } from "./poligonos.ts";
 
 /** Separación mínima entre dos líneas de la rejilla, en fracciones de h. */
@@ -202,6 +202,10 @@ export interface EntradaRejilla {
    * cara (§10 de la cabecera).
    */
   tapadas?: readonly number[];
+  /** Plantilla de las esquinas (§8). Sin ella, `PLANTILLA_ESQUINA`. */
+  plantillaEsquina?: PlantillaEsquina;
+  /** Jacobiano escalado mínimo de una plantilla refinada (de pilar, de esquina o de cara); por debajo, se queda sin refinar. Sin él, `JACOBIANO_REFINO`. */
+  jacobianoRefino?: number;
   regiones: readonly Region[];
   /** Losa que contiene un punto, o −1. */
   enLosa: (q: Vec2) => number;
@@ -283,23 +287,6 @@ export interface RefinoHuella {
 
 /** Posición de los dos nudos nuevos en el primer tramo junto a una cara refinada, desde la cara (F2). */
 export const PARTICION_REFINO: [number, number] = [1 / 3, 2 / 3];
-
-/**
- * Jacobiano escalado mínimo de una plantilla refinada; por debajo, se queda sin refinar (F2). El
- * mismo que el aviso de calidad de la malla (`JACOBIANO_BAJO` de `mallado.ts`): el refinamiento
- * nunca deja un cuadrilátero que lo dispare. Es un objeto para que las pruebas puedan forzar el
- * respaldo.
- */
-export const UMBRAL_REFINO = { jacobiano: 0.2 };
-
-/**
- * Plantilla de esquina (fase LV2, §8 de la cabecera): la graduada parte el elemento de la esquina en 3
- * hacia ella `niveles` veces en los cruces con pilar y `nivelesSinPilar` veces en los cruces sin pilar
- * (el de un zuncho o una viga secundaria con otra viga; LV2-i, 2026-10-18: allí el tercer nivel no
- * cambia ninguna estación de franja y cuesta un 7 % de los nudos). Sin `nivelesSinPilar`, los mismos
- * niveles en todos los cruces. Es un objeto para que las medidas puedan probar otras.
- */
-export const PLANTILLA_ESQUINA: { tipo: "tercios" | "graduada"; niveles: number; nivelesSinPilar?: number } = { tipo: "graduada", niveles: 3, nivelesSinPilar: 2 };
 
 /** Jacobiano escalado mínimo de una plantilla; por debajo, el pilar va por la triangulación (F2). */
 export const JACOBIANO_PLANTILLA = 0.2;
@@ -503,6 +490,8 @@ export function rejillaPlanta(E: EntradaRejilla): Rejilla | null {
 }
 
 function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejilla | { excluir: number[] } | null {
+  const plantillaE = E.plantillaEsquina ?? PLANTILLA_ESQUINA;
+  const umbralRefino = E.jacobianoRefino ?? JACOBIANO_REFINO;
   const { P, lados, h, O, e } = E;
   const s = 2 * h;
   const tol = 10 * E.epsGeom;
@@ -1261,12 +1250,12 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
    * sus ejes (x, y) desde esa esquina, en 36avos de la celda: el elemento de la esquina (hasta 18), en
    * tercios (3 × 3); los dos tramos junto a las caras, con la transición de 3 a 1 (4 cuadriláteros
    * cada uno, con dos nudos a 27); y el cuarto de enfrente, entero. Con dos niveles
-   * (`PLANTILLA_ESQUINA`), el subelemento de la esquina vuelve a ir en tercios, con sus transiciones.
+   * (`plantillaEsquina`), el subelemento de la esquina vuelve a ir en tercios, con sus transiciones.
    * Sus lados hacia la losa son los de la celda partida (los puntos medios, como «medio»); por las
    * caras, el primer tramo lleva sus nudos (`subdivididas`).
    */
   const plantillaEsquina = (i: number, j: number, su: number, sv: number, niveles: number, pu: 1 | 2 = 2, pv: 1 | 2 = 2): Plantilla => {
-    const graduada = PLANTILLA_ESQUINA.tipo === "graduada";
+    const graduada = plantillaE.tipo === "graduada";
     const dos = niveles > 1;
     const D = graduada ? 2 ** (niveles + 1) : 36;
     const g = (x: 0 | 1, y: 0 | 1) => (su < 0 ? i + x : i + 1 - x) + (sv < 0 ? j + y : j + 1 - y) * nu;
@@ -1468,8 +1457,8 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     const ref = E.refino?.[k] ?? null;
     let pl = redDe(k, mu, mv, ref);
     // Si la de F3 no tiene calidad (sus transiciones, más apretadas), la de F2; si tampoco, sin refinar
-    if (pl.refinada && jacobianoMin(pl) < UMBRAL_REFINO.jacobiano) pl = redDe(k, mu, mv, ref, false);
-    if (pl.refinada && jacobianoMin(pl) < UMBRAL_REFINO.jacobiano) {
+    if (pl.refinada && jacobianoMin(pl) < umbralRefino) pl = redDe(k, mu, mv, ref, false);
+    if (pl.refinada && jacobianoMin(pl) < umbralRefino) {
       pl = redDe(k, mu, mv, null);
       sinRefinar.push(k);
     }
@@ -1491,7 +1480,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       const pu = !regular || partidaH[i + j * (nu - 1)] === 1 ? 2 : 1;
       const pv = !regular || partidaV[i + j * nu] === 1 ? 2 : 1;
       const lado = Math.min((U[i + 1]! - U[i]!) / pu, (V[j + 1]! - V[j]!) / pv);
-      return { pu, pv, menor: PLANTILLA_ESQUINA.tipo === "graduada" ? lado / 2 ** k : lado / (k > 1 ? 9 : 3) } as const;
+      return { pu, pv, menor: plantillaE.tipo === "graduada" ? lado / 2 ** k : lado / (k > 1 ? 9 : 3) } as const;
     };
     /**
      * Plantilla de esquina de la celda (i, j) hacia (su, sv) con k niveles, si cabe; si no, false. Una
@@ -1516,10 +1505,10 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       // La plantilla de una tira de huella (un pilar que asoma del ancho de la viga, LV-8) ya es una
       // red estructurada en la esquina, con lo que asoma dentro: no impide refinar las demás
       if (estado[c] === PLANTILLA) return huellaDeCelda[c]! >= 0 && E.huellas[huellaDeCelda[c]!]!.tira === true;
-      if (estado[c] !== REGULAR || (PLANTILLA_ESQUINA.tipo !== "graduada" && (pu !== 2 || pv !== 2))) return false;
+      if (estado[c] !== REGULAR || (plantillaE.tipo !== "graduada" && (pu !== 2 || pv !== 2))) return false;
       // Ningún nudo nuevo que se haga rígido, y con calidad
       const pl = plantillaEsquina(i, j, su, sv, k, pu, pv);
-      return lejosDeHuellas(pl) && jacobianoMin(pl) >= UMBRAL_REFINO.jacobiano ? pl : false;
+      return lejosDeHuellas(pl) && jacobianoMin(pl) >= umbralRefino ? pl : false;
     };
     const vistos = new Set<number>();
     const sinEsquina = new Map<number, boolean>();
@@ -1543,7 +1532,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
         // Niveles del cruce: los de un cruce con pilar (alguna huella a menos de `lejos` de una de sus
         // esquinas, como en LV2-g) o, si se da, los de uno sin pilar (el cruce de un zuncho con una viga)
         const conPilar =
-          PLANTILLA_ESQUINA.nivelesSinPilar === undefined ||
+          plantillaE.nivelesSinPilar === undefined ||
           grupo.some(([a, b, p, q]) => {
             const Q = posicion((p < 0 ? a : a + 1) + (q < 0 ? b : b + 1) * nu);
             const lejos = 2 * (E.separacionRefino ?? 0) + 2 * particion(a, b, 1).menor;
@@ -1552,7 +1541,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
               return d.dentro || d.d < lejos;
             });
           });
-        let k = conPilar ? PLANTILLA_ESQUINA.niveles : PLANTILLA_ESQUINA.nivelesSinPilar!;
+        let k = conPilar ? plantillaE.niveles : plantillaE.nivelesSinPilar!;
         let pls: (Plantilla | boolean)[] = [];
         for (; k >= 1; k--) {
           pls = grupo.map(([a, b, p, q]) => intentar(a, b, p, q, k));
@@ -1759,7 +1748,7 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
       for (const t of tramos) {
         if (fallo) break;
         const pl = plantillaCara(t);
-        if (pl && lejosDeHuellas(pl, m) && jacobianoMin(pl) >= UMBRAL_REFINO.jacobiano) pls.push(pl);
+        if (pl && lejosDeHuellas(pl, m) && jacobianoMin(pl) >= umbralRefino) pls.push(pl);
         else fallo = true;
       }
       if (fallo) {

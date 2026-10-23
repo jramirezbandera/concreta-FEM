@@ -12,8 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { compilar } from "../../src/compilador/compilar.ts";
 import { Consultas } from "../../src/compilador/consultas.ts";
-import type { ModeloFisico, OpcionesCompilacion } from "../../src/compilador/fisico.ts";
-import { PLANTILLA_ESQUINA } from "../../src/compilador/rejilla.ts";
+import { PLANTILLA_ESQUINA, type ModeloFisico, type OpcionesCompilacion } from "../../src/compilador/fisico.ts";
 import { calcular } from "../../src/motor/calcular.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { casosValidos } from "../../src/pruebas/comparar.ts";
@@ -96,19 +95,16 @@ if (import.meta.main) {
   // con ellas, la de 0,055 mueve hasta un 3 % los valores en la cara (§19)
   const ref = medir({ tamanoMalla: 0.055, epsSnap: 0.025, refinoEsquinas: false });
   const claves = [...ref.r.keys()];
-  const defecto = { ...PLANTILLA_ESQUINA };
-  const variantes: [string, OpcionesCompilacion, typeof defecto][] = [
-    ["h = 0,25 uniforme (LV1)", { tamanoMalla: 0.25, refinoEsquinas: false }, defecto],
-    ["LV1, h = 0,75 (sin esquinas)", { refinoEsquinas: false }, defecto],
-    ["LV2, tercios, dos niveles", { refinoEsquinas: true }, { tipo: "tercios", niveles: 2 }],
-    ["LV2, graduada, 2 niveles", { refinoEsquinas: true }, { tipo: "graduada", niveles: 2 }],
-    ["LV2, graduada, 3 niveles", { refinoEsquinas: true }, { tipo: "graduada", niveles: 3 }],
+  // Los niveles de los cruces sin pilar, los de por defecto
+  const pe = (tipo: "tercios" | "graduada", niveles: number) => ({ refinoEsquinas: true, plantillaEsquina: { ...PLANTILLA_ESQUINA, tipo, niveles } });
+  const variantes: [string, OpcionesCompilacion][] = [
+    ["h = 0,25 uniforme (LV1)", { tamanoMalla: 0.25, refinoEsquinas: false }],
+    ["LV1, h = 0,75 (sin esquinas)", { refinoEsquinas: false }],
+    ["LV2, tercios, dos niveles", pe("tercios", 2)],
+    ["LV2, graduada, 2 niveles", pe("graduada", 2)],
+    ["LV2, graduada, 3 niveles", pe("graduada", 3)],
   ];
-  const res = variantes.map(([nombre, op, pe]) => {
-    Object.assign(PLANTILLA_ESQUINA, pe);
-    return { nombre, ...medir(op) };
-  });
-  Object.assign(PLANTILLA_ESQUINA, defecto);
+  const res = variantes.map(([nombre, op]) => ({ nombre, ...medir(op) }));
   console.log(`## 3 × 3 recuadros de 7,2 m: error frente a h = 0,055 (${ref.nudos} nudos)\n`);
   console.log(`${"".padEnd(30)}${"nudos".padStart(7)}${claves.map((k) => k.padStart(17)).join("")}`);
   console.log(`${"h = 0,055 (kN·m, kN)".padEnd(30)}${String(ref.nudos).padStart(7)}${claves.map((k) => ref.r.get(k)!.toFixed(2).padStart(17)).join("")}`);

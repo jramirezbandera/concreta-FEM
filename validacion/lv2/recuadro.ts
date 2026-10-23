@@ -8,7 +8,6 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PLANTILLA_ESQUINA } from "../../src/compilador/rejilla.ts";
 import { iniciarNucleo } from "../../src/nucleo/index.ts";
 import { cabecera, cype, fila, MEDIO_ANCHO as e, nuestro } from "../cy/borde.ts";
 
@@ -18,9 +17,6 @@ cabecera();
 fila(ref, "Emparrillado de CYPECAD (barras)", ref);
 // Desde §17 las esquinas van por defecto: LV1 es explícito
 fila(ref, "LV1 (sin esquinas), h = 0,75", await nuestro(-e, { refinoEsquinas: false }));
-const defecto = { ...PLANTILLA_ESQUINA };
-for (const [tipo, niveles] of [["tercios", 1], ["tercios", 2], ["graduada", 2], ["graduada", 3]] as const) {
-  Object.assign(PLANTILLA_ESQUINA, { tipo, niveles });
-  fila(ref, `LV2, ${tipo}, ${niveles} nivel${niveles > 1 ? "es" : ""}`, await nuestro(-e, { refinoEsquinas: true }));
-}
-Object.assign(PLANTILLA_ESQUINA, defecto);
+// Los mismos niveles en todos los cruces: el recuadro no tiene cruces sin pilar
+for (const [tipo, niveles] of [["tercios", 1], ["tercios", 2], ["graduada", 2], ["graduada", 3]] as const)
+  fila(ref, `LV2, ${tipo}, ${niveles} nivel${niveles > 1 ? "es" : ""}`, await nuestro(-e, { refinoEsquinas: true, plantillaEsquina: { tipo, niveles } }));

@@ -1010,6 +1010,12 @@
         "refinoEsquinas": {
           "type": "boolean"
         },
+        "plantillaEsquina": {
+          "$ref": "#/$defs/PlantillaEsquina"
+        },
+        "jacobianoRefino": {
+          "type": "number"
+        },
         "zonaRigidaBase": {
           "type": "boolean"
         }
@@ -1226,6 +1232,28 @@
       "required": [
         "id",
         "altura"
+      ],
+      "additionalProperties": false
+    },
+    "PlantillaEsquina": {
+      "type": "object",
+      "properties": {
+        "tipo": {
+          "enum": [
+            "graduada",
+            "tercios"
+          ]
+        },
+        "niveles": {
+          "type": "number"
+        },
+        "nivelesSinPilar": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "tipo",
+        "niveles"
       ],
       "additionalProperties": false
     },
