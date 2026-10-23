@@ -8,7 +8,7 @@ BIEN  180 pasos de deshacer: 18 ejes + 80 pilares + 81 vigas + Renumerar = 180
 BIEN  deshecho todo, la huella es la de partida (510668d6d2c35163)
 
 ## Criterio 5: el enganche en el edificio objetivo (7 plantas, 80 pilares por planta)
-BIEN  enganche al mover el ratón: mediana 0.100 ms, p95 0.200 ms, máx. 1.000 ms (≤ 2 ms); el índice de la planta, 3.7 ms la primera vez
+BIEN  enganche al mover el ratón: mediana 0.100 ms, p95 0.200 ms, máx. 0.900 ms (≤ 2 ms); el índice de la planta, 3.9 ms la primera vez
 BIEN  120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
 BIEN  con la viga en curso, el cursor junto al pilar dice su enganche: «x 18 · y 5 m · Centro (P-x18-y5)»
 

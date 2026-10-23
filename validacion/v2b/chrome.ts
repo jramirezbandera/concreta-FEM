@@ -7,8 +7,9 @@
  * y la maneja con Chrome headless por el protocolo de depuración.
  *
  * - 5, en el edificio reticular de V2 (C4, 7 plantas, 52 125 nudos): escribir en la tabla de losas y
- *   pegar 80 filas no dan tareas largas de más de 50 ms en el hilo principal; los diagnósticos de un
- *   cambio salen en ≤ 1,5 s.
+ *   pegar 80 filas no dan tareas largas de más de 50 ms en el hilo principal; el dibujo de un cambio
+ *   sale en ≤ 1,5 s. Como en V2a, desde el 2026-10-24 el worker dibuja sin compilar y el tiempo de
+ *   los diagnósticos (tras compilar) se da como información.
  *
  * Desde la fase F (`docs/fem3d/franjas.md`), «Proponer bandas» y Resultados · Bandas ya no están en
  * la app: su parte del banco la sustituye Resultados · Armado, en `validacion/f/chrome.ts`.
@@ -114,6 +115,8 @@ window.__v2 = {
   esperar: async (f, ms = 180000) => { const t0 = performance.now(); for (;;) { const v = f(); if (v) return v; if (performance.now() - t0 > ms) throw new Error("tiempo agotado: " + f); await new Promise((r) => setTimeout(r, 10)); } },
   estado: () => document.querySelector("[data-estado]")?.dataset.estado ?? null,
   huella: () => document.querySelector("[data-estado]")?.dataset.huella ?? null,
+  // Todas las vistas con su escena (de la versión que tienen: las de otra se descartan, criterio 3 de V1)
+  dibujado: () => { const ls = [...document.querySelectorAll(".lienzo[data-cargando]")]; return ls.length > 0 && ls.every((x) => x.dataset.cargando === "false"); },
   boton: (texto) => [...document.querySelectorAll("button")].find((b) => b.textContent.trim().startsWith(texto)),
   tabla: async (titulo) => {
     if (!document.querySelector("[role=grid]")) [...document.querySelectorAll(".dock-tab")].find((b) => b.textContent.startsWith("Tablas")).click();
@@ -172,17 +175,20 @@ try {
   const h0 = await pagina<string>(`return __v2.huella();`);
 
   // Escribir en una celda: el intereje del reticular de la primera losa de la planta activa
-  await pagina(`await __v2.tabla("Losas"); await __v2.esperar(() => __v2.hoja()?.getAttribute("aria-label") === "Tabla de losas");`);
+  await pagina(`await __v2.tabla("Forjados"); await __v2.esperar(() => __v2.hoja()?.getAttribute("aria-label") === "Tabla de forjados");`);
   const col = await pagina<number>(`return [...__v2.hoja().querySelectorAll("thead th")].findIndex((th) => th.textContent.trim().startsWith("intereje")) - 1;`);
   const t1 = await ahora();
-  const ms1 = await pagina<number>(`
+  const [ms1, md1] = await pagina<[number, number]>(`
     const t0 = performance.now();
     await __v2.escribir(0, ${col}, "0,8");
     await __v2.esperar(() => __v2.estado() === "desactualizado");
-    await __v2.esperar(() => __v2.estado() !== "desactualizado" && __v2.huella() !== ${JSON.stringify(h0)});
-    return performance.now() - t0;`);
+    await __v2.esperar(() => __v2.estado() !== "desactualizado" && __v2.huella() !== ${JSON.stringify(h0)} && __v2.dibujado());
+    const dibujo = performance.now() - t0;
+    await __v2.esperar(() => !["desactualizado", "compilando"].includes(__v2.estado()));
+    return [dibujo, performance.now() - t0];`);
   const l1 = await largasDesde(t1);
-  comprobar(ms1 <= 1500, `escribir el intereje de una losa: los diagnósticos de la versión nueva salen en ${(ms1 / 1000).toFixed(2)} s (≤ 1,5 s)`);
+  comprobar(ms1 <= 1500, `escribir el intereje de una losa: el dibujo de la versión nueva sale en ${(ms1 / 1000).toFixed(2)} s (≤ 1,5 s)`);
+  log(`  escribir el intereje de una losa: los diagnósticos, tras compilar, en ${(md1 / 1000).toFixed(2)} s (información)`);
   comprobar(l1.every((x) => x.ms <= 50), `escribir una celda: tareas largas > 50 ms en el hilo principal: ${largas(l1)}`);
 
   // Pegar 80 filas: el giro de los 80 pilares, por su id
@@ -191,15 +197,18 @@ try {
   const tsv = `id\tgiro\n${ids.map((id) => `${id}\t90`).join("\n")}\n`;
   const h1 = await pagina<string>(`return __v2.huella();`);
   const t2 = await ahora();
-  const ms2 = await pagina<number>(`
+  const [ms2, md2] = await pagina<[number, number]>(`
     const t0 = performance.now();
     __v2.pegar(${JSON.stringify(tsv)});
     await __v2.esperar(() => __v2.estado() === "desactualizado");
-    await __v2.esperar(() => __v2.estado() !== "desactualizado" && __v2.huella() !== ${JSON.stringify(h1)});
-    return performance.now() - t0;`);
+    await __v2.esperar(() => __v2.estado() !== "desactualizado" && __v2.huella() !== ${JSON.stringify(h1)} && __v2.dibujado());
+    const dibujo = performance.now() - t0;
+    await __v2.esperar(() => !["desactualizado", "compilando"].includes(__v2.estado()));
+    return [dibujo, performance.now() - t0];`);
   const l2 = await largasDesde(t2);
   comprobar((await pagina<string>(`return __v2.mensaje();`)).startsWith(`Pegadas ${ids.length} filas`), `pegar ${ids.length} filas: entran todas`);
-  comprobar(ms2 <= 1500, `pegar ${ids.length} filas: los diagnósticos salen en ${(ms2 / 1000).toFixed(2)} s (≤ 1,5 s)`);
+  comprobar(ms2 <= 1500, `pegar ${ids.length} filas: el dibujo sale en ${(ms2 / 1000).toFixed(2)} s (≤ 1,5 s)`);
+  log(`  pegar ${ids.length} filas: los diagnósticos, tras compilar, en ${(md2 / 1000).toFixed(2)} s (información)`);
   comprobar(l2.every((x) => x.ms <= 50), `pegar ${ids.length} filas: tareas largas > 50 ms: ${largas(l2)}`);
   await captura("reticular-pegar");
 

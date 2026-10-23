@@ -509,6 +509,14 @@
   - **AL2:** `vite-plugin-pwa` como Concreta, precache de todo `dist/` con el núcleo WASM, y el aviso de versión desde el service worker en espera.
   - **Validación:** `app/src/test/almacen*.test.ts(x)` y los bancos de Chrome `validacion/al/chrome.ts` (recargar sale de la caché en 0,2 s con el mismo sha256) y `pwa.ts` (calcula sin red; una versión nueva sólo se aplica al pulsar).
   - **Pendiente del usuario, AL-4:** el criterio 5 de V2a ya no pasa (diagnósticos del edificio objetivo en 3,3 s frente a 1,5 s); en HEAD sin AL da lo mismo, así que viene de LV2, HR o PF.
+- **2026-10-24: AL-4 resuelto, el dibujo no espera a la compilación** (decisión del usuario; `visor.md` §6.1, `almacen-local.md` AL-4).
+  - **La causa:** la malla de LV y LV2 (el edificio objetivo con vigas, de 34 737 a 88 210 nudos y de 1,0 a 3,3 s de compilación; HR y PF, ≤ 10 %). En el perfil no hay un punto caliente que lleve a 1,5 s.
+  - **Lo que pesaba de verdad:** tras editar, el dibujo seguía con la versión anterior hasta que acababa la compilación.
+  - **Ahora:** `Sesion.abrir(…, { diferir: true })` no compila. `abrir` contesta con el estado `compilando` (la huella de `huellaSinCompilar`, plantas, casos, ejes y sensatez previa) y lo que sólo necesita el modelo físico se dibuja ya. La app pide `compilar` tras el primer commit, detrás de los pedidos de las vistas; lo que necesita la compilación compila solo.
+  - **Resultado:** el dibujo de un cambio sale en 0,3 s en los dos edificios objetivo (antes, 3,3 y 6,0 s); los diagnósticos, a los ~3,4 y ~6 s. El criterio 5 de V2a y V2b mide el dibujo.
+  - **Validación:** `src/visor/diferida.test.ts` (lo dibujado sin compilar es lo de la sesión compilada; el estado tras compilar, idéntico).
+  - **De paso:** el banco de V2b vuelve a funcionar (la pestaña «Forjados»).
+  - **Sigue fallando, y ya fallaba en HEAD** (medido alternando con un worktree): V1, abrir con `.fem/` 3,3 s (≤ 2 s: usar los guardados exige compilar), M11 1,1 s y la planta N2 en Losas 0,66 s.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

@@ -40,7 +40,7 @@ Se dibuja en la **planta** (la vista de trabajo, como en CYPECAD) y en cualquier
   - caso y valor (cargas).
   - Es lo que en CYPECAD pide el diálogo antes de colocar, pero sin diálogo: se cambia en el panel y vale para los siguientes.
 - **Una acción, un paso de deshacer.** Cada objeto colocado es una operación `crear`, o un `lote`.
-- Después de dibujar, la compilación sin cálculo de siempre (150 ms) da los diagnósticos, como al editar una tabla.
+- Después de dibujar, la compilación sin cálculo de siempre da los diagnósticos, como al editar una tabla. (El «150 ms» de este plan era la pausa antes de compilar: compilar el edificio objetivo con vigas tarda ~3,3 s. Desde el 2026-10-24 lo dibujado sale en ~0,3 s sin esperar a la compilación: `visor.md` §6.1.)
 
 ### 2.2 Los enganches
 

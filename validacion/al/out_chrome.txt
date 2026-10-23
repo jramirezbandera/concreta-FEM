@@ -1,11 +1,11 @@
 BIEN  proyecto nuevo en IndexedDB: ["Nave AL"]
-BIEN  la URL lo nombra (?local=76a93056-d45c-471c-a158-607535986c97)
+BIEN  la URL lo nombra (?local=c1687953-e191-4e19-bf69-1362806b0e9d)
 BIEN  importado: la huella del fichero (bb8ea5a50c68)
 BIEN  importado: guardado con el texto canónico (3883 caracteres)
 BIEN  calculado al abrir; en la caché: 117888 bytes con el sha256 de la app (1c2a4524121d)
-BIEN  la descripción se guardó sola en IndexedDB (en 0.42 s, con la pausa de 0,4 s)
+BIEN  la descripción se guardó sola en IndexedDB (en 0.41 s, con la pausa de 0,4 s)
 BIEN  recargar abre el proyecto con el cambio
-BIEN  recargar no recalcula: resultados de la caché con el mismo sha256 (guardados, 0.18 s hasta calculado)
+BIEN  recargar no recalcula: resultados de la caché con el mismo sha256 (guardados, 0.19 s hasta calculado)
 BIEN  versiones del importado: 2
 BIEN  exportar descarga el texto guardado byte a byte (Ejemplo pórtico de dos plantas con losa.json)
 BIEN  lo exportado pasa el esquema y tiene la huella del importado
