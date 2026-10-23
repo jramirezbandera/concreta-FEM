@@ -86,7 +86,9 @@
  *    lado) y lleva la plantilla de 5, con el refinamiento de sus caras. Los rasgos de una tira no son
  *    ajenos para las celdas de las otras, y un pilar lleva plantilla en todas sus tiras o en ninguna
  *    (`tirasSinPlantilla`, para el aviso `malla/pilar-asoma-sin-plantilla`: lo que asoma lo malla
- *    entonces la triangulación, con astillas). La celda de una tira cuenta como esquina refinada
+ *    entonces la triangulación, con astillas). También va por la triangulación una tira cuya plantilla
+ *    refinada no tiene calidad: sin tercios, contra sus caras de centímetros quedan los elementos de la
+ *    celda, peor que la triangulación (P2-1 de la retícula 5 con muros). La celda de una tira cuenta como esquina refinada
  *    para su cruce (8). Sin tiras, lo que asomaba dejaba irregulares las celdas junto al pilar y la
  *    triangulación lo unía a las caras con astillas (jacobiano 0,11–0,19).
  * 10. Caras delante de un pilar tapado (fase LV2, LV-8, `tapadas`): un pilar que el ancho de su viga
@@ -1459,6 +1461,14 @@ function montarRejilla(E: EntradaRejilla, excluidas: ReadonlySet<number>): Rejil
     // Si la de F3 no tiene calidad (sus transiciones, más apretadas), la de F2; si tampoco, sin refinar
     if (pl.refinada && jacobianoMin(pl) < umbralRefino) pl = redDe(k, mu, mv, ref, false);
     if (pl.refinada && jacobianoMin(pl) < umbralRefino) {
+      // Una tira (LV-8) sin tercios deja contra sus caras, de centímetros, los elementos de la celda:
+      // va mejor por la triangulación, como la que no cabe (P2-1 de la retícula 5 con muros, una tira de
+      // 25 × 15 cm sobre una celda de 1,34 m: su franja en la cara, del −16 al −7 % de la malla fina, y
+      // la malla, de 0,25 a 0,30; `validacion/lv2/p21.ts`)
+      if (E.huellas[k]!.tira) {
+        malas.push(k);
+        continue;
+      }
       pl = redDe(k, mu, mv, null);
       sinRefinar.push(k);
     }

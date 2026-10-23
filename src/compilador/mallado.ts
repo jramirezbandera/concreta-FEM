@@ -1521,7 +1521,7 @@ export function mallarPlantaCon(arreglo: Arreglo, losas: readonly LosaMallar[], 
       losa: -1,
       severidad: "aviso",
       codigo: "malla/pilar-asoma-sin-plantilla",
-      mensaje: `${ids.join(", ")} ${ids.length > 1 ? "asoman" : "asoma"} del ancho de la viga que ${ids.length > 1 ? "los" : "lo"} atraviesa y lo que asoma no cabe en una plantilla de la rejilla (hay un hueco, una carga u otro rasgo cerca): lo malla la triangulación, con elementos peores junto a sus caras. El cálculo es válido; revise las franjas en esas caras o baje el tamaño de malla.`,
+      mensaje: `${ids.join(", ")} ${ids.length > 1 ? "asoman" : "asoma"} del ancho de la viga que ${ids.length > 1 ? "los" : "lo"} atraviesa y lo que asoma no cabe en una plantilla de la rejilla (hay un hueco, una carga u otro rasgo cerca) o su plantilla no admite el refinamiento de sus caras con calidad: lo malla la triangulación, con elementos peores junto a sus caras. El cálculo es válido; revise las franjas en esas caras o baje el tamaño de malla.`,
     });
   }
   for (const triangulacion of [true, false]) {

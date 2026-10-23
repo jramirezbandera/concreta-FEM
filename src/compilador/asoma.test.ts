@@ -111,16 +111,32 @@ describe("los pilares que asoman de su viga (LV-8)", () => {
     // P2-1, un 25 × 60 girado bajo X1 (de 30): con el muro MS la celda de su tira de abajo va
     // partida, la plantilla pone un nudo en mitad de la cara y el trozo de cara dentro de la huella,
     // que es un lado del ancho y no de la huella, se quedaba fuera de la cadena del lado:
-    // `malla/lado-perdido`, y toda la planta se quedaba sin refinar
-    const r = valido(compilar(reticulaConMuros(5)));
-    const fallo = r.diagnosticos.filter((d) => d.mensaje.includes("ha fallado en esta planta"));
+    // `malla/lado-perdido`, y toda la planta se quedaba sin refinar. Desde el 2026-10-23, con el
+    // refinamiento de las caras la plantilla de P2-1 no tiene calidad y sus tiras van por la
+    // triangulación (abajo); sin él, llevan la plantilla, que es lo que se prueba aquí
+    const r = valido(compilar(reticulaConMuros(5), { refinoCaras: false }));
+    const fallo = r.diagnosticos.filter((d) => d.mensaje.includes("ha fallado en esta planta") || d.codigo === "malla/lado-perdido");
     expect(fallo.map((d) => d.mensaje)).toEqual([]);
-    expect(r.estadisticas.malla.plantillasRefinadas).toBeGreaterThan(0);
+    expect(r.diagnosticos.filter((d) => d.codigo === "malla/pilar-asoma-sin-plantilla" && d.mensaje.includes("P2-1"))).toEqual([]);
     // La cara inferior de X1 (y = 5,70) dentro de la huella de P2-1 (x de 12,925 a 13,175), con su
     // nudo en medio, y los tres unidos a la viga
     const en = r.modelo.nudos.flatMap((n, i) => (Math.abs(n.y - 5.7) < 1e-9 && n.x > 12.9 && n.x < 13.2 ? [i] : []));
     expect([...new Set(en.map((i) => r.modelo.nudos[i]!.x.toFixed(3)))].sort()).toEqual(["12.925", "13.050", "13.175"]);
     const esclavos = new Set((r.modelo.restricciones ?? []).flatMap((x) => x.esclavos));
     for (const i of en) expect(esclavos.has(i), `nudo ${i}`).toBe(true);
+  });
+
+  it("una tira cuya plantilla refinada no tiene calidad va por la triangulación, no sin tercios (retícula 5 con muros, P2-1)", () => {
+    // Sus tiras, de 25 × 15 cm sobre una celda de 1,34 m: los tercios de la cara bajan por toda la
+    // celda (jacobiano 0,19). Sin tercios, la franja en su cara salía un 16 % baja frente a la malla
+    // fina; por la triangulación, un 7 % (`validacion/lv2/p21.ts`)
+    const r = valido(compilar(reticulaConMuros(5)));
+    const av = (codigo: string) => r.diagnosticos.filter((d) => d.codigo === codigo && d.mensaje.includes("P2-1"));
+    expect(av("malla/cara-sin-refinar")).toEqual([]);
+    expect(av("malla/pilar-asoma-sin-plantilla").map((d) => d.severidad)).toEqual(["aviso"]);
+    expect(av("malla/pilar-asoma-sin-plantilla")[0]!.mensaje).toContain("con calidad");
+    expect(r.estadisticas.malla.plantillasRefinadas).toBeGreaterThan(0);
+    expect(r.estadisticas.malla.jacobianoMin).toBeGreaterThanOrEqual(0.3);
+    expect(calidad(r)).toEqual([]);
   });
 });
