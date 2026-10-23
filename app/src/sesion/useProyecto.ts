@@ -15,6 +15,9 @@
  *   resultados: no entra en la huella, y las pantallas la mandan en sus pedidos.
  * - Nunca se pisa nada en silencio: si el fichero cambia en el disco con cambios sin guardar, no se
  *   recarga ni se sobrescribe; se avisa (`conflicto`) y el ingeniero elige.
+ * - AL (`docs/fem3d/almacen-local.md`): un proyecto del navegador se guarda solo (AL-b), guarda su
+ *   versión anterior al abrirse y guarda lo calculado para no recalcular al reabrir. Su «disco» es
+ *   IndexedDB, y lo que lo cambia es otra pestaña.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { leerProyecto, type Proyecto } from "../../../src/agente/proyecto.ts";
@@ -24,6 +27,7 @@ import { serializar } from "../../../src/editor/serializar.ts";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { descargar, nombreFirmas, type Origen } from "./origen.ts";
+import { crear, origenNavegador, versionar } from "./almacen.ts";
 import { ClienteSesion, ErrorObsoleto } from "./cliente.ts";
 
 export type Fase = "vacio" | "abriendo" | "calculando" | "listo" | "error";
@@ -52,13 +56,20 @@ export interface Edicion {
   rehacer: () => void;
   /** Guarda en el fichero (o lo descarga, sin carpeta); con `forzar`, aunque haya cambiado en el disco. */
   guardar: (o?: { forzar?: boolean }) => Promise<void>;
+  /** Descarga el proyecto.json tal como está aquí (AL). */
+  exportar: () => void;
+  /** AL: un proyecto sin sitio (un ejemplo) pasa al navegador, en esta pestaña y sin perder el deshacer. */
+  alNavegador: () => Promise<void>;
   guardado: EstadoGuardado;
   /** El fichero cambió en el disco con cambios sin guardar, o al guardar: no se ha recargado ni sobrescrito. */
   conflicto: string | null;
   /** Descarta los cambios y lee el fichero del disco. */
   recargarDisco: () => void;
-  /** Guardar escribe el fichero (carpeta o servidor local) o lo descarga (texto suelto). */
-  modo: "escribir" | "descargar";
+  /**
+   * Guardar escribe el fichero (carpeta o servidor local), lo descarga (texto suelto) o, en el
+   * navegador, se hace solo (AL-b).
+   */
+  modo: "escribir" | "descargar" | "auto";
   /** Hay un cambio que el worker aún no ha compilado. */
   pendiente: boolean;
 }
@@ -97,6 +108,8 @@ export const VIGILANCIA_MS = 1000;
  * seguidos (Tab, Tab…) en una compilación.
  */
 export const PAUSA_COMPILAR_MS = 150;
+/** AL-b: pausa tras el último cambio antes de guardar en el navegador (al ocultar la página, ya). */
+export const AUTOGUARDADO_MS = 400;
 
 /** ¿Difieren dos proyectos sólo en la armadura base? (el editor copia sólo lo que cambia: basta comparar referencias) */
 export function soloArmado(a: Proyecto | null, b: Proyecto): boolean {
@@ -105,6 +118,25 @@ export function soloArmado(a: Proyecto | null, b: Proyecto): boolean {
   claves.delete("armado");
   for (const k of claves) if ((a as unknown as Record<string, unknown>)[k] !== (b as unknown as Record<string, unknown>)[k]) return false;
   return true;
+}
+
+/** Nombre de fichero para exportar un proyecto («Nave Málaga» → «Nave Málaga.json»). */
+export function nombreFichero(nombre: string | undefined): string {
+  const n = (nombre ?? "").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+  return `${n || "proyecto"}.json`;
+}
+
+/**
+ * AL §3.4: lo que se acaba de calcular, a la caché del navegador (si la fuente es del navegador). No
+ * bloquea nada; si falla, se recalcula al reabrir.
+ */
+function guardarCalculo(c: ClienteSesion, f: Fuente, huella: string): void {
+  if (f.tipo !== "origen" || !f.origen.guardarResultados) return;
+  const o = f.origen;
+  void c
+    .pedir({ tipo: "paquete" })
+    .then((r) => (r.ok && r.valor ? o.guardarResultados!(huella, r.valor.cabecera, r.valor.bytes) : undefined))
+    .catch(() => {});
 }
 
 export function useProyecto(): ProyectoAbierto {
@@ -132,6 +164,10 @@ export function useProyecto(): ProyectoAbierto {
   const temporizador = useRef<number | null>(null);
   /** El proyecto que tiene el worker (el último que se le mandó a abrir). */
   const cargado = useRef<Proyecto | null>(null);
+  const fuenteRef = useRef<Fuente | null>(null);
+  fuenteRef.current = fuente;
+  /** Hay una escritura en curso: la siguiente espera (el autoguardado vuelve a mirar cuando acaba). */
+  const escribiendo = useRef(false);
 
   const sinGuardar = !!hist && hist.actual !== enDisco;
   sinGuardarRef.current = sinGuardar;
@@ -204,6 +240,7 @@ export function useProyecto(): ProyectoAbierto {
       } else {
         setEstado(r.valor);
         setFase("listo");
+        guardarCalculo(c, f, r.valor.huella);
       }
       setDesactualizado(false);
     } catch (e) {
@@ -236,6 +273,8 @@ export function useProyecto(): ProyectoAbierto {
   const abrirOrigen = useCallback(
     (o: Origen) => {
       void (async () => {
+        // AL §3.3: lo que había al abrir queda como versión, antes de cualquier cambio
+        if (o.navegador) await versionar(o.navegador).catch(() => {});
         const l = await o.leer(o.fichero);
         if (!l) {
           setErrores([{ codigo: "visor/fichero", severidad: "error", mensaje: `No se pudo leer ${o.descripcion}.` }]);
@@ -270,6 +309,7 @@ export function useProyecto(): ProyectoAbierto {
 
   const calcular = useCallback(() => {
     const c = clienteRef.current;
+    const f = fuenteRef.current;
     if (!c) return;
     const g = gen.current;
     setFase("calculando");
@@ -285,6 +325,7 @@ export function useProyecto(): ProyectoAbierto {
         } else {
           setEstado(r.valor);
           setFase("listo");
+          if (f) guardarCalculo(c, f, r.valor.huella);
         }
       },
       (e: unknown) => {
@@ -361,11 +402,19 @@ export function useProyecto(): ProyectoAbierto {
         setGuardado({ tipo: "guardado", ms: 0 });
         return;
       }
+      if (escribiendo.current) return;
+      escribiendo.current = true;
       setGuardado({ tipo: "guardando" });
       const t0 = performance.now();
-      const r = await fuente.origen.escribir(texto, { sello: ultimo.current?.sello ?? null, forzar: o.forzar });
+      let r: Awaited<ReturnType<Origen["escribir"]>>;
+      try {
+        r = await fuente.origen.escribir(texto, { sello: ultimo.current?.sello ?? null, forzar: o.forzar });
+        // El sello nuevo, antes de soltar la marca: la vigilancia no lo puede ver como un cambio de fuera
+        if (r.ok) ultimo.current = { texto, sello: r.sello, selloFirmas: ultimo.current?.selloFirmas ?? null };
+      } finally {
+        escribiendo.current = false;
+      }
       if (r.ok) {
-        ultimo.current = { texto, sello: r.sello, selloFirmas: ultimo.current?.selloFirmas ?? null };
         setEnDisco(p);
         setConflicto(null);
         setGuardado({ tipo: "guardado", ms: performance.now() - t0 });
@@ -404,10 +453,12 @@ export function useProyecto(): ProyectoAbierto {
       ocupado = true;
       try {
         const s = await o.sello(o.fichero);
+        // Un sello nuevo durante una escritura propia es el de esa escritura (con el autoguardado, a menudo)
+        if (escribiendo.current) return;
         if (s && s !== ultimo.current.sello) {
           if (sinGuardarRef.current) {
             // Con cambios sin guardar no se recarga ni se pisa nada: se avisa y elige el ingeniero
-            setConflicto(`${o.fichero} cambió en el disco y aquí hay cambios sin guardar.`);
+            setConflicto(o.navegador ? "El proyecto cambió en otra pestaña y aquí hay cambios sin guardar." : `${o.fichero} cambió en el disco y aquí hay cambios sin guardar.`);
           } else {
             // Antes de leerlo: lo que se ve ya no es de este fichero
             setDesactualizado(true);
@@ -434,6 +485,67 @@ export function useProyecto(): ProyectoAbierto {
       window.clearInterval(t);
     };
   }, [fuente, cargar, leerFirmas, empezarEdicion]);
+
+  // AL-b: en el navegador se guarda solo tras una pausa (no con un conflicto ni tras un error: hasta el siguiente cambio)
+  const auto = fuente?.tipo === "origen" && !!fuente.origen.navegador;
+  const guardarRef = useRef(guardar);
+  guardarRef.current = guardar;
+  useEffect(() => {
+    if (!auto || !sinGuardar || conflicto || guardado.tipo === "error" || guardado.tipo === "guardando") return;
+    const t = window.setTimeout(() => void guardarRef.current(), AUTOGUARDADO_MS);
+    return () => window.clearTimeout(t);
+  }, [auto, sinGuardar, hist, enDisco, conflicto, guardado]);
+  useEffect(() => {
+    if (!auto) return;
+    const f = () => {
+      if (document.visibilityState === "hidden" && sinGuardarRef.current) void guardarRef.current();
+    };
+    document.addEventListener("visibilitychange", f);
+    return () => document.removeEventListener("visibilitychange", f);
+  }, [auto]);
+
+  // AL: la URL dice qué proyecto del navegador está abierto (recargar la página lo vuelve a abrir)
+  useEffect(() => {
+    const id = fuente?.tipo === "origen" ? fuente.origen.navegador : undefined;
+    if (!id) return;
+    const u = new URL(location.href);
+    if (u.search === `?local=${encodeURIComponent(id)}`) return;
+    u.search = `?local=${encodeURIComponent(id)}`;
+    history.replaceState(null, "", u);
+  }, [fuente]);
+
+  const exportar = useCallback(() => {
+    const h = histRef.current;
+    if (!h) return;
+    const f = fuenteRef.current;
+    const nombre = f?.tipo === "texto" ? f.nombre : f?.origen.navegador ? nombreFichero(h.actual.nombre) : (f?.origen.fichero ?? "proyecto.json");
+    descargar(serializar(h.actual), nombre);
+  }, []);
+
+  const alNavegador = useCallback(async () => {
+    const h = histRef.current;
+    const f = fuenteRef.current;
+    if (!h || f?.tipo !== "texto") return;
+    const texto = serializar(h.actual);
+    const l = leerProyecto(texto);
+    if (!l.valido) {
+      setGuardado({ tipo: "error", mensaje: `El proyecto no pasa el esquema: no se guarda (${l.diagnosticos[0]?.mensaje ?? ""}).` });
+      return;
+    }
+    try {
+      const fi = await crear(texto, f.nombre.replace(/\.json$/i, ""));
+      ultimo.current = { texto, sello: String(fi.sello), selloFirmas: null };
+      setEnDisco(h.actual);
+      setGuardado({ tipo: "guardado", ms: 0 });
+      const nf: Fuente = { tipo: "origen", origen: origenNavegador(fi.id, fi.nombre) };
+      setFuente(nf);
+      // Lo calculado en esta pestaña, también a la caché
+      const c = clienteRef.current;
+      if (c?.huella) guardarCalculo(c, nf, c.huella);
+    } catch (e) {
+      setGuardado({ tipo: "error", mensaje: `No se pudo guardar en el navegador: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  }, []);
 
   // Avisar al cerrar la página con cambios sin guardar
   useEffect(() => {
@@ -467,7 +579,9 @@ export function useProyecto(): ProyectoAbierto {
         guardado,
         conflicto,
         recargarDisco,
-        modo: fuente?.tipo === "origen" ? "escribir" : "descargar",
+        exportar,
+        alNavegador,
+        modo: auto ? "auto" : fuente?.tipo === "origen" ? "escribir" : "descargar",
         pendiente,
       }
     : null;

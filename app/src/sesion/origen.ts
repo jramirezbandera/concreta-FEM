@@ -10,6 +10,7 @@
  * - Carpeta: la File System Access API (Chrome y Edge), elegida por el usuario.
  * - URL: un fichero que sirve el servidor local del visor (`?proyecto=<ruta>`), para abrirlo desde la
  *   línea de órdenes y para el banco de Chrome, que no puede elegir una carpeta.
+ * - Navegador (fase AL): IndexedDB, en `almacen.ts`.
  *
  * Los dos se vigilan con un sello (fecha y tamaño, o ETag) que se mira cada segundo.
  */
@@ -63,6 +64,13 @@ export interface Origen {
   guardados(huella: string): Promise<{ cabecera: string; bytes: Uint8Array } | null>;
   /** Escribe el proyecto si su sello sigue siendo `sello` (o siempre, con `forzar`). */
   escribir(texto: string, o: { sello: string | null; forzar?: boolean }): Promise<Escritura>;
+  /**
+   * AL: el id de un proyecto del navegador (`almacen.ts`). Se guarda solo (AL-b), tiene versiones y
+   * su sello cambia por otra pestaña, no por el disco.
+   */
+  navegador?: string;
+  /** AL: guarda lo calculado para no recalcular al reabrir (sólo el navegador; la CLI escribe `.fem/`). */
+  guardarResultados?(huella: string, cabecera: string, bytes: Uint8Array): Promise<void>;
 }
 
 /** Fichero de firmas de un proyecto: `<nombre>.revision.json`, junto a él (como `rutaFirmas` de la CLI). */
@@ -150,25 +158,6 @@ export function origenCarpeta(dir: Directorio, fichero: string): Origen {
       }
     },
   };
-}
-
-/** Crea `fichero` en la carpeta con `texto`; no sobrescribe uno que ya exista. */
-export async function crearEnCarpeta(dir: Directorio, fichero: string, texto: string): Promise<string | null> {
-  try {
-    await dir.getFileHandle(fichero);
-    return `Ya existe ${fichero} en ${dir.name}: no se sobrescribe. Ábralo o elija otro nombre.`;
-  } catch {
-    // No existe: se crea
-  }
-  try {
-    const h = await dir.getFileHandle(fichero, { create: true });
-    const w = await h.createWritable();
-    await w.write(texto);
-    await w.close();
-    return null;
-  } catch (e) {
-    return `No se pudo crear ${fichero}: ${e instanceof Error ? e.message : String(e)}`;
-  }
 }
 
 // ─── URL del servidor local ─────────────────────────────────────────────────────────────────────

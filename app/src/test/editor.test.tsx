@@ -280,7 +280,7 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
       </ThemeProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Proyecto nuevo/ }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del fichero" }), { target: { value: "portico" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "portico" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
     // I1: la paleta de órdenes (Ctrl+K) lleva a las tablas
@@ -328,13 +328,13 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     };
     const h = huella(esperado);
     await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(h), { timeout: 30_000 });
-    // Y compila: el estado no es «no compila»
-    expect(container.querySelector("[data-estado]")?.getAttribute("data-estado")).toBe("sin-calcular");
+    // Y compila: el estado no es «no compila» (AL: antes mira si la caché del navegador tiene esa huella)
+    await waitFor(() => expect(container.querySelector("[data-estado]")?.getAttribute("data-estado")).toBe("sin-calcular"));
     // I1, criterio 3: sin cálculo de esta huella no se entra en Resultados ni en Revisión
     expect(screen.getByRole("button", { name: "Resultados" }).hasAttribute("disabled")).toBe(true);
     expect(screen.getByRole("button", { name: "Revisión" }).hasAttribute("disabled")).toBe(true);
-    // Guardar está activo (hay cambios sin guardar)
-    expect(screen.getByRole("button", { name: /Descargar/ }).getAttribute("data-sin-guardar")).toBe("true");
+    // AL-b: un proyecto nuevo es del navegador y se guarda solo
+    await waitFor(() => expect(screen.getByRole("status", { name: "Estado del guardado" }).textContent).toMatch(/Guardado/));
 
     // Copiar y Borrar sin nada elegido esperan a que se elija: un clic abre su diálogo con lo elegido
     fireEvent.keyDown(window, { key: "Escape" });
@@ -377,7 +377,7 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
       </ThemeProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Proyecto nuevo/ }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del fichero" }), { target: { value: "muro" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "muro" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
 
@@ -425,7 +425,7 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     };
     const h = huella(esperado);
     await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(h), { timeout: 30_000 });
-    expect(container.querySelector("[data-estado]")?.getAttribute("data-estado")).toBe("sin-calcular");
+    await waitFor(() => expect(container.querySelector("[data-estado]")?.getAttribute("data-estado")).toBe("sin-calcular"));
   }, 120_000);
 });
 

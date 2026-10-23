@@ -29,3 +29,19 @@ export const mm = (m: number | null | undefined, dec = 2): string => (m === null
 
 /** Cota con signo: +18,00. */
 export const cota = (v: number | null | undefined): string => (v === null || v === undefined ? "—" : `${v > 0 ? "+" : ""}${fmt(v, 2)}`);
+
+const dos = (n: number) => String(n).padStart(2, "0");
+
+/** Fecha de un proyecto o una versión del navegador (AL): «hoy 18:25», «ayer 9:05» o «22/10/2026 18:25». */
+export function fechaCorta(ms: number, ahora = Date.now()): string {
+  const d = new Date(ms);
+  const hora = `${d.getHours()}:${dos(d.getMinutes())}`;
+  const dia = (x: Date) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  const hoy = new Date(ahora);
+  if (dia(d) === dia(hoy)) return `hoy ${hora}`;
+  if (dia(d) === dia(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1))) return `ayer ${hora}`;
+  return `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${d.getFullYear()} ${hora}`;
+}
+
+/** Tamaño de un texto (caracteres ≈ bytes): «12 kB», «1,4 MB». */
+export const tamano = (n: number): string => (n < 1e6 ? `${fmt(Math.max(1, Math.round(n / 1e3)), 0)} kB` : `${fmt(n / 1e6, 1)} MB`);

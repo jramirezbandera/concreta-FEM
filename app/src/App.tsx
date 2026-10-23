@@ -13,11 +13,13 @@
  * - desde I2: F encuadra la vista activa y Ctrl+1…4 cambian la disposición de las vistas.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FolderOpen, Moon, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
+import { Check, Download, FolderOpen, History, Moon, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
 import { lista, indiceIds } from "../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
 import { ejeVecino } from "./armazon/Disposicion.tsx";
 import { Paleta, type Orden } from "./armazon/Paleta.tsx";
+import { DialogoVersiones } from "./armazon/Versiones.tsx";
+import { hayAlmacen } from "./sesion/almacen.ts";
 import { ContextoPaneles, useAlmacenPaneles, type EstadoPaneles } from "./armazon/paneles.ts";
 import { ContextoVisor, type Espacio, type ModoResultados } from "./contexto.ts";
 import { EspacioModelo } from "./espacios/Modelo.tsx";
@@ -85,6 +87,7 @@ export function App() {
   const [elegidos, setElegidosE] = useState<string[]>([]);
   const seleccion = elegidos[elegidos.length - 1] ?? null;
   const [paleta, setPaleta] = useState(false);
+  const [versionesAbiertas, setVersionesAbiertas] = useState(false);
   const [tablaPedida, setTablaPedida] = useState<{ tabla: NombreTabla; n: number } | null>(null);
 
   // ?proyecto=<url> o ?ejemplo=<nombre>: abrir al cargar
@@ -160,7 +163,7 @@ export function App() {
       if (mod && !x.altKey && ed) {
         if (k === "s") {
           x.preventDefault();
-          void ed.guardar();
+          void (ed.modo === "descargar" && hayAlmacen() ? ed.alNavegador() : ed.guardar());
         } else if (!enCampo(x.target) && k === "z" && !x.shiftKey) {
           x.preventDefault();
           ed.deshacer();
@@ -189,6 +192,10 @@ export function App() {
     return () => window.removeEventListener("keydown", f);
   }, [ed, e, paleta, plantas, plantaValida, setPlanta, setDisposicion, ponerVista, vistaActiva]);
 
+  const navegador = proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.navegador : undefined;
+  // Lo que aún no se ha guardado, antes de ver las versiones (restaurar parte de lo guardado)
+  const abrirVersiones = () => void (ed?.sinGuardar ? ed.guardar() : Promise.resolve()).then(() => setVersionesAbiertas(true));
+
   // Órdenes de la paleta
   const ordenes = useMemo<Orden[]>(() => {
     const r: Orden[] = [];
@@ -199,10 +206,13 @@ export function App() {
     const vivo: Partial<EstadoPaneles> = paneles.vivos.get(clave) ?? {};
     r.push(
       { id: "calcular", grupo: "Proyecto", nombre: e?.calculado ? "Recalcular" : "Calcular", hacer: () => (e?.calculado || !proyecto.calcular ? proyecto.recalcular() : proyecto.calcular()), deshabilitada: !e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado) },
-      { id: "guardar", grupo: "Proyecto", nombre: ed?.modo === "escribir" ? "Guardar" : "Descargar", atajo: "Ctrl S", hacer: () => void ed?.guardar(), deshabilitada: !ed?.sinGuardar },
+      ...(ed?.modo === "escribir" ? [{ id: "guardar", grupo: "Proyecto", nombre: "Guardar", atajo: "Ctrl S", hacer: () => void ed.guardar(), deshabilitada: !ed.sinGuardar }] : []),
+      ...(ed?.modo === "descargar" && hayAlmacen() ? [{ id: "al-navegador", grupo: "Proyecto", nombre: "Guardar en mis proyectos (en este navegador)", atajo: "Ctrl S", hacer: () => void ed.alNavegador() }] : []),
+      { id: "exportar", grupo: "Proyecto", nombre: "Exportar el proyecto.json", hacer: () => ed?.exportar(), deshabilitada: !ed },
+      ...(ed?.modo === "auto" ? [{ id: "versiones", grupo: "Proyecto", nombre: "Versiones anteriores…", hacer: abrirVersiones }] : []),
       { id: "deshacer", grupo: "Proyecto", nombre: ed?.deshacerEtiqueta ? `Deshacer: ${ed.deshacerEtiqueta}` : "Deshacer", atajo: "Ctrl Z", hacer: () => ed?.deshacer(), deshabilitada: !ed?.deshacerEtiqueta },
       { id: "rehacer", grupo: "Proyecto", nombre: ed?.rehacerEtiqueta ? `Rehacer: ${ed.rehacerEtiqueta}` : "Rehacer", atajo: "Ctrl Y", hacer: () => ed?.rehacer(), deshabilitada: !ed?.rehacerEtiqueta },
-      { id: "abrir", grupo: "Proyecto", nombre: "Abrir otro proyecto", hacer: () => location.assign(location.pathname) },
+      { id: "abrir", grupo: "Proyecto", nombre: "Mis proyectos (abrir otro)", hacer: () => location.assign(location.pathname) },
       { id: "nav", grupo: "Paneles", nombre: vivo.nav === false ? "Abrir el navegador" : "Plegar el navegador", hacer: () => cambiar(clave, { nav: vivo.nav === false }) },
       { id: "props", grupo: "Paneles", nombre: vivo.props === false ? "Abrir las propiedades" : "Plegar las propiedades", hacer: () => cambiar(clave, { props: vivo.props === false }) },
       { id: "dock", grupo: "Paneles", nombre: vivo.dock ? "Plegar el panel inferior" : "Abrir el panel inferior", hacer: () => cambiar(clave, { dock: !vivo.dock }) },
@@ -245,9 +255,11 @@ export function App() {
 
   const pie =
     proyecto.fuente?.tipo === "origen"
-      ? `${proyecto.fuente.origen.descripcion} · vigilando cambios${ed?.guardado.tipo === "guardado" ? ` · guardado en ${ed.guardado.ms.toFixed(0)} ms` : ""}`
+      ? proyecto.fuente.origen.navegador
+        ? `${proyecto.fuente.origen.descripcion} · se guarda solo${ed?.guardado.tipo === "guardado" && ed.guardado.ms ? ` (en ${ed.guardado.ms.toFixed(0)} ms)` : ""}`
+        : `${proyecto.fuente.origen.descripcion} · vigilando cambios${ed?.guardado.tipo === "guardado" ? ` · guardado en ${ed.guardado.ms.toFixed(0)} ms` : ""}`
       : proyecto.fuente
-        ? `${proyecto.fuente.nombre} · sin vigilancia (ábralo desde su carpeta para recargarlo solo y guardar en él)`
+        ? `${proyecto.fuente.nombre} · sin guardar en ningún sitio${hayAlmacen() ? " (Guardar en mis proyectos, o Exportar)" : " (Exportar lo descarga)"}`
         : "";
   const resultados = !e?.calculado
     ? ""
@@ -284,16 +296,41 @@ export function App() {
                 <button type="button" className="ib" onClick={ed.rehacer} disabled={!ed.rehacerEtiqueta} title={ed.rehacerEtiqueta ? `Rehacer: ${ed.rehacerEtiqueta} (Ctrl+Y)` : "Nada que rehacer"} aria-label="Rehacer">
                   <Redo2 size={16} />
                 </button>
-                <button
-                  type="button"
-                  className={`btn ${ed.sinGuardar ? "btn-p" : ""}`}
-                  onClick={() => void ed.guardar()}
-                  disabled={!ed.sinGuardar || ed.guardado.tipo === "guardando"}
-                  data-sin-guardar={ed.sinGuardar}
-                  title={ed.modo === "escribir" ? `Guardar en ${proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : ""} (Ctrl+S)` : "Sin carpeta: guardar descarga el fichero (Ctrl+S)"}
-                >
-                  <Save size={15} /> {ed.guardado.tipo === "guardando" ? "Guardando…" : ed.modo === "escribir" ? "Guardar" : "Descargar"}
-                  {ed.sinGuardar && <span aria-label="sin guardar">●</span>}
+                {ed.modo === "auto" ? (
+                  // AL-b: se guarda solo; aquí sólo se dice cómo va
+                  <span className="flex items-center gap-1 px-1 text-[12px] text-text-secondary" role="status" aria-label="Estado del guardado" data-sin-guardar={ed.sinGuardar} title="Se guarda solo en este navegador">
+                    {ed.sinGuardar ? (
+                      "Guardando…"
+                    ) : (
+                      <>
+                        <Check size={14} /> Guardado
+                      </>
+                    )}
+                  </span>
+                ) : ed.modo === "descargar" && hayAlmacen() ? (
+                  <button type="button" className="btn btn-p" onClick={() => void ed.alNavegador()} title="Guardarlo en este navegador, con los demás proyectos (Ctrl+S); desde ahí se guarda solo">
+                    <Save size={15} /> Guardar en mis proyectos
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={`btn ${ed.sinGuardar ? "btn-p" : ""}`}
+                    onClick={() => void ed.guardar()}
+                    disabled={!ed.sinGuardar || ed.guardado.tipo === "guardando"}
+                    data-sin-guardar={ed.sinGuardar}
+                    title={ed.modo === "escribir" ? `Guardar en ${proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : ""} (Ctrl+S)` : "Este navegador no guarda proyectos: guardar descarga el fichero (Ctrl+S)"}
+                  >
+                    <Save size={15} /> {ed.guardado.tipo === "guardando" ? "Guardando…" : ed.modo === "escribir" ? "Guardar" : "Descargar"}
+                    {ed.sinGuardar && <span aria-label="sin guardar">●</span>}
+                  </button>
+                )}
+                {navegador && (
+                  <button type="button" className="ib" onClick={abrirVersiones} aria-label="Versiones anteriores" title="Versiones anteriores">
+                    <History size={16} />
+                  </button>
+                )}
+                <button type="button" className="ib" onClick={ed.exportar} aria-label="Exportar el proyecto.json" title="Exportar el proyecto.json (descargarlo)">
+                  <Download size={16} />
                 </button>
               </>
             ) : (
@@ -317,8 +354,8 @@ export function App() {
               </span>
               <span className="kbd">Ctrl K</span>
             </button>
-            <button type="button" className="btn" onClick={() => location.assign(location.pathname)} title="Abrir otro proyecto">
-              <FolderOpen size={15} /> Abrir
+            <button type="button" className="btn" onClick={() => location.assign(location.pathname)} title="Mis proyectos: abrir otro">
+              <FolderOpen size={15} /> Proyectos
             </button>
             <button type="button" className="ib" onClick={toggleTheme} aria-label={theme === "dark" ? "Tema claro" : "Tema oscuro"} title={theme === "dark" ? "Tema claro" : "Tema oscuro"}>
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
@@ -331,12 +368,23 @@ export function App() {
                 <strong>{ed.conflicto}</strong> No se ha recargado ni sobrescrito nada.
               </span>
               <button type="button" className="btn" onClick={ed.recargarDisco}>
-                Recargar del disco (se pierden los cambios de aquí)
+                {navegador ? "Recargar lo guardado" : "Recargar del disco"} (se pierden los cambios de aquí)
               </button>
               <button type="button" className="btn" onClick={() => void ed.guardar({ forzar: true })}>
-                Sobrescribir el del disco
+                {navegador ? "Sobrescribir lo guardado" : "Sobrescribir el del disco"}
               </button>
             </div>
+          )}
+          {versionesAbiertas && navegador && ed && (
+            <DialogoVersiones
+              id={navegador}
+              nombre={e?.nombre ?? "el proyecto"}
+              onCerrar={() => setVersionesAbiertas(false)}
+              onRestaurada={() => {
+                setVersionesAbiertas(false);
+                ed.recargarDisco();
+              }}
+            />
           )}
           {ed?.guardado.tipo === "error" && (
             <div className="banda fail" role="alert">

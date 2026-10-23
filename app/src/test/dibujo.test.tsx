@@ -64,7 +64,7 @@ describe("la herramienta activa (V2c-1)", () => {
       </ThemeProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Proyecto nuevo/ }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del fichero" }), { target: { value: "dibujo" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "dibujo" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
 

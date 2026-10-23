@@ -19,6 +19,8 @@ const bien = <K extends keyof Respuestas>(_k: K, valor: Respuestas[K]): Contesta
 
 export class Atendedor {
   private sesion: Sesion | null = null;
+  /** Lo que calculó la sesión, empaquetado como `.fem/<huella>/`, hasta que se pide (`paquete`). */
+  private empaquetado: { cabecera: string; bytes: Uint8Array } | null = null;
   readonly motor: string;
 
   constructor(motor: string) {
@@ -32,6 +34,7 @@ export class Atendedor {
   async atender(p: Pedido): Promise<Contestacion> {
     if (p.tipo === "abrir") {
       const a = Sesion.abrir(p.texto, this.motor);
+      this.empaquetado = null;
       if (!a.valido) {
         this.sesion = null;
         return { ok: false, diagnosticos: a.diagnosticos };
@@ -48,7 +51,16 @@ export class Atendedor {
       }
       case "calcular": {
         const r = await s.calcular();
-        return r.ok ? bien("calcular", s.estado()) : { ok: false, diagnosticos: r.diagnosticos };
+        if (!r.ok) return { ok: false, diagnosticos: r.diagnosticos };
+        const e = s.estado();
+        // La cabecera, como la escribe la CLI (cli/ordenes.ts): con el núcleo y el sha256 de los bytes
+        this.empaquetado = { cabecera: JSON.stringify({ ...r.cabecera, motor: this.motor, sha256: e.sha256Resultados }), bytes: r.bytes };
+        return bien("calcular", e);
+      }
+      case "paquete": {
+        const x = this.empaquetado;
+        this.empaquetado = null;
+        return bien("paquete", x);
       }
       case "estado":
         return bien("estado", s.estado());

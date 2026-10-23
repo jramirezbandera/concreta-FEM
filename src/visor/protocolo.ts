@@ -28,6 +28,8 @@ export type Pedido =
   | { tipo: "abrir"; texto: string }
   | { tipo: "guardados"; cabecera: string; bytes: Uint8Array }
   | { tipo: "calcular" }
+  /** AL: los resultados del último cálculo empaquetados como `.fem/<huella>/` (una vez; null si no hay), para la caché del navegador. */
+  | { tipo: "paquete" }
   | { tipo: "estado" }
   | { tipo: "escena"; planta: string; vista: VistaPlanta }
   /** Un alzado; con `diagramas`, los de las barras del plano, y con `reacciones`, las de sus objetos (I4); con `cargas`, las de un caso. */
@@ -75,6 +77,7 @@ export interface Respuestas {
   abrir: EstadoSesion;
   guardados: { usados: true; estado: EstadoSesion } | { usados: false; motivo: string };
   calcular: EstadoSesion;
+  paquete: { cabecera: string; bytes: Uint8Array } | null;
   estado: EstadoSesion;
   escena: EscenaPreparada;
   alzado: EscenaPreparada;

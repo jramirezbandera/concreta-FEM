@@ -16,7 +16,7 @@ import { useVisor } from "../contexto.ts";
 
 const total = (m: ModeloFisico) => COLECCIONES.reduce((n, c) => n + lista(m, c).length, 0);
 
-function Dialogo({ titulo, children, pie, onCerrar }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void }) {
+export function Dialogo({ titulo, children, pie, onCerrar }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void }) {
   return (
     <div className="dialogo-fondo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()} onKeyDown={(e) => e.key === "Escape" && onCerrar()}>
       <div className="dialogo" role="dialog" aria-modal="true" aria-label={titulo}>

@@ -149,6 +149,8 @@ describe("Fase AB · la armadura base y las zonas de refuerzo en el DOM", () => 
     guardado: { tipo: "nada" },
     conflicto: null,
     recargarDisco() {},
+    exportar() {},
+    alNavegador: async () => {},
     modo: "descargar",
     pendiente: false,
   });
