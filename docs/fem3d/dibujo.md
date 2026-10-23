@@ -1,6 +1,6 @@
 # V2c: dibujar el modelo con el ratón (plan)
 
-> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3.
+> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7).
 >
 > **Origen:** el usuario pide adelantar V2c a la puerta de uso de F y AB. Con las tablas sólo se modela bien si ya se tienen las coordenadas: «no sé cómo modelarlo yo si no». Se sustituye así el orden de `visor.md` (V-e: primero tablas y luego el ratón) y el de `CLAUDE.md` («con lo que salga, V2c»). La puerta de uso de F y AB va después de V2c, y con ella la fase MA.
 
@@ -169,3 +169,50 @@ La puerta de uso de V2c va al final de V2c-3 (o de V2c-4), y se puede juntar con
 - **V2c-c:** recuadro cerrado y polígono.
 - **V2c-e:** sí, el DXF de fondo como V2c-4, después de V2c-3. El lector de DXF se elige al empezar V2c-4 (lo que se iba a decidir en MA6).
 - **V2c-d** (mover un pilar arrastra sus vigas): se decide al empezar V2c-3.
+
+## 7. V2c-1 hecho (2026-10-23)
+
+La herramienta activa, los enganches, el marcador, lo que hay bajo el cursor, el ortogonal, el teclado y la barra de estado, con las herramientas Ejes, Pilar y Viga.
+
+### 7.1 Qué hay
+
+- **`src/editor/dibujo/`** (puro, sin DOM):
+  - `enganches.ts`: el índice de rasgos de una planta (lo que dibuja la vista `modelo`: pilares que llegan o arrancan, vigas, muros, apoyos lineales, losas, paños y los ejes del modelo o los propuestos), `enganchar` con la prioridad de §2.2, `ortogonal` (0°/90° de los ejes de la losa de la planta o, sin losas, del primer eje de replanteo; 45° con Mayús), `apuntar` (un enganche gana al ortogonal) y `bajoCursor`.
+  - `teclado.ts`: `x; y`, `@dx; dy`, `@L<ángulo` y una longitud. Los dos números se separan con «;», espacios o «, »; la coma sin espacio es la decimal, como en las tablas, y «3.5,4.2» también vale.
+  - `herramientas.ts`: Ejes, Pilar y Viga como máquinas de estados (`paso`, `borrador`, `ayuda`). Lo terminado es una `Operacion` (una acción, un paso de deshacer).
+- **`app/src/dibujo/`**: `controlador.ts` (la herramienta activa fuera de React: mover el ratón no pasa por un render) y `Plantilla.tsx` (la plantilla en Propiedades y el campo de teclado junto al cursor).
+- **Vistas:** `Vista2D.dibujo` recibe el cursor, los clics y la ventana en m y pinta encima el resaltado, el borrador y el marcador; un clic o una ventana que no usa (con Elegir) va a elegir, como antes. La barra de estado dice el enganche («Centro (P-x18-y5)», «Cruce (H)», «Ortogonal»).
+- **Barra de Modelo:** Ejes, Pilar y Viga son herramientas (antes abrían su tabla); un segundo clic o Esc sin nada en curso vuelve a Elegir. La tabla, desde la plantilla.
+
+Cómo se comporta cada herramienta:
+
+- **Ejes:** dos clics. Se llama con la letra o el número siguiente según vaya como los ejes con letra o como los numerados de `compilador/ejes.ts`. **El primero que se dibuja sin ejes en el modelo guarda también los propuestos** (V2c1-3); «Proponer ejes» los guarda sin dibujar.
+- **Pilar:** un clic pone su punto fijo donde se hace clic; una ventana, uno en cada cruce de ejes de dentro, por filas de arriba abajo y de izquierda a derecha. Plantilla: desde (por defecto, la planta más baja), hasta (por defecto, la de la vista), sección, giro y punto fijo. Donde ya hay un pilar que comparte plantas, no pone otro (el doble clic no duplica).
+- **Viga:** polilínea; doble clic o Intro termina, Retroceso quita el último punto, Esc anula. Plantilla: sección y alinear (V2c-b): eje a eje (por defecto) o con la cara izquierda o derecha, según el sentido del dibujo, en la de los pilares de sus extremos.
+- **Sección nueva** desde la plantilla, rectangular b × h en cm («P30x30», «V30x50»), sin ir a la tabla. La de por defecto es la más usada por su tipo de objeto.
+
+### 7.2 Criterios
+
+| # | Criterio | Resultado |
+|---|---|---|
+| 1 | Las herramientas dan lo que daría la tabla | **Pasa.** `dibujo.test.ts`: pilar con giro y punto fijo, y viga de tres puntos, iguales byte a byte a la fila de la tabla con esos valores |
+| 2 | El enganche es exacto | **Pasa.** El punto de un rasgo es el del modelo (los mismos doubles); los cruces y las proyecciones sobre rectas paralelas a X o a Y, con sus números (V2c1-1); prioridad por niveles; radio de 10 px a 5, 50 y 500 px/m; una retícula dibujada (ventana de pilares, vigas por los pilares, una viga en T por el punto medio y la perpendicular) compila sin `losa/ajuste`, `topologia/casi-encuentro`, `topologia/fusion` ni `topologia/nudos-proximos` |
+| 3 | Rehacer los modelos de A2 dibujándolos | **A medias, como estaba previsto:** lo de V2c-1. El banco (`validacion/v2c/chrome.ts`) dibuja con eventos de ratón y teclado una planta del edificio objetivo desde los ejes (18 ejes tecleados, 80 pilares con un clic, 18 vigas de pilar a pilar con el ratón y 63 secundarias tecleadas) y, tras «Renumerar», su huella es la de la referencia renumerada. Las losas y la retícula con núcleo (muros), con V2c-2 |
+| 4 | Deshacer | **Pasa.** En el banco, 180 pasos (18 ejes + 80 pilares + 81 vigas + Renumerar) y, deshecho todo, la huella de partida; en vitest, deshacer todo devuelve el mismo objeto |
+| 5 | Fluidez | **Pasa.** Edificio objetivo, planta N3, Viga: enganche de 0,1 ms de mediana y 0,2 ms p95 (máx. ≤ 1,2 ms); el índice de la planta, 3,7 ms la primera vez; 120 movimientos sin tareas largas |
+| 6 | Nada se rompe | **Pasa.** I1, I2, I3, I4, V1 y V2a dan los mismos bits. Sus fallos son de tiempo y salen igual en el commit anterior, medido en un worktree alternando con este (I2: una tarea larga de 83 / 76 ms al pasar a cuatro vistas; V1: abrir con `.fem/` 3,39 / 3,46 s y M11 1,16 / 1,12 s; V2a: diagnósticos 3,4 / 3,3 s, desde que el edificio compila en ~3 s). El banco de V2b se para antes y después porque busca la pestaña «Losas», que es «Forjados» |
+| 7 | Puerta de uso | Del usuario, al final de V2c |
+
+### 7.3 Hallazgos
+
+- **V2c1-1, el cruce de dos ejes no daba sus números.** El cruce de un eje según X con uno según Y, por el parámetro de la recta, sale 6,000000000000001 en vez de 6. Con una recta paralela a X o a Y se toma su coordenada tal cual (también en la proyección del punto más cercano y de la perpendicular). Sin esto, los pilares dibujados en los cruces no tendrían los números de la tabla y el criterio 3 no pasaría.
+- **V2c1-2, el orden de los pilares cuenta en la huella.** La huella ordena por id las vigas, losas y demás, pero no los pilares (su orden numera los nudos, C3-5), y «Renumerar» cambia los ids pero no el orden de la lista. Dos modelos con los mismos pilares dibujados en otro orden tienen otra huella aunque calculen lo mismo. El banco los dibuja en el orden de la referencia. Para el criterio 3 completo (V2c-2) habrá que decidir si «Renumerar» ordena también la lista de pilares.
+- **V2c1-3, el primer eje.** Sin ejes en el modelo, se ven los propuestos; si el primer eje dibujado se guardara solo, los propuestos desaparecerían. Se guardan con él, en el mismo paso.
+- **V2c1-4, el velo de «Compilando».** Tras cada objeto dibujado la planta se velaba mientras compilaba. Con una herramienta de dibujo activa, ya no; con Elegir y al editar en las tablas, como antes.
+
+### 7.4 Pendiente
+
+- **Al pasar el ratón** se resalta lo del índice local (pilares, vigas, muros, apoyos lineales, ejes, losas y paños), no lo que elegiría el worker: los apoyos puntuales y las cargas no se resaltan.
+- **«La cara de un pilar en la prolongación del cursor»** (§2.2, nivel 5) se ha hecho como el punto de la cara más cercano al cursor.
+- Los bancos de V1, V2a y V2b tienen umbrales de tiempo y nombres de pestaña de antes de LV2 y de Forjados: hay que ponerlos al día (no es de V2c).
+- La puerta de uso, al final de V2c (V2c-a).
