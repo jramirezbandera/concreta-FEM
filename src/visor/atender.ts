@@ -31,6 +31,18 @@ export class Atendedor {
     return this.sesion?.huella ?? null;
   }
 
+  /**
+   * Lo que se adelanta con el worker parado, tras fijar unos resultados (V1-3): la preparación de los
+   * campos SPR, que no depende del caso (en el edificio objetivo, ~0,35 s del primer mapa de M, N o Q).
+   */
+  ocioso(): void {
+    try {
+      void this.sesion?.rr?.campos;
+    } catch {
+      // Lo adelantado no es un pedido: si falla, fallará también el pedido que lo necesite, y lo dirá
+    }
+  }
+
   async atender(p: Pedido): Promise<Contestacion> {
     if (p.tipo === "abrir") {
       const a = Sesion.abrir(p.texto, this.motor, { diferir: !!p.diferir });
@@ -128,7 +140,7 @@ export class Atendedor {
       case "revision":
         return de(datosRevision(s, p.firmas, p.ficheroFirmas));
       case "precalentar":
-        if (s.proyecto.modelo.plantas.some((x) => x.id === p.planta)) s.rr?.valores(p.planta);
+        if (s.proyecto.modelo.plantas.some((x) => x.id === p.planta)) s.rr?.valores(p.planta, "losas", "flexion");
         return bien("precalentar", null);
     }
   }

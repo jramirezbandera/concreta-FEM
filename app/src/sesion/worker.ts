@@ -46,6 +46,8 @@ async function procesar(m: MensajeAlWorker): Promise<void> {
     const ms = performance.now() - t0;
     if (r.ok) ambito.postMessage({ id: m.id, huella: at.huella, ok: true, valor: r.valor, ms }, TRANSFERIR.has(m.pedido.tipo) ? transferibles(r.valor) : []);
     else ambito.postMessage({ id: m.id, huella: at.huella, ok: false, diagnosticos: r.diagnosticos, ms });
+    // Con resultados nuevos, lo que se puede adelantar va detrás de los pedidos que ya esperan
+    if (r.ok && (m.pedido.tipo === "calcular" || m.pedido.tipo === "guardados")) setTimeout(() => (cola = cola.then(() => at.ocioso())), 0);
   } catch (e) {
     // El motor nunca lanza por un dato del modelo (E6); lo que llegue aquí es un fallo del visor
     ambito.postMessage({ id: m.id, huella: at.huella, ok: false, diagnosticos: [{ codigo: "visor/error-interno", severidad: "error", mensaje: `Error interno del visor: ${e instanceof Error ? e.message : String(e)}` }], ms: performance.now() - t0 });

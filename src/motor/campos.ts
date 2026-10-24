@@ -47,7 +47,7 @@
  * `plazas`, `lebesgueEn`…) es de la de flexión.
  */
 import { PUNTOS_GAUSS } from "../elementos/dkmq.ts";
-import { coordenadasNaturales, funcionesForma, operadorResultantes, vectorALocales } from "../elementos/lamina.ts";
+import { coordenadasNaturales, funcionesForma, operadorResultantes } from "../elementos/lamina.ts";
 import { cajaCorte, ladoIndice, TOL_CORTE, type CortePreparado, type InfoCorte, type IntegradorCampos, type MuestrasCorte } from "./cortes.ts";
 import { cajaDe, IndiceCajas } from "./indice.ts";
 import { Diagnosticos, listaIds } from "./diagnosticos.ts";
@@ -286,7 +286,7 @@ export class ParticionCampos {
   private readonly base: Base;
   private readonly muestreo: MuestreoSpr;
 
-  constructor(campo: CampoParticion, modelo: ModeloAnalitico, geo: Geometria, laminas: readonly (LaminaPreparada | undefined)[], deformable: Uint8Array, porLado: ReadonlyMap<string, number[]>, base: Base, muestreo: MuestreoSpr) {
+  constructor(campo: CampoParticion, modelo: ModeloAnalitico, geo: Geometria, laminas: readonly (LaminaPreparada | undefined)[], deformable: Uint8Array, porLado: ReadonlyMap<number, number[]>, base: Base, muestreo: MuestreoSpr) {
     this.campo = campo;
     this.modelo = modelo;
     this.geo = geo;
@@ -364,21 +364,21 @@ export class ParticionCampos {
 
     // Borde: plazas en un lado que sólo usa una lámina de la región
     this.borde = new Uint8Array(np);
-    const usoLado = new Map<string, number>();
+    // (la clave de un lado, min·np + max: un número exacto, sin crear textos)
+    const usoLado = new Map<number, number>();
     for (let k = 0; k < nl; k++) {
       if (this.regionDe[k]! < 0) continue;
       for (let a = 0; a < 4; a++) {
         const u = this.plazas[4 * k + a]!;
         const v = this.plazas[4 * k + ((a + 1) % 4)]!;
-        const clave = u < v ? `${u},${v}` : `${v},${u}`;
+        const clave = u < v ? u * np + v : v * np + u;
         usoLado.set(clave, (usoLado.get(clave) ?? 0) + 1);
       }
     }
     for (const [clave, n] of usoLado) {
       if (n !== 1) continue;
-      const [u, v] = clave.split(",").map(Number);
-      this.borde[u!] = 1;
-      this.borde[v!] = 1;
+      this.borde[Math.floor(clave / np)] = 1;
+      this.borde[clave % np] = 1;
     }
 
     // Coordenadas de las plazas en su región y cambio de ejes de cada lámina
@@ -673,13 +673,16 @@ export class CamposLaminas implements IntegradorCampos {
     });
 
     // Lados compartidos entre láminas deformables, para unir las regiones de las dos particiones
-    const porLado = new Map<string, number[]>();
+    // (la clave de un lado, min·nn + max: un número exacto, sin crear textos; el orden de la unión es
+    // el de inserción, como antes)
+    const nn = modelo.nudos.length;
+    const porLado = new Map<number, number[]>();
     lista.forEach((l, k) => {
       if (!this.deformable[k]) return;
       for (let a = 0; a < 4; a++) {
         const u = l.nudos[a]!;
         const v = l.nudos[(a + 1) % 4]!;
-        const clave = u < v ? `${u},${v}` : `${v},${u}`;
+        const clave = u < v ? u * nn + v : v * nn + u;
         let q = porLado.get(clave);
         if (!q) porLado.set(clave, (q = []));
         q.push(k);
@@ -1241,6 +1244,22 @@ class EvaluadorParticion {
   }
 }
 
+/** Tensor (txx, tyy, txy) a la región: T' = A·T·Aᵀ (M con el signo s de la normal), en v desde o. */
+function girarTensor(v: Float64Array, o: number, txx: number, tyy: number, txy: number, s: number, a11: number, a12: number, a21: number, a22: number): void {
+  const b11 = a11 * txx + a12 * txy;
+  const b12 = a11 * txy + a12 * tyy;
+  const b21 = a21 * txx + a22 * txy;
+  const b22 = a21 * txy + a22 * tyy;
+  v[o] = s * (b11 * a11 + b12 * a12);
+  v[o + 1] = s * (b21 * a21 + b22 * a22);
+  v[o + 2] = s * (b11 * a21 + b12 * a22);
+}
+
+/** La muestra del centroide: la media de las de los 4 puntos de Gauss (nv valores cada una). */
+function centroide(v: Float64Array, nv: number): void {
+  for (let q = 0; q < nv; q++) v[nv * CENTROIDE + q] = 0.25 * (v[q]! + v[nv + q]! + v[2 * nv + q]! + v[3 * nv + q]!);
+}
+
 /** Valores de los campos para unos desplazamientos concretos, con cachés por lámina, parche y plaza. */
 export class EvaluadorCampos {
   private readonly c: CamposLaminas;
@@ -1249,6 +1268,8 @@ export class EvaluadorCampos {
   private readonly flexion: EvaluadorParticion;
   private readonly membrana: EvaluadorParticion;
   private static readonly R = new Float64Array(8);
+  private static readonly UG = new Float64Array(24);
+  private static readonly UL = new Float64Array(24);
   private readonly muestrasFlexion = (k: number) => this.muestrasDe(k, this.flexion);
   private readonly muestrasMembrana = (k: number) => this.muestrasDe(k, this.membrana);
 
@@ -1286,25 +1307,34 @@ export class EvaluadorCampos {
     if (hecho) return hecho;
     const pl = this.c._lamina(k)!;
     const nudos = this.c.modelo.laminas![k]!.nudos;
-    const ug = new Float64Array(24);
+    // Sin crear arrays más que los que se guardan (un mapa recorre decenas de miles de láminas por
+    // caso): las mismas cuentas, en el mismo orden, que `vectorALocales` y los tensores girados
+    const ug = EvaluadorCampos.UG;
+    const ul = EvaluadorCampos.UL;
     for (let a = 0; a < 4; a++) for (let q = 0; q < 6; q++) ug[6 * a + q] = this.u[6 * nudos[a]! + q]!;
-    const ul = vectorALocales(ug, pl.R);
+    const R = pl.R;
+    for (let I = 0; I < 8; I++) {
+      for (let a = 0; a < 3; a++) {
+        let s = 0;
+        for (let c = 0; c < 3; c++) s += R[3 * a + c]! * ug[3 * I + c]!;
+        ul[3 * I + a] = s;
+      }
+    }
     const OP = this.c._operador(k);
     const r = EvaluadorCampos.R;
     const vf = new Float64Array(MUESTRAS_LAMINA * FLEXION.nv);
     const vm = new Float64Array(MUESTRAS_LAMINA * MEMBRANA.nv);
-    const [f11, f12, f21, f22, fs3] = this.flexion.part.cambio.subarray(5 * k, 5 * k + 5);
-    const [m11, m12, m21, m22] = this.membrana.part.cambio.subarray(5 * k, 5 * k + 5);
-    // Tensores a la región: T' = A·T·Aᵀ (M con el signo de la normal), en v desde o
-    const girar = (v: Float64Array, o: number, txx: number, tyy: number, txy: number, s: number, a11: number, a12: number, a21: number, a22: number) => {
-      const b11 = a11 * txx + a12 * txy;
-      const b12 = a11 * txy + a12 * tyy;
-      const b21 = a21 * txx + a22 * txy;
-      const b22 = a21 * txy + a22 * tyy;
-      v[o] = s * (b11 * a11 + b12 * a12);
-      v[o + 1] = s * (b21 * a21 + b22 * a22);
-      v[o + 2] = s * (b11 * a21 + b12 * a22);
-    };
+    const cf = this.flexion.part.cambio;
+    const cm = this.membrana.part.cambio;
+    const f11 = cf[5 * k]!;
+    const f12 = cf[5 * k + 1]!;
+    const f21 = cf[5 * k + 2]!;
+    const f22 = cf[5 * k + 3]!;
+    const fs3 = cf[5 * k + 4]!;
+    const m11 = cm[5 * k]!;
+    const m12 = cm[5 * k + 1]!;
+    const m21 = cm[5 * k + 2]!;
+    const m22 = cm[5 * k + 3]!;
     for (let g = 0; g < 4; g++) {
       for (let f = 0; f < NV; f++) {
         let s = 0;
@@ -1312,14 +1342,13 @@ export class EvaluadorCampos {
         for (let q = 0; q < 24; q++) s += OP[o + q]! * ul[q]!;
         r[f] = s;
       }
-      girar(vm, MEMBRANA.nv * g, r[0]!, r[1]!, r[2]!, 1, m11!, m12!, m21!, m22!);
-      girar(vf, FLEXION.nv * g, r[3]!, r[4]!, r[5]!, fs3!, f11!, f12!, f21!, f22!);
-      vf[FLEXION.nv * g + 3] = fs3! * (f11! * r[6]! + f12! * r[7]!);
-      vf[FLEXION.nv * g + 4] = fs3! * (f21! * r[6]! + f22! * r[7]!);
+      girarTensor(vm, MEMBRANA.nv * g, r[0]!, r[1]!, r[2]!, 1, m11, m12, m21, m22);
+      girarTensor(vf, FLEXION.nv * g, r[3]!, r[4]!, r[5]!, fs3, f11, f12, f21, f22);
+      vf[FLEXION.nv * g + 3] = fs3 * (f11 * r[6]! + f12 * r[7]!);
+      vf[FLEXION.nv * g + 4] = fs3 * (f21 * r[6]! + f22 * r[7]!);
     }
-    for (const [v, nv] of [[vf, FLEXION.nv], [vm, MEMBRANA.nv]] as const) {
-      for (let q = 0; q < nv; q++) v[nv * CENTROIDE + q] = 0.25 * (v[q]! + v[nv + q]! + v[2 * nv + q]! + v[3 * nv + q]!);
-    }
+    centroide(vf, FLEXION.nv);
+    centroide(vm, MEMBRANA.nv);
     this.flexion.muestras[k] = vf;
     this.membrana.muestras[k] = vm;
     return e.muestras[k]!;
@@ -1373,6 +1402,43 @@ export class EvaluadorCampos {
       for (let q = 0; q < 3; q++) out[q]! += N[a]! * vm[q]!;
       const vf = this.flexion.plaza(p, this.muestrasFlexion);
       for (let q = 0; q < 5; q++) out[3 + q]! += N[a]! * vf[q]!;
+    }
+    return out;
+  }
+
+  /**
+   * Sólo una partición de `en`, con las mismas cuentas: «flexion», [Mx, My, Mxy, Qx, Qy] (out[3..7]
+   * de `en`); «membrana», [Nx, Ny, Nxy] (out[0..2]). Un mapa de M no ajusta así la membrana.
+   */
+  enParte(k: number, xi: number, eta: number, parte: "flexion" | "membrana"): Float64Array {
+    const N = funcionesForma(xi, eta);
+    const flexion = parte === "flexion";
+    const ps = flexion ? this.c.flexion.plazas : this.c.membrana.plazas;
+    const r = new Float64Array(flexion ? 5 : 3);
+    for (let a = 0; a < 4; a++) {
+      const p = ps[4 * k + a]!;
+      if (p < 0) throw new Error(`CamposLaminas: la lámina ${this.c.modelo.laminas![k]!.id} no está en ninguna región (es rígida)`);
+      const v = flexion ? this.flexion.plaza(p, this.muestrasFlexion) : this.membrana.plaza(p, this.muestrasMembrana);
+      for (let q = 0; q < r.length; q++) r[q]! += N[a]! * v[q]!;
+    }
+    const cambio = flexion ? this.c.flexion.cambio : this.c.membrana.cambio;
+    const a11 = cambio[5 * k]!;
+    const a12 = cambio[5 * k + 1]!;
+    const a21 = cambio[5 * k + 2]!;
+    const a22 = cambio[5 * k + 3]!;
+    const s = flexion ? cambio[5 * k + 4]! : 1;
+    // Lo mismo que `deshacer` de `en`
+    const b11 = a11 * r[0]! + a21 * r[2]!;
+    const b12 = a11 * r[2]! + a21 * r[1]!;
+    const b21 = a12 * r[0]! + a22 * r[2]!;
+    const b22 = a12 * r[2]! + a22 * r[1]!;
+    const out = new Float64Array(r.length);
+    out[0] = s * (b11 * a11 + b12 * a21);
+    out[1] = s * (b21 * a12 + b22 * a22);
+    out[2] = s * (b11 * a12 + b12 * a22);
+    if (flexion) {
+      out[3] = s * (a11 * r[3]! + a21 * r[4]!);
+      out[4] = s * (a12 * r[3]! + a22 * r[4]!);
     }
     return out;
   }

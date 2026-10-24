@@ -67,7 +67,7 @@ export class ResultadosRender {
   private camposC?: CamposLaminas;
   private epC?: EsfuerzosPiezas;
   /** Por planta: láminas y, por caso, los 8 campos en sus 4 nudos (32 por lámina). */
-  private readonly porPlanta = new Map<string, { laminas: number[]; region: boolean[]; valores?: Float64Array[] }>();
+  private readonly porPlanta = new Map<string, { laminas: number[]; region: boolean[]; valores?: Float64Array[]; hechas?: Set<"flexion" | "membrana"> }>();
 
   constructor(q: Consultas, c: Compilado) {
     this.q = q;
@@ -87,7 +87,7 @@ export class ResultadosRender {
    * Láminas de las losas de la planta o, con «muros», las de los muros entre ella y la planta de
    * debajo (por la cota de su centro), en el orden del modelo.
    */
-  laminas(planta: string, de: SuperficieMapa = "losas"): { laminas: number[]; region: boolean[]; valores?: Float64Array[] } {
+  laminas(planta: string, de: SuperficieMapa = "losas"): { laminas: number[]; region: boolean[]; valores?: Float64Array[]; hechas?: Set<"flexion" | "membrana"> } {
     const clave = de === "losas" ? planta : `muros
 ${planta}`;
     let x = this.porPlanta.get(clave);
@@ -116,23 +116,33 @@ ${planta}`;
     return x;
   }
 
-  /** Campos SPR por caso en los nudos de las láminas de la planta (o de sus muros). */
-  valores(planta: string, de: SuperficieMapa = "losas"): { laminas: number[]; region: boolean[]; valores: Float64Array[] } {
+  /**
+   * Campos SPR por caso en los nudos de las láminas de la planta (o de sus muros). Con `parte`, sólo
+   * se asegura la de esa partición (N, o M y Q): lo de la otra puede estar aún a 0.
+   */
+  valores(planta: string, de: SuperficieMapa = "losas", parte?: "flexion" | "membrana"): { laminas: number[]; region: boolean[]; valores: Float64Array[] } {
     const x = this.laminas(planta, de);
     if (!x.valores) {
+      x.region = x.laminas.map((l) => this.campos.region(l) >= 0);
+      x.valores = this.q.casos.map(() => new Float64Array(32 * x!.laminas.length));
+      x.hechas = new Set();
+    }
+    for (const p of parte ? [parte] : (["flexion", "membrana"] as const)) {
+      if (x.hechas!.has(p)) continue;
       const ls = x.laminas;
-      x.region = ls.map((l) => this.campos.region(l) >= 0);
       const XI = [-1, 1, 1, -1];
       const ETA = [-1, -1, 1, 1];
-      x.valores = this.q.casos.map((r) => {
-        const ev: EvaluadorCampos = this.campos.evaluadorCompartido(r.u);
-        const v = new Float64Array(32 * ls.length);
-        ls.forEach((l, i) => {
-          if (!x!.region[i]) return;
-          for (let a = 0; a < 4; a++) v.set(ev.en(l, XI[a]!, ETA[a]!), 32 * i + 8 * a);
+      const o = p === "flexion" ? 3 : 0;
+      const evs: EvaluadorCampos[] = this.q.casos.map((r) => this.campos.evaluadorCompartido(r.u));
+      // Lámina a lámina y, en cada una, todos los casos: el operador de resultantes de una lámina y de
+      // sus vecinas se calcula una vez, no una por caso (cada evaluador da lo mismo en otro orden)
+      ls.forEach((l, i) => {
+        if (!x!.region[i]) return;
+        evs.forEach((ev, k) => {
+          for (let a = 0; a < 4; a++) x!.valores![k]!.set(ev.enParte(l, XI[a]!, ETA[a]!, p), 32 * i + 8 * a + o);
         });
-        return v;
       });
+      x.hechas!.add(p);
     }
     return x as { laminas: number[]; region: boolean[]; valores: Float64Array[] };
   }
@@ -284,8 +294,8 @@ export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, 
     });
     return { laminas, v };
   }
-  const { laminas, region, valores } = r.valores(planta, de);
   const comp = COMPONENTE[campo];
+  const { laminas, region, valores } = r.valores(planta, de, comp < 3 ? "membrana" : "flexion");
   const v = new Float64Array(4 * laminas.length);
   laminas.forEach((_, i) => {
     for (let a = 0; a < 4; a++) {

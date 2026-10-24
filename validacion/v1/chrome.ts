@@ -241,7 +241,8 @@ try {
   await abrir("recarga");
   const huella0 = await pagina<string>(`return __v1.huella();`);
   await accion(pantalla("Pilares"));
-  await accion(planta("N3"));
+  // La tabla llega por su pedido, que puede ir detrás de lo que el worker adelanta tras calcular
+  await accion(planta("N3"), `document.querySelectorAll("tr.clic").length > 3`);
   await accion(`document.querySelectorAll("tr.clic")[3].click()`);
   const elegido = await pagina<string>(`return document.querySelector("tr.clic[data-on=true] td").firstChild.textContent;`);
   // El cambio: una carga un 10 % mayor, como lo haría el agente
