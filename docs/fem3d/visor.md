@@ -82,7 +82,7 @@ Las de los prototipos v3 (1, 3, 4, 5, 6 y 7), sin lo que es de edición.
 4. **Fluidez, en el edificio objetivo** (en sobremesa, en Chrome):
    - en un recorrido guionizado (abrir, calcular, cambiar de planta, de magnitud y de combinación, mover el cursor de una viga, orbitar el 3D), ninguna tarea larga del hilo principal pasa de 50 ms (`PerformanceObserver`, `longtask`);
    - cambiar de planta, magnitud o combinación tarda ≤ 0,5 s con el cálculo hecho;
-   - abrir con `.fem/` tarda ≤ 2 s; abrir y calcular, lo que tarde el cálculo más ≤ 1 s.
+   - abrir con `.fem/`, el dibujo en ≤ 2 s; abrir y calcular, lo que tarde el cálculo más ≤ 1 s. **Cambiado el 2026-10-24** (decisión del usuario, como el criterio 5 de V2a en AL-4): antes era hasta los resultados, que con `.fem/` esperan a la compilación (en el edificio con vigas, ~3 s desde LV2); el worker abre sin compilar (§6.1), así que el dibujo sale antes y el tiempo de los resultados se da como información.
 5. **Recarga.** Si se edita `proyecto.json` en disco (por ejemplo, con `fem` o a mano), el visor lo detecta en ≤ 2 s sin hacer nada, y conserva planta, vista y selección.
 6. **Puerta de uso.** El usuario revisa con el visor los tres proyectos de A2 y dice si le sirve para revisar. Lo que le falte se apunta para V1.1 o V2.
 

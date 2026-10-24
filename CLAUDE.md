@@ -517,6 +517,7 @@
   - **Validación:** `src/visor/diferida.test.ts` (lo dibujado sin compilar es lo de la sesión compilada; el estado tras compilar, idéntico).
   - **De paso:** el banco de V2b vuelve a funcionar (la pestaña «Forjados»).
   - **Sigue fallando, y ya fallaba en HEAD** (medido alternando con un worktree): V1, abrir con `.fem/` 3,3 s (≤ 2 s: usar los guardados exige compilar), M11 1,1 s y la planta N2 en Losas 0,66 s.
+  - **Arreglado el 2026-10-24** (`fase-v1.md`, «Pendiente»): los mapas de M, N y Q calculan sólo su partición, lámina a lámina con todos los casos seguidos, y el worker prepara los campos SPR tras fijar resultados (mismos bits; una planta nueva, de ~1,0 a ~0,3 s en Node). Abrir con `.fem/` mide ahora el dibujo (decisión del usuario, como AL-4); los resultados, como información.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

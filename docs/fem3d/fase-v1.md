@@ -101,6 +101,7 @@ Cada segundo se mira un sello (fecha y tamaño, o ETag) del proyecto y de su fic
   - **Criterio 4, a medias (V1-3).** Decidir entre:
     - aceptarlo así, porque sólo afecta a la primera magnitud de momentos de cada planta y el SPR se adelanta mientras se mira uz;
     - o adelantar C5-4 (la recuperación SPR más rápida, aplazada), que además importa más con proyectos reales de más casos.
+  - **2026-10-24, tras LV2** (la malla del edificio con vigas, ×2,5): M11 en 1,07 s, la planta N2 en 0,69 s y abrir con `.fem/` en 3,3 s. Los mapas calculan sólo la partición del campo (M y Q, o N), lámina a lámina con todos los casos seguidos, y el worker prepara los campos SPR en cuanto tiene resultados (mismos bits). Lo de `.fem/` es la compilación: por decisión del usuario, el criterio pasa a ser el dibujo (`visor.md` §3.3) y los resultados se dan como información.
 - **Técnico:**
   - sólo se midió en Chrome de sobremesa; Edge debería ir igual (es Chromium), y Firefox abre ficheros sueltos pero no carpetas;
   - el móvil, IndexedDB y offline van con V3 (V-c);
