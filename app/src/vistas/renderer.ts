@@ -10,6 +10,7 @@ import { AmbientLight, BufferAttribute, BufferGeometry, DirectionalLight, Double
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { MATERIAL_DEGRADADO, MATERIAL_LINEAS } from "./fondo.ts";
 
 let compartido: WebGLRenderer | null | undefined;
 
@@ -66,6 +67,12 @@ function precalentar(r: WebGLRenderer): void {
       if (m.dashed) l.computeLineDistances();
       escena.add(l);
     }
+    // Los del fondo (`fondo.ts`): las líneas llevan opacidad por vértice
+    const rgba = new BufferGeometry();
+    rgba.setAttribute("position", new BufferAttribute(new Float32Array(6), 3));
+    rgba.setAttribute("color", new BufferAttribute(new Float32Array(8), 4));
+    escena.add(new LineSegments(rgba, MATERIAL_LINEAS));
+    escena.add(new Mesh(tri, MATERIAL_DEGRADADO));
     // Los del 3D, los mismos objetos (con sus planos de recorte)
     for (const m of MATERIALES_3D) {
       if (m instanceof LineMaterial) {

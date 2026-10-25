@@ -5,7 +5,10 @@
  *
  * El encuadre es el centro (m) y la escala (px/m). Al cambiar de escena se conserva si lo que se veía
  * sigue cayendo en la nueva (cambiar de planta no mueve el dibujo, como en CYPECAD); si no, se
- * encuadra la escena entera.
+ * encuadra la escena entera. Una escena vacía encuadra `CAJA_VACIA` (el origen abajo a la izquierda),
+ * y lo primero que se dibuje en ella no mueve la vista si se ve.
+ *
+ * Detrás, la rejilla y los ejes del origen (`fondo.ts`).
  */
 import { Group, OrthographicCamera, Scene, type WebGLRenderer } from "three";
 import { rotulo, type Texto, type Vec2 } from "../../../src/agente/render/escena.ts";
@@ -13,6 +16,7 @@ import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
 import type { Eleccion, EscenaPreparada, Glifo } from "../../../src/visor/escena.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { Capas2D, MATERIALES, relleno, trazo } from "./capas.ts";
+import { CAJA_VACIA, ENCUADRE_MINIMO, iconoEjes, Rejilla2D } from "./fondo.ts";
 import { fuente, textoConHalo, Vista, type Colores, type Entorno } from "./motor.ts";
 import { colocarRotulos, ralearBurbujas } from "./rotulos.ts";
 
@@ -59,6 +63,9 @@ export interface Margenes {
   abajo: number;
 }
 
+/** La escena no tiene nada dibujado (una planta nueva). */
+export const escenaVacia = (e: EscenaPreparada): boolean => !e.glifos.length && e.capas.every((c) => !c.segmentos.length && !c.abanicos.length);
+
 /** Radio de elección, px. */
 const RADIO_CLIC = 6;
 /** Radio de enganche, px (el de `src/editor/dibujo/enganches.ts`). */
@@ -67,6 +74,9 @@ const RADIO_ENGANCHE = 10;
 export class Vista2D extends Vista {
   private readonly escena3 = new Scene();
   private readonly cam = new OrthographicCamera(-1, 1, 1, -1, -10, 10);
+  private readonly rejilla = new Rejilla2D();
+  /** Los nombres de los ejes del icono del origen (planta: X, Y; alzado: u, z). */
+  nombresEjes: readonly [string, string] = ["X", "Y"];
   private escena: EscenaPreparada | null = null;
   private capas: Capas2D | null = null;
   private resaltado: Eleccion | null = null;
@@ -92,6 +102,7 @@ export class Vista2D extends Vista {
 
   constructor(entorno: Entorno, camara?: Camara2D | null) {
     super(entorno);
+    this.escena3.add(this.rejilla.objeto);
     if (camara && camara.escala > 0) {
       ({ cx: this.cx, cy: this.cy, escala: this.s } = camara);
       this.encuadrada = true;
@@ -117,10 +128,12 @@ export class Vista2D extends Vista {
 
   ponerEscena(e: EscenaPreparada | null): void {
     if (e === this.escena) return;
+    // Lo primero que se dibuja en una planta vacía no mueve la vista (si se ve)
+    const veniaVacia = !!this.escena && escenaVacia(this.escena);
     this.escena = e;
     this.reconstruir();
     if (!e) return this.entorno.pintar();
-    if (!this.encuadrada || this.s <= 0 || this.ajustada) this.encuadrar();
+    if (!this.encuadrada || this.s <= 0 || (this.ajustada && !veniaVacia)) this.encuadrar();
     else {
       // ¿Se sigue viendo algo de la escena nueva?
       const [x0, y0] = this.aModelo(0, this.rect.h);
@@ -191,7 +204,12 @@ export class Vista2D extends Vista {
       this.encuadrada = false;
       return;
     }
-    const [x0, y0, x1, y1] = caja ?? e.caja;
+    let [x0, y0, x1, y1] = caja ?? (escenaVacia(e) ? CAJA_VACIA : e.caja);
+    if (!caja) {
+      // Un pilar solo no llena la vista
+      const [dx, dy] = [Math.max(0, ENCUADRE_MINIMO - (x1 - x0)) / 2, Math.max(0, ENCUADRE_MINIMO - (y1 - y0)) / 2];
+      [x0, y0, x1, y1] = [x0 - dx, y0 - dy, x1 + dx, y1 + dy];
+    }
     const m = this.margenes;
     const w = Math.max(20, this.rect.w - m.izq - m.der);
     const h = Math.max(20, this.rect.h - m.arriba - m.abajo);
@@ -278,6 +296,10 @@ export class Vista2D extends Vista {
     c.position.set(this.cx - o[0], this.cy - o[1], 5);
     c.updateProjectionMatrix();
     this.capas.encuadre(w, h, this.s);
+    if (this.fondo.rejilla) {
+      const [a, b] = [this.aModelo(0, h), this.aModelo(w, 0)];
+      this.rejilla.actualizar([a[0], a[1], b[0], b[1]], o, this.s, this.entorno.colores().texto, this.entorno.tema(), this.fondo.tenue, escenaVacia(this.escena));
+    } else this.rejilla.ocultar();
     r.render(this.escena3, c);
   }
 
@@ -290,6 +312,7 @@ export class Vista2D extends Vista {
     const col = this.entorno.colores();
     const tema = this.entorno.tema();
     const px = (q: Vec2) => this.aPx(q);
+    if (this.fondo.rejilla) this.dibujarOrigen(ctx);
     const burbujas = ralearBurbujas(e.glifos, e.textos, px, this.elegidos);
     for (const g of e.glifos) if (!burbujas.ocultos.has(g)) this.glifo(ctx, g, tema, col.fondo);
     const acento = col.acento;
@@ -348,6 +371,15 @@ export class Vista2D extends Vista {
       ctx.restore();
     }
     this.dibujarVentana(ctx);
+  }
+
+  /** El icono de los ejes en el origen o, si no se ve, en la esquina de abajo a la izquierda. */
+  private dibujarOrigen(ctx: CanvasRenderingContext2D): void {
+    const [x, y] = this.aPx([0, 0]);
+    const { w, h } = this.rect;
+    const dentro = x >= 12 && x <= w - 50 && y >= 50 && y <= h - 12;
+    const [ix, iy] = dentro ? [x, y] : [this.margenes.izq + 14, h - this.margenes.abajo - 6];
+    iconoEjes(ctx, ix, iy, dentro, this.nombresEjes, this.entorno.tema(), this.entorno.colores().fondo, this.fondo.tenue);
   }
 
   private glifo(ctx: CanvasRenderingContext2D, g: Glifo, tema: "light" | "dark", fondo: string): void {

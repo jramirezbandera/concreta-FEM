@@ -188,6 +188,11 @@ export function App() {
         setPlanta(plantas[j]!.id);
       } else if (x.key === "Escape") setElegidosE([]);
       else if (x.key === "f" || x.key === "F") encuadrarActiva();
+      else if (x.key === "F7" && va) {
+        // La rejilla de la vista activa, como en AutoCAD
+        x.preventDefault();
+        ponerVista(vistaActiva, { rejilla: va.rejilla === false });
+      }
     };
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);

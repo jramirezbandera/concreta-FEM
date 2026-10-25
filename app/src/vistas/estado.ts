@@ -32,6 +32,8 @@ export interface EstadoVista {
   dibujo: DibujoPlanta;
   /** En Resultados, la malla de la planta encima del resultado. */
   malla?: boolean;
+  /** La rejilla y los ejes del origen (`fondo.ts`); por defecto, sí. F7 la quita y la pone. */
+  rejilla?: boolean;
   modo3d: Modo3D;
   proyeccion: Proyeccion;
   /** I3: el color del sólido. */

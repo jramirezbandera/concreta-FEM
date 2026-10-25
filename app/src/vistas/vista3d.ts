@@ -37,6 +37,9 @@
  * aislar y ocultar) rehacen los índices de lo que se pinta, no la geometría; la caja de sección son
  * seis planos de recorte, los mismos en todos los materiales del 3D (siempre seis: lejos si no hay
  * caja, para no recompilar los programas al encenderla).
+ *
+ * Fondo (`fondo.ts`): un degradado suave y, en la cota más baja, un suelo con rejilla y los ejes
+ * del origen; sin nada dibujado, encuadra `CAJA_VACIA`.
  */
 import {
   AmbientLight,
@@ -74,6 +77,7 @@ import { COLOR_REACCION, type Reacciones3D } from "../../../src/visor/reacciones
 import { CLASES_CARGA, COLOR_CARGA, type Cargas3D } from "../../../src/visor/cargas3d.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import { pintura } from "../lienzo/pintura.ts";
+import { CAJA_VACIA, Degradado, Suelo3D } from "./fondo.ts";
 import { fuente, textoConHalo, Vista, type Entorno } from "./motor.ts";
 import { MATERIALES_3D } from "./renderer.ts";
 
@@ -327,9 +331,12 @@ export class Vista3D extends Vista {
   private triVis = 0;
   private lineasCaja: LineSegments<BufferGeometry, LineBasicMaterial> | null = null;
   private arrastreCaja: { cara: number; v0: number; s0: number } | null = null;
+  private readonly suelo = new Suelo3D();
+  private readonly degradado = new Degradado();
 
   constructor(entorno: Entorno, camara?: Camara3D | null) {
     super(entorno);
+    this.escena3.add(this.suelo.objeto);
     this.escena3.add(new AmbientLight(0xffffff, 1.6));
     const sol = new DirectionalLight(0xffffff, 1.4);
     sol.position.set(1, -2, 3);
@@ -1250,7 +1257,23 @@ export class Vista3D extends Vista {
       }
       return [m, M];
     }
+    // Sin nada dibujado, el sitio de un edificio con el origen en una esquina
+    if (a && o) return [new Vector3(CAJA_VACIA[0] - o[0], CAJA_VACIA[1] - o[1], -o[2]), new Vector3(CAJA_VACIA[2] - o[0], CAJA_VACIA[3] - o[1], 4 - o[2])];
     return null;
+  }
+
+  /** El suelo: bajo el modelo (o en `CAJA_VACIA`), en su cota más baja. */
+  private actualizarSuelo(): void {
+    const a = this.alamb;
+    const o = this.origen;
+    if (!this.fondo.rejilla || !a || !o) {
+      this.suelo.objeto.visible = false;
+      return;
+    }
+    const lleno = a.objeto.length > 0;
+    const caja = lleno ? ([a.caja[0], a.caja[1], a.caja[3], a.caja[4]] as const) : CAJA_VACIA;
+    this.suelo.actualizar(caja, lleno ? a.caja[2] : 0, o, this.entorno.colores().texto, this.entorno.tema(), this.fondo.tenue);
+    this.suelo.objeto.visible = true;
   }
 
   encuadrar(direccion?: readonly [number, number, number]): void {
@@ -1860,8 +1883,10 @@ export class Vista3D extends Vista {
       this.construirElegidos();
       if (this.carg) this.construirCargas(false);
     }
+    this.degradado.pintar(r, this.entorno.colores().fondo, this.entorno.tema());
     if (!this.alamb && !this.geo && !this.diag && !this.iso && !this.pil && !this.reac && !this.carg && !this.sol) return;
     this.actualizarCamaras();
+    this.actualizarSuelo();
     // La caja de sección de esta vista (los planos son de todos los materiales del 3D)
     const c = this.filtro.caja;
     const o = this.origen;
@@ -1884,6 +1909,7 @@ export class Vista3D extends Vista {
   }
 
   superponer(ctx: CanvasRenderingContext2D): void {
+    if (this.fondo.rejilla && this.suelo.objeto.visible) this.suelo.rotular(ctx, (x, y, z) => this.aPantalla(x, y, z), this.entorno.tema(), this.entorno.colores().fondo, this.fondo.tenue);
     this.dibujarRotulos(ctx);
     this.dibujarAsas(ctx);
     this.dibujarSonda(ctx);

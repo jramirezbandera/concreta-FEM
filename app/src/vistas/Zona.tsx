@@ -9,7 +9,7 @@
  * (`Fuente2D`, `Fuente3D`); también pintan lo que va en el DOM de la celda (la leyenda, un aviso).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BookmarkPlus, Box, BoxSelect, ChevronDown, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
+import { BookmarkPlus, Box, BoxSelect, ChevronDown, Grid3x3, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
 import type { EntradaLeyenda, Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
@@ -167,7 +167,10 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
     if (!motor?.disponible || !superficie.current) return;
     const cam = camaras.current?.[tipo];
     const x = tipo === "3d" ? new Vista3D(motor.entorno, cam as never) : new Vista2D(motor.entorno, cam as never);
-    if (x instanceof Vista2D) x.margenes = tipo === "planta" ? MARGENES_PLANTA : MARGENES_ALZADO;
+    if (x instanceof Vista2D) {
+      x.margenes = tipo === "planta" ? MARGENES_PLANTA : MARGENES_ALZADO;
+      if (tipo === "alzado") x.nombresEjes = ["u", "z"];
+    }
     x.alActivar = () => activar(i);
     x.alCambiarCamara = (c) => poner(i, { camaras: { ...camaras.current, [tipo]: c } });
     motor.poner(i, x, superficie.current);
@@ -182,6 +185,11 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   useEffect(() => {
     if (vista) vista.herramienta = herramienta;
   }, [vista, herramienta]);
+
+  // El fondo: en Resultados (las fuentes con una cabecera de resultados o la malla), más tenue
+  const rejilla = v.rejilla !== false;
+  const tenue = !!(fuentes.cabecera3D || fuentes.malla);
+  useEffect(() => vista?.ponerFondo(rejilla, tenue), [vista, rejilla, tenue]);
 
   // El encuadre completo deja sitio a la leyenda (plegada con varias vistas)
   useEffect(() => {
@@ -265,6 +273,9 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         </button>
         <button type="button" className="ib" data-on={herramienta === "desplazar"} aria-pressed={herramienta === "desplazar"} title="Desplazar con el botón izquierdo (siempre: botón central o derecho)" aria-label="Desplazar" onClick={() => setHerramienta("desplazar")}>
           <Hand size={15} />
+        </button>
+        <button type="button" className="ib" data-on={rejilla} aria-pressed={rejilla} title="Rejilla y ejes del origen (F7)" aria-label="Rejilla" onClick={() => poner(i, { rejilla: !rejilla })}>
+          <Grid3x3 size={15} />
         </button>
         <button type="button" className="ib" data-on={guardar} aria-expanded={guardar} disabled={!proyecto.edicion && !proyecto.estado?.vistas?.length} title="Vistas guardadas: abrir una aquí o guardar esta con un nombre" aria-label="Guardar la vista" onClick={() => setGuardar((x) => !x)}>
           <BookmarkPlus size={15} />

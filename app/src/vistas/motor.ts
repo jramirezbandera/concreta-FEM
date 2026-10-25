@@ -48,6 +48,8 @@ export interface Entorno {
 export abstract class Vista {
   rect: Rect = { x: 0, y: 0, w: 0, h: 0 };
   herramienta: Herramienta = "elegir";
+  /** El fondo (`fondo.ts`): la rejilla y los ejes del origen; `tenue`, en Resultados. */
+  protected fondo = { rejilla: true, tenue: false };
   /**
    * La cámara es la del último encuadre completo (nadie la ha movido desde entonces): al cambiar de
    * tamaño o de escena se encuadra de nuevo. Desplazar, orbitar o acercar la sueltan.
@@ -79,6 +81,12 @@ export abstract class Vista {
   protected abstract clic(x: number, y: number, ctrl: boolean, doble: boolean): void;
   protected abstract soltarVentana(c: [number, number, number, number], modo: "dentro" | "toca", ctrl: boolean): void;
   abstract camara(): unknown;
+
+  ponerFondo(rejilla: boolean, tenue: boolean): void {
+    if (rejilla === this.fondo.rejilla && tenue === this.fondo.tenue) return;
+    this.fondo = { rejilla, tenue };
+    this.entorno.pintar();
+  }
 
   protected camaraCambiada(): void {
     this.entorno.pintar();
