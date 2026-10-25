@@ -249,6 +249,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               cabecera3DModelo: () => chipCaso,
             }
           : {}),
+        ...(ed && !cargas ? { dibujarEjes: () => foto.herramienta !== "ejes" && elegirHerramienta("ejes") } : {}),
         cabeceraPlanta: (v, i) =>
           cargas ? (
             chipCaso

@@ -102,4 +102,27 @@ describe("la herramienta activa (V2c-1)", () => {
     expect(screen.getByRole("button", { name: "Viga" }).getAttribute("aria-pressed")).toBe("false");
     expect(screen.queryByRole("region", { name: "Dibujar · Viga" })).toBeNull();
   }, 60_000);
+
+  it("Alzado sin ejes: se puede elegir, lo dice y «Dibujar ejes» vuelve a la planta con la herramienta Ejes", async () => {
+    render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Proyecto nuevo/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "alzado" } });
+    fireEvent.click(screen.getByRole("button", { name: "Crear" }));
+    await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+
+    const celda = () => document.querySelector<HTMLElement>(".celda")!;
+    const alzado = screen.getByRole("button", { name: "Alzado" }) as HTMLButtonElement;
+    expect(alzado.disabled).toBe(false);
+    fireEvent.click(alzado);
+    await waitFor(() => expect(celda().dataset.tipo).toBe("alzado"));
+    expect(screen.getByText(/el proyecto aún no tiene ninguno/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Dibujar ejes" }));
+    await waitFor(() => expect(celda().dataset.tipo).toBe("planta"));
+    expect(screen.getByRole("button", { name: "Ejes" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("region", { name: "Dibujar · Ejes" })).toBeTruthy();
+  }, 60_000);
 });

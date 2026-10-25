@@ -18,7 +18,7 @@ export function BarraVistas() {
   return (
     <>
       <Herramienta icono={IcPlanta} nombre="Planta" activa={tipo === "planta"} onClick={() => v.irATipo("planta")} title="La vista activa, en planta" />
-      <Herramienta icono={IcAlzado} nombre="Alzado" activa={tipo === "alzado"} disabled={sinEjes} onClick={() => v.irATipo("alzado")} title={sinEjes ? "Sin ejes de replanteo" : "La vista activa, en alzado (por un eje)"} />
+      <Herramienta icono={IcAlzado} nombre="Alzado" activa={tipo === "alzado"} onClick={() => v.irATipo("alzado")} title={sinEjes ? "La vista activa, en alzado: va por un eje de replanteo, y aún no hay ninguno" : "La vista activa, en alzado (por un eje)"} />
       <Herramienta icono={Ic3D} nombre="3D" activa={tipo === "3d"} onClick={() => v.irATipo("3d")} title="La vista activa, en 3D" />
       <Separador />
       {DISPOSICIONES.map((d) => (

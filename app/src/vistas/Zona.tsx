@@ -102,6 +102,8 @@ export interface FuentesVistas {
   /** La cabecera de un 3D del modelo, sin resultados (Cargas): con ella, el sólido se puede seguir eligiendo. */
   cabecera3DModelo?: (v: EstadoVista, i: number) => ReactNode;
   cabeceraAlzado?: (v: EstadoVista, i: number) => ReactNode;
+  /** Un alzado sin ejes lo dice; con esto (Modelo, editable), ofrece dibujarlos en la planta. */
+  dibujarEjes?: () => void;
   /** Las plantas de resultados ofrecen ver la malla encima (`EstadoVista.malla`); la fuente la pide con `conMalla`. */
   malla?: boolean;
 }
@@ -217,7 +219,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           etiqueta="Tipo de vista"
           valor={tipo}
           onCambio={(t) => poner(i, { tipo: t })}
-          opciones={(["planta", "alzado", "3d"] as const).map((t) => ({ id: t, nombre: NOMBRE_TIPO[t], disabled: t === "alzado" && !e.ejes.length, title: t === "alzado" && !e.ejes.length ? "Sin ejes de replanteo" : undefined }))}
+          opciones={(["planta", "alzado", "3d"] as const).map((t) => ({ id: t, nombre: NOMBRE_TIPO[t], title: t === "alzado" && !e.ejes.length ? "El alzado va por un eje de replanteo, y aún no hay ninguno" : undefined }))}
         />
         {tipo === "planta" && (
           <>
@@ -232,10 +234,10 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             )}
           </>
         )}
-        {tipo === "alzado" && (
+        {tipo === "alzado" && eje && (
           <SelectorEje ejes={e.ejes} eje={eje} onEje={(x) => poner(i, { eje: x })} />
         )}
-        {tipo === "alzado" && (
+        {tipo === "alzado" && eje && (
           <Desplegable
             etiqueta="Profundidad del alzado"
             prefijo={<span className="text-text-secondary">±</span>}
@@ -244,7 +246,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             opciones={PROFUNDIDADES.map((d) => ({ id: String(d), nombre: `${String(d).replace(".", ",")} m`, title: "Lo que se ve a cada lado del plano del alzado" }))}
           />
         )}
-        {tipo === "alzado" && fuentes.cabeceraAlzado?.(vv, i)}
+        {tipo === "alzado" && eje && fuentes.cabeceraAlzado?.(vv, i)}
         {tipo === "3d" && (
           <>
             <Desplegable
@@ -322,6 +324,30 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         />
       )}
       <ContextoCelda.Provider value={celda}>{contenido}</ContextoCelda.Provider>
+      {tipo === "alzado" && !eje && (
+        <div className="velo">
+          <div style={{ pointerEvents: "auto" }}>
+            <Aviso>
+              El alzado se dibuja por un eje de replanteo, y el proyecto aún no tiene ninguno.
+              {fuentes.dibujarEjes ? " Dibuja uno en la planta (dos clics por eje) o propónlos desde los pilares en Propiedades." : " Se dibujan en Modelo, con la herramienta Ejes."}
+              {fuentes.dibujarEjes && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    className="btn btn-p"
+                    onClick={() => {
+                      poner(i, { tipo: "planta" });
+                      fuentes.dibujarEjes!();
+                    }}
+                  >
+                    Dibujar ejes
+                  </button>
+                </div>
+              )}
+            </Aviso>
+          </div>
+        </div>
+      )}
       {motor && !motor.disponible && (
         <div className="velo">
           <Aviso tono="warn">Este navegador no puede dibujar con WebGL: las vistas no se ven. Las tablas, los diagnósticos y los resultados por pieza siguen funcionando.</Aviso>
