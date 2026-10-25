@@ -47,7 +47,7 @@
 import { DiagramasBarras } from "./barras.ts";
 import type { ElementoMotor } from "./elementos.ts";
 import { Diagnosticos, listaIds, type Diagnostico } from "./diagnosticos.ts";
-import { FuerzasNodales, type FuerzasRestriccion } from "./fuerzasNodales.ts";
+import { defectoCasos, FuerzasNodales, type FuerzasRestriccion } from "./fuerzasNodales.ts";
 import { cajaDe, IndiceCajas } from "./indice.ts";
 import type { ModeloAnalitico, ResultadoCaso, Vec3 } from "./modelo.ts";
 
@@ -153,6 +153,52 @@ export interface CortePreparado {
   dentroNudo(v: number): boolean;
   /** Coordenadas (x, y, z) del punto en los ejes del corte, respecto al origen. */
   coordenadas(p: ArrayLike<number>): [number, number, number];
+}
+
+/**
+ * ¿Entra en el rectángulo de cp más de 10·TOL_CORTE del tramo en que el plano atraviesa el polígono
+ * X (con vértices a los dos lados)? El mismo recorte que `IntegradorCampos.integrar`.
+ */
+function atraviesaDentro(cp: CortePreparado, X: readonly ArrayLike<number>[]): boolean {
+  const n = X.length;
+  const d = X.map((p) => {
+    const s = cp.coordenadas(p)[0];
+    return Math.abs(s) <= TOL_CORTE ? 0 : s;
+  });
+  const P: number[][] = [];
+  for (let a = 0; a < n; a++) {
+    const b = (a + 1) % n;
+    if (d[a] === 0) P.push([...cp.coordenadas(X[a]!)]);
+    else if (d[a]! * d[b]! < 0) {
+      const t = d[a]! / (d[a]! - d[b]!);
+      P.push(cp.coordenadas([0, 1, 2].map((c) => X[a]![c]! + t * (X[b]![c]! - X[a]![c]!))));
+    }
+  }
+  if (P.length < 2) return false;
+  let [A, B] = [P[0]!, P[1]!];
+  let dm = -1;
+  for (let i = 0; i < P.length; i++)
+    for (let j = i + 1; j < P.length; j++) {
+      const dd = Math.hypot(P[i]![1]! - P[j]![1]!, P[i]![2]! - P[j]![2]!);
+      if (dd > dm) [dm, A, B] = [dd, P[i]!, P[j]!];
+    }
+  let [t0, t1] = [0, 1];
+  for (const [va, vb, [lo, hi]] of [
+    [A[1]!, B[1]!, cp.y],
+    [A[2]!, B[2]!, cp.z],
+  ] as const) {
+    const dv = vb - va;
+    if (Math.abs(dv) < 1e-15) {
+      if (va < lo - TOL_CORTE || va > hi + TOL_CORTE) return false;
+      continue;
+    }
+    let ta = (lo - TOL_CORTE - va) / dv;
+    let tb = (hi + TOL_CORTE - va) / dv;
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta);
+    t1 = Math.min(t1, tb);
+  }
+  return (t1 - t0) * dm > 10 * TOL_CORTE;
 }
 
 export interface InfoCorte {
@@ -391,8 +437,8 @@ export class Cortes {
   }
 
   /**
-   * Esfuerzos del corte en cada caso de `casos` (los de un cálculo válido, en el orden de
-   * `modelo.casos`). `campos` hace falta con el método "campos".
+   * Esfuerzos del corte en cada caso de `casos` (los de un cálculo válido: todos, en el orden de
+   * `modelo.casos`; si no, `motor/error-interno`, AU-8). `campos` hace falta con el método "campos".
    */
   cortar(corte: Corte, casos: readonly ResultadoCaso[], campos?: IntegradorCampos): ResultadoCorte {
     const diag = new Diagnosticos();
@@ -400,6 +446,12 @@ export class Cortes {
     const id = corte.id ?? "(sin id)";
     const info: InfoCorte = { laminas: [], barras: [], restricciones: [], extension: null };
     const vacio = (ejes: Float64Array = new Float64Array(9)): ResultadoCorte => ({ ...info, esfuerzos: new Float64Array(6 * nc).fill(NaN), ejes, diagnosticos: diag.lista, valido: false });
+    // AU-8: las cargas equivalentes van por la posición en `casos`
+    const dc = defectoCasos(this.modelo, casos);
+    if (dc) {
+      diag.error("motor/error-interno", `Corte ${id}: ${dc}.`, [id]);
+      return vacio();
+    }
     const cp = this.preparar(corte, diag);
     if (!cp) return vacio();
     const metodo = corte.metodo ?? "fuerzas-nodales";
@@ -430,6 +482,7 @@ export class Cortes {
     {
       const atraviesan: string[] = [];
       const bordes: string[] = [];
+      const enExtremos: string[] = [];
       const tocan: ElementoMotor[] = [];
       const rigida = corte.soloLaminas ? this.laminaRigida() : null;
       for (const e of cerca) {
@@ -443,7 +496,18 @@ export class Cortes {
           else if (s > 0) mas++;
           for (let q = 0; q < 3; q++) c[q]! += xyz[3 * v + q]! / 4;
         }
-        if (menos === 0 || !cp.dentro(c)) continue;
+        if (menos === 0) continue;
+        if (!cp.dentro(c)) {
+          // AU-7: atravesada con el centroide fuera, pero el tramo del plano en ella entra en el
+          // rectángulo (como lo recorta `IntegradorCampos.integrar`). Por campos, el corte es mixto;
+          // por fuerzas nodales no se cuenta, y se avisa: falta lo que pasa por ella hasta el extremo
+          // (lo de los nudos del corte, como las ventanas de las franjas, sigue exacto)
+          if (mas > 0 && atraviesaDentro(cp, e.nudos.map(X))) {
+            if (metodo === "fuerzas-nodales") enExtremos.push(e.id);
+            else mixto = true;
+          }
+          continue;
+        }
         if (mas > 0) {
           if (metodo === "fuerzas-nodales") atraviesan.push(e.id);
           else mixto = true;
@@ -476,6 +540,13 @@ export class Cortes {
           "corte/atraviesa-laminas",
           `El corte ${id} atraviesa ${atraviesan.length} láminas por dentro (${listaIds(atraviesan)}): por fuerzas nodales tiene que seguir los lados de la malla. Usa el método "campos" o siembra la línea del corte en la malla.`,
           [id, ...atraviesan],
+        );
+      }
+      if (enExtremos.length) {
+        diag.aviso(
+          "corte/borde-no-sigue-malla",
+          `El corte ${id} atraviesa ${enExtremos.length} láminas junto a los extremos de su rectángulo, con el centroide fuera (${listaIds(enExtremos)}): no las cuenta, así que le falta lo que pasa por ellas hasta el extremo. Lleve los extremos a nudos de la malla o use el método "campos".`,
+          [id, ...enExtremos],
         );
       }
       if (bordes.length) {

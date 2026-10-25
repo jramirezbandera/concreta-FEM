@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { B, CASOS_NAVIER, placaNavier } from "../../validacion/e3/navier.ts";
 import { cortarModelo } from "../../validacion/e5/bandas.ts";
+import { mensulaPlaca } from "../../validacion/e5/cortes.ts";
 import { navierFisico } from "../../validacion/c2/navier.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { iniciarNucleo } from "../nucleo/index.ts";
@@ -47,5 +48,35 @@ describe("cortes por campos en una malla no estructurada (C2-2)", () => {
         expect(Math.abs(r[2 * i + j]!.esfuerzos[4]! / exacta - 1), `x = ${x}, ancho ${2 * a}`).toBeLessThan(0.01);
       }),
     );
+  });
+});
+
+describe("AU-7: una lámina atravesada con el centroide fuera del rectángulo", () => {
+  /** Ménsula de 2 × 2 con la malla regular hasta y = 1 e inclinada por encima (los nudos interiores, x += 0,2·(y − 1)). */
+  function inclinada() {
+    const m = mensulaPlaca(4, 4, 2, 2, 4);
+    m.nudos.forEach((n) => {
+      if (n.y > 1 + 1e-9 && n.x > 1e-9 && n.x < 2 - 1e-9) (n as { x: number }).x += 0.2 * (n.y - 1);
+    });
+    return m;
+  }
+  const corte = (y: [number, number], metodo?: "campos"): Corte => ({ origen: [1, 0, 0], x: [1, 0, 0], vz: [0, 0, 1], y, ...(metodo ? { metodo } : {}) });
+
+  it("por fuerzas nodales, el corte que entra en ella lo avisa (antes salía sin diagnóstico)", () => {
+    const [r] = cortarModelo(inclinada(), [corte([0, 1.1])]);
+    // Sigue valiendo para lo que pasa por sus nudos (las ventanas de las franjas lo usan así)
+    expect(r!.valido).toBe(true);
+    const d = r!.diagnosticos.find((x) => x.codigo === "corte/borde-no-sigue-malla");
+    expect(d?.severidad).toBe("aviso");
+    expect(d?.mensaje).toMatch(/centroide fuera/);
+  });
+
+  it("por campos, va entero por campos: dos rectángulos complementarios suman el corte entero", () => {
+    const [a, b, todo] = cortarModelo(inclinada(), [corte([0, 1.1], "campos"), corte([1.1, 2], "campos"), corte([0, 2], "campos")]);
+    for (const r of [a, b, todo]) expect(r!.valido).toBe(true);
+    // Cada rectángulo se recorta con TOL_CORTE (1e-6 m) de más por cada lado: ~1e-6 de diferencia.
+    // Antes, el de abajo sumaba fuerzas nodales con la integral de la lámina atravesada: 1,7e-3.
+    const escala = Math.max(...[...todo!.esfuerzos].map(Math.abs));
+    for (let q = 0; q < 6; q++) expect(Math.abs(a!.esfuerzos[q]! + b!.esfuerzos[q]! - todo!.esfuerzos[q]!) / escala, `componente ${q}`).toBeLessThan(1e-5);
   });
 });

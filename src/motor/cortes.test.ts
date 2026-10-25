@@ -22,6 +22,7 @@ import { matrizGiro } from "../pruebas/transformar.ts";
 import { DiagramasBarras } from "./barras.ts";
 import { calcular } from "./calcular.ts";
 import { Cortes, type Corte } from "./cortes.ts";
+import { FuerzasNodales } from "./fuerzasNodales.ts";
 
 beforeAll(async () => {
   await iniciarNucleo(readFileSync(join(import.meta.dirname, "..", "nucleo", "pkg", "nucleo_bg.wasm")));
@@ -213,5 +214,28 @@ describe("criterio 5 de E5: diagnósticos de los cortes", () => {
       const { resultados } = erroresCortesCompletos(fabrica, cortes);
       for (const r of resultados) expect(r.diagnosticos).toEqual([]);
     }
+  });
+});
+
+describe("AU-8: los resultados tienen que ser los de todos los casos, en el orden del modelo", () => {
+  it("un corte con un caso suelto o desordenado es un error, no un resultado", () => {
+    const { modelo: base, b } = losaUnidireccional(6, 2);
+    const modelo = { ...base, casos: [...base.casos, { ...base.casos[0]!, id: "otras" }] };
+    const casos = casosValidos(calcular(modelo));
+    const ct = new Cortes(modelo);
+    const corte: Corte = { origen: [2, b / 2, 0], x: [1, 0, 0], vz: [0, 0, 1], y: [-b / 2, b / 2] };
+    expect(ct.cortar(corte, casos).valido).toBe(true);
+    // Antes, con sólo el segundo caso, salía Vz = 2,1578 en vez de −5,8422, válido y sin diagnóstico
+    for (const mal of [[casos[1]!], [...casos].reverse()]) {
+      const r = ct.cortar(corte, mal);
+      expect(r.valido).toBe(false);
+      expect(r.diagnosticos.map((d) => d.codigo)).toEqual(["motor/error-interno"]);
+      expect([...r.esfuerzos].every(Number.isNaN)).toBe(true);
+    }
+    const fn = new FuerzasNodales(modelo);
+    expect(() => fn.laminaCasos(0, [casos[1]!])).toThrow(/resultados para los \d+ casos del modelo/);
+    expect(() => fn.sumaEnNudos([0], [...casos].reverse())).toThrow(/orden del modelo/);
+    expect(() => fn.lamina(0, 0, casos[1]!)).toThrow(/«otras»/);
+    expect(fn.laminaCasos(0, casos)).toHaveLength(modelo.casos.length);
   });
 });

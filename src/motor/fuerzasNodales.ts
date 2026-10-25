@@ -34,6 +34,17 @@ const COMPONENTES_RESTRICCION = {
 /** Fuerzas de una restricción sobre sus nudos: 6 por nudo, en el orden [maestro, ...esclavos]. */
 export type FuerzasRestriccion = Float64Array;
 
+/**
+ * AU-8: qué falla en `casos` como lista de los resultados de todos los casos del modelo, en su orden
+ * (las cargas equivalentes de `casos[k]` son las de `modelo.casos[k]`), o null.
+ */
+export function defectoCasos(modelo: ModeloAnalitico, casos: readonly ResultadoCaso[]): string | null {
+  if (casos.length !== modelo.casos.length) return `hay ${casos.length} resultados para los ${modelo.casos.length} casos del modelo: tienen que ser todos, en su orden`;
+  for (let k = 0; k < casos.length; k++)
+    if (casos[k]!.id !== modelo.casos[k]!.id) return `el resultado ${k + 1} es del caso «${casos[k]!.id}» y el caso ${k + 1} del modelo es «${modelo.casos[k]!.id}»: tienen que ir en el orden del modelo`;
+  return null;
+}
+
 interface CargasCaso {
   /** Equivalentes por barra (12, globales en los nudos). */
   barras: Map<number, Float64Array>;
@@ -68,6 +79,21 @@ export class FuerzasNodales {
       else if (e.tipo === "lamina") this.porLamina[e.indice] = e;
     }
     this.cargas = new Array(modelo.casos.length);
+  }
+
+  /** Las listas de resultados ya comprobadas con `defectoCasos`. */
+  private readonly comprobados = new WeakSet<readonly ResultadoCaso[]>();
+
+  /** AU-8: un mal uso (resultados que no son los de todos los casos, en orden) es un error, no un resultado. */
+  private comprobar(casos: readonly ResultadoCaso[]): void {
+    if (this.comprobados.has(casos)) return;
+    const d = defectoCasos(this.modelo, casos);
+    if (d) throw new Error(`FuerzasNodales: ${d}`);
+    this.comprobados.add(casos);
+  }
+
+  private comprobarUno(k: number, r: ResultadoCaso): void {
+    if (this.modelo.casos[k]?.id !== r.id) throw new Error(`FuerzasNodales: el resultado es del caso «${r.id}» y el caso ${k} del modelo es «${this.modelo.casos[k]?.id}»`);
   }
 
   /** Barra preparada (ejes, tramo flexible, offsets). */
@@ -159,6 +185,7 @@ export class FuerzasNodales {
   barra(b: number, k: number, r: ResultadoCaso): Float64Array {
     const e = this.porBarra[b];
     if (!e) throw new Error(`FuerzasNodales: no hay barra ${b}`);
+    this.comprobarUno(k, r);
     return this.deElemento(e, k, r.u);
   }
 
@@ -166,11 +193,13 @@ export class FuerzasNodales {
   lamina(l: number, k: number, r: ResultadoCaso): Float64Array {
     const e = this.porLamina[l];
     if (!e) throw new Error(`FuerzasNodales: no hay lámina ${l}`);
+    this.comprobarUno(k, r);
     return this.deElemento(e, k, r.u, rigidezLamina(e.lamina!));
   }
 
   /** g de un elemento en todos los casos (`casos[k]`, el caso k del modelo), con su rigidez calculada una vez. */
   private deElementoCasos(e: ElementoMotor, casos: readonly ResultadoCaso[]): Float64Array[] {
+    this.comprobar(casos);
     const K = rigidezGlobal(this.modelo, e);
     return casos.map((r, k) => this.deElemento(e, k, r.u, K));
   }
@@ -213,6 +242,7 @@ export class FuerzasNodales {
    * de la lista. La rigidez de cada elemento se calcula una sola vez para todos los casos.
    */
   sumaEnNudos(nudos: readonly number[], casos: readonly ResultadoCaso[]): Float64Array[] {
+    this.comprobar(casos);
     const { ptr, idx } = this.incidencias();
     const pos = new Int32Array(this.modelo.nudos.length).fill(-1);
     nudos.forEach((v, i) => (pos[v] = i));
@@ -251,6 +281,7 @@ export class FuerzasNodales {
    * tienen por maestro a uno de sus esclavos).
    */
   restricciones(casos: readonly ResultadoCaso[], cuales?: readonly number[]): Map<number, FuerzasRestriccion>[] {
+    this.comprobar(casos);
     const lista = this.modelo.restricciones ?? [];
     // Restricciones de las que cada nudo es maestro
     const deMaestro = new Map<number, number[]>();
