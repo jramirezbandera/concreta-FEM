@@ -205,6 +205,24 @@ describe("GE: «Nueva…» desde los desplegables", () => {
     expect(within(within(dlg).getByRole("navigation", { name: "Lista de secciones" })).getByRole("button", { name: /P30x30/ }).getAttribute("aria-current")).toBe("true");
     fireEvent.click(within(dlg).getByRole("button", { name: "Usar P30x30" }));
     expect(screen.queryByRole("dialog", { name: "Secciones" })).toBeNull();
+
+    // La sección de la fila nueva se creó con la fila: un paso de deshacer quita las dos
+    expect(deshacer().getAttribute("title")).toMatch(/Nueva fila en pilares/);
+    fireEvent.click(deshacer());
+    expect(idsTabla("pilares")).toEqual([]);
+    elegirTabla("secciones");
+    expect(idsTabla("secciones")).toEqual([]);
+  }, 60_000);
+
+  it("en la fila nueva, la sección creada espera a la fila: sin fila, no hay sección", async () => {
+    await proyectoNuevo("ge-borrador");
+    elegirTabla("pilares");
+    elegirEnCelda("pilares", -1, "seccion", NUEVA);
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Secciones" })).getByRole("button", { name: "Crear y usar" }));
+    expect(screen.getByText(/P30x30 se crea con ella/)).toBeTruthy();
+    expect(deshacer().hasAttribute("disabled")).toBe(true);
+    elegirTabla("secciones");
+    expect(idsTabla("secciones")).toEqual([]);
   }, 60_000);
 
   it("en el inspector: el material de una sección, con un hormigón típico que no estaba", async () => {
@@ -260,5 +278,93 @@ describe("GE: el gestor de materiales", () => {
     fireEvent.click(within(dlg).getByRole("button", { name: "Crear" }));
     expect(within(dlg).getByRole("status").textContent).toBe("Creado HA-28.");
     expect(deshacer().getAttribute("title")).toMatch(/Nuevo material HA-28/);
+  }, 60_000);
+});
+
+/** Abre una orden de la paleta (Ctrl+K) por su nombre. */
+function orden(nombre: string) {
+  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+  fireEvent.change(screen.getByRole("combobox", { name: "Buscar una orden" }), { target: { value: nombre } });
+  fireEvent.click(screen.getAllByRole("option", { name: (n) => n.includes(nombre) })[0]!);
+}
+
+describe("GE2: casos de carga", () => {
+  it("las hipótesis típicas de una vez: reutiliza G y Q, crea el viento, y es un paso de deshacer", async () => {
+    await proyectoNuevo("ge2-juego");
+    orden("Hipótesis típicas");
+    const dlg = screen.getByRole("dialog", { name: "Casos de carga" });
+    expect(within(dlg).getByLabelText("Lo que se va a hacer").textContent).toBe("Se crean W+X, W-X, W+Y, W-Y. Ya están: G, Q.");
+    // Los típicos que ya están lo dicen
+    expect(within(within(dlg).getByRole("group", { name: "Casos típicos: uso" })).getByRole("button", { name: /^Q.*ya está: Q/ })).toBeTruthy();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Crear las hipótesis" }));
+    expect(within(dlg).getByRole("status").textContent).toBe("Creados W+X, W-X, W+Y, W-Y; ya estaban G, Q.");
+    expect(deshacer().getAttribute("title")).toMatch(/Hipótesis típicas: W\+X, W-X, W\+Y, W-Y/);
+    // La ficha de un caso es su formulario
+    fireEvent.click(within(within(dlg).getByRole("navigation", { name: "Lista de casos" })).getByRole("button", { name: /^W-Y/ }));
+    expect((within(dlg).getByRole("combobox", { name: "dirección" }) as HTMLSelectElement).value).toBe("Y");
+    expect((within(dlg).getByRole("combobox", { name: "signo" }) as HTMLSelectElement).value).toBe("-1");
+    // Esc cierra con el foco fuera (GE1-1)
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Casos de carga" })).toBeNull();
+    elegirTabla("casos");
+    expect(idsTabla("casos")).toEqual(["G", "Q", "W+X", "W-X", "W+Y", "W-Y"]);
+    fireEvent.click(deshacer());
+    expect(idsTabla("casos")).toEqual(["G", "Q"]);
+  }, 60_000);
+
+  it("en la fila nueva de Cargas: «Nuevo caso…» y un típico; se crea con la carga", async () => {
+    await proyectoNuevo("ge2-hoja");
+    elegirTabla("cargas");
+    const caso = DEF_TABLAS.cargas.columnas.find((c) => c.clave === "caso")!;
+    expect(caso.referencia).toBe("casos");
+    elegirEnCelda("cargas", -1, "caso", NUEVA);
+    const dlg = screen.getByRole("dialog", { name: "Casos de carga" });
+    expect(within(dlg).getByText("Para caso de la fila nueva")).toBeTruthy();
+    // Desde un campo no se ofrece el juego: sólo un caso
+    expect(within(dlg).queryByRole("button", { name: "Crear las hipótesis" })).toBeNull();
+    fireEvent.click(within(within(dlg).getByRole("group", { name: "Casos típicos: sismo" })).getByRole("button", { name: /^EX/ }));
+    expect(screen.queryByRole("dialog", { name: "Casos de carga" })).toBeNull();
+    expect(screen.getByText(/EX se crea con ella/)).toBeTruthy();
+    elegirTabla("casos");
+    expect(idsTabla("casos")).toEqual(["G", "Q"]);
+  }, 60_000);
+});
+
+describe("GE3: plantas", () => {
+  it("dos plantas de 3,20 m encima de N1, viendo antes las cotas; un paso de deshacer", async () => {
+    await proyectoNuevo("ge3-barra");
+    fireEvent.click(within(barra()).getByRole("button", { name: "Plantas" }));
+    const dlg = screen.getByRole("dialog", { name: "Plantas" });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Número de plantas nuevas" }), { target: { value: "2" } });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de las plantas nuevas, m" }), { target: { value: "3,2" } });
+    expect((within(dlg).getByRole("combobox", { name: "Planta de referencia" }) as HTMLSelectElement).value).toBe("N1");
+    const filas = () => [...within(dlg).getByRole("table", { name: "Cómo quedan las plantas" }).querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
+    expect(filas()).toEqual([
+      ["N3 · nueva", "—", "+9,40"],
+      ["N2 · nueva", "+3,20", "+6,20"],
+      ["N1", "+3,20", "+3,00"],
+      ["Cim", "+3,00", "0,00"],
+    ]);
+    fireEvent.click(within(dlg).getByRole("button", { name: "Añadir" }));
+    expect(within(dlg).getByRole("status").textContent).toBe("Plantas N2, N3 encima de N1.");
+    expect(deshacer().getAttribute("title")).toMatch(/Plantas N2, N3 encima de N1/);
+    fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar" }));
+    elegirTabla("plantas");
+    expect(idsTabla("plantas")).toEqual(["N3", "N2", "N1", "Cim"]);
+    fireEvent.click(deshacer());
+    expect(idsTabla("plantas")).toEqual(["N1", "Cim"]);
+  }, 60_000);
+
+  it("desde «hasta» de un pilar en la hoja: la planta nueva queda elegida, y va con la fila", async () => {
+    await proyectoNuevo("ge3-hoja");
+    elegirTabla("pilares");
+    elegirEnCelda("pilares", -1, "hasta", NUEVA);
+    const dlg = screen.getByRole("dialog", { name: "Plantas" });
+    expect(within(dlg).getByText("Para hasta de la fila nueva")).toBeTruthy();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Añadir y usar" }));
+    expect(screen.queryByRole("dialog", { name: "Plantas" })).toBeNull();
+    expect(screen.getByText(/N2 se crea con ella/)).toBeTruthy();
+    elegirTabla("plantas");
+    expect(idsTabla("plantas")).toEqual(["N1", "Cim"]);
   }, 60_000);
 });

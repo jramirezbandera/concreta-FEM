@@ -1,6 +1,6 @@
 # GE: crear secciones, materiales y demás listas sin ir a las tablas (plan)
 
-> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6.1). **GE1 hecho el 2026-10-25** (§7); GE2 y GE3, por hacer.
+> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6.1). **GE1, GE2 y GE3 hechos el 2026-10-25** (§7 y §8).
 >
 > **Origen:** el usuario, al dibujar un pilar en un proyecto nuevo (captura del 2026-10-25): «crear una sección o material es horrible, tienes que hacerlo por tablas». Pide ventanas contextuales que creen los casos típicos, como en CYPECAD o SAP2000, y que el desplegable «sección» tenga «Crear nueva…» y lleve a ese menú. «Todo este tipo de cosas tenemos que revisarlas»: el plan repasa todos los campos que eligen un objeto de otra lista, no sólo la sección.
 
@@ -168,7 +168,7 @@ Todas como se proponían, con dos matices:
 | # | Criterio | Resultado |
 |---|---|---|
 | 1 | Sin tablas | **Pasa.** Las cinco formas y los tres tipos de material se crean, cambian, duplican, renombran y borran desde el gestor. El resultado es lo escrito a mano en el JSON (`gestores.test.ts`, `app/src/test/gestores.test.tsx`) |
-| 2 | Desde cualquier desplegable | **Pasa.** El inspector, la hoja (filas del modelo) y la plantilla crean y eligen en un paso, y deshacer quita la sección y su material típico. En la fila nueva de la hoja son dos pasos: crear, y la fila cuando se completa |
+| 2 | Desde cualquier desplegable | **Pasa.** El inspector, la hoja y la plantilla crean y eligen en un paso, y deshacer quita la sección y su material típico. En la fila nueva de la hoja, lo creado espera a la fila y va en su lote (desde §8) |
 | 3 | Catálogo exacto | **Pasa.** Las 87 filas cuadran con la geometría de su sección (`perfiles.test.ts`). Un pórtico con `IPE300` del gestor es el mismo modelo que con el perfil escrito a mano, y compila y calcula |
 | 4 | Lo mostrado es lo calculado | **Pasa.** Las propiedades de la ficha son las de `compilarSeccion` en las cinco formas, y el Ecm, el de `hormigon(fck)` |
 | 5 | Nada se rompe | **Pasa en las pruebas** (raíz 2101 y app 60). Los bancos de Chrome no se han pasado: GE no toca las vistas ni el worker |
@@ -176,11 +176,39 @@ Todas como se proponían, con dos matices:
 
 ### 7.3 Hallazgos
 
-- **GE1-1:** el Esc de un diálogo sólo funcionaba con el foco dentro. Tras «Crear», el botón cambia y el foco se va al `body`. El gestor escucha el Esc en la ventana, salvo que haya otro diálogo encima. Los demás diálogos de la app tienen el mismo defecto.
+- **GE1-1:** el Esc de un diálogo sólo funcionaba con el foco dentro. Tras «Crear», el botón cambia y el foco se va al `body`. Arreglado en todos en §8.
 - **GE1-2:** la columna «forma» de la tabla de secciones sigue sin admitir `I` en una fila nueva (no tiene columnas para el perfil). Ahora la ayuda manda a «Nueva sección…».
 
 ### 7.4 Pendiente
 
 - La puerta de uso (criterio 6).
-- GE2 (casos típicos) y GE3 (plantas).
-- El Esc de los demás diálogos (GE1-1).
+- ~~GE2, GE3 y el Esc de los demás diálogos~~: hechos (§8).
+
+## 8. GE2, GE3 y lo que quedaba de GE1 (2026-10-25)
+
+### 8.1 Qué hay
+
+- **La fila nueva de la hoja, en un paso:** lo que el gestor crea para una celda de la fila nueva (una sección, un material, un caso o unas plantas) no se aplica hasta que la fila se crea, y entonces va en su lote. Mientras, el aviso de la fila lo dice («P30x30 se crea con ella»), y si la celda cambia a otra cosa, no se crea. Deshacer quita la fila y lo creado de una vez.
+- **«Usar» lo que ya tenía** no es un paso de deshacer (antes dejaba uno vacío; lo destapó la prueba de arriba).
+- **Esc en todos los diálogos (GE1-1):** `Dialogo` escucha el Esc en la ventana, en la fase de captura, y cierra el de encima aunque el foco esté fuera. No sigue: ya no suelta a la vez lo elegido ni anula la herramienta de dibujo. El gestor deja su arreglo propio.
+- **GE2, `src/editor/casos.ts`** (puro):
+  - los típicos del CTE: peso propio (G), cargas muertas (CM), uso A, B, C, D, E y G (`QA`…), nieve hasta 1000 m y por encima (`S`, la de altura con duración media), viento ±X ±Y (`W+X`…, familia `W`, ψ de viento) y sismo X e Y (`EX`, `EY`, sin familia: el generador hace el 100/30);
+  - `crearCasos`: reutiliza el caso que ya es el típico (el del peso propio, aunque se llame de otra forma, o uno con la misma acción) y da a los nuevos un id libre (`EX-2` si `EX` está cogido);
+  - `casosDelJuego`: las «Hipótesis típicas» (por defecto, G + Q de uso A + viento en cuatro direcciones);
+  - `describirCaso` y `psiCaso`, para los desplegables y la ficha.
+- **GE3, `src/editor/plantas.ts`** (puro): `insertarPlantas`, n plantas de altura h encima o debajo de una, en un lote. Encima de X, X pasa a tener h y la última nueva lo que X tenía hasta la de encima, así que lo de encima sube n·h con sus alturas; debajo, las nuevas van entre X y la de debajo. Ids con un prefijo y los siguientes números libres (`N2`, `N3`).
+- **`src/editor/tablas.ts`:** `referencia: "casos"` en el caso de una carga y en «deriva de», y `"plantas"` en las nueve columnas que eligen planta; las opciones de caso dicen qué es cada uno (`W+X · Viento +X · W · viento +X · familia W`).
+- **En la app:**
+  - `GestorCasos.tsx`: la lista con sus usos; en «Nuevo caso», los típicos por grupos con un clic (los que ya están lo dicen y se eligen) y, desde la barra, las hipótesis típicas con lo que se va a crear y lo que ya está; la ficha de un caso es su formulario del inspector, con sus ψ;
+  - `GestorPlantas.tsx`: la lista con su cota; «Añadir» con cuántas, altura, encima o debajo de cuál, prefijo y tipo, y la tabla de cómo quedan las cotas antes de hacerlo; la ficha de una planta, su formulario;
+  - «Nuevo caso…» y «Nuevas plantas…» al final de esos desplegables en la hoja, el inspector y (las plantas) la plantilla de Pilar; los botones Casos y Plantas de la barra y la paleta abren los gestores.
+
+### 8.2 Pruebas
+
+- `src/editor/casos.test.ts`: cada típico es lo que da su fila en la tabla Casos; el juego por defecto sobre un proyecto nuevo reutiliza G y Q y crea los cuatro vientos, y sus combinaciones ELU no llevan nunca dos vientos; ids libres; el peso propio reutiliza el caso que lo lleve; las cuatro formas de añadir plantas, con sus alturas y cotas, y lo que no vale.
+- `app/src/test/gestores.test.tsx`: el juego desde la paleta, en un paso; la ficha de un caso; un típico desde la fila nueva de Cargas, que no se crea sin la fila; dos plantas de 3,20 m encima de N1 con la tabla de cotas; una planta desde «hasta» de la fila nueva de Pilares; la sección de la fila nueva, que se deshace con la fila. `editor.test.tsx`: Esc con el foco fuera cierra Borrar.
+
+### 8.3 Pendiente
+
+- La puerta de uso de GE1–GE3 (criterio 6, ampliado: casos y plantas sin abrir la tabla).
+- Un caso típico de temperatura y los accidentales, si hacen falta.

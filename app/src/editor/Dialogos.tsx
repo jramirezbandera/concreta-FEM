@@ -3,7 +3,7 @@
  * elige entre borrarlos también o pasarlos a otro), copiar a otras plantas, renumerar (I-g) y
  * los ábacos en los pilares de un reticular.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { copiarAPlantas, objetosDePlanta } from "../../../src/editor/edicion.ts";
 import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
@@ -16,10 +16,31 @@ import { useVisor } from "../contexto.ts";
 
 const total = (m: ModeloFisico) => COLECCIONES.reduce((n, c) => n + lista(m, c).length, 0);
 
-/** `clase`: otra forma de la caja (el gestor de GE, más ancho y con dos columnas). */
+/**
+ * `clase`: otra forma de la caja (el gestor de GE, más ancho y con dos columnas).
+ *
+ * Esc cierra el de encima aunque el foco no esté dentro (GE1-1: tras pulsar un botón que cambia o
+ * desaparece, el foco se va al `body`). Se escucha en la ventana, en la fase de captura, y no sigue:
+ * así no suelta también lo elegido ni anula la herramienta de dibujo.
+ */
 export function Dialogo({ titulo, children, pie, onCerrar, clase }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void; clase?: string }) {
+  const fondo = useRef<HTMLDivElement>(null);
+  const cerrar = useRef(onCerrar);
+  cerrar.current = onCerrar;
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const abiertos = document.querySelectorAll(".dialogo-fondo");
+      if (abiertos[abiertos.length - 1] !== fondo.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cerrar.current();
+    };
+    window.addEventListener("keydown", tecla, true);
+    return () => window.removeEventListener("keydown", tecla, true);
+  }, []);
   return (
-    <div className="dialogo-fondo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()} onKeyDown={(e) => e.key === "Escape" && onCerrar()}>
+    <div ref={fondo} className="dialogo-fondo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()}>
       <div className={clase ? `dialogo ${clase}` : "dialogo"} role="dialog" aria-modal="true" aria-label={titulo}>
         <div className="dialogo-cab">
           <h2>{titulo}</h2>

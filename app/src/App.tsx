@@ -216,6 +216,9 @@ export function App() {
       r.push({ id: "gestor-nueva-seccion", grupo: "Modelo", nombre: "Nueva sección…", hacer: () => abrirGestor({ coleccion: "secciones", nueva: true }) });
       r.push({ id: "gestor-materiales", grupo: "Modelo", nombre: "Materiales… (gestor)", hacer: () => abrirGestor({ coleccion: "materiales" }) });
       r.push({ id: "gestor-nuevo-material", grupo: "Modelo", nombre: "Nuevo material…", hacer: () => abrirGestor({ coleccion: "materiales", nueva: true }) });
+      r.push({ id: "gestor-casos", grupo: "Cargas", nombre: "Casos de carga… (gestor)", hacer: () => abrirGestor({ coleccion: "casos" }) });
+      r.push({ id: "gestor-hipotesis", grupo: "Cargas", nombre: "Nuevo caso… / Hipótesis típicas…", hacer: () => abrirGestor({ coleccion: "casos", nueva: true }) });
+      r.push({ id: "gestor-plantas", grupo: "Modelo", nombre: "Plantas… / Añadir plantas…", hacer: () => abrirGestor({ coleccion: "plantas", nueva: true, ...(plantaValida ? { planta: plantaValida } : {}) }) });
     }
     const vivo: Partial<EstadoPaneles> = paneles.vivos.get(clave) ?? {};
     r.push(
@@ -238,7 +241,7 @@ export function App() {
       ...(e?.ejes ?? []).map((x) => ({ id: `alzado-${x.id}`, grupo: "Alzado", nombre: `Eje ${x.nombre ?? x.id}${x.propuesto ? " (propuesto)" : ""}`, hacer: () => vistas.abrirAlzado(x.id) })),
     );
     return r;
-  }, [e, ed, proyecto, irA, pedirTabla, paneles, clave, cambiar, theme, toggleTheme, seleccion, vistas]);
+  }, [e, ed, proyecto, irA, pedirTabla, paneles, clave, cambiar, theme, toggleTheme, seleccion, vistas, plantaValida]);
 
   // Los objetos del proyecto, para la paleta: elegirlo y llevar su planta
   const m = ed?.proyecto.modelo;

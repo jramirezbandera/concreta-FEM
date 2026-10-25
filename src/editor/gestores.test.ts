@@ -72,8 +72,14 @@ describe("GE: textos de los desplegables", () => {
     const col = DEF_TABLAS.pilares.columnas.find((c) => c.clave === "seccion")!;
     expect(col.referencia).toBe("secciones");
     expect(col.opciones!(contexto(p.modelo))).toEqual([{ valor: "P30x30", texto: "P30x30 · rect. 30 × 30 · HA-30" }]);
-    const conReferencia = Object.values(DEF_TABLAS).flatMap((d) => d.columnas.filter((c) => c.referencia).map((c) => `${d.nombre}.${c.clave}`));
-    expect(conReferencia).toEqual(["secciones.material", "pilares.seccion", "vigas.seccion", "forjados.material", "forjados.seccion", "muros.material"]);
+    const conReferencia = (r: string) => Object.values(DEF_TABLAS).flatMap((d) => d.columnas.filter((c) => c.referencia === r).map((c) => `${d.nombre}.${c.clave}`));
+    expect([...conReferencia("secciones"), ...conReferencia("materiales")]).toEqual(["pilares.seccion", "vigas.seccion", "forjados.seccion", "secciones.material", "forjados.material", "muros.material"]);
+    // GE2 y GE3
+    expect(conReferencia("casos")).toEqual(["casos.derivadoDe", "cargas.caso"]);
+    expect(conReferencia("plantas")).toEqual(["pilares.desde", "pilares.hasta", "vigas.planta", "forjados.planta", "muros.desde", "muros.hasta", "apoyos.planta", "apoyosLineales.planta", "cargas.planta"]);
+    // Toda columna que elige de esas listas lleva su referencia («desde» y «hasta» de una carga son estaciones)
+    const sinReferencia = Object.values(DEF_TABLAS).flatMap((d) => d.columnas.filter((c) => c.opciones && !c.referencia && /^(desde|hasta|planta|caso|seccion|material|derivadoDe)$/.test(c.clave)).map((c) => `${d.nombre}.${c.clave}`));
+    expect(sinReferencia).toEqual([]);
   });
 });
 

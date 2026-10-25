@@ -93,6 +93,25 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
   const propuesta = h === "ejes" ? operacionProponerEjes(m) : null;
   const ponerPilar = (c: Partial<Plantillas["pilar"]>) => setPlantillas({ ...t, pilar: { ...t.pilar, ...c } });
   const seccionPilar = m.secciones.find((s) => s.id === t.pilar.seccion);
+  // GE3: «Nuevas plantas…» al final de «desde» y «hasta»; añadirlas es un paso de deshacer
+  const elegirPlanta = (campo: "desde" | "hasta", v: string) => {
+    if (!esDelGestor(v)) return ponerPilar({ [campo]: v || undefined });
+    const actual = t.pilar[campo] ?? (campo === "hasta" ? planta : m.plantas.at(-1)?.id) ?? undefined;
+    abrirGestor({
+      coleccion: "plantas",
+      ...(v === EDITAR && actual ? { id: actual } : { nueva: true }),
+      ...(actual ? { planta: actual } : {}),
+      para: `«${campo}» de la plantilla de Pilar`,
+      alElegir: (id, crear) => {
+        if (crear.length) {
+          const e = editar(comoUna(crear), `Plantas nuevas (${id}…)`);
+          if (e) return e;
+        }
+        ponerPilar({ [campo]: id });
+        return null;
+      },
+    });
+  };
   return (
     <div role="region" aria-label={`Dibujar · ${TITULO[h]}`}>
       <Cabecera icono={Icono} tipo={`Dibujar${planta ? ` en ${planta}` : ""}`} titulo={TITULO[h]}>
@@ -114,16 +133,18 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
           <div className="py-1">
             <label className="campo">
               <span>desde</span>
-              <select className="sel" value={t.pilar.desde ?? ""} aria-label="Planta de la base" onChange={(x) => ponerPilar({ desde: x.target.value || undefined })}>
+              <select className="sel" value={t.pilar.desde ?? ""} aria-label="Planta de la base" onChange={(x) => elegirPlanta("desde", x.target.value)}>
                 <option value="">{`${m.plantas.at(-1)?.id ?? "—"} · la más baja`}</option>
                 {opcionesPlantas}
+                <OpcionesGestor coleccion="plantas" valor={t.pilar.desde ?? ""} />
               </select>
             </label>
             <label className="campo">
               <span>hasta</span>
-              <select className="sel" value={t.pilar.hasta ?? ""} aria-label="Planta de la cabeza" data-error={!!pl && !pl.ok} onChange={(x) => ponerPilar({ hasta: x.target.value || undefined })}>
+              <select className="sel" value={t.pilar.hasta ?? ""} aria-label="Planta de la cabeza" data-error={!!pl && !pl.ok} onChange={(x) => elegirPlanta("hasta", x.target.value)}>
                 <option value="">{`${planta ?? "—"} · la de la vista`}</option>
                 {opcionesPlantas}
+                <OpcionesGestor coleccion="plantas" valor={t.pilar.hasta ?? ""} />
               </select>
               {pl && !pl.ok && <p className="error">{pl.mensaje}</p>}
             </label>

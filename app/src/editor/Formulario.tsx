@@ -10,7 +10,7 @@ import { indiceIds } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, conActual, contexto, filaConValor, objetosTabla, tablaDeColeccion, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
-import { abrirGestor, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
+import { abrirGestor, ARTICULO, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
 
 /** La tabla del editor de un objeto (null si no está en el proyecto: un eje propuesto). */
 export function tablaDe(m: Parameters<typeof indiceIds>[0], id: string): NombreTabla | null {
@@ -73,8 +73,10 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
         tabla,
         clave,
         fila: actual,
-        para: `${col.titulo === "vigueta" ? "la vigueta" : `${col.referencia === "secciones" ? "la sección" : "el material"}`} de ${id}`,
+        para: `${col.titulo === "vigueta" ? "la vigueta" : ARTICULO[col.referencia!]} de ${id}`,
         alElegir: (nuevo, crear) => {
+          // «Usar» la que ya tiene no es un paso de deshacer
+          if (!crear.length && !pendiente && (fila[clave] ?? "") === nuevo) return null;
           const t = operacionFila(m, tabla, id, filaConValor(def, pendiente ? actual : fila, clave, nuevo));
           if (!t.ok) return t.errores.map((e) => e.mensaje).join(" · ");
           const r = ed.editar(comoUna([...crear, t.operacion]), `${id} · ${col.titulo} = ${nuevo}`);

@@ -368,6 +368,9 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     fireEvent.pointerDown(window);
     fireEvent.click(within(objetos()).getByRole("button", { name: /^V1/ }));
     expect(screen.getByRole("dialog", { name: "Borrar V1" })).toBeTruthy();
+    // GE1-1: Esc lo cierra aunque el foco esté fuera
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Borrar V1" })).toBeNull();
   }, 120_000);
 
   it("V2b: un paño con su carga y un muro con un hueco y su empuje, tecleados, dan la huella del mismo modelo escrito a mano", async () => {

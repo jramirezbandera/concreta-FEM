@@ -243,6 +243,12 @@ const PLURAL: Partial<Record<Coleccion, [string, string]>> = {
   muros: ["muro", "muros"],
   secciones: ["sección", "secciones"],
   materiales: ["material", "materiales"],
+  // GE2 y GE3: lo que usa un caso o una planta
+  casos: ["caso", "casos"],
+  cargas: ["carga", "cargas"],
+  apoyos: ["apoyo", "apoyos"],
+  apoyosLineales: ["apoyo lineal", "apoyos lineales"],
+  bandas: ["banda", "bandas"],
 };
 
 /** Quién usa un objeto, por colección: [{ coleccion, n }], en el orden de las colecciones. */

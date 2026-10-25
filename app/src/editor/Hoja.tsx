@@ -21,7 +21,8 @@ import { escribirTsv } from "../../../src/editor/celdas.ts";
 import { proponerEjes } from "../../../src/compilador/ejes.ts";
 import { operacionFila, pegar } from "../../../src/editor/edicion.ts";
 import { comoUna } from "../../../src/editor/gestores.ts";
-import { lista, type Objeto } from "../../../src/editor/referencias.ts";
+import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
+import { indiceIds, lista, type Objeto } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, conActual, contexto, filaConValor, objetosTabla, type NombreTabla, type Opcion } from "../../../src/editor/tablas.ts";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import { useVisor } from "../contexto.ts";
@@ -283,6 +284,11 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
   const [desplegado, setDesplegado] = useState(false);
   const [error, setError] = useState(false);
   const [borrador, setBorrador] = useState<Record<string, string>>({});
+  /**
+   * GE: lo que el gestor creó para una celda de la fila nueva (por columna: el id elegido y sus
+   * operaciones). No se aplica hasta que la fila se crea, y entonces va en su lote: un paso de deshacer.
+   */
+  const [creaBorrador, setCreaBorrador] = useState<Record<string, { id: string; crear: readonly Operacion[] }>>({});
   const [mensaje, setMensaje] = useState<Mensaje>(null);
   const [dialogo, setDialogo] = useState<{ tipo: "borrar" | "copiar"; ids: string[] } | null>(null);
   const hoja = useRef<HTMLDivElement>(null);
@@ -298,6 +304,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     setDesplegado(false);
     setError(false);
     setBorrador({});
+    setCreaBorrador({});
     setPendiente(null);
     setMensaje(null);
   }, [tabla, filtro]);
@@ -349,15 +356,38 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
 
   const textoCelda = (f: number, c: number) => (f === nBorrador ? (borrador[claves[c]!] ?? "") : (filas[f]?.fila[claves[c]!] ?? ""));
 
-  /** Escribe un valor en una celda; false si no entra (y se sigue editando), "creado" si la fila nueva pasó a ser un objeto. */
-  const escribir = (f: number, c: number, valor: string): boolean | "creado" => {
+  /**
+   * Escribe un valor en una celda; false si no entra (y se sigue editando), "creado" si la fila nueva
+   * pasó a ser un objeto. `crear`: lo que el gestor crea para tener ese valor (sólo en la fila nueva).
+   */
+  const escribir = (f: number, c: number, valor: string, crear: readonly Operacion[] = []): boolean | "creado" => {
     const col = cols[c]!;
     if (col.calculada) return true;
     if (f === nBorrador) {
       const nb = filaConValor(def, borrador, col.clave, valor);
+      const nc = crear.length ? { ...creaBorrador, [col.clave]: { id: valor, crear } } : creaBorrador;
       setBorrador(nb);
+      setCreaBorrador(nc);
       if (Object.values(nb).every((x) => x.trim() === "")) return true;
-      const t = operacionFila(m, tabla, null, nb);
+      // Lo creado para las celdas que aún lo eligen, sin lo que ya esté en el proyecto ni repetido
+      const hay = indiceIds(m);
+      const previas: Operacion[] = [];
+      const plano = (os: readonly Operacion[]): Operacion[] => os.flatMap((o) => (o.op === "lote" ? plano(o.operaciones) : [o]));
+      for (const [k, x] of Object.entries(nc)) {
+        if (nb[k] !== x.id) continue;
+        for (const o of plano(x.crear)) {
+          const id = o.op === "crear" ? o.objeto.id : null;
+          if (id !== null && (hay.has(id) || previas.some((p) => p.op === "crear" && p.objeto.id === id))) continue;
+          previas.push(o);
+        }
+      }
+      const conPrevias = previas.length ? aplicar(ed.proyecto, comoUna(previas)) : null;
+      if (conPrevias && !conPrevias.ok) {
+        setMensaje({ tono: "fail", texto: conPrevias.errores.map((e) => e.mensaje).join(" ") });
+        return false;
+      }
+      const creadas = previas.flatMap((o) => (o.op === "crear" ? [o.objeto.id] : []));
+      const t = operacionFila(conPrevias?.ok ? conPrevias.proyecto.modelo : m, tabla, null, nb);
       if (!t.ok) {
         const faltan = t.errores.filter((e) => e.mensaje === "falta el dato").map((e) => cols.find((x) => x.clave === e.columna)?.titulo ?? e.columna);
         const otros = t.errores.filter((e) => e.mensaje !== "falta el dato");
@@ -365,16 +395,17 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
           setMensaje({ tono: "fail", texto: `${col.titulo}: ${otros.find((e) => e.columna === col.clave)!.mensaje}` });
           return false;
         }
-        setMensaje({ tono: "neu", texto: `Fila nueva: ${faltan.length ? `falta ${faltan.join(", ")}` : ""}${otros.length ? `${faltan.length ? "; " : ""}${otros.map((e) => `${e.columna}: ${e.mensaje}`).join("; ")}` : ""}.` });
+        setMensaje({ tono: "neu", texto: `Fila nueva: ${faltan.length ? `falta ${faltan.join(", ")}` : ""}${otros.length ? `${faltan.length ? "; " : ""}${otros.map((e) => `${e.columna}: ${e.mensaje}`).join("; ")}` : ""}${creadas.length ? `; ${creadas.join(", ")} se crea${creadas.length > 1 ? "n" : ""} con ella` : ""}.` });
         return true;
       }
-      const r = ed.editar(t.operacion, `Nueva fila en ${def.titulo.toLowerCase()}`);
+      const r = ed.editar(comoUna([...previas, t.operacion]), `Nueva fila en ${def.titulo.toLowerCase()}`);
       if (!r.ok) {
         setMensaje({ tono: "fail", texto: r.errores.map((e) => e.mensaje).join(" ") });
         return true;
       }
       const nuevo = t.operacion.op === "crear" ? t.operacion.objeto.id : null;
       setBorrador({});
+      setCreaBorrador({});
       setMensaje({ tono: "ok", texto: `Creado ${nuevo}.` });
       if (nuevo) setSeleccion(nuevo);
       return "creado";
@@ -434,7 +465,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
 
   /**
    * GE: «Nueva…» o «Editar…» abre el gestor. En una fila del modelo, lo que crea y la celda van en un
-   * lote (un paso de deshacer); en la fila nueva, se crea y se escribe la celda, como al elegir.
+   * lote (un paso de deshacer); en la fila nueva, lo que crea espera a la fila y va en su lote.
    */
   const gestor = (f: number, c: number, eleccion: string) => {
     const col = cols[c]!;
@@ -451,13 +482,11 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         para: `${col.titulo} de ${v ? v.id : "la fila nueva"}`,
         alElegir: (nuevo, crear) => {
           if (!v) {
-            if (crear.length) {
-              const r = ed.editar(comoUna(crear), `Nueva ${col.referencia === "secciones" ? "sección" : "material"} ${nuevo}`);
-              if (!r.ok) return r.errores.map((e) => e.mensaje).join(" ");
-            }
-            escribir(f, c, nuevo);
+            escribir(f, c, nuevo, crear);
             return null;
           }
+          // «Usar» la que ya tiene no es un paso de deshacer
+          if (!crear.length && (v.fila[col.clave] ?? "") === nuevo) return null;
           const t = operacionFila(m, tabla, v.id, filaConValor(def, v.fila, col.clave, nuevo));
           if (!t.ok) return t.errores.map((e) => e.mensaje).join(" · ");
           const r = ed.editar(comoUna([...crear, t.operacion]), `${v.id} · ${col.titulo} = ${nuevo}`);

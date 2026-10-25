@@ -8,7 +8,7 @@
  * Todo lo que decide sale de `src/editor/gestores.ts` (ids, reutilizar, materiales típicos,
  * propiedades); aquí sólo se leen los campos y se pinta.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Plus, Table2 } from "lucide-react";
 import type { Material, Seccion } from "../../../src/compilador/fisico.ts";
 import {
@@ -42,23 +42,26 @@ import type { ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
+import { GestorCasos } from "./GestorCasos.tsx";
+import { GestorPlantas } from "./GestorPlantas.tsx";
 import { cerrarGestor, useGestor, type PedidoGestor } from "./referencia.tsx";
 
 /** El gestor abierto, si hay pedido (va una vez en `App`). */
 export function GestorAbierto() {
   const { pedido, n } = useGestor();
   const { proyecto } = useVisor();
-  // Esc cierra aunque el foco no esté dentro (tras crear, el botón cambia y el foco se va al body),
-  // salvo con otro diálogo encima (Borrar), que se cierra antes
-  useEffect(() => {
-    if (!pedido) return;
-    const tecla = (e: KeyboardEvent) => e.key === "Escape" && document.querySelectorAll(".dialogo-fondo").length <= 1 && cerrarGestor();
-    window.addEventListener("keydown", tecla);
-    return () => window.removeEventListener("keydown", tecla);
-  }, [pedido]);
   if (!pedido || !proyecto.edicion) return null;
   // La clave reinicia el gestor con cada pedido
-  return pedido.coleccion === "secciones" ? <GestorSecciones key={n} pedido={pedido} /> : <GestorMateriales key={n} pedido={pedido} />;
+  switch (pedido.coleccion) {
+    case "secciones":
+      return <GestorSecciones key={n} pedido={pedido} />;
+    case "materiales":
+      return <GestorMateriales key={n} pedido={pedido} />;
+    case "casos":
+      return <GestorCasos key={n} pedido={pedido} />;
+    case "plantas":
+      return <GestorPlantas key={n} pedido={pedido} />;
+  }
 }
 
 // ─── Números ────────────────────────────────────────────────────────────────────────────────────
@@ -555,7 +558,7 @@ function DibujoSeccion({ datos, mini = false }: { datos: DatosSeccion | null; mi
   );
 }
 
-function Propiedades({ filas, nota }: { filas: [string, string][]; nota: string }) {
+export function Propiedades({ filas, nota }: { filas: [string, string][]; nota: string }) {
   return (
     <div className="ges-props">
       {filas.length > 0 && (
@@ -573,12 +576,13 @@ function Propiedades({ filas, nota }: { filas: [string, string][]; nota: string 
   );
 }
 
-function Lista({ titulo, elementos, elegida, nueva, onElegir, onNueva }: { titulo: string; elementos: { id: string; texto: string; detalle: string; n: number }[]; elegida: string | null; nueva: boolean; onElegir: (id: string) => void; onNueva: () => void }) {
+/** La lista de la izquierda de un gestor; `nuevaTexto`, la línea de arriba («Nueva sección»). */
+export function Lista({ titulo, nuevaTexto, elementos, elegida, nueva, onElegir, onNueva }: { titulo: string; nuevaTexto?: string; elementos: { id: string; texto: string; detalle: string; n: number }[]; elegida: string | null; nueva: boolean; onElegir: (id: string) => void; onNueva: () => void }) {
   return (
     <nav className="ges-lista" aria-label={`Lista de ${titulo}`}>
       <button type="button" className="ges-nueva" aria-current={nueva || undefined} onClick={onNueva}>
         <Plus size={14} />
-        {titulo === "secciones" ? "Nueva sección" : "Nuevo material"}
+        {nuevaTexto ?? (titulo === "secciones" ? "Nueva sección" : "Nuevo material")}
       </button>
       {elementos.length === 0 && <p className="ges-vacia">Ninguna en el proyecto.</p>}
       {elementos.map((x) => (

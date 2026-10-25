@@ -195,7 +195,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Separador />
           <Herramienta icono={IcCarga} nombre="Nueva carga" onClick={() => abrirTabla("cargas", true)} title="Una carga nueva en la tabla de cargas" />
           <Herramienta icono={IcEmpuje} nombre="Empuje" onClick={() => abrirTabla("cargas", true, { tipo: "empuje", caso: casoValido })} title="Un empuje nuevo sobre un muro (terreno o agua), en la tabla de cargas" />
-          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirTabla("casos")} title="La tabla de casos de carga" />
+          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, las hipótesis típicas de una vez, y la tabla desde él (GE2)" />
         </>
       )}
       <Separador />
@@ -223,7 +223,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
           <Separador />
-          <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirTabla("plantas")} />
+          <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirGestor({ coleccion: "plantas", ...(planta ? { planta } : {}) })} title="Añadir plantas encima o debajo de una, viendo cómo quedan las cotas, y la tabla desde él (GE3)" />
           <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él (GE)" />
           <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él (GE)" />
         </>
