@@ -1,0 +1,23 @@
+AU-4: modelos de las referencias congeladas que cambian (el resto, idénticos)
+
+C3: 3 de 10
+  aleatorio-3-muros: Σ Rz del primer caso 977.582 → 1004.842 kN (2.79 %)
+  aleatorio-3-muros-lv: Σ Rz del primer caso 977.582 → 1004.842 kN (2.79 %)
+  aleatorio-3-muros-lv2: Σ Rz del primer caso 977.582 → 1004.842 kN (2.79 %)
+C4: 6 de 8
+  pano-oblicuo: Σ Rz del primer caso 174.750 → 189.600 kN (8.50 %)
+  aleatorio-7-unidireccional: Σ Rz del primer caso 970.999 → 1073.067 kN (10.51 %)
+  aleatorio-6-reticular: Σ Rz del primer caso 1676.288 → 1837.444 kN (9.61 %)
+  aleatorio-5-mixto: Σ Rz del primer caso 1961.154 → 2140.354 kN (9.14 %)
+  aleatorio-5-mixto-lv: Σ Rz del primer caso 1961.154 → 2140.354 kN (9.14 %)
+  aleatorio-5-mixto-lv2: Σ Rz del primer caso 1961.154 → 2140.354 kN (9.14 %)
+C5: 1 de 4
+  aleatorio-3: Σ Rz del primer caso 892.790 → 921.939 kN (3.26 %)
+F: 7 de 16
+  aleatorio-3: Σ Rz del primer caso 892.790 → 921.939 kN (3.26 %)
+  reticular-2x2-abacos: Σ Rz del primer caso 977.851 → 1038.791 kN (6.23 %)
+  aleatorio-3-lv: Σ Rz del primer caso 892.790 → 921.939 kN (3.26 %)
+  reticular-2x2-abacos-lv: Σ Rz del primer caso 977.851 → 1038.791 kN (6.23 %)
+  aleatorio-3-lv2: Σ Rz del primer caso 892.790 → 921.939 kN (3.26 %)
+  reticular-2x2-abacos-lv2: Σ Rz del primer caso 977.851 → 1038.791 kN (6.23 %)
+  reticular-2x2-planas-rva: Σ Rz del primer caso 872.613 → 959.624 kN (9.97 %)

@@ -100,7 +100,7 @@ function cargarViga(
  * `giro` grados (0 o 30: el paño oblicuo). 7 viguetas de 5 m (de y = 0,75 a 5,25), sus 14 nudos
  * sobre las vigas de los lados de 6 m y la torsión liberada en su primer extremo. Las vigas de los
  * lados de 5 m son paralelas a las viguetas: reciben la mitad de la franja hasta la primera (0,375 m).
- * Cargas: peso propio (pilares, vigas por su descuelgue y el pp del paño), una de superficie, una
+ * Cargas: peso propio (pilares, vigas sin lo que su ancho pesa ya como paño y el pp del paño), una de superficie, una
  * puntual entre dos viguetas y una lineal paralela a ellas, entre otras dos.
  */
 function unPano(giro: number): CasoMano {
@@ -176,8 +176,9 @@ function unPano(giro: number): CasoMano {
   const VB = viga(m, cadB, uY, V, 0.15, 0.15);
   const VC = viga(m, cadC, uX, V, 0.15, 0.15);
   const VD = viga(m, cadD, uX, V, 0.15, 0.15);
-  // Peso de las vigas: sólo su descuelgue, γ·(b·h − (b/2)·min(h, t)) con t = 0,3 (C2-g)
-  const wv = g(-(25 * 0.3 * 0.5 - 25 * 0.15 * 0.3));
+  // Peso de las vigas: γ·b·h menos lo que su medio ancho bajo el paño ya pesa como paño,
+  // (b/2)·min(γ·min(h, t), pp) con t = 0,3 y pp = 3 (C2-g, AU-4)
+  const wv = g(-(25 * 0.3 * 0.5 - 0.15 * Math.min(25 * 0.3, 3)));
   cargarViga(VA, cadA, G([0, 0]), uY, z, 0, 6, wv, bG, nG);
   cargarViga(VB, cadB, G([5, 0]), uY, z, 0, 6, wv, bG, nG);
   cargarViga(VC, cadC, G([0, 0]), uX, z, 0, 5, wv, bG, nG);

@@ -21,7 +21,7 @@
 import type { CargaFisica, Losa, ModeloFisico, PanoUnidireccional, Vec2 } from "../compilador/fisico.ts";
 import { momentosInterseccion, type Region } from "../compilador/poligonos.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
-import { areaRegion, areaSeccion, cantoLibre, gammaMaterial, pesoLosa, Plantas, regionDe, sobreMuros, tramos } from "./sensatez.ts";
+import { areaRegion, areaSeccion, gammaMaterial, pesoLibre, pesoLosa, Plantas, regionDe, sobreMuros, tramos } from "./sensatez.ts";
 
 /** Separación de los puntos de los ejes de los muros que hacen de generadores, m. */
 export const PASO_MURO = 0.5;
@@ -235,14 +235,14 @@ export function bajadaTributaria(f: ModeloFisico, casos: ReadonlySet<string>, ep
           const g = gammaMaterial(m);
           const w = areaSeccion(s) * g;
           const bajo = s.forma === "rectangular" && m.tipo === "hormigon";
-          // C2-g: bajo una losa o un paño, sólo el descuelgue (mitad del ancho a cada lado); A-9: por
+          // C2-g: bajo una losa o un paño, sólo lo que no pesa ya como forjado (mitad del ancho a cada lado, AU-4); A-9: por
           // el eje de un muro que le llega desde abajo, sólo lo que sobresale de él
           for (const t of tramos(v.puntos)) {
             const muros = bajo ? sobreMuros(t, k, f, P, epsSnap) : [];
             muestrear([t.A, t.B], (sl) => {
               if (!bajo) return w;
               let wl = 0;
-              for (const lado of [1, -1]) wl += g * (s.b / 2) * cantoLibre(f, pl, [t.A[0] + t.u[0] * sl - (lado * t.u[1] * s.b) / 4, t.A[1] + t.u[1] * sl + (lado * t.u[0] * s.b) / 4], s.h);
+              for (const lado of [1, -1]) wl += (s.b / 2) * pesoLibre(f, pl, [t.A[0] + t.u[0] * sl - (lado * t.u[1] * s.b) / 4, t.A[1] + t.u[1] * sl + (lado * t.u[0] * s.b) / 4], s.h, g);
               const o = muros.find((x) => sl > x.desde && sl < x.hasta);
               return o ? (wl * Math.max(0, s.b - o.t)) / s.b : wl;
             });

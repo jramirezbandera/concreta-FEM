@@ -141,12 +141,13 @@ describe("C4: unidireccional", () => {
     expect(s.modelo.restricciones?.some((x) => x.tipo === "diafragma") ?? false).toBe(false);
   });
 
-  it("peso propio: el pp del paño y las vigas por su descuelgue (C2-g con el canto de la vigueta)", () => {
+  it("peso propio: el pp del paño y las vigas sin lo que su ancho pesa ya como paño (C2-g, AU-4)", () => {
     const r = valido(compilar(recuadro()));
     const [g] = casosValidos(calcular(r.modelo));
     let Rz = 0;
     for (let i = 2; i < g!.reacciones.length; i += 6) Rz += g!.reacciones[i]!;
-    const vigas = 2 * (5 + 6) * 25 * (0.3 * 0.5 - 0.15 * 0.3);
+    // Medio ancho de cada viga bajo el paño: pesa su pp (3), no γ·t (C2-g con el pp del paño, AU-4)
+    const vigas = 2 * (5 + 6) * (25 * 0.3 * 0.5 - 0.15 * 3);
     const pilares = 4 * 3 * 25 * 0.09;
     expect(Rz).toBeCloseTo(3 * 30 + vigas + pilares, 9);
   });

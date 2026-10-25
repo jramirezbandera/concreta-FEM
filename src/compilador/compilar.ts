@@ -40,7 +40,7 @@ import type { ModificadoresBarra } from "../elementos/barra.ts";
 import { puntoEnRegion } from "./poligonos.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "RV2";
+export const VERSION_COMPILADOR = "AU1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -584,7 +584,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       );
     if (aPilar.length) h.push(`Los apoyos que llegan a la huella de un pilar (${aPilar.join(", ")}) acaban en su cara: lo que cae en la huella, o en la zona rígida de una viga en el pilar, es del pilar.`);
     h.push(
-      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos, con casetón recuperable (C4-i)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo su descuelgue (C2-g, H24).${ctx.pilares.length ? " Los pilares pesan de forjado a forjado, sin descontar su cruce con las losas (A-9): del lado de la seguridad, como es habitual." : ""}`,
+      `Peso propio de las losas desde su pp (${ctx.losas.map((l) => (l.reticular && l.reticular.ppAbaco !== l.reticular.ppAligerada ? `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m² en la zona aligerada y ${coma(Number(l.reticular.ppAbaco.toFixed(3)))} en los ábacos, con casetón recuperable (C4-i)` : `${l.losa.id}: ${coma(Number(l.pp.toFixed(3)))} kN/m²`)).join("; ")}). Las vigas rectangulares de hormigón bajo losa pesan sólo lo que su ancho no pesa ya como forjado: en una maciza, su descuelgue (C2-g, H24); en un aligerado, también γ·t menos el pp en su ancho, que es macizo (AU-4).${ctx.pilares.length ? " Los pilares pesan de forjado a forjado, sin descontar su cruce con las losas (A-9): del lado de la seguridad, como es habitual." : ""}`,
     );
     for (const l of ctx.losas) {
       const r = l.reticular;
@@ -624,7 +624,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
       `Forjados unidireccionales como viguetas-barra (D2; ${lista}). Las viguetas de los paños contiguos con la misma dirección e intereje siguen las mismas rectas, centradas en su ancho, y son continuas sobre sus apoyos comunes (C4-a). Cada vigueta va de apoyo a apoyo (vigas, muros, pilares y bordes de losa), sin nudos intermedios y con la torsión liberada en un extremo; las de un voladizo la conservan (C4-c, E2-3).`,
     );
     h.push(
-      "Cargas de los paños (su pp, de superficie, lineales y puntuales): a las viguetas por la regla de la palanca en la dirección transversal, y a las vigas y los muros paralelos a ellas en sus lados la franja entre la última vigueta y la viga o el muro; la franja junto a un borde sin viga ni muro va a la última vigueta con su momento de transporte (C4-e). Las vigas bajo un paño pesan sólo su descuelgue (C2-g con el canto de la vigueta).",
+      "Cargas de los paños (su pp, de superficie, lineales y puntuales): a las viguetas por la regla de la palanca en la dirección transversal, y a las vigas y los muros paralelos a ellas en sus lados la franja entre la última vigueta y la viga o el muro; la franja junto a un borde sin viga ni muro va a la última vigueta con su momento de transporte (C4-e). Las vigas bajo un paño pesan sólo lo que su ancho no pesa ya como paño: γ·h por su área menos el pp del paño, con el canto de la vigueta como canto del forjado (C2-g, AU-4).",
     );
     if (panos.voladizos) {
       const vigas = [...new Set([...equilibrio].map((b) => b.pieza))].sort();

@@ -19,7 +19,7 @@ import { compilar } from "../compilador/compilar.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesCompilacion, Seccion, Vec2 } from "../compilador/fisico.ts";
-import { momentosInterseccion, puntoEnRegion, type Region } from "../compilador/poligonos.ts";
+import { momentosInterseccion, puntoEnRegion, recorteRegionConvexo, type Region } from "../compilador/poligonos.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import type { TipoAccion } from "../combinaciones/generador.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
@@ -529,20 +529,40 @@ export function sobreMuros(t: { A: Vec2; L: number; u: Vec2 }, k: number, f: Mod
   return r;
 }
 
-/** Canto de una viga de canto h que queda en el punto q de la planta bajo su losa o su paño (C2-g): h menos lo que ocupan ellos. */
-export function cantoLibre(f: ModeloFisico, planta: string, q: Vec2, h: number): number {
+/** El pp de una losa (kN/m²) en su zona maciza o aligerada y en sus ábacos, como el compilador (C4-i). */
+export function ppLosa(l: Losa, m: Material): { pp: number; ppAbaco: number } {
+  const g = gammaMaterial(m);
+  if (l.pp !== undefined) return { pp: l.pp, ppAbaco: l.pp };
+  if (!l.reticular) return { pp: g * l.espesor, ppAbaco: g * l.espesor };
+  const { intereje: s, nervio: bw, capa: hf } = l.reticular;
+  return { pp: g * (hf + (l.espesor - hf) * (1 - ((s - bw) / s) ** 2)), ppAbaco: g * l.espesor };
+}
+
+/**
+ * Lo que una viga de hormigón de canto h y peso específico γ bajo una losa o un paño pesa por m² de
+ * planta en el punto q, sin lo que ese trozo de su ancho ya pesa como forjado (C2-g, AU-4):
+ * γ·h − min(γ·min(h, t), pp), con el pp del ábaco si q cae en uno.
+ */
+export function pesoLibre(f: ModeloFisico, planta: string, q: Vec2, h: number, gamma: number): number {
+  const solido = (t: number, pp: number) => gamma * h - Math.min(gamma * Math.min(h, t), pp);
   const l = (f.losas ?? []).find((x) => x.planta === planta && puntoEnRegion(q, regionDe(x)));
-  if (l) return h - Math.min(h, l.espesor);
+  const m = l && f.materiales.find((x) => x.id === l.material);
+  if (l && m) {
+    const { pp, ppAbaco } = ppLosa(l, m);
+    const enAbaco = (l.reticular?.abacos ?? []).some((ab) => puntoEnRegion(q, { contorno: ab, huecos: [] }));
+    return solido(l.espesor, enAbaco ? ppAbaco : pp);
+  }
+  if (l) return gamma * (h - Math.min(h, l.espesor));
   const pn = (f.panos ?? []).find((x) => x.planta === planta && puntoEnRegion(q, regionDe(x)));
   const s = pn && f.secciones.find((x) => x.id === pn.seccion);
   const hv = s ? cantoSeccion(s) : null;
-  return hv ? h - Math.min(h, hv) : h;
+  return hv ? solido(hv, pn!.pp) : gamma * h;
 }
 
 /**
  * Peso propio esperado por planta y tipo de pieza, sin la malla: Σ V·γ con el pp de las losas y
  * los paños, menos los solapes que el compilador descuenta (C2-g: una viga rectangular de
- * hormigón bajo una losa o un paño pesa sólo su descuelgue; C3-g: el muro, menos su solape con
+ * hormigón bajo una losa o un paño no pesa lo que su ancho ya pesa como forjado, AU-4; C3-g: el muro, menos su solape con
  * las losas, la mitad por cada lado de la planta al que llega). Estos se estiman por la huella de
  * la pieza (su eje con su ancho) dentro de las losas. El pilar no descuenta su solape (A-9).
  */
@@ -568,23 +588,33 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05): Omi
     const x = r.get(v.planta)!;
     x.vigas += w.w * longitud(v.puntos);
     if (w.s.forma !== "rectangular" || w.m.tipo !== "hormigon") continue;
-    // C2-g: bajo una losa o un paño, sólo el descuelgue
+    // C2-g: bajo una losa o un paño, sólo lo que no pesa ya como forjado (AU-4)
     const gamma = gammaMaterial(w.m);
     const k = P.indice.get(v.planta)!;
     for (const t of tramos(v.puntos)) {
       const huella = huellaTramo(t, w.s.b);
-      for (const l of losasEn(v.planta)) x.solapes += momentosInterseccion(regionDe(l), huella).A * Math.min(w.s.h, l.espesor) * gamma;
+      const hs = w.s.h;
+      const forjado = (t: number, pp: number) => Math.min(gamma * Math.min(hs, t), pp);
+      for (const l of losasEn(v.planta)) {
+        const ml = material.get(l.material);
+        if (!ml) continue;
+        const { pp, ppAbaco } = ppLosa(l, ml);
+        const A = momentosInterseccion(regionDe(l), huella).A;
+        // Lo de los ábacos dentro de la losa (uno de fachada se sale de ella): el ábaco recortado por la huella, que es convexa
+        const Aab = (l.reticular?.abacos ?? []).reduce((t, ab) => t + (recorteRegionConvexo({ contorno: ab, huecos: [] }, huella) ?? []).reduce((u, z) => u + Math.abs(momentosInterseccion(regionDe(l), z).A), 0), 0);
+        x.solapes += (A - Aab) * forjado(l.espesor, pp) + Aab * forjado(l.espesor, ppAbaco);
+      }
       for (const pn of panosEn(v.planta)) {
         const h = seccion.get(pn.seccion);
         const hv = h ? cantoSeccion(h) : null;
-        if (hv) x.solapes += momentosInterseccion(regionDe(pn), huella).A * Math.min(w.s.h, hv) * gamma;
+        if (hv) x.solapes += momentosInterseccion(regionDe(pn), huella).A * forjado(hv, pn.pp);
       }
       // A-9: por el eje de un muro que le llega desde abajo, sólo lo que sobresale de él
       for (const o of sobreMuros(t, k, f, P, eps)) {
         const sm = (o.desde + o.hasta) / 2;
         const { b, h } = w.s;
-        const hl = [1, -1].reduce((suma, lado) => suma + cantoLibre(f, v.planta, [t.A[0] + t.u[0] * sm - (lado * t.u[1] * b) / 4, t.A[1] + t.u[1] * sm + (lado * t.u[0] * b) / 4], h), 0);
-        x.solapes += ((gamma * Math.min(b, o.t)) / 2) * hl * (o.hasta - o.desde);
+        const wl = [1, -1].reduce((suma, lado) => suma + pesoLibre(f, v.planta, [t.A[0] + t.u[0] * sm - (lado * t.u[1] * b) / 4, t.A[1] + t.u[1] * sm + (lado * t.u[0] * b) / 4], h, gamma), 0);
+        x.solapes += (Math.min(b, o.t) / 2) * wl * (o.hasta - o.desde);
       }
     }
   }

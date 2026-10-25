@@ -10,7 +10,8 @@
  *   entre el punto y el eje o el nudo.
  * - Todo va en ejes globales; las cargas "local" se giran aquí con los ejes de cada tramo.
  * - Losas (C2): el peso propio sale de su pp, como carga de superficie de cada lámina, y una viga
- *   rectangular de hormigón bajo losa pesa sólo su descuelgue (C2-g). Las cargas de superficie van
+ *   rectangular de hormigón bajo losa pesa sólo lo que su ancho no pesa ya como forjado: en una
+ *   maciza, su descuelgue (C2-g); en un aligerado, también γ·t − pp (AU-4). Las cargas de superficie van
  *   por lámina entera (las zonas están sembradas en la malla), las lineales a los nudos de sus
  *   aristas y las puntuales que caen en una losa a su vértice (C2-h).
  * - El ancho de las vigas que se unen a la losa por sus caras (fase LV): lo que cae en él (el pp de
@@ -24,7 +25,8 @@
  * - Paños unidireccionales (C4): su pp y las cargas de superficie, lineales y puntuales que caen en
  *   ellos van a sus viguetas y a las vigas de sus lados paralelos por la regla de la palanca
  *   (`RepartoPano`, C4-e). Su resultante física se calcula con los polígonos del paño unido, sin
- *   las viguetas. Una viga bajo un paño pesa sólo su descuelgue (C2-g con el canto de la vigueta).
+ *   las viguetas. Una viga bajo un paño pesa sólo lo que su ancho no pesa ya como paño (C2-g con el canto de la
+ *   vigueta y el pp del paño, AU-4).
  * - Sin pérdidas (regla 3 del plan): la resultante física de cada caso (F y M respecto al centro
  *   del modelo, calculada sobre la pieza entera) tiene que coincidir con la analítica (leída del
  *   modelo analítico ya montado, con sus offsets) a 1e-9. La de las losas se calcula sin la malla,
@@ -123,6 +125,15 @@ function sumarLineal(r: Resultante, X1: readonly number[], e: readonly number[],
   r.escalaM += Math.max(Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2), Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2)) * m * delta;
 }
 
+/** Una losa, un ábaco o un paño bajo las vigas de su planta, con su espesor y su pp (kN/m²). */
+interface RegionPeso {
+  region: Region;
+  t: number;
+  pp: number;
+  /** De un ábaco: la región de su losa (un ábaco de fachada se sale de ella). */
+  en?: Region;
+}
+
 export interface CargasCompiladas {
   /**
    * Por caso: cargas nodales (por nudo provisional), cargas de barra (por barra de `piezas`) y
@@ -144,10 +155,12 @@ function sumarSuperficie(r: Resultante, m: Momentos, z: number, q: readonly numb
 
 /**
  * C2-g: tramos de peso de una viga de hormigón rectangular bajo losa. Por cada lado de su eje
- * cubierto por una losa se le quita γ·(b/2)·min(h, t); el lado se mira a b/4 del eje, en tramos
- * partidos donde esas dos líneas cortan el borde de una losa.
+ * cubierto por una losa se le quita lo que esa mitad del ancho ya pesa como forjado: (b/2)·pp, sin
+ * pasar de γ·(b/2)·min(h, t) (AU-4: en un aligerado o un paño, el ancho pesa como hormigón, no como
+ * el forjado). El lado se mira a b/4 del eje, en tramos partidos donde esas dos líneas cortan el
+ * borde de una losa o de un ábaco (que va antes que su losa en `regiones`).
  */
-function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: readonly { region: Region; t: number }[], eps: number): { desde: number; hasta: number; w: number }[] {
+function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: readonly RegionPeso[], eps: number): { desde: number; hasta: number; w: number }[] {
   const gamma = w / (b * h);
   const n: Vec2 = [-r.e[1], r.e[0]];
   const cortes = new Set<number>([0, r.len]);
@@ -179,8 +192,12 @@ function pesoBajoLosa(r: Recta, w: number, b: number, h: number, regiones: reado
     let quita = 0;
     for (const s of [1, -1]) {
       const q: Vec2 = [r.O[0] + sm * r.e[0] + (s * b * n[0]) / 4, r.O[1] + sm * r.e[1] + (s * b * n[1]) / 4];
-      const l = regiones.find((x) => puntoEnRegion(q, x.region));
-      if (l) quita += gamma * (b / 2) * Math.min(h, l.t);
+      const l = regiones.find((x) => puntoEnRegion(q, x.region) && (!x.en || puntoEnRegion(q, x.en)));
+      if (!l) continue;
+      // En una maciza con su pp (γ·t), lo de C2-g con los mismos bits
+      const solido = gamma * (b / 2) * Math.min(h, l.t);
+      const forjado = (b / 2) * l.pp;
+      quita += forjado < solido * (1 - 1e-9) ? forjado : solido;
     }
     const wi = w - quita;
     const ult = tramos[tramos.length - 1];
@@ -533,9 +550,16 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
   const desplazar = (m: Momentos): Momentos => ({ A: m.A, Sx: m.Sx - centro[0] * m.A, Sy: m.Sy - centro[1] * m.A });
   const cota = (planta: string) => ctx.cotas[ctx.planta.get(planta)!]! - centro[2];
   /** Losas y paños (C4) de la planta de una viga, con su región unida y su espesor (C2-g). */
-  const regionesBajo = (v: Viga) => [
-    ...ctx.losas.flatMap((l, i) => (l.losa.planta === v.planta ? [{ region: losas.regiones[i]!, t: l.material.t }] : [])),
-    ...ctx.panos.flatMap((p, i) => (p.pano.planta === v.planta && panos ? [{ region: panos.regiones[i]!, t: p.seccion.canto }] : [])),
+  const regionesBajo = (v: Viga): RegionPeso[] => [
+    ...ctx.losas.flatMap((l, i) =>
+      l.losa.planta === v.planta
+        ? [
+            ...(l.reticular?.abacos ?? []).map((ab) => ({ region: { contorno: ab, huecos: [] }, t: l.material.t, pp: l.reticular!.ppAbaco, en: losas.regiones[i]! })),
+            { region: losas.regiones[i]!, t: l.material.t, pp: l.pp },
+          ]
+        : [],
+    ),
+    ...ctx.panos.flatMap((p, i) => (p.pano.planta === v.planta && panos ? [{ region: panos.regiones[i]!, t: p.seccion.canto, pp: p.pano.pp }] : [])),
   ];
 
   // Reparto de los paños (C4-e): a las rectas de sus viguetas y de las vigas de sus lados paralelos, y
