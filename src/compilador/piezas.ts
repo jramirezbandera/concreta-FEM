@@ -426,7 +426,14 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     const n = topo.apoyoEn.get(a.id) ?? losas.apoyosPuntuales.get(a.id);
     if (n !== undefined) apoyar(n, a.coartados, a.id);
   }
-  for (const a of ctx.apoyosLineales) for (const n of losas.apoyosLineales.get(a.id) ?? []) apoyar(n, a.coartados, a.id);
+  // AU-1: un apoyo lineal sólo se reparte por las losas y los muros de su planta; sin ellos, no apoyaría nada
+  const conLaminas = new Set(ctx.losas.map((l) => ctx.planta.get(l.losa.planta)!));
+  for (const m of ctx.muros) for (let k = m.kh; k <= m.kb; k++) conLaminas.add(k);
+  for (const a of ctx.apoyosLineales) {
+    if (!conLaminas.has(ctx.planta.get(a.planta)!))
+      diag.error("apoyo/sin-destino", `El apoyo lineal ${a.id} está en la planta ${a.planta}, que no tiene losas ni muros: no apoya ningún nudo. Apoye los pilares o las vigas con apoyos puntuales.`, [a.id]);
+    for (const n of losas.apoyosLineales.get(a.id) ?? []) apoyar(n, a.coartados, a.id);
+  }
   for (const [id, ns] of losas.apoyosMuros) {
     const c = ctx.muroDe.get(id)!.muro.base === "articulado" ? [true, true, true, false, false, false] : [true, true, true, true, true, true];
     for (const n of ns) apoyar(n, c, id);

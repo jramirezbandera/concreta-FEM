@@ -74,6 +74,10 @@ export const CATALOGO: Caso[] = [
   ["pp negativo", (f) => (losa(f).pp = -1), "fisico/valor-no-valido", "L"],
   ["eje 1 que no es un número", (f) => (losa(f).eje1 = m("x")), "fisico/valor-no-valido", "L"],
   ["losas solapadas en la misma planta", (f) => (f.losas = [...f.losas!, { id: "L2", planta: "P1", contorno: rect(4, 3, 9, 7), espesor: 0.2, material: "HA" }]), "losa/solapadas", "L2"],
+  ["hueco a menos de ε_snap del contorno (AU-3)", (f) => (losa(f).huecos = [rect(2, 0.02, 4, 1)]), "fisico/valor-no-valido", "L"],
+  ["huecos a menos de ε_snap entre sí (AU-3)", (f) => (losa(f).huecos = [rect(1, 1, 2, 2), rect(2.03, 1, 3, 2)]), "fisico/valor-no-valido", "L"],
+  ["ranura más estrecha que ε_snap en el contorno (AU-2)", (f) => ((losa(f).contorno = [[0, 0], [3, 0], [3, 2], [3.02, 2], [3.02, 0], [6, 0], [6, 5], [0, 5]]), (losa(f).huecos = [])), "fisico/valor-no-valido", "L"],
+  ["dos losas separadas menos que ε_snap (AU-2)", (f) => ((losa(f).contorno = rect(0, 0, 3, 5)), (losa(f).huecos = []), (f.losas = [...f.losas!, { id: "L2", planta: "P1", contorno: rect(3.02, 0, 6, 5), espesor: 0.25, material: "HA" }])), "losa/casi-juntas", "L2"],
   ["borde de losa dentro del ancho de una viga (C2-c, con la unión por el eje)", (f) => (losa(f).contorno = rect(0, 0.12, 6, 5)), "losa/borde-en-viga", "L", { unionLosaViga: "eje" }],
   ["borde de losa dentro del ancho de una viga metálica (C2-c)", (f) => ((losa(f).contorno = rect(0, 0.12, 6, 5)), (f.secciones = [...f.secciones, { id: "ipe", material: "S", forma: "general", A: 0.0053, Iy: 8.36e-5, Iz: 6.04e-6, J: 2.0e-7, b: 0.3, h: 0.6 } as never]), (f.vigas![0]!.seccion = "ipe")), "losa/borde-en-viga", "L"],
   ["planta sin cota", (f) => (f.plantas = [{ id: "P1", altura: null }, { id: "C", tipo: "sotano", altura: null }]), "planta/sin-cota"],
@@ -83,6 +87,7 @@ export const CATALOGO: Caso[] = [
   ["apoyo lineal de un punto", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).puntos = [[1, 1]]), "fisico/valor-no-valido", "AL"],
   ["apoyo lineal sin coacciones", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).coartados = [false, false, false, false, false, false]), "fisico/valor-no-valido", "AL"],
   ["apoyo lineal en una planta que no existe", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).planta = "X"), "fisico/referencia", "AL"],
+  ["apoyo lineal en una planta sin losas ni muros (AU-1)", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).planta = "C"), "apoyo/sin-destino", "AL"],
   ["apoyo lineal fuera de la losa", (f) => ((f.apoyosLineales![0] as unknown as Record<string, unknown>).puntos = [[2, 1], [2, 8]]), "apoyo/fuera-de-losa", "AL"],
   // Un apoyo que entra en la huella de un pilar acaba en su cara, y uno en el ancho de una viga va a su
   // eje (`apoyosViga.test.ts`); sólo es un error si no le queda ningún nudo

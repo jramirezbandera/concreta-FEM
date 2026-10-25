@@ -184,6 +184,55 @@ function tocan(a: readonly Vec2[], b: readonly Vec2[]): boolean {
   return false;
 }
 
+const lados = (p: readonly Vec2[]) => p.map((a, i) => [a, p[(i + 1) % p.length]!] as const);
+
+/** Distancia mínima entre los lados de dos polígonos. */
+function distanciaPoligonos(a: readonly Vec2[], b: readonly Vec2[]): number {
+  let d = Infinity;
+  for (const [p, q] of lados(a)) for (const [r, s] of lados(b)) d = Math.min(d, distanciaEntreSegmentos(p, q, r, s));
+  return d;
+}
+
+/** Largo de CD que corre a menos de `eps` de AB y se proyecta dentro de AB. */
+function solapeParalelo(A: Vec2, B: Vec2, C: Vec2, D: Vec2, eps: number): number {
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  const u: Vec2 = [(B[0] - A[0]) / L, (B[1] - A[1]) / L];
+  const sigma = (P: Vec2) => (P[0] - A[0]) * u[0] + (P[1] - A[1]) * u[1];
+  const normal = (P: Vec2) => u[0] * (P[1] - A[1]) - u[1] * (P[0] - A[0]);
+  // t ∈ [0, 1] con lo ≤ f0 + t·(f1 − f0) ≤ hi
+  const intervalo = (f0: number, f1: number, lo: number, hi: number): [number, number] => {
+    const df = f1 - f0;
+    if (Math.abs(df) < 1e-15) return f0 >= lo && f0 <= hi ? [0, 1] : [1, 0];
+    const [t0, t1] = [(lo - f0) / df, (hi - f0) / df].sort((x, y) => x - y) as [number, number];
+    return [Math.max(0, t0), Math.min(1, t1)];
+  };
+  const [a0, a1] = intervalo(sigma(C), sigma(D), 0, L);
+  const [b0, b1] = intervalo(normal(C), normal(D), -eps, eps);
+  const t0 = Math.max(a0, b0);
+  const t1 = Math.min(a1, b1);
+  return t1 > t0 ? (t1 - t0) * Math.hypot(D[0] - C[0], D[1] - C[1]) : 0;
+}
+
+/**
+ * AU-2: dos lados no contiguos de un polígono que corren uno frente a otro a menos de `eps` a lo
+ * largo de más de `eps` (una ranura o una lengüeta estrecha, que el arreglo cerraría), con su
+ * distancia; o null. Un lado corto entre dos (un escalón) no cuenta: sus vecinos no se solapan.
+ */
+function ranura(p: readonly Vec2[], eps: number): { i: number; j: number; d: number } | null {
+  const n = p.length;
+  for (let i = 0; i < n; i++)
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      const [A, B, C, D] = [p[i]!, p[(i + 1) % n]!, p[j]!, p[(j + 1) % n]!];
+      const d = distanciaEntreSegmentos(A, B, C, D);
+      if (d >= eps) continue;
+      if (Math.max(solapeParalelo(A, B, C, D, eps), solapeParalelo(C, D, A, B, eps)) > eps) return { i, j, d };
+    }
+  return null;
+}
+
+const cm = (d: number) => `${(d * 100).toFixed(1)} cm`;
+
 export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagnosticos): Contexto | null {
   const f = fisico as unknown as Record<string, unknown>;
   if (!esObjeto(f)) {
@@ -578,6 +627,31 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
           mal(l.id, `los huecos ${i + 1} y ${j + 1} se solapan o se tocan`);
           huecosBien = false;
         }
+    // AU-2 y AU-3: lo que el arreglo uniría a ε_snap (un hueco junto al contorno o a otro hueco, una
+    // ranura) no se cierra en silencio
+    if (huecosBien) {
+      const eps = op.epsSnap;
+      huecos.forEach((h, i) => {
+        const d = distanciaPoligonos(h, l.contorno);
+        if (d < eps) {
+          mal(l.id, `el hueco ${i + 1} queda a ${cm(d)} del contorno, menos que ε_snap (${cm(eps)}): el arreglo cerraría esa tira de losa. Haga del hueco un entrante del contorno o sepárelo más de ε_snap`);
+          huecosBien = false;
+        }
+        for (let j = i + 1; j < huecos.length; j++) {
+          const dj = distanciaPoligonos(h, huecos[j]!);
+          if (dj < eps) {
+            mal(l.id, `los huecos ${i + 1} y ${j + 1} quedan a ${cm(dj)}, menos que ε_snap (${cm(eps)}): el arreglo cerraría la tira de losa entre ellos. Únalos en un hueco o sepárelos más de ε_snap`);
+            huecosBien = false;
+          }
+        }
+      });
+      for (const [nombre, p] of [["del contorno", l.contorno] as const, ...huecos.map((h, i) => [`del hueco ${i + 1}`, h] as const)]) {
+        const x = ranura(p, eps);
+        if (!x) continue;
+        mal(l.id, `los lados ${x.i + 1} y ${x.j + 1} ${nombre} corren a ${cm(x.d)} uno de otro, menos que ε_snap (${cm(eps)}): el arreglo los uniría y cerraría la ranura (o la tira de losa) entre ellos. Quítela o ensánchela más de ε_snap`);
+        huecosBien = false;
+      }
+    }
     const region: Region = { contorno: l.contorno, huecos };
     const reticular = l.reticular !== undefined && huecosBien ? validarReticular(l, region, mal, op, diag) : undefined;
     if (!huecosBien || !m || m.tipo === "acero" || !pos(l.espesor) || reticular === null) continue;
@@ -622,8 +696,29 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       const [a, b] = [losasC[i]!, losasC[j]!];
       if (a.losa.planta !== b.losa.planta) continue;
       const A = areaInterseccionRegiones(a.region, b.region);
-      if (A > op.epsSnap * op.epsSnap)
+      if (A > op.epsSnap * op.epsSnap) {
         diag.error("losa/solapadas", `Las losas ${a.losa.id} y ${b.losa.id} se solapan en ${A.toPrecision(3)} m² en la planta ${a.losa.planta}.`, [a.losa.id, b.losa.id]);
+        continue;
+      }
+      // AU-2: un lado de cada una frente a frente a menos de ε_snap: el arreglo las uniría (una junta de
+      // dilatación dibujada a 2 cm transmitiría momento). Los lados que se tocan (a ε_geom) se unen a
+      // sabiendas, y un escalón junto a ellos no cuenta (sus lados no se solapan).
+      const eps = op.epsSnap;
+      const anillos = (r: Region) => [r.contorno, ...r.huecos];
+      let d = Infinity;
+      for (const p of anillos(a.region))
+        for (const q of anillos(b.region))
+          for (const [P, Q] of lados(p))
+            for (const [R, S] of lados(q)) {
+              const x = distanciaEntreSegmentos(P, Q, R, S);
+              if (x > op.epsGeom && x < Math.min(d, eps) && Math.max(solapeParalelo(P, Q, R, S, eps), solapeParalelo(R, S, P, Q, eps)) > eps) d = x;
+            }
+      if (d < eps)
+        diag.error(
+          "losa/casi-juntas",
+          `Las losas ${a.losa.id} y ${b.losa.id} de la planta ${a.losa.planta} quedan a ${cm(d)}, menos que ε_snap (${cm(op.epsSnap)}): el arreglo las uniría y transmitirían esfuerzos. Si van unidas, dibújelas tocándose; si hay una junta, sepárelas más de ε_snap.`,
+          [a.losa.id, b.losa.id],
+        );
     }
   }
   // Paños unidireccionales (C4)
