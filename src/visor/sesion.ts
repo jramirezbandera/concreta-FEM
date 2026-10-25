@@ -229,6 +229,9 @@ export interface EstadoSesion {
 
 export type Apertura = { valido: true; sesion: Sesion } | { valido: false; diagnosticos: Diagnostico[] };
 
+/** Avisos de la sensatez previa que la app sólo enseña con resultados. */
+const SOLO_CALCULADO = new Set(["sensatez/caso-vacio"]);
+
 const ordenSeveridad = (ds: readonly Diagnostico[]) => [...ds].sort((a, b) => (a.severidad === "error" ? 0 : 1) - (b.severidad === "error" ? 0 : 1));
 
 /** Plantas de cada objeto físico (las que atraviesa, para los verticales), para contar los avisos por planta. */
@@ -362,7 +365,15 @@ export class Sesion {
 
   /** Todos los diagnósticos que se enseñan: compilación, sensatez previa y cálculo. */
   get diagnosticos(): Diagnostico[] {
-    return ordenSeveridad([...this.compilacion.diagnosticos, ...this.previa, ...(this.cabecera?.diagnosticos ?? [])]);
+    return ordenSeveridad([...this.compilacion.diagnosticos, ...this.previaMostrada, ...(this.cabecera?.diagnosticos ?? [])]);
+  }
+
+  /**
+   * La sensatez previa que se enseña: un caso sin cargas sólo se avisa con resultados (mientras se
+   * modela, un caso recién creado aún no tiene sus cargas; `fem validar` sí lo da).
+   */
+  private get previaMostrada(): Diagnostico[] {
+    return this.calculado ? this.previa : this.previa.filter((d) => !SOLO_CALCULADO.has(d.codigo));
   }
 
   /**
@@ -399,7 +410,7 @@ export class Sesion {
   private estadoSinCompilar(): EstadoSesion {
     const f = this.proyecto.modelo;
     const cotas = cotasPlantas(f.plantas);
-    const diagnosticos = ordenSeveridad(this.previa);
+    const diagnosticos = ordenSeveridad(this.previaMostrada);
     const cuenta = cuentaPorPlanta(this.proyecto, diagnosticos);
     return {
       huella: this.huella,
