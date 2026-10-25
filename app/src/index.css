@@ -670,6 +670,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .dib-teclas { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 14px 14px; font-size: 11.5px; color: var(--color-text-tertiary); }
 .dib-teclas > .dib-tecla:not(:first-child) { margin-left: 6px; }
 .campo-teclado .error { margin: 4px 2px 0; color: var(--color-state-fail); line-height: 1.35; }
+.campo-teclado .campo-cota { margin: 4px 2px 0; color: var(--color-text-secondary); line-height: 1.35; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
   border: 1px solid var(--color-border-main); border-radius: 8px;

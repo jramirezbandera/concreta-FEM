@@ -10,6 +10,9 @@
  * - **Pilar:** un clic, con la plantilla (desde, hasta, sección, giro y punto fijo); el punto del clic
  *   es el punto fijo. Con una ventana, uno en cada cruce de ejes de dentro, por filas de arriba abajo
  *   y de izquierda a derecha. Donde ya hay un pilar en las mismas plantas no se pone otro.
+ *   Cotas temporales (CT1, `docs/fem3d/cotas.md` §2.1, `cotas.ts`): Tab elige una de las cotas del
+ *   cursor, un número la fija (esa dirección queda a esa distancia de su referencia; la otra sigue al
+ *   cursor), e Intro o un clic coloca el pilar con lo fijado. Esc suelta lo fijado.
  * - **Viga:** polilínea a clics; doble clic o Intro termina, Retroceso quita el último punto. Eje a eje
  *   por defecto (el punto enganchado, el punto fijo de un pilar); con `alinear`, cada tramo que nace o
  *   acaba en un pilar se desplaza hasta que su cara izquierda o derecha (según el sentido del dibujo)
@@ -19,12 +22,14 @@
  *
  * Puro: sin IO, sin React ni DOM.
  */
+import { rotuloCota } from "../../agente/render/ejes.ts";
 import { anchoViga, huellaSeccion, PlantaFisica } from "../../agente/render/modelo.ts";
 import { direccionEjes, ejesDe, letraEje, proponerEjes } from "../../compilador/ejes.ts";
 import type { EjeReplanteo, ModeloFisico, Pilar, PuntoFijo, Vec2, Viga } from "../../compilador/fisico.ts";
 import type { Operacion } from "../operaciones.ts";
 import { indiceIds, type Objeto } from "../referencias.ts";
 import { idNuevo } from "../tablas.ts";
+import { colocar, cotasEn, LADOS, ladosEn, nombreCota, referenciaEn, referenciasDe, type CotaTemporal, type Fijo, type Lado } from "./cotas.ts";
 import { unitario, type Enganche, type IndiceEnganches } from "./enganches.ts";
 
 export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga";
@@ -60,6 +65,10 @@ export interface PuntoDibujo {
 
 export interface EstadoHerramienta {
   puntos: readonly PuntoDibujo[];
+  /** Pilar: las cotas fijadas (a lo sumo una por dirección). */
+  fijos?: readonly Fijo[];
+  /** Pilar: la cota que fija el número que se teclee (Tab). */
+  activa?: Lado;
 }
 
 export const ESTADO_INICIAL: EstadoHerramienta = { puntos: [] };
@@ -75,8 +84,12 @@ export interface ContextoHerramienta {
 export type Evento =
   /** Un clic, o un punto tecleado (sin enganche). */
   | { tipo: "punto"; p: Vec2; enganche?: Enganche | null }
-  /** Doble clic o Intro. */
-  | { tipo: "terminar" }
+  /** Doble clic o Intro; con el punto del cursor (ya enganchado), si lo hay. */
+  | { tipo: "terminar"; p?: Vec2 | null; enganche?: Enganche | null }
+  /** Tab (Mayús+Tab, `atras`): la cota siguiente del cursor. */
+  | { tipo: "tab"; cursor: Vec2 | null; atras?: boolean }
+  /** Un número tecleado: la distancia de la cota activa. */
+  | { tipo: "fijar"; valor: number; cursor: Vec2 | null }
   /** Esc. */
   | { tipo: "anular" }
   | { tipo: "retroceso" }
@@ -97,11 +110,12 @@ export interface Paso {
   salir?: boolean;
 }
 
-/** Lo que se pinta encima mientras se dibuja: líneas abiertas, contornos cerrados y puntos. */
+/** Lo que se pinta encima mientras se dibuja: líneas abiertas, contornos cerrados, puntos y cotas temporales. */
 export interface Borrador {
   lineas: Vec2[][];
   anillos: Vec2[][];
   puntos: Vec2[];
+  cotas: CotaTemporal[];
 }
 
 const igual = (a: Vec2, b: Vec2) => a[0] === b[0] && a[1] === b[1];
@@ -248,15 +262,55 @@ function pasoEjes(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): P
 const crucesEn = (ix: IndiceEnganches, [x0, y0, x1, y1]: readonly [number, number, number, number]) =>
   ix.crucesEjes.filter((c) => c[0] >= x0 && c[0] <= x1 && c[1] >= y0 && c[1] <= y1).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
 
+/** El pilar en el punto del cursor con lo fijado; lo fijado se suelta al colocarlo. */
+function ponerPilar(e: EstadoHerramienta, cursor: Vec2, ctx: ContextoHerramienta): Paso {
+  const m = ctx.modelo;
+  const p = colocar(referenciasDe(m, ctx.indice), cursor, e.fijos);
+  const r = pilarEn(ctx, p);
+  if (!r.ok) return { estado: e, error: r.mensaje };
+  const ya = pilarRepetido(m, p, r.pilar.desde, r.pilar.hasta);
+  if (ya) return { estado: e, error: `Ya hay un pilar (${ya}) en ese punto en esas plantas.` };
+  const id = idNuevo(m, "P");
+  return { estado: ESTADO_INICIAL, hecho: { operacion: { op: "crear", coleccion: "pilares", objeto: { id, ...r.pilar } as unknown as Objeto }, etiqueta: `Pilar ${id}` } };
+}
+
+const SIN_CURSOR = "Lleve el cursor a la planta.";
+
+/** ¿Van l y k por la misma dirección (izquierda y derecha, o abajo y arriba)? */
+const mismaDireccion = (l: Lado, k: Lado) => (l === "izquierda" || l === "derecha") === (k === "izquierda" || k === "derecha");
+
 function pasoPilar(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {
   const m = ctx.modelo;
-  if (ev.tipo === "punto") {
-    const r = pilarEn(ctx, ev.p);
-    if (!r.ok) return { estado: e, error: r.mensaje };
-    const ya = pilarRepetido(m, ev.p, r.pilar.desde, r.pilar.hasta);
-    if (ya) return { estado: e, error: `Ya hay un pilar (${ya}) en ese punto en esas plantas.` };
-    const id = idNuevo(m, "P");
-    return { estado: e, hecho: { operacion: { op: "crear", coleccion: "pilares", objeto: { id, ...r.pilar } as unknown as Objeto }, etiqueta: `Pilar ${id}` } };
+  if (ev.tipo === "punto") return ponerPilar(e, ev.p, ctx);
+  if (ev.tipo === "terminar") {
+    // Intro coloca con lo fijado; sin nada fijado, no hace nada (coloca el clic)
+    if (!e.fijos?.length) return { estado: e };
+    if (!ev.p) return { estado: e, error: SIN_CURSOR };
+    return ponerPilar(e, ev.p, ctx);
+  }
+  if (ev.tipo === "tab") {
+    if (!ev.cursor) return { estado: e, error: SIN_CURSOR };
+    const R = referenciasDe(m, ctx.indice);
+    const lados = ladosEn(R, colocar(R, ev.cursor, e.fijos), e.fijos);
+    if (!lados.length) return { estado: e, error: "No hay ningún eje ni pilar al que acotar." };
+    const orden = ev.atras ? [...LADOS].reverse() : LADOS;
+    const k = e.activa ? orden.indexOf(e.activa) : -1;
+    const sig = [...orden.slice(k + 1), ...orden.slice(0, k + 1)].find((l) => lados.includes(l))!;
+    return { estado: { ...e, activa: sig } };
+  }
+  if (ev.tipo === "fijar") {
+    const lado = e.activa;
+    if (!lado) return { estado: e, error: "Pulse Tab para elegir la cota que fija el número." };
+    if (!ev.cursor) return { estado: e, error: SIN_CURSOR };
+    if (!(ev.valor >= 0)) return { estado: e, error: "La distancia no puede ser negativa: para el otro lado, elija con Tab la cota de ese lado." };
+    const R = referenciasDe(m, ctx.indice);
+    // La referencia: la de lo ya fijado en ese lado o la más cercana del cursor
+    const ref = e.fijos?.find((f) => f.lado === lado)?.ref ?? referenciaEn(R, colocar(R, ev.cursor, e.fijos), lado);
+    if (!ref) return { estado: e, error: `No hay ningún eje ni pilar a ese lado (${lado}).` };
+    const fijos = [...(e.fijos ?? []).filter((f) => !mismaDireccion(f.lado, lado)), { lado, ref, valor: ev.valor }];
+    // La cota activa pasa a la primera de la otra dirección, si no está fijada
+    const otra = fijos.length < 2 ? ladosEn(R, colocar(R, ev.cursor, fijos), fijos).find((l) => !mismaDireccion(l, lado)) : undefined;
+    return { estado: { puntos: e.puntos, fijos, ...(otra ? { activa: otra } : {}) } };
   }
   if (ev.tipo === "ventana") {
     const cs = crucesEn(ctx.indice, ev.caja);
@@ -272,7 +326,8 @@ function pasoPilar(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): 
       ops.push({ op: "crear", coleccion: "pilares", objeto: { id, ...r.pilar } as unknown as Objeto });
     }
     if (!ops.length) return { estado: e, error: "Ya hay un pilar en todos los cruces de la ventana." };
-    return { estado: e, hecho: { operacion: ops.length === 1 ? ops[0]! : { op: "lote", operaciones: ops }, etiqueta: ops.length === 1 ? `Pilar ${[...ocupados][0]}` : `${ops.length} pilares en los cruces de ejes` } };
+    // La ventana no usa lo fijado, y lo suelta
+    return { estado: ESTADO_INICIAL, hecho: { operacion: ops.length === 1 ? ops[0]! : { op: "lote", operaciones: ops }, etiqueta: ops.length === 1 ? `Pilar ${[...ocupados][0]}` : `${ops.length} pilares en los cruces de ejes` } };
   }
   return { estado: e };
 }
@@ -303,7 +358,7 @@ function pasoViga(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): P
 
 /** El paso de la herramienta `h` con el evento `ev`. */
 export function paso(h: NombreHerramienta, e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {
-  if (ev.tipo === "anular") return e.puntos.length ? { estado: ESTADO_INICIAL } : { estado: e, salir: true };
+  if (ev.tipo === "anular") return e.puntos.length || e.fijos?.length || e.activa ? { estado: ESTADO_INICIAL } : { estado: e, salir: true };
   if (h === "ejes") return pasoEjes(e, ev, ctx);
   if (h === "pilar") return pasoPilar(e, ev, ctx);
   if (h === "viga") return pasoViga(e, ev, ctx);
@@ -312,9 +367,12 @@ export function paso(h: NombreHerramienta, e: EstadoHerramienta, ev: Evento, ctx
 
 /** Lo que se pinta con el cursor en `cursor` (ya enganchado). */
 export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec2 | null, ctx: ContextoHerramienta): Borrador {
-  const r: Borrador = { lineas: [], anillos: [], puntos: e.puntos.map((x) => x.p) };
+  const r: Borrador = { lineas: [], anillos: [], puntos: e.puntos.map((x) => x.p), cotas: [] };
   if (h === "ejes" && e.puntos[0] && cursor) r.lineas.push([e.puntos[0].p, cursor]);
   if (h === "pilar" && cursor) {
+    const R = referenciasDe(ctx.modelo, ctx.indice);
+    cursor = colocar(R, cursor, e.fijos);
+    r.cotas = cotasEn(R, cursor, e.fijos, e.activa);
     const t = ctx.plantillas.pilar;
     const s = ctx.modelo.secciones.find((x) => x.id === t.seccion);
     const huella = huellaSeccion({ id: "", x: cursor[0], y: cursor[1], desde: "", hasta: "", seccion: t.seccion ?? "", ...(t.giro ? { giro: t.giro } : {}), ...(t.fijo ? { fijo: t.fijo } : {}) }, s);
@@ -333,7 +391,11 @@ export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec
 /** Lo que dice la herramienta que hay que hacer ahora. */
 export function ayuda(h: NombreHerramienta, e: EstadoHerramienta): string {
   if (h === "ejes") return e.puntos.length ? "Eje: el segundo punto. Esc anula." : "Eje: el primer punto (clic, o «x; y» e Intro). Esc vuelve a Elegir.";
-  if (h === "pilar") return "Pilar: un clic donde va su punto fijo, o una ventana para uno en cada cruce de ejes. Esc vuelve a Elegir.";
+  if (h === "pilar") {
+    if (e.fijos?.length) return `Pilar: ${e.fijos.map((f) => `${rotuloCota(f.valor)} ${nombreCota(f)}`).join(" y ")}. Clic o Intro lo coloca; Tab y un número fijan otra cota; Esc suelta lo fijado.`;
+    if (e.activa) return `Pilar: escriba la distancia de la cota ${e.activa} e Intro. Tab cambia de cota; Esc la suelta.`;
+    return "Pilar: un clic donde va su punto fijo, o una ventana para uno en cada cruce de ejes. Tab elige una cota para escribir su distancia. Esc vuelve a Elegir.";
+  }
   if (h === "viga")
     return e.puntos.length
       ? `Viga: el punto siguiente (${e.puntos.length} puesto${e.puntos.length > 1 ? "s" : ""}). Doble clic o Intro termina; Retroceso quita el último; Esc anula.`

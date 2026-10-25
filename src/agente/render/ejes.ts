@@ -7,6 +7,9 @@
  * - Cotas (sólo en la vista `modelo`): por cada grupo de ejes paralelos, una cadena con la distancia
  *   entre ejes consecutivos, a COTA_DENTRO del extremo de los ejes donde empiezan, entre las
  *   burbujas y la estructura.
+ * - Los rótulos no engañan (CT1, `docs/fem3d/cotas.md` §2.4): una distancia que no es un número
+ *   entero de centímetros (a más de 0,5 mm) va en milímetros, y la cota junto a un eje propuesto
+ *   cuyos pilares no están en su recta (a más de 1 mm) lleva «≈», con una nota.
  *
  * Puro: sin IO.
  */
@@ -22,11 +25,22 @@ export const RADIO_BURBUJA = 11;
 
 const degenerado = (e: EjeReplanteo) => !(Number.isFinite(e.desde[0]) && Number.isFinite(e.desde[1]) && Number.isFinite(e.hasta[0]) && Number.isFinite(e.hasta[1])) || (e.desde[0] === e.hasta[0] && e.desde[1] === e.hasta[1]);
 
-/** Distancia entre ejes, con dos decimales y coma («6,00»). */
-const distancia = (d: number) => d.toFixed(2).replace(".", ",");
+/** Lo que un pilar se puede separar de su eje propuesto sin que su cota lleve «≈», m. */
+export const DISPERSION_EJE = 1e-3;
+
+/** Una distancia, m, con coma: con dos decimales («6,00») o, si no es un número entero de cm (a más de 0,5 mm), con tres («5,397»). */
+export function rotuloCota(d: number): string {
+  const cm = d * 100;
+  return d.toFixed(Math.abs(cm - Math.round(cm)) > 0.05 ? 3 : 2).replace(".", ",");
+}
 
 export function capaEjes(f: ModeloFisico, o: { cotas: boolean }): { primitivas: Primitiva[]; leyenda: EntradaLeyenda[]; notas: string[] } {
-  const { ejes, propuestos } = ejesDe(f);
+  const { ejes, propuestos, dispersion } = ejesDe(f);
+  const disperso = new Map<string, number>();
+  ejes.forEach((e, i) => {
+    const x = dispersion?.[i] ?? 0;
+    if (x > DISPERSION_EJE) disperso.set(e.id, x);
+  });
   const P: Primitiva[] = [];
   const notas: string[] = [];
   const validos = [...ejes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).filter((e) => {
@@ -36,18 +50,22 @@ export function capaEjes(f: ModeloFisico, o: { cotas: boolean }): { primitivas: 
   });
   if (!validos.length) return { primitivas: [], leyenda: [], notas };
   for (const e of validos) P.push({ tipo: "linea", puntos: [e.desde, e.hasta], estilo: "eje", objeto: e.id });
-  if (o.cotas) P.push(...cotas(validos));
+  if (o.cotas) P.push(...cotas(validos, disperso));
   for (const e of validos)
     for (const p of [e.desde, e.hasta]) {
       P.push({ tipo: "marca", p, forma: "circulo", radio: RADIO_BURBUJA, estilo: "eje-burbuja", objeto: e.id });
       P.push({ tipo: "texto", p, texto: e.nombre ?? e.id, tamano: 12, negrita: true, ancla: "medio", dy: 4, prioridad: 95, clase: "eje", objeto: e.id });
     }
   if (propuestos) notas.push("Ejes propuestos con las alineaciones de los pilares: el modelo no tiene ejes de replanteo.");
+  for (const e of validos) {
+    const x = disperso.get(e.id);
+    if (x !== undefined) notas.push(`Los pilares del eje ${e.nombre ?? e.id} no están en su recta: hasta ${rotuloCota(x)} m. Sus cotas llevan «≈».`);
+  }
   return { primitivas: P, leyenda: [{ estilo: "eje", texto: propuestos ? "Eje de replanteo propuesto" : "Eje de replanteo" }, ...(o.cotas ? [{ estilo: "cota" as const, texto: "Cota entre ejes paralelos (m)" }] : [])], notas };
 }
 
-/** Cadenas de cotas entre ejes paralelos. */
-function cotas(ejes: readonly EjeReplanteo[]): Primitiva[] {
+/** Cadenas de cotas entre ejes paralelos; las de un eje de `disperso`, con «≈». */
+function cotas(ejes: readonly EjeReplanteo[], disperso: ReadonlyMap<string, number>): Primitiva[] {
   const grupos = new Map<number, { e: EjeReplanteo; d: Vec2 }[]>();
   for (const e of ejes) {
     let [dx, dy] = [e.hasta[0] - e.desde[0], e.hasta[1] - e.desde[1]];
@@ -72,6 +90,8 @@ function cotas(ejes: readonly EjeReplanteo[]): Primitiva[] {
     const n: Vec2 = [-d[1], d[0]];
     const dot = (p: Vec2, v: Vec2) => p[0] * v[0] + p[1] * v[1];
     const ts = [...new Set(g.map((x) => Math.round(dot(x.e.desde, n) * 1e9) / 1e9))].sort((a, b) => a - b);
+    // Los valores de t con un eje de pilares desalineados
+    const aprox = new Set(g.filter((x) => disperso.has(x.e.id)).map((x) => Math.round(dot(x.e.desde, n) * 1e9) / 1e9));
     if (ts.length < 2) continue;
     const s = Math.min(...g.flatMap((x) => [dot(x.e.desde, d), dot(x.e.hasta, d)])) + COTA_DENTRO;
     const punto = (t: number): Vec2 => [s * d[0] + t * n[0], s * d[1] + t * n[1]];
@@ -82,7 +102,7 @@ function cotas(ejes: readonly EjeReplanteo[]): Primitiva[] {
       P.push({ tipo: "linea", puntos: [[p[0] - m * (d[0] + n[0]), p[1] - m * (d[1] + n[1])], [p[0] + m * (d[0] + n[0]), p[1] + m * (d[1] + n[1])]], estilo: "cota" });
     }
     const giro = giroTexto(n);
-    for (let i = 1; i < ts.length; i++) P.push({ tipo: "texto", p: punto((ts[i - 1]! + ts[i]!) / 2), texto: distancia(ts[i]! - ts[i - 1]!), tamano: 11, giro, ancla: "medio", dy: -4, fondo: true, prioridad: 15, clase: "cota" });
+    for (let i = 1; i < ts.length; i++) P.push({ tipo: "texto", p: punto((ts[i - 1]! + ts[i]!) / 2), texto: (aprox.has(ts[i - 1]!) || aprox.has(ts[i]!) ? "≈" : "") + rotuloCota(ts[i]! - ts[i - 1]!), tamano: 11, giro, ancla: "medio", dy: -4, fondo: true, prioridad: 15, clase: "cota" });
   }
   return P;
 }

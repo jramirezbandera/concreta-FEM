@@ -274,6 +274,7 @@ export class Motor {
     const move = (e: PointerEvent) => {
       const [x, y] = rel(e);
       vista.pointermove(e, x, y);
+      this.ultimoCursor = { vista, x, y };
       this.alCursor?.(vista.cursor(x, y));
     };
     const up = (e: PointerEvent) => vista.pointerup(e, ...rel(e));
@@ -284,6 +285,7 @@ export class Motor {
     };
     const menu = (e: Event) => e.preventDefault();
     const fuera = () => {
+      this.ultimoCursor = null;
       this.alCursor?.(null);
       vista.salir();
     };
@@ -342,6 +344,14 @@ export class Motor {
 
   /** Coordenadas del cursor para la barra de estado. */
   alCursor: ((texto: string | null) => void) | null = null;
+  /** Dónde se movió el ratón la última vez, para rehacer el texto del cursor sin moverlo. */
+  private ultimoCursor: { vista: Vista; x: number; y: number } | null = null;
+
+  /** Rehace el texto del cursor sin que se mueva el ratón (una tecla cambia lo que dice: Tab en las cotas de CT1). */
+  refrescarCursor(): void {
+    const c = this.ultimoCursor;
+    if (c) this.alCursor?.(c.vista.cursor(c.x, c.y));
+  }
 
   private medir(): void {
     const r0 = this.contenedor.getBoundingClientRect();

@@ -26,6 +26,8 @@ export const MARGEN_EJES = 2;
 
 export interface PropuestaEjes {
   ejes: EjeReplanteo[];
+  /** Por eje, lo que se separa de su recta el pilar más alejado de ella, m (CT1). */
+  dispersion: number[];
   /** Dirección de los ejes con letra, grados desde +X. */
   direccion: number;
 }
@@ -77,7 +79,7 @@ export function proponerEjes(f: ModeloFisico, opciones: OpcionesCompilacion = {}
     if (!ya || p.id < ya.id) vistos.set(k, { id: p.id, p: [p.x, p.y] });
   }
   const pilares = [...vistos.values()];
-  if (pilares.length < 2) return { ejes: [], direccion: theta };
+  if (pilares.length < 2) return { ejes: [], dispersion: [], direccion: theta };
   const eps = resolverOpciones(opciones).epsSnap;
   const s = pilares.map((q) => q.p[0] * d[0] + q.p[1] * d[1]);
   const t = pilares.map((q) => q.p[0] * n[0] + q.p[1] * n[1]);
@@ -91,6 +93,8 @@ export function proponerEjes(f: ModeloFisico, opciones: OpcionesCompilacion = {}
   const eje = (nombre: string, desde: Vec2, hasta: Vec2): EjeReplanteo => (ocupados.has(nombre) ? { id: `eje-${nombre}`, nombre, desde, hasta } : { id: nombre, desde, hasta });
 
   const ejes: EjeReplanteo[] = [];
+  const dispersion: number[] = [];
+  const separacion = (g: { t: number }[], m: number) => Math.max(...g.map((q) => Math.abs(q.t - m)));
   // Paralelos a n, por s (en `alineaciones`, la coordenada transversal es la de su segundo vector)
   const grupos = (a: Vec2, b: Vec2) => {
     const g = alineaciones(pilares, a, b, eps);
@@ -99,17 +103,20 @@ export function proponerEjes(f: ModeloFisico, opciones: OpcionesCompilacion = {}
   grupos(n, d).forEach((g, i) => {
     const sm = media(g);
     ejes.push(eje(String(i + 1), punto(sm, t0), punto(sm, t1)));
+    dispersion.push(separacion(g, sm));
   });
   // Paralelos a d, por t
   grupos(d, n).forEach((g, i) => {
     const tm = media(g);
     ejes.push(eje(letraEje(i), punto(s0, tm), punto(s1, tm)));
+    dispersion.push(separacion(g, tm));
   });
-  return { ejes, direccion: theta };
+  return { ejes, dispersion, direccion: theta };
 }
 
 /** Los ejes que se dibujan: los del modelo o, si no tiene, los propuestos. */
-export function ejesDe(f: ModeloFisico, opciones: OpcionesCompilacion = {}): { ejes: readonly EjeReplanteo[]; propuestos: boolean } {
+export function ejesDe(f: ModeloFisico, opciones: OpcionesCompilacion = {}): { ejes: readonly EjeReplanteo[]; propuestos: boolean; dispersion?: readonly number[] } {
   if (f.ejes) return { ejes: f.ejes, propuestos: false };
-  return { ejes: proponerEjes(f, opciones).ejes, propuestos: true };
+  const { ejes, dispersion } = proponerEjes(f, opciones);
+  return { ejes, propuestos: true, dispersion };
 }

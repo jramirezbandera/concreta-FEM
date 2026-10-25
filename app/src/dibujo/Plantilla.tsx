@@ -222,6 +222,12 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
 
       <Seccion titulo="Teclado">
         <dl className="dib-teclado">
+          {h === "pilar" && (
+            <>
+              <dt>Tab, L</dt>
+              <dd>fija una cota temporal a L de su eje o pilar</dd>
+            </>
+          )}
           <dt>x; y</dt>
           <dd>absolutas</dd>
           <dt>@dx; dy</dt>
@@ -369,7 +375,8 @@ export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: 
       <input
         className="sel mono"
         autoFocus
-        aria-label="Punto: x; y, @dx; dy, @L<ángulo o longitud"
+        aria-label={campo.cota ? `Distancia de la cota ${campo.cota}` : "Punto: x; y, @dx; dy, @L<ángulo o longitud"}
+        placeholder={campo.cota ? "distancia, m" : undefined}
         value={texto}
         onChange={(x) => setTexto(x.target.value)}
         onBlur={() => ctrl.cerrarCampo()}
@@ -377,8 +384,10 @@ export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: 
           x.stopPropagation();
           if (x.key === "Enter") ctrl.teclear(texto);
           else if (x.key === "Escape") ctrl.cerrarCampo();
+          else if (x.key === "Tab" && ctrl.tab(x.shiftKey)) x.preventDefault();
         }}
       />
+      {campo.cota && <p className="campo-cota">Cota {campo.cota}</p>}
       {campo.error && <p className="error">{campo.error}</p>}
     </div>
   );

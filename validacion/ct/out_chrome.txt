@@ -1,0 +1,12 @@
+## Criterio 1: pilares puestos con Tab y distancias tecleadas
+BIEN  Tab elige la cota de la izquierda, desde P1: «x 5,2 · y 0,3 m · Cota izquierda, desde P1: 5,20»
+BIEN  cuatro Tab llegan a la de arriba, desde P3: «x 0,2 · y 6 m · Cota arriba, desde P3: 0,25»
+BIEN  Esc suelta lo fijado y sigue en Pilar (true); el segundo vuelve a Elegir (true)
+BIEN  sin errores de la herramienta
+BIEN  guardados, los pilares están donde se tecleó, bit a bit: [[0,0],[5.4,0],[5.4,6.25],[0,6.25]]
+
+## Criterio 5: las cotas temporales en el edificio objetivo (7 plantas, 80 pilares por planta)
+BIEN  mover el ratón y pintar las cotas: mediana 0.200 ms, p95 0.300 ms, máx. 0.800 ms (≤ 2 ms); la primera vez (índice y referencias), 4.0 ms
+BIEN  120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
+
+Todo bien

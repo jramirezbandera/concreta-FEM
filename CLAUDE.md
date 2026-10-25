@@ -540,6 +540,11 @@
   - CT-b: el lado se elige con una flecha en la cota;
   - CT-c: en todas las plantas;
   - CT-d (= V2c-d): el pilar arrastra las vigas que acaban en él, y con Ctrl va solo.
+- **2026-10-25: CT1 hecho** (`cotas.md` §7): cotas temporales en la herramienta Pilar (`src/editor/dibujo/cotas.ts`).
+  - Tab elige una, un número la fija (exacta, bit a bit con la tabla) e Intro o un clic coloca el pilar; Esc suelta lo fijado.
+  - Las cotas de la cadena van en mm si no son cm redondos, y con «≈» junto a un eje propuesto con los pilares desalineados.
+  - Validación: `cotas.test.ts` y el banco `validacion/ct/chrome.ts` (pilares guardados donde se tecleó; 0,3 ms p95 en el edificio objetivo).
+  - Siguiente: CT2 (estirar desde la cadena).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

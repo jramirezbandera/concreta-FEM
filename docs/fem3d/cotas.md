@@ -1,6 +1,6 @@
 # CT: cotas que mandan (plan)
 
-> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6), por hacer.
+> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6). **CT1 hecho el 2026-10-25** (§7); CT2 y CT3, por hacer.
 >
 > **Origen:** el usuario, al dibujar pilares con V2c-1: «al meter pilares se ponen las cotas automáticas entre los pilares; estaría bien que pudieras confirmar la distancia de la cota para que sea lo que quieras, y que pudieras cambiar las cotas después y se cambiara la posición».
 
@@ -103,3 +103,40 @@ CT2 y CT3 adelantan parte de V2c-3 (mover y pinzamientos). Su `estirar.ts` es la
 | **CT-d** (= V2c-d) | Mover un pilar arrastra las vigas que acaban en él | **Sí, como CYPECAD;** con Ctrl, el pilar solo |
 
 Los detalles de §2 que no estaban en las preguntas los propone Claude, y se pueden cambiar en la puerta de uso: la línea de corte a min(L/4; 0,5 m), las cuatro referencias (eje o pilar más cercano a cada lado), los rótulos en mm y el aviso del hueco de muro que cambia de ancho.
+
+## 7. CT1 hecho (2026-10-25)
+
+Las cotas temporales de la herramienta Pilar y los rótulos de la cadena.
+
+### 7.1 Qué hay
+
+- **`src/editor/dibujo/cotas.ts`** (puro): las referencias de una planta (`referenciasCotas`, guardadas por índice de enganches), las cuatro cotas de un punto (`cotasEn`), la colocación con lo fijado (`colocar`) y `limpio`, que quita el ruido de una suma (3 + 2,4 es el 5,4 de la tabla).
+- **`herramientas.ts`:** el estado de Pilar lleva `fijos` y `activa`, y hay tres eventos nuevos: `tab`, `fijar` y `terminar` con el punto del cursor.
+  - Tab recorre izquierda, derecha, abajo y arriba (Mayús+Tab, al revés), saltándose los lados sin referencia.
+  - Un número fija la activa, y la activa pasa a la primera de la otra dirección: «Tab, 5,40, Intro, 3,00, Intro, Intro».
+  - Un clic o Intro coloca el pilar con lo fijado, y lo fijado se suelta.
+  - Esc suelta lo fijado sin salir de la herramienta; un número sin cota activa o negativo da su mensaje.
+- **App:** `controlador.ts` pinta las cotas encima de la vista:
+  - con la línea de referencia de trazos desde el pilar o el eje;
+  - la fijada, con el número relleno, y la activa, con borde grueso;
+  - un número que no cabe en su cota, por fuera de la referencia;
+  - una cota nula fijada, junto al punto.
+
+  El pie dice la cota activa y se rehace con las teclas, sin mover el ratón (`Motor.refrescarCursor`). En el campo de teclado, Tab cambia de cota, y Propiedades lo explica.
+- **Rótulos (§2.4):**
+  - `rotuloCota` en `render/ejes.ts`: mm si no son cm redondos;
+  - `proponerEjes` da la dispersión de cada eje, y las cotas junto a un eje con los pilares a más de 1 mm llevan «≈», con una nota.
+  - Ninguna referencia de render cambia.
+
+### 7.2 Criterios
+
+| # | Resultado |
+|---|---|
+| 1 | **Pasa.** `cotas.test.ts`: la x tecleada desde el eje 2 es, bit a bit, la que da la tabla, para 0,1, 0,2, 2,4, 2,45, 3,3, 5,4 y 0,7; con las dos fijadas, el proyecto es byte a byte el de la fila de la tabla; con ejes a 30°, la distancia fijada se mide en perpendicular a 1e-12 y la otra coordenada es la del cursor. En Chrome (`validacion/ct/chrome.ts`), cuatro pilares puestos sólo con Tab y distancias, desde un pilar y desde los ejes propuestos que salen de ellos; guardados, en (0; 0), (5,4; 0), (5,4; 6,25) y (0; 6,25) exactos |
+| 5 | **Pasa en lo de CT1.** Edificio objetivo, planta N3, con Pilar: mover el ratón y pintar las cotas, 0,2 ms de mediana y 0,3–0,4 ms p95; 120 movimientos sin tareas largas |
+| 6 | **Pasa.** El banco de V2c-1 da lo mismo; `src` (2 145 pruebas) y la app (65) en verde |
+
+### 7.3 Hallazgos
+
+- **CT1-1, Esc.** El controlador volvía a Elegir con Esc sin preguntar a la herramienta cuando no había puntos, así que el primer Esc no soltaba lo fijado. Lo encontró el banco; ahora sale sólo sin puntos, sin nada fijado y sin cota activa.
+- **CT1-2, la tolerancia de las alineaciones.** Un pilar entra en una alineación de los ejes propuestos hasta máx(ε_snap, una fracción de la menor separación), así que el eje puede pasar a centímetros de un pilar sin que se viera. Ahora lo dice el «≈».

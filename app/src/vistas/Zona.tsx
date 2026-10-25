@@ -70,6 +70,7 @@ export function encuadrarActiva(): void {
 /** V2c: repinta las vistas que se ven (una tecla cambia lo que se dibuja sin un evento de la vista). */
 export function repintarVistas(): void {
   motorVisible?.motor.pintar();
+  motorVisible?.motor.refrescarCursor();
 }
 
 /** AB: lleva la vista activa, si es una planta, a una caja del modelo (m) con un margen. */

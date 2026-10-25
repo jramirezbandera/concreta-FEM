@@ -109,7 +109,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         x.preventDefault();
         ctrl.alternarOrto();
       } else if (x.key === "Escape") ctrl.anular();
-      else if (x.key === "Enter") ctrl.intro();
+      else if (x.key === "Tab") {
+        if (ctrl.tab(x.shiftKey)) x.preventDefault();
+      } else if (x.key === "Enter") ctrl.intro();
       else if (x.key === "Backspace") {
         x.preventDefault();
         ctrl.retroceso();
