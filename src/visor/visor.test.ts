@@ -303,6 +303,24 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
     }
   });
 
+  it("los ejes de replanteo sólo se eligen por su burbuja, también en una ventana", () => {
+    const planta = s.proyecto.modelo.plantas[0]!.id;
+    const fu = { tipo: "planta" as const, planta, vista: { vista: "modelo" as const } };
+    const e = valido(s.escenaA4(planta, { vista: "modelo" }));
+    const rectas = e.primitivas.filter((p) => p.tipo === "linea" && p.estilo === "eje");
+    expect(rectas.length).toBeGreaterThan(0);
+    const radio = 0.05; // RADIO_CLIC px en m: la burbuja, de 11 px, mide 11/6 de él
+    for (const p of rectas) {
+      if (p.tipo !== "linea") continue;
+      const [a, b] = [p.puntos[0]!, p.puntos[1]!];
+      const m: Vec2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      // A media recta, nunca el eje, ni con un clic ni con una ventana que la corta; en su burbuja, a 9 px del centro, el eje
+      expect(s.elegir(fu, m, radio)?.objeto).not.toBe(p.objeto);
+      expect(s.ventana(fu, [m[0] - 0.1, m[1] - 0.1, m[0] + 0.1, m[1] + 0.1], "toca")).not.toContain(p.objeto);
+      expect(s.elegir(fu, [a[0] + (9 / 6) * radio, a[1]], radio)?.objeto).toBe(p.objeto);
+    }
+  });
+
   it("I2: 3D alámbrico, cada segmento de su objeto y con su cota", () => {
     const f = s.proyecto.modelo;
     const a = alambrico(f);

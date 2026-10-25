@@ -201,6 +201,9 @@ function areaAbs(r: readonly Vec2[]): number {
 /** Dentro de un polígono con huecos (par-impar). */
 const dentroAnillos = (q: Vec2, anillos: readonly (readonly Vec2[])[]) => anillos.reduce((c, r) => (dentro(q, r) ? !c : c), false);
 
+/** La tolerancia de un clic en una vista 2D, px. */
+export const RADIO_CLIC = 6;
+
 /** Lo que se resalta de unos objetos: sus formas como capas (relleno y trazo) y sus glifos. */
 export interface Eleccion {
   /** El primero de `objetos` (el principal). */
@@ -219,8 +222,9 @@ export interface Eleccion {
  * El objeto de la escena bajo el punto q (m), con una tolerancia de `radio` m para las líneas y los
  * glifos. Gana lo más pequeño: un glifo o una línea cercanos antes que un polígono, y de los
  * polígonos que lo contienen, el de menor área (un pilar antes que la losa que lo rodea). Las
- * rectas de los ejes de replanteo y de los niveles pasan por todo, así que van detrás de todo
- * (sus burbujas, no).
+ * rectas de los niveles pasan por todo, así que van detrás de todo. Un eje de replanteo sólo se
+ * elige por su burbuja, entera (su recta no: al elegir un forjado o un pilar se cogía el eje).
+ * `radio` es el de `RADIO_CLIC` px.
  */
 export function objetoEn(e: Escena, q: Vec2, radio: number): string | null {
   let mejor: { objeto: string; prioridad: number; medida: number } | null = null;
@@ -233,13 +237,15 @@ export function objetoEn(e: Escena, q: Vec2, radio: number): string | null {
       case "marca":
       case "flecha": {
         const d = Math.hypot(q[0] - p.p[0], q[1] - p.p[1]);
-        if (d <= radio) proponer(p.objeto, 3, d);
+        const r = p.tipo === "marca" && p.estilo === "eje-burbuja" ? (radio * Math.max(RADIO_CLIC, p.radio)) / RADIO_CLIC : radio;
+        if (d <= r) proponer(p.objeto, 3, d);
         break;
       }
       case "linea":
+        if (p.estilo === "eje") break;
         for (let i = 1; i < p.puntos.length; i++) {
           const d = distanciaSegmento(q, p.puntos[i - 1]!, p.puntos[i]!);
-          if (d <= radio) proponer(p.objeto, p.estilo === "eje" || p.estilo === "nivel" ? 0 : 2, d);
+          if (d <= radio) proponer(p.objeto, p.estilo === "nivel" ? 0 : 2, d);
         }
         break;
       case "poligono":
@@ -307,7 +313,7 @@ function segmentoToca(a: Vec2, b: Vec2, c: Caja): boolean {
 /**
  * Los objetos de una ventana (m): con «dentro», los que tienen todo lo dibujado dentro de ella (de
  * izquierda a derecha, como CYPECAD y AutoCAD); con «toca», los que tienen algo dentro o la cortan
- * (de derecha a izquierda). En el orden de la escena.
+ * (de derecha a izquierda). En el orden de la escena. Los ejes de replanteo, por sus burbujas.
  */
 export function elegirVentana(e: Escena, c: Caja, modo: "dentro" | "toca"): string[] {
   const en = (q: Vec2) => q[0] >= c[0] && q[0] <= c[2] && q[1] >= c[1] && q[1] <= c[3];
@@ -325,6 +331,7 @@ export function elegirVentana(e: Escena, c: Caja, modo: "dentro" | "toca"): stri
   ];
   for (const p of e.primitivas) {
     if (!("objeto" in p) || p.objeto === undefined || p.tipo === "texto") continue;
+    if (p.tipo === "linea" && p.estilo === "eje") continue;
     if (p.tipo === "marca" || p.tipo === "flecha") {
       marcar(p.objeto, en(p.p));
       continue;

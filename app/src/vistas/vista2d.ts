@@ -13,7 +13,7 @@
 import { Group, OrthographicCamera, Scene, type WebGLRenderer } from "three";
 import { rotulo, type Texto, type Vec2 } from "../../../src/agente/render/escena.ts";
 import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
-import type { Eleccion, EscenaPreparada, Glifo } from "../../../src/visor/escena.ts";
+import { RADIO_CLIC, type Eleccion, type EscenaPreparada, type Glifo } from "../../../src/visor/escena.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { Capas2D, MATERIALES, relleno, trazo } from "./capas.ts";
 import { CAJA_VACIA, ENCUADRE_MINIMO, iconoEjes, Rejilla2D } from "./fondo.ts";
@@ -66,8 +66,6 @@ export interface Margenes {
 /** La escena no tiene nada dibujado (una planta nueva). */
 export const escenaVacia = (e: EscenaPreparada): boolean => !e.glifos.length && e.capas.every((c) => !c.segmentos.length && !c.abanicos.length);
 
-/** Radio de elección, px. */
-const RADIO_CLIC = 6;
 /** Radio de enganche, px (el de `src/editor/dibujo/enganches.ts`). */
 const RADIO_ENGANCHE = 10;
 
