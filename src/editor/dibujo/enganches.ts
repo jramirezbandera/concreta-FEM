@@ -24,6 +24,7 @@
 import { direccionEjes, ejesDe } from "../../compilador/ejes.ts";
 import type { ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
 import { conPuntoFijo } from "../../compilador/puntoFijo.ts";
+import { RADIO_BURBUJA } from "../../agente/render/ejes.ts";
 import { anchoViga, ejeSeccion, huellaMuro, huellaSeccion, huellasVigasPlanta, PlantaFisica } from "../../agente/render/modelo.ts";
 
 export type TipoEnganche = "fijo" | "centro" | "esquina" | "extremo" | "vertice" | "cruce" | "medio" | "cara" | "perpendicular" | "cercano";
@@ -86,7 +87,8 @@ export interface IndiceEnganches {
   /** Dirección de los ejes de la losa (o de replanteo), grados desde +X, en [0, 90). */
   direccion: number;
   /** Lo que hay en la planta, para «al pasar el ratón», de más a menos prioridad. */
-  siluetas: (Silueta & { distancia: (q: Vec2) => number })[];
+  /** `distancia(q, radio)`, m: lo que hay a ≤ radio está bajo el cursor. */
+  siluetas: (Silueta & { distancia: (q: Vec2, radio: number) => number })[];
 }
 
 // ─── Geometría ──────────────────────────────────────────────────────────────────────────────────
@@ -252,7 +254,7 @@ export function indiceEnganches(m: ModeloFisico, planta: string): IndiceEnganche
     punto(e.desde, "extremo", e.id);
     punto(e.hasta, "extremo", e.id);
     if (e.desde[0] !== e.hasta[0] || e.desde[1] !== e.hasta[1]) rectas.push({ a: e.desde, b: e.hasta, objeto: e.id });
-    siluetasEjes.push({ id: e.id, tipo: "eje", cerrados: [], abiertos: [[e.desde, e.hasta]], distancia: (q) => distSegmento(q, e.desde, e.hasta) });
+    siluetasEjes.push({ id: e.id, tipo: "eje", cerrados: [], abiertos: [[e.desde, e.hasta]], distancia: (q, r) => Math.max(0, Math.min(dist(q, e.desde), dist(q, e.hasta)) - r * (RADIO_BURBUJA / RADIO_ENGANCHE - 1)) });
   }
   const crucesEjes: Vec2[] = [];
   const vistos = new Set<string>();
@@ -375,12 +377,16 @@ export function apuntar(ix: IndiceEnganches, q: Vec2, radio: number, o: Opciones
   return { p: q, enganche: null, orto: false };
 }
 
-/** Lo que hay bajo el cursor (a menos del radio, m): pilares, luego vigas, muros y apoyos lineales, luego ejes, luego losas y paños. */
+/**
+ * Lo que hay bajo el cursor (a menos del radio, m): las burbujas de los ejes, luego pilares, luego
+ * vigas, muros y apoyos lineales, luego losas y paños. Un eje, como al elegirlo (`objetoEn` de
+ * `src/visor/escena.ts`), sólo por su burbuja entera, y se resalta toda su recta.
+ */
 export function bajoCursor(ix: IndiceEnganches, q: Vec2, radio: number): Silueta | null {
   let mejor: { s: Silueta; d: number; grupo: number } | null = null;
-  const grupo = (t: TipoObjeto) => (t === "pilar" ? 0 : t === "eje" ? 2 : t === "losa" || t === "pano" ? 3 : 1);
+  const grupo = (t: TipoObjeto) => (t === "eje" ? -1 : t === "pilar" ? 0 : t === "losa" || t === "pano" ? 3 : 1);
   for (const s of ix.siluetas) {
-    const d = s.distancia(q);
+    const d = s.distancia(q, radio);
     if (d > radio) continue;
     const g = grupo(s.tipo);
     if (!mejor || g < mejor.grupo || (g === mejor.grupo && d < mejor.d)) mejor = { s, d, grupo: g };

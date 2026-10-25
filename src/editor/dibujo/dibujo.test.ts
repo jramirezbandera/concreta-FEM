@@ -157,10 +157,16 @@ describe("enganches (criterio 2)", () => {
     expect(apuntar(ix, [8, 4], 0.05, { ultimo: u }).p).toEqual([8, 4]);
   });
 
-  it("lo que hay bajo el cursor: el pilar, la viga, el eje", () => {
+  it("lo que hay bajo el cursor: el pilar, la viga, el eje por su burbuja", () => {
     expect(bajoCursor(ix, [4.8, 6.1], 0.05)?.id).toBe(pilar.id);
     expect(bajoCursor(ix, [7, 0.1], 0.05)?.id).toBe(p0.modelo.vigas![0]!.id);
-    expect(bajoCursor(ix, [10.02, 4], 0.05)?.id).toBe("3");
+    // El eje, como al elegirlo: no por su recta, sí en su burbuja entera (11 px; 0,05 m son 10 px), y entero
+    expect(bajoCursor(ix, [10.02, 4], 0.05)?.id).not.toBe("3");
+    const b = bajoCursor(ix, [10, 8.3 + 0.054], 0.05);
+    expect(b?.id).toBe("3");
+    expect(b?.abiertos).toEqual([[[10, -2], [10, 8.3]]]);
+    expect(bajoCursor(ix, [10, -2 - 0.054], 0.05)?.id).toBe("3");
+    expect(bajoCursor(ix, [10, 8.3 + 0.056], 0.05)?.id).not.toBe("3");
     expect(bajoCursor(ix, [7, 3], 0.05)).toBeNull();
   });
 });
