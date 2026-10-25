@@ -609,6 +609,63 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
   box-shadow: var(--shadow-pop); font-size: 12px;
 }
 .campo-teclado input { width: 100%; }
+
+/* V2c: la plantilla de una herramienta de dibujo, en Propiedades */
+.dib-icono { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: var(--color-tint-accent); color: var(--color-accent); }
+.dib-hecho { display: flex; align-items: center; gap: 7px; margin: 0; padding: 7px 14px; border-bottom: 1px solid var(--color-border-sub); background: var(--color-tint-ok); color: var(--color-state-ok); font-size: 12px; }
+.dib-hecho + section > .sec { border-top: 0; }
+.dib-tecla { display: inline-block; padding: 0 5px; border: 1px solid var(--color-border-main); border-bottom-width: 2px; border-radius: 4px; background: var(--color-bg-primary); font: 10.5px/16px var(--font-mono); color: var(--color-text-secondary); white-space: nowrap; }
+/* Los desplegables de texto (plantas con su cota), en la letra de la interfaz */
+.campo select[aria-label^="Planta"] { font-family: var(--font-sans); white-space: pre; }
+.campo > span.dib-unidad { position: relative; display: block; color: inherit; }
+.campo > span.dib-unidad::after { content: attr(data-unidad); position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font: 12px var(--font-mono); color: var(--color-text-tertiary); pointer-events: none; }
+.campo > span.dib-unidad input { padding-right: 22px; }
+.campo input::placeholder { color: var(--color-text-disabled); font-family: var(--font-sans); }
+.campo > span.dib-vacio { font-size: 12px; color: var(--color-state-fail); }
+.dib-mas { width: 28px; height: 28px; flex-shrink: 0; border: 1px solid var(--color-border-main); }
+.dib-mas[data-on="true"] { background: var(--color-tint-accent); border-color: transparent; color: var(--color-accent); }
+.dib-nueva { margin: 2px 14px 6px; padding: 8px; border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface); }
+.dib-nueva[data-error="true"] { border-color: var(--color-state-fail); box-shadow: 0 0 0 3px var(--color-tint-fail); }
+.dib-nueva-fila { display: flex; align-items: center; gap: 5px; }
+.dib-nueva-fila label { position: relative; display: block; }
+.dib-nueva-fila label > span { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); font: 11px var(--font-mono); color: var(--color-text-tertiary); pointer-events: none; }
+.dib-nueva-fila input { width: 46px; padding: 0 6px 0 18px; text-align: right; }
+.dib-nueva-fila .dib-por, .dib-nueva-fila .dib-cm { font-size: 12px; color: var(--color-text-tertiary); }
+.dib-nueva-fila .btn { margin-left: auto; height: 28px; padding: 0 9px; }
+.dib-nueva > p { margin: 6px 0 0; font-size: 11px; line-height: 1.4; color: var(--color-text-tertiary); }
+.dib-nueva > p.error { color: var(--color-state-fail); }
+.dib-seg { display: flex; width: 100%; }
+.dib-seg > button { flex: 1; justify-content: center; padding: 0 4px; font-size: 11.5px; }
+/* El punto fijo: la huella de la sección, girada como en la planta, con sus nueve puntos */
+.dib-pf { display: grid; place-items: center; height: 116px; border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface); overflow: hidden; }
+.dib-pf-sec { position: relative; border: 1.5px solid var(--color-text-tertiary); border-radius: 2px; background: var(--color-bg-elevated); }
+.dib-pf-sec[data-circular="true"] { border-radius: 50%; }
+.dib-pf-sec > button {
+  position: absolute; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; padding: 0;
+  border: 1.5px solid var(--color-text-tertiary); border-radius: 50%; background: var(--color-bg-primary); cursor: pointer;
+  transition: border-color .12s, background-color .12s, transform .12s;
+}
+.dib-pf-sec > button:hover { border-color: var(--color-accent); transform: scale(1.15); }
+.dib-pf-sec > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); }
+.dib-pf-sec > button[aria-checked="true"] { border-color: var(--color-accent); background: var(--color-accent); box-shadow: 0 0 0 3px var(--color-tint-accent); }
+/* Enganches: el ortogonal con su tecla y los tipos como fichas */
+.dib-orto { padding-top: 2px; padding-bottom: 4px; font-size: 12.5px; color: var(--color-text-primary); }
+.dib-orto small { font-size: 11px; color: var(--color-text-tertiary); }
+.dib-fichas { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 14px 12px; }
+.dib-fichas > button {
+  height: 24px; padding: 0 9px; border: 1px solid var(--color-border-main); border-radius: 12px;
+  background: var(--color-bg-primary); color: var(--color-text-tertiary); font: 500 11.5px var(--font-sans); cursor: pointer;
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+.dib-fichas > button:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
+.dib-fichas > button[aria-pressed="true"] { border-color: transparent; background: var(--color-tint-accent); color: var(--color-accent); }
+.dib-fichas > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); }
+/* La chuleta del teclado */
+.dib-teclado { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; align-items: baseline; margin: 2px 14px 8px; font-size: 12px; color: var(--color-text-secondary); }
+.dib-teclado dt { justify-self: start; padding: 0 6px; border-radius: 4px; background: var(--color-bg-elevated); font: 11.5px/19px var(--font-mono); color: var(--color-text-primary); white-space: nowrap; }
+.dib-teclado dd { margin: 0; line-height: 1.35; }
+.dib-teclas { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 14px 14px; font-size: 11.5px; color: var(--color-text-tertiary); }
+.dib-teclas > .dib-tecla:not(:first-child) { margin-left: 6px; }
 .campo-teclado .error { margin: 4px 2px 0; color: var(--color-state-fail); line-height: 1.35; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;

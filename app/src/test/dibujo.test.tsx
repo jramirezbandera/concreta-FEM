@@ -72,7 +72,7 @@ describe("la herramienta activa (V2c-1)", () => {
     expect(pilar.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(pilar);
     expect(pilar.getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByText("Dibujar · Pilar")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Dibujar · Pilar" })).toBeTruthy();
     // El proyecto nuevo no tiene secciones: la plantilla ofrece crear una (30 × 30 por defecto)
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect((screen.getByRole("combobox", { name: "Sección" }) as HTMLSelectElement).value).toBe("P30x30"));
@@ -96,10 +96,10 @@ describe("la herramienta activa (V2c-1)", () => {
 
     // Viga, desde Pilar; y Esc sin nada en curso vuelve a Elegir
     fireEvent.click(screen.getByRole("button", { name: "Viga" }));
-    expect(screen.getByText("Dibujar · Viga")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Dibujar · Viga" })).toBeTruthy();
     expect(pilar.getAttribute("aria-pressed")).toBe("false");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.getByRole("button", { name: "Viga" }).getAttribute("aria-pressed")).toBe("false");
-    expect(screen.queryByText("Dibujar · Viga")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Dibujar · Viga" })).toBeNull();
   }, 60_000);
 });
