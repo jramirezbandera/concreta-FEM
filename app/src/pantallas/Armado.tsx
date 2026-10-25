@@ -13,7 +13,7 @@
  *
  * Cada número es de una consulta, nunca del dibujo.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { ARMADURAS as LISTA_ARMADURAS, baseDe, hayBase, type ArmadoProyecto, type BasesArmado } from "../../../src/agente/armaduraBase.ts";
 import { NOMBRE_CORTO, UNIDAD_ARMADO, type Armadura, type FiltroArmado, type OpcionesArmado } from "../../../src/agente/render/armado.ts";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
@@ -24,7 +24,8 @@ import type { DatosFranja } from "../../../src/visor/franjas.ts";
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
 import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, ComboCombinaciones, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { IcBanda } from "../armazon/iconos.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { escalaDe, SeccionEscala, type EscalaElegida } from "../componentes/escala.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
@@ -295,7 +296,7 @@ function CeldaBase({ valor, heredado, etiqueta, activa, onCambio, deshabilitada 
       <input
         type="text"
         inputMode="decimal"
-        className="sel w-[58px] text-right mono"
+        className="sel w-full text-right mono"
         aria-label={etiqueta}
         aria-invalid={!!error || undefined}
         title={error ?? undefined}
@@ -344,7 +345,7 @@ function SeccionBase({ planta, armadura }: { planta: string | null; armadura: Ar
   );
   return (
     <Seccion titulo="Armadura base" valor={U}>
-      <table className="tb" aria-label="Armadura base">
+      <table className="tb tb-base" aria-label="Armadura base">
         <thead>
           <tr>
             <th>Losa</th>
@@ -425,40 +426,46 @@ function SeccionFiltro({ filtro, base, onCambio }: { filtro: FiltroArmado | unde
     poner(v[0], v[1]);
   };
   const entrada = (k: "min" | "max", etiqueta: string) => (
-    <label className="flex flex-col gap-0.5 text-[11px] text-text-secondary">
-      {etiqueta}
-      <input
-        type="text"
-        inputMode="decimal"
-        className="sel w-[84px] text-right mono"
-        aria-label={`${etiqueta} del filtro`}
-        placeholder="—"
-        value={borrador[k]}
-        onChange={(ev) => setBorrador({ ...borrador, [k]: ev.target.value })}
-        onBlur={aplicar}
-        onKeyDown={(ev) => ev.key === "Enter" && aplicar()}
-      />
+    <label className="campo">
+      <span>{etiqueta.toLowerCase()}</span>
+      <span className="unidad" data-unidad={U} style={{ "--u": U.length } as CSSProperties}>
+        <input
+          type="text"
+          inputMode="decimal"
+          aria-label={`${etiqueta} del filtro`}
+          placeholder="sin límite"
+          value={borrador[k]}
+          onChange={(ev) => setBorrador({ ...borrador, [k]: ev.target.value })}
+          onBlur={aplicar}
+          onKeyDown={(ev) => ev.key === "Enter" && aplicar()}
+        />
+      </span>
     </label>
   );
+  const desdeBase = base !== null && filtro?.min !== base;
   return (
     <Seccion titulo="Filtro" valor={filtro ? `${textoFiltro(filtro)} ${U}` : "todo"}>
-      <div className="flex flex-col gap-2 px-3.5 py-2">
-        <div className="flex items-end gap-2">
-          {entrada("min", "Desde")}
-          {entrada("max", "Hasta")}
-          {filtro && (
-            <button type="button" className="btn" style={{ height: 28 }} onClick={() => poner(undefined, undefined)}>
-              Quitar
-            </button>
-          )}
-        </div>
-        {base !== null && filtro?.min !== base && (
-          <button type="button" className="btn self-start" onClick={() => poner(base, filtro?.max)} title="Colorea sólo lo que supera la armadura base: lo que hay que reforzar">
-            Desde la base ({fmt(base, 1)})
-          </button>
-        )}
-        {error && <Aviso tono="fail">{error}</Aviso>}
+      <div className="pt-1">
+        {entrada("min", "Desde")}
+        {entrada("max", "Hasta")}
       </div>
+      {(filtro || desdeBase || error) && (
+        <div className="flex flex-col gap-2 px-3.5 pt-1.5">
+          <div className="flex flex-wrap gap-2">
+            {desdeBase && (
+              <button type="button" className="btn" onClick={() => poner(base!, filtro?.max)} title="Colorea sólo lo que supera la armadura base: lo que hay que reforzar">
+                Desde la base ({fmt(base, 1)})
+              </button>
+            )}
+            {filtro && (
+              <button type="button" className="btn btn-q" onClick={() => poner(undefined, undefined)}>
+                Quitar
+              </button>
+            )}
+          </div>
+          {error && <Aviso tono="fail">{error}</Aviso>}
+        </div>
+      )}
       <p className="nota">Se colorea sólo lo que está en el rango ({U}), con la escala de eso; lo demás, en gris. Vacío, sin límite.</p>
     </Seccion>
   );
@@ -680,6 +687,7 @@ export function ModoArmado() {
 
   const propiedades = (
     <>
+      <Cabecera icono={IcBanda} tipo={`Armado · ${planta ?? "—"}`} titulo={`${NOMBRE_CORTO[armadura]} · ${U}`} detalle="Demanda de Wood–Armer por metro de franja: el momento de dimensionado." />
       <Seccion titulo="Valor en el punto">
         <ValorPunto punto={puntoValido} armadura={armadura} varias={varias} />
       </Seccion>

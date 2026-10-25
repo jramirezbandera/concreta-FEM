@@ -19,7 +19,8 @@ import type { Reacciones3D, ReaccionObjeto } from "../../../src/visor/reacciones
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
 import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, ComboCombinaciones, Equilibrio, Seccion } from "../componentes/comunes.tsx";
+import { IcReacciones } from "../armazon/iconos.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
@@ -200,10 +201,9 @@ export function ModoReacciones() {
   const propiedades = (
     <>
       {elegido ? (
-        <Seccion titulo={elegido.id} valor={elegido.tipo}>
-          <div className="px-3.5 py-1.5 text-[12px] text-text-secondary">
-            {elegido.comb} · planta {elegido.planta} · en ({fmt(elegido.punto[0], 2)}; {fmt(elegido.punto[1], 2)}; {fmt(elegido.punto[2], 2)}) m
-          </div>
+        <>
+        <Cabecera icono={IcReacciones} tipo={`Reacción · ${elegido.tipo}`} titulo={elegido.id} mono detalle={`${elegido.comb} · planta ${elegido.planta} · en (${fmt(elegido.punto[0], 2)}; ${fmt(elegido.punto[1], 2)}; ${fmt(elegido.punto[2], 2)}) m`} />
+        <Seccion titulo="Reacción">
           <table className="tb">
             <tbody>
               {(["Fx", "Fy", "Fz", "Mx", "My", "Mz"] as const).map((k, i) => (
@@ -218,8 +218,9 @@ export function ModoReacciones() {
             </tbody>
           </table>
         </Seccion>
+        </>
       ) : (
-        <p className="nota">Elija un pilar, un muro o un apoyo (en una vista o en la tabla) para ver su reacción. En el 3D, bajo el cursor, la de cada flecha.</p>
+        <Cabecera icono={IcReacciones} tipo="Reacciones" titulo="Nada elegido" detalle="Elija un pilar, un muro o un apoyo (en una vista o en la tabla) para ver su reacción. En el 3D, bajo el cursor, la de cada flecha." />
       )}
       {d && d.extremos.length > 0 && (
         <Seccion titulo="Extremos">

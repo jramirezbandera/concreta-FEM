@@ -24,7 +24,8 @@ import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
 import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { IcDiagramas, IcPilar, IcViga } from "../armazon/iconos.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
@@ -437,23 +438,22 @@ export function ModoDiagramas() {
 
   const propiedades = (
     <>
+        {!v && <Cabecera icono={IcDiagramas} tipo="Diagramas" titulo="Ninguna pieza elegida" detalle="Elija una viga, una vigueta o un pilar en una vista o en el navegador." />}
         {viga.diagnosticos && <p className="nota text-state-fail">{viga.diagnosticos.map((x) => x.mensaje).join(" ")}</p>}
         {v && (
           <>
-            <Seccion titulo={v.tipo === "vigueta" ? "Vigueta" : v.tipo === "pilar" ? "Pilar" : "Viga"} valor={v.id}>
-              <div className="px-3.5 py-1.5 text-[12px] text-text-secondary">
-                {v.tipo === "pilar" ? (
-                  <>
-                    {fmt(v.longitud, 2)} m · {(v.plantas ?? []).map((p) => p.planta).join(", ")}
-                  </>
-                ) : (
-                  <>
-                    {fmt(v.longitud, 2)} m · {v.vanos.length} vano{v.vanos.length === 1 ? "" : "s"} · apoyos {v.apoyos.map((a) => a.objeto).join(", ") || "—"}
-                  </>
-                )}
-                {v.axilSinValor && <div className="mt-1">Axil sin valor: está en el plano de un diafragma rígido (C1-d).</div>}
-              </div>
-            </Seccion>
+            <Cabecera
+              icono={v.tipo === "pilar" ? IcPilar : IcViga}
+              tipo={v.tipo === "vigueta" ? "Vigueta" : v.tipo === "pilar" ? "Pilar" : "Viga"}
+              titulo={v.id}
+              mono
+              detalle={
+                <>
+                  {v.tipo === "pilar" ? `${fmt(v.longitud, 2)} m · ${(v.plantas ?? []).map((p) => p.planta).join(", ")}` : `${fmt(v.longitud, 2)} m · ${v.vanos.length} vano${v.vanos.length === 1 ? "" : "s"} · apoyos ${v.apoyos.map((a) => a.objeto).join(", ") || "—"}`}
+                  {v.axilSinValor && <div className="mt-1">Axil sin valor: está en el plano de un diafragma rígido (C1-d).</div>}
+                </>
+              }
+            />
             <Seccion titulo="En la estación">{est.datos ? <Estacion d={est.datos} unidad={unidad} /> : <p className="nota">…</p>}</Seccion>
             {v.tipo === "pilar" && <CuadroPilar filas={cuadro.datos?.filas ?? null} />}
             {v.tipo !== "pilar" && <Seccion titulo="Vanos de cara a cara" valor="fem consultar pieza">

@@ -17,13 +17,13 @@
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronRight, ListOrdered, Trash2 } from "lucide-react";
+import { ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
-import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcAbacos, IcLosa, IcVigaBorde, IcMateriales, IcMuro, IcPilar, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcAbacos, IcLosa, IcVigaBorde, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { DialogoAbacos, DialogoBorrar, DialogoCopiar, DialogoRenumerar, DialogoVigasBorde } from "../editor/Dialogos.tsx";
 import { tablaDe } from "../editor/Formulario.tsx";
@@ -520,23 +520,22 @@ function ListaElegidos() {
   const orden = [...TABLAS.map((t) => DEF_TABLAS[t].titulo), "Otros"].filter((t) => porTipo.has(t));
   return (
     <>
-      <p className="nota">
-        {elegidos.length} objetos elegidos. Un clic en uno lo deja solo; Ctrl+clic en el dibujo añade o quita; Esc suelta todo.
-      </p>
-      {orden.map((t) => (
-        <Seccion key={t} titulo={t} valor={porTipo.get(t)!.length}>
-          {porTipo.get(t)!.map((id) => (
-            <button key={id} type="button" className="arbol-fila sub" onClick={() => setSeleccion(id)}>
-              <span className="truncate mono">{id}</span>
-            </button>
-          ))}
-        </Seccion>
-      ))}
-      <div className="px-3.5 py-2">
+      <Cabecera icono={MousePointer2} tipo="Selección" titulo={`${elegidos.length} objetos`} detalle="Un clic en uno lo deja solo; Ctrl+clic en el dibujo añade o quita; Esc suelta todo.">
         <button type="button" className="btn" onClick={() => setElegidos([])}>
           Soltar todo
         </button>
-      </div>
+      </Cabecera>
+      {orden.map((t) => (
+        <Seccion key={t} titulo={t} valor={porTipo.get(t)!.length}>
+          <div className="fichas ids">
+            {porTipo.get(t)!.map((id) => (
+              <button key={id} type="button" title={`Dejar sólo ${id}`} onClick={() => setSeleccion(id)}>
+                {id}
+              </button>
+            ))}
+          </div>
+        </Seccion>
+      ))}
     </>
   );
 }
@@ -549,17 +548,24 @@ function ResumenPlanta() {
   const r = e.resumen?.plantas.find((p) => p.id === planta) ?? null;
   return (
     <>
-      <p className="nota">Nada elegido: un clic en el dibujo, en el navegador o en una tabla elige un objeto.</p>
+      <Cabecera
+        icono={IcPlanta}
+        tipo="Planta · nada elegido"
+        titulo={r?.id ?? planta ?? "—"}
+        detalle={r ? `Cota ${cota(r.cota)} m · altura ${r.altura === null ? "—" : `${fmt(r.altura, 2)} m`} · diafragma ${r.diafragma === "rigido" ? "rígido" : "ninguno"}` : undefined}
+      />
       {r && (
-        <Seccion titulo={`Planta ${r.id}`} valor={`${cota(r.cota)} m`}>
-          <Fila k="Altura" v={r.altura === null ? "—" : `${fmt(r.altura, 2)} m`} />
-          <Fila k="Diafragma" v={r.diafragma === "rigido" ? "rígido" : "ninguno"} />
+        <Seccion titulo="En la planta">
           {r.pilares && <Fila k="Pilares (cabeza aquí)" v={Object.entries(r.pilares).map(([s, n]) => `${n}×${s}`).join(" · ")} />}
           {r.vigas && <Fila k="Vigas" v={`${r.vigas.n} · ${fmt(r.vigas.m, 1)} m`} />}
           {r.muros && <Fila k="Muros" v={`${r.muros.n} · ${fmt(r.muros.m, 1)} m`} />}
           {r.losas?.map((l) => <Fila key={l.id} k={`Forjado ${l.id}`} v={`${l.tipo} · ${fmt(l.m2, 1)} m² · ${fmt(l.espesor, 2)} m`} />)}
           {r.panos?.map((l) => <Fila key={l.id} k={`Forjado ${l.id}`} v={`unidireccional · ${fmt(l.m2, 1)} m² · ${fmt(l.direccion, 0)}° · ${fmt(l.intereje, 2)} m`} />)}
-          <table className="tb mt-1">
+        </Seccion>
+      )}
+      {r && (
+        <Seccion titulo="Cargas que recibe" valor="kN">
+          <table className="tb">
             <thead>
               <tr>
                 <th>Caso</th>
@@ -577,7 +583,7 @@ function ResumenPlanta() {
               ))}
             </tbody>
           </table>
-          <p className="nota">Lo que recibe la planta, con el peso propio (−ΣFz de sus cargas, de <span className="mono">fem resumen</span>).</p>
+          <p className="nota">Con el peso propio (−ΣFz de sus cargas, de <span className="mono">fem resumen</span>).</p>
         </Seccion>
       )}
       <Equilibrio estado={e} />
@@ -592,6 +598,7 @@ function ResumenPlanta() {
           </ol>
         </Seccion>
       )}
+      <p className="nota">Un clic en el dibujo, en el navegador o en una tabla elige un objeto.</p>
     </>
   );
 }

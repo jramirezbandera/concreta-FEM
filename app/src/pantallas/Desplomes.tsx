@@ -11,7 +11,8 @@ import type { EleccionCombinaciones } from "../../../src/visor/sesion.ts";
 import type { DatosDesplomes } from "../../../src/visor/datos.ts";
 import { Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { IcDeformada } from "../armazon/iconos.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt, fraccion, mm } from "../fmt.ts";
@@ -183,8 +184,17 @@ export function ModoDeformada() {
 
   const propiedades = (
     <>
+      <Cabecera
+        icono={IcDeformada}
+        tipo="Deformada"
+        titulo="Desplomes"
+        detalle={
+          <>
+            Por defecto, las combinaciones de <span className="mono">fem consultar deriva</span> (la ELS característica si los casos llevan su acción). Para el viento solo, elija su caso.
+          </>
+        }
+      />
       {d.diagnosticos && <p className="nota text-state-fail">{d.diagnosticos.map((y) => y.mensaje).join(" ")}</p>}
-      <p className="nota">Por defecto, las combinaciones de <span className="mono">fem consultar deriva</span> (la ELS característica si los casos llevan su acción). Para el viento solo, elija su caso.</p>
       {x && (
         <>
           <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)} (A3)`}>

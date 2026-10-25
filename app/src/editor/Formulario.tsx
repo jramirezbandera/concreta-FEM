@@ -3,7 +3,7 @@
  * línea, con su unidad y su ayuda a la vista. Se escribe igual que en la tabla (Intro o salir del
  * campo), con las mismas funciones puras: un dato que no vale no entra y se dice por qué.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { operacionFila } from "../../../src/editor/edicion.ts";
 import { comoUna } from "../../../src/editor/gestores.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
@@ -105,7 +105,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
             <label key={c.clave} className="campo">
               <span title={c.ayuda}>
                 {c.titulo}
-                {c.unidad && <small>{c.unidad}</small>}
+                {c.unidad && opciones && <small>{c.unidad}</small>}
               </span>
               {opciones ? (
                 <select
@@ -129,8 +129,10 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                   {c.referencia && <OpcionesGestor coleccion={c.referencia} valor={valor} />}
                 </select>
               ) : (
+                <span className="unidad" data-unidad={c.unidad} style={c.unidad ? ({ "--u": c.unidad.length } as CSSProperties) : undefined}>
                 <input
                   value={valor}
+                  placeholder={c.calculada ? undefined : "—"}
                   readOnly={c.calculada}
                   data-error={!!err}
                   aria-label={c.titulo}
@@ -148,6 +150,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                     }
                   }}
                 />
+                </span>
               )}
               {err ? <p className="error">{err}</p> : c.ayuda ? <p className="ayuda">{c.ayuda}</p> : null}
             </label>

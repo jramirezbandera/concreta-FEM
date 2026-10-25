@@ -9,7 +9,7 @@ import type { Bloque } from "../../../src/agente/informe.ts";
 import { Disposicion, Herramienta, Separador } from "../armazon/Disposicion.tsx";
 import { IcFirma, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, Seccion } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { nombreFirmas } from "../sesion/origen.ts";
 import { usePedido } from "../sesion/usePedido.ts";
@@ -179,23 +179,22 @@ export function EspacioRevision() {
         ancho: 320,
         contenido: (
           <>
+        <Cabecera
+          icono={IcFirma}
+          tipo="Informe de revisión"
+          titulo={!x ? "—" : "error" in x.firma ? "Firmas ilegibles" : x.firma.firmado ? (x.firma.mismoInforme ? "Firmado" : "Firmado otro informe") : "Sin firmar"}
+          detalle={x && !("error" in x.firma) && x.firma.firmado ? `Por ${x.firma.por} el ${x.firma.fecha.slice(0, 10)}.` : undefined}
+        >
+          {x && !("error" in x.firma) && <span className={`pill ${x.firma.firmado ? (x.firma.mismoInforme ? "ok" : "warn") : "neu"}`}>{x.firma.firmado ? (x.firma.mismoInforme ? "FIRMADO" : "OTRO INFORME") : "SIN FIRMAR"}</span>}
+        </Cabecera>
         <Seccion titulo="Firma">
           {x &&
             ("error" in x.firma ? (
               <p className="nota text-state-fail">El fichero de firmas {x.firma.error}.</p>
             ) : x.firma.firmado ? (
-              <div className="px-3.5 py-2">
-                <span className={`pill ${x.firma.mismoInforme ? "ok" : "warn"}`}>{x.firma.mismoInforme ? "FIRMADO" : "FIRMADO OTRO INFORME"}</span>
-                <p className="mt-2 text-[12px] text-text-secondary">
-                  Por <b className="text-text-primary">{x.firma.por}</b> el {x.firma.fecha.slice(0, 10)}.
-                  {!x.firma.mismoInforme && " La firma es de esta huella pero de otro informe (otro núcleo de cálculo u otras comprobaciones): hay que volver a revisarlo."}
-                </p>
-              </div>
+              !x.firma.mismoInforme && <p className="nota text-state-warn">La firma es de esta huella pero de otro informe (otro núcleo de cálculo u otras comprobaciones): hay que volver a revisarlo.</p>
             ) : (
-              <div className="px-3.5 py-2">
-                <span className="pill neu">SIN FIRMAR</span>
-                {x.otrasHuellas > 0 && <p className="mt-2 text-[12px] text-state-warn">Hay {x.otrasHuellas} firma{x.otrasHuellas === 1 ? "" : "s"} de versiones anteriores del proyecto: el modelo cambió desde entonces.</p>}
-              </div>
+              x.otrasHuellas > 0 && <p className="nota text-state-warn">Hay {x.otrasHuellas} firma{x.otrasHuellas === 1 ? "" : "s"} de versiones anteriores del proyecto: el modelo cambió desde entonces.</p>
             ))}
           <p className="nota">
             Firmar es sólo del ingeniero, en la línea de órdenes, después de leer el informe:

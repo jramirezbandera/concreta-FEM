@@ -2,10 +2,9 @@
  * La escala de un mapa en Propiedades (Resultados · Losas y Armado): completa, sin picos o manual.
  * Los números de «manual» se guardan aunque se cambie de modo.
  */
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { rotulo, type EscalaDibujada } from "../../../src/agente/render/escena.ts";
 import { limitesMapa, type EscalaMapa } from "../../../src/agente/render/isovalores.ts";
-import { Segmentado } from "../armazon/Disposicion.tsx";
 import { fmt } from "../fmt.ts";
 import { Aviso, Seccion } from "./comunes.tsx";
 
@@ -45,42 +44,47 @@ export function SeccionEscala({ mapa, unidad, elegida, onCambio, lados = "dos" }
     if (e.min !== elegida.min || e.max !== elegida.max || e.paso !== elegida.paso) onCambio(e);
   };
   const entrada = (k: "min" | "max" | "paso", etiqueta: string) => (
-    <label className="flex flex-col gap-0.5 text-[11px] text-text-secondary">
-      {etiqueta}
-      <input
-        type="text"
-        inputMode="decimal"
-        className="sel w-[84px] text-right mono"
-        aria-label={`${etiqueta} de la escala`}
-        placeholder="auto"
-        value={borrador[k]}
-        onChange={(ev) => setBorrador({ ...borrador, [k]: ev.target.value })}
-        onBlur={aplicar}
-        onKeyDown={(ev) => ev.key === "Enter" && aplicar()}
-      />
+    <label className="campo">
+      <span>{etiqueta.toLowerCase()}</span>
+      <span className="unidad" data-unidad={unidad} style={{ "--u": unidad.length } as CSSProperties}>
+        <input
+          type="text"
+          inputMode="decimal"
+          aria-label={`${etiqueta} de la escala`}
+          placeholder="auto"
+          value={borrador[k]}
+          onChange={(ev) => setBorrador({ ...borrador, [k]: ev.target.value })}
+          onBlur={aplicar}
+          onKeyDown={(ev) => ev.key === "Enter" && aplicar()}
+        />
+      </span>
     </label>
   );
+  const MODOS = [
+    { id: "completa", nombre: "Completa", title: "Del mínimo al máximo del mapa" },
+    { id: "sin-picos", nombre: "Sin picos", title: lados === "dos" ? "Sin el 1 % del área por cada lado: un pico local no deja el resto en una o dos bandas" : "Sin el 1 % del área de los valores más altos: un pico local no deja el resto en una o dos bandas" },
+    { id: "manual", nombre: "Manual", title: "Mínimo, máximo y paso dados" },
+  ] as const;
   const area = lados === "dos" ? "2 %" : "1 %";
   return (
     <Seccion titulo="Escala" valor={mapa?.nulo ? "campo nulo" : mapa ? `${rotulo(mapa.limites[0]!, 4)} a ${rotulo(mapa.limites[mapa.limites.length - 1]!, 4)} ${unidad}` : undefined}>
-      <div className="flex flex-col gap-2 px-3.5 py-2">
-        <Segmentado
-          etiqueta="Escala del mapa"
-          opciones={[
-            { id: "completa", nombre: "Completa", title: "Del mínimo al máximo del mapa" },
-            { id: "sin-picos", nombre: "Sin picos", title: lados === "dos" ? "Sin el 1 % del área por cada lado: un pico local no deja el resto en una o dos bandas" : "Sin el 1 % del área de los valores más altos: un pico local no deja el resto en una o dos bandas" },
-            { id: "manual", nombre: "Manual", title: "Mínimo, máximo y paso dados" },
-          ]}
-          valor={elegida.modo}
-          onCambio={modo}
-        />
-        {elegida.modo === "manual" && (
-          <div className="flex items-end gap-2">
-            {entrada("min", "Mínimo")}
-            {entrada("max", "Máximo")}
-            {entrada("paso", "Paso")}
-          </div>
-        )}
+      <div className="px-3.5 pt-1 pb-1.5">
+        <div className="seg seg-ancho" role="group" aria-label="Escala del mapa">
+          {MODOS.map((o) => (
+            <button key={o.id} type="button" data-on={elegida.modo === o.id} aria-pressed={elegida.modo === o.id} title={o.title} onClick={() => modo(o.id)}>
+              {o.nombre}
+            </button>
+          ))}
+        </div>
+      </div>
+      {elegida.modo === "manual" && (
+        <div className="pb-1">
+          {entrada("min", "Mínimo")}
+          {entrada("max", "Máximo")}
+          {entrada("paso", "Paso")}
+        </div>
+      )}
+      <div className="flex flex-col gap-2 px-3.5 pb-2 empty:hidden">
         {error && <Aviso tono="fail">{error}</Aviso>}
         {mapa?.picos && elegida.modo === "completa" && (
           <Aviso tono="warn">

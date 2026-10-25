@@ -18,7 +18,8 @@ import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesion.ts";
 import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { IcPilares } from "../armazon/iconos.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
@@ -231,12 +232,13 @@ export function ModoPilares() {
 
   const propiedades = (
     <>
+      <Cabecera icono={IcPilares} tipo={`Pilares · bajo ${planta ?? "—"}`} titulo={id ?? `${filas.length} tramos`} mono={!!id} detalle={id ? "Todos sus tramos, abajo." : "Elija un pilar para ver todos sus tramos."} />
       <Seccion titulo={`Tramos bajo ${planta}`} valor={filas.length}>
         <div className="fila">
           <span>ν &gt; {fmt(LIMITE_NU, 2)}</span>
           <span className={`v ${pasan ? "text-state-warn" : ""}`}>{pasan}</span>
         </div>
-        <p className="nota">ν = Nd/(Ac·fcd), fcd = fck/1,5, en los tramos de hormigón: el aviso de A3 (orden de magnitud). La comprobación de norma es la del módulo de pilares de Concreta. El cuadro de la planta, abajo; elija un pilar para ver todos sus tramos.</p>
+        <p className="nota">ν = Nd/(Ac·fcd), fcd = fck/1,5, en los tramos de hormigón: el aviso de A3 (orden de magnitud). La comprobación de norma es la del módulo de pilares de Concreta. El cuadro de la planta, abajo.</p>
       </Seccion>
       {id && pilar.datos && (
             <Seccion titulo={`Pilar ${id}`} valor={`${pilar.datos.filas.length} tramos`}>

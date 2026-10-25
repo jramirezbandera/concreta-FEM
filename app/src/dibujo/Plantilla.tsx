@@ -16,7 +16,7 @@ import { operacionProponerEjes, plantasPilar, type Alinear, type NombreHerramien
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import type { NombreTabla } from "../../../src/editor/tablas.ts";
 import { IcEjes, IcPilar, IcViga } from "../armazon/iconos.tsx";
-import { Seccion } from "../componentes/comunes.tsx";
+import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
 import { cota } from "../fmt.ts";
 import type { ControladorDibujo, Instantanea } from "./controlador.ts";
@@ -95,19 +95,12 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
   const seccionPilar = m.secciones.find((s) => s.id === t.pilar.seccion);
   return (
     <div role="region" aria-label={`Dibujar · ${TITULO[h]}`}>
-      <div className="insp-cab">
-        <span className="dib-icono">
-          <Icono size={18} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="insp-tipo">Dibujar{planta ? ` en ${planta}` : ""}</div>
-          <div className="insp-id">{TITULO[h]}</div>
-        </div>
+      <Cabecera icono={Icono} tipo={`Dibujar${planta ? ` en ${planta}` : ""}`} titulo={TITULO[h]}>
         <button type="button" className="btn" title={`Abrir la tabla de ${TABLA[h]}`} onClick={() => abrirTabla(TABLA[h])}>
           <Table2 size={14} />
           Tabla
         </button>
-      </div>
+      </Cabecera>
       {!foto.error && foto.hecho && (
         <p className="dib-hecho" role="status">
           <Check size={14} />

@@ -23,7 +23,8 @@ import type { ValorPunto } from "../../../src/visor/datos.ts";
 import type { SuperficiesMapa } from "../../../src/visor/isovalores3d.ts";
 import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, ComboCombinaciones, Equilibrio, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { IcLosas } from "../armazon/iconos.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
 import { escalaDe, SeccionEscala, type EscalaElegida } from "../componentes/escala.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
@@ -175,12 +176,20 @@ export function ModoLosas() {
 
   const propiedades = (
     <>
-      {x && (
-        <p className="nota">
-          Se dibuja <b className="mono">{x.dibujada?.nombre ?? "—"}</b>
-          {x.combinaciones.nombres.length > 1 ? `: la de mayor |valor| en la planta de las ${x.combinaciones.nombres.length} de ${x.combinaciones.descripcion}.` : "."} uz de los nudos; momentos y cortantes recuperados por SPR (E5) en los ejes de cada losa. Bandas sin interpolar el color (H43): el número de un punto, con un clic.
-        </p>
-      )}
+      <Cabecera
+        icono={IcLosas}
+        tipo={`Losas · ${planta ?? "—"}`}
+        titulo={`${CAMPOS.find((c) => c.id === campo)!.nombre} · ${unidad}`}
+        detalle={
+          x ? (
+            <>
+              Se dibuja <b className="mono font-medium">{x.dibujada?.nombre ?? "—"}</b>
+              {x.combinaciones.nombres.length > 1 ? `: la de mayor |valor| en la planta de las ${x.combinaciones.nombres.length} de ${x.combinaciones.descripcion}.` : "."}
+            </>
+          ) : undefined
+        }
+      />
+      {x && <p className="nota">uz de los nudos; momentos y cortantes recuperados por SPR (E5) en los ejes de cada losa. Bandas sin interpolar el color (H43): el número de un punto, con un clic.</p>}
         <SeccionEscala
           key={campo}
           mapa={x?.escena.mapa}

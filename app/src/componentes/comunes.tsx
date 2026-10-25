@@ -1,10 +1,33 @@
 /** Piezas comunes de los paneles: secciones, filas, combinaciones, diagnósticos y equilibrio. */
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { CombinacionDisponible, EleccionCombinaciones, EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { Combinaciones } from "../../../src/visor/datos.ts";
 import { Campo } from "../armazon/Disposicion.tsx";
 import { fmt } from "../fmt.ts";
+
+/**
+ * Cabecera de un panel de Propiedades: el icono de lo que es, qué es (en pequeño), cuál (el título),
+ * una línea de detalle si hace falta y sus acciones a la derecha. La misma en el inspector, la
+ * plantilla de dibujo y los modos de Resultados.
+ */
+export function Cabecera({ icono: I, tipo, titulo, mono, detalle, children }: { icono?: ComponentType<{ size?: number }>; tipo: ReactNode; titulo: ReactNode; mono?: boolean; detalle?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="insp-cab">
+      {I && (
+        <span className="cab-icono">
+          <I size={18} />
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="insp-tipo">{tipo}</div>
+        <div className={`insp-id truncate${mono ? " mono" : ""}`}>{titulo}</div>
+        {detalle && <div className="cab-detalle">{detalle}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export function Seccion({ titulo, valor, children }: { titulo: string; valor?: ReactNode; children?: ReactNode }) {
   return (

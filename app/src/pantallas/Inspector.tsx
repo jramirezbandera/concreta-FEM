@@ -4,8 +4,9 @@
  * lo que se edita por tablas son un formulario (`FormularioObjeto`); desde V2b, todo el modelo
  * físico (sin tablas, sólo un proyecto de sólo lectura).
  */
-import { Crosshair, X } from "lucide-react";
-import { ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { Box, Crosshair, X } from "lucide-react";
+import { IcApoyo, IcApoyoLineal, IcBanda, IcCarga, IcCasos, IcEjes, IcForjado, IcMateriales, IcMuro, IcPilar, IcPlanta, IcSecciones, IcViga } from "../armazon/iconos.tsx";
+import { Cabecera, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
@@ -18,6 +19,25 @@ export function etiquetaTipo(o: { tipo: string; datos: Record<string, unknown> }
   if (o.tipo === "paño") return "forjado · unidireccional";
   return o.tipo;
 }
+
+/** El icono de cada tipo de objeto, el de su herramienta en la barra. */
+const ICONO_TIPO: Record<string, Parameters<typeof Cabecera>[0]["icono"]> = {
+  planta: IcPlanta,
+  pilar: IcPilar,
+  viga: IcViga,
+  vigueta: IcViga,
+  losa: IcForjado,
+  paño: IcForjado,
+  muro: IcMuro,
+  apoyo: IcApoyo,
+  "apoyo lineal": IcApoyoLineal,
+  banda: IcBanda,
+  carga: IcCarga,
+  caso: IcCasos,
+  sección: IcSecciones,
+  material: IcMateriales,
+  eje: IcEjes,
+};
 
 /** Un valor del proyecto en texto: números como están, puntos como (x; y), lo demás en JSON. */
 export function valorCampo(v: unknown): string {
@@ -52,11 +72,7 @@ export function Inspector({ id }: { id: string }) {
 
   return (
     <>
-      <div className="insp-cab">
-        <div className="min-w-0 flex-1">
-          <div className="insp-tipo">{o ? etiquetaTipo(o) : "objeto"}</div>
-          <div className="insp-id mono truncate">{id}</div>
-        </div>
+      <Cabecera icono={(o && ICONO_TIPO[o.tipo]) ?? Box} tipo={o ? etiquetaTipo(o) : "objeto"} titulo={id} mono>
         <button type="button" className="btn" onClick={localizar} disabled={!o && !tabla} title="Ir a la planta del objeto">
           <Crosshair size={14} />
           Localizar
@@ -64,7 +80,7 @@ export function Inspector({ id }: { id: string }) {
         <button type="button" className="ib" style={{ width: 28, height: 28 }} aria-label="Cerrar" title="Soltar (Esc)" onClick={() => setSeleccion(null)}>
           <X size={16} />
         </button>
-      </div>
+      </Cabecera>
       {ed && tabla && <FormularioObjeto id={id} tabla={tabla} />}
       {r.diagnosticos && !tabla && <p className="nota text-state-warn">{r.diagnosticos.map((d) => d.mensaje).join(" ")} (puede que ya no exista en esta versión del proyecto).</p>}
       {r.diagnosticos && tabla && <p className="nota">Compilando la versión nueva…</p>}
