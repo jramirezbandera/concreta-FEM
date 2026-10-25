@@ -16,10 +16,11 @@ import { useVisor } from "../contexto.ts";
 
 const total = (m: ModeloFisico) => COLECCIONES.reduce((n, c) => n + lista(m, c).length, 0);
 
-export function Dialogo({ titulo, children, pie, onCerrar }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void }) {
+/** `clase`: otra forma de la caja (el gestor de GE, más ancho y con dos columnas). */
+export function Dialogo({ titulo, children, pie, onCerrar, clase }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void; clase?: string }) {
   return (
     <div className="dialogo-fondo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()} onKeyDown={(e) => e.key === "Escape" && onCerrar()}>
-      <div className="dialogo" role="dialog" aria-modal="true" aria-label={titulo}>
+      <div className={clase ? `dialogo ${clase}` : "dialogo"} role="dialog" aria-modal="true" aria-label={titulo}>
         <div className="dialogo-cab">
           <h2>{titulo}</h2>
           <button type="button" className="ib" style={{ width: 28, height: 28 }} aria-label="Cerrar" title="Cerrar (Esc)" onClick={onCerrar}>

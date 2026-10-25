@@ -1,6 +1,6 @@
 # GE: crear secciones, materiales y demás listas sin ir a las tablas (plan)
 
-> **Fecha:** 2026-10-25. **Estado:** propuesto; decisiones GE-a…GE-g pendientes del usuario (§6).
+> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6.1). **GE1 hecho el 2026-10-25** (§7); GE2 y GE3, por hacer.
 >
 > **Origen:** el usuario, al dibujar un pilar en un proyecto nuevo (captura del 2026-10-25): «crear una sección o material es horrible, tienes que hacerlo por tablas». Pide ventanas contextuales que creen los casos típicos, como en CYPECAD o SAP2000, y que el desplegable «sección» tenga «Crear nueva…» y lleve a ese menú. «Todo este tipo de cosas tenemos que revisarlas»: el plan repasa todos los campos que eligen un objeto de otra lista, no sólo la sección.
 
@@ -128,3 +128,59 @@ Un diálogo como la introducción de plantas de CYPECAD: añadir n plantas de al
 | **GE-e** | Materiales típicos | HA-25…HA-50 y S235, S275 y S355. Sin el grado del acero en el modelo: sólo va en el nombre |
 | **GE-f** | Cambiar una sección que se usa | Se permite, como en SAP2000, diciendo cuántos objetos la usan y ofreciendo «Duplicar» al lado |
 | **GE-g** | Orden frente a V2c | GE1 ya, antes de V2c-2 (losas y muros también eligen material); GE2 con las cargas de V2c-2; GE3 después |
+
+### 6.1 Decidido por el usuario (2026-10-25)
+
+Todas como se proponían, con dos matices:
+
+- **GE-a:** diálogo modal.
+- **GE-b:** el botón «Secciones» (y «Materiales») abre el gestor; la tabla, desde «Abrir la tabla».
+- **GE-c:** ids automáticos y editables, y si ya hay una sección con los mismos datos se reutiliza. **Matiz:** la circular es `C40`, no `Ø40` (el «Ø» es incómodo de teclear y de pegar desde Excel).
+- **GE-d:** IPE, HEA, HEB e IPN; tubos, cajones y UPN, en su propia fase con oráculo.
+- **GE-e:** HA-25…HA-50 y S235, S275 y S355, con el grado del acero sólo en el nombre.
+- **GE-f:** se permite cambiar una sección que se usa. **Matiz:** el botón dice a cuántos objetos se aplica («Aplicar a 24 pilares y 3 vigas»), con «Duplicar» al lado.
+- **GE-g:** GE1 ya, antes de V2c-2; GE2 con las cargas de V2c-2; GE3 después.
+
+## 7. GE1 hecho (2026-10-25)
+
+### 7.1 Qué hay
+
+- **`src/secciones/perfiles.ts`:** el catálogo IPE (18), HEA (24), HEB (24) e IPN (21), copiado de Concreta (`src/data/steelProfiles.ts`, commit 3e24851) por un script que lee sus filas tal cual, con las columnas de `PerfilCatalogo`. Está citado en `NOTICE`.
+- **`src/editor/gestores.ts`** (puro):
+  - ids propuestos (`idSeccion`) y textos de los desplegables (`describirSeccion`, `describirMaterial`);
+  - materiales típicos y el propuesto por familia (el más usado, o el típico);
+  - `crearSeccion`, `cambiarSeccion` y `crearMaterial`, que dan las operaciones (un material típico que no está se crea con la sección; una sección igual se reutiliza);
+  - usos por colección (`usosDe`, `textoUsos`);
+  - propiedades con `compilarSeccion` y `materialElastico`.
+- **`src/editor/tablas.ts`:**
+  - las seis columnas que eligen sección o material llevan `referencia`;
+  - sus opciones dicen qué es cada una (`P30x30 · rect. 30 × 30 · HA-30`);
+  - el valor sigue siendo el id, así que pegar de Excel no cambia.
+- **En la app:**
+  - `app/src/editor/Gestores.tsx`: los dos gestores, con la lista y los usos, la ficha con el dibujo a escala y los ejes locales, las propiedades del compilador, «Nueva» por tipo, Duplicar, Borrar (con `DialogoBorrar`) y «Abrir la tabla»;
+  - `app/src/editor/referencia.tsx`: «Nueva…» y «Editar…» al final de cada desplegable, y el pedido que abre el gestor desde cualquier sitio;
+  - el inspector, la hoja y la plantilla de Pilar y de Viga los usan: crear y asignar van en un `lote`. En la plantilla, que no es del modelo, crear es el único paso.
+  - El «+» de la plantilla abre el gestor en lugar del formulario b × h en línea.
+  - La barra (Materiales, Secciones) y la paleta («Nueva sección…», «Nuevo material…») abren los gestores.
+
+### 7.2 Criterios
+
+| # | Criterio | Resultado |
+|---|---|---|
+| 1 | Sin tablas | **Pasa.** Las cinco formas y los tres tipos de material se crean, cambian, duplican, renombran y borran desde el gestor. El resultado es lo escrito a mano en el JSON (`gestores.test.ts`, `app/src/test/gestores.test.tsx`) |
+| 2 | Desde cualquier desplegable | **Pasa.** El inspector, la hoja (filas del modelo) y la plantilla crean y eligen en un paso, y deshacer quita la sección y su material típico. En la fila nueva de la hoja son dos pasos: crear, y la fila cuando se completa |
+| 3 | Catálogo exacto | **Pasa.** Las 87 filas cuadran con la geometría de su sección (`perfiles.test.ts`). Un pórtico con `IPE300` del gestor es el mismo modelo que con el perfil escrito a mano, y compila y calcula |
+| 4 | Lo mostrado es lo calculado | **Pasa.** Las propiedades de la ficha son las de `compilarSeccion` en las cinco formas, y el Ecm, el de `hormigon(fck)` |
+| 5 | Nada se rompe | **Pasa en las pruebas** (raíz 2101 y app 60). Los bancos de Chrome no se han pasado: GE no toca las vistas ni el worker |
+| 6 | Puerta de uso | **Del usuario** |
+
+### 7.3 Hallazgos
+
+- **GE1-1:** el Esc de un diálogo sólo funcionaba con el foco dentro. Tras «Crear», el botón cambia y el foco se va al `body`. El gestor escucha el Esc en la ventana, salvo que haya otro diálogo encima. Los demás diálogos de la app tienen el mismo defecto.
+- **GE1-2:** la columna «forma» de la tabla de secciones sigue sin admitir `I` en una fila nueva (no tiene columnas para el perfil). Ahora la ayuda manda a «Nueva sección…».
+
+### 7.4 Pendiente
+
+- La puerta de uso (criterio 6).
+- GE2 (casos típicos) y GE3 (plantas).
+- El Esc de los demás diálogos (GE1-1).

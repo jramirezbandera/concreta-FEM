@@ -16,6 +16,7 @@
 import type { AccionCaso, ApoyoFisico, ApoyoLineal, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Viga } from "../compilador/fisico.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
+import { describirMaterial, describirSeccion } from "./gestores.ts";
 import { Lector, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
@@ -36,6 +37,11 @@ export interface Columna {
    * es «» (sin dar: el valor por defecto).
    */
   opciones?: (ctx: Contexto) => readonly Opcion[];
+  /**
+   * GE: la lista de la que elige la columna (`opciones` son sus ids), para que la interfaz ofrezca
+   * «Nueva…» y «Editar…» junto a ellas. Sólo las que tienen gestor.
+   */
+  referencia?: "secciones" | "materiales";
 }
 
 /** Una opción de un desplegable: el texto de la celda y, si es otro, lo que se ve en la lista. */
@@ -143,6 +149,15 @@ const ids =
     ...lista(ctx.modelo, c).map((o) => ({ valor: o.id, texto: typeof o.nombre === "string" && o.nombre ? `${o.id} · ${o.nombre}` : undefined })),
   ];
 
+/**
+ * GE: las secciones o los materiales, con lo que es cada uno («P30x30 · rect. 30 × 30 · HA-30»), y
+ * la columna marcada para que la interfaz ofrezca crear y editar.
+ */
+const secciones_ = (defecto?: string) =>
+  (ctx: Contexto): Opcion[] => [...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]), ...ctx.modelo.secciones.map((x) => ({ valor: x.id, texto: `${x.id} · ${describirSeccion(x)}` }))];
+const materiales_ = (defecto?: string) =>
+  (ctx: Contexto): Opcion[] => [...(defecto === undefined ? [] : [{ valor: "", texto: `(${defecto})` }]), ...ctx.modelo.materiales.map((x) => ({ valor: x.id, texto: `${x.id} · ${describirMaterial(x)}` }))];
+
 const id: Columna = { clave: "id", titulo: "id", ayuda: "único en todo el modelo; vacío en una fila nueva: se pone solo" };
 const nombre: Columna = { clave: "nombre", titulo: "nombre" };
 
@@ -244,8 +259,8 @@ const secciones: DefTabla = {
   prefijo: "S",
   columnas: [
     id,
-    { clave: "material", titulo: "material", opciones: ids("materiales") },
-    { clave: "forma", titulo: "forma", ayuda: "rectangular, circular, T o general (los perfiles I, en el JSON por ahora)", opciones: fijas(["rectangular", "circular", "T", "general"]) },
+    { clave: "material", titulo: "material", opciones: materiales_(), referencia: "materiales" },
+    { clave: "forma", titulo: "forma", ayuda: "rectangular, circular, T o general (los perfiles I, desde «Nueva sección…»)", opciones: fijas(["rectangular", "circular", "T", "general"]) },
     { clave: "b", titulo: "b", unidad: "m", ayuda: "ancho (según y local); en general, la huella del pilar" },
     { clave: "h", titulo: "h", unidad: "m", ayuda: "canto (según z local)" },
     { clave: "D", titulo: "D", unidad: "m", ayuda: "diámetro" },
@@ -286,7 +301,7 @@ const secciones: DefTabla = {
         return resultado(L, { ...comun, A: pos("A"), Iy: pos("Iy"), Iz: pos("Iz"), J: pos("J"), Avy: pos("Avy", false), Avz: pos("Avz", false), b: pos("b", false), h: pos("h", false) });
       case "I":
         usa([]);
-        if (!base || base.forma !== "I") L.errores.push({ columna: "forma", mensaje: "los perfiles I se meten por ahora en el JSON (su catálogo llega con V2b)" });
+        if (!base || base.forma !== "I") L.errores.push({ columna: "forma", mensaje: "los perfiles I se crean con «Nueva sección…» (del catálogo)" });
         return resultado(L, { ...comun, perfil: base?.perfil });
     }
     return { ok: false, errores: L.errores };
@@ -308,7 +323,7 @@ const pilares: DefTabla = {
     { clave: "y", titulo: "y", unidad: "m" },
     { clave: "desde", titulo: "desde", ayuda: "planta de la base", opciones: opcionesPlantas },
     { clave: "hasta", titulo: "hasta", ayuda: "planta de la cabeza", opciones: opcionesPlantas },
-    { clave: "seccion", titulo: "sección", opciones: ids("secciones") },
+    { clave: "seccion", titulo: "sección", opciones: secciones_(), referencia: "secciones" },
     { clave: "tramos", titulo: "tramos", ayuda: "sección de los tramos que cambian, por la planta de su cabeza: «N3: P30x30; N5: P25x25»" },
     { clave: "giro", titulo: "giro", unidad: "°", ayuda: "del canto h desde +X; por defecto, 0" },
     {
@@ -387,7 +402,7 @@ const vigas: DefTabla = {
     nombre,
     { clave: "planta", titulo: "planta", opciones: opcionesPlantas },
     { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "eje en planta: «x y; x y; …» (al menos 2)" },
-    { clave: "seccion", titulo: "sección", opciones: ids("secciones") },
+    { clave: "seccion", titulo: "sección", opciones: secciones_(), referencia: "secciones" },
     { clave: "insercion", titulo: "inserción", ayuda: "plano (por defecto: el eje en el plano del forjado, C1-c) o superior", opciones: fijas(["plano", "superior"], "plano") },
     { clave: "libInicio", titulo: "lib. inicio", ayuda: GDL },
     { clave: "libFin", titulo: "lib. fin", ayuda: GDL },
@@ -474,7 +489,7 @@ const forjados: DefTabla = {
     { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes de las vigas y los muros en que se apoya: «x y; x y; …» (al menos 3, sin repetir el primero)" },
     { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»" },
     { clave: "espesor", titulo: "canto", unidad: "m", ayuda: "maciza y reticular: el canto total; vacío en un unidireccional (lo da la sección de la vigueta)" },
-    { clave: "material", titulo: "material", ayuda: "maciza y reticular; vacío en un unidireccional", opciones: ids("materiales", "ninguno: unidireccional") },
+    { clave: "material", titulo: "material", ayuda: "maciza y reticular; vacío en un unidireccional", opciones: materiales_("ninguno: unidireccional"), referencia: "materiales" },
     { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio. Maciza: por defecto, γ·canto. Reticular con casetón perdido y unidireccional (con las bovedillas): obligatorio" },
     { clave: "direccion", titulo: "dirección", unidad: "°", ayuda: "desde +X. Maciza: la del eje 1 de las láminas (por defecto, 0). Reticular: la de los nervios y su perpendicular. Unidireccional: la de las viguetas (obligatoria)" },
     { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "reticular: entre ejes de nervios; unidireccional: entre ejes de viguetas; vacío en una maciza" },
@@ -483,7 +498,7 @@ const forjados: DefTabla = {
     { clave: "caseton", titulo: "casetón", ayuda: "reticular: perdido (por defecto; entonces el pp es obligatorio) o recuperable", opciones: fijas(["perdido", "recuperable"], "perdido") },
     { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse del forjado" },
     { clave: "multiplicadores", titulo: "multiplicadores", ayuda: `reticular: los que sustituyen a los calculados, «m11=0,32 m22=0,27 …» (${MULT.join(", ")}), cada uno en (0, 100]` },
-    { clave: "seccion", titulo: "vigueta", ayuda: "unidireccional: sección de una vigueta (la T bruta u otra); no pesa: el peso es el pp", opciones: ids("secciones", "ninguna: losa") },
+    { clave: "seccion", titulo: "vigueta", ayuda: "unidireccional: sección de una vigueta (la T bruta u otra); no pesa: el peso es el pp", opciones: secciones_("ninguna: losa"), referencia: "secciones" },
   ],
   fila(o, ctx) {
     const tipo = tipoForjado(o, ctx);
@@ -600,7 +615,7 @@ const muros: DefTabla = {
     { clave: "desde", titulo: "desde", ayuda: "planta de la base", opciones: opcionesPlantas },
     { clave: "hasta", titulo: "hasta", ayuda: "planta de la cabeza", opciones: opcionesPlantas },
     { clave: "espesor", titulo: "espesor", unidad: "m" },
-    { clave: "material", titulo: "material", opciones: ids("materiales") },
+    { clave: "material", titulo: "material", opciones: materiales_(), referencia: "materiales" },
     { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (nace sobre una viga, una losa u otro muro)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
     { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "rectángulos en alzado, «desde hasta z0 z1 | …»: estaciones a lo largo del eje y alturas sobre la base" },
   ],

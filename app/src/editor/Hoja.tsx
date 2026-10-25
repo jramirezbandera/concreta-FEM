@@ -20,11 +20,13 @@ import type { Fila as FilaTexto } from "../../../src/editor/celdas.ts";
 import { escribirTsv } from "../../../src/editor/celdas.ts";
 import { proponerEjes } from "../../../src/compilador/ejes.ts";
 import { operacionFila, pegar } from "../../../src/editor/edicion.ts";
+import { comoUna } from "../../../src/editor/gestores.ts";
 import { lista, type Objeto } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, conActual, contexto, filaConValor, objetosTabla, type NombreTabla, type Opcion } from "../../../src/editor/tablas.ts";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import { useVisor } from "../contexto.ts";
 import { DialogoBorrar, DialogoCopiar } from "./Dialogos.tsx";
+import { abrirGestor, esDelGestor, OpcionesGestor, pedidoCampo, type ColeccionGestor } from "./referencia.tsx";
 
 type Mensaje = { tono: "fail" | "ok" | "neu"; texto: string } | null;
 
@@ -74,6 +76,8 @@ function EjesPropuestos() {
 /** El desplegable abierto en la celda activa (sólo en una fila a la vez). */
 interface DesplegableCelda {
   opciones: readonly Opcion[];
+  /** GE: la lista de la que elige, para «Nueva…» y «Editar…» al final. */
+  referencia?: ColeccionGestor;
   onElegir: (v: string) => void;
   onCerrar: () => void;
 }
@@ -124,6 +128,7 @@ function Desplegable({ valor, etiqueta, d }: { valor: string; etiqueta: string; 
           {o.texto ?? o.valor}
         </option>
       ))}
+      {d.referencia && <OpcionesGestor coleccion={d.referencia} valor={valor} />}
     </select>
   );
 }
@@ -418,6 +423,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
 
   /** Lo elegido en el desplegable se escribe en la celda, y el cursor se queda en ella. */
   const elegir = (v: string) => {
+    if (cols[c0]?.referencia && esDelGestor(v)) return gestor(f0, c0, v);
     const r = escribir(f0, c0, v);
     setEditando(null);
     setDesplegado(false);
@@ -426,8 +432,43 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     hoja.current?.focus();
   };
 
+  /**
+   * GE: «Nueva…» o «Editar…» abre el gestor. En una fila del modelo, lo que crea y la celda van en un
+   * lote (un paso de deshacer); en la fila nueva, se crea y se escribe la celda, como al elegir.
+   */
+  const gestor = (f: number, c: number, eleccion: string) => {
+    const col = cols[c]!;
+    const v = f < nBorrador ? filas[f]! : null;
+    cerrar();
+    abrirGestor(
+      pedidoCampo({
+        coleccion: col.referencia!,
+        eleccion,
+        valor: (v ? v.fila : borrador)[col.clave] ?? "",
+        tabla,
+        clave: col.clave,
+        fila: v ? v.fila : borrador,
+        para: `${col.titulo} de ${v ? v.id : "la fila nueva"}`,
+        alElegir: (nuevo, crear) => {
+          if (!v) {
+            if (crear.length) {
+              const r = ed.editar(comoUna(crear), `Nueva ${col.referencia === "secciones" ? "sección" : "material"} ${nuevo}`);
+              if (!r.ok) return r.errores.map((e) => e.mensaje).join(" ");
+            }
+            escribir(f, c, nuevo);
+            return null;
+          }
+          const t = operacionFila(m, tabla, v.id, filaConValor(def, v.fila, col.clave, nuevo));
+          if (!t.ok) return t.errores.map((e) => e.mensaje).join(" · ");
+          const r = ed.editar(comoUna([...crear, t.operacion]), `${v.id} · ${col.titulo} = ${nuevo}`);
+          return r.ok ? null : r.errores.map((e) => e.mensaje).join(" ");
+        },
+      }),
+    );
+  };
+
   const opcionesActiva = useMemo(() => (desplegado ? (cols[c0]?.opciones?.(contexto(m)) ?? null) : null), [desplegado, cols, c0, m]);
-  const desplegable: DesplegableCelda | null = opcionesActiva ? { opciones: opcionesActiva, onElegir: elegir, onCerrar: cerrar } : null;
+  const desplegable: DesplegableCelda | null = opcionesActiva ? { opciones: opcionesActiva, onElegir: elegir, onCerrar: cerrar, ...(cols[c0]?.referencia ? { referencia: cols[c0]!.referencia } : {}) } : null;
 
   const confirmar = (df: number, dc: number) => {
     if (editando === null) return;

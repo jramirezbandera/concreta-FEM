@@ -19,6 +19,8 @@ import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts
 import { ejeVecino } from "./armazon/Disposicion.tsx";
 import { Paleta, type Orden } from "./armazon/Paleta.tsx";
 import { DialogoVersiones } from "./armazon/Versiones.tsx";
+import { GestorAbierto } from "./editor/Gestores.tsx";
+import { abrirGestor } from "./editor/referencia.tsx";
 import { hayAlmacen } from "./sesion/almacen.ts";
 import { ContextoPaneles, useAlmacenPaneles, type EstadoPaneles } from "./armazon/paneles.ts";
 import { ContextoVisor, type Espacio, type ModoResultados } from "./contexto.ts";
@@ -209,6 +211,12 @@ export function App() {
     for (const m of MODOS) r.push({ id: `modo-${m.id}`, grupo: "Resultados", nombre: m.nombre, hacer: () => irA("resultados", m.id), deshabilitada: !e?.calculado });
     for (const p of e?.plantas ?? []) r.push({ id: `planta-${p.id}`, grupo: "Planta", nombre: `${p.id} ${cota(p.cota)}${p.nombre ? ` · ${p.nombre}` : ""}`, hacer: () => setPlanta(p.id) });
     if (ed) for (const t of TABLAS) r.push({ id: `tabla-${t}`, grupo: "Tabla", nombre: DEF_TABLAS[t].titulo, hacer: () => pedirTabla(t) });
+    if (ed) {
+      r.push({ id: "gestor-secciones", grupo: "Modelo", nombre: "Secciones… (gestor)", hacer: () => abrirGestor({ coleccion: "secciones" }) });
+      r.push({ id: "gestor-nueva-seccion", grupo: "Modelo", nombre: "Nueva sección…", hacer: () => abrirGestor({ coleccion: "secciones", nueva: true }) });
+      r.push({ id: "gestor-materiales", grupo: "Modelo", nombre: "Materiales… (gestor)", hacer: () => abrirGestor({ coleccion: "materiales" }) });
+      r.push({ id: "gestor-nuevo-material", grupo: "Modelo", nombre: "Nuevo material…", hacer: () => abrirGestor({ coleccion: "materiales", nueva: true }) });
+    }
     const vivo: Partial<EstadoPaneles> = paneles.vivos.get(clave) ?? {};
     r.push(
       { id: "calcular", grupo: "Proyecto", nombre: e?.calculado ? "Recalcular" : "Calcular", hacer: () => (e?.calculado || !proyecto.calcular ? proyecto.recalcular() : proyecto.calcular()), deshabilitada: !e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado) },
@@ -381,6 +389,7 @@ export function App() {
               </button>
             </div>
           )}
+          {ed && <GestorAbierto />}
           {versionesAbiertas && navegador && ed && (
             <DialogoVersiones
               id={navegador}

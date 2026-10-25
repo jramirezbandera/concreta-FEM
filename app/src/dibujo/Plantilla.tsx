@@ -7,6 +7,7 @@
  */
 import { Check, Plus, Table2 } from "lucide-react";
 import { useState, type KeyboardEvent } from "react";
+import { comoUna, describirSeccion } from "../../../src/editor/gestores.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
 import type { ModeloFisico, PuntoFijo, Seccion as SeccionFisica } from "../../../src/compilador/fisico.ts";
 import { medidasSeccion, SIGNOS_PUNTO_FIJO } from "../../../src/compilador/puntoFijo.ts";
@@ -16,7 +17,8 @@ import type { Operacion } from "../../../src/editor/operaciones.ts";
 import type { NombreTabla } from "../../../src/editor/tablas.ts";
 import { IcEjes, IcPilar, IcViga } from "../armazon/iconos.tsx";
 import { Seccion } from "../componentes/comunes.tsx";
-import { cota, fmt } from "../fmt.ts";
+import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
+import { cota } from "../fmt.ts";
 import type { ControladorDibujo, Instantanea } from "./controlador.ts";
 
 type Herramienta = Exclude<NombreHerramienta, "elegir">;
@@ -64,23 +66,6 @@ const ALINEAR: { v: Alinear; texto: string; ayuda: string }[] = [
   { v: "izquierda", texto: "Cara izq.", ayuda: "Cada tramo que nace o acaba en un pilar va con su cara izquierda (según el sentido del dibujo) en la del pilar." },
   { v: "derecha", texto: "Cara der.", ayuda: "Cada tramo que nace o acaba en un pilar va con su cara derecha (según el sentido del dibujo) en la del pilar." },
 ];
-
-/** Una sección en pocas palabras: forma, medidas en cm y material. */
-function describir(s: SeccionFisica | undefined): string {
-  if (!s) return "";
-  const cm = (v: number) => fmt(v * 100, Number.isInteger(Number((v * 100).toFixed(6))) ? 0 : 1);
-  const forma =
-    s.forma === "rectangular"
-      ? `Rectangular ${cm(s.b)} × ${cm(s.h)} cm`
-      : s.forma === "circular"
-        ? `Circular Ø ${cm(s.D)} cm`
-        : s.forma === "T"
-          ? `En T ${cm(s.bf)} × ${cm(s.h)} cm`
-          : s.forma === "I"
-            ? `Perfil I ${fmt(s.perfil.h, 0)} × ${fmt(s.perfil.b, 0)} mm`
-            : "General";
-  return `${forma} · ${s.material}`;
-}
 
 interface Props {
   foto: Instantanea;
@@ -262,76 +247,55 @@ function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda }: { etiqueta: s
 }
 
 /**
- * La sección de la plantilla: el desplegable, un «+» para una rectangular nueva (b × h en cm, sin ir a
- * la tabla: «P30x30», «V30x50») y lo que es la elegida. Sin secciones en el proyecto, sólo crearla.
+ * La sección de la plantilla: el desplegable (con lo que es cada una, y «Nueva…» y «Editar…» al
+ * final), un «+» que abre el gestor de secciones en «Nueva» (GE) y lo que es la elegida. Sin
+ * secciones en el proyecto, sólo crearla. Crear una sección es un paso de deshacer; la plantilla no
+ * es del modelo, así que elegirla no lo es.
  */
 function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio }: { modelo: ModeloFisico; valor: string | undefined; tipo: "P" | "V"; editar: Props["editar"]; onCambio: (s: string) => void }) {
   const ninguna = !m.secciones.length;
-  const [abierta, setAbierta] = useState(ninguna);
-  const [b, setB] = useState("30");
-  const [h, setH] = useState(tipo === "P" ? "30" : "50");
-  const [error, setError] = useState<string | null>(null);
-  const material = m.materiales.find((x) => x.tipo === "hormigon")?.id;
-  const crear = () => {
-    const [nb, nh] = [Number(b.replace(",", ".")), Number(h.replace(",", "."))];
-    if (!(nb > 0 && nh > 0)) return setError("b y h, en cm, mayores que 0.");
-    if (!material) return setError("No hay ningún hormigón en Materiales.");
-    const id = `${tipo}${b.replace(",", ".")}x${h.replace(",", ".")}`;
-    if (!m.secciones.some((s) => s.id === id)) {
-      const e = editar({ op: "crear", coleccion: "secciones", objeto: { id, material, forma: "rectangular", b: nb / 100, h: nh / 100 } }, `Sección ${id}`);
-      if (e) return setError(e);
-    }
-    setError(null);
-    setAbierta(false);
-    onCambio(id);
-  };
+  const abrir = (eleccion: string) =>
+    abrirGestor({
+      coleccion: "secciones",
+      ...(eleccion === EDITAR && valor ? { id: valor } : { nueva: true }),
+      uso: tipo === "P" ? "pilar" : "viga",
+      para: `la plantilla de ${tipo === "P" ? "Pilar" : "Viga"}`,
+      alElegir: (id, crear) => {
+        if (crear.length) {
+          const e = editar(comoUna(crear), `Sección ${id}`);
+          if (e) return e;
+        }
+        onCambio(id);
+        return null;
+      },
+    });
+  const elegida = m.secciones.find((s) => s.id === valor);
   return (
-    <>
-      <div className="campo">
-        <span>sección</span>
-        {ninguna ? (
-          <span className="dib-vacio">Ninguna en el proyecto: créela abajo.</span>
-        ) : (
-          <div className="flex min-w-0 gap-1">
-            <select className="sel min-w-0 flex-1" value={valor ?? ""} aria-label="Sección" onChange={(x) => onCambio(x.target.value)}>
-              {!valor && <option value="">(ninguna)</option>}
-              {m.secciones.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.id}
-                </option>
-              ))}
-            </select>
-            <button type="button" className="ib dib-mas" aria-label="Nueva sección rectangular" aria-expanded={abierta} title="Nueva sección rectangular" data-on={abierta} onClick={() => setAbierta(!abierta)}>
-              <Plus size={15} />
-            </button>
-          </div>
-        )}
-        {!abierta && valor && <p>{describir(m.secciones.find((s) => s.id === valor))}</p>}
-      </div>
-      {abierta && (
-        <div className="dib-nueva" data-error={ninguna}>
-          <div className="dib-nueva-fila">
-            <label>
-              <span>b</span>
-              <input className="sel" aria-label="b de la sección nueva, cm" value={b} onChange={(x) => setB(x.target.value)} onKeyDown={(x) => x.key === "Enter" && crear()} />
-            </label>
-            <span className="dib-por">×</span>
-            <label>
-              <span>h</span>
-              <input className="sel" aria-label="h de la sección nueva, cm" value={h} onChange={(x) => setH(x.target.value)} onKeyDown={(x) => x.key === "Enter" && crear()} />
-            </label>
-            <span className="dib-cm">cm</span>
-            <button type="button" className="btn btn-p" onClick={crear}>
-              Crear
-            </button>
-          </div>
-          <p>
-            Rectangular de {material ?? "hormigón"}; h es el canto{tipo === "P" ? ", según el giro" : ""}.
-          </p>
-          {error && <p className="error">{error}</p>}
+    <div className="campo">
+      <span>sección</span>
+      {ninguna ? (
+        <button type="button" className="btn btn-p" onClick={() => abrir(NUEVA)}>
+          <Plus size={14} />
+          Nueva sección…
+        </button>
+      ) : (
+        <div className="flex min-w-0 gap-1">
+          <select className="sel min-w-0 flex-1" value={valor ?? ""} aria-label="Sección" onChange={(x) => (esDelGestor(x.target.value) ? abrir(x.target.value) : onCambio(x.target.value))}>
+            {!valor && <option value="">(ninguna)</option>}
+            {m.secciones.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.id}
+              </option>
+            ))}
+            <OpcionesGestor coleccion="secciones" valor={valor ?? ""} />
+          </select>
+          <button type="button" className="ib dib-mas" aria-label="Nueva sección" title="Nueva sección: rectangular, circular, en T, perfil de catálogo o general" onClick={() => abrir(NUEVA)}>
+            <Plus size={15} />
+          </button>
         </div>
       )}
-    </>
+      <p>{ninguna ? "Ninguna en el proyecto: créela con su tipo y medidas." : elegida ? describirSeccion(elegida) : ""}</p>
+    </div>
   );
 }
 

@@ -83,6 +83,8 @@ Código de Concreta (concreta-v2), del mismo autor; copiado por decisión V-a
   app/public/icons/icon-192.png, icon-512.png e icon-maskable-512.png  ←  public/icons/ (AL2)
   app/src/armazon/AvisoVersion.tsx (registro y activación del service worker)  ←
     src/components/pwa/PwaUpdatePrompt.tsx y pwaUpdate.ts (AL2)
+  src/secciones/perfiles.ts (catálogo IPE, HEA, HEB e IPN de ArcelorMittal, fase GE)  ←
+    src/data/steelProfiles.ts (commit 3e24851; sólo las columnas de PerfilCatalogo)
 Copyright (c) Javier Ramírez Bandera. El lienzo 2D que se copió para V1 (transform.ts,
 useCanvasView2D.ts y ZoomControls.tsx) se quitó en I2: la planta se dibuja con el motor de vistas
 propio (app/src/vistas/).

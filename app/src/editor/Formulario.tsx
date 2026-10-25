@@ -5,10 +5,12 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { operacionFila } from "../../../src/editor/edicion.ts";
+import { comoUna } from "../../../src/editor/gestores.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, conActual, contexto, filaConValor, objetosTabla, tablaDeColeccion, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
+import { abrirGestor, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
 
 /** La tabla del editor de un objeto (null si no está en el proyecto: un eje propuesto). */
 export function tablaDe(m: Parameters<typeof indiceIds>[0], id: string): NombreTabla | null {
@@ -57,6 +59,31 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
     if (t.operacion.op === "cambiar" && t.operacion.objeto.id !== id) setSeleccion(t.operacion.objeto.id);
   };
 
+  /**
+   * GE: «Nueva…» o «Editar…» de un desplegable de referencia abre su gestor; lo que crea y la
+   * asignación van en un lote (un paso de deshacer).
+   */
+  const gestor = (clave: string, eleccion: string) => {
+    const col = def.columnas.find((c) => c.clave === clave)!;
+    abrirGestor(
+      pedidoCampo({
+        coleccion: col.referencia!,
+        eleccion,
+        valor: actual[clave] ?? "",
+        tabla,
+        clave,
+        fila: actual,
+        para: `${col.titulo === "vigueta" ? "la vigueta" : `${col.referencia === "secciones" ? "la sección" : "el material"}`} de ${id}`,
+        alElegir: (nuevo, crear) => {
+          const t = operacionFila(m, tabla, id, filaConValor(def, pendiente ? actual : fila, clave, nuevo));
+          if (!t.ok) return t.errores.map((e) => e.mensaje).join(" · ");
+          const r = ed.editar(comoUna([...crear, t.operacion]), `${id} · ${col.titulo} = ${nuevo}`);
+          return r.ok ? null : r.errores.map((e) => e.mensaje).join(" ");
+        },
+      }),
+    );
+  };
+
   return (
     <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`} valor="editable">
       <div className="py-1.5">
@@ -89,6 +116,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                   aria-invalid={!!err}
                   onChange={(e) => {
                     setErrores({ ...errores, [c.clave]: "" });
+                    if (c.referencia && esDelGestor(e.target.value)) return gestor(c.clave, e.target.value);
                     escribir(c.clave, e.target.value);
                   }}
                 >
@@ -98,6 +126,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                       {o.texto ?? o.valor}
                     </option>
                   ))}
+                  {c.referencia && <OpcionesGestor coleccion={c.referencia} valor={valor} />}
                 </select>
               ) : (
                 <input

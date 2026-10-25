@@ -73,8 +73,9 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.click(pilar);
     expect(pilar.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("region", { name: "Dibujar · Pilar" })).toBeTruthy();
-    // El proyecto nuevo no tiene secciones: la plantilla ofrece crear una (30 × 30 por defecto)
-    fireEvent.click(screen.getByRole("button", { name: "Crear" }));
+    // El proyecto nuevo no tiene secciones: la plantilla ofrece crear una en el gestor (GE; 30 × 30 por defecto)
+    fireEvent.click(screen.getByRole("button", { name: "Nueva sección…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Crear y usar" }));
     await waitFor(() => expect((screen.getByRole("combobox", { name: "Sección" }) as HTMLSelectElement).value).toBe("P30x30"));
     expect(screen.getByRole("button", { name: "Deshacer" }).getAttribute("title")).toMatch(/Sección P30x30/);
 

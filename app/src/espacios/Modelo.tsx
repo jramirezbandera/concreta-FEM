@@ -38,6 +38,7 @@ import { usePedido } from "../sesion/usePedido.ts";
 import type { NombreHerramienta, Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import { ControladorDibujo } from "../dibujo/controlador.ts";
 import { CampoTeclado, PlantillaDibujo, plantillasEfectivas } from "../dibujo/Plantilla.tsx";
+import { abrirGestor } from "../editor/referencia.tsx";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
 const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "forjados", "apoyos", "apoyosLineales", "cargas"]);
@@ -223,8 +224,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
           <Separador />
           <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirTabla("plantas")} />
-          <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirTabla("materiales")} />
-          <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirTabla("secciones")} />
+          <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él (GE)" />
+          <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él (GE)" />
         </>
       )}
       <Hueco />
