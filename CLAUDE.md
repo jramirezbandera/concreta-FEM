@@ -530,6 +530,16 @@
   - **AU-7:** una lámina atravesada con el centroide fuera del rectángulo hace el corte mixto por campos y, por fuerzas nodales, avisa (`corte/borde-no-sigue-malla`); como error, las franjas perdían estaciones de cara válidas;
   - **AU-8:** `Cortes.cortar` y `FuerzasNodales` exigen los resultados de todos los casos en el orden del modelo (`defectoCasos`).
   - **Abiertos:** AU-5, AU-6, AU-9 a AU-26 y los huecos de validación de §5.
+- **2026-10-25: plan de la fase CT** (cotas que mandan; `docs/fem3d/cotas.md`), a petición del usuario tras dibujar pilares con V2c-1. Las cotas de hoy son las cadenas entre ejes de replanteo (propuestos por las alineaciones de pilares), sólo dibujadas y redondeadas al cm. Se propone:
+  - **CT1:** cotas temporales al poner un pilar (eje o pilar más cercano a cada lado; Tab y un valor fijan esa dirección) y rótulos en mm cuando no son cm redondos;
+  - **CT2:** cambiar una cota de la cadena estira el modelo;
+  - **CT3:** las cotas de un pilar elegido lo mueven con sus vigas.
+
+  **Decidido el 2026-10-25:**
+  - CT-a: estirar (todo lo de un lado del vano; las demás luces no cambian);
+  - CT-b: el lado se elige con una flecha en la cota;
+  - CT-c: en todas las plantas;
+  - CT-d (= V2c-d): el pilar arrastra las vigas que acaban en él, y con Ctrl va solo.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

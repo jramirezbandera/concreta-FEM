@@ -168,7 +168,7 @@ La puerta de uso de V2c va al final de V2c-3 (o de V2c-4), y se puede juntar con
 - **V2c-b:** eje a eje por defecto, con la opción de alinear la viga a una cara del pilar en la plantilla.
 - **V2c-c:** recuadro cerrado y polígono.
 - **V2c-e:** sí, el DXF de fondo como V2c-4, después de V2c-3. El lector de DXF se elige al empezar V2c-4 (lo que se iba a decidir en MA6).
-- **V2c-d** (mover un pilar arrastra sus vigas): se decide al empezar V2c-3.
+- **V2c-d** (mover un pilar arrastra sus vigas): **decidida el 2026-10-25 con la fase CT** (`cotas.md`, CT-d): sí, como CYPECAD, y con Ctrl el pilar solo.
 
 ## 7. V2c-1 hecho (2026-10-23)
 
