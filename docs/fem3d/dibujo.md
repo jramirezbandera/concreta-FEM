@@ -1,6 +1,6 @@
 # V2c: dibujar el modelo con el ratón (plan)
 
-> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7). **V2c-2 hecho el 2026-10-26** (§8). **V2c-3 hecho el 2026-10-26** (§9).
+> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7). **V2c-2 hecho el 2026-10-26** (§8). **V2c-3 hecho el 2026-10-26** (§9). **V2c-4 decidido el 2026-10-26** (§10).
 >
 > **Origen:** el usuario pide adelantar V2c a la puerta de uso de F y AB. Con las tablas sólo se modela bien si ya se tienen las coordenadas: «no sé cómo modelarlo yo si no». Se sustituye así el orden de `visor.md` (V-e: primero tablas y luego el ratón) y el de `CLAUDE.md` («con lo que salga, V2c»). La puerta de uso de F y AB va después de V2c, y con ella la fase MA.
 
@@ -352,3 +352,41 @@ Cómo se comporta:
 - Al pasar el ratón siguen sin resaltarse los apoyos puntuales y las cargas (§7.4), aunque ya tienen asas.
 - La puerta de uso, al final de V2c (V2c-a).
 
+
+## 10. V2c-4: la plantilla DXF (plan, 2026-10-26)
+
+Un DXF de fondo en la planta, en gris, con enganches a sus líneas y vértices, para calcar la planta del arquitecto como con las plantillas de CYPECAD (V2c-e).
+
+### 10.1 Lo medido antes de empezar
+
+- **El DXF de la vivienda** (`ejemplos/Proyectos/modelo.dxf`, fuera de git: datos del cliente): AutoCAD 2018 (AC1032), ASCII, 872 kB. En ENTITIES, 1 401 `LINE`, 82 `LWPOLYLINE`, 71 `ARC`, 61 `SPLINE`, 32 `TEXT` y 18 `DIMENSION`; 21 bloques (los de las cotas, con `LINE`, `SOLID`, `MTEXT` y `POINT`); capas `00 0 PLANTA BAJA`, `00 1 PLANTA CUBIERTA`, `0 PILARES` y `Defpoints`.
+- **`$INSUNITS` = 4 (mm), pero las coordenadas están en metros** (extensión de 26,6 × 18,4). Las unidades no se pueden tomar de la cabecera: se proponen por el tamaño y se pueden cambiar.
+- **Las coordenadas llevan ruido:** −5,750000000007275 donde el arquitecto quiso −5,75.
+- **`dxf-parser` 1.1.2 (MIT)** lo lee en 16 ms y reconoce todo, pero sólo convierte los pares de código y valor en objetos: los bloques anidados con giro, escala y simetría, el OCS (extrusión −Z), los bulges, los splines, el texto de `MTEXT` y la codificación quedan por hacer.
+
+### 10.2 Decidido por el usuario (2026-10-26)
+
+- **V2c4-a, lector propio** en `src/dxf/` (puro, sin dependencias), que servirá también para `fem importar-dxf` (MA6). Se valida contra ezdxf 1.4.5 (MIT, en `.venv`) como oráculo.
+- **V2c4-b, en el proyecto y fuera de la huella:** un campo `plantillas` en `proyecto.json`, como `vistas`, con el nombre del fichero, su sha256, las unidades, la colocación, las plantas, las capas ocultas y el redondeo. El DXF va junto al proyecto en el disco y en IndexedDB en el navegador; si no se encuentra, se avisa y se pide.
+- **V2c4-c, lo enganchado del DXF se redondea a 1 mm** (en la plantilla: 1 mm, 1 cm o nada). Lo enganchado del modelo sigue exacto, bit a bit.
+- **V2c4-d, en las vistas de planta de Modelo y Cargas:** en gris, detrás de todo, en las plantas a las que está asignada, y con un botón para ocultarla. No se ve en Resultados, el alzado ni el 3D.
+
+### 10.3 Qué se propone
+
+- **`src/dxf/`** (puro):
+  - `lector.ts`: los bytes del fichero (UTF-8 desde AC1021; antes, la página de `$DWGCODEPAGE`) a cabecera, capas (color, apagada, congelada), bloques y entidades. El DXF binario y el DWG se rechazan con un mensaje.
+  - `aplanar.ts`: las entidades a geometría en el plano, con los bloques expandidos (`INSERT` anidados, con `MINSERT`; las cotas, por su bloque) y el OCS. Sale una lista de trazos (polilíneas; los arcos, círculos, elipses, splines y bulges, discretizados), los puntos para enganchar (extremos y vértices de verdad, centros de arcos y círculos, puntos medios de los arcos) y los textos. Lo que no se lee (`HATCH`, sólidos 3D, imágenes…) se cuenta.
+  - Las unidades se proponen por la extensión; mm y cm se pasan a m dividiendo (el double más cercano, como al teclear).
+- **La colocación:** p = d + R(giro)·(u·p_dxf). Al importar, si la extensión está a más de 1 km del origen, d lleva su esquina al origen (redondeada al metro). Herramientas **Colocar** (un punto de la plantilla y su destino) y **Girar plantilla** (centro y ángulo).
+- **En la app:** «Plantilla DXF» en la barra de Modelo (elegir el fichero; queda en la planta activa); su sección en el navegador; en Propiedades, el fichero, las unidades, el redondeo, las plantas, las capas con su número de entidades, la colocación y «Quitar». Se lee en un worker propio, sin bloquear la página.
+- **Dibujo:** las líneas, en un `LineSegments` de 1 px en gris detrás del modelo y delante de la rejilla; los textos, en el lienzo 2D cuando miden ≥ 5 px.
+- **Enganches:** los de §2.2 también en la plantilla (extremo, vértice, centro, medio, cruce entre sus líneas y con las del modelo, perpendicular y cercano), con un índice por celdas. A igual nivel y distancia gana el modelo. La barra dice «(DXF)». Ocultar la plantilla quita sus enganches.
+
+### 10.4 Criterios de paso
+
+1. **El lector coincide con ezdxf.** En DXF sintéticos escritos con ezdxf (cada entidad; `INSERT` anidados con giro, escala negativa y `MINSERT`; extrusión −Z; bulges; R12 con `POLYLINE`; R2000 con «ñ» en ANSI_1252; `MTEXT` con formato) y en el de la vivienda (sólo en local), los extremos, vértices y centros salen a ≤ 1e-9 de los de ezdxf, y los puntos de las curvas, sobre la curva de ezdxf. Los sintéticos y lo que dice ezdxf, congelados en el repositorio.
+2. **Calcar.** La retícula con núcleo de A2 exportada a DXF (en mm, con ruido de 1e-9) e importada como plantilla: dibujar sus pilares, vigas, muros y losas enganchando sólo a la plantilla da, tras «Renumerar», la huella de la referencia (vitest con las herramientas y banco de Chrome con el ratón).
+3. **Redondeo.** Lo enganchado del DXF de la vivienda sale en mm redondos, y con «nada», con los doubles del DXF transformados.
+4. **Fluidez.** Con un DXF sintético de 100 000 segmentos, el enganche tarda ≤ 2 ms en Chrome y la página no tiene tareas largas al cargarlo (se lee en el worker).
+5. **Nada se rompe.** Añadir, colocar o quitar una plantilla no cambia la huella; los bancos de V2c, CT e I2, como antes.
+6. **Puerta de uso** (del usuario): calcar un proyecto suyo real, al final de V2c, junto con la de F y AB.
