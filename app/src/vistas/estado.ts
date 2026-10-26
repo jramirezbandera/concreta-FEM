@@ -34,6 +34,8 @@ export interface EstadoVista {
   malla?: boolean;
   /** La rejilla y los ejes del origen (`fondo.ts`); por defecto, sí. F7 la quita y la pone. */
   rejilla?: boolean;
+  /** V2c-4: la plantilla DXF de la planta detrás (y sus enganches); por defecto, sí. */
+  plantilla?: boolean;
   modo3d: Modo3D;
   proyeccion: Proyeccion;
   /** I3: el color del sólido. */

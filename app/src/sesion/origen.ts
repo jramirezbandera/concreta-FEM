@@ -31,7 +31,7 @@ export interface Directorio extends Entrada {
 interface Fichero extends Entrada {
   kind: "file";
   getFile(): Promise<File>;
-  createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void>; abort(): Promise<void> }>;
+  createWritable(): Promise<{ write(d: string | Uint8Array): Promise<void>; close(): Promise<void>; abort(): Promise<void> }>;
 }
 
 declare global {
@@ -71,6 +71,10 @@ export interface Origen {
   navegador?: string;
   /** AL: guarda lo calculado para no recalcular al reabrir (sólo el navegador; la CLI escribe `.fem/`). */
   guardarResultados?(huella: string, cabecera: string, bytes: Uint8Array): Promise<void>;
+  /** V2c-4: los bytes de un fichero junto al proyecto (una plantilla DXF), o null si no está. */
+  leerBytes?(nombre: string): Promise<Uint8Array | null>;
+  /** V2c-4: deja un fichero junto al proyecto si aún no está (la carpeta); true si quedó. */
+  dejarFichero?(nombre: string, bytes: Uint8Array): Promise<boolean>;
 }
 
 /** Fichero de firmas de un proyecto: `<nombre>.revision.json`, junto a él (como `rutaFirmas` de la CLI). */
@@ -147,6 +151,28 @@ export function origenCarpeta(dir: Directorio, fichero: string): Origen {
         return { ok: false, conflicto: false, mensaje: `No se pudo escribir ${fichero}: ${e instanceof Error ? e.message : String(e)}` };
       }
     },
+    async leerBytes(nombre) {
+      const f = await archivo(nombre);
+      return f ? new Uint8Array(await f.arrayBuffer()) : null;
+    },
+    async dejarFichero(nombre, bytes) {
+      try {
+        if (await archivo(nombre)) return true;
+        const permiso = (await dir.queryPermission?.({ mode: "readwrite" })) ?? "granted";
+        if (permiso !== "granted" && (await dir.requestPermission?.({ mode: "readwrite" })) !== "granted") return false;
+        const w = await (await dir.getFileHandle(nombre, { create: true })).createWritable();
+        try {
+          await w.write(bytes);
+          await w.close();
+        } catch (e) {
+          await w.abort().catch(() => {});
+          throw e;
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    },
     async guardados(huella) {
       try {
         const d = await (await dir.getDirectoryHandle(".fem")).getDirectoryHandle(huella);
@@ -188,6 +214,10 @@ export function origenUrl(url: string): Origen {
     async sello(nombre) {
       const r = await pedir(nombre, "HEAD");
       return r ? selloDe(r) : null;
+    },
+    async leerBytes(nombre) {
+      const r = await pedir(nombre, "GET");
+      return r ? new Uint8Array(await r.arrayBuffer()) : null;
     },
     async guardados(huella) {
       const cab = await pedir(`.fem/${huella}/resultados.json`, "GET");

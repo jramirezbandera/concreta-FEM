@@ -9,7 +9,9 @@
  *   (lo elegido o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o
  *   3D; en Cargas, el caso activo, las herramientas de las cargas (Puntual, Lineal, Superficie, En
  *   barra y Empuje, en el caso activo), las de editar y Casos. Sin proyecto editable, sólo lo que mira.
- * - Navegador: el proyecto y los objetos de la planta activa (en Cargas, los casos y las cargas).
+ * - Navegador: el proyecto, las plantillas DXF (V2c-4, `docs/fem3d/dibujo.md` §10: «Plantilla DXF» en
+ *   la barra de Modelo; se ven detrás de las plantas de Modelo y Cargas y se engancha a ellas) y los
+ *   objetos de la planta activa (en Cargas, los casos y las cargas).
  * - Vistas (I2): 1, 2 o 4, de planta (modelo, diagnósticos o malla; en Cargas, las del caso activo),
  *   alzado o 3D (`vistas/Zona.tsx`). En Cargas, el alzado y el 3D también dibujan las del caso activo
  *   (`agente/render/cargas.ts` y `visor/cargas3d.ts`), a la escala de la barra. La barra cambia el
@@ -18,7 +20,7 @@
  *   por caso, equilibrio, hipótesis).
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
@@ -39,7 +41,11 @@ import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, repintarVistas,
 import { usePedido } from "../sesion/usePedido.ts";
 import type { NombreHerramienta, Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import { ControladorDibujo } from "../dibujo/controlador.ts";
-import { CampoTeclado, IcCopiar, IcGirar, IcMover, IcSimetria, PlantillaDibujo, plantillasEfectivas } from "../dibujo/Plantilla.tsx";
+import { CampoTeclado, IcCopiar, IcGirar, IcMover, IcPlantillaDxf, IcSimetria, PlantillaDibujo, plantillasEfectivas } from "../dibujo/Plantilla.tsx";
+import type { NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
+import { nuevaPlantilla } from "../../../src/editor/dibujo/plantilla.ts";
+import { importarDxf, nombreLibre, usePlantillasDxf } from "../plantilla/plantillas.ts";
+import { NavPlantillas } from "../plantilla/NavPlantillas.tsx";
 import { abrirGestor } from "../editor/referencia.tsx";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
@@ -85,7 +91,15 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
   // Las cargas que se dibujan van al caso activo
   const casoDibujo = cargas ? casoValido : undefined;
-  const plantillas = useMemo(() => plantillasEfectivas(modeloEd, plantillasDibujo, casoDibujo), [modeloEd, plantillasDibujo, casoDibujo]);
+  // V2c-4: las plantillas DXF, leídas en su worker; su índice por planta va al controlador
+  const origen = proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen : null;
+  const listaDxf = ed?.proyecto.plantillas;
+  const dxf = usePlantillasDxf(listaDxf, origen);
+  const [dxfActiva, setDxfActiva] = useState<string | null>(null);
+  const [errorDxf, setErrorDxf] = useState<string | null>(null);
+  const ficheroDxf = useRef<HTMLInputElement>(null);
+  const plantillas = useMemo(() => ({ ...plantillasEfectivas(modeloEd, plantillasDibujo, casoDibujo), dxf: { nombre: dxfActiva ?? undefined, lista: listaDxf } }), [modeloEd, plantillasDibujo, casoDibujo, dxfActiva, listaDxf]);
+  const indiceDxf = useMemo(() => (pl: string) => dxf.porPlanta(pl).indice(), [dxf.porPlanta]);
   const editarDibujo = (o: Operacion, etiqueta: string): string | null => {
     if (!ed) return "No hay ningún proyecto que editar.";
     const a = ed.editar(o, etiqueta);
@@ -97,6 +111,27 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   useEffect(() => ctrl.ponerModelo(modeloEd), [ctrl, modeloEd]);
   useEffect(() => ctrl.ponerPlantillas(plantillas), [ctrl, plantillas]);
   useEffect(() => ctrl.ponerElegidos(elegidos), [ctrl, elegidos]);
+  useEffect(() => ctrl.ponerPlantillasDxf(indiceDxf), [ctrl, indiceDxf]);
+  /** Lee un DXF elegido y lo pone de plantilla de la planta activa. */
+  const importarPlantilla = async (f: File) => {
+    setErrorDxf(null);
+    if (!ed) return;
+    try {
+      const { dibujo, sha256 } = await importarDxf(f, origen);
+      const lista = ed.proyecto.plantillas ?? [];
+      const t = nuevaPlantilla(dibujo, { nombre: nombreLibre(lista, f.name.replace(/\.dxf$/i, "")), fichero: f.name, sha256, planta: planta ?? ed.proyecto.modelo.plantas[0]?.id ?? "" });
+      const a = ed.editar({ op: "plantillas", plantillas: [...lista, t] }, `Plantilla DXF «${t.nombre}»`);
+      if (!a.ok) setErrorDxf(a.errores.map((x) => x.mensaje).join(" "));
+      else if (!dibujo.extension) setErrorDxf(`${f.name} no tiene nada que dibujar en el espacio modelo.`);
+    } catch (e) {
+      setErrorDxf(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const herramientaDxf = (h: NombrePlantillaDxf, nombre: string) => {
+    setDxfActiva(nombre);
+    ctrl.ponerHerramienta(h);
+    if (!pan.props) pan.poner({ props: true });
+  };
   const dibujando = foto.herramienta !== "elegir";
   const elegirHerramienta = (h: NombreHerramienta) => {
     const n = foto.herramienta === h ? "elegir" : h;
@@ -303,6 +338,13 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
           <Separador />
+          <Herramienta icono={IcPlantillaDxf} nombre="Plantilla DXF" onClick={() => ficheroDxf.current?.click()} title="Un plano DXF del arquitecto en gris detrás de la planta activa, para calcar con sus enganches (sus unidades, capas y colocación, en el navegador)" />
+          <input ref={ficheroDxf} type="file" accept=".dxf" hidden aria-label="Fichero DXF de la plantilla" onChange={(x) => {
+            const f = x.target.files?.[0];
+            x.target.value = "";
+            if (f) void importarPlantilla(f);
+          }} />
+          <Separador />
           <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirGestor({ coleccion: "plantas", ...(planta ? { planta } : {}) })} title="Añadir plantas encima o debajo de una, viendo cómo quedan las cotas, y la tabla desde él (GE3)" />
           <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él (GE)" />
           <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él (GE)" />
@@ -321,7 +363,12 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const vista = (
     <ZonaVistas
       fuentes={{
-        planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta, { cotas: !cargas && plantaVista(v, e.calculado).vista === "modelo" }) : null} dibujando={dibujando} /> : null),
+        planta: (v) => {
+          if (!v.planta) return null;
+          const geo = v.plantilla !== false ? dxf.porPlanta(v.planta).geometria : null;
+          return <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta, { cotas: !cargas && plantaVista(v, e.calculado).vista === "modelo", plantilla: !!geo }) : null} dibujando={dibujando} plantilla={geo} />;
+        },
+        plantilla: (pl) => !!listaDxf?.some((t) => t.plantas.includes(pl)),
         ...(cargas && casoValido
           ? {
               alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), cargas: { caso: casoValido, escala: Number(escala) } } : null} />,
@@ -375,7 +422,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         paneles={pan}
         etiquetaHerramientas={cargas ? "Herramientas de Cargas" : "Herramientas de Modelo"}
         herramientas={herramientas}
-        nav={{ titulo: "Navegador", contenido: cargas ? <NavCargas caso={casoValido} setCaso={setCaso} /> : <NavModelo /> }}
+        nav={{ titulo: "Navegador", contenido: cargas ? <NavCargas caso={casoValido} setCaso={setCaso} /> : <NavModelo plantillas={<NavPlantillas pl={dxf} herramienta={herramientaDxf} error={errorDxf} />} /> }}
         vista={
           <>
             {vista}
@@ -523,11 +570,12 @@ function Objetos({ tablas }: { tablas: NombreTabla[] }) {
   );
 }
 
-function NavModelo() {
+function NavModelo({ plantillas }: { plantillas: ReactNode }) {
   return (
     <>
       <Proyecto />
       <NavVistas />
+      {plantillas}
       <Objetos tablas={["pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "ejes"]} />
     </>
   );

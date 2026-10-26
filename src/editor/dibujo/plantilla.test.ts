@@ -258,3 +258,39 @@ describe("calcar la retícula con núcleo de A2 desde su DXF (criterio 2)", () =
     expect(huellaCompilacion(ren(p), op)).toBe(huellaCompilacion(ren(ref), op));
   });
 });
+
+describe("Colocar y Girar la plantilla (herramientas)", () => {
+  const t: PlantillaDxf = { nombre: "Arq", fichero: "a.dxf", sha256: "0", unidades: "m", plantas: ["N1"] };
+  const otra: PlantillaDxf = { ...t, nombre: "Otra" };
+  const modelo = { plantas: [{ id: "N1", altura: 3 }], materiales: [], secciones: [], casos: [] } as unknown as ModeloFisico;
+  const ctx = (nombre?: string) => ({ modelo, planta: "N1", indice: indiceEnganches(modelo, "N1"), plantillas: { pilar: {}, viga: {}, dxf: { nombre, lista: [t, otra] } } as Plantillas });
+  const correr = (h: NombreHerramienta, ps: Vec2[], nombre = "Arq") => {
+    let e: EstadoHerramienta = ESTADO_INICIAL;
+    let r: ReturnType<typeof paso> = { estado: e };
+    for (const p of ps) {
+      r = paso(h, e, { tipo: "punto", p }, ctx(nombre));
+      e = r.estado;
+    }
+    return r;
+  };
+
+  it("Colocar: el punto de la plantilla va al destino; las demás no cambian; vuelve a Elegir", () => {
+    const r = correr("colocarPlantilla", [[3.25, 1.5], [0, 0]]);
+    expect(r.salir).toBe(true);
+    expect(r.hecho?.operacion).toEqual({ op: "plantillas", plantillas: [{ ...t, traslacion: [-3.25, -1.5] }, otra] });
+    expect(r.hecho?.etiqueta).toBe("Colocar la plantilla «Arq»");
+  });
+
+  it("Girar: centro, un punto y hacia dónde; 90° exactos con el ortogonal", () => {
+    const r = correr("girarPlantilla", [[1, 1], [4, 1], [1, 7]]);
+    const o = r.hecho!.operacion as Extract<Operacion, { op: "plantillas" }>;
+    expect(o.plantillas[0]).toEqual({ ...t, giro: 90, traslacion: [2, 0] });
+    // El centro se queda: (1, 1) del DXF sigue en (1, 1)
+    expect(transformacion(o.plantillas[0]!)(1, 1)).toEqual([1, 1]);
+    expect(correr("girarPlantilla", [[1, 1], [4, 1], [7, 1]]).error).toMatch(/no gira/);
+  });
+
+  it("sin plantilla elegida, lo dice", () => {
+    expect(correr("colocarPlantilla", [[0, 0]], "Nada").error).toMatch(/Elija en el navegador/);
+  });
+});

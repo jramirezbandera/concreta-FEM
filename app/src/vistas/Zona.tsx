@@ -9,7 +9,7 @@
  * (`Fuente2D`, `Fuente3D`); también pintan lo que va en el DOM de la celda (la leyenda, un aviso).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BookmarkPlus, Box, BoxSelect, ChevronDown, Grid3x3, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
+import { BookmarkPlus, Box, BoxSelect, ChevronDown, FileImage, Grid3x3, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
 import type { EntradaLeyenda, Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
@@ -33,6 +33,7 @@ import type { VistaGuardada } from "../../../src/agente/proyecto.ts";
 import { aGuardada, useVistas, vistasDe, type EstadoVista, type TipoVista } from "./estado.ts";
 import { Motor, type Herramienta, type Vista } from "./motor.ts";
 import { Vista2D, type Dibujo2D, type Eventos2D, type Marca, type Margenes } from "./vista2d.ts";
+import type { GeometriaPlantilla } from "../plantilla/plantillas.ts";
 import { TIPOS_FILTRO, Vista3D, type Color3D, type Eventos3D, type FiltroVista, type Modo3D, type Objetivo3D, type Sonda, type TipoFiltro } from "./vista3d.ts";
 
 // ─── La celda y su contexto ─────────────────────────────────────────────────────────────────────
@@ -107,6 +108,8 @@ export interface FuentesVistas {
   dibujarEjes?: () => void;
   /** Las plantas de resultados ofrecen ver la malla encima (`EstadoVista.malla`); la fuente la pide con `conMalla`. */
   malla?: boolean;
+  /** V2c-4: si la planta tiene una plantilla DXF (la barra de la vista ofrece ocultarla, `EstadoVista.plantilla`). */
+  plantilla?: (planta: string) => boolean;
 }
 
 /** La vista de resultados de una planta con la malla encima si la celda la pide. */
@@ -280,6 +283,11 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         <button type="button" className="ib" data-on={rejilla} aria-pressed={rejilla} title="Rejilla y ejes del origen (F7)" aria-label="Rejilla" onClick={() => poner(i, { rejilla: !rejilla })}>
           <Grid3x3 size={15} />
         </button>
+        {tipo === "planta" && planta && fuentes.plantilla?.(planta) && (
+          <button type="button" className="ib" data-on={v.plantilla !== false} aria-pressed={v.plantilla !== false} title="Plantilla DXF: verla detrás y enganchar a ella" aria-label="Ver la plantilla DXF" onClick={() => poner(i, { plantilla: v.plantilla === false })}>
+            <FileImage size={15} />
+          </button>
+        )}
         <button type="button" className="ib" data-on={guardar} aria-expanded={guardar} disabled={!proyecto.edicion && !proyecto.estado?.vistas?.length} title="Vistas guardadas: abrir una aquí o guardar esta con un nombre" aria-label="Guardar la vista" onClick={() => setGuardar((x) => !x)}>
           <BookmarkPlus size={15} />
         </button>
@@ -567,13 +575,16 @@ interface PropsFuente2D {
   formatoCursor?: (q: Vec2) => string;
   /** V2c: lo que dibuja con el ratón en una planta editable. */
   dibujo?: Dibujo2D | null;
+  /** V2c-4: la plantilla DXF detrás. */
+  plantilla?: GeometriaPlantilla | null;
 }
 
 /** Una escena 2D en la vista de la celda. */
-export function Fuente2D({ escena, resaltado = null, marcas, eventos, aviso, cargando = false, leyenda = true, formatoCursor, dibujo = null }: PropsFuente2D) {
+export function Fuente2D({ escena, resaltado = null, marcas, eventos, aviso, cargando = false, leyenda = true, formatoCursor, dibujo = null, plantilla = null }: PropsFuente2D) {
   const { vista, varias } = useCelda();
   const v = vista instanceof Vista2D ? vista : null;
   useEffect(() => v?.ponerEscena(escena), [v, escena]);
+  useEffect(() => v?.ponerPlantilla(plantilla), [v, plantilla]);
   useEffect(() => v?.ponerResaltado(resaltado), [v, resaltado]);
   useEffect(() => v?.ponerMarcas(marcas), [v, marcas]);
   useEffect(() => {
@@ -640,7 +651,7 @@ export function useEleccionEscena(fuente: FuenteEscena | null): { eventos: Event
  * Una escena del modelo (una planta en una vista, o un alzado), con elegir. Con `dibujando` (V2c, una
  * herramienta de dibujo activa) no se vela la planta mientras compila lo dibujado: se sigue dibujando.
  */
-export function FuenteEscena({ fuente, dibujo = null, dibujando = false }: { fuente: FuenteEscena | null; dibujo?: Dibujo2D | null; dibujando?: boolean }) {
+export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantilla = null }: { fuente: FuenteEscena | null; dibujo?: Dibujo2D | null; dibujando?: boolean; plantilla?: GeometriaPlantilla | null }) {
   const { proyecto } = useVisor();
   const ed = proyecto.edicion;
   // La clave estable: el objeto cambia en cada render
@@ -662,7 +673,7 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false }: { fue
     <Aviso>{resultados ? "Preparando los diagramas…" : "Preparando la vista…"}</Aviso>
   ) : null;
   const cursor = useMemo(() => (fu?.tipo === "alzado" ? (q: Vec2) => `u ${rot(q[0])} · z ${rot(q[1])} m` : undefined), [fu?.tipo]);
-  return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} dibujo={dibujo} />;
+  return <Fuente2D escena={resultados && proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={eventos} aviso={aviso} cargando={escena.cargando} formatoCursor={cursor} dibujo={dibujo} plantilla={plantilla} />;
 }
 
 const rot = (x: number) => (Math.round(x * 1000) / 1000).toString().replace(".", ",");

@@ -8,15 +8,18 @@
  * encuadra la escena entera. Una escena vacía encuadra `CAJA_VACIA` (el origen abajo a la izquierda),
  * y lo primero que se dibuje en ella no mueve la vista si se ve.
  *
- * Detrás, la rejilla y los ejes del origen (`fondo.ts`).
+ * Detrás, la rejilla y los ejes del origen (`fondo.ts`) y, en las plantas de Modelo y Cargas, la
+ * plantilla DXF (V2c-4): sus líneas en gris en WebGL (con el material de la rejilla) y sus textos en
+ * el lienzo 2D, si miden al menos `TEXTO_MINIMO` px.
  */
-import { Group, OrthographicCamera, Scene, type WebGLRenderer } from "three";
+import { BufferAttribute, BufferGeometry, Color, Group, LineSegments, OrthographicCamera, Scene, type WebGLRenderer } from "three";
 import { rotulo, type Texto, type Vec2 } from "../../../src/agente/render/escena.ts";
 import { rotulosLineas } from "../../../src/agente/render/isovalores.ts";
 import { RADIO_CLIC, type Eleccion, type EscenaPreparada, type Glifo } from "../../../src/visor/escena.ts";
 import { pintura } from "../lienzo/pintura.ts";
 import { Capas2D, MATERIALES, relleno, trazo } from "./capas.ts";
-import { CAJA_VACIA, ENCUADRE_MINIMO, iconoEjes, Rejilla2D } from "./fondo.ts";
+import { CAJA_VACIA, ENCUADRE_MINIMO, iconoEjes, MATERIAL_LINEAS, Rejilla2D } from "./fondo.ts";
+import type { GeometriaPlantilla } from "../plantilla/plantillas.ts";
 import { fuente, textoConHalo, Vista, type Colores, type Entorno } from "./motor.ts";
 import { colocarRotulos, ralearBurbujas } from "./rotulos.ts";
 
@@ -71,6 +74,10 @@ export const escenaVacia = (e: EscenaPreparada): boolean => !e.glifos.length && 
 /** Radio de enganche, px (el de `src/editor/dibujo/enganches.ts`). */
 const RADIO_ENGANCHE = 10;
 
+/** V2c-4: el color y la opacidad de la plantilla DXF por tema, y el menor texto suyo que se dibuja, px. */
+const COLOR_PLANTILLA = { light: { c: "#6b7280", a: 0.6 }, dark: { c: "#9ca3af", a: 0.5 } } as const;
+const TEXTO_MINIMO = 5;
+
 export class Vista2D extends Vista {
   private readonly escena3 = new Scene();
   private readonly cam = new OrthographicCamera(-1, 1, 1, -1, -10, 10);
@@ -99,6 +106,10 @@ export class Vista2D extends Vista {
   private temaCapas: string | null = null;
   /** Los rótulos de las isolíneas de la escena, con la escala en que se colocaron. */
   private isolineas: { lineas: EscenaPreparada["lineasRotuladas"]; s: number; textos: Texto[] } | null = null;
+  /** V2c-4: la plantilla DXF de la planta y sus líneas, con el tema con que se pintaron. */
+  private plantilla: GeometriaPlantilla | null = null;
+  private plantillaL: LineSegments | null = null;
+  private temaPlantilla: string | null = null;
 
   constructor(entorno: Entorno, camara?: Camara2D | null) {
     super(entorno);
@@ -142,6 +153,40 @@ export class Vista2D extends Vista {
       if (a1 < x0 || a0 > x1 || b1 < y0 || b0 > y1) this.encuadrar();
       else this.entorno.pintar();
     }
+  }
+
+  /** V2c-4: la plantilla DXF que se ve detrás (null: ninguna). */
+  ponerPlantilla(g: GeometriaPlantilla | null): void {
+    if (g === this.plantilla) return;
+    this.plantilla = g;
+    this.reconstruirPlantilla();
+    this.entorno.pintar();
+  }
+
+  private reconstruirPlantilla(): void {
+    if (this.plantillaL) {
+      this.escena3.remove(this.plantillaL);
+      this.plantillaL.geometry.dispose();
+      this.plantillaL = null;
+    }
+    const g = this.plantilla;
+    const tema = this.entorno.tema();
+    this.temaPlantilla = tema;
+    if (!g || !g.posiciones.length) return;
+    const geo = new BufferGeometry();
+    geo.setAttribute("position", new BufferAttribute(g.posiciones, 3));
+    const { c, a } = COLOR_PLANTILLA[tema];
+    const k = new Color().setStyle(c);
+    const n = g.posiciones.length / 3;
+    const col = new Float32Array(n * 4);
+    for (let i = 0; i < n; i++) col.set([k.r, k.g, k.b, a], 4 * i);
+    geo.setAttribute("color", new BufferAttribute(col, 4));
+    const l = new LineSegments(geo, MATERIAL_LINEAS);
+    // Detrás de lo dibujado y delante de la rejilla
+    l.renderOrder = -500;
+    l.frustumCulled = false;
+    this.plantillaL = l;
+    this.escena3.add(l);
   }
 
   ponerResaltado(r: Eleccion | null): void {
@@ -328,7 +373,40 @@ export class Vista2D extends Vista {
       const [a, b] = [this.aModelo(0, h), this.aModelo(w, 0)];
       this.rejilla.actualizar([a[0], a[1], b[0], b[1]], o, this.s, this.entorno.colores().texto, this.entorno.tema(), this.fondo.tenue, escenaVacia(this.escena));
     } else this.rejilla.ocultar();
+    if (this.temaPlantilla !== this.entorno.tema()) this.reconstruirPlantilla();
+    if (this.plantillaL && this.plantilla) this.plantillaL.position.set(this.plantilla.origen[0] - o[0], this.plantilla.origen[1] - o[1], 0);
     r.render(this.escena3, c);
+  }
+
+  /** V2c-4: los textos de la plantilla que se ven y miden al menos `TEXTO_MINIMO` px. */
+  private textosPlantilla(ctx: CanvasRenderingContext2D): void {
+    const ts = this.plantilla?.textos;
+    if (!ts?.length) return;
+    const { w, h } = this.rect;
+    const tema = this.entorno.tema();
+    ctx.save();
+    ctx.fillStyle = COLOR_PLANTILLA[tema].c;
+    ctx.globalAlpha = Math.min(1, COLOR_PLANTILLA[tema].a + 0.2);
+    for (const t of ts) {
+      const tam = t.altura * this.s;
+      if (tam < TEXTO_MINIMO) continue;
+      const [x, y] = this.aPx([t.x, t.y]);
+      const lineas = t.texto.split("\n");
+      const largo = tam * Math.max(...lineas.map((l) => l.length)) + tam * lineas.length * 1.7;
+      if (x < -largo || y < -largo || x > w + largo || y > h + largo) continue;
+      ctx.save();
+      ctx.translate(x, y);
+      if (t.giro) ctx.rotate(-t.giro);
+      ctx.font = fuente(Math.min(tam, 400), false);
+      ctx.textAlign = t.h === 0 ? "left" : t.h === 1 ? "center" : "right";
+      ctx.textBaseline = t.v === 0 ? "alphabetic" : t.v === 1 ? "bottom" : t.v === 2 ? "middle" : "top";
+      // Las líneas de un MTEXT, una debajo de otra desde su anclaje
+      const paso = tam * 1.667;
+      const y0 = t.v === 3 ? 0 : t.v === 2 ? (-(lineas.length - 1) * paso) / 2 : -(lineas.length - 1) * paso;
+      lineas.forEach((l, i) => ctx.fillText(l, 0, y0 + i * paso));
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   superponer(ctx: CanvasRenderingContext2D): void {
@@ -340,6 +418,7 @@ export class Vista2D extends Vista {
     const col = this.entorno.colores();
     const tema = this.entorno.tema();
     const px = (q: Vec2) => this.aPx(q);
+    this.textosPlantilla(ctx);
     if (this.fondo.rejilla) this.dibujarOrigen(ctx);
     const burbujas = ralearBurbujas(e.glifos, e.textos, px, this.elegidos);
     for (const g of e.glifos) if (!burbujas.ocultos.has(g)) this.glifo(ctx, g, tema, col.fondo);
@@ -482,7 +561,7 @@ export class Vista2D extends Vista {
    * Para el banco de Chrome (criterio 1 de I2): el sha256 de los búferes de la escena que pinta (los
    * segmentos y los abanicos de cada capa, en orden), lo elegido y el encuadre.
    */
-  async depuracion(): Promise<{ tipo: "2d"; capas: number; sha256: string | null; elegidos: string[]; escala: number; centro: Vec2; omitidos: number }> {
+  async depuracion(): Promise<{ tipo: "2d"; capas: number; sha256: string | null; elegidos: string[]; escala: number; centro: Vec2; omitidos: number; plantilla: number }> {
     const e = this.escena;
     let sha: string | null = null;
     if (e) {
@@ -496,12 +575,14 @@ export class Vista2D extends Vista {
       }
       sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b)), (x) => x.toString(16).padStart(2, "0")).join("");
     }
-    return { tipo: "2d", capas: e?.capas.length ?? 0, sha256: sha, elegidos: [...this.elegidos], escala: this.s, centro: [this.cx, this.cy], omitidos: this.omitidos };
+    return { tipo: "2d", capas: e?.capas.length ?? 0, sha256: sha, elegidos: [...this.elegidos], escala: this.s, centro: [this.cx, this.cy], omitidos: this.omitidos, plantilla: (this.plantilla?.posiciones.length ?? 0) / 6 };
   }
 
   liberar(): void {
     this.capas?.liberar();
     this.capas = null;
+    this.plantilla = null;
+    this.reconstruirPlantilla();
     this.resaltado = null;
     this.reconstruirResaltado();
   }

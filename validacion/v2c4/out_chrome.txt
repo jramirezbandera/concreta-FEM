@@ -1,0 +1,20 @@
+## Criterios 2 y 5: calcar la retícula con núcleo de A2 desde su plano en mm (86 segmentos rectos)
+BIEN  el proyecto de partida tiene la huella de Node
+BIEN  la plantilla, leída en el worker, se dibuja con los 86 segmentos de Node (86); su fila: «PLANTILLAS DXF 1 arquitectura-nucleo 29 entidades»
+BIEN  con la plantilla, la huella no cambia
+BIEN  el pie dice el enganche a la plantilla, redondeado: «x -0,25 · y 0,1 m · Extremo (DXF arquitectura-nucleo)»
+BIEN  dibujada la viga, en ese punto gana su extremo: «x -0,25 · y 0,1 m · Extremo (V1)»
+BIEN  vigas, pilares, losa, hueco, núcleo y puerta, sin errores de la herramienta («»)
+BIEN  tras «Renumerar», la huella es la de la referencia sin cargas, renumerada (8f59bdd0e067ac16 = 8f59bdd0e067ac16)
+BIEN  quitada la plantilla, la vista no la dibuja y la huella no cambia
+
+## Una plantilla con su DXF junto al proyecto, y otra sin el suyo
+BIEN  la de planta.dxf se lee del servidor y se dibuja con los 86 segmentos de Node (86)
+BIEN  la de estructura.dxf dice que falta: «PLANTILLAS DXF 2 Arquitectura 29 entidades Estructura Falta el fichero»
+
+## Criterio 4: un plano de 100 000 segmentos en el edificio objetivo (N3)
+BIEN  leerlo (12.6 MB, en el worker), colocarlo y dibujarlo, en 504 ms: 0 tareas largas (> 50 ms) 
+BIEN  enganche con la plantilla al mover el ratón: mediana 0.100 ms, p95 0.300 ms, máx. 1.000 ms (≤ 2 ms); 368 de 400 a la plantilla; el índice de la planta, 4.5 ms la primera vez
+BIEN  120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
+
+Todo bien

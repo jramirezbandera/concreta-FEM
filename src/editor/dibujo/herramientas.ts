@@ -22,7 +22,8 @@
  *
  * Las de V2c-2 están en `piezas.ts` (Forjado, Hueco, Muro, Apoyo y Apoyo lineal) y `cargas.ts`
  * (Puntual, Lineal, Superficie, En barra y Empuje), y las de editar de V2c-3, en `editar.ts` (Mover,
- * Copiar, Girar y Simetría); aquí, lo que las reparte.
+ * Copiar, Girar y Simetría), y Colocar y Girar la plantilla DXF de V2c-4, en `herramientaPlantilla.ts`;
+ * aquí, lo que las reparte.
  *
  * Puro: sin IO, sin React ni DOM.
  */
@@ -38,9 +39,10 @@ import { unitario, type Enganche, type IndiceEnganches } from "./enganches.ts";
 import { ayudaCarga, borradorCarga, esCarga, pasoCarga, type NombreCarga, type PlantillaCargas } from "./cargas.ts";
 import { ayudaPieza, borradorPieza, esPieza, pasoPieza, type NombrePieza, type PlantillaApoyo, type PlantillaForjado, type PlantillaHueco, type PlantillaMuro } from "./piezas.ts";
 import { ayudaEditar, borradorEditar, esEditar, pasoEditar, type NombreEditar, type PlantillaEditar } from "./editar.ts";
+import { ayudaPlantillaDxf, borradorPlantillaDxf, esPlantillaDxf, pasoPlantillaDxf, type NombrePlantillaDxf, type PlantillaHerramientaDxf } from "./herramientaPlantilla.ts";
 
 /** Las de V2c-1 (ejes, pilar, viga), las de las piezas de V2c-2 (`piezas.ts`), las de las cargas (`cargas.ts`) y las de editar de V2c-3 (`editar.ts`). */
-export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga" | NombrePieza | NombreCarga | NombreEditar;
+export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga" | NombrePieza | NombreCarga | NombreEditar | NombrePlantillaDxf;
 
 export interface PlantillaPilar {
   /** Planta de la base; por defecto, la más baja. */
@@ -73,6 +75,8 @@ export interface Plantillas {
   cargas?: PlantillaCargas;
   /** V2c-3 (`editar.ts`): Mover, Copiar, Girar y Simetría. */
   editar?: PlantillaEditar;
+  /** V2c-4 (`herramientaPlantilla.ts`): la plantilla DXF que se coloca o se gira. */
+  dxf?: PlantillaHerramientaDxf;
 }
 
 /** Un punto de lo que se dibuja; `pilar`, si se enganchó a uno. */
@@ -394,6 +398,7 @@ function pasoViga(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): P
 export function paso(h: NombreHerramienta, e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {
   if (esEditar(h)) return pasoEditar(h, e, ev, ctx);
   if (ev.tipo === "anular") return e.puntos.length || e.fijos?.length || e.activa || e.objeto ? { estado: ESTADO_INICIAL } : { estado: e, salir: true };
+  if (esPlantillaDxf(h)) return pasoPlantillaDxf(h, e, ev, ctx);
   if (h === "ejes") return pasoEjes(e, ev, ctx);
   if (h === "pilar") return pasoPilar(e, ev, ctx);
   if (h === "viga") return pasoViga(e, ev, ctx);
@@ -424,6 +429,7 @@ export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec
   }
   if (esPieza(h)) borradorPieza(h, e, cursor, ctx, r, crudo);
   if (esCarga(h)) borradorCarga(h, e, cursor, ctx, r, crudo);
+  if (esPlantillaDxf(h)) borradorPlantillaDxf(h, e, cursor, r);
   if (esEditar(h)) {
     // Lo elegido se ve ya resaltado; los puntos del borrador son los transformados
     r.puntos = [];
@@ -437,6 +443,7 @@ export function ayuda(h: NombreHerramienta, e: EstadoHerramienta, t: Plantillas 
   if (esPieza(h)) return ayudaPieza(h, e, t);
   if (esCarga(h)) return ayudaCarga(h, e, t);
   if (esEditar(h)) return ayudaEditar(h, e, t);
+  if (esPlantillaDxf(h)) return ayudaPlantillaDxf(h, e, t);
   if (h === "ejes") return e.puntos.length ? "Eje: el segundo punto. Esc anula." : "Eje: el primer punto (clic, o «x; y» e Intro). Esc vuelve a Elegir.";
   if (h === "pilar") {
     if (e.fijos?.length) return `Pilar: ${e.fijos.map((f) => `${rotuloCota(f.valor)} ${nombreCota(f)}`).join(" y ")}. Clic o Intro lo coloca; Tab y un número fijan otra cota; Esc suelta lo fijado.`;

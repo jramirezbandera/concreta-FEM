@@ -27,9 +27,13 @@
  * Ctrl) lo confirma. Con Elegir, lo elegido enseña sus vértices (pinzamientos, `transformar.ts`): un
  * clic en uno lo coge (o se arrastra) y el clic siguiente, enganchado o tecleado, lo deja; Ctrl, un
  * pilar sin sus vigas; Esc lo suelta.
+ *
+ * V2c-4 (`docs/fem3d/dibujo.md` §10): en las vistas con la plantilla DXF visible, sus rasgos entran
+ * en el índice de enganches de la planta (`ponerPlantillasDxf`); la barra dice «(DXF …)».
  */
 import type { ModeloFisico, Vec2 } from "../../../src/compilador/fisico.ts";
 import { apuntar, bajoCursor, indiceEnganches, NOMBRE_ENGANCHE, RADIO_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
+import type { IndicePlantilla } from "../../../src/editor/dibujo/plantilla.ts";
 import { colocar, cotasEn, LADOS, nombreCota, referenciasCotas, type CotaTemporal, type Lado, type ReferenciasCotas } from "../../../src/editor/dibujo/cotas.ts";
 import { PlantaFisica } from "../../../src/agente/render/modelo.ts";
 import { cadenasDe, cotasCadena, rotuloCota, type CotaCadena } from "../../../src/agente/render/ejes.ts";
@@ -90,7 +94,11 @@ export class ControladorDibujo {
   private herramienta: NombreHerramienta = "elegir";
   private estado: EstadoHerramienta = ESTADO_INICIAL;
   private planta: string | null = null;
+  /** Los índices de enganches por planta (y, con la plantilla DXF, por planta y «dxf»). */
   private readonly indices = new Map<string, IndiceEnganches>();
+  /** V2c-4: el índice de la plantilla DXF de cada planta, y si la vista del cursor la tiene visible. */
+  private plantillasDxf: ((planta: string) => IndicePlantilla | null) | null = null;
+  private conPlantilla = false;
   private readonly adaptadores = new Map<string, Dibujo2D>();
   private cursorQ: Vec2 | null = null;
   private radio = 0;
@@ -154,6 +162,14 @@ export class ControladorDibujo {
     this.asaBajo = null;
     if (this.asaActiva) this.soltarAsa();
     // Lo recién dibujado ya engancha, sin esperar a que se mueva el ratón
+    this.recalcular();
+  }
+
+  /** V2c-4: las plantillas DXF (el índice de cada planta; cambia al leer una o al colocarla). */
+  ponerPlantillasDxf(f: ((planta: string) => IndicePlantilla | null) | null): void {
+    if (f === this.plantillasDxf) return;
+    this.plantillasDxf = f;
+    this.indices.clear();
     this.recalcular();
   }
 
@@ -331,10 +347,15 @@ export class ControladorDibujo {
 
   private indice(planta: string): IndiceEnganches | null {
     if (!this.modelo || !this.modelo.plantas.some((p) => p.id === planta)) return null;
-    let ix = this.indices.get(planta);
+    const pl = this.conPlantilla ? (this.plantillasDxf?.(planta) ?? null) : null;
+    const clave = pl ? `${planta}\u0000dxf` : planta;
+    let ix = this.indices.get(clave);
     if (!ix) {
-      ix = indiceEnganches(this.modelo, planta);
-      this.indices.set(planta, ix);
+      // Con la plantilla, el mismo índice del modelo y el suyo
+      const base = this.indices.get(planta) ?? indiceEnganches(this.modelo, planta);
+      this.indices.set(planta, base);
+      ix = pl ? { ...base, plantilla: pl } : base;
+      this.indices.set(clave, ix);
     }
     return ix;
   }
@@ -343,19 +364,30 @@ export class ControladorDibujo {
     return this.planta ? this.indice(this.planta) : null;
   }
 
-  /** Lo que se da a una vista de la planta `planta`; `cotas`, si dibuja la cadena de cotas entre ejes (CT2). */
-  adaptador(planta: string, o: { cotas?: boolean } = {}): Dibujo2D {
+  /**
+   * Lo que se da a una vista de la planta `planta`; `cotas`, si dibuja la cadena de cotas entre ejes
+   * (CT2); `plantilla`, si tiene visible la plantilla DXF (V2c-4: engancha a ella).
+   */
+  adaptador(planta: string, o: { cotas?: boolean; plantilla?: boolean } = {}): Dibujo2D {
     const cotas = !!o.cotas;
-    const clave = `${planta}\u0000${cotas}`;
+    const plantilla = !!o.plantilla;
+    const clave = `${planta}\u0000${cotas}\u0000${plantilla}`;
     let a = this.adaptadores.get(clave);
     if (a) return a;
+    const vista = () => {
+      this.conCotas = cotas;
+      this.conPlantilla = plantilla;
+    };
     a = {
       pasar: (p, radio, mayus, cliente) => {
-        this.conCotas = cotas;
+        vista();
         this.pasar(planta, p, radio, mayus, cliente);
       },
       salir: () => this.salir(planta),
-      clic: (p, radio, ctrl, doble) => (this.herramienta === "elegir" ? this.clicElegir(planta, p, radio, ctrl, doble, cotas) : this.clic(planta, p, radio, doble, ctrl)),
+      clic: (p, radio, ctrl, doble) => {
+        vista();
+        return this.herramienta === "elegir" ? this.clicElegir(planta, p, radio, ctrl, doble, cotas) : this.clic(planta, p, radio, doble, ctrl);
+      },
       ventana: (caja, ctrl) => this.ventana(planta, caja, !!ctrl),
       agarrar: (p, radio) => this.agarrar(planta, p, radio),
       cursor: () => this.cursor(planta),
@@ -937,7 +969,7 @@ export class ControladorDibujo {
     if (planta !== this.planta || !this.cursorQ) return null;
     const a = this.apunte;
     const partes: string[] = [];
-    if (a?.enganche) partes.push(`${NOMBRE_ENGANCHE[a.enganche.tipo]} (${a.enganche.objeto})`);
+    if (a?.enganche) partes.push(`${NOMBRE_ENGANCHE[a.enganche.tipo]} (${a.enganche.plantilla ? `DXF ${a.enganche.plantilla}` : a.enganche.objeto})`);
     else if (a?.orto) partes.push("Ortogonal");
     const c = this.cotaActiva();
     if (c) partes.push(`Cota ${nombreCota(c)}: ${c.texto}`);

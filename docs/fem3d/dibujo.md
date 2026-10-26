@@ -1,6 +1,6 @@
 # V2c: dibujar el modelo con el ratón (plan)
 
-> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7). **V2c-2 hecho el 2026-10-26** (§8). **V2c-3 hecho el 2026-10-26** (§9). **V2c-4 decidido el 2026-10-26** (§10).
+> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7). **V2c-2 hecho el 2026-10-26** (§8). **V2c-3 hecho el 2026-10-26** (§9). **V2c-4 hecho el 2026-10-26** (§10 y §11).
 >
 > **Origen:** el usuario pide adelantar V2c a la puerta de uso de F y AB. Con las tablas sólo se modela bien si ya se tienen las coordenadas: «no sé cómo modelarlo yo si no». Se sustituye así el orden de `visor.md` (V-e: primero tablas y luego el ratón) y el de `CLAUDE.md` («con lo que salga, V2c»). La puerta de uso de F y AB va después de V2c, y con ella la fase MA.
 
@@ -390,3 +390,48 @@ Un DXF de fondo en la planta, en gris, con enganches a sus líneas y vértices, 
 4. **Fluidez.** Con un DXF sintético de 100 000 segmentos, el enganche tarda ≤ 2 ms en Chrome y la página no tiene tareas largas al cargarlo (se lee en el worker).
 5. **Nada se rompe.** Añadir, colocar o quitar una plantilla no cambia la huella; los bancos de V2c, CT e I2, como antes.
 6. **Puerta de uso** (del usuario): calcar un proyecto suyo real, al final de V2c, junto con la de F y AB.
+
+## 11. V2c-4 hecho (2026-10-26)
+
+La plantilla DXF: un plano en gris detrás de las plantas de Modelo y Cargas, con enganches a sus líneas y vértices, para calcar (§10).
+
+### 11.1 Qué hay
+
+- **`src/dxf/`** (puro, sin dependencias, V2c4-a): `lector.ts` (cabecera, capas, bloques y entidades; UTF-8 desde AC1021 o la página de `$DWGCODEPAGE`; rechaza el DXF binario y el DWG) y `aplanar.ts` (bloques anidados con escala, giro, simetría y `MINSERT`; las cotas por su bloque en su OCS; el OCS; arcos, círculos, elipses, splines racionales y bulges en cuerdas de 5° como mucho con los extremos de verdad; `TEXT`, `MTEXT` y atributos; lo que no lee, contado). Puntos para enganchar: extremos, vértices, centros, puntos medios de los arcos y **el centro geométrico de las polilíneas cerradas sin arcos**: un pilar dibujado como rectángulo se pone con un clic (en la vivienda, sus 23 pilares son 23 polilíneas cerradas). `comparar.ts` lo contrasta con ezdxf.
+- **En el proyecto** (V2c4-b): `plantillas` (`PlantillaDxf`: nombre, fichero, sha256, unidades, traslación, giro, plantas, capas ocultas y redondeo), fuera de la huella, con la operación `plantillas` del editor. Sus plantas siguen a una planta renombrada o borrada.
+- **`src/editor/dibujo/plantilla.ts`** (puro): unidades propuestas (las de `$INSUNITS` si dan un edificio de 3 a 500 m; si no, la primera de m, mm y cm que lo dé), la traslación al importar un plano a más de 1 km del origen, `colocar` (los doubles del DXF tal cual sin giro ni traslación; mm y cm, dividiendo), mover y girar la plantilla, el redondeo y un índice por celdas (recorrido de Amanatides y Woo). `enganches.ts` engancha también a ella (§10.3); lo enganchado sale redondeado (V2c4-c) y con `objeto` vacío, para que ninguna herramienta lo tome por un id del modelo.
+- **`herramientaPlantilla.ts`** (puro): Colocar (un punto de la plantilla y su destino) y Girar (centro, un punto de la plantilla y hacia dónde va).
+- **En la app:**
+  - «Plantilla DXF» en la barra de Modelo: el fichero se lee en un worker propio (`app/src/plantilla/lector.worker.ts`) y queda en la planta activa;
+  - el fichero se busca por su sha256 en la memoria de la página, en IndexedDB (almacén `dxf`, base en su versión 2) y junto al proyecto (carpeta o servidor local; si allí tiene otro sha256, se dice); importado con una carpeta del disco, se deja a su lado;
+  - la sección «Plantillas DXF» del navegador: el estado del fichero (leyendo, entidades, falta, error) y, desplegada, «Elegir…», unidades (con el aviso si `$INSUNITS` dice otras), redondeo, colocación (x, y, giro), Colocar y Girar, plantas, capas con su número de entidades, lo que no se leyó y Quitar;
+  - la vista de planta la dibuja en gris (WebGL, con el material de la rejilla) y sus textos de ≥ 5 px; el botón de la barra de la vista la oculta (`EstadoVista.plantilla`), y oculta no engancha;
+  - el pie dice «Extremo (DXF nombre)».
+
+### 11.2 Criterios
+
+| # | Criterio | Resultado |
+|---|---|---|
+| 1 | El lector coincide con ezdxf | **Pasa.** Cinco DXF sintéticos escritos con ezdxf (`src/dxf/__fixtures__/`, con lo que dice ezdxf al lado) y el de la vivienda (`validacion/v2c4/vivienda.ts`, sólo en local): segmentos, puntos para enganchar, curvas, splines, textos, capas y lo que no se lee, a ≤ 1e-9 (la vivienda, a 2,7e-11; se lee en 50 ms) |
+| 2 | Calcar | **Pasa.** La retícula con núcleo de A2 exportada a DXF en mm con ruido de 1e-9 m (`src/pruebas/dxfPrueba.ts`): en vitest con las herramientas (`plantilla.test.ts`) y en Chrome con el ratón (`validacion/v2c4/chrome.ts`), las vigas, los pilares en el centro de su rectángulo, la losa y su hueco, el núcleo y su puerta entre las jambas dan, tras «Renumerar», la huella de la referencia |
+| 3 | Redondeo | **Pasa.** Lo enganchado de la plantilla sale en mm redondos (−5,750000000007275 → −5,75), en cm con 0,01 y con los doubles del DXF con «nada»; nunca −0 |
+| 4 | Fluidez | **Pasa.** Edificio objetivo, N3, con un DXF de 100 000 segmentos (12,6 MB): leerlo en el worker, colocarlo y dibujarlo, 0,5 s sin tareas largas; el enganche con Viga, 0,1 ms de mediana y 0,3 ms p95 (368 de 400 posiciones enganchan a la plantilla); 120 movimientos sin tareas largas |
+| 5 | Nada se rompe | **Pasa.** Añadir, colocar o quitar una plantilla no cambia la huella (vitest y Chrome). vitest en verde en la raíz y en la app (con `app/src/test/plantilla.test.tsx`); los bancos de V2c y CT, como antes |
+| 6 | Puerta de uso | Del usuario, al final de V2c |
+
+### 11.3 Hallazgos
+
+- **V2c4-1, `$INSUNITS` no sirve.** El DXF de la vivienda dice mm y está en m. Las unidades se proponen por el tamaño, se avisa si la cabecera dice otras y se cambian en el navegador.
+- **V2c4-2, ezdxf se equivoca en dos cosas, y el oráculo las evita.** `virtual_entities` de un `INSERT` girado 90° dentro de otro con escala (2, 1) pone la escala en el eje que no es (un pilar de 30 × 30 sale de 30 × 60 en vez de 60 × 30): el oráculo compone las `matrix44()` de ezdxf, y entonces coincide con el lector. Y `plain_text` de un MTEXT convierte `\S3^4;` en «3r» y no resuelve `\U+00E1`: esos dos casos van en la prueba unitaria, con lo que escribe AutoCAD.
+- **V2c4-3, el giro de un MTEXT va en grados** (código 50), aunque la referencia de DXF diga radianes: es lo que escriben AutoCAD y ezdxf.
+- **V2c4-4, el índice de un plano grande.** Con 100 000 segmentos, el índice por celdas tardaba 60 ms (creaba un array por celda y por punto); sin crear nada, 26 ms. Aun así, colocar, indexar y dibujar en la misma tarea pasaban de 50 ms: el índice se hace en una tarea aparte, justo después de dibujar (o al primer enganche).
+- **V2c4-5, calcar pide acercarse.** El radio de enganche es de 10 px: con la planta entera a la vista y los paneles abiertos (unos 35 px/m), son 0,28 m, y el centro del rectángulo de un pilar (nivel 1) gana al extremo de una viga a 0,27 m. Como en un CAD, se calca acercado (el banco, a unos 230 px/m).
+- **V2c4-6, la plantilla detrás queda tapada por las losas.** Va detrás de todo (V2c4-d) y el relleno de las losas es opaco: dibujado un forjado, el plano de debajo deja de verse (y de ayudar a calcar lo que falta encima). Ver §11.4.
+
+### 11.4 Pendiente
+
+- **Del usuario, V2c4-6:** dejarla detrás de todo, o dibujarla encima del relleno de las losas (debajo de las líneas del modelo) o encima de todo, tenue.
+- Las `MLINE` y los `HATCH` no se leen: se cuentan y se dice que se descompongan en el CAD.
+- Colocar con dos pares de puntos (mover, girar y escalar de una vez), y un factor de escala libre (hoy, sólo las unidades).
+- Una plantilla por planta en el 3D o en el alzado (§5 los deja fuera).
+- La puerta de uso, al final de V2c (V2c-a), con un plano real del usuario: la vivienda tiene sus pilares como rectángulos cerrados, así que se calcan con un clic en su centro.

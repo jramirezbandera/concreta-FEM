@@ -7,7 +7,7 @@
  *
  * La ayuda de la herramienta y su error van en el aviso del lienzo, no aquí: el panel es la plantilla.
  */
-import { Check, Copy, FlipHorizontal2, Move, Plus, RotateCw, Table2 } from "lucide-react";
+import { Check, Copy, FileImage, FlipHorizontal2, Move, Plus, RotateCw, Table2 } from "lucide-react";
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { comoUna, describirSeccion, type UsoSeccion } from "../../../src/editor/gestores.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
@@ -21,6 +21,7 @@ import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
 import { esEditar, type NombreEditar, type PlantillaEditar } from "../../../src/editor/dibujo/editar.ts";
+import { esPlantillaDxf, type NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
 import { IcApoyo, IcApoyoLineal, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
@@ -32,8 +33,10 @@ export const IcMover: Icono = ({ size }) => <Move size={size} strokeWidth={1.5} 
 export const IcCopiar: Icono = ({ size }) => <Copy size={size} strokeWidth={1.5} aria-hidden="true" />;
 export const IcGirar: Icono = ({ size }) => <RotateCw size={size} strokeWidth={1.5} aria-hidden="true" />;
 export const IcSimetria: Icono = ({ size }) => <FlipHorizontal2 size={size} strokeWidth={1.5} aria-hidden="true" />;
+/** V2c-4: la plantilla DXF. */
+export const IcPlantillaDxf: Icono = ({ size }) => <FileImage size={size} strokeWidth={1.5} aria-hidden="true" />;
 
-type Herramienta = Exclude<NombreHerramienta, "elegir" | NombreEditar>;
+type Herramienta = Exclude<NombreHerramienta, "elegir" | NombreEditar | NombrePlantillaDxf>;
 const TITULO: Record<Herramienta, string> = {
   ejes: "Ejes",
   pilar: "Pilar",
@@ -158,6 +161,13 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
   const h = foto.herramienta;
   if (h === "elegir") return null;
   if (esEditar(h)) return <PlantillaEditarPanel h={h} foto={foto} ctrl={ctrl} modelo={m} planta={planta} t={t.editar ?? {}} poner={(c) => setPlantillas({ ...t, editar: { ...t.editar, ...c } })} />;
+  if (esPlantillaDxf(h))
+    return (
+      <div role="region" aria-label={`Dibujar · ${h === "colocarPlantilla" ? "Colocar" : "Girar"} la plantilla`}>
+        <Cabecera icono={IcPlantillaDxf} tipo={`${h === "colocarPlantilla" ? "Colocar" : "Girar"} la plantilla DXF${planta ? ` en ${planta}` : ""}`} titulo={t.dxf?.nombre ?? "—"} />
+        <p className="nota">{foto.ayuda} Lo que se mueve es la plantilla, no el modelo; su traslación y su giro, también en el navegador.</p>
+      </div>
+    );
   const Icono = ICONO[h];
   const cotas = cotasPlantas(m.plantas);
   const opcionesPlantas = m.plantas.map((p, i) => (

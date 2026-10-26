@@ -49,7 +49,7 @@ export function proponerUnidades(d: DibujoDxf): UnidadDxf {
 }
 
 /** Si `$INSUNITS` dice otras unidades que las propuestas (para avisar). */
-export function insunitsDistintas(d: DibujoDxf, u: UnidadDxf): string | null {
+export function insunitsDistintas(d: DibujoDxf, u: UnidadDxf): UnidadDxf | null {
   const dice = (Object.keys(UNIDADES) as UnidadDxf[]).find((x) => UNIDADES[x].insunits === d.insunits);
   return dice && dice !== u ? dice : null;
 }
@@ -273,22 +273,39 @@ export function indicePlantilla(cs: readonly PlantillaColocada[]): IndicePlantil
   while (Math.ceil((x1 - x0) / lado + 1) * Math.ceil((y1 - y0) / lado + 1) > CELDAS_MAX) lado *= 2;
   const nx = Math.max(1, Math.ceil((x1 - x0) / lado) + 1);
   const ny = Math.max(1, Math.ceil((y1 - y0) / lado) + 1);
-  const celda = (x: number, y: number): [number, number] => [Math.min(nx - 1, Math.max(0, Math.floor((x - x0) / lado))), Math.min(ny - 1, Math.max(0, Math.floor((y - y0) / lado)))];
+  // Sin crear nada en los bucles: son cientos de miles de segmentos y puntos
+  const col = (x: number) => Math.min(nx - 1, Math.max(0, Math.floor((x - x0) / lado)));
+  const fil = (y: number) => Math.min(ny - 1, Math.max(0, Math.floor((y - y0) / lado)));
+  const nC = nx * ny;
+  // Lo que hace `marcar` con cada celda: contar (sin `destino`) o escribir el segmento en su sitio
+  let cuenta = new Uint32Array(nC + 1);
+  let destino: Uint32Array | null = null;
+  let actual = 0;
+  const marcar = (c: number) => {
+    if (destino) destino[cuenta[c]!++] = actual;
+    else cuenta[c + 1]!++;
+  };
 
   /** Las celdas que atraviesa el segmento i (Amanatides y Woo). */
-  const recorrer = (i: number, f: (c: number) => void) => {
-    const [ax, ay, bx, by] = [seg[4 * i]!, seg[4 * i + 1]!, seg[4 * i + 2]!, seg[4 * i + 3]!];
-    let [cx, cy] = celda(ax, ay);
-    const [ex, ey] = celda(bx, by);
+  const recorrer = (i: number) => {
+    actual = i;
+    const ax = seg[4 * i]!;
+    const ay = seg[4 * i + 1]!;
+    const bx = seg[4 * i + 2]!;
+    const by = seg[4 * i + 3]!;
+    let cx = col(ax);
+    let cy = fil(ay);
+    const ex = col(bx);
+    const ey = fil(by);
     const dx = bx - ax;
     const dy = by - ay;
     const sx = dx > 0 ? 1 : -1;
     const sy = dy > 0 ? 1 : -1;
     const tdx = dx === 0 ? Infinity : Math.abs(lado / dx);
     const tdy = dy === 0 ? Infinity : Math.abs(lado / dy);
-    let tx = dx === 0 ? Infinity : ((dx > 0 ? x0 + (cx + 1) * lado - ax : ax - (x0 + cx * lado)) / Math.abs(dx));
-    let ty = dy === 0 ? Infinity : ((dy > 0 ? y0 + (cy + 1) * lado - ay : ay - (y0 + cy * lado)) / Math.abs(dy));
-    f(cy * nx + cx);
+    let tx = dx === 0 ? Infinity : (dx > 0 ? x0 + (cx + 1) * lado - ax : ax - (x0 + cx * lado)) / Math.abs(dx);
+    let ty = dy === 0 ? Infinity : (dy > 0 ? y0 + (cy + 1) * lado - ay : ay - (y0 + cy * lado)) / Math.abs(dy);
+    marcar(cy * nx + cx);
     for (let pasos = Math.abs(ex - cx) + Math.abs(ey - cy); pasos > 0; pasos--) {
       if (tx < ty) {
         cx += sx;
@@ -298,26 +315,26 @@ export function indicePlantilla(cs: readonly PlantillaColocada[]): IndicePlantil
         ty += tdy;
       }
       if (cx < 0 || cy < 0 || cx >= nx || cy >= ny) break;
-      f(cy * nx + cx);
+      marcar(cy * nx + cx);
     }
     // Con el redondeo, el recorrido puede acabar en una vecina: la del final entra siempre
-    if (cx !== ex || cy !== ey) f(ey * nx + ex);
+    if (cx !== ex || cy !== ey) marcar(ey * nx + ex);
   };
 
-  const nC = nx * ny;
-  const contarSeg = new Uint32Array(nC + 1);
-  for (let i = 0; i < nSeg; i++) recorrer(i, (c) => contarSeg[c + 1]!++);
-  for (let c = 0; c < nC; c++) contarSeg[c + 1]! += contarSeg[c]!;
+  for (let i = 0; i < nSeg; i++) recorrer(i);
+  for (let c = 0; c < nC; c++) cuenta[c + 1]! += cuenta[c]!;
+  const contarSeg = cuenta;
   const segCelda = new Uint32Array(contarSeg[nC]!);
-  const llenos = contarSeg.slice(0, nC);
-  for (let i = 0; i < nSeg; i++) recorrer(i, (c) => (segCelda[llenos[c]!++] = i));
+  cuenta = contarSeg.slice(0, nC + 1);
+  destino = segCelda;
+  for (let i = 0; i < nSeg; i++) recorrer(i);
 
   const contarPts = new Uint32Array(nC + 1);
   const celdaPts = new Uint32Array(nPts);
   for (let i = 0; i < nPts; i++) {
-    const [cx, cy] = celda(pts[2 * i]!, pts[2 * i + 1]!);
-    celdaPts[i] = cy * nx + cx;
-    contarPts[celdaPts[i]! + 1]!++;
+    const c = fil(pts[2 * i + 1]!) * nx + col(pts[2 * i]!);
+    celdaPts[i] = c;
+    contarPts[c + 1]!++;
   }
   for (let c = 0; c < nC; c++) contarPts[c + 1]! += contarPts[c]!;
   const ptsCelda = new Uint32Array(nPts);

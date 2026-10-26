@@ -51,13 +51,17 @@ let bd: Promise<IDBDatabase> | null = null;
 
 function abrirBD(): Promise<IDBDatabase> {
   return (bd ??= new Promise<IDBDatabase>((res, rej) => {
-    const r = indexedDB.open(BD, 1);
-    r.onupgradeneeded = () => {
+    const r = indexedDB.open(BD, 2);
+    r.onupgradeneeded = (ev) => {
       const d = r.result;
-      d.createObjectStore("proyectos", { keyPath: "id" });
-      d.createObjectStore("textos");
-      d.createObjectStore("versiones", { keyPath: "n", autoIncrement: true }).createIndex("proyecto", "proyecto");
-      d.createObjectStore("resultados", { keyPath: "huella" }).createIndex("proyecto", "proyecto");
+      if (ev.oldVersion < 1) {
+        d.createObjectStore("proyectos", { keyPath: "id" });
+        d.createObjectStore("textos");
+        d.createObjectStore("versiones", { keyPath: "n", autoIncrement: true }).createIndex("proyecto", "proyecto");
+        d.createObjectStore("resultados", { keyPath: "huella" }).createIndex("proyecto", "proyecto");
+      }
+      // V2c-4: los ficheros de las plantillas DXF, por su sha256
+      if (ev.oldVersion < 2) d.createObjectStore("dxf");
     };
     r.onsuccess = () => {
       // Otra pestaña con una versión nueva de la base: ésta se cierra y la siguiente operación la reabre
@@ -305,6 +309,19 @@ export async function persistente(): Promise<boolean | null> {
 
 /** ¿Hay IndexedDB? (no, en algunos modos privados) */
 export const hayAlmacen = (): boolean => typeof indexedDB !== "undefined";
+
+// ─── Plantillas DXF (V2c-4) ─────────────────────────────────────────────────────────────────────
+
+/** Guarda el fichero de una plantilla por su sha256 (lo comparten todos los proyectos del navegador). */
+export async function guardarDxf(sha256: string, bytes: Uint8Array): Promise<void> {
+  await tx(["dxf"], "readwrite", (t) => pedido(t.objectStore("dxf").put(bytes, sha256)));
+}
+
+/** El fichero de una plantilla, o null si este navegador no lo tiene. */
+export async function leerDxfGuardado(sha256: string): Promise<Uint8Array | null> {
+  const r = await tx(["dxf"], "readonly", (t) => pedido(t.objectStore("dxf").get(sha256)));
+  return r instanceof Uint8Array ? r : r ? new Uint8Array(r as ArrayBuffer) : null;
+}
 
 // ─── El origen ──────────────────────────────────────────────────────────────────────────────────
 
