@@ -39,6 +39,37 @@ export interface Proyecto {
    * entra en la huella ni en el cálculo.
    */
   armado?: ArmadoProyecto;
+  /**
+   * V2c-4: las plantillas DXF de las plantas (`docs/fem3d/dibujo.md` §10), para calcar. Sólo para
+   * dibujar: no entran en la huella ni en el cálculo.
+   */
+  plantillas?: PlantillaDxf[];
+}
+
+/**
+ * Una plantilla DXF (V2c-4): un plano en gris detrás de unas plantas, con enganches a sus líneas y
+ * vértices. El fichero va junto al proyecto (en el disco) o en el navegador, y se reconoce por su
+ * sha256. Un punto del DXF va al modelo como p = traslación + R(giro) · (p_dxf en m).
+ */
+export interface PlantillaDxf {
+  /** Lo que se ve en el navegador; único entre las plantillas del proyecto. */
+  nombre: string;
+  /** Nombre del fichero DXF, junto al `proyecto.json`. */
+  fichero: string;
+  /** sha256 del fichero, en hexadecimal. */
+  sha256: string;
+  /** Unidades de las coordenadas del DXF. */
+  unidades: "m" | "cm" | "mm" | "in" | "ft";
+  /** Traslación, m; por defecto, ninguna. */
+  traslacion?: [number, number];
+  /** Giro, grados en sentido antihorario alrededor del origen del DXF; por defecto, 0. */
+  giro?: number;
+  /** Las plantas en las que se ve. */
+  plantas: string[];
+  /** Capas del DXF que no se ven ni enganchan. */
+  ocultas?: string[];
+  /** Redondeo de lo que se engancha de la plantilla, m: 0,001 por defecto (V2c4-c), 0,01, o 0 (nada). */
+  redondeo?: 0 | 0.01 | 0.001;
 }
 
 /**

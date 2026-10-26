@@ -1,6 +1,7 @@
 """Oráculo del lector de DXF (V2c-4, docs/fem3d/dibujo.md §10.4, criterio 1) con ezdxf 1.4.5 (MIT).
 
     python oraculo_dxf.py generar <carpeta>      escribe los DXF sintéticos y su oráculo
+    python oraculo_dxf.py oraculos <carpeta>     rehace el oráculo de los DXF de la carpeta (sin tocarlos)
     python oraculo_dxf.py oraculo <dxf> <json>   el oráculo de un DXF cualquiera
 
 El oráculo de un DXF es lo que ezdxf dice de su geometría en XY, con los bloques expandidos
@@ -101,6 +102,14 @@ def polilinea(o, f, vs, cerrada, z):
     for i, (x, y, _) in enumerate(vs):
         o.punto(f.p(Vec3(x, y, z)), "vertice" if cerr or 0 < i < n - 1 else "extremo")
     tramos = n if cerr else n - 1
+    if cerr and all(v[2] == 0 for v in vs):
+        # El centro geométrico (el centroide del área, por la fórmula del área de Gauss)
+        ps = [f.p(Vec3(x, y, z)) for x, y, _ in vs]
+        a = sum(ps[i].x * ps[(i + 1) % n].y - ps[(i + 1) % n].x * ps[i].y for i in range(n)) / 2
+        if a != 0:
+            cx = sum((ps[i].x + ps[(i + 1) % n].x) * (ps[i].x * ps[(i + 1) % n].y - ps[(i + 1) % n].x * ps[i].y) for i in range(n)) / (6 * a)
+            cy = sum((ps[i].y + ps[(i + 1) % n].y) * (ps[i].x * ps[(i + 1) % n].y - ps[(i + 1) % n].x * ps[i].y) for i in range(n)) / (6 * a)
+            o.punto((cx, cy), "centro")
     for i in range(tramos):
         j = (i + 1) % n
         p, q, b = vs[i], vs[j], vs[i][2]
@@ -353,6 +362,11 @@ def main():
             with open(carpeta / f"{nombre}.ezdxf.json", "w", encoding="utf-8", newline="") as fh:
                 json.dump(oraculo(str(dxf)), fh, ensure_ascii=False)
             print(nombre, "listo")
+    elif len(sys.argv) == 3 and sys.argv[1] == "oraculos":
+        for dxf in sorted(Path(sys.argv[2]).glob("*.dxf")):
+            with open(dxf.with_suffix(".ezdxf.json"), "w", encoding="utf-8", newline="") as fh:
+                json.dump(oraculo(str(dxf)), fh, ensure_ascii=False)
+            print(dxf.stem, "listo")
     elif len(sys.argv) == 4 and sys.argv[1] == "oraculo":
         with open(sys.argv[3], "w", encoding="utf-8", newline="") as fh:
             json.dump(oraculo(sys.argv[2]), fh, ensure_ascii=False)

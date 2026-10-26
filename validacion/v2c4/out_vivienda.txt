@@ -1,8 +1,8 @@
 V2c-4, criterio 1: el lector frente a ezdxf 1.4.5 con el DXF de la vivienda (852 kB, AC1032, utf-8, $INSUNITS 4)
 
-Leído en 50.5 ms (ezdxf, con Python: 0.6 s).
+Leído en 30.5 ms (ezdxf, con Python: 0.6 s).
 Capas: 0 (18), 0 PILARES (0), 00 0 PLANTA BAJA (1592), 00 1 PLANTA CUBIERTA (55), Defpoints (0)
-Segmentos rectos 2238, puntos para enganchar 4122, puntos de curvas 26422, textos 50.
+Segmentos rectos 2238, puntos para enganchar 4145, puntos de curvas 26422, textos 50.
 Sin leer: {}; avisos: ninguno.
 Extensión: -10.239, -2.154, 15.995, 16.234
 Mayor diferencia relativa de lo emparejado: 2.66e-11

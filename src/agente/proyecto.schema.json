@@ -38,6 +38,13 @@
     "armado": {
       "$ref": "#/$defs/ArmadoProyecto",
       "description": "AB: la armadura base de las losas (`docs/fem3d/armado.md` §2.5), el momento que cubre en kN·m/m:\nla común y la de cada losa. Para ver sólo lo que queda por encima (las zonas de refuerzo); no\nentra en la huella ni en el cálculo."
+    },
+    "plantillas": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PlantillaDxf"
+      },
+      "description": "V2c-4: las plantillas DXF de las plantas (`docs/fem3d/dibujo.md` §10), para calcar. Sólo para\ndibujar: no entran en la huella ni en el cálculo."
     }
   },
   "required": [
@@ -1482,6 +1489,83 @@
         "altura"
       ],
       "additionalProperties": false
+    },
+    "PlantillaDxf": {
+      "type": "object",
+      "properties": {
+        "nombre": {
+          "type": "string",
+          "description": "Lo que se ve en el navegador; único entre las plantillas del proyecto."
+        },
+        "fichero": {
+          "type": "string",
+          "description": "Nombre del fichero DXF, junto al `proyecto.json`."
+        },
+        "sha256": {
+          "type": "string",
+          "description": "sha256 del fichero, en hexadecimal."
+        },
+        "unidades": {
+          "enum": [
+            "cm",
+            "ft",
+            "in",
+            "m",
+            "mm"
+          ],
+          "description": "Unidades de las coordenadas del DXF."
+        },
+        "traslacion": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Traslación, m; por defecto, ninguna."
+        },
+        "giro": {
+          "type": "number",
+          "description": "Giro, grados en sentido antihorario alrededor del origen del DXF; por defecto, 0."
+        },
+        "plantas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Las plantas en las que se ve."
+        },
+        "ocultas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Capas del DXF que no se ven ni enganchan."
+        },
+        "redondeo": {
+          "enum": [
+            0,
+            0.001,
+            0.01
+          ],
+          "description": "Redondeo de lo que se engancha de la plantilla, m: 0,001 por defecto (V2c4-c), 0,01, o 0 (nada)."
+        }
+      },
+      "required": [
+        "nombre",
+        "fichero",
+        "sha256",
+        "unidades",
+        "plantas"
+      ],
+      "additionalProperties": false,
+      "description": "Una plantilla DXF (V2c-4): un plano en gris detrás de unas plantas, con enganches a sus líneas y\nvértices. El fichero va junto al proyecto (en el disco) o en el navegador, y se reconoce por su\nsha256. Un punto del DXF va al modelo como p = traslación + R(giro) · (p_dxf en m)."
     },
     "PlantillaEsquina": {
       "type": "object",

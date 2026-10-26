@@ -321,6 +321,25 @@ export function puntoSpline(grado: number, nudos: readonly number[], ctrl: reado
   return [x / w, y / w, z / w];
 }
 
+/** El centroide del área de un polígono (respecto a su primer vértice, para no perder cifras), o null si no tiene área. */
+export function centroide(ps: readonly [number, number][]): [number, number] | null {
+  const [x0, y0] = ps[0]!;
+  let a = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < ps.length; i++) {
+    const [xi, yi] = ps[i]!;
+    const [xj, yj] = ps[(i + 1) % ps.length]!;
+    const [ax, ay, bx, by] = [xi - x0, yi - y0, xj - x0, yj - y0];
+    const k = ax * by - bx * ay;
+    a += k;
+    cx += (ax + bx) * k;
+    cy += (ay + by) * k;
+  }
+  if (a === 0) return null;
+  return [x0 + cx / (3 * a), y0 + cy / (3 * a)];
+}
+
 /** Muestras de un B-spline por tramo de nudos. */
 const MUESTRAS_TRAMO = 8;
 
@@ -602,6 +621,11 @@ export function aplanarDxf(dxf: Dxf): DibujoDxf {
     const cerr = cerrada && n > 2;
     ps.forEach((p, i) => out.punto(p, cerr || (i > 0 && i < n - 1) ? "vertice" : "extremo", g));
     const tramos = cerr ? n : n - 1;
+    // El centro geométrico de una cerrada sin arcos (el de un pilar dibujado como rectángulo)
+    if (cerr && vs.every((v) => v.b === 0)) {
+      const c = centroide(ps);
+      if (c) out.punto(c, "centro", g);
+    }
     for (let i = 0; i < tramos; i++) {
       const j = (i + 1) % n;
       const b = vs[i]!.b;

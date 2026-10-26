@@ -21,7 +21,7 @@
  * Puro: sin IO, sin React ni DOM.
  */
 import { comprobarArmado, limpiarArmado, seguirLosas, type ArmadoProyecto } from "../agente/armaduraBase.ts";
-import { comprobarProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
+import { comprobarProyecto, type PlantillaDxf, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
 import type { ModeloFisico, OpcionesCompilacion } from "../compilador/fisico.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { conValor, indiceIds, lista, referenciasDe, usos, type Coleccion, type Objeto, type Uso } from "./referencias.ts";
@@ -50,6 +50,8 @@ export type Operacion =
   | { op: "vistas"; vistas: readonly VistaGuardada[] }
   /** AB: la armadura base de las losas, entera (no entra en la huella). Valores ≥ 0 y losas del modelo. */
   | { op: "armado"; armado: ArmadoProyecto | null }
+  /** V2c-4: la lista de plantillas DXF, entera (no entra en la huella). Los nombres, no vacíos y sin repetir. */
+  | { op: "plantillas"; plantillas: readonly PlantillaDxf[] }
   /** Varias operaciones como una sola: o entran todas o ninguna (y se deshacen de una vez). */
   | { op: "lote"; operaciones: readonly Operacion[] };
 
@@ -80,7 +82,7 @@ export const nombreColeccion = (c: Coleccion): string => NOMBRES[c];
 
 const conLista = (m: ModeloFisico, c: Coleccion, l: readonly Objeto[]): ModeloFisico => ({ ...m, [c]: l }) as ModeloFisico;
 
-type DatosProyecto = Partial<Pick<Proyecto, "nombre" | "descripcion" | "vistas" | "armado">>;
+type DatosProyecto = Partial<Pick<Proyecto, "nombre" | "descripcion" | "vistas" | "armado" | "plantillas">>;
 type Paso = { ok: true; modelo: ModeloFisico; proyecto?: DatosProyecto } | { ok: false; errores: Diagnostico[]; usos?: Uso[] };
 
 /** Las referencias de `o` que no apuntan a un objeto de su colección. */
@@ -280,13 +282,32 @@ function mover(m: ModeloFisico, o: Extract<Operacion, { op: "mover" }>): Paso {
   return { ok: true, modelo: conLista(m, o.coleccion, l) };
 }
 
-/** AB: la armadura base sigue a sus losas cuando una operación las renombra o las borra. */
+/**
+ * AB: la armadura base sigue a sus losas cuando una operación las renombra o las borra; V2c-4: las
+ * plantillas DXF, a sus plantas.
+ */
 function conArmado(s: Paso, antes: ModeloFisico, datos: DatosProyecto, renombres: ReadonlyMap<string, string> = new Map()): Paso {
-  if (!s.ok || !datos.armado?.losas) return s;
-  const armado = seguirLosas(datos.armado, renombres, antes, s.modelo);
-  if (armado === datos.armado) return s;
-  const { armado: _a, ...resto } = datos;
-  return { ...s, proyecto: armado ? { ...resto, armado } : resto };
+  if (!s.ok) return s;
+  let d = s.proyecto ?? datos;
+  if (d.armado?.losas) {
+    const armado = seguirLosas(d.armado, renombres, antes, s.modelo);
+    if (armado !== d.armado) {
+      const { armado: _a, ...resto } = d;
+      d = armado ? { ...resto, armado } : resto;
+    }
+  }
+  if (d.plantillas?.length) {
+    const hay = new Set(s.modelo.plantas.map((p) => p.id));
+    let cambia = false;
+    const plantillas = d.plantillas.map((t) => {
+      const plantas = t.plantas.map((p) => renombres.get(p) ?? p).filter((p) => hay.has(p));
+      if (plantas.length === t.plantas.length && plantas.every((p, i) => p === t.plantas[i])) return t;
+      cambia = true;
+      return { ...t, plantas };
+    });
+    if (cambia) d = { ...d, plantillas };
+  }
+  return d === datos ? s : { ...s, proyecto: d };
 }
 
 function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: OpcionesCompilacion): Paso {
@@ -324,6 +345,16 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
       }
       return { ok: true, modelo: m, proyecto: { ...datos, vistas: o.vistas.map((v) => ({ ...v, nombre: v.nombre.trim() })) } };
     }
+    case "plantillas": {
+      const vistos = new Set<string>();
+      for (const t of o.plantillas) {
+        const n = t.nombre.trim();
+        if (!n) return { ok: false, errores: [error("editor/plantilla-sin-nombre", "Una plantilla DXF necesita un nombre.")] };
+        if (vistos.has(n)) return { ok: false, errores: [error("editor/plantilla-repetida", `Ya hay una plantilla que se llama «${n}».`, [], { nombre: n })] };
+        vistos.add(n);
+      }
+      return { ok: true, modelo: m, proyecto: { ...datos, plantillas: o.plantillas.map((t) => ({ ...t, nombre: t.nombre.trim() })) } };
+    }
     case "lote": {
       let r = m;
       let d = datos;
@@ -343,7 +374,7 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
 
 /** Aplica una operación. El proyecto que sale pasa el esquema; si no, no se aplica. */
 export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
-  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas, armado: p.armado }, p.opciones ?? {});
+  const s = paso(p.modelo, o, { nombre: p.nombre, descripcion: p.descripcion, vistas: p.vistas, armado: p.armado, plantillas: p.plantillas }, p.opciones ?? {});
   if (!s.ok) return s.usos ? { ok: false, errores: s.errores, usos: s.usos } : { ok: false, errores: s.errores };
   const q: Proyecto = { ...p, modelo: s.modelo };
   if (s.proyecto) {
@@ -360,6 +391,11 @@ export function aplicar(p: Proyecto, o: Operacion): Aplicacion {
     }
     if (s.proyecto.armado) q.armado = s.proyecto.armado;
     else delete q.armado;
+    const ts = s.proyecto.plantillas;
+    if (ts !== p.plantillas) {
+      if (!ts?.length) delete q.plantillas;
+      else q.plantillas = [...ts];
+    }
   }
   const c = comprobarProyecto(q);
   if (!c.valido) return { ok: false, errores: c.diagnosticos.map((d) => ({ ...d, severidad: "error" as const })) };
