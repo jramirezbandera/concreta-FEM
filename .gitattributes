@@ -4,3 +4,4 @@
 *.npz binary
 *.png binary
 *.pdf binary
+*.dxf binary
