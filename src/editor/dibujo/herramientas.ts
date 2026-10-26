@@ -20,6 +20,9 @@
  *
  * Esc anula lo que está en curso y, sin nada en curso, sale a Elegir.
  *
+ * Las de V2c-2 están en `piezas.ts` (Forjado, Hueco, Muro, Apoyo y Apoyo lineal) y `cargas.ts`
+ * (Puntual, Lineal, Superficie, En barra y Empuje); aquí, lo que las reparte.
+ *
  * Puro: sin IO, sin React ni DOM.
  */
 import { rotuloCota } from "../../agente/render/ejes.ts";
@@ -31,8 +34,11 @@ import { indiceIds, type Objeto } from "../referencias.ts";
 import { idNuevo } from "../tablas.ts";
 import { colocar, cotasEn, LADOS, ladosEn, nombreCota, referenciaEn, referenciasDe, type CotaTemporal, type Fijo, type Lado } from "./cotas.ts";
 import { unitario, type Enganche, type IndiceEnganches } from "./enganches.ts";
+import { ayudaCarga, borradorCarga, esCarga, pasoCarga, type NombreCarga, type PlantillaCargas } from "./cargas.ts";
+import { ayudaPieza, borradorPieza, esPieza, pasoPieza, type NombrePieza, type PlantillaApoyo, type PlantillaForjado, type PlantillaHueco, type PlantillaMuro } from "./piezas.ts";
 
-export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga";
+/** Las de V2c-1 (ejes, pilar, viga), las de las piezas de V2c-2 (`piezas.ts`) y las de las cargas (`cargas.ts`). */
+export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga" | NombrePieza | NombreCarga;
 
 export interface PlantillaPilar {
   /** Planta de la base; por defecto, la más baja. */
@@ -55,6 +61,14 @@ export interface PlantillaViga {
 export interface Plantillas {
   pilar: PlantillaPilar;
   viga: PlantillaViga;
+  /** V2c-2 (`piezas.ts`). */
+  forjado?: PlantillaForjado;
+  hueco?: PlantillaHueco;
+  muro?: PlantillaMuro;
+  apoyo?: PlantillaApoyo;
+  apoyoLineal?: PlantillaApoyo;
+  /** V2c-2 (`cargas.ts`): el caso activo y lo de cada tipo de carga. */
+  cargas?: PlantillaCargas;
 }
 
 /** Un punto de lo que se dibuja; `pilar`, si se enganchó a uno. */
@@ -69,6 +83,10 @@ export interface EstadoHerramienta {
   fijos?: readonly Fijo[];
   /** Pilar: la cota que fija el número que se teclee (Tab). */
   activa?: Lado;
+  /** V2c-2: el objeto sobre el que se trabaja (el muro o el forjado de un hueco, la viga de una carga en un tramo). */
+  objeto?: string;
+  /** Hueco: el objeto es un muro. */
+  enMuro?: boolean;
 }
 
 export const ESTADO_INICIAL: EstadoHerramienta = { puntos: [] };
@@ -82,8 +100,12 @@ export interface ContextoHerramienta {
 }
 
 export type Evento =
-  /** Un clic, o un punto tecleado (sin enganche). */
-  | { tipo: "punto"; p: Vec2; enganche?: Enganche | null }
+  /**
+   * Un clic, o un punto tecleado (sin enganche). `cursor`, el punto del ratón sin enganchar (lo que
+   * se elige con un clic dentro o a un lado de algo: un recuadro, un forjado, el lado de un muro) y
+   * `radio`, el de enganche en m (lo que se elige con un clic encima: una viga, un muro).
+   */
+  | { tipo: "punto"; p: Vec2; enganche?: Enganche | null; cursor?: Vec2; radio?: number }
   /** Doble clic o Intro; con el punto del cursor (ya enganchado), si lo hay. */
   | { tipo: "terminar"; p?: Vec2 | null; enganche?: Enganche | null }
   /** Tab (Mayús+Tab, `atras`): la cota siguiente del cursor. */
@@ -118,23 +140,23 @@ export interface Borrador {
   cotas: CotaTemporal[];
 }
 
-const igual = (a: Vec2, b: Vec2) => a[0] === b[0] && a[1] === b[1];
+export const igual = (a: Vec2, b: Vec2) => a[0] === b[0] && a[1] === b[1];
 
 // ─── Plantas y plantilla del pilar ──────────────────────────────────────────────────────────────
 
 const indicePlanta = (m: ModeloFisico, id: string) => m.plantas.findIndex((p) => p.id === id);
 
-/** Desde y hasta de un pilar nuevo, con los de por defecto. Las plantas van de arriba abajo. */
-export function plantasPilar(m: ModeloFisico, planta: string, t: PlantillaPilar): { ok: true; desde: string; hasta: string } | { ok: false; mensaje: string } {
+/** Desde y hasta de un pilar (o un muro, `de`) nuevo, con los de por defecto. Las plantas van de arriba abajo. */
+export function plantasPilar(m: ModeloFisico, planta: string, t: { desde?: string; hasta?: string }, de = "del pilar"): { ok: true; desde: string; hasta: string } | { ok: false; mensaje: string } {
   const desde = t.desde || m.plantas[m.plantas.length - 1]?.id;
   const hasta = t.hasta || planta;
-  if (!desde || indicePlanta(m, desde) < 0) return { ok: false, mensaje: "Elija en Propiedades la planta de la base del pilar." };
+  if (!desde || indicePlanta(m, desde) < 0) return { ok: false, mensaje: `Elija en Propiedades la planta de la base ${de}.` };
   if (indicePlanta(m, hasta) < 0) return { ok: false, mensaje: `No hay ninguna planta «${hasta}».` };
   if (indicePlanta(m, desde) <= indicePlanta(m, hasta)) return { ok: false, mensaje: `La base (${desde}) tiene que estar por debajo de la cabeza (${hasta}): elija otras en Propiedades o dibuje en una planta más alta.` };
   return { ok: true, desde, hasta };
 }
 
-const seccionValida = (m: ModeloFisico, s: string | undefined) => !!s && m.secciones.some((x) => x.id === s);
+export const seccionValida = (m: ModeloFisico, s: string | undefined) => !!s && m.secciones.some((x) => x.id === s);
 
 /** Un pilar de la plantilla en p, sin id, o por qué no se puede. */
 function pilarEn(ctx: ContextoHerramienta, p: Vec2): { ok: true; pilar: Omit<Pilar, "id"> } | { ok: false; mensaje: string } {
@@ -358,15 +380,17 @@ function pasoViga(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): P
 
 /** El paso de la herramienta `h` con el evento `ev`. */
 export function paso(h: NombreHerramienta, e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {
-  if (ev.tipo === "anular") return e.puntos.length || e.fijos?.length || e.activa ? { estado: ESTADO_INICIAL } : { estado: e, salir: true };
+  if (ev.tipo === "anular") return e.puntos.length || e.fijos?.length || e.activa || e.objeto ? { estado: ESTADO_INICIAL } : { estado: e, salir: true };
   if (h === "ejes") return pasoEjes(e, ev, ctx);
   if (h === "pilar") return pasoPilar(e, ev, ctx);
   if (h === "viga") return pasoViga(e, ev, ctx);
+  if (esPieza(h)) return pasoPieza(h, e, ev, ctx);
+  if (esCarga(h)) return pasoCarga(h, e, ev, ctx);
   return { estado: e };
 }
 
-/** Lo que se pinta con el cursor en `cursor` (ya enganchado). */
-export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec2 | null, ctx: ContextoHerramienta): Borrador {
+/** Lo que se pinta con el cursor en `cursor` (ya enganchado); `crudo`, el del ratón sin enganchar (el recuadro de Forjado, el lado de un empuje). */
+export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec2 | null, ctx: ContextoHerramienta, crudo: Vec2 | null = cursor): Borrador {
   const r: Borrador = { lineas: [], anillos: [], puntos: e.puntos.map((x) => x.p), cotas: [] };
   if (h === "ejes" && e.puntos[0] && cursor) r.lineas.push([e.puntos[0].p, cursor]);
   if (h === "pilar" && cursor) {
@@ -385,11 +409,15 @@ export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec
     const t = ctx.plantillas.viga;
     if (t.alinear && t.alinear !== "eje" && ps.length > 1) r.lineas.push(puntosViga(ctx, ps));
   }
+  if (esPieza(h)) borradorPieza(h, e, cursor, ctx, r, crudo);
+  if (esCarga(h)) borradorCarga(h, e, cursor, ctx, r, crudo);
   return r;
 }
 
-/** Lo que dice la herramienta que hay que hacer ahora. */
-export function ayuda(h: NombreHerramienta, e: EstadoHerramienta): string {
+/** Lo que dice la herramienta que hay que hacer ahora; `t`, con lo que cambia según la plantilla (el modo). */
+export function ayuda(h: NombreHerramienta, e: EstadoHerramienta, t: Plantillas = { pilar: {}, viga: {} }): string {
+  if (esPieza(h)) return ayudaPieza(h, e, t);
+  if (esCarga(h)) return ayudaCarga(h, e, t);
   if (h === "ejes") return e.puntos.length ? "Eje: el segundo punto. Esc anula." : "Eje: el primer punto (clic, o «x; y» e Intro). Esc vuelve a Elegir.";
   if (h === "pilar") {
     if (e.fijos?.length) return `Pilar: ${e.fijos.map((f) => `${rotuloCota(f.valor)} ${nombreCota(f)}`).join(" y ")}. Clic o Intro lo coloca; Tab y un número fijan otra cota; Esc suelta lo fijado.`;

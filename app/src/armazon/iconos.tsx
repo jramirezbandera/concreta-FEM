@@ -124,6 +124,38 @@ export const IcCarga = icono(
     <rect x="3" y="15" width="18" height="5" rx="1" />
   </>,
 );
+/** Hueco: la planta de un forjado con un rectángulo vacío y su aspa. */
+export const IcHueco = icono(
+  <>
+    <rect x="3" y="4" width="18" height="16" rx="1" />
+    <path d="M9 9h6v6H9zM9 9l6 6M15 9l-6 6" />
+  </>,
+);
+/** Cargas por tipo: una flecha; una línea de flechas; un rectángulo con ellas; una viga con ellas. */
+export const IcPuntual = icono(
+  <>
+    <path d="M12 3v13M8.5 12.5 12 16l3.5-3.5" />
+    <path d="M4 20h16" />
+  </>,
+);
+export const IcLineal = icono(
+  <>
+    <path d="M4 8h16M6 8v8M12 8v8M18 8v8M4.5 14 6 16l1.5-2M10.5 14l1.5 2 1.5-2M16.5 14l1.5 2 1.5-2" />
+    <path d="M3 20h18" />
+  </>,
+);
+export const IcSuperficie = icono(
+  <>
+    <path d="M3 17l4-5h14l-4 5z" />
+    <path d="M9 3v7M15 3v7M7.5 8.5 9 10l1.5-1.5M13.5 8.5 15 10l1.5-1.5" />
+  </>,
+);
+export const IcEnBarra = icono(
+  <>
+    <rect x="2" y="14" width="20" height="5" rx="1" />
+    <path d="M7 4v8M12 4v8M17 4v8M5.5 10.5 7 12l1.5-1.5M10.5 10.5 12 12l1.5-1.5M15.5 10.5 17 12l1.5-1.5" />
+  </>,
+);
 export const IcCasos = icono(<path d="M4 6h16M4 12h10M4 18h13" />);
 export const IcCombinaciones = icono(<path d="M6 4v16M18 4v16M6 12h12M6 7l12 10" />);
 export const IcLosas = icono(

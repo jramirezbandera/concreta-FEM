@@ -2,11 +2,12 @@
  * Espacios Modelo y Cargas (`docs/fem3d/interfaz.md` §4 y §13): lo que era la pantalla Modelo de V1
  * y V2a, repartido en la disposición común.
  *
- * - Barra: en Modelo, las herramientas de dibujo (V2c-1, `docs/fem3d/dibujo.md`: Ejes, Pilar y Viga
- *   se dibujan en la planta, con su plantilla en Propiedades; `dibujo/controlador.ts`), las de los
- *   objetos que aún abren su tabla en la fila nueva, Copiar (a otras plantas) y Borrar (lo elegido
- *   o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o 3D; en
- *   Cargas, el caso activo, Nueva carga y Casos. Sin proyecto editable, sólo lo que mira.
+ * - Barra: en Modelo, las herramientas de dibujo (V2c-1 y V2c-2, `docs/fem3d/dibujo.md`: Ejes, Pilar,
+ *   Viga, Forjado, Hueco, Muro, Apoyo y Apoyo lineal se dibujan en la planta, con su plantilla en
+ *   Propiedades; `dibujo/controlador.ts`), Ábacos y Vigas de borde, Copiar (a otras plantas) y Borrar
+ *   (lo elegido o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o
+ *   3D; en Cargas, el caso activo, las herramientas de las cargas (Puntual, Lineal, Superficie, En
+ *   barra y Empuje, en el caso activo) y Casos. Sin proyecto editable, sólo lo que mira.
  * - Navegador: el proyecto y los objetos de la planta activa (en Cargas, los casos y las cargas).
  * - Vistas (I2): 1, 2 o 4, de planta (modelo, diagnósticos o malla; en Cargas, las del caso activo),
  *   alzado o 3D (`vistas/Zona.tsx`). En Cargas, el alzado y el 3D también dibujan las del caso activo
@@ -21,7 +22,7 @@ import { ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
-import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcAbacos, IcLosa, IcVigaBorde, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcSecciones, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcVigaBorde, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
@@ -80,17 +81,20 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const foto = useSyncExternalStore(ctrl.suscribir, ctrl.instantanea);
   const [plantillasDibujo, setPlantillasDibujo] = useState<Plantillas>({ pilar: {}, viga: {} });
   const modeloEd = ed?.proyecto.modelo ?? null;
-  const plantillas = useMemo(() => plantillasEfectivas(modeloEd, plantillasDibujo), [modeloEd, plantillasDibujo]);
+  const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
+  // Las cargas que se dibujan van al caso activo
+  const casoDibujo = cargas ? casoValido : undefined;
+  const plantillas = useMemo(() => plantillasEfectivas(modeloEd, plantillasDibujo, casoDibujo), [modeloEd, plantillasDibujo, casoDibujo]);
   const editarDibujo = (o: Operacion, etiqueta: string): string | null => {
     if (!ed) return "No hay ningún proyecto que editar.";
     const a = ed.editar(o, etiqueta);
     return a.ok ? null : a.errores.map((x) => x.mensaje).join(" ");
   };
-  ctrl.plantillas = plantillas;
   ctrl.aplicar = (h) => editarDibujo(h.operacion, h.etiqueta);
   ctrl.alSalir = () => ctrl.ponerHerramienta("elegir");
   ctrl.repintar = repintarVistas;
   useEffect(() => ctrl.ponerModelo(modeloEd), [ctrl, modeloEd]);
+  useEffect(() => ctrl.ponerPlantillas(plantillas), [ctrl, plantillas]);
   useEffect(() => ctrl.ponerElegidos(elegidos), [ctrl, elegidos]);
   const dibujando = foto.herramienta !== "elegir";
   const elegirHerramienta = (h: NombreHerramienta) => {
@@ -159,7 +163,6 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     return () => window.removeEventListener("keydown", tecla);
   }, [ctrl, dibujando]);
 
-  const casoValido = e.casos.some((c) => c.id === caso) ? caso! : (e.casos[0]?.id ?? "");
   // Lo elegido que está en el proyecto (un eje propuesto no lo está) y lo que de ello se copia
   const enTablas = ed ? elegidos.filter((id) => tablaDe(ed.proyecto.modelo, id)) : [];
   const copiables = ed ? enTablas.filter((id) => COPIABLES.has(tablaDe(ed.proyecto.modelo, id)!)) : [];
@@ -230,8 +233,12 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       {ed && (
         <>
           <Separador />
-          <Herramienta icono={IcCarga} nombre="Nueva carga" onClick={() => abrirTabla("cargas", true)} title="Una carga nueva en la tabla de cargas" />
-          <Herramienta icono={IcEmpuje} nombre="Empuje" onClick={() => abrirTabla("cargas", true, { tipo: "empuje", caso: casoValido })} title="Un empuje nuevo sobre un muro (terreno o agua), en la tabla de cargas" />
+          <Herramienta icono={IcPuntual} nombre="Puntual" activa={foto.herramienta === "puntual"} onClick={() => elegirHerramienta("puntual")} title="Dibujar cargas puntuales en el caso activo: un clic donde va (F y M en Propiedades). Esc vuelve a Elegir" />
+          <Herramienta icono={IcLineal} nombre="Lineal" activa={foto.herramienta === "lineal"} onClick={() => elegirHerramienta("lineal")} title="Dibujar cargas lineales en el caso activo: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
+          <Herramienta icono={IcSuperficie} nombre="Superficie" activa={foto.herramienta === "superficie"} onClick={() => elegirHerramienta("superficie")} title="Dibujar cargas de superficie en el caso activo: un clic en una losa o un paño, o una zona (Propiedades). Esc vuelve a Elegir" />
+          <Herramienta icono={IcEnBarra} nombre="En barra" activa={foto.herramienta === "barra"} onClick={() => elegirHerramienta("barra")} title="Dibujar cargas en vigas y pilares en el caso activo: un clic en la pieza, o dos en un tramo de viga (Propiedades). Esc vuelve a Elegir" />
+          <Herramienta icono={IcEmpuje} nombre="Empuje" activa={foto.herramienta === "empuje"} onClick={() => elegirHerramienta("empuje")} title="Dibujar empujes en el caso activo: un clic en un muro, del lado del terreno. Esc vuelve a Elegir" />
+          <Herramienta icono={IcCarga} nombre="Tabla" onClick={() => abrirTabla("cargas", true, { caso: casoValido })} title="Una carga nueva en la tabla de cargas, en el caso activo" />
           <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, las hipótesis típicas de una vez, y la tabla desde él (GE2)" />
         </>
       )}
@@ -249,12 +256,13 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcEjes} nombre="Ejes" activa={foto.herramienta === "ejes"} onClick={() => elegirHerramienta("ejes")} title="Dibujar ejes de replanteo: dos clics por eje (o «Proponer ejes» en Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcPilar} nombre="Pilar" activa={foto.herramienta === "pilar"} onClick={() => elegirHerramienta("pilar")} title="Dibujar pilares: un clic en su punto fijo, o una ventana para uno en cada cruce de ejes. Esc vuelve a Elegir" />
           <Herramienta icono={IcViga} nombre="Viga" activa={foto.herramienta === "viga"} onClick={() => elegirHerramienta("viga")} title="Dibujar vigas: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
-          <Herramienta icono={IcLosa} nombre="Forjado" onClick={() => abrirTabla("forjados", true, { tipo: "maciza" })} title="Un forjado nuevo en la tabla de forjados: losa maciza, reticular o unidireccional, según su columna «tipo»" />
+          <Herramienta icono={IcLosa} nombre="Forjado" activa={foto.herramienta === "forjado"} onClick={() => elegirHerramienta("forjado")} title="Dibujar forjados (maciza, reticular o unidireccional, en Propiedades): un clic dentro de un recuadro cerrado, o un polígono. Esc vuelve a Elegir" />
+          <Herramienta icono={IcHueco} nombre="Hueco" activa={foto.herramienta === "hueco"} onClick={() => elegirHerramienta("hueco")} title="Dibujar huecos: en un forjado, un rectángulo o un polígono; en un muro, dos clics por su eje. Esc vuelve a Elegir" />
           <Herramienta icono={IcAbacos} nombre="Ábacos" onClick={() => setDialogo("abacos")} title="Ábacos macizos en los pilares de un forjado reticular, del tamaño que diga" />
           <Herramienta icono={IcVigaBorde} nombre="Vigas de borde" onClick={() => setDialogo("vigasBorde")} title="El zuncho de los bordes de un forjado que no van sobre una viga, un muro o un apoyo: la viga, la losa hasta su eje y la carga de la banda en la viga" />
-          <Herramienta icono={IcMuro} nombre="Muro" onClick={() => abrirTabla("muros", true)} title="Un muro nuevo en la tabla de muros" />
-          <Herramienta icono={IcApoyo} nombre="Apoyo" onClick={() => abrirTabla("apoyos", true)} title="Un apoyo nuevo en la tabla de apoyos" />
-          <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" onClick={() => abrirTabla("apoyosLineales", true)} title="Un apoyo lineal nuevo en la tabla de apoyos lineales" />
+          <Herramienta icono={IcMuro} nombre="Muro" activa={foto.herramienta === "muro"} onClick={() => elegirHerramienta("muro")} title="Dibujar muros: clic a clic; doble clic o Intro termina, un clic en el primero lo cierra. Esc vuelve a Elegir" />
+          <Herramienta icono={IcApoyo} nombre="Apoyo" activa={foto.herramienta === "apoyo"} onClick={() => elegirHerramienta("apoyo")} title="Dibujar apoyos: un clic donde va. Esc vuelve a Elegir" />
+          <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" activa={foto.herramienta === "apoyoLineal"} onClick={() => elegirHerramienta("apoyoLineal")} title="Dibujar apoyos lineales: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
           <Separador />
           <Herramienta icono={IcAPlantas} nombre="Copiar" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, forjados, apoyos o cargas"} />
           <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />

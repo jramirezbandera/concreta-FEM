@@ -557,13 +557,23 @@
   - **Validación:** `estirar.test.ts` (criterio 4: mover y volver deja los bytes en la retícula y en seis referencias), `app/src/test/moverPilar.test.ts` y el banco `validacion/ct/chrome.ts` (guardado, lo de Node byte a byte; las cotas, 0,2 ms p95).
   - **CT3-3, corregido:** los bancos de Chrome de AL, cargas, I1–I4, V2c y CT cuentan como fallo una excepción que corta el banco (antes acababan en «Todo bien»).
   - Falta la puerta de uso de CT (criterio 7, del usuario).
+- **2026-10-26: V2c-2 hecho** (`dibujo.md` §8): Forjado, Hueco, Muro, Apoyo y Apoyo lineal en Modelo, y Puntual, Lineal, Superficie, En barra y Empuje en Cargas, en el caso activo. Pasan los criterios 1 a 6; el 7 (puerta de uso) es del usuario, al final de V2c.
+  - **Ya en `src/editor/dibujo/`** (puro): `recuadros.ts` (el recuadro cerrado de un clic por los ejes de vigas, muros y apoyos lineales y los bordes de los forjados, V2c-c), `piezas.ts` y `cargas.ts`. El clic lleva también el cursor sin enganchar y el radio (V2c2-2).
+  - **Cómo:**
+    - Forjado (maciza, reticular o unidireccional): un clic en un recuadro, desde su vértice más cercano (donde empiezan las viguetas), o un polígono.
+    - Hueco: un rectángulo o un polígono en un forjado, o dos clics por el eje de un muro, con las alturas en la plantilla.
+    - Muro: polilínea, cerrable, con el eje o una cara en lo dibujado.
+    - Cargas: sin valores por defecto; la zona de superficie lleva su forjado si cae entera en uno.
+  - Las estaciones (hueco de muro, carga en un tramo) se redondean a 1e-9 m (V2c2-1).
+  - **Validación:** `dibujo2.test.ts` (cada herramienta, byte a byte como su fila de la tabla; lo dibujado compila sin ajustes; deshacer), `app/src/test/dibujo.test.tsx` y el banco `validacion/v2c/chrome.ts`. El banco dibuja con ratón y teclado la planta del edificio objetivo con su losa, hueco y cargas, y la retícula con núcleo de A2; tras «Renumerar», las dos huellas son las de sus referencias. El recuadro bajo el cursor sale en 0,2 ms p95.
+  - **V2c2-3:** un valor por defecto escrito (`base: "empotrado"`) da otra huella con el mismo modelo analítico.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
   - **hecho el 2026-10-19:** el diagnóstico del `my` de la cubierta de la vivienda (0,82) y de P5 (`fase-lv.md` §2.1): lo que queda es del modelo de CYPE y tiene que mirarlo el usuario;
   - **hecha el 2026-10-20:** LV-d, la zona rígida en la base de los tramos de pilar (`fase-lv.md` §2.2, compilador LVD1);
   - **hecha el 2026-10-20:** RV-b, los nudos del forjado en su cara superior (`fase-lv.md` §2.3, compilador RV1); **hecha el 2026-10-20:** RV-a, las vigas planas en un reticular con la flexión ×0,6 (`fase-lv.md` §2.4, compilador RV2); el criterio 7 de la vivienda queda en 0,891 en el `my` de la cubierta superior, aceptado por el usuario;
-  - **decidido el 2026-10-23:** V2c (dibujar con el ratón) va antes de la puerta de uso de F y AB, porque sin ella el usuario no sabe modelar un proyecto suyo («no sé cómo modelarlo yo si no»). El plan está en `docs/fem3d/dibujo.md`. Decididas el mismo día: tramos V2c-1 → V2c-2 → V2c-3 y la puerta de uso al final (V2c-a), vigas eje a eje con la opción de alinearlas a una cara (V2c-b), losas por recuadro cerrado y por polígono (V2c-c) y un DXF de fondo como V2c-4 (V2c-e). V2c-d se decide al empezar V2c-3;
+  - **decidido el 2026-10-23:** V2c (dibujar con el ratón) va antes de la puerta de uso de F y AB, porque sin ella el usuario no sabe modelar un proyecto suyo («no sé cómo modelarlo yo si no»). El plan está en `docs/fem3d/dibujo.md`. Decididas el mismo día: tramos V2c-1 → V2c-2 → V2c-3 y la puerta de uso al final (V2c-a), vigas eje a eje con la opción de alinearlas a una cara (V2c-b), losas por recuadro cerrado y por polígono (V2c-c) y un DXF de fondo como V2c-4 (V2c-e). V2c-d se decidió con CT. **Hechos V2c-1 (2026-10-23) y V2c-2 (2026-10-26); sigue V2c-3** (mover, copiar, girar, simetría y pinzamientos);
   - luego: la puerta de uso de F y AB con un proyecto real del usuario, dibujado con V2c (cubre también buena parte de las de I1–I4, V2a y V2b);
   - **hecha el 2026-10-21:** la fase PF, el punto fijo de los pilares (`punto-fijo.md`); falta su comparación en sombra con CYPECAD;
   - las puertas de uso que queden;

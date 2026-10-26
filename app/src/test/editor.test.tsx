@@ -465,7 +465,9 @@ describe("Forjados: cambiar el tipo en la tabla", () => {
     // Una sola herramienta «Forjado» y una sola tabla, sin Losas ni Paños
     expect(screen.queryByRole("button", { name: /^Losa$/ })).toBeNull();
     expect(screen.queryByRole("tab", { name: /^Paños/ })).toBeNull();
+    // Forjado es una herramienta de dibujo (V2c-2): la tabla, desde su plantilla
     fireEvent.click(screen.getByRole("button", { name: "Forjado" }));
+    fireEvent.click(await screen.findByTitle("Abrir la tabla de forjados"));
     await waitFor(() => expect(hoja("forjados")).toBeTruthy());
     fireEvent.click(screen.getByRole("checkbox", { name: /sólo/ }));
 

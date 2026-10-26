@@ -104,6 +104,52 @@ describe("la herramienta activa (V2c-1)", () => {
     expect(screen.queryByRole("region", { name: "Dibujar · Viga" })).toBeNull();
   }, 60_000);
 
+  it("V2c-2: las plantillas de Forjado, Muro y Apoyo, y las cargas en el caso activo", async () => {
+    render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Proyecto nuevo/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "piezas" } });
+    fireEvent.click(screen.getByRole("button", { name: "Crear" }));
+    await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+
+    // Forjado: recuadro y maciza por defecto, con el material del proyecto; reticular, 25+5 y el pp obligatorio
+    fireEvent.click(screen.getByRole("button", { name: "Forjado" }));
+    const forjado = screen.getByRole("region", { name: "Dibujar · Forjado" });
+    expect(screen.getByRole("radio", { name: "Recuadro" }).getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByRole("textbox", { name: "canto" }) as HTMLInputElement).value).toBe("0,25");
+    expect((screen.getByRole("combobox", { name: "Material" }) as HTMLSelectElement).value).toBe("HA-30");
+    fireEvent.click(screen.getByRole("radio", { name: "Reticular" }));
+    expect((screen.getByRole("textbox", { name: "canto" }) as HTMLInputElement).value).toBe("0,3");
+    expect((screen.getByRole("textbox", { name: "nervio" }) as HTMLInputElement).value).toBe("0,12");
+    expect(screen.getByRole("textbox", { name: "pp" }).getAttribute("data-error")).toBe("true");
+    expect(forjado.textContent).toMatch(/Un clic dentro de un recuadro/);
+
+    // Muro y Apoyo
+    fireEvent.click(screen.getByRole("button", { name: "Muro" }));
+    expect((screen.getByRole("textbox", { name: "espesor" }) as HTMLInputElement).value).toBe("0,25");
+    fireEvent.click(screen.getByRole("button", { name: "Apoyo" }));
+    expect(screen.getByRole("radio", { name: "Empotrado" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "uz" }));
+    expect(screen.getByRole("radio", { name: "Empotrado" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("button", { name: "uz" }).getAttribute("aria-pressed")).toBe("false");
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    // En Cargas, las herramientas van al caso activo; sin valor no hay carga por defecto
+    fireEvent.click(screen.getByRole("button", { name: "Cargas" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Puntual" }));
+    const puntual = screen.getByRole("region", { name: "Dibujar · Carga puntual" });
+    expect(puntual.textContent).toMatch(/caso G/);
+    expect((screen.getByRole("textbox", { name: "F" }) as HTMLInputElement).value).toBe("");
+    fireEvent.change(screen.getByRole("textbox", { name: "F" }), { target: { value: "0 0 -12,5" } });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "F" }), { key: "Enter" });
+    expect((screen.getByRole("textbox", { name: "F" }) as HTMLInputElement).value).toBe("0 0 -12,5");
+    fireEvent.change(screen.getByRole("combobox", { name: "Caso activo" }), { target: { value: "Q" } });
+    await waitFor(() => expect(screen.getByRole("region", { name: "Dibujar · Carga puntual" }).textContent).toMatch(/caso Q/));
+  }, 60_000);
+
   it("Alzado sin ejes: se puede elegir, lo dice y «Dibujar ejes» vuelve a la planta con la herramienta Ejes", async () => {
     render(
       <ThemeProvider>

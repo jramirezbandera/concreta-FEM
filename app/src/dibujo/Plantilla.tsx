@@ -1,30 +1,63 @@
 /**
- * Lo que va en Propiedades mientras una herramienta de dibujo está activa (V2c-1, `dibujo.md` §2.1):
- * su plantilla (lo que en CYPECAD pide el diálogo antes de colocar, pero sin diálogo: vale para los
- * siguientes), los enganches por tipo y el ortogonal. Y el campo de teclado junto al cursor (§2.3).
+ * Lo que va en Propiedades mientras una herramienta de dibujo está activa (V2c-1 y V2c-2, `dibujo.md`
+ * §2.1): su plantilla (lo que en CYPECAD pide el diálogo antes de colocar, pero sin diálogo: vale
+ * para los siguientes), los enganches por tipo y el ortogonal. Y el campo de teclado junto al cursor
+ * (§2.3). Lo que la plantilla no dice se toma de lo último del mismo tipo en el proyecto (o de lo
+ * típico: losa de 25 cm, reticular 25+5, muro de 25 cm); los valores de las cargas, nunca.
  *
  * La ayuda de la herramienta y su error van en el aviso del lienzo, no aquí: el panel es la plantilla.
  */
 import { Check, Plus, Table2 } from "lucide-react";
-import { useState, type KeyboardEvent } from "react";
-import { comoUna, describirSeccion } from "../../../src/editor/gestores.ts";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { comoUna, describirSeccion, type UsoSeccion } from "../../../src/editor/gestores.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
 import type { ModeloFisico, PuntoFijo, Seccion as SeccionFisica } from "../../../src/compilador/fisico.ts";
+import type { Seis, Vec3 } from "../../../src/motor/modelo.ts";
 import { medidasSeccion, SIGNOS_PUNTO_FIJO } from "../../../src/compilador/puntoFijo.ts";
 import { NOMBRE_ENGANCHE, TIPOS_ENGANCHE } from "../../../src/editor/dibujo/enganches.ts";
 import { operacionProponerEjes, plantasPilar, type Alinear, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
+import { COARTADOS, HUECO_MURO, type PlantillaForjado } from "../../../src/editor/dibujo/piezas.ts";
+import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
-import type { NombreTabla } from "../../../src/editor/tablas.ts";
-import { IcEjes, IcPilar, IcViga } from "../armazon/iconos.tsx";
+import { TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
+import { IcApoyo, IcApoyoLineal, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga } from "../armazon/iconos.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
 import { cota } from "../fmt.ts";
 import type { ControladorDibujo, Instantanea } from "./controlador.ts";
 
 type Herramienta = Exclude<NombreHerramienta, "elegir">;
-const TITULO: Record<Herramienta, string> = { ejes: "Ejes", pilar: "Pilar", viga: "Viga" };
-const ICONO = { ejes: IcEjes, pilar: IcPilar, viga: IcViga } as const;
-const TABLA: Record<Herramienta, NombreTabla> = { ejes: "ejes", pilar: "pilares", viga: "vigas" };
+const TITULO: Record<Herramienta, string> = {
+  ejes: "Ejes",
+  pilar: "Pilar",
+  viga: "Viga",
+  forjado: "Forjado",
+  hueco: "Hueco",
+  muro: "Muro",
+  apoyo: "Apoyo",
+  apoyoLineal: "Apoyo lineal",
+  puntual: "Carga puntual",
+  lineal: "Carga lineal",
+  superficie: "Carga de superficie",
+  barra: "Carga en barra",
+  empuje: "Empuje",
+};
+const ICONO = { ejes: IcEjes, pilar: IcPilar, viga: IcViga, forjado: IcLosa, hueco: IcHueco, muro: IcMuro, apoyo: IcApoyo, apoyoLineal: IcApoyoLineal, puntual: IcPuntual, lineal: IcLineal, superficie: IcSuperficie, barra: IcEnBarra, empuje: IcEmpuje } as const;
+const TABLA: Record<Herramienta, NombreTabla> = {
+  ejes: "ejes",
+  pilar: "pilares",
+  viga: "vigas",
+  forjado: "forjados",
+  hueco: "forjados",
+  muro: "muros",
+  apoyo: "apoyos",
+  apoyoLineal: "apoyosLineales",
+  puntual: "cargas",
+  lineal: "cargas",
+  superficie: "cargas",
+  barra: "cargas",
+  empuje: "cargas",
+};
 
 /**
  * La sección de por defecto de una herramienta: la más usada por los objetos de su tipo; si no, la
@@ -39,13 +72,48 @@ export function seccionPorDefecto(m: ModeloFisico, tipo: "pilares" | "vigas"): s
   return mejor ?? m.secciones.find((s) => s.id.startsWith(letra))?.id ?? m.secciones[0]?.id;
 }
 
-/** La plantilla con lo de por defecto donde no hay nada válido. */
-export function plantillasEfectivas(m: ModeloFisico | null, t: Plantillas): Plantillas {
+/** El material de por defecto: el más usado por los objetos de esa lista; si no, el primero de hormigón; si no, el primero. */
+function materialPorDefecto(m: ModeloFisico, xs: readonly { material: string }[]): string | undefined {
+  const n = new Map<string, number>();
+  for (const o of xs) n.set(o.material, (n.get(o.material) ?? 0) + 1);
+  let mejor: string | undefined;
+  for (const [s, k] of n) if (m.materiales.some((x) => x.id === s) && (!mejor || k > n.get(mejor)!)) mejor = s;
+  return mejor ?? m.materiales.find((x) => x.tipo === "hormigon")?.id ?? m.materiales[0]?.id;
+}
+
+/** La plantilla de Forjado con lo que no dice tomado del último forjado de su tipo (o de lo típico; el pp, sólo del último). */
+function forjadoEfectivo(m: ModeloFisico, t: PlantillaForjado): PlantillaForjado {
+  const tipo = t.tipo ?? "maciza";
+  const valida = (s: string | undefined) => (s && m.secciones.some((x) => x.id === s) ? s : undefined);
+  const materialValido = (s: string | undefined) => (s && m.materiales.some((x) => x.id === s) ? s : undefined);
+  if (tipo === "unidireccional") {
+    const u = m.panos?.at(-1);
+    return { ...t, tipo, intereje: t.intereje ?? u?.intereje ?? 0.7, seccion: valida(t.seccion) ?? valida(u?.seccion) ?? m.secciones.find((s) => s.forma === "T")?.id, pp: t.pp ?? u?.pp, direccion: t.direccion ?? u?.direccion };
+  }
+  const losas = (m.losas ?? []).filter((l) => !!l.reticular === (tipo === "reticular"));
+  const u = losas.at(-1);
+  const material = materialValido(t.material) ?? materialValido(u?.material) ?? materialPorDefecto(m, m.losas ?? []);
+  if (tipo === "maciza") return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.25, material };
+  const r = u?.reticular;
+  return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.3, material, intereje: t.intereje ?? r?.intereje ?? 0.8, nervio: t.nervio ?? r?.nervio ?? 0.12, capa: t.capa ?? r?.capa ?? 0.05, pp: t.pp ?? u?.pp };
+}
+
+/** La plantilla con lo de por defecto donde no hay nada válido; `caso`, el activo de la barra de Cargas. */
+export function plantillasEfectivas(m: ModeloFisico | null, t: Plantillas, caso?: string): Plantillas {
   if (!m) return t;
   const valida = (s: string | undefined) => (s && m.secciones.some((x) => x.id === s) ? s : undefined);
+  const muro = m.muros?.at(-1);
+  const materialMuro = t.muro?.material && m.materiales.some((x) => x.id === t.muro!.material) ? t.muro.material : materialPorDefecto(m, m.muros ?? []);
   return {
+    ...t,
     pilar: { ...t.pilar, seccion: valida(t.pilar.seccion) ?? seccionPorDefecto(m, "pilares") },
     viga: { ...t.viga, seccion: valida(t.viga.seccion) ?? seccionPorDefecto(m, "vigas") },
+    forjado: forjadoEfectivo(m, t.forjado ?? {}),
+    hueco: { ...t.hueco, z0: t.hueco?.z0 ?? HUECO_MURO.z0, z1: t.hueco?.z1 ?? HUECO_MURO.z1 },
+    muro: { ...t.muro, espesor: t.muro?.espesor ?? muro?.espesor ?? 0.25, material: materialMuro },
+    apoyo: { coartados: t.apoyo?.coartados ?? COARTADOS.empotrado },
+    apoyoLineal: { coartados: t.apoyoLineal?.coartados ?? COARTADOS.uz },
+    cargas: { ...t.cargas, ...(caso ? { caso } : {}) },
   };
 }
 
@@ -90,6 +158,7 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
     </option>
   ));
   const pl = planta ? plantasPilar(m, planta, t.pilar) : null;
+  const plMuro = planta && h === "muro" ? plantasPilar(m, planta, t.muro ?? {}, "del muro") : null;
   const propuesta = h === "ejes" ? operacionProponerEjes(m) : null;
   const ponerPilar = (c: Partial<Plantillas["pilar"]>) => setPlantillas({ ...t, pilar: { ...t.pilar, ...c } });
   const seccionPilar = m.secciones.find((s) => s.id === t.pilar.seccion);
@@ -193,6 +262,81 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
         </Seccion>
       )}
 
+      {h === "forjado" && <PlantillaForjadoPanel modelo={m} t={t.forjado ?? {}} poner={(c, limpiar) => setPlantillas({ ...t, forjado: limpiar ? c : { ...t.forjado, ...c } })} editar={editar} />}
+
+      {h === "hueco" && (
+        <Seccion titulo="Plantilla" valor="para los siguientes">
+          <div className="py-1">
+            <Segmentado
+              etiqueta="en un forjado"
+              valor={t.hueco?.modo ?? "rectangulo"}
+              opciones={[
+                ["rectangulo", "Rectángulo"],
+                ["poligono", "Polígono"],
+              ]}
+              onCambio={(modo) => setPlantillas({ ...t, hueco: { ...t.hueco, modo } })}
+              ayuda={(t.hueco?.modo ?? "rectangulo") === "rectangulo" ? "Dos esquinas opuestas, en los ejes del ortogonal." : "Clic a clic; Intro o un clic en el primero lo cierra."}
+            />
+            <NumeroCampo etiqueta="z0" unidad="m" valor={t.hueco?.z0} onCambio={(z0) => setPlantillas({ ...t, hueco: { ...t.hueco, z0 } })} ayuda="En un muro: la altura del borde de abajo sobre el suelo de la planta de abajo." />
+            <NumeroCampo etiqueta="z1" unidad="m" valor={t.hueco?.z1} onCambio={(z1) => setPlantillas({ ...t, hueco: { ...t.hueco, z1 } })} ayuda="En un muro: la del borde de arriba." />
+            <p className="nota">El primer clic dice dónde va: dentro de un forjado o encima de un muro (dos clics por su eje, en un tramo).</p>
+          </div>
+        </Seccion>
+      )}
+
+      {h === "muro" && (
+        <Seccion titulo="Plantilla" valor="para los siguientes">
+          <div className="py-1">
+            <label className="campo">
+              <span>desde</span>
+              <select className="sel" value={t.muro?.desde ?? ""} aria-label="Planta de la base" onChange={(x) => setPlantillas({ ...t, muro: { ...t.muro, desde: x.target.value || undefined } })}>
+                <option value="">{`${m.plantas.at(-1)?.id ?? "—"} · la más baja`}</option>
+                {opcionesPlantas}
+              </select>
+            </label>
+            <label className="campo">
+              <span>hasta</span>
+              <select className="sel" value={t.muro?.hasta ?? ""} aria-label="Planta de la cabeza" data-error={!!plMuro && !plMuro.ok} onChange={(x) => setPlantillas({ ...t, muro: { ...t.muro, hasta: x.target.value || undefined } })}>
+                <option value="">{`${planta ?? "—"} · la de la vista`}</option>
+                {opcionesPlantas}
+              </select>
+              {plMuro && !plMuro.ok && <p className="error">{plMuro.mensaje}</p>}
+            </label>
+            <NumeroCampo etiqueta="espesor" unidad="m" valor={t.muro?.espesor} onCambio={(espesor) => setPlantillas({ ...t, muro: { ...t.muro, espesor } })} />
+            <CampoMaterial modelo={m} valor={t.muro?.material} para="la plantilla de Muro" editar={editar} onCambio={(material) => setPlantillas({ ...t, muro: { ...t.muro, material } })} />
+            <label className="campo">
+              <span>base</span>
+              <select className="sel" value={t.muro?.base ?? "empotrado"} aria-label="Base" onChange={(x) => setPlantillas({ ...t, muro: { ...t.muro, base: x.target.value as "empotrado" } })}>
+                <option value="empotrado">empotrado</option>
+                <option value="articulado">articulado</option>
+                <option value="ninguno">ninguno (nace sobre otra pieza)</option>
+              </select>
+            </label>
+            <Segmentado
+              etiqueta="lo dibujado"
+              valor={t.muro?.alinear ?? "eje"}
+              opciones={[
+                ["eje", "Eje"],
+                ["izquierda", "Cara izq."],
+                ["derecha", "Cara der."],
+              ]}
+              onCambio={(alinear) => setPlantillas({ ...t, muro: { ...t.muro, alinear } })}
+              ayuda={(t.muro?.alinear ?? "eje") === "eje" ? "El eje del muro." : `Su cara ${t.muro?.alinear === "izquierda" ? "izquierda" : "derecha"} según el sentido del dibujo: el eje va medio espesor más allá.`}
+            />
+          </div>
+        </Seccion>
+      )}
+
+      {(h === "apoyo" || h === "apoyoLineal") && (
+        <Seccion titulo="Plantilla" valor="para los siguientes">
+          <div className="py-1">
+            <CampoCoartados valor={t[h]?.coartados ?? (h === "apoyo" ? COARTADOS.empotrado : COARTADOS.uz)} onCambio={(coartados) => setPlantillas({ ...t, [h]: { coartados } })} />
+          </div>
+        </Seccion>
+      )}
+
+      {CARGA_HERR.has(h) && <PlantillaCargaPanel h={h as NombreCargaH} t={t.cargas ?? {}} poner={(c) => setPlantillas({ ...t, cargas: { ...t.cargas, ...c } })} />}
+
       <Seccion titulo="Enganches" valor={`${foto.activos.size} de ${TIPOS_ENGANCHE.length}`}>
         <label className="chk dib-orto">
           <input type="checkbox" checked={foto.orto} onChange={() => ctrl.alternarOrto()} />
@@ -245,21 +389,22 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
   );
 }
 
-function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda }: { etiqueta: string; unidad?: string; valor: number | undefined; onCambio: (v: number | undefined) => void; ayuda?: string }) {
+/** Un número de la plantilla; vacío es «el de por defecto» (y 0 también, salvo con `cero`); `falta`, en rojo mientras esté vacío. */
+function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, cero, vacio = "0" }: { etiqueta: string; unidad?: string; valor: number | undefined; onCambio: (v: number | undefined) => void; ayuda?: string; falta?: boolean; cero?: boolean; vacio?: string }) {
   const [texto, setTexto] = useState<string | null>(null);
   const mostrado = texto ?? (valor === undefined ? "" : String(valor).replace(".", ","));
   const v = Number(mostrado.trim().replace(",", "."));
   const mal = mostrado.trim() !== "" && !Number.isFinite(v);
   const escribir = () => {
     if (texto === null) return;
-    if (!mal) onCambio(texto.trim() === "" || v === 0 ? undefined : v);
+    if (!mal) onCambio(texto.trim() === "" || (v === 0 && !cero) ? undefined : v);
     setTexto(null);
   };
   return (
     <label className="campo">
       <span>{etiqueta}</span>
       <span className="dib-unidad" data-unidad={unidad}>
-        <input value={mostrado} placeholder="0" data-error={mal} aria-label={etiqueta} aria-invalid={mal} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+        <input value={mostrado} placeholder={falta ? "obligatorio" : vacio} data-error={mal || (!!falta && !mostrado.trim())} aria-label={etiqueta} aria-invalid={mal} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
       </span>
       {mal ? <p className="error">Un número</p> : ayuda ? <p className="ayuda">{ayuda}</p> : null}
     </label>
@@ -272,14 +417,15 @@ function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda }: { etiqueta: s
  * secciones en el proyecto, sólo crearla. Crear una sección es un paso de deshacer; la plantilla no
  * es del modelo, así que elegirla no lo es.
  */
-function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio }: { modelo: ModeloFisico; valor: string | undefined; tipo: "P" | "V"; editar: Props["editar"]; onCambio: (s: string) => void }) {
+function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio, etiqueta = "sección" }: { modelo: ModeloFisico; valor: string | undefined; tipo: "P" | "V" | "vigueta"; editar: Props["editar"]; onCambio: (s: string) => void; etiqueta?: string }) {
   const ninguna = !m.secciones.length;
+  const uso: UsoSeccion = tipo === "P" ? "pilar" : tipo === "V" ? "viga" : "vigueta";
   const abrir = (eleccion: string) =>
     abrirGestor({
       coleccion: "secciones",
       ...(eleccion === EDITAR && valor ? { id: valor } : { nueva: true }),
-      uso: tipo === "P" ? "pilar" : "viga",
-      para: `la plantilla de ${tipo === "P" ? "Pilar" : "Viga"}`,
+      uso,
+      para: `la plantilla de ${tipo === "P" ? "Pilar" : tipo === "V" ? "Viga" : "Forjado"}`,
       alElegir: (id, crear) => {
         if (crear.length) {
           const e = editar(comoUna(crear), `Sección ${id}`);
@@ -292,7 +438,7 @@ function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio }: { modelo: Mo
   const elegida = m.secciones.find((s) => s.id === valor);
   return (
     <div className="campo">
-      <span>sección</span>
+      <span>{etiqueta}</span>
       {ninguna ? (
         <button type="button" className="btn btn-p" onClick={() => abrir(NUEVA)}>
           <Plus size={14} />
@@ -316,6 +462,234 @@ function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio }: { modelo: Mo
       )}
       <p>{ninguna ? "Ninguna en el proyecto: créela con su tipo y medidas." : elegida ? describirSeccion(elegida) : ""}</p>
     </div>
+  );
+}
+
+/** Unos botones de radio en una fila (el modo de una herramienta, el tipo de un forjado). */
+function Segmentado<T extends string>({ etiqueta, valor, opciones, onCambio, ayuda }: { etiqueta: string; valor: T; opciones: readonly (readonly [T, string])[]; onCambio: (v: T) => void; ayuda?: ReactNode }) {
+  return (
+    <div className="campo">
+      <span>{etiqueta}</span>
+      <div className="seg dib-seg" role="radiogroup" aria-label={etiqueta}>
+        {opciones.map(([v, texto]) => (
+          <button key={v} type="button" role="radio" aria-checked={valor === v} data-on={valor === v} onClick={() => onCambio(v)}>
+            {texto}
+          </button>
+        ))}
+      </div>
+      {ayuda && <p>{ayuda}</p>}
+    </div>
+  );
+}
+
+/** El material de la plantilla, con «Nuevo material…» y «Editar…» (GE). */
+function CampoMaterial({ modelo: m, valor, para, editar, onCambio }: { modelo: ModeloFisico; valor: string | undefined; para: string; editar: Props["editar"]; onCambio: (s: string) => void }) {
+  const abrir = (eleccion: string) =>
+    abrirGestor({
+      coleccion: "materiales",
+      ...(eleccion === EDITAR && valor ? { id: valor } : { nueva: true }),
+      familia: "hormigon",
+      para,
+      alElegir: (id, crear) => {
+        if (crear.length) {
+          const e = editar(comoUna(crear), `Material ${id}`);
+          if (e) return e;
+        }
+        onCambio(id);
+        return null;
+      },
+    });
+  return (
+    <label className="campo">
+      <span>material</span>
+      <select className="sel" value={valor ?? ""} aria-label="Material" data-error={!valor} onChange={(x) => (esDelGestor(x.target.value) ? abrir(x.target.value) : onCambio(x.target.value))}>
+        {!valor && <option value="">(ninguno)</option>}
+        {m.materiales.map((x) => (
+          <option key={x.id} value={x.id}>
+            {x.id}
+          </option>
+        ))}
+        <OpcionesGestor coleccion="materiales" valor={valor ?? ""} />
+      </select>
+    </label>
+  );
+}
+
+const GDL = ["ux", "uy", "uz", "rx", "ry", "rz"] as const;
+const PRESETS: readonly (readonly [keyof typeof COARTADOS, string])[] = [
+  ["empotrado", "Empotrado"],
+  ["articulado", "Articulado"],
+  ["uz", "Sólo uz"],
+];
+
+/** Lo que coacciona un apoyo: los tres típicos y los seis GDL uno a uno. */
+function CampoCoartados({ valor, onCambio }: { valor: Seis<boolean>; onCambio: (v: Seis<boolean>) => void }) {
+  const preset = PRESETS.find(([k]) => COARTADOS[k].every((x, i) => x === valor[i]))?.[0];
+  return (
+    <>
+      <Segmentado etiqueta="coacciona" valor={preset ?? ("" as keyof typeof COARTADOS)} opciones={PRESETS} onCambio={(k) => onCambio(COARTADOS[k])} />
+      <div className="campo">
+        <span>GDL</span>
+        <div className="dib-gdl" role="group" aria-label="GDL coartados">
+          {GDL.map((g, i) => (
+            <button key={g} type="button" aria-pressed={valor[i]} onClick={() => onCambio(valor.map((x, j) => (j === i ? !x : x)) as unknown as Seis<boolean>)}>
+              {g}
+            </button>
+          ))}
+        </div>
+        <p>En ejes globales; los marcados no se mueven.</p>
+      </div>
+    </>
+  );
+}
+
+const textoVector = (v: Vec3 | undefined) => (v ? v.map((x) => String(x).replace(".", ",")).join(" ") : "");
+
+/** Un vector «x y z» (como en las tablas: coma decimal y espacios o «;»). */
+function CampoVector({ etiqueta, unidad, valor, onCambio, ayuda }: { etiqueta: string; unidad: string; valor: Vec3 | undefined; onCambio: (v: Vec3 | undefined) => void; ayuda?: string }) {
+  const [texto, setTexto] = useState<string | null>(null);
+  const mostrado = texto ?? textoVector(valor);
+  const ns = mostrado.trim() ? mostrado.trim().split(/[\s;]+/).map((x) => Number(x.replace(",", "."))) : [];
+  const mal = ns.length > 0 && (ns.length !== 3 || !ns.every(Number.isFinite));
+  const escribir = () => {
+    if (texto === null) return;
+    if (!mal) onCambio(ns.length ? (ns as unknown as Vec3) : undefined);
+    setTexto(null);
+  };
+  return (
+    <label className="campo">
+      <span>
+        {etiqueta} <small>{unidad}</small>
+      </span>
+      <input className="mono" value={mostrado} placeholder="x y z" data-error={mal} aria-label={etiqueta} aria-invalid={mal} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+      {mal ? <p className="error">Tres números: «0 0 -5»</p> : ayuda ? <p>{ayuda}</p> : null}
+    </label>
+  );
+}
+
+const TIPO_FORJADO: Record<TipoForjado, string> = { maciza: "Maciza", reticular: "Reticular", unidireccional: "Unidirecc." };
+
+/** La plantilla de Forjado: el modo (recuadro o polígono), el tipo y lo de cada tipo, como las columnas de la tabla. */
+function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: ModeloFisico; t: PlantillaForjado; poner: (c: PlantillaForjado, limpiar?: boolean) => void; editar: Props["editar"] }) {
+  const tipo = t.tipo ?? "maciza";
+  const num = (k: "espesor" | "pp" | "direccion" | "intereje" | "nervio" | "capa", etiqueta: string, unidad: string, ayuda?: string) => <NumeroCampo key={`${tipo}-${k}`} etiqueta={etiqueta} unidad={unidad} valor={t[k]} onCambio={(v) => poner({ [k]: v })} ayuda={ayuda} cero={k === "pp"} vacio={k === "pp" && tipo === "maciza" ? "γ·canto" : "0"} falta={k === "pp" && t.pp === undefined && (tipo === "unidireccional" || (tipo === "reticular" && t.caseton !== "recuperable"))} />;
+  return (
+    <Seccion titulo="Plantilla" valor="para los siguientes">
+      <div className="py-1">
+        <Segmentado
+          etiqueta="cómo"
+          valor={t.modo ?? "recuadro"}
+          opciones={[
+            ["recuadro", "Recuadro"],
+            ["poligono", "Polígono"],
+          ]}
+          onCambio={(modo) => poner({ modo })}
+          ayuda={(t.modo ?? "recuadro") === "recuadro" ? "Un clic dentro de un recuadro cerrado por vigas, muros, apoyos lineales o bordes de forjado: el contorno, por sus ejes, desde el vértice más cercano al clic." : "Clic a clic; Intro, doble clic o un clic en el primero lo cierra."}
+        />
+        <Segmentado etiqueta="tipo" valor={tipo} opciones={TIPOS_FORJADO.map((x) => [x, TIPO_FORJADO[x]] as const)} onCambio={(x) => poner({ modo: t.modo, tipo: x }, true)} />
+        {tipo !== "unidireccional" && (
+          <>
+            {num("espesor", "canto", "m")}
+            <CampoMaterial modelo={m} valor={t.material} para="la plantilla de Forjado" editar={editar} onCambio={(material) => poner({ material })} />
+          </>
+        )}
+        {tipo === "reticular" && (
+          <>
+            {num("intereje", "intereje", "m", "Entre ejes de nervios.")}
+            {num("nervio", "nervio", "m", "Ancho del nervio (bw).")}
+            {num("capa", "capa", "m", "Capa de compresión (hf).")}
+            <Segmentado
+              etiqueta="casetón"
+              valor={t.caseton ?? "perdido"}
+              opciones={[
+                ["perdido", "Perdido"],
+                ["recuperable", "Recuperable"],
+              ]}
+              onCambio={(caseton) => poner({ caseton })}
+            />
+          </>
+        )}
+        {tipo === "unidireccional" && (
+          <>
+            {num("intereje", "intereje", "m", "Entre ejes de viguetas.")}
+            <CampoSeccion modelo={m} valor={t.seccion} tipo="vigueta" etiqueta="vigueta" editar={editar} onCambio={(seccion) => poner({ seccion })} />
+          </>
+        )}
+        {num("pp", "pp", "kN/m²", tipo === "maciza" ? "Vacío: γ·canto." : tipo === "reticular" ? "Con casetón perdido, obligatorio: el peso de la zona aligerada." : "Obligatorio, con las bovedillas.")}
+        {num("direccion", "dirección", "°", tipo === "unidireccional" ? "La de las viguetas, desde +X." : tipo === "reticular" ? "La de los nervios, desde +X." : "La del eje 1 de las láminas, desde +X.")}
+      </div>
+    </Seccion>
+  );
+}
+
+const CARGA_HERR: ReadonlySet<string> = new Set(["puntual", "lineal", "superficie", "barra", "empuje"]);
+type NombreCargaH = "puntual" | "lineal" | "superficie" | "barra" | "empuje";
+
+/** La plantilla de una carga: el caso activo (el de la barra) y sus valores, que nunca tienen uno por defecto. */
+function PlantillaCargaPanel({ h, t, poner }: { h: NombreCargaH; t: PlantillaCargas; poner: (c: PlantillaCargas) => void }) {
+  const abajo = "Hacia abajo, z < 0.";
+  return (
+    <Seccion titulo="Plantilla" valor={t.caso ? `caso ${t.caso}` : "sin caso"}>
+      <div className="py-1">
+        {!t.caso && <p className="nota text-state-fail">Elija el caso activo en la barra (o cree uno con Casos).</p>}
+        {h === "puntual" && (
+          <>
+            <CampoVector etiqueta="F" unidad="kN" valor={t.puntual?.F} onCambio={(F) => poner({ puntual: { ...t.puntual, F } })} ayuda={`Fx Fy Fz en ejes globales. ${abajo}`} />
+            <CampoVector etiqueta="M" unidad="kN·m" valor={t.puntual?.M} onCambio={(M) => poner({ puntual: { ...t.puntual, M } })} ayuda="Mx My Mz en ejes globales." />
+          </>
+        )}
+        {h === "lineal" && <CampoVector etiqueta="q" unidad="kN/m" valor={t.lineal?.q} onCambio={(q) => poner({ lineal: { q } })} ayuda={`qx qy qz en ejes globales. ${abajo}`} />}
+        {h === "superficie" && (
+          <>
+            <Segmentado
+              etiqueta="dónde"
+              valor={t.superficie?.modo ?? "forjado"}
+              opciones={[
+                ["forjado", "Forjado"],
+                ["zona", "Zona"],
+              ]}
+              onCambio={(modo) => poner({ superficie: { ...t.superficie, modo } })}
+              ayuda={(t.superficie?.modo ?? "forjado") === "forjado" ? "Un clic dentro de una losa o un paño: todo él, sin sus huecos." : "Un polígono; si cae entero en un forjado, la parte de él en la zona."}
+            />
+            <CampoVector etiqueta="q" unidad="kN/m²" valor={t.superficie?.q} onCambio={(q) => poner({ superficie: { ...t.superficie, q } })} ayuda={`qx qy qz en ejes globales. ${abajo}`} />
+          </>
+        )}
+        {h === "barra" && (
+          <>
+            <Segmentado
+              etiqueta="dónde"
+              valor={t.barra?.modo ?? "entera"}
+              opciones={[
+                ["entera", "Pieza entera"],
+                ["tramo", "Tramo"],
+              ]}
+              onCambio={(modo) => poner({ barra: { ...t.barra, modo } })}
+              ayuda={(t.barra?.modo ?? "entera") === "entera" ? "Un clic en una viga o en un pilar." : "Dos clics en una viga: los extremos del tramo (en un pilar, todo él)."}
+            />
+            <Segmentado
+              etiqueta="ejes"
+              valor={t.barra?.ejes ?? "global"}
+              opciones={[
+                ["global", "Globales"],
+                ["local", "Locales"],
+              ]}
+              onCambio={(ejes) => poner({ barra: { ...t.barra, ejes } })}
+            />
+            <CampoVector etiqueta="q" unidad="kN/m" valor={t.barra?.q} onCambio={(q) => poner({ barra: { ...t.barra, q } })} ayuda={`qx qy qz. ${abajo}`} />
+            <CampoVector etiqueta="qb" unidad="kN/m" valor={t.barra?.qb} onCambio={(qb) => poner({ barra: { ...t.barra, qb } })} ayuda="Al final, si varía (vacío: uniforme)." />
+          </>
+        )}
+        {h === "empuje" && (
+          <>
+            <NumeroCampo etiqueta="z0" unidad="m" valor={t.empuje?.z0} onCambio={(z0) => poner({ empuje: { ...t.empuje, z0 } })} ayuda="Sobre la base del muro, donde vale p0." />
+            <NumeroCampo etiqueta="z1" unidad="m" valor={t.empuje?.z1} onCambio={(z1) => poner({ empuje: { ...t.empuje, z1 } })} falta={t.empuje?.z1 === undefined} ayuda="Donde vale p1; nula fuera de z0–z1." />
+            <NumeroCampo etiqueta="p0" unidad="kN/m²" cero valor={t.empuje?.p0} onCambio={(p0) => poner({ empuje: { ...t.empuje, p0 } })} falta={t.empuje?.p0 === undefined} />
+            <NumeroCampo etiqueta="p1" unidad="kN/m²" valor={t.empuje?.p1} onCambio={(p1) => poner({ empuje: { ...t.empuje, p1 } })} />
+            <p className="nota">El clic, del lado del terreno: empuja hacia el otro.</p>
+          </>
+        )}
+      </div>
+    </Seccion>
   );
 }
 

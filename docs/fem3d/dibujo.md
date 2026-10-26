@@ -1,6 +1,6 @@
 # V2c: dibujar el modelo con el ratón (plan)
 
-> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7).
+> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7). **V2c-2 hecho el 2026-10-26** (§8).
 >
 > **Origen:** el usuario pide adelantar V2c a la puerta de uso de F y AB. Con las tablas sólo se modela bien si ya se tienen las coordenadas: «no sé cómo modelarlo yo si no». Se sustituye así el orden de `visor.md` (V-e: primero tablas y luego el ratón) y el de `CLAUDE.md` («con lo que salga, V2c»). La puerta de uso de F y AB va después de V2c, y con ella la fase MA.
 
@@ -215,4 +215,66 @@ Cómo se comporta cada herramienta:
 - **Al pasar el ratón** se resalta lo del índice local (pilares, vigas, muros, apoyos lineales, ejes, losas y paños), no lo que elegiría el worker: los apoyos puntuales y las cargas no se resaltan.
 - **«La cara de un pilar en la prolongación del cursor»** (§2.2, nivel 5) se ha hecho como el punto de la cara más cercano al cursor.
 - Los bancos de V1, V2a y V2b tienen umbrales de tiempo y nombres de pestaña de antes de LV2 y de Forjados: hay que ponerlos al día (no es de V2c).
+- La puerta de uso, al final de V2c (V2c-a).
+
+## 8. V2c-2 hecho (2026-10-26)
+
+Forjado (recuadro y polígono), Hueco, Muro, Apoyo y Apoyo lineal en Modelo, y las cinco cargas en Cargas, con su plantilla en Propiedades.
+
+### 8.1 Qué hay
+
+- **`src/editor/dibujo/`** (puro, sin DOM):
+  - `recuadros.ts`: el grafo plano de los ejes de las vigas, muros y apoyos lineales de la planta y de los bordes de sus forjados, cortado en los cruces (con `cruce`: los extremos y los cruces de rectas paralelas a X o a Y tienen sus números), sin lo que cuelga; cada cara acotada es un recuadro. El de un punto es el menor que lo contiene; su contorno, sin vértices colineales y desde el vértice más cercano al clic.
+  - `piezas.ts`: Forjado, Hueco, Muro, Apoyo y Apoyo lineal, y lo común (`pasoPolilinea`, `desplazar`, `estacion`, `forjadoEn`).
+  - `cargas.ts`: Puntual, Lineal, Superficie, En barra y Empuje.
+  - `herramientas.ts` las reparte. El evento de un clic lleva además el cursor sin enganchar y el radio (V2c2-2).
+- **En la app:**
+  - las herramientas, en las barras de Modelo (Forjado, Hueco, Muro, Apoyo y Apoyo lineal, que antes abrían su tabla) y de Cargas (Puntual, Lineal, Superficie, En barra, Empuje y Tabla);
+  - sus plantillas en Propiedades (`Plantilla.tsx`);
+  - el borrador de cada una: el recuadro bajo el cursor, el rectángulo del hueco, la huella del muro, la cara del muro del lado del empuje;
+  - iconos nuevos: Hueco, Puntual, Lineal, Superficie y En barra.
+
+Cómo se comporta cada herramienta:
+
+- **Forjado:** maciza, reticular o unidireccional, como las columnas de la tabla.
+  - Con «Recuadro» (por defecto), un clic dentro de un recuadro cerrado; el borrador lo enseña bajo el cursor. Con «Polígono», clic a clic; Intro, doble clic o un clic en el primero lo cierra. No crea uno que pise otro forjado.
+  - En un unidireccional, las viguetas empiezan en el lado más cercano al primer vértice (C4-a.1): con el recuadro, el clic cerca de una esquina la elige.
+  - Lo que la plantilla no dice sale del último forjado de su tipo (o de lo típico: maciza de 25 cm; reticular 25+5 con 0,80 / 0,12 / 0,05). El pp del reticular con casetón perdido y del unidireccional, sólo del último: si no hay, la plantilla lo pide en rojo.
+- **Hueco:** el primer clic dice dónde va.
+  - En un forjado, un rectángulo de dos esquinas en los ejes del ortogonal (por defecto) o un polígono, dentro de su contorno y sin tocarlo ni tocar otros huecos.
+  - En un muro, dos clics por su eje y en un tramo dan las estaciones. Las alturas de la plantilla (por defecto, una puerta: 0 y 2,1 m) son sobre el suelo de la planta de abajo; en un muro de varias plantas, se suman las de las que quedan debajo.
+- **Muro:** polilínea, como la viga; un clic en el primer punto lo cierra (un núcleo, que repite el primero). Desde y hasta, como el pilar. Lo dibujado es el eje o una cara (el eje, medio espesor más allá; con tramos paralelos a X o a Y, los números se suman tal cual).
+- **Apoyo y Apoyo lineal:** un clic o una polilínea. Lo que coaccionan: empotrado (apoyo), sólo uz (apoyo lineal), articulado o los seis GDL uno a uno.
+- **Cargas,** en el caso activo de la barra. Sus valores no tienen nunca uno por defecto: sin ellos, la herramienta lo pide.
+  - Puntual: un clic, con F y M.
+  - Lineal: una polilínea (cerrable).
+  - Superficie: un clic en una losa o un paño (todo él), o una zona. La zona lleva su forjado si cae entera en uno, como la de la tabla («la parte de esa losa en la zona»).
+  - En barra: un clic en una viga o un pilar (la pieza entera) o, con «Tramo», dos clics en una viga.
+  - Empuje: un clic en un muro, del lado del terreno.
+
+### 8.2 Criterios
+
+| # | Criterio | Resultado |
+|---|---|---|
+| 1 | Las herramientas dan lo que daría la tabla | **Pasa.** `dibujo2.test.ts`: forjado por recuadro (maciza, reticular y un paño cerrado por el borde de otro forjado), por polígono, hueco rectangular y poligonal, muro cerrado y a una cara, hueco de muro, apoyo, apoyo lineal y las cinco cargas (con zona y con tramo), cada uno byte a byte igual a su fila de la tabla |
+| 2 | El enganche es exacto | **Pasa.** El contorno de un recuadro son los números de los ejes; las estaciones, redondeadas a 1e-9 m (V2c2-1). Una retícula con núcleo, dos forjados por recuadros, un hueco de losa, un muro con su hueco, un apoyo lineal y cargas compila sin `losa/ajuste`, `muro/ajuste`, `topologia/casi-encuentro`, `topologia/fusion`, `topologia/nudos-proximos` ni errores |
+| 3 | Rehacer los modelos de A2 dibujándolos | **Pasa.** El banco (`validacion/v2c/chrome.ts`) dibuja con ratón y teclado la planta del edificio objetivo entera (la de V2c-1, su losa con el hueco, tecleados, y sus cuatro cargas: dos de superficie con un clic, la lineal y la zona tecleadas) y la retícula con núcleo (ejes, 16 pilares, 8 vigas, losa con hueco, núcleo cerrado con su puerta, la sobrecarga con un clic y el viento con un clic en cada pilar). Tras «Renumerar», las dos huellas son las de sus referencias renumeradas. Las cargas de la referencia llevan los ids que les da el dibujo (Q1, Q2…) y el núcleo, sin la base `empotrado` escrita (V2c2-3) |
+| 4 | Deshacer | **Pasa.** En el banco, 186 pasos en el edificio (18 ejes, 80 pilares, 81 vigas, losa, hueco, 4 cargas y Renumerar) y, deshecho todo, la huella de partida; en vitest, deshacer los 9 pasos de la retícula con núcleo da los bytes de partida |
+| 5 | Fluidez | **Pasa.** Con Forjado en la planta del edificio con sus vigas y sin losa, pasar y pintar con el recuadro bajo el cursor: 0,1 ms de mediana y 0,2 ms p95; los recuadros de la planta, 3,3 ms la primera vez. El enganche con Viga, como en V2c-1 |
+| 6 | Nada se rompe | **Pasa.** vitest en verde: 2 214 pruebas de la raíz y 72 de la app. La prueba de DOM de Forjados abre ahora la tabla desde la plantilla («Tabla»), porque Forjado ya es una herramienta. Ningún otro banco de Chrome usa los botones que cambian; los de CT e I2 dan lo mismo que antes salvo los tiempos (ruido) |
+| 7 | Puerta de uso | Del usuario, al final de V2c |
+
+### 8.3 Hallazgos
+
+- **V2c2-1, las estaciones no son puntos.** Las de un hueco de muro y las de una carga en un tramo de viga son distancias a lo largo de la pieza: 8,4 − 6 da 2,4000000000000004. Se redondean a 1e-9 m. No hay unión que dependa de ellas: el compilador las vuelve a medir.
+- **V2c2-2, lo que se elige con un clic dentro necesita el cursor sin enganchar.** El enganche «más cercano» deja el punto en el borde de dos recuadros, y el punto en polígono decide entonces por redondeo. Por eso el clic lleva también el cursor del ratón y el radio. Con ellos se eligen el recuadro, el forjado de una carga de superficie, el lado de un empuje y la viga o el pilar de una carga en barra. Un punto tecleado no los lleva: vale el punto tecleado.
+- **V2c2-3, un valor por defecto escrito cambia la huella.** El núcleo de A2 lleva `base: "empotrado"`. Muro no lo escribe, como la tabla con la celda vacía. El modelo analítico es el mismo, pero la huella es la del modelo físico tal como está escrito, así que no coincide. La referencia del banco se compara sin él.
+- **V2c2-4, un núcleo dentro de un recuadro.** Un muro cerrado suelto dentro de un recuadro es una isla del grafo: el recuadro es el de fuera, y el forjado lo cubre entero. El hueco de la escalera se dibuja después, con Hueco. Si el núcleo se une al borde con una viga, el contorno pasa dos veces por ella: no es un polígono simple, y la herramienta pide dibujarlo como polígono.
+
+### 8.4 Pendiente
+
+- **Forjado con ventana:** un forjado en cada recuadro de dentro, como el pilar en cada cruce.
+- **Hueco de muro en el alzado** (§5 lo dejaba allí). Aquí se dibuja en la planta, con las alturas en la plantilla.
+- **Carga en un tramo de pilar.** Sigue en la tabla: En barra pone la carga en todo el pilar.
+- **Al pasar el ratón** siguen sin resaltarse los apoyos puntuales y las cargas (§7.4).
 - La puerta de uso, al final de V2c (V2c-a).

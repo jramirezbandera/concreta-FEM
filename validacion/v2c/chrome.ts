@@ -1,19 +1,22 @@
 /**
- * Banco de V2c-1 en Chrome de verdad (`docs/fem3d/dibujo.md` §4):
+ * Banco de V2c-1 y V2c-2 en Chrome de verdad (`docs/fem3d/dibujo.md` §4):
  *
  *   node validacion/v2c/chrome.ts          escribe validacion/v2c/out_chrome.txt
  *
  * Como el de V2a (`validacion/v2a/chrome.ts`): compila la app, la sirve con el manejador del servidor
  * local (`app/servidor.ts`) y la maneja con Chrome headless por el protocolo de depuración.
  *
- * - 3 (lo de V2c-1): dibuja con eventos de ratón y teclado, desde los ejes, los pilares y las vigas
- *   de una planta del edificio objetivo de A2 (ejes tecleados, pilares con un clic en cada cruce,
- *   vigas principales de pilar a pilar con el ratón y secundarias tecleadas). Tras «Renumerar», la
- *   huella es la de la referencia renumerada: la misma planta, con sus pilares y vigas. Las losas y
- *   los muros, con V2c-2.
+ * - 3: dibuja con eventos de ratón y teclado, desde los ejes, una planta del edificio objetivo de A2
+ *   (ejes tecleados, pilares con un clic en cada cruce, vigas principales de pilar a pilar con el
+ *   ratón y secundarias tecleadas, la losa como polígono y su hueco tecleados, y en Cargas sus cargas
+ *   de superficie con un clic, la lineal y la zona tecleadas) y la retícula con núcleo de A2 (ejes,
+ *   pilares, vigas, losa con hueco, el núcleo cerrado con su hueco de puerta, la sobrecarga con un
+ *   clic y el viento en los pilares con un clic en cada uno). Tras «Renumerar», la huella de cada uno
+ *   es la de su referencia renumerada.
  * - 4: deshacer todo vuelve a la huella de partida, una acción por paso.
  * - 5: en el edificio objetivo (80 pilares por planta, 7 plantas), el enganche al mover el ratón con
- *   la herramienta Viga tarda ≤ 2 ms, y pasar el ratón por la planta no da tareas largas.
+ *   la herramienta Viga tarda ≤ 2 ms, y pasar el ratón por la planta no da tareas largas; con Forjado
+ *   en una planta con sus vigas y sin losa, lo mismo con el recuadro bajo el cursor.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -22,7 +25,7 @@ import { tmpdir } from "node:os";
 import { extname, join, normalize } from "node:path";
 import { leerProyecto, type Proyecto } from "../../src/agente/proyecto.ts";
 import { huellaCompilacion } from "../../src/compilador/compilar.ts";
-import { resolverOpciones, type ModeloFisico } from "../../src/compilador/fisico.ts";
+import { resolverOpciones, type CargaFisica, type ModeloFisico } from "../../src/compilador/fisico.ts";
 import { aplicar } from "../../src/editor/operaciones.ts";
 import { serializar } from "../../src/editor/serializar.ts";
 import { manejadorCarpeta } from "../../app/servidor.ts";
@@ -34,6 +37,7 @@ const CAPTURAS = process.env.CAPTURAS;
 const PUERTO = 8778;
 const PUERTO_CDP = 9338;
 const EDIFICIO = "validacion/a2/agente/edificio/proyecto.json";
+const NUCLEO = "validacion/a2/agente/nucleo/proyecto.json";
 const salida: string[] = [];
 const log = (s: string) => {
   console.log(s);
@@ -53,9 +57,12 @@ const E = edificio.proyecto;
 const PLANTA = "N1";
 const m0 = E.modelo;
 const plantas: ModeloFisico["plantas"] = [{ id: PLANTA, altura: null }, m0.plantas.at(-1)!];
+/** Las cargas de la planta con los ids que les da el dibujo, Q1, Q2…, en el orden en que se dibujan. */
+const conIds = (cs: CargaFisica[]): CargaFisica[] => cs.map((c, i) => ({ ...c, id: `Q${i + 1}` }));
+const cargasN1 = (["G-sup-N1", "G-tab-N1", "Q-sup-N1", "Q-zona-N1"] as const).map((id) => m0.cargas!.find((c) => c.id === id)!);
 const referencia: Proyecto = {
   ...E,
-  nombre: "V2c-1: una planta del edificio objetivo",
+  nombre: "V2c: una planta del edificio objetivo",
   modelo: {
     plantas,
     materiales: m0.materiales,
@@ -63,6 +70,8 @@ const referencia: Proyecto = {
     casos: m0.casos,
     pilares: m0.pilares!.map((p) => ({ ...p, hasta: PLANTA })),
     vigas: m0.vigas!.filter((v) => v.planta === PLANTA),
+    losas: m0.losas!.filter((l) => l.planta === PLANTA),
+    cargas: conIds(cargasN1),
   },
 };
 const partida: Proyecto = { ...referencia, modelo: { plantas, materiales: m0.materiales, secciones: m0.secciones, casos: m0.casos } };
@@ -73,6 +82,19 @@ const HUELLA_REF = huellaCompilacion(renumerada.proyecto.modelo, op);
 const HUELLA_PARTIDA = huellaCompilacion(partida.modelo, op);
 const XS = [...new Set(m0.pilares!.map((p) => p.x))].sort((a, b) => a - b);
 const YS = [...new Set(m0.pilares!.map((p) => p.y))].sort((a, b) => a - b);
+
+// La retícula con núcleo: el muro sin la base de por defecto escrita (`empotrado`) y las cargas con los ids del dibujo
+const nucleo = leerProyecto(readFileSync(join(RAIZ, NUCLEO), "utf8"));
+if (!nucleo.valido) throw new Error("la retícula con núcleo no se lee");
+const N = nucleo.proyecto;
+const n0 = N.modelo;
+const refNucleo: Proyecto = { ...N, modelo: { ...n0, muros: n0.muros!.map(({ base, ...w }) => (base === "empotrado" ? w : { ...w, base })), cargas: conIds([...n0.cargas!]) } };
+const partidaNucleo: Proyecto = { ...N, modelo: { plantas: n0.plantas, materiales: n0.materiales, secciones: n0.secciones, casos: n0.casos } };
+const opN = resolverOpciones(N.opciones ?? {});
+const renNucleo = aplicar(refNucleo, { op: "renumerar" });
+if (!renNucleo.ok) throw new Error("la retícula con núcleo no se renumera");
+const HUELLA_NUCLEO = huellaCompilacion(renNucleo.proyecto.modelo, opN);
+const HUELLA_PARTIDA_NUCLEO = huellaCompilacion(partidaNucleo.modelo, opN);
 
 // ─── 1. La app compilada y los proyectos ────────────────────────────────────────────────────────
 
@@ -86,6 +108,7 @@ const poner = (nombre: string, texto: string) => {
   writeFileSync(join(d, "proyecto.json"), texto);
 };
 poner("partida", serializar(partida));
+poner("nucleo", serializar(partidaNucleo));
 poner("edificio", readFileSync(join(RAIZ, EDIFICIO), "utf8"));
 
 const TIPOS: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".woff2": "font/woff2", ".json": "application/json", ".txt": "text/plain", ".svg": "image/svg+xml" };
@@ -212,6 +235,55 @@ async function captura(nombre: string): Promise<void> {
 const compilada = () => pagina(`await new Promise((r) => setTimeout(r, 60)); await __c.esperar(() => __c.quieto()); await __c.fotograma(); await __c.fotograma();`);
 
 const num = (x: number) => String(x).replace(".", ",");
+const vector = (v: readonly number[]) => v.map(num).join(" ");
+let comprobarFluidez = () => {};
+
+/** Va a un espacio de trabajo (Modelo, Cargas…). */
+const espacio = (nombre: string) => pagina(`[...document.querySelectorAll("nav.espacios button")].find((b) => b.textContent.trim() === "${nombre}").click(); await __c.esperar(() => __c.herramienta("${nombre === "Cargas" ? "Puntual" : "Pilar"}"), 10000); await __c.esperar(() => __c.quieto());`);
+
+/** Una herramienta de carga con su caso y su valor q. */
+async function herramientaCarga(nombre: string, caso: string, q: readonly number[], campo = "q"): Promise<void> {
+  await pagina(`__c.elegir("Caso activo", "${caso}"); __c.herramienta("${nombre}").click(); await __c.esperar(() => document.querySelector('input[aria-label="${campo}"]'), 5000); await __c.escribir("${campo}", "${vector(q)}");`);
+}
+
+/** Las cuatro cargas de la planta del edificio, en el orden de la referencia. */
+async function dibujarCargasEdificio(): Promise<void> {
+  await espacio("Cargas");
+  const [gs, gt, qs, qz] = cargasN1 as [Extract<CargaFisica, { tipo: "superficie" }>, Extract<CargaFisica, { tipo: "lineal" }>, Extract<CargaFisica, { tipo: "superficie" }>, Extract<CargaFisica, { tipo: "superficie" }>];
+  // De superficie en toda la losa: un clic dentro
+  await herramientaCarga("Superficie", gs.caso, gs.q);
+  await pagina(`__c.clic([10, 10]);`);
+  await herramientaCarga("Lineal", gt.caso, gt.q);
+  for (const q of gt.puntos) await pagina(`await __c.teclear("${num(q[0])}; ${num(q[1])}");`);
+  await pagina(`__c.tecla("Enter");`);
+  await herramientaCarga("Superficie", qs.caso, qs.q);
+  await pagina(`__c.clic([10, 10]);`);
+  // La zona, tecleada (con la herramienta de antes: el modo, en Propiedades)
+  await pagina(`__c.escribir("q", "${vector(qz.q)}"); __c.boton("Zona").click();`);
+  for (const q of qz.zona!) await pagina(`await __c.teclear("${num(q[0])}; ${num(q[1])}");`);
+  await pagina(`__c.tecla("Enter"); __c.boton("Forjado").click(); __c.tecla("Escape");`);
+  await compilada();
+  await captura("3d-cargas");
+  const aviso = await pagina<string>(`return __c.aviso();`);
+  comprobar(!/Elija|Escriba|Haga clic/.test(aviso), `las cuatro cargas de la planta, sin errores de la herramienta («${aviso.slice(0, 80)}»)`);
+  await espacio("Modelo");
+}
+
+/** Compara lo guardado con una referencia, objeto a objeto, si las huellas no casan. */
+async function diferencias(carpeta: string, ref: Proyecto): Promise<void> {
+  await pagina(`__c.boton("Guardar")?.click(); await new Promise((r) => setTimeout(r, 800));`);
+  const leido = leerProyecto(readFileSync(join(datos, carpeta, "proyecto.json"), "utf8"));
+  if (!leido.valido) return log("  lo guardado no se lee");
+  const a = leido.proyecto.modelo as unknown as Record<string, { id: string }[] | undefined>;
+  const b = ref.modelo as unknown as Record<string, { id: string }[] | undefined>;
+  for (const k of ["pilares", "vigas", "losas", "panos", "muros", "apoyos", "apoyosLineales", "cargas"]) {
+    const [xa, xb] = [a[k] ?? [], b[k] ?? []];
+    if (xa.length !== xb.length) log(`  ${k}: ${xa.length} dibujados / ${xb.length} en la referencia`);
+    const pa = new Map(xa.map((x) => [x.id, JSON.stringify(x)]));
+    let n = 0;
+    for (const x of xb) if (pa.get(x.id) !== JSON.stringify(x) && n++ < 6) log(`  ${k} distinto: ${x.id} ${pa.get(x.id)} ≠ ${JSON.stringify(x)}`);
+  }
+}
 
 try {
   // ─── Criterio 3 ───────────────────────────────────────────────────────────────────────────────
@@ -259,6 +331,40 @@ try {
   await pagina(`__c.tecla("Escape");`);
   await compilada();
   await captura("3-vigas");
+
+  // Criterio 5 con Forjado: la planta con sus vigas y sin losa, el recuadro bajo el cursor
+  await pagina(`__c.herramienta("Forjado").click();`);
+  const mr = await pagina<{ primero: number; t: number[] }>(`
+    // Pasar y pintar: el recuadro bajo el cursor sale al pintar el borrador
+    const v = __c.vista(); const d = v.dibujo; const radio = 10 / v.escala;
+    const ctx = document.createElement("canvas").getContext("2d");
+    const col = { fondo: "#fff", texto: "#000", textoSuave: "#666", acento: "#06f", panel: "#fff", borde: "#ccc" };
+    const uno = (p) => { d.pasar(p, radio, false, [0, 0]); d.pintar(ctx, (q) => v.aPx(q), col); };
+    const t = []; let a = performance.now(); uno([2.5, 2.5]); const primero = performance.now() - a;
+    for (let k = 0; k < 400; k++) { const p = [0.3 + (53.4 * ((k * 37) % 400)) / 400, 0.3 + (34.4 * ((k * 91) % 400)) / 400]; a = performance.now(); uno(p); t.push(performance.now() - a); }
+    return { primero, t };`);
+  const sr = [...mr.t].sort((a, b) => a - b);
+  const p95r = sr[Math.floor(sr.length * 0.95)]!;
+  comprobarFluidez = () => comprobar(p95r <= 2, `Forjado, pasar y pintar con el recuadro bajo el cursor (80 pilares, ${referencia.modelo.vigas!.length} vigas): mediana ${sr[sr.length >> 1]!.toFixed(3)} ms, p95 ${p95r.toFixed(3)} ms (≤ 2 ms); los recuadros de la planta, ${mr.primero.toFixed(1)} ms la primera vez`);
+  await pagina(`__c.ev("pointermove", [2.5, 2.5]); await __c.fotograma(); await __c.fotograma();`);
+  await captura("3b-recuadro");
+
+  // La losa como polígono tecleado y su hueco
+  const losa = referencia.modelo.losas![0]!;
+  await pagina(`__c.boton("Polígono").click();`);
+  for (const q of losa.contorno) await pagina(`await __c.teclear("${num(q[0])}; ${num(q[1])}");`);
+  await pagina(`__c.tecla("Enter");`);
+  await pagina(`__c.herramienta("Hueco").click();`);
+  const h0 = losa.huecos![0]!;
+  await pagina(`await __c.teclear("${num(h0[0]![0])}; ${num(h0[0]![1])}"); await __c.teclear("${num(h0[2]![0])}; ${num(h0[2]![1])}");`);
+  await pagina(`__c.tecla("Escape");`);
+  await compilada();
+  await captura("3c-losa");
+  const avisoLosa = await pagina<string>(`return __c.aviso();`);
+  comprobar(!/Elija|Escriba|Ya hay|solapar|dentro/.test(avisoLosa), `la losa y su hueco, tecleados, sin errores de la herramienta («${avisoLosa.slice(0, 80)}»)`);
+
+  // Las cargas, en el espacio Cargas
+  await dibujarCargasEdificio();
   const dibujado = Date.now() - t0;
 
   // Renumerar y comparar
@@ -266,24 +372,11 @@ try {
   await compilada();
   const h3 = await pagina<string>(`return __c.huella();`);
   comprobar(h3 === HUELLA_REF, `tras «Renumerar», la huella es la de la referencia renumerada (${h3.slice(0, 16)} = ${HUELLA_REF.slice(0, 16)}); dibujado en ${(dibujado / 1000).toFixed(1)} s de banco`);
-  if (h3 !== HUELLA_REF) {
-    await pagina(`__c.boton("Guardar")?.click(); await new Promise((r) => setTimeout(r, 800));`);
-    const leido = leerProyecto(readFileSync(join(datos, "partida", "proyecto.json"), "utf8"));
-    if (leido.valido) {
-      const a = leido.proyecto.modelo;
-      const b = renumerada.proyecto.modelo;
-      log(`  pilares ${a.pilares?.length} / ${b.pilares?.length}, vigas ${a.vigas?.length} / ${b.vigas?.length}`);
-      const pa = new Map((a.pilares ?? []).map((p) => [p.id, JSON.stringify(p)]));
-      for (const p of b.pilares ?? []) if (pa.get(p.id) !== JSON.stringify(p)) log(`  pilar distinto: ${p.id} ${pa.get(p.id)} ≠ ${JSON.stringify(p)}`);
-      const va = new Map((a.vigas ?? []).map((v) => [v.id, JSON.stringify(v)]));
-      let n = 0;
-      for (const v of b.vigas ?? []) if (va.get(v.id) !== JSON.stringify(v) && n++ < 8) log(`  viga distinta: ${v.id} ${va.get(v.id)} ≠ ${JSON.stringify(v)}`);
-    }
-  }
+  if (h3 !== HUELLA_REF) await diferencias("partida", renumerada.proyecto);
 
   // ─── Criterio 4 ───────────────────────────────────────────────────────────────────────────────
   log("\n## Criterio 4: una acción, un paso; deshacer todo deja el proyecto de partida");
-  const pasos = XS.length + YS.length + referencia.modelo.pilares!.length + referencia.modelo.vigas!.length + 1;
+  const pasos = XS.length + YS.length + referencia.modelo.pilares!.length + referencia.modelo.vigas!.length + 2 + cargasN1.length + 1;
   const n = await pagina<number>(`
     const b = () => document.querySelector('button[aria-label="Deshacer"]');
     let k = 0;
@@ -291,8 +384,63 @@ try {
     return k;`);
   await compilada();
   const h4 = await pagina<string>(`return __c.huella();`);
-  comprobar(n === pasos, `${n} pasos de deshacer: ${XS.length + YS.length} ejes + ${referencia.modelo.pilares!.length} pilares + ${referencia.modelo.vigas!.length} vigas + Renumerar = ${pasos}`);
+  comprobar(n === pasos, `${n} pasos de deshacer: ${XS.length + YS.length} ejes + ${referencia.modelo.pilares!.length} pilares + ${referencia.modelo.vigas!.length} vigas + losa y hueco + ${cargasN1.length} cargas + Renumerar = ${pasos}`);
   comprobar(h4 === HUELLA_PARTIDA, `deshecho todo, la huella es la de partida (${h4.slice(0, 16)})`);
+
+  // ─── Criterio 3, la retícula con núcleo ───────────────────────────────────────────────────────
+  log(`\n## Criterio 3: la retícula con núcleo de A2 (${n0.pilares!.length} pilares, ${n0.vigas!.length} vigas, losa con hueco, núcleo con puerta, ${n0.cargas!.length} cargas)`);
+  await abrir("nucleo");
+  comprobar((await pagina<string>(`return __c.huella();`)) === HUELLA_PARTIDA_NUCLEO, "el proyecto de partida tiene la huella de Node");
+  const NX = [...new Set(n0.pilares!.map((p) => p.x))].sort((a, b) => a - b);
+  const NY = [...new Set(n0.pilares!.map((p) => p.y))].sort((a, b) => a - b);
+  await pagina(`__c.herramienta("Ejes").click(); __c.ev("pointermove", [9, 7.5]);`);
+  for (const y of NY) await pagina(`await __c.teclear("-2; ${num(y)}"); await __c.teclear("20; ${num(y)}");`);
+  for (const x of NX) await pagina(`await __c.teclear("${num(x)}; -2"); await __c.teclear("${num(x)}; 17");`);
+  await pagina(`__c.herramienta("Pilar").click(); await __c.esperar(() => document.querySelector('[aria-label="Planta de la base"]')); __c.elegir("Sección", "${n0.pilares![0]!.seccion}");`);
+  for (const p of n0.pilares!) await pagina(`__c.clic([${p.x}, ${p.y}]);`);
+  await pagina(`__c.herramienta("Viga").click(); __c.elegir("Sección", "${n0.vigas![0]!.seccion}");`);
+  for (const v of n0.vigas!) await pagina(`await __c.teclear("${num(v.puntos[0]![0])}; ${num(v.puntos[0]![1])}"); await __c.teclear("${num(v.puntos[1]![0])}; ${num(v.puntos[1]![1])}"); __c.tecla("Enter");`);
+  // La losa, como polígono tecleado, con su canto; su hueco
+  const ln = n0.losas![0]!;
+  await pagina(`__c.herramienta("Forjado").click(); await __c.esperar(() => document.querySelector('input[aria-label="canto"]')); __c.boton("Polígono").click(); await __c.escribir("canto", "${num(ln.espesor)}");`);
+  for (const q of ln.contorno) await pagina(`await __c.teclear("${num(q[0])}; ${num(q[1])}");`);
+  await pagina(`__c.tecla("Enter"); __c.herramienta("Hueco").click();`);
+  const hn = ln.huecos![0]!;
+  await pagina(`await __c.teclear("${num(hn[0]![0])}; ${num(hn[0]![1])}"); await __c.teclear("${num(hn[2]![0])}; ${num(hn[2]![1])}");`);
+  // El núcleo: cerrado con un clic (tecleado) en el primer punto; su puerta, dos puntos por el eje
+  const w = n0.muros![0]!;
+  await pagina(`__c.herramienta("Muro").click(); await __c.esperar(() => document.querySelector('input[aria-label="espesor"]')); await __c.escribir("espesor", "${num(w.espesor)}");`);
+  for (const q of w.puntos) await pagina(`await __c.teclear("${num(q[0])}; ${num(q[1])}");`);
+  const hw = w.huecos![0]!;
+  const [a0, a1] = [w.puntos[0]!, w.puntos[1]!];
+  const largo = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]);
+  const u = [(a1[0] - a0[0]) / largo, (a1[1] - a0[1]) / largo];
+  const enEje = (s: number) => [a0[0] + u[0]! * s, a0[1] + u[1]! * s];
+  await pagina(`__c.herramienta("Hueco").click(); await __c.esperar(() => document.querySelector('input[aria-label="z0"]'), 5000); await __c.escribir("z0", "${num(hw.z0)}"); await __c.escribir("z1", "${num(hw.z1)}");`);
+  for (const s of [hw.desde, hw.hasta]) await pagina(`await __c.teclear("${enEje(s).map(num).join("; ")}");`);
+  await pagina(`__c.tecla("Escape");`);
+  await compilada();
+  await captura("6-nucleo");
+  const avisoN = await pagina<string>(`return __c.aviso();`);
+  comprobar(!/Elija|Escriba|Ya hay|solapar|dentro|tramo/.test(avisoN), `ejes, pilares, vigas, losa, hueco, núcleo y puerta, sin errores de la herramienta («${avisoN.slice(0, 80)}»)`);
+  // Las cargas: la sobrecarga con un clic en la losa y el viento con un clic en cada pilar
+  await espacio("Cargas");
+  const [su, ...vs] = n0.cargas! as [Extract<CargaFisica, { tipo: "superficie" }>, ...Extract<CargaFisica, { tipo: "pilar" }>[]];
+  await herramientaCarga("Superficie", su.caso, su.q);
+  await pagina(`__c.clic([3, 3]);`);
+  await herramientaCarga("En barra", vs[0]!.caso, vs[0]!.q);
+  for (const c of vs) {
+    const p = n0.pilares!.find((x) => x.id === c.pilar)!;
+    await pagina(`__c.clic([${p.x + 0.04}, ${p.y + 0.03}]);`);
+  }
+  await pagina(`__c.tecla("Escape");`);
+  await espacio("Modelo");
+  await pagina(`__c.herramienta("Renumerar").click(); const d = await __c.esperar(() => document.querySelector("[role=dialog]")); __c.boton("Renumerar", d).click();`);
+  await compilada();
+  await captura("7-nucleo-cargas");
+  const hn3 = await pagina<string>(`return __c.huella();`);
+  comprobar(hn3 === HUELLA_NUCLEO, `tras «Renumerar», la huella es la de la referencia renumerada (${hn3.slice(0, 16)} = ${HUELLA_NUCLEO.slice(0, 16)})`);
+  if (hn3 !== HUELLA_NUCLEO) await diferencias("nucleo", renNucleo.proyecto);
 
   // ─── Criterio 5 ───────────────────────────────────────────────────────────────────────────────
   log("\n## Criterio 5: el enganche en el edificio objetivo (7 plantas, 80 pilares por planta)");
@@ -308,6 +456,7 @@ try {
     return { primero, t };`);
   const s = [...medidas.t].sort((a, b) => a - b);
   const p95 = s[Math.floor(s.length * 0.95)]!;
+  comprobarFluidez();
   comprobar(p95 <= 2, `enganche al mover el ratón: mediana ${s[s.length >> 1]!.toFixed(3)} ms, p95 ${p95.toFixed(3)} ms, máx. ${s.at(-1)!.toFixed(3)} ms (≤ 2 ms); el índice de la planta, ${medidas.primero.toFixed(1)} ms la primera vez`);
   await pagina(`window.__largas = [];`);
   await pagina(`for (let k = 0; k <= 120; k++) { __c.ev("pointermove", [-1 + 56 * k / 120, -1 + 37 * ((k * 7) % 120) / 120]); await __c.fotograma(); }`);

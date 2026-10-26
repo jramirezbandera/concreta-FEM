@@ -64,7 +64,7 @@ interface Estirado {
 
 export class ControladorDibujo {
   private modelo: ModeloFisico | null = null;
-  plantillas: Plantillas = { pilar: {}, viga: {} };
+  private plantillas: Plantillas = { pilar: {}, viga: {} };
   /** Aplica lo terminado; devuelve el error si no se pudo. */
   aplicar: (h: Hecho) => string | null = () => "No hay ningún proyecto que editar.";
   /** Vuelve a Elegir (Esc sin nada en curso). */
@@ -114,7 +114,7 @@ export class ControladorDibujo {
   instantanea = (): Instantanea => this.foto;
 
   private cambiar(c: Partial<Instantanea>): void {
-    this.foto = { ...this.foto, ayuda: ayuda(this.herramienta, this.estado), ...c };
+    this.foto = { ...this.foto, ayuda: ayuda(this.herramienta, this.estado, this.plantillas), ...c };
     for (const f of this.oyentes) f();
   }
 
@@ -131,6 +131,20 @@ export class ControladorDibujo {
     this.soltarPilar();
     // Lo recién dibujado ya engancha, sin esperar a que se mueva el ratón
     this.recalcular();
+  }
+
+  /**
+   * La plantilla de las herramientas (desde un efecto: cambia la ayuda y el borrador). Si cambia el
+   * modo de la herramienta activa (recuadro o polígono, rectángulo, zona, tramo), lo que estaba en
+   * curso se anula.
+   */
+  ponerPlantillas(t: Plantillas): void {
+    if (t === this.plantillas) return;
+    const modo = (x: Plantillas) => JSON.stringify([x.forjado?.modo, x.hueco?.modo, x.cargas?.superficie?.modo, x.cargas?.barra?.modo]);
+    if (modo(t) !== modo(this.plantillas)) this.estado = ESTADO_INICIAL;
+    this.plantillas = t;
+    this.cambiar({});
+    this.repintar();
   }
 
   ponerHerramienta(h: NombreHerramienta): void {
@@ -190,7 +204,7 @@ export class ControladorDibujo {
   private cotas(): CotaTemporal[] {
     const ix = this.indiceActual();
     if (!this.modelo || !this.planta || !ix || !this.cursorQ) return [];
-    return borrador(this.herramienta, this.estado, this.apunte?.p ?? this.cursorQ, { modelo: this.modelo, planta: this.planta, indice: ix, plantillas: this.plantillas }).cotas;
+    return borrador(this.herramienta, this.estado, this.apunte?.p ?? this.cursorQ, { modelo: this.modelo, planta: this.planta, indice: ix, plantillas: this.plantillas }, this.cursorQ).cotas;
   }
 
   anular(): void {
@@ -706,7 +720,8 @@ export class ControladorDibujo {
     }
     this.pasar(planta, q, radio, this.mayus, this.cliente);
     const a = this.apunte;
-    if (a) this.evento({ tipo: "punto", p: a.p, enganche: a.enganche });
+    // Con el punto del ratón sin enganchar y el radio: lo que se elige con un clic dentro, a un lado o encima de algo
+    if (a) this.evento({ tipo: "punto", p: a.p, enganche: a.enganche, cursor: q, radio });
     return true;
   }
 
@@ -810,7 +825,7 @@ export class ControladorDibujo {
     }
     if (this.herramienta === "elegir" || !ix) return;
     // El borrador
-    const b = borrador(this.herramienta, this.estado, this.cursorQ ? (this.apunte?.p ?? this.cursorQ) : null, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas });
+    const b = borrador(this.herramienta, this.estado, this.cursorQ ? (this.apunte?.p ?? this.cursorQ) : null, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas }, this.cursorQ);
     ctx.strokeStyle = c.acento;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
@@ -819,13 +834,24 @@ export class ControladorDibujo {
       ctx.stroke();
     }
     ctx.setLineDash([]);
-    for (const r of b.anillos) {
-      camino(r, true);
+    // Los anillos de un mismo borrador, juntos y par-impar: el forjado con sus huecos
+    if (b.anillos.length) {
+      ctx.beginPath();
+      for (const r of b.anillos)
+        r.forEach((q, i) => {
+          const [x, y] = aPx(q);
+          if (i) ctx.lineTo(x, y);
+          else ctx.moveTo(x, y);
+        });
+      ctx.closePath();
       ctx.globalAlpha = 0.18;
       ctx.fillStyle = c.acento;
-      ctx.fill();
+      ctx.fill("evenodd");
       ctx.globalAlpha = 1;
-      ctx.stroke();
+      for (const r of b.anillos) {
+        camino(r, true);
+        ctx.stroke();
+      }
     }
     for (const q of b.puntos) {
       const [x, y] = aPx(q);
