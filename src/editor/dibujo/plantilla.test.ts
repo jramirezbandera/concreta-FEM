@@ -203,7 +203,7 @@ describe("calcar la retícula con núcleo de A2 desde su DXF (criterio 2)", () =
     const usados = new Set<string>();
     // A 200 px/m: el radio de 10 px es de 5 cm
     const radio = RADIO_ENGANCHE / 200;
-    const dibujar = (h: NombreHerramienta, plantillas: Plantillas, puntos: (Vec2 | "fin")[]) => {
+    const dibujar = (h: NombreHerramienta, plantillas: Plantillas, puntos: readonly (Vec2 | "fin")[]) => {
       let e: EstadoHerramienta = ESTADO_INICIAL;
       let ultimo: Vec2 | null = null;
       for (const x of puntos) {
