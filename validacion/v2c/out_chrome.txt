@@ -1,14 +1,14 @@
 ## Criterio 3: dibujar una planta del edificio objetivo desde los ejes (10 × 8 pilares, 81 vigas)
 BIEN  el proyecto de partida tiene la huella de Node
 BIEN  80 pilares con un clic, sin errores de la herramienta («Pilar: un clic donde va su punto fijo, o una ventana para uno en cada cruce de e»)
-BIEN  tras «Renumerar», la huella es la de la referencia renumerada (67daff44da85750f = 67daff44da85750f); dibujado en 6.7 s de banco
+BIEN  tras «Renumerar», la huella es la de la referencia renumerada (d1e8f0411d4255f3 = d1e8f0411d4255f3); dibujado en 6.1 s de banco
 
 ## Criterio 4: una acción, un paso; deshacer todo deja el proyecto de partida
 BIEN  180 pasos de deshacer: 18 ejes + 80 pilares + 81 vigas + Renumerar = 180
-BIEN  deshecho todo, la huella es la de partida (510668d6d2c35163)
+BIEN  deshecho todo, la huella es la de partida (282bbe97a32925a9)
 
 ## Criterio 5: el enganche en el edificio objetivo (7 plantas, 80 pilares por planta)
-BIEN  enganche al mover el ratón: mediana 0.100 ms, p95 0.200 ms, máx. 0.900 ms (≤ 2 ms); el índice de la planta, 3.9 ms la primera vez
+BIEN  enganche al mover el ratón: mediana 0.100 ms, p95 0.200 ms, máx. 1.100 ms (≤ 2 ms); el índice de la planta, 2.9 ms la primera vez
 BIEN  120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
 BIEN  con la viga en curso, el cursor junto al pilar dice su enganche: «x 18 · y 5 m · Centro (P-x18-y5)»
 

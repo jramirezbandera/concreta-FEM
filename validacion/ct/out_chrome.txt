@@ -6,7 +6,16 @@ BIEN  sin errores de la herramienta
 BIEN  guardados, los pilares están donde se tecleó, bit a bit: [[0,0],[5.4,0],[5.4,6.25],[0,6.25]]
 
 ## Criterio 5: las cotas temporales en el edificio objetivo (7 plantas, 80 pilares por planta)
-BIEN  mover el ratón y pintar las cotas: mediana 0.200 ms, p95 0.300 ms, máx. 0.800 ms (≤ 2 ms); la primera vez (índice y referencias), 4.0 ms
+BIEN  mover el ratón y pintar las cotas: mediana 0.200 ms, p95 0.400 ms, máx. 1.800 ms (≤ 2 ms); la primera vez (índice y referencias), 6.5 ms
 BIEN  120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
+
+## CT2: estirar el edificio objetivo desde la cota 3–4
+BIEN  al pasar por el número, la barra lo ofrece: «x 15 · y -1 m · Cota 3–4: 6,00 m · clic para cambiarla»
+BIEN  un clic en el número elige la cota: «Cota 3–4 (6,00 m): elija la flecha del lado que se mueve. Esc anula.»
+BIEN  la flecha del 4 abre el campo con el valor: «6,00», «Cota 3–4, se mueve el 4»
+BIEN  pintar lo que se mueve en una planta: la primera vez 0.5 ms, luego mediana 0.20 ms y máx. 0.80 ms (≤ 16 ms); 0 tareas largas
+BIEN  ← y → cambian de lado: «Cota 3–4, se mueve el 3», «Cota 3–4, se mueve el 4»
+BIEN  guardado, el proyecto es el de `estirar` en Node, byte a byte (469 objetos cambiados)
+BIEN  deshecho y guardado, los bytes del de partida (en el formato canónico)
 
 Todo bien

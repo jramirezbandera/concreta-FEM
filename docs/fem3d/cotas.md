@@ -1,6 +1,6 @@
 # CT: cotas que mandan (plan)
 
-> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6). **CT1 hecho el 2026-10-25** (§7); CT2 y CT3, por hacer.
+> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6). **CT1 hecho el 2026-10-25** (§7); **CT2, el 2026-10-26** (§8); CT3, por hacer.
 >
 > **Origen:** el usuario, al dibujar pilares con V2c-1: «al meter pilares se ponen las cotas automáticas entre los pilares; estaría bien que pudieras confirmar la distancia de la cota para que sea lo que quieras, y que pudieras cambiar las cotas después y se cambiara la posición».
 
@@ -140,3 +140,46 @@ Las cotas temporales de la herramienta Pilar y los rótulos de la cadena.
 
 - **CT1-1, Esc.** El controlador volvía a Elegir con Esc sin preguntar a la herramienta cuando no había puntos, así que el primer Esc no soltaba lo fijado. Lo encontró el banco; ahora sale sólo sin puntos, sin nada fijado y sin cota activa.
 - **CT1-2, la tolerancia de las alineaciones.** Un pilar entra en una alineación de los ejes propuestos hasta máx(ε_snap, una fracción de la menor separación), así que el eje puede pasar a centímetros de un pilar sin que se viera. Ahora lo dice el «≈».
+
+## 8. CT2 hecho (2026-10-26)
+
+Estirar el modelo desde la cadena de cotas entre ejes, como en §2.2.
+
+### 8.1 Qué hay
+
+- **`src/editor/estirar.ts`** (puro):
+  - `estirar(modelo, { n, fijo, movil }, valor)` da el `lote` de `cambiar` (un paso de deshacer) y los avisos;
+  - `afectados` dice lo que se mueve entero y lo que se alarga, para resaltarlo;
+  - `corte` da la línea de corte, a min(L/4; 0,5 m) del eje que se mueve.
+
+  Va vértice a vértice por todo lo de §2.2, en todas las plantas. Las estaciones (cargas de viga con `desde`/`hasta`, huecos de muro y apoyos de banda) se llevan a su punto, se estiran y se vuelven a medir. En un tramo que cruza el corte, el punto va a su t estirado sobre el tramo nuevo.
+- **Exacto:** con ejes paralelos a X o a Y, un punto del eje que se mueve acaba en la coordenada del fijo más el valor, y los demás en la suya más Δ, con `limpio` (el double de la tabla). En una planta girada, p + Δ·n.
+- **Errores:**
+  - un valor que no es positivo, o que es el de ahora;
+  - acortar tanto que lo que se mueve pase por encima de lo que se queda: «La cota tiene que medir más de 0,90 m: con menos, L-N2 pasaría por encima de L-N2», con el vértice que se mueve y el que se queda más cerca del corte, en todo el modelo.
+- **Aviso:** un hueco de muro que cruza el corte cambia de ancho («pasa de 0,90 a 1,40 m de ancho»).
+- **`render/ejes.ts`:** la geometría de las cadenas sale a `cadenasCotas` y `cotasCadena` (cada cota con sus dos ejes, sus extremos y el centro del rótulo), y `cadenasDe(modelo)` da las de la vista `modelo`. El SVG no cambia.
+- **App** (`controlador.ts`, con Elegir, sólo en las vistas de planta que dibujan la cadena):
+  - al pasar por el número de una cota, se engrosa y la barra dice «Cota 3–4: 6,00 m · clic para cambiarla»;
+  - un clic la elige y pinta una flecha por fuera de cada extremo;
+  - un clic en una flecha elige el lado que se mueve y abre el campo encima, con el valor elegido;
+  - mientras, en todas las plantas, lo que se mueve va lleno, lo que se alarga de trazos, y se ve la línea de corte;
+  - ← y → cambian de lado, también con el campo abierto; Intro aplica («Estirar 3–4 a 6,35 m» en deshacer); Esc, o un clic fuera de las cotas, la deja;
+  - los avisos quedan en la barra.
+
+### 8.2 Criterios
+
+| # | Resultado |
+|---|---|
+| 2 | **Pasa.** `estirar.test.ts`: una retícula de 3 × 2 vanos con dos plantas (pilares, vigas por los ejes y una alineada a una cara, losa con un hueco, reticular con ábacos, muro con un hueco, ejes guardados y cargas de superficie, de zona, lineales, puntuales y de viga parciales), estirada en cada vano, a +0,35, −0,8 y +1,2 m y moviendo cada uno de los dos ejes, es byte a byte la generada con esa luz: 30 casos. Girada 30°, la geometría a ≤ 1e-9 y los nudos al compilar, emparejados a ≤ 1e-9 |
+| 3 | **Pasa.** En 1-022, la retícula enrasada (C2), la retícula con núcleo (C3), el reticular y el unidireccional (C4) y la vivienda, deshacer da los bytes. Estirado, compila sin avisos nuevos de ajustes, casi encuentros, losas casi juntas ni fusiones, y la carga de cada caso es lineal en Δ (estirar 0,8 cambia el doble que 0,4, a 1e-9): sólo cambia por el área nueva. Un caso sólo con puntuales no cambia |
+| 5 | **Pasa.** En el edificio objetivo (`validacion/ct/chrome.ts`), pintar lo que se mueve en una planta tarda 0,5 ms la primera vez y 0,2 ms de mediana, sin tareas largas |
+| 6 | **Pasa.** El banco de V2c-1 y el de CT1 dan lo mismo; `src` (2 193 pruebas) y la app (68) en verde |
+
+Además, en Chrome, con el edificio objetivo: el número de la cota 3–4 se ofrece al pasar, la flecha del 4 abre el campo con «6,00» y ← y → cambian de lado. Con 6,35 e Intro, el proyecto guardado es el de `estirar` en Node byte a byte (469 objetos cambiados); deshecho y guardado, el de partida. La prueba del controlador (`app/src/test/estirar.test.ts`) recorre la misma secuencia y los errores.
+
+### 8.3 Hallazgos
+
+- **CT2-1, lo que hay dentro del vano se queda.** Al estirar 3–4 del edificio objetivo a 6,35, la viga secundaria a media luz sigue en x = 15, a 0,175 del centro nuevo. Es lo decidido en CT-a (sólo se mueve lo que está más allá del corte), pero quizá se espere otra cosa al probarlo. Si se quiere, la otra regla sería repartir lo de dentro del vano en proporción, para la puerta de uso.
+- **CT2-2, los nombres al revés.** Con los ejes paralelos a Y, la cadena mide t = −x (n = d girado 90°), así que el primer eje de una cota es el de la derecha. La barra, el campo y deshacer nombran la cota en el orden de lectura («3–4»), y el lado, por el eje que se mueve.
+- **CT2-3, el formato del edificio objetivo.** El `proyecto.json` de `validacion/a2/agente/edificio/` no está en el formato canónico: guardarlo sin cambios ya cambia sus bytes. El banco compara lo deshecho con el formato canónico.

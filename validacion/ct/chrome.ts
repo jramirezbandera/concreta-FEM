@@ -1,5 +1,5 @@
 /**
- * Banco de CT1 en Chrome de verdad (`docs/fem3d/cotas.md` §4):
+ * Banco de CT1 y CT2 en Chrome de verdad (`docs/fem3d/cotas.md` §4):
  *
  *   node validacion/ct/chrome.ts          escribe validacion/ct/out_chrome.txt
  *
@@ -11,6 +11,10 @@
  *   ellos. Guardado el proyecto, sus coordenadas son las tecleadas, bit a bit. Esc suelta lo fijado.
  * - 5: en el edificio objetivo (80 pilares por planta, 7 plantas), con la herramienta Pilar, mover el
  *   ratón y pintar las cotas temporales tarda ≤ 2 ms y no da tareas largas.
+ * - CT2 (2, 5 y 6): en el edificio objetivo, con Elegir, el número de la cota 3–4 se ofrece al pasar
+ *   por él; un clic lo elige, otro en la flecha del 4 abre el campo con «6,00», y pintar lo que se
+ *   mueve en una planta tarda ≤ 16 ms sin tareas largas. Con 6,35 e Intro, el proyecto guardado es el
+ *   de `estirar` en Node, byte a byte; deshecho y guardado otra vez, el de partida.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -20,6 +24,9 @@ import { extname, join, normalize } from "node:path";
 import { leerProyecto, type Proyecto } from "../../src/agente/proyecto.ts";
 import type { ModeloFisico } from "../../src/compilador/fisico.ts";
 import { serializar } from "../../src/editor/serializar.ts";
+import { cadenasDe, cotasCadena } from "../../src/agente/render/ejes.ts";
+import { estirar } from "../../src/editor/estirar.ts";
+import { aplicar } from "../../src/editor/operaciones.ts";
 import { manejadorCarpeta } from "../../app/servidor.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
@@ -265,6 +272,62 @@ try {
   await pagina(`__c.ev("pointermove", [14.1, 9.3]); __c.tecla("Tab"); await __c.fotograma(); await __c.fotograma();`);
   await captura("5-edificio");
   await pagina(`__c.tecla("Escape"); __c.tecla("Escape");`);
+
+  // ─── CT2 ──────────────────────────────────────────────────────────────────────────────────────
+  log("\n## CT2: estirar el edificio objetivo desde la cota 3–4");
+  const m = edificio.proyecto.modelo;
+  const k = cadenasDe(m).flatMap(cotasCadena).find((x) => x.cadena.ejes[x.i - 1]!.includes("4") && x.cadena.ejes[x.i]!.includes("3"))!;
+  // Se mueve el 4 (el extremo de t menor: con los ejes paralelos a Y, t = −x) y todo lo que hay a su derecha
+  const lado = 0;
+  const e = { n: k.cadena.n, fijo: k.cadena.ts[k.i]!, movil: k.cadena.ts[k.i - 1]! };
+  const r = estirar(m, e, 6.35);
+  const estirado = r.ok ? aplicar(edificio.proyecto, r.operacion) : null;
+  if (!estirado?.ok) throw new Error("estirar en Node no se aplica");
+  await pagina(`await __c.esperar(() => !__c.herramienta("Pilar").getAttribute("aria-pressed") || __c.herramienta("Pilar").getAttribute("aria-pressed") === "false");`);
+  const K = JSON.stringify({ p: k.p, a: k.a, b: k.b, n: k.cadena.n, lado });
+  const pieCota = await pagina<string>(`const k = ${K}; __c.ev("pointermove", k.p); await __c.fotograma(); return document.querySelector("[data-cursor]")?.textContent ?? "";`);
+  comprobar(/Cota 3–4: 6,00 m · clic para cambiarla/.test(pieCota), `al pasar por el número, la barra lo ofrece: «${pieCota}»`);
+  await pagina(`const k = ${K}; __c.clic(k.p); await __c.fotograma();`);
+  const chip1 = await pagina<string>(`return __c.aviso();`);
+  comprobar(/Cota 3–4 \(6,00 m\): elija la flecha/.test(chip1), `un clic en el número elige la cota: «${chip1}»`);
+  await captura("6-cota-elegida");
+  await pagina(`window.__largas = []; const k = ${K}; const px = 1 / __c.vista().escala; const [e, s] = k.lado ? [k.b, 1] : [k.a, -1]; __c.clic([e[0] + s * k.n[0] * 16 * px, e[1] + s * k.n[1] * 16 * px]); await __c.fotograma(); await __c.fotograma();`);
+  const campo = await pagina<{ valor: string; cota: string; chip: string }>(`const i = await __c.esperar(() => document.querySelector(".campo-teclado input"), 5000); return { valor: i.value, cota: document.querySelector(".campo-cota")?.textContent ?? "", chip: __c.aviso() };`);
+  comprobar(campo.valor === "6,00" && /3–4, se mueve el 4/.test(campo.cota) && /se mueve el eje 4/.test(campo.chip), `la flecha del 4 abre el campo con el valor: «${campo.valor}», «${campo.cota}»`);
+  await captura("7-lo-que-se-mueve");
+  // Pintar lo de estirar en una planta (lo que se mueve y se alarga, el corte y las flechas)
+  const tiempos = await pagina<{ primero: number; t: number[] }>(`
+    const v = __c.vista(); const d = v.dibujo;
+    const lienzo = document.createElement("canvas"); lienzo.width = 1600; lienzo.height = 900; const ctx = lienzo.getContext("2d");
+    const col = { fondo: "#fff", texto: "#000", textoSuave: "#666", acento: "#0a64d8", panel: "#fff", borde: "#ccc" };
+    const aPx = (q) => v.aPx(q);
+    let a = performance.now(); d.pintar(ctx, aPx, col); const primero = performance.now() - a;
+    const t = [];
+    for (let k = 0; k < 60; k++) { a = performance.now(); d.pintar(ctx, aPx, col); t.push(performance.now() - a); }
+    return { primero, t };`);
+  const ts = [...tiempos.t].sort((a, b) => a - b);
+  const largasCT2 = await pagina<{ ms: number }[]>(`return window.__largas;`);
+  comprobar(ts.at(-1)! <= 16 && tiempos.primero <= 16 && !largasCT2.some((x) => x.ms > 50), `pintar lo que se mueve en una planta: la primera vez ${tiempos.primero.toFixed(1)} ms, luego mediana ${ts[ts.length >> 1]!.toFixed(2)} ms y máx. ${ts.at(-1)!.toFixed(2)} ms (≤ 16 ms); ${largasCT2.length} tareas largas`);
+  // ← cambia de lado y → vuelve
+  const lados = await pagina<string[]>(`const i = document.querySelector(".campo-teclado input"); const r = [];
+    for (const key of ["ArrowLeft", "ArrowRight"]) { i.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true })); await __c.fotograma(); r.push(document.querySelector(".campo-cota")?.textContent ?? ""); }
+    return r;`);
+  comprobar(/se mueve el 3/.test(lados[0]!) && /se mueve el 4/.test(lados[1]!), `← y → cambian de lado: «${lados.join("», «")}»`);
+  await pagina(`const i = document.querySelector(".campo-teclado input");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, "6,35"); i.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0)); i.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    await __c.esperar(() => !document.querySelector(".campo-teclado input"), 5000);`);
+  await compilada();
+  await captura("8-estirado");
+  const guardar = () => pagina(`document.querySelector("button[data-sin-guardar=true]").click(); await __c.esperar(() => document.querySelector("button[data-sin-guardar=false]") && !/Guardando/.test(document.body.textContent), 10000);`);
+  await guardar();
+  const tras = readFileSync(join(datos, "edificio", "proyecto.json"), "utf8");
+  comprobar(tras === serializar(estirado.proyecto), `guardado, el proyecto es el de \`estirar\` en Node, byte a byte (${r.ok ? r.operacion.op === "lote" ? r.operacion.operaciones.length : 0 : 0} objetos cambiados)`);
+  await pagina(`[...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Deshacer" || b.textContent.trim() === "Deshacer").click(); await __c.fotograma();`);
+  await compilada();
+  await guardar();
+  const deshecho = readFileSync(join(datos, "edificio", "proyecto.json"), "utf8");
+  comprobar(deshecho === serializar(edificio.proyecto), `deshecho y guardado, los bytes del de partida (en el formato canónico)`);
 } finally {
   ws.close();
   chrome.kill();

@@ -544,7 +544,14 @@
   - Tab elige una, un número la fija (exacta, bit a bit con la tabla) e Intro o un clic coloca el pilar; Esc suelta lo fijado.
   - Las cotas de la cadena van en mm si no son cm redondos, y con «≈» junto a un eje propuesto con los pilares desalineados.
   - Validación: `cotas.test.ts` y el banco `validacion/ct/chrome.ts` (pilares guardados donde se tecleó; 0,3 ms p95 en el edificio objetivo).
-  - Siguiente: CT2 (estirar desde la cadena).
+- **2026-10-26: CT2 hecho** (`cotas.md` §8): estirar el modelo desde la cadena de cotas entre ejes.
+  - **`src/editor/estirar.ts`** (puro): todo lo que está más allá de una paralela a min(L/4; 0,5 m) del eje que se mueve se desplaza Δ, en todas las plantas. Va vértice a vértice, las estaciones se vuelven a medir y sale un `lote` de `cambiar`. Con ejes paralelos a X o a Y, exacto (el double de la tabla). Al acortar, el límite es que lo que se mueve no pase por encima de lo que se queda. Un hueco de muro que cruza el corte se avisa.
+  - **En la app, con Elegir:** clic en el número de una cota, clic en la flecha del lado que se mueve, el valor e Intro; ← y → cambian de lado. Mientras, se resalta lo que se mueve y lo que se alarga, con la línea de corte.
+  - **Validación:**
+    - `estirar.test.ts`: una retícula estirada en cada vano es byte a byte la generada con la luz nueva; girada, a 1e-9. En seis referencias, deshacer da los bytes, no salen avisos nuevos de ε_snap y la carga cambia lineal con Δ;
+    - `app/src/test/estirar.test.ts` y el banco de Chrome: guardado, lo de `estirar` en Node byte a byte; pintar, 0,2 ms.
+  - **Para la puerta de uso (CT2-1):** lo que hay dentro del vano no se mueve: la viga secundaria a media luz queda descentrada.
+  - Siguiente: CT3 (las cotas de un pilar elegido).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

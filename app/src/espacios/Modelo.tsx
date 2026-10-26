@@ -100,6 +100,23 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       if (!pan.props) pan.poner({ props: true });
     }
   };
+  // CT2: con una cota elegida para estirar, Esc la deja, ← y → cambian de lado y un número abre el campo
+  const estirando = !!foto.estirado;
+  useEffect(() => {
+    if (!estirando || dibujando) return;
+    const tecla = (x: KeyboardEvent) => {
+      if (x.ctrlKey || x.metaKey || x.altKey || enCampo(x.target)) return;
+      if (x.key === "Escape") ctrl.anularEstirado();
+      else if (x.key === "ArrowLeft" || x.key === "ArrowRight") {
+        if (ctrl.cambiarLado()) x.preventDefault();
+      } else if (/^[0-9.,]$/.test(x.key)) {
+        x.preventDefault();
+        ctrl.abrirCampo(x.key);
+      }
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [ctrl, estirando, dibujando]);
   // Las teclas de una herramienta: F8, Esc, Intro, Retroceso y lo que abre el campo de teclado
   useEffect(() => {
     if (!dibujando) return;
@@ -243,7 +260,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const vista = (
     <ZonaVistas
       fuentes={{
-        planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta) : null} dibujando={dibujando} /> : null),
+        planta: (v) => (v.planta ? <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta, { cotas: !cargas && plantaVista(v, e.calculado).vista === "modelo" }) : null} dibujando={dibujando} /> : null),
         ...(cargas && casoValido
           ? {
               alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), cargas: { caso: casoValido, escala: Number(escala) } } : null} />,
@@ -305,6 +322,12 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               <span className="chip aviso-herr" data-acento="true" role="status">
                 {foto.ayuda}
                 {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
+              </span>
+            )}
+            {!dibujando && (foto.estirado || foto.aviso) && (
+              <span className="chip aviso-herr" data-acento="true" role="status">
+                {foto.estirado ?? foto.aviso}
+                {foto.estirado && foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
               </span>
             )}
             {foto.campo && <CampoTeclado key={foto.campo.n} ctrl={ctrl} campo={foto.campo} />}

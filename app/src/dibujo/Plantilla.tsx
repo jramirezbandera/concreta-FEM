@@ -371,7 +371,7 @@ function SelectorPuntoFijo({ seccion, giro, valor, onCambio }: { seccion: Seccio
 export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: NonNullable<Instantanea["campo"]> }) {
   const [texto, setTexto] = useState(campo.texto);
   return (
-    <div className="campo-teclado" style={{ left: campo.x + 16, top: campo.y + 16 }} role="dialog" aria-label="Punto por teclado">
+    <div className="campo-teclado" style={{ left: campo.x + 16, top: campo.seleccionar ? campo.y - 72 : campo.y + 16 }} role="dialog" aria-label="Punto por teclado">
       <input
         className="sel mono"
         autoFocus
@@ -379,12 +379,15 @@ export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: 
         placeholder={campo.cota ? "distancia, m" : undefined}
         value={texto}
         onChange={(x) => setTexto(x.target.value)}
+        onFocus={(x) => campo.seleccionar && x.target.select()}
         onBlur={() => ctrl.cerrarCampo()}
         onKeyDown={(x) => {
           x.stopPropagation();
           if (x.key === "Enter") ctrl.teclear(texto);
-          else if (x.key === "Escape") ctrl.cerrarCampo();
+          else if (x.key === "Escape") ctrl.escCampo();
           else if (x.key === "Tab" && ctrl.tab(x.shiftKey)) x.preventDefault();
+          // CT2: el otro lado de la cota que se estira
+          else if ((x.key === "ArrowLeft" || x.key === "ArrowRight") && ctrl.cambiarLado()) x.preventDefault();
         }}
       />
       {campo.cota && <p className="campo-cota">Cota {campo.cota}</p>}

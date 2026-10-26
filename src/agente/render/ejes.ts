@@ -34,23 +34,30 @@ export function rotuloCota(d: number): string {
   return d.toFixed(Math.abs(cm - Math.round(cm)) > 0.05 ? 3 : 2).replace(".", ",");
 }
 
-export function capaEjes(f: ModeloFisico, o: { cotas: boolean }): { primitivas: Primitiva[]; leyenda: EntradaLeyenda[]; notas: string[] } {
+/** Los ejes que se dibujan, ordenados por id y sin los degenerados, y los de pilares desalineados con su dispersión. */
+function ejesDibujados(f: ModeloFisico): { validos: EjeReplanteo[]; degenerados: string[]; propuestos: boolean; disperso: Map<string, number> } {
   const { ejes, propuestos, dispersion } = ejesDe(f);
   const disperso = new Map<string, number>();
   ejes.forEach((e, i) => {
     const x = dispersion?.[i] ?? 0;
     if (x > DISPERSION_EJE) disperso.set(e.id, x);
   });
-  const P: Primitiva[] = [];
-  const notas: string[] = [];
+  const degenerados: string[] = [];
   const validos = [...ejes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).filter((e) => {
     if (!degenerado(e)) return true;
-    notas.push(`El eje ${e.id} no tiene dos extremos distintos: no se dibuja.`);
+    degenerados.push(e.id);
     return false;
   });
+  return { validos, degenerados, propuestos, disperso };
+}
+
+export function capaEjes(f: ModeloFisico, o: { cotas: boolean }): { primitivas: Primitiva[]; leyenda: EntradaLeyenda[]; notas: string[] } {
+  const { validos, degenerados, propuestos, disperso } = ejesDibujados(f);
+  const P: Primitiva[] = [];
+  const notas = degenerados.map((id) => `El eje ${id} no tiene dos extremos distintos: no se dibuja.`);
   if (!validos.length) return { primitivas: [], leyenda: [], notas };
   for (const e of validos) P.push({ tipo: "linea", puntos: [e.desde, e.hasta], estilo: "eje", objeto: e.id });
-  if (o.cotas) P.push(...cotas(validos, disperso));
+  if (o.cotas) P.push(...cotas(cadenasCotas(validos, disperso)));
   for (const e of validos)
     for (const p of [e.desde, e.hasta]) {
       P.push({ tipo: "marca", p, forma: "circulo", radio: RADIO_BURBUJA, estilo: "eje-burbuja", objeto: e.id });
@@ -64,8 +71,40 @@ export function capaEjes(f: ModeloFisico, o: { cotas: boolean }): { primitivas: 
   return { primitivas: P, leyenda: [{ estilo: "eje", texto: propuestos ? "Eje de replanteo propuesto" : "Eje de replanteo" }, ...(o.cotas ? [{ estilo: "cota" as const, texto: "Cota entre ejes paralelos (m)" }] : [])], notas };
 }
 
-/** Cadenas de cotas entre ejes paralelos; las de un eje de `disperso`, con «≈». */
-function cotas(ejes: readonly EjeReplanteo[], disperso: ReadonlyMap<string, number>): Primitiva[] {
+/**
+ * Una cadena de cotas entre ejes paralelos (CT2: cada cota se elige por su número). Los ejes van en
+ * la dirección d y se miden por t = p·n, con n = d girado 90° y d en [0°, 180°).
+ */
+export interface CadenaCotas {
+  d: Vec2;
+  n: Vec2;
+  /** La cadena va por s = p·d = s. */
+  s: number;
+  /** Los valores de t de los ejes, crecientes (redondeados a 1e-9: los ejes del mismo t son uno). */
+  ts: number[];
+  /** Los ids de los ejes de cada t. */
+  ejes: string[][];
+  /** Si algún eje de ese t es propuesto con los pilares desalineados (su cota lleva «≈»). */
+  aprox: boolean[];
+}
+
+/** Una cota de una cadena: la i-ésima, entre `ts[i − 1]` y `ts[i]`. */
+export interface CotaCadena {
+  cadena: CadenaCotas;
+  i: number;
+  /** Sus extremos en la línea de la cadena y el centro del rótulo, m. */
+  a: Vec2;
+  b: Vec2;
+  p: Vec2;
+  valor: number;
+  texto: string;
+}
+
+/** El punto de la línea de una cadena con ese t. */
+export const puntoCadena = (c: CadenaCotas, t: number): Vec2 => [c.s * c.d[0] + t * c.n[0], c.s * c.d[1] + t * c.n[1]];
+
+/** Las cadenas de cotas de unos ejes (ya sin los degenerados); las de un eje de `disperso`, con «≈». */
+export function cadenasCotas(ejes: readonly EjeReplanteo[], disperso: ReadonlyMap<string, number> = new Map()): CadenaCotas[] {
   const grupos = new Map<number, { e: EjeReplanteo; d: Vec2 }[]>();
   for (const e of ejes) {
     let [dx, dy] = [e.hasta[0] - e.desde[0], e.hasta[1] - e.desde[1]];
@@ -82,27 +121,58 @@ function cotas(ejes: readonly EjeReplanteo[], disperso: ReadonlyMap<string, numb
     g.push({ e, d: [dx, dy] });
     grupos.set(k, g);
   }
-  const P: Primitiva[] = [];
+  const r: CadenaCotas[] = [];
   for (const k of [...grupos.keys()].sort((a, b) => a - b)) {
     const g = grupos.get(k)!;
     if (g.length < 2) continue;
     const d = g[0]!.d;
     const n: Vec2 = [-d[1], d[0]];
     const dot = (p: Vec2, v: Vec2) => p[0] * v[0] + p[1] * v[1];
-    const ts = [...new Set(g.map((x) => Math.round(dot(x.e.desde, n) * 1e9) / 1e9))].sort((a, b) => a - b);
-    // Los valores de t con un eje de pilares desalineados
-    const aprox = new Set(g.filter((x) => disperso.has(x.e.id)).map((x) => Math.round(dot(x.e.desde, n) * 1e9) / 1e9));
+    const tDe = (e: EjeReplanteo) => Math.round(dot(e.desde, n) * 1e9) / 1e9;
+    const ts = [...new Set(g.map((x) => tDe(x.e)))].sort((a, b) => a - b);
     if (ts.length < 2) continue;
     const s = Math.min(...g.flatMap((x) => [dot(x.e.desde, d), dot(x.e.hasta, d)])) + COTA_DENTRO;
-    const punto = (t: number): Vec2 => [s * d[0] + t * n[0], s * d[1] + t * n[1]];
-    P.push({ tipo: "linea", puntos: [punto(ts[0]!), punto(ts[ts.length - 1]!)], estilo: "cota" });
+    r.push({
+      d,
+      n,
+      s,
+      ts,
+      ejes: ts.map((t) => g.filter((x) => tDe(x.e) === t).map((x) => x.e.id)),
+      aprox: ts.map((t) => g.some((x) => tDe(x.e) === t && disperso.has(x.e.id))),
+    });
+  }
+  return r;
+}
+
+/** Las cotas de una cadena, en orden. */
+export function cotasCadena(c: CadenaCotas): CotaCadena[] {
+  const r: CotaCadena[] = [];
+  for (let i = 1; i < c.ts.length; i++) {
+    const [ta, tb] = [c.ts[i - 1]!, c.ts[i]!];
+    r.push({ cadena: c, i, a: puntoCadena(c, ta), b: puntoCadena(c, tb), p: puntoCadena(c, (ta + tb) / 2), valor: tb - ta, texto: (c.aprox[i - 1] || c.aprox[i] ? "≈" : "") + rotuloCota(tb - ta) });
+  }
+  return r;
+}
+
+/** Las cadenas de cotas de la vista `modelo` de un modelo. */
+export const cadenasDe = (f: ModeloFisico): CadenaCotas[] => {
+  const { validos, disperso } = ejesDibujados(f);
+  return cadenasCotas(validos, disperso);
+};
+
+/** Las primitivas de unas cadenas de cotas. */
+function cotas(cadenas: readonly CadenaCotas[]): Primitiva[] {
+  const P: Primitiva[] = [];
+  for (const c of cadenas) {
+    const { d, n, ts } = c;
+    P.push({ tipo: "linea", puntos: [puntoCadena(c, ts[0]!), puntoCadena(c, ts[ts.length - 1]!)], estilo: "cota" });
     const m = 0.12;
     for (const t of ts) {
-      const p = punto(t);
+      const p = puntoCadena(c, t);
       P.push({ tipo: "linea", puntos: [[p[0] - m * (d[0] + n[0]), p[1] - m * (d[1] + n[1])], [p[0] + m * (d[0] + n[0]), p[1] + m * (d[1] + n[1])]], estilo: "cota" });
     }
     const giro = giroTexto(n);
-    for (let i = 1; i < ts.length; i++) P.push({ tipo: "texto", p: punto((ts[i - 1]! + ts[i]!) / 2), texto: (aprox.has(ts[i - 1]!) || aprox.has(ts[i]!) ? "≈" : "") + rotuloCota(ts[i]! - ts[i - 1]!), tamano: 11, giro, ancla: "medio", dy: -4, fondo: true, prioridad: 15, clase: "cota" });
+    for (const k of cotasCadena(c)) P.push({ tipo: "texto", p: k.p, texto: k.texto, tamano: 11, giro, ancla: "medio", dy: -4, fondo: true, prioridad: 15, clase: "cota" });
   }
   return P;
 }

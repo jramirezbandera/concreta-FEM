@@ -10,10 +10,19 @@
  *
  * Con Pilar se pintan también sus cotas temporales (CT1, `docs/fem3d/cotas.md` §2.1): Tab elige una
  * y un número tecleado la fija.
+ *
+ * Con Elegir, en las vistas con la cadena de cotas entre ejes (la de `modelo`), un clic en el número
+ * de una cota la elige para estirar el modelo (CT2, §2.2): se pintan una flecha en cada extremo, un
+ * clic en una elige el lado que se mueve y abre el campo con el valor actual, ← y → cambian de lado,
+ * Intro aplica (`src/editor/estirar.ts`) y Esc anula. Mientras, en todas las plantas se resalta lo que
+ * se mueve (lleno) y lo que se alarga (de trazos), con la línea de corte.
  */
 import type { ModeloFisico, Vec2 } from "../../../src/compilador/fisico.ts";
-import { apuntar, bajoCursor, indiceEnganches, NOMBRE_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
+import { apuntar, bajoCursor, indiceEnganches, NOMBRE_ENGANCHE, RADIO_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
 import { nombreCota, type CotaTemporal } from "../../../src/editor/dibujo/cotas.ts";
+import { cadenasDe, cotasCadena, rotuloCota, type CotaCadena } from "../../../src/agente/render/ejes.ts";
+import { ejesDe } from "../../../src/compilador/ejes.ts";
+import { afectados, corte, estirar, type Estiramiento } from "../../../src/editor/estirar.ts";
 import { ayuda, borrador, ESTADO_INICIAL, paso, ultimoPunto, type EstadoHerramienta, type Evento, type Hecho, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import { leerEntrada, resolverEntrada } from "../../../src/editor/dibujo/teclado.ts";
 import type { Colores } from "../vistas/motor.ts";
@@ -28,8 +37,21 @@ export interface Instantanea {
   hecho: string | null;
   orto: boolean;
   activos: ReadonlySet<TipoEnganche>;
-  /** El campo de teclado, abierto con su texto inicial y dónde (px de la ventana); `cota`, la que fija lo que se escriba. */
-  campo: { n: number; texto: string; x: number; y: number; error: string | null; cota?: string } | null;
+  /** El campo de teclado, abierto con su texto inicial y dónde (px de la ventana); `cota`, la que fija lo que se escriba; `seleccionar`, con el texto elegido (se escribe encima) y por encima del punto (CT2: la cota está junto a la barra). */
+  campo: { n: number; texto: string; x: number; y: number; error: string | null; cota?: string; seleccionar?: boolean } | null;
+  /** CT2: lo que dice la barra mientras se estira desde una cota. */
+  estirado: string | null;
+  /** CT2: los avisos del último estirado (un hueco de muro que cambia de ancho). */
+  aviso: string | null;
+}
+
+/** Por fuera de cada extremo de la cota que se estira, el centro de su flecha, px. */
+const FLECHA = 16;
+
+/** Una cota de la cadena elegida para estirar y el extremo que se mueve (0, el de t menor; 1, el otro; null, sin elegir). */
+interface Estirado {
+  cota: CotaCadena;
+  mueve: 0 | 1 | null;
 }
 
 export class ControladorDibujo {
@@ -57,9 +79,16 @@ export class ControladorDibujo {
   /** Cuántas veces se ha abierto el campo de teclado (su clave en React). */
   private abiertos = 0;
   private readonly oyentes = new Set<() => void>();
+  /** CT2: las cotas de la cadena del modelo (se rehacen con él), la elegida y lo que mueve. */
+  private cadena: CotaCadena[] | null = null;
+  private estirado: Estirado | null = null;
+  private afectadosCache: { clave: string; mueven: Set<string>; alargan: Set<string> } | null = null;
+  /** Si la vista del cursor tiene la cadena de cotas, y la cota bajo el cursor (con Elegir). */
+  private conCotas = false;
+  private cotaBajo: CotaCadena | null = null;
 
   constructor() {
-    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), campo: null };
+    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), campo: null, estirado: null, aviso: null };
   }
 
   // ─── Para React ─────────────────────────────────────────────────────────────────────────────
@@ -80,6 +109,11 @@ export class ControladorDibujo {
     if (m === this.modelo) return;
     this.modelo = m;
     this.indices.clear();
+    this.cadena = null;
+    this.afectadosCache = null;
+    this.cotaBajo = null;
+    // La cota elegida era del modelo de antes
+    if (this.estirado) this.anularEstirado();
     // Lo recién dibujado ya engancha, sin esperar a que se mueva el ratón
     this.recalcular();
   }
@@ -89,7 +123,8 @@ export class ControladorDibujo {
     this.herramienta = h;
     this.estado = ESTADO_INICIAL;
     this.apunte = null;
-    this.cambiar({ herramienta: h, error: null, hecho: null, campo: null });
+    this.estirado = null;
+    this.cambiar({ herramienta: h, error: null, hecho: null, campo: null, estirado: null, aviso: null });
     this.repintar();
   }
 
@@ -150,7 +185,7 @@ export class ControladorDibujo {
   }
 
   abrirCampo(texto: string): void {
-    if (this.herramienta === "elegir") return;
+    if (this.herramienta === "elegir" && this.estirado?.mueve == null) return;
     this.cambiar({ campo: { n: this.abiertos + 1, texto, x: this.cliente[0], y: this.cliente[1], error: null, ...this.cotaCampo() } });
     this.abiertos++;
   }
@@ -159,8 +194,15 @@ export class ControladorDibujo {
     if (this.foto.campo) this.cambiar({ campo: null });
   }
 
+  /** Esc en el campo: anula el estirado o, si no, sólo cierra el campo. */
+  escCampo(): void {
+    if (this.estirado) this.anularEstirado();
+    else this.cerrarCampo();
+  }
+
   /** Lo escrito en el campo, como un punto. Devuelve si se aceptó. */
   teclear(texto: string): boolean {
+    if (this.estirado?.mueve != null) return this.teclearEstirado(texto);
     const ix = this.indiceActual();
     const l = leerEntrada(texto);
     // Con Pilar, un número suelto es la distancia de la cota activa
@@ -201,19 +243,24 @@ export class ControladorDibujo {
     return this.planta ? this.indice(this.planta) : null;
   }
 
-  /** Lo que se da a una vista de la planta `planta`. */
-  adaptador(planta: string): Dibujo2D {
-    let a = this.adaptadores.get(planta);
+  /** Lo que se da a una vista de la planta `planta`; `cotas`, si dibuja la cadena de cotas entre ejes (CT2). */
+  adaptador(planta: string, o: { cotas?: boolean } = {}): Dibujo2D {
+    const cotas = !!o.cotas;
+    const clave = `${planta}\u0000${cotas}`;
+    let a = this.adaptadores.get(clave);
     if (a) return a;
     a = {
-      pasar: (p, radio, mayus, cliente) => this.pasar(planta, p, radio, mayus, cliente),
+      pasar: (p, radio, mayus, cliente) => {
+        this.conCotas = cotas;
+        this.pasar(planta, p, radio, mayus, cliente);
+      },
       salir: () => this.salir(planta),
-      clic: (p, radio, _ctrl, doble) => this.clic(planta, p, radio, doble),
+      clic: (p, radio, _ctrl, doble) => (this.herramienta === "elegir" ? this.clicCotas(planta, p, radio, cotas) : this.clic(planta, p, radio, doble)),
       ventana: (caja) => this.ventana(planta, caja),
       cursor: () => this.cursor(planta),
-      pintar: (ctx, aPx, c) => this.pintar(planta, ctx, aPx, c),
+      pintar: (ctx, aPx, c) => this.pintar(planta, ctx, aPx, c, cotas),
     };
-    this.adaptadores.set(planta, a);
+    this.adaptadores.set(clave, a);
     return a;
   }
 
@@ -228,7 +275,9 @@ export class ControladorDibujo {
     this.radio = radio;
     this.mayus = mayus;
     this.cliente = cliente;
-    this.recalcular(false);
+    const antes = this.cotaBajo;
+    this.cotaBajo = this.herramienta === "elegir" && this.conCotas ? this.cotaEn(q, radio / RADIO_ENGANCHE) : null;
+    this.recalcular(this.cotaBajo !== antes);
   }
 
   /** El enganche y lo de debajo con el cursor de ahora. */
@@ -250,6 +299,245 @@ export class ControladorDibujo {
     this.cursorQ = null;
     this.apunte = null;
     this.silueta = null;
+    this.cotaBajo = null;
+  }
+
+  // ─── Estirar desde una cota (CT2) ───────────────────────────────────────────────────────────
+
+  private cotasDeCadena(): CotaCadena[] {
+    if (!this.modelo) return [];
+    this.cadena ??= cadenasDe(this.modelo).flatMap(cotasCadena);
+    return this.cadena;
+  }
+
+  /** La cota cuyo número está bajo q (px: los m de un px). */
+  private cotaEn(q: Vec2, px: number): CotaCadena | null {
+    let mejor: CotaCadena | null = null;
+    let dm = Infinity;
+    for (const k of this.cotasDeCadena()) {
+      const { d, n } = k.cadena;
+      const v: Vec2 = [q[0] - k.p[0], q[1] - k.p[1]];
+      const [a, b] = [Math.abs(v[0] * n[0] + v[1] * n[1]), Math.abs(v[0] * d[0] + v[1] * d[1])];
+      // El rótulo, a lo largo de la cota: ~6,5 px por carácter de 11 px
+      if (a > Math.min(k.valor / 2, ((k.texto.length * 6.5) / 2 + 6) * px) || b > 12 * px) continue;
+      if (a + b < dm) [mejor, dm] = [k, a + b];
+    }
+    return mejor;
+  }
+
+  /** El centro de la flecha del extremo `lado` de la cota. */
+  private flecha(k: CotaCadena, lado: 0 | 1, px: number): Vec2 {
+    const { n } = k.cadena;
+    const [e, s] = lado ? [k.b, 1] : [k.a, -1];
+    return [e[0] + s * n[0] * FLECHA * px, e[1] + s * n[1] * FLECHA * px];
+  }
+
+  /** El estiramiento de la cota elegida, con el extremo que se mueve. */
+  private estiramiento(): Estiramiento | null {
+    const x = this.estirado;
+    if (!x || x.mueve === null) return null;
+    const c = x.cota.cadena;
+    const [ta, tb] = [c.ts[x.cota.i - 1]!, c.ts[x.cota.i]!];
+    return x.mueve ? { n: c.n, fijo: ta, movil: tb } : { n: c.n, fijo: tb, movil: ta };
+  }
+
+  /** Los nombres de los ejes de los dos extremos de la cota, el de t menor primero. */
+  private nombres(k: CotaCadena): [string, string] {
+    const ejes = this.modelo ? ejesDe(this.modelo).ejes : [];
+    const nombre = (id: string | undefined) => ejes.find((x) => x.id === id)?.nombre ?? id ?? "?";
+    return [nombre(k.cadena.ejes[k.i - 1]?.[0]), nombre(k.cadena.ejes[k.i]?.[0])];
+  }
+
+  /** «1–2»: los nombres en el orden de lectura (de izquierda a derecha o de abajo arriba). */
+  private titulo(k: CotaCadena): string {
+    const [a, b] = this.nombres(k);
+    const [dx, dy] = [k.b[0] - k.a[0], k.b[1] - k.a[1]];
+    return dx < -1e-9 || (Math.abs(dx) <= 1e-9 && dy < 0) ? `${b}–${a}` : `${a}–${b}`;
+  }
+
+  private textoEstirado(): string | null {
+    const x = this.estirado;
+    if (!x) return null;
+    const [a, b] = this.nombres(x.cota);
+    const cota = `Cota ${this.titulo(x.cota)} (${x.cota.texto} m)`;
+    if (x.mueve === null) return `${cota}: elija la flecha del lado que se mueve. Esc anula.`;
+    return `${cota}: se mueve el eje ${x.mueve ? b : a} y lo que hay más allá. Escriba la distancia e Intro; ← y → cambian de lado; Esc anula.`;
+  }
+
+  private textoCampo(): string {
+    const x = this.estirado!;
+    const [a, b] = this.nombres(x.cota);
+    return `${this.titulo(x.cota)}, se mueve el ${x.mueve ? b : a}`;
+  }
+
+  private clicCotas(planta: string, q: Vec2, radio: number, cotas: boolean): boolean {
+    const px = radio / RADIO_ENGANCHE;
+    const x = this.estirado;
+    if (x && cotas)
+      for (const lado of [0, 1] as const) {
+        const f = this.flecha(x.cota, lado, px);
+        if (Math.hypot(q[0] - f[0], q[1] - f[1]) <= 12 * px) {
+          this.elegirLado(lado);
+          return true;
+        }
+      }
+    const k = cotas ? this.cotaEn(q, px) : null;
+    if (k) {
+      this.planta = planta;
+      this.estirado = { cota: k, mueve: null };
+      this.cambiar({ estirado: this.textoEstirado(), campo: null, aviso: null });
+      this.repintar();
+      return true;
+    }
+    if (x) this.anularEstirado();
+    return false;
+  }
+
+  private elegirLado(lado: 0 | 1): void {
+    const x = this.estirado;
+    if (!x) return;
+    x.mueve = lado;
+    this.cambiar({ estirado: this.textoEstirado(), campo: { n: ++this.abiertos, texto: rotuloCota(x.cota.valor), x: this.cliente[0], y: this.cliente[1], error: null, cota: this.textoCampo(), seleccionar: true } });
+    this.repintar();
+  }
+
+  /** ← o →: el otro extremo de la cota. Devuelve si había un lado elegido. */
+  cambiarLado(): boolean {
+    const x = this.estirado;
+    if (!x || x.mueve === null) return false;
+    x.mueve = x.mueve ? 0 : 1;
+    const c = this.foto.campo;
+    this.cambiar({ estirado: this.textoEstirado(), ...(c ? { campo: { ...c, cota: this.textoCampo(), error: null } } : {}) });
+    this.repintar();
+    return true;
+  }
+
+  /** Esc: deja la cota. */
+  anularEstirado(): void {
+    if (!this.estirado) return;
+    this.estirado = null;
+    this.cambiar({ estirado: null, campo: null });
+    this.repintar();
+  }
+
+  private teclearEstirado(texto: string): boolean {
+    const e = this.estiramiento();
+    const l = leerEntrada(texto);
+    const campo = (error: string) => {
+      this.cambiar({ campo: this.foto.campo && { ...this.foto.campo, texto, error } });
+      return false;
+    };
+    if (!e || !this.modelo) return campo("No hay ninguna cota elegida.");
+    if (!l.ok || l.valor.tipo !== "longitud") return campo("Escriba la distancia entre los dos ejes, m (p. ej. «5,40»).");
+    const r = estirar(this.modelo, e, l.valor.l);
+    if (!r.ok) return campo(r.mensaje);
+    const etiqueta = `Estirar ${this.titulo(this.estirado!.cota)} a ${rotuloCota(l.valor.l)} m`;
+    const error = this.aplicar({ operacion: r.operacion, etiqueta });
+    if (error) return campo(error);
+    this.estirado = null;
+    this.cambiar({ estirado: null, campo: null, hecho: etiqueta, aviso: r.avisos.length ? r.avisos.join(" ") : null });
+    this.repintar();
+    return true;
+  }
+
+  /** Lo que mueve y lo que alarga la cota elegida (se rehace al cambiar de lado o de modelo). */
+  private afectadosAhora(): { mueven: Set<string>; alargan: Set<string> } | null {
+    const e = this.estiramiento();
+    if (!e || !this.modelo) return null;
+    const clave = `${e.n[0]} ${e.n[1]} ${e.fijo} ${e.movil}`;
+    if (this.afectadosCache?.clave !== clave) {
+      const a = afectados(this.modelo, e);
+      this.afectadosCache = { clave, mueven: new Set(a.mueven), alargan: new Set(a.alargan) };
+    }
+    return this.afectadosCache;
+  }
+
+  /** Lo de estirar en una vista: lo que se mueve y se alarga, la línea de corte y la cota con sus flechas. */
+  private pintarEstirado(planta: string, ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores, cotas: boolean): void {
+    const x = this.estirado!;
+    const camino = (ps: readonly Vec2[], cerrado: boolean) => {
+      ctx.beginPath();
+      ps.forEach((q, i) => {
+        const [u, v] = aPx(q);
+        if (i) ctx.lineTo(u, v);
+        else ctx.moveTo(u, v);
+      });
+      if (cerrado) ctx.closePath();
+    };
+    ctx.save();
+    ctx.strokeStyle = c.acento;
+    ctx.fillStyle = c.acento;
+    const af = this.afectadosAhora();
+    const ix = af ? this.indice(planta) : null;
+    if (af && ix) {
+      for (const s of ix.siluetas) {
+        const mueve = af.mueven.has(s.id);
+        if (!mueve && !af.alargan.has(s.id)) continue;
+        ctx.setLineDash(mueve ? [] : [5, 3]);
+        ctx.lineWidth = mueve ? 2 : 1.5;
+        for (const r of s.cerrados) {
+          camino(r, true);
+          if (mueve) {
+            ctx.globalAlpha = s.tipo === "losa" || s.tipo === "pano" ? 0.08 : 0.3;
+            ctx.fill("evenodd");
+          }
+          ctx.globalAlpha = 0.9;
+          ctx.stroke();
+        }
+        if (!s.cerrados.length)
+          for (const r of s.abiertos) {
+            camino(r, false);
+            ctx.globalAlpha = 0.9;
+            ctx.stroke();
+          }
+      }
+      // La línea de corte, de lado a lado
+      const e = this.estiramiento()!;
+      const { d } = x.cota.cadena;
+      const t = corte(e);
+      const lejos = 1e4;
+      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([10, 4, 2, 4]);
+      camino(
+        [
+          [t * e.n[0] - lejos * d[0], t * e.n[1] - lejos * d[1]],
+          [t * e.n[0] + lejos * d[0], t * e.n[1] + lejos * d[1]],
+        ],
+        false,
+      );
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
+    if (cotas) {
+      // La cota, gruesa, y una flecha por fuera de cada extremo (llena, la del lado que se mueve)
+      const k = x.cota;
+      ctx.lineWidth = 2.5;
+      camino([k.a, k.b], false);
+      ctx.stroke();
+      const [ax, ay] = aPx(k.a);
+      const [bx, by] = aPx(k.b);
+      const l = Math.hypot(bx - ax, by - ay) || 1;
+      const [ux, uy] = [(bx - ax) / l, (by - ay) / l];
+      for (const lado of [0, 1] as const) {
+        const [ex, ey] = lado ? [bx, by] : [ax, ay];
+        const s = lado ? 1 : -1;
+        // La punta, hacia fuera de la cota
+        const [px, py] = [ex + s * ux * (FLECHA + 8), ey + s * uy * (FLECHA + 8)];
+        const [qx, qy] = [ex + s * ux * (FLECHA - 8), ey + s * uy * (FLECHA - 8)];
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(qx - uy * 7, qy + ux * 7);
+        ctx.lineTo(qx + uy * 7, qy - ux * 7);
+        ctx.closePath();
+        ctx.lineWidth = 1.5;
+        ctx.fillStyle = x.mueve === lado ? c.acento : c.fondo;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   private clic(planta: string, q: Vec2, radio: number, doble: boolean): boolean {
@@ -304,14 +592,30 @@ export class ControladorDibujo {
     else if (a?.orto) partes.push("Ortogonal");
     const c = this.cotaActiva();
     if (c) partes.push(`Cota ${nombreCota(c)}: ${c.texto}`);
-    if (this.herramienta === "elegir" && this.silueta) partes.push(this.silueta.id);
+    if (this.herramienta === "elegir" && this.cotaBajo) {
+      partes.push(`Cota ${this.titulo(this.cotaBajo)}: ${this.cotaBajo.texto} m · clic para cambiarla`);
+    } else if (this.herramienta === "elegir" && this.silueta) partes.push(this.silueta.id);
     return { p: a?.p ?? this.cursorQ, texto: partes.join(" · ") };
   }
 
   // ─── Pintar ─────────────────────────────────────────────────────────────────────────────────
 
-  private pintar(planta: string, ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores): void {
-    if (planta !== this.planta || !this.modelo) return;
+  private pintar(planta: string, ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores, cotas: boolean): void {
+    if (!this.modelo) return;
+    // Lo de estirar, en todas las plantas (CT-c); la cota bajo el cursor, gruesa
+    if (this.estirado) this.pintarEstirado(planta, ctx, aPx, c, cotas);
+    else if (cotas && this.cotaBajo && planta === this.planta) {
+      ctx.save();
+      ctx.strokeStyle = c.acento;
+      ctx.lineWidth = 2.5;
+      const [a, b] = [aPx(this.cotaBajo.a), aPx(this.cotaBajo.b)];
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (planta !== this.planta) return;
     const ix = this.indiceActual();
     const camino = (ps: readonly Vec2[], cerrado: boolean) => {
       ctx.beginPath();
