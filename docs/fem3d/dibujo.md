@@ -1,6 +1,6 @@
 # V2c: dibujar el modelo con el ratón (plan)
 
-> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7). **V2c-2 hecho el 2026-10-26** (§8).
+> **Fecha:** 2026-10-23. **Estado:** decidido por el usuario el 2026-10-23 (§6.1), salvo V2c-d, que se decide al empezar V2c-3. **V2c-1 hecho el 2026-10-23** (§7). **V2c-2 hecho el 2026-10-26** (§8). **V2c-3 hecho el 2026-10-26** (§9).
 >
 > **Origen:** el usuario pide adelantar V2c a la puerta de uso de F y AB. Con las tablas sólo se modela bien si ya se tienen las coordenadas: «no sé cómo modelarlo yo si no». Se sustituye así el orden de `visor.md` (V-e: primero tablas y luego el ratón) y el de `CLAUDE.md` («con lo que salga, V2c»). La puerta de uso de F y AB va después de V2c, y con ella la fase MA.
 
@@ -278,3 +278,77 @@ Cómo se comporta cada herramienta:
 - **Carga en un tramo de pilar.** Sigue en la tabla: En barra pone la carga en todo el pilar.
 - **Al pasar el ratón** siguen sin resaltarse los apoyos puntuales y las cargas (§7.4).
 - La puerta de uso, al final de V2c (V2c-a).
+
+## 9. V2c-3 hecho (2026-10-26)
+
+Mover, Copiar, Girar y Simetría sobre lo elegido, los pinzamientos con Elegir y las vigas unidas a los pilares (V2c-d).
+
+### 9.1 Qué hay
+
+- **`src/editor/transformar.ts`** (puro):
+  - `Transformador`: lo que hace una transformación con un punto, una dirección, un vector (fuerza) y un pseudovector (momento).
+  - `transformar(modelo, ids, t, { copiar, plantas, conVigas })`: lo elegido movido o copiado, como un `lote` de `cambiar` o de `crear`.
+  - `asas` y `moverAsa`: los vértices de lo elegido en una planta y uno de ellos llevado a otro punto.
+- **`src/editor/dibujo/editar.ts`** (puro): las cuatro herramientas como máquinas de estados, como las de V2c-1 y V2c-2, con su borrador (lo elegido transformado bajo el cursor) y lo que dice la barra (Δ o el ángulo).
+- **En la app:**
+  - Mover, Copiar, Girar y Simetría en las barras de Modelo y de Cargas, con su plantilla en Propiedades: lo elegido; si las vigas siguen a los pilares; conservar lo original (Simetría); las plantas de las copias (Copiar).
+  - El antiguo «Copiar» (a otras plantas, con su diálogo) pasa a llamarse «A plantas».
+  - Los pinzamientos con Elegir (`controlador.ts`, y `Vista2D.agarrar` para arrastrar).
+
+Cómo se comporta:
+
+- **Lo que se transforma** es lo elegido. Con algo elegido al activar la herramienta, empieza ya. Si no, los clics y las ventanas eligen como con Elegir: un clic sin Ctrl confirma, y con Ctrl se suma e Intro confirma.
+- **Mover y Copiar:** el punto base y el destino, enganchados o tecleados («@dx; dy» es relativo al punto base).
+  - Copiar pone una copia por clic hasta Intro o Esc.
+  - Con plantas marcadas en la plantilla, las copias de lo que es de una planta van a ellas, y los pilares, muros y ejes se copian una vez. Intro sin punto base (o «Copiar en su sitio») las copia allí sin moverlas: el «A plantas» de siempre.
+- **Girar:** el centro y el ángulo desde +X, con un clic (con el ortogonal, 0°, 90°…) o los grados tecleados.
+- **Simetría:** dos puntos del eje; con «Conservar lo original», es una copia.
+- **Después de una acción,** Mover, Girar y Simetría vuelven al punto base con lo mismo elegido (los ids no cambian). Esc anula el punto en curso y lo elegido se queda; otro Esc vuelve a Elegir.
+- **Con sus cargas:** las que van sobre lo elegido por su id (en barra, empujes, superficie sobre una losa o un paño) lo acompañan: al mover, giran con ello; al copiar, se copian con la copia y apuntan a ella. Las sueltas (puntual, lineal, zona sin forjado), sólo si se eligen. Una carga en barra elegida sin su pieza va con la pieza, y se avisa.
+- **Vigas unidas a los pilares** (V2c-d): al mover, girar o hacer la simetría sin conservar, el vértice de cada viga no elegida que está bit a bit en el punto fijo de un pilar que se transforma (en sus plantas) va con él. Con la casilla quitada, o con Ctrl en el último clic, no, y se avisa. Una viga alineada a una cara (V2c-b) no lo sigue, y se avisa, como en CT3.
+- **Lo que no es un punto:**
+  - al girar, cambian el giro de los pilares, el eje 1 de las losas, la dirección de los paños, las componentes horizontales de las fuerzas en ejes globales y las coacciones de los apoyos (ux ↔ uy y rx ↔ ry a 90°; a otro ángulo, si son distintas, se quedan y se avisa);
+  - en la simetría, además, el punto fijo de los pilares cambia de lado, la componente y de las cargas en ejes locales cambia de signo, los momentos se reflejan con el signo cambiado (son pseudovectores) y el empuje pasa al otro lado del muro;
+  - un pilar girado 180° o más con una sección simétrica respecto a su centro (todas salvo la T) se deja con el giro en [0°, 180°) y el punto fijo al otro lado: es la misma pieza.
+- **Exacto,** como en CT2: al mover, la coordenada igual a la del punto base acaba en la del destino y las demás, en la suya más el desplazamiento sin el ruido de la suma; los giros de 90°, 180° y 270° y la simetría por un eje paralelo a X, a Y o a 45° no usan senos. Un valor por defecto (giro 0, eje 1 0) no se escribe, salvo si ya estaba escrito y no cambia.
+- **Pinzamientos** (con Elegir y hasta 60 objetos elegidos): un cuadrado en cada vértice de lo elegido de la planta (el punto de un pilar, un apoyo o una puntual; los de vigas, muros, apoyos lineales, contornos, huecos y ábacos, zonas de carga y extremos de los ejes).
+  - Un clic en uno lo coge y el clic siguiente, enganchado o tecleado («@dx; dy» desde donde estaba), lo deja; también se puede arrastrar. Esc lo suelta.
+  - El de un pilar lo mueve con sus vigas (`moverPilar`, como CT3) y con Ctrl, solo.
+  - En un muro cerrado, el primer punto y el último van juntos. Los huecos del muro y los tramos de las cargas de la viga se vuelven a medir en su tramo, a 1e-9 m.
+
+### 9.2 Criterios
+
+| # | Criterio | Resultado |
+|---|---|---|
+| 1 | Las herramientas dan lo que daría la tabla | **Pasa.** `editar.test.ts`: mover un pilar con el destino tecleado es byte a byte lo de escribir en la tabla el pilar y el extremo de sus tres vigas; copiar un pilar y una viga con sus cargas, girar y la simetría con sus cargas, puntos fijos, coacciones y ejes de losa (`transformar.test.ts`), con la huella del pilar transformado igual a la huella transformada |
+| 2 | El enganche es exacto | **Pasa.** Los números de la tabla salen tal cual al mover, girar 90°, 180° y 270° y en la simetría por ejes paralelos a X, a Y o a 45°. **Metamórfica:** la retícula con núcleo y el unidireccional de C4, trasladados y girados 90° y 180° enteros, dan la misma malla y los desplazamientos y reacciones transformados a ≤ 3,2e-13 por caso (la prueba, a 1e-9); reflejados, las reacciones de los apoyos a 1,6e-14 sin losas y a 6,1e-4 con ellas (V2c3-2) |
+| 3 | Rehacer los modelos de A2 | Hecho en V2c-2. El banco (`validacion/v2c/chrome.ts`) sigue en la retícula con núcleo ya dibujada: mover un pilar, copiar una viga dos veces, girarla 90° (tecleado), la simetría de un pilar conservándolo y arrastrar con el ratón el vértice de una viga hasta un cruce dan, cada uno, la huella de lo mismo hecho en Node |
+| 4 | Deshacer | **Pasa.** En el banco, 6 pasos de deshacer (las seis acciones) vuelven a la huella de antes. En vitest, en los seis modelos de referencia (1-022, C2, C3, los dos de C4 y la vivienda), mover y volver, girar cuatro veces 90° y dos simetrías iguales dejan los bytes, y deshacer, también |
+| 5 | Fluidez | **Pasa.** Edificio objetivo, planta N3, Mover con la planta entera elegida (162 objetos) y el punto base puesto: pasar y pintar lo elegido movido bajo el cursor, 0,2 ms de mediana y 0,3 ms p95; 120 movimientos sin tareas largas. Lo de V2c-1 y V2c-2, igual que antes |
+| 6 | Nada se rompe | **Pasa.** vitest en verde: 2 263 pruebas de la raíz y 79 de la app (la de «A plantas», con su nombre nuevo). Bancos de Chrome: V2c y CT, todo bien; I2 elige en las cuatro vistas y Esc suelta como antes, con el único fallo que ya tenía (una tarea larga de 66 ms al pasar a cuatro vistas, §7.2). El paso de CT3 que elige un pilar falló una vez con vitest corriendo a la vez (espera dos fotogramas a que llegue la elección del worker) y pasa solo |
+| 7 | Puerta de uso | Del usuario, al final de V2c |
+
+### 9.3 Hallazgos
+
+- **V2c3-1, un valor por defecto escrito no vuelve.** Los modelos de C4 llevan `giro: 0` escrito. Girarlos 90° cuatro veces lo deja sin escribir (un giro que vuelve a 0 no se escribe, como la tabla con la celda vacía), así que la ida y vuelta sólo deja los bytes sin esos valores escritos. Es V2c2-3 otra vez; la prueba los quita antes.
+- **V2c3-2, la malla de una losa no es simétrica.** El mismo modelo reflejado da otra malla: los empates de Delaunay se deshacen con una perturbación ligada a los ejes de la losa (C2-3), que la simetría cambia de orientación. Las reacciones de la retícula con núcleo quedan a 6,1e-4 de las reflejadas; sin losas, a 1,6e-14. Girado o trasladado, la malla es la misma, como prometía C2.
+- **V2c3-3, comparar resultados sin limpiar.** La primera versión de la prueba metamórfica comparaba los desplazamientos pasados por `vector3`, que limpia el ruido de los números del modelo (redondea lo que está a 1e-9 de la rejilla de 1e-6). Con desplazamientos de 1e-9 m daba un error de 8,6e-4 que no era del motor; sin limpiar, ≤ 3,2e-13, como las metamórficas de C2–C4. Lo de comparar va ahora sin limpiar (`vector3(v, false)`).
+- **V2c3-4, Esc soltaba lo elegido en mitad de una acción.** El Esc de la app (`App.tsx`) suelta lo elegido siempre. Con un punto en curso de Mover, Copiar, Girar o Simetría, o con un vértice cogido, Esc es de la herramienta: anula el punto y lo elegido se queda. Una tecla que ya usó una herramienta (`defaultPrevented`) no es un atajo.
+- **V2c3-5, una viga por el eje de un muro.** Un clic en ella elige el muro. Para moverla, se elige en el navegador o con una ventana.
+
+### 9.4 Decisiones tomadas al hacerlo (para revisar en la puerta de uso)
+
+- Las vigas siguen a los pilares también al girar y en la simetría, no sólo al mover (V2c-d decía «mover»). Al copiar, no: lo original no se mueve.
+- Las cargas que van por su id acompañan siempre; las sueltas, sólo elegidas. No se buscan las puntuales o lineales que caen sobre una losa movida.
+- Las copias llevan ids nuevos con el prefijo de su tabla (P, V, L, F, M, A, AL, Q; los ejes, la letra o el número siguiente). «A plantas» sigue poniendo la planta en el id.
+- El ángulo de Girar se mide desde +X, sin una dirección de referencia.
+
+### 9.5 Pendiente
+
+- Girar con un ángulo de referencia (dos puntos), como en los CAD.
+- Pinzamientos en el punto medio de un tramo (mover el tramo entero), en las estaciones de un hueco de muro y en el alzado.
+- Mover lo mismo en varias plantas a la vez (las vigas de una planta tipo): hoy se eligen en cada una, o se copia con «A plantas».
+- Las vigas que llegan a una viga que se mueve no la siguen (sólo a los pilares).
+- Al pasar el ratón siguen sin resaltarse los apoyos puntuales y las cargas (§7.4), aunque ya tienen asas.
+- La puerta de uso, al final de V2c (V2c-a).
+

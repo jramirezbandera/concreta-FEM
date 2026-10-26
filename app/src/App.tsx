@@ -176,7 +176,8 @@ export function App() {
         }
         return;
       }
-      if (mod || x.altKey || enCampo(x.target) || (x.target as HTMLElement | null)?.closest?.("[role=grid]")) return;
+      // Una tecla que ya usó una herramienta (Esc con un punto en curso de Mover…) no es un atajo
+      if (x.defaultPrevented || mod || x.altKey || enCampo(x.target) || (x.target as HTMLElement | null)?.closest?.("[role=grid]")) return;
       const va = vistasRef.current.vistas[vistasRef.current.activa];
       if ((x.key === "PageUp" || x.key === "PageDown") && va?.tipo === "alzado" && e?.ejes.length) {
         x.preventDefault();

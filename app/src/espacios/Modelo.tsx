@@ -4,10 +4,11 @@
  *
  * - Barra: en Modelo, las herramientas de dibujo (V2c-1 y V2c-2, `docs/fem3d/dibujo.md`: Ejes, Pilar,
  *   Viga, Forjado, Hueco, Muro, Apoyo y Apoyo lineal se dibujan en la planta, con su plantilla en
- *   Propiedades; `dibujo/controlador.ts`), Ábacos y Vigas de borde, Copiar (a otras plantas) y Borrar
+ *   Propiedades; `dibujo/controlador.ts`), Ábacos y Vigas de borde, las de editar con el ratón (V2c-3:
+ *   Mover, Copiar, Girar y Simetría, sobre lo elegido), A plantas (copiar a otras plantas) y Borrar
  *   (lo elegido o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o
  *   3D; en Cargas, el caso activo, las herramientas de las cargas (Puntual, Lineal, Superficie, En
- *   barra y Empuje, en el caso activo) y Casos. Sin proyecto editable, sólo lo que mira.
+ *   barra y Empuje, en el caso activo), las de editar y Casos. Sin proyecto editable, sólo lo que mira.
  * - Navegador: el proyecto y los objetos de la planta activa (en Cargas, los casos y las cargas).
  * - Vistas (I2): 1, 2 o 4, de planta (modelo, diagnósticos o malla; en Cargas, las del caso activo),
  *   alzado o 3D (`vistas/Zona.tsx`). En Cargas, el alzado y el 3D también dibujan las del caso activo
@@ -38,7 +39,7 @@ import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, repintarVistas,
 import { usePedido } from "../sesion/usePedido.ts";
 import type { NombreHerramienta, Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import { ControladorDibujo } from "../dibujo/controlador.ts";
-import { CampoTeclado, PlantillaDibujo, plantillasEfectivas } from "../dibujo/Plantilla.tsx";
+import { CampoTeclado, IcCopiar, IcGirar, IcMover, IcSimetria, PlantillaDibujo, plantillasEfectivas } from "../dibujo/Plantilla.tsx";
 import { abrirGestor } from "../editor/referencia.tsx";
 
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
@@ -122,10 +123,31 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   }, [ctrl, estirando, dibujando]);
+  // V2c-3: con un vértice cogido, Esc lo suelta, F8 el ortogonal y lo que se teclea abre el campo
+  const conAsa = !!foto.asa;
+  useEffect(() => {
+    if (!conAsa || dibujando) return;
+    const tecla = (x: KeyboardEvent) => {
+      if (x.ctrlKey || x.metaKey || x.altKey || enCampo(x.target)) return;
+      if (x.key === "Escape") {
+        // Suelta el vértice; lo elegido se queda
+        x.preventDefault();
+        ctrl.soltarAsa();
+      } else if (x.key === "F8") {
+        x.preventDefault();
+        ctrl.alternarOrto();
+      } else if (/^[0-9@.,+-]$/.test(x.key)) {
+        x.preventDefault();
+        ctrl.abrirCampo(x.key);
+      }
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [ctrl, conAsa, dibujando]);
   // CT3: con un pilar elegido, Tab elige una de sus cotas, un número abre su campo y Esc la deja
   const conPilar = !!foto.pilar;
   useEffect(() => {
-    if (!conPilar || dibujando || estirando) return;
+    if (!conPilar || dibujando || estirando || conAsa) return;
     const tecla = (x: KeyboardEvent) => {
       if (x.ctrlKey || x.metaKey || x.altKey || enCampo(x.target)) return;
       if (x.key === "Tab") {
@@ -138,7 +160,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [ctrl, conPilar, dibujando, estirando]);
+  }, [ctrl, conPilar, dibujando, estirando, conAsa]);
   // Las teclas de una herramienta: F8, Esc, Intro, Retroceso y lo que abre el campo de teclado
   useEffect(() => {
     if (!dibujando) return;
@@ -147,8 +169,11 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       if (x.key === "F8") {
         x.preventDefault();
         ctrl.alternarOrto();
-      } else if (x.key === "Escape") ctrl.anular();
-      else if (x.key === "Tab") {
+      } else if (x.key === "Escape") {
+        // Con un punto en curso de Mover, Copiar, Girar o Simetría, Esc lo anula y lo elegido se queda
+        if (ctrl.editando) x.preventDefault();
+        ctrl.anular();
+      } else if (x.key === "Tab") {
         if (ctrl.tab(x.shiftKey)) x.preventDefault();
       } else if (x.key === "Enter") ctrl.intro();
       else if (x.key === "Backspace") {
@@ -238,6 +263,11 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcSuperficie} nombre="Superficie" activa={foto.herramienta === "superficie"} onClick={() => elegirHerramienta("superficie")} title="Dibujar cargas de superficie en el caso activo: un clic en una losa o un paño, o una zona (Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcEnBarra} nombre="En barra" activa={foto.herramienta === "barra"} onClick={() => elegirHerramienta("barra")} title="Dibujar cargas en vigas y pilares en el caso activo: un clic en la pieza, o dos en un tramo de viga (Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcEmpuje} nombre="Empuje" activa={foto.herramienta === "empuje"} onClick={() => elegirHerramienta("empuje")} title="Dibujar empujes en el caso activo: un clic en un muro, del lado del terreno. Esc vuelve a Elegir" />
+          <Separador />
+          <Herramienta icono={IcMover} nombre="Mover" activa={foto.herramienta === "mover"} onClick={() => elegirHerramienta("mover")} title="Mover lo elegido: punto base y destino (con las vigas que acaban en sus pilares). Esc vuelve a Elegir" />
+          <Herramienta icono={IcCopiar} nombre="Copiar" activa={foto.herramienta === "copiar"} onClick={() => elegirHerramienta("copiar")} title="Copiar lo elegido: punto base y un destino por copia, en su planta o en las de Propiedades. Esc vuelve a Elegir" />
+          <Herramienta icono={IcGirar} nombre="Girar" activa={foto.herramienta === "girar"} onClick={() => elegirHerramienta("girar")} title="Girar lo elegido: el centro y el ángulo (un clic, o los grados). Esc vuelve a Elegir" />
+          <Herramienta icono={IcSimetria} nombre="Simetría" activa={foto.herramienta === "simetria"} onClick={() => elegirHerramienta("simetria")} title="La simetría de lo elegido por un eje de dos puntos (conservando lo original, en Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcCarga} nombre="Tabla" onClick={() => abrirTabla("cargas", true, { caso: casoValido })} title="Una carga nueva en la tabla de cargas, en el caso activo" />
           <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, las hipótesis típicas de una vez, y la tabla desde él (GE2)" />
         </>
@@ -264,7 +294,12 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcApoyo} nombre="Apoyo" activa={foto.herramienta === "apoyo"} onClick={() => elegirHerramienta("apoyo")} title="Dibujar apoyos: un clic donde va. Esc vuelve a Elegir" />
           <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" activa={foto.herramienta === "apoyoLineal"} onClick={() => elegirHerramienta("apoyoLineal")} title="Dibujar apoyos lineales: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
           <Separador />
-          <Herramienta icono={IcAPlantas} nombre="Copiar" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, forjados, apoyos o cargas"} />
+          <Herramienta icono={IcMover} nombre="Mover" activa={foto.herramienta === "mover"} onClick={() => elegirHerramienta("mover")} title="Mover lo elegido: punto base y destino (con las vigas que acaban en sus pilares). Esc vuelve a Elegir" />
+          <Herramienta icono={IcCopiar} nombre="Copiar" activa={foto.herramienta === "copiar"} onClick={() => elegirHerramienta("copiar")} title="Copiar lo elegido: punto base y un destino por copia, en su planta o en las de Propiedades. Esc vuelve a Elegir" />
+          <Herramienta icono={IcGirar} nombre="Girar" activa={foto.herramienta === "girar"} onClick={() => elegirHerramienta("girar")} title="Girar lo elegido: el centro y el ángulo (un clic, o los grados). Esc vuelve a Elegir" />
+          <Herramienta icono={IcSimetria} nombre="Simetría" activa={foto.herramienta === "simetria"} onClick={() => elegirHerramienta("simetria")} title="La simetría de lo elegido por un eje de dos puntos (conservando lo original, en Propiedades). Esc vuelve a Elegir" />
+          <Separador />
+          <Herramienta icono={IcAPlantas} nombre="A plantas" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, forjados, apoyos o cargas"} />
           <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
           <Separador />
@@ -348,12 +383,13 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               <span className="chip aviso-herr" data-acento="true" role="status">
                 {foto.ayuda}
                 {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
+                {!foto.error && foto.aviso && <span className="text-state-warn"> {foto.aviso}</span>}
               </span>
             )}
-            {!dibujando && (foto.estirado || foto.aviso || foto.pilar) && (
+            {!dibujando && (foto.asa || foto.estirado || foto.aviso || foto.pilar) && (
               <span className="chip aviso-herr" data-acento="true" role="status">
-                {foto.estirado ?? foto.aviso ?? foto.pilar}
-                {foto.estirado && foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
+                {foto.asa ?? foto.estirado ?? foto.aviso ?? foto.pilar}
+                {(foto.estirado || foto.asa) && foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
               </span>
             )}
             {foto.campo && <CampoTeclado key={foto.campo.n} ctrl={ctrl} campo={foto.campo} />}

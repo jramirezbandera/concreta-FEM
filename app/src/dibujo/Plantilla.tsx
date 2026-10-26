@@ -1,13 +1,13 @@
 /**
- * Lo que va en Propiedades mientras una herramienta de dibujo está activa (V2c-1 y V2c-2, `dibujo.md`
- * §2.1): su plantilla (lo que en CYPECAD pide el diálogo antes de colocar, pero sin diálogo: vale
+ * Lo que va en Propiedades mientras una herramienta de dibujo está activa (V2c-1, V2c-2 y V2c-3,
+ * `dibujo.md` §2.1 y §9): su plantilla (lo que en CYPECAD pide el diálogo antes de colocar, pero sin diálogo: vale
  * para los siguientes), los enganches por tipo y el ortogonal. Y el campo de teclado junto al cursor
  * (§2.3). Lo que la plantilla no dice se toma de lo último del mismo tipo en el proyecto (o de lo
  * típico: losa de 25 cm, reticular 25+5, muro de 25 cm); los valores de las cargas, nunca.
  *
  * La ayuda de la herramienta y su error van en el aviso del lienzo, no aquí: el panel es la plantilla.
  */
-import { Check, Plus, Table2 } from "lucide-react";
+import { Check, Copy, FlipHorizontal2, Move, Plus, RotateCw, Table2 } from "lucide-react";
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { comoUna, describirSeccion, type UsoSeccion } from "../../../src/editor/gestores.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
@@ -20,13 +20,20 @@ import { COARTADOS, HUECO_MURO, type PlantillaForjado } from "../../../src/edito
 import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
-import { IcApoyo, IcApoyoLineal, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga } from "../armazon/iconos.tsx";
+import { esEditar, type NombreEditar, type PlantillaEditar } from "../../../src/editor/dibujo/editar.ts";
+import { IcApoyo, IcApoyoLineal, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
 import { cota } from "../fmt.ts";
 import type { ControladorDibujo, Instantanea } from "./controlador.ts";
 
-type Herramienta = Exclude<NombreHerramienta, "elegir">;
+/** V2c-3: los iconos de editar, de lucide. */
+export const IcMover: Icono = ({ size }) => <Move size={size} strokeWidth={1.5} aria-hidden="true" />;
+export const IcCopiar: Icono = ({ size }) => <Copy size={size} strokeWidth={1.5} aria-hidden="true" />;
+export const IcGirar: Icono = ({ size }) => <RotateCw size={size} strokeWidth={1.5} aria-hidden="true" />;
+export const IcSimetria: Icono = ({ size }) => <FlipHorizontal2 size={size} strokeWidth={1.5} aria-hidden="true" />;
+
+type Herramienta = Exclude<NombreHerramienta, "elegir" | NombreEditar>;
 const TITULO: Record<Herramienta, string> = {
   ejes: "Ejes",
   pilar: "Pilar",
@@ -150,6 +157,7 @@ interface Props {
 export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, setPlantillas, editar, abrirTabla }: Props) {
   const h = foto.herramienta;
   if (h === "elegir") return null;
+  if (esEditar(h)) return <PlantillaEditarPanel h={h} foto={foto} ctrl={ctrl} modelo={m} planta={planta} t={t.editar ?? {}} poner={(c) => setPlantillas({ ...t, editar: { ...t.editar, ...c } })} />;
   const Icono = ICONO[h];
   const cotas = cotasPlantas(m.plantas);
   const opcionesPlantas = m.plantas.map((p, i) => (
@@ -383,6 +391,119 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
         </dl>
         <p className="dib-teclas">
           <span className="dib-tecla">Intro</span> acepta <span className="dib-tecla">Esc</span> anula <span className="dib-tecla">Retroceso</span> quita el último punto
+        </p>
+      </Seccion>
+    </div>
+  );
+}
+
+const EDITAR_TITULO: Record<NombreEditar, string> = { mover: "Mover", copiar: "Copiar", girar: "Girar", simetria: "Simetría" };
+const EDITAR_ICONO: Record<NombreEditar, Icono> = { mover: IcMover, copiar: IcCopiar, girar: IcGirar, simetria: IcSimetria };
+
+/** V2c-3: Mover, Copiar, Girar y Simetría: lo elegido, las vigas de los pilares, conservar lo original y las plantas de las copias. */
+function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { h: NombreEditar; foto: Instantanea; ctrl: ControladorDibujo; modelo: ModeloFisico; planta: string | null; t: PlantillaEditar; poner: (c: PlantillaEditar) => void }) {
+  const Icono = EDITAR_ICONO[h];
+  const elegidos = foto.transformando;
+  const cotas = cotasPlantas(m.plantas);
+  const plantas = new Set(t.plantas ?? []);
+  return (
+    <div role="region" aria-label={`Editar · ${EDITAR_TITULO[h]}`}>
+      <Cabecera icono={Icono} tipo={`Editar${planta ? ` en ${planta}` : ""}`} titulo={EDITAR_TITULO[h]} />
+      {!foto.error && foto.hecho && (
+        <p className="dib-hecho" role="status">
+          <Check size={14} />
+          <span className="min-w-0 flex-1 truncate">{foto.hecho}</span>
+          <span className="dib-tecla">Ctrl+Z</span>
+        </p>
+      )}
+      <Seccion titulo="Lo elegido" valor={elegidos ? elegidos.length : undefined}>
+        {elegidos ? (
+          <div className="fichas ids">
+            {elegidos.slice(0, 40).map((id) => (
+              <span key={id}>{id}</span>
+            ))}
+            {elegidos.length > 40 && <span>… y {elegidos.length - 40} más</span>}
+          </div>
+        ) : (
+          <p className="nota">Nada aún: elija en la vista (clic o ventana; con Ctrl+clic, varios e Intro).</p>
+        )}
+      </Seccion>
+      <Seccion titulo="Opciones" valor="para las siguientes">
+        <div className="py-1">
+          {h === "simetria" && (
+            <label className="chk">
+              <input type="checkbox" checked={!!t.conservar} onChange={(x) => poner({ conservar: x.target.checked })} />
+              <span>Conservar lo original (la simetría es una copia)</span>
+            </label>
+          )}
+          {h !== "copiar" && !(h === "simetria" && t.conservar) && (
+            <label className="chk">
+              <input type="checkbox" checked={t.conVigas !== false} onChange={(x) => poner({ conVigas: x.target.checked })} />
+              <span>Las vigas siguen a los pilares</span>
+            </label>
+          )}
+          {h !== "copiar" && !(h === "simetria" && t.conservar) && <p className="nota">Las vigas no elegidas que acaban en el punto fijo de un pilar que se mueve lo siguen, como en CYPECAD. Con Ctrl en el último clic, no.</p>}
+          {h === "copiar" && (
+            <>
+              <div className="campo" style={{ alignItems: "start" }}>
+                <span className="pt-1">plantas</span>
+                <div role="group" aria-label="Plantas de las copias">
+                  {m.plantas.map((p, i) => (
+                    <label key={p.id} className="chk">
+                      <input
+                        type="checkbox"
+                        checked={plantas.has(p.id)}
+                        onChange={(x) => {
+                          const n = new Set(plantas);
+                          if (x.target.checked) n.add(p.id);
+                          else n.delete(p.id);
+                          poner({ plantas: m.plantas.map((q) => q.id).filter((q) => n.has(q)) });
+                        }}
+                      />
+                      <span>{`${p.id} · ${cota(cotas[i])}`}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <p className="nota">{plantas.size ? "Lo que es de una planta (vigas, forjados, apoyos y cargas) se copia en las marcadas; pilares, muros y ejes, una vez. Intro sin punto base lo copia en su sitio." : "Sin ninguna marcada, cada copia va en la planta de lo copiado."}</p>
+              {plantas.size > 0 && elegidos && (
+                <div className="px-3.5 pb-2">
+                  <button type="button" className="btn" onClick={() => ctrl.intro()}>
+                    Copiar en su sitio
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </Seccion>
+      <Seccion titulo="Enganches" valor={`${foto.activos.size} de ${TIPOS_ENGANCHE.length}`}>
+        <label className="chk dib-orto">
+          <input type="checkbox" checked={foto.orto} onChange={() => ctrl.alternarOrto()} />
+          <span className="flex-1">
+            Ortogonal <small>(Mayús, también a 45°)</small>
+          </span>
+          <span className="dib-tecla">F8</span>
+        </label>
+      </Seccion>
+      <Seccion titulo="Teclado">
+        <dl className="dib-teclado">
+          {h === "girar" ? (
+            <>
+              <dt>α</dt>
+              <dd>el ángulo en grados, desde +X</dd>
+            </>
+          ) : (
+            <>
+              <dt>@dx; dy</dt>
+              <dd>relativo al punto base</dd>
+            </>
+          )}
+          <dt>x; y</dt>
+          <dd>absolutas</dd>
+        </dl>
+        <p className="dib-teclas">
+          <span className="dib-tecla">Intro</span> acepta <span className="dib-tecla">Esc</span> anula
         </p>
       </Seccion>
     </div>

@@ -1,5 +1,5 @@
 /**
- * Banco de V2c-1 y V2c-2 en Chrome de verdad (`docs/fem3d/dibujo.md` §4):
+ * Banco de V2c-1, V2c-2 y V2c-3 en Chrome de verdad (`docs/fem3d/dibujo.md` §4 y §9):
  *
  *   node validacion/v2c/chrome.ts          escribe validacion/v2c/out_chrome.txt
  *
@@ -16,7 +16,12 @@
  * - 4: deshacer todo vuelve a la huella de partida, una acción por paso.
  * - 5: en el edificio objetivo (80 pilares por planta, 7 plantas), el enganche al mover el ratón con
  *   la herramienta Viga tarda ≤ 2 ms, y pasar el ratón por la planta no da tareas largas; con Forjado
- *   en una planta con sus vigas y sin losa, lo mismo con el recuadro bajo el cursor.
+ *   en una planta con sus vigas y sin losa, lo mismo con el recuadro bajo el cursor; con Mover y la
+ *   planta entera elegida, lo mismo con lo elegido movido bajo el cursor.
+ * - V2c-3: en la retícula con núcleo ya dibujada, Mover (un pilar, con sus vigas), Copiar (una viga,
+ *   dos veces), Girar (90°, tecleado), Simetría (conservando lo original) y un pinzamiento arrastrado
+ *   con el ratón dan la huella de lo mismo hecho en Node con `transformar` y `moverAsa`; deshacerlos
+ *   vuelve a la de antes, una acción por paso.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -27,6 +32,9 @@ import { leerProyecto, type Proyecto } from "../../src/agente/proyecto.ts";
 import { huellaCompilacion } from "../../src/compilador/compilar.ts";
 import { resolverOpciones, type CargaFisica, type ModeloFisico } from "../../src/compilador/fisico.ts";
 import { aplicar } from "../../src/editor/operaciones.ts";
+import { leerEntrada, resolverEntrada } from "../../src/editor/dibujo/teclado.ts";
+import { asas, moverAsa, transformar, type ResultadoTransformar } from "../../src/editor/transformar.ts";
+import type { Vec2 } from "../../src/compilador/fisico.ts";
 import { serializar } from "../../src/editor/serializar.ts";
 import { manejadorCarpeta } from "../../app/servidor.ts";
 
@@ -442,6 +450,83 @@ try {
   comprobar(hn3 === HUELLA_NUCLEO, `tras «Renumerar», la huella es la de la referencia renumerada (${hn3.slice(0, 16)} = ${HUELLA_NUCLEO.slice(0, 16)})`);
   if (hn3 !== HUELLA_NUCLEO) await diferencias("nucleo", renNucleo.proyecto);
 
+  // ─── V2c-3 ────────────────────────────────────────────────────────────────────────────────────
+  log("\n## V2c-3: mover, copiar, girar, simetría y un pinzamiento en la retícula con núcleo");
+  let esperado: Proyecto = renNucleo.proyecto;
+  const etiquetas: string[] = [];
+  const enNode = (r: ResultadoTransformar, etiqueta: string) => {
+    if (!r.ok) throw new Error(`${etiqueta}: ${r.mensaje}`);
+    const a = aplicar(esperado, r.operacion);
+    if (!a.ok) throw new Error(`${etiqueta}: ${a.errores.map((x) => x.mensaje).join(" ")}`);
+    esperado = a.proyecto;
+    etiquetas.push(etiqueta);
+  };
+  /** El punto que da lo tecleado desde `ultimo`, como en la app. */
+  const tecleado = (texto: string, ultimo: Vec2): Vec2 => {
+    const l = leerEntrada(texto);
+    if (!l.ok) throw new Error(l.mensaje);
+    const r = resolverEntrada(l.valor, { ultimo, cursor: null, direccion: 0, orto: false, mayus: false });
+    if (!r.ok) throw new Error(r.mensaje);
+    return r.valor;
+  };
+  const huellaApp = () => pagina<string>(`return __c.huella();`);
+  const P = esperado.modelo.pilares![0]!;
+  // Mover: con nada elegido, un clic en el pilar lo elige (y lo confirma); el punto base, en él; el destino, tecleado
+  await pagina(`__c.herramienta("Mover").click(); __c.clic([${P.x}, ${P.y}]); await __c.esperar(() => __c.aviso().startsWith("Mover ${P.id}: el punto base"), 10000); __c.clic([${P.x}, ${P.y}]); await __c.teclear("@0,4; -0,3"); __c.tecla("Escape"); __c.tecla("Escape");`);
+  enNode(transformar(esperado.modelo, [P.id], { tipo: "mover", de: [P.x, P.y], a: tecleado("@0,4; -0,3", [P.x, P.y]) }), "mover");
+  await compilada();
+  comprobar((await huellaApp()) === huellaCompilacion(esperado.modelo, opN), `Mover ${P.id} (con sus vigas): la huella de Node`);
+  // Copiar: una viga, dos veces
+  const V = esperado.modelo.vigas![0]!;
+  const [va, vb] = [V.puntos[0]!, V.puntos.at(-1)!];
+  const medio: Vec2 = [(va[0] + vb[0]) / 2, (va[1] + vb[1]) / 2];
+  await pagina(`__c.herramienta("Copiar").click(); __c.clic([${medio[0]}, ${medio[1]}]); await __c.esperar(() => __c.aviso().startsWith("Copiar ${V.id}: el punto base"), 10000); __c.clic([${va[0]}, ${va[1]}]); await __c.teclear("@0; 1,5"); await __c.teclear("@0; 3"); __c.tecla("Escape"); __c.tecla("Escape"); __c.tecla("Escape");`);
+  for (const d of ["@0; 1,5", "@0; 3"]) enNode(transformar(esperado.modelo, [V.id], { tipo: "mover", de: va, a: tecleado(d, va) }, { copiar: true }), "copiar");
+  await compilada();
+  comprobar((await huellaApp()) === huellaCompilacion(esperado.modelo, opN), `Copiar ${V.id} dos veces: la huella de Node`);
+  // Girar 90° la última copia alrededor de su primer punto, con los grados tecleados
+  const C = esperado.modelo.vigas!.at(-1)!;
+  const c0 = C.puntos[0]!;
+  const cm: Vec2 = [(c0[0] + C.puntos.at(-1)![0]) / 2, (c0[1] + C.puntos.at(-1)![1]) / 2];
+  await pagina(`__c.herramienta("Girar").click(); __c.clic([${cm[0]}, ${cm[1]}]); await __c.esperar(() => __c.aviso().startsWith("Girar ${C.id}: el centro"), 10000); await __c.teclear("${num(c0[0])}; ${num(c0[1])}"); await __c.teclear("90"); __c.tecla("Escape"); __c.tecla("Escape");`);
+  enNode(transformar(esperado.modelo, [C.id], { tipo: "girar", centro: c0, angulo: 90 }), "girar");
+  await compilada();
+  comprobar((await huellaApp()) === huellaCompilacion(esperado.modelo, opN), `Girar ${C.id} 90° (tecleado): la huella de Node`);
+  // Simetría del pilar movido, conservando lo original, por el eje x = 9 (tecleado)
+  const Pm = esperado.modelo.pilares!.find((x) => x.id === P.id)!;
+  await pagina(`__c.herramienta("Simetría").click(); __c.clic([${Pm.x}, ${Pm.y}]); await __c.esperar(() => __c.aviso().startsWith("Simetría de ${P.id}"), 10000);
+    [...document.querySelectorAll("label.chk")].find((l) => l.textContent.includes("Conservar lo original")).querySelector("input").click(); await __c.fotograma();
+    await __c.teclear("9; 0"); await __c.teclear("9; 1"); __c.tecla("Escape"); __c.tecla("Escape");`);
+  enNode(transformar(esperado.modelo, [P.id], { tipo: "simetria", a: [9, 0], b: [9, 1] }, { copiar: true }), "simetría");
+  await compilada();
+  comprobar((await huellaApp()) === huellaCompilacion(esperado.modelo, opN), `Simetría de ${P.id} conservándolo: la huella de Node`);
+  // Un pinzamiento: con Elegir, un clic elige la viga y se arrastra su último vértice al cruce de ejes de al lado
+  // La viga más lejos del núcleo (un clic en la de y = 5 elegiría el muro, que va por ella)
+  const lejos = (v: (typeof esperado.modelo.vigas & {})[number]) => -Math.hypot((v.puntos[0]![0] + v.puntos.at(-1)![0]) / 2 - 9, (v.puntos[0]![1] + v.puntos.at(-1)![1]) / 2 - 7.5);
+  const W = [...esperado.modelo.vigas!].sort((a, b) => lejos(a) - lejos(b))[0]!;
+  const wa = W.puntos.at(-1)!;
+  const wm: Vec2 = [(W.puntos[0]![0] + wa[0]) / 2, (W.puntos[0]![1] + wa[1]) / 2];
+  const ejesX = [...new Set(n0.pilares!.map((x) => x.x))].sort((a, b) => a - b);
+  const ejesY = [...new Set(n0.pilares!.map((x) => x.y))].sort((a, b) => a - b);
+  const destino: Vec2 = [ejesX.find((x) => x > wa[0]) ?? ejesX[0]!, ejesY.find((y) => y > wa[1]) ?? ejesY[0]!];
+  await pagina(`__c.clic([${wm[0]}, ${wm[1]}]); __c.ev("pointermove", [${wa[0]}, ${wa[1]}]);
+    await __c.esperar(() => { __c.ev("pointermove", [${wa[0]}, ${wa[1]}]); return document.querySelector("[data-cursor]")?.textContent.includes("Vértice de ${W.id}"); }, 10000).catch(() => { throw new Error("cursor: " + document.querySelector("[data-cursor]")?.textContent + " | props: " + document.querySelector('[aria-label="Propiedades"], .props')?.innerText?.slice(0, 200)); });
+    __c.ev("pointerdown", [${wa[0]}, ${wa[1]}]);
+    for (let k = 1; k <= 10; k++) { __c.ev("pointermove", [${wa[0]} + (${destino[0] - wa[0]}) * k / 10, ${wa[1]} + (${destino[1] - wa[1]}) * k / 10]); await __c.fotograma(); }
+    __c.ev("pointerup", [${destino[0]}, ${destino[1]}]);`);
+  const asa = asas(esperado.modelo, [W.id], "N1").find((x) => x.ruta.join() === `puntos,${W.puntos.length - 1}`)!;
+  enNode(moverAsa(esperado.modelo, asa, destino), "pinzamiento");
+  await compilada();
+  await captura("8-editar");
+  comprobar((await huellaApp()) === huellaCompilacion(esperado.modelo, opN), `arrastrar el último vértice de ${W.id} hasta el cruce (${destino.map(num).join("; ")}): la huella de Node`);
+  const pasosEditar = await pagina<number>(`
+    const b = () => document.querySelector('button[aria-label="Deshacer"]');
+    let k = 0;
+    for (; k < ${etiquetas.length} && !b().disabled; k++) { const t = b().title; b().click(); await __c.esperar(() => b().disabled || b().title !== t, 2000).catch(() => null); }
+    return k;`);
+  await compilada();
+  comprobar(pasosEditar === etiquetas.length && (await huellaApp()) === HUELLA_NUCLEO, `${pasosEditar} pasos de deshacer (${etiquetas.join(", ")}) vuelven a la huella de antes`);
+
   // ─── Criterio 5 ───────────────────────────────────────────────────────────────────────────────
   log("\n## Criterio 5: el enganche en el edificio objetivo (7 plantas, 80 pilares por planta)");
   await abrir("edificio");
@@ -467,6 +552,26 @@ try {
   const pie = await pagina<string>(`return document.querySelector("[data-cursor]")?.textContent ?? "";`);
   comprobar(pie.includes("Centro (P-x18-y5)"), `con la viga en curso, el cursor junto al pilar dice su enganche: «${pie}»`);
   await captura("5-viga-en-curso");
+  await pagina(`__c.tecla("Escape"); __c.tecla("Escape");`);
+  // V2c-3: Mover con la planta entera elegida (una ventana), el punto base puesto y lo elegido movido bajo el cursor
+  await pagina(`__c.herramienta("Mover").click(); __c.ev("pointermove", [-3, 40]); __c.ev("pointerdown", [-3, 40]); __c.ev("pointermove", [20, 20]); __c.ev("pointermove", [60, -3]); __c.ev("pointerup", [60, -3]);
+    await __c.esperar(() => /^Mover [0-9]+ objetos: el punto base/.test(__c.aviso()), 10000); __c.clic([0, 0]);`);
+  const elegidos = await pagina<string>(`return __c.aviso();`);
+  const mm = await pagina<number[]>(`
+    const v = __c.vista(); const d = v.dibujo; const radio = 10 / v.escala;
+    const ctx = document.createElement("canvas").getContext("2d");
+    const col = { fondo: "#fff", texto: "#000", textoSuave: "#666", acento: "#06f", panel: "#fff", borde: "#ccc" };
+    const t = [];
+    for (let k = 0; k < 400; k++) { const p = [-1 + (56 * ((k * 37) % 400)) / 400, -1 + (37 * ((k * 91) % 400)) / 400]; const a = performance.now(); d.pasar(p, radio, false, [0, 0]); d.pintar(ctx, (q) => v.aPx(q), col); t.push(performance.now() - a); }
+    return t;`);
+  const sm = [...mm].sort((a, b) => a - b);
+  const p95m = sm[Math.floor(sm.length * 0.95)]!;
+  comprobar(p95m <= 2, `Mover, pasar y pintar lo elegido movido bajo el cursor («${elegidos.slice(0, 22)}…»): mediana ${sm[sm.length >> 1]!.toFixed(3)} ms, p95 ${p95m.toFixed(3)} ms (≤ 2 ms)`);
+  await pagina(`window.__largas = [];`);
+  await pagina(`for (let k = 0; k <= 120; k++) { __c.ev("pointermove", [-1 + 56 * k / 120, -1 + 37 * ((k * 7) % 120) / 120]); await __c.fotograma(); }`);
+  const largasM = await pagina<{ ms: number }[]>(`return window.__largas;`);
+  comprobar(!largasM.some((x) => x.ms > 50), `Mover con la planta elegida, 120 movimientos con un fotograma cada uno: ${largasM.length} tareas largas (> 50 ms) ${largasM.length ? `(${largasM.map((x) => x.ms.toFixed(0)).join(", ")} ms)` : ""}`);
+  await captura("9-mover-planta");
   await pagina(`__c.tecla("Escape"); __c.tecla("Escape");`);
 } catch (e) {
   comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);

@@ -343,7 +343,7 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     fireEvent.click(screen.getAllByRole("option", { name: /N1/ })[0]!);
     const objetos = () => screen.getByText("Objetos", { selector: "h2 span" }).closest("section")!;
     fireEvent.click(within(objetos()).getByRole("button", { name: /^Vigas/ }));
-    const copiar = within(screen.getByRole("toolbar", { name: "Herramientas de Modelo" })).getByRole("button", { name: "Copiar" });
+    const copiar = within(screen.getByRole("toolbar", { name: "Herramientas de Modelo" })).getByRole("button", { name: "A plantas" });
     fireEvent.click(copiar);
     expect(copiar.getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector(".aviso-herr")?.textContent).toMatch(/elija las vigas/);

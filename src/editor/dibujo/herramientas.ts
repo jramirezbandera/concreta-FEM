@@ -21,7 +21,8 @@
  * Esc anula lo que está en curso y, sin nada en curso, sale a Elegir.
  *
  * Las de V2c-2 están en `piezas.ts` (Forjado, Hueco, Muro, Apoyo y Apoyo lineal) y `cargas.ts`
- * (Puntual, Lineal, Superficie, En barra y Empuje); aquí, lo que las reparte.
+ * (Puntual, Lineal, Superficie, En barra y Empuje), y las de editar de V2c-3, en `editar.ts` (Mover,
+ * Copiar, Girar y Simetría); aquí, lo que las reparte.
  *
  * Puro: sin IO, sin React ni DOM.
  */
@@ -36,9 +37,10 @@ import { colocar, cotasEn, LADOS, ladosEn, nombreCota, referenciaEn, referencias
 import { unitario, type Enganche, type IndiceEnganches } from "./enganches.ts";
 import { ayudaCarga, borradorCarga, esCarga, pasoCarga, type NombreCarga, type PlantillaCargas } from "./cargas.ts";
 import { ayudaPieza, borradorPieza, esPieza, pasoPieza, type NombrePieza, type PlantillaApoyo, type PlantillaForjado, type PlantillaHueco, type PlantillaMuro } from "./piezas.ts";
+import { ayudaEditar, borradorEditar, esEditar, pasoEditar, type NombreEditar, type PlantillaEditar } from "./editar.ts";
 
-/** Las de V2c-1 (ejes, pilar, viga), las de las piezas de V2c-2 (`piezas.ts`) y las de las cargas (`cargas.ts`). */
-export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga" | NombrePieza | NombreCarga;
+/** Las de V2c-1 (ejes, pilar, viga), las de las piezas de V2c-2 (`piezas.ts`), las de las cargas (`cargas.ts`) y las de editar de V2c-3 (`editar.ts`). */
+export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga" | NombrePieza | NombreCarga | NombreEditar;
 
 export interface PlantillaPilar {
   /** Planta de la base; por defecto, la más baja. */
@@ -69,6 +71,8 @@ export interface Plantillas {
   apoyoLineal?: PlantillaApoyo;
   /** V2c-2 (`cargas.ts`): el caso activo y lo de cada tipo de carga. */
   cargas?: PlantillaCargas;
+  /** V2c-3 (`editar.ts`): Mover, Copiar, Girar y Simetría. */
+  editar?: PlantillaEditar;
 }
 
 /** Un punto de lo que se dibuja; `pilar`, si se enganchó a uno. */
@@ -87,6 +91,8 @@ export interface EstadoHerramienta {
   objeto?: string;
   /** Hueco: el objeto es un muro. */
   enMuro?: boolean;
+  /** V2c-3: lo elegido que se transforma, ya confirmado. */
+  elegidos?: readonly string[];
 }
 
 export const ESTADO_INICIAL: EstadoHerramienta = { puntos: [] };
@@ -97,6 +103,8 @@ export interface ContextoHerramienta {
   planta: string;
   indice: IndiceEnganches;
   plantillas: Plantillas;
+  /** V2c-3: lo elegido en las vistas, el navegador o la tabla. */
+  elegidos?: readonly string[];
 }
 
 export type Evento =
@@ -105,7 +113,7 @@ export type Evento =
    * se elige con un clic dentro o a un lado de algo: un recuadro, un forjado, el lado de un muro) y
    * `radio`, el de enganche en m (lo que se elige con un clic encima: una viga, un muro).
    */
-  | { tipo: "punto"; p: Vec2; enganche?: Enganche | null; cursor?: Vec2; radio?: number }
+  | { tipo: "punto"; p: Vec2; enganche?: Enganche | null; cursor?: Vec2; radio?: number; ctrl?: boolean }
   /** Doble clic o Intro; con el punto del cursor (ya enganchado), si lo hay. */
   | { tipo: "terminar"; p?: Vec2 | null; enganche?: Enganche | null }
   /** Tab (Mayús+Tab, `atras`): la cota siguiente del cursor. */
@@ -116,11 +124,15 @@ export type Evento =
   | { tipo: "anular" }
   | { tipo: "retroceso" }
   /** Una ventana, m: [x0, y0, x1, y1]. */
-  | { tipo: "ventana"; caja: readonly [number, number, number, number] };
+  | { tipo: "ventana"; caja: readonly [number, number, number, number] }
+  /** V2c-3: lo elegido para transformar (un clic sin Ctrl con la herramienta esperando elección, o al activarla). */
+  | { tipo: "elegidos"; ids: readonly string[] };
 
 export interface Hecho {
   operacion: Operacion;
   etiqueta: string;
+  /** Lo que conviene saber de lo hecho (una viga que no sigue a su pilar, un apoyo que no gira). */
+  avisos?: string[];
 }
 
 export interface Paso {
@@ -380,6 +392,7 @@ function pasoViga(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): P
 
 /** El paso de la herramienta `h` con el evento `ev`. */
 export function paso(h: NombreHerramienta, e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {
+  if (esEditar(h)) return pasoEditar(h, e, ev, ctx);
   if (ev.tipo === "anular") return e.puntos.length || e.fijos?.length || e.activa || e.objeto ? { estado: ESTADO_INICIAL } : { estado: e, salir: true };
   if (h === "ejes") return pasoEjes(e, ev, ctx);
   if (h === "pilar") return pasoPilar(e, ev, ctx);
@@ -411,6 +424,11 @@ export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec
   }
   if (esPieza(h)) borradorPieza(h, e, cursor, ctx, r, crudo);
   if (esCarga(h)) borradorCarga(h, e, cursor, ctx, r, crudo);
+  if (esEditar(h)) {
+    // Lo elegido se ve ya resaltado; los puntos del borrador son los transformados
+    r.puntos = [];
+    borradorEditar(h, e, cursor, ctx, r);
+  }
   return r;
 }
 
@@ -418,6 +436,7 @@ export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec
 export function ayuda(h: NombreHerramienta, e: EstadoHerramienta, t: Plantillas = { pilar: {}, viga: {} }): string {
   if (esPieza(h)) return ayudaPieza(h, e, t);
   if (esCarga(h)) return ayudaCarga(h, e, t);
+  if (esEditar(h)) return ayudaEditar(h, e, t);
   if (h === "ejes") return e.puntos.length ? "Eje: el segundo punto. Esc anula." : "Eje: el primer punto (clic, o «x; y» e Intro). Esc vuelve a Elegir.";
   if (h === "pilar") {
     if (e.fijos?.length) return `Pilar: ${e.fijos.map((f) => `${rotuloCota(f.valor)} ${nombreCota(f)}`).join(" y ")}. Clic o Intro lo coloca; Tab y un número fijan otra cota; Esc suelta lo fijado.`;

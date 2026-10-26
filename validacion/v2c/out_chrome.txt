@@ -3,7 +3,7 @@ BIEN  el proyecto de partida tiene la huella de Node
 BIEN  80 pilares con un clic, sin errores de la herramienta («Pilar: un clic donde va su punto fijo, o una ventana para uno en cada cruce de e»)
 BIEN  la losa y su hueco, tecleados, sin errores de la herramienta («»)
 BIEN  las cuatro cargas de la planta, sin errores de la herramienta («»)
-BIEN  tras «Renumerar», la huella es la de la referencia renumerada (20a5454f049a8105 = 20a5454f049a8105); dibujado en 11.5 s de banco
+BIEN  tras «Renumerar», la huella es la de la referencia renumerada (20a5454f049a8105 = 20a5454f049a8105); dibujado en 8.3 s de banco
 
 ## Criterio 4: una acción, un paso; deshacer todo deja el proyecto de partida
 BIEN  186 pasos de deshacer: 18 ejes + 80 pilares + 81 vigas + losa y hueco + 4 cargas + Renumerar = 186
@@ -14,10 +14,20 @@ BIEN  el proyecto de partida tiene la huella de Node
 BIEN  ejes, pilares, vigas, losa, hueco, núcleo y puerta, sin errores de la herramienta («»)
 BIEN  tras «Renumerar», la huella es la de la referencia renumerada (3d732ce8ea185f98 = 3d732ce8ea185f98)
 
+## V2c-3: mover, copiar, girar, simetría y un pinzamiento en la retícula con núcleo
+BIEN  Mover P1 (con sus vigas): la huella de Node
+BIEN  Copiar V8 dos veces: la huella de Node
+BIEN  Girar V10 90° (tecleado): la huella de Node
+BIEN  Simetría de P1 conservándolo: la huella de Node
+BIEN  arrastrar el último vértice de V10 hasta el cruce (0; 0): la huella de Node
+BIEN  6 pasos de deshacer (mover, copiar, copiar, girar, simetría, pinzamiento) vuelven a la huella de antes
+
 ## Criterio 5: el enganche en el edificio objetivo (7 plantas, 80 pilares por planta)
-BIEN  Forjado, pasar y pintar con el recuadro bajo el cursor (80 pilares, 81 vigas): mediana 0.100 ms, p95 0.200 ms (≤ 2 ms); los recuadros de la planta, 0.2 ms la primera vez
-BIEN  enganche al mover el ratón: mediana 0.100 ms, p95 0.200 ms, máx. 1.200 ms (≤ 2 ms); el índice de la planta, 4.5 ms la primera vez
+BIEN  Forjado, pasar y pintar con el recuadro bajo el cursor (80 pilares, 81 vigas): mediana 0.100 ms, p95 0.200 ms (≤ 2 ms); los recuadros de la planta, 2.3 ms la primera vez
+BIEN  enganche al mover el ratón: mediana 0.100 ms, p95 0.200 ms, máx. 0.800 ms (≤ 2 ms); el índice de la planta, 2.7 ms la primera vez
 BIEN  120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
 BIEN  con la viga en curso, el cursor junto al pilar dice su enganche: «x 18 · y 5 m · Centro (P-x18-y5)»
+BIEN  Mover, pasar y pintar lo elegido movido bajo el cursor («Mover 162 objetos: el …»): mediana 0.200 ms, p95 0.300 ms (≤ 2 ms)
+BIEN  Mover con la planta elegida, 120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
 
 Todo bien

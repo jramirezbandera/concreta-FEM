@@ -21,6 +21,12 @@
  * referencias, en las vistas de planta en las que está: un clic en un número (o Tab) la elige y abre
  * el campo con su valor, Intro mueve el pilar con las vigas que acaban en su punto fijo, en todas sus
  * plantas (`moverPilar`), Ctrl+Intro lo mueve solo y Esc la deja.
+ *
+ * V2c-3 (`docs/fem3d/dibujo.md` §9): Mover, Copiar, Girar y Simetría (`editar.ts`). Sin lo elegido
+ * confirmado, los clics y las ventanas van a elegir; un clic sin Ctrl (o Intro, con lo sumado con
+ * Ctrl) lo confirma. Con Elegir, lo elegido enseña sus vértices (pinzamientos, `transformar.ts`): un
+ * clic en uno lo coge (o se arrastra) y el clic siguiente, enganchado o tecleado, lo deja; Ctrl, un
+ * pilar sin sus vigas; Esc lo suelta.
  */
 import type { ModeloFisico, Vec2 } from "../../../src/compilador/fisico.ts";
 import { apuntar, bajoCursor, indiceEnganches, NOMBRE_ENGANCHE, RADIO_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
@@ -30,6 +36,8 @@ import { cadenasDe, cotasCadena, rotuloCota, type CotaCadena } from "../../../sr
 import { ejesDe } from "../../../src/compilador/ejes.ts";
 import { afectados, corte, estirar, moverPilar, type Estiramiento } from "../../../src/editor/estirar.ts";
 import { ayuda, borrador, ESTADO_INICIAL, paso, ultimoPunto, type EstadoHerramienta, type Evento, type Hecho, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
+import { esEditar, medidaEditar } from "../../../src/editor/dibujo/editar.ts";
+import { asas, moverAsa, type Asa } from "../../../src/editor/transformar.ts";
 import { leerEntrada, resolverEntrada } from "../../../src/editor/dibujo/teclado.ts";
 import type { Colores } from "../vistas/motor.ts";
 import type { Dibujo2D } from "../vistas/vista2d.ts";
@@ -51,10 +59,17 @@ export interface Instantanea {
   aviso: string | null;
   /** CT3: lo que dice la barra con un solo pilar elegido. */
   pilar: string | null;
+  /** V2c-3: lo que dice la barra con un vértice cogido (pinzamientos). */
+  asa: string | null;
+  /** V2c-3: lo elegido que transforma la herramienta de editar, ya confirmado. */
+  transformando: readonly string[] | null;
 }
 
 /** Por fuera de cada extremo de la cota que se estira, el centro de su flecha, px. */
 const FLECHA = 16;
+
+/** Con más elegidos, no se enseñan sus vértices (pinzamientos). */
+const MAX_ASAS = 60;
 
 /** Una cota de la cadena elegida para estirar y el extremo que se mueve (0, el de t menor; 1, el otro; null, sin elegir). */
 interface Estirado {
@@ -99,9 +114,15 @@ export class ControladorDibujo {
   private readonly refsPilar = new Map<string, ReferenciasCotas | null>();
   private ladoPilar: Lado | null = null;
   private ladoBajo: Lado | null = null;
+  /** V2c-3: el último clic de elegir con una herramienta de editar esperando elección llevaba Ctrl (suma; no confirma). */
+  private ctrlEleccion = false;
+  /** V2c-3: los vértices de lo elegido en una planta, el que está bajo el cursor y el cogido. */
+  private asasCache: { planta: string; elegidos: readonly string[]; lista: Asa[] } | null = null;
+  private asaBajo: Asa | null = null;
+  private asaActiva: Asa | null = null;
 
   constructor() {
-    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null };
+    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null, asa: null, transformando: null };
   }
 
   // ─── Para React ─────────────────────────────────────────────────────────────────────────────
@@ -114,7 +135,7 @@ export class ControladorDibujo {
   instantanea = (): Instantanea => this.foto;
 
   private cambiar(c: Partial<Instantanea>): void {
-    this.foto = { ...this.foto, ayuda: ayuda(this.herramienta, this.estado, this.plantillas), ...c };
+    this.foto = { ...this.foto, ayuda: ayuda(this.herramienta, this.estado, this.plantillas), transformando: this.estado.elegidos ?? null, ...c };
     for (const f of this.oyentes) f();
   }
 
@@ -129,6 +150,9 @@ export class ControladorDibujo {
     // La cota elegida era del modelo de antes
     if (this.estirado) this.anularEstirado();
     this.soltarPilar();
+    this.asasCache = null;
+    this.asaBajo = null;
+    if (this.asaActiva) this.soltarAsa();
     // Lo recién dibujado ya engancha, sin esperar a que se mueva el ratón
     this.recalcular();
   }
@@ -154,8 +178,18 @@ export class ControladorDibujo {
     this.apunte = null;
     this.estirado = null;
     this.ladoPilar = null;
-    this.cambiar({ herramienta: h, error: null, hecho: null, campo: null, estirado: null, aviso: null, pilar: this.textoPilar() });
+    this.asaActiva = null;
+    this.asaBajo = null;
+    this.ctrlEleccion = false;
+    this.cambiar({ herramienta: h, error: null, hecho: null, campo: null, estirado: null, aviso: null, pilar: this.textoPilar(), asa: null });
+    // V2c-3: con algo elegido, Mover, Copiar, Girar y Simetría empiezan ya con ello
+    if (esEditar(h) && this.elegidos.length) this.evento({ tipo: "elegidos", ids: this.elegidos });
     this.repintar();
+  }
+
+  /** V2c-3: la herramienta de editar espera a que se elija (sus clics y ventanas eligen). */
+  private eligiendo(): boolean {
+    return esEditar(this.herramienta) && !this.estado.elegidos;
   }
 
   get activa(): NombreHerramienta {
@@ -211,12 +245,22 @@ export class ControladorDibujo {
     this.evento({ tipo: "anular" });
   }
 
+  /** V2c-3: hay un punto en curso de una herramienta de editar (Esc lo anula y lo elegido se queda). */
+  get editando(): boolean {
+    return esEditar(this.herramienta) && !!this.estado.elegidos && this.estado.puntos.length > 0;
+  }
+
   retroceso(): void {
     this.evento({ tipo: "retroceso" });
   }
 
   abrirCampo(texto: string): void {
     if (this.herramienta === "elegir" && this.ladoPilar) return this.abrirCampoPilar(texto);
+    if (this.herramienta === "elegir" && this.asaActiva) {
+      this.cambiar({ campo: { n: ++this.abiertos, texto, x: this.cliente[0], y: this.cliente[1], error: null, cota: `vértice de ${this.asaActiva.id}` } });
+      return;
+    }
+    if (this.eligiendo()) return;
     if (this.herramienta === "elegir" && this.estirado?.mueve == null) return;
     this.cambiar({ campo: { n: this.abiertos + 1, texto, x: this.cliente[0], y: this.cliente[1], error: null, ...this.cotaCampo() } });
     this.abiertos++;
@@ -230,6 +274,7 @@ export class ControladorDibujo {
   escCampo(): void {
     if (this.estirado) this.anularEstirado();
     else if (this.ladoPilar) this.soltarPilar();
+    else if (this.asaActiva) this.soltarAsa();
     else this.cerrarCampo();
   }
 
@@ -239,6 +284,27 @@ export class ControladorDibujo {
     if (this.herramienta === "elegir" && this.ladoPilar) return this.teclearPilar(texto, ctrl);
     const ix = this.indiceActual();
     const l = leerEntrada(texto);
+    // Girar: un número suelto son los grados
+    if (l.ok && l.valor.tipo === "longitud" && this.herramienta === "girar" && this.estado.puntos.length === 1) {
+      this.cambiar({ campo: null });
+      this.evento({ tipo: "fijar", valor: l.valor.l, cursor: this.cursorQ });
+      return true;
+    }
+    // Un vértice cogido: el punto escrito («@dx; dy», desde donde estaba)
+    if (this.herramienta === "elegir" && this.asaActiva) {
+      const r = l.ok && ix ? resolverEntrada(l.valor, { ultimo: this.asaActiva.p, cursor: this.cursorQ, direccion: ix.direccion, orto: this.foto.orto, mayus: this.mayus }) : null;
+      if (!l.ok || !r || !r.ok) {
+        this.cambiar({ campo: this.foto.campo && { ...this.foto.campo, texto, error: !l.ok ? l.mensaje : r && !r.ok ? r.mensaje : "Lleve el cursor a una planta." } });
+        return false;
+      }
+      const error = this.dejarAsa(r.valor, ctrl);
+      if (error) {
+        this.cambiar({ campo: this.foto.campo && { ...this.foto.campo, texto, error } });
+        return false;
+      }
+      this.cambiar({ campo: null });
+      return true;
+    }
     // Con Pilar, un número suelto es la distancia de la cota activa
     if (l.ok && l.valor.tipo === "longitud" && this.herramienta === "pilar") {
       const antes = this.estado;
@@ -289,8 +355,9 @@ export class ControladorDibujo {
         this.pasar(planta, p, radio, mayus, cliente);
       },
       salir: () => this.salir(planta),
-      clic: (p, radio, _ctrl, doble) => (this.herramienta === "elegir" ? this.clicCotas(planta, p, radio, cotas) : this.clic(planta, p, radio, doble)),
-      ventana: (caja) => this.ventana(planta, caja),
+      clic: (p, radio, ctrl, doble) => (this.herramienta === "elegir" ? this.clicElegir(planta, p, radio, ctrl, doble, cotas) : this.clic(planta, p, radio, doble, ctrl)),
+      ventana: (caja, ctrl) => this.ventana(planta, caja, !!ctrl),
+      agarrar: (p, radio) => this.agarrar(planta, p, radio),
       cursor: () => this.cursor(planta),
       pintar: (ctx, aPx, c) => this.pintar(planta, ctx, aPx, c, cotas),
     };
@@ -309,10 +376,11 @@ export class ControladorDibujo {
     this.radio = radio;
     this.mayus = mayus;
     this.cliente = cliente;
-    const [antes, ladoAntes] = [this.cotaBajo, this.ladoBajo];
-    this.ladoBajo = this.herramienta === "elegir" && this.conCotas && !this.estirado ? this.cotaPilarEn(planta, q, radio / RADIO_ENGANCHE) : null;
-    this.cotaBajo = this.herramienta === "elegir" && this.conCotas && !this.ladoBajo ? this.cotaEn(q, radio / RADIO_ENGANCHE) : null;
-    this.recalcular(this.cotaBajo !== antes || this.ladoBajo !== ladoAntes);
+    const [antes, ladoAntes, asaAntes] = [this.cotaBajo, this.ladoBajo, this.asaBajo];
+    this.asaBajo = this.herramienta === "elegir" && !this.asaActiva && !this.estirado ? this.asaEn(planta, q, radio) : null;
+    this.ladoBajo = this.herramienta === "elegir" && this.conCotas && !this.estirado && !this.asaBajo && !this.asaActiva ? this.cotaPilarEn(planta, q, radio / RADIO_ENGANCHE) : null;
+    this.cotaBajo = this.herramienta === "elegir" && this.conCotas && !this.ladoBajo && !this.asaBajo && !this.asaActiva ? this.cotaEn(q, radio / RADIO_ENGANCHE) : null;
+    this.recalcular(this.cotaBajo !== antes || this.ladoBajo !== ladoAntes || this.asaBajo !== asaAntes || !!this.asaActiva);
   }
 
   /** El enganche y lo de debajo con el cursor de ahora. */
@@ -323,7 +391,8 @@ export class ControladorDibujo {
       this.apunte = null;
       this.silueta = null;
     } else {
-      this.apunte = this.herramienta === "elegir" ? null : apuntar(ix, q, this.radio, { ultimo: ultimoPunto(this.estado), orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos });
+      const asa = this.herramienta === "elegir" ? this.asaActiva : null;
+      this.apunte = asa ? apuntar(ix, q, this.radio, { ultimo: asa.p, orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos }) : this.herramienta === "elegir" || this.eligiendo() ? null : apuntar(ix, q, this.radio, { ultimo: ultimoPunto(this.estado), orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos });
       this.silueta = bajoCursor(ix, this.apunte?.p ?? q, this.radio);
     }
     if (pintar) this.repintar();
@@ -336,6 +405,94 @@ export class ControladorDibujo {
     this.silueta = null;
     this.cotaBajo = null;
     this.ladoBajo = null;
+    this.asaBajo = null;
+  }
+
+  // ─── Pinzamientos (V2c-3) ───────────────────────────────────────────────────────────────────
+
+  /** Los vértices de lo elegido en la planta (con Elegir y a lo sumo `MAX_ASAS` objetos). */
+  private asasDe(planta: string): Asa[] {
+    if (this.herramienta !== "elegir" || !this.modelo || !this.elegidos.length || this.elegidos.length > MAX_ASAS) return [];
+    const c = this.asasCache;
+    if (c && c.planta === planta && c.elegidos === this.elegidos) return c.lista;
+    const lista = asas(this.modelo, this.elegidos, planta);
+    this.asasCache = { planta, elegidos: this.elegidos, lista };
+    return lista;
+  }
+
+  /** El vértice más cercano a q a menos del radio (los pilares primero: arrastran sus vigas). */
+  private asaEn(planta: string, q: Vec2, radio: number): Asa | null {
+    let mejor: Asa | null = null;
+    let dm = radio;
+    for (const a of this.asasDe(planta)) {
+      const d = Math.hypot(a.p[0] - q[0], a.p[1] - q[1]) - (a.coleccion === "pilares" ? radio / 2 : 0);
+      if (d <= dm) [mejor, dm] = [a, d];
+    }
+    return mejor;
+  }
+
+  /** Coge el vértice bajo p (un clic o el principio de un arrastre). */
+  private agarrar(planta: string, p: Vec2, radio: number): boolean {
+    if (this.herramienta !== "elegir" || this.asaActiva || this.estirado || this.ladoPilar) return false;
+    const a = this.asaEn(planta, p, radio);
+    if (!a) return false;
+    this.planta = planta;
+    this.asaActiva = a;
+    this.asaBajo = null;
+    this.cursorQ = p;
+    this.radio = radio;
+    this.cambiar({ asa: this.textoAsa(), aviso: null, error: null });
+    this.recalcular();
+    return true;
+  }
+
+  private textoAsa(): string | null {
+    const a = this.asaActiva;
+    if (!a) return null;
+    const que = a.coleccion === "pilares" ? `${a.id} (su punto fijo)` : a.ruta[0] === "x" ? a.id : `un vértice de ${a.id}`;
+    return `${que}: el punto nuevo (clic, o «x; y», «@dx; dy» e Intro)${a.coleccion === "pilares" ? "; con Ctrl, sin sus vigas" : ""}. Esc lo suelta.`;
+  }
+
+  /** Esc: suelta el vértice cogido sin moverlo. */
+  soltarAsa(): void {
+    if (!this.asaActiva) return;
+    this.asaActiva = null;
+    this.apunte = null;
+    this.cambiar({ asa: null, campo: null, error: null });
+    this.repintar();
+  }
+
+  /** Lleva el vértice cogido a q; con `solo`, un pilar sin sus vigas. Devuelve el error, si lo hay. */
+  private dejarAsa(q: Vec2, solo: boolean): string | null {
+    const a = this.asaActiva;
+    if (!a || !this.modelo) return "No hay ningún vértice cogido.";
+    const r = moverAsa(this.modelo, a, q, !solo);
+    if (!r.ok) {
+      this.cambiar({ error: r.mensaje });
+      return r.mensaje;
+    }
+    const etiqueta = `Mover ${a.coleccion === "pilares" || a.ruta[0] === "x" ? a.id : `un vértice de ${a.id}`}${solo && a.coleccion === "pilares" ? ", sin sus vigas" : ""}`;
+    const error = this.aplicar({ operacion: r.operacion, etiqueta });
+    if (error) {
+      this.cambiar({ error });
+      return error;
+    }
+    this.asaActiva = null;
+    this.cambiar({ asa: null, error: null, hecho: etiqueta, aviso: r.avisos.length ? r.avisos.join(" ") : null });
+    this.repintar();
+    return null;
+  }
+
+  /** Con Elegir: un vértice cogido se deja; si no, las cotas (CT2, CT3) o elegir. */
+  private clicElegir(planta: string, q: Vec2, radio: number, ctrl: boolean, doble: boolean, cotas: boolean): boolean {
+    if (this.asaActiva) {
+      // El doble clic sobre el asa que se acaba de coger no la deja en su sitio
+      if (doble) return true;
+      this.pasar(planta, q, radio, this.mayus, this.cliente);
+      this.dejarAsa(this.apunte?.p ?? q, ctrl);
+      return true;
+    }
+    return this.clicCotas(planta, q, radio, cotas);
   }
 
   // ─── Estirar desde una cota (CT2) ───────────────────────────────────────────────────────────
@@ -593,8 +750,13 @@ export class ControladorDibujo {
     if (ids === this.elegidos) return;
     this.elegidos = ids;
     this.ladoBajo = null;
+    this.asaBajo = null;
     if (this.ladoPilar) this.soltarPilar();
-    this.cambiar({ pilar: this.textoPilar(), aviso: null });
+    if (this.asaActiva) this.soltarAsa();
+    // V2c-3: lo elegido para Mover, Copiar, Girar o Simetría (con Ctrl se suma, y lo confirma Intro)
+    if (esEditar(this.herramienta) && (this.estado.elegidos || (ids.length && !this.ctrlEleccion))) this.evento({ tipo: "elegidos", ids });
+    else if (!esEditar(this.herramienta)) this.cambiar({ aviso: null });
+    this.cambiar({ pilar: this.textoPilar() });
     this.repintar();
   }
 
@@ -712,8 +874,13 @@ export class ControladorDibujo {
     return true;
   }
 
-  private clic(planta: string, q: Vec2, radio: number, doble: boolean): boolean {
+  private clic(planta: string, q: Vec2, radio: number, doble: boolean, ctrl = false): boolean {
     if (this.herramienta === "elegir") return false;
+    // Esperando elección: el clic elige (con Ctrl, suma)
+    if (this.eligiendo()) {
+      this.ctrlEleccion = ctrl;
+      return false;
+    }
     if (doble) {
       this.evento({ tipo: "terminar" });
       return true;
@@ -721,12 +888,17 @@ export class ControladorDibujo {
     this.pasar(planta, q, radio, this.mayus, this.cliente);
     const a = this.apunte;
     // Con el punto del ratón sin enganchar y el radio: lo que se elige con un clic dentro, a un lado o encima de algo
-    if (a) this.evento({ tipo: "punto", p: a.p, enganche: a.enganche, cursor: q, radio });
+    if (a) this.evento({ tipo: "punto", p: a.p, enganche: a.enganche, cursor: q, radio, ...(ctrl ? { ctrl } : {}) });
     return true;
   }
 
-  private ventana(planta: string, caja: [number, number, number, number]): boolean {
-    if (this.herramienta === "elegir") return false;
+  private ventana(planta: string, caja: [number, number, number, number], ctrl: boolean): boolean {
+    if (this.herramienta === "elegir") return !!this.asaActiva;
+    if (this.eligiendo()) {
+      this.ctrlEleccion = ctrl;
+      return false;
+    }
+    if (esEditar(this.herramienta)) return true;
     if (planta !== this.planta) this.pasar(planta, [(caja[0] + caja[2]) / 2, (caja[1] + caja[3]) / 2], this.radio, false, this.cliente);
     this.evento({ tipo: "ventana", caja });
     return true;
@@ -741,18 +913,22 @@ export class ControladorDibujo {
       this.alSalir();
       return;
     }
-    if (!this.modelo || !this.planta) return;
-    const ix = this.indiceActual();
+    // Lo elegido no necesita el cursor en una planta (se activa la herramienta con algo elegido)
+    const planta = this.planta ?? (esEditar(this.herramienta) ? this.modelo?.plantas[0]?.id : null);
+    if (!this.modelo || !planta) return;
+    const ix = this.indice(planta);
     if (!ix) return;
-    const r = paso(this.herramienta, this.estado, ev, { modelo: this.modelo, planta: this.planta, indice: ix, plantillas: this.plantillas });
+    const r = paso(this.herramienta, this.estado, ev, { modelo: this.modelo, planta, indice: ix, plantillas: this.plantillas, elegidos: this.elegidos });
     this.estado = r.estado;
     let error = r.error ?? null;
     let hecho: string | null = this.foto.hecho;
+    let aviso: string | null = esEditar(this.herramienta) ? this.foto.aviso : null;
     if (r.hecho) {
       error = this.aplicar(r.hecho);
-      if (!error) hecho = r.hecho.etiqueta;
+      if (!error) [hecho, aviso] = [r.hecho.etiqueta, r.hecho.avisos?.join(" ") ?? null];
     }
-    this.cambiar({ error, hecho });
+    if (ev.tipo === "elegidos") this.ctrlEleccion = false;
+    this.cambiar({ error, hecho, aviso });
     if (r.salir) this.alSalir();
     this.recalcular();
   }
@@ -765,15 +941,39 @@ export class ControladorDibujo {
     else if (a?.orto) partes.push("Ortogonal");
     const c = this.cotaActiva();
     if (c) partes.push(`Cota ${nombreCota(c)}: ${c.texto}`);
+    const medida = esEditar(this.herramienta) ? medidaEditar(this.herramienta, this.estado, a?.p ?? this.cursorQ) : null;
+    if (medida) partes.push(medida);
+    if (this.herramienta === "elegir" && this.asaActiva) {
+      const q = a?.p ?? this.cursorQ;
+      partes.push(`Δ ${rotuloCota(q[0] - this.asaActiva.p[0])}; ${rotuloCota(q[1] - this.asaActiva.p[1])} m`);
+    } else if (this.herramienta === "elegir" && this.asaBajo) partes.push(`Vértice de ${this.asaBajo.id} · clic para moverlo`);
     const k = this.herramienta === "elegir" && this.ladoBajo ? this.cotasPilar(planta)?.cotas.find((x) => x.lado === this.ladoBajo) : null;
     if (k) partes.push(`Cota ${nombreCota(k)}: ${k.texto} m · clic para cambiarla`);
     else if (this.herramienta === "elegir" && this.cotaBajo) {
       partes.push(`Cota ${this.titulo(this.cotaBajo)}: ${this.cotaBajo.texto} m · clic para cambiarla`);
-    } else if (this.herramienta === "elegir" && this.silueta) partes.push(this.silueta.id);
+    } else if (this.herramienta === "elegir" && this.silueta && !this.asaBajo && !this.asaActiva) partes.push(this.silueta.id);
     return { p: a?.p ?? this.cursorQ, texto: partes.join(" · ") };
   }
 
   // ─── Pintar ─────────────────────────────────────────────────────────────────────────────────
+
+  /** Un cuadrado por vértice de lo elegido: lleno el que está bajo el cursor y el cogido. */
+  private pintarAsas(planta: string, ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores): void {
+    const lista = this.asasDe(planta);
+    if (!lista.length) return;
+    ctx.save();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = c.acento;
+    const r = 4;
+    for (const a of lista) {
+      const [x, y] = aPx(a.p);
+      const on = a === this.asaBajo || (this.asaActiva && a.id === this.asaActiva.id && a.ruta.join() === this.asaActiva.ruta.join());
+      ctx.fillStyle = on ? c.acento : c.fondo;
+      ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
+      ctx.strokeRect(x - r, y - r, 2 * r, 2 * r);
+    }
+    ctx.restore();
+  }
 
   private pintar(planta: string, ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores, cotas: boolean): void {
     if (!this.modelo) return;
@@ -795,6 +995,8 @@ export class ControladorDibujo {
       const x = this.cotasPilar(planta);
       if (x) for (const k of x.cotas) cotaTemporal(ctx, { ...k, activa: k.lado === this.ladoPilar || (planta === this.planta && k.lado === this.ladoBajo) }, aPx, c);
     }
+    // V2c-3: los vértices de lo elegido (pinzamientos), en todas las plantas en las que está
+    if (this.herramienta === "elegir" && !this.estirado) this.pintarAsas(planta, ctx, aPx, c);
     if (planta !== this.planta) return;
     const ix = this.indiceActual();
     const camino = (ps: readonly Vec2[], cerrado: boolean) => {
@@ -822,6 +1024,21 @@ export class ControladorDibujo {
           ctx.stroke();
         }
       ctx.globalAlpha = 1;
+    }
+    if (this.herramienta === "elegir" && this.asaActiva && this.cursorQ) {
+      // El vértice cogido, con una línea hasta donde iría
+      const [a, b] = [aPx(this.asaActiva.p), aPx(this.apunte?.p ?? this.cursorQ)];
+      ctx.save();
+      ctx.strokeStyle = c.acento;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.stroke();
+      ctx.restore();
+      const e = this.apunte?.enganche;
+      if (e) marcador(ctx, e.tipo, aPx(e.p), c);
     }
     if (this.herramienta === "elegir" || !ix) return;
     // El borrador

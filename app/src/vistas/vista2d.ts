@@ -43,7 +43,9 @@ export interface Dibujo2D {
   /** true si el clic es suyo. */
   clic(p: Vec2, radio: number, ctrl: boolean, doble: boolean): boolean;
   /** true si la ventana es suya. */
-  ventana(caja: [number, number, number, number]): boolean;
+  ventana(caja: [number, number, number, number], ctrl?: boolean): boolean;
+  /** V2c-3: al pulsar, true si coge algo que se arrastra (un vértice de lo elegido); al soltar tras moverse, va a `clic`. */
+  agarrar?(p: Vec2, radio: number): boolean;
   /** El punto que se usaría (enganchado) y lo que dice la barra de estado. */
   cursor(): { p: Vec2; texto: string } | null;
   pintar(ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores): void;
@@ -251,8 +253,36 @@ export class Vista2D extends Vista {
   protected soltarVentana(c: [number, number, number, number], modo: "dentro" | "toca", ctrl: boolean): void {
     if (this.s <= 0) return;
     const [a, b] = [this.aModelo(c[0], c[3]), this.aModelo(c[2], c[1])];
-    if (this.dibujo?.ventana([a[0], a[1], b[0], b[1]])) return;
+    if (this.dibujo?.ventana([a[0], a[1], b[0], b[1]], ctrl)) return;
     this.eventos.ventana?.([a[0], a[1], b[0], b[1]], modo, ctrl);
+  }
+
+  /** V2c-3: lo que se arrastra desde un vértice cogido (px de la pulsación y si se ha movido). */
+  private asa: { x0: number; y0: number; movido: boolean } | null = null;
+
+  override pointerdown(e: PointerEvent, x: number, y: number): void {
+    if (e.button === 0 && this.s > 0 && this.dibujo?.agarrar?.(this.aModelo(x, y), RADIO_ENGANCHE / this.s)) {
+      this.alActivar?.();
+      this.asa = { x0: x, y0: y, movido: false };
+      this.entorno.pintar();
+      return;
+    }
+    super.pointerdown(e, x, y);
+  }
+
+  override pointermove(e: PointerEvent, x: number, y: number): void {
+    const a = this.asa;
+    if (!a) return super.pointermove(e, x, y);
+    if (!a.movido && Math.hypot(x - a.x0, y - a.y0) > 4) a.movido = true;
+    this.pasar(x, y, e);
+  }
+
+  override pointerup(e: PointerEvent, x: number, y: number): void {
+    const a = this.asa;
+    if (!a) return super.pointerup(e, x, y);
+    this.asa = null;
+    // Arrastrado, se deja donde se suelta; con un clic, queda cogido hasta el clic siguiente
+    if (a.movido) this.clic(x, y, e.ctrlKey || e.metaKey, false);
   }
 
   protected override pasar(x: number, y: number, e?: PointerEvent): void {
