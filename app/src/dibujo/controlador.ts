@@ -16,13 +16,19 @@
  * clic en una elige el lado que se mueve y abre el campo con el valor actual, ← y → cambian de lado,
  * Intro aplica (`src/editor/estirar.ts`) y Esc anula. Mientras, en todas las plantas se resalta lo que
  * se mueve (lleno) y lo que se alarga (de trazos), con la línea de corte.
+ *
+ * Con Elegir y un solo pilar elegido, se pintan sus cotas temporales (CT3, §2.3), sin él entre las
+ * referencias, en las vistas de planta en las que está: un clic en un número (o Tab) la elige y abre
+ * el campo con su valor, Intro mueve el pilar con las vigas que acaban en su punto fijo, en todas sus
+ * plantas (`moverPilar`), Ctrl+Intro lo mueve solo y Esc la deja.
  */
 import type { ModeloFisico, Vec2 } from "../../../src/compilador/fisico.ts";
 import { apuntar, bajoCursor, indiceEnganches, NOMBRE_ENGANCHE, RADIO_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
-import { nombreCota, type CotaTemporal } from "../../../src/editor/dibujo/cotas.ts";
+import { colocar, cotasEn, LADOS, nombreCota, referenciasCotas, type CotaTemporal, type Lado, type ReferenciasCotas } from "../../../src/editor/dibujo/cotas.ts";
+import { PlantaFisica } from "../../../src/agente/render/modelo.ts";
 import { cadenasDe, cotasCadena, rotuloCota, type CotaCadena } from "../../../src/agente/render/ejes.ts";
 import { ejesDe } from "../../../src/compilador/ejes.ts";
-import { afectados, corte, estirar, type Estiramiento } from "../../../src/editor/estirar.ts";
+import { afectados, corte, estirar, moverPilar, type Estiramiento } from "../../../src/editor/estirar.ts";
 import { ayuda, borrador, ESTADO_INICIAL, paso, ultimoPunto, type EstadoHerramienta, type Evento, type Hecho, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import { leerEntrada, resolverEntrada } from "../../../src/editor/dibujo/teclado.ts";
 import type { Colores } from "../vistas/motor.ts";
@@ -41,8 +47,10 @@ export interface Instantanea {
   campo: { n: number; texto: string; x: number; y: number; error: string | null; cota?: string; seleccionar?: boolean } | null;
   /** CT2: lo que dice la barra mientras se estira desde una cota. */
   estirado: string | null;
-  /** CT2: los avisos del último estirado (un hueco de muro que cambia de ancho). */
+  /** CT2: los avisos del último estirado (un hueco de muro que cambia de ancho); CT3, los de mover un pilar. */
   aviso: string | null;
+  /** CT3: lo que dice la barra con un solo pilar elegido. */
+  pilar: string | null;
 }
 
 /** Por fuera de cada extremo de la cota que se estira, el centro de su flecha, px. */
@@ -86,9 +94,14 @@ export class ControladorDibujo {
   /** Si la vista del cursor tiene la cadena de cotas, y la cota bajo el cursor (con Elegir). */
   private conCotas = false;
   private cotaBajo: CotaCadena | null = null;
+  /** CT3: lo elegido, las referencias de las cotas del pilar elegido por planta, la cota activa y la que está bajo el cursor. */
+  private elegidos: readonly string[] = [];
+  private readonly refsPilar = new Map<string, ReferenciasCotas | null>();
+  private ladoPilar: Lado | null = null;
+  private ladoBajo: Lado | null = null;
 
   constructor() {
-    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), campo: null, estirado: null, aviso: null };
+    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null };
   }
 
   // ─── Para React ─────────────────────────────────────────────────────────────────────────────
@@ -112,8 +125,10 @@ export class ControladorDibujo {
     this.cadena = null;
     this.afectadosCache = null;
     this.cotaBajo = null;
+    this.refsPilar.clear();
     // La cota elegida era del modelo de antes
     if (this.estirado) this.anularEstirado();
+    this.soltarPilar();
     // Lo recién dibujado ya engancha, sin esperar a que se mueva el ratón
     this.recalcular();
   }
@@ -124,7 +139,8 @@ export class ControladorDibujo {
     this.estado = ESTADO_INICIAL;
     this.apunte = null;
     this.estirado = null;
-    this.cambiar({ herramienta: h, error: null, hecho: null, campo: null, estirado: null, aviso: null });
+    this.ladoPilar = null;
+    this.cambiar({ herramienta: h, error: null, hecho: null, campo: null, estirado: null, aviso: null, pilar: this.textoPilar() });
     this.repintar();
   }
 
@@ -151,6 +167,7 @@ export class ControladorDibujo {
 
   /** Tab (Mayús+Tab, `atras`): la cota temporal siguiente. Devuelve si la herramienta las tiene. */
   tab(atras = false): boolean {
+    if (this.herramienta === "elegir") return this.tabPilar(atras);
     if (this.herramienta !== "pilar") return false;
     this.evento({ tipo: "tab", cursor: this.apunte?.p ?? this.cursorQ, atras });
     const c = this.foto.campo;
@@ -185,6 +202,7 @@ export class ControladorDibujo {
   }
 
   abrirCampo(texto: string): void {
+    if (this.herramienta === "elegir" && this.ladoPilar) return this.abrirCampoPilar(texto);
     if (this.herramienta === "elegir" && this.estirado?.mueve == null) return;
     this.cambiar({ campo: { n: this.abiertos + 1, texto, x: this.cliente[0], y: this.cliente[1], error: null, ...this.cotaCampo() } });
     this.abiertos++;
@@ -197,12 +215,14 @@ export class ControladorDibujo {
   /** Esc en el campo: anula el estirado o, si no, sólo cierra el campo. */
   escCampo(): void {
     if (this.estirado) this.anularEstirado();
+    else if (this.ladoPilar) this.soltarPilar();
     else this.cerrarCampo();
   }
 
-  /** Lo escrito en el campo, como un punto. Devuelve si se aceptó. */
-  teclear(texto: string): boolean {
+  /** Lo escrito en el campo, como un punto; con `ctrl` (Ctrl+Intro), un pilar movido sin sus vigas (CT3). Devuelve si se aceptó. */
+  teclear(texto: string, ctrl = false): boolean {
     if (this.estirado?.mueve != null) return this.teclearEstirado(texto);
+    if (this.herramienta === "elegir" && this.ladoPilar) return this.teclearPilar(texto, ctrl);
     const ix = this.indiceActual();
     const l = leerEntrada(texto);
     // Con Pilar, un número suelto es la distancia de la cota activa
@@ -275,9 +295,10 @@ export class ControladorDibujo {
     this.radio = radio;
     this.mayus = mayus;
     this.cliente = cliente;
-    const antes = this.cotaBajo;
-    this.cotaBajo = this.herramienta === "elegir" && this.conCotas ? this.cotaEn(q, radio / RADIO_ENGANCHE) : null;
-    this.recalcular(this.cotaBajo !== antes);
+    const [antes, ladoAntes] = [this.cotaBajo, this.ladoBajo];
+    this.ladoBajo = this.herramienta === "elegir" && this.conCotas && !this.estirado ? this.cotaPilarEn(planta, q, radio / RADIO_ENGANCHE) : null;
+    this.cotaBajo = this.herramienta === "elegir" && this.conCotas && !this.ladoBajo ? this.cotaEn(q, radio / RADIO_ENGANCHE) : null;
+    this.recalcular(this.cotaBajo !== antes || this.ladoBajo !== ladoAntes);
   }
 
   /** El enganche y lo de debajo con el cursor de ahora. */
@@ -300,6 +321,7 @@ export class ControladorDibujo {
     this.apunte = null;
     this.silueta = null;
     this.cotaBajo = null;
+    this.ladoBajo = null;
   }
 
   // ─── Estirar desde una cota (CT2) ───────────────────────────────────────────────────────────
@@ -372,6 +394,16 @@ export class ControladorDibujo {
 
   private clicCotas(planta: string, q: Vec2, radio: number, cotas: boolean): boolean {
     const px = radio / RADIO_ENGANCHE;
+    // CT3: el número de una cota del pilar elegido
+    const lado = cotas && !this.estirado ? this.cotaPilarEn(planta, q, px) : null;
+    if (lado) {
+      this.planta = planta;
+      this.ladoPilar = lado;
+      this.abrirCampoPilar(null);
+      this.repintar();
+      return true;
+    }
+    if (this.ladoPilar) this.soltarPilar();
     const x = this.estirado;
     if (x && cotas)
       for (const lado of [0, 1] as const) {
@@ -540,6 +572,132 @@ export class ControladorDibujo {
     ctx.restore();
   }
 
+  // ─── Las cotas del pilar elegido (CT3) ──────────────────────────────────────────────────────
+
+  /** Lo elegido en las vistas, el navegador o la tabla. */
+  ponerElegidos(ids: readonly string[]): void {
+    if (ids === this.elegidos) return;
+    this.elegidos = ids;
+    this.ladoBajo = null;
+    if (this.ladoPilar) this.soltarPilar();
+    this.cambiar({ pilar: this.textoPilar(), aviso: null });
+    this.repintar();
+  }
+
+  /** El pilar elegido solo, con Elegir. */
+  private pilarElegido() {
+    if (this.herramienta !== "elegir" || this.elegidos.length !== 1 || !this.modelo) return null;
+    return this.modelo.pilares?.find((p) => p.id === this.elegidos[0]) ?? null;
+  }
+
+  /** Las cotas del pilar elegido en la planta (null si no hay o no está en ella). */
+  private cotasPilar(planta: string): { id: string; p: Vec2; R: ReferenciasCotas; cotas: CotaTemporal[] } | null {
+    const pil = this.pilarElegido();
+    const ix = pil ? this.indice(planta) : null;
+    if (!pil || !ix || !this.modelo) return null;
+    const clave = `${planta}\u0000${pil.id}`;
+    let R = this.refsPilar.get(clave);
+    if (R === undefined) {
+      R = new PlantaFisica(this.modelo, planta).pilares().some((x) => x.p.id === pil.id) ? referenciasCotas(this.modelo, planta, ix.direccion, pil.id) : null;
+      this.refsPilar.set(clave, R);
+    }
+    if (!R) return null;
+    const p: Vec2 = [pil.x, pil.y];
+    return { id: pil.id, p, R, cotas: cotasEn(R, p) };
+  }
+
+  /**
+   * La cota del pilar elegido cuyo número está bajo q (px: los m de un px), con el rótulo donde lo
+   * pone `cotaTemporal`: centrado en la cota o, si no cabe, más allá de su referencia.
+   */
+  private cotaPilarEn(planta: string, q: Vec2, px: number): Lado | null {
+    const x = this.cotasPilar(planta);
+    if (!x) return null;
+    for (const k of x.cotas) {
+      const l = Math.hypot(k.b[0] - k.a[0], k.b[1] - k.a[1]);
+      if (!(l > 0)) continue;
+      const u: Vec2 = [(k.b[0] - k.a[0]) / l, (k.b[1] - k.a[1]) / l];
+      // ~6,5 px por carácter de 11 px, como en `cotaEn`
+      const [w, h] = [k.texto.length * 6.5 + 8, 16];
+      const largo = Math.abs(u[0]) * w + Math.abs(u[1]) * h;
+      const ancho = Math.abs(u[1]) * w + Math.abs(u[0]) * h;
+      const c: Vec2 = l / px >= largo + 12 ? [(k.a[0] + k.b[0]) / 2, (k.a[1] + k.b[1]) / 2] : [k.a[0] - u[0] * (largo / 2 + 6) * px, k.a[1] - u[1] * (largo / 2 + 6) * px];
+      const v: Vec2 = [q[0] - c[0], q[1] - c[1]];
+      if (Math.abs(v[0] * u[0] + v[1] * u[1]) <= (largo / 2 + 2) * px && Math.abs(v[0] * u[1] - v[1] * u[0]) <= (ancho / 2 + 2) * px) return k.lado;
+    }
+    return null;
+  }
+
+  /** La cota activa del pilar elegido. */
+  private cotaPilarActiva(): CotaTemporal | null {
+    if (!this.ladoPilar || !this.planta) return null;
+    return this.cotasPilar(this.planta)?.cotas.find((x) => x.lado === this.ladoPilar) ?? null;
+  }
+
+  private textoPilar(): string | null {
+    const pil = this.pilarElegido();
+    if (!pil) return null;
+    const k = this.cotaPilarActiva();
+    if (k) return `${pil.id}, cota ${nombreCota(k)} (${k.texto} m): escriba la distancia; Intro mueve ${pil.id} con sus vigas y Ctrl+Intro, solo; Tab, otra cota; Esc la deja.`;
+    return `${pil.id}: un clic en el número de una cota (o Tab) para moverlo.`;
+  }
+
+  /** Tab con Elegir: la cota siguiente del pilar elegido (Mayús+Tab, la anterior). */
+  private tabPilar(atras: boolean): boolean {
+    const x = this.planta ? this.cotasPilar(this.planta) : null;
+    if (!x || !x.cotas.length) return false;
+    const lados = LADOS.filter((l) => x.cotas.some((k) => k.lado === l));
+    const i = this.ladoPilar ? lados.indexOf(this.ladoPilar) : atras ? 0 : -1;
+    this.ladoPilar = lados[(i + (atras ? -1 : 1) + lados.length) % lados.length]!;
+    const c = this.foto.campo;
+    this.cambiar({ pilar: this.textoPilar(), ...(c ? { campo: { ...c, cota: this.textoCampoPilar(), error: null } } : {}) });
+    this.repintar();
+    return true;
+  }
+
+  private textoCampoPilar(): string | undefined {
+    const pil = this.pilarElegido();
+    const k = this.cotaPilarActiva();
+    return pil && k ? `${nombreCota(k)} · ${pil.id}` : undefined;
+  }
+
+  /** El campo de la cota activa: con `texto`, lo tecleado; si no, su valor, elegido para escribir encima. */
+  private abrirCampoPilar(texto: string | null): void {
+    const k = this.cotaPilarActiva();
+    if (!k) return;
+    this.cambiar({ pilar: this.textoPilar(), aviso: null, campo: { n: ++this.abiertos, texto: texto ?? k.texto, x: this.cliente[0], y: this.cliente[1], error: null, cota: this.textoCampoPilar(), ...(texto === null ? { seleccionar: true } : {}) } });
+  }
+
+  /** Esc: deja la cota activa del pilar. */
+  soltarPilar(): void {
+    if (!this.ladoPilar) return;
+    this.ladoPilar = null;
+    this.cambiar({ pilar: this.textoPilar(), campo: null });
+    this.repintar();
+  }
+
+  private teclearPilar(texto: string, solo: boolean): boolean {
+    const campo = (error: string) => {
+      this.cambiar({ campo: this.foto.campo && { ...this.foto.campo, texto, error } });
+      return false;
+    };
+    const x = this.planta ? this.cotasPilar(this.planta) : null;
+    const k = this.cotaPilarActiva();
+    if (!x || !k || !this.modelo) return campo("No hay ninguna cota elegida.");
+    const l = leerEntrada(texto);
+    if (!l.ok || l.valor.tipo !== "longitud" || l.valor.l < 0) return campo(`Escriba la distancia a ${k.ref.nombre}, m (p. ej. «5,40»).`);
+    const q = colocar(x.R, x.p, [{ lado: k.lado, ref: k.ref, valor: l.valor.l }]);
+    const r = moverPilar(this.modelo, x.id, q, !solo);
+    if (!r.ok) return campo(r.mensaje);
+    const etiqueta = `Mover ${x.id} a ${rotuloCota(l.valor.l)} m de ${k.ref.nombre}${solo ? ", sin sus vigas" : ""}`;
+    const error = this.aplicar({ operacion: r.operacion, etiqueta });
+    if (error) return campo(error);
+    this.ladoPilar = null;
+    this.cambiar({ campo: null, hecho: etiqueta, aviso: r.avisos.length ? r.avisos.join(" ") : null, pilar: this.textoPilar() });
+    this.repintar();
+    return true;
+  }
+
   private clic(planta: string, q: Vec2, radio: number, doble: boolean): boolean {
     if (this.herramienta === "elegir") return false;
     if (doble) {
@@ -592,7 +750,9 @@ export class ControladorDibujo {
     else if (a?.orto) partes.push("Ortogonal");
     const c = this.cotaActiva();
     if (c) partes.push(`Cota ${nombreCota(c)}: ${c.texto}`);
-    if (this.herramienta === "elegir" && this.cotaBajo) {
+    const k = this.herramienta === "elegir" && this.ladoBajo ? this.cotasPilar(planta)?.cotas.find((x) => x.lado === this.ladoBajo) : null;
+    if (k) partes.push(`Cota ${nombreCota(k)}: ${k.texto} m · clic para cambiarla`);
+    else if (this.herramienta === "elegir" && this.cotaBajo) {
       partes.push(`Cota ${this.titulo(this.cotaBajo)}: ${this.cotaBajo.texto} m · clic para cambiarla`);
     } else if (this.herramienta === "elegir" && this.silueta) partes.push(this.silueta.id);
     return { p: a?.p ?? this.cursorQ, texto: partes.join(" · ") };
@@ -614,6 +774,11 @@ export class ControladorDibujo {
       ctx.lineTo(b[0], b[1]);
       ctx.stroke();
       ctx.restore();
+    }
+    // CT3: las cotas del pilar elegido, en todas las plantas en las que está
+    if (cotas && !this.estirado) {
+      const x = this.cotasPilar(planta);
+      if (x) for (const k of x.cotas) cotaTemporal(ctx, { ...k, activa: k.lado === this.ladoPilar || (planta === this.planta && k.lado === this.ladoBajo) }, aPx, c);
     }
     if (planta !== this.planta) return;
     const ix = this.indiceActual();

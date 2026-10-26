@@ -551,7 +551,12 @@
     - `estirar.test.ts`: una retícula estirada en cada vano es byte a byte la generada con la luz nueva; girada, a 1e-9. En seis referencias, deshacer da los bytes, no salen avisos nuevos de ε_snap y la carga cambia lineal con Δ;
     - `app/src/test/estirar.test.ts` y el banco de Chrome: guardado, lo de `estirar` en Node byte a byte; pintar, 0,2 ms.
   - **Para la puerta de uso (CT2-1):** lo que hay dentro del vano no se mueve: la viga secundaria a media luz queda descentrada.
-  - Siguiente: CT3 (las cotas de un pilar elegido).
+- **2026-10-26: CT3 hecho, y la fase CT** (`cotas.md` §9): las cotas de un pilar elegido lo mueven con sus vigas (CT-d).
+  - **`moverPilar`** (`src/editor/estirar.ts`, puro): el pilar a su punto nuevo y, en todas sus plantas, el vértice de cada viga que estaba bit a bit en su punto fijo; un paso de deshacer. Una viga alineada a una cara no lo sigue y se avisa; sin vigas, se nombran las que se quedan. Los ejes guardados no se mueven.
+  - **En la app, con Elegir y un pilar elegido:** sus cotas temporales (las de CT1, sin él entre las referencias, ni en los ejes propuestos); un clic en un número, o Tab y un número, abre el campo; Intro lo mueve con sus vigas y Ctrl+Intro, solo.
+  - **Validación:** `estirar.test.ts` (criterio 4: mover y volver deja los bytes en la retícula y en seis referencias), `app/src/test/moverPilar.test.ts` y el banco `validacion/ct/chrome.ts` (guardado, lo de Node byte a byte; las cotas, 0,2 ms p95).
+  - **CT3-3:** los bancos de Chrome de AL, cargas, I1–I4 y V2c acaban en «Todo bien» si una excepción corta el banco (sin `catch`); el de CT ya la cuenta como fallo.
+  - Falta la puerta de uso de CT (criterio 7, del usuario).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

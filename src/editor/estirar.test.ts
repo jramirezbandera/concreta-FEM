@@ -6,7 +6,9 @@
  * - criterio 3: en los modelos de referencia, estirar y deshacer devuelve los bytes; estirado,
  *   compila sin avisos nuevos de ε_snap, ajustes ni fusiones, y la carga de cada caso cambia lineal
  *   con Δ (sólo por el área nueva) y nada en las puntuales;
- * - el límite al acortar, el hueco de muro que cruza el corte y los ejes propuestos.
+ * - el límite al acortar, el hueco de muro que cruza el corte y los ejes propuestos;
+ * - CT3 (§2.3, criterio 4): mover un pilar arrastra los vértices de sus vigas en todas sus plantas, y
+ *   con Ctrl no; moverlo y volverlo a su sitio deja el proyecto byte a byte.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,8 +23,8 @@ import { canonico } from "../compilador/huella.ts";
 import { reticulaEnrasada } from "../../validacion/c2/modelos.ts";
 import { reticulaConNucleo } from "../../validacion/c3/modelos.ts";
 import { edificioReticular, edificioUnidireccional } from "../../validacion/c4/modelos.ts";
-import { limpio } from "./dibujo/cotas.ts";
-import { afectados, corte, estirar, type Estiramiento } from "./estirar.ts";
+import { colocar, cotasEn, limpio, referenciasCotas } from "./dibujo/cotas.ts";
+import { afectados, corte, estirar, moverPilar, type Estiramiento } from "./estirar.ts";
 import { deshacer, hacer, historial } from "./historial.ts";
 import { aplicar } from "./operaciones.ts";
 import { serializar } from "./serializar.ts";
@@ -303,5 +305,133 @@ describe("estirar: límites, avisos y ejes propuestos", () => {
     expect(k).toEqual(expect.arrayContaining(["6,35", "5,40", "5,00"]));
     expect(nuevo.pilares!.filter((p) => p.id.startsWith("P1-")).map((p) => p.x)).toEqual([6.35, 6.35]);
     expect(nuevo.pilares!.filter((p) => p.id.startsWith("P2-")).map((p) => p.x)).toEqual([11.75, 11.75]);
+  });
+});
+
+// ─── CT3: mover un pilar con sus vigas (criterio 4) ─────────────────────────────────────────────
+
+/**
+ * 2 × 1 vanos (6 y 5,4 por 5) con dos plantas y un sótano: vigas de pilar a pilar en las dos (una
+ * continua con un vértice en P10), una alineada a la cara inferior de la fila 1 y, en N2, la continua
+ * acaba donde P20 (que sólo llega a N1) no está.
+ */
+function porticos(conEjes = true): ModeloFisico {
+  const xs = [0, 6, 11.4];
+  const ys = [0, 5];
+  const vigas = ["N2", "N1"].flatMap((p) => [
+    { id: `VA-${p}`, planta: p, puntos: [[0, 0], [6, 0], [11.4, 0]] as Vec2[], seccion: "v30" },
+    { id: `VB1-${p}`, planta: p, puntos: [[0, 5], [6, 5]] as Vec2[], seccion: "v30" },
+    { id: `VB2-${p}`, planta: p, puntos: [[6, 5], [11.4, 5]] as Vec2[], seccion: "v30" },
+    { id: `V1-${p}`, planta: p, puntos: [[6, 0], [6, 5]] as Vec2[], seccion: "v30" },
+    { id: `VC-${p}`, planta: p, puntos: [[0, 4.9], [6, 4.9]] as Vec2[], seccion: "v30" },
+  ]);
+  return {
+    plantas: [{ id: "N2", altura: null }, { id: "N1", altura: 3 }, { id: "C", tipo: "sotano", altura: 3 }],
+    materiales: [{ id: "HA", tipo: "hormigon", fck: 25 }],
+    secciones: [
+      { id: "p40", material: "HA", forma: "rectangular", b: 0.4, h: 0.4 },
+      { id: "v30", material: "HA", forma: "rectangular", b: 0.3, h: 0.5 },
+    ],
+    pilares: xs.flatMap((x, i) => ys.map((y, j) => ({ id: `P${i}${j}`, x, y, desde: "C", hasta: i === 2 && j === 0 ? "N1" : "N2", seccion: "p40" }))),
+    vigas,
+    losas: ["N2", "N1"].map((p) => ({ id: `L-${p}`, planta: p, contorno: [[0, 0], [11.4, 0], [11.4, 5], [0, 5]] as Vec2[], espesor: 0.25, material: "HA" })),
+    casos: [{ id: "G", pesoPropio: true }],
+    ...(conEjes ? { ejes: [...xs.map((x, i) => ({ id: String(i + 1), desde: [x, -2] as Vec2, hasta: [x, 7] as Vec2 })), ...ys.map((y, j) => ({ id: "AB"[j]!, desde: [-2, y] as Vec2, hasta: [13.4, y] as Vec2 }))] } : {}),
+  };
+}
+
+function movido(m: ModeloFisico, id: string, q: Vec2, conVigas = true): ModeloFisico {
+  const r = moverPilar(m, id, q, conVigas);
+  if (!r.ok) throw new Error(r.mensaje);
+  const a = aplicar(proyecto(m), r.operacion);
+  if (!a.ok) throw new Error(a.errores.map((x) => x.mensaje).join(" | "));
+  return a.proyecto.modelo;
+}
+
+describe("mover un pilar (CT3, criterio 4)", () => {
+  it("con una de sus cotas: el punto exacto y sus vigas en todas sus plantas, sin la de la cara", () => {
+    const m = porticos();
+    const R = referenciasCotas(m, "N1", 0, "P11");
+    // Sin él entre las referencias: a la izquierda, el eje 1 (el 2 pasa por él)
+    const p: Vec2 = [6, 5];
+    const c = cotasEn(R, p);
+    expect(c.map((x) => `${x.lado} ${x.ref.nombre} ${x.texto}`)).toEqual(["izquierda eje 1 6,00", "derecha eje 3 5,40", "abajo eje A 5,00"]);
+    const q = colocar(R, p, [{ lado: "izquierda", ref: c[0]!.ref, valor: 6.4 }]);
+    expect(q).toEqual([6.4, 5]);
+    const r = moverPilar(m, "P11", q);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.vigas).toEqual(["V1-N2", "VB1-N2", "VB2-N2", "V1-N1", "VB1-N1", "VB2-N1"]);
+    expect(r.avisos).toEqual(["Las vigas VC-N2, VC-N1 llegan a P11 sin acabar en su punto fijo (alineadas a una cara) y no lo siguen."]);
+    const n = movido(m, "P11", q);
+    expect(n.pilares!.find((x) => x.id === "P11")).toMatchObject({ x: 6.4, y: 5 });
+    for (const pl of ["N1", "N2"]) {
+      const v = (id: string) => n.vigas!.find((x) => x.id === `${id}-${pl}`)!.puntos;
+      expect(v("VB1")).toEqual([[0, 5], [6.4, 5]]);
+      expect(v("VB2")).toEqual([[6.4, 5], [11.4, 5]]);
+      expect(v("V1")).toEqual([[6, 0], [6.4, 5]]);
+      expect(v("VC")).toEqual([[0, 4.9], [6, 4.9]]);
+      expect(v("VA")).toEqual([[0, 0], [6, 0], [11.4, 0]]);
+    }
+    // Los ejes guardados no se mueven
+    expect(n.ejes).toEqual(m.ejes);
+  });
+
+  it("un vértice intermedio también lo sigue; sólo en las plantas del pilar", () => {
+    const m = porticos();
+    const n = movido(m, "P20", [11.4, -0.3]);
+    // P20 llega sólo a N1: la VA de N2 acaba en su punto, pero no es suya
+    expect(n.vigas!.find((x) => x.id === "VA-N1")!.puntos).toEqual([[0, 0], [6, 0], [11.4, -0.3]]);
+    expect(n.vigas!.find((x) => x.id === "VA-N2")!.puntos).toEqual([[0, 0], [6, 0], [11.4, 0]]);
+    const k = movido(m, "P10", [6, 0.25]);
+    expect(k.vigas!.find((x) => x.id === "VA-N2")!.puntos).toEqual([[0, 0], [6, 0.25], [11.4, 0]]);
+    expect(k.vigas!.find((x) => x.id === "V1-N1")!.puntos).toEqual([[6, 0.25], [6, 5]]);
+  });
+
+  it("con Ctrl, el pilar solo, y se avisa de las vigas que se quedan", () => {
+    const m = porticos();
+    const r = moverPilar(m, "P11", [6.4, 5], false);
+    expect(r.ok && r.vigas).toEqual([]);
+    expect(r.ok && r.avisos[0]).toBe("Las vigas V1-N2, VB1-N2, VB2-N2, V1-N1, VB1-N1, VB2-N1 acaban en P11 y se quedan donde estaban.");
+    const n = movido(m, "P11", [6.4, 5], false);
+    expect(n.vigas).toEqual(m.vigas);
+    expect(n.pilares!.find((x) => x.id === "P11")!.x).toBe(6.4);
+  });
+
+  it("moverlo y volverlo a su sitio deja el proyecto byte a byte, también en los modelos de referencia", () => {
+    const m = porticos();
+    expect(serializar(proyecto(movido(movido(m, "P11", [6.4, 5.35]), "P11", [6, 5])))).toBe(serializar(proyecto(m)));
+    for (const [nombre, p] of referencias()) {
+      // El pilar del que salen más vigas
+      const pilares = p.modelo.pilares ?? [];
+      const cuenta = (x: (typeof pilares)[number]) => (p.modelo.vigas ?? []).filter((v) => v.puntos.some((q) => q[0] === x.x && q[1] === x.y)).length;
+      const pil = [...pilares].sort((a, b) => cuenta(b) - cuenta(a))[0]!;
+      const ida = moverPilar(p.modelo, pil.id, [L(pil.x + 0.1), L(pil.y + 0.05)]);
+      if (!ida.ok) throw new Error(ida.mensaje);
+      expect(ida.vigas.length, nombre).toBe(cuenta(pil));
+      const a = aplicar(p, ida.operacion);
+      if (!a.ok) throw new Error(`${nombre}: ${a.errores.map((x) => x.mensaje).join(" | ")}`);
+      const vuelta = moverPilar(a.proyecto.modelo, pil.id, [pil.x, pil.y]);
+      if (!vuelta.ok) throw new Error(vuelta.mensaje);
+      const b = aplicar(a.proyecto, vuelta.operacion);
+      if (!b.ok) throw new Error(b.errores.map((x) => x.mensaje).join(" | "));
+      expect(serializar(b.proyecto), nombre).toBe(serializar(p));
+      expect(serializar(deshacer(hacer(historial(p), a.proyecto, "mover")).actual), nombre).toBe(serializar(p));
+    }
+  });
+
+  it("los errores: un pilar que no hay, un punto que no es un número o el mismo sitio", () => {
+    const m = porticos();
+    expect(moverPilar(m, "PX", [0, 0])).toEqual({ ok: false, mensaje: "No hay ningún pilar PX." });
+    expect(moverPilar(m, "P11", [Number.NaN, 0]).ok).toBe(false);
+    expect(moverPilar(m, "P11", [6, 5])).toEqual({ ok: false, mensaje: "P11 ya está ahí." });
+  });
+
+  it("con los ejes propuestos, las cotas no se miden a él ni a lo que sólo él propone", () => {
+    const m = porticos(false);
+    expect(cotasEn(referenciasCotas(m, "N1", 0, "P11"), [6, 5]).map((x) => x.ref.nombre)).not.toContain("P11");
+    // Sin P10, nadie más está en x = 6: no queda ningún eje ni pilar allí
+    const R = referenciasCotas({ ...m, pilares: m.pilares!.filter((x) => x.id !== "P10") }, "N1", 0, "P11");
+    expect(R.s.map((x) => x.valor).some((v) => Math.abs(Math.abs(v) - 6) < 1e-9)).toBe(false);
   });
 });

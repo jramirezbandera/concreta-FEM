@@ -91,6 +91,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   ctrl.alSalir = () => ctrl.ponerHerramienta("elegir");
   ctrl.repintar = repintarVistas;
   useEffect(() => ctrl.ponerModelo(modeloEd), [ctrl, modeloEd]);
+  useEffect(() => ctrl.ponerElegidos(elegidos), [ctrl, elegidos]);
   const dibujando = foto.herramienta !== "elegir";
   const elegirHerramienta = (h: NombreHerramienta) => {
     const n = foto.herramienta === h ? "elegir" : h;
@@ -117,6 +118,23 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   }, [ctrl, estirando, dibujando]);
+  // CT3: con un pilar elegido, Tab elige una de sus cotas, un número abre su campo y Esc la deja
+  const conPilar = !!foto.pilar;
+  useEffect(() => {
+    if (!conPilar || dibujando || estirando) return;
+    const tecla = (x: KeyboardEvent) => {
+      if (x.ctrlKey || x.metaKey || x.altKey || enCampo(x.target)) return;
+      if (x.key === "Tab") {
+        if (ctrl.tab(x.shiftKey)) x.preventDefault();
+      } else if (x.key === "Escape") ctrl.soltarPilar();
+      else if (/^[0-9.,]$/.test(x.key)) {
+        x.preventDefault();
+        ctrl.abrirCampo(x.key);
+      }
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [ctrl, conPilar, dibujando, estirando]);
   // Las teclas de una herramienta: F8, Esc, Intro, Retroceso y lo que abre el campo de teclado
   useEffect(() => {
     if (!dibujando) return;
@@ -324,9 +342,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
                 {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
               </span>
             )}
-            {!dibujando && (foto.estirado || foto.aviso) && (
+            {!dibujando && (foto.estirado || foto.aviso || foto.pilar) && (
               <span className="chip aviso-herr" data-acento="true" role="status">
-                {foto.estirado ?? foto.aviso}
+                {foto.estirado ?? foto.aviso ?? foto.pilar}
                 {foto.estirado && foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
               </span>
             )}

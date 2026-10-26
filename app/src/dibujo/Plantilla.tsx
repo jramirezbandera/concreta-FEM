@@ -383,7 +383,8 @@ export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: 
         onBlur={() => ctrl.cerrarCampo()}
         onKeyDown={(x) => {
           x.stopPropagation();
-          if (x.key === "Enter") ctrl.teclear(texto);
+          // CT3: Ctrl+Intro mueve el pilar elegido sin sus vigas
+          if (x.key === "Enter") ctrl.teclear(texto, x.ctrlKey || x.metaKey);
           else if (x.key === "Escape") ctrl.escCampo();
           else if (x.key === "Tab" && ctrl.tab(x.shiftKey)) x.preventDefault();
           // CT2: el otro lado de la cota que se estira

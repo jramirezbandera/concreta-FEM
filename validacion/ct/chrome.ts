@@ -1,5 +1,5 @@
 /**
- * Banco de CT1 y CT2 en Chrome de verdad (`docs/fem3d/cotas.md` §4):
+ * Banco de CT1, CT2 y CT3 en Chrome de verdad (`docs/fem3d/cotas.md` §4):
  *
  *   node validacion/ct/chrome.ts          escribe validacion/ct/out_chrome.txt
  *
@@ -15,6 +15,10 @@
  *   por él; un clic lo elige, otro en la flecha del 4 abre el campo con «6,00», y pintar lo que se
  *   mueve en una planta tarda ≤ 16 ms sin tareas largas. Con 6,35 e Intro, el proyecto guardado es el
  *   de `estirar` en Node, byte a byte; deshecho y guardado otra vez, el de partida.
+ * - CT3 (4 y 5): en el edificio objetivo, con el pilar de N3 al que llegan más vigas elegido, mover
+ *   el ratón y pintar sus cotas tarda ≤ 2 ms; un clic en el número de la izquierda abre el campo con
+ *   su valor y, con 0,35 más e Intro, el proyecto guardado es el de `moverPilar` en Node, byte a byte;
+ *   deshecho y guardado, el de partida.
  */
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -25,7 +29,9 @@ import { leerProyecto, type Proyecto } from "../../src/agente/proyecto.ts";
 import type { ModeloFisico } from "../../src/compilador/fisico.ts";
 import { serializar } from "../../src/editor/serializar.ts";
 import { cadenasDe, cotasCadena } from "../../src/agente/render/ejes.ts";
-import { estirar } from "../../src/editor/estirar.ts";
+import { estirar, moverPilar } from "../../src/editor/estirar.ts";
+import { colocar, cotasEn, limpio, referenciasCotas } from "../../src/editor/dibujo/cotas.ts";
+import { PlantaFisica } from "../../src/agente/render/modelo.ts";
 import { aplicar } from "../../src/editor/operaciones.ts";
 import { manejadorCarpeta } from "../../app/servidor.ts";
 
@@ -328,6 +334,57 @@ try {
   await guardar();
   const deshecho = readFileSync(join(datos, "edificio", "proyecto.json"), "utf8");
   comprobar(deshecho === serializar(edificio.proyecto), `deshecho y guardado, los bytes del de partida (en el formato canónico)`);
+
+  // ─── CT3 ──────────────────────────────────────────────────────────────────────────────────────
+  log("\n## CT3: mover un pilar del edificio objetivo desde sus cotas");
+  // El pilar de N3 con cota a la izquierda al que llegan más vigas de N3 por su punto fijo
+  const enN3 = new PlantaFisica(m, "N3").pilares().map((x) => x.p);
+  const vigasDe = (p: (typeof enN3)[number]) => (m.vigas ?? []).filter((v) => v.planta === "N3" && v.puntos.some((q) => q[0] === p.x && q[1] === p.y)).length;
+  const conIzq = enN3.filter((p) => cotasEn(referenciasCotas(m, "N3", 0, p.id), [p.x, p.y]).some((x) => x.lado === "izquierda"));
+  const pil = [...conIzq].sort((a, b) => vigasDe(b) - vigasDe(a) || (a.id < b.id ? -1 : 1))[0]!;
+  const R = referenciasCotas(m, "N3", 0, pil.id);
+  const izq = cotasEn(R, [pil.x, pil.y]).find((x) => x.lado === "izquierda")!;
+  const valor = limpio(izq.distancia + 0.35);
+  const mv = moverPilar(m, pil.id, colocar(R, [pil.x, pil.y], [{ lado: "izquierda", ref: izq.ref, valor }]));
+  const movidoNode = mv.ok ? aplicar(edificio.proyecto, mv.operacion) : null;
+  if (!movidoNode?.ok) throw new Error("mover el pilar en Node no se aplica");
+  await pagina(`__c.clic(${JSON.stringify([pil.x, pil.y])}); await __c.fotograma(); await __c.fotograma();`);
+  const chipPilar = await pagina<string>(`return __c.aviso();`);
+  comprobar(chipPilar.startsWith(`${pil.id}: un clic en el número de una cota`), `elegido ${pil.id} (${vigasDe(pil)} vigas de N3 por su punto fijo), la barra ofrece sus cotas: «${chipPilar}»`);
+  // Mover el ratón y pintar con sus cotas, cada movimiento por separado
+  const tPilar = await pagina<number[]>(`
+    const v = __c.vista(); const d = v.dibujo; const radio = 10 / v.escala;
+    const lienzo = document.createElement("canvas"); lienzo.width = 1600; lienzo.height = 900; const ctx = lienzo.getContext("2d");
+    const col = { fondo: "#fff", texto: "#000", textoSuave: "#666", acento: "#0a64d8", panel: "#fff", borde: "#ccc" };
+    const aPx = (q) => v.aPx(q);
+    const t = [];
+    for (let k = 0; k < 400; k++) { const p = [-1 + (56 * ((k * 37) % 400)) / 400, -1 + (37 * ((k * 91) % 400)) / 400]; const a = performance.now(); d.pasar(p, radio, false, [0, 0]); d.pintar(ctx, aPx, col); t.push(performance.now() - a); }
+    return t;`);
+  const sp = [...tPilar].sort((a, b) => a - b);
+  const p95p = sp[Math.floor(sp.length * 0.95)]!;
+  comprobar(p95p <= 2, `mover el ratón y pintar las cotas del pilar: mediana ${sp[sp.length >> 1]!.toFixed(3)} ms, p95 ${p95p.toFixed(3)} ms, máx. ${sp.at(-1)!.toFixed(3)} ms (≤ 2 ms)`);
+  const centro = [(izq.a[0] + izq.b[0]) / 2, (izq.a[1] + izq.b[1]) / 2];
+  const pieP = await pagina<string>(`__c.ev("pointermove", ${JSON.stringify(centro)}); await __c.fotograma(); return document.querySelector("[data-cursor]")?.textContent ?? "";`);
+  comprobar(pieP.includes(`Cota izquierda, desde ${izq.ref.nombre}: ${izq.texto} m · clic para cambiarla`), `al pasar por el número de la izquierda, la barra lo ofrece: «${pieP}»`);
+  await captura("9-cotas-pilar");
+  await pagina(`__c.clic(${JSON.stringify(centro)}); await __c.fotograma();`);
+  const campoP = await pagina<{ valor: string; cota: string }>(`const i = await __c.esperar(() => document.querySelector(".campo-teclado input"), 5000); return { valor: i.value, cota: document.querySelector(".campo-cota")?.textContent ?? "" };`);
+  comprobar(campoP.valor === izq.texto && campoP.cota.includes(`izquierda, desde ${izq.ref.nombre} · ${pil.id}`), `un clic abre el campo con el valor: «${campoP.valor}», «${campoP.cota}»`);
+  await pagina(`const i = document.querySelector(".campo-teclado input");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(i, ${JSON.stringify(String(valor).replace(".", ","))}); i.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0)); i.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    await __c.esperar(() => !document.querySelector(".campo-teclado input"), 5000);`);
+  await compilada();
+  await captura("10-pilar-movido");
+  await guardar();
+  const trasP = readFileSync(join(datos, "edificio", "proyecto.json"), "utf8");
+  comprobar(trasP === serializar(movidoNode.proyecto), `con ${String(valor).replace(".", ",")} e Intro, guardado, el proyecto es el de \`moverPilar\` en Node, byte a byte (${pil.id} y ${mv.ok ? mv.vigas.length : 0} vigas)`);
+  await pagina(`[...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Deshacer" || b.textContent.trim() === "Deshacer").click(); await __c.fotograma();`);
+  await compilada();
+  await guardar();
+  comprobar(readFileSync(join(datos, "edificio", "proyecto.json"), "utf8") === serializar(edificio.proyecto), `deshecho y guardado, los bytes del de partida`);
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   ws.close();
   chrome.kill();

@@ -105,8 +105,13 @@ function agrupar(xs: { valor: number; nombre: string; eje: boolean; puntos: Vec2
   return r.map(({ valor, nombre, origenes }) => ({ valor, nombre, origenes }));
 }
 
-/** Las referencias de la planta, en el marco de los ejes de dirección `direccion` (grados). */
-export function referenciasCotas(m: ModeloFisico, planta: string, direccion: number): ReferenciasCotas {
+/**
+ * Las referencias de la planta, en el marco de los ejes de dirección `direccion` (grados). Con `sin`,
+ * sin ese pilar (CT3: las cotas de un pilar elegido no se miden a él mismo, ni a los ejes propuestos
+ * que pasan por él).
+ */
+export function referenciasCotas(m0: ModeloFisico, planta: string, direccion: number, sin?: string): ReferenciasCotas {
+  const m = sin === undefined ? m0 : { ...m0, pilares: (m0.pilares ?? []).filter((p) => p.id !== sin) };
   const d = unitario(direccion);
   const n: Vec2 = [-d[1] + 0, d[0]];
   const R0 = { d, n, s: [], t: [] };

@@ -1,5 +1,6 @@
 /**
- * Estirar el modelo desde una cota de la cadena entre ejes (CT2, `docs/fem3d/cotas.md` §2.2).
+ * Estirar el modelo desde una cota de la cadena entre ejes (CT2, `docs/fem3d/cotas.md` §2.2), y
+ * mover un pilar con sus vigas (CT3, §2.3: `moverPilar`, al final).
  *
  * La cota mide t = p·n entre dos ejes paralelos: el que se queda (`fijo`) y el que se mueve (`movil`).
  * Darle el valor L′ desplaza Δ = L′ − L, en perpendicular a los ejes, todo lo que está del lado del
@@ -28,7 +29,9 @@
  * Puro: sin IO, sin React ni DOM.
  */
 import { rotuloCota } from "../agente/render/ejes.ts";
+import { huellaSeccion, PlantaFisica } from "../agente/render/modelo.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
+import { distanciaABorde, puntoEnPoligono } from "../compilador/poligonos.ts";
 import { limpio } from "./dibujo/cotas.ts";
 import type { Operacion } from "./operaciones.ts";
 import type { Coleccion, Objeto } from "./referencias.ts";
@@ -297,6 +300,50 @@ export function estirar(m: ModeloFisico, e: Estiramiento, valor: number): Result
   }
   if (!ops.length) return { ok: false, mensaje: "No hay nada del lado que se mueve." };
   return { ok: true, operacion: { op: "lote", operaciones: ops }, avisos, afectados: afectados(m, e) };
+}
+
+// ─── Mover un pilar (CT3, §2.3) ─────────────────────────────────────────────────────────────────
+
+export type ResultadoMover = { ok: true; operacion: Operacion; avisos: string[]; vigas: string[] } | { ok: false; mensaje: string };
+
+/**
+ * El pilar `id` con su punto fijo en q, en todas sus plantas (una sola coordenada, así que en todas).
+ * Con `conVigas` (CT-d, como CYPECAD), lo siguen las vigas de sus plantas con un vértice en su punto
+ * fijo bit a bit: ese vértice pasa a ser q. Las que tienen un vértice en su huella sin estar en el
+ * punto (alineadas a una cara, V2c-b) no lo siguen, y se avisa; sin `conVigas`, también de las que se
+ * quedan. Los ejes guardados no se mueven. Un `lote` de `cambiar`: un paso de deshacer.
+ */
+export function moverPilar(m: ModeloFisico, id: string, q: Vec2, conVigas = true): ResultadoMover {
+  const p = m.pilares?.find((x) => x.id === id);
+  if (!p) return { ok: false, mensaje: `No hay ningún pilar ${id}.` };
+  if (!Number.isFinite(q[0]) || !Number.isFinite(q[1])) return { ok: false, mensaje: "La posición tiene que ser un número." };
+  if (q[0] === p.x && q[1] === p.y) return { ok: false, mensaje: `${id} ya está ahí.` };
+  const ops: Operacion[] = [{ op: "cambiar", coleccion: "pilares", id, objeto: { ...p, x: q[0], y: q[1] } as Objeto }];
+  const siguen: string[] = [];
+  const quedan: string[] = [];
+  const cara: string[] = [];
+  for (const pl of m.plantas) {
+    const planta = new PlantaFisica(m, pl.id);
+    const x = planta.pilares().find((r) => r.p.id === id);
+    if (!x) continue;
+    const h = huellaSeccion(p, x.seccion);
+    const enHuella = (v: Vec2) => (h ? ("anillo" in h ? puntoEnPoligono(v, h.anillo) || distanciaABorde(v, h.anillo) <= EN_EJE : Math.hypot(v[0] - h.centro[0], v[1] - h.centro[1]) <= h.radio + EN_EJE) : false);
+    for (const v of planta.enPlanta(m.vigas)) {
+      if (v.puntos.some((r) => r[0] === p.x && r[1] === p.y)) {
+        if (!conVigas) {
+          quedan.push(v.id);
+          continue;
+        }
+        siguen.push(v.id);
+        ops.push({ op: "cambiar", coleccion: "vigas", id: v.id, objeto: { ...v, puntos: v.puntos.map((r) => (r[0] === p.x && r[1] === p.y ? q : r)) } as Objeto });
+      } else if (v.puntos.some(enHuella)) cara.push(v.id);
+    }
+  }
+  const avisos: string[] = [];
+  const lista = (ids: string[]) => ids.join(", ");
+  if (quedan.length) avisos.push(`${quedan.length > 1 ? `Las vigas ${lista(quedan)} acaban` : `La viga ${quedan[0]} acaba`} en ${id} y se ${quedan.length > 1 ? "quedan" : "queda"} donde estaba${quedan.length > 1 ? "n" : ""}.`);
+  if (cara.length) avisos.push(`${cara.length > 1 ? `Las vigas ${lista(cara)} llegan` : `La viga ${cara[0]} llega`} a ${id} sin acabar en su punto fijo (alineada${cara.length > 1 ? "s" : ""} a una cara) y no lo ${cara.length > 1 ? "siguen" : "sigue"}.`);
+  return { ok: true, operacion: ops.length > 1 ? { op: "lote", operaciones: ops } : ops[0]!, avisos, vigas: siguen };
 }
 
 function cargaEstirada(tr: Transformador, c: CargaFisica, vigas: ReadonlyMap<string, [readonly Vec2[], readonly Vec2[]]>): CargaFisica {

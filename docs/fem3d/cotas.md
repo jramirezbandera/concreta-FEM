@@ -1,6 +1,6 @@
 # CT: cotas que mandan (plan)
 
-> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6). **CT1 hecho el 2026-10-25** (§7); **CT2, el 2026-10-26** (§8); CT3, por hacer.
+> **Fecha:** 2026-10-25. **Estado:** decidido por el usuario el 2026-10-25 (§6). **CT1 hecho el 2026-10-25** (§7); **CT2, el 2026-10-26** (§8); **CT3, el 2026-10-26** (§9).
 >
 > **Origen:** el usuario, al dibujar pilares con V2c-1: «al meter pilares se ponen las cotas automáticas entre los pilares; estaría bien que pudieras confirmar la distancia de la cota para que sea lo que quieras, y que pudieras cambiar las cotas después y se cambiara la posición».
 
@@ -183,3 +183,38 @@ Además, en Chrome, con el edificio objetivo: el número de la cota 3–4 se ofr
 - **CT2-1, lo que hay dentro del vano se queda.** Al estirar 3–4 del edificio objetivo a 6,35, la viga secundaria a media luz sigue en x = 15, a 0,175 del centro nuevo. Es lo decidido en CT-a (sólo se mueve lo que está más allá del corte), pero quizá se espere otra cosa al probarlo. Si se quiere, la otra regla sería repartir lo de dentro del vano en proporción, para la puerta de uso.
 - **CT2-2, los nombres al revés.** Con los ejes paralelos a Y, la cadena mide t = −x (n = d girado 90°), así que el primer eje de una cota es el de la derecha. La barra, el campo y deshacer nombran la cota en el orden de lectura («3–4»), y el lado, por el eje que se mueve.
 - **CT2-3, el formato del edificio objetivo.** El `proyecto.json` de `validacion/a2/agente/edificio/` no está en el formato canónico: guardarlo sin cambios ya cambia sus bytes. El banco compara lo deshecho con el formato canónico.
+
+## 9. CT3 hecho (2026-10-26)
+
+Las cotas de un pilar elegido, que lo mueven con sus vigas, como en §2.3.
+
+### 9.1 Qué hay
+
+- **`src/editor/estirar.ts`:** `moverPilar(modelo, id, q, conVigas)` da el `lote` de `cambiar` (un paso de deshacer), las vigas que lo siguen y los avisos.
+  - El pilar cambia de (x, y), que es una sola para todas sus plantas.
+  - Con `conVigas`, cada viga de una planta del pilar (en la que llega o de la que arranca) con un vértice bit a bit en su punto fijo lleva ese vértice a q; también un vértice intermedio. Una viga de otra planta que acaba en el mismo punto no es suya y no se mueve.
+  - **Avisos:** una viga con un vértice en la huella del pilar que no está en su punto fijo (alineada a una cara, V2c-b) no lo sigue, y se dice; sin `conVigas`, se nombran las que se quedan.
+  - Los ejes guardados no se mueven. Errores: el pilar no existe, el punto no es un número o es el de ahora.
+- **`cotas.ts`:** `referenciasCotas(…, sin)` quita un pilar de las referencias, también de los ejes propuestos: un eje que sólo salía de él no queda como referencia (si no, la cota se mediría a sí misma).
+- **App** (`controlador.ts`, con Elegir y un solo pilar elegido, en las vistas de planta del modelo en las que está):
+  - sus cotas temporales, como las de CT1, sin él entre las referencias; la barra dice «P5: un clic en el número de una cota (o Tab) para moverlo.»;
+  - al pasar por un número, se resalta y el pie dice «Cota izquierda, desde eje 9: 6,00 m · clic para cambiarla»;
+  - un clic en el número, o Tab (Mayús+Tab al revés) y un número, abre el campo con la distancia; Intro mueve el pilar con sus vigas, en todas sus plantas («Mover P5 a 6,35 m de eje 9» en deshacer), y **Ctrl+Intro, solo** («…, sin sus vigas»); Esc deja la cota;
+  - la posición es la de CT1: la referencia más el valor, con `limpio` (el double de la tabla con ejes paralelos a X o Y); la otra coordenada no cambia;
+  - los avisos quedan en la barra.
+
+### 9.2 Criterios
+
+| # | Resultado |
+|---|---|
+| 4 | **Pasa.** `estirar.test.ts`: con sus cotas, P11 queda a la distancia tecleada del eje 1 y sus vigas lo siguen en las dos plantas (también la continua por un vértice intermedio); la alineada a una cara no lo sigue y se avisa; una viga de una planta a la que el pilar no llega no se mueve; sin vigas, ninguna se mueve y se avisa. Moverlo y volverlo a su sitio deja el proyecto byte a byte, en esa retícula y en el pilar con más vigas de 1-022, las retículas de C2 y C3, el reticular y el unidireccional de C4 y la vivienda; deshacer, también. La prueba del controlador (`app/src/test/moverPilar.test.ts`) recorre el clic en el número, Tab, Ctrl+Intro, los errores y Esc |
+| 5 | **Pasa en lo de CT3.** En el edificio objetivo (`validacion/ct/chrome.ts`), con un pilar elegido, mover el ratón y pintar sus cotas: 0,1 ms de mediana y 0,2 ms p95 |
+| 6 | **Pasa.** Los bancos de V2c-1, CT1 y CT2 dan lo mismo; `src` (2 199 pruebas) y la app (71) en verde |
+
+Además, en Chrome, con el edificio objetivo: elegido P-x54-y0, el número de su cota izquierda (6,00 desde el eje 9) se ofrece al pasar y un clic abre el campo con «6,00». Con 6,35 e Intro, el proyecto guardado es el de `moverPilar` en Node byte a byte (el pilar y sus 14 vigas, dos por planta); deshecho y guardado, el de partida.
+
+### 9.3 Hallazgos
+
+- **CT3-1, dos cotas en el mismo sitio.** En un pilar de fachada, su cota a lo largo de la fachada cae sobre la de la cadena entre ejes, con el mismo número. Con el pilar elegido manda la del pilar; para estirar desde la cadena hay que soltarlo (Esc).
+- **CT3-2, Esc suelta también el pilar.** Con el campo abierto, Esc sólo deja la cota; sin él, el Esc general de la app suelta lo elegido, y las cotas se van con el pilar.
+- **CT3-3, los bancos que se tragan una excepción.** El de CT salía con «Todo bien» cuando una excepción cortaba su sección de CT3 (el `finally` acaba en `process.exit`). Ahora la excepción es un fallo. Tienen el mismo patrón, sin `catch`, los de AL (`chrome.ts` y `pwa.ts`), cargas, I1–I4 y V2c: un fallo a mitad de banco no se vería. Sin corregir; es poner el mismo `catch`.
