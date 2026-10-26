@@ -439,6 +439,8 @@ try {
     fps("orbitar el 3D con los muros", await orbitar());
     await largas("al orbitar");
   }
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   writeFileSync(join(import.meta.dirname, "out_chrome.txt"), `${salida.join("\n")}\n\n${fallos ? `${fallos} FALLOS` : "TODO BIEN"}\n`);
   ws.close();

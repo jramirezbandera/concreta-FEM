@@ -18,6 +18,7 @@ const CHROME = process.env.CHROME ?? "C:/Program Files/Google/Chrome/Application
 const PUERTO = 8779;
 const PUERTO_CDP = 9339;
 const salida: string[] = [];
+let fallo = false;
 const log = (s: string) => {
   console.log(s);
   salida.push(s);
@@ -165,6 +166,9 @@ Programas nuevos al entrar en Diagramas (de ${antes.length}):`);
   await perfilar("modo Pilares", `__i1.boton("Pilares").click()`, `document.querySelector("tr.clic")`);
   await perfilar("elegir un pilar (cuadro)", `document.querySelectorAll("tr.clic")[5].click()`, `document.querySelector(".panel.der svg")`);
   await perfilar("modo Deformada", `__i1.boton("Deformada").click()`, `document.querySelector('.celda[data-tipo="3d"]')`);
+} catch (e) {
+  log(`\nexcepción: ${e instanceof Error ? e.message : String(e)}`);
+  fallo = true;
 } finally {
   writeFileSync(join(import.meta.dirname, "out_perfil.txt"), salida.join("\n") + "\n");
   ws.close();
@@ -173,4 +177,4 @@ Programas nuevos al entrar en Diagramas (de ${antes.length}):`);
   rmSync(datos, { recursive: true, force: true });
   setTimeout(() => rmSync(perfil, { recursive: true, force: true }), 500);
 }
-process.exit(0);
+process.exit(fallo ? 1 : 0);

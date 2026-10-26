@@ -319,6 +319,8 @@ try {
   comprobar(pie.includes("Centro (P-x18-y5)"), `con la viga en curso, el cursor junto al pilar dice su enganche: «${pie}»`);
   await captura("5-viga-en-curso");
   await pagina(`__c.tecla("Escape"); __c.tecla("Escape");`);
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   ws.close();
   chrome.kill();

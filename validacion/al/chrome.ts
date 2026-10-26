@@ -201,6 +201,8 @@ try {
   comprobar(exportado === final, `exportar descarga el texto guardado byte a byte (${readdirSync(descargas).join(", ")})`);
   const le = leerProyecto(exportado);
   comprobar(le.valido && huellaCompilacion(le.proyecto.modelo, resolverOpciones(le.proyecto.opciones ?? {})) === HUELLA, "lo exportado pasa el esquema y tiene la huella del importado");
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   ws.close();
   chrome.kill();

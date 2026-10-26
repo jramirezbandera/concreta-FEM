@@ -555,7 +555,7 @@
   - **`moverPilar`** (`src/editor/estirar.ts`, puro): el pilar a su punto nuevo y, en todas sus plantas, el vértice de cada viga que estaba bit a bit en su punto fijo; un paso de deshacer. Una viga alineada a una cara no lo sigue y se avisa; sin vigas, se nombran las que se quedan. Los ejes guardados no se mueven.
   - **En la app, con Elegir y un pilar elegido:** sus cotas temporales (las de CT1, sin él entre las referencias, ni en los ejes propuestos); un clic en un número, o Tab y un número, abre el campo; Intro lo mueve con sus vigas y Ctrl+Intro, solo.
   - **Validación:** `estirar.test.ts` (criterio 4: mover y volver deja los bytes en la retícula y en seis referencias), `app/src/test/moverPilar.test.ts` y el banco `validacion/ct/chrome.ts` (guardado, lo de Node byte a byte; las cotas, 0,2 ms p95).
-  - **CT3-3:** los bancos de Chrome de AL, cargas, I1–I4 y V2c acaban en «Todo bien» si una excepción corta el banco (sin `catch`); el de CT ya la cuenta como fallo.
+  - **CT3-3, corregido:** los bancos de Chrome de AL, cargas, I1–I4, V2c y CT cuentan como fallo una excepción que corta el banco (antes acababan en «Todo bien»).
   - Falta la puerta de uso de CT (criterio 7, del usuario).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);

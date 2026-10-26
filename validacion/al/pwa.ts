@@ -166,6 +166,8 @@ try {
   await pagina(`await __c.esperar(() => __c.principal());`);
   const tras = await pagina<{ principal: string; controla: boolean }>(`return { principal: __c.principal(), controla: !!navigator.serviceWorker.controller };`);
   comprobar(tras.principal === PRINCIPAL.v2 && tras.controla, `al pulsar «Actualizar», recarga con v2 (${tras.principal})`);
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   ws.close();
   chrome.kill();

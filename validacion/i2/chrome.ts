@@ -322,6 +322,8 @@ try {
   // 6. Esc suelta todo
   await pagina(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));`);
   await comprobarTodas("Esc", []);
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   writeFileSync(join(import.meta.dirname, "out_chrome.txt"), `${salida.join("\n")}\n\n${fallos ? `${fallos} FALLOS` : "TODO BIEN"}\n`);
   ws.close();

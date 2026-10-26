@@ -185,6 +185,8 @@ try {
   for (const [que, t0, ms] of pasos) log(`  ${que}: ${ms.toFixed(0)} ms${largas.some((l) => l.t >= t0 && l.t < t0 + ms + 50) ? ` · tareas largas: ${largas.filter((l) => l.t >= t0 && l.t < t0 + ms + 50).map((l) => l.ms.toFixed(0)).join(", ")} ms` : ""}`);
   const peor = Math.max(0, ...largas.map((l) => l.ms));
   comprobar(peor <= 50, `ninguna tarea larga de más de 50 ms en el recorrido (la peor, ${peor.toFixed(0)} ms; ${largas.length} en total)`);
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   writeFileSync(join(import.meta.dirname, "out_chrome.txt"), `${salida.join("\n")}\n\n${fallos ? `${fallos} FALLOS` : "TODO BIEN"}\n`);
   ws.close();

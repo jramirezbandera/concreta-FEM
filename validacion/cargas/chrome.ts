@@ -293,6 +293,8 @@ try {
   await captura("5-alzado-3-G");
   const d3 = await pagina<{ sha256?: string; capas?: number }>(`return await __i2.dep(0);`);
   comprobar(d3.sha256 === ESPERADO.alzado, `alzado del eje 3 con G: ${d3.capas} capas, sha256 ${d3.sha256?.slice(0, 16)} = Node ${ESPERADO.alzado.slice(0, 16)}`);
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   writeFileSync(join(import.meta.dirname, "out_chrome.txt"), `${salida.join("\n")}\n\n${fallos ? `${fallos} FALLOS` : "TODO BIEN"}\n`);
   ws.close();

@@ -372,6 +372,8 @@ try {
   await pagina(`window.__motorVistas.vista(0).vistaEstandar("inferior");`);
   await quietos();
   await captura("11-reticular-desde-abajo");
+} catch (e) {
+  comprobar(false, `excepción: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
   writeFileSync(join(import.meta.dirname, "out_chrome.txt"), `${salida.join("\n")}\n\n${fallos ? `${fallos} FALLOS` : "TODO BIEN"}\n`);
   ws.close();
