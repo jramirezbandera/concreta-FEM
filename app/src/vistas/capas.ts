@@ -143,21 +143,36 @@ export function raya(dash: string | undefined): [number, number] | undefined {
   return [n[0]!, n.slice(1).reduce((a, b) => a + b, 0)];
 }
 
+/**
+ * V2c4-6: los estilos de fondo, cuyo relleno va delante de todo lo demás y detrás de la plantilla
+ * DXF (las losas, los ábacos, los paños y, en Cargas, el modelo atenuado). Sus contornos van en su
+ * sitio, encima de la plantilla.
+ */
+const ESTILOS_FONDO = new Set<string>(["losa", "losa-reticular", "abaco", "abaco-relleno", "pano", "atenuado"]);
+
 /** Los objetos de Three.js de una escena preparada, en su orden, con lo que cambia con el encuadre. */
 export class Capas2D {
   readonly grupo = new Group();
   private readonly mat = MATERIALES;
+  /** V2c4-6: el `renderOrder` de la plantilla DXF: encima del relleno de fondo y debajo de lo demás. */
+  readonly ordenPlantilla: number;
 
   constructor(e: EscenaPreparada, tema: Theme, orden: { n: number }) {
-    for (const c of e.capas) this.capa(c, tema, orden);
+    const fondo = (c: Capa) => c.forma === "area" && ESTILOS_FONDO.has(c.estilo);
+    for (const c of e.capas) if (fondo(c)) this.rellenar(c, tema, orden);
+    this.ordenPlantilla = orden.n++;
+    for (const c of e.capas) this.capa(c, tema, orden, !fondo(c));
   }
 
-  private capa(c: Capa, tema: Theme, orden: { n: number }): void {
+  private rellenar(c: Capa, tema: Theme, orden: { n: number }): void {
     const p = pintura(c.estilo, tema);
-    if (c.forma !== "trazo") {
-      const color = c.relleno ?? p.fill;
-      if (color && color !== "none") for (const m of relleno(c.abanicos, c.caja, color, p.opacity ?? 1, orden, this.mat)) this.grupo.add(m);
-    }
+    const color = c.relleno ?? p.fill;
+    if (color && color !== "none") for (const m of relleno(c.abanicos, c.caja, color, p.opacity ?? 1, orden, this.mat)) this.grupo.add(m);
+  }
+
+  private capa(c: Capa, tema: Theme, orden: { n: number }, conRelleno: boolean): void {
+    const p = pintura(c.estilo, tema);
+    if (c.forma !== "trazo" && conRelleno) this.rellenar(c, tema, orden);
     // Las bandas, con un trazo de su color que tapa las juntas del antialias (como el SVG de V1)
     const color = c.forma === "region" ? c.relleno : p.stroke;
     const grosor = c.forma === "region" ? 0.6 : (p.sw ?? 1);

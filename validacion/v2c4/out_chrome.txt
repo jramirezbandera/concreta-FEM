@@ -13,8 +13,8 @@ BIEN  la de planta.dxf se lee del servidor y se dibuja con los 86 segmentos de N
 BIEN  la de estructura.dxf dice que falta: «PLANTILLAS DXF 2 Arquitectura 29 entidades Estructura Falta el fichero»
 
 ## Criterio 4: un plano de 100 000 segmentos en el edificio objetivo (N3)
-BIEN  leerlo (12.6 MB, en el worker), colocarlo y dibujarlo, en 504 ms: 0 tareas largas (> 50 ms) 
-BIEN  enganche con la plantilla al mover el ratón: mediana 0.100 ms, p95 0.300 ms, máx. 1.000 ms (≤ 2 ms); 368 de 400 a la plantilla; el índice de la planta, 4.5 ms la primera vez
+BIEN  leerlo (12.6 MB, en el worker), colocarlo y dibujarlo, en 507 ms: 0 tareas largas (> 50 ms) 
+BIEN  enganche con la plantilla al mover el ratón: mediana 0.100 ms, p95 0.200 ms, máx. 0.700 ms (≤ 2 ms); 368 de 400 a la plantilla; el índice de la planta, 4.4 ms la primera vez
 BIEN  120 movimientos con un fotograma cada uno: 0 tareas largas (> 50 ms) 
 
 Todo bien

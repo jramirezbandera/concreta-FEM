@@ -284,7 +284,7 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
           <Grid3x3 size={15} />
         </button>
         {tipo === "planta" && planta && fuentes.plantilla?.(planta) && (
-          <button type="button" className="ib" data-on={v.plantilla !== false} aria-pressed={v.plantilla !== false} title="Plantilla DXF: verla detrás y enganchar a ella" aria-label="Ver la plantilla DXF" onClick={() => poner(i, { plantilla: v.plantilla === false })}>
+          <button type="button" className="ib" data-on={v.plantilla !== false} aria-pressed={v.plantilla !== false} title="Plantilla DXF: verla y enganchar a ella" aria-label="Ver la plantilla DXF" onClick={() => poner(i, { plantilla: v.plantilla === false })}>
             <FileImage size={15} />
           </button>
         )}
@@ -575,7 +575,7 @@ interface PropsFuente2D {
   formatoCursor?: (q: Vec2) => string;
   /** V2c: lo que dibuja con el ratón en una planta editable. */
   dibujo?: Dibujo2D | null;
-  /** V2c-4: la plantilla DXF detrás. */
+  /** V2c-4: la plantilla DXF de la planta. */
   plantilla?: GeometriaPlantilla | null;
 }
 

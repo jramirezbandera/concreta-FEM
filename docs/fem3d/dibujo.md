@@ -369,7 +369,7 @@ Un DXF de fondo en la planta, en gris, con enganches a sus líneas y vértices, 
 - **V2c4-a, lector propio** en `src/dxf/` (puro, sin dependencias), que servirá también para `fem importar-dxf` (MA6). Se valida contra ezdxf 1.4.5 (MIT, en `.venv`) como oráculo.
 - **V2c4-b, en el proyecto y fuera de la huella:** un campo `plantillas` en `proyecto.json`, como `vistas`, con el nombre del fichero, su sha256, las unidades, la colocación, las plantas, las capas ocultas y el redondeo. El DXF va junto al proyecto en el disco y en IndexedDB en el navegador; si no se encuentra, se avisa y se pide.
 - **V2c4-c, lo enganchado del DXF se redondea a 1 mm** (en la plantilla: 1 mm, 1 cm o nada). Lo enganchado del modelo sigue exacto, bit a bit.
-- **V2c4-d, en las vistas de planta de Modelo y Cargas:** en gris, detrás de todo, en las plantas a las que está asignada, y con un botón para ocultarla. No se ve en Resultados, el alzado ni el 3D.
+- **V2c4-d, en las vistas de planta de Modelo y Cargas:** en gris, detrás de todo (desde V2c4-6, encima del relleno de las losas), en las plantas a las que está asignada, y con un botón para ocultarla. No se ve en Resultados, el alzado ni el 3D.
 
 ### 10.3 Qué se propone
 
@@ -426,11 +426,10 @@ La plantilla DXF: un plano en gris detrás de las plantas de Modelo y Cargas, co
 - **V2c4-3, el giro de un MTEXT va en grados** (código 50), aunque la referencia de DXF diga radianes: es lo que escriben AutoCAD y ezdxf.
 - **V2c4-4, el índice de un plano grande.** Con 100 000 segmentos, el índice por celdas tardaba 60 ms (creaba un array por celda y por punto); sin crear nada, 26 ms. Aun así, colocar, indexar y dibujar en la misma tarea pasaban de 50 ms: el índice se hace en una tarea aparte, justo después de dibujar (o al primer enganche).
 - **V2c4-5, calcar pide acercarse.** El radio de enganche es de 10 px: con la planta entera a la vista y los paneles abiertos (unos 35 px/m), son 0,28 m, y el centro del rectángulo de un pilar (nivel 1) gana al extremo de una viga a 0,27 m. Como en un CAD, se calca acercado (el banco, a unos 230 px/m).
-- **V2c4-6, la plantilla detrás queda tapada por las losas.** Va detrás de todo (V2c4-d) y el relleno de las losas es opaco: dibujado un forjado, el plano de debajo deja de verse (y de ayudar a calcar lo que falta encima). Ver §11.4.
+- **V2c4-6, la plantilla detrás queda tapada por las losas.** Iba detrás de todo (V2c4-d) y el relleno de las losas es opaco: dibujado un forjado, el plano de debajo dejaba de verse (y de ayudar a calcar lo que falta encima). **Decidido por el usuario el 2026-10-27:** encima del relleno de las losas, los ábacos y los paños (en Cargas, del modelo atenuado de fondo) y debajo de lo demás: contornos, vigas, muros, pilares, cargas y rótulos. `Capas2D` pinta primero esos rellenos, en el orden de la escena, y deja el hueco `ordenPlantilla`; sus contornos y el resto de capas siguen en su orden. Comprobado en Chrome con un tabique del plano en mitad de un vano ya calcado: se ve sobre la losa. Los bancos de V2c-4 y los tests de la app, como antes.
 
 ### 11.4 Pendiente
 
-- **Del usuario, V2c4-6:** dejarla detrás de todo, o dibujarla encima del relleno de las losas (debajo de las líneas del modelo) o encima de todo, tenue.
 - Las `MLINE` y los `HATCH` no se leen: se cuentan y se dice que se descompongan en el CAD.
 - Colocar con dos pares de puntos (mover, girar y escalar de una vez), y un factor de escala libre (hoy, sólo las unidades).
 - Una plantilla por planta en el 3D o en el alzado (§5 los deja fuera).

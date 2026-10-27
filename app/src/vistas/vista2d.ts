@@ -8,9 +8,10 @@
  * encuadra la escena entera. Una escena vacía encuadra `CAJA_VACIA` (el origen abajo a la izquierda),
  * y lo primero que se dibuje en ella no mueve la vista si se ve.
  *
- * Detrás, la rejilla y los ejes del origen (`fondo.ts`) y, en las plantas de Modelo y Cargas, la
- * plantilla DXF (V2c-4): sus líneas en gris en WebGL (con el material de la rejilla) y sus textos en
- * el lienzo 2D, si miden al menos `TEXTO_MINIMO` px.
+ * Detrás, la rejilla y los ejes del origen (`fondo.ts`). En las plantas de Modelo y Cargas, la
+ * plantilla DXF (V2c-4): sus líneas en gris en WebGL (con el material de la rejilla), encima del
+ * relleno de las losas, los ábacos y los paños y debajo de lo demás (V2c4-6, `Capas2D.ordenPlantilla`),
+ * y sus textos en el lienzo 2D, si miden al menos `TEXTO_MINIMO` px.
  */
 import { BufferAttribute, BufferGeometry, Color, Group, LineSegments, OrthographicCamera, Scene, type WebGLRenderer } from "three";
 import { rotulo, type Texto, type Vec2 } from "../../../src/agente/render/escena.ts";
@@ -155,7 +156,7 @@ export class Vista2D extends Vista {
     }
   }
 
-  /** V2c-4: la plantilla DXF que se ve detrás (null: ninguna). */
+  /** V2c-4: la plantilla DXF de la planta (null: ninguna). */
   ponerPlantilla(g: GeometriaPlantilla | null): void {
     if (g === this.plantilla) return;
     this.plantilla = g;
@@ -182,7 +183,7 @@ export class Vista2D extends Vista {
     for (let i = 0; i < n; i++) col.set([k.r, k.g, k.b, a], 4 * i);
     geo.setAttribute("color", new BufferAttribute(col, 4));
     const l = new LineSegments(geo, MATERIAL_LINEAS);
-    // Detrás de lo dibujado y delante de la rejilla
+    // Delante de la rejilla; con una escena, encima de su relleno de fondo (`render`, V2c4-6)
     l.renderOrder = -500;
     l.frustumCulled = false;
     this.plantillaL = l;
@@ -374,7 +375,10 @@ export class Vista2D extends Vista {
       this.rejilla.actualizar([a[0], a[1], b[0], b[1]], o, this.s, this.entorno.colores().texto, this.entorno.tema(), this.fondo.tenue, escenaVacia(this.escena));
     } else this.rejilla.ocultar();
     if (this.temaPlantilla !== this.entorno.tema()) this.reconstruirPlantilla();
-    if (this.plantillaL && this.plantilla) this.plantillaL.position.set(this.plantilla.origen[0] - o[0], this.plantilla.origen[1] - o[1], 0);
+    if (this.plantillaL && this.plantilla) {
+      this.plantillaL.position.set(this.plantilla.origen[0] - o[0], this.plantilla.origen[1] - o[1], 0);
+      this.plantillaL.renderOrder = this.capas.ordenPlantilla;
+    }
     r.render(this.escena3, c);
   }
 
