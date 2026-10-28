@@ -4,7 +4,7 @@
  * capas (con cuántas entidades tiene cada una), su colocación (con Colocar y Girar en la planta) y
  * Quitar. Todo cambio es una operación `plantillas` del editor: se deshace y no cambia la huella.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, Trash2 } from "lucide-react";
 import type { PlantillaDxf } from "../../../src/agente/proyecto.ts";
 import { leerNumero, textoNumero } from "../../../src/editor/celdas.ts";
@@ -34,6 +34,12 @@ export function NavPlantillas({ pl, herramienta, error }: Props) {
   const ed = proyecto.edicion;
   const lista = ed?.proyecto.plantillas ?? [];
   const [abierta, setAbierta] = useState<string | null>(null);
+  // Una plantilla recién importada se abre: sus capas son lo primero que hay que mirar
+  const antes = useRef(lista.length);
+  useEffect(() => {
+    if (lista.length > antes.current) setAbierta(lista[lista.length - 1]!.nombre);
+    antes.current = lista.length;
+  }, [lista]);
   if (!ed) return null;
   const cambiar = (t: PlantillaDxf, nueva: PlantillaDxf, etiqueta: string) => ed.editar({ op: "plantillas", plantillas: lista.map((x) => (x.nombre === t.nombre ? nueva : x)) }, etiqueta);
   return (
@@ -52,8 +58,14 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
   const plantas = proyecto.edicion?.proyecto.modelo.plantas ?? [];
   const est = pl.estados.get(t.sha256);
   const d = est?.tipo === "listo" ? est.dibujo : null;
-  const estado = !est || est.tipo === "cargando" ? "Leyendo…" : est.tipo === "falta" ? "Falta el fichero" : est.tipo === "error" ? "No se pudo leer" : `${d!.capas.reduce((s, c) => s + c.entidades, 0)} entidades`;
   const ocultas = new Set(t.ocultas ?? []);
+  const conEntidades = d ? d.capas.filter((c) => c.entidades > 0 || ocultas.has(c.nombre)) : [];
+  const visibles = conEntidades.filter((c) => !ocultas.has(c.nombre)).length;
+  const estado = !est || est.tipo === "cargando" ? "Leyendo…" : est.tipo === "falta" ? "Falta el fichero" : est.tipo === "error" ? "No se pudo leer" : `${visibles}/${conEntidades.length} capas`;
+  const ponerOcultas = (n: readonly string[]) => {
+    const { ocultas: _o, ...resto } = t;
+    cambiar(n.length ? { ...resto, ocultas: [...n] } : resto, `Capas de la plantilla «${t.nombre}»`);
+  };
   const [aviso, setAviso] = useState<string | null>(null);
 
   /** El fichero elegido otra vez: si es el mismo, se vuelve a leer; si no, la plantilla pasa a él. */
@@ -96,6 +108,28 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
       </div>
       {abierta && (
         <div className="px-3.5 pb-2 text-[12px]" style={{ display: "grid", gap: 6 }}>
+          {d && (
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-text-secondary">Capas (las que se ven y enganchan)</span>
+                <button type="button" className="ib-chip ml-auto" style={{ width: "auto", padding: "0 6px" }} disabled={!ocultas.size} onClick={() => ponerOcultas([])}>
+                  Todas
+                </button>
+                <button type="button" className="ib-chip" style={{ width: "auto", padding: "0 6px" }} disabled={visibles === 0} onClick={() => ponerOcultas(conEntidades.map((c) => c.nombre))}>
+                  Ninguna
+                </button>
+              </div>
+              <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                {conEntidades.map((c) => (
+                  <label key={c.nombre} className="flex items-center gap-1.5">
+                    <input type="checkbox" checked={!ocultas.has(c.nombre)} onChange={(x) => ponerOcultas(x.target.checked ? [...ocultas].filter((y) => y !== c.nombre) : [...ocultas, c.nombre])} />
+                    <span className="truncate">{c.nombre}</span>
+                    <span className="ml-auto text-text-secondary">{fmt(c.entidades, 0)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <Linea k="Fichero">
             <span className="mono truncate" title={`sha256 ${t.sha256}`}>
               {t.fichero}
@@ -154,28 +188,6 @@ function Ficha({ t, abierta, alternar, pl, cambiar, quitar, herramienta }: { t: 
               ))}
             </div>
           </div>
-          {d && (
-            <div>
-              <div className="text-text-secondary">Capas (las que se ven y enganchan)</div>
-              {d.capas
-                .filter((c) => c.entidades > 0 || ocultas.has(c.nombre))
-                .map((c) => (
-                  <label key={c.nombre} className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={!ocultas.has(c.nombre)}
-                      onChange={(x) => {
-                        const n = x.target.checked ? [...ocultas].filter((y) => y !== c.nombre) : [...ocultas, c.nombre];
-                        const { ocultas: _o, ...resto } = t;
-                        cambiar(n.length ? { ...resto, ocultas: n } : resto, `Capas de la plantilla «${t.nombre}»`);
-                      }}
-                    />
-                    <span className="truncate">{c.nombre}</span>
-                    <span className="ml-auto text-text-secondary">{fmt(c.entidades, 0)}</span>
-                  </label>
-                ))}
-            </div>
-          )}
           {d && Object.keys(d.ignoradas).length > 0 && (
             <p className="nota">
               Sin leer: {Object.entries(d.ignoradas)

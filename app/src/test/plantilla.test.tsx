@@ -80,15 +80,20 @@ describe("la plantilla DXF (V2c-4)", () => {
     const f = new File([bytes as Uint8Array<ArrayBuffer>], "Planta baja.dxf");
     fireEvent.change(screen.getByLabelText("Fichero DXF de la plantilla"), { target: { files: [f] } });
     const nav = await waitFor(() => screen.getByRole("heading", { name: /Plantillas DXF/ }).closest("section")!, { timeout: 10_000 });
-    await waitFor(() => expect(within(nav).getByText("2 entidades")).toBeTruthy(), { timeout: 10_000 });
+    await waitFor(() => expect(within(nav).getByText("2/2 capas")).toBeTruthy(), { timeout: 10_000 });
     expect(screen.getByRole("button", { name: "Deshacer" }).getAttribute("title")).toMatch(/Plantilla DXF «Planta baja»/);
 
-    // Desplegada: en mm (por el tamaño), las dos capas visibles; ocultar la de cotas y pasar a m
-    fireEvent.click(within(nav).getByRole("button", { name: "Planta baja" }));
+    // Recién importada, desplegada: en mm (por el tamaño), las dos capas visibles; ocultar la de cotas y pasar a m
+    expect(within(nav).getByRole("button", { name: "Planta baja" }).getAttribute("aria-expanded")).toBe("true");
     const unidades = within(nav).getByRole("combobox", { name: "Unidades del DXF" }) as HTMLSelectElement;
     expect(unidades.value).toBe("mm");
     fireEvent.click(within(nav).getByRole("checkbox", { name: /COTAS/ }));
     await waitFor(() => expect((within(nav).getByRole("checkbox", { name: /COTAS/ }) as HTMLInputElement).checked).toBe(false));
+    expect(within(nav).getByText("1/2 capas")).toBeTruthy();
+    fireEvent.click(within(nav).getByRole("button", { name: "Todas" }));
+    await waitFor(() => expect(within(nav).getByText("2/2 capas")).toBeTruthy());
+    fireEvent.click(within(nav).getByRole("checkbox", { name: /COTAS/ }));
+    await waitFor(() => expect(within(nav).getByText("1/2 capas")).toBeTruthy());
     fireEvent.change(unidades, { target: { value: "m" } });
     await waitFor(() => expect((within(nav).getByRole("combobox", { name: "Unidades del DXF" }) as HTMLSelectElement).value).toBe("m"));
     // En m, el plano mediría 12 km: se avisa de que $INSUNITS dice mm
