@@ -241,7 +241,7 @@ async function elegirDxf(ruta: string): Promise<void> {
 }
 
 /** Espera a que la plantilla esté leída: lo que dice su fila en el navegador. */
-const leida = (ms = 60000) => pagina<string>(`return await __c.esperar(() => { const t = __c.plantillas()?.innerText ?? ""; return /[0-9 ]+ entidades/.test(t) ? t : null; }, ${ms});`);
+const leida = (ms = 60000) => pagina<string>(`return await __c.esperar(() => { const t = __c.plantillas()?.innerText ?? ""; return /[0-9]+ capas/.test(t) ? t : null; }, ${ms});`);
 
 try {
   // ─── Criterios 2 y 5 ──────────────────────────────────────────────────────────────────────────
