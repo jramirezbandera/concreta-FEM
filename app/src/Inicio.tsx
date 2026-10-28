@@ -15,6 +15,7 @@ import { borrar, crear, duplicar, ficha, hayAlmacen, leer, listar, origenNavegad
 import { descargar, elegirCarpeta, hayCarpetas, origenCarpeta, origenUrl, proyectosEn, type Directorio } from "./sesion/origen.ts";
 import { nombreFichero, type ProyectoAbierto } from "./sesion/useProyecto.ts";
 import { DialogoVersiones } from "./armazon/Versiones.tsx";
+import { abrirGestor, cerrarGestor } from "./editor/referencia.tsx";
 import { fechaCorta, tamano } from "./fmt.ts";
 
 /** Proyectos de ejemplo del repositorio (el muestrario y la vivienda de `ejemplos/`, la skill y los tres de A2). */
@@ -82,10 +83,13 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
     if (nuevo === null) return;
     const nombre = nuevo.trim() || "Proyecto nuevo";
     const texto = serializar(proyectoNuevo(nombre));
+    // Lo primero de una obra nueva son sus plantas: el gestor se abre en cuanto el editor lo esté
+    abrirGestor({ coleccion: "plantas", inicio: true });
     if (!almacen) return proyecto.abrirTexto(texto, nombreFichero(nombre));
     try {
       abrir(await crear(texto));
     } catch (e) {
+      cerrarGestor();
       setError(`No se pudo crear el proyecto en el navegador: ${mensaje(e)}`);
     }
   };

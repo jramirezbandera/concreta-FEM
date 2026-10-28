@@ -283,6 +283,8 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "portico" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+    // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
     // I1: la paleta de órdenes (Ctrl+K) lleva a las tablas
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     fireEvent.change(screen.getByRole("combobox", { name: "Buscar una orden" }), { target: { value: "tabla secc" } });
@@ -383,6 +385,8 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "muro" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+    // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     elegirTabla("secciones");
     escribirFilaNueva("secciones", { id: "P30", material: "HA-30", forma: "rectangular", b: "0,3", h: "0,3" });

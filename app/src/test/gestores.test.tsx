@@ -59,7 +59,8 @@ beforeAll(async () => {
   (globalThis as unknown as { __motor: string }).__motor = sha256(new Uint8Array(wasm));
 }, 120_000);
 
-async function proyectoNuevo(nombre: string) {
+/** Una obra nueva abre el gestor de plantas; con `abierto`, se queda abierto. */
+async function proyectoNuevo(nombre: string, abierto = false) {
   render(
     <ThemeProvider>
       <App />
@@ -69,6 +70,7 @@ async function proyectoNuevo(nombre: string) {
   fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: nombre } });
   fireEvent.click(screen.getByRole("button", { name: "Crear" }));
   await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+  if (!abierto) fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 }
 
 const barra = () => screen.getByRole("toolbar", { name: "Herramientas de Modelo" });
@@ -331,6 +333,32 @@ describe("GE2: casos de carga", () => {
 });
 
 describe("GE3: plantas", () => {
+  it("una obra nueva empieza por sus plantas: cuántas y de qué altura, viendo el alzado; un paso de deshacer", async () => {
+    await proyectoNuevo("ge3-inicio", true);
+    const dlg = screen.getByRole("dialog", { name: "Plantas" });
+    expect(within(dlg).getByText("Empiece por las plantas.")).toBeTruthy();
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Número de plantas sobre la cimentación" }), { target: { value: "4" } });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de la primera planta, m" }), { target: { value: "4" } });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de las demás plantas, m" }), { target: { value: "3" } });
+    const filas = () => [...within(dlg).getByRole("table", { name: "Cómo quedan las plantas" }).querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
+    expect(filas()).toEqual([
+      ["N4 · nueva", "", "—", "+13,00"],
+      ["N3 · nueva", "", "3,00", "+10,00"],
+      ["N2 · nueva", "", "3,00", "+7,00"],
+      ["N1", "", "3,00", "+4,00"],
+      ["Cim", "", "4,00", "0,00"],
+    ]);
+    fireEvent.click(within(dlg).getByRole("button", { name: "Crear las plantas" }));
+    expect(within(dlg).getByRole("status").textContent).toBe("4 plantas sobre Cim.");
+    // Ya no es el primer paso: se añaden encima o debajo de una
+    expect(within(dlg).getByRole("textbox", { name: "Número de plantas nuevas" })).toBeTruthy();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar" }));
+    elegirTabla("plantas");
+    expect(idsTabla("plantas")).toEqual(["N4", "N3", "N2", "N1", "Cim"]);
+    fireEvent.click(deshacer());
+    expect(idsTabla("plantas")).toEqual(["N1", "Cim"]);
+  }, 60_000);
+
   it("dos plantas de 3,20 m encima de N1, viendo antes las cotas; un paso de deshacer", async () => {
     await proyectoNuevo("ge3-barra");
     fireEvent.click(within(barra()).getByRole("button", { name: "Plantas" }));
@@ -340,10 +368,10 @@ describe("GE3: plantas", () => {
     expect((within(dlg).getByRole("combobox", { name: "Planta de referencia" }) as HTMLSelectElement).value).toBe("N1");
     const filas = () => [...within(dlg).getByRole("table", { name: "Cómo quedan las plantas" }).querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     expect(filas()).toEqual([
-      ["N3 · nueva", "—", "+9,40"],
-      ["N2 · nueva", "+3,20", "+6,20"],
-      ["N1", "+3,20", "+3,00"],
-      ["Cim", "+3,00", "0,00"],
+      ["N3 · nueva", "", "—", "+9,40"],
+      ["N2 · nueva", "", "3,20", "+6,20"],
+      ["N1", "", "3,20", "+3,00"],
+      ["Cim", "", "3,00", "0,00"],
     ]);
     fireEvent.click(within(dlg).getByRole("button", { name: "Añadir" }));
     expect(within(dlg).getByRole("status").textContent).toBe("Plantas N2, N3 encima de N1.");

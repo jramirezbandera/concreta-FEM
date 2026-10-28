@@ -13,7 +13,7 @@ import { cotasPlantas } from "../compilador/cotas.ts";
 import { CASOS_TIPICOS, casosDelJuego, casoTipico, crearCasos, describirCaso, JUEGO_DEFECTO, psiCaso } from "./casos.ts";
 import { comoUna } from "./gestores.ts";
 import { aplicar, type Operacion } from "./operaciones.ts";
-import { insertarPlantas } from "./plantas.ts";
+import { insertarPlantas, plantasEdificio } from "./plantas.ts";
 import { proyectoNuevo } from "./plantilla.ts";
 import { referenciasRotas } from "./referencias.ts";
 import { contexto, DEF_TABLAS } from "./tablas.ts";
@@ -97,6 +97,23 @@ describe("GE2: casos típicos", () => {
 
 describe("GE3: añadir plantas", () => {
   const cotas = (p: Proyecto) => Object.fromEntries(p.modelo.plantas.map((x, i) => [x.id, cotasPlantas(p.modelo.plantas)[i]]));
+
+  it("un proyecto que empieza: n plantas sobre la cimentación, la primera con su altura", () => {
+    const p = proyectoNuevo();
+    const r = plantasEdificio(p.modelo, { n: 4, alturaBaja: 4, altura: 3 });
+    if (!r.ok) throw new Error(r.mensaje);
+    expect(r.ids).toEqual(["N2", "N3", "N4"]);
+    const q = aplicado(p, r.operacion);
+    expect(q.modelo.plantas).toEqual(r.plantas);
+    expect(cotas(q)).toEqual({ N4: 13, N3: 10, N2: 7, N1: 4, Cim: 0 });
+    // Una sola, con la altura que ya tiene: nada que hacer; con otra, sólo la cimentación
+    expect(plantasEdificio(p.modelo, { n: 1, alturaBaja: 3, altura: 3 }).ok).toBe(false);
+    const s = plantasEdificio(p.modelo, { n: 1, alturaBaja: 3.5, altura: 3 });
+    if (!s.ok) throw new Error(s.mensaje);
+    expect(cotas(aplicado(p, s.operacion))).toEqual({ N1: 3.5, Cim: 0 });
+    // Con más de dos plantas, no
+    expect(plantasEdificio(q.modelo, { n: 2, alturaBaja: 3, altura: 3 }).ok).toBe(false);
+  });
 
   it("encima de la de arriba: las nuevas encima, con su altura", () => {
     const p = proyectoNuevo();

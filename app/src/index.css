@@ -849,6 +849,29 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .ges-tipo[aria-checked="true"] { border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border-main)); background: var(--color-tint-accent); }
 .ges-mini { width: 44px; height: 36px; display: grid; place-items: center; }
 .ges-mini svg { width: 100%; height: 100%; }
+/* GE3: el alzado esquemático de las plantas */
+.gestor-plantas .dialogo-cuerpo { grid-template-columns: 330px minmax(0, 1fr); }
+.ges-alzado { min-height: 0; overflow-y: auto; padding: 12px 12px 16px; border-right: 1px solid var(--color-border-sub); background: var(--color-bg-surface); }
+.ges-alzado table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ges-alzado th { padding: 0 4px 6px; font-weight: 500; font-size: 11px; text-align: left; color: var(--color-text-tertiary); }
+.ges-alzado th:nth-child(n+3), .ges-alzado td:nth-child(n+3) { text-align: right; }
+.ges-alzado td { padding: 0 4px; vertical-align: bottom; white-space: nowrap; color: var(--color-text-secondary); }
+.ges-alzado td.ges-h { vertical-align: middle; color: var(--color-text-tertiary); }
+.ges-planta { display: inline-block; padding: 1px 6px; margin-bottom: -3px; border: 0; border-radius: 5px; background: none; font: 600 12px var(--font-mono); color: var(--color-text-primary); cursor: pointer; }
+.ges-planta small { font: 400 11px var(--font-sans); color: var(--color-text-tertiary); }
+button.ges-planta:hover { background: var(--color-bg-elevated); }
+.ges-alzado tr[data-elegida] .ges-planta { background: var(--color-tint-accent); color: var(--color-accent); }
+.ges-alzado tr[data-nueva] td { color: var(--color-accent); }
+.ges-alzado tr[data-nueva] .ges-planta { color: var(--color-accent); cursor: default; }
+.ges-dib { position: relative; width: 42%; }
+.ges-forjado { position: absolute; left: 6%; right: 6%; bottom: 0; height: 5px; border-radius: 1px; background: var(--color-text-secondary); }
+.ges-pil { position: absolute; top: 0; bottom: 0; width: 4px; background: var(--color-border-strong); }
+.ges-alzado tr[data-nueva] .ges-forjado { background: none; border: 1.5px dashed var(--color-accent); height: 6px; }
+.ges-alzado tr[data-nueva] .ges-pil { background: color-mix(in srgb, var(--color-accent) 45%, transparent); }
+.ges-alzado tr[data-elegida] .ges-forjado { background: var(--color-accent); }
+.ges-alzado tbody tr:last-child .ges-forjado { left: 14%; right: 14%; height: 7px; }
+.ges-terreno { height: 14px; margin: 2px 4px 0; background: repeating-linear-gradient(135deg, var(--color-border-main) 0 1.5px, transparent 1.5px 7px); border-top: 1.5px solid var(--color-border-strong); }
+.ges-bienvenida { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5; background: var(--color-tint-accent); color: var(--color-text-primary); }
 .ges-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; align-items: start; }
 .ges-dibujo { display: grid; place-items: center; height: 190px; border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface); font-size: 12px; }
 .ges-dibujo svg { width: 100%; height: 100%; }

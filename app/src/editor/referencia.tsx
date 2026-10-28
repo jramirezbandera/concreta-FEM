@@ -26,6 +26,8 @@ export interface PedidoGestor {
   familia?: FamiliaMaterial;
   /** GE3: la planta junto a la que se añaden las nuevas. */
   planta?: string;
+  /** GE3: el proyecto acaba de crearse: lo primero es decir cuántas plantas tiene y de qué altura. */
+  inicio?: boolean;
   /** Lo que se rellena: «la sección de P3», «la plantilla de Pilar». */
   para?: string;
   /** Desde un campo: con lo elegido o creado; devuelve el error o null (y entonces se cierra). */

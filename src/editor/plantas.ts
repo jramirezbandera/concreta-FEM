@@ -64,3 +64,39 @@ export function insertarPlantas(m: ModeloFisico, p: PedidoPlantas): InsercionPla
   }
   return { ok: true, operacion: operaciones.length === 1 ? operaciones[0]! : { op: "lote", operaciones }, ids, plantas: resultado };
 }
+
+export interface PedidoEdificio {
+  /** Plantas sobre la de abajo (la cimentación), contando la que ya hay encima de ella. */
+  n: number;
+  /** m, de la cimentación a la primera. */
+  alturaBaja: number;
+  /** m, entre las demás. */
+  altura: number;
+  prefijo?: string;
+}
+
+/**
+ * Las plantas de un proyecto que empieza (dos plantas: una sobre la cimentación, como el proyecto
+ * nuevo): la primera a `alturaBaja` de la cimentación y n − 1 más encima, de `altura`. Un paso de
+ * deshacer. Con más de dos plantas, se añaden con `insertarPlantas`.
+ */
+export function plantasEdificio(m: ModeloFisico, p: PedidoEdificio): InsercionPlantas {
+  if (m.plantas.length !== 2) return { ok: false, mensaje: "Sólo para un proyecto con una planta sobre la cimentación." };
+  if (!Number.isInteger(p.n) || p.n < 1 || p.n > MAX_PLANTAS_NUEVAS + 1) return { ok: false, mensaje: `El número de plantas va de 1 a ${MAX_PLANTAS_NUEVAS + 1}.` };
+  if (!(Number.isFinite(p.alturaBaja) && p.alturaBaja > 0)) return { ok: false, mensaje: "La altura de la primera tiene que ser mayor que 0." };
+  const [primera, base] = m.plantas as [Planta, Planta];
+  const baseNueva: Planta = { ...base, altura: p.alturaBaja };
+  const operaciones: Operacion[] = base.altura === p.alturaBaja ? [] : [{ op: "cambiar", coleccion: "plantas", id: base.id, objeto: baseNueva as unknown as Objeto }];
+  const m2: ModeloFisico = { ...m, plantas: [primera, baseNueva] };
+  let ids: string[] = [];
+  let plantas: Planta[] = [...m2.plantas];
+  if (p.n > 1) {
+    const r = insertarPlantas(m2, { n: p.n - 1, altura: p.altura, donde: "encima", de: primera.id, ...(p.prefijo !== undefined ? { prefijo: p.prefijo } : {}) });
+    if (!r.ok) return r;
+    operaciones.push(...(r.operacion.op === "lote" ? r.operacion.operaciones : [r.operacion]));
+    ids = r.ids;
+    plantas = r.plantas;
+  }
+  if (!operaciones.length) return { ok: false, mensaje: "Ya está así." };
+  return { ok: true, operacion: operaciones.length === 1 ? operaciones[0]! : { op: "lote", operaciones }, ids, plantas };
+}

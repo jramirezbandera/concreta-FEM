@@ -6,7 +6,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
 import { sha256 } from "../../../src/compilador/huella.ts";
@@ -67,6 +67,8 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "dibujo" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+    // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     const pilar = screen.getByRole("button", { name: "Pilar" });
     expect(pilar.getAttribute("aria-pressed")).toBe("false");
@@ -114,6 +116,8 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "piezas" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+    // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     // Forjado: recuadro y maciza por defecto, con el material del proyecto; reticular, 25+5 y el pp obligatorio
     fireEvent.click(screen.getByRole("button", { name: "Forjado" }));
@@ -160,6 +164,8 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Nombre del proyecto" }), { target: { value: "alzado" } });
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(screen.getByRole("grid", { name: /Tabla de/ })).toBeTruthy(), { timeout: 30_000 });
+    // Una obra nueva abre el gestor de plantas: aquí no se toca
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
     const celda = () => document.querySelector<HTMLElement>(".celda")!;
     const alzado = screen.getByRole("button", { name: "Alzado" }) as HTMLButtonElement;
