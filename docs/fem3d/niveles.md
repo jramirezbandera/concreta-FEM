@@ -93,6 +93,17 @@ En CYPECAD, cada paño puede llevar un desnivel respecto a la cota de su planta.
 
 Recomendación: **a**, medida contra un modelo con láminas en su cota real unidas por enlaces rígidos en el escalón. Además, un modelo de CYPECAD del usuario con un desnivel, para ver qué hace (en sombra).
 
+**La viga del escalón** (pregunta del usuario, 2026-10-29):
+
+- **No hay torsión nueva por las cargas verticales.** El par que da un cortante vertical depende de la distancia horizontal a su eje, no de la altura, así que el desnivel no la cambia.
+- **Tampoco por el momento que pasa de una losa a otra.** Un par es un vector libre: el de la losa alta y el de la baja se equilibran aunque estén a distinta altura. La torsión sigue siendo la diferencia de los momentos de las dos losas, como sin desnivel (y con la de D4).
+- **Sí hay torsión por las fuerzas horizontales de la membrana,** N·Δ en cada metro de viga: el diafragma y el sismo. Con el diafragma rígido el modelo no las calcula, así que sería una comprobación aparte. Es pequeña con Δ de 10 cm.
+- **Lo que aparece es un problema local de armado,** no de análisis global. La tracción de las barras superiores de una losa tiene que bajar Δ para seguir por las de la otra, y eso se resuelve de una de dos maneras:
+  - **Barras dobladas a través de la viga,** si la pendiente Δ/b es pequeña (≤ 1/6 es lo habitual: con b = 0,30, hasta unos 5 cm).
+  - **Anclaje por separado,** cuando el desnivel es mayor. Es un solape sin contacto, y los cercos cerrados de la viga atan las dos capas. Por bielas y tirantes, la fuerza vertical del tirante es ≈ T·Δ/ℓ, con T = M/z la tracción por metro y ℓ el solape. Por ejemplo, M = 40 kN·m/m, z ≈ 0,23 m, Δ = 0,10 m y ℓ = 0,40 m dan unos 43 kN/m (≈ 1 cm²/m), que se suman a los cercos del cortante de la viga. Es una estimación, por contrastar.
+- **La losa baja cuelga de la viga si su cara inferior queda por debajo de la de la viga:** hace falta armadura de cuelgue. En el caso del reticular de 30 con la losa de 20 enrasada abajo, no.
+- **Lo que podría dar la app:** por cada escalón, Δ, el momento de las franjas en las dos caras de la viga (ya hay estaciones allí, LV), la pendiente Δ/b con el aviso de anclar por separado, y la fuerza del tirante.
+
 **Decisiones:**
 
 - DN-a: el cálculo (a o b);
