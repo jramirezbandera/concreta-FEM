@@ -426,7 +426,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 
 /*
  * Formulario del inspector: etiqueta (con su unidad) e input en una línea. La ayuda de cada campo
- * sale al escribir en él (y al pasar por la etiqueta, como «title»); un error, siempre.
+ * sale en un globo al pasar el ratón por su «?» (`Ayuda.tsx`); un error, bajo el campo.
  */
 .campo { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: 10px; align-items: center; padding: 3px 14px; }
 .campo > span { display: flex; align-items: baseline; gap: 5px; min-width: 0; font-size: 12px; color: var(--color-text-secondary); cursor: default; }
@@ -444,8 +444,6 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .campo input:read-only { border-color: transparent; background: var(--color-bg-surface); color: var(--color-text-secondary); }
 .campo input[data-error="true"], .campo select[data-error="true"] { border-color: var(--color-state-fail); box-shadow: 0 0 0 3px var(--color-tint-fail); }
 .campo p { grid-column: 2; margin: 3px 0 2px; font-size: 11px; line-height: 1.4; color: var(--color-text-tertiary); }
-.campo p.ayuda { display: none; }
-.campo:focus-within p.ayuda { display: block; }
 .campo p.error { color: var(--color-state-fail); }
 
 /* Cabecera del inspector: qué es y cuál, con sus acciones */
@@ -850,27 +848,68 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .ges-mini { width: 44px; height: 36px; display: grid; place-items: center; }
 .ges-mini svg { width: 100%; height: 100%; }
 /* GE3: el alzado esquemático de las plantas */
-.gestor-plantas .dialogo-cuerpo { grid-template-columns: 330px minmax(0, 1fr); }
-.ges-alzado { min-height: 0; overflow-y: auto; padding: 12px 12px 16px; border-right: 1px solid var(--color-border-sub); background: var(--color-bg-surface); }
-.ges-alzado table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.ges-alzado th { padding: 0 4px 6px; font-weight: 500; font-size: 11px; text-align: left; color: var(--color-text-tertiary); }
-.ges-alzado th:nth-child(n+3), .ges-alzado td:nth-child(n+3) { text-align: right; }
-.ges-alzado td { padding: 0 4px; vertical-align: bottom; white-space: nowrap; color: var(--color-text-secondary); }
-.ges-alzado td.ges-h { vertical-align: middle; color: var(--color-text-tertiary); }
-.ges-planta { display: inline-block; padding: 1px 6px; margin-bottom: -3px; border: 0; border-radius: 5px; background: none; font: 600 12px var(--font-mono); color: var(--color-text-primary); cursor: pointer; }
-.ges-planta small { font: 400 11px var(--font-sans); color: var(--color-text-tertiary); }
-button.ges-planta:hover { background: var(--color-bg-elevated); }
-.ges-alzado tr[data-elegida] .ges-planta { background: var(--color-tint-accent); color: var(--color-accent); }
-.ges-alzado tr[data-nueva] td { color: var(--color-accent); }
-.ges-alzado tr[data-nueva] .ges-planta { color: var(--color-accent); cursor: default; }
-.ges-dib { position: relative; width: 42%; }
-.ges-forjado { position: absolute; left: 6%; right: 6%; bottom: 0; height: 5px; border-radius: 1px; background: var(--color-text-secondary); }
-.ges-pil { position: absolute; top: 0; bottom: 0; width: 4px; background: var(--color-border-strong); }
-.ges-alzado tr[data-nueva] .ges-forjado { background: none; border: 1.5px dashed var(--color-accent); height: 6px; }
-.ges-alzado tr[data-nueva] .ges-pil { background: color-mix(in srgb, var(--color-accent) 45%, transparent); }
-.ges-alzado tr[data-elegida] .ges-forjado { background: var(--color-accent); }
-.ges-alzado tbody tr:last-child .ges-forjado { left: 14%; right: 14%; height: 7px; }
-.ges-terreno { height: 14px; margin: 2px 4px 0; background: repeating-linear-gradient(135deg, var(--color-border-main) 0 1.5px, transparent 1.5px 7px); border-top: 1.5px solid var(--color-border-strong); }
+.gestor-plantas .dialogo-cuerpo { grid-template-columns: 340px minmax(0, 1fr); }
+/* El alzado del gestor de plantas: el dibujo centrado en su panel, a escala */
+.ges-alzado { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 0; overflow-y: auto; padding: 18px 16px; border-right: 1px solid var(--color-border-sub); background: var(--color-bg-surface); }
+.gp-alzado { flex-shrink: 0; max-width: 100%; height: auto; overflow: visible; }
+.gp-alzado text { font: 11px var(--font-mono); fill: var(--color-text-tertiary); }
+.gp-nivel[role="button"] { cursor: pointer; outline: none; }
+.gp-banda { fill: transparent; transition: fill .12s; }
+.gp-nivel[role="button"]:hover .gp-banda { fill: var(--color-bg-elevated); }
+.gp-nivel[role="button"]:focus-visible .gp-banda { stroke: var(--color-accent); stroke-width: 1.5; }
+.gp-nivel[data-elegida] .gp-banda { fill: color-mix(in srgb, var(--color-accent) 11%, transparent); }
+.gp-alzado .gp-id { font: 600 12.5px var(--font-mono); fill: var(--color-text-primary); }
+.gp-alzado .gp-sub { font: 10.5px var(--font-sans); fill: var(--color-text-tertiary); }
+.gp-alzado .gp-cota { text-anchor: end; fill: var(--color-text-secondary); }
+.gp-forjado { fill: var(--color-text-secondary); }
+.gp-cim { fill: var(--color-text-primary); }
+.gp-pilar { fill: var(--color-border-strong); }
+.gp-nivel-linea { stroke: var(--color-border-main); stroke-dasharray: 2 3; }
+.gp-acot line { stroke: var(--color-text-tertiary); stroke-width: 1; }
+.gp-rayado { stroke: var(--color-border-strong); stroke-width: 1.2; }
+.gp-terreno { stroke: var(--color-text-secondary); stroke-width: 1.5; }
+.gp-nivel[data-elegida] .gp-forjado:not(.gp-cim) { fill: var(--color-accent); }
+.gp-nivel[data-elegida] .gp-id, .gp-nivel[data-elegida] .gp-cota { fill: var(--color-accent); }
+.gp-nivel[data-nueva] .gp-banda { fill: color-mix(in srgb, var(--color-accent) 6%, transparent); }
+.gp-nivel[data-nueva] .gp-forjado { fill: color-mix(in srgb, var(--color-accent) 18%, transparent); stroke: var(--color-accent); stroke-width: 1.2; stroke-dasharray: 4 2.5; }
+.gp-nivel[data-nueva] .gp-pilar { fill: color-mix(in srgb, var(--color-accent) 40%, transparent); }
+.gp-nivel[data-nueva] .gp-id, .gp-nivel[data-nueva] .gp-sub, .gp-nivel[data-nueva] .gp-cota, .gp-nivel[data-nueva] .gp-acot text { fill: var(--color-accent); }
+.gp-nivel[data-nueva] .gp-nivel-linea { stroke: color-mix(in srgb, var(--color-accent) 50%, transparent); }
+.gp-total { margin: 0; font-size: 11.5px; color: var(--color-text-tertiary); }
+.gp-total span { color: var(--color-accent); }
+/* La ficha del gestor de plantas: secciones con su título y los campos en fila */
+.gp-form { display: flex; flex-direction: column; gap: 4px; }
+.gp-sec { padding: 12px 0 14px; border-bottom: 1px solid var(--color-border-sub); }
+.gp-sec:last-of-type { border-bottom: 0; }
+.gp-sec h3 { margin: 0 0 10px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-text-tertiary); }
+.gp-fila { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+.gp-campo { display: flex; flex-direction: column; gap: 4px; width: 130px; }
+.gp-campo.gp-corto { width: 80px; }
+.gp-campo.gp-ancho { flex: 1; min-width: 160px; width: auto; }
+.gp-campo > span:first-child:not(.gp-unidad) { font-size: 12px; color: var(--color-text-secondary); }
+.gp-campo:focus-within > span:first-child:not(.gp-unidad) { color: var(--color-text-primary); }
+.gp-campo input, .gp-campo select {
+  width: 100%; height: 30px; padding: 0 9px;
+  border: 1px solid var(--color-border-main); border-radius: 6px;
+  background: var(--color-bg-primary); color: var(--color-text-primary); font: 12.5px var(--font-mono);
+  transition: border-color .12s, box-shadow .12s;
+}
+.gp-campo select { font-family: var(--font-sans); }
+.gp-campo input:hover, .gp-campo select:hover { border-color: var(--color-border-strong); }
+.gp-campo input:focus, .gp-campo select:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-ring); }
+.gp-campo input:disabled { opacity: .5; }
+.gp-campo input[data-error="true"] { border-color: var(--color-state-fail); box-shadow: 0 0 0 3px var(--color-tint-fail); }
+.gp-unidad { position: relative; display: block; }
+.gp-unidad::after { content: attr(data-unidad); position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font: 12px var(--font-mono); color: var(--color-text-tertiary); pointer-events: none; }
+.gp-unidad input { padding-right: 24px; }
+.gp-seg { height: 30px; align-items: center; }
+.gp-seg > button { height: 26px; padding: 0 12px; }
+.gp-nuevas { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0 0 3px; list-style: none; }
+.gp-nuevas li { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 9px; border: 1px dashed color-mix(in srgb, var(--color-accent) 55%, transparent); border-radius: 999px; background: var(--color-tint-accent); font: 11.5px var(--font-mono); color: var(--color-text-secondary); }
+.gp-nuevas b { font-weight: 600; color: var(--color-accent); }
+.gp-mal { flex: 1; margin: 0 0 6px; font-size: 12px; color: var(--color-state-fail); }
+.gp-enlace { align-self: flex-start; margin-top: 4px; padding: 0; border: 0; background: none; font-size: 12px; color: var(--color-accent); cursor: pointer; }
+.gp-enlace:hover { text-decoration: underline; }
 .ges-bienvenida { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5; background: var(--color-tint-accent); color: var(--color-text-primary); }
 .ges-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; align-items: start; }
 .ges-dibujo { display: grid; place-items: center; height: 190px; border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface); font-size: 12px; }
@@ -910,19 +949,29 @@ button.ges-planta:hover { background: var(--color-bg-elevated); }
 .campo-q {
   display: inline-grid; place-items: center; flex-shrink: 0; width: 13px; height: 13px; border: 1px solid var(--color-border-strong); border-radius: 50%;
   font: normal 600 9px/1 var(--font-sans); color: var(--color-text-tertiary); cursor: help;
+  position: relative;
 }
-.campo > span:first-child:hover .campo-q, .campo:focus-within .campo-q { border-color: var(--color-accent); color: var(--color-accent); }
-.campo > span:first-child:hover ~ p.ayuda, .form-datos[data-ayudas] .campo p.ayuda { display: block; }
+/* Más fácil de coger con el ratón que sus 13 px */
+.campo-q::after { content: ""; position: absolute; inset: -4px; }
+.campo-q:hover, .campo-q[data-abierta] { border-color: var(--color-accent); background: var(--color-tint-accent); color: var(--color-accent); }
+/* El globo de la ayuda: en el body, por encima de los diálogos y la paleta */
+@keyframes globo-entra { from { opacity: 0; transform: translateY(-3px); } }
+.globo-ayuda {
+  position: fixed; z-index: 70; max-width: 280px; padding: 8px 11px;
+  border: 1px solid var(--color-border-main); border-radius: 8px; background: var(--color-bg-primary);
+  box-shadow: var(--shadow-pop); font: 12px/1.45 var(--font-sans); color: var(--color-text-primary);
+  pointer-events: none; animation: globo-entra .12s ease-out;
+}
+.globo-ayuda::before {
+  content: ""; position: absolute; top: -5px; left: calc(var(--flecha, 18px) - 5px); width: 8px; height: 8px;
+  border: solid var(--color-border-main); border-width: 1px 0 0 1px; background: inherit; transform: rotate(45deg);
+}
+.globo-ayuda[data-arriba]::before { top: auto; bottom: -5px; border-width: 0 1px 1px 0; }
+@media (prefers-reduced-motion: reduce) { .globo-ayuda { animation: none; } }
 .campo[data-activo] > span:first-child { color: var(--color-text-primary); }
 .campo input[data-falta], .campo select[data-falta] { border-style: dashed; border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border-main)); }
 .campo input[data-falta]::placeholder { color: var(--color-accent); opacity: .8; }
 .form-leyenda { margin-top: 10px; font-size: 11px; color: var(--color-text-tertiary); }
-.sec .sec-boton {
-  height: 20px; padding: 0 8px; border: 1px solid var(--color-border-main); border-radius: 10px; background: none;
-  font: 11px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--color-text-secondary); cursor: pointer;
-}
-.sec .sec-boton:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
-.sec .sec-boton[aria-pressed="true"] { border-color: transparent; background: var(--color-tint-accent); color: var(--color-accent); }
 
 /* El croquis de un forjado: planta y sección a escala; lo que se resalta es el campo con el foco o bajo el ratón */
 .croquis { margin: 4px 14px 8px; padding: 6px 0 0; border: 1px solid var(--color-border-sub); border-radius: 8px; background: var(--color-bg-surface); }

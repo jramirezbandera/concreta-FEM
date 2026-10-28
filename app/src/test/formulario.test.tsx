@@ -1,11 +1,11 @@
 /**
  * Propiedades de un forjado (prueba de uso del 2026-10-28): los campos por grupos, lo obligatorio
- * marcado y dicho en el campo vacío, el valor por defecto de uno opcional, la ayuda con «Ayudas» y
+ * marcado y dicho en el campo vacío, el valor por defecto de uno opcional, la ayuda en un globo y
  * el croquis enlazado con los campos.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { leerProyecto } from "../../../src/agente/proyecto.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
@@ -51,13 +51,18 @@ describe("Propiedades de un forjado", () => {
     expect(screen.getByRole("img", { name: "Sección del reticular" }).textContent).toContain("nervio 12");
   });
 
-  it("«Ayudas» enseña todas, y un clic en una cota lleva a su campo", () => {
+  it("la ayuda sale en un globo al pasar por su «?», y un clic en una cota lleva a su campo", () => {
+    vi.useFakeTimers();
     const { container } = montar("L2");
-    const datos = container.querySelector(".form-datos")!;
-    expect(datos.hasAttribute("data-ayudas")).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Ayudas" }));
-    expect(datos.hasAttribute("data-ayudas")).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "Ayudas" }));
+    expect(container.querySelector("p.ayuda")).toBeNull();
+    const q = screen.getByLabelText("ábacos").closest("label")!.querySelector(".campo-q")!;
+    fireEvent.mouseEnter(q);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    act(() => void vi.advanceTimersByTime(200));
+    expect(screen.getByRole("tooltip").textContent).toMatch(/polígonos macizos/);
+    fireEvent.mouseLeave(q);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    vi.useRealTimers();
     const cota = container.querySelector('.cq-cota[data-campo="nervio"]')!;
     fireEvent.click(cota);
     expect(document.activeElement).toBe(screen.getByLabelText("nervio"));

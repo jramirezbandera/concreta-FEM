@@ -68,3 +68,7 @@ html[data-theme="dark"] {
 .ges-props .ges-glosario dt { font-family: var(--font-mono); color: var(--color-text-primary); }
 .ges-props .ges-glosario dd { font-family: var(--font-sans); line-height: 1.4; color: var(--color-text-secondary); }
 .ges-props dl > div[title] { cursor: help; }
+
+/* Plantas y secciones: el «?» junto al nombre del campo */
+.gp-campo > span:first-child:not(.gp-unidad), .gp-sec h3 { display: flex; align-items: center; gap: 5px; }
+.gp-sec h3 .campo-q { text-transform: none; letter-spacing: 0; }

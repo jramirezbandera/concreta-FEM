@@ -6,8 +6,8 @@
  *
  * Lo que ayuda a meter los datos (de la prueba de uso del 2026-10-28): lo obligatorio va marcado
  * con «*» y, vacío, lo dice el campo; un campo opcional vacío enseña lo que vale (`estadoCampos`); la
- * ayuda de cada campo sale al pasar el ratón por su nombre, con el foco o, con «Ayudas», todas; y un
- * forjado lleva su croquis (`CroquisForjado.tsx`), enlazado con sus campos.
+ * ayuda de cada campo sale en un globo al pasar el ratón por su «?» (`Ayuda`); y un forjado lleva su
+ * croquis (`CroquisForjado.tsx`), enlazado con sus campos.
  */
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ComponentType, type ReactNode } from "react";
 import { operacionFila } from "../../../src/editor/edicion.ts";
@@ -18,6 +18,7 @@ import { columnasComunes, operacionVarios, type ColumnaComun } from "../../../sr
 import { DEF_TABLAS, conActual, contexto, filaConValor, objetosTabla, tablaDeColeccion, type Columna, type NombreTabla } from "../../../src/editor/tablas.ts";
 import type { Fila } from "../../../src/editor/celdas.ts";
 import type { Contexto } from "../../../src/editor/tablas.ts";
+import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { PlantaForjado, SeccionForjado } from "./CroquisForjado.tsx";
@@ -64,31 +65,7 @@ const CROQUIS: Partial<Record<NombreTabla, Record<string, ComponentType<PropsCro
   },
 };
 
-const CLAVE_AYUDAS = "fem.inspector.ayudas";
-
-/** «Ayudas» a la vista en todos los formularios, recordado en el navegador. */
-function useAyudas(): [boolean, (v: boolean) => void] {
-  const [v, setV] = useState(() => {
-    try {
-      return localStorage.getItem(CLAVE_AYUDAS) === "1";
-    } catch {
-      return false;
-    }
-  });
-  return [
-    v,
-    (x) => {
-      setV(x);
-      try {
-        localStorage.setItem(CLAVE_AYUDAS, x ? "1" : "0");
-      } catch {
-        // sin almacenamiento, sólo en esta sesión
-      }
-    },
-  ];
-}
-
-/** El nombre del campo: «*» si es obligatorio y «?» si tiene ayuda (que sale al pasar el ratón). */
+/** El nombre del campo: «*» si es obligatorio y «?» si tiene ayuda (en un globo, al pasar el ratón). */
 function Etiqueta({ c, estado, conUnidad }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean }) {
   return (
     <span>
@@ -101,21 +78,8 @@ function Etiqueta({ c, estado, conUnidad }: { c: Columna; estado?: EstadoCampo; 
         )}
       </span>
       {c.unidad && conUnidad && <small>{c.unidad}</small>}
-      {c.ayuda && (
-        <i className="campo-q" aria-hidden="true">
-          ?
-        </i>
-      )}
+      {c.ayuda && <Ayuda texto={c.ayuda} />}
     </span>
-  );
-}
-
-/** El interruptor de las ayudas, en la cabecera de los datos. */
-function BotonAyudas({ ayudas, setAyudas }: { ayudas: boolean; setAyudas: (v: boolean) => void }) {
-  return (
-    <button type="button" className="sec-boton" aria-pressed={ayudas} onClick={() => setAyudas(!ayudas)} title="Enseñar la ayuda de todos los campos">
-      Ayudas
-    </button>
   );
 }
 
@@ -140,10 +104,8 @@ export function tablaDe(m: Parameters<typeof indiceIds>[0], id: string): NombreT
   return c ? tablaDeColeccion(c) : null;
 }
 
-/** `ayudas="siempre"`: las ayudas a la vista, sin interruptor (en los gestores). */
-export function FormularioObjeto({ id, tabla, ayudas: siempre }: { id: string; tabla: NombreTabla; ayudas?: "siempre" }) {
+export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla }) {
   const { proyecto, setSeleccion } = useVisor();
-  const [ayudas, setAyudas] = useAyudas();
   const [foco, setFoco] = useState<string | null>(null);
   const [sobre, setSobre] = useState<string | null>(null);
   const caja = useRef<HTMLDivElement>(null);
@@ -219,8 +181,8 @@ export function FormularioObjeto({ id, tabla, ayudas: siempre }: { id: string; t
   const irACampo = (clave: string) => caja.current?.querySelector<HTMLElement>(`[data-clave="${clave}"]`)?.focus();
 
   return (
-    <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`} valor={siempre ? undefined : <BotonAyudas ayudas={ayudas} setAyudas={setAyudas} />}>
-      <div className="form-datos" ref={caja} data-ayudas={siempre || ayudas || undefined}>
+    <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`}>
+      <div className="form-datos" ref={caja}>
         {pendiente && (
           <p className="nota">
             {id} pasa a ser {actual.tipo}: falta lo marcado.{" "}
@@ -304,7 +266,7 @@ export function FormularioObjeto({ id, tabla, ayudas: siempre }: { id: string; t
                     />
                     </span>
                   )}
-                  {err ? <p className="error">{err}</p> : c.ayuda ? <p className="ayuda">{c.ayuda}</p> : null}
+                  {err && <p className="error">{err}</p>}
                 </label>
               );
           }}
@@ -335,7 +297,6 @@ export function FormularioVarios({ ids, tabla }: { ids: readonly string[]; tabla
   const cols = useMemo(() => columnasComunes(m, tabla, ids), [m, tabla, claveIds]);
   const [borrador, setBorrador] = useState<Record<string, string>>({});
   const [errores, setErrores] = useState<Record<string, string>>({});
-  const [ayudas, setAyudas] = useAyudas();
 
   useEffect(() => {
     setBorrador({});
@@ -379,8 +340,8 @@ export function FormularioVarios({ ids, tabla }: { ids: readonly string[]; tabla
   };
 
   return (
-    <Seccion titulo={`Datos · ${ids.length} ${def.titulo.toLowerCase()}`} valor={<BotonAyudas ayudas={ayudas} setAyudas={setAyudas} />}>
-      <div className="form-datos" data-ayudas={ayudas || undefined}>
+    <Seccion titulo={`Datos · ${ids.length} ${def.titulo.toLowerCase()}`}>
+      <div className="form-datos">
         <p className="nota">Lo que escriba va a los {ids.length}; «varios» es que no lo tienen igual.</p>
         <Grupos
           tabla={tabla}
@@ -440,7 +401,7 @@ export function FormularioVarios({ ids, tabla }: { ids: readonly string[]; tabla
                       />
                     </span>
                   )}
-                  {err ? <p className="error">{err}</p> : c.columna.ayuda ? <p className="ayuda">{c.columna.ayuda}</p> : null}
+                  {err && <p className="error">{err}</p>}
                 </label>
               );
           }}

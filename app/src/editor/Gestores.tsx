@@ -39,6 +39,7 @@ import type { Operacion } from "../../../src/editor/operaciones.ts";
 import type { Objeto } from "../../../src/editor/referencias.ts";
 import { enCatalogo, perfilDeCatalogo, PERFILES, SERIES_PERFILES, type SeriePerfil } from "../../../src/secciones/perfiles.ts";
 import type { ModeloFisico } from "../../../src/compilador/fisico.ts";
+import { Ayuda } from "../componentes/Ayuda.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
@@ -359,13 +360,17 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
             <div className="ges-datos">
               <p className="dlg-et">{actual ? `${actual.id} · ${TIPOS.find((t) => t.forma === form.forma)?.nombre ?? form.forma}` : "Nueva"}</p>
               <label className="campo">
-                <span>id</span>
+                <span>
+                  id <Ayuda texto="El nombre con que la eligen pilares y vigas. Vacío, el propuesto, que dice su forma y sus medidas (P30x30, V30x50)." />
+                </span>
                 <input value={form.id} placeholder={propuesto} aria-label="id de la sección" onChange={(e) => setForm({ ...form, id: e.target.value })} />
-                {!actual && <p>{igual ? `Ya hay una igual: se usará ${igual.id}.` : "Vacío: el propuesto."}</p>}
+                {!actual && igual && <p>{`Ya hay una igual: se usará ${igual.id}.`}</p>}
               </label>
               <CamposSeccion form={form} errores={errores} setForm={setForm} />
               <label className="campo">
-                <span>material</span>
+                <span>
+                  material <Ayuda texto="Da E, G y γ: la rigidez y el peso propio de la sección. Un típico que aún no está en el proyecto se añade con la sección." />
+                </span>
                 <select className="sel" value={form.material} aria-label="Material de la sección" data-error={!!errores.material} onChange={(e) => setForm({ ...form, material: e.target.value })}>
                   {!form.material && <option value="">(ninguno)</option>}
                   <OpcionesMaterial m={m} />
@@ -425,9 +430,10 @@ function CamposSeccion({ form, errores, setForm }: { form: FormSeccion; errores:
       <span>
         {k}
         <small>{unidad}</small>
+        <Ayuda texto={ayuda} />
       </span>
       <input value={form.campos[k] ?? ""} inputMode="decimal" aria-label={`${k} de la sección, ${unidad}`} data-error={!!errores[k]} aria-invalid={!!errores[k]} onChange={(e) => poner(k, e.target.value)} />
-      <p className={errores[k] ? "error" : undefined}>{errores[k] ?? ayuda}</p>
+      {errores[k] && <p className="error">{errores[k]}</p>}
     </label>
   );
   if (form.forma === "I") {
@@ -674,7 +680,7 @@ const CAMPOS_MATERIAL: Record<Material["tipo"], readonly [string, string, string
     ["peso", "kN/m³", "peso específico; vacío, 25"],
   ],
   acero: [
-    ["E", "MPa", "vacío, 210 000"],
+    ["E", "MPa", "módulo de elasticidad; vacío, 210 000"],
     ["peso", "kN/m³", "peso específico; vacío, 78,5"],
   ],
   general: [
@@ -833,12 +839,15 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
             <div className="ges-datos">
               {actual && <p className="dlg-et">{actual.id}</p>}
               <label className="campo">
-                <span>id</span>
+                <span>
+                  id <Ayuda texto="El nombre con que lo eligen secciones y losas. Vacío, el propuesto (HA-30 para un hormigón de fck 30)." />
+                </span>
                 <input value={form.id} placeholder={propuesto} aria-label="id del material" data-error={!!errores.id} onChange={(e) => setForm({ ...form, id: e.target.value })} />
-                {!actual && <p>Vacío: el propuesto.</p>}
               </label>
               <div className="campo">
-                <span>tipo</span>
+                <span>
+                  tipo <Ayuda texto="Hormigón: E sale de fck (el Ecm del Código Estructural). Acero: E = 210 000 MPa; el grado sólo da el nombre, porque el cálculo es elástico. General: E, ν y γ a mano." />
+                </span>
                 <div className="seg" role="radiogroup" aria-label="Tipo de material">
                   {(["hormigon", "acero", "general"] as const).map((t) => (
                     <button key={t} type="button" role="radio" aria-checked={form.tipo === t} data-on={form.tipo === t} onClick={() => setForm(t === form.tipo ? form : { ...vacio(t), id: form.id })}>
@@ -852,16 +861,18 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
                   <span>
                     {k === "nu" ? "ν" : k === "peso" ? "γ" : k}
                     {u && <small>{u}</small>}
+                    <Ayuda texto={a} />
                   </span>
-                  <input value={form.campos[k] ?? ""} inputMode="decimal" aria-label={`${k} del material${u ? `, ${u}` : ""}`} data-error={!!errores[k]} aria-invalid={!!errores[k]} onChange={(e) => setForm({ ...form, campos: { ...form.campos, [k]: e.target.value } })} />
-                  <p className={errores[k] ? "error" : undefined}>{errores[k] ?? a}</p>
+                  {/* Vacío vale lo que dice su ayuda («vacío, 0,2»): se ve en gris, como en el inspector */}
+                  <input value={form.campos[k] ?? ""} placeholder={/vacío, ([\d ,]+)/.exec(a)?.[1]?.trim()} inputMode="decimal" aria-label={`${k} del material${u ? `, ${u}` : ""}`} data-error={!!errores[k]} aria-invalid={!!errores[k]} onChange={(e) => setForm({ ...form, campos: { ...form.campos, [k]: e.target.value } })} />
+                  {errores[k] && <p className="error">{errores[k]}</p>}
                 </label>
               ))}
             </div>
             <div className="ges-ver">
               <Propiedades
                 filas={props ? [["E", `${fmt(props.E / 1000, 0)} MPa`], ["G", `${fmt(props.G / 1000, 0)} MPa`], ["γ", `${cifras(props.peso, 3)} kN/m³`]] : []}
-                nota={props ? (material?.tipo === "hormigon" ? "E: el Ecm del Código Estructural al MPa, como CYPECAD (CY-a)." : "Los que usa el cálculo.") : "Complete los datos para ver sus propiedades."}
+                nota={props ? (material?.tipo === "hormigon" ? "E: el Ecm del Código Estructural al MPa." : "Los que usa el cálculo.") : "Complete los datos para ver sus propiedades."}
               />
               {actual && <p className="ges-usos">{usos.length ? `Lo usan ${textoUsos(usos)}: cambiarlo los cambia a todos.` : "No lo usa ningún objeto."}</p>}
             </div>

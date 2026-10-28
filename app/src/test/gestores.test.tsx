@@ -346,6 +346,12 @@ describe("GE3: plantas", () => {
     await proyectoNuevo("ge3-inicio", true);
     const dlg = screen.getByRole("dialog", { name: "Plantas" });
     expect(within(dlg).getByText("Empiece por las plantas.")).toBeTruthy();
+    // La ayuda de cada campo, en un globo al pasar por su «?» (no un texto debajo)
+    const q = within(dlg).getByRole("textbox", { name: "Altura de la primera planta, m" }).closest("label")!.querySelector(".campo-q")!;
+    fireEvent.mouseEnter(q);
+    expect((await screen.findByRole("tooltip")).textContent).toMatch(/cara superior del primer forjado/);
+    fireEvent.mouseLeave(q);
+    expect(screen.queryByRole("tooltip")).toBeNull();
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Número de plantas sobre la cimentación" }), { target: { value: "4" } });
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de la primera planta, m" }), { target: { value: "4" } });
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Altura de las demás plantas, m" }), { target: { value: "3" } });
