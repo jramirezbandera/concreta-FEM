@@ -1,7 +1,7 @@
 /**
  * Lo que va en Propiedades mientras una herramienta de dibujo está activa (V2c-1, V2c-2 y V2c-3,
  * `dibujo.md` §2.1 y §9): su plantilla (lo que en CYPECAD pide el diálogo antes de colocar, pero sin diálogo: vale
- * para los siguientes), los enganches por tipo y el ortogonal. Y el campo de teclado junto al cursor
+ * para los siguientes), los enganches por fuente y por tipo y el ortogonal. Y el campo de teclado junto al cursor
  * (§2.3). Lo que la plantilla no dice se toma de lo último del mismo tipo en el proyecto (o de lo
  * típico: losa de 25 cm, reticular 25+5, muro de 25 cm); los valores de las cargas, nunca.
  *
@@ -14,7 +14,7 @@ import { cotasPlantas } from "../../../src/compilador/cotas.ts";
 import type { ModeloFisico, PuntoFijo, Seccion as SeccionFisica } from "../../../src/compilador/fisico.ts";
 import type { Seis, Vec3 } from "../../../src/motor/modelo.ts";
 import { medidasSeccion, SIGNOS_PUNTO_FIJO } from "../../../src/compilador/puntoFijo.ts";
-import { NOMBRE_ENGANCHE, TIPOS_ENGANCHE } from "../../../src/editor/dibujo/enganches.ts";
+import { FUENTES_ENGANCHE, NOMBRE_ENGANCHE, TIPOS_ENGANCHE, type FuenteEnganche } from "../../../src/editor/dibujo/enganches.ts";
 import { operacionProponerEjes, plantasPilar, type Alinear, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import { COARTADOS, HUECO_MURO, type PlantillaForjado } from "../../../src/editor/dibujo/piezas.ts";
 import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
@@ -355,32 +355,7 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
 
       {CARGA_HERR.has(h) && <PlantillaCargaPanel h={h as NombreCargaH} t={t.cargas ?? {}} poner={(c) => setPlantillas({ ...t, cargas: { ...t.cargas, ...c } })} />}
 
-      <Seccion titulo="Enganches" valor={`${foto.activos.size} de ${TIPOS_ENGANCHE.length}`}>
-        <label className="chk dib-orto">
-          <input type="checkbox" checked={foto.orto} onChange={() => ctrl.alternarOrto()} />
-          <span className="flex-1">
-            Ortogonal <small>(Mayús, también a 45°)</small>
-          </span>
-          <span className="dib-tecla">F8</span>
-        </label>
-        <div className="dib-fichas" role="group" aria-label="Enganches">
-          {TIPOS_ENGANCHE.map((x) => (
-            <button
-              key={x}
-              type="button"
-              aria-pressed={foto.activos.has(x)}
-              onClick={() => {
-                const n = new Set(foto.activos);
-                if (n.has(x)) n.delete(x);
-                else n.add(x);
-                ctrl.ponerActivos(n);
-              }}
-            >
-              {NOMBRE_ENGANCHE[x]}
-            </button>
-          ))}
-        </div>
-      </Seccion>
+      <SeccionEnganches foto={foto} ctrl={ctrl} />
 
       <Seccion titulo="Teclado">
         <dl className="dib-teclado">
@@ -487,15 +462,7 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
           )}
         </div>
       </Seccion>
-      <Seccion titulo="Enganches" valor={`${foto.activos.size} de ${TIPOS_ENGANCHE.length}`}>
-        <label className="chk dib-orto">
-          <input type="checkbox" checked={foto.orto} onChange={() => ctrl.alternarOrto()} />
-          <span className="flex-1">
-            Ortogonal <small>(Mayús, también a 45°)</small>
-          </span>
-          <span className="dib-tecla">F8</span>
-        </label>
-      </Seccion>
+      <SeccionEnganches foto={foto} ctrl={ctrl} />
       <Seccion titulo="Teclado">
         <dl className="dib-teclado">
           {h === "girar" ? (
@@ -517,6 +484,44 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
         </p>
       </Seccion>
     </div>
+  );
+}
+
+const NOMBRE_FUENTE: Record<FuenteEnganche, string> = { modelo: "Modelo", plantilla: "Plantilla DXF" };
+
+/** Los enganches, iguales al dibujar y al editar: el ortogonal, de dónde (modelo, plantilla DXF) y a qué. */
+function SeccionEnganches({ foto, ctrl }: { foto: Instantanea; ctrl: ControladorDibujo }) {
+  const alternar = <T,>(xs: ReadonlySet<T>, x: T) => {
+    const n = new Set(xs);
+    if (n.has(x)) n.delete(x);
+    else n.add(x);
+    return n;
+  };
+  return (
+    <Seccion titulo="Enganches" valor={`${foto.activos.size} de ${TIPOS_ENGANCHE.length}`}>
+      <label className="chk dib-orto">
+        <input type="checkbox" checked={foto.orto} onChange={() => ctrl.alternarOrto()} />
+        <span className="flex-1">
+          Ortogonal <small>(Mayús, también a 45°)</small>
+        </span>
+        <span className="dib-tecla">F8</span>
+      </label>
+      <div className="dib-fichas" role="group" aria-label="Enganchar a">
+        {FUENTES_ENGANCHE.map((x) => (
+          <button key={x} type="button" aria-pressed={foto.fuentes.has(x)} onClick={() => ctrl.ponerFuentes(alternar(foto.fuentes, x))}>
+            {NOMBRE_FUENTE[x]}
+          </button>
+        ))}
+      </div>
+      <div className="dib-fichas" role="group" aria-label="Enganches">
+        {TIPOS_ENGANCHE.map((x) => (
+          <button key={x} type="button" aria-pressed={foto.activos.has(x)} onClick={() => ctrl.ponerActivos(alternar(foto.activos, x))}>
+            {NOMBRE_ENGANCHE[x]}
+          </button>
+        ))}
+      </div>
+      <p className="nota">A igual tipo, el modelo gana a la plantilla DXF.</p>
+    </Seccion>
   );
 }
 

@@ -380,7 +380,7 @@ Un DXF de fondo en la planta, en gris, con enganches a sus líneas y vértices, 
 - **La colocación:** p = d + R(giro)·(u·p_dxf). Al importar, si la extensión está a más de 1 km del origen, d lleva su esquina al origen (redondeada al metro). Herramientas **Colocar** (un punto de la plantilla y su destino) y **Girar plantilla** (centro y ángulo).
 - **En la app:** «Plantilla DXF» en la barra de Modelo (elegir el fichero; queda en la planta activa); su sección en el navegador; en Propiedades, el fichero, las unidades, el redondeo, las plantas, las capas con su número de entidades, la colocación y «Quitar». Se lee en un worker propio, sin bloquear la página.
 - **Dibujo:** las líneas, en un `LineSegments` de 1 px en gris detrás del modelo y delante de la rejilla; los textos, en el lienzo 2D cuando miden ≥ 5 px.
-- **Enganches:** los de §2.2 también en la plantilla (extremo, vértice, centro, medio, cruce entre sus líneas y con las del modelo, perpendicular y cercano), con un índice por celdas. A igual nivel y distancia gana el modelo. La barra dice «(DXF)». Ocultar la plantilla quita sus enganches.
+- **Enganches:** los de §2.2 también en la plantilla (extremo, vértice, centro, medio, cruce entre sus líneas y con las del modelo, perpendicular y cercano), con un índice por celdas. A igual nivel gana el modelo, aunque la plantilla quede más cerca (2026-10-28: con un DXF denso, sus puntos tapaban los extremos de las vigas). En Propiedades, «Modelo» y «Plantilla DXF» apagan cada fuente, y los tipos se eligen también al editar (Mover, Copiar, Girar y Simetría no los tenían). La barra dice «(DXF)». Ocultar la plantilla quita sus enganches.
 
 ### 10.4 Criterios de paso
 

@@ -32,7 +32,7 @@
  * en el índice de enganches de la planta (`ponerPlantillasDxf`); la barra dice «(DXF …)».
  */
 import type { ModeloFisico, Vec2 } from "../../../src/compilador/fisico.ts";
-import { apuntar, bajoCursor, indiceEnganches, NOMBRE_ENGANCHE, RADIO_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
+import { apuntar, bajoCursor, FUENTES_ENGANCHE, indiceEnganches, NOMBRE_ENGANCHE, RADIO_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type FuenteEnganche, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
 import type { IndicePlantilla } from "../../../src/editor/dibujo/plantilla.ts";
 import { colocar, cotasEn, LADOS, nombreCota, referenciasCotas, type CotaTemporal, type Lado, type ReferenciasCotas } from "../../../src/editor/dibujo/cotas.ts";
 import { PlantaFisica } from "../../../src/agente/render/modelo.ts";
@@ -55,6 +55,8 @@ export interface Instantanea {
   hecho: string | null;
   orto: boolean;
   activos: ReadonlySet<TipoEnganche>;
+  /** De dónde se engancha: el modelo y las plantillas DXF. */
+  fuentes: ReadonlySet<FuenteEnganche>;
   /** El campo de teclado, abierto con su texto inicial y dónde (px de la ventana); `cota`, la que fija lo que se escriba; `seleccionar`, con el texto elegido (se escribe encima) y por encima del punto (CT2: la cota está junto a la barra). */
   campo: { n: number; texto: string; x: number; y: number; error: string | null; cota?: string; seleccionar?: boolean } | null;
   /** CT2: lo que dice la barra mientras se estira desde una cota. */
@@ -130,7 +132,7 @@ export class ControladorDibujo {
   private asaActiva: Asa | null = null;
 
   constructor() {
-    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null, asa: null, transformando: null };
+    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), fuentes: new Set(FUENTES_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null, asa: null, transformando: null };
   }
 
   // ─── Para React ─────────────────────────────────────────────────────────────────────────────
@@ -219,6 +221,11 @@ export class ControladorDibujo {
 
   ponerActivos(a: ReadonlySet<TipoEnganche>): void {
     this.cambiar({ activos: a });
+    this.recalcular();
+  }
+
+  ponerFuentes(f: ReadonlySet<FuenteEnganche>): void {
+    this.cambiar({ fuentes: f });
     this.recalcular();
   }
 
@@ -424,7 +431,7 @@ export class ControladorDibujo {
       this.silueta = null;
     } else {
       const asa = this.herramienta === "elegir" ? this.asaActiva : null;
-      this.apunte = asa ? apuntar(ix, q, this.radio, { ultimo: asa.p, orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos }) : this.herramienta === "elegir" || this.eligiendo() ? null : apuntar(ix, q, this.radio, { ultimo: ultimoPunto(this.estado), orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos });
+      this.apunte = asa ? apuntar(ix, q, this.radio, { ultimo: asa.p, orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos, fuentes: this.foto.fuentes }) : this.herramienta === "elegir" || this.eligiendo() ? null : apuntar(ix, q, this.radio, { ultimo: ultimoPunto(this.estado), orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos, fuentes: this.foto.fuentes });
       this.silueta = bajoCursor(ix, this.apunte?.p ?? q, this.radio);
     }
     if (pintar) this.repintar();

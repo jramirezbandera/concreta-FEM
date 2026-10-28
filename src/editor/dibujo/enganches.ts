@@ -21,8 +21,9 @@
  *
  * V2c-4: con una plantilla DXF (`plantilla.ts`, en `IndiceEnganches.plantilla`), también sus puntos
  * (extremos, vértices, centros, medios), los cruces de sus segmentos rectos entre sí y con las rectas
- * del modelo, la perpendicular y el más cercano, con las mismas prioridades. A igual nivel y
- * distancia gana el modelo, y lo enganchado de la plantilla sale redondeado (V2c4-c).
+ * del modelo, la perpendicular y el más cercano, con las mismas prioridades. A igual nivel gana el
+ * modelo aunque la plantilla quede más cerca (un DXF denso tapaba los extremos de una viga), y lo
+ * enganchado de la plantilla sale redondeado (V2c4-c). Cada fuente se puede apagar (`fuentes`).
  *
  * Puro: sin IO, sin React ni DOM.
  */
@@ -39,6 +40,11 @@ export type TipoEnganche = "fijo" | "centro" | "esquina" | "extremo" | "vertice"
 export const NIVEL: Readonly<Record<TipoEnganche, number>> = { fijo: 1, centro: 1, esquina: 1, extremo: 2, vertice: 2, cruce: 3, medio: 4, cara: 5, perpendicular: 6, cercano: 7 };
 
 export const TIPOS_ENGANCHE = Object.keys(NIVEL) as readonly TipoEnganche[];
+
+/** De dónde salen los enganches: el modelo o las plantillas DXF. */
+export type FuenteEnganche = "modelo" | "plantilla";
+
+export const FUENTES_ENGANCHE: readonly FuenteEnganche[] = ["modelo", "plantilla"];
 
 /** Lo que dice la barra de estado de cada enganche. */
 export const NOMBRE_ENGANCHE: Readonly<Record<TipoEnganche, string>> = {
@@ -323,11 +329,14 @@ export interface OpcionesEnganche {
   ultimo?: Vec2 | null;
   /** Los tipos que enganchan; por defecto, todos. */
   activos?: ReadonlySet<TipoEnganche>;
+  /** Las fuentes que enganchan; por defecto, las dos. */
+  fuentes?: ReadonlySet<FuenteEnganche>;
 }
 
 /** El enganche del cursor q con el radio en m, o null si no hay ninguno a ese radio. */
 export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: OpcionesEnganche = {}): Enganche | null {
   const activo = (t: TipoEnganche) => !o.activos || o.activos.has(t);
+  const conModelo = !o.fuentes || o.fuentes.has("modelo");
   let mejor: (Enganche & { d: number; n: number; pl: number }) | null = null;
   /** `pl`: la plantilla del rasgo, o −1 si es del modelo. */
   const proponer = (p: Vec2, tipo: TipoEnganche, objeto: string, pl = -1) => {
@@ -335,11 +344,13 @@ export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: Opcion
     const d = dist(p, q);
     if (d > radio) return;
     const n = NIVEL[tipo];
-    if (!mejor || n < mejor.n || (n === mejor.n && d < mejor.d)) mejor = { p, tipo, objeto, d, n, pl };
+    // A igual nivel, el modelo gana a la plantilla; entre los de la misma fuente, el más cercano
+    const gana = !mejor || n < mejor.n || (n === mejor.n && (pl < 0 !== mejor.pl < 0 ? pl < 0 : d < mejor.d));
+    if (gana) mejor = { p, tipo, objeto, d, n, pl };
   };
-  for (const x of ix.puntos) proponer(x.p, x.tipo, x.objeto);
+  if (conModelo) for (const x of ix.puntos) proponer(x.p, x.tipo, x.objeto);
   // La plantilla: sus puntos, y lo que hay cerca del cursor para lo demás
-  const t = ix.plantilla;
+  const t = !o.fuentes || o.fuentes.has("plantilla") ? ix.plantilla : null;
   const junto = t ? cerca(t, q, radio) : null;
   const segPl = (s: number): [Vec2, Vec2] => [
     [t!.seg[4 * s]!, t!.seg[4 * s + 1]!],
@@ -353,7 +364,7 @@ export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: Opcion
     // Los segmentos rectos a ≤ radio del cursor
     const rectos = junto.segmentos.filter((s) => s < t.rectos && distSegmento(q, ...segPl(s)) <= radio);
     if (puede("cruce") && rectos.length <= CRUCES_MAX) {
-      const delModelo = ix.rectas.filter((r) => distSegmento(q, r.a, r.b) <= radio);
+      const delModelo = !conModelo ? [] : ix.rectas.filter((r) => distSegmento(q, r.a, r.b) <= radio);
       for (let i = 0; i < rectos.length; i++) {
         const [a, b] = segPl(rectos[i]!);
         const pl = t.plSeg[rectos[i]!]!;
@@ -373,7 +384,7 @@ export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: Opcion
         proponer([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], "medio", nombrePl(t.plSeg[s]!), t.plSeg[s]!);
       }
   }
-  if (puede("cara")) {
+  if (conModelo && puede("cara")) {
     for (const c of ix.caras) proponer(proyectar(q, c.a, c.b).p, "cara", c.objeto);
     for (const c of ix.circulos) {
       const d = dist(q, c.c);
@@ -381,12 +392,12 @@ export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: Opcion
     }
   }
   const u = o.ultimo;
-  if (u && puede("perpendicular"))
+  if (conModelo && u && puede("perpendicular"))
     for (const r of ix.rectas) {
       const { p, t } = proyectar(u, r.a, r.b);
       if (t > 0 && t < 1 && dist(p, u) > 0) proponer(p, "perpendicular", r.objeto);
     }
-  if (puede("cercano")) for (const r of ix.rectas) proponer(proyectar(q, r.a, r.b).p, "cercano", r.objeto);
+  if (conModelo && puede("cercano")) for (const r of ix.rectas) proponer(proyectar(q, r.a, r.b).p, "cercano", r.objeto);
   if (t && junto) {
     if (u && puede("perpendicular"))
       for (const s of junto.segmentos) {

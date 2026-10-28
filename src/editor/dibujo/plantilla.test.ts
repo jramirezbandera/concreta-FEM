@@ -108,6 +108,18 @@ describe("enganchar a la plantilla", () => {
     expect(enganchar(ix, [5.03, 0.02], radio)).toMatchObject({ p: [5, 0], tipo: "extremo", plantilla: "Arq" });
   });
 
+  it("a igual nivel gana el modelo aunque la plantilla esté más cerca; cada fuente se apaga sola", () => {
+    const m = { ...vacio(), ejes: [{ id: "A", desde: [0, 0], hasta: [10, 0] }] } as unknown as ModeloFisico;
+    const ix = conPlantilla(m, [{ capa: "A", linea: [[0.1, 0], [5, 0]] }]);
+    // El extremo (0,1; 0) de la plantilla está a 2 cm y el del eje, a 9 cm
+    expect(enganchar(ix, [0.09, 0.02], radio)).toEqual({ p: [0, 0], tipo: "extremo", objeto: "A" });
+    expect(enganchar(ix, [0.09, 0.02], radio, { fuentes: new Set(["plantilla"]) })).toMatchObject({ p: [0.1, 0], tipo: "extremo", plantilla: "Arq" });
+    expect(enganchar(ix, [6.03, 0.02], radio, { fuentes: new Set(["modelo"]) })).toEqual({ p: [6.03, 0], tipo: "cercano", objeto: "A" });
+    // Sin el modelo, ni su cercano ni su perpendicular
+    expect(enganchar(ix, [7.03, 0.1], radio, { fuentes: new Set(["plantilla"]), ultimo: [7, 4] })).toBeNull();
+    expect(enganchar(ix, [0.09, 0.02], radio, { fuentes: new Set() })).toBeNull();
+  });
+
   it("capas ocultas: ni se ven ni enganchan", () => {
     const es: EntidadPrueba[] = [{ capa: "COTAS", linea: [[0, 0], [5, 0]] }, { capa: "A", linea: [[0, 1], [5, 1]] }];
     const ix = conPlantilla(vacio(), es, { ocultas: ["COTAS"] });
