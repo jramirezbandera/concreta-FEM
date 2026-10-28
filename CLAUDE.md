@@ -585,6 +585,12 @@
   - **Validación:** el lector frente a ezdxf 1.4.5 (`.venv`, `validacion/v2c4/oraculo_dxf.py`) en cinco DXF sintéticos congelados y en el de la vivienda (2,7e-11, sólo en local); calcar la retícula con núcleo desde su DXF en mm con ruido da su huella (vitest y Chrome, `validacion/v2c4/chrome.ts`); con un DXF de 100 000 segmentos, sin tareas largas y el enganche a 0,3 ms p95.
   - **V2c4-2:** `virtual_entities` de ezdxf escala mal un `INSERT` girado dentro de otro con escala no uniforme; el oráculo compone `matrix44()`.
   - **V2c4-6, decidido el 2026-10-27:** la plantilla va encima del relleno de las losas, los ábacos y los paños (en Cargas, del modelo atenuado) y debajo de lo demás (`Capas2D.ordenPlantilla`).
+- **2026-10-28: de la prueba de uso del dibujo** (a petición del usuario):
+  - **varios a la vez:** con varios elegidos, Propiedades da por tabla lo que tienen en común («varios» si no) y lo escrito va a todos en un lote (`src/editor/varios.ts`);
+  - **la barra, en el orden de meter un edificio:** Plantas, Materiales, Secciones | Plantilla DXF, Ejes | Pilar, Muro, Viga | Forjado, Hueco, Ábacos, Vigas de borde | Apoyo, Apoyo lineal | editar; en Cargas, Casos junto al caso activo;
+  - **capas del DXF a la vista:** la plantilla recién importada se abre con sus capas arriba, «Todas» y «Ninguna»;
+  - **gestor de plantas (GE3) rehecho:** alzado esquemático con lo nuevo en azul antes de añadirlo, «Añadir» o «Datos de X», y una obra nueva lo abre con su primer paso (cuántas plantas sobre la cimentación, la primera y las demás: `plantasEdificio`);
+  - **DWG:** sin decidir. LibreDWG es GPL y el SDK de la ODA, de pago: por ahora, DXF.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
