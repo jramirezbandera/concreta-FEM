@@ -168,9 +168,19 @@ describe("la herramienta activa (V2c-1)", () => {
     const puntual = screen.getByRole("region", { name: "Dibujar · Carga puntual" });
     expect(puntual.textContent).toMatch(/caso G/);
     expect((screen.getByRole("textbox", { name: "F" }) as HTMLInputElement).value).toBe("");
-    fireEvent.change(screen.getByRole("textbox", { name: "F" }), { target: { value: "0 0 -12,5" } });
+    // Un número hacia abajo (la gravedad, por defecto); con «x, y, z», sus componentes (z < 0)
+    expect(screen.getByRole("radio", { name: "↓ Gravedad" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.change(screen.getByRole("textbox", { name: "F" }), { target: { value: "12,5" } });
     fireEvent.keyDown(screen.getByRole("textbox", { name: "F" }), { key: "Enter" });
-    expect((screen.getByRole("textbox", { name: "F" }) as HTMLInputElement).value).toBe("0 0 -12,5");
+    expect((screen.getByRole("textbox", { name: "F" }) as HTMLInputElement).value).toBe("12,5");
+    fireEvent.click(screen.getByRole("radio", { name: "x, y, z" }));
+    expect((screen.getByRole("textbox", { name: "Fz" }) as HTMLInputElement).value).toBe("-12,5");
+    expect((screen.getByRole("textbox", { name: "Fx" }) as HTMLInputElement).value).toBe("0");
+    fireEvent.click(screen.getByRole("radio", { name: "X" }));
+    expect((screen.getByRole("textbox", { name: "F" }) as HTMLInputElement).value).toBe("");
+    fireEvent.click(screen.getByRole("radio", { name: "↓ Gravedad" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "F" }), { target: { value: "12,5" } });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "F" }), { key: "Enter" });
     fireEvent.change(screen.getByRole("combobox", { name: "Caso activo" }), { target: { value: "Q" } });
     await waitFor(() => expect(screen.getByRole("region", { name: "Dibujar · Carga puntual" }).textContent).toMatch(/caso Q/));
   }, 60_000);

@@ -85,7 +85,7 @@ function pasoLineal(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta):
     que: "Una carga lineal",
     terminar: (ps, cerrada) => {
       const q = ctx.plantillas.cargas?.lineal?.q;
-      if (!noNulo(q)) return { estado: e, error: "Escriba en Propiedades el valor de la carga lineal (qx qy qz, kN/m)." };
+      if (!noNulo(q)) return { estado: e, error: "Escriba en Propiedades el valor de la carga lineal (kN/m)." };
       return comoPaso(e, carga(ctx, { tipo: "lineal", planta: ctx.planta, puntos: cerrada ? [...ps, ps[0]!] : ps, q }, "lineal"));
     },
   });
@@ -93,7 +93,7 @@ function pasoLineal(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta):
 
 function pasoSuperficie(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {
   const t = ctx.plantillas.cargas?.superficie ?? {};
-  const sinQ = "Escriba en Propiedades el valor de la carga de superficie (qx qy qz, kN/m²).";
+  const sinQ = "Escriba en Propiedades el valor de la carga de superficie (kN/m²).";
   if ((t.modo ?? "forjado") === "forjado") {
     if (ev.tipo !== "punto") return { estado: e };
     if (!noNulo(t.q)) return { estado: e, error: sinQ };
@@ -122,7 +122,7 @@ function pasoBarra(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): 
   const m = ctx.modelo;
   if (ev.tipo === "retroceso" || (ev.tipo === "terminar" && e.objeto)) return { estado: ESTADO_INICIAL };
   if (ev.tipo !== "punto") return { estado: e };
-  const valores = () => (noNulo(t.q) ? null : "Escriba en Propiedades el valor de la carga (qx qy qz, kN/m).");
+  const valores = () => (noNulo(t.q) ? null : "Escriba en Propiedades el valor de la carga (kN/m).");
   const base = (tipo: "viga" | "pilar", id: string) => ({ tipo, [tipo]: id, ejes: t.ejes ?? "global", q: t.q!, ...(noNulo(t.qb) ? { qb: t.qb } : {}) });
   // El segundo clic de un tramo: en la misma viga
   if (e.objeto) {

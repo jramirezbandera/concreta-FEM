@@ -682,27 +682,81 @@ function CampoCoartados({ valor, onCambio }: { valor: Seis<boolean>; onCambio: (
   );
 }
 
-const textoVector = (v: Vec3 | undefined) => (v ? v.map((x) => String(x).replace(".", ",")).join(" ") : "");
+type DirCarga = "abajo" | "x" | "y" | "xyz";
+const DIRS_CARGA: readonly (readonly [DirCarga, string])[] = [
+  ["abajo", "↓ Gravedad"],
+  ["x", "X"],
+  ["y", "Y"],
+  ["xyz", "x, y, z"],
+];
+/** La dirección de un vector de carga: la de un eje si sólo tiene esa componente. */
+const direccionDe = (v: Vec3 | undefined): DirCarga | null => (!v ? null : v[0] === 0 && v[1] === 0 ? "abajo" : v[1] === 0 && v[2] === 0 ? "x" : v[0] === 0 && v[2] === 0 ? "y" : "xyz");
+/** El valor según una dirección (hacia abajo, en positivo). */
+const valorSegun = (v: Vec3 | undefined, d: Exclude<DirCarga, "xyz">): number | undefined => (v === undefined ? undefined : d === "abajo" ? (v[2] === 0 ? 0 : -v[2]) : d === "x" ? v[0] : v[1]);
+const vectorSegun = (m: number | undefined, d: Exclude<DirCarga, "xyz">): Vec3 | undefined => (!m ? undefined : d === "abajo" ? [0, 0, -m] : d === "x" ? [m, 0, 0] : [0, m, 0]);
+const conComponente = (v: Vec3 | undefined, i: number, c: number | undefined): Vec3 | undefined => {
+  const n = [...(v ?? [0, 0, 0])] as [number, number, number];
+  n[i] = c ?? 0;
+  return n.every((x) => x === 0) ? undefined : n;
+};
 
-/** Un vector «x y z» (como en las tablas: coma decimal y espacios o «;»). */
-function CampoVector({ etiqueta, unidad, valor, onCambio, ayuda }: { etiqueta: string; unidad: string; valor: Vec3 | undefined; onCambio: (v: Vec3 | undefined) => void; ayuda?: string }) {
-  const [texto, setTexto] = useState<string | null>(null);
-  const mostrado = texto ?? textoVector(valor);
-  const ns = mostrado.trim() ? mostrado.trim().split(/[\s;]+/).map((x) => Number(x.replace(",", "."))) : [];
-  const mal = ns.length > 0 && (ns.length !== 3 || !ns.every(Number.isFinite));
-  const escribir = () => {
-    if (texto === null) return;
-    if (!mal) onCambio(ns.length ? (ns as unknown as Vec3) : undefined);
-    setTexto(null);
+/**
+ * El valor de una carga: la dirección (hacia abajo por defecto, X, Y o las tres componentes) y un
+ * solo número; hacia abajo va en positivo y se guarda con z < 0. Con `componentes`, sólo las tres
+ * (el momento, o una carga en ejes locales). `final`, el valor al final de una carga variable, en la
+ * misma dirección.
+ */
+function CampoCarga({
+  etiqueta,
+  unidad,
+  valor,
+  onCambio,
+  ayuda,
+  final,
+  componentes,
+}: {
+  etiqueta: string;
+  unidad: string;
+  valor: Vec3 | undefined;
+  onCambio: (v: Vec3 | undefined) => void;
+  ayuda?: string;
+  final?: { etiqueta: string; valor: Vec3 | undefined; onCambio: (v: Vec3 | undefined) => void; ayuda: string };
+  componentes?: "globales" | "locales";
+}) {
+  const [elegida, setElegida] = useState<DirCarga>(() => direccionDe(valor) ?? "abajo");
+  const derivada = direccionDe(valor);
+  const dir: DirCarga = componentes ? "xyz" : elegida === "xyz" || !derivada ? elegida : derivada;
+  const cambiarDir = (d: DirCarga) => {
+    setElegida(d);
+    if (d === "xyz") return;
+    // Lo escrito pasa a la dirección nueva: el mismo número (desde las tres, la componente de esa dirección)
+    const pasar = (v: Vec3 | undefined) => vectorSegun(dir === "xyz" ? valorSegun(v, d) : valorSegun(v, dir), d);
+    onCambio(pasar(valor));
+    if (final) final.onCambio(pasar(final.valor));
   };
+  const ayudaDir: Record<DirCarga, string> = {
+    abajo: `Hacia abajo, en positivo: 2 son 2 ${unidad} de peso. En negativo, hacia arriba.`,
+    x: "Horizontal, según +X global; en negativo, hacia −X.",
+    y: "Horizontal, según +Y global; en negativo, hacia −Y.",
+    xyz: "Las tres componentes en ejes globales; hacia abajo, z < 0.",
+  };
+  const tres = (et: string, v: Vec3 | undefined, cambio: (v: Vec3 | undefined) => void, ay?: string) =>
+    (["x", "y", "z"] as const).map((e, i) => <NumeroCampo key={`${et}${e}`} etiqueta={`${et}${e}`} unidad={unidad} valor={v === undefined ? undefined : v[i]} onCambio={(c) => cambio(conComponente(v, i, c))} ayuda={i === 2 ? ay : undefined} />);
   return (
-    <label className="campo">
-      <span>
-        {etiqueta} <small>{unidad}</small>
-      </span>
-      <input className="mono" value={mostrado} placeholder="x y z" data-error={mal} aria-label={etiqueta} aria-invalid={mal} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
-      {mal ? <p className="error">Tres números: «0 0 -5»</p> : ayuda ? <p>{ayuda}</p> : null}
-    </label>
+    <>
+      {!componentes && <Segmentado etiqueta="dirección" valor={dir} opciones={DIRS_CARGA} onCambio={cambiarDir} ayuda={ayudaDir[dir]} />}
+      {dir === "xyz" ? (
+        <>
+          {tres(etiqueta, valor, onCambio, componentes === "locales" ? "En los ejes de la pieza: x a lo largo de ella y z según su canto." : ayuda)}
+          {final && tres(final.etiqueta, final.valor, final.onCambio, final.ayuda)}
+        </>
+      ) : (
+        <>
+          <NumeroCampo etiqueta={etiqueta} unidad={unidad} valor={valorSegun(valor, dir)} onCambio={(m) => onCambio(vectorSegun(m, dir))} ayuda={ayuda} />
+          {final && <NumeroCampo etiqueta={final.etiqueta} unidad={unidad} valor={valorSegun(final.valor, dir)} onCambio={(m) => final.onCambio(vectorSegun(m, dir))} ayuda={final.ayuda} />}
+        </>
+      )}
+    </>
   );
 }
 
@@ -781,18 +835,30 @@ type NombreCargaH = "puntual" | "lineal" | "superficie" | "barra" | "empuje";
 
 /** La plantilla de una carga: el caso activo (el de la barra) y sus valores, que nunca tienen uno por defecto. */
 function PlantillaCargaPanel({ h, t, poner }: { h: NombreCargaH; t: PlantillaCargas; poner: (c: PlantillaCargas) => void }) {
-  const abajo = "Hacia abajo, z < 0.";
+  const [momento, setMomento] = useState(false);
+  const conM = momento || !!t.puntual?.M;
   return (
     <Seccion titulo="Plantilla" valor={t.caso ? `caso ${t.caso}` : "sin caso"}>
       <div className="py-1">
         {!t.caso && <p className="nota text-state-fail">Elija el caso activo en la barra (o cree uno con Casos).</p>}
         {h === "puntual" && (
           <>
-            <CampoVector etiqueta="F" unidad="kN" valor={t.puntual?.F} onCambio={(F) => poner({ puntual: { ...t.puntual, F } })} ayuda={`Fx Fy Fz en ejes globales. ${abajo}`} />
-            <CampoVector etiqueta="M" unidad="kN·m" valor={t.puntual?.M} onCambio={(M) => poner({ puntual: { ...t.puntual, M } })} ayuda="Mx My Mz en ejes globales." />
+            <CampoCarga etiqueta="F" unidad="kN" valor={t.puntual?.F} onCambio={(F) => poner({ puntual: { ...t.puntual, F } })} ayuda="La fuerza en el punto: p. ej., la reacción de un apeo." />
+            <label className="chk">
+              <input
+                type="checkbox"
+                checked={conM}
+                onChange={(x) => {
+                  setMomento(x.target.checked);
+                  if (!x.target.checked) poner({ puntual: { ...t.puntual, M: undefined } });
+                }}
+              />
+              <span>Con momento</span>
+            </label>
+            {conM && <CampoCarga etiqueta="M" unidad="kN·m" componentes="globales" valor={t.puntual?.M} onCambio={(M) => poner({ puntual: { ...t.puntual, M } })} ayuda="Mx My Mz en ejes globales (regla de la mano derecha)." />}
           </>
         )}
-        {h === "lineal" && <CampoVector etiqueta="q" unidad="kN/m" valor={t.lineal?.q} onCambio={(q) => poner({ lineal: { q } })} ayuda={`qx qy qz en ejes globales. ${abajo}`} />}
+        {h === "lineal" && <CampoCarga etiqueta="q" unidad="kN/m" valor={t.lineal?.q} onCambio={(q) => poner({ lineal: { q } })} ayuda="Por metro de la línea dibujada: p. ej., 7 de un cerramiento." />}
         {h === "superficie" && (
           <>
             <Segmentado
@@ -805,7 +871,7 @@ function PlantillaCargaPanel({ h, t, poner }: { h: NombreCargaH; t: PlantillaCar
               onCambio={(modo) => poner({ superficie: { ...t.superficie, modo } })}
               ayuda={(t.superficie?.modo ?? "forjado") === "forjado" ? "Un clic dentro de una losa o un paño: todo él, sin sus huecos." : "Un polígono; si cae entero en un forjado, la parte de él en la zona."}
             />
-            <CampoVector etiqueta="q" unidad="kN/m²" valor={t.superficie?.q} onCambio={(q) => poner({ superficie: { ...t.superficie, q } })} ayuda={`qx qy qz en ejes globales. ${abajo}`} />
+            <CampoCarga etiqueta="q" unidad="kN/m²" valor={t.superficie?.q} onCambio={(q) => poner({ superficie: { ...t.superficie, q } })} ayuda="Por m² de forjado: p. ej., 1,5 de solado o 2 de uso." />
           </>
         )}
         {h === "barra" && (
@@ -828,9 +894,18 @@ function PlantillaCargaPanel({ h, t, poner }: { h: NombreCargaH; t: PlantillaCar
                 ["local", "Locales"],
               ]}
               onCambio={(ejes) => poner({ barra: { ...t.barra, ejes } })}
+              ayuda={(t.barra?.ejes ?? "global") === "global" ? "Los de la planta: z hacia arriba." : "Los de la pieza: x a lo largo de ella y z según su canto."}
             />
-            <CampoVector etiqueta="q" unidad="kN/m" valor={t.barra?.q} onCambio={(q) => poner({ barra: { ...t.barra, q } })} ayuda={`qx qy qz. ${abajo}`} />
-            <CampoVector etiqueta="qb" unidad="kN/m" valor={t.barra?.qb} onCambio={(qb) => poner({ barra: { ...t.barra, qb } })} ayuda="Al final, si varía (vacío: uniforme)." />
+            <CampoCarga
+              key={t.barra?.ejes ?? "global"}
+              etiqueta="q"
+              unidad="kN/m"
+              componentes={t.barra?.ejes === "local" ? "locales" : undefined}
+              valor={t.barra?.q}
+              onCambio={(q) => poner({ barra: { ...t.barra, q } })}
+              ayuda="Por metro de la pieza; al principio, si varía."
+              final={{ etiqueta: "qb", valor: t.barra?.qb, onCambio: (qb) => poner({ barra: { ...t.barra, qb } }), ayuda: "Al final de la pieza o del tramo, si varía (vacío: uniforme)." }}
+            />
           </>
         )}
         {h === "empuje" && (

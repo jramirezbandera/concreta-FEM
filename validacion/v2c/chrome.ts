@@ -246,7 +246,13 @@ async function captura(nombre: string): Promise<void> {
 const compilada = () => pagina(`await new Promise((r) => setTimeout(r, 60)); await __c.esperar(() => __c.quieto()); await __c.fotograma(); await __c.fotograma();`);
 
 const num = (x: number) => String(x).replace(".", ",");
-const vector = (v: readonly number[]) => v.map(num).join(" ");
+/** Escribe una carga en la plantilla: un número en la dirección de su eje, o sus tres componentes. */
+const escribirCarga = (campo: string, v: readonly number[]) => {
+  const [x, y, z] = v as [number, number, number];
+  const [dir, m] = x === 0 && y === 0 ? ["↓ Gravedad", -z] : y === 0 && z === 0 ? ["X", x] : x === 0 && z === 0 ? ["Y", y] : [null, 0];
+  if (dir) return `__c.boton("${dir}", document.querySelector('[role=radiogroup][aria-label="dirección"]')).click(); await __c.fotograma(); await __c.escribir("${campo}", "${num(m)}");`;
+  return `__c.boton("x, y, z", document.querySelector('[role=radiogroup][aria-label="dirección"]')).click(); await __c.fotograma(); ${v.map((c, i) => `await __c.escribir("${campo}${"xyz"[i]}", "${num(c)}");`).join(" ")}`;
+};
 let comprobarFluidez = () => {};
 
 /** Va a un espacio de trabajo (Modelo, Cargas…). */
@@ -254,7 +260,7 @@ const espacio = (nombre: string) => pagina(`[...document.querySelectorAll("nav.e
 
 /** Una herramienta de carga con su caso y su valor q. */
 async function herramientaCarga(nombre: string, caso: string, q: readonly number[], campo = "q"): Promise<void> {
-  await pagina(`__c.elegir("Caso activo", "${caso}"); __c.herramienta("${nombre}").click(); await __c.esperar(() => document.querySelector('input[aria-label="${campo}"]'), 5000); await __c.escribir("${campo}", "${vector(q)}");`);
+  await pagina(`__c.elegir("Caso activo", "${caso}"); __c.herramienta("${nombre}").click(); await __c.esperar(() => document.querySelector('input[aria-label="${campo}"]'), 5000); ${escribirCarga(campo, q)}`);
 }
 
 /** Las cuatro cargas de la planta del edificio, en el orden de la referencia. */
@@ -270,7 +276,7 @@ async function dibujarCargasEdificio(): Promise<void> {
   await herramientaCarga("Superficie", qs.caso, qs.q);
   await pagina(`__c.clic([10, 10]);`);
   // La zona, tecleada (con la herramienta de antes: el modo, en Propiedades)
-  await pagina(`__c.escribir("q", "${vector(qz.q)}"); __c.boton("Zona").click();`);
+  await pagina(`${escribirCarga("q", qz.q)} __c.boton("Zona").click();`);
   for (const q of qz.zona!) await pagina(`await __c.teclear("${num(q[0])}; ${num(q[1])}");`);
   await pagina(`__c.tecla("Enter"); __c.boton("Forjado").click(); __c.tecla("Escape");`);
   await compilada();
