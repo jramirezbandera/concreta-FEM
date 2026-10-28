@@ -81,23 +81,45 @@ describe("la herramienta activa (V2c-1)", () => {
     await waitFor(() => expect((screen.getByRole("combobox", { name: "Sección" }) as HTMLSelectElement).value).toBe("P30x30"));
     expect(screen.getByRole("button", { name: "Deshacer" }).getAttribute("title")).toMatch(/Sección P30x30/);
 
+    // Los enganches no están en Propiedades: van en la barra de la planta
+    expect(within(screen.getByRole("region", { name: "Dibujar · Pilar" })).queryByText("Enganches")).toBeNull();
+    const barra = screen.getByRole("toolbar", { name: "Barra de la vista" });
     // F8, el ortogonal
-    const orto = screen.getByRole("checkbox", { name: /Ortogonal/ }) as HTMLInputElement;
-    expect(orto.checked).toBe(false);
+    const orto = within(barra).getByRole("button", { name: "Ortogonal" });
+    expect(orto.getAttribute("aria-pressed")).toBe("false");
     fireEvent.keyDown(window, { key: "F8" });
-    expect(orto.checked).toBe(true);
-    // F3, los enganches a la plantilla DXF; el botón dice lo mismo
-    const dxf = within(screen.getByRole("group", { name: "Enganchar a" })).getByRole("button", { name: "Plantilla DXF" });
-    expect(dxf.getAttribute("aria-pressed")).toBe("true");
+    expect(orto.getAttribute("aria-pressed")).toBe("true");
+    // El imán los apaga y los enciende; marcar un tipo los enciende
+    const iman = within(barra).getByRole("button", { name: "Enganches" });
+    expect(iman.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(iman);
+    expect(iman.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(within(barra).getByRole("button", { name: "Lista de enganches" }));
+    const menu = within(barra).getByRole("group", { name: "Enganches a objetos" });
+    const centro = within(menu).getByRole("checkbox", { name: /Centro/ }) as HTMLInputElement;
+    expect(centro.checked).toBe(true);
+    fireEvent.click(centro);
+    expect(centro.checked).toBe(false);
+    fireEvent.click(centro);
+    expect(iman.getAttribute("aria-pressed")).toBe("true");
+    // F3, los enganches a la plantilla DXF; la casilla dice lo mismo
+    const dxf = within(within(menu).getByRole("group", { name: "Enganchar a" })).getByRole("checkbox", { name: /Plantilla DXF/ }) as HTMLInputElement;
+    expect(dxf.checked).toBe(true);
     fireEvent.keyDown(window, { key: "F3" });
-    expect(dxf.getAttribute("aria-pressed")).toBe("false");
+    expect(dxf.checked).toBe(false);
     fireEvent.click(dxf);
-    expect(dxf.getAttribute("aria-pressed")).toBe("true");
+    expect(dxf.checked).toBe(true);
+    // Esc cierra la lista sin salir de la herramienta
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(within(barra).queryByRole("group", { name: "Enganches a objetos" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Dibujar · Pilar" })).toBeTruthy();
 
     // Una cifra abre el campo; lo que no se puede situar sin cursor en una planta lo dice; Esc lo cierra
     fireEvent.keyDown(window, { key: "3" });
     const campo = screen.getByRole("textbox", { name: /Punto: x; y/ }) as HTMLInputElement;
     expect(campo.value).toBe("3");
+    // El campo dice lo que se puede escribir (lo que antes era «Teclado» en Propiedades)
+    expect(within(screen.getByRole("dialog", { name: "Punto por teclado" })).getByText("@dx; dy")).toBeTruthy();
     fireEvent.change(campo, { target: { value: "3; 4" } });
     fireEvent.keyDown(campo, { key: "Enter" });
     expect(screen.getByText("Lleve el cursor a una planta.")).toBeTruthy();

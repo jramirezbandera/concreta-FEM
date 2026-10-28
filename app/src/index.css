@@ -338,6 +338,30 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 }
 .vista-barra > .ib { width: 28px; height: 28px; }
 .vista-barra > .ib[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
+/* V2c: el ortogonal y los enganches en la barra de la planta, como la barra de estado de AutoCAD */
+.vista-barra-sep { width: 1px; margin: 4px 3px; background: var(--color-border-main); }
+.eng-barra { position: relative; display: flex; gap: 2px; }
+.eng-barra .ib { width: 28px; height: 28px; }
+.eng-barra .ib[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
+.eng-dividido { display: flex; }
+.eng-dividido > .ib:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.eng-barra .ib.eng-flecha { width: 16px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.eng-barra .ib.eng-flecha[data-on="false"] { color: var(--color-text-tertiary); }
+.eng-menu {
+  position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 16; width: 236px; padding: 6px 0 8px;
+  border: 1px solid var(--color-border-main); border-radius: 10px; background: var(--color-bg-primary);
+  box-shadow: var(--shadow-pop); font-size: 12.5px; color: var(--color-text-primary);
+}
+.eng-cab { display: flex; align-items: center; gap: 8px; padding: 6px 12px 3px; font: 600 10px var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary); }
+.eng-cab > span { flex: 1; }
+.eng-link { border: 0; padding: 0; background: none; font: 500 11.5px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--color-accent); cursor: pointer; }
+.eng-link:hover { text-decoration: underline; }
+.eng-tipos { display: flex; flex-direction: column; }
+.eng-tipos[data-apagados="true"] { opacity: .55; }
+.eng-fila { display: flex; align-items: center; gap: 8px; padding: 3px 12px; cursor: pointer; }
+.eng-fila:hover { background: var(--color-bg-elevated); }
+.eng-fila > svg { flex-shrink: 0; color: var(--color-accent); }
+.eng-nota { margin: 6px 12px 0; font-size: 11px; line-height: 1.35; color: var(--color-text-tertiary); }
 .leyenda-vista[data-abierta="false"] { width: 112px; }
 /* I3: las opciones de un 3D y los chips de sus filtros */
 .opciones-vista {
@@ -646,31 +670,28 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .dib-pf-sec > button:hover { border-color: var(--color-accent); transform: scale(1.15); }
 .dib-pf-sec > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); }
 .dib-pf-sec > button[aria-checked="true"] { border-color: var(--color-accent); background: var(--color-accent); box-shadow: 0 0 0 3px var(--color-tint-accent); }
-/* Enganches: el ortogonal con su tecla y los tipos como fichas */
-.dib-orto { padding-top: 2px; padding-bottom: 4px; font-size: 12.5px; color: var(--color-text-primary); }
-.dib-orto small { font-size: 11px; color: var(--color-text-tertiary); }
-.fichas, .dib-fichas { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 14px 12px; }
+.fichas { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 14px 12px; }
 .dib-gdl { display: flex; gap: 3px; }
-.fichas > button, .dib-fichas > button, .dib-gdl > button {
+.fichas > button, .dib-gdl > button {
   height: 24px; padding: 0 9px; border: 1px solid var(--color-border-main); border-radius: 12px;
   background: var(--color-bg-primary); color: var(--color-text-tertiary); font: 500 11.5px var(--font-sans); cursor: pointer;
   transition: background-color .12s, border-color .12s, color .12s;
 }
-.fichas > button:hover, .dib-fichas > button:hover, .dib-gdl > button:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
-.fichas > button[aria-pressed="true"], .dib-fichas > button[aria-pressed="true"], .dib-gdl > button[aria-pressed="true"] { border-color: transparent; background: var(--color-tint-accent); color: var(--color-accent); }
-.fichas > button:focus-visible, .dib-fichas > button:focus-visible, .dib-gdl > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); }
+.fichas > button:hover, .dib-gdl > button:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
+.fichas > button[aria-pressed="true"], .dib-gdl > button[aria-pressed="true"] { border-color: transparent; background: var(--color-tint-accent); color: var(--color-accent); }
+.fichas > button:focus-visible, .dib-gdl > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); }
 .dib-gdl > button { flex: 1; padding: 0; font-family: var(--font-mono); }
 /* Fichas de ids (lo elegido): en mono y con el color del texto, porque no se encienden */
 .fichas.ids > button { font: 11.5px var(--font-mono); color: var(--color-text-secondary); border-radius: 6px; }
 .fichas.ids > button:hover { border-color: var(--color-accent); color: var(--color-accent); }
-/* La chuleta del teclado */
-.dib-teclado { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; align-items: baseline; margin: 2px 14px 8px; font-size: 12px; color: var(--color-text-secondary); }
-.dib-teclado dt { justify-self: start; padding: 0 6px; border-radius: 4px; background: var(--color-bg-elevated); font: 11.5px/19px var(--font-mono); color: var(--color-text-primary); white-space: nowrap; }
-.dib-teclado dd { margin: 0; line-height: 1.35; }
-.dib-teclas { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 14px 14px; font-size: 11.5px; color: var(--color-text-tertiary); }
-.dib-teclas > .dib-tecla:not(:first-child) { margin-left: 6px; }
 .campo-teclado .error { margin: 4px 2px 0; color: var(--color-state-fail); line-height: 1.35; }
 .campo-teclado .campo-cota { margin: 4px 2px 0; color: var(--color-text-secondary); line-height: 1.35; }
+/* Lo que se puede escribir en el campo (la línea de órdenes de los CAD) */
+.campo-formas { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: baseline; margin: 7px 2px 0; padding-top: 6px; border-top: 1px solid var(--color-border-sub); font-size: 11.5px; color: var(--color-text-secondary); }
+.campo-formas dt { justify-self: start; padding: 0 5px; border-radius: 4px; background: var(--color-bg-elevated); font: 11px/17px var(--font-mono); color: var(--color-text-primary); white-space: nowrap; }
+.campo-formas dd { margin: 0; line-height: 1.3; }
+.campo-teclado .campo-teclas { display: flex; align-items: center; gap: 5px; margin: 6px 2px 0; font-size: 11px; color: var(--color-text-tertiary); }
+.campo-teclas > .dib-tecla:not(:first-child) { margin-left: 5px; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
   border: 1px solid var(--color-border-main); border-radius: 8px;

@@ -110,6 +110,8 @@ export interface FuentesVistas {
   malla?: boolean;
   /** V2c-4: si la planta tiene una plantilla DXF (la barra de la vista ofrece ocultarla, `EstadoVista.plantilla`). */
   plantilla?: (planta: string) => boolean;
+  /** V2c: el ortogonal y los enganches al dibujar, en la barra de las plantas (Modelo y Cargas, con el editor). */
+  enganches?: () => ReactNode;
 }
 
 /** La vista de resultados de una planta con la malla encima si la celda la pide. */
@@ -271,6 +273,12 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
         )}
       </div>
       <div className="vista-barra" role="toolbar" aria-label="Barra de la vista">
+        {tipo === "planta" && fuentes.enganches && (
+          <>
+            {fuentes.enganches()}
+            <span className="vista-barra-sep" aria-hidden="true" />
+          </>
+        )}
         <button type="button" className="ib" title="Encuadrar (F)" aria-label="Encuadrar" onClick={() => vista?.encuadrar()}>
           <Maximize size={15} />
         </button>

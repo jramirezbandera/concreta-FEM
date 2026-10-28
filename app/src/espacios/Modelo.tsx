@@ -48,6 +48,8 @@ import { Fuente3DModelo, FuenteEscena, planoAlzado, plantaVista, repintarVistas,
 import { usePedido } from "../sesion/usePedido.ts";
 import type { NombreHerramienta, Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import { ControladorDibujo } from "../dibujo/controlador.ts";
+import { BarraEnganches } from "../dibujo/Enganches.tsx";
+import { esEditar } from "../../../src/editor/dibujo/editar.ts";
 import { CampoTeclado, IcCopiar, IcGirar, IcMover, IcPlantillaDxf, IcSimetria, PlantillaDibujo, plantillasEfectivas } from "../dibujo/Plantilla.tsx";
 import type { NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
 import { nuevaPlantilla } from "../../../src/editor/dibujo/plantilla.ts";
@@ -405,6 +407,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           return <FuenteEscena fuente={{ tipo: "planta", planta: v.planta, vista: cargas ? { vista: "cargas", caso: casoValido } : plantaVista(v, e.calculado) }} dibujo={ed ? ctrl.adaptador(v.planta, { cotas: !cargas && plantaVista(v, e.calculado).vista === "modelo", plantilla: !!geo }) : null} dibujando={dibujando} plantilla={geo} />;
         },
         plantilla: (pl) => !!listaDxf?.some((t) => t.plantas.includes(pl)),
+        ...(ed ? { enganches: () => <BarraEnganches ctrl={ctrl} /> } : {}),
         ...(cargas && casoValido
           ? {
               alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), cargas: { caso: casoValido, escala: Number(escala) } } : null} />,
@@ -465,6 +468,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
             {dibujando && (
               <span className="chip aviso-herr" data-acento="true" role="status">
                 {foto.ayuda}
+                {!foto.error && !foto.campo && !foto.ayuda.includes("x; y") && !(esEditar(foto.herramienta) && !foto.transformando) && <span className="text-text-tertiary"> O teclee las coordenadas.</span>}
                 {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
                 {!foto.error && foto.aviso && <span className="text-state-warn"> {foto.aviso}</span>}
               </span>

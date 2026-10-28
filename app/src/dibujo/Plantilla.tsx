@@ -8,13 +8,12 @@
  * La ayuda de la herramienta y su error van en el aviso del lienzo, no aquí: el panel es la plantilla.
  */
 import { Check, Copy, FileImage, FlipHorizontal2, Move, Plus, RotateCw, Table2 } from "lucide-react";
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useState, type KeyboardEvent, type ReactNode } from "react";
 import { comoUna, describirSeccion, type UsoSeccion } from "../../../src/editor/gestores.ts";
 import { cotasPlantas } from "../../../src/compilador/cotas.ts";
 import type { ModeloFisico, PuntoFijo, Seccion as SeccionFisica } from "../../../src/compilador/fisico.ts";
 import type { Seis, Vec3 } from "../../../src/motor/modelo.ts";
 import { medidasSeccion, SIGNOS_PUNTO_FIJO } from "../../../src/compilador/puntoFijo.ts";
-import { FUENTES_ENGANCHE, NOMBRE_ENGANCHE, TIPOS_ENGANCHE, type FuenteEnganche } from "../../../src/editor/dibujo/enganches.ts";
 import { operacionProponerEjes, plantasPilar, type Alinear, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import { ANCHO_ZUNCHO, COARTADOS, HUECO_MURO, type PlantillaForjado } from "../../../src/editor/dibujo/piezas.ts";
 import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
@@ -356,29 +355,6 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
 
       {CARGA_HERR.has(h) && <PlantillaCargaPanel h={h as NombreCargaH} t={t.cargas ?? {}} poner={(c) => setPlantillas({ ...t, cargas: { ...t.cargas, ...c } })} />}
 
-      <SeccionEnganches foto={foto} ctrl={ctrl} />
-
-      <Seccion titulo="Teclado">
-        <dl className="dib-teclado">
-          {h === "pilar" && (
-            <>
-              <dt>Tab, L</dt>
-              <dd>fija una cota temporal a L de su eje o pilar</dd>
-            </>
-          )}
-          <dt>x; y</dt>
-          <dd>absolutas</dd>
-          <dt>@dx; dy</dt>
-          <dd>relativas al último punto</dd>
-          <dt>@L&lt;α</dt>
-          <dd>longitud y ángulo desde el eje 1 de la losa</dd>
-          <dt>L</dt>
-          <dd>longitud hacia el cursor</dd>
-        </dl>
-        <p className="dib-teclas">
-          <span className="dib-tecla">Intro</span> acepta <span className="dib-tecla">Esc</span> anula <span className="dib-tecla">Retroceso</span> quita el último punto
-        </p>
-      </Seccion>
     </div>
   );
 }
@@ -463,68 +439,7 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
           )}
         </div>
       </Seccion>
-      <SeccionEnganches foto={foto} ctrl={ctrl} />
-      <Seccion titulo="Teclado">
-        <dl className="dib-teclado">
-          {h === "girar" ? (
-            <>
-              <dt>α</dt>
-              <dd>el ángulo en grados, desde +X</dd>
-            </>
-          ) : (
-            <>
-              <dt>@dx; dy</dt>
-              <dd>relativo al punto base</dd>
-            </>
-          )}
-          <dt>x; y</dt>
-          <dd>absolutas</dd>
-        </dl>
-        <p className="dib-teclas">
-          <span className="dib-tecla">Intro</span> acepta <span className="dib-tecla">Esc</span> anula
-        </p>
-      </Seccion>
     </div>
-  );
-}
-
-const NOMBRE_FUENTE: Record<FuenteEnganche, string> = { modelo: "Modelo", plantilla: "Plantilla DXF" };
-
-/** Los enganches, iguales al dibujar y al editar: el ortogonal, de dónde (modelo, plantilla DXF) y a qué. */
-function SeccionEnganches({ foto, ctrl }: { foto: Instantanea; ctrl: ControladorDibujo }) {
-  const alternar = <T,>(xs: ReadonlySet<T>, x: T) => {
-    const n = new Set(xs);
-    if (n.has(x)) n.delete(x);
-    else n.add(x);
-    return n;
-  };
-  return (
-    <Seccion titulo="Enganches" valor={`${foto.activos.size} de ${TIPOS_ENGANCHE.length}`}>
-      <label className="chk dib-orto">
-        <input type="checkbox" checked={foto.orto} onChange={() => ctrl.alternarOrto()} />
-        <span className="flex-1">
-          Ortogonal <small>(Mayús, también a 45°)</small>
-        </span>
-        <span className="dib-tecla">F8</span>
-      </label>
-      <div className="dib-fichas" role="group" aria-label="Enganchar a">
-        {FUENTES_ENGANCHE.map((x) => (
-          <button key={x} type="button" aria-pressed={foto.fuentes.has(x)} onClick={() => ctrl.ponerFuentes(alternar(foto.fuentes, x))}>
-            {NOMBRE_FUENTE[x]}
-          </button>
-        ))}
-      </div>
-      <div className="dib-fichas" role="group" aria-label="Enganches">
-        {TIPOS_ENGANCHE.map((x) => (
-          <button key={x} type="button" aria-pressed={foto.activos.has(x)} onClick={() => ctrl.ponerActivos(alternar(foto.activos, x))}>
-            {NOMBRE_ENGANCHE[x]}
-          </button>
-        ))}
-      </div>
-      <p className="nota">
-        A igual tipo, el modelo gana a la plantilla DXF. <span className="dib-tecla">F3</span> enciende y apaga la plantilla.
-      </p>
-    </Seccion>
   );
 }
 
@@ -970,9 +885,25 @@ function SelectorPuntoFijo({ seccion, giro, valor, onCambio }: { seccion: Seccio
   );
 }
 
-/** El campo de lo que se teclea, junto al cursor. */
+/**
+ * Lo que se puede escribir en el campo de teclado con cada herramienta, como la línea de órdenes de
+ * AutoCAD: [lo que se escribe, lo que es]. Con una cota, el campo pide sólo su distancia.
+ */
+function formasTeclado(h: Instantanea["herramienta"], asa: boolean): (readonly [string, string])[] {
+  const abs = ["x; y", "coordenadas absolutas, m"] as const;
+  if (asa) return [abs, ["@dx; dy", "desde donde estaba el vértice"]];
+  if (h === "girar") return [["α", "el ángulo en grados, desde +X"], abs];
+  if (esEditar(h)) return [abs, ["@dx; dy", "desde el punto base"]];
+  const formas: (readonly [string, string])[] = [abs, ["@dx; dy", "desde el último punto"], ["@L<α", "longitud y ángulo, desde el eje 1"], ["L", "longitud hacia el cursor"]];
+  if (h === "pilar") formas.push(["Tab", "elige una cota; luego, su distancia"]);
+  return formas;
+}
+
+/** El campo de lo que se teclea, junto al cursor, con lo que se puede escribir en él. */
 export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: NonNullable<Instantanea["campo"]> }) {
   const [texto, setTexto] = useState(campo.texto);
+  const foto = ctrl.instantanea();
+  const formas = campo.cota && !foto.asa ? [] : formasTeclado(foto.herramienta, !!foto.asa);
   return (
     <div className="campo-teclado" style={{ left: campo.x + 16, top: campo.seleccionar ? campo.y - 72 : campo.y + 16 }} role="dialog" aria-label="Punto por teclado">
       <input
@@ -994,8 +925,21 @@ export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: 
           else if ((x.key === "ArrowLeft" || x.key === "ArrowRight") && ctrl.cambiarLado()) x.preventDefault();
         }}
       />
-      {campo.cota && <p className="campo-cota">Cota {campo.cota}</p>}
+      {campo.cota && <p className="campo-cota">{foto.asa ? campo.cota : `Cota ${campo.cota}`}</p>}
       {campo.error && <p className="error">{campo.error}</p>}
+      {formas.length > 0 && (
+        <dl className="campo-formas">
+          {formas.map(([f, q]) => (
+            <Fragment key={f}>
+              <dt>{f}</dt>
+              <dd>{q}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      )}
+      <p className="campo-teclas">
+        <span className="dib-tecla">Intro</span> acepta <span className="dib-tecla">Esc</span> anula
+      </p>
     </div>
   );
 }

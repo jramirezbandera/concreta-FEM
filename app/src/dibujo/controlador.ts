@@ -54,6 +54,8 @@ export interface Instantanea {
   /** Lo último que se hizo (la etiqueta de deshacer). */
   hecho: string | null;
   orto: boolean;
+  /** Los enganches encendidos (el imán de la barra de la vista); apagados, ninguno de `activos` cuenta. */
+  enganchar: boolean;
   activos: ReadonlySet<TipoEnganche>;
   /** De dónde se engancha: el modelo y las plantillas DXF. */
   fuentes: ReadonlySet<FuenteEnganche>;
@@ -73,6 +75,9 @@ export interface Instantanea {
 
 /** Por fuera de cada extremo de la cota que se estira, el centro de su flecha, px. */
 const FLECHA = 16;
+
+/** Los enganches apagados. */
+const NINGUNO: ReadonlySet<TipoEnganche> = new Set();
 
 /** Con más elegidos, no se enseñan sus vértices (pinzamientos). */
 const MAX_ASAS = 60;
@@ -132,7 +137,7 @@ export class ControladorDibujo {
   private asaActiva: Asa | null = null;
 
   constructor() {
-    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, activos: new Set(TIPOS_ENGANCHE), fuentes: new Set(FUENTES_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null, asa: null, transformando: null };
+    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, enganchar: true, activos: new Set(TIPOS_ENGANCHE), fuentes: new Set(FUENTES_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null, asa: null, transformando: null };
   }
 
   // ─── Para React ─────────────────────────────────────────────────────────────────────────────
@@ -219,9 +224,21 @@ export class ControladorDibujo {
     this.recalcular();
   }
 
-  ponerActivos(a: ReadonlySet<TipoEnganche>): void {
-    this.cambiar({ activos: a });
+  /** Enciende o apaga los enganches sin perder cuáles están marcados. */
+  alternarEnganches(): void {
+    this.cambiar({ enganchar: !this.foto.enganchar });
     this.recalcular();
+  }
+
+  /** Los tipos marcados; marcar alguno enciende los enganches. */
+  ponerActivos(a: ReadonlySet<TipoEnganche>): void {
+    this.cambiar({ activos: a, ...(a.size ? { enganchar: true } : {}) });
+    this.recalcular();
+  }
+
+  /** Los tipos que cuentan ahora. */
+  private get enganches(): ReadonlySet<TipoEnganche> {
+    return this.foto.enganchar ? this.foto.activos : NINGUNO;
   }
 
   ponerFuentes(f: ReadonlySet<FuenteEnganche>): void {
@@ -447,7 +464,7 @@ export class ControladorDibujo {
       this.silueta = null;
     } else {
       const asa = this.herramienta === "elegir" ? this.asaActiva : null;
-      this.apunte = asa ? apuntar(ix, q, this.radio, { ultimo: asa.p, orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos, fuentes: this.foto.fuentes }) : this.herramienta === "elegir" || this.eligiendo() ? null : apuntar(ix, q, this.radio, { ultimo: ultimoPunto(this.estado), orto: this.foto.orto, mayus: this.mayus, activos: this.foto.activos, fuentes: this.foto.fuentes });
+      this.apunte = asa ? apuntar(ix, q, this.radio, { ultimo: asa.p, orto: this.foto.orto, mayus: this.mayus, activos: this.enganches, fuentes: this.foto.fuentes }) : this.herramienta === "elegir" || this.eligiendo() ? null : apuntar(ix, q, this.radio, { ultimo: ultimoPunto(this.estado), orto: this.foto.orto, mayus: this.mayus, activos: this.enganches, fuentes: this.foto.fuentes });
       this.silueta = bajoCursor(ix, this.apunte?.p ?? q, this.radio);
     }
     if (pintar) this.repintar();
