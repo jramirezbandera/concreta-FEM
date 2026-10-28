@@ -14,11 +14,13 @@
  * Puro: sin IO.
  */
 import type { AccionCaso, ApoyoFisico, ApoyoLineal, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Viga } from "../compilador/fisico.ts";
+import { gammaMaterial } from "../agente/sensatez.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
+import { volumenReticular } from "../compilador/reticular.ts";
 import { describirCaso } from "./casos.ts";
 import { describirMaterial, describirSeccion } from "./gestores.ts";
-import { Lector, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
+import { Lector, leerNumero, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
 export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "casos", "cargas"] as const;
@@ -44,6 +46,8 @@ export interface Columna {
    * GE2: casos; GE3: plantas).
    */
   referencia?: "secciones" | "materiales" | "casos" | "plantas";
+  /** Lo que vale si se deja vacía, en texto («7,5 = γ·canto»), para que el inspector lo diga (`ficha.ts`). */
+  defecto?: (f: Fila, ctx: Contexto) => string | undefined;
 }
 
 /** Una opción de un desplegable: el texto de la celda y, si es otro, lo que se ve en la lista. */
@@ -91,6 +95,12 @@ export interface DefTabla {
   plantas(o: Objeto, ctx: Contexto): string[] | null;
   /** ¿La columna aplica a la fila? Lo que no aplica va vacío y la hoja lo apaga (Forjados: según su tipo). Sin ella, todas. */
   aplica?(clave: string, f: Fila): boolean;
+  /**
+   * ¿La columna es obligatoria en la fila aunque la tabla la deje vacía? Lo que la tabla exige ya se
+   * sabe leyéndola (`ficha.ts`); esto es lo que exige después el compilador (el pp de un reticular
+   * con casetón perdido, C4-i).
+   */
+  obligatoria?(clave: string, f: Fila): boolean;
   /**
    * La fila con `valor` escrito en `clave`. Por defecto, sólo esa celda; en Forjados, cambiar el tipo
    * vacía lo que deja de aplicar y el pp (que es otro en cada tipo), para no arrastrar un dato que ya
@@ -466,6 +476,30 @@ export function tipoForjado(o: Objeto, ctx: Contexto): TipoForjado {
 /** El tipo de una fila: el de su celda o, vacía, maciza. */
 const tipoFila = (f: Fila): string => (f.tipo ?? "").trim().toLowerCase() || "maciza";
 
+/** Un número de la fila, o undefined si no lo es (para decir el valor por defecto mientras se escribe). */
+const numeroDe = (f: Fila, c: string): number | undefined => {
+  const v = leerNumero(f[c] ?? "");
+  return typeof v === "number" ? v : undefined;
+};
+
+/**
+ * El pp que toma un forjado sin él (`pesoLosa` de A3): γ·canto en una maciza y, en un reticular con
+ * casetón recuperable, γ·volumen en lo aligerado (C4-i). Con casetón perdido y en un unidireccional
+ * es obligatorio.
+ */
+function ppPorDefecto(f: Fila, ctx: Contexto): string | undefined {
+  const tipo = tipoFila(f);
+  const mat = ctx.modelo.materiales.find((x) => x.id === (f.material ?? "").trim());
+  const g = mat ? gammaMaterial(mat) : undefined;
+  const h = numeroDe(f, "espesor");
+  const kN = (v: number) => textoNumero(Math.round(v * 100) / 100);
+  if (tipo === "maciza") return g !== undefined && h ? `${kN(g * h)} = γ·canto` : "γ·canto";
+  if (tipo !== "reticular" || (f.caseton ?? "").trim().toLowerCase() !== "recuperable") return undefined;
+  const [s, bw, hf] = [numeroDe(f, "intereje"), numeroDe(f, "nervio"), numeroDe(f, "capa")];
+  if (g === undefined || !h || !s || !bw || !hf) return "γ·hormigón";
+  return `${kN(g * volumenReticular({ h, hf, bw, s }))} = γ·hormigón (aligerado)`;
+}
+
 /**
  * Forjados (como los paños de CYPECAD): una sola tabla con una columna «tipo». En el modelo siguen
  * siendo dos listas, las losas (maciza o reticular: láminas) y los paños unidireccionales (viguetas
@@ -487,17 +521,23 @@ const forjados: DefTabla = {
     { clave: "planta", titulo: "planta", opciones: opcionesPlantas, referencia: "plantas" },
     { clave: "tipo", titulo: "tipo", ayuda: "maciza (por defecto), reticular o unidireccional; cambiarlo cambia las columnas que tocan", opciones: fijas(TIPOS_FORJADO) },
     { clave: "contorno", titulo: "contorno", unidad: "m", ayuda: "a ejes de las vigas y los muros en que se apoya: «x y; x y; …» (al menos 3, sin repetir el primero)" },
-    { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»" },
+    { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»", defecto: () => "ninguno" },
     { clave: "espesor", titulo: "canto", unidad: "m", ayuda: "maciza y reticular: el canto total; vacío en un unidireccional (lo da la sección de la vigueta)" },
     { clave: "material", titulo: "material", ayuda: "maciza y reticular; vacío en un unidireccional", opciones: materiales_("ninguno: unidireccional"), referencia: "materiales" },
-    { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio. Maciza: por defecto, γ·canto. Reticular con casetón perdido y unidireccional (con las bovedillas): obligatorio" },
-    { clave: "direccion", titulo: "dirección", unidad: "°", ayuda: "desde +X. Maciza: la del eje 1 de las láminas (por defecto, 0). Reticular: la de los nervios y su perpendicular. Unidireccional: la de las viguetas (obligatoria)" },
+    { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio. Maciza: por defecto, γ·canto. Reticular con casetón perdido y unidireccional (con las bovedillas): obligatorio", defecto: ppPorDefecto },
+    {
+      clave: "direccion",
+      titulo: "dirección",
+      unidad: "°",
+      ayuda: "desde +X. Maciza: la del eje 1 de las láminas (por defecto, 0). Reticular: la de los nervios y su perpendicular. Unidireccional: la de las viguetas (obligatoria)",
+      defecto: (f) => (tipoFila(f) === "unidireccional" ? undefined : "0 (según +X)"),
+    },
     { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "reticular: entre ejes de nervios; unidireccional: entre ejes de viguetas; vacío en una maciza" },
     { clave: "nervio", titulo: "nervio", unidad: "m", ayuda: "reticular: ancho del nervio (bw)" },
     { clave: "capa", titulo: "capa", unidad: "m", ayuda: "reticular: espesor de la capa de compresión (hf)" },
     { clave: "caseton", titulo: "casetón", ayuda: "reticular: perdido (por defecto; entonces el pp es obligatorio) o recuperable", opciones: fijas(["perdido", "recuperable"], "perdido") },
-    { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse del forjado" },
-    { clave: "multiplicadores", titulo: "multiplicadores", ayuda: `reticular: los que sustituyen a los calculados, «m11=0,32 m22=0,27 …» (${MULT.join(", ")}), cada uno en (0, 100]` },
+    { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse del forjado", defecto: () => "ninguno" },
+    { clave: "multiplicadores", titulo: "multiplicadores", ayuda: `reticular: los que sustituyen a los calculados, «m11=0,32 m22=0,27 …» (${MULT.join(", ")}), cada uno en (0, 100]`, defecto: () => "los calculados" },
     { clave: "seccion", titulo: "vigueta", ayuda: "unidireccional: sección de una vigueta (la T bruta u otra); no pesa: el peso es el pp", opciones: secciones_("ninguna: losa"), referencia: "secciones" },
   ],
   fila(o, ctx) {
@@ -592,6 +632,7 @@ const forjados: DefTabla = {
     const propias = PROPIAS[tipoFila(f) as TipoForjado];
     return !propias || !DE_ALGUNO.has(clave) || propias.includes(clave);
   },
+  obligatoria: (clave, f) => clave === "pp" && tipoFila(f) === "reticular" && (f.caseton ?? "").trim().toLowerCase() !== "recuperable",
   conValor(f, clave, valor) {
     const r: Record<string, string> = { ...f, [clave]: valor };
     if (clave !== "tipo" || tipoFila(r) === tipoFila(f)) return r;

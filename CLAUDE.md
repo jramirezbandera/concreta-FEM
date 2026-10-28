@@ -593,6 +593,12 @@
   - **DWG:** sin decidir. LibreDWG es GPL y el SDK de la ODA, de pago: por ahora, DXF.
   - **enganches:** a igual tipo, el modelo gana a la plantilla DXF aunque esté más lejos; «Modelo» y «Plantilla DXF» apagan cada fuente (F3, la plantilla), también al editar;
   - **«Con zunchos»** (decisión del usuario) en Forjado (maciza y reticular) y en Hueco de una losa, por defecto: en el mismo paso, las vigas de «Vigas de borde» (0,30 × el canto) en los lados libres; en un hueco, sólo en los suyos (`proponerVigasBorde(…, anillos)`). Da byte a byte lo de dibujar sin ella y aplicar la orden (`dibujo2.test.ts`). «Vigas de borde» sale de la barra y queda en la paleta (Ctrl+K), para lo importado o del agente. Los bancos de V2c y V2c4 la desmarcan (sus referencias no tienen zunchos);
+  - **Propiedades, más claras** (`src/editor/ficha.ts`, `app/src/editor/CroquisForjado.tsx`):
+    - los campos, por grupos (Forjados y Casos);
+    - «*» en lo obligatorio, que se sabe leyendo la fila con el campo vacío, más `DefTabla.obligatoria` (el pp de un reticular con casetón perdido);
+    - un campo opcional vacío dice en gris lo que vale (`Columna.defecto`: el pp de una maciza, γ·canto);
+    - un «?» enseña la ayuda al pasar el ratón, y el interruptor «Ayudas», todas;
+    - un forjado lleva el croquis de su planta y de su sección a escala: cada cota lleva el nombre de su campo, se resalta con el foco y un clic en ella lleva al campo;
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

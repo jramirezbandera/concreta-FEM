@@ -1,17 +1,138 @@
 /**
  * El inspector como formulario del objeto elegido (V2a, §6.2): las columnas de su tabla, una por
- * línea, con su unidad y su ayuda a la vista. Se escribe igual que en la tabla (Intro o salir del
- * campo), con las mismas funciones puras: un dato que no vale no entra y se dice por qué.
+ * línea, con su unidad, por grupos («Sección», «Material y peso»…). Se escribe igual que en la tabla
+ * (Intro o salir del campo), con las mismas funciones puras: un dato que no vale no entra y se dice
+ * por qué.
+ *
+ * Lo que ayuda a meter los datos (de la prueba de uso del 2026-10-28): lo obligatorio va marcado
+ * con «*» y, vacío, lo dice el campo; un campo opcional vacío enseña lo que vale (`estadoCampos`); la
+ * ayuda de cada campo sale al pasar el ratón por su nombre, con el foco o, con «Ayudas», todas; y un
+ * forjado lleva su croquis (`CroquisForjado.tsx`), enlazado con sus campos.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ComponentType, type ReactNode } from "react";
 import { operacionFila } from "../../../src/editor/edicion.ts";
+import { croquisForjado, estadoCampos, type EstadoCampo } from "../../../src/editor/ficha.ts";
 import { comoUna } from "../../../src/editor/gestores.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
 import { columnasComunes, operacionVarios, type ColumnaComun } from "../../../src/editor/varios.ts";
-import { DEF_TABLAS, conActual, contexto, filaConValor, objetosTabla, tablaDeColeccion, type NombreTabla } from "../../../src/editor/tablas.ts";
+import { DEF_TABLAS, conActual, contexto, filaConValor, objetosTabla, tablaDeColeccion, type Columna, type NombreTabla } from "../../../src/editor/tablas.ts";
+import type { Fila } from "../../../src/editor/celdas.ts";
+import type { Contexto } from "../../../src/editor/tablas.ts";
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
+import { PlantaForjado, SeccionForjado } from "./CroquisForjado.tsx";
 import { abrirGestor, ARTICULO, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
+
+/** Los grupos de campos de una tabla, en orden; lo que no está en ninguno va al final, sin título. */
+const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly string[]])[]>> = {
+  forjados: [
+    ["General", ["id", "nombre", "planta", "tipo"]],
+    ["Geometría en planta", ["contorno", "huecos", "abacos", "direccion"]],
+    ["Sección", ["espesor", "intereje", "nervio", "capa", "caseton", "seccion"]],
+    ["Material y peso", ["material", "pp"]],
+    ["Avanzado", ["multiplicadores"]],
+  ],
+  casos: [
+    ["El caso", ["id", "nombre", "pesoPropio"]],
+    ["Para las combinaciones", ["tipo", "psi", "familia", "duracion"]],
+    ["Según la acción", ["permanente", "direccion", "signo", "derivadoDe"]],
+  ],
+};
+
+/** Las columnas por grupos (`GRUPOS`); una tabla sin grupos, un solo grupo sin título. */
+function agrupar<T>(tabla: NombreTabla, cosas: readonly T[], clave: (x: T) => string): { titulo: string | null; cosas: T[] }[] {
+  const g = GRUPOS[tabla];
+  if (!g) return [{ titulo: null, cosas: [...cosas] }];
+  const r = g.map(([titulo, claves]) => ({ titulo: titulo as string | null, cosas: claves.flatMap((k) => cosas.filter((x) => clave(x) === k)) }));
+  const resto = cosas.filter((x) => !g.some(([, claves]) => claves.includes(clave(x))));
+  if (resto.length) r.push({ titulo: null, cosas: resto });
+  return r.filter((x) => x.cosas.length);
+}
+
+interface PropsCroquis {
+  fila: Fila;
+  ctx: Contexto;
+  activo: string | null;
+  onCampo: (clave: string) => void;
+}
+
+/** El dibujo que encabeza un grupo de una tabla. */
+const CROQUIS: Partial<Record<NombreTabla, Record<string, ComponentType<PropsCroquis>>>> = {
+  forjados: {
+    "Geometría en planta": ({ fila, ctx, ...p }) => <PlantaForjado c={croquisForjado(fila, ctx)} {...p} />,
+    Sección: ({ fila, ctx, ...p }) => <SeccionForjado c={croquisForjado(fila, ctx)} {...p} />,
+  },
+};
+
+const CLAVE_AYUDAS = "fem.inspector.ayudas";
+
+/** «Ayudas» a la vista en todos los formularios, recordado en el navegador. */
+function useAyudas(): [boolean, (v: boolean) => void] {
+  const [v, setV] = useState(() => {
+    try {
+      return localStorage.getItem(CLAVE_AYUDAS) === "1";
+    } catch {
+      return false;
+    }
+  });
+  return [
+    v,
+    (x) => {
+      setV(x);
+      try {
+        localStorage.setItem(CLAVE_AYUDAS, x ? "1" : "0");
+      } catch {
+        // sin almacenamiento, sólo en esta sesión
+      }
+    },
+  ];
+}
+
+/** El nombre del campo: «*» si es obligatorio y «?» si tiene ayuda (que sale al pasar el ratón). */
+function Etiqueta({ c, estado, conUnidad }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean }) {
+  return (
+    <span>
+      <span className="campo-nombre">
+        {c.titulo}
+        {estado?.obligatorio && (
+          <b className="campo-oblig" title="obligatorio">
+            *
+          </b>
+        )}
+      </span>
+      {c.unidad && conUnidad && <small>{c.unidad}</small>}
+      {c.ayuda && (
+        <i className="campo-q" aria-hidden="true">
+          ?
+        </i>
+      )}
+    </span>
+  );
+}
+
+/** El interruptor de las ayudas, en la cabecera de los datos. */
+function BotonAyudas({ ayudas, setAyudas }: { ayudas: boolean; setAyudas: (v: boolean) => void }) {
+  return (
+    <button type="button" className="sec-boton" aria-pressed={ayudas} onClick={() => setAyudas(!ayudas)} title="Enseñar la ayuda de todos los campos">
+      Ayudas
+    </button>
+  );
+}
+
+/** Los campos por grupos, con el croquis de cada grupo si lo tiene. */
+function Grupos<T>({ tabla, cosas, clave, campo, croquis }: { tabla: NombreTabla; cosas: readonly T[]; clave: (x: T) => string; campo: (x: T) => ReactNode; croquis?: (grupo: string) => ReactNode }) {
+  return (
+    <>
+      {agrupar(tabla, cosas, clave).map((g, i) => (
+        <Fragment key={g.titulo ?? `g${i}`}>
+          {g.titulo && <h3 className="campo-grupo">{g.titulo}</h3>}
+          {g.titulo && croquis?.(g.titulo)}
+          {g.cosas.map(campo)}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 /** La tabla del editor de un objeto (null si no está en el proyecto: un eje propuesto). */
 export function tablaDe(m: Parameters<typeof indiceIds>[0], id: string): NombreTabla | null {
@@ -19,8 +140,13 @@ export function tablaDe(m: Parameters<typeof indiceIds>[0], id: string): NombreT
   return c ? tablaDeColeccion(c) : null;
 }
 
-export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla }) {
+/** `ayudas="siempre"`: las ayudas a la vista, sin interruptor (en los gestores). */
+export function FormularioObjeto({ id, tabla, ayudas: siempre }: { id: string; tabla: NombreTabla; ayudas?: "siempre" }) {
   const { proyecto, setSeleccion } = useVisor();
+  const [ayudas, setAyudas] = useAyudas();
+  const [foco, setFoco] = useState<string | null>(null);
+  const [sobre, setSobre] = useState<string | null>(null);
+  const caja = useRef<HTMLDivElement>(null);
   const ed = proyecto.edicion!;
   const m = ed.proyecto.modelo;
   const def = DEF_TABLAS[tabla];
@@ -87,9 +213,14 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
     );
   };
 
+  const estados = estadoCampos(def, actual, ctx, objeto);
+  const Croquis = CROQUIS[tabla];
+  /** Un clic en el croquis lleva al campo. */
+  const irACampo = (clave: string) => caja.current?.querySelector<HTMLElement>(`[data-clave="${clave}"]`)?.focus();
+
   return (
-    <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`} valor="editable">
-      <div className="py-1.5">
+    <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`} valor={siempre ? undefined : <BotonAyudas ayudas={ayudas} setAyudas={setAyudas} />}>
+      <div className="form-datos" ref={caja} data-ayudas={siempre || ayudas || undefined}>
         {pendiente && (
           <p className="nota">
             {id} pasa a ser {actual.tipo}: falta lo marcado.{" "}
@@ -98,67 +229,89 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
             </button>
           </p>
         )}
-        {def.columnas.map((c) => {
-          const valor = borrador[c.clave] ?? fila[c.clave] ?? "";
+        <Grupos
+          tabla={tabla}
           // Lo que no aplica al tipo (Forjados) no se enseña si está vacío
-          if (def.aplica && !valor && !def.aplica(c.clave, actual)) return null;
-          const err = errores[c.clave];
-          const opciones = c.opciones && !c.calculada ? c.opciones(ctx) : null;
-          return (
-            <label key={c.clave} className="campo">
-              <span title={c.ayuda}>
-                {c.titulo}
-                {c.unidad && opciones && <small>{c.unidad}</small>}
-              </span>
-              {opciones ? (
-                <select
-                  className="sel"
-                  value={valor}
-                  data-error={!!err}
-                  aria-label={c.titulo}
-                  aria-invalid={!!err}
-                  onChange={(e) => {
-                    setErrores({ ...errores, [c.clave]: "" });
-                    if (c.referencia && esDelGestor(e.target.value)) return gestor(c.clave, e.target.value);
-                    escribir(c.clave, e.target.value);
-                  }}
+          cosas={def.columnas.filter((c) => !(def.aplica && !(borrador[c.clave] ?? fila[c.clave]) && !def.aplica(c.clave, actual)))}
+          clave={(c) => c.clave}
+          croquis={(g) => {
+            const C = Croquis?.[g];
+            return C && <C fila={actual} ctx={ctx} activo={sobre ?? foco} onCampo={irACampo} />;
+          }}
+          campo={(c) => {
+              const valor = borrador[c.clave] ?? fila[c.clave] ?? "";
+              const err = errores[c.clave];
+              const opciones = c.opciones && !c.calculada ? c.opciones(ctx) : null;
+              const estado = estados[c.clave];
+              const falta = !!estado?.obligatorio && !valor.trim();
+              return (
+                <label
+                  key={c.clave}
+                  className="campo"
+                  data-activo={(sobre ?? foco) === c.clave || undefined}
+                  onFocus={() => setFoco(c.clave)}
+                  onBlur={() => setFoco(null)}
+                  onMouseEnter={() => setSobre(c.clave)}
+                  onMouseLeave={() => setSobre(null)}
                 >
-                  {/* Un valor que no está entre las opciones (escrito en la tabla) se conserva */}
-                  {conActual(opciones, valor).map((o) => (
-                    <option key={o.valor} value={o.valor}>
-                      {o.texto ?? o.valor}
-                    </option>
-                  ))}
-                  {c.referencia && <OpcionesGestor coleccion={c.referencia} valor={valor} />}
-                </select>
-              ) : (
-                <span className="unidad" data-unidad={c.unidad} style={c.unidad ? ({ "--u": c.unidad.length } as CSSProperties) : undefined}>
-                <input
-                  value={valor}
-                  placeholder={c.calculada ? undefined : "—"}
-                  readOnly={c.calculada}
-                  data-error={!!err}
-                  aria-label={c.titulo}
-                  aria-invalid={!!err}
-                  onChange={(e) => {
-                    setBorrador({ ...borrador, [c.clave]: e.target.value });
-                    if (err) setErrores({ ...errores, [c.clave]: "" });
-                  }}
-                  onBlur={() => escribir(c.clave)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") escribir(c.clave);
-                    if (e.key === "Escape") {
-                      setBorrador({ ...borrador, [c.clave]: fila[c.clave] ?? "" });
-                      setErrores({ ...errores, [c.clave]: "" });
-                    }
-                  }}
-                />
-                </span>
-              )}
-              {err ? <p className="error">{err}</p> : c.ayuda ? <p className="ayuda">{c.ayuda}</p> : null}
-            </label>
-          );
-        })}
+                  <Etiqueta c={c} estado={estado} conUnidad={!!opciones} />
+                  {opciones ? (
+                    <select
+                      className="sel"
+                      value={valor}
+                      data-error={!!err}
+                      data-falta={falta || undefined}
+                      data-clave={c.clave}
+                      aria-label={c.titulo}
+                      aria-invalid={!!err}
+                      onChange={(e) => {
+                        setErrores({ ...errores, [c.clave]: "" });
+                        if (c.referencia && esDelGestor(e.target.value)) return gestor(c.clave, e.target.value);
+                        escribir(c.clave, e.target.value);
+                      }}
+                    >
+                      {/* Un valor que no está entre las opciones (escrito en la tabla) se conserva */}
+                      {conActual(opciones, valor).map((o) => (
+                        <option key={o.valor} value={o.valor}>
+                          {o.texto ?? o.valor}
+                        </option>
+                      ))}
+                      {c.referencia && <OpcionesGestor coleccion={c.referencia} valor={valor} />}
+                    </select>
+                  ) : (
+                    <span className="unidad" data-unidad={c.unidad} style={c.unidad ? ({ "--u": c.unidad.length } as CSSProperties) : undefined}>
+                    <input
+                      value={valor}
+                      placeholder={c.calculada ? undefined : estado?.obligatorio ? "obligatorio" : (estado?.defecto ?? "—")}
+                      readOnly={c.calculada}
+                      data-error={!!err}
+                      data-falta={falta || undefined}
+                      data-clave={c.clave}
+                      aria-label={c.titulo}
+                      aria-invalid={!!err}
+                      onChange={(e) => {
+                        setBorrador({ ...borrador, [c.clave]: e.target.value });
+                        if (err) setErrores({ ...errores, [c.clave]: "" });
+                      }}
+                      onBlur={() => escribir(c.clave)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") escribir(c.clave);
+                        if (e.key === "Escape") {
+                          setBorrador({ ...borrador, [c.clave]: fila[c.clave] ?? "" });
+                          setErrores({ ...errores, [c.clave]: "" });
+                        }
+                      }}
+                    />
+                    </span>
+                  )}
+                  {err ? <p className="error">{err}</p> : c.ayuda ? <p className="ayuda">{c.ayuda}</p> : null}
+                </label>
+              );
+          }}
+        />
+        <p className="nota form-leyenda">
+          <b className="campo-oblig">*</b> obligatorio. Un campo vacío dice en gris lo que vale.
+        </p>
       </div>
     </Seccion>
   );
@@ -182,6 +335,7 @@ export function FormularioVarios({ ids, tabla }: { ids: readonly string[]; tabla
   const cols = useMemo(() => columnasComunes(m, tabla, ids), [m, tabla, claveIds]);
   const [borrador, setBorrador] = useState<Record<string, string>>({});
   const [errores, setErrores] = useState<Record<string, string>>({});
+  const [ayudas, setAyudas] = useAyudas();
 
   useEffect(() => {
     setBorrador({});
@@ -225,70 +379,72 @@ export function FormularioVarios({ ids, tabla }: { ids: readonly string[]; tabla
   };
 
   return (
-    <Seccion titulo={`Datos · ${ids.length} ${def.titulo.toLowerCase()}`} valor="editable">
-      <div className="py-1.5">
+    <Seccion titulo={`Datos · ${ids.length} ${def.titulo.toLowerCase()}`} valor={<BotonAyudas ayudas={ayudas} setAyudas={setAyudas} />}>
+      <div className="form-datos" data-ayudas={ayudas || undefined}>
         <p className="nota">Lo que escriba va a los {ids.length}; «varios» es que no lo tienen igual.</p>
-        {cols.map((c) => {
-          const clave = c.columna.clave;
-          const valor = borrador[clave] ?? c.valor ?? "";
-          const err = errores[clave];
-          const opciones = c.columna.opciones && !c.columna.calculada ? c.columna.opciones(ctx) : null;
-          return (
-            <label key={clave} className="campo">
-              <span title={c.columna.ayuda}>
-                {c.columna.titulo}
-                {c.columna.unidad && opciones && <small>{c.columna.unidad}</small>}
-              </span>
-              {opciones ? (
-                <select
-                  className="sel"
-                  value={c.valor === null ? VARIOS : valor}
-                  data-error={!!err}
-                  aria-label={c.columna.titulo}
-                  aria-invalid={!!err}
-                  onChange={(e) => {
-                    setErrores({ ...errores, [clave]: "" });
-                    if (c.columna.referencia && esDelGestor(e.target.value)) return gestor(c, e.target.value);
-                    escribir(c, e.target.value);
-                  }}
-                >
-                  {c.valor === null && <option value={VARIOS}>(varios)</option>}
-                  {(c.valor === null ? opciones : conActual(opciones, valor)).map((o) => (
-                    <option key={o.valor} value={o.valor}>
-                      {o.texto ?? o.valor}
-                    </option>
-                  ))}
-                  {c.columna.referencia && <OpcionesGestor coleccion={c.columna.referencia} valor={c.valor ?? ""} />}
-                </select>
-              ) : (
-                <span className="unidad" data-unidad={c.columna.unidad} style={c.columna.unidad ? ({ "--u": c.columna.unidad.length } as CSSProperties) : undefined}>
-                  <input
-                    value={valor}
-                    placeholder={c.valor === null ? "(varios)" : c.columna.calculada ? undefined : "—"}
-                    readOnly={c.columna.calculada}
-                    data-error={!!err}
-                    aria-label={c.columna.titulo}
-                    aria-invalid={!!err}
-                    onChange={(e) => {
-                      setBorrador({ ...borrador, [clave]: e.target.value });
-                      if (err) setErrores({ ...errores, [clave]: "" });
-                    }}
-                    onBlur={() => escribir(c)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") escribir(c);
-                      if (e.key === "Escape") {
-                        const { [clave]: _b, ...resto } = borrador;
-                        setBorrador(resto);
+        <Grupos
+          tabla={tabla}
+          cosas={cols}
+          clave={(c) => c.columna.clave}
+          campo={(c) => {
+              const clave = c.columna.clave;
+              const valor = borrador[clave] ?? c.valor ?? "";
+              const err = errores[clave];
+              const opciones = c.columna.opciones && !c.columna.calculada ? c.columna.opciones(ctx) : null;
+              return (
+                <label key={clave} className="campo">
+                  <Etiqueta c={c.columna} conUnidad={!!opciones} />
+                  {opciones ? (
+                    <select
+                      className="sel"
+                      value={c.valor === null ? VARIOS : valor}
+                      data-error={!!err}
+                      aria-label={c.columna.titulo}
+                      aria-invalid={!!err}
+                      onChange={(e) => {
                         setErrores({ ...errores, [clave]: "" });
-                      }
-                    }}
-                  />
-                </span>
-              )}
-              {err ? <p className="error">{err}</p> : c.columna.ayuda ? <p className="ayuda">{c.columna.ayuda}</p> : null}
-            </label>
-          );
-        })}
+                        if (c.columna.referencia && esDelGestor(e.target.value)) return gestor(c, e.target.value);
+                        escribir(c, e.target.value);
+                      }}
+                    >
+                      {c.valor === null && <option value={VARIOS}>(varios)</option>}
+                      {(c.valor === null ? opciones : conActual(opciones, valor)).map((o) => (
+                        <option key={o.valor} value={o.valor}>
+                          {o.texto ?? o.valor}
+                        </option>
+                      ))}
+                      {c.columna.referencia && <OpcionesGestor coleccion={c.columna.referencia} valor={c.valor ?? ""} />}
+                    </select>
+                  ) : (
+                    <span className="unidad" data-unidad={c.columna.unidad} style={c.columna.unidad ? ({ "--u": c.columna.unidad.length } as CSSProperties) : undefined}>
+                      <input
+                        value={valor}
+                        placeholder={c.valor === null ? "(varios)" : c.columna.calculada ? undefined : "—"}
+                        readOnly={c.columna.calculada}
+                        data-error={!!err}
+                        aria-label={c.columna.titulo}
+                        aria-invalid={!!err}
+                        onChange={(e) => {
+                          setBorrador({ ...borrador, [clave]: e.target.value });
+                          if (err) setErrores({ ...errores, [clave]: "" });
+                        }}
+                        onBlur={() => escribir(c)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") escribir(c);
+                          if (e.key === "Escape") {
+                            const { [clave]: _b, ...resto } = borrador;
+                            setBorrador(resto);
+                            setErrores({ ...errores, [clave]: "" });
+                          }
+                        }}
+                      />
+                    </span>
+                  )}
+                  {err ? <p className="error">{err}</p> : c.columna.ayuda ? <p className="ayuda">{c.columna.ayuda}</p> : null}
+                </label>
+              );
+          }}
+        />
       </div>
     </Seccion>
   );
