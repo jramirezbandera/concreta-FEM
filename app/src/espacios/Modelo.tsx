@@ -159,7 +159,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   }, [ctrl, estirando, dibujando]);
-  // V2c-3: con un vértice cogido, Esc lo suelta, F8 el ortogonal y lo que se teclea abre el campo
+  // V2c-3: con un vértice cogido, Esc lo suelta, F8 el ortogonal, F3 los enganches al DXF y lo que se teclea abre el campo
   const conAsa = !!foto.asa;
   useEffect(() => {
     if (!conAsa || dibujando) return;
@@ -172,6 +172,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       } else if (x.key === "F8") {
         x.preventDefault();
         ctrl.alternarOrto();
+      } else if (x.key === "F3") {
+        x.preventDefault();
+        ctrl.alternarPlantilla();
       } else if (/^[0-9@.,+-]$/.test(x.key)) {
         x.preventDefault();
         ctrl.abrirCampo(x.key);
@@ -197,7 +200,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   }, [ctrl, conPilar, dibujando, estirando, conAsa]);
-  // Las teclas de una herramienta: F8, Esc, Intro, Retroceso y lo que abre el campo de teclado
+  // Las teclas de una herramienta: F8, F3, Esc, Intro, Retroceso y lo que abre el campo de teclado
   useEffect(() => {
     if (!dibujando) return;
     const tecla = (x: KeyboardEvent) => {
@@ -205,6 +208,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       if (x.key === "F8") {
         x.preventDefault();
         ctrl.alternarOrto();
+      } else if (x.key === "F3") {
+        x.preventDefault();
+        ctrl.alternarPlantilla();
       } else if (x.key === "Escape") {
         // Con un punto en curso de Mover, Copiar, Girar o Simetría, Esc lo anula y lo elegido se queda
         if (ctrl.editando) x.preventDefault();

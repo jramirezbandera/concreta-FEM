@@ -1,7 +1,7 @@
 /**
  * La herramienta activa de V2c-1 en la app (`docs/fem3d/dibujo.md` §2.1), sin las vistas (jsdom no
  * tiene WebGL; lo que pasa en ellas lo prueba `validacion/v2c/chrome.ts`): la barra la activa, la
- * plantilla sale en Propiedades, una sección nueva se crea desde ella, F8 pone el ortogonal, una
+ * plantilla sale en Propiedades, una sección nueva se crea desde ella, F8 pone el ortogonal, F3 los enganches al DXF, una
  * tecla abre el campo de teclado y Esc vuelve a Elegir.
  */
 import { readFileSync } from "node:fs";
@@ -86,6 +86,13 @@ describe("la herramienta activa (V2c-1)", () => {
     expect(orto.checked).toBe(false);
     fireEvent.keyDown(window, { key: "F8" });
     expect(orto.checked).toBe(true);
+    // F3, los enganches a la plantilla DXF; el botón dice lo mismo
+    const dxf = within(screen.getByRole("group", { name: "Enganchar a" })).getByRole("button", { name: "Plantilla DXF" });
+    expect(dxf.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.keyDown(window, { key: "F3" });
+    expect(dxf.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(dxf);
+    expect(dxf.getAttribute("aria-pressed")).toBe("true");
 
     // Una cifra abre el campo; lo que no se puede situar sin cursor en una planta lo dice; Esc lo cierra
     fireEvent.keyDown(window, { key: "3" });

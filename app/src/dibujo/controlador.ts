@@ -229,6 +229,14 @@ export class ControladorDibujo {
     this.recalcular();
   }
 
+  /** F3: enciende o apaga los enganches a la plantilla DXF. */
+  alternarPlantilla(): void {
+    const f = new Set(this.foto.fuentes);
+    if (f.has("plantilla")) f.delete("plantilla");
+    else f.add("plantilla");
+    this.ponerFuentes(f);
+  }
+
   // ─── Teclado ────────────────────────────────────────────────────────────────────────────────
 
   intro(): void {

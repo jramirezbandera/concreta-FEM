@@ -520,7 +520,9 @@ function SeccionEnganches({ foto, ctrl }: { foto: Instantanea; ctrl: Controlador
           </button>
         ))}
       </div>
-      <p className="nota">A igual tipo, el modelo gana a la plantilla DXF.</p>
+      <p className="nota">
+        A igual tipo, el modelo gana a la plantilla DXF. <span className="dib-tecla">F3</span> enciende y apaga la plantilla.
+      </p>
     </Seccion>
   );
 }
