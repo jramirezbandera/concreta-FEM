@@ -15,7 +15,8 @@ import { proyectoNuevo } from "../plantilla.ts";
 import { serializar } from "../serializar.ts";
 import { apuntar, indiceEnganches, RADIO_ENGANCHE } from "./enganches.ts";
 import { ESTADO_INICIAL, borrador, paso, type ContextoHerramienta, type EstadoHerramienta, type Evento, type NombreHerramienta, type Plantillas } from "./herramientas.ts";
-import { desplazar, rectangulo } from "./piezas.ts";
+import { ANCHO_ZUNCHO, desplazar, rectangulo } from "./piezas.ts";
+import { operacionVigasBorde, proponerVigasBorde } from "../vigasBorde.ts";
 import { contornoDesde, recuadroEn, recuadrosDe } from "./recuadros.ts";
 
 const SECCIONES = [
@@ -51,6 +52,8 @@ const PLANTILLAS: Plantillas = {
   pilar: { seccion: "P30" },
   viga: { seccion: "V30x50" },
   forjado: { tipo: "maciza", espesor: 0.25, material: "HA-30" },
+  // Lo que da la tabla, sin zunchos (los prueba «Con zunchos»)
+  hueco: { zunchos: false },
   muro: { espesor: 0.25, material: "HA-30" },
   cargas: { caso: "G" },
 };
@@ -174,6 +177,51 @@ describe("Forjado (criterio 1)", () => {
     expect(otro.errores).toEqual(["Se solaparía con el forjado L1."]);
   });
 
+  it("con zunchos: lo mismo que dibujarlo sin ellos y «Vigas de borde» después, en un paso; cerrado por vigas, ninguno", () => {
+    const p0 = proyectoNuevo("zunchos");
+    const p: Proyecto = { ...p0, modelo: { ...p0.modelo, secciones: SECCIONES as unknown as ModeloFisico["secciones"], ejes: EJES } };
+    const eventos = [punto([0, 0]), punto([10, 0]), punto([10, 6.3]), punto([0, 6.3]), punto([0, 0])];
+    const con: Plantillas = { ...PLANTILLAS, forjado: { ...PLANTILLAS.forjado, modo: "poligono" } };
+    const r = dibujar(p, "forjado", eventos, con);
+    expect(r.etiquetas).toEqual(["Forjado L1 (maciza) con 4 zunchos"]);
+    // El oráculo: sin la casilla, y la orden de la barra con 0,30 × el canto
+    const sin = dibujar(p, "forjado", eventos, { ...con, forjado: { ...con.forjado, zunchos: false } });
+    expect(sin.etiquetas).toEqual(["Forjado L1 (maciza)"]);
+    const pr = proponerVigasBorde(sin.proyecto.modelo, "L1", ANCHO_ZUNCHO, 0.25);
+    if ("error" in pr) throw new Error(pr.error);
+    const a = aplicar(sin.proyecto, operacionVigasBorde(sin.proyecto.modelo, pr)!);
+    if (!a.ok) throw new Error();
+    expect(serializar(r.proyecto)).toBe(serializar(a.proyecto));
+    expect(r.proyecto.modelo.vigas!.length).toBe(4);
+    // Un paso de deshacer
+    const h = hacer(historial(p), r.proyecto, r.etiquetas[0]!);
+    expect(serializar(deshacer(h).actual)).toBe(serializar(p));
+    // El ancho de la plantilla
+    const b40 = dibujar(p, "forjado", eventos, { ...con, forjado: { ...con.forjado, anchoZuncho: 0.4 } });
+    expect(b40.proyecto.modelo.secciones.find((x) => x.id === b40.proyecto.modelo.vigas![0]!.seccion)).toMatchObject({ b: 0.4, h: 0.25 });
+    // Cerrado por vigas: ninguno, lo de la tabla
+    const q = reticula();
+    const rq = dibujar(q, "forjado", [clic(q, [2, 2])], { ...PLANTILLAS, forjado: { ...PLANTILLAS.forjado, zunchos: true } });
+    expect(rq.etiquetas).toEqual(["Forjado L1 (maciza)"]);
+  });
+
+  it("con zunchos, un hueco: sólo en sus lados, y el contorno de la losa no se toca", () => {
+    const p = conTabla(reticula(), "forjados", { planta: "N1", tipo: "maciza", contorno: "0 0; 10 0; 10 6,3; 0 6,3", espesor: "0,25", material: "HA-30" });
+    const eventos = [punto([6.6, 2.4]), punto([8.4, 4.6])];
+    const r = dibujar(p, "hueco", eventos, { ...PLANTILLAS, hueco: { zunchos: true } });
+    expect(r.etiquetas).toEqual(["Hueco en el forjado L1 con 4 zunchos"]);
+    const l = r.proyecto.modelo.losas![0]!;
+    expect(l.contorno).toEqual(p.modelo.losas![0]!.contorno);
+    // Enrasados por fuera del hueco: el hueco crece b/2 por lado
+    expect(l.huecos).toEqual([[[6.45, 2.25], [8.55, 2.25], [8.55, 4.75], [6.45, 4.75]]]);
+    const sin = dibujar(p, "hueco", eventos);
+    const pr = proponerVigasBorde(sin.proyecto.modelo, "L1", ANCHO_ZUNCHO, 0.25, undefined, new Set([1]));
+    if ("error" in pr) throw new Error(pr.error);
+    const a = aplicar(sin.proyecto, operacionVigasBorde(sin.proyecto.modelo, pr)!);
+    if (!a.ok) throw new Error();
+    expect(serializar(r.proyecto)).toBe(serializar(a.proyecto));
+  });
+
   it("el borrador del recuadro sigue al cursor sin enganchar", () => {
     const p = reticula();
     const ix = indiceEnganches(p.modelo, "N1");
@@ -202,7 +250,7 @@ describe("Hueco, Muro y apoyos (criterio 1)", () => {
     expect(rectangulo([8.4, 4.6], [6.6, 2.4], 0)).toEqual([[8.4, 4.6], [6.6, 4.6], [6.6, 2.4], [8.4, 2.4]]);
     // Que se sale: no
     expect(dibujar(p, "hueco", [punto([9, 5]), punto([11, 6])]).errores[0]).toMatch(/dentro del forjado L1/);
-    const pol = dibujar(p, "hueco", [punto([2, 2]), punto([3, 2]), punto([2.5, 3]), punto([2, 2])], { ...PLANTILLAS, hueco: { modo: "poligono" } });
+    const pol = dibujar(p, "hueco", [punto([2, 2]), punto([3, 2]), punto([2.5, 3]), punto([2, 2])], { ...PLANTILLAS, hueco: { ...PLANTILLAS.hueco, modo: "poligono" } });
     expect(pol.proyecto.modelo.losas![0]!.huecos).toEqual([[[2, 2], [3, 2], [2.5, 3]]]);
   });
 

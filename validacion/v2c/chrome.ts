@@ -167,6 +167,9 @@ const cdp = (method: string, params: Record<string, unknown> = {}) =>
     pendientes.set(id, (m) => (m.error ? rej(new Error(`${method}: ${m.error.message}`)) : res(m.result)));
     ws.send(JSON.stringify({ id, method, params }));
   });
+/** Desmarca «Con zunchos» en la plantilla de la herramienta activa: la referencia no los lleva. */
+const SIN_ZUNCHOS = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim() === "Con zunchos")?.querySelector("input"); if (z?.checked) z.click(); }`;
+
 async function pagina<T>(expr: string): Promise<T> {
   const r = (await cdp("Runtime.evaluate", { expression: `(async () => { ${expr} })()`, awaitPromise: true, returnByValue: true })) as { result: { value: T }; exceptionDetails?: { exception?: { description?: string }; text: string } };
   if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
@@ -359,10 +362,10 @@ try {
 
   // La losa como polígono tecleado y su hueco
   const losa = referencia.modelo.losas![0]!;
-  await pagina(`__c.boton("Polígono").click();`);
+  await pagina(`__c.boton("Polígono").click(); await new Promise((r) => setTimeout(r, 50)); ${SIN_ZUNCHOS}`);
   for (const q of losa.contorno) await pagina(`await __c.teclear("${num(q[0])}; ${num(q[1])}");`);
   await pagina(`__c.tecla("Enter");`);
-  await pagina(`__c.herramienta("Hueco").click();`);
+  await pagina(`__c.herramienta("Hueco").click(); await __c.esperar(() => document.querySelector('input[aria-label="z0"]'), 5000); ${SIN_ZUNCHOS}`);
   const h0 = losa.huecos![0]!;
   await pagina(`await __c.teclear("${num(h0[0]![0])}; ${num(h0[0]![1])}"); await __c.teclear("${num(h0[2]![0])}; ${num(h0[2]![1])}");`);
   await pagina(`__c.tecla("Escape");`);
@@ -410,9 +413,9 @@ try {
   for (const v of n0.vigas!) await pagina(`await __c.teclear("${num(v.puntos[0]![0])}; ${num(v.puntos[0]![1])}"); await __c.teclear("${num(v.puntos[1]![0])}; ${num(v.puntos[1]![1])}"); __c.tecla("Enter");`);
   // La losa, como polígono tecleado, con su canto; su hueco
   const ln = n0.losas![0]!;
-  await pagina(`__c.herramienta("Forjado").click(); await __c.esperar(() => document.querySelector('input[aria-label="canto"]')); __c.boton("Polígono").click(); await __c.escribir("canto", "${num(ln.espesor)}");`);
+  await pagina(`__c.herramienta("Forjado").click(); await __c.esperar(() => document.querySelector('input[aria-label="canto"]')); __c.boton("Polígono").click(); await __c.escribir("canto", "${num(ln.espesor)}"); ${SIN_ZUNCHOS}`);
   for (const q of ln.contorno) await pagina(`await __c.teclear("${num(q[0])}; ${num(q[1])}");`);
-  await pagina(`__c.tecla("Enter"); __c.herramienta("Hueco").click();`);
+  await pagina(`__c.tecla("Enter"); __c.herramienta("Hueco").click(); await __c.esperar(() => document.querySelector('input[aria-label="z0"]'), 5000); ${SIN_ZUNCHOS}`);
   const hn = ln.huecos![0]!;
   await pagina(`await __c.teclear("${num(hn[0]![0])}; ${num(hn[0]![1])}"); await __c.teclear("${num(hn[2]![0])}; ${num(hn[2]![1])}");`);
   // El núcleo: cerrado con un clic (tecleado) en el primer punto; su puerta, dos puntos por el eje

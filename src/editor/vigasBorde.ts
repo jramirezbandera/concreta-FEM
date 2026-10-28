@@ -105,8 +105,12 @@ function corte(P: Vec2, u: Vec2, Q: Vec2, v: Vec2): Vec2 | null {
   return [P[0] + s * u[0], P[1] + s * u[1]];
 }
 
-/** Las vigas de borde de `b` × `h` m en los lados libres de la losa `losaId`. `eps`: la tolerancia de conexión (ε_snap). */
-export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h: number, eps = 0.05): PropuestaVigasBorde | { error: string } {
+/**
+ * Las vigas de borde de `b` × `h` m en los lados libres de la losa `losaId`. `eps`: la tolerancia de
+ * conexión (ε_snap). `anillos`: sólo los lados de esos anillos (0, el contorno; i, el hueco i − 1),
+ * como el hueco recién dibujado con «Con zunchos»; los demás quedan como están.
+ */
+export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h: number, eps = 0.05, anillos?: ReadonlySet<number>): PropuestaVigasBorde | { error: string } {
   const l = (m.losas ?? []).find((x) => x.id === losaId) as Losa | undefined;
   if (!l) return { error: `No hay ninguna losa «${losaId}».` };
   if (!(b > 0 && h > 0)) return { error: "La viga tiene que tener el ancho y el canto mayores que 0." };
@@ -138,11 +142,11 @@ export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h
 
   const ejes = ejesQueAtan(m, P, l);
   const avisos: string[] = [];
-  const anillos = anillosForjado(l);
+  const todos = anillosForjado(l);
   const nuevos: Vec2[][] = [];
   /** Las vigas (sin id), con las bandas que pasan a cada una y su normal hacia la losa. */
   const grupos: { viga: Omit<VigaBorde, "id">; bandas: Vec2[][]; dentro: Vec2 }[] = [];
-  for (const [ia, an0] of anillos.entries()) {
+  for (const [ia, an0] of todos.entries()) {
     // Sin el vértice repetido ni lados nulos
     const an = an0.filter((q, i) => {
       const s = an0[(i + 1) % an0.length]!;
@@ -150,6 +154,11 @@ export function proponerVigasBorde(m: ModeloFisico, losaId: string, b: number, h
     });
     const n = an.length;
     if (n < 3) return { error: `Un anillo de ${losaId} tiene menos de 3 vértices.` };
+    // Un anillo que no se pide se queda tal cual, bit a bit
+    if (anillos && !anillos.has(ia)) {
+      nuevos.push([...an0]);
+      continue;
+    }
     // Hacia la losa: a la izquierda en un contorno antihorario; en un hueco, hacia fuera de él
     const sentido = Math.sign(areaConSigno(an)) * (ia === 0 ? 1 : -1);
     const ts = tramos([...an, an[0]!]);

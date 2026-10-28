@@ -16,7 +16,7 @@ import type { Seis, Vec3 } from "../../../src/motor/modelo.ts";
 import { medidasSeccion, SIGNOS_PUNTO_FIJO } from "../../../src/compilador/puntoFijo.ts";
 import { FUENTES_ENGANCHE, NOMBRE_ENGANCHE, TIPOS_ENGANCHE, type FuenteEnganche } from "../../../src/editor/dibujo/enganches.ts";
 import { operacionProponerEjes, plantasPilar, type Alinear, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
-import { COARTADOS, HUECO_MURO, type PlantillaForjado } from "../../../src/editor/dibujo/piezas.ts";
+import { ANCHO_ZUNCHO, COARTADOS, HUECO_MURO, type PlantillaForjado } from "../../../src/editor/dibujo/piezas.ts";
 import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
@@ -297,6 +297,7 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
             />
             <NumeroCampo etiqueta="z0" unidad="m" valor={t.hueco?.z0} onCambio={(z0) => setPlantillas({ ...t, hueco: { ...t.hueco, z0 } })} ayuda="En un muro: la altura del borde de abajo sobre el suelo de la planta de abajo." />
             <NumeroCampo etiqueta="z1" unidad="m" valor={t.hueco?.z1} onCambio={(z1) => setPlantillas({ ...t, hueco: { ...t.hueco, z1 } })} ayuda="En un muro: la del borde de arriba." />
+            <CampoZunchos t={t.hueco ?? {}} poner={(c) => setPlantillas({ ...t, hueco: { ...t.hueco, ...c } })} ayuda="En una losa: un zuncho en cada lado del hueco que no va sobre una viga o un muro, con la losa hasta su eje y la carga de la banda en él." />
             <p className="nota">El primer clic dice dónde va: dentro de un forjado o encima de un muro (dos clics por su eje, en un tramo).</p>
           </div>
         </Seccion>
@@ -705,6 +706,20 @@ function CampoVector({ etiqueta, unidad, valor, onCambio, ayuda }: { etiqueta: s
   );
 }
 
+/** «Con zunchos» y su ancho (Forjado y Hueco; `piezas.ts`). */
+function CampoZunchos({ t, poner, ayuda }: { t: { zunchos?: boolean; anchoZuncho?: number }; poner: (c: { zunchos?: boolean; anchoZuncho?: number }) => void; ayuda: string }) {
+  const con = t.zunchos !== false;
+  return (
+    <>
+      <label className="chk">
+        <input type="checkbox" checked={con} onChange={(x) => poner({ zunchos: x.target.checked })} />
+        <span>Con zunchos</span>
+      </label>
+      {con && <NumeroCampo etiqueta="ancho zuncho" unidad="m" valor={t.anchoZuncho} onCambio={(anchoZuncho) => poner({ anchoZuncho })} vacio={String(ANCHO_ZUNCHO).replace(".", ",")} ayuda={ayuda} />}
+    </>
+  );
+}
+
 const TIPO_FORJADO: Record<TipoForjado, string> = { maciza: "Maciza", reticular: "Reticular", unidireccional: "Unidirecc." };
 
 /** La plantilla de Forjado: el modo (recuadro o polígono), el tipo y lo de cada tipo, como las columnas de la tabla. */
@@ -724,11 +739,12 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
           onCambio={(modo) => poner({ modo })}
           ayuda={(t.modo ?? "recuadro") === "recuadro" ? "Un clic dentro de un recuadro cerrado por vigas, muros, apoyos lineales o bordes de forjado: el contorno, por sus ejes, desde el vértice más cercano al clic." : "Clic a clic; Intro, doble clic o un clic en el primero lo cierra."}
         />
-        <Segmentado etiqueta="tipo" valor={tipo} opciones={TIPOS_FORJADO.map((x) => [x, TIPO_FORJADO[x]] as const)} onCambio={(x) => poner({ modo: t.modo, tipo: x }, true)} />
+        <Segmentado etiqueta="tipo" valor={tipo} opciones={TIPOS_FORJADO.map((x) => [x, TIPO_FORJADO[x]] as const)} onCambio={(x) => poner({ modo: t.modo, tipo: x, zunchos: t.zunchos, anchoZuncho: t.anchoZuncho }, true)} />
         {tipo !== "unidireccional" && (
           <>
             {num("espesor", "canto", "m")}
             <CampoMaterial modelo={m} valor={t.material} para="la plantilla de Forjado" editar={editar} onCambio={(material) => poner({ material })} />
+            <CampoZunchos t={t} poner={poner} ayuda="Un zuncho del canto del forjado en cada lado que no va sobre una viga, un muro, un apoyo lineal u otro forjado: su eje, por el de los pilares del lado (o enrasado por fuera), la losa hasta él y la carga de la banda en la viga. Cerrado por vigas, no pone ninguno." />
           </>
         )}
         {tipo === "reticular" && (

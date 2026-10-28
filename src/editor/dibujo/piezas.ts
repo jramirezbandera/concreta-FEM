@@ -9,6 +9,10 @@
  *   de forjado da su contorno por los ejes (`recuadros.ts`, V2c-c), desde el vértice más cercano al
  *   clic (el lado donde empiezan las viguetas de un unidireccional). Con «polígono», clic a clic;
  *   Intro, doble clic o un clic en el primer punto lo cierra.
+ * - **Con zunchos** (por defecto, en una losa maciza o reticular y en un hueco de una losa): en el
+ *   mismo paso, las vigas de borde de «Vigas de borde» (`vigasBorde.ts`) en los lados que no van sobre
+ *   una viga, un muro, un apoyo lineal u otro forjado; en un hueco, sólo en los suyos. Un forjado
+ *   cerrado por vigas no tiene ninguno libre y sale igual que sin la casilla.
  * - **Hueco:** el primer clic dice dónde va. En un forjado, un rectángulo (dos esquinas, en los ejes
  *   del ortogonal) o un polígono, dentro de su contorno. En un muro, dos clics por su eje dan las
  *   estaciones de sus bordes (en un tramo) y las alturas, las de la plantilla sobre el suelo de la
@@ -32,6 +36,7 @@ import { idNuevo, type TipoForjado } from "../tablas.ts";
 import { unitario } from "./enganches.ts";
 import { ESTADO_INICIAL, igual, plantasPilar, seccionValida, type Alinear, type Borrador, type ContextoHerramienta, type EstadoHerramienta, type Evento, type Paso, type Plantillas } from "./herramientas.ts";
 import { contornoDesde, puntoEnPoligono, recuadroEn, recuadrosPlanta } from "./recuadros.ts";
+import { operacionVigasBorde, proponerVigasBorde } from "../vigasBorde.ts";
 
 export const PIEZAS = ["forjado", "hueco", "muro", "apoyo", "apoyoLineal"] as const;
 export type NombrePieza = (typeof PIEZAS)[number];
@@ -54,6 +59,10 @@ export interface PlantillaForjado {
   caseton?: "perdido" | "recuperable";
   /** Unidireccional: la sección de la vigueta. */
   seccion?: string;
+  /** Maciza y reticular: las vigas de borde en los lados libres (por defecto, sí). */
+  zunchos?: boolean;
+  /** Ancho de esas vigas, m (por defecto, `ANCHO_ZUNCHO`); el canto, el del forjado. */
+  anchoZuncho?: number;
 }
 
 export interface PlantillaHueco {
@@ -62,7 +71,13 @@ export interface PlantillaHueco {
   /** En un muro: alturas de sus bordes sobre el suelo de la planta de abajo, m (por defecto, 0 y 2,1). */
   z0?: number;
   z1?: number;
+  /** En una losa: las vigas de borde en los lados del hueco (por defecto, sí), de este ancho. */
+  zunchos?: boolean;
+  anchoZuncho?: number;
 }
+
+/** Ancho por defecto de los zunchos, m (el de la regla de la skill). */
+export const ANCHO_ZUNCHO = 0.3;
 
 export interface PlantillaMuro {
   desde?: string;
@@ -195,6 +210,26 @@ export function desplazar(ps: readonly Vec2[], d: number): Vec2[] {
 
 const materialValido = (m: ModeloFisico, x: string | undefined) => !!x && m.materiales.some((y) => y.id === x);
 
+// ─── Con zunchos ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `op` (que crea la losa o le pone un hueco; `losa`, como queda) y, en el mismo paso, sus vigas de
+ * borde en los anillos `anillos`. Sin lados libres, `op` tal cual; si no se pueden poner, `op` con
+ * un aviso.
+ */
+function conZunchos(ctx: ContextoHerramienta, op: Operacion, etiqueta: string, losa: Losa, ancho: number | undefined, anillos?: ReadonlySet<number>): Paso {
+  const m = ctx.modelo;
+  const losas = m.losas ?? [];
+  const m2: ModeloFisico = { ...m, losas: losas.some((x) => x.id === losa.id) ? losas.map((x) => (x.id === losa.id ? losa : x)) : [...losas, losa] };
+  const p = proponerVigasBorde(m2, losa.id, ancho ?? ANCHO_ZUNCHO, losa.espesor, undefined, anillos);
+  if ("error" in p) return { estado: ESTADO_INICIAL, hecho: { operacion: op, etiqueta, avisos: [`Sin zunchos: ${p.error}`] } };
+  const z = operacionVigasBorde(m2, p);
+  if (!z || z.op !== "lote") return hecho(op, etiqueta);
+  const avisos = [...p.avisos, ...(p.sueltas.length ? [`Las cargas puntuales ${p.sueltas.join(", ")} quedan en la banda del zuncho, fuera de la losa.`] : [])];
+  const n = p.vigas.length;
+  return { estado: ESTADO_INICIAL, hecho: { operacion: { op: "lote", operaciones: [op, ...z.operaciones] }, etiqueta: `${etiqueta} con ${n} ${n === 1 ? "zuncho" : "zunchos"}`, ...(avisos.length ? { avisos } : {}) } };
+}
+
 // ─── Forjado ────────────────────────────────────────────────────────────────────────────────────
 
 /** El forjado de la plantilla con ese contorno, o por qué no. */
@@ -228,7 +263,8 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[]): Paso | string {
   }
   const id = idNuevo(m, "L");
   const losa: Losa = { id, planta: ctx.planta, contorno, espesor: t.espesor!, material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };
-  return hecho(crear("losas", losa), `Forjado ${id} (${tipo})`);
+  const etiqueta = `Forjado ${id} (${tipo})`;
+  return t.zunchos === false ? hecho(crear("losas", losa), etiqueta) : conZunchos(ctx, crear("losas", losa), etiqueta, losa, t.anchoZuncho);
 }
 
 const comoPaso = (e: EstadoHerramienta, r: Paso | string): Paso => (typeof r === "string" ? { estado: e, error: r } : r);
@@ -315,7 +351,12 @@ function huecoForjado(ctx: ContextoHerramienta, id: string, anillo: Vec2[]): Pas
     if (!puntoEnPoligono(q, f.contorno) || distBorde(q, f.contorno) <= 1e-9) return `El hueco tiene que quedar dentro del forjado ${id}, sin tocar su borde.`;
     if ((f.huecos ?? []).some((h) => puntoEnPoligono(q, h) || distBorde(q, h) <= 1e-9)) return `El hueco no puede tocar otro hueco del forjado ${id}.`;
   }
-  return hecho({ op: "cambiar", coleccion, id, objeto: { ...f, huecos: [...(f.huecos ?? []), anillo] } as unknown as Objeto }, `Hueco en el forjado ${id}`);
+  const nuevo = { ...f, huecos: [...(f.huecos ?? []), anillo] };
+  const op: Operacion = { op: "cambiar", coleccion, id, objeto: nuevo as unknown as Objeto };
+  const t = ctx.plantillas.hueco ?? {};
+  // El hueco nuevo es el último anillo (0, el contorno)
+  if (coleccion === "panos" || t.zunchos === false) return hecho(op, `Hueco en el forjado ${id}`);
+  return conZunchos(ctx, op, `Hueco en el forjado ${id}`, nuevo as Losa, t.anchoZuncho, new Set([nuevo.huecos.length]));
 }
 
 function pasoHueco(e: EstadoHerramienta, ev: Evento, ctx: ContextoHerramienta): Paso {

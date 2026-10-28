@@ -137,6 +137,20 @@ describe("la herramienta activa (V2c-1)", () => {
     expect((screen.getByRole("textbox", { name: "nervio" }) as HTMLInputElement).value).toBe("0,12");
     expect(screen.getByRole("textbox", { name: "pp" }).getAttribute("data-error")).toBe("true");
     expect(forjado.textContent).toMatch(/Un clic dentro de un recuadro/);
+    // Con zunchos, por defecto, con su ancho; sin ellos, sin el ancho; y no en un unidireccional
+    const zunchos = screen.getByRole("checkbox", { name: "Con zunchos" }) as HTMLInputElement;
+    expect(zunchos.checked).toBe(true);
+    expect(screen.getByRole("textbox", { name: "ancho zuncho" }).getAttribute("placeholder")).toBe("0,3");
+    fireEvent.click(zunchos);
+    expect(screen.queryByRole("textbox", { name: "ancho zuncho" })).toBeNull();
+    fireEvent.click(zunchos);
+    fireEvent.click(screen.getByRole("radio", { name: "Unidirecc." }));
+    expect(screen.queryByRole("checkbox", { name: "Con zunchos" })).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: "Reticular" }));
+    expect((screen.getByRole("checkbox", { name: "Con zunchos" }) as HTMLInputElement).checked).toBe(true);
+    // Y en Hueco
+    fireEvent.click(screen.getByRole("button", { name: "Hueco" }));
+    expect((screen.getByRole("checkbox", { name: "Con zunchos" }) as HTMLInputElement).checked).toBe(true);
 
     // Muro y Apoyo
     fireEvent.click(screen.getByRole("button", { name: "Muro" }));

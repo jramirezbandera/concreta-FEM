@@ -20,6 +20,7 @@ import { ejeVecino } from "./armazon/Disposicion.tsx";
 import { Paleta, type Orden } from "./armazon/Paleta.tsx";
 import { DialogoVersiones } from "./armazon/Versiones.tsx";
 import { GestorAbierto } from "./editor/Gestores.tsx";
+import { DialogoVigasBorde } from "./editor/Dialogos.tsx";
 import { abrirGestor } from "./editor/referencia.tsx";
 import { hayAlmacen } from "./sesion/almacen.ts";
 import { ContextoPaneles, useAlmacenPaneles, type EstadoPaneles } from "./armazon/paneles.ts";
@@ -88,6 +89,8 @@ export function App() {
   const paneles = useAlmacenPaneles();
   const [{ espacio, modo }, setDonde] = useState(inicial);
   const [elegidos, setElegidosE] = useState<string[]>([]);
+  // «Vigas de borde» de un forjado ya dibujado (sin «Con zunchos», importado o del agente), desde la paleta
+  const [vigasBorde, setVigasBorde] = useState(false);
   const seleccion = elegidos[elegidos.length - 1] ?? null;
   const [paleta, setPaleta] = useState(false);
   const [versionesAbiertas, setVersionesAbiertas] = useState(false);
@@ -219,6 +222,7 @@ export function App() {
       r.push({ id: "gestor-nuevo-material", grupo: "Modelo", nombre: "Nuevo material…", hacer: () => abrirGestor({ coleccion: "materiales", nueva: true }) });
       r.push({ id: "gestor-casos", grupo: "Cargas", nombre: "Casos de carga… (gestor)", hacer: () => abrirGestor({ coleccion: "casos" }) });
       r.push({ id: "gestor-hipotesis", grupo: "Cargas", nombre: "Nuevo caso… / Hipótesis típicas…", hacer: () => abrirGestor({ coleccion: "casos", nueva: true }) });
+      r.push({ id: "vigas-borde", grupo: "Modelo", nombre: "Vigas de borde… (los zunchos de un forjado ya dibujado)", hacer: () => setVigasBorde(true) });
       r.push({ id: "gestor-plantas", grupo: "Modelo", nombre: "Plantas… / Añadir plantas…", hacer: () => abrirGestor({ coleccion: "plantas", nueva: true, ...(plantaValida ? { planta: plantaValida } : {}) }) });
     }
     const vivo: Partial<EstadoPaneles> = paneles.vivos.get(clave) ?? {};
@@ -394,6 +398,7 @@ export function App() {
             </div>
           )}
           {ed && <GestorAbierto />}
+          {ed && vigasBorde && <DialogoVigasBorde onCerrar={() => setVigasBorde(false)} />}
           {versionesAbiertas && navegador && ed && (
             <DialogoVersiones
               id={navegador}

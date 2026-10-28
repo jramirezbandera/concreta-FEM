@@ -245,8 +245,8 @@ describe("calcar la retícula con núcleo de A2 desde su DXF (criterio 2)", () =
     dibujar("pilar", base, n0.pilares!.map((x) => [x.x, x.y]));
     for (const v of n0.vigas!) dibujar("viga", base, [...v.puntos, "fin"]);
     const ln = n0.losas![0]!;
-    dibujar("forjado", { ...base, forjado: { modo: "poligono", tipo: "maciza", espesor: ln.espesor, material: ln.material } }, [...ln.contorno, "fin"]);
-    dibujar("hueco", { ...base, hueco: { modo: "rectangulo" } }, [ln.huecos![0]![0]!, ln.huecos![0]![2]!]);
+    dibujar("forjado", { ...base, forjado: { modo: "poligono", tipo: "maciza", espesor: ln.espesor, material: ln.material, zunchos: false } }, [...ln.contorno, "fin"]);
+    dibujar("hueco", { ...base, hueco: { modo: "rectangulo", zunchos: false } }, [ln.huecos![0]![0]!, ln.huecos![0]![2]!]);
     const w = n0.muros![0]!;
     dibujar("muro", { ...base, muro: { espesor: w.espesor, material: w.material } }, w.puntos);
     // La puerta, entre las jambas del plano

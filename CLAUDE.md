@@ -587,10 +587,12 @@
   - **V2c4-6, decidido el 2026-10-27:** la plantilla va encima del relleno de las losas, los ábacos y los paños (en Cargas, del modelo atenuado) y debajo de lo demás (`Capas2D.ordenPlantilla`).
 - **2026-10-28: de la prueba de uso del dibujo** (a petición del usuario):
   - **varios a la vez:** con varios elegidos, Propiedades da por tabla lo que tienen en común («varios» si no) y lo escrito va a todos en un lote (`src/editor/varios.ts`);
-  - **la barra, en el orden de meter un edificio:** Plantas, Materiales, Secciones | Plantilla DXF, Ejes | Pilar, Muro, Viga | Forjado, Hueco, Ábacos, Vigas de borde | Apoyo, Apoyo lineal | editar; en Cargas, Casos junto al caso activo;
+  - **la barra, en el orden de meter un edificio:** Plantas, Materiales, Secciones | Plantilla DXF, Ejes | Pilar, Muro, Viga | Forjado, Hueco, Ábacos | Apoyo, Apoyo lineal | editar; en Cargas, Casos junto al caso activo;
   - **capas del DXF a la vista:** la plantilla recién importada se abre con sus capas arriba, «Todas» y «Ninguna»;
   - **gestor de plantas (GE3) rehecho:** alzado esquemático con lo nuevo en azul antes de añadirlo, «Añadir» o «Datos de X», y una obra nueva lo abre con su primer paso (cuántas plantas sobre la cimentación, la primera y las demás: `plantasEdificio`);
   - **DWG:** sin decidir. LibreDWG es GPL y el SDK de la ODA, de pago: por ahora, DXF.
+  - **enganches:** a igual tipo, el modelo gana a la plantilla DXF aunque esté más lejos; «Modelo» y «Plantilla DXF» apagan cada fuente (F3, la plantilla), también al editar;
+  - **«Con zunchos»** (decisión del usuario) en Forjado (maciza y reticular) y en Hueco de una losa, por defecto: en el mismo paso, las vigas de «Vigas de borde» (0,30 × el canto) en los lados libres; en un hueco, sólo en los suyos (`proponerVigasBorde(…, anillos)`). Da byte a byte lo de dibujar sin ella y aplicar la orden (`dibujo2.test.ts`). «Vigas de borde» sale de la barra y queda en la paleta (Ctrl+K), para lo importado o del agente. Los bancos de V2c y V2c4 la desmarcan (sus referencias no tienen zunchos);
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

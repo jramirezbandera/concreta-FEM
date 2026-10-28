@@ -168,6 +168,9 @@ const cdp = (method: string, params: Record<string, unknown> = {}) =>
     pendientes.set(id, (m) => (m.error ? rej(new Error(`${method}: ${m.error.message}`)) : res(m.result)));
     ws.send(JSON.stringify({ id, method, params }));
   });
+/** Desmarca «Con zunchos» en la plantilla de la herramienta activa: la referencia no los lleva. */
+const SIN_ZUNCHOS = `{ const z = [...document.querySelectorAll("label.chk")].find((l) => l.textContent.trim() === "Con zunchos")?.querySelector("input"); if (z?.checked) z.click(); }`;
+
 async function pagina<T>(expr: string): Promise<T> {
   const r = (await cdp("Runtime.evaluate", { expression: `(async () => { ${expr} })()`, awaitPromise: true, returnByValue: true })) as { result: { value: T }; exceptionDetails?: { exception?: { description?: string }; text: string } };
   if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
@@ -271,10 +274,11 @@ try {
   for (const p of n0.pilares!) await pagina(`__c.clicCerca([${p.x}, ${p.y}]);`);
   // La losa como polígono y su hueco
   const ln = n0.losas![0]!;
-  await pagina(`__c.herramienta("Forjado").click(); await __c.esperar(() => document.querySelector('input[aria-label="canto"]')); __c.boton("Polígono").click(); await __c.escribir("canto", "${num(ln.espesor)}");`);
+  await pagina(`__c.herramienta("Forjado").click(); await __c.esperar(() => document.querySelector('input[aria-label="canto"]')); __c.boton("Polígono").click(); await __c.escribir("canto", "${num(ln.espesor)}"); ${SIN_ZUNCHOS}`);
   await pagina(`${ln.contorno.map((q) => `__c.clicCerca([${q[0]}, ${q[1]}]);`).join(" ")} __c.tecla("Enter");`);
   const hn = ln.huecos![0]!;
-  await pagina(`__c.herramienta("Hueco").click(); __c.clicCerca([${hn[0]![0]}, ${hn[0]![1]}]); __c.clicCerca([${hn[2]![0]}, ${hn[2]![1]}]);`);
+  await pagina(`__c.herramienta("Hueco").click(); await __c.esperar(() => document.querySelector('input[aria-label="z0"]'), 5000); ${SIN_ZUNCHOS}`);
+  await pagina(`__c.clicCerca([${hn[0]![0]}, ${hn[0]![1]}]); __c.clicCerca([${hn[2]![0]}, ${hn[2]![1]}]);`);
   // El núcleo, cerrado en su primer punto, y la puerta entre las jambas
   const w = n0.muros![0]!;
   await pagina(`__c.herramienta("Muro").click(); await __c.esperar(() => document.querySelector('input[aria-label="espesor"]')); await __c.escribir("espesor", "${num(w.espesor)}");`);
