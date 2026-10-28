@@ -537,3 +537,15 @@ Hasta ahora las cargas sólo se veían en planta (la vista `cargas` de A4). En C
   - **filtros:** el 3D trata cada carga como a su pieza (la losa o el paño, la viga, el pilar o el muro; una lineal o una puntual, sin pieza): el rango de plantas (lo de un pilar o un muro, partido por plantas y en la de la cabeza de cada tramo, como el sólido), los tipos, aislar y ocultar (a ella o a su pieza);
   - **momentos de las puntuales** (`momento2D`): en planta, Mz en un arco (antihorario, positivo) y (Mx, My) en una flecha de doble punta; en alzado, la componente normal al plano en un arco (positiva hacia quien mira) y la del plano de doble punta; en el 3D, una flecha de doble punta en la dirección de M. Todo por la regla de la mano derecha. La vista `cargas` de `fem render` los dibuja también.
 - **Fuera:** el peso propio (lo calcula el programa).
+
+## 18. Qué es de Modelo y qué de Cargas (2026-10-28, a petición del usuario)
+
+El usuario veía las dos pestañas casi iguales: al elegir una losa en Cargas, Propiedades daba el mismo formulario que en Modelo, y Mover o Supr actuaban sobre la losa. La regla: **Modelo es lo que hay y cómo es** (geometría, secciones, canto, tipo y `pp` del forjado); **Cargas, lo que actúa sobre ello**, con el modelo de fondo, que se consulta y no se edita.
+
+- **Propiedades en Cargas** (`app/src/pantallas/CargasPieza.tsx`, con `src/editor/cargasPieza.ts`, puro):
+  - **una pieza** (forjado, viga, pilar, muro): sus cargas por caso, cada una con su resultante (kN hacia abajo y la horizontal) y un clic que la elige; el peso propio en el caso que lo lleva (el del forjado con `pesoLosa`, el de A3; el de barras y muros, γ·A o γ·e por unidad, sin los solapes); y «Añadir en <caso activo>» en toda la pieza con la plantilla de su herramienta (Superficie, En barra o Empuje con el lado), el mismo objeto que un clic con ella (prueba byte a byte). De la geometría, una línea y «Editar en Modelo». Es lo dibujado, no el reparto del compilador: en un forjado cuentan sus cargas, su parte de las de zona y de las lineales, y las puntuales que caen dentro;
+  - **una carga:** su formulario y, encima, la pieza que nombra;
+  - **nada elegido:** el caso activo en la planta, por tipo, y lo que recibe la planta por caso (de `fem resumen`).
+- **Las herramientas de editar sólo cogen cargas en Cargas:** Mover, Copiar, Girar, Simetría, los pinzamientos, Supr y la nueva «A plantas» filtran lo elegido. En un clic, a la misma medida, la carga gana a la pieza que tiene debajo (`objetoEn`: la de superficie en todo un forjado, la lineal por el eje de una viga).
+- **Fuera de la barra:** «Tabla» (la tabla de cargas está en el panel inferior). La escala de las cargas pasa a la cabecera del alzado y del 3D, que es donde actúa.
+- **Decidido el 2026-10-28:** se quedan el chip «Cargas del caso», las tablas y los diagnósticos como están (sin separar por espacio).

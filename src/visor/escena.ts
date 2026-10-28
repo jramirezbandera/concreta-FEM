@@ -224,13 +224,16 @@ export interface Eleccion {
  * polígonos que lo contienen, el de menor área (un pilar antes que la losa que lo rodea). Las
  * rectas de los niveles pasan por todo, así que van detrás de todo. Un eje de replanteo sólo se
  * elige por su burbuja, entera (su recta no: al elegir un forjado o un pilar se cogía el eje).
- * `radio` es el de `RADIO_CLIC` px.
+ * A la misma medida, una carga gana a la pieza que tiene debajo (la de superficie en todo un forjado,
+ * la lineal por el eje de una viga). `radio` es el de `RADIO_CLIC` px.
  */
 export function objetoEn(e: Escena, q: Vec2, radio: number): string | null {
-  let mejor: { objeto: string; prioridad: number; medida: number } | null = null;
-  const proponer = (objeto: string | undefined, prioridad: number, medida: number) => {
+  let mejor: { objeto: string; prioridad: number; medida: number; carga: boolean } | null = null;
+  const proponer = (objeto: string | undefined, prioridad: number, medida: number, estilo: string) => {
     if (!objeto) return;
-    if (!mejor || prioridad > mejor.prioridad || (prioridad === mejor.prioridad && medida < mejor.medida)) mejor = { objeto, prioridad, medida };
+    const carga = estilo.startsWith("carga-");
+    const empate = !!mejor && prioridad === mejor.prioridad && Math.abs(medida - mejor.medida) <= 1e-9 * Math.max(1, medida);
+    if (!mejor || prioridad > mejor.prioridad || (empate ? carga && !mejor.carga : prioridad === mejor.prioridad && medida < mejor.medida)) mejor = { objeto, prioridad, medida, carga };
   };
   for (const p of e.primitivas) {
     switch (p.tipo) {
@@ -238,18 +241,18 @@ export function objetoEn(e: Escena, q: Vec2, radio: number): string | null {
       case "flecha": {
         const d = Math.hypot(q[0] - p.p[0], q[1] - p.p[1]);
         const r = p.tipo === "marca" && p.estilo === "eje-burbuja" ? (radio * Math.max(RADIO_CLIC, p.radio)) / RADIO_CLIC : radio;
-        if (d <= r) proponer(p.objeto, 3, d);
+        if (d <= r) proponer(p.objeto, 3, d, p.estilo);
         break;
       }
       case "linea":
         if (p.estilo === "eje") break;
         for (let i = 1; i < p.puntos.length; i++) {
           const d = distanciaSegmento(q, p.puntos[i - 1]!, p.puntos[i]!);
-          if (d <= radio) proponer(p.objeto, p.estilo === "nivel" ? 0 : 2, d);
+          if (d <= radio) proponer(p.objeto, p.estilo === "nivel" ? 0 : 2, d, p.estilo);
         }
         break;
       case "poligono":
-        if (dentroAnillos(q, p.anillos)) proponer(p.objeto, 1, areaAbs(p.anillos[0]!));
+        if (dentroAnillos(q, p.anillos)) proponer(p.objeto, 1, areaAbs(p.anillos[0]!), p.estilo);
         break;
       default:
         break;

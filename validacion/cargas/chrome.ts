@@ -275,7 +275,7 @@ try {
   const d2 = await pagina<{ cargas: number }>(`return await __i2.dep(0);`);
   comprobar(d2.cargas === ESPERADO.Vx, `segmentos de las cargas de Vx: ${d2.cargas} = Node ${ESPERADO.Vx}`);
   await pagina(elegirEn('select[aria-label="Caso activo"]', "G"));
-  await pagina(elegirEn('select[aria-label="Escala de las cargas en el alzado y el 3D"]', "2"));
+  await pagina(elegirEn('select[aria-label="Escala de las cargas"]', "2"));
   await pagina(elegir("Modo del 3D", "translucido"));
   await pagina(`await __i2.esperar(async () => (await __i2.dep(0)).cargas === ${ESPERADO.G}, 60000).catch(() => null);`);
   await quietos();
@@ -284,7 +284,7 @@ try {
   comprobar(sha2 === ESPERADO.G2, `los segmentos de G a escala ×2 son los de Node: ${sha2.slice(0, 16)} = ${ESPERADO.G2.slice(0, 16)}`);
 
   log("\n## Alzado del eje 3 con las cargas de G");
-  await pagina(elegirEn('select[aria-label="Escala de las cargas en el alzado y el 3D"]', "1"));
+  await pagina(elegirEn('select[aria-label="Escala de las cargas"]', "1"));
   await pagina(`__i2.boton("Alzado").click()`);
   await pagina(`await __i2.esperar(() => document.querySelector('.celda[data-vista="0"][data-tipo="alzado"] select[aria-label="Eje del alzado"]'));`);
   await pagina(elegir("Eje del alzado", "3"));

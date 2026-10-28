@@ -7,17 +7,21 @@
  *   Propiedades; `dibujo/controlador.ts`; Forjado y Hueco, con sus zunchos), Ábacos, las de editar con el ratón (V2c-3:
  *   Mover, Copiar, Girar y Simetría, sobre lo elegido), A plantas (copiar a otras plantas) y Borrar
  *   (lo elegido o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o
- *   3D; en Cargas, el caso activo, las herramientas de las cargas (Puntual, Lineal, Superficie, En
- *   barra y Empuje, en el caso activo), las de editar y Casos. Sin proyecto editable, sólo lo que mira.
+ *   3D; en Cargas, el caso activo, Casos, las herramientas de las cargas (Puntual, Lineal, Superficie,
+ *   En barra y Empuje, en el caso activo), las de editar y A plantas (que en Cargas, como Supr y los
+ *   pinzamientos, sólo cogen las cargas: el modelo se edita en Modelo) y Combinaciones. Sin proyecto
+ *   editable, sólo lo que mira.
  * - Navegador: el proyecto, las plantillas DXF (V2c-4, `docs/fem3d/dibujo.md` §10: «Plantilla DXF» en
  *   la barra de Modelo; se ven detrás de las plantas de Modelo y Cargas y se engancha a ellas) y los
  *   objetos de la planta activa (en Cargas, los casos y las cargas).
  * - Vistas (I2): 1, 2 o 4, de planta (modelo, diagnósticos o malla; en Cargas, las del caso activo),
  *   alzado o 3D (`vistas/Zona.tsx`). En Cargas, el alzado y el 3D también dibujan las del caso activo
- *   (`agente/render/cargas.ts` y `visor/cargas3d.ts`), a la escala de la barra. La barra cambia el
+ *   (`agente/render/cargas.ts` y `visor/cargas3d.ts`), a la escala de su cabecera. La barra cambia el
  *   tipo de la vista activa y la disposición.
  * - Propiedades: lo elegido (con varios, la lista por tipo) o, sin nada, la planta (resumen, cargas
- *   por caso, equilibrio, hipótesis).
+ *   por caso, equilibrio, hipótesis). En Cargas (`pantallas/CargasPieza.tsx`), una pieza da sus cargas
+ *   por caso y añadirle una en el caso activo; una carga, su formulario y la pieza que nombra; sin
+ *   nada, el caso activo en la planta.
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -35,6 +39,8 @@ import { FormularioVarios, tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
 import { cota, fmt } from "../fmt.ts";
 import { Inspector } from "../pantallas/Inspector.tsx";
+import { PropiedadesCargas, ResumenCaso, SobrePieza } from "../pantallas/CargasPieza.tsx";
+import { tipoPieza } from "../../../src/editor/cargasPieza.ts";
 import { NavVistas } from "../armazon/VistasGuardadas.tsx";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, type DibujoPlanta, type EstadoVista } from "../vistas/estado.ts";
@@ -111,7 +117,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   ctrl.repintar = repintarVistas;
   useEffect(() => ctrl.ponerModelo(modeloEd), [ctrl, modeloEd]);
   useEffect(() => ctrl.ponerPlantillas(plantillas), [ctrl, plantillas]);
-  useEffect(() => ctrl.ponerElegidos(elegidos), [ctrl, elegidos]);
+  // En Cargas, las herramientas de editar (y los pinzamientos) sólo cogen cargas: el modelo, en Modelo
+  const elegidosHerr = useMemo(() => (cargas && modeloEd ? elegidos.filter((id) => tablaDe(modeloEd, id) === "cargas") : elegidos), [cargas, modeloEd, elegidos]);
+  useEffect(() => ctrl.ponerElegidos(elegidosHerr), [ctrl, elegidosHerr]);
   useEffect(() => ctrl.ponerPlantillasDxf(indiceDxf), [ctrl, indiceDxf]);
   /** Lee un DXF elegido y lo pone de plantilla de la planta activa. */
   const importarPlantilla = async (f: File) => {
@@ -230,8 +238,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     return () => window.removeEventListener("keydown", tecla);
   }, [ctrl, dibujando]);
 
-  // Lo elegido que está en el proyecto (un eje propuesto no lo está) y lo que de ello se copia
-  const enTablas = ed ? elegidos.filter((id) => tablaDe(ed.proyecto.modelo, id)) : [];
+  // Lo elegido que está en el proyecto (un eje propuesto no lo está; en Cargas, sólo las cargas) y lo que de ello se copia
+  const enTablas = ed ? elegidosHerr.filter((id) => tablaDe(ed.proyecto.modelo, id)) : [];
   const copiables = ed ? enTablas.filter((id) => COPIABLES.has(tablaDe(ed.proyecto.modelo, id)!)) : [];
 
   // Copiar y Borrar sin nada que les sirva elegido esperan a que se elija: un clic (o una ventana)
@@ -321,15 +329,13 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcEnBarra} nombre="En barra" activa={foto.herramienta === "barra"} onClick={() => elegirHerramienta("barra")} title="Dibujar cargas en vigas y pilares en el caso activo: un clic en la pieza, o dos en un tramo de viga (Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcEmpuje} nombre="Empuje" activa={foto.herramienta === "empuje"} onClick={() => elegirHerramienta("empuje")} title="Dibujar empujes en el caso activo: un clic en un muro, del lado del terreno. Esc vuelve a Elegir" />
           <Separador />
-          <Herramienta icono={IcMover} nombre="Mover" activa={foto.herramienta === "mover"} onClick={() => elegirHerramienta("mover")} title="Mover lo elegido: punto base y destino (con las vigas que acaban en sus pilares). Esc vuelve a Elegir" />
-          <Herramienta icono={IcCopiar} nombre="Copiar" activa={foto.herramienta === "copiar"} onClick={() => elegirHerramienta("copiar")} title="Copiar lo elegido: punto base y un destino por copia, en su planta o en las de Propiedades. Esc vuelve a Elegir" />
-          <Herramienta icono={IcGirar} nombre="Girar" activa={foto.herramienta === "girar"} onClick={() => elegirHerramienta("girar")} title="Girar lo elegido: el centro y el ángulo (un clic, o los grados). Esc vuelve a Elegir" />
-          <Herramienta icono={IcSimetria} nombre="Simetría" activa={foto.herramienta === "simetria"} onClick={() => elegirHerramienta("simetria")} title="La simetría de lo elegido por un eje de dos puntos (conservando lo original, en Propiedades). Esc vuelve a Elegir" />
-          <Herramienta icono={IcCarga} nombre="Tabla" onClick={() => abrirTabla("cargas", true, { caso: casoValido })} title="Una carga nueva en la tabla de cargas, en el caso activo" />
+          <Herramienta icono={IcMover} nombre="Mover" activa={foto.herramienta === "mover"} onClick={() => elegirHerramienta("mover")} title="Mover las cargas elegidas: punto base y destino. Esc vuelve a Elegir" />
+          <Herramienta icono={IcCopiar} nombre="Copiar" activa={foto.herramienta === "copiar"} onClick={() => elegirHerramienta("copiar")} title="Copiar las cargas elegidas: punto base y un destino por copia, en su planta o en las de Propiedades. Esc vuelve a Elegir" />
+          <Herramienta icono={IcGirar} nombre="Girar" activa={foto.herramienta === "girar"} onClick={() => elegirHerramienta("girar")} title="Girar las cargas elegidas: el centro y el ángulo (un clic, o los grados). Esc vuelve a Elegir" />
+          <Herramienta icono={IcSimetria} nombre="Simetría" activa={foto.herramienta === "simetria"} onClick={() => elegirHerramienta("simetria")} title="La simetría de las cargas elegidas por un eje de dos puntos (conservando lo original, en Propiedades). Esc vuelve a Elegir" />
+          <Herramienta icono={IcAPlantas} nombre="A plantas" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} cargas` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar cargas a otras plantas: elíjalas después"} />
         </>
       )}
-      <Separador />
-      <Desplegable etiqueta="Escala de las cargas en el alzado y el 3D" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
       <Separador />
       <Herramienta icono={IcCombinaciones} nombre="Combinaciones" onClick={() => pan.abrirPestana("combinaciones")} title="Las combinaciones que salen de los casos" />
       <Hueco />
@@ -383,6 +389,13 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       Cargas del caso <strong className="font-semibold">{casoValido || "—"}</strong>
     </Chip>
   );
+  // La escala sólo cambia el alzado y el 3D: va en su cabecera
+  const cabeceraEscala = () => (
+    <>
+      {chipCaso}
+      <Desplegable etiqueta="Escala de las cargas" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
+    </>
+  );
   const vista = (
     <ZonaVistas
       fuentes={{
@@ -396,8 +409,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           ? {
               alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), cargas: { caso: casoValido, escala: Number(escala) } } : null} />,
               tresD: () => <TresDCargas caso={casoValido} escala={Number(escala)} />,
-              cabeceraAlzado: () => chipCaso,
-              cabecera3DModelo: () => chipCaso,
+              cabeceraAlzado: cabeceraEscala,
+              cabecera3DModelo: cabeceraEscala,
             }
           : {}),
         ...(ed && !cargas ? { dibujarEjes: () => foto.herramienta !== "ejes" && elegirHerramienta("ejes") } : {}),
@@ -478,8 +491,15 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               <PlantillaDibujo foto={foto} ctrl={ctrl} modelo={modeloEd} planta={planta} plantillas={plantillas} setPlantillas={setPlantillasDibujo} editar={editarDibujo} abrirTabla={(t) => abrirTabla(t)} />
             ) : elegidos.length > 1 ? (
               <ListaElegidos />
+            ) : seleccion && cargas && modeloEd && tipoPieza(modeloEd, seleccion) ? (
+              <PropiedadesCargas id={seleccion} caso={casoValido} plantillas={plantillas} setPlantillas={setPlantillasDibujo} editar={editarDibujo} />
             ) : seleccion ? (
-              <Inspector id={seleccion} />
+              <>
+                {cargas && modeloEd && <SobrePieza id={seleccion} />}
+                <Inspector id={seleccion} />
+              </>
+            ) : cargas ? (
+              <ResumenCaso caso={casoValido} />
             ) : (
               <ResumenPlanta />
             ),

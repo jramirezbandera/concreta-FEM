@@ -529,7 +529,7 @@ function SeccionEnganches({ foto, ctrl }: { foto: Instantanea; ctrl: Controlador
 }
 
 /** Un número de la plantilla; vacío es «el de por defecto» (y 0 también, salvo con `cero`); `falta`, en rojo mientras esté vacío. */
-function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, cero, vacio = "0" }: { etiqueta: string; unidad?: string; valor: number | undefined; onCambio: (v: number | undefined) => void; ayuda?: string; falta?: boolean; cero?: boolean; vacio?: string }) {
+export function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, cero, vacio = "0" }: { etiqueta: string; unidad?: string; valor: number | undefined; onCambio: (v: number | undefined) => void; ayuda?: string; falta?: boolean; cero?: boolean; vacio?: string }) {
   const [texto, setTexto] = useState<string | null>(null);
   const mostrado = texto ?? (valor === undefined ? "" : String(valor).replace(".", ","));
   const v = Number(mostrado.trim().replace(",", "."));
@@ -605,7 +605,7 @@ function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio, etiqueta = "se
 }
 
 /** Unos botones de radio en una fila (el modo de una herramienta, el tipo de un forjado). */
-function Segmentado<T extends string>({ etiqueta, valor, opciones, onCambio, ayuda }: { etiqueta: string; valor: T; opciones: readonly (readonly [T, string])[]; onCambio: (v: T) => void; ayuda?: ReactNode }) {
+export function Segmentado<T extends string>({ etiqueta, valor, opciones, onCambio, ayuda }: { etiqueta: string; valor: T; opciones: readonly (readonly [T, string])[]; onCambio: (v: T) => void; ayuda?: ReactNode }) {
   return (
     <div className="campo">
       <span>{etiqueta}</span>
@@ -706,7 +706,7 @@ const conComponente = (v: Vec3 | undefined, i: number, c: number | undefined): V
  * (el momento, o una carga en ejes locales). `final`, el valor al final de una carga variable, en la
  * misma dirección.
  */
-function CampoCarga({
+export function CampoCarga({
   etiqueta,
   unidad,
   valor,
