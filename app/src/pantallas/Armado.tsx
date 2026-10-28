@@ -22,7 +22,7 @@ import { leerNumero, textoNumero } from "../../../src/editor/celdas.ts";
 import type { ValorArmado } from "../../../src/visor/armado.ts";
 import type { DatosFranja } from "../../../src/visor/franjas.ts";
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
-import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { CampoLista, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcBanda } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
@@ -524,7 +524,7 @@ export function ModoArmado() {
   const herramientas = (
     <>
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
-      <Desplegable etiqueta="Armadura" valor={armadura} onCambio={setArmadura} opciones={ARMADURAS} />
+      <CampoLista etiqueta="Armadura" valor={armadura} onCambio={setArmadura} opciones={ARMADURAS} />
       <Separador />
       <BarraModos />
       <Separador />

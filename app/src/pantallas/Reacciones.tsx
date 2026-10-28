@@ -17,7 +17,7 @@ import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { Reacciones3D, ReaccionObjeto } from "../../../src/visor/reacciones3d.ts";
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
-import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { CampoLista, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcReacciones } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion } from "../componentes/comunes.tsx";
@@ -98,7 +98,7 @@ export function ModoReacciones() {
   const herramientas = (
     <>
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="reacciones" />
-      <Desplegable etiqueta="Escala de las flechas" prefijo={<span className="text-text-secondary">Escala</span>} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
+      <CampoLista etiqueta="Escala" nombre="Escala de las flechas" ancho={90} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
       <Separador />
       <BarraModos />
       <Separador />

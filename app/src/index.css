@@ -589,8 +589,6 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .herr[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
 .herr:disabled { opacity: .4; cursor: default; }
 .herr-sep { width: 1px; margin: 12px 6px; flex-shrink: 0; background: var(--color-border-main); }
-/* Un chip en la barra (la escala), centrado: con su altura fija, «stretch» lo deja arriba */
-.herramientas > .chip { align-self: center; }
 .herr-campo { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 6px; flex-shrink: 0; }
 .herr-campo > span, .herr-seg-et { font: 600 10px var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary); }
 .herr-seg { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 6px; flex-shrink: 0; }

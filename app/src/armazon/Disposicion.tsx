@@ -55,6 +55,21 @@ export function Campo({ etiqueta, children, ancho }: { etiqueta: string; childre
   );
 }
 
+/** Elegir uno de varios valores en la barra: un `Campo` con su desplegable, alineado con los demás. */
+export function CampoLista<T extends string>({ etiqueta, nombre, opciones, valor, onCambio, ancho }: { etiqueta: string; nombre?: string; opciones: readonly Opcion<T>[]; valor: T; onCambio: (v: T) => void; ancho?: number }) {
+  return (
+    <Campo etiqueta={etiqueta} ancho={ancho}>
+      <select className="sel w-full" value={valor} onChange={(x) => onCambio(x.target.value as T)} aria-label={nombre ?? etiqueta} title={opciones.find((o) => o.id === valor)?.title}>
+        {opciones.map((o) => (
+          <option key={o.id} value={o.id} disabled={o.disabled} title={o.title}>
+            {o.nombre}
+          </option>
+        ))}
+      </select>
+    </Campo>
+  );
+}
+
 // ─── Vista: cabecera y selector de plantas ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** Lo que dice qué se ve, arriba a la izquierda de la vista. */
