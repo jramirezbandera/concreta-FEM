@@ -9,7 +9,7 @@ import type { CasoFisico, ModeloFisico } from "../../../src/compilador/fisico.ts
 import { psiDe } from "../../../src/combinaciones/psi.ts";
 import type { Objeto } from "../../../src/editor/referencias.ts";
 import { DEF_TABLAS, contexto } from "../../../src/editor/tablas.ts";
-import { ACCIONES, CAMPOS_CASO, CLAVE_POR_TITULO } from "./explicaciones.ts";
+import { ACCIONES, CAMPOS_CASO } from "./explicaciones.ts";
 import "./gestores.css";
 
 const coma = (x: number) => String(x).replace(".", ",");
@@ -24,7 +24,7 @@ export function LetraAccion({ tipo, texto, grande }: { tipo?: string; texto?: st
 }
 
 /**
- * El campo del formulario bajo el ratón o con el foco, por el `aria-label` de su input (el título de
+ * El campo del formulario bajo el ratón o con el foco, por el `data-clave` de su input (la clave de
  * la columna). Se ponen los manejadores en el contenedor del formulario.
  */
 export function useCampoActivo() {
@@ -32,8 +32,8 @@ export function useCampoActivo() {
   const [encima, setEncima] = useState<string | null>(null);
   const clave = (t: EventTarget | null): string | null => {
     const campo = (t as HTMLElement | null)?.closest?.(".campo");
-    const titulo = campo?.querySelector("input, select")?.getAttribute("aria-label");
-    return titulo ? (CLAVE_POR_TITULO.get(titulo) ?? null) : null;
+    const clave = campo?.querySelector("[data-clave]")?.getAttribute("data-clave");
+    return clave && CAMPOS_CASO[clave] ? clave : null;
   };
   const manejadores = {
     onFocus: useCallback((e: FocusEvent) => setFoco(clave(e.target)), []),

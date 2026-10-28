@@ -785,21 +785,33 @@ const casos: DefTabla = {
   columnas: [
     id,
     nombre,
-    { clave: "pesoPropio", titulo: "peso propio", ayuda: "«sí» en el caso al que va el peso de las piezas (como mucho, uno)", opciones: fijas(["sí", "no"], "no") },
+    { clave: "pesoPropio", titulo: "peso propio", ayuda: "«sí»: el peso de pilares, vigas, losas y muros, sacado del modelo, va a este caso; sólo uno puede llevarlo", opciones: fijas(["sí", "no"], "no") },
     {
       clave: "tipo",
       titulo: "acción",
-      ayuda: "G permanente, Q sobrecarga de uso, S nieve, W viento, T temperatura, E sismo, A accidental o N nocional; vacía: el caso no entra en las combinaciones CTE/NCSE",
+      ayuda: "el tipo de acción del CTE, que decide sus γ y ψ y con qué otras se combina: G permanente, Q uso, S nieve, W viento, T temperatura, E sismo, A accidental o N nocional; vacía: se calcula, pero no entra en las combinaciones CTE/NCSE",
       opciones: () => [{ valor: "", texto: "(sin acción: fuera de las combinaciones)" }, ...ACCIONES.map(([valor, nombre]) => ({ valor, texto: `${valor} · ${nombre}` }))],
     },
-    { clave: "psi", titulo: "ψ", ayuda: `por su nombre (${PSI.join(", ")}) o «ψ0 ψ1 ψ2»`, opciones: fijas(PSI, "sin dar") },
-    { clave: "familia", titulo: "familia", ayuda: "excluyente: como mucho un caso de la familia por combinación" },
-    { clave: "permanente", titulo: "permanente", ayuda: "G: peso (por defecto), empuje o agua", opciones: fijas(["peso", "empuje", "agua"], "peso") },
-    { clave: "direccion", titulo: "dirección", ayuda: "W, E y N: X o Y", opciones: fijas(["X", "Y"], "sin dirección") },
-    { clave: "signo", titulo: "signo", ayuda: "W y N: 1 o -1", opciones: fijas(["1", "-1"], "sin signo") },
-    { clave: "derivadoDe", titulo: "deriva de", ayuda: "N: id del caso vertical", opciones: casos_("ninguno"), referencia: "casos" },
-    { clave: "duracion", titulo: "duración", ayuda: "permanente, larga, media, corta o instantanea; por defecto, la del tipo", opciones: fijas(["permanente", "larga", "media", "corta", "instantanea"], "la del tipo") },
+    { clave: "psi", titulo: "ψ", ayuda: `simultaneidad (DB SE, tabla 4.2): ψ0 al acompañar a otra variable, ψ1 frecuente, ψ2 casi permanente; por su nombre (${PSI.join(", ")}) o «ψ0 ψ1 ψ2»`, opciones: fijas(PSI, "sin dar") },
+    { clave: "familia", titulo: "familia", ayuda: "un nombre común a casos que se excluyen (el viento en ±X y ±Y): en cada combinación entra como mucho uno" },
+    { clave: "permanente", titulo: "permanente", ayuda: "sólo en G, la fila de la tabla 4.1: peso (γ 1,35 / 0,80, por defecto), empuje del terreno (1,35 / 0,70) o agua (1,20 / 0,90)", opciones: fijas(["peso", "empuje", "agua"], "peso") },
+    { clave: "direccion", titulo: "dirección", ayuda: "W, E y N: el eje global en que empuja, X o Y; en sismo, la otra dirección entra al 30 %", opciones: fijas(["X", "Y"], "sin dirección") },
+    { clave: "signo", titulo: "signo", ayuda: "W y N: el sentido, hacia +eje (1) o −eje (-1)", opciones: fijas(["1", "-1"], "sin signo") },
+    { clave: "derivadoDe", titulo: "deriva de", ayuda: "N: el caso vertical (G, Q o S) cuyo peso la genera; entra con su mismo factor", opciones: casos_("ninguno"), referencia: "casos" },
+    { clave: "duracion", titulo: "duración", ayuda: "clase de duración (DB SE-M, tabla 2.2), sólo para el kmod de la madera: permanente, larga, media, corta o instantanea; por defecto, la de la acción", opciones: fijas(["permanente", "larga", "media", "corta", "instantanea"], "la del tipo") },
   ],
+  // Lo que pide cada acción (`CasoCarga` de `src/combinaciones/generador.ts`); lo que no, la hoja lo apaga
+  aplica(clave, f) {
+    const t = (f.tipo ?? "").trim().toUpperCase();
+    if (clave === "id" || clave === "nombre" || clave === "pesoPropio") return true;
+    if (!t) return false;
+    if (clave === "psi") return "QSWT".includes(t);
+    if (clave === "permanente") return t === "G";
+    if (clave === "direccion") return "WEN".includes(t);
+    if (clave === "signo") return t === "W" || t === "N";
+    if (clave === "derivadoDe") return t === "N";
+    return true;
+  },
   fila(o) {
     const c = o as unknown as CasoFisico;
     const a = c.accion;

@@ -156,3 +156,23 @@ describe("GE3: añadir plantas", () => {
     expect(insertarPlantas(m, { n: 1, altura: 3, donde: "encima", de: "N9" }).ok).toBe(false);
   });
 });
+
+describe("la tabla Casos: lo que pide cada acción", () => {
+  const def = DEF_TABLAS.casos;
+  const pide = (tipo: string) => def.columnas.map((c) => c.clave).filter((k) => def.aplica!(k, { tipo }));
+  it("cada acción, sólo sus columnas; sin acción, ninguna de las combinaciones", () => {
+    expect(pide("")).toEqual(["id", "nombre", "pesoPropio"]);
+    expect(pide("G")).toEqual(["id", "nombre", "pesoPropio", "tipo", "familia", "permanente", "duracion"]);
+    expect(pide("Q")).toEqual(["id", "nombre", "pesoPropio", "tipo", "psi", "familia", "duracion"]);
+    expect(pide("W")).toEqual(["id", "nombre", "pesoPropio", "tipo", "psi", "familia", "direccion", "signo", "duracion"]);
+    expect(pide("E")).toEqual(["id", "nombre", "pesoPropio", "tipo", "familia", "direccion", "duracion"]);
+    expect(pide("N")).toEqual(["id", "nombre", "pesoPropio", "tipo", "familia", "direccion", "signo", "derivadoDe", "duracion"]);
+  });
+  it("los típicos no llevan nada que su acción no pida", () => {
+    const ctx = contexto(proyectoNuevo().modelo);
+    for (const t of CASOS_TIPICOS) {
+      const f = def.fila(t.caso as never, ctx);
+      for (const c of def.columnas) if (f[c.clave]) expect(def.aplica!(c.clave, f), `${t.clave}: ${c.clave}`).toBe(true);
+    }
+  });
+});

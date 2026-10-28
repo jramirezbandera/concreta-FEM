@@ -173,6 +173,3 @@ export const CAMPOS_CASO: Record<string, InfoCampo> = {
     ],
   },
 };
-
-/** La columna de la tabla Casos por el título de su campo (el `aria-label` del formulario). */
-export const CLAVE_POR_TITULO: ReadonlyMap<string, string> = new Map(Object.entries(CAMPOS_CASO).map(([k, c]) => [c.titulo, k]));
