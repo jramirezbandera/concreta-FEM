@@ -20,7 +20,7 @@
  *   por caso, equilibrio, hipótesis).
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
@@ -30,7 +30,7 @@ import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { DialogoAbacos, DialogoBorrar, DialogoCopiar, DialogoRenumerar, DialogoVigasBorde } from "../editor/Dialogos.tsx";
-import { tablaDe } from "../editor/Formulario.tsx";
+import { FormularioVarios, tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
 import { cota, fmt } from "../fmt.ts";
 import { Inspector } from "../pantallas/Inspector.tsx";
@@ -647,9 +647,11 @@ function ListaElegidos() {
   const { proyecto, elegidos, setSeleccion, setElegidos } = useVisor();
   const ed = proyecto.edicion;
   const porTipo = new Map<string, string[]>();
+  const tablaDeTipo = new Map<string, NombreTabla>();
   for (const id of elegidos) {
     const t = ed ? tablaDe(ed.proyecto.modelo, id) : null;
     const nombre = t ? DEF_TABLAS[t].titulo : "Otros";
+    if (t) tablaDeTipo.set(nombre, t);
     porTipo.set(nombre, [...(porTipo.get(nombre) ?? []), id]);
   }
   const orden = [...TABLAS.map((t) => DEF_TABLAS[t].titulo), "Otros"].filter((t) => porTipo.has(t));
@@ -661,15 +663,19 @@ function ListaElegidos() {
         </button>
       </Cabecera>
       {orden.map((t) => (
-        <Seccion key={t} titulo={t} valor={porTipo.get(t)!.length}>
-          <div className="fichas ids">
-            {porTipo.get(t)!.map((id) => (
-              <button key={id} type="button" title={`Dejar sólo ${id}`} onClick={() => setSeleccion(id)}>
-                {id}
-              </button>
-            ))}
-          </div>
-        </Seccion>
+        <Fragment key={t}>
+          <Seccion titulo={t} valor={porTipo.get(t)!.length}>
+            <div className="fichas ids">
+              {porTipo.get(t)!.map((id) => (
+                <button key={id} type="button" title={`Dejar sólo ${id}`} onClick={() => setSeleccion(id)}>
+                  {id}
+                </button>
+              ))}
+            </div>
+          </Seccion>
+          {/* Varios de una tabla: lo que tienen en común, editable en todos a la vez */}
+          {ed && tablaDeTipo.has(t) && porTipo.get(t)!.length > 1 && <FormularioVarios ids={porTipo.get(t)!} tabla={tablaDeTipo.get(t)!} />}
+        </Fragment>
       ))}
     </>
   );
