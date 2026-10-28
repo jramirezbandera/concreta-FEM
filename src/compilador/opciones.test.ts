@@ -92,21 +92,21 @@ describe("valores por defecto del compilador (C1-a y D4)", () => {
 
   it("las hipótesis lo dejan escrito para la memoria", () => {
     expect(compilado().hipotesis).toEqual([
-      "Nudos de dimensión finita: las vigas son rígidas en el 50 % de lo que recorren dentro del pilar (hasta su cara); los pilares, en todo el canto de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior, como CYPECAD (RV-b): la base arranca en el nudo.",
+      "Nudos de dimensión finita: las vigas son rígidas en el 50 % de lo que recorren dentro del pilar (hasta su cara); los pilares, en todo el canto de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior (RV-b): la base arranca en el nudo.",
       "Modificadores de rigidez (D4): tramos de pilar de hormigón: A ×2 (2); tramos de pilar de acero: A ×2 (1); tramos de viga de hormigón: J ×0,1 (1).",
-      "Empotramiento parcial de los pilares (CY2, como CYPECAD: la rigidez es α·K_biempotrada + (1 − α)·K_articulada en ese extremo): cabeza 0,3 (3 tramos). Por defecto, 0,3 en la cabeza del último tramo, salvo en los pilares sobre los que arranca otro.",
+      "Empotramiento parcial de los pilares (CY2: la rigidez es α·K_biempotrada + (1 − α)·K_articulada en ese extremo): cabeza 0,3 (3 tramos). Por defecto, 0,3 en la cabeza del último tramo, salvo en los pilares sobre los que arranca otro.",
       "Diafragma rígido en P1; sin diafragma en C.",
       "Eje de las vigas en el plano del forjado.",
     ]);
     expect(compilado({ factorZonaRigida: 1, modificadores: {} }).hipotesis.slice(0, 2)).toEqual([
-      "Nudos de dimensión finita: las vigas son rígidas en todo lo que recorren dentro del pilar (hasta su cara); los pilares, en todo el canto de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior, como CYPECAD (RV-b): la base arranca en el nudo.",
+      "Nudos de dimensión finita: las vigas son rígidas en todo lo que recorren dentro del pilar (hasta su cara); los pilares, en todo el canto de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior (RV-b): la base arranca en el nudo.",
       "Sin modificadores de rigidez.",
     ]);
     expect(compilado({ planoForjado: "medio" }).hipotesis[0]).toBe(
-      "Nudos de dimensión finita: las vigas son rígidas en el 50 % de lo que recorren dentro del pilar (hasta su cara); los pilares, hasta la cara de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo y, sobre un forjado, también en su base, como CYPECAD (LV-d).",
+      "Nudos de dimensión finita: las vigas son rígidas en el 50 % de lo que recorren dentro del pilar (hasta su cara); los pilares, hasta la cara de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo y, sobre un forjado, también en su base (LV-d).",
     );
     expect(compilado({ factorZonaRigidaPilares: 0.5 }).hipotesis[0]).toBe(
-      "Nudos de dimensión finita: las vigas son rígidas en el 50 % de lo que recorren dentro del pilar (hasta su cara); los pilares, en el 50 % del canto de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior, como CYPECAD (RV-b): la base arranca en el nudo.",
+      "Nudos de dimensión finita: las vigas son rígidas en el 50 % de lo que recorren dentro del pilar (hasta su cara); los pilares, en el 50 % del canto de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior (RV-b): la base arranca en el nudo.",
     );
     // con el factor 0, ninguna barra lleva offset (los pilares tampoco): de eje a eje
     expect(compilado({ factorZonaRigida: 0 }).hipotesis[0]).toMatch(/^Nudos de eje a eje/);

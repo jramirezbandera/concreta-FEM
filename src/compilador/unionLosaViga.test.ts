@@ -76,7 +76,7 @@ describe("fase LV: la losa unida a las vigas por sus caras", () => {
     expect(r.estadisticas.sinPerdidas.momentos).toBeLessThan(1e-9);
     expect(r.estadisticas.enlacesVigas.enlaces).toBeGreaterThan(0);
     expect(casosValidos(calcular(r.modelo))).toHaveLength(2);
-    expect(r.hipotesis.some((h) => h.includes("Unión losa–viga como CYPECAD"))).toBe(true);
+    expect(r.hipotesis.some((h) => h.includes("Unión losa–viga por las caras de la viga"))).toBe(true);
   });
 
   it("no hay láminas en el ancho de las vigas, y sus nudos en él van con un enlace", () => {

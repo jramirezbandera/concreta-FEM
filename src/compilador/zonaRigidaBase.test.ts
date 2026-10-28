@@ -143,7 +143,7 @@ describe("zona rígida en la base de los tramos de pilar (LV-d)", () => {
   });
 
   it("la hipótesis lo deja escrito", () => {
-    expect(valido(compilarMedio(portico())).hipotesis[0]).toMatch(/también en su base, como CYPECAD \(LV-d\)\.$/);
+    expect(valido(compilarMedio(portico())).hipotesis[0]).toMatch(/también en su base \(LV-d\)\.$/);
     expect(valido(compilarMedio(portico(), { zonaRigidaBase: false })).hipotesis[0]).toMatch(/en la cabeza de cada tramo\.$/);
   });
 });

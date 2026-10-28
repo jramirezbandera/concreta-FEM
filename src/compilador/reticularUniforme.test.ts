@@ -96,7 +96,7 @@ describe("rigidez del reticular (CY3)", () => {
   });
 
   it("la hipótesis va en el informe, y una opción no válida es un error", () => {
-    expect(valido(compilar(recuadro())).hipotesis.some((h) => /con la rigidez de CYPECAD \(CY3\)/.test(h))).toBe(true);
+    expect(valido(compilar(recuadro())).hipotesis.some((h) => /con la rigidez «uniforme» \(CY3\)/.test(h))).toBe(true);
     expect(valido(compilar(recuadro(), { rigidezReticular: "bruta" })).hipotesis.some((h) => /C4-h, rigidez «bruta»/.test(h))).toBe(true);
     const r = compilar(recuadro(), { rigidezReticular: "otra" as never });
     expect(r.valido).toBe(false);

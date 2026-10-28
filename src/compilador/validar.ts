@@ -250,7 +250,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     return null;
   }
   if (op.planoForjado !== "superior" && op.planoForjado !== "medio") {
-    diag.error("opciones/no-validas", "El plano de los nudos del forjado tiene que ser superior (su cara superior, la de CYPECAD) o medio (el plano medio de la losa).");
+    diag.error("opciones/no-validas", "El plano de los nudos del forjado tiene que ser superior (su cara superior, por defecto) o medio (el plano medio de la losa).");
     return null;
   }
   if (!(num(op.empotramientoCabeza) && op.empotramientoCabeza >= 0 && op.empotramientoCabeza <= 1)) {
@@ -258,7 +258,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     return null;
   }
   if (op.rigidezReticular !== "uniforme" && op.rigidezReticular !== "bruta") {
-    diag.error("opciones/no-validas", "La rigidez del reticular tiene que ser uniforme (la de CYPECAD) o bruta (C4-h).");
+    diag.error("opciones/no-validas", "La rigidez del reticular tiene que ser uniforme (por defecto) o bruta (C4-h).");
     return null;
   }
   if (!(num(op.rigidezVigasPlanas) && op.rigidezVigasPlanas > 0 && op.rigidezVigasPlanas <= 1)) {
@@ -266,7 +266,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     return null;
   }
   if (op.unionLosaViga !== "cara" && op.unionLosaViga !== "eje") {
-    diag.error("opciones/no-validas", "La unión de las losas con las vigas tiene que ser cara (la de CYPECAD) o eje (C2-c, C2-e).");
+    diag.error("opciones/no-validas", "La unión de las losas con las vigas tiene que ser cara (por defecto) o eje (C2-c, C2-e).");
     return null;
   }
   if (!(num(op.tamanoMalla) && op.tamanoMalla >= 2 * op.epsSnap)) {

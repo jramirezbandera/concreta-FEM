@@ -409,7 +409,7 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
               <span>Las vigas siguen a los pilares</span>
             </label>
           )}
-          {h !== "copiar" && !(h === "simetria" && t.conservar) && <p className="nota">Las vigas no elegidas que acaban en el punto fijo de un pilar que se mueve lo siguen, como en CYPECAD. Con Ctrl en el último clic, no.</p>}
+          {h !== "copiar" && !(h === "simetria" && t.conservar) && <p className="nota">Las vigas no elegidas que acaban en el punto fijo de un pilar que se mueve lo siguen. Con Ctrl en el último clic, no.</p>}
           {h === "copiar" && (
             <>
               <div className="campo" style={{ alignItems: "start" }}>
@@ -461,11 +461,14 @@ export function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, c
   };
   return (
     <label className="campo">
-      <span>{etiqueta}</span>
+      <span>
+        <span className="campo-nombre">{etiqueta}</span>
+        {ayuda && <Ayuda texto={ayuda} />}
+      </span>
       <span className="dib-unidad" data-unidad={unidad}>
         <input value={mostrado} placeholder={falta ? "obligatorio" : vacio} data-error={mal || (!!falta && !mostrado.trim())} aria-label={etiqueta} aria-invalid={mal} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
       </span>
-      {mal ? <p className="error">Un número</p> : ayuda ? <p className="ayuda">{ayuda}</p> : null}
+      {mal && <p className="error">Un número</p>}
     </label>
   );
 }

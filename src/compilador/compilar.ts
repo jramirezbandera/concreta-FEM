@@ -484,15 +484,15 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     fp === 0
       ? "los pilares, de eje a eje"
       : op.planoForjado === "superior"
-        ? `los pilares, ${fp === 1 ? "en todo el canto" : `en el ${coma(fp * 100)} % del canto`} de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior, como CYPECAD (RV-b): la base arranca en el nudo`
+        ? `los pilares, ${fp === 1 ? "en todo el canto" : `en el ${coma(fp * 100)} % del canto`} de la losa o de la viga más alta que les llega, en la cabeza de cada tramo, con los nudos del forjado en su cara superior (RV-b): la base arranca en el nudo`
         : `los pilares, ${fp === 1 ? "hasta la cara" : `en el ${coma(fp * 100)} % del nudo hacia la cara`} de la viga o la losa que les llega (el medio canto con el eje de la viga en el plano del forjado, el canto entero si cuelga de él), en la cabeza de cada tramo${
-            op.zonaRigidaBase ? " y, sobre un forjado, también en su base, como CYPECAD (LV-d)" : ""
+            op.zonaRigidaBase ? " y, sobre un forjado, también en su base (LV-d)" : ""
           }`;
   h.push(
     !conZonas
       ? "Nudos de eje a eje: ninguna barra tiene zona rígida ni excentricidad (las secciones no dan dimensiones al nudo), así que el factor de zona rígida no actúa."
       : fv === 0 && fp === 0
-        ? "Nudos de eje a eje: sin zonas rígidas (factor 0), como SAP2000 por defecto."
+        ? "Nudos de eje a eje: sin zonas rígidas (factor 0)."
         : `Nudos de dimensión finita: ${vigasZR}; ${pilaresZR}.`,
   );
   // PF: los pilares cuyo eje cambia entre tramos
@@ -508,7 +508,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
   });
   if (excentricos.length)
     h.push(
-      `Pilares con punto fijo y cambio de sección (PF, como CYPECAD): el eje de cada tramo es el centro de su sección; el nudo de cada planta va en el eje del tramo que llega a ella desde abajo, y la excentricidad, en un offset rígido en la base del tramo de encima (${excentricos.map((p) => p.id).join(", ")}).`,
+      `Pilares con punto fijo y cambio de sección (PF): el eje de cada tramo es el centro de su sección; el nudo de cada planta va en el eje del tramo que llega a ella desde abajo, y la excentricidad, en un offset rígido en la base del tramo de encima (${excentricos.map((p) => p.id).join(", ")}).`,
     );
   const grupos = new Map<string, number>();
   for (const b of piezas.barras) {
@@ -524,7 +524,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
   if (planas.size) {
     const vs = [...new Set([...planas].map((b) => b.pieza))].sort();
     h.push(
-      `Vigas planas en un reticular (RV-a): la flexión (Iy) ×${coma(op.rigidezVigasPlanas)} en ${planas.size} tramos de ${vs.length} vigas (${vs.join(", ")}), incluida en los modificadores de arriba. Es un ajuste empírico a CYPECAD, que trata así las vigas de hormigón con el canto del forjado embebidas en un reticular «uniforme» sin decirlo en su memoria: con la sección bruta, sus vigas llevan hasta 1,6 veces el momento de vano de CYPECAD y la losa, hasta un 13 % menos.`,
+      `Vigas planas en un reticular (RV-a): la flexión (Iy) ×${coma(op.rigidezVigasPlanas)} en ${planas.size} tramos de ${vs.length} vigas (${vs.join(", ")}), incluida en los modificadores de arriba. Es un ajuste empírico para las vigas de hormigón con el canto del forjado embebidas en un reticular «uniforme»: con la sección bruta, en los modelos de contraste, estas vigas llevaban hasta 1,6 veces el momento de vano de referencia y la losa, hasta un 13 % menos.`,
     );
   }
   // CY2: empotramiento parcial de los extremos de pilar, agrupado por valor
@@ -540,7 +540,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
   if (ctx.pilares.length)
     h.push(
       emp.size
-        ? `Empotramiento parcial de los pilares (CY2, como CYPECAD: la rigidez es α·K_biempotrada + (1 − α)·K_articulada en ese extremo): ${[...emp].map(([k, n]) => `${k} (${n} tramos)`).join("; ")}. Por defecto, 0,3 en la cabeza del último tramo, salvo en los pilares sobre los que arranca otro.`
+        ? `Empotramiento parcial de los pilares (CY2: la rigidez es α·K_biempotrada + (1 − α)·K_articulada en ese extremo): ${[...emp].map(([k, n]) => `${k} (${n} tramos)`).join("; ")}. Por defecto, 0,3 en la cabeza del último tramo, salvo en los pilares sobre los que arranca otro.`
         : "Pilares empotrados en sus dos extremos (sin coeficiente de empotramiento parcial).",
     );
   const usadas = new Set<string>([...ctx.vigas.map((v) => v.planta), ...ctx.losas.map((l) => l.losa.planta), ...ctx.panos.map((p) => p.pano.planta)]);
@@ -574,7 +574,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     h.push(
       `Unión pilar–losa por la huella del pilar, rígida: sólo los nudos dentro de la huella o en su borde (${losas.huellas.length} huellas, H09; fase HR). ${
         conAncho
-          ? `Unión losa–viga como CYPECAD (fase LV, CY-g): el ancho de las vigas de hormigón rectangulares no es losa; la losa llega a sus caras y sus nudos en ellas van unidos al eje de la viga por un enlace rígido (${losas.enlacesVigas.length} enlaces, ${losas.enlacesVigas.reduce((a, x) => a + x.esclavos.length, 0)} nudos; los que caen frente a un pilar, con su huella). Lo que cae en el ancho de la viga (el pp de la losa, sus cargas de superficie, lineales y puntuales) pasa a la viga con su momento de transporte.${tiras.length ? ` La franja de losa entre la cara de fuera de una viga y el borde dibujado del forjado, de hasta el ancho de la viga, va con la viga del mismo modo, sin mallarse: el borde dibujado no se mueve (fase TB; ${tiras.length} tiras, en ${tirasVigas.join(", ")}).` : ""}${op.refinoEsquinas ? ` La malla se refina en las esquinas de los paños entre vigas (fase LV2: plantillas de esquina graduadas hacia ella, con 3 niveles en los cruces con pilar y 2 en los demás), para que la viga en la cara del pilar y las franjas junto a las vigas salgan como con la malla fina.` : ""}${otras ? " Las demás vigas (metálicas o de otras secciones) se parten en los nudos de la malla sobre su eje, con la losa continua por encima." : ""}`
+          ? `Unión losa–viga por las caras de la viga (fase LV, CY-g): el ancho de las vigas de hormigón rectangulares no es losa; la losa llega a sus caras y sus nudos en ellas van unidos al eje de la viga por un enlace rígido (${losas.enlacesVigas.length} enlaces, ${losas.enlacesVigas.reduce((a, x) => a + x.esclavos.length, 0)} nudos; los que caen frente a un pilar, con su huella). Lo que cae en el ancho de la viga (el pp de la losa, sus cargas de superficie, lineales y puntuales) pasa a la viga con su momento de transporte.${tiras.length ? ` La franja de losa entre la cara de fuera de una viga y el borde dibujado del forjado, de hasta el ancho de la viga, va con la viga del mismo modo, sin mallarse: el borde dibujado no se mueve (fase TB; ${tiras.length} tiras, en ${tirasVigas.join(", ")}).` : ""}${op.refinoEsquinas ? ` La malla se refina en las esquinas de los paños entre vigas (fase LV2: plantillas de esquina graduadas hacia ella, con 3 niveles en los cruces con pilar y 2 en los demás), para que la viga en la cara del pilar y las franjas junto a las vigas salgan como con la malla fina.` : ""}${otras ? " Las demás vigas (metálicas o de otras secciones) se parten en los nudos de la malla sobre su eje, con la losa continua por encima." : ""}`
           : "Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas."
       } La zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
     );
@@ -598,7 +598,7 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
         r.dados
           ? `Forjado reticular ${l.losa.id}: zona aligerada con los multiplicadores dados por el usuario sobre la losa maciza de ${coma(l.material.t)} m, con el ν del material (C4-h): f11 ${f(m.f11)}, f22 ${f(m.f22)}, f12 ${f(m.f12)}, m11 ${f(m.m11)}, m22 ${f(m.m22)}, m12 ${f(m.m12)}, v13 ${f(m.v13)}, v23 ${f(m.v23)}; ${r.abacos.length} ábacos macizos.`
           : r.abaco
-            ? `Forjado reticular ${l.losa.id} (nervios de ${coma(nr.nervio)} m cada ${coma(nr.intereje)} m, capa de ${coma(nr.capa)} m y canto total ${coma(l.material.t)} m), con la rigidez de CYPECAD (CY3): la zona aligerada y sus ${r.abacos.length} ábacos, con la mitad de la flexión de la maciza y la torsión de su emparrillado, sin efecto Poisson (ν = 0): m11 = m22 ${f(m.m11)}, m12 ${f(m.m12)}; la membrana y el cortante, por zonas (aligerada: f11 = f22 ${f(m.f11)}, f12 ${f(m.f12)}, v13 = v23 ${f(m.v13)}; ábacos, los de la maciza).`
+            ? `Forjado reticular ${l.losa.id} (nervios de ${coma(nr.nervio)} m cada ${coma(nr.intereje)} m, capa de ${coma(nr.capa)} m y canto total ${coma(l.material.t)} m), con la rigidez «uniforme» (CY3): la zona aligerada y sus ${r.abacos.length} ábacos, con la mitad de la flexión de la maciza y la torsión de su emparrillado, sin efecto Poisson (ν = 0): m11 = m22 ${f(m.m11)}, m12 ${f(m.m12)}; la membrana y el cortante, por zonas (aligerada: f11 = f22 ${f(m.f11)}, f12 ${f(m.f12)}, v13 = v23 ${f(m.v13)}; ábacos, los de la maciza).`
             : `Forjado reticular ${l.losa.id} (nervios de ${coma(nr.nervio)} m cada ${coma(nr.intereje)} m, capa de ${coma(nr.capa)} m y canto total ${coma(l.material.t)} m): la zona aligerada es una lámina maciza con los multiplicadores del emparrillado de nervios, sin efecto Poisson (ν = 0) y con el G del hormigón (C4-h, rigidez «bruta»): f11 = f22 ${f(m.f11)}, f12 ${f(m.f12)}, m11 = m22 ${f(m.m11)}, m12 ${f(m.m12)}, v13 = v23 ${f(m.v13)}; ${r.abacos.length} ábacos macizos.`,
       );
     }

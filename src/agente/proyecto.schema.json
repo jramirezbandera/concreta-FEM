@@ -1006,7 +1006,7 @@
         "casos"
       ],
       "additionalProperties": false,
-      "description": "Modelo físico del compilador (C1: plantas, pilares, vigas, apoyos, casos y cargas; C2: losas,\napoyos lineales, bandas y cargas de superficie y lineales; C3: muros y empujes). Es lo que el\nusuario describe; el compilador lo convierte en el `ModeloAnalitico` del motor\n(`docs/fem3d/compilador.md`).\n\nConvenios:\n- Unidades kN y m (D1); los módulos elásticos, en kN/m², salvo los datos de material que se\n  dicen en MPa; el peso específico, en kN/m³.\n- Ejes globales X, Y en planta y Z hacia arriba, los del motor (cabecera de `motor/modelo.ts`).\n- Las plantas van de ARRIBA ABAJO, cada una con su altura de forjado a forjado hasta la de\n  encima, como `lib/edificio` de Concreta. Las cotas se derivan (`cotas.ts`); nunca se guardan\n  (H33, COM-17). Un nivel de cimentación es una planta más, de tipo `sotano`, que cuelga de la de\n  encima su propia altura.\n- Todo lo demás se sitúa en planta (x, y) y por la planta a la que pertenece.\n- Los `id` son únicos en todo el modelo (plantas, materiales, secciones, piezas, apoyos, casos y\n  cargas), así que un diagnóstico nombra el objeto sólo por su `id`.\n- Ejes locales de las piezas, los de las barras del motor (H02):\n  · viga: x a lo largo de cada tramo de su polilínea, en el sentido de sus puntos; z = +Z (el\n    canto, vertical); y = z × x;\n  · pilar: x hacia arriba; z = dirección del canto h en planta, girada `giro` grados desde +X;\n    y = z × x. Con giro 0, el canto h va según X y el ancho b según −Y.\n  Las liberaciones y las cargas \"local\" van en esos ejes.\n- Estaciones: distancia en m a lo largo de la pieza, desde el primer punto de una viga (sumando\n  sus tramos) o desde la base de un pilar.\n- Losas (C2): planas, en el plano de su planta, a la cota del forjado. Esa cota es la cara superior\n  del forjado, como en CYPECAD (RV-b, `planoForjado: \"superior\"`, por defecto): las láminas, el eje\n  de las vigas y sus nudos van en ella; con `planoForjado: \"medio\"`, es el plano medio de la losa.\n  Su contorno y sus huecos son polígonos simples en planta, en cualquier sentido y sin repetir el\n  primer punto. Los bordes van a ejes: un borde que se apoya en una viga se dibuja sobre su eje\n  (C2-c). Las láminas tienen la normal hacia +Z y el eje 1 en la dirección `eje1` (E3-2).\n- Muros (C3): verticales, de forjado a forjado, con el plano medio sobre su eje en planta (una\n  polilínea; cada tramo es un paño plano). Los bordes de las losas que se apoyan en un muro van\n  sobre su eje (C3-b). En alzado, la estación s va a lo largo del eje desde su primer punto\n  (sumando sus tramos) y la altura z, desde la cota de su base. Sus láminas tienen el eje 1\n  horizontal en el sentido del tramo, el 2 hacia +Z y el 3 (la normal) a la derecha del sentido\n  del eje en planta. «Izquierdo» y «derecho» son los lados del eje mirando en su sentido.\n- Forjados (C4): un reticular es una losa con `reticular` (los nervios van según su `eje1` y la\n  perpendicular); un unidireccional es un paño (`panos`) dibujado como una losa, a ejes, cuyas\n  viguetas van según su `direccion`. Cada vigueta es una pieza (`<paño>:v<n>`) con los ejes de\n  una viga: x a lo largo de ella, en el sentido de la dirección llevada a [0°, 180°) (las de 0° y\n  180° son las mismas), y z = +Z; sus estaciones van desde su primer extremo."
+      "description": "Modelo físico del compilador (C1: plantas, pilares, vigas, apoyos, casos y cargas; C2: losas,\napoyos lineales, bandas y cargas de superficie y lineales; C3: muros y empujes). Es lo que el\nusuario describe; el compilador lo convierte en el `ModeloAnalitico` del motor\n(`docs/fem3d/compilador.md`).\n\nConvenios:\n- Unidades kN y m (D1); los módulos elásticos, en kN/m², salvo los datos de material que se\n  dicen en MPa; el peso específico, en kN/m³.\n- Ejes globales X, Y en planta y Z hacia arriba, los del motor (cabecera de `motor/modelo.ts`).\n- Las plantas van de ARRIBA ABAJO, cada una con su altura de forjado a forjado hasta la de\n  encima, como `lib/edificio` de Concreta. Las cotas se derivan (`cotas.ts`); nunca se guardan\n  (H33, COM-17). Un nivel de cimentación es una planta más, de tipo `sotano`, que cuelga de la de\n  encima su propia altura.\n- Todo lo demás se sitúa en planta (x, y) y por la planta a la que pertenece.\n- Los `id` son únicos en todo el modelo (plantas, materiales, secciones, piezas, apoyos, casos y\n  cargas), así que un diagnóstico nombra el objeto sólo por su `id`.\n- Ejes locales de las piezas, los de las barras del motor (H02):\n  · viga: x a lo largo de cada tramo de su polilínea, en el sentido de sus puntos; z = +Z (el\n    canto, vertical); y = z × x;\n  · pilar: x hacia arriba; z = dirección del canto h en planta, girada `giro` grados desde +X;\n    y = z × x. Con giro 0, el canto h va según X y el ancho b según −Y.\n  Las liberaciones y las cargas \"local\" van en esos ejes.\n- Estaciones: distancia en m a lo largo de la pieza, desde el primer punto de una viga (sumando\n  sus tramos) o desde la base de un pilar.\n- Losas (C2): planas, en el plano de su planta, a la cota del forjado. Esa cota es la cara superior\n  del forjado (RV-b, `planoForjado: \"superior\"`, por defecto): las láminas, el eje\n  de las vigas y sus nudos van en ella; con `planoForjado: \"medio\"`, es el plano medio de la losa.\n  Su contorno y sus huecos son polígonos simples en planta, en cualquier sentido y sin repetir el\n  primer punto. Los bordes van a ejes: un borde que se apoya en una viga se dibuja sobre su eje\n  (C2-c). Las láminas tienen la normal hacia +Z y el eje 1 en la dirección `eje1` (E3-2).\n- Muros (C3): verticales, de forjado a forjado, con el plano medio sobre su eje en planta (una\n  polilínea; cada tramo es un paño plano). Los bordes de las losas que se apoyan en un muro van\n  sobre su eje (C3-b). En alzado, la estación s va a lo largo del eje desde su primer punto\n  (sumando sus tramos) y la altura z, desde la cota de su base. Sus láminas tienen el eje 1\n  horizontal en el sentido del tramo, el 2 hacia +Z y el 3 (la normal) a la derecha del sentido\n  del eje en planta. «Izquierdo» y «derecho» son los lados del eje mirando en su sentido.\n- Forjados (C4): un reticular es una losa con `reticular` (los nervios van según su `eje1` y la\n  perpendicular); un unidireccional es un paño (`panos`) dibujado como una losa, a ejes, cuyas\n  viguetas van según su `direccion`. Cada vigueta es una pieza (`<paño>:v<n>`) con los ejes de\n  una viga: x a lo largo de ella, en el sentido de la dirección llevada a [0°, 180°) (las de 0° y\n  180° son las mismas), y z = +Z; sus estaciones van desde su primer extremo."
     },
     "ModificadoresBarra": {
       "type": "object",
@@ -1172,40 +1172,40 @@
         },
         "factorZonaRigida": {
           "type": "number",
-          "description": "Fracción rígida de los nudos de dimensión finita en las vigas y viguetas, en [0, 1] (C1-a): de lo\nque su eje recorre dentro de la huella del pilar. Por defecto, 0,5. Con 1, hasta la cara del\npilar, como en CYPECAD; con 0, de eje a eje, como SAP2000 por defecto."
+          "description": "Fracción rígida de los nudos de dimensión finita en las vigas y viguetas, en [0, 1] (C1-a): de lo\nque su eje recorre dentro de la huella del pilar. Por defecto, 0,5. Con 1, hasta la cara del\npilar; con 0, de eje a eje."
         },
         "factorZonaRigidaPilares": {
           "type": "number",
-          "description": "Fracción rígida del nudo en los tramos de pilar, en [0, 1] (ZR1): de lo que el nudo físico ocupa\npor debajo del plano del forjado en la cabeza y por encima en la base (`planoForjado`). Con el\nplano en la cara superior (por defecto), todo el canto de la losa o de la viga más alta por debajo\ny nada por encima; con el plano medio, medio canto de la losa o de una viga con el eje en el plano\npor debajo (el canto entero de una viga con la cara superior en él) y por encima (con\n`zonaRigidaBase`). Por defecto, 1 (hasta la cara, como CYPECAD), salvo con `factorZonaRigida: 0`,\nque deja también los pilares de eje a eje."
+          "description": "Fracción rígida del nudo en los tramos de pilar, en [0, 1] (ZR1): de lo que el nudo físico ocupa\npor debajo del plano del forjado en la cabeza y por encima en la base (`planoForjado`). Con el\nplano en la cara superior (por defecto), todo el canto de la losa o de la viga más alta por debajo\ny nada por encima; con el plano medio, medio canto de la losa o de una viga con el eje en el plano\npor debajo (el canto entero de una viga con la cara superior en él) y por encima (con\n`zonaRigidaBase`). Por defecto, 1 (hasta la cara), salvo con `factorZonaRigida: 0`,\nque deja también los pilares de eje a eje."
         },
         "planoForjado": {
           "enum": [
             "medio",
             "superior"
           ],
-          "description": "Plano de los nudos del forjado (RV-b, `fase-lv.md` §2.3). \"superior\" (por defecto, el de\nCYPECAD): la cota de la planta es la cara superior del forjado, y las láminas de la losa y el eje\nde las vigas van en ella; el nudo físico de un pilar ocupa por debajo todo el canto de la losa de\nsu huella o de la viga más alta que le llega, y nada por encima. La cabeza de cada tramo es\nrígida en ese canto y la base arranca en el nudo (`zonaRigidaBase` no actúa). \"medio\" (C1–ZR1):\nla cota es el plano medio de la losa, y el nudo ocupa medio canto por debajo y medio por encima.\nNo es un hecho físico (la losa trabaja en su plano medio), sino el convenio de CYPECAD: entre dos\nforjados del mismo canto la altura libre es la misma, pero la cabeza tiene de brazo el canto entero\ny la base ninguno, y eso da los momentos de los pilares de CYPE (en el de esquina, +12–25 % en el\npie). Bajo el primer forjado, la altura libre es la altura menos el canto entero."
+          "description": "Plano de los nudos del forjado (RV-b, `fase-lv.md` §2.3). \"superior\" (por defecto): la\ncota de la planta es la cara superior del forjado, y las láminas de la losa y el eje\nde las vigas van en ella; el nudo físico de un pilar ocupa por debajo todo el canto de la losa de\nsu huella o de la viga más alta que le llega, y nada por encima. La cabeza de cada tramo es\nrígida en ese canto y la base arranca en el nudo (`zonaRigidaBase` no actúa). \"medio\" (C1–ZR1):\nla cota es el plano medio de la losa, y el nudo ocupa medio canto por debajo y medio por encima.\nNo es un hecho físico (la losa trabaja en su plano medio), sino el convenio habitual de los planos:\nentre dos forjados del mismo canto la altura libre es la misma, pero la cabeza tiene de brazo el\ncanto entero y la base ninguno (en el pilar de esquina, +12–25 % de momento en el pie). Bajo el\nprimer forjado, la altura libre es la altura menos el canto entero."
         },
         "empotramientoCabeza": {
           "type": "number",
-          "description": "Coeficiente de empotramiento de la cabeza del último tramo de cada pilar, en [0, 1] (CY2, CY-b).\nPor defecto, 0,3, el que aconseja CYPECAD: la cabeza, con poco axil, fisura y no desarrolla el\nempotramiento elástico. Se multiplica por el `empotramiento.cabeza` del pilar. No se aplica al\npilar sobre el que arranca otro en su cabeza. Con 1, la cabeza empotrada de antes de CY2."
+          "description": "Coeficiente de empotramiento de la cabeza del último tramo de cada pilar, en [0, 1] (CY2, CY-b).\nPor defecto, 0,3: la cabeza, con poco axil, fisura y no desarrolla el\nempotramiento elástico. Se multiplica por el `empotramiento.cabeza` del pilar. No se aplica al\npilar sobre el que arranca otro en su cabeza. Con 1, la cabeza empotrada de antes de CY2."
         },
         "rigidezReticular": {
           "enum": [
             "bruta",
             "uniforme"
           ],
-          "description": "Rigidez de los forjados reticulares (CY3, CY-c). \"uniforme\" (por defecto), la de CYPECAD: la\nzona aligerada y los ábacos con la mitad de la flexión de la maciza y la torsión de su\nemparrillado, sin Poisson; como fisurados, los ábacos no se llevan los momentos de los vanos.\n\"bruta\" (C4-h): la zona aligerada con la T bruta de sus nervios y los ábacos macizos. Los\n`multiplicadores` dados en la losa mandan sobre las dos."
+          "description": "Rigidez de los forjados reticulares (CY3, CY-c). \"uniforme\" (por defecto): la\nzona aligerada y los ábacos con la mitad de la flexión de la maciza y la torsión de su\nemparrillado, sin Poisson; como fisurados, los ábacos no se llevan los momentos de los vanos.\n\"bruta\" (C4-h): la zona aligerada con la T bruta de sus nervios y los ábacos macizos. Los\n`multiplicadores` dados en la losa mandan sobre las dos."
         },
         "rigidezVigasPlanas": {
           "type": "number",
-          "description": "Flexión de las vigas planas en un reticular (RV-a, `fase-lv.md` §2.4), en (0, 1]: el `Iy` de los\ntramos de viga de hormigón rectangular con un canto no mayor que el del forjado que tienen a uno\no a los dos lados un reticular «uniforme» (con `rigidezReticular: \"uniforme\"` y sin\n`multiplicadores` dados), y ninguna otra losa, se multiplica por este factor (encima de los\n`modificadores`). Por defecto, 0,6: el ajuste a CYPECAD, que trata así estas vigas sin decirlo\nen su memoria (modelo A con vigas planas de 30 y de 50: ±11 %, y del lado seguro en la viga). No\nrebaja las vigas descolgadas ni las de una losa maciza, como CYPECAD. Con 1, nada."
+          "description": "Flexión de las vigas planas en un reticular (RV-a, `fase-lv.md` §2.4), en (0, 1]: el `Iy` de los\ntramos de viga de hormigón rectangular con un canto no mayor que el del forjado que tienen a uno\no a los dos lados un reticular «uniforme» (con `rigidezReticular: \"uniforme\"` y sin\n`multiplicadores` dados), y ninguna otra losa, se multiplica por este factor (encima de los\n`modificadores`). Por defecto, 0,6: un ajuste empírico (modelo A con vigas planas de 30 y\nde 50: ±11 %, y del lado seguro en la viga). No rebaja las vigas descolgadas ni las de una losa\nmaciza. Con 1, nada."
         },
         "unionLosaViga": {
           "enum": [
             "cara",
             "eje"
           ],
-          "description": "Unión de las losas con las vigas de hormigón rectangulares (fase LV, CY-g). \"cara\" (por\ndefecto), la de CYPECAD: el ancho de la viga no es losa, y los nudos de la losa en sus caras van\nunidos a su eje por un enlace rígido; lo que cae en el ancho pasa a la viga. \"eje\" (C2-c, C2-e):\nla losa llega al eje de la viga y la viga se parte en los nudos de la malla sobre él."
+          "description": "Unión de las losas con las vigas de hormigón rectangulares (fase LV, CY-g). \"cara\" (por\ndefecto): el ancho de la viga no es losa, y los nudos de la losa en sus caras van\nunidos a su eje por un enlace rígido; lo que cae en el ancho pasa a la viga. \"eje\" (C2-c, C2-e):\nla losa llega al eje de la viga y la viga se parte en los nudos de la malla sobre él."
         },
         "cortante": {
           "type": "boolean",
@@ -1253,7 +1253,7 @@
         },
         "zonaRigidaBase": {
           "type": "boolean",
-          "description": "Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo\nnudo inferior está en un forjado es rígida en lo que ese nudo ocupa por encima del plano del\nforjado (medio canto de la losa en la huella del pilar o de la viga más alta que le llega con el\neje en el plano; una viga con la cara superior en el forjado queda entera por debajo y no cuenta),\npor `factorZonaRigidaPilares`. Con los valores por defecto, la cara del forjado, como CYPECAD.\nPor defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1. Sólo actúa\ncon `planoForjado: \"medio\"`: con el plano en la cara superior, el nudo no ocupa nada por encima."
+          "description": "Zona rígida en la base de los tramos de pilar (LV-d): la base de un tramo cuyo\nnudo inferior está en un forjado es rígida en lo que ese nudo ocupa por encima del plano del\nforjado (medio canto de la losa en la huella del pilar o de la viga más alta que le llega con el\neje en el plano; una viga con la cara superior en el forjado queda entera por debajo y no cuenta),\npor `factorZonaRigidaPilares`. Con los valores por defecto, la cara del forjado.\nPor defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1. Sólo actúa\ncon `planoForjado: \"medio\"`: con el plano en la cara superior, el nudo no ocupa nada por encima."
         },
         "tirasBorde": {
           "type": "boolean",
@@ -1454,7 +1454,7 @@
             }
           },
           "additionalProperties": false,
-          "description": "Coeficientes de empotramiento, en [0, 1] (CY2, como en CYPECAD): el de la base del tramo\ninferior y el de la cabeza del tramo superior. 0 es articulado y 1, empotrado (por defecto). El\nde la cabeza se multiplica por la opción `empotramientoCabeza`."
+          "description": "Coeficientes de empotramiento, en [0, 1] (CY2): el de la base del tramo\ninferior y el de la cabeza del tramo superior. 0 es articulado y 1, empotrado (por defecto). El\nde la cabeza se multiplica por la opción `empotramientoCabeza`."
         }
       },
       "required": [
@@ -1636,7 +1636,7 @@
         "mitad-izquierda",
         "mitad-superior"
       ],
-      "description": "Punto fijo de un pilar (fase PF, como en CYPECAD): el punto de su sección que está en (x, y) en\ntodas las plantas. Los lados, en los ejes de la sección girados con ella: «derecha» según el canto\nh y «superior» a 90° (con giro 0, +X y +Y). Lo explica `puntoFijo.ts`."
+      "description": "Punto fijo de un pilar (fase PF): el punto de su sección que está en (x, y) en\ntodas las plantas. Los lados, en los ejes de la sección girados con ella: «derecha» según el canto\nh y «superior» a 90° (con giro 0, +X y +Y). Lo explica `puntoFijo.ts`."
     },
     "Reticular": {
       "type": "object",
@@ -1675,7 +1675,7 @@
         },
         "multiplicadores": {
           "$ref": "#/$defs/MultiplicadoresLamina",
-          "description": "Multiplicadores de la zona aligerada dados por el usuario: sustituyen a los calculados y se\naplican sobre la maciza con el ν del material, como en SAP2000 (C4-h). Cada uno en (0, 100]."
+          "description": "Multiplicadores de la zona aligerada dados por el usuario: sustituyen a los calculados y se\naplican sobre la maciza con el ν del material (C4-h). Cada uno en (0, 100]."
         }
       },
       "required": [

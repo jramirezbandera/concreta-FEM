@@ -173,7 +173,7 @@ describe("los nudos del forjado en su cara superior (RV-b)", () => {
   });
 
   it("la hipótesis lo deja escrito", () => {
-    expect(valido(compilar(portico())).hipotesis[0]).toMatch(/con los nudos del forjado en su cara superior, como CYPECAD \(RV-b\): la base arranca en el nudo\.$/);
-    expect(valido(compilar(portico(), { planoForjado: "medio" })).hipotesis[0]).toMatch(/también en su base, como CYPECAD \(LV-d\)\.$/);
+    expect(valido(compilar(portico())).hipotesis[0]).toMatch(/con los nudos del forjado en su cara superior \(RV-b\): la base arranca en el nudo\.$/);
+    expect(valido(compilar(portico(), { planoForjado: "medio" })).hipotesis[0]).toMatch(/también en su base \(LV-d\)\.$/);
   });
 });

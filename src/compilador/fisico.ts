@@ -24,7 +24,7 @@
  * - Estaciones: distancia en m a lo largo de la pieza, desde el primer punto de una viga (sumando
  *   sus tramos) o desde la base de un pilar.
  * - Losas (C2): planas, en el plano de su planta, a la cota del forjado. Esa cota es la cara superior
- *   del forjado, como en CYPECAD (RV-b, `planoForjado: "superior"`, por defecto): las láminas, el eje
+ *   del forjado (RV-b, `planoForjado: "superior"`, por defecto): las láminas, el eje
  *   de las vigas y sus nudos van en ella; con `planoForjado: "medio"`, es el plano medio de la losa.
  *   Su contorno y sus huecos son polígonos simples en planta, en cualquier sentido y sin repetir el
  *   primer punto. Los bordes van a ejes: un borde que se apoya en una viga se dibuja sobre su eje
@@ -124,7 +124,7 @@ export type Seccion =
 export type Liberacion = Seis<boolean>;
 
 /**
- * Punto fijo de un pilar (fase PF, como en CYPECAD): el punto de su sección que está en (x, y) en
+ * Punto fijo de un pilar (fase PF): el punto de su sección que está en (x, y) en
  * todas las plantas. Los lados, en los ejes de la sección girados con ella: «derecha» según el canto
  * h y «superior» a 90° (con giro 0, +X y +Y). Lo explica `puntoFijo.ts`.
  */
@@ -168,7 +168,7 @@ export interface Pilar {
   /** Liberaciones en la base física (tramo inferior) y en la cabeza física (tramo superior). */
   liberaciones?: { base?: Liberacion; cabeza?: Liberacion };
   /**
-   * Coeficientes de empotramiento, en [0, 1] (CY2, como en CYPECAD): el de la base del tramo
+   * Coeficientes de empotramiento, en [0, 1] (CY2): el de la base del tramo
    * inferior y el de la cabeza del tramo superior. 0 es articulado y 1, empotrado (por defecto). El
    * de la cabeza se multiplica por la opción `empotramientoCabeza`.
    */
@@ -345,7 +345,7 @@ export interface Reticular {
   abacos?: readonly (readonly Vec2[])[];
   /**
    * Multiplicadores de la zona aligerada dados por el usuario: sustituyen a los calculados y se
-   * aplican sobre la maciza con el ν del material, como en SAP2000 (C4-h). Cada uno en (0, 100].
+   * aplican sobre la maciza con el ν del material (C4-h). Cada uno en (0, 100].
    */
   multiplicadores?: MultiplicadoresLamina;
 }
@@ -576,7 +576,7 @@ export interface OpcionesCompilacion {
   /**
    * Fracción rígida de los nudos de dimensión finita en las vigas y viguetas, en [0, 1] (C1-a): de lo
    * que su eje recorre dentro de la huella del pilar. Por defecto, 0,5. Con 1, hasta la cara del
-   * pilar, como en CYPECAD; con 0, de eje a eje, como SAP2000 por defecto.
+   * pilar; con 0, de eje a eje.
    */
   factorZonaRigida?: number;
   /**
@@ -585,32 +585,32 @@ export interface OpcionesCompilacion {
    * plano en la cara superior (por defecto), todo el canto de la losa o de la viga más alta por debajo
    * y nada por encima; con el plano medio, medio canto de la losa o de una viga con el eje en el plano
    * por debajo (el canto entero de una viga con la cara superior en él) y por encima (con
-   * `zonaRigidaBase`). Por defecto, 1 (hasta la cara, como CYPECAD), salvo con `factorZonaRigida: 0`,
+   * `zonaRigidaBase`). Por defecto, 1 (hasta la cara), salvo con `factorZonaRigida: 0`,
    * que deja también los pilares de eje a eje.
    */
   factorZonaRigidaPilares?: number;
   /**
-   * Plano de los nudos del forjado (RV-b, `fase-lv.md` §2.3). "superior" (por defecto, el de
-   * CYPECAD): la cota de la planta es la cara superior del forjado, y las láminas de la losa y el eje
+   * Plano de los nudos del forjado (RV-b, `fase-lv.md` §2.3). "superior" (por defecto): la
+   * cota de la planta es la cara superior del forjado, y las láminas de la losa y el eje
    * de las vigas van en ella; el nudo físico de un pilar ocupa por debajo todo el canto de la losa de
    * su huella o de la viga más alta que le llega, y nada por encima. La cabeza de cada tramo es
    * rígida en ese canto y la base arranca en el nudo (`zonaRigidaBase` no actúa). "medio" (C1–ZR1):
    * la cota es el plano medio de la losa, y el nudo ocupa medio canto por debajo y medio por encima.
-   * No es un hecho físico (la losa trabaja en su plano medio), sino el convenio de CYPECAD: entre dos
-   * forjados del mismo canto la altura libre es la misma, pero la cabeza tiene de brazo el canto entero
-   * y la base ninguno, y eso da los momentos de los pilares de CYPE (en el de esquina, +12–25 % en el
-   * pie). Bajo el primer forjado, la altura libre es la altura menos el canto entero.
+   * No es un hecho físico (la losa trabaja en su plano medio), sino el convenio habitual de los planos:
+   * entre dos forjados del mismo canto la altura libre es la misma, pero la cabeza tiene de brazo el
+   * canto entero y la base ninguno (en el pilar de esquina, +12–25 % de momento en el pie). Bajo el
+   * primer forjado, la altura libre es la altura menos el canto entero.
    */
   planoForjado?: "superior" | "medio";
   /**
    * Coeficiente de empotramiento de la cabeza del último tramo de cada pilar, en [0, 1] (CY2, CY-b).
-   * Por defecto, 0,3, el que aconseja CYPECAD: la cabeza, con poco axil, fisura y no desarrolla el
+   * Por defecto, 0,3: la cabeza, con poco axil, fisura y no desarrolla el
    * empotramiento elástico. Se multiplica por el `empotramiento.cabeza` del pilar. No se aplica al
    * pilar sobre el que arranca otro en su cabeza. Con 1, la cabeza empotrada de antes de CY2.
    */
   empotramientoCabeza?: number;
   /**
-   * Rigidez de los forjados reticulares (CY3, CY-c). "uniforme" (por defecto), la de CYPECAD: la
+   * Rigidez de los forjados reticulares (CY3, CY-c). "uniforme" (por defecto): la
    * zona aligerada y los ábacos con la mitad de la flexión de la maciza y la torsión de su
    * emparrillado, sin Poisson; como fisurados, los ábacos no se llevan los momentos de los vanos.
    * "bruta" (C4-h): la zona aligerada con la T bruta de sus nervios y los ábacos macizos. Los
@@ -622,14 +622,14 @@ export interface OpcionesCompilacion {
    * tramos de viga de hormigón rectangular con un canto no mayor que el del forjado que tienen a uno
    * o a los dos lados un reticular «uniforme» (con `rigidezReticular: "uniforme"` y sin
    * `multiplicadores` dados), y ninguna otra losa, se multiplica por este factor (encima de los
-   * `modificadores`). Por defecto, 0,6: el ajuste a CYPECAD, que trata así estas vigas sin decirlo
-   * en su memoria (modelo A con vigas planas de 30 y de 50: ±11 %, y del lado seguro en la viga). No
-   * rebaja las vigas descolgadas ni las de una losa maciza, como CYPECAD. Con 1, nada.
+   * `modificadores`). Por defecto, 0,6: un ajuste empírico (modelo A con vigas planas de 30 y
+   * de 50: ±11 %, y del lado seguro en la viga). No rebaja las vigas descolgadas ni las de una losa
+   * maciza. Con 1, nada.
    */
   rigidezVigasPlanas?: number;
   /**
    * Unión de las losas con las vigas de hormigón rectangulares (fase LV, CY-g). "cara" (por
-   * defecto), la de CYPECAD: el ancho de la viga no es losa, y los nudos de la losa en sus caras van
+   * defecto): el ancho de la viga no es losa, y los nudos de la losa en sus caras van
    * unidos a su eje por un enlace rígido; lo que cae en el ancho pasa a la viga. "eje" (C2-c, C2-e):
    * la losa llega al eje de la viga y la viga se parte en los nudos de la malla sobre él.
    */
@@ -698,11 +698,11 @@ export interface OpcionesCompilacion {
    */
   jacobianoRefino?: number;
   /**
-   * Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo
+   * Zona rígida en la base de los tramos de pilar (LV-d): la base de un tramo cuyo
    * nudo inferior está en un forjado es rígida en lo que ese nudo ocupa por encima del plano del
    * forjado (medio canto de la losa en la huella del pilar o de la viga más alta que le llega con el
    * eje en el plano; una viga con la cara superior en el forjado queda entera por debajo y no cuenta),
-   * por `factorZonaRigidaPilares`. Con los valores por defecto, la cara del forjado, como CYPECAD.
+   * por `factorZonaRigidaPilares`. Con los valores por defecto, la cara del forjado.
    * Por defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1. Sólo actúa
    * con `planoForjado: "medio"`: con el plano en la cara superior, el nudo no ocupa nada por encima.
    */
