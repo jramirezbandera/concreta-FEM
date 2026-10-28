@@ -1305,7 +1305,15 @@
         },
         "pp": {
           "type": "number",
-          "description": "Peso propio del forjado, kN/m² (H24): incluye las bovedillas, que la sección no conoce."
+          "description": "Peso propio del forjado, kN/m² (H24), con las bovedillas. Sin él, con una vigueta en T, sale de\nla sección y de la `bovedilla` (`pesoForjado.ts`); con otra sección es obligatorio."
+        },
+        "bovedilla": {
+          "enum": [
+            "ceramica",
+            "hormigon",
+            "poliestireno"
+          ],
+          "description": "Bovedilla, para el peso sin `pp`. Por defecto, \"hormigon\"."
         }
       },
       "required": [
@@ -1314,8 +1322,7 @@
         "contorno",
         "direccion",
         "intereje",
-        "seccion",
-        "pp"
+        "seccion"
       ],
       "additionalProperties": false,
       "description": "Paño de forjado unidireccional (C4, D2): viguetas como barras según `direccion`, cada\n`intereje`, dentro de su contorno (sin sus huecos). Vale también para placas alveolares y chapa\ncolaborante (barras unidireccionales con su intereje, H46). Su contorno va a ejes (C2-c): sobre\nlos ejes de las vigas y los muros en los que se apoya."
@@ -1648,10 +1655,13 @@
         },
         "caseton": {
           "enum": [
+            "ceramica",
+            "hormigon",
             "perdido",
+            "poliestireno",
             "recuperable"
           ],
-          "description": "Casetón (C4-i). Por defecto, \"perdido\", el caso más común en obra: se queda en el forjado y su\npeso depende de su material, así que el `pp` de la losa es obligatorio. Con \"recuperable\", sin\n`pp` el peso es el del hormigón: γ·volumen en la zona aligerada y γ·h en los ábacos."
+          "description": "Casetón (C4-i, `pesoForjado.ts`). Sin `pp`, el peso sale de él: γ·volumen de hormigón más el peso\naparente del casetón en el hueco entre nervios, en la zona aligerada, y γ·h en los ábacos. Por\ndefecto, \"hormigon\" (perdido de hormigón, el más común en obra; desde el 2026-10-28). Los perdidos\n\"ceramica\" y \"poliestireno\", y \"recuperable\" (el hueco no pesa). \"perdido\" es un casetón perdido\nde otro material: el `pp` de la losa es obligatorio."
         },
         "abacos": {
           "type": "array",

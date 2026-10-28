@@ -18,10 +18,12 @@
 import { compilar } from "../compilador/compilar.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
-import type { CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesCompilacion, Seccion, Vec2 } from "../compilador/fisico.ts";
+import type { CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesCompilacion, PanoUnidireccional, Seccion, Vec2 } from "../compilador/fisico.ts";
+import { ppLosa as ppLosaFisica, ppPano } from "../compilador/pesoForjado.ts";
 import { areaConSigno, momentosInterseccion, puntoEnRegion, recorteRegionConvexo, type Region } from "../compilador/poligonos.ts";
 import { TIRA_MAXIMA } from "../compilador/anchosVigas.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
+import { volumenReticular } from "../compilador/reticular.ts";
 import type { TipoAccion } from "../combinaciones/generador.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import { cargasPorPlanta, type Resumen } from "./consultas.ts";
@@ -325,6 +327,7 @@ function datos(f: ModeloFisico): Registro[] {
     if (fuera(x, r)) pp.aviso(`La losa ${l.id} tiene pp = ${num(l.pp)} kN/m², ${num(x)} veces el de una maciza de su espesor (${rango(r)}): ¿es un peso específico o está mal el espesor?`, [l.id], { pp: l.pp, relacion: x });
   }
   for (const x of f.panos ?? []) {
+    if (x.pp === undefined) continue;
     pp.peor(salida(x.pp, U.ppPano), `${x.id}: pp = ${num(x.pp)} kN/m²`);
     if (fuera(x.pp, U.ppPano)) pp.aviso(`El paño ${x.id} tiene pp = ${num(x.pp)} kN/m² (${rango(U.ppPano, "kN/m²")}).`, [x.id], { pp: x.pp });
   }
@@ -361,7 +364,7 @@ function claveCarga(c: CargaFisica): string {
 function cargas(f: ModeloFisico): Registro[] {
   const sinPP = new Registro("sensatez/sin-peso-propio", "Caso de peso propio", "no hay ningún caso con `pesoPropio`");
   // Sólo si algo pesaría: un modelo con todos los materiales de peso 0 y paños sin pp no lo necesita
-  const pesan = f.materiales.some((m) => gammaMaterial(m) > 0) || (f.panos ?? []).some((x) => x.pp > 0) || (f.losas ?? []).some((l) => (l.pp ?? 0) > 0);
+  const pesan = f.materiales.some((m) => gammaMaterial(m) > 0) || (f.panos ?? []).some((x) => (ppDePano(f, x) ?? 0) > 0) || (f.losas ?? []).some((l) => (l.pp ?? 0) > 0);
   const conPiezas = [f.pilares, f.vigas, f.losas, f.muros, f.panos].some((x) => x?.length);
   if (conPiezas && pesan) {
     sinPP.aplica();
@@ -530,13 +533,21 @@ export function sobreMuros(t: { A: Vec2; L: number; u: Vec2 }, k: number, f: Mod
   return r;
 }
 
-/** El pp de una losa (kN/m²) en su zona maciza o aligerada y en sus ábacos, como el compilador (C4-i). */
+/**
+ * El pp de una losa (kN/m²) en su zona maciza o aligerada y en sus ábacos, como el compilador (C4-i,
+ * `pesoForjado.ts`). Un reticular con casetón "perdido" sin pp (error del compilador) pesa como el
+ * recuperable.
+ */
 export function ppLosa(l: Losa, m: Material): { pp: number; ppAbaco: number } {
   const g = gammaMaterial(m);
-  if (l.pp !== undefined) return { pp: l.pp, ppAbaco: l.pp };
-  if (!l.reticular) return { pp: g * l.espesor, ppAbaco: g * l.espesor };
-  const { intereje: s, nervio: bw, capa: hf } = l.reticular;
-  return { pp: g * (hf + (l.espesor - hf) * (1 - ((s - bw) / s) ** 2)), ppAbaco: g * l.espesor };
+  const r = l.reticular;
+  return ppLosaFisica(l, g) ?? { pp: g * volumenReticular({ h: l.espesor, hf: r!.capa, bw: r!.nervio, s: r!.intereje }), ppAbaco: g * l.espesor };
+}
+
+/** El pp de un paño (kN/m²), como el compilador: el escrito o el de su vigueta en T y su bovedilla (`pesoForjado.ts`). */
+export function ppDePano(f: ModeloFisico, p: PanoUnidireccional): number | undefined {
+  const s = f.secciones.find((x) => x.id === p.seccion);
+  return ppPano(p, s, s && f.materiales.find((x) => x.id === s.material));
 }
 
 /**
@@ -557,7 +568,7 @@ export function pesoLibre(f: ModeloFisico, planta: string, q: Vec2, h: number, g
   const pn = (f.panos ?? []).find((x) => x.planta === planta && puntoEnRegion(q, regionDe(x)));
   const s = pn && f.secciones.find((x) => x.id === pn.seccion);
   const hv = s ? cantoSeccion(s) : null;
-  return hv ? solido(hv, pn!.pp) : gamma * h;
+  return hv ? solido(hv, ppDePano(f, pn!) ?? 0) : gamma * h;
 }
 
 /**
@@ -608,7 +619,7 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05): Omi
       for (const pn of panosEn(v.planta)) {
         const h = seccion.get(pn.seccion);
         const hv = h ? cantoSeccion(h) : null;
-        if (hv) x.solapes += momentosInterseccion(regionDe(pn), huella).A * forjado(hv, pn.pp);
+        if (hv) x.solapes += momentosInterseccion(regionDe(pn), huella).A * forjado(hv, ppDePano(f, pn) ?? 0);
       }
       // A-9: por el eje de un muro que le llega desde abajo, sólo lo que sobresale de él
       for (const o of sobreMuros(t, k, f, P, eps)) {
@@ -623,7 +634,7 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05): Omi
     const m = material.get(l.material);
     if (m) r.get(l.planta)!.losas += pesoLosa(l, m);
   }
-  for (const pn of f.panos ?? []) r.get(pn.planta)!.panos += pn.pp * areaRegion(pn);
+  for (const pn of f.panos ?? []) r.get(pn.planta)!.panos += (ppDePano(f, pn) ?? 0) * areaRegion(pn);
   for (const m of f.muros ?? []) {
     const mat = material.get(m.material);
     if (!mat) continue;
@@ -651,18 +662,16 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05): Omi
 }
 
 /**
- * Peso de una losa, kN: su pp por su área o, sin él, γ·e (maciza) o, en un reticular con casetón
- * recuperable (C4-i), γ·volumen en la zona aligerada y γ·e en los ábacos.
+ * Peso de una losa, kN: su pp por su área o, sin él, γ·e (maciza) o, en un reticular (C4-i), el pp
+ * de su casetón en la zona aligerada y γ·e en los ábacos (`ppLosa`).
  */
 export function pesoLosa(l: Losa, m: Material): number {
-  const g = gammaMaterial(m);
   const A = areaRegion(l);
   if (l.pp !== undefined) return l.pp * A;
-  if (!l.reticular) return g * l.espesor * A;
-  const { intereje: s, nervio: bw, capa: hf } = l.reticular;
-  const vol = hf + (l.espesor - hf) * (1 - ((s - bw) / s) ** 2);
+  if (!l.reticular) return gammaMaterial(m) * l.espesor * A;
+  const { pp, ppAbaco } = ppLosa(l, m);
   const Aab = (l.reticular.abacos ?? []).reduce((t, ab) => t + Math.abs(momentosInterseccion(regionDe(l), ab).A), 0);
-  return g * (vol * (A - Aab) + l.espesor * Aab);
+  return pp * (A - Aab) + ppAbaco * Aab;
 }
 
 /**

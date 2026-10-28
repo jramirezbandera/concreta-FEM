@@ -412,15 +412,14 @@ describe("C4: reticular", () => {
     expect(peso(reticular(4.5, undefined, "recuperable"))).toBeCloseTo(4.5 * 36, 8);
   });
 
-  it("con casetón perdido (por defecto) el pp es obligatorio: su peso depende de su material (C4-i)", () => {
-    for (const omitido of [true, false]) {
-      const f = reticular(undefined, undefined, "perdido");
-      if (omitido) delete (f.losas![0]!.reticular as { caseton?: string }).caseton;
-      const r = compilar(f);
-      expect(r.valido).toBe(false);
-      expect(r.diagnosticos.find((d) => d.codigo === "reticular/sin-pp")?.ids).toEqual(["L"]);
-    }
+  it("con un casetón perdido de otro material el pp es obligatorio (C4-i); sin decirlo, el casetón es de hormigón", () => {
+    const r = compilar(reticular(undefined, undefined, "perdido"));
+    expect(r.valido).toBe(false);
+    expect(r.diagnosticos.find((d) => d.codigo === "reticular/sin-pp")?.ids).toEqual(["L"]);
     expect(compilar(reticular(4.5, undefined, "perdido")).valido).toBe(true);
+    const g = reticular(undefined, undefined, "perdido");
+    delete (g.losas![0]!.reticular as { caseton?: string }).caseton;
+    expect(compilar(g).valido).toBe(true);
     const f = reticular(undefined, undefined, "recuperable");
     (f.losas![0]!.reticular as unknown as Record<string, unknown>).caseton = "de corcho";
     expect(compilar(f).diagnosticos.map((d) => d.codigo)).toContain("fisico/valor-no-valido");

@@ -421,7 +421,7 @@ function etiquetaLosa(l: Losa): string {
 }
 
 function etiquetaPano(p: PanoUnidireccional): string {
-  return `${p.id} · viguetas a ${rotulo(p.intereje * 100)} cm, ${rotulo(p.direccion)}°, pp ${rotulo(p.pp)} kN/m²`;
+  return `${p.id} · viguetas a ${rotulo(p.intereje * 100)} cm, ${rotulo(p.direccion)}°${p.pp !== undefined ? `, pp ${rotulo(p.pp)} kN/m²` : ""}`;
 }
 
 /** Tramos del eje de un muro (en planta) que ocupan sus huecos en el piso de debajo de la planta. */

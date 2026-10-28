@@ -21,7 +21,7 @@
 import type { CargaFisica, Losa, ModeloFisico, PanoUnidireccional, Vec2 } from "../compilador/fisico.ts";
 import { momentosInterseccion, type Region } from "../compilador/poligonos.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
-import { areaRegion, areaSeccion, gammaMaterial, pesoLibre, pesoLosa, Plantas, regionDe, sobreMuros, tramos } from "./sensatez.ts";
+import { areaRegion, areaSeccion, gammaMaterial, pesoLibre, pesoLosa, Plantas, ppDePano, regionDe, sobreMuros, tramos } from "./sensatez.ts";
 
 /** Separación de los puntos de los ejes de los muros que hacen de generadores, m. */
 export const PASO_MURO = 0.5;
@@ -226,7 +226,7 @@ export function bajadaTributaria(f: ModeloFisico, casos: ReadonlySet<string>, ep
           const m = material.get(l.material);
           if (m) enCeldas(regionDe(l), pesoLosa(l, m) / areaRegion(l));
         }
-        for (const x of panosEn(pl)) enCeldas(regionDe(x), x.pp);
+        for (const x of panosEn(pl)) enCeldas(regionDe(x), ppDePano(f, x) ?? 0);
         for (const v of f.vigas ?? []) {
           if (v.planta !== pl) continue;
           const s = seccion.get(v.seccion);

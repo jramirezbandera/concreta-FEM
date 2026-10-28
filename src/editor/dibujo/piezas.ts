@@ -28,6 +28,8 @@
  */
 import { huellaMuro, PlantaFisica } from "../../agente/render/modelo.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
+import { BOVEDILLA_POR_DEFECTO, CASETON_POR_DEFECTO, desglosePano, pesoReticular, type Bovedilla, type Caseton, type DesglosePeso } from "../../compilador/pesoForjado.ts";
+import { materialElastico } from "../../compilador/secciones.ts";
 import type { ApoyoFisico, ApoyoLineal, HuecoMuro, Losa, ModeloFisico, Muro, PanoUnidireccional, Vec2 } from "../../compilador/fisico.ts";
 import type { Seis } from "../../motor/modelo.ts";
 import type { Operacion } from "../operaciones.ts";
@@ -56,13 +58,37 @@ export interface PlantillaForjado {
   intereje?: number;
   nervio?: number;
   capa?: number;
-  caseton?: "perdido" | "recuperable";
+  /** Reticular: el casetón, para el peso propio (por defecto, `CASETON_POR_DEFECTO`). */
+  caseton?: Caseton;
   /** Unidireccional: la sección de la vigueta. */
   seccion?: string;
+  /** Unidireccional: la bovedilla, para el peso propio (por defecto, `BOVEDILLA_POR_DEFECTO`). */
+  bovedilla?: Bovedilla;
   /** Maciza y reticular: las vigas de borde en los lados libres (por defecto, sí). */
   zunchos?: boolean;
   /** Ancho de esas vigas, m (por defecto, `ANCHO_ZUNCHO`); el canto, el del forjado. */
   anchoZuncho?: number;
+}
+
+/**
+ * El pp que tomará un forjado de la plantilla sin pp escrito (`pesoForjado.ts`), para enseñarlo;
+ * undefined si no sale (falta un dato, casetón "perdido" o una vigueta que no es una T).
+ */
+export function pesoPlantillaForjado(m: ModeloFisico, t: PlantillaForjado): DesglosePeso | undefined {
+  const tipo = t.tipo ?? "maciza";
+  if (tipo === "unidireccional") {
+    const v = m.secciones.find((x) => x.id === t.seccion);
+    if (!v || !(t.intereje! > 0)) return undefined;
+    return desglosePano({ id: "", planta: "", contorno: [], direccion: 0, intereje: t.intereje!, seccion: v.id, ...(t.bovedilla ? { bovedilla: t.bovedilla } : {}) }, v, m.materiales.find((x) => x.id === v.material));
+  }
+  const mat = m.materiales.find((x) => x.id === t.material);
+  const h = t.espesor;
+  if (!mat || !(h! > 0)) return undefined;
+  const g = materialElastico(mat).peso;
+  if (tipo === "maciza") return { hormigon: h!, gamma: g, hueco: 0, pesoHueco: 0, pp: g * h! };
+  const [s, bw, hf] = [t.intereje, t.nervio, t.capa];
+  if (!(s! > 0 && bw! > 0 && hf! > 0 && bw! < s! && hf! < h!)) return undefined;
+  return pesoReticular({ h: h!, hf: hf!, bw: bw!, s: s! }, g, t.caseton);
 }
 
 export interface PlantillaHueco {
@@ -248,9 +274,20 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[]): Paso | string {
   if (tipo === "unidireccional") {
     if (!positivo(t.intereje)) return "Escriba en Propiedades el intereje de las viguetas.";
     if (!seccionValida(m, t.seccion)) return "Elija en Propiedades la sección de la vigueta (o cree una).";
-    if (t.pp === undefined) return "Escriba en Propiedades el peso propio del forjado (con las bovedillas).";
     const id = idNuevo(m, "F");
-    const pano: PanoUnidireccional = { id, planta: ctx.planta, contorno, direccion: t.direccion ?? 0, intereje: t.intereje!, seccion: t.seccion!, pp: t.pp };
+    const pano: PanoUnidireccional = {
+      id,
+      planta: ctx.planta,
+      contorno,
+      direccion: t.direccion ?? 0,
+      intereje: t.intereje!,
+      seccion: t.seccion!,
+      ...(t.pp !== undefined ? { pp: t.pp } : {}),
+      ...(t.bovedilla && t.bovedilla !== BOVEDILLA_POR_DEFECTO ? { bovedilla: t.bovedilla } : {}),
+    };
+    const v = m.secciones.find((x) => x.id === t.seccion);
+    if (t.pp === undefined && !desglosePano(pano, v, v && m.materiales.find((x) => x.id === v.material)))
+      return "La vigueta no es una T más estrecha que el intereje: escriba en Propiedades el peso propio del forjado (con las bovedillas).";
     return hecho(crear("panos", pano), `Forjado ${id} (unidireccional)`);
   }
   if (!positivo(t.espesor)) return "Escriba en Propiedades el canto del forjado.";
@@ -258,8 +295,8 @@ function forjadoCon(ctx: ContextoHerramienta, contorno: Vec2[]): Paso | string {
   let reticular: Losa["reticular"];
   if (tipo === "reticular") {
     if (!positivo(t.intereje) || !positivo(t.nervio) || !positivo(t.capa)) return "Escriba en Propiedades el intereje, el nervio y la capa del reticular.";
-    if (t.caseton !== "recuperable" && t.pp === undefined) return "Con casetón perdido, escriba en Propiedades el peso propio del reticular.";
-    reticular = { intereje: t.intereje!, nervio: t.nervio!, capa: t.capa!, ...(t.caseton === "recuperable" ? { caseton: t.caseton } : {}) };
+    if (t.caseton === "perdido" && t.pp === undefined) return "Con un casetón perdido de otro material, escriba en Propiedades el peso propio del reticular.";
+    reticular = { intereje: t.intereje!, nervio: t.nervio!, capa: t.capa!, ...(t.caseton && t.caseton !== CASETON_POR_DEFECTO ? { caseton: t.caseton } : {}) };
   }
   const id = idNuevo(m, "L");
   const losa: Losa = { id, planta: ctx.planta, contorno, espesor: t.espesor!, material: t.material!, ...(t.pp !== undefined ? { pp: t.pp } : {}), ...(t.direccion ? { eje1: t.direccion } : {}), ...(reticular ? { reticular } : {}) };

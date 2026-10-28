@@ -331,11 +331,13 @@ export interface Reticular {
   /** Espesor de la capa de compresión (hf). */
   capa: number;
   /**
-   * Casetón (C4-i). Por defecto, "perdido", el caso más común en obra: se queda en el forjado y su
-   * peso depende de su material, así que el `pp` de la losa es obligatorio. Con "recuperable", sin
-   * `pp` el peso es el del hormigón: γ·volumen en la zona aligerada y γ·h en los ábacos.
+   * Casetón (C4-i, `pesoForjado.ts`). Sin `pp`, el peso sale de él: γ·volumen de hormigón más el peso
+   * aparente del casetón en el hueco entre nervios, en la zona aligerada, y γ·h en los ábacos. Por
+   * defecto, "hormigon" (perdido de hormigón, el más común en obra; desde el 2026-10-28). Los perdidos
+   * "ceramica" y "poliestireno", y "recuperable" (el hueco no pesa). "perdido" es un casetón perdido
+   * de otro material: el `pp` de la losa es obligatorio.
    */
-  caseton?: "perdido" | "recuperable";
+  caseton?: "hormigon" | "ceramica" | "poliestireno" | "recuperable" | "perdido";
   /**
    * Ábacos: polígonos simples macizos (multiplicador 1). Pueden salirse de la losa: cuenta su
    * parte dentro. No pueden solaparse entre sí.
@@ -371,8 +373,13 @@ export interface PanoUnidireccional {
   intereje: number;
   /** Sección de una vigueta: la T bruta (bf = intereje) u otra. No pesa: el peso es el `pp`. */
   seccion: string;
-  /** Peso propio del forjado, kN/m² (H24): incluye las bovedillas, que la sección no conoce. */
-  pp: number;
+  /**
+   * Peso propio del forjado, kN/m² (H24), con las bovedillas. Sin él, con una vigueta en T, sale de
+   * la sección y de la `bovedilla` (`pesoForjado.ts`); con otra sección es obligatorio.
+   */
+  pp?: number;
+  /** Bovedilla, para el peso sin `pp`. Por defecto, "hormigon". */
+  bovedilla?: "hormigon" | "ceramica" | "poliestireno";
 }
 
 /** Apoyo lineal (C2): todos los nudos de la malla sobre una polilínea de una losa o del eje de un muro (C3). */

@@ -15,13 +15,15 @@ import type { ModeloFisico, PuntoFijo, Seccion as SeccionFisica } from "../../..
 import type { Seis, Vec3 } from "../../../src/motor/modelo.ts";
 import { medidasSeccion, SIGNOS_PUNTO_FIJO } from "../../../src/compilador/puntoFijo.ts";
 import { operacionProponerEjes, plantasPilar, type Alinear, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
-import { ANCHO_ZUNCHO, COARTADOS, HUECO_MURO, type PlantillaForjado } from "../../../src/editor/dibujo/piezas.ts";
+import { ANCHO_ZUNCHO, COARTADOS, HUECO_MURO, pesoPlantillaForjado, type PlantillaForjado } from "../../../src/editor/dibujo/piezas.ts";
+import { BOVEDILLA_POR_DEFECTO, BOVEDILLAS, CASETON_POR_DEFECTO, CASETONES, type Bovedilla, type Caseton } from "../../../src/compilador/pesoForjado.ts";
 import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
-import { TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
+import { TEXTO_BOVEDILLA, TEXTO_CASETON, TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
 import { esEditar, type NombreEditar, type PlantillaEditar } from "../../../src/editor/dibujo/editar.ts";
 import { esPlantillaDxf, type NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
 import { IcApoyo, IcApoyoLineal, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
 import { cota } from "../fmt.ts";
@@ -90,21 +92,24 @@ function materialPorDefecto(m: ModeloFisico, xs: readonly { material: string }[]
   return mejor ?? m.materiales.find((x) => x.tipo === "hormigon")?.id ?? m.materiales[0]?.id;
 }
 
-/** La plantilla de Forjado con lo que no dice tomado del último forjado de su tipo (o de lo típico; el pp, sólo del último). */
+/**
+ * La plantilla de Forjado con lo que no dice tomado del último forjado de su tipo (o de lo típico). El
+ * pp no se hereda: sin él, sale de la sección y del casetón o la bovedilla (`pesoForjado.ts`).
+ */
 function forjadoEfectivo(m: ModeloFisico, t: PlantillaForjado): PlantillaForjado {
   const tipo = t.tipo ?? "maciza";
   const valida = (s: string | undefined) => (s && m.secciones.some((x) => x.id === s) ? s : undefined);
   const materialValido = (s: string | undefined) => (s && m.materiales.some((x) => x.id === s) ? s : undefined);
   if (tipo === "unidireccional") {
     const u = m.panos?.at(-1);
-    return { ...t, tipo, intereje: t.intereje ?? u?.intereje ?? 0.7, seccion: valida(t.seccion) ?? valida(u?.seccion) ?? m.secciones.find((s) => s.forma === "T")?.id, pp: t.pp ?? u?.pp, direccion: t.direccion ?? u?.direccion };
+    return { ...t, tipo, intereje: t.intereje ?? u?.intereje ?? 0.7, seccion: valida(t.seccion) ?? valida(u?.seccion) ?? m.secciones.find((s) => s.forma === "T")?.id, bovedilla: t.bovedilla ?? u?.bovedilla, direccion: t.direccion ?? u?.direccion };
   }
   const losas = (m.losas ?? []).filter((l) => !!l.reticular === (tipo === "reticular"));
   const u = losas.at(-1);
   const material = materialValido(t.material) ?? materialValido(u?.material) ?? materialPorDefecto(m, m.losas ?? []);
   if (tipo === "maciza") return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.25, material };
   const r = u?.reticular;
-  return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.3, material, intereje: t.intereje ?? r?.intereje ?? 0.8, nervio: t.nervio ?? r?.nervio ?? 0.12, capa: t.capa ?? r?.capa ?? 0.05, pp: t.pp ?? u?.pp };
+  return { ...t, tipo, espesor: t.espesor ?? u?.espesor ?? 0.3, material, intereje: t.intereje ?? r?.intereje ?? 0.8, nervio: t.nervio ?? r?.nervio ?? 0.12, capa: t.capa ?? r?.capa ?? 0.05, caseton: t.caseton ?? r?.caseton };
 }
 
 /** La plantilla con lo de por defecto donde no hay nada válido; `caso`, el activo de la barra de Cargas. */
@@ -694,7 +699,11 @@ const TIPO_FORJADO: Record<TipoForjado, string> = { maciza: "Maciza", reticular:
 /** La plantilla de Forjado: el modo (recuadro o polígono), el tipo y lo de cada tipo, como las columnas de la tabla. */
 function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: ModeloFisico; t: PlantillaForjado; poner: (c: PlantillaForjado, limpiar?: boolean) => void; editar: Props["editar"] }) {
   const tipo = t.tipo ?? "maciza";
-  const num = (k: "espesor" | "pp" | "direccion" | "intereje" | "nervio" | "capa", etiqueta: string, unidad: string, ayuda?: string) => <NumeroCampo key={`${tipo}-${k}`} etiqueta={etiqueta} unidad={unidad} valor={t[k]} onCambio={(v) => poner({ [k]: v })} ayuda={ayuda} cero={k === "pp"} vacio={k === "pp" && tipo === "maciza" ? "γ·canto" : "0"} falta={k === "pp" && t.pp === undefined && (tipo === "unidireccional" || (tipo === "reticular" && t.caseton !== "recuperable"))} />;
+  // El pp vacío sale solo; si no puede salir (casetón de otro material, vigueta que no es una T), falta
+  const peso = pesoPlantillaForjado(m, t);
+  const faltaPp = t.pp === undefined && (tipo === "reticular" ? t.caseton === "perdido" : tipo === "unidireccional" && !!m.secciones.find((x) => x.id === t.seccion) && !peso);
+  const vacioPp = peso ? `${String(Math.round(peso.pp * 100) / 100).replace(".", ",")} (sale solo)` : "sale solo";
+  const num = (k: "espesor" | "pp" | "direccion" | "intereje" | "nervio" | "capa", etiqueta: string, unidad: string, ayuda?: string) => <NumeroCampo key={`${tipo}-${k}`} etiqueta={etiqueta} unidad={unidad} valor={t[k]} onCambio={(v) => poner({ [k]: v })} ayuda={ayuda} cero={k === "pp"} vacio={k === "pp" ? vacioPp : "0"} falta={k === "pp" && faltaPp} />;
   return (
     <Seccion titulo="Plantilla" valor="para los siguientes">
       <div className="py-1">
@@ -721,24 +730,50 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
             {num("intereje", "intereje", "m", "Entre ejes de nervios.")}
             {num("nervio", "nervio", "m", "Ancho del nervio (bw).")}
             {num("capa", "capa", "m", "Capa de compresión (hf).")}
-            <Segmentado
-              etiqueta="casetón"
-              valor={t.caseton ?? "perdido"}
-              opciones={[
-                ["perdido", "Perdido"],
-                ["recuperable", "Recuperable"],
-              ]}
-              onCambio={(caseton) => poner({ caseton })}
-            />
+            <label className="campo">
+              <span>
+                <span className="campo-nombre">casetón</span>
+                <Ayuda texto="De qué es el casetón: con él sale el peso propio (hormigón de nervios y capa más el casetón en el hueco). «Perdido de otro material» pide escribir el pp." />
+              </span>
+              <select className="sel" value={t.caseton ?? CASETON_POR_DEFECTO} aria-label="Casetón" onChange={(x) => poner({ caseton: x.target.value as Caseton })}>
+                {CASETONES.map((c) => (
+                  <option key={c} value={c}>
+                    {TEXTO_CASETON[c]}
+                  </option>
+                ))}
+              </select>
+            </label>
           </>
         )}
         {tipo === "unidireccional" && (
           <>
             {num("intereje", "intereje", "m", "Entre ejes de viguetas.")}
             <CampoSeccion modelo={m} valor={t.seccion} tipo="vigueta" etiqueta="vigueta" editar={editar} onCambio={(seccion) => poner({ seccion })} />
+            <label className="campo">
+              <span>
+                <span className="campo-nombre">bovedilla</span>
+                <Ayuda texto="De qué es la bovedilla: con ella y una vigueta en T sale el peso propio (vigueta y capa más la bovedilla en el hueco)." />
+              </span>
+              <select className="sel" value={t.bovedilla ?? BOVEDILLA_POR_DEFECTO} aria-label="Bovedilla" onChange={(x) => poner({ bovedilla: x.target.value as Bovedilla })}>
+                {BOVEDILLAS.map((b) => (
+                  <option key={b} value={b}>
+                    {TEXTO_BOVEDILLA[b]}
+                  </option>
+                ))}
+              </select>
+            </label>
           </>
         )}
-        {num("pp", "pp", "kN/m²", tipo === "maciza" ? "Vacío: γ·canto." : tipo === "reticular" ? "Con casetón perdido, obligatorio: el peso de la zona aligerada." : "Obligatorio, con las bovedillas.")}
+        {num(
+          "pp",
+          "pp",
+          "kN/m²",
+          tipo === "maciza"
+            ? "Vacío: γ·canto."
+            : tipo === "reticular"
+              ? "Vacío, sale solo: el hormigón de nervios y capa más el casetón (los ábacos, γ·canto). Lo escrito manda: el medio de toda la losa con los ábacos."
+              : "Vacío, sale solo con una vigueta en T: vigueta y capa más la bovedilla. Lo escrito manda.",
+        )}
         {num("direccion", "dirección", "°", tipo === "unidireccional" ? "La de las viguetas, desde +X." : tipo === "reticular" ? "La de los nervios, desde +X." : "La del eje 1 de las láminas, desde +X.")}
       </div>
     </Seccion>

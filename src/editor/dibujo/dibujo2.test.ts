@@ -162,7 +162,11 @@ describe("Forjado (criterio 1)", () => {
     const r = dibujar(p, "forjado", [clic(p, [6, 1])], ret);
     const t = conTabla(p, "forjados", { planta: "N1", tipo: "reticular", contorno: "5 0; 10 0; 10 6,3; 5 6,3", espesor: "0,3", material: "HA-30", pp: "4,3", intereje: "0,8", nervio: "0,12", capa: "0,05" });
     expect(serializar(r.proyecto)).toBe(serializar(t));
-    expect(dibujar(p, "forjado", [clic(p, [6, 1])], { ...ret, forjado: { ...ret.forjado, pp: undefined } }).errores[0]).toMatch(/casetón perdido/);
+    // Sin pp, sale del casetón (de hormigón, por defecto); con uno perdido de otro material, falta
+    const sinPp = dibujar(p, "forjado", [clic(p, [6, 1])], { ...ret, forjado: { ...ret.forjado, pp: undefined } });
+    expect(sinPp.errores).toEqual([]);
+    expect(serializar(sinPp.proyecto)).toBe(serializar(conTabla(p, "forjados", { planta: "N1", tipo: "reticular", contorno: "5 0; 10 0; 10 6,3; 5 6,3", espesor: "0,3", material: "HA-30", intereje: "0,8", nervio: "0,12", capa: "0,05" })));
+    expect(dibujar(p, "forjado", [clic(p, [6, 1])], { ...ret, forjado: { ...ret.forjado, pp: undefined, caseton: "perdido" } }).errores[0]).toMatch(/casetón perdido de otro material/);
     expect(dibujar(p, "forjado", [clic(p, [6, 1])], { ...PLANTILLAS, forjado: { tipo: "maciza", espesor: 0.25 } }).errores[0]).toMatch(/material/);
   });
 

@@ -79,7 +79,9 @@ export const CATALOGO: Caso[] = [
   ["paño con una dirección infinita", (f) => (pano(f).direccion = Infinity), "fisico/valor-no-valido", "F1"],
   ["paño con un intereje menor que 2·ε_snap", (f) => (pano(f).intereje = 0.08), "fisico/valor-no-valido", "F1"],
   ["paño con un intereje negativo", (f) => (pano(f).intereje = -0.7), "fisico/valor-no-valido", "F1"],
-  ["paño sin pp", (f) => delete pano(f).pp, "fisico/valor-no-valido", "F1"],
+  // Sin pp, sale de una vigueta en T y su bovedilla; con otra sección no sale
+  ["paño sin pp con una vigueta que no es una T", (f) => (delete pano(f).pp, (pano(f).seccion = "v")), "fisico/valor-no-valido", "F1"],
+  ["paño con una bovedilla que no es de hormigón, cerámica ni poliestireno", (f) => (pano(f).bovedilla = "corcho"), "fisico/valor-no-valido", "F1"],
   ["paño con un pp negativo", (f) => (pano(f).pp = -1), "fisico/valor-no-valido", "F1"],
   // Geometría de los paños
   ["paño con un contorno de dos puntos", (f) => (pano(f).contorno = [[0, 0], [5, 0]]), "fisico/valor-no-valido", "F1"],
@@ -122,8 +124,8 @@ export const CATALOGO: Caso[] = [
   ["reticular con la capa más gruesa que el canto", (f) => (ret(f).capa = 0.4), "fisico/valor-no-valido", "L2"],
   ["reticular con un intereje que no es un número", (f) => (ret(f).intereje = m("0.82")), "fisico/valor-no-valido", "L2"],
   ["reticular con un multiplicador desconocido", (f) => (ret(f).multiplicadores = { k11: 0.5 }), "fisico/campo-desconocido", "L2"], // A-1: antes, fisico/valor-no-valido
-  ["reticular con casetón perdido sin pp (su peso depende del casetón)", (f) => delete ret(f).caseton, "reticular/sin-pp", "L2"],
-  ["reticular con un casetón que no es perdido ni recuperable", (f) => (ret(f).caseton = "corcho"), "fisico/valor-no-valido", "L2"],
+  ["reticular con un casetón perdido de otro material sin pp (su peso depende del casetón)", (f) => (ret(f).caseton = "perdido"), "reticular/sin-pp", "L2"],
+  ["reticular con un casetón que no es ninguno de los conocidos", (f) => (ret(f).caseton = "corcho"), "fisico/valor-no-valido", "L2"],
   ["reticular con un multiplicador nulo", (f) => (ret(f).multiplicadores = { m11: 0 }), "fisico/valor-no-valido", "L2"],
   ["reticular con un multiplicador mayor que 100 (una penalización)", (f) => (ret(f).multiplicadores = { m11: 1000 }), "fisico/valor-no-valido", "L2"],
   ["reticular con multiplicadores que no son un objeto", (f) => (ret(f).multiplicadores = m([0.3])), "fisico/valor-no-valido", "L2"],

@@ -17,7 +17,7 @@
  *
  * Puro: sin IO.
  */
-import { areaRegion, areaSeccion, gammaMaterial, pesoLosa, regionDe } from "../agente/sensatez.ts";
+import { areaRegion, areaSeccion, gammaMaterial, pesoLosa, ppDePano, regionDe } from "../agente/sensatez.ts";
 import { geometriaCargas, presionEn, type GeometriaCarga, type V3 } from "../agente/render/cargas.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { fraccionEnRegiones, momentosInterseccion, puntoEnRegion } from "../compilador/poligonos.ts";
@@ -160,7 +160,8 @@ function pesoPropioPieza(f: ModeloFisico, tipo: TipoPieza, id: string): PesoProp
     }
     case "pano": {
       const p = f.panos!.find((x) => x.id === id)!;
-      return { caso, unidad: p.pp, queUnidad: "kN/m²", total: p.pp * areaRegion(p) };
+      const pp = ppDePano(f, p);
+      return pp === undefined ? null : { caso, unidad: pp, queUnidad: "kN/m²", total: pp * areaRegion(p) };
     }
     case "viga":
       return porSeccion(f.vigas!.find((x) => x.id === id)!.seccion);

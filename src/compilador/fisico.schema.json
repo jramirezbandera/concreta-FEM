@@ -1063,6 +1063,13 @@
         },
         "pp": {
           "type": "number"
+        },
+        "bovedilla": {
+          "enum": [
+            "ceramica",
+            "hormigon",
+            "poliestireno"
+          ]
         }
       },
       "required": [
@@ -1071,8 +1078,7 @@
         "contorno",
         "direccion",
         "intereje",
-        "seccion",
-        "pp"
+        "seccion"
       ],
       "additionalProperties": false
     },
@@ -1307,7 +1313,10 @@
         },
         "caseton": {
           "enum": [
+            "ceramica",
+            "hormigon",
             "perdido",
+            "poliestireno",
             "recuperable"
           ]
         },

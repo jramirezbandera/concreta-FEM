@@ -293,7 +293,7 @@ function SeccionUnidireccional({ c, prop }: { c: CroquisForjado; prop: Pick<Prop
         <Cota campo="intereje" titulo="intereje" valor={c.intereje} a={X(ejes[0]!)} b={X(ejes[1]!)} linea={Y(0) - 10} lado={-1} prop={prop} />
       </svg>
       <figcaption>
-        {v ? `Vigueta ${v.id}: ${describirSeccion(v)}` : "Falta la vigueta: elija su sección."} El peso es el pp (con las bovedillas); la vigueta no pesa.
+        {v ? `Vigueta ${v.id}: ${describirSeccion(v)}` : "Falta la vigueta: elija su sección."} {v?.forma === "T" ? "El peso sale de ella y de la bovedilla (en «Material y peso»), o del pp escrito." : "El peso es el pp (con las bovedillas)."}
       </figcaption>
     </figure>
   );

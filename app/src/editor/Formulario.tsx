@@ -22,6 +22,7 @@ import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { PlantaForjado, SeccionForjado } from "./CroquisForjado.tsx";
+import { PesoForjado, RigidezAligeradoPanel } from "./FichaForjado.tsx";
 import { abrirGestor, ARTICULO, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
 
 /** Los grupos de campos de una tabla, en orden; lo que no está en ninguno va al final, sin título. */
@@ -29,9 +30,9 @@ const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly s
   forjados: [
     ["General", ["id", "nombre", "planta", "tipo"]],
     ["Geometría en planta", ["contorno", "huecos", "abacos", "direccion"]],
-    ["Sección", ["espesor", "intereje", "nervio", "capa", "caseton", "seccion"]],
+    ["Sección", ["espesor", "intereje", "nervio", "capa", "caseton", "seccion", "bovedilla"]],
     ["Material y peso", ["material", "pp"]],
-    ["Avanzado", ["multiplicadores"]],
+    ["Rigidez del aligerado", ["multiplicadores"]],
   ],
   casos: [
     ["El caso", ["id", "nombre", "pesoPropio"]],
@@ -55,15 +56,24 @@ interface PropsCroquis {
   ctx: Contexto;
   activo: string | null;
   onCampo: (clave: string) => void;
+  /** Escribe un campo, como si se tecleara. */
+  escribir: (clave: string, valor: string) => void;
+  errores: Readonly<Record<string, string>>;
+  rigidezReticular: "uniforme" | "bruta";
 }
 
-/** El dibujo que encabeza un grupo de una tabla. */
+/** El dibujo (o la tabla) que encabeza un grupo de una tabla. */
 const CROQUIS: Partial<Record<NombreTabla, Record<string, ComponentType<PropsCroquis>>>> = {
   forjados: {
-    "Geometría en planta": ({ fila, ctx, ...p }) => <PlantaForjado c={croquisForjado(fila, ctx)} {...p} />,
-    Sección: ({ fila, ctx, ...p }) => <SeccionForjado c={croquisForjado(fila, ctx)} {...p} />,
+    "Geometría en planta": ({ fila, ctx, activo, onCampo }) => <PlantaForjado c={croquisForjado(fila, ctx)} activo={activo} onCampo={onCampo} />,
+    Sección: ({ fila, ctx, activo, onCampo }) => <SeccionForjado c={croquisForjado(fila, ctx)} activo={activo} onCampo={onCampo} />,
+    "Material y peso": PesoForjado,
+    "Rigidez del aligerado": ({ rigidezReticular, ...p }) => <RigidezAligeradoPanel {...p} rigidez={rigidezReticular} />,
   },
 };
+
+/** Los campos que no se enseñan como campo: los lleva el croquis de su grupo (los multiplicadores, en su tabla). */
+const EN_CROQUIS: Partial<Record<NombreTabla, ReadonlySet<string>>> = { forjados: new Set(["multiplicadores"]) };
 
 /** El nombre del campo: «*» si es obligatorio y «?» si tiene ayuda (en un globo, al pasar el ratón). */
 function Etiqueta({ c, estado, conUnidad }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean }) {
@@ -198,9 +208,10 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
           clave={(c) => c.clave}
           croquis={(g) => {
             const C = Croquis?.[g];
-            return C && <C fila={actual} ctx={ctx} activo={sobre ?? foco} onCampo={irACampo} />;
+            return C && <C fila={actual} ctx={ctx} activo={sobre ?? foco} onCampo={irACampo} escribir={escribir} errores={errores} rigidezReticular={ed.proyecto.opciones?.rigidezReticular ?? "uniforme"} />;
           }}
           campo={(c) => {
+              if (EN_CROQUIS[tabla]?.has(c.clave)) return null;
               const valor = borrador[c.clave] ?? fila[c.clave] ?? "";
               const err = errores[c.clave];
               const opciones = c.opciones && !c.calculada ? c.opciones(ctx) : null;

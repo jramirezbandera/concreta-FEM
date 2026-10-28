@@ -148,7 +148,7 @@ describe("la herramienta activa (V2c-1)", () => {
     // Una obra nueva abre el gestor de plantas: aquí no se toca
     fireEvent.click(within(screen.getByRole("dialog", { name: "Plantas" })).getByRole("button", { name: "Cerrar" }));
 
-    // Forjado: recuadro y maciza por defecto, con el material del proyecto; reticular, 25+5 y el pp obligatorio
+    // Forjado: recuadro y maciza por defecto, con el material del proyecto; reticular, 25+5 y el pp que sale solo (obligatorio con un casetón de otro material)
     fireEvent.click(screen.getByRole("button", { name: "Forjado" }));
     const forjado = screen.getByRole("region", { name: "Dibujar · Forjado" });
     expect(screen.getByRole("radio", { name: "Recuadro" }).getAttribute("aria-checked")).toBe("true");
@@ -157,7 +157,11 @@ describe("la herramienta activa (V2c-1)", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Reticular" }));
     expect((screen.getByRole("textbox", { name: "canto" }) as HTMLInputElement).value).toBe("0,3");
     expect((screen.getByRole("textbox", { name: "nervio" }) as HTMLInputElement).value).toBe("0,12");
+    expect(screen.getByRole("textbox", { name: "pp" }).getAttribute("data-error")).toBe("false");
+    expect(screen.getByRole("textbox", { name: "pp" }).getAttribute("placeholder")).toBe("4,34 (sale solo)");
+    fireEvent.change(screen.getByRole("combobox", { name: "Casetón" }), { target: { value: "perdido" } });
     expect(screen.getByRole("textbox", { name: "pp" }).getAttribute("data-error")).toBe("true");
+    fireEvent.change(screen.getByRole("combobox", { name: "Casetón" }), { target: { value: "hormigon" } });
     expect(forjado.textContent).toMatch(/Un clic dentro de un recuadro/);
     // Con zunchos, por defecto, con su ancho; sin ellos, sin el ancho; y no en un unidireccional
     const zunchos = screen.getByRole("checkbox", { name: "Con zunchos" }) as HTMLInputElement;

@@ -17,7 +17,7 @@ import type { AccionCaso, ApoyoFisico, ApoyoLineal, CargaFisica, CasoFisico, Eje
 import { gammaMaterial } from "../agente/sensatez.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
-import { volumenReticular } from "../compilador/reticular.ts";
+import { BOVEDILLA_POR_DEFECTO, BOVEDILLAS, CASETON_POR_DEFECTO, CASETONES, pesoReticular, pesoUnidireccional, viguetaPesable, type Bovedilla, type Caseton, type DesglosePeso } from "../compilador/pesoForjado.ts";
 import { describirCaso } from "./casos.ts";
 import { describirMaterial, describirSeccion } from "./gestores.ts";
 import { Lector, leerNumero, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
@@ -100,7 +100,7 @@ export interface DefTabla {
    * sabe leyéndola (`ficha.ts`); esto es lo que exige después el compilador (el pp de un reticular
    * con casetón perdido, C4-i).
    */
-  obligatoria?(clave: string, f: Fila): boolean;
+  obligatoria?(clave: string, f: Fila, ctx: Contexto): boolean;
   /**
    * La fila con `valor` escrito en `clave`. Por defecto, sólo esa celda; en Forjados, cambiar el tipo
    * vacía lo que deja de aplicar y el pp (que es otro en cada tipo), para no arrastrar un dato que ya
@@ -339,7 +339,7 @@ const pilares: DefTabla = {
     {
       clave: "fijo",
       titulo: "punto fijo",
-      ayuda: "el punto de la sección que está en (x, y) en todas las plantas, como CYPECAD: centro (por defecto), mitad-… o esquina-… («derecha» según el canto h; con giro 0, +X, y «superior», +Y)",
+      ayuda: "el punto de la sección que está en (x, y) en todas las plantas: centro (por defecto), mitad-… o esquina-… («derecha» según el canto h; con giro 0, +X, y «superior», +Y)",
       opciones: fijas(PUNTOS_FIJOS, "centro"),
     },
     { clave: "base", titulo: "base", ayuda: "empotrado (por defecto), articulado o ninguno (apeado: nace sobre una viga, una losa, un muro u otro pilar)", opciones: fijas(["empotrado", "articulado", "ninguno"], "empotrado") },
@@ -463,8 +463,20 @@ const DEL_RETICULAR = ["nervio", "capa", "caseton", "abacos", "multiplicadores"]
 const PROPIAS: Readonly<Record<TipoForjado, readonly string[]>> = {
   maciza: ["espesor", "material"],
   reticular: ["espesor", "material", "intereje", ...DEL_RETICULAR],
-  unidireccional: ["intereje", "seccion"],
+  unidireccional: ["intereje", "seccion", "bovedilla"],
 };
+
+/** Lo que es cada casetón y cada bovedilla, en las opciones. */
+export const TEXTO_CASETON: Readonly<Record<Caseton, string>> = {
+  hormigon: "perdido de hormigón",
+  ceramica: "perdido cerámico",
+  poliestireno: "perdido de poliestireno",
+  recuperable: "recuperable (el hueco no pesa)",
+  perdido: "perdido de otro material (escriba el pp)",
+};
+export const TEXTO_BOVEDILLA: Readonly<Record<Bovedilla, string>> = { hormigon: "de hormigón", ceramica: "cerámica", poliestireno: "de poliestireno" };
+const opcionesCaseton = (): readonly Opcion[] => [{ valor: "", texto: `(${TEXTO_CASETON[CASETON_POR_DEFECTO]})` }, ...CASETONES.map((valor) => ({ valor, texto: TEXTO_CASETON[valor] }))];
+const opcionesBovedilla = (): readonly Opcion[] => [{ valor: "", texto: `(${TEXTO_BOVEDILLA[BOVEDILLA_POR_DEFECTO]})` }, ...BOVEDILLAS.map((valor) => ({ valor, texto: TEXTO_BOVEDILLA[valor] }))];
 const DE_ALGUNO = new Set(Object.values(PROPIAS).flat());
 
 /** El tipo de un forjado del modelo. */
@@ -482,22 +494,58 @@ const numeroDe = (f: Fila, c: string): number | undefined => {
   return typeof v === "number" ? v : undefined;
 };
 
+/** El casetón de una fila (vacía, el de por defecto); undefined si no es uno. */
+function casetonFila(f: Fila): Caseton | undefined {
+  const c = (f.caseton ?? "").trim().toLowerCase() || CASETON_POR_DEFECTO;
+  return (CASETONES as readonly string[]).includes(c) ? (c as Caseton) : undefined;
+}
+
+/** La sección de la vigueta de una fila, si está en el modelo. */
+const viguetaFila = (f: Fila, ctx: Contexto): Seccion | undefined => ctx.modelo.secciones.find((x) => x.id === (f.seccion ?? "").trim());
+
 /**
- * El pp que toma un forjado sin él (`pesoLosa` de A3): γ·canto en una maciza y, en un reticular con
- * casetón recuperable, γ·volumen en lo aligerado (C4-i). Con casetón perdido y en un unidireccional
- * es obligatorio.
+ * Cómo sale el pp de una fila de Forjados sin pp escrito, como en el compilador (`pesoForjado.ts`):
+ * γ·canto en una maciza, el hormigón y el casetón en lo aligerado de un reticular (los ábacos, γ·canto)
+ * y la vigueta en T y la bovedilla en un unidireccional. undefined si falta un dato, con un casetón
+ * "perdido" o con una vigueta que no es una T.
  */
-function ppPorDefecto(f: Fila, ctx: Contexto): string | undefined {
+export function desglosePesoFila(f: Fila, ctx: Contexto): DesglosePeso | undefined {
   const tipo = tipoFila(f);
+  if (tipo === "unidireccional") {
+    const v = viguetaFila(f, ctx);
+    const mat = v && ctx.modelo.materiales.find((x) => x.id === v.material);
+    const s = numeroDe(f, "intereje");
+    const b = (f.bovedilla ?? "").trim().toLowerCase() || BOVEDILLA_POR_DEFECTO;
+    if (!v || v.forma !== "T" || !mat || !s || !viguetaPesable(v, s) || !(BOVEDILLAS as readonly string[]).includes(b)) return undefined;
+    return pesoUnidireccional(v, s, gammaMaterial(mat), b as Bovedilla);
+  }
   const mat = ctx.modelo.materiales.find((x) => x.id === (f.material ?? "").trim());
-  const g = mat ? gammaMaterial(mat) : undefined;
   const h = numeroDe(f, "espesor");
-  const kN = (v: number) => textoNumero(Math.round(v * 100) / 100);
-  if (tipo === "maciza") return g !== undefined && h ? `${kN(g * h)} = γ·canto` : "γ·canto";
-  if (tipo !== "reticular" || (f.caseton ?? "").trim().toLowerCase() !== "recuperable") return undefined;
-  const [s, bw, hf] = [numeroDe(f, "intereje"), numeroDe(f, "nervio"), numeroDe(f, "capa")];
-  if (g === undefined || !h || !s || !bw || !hf) return "γ·hormigón";
-  return `${kN(g * volumenReticular({ h, hf, bw, s }))} = γ·hormigón (aligerado)`;
+  if (!mat || !h || h <= 0) return undefined;
+  const g = gammaMaterial(mat);
+  if (tipo === "maciza") return { hormigon: h, gamma: g, hueco: 0, pesoHueco: 0, pp: g * h };
+  const [s, bw, hf, c] = [numeroDe(f, "intereje"), numeroDe(f, "nervio"), numeroDe(f, "capa"), casetonFila(f)];
+  if (tipo !== "reticular" || !s || !bw || !hf || !c || !(bw < s) || !(hf < h)) return undefined;
+  return pesoReticular({ h, hf, bw, s }, g, c);
+}
+
+/** El pp es obligatorio: un reticular con casetón "perdido" de otro material, o un unidireccional con una vigueta que no es una T. */
+export function ppObligatorio(f: Fila, ctx: Contexto): boolean {
+  const tipo = tipoFila(f);
+  if (tipo === "reticular") return casetonFila(f) === "perdido";
+  if (tipo !== "unidireccional") return false;
+  const v = viguetaFila(f, ctx);
+  const s = numeroDe(f, "intereje");
+  return !!v && (v.forma !== "T" || (!!s && !viguetaPesable(v, s)));
+}
+
+/** El pp que toma un forjado sin él (`desglosePesoFila`), como texto; undefined si es obligatorio. */
+function ppPorDefecto(f: Fila, ctx: Contexto): string | undefined {
+  if (ppObligatorio(f, ctx)) return undefined;
+  const tipo = tipoFila(f);
+  const d = desglosePesoFila(f, ctx);
+  const que = tipo === "maciza" ? "γ·canto" : tipo === "reticular" ? (casetonFila(f) === "recuperable" ? "hormigón" : "hormigón + casetón") : "vigueta + bovedilla";
+  return d ? `${textoNumero(Math.round(d.pp * 100) / 100)} = ${que}` : que;
 }
 
 /**
@@ -524,7 +572,14 @@ const forjados: DefTabla = {
     { clave: "huecos", titulo: "huecos", unidad: "m", ayuda: "polígonos separados por «|»", defecto: () => "ninguno" },
     { clave: "espesor", titulo: "canto", unidad: "m", ayuda: "maciza y reticular: el canto total; vacío en un unidireccional (lo da la sección de la vigueta)" },
     { clave: "material", titulo: "material", ayuda: "maciza y reticular; vacío en un unidireccional", opciones: materiales_("ninguno: unidireccional"), referencia: "materiales" },
-    { clave: "pp", titulo: "pp", unidad: "kN/m²", ayuda: "peso propio. Maciza: por defecto, γ·canto. Reticular con casetón perdido y unidireccional (con las bovedillas): obligatorio", defecto: ppPorDefecto },
+    {
+      clave: "pp",
+      titulo: "pp",
+      unidad: "kN/m²",
+      ayuda:
+        "peso propio. Vacío, sale solo: γ·canto en una maciza; en un reticular, el hormigón de nervios y capa más el casetón en el hueco (los ábacos, γ·canto); en un unidireccional, la vigueta en T y la capa más la bovedilla. Lo escrito manda (en un reticular, el medio de toda la losa con los ábacos). Obligatorio con un casetón «perdido de otro material» o una vigueta que no es una T",
+      defecto: ppPorDefecto,
+    },
     {
       clave: "direccion",
       titulo: "dirección",
@@ -535,10 +590,16 @@ const forjados: DefTabla = {
     { clave: "intereje", titulo: "intereje", unidad: "m", ayuda: "reticular: entre ejes de nervios; unidireccional: entre ejes de viguetas; vacío en una maciza" },
     { clave: "nervio", titulo: "nervio", unidad: "m", ayuda: "reticular: ancho del nervio (bw)" },
     { clave: "capa", titulo: "capa", unidad: "m", ayuda: "reticular: espesor de la capa de compresión (hf)" },
-    { clave: "caseton", titulo: "casetón", ayuda: "reticular: perdido (por defecto; entonces el pp es obligatorio) o recuperable", opciones: fijas(["perdido", "recuperable"], "perdido") },
+    { clave: "caseton", titulo: "casetón", ayuda: "reticular: de qué es el casetón, para el peso propio. Perdido de hormigón (por defecto), cerámico o de poliestireno, recuperable o perdido de otro material (entonces se escribe el pp)", opciones: opcionesCaseton },
     { clave: "abacos", titulo: "ábacos", unidad: "m", ayuda: "reticular: polígonos macizos separados por «|»; pueden salirse del forjado", defecto: () => "ninguno" },
-    { clave: "multiplicadores", titulo: "multiplicadores", ayuda: `reticular: los que sustituyen a los calculados, «m11=0,32 m22=0,27 …» (${MULT.join(", ")}), cada uno en (0, 100]`, defecto: () => "los calculados" },
-    { clave: "seccion", titulo: "vigueta", ayuda: "unidireccional: sección de una vigueta (la T bruta u otra); no pesa: el peso es el pp", opciones: secciones_("ninguna: losa"), referencia: "secciones" },
+    {
+      clave: "multiplicadores",
+      titulo: "multiplicadores",
+      ayuda: `reticular: la rigidez del aligerado frente a la losa maciza del mismo canto. Vacío, la calculada con los nervios. Si escribe alguno, «m11=0,32 m22=0,27 …» (${MULT.join(", ")}, cada uno en (0, 100]), mandan todos los suyos: los que no escriba valen 1 (la maciza), van con el ν del hormigón y los ábacos, macizos`,
+      defecto: () => "los calculados",
+    },
+    { clave: "seccion", titulo: "vigueta", ayuda: "unidireccional: sección de una vigueta (la T bruta u otra). Con una T, el peso propio sale de ella y de la bovedilla", opciones: secciones_("ninguna: losa"), referencia: "secciones" },
+    { clave: "bovedilla", titulo: "bovedilla", ayuda: "unidireccional: de qué es la bovedilla, para el peso propio. De hormigón (por defecto), cerámica o de poliestireno", opciones: opcionesBovedilla },
   ],
   fila(o, ctx) {
     const tipo = tipoForjado(o, ctx);
@@ -562,6 +623,7 @@ const forjados: DefTabla = {
         abacos: "",
         multiplicadores: "",
         seccion: p.seccion,
+        bovedilla: s(p.bovedilla),
       };
     }
     const l = o as unknown as Losa;
@@ -584,6 +646,7 @@ const forjados: DefTabla = {
       abacos: r?.abacos?.length ? textoPoligonos(r.abacos) : "",
       multiplicadores: r?.multiplicadores ? textoClaves(r.multiplicadores as Record<string, number>, MULT) : "",
       seccion: "",
+      bovedilla: "",
     };
   },
   objeto(f) {
@@ -597,7 +660,8 @@ const forjados: DefTabla = {
         direccion: L.numero("direccion", { obligatorio: true }),
         intereje: L.numero("intereje", { obligatorio: true, mayorQue: 0 }),
         seccion: L.texto("seccion", { obligatorio: true }),
-        pp: L.numero("pp", { obligatorio: true, min: 0 }),
+        pp: L.numero("pp", { min: 0 }),
+        bovedilla: L.opcion("bovedilla", BOVEDILLAS),
       });
       return r.ok ? { ...r, coleccion: "panos" } : r;
     }
@@ -605,7 +669,7 @@ const forjados: DefTabla = {
       L.errores.push({ columna: "tipo", mensaje: `«${f.tipo}» no es un tipo de forjado: ${TIPOS_FORJADO.join(", ")}` });
       return { ok: false, errores: L.errores };
     }
-    L.vacias(["seccion"], `a una losa ${tipo}`);
+    L.vacias(["seccion", "bovedilla"], `a una losa ${tipo}`);
     let reticular: Losa["reticular"];
     if (tipo === "maciza") L.vacias(["intereje", ...DEL_RETICULAR], "a una losa maciza");
     else
@@ -613,7 +677,7 @@ const forjados: DefTabla = {
         intereje: L.numero("intereje", { obligatorio: true, mayorQue: 0 }),
         nervio: L.numero("nervio", { obligatorio: true, mayorQue: 0 }),
         capa: L.numero("capa", { obligatorio: true, mayorQue: 0 }),
-        caseton: L.opcion("caseton", ["perdido", "recuperable"] as const),
+        caseton: L.opcion("caseton", CASETONES),
         abacos: L.poligonos("abacos"),
         multiplicadores: L.claves("multiplicadores", MULT, { max: 100 }),
       }) as Losa["reticular"];
@@ -632,7 +696,7 @@ const forjados: DefTabla = {
     const propias = PROPIAS[tipoFila(f) as TipoForjado];
     return !propias || !DE_ALGUNO.has(clave) || propias.includes(clave);
   },
-  obligatoria: (clave, f) => clave === "pp" && tipoFila(f) === "reticular" && (f.caseton ?? "").trim().toLowerCase() !== "recuperable",
+  obligatoria: (clave, f, ctx) => clave === "pp" && ppObligatorio(f, ctx),
   conValor(f, clave, valor) {
     const r: Record<string, string> = { ...f, [clave]: valor };
     if (clave !== "tipo" || tipoFila(r) === tipoFila(f)) return r;

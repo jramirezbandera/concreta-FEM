@@ -22,9 +22,12 @@ const obligatorios = (f: Record<string, string>) =>
 describe("estadoCampos", () => {
   it("en Forjados, lo obligatorio depende del tipo", () => {
     expect(obligatorios(fila("L1"))).toEqual(["planta", "contorno", "espesor", "material"]);
+    // El pp sale solo, salvo con un casetón perdido de otro material o una vigueta que no es una T
+    expect(fila("L2").caseton).toBe("perdido");
     expect(obligatorios(fila("L2"))).toEqual(["planta", "contorno", "espesor", "material", "pp", "intereje", "nervio", "capa"]);
-    expect(obligatorios({ ...fila("L2"), caseton: "recuperable" })).toEqual(["planta", "contorno", "espesor", "material", "intereje", "nervio", "capa"]);
-    expect(obligatorios(fila("F1"))).toEqual(["planta", "contorno", "pp", "direccion", "intereje", "seccion"]);
+    for (const caseton of ["", "hormigon", "ceramica", "poliestireno", "recuperable"])
+      expect(obligatorios({ ...fila("L2"), caseton }), caseton).toEqual(["planta", "contorno", "espesor", "material", "intereje", "nervio", "capa"]);
+    expect(obligatorios(fila("F1"))).toEqual(["planta", "contorno", "direccion", "intereje", "seccion"]);
   });
 
   it("el pp por defecto es el que pesa la losa sin él", () => {
@@ -52,7 +55,7 @@ describe("estadoCampos", () => {
         const f = def.fila(o, ctx);
         const e = estadoCampos(def, f, ctx, o);
         expect(e.id?.obligatorio ?? false).toBe(false);
-        for (const [k, x] of Object.entries(e)) if (x.obligatorio && !def.obligatoria?.(k, f)) expect(def.objeto({ ...f, [k]: "" }, ctx, o).ok).toBe(false);
+        for (const [k, x] of Object.entries(e)) if (x.obligatorio && !def.obligatoria?.(k, f, ctx)) expect(def.objeto({ ...f, [k]: "" }, ctx, o).ok).toBe(false);
       }
     }
   });

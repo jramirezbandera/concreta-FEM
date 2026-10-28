@@ -413,7 +413,8 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     escribirFilaNueva("vigas", { planta: "N1", puntos: "0 0; 6 0", seccion: "V30x50" });
     escribirFilaNueva("vigas", { planta: "N1", puntos: "0 5; 6 5", seccion: "V30x50" });
     elegirTabla("forjados");
-    escribirFilaNueva("forjados", { planta: "N1", tipo: "unidireccional", contorno: "0 0; 6 0; 6 5; 0 5", direccion: "90", intereje: "0,7", seccion: "T25", pp: "3,5" });
+    // El pp antes que la vigueta: con una T, el paño ya está completo sin él (el peso sale solo)
+    escribirFilaNueva("forjados", { planta: "N1", tipo: "unidireccional", contorno: "0 0; 6 0; 6 5; 0 5", direccion: "90", intereje: "0,7", pp: "3,5", seccion: "T25" });
     elegirTabla("muros");
     fireEvent.click(screen.getByRole("checkbox", { name: /sólo/ }));
     // Los huecos antes que el material: con él, el muro tiene lo que necesita y se crea

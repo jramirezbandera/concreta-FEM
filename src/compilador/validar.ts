@@ -9,6 +9,7 @@ import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
 import { PUNTOS_FIJOS } from "./puntoFijo.ts";
 import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
+import { BOVEDILLAS, CASETONES, desglosePano, pesoReticular } from "./pesoForjado.ts";
 import { areaConSigno, areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { flexionUniforme, multiplicadoresAbacoUniforme, multiplicadoresReticular, volumenReticular } from "./reticular.ts";
 import { compilarSeccion, materialElastico, type SeccionCompilada } from "./secciones.ts";
@@ -46,7 +47,8 @@ export interface ReticularCompilado {
 
 /** Un paño unidireccional ya comprobado (C4). */
 export interface PanoCompilado {
-  pano: PanoUnidireccional;
+  /** El paño, con su pp (el escrito o el de `pesoForjado.ts`). */
+  pano: PanoUnidireccional & { pp: number };
   region: Region;
   /** Planta (índice). */
   k: number;
@@ -673,7 +675,8 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     const r = l.reticular!;
     const g = { h: l.espesor, hf: r.capa, bw: r.nervio, s: r.intereje };
     const dados = r.multiplicadores !== undefined;
-    const ppAligerada = l.pp ?? peso * volumenReticular(g);
+    // Sin pp, el de su casetón (`pesoForjado.ts`); con "perdido" sin pp ya hay un error (reticular/sin-pp)
+    const ppAligerada = l.pp ?? pesoReticular(g, peso, r.caseton)?.pp ?? peso * volumenReticular(g);
     // CY3: con «uniforme», la flexión y la torsión de CYPECAD en las dos zonas; la membrana y el cortante, por zonas
     const uniforme = !dados && op.rigidezReticular === "uniforme";
     const calculados = multiplicadoresReticular(g, nu);
@@ -732,10 +735,16 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     usaSeccion(p.id, p.seccion);
     const okDir = num(p.direccion);
     const okS = num(p.intereje) && p.intereje > 2 * op.epsSnap;
-    const okPp = num(p.pp) && p.pp >= 0;
+    const okBov = p.bovedilla === undefined || (BOVEDILLAS as readonly unknown[]).includes(p.bovedilla);
+    if (!okBov) mal(p.id, `la bovedilla tiene que ser ${BOVEDILLAS.map((x) => `«${x}»`).join(", ")}`);
+    // Sin pp, el de su vigueta en T y su bovedilla (`pesoForjado.ts`)
+    const sv = typeof p.seccion === "string" ? seccionFisica.get(p.seccion) : undefined;
+    const pp = p.pp !== undefined ? p.pp : okBov && num(p.intereje) ? desglosePano(p, sv, sv && materiales.find((x) => x.id === sv.material))?.pp : undefined;
+    const okPp = num(pp) && pp >= 0;
     if (!okDir) mal(p.id, "la dirección de las viguetas tiene que ser un número (grados)");
     if (!okS) mal(p.id, `el intereje tiene que ser un número mayor que 2·ε_snap (${2 * op.epsSnap} m)`);
-    if (!okPp) mal(p.id, "el peso propio pp tiene que ser un número ≥ 0 (kN/m²): incluye las bovedillas, que la sección de la vigueta no conoce");
+    if (!okPp)
+      mal(p.id, p.pp === undefined ? "falta el peso propio pp (kN/m², con las bovedillas): sólo sale solo con una vigueta en T (sección forma \"T\") más estrecha que el intereje" : "el peso propio pp tiene que ser un número ≥ 0 (kN/m²): incluye las bovedillas, que la sección de la vigueta no conoce");
     const dc = poligonoNoValido(p.contorno);
     if (dc) {
       mal(p.id, `el contorno ${dc}`);
@@ -747,9 +756,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     }
     const huecos = (p.huecos ?? []) as readonly (readonly Vec2[])[];
     if (!huecosValidos(p.id, p.contorno, huecos, mal)) continue;
-    if (!okP || !okDir || !okS || !okPp || typeof p.seccion !== "string" || !seccionFisica.has(p.seccion)) continue;
+    if (!okP || !okDir || !okS || !okPp || !okBov || typeof p.seccion !== "string" || !seccionFisica.has(p.seccion)) continue;
     const d = direccionGrados(p.direccion);
-    panosC.push({ pano: p, region: { contorno: p.contorno, huecos }, k: planta.get(p.planta)!, seccion: null as unknown as SeccionCompilada, d, n: [-d[1], d[0]] });
+    panosC.push({ pano: { ...p, pp: pp! }, region: { contorno: p.contorno, huecos }, k: planta.get(p.planta)!, seccion: null as unknown as SeccionCompilada, d, n: [-d[1], d[0]] });
   }
   // Paños solapados entre sí o con una losa de su planta
   for (let i = 0; i < panosC.length; i++) {
@@ -1019,12 +1028,12 @@ function validarReticular(l: Losa, region: Region, mal: (id: string, que: string
     if (!((r.nervio as number) < (r.intereje as number))) no("el nervio del reticular tiene que ser más estrecho que su intereje");
     if (pos(l.espesor) && !((r.capa as number) < l.espesor)) no("la capa de compresión del reticular tiene que ser más delgada que el canto total (el espesor de la losa)");
   }
-  if (r.caseton !== undefined && r.caseton !== "perdido" && r.caseton !== "recuperable") no("el casetón del reticular tiene que ser «perdido» o «recuperable»");
-  // C4-i: con casetón perdido (por defecto) el peso depende de su material: sólo lo sabe el usuario
-  else if ((r.caseton ?? "perdido") === "perdido" && l.pp === undefined)
+  if (r.caseton !== undefined && !(CASETONES as readonly unknown[]).includes(r.caseton)) no(`el casetón del reticular tiene que ser ${CASETONES.map((x) => `«${x}»`).join(", ")}`);
+  // C4-i: con un casetón perdido de otro material, el peso sólo lo sabe el usuario
+  else if (r.caseton === "perdido" && l.pp === undefined)
     diag.error(
       "reticular/sin-pp",
-      `${l.id}: un reticular con casetón perdido (el caso por defecto) necesita su peso propio pp, porque depende del material del casetón (C4-i). Dé el pp medio de la losa con los ábacos o, si el casetón es recuperable, ponga caseton: "recuperable" y el peso será el del hormigón.`,
+      `${l.id}: un reticular con caseton: "perdido" (de un material sin decir) necesita su peso propio pp (C4-i). Dé el pp medio de la losa con los ábacos o diga el casetón ("hormigon", "ceramica", "poliestireno" o "recuperable") y el peso saldrá de él.`,
       [l.id],
     );
   if (r.multiplicadores !== undefined) {
