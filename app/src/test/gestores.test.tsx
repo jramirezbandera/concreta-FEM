@@ -305,6 +305,15 @@ describe("GE2: casos de carga", () => {
     fireEvent.click(within(within(dlg).getByRole("navigation", { name: "Lista de casos" })).getByRole("button", { name: /^W-Y/ }));
     expect((within(dlg).getByRole("combobox", { name: "dirección" }) as HTMLSelectElement).value).toBe("Y");
     expect((within(dlg).getByRole("combobox", { name: "signo" }) as HTMLSelectElement).value).toBe("-1");
+    // La ayuda de la derecha: la acción con sus ψ (los del generador) y, con el foco en un campo, qué es y la opción del caso
+    const ayuda = within(dlg).getByLabelText("Ayuda del caso");
+    expect(ayuda.textContent).toMatch(/Viento.*ψ0\s*0,6.*ψ1\s*0,5.*ψ2\s*0/);
+    expect(within(ayuda).queryByRole("note")).toBeNull();
+    fireEvent.focus(within(dlg).getByRole("combobox", { name: "signo" }));
+    const nota = within(ayuda).getByRole("note", { name: "Ayuda de signo" });
+    expect([...nota.querySelectorAll('li[data-on="true"]')].map((li) => li.textContent)).toEqual(["-1hacia −X o −Y"]);
+    fireEvent.blur(within(dlg).getByRole("combobox", { name: "signo" }));
+    expect(within(ayuda).queryByRole("note")).toBeNull();
     // Esc cierra con el foco fuera (GE1-1)
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Casos de carga" })).toBeNull();

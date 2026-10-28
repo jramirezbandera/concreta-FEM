@@ -13,12 +13,21 @@ import { CASOS_TIPICOS, casoIgual, casosDelJuego, crearCasos, describirCaso, JUE
 import { comoUna, textoUsos, usosDe } from "../../../src/editor/gestores.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { useVisor } from "../contexto.ts";
+import { AyudaCaso, LetraAccion, useCampoActivo } from "./AyudaCaso.tsx";
 import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
 import { FormularioObjeto } from "./Formulario.tsx";
 import { Lista } from "./Gestores.tsx";
+import { ACCIONES } from "./explicaciones.ts";
 import { cerrarGestor, type PedidoGestor } from "./referencia.tsx";
 
-const GRUPOS = ["Permanentes", "Uso", "Nieve", "Viento", "Sismo"] as const;
+/** Los grupos de típicos, con la acción de cada uno. */
+const GRUPOS = [
+  ["Permanentes", "G"],
+  ["Uso", "Q"],
+  ["Nieve", "S"],
+  ["Viento", "W"],
+  ["Sismo", "E"],
+] as const;
 const USOS: readonly CategoriaUso[] = ["A", "B", "C", "D", "E", "G"];
 
 export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
@@ -82,6 +91,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
   const usos = actual ? usosDe(m, actual.id) : [];
   const ya = new Map(CASOS_TIPICOS.map((t) => [t.clave, casoIgual(m, t.caso)?.id]));
   const poner = (c: Partial<JuegoCasos>) => setJuego({ ...juego, ...c });
+  const { activo, manejadores } = useCampoActivo();
 
   return (
     <>
@@ -117,7 +127,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
           nuevaTexto="Nuevo caso"
           nueva={!actual}
           onNueva={() => (setAviso(null), ir(-1))}
-          elementos={casos.map((c) => ({ id: c.id, texto: c.nombre ?? "", detalle: describirCaso(c), n: usosDe(m, c.id).reduce((t, u) => t + u.n, 0) }))}
+          elementos={casos.map((c) => ({ id: c.id, texto: c.nombre ?? "", detalle: describirCaso(c), n: usosDe(m, c.id).reduce((t, u) => t + u.n, 0), marca: c.accion?.tipo ?? "" }))}
           elegida={actual?.id ?? null}
           onElegir={(id) => (setAviso(null), ir(casos.findIndex((c) => c.id === id)))}
         />
@@ -135,6 +145,7 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
                   <p className="dlg-et" style={{ marginTop: 0 }}>
                     Hipótesis típicas: el juego de una vez
                   </p>
+                  <p className="ges-para">Crea de una vez los casos que pide casi cualquier edificio, con su acción y sus ψ del CTE. Los que ya estén se reutilizan.</p>
                   <div className="ges-cuerpo">
                     <div className="ges-datos">
                       <div className="flex flex-wrap gap-x-5 gap-y-1.5 py-1">
@@ -188,11 +199,15 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
               <p className="dlg-et" style={pedido.alElegir ? { marginTop: 0 } : undefined}>
                 {pedido.alElegir ? "Típicos del CTE: un clic lo crea y lo elige" : "O uno a uno: un clic"}
               </p>
-              <div className="grid grid-cols-[96px_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5">
-                {GRUPOS.map((g) => (
+              <div className="grid grid-cols-[150px_minmax(0,1fr)] items-start gap-x-3 gap-y-2.5">
+                {GRUPOS.map(([g, tipo]) => (
                   <Fragment key={g}>
-                    <span className="ges-para" style={{ margin: "8px 0 0" }}>
-                      {g}
+                    <span className="ges-grupo">
+                      <span>
+                        <LetraAccion tipo={tipo} />
+                        {g}
+                      </span>
+                      <small>{ACCIONES[tipo].breve}</small>
                     </span>
                     <div className="ges-tipicos" role="group" aria-label={`Casos típicos: ${g.toLowerCase()}`}>
                       {CASOS_TIPICOS.filter((t) => t.grupo === g).map((t) => {
@@ -210,24 +225,12 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
               </div>
             </>
           ) : (
-            <div className="ges-cuerpo">
-              <div className="ges-datos">
+            <div className="ges-cuerpo ancho">
+              <div className="ges-datos" {...manejadores}>
                 <FormularioObjeto id={actual.id} tabla="casos" />
               </div>
               <div className="ges-ver">
-                <div className="ges-props">
-                  <dl style={{ gridTemplateColumns: "1fr" }}>
-                    <div>
-                      <dt>para las combinaciones</dt>
-                      <dd>{describirCaso(actual)}</dd>
-                    </div>
-                    <div>
-                      <dt>ψ0 / ψ1 / ψ2</dt>
-                      <dd>{psiCaso(actual) ?? "—"}</dd>
-                    </div>
-                  </dl>
-                  <p>{actual.accion ? "Lo que usa el generador de combinaciones CTE/NCSE; ψ, de la tabla 4.2 del DB SE." : "Sin acción no entra en las combinaciones CTE/NCSE."}</p>
-                </div>
+                <AyudaCaso caso={actual} m={m} campo={activo} />
                 <p className="ges-usos">{usos.length ? `Lo usan ${textoUsos(usos)}.` : "No lo usa ninguna carga."}</p>
               </div>
             </div>

@@ -45,6 +45,7 @@ import { Dialogo, DialogoBorrar } from "./Dialogos.tsx";
 import { GestorCasos } from "./GestorCasos.tsx";
 import { GestorPlantas } from "./GestorPlantas.tsx";
 import { cerrarGestor, useGestor, type PedidoGestor } from "./referencia.tsx";
+import "./gestores.css";
 
 /** El gestor abierto, si hay pedido (va una vez en `App`). */
 export function GestorAbierto() {
@@ -558,13 +559,28 @@ function DibujoSeccion({ datos, mini = false }: { datos: DatosSeccion | null; mi
   );
 }
 
+/** Lo que es cada propiedad que enseñan los gestores (el `title` de su fila y «Qué es cada una»). */
+const QUE_ES: Record<string, string> = {
+  A: "Área de la sección. Da la rigidez axil, E·A.",
+  Iy: "Inercia alrededor del eje y local: la flexión del canto h (My). Da la rigidez E·Iy.",
+  Iz: "Inercia alrededor del eje z local: la flexión en el sentido del ancho b (Mz).",
+  J: "Constante de torsión de Saint-Venant: la rigidez a torsión G·J. En las vigas de hormigón va ×0,1 (D4).",
+  Avy: "Área de cortante según y: la deformación por cortante de Timoshenko (Vy). Sin ella, no se cuenta.",
+  Avz: "Área de cortante según z (Vz), como Avy.",
+  peso: "Peso por metro lineal, γ·A: el que lleva el caso de peso propio.",
+  E: "Módulo de elasticidad. En hormigón, el Ecm del Código Estructural para su fck.",
+  G: "Módulo de cortante, E / (2·(1 + ν)): da la rigidez a torsión y a cortante.",
+  γ: "Peso específico: con el volumen de cada pieza da su peso propio.",
+};
+
 export function Propiedades({ filas, nota }: { filas: [string, string][]; nota: string }) {
+  const glosario = filas.filter(([k]) => QUE_ES[k]);
   return (
     <div className="ges-props">
       {filas.length > 0 && (
         <dl>
           {filas.map(([k, v]) => (
-            <div key={k}>
+            <div key={k} title={QUE_ES[k]}>
               <dt>{k}</dt>
               <dd>{v}</dd>
             </div>
@@ -572,12 +588,25 @@ export function Propiedades({ filas, nota }: { filas: [string, string][]; nota: 
         </dl>
       )}
       <p>{nota}</p>
+      {glosario.length > 0 && (
+        <details className="ges-glosario">
+          <summary>Qué es cada una</summary>
+          <dl>
+            {glosario.map(([k]) => (
+              <div key={k}>
+                <dt>{k}</dt>
+                <dd>{QUE_ES[k]}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
     </div>
   );
 }
 
 /** La lista de la izquierda de un gestor; `nuevaTexto`, la línea de arriba («Nueva sección»). */
-export function Lista({ titulo, nuevaTexto, elementos, elegida, nueva, onElegir, onNueva }: { titulo: string; nuevaTexto?: string; elementos: { id: string; texto: string; detalle: string; n: number }[]; elegida: string | null; nueva: boolean; onElegir: (id: string) => void; onNueva: () => void }) {
+export function Lista({ titulo, nuevaTexto, elementos, elegida, nueva, onElegir, onNueva }: { titulo: string; nuevaTexto?: string; elementos: { id: string; texto: string; detalle: string; n: number; marca?: string }[]; elegida: string | null; nueva: boolean; onElegir: (id: string) => void; onNueva: () => void }) {
   return (
     <nav className="ges-lista" aria-label={`Lista de ${titulo}`}>
       <button type="button" className="ges-nueva" aria-current={nueva || undefined} onClick={onNueva}>
@@ -587,7 +616,8 @@ export function Lista({ titulo, nuevaTexto, elementos, elegida, nueva, onElegir,
       {elementos.length === 0 && <p className="ges-vacia">Ninguna en el proyecto.</p>}
       {elementos.map((x) => (
         <button key={x.id} type="button" aria-current={x.id === elegida || undefined} onClick={() => onElegir(x.id)}>
-          <span className="ges-id">{x.id}</span>
+          {/* `marca`: el id como la letra de su acción, con su color (casos) */}
+          {x.marca === undefined ? <span className="ges-id">{x.id}</span> : <span className="ges-id acc-letra" data-acc={x.marca || undefined}>{x.id}</span>}
           <span className="ges-texto">{x.texto}</span>
           <span className="ges-n" title={x.n ? `${x.n} objetos la usan` : "Sin usar"}>
             {x.detalle}
