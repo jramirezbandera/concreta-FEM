@@ -965,6 +965,12 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .campo-grupo { display: flex; align-items: center; gap: 8px; margin: 12px 14px 4px; font-size: 11px; font-weight: 600; color: var(--color-text-primary); }
 .campo-grupo::after { content: ""; flex: 1; height: 1px; background: var(--color-border-sub); }
 .form-datos > .campo-grupo:first-child, .form-datos > .nota:first-child + .campo-grupo { margin-top: 6px; }
+/* El grupo plegado (opciones avanzadas): el título es el botón, con un triángulo que gira */
+.campo-plegado > summary { cursor: pointer; list-style: none; color: var(--color-text-secondary); }
+.campo-plegado > summary::-webkit-details-marker { display: none; }
+.campo-plegado > summary::before { content: "▸"; font-size: 10px; transition: transform .12s; }
+.campo-plegado[open] > summary::before { transform: rotate(90deg); }
+.campo-plegado > summary:hover, .campo-plegado[open] > summary { color: var(--color-text-primary); }
 .campo-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .campo-oblig { margin-left: 2px; font-weight: 600; color: var(--color-accent); }
 .campo-q {

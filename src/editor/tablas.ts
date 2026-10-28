@@ -931,6 +931,17 @@ const casos: DefTabla = {
 // ─── Cargas ─────────────────────────────────────────────────────────────────────────────────────
 
 const CARGA = ["planta", "sobre", "ejes", "x", "y", "F", "M", "q", "qb", "desde", "hasta", "puntos", "lado", "z0", "z1", "p0", "p1"] as const;
+const TIPOS_CARGA = ["puntual", "viga", "pilar", "superficie", "lineal", "empuje"] as const;
+/** Las columnas de cada tipo de carga (además de id, tipo y caso); las demás van vacías. */
+const PROPIAS_CARGA: Readonly<Record<(typeof TIPOS_CARGA)[number], readonly (typeof CARGA)[number][]>> = {
+  puntual: ["planta", "x", "y", "F", "M"],
+  viga: ["sobre", "ejes", "q", "qb", "desde", "hasta"],
+  pilar: ["sobre", "ejes", "q", "qb", "desde", "hasta"],
+  superficie: ["planta", "sobre", "q", "puntos"],
+  lineal: ["planta", "puntos", "q"],
+  empuje: ["sobre", "lado", "z0", "z1", "p0", "p1"],
+};
+const tipoCarga = (f: Fila) => (f.tipo ?? "").trim().toLowerCase() as (typeof TIPOS_CARGA)[number];
 const cargas: DefTabla = {
   nombre: "cargas",
   titulo: "Cargas",
@@ -938,26 +949,48 @@ const cargas: DefTabla = {
   prefijo: "Q",
   columnas: [
     id,
-    { clave: "tipo", titulo: "tipo", ayuda: "puntual, viga, pilar, superficie, lineal o empuje", opciones: fijas(["puntual", "viga", "pilar", "superficie", "lineal", "empuje"]) },
-    { clave: "caso", titulo: "caso", opciones: casos_(), referencia: "casos" },
-    { clave: "planta", titulo: "planta", ayuda: "puntual, superficie y lineal", opciones: (ctx) => [{ valor: "", texto: "(viga y pilar)" }, ...opcionesPlantas(ctx)], referencia: "plantas" },
-    { clave: "sobre", titulo: "sobre", ayuda: "la viga, el pilar, el muro de un empuje, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)" },
-    { clave: "ejes", titulo: "ejes", ayuda: "viga y pilar: global o local", opciones: fijas(["global", "local"], "puntual, superficie y lineal") },
-    { clave: "x", titulo: "x", unidad: "m", ayuda: "puntual" },
-    { clave: "y", titulo: "y", unidad: "m", ayuda: "puntual" },
-    { clave: "F", titulo: "F", unidad: "kN", ayuda: "puntual: «Fx Fy Fz» en ejes globales" },
-    { clave: "M", titulo: "M", unidad: "kN·m", ayuda: "puntual: «Mx My Mz» en ejes globales" },
+    { clave: "tipo", titulo: "tipo", ayuda: "puntual (en un punto de la planta), viga o pilar (repartida a lo largo de la pieza), superficie (por m² de forjado), lineal (por metro de una línea de la planta) o empuje (del terreno sobre un muro)", opciones: fijas(TIPOS_CARGA) },
+    { clave: "caso", titulo: "caso", ayuda: "la hipótesis en que va: peso, uso, viento…", opciones: casos_(), referencia: "casos" },
+    { clave: "planta", titulo: "planta", ayuda: "la planta en que está la carga (en viga, pilar y empuje, la de su pieza)", opciones: (ctx) => [{ valor: "", texto: "(la de la pieza)" }, ...opcionesPlantas(ctx)], referencia: "plantas" },
+    {
+      clave: "sobre",
+      titulo: "sobre",
+      ayuda: "la pieza que carga: la viga, el pilar, el muro de un empuje, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)",
+      defecto: (f) => (tipoCarga(f) === "superficie" && (f.puntos ?? "").trim() ? "los forjados de la zona" : undefined),
+    },
+    { clave: "ejes", titulo: "ejes", ayuda: "en qué ejes van las componentes: global (los de la planta, z hacia arriba) o local (los de la pieza: x a lo largo de ella, z según su canto)", opciones: fijas(["global", "local"], "global") },
+    { clave: "x", titulo: "x", unidad: "m", ayuda: "coordenada X del punto donde actúa, en la planta" },
+    { clave: "y", titulo: "y", unidad: "m", ayuda: "coordenada Y del punto donde actúa, en la planta" },
+    { clave: "F", titulo: "F", unidad: "kN", ayuda: "la fuerza, «Fx Fy Fz» en ejes globales; hacia abajo es Fz < 0" },
+    { clave: "M", titulo: "M", unidad: "kN·m", ayuda: "un momento en el punto, «Mx My Mz» en ejes globales (casi nunca hace falta)" },
     { clave: "q", titulo: "q", ayuda: "«qx qy qz»: kN/m (viga, pilar, lineal) o kN/m² (superficie); hacia abajo es qz < 0" },
-    { clave: "qb", titulo: "qb", ayuda: "viga y pilar: q al final del tramo, si varía" },
-    { clave: "desde", titulo: "desde", unidad: "m", ayuda: "viga y pilar: estación de inicio; por defecto, la pieza entera" },
-    { clave: "hasta", titulo: "hasta", unidad: "m", ayuda: "viga y pilar: estación final" },
-    { clave: "puntos", titulo: "puntos", unidad: "m", ayuda: "lineal: la polilínea; superficie: la zona (vacía: la losa o el paño de «sobre» enteros)" },
-    { clave: "lado", titulo: "lado", ayuda: "empuje: la cara del muro donde está el terreno, mirando de su primer punto al último; empuja hacia la otra", opciones: fijas(["izquierdo", "derecho"], "sólo empuje") },
-    { clave: "z0", titulo: "z0", unidad: "m", ayuda: "empuje: altura sobre la base del muro donde vale p0" },
-    { clave: "z1", titulo: "z1", unidad: "m", ayuda: "empuje: altura donde vale p1; nula fuera de z0–z1" },
-    { clave: "p0", titulo: "p0", unidad: "kN/m²", ayuda: "empuje: presión en z0" },
-    { clave: "p1", titulo: "p1", unidad: "kN/m²", ayuda: "empuje: presión en z1" },
+    { clave: "qb", titulo: "qb", ayuda: "q al final de la pieza o del tramo, si varía (vacía: uniforme)" },
+    { clave: "desde", titulo: "desde", unidad: "m", ayuda: "un tramo de la pieza: dónde empieza, en m desde su primer extremo", defecto: () => "la pieza entera" },
+    { clave: "hasta", titulo: "hasta", unidad: "m", ayuda: "un tramo de la pieza: dónde acaba, en m desde su primer extremo", defecto: () => "la pieza entera" },
+    {
+      clave: "puntos",
+      titulo: "puntos",
+      unidad: "m",
+      ayuda: "lineal: la línea por la que va, «x y; x y; …»; superficie: la zona, si no es el forjado entero",
+      defecto: (f) => (tipoCarga(f) === "superficie" && (f.sobre ?? "").trim() ? "todo el forjado" : undefined),
+    },
+    { clave: "lado", titulo: "lado", ayuda: "la cara del muro donde está el terreno, mirando de su primer punto al último; empuja hacia la otra", opciones: fijas(["izquierdo", "derecho"], "sólo empuje") },
+    { clave: "z0", titulo: "z0", unidad: "m", ayuda: "altura sobre la base del muro donde vale p0" },
+    { clave: "z1", titulo: "z1", unidad: "m", ayuda: "altura donde vale p1; nula fuera de z0–z1" },
+    { clave: "p0", titulo: "p0", unidad: "kN/m²", ayuda: "presión del terreno en z0" },
+    { clave: "p1", titulo: "p1", unidad: "kN/m²", ayuda: "presión del terreno en z1" },
   ],
+  aplica(clave, f) {
+    const propias = PROPIAS_CARGA[tipoCarga(f)];
+    return !propias || !(CARGA as readonly string[]).includes(clave) || (propias as readonly string[]).includes(clave);
+  },
+  conValor(f, clave, valor) {
+    const r: Record<string, string> = { ...f, [clave]: valor };
+    if (clave !== "tipo") return r;
+    // Lo que deja de aplicar al nuevo tipo se vacía: no se arrastra un dato que ya no significa nada
+    for (const k of CARGA) if (!cargas.aplica!(k, r)) r[k] = "";
+    return r;
+  },
   fila(o) {
     const c = o as unknown as CargaFisica;
     const r: Record<string, string> = { id: c.id, tipo: c.tipo, caso: c.caso };
@@ -984,7 +1017,7 @@ const cargas: DefTabla = {
   },
   objeto(f, ctx) {
     const L = new Lector(f);
-    const tipo = L.opcion("tipo", ["puntual", "viga", "pilar", "superficie", "lineal", "empuje"] as const, { obligatorio: true });
+    const tipo = L.opcion("tipo", TIPOS_CARGA, { obligatorio: true });
     const comun = { tipo, id: L.texto("id") ?? "", caso: L.texto("caso", { obligatorio: true }) };
     const usa = (cs: readonly (typeof CARGA)[number][]) => L.vacias(CARGA.filter((k) => !cs.includes(k)), `a una carga ${tipo}`);
     switch (tipo) {
@@ -997,7 +1030,7 @@ const cargas: DefTabla = {
         return resultado(L, {
           ...comun,
           [tipo]: L.texto("sobre", { obligatorio: true }),
-          ejes: L.opcion("ejes", ["global", "local"] as const, { obligatorio: true }),
+          ejes: L.opcion("ejes", ["global", "local"] as const) ?? "global",
           q: L.vector("q", { obligatorio: true }),
           qb: L.vector("qb"),
           desde: L.numero("desde", { min: 0 }),

@@ -22,8 +22,12 @@ import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { PlantaForjado, SeccionForjado } from "./CroquisForjado.tsx";
+import { ValorCarga } from "./FichaCarga.tsx";
 import { PesoForjado, RigidezAligeradoPanel } from "./FichaForjado.tsx";
 import { abrirGestor, ARTICULO, esDelGestor, OpcionesGestor, pedidoCampo } from "./referencia.tsx";
+
+/** El grupo que va plegado: lo que casi nunca hace falta (2026-10-28, cargas). */
+const AVANZADAS = "Opciones avanzadas";
 
 /** Los grupos de campos de una tabla, en orden; lo que no está en ninguno va al final, sin título. */
 const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly string[]])[]>> = {
@@ -39,6 +43,27 @@ const GRUPOS: Partial<Record<NombreTabla, readonly (readonly [string, readonly s
     ["Para las combinaciones", ["tipo", "psi", "familia", "duracion"]],
     ["Según la acción", ["permanente", "direccion", "signo", "derivadoDe"]],
   ],
+  cargas: [
+    ["La carga", ["id", "tipo", "caso", "planta", "sobre"]],
+    ["Dónde", ["x", "y", "puntos"]],
+    ["Valor", ["q", "qb", "F", "M", "lado", "z0", "z1", "p0", "p1"]],
+    [AVANZADAS, ["ejes", "desde", "hasta"]],
+  ],
+};
+
+/** El nombre de un campo según la fila, si no es su título de la tabla («sobre» de una carga de viga es «viga»). */
+const TITULO_EN: Partial<Record<NombreTabla, (clave: string, f: Fila) => string | undefined>> = {
+  cargas: (clave, f) => {
+    const tipo = (f.tipo ?? "").trim().toLowerCase();
+    if (clave === "sobre") return ({ viga: "viga", pilar: "pilar", empuje: "muro", superficie: "forjado" } as Record<string, string>)[tipo];
+    if (clave === "puntos") return ({ lineal: "recorrido", superficie: "zona" } as Record<string, string>)[tipo];
+    if (clave === "x" || clave === "y") return `${clave} del punto`;
+  },
+};
+
+/** ¿Se abre el grupo plegado? Sí si algo de él no está en su valor por defecto. */
+const ABRIR_AVANZADAS: Partial<Record<NombreTabla, (f: Fila) => boolean>> = {
+  cargas: (f) => (f.ejes ?? "").trim().toLowerCase() === "local" || !!(f.desde ?? "").trim() || !!(f.hasta ?? "").trim(),
 };
 
 /** Las columnas por grupos (`GRUPOS`); una tabla sin grupos, un solo grupo sin título. */
@@ -52,12 +77,15 @@ function agrupar<T>(tabla: NombreTabla, cosas: readonly T[], clave: (x: T) => st
 }
 
 interface PropsCroquis {
+  id: string;
   fila: Fila;
   ctx: Contexto;
   activo: string | null;
   onCampo: (clave: string) => void;
   /** Escribe un campo, como si se tecleara. */
   escribir: (clave: string, valor: string) => void;
+  /** Escribe varios campos en un paso de deshacer. */
+  escribirVarios: (cambios: Readonly<Record<string, string>>) => void;
   errores: Readonly<Record<string, string>>;
   rigidezReticular: "uniforme" | "bruta";
 }
@@ -70,17 +98,18 @@ const CROQUIS: Partial<Record<NombreTabla, Record<string, ComponentType<PropsCro
     "Material y peso": PesoForjado,
     "Rigidez del aligerado": ({ rigidezReticular, ...p }) => <RigidezAligeradoPanel {...p} rigidez={rigidezReticular} />,
   },
+  cargas: { Valor: ValorCarga },
 };
 
-/** Los campos que no se enseñan como campo: los lleva el croquis de su grupo (los multiplicadores, en su tabla). */
-const EN_CROQUIS: Partial<Record<NombreTabla, ReadonlySet<string>>> = { forjados: new Set(["multiplicadores"]) };
+/** Los campos que no se enseñan como campo: los lleva el croquis de su grupo (los multiplicadores; el valor de una carga). */
+const EN_CROQUIS: Partial<Record<NombreTabla, ReadonlySet<string>>> = { forjados: new Set(["multiplicadores"]), cargas: new Set(["q", "qb", "F", "M"]) };
 
 /** El nombre del campo: «*» si es obligatorio y «?» si tiene ayuda (en un globo, al pasar el ratón). */
-function Etiqueta({ c, estado, conUnidad }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean }) {
+function Etiqueta({ c, estado, conUnidad, titulo }: { c: Columna; estado?: EstadoCampo; conUnidad: boolean; titulo?: string }) {
   return (
     <span>
       <span className="campo-nombre">
-        {c.titulo}
+        {titulo ?? c.titulo}
         {estado?.obligatorio && (
           <b className="campo-oblig" title="obligatorio">
             *
@@ -93,18 +122,38 @@ function Etiqueta({ c, estado, conUnidad }: { c: Columna; estado?: EstadoCampo; 
   );
 }
 
-/** Los campos por grupos, con el croquis de cada grupo si lo tiene. */
-function Grupos<T>({ tabla, cosas, clave, campo, croquis }: { tabla: NombreTabla; cosas: readonly T[]; clave: (x: T) => string; campo: (x: T) => ReactNode; croquis?: (grupo: string) => ReactNode }) {
+/** Los campos por grupos, con el croquis de cada grupo si lo tiene; el de `AVANZADAS`, plegado salvo con `abrir`. */
+function Grupos<T>({ tabla, cosas, clave, campo, croquis, abrir }: { tabla: NombreTabla; cosas: readonly T[]; clave: (x: T) => string; campo: (x: T) => ReactNode; croquis?: (grupo: string) => ReactNode; abrir?: boolean }) {
   return (
     <>
-      {agrupar(tabla, cosas, clave).map((g, i) => (
-        <Fragment key={g.titulo ?? `g${i}`}>
-          {g.titulo && <h3 className="campo-grupo">{g.titulo}</h3>}
-          {g.titulo && croquis?.(g.titulo)}
-          {g.cosas.map(campo)}
-        </Fragment>
-      ))}
+      {agrupar(tabla, cosas, clave).map((g, i) =>
+        g.titulo === AVANZADAS ? (
+          <Plegado key={g.titulo} titulo={g.titulo} abierto={!!abrir}>
+            {g.cosas.map(campo)}
+          </Plegado>
+        ) : (
+          <Fragment key={g.titulo ?? `g${i}`}>
+            {g.titulo && <h3 className="campo-grupo">{g.titulo}</h3>}
+            {g.titulo && croquis?.(g.titulo)}
+            {g.cosas.map(campo)}
+          </Fragment>
+        ),
+      )}
     </>
+  );
+}
+
+/** Un grupo plegado; se abre solo cuando algo suyo deja de estar en su valor por defecto. */
+function Plegado({ titulo, abierto, children }: { titulo: string; abierto: boolean; children: ReactNode }) {
+  const [abierta, setAbierta] = useState(abierto);
+  useEffect(() => {
+    if (abierto) setAbierta(true);
+  }, [abierto]);
+  return (
+    <details className="campo-plegado" open={abierta} onToggle={(e) => setAbierta(e.currentTarget.open)}>
+      <summary className="campo-grupo">{titulo}</summary>
+      {children}
+    </details>
   );
 }
 
@@ -139,23 +188,29 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
   const pendiente = borrador.tipo !== undefined && borrador.tipo !== fila.tipo;
   const actual = { ...fila, ...borrador };
 
-  /** `elegido`: lo elegido en un desplegable (si no, lo escrito en el campo). */
-  const escribir = (clave: string, elegido?: string) => {
-    const v = elegido ?? borrador[clave];
-    if (v === undefined || (v === (fila[clave] ?? "") && !pendiente)) return;
-    const nueva = filaConValor(def, pendiente ? actual : fila, clave, v);
+  /** Escribe varios campos en un paso de deshacer (el valor de una carga: q y qb a la vez). */
+  const escribirVarios = (cambios: Readonly<Record<string, string>>) => {
+    const claves = Object.keys(cambios).filter((k) => pendiente || cambios[k] !== (fila[k] ?? ""));
+    if (!claves.length) return;
+    const nueva = claves.reduce((f, k) => filaConValor(def, f, k, cambios[k]!), pendiente ? actual : fila);
     const t = operacionFila(m, tabla, id, nueva);
     if (!t.ok) {
-      if (t.errores.every((e) => e.mensaje === "falta el dato") && ((clave === "tipo" && def.conValor) || pendiente)) {
+      if (t.errores.every((e) => e.mensaje === "falta el dato") && ((claves.includes("tipo") && def.conValor) || pendiente)) {
         setBorrador(nueva);
         return setErrores(Object.fromEntries(t.errores.map((e) => [e.columna ?? "", "falta el dato: se guarda en cuanto esté completo"])));
       }
-      return setErrores({ ...errores, [clave]: t.errores.map((e) => e.mensaje).join(" · ") });
+      return setErrores({ ...errores, [claves[0]!]: t.errores.map((e) => e.mensaje).join(" · ") });
     }
-    const col = def.columnas.find((c) => c.clave === clave)!;
-    const r = ed.editar(t.operacion, `${id} · ${col.titulo} = ${v || "(vacío)"}`);
-    if (!r.ok) return setErrores({ ...errores, [clave]: r.errores.map((e) => e.mensaje).join(" ") });
+    const titulo = (k: string) => def.columnas.find((c) => c.clave === k)!.titulo;
+    const r = ed.editar(t.operacion, `${id} · ${claves.map((k) => `${titulo(k)} = ${cambios[k] || "(vacío)"}`).join(", ")}`);
+    if (!r.ok) return setErrores({ ...errores, [claves[0]!]: r.errores.map((e) => e.mensaje).join(" ") });
     if (t.operacion.op === "cambiar" && t.operacion.objeto.id !== id) setSeleccion(t.operacion.objeto.id);
+  };
+
+  /** `elegido`: lo elegido en un desplegable (si no, lo escrito en el campo). */
+  const escribir = (clave: string, elegido?: string) => {
+    const v = elegido ?? borrador[clave];
+    if (v !== undefined) escribirVarios({ [clave]: v });
   };
 
   /**
@@ -206,9 +261,24 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
           // Lo que no aplica al tipo (Forjados) no se enseña si está vacío
           cosas={def.columnas.filter((c) => !(def.aplica && !(borrador[c.clave] ?? fila[c.clave]) && !def.aplica(c.clave, actual)))}
           clave={(c) => c.clave}
+          abrir={!!ABRIR_AVANZADAS[tabla]?.(actual)}
           croquis={(g) => {
             const C = Croquis?.[g];
-            return C && <C fila={actual} ctx={ctx} activo={sobre ?? foco} onCampo={irACampo} escribir={escribir} errores={errores} rigidezReticular={ed.proyecto.opciones?.rigidezReticular ?? "uniforme"} />;
+            return (
+              C && (
+                <C
+                  id={id}
+                  fila={actual}
+                  ctx={ctx}
+                  activo={sobre ?? foco}
+                  onCampo={irACampo}
+                  escribir={escribir}
+                  escribirVarios={escribirVarios}
+                  errores={errores}
+                  rigidezReticular={ed.proyecto.opciones?.rigidezReticular ?? "uniforme"}
+                />
+              )
+            );
           }}
           campo={(c) => {
               if (EN_CROQUIS[tabla]?.has(c.clave)) return null;
@@ -227,7 +297,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
                   onMouseEnter={() => setSobre(c.clave)}
                   onMouseLeave={() => setSobre(null)}
                 >
-                  <Etiqueta c={c} estado={estado} conUnidad={!!opciones} />
+                  <Etiqueta c={c} estado={estado} conUnidad={!!opciones} titulo={TITULO_EN[tabla]?.(c.clave, actual)} />
                   {opciones ? (
                     <select
                       className="sel"

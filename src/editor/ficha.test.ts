@@ -79,3 +79,25 @@ describe("croquisForjado", () => {
     expect(croquisForjado(fila("F1"), ctx).vigueta?.id).toBe(fila("F1").seccion);
   });
 });
+
+describe("Cargas en el inspector (2026-10-28)", () => {
+  const cargas = DEF_TABLAS.cargas;
+  const filaCarga = (id: string) => cargas.fila(objetosTabla(m, "cargas").find((o) => o.id === id)!, ctx);
+  const aplican = (f: Record<string, string>) => cargas.columnas.map((c) => c.clave).filter((k) => cargas.aplica!(k, f));
+
+  it("cada tipo enseña sólo sus campos", () => {
+    expect(aplican(filaCarga("CM-PB"))).toEqual(["id", "tipo", "caso", "planta", "sobre", "q", "puntos"]);
+    expect(aplican(filaCarga("PETO-1"))).toEqual(["id", "tipo", "caso", "sobre", "ejes", "q", "qb", "desde", "hasta"]);
+    expect(aplican(filaCarga("WX+P1"))).toEqual(["id", "tipo", "caso", "planta", "x", "y", "F", "M"]);
+    expect(aplican(filaCarga("EMP-M1"))).toEqual(["id", "tipo", "caso", "sobre", "lado", "z0", "z1", "p0", "p1"]);
+  });
+
+  it("los ejes de una carga de barra son globales si no se dicen, y cambiar de tipo vacía lo que deja de aplicar", () => {
+    const f = { ...filaCarga("PETO-1"), ejes: "" };
+    const l = cargas.objeto(f, ctx);
+    expect(l.ok && l.objeto).toEqual(objetosTabla(m, "cargas").find((o) => o.id === "PETO-1"));
+    expect(estadoCampos(cargas, f, ctx).ejes).toEqual({ obligatorio: false });
+    const lineal = cargas.conValor!(filaCarga("CM-PB"), "tipo", "lineal");
+    expect([lineal.sobre, lineal.q, lineal.planta]).toEqual(["", "0 0 -2", "PB"]);
+  });
+});
