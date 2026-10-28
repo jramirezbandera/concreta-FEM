@@ -50,6 +50,8 @@ export interface Dibujo2D {
   ventana(caja: [number, number, number, number], ctrl?: boolean): boolean;
   /** V2c-3: al pulsar, true si coge algo que se arrastra (un vértice de lo elegido); al soltar tras moverse, va a `clic`. */
   agarrar?(p: Vec2, radio: number): boolean;
+  /** El clic derecho sin arrastrar; true si es suyo. */
+  derecho?(): boolean;
   /** El punto que se usaría (enganchado) y lo que dice la barra de estado. */
   cursor(): { p: Vec2; texto: string } | null;
   pintar(ctx: CanvasRenderingContext2D, aPx: (q: Vec2) => [number, number], c: Colores): void;
@@ -335,6 +337,10 @@ export class Vista2D extends Vista {
     if (!this.dibujo || this.s <= 0 || !this.escena) return;
     this.dibujo.pasar(this.aModelo(x, y), RADIO_ENGANCHE / this.s, !!e?.shiftKey, [e?.clientX ?? 0, e?.clientY ?? 0]);
     this.entorno.pintar();
+  }
+
+  protected override clicDerecho(): void {
+    if (this.dibujo?.derecho?.()) this.entorno.pintar();
   }
 
   override salir(): void {

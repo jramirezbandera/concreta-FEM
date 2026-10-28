@@ -23,7 +23,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
-import type { Operacion } from "../../../src/editor/operaciones.ts";
+import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
+import { indiceIds } from "../../../src/editor/referencias.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcVigaBorde, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
@@ -262,6 +263,20 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     if (eligiendo && elegidos !== alEmpezar.current && !conCtrl.current && paraAccion(eligiendo).length) setDialogo(eligiendo);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando cambia lo elegido
   }, [elegidos]);
+  // Supr borra lo elegido: si nada más lo usa, en el acto (se deshace con Ctrl+Z); si no, el diálogo
+  // de Borrar dice qué lo usa. La hoja tiene su Supr (vaciar celdas) y un diálogo abierto, el suyo.
+  useEffect(() => {
+    if (dibujando || estirando || conAsa || dialogo || !ed || !enTablas.length) return;
+    const tecla = (x: KeyboardEvent) => {
+      if (x.key !== "Delete" || x.ctrlKey || x.metaKey || x.altKey || x.shiftKey || enCampo(x.target)) return;
+      x.preventDefault();
+      if (!aplicar(ed.proyecto, { op: "borrar", ids: enTablas }).ok) return setDialogo("borrar");
+      const r = ed.editar({ op: "borrar", ids: enTablas }, `Borrar ${enTablas.length > 3 ? `${enTablas.length} objetos` : enTablas.join(", ")}`);
+      if (r.ok && seleccion && !indiceIds(r.proyecto.modelo).has(seleccion)) setSeleccion(null);
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  });
 
   const abrirTabla = (t: NombreTabla, filaNueva = false, celdas?: Record<string, string>) => {
     setTabla(t);

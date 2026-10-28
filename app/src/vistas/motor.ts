@@ -127,6 +127,7 @@ export abstract class Vista {
     this.arrastre = null;
     if (!a) return;
     if (a.boton === 0 && !a.movido) this.clic(x, y, a.ctrl, false);
+    else if (a.boton === 2 && !a.movido) this.clicDerecho();
     else if (this.ventana) {
       const [x0, y0, x1, y1] = this.ventana;
       this.ventana = null;
@@ -140,6 +141,9 @@ export abstract class Vista {
 
   /** El cursor sale de la vista. */
   salir(): void {}
+
+  /** Un clic con el botón derecho sin arrastrar (arrastrando, desplaza la cámara). */
+  protected clicDerecho(): void {}
 
   dobleclic(e: MouseEvent, x: number, y: number): void {
     this.clic(x, y, e.ctrlKey || e.metaKey, true);

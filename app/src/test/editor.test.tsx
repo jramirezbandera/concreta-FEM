@@ -373,6 +373,17 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     // GE1-1: Esc lo cierra aunque el foco esté fuera
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Borrar V1" })).toBeNull();
+    // Supr: lo que nada usa se borra en el acto (Ctrl+Z lo devuelve); lo que algo usa abre el diálogo
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^V1/ }));
+    fireEvent.keyDown(window, { key: "Delete" });
+    expect(screen.queryByRole("dialog", { name: "Borrar V1" })).toBeNull();
+    await waitFor(() => expect(within(objetos()).queryByRole("button", { name: /^V1/ })).toBeNull());
+    fireEvent.click(screen.getByTitle("Deshacer: Borrar V1 (Ctrl+Z)"));
+    await waitFor(() => expect(within(objetos()).getByRole("button", { name: /^V1/ })).toBeTruthy());
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^Forjados/ }));
+    fireEvent.click(within(objetos()).getByRole("button", { name: /^L1/ }));
+    fireEvent.keyDown(window, { key: "Delete" });
+    expect(screen.getByRole("dialog", { name: "Borrar L1" }).textContent).toMatch(/Q1/);
   }, 120_000);
 
   it("V2b: un paño con su carga y un muro con un hueco y su empuje, tecleados, dan la huella del mismo modelo escrito a mano", async () => {

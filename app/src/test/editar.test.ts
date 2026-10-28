@@ -180,3 +180,23 @@ describe("pinzamientos", () => {
     expect(proyecto().modelo.pilares!.find((x) => x.id === "P11")).toMatchObject({ x: 6, y: 5 });
   });
 });
+
+describe("Clic derecho", () => {
+  it("termina la viga como Intro; sin puntos en curso no es de la herramienta", () => {
+    const { ctrl, vista, clic, hechos, proyecto } = preparar();
+    ctrl.ponerPlantillas({ pilar: {}, viga: { seccion: "v30" } });
+    ctrl.ponerHerramienta("viga");
+    expect(vista.derecho!()).toBe(false);
+    clic([0, 0]);
+    clic([6, 0]);
+    clic([11.4, 0]);
+    expect(vista.derecho!()).toBe(true);
+    expect(hechos).toEqual(["Viga V1"]);
+    expect(viga(proyecto(), "V1")).toEqual([[0, 0], [6, 0], [11.4, 0]]);
+    // Sigue en Viga, sin puntos: el siguiente clic derecho no hace nada
+    expect(ctrl.activa).toBe("viga");
+    expect(vista.derecho!()).toBe(false);
+    ctrl.ponerHerramienta("elegir");
+    expect(vista.derecho!()).toBe(false);
+  });
+});

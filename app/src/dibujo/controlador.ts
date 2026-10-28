@@ -236,6 +236,13 @@ export class ControladorDibujo {
     this.evento({ tipo: "terminar", p: a?.p ?? null, enganche: a?.enganche ?? null });
   }
 
+  /** El clic derecho: Intro si la herramienta tiene puntos en curso (termina una viga, un muro, un polígono). */
+  derecho(): boolean {
+    if (this.herramienta === "elegir" || !this.estado.puntos.length) return false;
+    this.intro();
+    return true;
+  }
+
   /** Tab (Mayús+Tab, `atras`): la cota temporal siguiente. Devuelve si la herramienta las tiene. */
   tab(atras = false): boolean {
     if (this.herramienta === "elegir") return this.tabPilar(atras);
@@ -397,6 +404,7 @@ export class ControladorDibujo {
       },
       ventana: (caja, ctrl) => this.ventana(planta, caja, !!ctrl),
       agarrar: (p, radio) => this.agarrar(planta, p, radio),
+      derecho: () => this.derecho(),
       cursor: () => this.cursor(planta),
       pintar: (ctx, aPx, c) => this.pintar(planta, ctx, aPx, c, cotas),
     };
