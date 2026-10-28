@@ -99,12 +99,12 @@ export function RigidezAligeradoPanel({ fila, ctx, escribir, errores, rigidez }:
       <p className="text-[11.5px] leading-snug text-text-secondary mt-1.5">
         {mia ? (
           <>
-            Como en SAP2000: van sobre la maciza con el ν del hormigón ({n(r.nu, 2)}), los ábacos son macizos (1) y las vigas planas a sus lados no se rebajan.
+            Van sobre la maciza con el ν del hormigón ({n(r.nu, 2)}), los ábacos son macizos (1) y las vigas planas a sus lados no se rebajan.
           </>
         ) : r.rigidez === "uniforme" ? (
           <>
-            Como CYPECAD: la flexión, ½ de la maciza en las dos direcciones, y la torsión, ½ con el G del hormigón, en lo aligerado y en los ábacos; el axil y los cortantes, los de la T del nervio (en los ábacos, macizos). Sin efecto Poisson
-            (ν = 0, como un emparrillado). Las vigas planas a sus lados van con la flexión ×0,6.
+            Rigidez «uniforme» (CY3): la flexión, ½ de la maciza en las dos direcciones, y la torsión, ½ con el G del hormigón, en lo aligerado y en los ábacos; el axil y los cortantes, los de la T del nervio (en los ábacos, macizos). Sin efecto Poisson
+            (ν = 0, como un emparrillado). Las vigas planas a sus lados van con la flexión ×0,6 (RV-a).
           </>
         ) : (
           <>Los de la T bruta del nervio (opción «bruta»), sin efecto Poisson (ν = 0, como un emparrillado); los ábacos, macizos.</>
