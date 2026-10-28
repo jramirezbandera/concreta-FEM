@@ -6,6 +6,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { FiltroGuardado, VistaGuardada } from "../../../src/agente/proyecto.ts";
+import type { ModoAlzado } from "../../../src/agente/render/alzado.ts";
 import type { Camara2D } from "./vista2d.ts";
 import type { CajaSeccion, Camara3D, Color3D, FiltroVista, Modo3D, Proyeccion } from "./vista3d.ts";
 
@@ -44,6 +45,8 @@ export interface EstadoVista {
   filtro?: FiltroVista;
   /** I3: ±d de un alzado, m (por defecto, 0,5). */
   profundidad?: number;
+  /** Cómo se dibuja un alzado; sin él, sólido (en Resultados, alámbrico: `modoAlzadoVisto`). */
+  modoAlzado?: ModoAlzado;
   /** I3: sube al abrir una vista guardada, para que la celda rehaga su vista con la cámara guardada. */
   salto?: number;
   /** La cámara de cada tipo (al cambiar de tipo y volver, se recupera). */
@@ -120,6 +123,7 @@ export function aGuardada(v: EstadoVista, nombre: string, camara: unknown): Vist
     ...(v.tipo === "planta" ? { dibujo: v.dibujo } : {}),
     ...(v.tipo === "3d" ? { modo3d: v.modo3d, proyeccion: v.proyeccion, ...(v.color3d && v.color3d !== "material" ? { color3d: v.color3d } : {}) } : {}),
     ...(v.tipo === "alzado" && v.profundidad !== undefined ? { profundidad: v.profundidad } : {}),
+    ...(v.tipo === "alzado" && v.modoAlzado ? { modoAlzado: v.modoAlzado } : {}),
     ...(v.tipo === "3d" && c?.C && c.T ? { camara3d: { C: [...c.C] as [number, number, number], T: [...c.T] as [number, number, number] } } : {}),
     ...(v.tipo !== "3d" && c?.escala !== undefined ? { camara2d: { cx: c.cx!, cy: c.cy!, escala: c.escala } } : {}),
     ...(filtro ? { filtro } : {}),
@@ -141,6 +145,7 @@ function desdeGuardada(v: EstadoVista, g: VistaGuardada): EstadoVista {
     proyeccion: g.proyeccion ?? b.proyeccion,
     color3d: g.color3d ?? "material",
     profundidad: g.profundidad,
+    modoAlzado: g.modoAlzado,
     filtro: f ? { desde: f.desde ?? null, hasta: f.hasta ?? null, sinTipos: f.sinTipos ? [...f.sinTipos] : [], aislados: f.aislados ? [...f.aislados] : null, ocultos: f.ocultos ? [...f.ocultos] : [], caja: f.caja ? ([...f.caja] as CajaSeccion) : null } : {},
     camaras: { ...v.camaras, ...(cam ? { [g.tipo]: cam } : {}) },
     salto: (v.salto ?? 0) + 1,

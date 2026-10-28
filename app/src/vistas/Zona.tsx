@@ -11,6 +11,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BookmarkPlus, Box, BoxSelect, ChevronDown, FileImage, Grid3x3, Hand, Maximize, Move3d, MousePointer2, Rotate3d, SlidersHorizontal, X } from "lucide-react";
 import type { EntradaLeyenda, Estilo, Vec2 } from "../../../src/agente/render/escena.ts";
+import type { ModoAlzado } from "../../../src/agente/render/alzado.ts";
 import type { Alambrico } from "../../../src/visor/alambrico.ts";
 import type { Geometria3D } from "../../../src/visor/datos.ts";
 import type { Diagramas3D } from "../../../src/visor/diagramas3d.ts";
@@ -212,7 +213,8 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
   // En 3D, la planta resaltada puede no ser ninguna (es lo de por defecto)
   const planta = e.plantas.some((p) => p.id === v.planta) ? v.planta! : tipo === "3d" ? null : (e.plantas[0]?.id ?? null);
   const eje = e.ejes.some((x) => x.id === v.eje) ? v.eje! : (e.ejes[0]?.id ?? null);
-  const vv = useMemo(() => ({ ...v, planta, eje }), [v, planta, eje]);
+  const modoAlzado = modoAlzadoVisto(v.modoAlzado, !!fuentes.cabecera3D, e.compila);
+  const vv = useMemo(() => ({ ...v, planta, eje, modoAlzado }), [v, planta, eje, modoAlzado]);
   const celda = useMemo(() => ({ i, varias, v: vv, vista }), [i, varias, vv, vista]);
 
   const contenido = tipo === "planta" ? (fuentes.planta?.(vv, i) ?? <FuenteEscena fuente={planta ? { tipo: "planta", planta, vista: { vista: "modelo" } } : null} />) : tipo === "alzado" ? (fuentes.alzado?.(vv, i) ?? <FuenteEscena fuente={eje ? { tipo: "alzado", plano: planoAlzado(eje, vv) } : null} />) : (fuentes.tresD?.(vv, i) ?? <Fuente3DModelo />);
@@ -250,6 +252,14 @@ function CeldaVista({ i, v, motor, fuentes, activa, varias }: { i: number; v: Es
             valor={String(v.profundidad ?? PROFUNDIDAD_POR_DEFECTO)}
             onCambio={(x) => poner(i, { profundidad: Number(x) })}
             opciones={PROFUNDIDADES.map((d) => ({ id: String(d), nombre: `${String(d).replace(".", ",")} m`, title: "Lo que se ve a cada lado del plano del alzado" }))}
+          />
+        )}
+        {tipo === "alzado" && eje && (
+          <Desplegable
+            etiqueta="Modo del alzado"
+            valor={modoAlzado}
+            onCambio={(m) => poner(i, { modoAlzado: m })}
+            opciones={MODOS_ALZADO.map((m) => ({ id: m.id, nombre: m.nombre, disabled: m.id === "analitico" && !e.compila, title: m.id === "analitico" && !e.compila ? (e.compilando ? "Compilando…" : "El modelo no compila") : m.title }))}
           />
         )}
         {tipo === "alzado" && eje && fuentes.cabeceraAlzado?.(vv, i)}
@@ -391,13 +401,28 @@ const MODOS_3D: { id: Modo3D; nombre: string; title: string }[] = [
   { id: "analitico", nombre: "Analítico", title: "El modelo que se calcula: barras y láminas" },
 ];
 
+/**
+ * El modo con que se pinta un alzado: el elegido o, sin elegir, el sólido (en Resultados, el
+ * alámbrico, como el 3D). El analítico, sólo si compila; si no, el alámbrico.
+ */
+export function modoAlzadoVisto(modo: ModoAlzado | undefined, resultados: boolean, compila: boolean): ModoAlzado {
+  const m = modo ?? (resultados ? "alambrico" : "solido");
+  return m === "analitico" && !compila ? "alambrico" : m;
+}
+
+const MODOS_ALZADO: { id: ModoAlzado; nombre: string; title: string }[] = [
+  { id: "solido", nombre: "Sólido", title: "Las piezas con su canto y su ancho" },
+  { id: "alambrico", nombre: "Alámbrico", title: "Los ejes de las piezas: los pilares por el de su sección, las vigas y las losas en la cota de su planta" },
+  { id: "analitico", nombre: "Analítico", title: "El modelo que se calcula: barras con sus zonas rígidas y articulaciones, nudos, láminas cortadas y enlaces rígidos" },
+];
+
 /** ±d de un alzado (I3). */
 const PROFUNDIDADES = [0.25, 0.5, 1, 2, 5];
 const PROFUNDIDAD_POR_DEFECTO = 0.5;
 
 /** El plano del alzado de una vista: su eje y, si no es la de por defecto, su profundidad. */
-export function planoAlzado(eje: string, v: EstadoVista): { eje: string; profundidad?: number } {
-  return v.profundidad !== undefined && v.profundidad !== PROFUNDIDAD_POR_DEFECTO ? { eje, profundidad: v.profundidad } : { eje };
+export function planoAlzado(eje: string, v: EstadoVista): { eje: string; profundidad?: number; modo?: ModoAlzado } {
+  return { eje, ...(v.profundidad !== undefined && v.profundidad !== PROFUNDIDAD_POR_DEFECTO ? { profundidad: v.profundidad } : {}), ...(v.modoAlzado && v.modoAlzado !== "solido" ? { modo: v.modoAlzado } : {}) };
 }
 
 const NOMBRE_FILTRO: Record<TipoFiltro, string> = { pilar: "Pilares", viga: "Vigas", losa: "Losas", pano: "Unidireccionales", muro: "Muros", apoyo: "Apoyos" };

@@ -621,6 +621,12 @@
   - **Propiedades de un forjado** (`app/src/editor/FichaForjado.tsx`): en «Material y peso», cómo sale el pp con sus números y «Usar el calculado» si hay uno escrito; «Rigidez del aligerado», con «Calculada» (los ocho multiplicadores que usa el cálculo, con su nombre y lo que es cada uno) o «La mía» (los ocho, rellenos con los calculados para cambiar el que se quiera; `rigidezAligerado` en `ficha.ts`). La plantilla de Forjado y la tabla tienen el casetón y la bovedilla como desplegables y enseñan el pp que saldrá.
   - **Lo que hacía el texto de antes, y no decía:** con algún multiplicador escrito, los no escritos valen 1 (la maciza), van con el ν del hormigón, los ábacos dejan la rigidez «uniforme» y las vigas planas no se rebajan. No cambia (la semántica de SAP2000 contrastada en E6-11 y E6-12); ahora se ve.
   - **Validación:** `src/compilador/pesoForjado.test.ts` (los números a mano, sin pp el mismo modelo que con el pp calculado escrito, la sensatez y la tabla pesan lo del compilador, y la tabla de rigidez es la del compilador con «uniforme», «bruta» y dados).
+- **2026-10-29: el alzado alámbrico y analítico** (a petición del usuario; `docs/fem3d/niveles.md` §0). El alzado tiene un selector Sólido, Alámbrico y Analítico, como el 3D (`ModoAlzado`, en el pedido del plano y en las vistas guardadas, `modoAlzado`).
+  - **Alámbrico** (por defecto en Resultados): las piezas por sus ejes, sólo con el modelo físico.
+  - **Analítico:** lo que se calcula: barras con sus zonas rígidas, articulaciones y empotramientos parciales, nudos, la malla de los muros paralelos, las láminas cortadas, los enlaces rígidos y los apoyos.
+  - Los diagramas, las reacciones y las cargas se dibujan encima del modo elegido; el sólido no espera a compilar (AL-4).
+  - Prueba: `alzado.test.ts` (el analítico, barra a barra con la compilación).
+- **2026-10-29: propuesta de piezas fuera del plano de su planta** (`docs/fem3d/niveles.md`, sin decidir): `barras` entre dos niveles (vigas inclinadas, tornapuntas, diagonales; propuesta para CB-c), desniveles de paño como en CYPECAD (DN-a…DN-c) y losas inclinadas (DN-d). Orden: barras lineales con la herramienta del alzado, desniveles, lo no lineal (sólo tracción y balasto), losas inclinadas.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
@@ -633,6 +639,7 @@
   - las puertas de uso que queden;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
+  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles (paso siguiente, tras decidir CB-c y CB-f), desniveles de paño y, más adelante, losas inclinadas;
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

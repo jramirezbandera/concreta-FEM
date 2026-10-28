@@ -21,7 +21,7 @@
 import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones, type Proposito } from "../agente/combinaciones.ts";
 import { resumen, type Resumen } from "../agente/consultas.ts";
 import { leerProyecto, type Proyecto, type VistaGuardada } from "../agente/proyecto.ts";
-import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, capaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
+import { conjuntoPorDefecto, planoDeEje, ResultadosRender, vistaAlzado, vistaAlzadoCargas, vistaAlzadoDiagramas, vistaAxiles, vistaCampo, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, capaMalla, vistaModelo, vistaAlzadoReacciones, vistaReacciones, type Campo, type EscalaMapa, type Escena, type EsfuerzoPlano, type ModoAlzado, type PlanoAlzado, type Vec2 } from "../agente/render/index.ts";
 import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/armado.ts";
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
@@ -83,7 +83,8 @@ export type VistaResultadosPlanta = (
 ) & { malla?: boolean };
 
 /** El plano de un alzado que pide la interfaz: el de un eje (los del modelo o los propuestos) o el que pasa por dos puntos. */
-export type PlanoPedido = { eje: string; profundidad?: number } | { desde: Vec2; hasta: Vec2; profundidad?: number };
+/** El plano de un alzado y cómo se dibujan sus piezas (`modo`: por defecto, «solido»; «analitico» necesita la compilación). */
+export type PlanoPedido = ({ eje: string; profundidad?: number } | { desde: Vec2; hasta: Vec2; profundidad?: number }) & { modo?: ModoAlzado };
 
 /** Los diagramas de las barras del plano de un alzado (I4): el esfuerzo en el plano y sus combinaciones. */
 export interface DiagramasAlzado {
@@ -605,6 +606,11 @@ export class Sesion {
     const hecha = this.escenas.get(clave);
     if (hecha) return { valido: true, valor: hecha };
     let plano: PlanoAlzado | null;
+    const modo = p.modo ?? "solido";
+    // Sólo el analítico espera a la compilación (AL-4: el dibujo del modelo físico, no)
+    const c = modo === "analitico" ? this.compilado : null;
+    if (modo === "analitico" && !c) return { valido: false, diagnosticos: [{ codigo: "visor/no-compila", severidad: "error", mensaje: "El modelo analítico necesita que el modelo compile." }] };
+    const base = { modo, analitico: c ? { modelo: c.modelo, mapeo: c.mapeo } : null };
     if ("eje" in p) plano = planoDeEje(f, p.eje, p.profundidad);
     else plano = p.desde[0] === p.hasta[0] && p.desde[1] === p.hasta[1] ? null : { desde: p.desde, hasta: p.hasta, ...(p.profundidad !== undefined ? { profundidad: p.profundidad } : {}) };
     if (!plano) return { valido: false, diagnosticos: [{ codigo: "visor/alzado", severidad: "error", mensaje: "eje" in p ? `No hay ningún eje ${p.eje}.` : "Los dos puntos del alzado son el mismo." }] };
@@ -615,17 +621,17 @@ export class Sesion {
       if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Los diagramas necesitan el cálculo." }] };
       const conj = this.conjunto(diagramas.combinaciones, "esfuerzos");
       if (!conj.valido) return conj;
-      e = vistaAlzadoDiagramas(rr, plano, diagramas.esfuerzo, conj.valor, d, diagramas.escala);
+      e = vistaAlzadoDiagramas(rr, plano, diagramas.esfuerzo, conj.valor, d, diagramas.escala, modo);
     } else if (reacciones) {
       const rr = this.rr;
       if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Las reacciones necesitan el cálculo." }] };
       const conj = this.conjunto(reacciones.combinaciones, "lineal");
       if (!conj.valido) return conj;
-      e = vistaAlzadoReacciones(rr, plano, conj.valor, d, reacciones.escala);
+      e = vistaAlzadoReacciones(rr, plano, conj.valor, d, reacciones.escala, modo);
     } else if (cargas) {
       if (!f.casos.some((c) => c.id === cargas.caso)) return { valido: false, diagnosticos: [{ codigo: "visor/caso", severidad: "error", mensaje: `El caso ${cargas.caso} no existe.` }] };
-      e = vistaAlzadoCargas(f, plano, cargas.caso, d, cargas.escala);
-    } else e = vistaAlzado(f, plano, d);
+      e = vistaAlzadoCargas(f, plano, cargas.caso, d, cargas.escala, base);
+    } else e = vistaAlzado(f, plano, d, base);
     this.escenas.set(clave, e);
     return { valido: true, valor: e };
   }

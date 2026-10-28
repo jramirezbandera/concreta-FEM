@@ -2012,6 +2012,14 @@
           "type": "number",
           "description": "±d de un alzado, m."
         },
+        "modoAlzado": {
+          "enum": [
+            "alambrico",
+            "analitico",
+            "solido"
+          ],
+          "description": "Cómo se dibuja un alzado: con el canto de las piezas (por defecto), por sus ejes o el modelo analítico."
+        },
         "camara3d": {
           "type": "object",
           "properties": {

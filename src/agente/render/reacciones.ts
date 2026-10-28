@@ -21,7 +21,7 @@ import type { ModeloFisico } from "../../compilador/fisico.ts";
 import type { Diagnostico } from "../../motor/diagnosticos.ts";
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { reacciones } from "../consultas.ts";
-import { PROFUNDIDAD_ALZADO, vistaAlzado, type PlanoAlzado } from "./alzado.ts";
+import { PROFUNDIDAD_ALZADO, vistaAlzado, type ModoAlzado, type PlanoAlzado } from "./alzado.ts";
 import { ORDENADA_DIAGRAMA } from "./diagramas.ts";
 import { cajaDe, rotulo, type EntradaLeyenda, type Escena, type Estilo, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import { cabeceraPlanta, cajaPlanta, fondoModelo, PlantaFisica, porId, type DatosVista } from "./modelo.ts";
@@ -203,7 +203,7 @@ export function vistaReacciones(r: ResultadosRender, planta: string, conjunto: C
 
 // ─── Alzado ─────────────────────────────────────────────────────────────────────────────────────
 
-export function vistaAlzadoReacciones(r: ResultadosRender, plano: PlanoAlzado, conjunto: ConjuntoCombinaciones, d: DatosVista, escala = 1): Escena {
+export function vistaAlzadoReacciones(r: ResultadosRender, plano: PlanoAlzado, conjunto: ConjuntoCombinaciones, d: DatosVista, escala = 1, modo: ModoAlzado = "solido"): Escena {
   const f = r.q.fisico;
   const prof = plano.profundidad ?? PROFUNDIDAD_ALZADO;
   const L = Math.hypot(plano.hasta[0] - plano.desde[0], plano.hasta[1] - plano.desde[1]);
@@ -222,7 +222,7 @@ export function vistaAlzadoReacciones(r: ResultadosRender, plano: PlanoAlzado, c
   const m = ORDENADA_DIAGRAMA * escala;
   const k = max > 0 ? m / max : 0;
   // Las verticales que empujan hacia arriba cuelgan bajo su objeto: las burbujas de los ejes, más abajo
-  const base = vistaAlzado(f, plano, d, { abajo: vistos.some((o) => o.R[2]! > 0) ? m + 1 : 0 });
+  const base = vistaAlzado(f, plano, d, { abajo: vistos.some((o) => o.R[2]! > 0) ? m + 1 : 0, modo, analitico: { modelo: r.q.modelo, mapeo: r.q.mapeo } });
 
   const P: Primitiva[] = [...base.primitivas];
   const nuevos: Vec2[] = [];

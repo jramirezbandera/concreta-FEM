@@ -37,7 +37,7 @@
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { conPuntoFijo } from "../../compilador/puntoFijo.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
-import { intervalosRecta, PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type PlanoAlzado } from "./alzado.ts";
+import { intervalosRecta, PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type OpcionesAlzado, type PlanoAlzado } from "./alzado.ts";
 import { ORDENADA_DIAGRAMA } from "./diagramas.ts";
 import { cajaDe, momento2D, R_MOMENTO, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
 import { ejeSeccion, giroTexto, porId, vector, type DatosVista } from "./modelo.ts";
@@ -307,7 +307,7 @@ interface Bloque {
   ord: [Vec2, Vec2];
 }
 
-export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: string, d: DatosVista, escala = 1): Escena {
+export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: string, d: DatosVista, escala = 1, base0: OpcionesAlzado = {}): Escena {
   const c = f.casos.find((x) => x.id === caso);
   const prof = plano.profundidad ?? PROFUNDIDAD_ALZADO;
   const L = Math.hypot(plano.hasta[0] - plano.desde[0], plano.hasta[1] - plano.desde[1]);
@@ -419,7 +419,7 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
   for (const b of bloques) for (let i = 0; i < 2; i++) cima = Math.max(cima, b.base[i]![1] + b.ord[i]![1] * (b.porArea ? kS : kL));
   for (const x of cruces) cima = Math.max(cima, x.p[1] - x.v[1] * kL);
   for (const x of puntuales) cima = Math.max(cima, x.p[1] + (Math.hypot(...x.v) > 0 ? (-x.v[1] / Math.hypot(...x.v)) * m : 0), x.giro || Math.hypot(...x.M) ? x.p[1] + 2 * R_MOMENTO : -Infinity);
-  const base = vistaAlzado(f, plano, d, { atenuado: true, arriba: zs.length && cima > Math.max(...zs) ? cima - Math.max(...zs) + 0.3 : 0 });
+  const base = vistaAlzado(f, plano, d, { ...base0, atenuado: true, arriba: zs.length && cima > Math.max(...zs) ? cima - Math.max(...zs) + 0.3 : 0 });
 
   const P: Primitiva[] = [...base.primitivas];
   const usados = new Set<Estilo>();

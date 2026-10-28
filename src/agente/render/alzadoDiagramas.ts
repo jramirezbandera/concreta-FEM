@@ -19,7 +19,7 @@
  * Puro: sin IO.
  */
 import type { ConjuntoCombinaciones } from "../combinaciones.ts";
-import { PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type PlanoAlzado } from "./alzado.ts";
+import { PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type ModoAlzado, type PlanoAlzado } from "./alzado.ts";
 import { axilSinValor, envolventeGuardada, extremosCurva, ORDENADA_DIAGRAMA, pe, piezasConDiagrama, por, pv, tramosEspacio, trozosTramo, type TramoEspacio, type V3 } from "./diagramas.ts";
 import { cajaDe, rotulo, type EntradaLeyenda, type Escena, type ExtremoRotulado, type Primitiva, type Vec2 } from "./escena.ts";
 import type { DatosVista } from "./modelo.ts";
@@ -62,8 +62,8 @@ export function enPlano(e: EsfuerzoPlano, tr: TramoEspacio, n: V3): { comp: [num
   }
 }
 
-export function vistaAlzadoDiagramas(r: ResultadosRender, plano: PlanoAlzado, esfuerzo: EsfuerzoPlano, conjunto: ConjuntoCombinaciones, d: DatosVista, escala = 1): Escena {
-  const base = vistaAlzado(r.q.fisico, plano, d);
+export function vistaAlzadoDiagramas(r: ResultadosRender, plano: PlanoAlzado, esfuerzo: EsfuerzoPlano, conjunto: ConjuntoCombinaciones, d: DatosVista, escala = 1, modo: ModoAlzado = "solido"): Escena {
+  const base = vistaAlzado(r.q.fisico, plano, d, { modo, analitico: { modelo: r.q.modelo, mapeo: r.q.mapeo } });
   const prof = plano.profundidad ?? PROFUNDIDAD_ALZADO;
   const L = Math.hypot(plano.hasta[0] - plano.desde[0], plano.hasta[1] - plano.desde[1]);
   const dir: Vec2 = L > 0 ? [(plano.hasta[0] - plano.desde[0]) / L, (plano.hasta[1] - plano.desde[1]) / L] : [1, 0];

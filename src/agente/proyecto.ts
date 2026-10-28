@@ -93,6 +93,8 @@ export interface VistaGuardada {
   color3d?: "material" | "seccion" | "planta";
   /** ±d de un alzado, m. */
   profundidad?: number;
+  /** Cómo se dibuja un alzado: con el canto de las piezas (por defecto), por sus ejes o el modelo analítico. */
+  modoAlzado?: "solido" | "alambrico" | "analitico";
   /** La cámara de un 3D: su posición C y el punto al que mira T, m. */
   camara3d?: { C: [number, number, number]; T: [number, number, number] };
   /** La cámara de una planta o un alzado: el centro de la vista (m) y la escala (px/m). */
