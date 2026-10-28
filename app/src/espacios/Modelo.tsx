@@ -292,6 +292,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       </Campo>
       {ed && (
         <>
+          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, las hipótesis típicas de una vez, y la tabla desde él (GE2)" />
           <Separador />
           <Herramienta icono={IcPuntual} nombre="Puntual" activa={foto.herramienta === "puntual"} onClick={() => elegirHerramienta("puntual")} title="Dibujar cargas puntuales en el caso activo: un clic donde va (F y M en Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcLineal} nombre="Lineal" activa={foto.herramienta === "lineal"} onClick={() => elegirHerramienta("lineal")} title="Dibujar cargas lineales en el caso activo: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
@@ -304,7 +305,6 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcGirar} nombre="Girar" activa={foto.herramienta === "girar"} onClick={() => elegirHerramienta("girar")} title="Girar lo elegido: el centro y el ángulo (un clic, o los grados). Esc vuelve a Elegir" />
           <Herramienta icono={IcSimetria} nombre="Simetría" activa={foto.herramienta === "simetria"} onClick={() => elegirHerramienta("simetria")} title="La simetría de lo elegido por un eje de dos puntos (conservando lo original, en Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcCarga} nombre="Tabla" onClick={() => abrirTabla("cargas", true, { caso: casoValido })} title="Una carga nueva en la tabla de cargas, en el caso activo" />
-          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, las hipótesis típicas de una vez, y la tabla desde él (GE2)" />
         </>
       )}
       <Separador />
@@ -318,14 +318,28 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     <>
       {ed && (
         <>
+          {/* En el orden en que se mete un edificio: plantas y datos, el plano y los ejes, lo vertical, las vigas, los forjados, los apoyos; después, editar */}
+          <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirGestor({ coleccion: "plantas", ...(planta ? { planta } : {}) })} title="Añadir plantas encima o debajo de una, viendo cómo quedan las cotas, y la tabla desde él (GE3)" />
+          <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él (GE)" />
+          <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él (GE)" />
+          <Separador />
+          <Herramienta icono={IcPlantillaDxf} nombre="Plantilla DXF" onClick={() => ficheroDxf.current?.click()} title="Un plano DXF del arquitecto en gris detrás de la planta activa, para calcar con sus enganches (sus unidades, capas y colocación, en el navegador)" />
+          <input ref={ficheroDxf} type="file" accept=".dxf" hidden aria-label="Fichero DXF de la plantilla" onChange={(x) => {
+            const f = x.target.files?.[0];
+            x.target.value = "";
+            if (f) void importarPlantilla(f);
+          }} />
           <Herramienta icono={IcEjes} nombre="Ejes" activa={foto.herramienta === "ejes"} onClick={() => elegirHerramienta("ejes")} title="Dibujar ejes de replanteo: dos clics por eje (o «Proponer ejes» en Propiedades). Esc vuelve a Elegir" />
+          <Separador />
           <Herramienta icono={IcPilar} nombre="Pilar" activa={foto.herramienta === "pilar"} onClick={() => elegirHerramienta("pilar")} title="Dibujar pilares: un clic en su punto fijo, o una ventana para uno en cada cruce de ejes. Esc vuelve a Elegir" />
+          <Herramienta icono={IcMuro} nombre="Muro" activa={foto.herramienta === "muro"} onClick={() => elegirHerramienta("muro")} title="Dibujar muros: clic a clic; doble clic o Intro termina, un clic en el primero lo cierra. Esc vuelve a Elegir" />
           <Herramienta icono={IcViga} nombre="Viga" activa={foto.herramienta === "viga"} onClick={() => elegirHerramienta("viga")} title="Dibujar vigas: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
+          <Separador />
           <Herramienta icono={IcLosa} nombre="Forjado" activa={foto.herramienta === "forjado"} onClick={() => elegirHerramienta("forjado")} title="Dibujar forjados (maciza, reticular o unidireccional, en Propiedades): un clic dentro de un recuadro cerrado, o un polígono. Esc vuelve a Elegir" />
           <Herramienta icono={IcHueco} nombre="Hueco" activa={foto.herramienta === "hueco"} onClick={() => elegirHerramienta("hueco")} title="Dibujar huecos: en un forjado, un rectángulo o un polígono; en un muro, dos clics por su eje. Esc vuelve a Elegir" />
           <Herramienta icono={IcAbacos} nombre="Ábacos" onClick={() => setDialogo("abacos")} title="Ábacos macizos en los pilares de un forjado reticular, del tamaño que diga" />
           <Herramienta icono={IcVigaBorde} nombre="Vigas de borde" onClick={() => setDialogo("vigasBorde")} title="El zuncho de los bordes de un forjado que no van sobre una viga, un muro o un apoyo: la viga, la losa hasta su eje y la carga de la banda en la viga" />
-          <Herramienta icono={IcMuro} nombre="Muro" activa={foto.herramienta === "muro"} onClick={() => elegirHerramienta("muro")} title="Dibujar muros: clic a clic; doble clic o Intro termina, un clic en el primero lo cierra. Esc vuelve a Elegir" />
+          <Separador />
           <Herramienta icono={IcApoyo} nombre="Apoyo" activa={foto.herramienta === "apoyo"} onClick={() => elegirHerramienta("apoyo")} title="Dibujar apoyos: un clic donde va. Esc vuelve a Elegir" />
           <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" activa={foto.herramienta === "apoyoLineal"} onClick={() => elegirHerramienta("apoyoLineal")} title="Dibujar apoyos lineales: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
           <Separador />
@@ -337,17 +351,6 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcAPlantas} nombre="A plantas" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, forjados, apoyos o cargas"} />
           <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos como en CYPECAD: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
-          <Separador />
-          <Herramienta icono={IcPlantillaDxf} nombre="Plantilla DXF" onClick={() => ficheroDxf.current?.click()} title="Un plano DXF del arquitecto en gris detrás de la planta activa, para calcar con sus enganches (sus unidades, capas y colocación, en el navegador)" />
-          <input ref={ficheroDxf} type="file" accept=".dxf" hidden aria-label="Fichero DXF de la plantilla" onChange={(x) => {
-            const f = x.target.files?.[0];
-            x.target.value = "";
-            if (f) void importarPlantilla(f);
-          }} />
-          <Separador />
-          <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirGestor({ coleccion: "plantas", ...(planta ? { planta } : {}) })} title="Añadir plantas encima o debajo de una, viendo cómo quedan las cotas, y la tabla desde él (GE3)" />
-          <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él (GE)" />
-          <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él (GE)" />
         </>
       )}
       <Hueco />
