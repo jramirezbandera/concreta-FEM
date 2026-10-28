@@ -1,17 +1,18 @@
 /**
  * «Vigas de borde»: en la vivienda sin zunchos (`vigasBorde.vivienda.json`, la de antes de ponerlos a
- * mano), la orden da los mismos contornos y las mismas vigas que los zunchos hechos a mano con la
- * regla de la skill; la carga de la banda pasa a las vigas sin perder nada; el modelo compila y
- * ya no tiene bordes sin viga. Y en una losa hecha a mano: el lado libre sólo en parte, el hueco,
- * el error si un lado es más corto que el retranqueo y la sección que ya hay.
+ * mano), la orden da las mismas vigas que los zunchos hechos a mano con la regla de la skill; la losa
+ * y las cargas no se tocan (fase TB: la tira entre la cara de la viga y el borde va con la viga en el
+ * compilador); el modelo compila con sus tiras y ya no tiene bordes sin viga. Y en una losa hecha a
+ * mano: el lado libre sólo en parte, el hueco, el error si un lado es más corto que la distancia de su
+ * borde al eje y la sección que ya hay.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { areaRegion, bordesSinViga, longitud, Plantas } from "../agente/sensatez.ts";
+import { bordesSinViga, Plantas } from "../agente/sensatez.ts";
 import { leerProyecto, type Proyecto } from "../agente/proyecto.ts";
 import { compilar } from "../compilador/compilar.ts";
-import type { CargaFisica, Losa, ModeloFisico } from "../compilador/fisico.ts";
+import type { Losa, ModeloFisico } from "../compilador/fisico.ts";
 import { aplicar } from "./operaciones.ts";
 import { operacionVigasBorde, proponerVigasBorde, type PropuestaVigasBorde } from "./vigasBorde.ts";
 
@@ -26,19 +27,12 @@ const propuesta = (m: ModeloFisico, losa: string, b = 0.3, h = 0.3): PropuestaVi
   if ("error" in r) throw new Error(r.error);
   return r;
 };
-const largoViga = (v: { puntos: readonly (readonly number[])[] }) => Math.hypot(v.puntos[1]![0]! - v.puntos[0]![0]!, v.puntos[1]![1]! - v.puntos[0]![1]!);
-/** Σ qz·largo de las cargas de viga de un caso. */
-const totalViga = (cs: readonly CargaFisica[], vigas: readonly { id: string; puntos: readonly (readonly number[])[] }[], caso: string) =>
-  cs.reduce((t, c) => (c.tipo === "viga" && c.caso === caso ? t + c.q[2] * ((c.hasta ?? largoViga(vigas.find((v) => v.id === c.viga)!)) - (c.desde ?? 0)) : t), 0);
-
 describe("Vigas de borde en la vivienda", () => {
   const antes = leer("src/editor/vigasBorde.vivienda.json");
   const ahora = leer("ejemplos/vivienda/proyecto.json");
 
-  it.each(["L-CUB", "L-CUB-S"])("%s: los contornos y las vigas de los zunchos hechos a mano", (id) => {
+  it.each(["L-CUB", "L-CUB-S"])("%s: las vigas de los zunchos hechos a mano", (id) => {
     const r = propuesta(antes.modelo, id);
-    const l = ahora.modelo.losas!.find((x) => x.id === id)!;
-    expect(r.contorno).toEqual(l.contorno);
     const aMano = ahora.modelo.vigas!.filter((v) => v.id.startsWith(`Z-${id.slice(2)}-`) && !v.id.slice(id.length).includes("-", 1));
     expect(r.vigas.map((v) => v.puntos)).toEqual(aMano.map((v) => v.puntos));
     expect(r.vigas.map((v) => v.id)).toEqual(aMano.map((v) => v.id));
@@ -48,22 +42,14 @@ describe("Vigas de borde en la vivienda", () => {
     expect(r.avisos).toEqual([]);
   });
 
-  it.each(["L-CUB", "L-CUB-S"])("%s: la banda pasa a las vigas sin perder carga", (id) => {
+  it("la losa y las cargas no se tocan: sólo se crean las vigas", () => {
     const m = antes.modelo;
-    const l = m.losas!.find((x) => x.id === id)!;
-    const r = propuesta(m, id);
-    const dA = areaRegion(l) - areaRegion({ contorno: r.contorno, huecos: r.huecos });
-    expect(dA).toBeGreaterThan(5);
-    const sup = (caso: string) => m.cargas!.filter((c) => c.tipo === "superficie" && c.losa === id && c.caso === caso).reduce((t, c) => t + (c as unknown as { q: number[] }).q[2]! * dA, 0);
-    // Q y N: sólo superficie (los q, redondeados a 1e-6)
-    for (const caso of ["Q", "N"]) expect(Math.abs(totalViga(r.cargas, r.vigas, caso) - sup(caso))).toBeLessThan(1e-4);
-    // Los petos enteros, sin perder ni un trozo
-    const petos = m.cargas!.filter((c) => c.tipo === "lineal" && c.planta === l.planta);
-    expect(r.quitadas).toEqual(petos.map((c) => c.id));
-    expect(r.cargas.filter((c) => c.tipo === "lineal")).toEqual([]);
-    const petoViga = r.cargas.filter((c) => c.tipo === "viga" && petos.some((p) => c.id.startsWith(`${p.id}-`)));
-    const petoTotal = petos.reduce((t, c) => t + (c as unknown as { q: number[] }).q[2]! * longitud((c as unknown as { puntos: [number, number][] }).puntos), 0);
-    expect(Math.abs(totalViga(petoViga, r.vigas, "G") - petoTotal)).toBeLessThan(1e-4);
+    const op = operacionVigasBorde(m, propuesta(m, "L-CUB"))!;
+    expect(op.op === "lote" && op.operaciones.every((o) => o.op === "crear" && o.coleccion === "vigas")).toBe(true);
+    const a = aplicar(antes, op);
+    if (!a.ok) throw new Error(a.errores.map((e) => e.mensaje).join(" "));
+    expect(a.proyecto.modelo.losas).toEqual(m.losas);
+    expect(a.proyecto.modelo.cargas).toEqual(m.cargas);
   });
 
   it("aplicada en las dos losas, el modelo compila y no le queda ningún borde sin viga", () => {
@@ -77,6 +63,10 @@ describe("Vigas de borde en la vivienda", () => {
     expect(p.modelo.secciones.filter((s) => s.id === "V30x30")).toHaveLength(1);
     const c = compilar(p.modelo);
     expect(c.valido, c.diagnosticos.filter((d) => d.severidad === "error").map((d) => d.mensaje).join(" ")).toBe(true);
+    if (!c.valido) return;
+    // La franja entre la cara de los zunchos y el borde (0,12 m), con ellos; los petos del borde, también
+    expect(c.hipotesis.some((h) => h.includes("fase TB;"))).toBe(true);
+    expect(c.diagnosticos.filter((d) => d.codigo === "carga/fuera-de-losa" || d.codigo === "carga/zona-fuera-de-losa")).toEqual([]);
     // Y otra vez, nada que hacer
     expect(proponerVigasBorde(p.modelo, "L-CUB", 0.3, 0.3)).toEqual({ error: "L-CUB ya tiene todos sus bordes sobre una viga, un muro, un apoyo lineal u otro forjado." });
   });
@@ -107,14 +97,11 @@ describe("Vigas de borde en una losa hecha a mano", () => {
     ],
   });
 
-  it("sur, este y oeste por los pilares de las esquinas, el norte sigue la viga que hay y el hueco se agranda", () => {
+  it("sur, este y oeste por los pilares de las esquinas, el norte sigue la viga que hay y el hueco lleva las suyas", () => {
     const m = modelo();
     const r = propuesta(m, "L", 0.25, 0.25);
     expect(r.seccion.id).toBe("Z25");
     expect(r.nueva).toBe(false);
-    // Sur, este y oeste, al eje de los pilares de las esquinas (0,15); el norte no se mueve
-    expect(r.contorno).toEqual([[0.15, 0.15], [7.85, 0.15], [7.85, 6], [0.15, 6]]);
-    expect(r.huecos).toEqual([[[2.875, 1.875], [5.125, 1.875], [5.125, 4.125], [2.875, 4.125]]]);
     const v = r.vigas.map((x) => [x.regla, x.puntos]);
     expect(v).toContainEqual(["pilares", [[0.15, 0.15], [7.85, 0.15]]]);
     expect(v).toContainEqual(["pilares", [[7.85, 0.15], [7.85, 6]]]);
@@ -122,19 +109,15 @@ describe("Vigas de borde en una losa hecha a mano", () => {
     expect(v).toContainEqual(["continua", [[7.85, 6], [4, 6]]]);
     // El hueco, enrasado por sus cuatro lados
     expect(r.vigas.filter((x) => x.regla === "enrasada")).toHaveLength(4);
-    // La puntual en el borde este queda fuera y se dice
-    expect(r.sueltas).toEqual(["F"]);
-    // La Q de la banda, entera en las vigas
-    const dA = areaRegion(m.losas![0]!) - areaRegion({ contorno: r.contorno, huecos: r.huecos });
-    expect(Math.abs(totalViga(r.cargas, r.vigas, "Q") - -2 * dA)).toBeLessThan(1e-4);
-    // El peso de la losa sólo donde no está la viga: retranqueo 0,15 > 0,125, una tira de 0,025 en
-    // el sur (8 m), el este y el oeste (6 m menos la esquina del sur)
-    const pp = r.cargas.filter((c) => c.tipo === "viga" && c.caso === "G");
-    expect(pp.map((c) => (c as { viga: string }).viga).sort()).toEqual(r.vigas.filter((x) => x.regla === "pilares").map((x) => x.id).sort());
-    expect(Math.abs(totalViga(pp, r.vigas, "G") - -25 * 0.25 * 0.025 * (8 + 2 * 6 - 2 * 0.025))).toBeLessThan(1e-4);
+    expect(r.vigas.filter((x) => x.regla === "pilares").map((x) => x.retranqueo)).toEqual([0.15, 0.15, 0.15]);
     const a = aplicar({ esquema: "concreta-fem/proyecto@1", modelo: m } as Proyecto, operacionVigasBorde(m, r)!);
     expect(a.ok).toBe(true);
-    if (a.ok) expect(bordesSinViga(a.proyecto.modelo, new Plantas(a.proyecto.modelo), 0.05)).toEqual([]);
+    if (!a.ok) return;
+    expect(a.proyecto.modelo.losas).toEqual(m.losas);
+    expect(bordesSinViga(a.proyecto.modelo, new Plantas(a.proyecto.modelo), 0.05)).toEqual([]);
+    // La puntual en el borde este cae en la tira del zunchos (0,025 m más allá de su cara): va a la viga
+    const c = compilar(a.proyecto.modelo);
+    expect(c.valido, c.diagnosticos.filter((d) => d.severidad === "error").map((d) => d.mensaje).join(" ")).toBe(true);
   });
 
   it("un lado más corto que el retranqueo es un error", () => {
@@ -143,7 +126,7 @@ describe("Vigas de borde en una losa hecha a mano", () => {
     (m.losas![0] as Losa & { contorno: unknown; huecos?: unknown }).contorno = [[0, 0], [8, 0], [8, 6], [4.1, 6], [4.1, 6.5], [3.9, 6.5], [3.9, 6], [0, 6]];
     delete (m.losas![0] as { huecos?: unknown }).huecos;
     const r = proponerVigasBorde(m, "L", 0.3, 0.3);
-    expect("error" in r && r.error).toContain("algún lado es más corto que el retranqueo");
+    expect("error" in r && r.error).toContain("algún lado es más corto que la distancia de su borde al eje");
     expect(proponerVigasBorde(m, "L", 30, 30)).toEqual({ error: "Una viga de borde de 30 × 30 m no es razonable: las medidas van en metros." });
     expect(proponerVigasBorde(m, "X", 0.3, 0.3)).toEqual({ error: "No hay ninguna losa «X»." });
   });

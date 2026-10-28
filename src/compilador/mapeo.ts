@@ -60,9 +60,10 @@ export interface Mapeo {
   apoyos: Record<string, number>;
   /**
    * Fase LV: el ancho de las vigas que se unen a la losa por sus caras (no es losa), por tramo de su
-   * polilínea fuera de los muros, con su polígono en planta (sólo si hay alguno).
+   * polilínea fuera de los muros, con su polígono en planta (sólo si hay alguno). Fase TB: también
+   * las tiras de borde (`tira`), que no son losa pero no tienen caras.
    */
-  anchos?: { viga: string; planta: string; b: number; poligono: [number, number][] }[];
+  anchos?: { viga: string; planta: string; b: number; poligono: [number, number][]; tira?: true }[];
   /**
    * Fase LV: los nudos del eje de las vigas que apoya cada apoyo lineal que llega a ellas por su
    * ancho o su cara (sólo si hay alguno). No tienen por qué caer sobre su polilínea.

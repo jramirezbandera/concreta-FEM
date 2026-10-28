@@ -225,7 +225,7 @@ function conZunchos(ctx: ContextoHerramienta, op: Operacion, etiqueta: string, l
   if ("error" in p) return { estado: ESTADO_INICIAL, hecho: { operacion: op, etiqueta, avisos: [`Sin zunchos: ${p.error}`] } };
   const z = operacionVigasBorde(m2, p);
   if (!z || z.op !== "lote") return hecho(op, etiqueta);
-  const avisos = [...p.avisos, ...(p.sueltas.length ? [`Las cargas puntuales ${p.sueltas.join(", ")} quedan en la banda del zuncho, fuera de la losa.`] : [])];
+  const avisos = p.avisos;
   const n = p.vigas.length;
   return { estado: ESTADO_INICIAL, hecho: { operacion: { op: "lote", operaciones: [op, ...z.operaciones] }, etiqueta: `${etiqueta} con ${n} ${n === 1 ? "zuncho" : "zunchos"}`, ...(avisos.length ? { avisos } : {}) } };
 }

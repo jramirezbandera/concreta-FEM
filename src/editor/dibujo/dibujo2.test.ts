@@ -212,8 +212,11 @@ describe("Forjado (criterio 1)", () => {
     expect(r.etiquetas).toEqual(["Hueco en el forjado L1 con 4 zunchos"]);
     const l = r.proyecto.modelo.losas![0]!;
     expect(l.contorno).toEqual(p.modelo.losas![0]!.contorno);
-    // Enrasados por fuera del hueco: el hueco crece b/2 por lado
-    expect(l.huecos).toEqual([[[6.45, 2.25], [8.55, 2.25], [8.55, 4.75], [6.45, 4.75]]]);
+    // El hueco no se toca (fase TB): los zunchos, enrasados por fuera de él, con su eje a b/2 de sus lados
+    expect(l.huecos).toEqual([[[6.6, 2.4], [8.4, 2.4], [8.4, 4.6], [6.6, 4.6]]]);
+    const antes = new Set((p.modelo.vigas ?? []).map((v) => v.id));
+    const zunchos = r.proyecto.modelo.vigas!.filter((v) => !antes.has(v.id)).flatMap((v) => v.puntos);
+    expect([Math.min(...zunchos.map((q) => q[0])), Math.max(...zunchos.map((q) => q[0])), Math.min(...zunchos.map((q) => q[1])), Math.max(...zunchos.map((q) => q[1]))]).toEqual([6.45, 8.55, 2.25, 4.75]);
     const sin = dibujar(p, "hueco", eventos);
     const pr = proponerVigasBorde(sin.proyecto.modelo, "L1", ANCHO_ZUNCHO, 0.25, undefined, new Set([1]));
     if ("error" in pr) throw new Error(pr.error);

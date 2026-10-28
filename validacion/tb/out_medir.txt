@@ -1,0 +1,15 @@
+1. Vivienda con «Vigas de borde» (las dos cubiertas), con tiras frente a la franja mallada
+   nudos: 3648 con tiras (14), 6265 sin ellas
+   G: ΣFz 2357.511400 frente a 2357.511400 kN
+      pilares (|Fz| > 5 kN), los que más cambian: P7 70.4 → 68.3 (-3.0 %); P14 68.1 → 69.1 (1.5 %); P5 118.8 → 117.1 (-1.4 %); P10 93.2 → 94.4 (1.2 %); P16 105.5 → 104.3 (-1.2 %)
+   Q: ΣFz 225.099700 frente a 225.099700 kN
+      pilares (|Fz| > 5 kN), los que más cambian: P7 6.0 → 5.7 (-4.6 %); P14 5.4 → 5.6 (3.7 %); P5 9.6 → 9.4 (-2.2 %); P10 8.4 → 8.5 (1.7 %); P6 6.0 → 6.1 (1.7 %)
+   N: ΣFz 45.019940 frente a 45.019940 kN
+      pilares (|Fz| > 5 kN), los que más cambian: P11 5.1 → 5.0 (-1.5 %)
+2. Retícula 16, precisión local (respecto al máximo de la viga o de la franja)
+   gruesa frente a fina, sin tiras, vigas: 88 estaciones, mediana 0.64 %, máximo 6.7 %, > 10 %: 0; peores X1-N2 P2-1 fin-der 6.7 %; X3-N2 P2-3 fin-der 6.6 %; X1-N2 P2-1 fin-izq 6.5 %
+   gruesa frente a fina, sin tiras, franjas: 122 estaciones, mediana 2.64 %, máximo 31.6 %, > 10 %: 11; peores L-N1:Y1 0.300:1 cara -31.6 %; L-N2:Y5 10.500:-1 cara -15.0 %; L-N2:Y6 10.500:-1 cara -15.0 %
+   gruesa frente a fina, con tiras, vigas: 88 estaciones, mediana 0.61 %, máximo 6.8 %, > 10 %: 0; peores X1-N2 P2-1 fin-der 6.8 %; X3-N2 P2-3 fin-der 6.7 %; X1-N2 P2-1 fin-izq 6.6 %
+   gruesa frente a fina, con tiras, franjas: 122 estaciones, mediana 1.74 %, máximo 31.5 %, > 10 %: 6; peores L-N1:Y1 0.300:1 cara -31.5 %; L-N1:X1 8.550:-1 cara -14.4 %; L-N1:X23 8.400:-1 cara -13.8 %
+   fina con tiras frente a fina sin ellas (el modelo), vigas: 88 estaciones, mediana 0.22 %, máximo 11.4 %, > 10 %: 1; peores Y1-N2 P1-2 fin-izq -11.4 %; Y1-N1 P1-2 fin-izq -8.1 %; X2-N2 P1-2 fin-der -7.0 %
+   fina con tiras frente a fina sin ellas (el modelo), franjas: 132 estaciones, mediana 0.21 %, máximo 38.3 %, > 10 %: 8; peores L-N1:X11 4.150:-1 cara 38.3 %; L-N1:X12 4.150:-1 cara 38.3 %; L-N2:X11 4.150:-1 cara 32.2 %

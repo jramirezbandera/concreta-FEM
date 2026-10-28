@@ -30,9 +30,9 @@ export interface ReferenciaFina {
  * referencia fina es anterior y la medida es de la malla, no de la barra del pilar.
  */
 export const MODELOS_PRECISION: Record<string, { fisico: () => ModeloFisico; gruesa: OpcionesCompilacion; fina: OpcionesCompilacion }> = {
-  "reticula-1": { fisico: () => reticulaAleatoria(1), gruesa: { zonaRigidaBase: false, planoForjado: "medio" }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio" } },
-  "reticula-12": { fisico: () => reticulaAleatoria(12), gruesa: { zonaRigidaBase: false, planoForjado: "medio" }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio" } },
-  "reticula-16": { fisico: () => reticulaAleatoria(16), gruesa: { zonaRigidaBase: false, planoForjado: "medio" }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio" } },
+  "reticula-1": { fisico: () => reticulaAleatoria(1), gruesa: { zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } },
+  "reticula-12": { fisico: () => reticulaAleatoria(12), gruesa: { zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } },
+  "reticula-16": { fisico: () => reticulaAleatoria(16), gruesa: { zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false }, fina: { tamanoMalla: 0.25, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } },
   "losa-3x3-mezclada": { fisico: () => losa3x3Mezclada(), gruesa: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" }, fina: { unionLosaViga: "eje", tamanoMalla: 0.1, zonaRigidaBase: false, planoForjado: "medio" } },
 };
 

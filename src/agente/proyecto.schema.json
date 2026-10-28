@@ -1254,6 +1254,10 @@
         "zonaRigidaBase": {
           "type": "boolean",
           "description": "Zona rígida en la base de los tramos de pilar (LV-d, como CYPECAD): la base de un tramo cuyo\nnudo inferior está en un forjado es rígida en lo que ese nudo ocupa por encima del plano del\nforjado (medio canto de la losa en la huella del pilar o de la viga más alta que le llega con el\neje en el plano; una viga con la cara superior en el forjado queda entera por debajo y no cuenta),\npor `factorZonaRigidaPilares`. Con los valores por defecto, la cara del forjado, como CYPECAD.\nPor defecto, sí (compilador LVD1, 2026-10-20); sin ella, sólo la cabeza, como en C1. Sólo actúa\ncon `planoForjado: \"medio\"`: con el plano en la cara superior, el nudo no ocupa nada por encima."
+        },
+        "tirasBorde": {
+          "type": "boolean",
+          "description": "Tiras de borde (fase TB, `anchosVigas.ts`): con la unión por las caras, la franja de losa entre\nla cara de fuera de una viga y el borde dibujado del forjado, de hasta el ancho de la viga (el\nzuncho por el eje de los pilares y el forjado hasta la fachada), no se malla: va con la viga como\nsu ancho, y lo que cae en ella pasa a la viga con su momento de transporte. El borde dibujado no\nse mueve. Por defecto, sí (compilador TB1, 2026-10-28); sin ellas, esa franja se malla como losa."
         }
       },
       "additionalProperties": false

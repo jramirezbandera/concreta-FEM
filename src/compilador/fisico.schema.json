@@ -1018,6 +1018,9 @@
         },
         "zonaRigidaBase": {
           "type": "boolean"
+        },
+        "tirasBorde": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

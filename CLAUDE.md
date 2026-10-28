@@ -600,6 +600,27 @@
     - un campo opcional vacío dice en gris lo que vale (`Columna.defecto`: el pp de una maciza, γ·canto);
     - un «?» enseña la ayuda al pasar el ratón, y el interruptor «Ayudas», todas;
     - un forjado lleva el croquis de su planta y de su sección a escala: cada cota lleva el nombre de su campo, se resalta con el foco y un clic en ella lleva al campo;
+- **2026-10-28: fase TB hecha** (las tiras de borde; compilador **TB1**, `docs/fem3d/tiras-borde.md`), de la prueba de uso del dibujo: «Vigas de borde» y «Con zunchos» recortaban el forjado hasta el eje del zuncho, y el usuario no quiere que se le cambie la geometría (el borde dibujado es donde se hormigona).
+  - **Decidido por el usuario:** la losa se queda como se dibuja; la franja entre la cara de fuera de una viga y el borde, de hasta b, va con la viga.
+  - **Ya en `src/compilador/`:**
+    - `tirasBorde` (`anchosVigas.ts`): la tira es una entrada más de los anchos de LV (no es losa; lo que cae en ella pasa a la viga con su momento de transporte), a inglete en las esquinas, sin caras (no une nudos, no da caras a las huellas ni estaciones a las franjas: `mapeo.anchos[].tira`);
+    - opción `tirasBorde` (por defecto sí; con `false`, la franja mallada como antes, bit a bit);
+    - arreglado: un peto por la cara de fuera de un zuncho enrasado (o por el borde de una tira) daba `carga/fuera-de-losa`; ahora va a la viga.
+  - **Editor y sensatez:** la orden sólo pone las vigas, con el eje de siempre; `libresTramo` da por atado lo que el compilador lleva a la viga.
+  - **Medido:**
+    - la vivienda, de 6 265 a 3 648 nudos con las mismas reacciones totales y los pilares a ≤ 4,6 % (`validacion/tb/out_medir.txt`);
+    - frente a la orden de antes, peso +0,03 % y los pilares de la pérgola +7…+11 %, porque la carga va ahora donde cae;
+    - en la retícula 16, la malla no empeora, y ocho estaciones de franja junto a los bordes con tira cambian > 10 % (sin analizar).
+  - **Referencias congeladas:** las de antes llevan `tirasBorde: false` (idénticas), y hay tres nuevas `-tb`.
+- **2026-10-28: el peso propio de los forjados sale solo y la rigidez del reticular, a la vista** (a petición del usuario: los multiplicadores «no se entienden» ni se sabe cómo cambiarlos, y el pp «se podría calcular»; decisiones del usuario: «calculada o la mía» y el tipo de aligeramiento).
+  - **Peso propio** (`src/compilador/pesoForjado.ts`): sin `pp`, γ·hormigón + el peso aparente del aligeramiento en el hueco entre nervios o viguetas.
+    - Reticular: `caseton` `"hormigon"` (por defecto desde hoy; antes `"perdido"` y el pp obligatorio), `"ceramica"`, `"poliestireno"` o `"recuperable"`; los ábacos, γ·canto. `"perdido"` queda como un casetón de otro material, con el pp obligatorio (`reticular/sin-pp`).
+    - Unidireccional: `pp` opcional y `bovedilla` (`"hormigon"` por defecto, `"ceramica"`, `"poliestireno"`); sale de la vigueta en T (la capa en todo el intereje). Con otra sección, el pp es obligatorio.
+    - Pesos aparentes por m³ de hueco (estimaciones de catálogo, **por confirmar por el usuario**): casetón de hormigón 7,5, bovedilla de hormigón 6, cerámica 3,2 y poliestireno 0,2 kN/m³. Reticular 25+5 a 80/12 de hormigón: 4,34 kN/m²; la vivienda (72/12), 4,46 (tenía 4,5 escrito); unidireccional 25+5 a 70 de hormigón: 3,56.
+    - Un `pp` escrito manda, con su significado de antes: los modelos que ya lo tienen dan los mismos bits. La sensatez de A3, la tributaria, el editor y el dibujo pesan con las mismas funciones (`ppLosa`, `ppDePano`, `desglosePesoFila`).
+  - **Propiedades de un forjado** (`app/src/editor/FichaForjado.tsx`): en «Material y peso», cómo sale el pp con sus números y «Usar el calculado» si hay uno escrito; «Rigidez del aligerado», con «Calculada» (los ocho multiplicadores que usa el cálculo, con su nombre y lo que es cada uno) o «La mía» (los ocho, rellenos con los calculados para cambiar el que se quiera; `rigidezAligerado` en `ficha.ts`). La plantilla de Forjado y la tabla tienen el casetón y la bovedilla como desplegables y enseñan el pp que saldrá.
+  - **Lo que hacía el texto de antes, y no decía:** con algún multiplicador escrito, los no escritos valen 1 (la maciza), van con el ν del hormigón, los ábacos dejan la rigidez «uniforme» y las vigas planas no se rebajan. No cambia (la semántica de SAP2000 contrastada en E6-11 y E6-12); ahora se ve.
+  - **Validación:** `src/compilador/pesoForjado.test.ts` (los números a mano, sin pp el mismo modelo que con el pp calculado escrito, la sensatez y la tabla pesan lo del compilador, y la tabla de rigidez es la del compilador con «uniforme», «bruta» y dados).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

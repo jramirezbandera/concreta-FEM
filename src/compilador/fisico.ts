@@ -700,6 +700,14 @@ export interface OpcionesCompilacion {
    * con `planoForjado: "medio"`: con el plano en la cara superior, el nudo no ocupa nada por encima.
    */
   zonaRigidaBase?: boolean;
+  /**
+   * Tiras de borde (fase TB, `anchosVigas.ts`): con la unión por las caras, la franja de losa entre
+   * la cara de fuera de una viga y el borde dibujado del forjado, de hasta el ancho de la viga (el
+   * zuncho por el eje de los pilares y el forjado hasta la fachada), no se malla: va con la viga como
+   * su ancho, y lo que cae en ella pasa a la viga con su momento de transporte. El borde dibujado no
+   * se mueve. Por defecto, sí (compilador TB1, 2026-10-28); sin ellas, esa franja se malla como losa.
+   */
+  tirasBorde?: boolean;
 }
 
 export interface OpcionesResueltas {
@@ -726,6 +734,7 @@ export interface OpcionesResueltas {
   /** Sólo si se da, como `plantillaEsquina`. */
   jacobianoRefino?: number;
   zonaRigidaBase: boolean;
+  tirasBorde: boolean;
 }
 
 export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas {
@@ -753,5 +762,6 @@ export function resolverOpciones(o: OpcionesCompilacion = {}): OpcionesResueltas
     ...(o.plantillaEsquina !== undefined ? { plantillaEsquina: o.plantillaEsquina } : {}),
     ...(o.jacobianoRefino !== undefined ? { jacobianoRefino: o.jacobianoRefino } : {}),
     zonaRigidaBase: o.zonaRigidaBase ?? true,
+    tirasBorde: o.tirasBorde ?? true,
   };
 }

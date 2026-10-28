@@ -28,6 +28,10 @@
  * terminado en `-rvb`, el de por defecto (los nudos del forjado en su cara superior y la cabeza de los
  * pilares rígida en todo el canto, como CYPECAD).
  *
+ * TB (compilador TB1): los que se unen a la losa por las caras llevan `tirasBorde: false` (los mismos
+ * bits); los terminados en `-tb`, el de por defecto (la franja de losa entre la cara de fuera de una
+ * viga y el borde dibujado, de hasta b, va con la viga: `anchosVigas.ts`, `tirasBorde`).
+ *
  * RV-a (compilador RV2): ninguno de los de antes tiene vigas planas en un reticular «uniforme», así
  * que salen idénticos; el terminado en `-rva` es el reticular de 2 × 2 con las vigas planas, de 40 ×
  * 35 (el canto del forjado), con su flexión ×0,6 (por defecto).
@@ -66,21 +70,24 @@ export const MODELOS_CONGELADOS_F: Record<string, () => ModeloCongelado> = {
   // SP-1 y SP-2: ábacos de pilares de borde, de esquina y atravesados por vigas
   "reticular-2x2-abacos": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
-  "aleatorio-3-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio" } }),
-  "reticular-2x2-abacos-lv": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-3-lv": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } }),
+  "reticular-2x2-abacos-lv": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } }),
   // Fase LV2: con la malla junto a las vigas (`refinoEsquinas`, por defecto desde el compilador LV2: plantillas de esquina con 3 niveles en
   // los cruces con pilar y 2 en los cruces sin pilar, LV2-i; tiras de las huellas que asoman, LV-8;
   // sólo la huella rígida en los pilares bajo una viga, LV2-f). El edificio objetivo de un vano de
   // 2 × 2 con su hueco y sus vigas secundarias tiene cruces sin pilar
-  "aleatorio-3-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
-  "reticular-2x2-abacos-lv2": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
-  "edificio-2x2-lv2": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-3-lv2": () => ({ fisico: conLosasAleatorias(fisicoAleatorio(3), 3, { eje1: "azar" }), opciones: { zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } }),
+  "reticular-2x2-abacos-lv2": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: { zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } }),
+  "edificio-2x2-lv2": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } }),
   // LV-d (compilador LVD1, 2026-10-20): la zona rígida también en la base de los tramos de pilar sobre un forjado (la de LVD1)
-  "edificio-2x2-lvd": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { planoForjado: "medio" } }),
+  "edificio-2x2-lvd": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { planoForjado: "medio", tirasBorde: false } }),
   // RV-b (compilador RV1, 2026-10-20): los nudos del forjado en su cara superior y la cabeza de los pilares rígida en todo el canto (por defecto)
-  "edificio-2x2-rvb": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: {} }),
+  "edificio-2x2-rvb": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: { tirasBorde: false } }),
   // RV-a (compilador RV2, 2026-10-20): las vigas planas de un reticular «uniforme», con Iy ×0,6 (por defecto)
-  "reticular-2x2-planas-rva": () => ({ fisico: conVigasPlanas(conAcciones(edificioReticular(1, 2, 2))), opciones: {} }),
+  "reticular-2x2-planas-rva": () => ({ fisico: conVigasPlanas(conAcciones(edificioReticular(1, 2, 2))), opciones: { tirasBorde: false } }),
+  // TB (compilador TB1, 2026-10-28): las tiras de borde, la losa entre la cara de fuera de una viga y el borde dibujado, con la viga (por defecto)
+  "edificio-2x2-tb": () => ({ fisico: conAcciones(edificioObjetivoLosas(1, 2, 2)), opciones: {} }),
+  "reticular-2x2-abacos-tb": () => ({ fisico: conAcciones(edificioReticular(1, 2, 2)), opciones: {} }),
 };
 
 /** RV-a: todas las vigas, planas de 40 × 35 (el canto del reticular de `edificioReticular`). */

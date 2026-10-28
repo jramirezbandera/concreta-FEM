@@ -45,7 +45,7 @@ import { Arreglo, type Trazo, type TipoTrazo } from "./arreglo.ts";
 import { CUANTO_ORDEN, cortarTramos, tramo } from "./geometria2d.ts";
 import type { CargaFisica, Vec2 } from "./fisico.ts";
 import { mallarPlanta, type AnchoMallar, type LosaMallar, type ResultadoMalla, type RefinoCaras } from "./mallado.ts";
-import { anchoMasCercano, anchosPlanta, anchoUnion, sigmaEnAncho, type AnchoViga } from "./anchosVigas.ts";
+import { anchoMasCercano, anchosPlanta, anchoUnion, sigmaEnAncho, tirasBorde, type AnchoViga } from "./anchosVigas.ts";
 import { estacionesBanda, ladoEstacion } from "./estaciones.ts";
 import { carasFranjas, ejesArmado, segmentosCara, type CaraFranja } from "./franjas.ts";
 import { estacionesComunes, huellasVigas, mallarMuros, planMuros, unificarEstaciones, type HuellaViga, type LaminaMuro, type MallaMuros, type PlanMuros, type PlantaMuros, type TrazoMuro } from "./muros.ts";
@@ -450,7 +450,14 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     const primera = ctx.losas.find((l) => l.losa.planta === ctx.plantas[k]!.id);
     if (!primera) continue;
     const lista: number[] = [];
-    for (const x of anchosPlanta(ctx, topo, k, direccionEje1(primera.losa.eje1 ?? 0))) lista.push(r.anchos.push(x) - 1);
+    const e1 = direccionEje1(primera.losa.eje1 ?? 0);
+    const principales = anchosPlanta(ctx, topo, k, e1);
+    for (const x of principales) lista.push(r.anchos.push(x) - 1);
+    // Fase TB: las tiras de borde, detrás (sin ellas, los mismos índices de antes)
+    if (ctx.op.tirasBorde && principales.length) {
+      const regiones = ctx.losas.filter((l) => l.losa.planta === ctx.plantas[k]!.id).map((l) => l.region);
+      for (const x of tirasBorde(ctx, k, principales, regiones, e1)) lista.push(r.anchos.push(x) - 1);
+    }
     if (lista.length) anchosDe.set(k, lista);
   }
 
@@ -498,7 +505,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     // 40 bajo una viga de 30 que acaba en su centro, las dos esquinas de cada lado van a la cara.
     // Lo rígido sigue siendo la huella de verdad (C2-d, `unirCaras`); la sembrada sólo da la malla,
     // y los ejes de las vigas se cortan en ella, para que acaben en su lado
-    const carasAnchoK = (anchosDe.get(k) ?? []).map((g) => {
+    const carasAnchoK = (anchosDe.get(k) ?? []).filter((g) => !r.anchos[g]!.tira).map((g) => {
       const [d0, d1, i1, i0] = r.anchos[g]!.poligono as [Vec2, Vec2, Vec2, Vec2];
       return { poli: r.anchos[g]!.poligono, caras: [[d0, d1] as const, [i0, i1] as const] };
     });
@@ -566,7 +573,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
           const x = r.anchos[g]!;
           const { u } = x.tramo.t;
           // Sólo un ancho a lo largo de d, que cruza la recta de la cara (según n) en perpendicular
-          if (Math.abs(u[0] * d[0] + u[1] * d[1]) < 1 - 1e-9 || !puntoEnPoligono(q, x.poligono)) continue;
+          if (x.tira || Math.abs(u[0] * d[0] + u[1] * d[1]) < 1 - 1e-9 || !puntoEnPoligono(q, x.poligono)) continue;
           const tc = q[0] * n[0] + q[1] * n[1];
           const [lo, hi] = [tc - x.b / 2, tc + x.b / 2];
           c.tramos = c.tramos.flatMap(([t0, t1]): [number, number][] => {
@@ -797,8 +804,10 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       const abacos = r.abacosUnidos.get(li);
       r.piezasAncho.push({ ancho: e.anchos[pa.ancho]!.g, losa: li, v: pa.v, c: pa.c, area: pa.area, abaco: abacos?.some((ab) => puntoEnPoligono(pa.c, ab)) ?? false });
     }
-    // Nudos de las láminas sobre los lados de los trazos de los anchos, con sus anchos
-    const local = new Map(e.anchos.map((x, j) => [x.t, j] as const));
+    // Nudos de las láminas sobre los lados de los trazos de los anchos, con sus anchos. Los de una
+    // tira de borde (TB), no: no tiene caras, y el lado con el que acaba a media arista (la viga
+    // termina en un pilar y la losa sigue) caía en la zona rígida del pilar, fuera de su huella
+    const local = new Map(e.anchos.flatMap((x, j) => (x.a.tira ? [] : [[x.t, j] as const])));
     const cand = new Map<number, number[]>();
     m.lados.forEach((l, i) => {
       const ns = m.nudosLado[i]!;
@@ -1151,11 +1160,13 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     }
 
     // Apoyos lineales y cargas lineales: nudos y aristas a lo largo de sus lados. Fase LV: un lado
-    // dentro del ancho de una viga (su punto medio dentro de su polígono en el arreglo) va a la viga
+    // sin nudos de la malla dentro del ancho de una viga o en su borde (su punto medio en su polígono
+    // del arreglo, o a ≤ ε_geom) va a la viga. En el borde: el peto por la cara de fuera de un zuncho
+    // enrasado, o por el borde de una tira (TB), no toca ninguna lámina; antes se perdía (un error)
     const polisAncho = e.anchos.map((x) => x.t.puntos.map((p) => [a.puntos[p]!.x, a.puntos[p]!.y] as Vec2));
     const anchoLado = (A: Vec2, B: Vec2): number => {
       const M: Vec2 = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
-      const en = polisAncho.flatMap((pl, j) => (puntoEnPoligono(M, pl) && distanciaABorde(M, pl) > epsGeom ? [j] : []));
+      const en = polisAncho.flatMap((pl, j) => (puntoEnPoligono(M, pl) || distanciaABorde(M, pl) <= epsGeom ? [j] : []));
       return en.length ? anchoMasCercano(M, en, e.anchos.map((x) => x.a)) : -1;
     };
     const recorrer = (t: Trazo): { aristas: [number, number][]; fuera: boolean; lados: [Vec2, Vec2][]; enAncho: { ancho: number; A: Vec2; B: Vec2 }[] } => {

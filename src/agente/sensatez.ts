@@ -19,7 +19,8 @@ import { compilar } from "../compilador/compilar.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesCompilacion, Seccion, Vec2 } from "../compilador/fisico.ts";
-import { momentosInterseccion, puntoEnRegion, recorteRegionConvexo, type Region } from "../compilador/poligonos.ts";
+import { areaConSigno, momentosInterseccion, puntoEnRegion, recorteRegionConvexo, type Region } from "../compilador/poligonos.ts";
+import { TIRA_MAXIMA } from "../compilador/anchosVigas.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import type { TipoAccion } from "../combinaciones/generador.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
@@ -718,7 +719,8 @@ export const anillosForjado = (x: Forjado): (readonly Vec2[])[] => [x.contorno, 
  * Los ejes que atan el borde de un forjado: los tramos de las vigas y los apoyos lineales de su
  * planta, de los muros que llegan a ella o salen de ella, y los bordes de los otros forjados de la
  * planta. Los de las vigas, con su ancho: un borde dentro de él también está atado (fase LV: la
- * losa se une a la viga por su cara, así que el borde puede ir por el eje o hasta la cara de fuera).
+ * losa se une a la viga por su cara, así que el borde puede ir por el eje o hasta la cara de fuera),
+ * y hasta TIRA_MAXIMA·b más allá de su cara de fuera (fase TB: la tira de borde, `libresTramo`).
  */
 export function ejesQueAtan(f: ModeloFisico, P: Plantas, x: Forjado): { A: Vec2; B: Vec2; ancho?: number }[] {
   const k = P.indice.get(x.planta);
@@ -740,19 +742,45 @@ export function ejesQueAtan(f: ModeloFisico, P: Plantas, x: Forjado): { A: Vec2;
 
 /**
  * Los trozos [s0, s1] del tramo t (de A a B, de largo L y dirección u) que no van sobre ninguno de los
- * `ejes` (a ≤ eps de su recta, o dentro de su ancho), de más de eps.
+ * `ejes` (a ≤ eps de su recta, o dentro de su ancho), de más de eps. Con `dentro` (la normal del
+ * tramo hacia el forjado), como el compilador en la fase TB (`tirasBorde`): una viga del lado del
+ * forjado ata también el borde que queda a no más de TIRA_MAXIMA·b de su cara de fuera (su tira va
+ * con la viga), y una viga ata hasta el extremo del tramo si le queda a no más de b/2 + TIRA_MAXIMA·b
+ * (la esquina más allá del pilar de esquina, en el que acaba la viga). Un tramo que cae entero en esa
+ * franja de la viga (un escalón del borde junto a ella) también está atado.
  */
-export function libresTramo(t: { A: Vec2; L: number; u: Vec2 }, ejes: readonly { A: Vec2; B: Vec2; ancho?: number }[], eps: number): [number, number][] {
+export function libresTramo(t: { A: Vec2; L: number; u: Vec2 }, ejes: readonly { A: Vec2; B: Vec2; ancho?: number }[], eps: number, dentro?: Vec2): [number, number][] {
   const pr = (q: Vec2) => {
     const [dx, dy] = [q[0] - t.A[0], q[1] - t.A[1]];
-    return { s: dx * t.u[0] + dy * t.u[1], d: Math.abs(dx * t.u[1] - dy * t.u[0]) };
+    return { s: dx * t.u[0] + dy * t.u[1], d: Math.abs(dx * t.u[1] - dy * t.u[0]), n: dentro ? dx * dentro[0] + dy * dentro[1] : 0 };
   };
   const cub: [number, number][] = [];
   for (const e of ejes) {
+    const w = e.ancho ?? 0;
+    if (dentro && w > 0) {
+      const Le = Math.hypot(e.B[0] - e.A[0], e.B[1] - e.A[1]);
+      const ue: Vec2 = Le > 0 ? [(e.B[0] - e.A[0]) / Le, (e.B[1] - e.A[1]) / Le] : [0, 0];
+      const ext = w / 2 + TIRA_MAXIMA * w + eps;
+      const enFranja = (q: Vec2) => {
+        const [dx, dy] = [q[0] - e.A[0], q[1] - e.A[1]];
+        const sg = dx * ue[0] + dy * ue[1];
+        return Le > 0 && Math.abs(dx * ue[1] - dy * ue[0]) <= ext && sg >= -ext && sg <= Le + ext;
+      };
+      if (enFranja(t.A) && enFranja([t.A[0] + t.L * t.u[0], t.A[1] + t.L * t.u[1]])) {
+        cub.push([0, t.L]);
+        continue;
+      }
+    }
     const [a, b] = [pr(e.A), pr(e.B)];
-    const tol = Math.max(eps, (e.ancho ?? 0) / 2 + eps);
+    const tira = w > 0 && a.n > 0 && b.n > 0 ? TIRA_MAXIMA * w : 0;
+    const tol = Math.max(eps, w / 2 + tira + eps);
     if (a.d > tol || b.d > tol) continue;
-    const [s0, s1] = [Math.max(0, Math.min(a.s, b.s)), Math.min(t.L, Math.max(a.s, b.s))];
+    let [s0, s1] = [Math.max(0, Math.min(a.s, b.s)), Math.min(t.L, Math.max(a.s, b.s))];
+    if (dentro && w > 0 && s1 > s0) {
+      const ext = w / 2 + TIRA_MAXIMA * w + eps;
+      if (s0 <= ext) s0 = 0;
+      if (t.L - s1 <= ext) s1 = t.L;
+    }
     if (s1 > s0) cub.push([s0, s1]);
   }
   cub.sort((p, q) => p[0] - q[0]);
@@ -779,9 +807,12 @@ export function bordesSinViga(f: ModeloFisico, P: Plantas, eps: number): { pieza
     if (!P.indice.has(x.planta)) continue;
     const ejes = ejesQueAtan(f, P, x);
     const libres: [Vec2, Vec2][] = [];
-    for (const an of anillosForjado(x))
+    for (const [ia, an] of anillosForjado(x).entries()) {
+      // Hacia el forjado: a la izquierda en un contorno antihorario; en un hueco, hacia fuera de él
+      const sentido = Math.sign(areaConSigno(an)) * (ia === 0 ? 1 : -1);
       for (const t of tramos([...an, an[0]!]))
-        for (const [s0, s1] of libresTramo(t, ejes, eps)) libres.push([[t.A[0] + s0 * t.u[0], t.A[1] + s0 * t.u[1]], [t.A[0] + s1 * t.u[0], t.A[1] + s1 * t.u[1]]]);
+        for (const [s0, s1] of libresTramo(t, ejes, eps, [-t.u[1] * sentido, t.u[0] * sentido])) libres.push([[t.A[0] + s0 * t.u[0], t.A[1] + s0 * t.u[1]], [t.A[0] + s1 * t.u[0], t.A[1] + s1 * t.u[1]]]);
+    }
     if (libres.length) r.push({ pieza: x.id, planta: x.planta, tramos: libres });
   }
   return r;

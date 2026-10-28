@@ -40,7 +40,7 @@ import type { ModificadoresBarra } from "../elementos/barra.ts";
 import { puntoEnRegion } from "./poligonos.ts";
 
 /** Versión del compilador: entra en la huella, así que cambia cuando cambia su salida. */
-export const VERSION_COMPILADOR = "AU1";
+export const VERSION_COMPILADOR = "TB1";
 
 export interface EstadisticasCompilacion {
   nudos: number;
@@ -390,7 +390,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   };
   const enVigas = [...losas.apoyosAViga].filter(([id, x]) => x.nudos.length && ctx.apoyosLineales.some((y) => y.id === id));
   if (enVigas.length) mapeo.apoyosEnVigas = Object.fromEntries(enVigas.map(([id, x]) => [id, x.nudos.map((n) => nuevo[n]!).sort((p, q) => p - q)]));
-  if (losas.anchos.length) mapeo.anchos = losas.anchos.map((a) => ({ viga: a.viga, planta: ctx.plantas[a.k]!.id, b: a.b, poligono: a.poligono.map((q) => [q[0], q[1]]) }));
+  if (losas.anchos.length) mapeo.anchos = losas.anchos.map((a) => ({ viga: a.viga, planta: ctx.plantas[a.k]!.id, b: a.b, poligono: a.poligono.map((q) => [q[0], q[1]]), ...(a.tira ? { tira: true as const } : {}) }));
   if (panos.viguetas.length) {
     const porPano: Record<string, string[]> = {};
     ctx.panos.forEach((p, i) => panos.porPano[i]!.length && (porPano[p.pano.id] = panos.porPano[i]!.map((v) => panos.viguetas[v]!.id)));
@@ -568,11 +568,13 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
         : `Losas malladas con láminas DKMQ: triangulación restringida de lado ${coma(2 * op.tamanoMalla)} m, refinada junto a los rasgos pequeños (G-4) y dividida en 3 cuadriláteros (h = ${coma(op.tamanoMalla)} m; ${losas.laminas.length} láminas; jacobiano escalado mínimo ${coma(Number(losas.malla.jacobianoMin.toFixed(3)))}).`,
     );
     const conAncho = losas.anchos.length > 0;
+    const tiras = losas.anchos.filter((x) => x.tira);
+    const tirasVigas = [...new Set(tiras.map((x) => x.viga))].sort();
     const otras = ctx.vigas.some((v) => ctx.losas.some((l) => l.losa.planta === v.planta) && anchoUnion(ctx, v) === null);
     h.push(
       `Unión pilar–losa por la huella del pilar, rígida: sólo los nudos dentro de la huella o en su borde (${losas.huellas.length} huellas, H09; fase HR). ${
         conAncho
-          ? `Unión losa–viga como CYPECAD (fase LV, CY-g): el ancho de las vigas de hormigón rectangulares no es losa; la losa llega a sus caras y sus nudos en ellas van unidos al eje de la viga por un enlace rígido (${losas.enlacesVigas.length} enlaces, ${losas.enlacesVigas.reduce((a, x) => a + x.esclavos.length, 0)} nudos; los que caen frente a un pilar, con su huella). Lo que cae en el ancho de la viga (el pp de la losa, sus cargas de superficie, lineales y puntuales) pasa a la viga con su momento de transporte.${op.refinoEsquinas ? ` La malla se refina en las esquinas de los paños entre vigas (fase LV2: plantillas de esquina graduadas hacia ella, con 3 niveles en los cruces con pilar y 2 en los demás), para que la viga en la cara del pilar y las franjas junto a las vigas salgan como con la malla fina.` : ""}${otras ? " Las demás vigas (metálicas o de otras secciones) se parten en los nudos de la malla sobre su eje, con la losa continua por encima." : ""}`
+          ? `Unión losa–viga como CYPECAD (fase LV, CY-g): el ancho de las vigas de hormigón rectangulares no es losa; la losa llega a sus caras y sus nudos en ellas van unidos al eje de la viga por un enlace rígido (${losas.enlacesVigas.length} enlaces, ${losas.enlacesVigas.reduce((a, x) => a + x.esclavos.length, 0)} nudos; los que caen frente a un pilar, con su huella). Lo que cae en el ancho de la viga (el pp de la losa, sus cargas de superficie, lineales y puntuales) pasa a la viga con su momento de transporte.${tiras.length ? ` La franja de losa entre la cara de fuera de una viga y el borde dibujado del forjado, de hasta el ancho de la viga, va con la viga del mismo modo, sin mallarse: el borde dibujado no se mueve (fase TB; ${tiras.length} tiras, en ${tirasVigas.join(", ")}).` : ""}${op.refinoEsquinas ? ` La malla se refina en las esquinas de los paños entre vigas (fase LV2: plantillas de esquina graduadas hacia ella, con 3 niveles en los cruces con pilar y 2 en los demás), para que la viga en la cara del pilar y las franjas junto a las vigas salgan como con la malla fina.` : ""}${otras ? " Las demás vigas (metálicas o de otras secciones) se parten en los nudos de la malla sobre su eje, con la losa continua por encima." : ""}`
           : "Las vigas embebidas se parten en los nudos de la malla sobre su eje fuera de las huellas."
       } La zona rígida de la cabeza de los pilares cuenta el espesor de la losa.`,
     );

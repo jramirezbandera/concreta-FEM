@@ -18,6 +18,9 @@
  * (`unionLosaViga: "eje"`: los mismos bits que antes de la fase); los terminados en `-lv`, la de la
  * fase (por las caras, por defecto).
  *
+ * TB (compilador TB1): los que se unen a la losa por las caras llevan `tirasBorde: false` (los mismos
+ * bits); el terminado en `-tb`, las tiras de borde con la viga (por defecto).
+ *
  * Sólo se regenera a sabiendas (un cambio validado aparte, o un cambio de los generadores):
  *   bun validacion/c3/congelar.ts
  */
@@ -45,13 +48,15 @@ export const MODELOS_CONGELADOS_C3: Record<string, () => ModeloCongelado> = {
   "aleatorio-3-muros": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   "reticula-nucleo": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1, unionLosaViga: "eje", zonaRigidaBase: false, planoForjado: "medio" } }),
   // Fase LV: con la unión de la losa con las vigas por las caras, sin la malla de LV2 (la de LV1)
-  "aleatorio-3-muros-lv": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-3-muros-lv": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, refinoEsquinas: false, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } }),
   // Fase LV2: con la malla junto a las vigas (por defecto; sin rejilla, actúan las tiras y LV2-f)
-  "aleatorio-3-muros-lv2": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, zonaRigidaBase: false, planoForjado: "medio" } }),
+  "aleatorio-3-muros-lv2": () => ({ fisico: conMurosAleatorios(conLosasAleatorias(fisicoAleatorio(3), 3), 3), opciones: { franjas: false, tamanoMalla: 1.25, rejilla: false, zonaRigidaBase: false, planoForjado: "medio", tirasBorde: false } }),
   // LV-d (compilador LVD1, 2026-10-20): la zona rígida también en la base de los tramos de pilar sobre un forjado (la de LVD1)
-  "reticula-nucleo-lvd": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1, planoForjado: "medio" } }),
+  "reticula-nucleo-lvd": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1, planoForjado: "medio", tirasBorde: false } }),
   // RV-b (compilador RV1, 2026-10-20): los nudos del forjado en su cara superior (por defecto)
-  "reticula-nucleo-rvb": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1 } }),
+  "reticula-nucleo-rvb": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1, tirasBorde: false } }),
+  // TB (compilador TB1, 2026-10-28): las tiras de borde con la viga (por defecto)
+  "reticula-nucleo-tb": () => ({ fisico: reticulaConNucleo(), opciones: { franjas: false, tamanoMalla: 1 } }),
 };
 
 if (import.meta.main) {

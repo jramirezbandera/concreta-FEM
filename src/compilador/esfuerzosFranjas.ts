@@ -476,6 +476,8 @@ export class EsfuerzosFranjas {
     // Fase LV: de una viga que se une por sus caras, cada cara con la losa de su lado (la de menor s,
     // la de s menores); entre las caras no hay estaciones
     for (const a of anchosL) {
+      // Una tira de borde (TB) no es losa, pero no tiene caras: va con la viga
+      if (a.tira) continue;
       const [d0, d1, i1, i0] = a.poligono;
       const sc = (d0[0] + d1[0] + i1[0] + i0[0]) / 4 * d[0] + (d0[1] + d1[1] + i1[1] + i0[1]) / 4 * d[1];
       const caras: [number, number][] = [];
@@ -724,7 +726,8 @@ export class EsfuerzosFranjas {
     // holgura: el de un pilar en el extremo de la viga cae en el borde del polígono, y
     // `puntoEnPoligono` lo daba dentro en un extremo y fuera en el otro
     const enVigaSegunN = (q: Vec2, ed: number) =>
-      anchosL.some(({ poligono, b }) => {
+      anchosL.some(({ poligono, b, tira }) => {
+        if (tira) return false;
         const [d0, d1, i1, i0] = [poligono[0]!, poligono[1]!, poligono[2]!, poligono[3]!];
         const A: Vec2 = [(d0[0] + i0[0]) / 2, (d0[1] + i0[1]) / 2];
         const B: Vec2 = [(d1[0] + i1[0]) / 2, (d1[1] + i1[1]) / 2];

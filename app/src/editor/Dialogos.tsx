@@ -410,7 +410,7 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
       ) : (
         <>
           <p>
-            Un zuncho en cada lado del borde (contorno y huecos) que no va sobre una viga, un muro, un apoyo lineal u otro forjado. Su eje va por el de los pilares del lado; sin pilares, enrasado por fuera. La losa se lleva hasta el eje, y lo que cargaba la banda que queda fuera (cargas de superficie, petos y su peso donde no está la viga) pasa a la viga.
+            Un zuncho en cada lado del borde (contorno y huecos) que no va sobre una viga, un muro, un apoyo lineal u otro forjado. Su eje va por el de los pilares del lado; sin pilares, enrasado por fuera. La losa no se toca: el cálculo lleva a la viga lo que cae en su ancho y en la franja de hasta su ancho que quede entre su cara de fuera y el borde del forjado.
           </p>
           <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5">
             <label htmlFor="vb-losa">Forjado</label>
@@ -436,11 +436,7 @@ export function DialogoVigasBorde({ onCerrar }: { onCerrar: (hecho?: string) => 
                 {p.nueva ? " (sección nueva)" : ""}: {cuenta("pilares")} por el eje de los pilares, {cuenta("enrasada")} enrasadas
                 {cuenta("continua") ? ` y ${cuenta("continua")} que siguen la viga que ya ata el lado` : ""}.
               </li>
-              <li>
-                La losa pierde una banda de {coma(Math.max(...p.vigas.map((v) => v.retranqueo)))} m como mucho; {p.cargas.filter((c) => c.tipo === "viga").length} cargas de viga la llevan a las vigas.
-              </li>
-              {p.quitadas.length > 0 && <li>Las cargas lineales {p.quitadas.join(", ")} pasan a las vigas{p.cargas.some((c) => c.tipo === "lineal") ? " (lo que queda fuera de la banda sigue como lineal)" : ""}.</li>}
-              {p.sueltas.length > 0 && <li className="text-state-warn">Las puntuales {p.sueltas.join(", ")} quedan fuera de la losa: muévalas a la viga.</li>}
+              <li>Su eje queda a {coma(Math.max(...p.vigas.map((v) => v.retranqueo)))} m del borde como mucho; la losa y sus cargas no cambian.</li>
               {p.avisos.map((a) => (
                 <li key={a} className="text-state-warn">
                   {a}

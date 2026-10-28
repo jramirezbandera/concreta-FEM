@@ -30,8 +30,10 @@ beforeAll(async () => {
 });
 
 const fisico = conAcciones(edificioReticular(1, 3, 3));
+// Sin las tiras de borde (TB): las del hueco (a 0,40 m del eje de X10 y X15) llevan su lado corto a
+// 0,45 m de la esquina del paño de P12-10 y P18-10, y con h = 0,5 su plantilla ya no cabe
 const avisos = (op: OpcionesCompilacion) => {
-  const c = compilar(fisico, op);
+  const c = compilar(fisico, { tirasBorde: false, ...op });
   expect(c.valido).toBe(true);
   return c.diagnosticos.filter((d) => d.codigo === "malla/esquina-sin-refinar");
 };

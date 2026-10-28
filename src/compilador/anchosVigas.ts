@@ -10,14 +10,23 @@
  * escuadra. El trozo que va por el eje de un muro de la planta no cuenta, ni el que pisa el espesor
  * de un muro que cruza o en el que acaba: ahí la losa llega al eje del muro, como en C3.
  *
+ * Las tiras de borde (fase TB, `tirasBorde`): la losa dibujada hasta unos centímetros por fuera de
+ * la cara de una viga de borde (el zuncho por el eje de los pilares y el forjado hasta la fachada) no
+ * se malla. La tira entre la cara y el borde, de hasta TIRA_MAXIMA·b, va con la viga como su ancho:
+ * lo que cae en ella pasa a la viga con su momento de transporte. El borde dibujado no se mueve.
+ *
  * Puro y determinista.
  */
 import type { Vec2, Viga } from "./fisico.ts";
-import { cuerdaEnTramo, type Topologia, type TramoViga } from "./topologia.ts";
+import { areaConSigno, defectoPoligono, distanciaABorde, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
+import { cuerdaEnTramo, distanciaARegion, type Topologia, type TramoViga } from "./topologia.ts";
 import type { Contexto } from "./validar.ts";
 
 /** Giro máximo de un quiebro que se une a inglete, en grados. */
 export const GIRO_INGLETE = 120;
+
+/** Ancho máximo de una tira de borde (fase TB), en anchos de la viga más allá de su cara. */
+export const TIRA_MAXIMA = 1;
 
 export interface AnchoViga {
   /** Tramo de la viga del que sale. */
@@ -31,6 +40,11 @@ export interface AnchoViga {
   b: number;
   /** Polígono del ancho, antihorario. */
   poligono: Vec2[];
+  /**
+   * Fase TB: es la tira de borde de la viga, del lado `tira` de su eje (+1, a la izquierda de su
+   * dirección), entre su cara y el borde de la losa. No es losa, como el ancho, pero no tiene caras.
+   */
+  tira?: 1 | -1;
 }
 
 /** Ancho b de la viga si se une a la losa por sus caras (hormigón y sección rectangular); si no, null. */
@@ -221,11 +235,16 @@ export function anchosPlanta(ctx: Contexto, topo: Topologia, k: number, e1: Vec2
       r.push({ tramo: tv, viga: tv.viga.id, k, desde, hasta, b, poligono: [d0, d1, i1, i0] });
     }
   }
-  const tol = ctx.op.epsGeom;
+  return ordenCanonico(r, e1, ctx.op.epsGeom);
+}
+
+/** Los anchos en el orden canónico de `anchosPlanta`. */
+function ordenCanonico(r: readonly AnchoViga[], e1: Vec2, tol: number): AnchoViga[] {
   const clave = r.map((a) => {
     const { A, u } = a.tramo.t;
     const sm = (a.desde + a.hasta) / 2;
-    const M: Vec2 = [A[0] + sm * u[0], A[1] + sm * u[1]];
+    // Una tira, por el centro de su polígono: las dos de un trozo comparten el eje
+    const M: Vec2 = a.tira ? centro(a.poligono) : [A[0] + sm * u[0], A[1] + sm * u[1]];
     return { b: a.b, al: Math.abs(u[0] * e1[0] + u[1] * e1[1]), u: M[0] * e1[0] + M[1] * e1[1], v: -M[0] * e1[1] + M[1] * e1[0] };
   });
   const orden = r.map((_, i) => i).sort((i, j) => {
@@ -237,6 +256,142 @@ export function anchosPlanta(ctx: Contexto, topo: Topologia, k: number, e1: Vec2
     return i - j;
   });
   return orden.map((i) => r[i]!);
+}
+
+const centro = (p: readonly Vec2[]): Vec2 => p.reduce((s, q) => [s[0] + q[0] / p.length, s[1] + q[1] / p.length] as Vec2, [0, 0] as Vec2);
+const punto = (A: Vec2, u: Vec2, s: number): Vec2 => [A[0] + s * u[0], A[1] + s * u[1]];
+const prod = (a: Vec2, b: Vec2) => a[0] * b[0] + a[1] * b[1];
+/** Corte de las rectas P + s·u y Q + t·v (null si son paralelas). */
+function corteRectas(P: Vec2, u: Vec2, Q: Vec2, v: Vec2): Vec2 | null {
+  const den = u[0] * v[1] - u[1] * v[0];
+  if (Math.abs(den) < 1e-12) return null;
+  const s = ((Q[0] - P[0]) * v[1] - (Q[1] - P[1]) * v[0]) / den;
+  return punto(P, u, s);
+}
+
+/**
+ * Las tiras de borde de la planta k (fase TB), en orden canónico, de los anchos `anchos` (los de
+ * `anchosPlanta`) en las losas de `regiones`. Un lado del borde de una losa (contorno o hueco)
+ * paralelo al eje de un ancho, con la losa entre él y la viga y a más de ε_snap de su cara pero a no
+ * más de TIRA_MAXIMA·b de ella, da una tira por cada trozo del ancho que recorre: el cuadrilátero
+ * entre la cara y el lado, en lo que el trozo cubre del lado. La primera y la última de la línea
+ * llegan hasta los extremos del lado si les quedan a no más de b/2 + TIRA_MAXIMA·b + ε_snap (las
+ * esquinas: el pilar de esquina está en el eje): allí cierran contra el lado vecino, a inglete con su
+ * tira si la tiene. Una tira que no es un cuadrilátero simple dentro de la losa, o que pisa un muro,
+ * no se pone (esa franja se malla).
+ */
+export function tirasBorde(ctx: Contexto, k: number, anchos: readonly AnchoViga[], regiones: readonly Region[], e1: Vec2): AnchoViga[] {
+  const eps = ctx.op.epsSnap;
+  const tol = ctx.op.epsGeom;
+  const r: AnchoViga[] = [];
+  const muros = ctx.muros.filter((m) => k >= m.kh && k <= m.kb).map((m) => m.muro.puntos);
+  for (const rg of regiones) {
+    const anillos = [rg.contorno, ...rg.huecos];
+    for (const [ia, an0] of anillos.entries()) {
+      const an = an0.filter((q, i) => {
+        const s = an0[(i + 1) % an0.length]!;
+        return Math.hypot(s[0] - q[0], s[1] - q[1]) > tol;
+      });
+      const n = an.length;
+      if (n < 3) continue;
+      // Hacia la losa: a la izquierda en un contorno antihorario; en un hueco, hacia fuera de él
+      const sentido = Math.sign(areaConSigno(an)) * (ia === 0 ? 1 : -1);
+      const lados = an.map((P, i) => {
+        const Q = an[(i + 1) % n]!;
+        const L = Math.hypot(Q[0] - P[0], Q[1] - P[1]);
+        const e: Vec2 = [(Q[0] - P[0]) / L, (Q[1] - P[1]) / L];
+        return { P, Q, L, e, nu: [-e[1] * sentido, e[0] * sentido] as Vec2 };
+      });
+      // La línea de vigas de cada lado: los trozos paralelos a la distancia más corta, del lado de la losa
+      type Trozo = { a: AnchoViga; s: 1 | -1; c0: number; c1: number; X0: Vec2; X1: Vec2 };
+      const lineas = lados.map((l): { d: number; trozos: Trozo[] } | null => {
+        let mejor = null as { d: number; trozos: Trozo[] } | null;
+        for (const a of anchos) {
+          if (a.tira) continue;
+          const { A, u } = a.tramo.t;
+          const nn: Vec2 = [-u[1], u[0]];
+          if (Math.abs(l.e[0] * u[1] - l.e[1] * u[0]) > 1e-9) continue;
+          const [tP, tQ] = [prod([l.P[0] - A[0], l.P[1] - A[1]], nn), prod([l.Q[0] - A[0], l.Q[1] - A[1]], nn)];
+          if (Math.abs(tP - tQ) > tol) continue;
+          const t = (tP + tQ) / 2;
+          const d = Math.abs(t);
+          if (!(d > a.b / 2 + eps && d <= a.b / 2 + TIRA_MAXIMA * a.b + tol)) continue;
+          const s = t > 0 ? 1 : -1;
+          // La losa, entre el lado y la viga
+          if (prod(l.nu, nn) * s > -(1 - 1e-9)) continue;
+          const X0 = a.desde === 0 ? A : a.desde === a.tramo.t.len ? a.tramo.t.B : punto(A, u, a.desde);
+          const X1 = a.hasta === a.tramo.t.len ? a.tramo.t.B : a.hasta === 0 ? A : punto(A, u, a.hasta);
+          const [r0, r1] = [prod([X0[0] - l.P[0], X0[1] - l.P[1]], l.e), prod([X1[0] - l.P[0], X1[1] - l.P[1]], l.e)];
+          const [c0, c1] = [Math.max(0, Math.min(r0, r1)), Math.min(l.L, Math.max(r0, r1))];
+          if (!(c1 - c0 > tol)) continue;
+          const tr = { a, s: s as 1 | -1, c0, c1, X0: r0 <= r1 ? X0 : X1, X1: r0 <= r1 ? X1 : X0 };
+          if (!mejor || d < mejor.d - tol) mejor = { d, trozos: [tr] };
+          else if (Math.abs(d - mejor.d) <= tol) mejor.trozos.push(tr);
+        }
+        mejor?.trozos.sort((x, y) => x.c0 - y.c0);
+        return mejor;
+      });
+      // Las tiras de cada lado, en su recorrido [t0, t1] del lado; las de los extremos, hasta el vértice
+      const tiras = lineas.map((ln, i) => {
+        if (!ln) return [];
+        const l = lados[i]!;
+        const ext = (b: number) => b / 2 + TIRA_MAXIMA * b + eps;
+        return ln.trozos.map((tr, j) => {
+          const inicio = j === 0 && tr.c0 <= ext(tr.a.b);
+          const final = j === ln.trozos.length - 1 && l.L - tr.c1 <= ext(tr.a.b);
+          return { ...tr, inicio, final };
+        });
+      });
+      /** La cara de la viga de una tira (un punto y su dirección). */
+      const cara = (tr: { a: AnchoViga; s: 1 | -1 }): { O: Vec2; u: Vec2 } => {
+        const { A, u } = tr.a.tramo.t;
+        return { O: [A[0] - tr.s * (tr.a.b / 2) * u[1], A[1] + tr.s * (tr.a.b / 2) * u[0]], u };
+      };
+      /** Pie en la cara de un punto X del eje (o del lado), en perpendicular. */
+      const pie = (X: Vec2, c: { O: Vec2; u: Vec2 }): Vec2 => punto(c.O, c.u, prod([X[0] - c.O[0], X[1] - c.O[1]], c.u));
+      // Esquinas en cada vértice i (entre el lado i − 1 y el i), una vez: a inglete si las dos tiras llegan a él
+      const esquinas = an.map((V, i) => {
+        const ip = (i + n - 1) % n;
+        const [ta, tb] = [tiras[ip]!.at(-1), tiras[i]![0]];
+        const fin = ta?.final ? { tr: ta, c: cara(ta) } : null;
+        const ini = tb?.inicio ? { tr: tb, c: cara(tb) } : null;
+        const inglete = fin && ini ? corteRectas(fin.c.O, fin.c.u, ini.c.O, ini.c.u) : null;
+        const contra = (c: { O: Vec2; u: Vec2 }, vecino: (typeof lados)[number]): Vec2 => {
+          // Contra el lado vecino si la cara lo corta dentro de él; si no, en perpendicular por el vértice
+          const X = corteRectas(c.O, c.u, vecino.P, vecino.e);
+          if (X) {
+            const s = prod([X[0] - vecino.P[0], X[1] - vecino.P[1]], vecino.e);
+            if (s >= -tol && s <= vecino.L + tol) return X;
+          }
+          return pie(V, c);
+        };
+        return {
+          fin: fin ? (inglete ?? contra(fin.c, lados[i]!)) : null,
+          ini: ini ? (inglete ?? contra(ini.c, lados[ip]!)) : null,
+        };
+      });
+      for (const [i, ts] of tiras.entries()) {
+        const l = lados[i]!;
+        for (const tr of ts) {
+          const c = cara(tr);
+          const enLado = (X: Vec2): Vec2 => punto(l.P, l.e, prod([X[0] - l.P[0], X[1] - l.P[1]], l.e));
+          const E0 = tr.inicio ? l.P : enLado(tr.X0);
+          const E1 = tr.final ? l.Q : enLado(tr.X1);
+          const F0 = tr.inicio ? esquinas[i]!.ini! : pie(tr.X0, c);
+          const F1 = tr.final ? esquinas[(i + 1) % n]!.fin! : pie(tr.X1, c);
+          let poli: Vec2[] = [E0, E1, F1, F0];
+          if (areaConSigno(poli) < 0) poli = [F0, F1, E1, E0];
+          // Un cuadrilátero simple, dentro de la losa, sin vértices de la losa dentro ni muros
+          if (defectoPoligono(poli, tol) || !(Math.abs(areaConSigno(poli)) > tol * tol)) continue;
+          if (poli.some((q) => distanciaARegion(q, rg) > tol)) continue;
+          if (anillos.some((x) => x.some((q) => puntoEnPoligono(q, poli) && distanciaABorde(q, poli) > tol))) continue;
+          if (muros.some((p) => p.some((q, j) => j > 0 && (puntoEnPoligono(q, poli) || poli.some((A, m) => distanciaEntreSegmentos(p[j - 1]!, q, A, poli[(m + 1) % 4]!) === 0))))) continue;
+          r.push({ tramo: tr.a.tramo, viga: tr.a.viga, k, desde: tr.a.desde, hasta: tr.a.hasta, b: tr.a.b, poligono: poli, tira: tr.s });
+        }
+      }
+    }
+  }
+  return ordenCanonico(r, e1, tol);
 }
 
 /** Distancia de q al eje de un ancho (el segmento de su trozo). */
