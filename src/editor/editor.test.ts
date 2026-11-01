@@ -219,13 +219,44 @@ describe("operaciones", () => {
 
   it("copiar una planta a otra da sus vigas, losas y cargas con ids de la planta nueva", () => {
     const ids = objetosDePlanta(ej.modelo, "P1");
-    const r = copiarAPlantas(ej.modelo, ids, ["P2"]);
+    const r = copiarAPlantas(ej.modelo, ids, ["CIM"]);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const p = aplicado(ej, r.operacion);
-    expect(lista(p.modelo, "vigas").filter((v) => v.planta === "P2")).toHaveLength(4);
+    expect(lista(p.modelo, "vigas").filter((v) => v.planta === "CIM").map((v) => v.id)).toEqual(["VX0-CIM", "VX5-CIM"]);
     expect(referenciasRotas(p.modelo)).toEqual([]);
     expect(copiarAPlantas(ej.modelo, ["A1"], ["P2"]).ok).toBe(false);
+  });
+
+  it("lo que ya está no se duplica, y las cargas solas van a las piezas iguales del destino (UI-6)", () => {
+    const ids = objetosDePlanta(ej.modelo, "P1");
+    // P2 ya tiene las vigas y la losa de P1 en el mismo sitio: no se duplican (antes, dos vigas más y la losa solapada)
+    const a = copiarAPlantas(ej.modelo, ids, ["P2"]);
+    if (!a.ok) throw new Error(a.errores[0]!.mensaje);
+    expect(a.avisos?.[0]).toBe("P2 ya tiene en el mismo sitio 2 vigas, 1 losa: no se copian, y sus cargas van a esas piezas.");
+    const pa = aplicado(ej, a.operacion);
+    expect(lista(pa.modelo, "vigas").filter((v) => v.planta === "P2")).toHaveLength(2);
+    expect(lista(pa.modelo, "losas").filter((v) => v.planta === "P2")).toHaveLength(1);
+    expect(referenciasRotas(pa.modelo)).toEqual([]);
+    // A una planta vacía, y otra vez: nada que copiar, y se dice por qué
+    const r = copiarAPlantas(ej.modelo, ids, ["CIM"]);
+    if (!r.ok) throw new Error(r.errores[0]!.mensaje);
+    const p = aplicado(ej, r.operacion);
+    const otra = copiarAPlantas(p.modelo, ids, ["CIM"]);
+    expect(!otra.ok && otra.errores[0]!.mensaje).toMatch(/^No hay nada que copiar\. CIM ya tiene en el mismo sitio 2 vigas, 1 losa: .* CIM ya tiene \d+ cargas iguales/);
+    // Sin las cargas de CIM, las de P1 solas: van a las copias de sus piezas
+    const enCim = new Set(objetosDePlanta(p.modelo, "CIM"));
+    const sinCargas = { ...p, modelo: { ...p.modelo, cargas: lista(p.modelo, "cargas").filter((c) => !enCim.has(c.id)) } };
+    const cargas = ids.filter((id) => lista(ej.modelo, "cargas").some((c) => c.id === id));
+    const c = copiarAPlantas(sinCargas.modelo, cargas, ["CIM"]);
+    if (!c.ok) throw new Error(c.errores[0]!.mensaje);
+    const q = aplicado(sinCargas, c.operacion);
+    expect(referenciasRotas(q.modelo)).toEqual([]);
+    expect(lista(q.modelo, "cargas").find((x) => x.id === "CM-CIM")?.losa).toBe("L-CIM");
+    // A una planta sin esas piezas, las que van sobre una no se copian, y se dice
+    const sola = copiarAPlantas(ej.modelo, cargas, ["CIM"]);
+    if (!sola.ok) throw new Error(sola.errores[0]!.mensaje);
+    expect(sola.avisos).toEqual(["CIM no tiene en el mismo sitio la pieza de CM-P1, SU-P1: no se copian (copie también su pieza)."]);
   });
 
   it("el proyecto nuevo pasa el esquema", () => {

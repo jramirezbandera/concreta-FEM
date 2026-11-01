@@ -9,9 +9,10 @@
  */
 import type { Proyecto } from "../agente/proyecto.ts";
 import type { ModeloFisico } from "../compilador/fisico.ts";
+import { canonico } from "../compilador/huella.ts";
 import { escribirTsv, leerTsv, type ErrorCelda, type Fila } from "./celdas.ts";
-import { aplicar, type Aplicacion, type Operacion } from "./operaciones.ts";
-import { indiceIds, lista, referenciasDe, type Coleccion, type Objeto } from "./referencias.ts";
+import { aplicar, nombreColeccion, type Aplicacion, type Operacion } from "./operaciones.ts";
+import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 import { contexto, DEF_TABLAS, idNuevo, objetosTabla, type NombreTabla } from "./tablas.ts";
 
 export interface ErrorFila {
@@ -164,12 +165,23 @@ export function objetosDePlanta(m: ModeloFisico, planta: string): string[] {
   return r;
 }
 
+/** Dónde está una pieza de planta (su geometría), para reconocer su igual en otra; null en una carga. */
+function sitio(c: Coleccion, o: Objeto): string | null {
+  const g = c === "losas" || c === "panos" ? o.contorno : c === "apoyos" ? [o.x, o.y] : c === "vigas" || c === "apoyosLineales" ? o.puntos : undefined;
+  return g === undefined ? null : `${c}|${JSON.stringify(g)}`;
+}
+
 /**
  * Copia unos objetos a otras plantas. Los ids nuevos llevan la planta de destino. Las cargas que se
- * copian con la viga, la losa o el paño en que van pasan a la copia; una carga sobre algo que no se
- * copia no se puede copiar (diría dos veces la misma carga sobre la misma pieza).
+ * copian con la viga, la losa o el paño en que van pasan a la copia.
+ *
+ * Lo que ya está (`auditoria-ui.md`, UI-6): una pieza con otra del mismo tipo en el mismo sitio en la
+ * planta de destino no se copia (antes se duplicaba y el modelo dejaba de compilar), y sus cargas van
+ * a esa; una carga sobre una pieza que no se copia va a su igual del destino (antes no se podía
+ * copiar), y si el destino no la tiene, no se copia y se dice; una carga igual a otra que ya está no se
+ * duplica. Lo que se salta va en `avisos`.
  */
-export function copiarAPlantas(m: ModeloFisico, ids: readonly string[], destinos: readonly string[]): Traduccion {
+export function copiarAPlantas(m: ModeloFisico, ids: readonly string[], destinos: readonly string[]): Traduccion & { avisos?: string[] } {
   const idx = indiceIds(m);
   const errores: ErrorFila[] = [];
   const objetos: { coleccion: Coleccion; o: Objeto; origen: string }[] = [];
@@ -194,32 +206,77 @@ export function copiarAPlantas(m: ModeloFisico, ids: readonly string[], destinos
     }
     objetos.push({ coleccion: x.coleccion, o, origen: ps![0]! });
   }
-  const copiados = new Set(objetos.map((x) => x.o.id));
-  // Una carga sobre algo que no se copia
-  for (const { coleccion, o } of objetos)
-    if (coleccion === "cargas")
-      for (const r of referenciasDe("cargas", o)) if ((r.destino === "vigas" || r.destino === "losas" || r.destino === "panos") && !copiados.has(r.id)) errores.push({ fila: null, id: o.id, mensaje: `${o.id} va sobre ${r.id}, que no se copia: copia también ${r.id}.` });
   if (errores.length) return { ok: false, errores };
+  const copiados = new Set(objetos.map((x) => x.o.id));
+  // Lo que ya hay en cada planta, por su sitio; y las cargas que ya hay, sin su id
+  const yaHay = new Map<string, string>();
+  for (const c of COPIABLES)
+    if (c !== "cargas")
+      for (const o of lista(m, c)) {
+        const s = sitio(c, o);
+        const k = `${o.planta as string}|${s}`;
+        if (s && !yaHay.has(k)) yaHay.set(k, o.id);
+      }
+  const sinId = (o: Objeto) => canonico({ ...o, id: "" });
+  const cargasYa = new Set(lista(m, "cargas").map(sinId));
+  const piezaDe = (id: string) => {
+    const x = idx.get(id);
+    return x ? sitio(x.coleccion, lista(m, x.coleccion)[x.indice]!) : null;
+  };
   const ops: Operacion[] = [];
+  const avisos: string[] = [];
   const nuevos = new Set<string>();
   const usado = (x: string) => idx.has(x) || nuevos.has(x);
   for (const destino of destinos) {
     const mapa = new Map<string, string>();
-    for (const { o, origen } of objetos) {
+    const saltados = new Set<string>();
+    const saltadas = new Map<Coleccion, number>();
+    const sinPieza: string[] = [];
+    let cargasIguales = 0;
+    for (const { coleccion, o, origen } of objetos) {
       if (origen === destino) continue;
+      const s = sitio(coleccion, o);
+      const igual = s && yaHay.get(`${destino}|${s}`);
+      if (igual) {
+        mapa.set(o.id, igual);
+        saltados.add(o.id);
+        saltadas.set(coleccion, (saltadas.get(coleccion) ?? 0) + 1);
+        continue;
+      }
       const n = idCopia(o.id, origen, destino, usado);
       nuevos.add(n);
       mapa.set(o.id, n);
     }
     // Primero lo que no es carga (las cargas apuntan a ello)
     for (const { coleccion, o, origen } of [...objetos].sort((a, b) => Number(a.coleccion === "cargas") - Number(b.coleccion === "cargas"))) {
-      if (origen === destino) continue;
-      let c: Record<string, unknown> = { ...o, id: mapa.get(o.id)! };
+      if (origen === destino || saltados.has(o.id)) continue;
+      const c: Record<string, unknown> = { ...o, id: mapa.get(o.id)! };
       if ("planta" in c) c.planta = destino;
-      for (const k of ["viga", "losa", "pano"]) if (typeof c[k] === "string" && mapa.has(c[k] as string)) c[k] = mapa.get(c[k] as string);
+      let falta = false;
+      for (const k of ["viga", "losa", "pano"]) {
+        if (typeof c[k] !== "string") continue;
+        const ref = c[k] as string;
+        // La pieza que se copia, o su igual en el destino
+        const otra = mapa.get(ref) ?? (copiados.has(ref) ? undefined : yaHay.get(`${destino}|${piezaDe(ref)}`));
+        if (otra) c[k] = otra;
+        else falta = true;
+      }
+      if (falta) {
+        sinPieza.push(o.id);
+        continue;
+      }
+      if (coleccion === "cargas" && cargasYa.has(sinId(c as Objeto))) {
+        cargasIguales++;
+        continue;
+      }
       ops.push({ op: "crear", coleccion, objeto: c as Objeto });
-      c = {};
     }
+    const ya = [...saltadas].map(([c, n]) => `${n} ${n > 1 ? nombreColeccion(c).replace(/ (\S+)$/, " $1es").replace(/^(\S+)/, "$1s") : nombreColeccion(c)}`);
+    const una = saltados.size === 1;
+    if (ya.length) avisos.push(`${destino} ya tiene en el mismo sitio ${ya.join(", ")}: no se ${una ? "copia" : "copian"}, y sus cargas van a ${una ? "esa pieza" : "esas piezas"}.`);
+    if (cargasIguales) avisos.push(`${destino} ya tiene ${cargasIguales === 1 ? "una carga igual" : `${cargasIguales} cargas iguales`}: no se ${cargasIguales === 1 ? "duplica" : "duplican"}.`);
+    if (sinPieza.length) avisos.push(`${destino} no tiene en el mismo sitio la pieza de ${sinPieza.join(", ")}: no se ${sinPieza.length === 1 ? "copia" : "copian"} (copie también su pieza).`);
   }
-  return { ok: true, operacion: { op: "lote", operaciones: ops } };
+  if (!ops.length) return { ok: false, errores: [{ fila: null, mensaje: avisos.length ? `No hay nada que copiar. ${avisos.join(" ")}` : "No hay nada que copiar." }] };
+  return { ok: true, operacion: { op: "lote", operaciones: ops }, ...(avisos.length ? { avisos } : {}) };
 }

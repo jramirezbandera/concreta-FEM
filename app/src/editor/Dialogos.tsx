@@ -160,14 +160,16 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
   const [error, setError] = useState<string | null>(null);
   const todos = planta ? objetosDePlanta(m, planta) : [];
   const copiar = entera ? todos : ids;
+  // Lo que hará, antes de pulsar: cuántos crea y lo que se salta porque ya está (UI-6)
+  const prueba = useMemo(() => (destinos.size && copiar.length ? copiarAPlantas(m, copiar, [...destinos]) : null), [m, copiar, destinos]);
+  const n = prueba?.ok ? (prueba.operacion.op === "lote" ? prueba.operacion.operaciones.length : 1) : 0;
 
   const hacer = () => {
-    const t = copiarAPlantas(m, copiar, [...destinos]);
-    if (!t.ok) return setError(t.errores.map((e) => e.mensaje).join(" "));
-    const n = t.operacion.op === "lote" ? t.operacion.operaciones.length : 1;
-    const r = ed.editar(t.operacion, `Copiar ${copiar.length} objetos a ${[...destinos].join(", ")}`);
+    if (!prueba) return;
+    if (!prueba.ok) return setError(prueba.errores.map((e) => e.mensaje).join(" "));
+    const r = ed.editar(prueba.operacion, `Copiar ${copiar.length} objetos a ${[...destinos].join(", ")}`);
     if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
-    onCerrar(`Creados ${n} objetos en ${[...destinos].join(", ")}.`);
+    onCerrar(`Creados ${n} objetos en ${[...destinos].join(", ")}.${prueba.avisos ? ` ${prueba.avisos.join(" ")}` : ""}`);
   };
 
   return (
@@ -179,21 +181,21 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
           <button type="button" className="btn" onClick={() => onCerrar()}>
             Cancelar
           </button>
-          <button type="button" className="btn btn-p" onClick={hacer} disabled={destinos.size === 0 || copiar.length === 0}>
-            Copiar
+          <button type="button" className="btn btn-p" onClick={hacer} disabled={!prueba?.ok}>
+            {n ? `Copiar ${n} ${n === 1 ? "objeto" : "objetos"}` : "Copiar"}
           </button>
         </>
       }
     >
       <div className="dlg-et" style={{ marginTop: 4 }}>Qué se copia</div>
       <label className="opcion">
-        <input type="radio" checked={!entera} onChange={() => setEntera(false)} />
+        <input type="radio" name="copiar-que" checked={!entera} onChange={() => setEntera(false)} />
         <span>
           Lo elegido <span className="mono text-text-secondary">· {ids.length > 6 ? `${ids.slice(0, 6).join(", ")}… (${ids.length})` : ids.join(", ")}</span>
         </span>
       </label>
       <label className="opcion">
-        <input type="radio" checked={entera} onChange={() => setEntera(true)} disabled={!planta} />
+        <input type="radio" name="copiar-que" checked={entera} onChange={() => setEntera(true)} disabled={!planta} />
         <span>
           Toda la planta {planta} <span className="mono text-text-secondary">· {todos.length} objetos</span>
           <small>Vigas, losas, paños, apoyos, apoyos lineales y sus cargas.</small>
@@ -207,10 +209,10 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
               type="checkbox"
               checked={destinos.has(x.id)}
               onChange={(e) => {
-                const n = new Set(destinos);
-                if (e.target.checked) n.add(x.id);
-                else n.delete(x.id);
-                setDestinos(n);
+                const d = new Set(destinos);
+                if (e.target.checked) d.add(x.id);
+                else d.delete(x.id);
+                setDestinos(d);
               }}
             />
             {x.id}
@@ -218,7 +220,9 @@ export function DialogoCopiar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
           </label>
         ))}
       </div>
-      <p className="dlg-nota">Los ids nuevos llevan la planta de destino. Las cargas van a la copia de su viga, su losa o su paño. Los pilares y los muros no se copian: se alargan con su «desde» y su «hasta».</p>
+      <p className="dlg-nota">Los ids nuevos llevan la planta de destino. Las cargas van a la copia de su viga, su losa o su paño, o a la pieza igual que ya esté en el mismo sitio. Lo que ya está no se duplica. Los pilares y los muros no se copian: se alargan con su «desde» y su «hasta».</p>
+      {prueba && !prueba.ok && <p className="mt-2 text-state-fail">{prueba.errores.map((e) => e.mensaje).join(" ")}</p>}
+      {prueba?.ok && prueba.avisos && <p className="dlg-nota">{prueba.avisos.join(" ")}</p>}
       {error && <p className="mt-2 text-state-fail">{error}</p>}
     </Dialogo>
   );
