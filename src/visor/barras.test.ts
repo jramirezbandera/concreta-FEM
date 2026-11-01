@@ -17,7 +17,7 @@ import { porticoAcero, porticoArriostrado } from "../pruebas/barras.ts";
 import { alambrico } from "./alambrico.ts";
 import { piezasSolido, volumen } from "./solido.ts";
 
-const objeto = (ps: readonly Primitiva[], id: string) => ps.filter((p) => p.tipo !== "texto" && p.objeto === id);
+const objeto = (ps: readonly Primitiva[], id: string) => ps.filter((p) => p.tipo !== "texto" && "objeto" in p && p.objeto === id);
 
 describe("BN2: las barras en el sólido y en el alámbrico", () => {
   for (const [nombre, f] of [["arriostrado", porticoArriostrado()], ["acero", porticoAcero()]] as [string, ModeloFisico][]) {

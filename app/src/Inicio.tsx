@@ -22,10 +22,11 @@ import { fechaCorta, tamano } from "./fmt.ts";
 export const EJEMPLOS: Record<string, { titulo: string; cargar: () => Promise<string> }> = {
   muestrario: { titulo: "Muestrario: sótano con empuje, núcleo, porche con apoyo lineal, reticular y unidireccional (con combinaciones)", cargar: () => import("../../ejemplos/muestrario/proyecto.json?raw").then((m) => m.default) },
   vivienda: { titulo: "Vivienda de una planta con dos cubiertas reticulares y pérgola (proyecto real, modelado por el agente)", cargar: () => import("../../ejemplos/vivienda/proyecto.json?raw").then((m) => m.default) },
-  ejemplo: { titulo: "Pórtico de dos plantas con losa (ejemplo de la skill)", cargar: () => import("../../.claude/skills/fem/ejemplo.json?raw").then((m) => m.default) },
-  "1022": { titulo: "Pórtico de acero de 7 plantas (SAP2000 1-022, A2)", cargar: () => import("../../validacion/a2/agente/1022/proyecto.json?raw").then((m) => m.default) },
-  nucleo: { titulo: "Retícula con núcleo de muros (A2)", cargar: () => import("../../validacion/a2/agente/nucleo/proyecto.json?raw").then((m) => m.default) },
-  edificio: { titulo: "Edificio objetivo: 7 plantas, 80 pilares (A2)", cargar: () => import("../../validacion/a2/agente/edificio/proyecto.json?raw").then((m) => m.default) },
+  ejemplo: { titulo: "Pórtico de dos plantas con losa (ejemplo sencillo)", cargar: () => import("../../.claude/skills/fem/ejemplo.json?raw").then((m) => m.default) },
+  // Sin el nombre del programa del caso de validación: los textos de la app no nombran software comercial
+  "1022": { titulo: "Pórtico de acero de 7 plantas (caso de validación 1-022)", cargar: () => import("../../validacion/a2/agente/1022/proyecto.json?raw").then((m) => m.default) },
+  nucleo: { titulo: "Retícula con núcleo de muros", cargar: () => import("../../validacion/a2/agente/nucleo/proyecto.json?raw").then((m) => m.default) },
+  edificio: { titulo: "Edificio de 7 plantas y 80 pilares", cargar: () => import("../../validacion/a2/agente/edificio/proyecto.json?raw").then((m) => m.default) },
 };
 
 export async function abrirDesdeUrl(p: ProyectoAbierto): Promise<void> {

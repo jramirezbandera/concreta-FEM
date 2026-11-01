@@ -10,6 +10,9 @@
  * - Cada carga va donde cae: las de superficie y el pp de losas y paños, por el área de la celda
  *   dentro de su región (`momentosInterseccion`); las lineales, las de viga y el peso de las vigas,
  *   muestreados por su eje cada `PASO` m al generador más cercano; las puntuales, al suyo.
+ * - Una barra entre dos niveles (fase BN) lleva su peso y sus cargas verticales a sus dos extremos,
+ *   como una pieza biapoyada (por la palanca a lo largo de ella), y cada parte cae en la planta de su
+ *   extremo, como una puntual.
  * - La bajada de un tramo es lo que recibe en su planta más lo que baja por el tramo de encima, con
  *   su peso y sus cargas. Un pilar apeado (base "ninguno") lleva lo suyo, como carga puntual, a la
  *   planta en la que nace.
@@ -20,6 +23,7 @@
  */
 import type { CargaFisica, Losa, ModeloFisico, PanoUnidireccional, Vec2 } from "../compilador/fisico.ts";
 import { momentosInterseccion, type Region } from "../compilador/poligonos.ts";
+import { ejesBarra, puntosBarra } from "../compilador/barras.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import { areaRegion, areaSeccion, gammaMaterial, pesoLibre, pesoLosa, Plantas, ppDePano, regionDe, sobreMuros, tramos } from "./sensatez.ts";
 
@@ -168,6 +172,34 @@ export function bajadaTributaria(f: ModeloFisico, casos: ReadonlySet<string>, ep
     ] as Vec2[];
   })();
 
+  // Fase BN: las barras, a sus extremos como biapoyadas (lo vertical, hacia abajo positivo)
+  const extremos = new Map<string, { p: Vec2; F: number }[]>();
+  for (const b of f.barras ?? []) {
+    const AB = puntosBarra(f.plantas, b);
+    if (!AB) continue;
+    const [A, B] = AB;
+    const L = Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]);
+    if (!(L > 0)) continue;
+    const { ex, ey, ez } = ejesBarra(A, B, b.giro ?? 0);
+    // Σ de las cargas por metro, vertical, en [a, b] lineal: su resultante y su momento respecto al inicio
+    let [F, M] = [0, 0];
+    const tramo = (a: number, c: number, qa: number, qc: number) => {
+      if (!(c > a)) return;
+      F += ((qa + qc) / 2) * (c - a);
+      M += ((c - a) * (qa * (2 * a + c) + qc * (a + 2 * c))) / 6;
+    };
+    const s = seccion.get(b.seccion);
+    const m = s && material.get(s.material);
+    if (conPeso && s && m) tramo(0, L, areaSeccion(s) * gammaMaterial(m), areaSeccion(s) * gammaMaterial(m));
+    for (const c of cargas) {
+      if (c.tipo !== "barra" || c.barra !== b.id) continue;
+      const v = (q: readonly number[]) => -(c.ejes === "global" ? q[2]! : q[0]! * ex[2] + q[1]! * ey[2] + q[2]! * ez[2]);
+      tramo(c.desde ?? 0, c.hasta ?? L, v(c.q), v(c.qb ?? c.q));
+    }
+    if (!F) continue;
+    for (const [x, P0, parte] of [[b.inicio, A, F - M / L], [b.fin, B, M / L]] as const) extremos.set(x.planta, [...(extremos.get(x.planta) ?? []), { p: [P0[0], P0[1]], F: parte }]);
+  }
+
   // El eje del tramo de un pilar con la cabeza en la planta k (PF: el centro de su sección)
   const ejeEn = (p: NonNullable<ModeloFisico["pilares"]>[number], k: number): Vec2 => ejeSeccion(p, f.secciones?.find((s) => s.id === (p.tramos?.find((t) => t.planta === P.ids[k])?.seccion ?? p.seccion)));
   const cabeza = new Map<string, number>(); // bajada en la cabeza del tramo `${pilar}@${k}`
@@ -255,6 +287,7 @@ export function bajadaTributaria(f: ModeloFisico, casos: ReadonlySet<string>, ep
         cargaEnPlanta(c, losasEn(pl), panosEn(pl), enCeldas, muestrear, (q, F) => dar(cercano(q), F), f);
       }
       for (const a of apeados.get(k) ?? []) dar(cercano(a.p), a.F);
+      for (const a of extremos.get(pl) ?? []) dar(cercano(a.p), a.F);
     }
     // Bajada en la cabeza de cada tramo con su cabeza en k
     for (const p of f.pilares ?? []) {

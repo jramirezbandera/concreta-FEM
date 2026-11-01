@@ -294,8 +294,34 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
       if (x.nu > U.axilReducido) ax.aviso(`El pilar ${p.id} bajo la planta ${x.planta} tiene ν = ${num(x.nu)} (Nd = ${num(x.Nd)} kN con ${x.comb}; más de ${num(U.axilReducido)}): ¿la sección es pequeña o le llega más carga de la debida?`, [p.id, x.planta], { nu: x.nu, Nd: x.Nd });
     }
 
+  // ─── Barras sólo a tracción (fase BN, CB-e opción a) ──────────────────────────────────────────
+  // Se calculan lineales, con las dos diagonales de una cruz activas: si alguna queda comprimida en
+  // una combinación (la de esfuerzos de ELU o, sin acciones, cada caso), no es lo que se declaró
+  const traccion = (f.barras ?? []).filter((b) => b.soloTraccion);
+  const ct = new Registro("barra/compresion", "Barras declaradas sólo a tracción, comprimidas", `N < 0 en alguna combinación (${cjAxil?.descripcion ?? "cada caso"})`);
+  if (traccion.length) {
+    const cj = cjAxil ?? conjunto(q, { tipo: "casos" });
+    for (const b of traccion) {
+      let peor: { N: number; comb: string } | null = null;
+      cj?.factores.forEach((fa, kc) => {
+        const d = q.diagrama(b.id, fa);
+        if (!d.valido) return;
+        for (const e of d.valor) for (const N of [e.izquierda[0]!, e.derecha[0]!]) if (!peor || N < peor.N) peor = { N, comb: cj.nombres[kc]! };
+      });
+      const x = peor as { N: number; comb: string } | null;
+      if (!x) continue;
+      ct.peor(-x.N, `${b.id}: ${num(x.N)} kN`);
+      if (x.N < -1e-6)
+        ct.aviso(
+          `La barra ${b.id}, declarada sólo a tracción, está comprimida con ${x.comb} (N = ${num(x.N)} kN). El cálculo es lineal (en una cruz, con las dos diagonales activas): si no resiste compresión, el reparto real es otro y las piezas a las que llega llevan más de lo calculado. Dimensiónela también a compresión o compruebe el modelo sin ella en esa combinación.`,
+          [b.id],
+          { N: x.N, comb: x.comb },
+        );
+    }
+  }
+
   return {
-    comprobaciones: [trib, ev, el, fl, de, ax].map((r) => r.c),
+    comprobaciones: [trib, ev, el, fl, de, ax, ...(traccion.length ? [ct] : [])].map((r) => r.c),
     gravedad: grav,
     combinaciones: { flechas: cjFlechas?.descripcion ?? "ninguna", desplomes: cjDesplome?.descripcion ?? "ninguna", axil: cjAxil?.descripcion ?? "ninguna" },
     tributaria: comparados,

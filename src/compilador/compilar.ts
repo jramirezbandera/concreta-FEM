@@ -465,7 +465,7 @@ function avisarDintelesEnDiafragma(ctx: Contexto, diag: Diagnosticos): void {
       const canto = ctx.cotas[k]! - techo;
       diag.aviso(
         "muro/dintel-en-diafragma",
-        `El dintel sobre el hueco ${nh + 1} del muro ${m.muro.id} (${luz.toFixed(2)} m de luz y ${canto.toFixed(2)} m de canto) entra en el diafragma rígido de la planta ${planta}, que no tiene losa que lo coaccione: el diafragma impide que su fibra superior se alargue y rigidiza el muro acoplado (un 7 % con dinteles de 1,5 m y un 35 % con los de 6 m en ETABS 15, E6-3). Para el sismo, contraste con diafragma "ninguno" en esa planta (C3-d).`,
+        `El dintel sobre el hueco ${nh + 1} del muro ${m.muro.id} (${luz.toFixed(2)} m de luz y ${canto.toFixed(2)} m de canto) entra en el diafragma rígido de la planta ${planta}, que no tiene losa que lo coaccione: el diafragma impide que su fibra superior se alargue y rigidiza el muro acoplado (un 7 % con dinteles de 1,5 m y un 35 % con los de 6 m en los modelos de contraste). Para el sismo, contraste con diafragma "ninguno" en esa planta.`,
         [m.muro.id, planta],
         { luz, canto },
       );

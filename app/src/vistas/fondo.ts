@@ -189,7 +189,7 @@ export function iconoEjes(ctx: CanvasRenderingContext2D, x: number, y: number, e
     ctx.lineTo(ex - dx * 6 - nx * 3.5, ey - dy * 6 - ny * 3.5);
     ctx.stroke();
     if (!nombre) return;
-    ctx.font = `600 10px Geist, "Segoe UI", system-ui, sans-serif`;
+    ctx.font = `600 10px "Geist Sans", "Segoe UI", system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.lineWidth = 3;
@@ -298,7 +298,7 @@ export class Suelo3D {
     const c = COLORES_EJES[tema];
     ctx.save();
     ctx.globalAlpha = tenue ? 0.5 : 0.85;
-    ctx.font = `600 10px Geist, "Segoe UI", system-ui, sans-serif`;
+    ctx.font = `600 10px "Geist Sans", "Segoe UI", system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.lineJoin = "round";

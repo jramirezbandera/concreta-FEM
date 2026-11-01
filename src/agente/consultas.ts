@@ -583,8 +583,25 @@ export function pieza(q: Consultas, conjunto: ConjuntoCombinaciones, id: string 
     const tramos: TramoEnvolvente[] = r.valor.map((t) => ({ planta: t.planta, seccion: t.seccion, longitud: t.longitud, base: extremo(t.base.esfuerzos), cabeza: extremo(t.cabeza.esfuerzos) }));
     return si({ pieza: id, tipo: "pilar", combinaciones: conjunto.descripcion, tramos }, r.diagnosticos);
   }
+  if (q.fisico.barras?.some((b) => b.id === id)) {
+    // Fase BN: los extremos a lo largo de la barra, desde su inicio (sin vanos)
+    const extremos: Record<string, Extremo> = {};
+    for (let kc = 0; kc < conjunto.factores.length; kc++) {
+      const d = q.diagrama(id, conjunto.factores[kc]!);
+      if (!d.valido) return d;
+      for (const e of d.valor)
+        for (const lado of [e.izquierda, e.derecha])
+          for (const nombre of EXTREMOS.barra) {
+            const v = lado[COMPONENTES.indexOf(nombre.replace(/[+-]$/, "") as (typeof COMPONENTES)[number])]!;
+            if (mejora(nombre, extremos[nombre], v)) extremos[nombre] = { v, s: e.s, comb: conjunto.nombres[kc]! };
+          }
+    }
+    const bs = q.mapeo.piezas[id] ?? [];
+    const longitud = bs.length ? q.mapeo.barras[bs[bs.length - 1]!]!.s[3] : 0;
+    return si({ pieza: id, tipo: "barra", combinaciones: conjunto.descripcion, longitud, extremos });
+  }
   const v = q.viga(id);
-  if (!v.valido) return no("consulta/no-existe", `No hay ninguna pieza ${id} (ni pilar, ni viga, ni vigueta).`, [id]);
+  if (!v.valido) return no("consulta/no-existe", `No hay ninguna pieza ${id} (ni pilar, ni viga, ni vigueta, ni barra).`, [id]);
   const vanos: VanoEnvolvente[] = [];
   for (let i = 0; i < v.valor.vanos.length; i++) {
     const va = v.valor.vanos[i]!;

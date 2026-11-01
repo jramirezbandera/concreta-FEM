@@ -181,12 +181,12 @@ export function combinacionEn(r: ResultadosRender, t: TramoFlexible, conjunto: C
 
 /** Una viga o una vigueta en el plano de un diafragma rígido: su axil no tiene valor (C1-d) y no se dibuja. */
 export function axilSinValor(r: ResultadosRender, tr: TramoEspacio): boolean {
-  if (tr.tipo === "pilar") return false;
+  if (tr.tipo !== "viga" && tr.tipo !== "vigueta") return false;
   const v = r.q.viga(tr.pieza);
   return v.valido && v.valor.axilSinValor;
 }
 
-/** Las piezas con diagrama (vigas, viguetas y pilares), por id. */
+/** Las piezas con diagrama (vigas, viguetas, pilares y barras), por id. */
 export function piezasConDiagrama(r: ResultadosRender): string[] {
   return Object.keys(r.c.mapeo.piezas).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }

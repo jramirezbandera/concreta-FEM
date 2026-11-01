@@ -203,6 +203,8 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
     parrafo(
       `Caso ${pp.caso}. Lo esperado es Σ V·γ por tipo de pieza (losas y paños con su pp), calculado sin la malla, menos los solapes que el compilador no cuenta dos veces (C2-g y C3-g, estimados por la huella de las vigas y los muros dentro de las losas). Lo calculado es el caso de peso propio compilado sin las demás cargas. kN.`,
     );
+    // Fase BN: la columna de las barras, sólo si el modelo tiene alguna
+    const conBarras = pp.total.barras !== undefined;
     const filas = [...pp.plantas.filter((x) => x.esperado || x.calculado), { ...pp.total, planta: "Total" }].map((x) => [
       x.planta,
       kN(x.pilares),
@@ -210,12 +212,18 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
       kN(x.losas),
       kN(x.panos),
       kN(x.muros),
+      ...(conBarras ? [kN(x.barras ?? 0)] : []),
       kN(-x.solapes),
       kN(x.esperado),
       x.calculado === null ? "—" : kN(x.calculado),
       x.calculado === null || !(x.esperado || x.calculado) ? "—" : `${num(((x.calculado - x.esperado) / Math.max(x.esperado, x.calculado)) * 100, 2)} %`,
     ]);
-    b.push({ tipo: "tabla", cabecera: ["Planta", "Pilares", "Vigas", "Losas", "Paños", "Muros", "Solapes", "Esperado", "Calculado", "Diferencia"], numericas: [1, 2, 3, 4, 5, 6, 7, 8, 9], filas });
+    b.push({
+      tipo: "tabla",
+      cabecera: ["Planta", "Pilares", "Vigas", "Losas", "Paños", "Muros", ...(conBarras ? ["Barras"] : []), "Solapes", "Esperado", "Calculado", "Diferencia"],
+      numericas: conBarras ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      filas,
+    });
   }
 
   // ─── Bajada tributaria ─────────────────────────────────────────────────────────────────────

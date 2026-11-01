@@ -17,6 +17,7 @@ import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type PuntoEn
 import { estadoFirma, leerFirmas, revisar, type EstadoFirma } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion } from "../agente/sensatez.ts";
+import { puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { proponerEjes } from "../compilador/ejes.ts";
 import { sha256 } from "../compilador/huella.ts";
@@ -56,6 +57,7 @@ const LISTAS = [
   ["plantas", "planta"],
   ["pilares", "pilar"],
   ["vigas", "viga"],
+  ["barras", "barra"],
   ["losas", "losa"],
   ["panos", "paño"],
   ["muros", "muro"],
@@ -188,14 +190,15 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
 
 export interface PiezaListada {
   id: string;
-  tipo: "viga" | "vigueta";
+  /** Una barra entre dos niveles (fase BN) sale en las plantas de sus dos extremos. */
+  tipo: "viga" | "vigueta" | "barra";
   /** Paño de una vigueta. */
   pano?: string;
   seccion?: string;
   longitud: number;
 }
 
-/** Vigas y viguetas de una planta (las viguetas, de los paños, con su pieza del compilador). */
+/** Vigas, viguetas y barras de una planta (las viguetas, de los paños, con su pieza del compilador). */
 export function piezasPlanta(s: Sesion, planta: string): PiezaListada[] {
   const f = s.proyecto.modelo;
   const r: PiezaListada[] = [];
@@ -209,13 +212,18 @@ export function piezasPlanta(s: Sesion, planta: string): PiezaListada[] {
         const L = bs.length ? c!.mapeo.barras[bs[bs.length - 1]!]!.s[3] : 0;
         r.push({ id, tipo: "vigueta", pano: p.id, longitud: L });
       }
+  for (const b of f.barras ?? []) {
+    if (b.inicio.planta !== planta && b.fin.planta !== planta) continue;
+    const AB = puntosBarra(f.plantas, b);
+    r.push({ id: b.id, tipo: "barra", seccion: b.seccion, longitud: AB ? Math.hypot(AB[1][0] - AB[0][0], AB[1][1] - AB[0][1], AB[1][2] - AB[0][2]) : 0 });
+  }
   return r;
 }
 
 export interface DatosViga {
   id: string;
-  /** Desde I4, también un pilar: su envolvente a lo largo de su altura, desde su base. */
-  tipo: "viga" | "vigueta" | "pilar";
+  /** Desde I4, también un pilar: su envolvente a lo largo de su altura, desde su base; y una barra (fase BN), desde su inicio. */
+  tipo: "viga" | "vigueta" | "pilar" | "barra";
   esfuerzo: Esfuerzo;
   combinaciones: Combinaciones;
   /** Longitud de la pieza (estación final), m. */
@@ -228,7 +236,7 @@ export interface DatosViga {
   vanos: VanoEnvolvente[];
   /** Tramos flexibles: fuera de ellos (las zonas rígidas, dentro de los apoyos) no hay esfuerzos. */
   flexibles: [number, number][];
-  /** En un pilar: la estación de cada planta que atraviesa (la de su base, 0). */
+  /** En un pilar: la estación de cada planta que atraviesa (la de su base, 0); en una barra, las de sus dos extremos. */
   plantas?: { planta: string; s: number }[];
 }
 
@@ -239,6 +247,32 @@ export function datosViga(s: Sesion, id: string, esfuerzo: Esfuerzo, e: Eleccion
   const conj = s.conjunto(e, "esfuerzos");
   if (!conj.valido) return conj;
   if (q.fisico.pilares?.some((p) => p.id === id)) return datosPilarAlzado(s, id, esfuerzo, conj.valor);
+  const barra = q.fisico.barras?.find((b) => b.id === id);
+  if (barra) {
+    // Fase BN: su envolvente desde el inicio, con las plantas de sus extremos
+    const bs = s.compilado!.mapeo.piezas[id] ?? [];
+    if (!bs.length) return no("visor/objeto", `${id} no tiene barras.`);
+    const L = s.compilado!.mapeo.barras[bs[0]!]!.s[3];
+    return {
+      valido: true,
+      valor: {
+        id,
+        tipo: "barra",
+        esfuerzo,
+        combinaciones: resumenConjunto(conj.valor),
+        longitud: L,
+        apoyos: [],
+        axilSinValor: false,
+        envolvente: envolventePieza(rr, id, conj.valor, COMPONENTE[esfuerzo]),
+        vanos: [],
+        flexibles: rr.ep.tramos(id).map((t) => [t.s0, t.s1]),
+        plantas: [
+          { planta: barra.inicio.planta, s: 0 },
+          { planta: barra.fin.planta, s: L },
+        ],
+      },
+    };
+  }
   const v = q.viga(id);
   if (!v.valido) return v;
   const p = pieza(q, conj.valor, id);

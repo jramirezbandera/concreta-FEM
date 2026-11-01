@@ -219,6 +219,13 @@ export class Motor {
     });
     this.ro.observe(contenedor);
     this.medir();
+    // El lienzo no pide la fuente: hasta que llega se mide y se pinta con la de reserva
+    void Promise.all([fuente(11, false), fuente(11, true)].map((f) => document.fonts?.load(f)))
+      .then(() => {
+        this.medidas.clear();
+        this.pintar();
+      })
+      .catch(() => {});
   }
 
   get entorno(): Entorno {
@@ -433,7 +440,9 @@ export class Motor {
   }
 }
 
-export const fuente = (tam: number, negrita: boolean) => `${negrita ? 600 : 400} ${tam}px Geist, "Segoe UI", system-ui, sans-serif`;
+/** La familia es la de la `@font-face` de index.css («Geist Sans»): con «Geist» todo caía a la de reserva. */
+export const FAMILIA_LIENZO = `"Geist Sans", "Segoe UI", system-ui, sans-serif`;
+export const fuente = (tam: number, negrita: boolean) => `${negrita ? 600 : 400} ${tam}px ${FAMILIA_LIENZO}`;
 
 /** Un texto con halo del color del fondo, para que se lea sobre cualquier cosa. */
 export function textoConHalo(ctx: CanvasRenderingContext2D, t: string, x: number, y: number, color: string, halo: string): void {

@@ -1195,7 +1195,7 @@ function cotaTemporal(ctx: CanvasRenderingContext2D, k: CotaTemporal, aPx: (q: V
   ctx.stroke();
   // El número, centrado en la cota
   const texto = k.texto;
-  ctx.font = `${k.activa || k.fija ? 600 : 400} 11px Geist, system-ui, sans-serif`;
+  ctx.font = `${k.activa || k.fija ? 600 : 400} 11px "Geist Sans", "Segoe UI", system-ui, sans-serif`;
   const w = ctx.measureText(texto).width + 8;
   const h = 16;
   // Centrada en la cota; si no cabe en ella, por fuera, más allá de la referencia

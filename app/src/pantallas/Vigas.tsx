@@ -45,8 +45,9 @@ function PlantaDiagramas({ planta, vista, id, cargando }: { planta: string; vist
     if (!proyecto.cliente) return;
     const r = await proyecto.cliente.pedir({ tipo: "elegir", fuente, punto: p, radio });
     const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
-    // Sólo las piezas con diagrama: vigas y viguetas
-    if (o && ((proyecto.edicion?.proyecto.modelo.vigas ?? []).some((v) => v.id === o) || o.includes(":v") || !proyecto.edicion)) setSeleccion(o);
+    // Sólo las piezas con diagrama: vigas, viguetas y barras
+    const m = proyecto.edicion?.proyecto.modelo;
+    if (o && ((m?.vigas ?? []).some((v) => v.id === o) || (m?.barras ?? []).some((b) => b.id === o) || o.includes(":v") || !proyecto.edicion)) setSeleccion(o);
   };
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : escena.diagnosticos ? <Aviso tono="fail">{escena.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !escena.datos && escena.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
   return <Fuente2D escena={proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={escena.cargando || cargando} />;
@@ -62,8 +63,8 @@ const ESFUERZOS: { id: Esfuerzo; unidad: string; abajo: boolean; plano: Esfuerzo
 ];
 
 const PIEZAS: { id: PiezasDiagrama; nombre: string }[] = [
-  { id: "todas", nombre: "Vigas y pilares" },
-  { id: "vigas", nombre: "Vigas" },
+  { id: "todas", nombre: "Vigas, barras y pilares" },
+  { id: "vigas", nombre: "Vigas y barras" },
   { id: "pilares", nombre: "Pilares" },
 ];
 const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
@@ -146,8 +147,8 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
     if (v.esfuerzo === "Vz" && ex.Vz) r.push({ s: ex.Vz.s!, v: ex.Vz.v, comb: ex.Vz.comb });
     return r;
   });
-  // En un pilar no hay vanos: su máximo y su mínimo
-  if (v.tipo === "pilar" && v.envolvente.length) {
+  // En un pilar o en una barra no hay vanos: su máximo y su mínimo
+  if ((v.tipo === "pilar" || v.tipo === "barra") && v.envolvente.length) {
     const mx = v.envolvente.reduce((a, b) => (b.max > a.max ? b : a));
     const mn = v.envolvente.reduce((a, b) => (b.min < a.min ? b : a));
     if (mx.max > 0) todos.push({ s: mx.s, v: mx.max, comb: "" });
@@ -169,9 +170,10 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
           <i className="inline-block h-[3px] w-4 bg-[var(--color-env-min)]" /> mínimo
         </span>
         <span className="flex items-center gap-1">
-          <i className="inline-block h-[10px] w-4 bg-bg-elevated" /> {v.tipo === "pilar" ? "planta (zona rígida)" : "apoyo (zona rígida)"}
+          <i className="inline-block h-[10px] w-4 bg-bg-elevated" /> {v.tipo === "pilar" ? "planta (zona rígida)" : v.tipo === "barra" ? "zona rígida" : "apoyo (zona rígida)"}
         </span>
         {v.tipo === "pilar" && <span>desde la base, hacia arriba a la derecha</span>}
+        {v.tipo === "barra" && <span>desde su inicio</span>}
         {v.esfuerzo === "My" && <span>positivo hacia abajo (tracciones)</span>}
       </div>
       <svg width={w} height={H} role="img" aria-label={`Envolvente de ${v.esfuerzo} de ${v.id}`}
@@ -331,7 +333,7 @@ export function ModoDiagramas() {
   const lista = piezas.datos ?? [];
   // Cualquier viga, vigueta o pilar elegido (en el 3D o en un alzado), de cualquier planta
   const obj = usePedido(proyecto.cliente, seleccion && !lista.some((p) => p.id === seleccion) ? { tipo: "objeto", id: seleccion } : null);
-  const otra = obj.datos?.id === seleccion && ["viga", "vigueta", "pilar"].includes(obj.datos.tipo) ? seleccion : null;
+  const otra = obj.datos?.id === seleccion && ["viga", "vigueta", "pilar", "barra"].includes(obj.datos.tipo) ? seleccion : null;
   const id = lista.some((p) => p.id === seleccion) ? seleccion! : (otra ?? lista.find((p) => p.tipo === "viga")?.id ?? lista[0]?.id ?? null);
   const vista: VistaPlanta = esfuerzo === "My" || esfuerzo === "Vz" ? { vista: "vigas", esfuerzo, combinaciones: eleccion } : { vista: "modelo" };
   const viga = usePedido(proyecto.cliente, id ? { tipo: "viga", id, esfuerzo, combinaciones: eleccion } : null);
@@ -354,7 +356,10 @@ export function ModoDiagramas() {
   const unidad = ESFUERZOS.find((x) => x.id === esfuerzo)!.unidad;
   const grupos = useMemo(() => {
     const g = new Map<string, typeof lista>();
-    for (const p of lista) g.set(p.pano ?? "Vigas", [...(g.get(p.pano ?? "Vigas") ?? []), p]);
+    for (const p of lista) {
+      const k = p.pano ?? (p.tipo === "barra" ? "Barras" : "Vigas");
+      g.set(k, [...(g.get(k) ?? []), p]);
+    }
     return [...g];
   }, [lista]);
 
@@ -378,7 +383,7 @@ export function ModoDiagramas() {
   const navegador = (
     <>
       {grupos.map(([g, ps]) => (
-        <Seccion key={g} titulo={g === "Vigas" ? `Vigas de ${planta}` : `Viguetas del paño ${g}`} valor={ps.length}>
+        <Seccion key={g} titulo={g === "Vigas" ? `Vigas de ${planta}` : g === "Barras" ? `Barras que llegan a ${planta}` : `Viguetas del paño ${g}`} valor={ps.length}>
           {ps.map((p) => (
             <button key={p.id} type="button" className="lista-fila" data-on={p.id === id} style={{ gridTemplateColumns: "1fr auto auto" }} onClick={() => setSeleccion(p.id)}>
               <span className="mono truncate">{p.id}</span>
@@ -388,7 +393,7 @@ export function ModoDiagramas() {
           ))}
         </Seccion>
       ))}
-      {!lista.length && !piezas.cargando && <p className="nota">La planta no tiene vigas ni viguetas.</p>}
+      {!lista.length && !piezas.cargando && <p className="nota">La planta no tiene vigas, viguetas ni barras.</p>}
     </>
   );
 
@@ -438,18 +443,18 @@ export function ModoDiagramas() {
 
   const propiedades = (
     <>
-        {!v && <Cabecera icono={IcDiagramas} tipo="Diagramas" titulo="Ninguna pieza elegida" detalle="Elija una viga, una vigueta o un pilar en una vista o en el navegador." />}
+        {!v && <Cabecera icono={IcDiagramas} tipo="Diagramas" titulo="Ninguna pieza elegida" detalle="Elija una viga, una vigueta, un pilar o una barra en una vista o en el navegador." />}
         {viga.diagnosticos && <p className="nota text-state-fail">{viga.diagnosticos.map((x) => x.mensaje).join(" ")}</p>}
         {v && (
           <>
             <Cabecera
               icono={v.tipo === "pilar" ? IcPilar : IcViga}
-              tipo={v.tipo === "vigueta" ? "Vigueta" : v.tipo === "pilar" ? "Pilar" : "Viga"}
+              tipo={v.tipo === "vigueta" ? "Vigueta" : v.tipo === "pilar" ? "Pilar" : v.tipo === "barra" ? "Barra" : "Viga"}
               titulo={v.id}
               mono
               detalle={
                 <>
-                  {v.tipo === "pilar" ? `${fmt(v.longitud, 2)} m · ${(v.plantas ?? []).map((p) => p.planta).join(", ")}` : `${fmt(v.longitud, 2)} m · ${v.vanos.length} vano${v.vanos.length === 1 ? "" : "s"} · apoyos ${v.apoyos.map((a) => a.objeto).join(", ") || "—"}`}
+                  {v.tipo === "pilar" ? `${fmt(v.longitud, 2)} m · ${(v.plantas ?? []).map((p) => p.planta).join(", ")}` : v.tipo === "barra" ? `${fmt(v.longitud, 2)} m · de ${v.plantas?.[0]?.planta ?? "—"} a ${v.plantas?.[1]?.planta ?? "—"}` : `${fmt(v.longitud, 2)} m · ${v.vanos.length} vano${v.vanos.length === 1 ? "" : "s"} · apoyos ${v.apoyos.map((a) => a.objeto).join(", ") || "—"}`}
                   {v.axilSinValor && <div className="mt-1">Axil sin valor: está en el plano de un diafragma rígido (C1-d).</div>}
                 </>
               }

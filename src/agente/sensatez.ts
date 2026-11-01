@@ -17,7 +17,10 @@
  */
 import { compilar } from "../compilador/compilar.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
+import { puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
+import { cuerdaHuella, distanciaAHuella, huellaPilar } from "../compilador/geometria2d.ts";
+import { compilarSeccion } from "../compilador/secciones.ts";
 import type { CargaFisica, CasoFisico, Losa, Material, ModeloFisico, OpcionesCompilacion, PanoUnidireccional, Seccion, Vec2 } from "../compilador/fisico.ts";
 import { ppLosa as ppLosaFisica, ppPano } from "../compilador/pesoForjado.ts";
 import { areaConSigno, momentosInterseccion, puntoEnRegion, recorteRegionConvexo, type Region } from "../compilador/poligonos.ts";
@@ -38,6 +41,8 @@ export const UMBRALES = {
   dimension: [0.1, 3],
   /** bw y hf de una T, m. */
   dimensionFina: [0.03, 3],
+  /** b, h o D de una sección que sólo usan barras entre dos niveles (fase BN: redondos y perfiles de arriostramiento), m. */
+  dimensionBarra: [0.01, 3],
   /** fck, MPa. */
   fck: [12, 100],
   /** E de un material general, kN/m². */
@@ -267,27 +272,35 @@ function datos(f: ModeloFisico): Registro[] {
     if (fuera(x.espesor, U.espesor)) esp.aviso(`El ${que} ${x.id} tiene ${num(x.espesor)} m de espesor (${rango(U.espesor, "m")}): ¿está en cm?`, [x.id], { valor: x.espesor });
   }
 
-  const sec = new Registro("sensatez/seccion", "Dimensiones de las secciones", `${rango(U.dimension, "m")} (bw y hf de una T, ${rango(U.dimensionFina, "m")})`);
+  const sec = new Registro(
+    "sensatez/seccion",
+    "Dimensiones de las secciones",
+    `${rango(U.dimension, "m")} (bw y hf de una T, ${rango(U.dimensionFina, "m")}${f.barras?.length ? `; las que sólo usan barras, ${rango(U.dimensionBarra, "m")}` : ""})`,
+  );
+  // Fase BN: las secciones que sólo usan barras entre dos niveles admiten redondos y perfiles finos
+  const deOtras = new Set([...(f.pilares ?? []).flatMap((p) => [p.seccion, ...(p.tramos ?? []).map((t) => t.seccion)]), ...(f.vigas ?? []).map((v) => v.seccion), ...(f.panos ?? []).map((p) => p.seccion)]);
+  const deBarras = new Set((f.barras ?? []).map((b) => b.seccion).filter((id) => !deOtras.has(id)));
   for (const s of f.secciones) {
+    const D = deBarras.has(s.id) ? U.dimensionBarra : U.dimension;
     const dims: [string, number, readonly [number, number]][] =
       s.forma === "rectangular"
         ? [
-            ["b", s.b, U.dimension],
-            ["h", s.h, U.dimension],
+            ["b", s.b, D],
+            ["h", s.h, D],
           ]
         : s.forma === "circular"
-          ? [["D", s.D, U.dimension]]
+          ? [["D", s.D, D]]
           : s.forma === "T"
             ? [
-                ["bf", s.bf, U.dimension],
-                ["h", s.h, U.dimension],
+                ["bf", s.bf, D],
+                ["h", s.h, D],
                 ["bw", s.bw, U.dimensionFina],
                 ["hf", s.hf, U.dimensionFina],
               ]
             : s.forma === "general"
               ? ([
-                  ["b", s.b, U.dimension],
-                  ["h", s.h, U.dimension],
+                  ["b", s.b, D],
+                  ["h", s.h, D],
                 ].filter((d) => d[1] !== undefined) as [string, number, readonly [number, number]][])
               : [];
     for (const [nombre, v, r] of dims) {
@@ -499,6 +512,8 @@ export interface PesoPropioPlanta {
   losas: number;
   panos: number;
   muros: number;
+  /** Fase BN: las barras entre dos niveles, enteras en la planta de su extremo alto (sólo si el modelo tiene alguna). */
+  barras?: number;
   /** Lo que el compilador no cuenta dos veces (C2-g, C3-g), estimado aparte, kN. */
   solapes: number;
   esperado: number;
@@ -578,12 +593,15 @@ export function pesoLibre(f: ModeloFisico, planta: string, q: Vec2, h: number, g
  * los paños, menos los solapes que el compilador descuenta (C2-g: una viga rectangular de
  * hormigón bajo una losa o un paño no pesa lo que su ancho ya pesa como forjado, AU-4; C3-g: el muro, menos su solape con
  * las losas, la mitad por cada lado de la planta al que llega). Estos se estiman por la huella de
- * la pieza (su eje con su ancho) dentro de las losas. El pilar no descuenta su solape (A-9).
+ * la pieza (su eje con su ancho) dentro de las losas. El pilar no descuenta su solape (A-9). Una barra
+ * entre dos niveles (fase BN) pesa γ·A por su longitud real, en la planta de su extremo alto salvo su
+ * zona rígida en el extremo bajo (CB-f, la que el compilador lleva al nudo de esa planta).
  */
 export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05): Omit<PesoPropioPlanta, "calculado">[] {
   const material = new Map(f.materiales.map((m) => [m.id, m]));
   const seccion = new Map(f.secciones.map((s) => [s.id, s]));
-  const r = new Map(P.ids.map((id) => [id, { planta: id, pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, solapes: 0, esperado: 0 }]));
+  const conBarras = !!f.barras?.length;
+  const r = new Map(P.ids.map((id) => [id, { planta: id, pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, ...(conBarras ? { barras: 0 } : {}), solapes: 0, esperado: 0 } as Omit<PesoPropioPlanta, "calculado">]));
   const pesoSeccion = (id: string) => {
     const s = seccion.get(id);
     const m = s && material.get(s.material);
@@ -659,8 +677,51 @@ export function pesoPropioEsperado(f: ModeloFisico, P: Plantas, eps = 0.05): Omi
         for (const t of tramos(m.puntos)) r.get(P.ids[k]!)!.solapes += momentosInterseccion(regionDe(l), huellaTramo(t, m.espesor)).A * l.espesor * gammaMaterial(mat) * lados;
     }
   }
-  for (const x of r.values()) x.esperado = x.pilares + x.vigas + x.losas + x.panos + x.muros - x.solapes;
+  for (const b of f.barras ?? []) {
+    const w = pesoSeccion(b.seccion);
+    const AB = puntosBarra(f.plantas, b);
+    const [ki, kf] = [P.indice.get(b.inicio.planta), P.indice.get(b.fin.planta)];
+    if (!w || !AB || ki === undefined || kf === undefined) continue;
+    const L = Math.hypot(AB[1][0] - AB[0][0], AB[1][1] - AB[0][1], AB[1][2] - AB[0][2]);
+    // La zona rígida del extremo bajo (si lo hay), a su planta
+    const bajo = ki === kf ? 0 : zonaRigidaBarra(f, ki > kf ? AB[0] : AB[1], ki > kf ? AB[1] : AB[0], Math.max(ki, kf), eps);
+    r.get(P.ids[Math.min(ki, kf)]!)!.barras! += w.w * (L - bajo);
+    r.get(P.ids[Math.max(ki, kf)]!)!.barras! += w.w * bajo;
+  }
+  for (const x of r.values()) x.esperado = x.pilares + x.vigas + x.losas + x.panos + x.muros + (x.barras ?? 0) - x.solapes;
   return [...r.values()];
+}
+
+/**
+ * Lo que una barra recorre en la huella del pilar de hormigón al que llega en X (CB-f), desde X hacia
+ * Y, m: la zona rígida del compilador (`piezas.ts`), con la huella del nudo de la planta k.
+ */
+function zonaRigidaBarra(f: ModeloFisico, X: readonly number[], Y: readonly number[], k: number, eps: number): number {
+  const L = Math.hypot(Y[0]! - X[0]!, Y[1]! - X[1]!, Y[2]! - X[2]!);
+  const h = Math.hypot(Y[0]! - X[0]!, Y[1]! - X[1]!) / L;
+  if (!(h > 1e-9)) return 0;
+  const ids = f.plantas.map((p) => p.id);
+  const Q: Vec2 = [X[0]!, X[1]!];
+  let mejor: { d: number; huella: ReturnType<typeof huellaPilar>; hormigon: boolean } | null = null;
+  for (const p of f.pilares ?? []) {
+    const [kb, kh] = [ids.indexOf(p.desde), ids.indexOf(p.hasta)];
+    if (!(k >= kh && k <= kb)) continue;
+    // El tramo del nudo: el de debajo o, en la planta de su base, el de encima
+    const kt = k < kb ? k : k - 1;
+    const sec = f.secciones.find((x) => x.id === (p.tramos?.find((t) => t.planta === ids[kt])?.seccion ?? p.seccion));
+    const mat = sec && f.materiales.find((m) => m.id === sec.material);
+    if (!sec || !mat) continue;
+    const forma = compilarSeccion(sec, mat, true).huella;
+    if (!forma) continue;
+    const [cx, cy] = ejeSeccion(p, sec);
+    const huella = huellaPilar(cx, cy, p.giro ?? 0, forma);
+    const d = distanciaAHuella(Q, huella);
+    if (d <= eps && (!mejor || d < mejor.d)) mejor = { d, huella, hormigon: mat.tipo === "hormigon" };
+  }
+  if (!mejor?.hormigon) return 0;
+  const u: Vec2 = [(Y[0]! - X[0]!) / (L * h), (Y[1]! - X[1]!) / (L * h)];
+  const cu = cuerdaHuella(Q, u, mejor.huella, 1e-6);
+  return cu ? Math.max(0, cu[1]) / h : 0;
 }
 
 /**
@@ -701,9 +762,11 @@ function pesoPropio(f: ModeloFisico, P: Plantas, opciones: OpcionesCompilacion |
   if (!caso) return { registro: reg, desglose: null };
   const calc = pesoPropioCalculado(f, opciones);
   const plantas: PesoPropioPlanta[] = pesoPropioEsperado(f, P, opciones?.epsSnap).map((x) => ({ ...x, calculado: calc ? (calc.get(x.planta) ?? 0) : null }));
-  const total = { pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, solapes: 0, esperado: 0, calculado: calc ? 0 : null } as DesglosePesoPropio["total"];
-  for (const x of plantas)
+  const total = { pilares: 0, vigas: 0, losas: 0, panos: 0, muros: 0, ...(f.barras?.length ? { barras: 0 } : {}), solapes: 0, esperado: 0, calculado: calc ? 0 : null } as DesglosePesoPropio["total"];
+  for (const x of plantas) {
     for (const k of ["pilares", "vigas", "losas", "panos", "muros", "solapes", "esperado"] as const) total[k] += x[k];
+    if (total.barras !== undefined) total.barras += x.barras ?? 0;
+  }
   if (calc) total.calculado = plantas.reduce((s, x) => s + x.calculado!, 0);
   for (const x of [...plantas, { ...total, planta: "total" }]) {
     if (x.calculado === null || !(x.esperado > 0 || x.calculado > 0)) continue;

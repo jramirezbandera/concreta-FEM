@@ -395,7 +395,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
                       ]
                     : []
                 }
-                nota={props ? "Las que usa el cálculo (compilarSeccion), con las áreas de cortante de CSI." : "Complete los datos para ver sus propiedades."}
+                nota={props ? "Las que usa el cálculo, con las áreas de cortante de la sección." : "Complete los datos para ver sus propiedades."}
               />
               {actual && <p className="ges-usos">{usos.length ? `Se usa en ${textoUsos(usos)}: cambiarla los cambia a todos. Para variar sólo algunos, «Duplicar».` : "No la usa ningún objeto."}</p>}
             </div>

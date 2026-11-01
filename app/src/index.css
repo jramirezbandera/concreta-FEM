@@ -102,9 +102,15 @@ html.theme-switching *::after {
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
   --color-text-disabled: #586880;
-  --color-text-tertiary: #6b778a;
+  /* ≥ 4,5:1 sobre la superficie, el elevado y el lienzo (con #6b778a, 4,14–4,33) */
+  --color-text-tertiary: #5f6b7e;
   --color-accent: #2563eb;
   --color-accent-hover: #1d4ed8;
+  /* Texto sobre un tinte (pastillas, herramienta activa): el del estado no llega a 4,5:1 sobre su tinte */
+  --color-accent-text: #1d4ed8;
+  --color-state-ok-text: #166534;
+  --color-state-warn-text: #92400e;
+  --color-state-fail-text: #b91c1c;
   --color-btn-primary-bg: #2563eb;
   --color-btn-primary-bg-hover: #1d4ed8;
   --color-btn-primary-fg: #ffffff;
@@ -155,9 +161,13 @@ html[data-theme="dark"] {
   --color-text-primary: #fafafa;
   --color-text-secondary: #9a9ea7;
   --color-text-disabled: #8a8e99;
-  --color-text-tertiary: #7d828d;
+  --color-text-tertiary: #8b909b;
   --color-accent: #5b9bff;
   --color-accent-hover: #7db0ff;
+  --color-accent-text: #7db0ff;
+  --color-state-ok-text: #22c55e;
+  --color-state-warn-text: #f59e0b;
+  --color-state-fail-text: #f56565;
   --color-btn-primary-bg: #5b9bff;
   --color-btn-primary-bg-hover: #7db0ff;
   --color-btn-primary-fg: #0b1730;
@@ -195,15 +205,16 @@ body {
 
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-/* Cabecera de una sección: una raya encima que la separa de la anterior, nada debajo */
+/* Cabecera de una sección: una raya encima que la separa de la anterior, nada debajo. Sin
+   mayúsculas automáticas: los títulos llevan ids y unidades («Cuadro bajo CUB-S», «mm» no es «MM») */
 .sec {
   display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
   margin: 0; padding: 14px 14px 6px;
   border-top: 1px solid var(--color-border-sub);
-  font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
-  color: var(--color-text-tertiary);
+  font-size: 11.5px; font-weight: 600;
+  color: var(--color-text-secondary);
 }
-.sec > span + span { letter-spacing: 0; text-transform: none; font-weight: 400; font-size: 11px; font-family: var(--font-mono); color: var(--color-text-disabled); }
+.sec > span + span { font-weight: 400; font-size: 11px; font-family: var(--font-mono); color: var(--color-text-tertiary); }
 .panel-cuerpo > section:first-child > .sec, .panel-cuerpo > .nota:first-child + section > .sec, .dock-cuerpo > section:first-child > .sec { border-top: 0; }
 
 .fila {
@@ -279,16 +290,16 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 4px;
   font: 500 11px var(--font-mono); white-space: nowrap;
 }
-.pill.ok { background: var(--color-tint-ok); color: var(--color-state-ok); }
-.pill.warn { background: var(--color-tint-warn); color: var(--color-state-warn); }
-.pill.fail { background: var(--color-tint-fail); color: var(--color-state-fail); }
+.pill.ok { background: var(--color-tint-ok); color: var(--color-state-ok-text); }
+.pill.warn { background: var(--color-tint-warn); color: var(--color-state-warn-text); }
+.pill.fail { background: var(--color-tint-fail); color: var(--color-state-fail-text); }
 .pill.neu { background: var(--color-tint-neutral); color: var(--color-state-neutral); }
 
 /* Tabla densa */
 .tb { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .tb th {
   padding: 6px 6px 5px; border-bottom: 1px solid var(--color-border-sub);
-  font: 600 10px var(--font-sans); letter-spacing: .06em; text-transform: uppercase;
+  font: 600 11px var(--font-sans);
   color: var(--color-text-tertiary); text-align: right; white-space: nowrap; vertical-align: bottom;
 }
 .tb th:first-child, .tb td:first-child { text-align: left; padding-left: 14px; }
@@ -300,8 +311,6 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 }
 .tb td small { display: block; font-size: 10.5px; color: var(--color-text-tertiary); white-space: normal; }
 .tb tbody tr:last-child td { border-bottom: 0; }
-/* Sin mayúsculas: ν pasaría a Ν, que se lee N */
-.tb th.nu { text-transform: none; font-size: 11px; }
 .tb td.txt { font-family: var(--font-sans); white-space: normal; }
 .tb tr.max td, .tb tr[data-on="true"] td { background: var(--color-tint-accent); }
 .tb tr.clic { cursor: pointer; }
@@ -516,7 +525,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .dialogo-cuerpo { min-height: 0; overflow-y: auto; padding: 8px 20px 18px; font-size: 13px; line-height: 1.5; color: var(--color-text-primary); }
 .dialogo .pie { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--color-border-sub); background: var(--color-bg-surface); }
 /* Lo pequeño de un diálogo: etiquetas de grupo, notas y listas */
-.dlg-et { margin: 16px 0 6px; font: 600 10.5px var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary); }
+.dlg-et { margin: 16px 0 6px; font: 600 11.5px var(--font-sans); color: var(--color-text-secondary); }
 .dlg-nota { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--color-text-secondary); }
 .dlg-lista { margin: 10px 0; padding: 8px 10px; max-height: 180px; overflow-y: auto; list-style: none; border-radius: 8px; background: var(--color-bg-surface); border: 1px solid var(--color-border-sub); font: 11.5px/1.6 var(--font-mono); }
 /* Opciones excluyentes como tarjetas: toda la fila se elige, y la elegida se marca */
@@ -586,7 +595,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
   font: 11.5px var(--font-sans); color: var(--color-text-secondary); cursor: pointer; white-space: nowrap;
 }
 .herr:hover:not(:disabled) { background: var(--color-bg-elevated); color: var(--color-text-primary); }
-.herr[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent); }
+.herr[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent-text); }
 .herr:disabled { opacity: .4; cursor: default; }
 .herr-sep { width: 1px; margin: 12px 6px; flex-shrink: 0; background: var(--color-border-main); }
 .herr-campo { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 6px; flex-shrink: 0; }
@@ -676,7 +685,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
   transition: background-color .12s, border-color .12s, color .12s;
 }
 .fichas > button:hover, .dib-gdl > button:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
-.fichas > button[aria-pressed="true"], .dib-gdl > button[aria-pressed="true"] { border-color: transparent; background: var(--color-tint-accent); color: var(--color-accent); }
+.fichas > button[aria-pressed="true"], .dib-gdl > button[aria-pressed="true"] { border-color: transparent; background: var(--color-tint-accent); color: var(--color-accent-text); }
 .fichas > button:focus-visible, .dib-gdl > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); }
 .dib-gdl > button { flex: 1; padding: 0; font-family: var(--font-mono); }
 /* Fichas de ids (lo elegido): en mono y con el color del texto, porque no se encienden */
