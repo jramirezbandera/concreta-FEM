@@ -55,6 +55,9 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase }: { titulo: st
   );
 }
 
+/** Lo que otros objetos usan sin ser suyo: al borrarlo, lo natural es pasar a otro lo que lo usa. */
+const RECURSOS: ReadonlySet<string> = new Set(["secciones", "materiales", "casos"]);
+
 export function DialogoBorrar({ ids: elegidos, onCerrar }: { ids: string[]; onCerrar: (hecho?: string) => void }) {
   const { proyecto, seleccion, setSeleccion } = useVisor();
   const ed = proyecto.edicion!;
@@ -76,8 +79,17 @@ export function DialogoBorrar({ ids: elegidos, onCerrar }: { ids: string[]; onCe
     const c = idx.get(id)?.coleccion;
     return c ? lista(p.modelo, c).filter((o) => !borrados.has(o.id)).map((o) => o.id) : [];
   };
-  // Nunca en cascada por defecto: un Intro reflejo borraba todo lo que usaba lo borrado
-  const [modo, setModo] = useState<"borrar" | "reasignar" | null>(() => (usados.length && usados.every((u) => candidatos(u).length) ? "reasignar" : null));
+  // Lo de por defecto, según qué se borra (UI-5). Una sección, un material o un caso: pasar a otro lo
+  // que lo usa. Una pieza: lo que la usa (sus cargas) es suyo y va con ella; pasarlo a otra llevaría las
+  // cargas de un forjado al de otra planta. Una planta, o una mezcla: nada, que se elija. El foco va a
+  // Cancelar, así que un Intro reflejo no borra nada.
+  const [modo, setModo] = useState<"borrar" | "reasignar" | null>(() => {
+    const de = usados.map((u) => idx.get(u)?.coleccion);
+    if (!de.length) return null;
+    if (de.every((c) => c && RECURSOS.has(c)) && usados.every((u) => candidatos(u).length)) return "reasignar";
+    if (de.every((c) => c && !RECURSOS.has(c) && c !== "plantas")) return "borrar";
+    return null;
+  });
   const [destino, setDestino] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
