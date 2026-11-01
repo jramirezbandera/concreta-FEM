@@ -102,6 +102,8 @@ export interface DatosLosas {
   /** Flechas de las losas y paños de la planta (`fem consultar flechas`), con sus combinaciones. */
   flechas: FlechasLosa[];
   combinacionesFlechas: Combinaciones;
+  /** UI-24: las plantas con losas o paños, de arriba abajo (para ir a una desde una que no tiene). */
+  plantasConLosas: string[];
 }
 
 /** El propósito de las flechas: el de la elección si el mapa es de uz, si no las de desplazamientos por defecto. */
@@ -133,6 +135,7 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
       ...(env ? { envolvente: env } : {}),
       flechas: fl,
       combinacionesFlechas: resumenConjunto(cjF.valor),
+      plantasConLosas: q.fisico.plantas.map((p) => p.id).filter((id) => [...(q.fisico.losas ?? []), ...(q.fisico.panos ?? [])].some((l) => l.planta === id)),
     },
   };
 }

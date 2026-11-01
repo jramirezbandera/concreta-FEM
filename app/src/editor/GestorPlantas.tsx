@@ -137,6 +137,8 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
         titulo="Plantas"
         clase="gestor gestor-plantas"
         onCerrar={cerrarGestor}
+        // UI-39: el primer paso de una obra nueva no se cierra con un clic en el fondo
+        fondoCierra={modo !== "inicio"}
         pie={
           <>
             <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("plantas"))} title="Para cambiar muchas a la vez o pegar de Excel">

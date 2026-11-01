@@ -1,10 +1,10 @@
 /**
- * El «?» de un campo y su ayuda en un globo flotante al pasar el ratón (de la prueba de uso del
+ * El «?» de un campo y su ayuda en un globo flotante al pasar el ratón, con el foco o al tocarlo (de la prueba de uso del
  * 2026-10-28: el texto bajo el campo empujaba los demás). El globo va en `document.body` con
  * posición fija, así que no lo recorta el panel que se desplaza ni un diálogo; sale debajo del «?»
  * y, si no cabe, encima, sin salirse de la ventana.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /** Lo que tarda en salir, para que no salten globos al cruzar el panel con el ratón. */
@@ -12,7 +12,8 @@ const ESPERA_MS = 120;
 const MARGEN = 8;
 
 export function Ayuda({ texto }: { texto: string }) {
-  const ancla = useRef<HTMLElement>(null);
+  const ancla = useRef<HTMLSpanElement>(null);
+  const id = useId();
   const globo = useRef<HTMLDivElement>(null);
   const espera = useRef<number>(0);
   const [abierta, setAbierta] = useState(false);
@@ -50,23 +51,46 @@ export function Ayuda({ texto }: { texto: string }) {
 
   return (
     <>
-      <i
+      {/* UI-55: se abre también con el foco (teclado, lector de pantalla) y al tocarlo. Un <span> y no un
+          <button>: dentro de un <label>, un botón pasaría a ser el campo de la etiqueta */}
+      <span
         ref={ancla}
+        role="button"
+        tabIndex={0}
         className="campo-q"
         data-abierta={abierta || undefined}
-        aria-hidden="true"
+        aria-label="Ayuda"
+        aria-describedby={abierta ? id : undefined}
+        aria-expanded={abierta}
         onMouseEnter={() => {
           clearTimeout(espera.current);
           espera.current = window.setTimeout(() => setAbierta(true), ESPERA_MS);
         }}
         onMouseLeave={cerrar}
+        onFocus={() => setAbierta(true)}
+        onBlur={cerrar}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setAbierta((x) => !x);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && abierta) {
+            e.stopPropagation();
+            cerrar();
+          } else if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setAbierta((x) => !x);
+          }
+        }}
       >
         ?
-      </i>
+      </span>
       {abierta &&
         createPortal(
           <div
             ref={globo}
+            id={id}
             className="globo-ayuda"
             role="tooltip"
             data-arriba={pos?.arriba || undefined}

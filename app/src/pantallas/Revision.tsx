@@ -23,7 +23,7 @@ function Figura({ svg, titulo }: { svg: string; titulo: string }) {
   return (
     <figure className="my-3">
       <img src={url} alt={titulo} className="w-full rounded border border-border-sub bg-white" />
-      <figcaption className="mt-1 text-[11px] text-text-disabled">{titulo}</figcaption>
+      <figcaption className="mt-1 text-[11px] text-text-muted">{titulo}</figcaption>
     </figure>
   );
 }
@@ -124,7 +124,7 @@ export function EspacioRevision() {
           window.setTimeout(() => setCopiada(false), 1500);
         }}
       />
-      <span className="self-center px-2 text-[12px] text-text-disabled">Firmar es sólo del ingeniero, en la línea de órdenes, después de leer el informe.</span>
+      <span className="self-center px-2 text-[12px] text-text-muted">Firmar es sólo del ingeniero, en la línea de órdenes, después de leer el informe.</span>
     </>
   );
 
@@ -230,7 +230,7 @@ export function EspacioRevision() {
                 <a key={c.codigo} href={`#${ancla(x.documento.findIndex((b) => b.tipo === "titulo" && b.texto.includes(c.titulo)))}`} className="flex items-center justify-between gap-2 border-b border-border-sub px-3.5 py-1.5 text-[12px] text-text-secondary hover:bg-bg-elevated">
                   <span className="min-w-0">
                     <span className="block text-text-primary">{c.titulo}</span>
-                    {c.peor && <span className="mono block truncate text-[10.5px] text-text-disabled">peor: {c.peor}</span>}
+                    {c.peor && <span className="mono block truncate text-[10.5px] text-text-muted">peor: {c.peor}</span>}
                   </span>
                   <span className={`pill ${TONO[c.estado]}`}>{TEXTO[c.estado]}</span>
                 </a>

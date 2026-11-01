@@ -197,7 +197,8 @@ export function ModoLosas() {
       fuentes={{
         planta: (v) => (v.planta ? <PlantaLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} envolvente={envolvente} punto={punto && punto.clave === claveDe(v.planta) ? punto : null} onPunto={(p, pl) => void clic(p, pl)} dec={dec} unidad={unidad} malla={!!v.malla} /> : null),
         malla: true,
-        cabeceraPlanta: (v) => (
+        cabeceraPlanta: (v, i) => (
+          <>
           <Chip acento title={v.planta === planta ? `${x?.envolvente ? resumenComb : coma(x?.dibujada?.etiqueta ?? "")}${d.ms !== null ? ` · ${fmt(d.ms, 0)} ms` : ""}` : undefined}>
             {nombreCampo} · {unidad}
             {elegida.modo !== "completa" && ` · ${elegida.modo === "sin-picos" ? "sin picos" : "escala manual"}`}
@@ -208,6 +209,18 @@ export function ModoLosas() {
               </>
             )}
           </Chip>
+          {/* UI-24: en una planta sin losas, a cuáles ir (como en Armado) */}
+          {v.planta && x && !x.plantasConLosas.includes(v.planta) && (
+            <>
+              <Chip>Sin losas aquí</Chip>
+              {x.plantasConLosas.slice(0, 4).map((p) => (
+                <button key={p} type="button" className="chip" data-acento onClick={() => vistas.poner(i, { planta: p })}>
+                  Ir a {p}
+                </button>
+              ))}
+            </>
+          )}
+          </>
         ),
         tresD: (v) => <TresDLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} envolvente={envolvente} superficies={superficies} dec={dec} />,
         cabecera3D: () => (
@@ -256,7 +269,7 @@ export function ModoLosas() {
           {puntoValido ? (
             puntoValido.v ? (
               <div className="px-3.5 py-2">
-                <div className="mono text-[11px] text-text-disabled">
+                <div className="mono text-[11px] text-text-muted">
                   {puntoValido.v.losa} · ({fmt(puntoValido.p[0], 2)}; {fmt(puntoValido.p[1], 2)}) m
                 </div>
                 <div className="mono text-[17px] font-medium" data-valor-punto={puntoValido.v.valor}>
@@ -288,7 +301,7 @@ export function ModoLosas() {
                 <button key={i} type="button" className="lista-fila" style={{ gridTemplateColumns: "1fr auto", height: "auto", padding: "6px 14px" }} onClick={() => ex.punto && setPunto({ p: ex.punto, v: ex.punto ? { valor: ex.valor, unidad: ex.unidad, losa: ex.objeto ?? "", lamina: -1, comb: ex.comb ?? "" } : null, planta: planta!, clave })} title="Marcar el punto">
                   <span>
                     <span className="block text-text-primary">{ex.que}</span>
-                    <span className="mono text-[11px] text-text-disabled">
+                    <span className="mono text-[11px] text-text-muted">
                       {ex.objeto} · {ex.punto ? `(${fmt(ex.punto[0], 2)}; ${fmt(ex.punto[1], 2)})` : ""}
                       {x.envolvente && ex.comb ? ` · ${ex.comb}` : ""}
                     </span>

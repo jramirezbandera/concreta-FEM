@@ -127,7 +127,9 @@ export class Rejilla2D {
     const { menor, mayor, alfaMenor } = pasoRejilla(escala);
     const T = tenue ? ALFA_2D.tenue : ALFA_2D.normal;
     const f = vacia ? 1 : CON_DIBUJO;
-    const A = { menor: T.menor * f, mayor: T.mayor * f, eje: T.eje };
+    // UI-53: con algo dibujado, los ejes del origen casi no se ven: si no, teñían de rojo o de verde el
+    // eje de replanteo que pasa por x = 0 o y = 0 (el icono del origen sigue diciendo dónde está)
+    const A = { menor: T.menor * f, mayor: T.mayor * f, eje: vacia ? T.eje : Math.min(T.eje, 0.12) };
     const menores = A.menor * alfaMenor > 0.004;
     const paso = menores ? menor : mayor;
     const [i0, i1, j0, j1] = [Math.ceil(x0 / paso), Math.floor(x1 / paso), Math.ceil(y0 / paso), Math.floor(y1 / paso)];

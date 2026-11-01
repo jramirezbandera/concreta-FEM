@@ -246,7 +246,7 @@ describe("operaciones", () => {
     expect(!otra.ok && otra.errores[0]!.mensaje).toMatch(/^No hay nada que copiar\. CIM ya tiene en el mismo sitio 2 vigas, 1 losa: .* CIM ya tiene \d+ cargas iguales/);
     // Sin las cargas de CIM, las de P1 solas: van a las copias de sus piezas
     const enCim = new Set(objetosDePlanta(p.modelo, "CIM"));
-    const sinCargas = { ...p, modelo: { ...p.modelo, cargas: lista(p.modelo, "cargas").filter((c) => !enCim.has(c.id)) } };
+    const sinCargas = { ...p, modelo: { ...p.modelo, cargas: (p.modelo.cargas ?? []).filter((c) => !enCim.has(c.id)) } };
     const cargas = ids.filter((id) => lista(ej.modelo, "cargas").some((c) => c.id === id));
     const c = copiarAPlantas(sinCargas.modelo, cargas, ["CIM"]);
     if (!c.ok) throw new Error(c.errores[0]!.mensaje);

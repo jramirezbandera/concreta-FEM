@@ -114,7 +114,8 @@ describe("la herramienta activa (V2c-1)", () => {
     expect(within(barra).queryByRole("group", { name: "Enganches a objetos" })).toBeNull();
     expect(screen.getByRole("region", { name: "Dibujar · Pilar" })).toBeTruthy();
 
-    // Una cifra abre el campo; lo que no se puede situar sin cursor en una planta lo dice; Esc lo cierra
+    // Una cifra abre el campo; sin haber pasado el cursor por una planta, el punto va a la de la vista
+    // activa (UI-40; antes pedía «Lleve el cursor a una planta»)
     fireEvent.keyDown(window, { key: "3" });
     const campo = screen.getByRole("textbox", { name: /Punto: x; y/ }) as HTMLInputElement;
     expect(campo.value).toBe("3");
@@ -122,8 +123,11 @@ describe("la herramienta activa (V2c-1)", () => {
     expect(within(screen.getByRole("dialog", { name: "Punto por teclado" })).getByText("@dx; dy")).toBeTruthy();
     fireEvent.change(campo, { target: { value: "3; 4" } });
     fireEvent.keyDown(campo, { key: "Enter" });
-    expect(screen.getByText("Lleve el cursor a una planta.")).toBeTruthy();
-    fireEvent.keyDown(campo, { key: "Escape" });
+    expect(screen.queryByRole("textbox", { name: /Punto: x; y/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Deshacer" }).getAttribute("title")).toMatch(/^Deshacer: /);
+    // Esc cierra el campo sin poner nada
+    fireEvent.keyDown(window, { key: "3" });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: /Punto: x; y/ }), { key: "Escape" });
     expect(screen.queryByRole("textbox", { name: /Punto: x; y/ })).toBeNull();
 
     // Viga, desde Pilar; y Esc sin nada en curso vuelve a Elegir

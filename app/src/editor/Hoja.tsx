@@ -649,7 +649,7 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         <div className="seg max-w-full" style={{ overflowX: "auto" }} role="tablist" aria-label="Tabla">
           {TABLAS.map((t) => (
             <button key={t} type="button" role="tab" aria-selected={t === tabla} data-on={t === tabla} onClick={() => setTabla(t)}>
-              {DEF_TABLAS[t].titulo} <span className="mono text-[10.5px] text-text-disabled">{contar(t)}</span>
+              {DEF_TABLAS[t].titulo} <span className="mono text-[10.5px] text-text-muted">{contar(t)}</span>
             </button>
           ))}
         </div>

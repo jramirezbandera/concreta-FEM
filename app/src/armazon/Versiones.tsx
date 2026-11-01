@@ -53,7 +53,7 @@ export function DialogoVersiones({ id, nombre, onCerrar, onRestaurada }: { id: s
             <li key={v.n} className="flex items-center gap-3 border-t border-border-sub py-1.5">
               <span className="mono w-36 shrink-0">{fechaCorta(v.fecha)}</span>
               <span className="min-w-0 flex-1 truncate">{v.nombre}</span>
-              <span className="mono shrink-0 text-text-disabled">{tamano(v.tamano)}</span>
+              <span className="mono shrink-0 text-text-muted">{tamano(v.tamano)}</span>
               <button type="button" className="btn" disabled={ocupado} onClick={() => void volver(v.n)}>
                 Volver a ésta
               </button>

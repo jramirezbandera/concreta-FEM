@@ -126,6 +126,11 @@ export class ControladorDibujo {
   private radio = 0;
   private mayus = false;
   private cliente: readonly [number, number] = [0, 0];
+  /**
+   * UI-40: la planta de la vista activa. Lo tecleado («x; y» e Intro) va a ella aunque el cursor no
+   * haya pasado por ninguna planta (antes pedía «Lleve el cursor a una planta»).
+   */
+  plantaVista: string | null = null;
   private apunte: Apunte | null = null;
   private silueta: Silueta | null = null;
   private foto: Instantanea;
@@ -330,6 +335,12 @@ export class ControladorDibujo {
   }
 
   abrirCampo(texto: string): void {
+    // Sin haber pasado por una planta: la de la vista activa, y el campo junto a la zona de las vistas
+    if (!this.planta && this.plantaVista) {
+      this.planta = this.plantaVista;
+      const z = document.querySelector(".zona-vistas")?.getBoundingClientRect();
+      if (z && this.cliente[0] === 0 && this.cliente[1] === 0) this.cliente = [z.left + 40, z.top + 70];
+    }
     if (this.herramienta === "elegir" && this.ladoPilar) return this.abrirCampoPilar(texto);
     if (this.herramienta === "elegir" && this.asaActiva) {
       this.cambiar({ campo: { n: ++this.abiertos, texto, x: this.cliente[0], y: this.cliente[1], error: null, cota: `vértice de ${this.asaActiva.id}` } });

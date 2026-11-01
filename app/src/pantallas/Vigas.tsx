@@ -186,7 +186,7 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
         {v.apoyos.map((a, i) => (
           <g key={i}>
             <rect x={X(a.caras[0])} y={mt - 6} width={Math.max(1, X(a.caras[1]) - X(a.caras[0]))} height={H - mt - mb + 12} fill="var(--color-bg-elevated)" />
-            <text x={X(a.s)} y={H - 6} fontSize={10.5} textAnchor="middle" fill="var(--color-text-disabled)" fontFamily="var(--font-mono)">
+            <text x={X(a.s)} y={H - 6} fontSize={10.5} textAnchor="middle" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
               {a.objeto}
             </text>
           </g>
@@ -194,14 +194,14 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
         {(v.plantas ?? []).map((p) => (
           <g key={p.planta}>
             <line x1={X(p.s)} x2={X(p.s)} y1={mt - 6} y2={H - mb + 4} stroke="var(--color-border-main)" strokeDasharray="3 3" />
-            <text x={X(p.s)} y={H - 6} fontSize={10.5} textAnchor="middle" fill="var(--color-text-disabled)" fontFamily="var(--font-mono)">
+            <text x={X(p.s)} y={H - 6} fontSize={10.5} textAnchor="middle" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
               {p.planta}
             </text>
           </g>
         ))}
         <path d={area("max")} fill="var(--color-env-max-f)" opacity={0.9} />
         <path d={area("min")} fill="var(--color-env-min-f)" opacity={0.9} />
-        <line x1={ml} x2={w - mr} y1={y0} y2={y0} stroke="var(--color-text-disabled)" strokeWidth={1} />
+        <line x1={ml} x2={w - mr} y1={y0} y2={y0} stroke="var(--color-text-muted)" strokeWidth={1} />
         <path d={camino("max")} fill="none" stroke="var(--color-env-max)" strokeWidth={1.4} />
         <path d={camino("min")} fill="none" stroke="var(--color-env-min)" strokeWidth={1.4} />
         {picos.map((p, i) => (
@@ -210,7 +210,7 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
           </text>
         ))}
         <line x1={X(s)} x2={X(s)} y1={mt - 8} y2={H - mb + 4} stroke="var(--color-accent)" strokeDasharray="4 3" />
-        <text x={ml - 6} y={y0 + 4} fontSize={10} textAnchor="end" fill="var(--color-text-disabled)" fontFamily="var(--font-mono)">
+        <text x={ml - 6} y={y0 + 4} fontSize={10} textAnchor="end" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
           0
         </text>
       </svg>

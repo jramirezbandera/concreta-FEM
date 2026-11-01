@@ -13,7 +13,7 @@ import { canonico } from "../compilador/huella.ts";
 import { escribirTsv, leerTsv, type ErrorCelda, type Fila } from "./celdas.ts";
 import { aplicar, nombreColeccion, type Aplicacion, type Operacion } from "./operaciones.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
-import { contexto, DEF_TABLAS, idNuevo, objetosTabla, type NombreTabla } from "./tablas.ts";
+import { contexto, DEF_TABLAS, idNuevo, objetosTabla, TABLAS, type NombreTabla } from "./tablas.ts";
 
 export interface ErrorFila {
   /** Fila del bloque pegado, desde 1 (sin contar la cabecera), o null en una sola fila. */
@@ -151,6 +151,23 @@ function idCopia(id: string, origen: string, destino: string, usado: (x: string)
 }
 
 /** Los objetos de una sola planta (los que «copiar la planta entera» copia): no los pilares ni lo que cuelga de ellos. */
+/**
+ * UI-37: lo que se ve en una planta, para Ctrl+A: los objetos de las tablas que van por plantas y
+ * pasan por ella (los pilares y muros de varias, también); con `soloCargas`, sólo sus cargas (en
+ * Cargas), y con `caso`, sólo las de ese caso.
+ */
+export function objetosVisibles(m: ModeloFisico, planta: string, o: { soloCargas?: boolean; caso?: string } = {}): string[] {
+  const ctx = contexto(m);
+  const r: string[] = [];
+  for (const t of o.soloCargas ? (["cargas"] as const) : TABLAS) {
+    for (const x of objetosTabla(m, t)) {
+      if (o.caso && t === "cargas" && x.caso !== o.caso) continue;
+      if (DEF_TABLAS[t].plantas(x, ctx)?.includes(planta)) r.push(x.id);
+    }
+  }
+  return r;
+}
+
 export function objetosDePlanta(m: ModeloFisico, planta: string): string[] {
   const ctx = contexto(m);
   const r: string[] = [];

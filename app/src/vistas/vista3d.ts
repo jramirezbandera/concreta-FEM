@@ -915,7 +915,7 @@ export class Vista3D extends Vista {
     if (!pos.length) return;
     const g = new LineSegmentsGeometry();
     g.setPositions(pos);
-    MAT.elegidas.color.set(this.entorno.colores().acento);
+    MAT.elegidas.color.set(this.entorno.colores().seleccion);
     this.lineasElegidas = new LineSegments2(g, MAT.elegidas);
     this.lineasElegidas.renderOrder = 10;
     this.lineasElegidas.frustumCulled = false;
@@ -1163,7 +1163,7 @@ export class Vista3D extends Vista {
       const porPlanta = x.plantas.map((_, k) => cats[k % cats.length]!);
       const porPlantaT = porPlanta.map(tenue);
       const elegido = x.objetos.map((o) => this.elegidos.has(o.id));
-      const acento = rgb(this.entorno.colores().acento);
+      const acento = rgb(this.entorno.colores().seleccion);
       const C = (this.malla.geometry.getAttribute("color") as BufferAttribute).array as Uint8Array;
       const bytes = (c: [number, number, number]) => [Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255)];
       const [baseB, baseTB, plB, plTB, acB] = [base.map(bytes), baseT.map(bytes), porPlanta.map(bytes), porPlantaT.map(bytes), bytes(acento)];
@@ -1908,7 +1908,7 @@ export class Vista3D extends Vista {
     MAT.positivo.color.set(pintura("diagrama-positivo", t).fill ?? "#dc2626");
     MAT.negativo.color.set(pintura("diagrama-negativo", t).fill ?? "#2563eb");
     // El color de lo elegido es el de esta vista (el acento del tema)
-    MAT.elegidas.color.set(this.entorno.colores().acento);
+    MAT.elegidas.color.set(this.entorno.colores().seleccion);
     r.render(this.escena3, this.camaraActiva);
   }
 

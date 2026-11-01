@@ -373,6 +373,21 @@ export interface OpcionesEnganche {
   activos?: ReadonlySet<TipoEnganche>;
   /** Las fuentes que enganchan; por defecto, las dos. */
   fuentes?: ReadonlySet<FuenteEnganche>;
+  /**
+   * UI-36: el paso al que se redondea un punto sin enganche, m (por defecto 1 cm; 0, sin redondear).
+   * Lo enganchado sigue exacto; sin esto, un clic libre guardaba x = 5,130294802570366.
+   */
+  paso?: number;
+}
+
+/** PASO_LIBRE: el redondeo por defecto de un punto sin enganche, m. */
+export const PASO_LIBRE = 0.01;
+
+/** `x` al múltiplo más cercano de `paso` (con su número más corto: 5,13 y no 5,130000000000001). */
+export function redondearPaso(x: number, paso: number): number {
+  if (!(paso > 0)) return x;
+  const k = Math.round(1 / paso);
+  return Math.abs(k * paso - 1) < 1e-12 ? Math.round(x * k) / k : Math.round(x / paso) * paso;
 }
 
 /** El enganche del cursor q con el radio en m, o null si no hay ninguno a ese radio. */
@@ -494,8 +509,15 @@ export interface Apunte {
 export function apuntar(ix: IndiceEnganches, q: Vec2, radio: number, o: OpcionesEnganche & { orto?: boolean; mayus?: boolean } = {}): Apunte {
   const e = enganchar(ix, q, radio, o);
   if (e) return { p: e.p, enganche: e, orto: false };
-  if (o.ultimo && (o.orto || o.mayus)) return { p: ortogonal(o.ultimo, q, ix.direccion, !!o.mayus), enganche: null, orto: true };
-  return { p: q, enganche: null, orto: false };
+  const paso = o.paso ?? PASO_LIBRE;
+  const red = (x: number) => redondearPaso(x, paso);
+  if (o.ultimo && (o.orto || o.mayus)) {
+    // Lo que sale del cursor se redondea; lo que copia del punto anterior, no
+    const p = ortogonal(o.ultimo, q, ix.direccion, !!o.mayus);
+    const libre: Vec2 = p[1] === o.ultimo[1] ? [red(p[0]), p[1]] : p[0] === o.ultimo[0] ? [p[0], red(p[1])] : p;
+    return { p: libre, enganche: null, orto: true };
+  }
+  return { p: [red(q[0]), red(q[1])], enganche: null, orto: false };
 }
 
 /**

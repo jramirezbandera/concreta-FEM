@@ -237,7 +237,7 @@ export class Vista2D extends Vista {
     const r = this.resaltado;
     if (!r || !this.escena) return;
     const g = new Group();
-    const acento = this.entorno.colores().acento;
+    const acento = this.entorno.colores().seleccion;
     const orden = { n: 100000 };
     if (r.objetos.length === 1) for (const m of relleno(r.abanicos, r.caja, acento, 0.22, orden, this.matResaltado)) g.add(m);
     const l = trazo(r.segmentos, acento, 3, orden, this.matResaltado, undefined, 0.85);
@@ -466,7 +466,7 @@ export class Vista2D extends Vista {
       ctx.font = fuente(p.tam, !!p.t.negrita);
       ctx.textAlign = p.ancla === "inicio" ? "left" : p.ancla === "medio" ? "center" : "right";
       const elegido = p.t.objeto !== undefined && this.elegidos.has(p.t.objeto);
-      textoConHalo(ctx, p.t.texto, 0, 0, elegido ? acento : (p.t.color ?? col.texto), col.fondo);
+      textoConHalo(ctx, p.t.texto, 0, 0, elegido ? col.seleccion : (p.t.color ?? col.texto), col.fondo);
       ctx.restore();
     }
     // Las marcas de la pantalla (el punto pulsado en Losas…)

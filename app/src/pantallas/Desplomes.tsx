@@ -40,15 +40,15 @@ function Perfil({ d, cotas }: { d: DatosDesplomes; cotas: Map<string, number | n
         <g key={i}>
           <circle cx={X(p.ux)} cy={Y(p.z)} r={2.5} fill="var(--color-accent)" />
           <circle cx={X(p.uy)} cy={Y(p.z)} r={2.5} fill="var(--color-uy)" />
-          <text x={4} y={Y(p.z) + 3} fontSize={9.5} fontFamily="var(--font-mono)" fill="var(--color-text-disabled)">
+          <text x={4} y={Y(p.z) + 3} fontSize={9.5} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
             {cota(p.z)}
           </text>
         </g>
       ))}
-      <text x={X(umax)} y={H - 6} fontSize={9.5} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-disabled)">
+      <text x={X(umax)} y={H - 6} fontSize={9.5} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
         {fmt(umax, 2)} mm
       </text>
-      <text x={X(-umax)} y={H - 6} fontSize={9.5} fontFamily="var(--font-mono)" fill="var(--color-text-disabled)">
+      <text x={X(-umax)} y={H - 6} fontSize={9.5} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
         {fmt(-umax, 2)}
       </text>
     </svg>

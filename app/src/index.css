@@ -101,7 +101,9 @@ html.theme-switching *::after {
   --color-border-strong: #b4bec9;
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-disabled: #586880;
+  /* UI-48: «muted», el texto atenuado (cuentas, unidades, notas); «disabled», sólo lo deshabilitado */
+  --color-text-muted: #586880;
+  --color-text-disabled: #98a2b3;
   /* ≥ 4,5:1 sobre la superficie, el elevado y el lienzo (con #6b778a, 4,14–4,33) */
   --color-text-tertiary: #5f6b7e;
   --color-accent: #2563eb;
@@ -132,6 +134,7 @@ html.theme-switching *::after {
      de los diagramas en planta de A4 (diagrama-positivo y -negativo de src/agente/render/svg.ts) */
   --color-env-max: #dc2626;
   --color-env-min: #2563eb;
+  --color-seleccion: #d97706;
   --color-env-max-f: #fde8e8;
   --color-env-min-f: #e3ecfd;
   --color-uy: #0e7490;
@@ -160,7 +163,8 @@ html[data-theme="dark"] {
   --color-border-strong: #454752;
   --color-text-primary: #fafafa;
   --color-text-secondary: #9a9ea7;
-  --color-text-disabled: #8a8e99;
+  --color-text-muted: #8a8e99;
+  --color-text-disabled: #5d616b;
   --color-text-tertiary: #8b909b;
   --color-accent: #5b9bff;
   --color-accent-hover: #7db0ff;
@@ -184,6 +188,7 @@ html[data-theme="dark"] {
   --shadow-dialogo: 0 24px 56px -8px rgb(0 0 0 / .65), 0 0 0 1px rgb(255 255 255 / .04);
   --color-env-max: #f87171;
   --color-env-min: #38bdf8;
+  --color-seleccion: #fbbf24;
   --color-env-max-f: #3a1717;
   --color-env-min-f: #0f2a38;
   --color-uy: #2dd4bf;
@@ -328,7 +333,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 /* Texto sobre el dibujo: halo del color del lienzo */
 .halo { paint-order: stroke; stroke: var(--color-bg-canvas); stroke-width: 3px; stroke-linejoin: round; }
 
-.kbd { font: 11px var(--font-mono); color: var(--color-text-disabled); }
+.kbd { font: 11px var(--font-mono); color: var(--color-text-muted); }
 
 /* Lienzo: lo que dibuja ocupa su caja */
 .lienzo { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
@@ -422,12 +427,12 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
   position: sticky; top: 0; z-index: 2;
   padding: 5px 6px 3px; background: var(--color-bg-surface);
   border-bottom: 1px solid var(--color-border-main); border-right: 1px solid var(--color-border-sub);
-  font: 600 10px var(--font-sans); letter-spacing: .04em; color: var(--color-text-disabled);
+  font: 600 10px var(--font-sans); letter-spacing: .04em; color: var(--color-text-muted);
   text-align: left; white-space: nowrap; vertical-align: bottom;
 }
 .hoja th small { display: block; font: 400 10px var(--font-mono); letter-spacing: 0; }
 .hoja th.marca, .hoja td.marca { position: sticky; left: 0; z-index: 3; width: 22px; min-width: 22px; padding: 0 4px; text-align: center; background: var(--color-bg-surface); cursor: pointer; }
-.hoja td.marca { z-index: 1; color: var(--color-text-disabled); font: 10px var(--font-mono); }
+.hoja td.marca { z-index: 1; color: var(--color-text-muted); font: 10px var(--font-mono); }
 .hoja td {
   height: 24px; padding: 0 6px; max-width: 320px;
   border-bottom: 1px solid var(--color-border-sub); border-right: 1px solid var(--color-border-sub);
@@ -435,7 +440,7 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
   color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background: var(--color-bg-primary); cursor: cell;
 }
-.hoja td.calc { color: var(--color-text-disabled); background: var(--color-bg-surface); cursor: default; }
+.hoja td.calc { color: var(--color-text-muted); background: var(--color-bg-surface); cursor: default; }
 /* Lo que no aplica al tipo de la fila (Forjados): rayado tenue; se puede escribir, y si se escribe, la fila da error */
 .hoja td.na { background: repeating-linear-gradient(135deg, var(--color-bg-surface) 0 5px, var(--color-bg-primary) 5px 9px); }
 .hoja tr.borrador td.na { background: repeating-linear-gradient(135deg, var(--color-bg-surface) 0 5px, var(--color-bg-primary) 5px 9px); }
@@ -715,7 +720,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .campo > span.unidad, .campo > span.dib-unidad { position: relative; display: block; color: inherit; }
 .campo > span.unidad::after, .campo > span.dib-unidad::after { content: attr(data-unidad); position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font: 12px var(--font-mono); color: var(--color-text-tertiary); pointer-events: none; }
 .campo > span.unidad input, .campo > span.dib-unidad input { padding-right: calc(var(--u, 1) * 7.3px + 16px); }
-.campo input::placeholder { color: var(--color-text-disabled); font-family: var(--font-sans); }
+.campo input::placeholder { color: var(--color-text-muted); font-family: var(--font-sans); }
 .dib-mas { width: 28px; height: 28px; flex-shrink: 0; border: 1px solid var(--color-border-main); }
 .dib-mas[data-on="true"] { background: var(--color-tint-accent); border-color: transparent; color: var(--color-accent); }
 .seg-ancho, .dib-seg { display: flex; width: 100%; }
@@ -1038,8 +1043,9 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .campo-q {
   display: inline-grid; place-items: center; flex-shrink: 0; width: 13px; height: 13px; border: 1px solid var(--color-border-strong); border-radius: 50%;
   font: normal 600 9px/1 var(--font-sans); color: var(--color-text-tertiary); cursor: help;
-  position: relative;
+  position: relative; padding: 0; margin: 0 0 0 2px; background: none; vertical-align: middle;
 }
+.campo-q:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); border-color: var(--color-accent); }
 /* Más fácil de coger con el ratón que sus 13 px */
 .campo-q::after { content: ""; position: absolute; inset: -4px; }
 .campo-q:hover, .campo-q[data-abierta] { border-color: var(--color-accent); background: var(--color-tint-accent); color: var(--color-accent); }
@@ -1119,3 +1125,12 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .espera-calculo { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 72px auto 0; width: min(560px, calc(100% - 32px)); }
 .espera-calculo h1 { margin: 0; font-size: 15px; font-weight: 600; }
 .espera-calculo p { margin: 0; color: var(--color-text-secondary); }
+
+/* UI-37: el armazón y las vistas no seleccionan texto (Ctrl+A o un arrastre lo pintaban de azul) */
+.barra-sup, .herramientas, .zona-vistas, .dock-tabs, .panel-cab, .panel-carril, .barra-estado { user-select: none; }
+
+/* UI-56: el foco de teclado de la barra, los segmentados, las pestañas y los espacios, con el anillo
+   de la app (era el negro del navegador) */
+.herr:focus-visible, .herr-seg button:focus-visible, .dock-tab:focus-visible, .espacios > button:focus-visible, .ib:focus-visible, .ges-lista > button:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px var(--color-accent);
+}

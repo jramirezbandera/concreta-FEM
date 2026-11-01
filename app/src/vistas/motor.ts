@@ -32,6 +32,8 @@ export interface Colores {
   texto: string;
   textoSuave: string;
   acento: string;
+  /** Lo elegido (UI-22): un color que no usa ningún dato; el acento era el azul de los negativos. */
+  seleccion: string;
   panel: string;
   borde: string;
 }
@@ -240,7 +242,7 @@ export class Motor {
   private leerColores(): Colores {
     const s = getComputedStyle(this.contenedor);
     const v = (n: string, d: string) => s.getPropertyValue(n).trim() || d;
-    return { fondo: v("--color-bg-canvas", "#f4f5f7"), texto: v("--color-text-primary", "#111827"), textoSuave: v("--color-text-secondary", "#4b5563"), acento: v("--color-accent", "#2563eb"), panel: v("--color-bg-primary", "#ffffff"), borde: v("--color-border-main", "#d1d5db") };
+    return { fondo: v("--color-bg-canvas", "#f4f5f7"), texto: v("--color-text-primary", "#111827"), textoSuave: v("--color-text-secondary", "#4b5563"), acento: v("--color-accent", "#2563eb"), seleccion: v("--color-seleccion", "#d97706"), panel: v("--color-bg-primary", "#ffffff"), borde: v("--color-border-main", "#d1d5db") };
   }
 
   ponerTema(t: Theme): void {

@@ -131,13 +131,14 @@ function DiagramaFranja({ d, base }: { d: DatosFranja; base: { inferior: number 
   const area = (v: (x: EstacionFranjaEnvolvente) => number) => `${linea(v)} L${X(es[es.length - 1]!.s).toFixed(1)},${Y(0).toFixed(1)} L${X(es[0]!.s).toFixed(1)},${Y(0).toFixed(1)} Z`;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Diagrama de ${d.franja.id}`}>
-      <path d={area((x) => x.inferior[0])} fill="#d6604d" fillOpacity={0.25} />
-      <path d={area((x) => -x.superior[0])} fill="#4393c3" fillOpacity={0.25} />
+      {/* Los colores de la envolvente del tema (UI-48: fijos, en oscuro daban 2,9–3,3:1) */}
+      <path d={area((x) => x.inferior[0])} fill="var(--color-env-max)" fillOpacity={0.22} />
+      <path d={area((x) => -x.superior[0])} fill="var(--color-env-min)" fillOpacity={0.22} />
       <line x1={m} x2={W - m} y1={Y(0)} y2={Y(0)} stroke="currentColor" strokeOpacity={0.5} />
-      <path d={linea((x) => x.max[0])} fill="none" stroke="#b2182b" strokeWidth={1.2} />
-      <path d={linea((x) => x.min[0])} fill="none" stroke="#2166ac" strokeWidth={1.2} />
-      {base.inferior !== null && <line data-base="inferior" x1={m} x2={W - m} y1={Y(base.inferior)} y2={Y(base.inferior)} stroke="#b2182b" strokeDasharray="5 3" strokeWidth={1} />}
-      {base.superior !== null && <line data-base="superior" x1={m} x2={W - m} y1={Y(-base.superior)} y2={Y(-base.superior)} stroke="#2166ac" strokeDasharray="5 3" strokeWidth={1} />}
+      <path d={linea((x) => x.max[0])} fill="none" stroke="var(--color-env-max)" strokeWidth={1.2} />
+      <path d={linea((x) => x.min[0])} fill="none" stroke="var(--color-env-min)" strokeWidth={1.2} />
+      {base.inferior !== null && <line data-base="inferior" x1={m} x2={W - m} y1={Y(base.inferior)} y2={Y(base.inferior)} stroke="var(--color-env-max)" strokeDasharray="5 3" strokeWidth={1} />}
+      {base.superior !== null && <line data-base="superior" x1={m} x2={W - m} y1={Y(-base.superior)} y2={Y(-base.superior)} stroke="var(--color-env-min)" strokeDasharray="5 3" strokeWidth={1} />}
       {es
         .filter((x) => x.tipo !== "paso")
         .map((x) => (
@@ -252,7 +253,7 @@ function ValorPunto({ punto, armadura, varias }: { punto: Punto | null; armadura
   const e = v.estacion;
   return (
     <div className="px-3.5 py-2" data-valor-armado={v.valor}>
-      <div className="mono text-[11px] text-text-disabled">
+      <div className="mono text-[11px] text-text-muted">
         {v.franja} · s = {fmt(v.s, 2)} m · ({fmt(punto.p[0], 2)}; {fmt(punto.p[1], 2)}) m
       </div>
       <div className="mono text-[17px] font-medium">
@@ -267,7 +268,7 @@ function ValorPunto({ punto, armadura, varias }: { punto: Punto | null; armadura
       <div className="text-[11px] text-text-secondary">
         {varias ? `${v.comb} · ` : ""}estación {e.tipo === "paso" ? "de paso (por campos)" : `${e.tipo} (exacta, por fuerzas nodales)`}
       </div>
-      <div className="mono mt-1 text-[11px] text-text-disabled">
+      <div className="mono mt-1 text-[11px] text-text-muted">
         inf. {fmt(e.inferior[0], 1)} · sup. {fmt(e.superior[0], 1)} · mx de {fmt(e.min[0], 1)} a {fmt(e.max[0], 1)}
       </div>
     </div>

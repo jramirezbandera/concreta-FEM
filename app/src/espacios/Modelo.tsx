@@ -28,6 +28,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Check, ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
+import { objetosVisibles } from "../../../src/editor/edicion.ts";
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
 import { Chip, Desplegable, Disposicion, GrupoPlegable, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
@@ -118,6 +119,10 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   ctrl.aplicar = (h) => editarDibujo(h.operacion, h.etiqueta);
   ctrl.alSalir = () => ctrl.ponerHerramienta("elegir");
   ctrl.repintar = repintarVistas;
+  {
+    const va = vistas.vistas[vistas.activa];
+    ctrl.plantaVista = va?.tipo === "planta" ? planta : null;
+  }
   useEffect(() => ctrl.ponerModelo(modeloEd), [ctrl, modeloEd]);
   useEffect(() => ctrl.ponerPlantillas(plantillas), [ctrl, plantillas]);
   // En Cargas, las herramientas de editar (y los pinzamientos) sólo cogen cargas: el modelo, en Modelo
@@ -194,6 +199,22 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
   }, [ctrl, conAsa, dibujando]);
+  // UI-37: Ctrl+A elige lo que se ve en la planta activa (en Cargas, las cargas del caso activo); antes
+  // seleccionaba el texto de la página
+  const { setElegidos } = useVisor();
+  useEffect(() => {
+    if (!ed || dibujando) return;
+    const tecla = (x: KeyboardEvent) => {
+      if (!(x.ctrlKey || x.metaKey) || x.altKey || x.shiftKey || x.key.toLowerCase() !== "a" || enCampo(x.target)) return;
+      if ((x.target as HTMLElement | null)?.closest?.("[role=grid], [role=dialog]") || document.querySelector("[role=dialog]")) return;
+      const va = vistas.vistas[vistas.activa];
+      if (!planta || va?.tipo !== "planta") return;
+      x.preventDefault();
+      setElegidos(objetosVisibles(ed.proyecto.modelo, planta, cargas ? { soloCargas: true, caso: casoValido } : {}));
+    };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [ed, dibujando, vistas, planta, cargas, casoValido, setElegidos]);
   // CT3: con un pilar elegido, Tab elige una de sus cotas, un número abre su campo y Esc la deja
   const conPilar = !!foto.pilar;
   useEffect(() => {
@@ -446,6 +467,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           cargas ? (
             chipCaso
           ) : (
+            <>
             <Desplegable
               etiqueta="Qué se dibuja"
               valor={v.dibujo === "malla" && !e.calculado ? "modelo" : v.dibujo}
@@ -457,6 +479,22 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
                 title: d === "malla" && !e.calculado ? "Necesita el cálculo" : undefined,
               }))}
             />
+            {/* UI-39: en una planta vacía, por dónde empezar (antes, un lienzo en blanco sin ninguna pista) */}
+            {ed && !dibujando && v.planta && objetosVisibles(ed.proyecto.modelo, v.planta).length === 0 && (
+              <>
+                <Chip>Planta vacía: empiece por</Chip>
+                <button type="button" className="chip" data-acento onClick={() => elegirHerramienta("ejes")}>
+                  Ejes
+                </button>
+                <button type="button" className="chip" data-acento onClick={() => elegirHerramienta("pilar")}>
+                  Pilares
+                </button>
+                <button type="button" className="chip" data-acento onClick={() => ficheroDxf.current?.click()}>
+                  Calcar un DXF
+                </button>
+              </>
+            )}
+            </>
           ),
       }}
     />
@@ -479,7 +517,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         </>
       ),
     },
-    { id: "combinaciones", titulo: "Combinaciones", insignia: e.combinaciones.length, contenido: <ListaCombinaciones /> },
+    // UI-13: sin calcular no hay combinaciones que contar (salían «0», con un motivo falso)
+    { id: "combinaciones", titulo: "Combinaciones", insignia: e.calculado ? e.combinaciones.length : "—", contenido: <ListaCombinaciones /> },
   ];
 
   return (
@@ -839,6 +878,7 @@ function ResumenPlanta() {
 function ListaCombinaciones() {
   const { proyecto } = useVisor();
   const e = proyecto.estado!;
+  if (!e.calculado) return <p className="nota">Las combinaciones salen de los casos al calcular: entonces se ven aquí.</p>;
   if (!e.combinaciones.length) return <p className="nota">Sin combinaciones: los casos no llevan su acción (tipo, ψ y familia), así que no hay combinaciones CTE/NCSE. Se pueden ver los casos sueltos.</p>;
   return (
     <table className="tb">

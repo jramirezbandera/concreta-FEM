@@ -497,7 +497,7 @@ function GuardarVista({ v, camara, onAbrir, onCerrar }: { v: EstadoVista; camara
           <label className="mt-1">
             <input className="sel w-full" aria-label="Nombre de la vista" value={nombre} autoFocus onChange={(x) => setNombre(x.target.value)} onKeyDown={(x) => x.key === "Enter" && hacer()} />
           </label>
-          <p className="mt-1 text-[11px] leading-snug text-text-disabled">Con su tipo, su planta o su eje, su modo, su cámara y sus filtros. Se guarda en el proyecto (no cambia la huella; al disco, al guardar el proyecto) y se abre desde aquí o desde el navegador.</p>
+          <p className="mt-1 text-[11px] leading-snug text-text-muted">Con su tipo, su planta o su eje, su modo, su cámara y sus filtros. Se guarda en el proyecto (no cambia la huella; al disco, al guardar el proyecto) y se abre desde aquí o desde el navegador.</p>
           <div className="mt-2 flex items-center gap-2">
             <button type="button" className="btn" disabled={!limpio} onClick={hacer}>
               {existe ? "Sustituir" : "Guardar"}
@@ -590,7 +590,7 @@ function OpcionesVista3D({ v, estado, onCambio, onCerrar }: { v: EstadoVista; es
           Mostrar todo
         </button>
       </div>
-      <p className="mt-2 text-[11px] leading-snug text-text-disabled">H aísla lo elegido (otra vez, lo suelta); Ctrl+H lo oculta; Mayús+H lo muestra todo. La caja de sección no se quita con ellos.</p>
+      <p className="mt-2 text-[11px] leading-snug text-text-muted">H aísla lo elegido (otra vez, lo suelta); Ctrl+H lo oculta; Mayús+H lo muestra todo. La caja de sección no se quita con ellos.</p>
     </div>
   );
 }

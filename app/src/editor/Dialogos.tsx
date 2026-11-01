@@ -201,7 +201,7 @@ export function DialogoBorrar({ ids: elegidos, onCerrar }: { ids: string[]; onCe
           <ul className="dlg-lista">
             {[...porObjeto].map(([id, rs]) => (
               <li key={id}>
-                {nombreColeccion(idx.get(id)!.coleccion)} {id} <span className="text-text-disabled">({rs.join("; ")})</span>
+                {nombreColeccion(idx.get(id)!.coleccion)} {id} <span className="text-text-muted">({rs.join("; ")})</span>
               </li>
             ))}
           </ul>
@@ -368,7 +368,7 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
                 {a} → {b}
               </li>
             ))}
-            {mapa.size > ejemplos.length && <li className="text-text-disabled">… y {mapa.size - ejemplos.length} más</li>}
+            {mapa.size > ejemplos.length && <li className="text-text-muted">… y {mapa.size - ejemplos.length} más</li>}
           </ul>
           <p className="dlg-nota">Las cargas y demás referencias siguen a su objeto. Cambia la huella, así que hay que volver a calcular. Se puede deshacer con Ctrl+Z.</p>
         </>
