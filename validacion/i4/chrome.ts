@@ -318,7 +318,9 @@ try {
     sondaIgual("de uz en N3", d, (o) => {
       if (o.tipo !== "lamina") return null;
       const v = valor(ses.valorLamina({ campo: "uz", combinaciones: D, nombre: isoN3.combinacion!.nombre, lamina: o.lamina!, punto: o.p }));
-      return v ? [`${fmt(v.valor, 2)} ${v.unidad}`, `${v.objeto} · ${v.planta} · ${v.comb}`] : null;
+      // En uz, la flecha hacia abajo y en positivo (UI-14, `textoValor` de Losas)
+      const uz = v ? (v.valor < 0 ? `↓ ${fmt(-v.valor, 2)}` : v.valor > 0 ? `↑ ${fmt(v.valor, 2)}` : fmt(v.valor, 2)) : "";
+      return v ? [`${uz} ${v.unidad}`, `${v.objeto} · ${v.planta} · ${v.comb}`] : null;
     }, [0, 1]);
     await largas("al pasar el ratón");
   }

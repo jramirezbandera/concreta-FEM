@@ -94,8 +94,9 @@ export function figurasInforme(p: Proyecto, c: Extract<ResultadoCompilacion, { v
     if (!losas && !(f.panos ?? []).some((x) => x.planta === pl.id)) continue;
     r.push({ titulo: `Planta ${pl.id}: modelo`, svg: escenaASvg(vistaModelo(f, pl.id, d)).svg });
     if (losas && cj) {
-      const e = vistaCampo(rr, pl.id, "uz", cj, d);
-      r.push({ titulo: `Planta ${pl.id}: uz (mm) en ${e.extremos[0]?.comb ?? cj.descripcion}`, svg: escenaASvg(e).svg });
+      // La flecha: con varias combinaciones, su envolvente mínima en cada nudo (UI-1)
+      const e = vistaCampo(rr, pl.id, "uz", cj, d, {}, "min");
+      r.push({ titulo: `Planta ${pl.id}: uz (mm), ${cj.factores.length > 1 ? `envolvente mínima de ${cj.descripcion}` : (cj.nombres[0] ?? cj.descripcion)}`, svg: escenaASvg(e).svg });
     }
   }
   return r;

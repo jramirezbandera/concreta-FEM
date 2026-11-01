@@ -7,9 +7,9 @@
  * respuesta tardía de la sesión anterior no puede llegar, y la memoria de la anterior se libera.
  */
 import type { EscalaMapa } from "../agente/render/isovalores.ts";
-import type { Campo } from "../agente/render/resultados.ts";
+import type { Campo, Envolvente } from "../agente/render/resultados.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import type { DatosDeformada, DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ValorPunto } from "./datos.ts";
+import type { DatosDeformada, DatosDesplomes, DatosEstacion, DatosLosas, DatosObjeto, DatosPilares, DatosRevision, DatosViga, Esfuerzo, FilaPilar, Combinaciones, Geometria3D, PiezaListada, ReaccionesCasos, ValorPunto } from "./datos.ts";
 import type { Eleccion, EscenaPreparada } from "./escena.ts";
 import type { Alambrico } from "./alambrico.ts";
 import type { Solido } from "./solido.ts";
@@ -46,8 +46,8 @@ export type Pedido =
   /** El 3D sólido: las secciones extruidas, con sus aristas (I3). */
   | { tipo: "solido" }
   | { tipo: "objeto"; id: string }
-  | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa; malla?: boolean }
-  | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number; escala?: EscalaMapa }
+  | { tipo: "losas"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa; malla?: boolean; envolvente?: Envolvente }
+  | { tipo: "valor-punto"; planta: string; campo: Campo; combinaciones: EleccionCombinaciones; x: number; y: number; escala?: EscalaMapa; envolvente?: Envolvente }
   | { tipo: "piezas"; planta: string }
   | { tipo: "viga"; id: string; esfuerzo: Esfuerzo; combinaciones: EleccionCombinaciones }
   | { tipo: "estacion"; id: string; esfuerzo: Esfuerzo; combinaciones: EleccionCombinaciones; s: number }
@@ -67,6 +67,8 @@ export type Pedido =
   | { tipo: "reacciones3d"; combinaciones: EleccionCombinaciones; escala?: number }
   /** Las cargas de un caso en el 3D. */
   | { tipo: "cargas3d"; caso: string; escala?: number }
+  /** UI-11: las reacciones de cada objeto por caso. */
+  | { tipo: "reacciones-casos" }
   | ({ tipo: "valor-lamina" } & PedidoValorLamina)
   /** AB: el armado en el 3D y el valor de un punto de su mapa. */
   | ({ tipo: "armado3d" } & PedidoArmado3D)
@@ -107,6 +109,7 @@ export interface Respuestas {
   pilares3d: Pilares3D;
   reacciones3d: Reacciones3D;
   cargas3d: Cargas3D;
+  "reacciones-casos": ReaccionesCasos;
   "valor-lamina": ValorLamina | null;
   armado3d: Armado3D;
   "valor-armado": ValorArmado | null;

@@ -1,16 +1,18 @@
 /**
  * Resultados · Pilares (la pantalla 5 de V1): en planta, el axil de cada tramo que llega (escena
  * `pilares-n` de A4); en el panel inferior, el cuadro de los tramos de la planta, y en Propiedades,
- * el del pilar elegido en toda su altura, con los
- * extremos de `fem consultar pieza` (N, |My|, |Mz| en la base y en la cabeza de cada tramo, cada uno
- * con su combinación) y el axil reducido ν de A3 (un aviso de orden de magnitud, no la comprobación
- * de norma, que hace el módulo de pilares de Concreta).
+ * el del pilar elegido en toda su altura. Cada tramo, con sus ternas concomitantes (UI-10): en la
+ * cabeza y en el pie, la combinación del N mínimo (la mayor compresión), del N máximo, del mayor |My|
+ * y del mayor |Mz|, cada una con sus N, My y Mz (los extremos de `fem consultar pieza`, que ya llevan
+ * sus concomitantes; antes, cada columna era de otra combinación). Y el axil reducido ν de A3 (un
+ * aviso de orden de magnitud, no la comprobación de norma, que hace el módulo de pilares de Concreta).
+ * Se abre en la planta más baja con pilares, la del mayor axil (UI-16).
  *
  * I4: un 3D pinta cada tramo del color de su N o su ν (`pilares3d`, los valores del cuadro), los de
  * todas las plantas o los de la de su cabecera; bajo el cursor, los del tramo. Se puede elegir
  * cualquier pilar, en el 3D o en un alzado, aunque no llegue a la planta activa.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { FilaPilar } from "../../../src/visor/datos.ts";
 import type { MagnitudPilares, Pilares3D } from "../../../src/visor/pilares3d.ts";
@@ -19,7 +21,7 @@ import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesi
 import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcPilares } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
@@ -28,6 +30,7 @@ import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
 import { Fuente2D, Fuente3DModelo, ZonaVistas } from "../vistas/Zona.tsx";
+import { LIMITE_NU, NOTA_TERNAS, TablaTernas } from "./Ternas.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 /** El axil de los tramos que llegan a una planta, en una vista: un clic elige el pilar. */
@@ -47,8 +50,6 @@ function PlantaPilares({ planta, eleccion, id, malla }: { planta: string; elecci
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
   return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} />;
 }
-
-const LIMITE_NU = 0.65;
 
 const MAGNITUDES: { id: MagnitudPilares; nombre: string; title: string }[] = [
   { id: "N", nombre: "N", title: "La mayor compresión de cada tramo (la columna N del cuadro)" },
@@ -83,40 +84,11 @@ function extremo(x: Extremos, k: "N+" | "N-" | "My" | "Mz"): { v: number; comb: 
   return { v: e.esfuerzos[c]!, comb: e.comb };
 }
 
-/** El mayor |·| de la base y la cabeza. */
-function peor(f: FilaPilar, k: "My" | "Mz"): { v: number; comb: string; donde: string } | null {
-  const a = extremo(f.tramo.base, k);
-  const b = extremo(f.tramo.cabeza, k);
-  if (!a && !b) return null;
-  return !b || (a && Math.abs(a.v) >= Math.abs(b.v)) ? { ...a!, donde: "base" } : { ...b, donde: "cabeza" };
-}
-
 /** La mayor compresión (el N más negativo) de la base y la cabeza. */
 function compresion(f: FilaPilar): { v: number; comb: string } | null {
   const a = extremo(f.tramo.base, "N-");
   const b = extremo(f.tramo.cabeza, "N-");
   return !b || (a && a.v <= b.v) ? a : b;
-}
-
-function Celda({ x, dec = 1 }: { x: { v: number; comb: string } | null; dec?: number }) {
-  return x ? (
-    <>
-      {fmt(x.v, dec)}
-      <small>{x.comb}</small>
-    </>
-  ) : (
-    <>—</>
-  );
-}
-
-function CeldaNu({ f }: { f: FilaPilar }) {
-  if (!f.nu) return <td>—</td>;
-  return (
-    <td className={f.nu.nu > LIMITE_NU ? "w" : undefined}>
-      {fmt(f.nu.nu, 2)}
-      <small>{f.nu.comb}</small>
-    </td>
-  );
 }
 
 function GraficoAxil({ filas }: { filas: FilaPilar[] }) {
@@ -144,7 +116,7 @@ function GraficoAxil({ filas }: { filas: FilaPilar[] }) {
 }
 
 export function ModoPilares() {
-  const { proyecto, planta, seleccion, setSeleccion } = useVisor();
+  const { proyecto, planta, setPlanta, seleccion, setSeleccion } = useVisor();
   const pan = usePaneles("resultados:pilares", { props: true, dock: true, pestana: "cuadro" });
   const vistas = useVistas();
   const sinPlanta = !vistas.vistas.slice(0, vistasDe(vistas.disposicion)).some((v) => v.tipo === "planta" || v.tipo === "3d");
@@ -153,6 +125,22 @@ export function ModoPilares() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
   }, []);
   const e = proyecto.estado!;
+  // Se abre en la planta más baja a la que llegan pilares: la del mayor axil (UI-16)
+  const abierta = useRef(false);
+  useEffect(() => {
+    if (abierta.current) return;
+    abierta.current = true;
+    const f = proyecto.edicion?.proyecto.modelo;
+    if (!f) return;
+    const ids = f.plantas.map((p) => p.id);
+    const llegan = new Set((f.pilares ?? []).flatMap((p) => {
+      const [a, b] = [ids.indexOf(p.hasta), ids.indexOf(p.desde)];
+      return a < 0 || b < 0 ? [] : ids.slice(a, b);
+    }));
+    const baja = [...ids].reverse().find((p) => llegan.has(p));
+    if (baja && baja !== planta) setPlanta(baja);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo al entrar
+  }, []);
   const [eleccion, setEleccion] = useState<EleccionCombinaciones>({ tipo: "defecto" });
   const [magnitud, setMagnitud] = useState<MagnitudPilares>("N");
   const d = usePedido(proyecto.cliente, planta ? { tipo: "pilares", planta, combinaciones: eleccion } : null);
@@ -165,7 +153,7 @@ export function ModoPilares() {
 
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="esfuerzos" />
       <Separador />
       <BarraModos />
       <Separador />
@@ -195,39 +183,21 @@ export function ModoPilares() {
   );
 
   const cuadro = (
-    <Seccion titulo={`Cuadro bajo ${planta}`} valor={filas.length}>
-          <table className="tb">
-            <thead>
-              <tr>
-                <th>Pilar</th>
-                <th>N kN</th>
-                <th>|My|</th>
-                <th>|Mz|</th>
-                <th className="nu">ν</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((f) => (
-                <tr key={f.pilar} className="clic" data-on={f.pilar === id} onClick={() => setSeleccion(f.pilar)}>
-                  <td>
-                    {f.pilar}
-                    <small>{f.tramo.seccion}</small>
-                  </td>
-                  <td>
-                    <Celda x={compresion(f)} dec={0} />
-                  </td>
-                  <td>
-                    <Celda x={peor(f, "My")} />
-                  </td>
-                  <td>
-                    <Celda x={peor(f, "Mz")} />
-                  </td>
-                  <CeldaNu f={f} />
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Seccion>
+    <Seccion titulo={`Cuadro bajo ${planta}`} valor={`${filas.length} tramos · ternas concomitantes`}>
+      <TablaTernas
+        filas={filas}
+        cabecera="Pilar"
+        titulo={(f) => (
+          <>
+            {f.pilar}
+            <small>{f.tramo.seccion}</small>
+          </>
+        )}
+        activa={(f) => f.pilar === id}
+        onFila={(f) => setSeleccion(f.pilar)}
+      />
+      <p className="nota">{NOTA_TERNAS}</p>
+    </Seccion>
   );
 
   const propiedades = (
@@ -244,40 +214,21 @@ export function ModoPilares() {
             <Seccion titulo={`Pilar ${id}`} valor={`${pilar.datos.filas.length} tramos`}>
               {!filas.some((f) => f.pilar === id) && <p className="nota">No llega a {planta}: su cuadro completo, aquí.</p>}
               <GraficoAxil filas={pilar.datos.filas} />
-              <table className="tb">
-                <thead>
-                  <tr>
-                    <th>Tramo</th>
-                    <th>N kN</th>
-                    <th>|My| kN·m</th>
-                    <th>|Mz| kN·m</th>
-                    <th className="nu">ν</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pilar.datos.filas.map((f) => (
-                    <tr key={f.planta} data-on={f.planta === planta}>
-                      <td>
-                        bajo {f.planta}
-                        <small>
-                          {f.tramo.seccion} · {fmt(f.tramo.longitud, 2)} m · {fmt(f.giro, 0)}°
-                        </small>
-                      </td>
-                      <td>
-                        <Celda x={compresion(f)} />
-                      </td>
-                      <td>
-                        <Celda x={peor(f, "My")} />
-                      </td>
-                      <td>
-                        <Celda x={peor(f, "Mz")} />
-                      </td>
-                      <CeldaNu f={f} />
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="nota">N: la mayor compresión (negativa) de la base y la cabeza; |My| y |Mz|: el mayor de las dos, con su signo. Ejes de la sección (giro desde +X).</p>
+              <TablaTernas
+                compacta
+                filas={pilar.datos.filas}
+                cabecera="Tramo"
+                titulo={(f) => (
+                  <>
+                    Tramo bajo {f.planta}
+                    <small>
+                      {f.tramo.seccion} · {fmt(f.tramo.longitud, 2)} m · {fmt(f.giro, 0)}°
+                    </small>
+                  </>
+                )}
+                activa={(f) => f.planta === planta}
+              />
+              <p className="nota">{NOTA_TERNAS} Ejes de la sección: giro desde +X.</p>
             </Seccion>
       )}
     </>
@@ -292,7 +243,7 @@ export function ModoPilares() {
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 400 }}
       dock={[
         { id: "cuadro", titulo: `Cuadro bajo ${planta ?? ""}`, insignia: filas.length, contenido: cuadro },
-        { id: "combinaciones", titulo: "Combinaciones", insignia: d.datos?.combinaciones.nombres.length, contenido: d.datos ? <TablaCombinaciones c={d.datos.combinaciones} /> : <p className="nota">…</p> },
+        { id: "combinaciones", titulo: TITULO_COMBINACIONES, insignia: d.datos?.combinaciones.nombres.length, contenido: d.datos ? <TablaCombinaciones c={d.datos.combinaciones} /> : <p className="nota">…</p> },
       ]}
     />
   );

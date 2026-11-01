@@ -25,7 +25,7 @@ import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesi
 import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcDiagramas, IcPilar, IcViga } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
@@ -33,6 +33,7 @@ import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
 import { conMalla, Fuente2D, Fuente3DModelo, FuenteEscena, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
+import { NOTA_TERNAS, TablaTernas } from "./Ternas.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 /** Los diagramas de las vigas de una planta, en una vista: un clic elige la viga o la vigueta. */
@@ -263,58 +264,23 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
 /** El cuadro de un pilar por tramos (el de la pantalla Pilares): N, |My| y |Mz| en la base y la cabeza, con su combinación. */
 function CuadroPilar({ filas }: { filas: FilaPilar[] | null }) {
   if (!filas) return <p className="nota">…</p>;
-  const ext = (f: FilaPilar, k: "N-" | "My" | "Mz") => {
-    const c = k === "My" ? 4 : k === "Mz" ? 5 : 0;
-    const xs = [f.tramo.base[k], f.tramo.cabeza[k]].filter((x): x is { comb: string; esfuerzos: number[] } => !!x);
-    if (!xs.length) return null;
-    // Los empates, la base (como el cuadro de Pilares)
-    return xs.reduce((a, b) => (k === "N-" ? (b.esfuerzos[0]! < a.esfuerzos[0]! ? b : a) : Math.abs(b.esfuerzos[c]!) > Math.abs(a.esfuerzos[c]!) ? b : a));
-  };
-  const celda = (f: FilaPilar, k: "N-" | "My" | "Mz") => {
-    const x = ext(f, k);
-    const c = k === "My" ? 4 : k === "Mz" ? 5 : 0;
-    return x ? (
-      <>
-        {fmt(x.esfuerzos[c], 1)}
-        <small>{x.comb}</small>
-      </>
-    ) : (
-      "—"
-    );
-  };
+  // Las ternas concomitantes de cada tramo, como en Pilares (UI-10)
   return (
-    <Seccion titulo="Tramos" valor="fem consultar pieza">
-      <table className="tb">
-        <thead>
-          <tr>
-            <th>Tramo</th>
-            <th>N kN</th>
-            <th>|My| kN·m</th>
-            <th>|Mz| kN·m</th>
-            <th className="nu">ν</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filas.map((f) => (
-            <tr key={f.planta}>
-              <td>
-                bajo {f.planta}
-                <small>
-                  {f.tramo.seccion} · {fmt(f.tramo.longitud, 2)} m
-                </small>
-              </td>
-              <td>{celda(f, "N-")}</td>
-              <td>{celda(f, "My")}</td>
-              <td>{celda(f, "Mz")}</td>
-              <td>
-                {f.nu ? fmt(f.nu.nu, 2) : "—"}
-                <small>{f.nu?.comb ?? ""}</small>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="nota">N: la mayor compresión de la base y la cabeza; |My| y |Mz|: el mayor de las dos, con su signo. Como el cuadro de Pilares.</p>
+    <Seccion titulo="Tramos" valor="ternas concomitantes">
+      <TablaTernas
+        compacta
+        filas={filas}
+        cabecera="Tramo"
+        titulo={(f) => (
+          <>
+            Tramo bajo {f.planta}
+            <small>
+              {f.tramo.seccion} · {fmt(f.tramo.longitud, 2)} m
+            </small>
+          </>
+        )}
+      />
+      <p className="nota">{NOTA_TERNAS}</p>
     </Seccion>
   );
 }
@@ -365,7 +331,7 @@ export function ModoDiagramas() {
 
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="esfuerzos" />
       <Separador />
       <BarraModos />
       <Separador />
@@ -468,7 +434,7 @@ export function ModoDiagramas() {
                     <th>Vano</th>
                     <th>My+ kN·m</th>
                     <th>My− kN·m</th>
-                    <th>|Vz| kN</th>
+                    <th title="El mayor |Vz| del vano, con su signo">Vz kN</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -516,7 +482,7 @@ export function ModoDiagramas() {
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 400 }}
       dock={[
         { id: "alzado", titulo: v ? `Alzado · ${v.id}` : "Alzado", contenido: alzado },
-        { id: "combinaciones", titulo: "Combinaciones", insignia: v?.combinaciones.nombres.length, contenido: v ? <TablaCombinaciones c={v.combinaciones} /> : <p className="nota">…</p> },
+        { id: "combinaciones", titulo: TITULO_COMBINACIONES, insignia: v?.combinaciones.nombres.length, contenido: v ? <TablaCombinaciones c={v.combinaciones} /> : <p className="nota">…</p> },
       ]}
     />
   );

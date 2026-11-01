@@ -105,7 +105,7 @@ describe.each(PROYECTOS)("I4 (resto) con %s", (_nombre, ruta) => {
 
   it("reacciones: cada flecha es la resultante de la consulta, en el sentido de su fuerza; la suma de una combinación, su total", () => {
     const q = s.q!;
-    const conj = valido(s.conjunto(D, "lineal"));
+    const conj = valido(s.conjunto(D, "reacciones"));
     const d = valido(s.reacciones3D(D));
     const r = valido(reacciones(q, conj, { todos: true }));
     expect(d.objetos.map((o) => o.id)).toEqual(r.objetos.map((o) => o.id));

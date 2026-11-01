@@ -64,11 +64,11 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 | `cargas` | Las cargas de cada caso (`--caso C` para uno) en la planta, con su valor |
 | `diagnosticos` | Una marca numerada en cada objeto con un error o un aviso, con la lista al lado |
 | `malla` | Láminas y barras de la planta |
-| `uz`, `m11`, `m22`, `m12`, `v13`, `v23` | Isovalores en las losas, en la combinación que gobierna en la planta, con las isolíneas rotuladas con su valor (la del 0, más gruesa) |
+| `uz`, `m11`, `m22`, `m12`, `v13`, `v23` | Isovalores en las losas, en la combinación que gobierna en la planta (con `--envolvente max\|min`, la envolvente en cada nudo), con las isolíneas rotuladas con su valor (la del 0, más gruesa). En uz se rotulan la flecha máxima (hacia abajo, en positivo) y, si lo hay, el levantamiento |
 | `f11`, `f22`, `f12` | Fuerzas de membrana de las losas (kN/m, tracción positiva). En una planta con diafragma rígido son nulas (las lleva el diafragma): el mapa sale de una sola banda y lo dice |
 | `vigas-my`, `vigas-vz` | Diagramas envolventes de vigas y viguetas, con el máximo y el mínimo de cada vano |
 | `pilares-n` | Axil de cada pilar que llega a la planta |
-| `reacciones` | Reacciones de los pilares y muros que arrancan de la planta y de sus apoyos: Fz rotulada y (Fx, Fy) a escala; por defecto, cada objeto en el caso de su mayor \|Fz\| (como `consultar reacciones`) |
+| `reacciones` | Reacciones de los pilares y muros que arrancan de la planta y de sus apoyos: Fz rotulada y (Fx, Fy) a escala; por defecto, cada objeto en la combinación de la ELS característica de su mayor \|Fz\| (sin acciones en los casos, en el caso de su mayor \|Fz\|) |
 | `armado-x-inf`, `armado-x-sup`, `armado-y-inf`, `armado-y-sup` | Las franjas de armado de las losas, coloreadas por tramos según la demanda de Wood–Armer (kN·m/m) de su armadura inferior o superior en X (el eje 1 de cada losa) o en Y, de `consultar franja`; rotulados, los picos de cada franja. Con la armadura base del proyecto, lo cubierto en gris y las zonas de refuerzo con su máximo y el exceso |
 | `bandas` | Las bandas de dimensionado del proyecto (si las tiene) con su My en cada estación, de `consultar banda` |
 
@@ -76,6 +76,7 @@ Son avisos de orden de magnitud, no comprobaciones de norma. Escribe el informe 
 - `modelo`, `cargas` y `diagnosticos` se dibujan aunque el modelo no compile: así se ve dónde está el error.
 - Todas las vistas llevan los ejes de replanteo (los de `ejes` o, sin ellos, los propuestos con las alineaciones de los pilares): úsalos para comprobar que cada pilar está en su eje.
 - Las combinaciones son las de `consultar`; sin acciones en los casos, la suma de los gravitatorios (×1 en uz y ×1,4 en los esfuerzos). Con `--caso` y `--combinacion`, como en las consultas.
+- `--envolvente` de los mapas con varias combinaciones: `max` o `min` dibuja en cada nudo la mayor o la menor de todas, y cada extremo de `extremos` lleva la suya en `comb`. Sin ella, el mapa es una sola combinación (la de mayor |valor| de la planta) y no es la envolvente: un punto puede valer más en otra.
 - `--escala` de los mapas: `completa` (por defecto), `sin-picos` (sin el 1 % del área por cada lado) o `mín:máx:paso` (cualquiera vacío: `-40:20:`, `::5`). Lo que se sale va rayado en una banda «menos de…» o «más de…»; los `extremos` siguen siendo los reales. Cada figura de mapa trae su `escala` en el JSON; con `picos: true`, la escala completa la marcan picos locales y conviene mirarla también `sin-picos`.
 
 **Mira `modelo` y `cargas` de cada planta antes de calcular, y compáralos con la descripción:**
@@ -171,7 +172,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 | `combinaciones` | Las combinaciones en uso, con sus factores |
 
 **Combinaciones:**
-- Por defecto, ELU para los esfuerzos, ELS característica para los desplazamientos y los casos sueltos para las reacciones.
+- Por defecto, ELU para los esfuerzos, ELS característica para los desplazamientos y los casos sueltos para la consulta de reacciones (su dibujo, `fem render --vista reacciones`, en la ELS característica).
 - Para cambiarlas: `--casos`, `--situacion ELU-PT,ELS-C`, `--combinacion "1.35*G+1.5*Q"` (repetible) o `--caso G`.
 - `--estaciones` necesita una sola combinación.
 

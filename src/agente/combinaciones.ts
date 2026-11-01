@@ -32,8 +32,11 @@ export type Seleccion =
   /** Combinaciones escritas como expresiones lineales de los casos. */
   | { tipo: "expresiones"; expresiones: string[] };
 
-/** «lineal»: lo que se combina linealmente (reacciones): por defecto, los casos sueltos. */
-export type Proposito = "esfuerzos" | "desplazamientos" | "lineal";
+/**
+ * «lineal»: lo que se combina linealmente (la consulta de reacciones): por defecto, los casos
+ * sueltos. «reacciones»: el dibujo de las reacciones (UI-11), por defecto en la ELS característica.
+ */
+export type Proposito = "esfuerzos" | "desplazamientos" | "lineal" | "reacciones";
 
 type Respuesta<T> = { valido: true; valor: T; diagnosticos: Diagnostico[] } | { valido: false; diagnosticos: Diagnostico[] };
 
@@ -42,7 +45,7 @@ const no = <T>(codigo: string, mensaje: string): Respuesta<T> => ({ valido: fals
 /** La selección por defecto para un propósito. */
 export function seleccionPorDefecto(casos: readonly CasoFisico[], proposito: Proposito): Seleccion {
   if (proposito === "lineal" || !casos.length || !casos.every((c) => c.accion)) return { tipo: "casos" };
-  if (proposito === "desplazamientos") return { tipo: "situaciones", situaciones: ["ELS-C"] };
+  if (proposito === "desplazamientos" || proposito === "reacciones") return { tipo: "situaciones", situaciones: ["ELS-C"] };
   const tipos = new Set(casos.map((c) => c.accion!.tipo));
   return { tipo: "situaciones", situaciones: ["ELU-PT", ...(tipos.has("E") ? (["ELU-SIS"] as const) : []), ...(tipos.has("A") ? (["ELU-ACC"] as const) : [])] };
 }

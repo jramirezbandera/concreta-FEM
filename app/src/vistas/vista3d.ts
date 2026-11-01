@@ -2061,7 +2061,7 @@ export class Vista3D extends Vista {
         }
     }
     const i = this.iso;
-    if (i) for (const e of i.extremos) r.push({ p: e.punto, texto: `${e.que} ${rotulo(e.valor)} ${i.unidad} · ${e.objeto}`, signo: Math.sign(e.valor), prioridad: 100 });
+    if (i) for (const e of i.extremos) r.push({ p: e.punto, texto: `${e.texto ?? `${e.que} ${rotulo(e.valor)} ${i.unidad}`} · ${e.objeto}${e.comb ? ` · ${e.comb}` : ""}`, signo: Math.sign(e.valor), prioridad: 100 });
     const pl = this.pil;
     if (pl)
       for (const e of pl.extremos) {

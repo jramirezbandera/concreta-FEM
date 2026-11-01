@@ -386,6 +386,43 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
           expect([v!.valor, ...(v!.otros ?? [])].some((y) => Math.abs(y - ex.valor) <= 1e-9 * Math.max(1, Math.abs(ex.valor))), `${v!.valor} ${v!.otros}`).toBe(true);
           expect(v!.comb).toBe(ex.comb);
         }
+        // UI-1: en la envolvente, el valor de un punto es el mayor (o el menor) de cada combinación en
+        // él, con la suya; en el nudo de su extremo, el del extremo
+        const conj = valido(s.conjunto(D, campo === "uz" ? "desplazamientos" : "esfuerzos"));
+        if (conj.factores.length < 2 || !x.escena.mapa) continue;
+        for (const envolvente of ["max", "min"] as const) {
+          const xe = valido(datosLosas(s, p.id, campo, D, undefined, undefined, envolvente));
+          expect(xe.envolvente).toBe(envolvente);
+          expect(xe.dibujada).toBeNull();
+          const puntos: Vec2[] = [...xe.escena.extremos.map((ex) => ex.punto!), ...x.escena.extremos.map((ex) => ex.punto!)];
+          // Y puntos dentro de las láminas, lejos de sus nudos
+          const c = s.compilado!;
+          for (const l of s.rr!.laminas(p.id).laminas.slice(0, 5)) {
+            const ns = c.modelo.laminas![l]!.nudos.map((n) => c.modelo.nudos[n]!);
+            puntos.push([0.4 * ns[0]!.x + 0.3 * ns[1]!.x + 0.2 * ns[2]!.x + 0.1 * ns[3]!.x, 0.4 * ns[0]!.y + 0.3 * ns[1]!.y + 0.2 * ns[2]!.y + 0.1 * ns[3]!.y]);
+          }
+          for (const pt of puntos) {
+            const v = valido(valorEnPunto(s, p.id, campo, D, pt[0], pt[1], undefined, envolvente));
+            if (!v) continue;
+            const vs = conj.nombres.map((nombre, k) => {
+              const una = valido(valorEnPunto(s, p.id, campo, { tipo: "una", de: D, nombre }, pt[0], pt[1]));
+              return { valor: una!.valor, comb: conj.nombres[k]! };
+            });
+            const max = vs.reduce((a, b) => (b.valor > a.valor ? b : a));
+            const min = vs.reduce((a, b) => (b.valor < a.valor ? b : a));
+            const tol = 1e-9 * Math.max(1, Math.abs(max.valor), Math.abs(min.valor));
+            expect(Math.abs(v.envolvente!.max.valor - max.valor)).toBeLessThanOrEqual(tol);
+            expect(Math.abs(v.envolvente!.min.valor - min.valor)).toBeLessThanOrEqual(tol);
+            expect(v.valor).toBe(v.envolvente![envolvente].valor);
+            expect(v.comb).toBe(v.envolvente![envolvente].comb);
+          }
+          // En el nudo de su extremo, el valor del punto es el del mapa (salvo un salto entre regiones SPR)
+          for (const ex of xe.escena.extremos) {
+            const v = valido(valorEnPunto(s, p.id, campo, D, ex.punto![0], ex.punto![1], undefined, envolvente))!;
+            if (valido(valorEnPunto(s, p.id, campo, { tipo: "una", de: D, nombre: ex.comb! }, ex.punto![0], ex.punto![1]))!.otros) continue;
+            expect(Math.abs(v.valor - ex.valor)).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(ex.valor)));
+          }
+        }
       }
     }
   });
@@ -429,6 +466,28 @@ describe.each(PROYECTOS)("V1 con %s", (nombre, ruta) => {
       const t = valido(datosPilar(s, id, D)).filas;
       expect(Math.max(...t.map((f) => f.nu?.nu ?? -Infinity))).toBe(porPilar.get(id));
     }
+    // UI-10: cada terna del cuadro es concomitante (sus seis esfuerzos, los de su combinación en esa
+    // sección) y su combinación, la que da el pésimo (la primera, si empatan)
+    let ternas = 0;
+    for (const id of (s.proyecto.modelo.pilares ?? []).slice(0, 12).map((p) => p.id)) {
+      const porCaso = valido(q.pilar(id));
+      valido(datosPilar(s, id, D)).filas.forEach((f, i) => {
+        for (const ex of ["cabeza", "base"] as const) {
+          const e = porCaso[i]![ex].esfuerzos;
+          const combs = esf.factores.map((fa) => [0, 1, 2, 3, 4, 5].map((c) => fa.reduce((t, x, k) => t + x * e[6 * k + c]!, 0)));
+          for (const [t, c, cual] of [["N-", 0, "min"], ["N+", 0, "max"], ["My", 4, "abs"], ["Mz", 5, "abs"]] as const) {
+            const x = f.tramo[ex][t]!;
+            const k = esf.nombres.indexOf(x.comb);
+            for (let j = 0; j < 6; j++) expect(Math.abs(x.esfuerzos[j]! - combs[k]![j]!)).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(combs[k]![j]!)));
+            const v = combs.map((y) => (cual === "abs" ? Math.abs(y[c]!) : y[c]!));
+            const pes = cual === "min" ? Math.min(...v) : Math.max(...v);
+            expect(Math.abs(v[k]! - pes)).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(pes)));
+            ternas++;
+          }
+        }
+      });
+    }
+    if (s.proyecto.modelo.pilares?.length) expect(ternas).toBeGreaterThan(0);
     // Los avisos de axil reducido de A3 dan el mismo ν que el visor en su pilar
     const a3 = sensatezResultados(q, s.resumen!, s.proyecto.opciones).comprobaciones.find((c) => c.codigo === "sensatez/axil-reducido")!;
     for (const av of a3.avisos) {

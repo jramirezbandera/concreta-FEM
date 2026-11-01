@@ -1,7 +1,7 @@
 /** Piezas comunes de los paneles: secciones, filas, combinaciones, diagnósticos y equilibrio. */
 import type { ComponentType, ReactNode } from "react";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
-import type { CombinacionDisponible, EleccionCombinaciones, EstadoSesion } from "../../../src/visor/sesion.ts";
+import type { CombinacionDisponible, EleccionCombinaciones, EstadoSesion, PropositoVista } from "../../../src/visor/sesion.ts";
 import type { Combinaciones } from "../../../src/visor/datos.ts";
 import { Campo } from "../armazon/Disposicion.tsx";
 import { fmt } from "../fmt.ts";
@@ -56,20 +56,27 @@ const AYUDA_ACCION = "Dé la acción de cada caso (tipo, ψ, familia, dirección
 /** Valor del selector de combinaciones, en texto. */
 const codificar = (e: EleccionCombinaciones) => JSON.stringify(e);
 
+/** «Por defecto» con lo que es (UI-12): «Por defecto (ELU-PT, 8)»; sin resultados, sólo «Por defecto». */
+export function textoPorDefecto(d: { descripcion: string; n: number } | undefined): string {
+  if (!d) return "Por defecto";
+  if (d.descripcion === "casos") return `Por defecto (cada caso, ${d.n})`;
+  return d.n > 1 ? `Por defecto (${d.descripcion}, ${d.n})` : `Por defecto (${d.descripcion})`;
+}
+
 /**
  * Selector de combinaciones, en la barra de herramientas de Resultados: las de por defecto (las de
- * A1/A4 para la vista), la envolvente de una situación, una combinación suelta o un caso. Todas las
- * opciones a la vista en un solo desplegable. Con `pesima` (los mapas de Losas, que pintan entera la
- * combinación de mayor |valor|), la situación no se llama envolvente: no lo es punto a punto.
+ * A1/A4 para el propósito de la vista, con lo que son: UI-12), la envolvente de una situación, una
+ * combinación suelta o un caso. Todas las opciones a la vista en un solo desplegable.
  */
-export function ComboCombinaciones({ estado, valor, onCambio, etiqueta, soloUna, pesima }: { estado: EstadoSesion; valor: EleccionCombinaciones; onCambio: (e: EleccionCombinaciones) => void; etiqueta: string; soloUna?: boolean; pesima?: boolean }) {
+export function ComboCombinaciones({ estado, valor, onCambio, proposito, soloUna }: { estado: EstadoSesion; valor: EleccionCombinaciones; onCambio: (e: EleccionCombinaciones) => void; proposito: PropositoVista; soloUna?: boolean }) {
   const porSituacion = new Map<string, CombinacionDisponible[]>();
   const sin = estado.sinCombinaciones;
   for (const c of estado.combinaciones) porSituacion.set(c.situacion, [...(porSituacion.get(c.situacion) ?? []), c]);
+  const defecto = estado.defectos?.[proposito];
   return (
-    <Campo etiqueta={`Combinaciones · ${etiqueta}`} ancho={280}>
-      <select className="sel w-full" value={codificar(valor)} title={sin ? `Sin combinaciones CTE/NCSE. ${sin.mensaje}${sin.sinAccion.length ? ` ${AYUDA_ACCION}` : ""}` : undefined} onChange={(e) => onCambio(JSON.parse(e.target.value) as EleccionCombinaciones)}>
-        {!soloUna && <option value={codificar({ tipo: "defecto" })}>Por defecto</option>}
+    <Campo etiqueta={`Combinaciones · ${proposito}`} ancho={280}>
+      <select className="sel w-full" aria-label={`Combinaciones · ${proposito}`} value={codificar(valor)} title={sin ? `Sin combinaciones CTE/NCSE. ${sin.mensaje}${sin.sinAccion.length ? ` ${AYUDA_ACCION}` : ""}` : undefined} onChange={(e) => onCambio(JSON.parse(e.target.value) as EleccionCombinaciones)}>
+        {!soloUna && <option value={codificar({ tipo: "defecto" })}>{textoPorDefecto(defecto)}</option>}
         {sin && (
           <optgroup label="Sin combinaciones CTE/NCSE">
             <option disabled value="">
@@ -78,10 +85,10 @@ export function ComboCombinaciones({ estado, valor, onCambio, etiqueta, soloUna,
           </optgroup>
         )}
         {!soloUna && porSituacion.size > 0 && (
-          <optgroup label={pesima ? "La pésima de una situación (una combinación)" : "Envolvente de una situación"}>
+          <optgroup label="Envolvente de una situación">
             {[...porSituacion].map(([s, cs]) => (
               <option key={s} value={codificar({ tipo: "situaciones", situaciones: [s as never] })}>
-                {pesima ? `La pésima de ${s} (de ${cs.length})` : `${s} (${cs.length})`}
+                {`${s} (${cs.length})`}
               </option>
             ))}
           </optgroup>
@@ -108,10 +115,13 @@ export function ComboCombinaciones({ estado, valor, onCambio, etiqueta, soloUna,
   );
 }
 
+/** El título de la pestaña del panel inferior con las combinaciones de lo que se ve (UI-12: cambian con el modo). */
+export const TITULO_COMBINACIONES = "Combinaciones de esta vista";
+
 /** Las combinaciones que entran en lo que se ve, con su expresión (en el panel inferior). */
 export function TablaCombinaciones({ c, resaltar }: { c: Combinaciones; resaltar?: string | null }) {
   return (
-    <Seccion titulo="Combinaciones" valor={`${c.nombres.length} · ${c.descripcion}`}>
+    <Seccion titulo={TITULO_COMBINACIONES} valor={`${c.nombres.length} · ${c.descripcion}`}>
       <div>
         <table className="tb">
           <thead>

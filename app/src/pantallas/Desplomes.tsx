@@ -12,7 +12,7 @@ import type { DatosDesplomes } from "../../../src/visor/datos.ts";
 import { Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcDeformada } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { cota, fmt, fraccion, mm } from "../fmt.ts";
@@ -85,7 +85,7 @@ export function ModoDeformada() {
 
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="desplazamientos" />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="desplazamientos" />
       <Separador />
       <BarraModos />
       <Separador />
@@ -229,7 +229,7 @@ export function ModoDeformada() {
       props={{ titulo: "Propiedades", contenido: propiedades, ancho: 320 }}
       dock={[
         { id: "desplomes", titulo: "Desplomes por planta", contenido: tabla },
-        { id: "combinaciones", titulo: "Combinaciones", insignia: x?.combinaciones.nombres.length, contenido: x ? <TablaCombinaciones c={x.combinaciones} resaltar={x.pesima} /> : <p className="nota">…</p> },
+        { id: "combinaciones", titulo: TITULO_COMBINACIONES, insignia: x?.combinaciones.nombres.length, contenido: x ? <TablaCombinaciones c={x.combinaciones} resaltar={x.pesima} /> : <p className="nota">…</p> },
       ]}
     />
   );

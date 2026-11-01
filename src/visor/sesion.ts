@@ -26,7 +26,7 @@ import { vistaArmado, type Armadura, type FiltroArmado } from "../agente/render/
 import type { DatosVista } from "../agente/render/modelo.ts";
 import type { ArmadoProyecto } from "../agente/armaduraBase.ts";
 import { armado3D, tramosPlanta, valorArmado, type Armado3D, type ValorArmado } from "./armado.ts";
-import { UNIDADES_CAMPO } from "../agente/render/resultados.ts";
+import { UNIDADES_CAMPO, type Envolvente } from "../agente/render/resultados.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../agente/resultados.ts";
 import { sensatezPrevia } from "../agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../combinaciones/generador.ts";
@@ -48,6 +48,10 @@ import { reacciones3D, type Reacciones3D } from "./reacciones3d.ts";
 import { cargas3D, type Cargas3D } from "./cargas3d.ts";
 
 export type Compilado = Extract<ResultadoCompilacion, { valido: true }>;
+
+/** Los propósitos de las vistas de Resultados: lo que pinta cada una por defecto. */
+export const PROPOSITOS_VISTA = ["esfuerzos", "desplazamientos", "reacciones"] as const;
+export type PropositoVista = (typeof PROPOSITOS_VISTA)[number];
 
 /** Qué combinaciones usa una pantalla. */
 export type EleccionCombinaciones =
@@ -72,7 +76,8 @@ export type VistaPlanta =
 /** Las vistas de planta con resultados. `malla`: con la malla de la planta encima (`capaMalla`). */
 export type VistaResultadosPlanta = (
   /** `escala`: la del mapa (`EscalaMapa`); sin ella, la completa. */
-  | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa }
+  /** `envolvente`: con varias combinaciones, el mapa de su envolvente en cada nudo (UI-1); sin ella, la que gobierna en la planta. */
+  | { vista: "campo"; campo: Campo; combinaciones: EleccionCombinaciones; escala?: EscalaMapa; envolvente?: Envolvente }
   | { vista: "vigas"; esfuerzo: "My" | "Vz"; combinaciones: EleccionCombinaciones }
   | { vista: "pilares-n"; combinaciones: EleccionCombinaciones }
   /** Fase F: la demanda de Wood–Armer de una armadura de las franjas de la planta. */
@@ -129,6 +134,8 @@ export interface PedidoIsovalores3D {
   /** Por defecto, las losas. */
   superficies?: SuperficiesMapa;
   escala?: EscalaMapa;
+  /** UI-1: con varias combinaciones, su envolvente (como en la planta). */
+  envolvente?: Envolvente;
 }
 
 /** AB: el armado en el 3D, de una planta o de todas (null), con la base del proyecto que se edita. */
@@ -162,9 +169,10 @@ export interface PedidoPilares3D {
 /** El valor de un mapa bajo el cursor (I4): en un punto de una lámina, en una combinación. */
 export interface PedidoValorLamina {
   campo: Campo;
-  /** Las del mapa y, de ellas, la dibujada (`nombre`). */
+  /** Las del mapa y, de ellas, la dibujada (`nombre`) o, en una envolvente (UI-1), la que manda en el punto. */
   combinaciones: EleccionCombinaciones;
-  nombre: string;
+  nombre?: string;
+  envolvente?: Envolvente;
   lamina: number;
   punto: readonly [number, number, number];
 }
@@ -220,6 +228,8 @@ export interface EstadoSesion {
   combinaciones: CombinacionDisponible[];
   /** Sin combinaciones del generador, por qué: el mensaje de la consulta y los casos sin acción. */
   sinCombinaciones?: { mensaje: string; sinAccion: string[] };
+  /** UI-12: lo que es «Por defecto» en cada propósito (con resultados), para decirlo en el selector. */
+  defectos?: Partial<Record<PropositoVista, { descripcion: string; n: number }>>;
   /** sha256 de los resultados empaquetados como `resultados.bin` (el mismo que guarda la CLI): criterio 2 de V1. */
   sha256Resultados: string | null;
   /** I2: los ejes de replanteo que se dibujan (los del modelo o, si no tiene, los propuestos). */
@@ -402,6 +412,7 @@ export class Sesion {
       origen: this.origenR,
       equilibrio: (this.cabecera?.casos ?? []).map((x) => ({ id: x.id, ...x.equilibrio })),
       ...this.combinacionesEstado(),
+      ...this.defectosEstado(),
       sha256Resultados: this.shaR,
       ejes: this.ejesEstado(),
       vistas: this.proyecto.vistas ?? [],
@@ -510,13 +521,25 @@ export class Sesion {
     return { combinaciones, sinCombinaciones: { mensaje, sinAccion: q.fisico.casos.filter((c) => !c.accion).map((c) => c.id) } };
   }
 
+  /** Lo que es «Por defecto» en cada propósito, si hay resultados (UI-12). */
+  private defectosEstado(): Pick<EstadoSesion, "defectos"> {
+    if (!this.q || !this.resumen) return {};
+    const defectos: NonNullable<EstadoSesion["defectos"]> = {};
+    for (const p of PROPOSITOS_VISTA) {
+      const c = this.conjunto({ tipo: "defecto" }, p);
+      if (c.valido) defectos[p] = { descripcion: c.valor.descripcion, n: c.valor.nombres.length };
+    }
+    return { defectos };
+  }
+
   /** El conjunto de combinaciones de una elección, para un propósito. */
   conjunto(e: EleccionCombinaciones, proposito: Proposito): { valido: true; valor: ConjuntoCombinaciones } | { valido: false; diagnosticos: Diagnostico[] } {
     const q = this.q;
     if (!q || !this.resumen) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
     switch (e.tipo) {
       case "defecto":
-        return proposito === "lineal" ? conjuntoCombinaciones(q, seleccionPorDefecto(q.fisico.casos, "lineal")) : { valido: true, valor: conjuntoPorDefecto(q, this.resumen!, proposito) };
+        // Las reacciones se dibujan en la ELS característica (UI-11); lo lineal, por casos
+        return proposito === "lineal" || proposito === "reacciones" ? conjuntoCombinaciones(q, seleccionPorDefecto(q.fisico.casos, proposito)) : { valido: true, valor: conjuntoPorDefecto(q, this.resumen!, proposito) };
       case "situaciones":
         return conjuntoCombinaciones(q, { tipo: "situaciones", situaciones: e.situaciones });
       case "combinacion": {
@@ -575,13 +598,13 @@ export class Sesion {
           e = { ...r.valor, primitivas: [...r.valor.primitivas.filter((p) => p.tipo !== "texto"), ...m.primitivas, ...textos], leyenda: [...r.valor.leyenda, ...m.leyenda], notas: [...r.valor.notas, ...m.notas] };
         } else if (v.vista === "malla") e = vistaMalla(rr, planta, d);
         else if (v.vista === "reacciones") {
-          const conj = this.conjunto(v.combinaciones, "lineal");
+          const conj = this.conjunto(v.combinaciones, "reacciones");
           if (!conj.valido) return conj;
           e = vistaReacciones(rr, planta, conj.valor, d, v.escala);
         } else {
           const conj = this.conjunto(v.combinaciones, v.vista === "campo" && v.campo === "uz" ? "desplazamientos" : "esfuerzos");
           if (!conj.valido) return conj;
-          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : v.vista === "armado" ? this.vistaArmado(rr, planta, v, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
+          e = v.vista === "campo" ? vistaCampo(rr, planta, v.campo, conj.valor, d, v.escala, v.envolvente) : v.vista === "vigas" ? vistaDiagramas(rr, planta, v.esfuerzo, conj.valor, d) : v.vista === "armado" ? this.vistaArmado(rr, planta, v, conj.valor, d) : vistaAxiles(rr, planta, conj.valor, d);
         }
       }
     }
@@ -625,7 +648,7 @@ export class Sesion {
     } else if (reacciones) {
       const rr = this.rr;
       if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Las reacciones necesitan el cálculo." }] };
-      const conj = this.conjunto(reacciones.combinaciones, "lineal");
+      const conj = this.conjunto(reacciones.combinaciones, "reacciones");
       if (!conj.valido) return conj;
       e = vistaAlzadoReacciones(rr, plano, conj.valor, d, reacciones.escala, modo);
     } else if (cargas) {
@@ -685,7 +708,7 @@ export class Sesion {
     if (p.planta !== null && !this.proyecto.modelo.plantas.some((x) => x.id === p.planta)) return { valido: false, diagnosticos: [{ codigo: "visor/planta", severidad: "error", mensaje: `La planta ${p.planta} no existe.` }] };
     const conj = this.conjunto(p.combinaciones, p.campo === "uz" ? "desplazamientos" : "esfuerzos");
     if (!conj.valido) return conj;
-    return { valido: true, valor: isovalores3D(rr, this.origen3D, p.campo, conj.valor, { planta: p.planta, ...(p.superficies ? { superficies: p.superficies } : {}), ...(p.escala ? { escala: p.escala } : {}) }) };
+    return { valido: true, valor: isovalores3D(rr, this.origen3D, p.campo, conj.valor, { planta: p.planta, ...(p.superficies ? { superficies: p.superficies } : {}), ...(p.escala ? { escala: p.escala } : {}), ...(p.envolvente ? { envolvente: p.envolvente } : {}) }) };
   }
 
   pilares3D(p: PedidoPilares3D): { valido: true; valor: Pilares3D } | { valido: false; diagnosticos: Diagnostico[] } {
@@ -700,7 +723,7 @@ export class Sesion {
   reacciones3D(e: EleccionCombinaciones, escala?: number): { valido: true; valor: Reacciones3D } | { valido: false; diagnosticos: Diagnostico[] } {
     const rr = this.rr;
     if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "Las reacciones necesitan el cálculo." }] };
-    const conj = this.conjunto(e, "lineal");
+    const conj = this.conjunto(e, "reacciones");
     if (!conj.valido) return conj;
     return reacciones3D(rr, this.origen3D, conj.valor, escala);
   }
@@ -730,7 +753,28 @@ export class Sesion {
     const rr = this.rr;
     if (!rr) return { valido: false, diagnosticos: [{ codigo: "visor/sin-resultados", severidad: "error", mensaje: "No hay resultados de esta huella." }] };
     if (!Number.isInteger(p.lamina) || p.lamina < 0 || p.lamina >= (rr.c.modelo.laminas?.length ?? 0)) return { valido: false, diagnosticos: [{ codigo: "visor/lamina", severidad: "error", mensaje: `No hay ninguna lámina ${p.lamina}.` }] };
-    const conj = this.conjunto({ tipo: "una", de: p.combinaciones, nombre: p.nombre }, p.campo === "uz" ? "desplazamientos" : "esfuerzos");
+    const proposito = p.campo === "uz" ? "desplazamientos" : "esfuerzos";
+    if (p.envolvente) {
+      // La de ese punto: cada combinación en él (lineal en los casos) y, de ellas, la mayor o la menor
+      const conj = this.conjunto(p.combinaciones, proposito);
+      if (!conj.valido) return conj;
+      const porCaso = rr.q.casos.map((_, k) => {
+        const f = new Float64Array(rr.q.casos.length);
+        f[k] = 1;
+        return valorEnLamina(rr, p.campo, f, p.lamina, p.punto);
+      });
+      const h = porCaso[0];
+      if (!h) return { valido: true, valor: null };
+      let mejor = { valor: p.envolvente === "max" ? -Infinity : Infinity, comb: "" };
+      conj.valor.factores.forEach((f, kc) => {
+        let v = 0;
+        for (let k = 0; k < f.length; k++) if (f[k]) v += f[k]! * porCaso[k]!.valor;
+        if (p.envolvente === "max" ? v > mejor.valor : v < mejor.valor) mejor = { valor: v, comb: conj.valor.nombres[kc]! };
+      });
+      return { valido: true, valor: { valor: mejor.valor, objeto: h.objeto, planta: h.planta, unidad: UNIDADES_CAMPO[p.campo], lamina: p.lamina, comb: mejor.comb } };
+    }
+    if (p.nombre === undefined) return { valido: false, diagnosticos: [{ codigo: "visor/combinacion", severidad: "error", mensaje: "Falta la combinación dibujada." }] };
+    const conj = this.conjunto({ tipo: "una", de: p.combinaciones, nombre: p.nombre }, proposito);
     if (!conj.valido) return conj;
     const v = valorEnLamina(rr, p.campo, conj.valor.factores[0]!, p.lamina, p.punto);
     return { valido: true, valor: v ? { ...v, unidad: UNIDADES_CAMPO[p.campo], lamina: p.lamina, comb: p.nombre } : null };

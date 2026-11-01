@@ -523,7 +523,7 @@ export function ModoArmado() {
 
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="esfuerzos" />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="esfuerzos" />
       <CampoLista etiqueta="Armadura" valor={armadura} onCambio={setArmadura} opciones={ARMADURAS} />
       <Separador />
       <BarraModos />

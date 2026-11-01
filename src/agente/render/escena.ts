@@ -191,6 +191,8 @@ export interface EscalaDibujada {
   nulo?: true;
   /** La combinación dibujada (la de los extremos; también cuando un campo nulo no los rotula). */
   combinacion?: string;
+  /** UI-1: el mapa es la envolvente máxima o mínima de sus combinaciones (cada extremo, con la suya). */
+  envolvente?: "max" | "min";
 }
 
 /** Caja de unos puntos (la vacía si no hay ninguno). */

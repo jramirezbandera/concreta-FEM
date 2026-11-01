@@ -67,7 +67,7 @@
 | Desplomes | `deriva` |
 | Revisión | `revisar` |
 
-**Combinaciones.** «Por defecto» son las de las consultas de A1 y el render de A4. El selector ofrece además la envolvente de cada situación, cada combinación suelta y cada caso. Un mapa se dibuja en la combinación de mayor |valor| de las elegidas, y se dice cuál.
+**Combinaciones.** «Por defecto» son las de las consultas de A1 y el render de A4. El selector ofrece además la envolvente de cada situación, cada combinación suelta y cada caso. Un mapa se dibuja en la combinación de mayor |valor| de las elegidas, y se dice cuál. **Cambiado el 2026-11-01 (UI-1, `auditoria-ui.md`):** con varias combinaciones, el mapa es su envolvente en cada nudo, la máxima o la mínima, y el clic da la combinación que manda en el punto; la pésima de la planta no es la envolvente (en el muestrario, un 13 % por debajo en un punto).
 
 **Origen y recarga.** Hay dos orígenes que se vigilan:
 - la carpeta (File System Access, Chrome y Edge, elegida por el usuario);

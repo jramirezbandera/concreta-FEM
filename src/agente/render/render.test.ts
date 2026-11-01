@@ -21,7 +21,7 @@ import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import { pieza, resumen, type VanoEnvolvente } from "../consultas.ts";
 import { anchoTexto, area, dentro, rotulo, type Escena, type Primitiva, type Vec2 } from "./escena.ts";
 import { bandaDe, bandas, coloresBandas, escalaDeTexto, isolineas, limitesMapa, limitesRedondos, PRIORIDAD_ISOLINEA, rangoSinPicos, rotulosLineas, SEPARACION_ROTULOS, triangulosCuadrilatero, trozosTriangulo, type LimitesMapa, type Triangulo } from "./isovalores.ts";
-import { envolventePieza } from "./resultados.ts";
+import { envolventeCampo, envolventePieza, valoresCampo, type Envolvente } from "./resultados.ts";
 import {
   conjuntoPorDefecto,
   escenaASvg,
@@ -386,22 +386,84 @@ describe("A4, criterio 1: lo dibujado es lo del modelo y de las consultas", () =
     expect(mala.notas[0]).toMatch(/^Escala no válida/);
   });
 
-  it("uz: el mínimo de cada planta es la flecha máxima de sus losas (Consultas.flechas) en la combinación que gobierna", () => {
+  it("uz: el mínimo de cada planta es la flecha máxima de sus losas (Consultas.flechas) en la combinación que gobierna, rotulada hacia abajo y en positivo (UI-14)", () => {
     for (const [nombre, f] of MODELOS) {
       const { q, r, cj } = calculados.get(nombre)!;
       for (const pl of f.plantas) {
         const losas = (f.losas ?? []).filter((l) => l.planta === pl.id);
         if (!losas.length) continue;
-        const e = vistaCampo(r, pl.id, "uz", cj.desplazamientos, d);
-        const min = e.extremos.find((x) => x.que === "uz mínimo")!;
-        const fs = cj.desplazamientos.factores[cj.desplazamientos.nombres.indexOf(min.comb!)]!;
-        const flecha = Math.max(...losas.map((l) => (q.flechas(l.id, fs) as { valido: true; valor: { maxima: { flecha: number } } }).valor.maxima.flecha));
-        expect(min.valor, `${nombre}, ${pl.id}`).toBeCloseTo(-flecha * 1000, 9);
-        // Y ninguna otra combinación da más
-        for (const g of cj.desplazamientos.factores) for (const l of losas) expect((q.flechas(l.id, g) as { valido: true; valor: { maxima: { flecha: number } } }).valor.maxima.flecha * 1000).toBeLessThanOrEqual(Math.max(Math.abs(min.valor), Math.abs(e.extremos[0]!.valor)) + 1e-9);
+        for (const env of [undefined, "min"] as const) {
+          const e = vistaCampo(r, pl.id, "uz", cj.desplazamientos, d, {}, env);
+          const min = e.extremos.find((x) => x.que === "flecha máxima")!;
+          const fs = cj.desplazamientos.factores[cj.desplazamientos.nombres.indexOf(min.comb!)]!;
+          const flecha = Math.max(...losas.map((l) => (q.flechas(l.id, fs) as { valido: true; valor: { maxima: { flecha: number } } }).valor.maxima.flecha));
+          expect(min.valor, `${nombre}, ${pl.id}`).toBeCloseTo(-flecha * 1000, 9);
+          // Su rótulo, en positivo y hacia abajo
+          expect(e.primitivas.some((p) => p.tipo === "texto" && p.texto.startsWith(`flecha máxima ${rotulo(-min.valor)} mm ↓`))).toBe(true);
+          // Y ninguna otra combinación da más
+          for (const g of cj.desplazamientos.factores) for (const l of losas) expect((q.flechas(l.id, g) as { valido: true; valor: { maxima: { flecha: number } } }).valor.maxima.flecha * 1000).toBeLessThanOrEqual(Math.abs(min.valor) + 1e-9);
+          // El levantamiento, sólo si algo sube
+          const lev = e.extremos.find((x) => x.que === "levantamiento máximo");
+          if ((env === "min" && cj.desplazamientos.factores.length > 1) || !(e.mapa!.maximo > 0)) expect(lev).toBeUndefined();
+          else expect(lev!.valor).toBe(e.mapa!.maximo);
+        }
       }
     }
   });
+
+  it("UI-1: la envolvente de un mapa es, en cada nudo, el máximo o el mínimo de sus combinaciones, con la que lo da; el extremo rotulado lo es de todas", () => {
+    let probados = 0;
+    for (const [nombre, f] of MODELOS) {
+      const { r, cj } = calculados.get(nombre)!;
+      for (const pl of f.plantas) {
+        if (!(f.losas ?? []).some((l) => l.planta === pl.id)) continue;
+        for (const [campo, conj] of [["uz", cj.desplazamientos], ["m11", cj.esfuerzos], ["v23", cj.esfuerzos]] as [Campo, ConjuntoCombinaciones][]) {
+          // Los modelos sin acciones en sus casos tienen una sola (la gravedad de A3)
+          if (conj.factores.length < 2) continue;
+          probados++;
+          const porComb = conj.factores.map((fs) => valoresCampo(r, pl.id, campo, fs).v);
+          for (const cual of ["max", "min"] as Envolvente[]) {
+            const env = envolventeCampo(r, pl.id, campo, conj, cual);
+            let extremo = cual === "max" ? -Infinity : Infinity;
+            for (let j = 0; j < env.v.length; j++) {
+              const vs = porComb.map((v) => v[j]!);
+              if (vs.some(Number.isNaN)) {
+                expect(env.v[j]).toBeNaN();
+                continue;
+              }
+              const x = cual === "max" ? Math.max(...vs) : Math.min(...vs);
+              expect(env.v[j]).toBe(x);
+              // La combinación del nudo es la primera que lo da
+              expect(env.comb[j]).toBe(vs.indexOf(x));
+              extremo = cual === "max" ? Math.max(extremo, x) : Math.min(extremo, x);
+            }
+            const e = vistaCampo(r, pl.id, campo, conj, d, {}, cual);
+            expect(e.mapa!.envolvente).toBe(cual);
+            expect(e.mapa!.combinacion).toBeUndefined();
+            expect(cual === "max" ? e.mapa!.maximo : e.mapa!.minimo).toBe(extremo);
+            // Un solo extremo rotulado, el suyo, con la combinación que lo da
+            const ex = e.extremos;
+            if (campo === "uz" && (cual === "max" ? !(extremo > 0) : !(extremo < 0))) expect(ex).toEqual([]);
+            else {
+              expect(ex.length).toBe(1);
+              expect(ex[0]!.valor).toBe(extremo);
+              const k = conj.nombres.indexOf(ex[0]!.comb!);
+              expect(k).toBeGreaterThanOrEqual(0);
+              expect(porComb[k]!.some((v) => v === extremo)).toBe(true);
+            }
+            // La pésima de la planta, una sola combinación, no llega más lejos que la envolvente
+            const pes = vistaCampo(r, pl.id, campo, conj, d);
+            if (cual === "max") expect(pes.mapa!.maximo).toBeLessThanOrEqual(extremo);
+            else expect(pes.mapa!.minimo).toBeGreaterThanOrEqual(extremo);
+          }
+          // Con una sola combinación, la envolvente no cambia nada
+          const una = { ...conj, nombres: conj.nombres.slice(0, 1), etiquetas: conj.etiquetas.slice(0, 1), factores: conj.factores.slice(0, 1) };
+          expect(escenaASvg(vistaCampo(r, pl.id, campo, una, d, {}, "max")).svg).toBe(escenaASvg(vistaCampo(r, pl.id, campo, una, d)).svg);
+        }
+      }
+    }
+    expect(probados).toBeGreaterThan(0);
+  }, 120_000);
 
   it("m11, m22 y v13: los extremos son los de los campos SPR en los nudos de las láminas de la planta", () => {
     for (const [nombre, f] of MODELOS) {
@@ -576,6 +638,7 @@ describe("A4, criterio 2: determinismo", () => {
           [vistaDiagnosticos(f, pl.id, diags, d), vistaDiagnosticos(g, pl.id, [...diags].reverse(), d)],
           [vistaMalla(r, pl.id, d), vistaMalla(r2, pl.id, d)],
           [vistaCampo(r, pl.id, "uz", cj.desplazamientos, d), vistaCampo(r2, pl.id, "uz", cj.desplazamientos, d)],
+          [vistaCampo(r, pl.id, "m11", cj.esfuerzos, d, {}, "min"), vistaCampo(r2, pl.id, "m11", cj.esfuerzos, d, {}, "min")],
           [vistaDiagramas(r, pl.id, "My", cj.esfuerzos, d), vistaDiagramas(r2, pl.id, "My", cj.esfuerzos, d)],
           [vistaAxiles(r, pl.id, cj.esfuerzos, d), vistaAxiles(r2, pl.id, cj.esfuerzos, d)],
           ...f.casos.map((x) => [vistaCargas(f, pl.id, x.id, d), vistaCargas(g, pl.id, x.id, d)] as [Escena, Escena]),

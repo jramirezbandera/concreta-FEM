@@ -12,8 +12,11 @@
  *   rotulados, de `Consultas.vano` en cada combinación;
  * - los axiles, de `Consultas.pilar`.
  *
- * Un mapa es de una combinación: con varias, la que da el mayor |valor| en la planta. Los diagramas y
- * los axiles son envolventes sobre todas las combinaciones del conjunto.
+ * Un mapa es de una combinación: con varias, la que da el mayor |valor| en la planta o, con
+ * `envolvente` (UI-1), su envolvente en cada nudo de cada lámina (el máximo o el mínimo, cada nudo con
+ * su combinación). Los diagramas y los axiles son envolventes sobre todas las combinaciones del
+ * conjunto. En uz, los extremos se rotulan como se leen (UI-14): la flecha máxima hacia abajo y, si lo
+ * hay, el levantamiento.
  *
  * Puro: sin IO.
  */
@@ -311,23 +314,80 @@ export function valoresCampo(r: ResultadosRender, planta: string, campo: Campo, 
   return { laminas, v };
 }
 
+/** UI-1: con varias combinaciones, el mapa de su envolvente: en cada nudo de cada lámina, el mayor o el menor valor. */
+export type Envolvente = "max" | "min";
+
+/**
+ * La envolvente de un campo en los nudos de las láminas de una planta (4 por lámina; NaN si no
+ * tiene): en cada nudo, el máximo o el mínimo de las combinaciones del conjunto y la que lo da (la
+ * primera, si empatan). Entre los nudos, el mapa la interpola: en una lámina queda por encima del
+ * máximo de cada combinación (por debajo del mínimo), del lado de la seguridad.
+ */
+export function envolventeCampo(r: ResultadosRender, planta: string, campo: Campo, conjunto: ConjuntoCombinaciones, cual: Envolvente, de: SuperficieMapa = "losas"): { laminas: number[]; v: Float64Array; comb: Int32Array } {
+  let laminas: number[] = [];
+  let v: Float64Array = new Float64Array();
+  let comb: Int32Array = new Int32Array();
+  conjunto.factores.forEach((f, k) => {
+    const x = valoresCampo(r, planta, campo, f, de);
+    if (k === 0) {
+      [laminas, v, comb] = [x.laminas, x.v, new Int32Array(x.v.length)];
+      return;
+    }
+    for (let j = 0; j < v.length; j++)
+      if (cual === "max" ? x.v[j]! > v[j]! : x.v[j]! < v[j]!) {
+        v[j] = x.v[j]!;
+        comb[j] = k;
+      }
+  });
+  return { laminas, v, comb };
+}
+
+/**
+ * Qué extremos de un mapa se rotulan y cómo (UI-14): en uz, la flecha máxima (el mínimo, si baja) y
+ * el levantamiento (el máximo, si sube), en positivo y con su flecha; en los demás, el máximo y el
+ * mínimo. Con una envolvente, sólo el suyo.
+ */
+export function extremosMapa(campo: Campo, vmin: number, vmax: number, envolvente: Envolvente | null): { cual: "max" | "min"; que: string; texto: string }[] {
+  const u = UNIDAD[campo];
+  const r: { cual: "max" | "min"; que: string; texto: string }[] = [];
+  if (campo === "uz") {
+    if (vmin < 0 && envolvente !== "max") r.push({ cual: "min", que: "flecha máxima", texto: `flecha máxima ${rotulo(-vmin)} mm ↓` });
+    if (vmax > 0 && envolvente !== "min") r.push({ cual: "max", que: "levantamiento máximo", texto: `levantamiento máximo ${rotulo(vmax)} mm ↑` });
+    return r;
+  }
+  if (envolvente !== "min") r.push({ cual: "max", que: `${campo} máximo`, texto: `máximo ${rotulo(vmax)} ${u}` });
+  if (envolvente !== "max") r.push({ cual: "min", que: `${campo} mínimo`, texto: `mínimo ${rotulo(vmin)} ${u}` });
+  return r;
+}
+
 /**
  * Mapa de isovalores de un campo en una planta. `escala` (`EscalaMapa`): la completa por defecto;
- * una no válida se cambia por la completa y se dice en las notas.
+ * una no válida se cambia por la completa y se dice en las notas. Con varias combinaciones, la que da
+ * el mayor |valor| en la planta o, con `envolvente`, la envolvente en cada nudo (UI-1).
  */
-export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, conjunto: ConjuntoCombinaciones, d: DatosVista, escala: EscalaMapa = {}): Escena {
+export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, conjunto: ConjuntoCombinaciones, d: DatosVista, escala: EscalaMapa = {}, envolvente?: Envolvente): Escena {
   const pl = new PlantaFisica(r.q.fisico, planta);
   const c = r.c;
-  // La combinación que gobierna en la planta: la del mayor |valor|
-  let mejor: { k: number; m: number; laminas: number[]; v: Float64Array } = { k: 0, m: -1, laminas: [], v: new Float64Array() };
-  conjunto.factores.forEach((f, k) => {
-    const x = valoresCampo(r, planta, campo, f);
-    let m = 0;
-    for (const y of x.v) if (Math.abs(y) > m) m = Math.abs(y);
-    if (m > mejor.m) mejor = { k, m, ...x };
-  });
-  const { laminas, v } = mejor;
-  const comb = conjunto.nombres[mejor.k] ?? "";
+  const env = envolvente && conjunto.factores.length > 1 ? envolvente : null;
+  let laminas: number[];
+  let v: Float64Array;
+  // La combinación de cada nudo: la de la envolvente o, sin ella, la que gobierna en la planta
+  let combNudo: Int32Array | null = null;
+  let k0 = 0;
+  if (env) ({ laminas, v, comb: combNudo } = envolventeCampo(r, planta, campo, conjunto, env));
+  else {
+    // La que gobierna en la planta: la del mayor |valor|
+    let mejor: { k: number; m: number; laminas: number[]; v: Float64Array } = { k: 0, m: -1, laminas: [], v: new Float64Array() };
+    conjunto.factores.forEach((f, k) => {
+      const x = valoresCampo(r, planta, campo, f);
+      let m = 0;
+      for (const y of x.v) if (Math.abs(y) > m) m = Math.abs(y);
+      if (m > mejor.m) mejor = { k, m, ...x };
+    });
+    ({ laminas, v, k: k0 } = mejor);
+  }
+  const comb = env ? "" : (conjunto.nombres[k0] ?? "");
+  const combDe = (j: number) => (combNudo ? (conjunto.nombres[combNudo[j]!] ?? "") : comb);
   const P: Primitiva[] = [];
   const notas: string[] = [];
   // Triángulos y extremos
@@ -335,6 +395,7 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   let [vmin, vmax] = [Infinity, -Infinity];
   let [pmin, pmax]: [Vec2 | null, Vec2 | null] = [null, null];
   let [omin, omax] = ["", ""];
+  let [jmin, jmax] = [0, 0];
   let sinMapa = 0;
   // Valores y pesos (un cuarto del área de la lámina por nudo), para la escala sin picos
   const valoresNudos: number[] = [];
@@ -350,8 +411,8 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
     }
     const losa = c.mapeo.laminas![l]!.losa ?? "";
     w.forEach((x, a) => {
-      if (x < vmin) [vmin, pmin, omin] = [x, pts[a]!, losa];
-      if (x > vmax) [vmax, pmax, omax] = [x, pts[a]!, losa];
+      if (x < vmin) [vmin, pmin, omin, jmin] = [x, pts[a]!, losa, 4 * i + a];
+      if (x > vmax) [vmax, pmax, omax, jmax] = [x, pts[a]!, losa, 4 * i + a];
     });
     tris.push(...triangulosCuadrilatero(pts, w));
     const a4 = Math.abs(area(pts)) / 4;
@@ -368,7 +429,7 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
     for (const b of bandas(tris, LIMITES_NULO)) P.push({ tipo: "region", anillos: b.anillos, estilo: "isobanda", relleno: COLOR_NULO, banda: 0 });
     leyenda.push({ relleno: COLOR_NULO, texto: `0: campo nulo (|valor| < ${CAMPO_NULO})` });
     notas.push(`El campo es nulo en la planta: su mayor |valor| es ${Math.max(Math.abs(vmin), Math.abs(vmax)).toExponential(1)} ${u}, ruido de redondeo. No se rotulan extremos.`);
-    mapa = { limites: [...LIMITES_NULO], paso: 2 * CAMPO_NULO, fueraAbajo: false, fueraArriba: false, picos: false, minimo: vmin, maximo: vmax, nulo: true, combinacion: comb };
+    mapa = { limites: [...LIMITES_NULO], paso: 2 * CAMPO_NULO, fueraAbajo: false, fueraArriba: false, picos: false, minimo: vmin, maximo: vmax, nulo: true, ...(env ? { envolvente: env } : { combinacion: comb }) };
     [pmax, pmin] = [null, null];
   } else if (tris.length) {
     const robusto = rangoSinPicos(valoresNudos, pesos);
@@ -405,7 +466,7 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
     // Picos: con la escala completa, si unos pocos puntos marcan la escala, se dice
     const picos = !!robusto && !(fueraAbajo || fueraArriba) && Math.max(Math.abs(vmin), Math.abs(vmax)) > AVISO_PICOS * Math.max(Math.abs(robusto[0]), Math.abs(robusto[1]));
     if (picos) notas.push(`La escala la marcan picos en menos del ${rotulo(2 * FRACCION_PICOS * 100)} % del área (hasta ${rotulo(Math.abs(vmin) > Math.abs(vmax) ? vmin : vmax)} ${u}); sin ellos, el campo va de ${rotulo(robusto![0])} a ${rotulo(robusto![1])} ${u} (escala «sin picos»).`);
-    mapa = { limites: dentro, paso: lm.paso, fueraAbajo, fueraArriba, picos, minimo: vmin, maximo: vmax, ...(robusto ? { sinPicos: robusto } : {}), combinacion: comb };
+    mapa = { limites: dentro, paso: lm.paso, fueraAbajo, fueraArriba, picos, minimo: vmin, maximo: vmax, ...(robusto ? { sinPicos: robusto } : {}), ...(env ? { envolvente: env } : { combinacion: comb }) };
   }
   P.push(...trazoModelo(pl));
   const ejes = capaEjes(pl.f, { cotas: false });
@@ -416,26 +477,26 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   leyenda.push(...apoyos.leyenda);
   const extremos: ExtremoRotulado[] = [];
   if (pmax && pmin) {
-    for (const [que, x, p, o, estilo, dy] of [
-      ["máximo", vmax, pmax, omax, "extremo-maximo", -10],
-      ["mínimo", vmin, pmin, omin, "extremo-minimo", 20],
-    ] as const) {
+    for (const ex of extremosMapa(campo, vmin, vmax, env)) {
+      const [x, p, o, j] = ex.cual === "max" ? [vmax, pmax, omax, jmax] : [vmin, pmin, omin, jmin];
+      const [estilo, dy] = ex.cual === "max" ? (["extremo-maximo", -10] as const) : (["extremo-minimo", 20] as const);
       P.push({ tipo: "marca", p, forma: "circulo", radio: 6, estilo, objeto: o });
-      P.push({ tipo: "texto", p, texto: `${que} ${rotulo(x)} ${u}`, tamano: 13, negrita: true, dx: 9, dy, fondo: true, prioridad: 100, alternativas: [{ dx: -9, dy, ancla: "fin" }], objeto: o });
-      extremos.push({ que: `${campo} ${que}`, valor: x, unidad: u, objeto: o, punto: p, comb });
+      P.push({ tipo: "texto", p, texto: env ? `${ex.texto} (${combDe(j)})` : ex.texto, tamano: 13, negrita: true, dx: 9, dy, fondo: true, prioridad: 100, alternativas: [{ dx: -9, dy, ancla: "fin" }], objeto: o });
+      extremos.push({ que: ex.que, valor: x, unidad: u, objeto: o, punto: p, comb: combDe(j) });
     }
   }
   const paños = pl.enPlanta(pl.f.panos);
   if (paños.length) notas.push(`Los paños (${paños.map((p) => p.id).join(", ")}) no tienen láminas: sus viguetas, con «fem consultar pieza».`);
   if (sinMapa) notas.push(`${sinMapa} láminas sin mapa (gris): las rígidas de las huellas de los pilares, que no se deforman.`);
   if (!laminas.length) notas.push("La planta no tiene losas.");
-  if (campo === "uz") notas.push("Valores en los nudos de las láminas, interpolados en cada una como en un cuadrilátero bilineal; la flecha relativa de cada recuadro, con «fem consultar flechas».");
+  if (campo === "uz") notas.push("Valores en los nudos de las láminas, interpolados en cada una como en un cuadrilátero bilineal; negativos hacia abajo (la flecha). La flecha relativa de cada recuadro, con «fem consultar flechas».");
   else if (campo.startsWith("f")) notas.push(NOTA_MEMBRANA);
   else notas.push("Campos suavizados (SPR) en los nudos de cada lámina, en los ejes de su losa (eje 1 = su eje1, X por defecto), interpolados en cada una como en un cuadrilátero bilineal. Para dimensionar, las franjas de armado (modo Armado).");
-  if (conjunto.factores.length > 1) notas.push(`Combinación ${comb}: la del mayor |valor| en la planta de las ${conjunto.factores.length} de ${conjunto.descripcion}.`);
+  if (env && laminas.length) notas.push(`Envolvente ${env === "max" ? "máxima" : "mínima"} de las ${conjunto.factores.length} combinaciones de ${conjunto.descripcion}: en cada nudo de cada lámina, la de ${env === "max" ? "mayor" : "menor"} valor, interpolada en la lámina (entre los nudos queda del lado de la seguridad). El extremo rotulado, con la suya.`);
+  else if (conjunto.factores.length > 1) notas.push(`Combinación ${comb}: la del mayor |valor| en la planta de las ${conjunto.factores.length} de ${conjunto.descripcion}.`);
   return {
     titulo: d.nombre ?? "Proyecto",
-    cabecera: cabecera(pl, `Vista: ${NOMBRE[campo]}`, d).map((x, i) => (i === 1 ? `${x}; combinación ${conjunto.etiquetas[mejor.k] ?? comb}` : x)),
+    cabecera: cabecera(pl, `Vista: ${NOMBRE[campo]}`, d).map((x, i) => (i === 1 ? `${x}; ${env ? `envolvente ${env === "max" ? "máxima" : "mínima"} de ${conjunto.descripcion} (${conjunto.factores.length})` : `combinación ${conjunto.etiquetas[k0] ?? comb}`}` : x)),
     primitivas: P,
     leyenda,
     notas,

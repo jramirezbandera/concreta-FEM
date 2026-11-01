@@ -250,7 +250,11 @@ describe("A4: render", () => {
       expect(png.readUInt32BE(20)).toBe(x.alto);
       expect(readFileSync(join(carpeta, x.svg), "utf8").startsWith("<svg")).toBe(true);
     }
-    expect(j.figuras[1]!.extremos.map((x) => x.que)).toEqual(["uz máximo", "uz mínimo"]);
+    // UI-14: en uz, la flecha (hacia abajo) y lo que sube
+    expect(j.figuras[1]!.extremos.map((x) => x.que)).toEqual(["flecha máxima", "levantamiento máximo"]);
+    // UI-1: --envolvente, sólo max o min
+    expect(fem(["render", ruta, "--vista", "uz", "--planta", "N1", "--envolvente", "media"]).codigo).not.toBe(0);
+    expect(fem(["render", ruta, "--vista", "uz", "--planta", "N1", "--envolvente", "min"]).codigo).toBe(0);
     if (bun) {
       const png = readFileSync(join(carpeta, j.figuras[1]!.png));
       expect(fem(["render", ruta, "--vista", "uz", "--planta", "N1"], "bun").codigo).toBe(0);
@@ -259,7 +263,7 @@ describe("A4: render", () => {
     const rev = fem(["revisar", ruta]).json as { huella: string };
     const md = readFileSync(join(ruta, "..", ".fem", rev.huella, "informe.md"), "utf8");
     expect(md).toMatch(/Figura: Planta N1: modelo\. SVG, sha256 [0-9a-f]{64}\./);
-    expect(md).toMatch(/Figura: Planta N1: uz \(mm\) en .+\. SVG, sha256 [0-9a-f]{64}\./);
+    expect(md).toMatch(/Figura: Planta N1: uz \(mm\), .+\. SVG, sha256 [0-9a-f]{64}\./);
     expect(readFileSync(join(ruta, "..", ".fem", rev.huella, "informe.html"), "utf8")).toContain("<figure><figcaption>Planta N1: modelo</figcaption>\n<svg");
   });
 

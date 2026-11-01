@@ -7,17 +7,20 @@
  * - en planta, la escena `reacciones` de A4 (la de `fem render`): Fz rotulada y (Fx, Fy) a escala en
  *   los objetos de la planta (los que arrancan de ella y sus apoyos);
  * - en alzado, los objetos del plano con Fz y la componente en el plano, a la escala del 3D.
- * Abajo, la tabla de la consulta y sus totales por combinación; en Propiedades, el objeto elegido.
+ * Abajo, las reacciones de cada objeto por caso, un caso por columna (UI-11, como «Cargas en
+ * cimentación» del informe), las de lo dibujado y sus totales; en Propiedades, el objeto elegido.
  *
- * Con varias combinaciones, cada objeto con la de su mayor |Fz| (dicha en su fila). Cada número es
- * de la consulta; bajo el cursor, los de la flecha.
+ * Por defecto se dibuja la ELS característica (sin acciones en los casos, cada caso), y se dice. Con
+ * varias combinaciones, cada objeto con la de su mayor |Fz| (dicha en su fila). Cada número es de la
+ * consulta; bajo el cursor, los de la flecha.
  */
 import { useState, type ReactNode } from "react";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
 import type { Eleccion } from "../../../src/visor/escena.ts";
 import type { Reacciones3D, ReaccionObjeto } from "../../../src/visor/reacciones3d.ts";
+import type { ReaccionesCasos } from "../../../src/visor/datos.ts";
 import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/sesion.ts";
-import { CampoLista, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
+import { CampoLista, Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcReacciones } from "../armazon/iconos.tsx";
 import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion } from "../componentes/comunes.tsx";
@@ -27,12 +30,83 @@ import { fmt } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas } from "../vistas/estado.ts";
-import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
+import { useSonda } from "../vistas/sonda.ts";
 import { conMalla, Fuente2D, Fuente3DModelo, planoAlzado, ZonaVistas } from "../vistas/Zona.tsx";
 import { useEleccion } from "./useEleccion.ts";
 
 const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
 type Escala = (typeof ESCALAS)[number];
+
+/** Las componentes de una reacción, con su unidad. */
+const COMPONENTES = [
+  { id: "Fz", nombre: "Fz", unidad: "kN" },
+  { id: "Fx", nombre: "Fx", unidad: "kN" },
+  { id: "Fy", nombre: "Fy", unidad: "kN" },
+  { id: "Mx", nombre: "Mx", unidad: "kN·m" },
+  { id: "My", nombre: "My", unidad: "kN·m" },
+  { id: "Mz", nombre: "Mz", unidad: "kN·m" },
+] as const;
+type Componente = (typeof COMPONENTES)[number]["id"];
+const INDICE: Record<Componente, number> = { Fx: 0, Fy: 1, Fz: 2, Mx: 3, My: 4, Mz: 5 };
+
+/** Lo que se dibuja, dicho (UI-11): la combinación o, con varias, de dónde sale la de cada objeto. */
+function queSeDibuja(c: { descripcion: string; n: number } | undefined): string {
+  if (!c) return "…";
+  if (c.n === 1) return c.descripcion;
+  return c.descripcion === "casos" ? `cada objeto, en el caso de su mayor |Fz| (de ${c.n})` : `${c.descripcion}: cada objeto, en la de su mayor |Fz| (de ${c.n})`;
+}
+
+/** Las reacciones de cada objeto por caso, un caso por columna, y su suma (UI-11). */
+function TablaPorCaso({ d, seleccion, onObjeto }: { d: ReaccionesCasos; seleccion: string | null; onObjeto: (id: string) => void }) {
+  const [comp, setComp] = useState<Componente>("Fz");
+  const i = INDICE[comp];
+  const u = COMPONENTES.find((c) => c.id === comp)!.unidad;
+  return (
+    <Seccion titulo="Reacciones por caso" valor={`${d.objetos.length} objetos · ${d.casos.length} casos`}>
+      <div className="px-3.5 py-1.5">
+        <Segmentado etiqueta="Componente" opciones={COMPONENTES} valor={comp} onCambio={setComp} />
+      </div>
+      <table className="tb">
+        <thead>
+          <tr>
+            <th>Objeto</th>
+            {d.casos.map((c) => (
+              <th key={c.id} title={c.nombre}>
+                {comp} {c.id} {u}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {d.objetos.map((o) => (
+            <tr key={o.id} className="clic" data-on={o.id === seleccion} onClick={() => onObjeto(o.id)}>
+              <td>
+                {o.id}
+                <small>
+                  {o.tipo} · {o.planta}
+                </small>
+              </td>
+              {o.R.map((r, k) => (
+                <td key={k} data-reaccion-caso={i === 2 ? r[i] : undefined}>
+                  {fmt(r[i], 1)}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {i < 3 && (
+            <tr>
+              <td>Suma</td>
+              {d.totales.map((t, k) => (
+                <td key={k}>{fmt(t[i], 1)}</td>
+              ))}
+            </tr>
+          )}
+        </tbody>
+      </table>
+      <p className="nota">La resultante de cada objeto respecto al centro de sus nudos coartados, en ejes globales, en cada caso sin mayorar; Fz &gt; 0, hacia arriba (el apoyo empuja la estructura). La carga sobre la cimentación es la reacción cambiada de signo.</p>
+    </Seccion>
+  );
+}
 
 /** Las líneas de la sonda de una flecha: sus valores, de la consulta. */
 export function lineasReaccion(o: ReaccionObjeto): string[] {
@@ -91,13 +165,16 @@ export function ModoReacciones() {
   const [escala, setEscala] = useState<Escala>("1");
   const r = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "reacciones3d", combinaciones: eleccion, escala: Number(escala) });
   const d = proyecto.desactualizado ? null : r.datos;
+  const pc = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "reacciones-casos" });
+  const porCaso = proyecto.desactualizado ? null : pc.datos;
   const elegido = d?.objetos.find((o) => o.id === seleccion) ?? null;
+  const elegidoCasos = porCaso?.objetos.find((o) => o.id === seleccion) ?? null;
   const ids = d ? new Set(d.objetos.map((o) => o.id)) : null;
   const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : r.diagnosticos ? <Aviso tono="fail">{r.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !r.datos && r.cargando ? <Aviso>Sumando las reacciones…</Aviso> : null;
 
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta="reacciones" />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="reacciones" />
       <CampoLista etiqueta="Escala" nombre="Escala de las flechas" ancho={90} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
       <Separador />
       <BarraModos />
@@ -108,7 +185,7 @@ export function ModoReacciones() {
 
   const cabecera = (
     <Chip acento title={d?.notas[0]}>
-      Reacciones · {queCombinaciones(d?.conjunto)}
+      Reacciones · {queSeDibuja(d?.conjunto)}
     </Chip>
   );
 
@@ -131,8 +208,10 @@ export function ModoReacciones() {
     />
   );
 
+  const tablaCasos = porCaso ? <TablaPorCaso d={porCaso} seleccion={seleccion} onObjeto={setSeleccion} /> : <p className="nota">…</p>;
+
   const tabla = d ? (
-    <Seccion titulo="Reacciones por objeto" valor={`${d.objetos.length} · fem consultar reacciones`}>
+    <Seccion titulo="Reacciones de lo dibujado" valor={`${d.objetos.length} · ${queSeDibuja(d.conjunto)}`}>
       <table className="tb">
         <thead>
           <tr>
@@ -170,12 +249,13 @@ export function ModoReacciones() {
     <p className="nota">…</p>
   );
 
+  const porCasos = d?.conjunto.descripcion === "casos";
   const totales = d ? (
-    <Seccion titulo="Totales por combinación" valor={d.totales.length}>
+    <Seccion titulo={porCasos ? "Totales por caso" : "Totales por combinación"} valor={`${d.totales.length} · ${d.conjunto.descripcion}`}>
       <table className="tb">
         <thead>
           <tr>
-            <th>Combinación</th>
+            <th>{porCasos ? "Caso" : "Combinación"}</th>
             <th>ΣFx kN</th>
             <th>ΣFy kN</th>
             <th>ΣFz kN</th>
@@ -192,7 +272,7 @@ export function ModoReacciones() {
           ))}
         </tbody>
       </table>
-      <p className="nota">La suma de todas las reacciones de cada combinación: equilibra sus cargas (ΣF y ΣM se comprueban a 1e-9 en cada cálculo).</p>
+      <p className="nota">La suma de todas las reacciones de {porCasos ? "cada caso" : "cada combinación"}: equilibra sus cargas (ΣF y ΣM se comprueban a 1e-9 en cada cálculo).</p>
     </Seccion>
   ) : (
     <p className="nota">…</p>
@@ -203,7 +283,7 @@ export function ModoReacciones() {
       {elegido ? (
         <>
         <Cabecera icono={IcReacciones} tipo={`Reacción · ${elegido.tipo}`} titulo={elegido.id} mono detalle={`${elegido.comb} · planta ${elegido.planta} · en (${fmt(elegido.punto[0], 2)}; ${fmt(elegido.punto[1], 2)}; ${fmt(elegido.punto[2], 2)}) m`} />
-        <Seccion titulo="Reacción">
+        <Seccion titulo="Reacción" valor={elegido.comb}>
           <table className="tb">
             <tbody>
               {(["Fx", "Fy", "Fz", "Mx", "My", "Mz"] as const).map((k, i) => (
@@ -218,6 +298,33 @@ export function ModoReacciones() {
             </tbody>
           </table>
         </Seccion>
+        {elegidoCasos && porCaso && (
+          <Seccion titulo="Por caso" valor="sin mayorar">
+            <table className="tb">
+              <thead>
+                <tr>
+                  <th>Caso</th>
+                  <th>Fx kN</th>
+                  <th>Fy kN</th>
+                  <th>Fz kN</th>
+                  <th>Mx kN·m</th>
+                  <th>My kN·m</th>
+                  <th>Mz kN·m</th>
+                </tr>
+              </thead>
+              <tbody>
+                {porCaso.casos.map((c, k) => (
+                  <tr key={c.id}>
+                    <td title={c.nombre}>{c.id}</td>
+                    {elegidoCasos.R[k]!.map((v, i) => (
+                      <td key={i}>{fmt(v, 1)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Seccion>
+        )}
         </>
       ) : (
         <Cabecera icono={IcReacciones} tipo="Reacciones" titulo="Nada elegido" detalle="Elija un pilar, un muro o un apoyo (en una vista o en la tabla) para ver su reacción. En el 3D, bajo el cursor, la de cada flecha." />
@@ -229,6 +336,7 @@ export function ModoReacciones() {
               <span>{x.que}</span>
               <span className="v">
                 {fmt(x.valor, 1)} kN · {x.id}
+                <small>{x.comb}</small>
               </span>
             </div>
           ))}
@@ -244,9 +352,10 @@ export function ModoReacciones() {
       etiquetaHerramientas="Herramientas de Resultados"
       herramientas={herramientas}
       vista={vista}
-      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 320 }}
+      props={{ titulo: "Propiedades", contenido: propiedades, ancho: 380 }}
       dock={[
-        { id: "reacciones", titulo: "Reacciones", insignia: d?.objetos.length, contenido: tabla },
+        { id: "reacciones", titulo: "Por caso", insignia: porCaso?.objetos.length, contenido: tablaCasos },
+        { id: "dibujado", titulo: "Lo dibujado", insignia: d?.objetos.length, contenido: tabla },
         { id: "totales", titulo: "Totales", insignia: d?.totales.length, contenido: totales },
       ]}
     />

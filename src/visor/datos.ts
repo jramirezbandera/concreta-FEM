@@ -10,10 +10,11 @@
  * Puro: sin IO.
  */
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
-import { deriva, diagramaCombinado, flechas, pieza, type DerivaPlanta, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
+import { deriva, diagramaCombinado, flechas, pieza, reacciones, type DerivaPlanta, type FlechasLosa, type TramoEnvolvente, type VanoEnvolvente } from "../agente/consultas.ts";
+import { conjuntoCombinaciones } from "../agente/combinaciones.ts";
 import type { Vec2 } from "../agente/render/escena.ts";
 import { triangulosCuadrilatero, valorEnTriangulo, type EscalaMapa } from "../agente/render/isovalores.ts";
-import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type PuntoEnvolvente } from "../agente/render/resultados.ts";
+import { envolventePieza, UNIDADES_CAMPO, valoresCampo, type Campo, type Envolvente, type PuntoEnvolvente } from "../agente/render/resultados.ts";
 import { estadoFirma, leerFirmas, revisar, type EstadoFirma } from "../agente/revision.ts";
 import type { Bloque } from "../agente/informe.ts";
 import { areaSeccion, UMBRALES, type Comprobacion } from "../agente/sensatez.ts";
@@ -93,17 +94,19 @@ export function datosObjeto(s: Sesion, id: string): Resultado<DatosObjeto> {
 export interface DatosLosas {
   escena: EscenaPreparada;
   campo: Campo;
-  /** Las combinaciones del mapa y, de ellas, la que se dibuja (la de mayor |valor| en la planta). */
+  /** Las combinaciones del mapa y, de ellas, la que se dibuja (la de mayor |valor| en la planta; ninguna en una envolvente). */
   combinaciones: Combinaciones;
   dibujada: { nombre: string; etiqueta: string } | null;
+  /** UI-1: con varias combinaciones y la envolvente pedida, la que se dibuja (cada nudo con la suya). */
+  envolvente?: Envolvente;
   /** Flechas de las losas y paños de la planta (`fem consultar flechas`), con sus combinaciones. */
   flechas: FlechasLosa[];
   combinacionesFlechas: Combinaciones;
 }
 
 /** El propósito de las flechas: el de la elección si el mapa es de uz, si no las de desplazamientos por defecto. */
-export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, escala?: EscalaMapa, malla?: boolean): Resultado<DatosLosas> {
-  const esc = s.escena(planta, { vista: "campo", campo, combinaciones: e, ...(escala ? { escala } : {}), ...(malla ? { malla } : {}) });
+export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, escala?: EscalaMapa, malla?: boolean, envolvente?: Envolvente): Resultado<DatosLosas> {
+  const esc = s.escena(planta, { vista: "campo", campo, combinaciones: e, ...(escala ? { escala } : {}), ...(malla ? { malla } : {}), ...(envolvente ? { envolvente } : {}) });
   if (!esc.valido) return esc;
   const conj = s.conjunto(e, campo === "uz" ? "desplazamientos" : "esfuerzos");
   if (!conj.valido) return conj;
@@ -117,7 +120,8 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
     if (!r.valido) return r;
     fl.push(...r.valor);
   }
-  const comb = esc.valor.mapa?.combinacion ?? esc.valor.extremos[0]?.comb;
+  const env = esc.valor.mapa?.envolvente;
+  const comb = env ? undefined : (esc.valor.mapa?.combinacion ?? esc.valor.extremos[0]?.comb);
   const k = comb === undefined ? -1 : conj.valor.nombres.indexOf(comb);
   return {
     valido: true,
@@ -126,6 +130,7 @@ export function datosLosas(s: Sesion, planta: string, campo: Campo, e: EleccionC
       campo,
       combinaciones: resumenConjunto(conj.valor),
       dibujada: k >= 0 ? { nombre: conj.valor.nombres[k]!, etiqueta: conj.valor.etiquetas[k]! } : null,
+      ...(env ? { envolvente: env } : {}),
       flechas: fl,
       combinacionesFlechas: resumenConjunto(cjF.valor),
     },
@@ -144,6 +149,11 @@ export interface ValorPunto {
    * losa–muro, el borde de un ábaco, E5-7): ahí el campo salta y no se promedia.
    */
   otros?: number[];
+  /**
+   * UI-1: en un mapa de envolvente, el máximo y el mínimo de las combinaciones en el punto, cada uno
+   * con la suya (`valor` y `comb` son los de la envolvente dibujada).
+   */
+  envolvente?: { max: { valor: number; comb: string }; min: { valor: number; comb: string } };
 }
 
 const UNIDAD = UNIDADES_CAMPO;
@@ -152,19 +162,49 @@ const UNIDAD = UNIDADES_CAMPO;
  * Valor del mapa en un punto: el de la combinación dibujada, interpolado como las bandas de A4 (en
  * los triángulos de `triangulosCuadrilatero` de cada lámina, con los valores de `valoresCampo`).
  * null fuera de las losas o en una lámina sin mapa (las rígidas de las huellas).
+ *
+ * En un mapa de envolvente (UI-1), la de ese punto: el valor de cada combinación en él (lineal en los
+ * casos, con la misma interpolación) y, de ellas, la mayor y la menor. En los nudos es lo que pinta
+ * el mapa; entre ellos, el mapa interpola la de los nudos.
  */
-export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, x: number, y: number, escala?: EscalaMapa): Resultado<ValorPunto | null> {
-  const d = datosLosas(s, planta, campo, e, escala);
+export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: EleccionCombinaciones, x: number, y: number, escala?: EscalaMapa, envolvente?: Envolvente): Resultado<ValorPunto | null> {
+  const d = datosLosas(s, planta, campo, e, escala, undefined, envolvente);
   if (!d.valido) return d;
-  const dib = d.valor.dibujada;
-  if (!dib) return { valido: true, valor: null };
   const conj = s.conjunto(e, campo === "uz" ? "desplazamientos" : "esfuerzos");
   if (!conj.valido) return conj;
+  const env = d.valor.envolvente;
+  if (env) {
+    // El valor de cada caso en el punto; cada combinación, su suma con sus factores
+    const porCaso = s.q!.casos.map((_, k) => {
+      const f = new Float64Array(s.q!.casos.length);
+      f[k] = 1;
+      return valorEnPuntoCon(s, planta, campo, f, x, y);
+    });
+    const h = porCaso[0];
+    if (!h) return { valido: true, valor: null };
+    let [max, min] = [{ valor: -Infinity, comb: "" }, { valor: Infinity, comb: "" }];
+    conj.valor.factores.forEach((f, kc) => {
+      let v = 0;
+      for (let k = 0; k < f.length; k++) if (f[k]) v += f[k]! * porCaso[k]!.valor;
+      if (v > max.valor) max = { valor: v, comb: conj.valor.nombres[kc]! };
+      if (v < min.valor) min = { valor: v, comb: conj.valor.nombres[kc]! };
+    });
+    const dib = env === "max" ? max : min;
+    return { valido: true, valor: { valor: dib.valor, unidad: UNIDAD[campo], losa: h.losa, lamina: h.lamina, comb: dib.comb, envolvente: { max, min } } };
+  }
+  const dib = d.valor.dibujada;
+  if (!dib) return { valido: true, valor: null };
   const k = conj.valor.nombres.indexOf(dib.nombre);
+  const r = valorEnPuntoCon(s, planta, campo, conj.valor.factores[k]!, x, y);
+  return { valido: true, valor: r ? { ...r, comb: dib.nombre } : null };
+}
+
+/** El valor de un campo en un punto de la planta con unos factores de los casos (`valorEnPunto`). */
+function valorEnPuntoCon(s: Sesion, planta: string, campo: Campo, f: ArrayLike<number>, x: number, y: number): Omit<ValorPunto, "comb"> | null {
   const rr = s.rr!;
   const c = s.compilado!;
-  const { laminas, v } = valoresCampo(rr, planta, campo, conj.valor.factores[k]!);
-  let hallado: ValorPunto | null = null;
+  const { laminas, v } = valoresCampo(rr, planta, campo, f);
+  let hallado: Omit<ValorPunto, "comb"> | null = null;
   const otros: number[] = [];
   const q: Vec2 = [x, y];
   for (let i = 0; i < laminas.length; i++) {
@@ -178,12 +218,12 @@ export function valorEnPunto(s: Sesion, planta: string, campo: Campo, e: Eleccio
       if (valor === null) continue;
       // Una lámina sin mapa (rígida): el punto puede estar también en una vecina que sí lo tiene
       if (Number.isNaN(valor)) break;
-      if (!hallado) hallado = { valor, unidad: UNIDAD[campo], losa: c.mapeo.laminas![laminas[i]!]!.losa ?? "", lamina: laminas[i]!, comb: dib.nombre };
+      if (!hallado) hallado = { valor, unidad: UNIDAD[campo], losa: c.mapeo.laminas![laminas[i]!]!.losa ?? "", lamina: laminas[i]! };
       else if (valor !== hallado.valor && !otros.includes(valor)) otros.push(valor);
       break;
     }
   }
-  return { valido: true, valor: hallado && otros.length ? { ...hallado, otros } : hallado };
+  return hallado && otros.length ? { ...hallado, otros } : hallado;
 }
 
 // ─── Vigas ──────────────────────────────────────────────────────────────────────────────────────
@@ -459,6 +499,43 @@ export function datosPilar(s: Sesion, id: string, e: EleccionCombinaciones): Res
   if (!conj.valido) return conj;
   const r = filasPilarQ(s.q!, conj.valor, id);
   return r.valido ? { valido: true, valor: { combinaciones: resumenConjunto(conj.valor), filas: r.valor } } : r;
+}
+
+// ─── Reacciones por caso ────────────────────────────────────────────────────────────────────────
+
+export interface ReaccionesCasos {
+  casos: { id: string; nombre?: string }[];
+  /** Los objetos con reacciones (los de `fem consultar reacciones`), en su orden; `R[k]`, [Fx, Fy, Fz, Mx, My, Mz] del caso k. */
+  objetos: { id: string; tipo: "pilar" | "muro" | "apoyo" | "apoyo lineal"; planta: string; R: number[][] }[];
+  /** Por caso, la suma de todas las reacciones (`totales` de la consulta): [Fx, Fy, Fz]. */
+  totales: number[][];
+}
+
+/**
+ * Las reacciones de cada objeto por caso (UI-11): la tabla con un caso por columna, como «Cargas en
+ * cimentación» del informe; son las de `fem consultar reacciones --casos`.
+ */
+export function reaccionesPorCaso(s: Sesion): Resultado<ReaccionesCasos> {
+  const q = s.q;
+  if (!q) return no("visor/sin-resultados", "No hay resultados de esta huella.");
+  const conj = conjuntoCombinaciones(q, { tipo: "casos" });
+  if (!conj.valido) return conj;
+  const r = reacciones(q, conj.valor, { todos: true });
+  if (!r.valido) return r;
+  const f = q.fisico;
+  const datos = new Map<string, { tipo: ReaccionesCasos["objetos"][number]["tipo"]; planta: string }>();
+  for (const x of f.pilares ?? []) datos.set(x.id, { tipo: "pilar", planta: x.desde });
+  for (const x of f.muros ?? []) datos.set(x.id, { tipo: "muro", planta: x.desde });
+  for (const x of f.apoyos ?? []) datos.set(x.id, { tipo: "apoyo", planta: x.planta });
+  for (const x of f.apoyosLineales ?? []) datos.set(x.id, { tipo: "apoyo lineal", planta: x.planta });
+  return {
+    valido: true,
+    valor: {
+      casos: f.casos.map((c) => ({ id: c.id, ...(c.nombre ? { nombre: c.nombre } : {}) })),
+      objetos: r.valor.objetos.map((o) => ({ id: o.id, ...(datos.get(o.id) ?? { tipo: "apoyo" as const, planta: "" }), R: o.R.map((x) => [...x]) })),
+      totales: r.valor.totales.map((t) => [...t.F]),
+    },
+  };
 }
 
 // ─── Desplomes ──────────────────────────────────────────────────────────────────────────────────

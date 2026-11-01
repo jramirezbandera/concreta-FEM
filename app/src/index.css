@@ -316,6 +316,9 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
 .tb td small { display: block; font-size: 10.5px; color: var(--color-text-tertiary); white-space: normal; }
 .tb tbody tr:last-child td { border-bottom: 0; }
 .tb td.txt { font-family: var(--font-sans); white-space: normal; }
+/* Las etiquetas de una tabla con celdas de varias filas (las ternas de los pilares): a la izquierda, arriba */
+.tb td.et { text-align: left; vertical-align: top; padding-left: 14px; }
+.tb tr.grupo td { background: var(--color-bg-elevated); font-family: var(--font-sans); font-weight: 500; }
 .tb tr.max td, .tb tr[data-on="true"] td { background: var(--color-tint-accent); }
 .tb tr.clic { cursor: pointer; }
 .tb tr.clic:hover td { background: var(--color-bg-elevated); }

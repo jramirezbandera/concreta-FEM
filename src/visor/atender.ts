@@ -5,7 +5,7 @@
  * Puro: el núcleo WASM ya iniciado por quien lo crea.
  */
 import type { Diagnostico } from "../motor/diagnosticos.ts";
-import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, valorEnPunto, type Resultado } from "./datos.ts";
+import { datosDesplomes, datosLosas, datosObjeto, datosPilar, datosPilares, datosRevision, datosViga, desplazamientos, estacionViga, geometria3D, piezasPlanta, reaccionesPorCaso, type Resultado, valorEnPunto } from "./datos.ts";
 import { alambrico } from "./alambrico.ts";
 import { datosArmado, datosFranja } from "./franjas.ts";
 import type { Pedido, Respuestas } from "./protocolo.ts";
@@ -98,9 +98,9 @@ export class Atendedor {
       case "objeto":
         return de(datosObjeto(s, p.id));
       case "losas":
-        return de(datosLosas(s, p.planta, p.campo, p.combinaciones, p.escala, p.malla));
+        return de(datosLosas(s, p.planta, p.campo, p.combinaciones, p.escala, p.malla, p.envolvente));
       case "valor-punto":
-        return de(valorEnPunto(s, p.planta, p.campo, p.combinaciones, p.x, p.y, p.escala));
+        return de(valorEnPunto(s, p.planta, p.campo, p.combinaciones, p.x, p.y, p.escala, p.envolvente));
       case "piezas":
         return bien("piezas", piezasPlanta(s, p.planta));
       case "viga":
@@ -137,6 +137,8 @@ export class Atendedor {
         return de(s.cargas3D(p.caso, p.escala));
       case "valor-lamina":
         return de(s.valorLamina(p));
+      case "reacciones-casos":
+        return de(reaccionesPorCaso(s));
       case "revision":
         return de(datosRevision(s, p.firmas, p.ficheroFirmas));
       case "precalentar":

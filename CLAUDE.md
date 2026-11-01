@@ -654,6 +654,14 @@
   - **Exactitud:** nudos, vértices y cruces, bit a bit; caras, medios, puntos de una recta y lo tecleado, a 1e-9 m.
   - **Validación:** `src/editor/dibujo/barra.test.ts` (el pórtico arriostrado dibujado, byte a byte con las filas de la tabla), `app/src/test/barra.test.ts` y el banco `validacion/bn3/chrome.ts` (el pórtico dibujado con ratón y teclado tiene la huella de Node; en el alzado del edificio objetivo, 0,1 ms p95).
   - **Para la puerta de uso:** las decisiones BN3-a…BN3-e de `barras.md` §6.1.
+- **2026-11-01: auditoría de la interfaz, puntos 1 a 3 de su orden** (`docs/fem3d/auditoria-ui.md` §6 y §7, con las decisiones del usuario de §5). El punto 3, la lectura de resultados:
+  - **UI-1 (cambia la decisión de V1):** con varias combinaciones, el mapa de Losas es su envolvente en cada nudo, máxima o mínima (`envolventeCampo`), y el clic da la combinación que manda en el punto con el máximo y el mínimo; igual en el 3D. `fem render --envolvente max|min`; el informe dibuja la envolvente mínima de uz.
+  - **UI-14:** en uz, «flecha máxima … mm ↓» y, si algo sube, el levantamiento.
+  - **UI-12:** el selector dice qué es «Por defecto» (`EstadoSesion.defectos`) y la pestaña es «Combinaciones de esta vista».
+  - **UI-11:** las reacciones se dibujan en la ELS característica (propósito `reacciones`, también en `fem render`), con una tabla de un caso por columna (pedido `reacciones-casos`); `fem consultar reacciones` sigue por casos.
+  - **UI-10 y UI-16:** los pilares, con sus ternas concomitantes en cabeza y pie (`app/src/pantallas/Ternas.tsx`), unidades en las cabeceras y Pilares abierto en la planta más baja.
+  - **UI-2:** las cargas verticales se rotulan como se escriben («↓ 2 kN/m²», `valorCarga`), las demás por componentes con su nombre, y las nuevas se llaman con el prefijo de su caso (`G-1`, `idCarga`).
+  - **Siguen** los puntos 4 a 7 (pantallas por debajo de 1600 px, estado y errores, textos sin jerga y el resto).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

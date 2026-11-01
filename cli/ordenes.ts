@@ -16,7 +16,7 @@ import { consultar, CONSULTAS, resumen, TOP_POR_DEFECTO, type OpcionesConsulta }
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../src/agente/proyecto.ts";
 import { desempaquetarResultados, empaquetarResultados, type CabeceraResultados } from "../src/agente/resultados.ts";
 import { anadirFirma, estadoFirma, leerFirmas, revisar, type FicheroFirmas, type Revision } from "../src/agente/revision.ts";
-import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaArmado, vistaAxiles, vistaBandas, vistaCampo, vistaReacciones, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Armadura, type Campo, type Escena, type Vista } from "../src/agente/render/index.ts";
+import { CAMPOS, conjuntoPorDefecto, escalaDeTexto, escenaASvg, necesitaCalculo, nombreFigura, propositoDe, ResultadosRender, VISTAS, vistaArmado, vistaAxiles, vistaBandas, vistaCampo, vistaReacciones, vistaCargas, vistaDiagnosticos, vistaDiagramas, vistaMalla, vistaModelo, type Armadura, type Campo, type Envolvente, type Escena, type Vista } from "../src/agente/render/index.ts";
 import { sensatezPrevia } from "../src/agente/sensatez.ts";
 import { SITUACIONES, type Situacion } from "../src/combinaciones/generador.ts";
 import { compilar, type ResultadoCompilacion } from "../src/compilador/compilar.ts";
@@ -51,7 +51,7 @@ export interface Argumentos {
   banderas: Map<string, string[]>;
 }
 
-const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por", "vista", "escala", "armadura"]);
+const BANDERAS_CON_VALOR = new Set(["modelo", "situacion", "combinacion", "caso", "planta", "tipo", "top", "objeto", "losa", "cifras", "por", "vista", "escala", "armadura", "envolvente"]);
 const BANDERAS_SIN_VALOR = new Set(["exacto", "casos", "recalcular", "todos", "estaciones", "ayuda"]);
 
 export function analizarArgumentos(argv: readonly string[]): Argumentos | { error: string } {
@@ -84,8 +84,9 @@ const AYUDA = `fem — Concreta FEM 3D desde la línea de órdenes (docs/fem3d/a
   fem calcular <proyecto.json> [--recalcular]
   fem resumen <proyecto.json>
   fem consultar <proyecto.json> <consulta> [opciones]   (consultas: ${CONSULTAS.join(", ")})
-  fem render <proyecto.json> [--vista V] [--planta P] [--caso C] [--escala E]   PNG y SVG de cada planta (A4; vistas: ${VISTAS.join(", ")})
+  fem render <proyecto.json> [--vista V] [--planta P] [--caso C] [--escala E] [--envolvente max|min]   PNG y SVG de cada planta (A4; vistas: ${VISTAS.join(", ")})
       --escala de los mapas (uz…v23, f11…f12): completa (por defecto), sin-picos o mín:máx:paso («-40:20:5», «::5»)
+      --envolvente de los mapas con varias combinaciones: en cada nudo, la mayor o la menor (sin ella, la combinación de mayor |valor| de la planta)
   fem revisar <proyecto.json> [--recalcular]   sensatez e informe de revisión (A3)
   fem firmar <proyecto.json> --por "<nombre>"   sólo el ingeniero: firma el informe revisado
   fem esquema
@@ -370,6 +371,9 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
       if (escalas.length > 1) return mal("--escala sólo una vez");
       const escala = escalaDeTexto(escalas[0] ?? "");
       if ("error" in escala) return mal(escala.error);
+      const envolventes = a.banderas.get("envolvente") ?? [];
+      if (envolventes.length > 1 || (envolventes[0] !== undefined && envolventes[0] !== "max" && envolventes[0] !== "min")) return mal("--envolvente: max o min, una vez");
+      const envolvente = envolventes[0] as Envolvente | undefined;
       const casos = a.banderas.get("caso") ?? f.casos.map((c) => c.id);
       const c = compilar(f, l.proyecto.opciones);
       const d = { nombre: l.proyecto.nombre, huella: c.huella };
@@ -385,10 +389,10 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
         diags = [...r.compilacion.diagnosticos, ...r.cabecera.diagnosticos];
         const res = resumen(l.proyecto, r.compilacion);
         if (!res.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos(res.diagnosticos) } };
-        for (const proposito of ["desplazamientos", "esfuerzos", "lineal"] as const) {
-          if (seleccion || proposito === "lineal") {
-            // Las reacciones, por defecto, por casos (como `fem consultar reacciones`)
-            const x = conjuntoCombinaciones(q, seleccion ?? seleccionPorDefecto(f.casos, "lineal"));
+        for (const proposito of ["desplazamientos", "esfuerzos", "reacciones"] as const) {
+          if (seleccion || proposito === "reacciones") {
+            // Las reacciones, por defecto, en la ELS característica (UI-11; por casos si no llevan su acción)
+            const x = conjuntoCombinaciones(q, seleccion ?? seleccionPorDefecto(f.casos, "reacciones"));
             if (!x.valido) return { codigo: CODIGO.errores, json: { orden, ok: false, huella: c.huella, ...listaDiagnosticos(x.diagnosticos) } };
             conjuntos.set(proposito, x.valor);
           } else conjuntos.set(proposito, conjuntoPorDefecto(q, res.valor, proposito));
@@ -407,10 +411,10 @@ export async function ejecutar(argv: readonly string[]): Promise<Salida> {
           else if (vista === "malla") escenas.push([vistaMalla(rr!, planta, d), undefined]);
           else if (vista === "vigas-my" || vista === "vigas-vz") escenas.push([vistaDiagramas(rr!, planta, vista === "vigas-my" ? "My" : "Vz", conjuntos.get("esfuerzos")!, d), undefined]);
           else if (vista === "pilares-n") escenas.push([vistaAxiles(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
-          else if (vista === "reacciones") escenas.push([vistaReacciones(rr!, planta, conjuntos.get("lineal")!, d), undefined]);
+          else if (vista === "reacciones") escenas.push([vistaReacciones(rr!, planta, conjuntos.get("reacciones")!, d), undefined]);
           else if (vista === "bandas") escenas.push([vistaBandas(rr!, planta, conjuntos.get("esfuerzos")!, d), undefined]);
           else if (vista.startsWith("armado-")) escenas.push([vistaArmado(rr!, planta, vista.slice("armado-".length) as Armadura, conjuntos.get("esfuerzos")!, d, { ...(escala ? { escala } : {}), ...(l.proyecto.armado ? { armado: l.proyecto.armado } : {}) }), undefined]);
-          else escenas.push([vistaCampo(rr!, planta, vista as Campo, conjuntos.get(propositoDe(vista))!, d, escala), undefined]);
+          else escenas.push([vistaCampo(rr!, planta, vista as Campo, conjuntos.get(propositoDe(vista))!, d, escala, envolvente), undefined]);
           for (const [e, caso] of escenas) {
             const s = escenaASvg(e);
             const base = join(carpeta, nombreFigura(planta, vista, caso));

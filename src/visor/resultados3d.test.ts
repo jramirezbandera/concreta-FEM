@@ -159,12 +159,20 @@ describe.each(PROYECTOS)("I4 con %s", (_nombre, ruta) => {
         const e = vistaCampo(rr, p, campo, conj, { huella: s.huella });
         expect(i.mapa).toEqual(e.mapa);
         expect(i.combinacion?.nombre).toBe(e.extremos[0]?.comb);
-        const max = e.extremos.find((x) => x.que.endsWith("máximo"))!;
-        const min = e.extremos.find((x) => x.que.endsWith("mínimo"))!;
-        expect(i.extremos.map((x) => [x.valor, x.objeto, x.punto[0], x.punto[1]])).toEqual([
-          [max.valor, max.objeto, max.punto![0], max.punto![1]],
-          [min.valor, min.objeto, min.punto![0], min.punto![1]],
-        ]);
+        // Los mismos extremos rotulados (UI-14: en uz, la flecha y, si lo hay, el levantamiento)
+        expect(i.extremos.map((x) => [x.valor, x.objeto, x.punto[0], x.punto[1]])).toEqual(e.extremos.map((x) => [x.valor, x.objeto, x.punto![0], x.punto![1]]));
+        // UI-1: la envolvente, la de la planta, con la combinación de su extremo
+        for (const envolvente of ["max", "min"] as const) {
+          const ie = valido(s.isovalores3D({ campo, combinaciones: D, planta: p, envolvente }));
+          const ee = vistaCampo(rr, p, campo, conj, { huella: s.huella }, {}, envolvente);
+          expect(ie.mapa).toEqual(ee.mapa);
+          // Con una sola combinación no hay envolvente: es esa
+          if (conj.factores.length > 1) {
+            expect(ie.combinacion).toBeNull();
+            expect(ie.envolvente).toBe(envolvente);
+          } else expect(ie.combinacion).toEqual(i.combinacion);
+          expect(ie.extremos.map((x) => [x.valor, x.objeto, conj.factores.length > 1 ? x.comb : null])).toEqual(ee.extremos.map((x) => [x.valor, x.objeto, conj.factores.length > 1 ? x.comb : null]));
+        }
         // Los colores de las bandas que se ven, los de la planta
         const enPlanta = new Map<number, string>();
         for (const q of e.primitivas) if (q.tipo === "region") enPlanta.set(q.banda, q.relleno);
@@ -191,9 +199,13 @@ describe.each(PROYECTOS)("I4 con %s", (_nombre, ruta) => {
     const conPlanta = s.proyecto.modelo.plantas.map((x) => x.id).filter((p) => s.rr!.laminas(p).laminas.length);
     expect(i.plantas).toEqual(conPlanta);
     if (!i.mapa) return;
-    const [vmin, vmax] = [Math.min(...i.extremos.map((x) => x.valor)), Math.max(...i.extremos.map((x) => x.valor))];
-    expect(i.mapa.minimo).toBe(vmin);
-    expect(i.mapa.maximo).toBe(vmax);
+    // En uz, la flecha (el mínimo, si baja) y el levantamiento (el máximo, si sube): UI-14
+    const flecha = i.extremos.find((x) => x.texto?.startsWith("flecha máxima"));
+    const lev = i.extremos.find((x) => x.texto?.startsWith("levantamiento"));
+    if (i.mapa.minimo < 0) expect(flecha!.valor).toBe(i.mapa.minimo);
+    else expect(flecha).toBeUndefined();
+    if (i.mapa.maximo > 0) expect(lev!.valor).toBe(i.mapa.maximo);
+    else expect(lev).toBeUndefined();
   });
 });
 

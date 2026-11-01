@@ -25,7 +25,7 @@
 import type { ConjuntoCombinaciones } from "../agente/combinaciones.ts";
 import { area, rotulo, type EntradaLeyenda, type EscalaDibujada, type Vec2 } from "../agente/render/escena.ts";
 import { AVISO_PICOS, CAMPO_NULO, COLOR_NULO, coloresBandas, FRACCION_PICOS, LIMITES_NULO, limitesMapa, rangoSinPicos, triangulosCuadrilatero, trozosTriangulo, valorEnTriangulo, type EscalaMapa, type LimitesMapa, type Triangulo } from "../agente/render/isovalores.ts";
-import { NOTA_MEMBRANA, UNIDADES_CAMPO, valoresCampo, type Campo, type ResultadosRender, type SuperficieMapa } from "../agente/render/resultados.ts";
+import { envolventeCampo, extremosMapa, NOTA_MEMBRANA, UNIDADES_CAMPO, valoresCampo, type Campo, type Envolvente, type ResultadosRender, type SuperficieMapa } from "../agente/render/resultados.ts";
 
 type V3 = [number, number, number];
 
@@ -39,6 +39,10 @@ export interface ExtremoIsovalores {
   objeto: string;
   /** El nudo (m, globales). */
   punto: V3;
+  /** El rótulo, sin el objeto (UI-14: en uz, «flecha máxima 1,51 mm ↓»); sin él, «<que> <valor> <unidad>». */
+  texto?: string;
+  /** La combinación del nudo, en una envolvente (UI-1). */
+  comb?: string;
 }
 
 export interface Isovalores3D {
@@ -48,8 +52,10 @@ export interface Isovalores3D {
   superficies: SuperficiesMapa;
   /** Las plantas que se dibujan. */
   plantas: string[];
-  /** La combinación dibujada, y de qué conjunto sale. */
+  /** La combinación dibujada, y de qué conjunto sale; null en una envolvente (UI-1) o sin láminas. */
   combinacion: { nombre: string; etiqueta: string } | null;
+  /** UI-1: la envolvente que se dibuja, con varias combinaciones. */
+  envolvente?: Envolvente;
   conjunto: { descripcion: string; n: number };
   /** Triángulos de las bandas (x, y, z de sus vértices respecto al origen), la banda y la lámina de cada uno. */
   triangulos: Float32Array;
@@ -119,6 +125,8 @@ export interface OpcionesIsovalores3D {
   planta: string | null;
   superficies?: SuperficiesMapa;
   escala?: EscalaMapa;
+  /** UI-1: con varias combinaciones, su envolvente en cada nudo (como `vistaCampo`). */
+  envolvente?: Envolvente;
 }
 
 export function isovalores3D(r: ResultadosRender, origen: [number, number, number], campo: Campo, conjunto: ConjuntoCombinaciones, op: OpcionesIsovalores3D): Isovalores3D {
@@ -129,14 +137,18 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
   const grupos: Grupo[] = [];
   for (const planta of op.planta === null ? todas : todas.filter((p) => p === op.planta)) for (const de of gruposDe(superficies)) if (r.laminas(planta, de).laminas.length) grupos.push({ planta, de });
   const plantas = todas.filter((p) => grupos.some((g) => g.planta === p));
-  // La combinación que gobierna en lo que se ve: la del mayor |valor| (como `vistaCampo` en una planta)
-  let mejor: { k: number; m: number; por: { laminas: number[]; v: Float64Array }[] } = { k: 0, m: -1, por: [] };
-  conjunto.factores.forEach((f, k) => {
-    const por = grupos.map((g) => valoresCampo(r, g.planta, campo, f, g.de));
-    let m = 0;
-    for (const x of por) for (const y of x.v) if (Math.abs(y) > m) m = Math.abs(y);
-    if (m > mejor.m) mejor = { k, m, por };
-  });
+  // Con varias combinaciones y `envolvente`, la envolvente en cada nudo (UI-1); si no, la que gobierna
+  // en lo que se ve: la del mayor |valor| (como `vistaCampo` en una planta)
+  const env = op.envolvente && conjunto.factores.length > 1 ? op.envolvente : null;
+  let mejor: { k: number; m: number; por: { laminas: number[]; v: Float64Array; comb?: Int32Array }[] } = { k: 0, m: -1, por: [] };
+  if (env) mejor = { k: 0, m: 0, por: grupos.map((g) => envolventeCampo(r, g.planta, campo, conjunto, env, g.de)) };
+  else
+    conjunto.factores.forEach((f, k) => {
+      const por = grupos.map((g) => valoresCampo(r, g.planta, campo, f, g.de));
+      let m = 0;
+      for (const x of por) for (const y of x.v) if (Math.abs(y) > m) m = Math.abs(y);
+      if (m > mejor.m) mejor = { k, m, por };
+    });
   const rel = (q: readonly number[], a: number[]) => a.push(q[0]! - origen[0], q[1]! - origen[1], q[2]! - origen[2]);
 
   // Triángulos (los de la planta, en el plano de su lámina), su lámina, extremos y pesos
@@ -150,7 +162,7 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
   let emin: ExtremoIsovalores | null = null;
   let emax: ExtremoIsovalores | null = null;
   let [nSin, nMuros] = [0, 0];
-  for (const { laminas, v } of mejor.por)
+  for (const { laminas, v, comb: combNudo } of mejor.por)
     laminas.forEach((l, i) => {
       const ns = c.modelo.laminas![l]!.nudos;
       const P = ns.map((n): V3 => [c.modelo.nudos[n]!.x, c.modelo.nudos[n]!.y, c.modelo.nudos[n]!.z]);
@@ -164,8 +176,9 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
       if (m.muro) nMuros++;
       const objeto = m.losa ?? m.muro ?? "";
       w.forEach((x, a) => {
-        if (x < vmin) [vmin, emin] = [x, { que: "mínimo", valor: x, objeto, punto: P[a]! }];
-        if (x > vmax) [vmax, emax] = [x, { que: "máximo", valor: x, objeto, punto: P[a]! }];
+        const comb = combNudo ? { comb: conjunto.nombres[combNudo[4 * i + a]!] ?? "" } : {};
+        if (x < vmin) [vmin, emin] = [x, { que: "mínimo", valor: x, objeto, punto: P[a]!, ...comb }];
+        if (x > vmax) [vmax, emax] = [x, { que: "máximo", valor: x, objeto, punto: P[a]!, ...comb }];
       });
       const pl = planoLamina(r, l);
       const k = planos.length;
@@ -241,12 +254,13 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
     if (fueraAbajo || fueraArriba) notas.push(`Escala de ${rotulo(dentro[0]!, 4)} a ${rotulo(dentro[dentro.length - 1]!, 4)} ${unidad}${escala.modo === "sin-picos" ? `, sin picos (sin el ${rotulo(FRACCION_PICOS * 100)} % del área por cada lado)` : ""}. Los extremos rotulados son los reales.`);
     const picos = !!robusto && !(fueraAbajo || fueraArriba) && Math.max(Math.abs(vmin), Math.abs(vmax)) > AVISO_PICOS * Math.max(Math.abs(robusto[0]), Math.abs(robusto[1]));
     if (picos) notas.push(`La escala la marcan picos en menos del ${rotulo(2 * FRACCION_PICOS * 100)} % del área; sin ellos, el campo va de ${rotulo(robusto![0])} a ${rotulo(robusto![1])} ${unidad} (escala «sin picos»).`);
-    mapa = { limites: dentro, paso: lm.paso, fueraAbajo, fueraArriba, picos, minimo: vmin, maximo: vmax, ...(robusto ? { sinPicos: robusto } : {}), ...(nulo ? { nulo: true as const } : {}), combinacion: conjunto.nombres[mejor.k] ?? "" };
+    mapa = { limites: dentro, paso: lm.paso, fueraAbajo, fueraArriba, picos, minimo: vmin, maximo: vmax, ...(robusto ? { sinPicos: robusto } : {}), ...(nulo ? { nulo: true as const } : {}), ...(env ? { envolvente: env } : { combinacion: conjunto.nombres[mejor.k] ?? "" }) };
     if (nulo) notas.push(`El campo es nulo en lo que se ve: su mayor |valor| es ${Math.max(Math.abs(vmin), Math.abs(vmax)).toExponential(1)} ${unidad}, ruido de redondeo. No se rotulan extremos.`);
   }
   const que = superficies === "losas" ? "con losas" : superficies === "muros" ? "con muros" : "con losas o muros";
   notas.push(op.planta === null ? `Todas las plantas ${que} (${plantas.length}), con una escala común.` : superficies === "losas" ? `Planta ${op.planta}: la misma escala y la misma combinación que su vista en planta.` : `Planta ${op.planta}${superficies === "muros" ? ": sus muros" : ": sus losas y sus muros, con una escala común"} (los muros, de la planta de debajo a ella).`);
-  if (conjunto.factores.length > 1) notas.push(`Combinación ${conjunto.nombres[mejor.k] ?? ""}: la del mayor |valor| de las ${conjunto.factores.length} de ${conjunto.descripcion}.`);
+  if (env) notas.push(`Envolvente ${env === "max" ? "máxima" : "mínima"} de las ${conjunto.factores.length} combinaciones de ${conjunto.descripcion}: en cada nudo, la de ${env === "max" ? "mayor" : "menor"} valor.`);
+  else if (conjunto.factores.length > 1) notas.push(`Combinación ${conjunto.nombres[mejor.k] ?? ""}: la del mayor |valor| de las ${conjunto.factores.length} de ${conjunto.descripcion}.`);
   if (nSin) notas.push(`${nSin} láminas sin mapa (gris): las rígidas de las huellas de los pilares.`);
   if (campo === "uz") notas.push(`uz de los nudos de las láminas${nMuros ? " (en los muros, su desplazamiento vertical)" : ""}, sobre la geometría sin deformar.`);
   else if (campo.startsWith("f")) notas.push(NOTA_MEMBRANA);
@@ -259,7 +273,8 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
     origen,
     superficies,
     plantas,
-    combinacion: tris.length || nSin ? { nombre: conjunto.nombres[mejor.k] ?? "", etiqueta: conjunto.etiquetas[mejor.k] ?? "" } : null,
+    combinacion: !env && (tris.length || nSin) ? { nombre: conjunto.nombres[mejor.k] ?? "", etiqueta: conjunto.etiquetas[mejor.k] ?? "" } : null,
+    ...(env ? { envolvente: env } : {}),
     conjunto: { descripcion: conjunto.descripcion, n: conjunto.factores.length },
     triangulos: Float32Array.from(tri),
     banda: Uint16Array.from(banda),
@@ -268,7 +283,8 @@ export function isovalores3D(r: ResultadosRender, origen: [number, number, numbe
     sinMapa: Float32Array.from(sinMapa),
     isolineas: Float32Array.from(iso),
     ceros: Float32Array.from(ceros),
-    extremos: nulo ? [] : ([emax, emin] as (ExtremoIsovalores | null)[]).filter((x): x is ExtremoIsovalores => x !== null),
+    // Los de `extremosMapa` (UI-14: en uz, la flecha y el levantamiento; en una envolvente, el suyo)
+    extremos: nulo || !emax || !emin ? [] : extremosMapa(campo, vmin, vmax, env).map((x) => ({ ...(x.cual === "max" ? emax! : emin!), texto: x.texto })),
     ...(mapa ? { mapa } : {}),
     leyenda,
     notas,

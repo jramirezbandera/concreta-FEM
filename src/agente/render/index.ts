@@ -17,7 +17,7 @@ export { escenaASvg, LADO_MAXIMO } from "./svg.ts";
 export { cantoSeccion, planoDeEje, PROFUNDIDAD_ALZADO, vistaAlzado, type ModoAlzado, type OpcionesAlzado, type PlanoAlzado } from "./alzado.ts";
 export { ESFUERZOS_PLANO, vistaAlzadoDiagramas, type EsfuerzoPlano } from "./alzadoDiagramas.ts";
 export { PlantaFisica, vistaCargas, vistaDiagnosticos, vistaModelo, type DatosVista } from "./modelo.ts";
-export { CAMPOS, capaMalla, ResultadosRender, vistaAxiles, vistaCampo, vistaDiagramas, vistaMalla, type Campo } from "./resultados.ts";
+export { CAMPOS, capaMalla, envolventeCampo, ResultadosRender, vistaAxiles, vistaCampo, vistaDiagramas, vistaMalla, type Campo, type Envolvente } from "./resultados.ts";
 export { escalaDeTexto, type EscalaMapa } from "./isovalores.ts";
 export { ARMADURAS, escalaArmado, mapaArmado, NOMBRE_CORTO, tituloArmado, tramosArmado, UNIDAD_ARMADO, vistaArmado, VISTAS_ARMADO, type Armadura, type FiltroArmado, type MapaArmado, type OpcionesArmado, type TramoArmado } from "./armado.ts";
 export { direccionBanda, envolventesBandas, gobierna, vistaBandas, type BandaEnvolvente, type DireccionBanda } from "./bandas.ts";
@@ -30,8 +30,8 @@ export type Vista = (typeof VISTAS)[number];
 /** Las vistas del modelo se dibujan sin calcular, también si no compila; las demás necesitan el cálculo. */
 export const necesitaCalculo = (v: Vista): boolean => !(VISTAS_MODELO as readonly string[]).includes(v);
 
-/** Qué combinaciones busca cada vista: los desplazamientos (uz), lo lineal (las reacciones: por defecto, los casos) o los esfuerzos. */
-export const propositoDe = (v: Vista): "desplazamientos" | "esfuerzos" | "lineal" => (v === "uz" ? "desplazamientos" : v === "reacciones" ? "lineal" : "esfuerzos");
+/** Qué combinaciones busca cada vista: los desplazamientos (uz), las reacciones (por defecto, la ELS característica, UI-11) o los esfuerzos. */
+export const propositoDe = (v: Vista): "desplazamientos" | "esfuerzos" | "reacciones" => (v === "uz" ? "desplazamientos" : v === "reacciones" ? "reacciones" : "esfuerzos");
 
 /**
  * Combinaciones por defecto de una vista con resultados: las de las consultas de A1 si todos los

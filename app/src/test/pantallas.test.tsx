@@ -5,12 +5,12 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 import { iniciarNucleo } from "../../../src/nucleo/index.ts";
 import { sha256 } from "../../../src/compilador/huella.ts";
 import { Atendedor } from "../../../src/visor/atender.ts";
-import type { DatosEstacion, DatosLosas, DatosPilares } from "../../../src/visor/datos.ts";
+import type { DatosEstacion, DatosLosas, DatosPilares, ReaccionesCasos } from "../../../src/visor/datos.ts";
 import type { Pilares3D } from "../../../src/visor/pilares3d.ts";
 import type { Reacciones3D } from "../../../src/visor/reacciones3d.ts";
 import type { Pedido } from "../../../src/visor/protocolo.ts";
@@ -18,7 +18,7 @@ import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { ContextoPaneles, useAlmacenPaneles } from "../armazon/paneles.ts";
 import { ContextoVisor, type ModoResultados } from "../contexto.ts";
 import { fmt, mm } from "../fmt.ts";
-import { ModoLosas } from "../pantallas/Losas.tsx";
+import { ModoLosas, textoValor } from "../pantallas/Losas.tsx";
 import { lineasTramo, ModoPilares } from "../pantallas/Pilares.tsx";
 import { lineasReaccion, ModoReacciones } from "../pantallas/Reacciones.tsx";
 import { lineasEstacion } from "../pantallas/Vigas.tsx";
@@ -91,32 +91,43 @@ describe("V1 · DOM", () => {
     const r = await at.atender({ tipo: "pilares", planta, combinaciones: { tipo: "defecto" } });
     const d = (r as { valor: DatosPilares }).valor;
     montar(<ModoPilares />, planta, "pilares");
+    // UI-10: por tramo, en la cabeza y en el pie, una fila por pésimo con sus concomitantes
     const cuadro = await waitFor(() => {
       const s = seccion(`Cuadro bajo ${planta}`);
-      expect(within(s).getAllByRole("row").length).toBe(d.filas.length + 1);
+      expect(within(s).getAllByRole("row").length).toBe(8 * d.filas.length + 1);
       return s;
     });
     const filas = within(cuadro).getAllByRole("row").slice(1);
     d.filas.forEach((f, i) => {
-      const celdas = within(filas[i]!).getAllByRole("cell");
-      expect(celdas[0]!.textContent).toBe(`${f.pilar}${f.tramo.seccion}`);
-      // N: la mayor compresión de la base y la cabeza, con su combinación
-      const nb = f.tramo.base["N-"]!;
-      const nc = f.tramo.cabeza["N-"]!;
-      const n = nb.esfuerzos[0]! <= nc.esfuerzos[0]! ? nb : nc;
-      expect(celdas[1]!.textContent).toBe(`${fmt(n.esfuerzos[0]!, 0)}${n.comb}`);
-      expect(celdas[4]!.textContent).toBe(f.nu ? `${fmt(f.nu.nu, 2)}${f.nu.comb}` : "—");
+      for (const [k, ex] of (["cabeza", "base"] as const).entries())
+        for (const [j, t] of (["N-", "N+", "My", "Mz"] as const).entries()) {
+          const fila = filas[8 * i + 4 * k + j]!;
+          expect(fila.getAttribute("data-terna")).toBe(`${ex} ${t}`);
+          const celdas = within(fila).getAllByRole("cell");
+          // La primera fila del tramo lleva el pilar y el ν; la primera de cada extremo, dónde
+          const desde = (k === 0 && j === 0 ? 1 : 0) + (j === 0 ? 1 : 0);
+          if (k === 0 && j === 0) {
+            expect(celdas[0]!.textContent).toBe(`${f.pilar}${f.tramo.seccion}`);
+            expect(celdas.at(-1)!.textContent).toBe(f.nu ? `${fmt(f.nu.nu, 2)}${f.nu.comb}` : "—");
+          }
+          if (j === 0) expect(celdas[desde - 1]!.textContent).toBe(ex === "cabeza" ? "Cabeza" : "Pie");
+          // N, My y Mz de la misma combinación: la del pésimo
+          const x = f.tramo[ex][t]!;
+          expect(celdas[desde]!.textContent).toBe(`${{ "N-": "N mín.", "N+": "N máx.", My: "My máx.", Mz: "Mz máx." }[t]}${x.comb}`);
+          expect([1, 2, 3].map((c) => celdas[desde + c]!.textContent)).toEqual([fmt(x.esfuerzos[0], 1), fmt(x.esfuerzos[4], 1), fmt(x.esfuerzos[5], 1)]);
+        }
     });
   }, 60_000);
 
   it("losas: los extremos y las flechas dicen los valores de la consulta", async () => {
     const planta = estado.plantas[0]!.id;
-    const r = await at.atender({ tipo: "losas", planta, campo: "uz", combinaciones: { tipo: "defecto" } });
+    // Por defecto, la envolvente de la flecha (UI-1), hacia abajo y en positivo (UI-14)
+    const r = await at.atender({ tipo: "losas", planta, campo: "uz", combinaciones: { tipo: "defecto" }, envolvente: "min" });
     const d = (r as { valor: DatosLosas }).valor;
     montar(<ModoLosas />, planta, "losas");
     await waitFor(() => expect(document.querySelectorAll("[data-extremo]").length).toBe(d.escena.extremos.length));
     const ex = [...document.querySelectorAll("[data-extremo]")];
-    d.escena.extremos.forEach((e, i) => expect(ex[i]!.textContent).toBe(`${fmt(e.valor, 2)} ${e.unidad}`));
+    d.escena.extremos.forEach((e, i) => expect(ex[i]!.textContent).toBe(textoValor("uz", e.valor, 2, e.unidad)));
     const fl = within(seccion("Flechas")).getAllByRole("row").slice(1);
     expect(fl.length).toBe(d.flechas.length);
     d.flechas.forEach((f, i) => {
@@ -130,9 +141,24 @@ describe("V1 · DOM", () => {
     const r = await at.atender({ tipo: "reacciones3d", combinaciones: { tipo: "defecto" }, escala: 1 });
     const d = (r as { valor: Reacciones3D }).valor;
     expect(d.objetos.length).toBeGreaterThan(0);
+    // Por defecto, la ELS característica, dicha (UI-11)
+    expect(d.conjunto.descripcion).toBe(estado.casos.every((c) => c.accion) ? "ELS-C" : "casos");
+    const pc = (await at.atender({ tipo: "reacciones-casos" })) as { valor: ReaccionesCasos };
     montar(<ModoReacciones />, planta, "reacciones");
+    // La pestaña de entrada: un caso por columna (Fz), con la suma de cada caso
+    await waitFor(() => expect(document.querySelectorAll("[data-reaccion-caso]").length).toBe(pc.valor.objetos.length * pc.valor.casos.length));
+    const porCaso = within(seccion("Reacciones por caso")).getAllByRole("row");
+    expect([...within(porCaso[0]!).getAllByRole("columnheader")].map((x) => x.textContent)).toEqual(["Objeto", ...pc.valor.casos.map((c) => `Fz ${c.id} kN`)]);
+    pc.valor.objetos.forEach((o, i) => expect(within(porCaso[i + 1]!).getAllByRole("cell").slice(1).map((x) => x.textContent)).toEqual(o.R.map((r) => fmt(r[2], 1))));
+    expect(within(porCaso.at(-1)!).getAllByRole("cell").map((x) => x.textContent)).toEqual(["Suma", ...pc.valor.totales.map((t) => fmt(t[2], 1))]);
+    // Cada caso suelto, lo mismo que el 3D en ese caso
+    for (const [k, c] of pc.valor.casos.entries()) {
+      const x = (await at.atender({ tipo: "reacciones3d", combinaciones: { tipo: "caso", caso: c.id }, escala: 1 })) as { valor: Reacciones3D };
+      x.valor.objetos.forEach((o) => expect(pc.valor.objetos.find((y) => y.id === o.id)!.R[k]).toEqual(o.R));
+    }
+    fireEvent.click(screen.getByRole("tab", { name: /Lo dibujado/ }));
     await waitFor(() => expect(document.querySelectorAll("[data-reaccion]").length).toBe(d.objetos.length));
-    const filas = within(seccion("Reacciones por objeto")).getAllByRole("row").slice(1);
+    const filas = within(seccion("Reacciones de lo dibujado")).getAllByRole("row").slice(1);
     d.objetos.forEach((o, i) => {
       const celdas = within(filas[i]!).getAllByRole("cell");
       expect(celdas[0]!.textContent).toBe(`${o.id}${o.tipo} · ${o.planta}${d.conjunto.n > 1 ? ` · ${o.comb}` : ""}`);
