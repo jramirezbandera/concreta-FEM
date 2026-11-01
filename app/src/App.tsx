@@ -42,13 +42,14 @@ const ESPACIOS: { id: Espacio; nombre: string; calculo: boolean }[] = [
   { id: "revision", nombre: "Revisión", calculo: true },
 ];
 
-const MODOS: { id: ModoResultados; nombre: string }[] = [
-  { id: "losas", nombre: "Losas" },
-  { id: "diagramas", nombre: "Diagramas de vigas" },
-  { id: "pilares", nombre: "Pilares" },
-  { id: "armado", nombre: "Armado de losas" },
-  { id: "deformada", nombre: "Deformada y desplomes" },
-  { id: "reacciones", nombre: "Reacciones" },
+/** `claves`: lo que se busca en la paleta sin estar en el nombre (UI-41: «flecha», «axil», «momento»). */
+const MODOS: { id: ModoResultados; nombre: string; claves: string }[] = [
+  { id: "losas", nombre: "Losas", claves: "flecha uz momentos M11 M22 cortantes mapa isovalores" },
+  { id: "diagramas", nombre: "Diagramas de vigas", claves: "momento flector cortante My Vz vanos barras viguetas" },
+  { id: "pilares", nombre: "Pilares", claves: "axil N ternas cabeza pie cuadro" },
+  { id: "armado", nombre: "Armado de losas", claves: "franjas Wood-Armer refuerzo armadura base" },
+  { id: "deformada", nombre: "Deformada y desplomes", claves: "deriva desplome viento sismo" },
+  { id: "reacciones", nombre: "Reacciones", claves: "cimentacion apoyos cargas en cimentacion" },
 ];
 
 /** `?espacio=…&modo=…` o, como en V1, `?pantalla=…`. */
@@ -218,7 +219,7 @@ export function App() {
   const ordenes = useMemo<Orden[]>(() => {
     const r: Orden[] = [];
     for (const x of ESPACIOS) r.push({ id: `esp-${x.id}`, grupo: "Espacio", nombre: x.nombre, hacer: () => irA(x.id), deshabilitada: x.calculo && !e?.calculado });
-    for (const m of MODOS) r.push({ id: `modo-${m.id}`, grupo: "Resultados", nombre: m.nombre, hacer: () => irA("resultados", m.id), deshabilitada: !e?.calculado });
+    for (const m of MODOS) r.push({ id: `modo-${m.id}`, grupo: "Resultados", nombre: m.nombre, claves: m.claves, hacer: () => irA("resultados", m.id), deshabilitada: !e?.calculado });
     for (const p of e?.plantas ?? []) r.push({ id: `planta-${p.id}`, grupo: "Planta", nombre: `${p.id} ${cota(p.cota)}${p.nombre ? ` · ${p.nombre}` : ""}`, hacer: () => setPlanta(p.id) });
     if (ed) for (const t of TABLAS) r.push({ id: `tabla-${t}`, grupo: "Tabla", nombre: DEF_TABLAS[t].titulo, hacer: () => pedirTabla(t) });
     if (ed) {

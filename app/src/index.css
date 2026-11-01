@@ -789,7 +789,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .planta-sel-campo > i { width: 6px; height: 6px; border-radius: 3px; flex-shrink: 0; }
 .planta-sel-campo > i.f { background: var(--color-state-fail); }
 .planta-sel-campo > i.w { background: var(--color-state-warn); }
-.ib-chip { display: inline-grid; place-items: center; width: 22px; height: 24px; border: 0; border-radius: 5px; background: none; color: var(--color-text-secondary); cursor: pointer; }
+.ib-chip { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 5px; background: none; color: var(--color-text-secondary); cursor: pointer; }
 .ib-chip:hover:not(:disabled) { background: var(--color-bg-elevated); color: var(--color-text-primary); }
 .ib-chip:disabled { opacity: .35; cursor: default; }
 

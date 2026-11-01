@@ -661,7 +661,22 @@
   - **UI-11:** las reacciones se dibujan en la ELS característica (propósito `reacciones`, también en `fem render`), con una tabla de un caso por columna (pedido `reacciones-casos`); `fem consultar reacciones` sigue por casos.
   - **UI-10 y UI-16:** los pilares, con sus ternas concomitantes en cabeza y pie (`app/src/pantallas/Ternas.tsx`), unidades en las cabeceras y Pilares abierto en la planta más baja.
   - **UI-2:** las cargas verticales se rotulan como se escriben («↓ 2 kN/m²», `valorCarga`), las demás por componentes con su nombre, y las nuevas se llaman con el prefijo de su caso (`G-1`, `idCarga`).
-  - **Siguen** los puntos 4 a 7 (pantallas por debajo de 1600 px, estado y errores, textos sin jerga y el resto).
+- **2026-11-02: auditoría de la interfaz, puntos 4 a 7** (`auditoria-ui.md` §7):
+  - **Pantallas estrechas (UI-7, UI-50, UI-46):**
+    - la barra superior no desplaza la página (iconos solos por debajo de 1500 px y un menú «⋯» por debajo de 1100);
+    - en la de herramientas, la disposición en «Vistas ▾» y Mover…Renumerar en «Editar ▾» (`MenuFlotante`, `GrupoPlegable`);
+    - paneles con `clamp()`, y por debajo de 1440 px navegador o Propiedades;
+    - la cámara recordada sigue encuadrándose sola;
+    - leyenda corta con «Detalles».
+  - **Estado y errores (UI-9, UI-25…UI-31, UI-38, UI-54):**
+    - editar en Resultados no saca de ellos (con «Calcular»);
+    - por qué falló, en una banda y en Diagnósticos (agrupados, con la causa delante);
+    - los gestores preguntan antes de tirar lo cambiado;
+    - sobrescribir se confirma;
+    - el foco de los diálogos.
+  - **Textos (UI-43, UI-44):** sin códigos internos ni órdenes de la CLI; lo que llega del motor y del compilador pasa por `textoApp()` (el agente y el informe los conservan), con la prueba en `src/pruebas/textos.test.ts`.
+  - **Medios de §3.2:** UI-13, UI-18, UI-22 (lo elegido en ámbar), UI-23, UI-24, UI-36 (clic libre a 1 cm), UI-37 (Ctrl+A), UI-39, UI-40, UI-48, UI-55 y UI-56, y en parte UI-15, UI-41 y UI-53.
+  - **Quedan:** UI-15 en la tabla Plantas, UI-19, UI-20, UI-21, UI-32 (firmar en la web), UI-49 y parte de UI-41 y UI-53. Los bancos de Chrome no se han pasado.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);

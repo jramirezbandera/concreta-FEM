@@ -11,6 +11,8 @@ export interface Orden {
   grupo: string;
   nombre: string;
   atajo?: string;
+  /** Más palabras con que se encuentra (no se enseñan). */
+  claves?: string;
   hacer: () => void;
   deshabilitada?: boolean;
 }
@@ -33,7 +35,7 @@ export function Paleta({ ordenes, objetos, onCerrar }: { ordenes: Orden[]; objet
   const vistas = useMemo(() => {
     const palabras = normal(q).split(/\s+/).filter(Boolean);
     const vale = (o: Orden) => {
-      const t = normal(`${o.grupo} ${o.nombre}`);
+      const t = normal(`${o.grupo} ${o.nombre} ${o.claves ?? ""}`);
       return palabras.every((p) => t.includes(p));
     };
     const r = ordenes.filter((o) => !o.deshabilitada && vale(o));
