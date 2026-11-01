@@ -11,6 +11,7 @@
  */
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ComponentType, type ReactNode } from "react";
 import { operacionFila } from "../../../src/editor/edicion.ts";
+import { moverPilar } from "../../../src/editor/estirar.ts";
 import { croquisForjado, estadoCampos, type EstadoCampo } from "../../../src/editor/ficha.ts";
 import { comoUna } from "../../../src/editor/gestores.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
@@ -176,11 +177,14 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
   const fila = useMemo(() => (objeto ? def.fila(objeto, ctx) : null), [objeto, def, ctx]);
   const [borrador, setBorrador] = useState<Record<string, string>>({});
   const [errores, setErrores] = useState<Record<string, string>>({});
+  /** Lo que dijo el último movimiento de un pilar (sus vigas), hasta que se elige otro objeto. */
+  const [movido, setMovido] = useState<string | null>(null);
 
   useEffect(() => {
     setBorrador({});
     setErrores({});
   }, [id, fila]);
+  useEffect(() => setMovido(null), [id]);
 
   if (!objeto || !fila) return <p className="nota">Este objeto ya no está en el proyecto.</p>;
 
@@ -202,8 +206,20 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
       return setErrores({ ...errores, [claves[0]!]: t.errores.map((e) => e.mensaje).join(" · ") });
     }
     const titulo = (k: string) => def.columnas.find((c) => c.clave === k)!.titulo;
-    const r = ed.editar(t.operacion, `${id} · ${claves.map((k) => `${titulo(k)} = ${cambios[k] || "(vacío)"}`).join(", ")}`);
+    // La x o la y de un pilar lo mueven con sus vigas, como sus cotas (CT3; UI-3: antes las dejaba atrás)
+    let operacion = t.operacion;
+    let avisos: string[] = [];
+    if (tabla === "pilares" && claves.every((k) => k === "x" || k === "y") && t.operacion.op === "cambiar") {
+      const n = t.operacion.objeto as unknown as { x: number; y: number };
+      const mv = moverPilar(m, id, [n.x, n.y]);
+      if (mv.ok) {
+        operacion = mv.operacion;
+        avisos = [mv.vigas.length ? `Lo siguen ${mv.vigas.join(", ")}.` : "No lo sigue ninguna viga.", ...mv.avisos];
+      }
+    }
+    const r = ed.editar(operacion, `${id} · ${claves.map((k) => `${titulo(k)} = ${cambios[k] || "(vacío)"}`).join(", ")}`);
     if (!r.ok) return setErrores({ ...errores, [claves[0]!]: r.errores.map((e) => e.mensaje).join(" ") });
+    setMovido(avisos.length ? avisos.join(" ") : null);
     if (t.operacion.op === "cambiar" && t.operacion.objeto.id !== id) setSeleccion(t.operacion.objeto.id);
   };
 
@@ -248,6 +264,7 @@ export function FormularioObjeto({ id, tabla }: { id: string; tabla: NombreTabla
   return (
     <Seccion titulo={`Datos · ${def.titulo.toLowerCase()}`}>
       <div className="form-datos" ref={caja}>
+        {movido && <p className="nota">{movido}</p>}
         {pendiente && (
           <p className="nota">
             {id} pasa a ser {actual.tipo}: falta lo marcado.{" "}

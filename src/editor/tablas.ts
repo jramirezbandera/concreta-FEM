@@ -20,7 +20,7 @@ import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
 import { BOVEDILLA_POR_DEFECTO, BOVEDILLAS, CASETON_POR_DEFECTO, CASETONES, pesoReticular, pesoUnidireccional, viguetaPesable, type Bovedilla, type Caseton, type DesglosePeso } from "../compilador/pesoForjado.ts";
 import { describirCaso } from "./casos.ts";
 import { describirMaterial, describirSeccion } from "./gestores.ts";
-import { Lector, leerNumero, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
+import { Lector, LONGITUD_MAXIMA, leerNumero, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
 export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "barras", "forjados", "muros", "apoyos", "apoyosLineales", "casos", "cargas"] as const;
@@ -296,19 +296,21 @@ const secciones: DefTabla = {
     const comun = { id: L.texto("id") ?? "", material: L.texto("material", { obligatorio: true }), forma };
     const usa = (cs: readonly (typeof DIM)[number][]) => L.vacias(DIM.filter((k) => !cs.includes(k)), `a la forma ${forma}`);
     const pos = (c: string, obligatorio = true) => L.numero(c, { obligatorio, mayorQue: 0 });
+    // Las medidas, con su unidad si se escribe («30 cm») y sin pasar de lo posible (UI-4)
+    const lon = (c: string, obligatorio = true, max: number = LONGITUD_MAXIMA.seccion) => L.longitud(c, { obligatorio, max });
     switch (forma) {
       case "rectangular":
         usa(["b", "h"]);
-        return resultado(L, { ...comun, b: pos("b"), h: pos("h") });
+        return resultado(L, { ...comun, b: lon("b"), h: lon("h") });
       case "circular":
         usa(["D"]);
-        return resultado(L, { ...comun, D: pos("D") });
+        return resultado(L, { ...comun, D: lon("D") });
       case "T":
         usa(["bf", "hf", "bw", "h"]);
-        return resultado(L, { ...comun, bf: pos("bf"), hf: pos("hf"), bw: pos("bw"), h: pos("h") });
+        return resultado(L, { ...comun, bf: lon("bf"), hf: lon("hf", true, LONGITUD_MAXIMA.ala), bw: lon("bw"), h: lon("h") });
       case "general":
         usa(["A", "Iy", "Iz", "J", "Avy", "Avz", "b", "h"]);
-        return resultado(L, { ...comun, A: pos("A"), Iy: pos("Iy"), Iz: pos("Iz"), J: pos("J"), Avy: pos("Avy", false), Avz: pos("Avz", false), b: pos("b", false), h: pos("h", false) });
+        return resultado(L, { ...comun, A: pos("A"), Iy: pos("Iy"), Iz: pos("Iz"), J: pos("J"), Avy: pos("Avy", false), Avz: pos("Avz", false), b: lon("b", false), h: lon("h", false) });
       case "I":
         usa([]);
         if (!base || base.forma !== "I") L.errores.push({ columna: "forma", mensaje: "los perfiles I se crean con «Nueva sección…» (del catálogo)" });
@@ -723,7 +725,7 @@ const forjados: DefTabla = {
       const r = resultado(L, {
         ...comun,
         direccion: L.numero("direccion", { obligatorio: true }),
-        intereje: L.numero("intereje", { obligatorio: true, mayorQue: 0 }),
+        intereje: L.longitud("intereje", { obligatorio: true, max: LONGITUD_MAXIMA.intereje }),
         seccion: L.texto("seccion", { obligatorio: true }),
         pp: L.numero("pp", { min: 0 }),
         bovedilla: L.opcion("bovedilla", BOVEDILLAS),
@@ -739,16 +741,16 @@ const forjados: DefTabla = {
     if (tipo === "maciza") L.vacias(["intereje", ...DEL_RETICULAR], "a una losa maciza");
     else
       reticular = limpio({
-        intereje: L.numero("intereje", { obligatorio: true, mayorQue: 0 }),
-        nervio: L.numero("nervio", { obligatorio: true, mayorQue: 0 }),
-        capa: L.numero("capa", { obligatorio: true, mayorQue: 0 }),
+        intereje: L.longitud("intereje", { obligatorio: true, max: LONGITUD_MAXIMA.intereje }),
+        nervio: L.longitud("nervio", { obligatorio: true, max: LONGITUD_MAXIMA.nervio }),
+        capa: L.longitud("capa", { obligatorio: true, max: LONGITUD_MAXIMA.nervio }),
         caseton: L.opcion("caseton", CASETONES),
         abacos: L.poligonos("abacos"),
         multiplicadores: L.claves("multiplicadores", MULT, { max: 100 }),
       }) as Losa["reticular"];
     const r = resultado(L, {
       ...comun,
-      espesor: L.numero("espesor", { obligatorio: true, mayorQue: 0 }),
+      espesor: L.longitud("espesor", { obligatorio: true, max: LONGITUD_MAXIMA.espesor }),
       material: L.texto("material", { obligatorio: true }),
       pp: L.numero("pp", { min: 0 }),
       eje1: L.numero("direccion"),
@@ -812,7 +814,7 @@ const muros: DefTabla = {
       puntos: L.puntos("puntos", { obligatorio: true, min: 2 }),
       desde: L.texto("desde", { obligatorio: true }),
       hasta: L.texto("hasta", { obligatorio: true }),
-      espesor: L.numero("espesor", { obligatorio: true, mayorQue: 0 }),
+      espesor: L.longitud("espesor", { obligatorio: true, max: LONGITUD_MAXIMA.espesor }),
       material: L.texto("material", { obligatorio: true }),
       base: L.opcion("base", ["empotrado", "articulado", "ninguno"] as const),
       huecos: h?.map(([desde, hasta, z0, z1]) => ({ desde, hasta, z0, z1 })),

@@ -24,6 +24,13 @@ export interface ErrorCelda {
 }
 
 const NUMERO = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
+const FACTOR_LONGITUD = { m: 1, cm: 0.01, mm: 0.001 } as const;
+
+/**
+ * Lo más que puede medir cada longitud de una sección o un forjado, m: por encima, casi seguro que
+ * está en cm o en mm (`Lector.longitud`). Holgados: una viga de transición, una losa de cimentación.
+ */
+export const LONGITUD_MAXIMA = { seccion: 5, ala: 2, espesor: 3, intereje: 3, nervio: 1 } as const;
 
 /** Número de una celda, o un mensaje de por qué no lo es. */
 export function leerNumero(t: string): number | string {
@@ -80,6 +87,27 @@ export class Lector {
     if (o.min !== undefined && v < o.min) return this.mal(c, `no puede ser menor que ${textoNumero(o.min)}`);
     if (o.max !== undefined && v > o.max) return this.mal(c, `no puede ser mayor que ${textoNumero(o.max)}`);
     return v;
+  }
+
+  /**
+   * Una longitud en m: admite la unidad escrita («25 cm», «250 mm», «0,25 m») y, sin ella, rechaza lo
+   * que pasa de `max` con su causa probable (`auditoria-ui.md`, UI-4: un «25» de canto entraba como
+   * 25 m y compilaba).
+   */
+  longitud(c: string, o: { obligatorio?: boolean; max: number }): number | undefined {
+    const t = this.texto(c, o);
+    if (t === undefined) return undefined;
+    const u = /^(.*?)\s*(mm|cm|m)$/i.exec(t);
+    const v = leerNumero(u ? u[1]! : t);
+    if (typeof v === "string") return this.mal(c, v);
+    const m = u ? v * FACTOR_LONGITUD[u[2]!.toLowerCase() as keyof typeof FACTOR_LONGITUD] : v;
+    if (!(m > 0)) return this.mal(c, "tiene que ser mayor que 0");
+    if (m > o.max) {
+      if (u) return this.mal(c, `${textoNumero(m)} m no puede ser: como mucho ${textoNumero(o.max)} m`);
+      const [d, unidad] = v > 100 ? [1000, "mm"] : [100, "cm"];
+      return this.mal(c, `¿${t} m? Si son ${unidad}, escriba ${textoNumero(v / d)} o «${t} ${unidad}»`);
+    }
+    return m;
   }
 
   opcion<T extends string>(c: string, valores: readonly T[], o: { obligatorio?: boolean } = {}): T | undefined {

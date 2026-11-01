@@ -14,12 +14,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { cadenasDe, cotasCadena } from "../agente/render/ejes.ts";
+import { PlantaFisica } from "../agente/render/modelo.ts";
 import { leerProyecto, VERSION_ESQUEMA, type Proyecto } from "../agente/proyecto.ts";
 import { resultanteAnalitica } from "../compilador/cargas.ts";
 import { compilar } from "../compilador/compilar.ts";
 import { ejesDe } from "../compilador/ejes.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { canonico } from "../compilador/huella.ts";
+import { distanciaASegmento } from "../compilador/poligonos.ts";
 import { reticulaEnrasada } from "../../validacion/c2/modelos.ts";
 import { reticulaConNucleo } from "../../validacion/c3/modelos.ts";
 import { edificioReticular, edificioUnidireccional } from "../../validacion/c4/modelos.ts";
@@ -406,18 +408,54 @@ describe("mover un pilar (CT3, criterio 4)", () => {
       const pilares = p.modelo.pilares ?? [];
       const cuenta = (x: (typeof pilares)[number]) => (p.modelo.vigas ?? []).filter((v) => v.puntos.some((q) => q[0] === x.x && q[1] === x.y)).length;
       const pil = [...pilares].sort((a, b) => cuenta(b) - cuenta(a))[0]!;
-      const ida = moverPilar(p.modelo, pil.id, [L(pil.x + 0.1), L(pil.y + 0.05)]);
+      // Las vigas que pasan por él sin un vértice en su punto lo ganan (UI-3): a la vuelta, lo esperado es el original con ese vértice
+      const fijo: Vec2 = [pil.x, pil.y];
+      const plantasPil = new Set(p.modelo.plantas.filter((pl) => new PlantaFisica(p.modelo, pl.id).pilares().some((r) => r.p.id === pil.id)).map((pl) => pl.id));
+      const conVertice = (v: (typeof p.modelo.vigas & {})[number]) => {
+        if (!plantasPil.has(v.planta) || v.puntos.some((q) => q[0] === pil.x && q[1] === pil.y)) return v;
+        const i = v.puntos.findIndex((b, k) => k > 0 && distanciaASegmento(fijo, v.puntos[k - 1]!, b) <= 1e-6);
+        return i > 0 ? { ...v, puntos: [...v.puntos.slice(0, i), fijo, ...v.puntos.slice(i)] } : v;
+      };
+      const esperado = { ...p, modelo: { ...p.modelo, vigas: p.modelo.vigas?.map(conVertice) } };
+      const ganan = (p.modelo.vigas ?? []).filter((v) => conVertice(v) !== v).length;
+      const ida = moverPilar(p.modelo, pil.id, [L(pil.x + 0.13), L(pil.y + 0.07)]);
       if (!ida.ok) throw new Error(ida.mensaje);
-      expect(ida.vigas.length, nombre).toBe(cuenta(pil));
+      expect(ida.vigas.length, nombre).toBe(cuenta(pil) + ganan);
       const a = aplicar(p, ida.operacion);
       if (!a.ok) throw new Error(`${nombre}: ${a.errores.map((x) => x.mensaje).join(" | ")}`);
       const vuelta = moverPilar(a.proyecto.modelo, pil.id, [pil.x, pil.y]);
       if (!vuelta.ok) throw new Error(vuelta.mensaje);
       const b = aplicar(a.proyecto, vuelta.operacion);
       if (!b.ok) throw new Error(b.errores.map((x) => x.mensaje).join(" | "));
-      expect(serializar(b.proyecto), nombre).toBe(serializar(p));
+      expect(serializar(b.proyecto), nombre).toBe(serializar(esperado));
       expect(serializar(deshacer(hacer(historial(p), a.proyecto, "mover")).actual), nombre).toBe(serializar(p));
     }
+  });
+
+  it("una viga continua que pasa por él sin un vértice lo gana y lo sigue (UI-3); con Ctrl se queda, y se avisa", () => {
+    const base = porticos();
+    // VB de extremo a extremo por P11, sin vértice en él; VD cruza su huella a 5 cm del punto fijo
+    const m: ModeloFisico = {
+      ...base,
+      vigas: base.vigas!.filter((v) => !v.id.startsWith("VB")).concat(["N2", "N1"].flatMap((p) => [
+        { id: `VB-${p}`, planta: p, puntos: [[0, 5], [11.4, 5]] as Vec2[], seccion: "v30" },
+        { id: `VD-${p}`, planta: p, puntos: [[5.95, 2], [5.95, 8]] as Vec2[], seccion: "v30" },
+      ])),
+    };
+    const r = moverPilar(m, "P11", [6, 5.3]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.vigas).toEqual(["V1-N2", "VB-N2", "V1-N1", "VB-N1"]);
+    expect(r.avisos).toEqual([
+      "Las vigas VB-N2, VB-N1 pasaban por P11 sin un vértice en él: ahora lo tienen y lo siguen.",
+      "Las vigas VC-N2, VC-N1 llegan a P11 sin acabar en su punto fijo (alineadas a una cara) y no lo siguen.",
+      "Las vigas VD-N2, VD-N1 cruzan la huella de P11 sin pasar por su punto fijo y no lo siguen.",
+    ]);
+    const n = movido(m, "P11", [6, 5.3]);
+    for (const pl of ["N1", "N2"]) expect(n.vigas!.find((x) => x.id === `VB-${pl}`)!.puntos).toEqual([[0, 5], [6, 5.3], [11.4, 5]]);
+    const s = moverPilar(m, "P11", [6, 5.3], false);
+    expect(s.ok && s.avisos.slice(0, 2)).toEqual(["Las vigas V1-N2, V1-N1 acaban en P11 y se quedan donde estaban.", "Las vigas VB-N2, VB-N1 pasan por P11 y se quedan donde estaban."]);
+    expect(movido(m, "P11", [6, 5.3], false).vigas).toEqual(m.vigas);
   });
 
   it("los errores: un pilar que no hay, un punto que no es un número o el mismo sitio", () => {

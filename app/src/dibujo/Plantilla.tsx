@@ -20,6 +20,7 @@ import { BOVEDILLA_POR_DEFECTO, BOVEDILLAS, CASETON_POR_DEFECTO, CASETONES, type
 import type { PlantillaCargas } from "../../../src/editor/dibujo/cargas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
 import { TEXTO_BOVEDILLA, TEXTO_CASETON, TIPOS_FORJADO, type NombreTabla, type TipoForjado } from "../../../src/editor/tablas.ts";
+import { LONGITUD_MAXIMA } from "../../../src/editor/celdas.ts";
 import { esEditar, type NombreEditar, type PlantillaEditar } from "../../../src/editor/dibujo/editar.ts";
 import { esPlantillaDxf, type NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
 import { IcApoyo, IcApoyoLineal, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
@@ -328,7 +329,7 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
               </select>
               {plMuro && !plMuro.ok && <p className="error">{plMuro.mensaje}</p>}
             </label>
-            <NumeroCampo etiqueta="espesor" unidad="m" valor={t.muro?.espesor} onCambio={(espesor) => setPlantillas({ ...t, muro: { ...t.muro, espesor } })} />
+            <NumeroCampo etiqueta="espesor" unidad="m" valor={t.muro?.espesor} onCambio={(espesor) => setPlantillas({ ...t, muro: { ...t.muro, espesor } })} max={LONGITUD_MAXIMA.espesor} />
             <CampoMaterial modelo={m} valor={t.muro?.material} para="la plantilla de Muro" editar={editar} onCambio={(material) => setPlantillas({ ...t, muro: { ...t.muro, material } })} />
             <label className="campo">
               <span>base</span>
@@ -452,16 +453,28 @@ function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { 
 }
 
 /** Un número de la plantilla; vacío es «el de por defecto» (y 0 también, salvo con `cero`); `falta`, en rojo mientras esté vacío. */
-export function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, cero, vacio = "0" }: { etiqueta: string; unidad?: string; valor: number | undefined; onCambio: (v: number | undefined) => void; ayuda?: string; falta?: boolean; cero?: boolean; vacio?: string }) {
+/** Lo más que puede medir cada longitud de la plantilla de Forjado, m (las de la tabla). */
+const MAXIMO_FORJADO: Partial<Record<"espesor" | "pp" | "direccion" | "intereje" | "nervio" | "capa", number>> = { espesor: LONGITUD_MAXIMA.espesor, intereje: LONGITUD_MAXIMA.intereje, nervio: LONGITUD_MAXIMA.nervio, capa: LONGITUD_MAXIMA.nervio };
+
+/**
+ * Un número de la plantilla. En m admite la unidad escrita («25 cm», «250 mm»), y con `max` rechaza
+ * lo que no puede ser con su causa probable (`auditoria-ui.md`, UI-4: un «25» de canto eran 25 m).
+ */
+export function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, cero, vacio = "0", max }: { etiqueta: string; unidad?: string; valor: number | undefined; onCambio: (v: number | undefined) => void; ayuda?: string; falta?: boolean; cero?: boolean; vacio?: string; max?: number }) {
   const [texto, setTexto] = useState<string | null>(null);
   const mostrado = texto ?? (valor === undefined ? "" : String(valor).replace(".", ","));
-  const v = Number(mostrado.trim().replace(",", "."));
-  const mal = mostrado.trim() !== "" && !Number.isFinite(v);
+  const t = mostrado.trim();
+  const u = unidad === "m" ? /^(.*?)\s*(mm|cm|m)$/i.exec(t) : null;
+  const n = Number((u ? u[1]! : t).replace(",", "."));
+  const v = u ? n * { mm: 0.001, cm: 0.01, m: 1 }[u[2]!.toLowerCase() as "mm" | "cm" | "m"] : n;
+  const mal = t !== "" && !Number.isFinite(v);
+  const grande = !mal && max !== undefined && v > max;
   const escribir = () => {
     if (texto === null) return;
-    if (!mal) onCambio(texto.trim() === "" || (v === 0 && !cero) ? undefined : v);
-    setTexto(null);
+    if (!mal && !grande) onCambio(texto.trim() === "" || (v === 0 && !cero) ? undefined : v);
+    if (!grande) setTexto(null);
   };
+  const [d, en] = n > 100 ? [1000, "mm"] : [100, "cm"];
   return (
     <label className="campo">
       <span>
@@ -472,6 +485,7 @@ export function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, c
         <input value={mostrado} placeholder={falta ? "obligatorio" : vacio} data-error={mal || (!!falta && !mostrado.trim())} aria-label={etiqueta} aria-invalid={mal} onChange={(x) => setTexto(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
       </span>
       {mal && <p className="error">Un número</p>}
+      {grande && <p className="error">{u ? `Como mucho ${String(max).replace(".", ",")} m` : `¿${t} m? Si son ${en}, escriba ${String(n / d).replace(".", ",")} o «${t} ${en}»`}</p>}
     </label>
   );
 }
@@ -709,7 +723,7 @@ function PlantillaForjadoPanel({ modelo: m, t, poner, editar }: { modelo: Modelo
   const peso = pesoPlantillaForjado(m, t);
   const faltaPp = t.pp === undefined && (tipo === "reticular" ? t.caseton === "perdido" : tipo === "unidireccional" && !!m.secciones.find((x) => x.id === t.seccion) && !peso);
   const vacioPp = peso ? `${String(Math.round(peso.pp * 100) / 100).replace(".", ",")} (sale solo)` : "sale solo";
-  const num = (k: "espesor" | "pp" | "direccion" | "intereje" | "nervio" | "capa", etiqueta: string, unidad: string, ayuda?: string) => <NumeroCampo key={`${tipo}-${k}`} etiqueta={etiqueta} unidad={unidad} valor={t[k]} onCambio={(v) => poner({ [k]: v })} ayuda={ayuda} cero={k === "pp"} vacio={k === "pp" ? vacioPp : "0"} falta={k === "pp" && faltaPp} />;
+  const num = (k: "espesor" | "pp" | "direccion" | "intereje" | "nervio" | "capa", etiqueta: string, unidad: string, ayuda?: string) => <NumeroCampo key={`${tipo}-${k}`} etiqueta={etiqueta} unidad={unidad} valor={t[k]} onCambio={(v) => poner({ [k]: v })} ayuda={ayuda} cero={k === "pp"} vacio={k === "pp" ? vacioPp : "0"} falta={k === "pp" && faltaPp} max={MAXIMO_FORJADO[k]} />;
   return (
     <Seccion titulo="Plantilla" valor="para los siguientes">
       <div className="py-1">

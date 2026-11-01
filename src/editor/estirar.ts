@@ -33,7 +33,7 @@ import { rotuloCota } from "../agente/render/ejes.ts";
 import { huellaSeccion, PlantaFisica } from "../agente/render/modelo.ts";
 import { puntosBarra } from "../compilador/barras.ts";
 import type { Barra, CargaFisica, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
-import { distanciaABorde, puntoEnPoligono } from "../compilador/poligonos.ts";
+import { distanciaABorde, distanciaASegmento, distanciaEntreSegmentos, puntoEnPoligono } from "../compilador/poligonos.ts";
 import { limpio } from "./dibujo/cotas.ts";
 import type { Operacion } from "./operaciones.ts";
 import type { Coleccion, Objeto } from "./referencias.ts";
@@ -51,6 +51,8 @@ export const CORTE_MAXIMO = 0.5;
 
 /** A menos de esto del eje móvil, un punto está en él, m. */
 const EN_EJE = 1e-9;
+/** A menos de esto del punto fijo de un pilar, un tramo de viga pasa por él (un enganche «en el eje» de una viga inclinada lo deja a un ulp), m. */
+const PASA_POR_FIJO = 1e-6;
 
 /** Lo que el estirado mueve entero y lo que alarga (ids, en el orden del modelo). */
 export interface Afectados {
@@ -338,10 +340,13 @@ export type ResultadoMover = { ok: true; operacion: Operacion; avisos: string[];
 /**
  * El pilar `id` con su punto fijo en q, en todas sus plantas (una sola coordenada, así que en todas).
  * Con `conVigas` (CT-d, como CYPECAD), lo siguen las vigas de sus plantas con un vértice en su punto
- * fijo bit a bit: ese vértice pasa a ser q. Las que tienen un vértice en su huella sin estar en el
- * punto (alineadas a una cara, V2c-b) no lo siguen, y se avisa; sin `conVigas`, también de las que se
- * quedan. Las barras (fase BN) con un extremo en su punto fijo en una de sus plantas lo siguen igual.
- * Los ejes guardados no se mueven. Un `lote` de `cambiar`: un paso de deshacer.
+ * fijo bit a bit: ese vértice pasa a ser q. Una viga que pasa por el punto sin un vértice en él (una
+ * continua dibujada de extremo a extremo) gana ese vértice y lo sigue igual (`auditoria-ui.md`, UI-3:
+ * antes se quedaba sin decir nada). Las que tienen un vértice en su huella sin estar en el punto
+ * (alineadas a una cara, V2c-b), o la cruzan sin pasar por él, no lo siguen, y se avisa; sin
+ * `conVigas`, también de las que se quedan. Las barras (fase BN) con un extremo en su punto fijo en
+ * una de sus plantas lo siguen igual. Los ejes guardados no se mueven. Un `lote` de `cambiar`: un
+ * paso de deshacer.
  */
 export function moverPilar(m: ModeloFisico, id: string, q: Vec2, conVigas = true): ResultadoMover {
   const p = m.pilares?.find((x) => x.id === id);
@@ -351,13 +356,18 @@ export function moverPilar(m: ModeloFisico, id: string, q: Vec2, conVigas = true
   const ops: Operacion[] = [{ op: "cambiar", coleccion: "pilares", id, objeto: { ...p, x: q[0], y: q[1] } as Objeto }];
   const siguen: string[] = [];
   const quedan: string[] = [];
+  const pasan: string[] = [];
+  const ganan: string[] = [];
   const cara: string[] = [];
+  const cruzan: string[] = [];
+  const fijo: Vec2 = [p.x, p.y];
   for (const pl of m.plantas) {
     const planta = new PlantaFisica(m, pl.id);
     const x = planta.pilares().find((r) => r.p.id === id);
     if (!x) continue;
     const h = huellaSeccion(p, x.seccion);
     const enHuella = (v: Vec2) => (h ? ("anillo" in h ? puntoEnPoligono(v, h.anillo) || distanciaABorde(v, h.anillo) <= EN_EJE : Math.hypot(v[0] - h.centro[0], v[1] - h.centro[1]) <= h.radio + EN_EJE) : false);
+    const cruza = (a: Vec2, b: Vec2) => (h ? ("anillo" in h ? h.anillo.some((c, k) => distanciaEntreSegmentos(a, b, c, h.anillo[(k + 1) % h.anillo.length]!) <= EN_EJE) : distanciaASegmento(h.centro, a, b) <= h.radio + EN_EJE) : false);
     for (const v of planta.enPlanta(m.vigas)) {
       if (v.puntos.some((r) => r[0] === p.x && r[1] === p.y)) {
         if (!conVigas) {
@@ -366,7 +376,19 @@ export function moverPilar(m: ModeloFisico, id: string, q: Vec2, conVigas = true
         }
         siguen.push(v.id);
         ops.push({ op: "cambiar", coleccion: "vigas", id: v.id, objeto: { ...v, puntos: v.puntos.map((r) => (r[0] === p.x && r[1] === p.y ? q : r)) } as Objeto });
+        continue;
+      }
+      const i = v.puntos.findIndex((b, k) => k > 0 && distanciaASegmento(fijo, v.puntos[k - 1]!, b) <= PASA_POR_FIJO);
+      if (i > 0) {
+        if (!conVigas) {
+          pasan.push(v.id);
+          continue;
+        }
+        siguen.push(v.id);
+        ganan.push(v.id);
+        ops.push({ op: "cambiar", coleccion: "vigas", id: v.id, objeto: { ...v, puntos: [...v.puntos.slice(0, i), q, ...v.puntos.slice(i)] } as Objeto });
       } else if (v.puntos.some(enHuella)) cara.push(v.id);
+      else if (v.puntos.some((b, k) => k > 0 && cruza(v.puntos[k - 1]!, b))) cruzan.push(v.id);
     }
   }
   // Fase BN: las barras con un extremo en su punto fijo, en las plantas del pilar
@@ -387,7 +409,10 @@ export function moverPilar(m: ModeloFisico, id: string, q: Vec2, conVigas = true
   const lista = (ids: string[]) => ids.join(", ");
   if (quedan.length) avisos.push(`${quedan.length > 1 ? `Las vigas ${lista(quedan)} acaban` : `La viga ${quedan[0]} acaba`} en ${id} y se ${quedan.length > 1 ? "quedan" : "queda"} donde estaba${quedan.length > 1 ? "n" : ""}.`);
   if (quedanBarras.length) avisos.push(`${quedanBarras.length > 1 ? `Las barras ${lista(quedanBarras)} acaban` : `La barra ${quedanBarras[0]} acaba`} en ${id} y se ${quedanBarras.length > 1 ? "quedan" : "queda"} donde estaba${quedanBarras.length > 1 ? "n" : ""}.`);
+  if (pasan.length) avisos.push(`${pasan.length > 1 ? `Las vigas ${lista(pasan)} pasan` : `La viga ${pasan[0]} pasa`} por ${id} y se ${pasan.length > 1 ? "quedan" : "queda"} donde estaba${pasan.length > 1 ? "n" : ""}.`);
+  if (ganan.length) avisos.push(`${ganan.length > 1 ? `Las vigas ${lista(ganan)} pasaban` : `La viga ${ganan[0]} pasaba`} por ${id} sin un vértice en él: ahora lo ${ganan.length > 1 ? "tienen" : "tiene"} y lo ${ganan.length > 1 ? "siguen" : "sigue"}.`);
   if (cara.length) avisos.push(`${cara.length > 1 ? `Las vigas ${lista(cara)} llegan` : `La viga ${cara[0]} llega`} a ${id} sin acabar en su punto fijo (alineada${cara.length > 1 ? "s" : ""} a una cara) y no lo ${cara.length > 1 ? "siguen" : "sigue"}.`);
+  if (cruzan.length) avisos.push(`${cruzan.length > 1 ? `Las vigas ${lista(cruzan)} cruzan` : `La viga ${cruzan[0]} cruza`} la huella de ${id} sin pasar por su punto fijo y no lo ${cruzan.length > 1 ? "siguen" : "sigue"}.`);
   return { ok: true, operacion: ops.length > 1 ? { op: "lote", operaciones: ops } : ops[0]!, avisos, vigas: siguen };
 }
 

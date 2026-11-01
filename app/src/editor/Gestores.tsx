@@ -145,13 +145,25 @@ function formDe(d: DatosSeccion, id: string): FormSeccion {
 function datosDe(f: FormSeccion): { ok: true; datos: DatosSeccion } | { ok: false; errores: Record<string, string> } {
   const errores: Record<string, string> = {};
   const pos = (k: string, factor: number, obligatorio = true): number | undefined => {
-    const v = leer(f.campos[k]);
+    const t = f.campos[k]?.trim() ?? "";
+    // Las medidas van en cm, pero se admite la unidad escrita («0,3 m», «300 mm»: UI-4)
+    const u = factor === 100 ? /^(.*?)\s*(mm|cm|m)$/i.exec(t) : null;
+    const v = leer(u ? u[1] : t);
     if (v === null) {
       if (obligatorio) errores[k] = "falta";
       return undefined;
     }
+    if (Number.isNaN(v)) {
+      errores[k] = `«${t}» no es un número`;
+      return undefined;
+    }
     if (!(v > 0)) {
       errores[k] = "mayor que 0";
+      return undefined;
+    }
+    if (u) return v * { mm: 0.001, cm: 0.01, m: 1 }[u[2]!.toLowerCase() as "mm" | "cm" | "m"];
+    if (factor === 100 && v < 2) {
+      errores[k] = `¿${t} cm? Si son m, escriba ${escrito(v, 100)} o «${t} m»`;
       return undefined;
     }
     return v / factor;

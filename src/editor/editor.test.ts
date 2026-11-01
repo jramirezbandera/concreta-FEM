@@ -345,6 +345,26 @@ describe("materiales: el E de cada tipo, en su unidad", () => {
   });
 });
 
+describe("longitudes con su unidad, y las que no pueden ser (UI-4)", () => {
+  const ctx = contexto(vacio().modelo);
+  const sec = (b: string, h = "0,5") => DEF_TABLAS.secciones.objeto({ id: "V", material: "HA", forma: "rectangular", b, h }, ctx);
+  it("«30 cm», «300 mm» y «0,3 m» son 0,3 m; sin unidad, en m", () => {
+    for (const b of ["30 cm", "30cm", "300 mm", "0,3 m", "0,3"]) expect(sec(b), b).toMatchObject({ ok: true, objeto: { b: 0.3 } });
+  });
+  it("un 30 en m no entra, y el mensaje dice la causa y cómo escribirlo", () => {
+    const r = sec("30");
+    expect(r.ok ? null : r.errores).toEqual([{ columna: "b", mensaje: "¿30 m? Si son cm, escriba 0,3 o «30 cm»" }]);
+    const mm = sec("300");
+    expect(mm.ok ? null : mm.errores[0]!.mensaje).toBe("¿300 m? Si son mm, escriba 0,3 o «300 mm»");
+    expect(sec("7 m").ok ? null : (sec("7 m") as { errores: { mensaje: string }[] }).errores[0]!.mensaje).toBe("7 m no puede ser: como mucho 5 m");
+  });
+  it("el canto de una losa maciza: «25» no, «25 cm» sí", () => {
+    const losa = (espesor: string) => DEF_TABLAS.forjados.objeto({ id: "L", tipo: "maciza", planta: "N1", contorno: "0 0; 5 0; 5 5; 0 5", espesor, material: "HA" }, ctx);
+    expect(losa("25").ok).toBe(false);
+    expect(losa("25 cm")).toMatchObject({ ok: true, objeto: { espesor: 0.25 } });
+  });
+});
+
 describe("pegar en una celda, como en Excel", () => {
   const { proyecto: ej } = leerEjemplo("ejemplo");
   const ids = filas(ej.modelo, "pilares").map((f) => f.id);
