@@ -19,12 +19,20 @@ export class ErrorObsoleto extends Error {
 }
 
 let wasm: Promise<ArrayBuffer> | null = null;
-/** Los bytes del núcleo, una vez por página (cada worker recibe su copia). */
+/**
+ * Los bytes del núcleo, una vez por página (cada worker recibe su copia). Si la descarga falla, se
+ * olvida: el siguiente proyecto que se abra lo vuelve a intentar (UI-28; antes, todo lo que se
+ * abría después fallaba hasta recargar la página).
+ */
 function bytesNucleo(): Promise<ArrayBuffer> {
-  return (wasm ??= fetch(urlNucleo).then((r) => {
+  const p = (wasm ??= fetch(urlNucleo).then((r) => {
     if (!r.ok) throw new Error(`No se pudo descargar el núcleo de cálculo (${r.status}).`);
     return r.arrayBuffer();
   }));
+  p.catch(() => {
+    if (wasm === p) wasm = null;
+  });
+  return p;
 }
 
 export class ClienteSesion {

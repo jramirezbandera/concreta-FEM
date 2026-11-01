@@ -1,5 +1,5 @@
 /** Piezas comunes de los paneles: secciones, filas, combinaciones, diagnósticos y equilibrio. */
-import type { ComponentType, ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { CombinacionDisponible, EleccionCombinaciones, EstadoSesion, PropositoVista } from "../../../src/visor/sesion.ts";
 import type { Combinaciones } from "../../../src/visor/datos.ts";
@@ -146,31 +146,89 @@ export function TablaCombinaciones({ c, resaltar }: { c: Combinaciones; resaltar
   );
 }
 
+/** Diagnósticos del mismo código y severidad, juntos: los de una sola acción salían uno por uno. */
+interface GrupoDiagnosticos {
+  d: Diagnostico;
+  todos: Diagnostico[];
+  ids: string[];
+  /** Un aviso sobre los mismos objetos que un error: lo más probable es que sea su causa. */
+  causa: boolean;
+}
+
+const RANGO = { error: 0, aviso: 1, info: 2 } as const;
+
+/**
+ * El orden de la lista (UI-38): primero los avisos que tocan a los objetos de un error (el «¿está
+ * en cm?» de una sección de 30 m explica el error de topología que viene después), luego los
+ * errores, los avisos y la información; los del mismo código, en un solo grupo.
+ */
+export function agruparDiagnosticos(ds: readonly Diagnostico[]): GrupoDiagnosticos[] {
+  const grupos = new Map<string, GrupoDiagnosticos>();
+  for (const d of ds) {
+    const k = `${d.severidad}|${d.codigo}`;
+    const g = grupos.get(k);
+    if (g) {
+      g.todos.push(d);
+      for (const id of d.ids ?? []) if (!g.ids.includes(id)) g.ids.push(id);
+    } else grupos.set(k, { d, todos: [d], ids: [...(d.ids ?? [])], causa: false });
+  }
+  const conError = new Set(ds.filter((d) => d.severidad === "error").flatMap((d) => d.ids ?? []));
+  const lista = [...grupos.values()];
+  for (const g of lista) g.causa = g.d.severidad === "aviso" && g.ids.some((id) => conError.has(id));
+  return lista.sort((a, b) => Number(b.causa) - Number(a.causa) || RANGO[a.d.severidad] - RANGO[b.d.severidad]);
+}
+
 export function ListaDiagnosticos({ ds, onObjeto, max = 200 }: { ds: readonly Diagnostico[]; onObjeto?: (id: string) => void; max?: number }) {
+  const [abiertos, setAbiertos] = useState<ReadonlySet<string>>(() => new Set());
   if (!ds.length) return <p className="nota">Sin errores ni avisos.</p>;
+  const grupos = agruparDiagnosticos(ds);
   return (
     <ul className="m-0 list-none p-0">
-      {ds.slice(0, max).map((d, i) => (
-        <li key={i} className="border-b border-border-sub px-3.5 py-1.5 text-[12px]">
-          <div className="flex items-center gap-2">
-            <span className={`pill ${d.severidad === "error" ? "fail" : "warn"}`} style={{ height: 18, fontSize: 10 }}>
-              {d.severidad === "error" ? "ERROR" : "AVISO"}
-            </span>
-            <span className="mono truncate text-[11px] text-text-disabled">{d.codigo}</span>
-          </div>
-          <p className="mt-1 text-text-secondary">{d.mensaje}</p>
-          {d.ids && d.ids.length > 0 && onObjeto && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {d.ids.slice(0, 8).map((id) => (
-                <button key={id} type="button" className="btn" style={{ height: 22, padding: "0 6px", fontSize: 11 }} onClick={() => onObjeto(id)}>
-                  {id}
-                </button>
-              ))}
+      {grupos.slice(0, max).map((g) => {
+        const k = `${g.d.severidad}|${g.d.codigo}`;
+        const n = g.todos.length;
+        const abierto = abiertos.has(k);
+        const sev = g.d.severidad;
+        return (
+          <li key={k} className="border-b border-border-sub px-3.5 py-1.5 text-[12px]" data-severidad={sev}>
+            <div className="flex items-center gap-2">
+              <span className={`pill ${sev === "error" ? "fail" : sev === "aviso" ? "warn" : "neu"}`} style={{ height: 18, fontSize: 10 }}>
+                {sev === "error" ? "ERROR" : sev === "aviso" ? "AVISO" : "INFO"}
+              </span>
+              {g.causa && <span className="text-[11px] font-medium text-state-warn">Posible causa de un error</span>}
+              {n > 1 && <span className="text-[11px] text-text-secondary">{n} iguales</span>}
+              <span className="mono ml-auto truncate text-[11px] text-text-tertiary" title="El código del diagnóstico">
+                {g.d.codigo}
+              </span>
             </div>
-          )}
-        </li>
-      ))}
-      {ds.length > max && <li className="nota">… y {ds.length - max} más.</li>}
+            <p className="mt-1 text-text-secondary">{g.d.mensaje}</p>
+            {n > 1 && (
+              <>
+                <button type="button" className="enlace text-[11.5px]" aria-expanded={abierto} onClick={() => setAbiertos((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set([...s, k])))}>
+                  {abierto ? "Ocultar los demás" : `Ver los otros ${n - 1}`}
+                </button>
+                {abierto &&
+                  g.todos.slice(1).map((d, i) => (
+                    <p key={i} className="mt-1 border-l-2 border-border-sub pl-2 text-text-secondary">
+                      {d.mensaje}
+                    </p>
+                  ))}
+              </>
+            )}
+            {g.ids.length > 0 && onObjeto && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {g.ids.slice(0, 12).map((id) => (
+                  <button key={id} type="button" className="btn" style={{ height: 22, padding: "0 6px", fontSize: 11 }} onClick={() => onObjeto(id)}>
+                    {id}
+                  </button>
+                ))}
+                {g.ids.length > 12 && <span className="self-center text-[11px] text-text-tertiary">y {g.ids.length - 12} más</span>}
+              </div>
+            )}
+          </li>
+        );
+      })}
+      {grupos.length > max && <li className="nota">… y {grupos.length - max} más.</li>}
     </ul>
   );
 }

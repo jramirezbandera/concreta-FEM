@@ -1106,3 +1106,16 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .cq-cota:hover line { stroke: var(--color-text-primary); }
 .cq-guia { fill: none; stroke: var(--color-text-tertiary); stroke-width: .7; }
 .cq-cota[data-activo] .cq-guia { stroke: var(--color-accent); }
+
+/* Un botón que parece un enlace (ver los demás diagnósticos de un grupo) */
+.enlace { padding: 0; border: 0; background: none; font-family: var(--font-sans); color: var(--color-accent-text); cursor: pointer; }
+.enlace:hover { text-decoration: underline; }
+
+/* UI-30: cambios sin aplicar en un gestor (al cerrar, en el pie; al ir a otra fila, en la ficha) */
+.dialogo .pie.pie-pregunta { align-items: center; background: var(--color-tint-warn); color: var(--color-state-warn-text); }
+.ges-pregunta { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; padding: 6px 6px 6px 10px; border-radius: 6px; font-size: 12px; background: var(--color-tint-warn); color: var(--color-state-warn-text); }
+
+/* UI-9: Resultados o Revisión sin el cálculo de esta versión */
+.espera-calculo { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 72px auto 0; width: min(560px, calc(100% - 32px)); }
+.espera-calculo h1 { margin: 0; font-size: 15px; font-weight: 600; }
+.espera-calculo p { margin: 0; color: var(--color-text-secondary); }

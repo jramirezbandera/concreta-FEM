@@ -259,7 +259,8 @@ try {
   await captura("ejemplo-conflicto");
   await pagina(`__v2.boton("Guardar").click(); await new Promise((r) => setTimeout(r, 500));`);
   comprobar(readFileSync(rutaE, "utf8") === fuera, "Guardar con el conflicto abierto no pisa el fichero");
-  await pagina(`__v2.boton("Sobrescribir").click(); await __v2.esperar(() => !document.querySelector("[role=alert]"), 5000);`);
+  // UI-31: dos pasos (quedarse con lo de aquí y confirmar)
+  await pagina(`__v2.boton("Quedarme con lo de aquí (sobrescribir el del disco)").click(); await new Promise((r) => setTimeout(r, 100)); __v2.boton("Sobrescribir").click(); await __v2.esperar(() => !document.querySelector("[role=alert]"), 5000);`);
   const e2 = huellaDe(readFileSync(rutaE, "utf8"));
   comprobar(e2.proyecto.modelo.pilares![0]!.x === 0.25 && !e2.proyecto.nombre?.startsWith("Cambiado"), "«Sobrescribir» escribe lo de la página");
 } catch (e) {

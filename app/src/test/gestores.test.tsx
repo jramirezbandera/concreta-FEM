@@ -281,6 +281,28 @@ describe("GE: el gestor de materiales", () => {
     expect(within(dlg).getByRole("status").textContent).toBe("Creado HA-28.");
     expect(deshacer().getAttribute("title")).toMatch(/Nuevo material HA-28/);
   }, 60_000);
+
+  it("UI-30: lo cambiado sin aplicar no se tira sin preguntar, y un HA-30 con otro fck propone su id", async () => {
+    await proyectoNuevo("ge-cambios");
+    fireEvent.click(within(barra()).getByRole("button", { name: "Materiales" }));
+    const dlg = screen.getByRole("dialog", { name: "Materiales" });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "fck del material, MPa" }), { target: { value: "25" } });
+    // El id ya no dice lo que es
+    fireEvent.click(within(dlg).getByRole("button", { name: "Llamarlo HA-25" }));
+    expect((within(dlg).getByRole("textbox", { name: "id del material" }) as HTMLInputElement).value).toBe("HA-25");
+    // A otra fila: pregunta, y «Seguir editando» deja lo escrito
+    fireEvent.click(within(dlg).getByRole("button", { name: "Nuevo material" }));
+    expect(within(dlg).getByRole("alert").textContent).toMatch(/HA-30 tiene cambios sin aplicar/);
+    fireEvent.click(within(dlg).getByRole("button", { name: "Seguir editando" }));
+    expect((within(dlg).getByRole("textbox", { name: "fck del material, MPa" }) as HTMLInputElement).value).toBe("25");
+    // Un clic en el fondo no cierra; Esc pregunta, y «Cerrar sin aplicar» cierra sin cambiar nada
+    fireEvent.mouseDown(dlg.parentElement!);
+    expect(screen.getByRole("dialog", { name: "Materiales" })).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar sin aplicar" }));
+    expect(screen.queryByRole("dialog", { name: "Materiales" })).toBeNull();
+    expect(deshacer().getAttribute("title")).not.toMatch(/Material HA-30/);
+  }, 60_000);
 });
 
 /** Abre una orden de la paleta (Ctrl+K) por su nombre. */

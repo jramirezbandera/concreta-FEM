@@ -23,10 +23,59 @@ const total = (m: ModeloFisico) => COLECCIONES.reduce((n, c) => n + lista(m, c).
  * desaparece, el foco se va al `body`). Se escucha en la ventana, en la fase de captura, y no sigue:
  * así no suelta también lo elegido ni anula la herramienta de dibujo.
  */
-export function Dialogo({ titulo, children, pie, onCerrar, clase }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void; clase?: string }) {
+const ENFOCABLES = 'button:not(:disabled), [href], input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * El foco de un diálogo (UI-54): al abrirse va dentro (a lo marcado con `autoFocus`, o al primer
+ * campo), Tab no sale de él y al cerrarse vuelve a donde estaba.
+ */
+function useFocoDialogo(caja: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const antes = document.activeElement as HTMLElement | null;
+    const c = caja.current;
+    if (c && !c.contains(document.activeElement)) {
+      const primero = c.querySelector<HTMLElement>(".dialogo-cuerpo input:not(:disabled), .dialogo-cuerpo select:not(:disabled), .dialogo-cuerpo textarea:not(:disabled)") ?? c.querySelector<HTMLElement>(ENFOCABLES);
+      primero?.focus();
+    }
+    const tab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !c) return;
+      const abiertos = document.querySelectorAll(".dialogo");
+      if (abiertos[abiertos.length - 1] !== c) return;
+      const t = [...c.querySelectorAll<HTMLElement>(ENFOCABLES)].filter((x) => x.offsetParent !== null || x === document.activeElement);
+      if (!t.length) return;
+      const [a, z] = [t[0]!, t[t.length - 1]!];
+      if (!c.contains(document.activeElement)) {
+        e.preventDefault();
+        a.focus();
+      } else if (e.shiftKey && document.activeElement === a) {
+        e.preventDefault();
+        z.focus();
+      } else if (!e.shiftKey && document.activeElement === z) {
+        e.preventDefault();
+        a.focus();
+      }
+    };
+    window.addEventListener("keydown", tab, true);
+    return () => {
+      window.removeEventListener("keydown", tab, true);
+      if (antes && antes.isConnected && antes !== document.body) antes.focus();
+    };
+  }, [caja]);
+}
+
+/**
+ * `pendiente` (UI-30): lo que se perdería al cerrar (los cambios de una ficha sin aplicar). Con él,
+ * cerrar (Esc, la cruz o el fondo) pregunta antes. `fondoCierra: false`, un clic en el fondo no
+ * cierra (los gestores: se perdía lo escrito con un clic fuera).
+ */
+export function Dialogo({ titulo, children, pie, onCerrar, clase, pendiente = null, fondoCierra = true }: { titulo: string; children: React.ReactNode; pie: React.ReactNode; onCerrar: () => void; clase?: string; pendiente?: string | null; fondoCierra?: boolean }) {
   const fondo = useRef<HTMLDivElement>(null);
-  const cerrar = useRef(onCerrar);
-  cerrar.current = onCerrar;
+  const caja = useRef<HTMLDivElement>(null);
+  const [preguntando, setPreguntando] = useState(false);
+  const intentar = () => (pendiente ? setPreguntando(true) : onCerrar());
+  const cerrar = useRef(intentar);
+  cerrar.current = intentar;
+  useFocoDialogo(caja);
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -40,16 +89,28 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase }: { titulo: st
     return () => window.removeEventListener("keydown", tecla, true);
   }, []);
   return (
-    <div ref={fondo} className="dialogo-fondo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()}>
-      <div className={clase ? `dialogo ${clase}` : "dialogo"} role="dialog" aria-modal="true" aria-label={titulo}>
+    <div ref={fondo} className="dialogo-fondo" onMouseDown={(e) => fondoCierra && e.target === e.currentTarget && intentar()}>
+      <div ref={caja} className={clase ? `dialogo ${clase}` : "dialogo"} role="dialog" aria-modal="true" aria-label={titulo}>
         <div className="dialogo-cab">
           <h2>{titulo}</h2>
-          <button type="button" className="ib" style={{ width: 28, height: 28 }} aria-label="Cerrar" title="Cerrar (Esc)" onClick={onCerrar}>
+          <button type="button" className="ib" style={{ width: 28, height: 28 }} aria-label="Cerrar" title="Cerrar (Esc)" onClick={intentar}>
             <X size={16} />
           </button>
         </div>
         <div className="dialogo-cuerpo">{children}</div>
-        <div className="pie">{pie}</div>
+        {preguntando && pendiente ? (
+          <div className="pie pie-pregunta" role="alertdialog" aria-label="Cambios sin aplicar">
+            <span className="mr-auto text-[12.5px]">{pendiente} Si cierra, se pierden.</span>
+            <button type="button" className="btn" autoFocus onClick={() => setPreguntando(false)}>
+              Seguir editando
+            </button>
+            <button type="button" className="btn btn-peligro" onClick={onCerrar}>
+              Cerrar sin aplicar
+            </button>
+          </div>
+        ) : (
+          <div className="pie">{pie}</div>
+        )}
       </div>
     </div>
   );

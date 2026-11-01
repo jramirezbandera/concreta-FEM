@@ -462,8 +462,10 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     />
   );
 
-  const errores = e.diagnosticos.filter((d) => d.severidad === "error").length;
-  const avisos = e.diagnosticos.length - errores;
+  // UI-27: por qué falló el cálculo (un mecanismo, el equilibrio, la memoria) va también aquí
+  const diagnosticos = proyecto.fase === "error" && proyecto.errores.length ? [...proyecto.errores, ...e.diagnosticos] : e.diagnosticos;
+  const errores = diagnosticos.filter((d) => d.severidad === "error").length;
+  const avisos = diagnosticos.filter((d) => d.severidad === "aviso").length;
   const dock: Pestana[] = [
     ...(ed ? [{ id: "tablas", titulo: "Tablas", contenido: <PanelTablas tabla={tabla} setTabla={setTabla} nueva={nueva} plantilla={plantilla} /> }] : []),
     {
@@ -472,8 +474,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       insignia: e.compilando ? <span className="text-text-secondary">…</span> : errores ? <span className="text-state-fail">{errores} error{errores === 1 ? "" : "es"}</span> : avisos ? <span className="text-state-warn">{avisos} aviso{avisos === 1 ? "" : "s"}</span> : "0",
       contenido: (
         <>
-          <p className="nota">Los de <span className="mono">fem validar</span> y <span className="mono">fem calcular</span>. Un clic en un id lo elige.{e.compilando ? " Compilando: de momento, sólo los que no necesitan la compilación." : ""}</p>
-          <ListaDiagnosticos ds={e.diagnosticos} onObjeto={setSeleccion} />
+          <p className="nota">Lo que se comprueba del modelo al compilarlo y al calcularlo. Un clic en un id lo elige.{e.compilando ? " Compilando: de momento, sólo lo que no necesita la compilación." : ""}</p>
+          <ListaDiagnosticos ds={diagnosticos} onObjeto={setSeleccion} />
         </>
       ),
     },
@@ -701,18 +703,29 @@ function DatosProyecto() {
   const p = ed.proyecto;
   const [nombre, setNombre] = useState<string | null>(null);
   const [descripcion, setDescripcion] = useState<string | null>(null);
-  const escribir = () => {
+  // Al salir del campo, recortado; mientras se escribe, tras una pausa y tal cual (UI-26: lo escrito
+  // no llegaba al proyecto, ni se guardaba, hasta salir del campo)
+  const escribir = (final = true) => {
+    const t = (x: string) => (final ? x.trim() : x);
     const cambio: { nombre?: string; descripcion?: string } = {};
-    if (nombre !== null && nombre !== (p.nombre ?? "")) cambio.nombre = nombre.trim();
-    if (descripcion !== null && descripcion !== (p.descripcion ?? "")) cambio.descripcion = descripcion.trim();
+    if (nombre !== null && t(nombre) !== (p.nombre ?? "")) cambio.nombre = t(nombre);
+    if (descripcion !== null && t(descripcion) !== (p.descripcion ?? "")) cambio.descripcion = t(descripcion);
     if (Object.keys(cambio).length) ed.editar({ op: "datos", ...cambio }, "Datos del proyecto");
+    if (!final) return;
     setNombre(null);
     setDescripcion(null);
   };
+  const escribirRef = useRef(escribir);
+  escribirRef.current = escribir;
+  useEffect(() => {
+    if (nombre === null && descripcion === null) return;
+    const t = window.setTimeout(() => escribirRef.current(false), 700);
+    return () => window.clearTimeout(t);
+  }, [nombre, descripcion]);
   return (
     <div className="flex flex-col gap-0.5 px-2 pb-2">
-      <input className="sel en-sitio w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 600 }} aria-label="Nombre del proyecto" title={nombre ?? p.nombre ?? undefined} placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={escribir} onKeyDown={(x) => x.key === "Enter" && escribir()} />
-      <textarea className="sel en-sitio w-full" style={{ height: 56, padding: "5px 6px", fontFamily: "var(--font-sans)", fontSize: 12, lineHeight: 1.45, resize: "vertical" }} aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={escribir} />
+      <input className="sel en-sitio w-full" style={{ fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 600 }} aria-label="Nombre del proyecto" title={nombre ?? p.nombre ?? undefined} placeholder="Nombre del proyecto" value={nombre ?? p.nombre ?? ""} onChange={(x) => setNombre(x.target.value)} onBlur={() => escribir()} onKeyDown={(x) => x.key === "Enter" && escribir()} />
+      <textarea className="sel en-sitio w-full" style={{ height: 56, padding: "5px 6px", fontFamily: "var(--font-sans)", fontSize: 12, lineHeight: 1.45, resize: "vertical" }} aria-label="Descripción del proyecto" placeholder="Descripción" value={descripcion ?? p.descripcion ?? ""} onChange={(x) => setDescripcion(x.target.value)} onBlur={() => escribir()} />
     </div>
   );
 }

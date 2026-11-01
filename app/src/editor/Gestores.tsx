@@ -249,6 +249,10 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
   const usos = actual ? usosDe(m, actual.id) : [];
   const igual = !actual && datos && !form.id.trim() ? seccionIgual(m, datos) : undefined;
   const propuesto = !actual && datos ? (igual?.id ?? idSeccion(m, datos, uso)) : "";
+  // UI-30: lo cambiado en la ficha no se tira sin preguntar (al cerrar, al ir a otra o a «Nueva»)
+  const pendiente = actual && cambiada ? `${actual.id} tiene cambios sin aplicar.` : null;
+  const [irA, setIrA] = useState<(() => void) | null>(null);
+  const antes = (f: () => void) => (pendiente ? setIrA(() => f) : f());
 
   /** Aplica unas operaciones (si hay) y, desde un campo, elige `id`; devuelve si se hizo. */
   const terminar = (id: string, ops: readonly Operacion[], etiqueta: string): boolean => {
@@ -317,6 +321,8 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
         titulo="Secciones"
         clase="gestor"
         onCerrar={cerrarGestor}
+        pendiente={pendiente}
+        fondoCierra={false}
         pie={
           <>
             <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("secciones"))} title="Para cambiar muchas a la vez o pegar de Excel">
@@ -340,10 +346,10 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
         <Lista
           titulo="secciones"
           nueva={elegida === null}
-          onNueva={() => (setAviso(null), ir(null))}
+          onNueva={() => antes(() => (setAviso(null), ir(null)))}
           elementos={m.secciones.map((s) => ({ id: s.id, texto: describirSeccion(sinId(s)).replace(` · ${s.material}`, ""), detalle: s.material, n: usosDe(m, s.id).reduce((t, u) => t + u.n, 0) }))}
           elegida={elegida}
-          onElegir={(id) => (setAviso(null), ir(id))}
+          onElegir={(id) => antes(() => (setAviso(null), ir(id)))}
         />
         <div
           className="ges-ficha"
@@ -352,6 +358,7 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
           }}
         >
           {pedido.para && <p className="ges-para">Para {pedido.para}</p>}
+          {irA && <PreguntaCambios texto={pendiente} onDescartar={() => (setIrA(null), irA())} onSeguir={() => setIrA(null)} />}
           {aviso && (
             <p className="ges-aviso" role="status">
               {aviso}
@@ -624,6 +631,21 @@ export function Propiedades({ filas, nota }: { filas: [string, string][]; nota: 
 }
 
 /** La lista de la izquierda de un gestor; `nuevaTexto`, la línea de arriba («Nueva sección»). */
+/** UI-30: ir a otra fila o a «Nueva» con la ficha cambiada pregunta antes de tirar lo escrito. */
+function PreguntaCambios({ texto, onDescartar, onSeguir }: { texto: string | null; onDescartar: () => void; onSeguir: () => void }) {
+  return (
+    <div className="ges-pregunta" role="alert">
+      <span className="mr-auto">{texto} Si sigue, se pierden.</span>
+      <button type="button" className="btn" autoFocus onClick={onSeguir}>
+        Seguir editando
+      </button>
+      <button type="button" className="btn btn-peligro" onClick={onDescartar}>
+        Descartarlos
+      </button>
+    </div>
+  );
+}
+
 export function Lista({ titulo, nuevaTexto, elementos, elegida, nueva, onElegir, onNueva }: { titulo: string; nuevaTexto?: string; elementos: { id: string; texto: string; detalle: string; n: number; marca?: string }[]; elegida: string | null; nueva: boolean; onElegir: (id: string) => void; onNueva: () => void }) {
   return (
     <nav className="ges-lista" aria-label={`Lista de ${titulo}`}>
@@ -739,6 +761,13 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
   const cambiado = !!actual && (!material || JSON.stringify(actual) !== JSON.stringify(material));
   const usos = actual ? usosDe(m, actual.id) : [];
   const props = material ? propiedadesMaterial(material) : null;
+  const pendiente = actual && cambiado ? `${actual.id} tiene cambios sin aplicar.` : null;
+  const [irA, setIrA] = useState<(() => void) | null>(null);
+  const antes = (f: () => void) => (pendiente ? setIrA(() => f) : f());
+  // Un id de material típico que ya no dice lo que es (HA-30 con un fck de 25): proponer el suyo
+  const idTipico = /^HA-(\d+)$/.exec(form.id.trim() || (actual?.id ?? ""));
+  const fckEscrito = form.tipo === "hormigon" ? Number((form.campos.fck ?? "").replace(",", ".")) : NaN;
+  const renombrar = idTipico && Number.isFinite(fckEscrito) && fckEscrito > 0 && Number(idTipico[1]) !== fckEscrito ? `HA-${escrito(fckEscrito)}` : null;
 
   const terminar = (id: string, ops: readonly Operacion[], etiqueta: string): boolean => {
     if (pedido.alElegir) {
@@ -798,6 +827,8 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
         titulo="Materiales"
         clase="gestor"
         onCerrar={cerrarGestor}
+        pendiente={pendiente}
+        fondoCierra={false}
         pie={
           <>
             <button type="button" className="btn btn-q mr-auto" onClick={() => (cerrarGestor(), pedirTabla("materiales"))}>
@@ -816,10 +847,10 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
         <Lista
           titulo="materiales"
           nueva={elegido === null}
-          onNueva={() => (setAviso(null), ir(null))}
+          onNueva={() => antes(() => (setAviso(null), ir(null)))}
           elementos={m.materiales.map((x) => ({ id: x.id, texto: describirMaterial(x), detalle: NOMBRE_TIPO[x.tipo].toLowerCase(), n: usosDe(m, x.id).reduce((t, u) => t + u.n, 0) }))}
           elegida={elegido}
-          onElegir={(id) => (setAviso(null), ir(id))}
+          onElegir={(id) => antes(() => (setAviso(null), ir(id)))}
         />
         <div
           className="ges-ficha"
@@ -828,6 +859,7 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
           }}
         >
           {pedido.para && <p className="ges-para">Para {pedido.para}</p>}
+          {irA && <PreguntaCambios texto={pendiente} onDescartar={() => (setIrA(null), irA())} onSeguir={() => setIrA(null)} />}
           {aviso && (
             <p className="ges-aviso" role="status">
               {aviso}
@@ -855,6 +887,14 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
                   id <Ayuda texto="El nombre con que lo eligen secciones y losas. Vacío, el propuesto (HA-30 para un hormigón de fck 30)." />
                 </span>
                 <input value={form.id} placeholder={propuesto} aria-label="id del material" data-error={!!errores.id} onChange={(e) => setForm({ ...form, id: e.target.value })} />
+                {renombrar && !hay.has(renombrar) && (
+                  <p>
+                    El id dice otro fck.{" "}
+                    <button type="button" className="enlace" onClick={() => setForm({ ...form, id: renombrar })}>
+                      Llamarlo {renombrar}
+                    </button>
+                  </p>
+                )}
               </label>
               <div className="campo">
                 <span>

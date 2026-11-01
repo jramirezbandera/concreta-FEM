@@ -75,7 +75,7 @@ function TextoEstado({ p }: { p: ProyectoAbierto }) {
   // La huella, en el título y en Revisión: en la píldora era un código que no dice nada (UI-43)
   const huella = e ? `Versión del modelo ${e.huella.slice(0, 8)}` : undefined;
   if (p.fase === "calculando") return <span className="pill warn" title={huella}>CALCULANDO</span>;
-  if (p.fase === "error") return <span className="pill fail">{e && e.compila ? "EL CÁLCULO FALLÓ" : "NO SE PUEDE ABRIR"}</span>;
+  if (p.fase === "error") return <span className="pill fail" title={p.errores.map((d) => d.mensaje).join(" ") || undefined}>{!e ? "NO SE PUEDE ABRIR" : e.compila ? "EL CÁLCULO FALLÓ" : "NO SE PUDO COMPILAR"}</span>;
   if (!e) return null;
   if (e.compilando) return <span className="pill warn" title={`Lo que sólo necesita el modelo ya se dibuja; los diagnósticos, la malla y el cálculo esperan a la compilación. ${huella}`}>COMPILANDO</span>;
   if (!e.compila) return <span className="pill fail" title={`Los errores, en Diagnósticos. ${huella}`}>NO COMPILA</span>;
@@ -96,6 +96,7 @@ export function App() {
   const seleccion = elegidos[elegidos.length - 1] ?? null;
   const [paleta, setPaleta] = useState(false);
   const [versionesAbiertas, setVersionesAbiertas] = useState(false);
+  const [sobrescribir, setSobrescribir] = useState(false);
   const [tablaPedida, setTablaPedida] = useState<{ tabla: NombreTabla; n: number } | null>(null);
 
   // ?proyecto=<url> o ?ejemplo=<nombre>: abrir al cargar
@@ -115,8 +116,11 @@ export function App() {
   const elegidosRef = useRef(elegidos);
   elegidosRef.current = elegidos;
   const setPlanta = useCallback((p: string) => ponerVista(vistaActiva, { planta: p }), [ponerVista, vistaActiva]);
-  // Resultados y Revisión sólo con un cálculo de esta huella (criterio 3 de I1)
-  const espacioValido: Espacio = (espacio === "resultados" || espacio === "revision") && !e?.calculado ? "modelo" : espacio;
+  // Resultados y Revisión sólo con un cálculo de esta huella (criterio 3 de I1). UI-9: tras editar o
+  // deshacer no se sale de ellos; se ve que lo de antes ya no vale, con su «Calcular», y al volver el
+  // cálculo siguen el modo, la planta y la cámara
+  const sinCalculo = (espacio === "resultados" || espacio === "revision") && !e?.calculado;
+  const espacioValido: Espacio = sinCalculo && !e ? "modelo" : espacio;
   const clave = espacioValido === "resultados" ? `resultados:${modo}` : espacioValido;
 
   const irA = useCallback((x: Espacio, m?: ModoResultados) => setDonde((d) => ({ espacio: x, modo: m ?? d.modo })), []);
@@ -306,7 +310,7 @@ export function App() {
             </span>
             <nav className="espacios" aria-label="Espacios de trabajo">
               {ESPACIOS.map((x) => (
-                <button key={x.id} type="button" aria-current={espacioValido === x.id ? "page" : undefined} disabled={x.calculo && !e?.calculado} title={x.calculo && !e?.calculado ? "Necesita el cálculo" : undefined} onClick={() => irA(x.id)}>
+                <button key={x.id} type="button" aria-current={espacioValido === x.id ? "page" : undefined} disabled={x.calculo && !e?.calculado && espacioValido !== x.id} title={x.calculo && !e?.calculado ? "Necesita el cálculo" : undefined} onClick={() => irA(x.id)}>
                   {x.nombre}
                 </button>
               ))}
@@ -323,7 +327,12 @@ export function App() {
                 {ed.modo === "auto" ? (
                   // AL-b: se guarda solo; aquí sólo se dice cómo va
                   <span className="flex items-center gap-1 px-1 text-[12px] text-text-secondary" role="status" aria-label="Estado del guardado" data-sin-guardar={ed.sinGuardar} title="Se guarda solo en este navegador">
-                    {ed.sinGuardar ? (
+                    {/* UI-25: con un error o un conflicto el autoguardado se para; decía «Guardando…» */}
+                    {ed.conflicto ? (
+                      <span className="text-state-warn">Conflicto: sin guardar</span>
+                    ) : ed.guardado.tipo === "error" ? (
+                      <span className="text-state-fail">Sin guardar · error</span>
+                    ) : ed.sinGuardar ? (
                       "Guardando…"
                     ) : (
                       <>
@@ -417,12 +426,25 @@ export function App() {
               <span className="min-w-0 flex-1">
                 <strong>{ed.conflicto}</strong> No se ha recargado ni sobrescrito nada.
               </span>
-              <button type="button" className="btn" onClick={ed.recargarDisco}>
-                {navegador ? "Recargar lo guardado" : "Recargar del disco"} (se pierden los cambios de aquí)
+              <button type="button" className="btn" onClick={ed.recargarDisco} title="Se pierden los cambios de aquí">
+                {navegador ? "Quedarme con lo guardado" : "Quedarme con el del disco"}
               </button>
-              <button type="button" className="btn" onClick={() => void ed.guardar({ forzar: true })}>
-                {navegador ? "Sobrescribir lo guardado" : "Sobrescribir el del disco"}
-              </button>
+              {/* UI-31: pisar los cambios de fuera se confirma, como recargar dice lo que se pierde */}
+              {sobrescribir ? (
+                <>
+                  <span className="text-[12px]">{navegador ? "Se pierde lo de la otra pestaña." : "Se pierden los cambios de fuera; en una carpeta no queda copia."}</span>
+                  <button type="button" className="btn btn-peligro" onClick={() => (setSobrescribir(false), void ed.guardar({ forzar: true }))}>
+                    Sobrescribir
+                  </button>
+                  <button type="button" className="btn" onClick={() => setSobrescribir(false)}>
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="btn" onClick={() => setSobrescribir(true)} title={navegador ? "Se pierde lo de la otra pestaña" : "Se pierden los cambios de fuera"}>
+                  {navegador ? "Quedarme con lo de aquí" : "Quedarme con lo de aquí (sobrescribir el del disco)"}
+                </button>
+              )}
             </div>
           )}
           {ed && <GestorAbierto />}
@@ -449,9 +471,40 @@ export function App() {
             </div>
           )}
 
+          {proyecto.fase === "error" && e && proyecto.errores.length > 0 && (
+            // UI-27: por qué falló, a la vista (antes, sólo en una nota del navegador)
+            <div className="banda fail" role="alert">
+              <span className="min-w-0 flex-1">
+                <strong>{e.compila ? "El cálculo falló." : "No se pudo compilar."}</strong> {proyecto.errores.map((d) => d.mensaje).join(" ")}
+                {proyecto.errores.some((d) => d.ids?.length) && (
+                  <>
+                    {" "}
+                    {[...new Set(proyecto.errores.flatMap((d) => d.ids ?? []))].slice(0, 8).map((id) => (
+                      <button key={id} type="button" className="btn ml-1" style={{ height: 22, padding: "0 6px", fontSize: 11 }} onClick={() => setElegidos([id])}>
+                        {id}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </span>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  paneles.cambiar("modelo", { dock: true, pestana: "diagnosticos" });
+                  irA("modelo");
+                }}
+              >
+                Ver en Diagnósticos
+              </button>
+            </div>
+          )}
+
           <main className="flex min-h-0 flex-1">
             {proyecto.fase === "error" && !e ? (
               <PantallaError p={proyecto} />
+            ) : sinCalculo && e ? (
+              <EsperaCalculo p={proyecto} donde={espacioValido === "revision" ? "Revisión" : "Resultados"} onModelo={() => irA("modelo")} />
             ) : espacioValido === "resultados" ? (
               <EspacioResultados />
             ) : espacioValido === "revision" ? (
@@ -486,19 +539,76 @@ export function App() {
   );
 }
 
-function PantallaError({ p }: { p: ProyectoAbierto }) {
+/**
+ * Resultados o Revisión sin el cálculo de esta versión (UI-9): lo que pasa (se está calculando, no
+ * compila, o se editó o se deshizo algo) y el botón para seguir, sin salir del espacio.
+ */
+function EsperaCalculo({ p, donde, onModelo }: { p: ProyectoAbierto; donde: string; onModelo: () => void }) {
+  const e = p.estado!;
+  const ed = p.edicion;
+  const ocupado = p.fase === "calculando" || p.fase === "abriendo" || e.compilando || (p.desactualizado && !!ed?.pendiente);
   return (
-    <div className="mx-auto mt-16 w-[640px] max-w-full">
+    <div className="espera-calculo" role="status">
+      <h1>{ocupado ? (p.fase === "calculando" ? "Calculando…" : "Leyendo lo editado…") : !e.compila ? "El modelo no compila" : p.fase === "error" ? "El cálculo falló" : "Los resultados eran de otra versión"}</h1>
+      <p>
+        {ocupado
+          ? `${donde} sale en cuanto termine.`
+          : !e.compila
+            ? "Corrija los errores (en Modelo, pestaña Diagnósticos) y calcule de nuevo."
+            : p.fase === "error"
+              ? "El motivo está en la banda de arriba y en Diagnósticos."
+              : `El proyecto cambió desde el último cálculo${ed?.rehacerEtiqueta ? ` (se deshizo «${ed.rehacerEtiqueta}»)` : ed?.deshacerEtiqueta ? ` («${ed.deshacerEtiqueta}»)` : ""}. Calcule para ver ${donde === "Revisión" ? "el informe" : "los resultados"} de esta versión.`}
+      </p>
+      <div className="flex gap-2">
+        {!ocupado && e.compila && (
+          <button type="button" className="btn btn-p" onClick={p.calcular}>
+            <Play size={15} /> Calcular
+          </button>
+        )}
+        <button type="button" className="btn" onClick={onModelo}>
+          Ir a Modelo
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Por qué no se pudo abrir (UI-28): el fichero (no es JSON, no pasa el esquema) o la app (el
+ * núcleo no se descargó, el worker falló). Antes se culpaba siempre al fichero.
+ */
+function PantallaError({ p }: { p: ProyectoAbierto }) {
+  const delFichero = p.errores.length > 0 && p.errores.every((d) => !d.codigo.startsWith("visor/"));
+  const leer = p.errores.some((d) => d.codigo === "visor/fichero");
+  const origen = p.fuente?.tipo === "origen" ? p.fuente.origen : null;
+  return (
+    <div className="mx-auto mt-16 w-[640px] max-w-full px-4">
       <h1 className="text-[15px] font-semibold">No se pudo abrir el proyecto</h1>
-      <p className="mt-1 text-text-secondary">El fichero no es un proyecto válido (JSON o esquema). Corríjalo y la app lo recargará sola si lo abrió desde su carpeta.</p>
+      <p className="mt-1 text-text-secondary">
+        {delFichero
+          ? `El fichero no es un proyecto válido. ${origen && !origen.navegador ? "Corríjalo: la app lo recargará sola al guardarlo." : "Corríjalo y vuelva a abrirlo."}`
+          : leer
+            ? "No se pudo leer el proyecto (el fichero se movió, o el navegador perdió el permiso para la carpeta)."
+            : "La app no pudo prepararlo: no es un problema del proyecto. Compruebe la conexión (la primera vez se descarga el núcleo de cálculo) y vuelva a intentarlo."}
+      </p>
       <ul className="mt-4 list-none p-0">
         {p.errores.map((d, i) => (
           <li key={i} className="border-b border-border-sub py-2 text-[12px]">
-            <span className="mono text-text-disabled">{d.codigo}</span>
-            <p className="mt-0.5">{d.mensaje}</p>
+            <p>{d.mensaje}</p>
+            <span className="mono text-[11px] text-text-tertiary">{d.codigo}</span>
           </li>
         ))}
       </ul>
+      <div className="mt-4 flex gap-2">
+        {!delFichero && !leer && (
+          <button type="button" className="btn btn-p" onClick={() => location.reload()}>
+            Volver a intentarlo
+          </button>
+        )}
+        <button type="button" className={`btn ${delFichero || leer ? "btn-p" : ""}`} onClick={() => location.assign(location.pathname)}>
+          Volver a Mis proyectos
+        </button>
+      </div>
     </div>
   );
 }

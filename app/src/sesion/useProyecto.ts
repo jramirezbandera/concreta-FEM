@@ -146,6 +146,15 @@ function guardarCalculo(c: ClienteSesion, f: Fuente, huella: string): void {
     .catch(() => {});
 }
 
+/**
+ * Confirma lo que se está escribiendo en un campo (su `onBlur` lo pasa al proyecto, como al salir de
+ * él): antes de guardar al ocultar la página y antes de avisar al cerrarla.
+ */
+function confirmarCampo(): void {
+  const a = document.activeElement;
+  if (a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement || a instanceof HTMLSelectElement) a.blur();
+}
+
 export function useProyecto(): ProyectoAbierto {
   const [fase, setFase] = useState<Fase>("vacio");
   const [estado, setEstado] = useState<EstadoSesion | null>(null);
@@ -192,6 +201,10 @@ export function useProyecto(): ProyectoAbierto {
 
   const sinGuardar = !!hist && hist.actual !== enDisco;
   sinGuardarRef.current = sinGuardar;
+  const enDiscoRef = useRef(enDisco);
+  enDiscoRef.current = enDisco;
+  /** Lo editado no es lo guardado (con lo que acaba de confirmar un campo, aún sin render). */
+  const hayCambios = useCallback(() => !!histRef.current && histRef.current.actual !== enDiscoRef.current, []);
   histRef.current = hist;
 
   const cargar = useCallback(async (texto: string, f: Fuente, opciones: { sinGuardados?: boolean; sinCalcular?: boolean } = {}) => {
@@ -233,6 +246,9 @@ export function useProyecto(): ProyectoAbierto {
       const t: Tiempos = { abrir: (performance.now() - t0) / 1000, dibujo };
       setTiempos(t);
       if (!k.ok) {
+        // Ya no se está compilando: la cabecera decía a la vez «Compilando» y que no se podía abrir
+        const { compilando: _c, ...sin } = a.valor;
+        setEstado(sin);
         setErrores(k.diagnosticos);
         setFase("error");
         return;
@@ -467,12 +483,14 @@ export function useProyecto(): ProyectoAbierto {
     if (!fuente || fuente.tipo !== "origen") return;
     void (async () => {
       const o = fuente.origen;
-      setDesactualizado(true);
+      // Lo de aquí sólo deja de valer si se lee algo: si el proyecto ya no está, los resultados
+      // siguen siendo los de lo que se ve (UI-29: antes quedaban «desactualizados» y sin Recalcular)
       const l = await o.leer(o.fichero);
       if (!l) {
-        setGuardado({ tipo: "error", mensaje: `No se pudo leer ${o.descripcion}.` });
+        setGuardado({ tipo: "error", mensaje: `No se pudo leer ${o.descripcion}: ${o.navegador ? "ya no está en este navegador" : "el fichero se movió o se borró"}. Lo de aquí sigue sin guardar.` });
         return;
       }
+      setDesactualizado(true);
       ultimo.current = { texto: l.texto, sello: l.sello, selloFirmas: ultimo.current?.selloFirmas ?? null };
       empezarEdicion(l.texto);
       await cargar(l.texto, fuente);
@@ -535,7 +553,9 @@ export function useProyecto(): ProyectoAbierto {
   useEffect(() => {
     if (!auto) return;
     const f = () => {
-      if (document.visibilityState === "hidden" && sinGuardarRef.current) void guardarRef.current();
+      if (document.visibilityState !== "hidden") return;
+      confirmarCampo();
+      if (hayCambios()) void guardarRef.current();
     };
     document.addEventListener("visibilitychange", f);
     return () => document.removeEventListener("visibilitychange", f);
@@ -584,16 +604,19 @@ export function useProyecto(): ProyectoAbierto {
     }
   }, []);
 
-  // Avisar al cerrar la página con cambios sin guardar
+  // Avisar al cerrar la página con cambios sin guardar, también con lo que se está escribiendo en un
+  // campo que aún no se ha confirmado (UI-26: se perdía al recargar con la barra diciendo «Guardado»)
   useEffect(() => {
-    if (!sinGuardar) return;
+    if (!hist) return;
     const f = (e: BeforeUnloadEvent) => {
+      confirmarCampo();
+      if (!hayCambios()) return;
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", f);
     return () => window.removeEventListener("beforeunload", f);
-  }, [sinGuardar]);
+  }, [hist, hayCambios]);
 
   useEffect(
     () => () => {
