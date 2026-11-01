@@ -23,10 +23,10 @@ import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/ses
 import { CampoLista, Chip, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcReacciones } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
-import { fmt } from "../fmt.ts";
+import { fmt, textoApp } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas } from "../vistas/estado.ts";
@@ -134,7 +134,7 @@ function EscenaReacciones({ fuente, objetos }: { fuente: FuenteEscena | null; ob
     const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
     setSeleccion(o && objetos?.has(o) ? o : null);
   };
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Sumando las reacciones…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Sumando las reacciones…</Aviso> : null;
   return <Fuente2D escena={proyecto.desactualizado ? null : d.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} />;
 }
 
@@ -170,7 +170,7 @@ export function ModoReacciones() {
   const elegido = d?.objetos.find((o) => o.id === seleccion) ?? null;
   const elegidoCasos = porCaso?.objetos.find((o) => o.id === seleccion) ?? null;
   const ids = d ? new Set(d.objetos.map((o) => o.id)) : null;
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : r.diagnosticos ? <Aviso tono="fail">{r.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !r.datos && r.cargando ? <Aviso>Sumando las reacciones…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : r.diagnosticos ? <Aviso tono="fail">{r.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !r.datos && r.cargando ? <Aviso>Sumando las reacciones…</Aviso> : null;
 
   const herramientas = (
     <>
@@ -185,7 +185,7 @@ export function ModoReacciones() {
   );
 
   const cabecera = (
-    <Chip acento title={d?.notas[0]}>
+    <Chip acento title={d?.notas[0] && textoApp(d.notas[0])}>
       Reacciones · {queSeDibuja(d?.conjunto)}
     </Chip>
   );

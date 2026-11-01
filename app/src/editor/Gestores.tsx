@@ -589,7 +589,7 @@ const QUE_ES: Record<string, string> = {
   A: "Área de la sección. Da la rigidez axil, E·A.",
   Iy: "Inercia alrededor del eje y local: la flexión del canto h (My). Da la rigidez E·Iy.",
   Iz: "Inercia alrededor del eje z local: la flexión en el sentido del ancho b (Mz).",
-  J: "Constante de torsión de Saint-Venant: la rigidez a torsión G·J. En las vigas de hormigón va ×0,1 (D4).",
+  J: "Constante de torsión de Saint-Venant: la rigidez a torsión G·J. En las vigas de hormigón va ×0,1 (lo de por defecto).",
   Avy: "Área de cortante según y: la deformación por cortante de Timoshenko (Vy). Sin ella, no se cuenta.",
   Avz: "Área de cortante según z (Vz), como Avy.",
   peso: "Peso por metro lineal, γ·A: el que lleva el caso de peso propio.",

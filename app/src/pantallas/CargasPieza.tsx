@@ -292,7 +292,7 @@ export function ResumenCaso({ caso }: { caso: string }) {
               ))}
             </tbody>
           </table>
-          <p className="nota">Con el peso propio (−ΣFz de sus cargas, de <span className="mono">fem resumen</span>).</p>
+          <p className="nota">Con el peso propio (−ΣFz de sus cargas).</p>
         </Seccion>
       )}
       <p className="nota">Un clic en una carga la elige; en una pieza, da sus cargas y deja añadirle una.</p>

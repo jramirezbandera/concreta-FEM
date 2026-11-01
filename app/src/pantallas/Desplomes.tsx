@@ -12,10 +12,10 @@ import type { DatosDesplomes } from "../../../src/visor/datos.ts";
 import { Campo, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcDeformada } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES } from "../componentes/comunes.tsx";
+import { Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
-import { cota, fmt, fraccion, mm } from "../fmt.ts";
+import { cota, fmt, fraccion, mm, coma } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
@@ -115,7 +115,7 @@ export function ModoDeformada() {
         tresD: () =>
           proyecto.desactualizado ? (
             <div className="velo">
-              <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
+              <AvisoDesactualizado />
             </div>
           ) : (
             <Fuente3DModelo deformada={def3D} modo="analitico" />
@@ -126,7 +126,7 @@ export function ModoDeformada() {
               <Chip>
                 <strong className="font-semibold">Deformada</strong> ×{fmt(escala, 0)}
               </Chip>
-              <Chip acento title={deformada.datos?.etiqueta}>
+              <Chip acento title={deformada.datos?.etiqueta && coma(deformada.datos.etiqueta)}>
                 <span className="mono">{deformada.datos?.comb ?? "—"}</span> · máx. {mm(umax)} mm{!unaSola && x?.pesima ? " · la del mayor desplome relativo" : ""}
               </Chip>
             </>
@@ -136,7 +136,7 @@ export function ModoDeformada() {
   );
 
   const tabla = x ? (
-    <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)} (A3)`}>
+    <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)}`}>
       <table className="tb">
         <thead>
           <tr>
@@ -191,14 +191,14 @@ export function ModoDeformada() {
         titulo="Desplomes"
         detalle={
           <>
-            Por defecto, las combinaciones de <span className="mono">fem consultar deriva</span> (la ELS característica si los casos llevan su acción). Para el viento solo, elija su caso.
+            Por defecto, la ELS característica (si los casos llevan su acción; si no, cada caso). Para el viento solo, elija su caso.
           </>
         }
       />
       {d.diagnosticos && <p className="nota text-state-fail">{d.diagnosticos.map((y) => y.mensaje).join(" ")}</p>}
       {x && (
         <>
-          <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)} (A3)`}>
+          <Seccion titulo="Desplome relativo" valor={`límite ${fraccion(x.limiteRelativo)}`}>
             <div className="fila">
               <span>Plantas que lo pasan</span>
               <span className={`v ${pasan ? "text-state-warn" : ""}`}>{pasan}</span>

@@ -4,7 +4,8 @@ import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import type { CombinacionDisponible, EleccionCombinaciones, EstadoSesion, PropositoVista } from "../../../src/visor/sesion.ts";
 import type { Combinaciones } from "../../../src/visor/datos.ts";
 import { Campo } from "../armazon/Disposicion.tsx";
-import { fmt } from "../fmt.ts";
+import { useVisor } from "../contexto.ts";
+import { fmt, textoApp, coma } from "../fmt.ts";
 
 /**
  * Cabecera de un panel de Propiedades: el icono de lo que es, qué es (en pequeño), cuál (el título),
@@ -97,7 +98,7 @@ export function ComboCombinaciones({ estado, valor, onCambio, proposito, soloUna
           <optgroup key={s} label={`Una combinación ${s}`}>
             {cs.map((c) => (
               <option key={c.nombre} value={codificar({ tipo: "combinacion", situaciones: [c.situacion], nombre: c.nombre })}>
-                {c.nombre} · {c.etiqueta}
+                {c.nombre} · {coma(c.etiqueta)}
               </option>
             ))}
           </optgroup>
@@ -135,7 +136,7 @@ export function TablaCombinaciones({ c, resaltar }: { c: Combinaciones; resaltar
               <tr key={n} className={n === resaltar ? "max" : undefined}>
                 <td>{n}</td>
                 <td className="txt" style={{ textAlign: "left" }}>
-                  {c.etiquetas[i]}
+                  {coma(c.etiquetas[i]!)}
                 </td>
               </tr>
             ))}
@@ -201,7 +202,7 @@ export function ListaDiagnosticos({ ds, onObjeto, max = 200 }: { ds: readonly Di
                 {g.d.codigo}
               </span>
             </div>
-            <p className="mt-1 text-text-secondary">{g.d.mensaje}</p>
+            <p className="mt-1 text-text-secondary">{textoApp(g.d.mensaje)}</p>
             {n > 1 && (
               <>
                 <button type="button" className="enlace text-[11.5px]" aria-expanded={abierto} onClick={() => setAbiertos((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set([...s, k])))}>
@@ -210,7 +211,7 @@ export function ListaDiagnosticos({ ds, onObjeto, max = 200 }: { ds: readonly Di
                 {abierto &&
                   g.todos.slice(1).map((d, i) => (
                     <p key={i} className="mt-1 border-l-2 border-border-sub pl-2 text-text-secondary">
-                      {d.mensaje}
+                      {textoApp(d.mensaje)}
                     </p>
                   ))}
               </>
@@ -240,6 +241,27 @@ export function Aviso({ children, tono = "neu" }: { children: ReactNode; tono?: 
       {children}
     </div>
   );
+}
+
+/**
+ * Lo que se ve ya no es del proyecto (C-27; decía «El fichero cambió» también tras una edición): por
+ * qué, según lo que pasa. `que`: lo que se ve («estos resultados», «este informe»); `abriendo`: lo
+ * que se dibuja es el modelo, que ya llega.
+ */
+export function AvisoDesactualizado({ que = "estos resultados", abriendo = false }: { que?: string; abriendo?: boolean }) {
+  const { proyecto } = useVisor();
+  const editado = !!proyecto.edicion?.pendiente || (!!proyecto.edicion && proyecto.fase !== "calculando" && proyecto.fase !== "abriendo");
+  const plural = /^estos|^estas/.test(que);
+  const texto = abriendo
+    ? editado
+      ? "Leyendo lo editado…"
+      : "El proyecto cambió fuera de aquí: abriendo la versión nueva…"
+    : proyecto.fase === "calculando"
+      ? `Calculando: ${que} ${plural ? "son" : "es"} de la versión anterior.`
+      : editado
+        ? `Lo editado cambia el cálculo: ${que} ${plural ? "son" : "es"} de la versión anterior.`
+        : `El proyecto cambió fuera de aquí: ${que} ya no ${plural ? "son" : "es"} del proyecto.`;
+  return <Aviso tono="warn">{texto}</Aviso>;
 }
 
 export function Equilibrio({ estado }: { estado: EstadoSesion }) {

@@ -9,7 +9,7 @@ import type { Bloque } from "../../../src/agente/informe.ts";
 import { Disposicion, Herramienta, Separador } from "../armazon/Disposicion.tsx";
 import { IcFirma, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, Cabecera, Seccion } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { nombreFirmas } from "../sesion/origen.ts";
 import { usePedido } from "../sesion/usePedido.ts";
@@ -159,7 +159,7 @@ export function EspacioRevision() {
       <section className="scroll-hide min-h-0 flex-1 overflow-y-auto bg-bg-primary" aria-label="Informe de revisión">
         {proyecto.desactualizado ? (
           <div className="mt-10 grid place-items-center">
-            <Aviso tono="warn">El fichero cambió: este informe ya no es el del proyecto.</Aviso>
+            <AvisoDesactualizado que="este informe" />
           </div>
         ) : r.diagnosticos ? (
           <div className="mt-10 grid place-items-center">

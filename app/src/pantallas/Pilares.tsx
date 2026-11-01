@@ -21,7 +21,7 @@ import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesi
 import { Chip, Desplegable, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcPilares } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
 import { fmt } from "../fmt.ts";
@@ -47,7 +47,7 @@ function PlantaPilares({ planta, eleccion, id, malla }: { planta: string; elecci
     const o = r.ok ? (r.valor as Eleccion | null)?.objeto : null;
     setSeleccion(o && filas?.some((f) => f.pilar === o) ? o : null);
   };
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
   return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={d.cargando} />;
 }
 
@@ -69,7 +69,7 @@ function TresDPilares({ planta, magnitud, eleccion }: { planta: string | null; m
   const { proyecto } = useVisor();
   const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "pilares3d", magnitud, combinaciones: eleccion, planta });
   const datos = proyecto.desactualizado ? null : d.datos;
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Buscando los extremos de cada tramo…</Aviso> : null;
   const { alPasar, sonda } = useSonda(datos ? (o) => (o.tipo === "pilar" ? lineasTramo(datos, o.k) : null) : null, JSON.stringify([planta, magnitud, eleccion, !!datos]));
   return <Fuente3DModelo resultados={{ pilares: datos, leyenda: datos, aviso, cargando: d.cargando, alPasar, sonda }} />;
 }

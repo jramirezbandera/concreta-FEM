@@ -33,12 +33,12 @@ import { indiceIds } from "../../../src/editor/referencias.ts";
 import { Chip, Desplegable, Disposicion, GrupoPlegable, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
-import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { DialogoAbacos, DialogoBorrar, DialogoCopiar, DialogoRenumerar } from "../editor/Dialogos.tsx";
 import { FormularioVarios, tablaDe } from "../editor/Formulario.tsx";
 import { PanelTablas } from "../editor/Hoja.tsx";
-import { cota, fmt } from "../fmt.ts";
+import { cota, fmt, textoApp, coma } from "../fmt.ts";
 import { Inspector } from "../pantallas/Inspector.tsx";
 import { PropiedadesCargas, ResumenCaso, SobrePieza } from "../pantallas/CargasPieza.tsx";
 import { tipoPieza } from "../../../src/editor/cargasPieza.ts";
@@ -341,7 +341,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       </Campo>
       {ed && (
         <>
-          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, las hipótesis típicas de una vez, y la tabla desde él (GE2)" />
+          <Herramienta icono={IcCasos} nombre="Casos" onClick={() => abrirGestor({ coleccion: "casos" })} title="El gestor de casos: los típicos del CTE con un clic, las hipótesis típicas de una vez, y la tabla desde él" />
           <Separador />
           <Herramienta icono={IcPuntual} nombre="Puntual" activa={foto.herramienta === "puntual"} onClick={() => elegirHerramienta("puntual")} title="Dibujar cargas puntuales en el caso activo: un clic donde va (F y M en Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcLineal} nombre="Lineal" activa={foto.herramienta === "lineal"} onClick={() => elegirHerramienta("lineal")} title="Dibujar cargas lineales en el caso activo: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
@@ -368,9 +368,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       {ed && (
         <>
           {/* En el orden en que se mete un edificio: plantas y datos, el plano y los ejes, lo vertical, las vigas, los forjados, los apoyos; después, editar */}
-          <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirGestor({ coleccion: "plantas", ...(planta ? { planta } : {}) })} title="Añadir plantas encima o debajo de una, viendo cómo quedan las cotas, y la tabla desde él (GE3)" />
-          <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él (GE)" />
-          <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él (GE)" />
+          <Herramienta icono={IcPlantas} nombre="Plantas" onClick={() => abrirGestor({ coleccion: "plantas", ...(planta ? { planta } : {}) })} title="Añadir plantas encima o debajo de una, viendo cómo quedan las cotas, y la tabla desde él" />
+          <Herramienta icono={IcMateriales} nombre="Materiales" onClick={() => abrirGestor({ coleccion: "materiales" })} title="El gestor de materiales: los típicos con un clic, y la tabla desde él" />
+          <Herramienta icono={IcSecciones} nombre="Secciones" onClick={() => abrirGestor({ coleccion: "secciones" })} title="El gestor de secciones: nueva por tipo (hormigón, perfil de catálogo o general), y la tabla desde él" />
           <Separador />
           <Herramienta icono={IcPlantillaDxf} nombre="Plantilla DXF" onClick={() => ficheroDxf.current?.click()} title="Un plano DXF del arquitecto en gris detrás de la planta activa, para calcar con sus enganches (sus unidades, capas y colocación, en el navegador)" />
           <input ref={ficheroDxf} type="file" accept=".dxf" hidden aria-label="Fichero DXF de la plantilla" onChange={(x) => {
@@ -665,7 +665,7 @@ function TresDCargas({ caso, escala }: { caso: string; escala: number }) {
   const { proyecto } = useVisor();
   const r = usePedido(proyecto.cliente, { tipo: "cargas3d", caso, escala });
   const aviso = proyecto.desactualizado ? (
-    <Aviso tono="warn">{proyecto.edicion?.pendiente ? "Compilando la versión editada…" : "El fichero cambió: abriendo la versión nueva…"}</Aviso>
+    <AvisoDesactualizado abriendo />
   ) : r.diagnosticos ? (
     <Aviso tono="fail">{r.diagnosticos.map((d) => d.mensaje).join(" ")}</Aviso>
   ) : null;
@@ -814,16 +814,16 @@ function ResumenPlanta() {
               ))}
             </tbody>
           </table>
-          <p className="nota">Con el peso propio (−ΣFz de sus cargas, de <span className="mono">fem resumen</span>).</p>
+          <p className="nota">Con el peso propio (−ΣFz de sus cargas).</p>
         </Seccion>
       )}
       <Equilibrio estado={e} />
       {e.hipotesis.length > 0 && (
-        <Seccion titulo="Hipótesis del compilador" valor={e.hipotesis.length}>
+        <Seccion titulo="Hipótesis del cálculo" valor={e.hipotesis.length}>
           <ol className="m-0 list-decimal py-1 pl-8 pr-3.5 text-[12px] leading-snug text-text-secondary">
             {e.hipotesis.map((h, i) => (
               <li key={i} className="py-0.5">
-                {h}
+                {textoApp(h)}
               </li>
             ))}
           </ol>
@@ -855,7 +855,7 @@ function ListaCombinaciones() {
             <td>{c.situacion}</td>
             <td>{c.nombre}</td>
             <td className="txt" style={{ textAlign: "left" }}>
-              {c.etiqueta}
+              {coma(c.etiqueta)}
             </td>
           </tr>
         ))}

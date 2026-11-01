@@ -103,8 +103,8 @@ export function RigidezAligeradoPanel({ fila, ctx, escribir, errores, rigidez }:
           </>
         ) : r.rigidez === "uniforme" ? (
           <>
-            Rigidez «uniforme» (CY3): la flexión, ½ de la maciza en las dos direcciones, y la torsión, ½ con el G del hormigón, en lo aligerado y en los ábacos; el axil y los cortantes, los de la T del nervio (en los ábacos, macizos). Sin efecto Poisson
-            (ν = 0, como un emparrillado). Las vigas planas a sus lados van con la flexión ×0,6 (RV-a).
+            Rigidez «uniforme»: la flexión, ½ de la maciza en las dos direcciones, y la torsión, ½ con el G del hormigón, en lo aligerado y en los ábacos; el axil y los cortantes, los de la T del nervio (en los ábacos, macizos). Sin efecto Poisson
+            (ν = 0, como un emparrillado). Las vigas planas a sus lados van con la flexión ×0,6.
           </>
         ) : (
           <>Los de la T bruta del nervio (opción «bruta»), sin efecto Poisson (ν = 0, como un emparrillado); los ábacos, macizos.</>

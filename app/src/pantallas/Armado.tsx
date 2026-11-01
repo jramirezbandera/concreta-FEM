@@ -25,7 +25,7 @@ import type { EleccionCombinaciones, FuenteEscena } from "../../../src/visor/ses
 import { CampoLista, Chip, Disposicion, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcBanda } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, ListaDiagnosticos, Seccion, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { escalaDe, SeccionEscala, type EscalaElegida } from "../componentes/escala.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
@@ -83,7 +83,7 @@ function EscenaArmado({ fuente, objetos, marcas, onPunto }: { fuente: FuenteEsce
   const pedido = !fuente || proyecto.desactualizado || fuente.tipo !== "planta" ? null : { tipo: "escena" as const, planta: fuente.planta, vista: fuente.vista };
   const d = usePedido(proyecto.cliente, pedido);
   const resaltado = useEleccion(fuente, seleccion && objetos?.has(seleccion) ? seleccion : null);
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Cortando las franjas…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Cortando las franjas…</Aviso> : null;
   return <Fuente2D escena={proyecto.desactualizado ? null : d.datos} resaltado={resaltado} marcas={marcas} eventos={{ clic: (p) => fuente?.tipo === "planta" && onPunto(p, fuente.planta) }} aviso={aviso} cargando={d.cargando} />;
 }
 
@@ -92,7 +92,7 @@ function TresDArmado({ planta, armadura, eleccion, op }: { planta: string | null
   const { proyecto } = useVisor();
   const armado = op.armado;
   const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "armado3d", armadura, combinaciones: eleccion, planta, ...op });
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Cortando las franjas…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Cortando las franjas…</Aviso> : null;
   const datos = proyecto.desactualizado ? null : d.datos;
   const cliente = proyecto.cliente;
   const { alPasar, sonda } = useSonda(
@@ -199,7 +199,7 @@ function DetalleFranja({ d, varias, base }: { d: DatosFranja; varias: boolean; b
             ))}
           </tbody>
         </table>
-        <p className="nota">De «fem consultar franja»: exactas, por fuerzas nodales, del lado de la flecha. Momento medio por metro de la franja; mx &gt; 0 tracciona la cara inferior. Con un borde rígido detrás (una viga, una huella), my y mxy se toman a la distancia que se indica, un canto de la losa: pegados a él, el torsor tiene una capa límite que la malla no resuelve.</p>
+        <p className="nota">Exactas, por fuerzas nodales, del lado de la flecha. Momento medio por metro de la franja; mx &gt; 0 tracciona la cara inferior. Con un borde rígido detrás (una viga, una huella), my y mxy se toman a la distancia que se indica, un canto de la losa: pegados a él, el torsor tiene una capa límite que la malla no resuelve.</p>
       </Seccion>
       <Seccion titulo="Todas las estaciones" valor={d.estaciones.length}>
         {!todas ? (
@@ -574,10 +574,10 @@ export function ModoArmado() {
     />
   );
 
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : r.diagnosticos ? <Aviso tono="fail">{r.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !r.datos && r.cargando ? <Aviso>Cortando las franjas…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : r.diagnosticos ? <Aviso tono="fail">{r.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !r.datos && r.cargando ? <Aviso>Cortando las franjas…</Aviso> : null;
 
   const tabla = d ? (
-    <Seccion titulo={`Franjas de ${planta}`} valor={`${d.filas.length} · fem consultar franjas`}>
+    <Seccion titulo={`Franjas de ${planta}`} valor={d.filas.length}>
       {d.filas.length === 0 ? (
         <p className="nota">Esta planta no tiene losas macizas ni reticulares.</p>
       ) : (
@@ -619,7 +619,7 @@ export function ModoArmado() {
   );
 
   const tablaZonas = d ? (
-    <Seccion titulo={`Zonas de refuerzo de ${planta} · ${NOMBRE_CORTO[armadura]}`} valor={`${zonas.length} · fem consultar refuerzos`}>
+    <Seccion titulo={`Zonas de refuerzo de ${planta} · ${NOMBRE_CORTO[armadura]}`} valor={zonas.length}>
       {!conBase ? (
         <p className="nota">Sin armadura base en {NOMBRE_CORTO[armadura]}: póngala en Propiedades (sin nada elegido) para ver las zonas que no cubre.</p>
       ) : zonas.length === 0 ? (
@@ -699,7 +699,7 @@ export function ModoArmado() {
       {!zona && !detalle && <SeccionBase planta={planta} armadura={armadura} />}
       <Seccion titulo="Qué se dibuja">
         <p className="nota">
-          Momento de dimensionado de Wood–Armer por metro de la franja ({U}), por combinación con los momentos medios de su ancho, en la dirección de la franja (fase F): de «fem consultar franja». En las caras de los pilares y en las líneas de apoyo, exacto (por fuerzas nodales); entre ellas, cada 0,25 m, por campos. Cada estación colorea su tramo de la franja, hasta la mitad de sus vecinas.
+          Momento de dimensionado de Wood–Armer por metro de la franja ({U}), por combinación con los momentos medios de su ancho, en la dirección de la franja. En las caras de los pilares y en las líneas de apoyo, exacto (por fuerzas nodales); entre ellas, cada 0,25 m, por campos. Cada estación colorea su tramo de la franja, hasta la mitad de sus vecinas.
         </p>
         {(zona || detalle) && (
           <button type="button" className="btn mx-3.5 my-1.5" onClick={() => setSeleccion(null)}>

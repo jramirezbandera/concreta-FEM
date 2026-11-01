@@ -27,7 +27,7 @@ import { ContextoPaneles, useAlmacenPaneles, type EstadoPaneles } from "./armazo
 import { ContextoVisor, type Espacio, type ModoResultados } from "./contexto.ts";
 import { EspacioModelo } from "./espacios/Modelo.tsx";
 import { EspacioResultados } from "./espacios/Resultados.tsx";
-import { cota } from "./fmt.ts";
+import { cota, fmt } from "./fmt.ts";
 import { Inicio, abrirDesdeUrl } from "./Inicio.tsx";
 import { EspacioRevision } from "./pantallas/Revision.tsx";
 import { useProyecto, type ProyectoAbierto } from "./sesion/useProyecto.ts";
@@ -292,8 +292,8 @@ export function App() {
   const resultados = !e?.calculado
     ? ""
     : e.origen === "guardados"
-      ? `resultados de .fem/${e.huella.slice(0, 8)} (CLI) · leídos en ${(proyecto.tiempos.guardados ?? 0).toFixed(2)} s`
-      : `compilado en ${(proyecto.tiempos.abrir ?? 0).toFixed(2)} s y calculado en el visor en ${(proyecto.tiempos.calcular ?? 0).toFixed(2)} s${proyecto.motivoGuardados ? ` · .fem no se usó: ${proyecto.motivoGuardados}` : ""}`;
+      ? `resultados guardados ${navegador ? "en este navegador" : "junto al proyecto"} · leídos en ${fmt(proyecto.tiempos.guardados ?? 0, 2)} s`
+      : `compilado en ${fmt(proyecto.tiempos.abrir ?? 0, 2)} s y calculado en ${fmt(proyecto.tiempos.calcular ?? 0, 2)} s${proyecto.motivoGuardados ? ` · los guardados no valían: ${proyecto.motivoGuardados}` : ""}`;
 
   return (
     <ContextoPaneles.Provider value={paneles}>
@@ -525,11 +525,9 @@ export function App() {
               </span>
             )}
             {e?.sha256Resultados && (
-              <span className="shrink-0 whitespace-nowrap" title={`sha256 de resultados.bin: ${e.sha256Resultados}`} data-sha={e.sha256Resultados} data-origen={e.origen}>
-                resultados {e.sha256Resultados.slice(0, 8)}
-              </span>
+              // Las huellas de los resultados y del núcleo, para los bancos y en Revisión: en el pie eran códigos sin sentido (UI-43)
+              <span hidden data-sha={e.sha256Resultados} data-origen={e.origen} />
             )}
-            {proyecto.cliente?.motor && <span className="shrink-0 whitespace-nowrap" title="sha256 del núcleo WASM">núcleo {proyecto.cliente.motor.slice(0, 8)}</span>}
           </footer>
         </div>
         {paleta && <Paleta ordenes={ordenes} objetos={objetos} onCerrar={() => setPaleta(false)} />}

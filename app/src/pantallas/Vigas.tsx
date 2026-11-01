@@ -25,10 +25,10 @@ import type { EleccionCombinaciones, VistaPlanta } from "../../../src/visor/sesi
 import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcDiagramas, IcPilar, IcViga } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
-import { fmt } from "../fmt.ts";
+import { fmt, coma } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { queCombinaciones, useSonda } from "../vistas/sonda.ts";
@@ -50,7 +50,7 @@ function PlantaDiagramas({ planta, vista, id, cargando }: { planta: string; vist
     const m = proyecto.edicion?.proyecto.modelo;
     if (o && ((m?.vigas ?? []).some((v) => v.id === o) || (m?.barras ?? []).some((b) => b.id === o) || o.includes(":v") || !proyecto.edicion)) setSeleccion(o);
   };
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : escena.diagnosticos ? <Aviso tono="fail">{escena.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !escena.datos && escena.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : escena.diagnosticos ? <Aviso tono="fail">{escena.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !escena.datos && escena.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
   return <Fuente2D escena={proyecto.desactualizado ? null : escena.datos} resaltado={resaltado} eventos={{ clic: (p, r) => void clic(p, r) }} aviso={aviso} cargando={escena.cargando || cargando} />;
 }
 
@@ -75,7 +75,7 @@ type Escala = (typeof ESCALAS)[number];
 function TresDDiagramas({ planta, esfuerzo, eleccion, piezas, escala }: { planta: string | null; esfuerzo: Esfuerzo; eleccion: EleccionCombinaciones; piezas: PiezasDiagrama; escala: number }) {
   const { proyecto } = useVisor();
   const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "diagramas3d", esfuerzo, combinaciones: eleccion, planta, piezas, escala });
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Preparando los diagramas…</Aviso> : null;
   const datos = proyecto.desactualizado ? null : d.datos;
   const cliente = proyecto.cliente;
   const unidad = ESFUERZOS.find((x) => x.id === esfuerzo)!.unidad;
@@ -229,7 +229,7 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
             {fmt(x.max.v, 2)}
             <small>
               {x.max.comb}
-              {x.max.etiqueta !== x.max.comb ? ` · ${x.max.etiqueta}` : ""}
+              {x.max.etiqueta !== x.max.comb ? ` · ${coma(x.max.etiqueta)}` : ""}
             </small>
           </td>
         </tr>
@@ -239,7 +239,7 @@ function Estacion({ d, unidad }: { d: DatosEstacion; unidad: string }) {
             {fmt(x.min.v, 2)}
             <small>
               {x.min.comb}
-              {x.min.etiqueta !== x.min.comb ? ` · ${x.min.etiqueta}` : ""}
+              {x.min.etiqueta !== x.min.comb ? ` · ${coma(x.min.etiqueta)}` : ""}
             </small>
           </td>
         </tr>
@@ -348,7 +348,7 @@ export function ModoDiagramas() {
       <Separador />
       <Segmentado
         etiqueta="Esfuerzo"
-        opciones={ESFUERZOS.map((x) => ({ id: x.id, nombre: x.id, title: x.id === "N" && v?.axilSinValor ? `${x.title}. En ${v.id}, sin valor: está en un diafragma rígido (C1-d)` : x.title }))}
+        opciones={ESFUERZOS.map((x) => ({ id: x.id, nombre: x.id, title: x.id === "N" && v?.axilSinValor ? `${x.title}. En ${v.id}, sin valor: está en un diafragma rígido` : x.title }))}
         valor={esfuerzo}
         onCambio={setEsfuerzo}
       />
@@ -384,7 +384,7 @@ export function ModoDiagramas() {
         alzado: (x) => <FuenteEscena fuente={x.eje ? { tipo: "alzado", plano: planoAlzado(x.eje, x), diagramas: { esfuerzo: plano, combinaciones: eleccion, escala: Number(escala) } } : null} />,
         cabecera3D: () => (
           <>
-            <Chip acento title={v ? v.combinaciones.etiquetas.join("\n") : undefined}>
+            <Chip acento title={v ? coma(v.combinaciones.etiquetas.join("\n")) : undefined}>
               {esfuerzo} · {queCombinaciones(v ? { descripcion: v.combinaciones.descripcion, n: v.combinaciones.nombres.length } : undefined, v?.combinaciones.nombres[0])}
             </Chip>
             <Desplegable etiqueta="Piezas con diagrama" valor={piezas3D} onCambio={setPiezas3D} opciones={PIEZAS} />
@@ -432,13 +432,13 @@ export function ModoDiagramas() {
               detalle={
                 <>
                   {v.tipo === "pilar" ? `${fmt(v.longitud, 2)} m · ${(v.plantas ?? []).map((p) => p.planta).join(", ")}` : v.tipo === "barra" ? `${fmt(v.longitud, 2)} m · de ${v.plantas?.[0]?.planta ?? "—"} a ${v.plantas?.[1]?.planta ?? "—"}` : `${fmt(v.longitud, 2)} m · ${v.vanos.length} vano${v.vanos.length === 1 ? "" : "s"} · apoyos ${v.apoyos.map((a) => a.objeto).join(", ") || "—"}`}
-                  {v.axilSinValor && <div className="mt-1">Axil sin valor: está en el plano de un diafragma rígido (C1-d).</div>}
+                  {v.axilSinValor && <div className="mt-1">Axil sin valor: está en el plano de un diafragma rígido.</div>}
                 </>
               }
             />
             <Seccion titulo="En la estación">{est.datos ? <Estacion d={est.datos} unidad={unidad} /> : <p className="nota">…</p>}</Seccion>
             {v.tipo === "pilar" && <CuadroPilar filas={cuadro.datos?.filas ?? null} />}
-            {v.tipo !== "pilar" && <Seccion titulo="Vanos de cara a cara" valor="fem consultar pieza">
+            {v.tipo !== "pilar" && <Seccion titulo="Vanos de cara a cara">
               <table className="tb">
                 <thead>
                   <tr>

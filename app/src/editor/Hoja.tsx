@@ -28,6 +28,7 @@ import type { Diagnostico } from "../../../src/motor/diagnosticos.ts";
 import { useVisor } from "../contexto.ts";
 import { DialogoBorrar, DialogoCopiar } from "./Dialogos.tsx";
 import { abrirGestor, esDelGestor, OpcionesGestor, pedidoCampo, type ColeccionGestor } from "./referencia.tsx";
+import { textoApp } from "../fmt.ts";
 
 type Mensaje = { tono: "fail" | "ok" | "neu"; texto: string } | null;
 
@@ -49,7 +50,7 @@ function diagnosticosPorObjeto(ds: readonly Diagnostico[]): Map<string, { sev: "
     for (const id of d.ids ?? []) {
       const x = r.get(id) ?? { sev: "w" as const, textos: [] };
       if (d.severidad === "error") x.sev = "f";
-      x.textos.push(d.mensaje);
+      x.textos.push(textoApp(d.mensaje));
       r.set(id, x);
     }
   return r;

@@ -6,6 +6,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { soloCodigos, textoApp } from "../../app/src/fmt.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const COMERCIAL = /SAP\s?2000|CYPECAD|\bCYPE\b|ETABS|\bCSI\b/;
@@ -44,9 +45,31 @@ function sinComentarios(s: string): string {
   return r;
 }
 
-describe("los textos de la app no nombran software comercial", () => {
+describe("los textos de la app no nombran software comercial ni lo interno", () => {
   it("quita los comentarios y deja los literales", () => {
     expect(sinComentarios(`a = "x // y"; // SAP2000\n/* ETABS */ b = 'CSI'`)).toBe(`a = "x // y"; \n b = 'CSI'`);
+  });
+
+  it("UI-43: los literales de la app no llevan códigos internos ni órdenes de la CLI", () => {
+    // Las órdenes de firmar de Revisión son el camino real hasta que se firme en la web (UI-32), y
+    // `origen.ts` lee los guardados de la CLI por su ruta
+    const permitidos = /pantallas[\\/]Revision\.tsx|sesion[\\/]origen\.ts/;
+    const malos: string[] = [];
+    for (const f of ficheros(join(RAIZ, "app", "src"))) {
+      if (permitidos.test(f) || /[\\/]fmt\.ts$/.test(f)) continue;
+      for (const l of sinComentarios(readFileSync(f, "utf8")).split("\n")) {
+        const parentesis = [...l.matchAll(/\(([^()]*)\)/g)].some((m) => soloCodigos(m[1]!));
+        if (parentesis || /\bfem (validar|calcular|compilar|consultar|resumen|render|revisar|firmar)\b|\.fem\/|\bSPR\b|ε_snap/.test(l)) malos.push(`${relative(RAIZ, f)}: ${l.trim().slice(0, 140)}`);
+      }
+    }
+    expect(malos).toEqual([]);
+  });
+
+  it("textoApp quita lo interno de los textos del motor y del compilador", () => {
+    expect(textoApp("Axil sin valor: está en un diafragma rígido (C1-d).")).toBe("Axil sin valor: está en un diafragma rígido.");
+    expect(textoApp("Losas malladas (h = 0.75 m) (H52, C2-a, G-4).")).toBe("Losas malladas (h = 0,75 m).");
+    expect(textoApp("Los paños (F1, F2) no llevan franjas: sus viguetas, con «fem consultar pieza».")).toBe("Los paños (F1, F2) no llevan franjas: sus viguetas, en Resultados · Diagramas.");
+    expect(textoApp("el cálculo une a ε_snap sus zonas (C2-b).")).toBe("el cálculo une a menos de la tolerancia de unión sus zonas.");
   });
 
   it("ni en app/src ni en src, fuera de los comentarios", () => {

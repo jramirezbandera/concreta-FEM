@@ -25,7 +25,7 @@ import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
 import type { FuenteEscena, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
 import { Desplegable, SelectorEje, SelectorPlanta, useEstrecha } from "../armazon/Disposicion.tsx";
-import { Aviso } from "../componentes/comunes.tsx";
+import { Aviso, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { atributos, pintura } from "../lienzo/pintura.ts";
 import { usePedido } from "../sesion/usePedido.ts";
@@ -36,6 +36,7 @@ import { Motor, type Herramienta, type Vista } from "./motor.ts";
 import { Vista2D, type Dibujo2D, type Eventos2D, type Marca, type Margenes } from "./vista2d.ts";
 import type { GeometriaPlantilla } from "../plantilla/plantillas.ts";
 import { TIPOS_FILTRO, Vista3D, type Color3D, type Eventos3D, type FiltroVista, type Modo3D, type Objetivo3D, type Sonda, type TipoFiltro } from "./vista3d.ts";
+import { textoApp } from "../fmt.ts";
 
 // ─── La celda y su contexto ─────────────────────────────────────────────────────────────────────
 
@@ -695,11 +696,11 @@ export function FuenteEscena({ fuente, dibujo = null, dibujando = false, plantil
   // Con resultados (los diagramas de un alzado), lo de una versión anterior no se enseña
   const resultados = fu?.tipo === "alzado" && !!fu.diagramas;
   const aviso = resultados && proyecto.desactualizado ? (
-    <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso>
+    <AvisoDesactualizado />
   ) : proyecto.desactualizado && ed?.pendiente ? (
     dibujando ? null : <Aviso tono="warn">Compilando la versión editada…</Aviso>
   ) : proyecto.desactualizado ? (
-    <Aviso tono="warn">El fichero cambió: abriendo la versión nueva…</Aviso>
+    <AvisoDesactualizado abriendo />
   ) : escena.diagnosticos ? (
     <Aviso tono="fail">{escena.diagnosticos.map((d) => d.mensaje).join(" ")}</Aviso>
   ) : !escena.datos && escena.cargando ? (
@@ -849,7 +850,8 @@ export interface ContenidoLeyenda {
  * un párrafo encima del dibujo). Lo demás va en su título y en «Detalles»; un rango de un mapa
  * («-0,5 a 0») se queda entero.
  */
-export function textoCorto(t: string): string {
+export function textoCorto(t0: string): string {
+  const t = textoApp(t0);
   if (/^[-−+]?\d/.test(t)) return t;
   const k = t.search(/ \(|; |, |\. /);
   return k > 0 ? t.slice(0, k) : t;
@@ -861,7 +863,7 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
   const estrecha = useEstrecha(1600);
   const [ver, setVer] = useState(abierta && !estrecha);
   const [detalles, setDetalles] = useState(false);
-  const recortadas = escena.leyenda.some((l) => textoCorto(l.texto) !== l.texto);
+  const recortadas = escena.leyenda.some((l) => textoCorto(l.texto) !== textoApp(l.texto));
   return (
     <div className="leyenda-vista scroll-hide" data-abierta={ver} data-detalles={detalles}>
       <button type="button" className="leyenda-cab" onClick={() => setVer((x) => !x)} aria-expanded={ver}>
@@ -877,7 +879,7 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
           {escena.leyenda.map((l, i) => {
             const p = l.estilo ? pintura(l.estilo, tema) : {};
             return (
-              <div key={i} className="flex items-start gap-2 py-[2px] text-text-secondary" title={detalles ? undefined : l.texto}>
+              <div key={i} className="flex items-start gap-2 py-[2px] text-text-secondary" title={detalles ? undefined : textoApp(l.texto)}>
                 <svg width={18} height={12} className="mt-[1px] shrink-0" aria-hidden="true">
                   {l.relleno || p.fill ? (
                     <rect x={0.5} y={0.5} width={17} height={11} {...atributos({ ...p, sw: Math.min(p.sw ?? 1, 1.5) }, l.relleno)} />
@@ -889,7 +891,7 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
                   )}
                 </svg>
                 {/* Mono sólo para los rangos de un mapa («-0,5 a 0»), no para las descripciones */}
-                <span className={l.relleno && /^[-−+]?\d/.test(l.texto) ? "mono" : undefined}>{detalles ? l.texto : textoCorto(l.texto)}</span>
+                <span className={l.relleno && /^[-−+]?\d/.test(l.texto) ? "mono" : undefined}>{detalles ? textoApp(l.texto) : textoCorto(l.texto)}</span>
               </div>
             );
           })}
@@ -902,7 +904,7 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
             <div className="mt-1 border-t border-border-sub pt-1.5 text-[11px] leading-snug text-text-tertiary">
               {escena.notas.map((n, i) => (
                 <p key={i} className="mt-1">
-                  {n}
+                  {textoApp(n)}
                 </p>
               ))}
             </div>

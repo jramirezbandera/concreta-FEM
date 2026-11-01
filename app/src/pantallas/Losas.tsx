@@ -27,11 +27,11 @@ import type { SuperficiesMapa } from "../../../src/visor/isovalores3d.ts";
 import { Chip, Desplegable, Disposicion, Segmentado, Separador } from "../armazon/Disposicion.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { IcLosas } from "../armazon/iconos.tsx";
-import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion, TablaCombinaciones, TITULO_COMBINACIONES } from "../componentes/comunes.tsx";
+import { Aviso, Cabecera, ComboCombinaciones, Equilibrio, Seccion, TablaCombinaciones, TITULO_COMBINACIONES, AvisoDesactualizado } from "../componentes/comunes.tsx";
 import { escalaDe, SeccionEscala, type EscalaElegida } from "../componentes/escala.tsx";
 import { BarraModos } from "../espacios/BarraModos.tsx";
 import { useVisor } from "../contexto.ts";
-import { fmt, mm } from "../fmt.ts";
+import { fmt, mm, textoApp, coma } from "../fmt.ts";
 import { usePedido } from "../sesion/usePedido.ts";
 import { BarraVistas } from "../vistas/BarraVistas.tsx";
 import { useVistas, vistasDe } from "../vistas/estado.ts";
@@ -64,7 +64,7 @@ function PlantaLosas({ planta, campo, eleccion, escala, envolvente, punto, onPun
   const { proyecto } = useVisor();
   const d = usePedido(proyecto.cliente, { tipo: "losas", planta, campo, combinaciones: eleccion, envolvente, ...(escala ? { escala } : {}), ...(malla ? { malla } : {}) });
   const marcas: Marca[] = punto && punto.planta === planta ? [{ p: punto.p, texto: punto.v ? textoValor(campo, punto.v.valor, dec, unidad) : "sin mapa" }] : [];
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Recuperando los campos (SPR)…</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>Suavizando los campos…</Aviso> : null;
   return <Fuente2D escena={proyecto.desactualizado ? null : (d.datos?.escena ?? null)} marcas={marcas} eventos={{ clic: (p) => onPunto(p, planta) }} aviso={aviso} cargando={d.cargando} />;
 }
 
@@ -72,7 +72,7 @@ function PlantaLosas({ planta, campo, eleccion, escala, envolvente, punto, onPun
 function TresDLosas({ planta, campo, eleccion, escala, envolvente, superficies, dec }: { planta: string | null; campo: Campo; eleccion: EleccionCombinaciones; escala: EscalaMapa | undefined; envolvente: Envolvente; superficies: SuperficiesMapa; dec: number }) {
   const { proyecto } = useVisor();
   const d = usePedido(proyecto.cliente, proyecto.desactualizado ? null : { tipo: "isovalores3d", campo, combinaciones: eleccion, planta, superficies, envolvente, ...(escala ? { escala } : {}) });
-  const aviso = proyecto.desactualizado ? <Aviso tono="warn">El fichero cambió: estos resultados ya no son del proyecto.</Aviso> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>{campo === "uz" ? "Preparando el mapa…" : "Recuperando los campos (SPR)…"}</Aviso> : null;
+  const aviso = proyecto.desactualizado ? <AvisoDesactualizado /> : d.diagnosticos ? <Aviso tono="fail">{d.diagnosticos.map((x) => x.mensaje).join(" ")}</Aviso> : !d.datos && d.cargando ? <Aviso>{campo === "uz" ? "Preparando el mapa…" : "Suavizando los campos…"}</Aviso> : null;
   const datos = proyecto.desactualizado ? null : d.datos;
   const cliente = proyecto.cliente;
   const comb = datos?.combinacion?.nombre;
@@ -198,7 +198,7 @@ export function ModoLosas() {
         planta: (v) => (v.planta ? <PlantaLosas planta={v.planta} campo={campo} eleccion={eleccion} escala={escala} envolvente={envolvente} punto={punto && punto.clave === claveDe(v.planta) ? punto : null} onPunto={(p, pl) => void clic(p, pl)} dec={dec} unidad={unidad} malla={!!v.malla} /> : null),
         malla: true,
         cabeceraPlanta: (v) => (
-          <Chip acento title={v.planta === planta ? `${x?.envolvente ? resumenComb : (x?.dibujada?.etiqueta ?? "")}${d.ms !== null ? ` · ${fmt(d.ms, 0)} ms` : ""}` : undefined}>
+          <Chip acento title={v.planta === planta ? `${x?.envolvente ? resumenComb : coma(x?.dibujada?.etiqueta ?? "")}${d.ms !== null ? ` · ${fmt(d.ms, 0)} ms` : ""}` : undefined}>
             {nombreCampo} · {unidad}
             {elegida.modo !== "completa" && ` · ${elegida.modo === "sin-picos" ? "sin picos" : "escala manual"}`}
             {v.planta === planta && (
@@ -244,7 +244,7 @@ export function ModoLosas() {
           ) : undefined
         }
       />
-      {x && <p className="nota">uz de los nudos; momentos y cortantes recuperados por SPR (E5) en los ejes de cada losa. Bandas sin interpolar el color (H43): el número de un punto, con un clic.</p>}
+      {x && <p className="nota">uz en los nudos; momentos y cortantes suavizados entre láminas, en los ejes de cada losa. Las bandas no interpolan el color: el número de un punto, con un clic.</p>}
         <SeccionEscala
           key={campo}
           mapa={x?.escena.mapa}
@@ -298,7 +298,7 @@ export function ModoLosas() {
                   </span>
                 </button>
               ))}
-              {!x.escena.extremos.length && <p className="nota">{x.escena.notas.join(" ")}</p>}
+              {!x.escena.extremos.length && <p className="nota">{textoApp(x.escena.notas.join(" "))}</p>}
             </Seccion>
             <Seccion titulo="Flechas" valor={x.combinacionesFlechas.descripcion}>
               {x.flechas.length ? (
@@ -332,7 +332,7 @@ export function ModoLosas() {
               ) : (
                 <p className="nota">La planta no tiene losas ni paños.</p>
               )}
-              <p className="nota">Hacia abajo, positivas. Relativa: a las esquinas de su recuadro de pilares (losas) o a los extremos del vano (paños), como <span className="mono">fem consultar flechas</span>.</p>
+              <p className="nota">Hacia abajo, positivas. Relativa: a las esquinas de su recuadro de pilares (losas) o a los extremos del vano (paños).</p>
             </Seccion>
           </>
         )}
