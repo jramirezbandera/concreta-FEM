@@ -270,7 +270,7 @@ describe("alzado de las cargas, a mano", () => {
 
   it("lo normal al plano no tiene bloque: se rotula", () => {
     expect(bloque(e, "PA-wy")).toBeUndefined();
-    expect(e.primitivas.some((p) => p.tipo === "texto" && p.texto === "PA-wy: (0; 1; 0) kN/m global, normal al plano")).toBe(true);
+    expect(e.primitivas.some((p) => p.tipo === "texto" && p.texto === "PA-wy: Y = 1 kN/m, normal al plano")).toBe(true);
   });
 
   it("el fondo, atenuado y sin ids; las plantas, con su cota", () => {

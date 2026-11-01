@@ -500,6 +500,42 @@ export function vistaModelo(f: ModeloFisico, planta: string, d: DatosVista): Esc
 /** Un vector de carga rotulado: sólo su Z si es vertical; si no, sus tres componentes. */
 export const vector = (q: readonly number[]) => (q[0] === 0 && q[1] === 0 ? rotulo(q[2]!) : `(${q.map((x) => rotulo(x)).join("; ")})`);
 
+/** Cómo se escribe un número en un rótulo de carga (`rotulo` en A4; la app pasa el suyo). */
+type Numero = (x: number) => string;
+
+/** Unas componentes con su nombre y su signo, sin las nulas («X = 1,5; Z = -2 kN/m²»). */
+export function componentes(v: readonly number[], nombres: readonly string[], unidad: string, num: Numero = (x) => rotulo(x)): string {
+  const partes = v.flatMap((x, i) => (x !== 0 ? [`${nombres[i]} = ${num(x)}`] : []));
+  return `${partes.length ? partes.join("; ") : `${nombres[nombres.length - 1]} = 0`} ${unidad}`;
+}
+
+/**
+ * El valor de una carga como se escribe (UI-2): una vertical, sin signo y con su flecha («↓ 2 kN/m²»
+ * son 2 kN/m² hacia abajo, como se teclean); si no, sus componentes con su nombre y su signo, X, Y, Z
+ * en ejes globales (Z hacia arriba) o, con `local`, x, y, z en los de la pieza.
+ */
+export function valorCarga(v: readonly number[], unidad: string, o: { local?: boolean; num?: Numero } = {}): string {
+  const num = o.num ?? ((x: number) => rotulo(x));
+  if (o.local) return `${componentes(v, ["x", "y", "z"], unidad, num)} locales`;
+  if (v[0] === 0 && v[1] === 0 && v[2] !== 0) return `${v[2]! < 0 ? "↓" : "↑"} ${num(Math.abs(v[2]!))} ${unidad}`;
+  return componentes(v, ["X", "Y", "Z"], unidad, num);
+}
+
+/** Una carga que varía de q a qb: «↓ 5 a 7 kN/m» si las dos son verticales en el mismo sentido; si no, las dos enteras. */
+export function valorCargaVariable(q: readonly number[], qb: readonly number[] | undefined, unidad: string, o: { local?: boolean; num?: Numero } = {}): string {
+  if (!qb) return valorCarga(q, unidad, o);
+  const num = o.num ?? ((x: number) => rotulo(x));
+  const vertical = (v: readonly number[]) => v[0] === 0 && v[1] === 0 && v[2] !== 0;
+  if (!o.local && vertical(q) && vertical(qb) && Math.sign(q[2]!) === Math.sign(qb[2]!)) return `${q[2]! < 0 ? "↓" : "↑"} ${num(Math.abs(q[2]!))} a ${num(Math.abs(qb[2]!))} ${unidad}`;
+  return `${valorCarga(q, unidad, o)} a ${valorCarga(qb, unidad, o)}`;
+}
+
+/** El rótulo del valor de una carga puntual: su fuerza y su momento (Mx, My, Mz globales). */
+export const valorPuntual = (F: readonly number[] | undefined, M: readonly number[] | undefined, num?: Numero): string => [F && F.some((x) => x !== 0) ? valorCarga(F, "kN", num ? { num } : {}) : "", M && M.some((x) => x !== 0) ? componentes(M, ["Mx", "My", "Mz"], "kN·m", num) : ""].filter(Boolean).join(", ") || "0 kN";
+
+/** Lo que se lee en un rótulo de carga (UI-2). */
+export const NOTA_VALOR_CARGA = "↓ y ↑: una carga vertical, con el valor que se escribe (↓ 2 kN/m² son 2 kN/m² hacia abajo). Las demás, por sus componentes con su signo: X, Y, Z en ejes globales (Z hacia arriba) o x, y, z en los ejes de la pieza.";
+
 /** Cargas de un caso en la planta, dibujadas sobre el modelo atenuado. */
 export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: DatosVista): Escena {
   const pl = new PlantaFisica(f, planta);
@@ -536,14 +572,14 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         }
         poner({ tipo: "poligono", anillos, estilo: "carga-superficie", objeto: g.id });
         const sufijo = g.zona && (g.losa || g.pano) ? ` (sólo en ${g.losa ?? g.pano})` : "";
-        rot(puntoInterior(anillos), `${g.id}: ${vector(g.q)} kN/m²${sufijo}`, { ancla: "medio" });
+        rot(puntoInterior(anillos), `${g.id}: ${valorCarga(g.q, "kN/m²")}${sufijo}`, { ancla: "medio" });
         return;
       }
       case "lineal": {
         if (g.planta !== planta) return;
         poner({ tipo: "linea", puntos: g.puntos as Vec2[], estilo: "carga-lineal", objeto: g.id });
         const { p, d: dir } = puntoEnPolilinea(g.puntos, longitud(g.puntos) / 2);
-        rot(p, `${g.id}: ${vector(g.q)} kN/m`, { giro: giroTexto(dir), ancla: "medio", dy: -8 });
+        rot(p, `${g.id}: ${valorCarga(g.q, "kN/m")}`, { giro: giroTexto(dir), ancla: "medio", dy: -8 });
         return;
       }
       case "puntual": {
@@ -553,7 +589,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         poner({ tipo: "flecha", p: [g.x, g.y], d: h > 0 ? [F[0], F[1]] : null, abajo: F[2] <= 0, estilo: "carga-puntual", objeto: g.id });
         // Su momento: Mz en un arco (antihorario visto desde arriba) y (Mx, My), de doble punta
         if (g.M) for (const x of momento2D([g.x, g.y], g.M[2], [g.M[0], g.M[1]], "carga-puntual", g.id)) poner(x);
-        rot([g.x, g.y], `${g.id}: F ${vector(F)} kN${g.M ? `, M ${vector(g.M)} kN·m` : ""}`, { dx: 10, dy: 18 });
+        rot([g.x, g.y], `${g.id}: ${valorPuntual(g.F, g.M)}`, { dx: 10, dy: 18 });
         return;
       }
       case "viga": {
@@ -564,7 +600,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         const tramo = Array.from({ length: 17 }, (_, i) => puntoEnPolilinea(v.puntos, s0 + ((s1 - s0) * i) / 16).p);
         poner({ tipo: "linea", puntos: tramo, estilo: "carga-pieza", objeto: g.id });
         const { p, d: dir } = puntoEnPolilinea(v.puntos, (s0 + s1) / 2);
-        rot(p, `${g.id}: ${vector(g.q)}${g.qb ? ` a ${vector(g.qb)}` : ""} kN/m ${g.ejes}`, { giro: giroTexto(dir), ancla: "medio", dy: -9 });
+        rot(p, `${g.id}: ${valorCargaVariable(g.q, g.qb, "kN/m", { local: g.ejes === "local" })}`, { giro: giroTexto(dir), ancla: "medio", dy: -9 });
         return;
       }
       case "pilar": {
@@ -574,7 +610,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
         const [px, py] = ejeSeccion(p, x.seccion);
         const horizontal = g.ejes === "global" ? Math.hypot(g.q[0], g.q[1]) > 0 : true;
         poner({ tipo: "flecha", p: [px, py], d: g.ejes === "global" && horizontal ? [g.q[0], g.q[1]] : null, abajo: true, estilo: "carga-pieza", objeto: g.id });
-        rot([px, py], `${g.id}: ${vector(g.q)}${g.qb ? ` a ${vector(g.qb)}` : ""} kN/m ${g.ejes}`, { dx: 10, dy: 20 });
+        rot([px, py], `${g.id}: ${valorCargaVariable(g.q, g.qb, "kN/m", { local: g.ejes === "local" })}`, { dx: 10, dy: 20 });
         return;
       }
       case "empuje": {
@@ -597,7 +633,7 @@ export function vistaCargas(f: ModeloFisico, planta: string, caso: string, d: Da
   entrada("carga-pieza", "Carga en una viga, un pilar que llega a la planta o un muro (kN/m o kN/m²)");
   if (!c) notas.push(`El caso «${caso}» no existe.`);
   else if (c.pesoPropio) notas.push("Este caso lleva además el peso propio de la estructura, que calcula el programa y no se dibuja.");
-  notas.push("Componentes en ejes globales salvo que diga «local»; un valor solo es la componente Z (negativa, hacia abajo).");
+  notas.push(NOTA_VALOR_CARGA);
   if (!n) notas.push("El caso no tiene cargas en esta planta.");
   return {
     titulo: titulo(d.nombre),

@@ -316,7 +316,7 @@ describe("cargas (criterio 1)", () => {
     const li = dibujar(p, "lineal", [punto([1, 1]), punto([4, 1]), punto([4, 5]), { tipo: "terminar" }], conCargas({ lineal: { q: [0, 0, -7] } }));
     expect(serializar(li.proyecto)).toBe(serializar(conTabla(p, "cargas", { tipo: "lineal", caso: "G", planta: "N1", puntos: "1 1; 4 1; 4 5", q: "0 0 -7" })));
     const su = dibujar(p, "superficie", [clic(p, [3, 3])], conCargas({ superficie: { q: [0, 0, -2] } }));
-    expect(su.etiquetas).toEqual(["Carga Q1 (superficie en L1, G)"]);
+    expect(su.etiquetas).toEqual(["Carga G-1 (superficie en L1, G)"]);
     expect(serializar(su.proyecto)).toBe(serializar(conTabla(p, "cargas", { tipo: "superficie", caso: "G", planta: "N1", sobre: "L1", q: "0 0 -2" })));
     const zo = dibujar(p, "superficie", [punto([1, 1]), punto([3, 1]), punto([3, 2]), punto([1, 2]), punto([1, 1])], conCargas({ superficie: { q: [0, 0, -3], modo: "zona" } }));
     expect(serializar(zo.proyecto)).toBe(serializar(conTabla(p, "cargas", { tipo: "superficie", caso: "G", planta: "N1", sobre: "L1", q: "0 0 -3", puntos: "1 1; 3 1; 3 2; 1 2" })));

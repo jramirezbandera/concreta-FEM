@@ -40,7 +40,7 @@ import { limpio } from "./dibujo/cotas.ts";
 import { moverPilar } from "./estirar.ts";
 import type { Operacion } from "./operaciones.ts";
 import { conValor, indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
-import { idNuevo } from "./tablas.ts";
+import { idCarga, idNuevo } from "./tablas.ts";
 
 export type Transformacion =
   /** El punto `de` va a `a`, y todo lo demás con él. */
@@ -514,6 +514,10 @@ function copiar(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Ob
       ocupados.add(id);
       const { nombre: _n, ...resto } = n;
       n = { ...resto, ...(id !== nombre ? { nombre } : {}) } as Objeto;
+    } else if (c === "cargas") {
+      // Con el prefijo de su caso (UI-2)
+      id = idCarga(m, (x as unknown as CargaFisica).caso, ocupados);
+      ocupados.add(id);
     } else id = nuevoId(c);
     n = { ...n, id, ...(planta !== null && "planta" in n ? { planta } : {}) };
     ops.push({ op: "crear", coleccion: c, objeto: n });
@@ -536,7 +540,8 @@ function copiar(m: ModeloFisico, tr: Transformador, todas: { c: Coleccion; o: Ob
       for (const [planta, sid] of copias.get(soporte)!) {
         const campo = carga.tipo === "viga" ? "viga" : carga.tipo === "pilar" ? "pilar" : carga.tipo === "empuje" ? "muro" : carga.tipo === "superficie" && carga.losa ? "losa" : "pano";
         let n = transformado(m, tr, "cargas", x, avisos);
-        const id = nuevoId("cargas");
+        const id = idCarga(m, carga.caso, ocupados);
+        ocupados.add(id);
         n = { ...n, id, [campo]: sid, ...(planta && "planta" in n ? { planta } : {}) };
         ops.push({ op: "crear", coleccion: "cargas", objeto: n });
         nuevos.push(id);

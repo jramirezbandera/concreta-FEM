@@ -1014,7 +1014,9 @@ const cargas: DefTabla = {
   nombre: "cargas",
   titulo: "Cargas",
   colecciones: ["cargas"],
-  prefijo: "Q",
+  prefijo: "C-",
+  // Con el de su caso (UI-2): «G-1»
+  prefijoDe: (f) => `${(f.caso ?? "").trim() || "C"}-`,
   columnas: [
     id,
     { clave: "tipo", titulo: "tipo", ayuda: "puntual (en un punto de la planta), viga, pilar o barra (repartida a lo largo de la pieza), superficie (por m² de forjado), lineal (por metro de una línea de la planta) o empuje (del terreno sobre un muro)", opciones: fijas(TIPOS_CARGA) },
@@ -1154,6 +1156,14 @@ export function idNuevo(m: ModeloFisico, prefijo: string, ocupados: ReadonlySet<
     const x = `${prefijo}${i}`;
     if (!idx.has(x) && !ocupados.has(x)) return x;
   }
+}
+
+/**
+ * El id de una carga nueva (UI-2): con el prefijo de su caso, «G-1», «Q-2»…, para que no se confunda
+ * con un caso (antes, «Q1» también en el caso G).
+ */
+export function idCarga(m: ModeloFisico, caso: string, ocupados: ReadonlySet<string> = new Set()): string {
+  return idNuevo(m, `${caso.trim() || "C"}-`, ocupados);
 }
 
 /** Los objetos de una tabla, de todas sus listas y en el orden del modelo (las losas antes que los paños). */

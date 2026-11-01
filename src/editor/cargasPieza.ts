@@ -25,7 +25,7 @@ import type { Vec3 } from "../motor/modelo.ts";
 import type { PlantillaCargas } from "./dibujo/cargas.ts";
 import type { Operacion } from "./operaciones.ts";
 import type { Objeto } from "./referencias.ts";
-import { idNuevo } from "./tablas.ts";
+import { idCarga } from "./tablas.ts";
 
 export type TipoPieza = "losa" | "pano" | "viga" | "pilar" | "muro";
 
@@ -220,7 +220,7 @@ export function cargaEnPieza(f: ModeloFisico, t: PlantillaCargas, id: string, la
     default:
       return `${id} no es un forjado, una viga, un pilar ni un muro.`;
   }
-  const nuevo = idNuevo(f, "Q");
+  const nuevo = idCarga(f, caso);
   const objeto = { ...c, id: nuevo, caso } as unknown as Objeto;
   return { operacion: { op: "crear", coleccion: "cargas", objeto }, etiqueta: `Carga ${nuevo} (${que}, ${caso})` };
 }

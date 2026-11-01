@@ -174,14 +174,15 @@ describe("lo transformado es lo que se escribiría en la tabla (criterio 1)", ()
   it("copiar una viga a otra planta lleva sus cargas, que apuntan a la copia", () => {
     const m: ModeloFisico = { ...portico(), plantas: [{ id: "N2", altura: null }, { id: "N1", altura: 3 }, { id: "N0", altura: 3 }] };
     const { modelo, nuevos } = transformado(m, ["V1"], { tipo: "mover", de: [0, 0], a: [0, 4.3] }, { copiar: true, plantas: ["N1", "N2"] });
-    expect(nuevos).toEqual(["V3", "V4", "Q1", "Q2"]);
+    // Las cargas nuevas, con el prefijo de su caso (UI-2)
+    expect(nuevos).toEqual(["V3", "V4", "Q-1", "Q-2"]);
     expect(modelo.vigas!.slice(2)).toEqual([
       { id: "V3", planta: "N1", puntos: [[0, 4.3], [6, 4.3]], seccion: "v30" },
       { id: "V4", planta: "N2", puntos: [[0, 4.3], [6, 4.3]], seccion: "v30" },
     ]);
     expect(modelo.cargas!.slice(4)).toEqual([
-      { tipo: "viga", id: "Q1", caso: "Q", viga: "V3", ejes: "global", q: [1.5, 0, -5], desde: 1.2, hasta: 4.3 },
-      { tipo: "viga", id: "Q2", caso: "Q", viga: "V4", ejes: "global", q: [1.5, 0, -5], desde: 1.2, hasta: 4.3 },
+      { tipo: "viga", id: "Q-1", caso: "Q", viga: "V3", ejes: "global", q: [1.5, 0, -5], desde: 1.2, hasta: 4.3 },
+      { tipo: "viga", id: "Q-2", caso: "Q", viga: "V4", ejes: "global", q: [1.5, 0, -5], desde: 1.2, hasta: 4.3 },
     ]);
   });
 
@@ -190,7 +191,7 @@ describe("lo transformado es lo que se escribiría en la tabla (criterio 1)", ()
     const t: Transformacion = { tipo: "mover", de: [1, 1], a: [1, 1] };
     const r = transformado(m, ["L1"], t, { copiar: true, plantas: ["N2"] });
     expect(r.modelo.losas!.at(-1)).toEqual({ ...m.losas![0], id: "L2", planta: "N2" });
-    expect(r.modelo.cargas!.at(-1)).toEqual({ ...m.cargas![2], id: "Q1", losa: "L2", planta: "N2" });
+    expect(r.modelo.cargas!.at(-1)).toEqual({ ...m.cargas![2], id: "Q-1", losa: "L2", planta: "N2" });
     expect(transformar(m, ["L1"], t, { copiar: true })).toEqual({ ok: false, mensaje: "El destino es el punto base: la copia caería encima de lo copiado." });
   });
 

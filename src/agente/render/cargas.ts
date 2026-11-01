@@ -41,7 +41,7 @@ import type { CargaFisica, ModeloFisico, Vec2 } from "../../compilador/fisico.ts
 import { intervalosRecta, PROFUNDIDAD_ALZADO, SENO_PARALELO, vistaAlzado, type OpcionesAlzado, type PlanoAlzado } from "./alzado.ts";
 import { ORDENADA_DIAGRAMA } from "./diagramas.ts";
 import { cajaDe, momento2D, R_MOMENTO, rotulo, type EntradaLeyenda, type Escena, type Estilo, type Primitiva } from "./escena.ts";
-import { ejeSeccion, giroTexto, porId, vector, type DatosVista } from "./modelo.ts";
+import { ejeSeccion, giroTexto, NOTA_VALOR_CARGA, porId, valorCarga, valorCargaVariable, valorPuntual, type DatosVista } from "./modelo.ts";
 import { flecha2D } from "./reacciones.ts";
 
 export type V3 = [number, number, number];
@@ -280,15 +280,15 @@ export function geometriaCargas(f: ModeloFisico, caso: string): { cargas: Geomet
 export function textoCarga(g: CargaFisica): string {
   switch (g.tipo) {
     case "superficie":
-      return `${g.id}: ${vector(g.q)} kN/m²`;
+      return `${g.id}: ${valorCarga(g.q, "kN/m²")}`;
     case "lineal":
-      return `${g.id}: ${vector(g.q)} kN/m`;
+      return `${g.id}: ${valorCarga(g.q, "kN/m")}`;
     case "puntual":
-      return `${g.id}: F ${vector(g.F ?? [0, 0, 0])} kN${g.M ? `, M ${vector(g.M)} kN·m` : ""}`;
+      return `${g.id}: ${valorPuntual(g.F, g.M)}`;
     case "viga":
     case "pilar":
     case "barra":
-      return `${g.id}: ${vector(g.q)}${g.qb ? ` a ${vector(g.qb)}` : ""} kN/m ${g.ejes}`;
+      return `${g.id}: ${valorCargaVariable(g.q, g.qb, "kN/m", { local: g.ejes === "local" })}`;
     case "empuje":
       return `${g.id}: empuje ${rotulo(g.p0)} a ${rotulo(g.p1)} kN/m²`;
   }
@@ -538,6 +538,7 @@ export function vistaAlzadoCargas(f: ModeloFisico, plano: PlanoAlzado, caso: str
   const notas = [
     ...(maxS > 0 || maxL > 0 ? [`Escalas: ${[maxS > 0 ? `${rotulo(maxS)} kN/m² = ${rotulo(m)} m` : "", maxL > 0 ? `${rotulo(maxL)} kN/m = ${rotulo(m)} m` : ""].filter(Boolean).join("; ")}. Las puntuales, de ${rotulo(m)} m.`] : []),
     `Se dibuja la componente de cada carga en el plano; lo normal a él, en el rótulo. Las cargas de superficie, donde su zona está a menos de ${rotulo(prof)} m del plano, con su componente Z.`,
+    NOTA_VALOR_CARGA,
     "Cada carga, como está en el modelo: el cálculo une a ε_snap sus zonas y polilíneas a lo que tienen cerca (C2-b).",
     ...(horizontales ? ["Las componentes horizontales de las cargas de superficie no se dibujan (van en el rótulo)."] : []),
     ...(paralelos.length ? ["El empuje de un muro paralelo al plano es normal a él: sólo se rotula."] : []),

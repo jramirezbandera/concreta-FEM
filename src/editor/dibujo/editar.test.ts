@@ -157,8 +157,8 @@ describe("Copiar", () => {
 describe("Girar y Simetría", () => {
   it("girar 90° con los grados escritos; con un clic, el ángulo desde +X", () => {
     const p = reticula();
-    const r = editar(p, "girar", [clic(p, [0, 0]), { tipo: "fijar", valor: 90, cursor: null }], ["V1", "Q1"]);
-    expect(r.etiquetas).toEqual(["Girar V1 y Q1 90°"]);
+    const r = editar(p, "girar", [clic(p, [0, 0]), { tipo: "fijar", valor: 90, cursor: null }], ["V1", "G-1"]);
+    expect(r.etiquetas).toEqual(["Girar V1 y G-1 90°"]);
     expect(r.proyecto.modelo.vigas![0]!.puntos).toEqual([[0, 0], [0, 5]]);
     expect(r.proyecto.modelo.cargas![0]).toMatchObject({ x: -3, y: 2.5 });
     expect(anguloGiro([0, 0], [0, -2])).toBe(-90);
@@ -170,14 +170,14 @@ describe("Girar y Simetría", () => {
   it("simetría por un eje: mueve; con «conservar», copia", () => {
     const p = reticula();
     const eje = [tecleado("5; 0", null), tecleado("5; 6,3", null)];
-    const m = editar(p, "simetria", eje, ["Q1"]);
+    const m = editar(p, "simetria", eje, ["G-1"]);
     expect(m.proyecto.modelo.cargas![0]).toMatchObject({ x: 7.5, y: 3 });
     expect(m.proyecto.modelo.cargas!.length).toBe(1);
-    const c = editar(p, "simetria", eje, ["Q1"], { ...PLANTILLAS, editar: { conservar: true } });
-    expect(c.etiquetas).toEqual(["Simetría de Q1 (con lo original)"]);
+    const c = editar(p, "simetria", eje, ["G-1"], { ...PLANTILLAS, editar: { conservar: true } });
+    expect(c.etiquetas).toEqual(["Simetría de G-1 (con lo original)"]);
     expect(c.proyecto.modelo.cargas!.map((x) => [x.id, (x as { x: number }).x])).toEqual([
-      ["Q1", 2.5],
-      ["Q2", 7.5],
+      ["G-1", 2.5],
+      ["G-2", 7.5],
     ]);
   });
 });
@@ -185,8 +185,8 @@ describe("Girar y Simetría", () => {
 describe("el borrador y la barra", () => {
   it("lo elegido transformado con el cursor, la línea del punto base y el desplazamiento", () => {
     const p = reticula();
-    const ctx: ContextoHerramienta = { modelo: p.modelo, planta: "N1", indice: indiceEnganches(p.modelo, "N1"), plantillas: PLANTILLAS, elegidos: ["V1", "Q1"] };
-    const e: EstadoHerramienta = { puntos: [{ p: [0, 0] }], elegidos: ["V1", "Q1"] };
+    const ctx: ContextoHerramienta = { modelo: p.modelo, planta: "N1", indice: indiceEnganches(p.modelo, "N1"), plantillas: PLANTILLAS, elegidos: ["V1", "G-1"] };
+    const e: EstadoHerramienta = { puntos: [{ p: [0, 0] }], elegidos: ["V1", "G-1"] };
     const b = borrador("mover", e, [1, 2], ctx);
     expect(b.lineas).toContainEqual([[0, 0], [1, 2]]);
     expect(b.puntos).toEqual([[3.5, 5]]);

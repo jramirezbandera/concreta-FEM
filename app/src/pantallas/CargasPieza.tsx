@@ -11,6 +11,7 @@
 import { Pencil, Plus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CargaFisica, ModeloFisico } from "../../../src/compilador/fisico.ts";
+import { componentes, valorCarga, valorCargaVariable } from "../../../src/agente/render/modelo.ts";
 import { cargaEnPieza, cargasPieza, resumenCaso, type CargasPieza as Datos, type TipoPieza } from "../../../src/editor/cargasPieza.ts";
 import type { Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
 import type { Operacion } from "../../../src/editor/operaciones.ts";
@@ -25,11 +26,11 @@ const ICONO: Record<TipoPieza, typeof IcForjado> = { losa: IcForjado, pano: IcFo
 const NOMBRE: Record<TipoPieza, string> = { losa: "Forjado", pano: "Forjado", viga: "Viga", pilar: "Pilar", muro: "Muro" };
 const NOMBRE_CARGA: Record<CargaFisica["tipo"], string> = { superficie: "Superficie", lineal: "Lineal", puntual: "Puntual", viga: "En viga", pilar: "En pilar", barra: "En barra", empuje: "Empuje" };
 
-/** Un vector de carga en texto: hacia abajo, un número (positivo hacia abajo); si no, sus componentes. */
-function valor(v: Vec3 | undefined, unidad: string): string {
-  if (!v) return "—";
-  if (v[0] === 0 && v[1] === 0) return `${fmt(-v[2], 2)} ${unidad}`;
-  return `(${v.map((x) => fmt(x, 2)).join("; ")}) ${unidad}`;
+const num = (x: number) => fmt(x, 2);
+
+/** Un vector de carga en texto, como en el dibujo (UI-2): «↓ 2,00 kN/m²» o sus componentes con su nombre y su signo. */
+function valor(v: Vec3 | undefined, unidad: string, local = false): string {
+  return v ? valorCarga(v, unidad, { local, num }) : "—";
 }
 
 /** Lo que es una carga, en una línea. */
@@ -41,23 +42,23 @@ function textoCarga(c: CargaFisica, parte: boolean): string {
     case "lineal":
       return `${valor(c.q, "kN/m")}${de}`;
     case "puntual":
-      return [c.F && valor(c.F, "kN"), c.M && `M (${c.M.map((x) => fmt(x, 2)).join("; ")}) kN·m`].filter(Boolean).join(" · ");
+      return [c.F && valor(c.F, "kN"), c.M && componentes(c.M, ["Mx", "My", "Mz"], "kN·m", num)].filter(Boolean).join(" · ");
     case "viga":
     case "pilar":
     case "barra": {
-      const q = c.qb ? `${valor(c.q, "")}→ ${valor(c.qb, "kN/m")}` : valor(c.q, "kN/m");
+      const q = valorCargaVariable(c.q, c.qb, "kN/m", { local: c.ejes === "local", num });
       const tramo = c.desde !== undefined || c.hasta !== undefined ? ` · de ${fmt(c.desde ?? 0, 2)} a ${c.hasta === undefined ? "el final" : `${fmt(c.hasta, 2)} m`}` : "";
-      return `${q}${c.ejes === "local" ? " · locales" : ""}${tramo}`;
+      return `${q}${tramo}`;
     }
     case "empuje":
       return `${fmt(c.p0, 1)} → ${fmt(c.p1, 1)} kN/m² · de ${fmt(c.z0, 2)} a ${fmt(c.z1, 2)} m · lado ${c.lado}`;
   }
 }
 
-/** La resultante en texto: la vertical hacia abajo y, si la hay, la horizontal. */
+/** La resultante en texto: la vertical con su flecha (UI-2) y, si la hay, la horizontal. */
 function resultante(F: readonly number[]): string {
   const h = Math.hypot(F[0]!, F[1]!);
-  const v = fmt(-F[2]!, 1);
+  const v = F[2] === 0 ? "0" : `${F[2]! < 0 ? "↓" : "↑"} ${fmt(Math.abs(F[2]!), 1)}`;
   return h > 1e-9 ? `${v} · H ${fmt(h, 1)}` : v;
 }
 

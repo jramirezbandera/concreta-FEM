@@ -27,6 +27,7 @@
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { CargaFisica, ModeloFisico } from "../compilador/fisico.ts";
 import { geometriaCargas, presionEn, textoCarga, type ClaseCarga, type V3 } from "../agente/render/cargas.ts";
+import { NOTA_VALOR_CARGA } from "../agente/render/modelo.ts";
 import { ORDENADA_DIAGRAMA } from "../agente/render/diagramas.ts";
 import { rotulo, type EntradaLeyenda } from "../agente/render/escena.ts";
 import { descomponer } from "./solido.ts";
@@ -327,6 +328,7 @@ export function cargas3D(f: ModeloFisico, origen: [number, number, number], caso
   const notas = [
     ...(maxS > 0 || maxL > 0 ? [`Escalas: ${[maxS > 0 ? `${rotulo(maxS)} kN/m² = ${rotulo(m)} m` : "", maxL > 0 ? `${rotulo(maxL)} kN/m = ${rotulo(m)} m` : ""].filter(Boolean).join("; ")}. Las puntuales, de ${rotulo(m)} m. Cada flecha, con la punta en la pieza y en el sentido de la carga.`] : []),
     "Se rotulan las cargas de la planta resaltada y las elegidas. El momento de una puntual, una flecha de doble punta que sale del punto, por la regla de la mano derecha.",
+    NOTA_VALOR_CARGA,
     "Cada carga, como está en el modelo: el cálculo une a ε_snap sus zonas y polilíneas a lo que tienen cerca (C2-b).",
     ...(!c ? [`El caso «${caso}» no existe.`] : c.pesoPropio ? ["Este caso lleva además el peso propio de la estructura, que calcula el programa y no se dibuja."] : []),
     ...(objetos.length ? [] : ["El caso no tiene cargas."]),

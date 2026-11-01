@@ -19,7 +19,7 @@ import type { CargaFisica, Vec2 } from "../../compilador/fisico.ts";
 import type { Vec3 } from "../../motor/modelo.ts";
 import type { Operacion } from "../operaciones.ts";
 import type { Objeto } from "../referencias.ts";
-import { idNuevo } from "../tablas.ts";
+import { idCarga } from "../tablas.ts";
 import { ESTADO_INICIAL, igual, type Borrador, type ContextoHerramienta, type EstadoHerramienta, type Evento, type Paso, type Plantillas } from "./herramientas.ts";
 import { borradorPolilinea, desplazar, distBorde, estacion, forjadoEn, muroEn, pasoPolilinea } from "./piezas.ts";
 import { puntoEnPoligono } from "./recuadros.ts";
@@ -45,7 +45,7 @@ const noNulo = (v: Vec3 | undefined): v is Vec3 => !!v && v.some((x) => x !== 0)
 function carga(ctx: ContextoHerramienta, c: Record<string, unknown> & { tipo: CargaFisica["tipo"] }, que: string): Paso | string {
   const caso = ctx.plantillas.cargas?.caso;
   if (!caso || !ctx.modelo.casos.some((x) => x.id === caso)) return "Elija el caso activo en la barra (o cree uno con Casos).";
-  const id = idNuevo(ctx.modelo, "Q");
+  const id = idCarga(ctx.modelo, caso);
   const objeto = { ...c, id, caso } as unknown as Objeto;
   const op: Operacion = { op: "crear", coleccion: "cargas", objeto };
   return { estado: ESTADO_INICIAL, hecho: { operacion: op, etiqueta: `Carga ${id} (${que}, ${caso})` } };

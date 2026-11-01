@@ -326,7 +326,8 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
         { id: "V2", planta: "N1", puntos: [[0, 5], [6, 5]], seccion: "V30x50" },
       ],
       losas: [{ id: "L1", planta: "N1", contorno: [[0, 0], [6, 0], [6, 5], [0, 5]], espesor: 0.2, material: "HA-30" }],
-      cargas: [{ tipo: "superficie", id: "Q1", caso: "Q", planta: "N1", q: [0, 0, -2], losa: "L1" }],
+      // La carga nueva, con el prefijo de su caso (UI-2)
+      cargas: [{ tipo: "superficie", id: "Q-1", caso: "Q", planta: "N1", q: [0, 0, -2], losa: "L1" }],
     };
     const h = huella(esperado);
     await waitFor(() => expect(container.querySelector("[data-huella]")?.getAttribute("data-huella")).toBe(h), { timeout: 30_000 });
@@ -383,7 +384,7 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
     fireEvent.click(within(objetos()).getByRole("button", { name: /^Forjados/ }));
     fireEvent.click(within(objetos()).getByRole("button", { name: /^L1/ }));
     fireEvent.keyDown(window, { key: "Delete" });
-    expect(screen.getByRole("dialog", { name: "Borrar L1" }).textContent).toMatch(/Q1/);
+    expect(screen.getByRole("dialog", { name: "Borrar L1" }).textContent).toMatch(/Q-1/);
   }, 120_000);
 
   it("V2b: un paño con su carga y un muro con un hueco y su empuje, tecleados, dan la huella del mismo modelo escrito a mano", async () => {
@@ -438,8 +439,8 @@ describe("meter un modelo en las tablas (criterio 3)", () => {
       panos: [{ id: "F1", planta: "N1", contorno: [[0, 0], [6, 0], [6, 5], [0, 5]], direccion: 90, intereje: 0.7, seccion: "T25", pp: 3.5 }],
       muros: [{ id: "M1", puntos: [[10, 0], [10, 5]], desde: "Cim", hasta: "N1", espesor: 0.25, material: "HA-30", huecos: [{ desde: 1, hasta: 2, z0: 0.5, z1: 1.5 }] }],
       cargas: [
-        { tipo: "superficie", id: "Q1", caso: "Q", planta: "N1", q: [0, 0, -2], pano: "F1" },
-        { tipo: "empuje", id: "Q2", caso: "G", muro: "M1", lado: "derecho", z0: 0, z1: 1.5, p0: 15, p1: 0 },
+        { tipo: "superficie", id: "Q-1", caso: "Q", planta: "N1", q: [0, 0, -2], pano: "F1" },
+        { tipo: "empuje", id: "G-1", caso: "G", muro: "M1", lado: "derecho", z0: 0, z1: 1.5, p0: 15, p1: 0 },
       ],
     };
     const h = huella(esperado);

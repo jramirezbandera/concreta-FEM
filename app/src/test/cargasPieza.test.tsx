@@ -54,7 +54,8 @@ describe("Propiedades en Cargas", () => {
     const g = d.casos.find((c) => c.caso === "G")!;
     // El caso activo, marcado
     expect(screen.getByText("● Q", { selector: "h2 span" })).toBeTruthy();
-    expect(screen.getByText(`${fmt(-(g.F[2] - d.pesoPropio!.total!), 1)} kN`)).toBeTruthy();
+    // La vertical, con su flecha (UI-2)
+    expect(screen.getByText(`↓ ${fmt(-(g.F[2] - d.pesoPropio!.total!), 1)} kN`)).toBeTruthy();
     expect(screen.getByText(/Peso propio/)).toBeTruthy();
   });
 
