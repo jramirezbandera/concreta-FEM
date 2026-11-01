@@ -25,6 +25,11 @@
  * modelo aunque la plantilla quede más cerca (un DXF denso tapaba los extremos de una viga), y lo
  * enganchado de la plantilla sale redondeado (V2c4-c). Cada fuente se puede apagar (`fuentes`).
  *
+ * BN3: el índice de un alzado (`alzado.ts`) va en (u, z), y cada rasgo lleva su punto del modelo (su
+ * planta y su (x, y), `PuntoModelo`), que `enganchar` devuelve con el enganche: el de un rasgo de
+ * punto, bit a bit; el de un punto de una recta, interpolado entre los de sus extremos y redondeado a
+ * 1e-9 m. En planta, ningún rasgo lo lleva.
+ *
  * Puro: sin IO, sin React ni DOM.
  */
 import { direccionEjes, ejesDe } from "../../compilador/ejes.ts";
@@ -65,16 +70,35 @@ export const RADIO_ENGANCHE = 10;
 
 export type TipoObjeto = "pilar" | "viga" | "muro" | "apoyoLineal" | "losa" | "pano" | "eje";
 
-interface PuntoRasgo {
+/** BN3: el punto del modelo de un rasgo de un alzado: la planta de su nivel y su (x, y). */
+export interface PuntoModelo {
+  planta: string;
+  p: Vec2;
+}
+
+export interface PuntoRasgo {
   p: Vec2;
   tipo: TipoEnganche;
   objeto: string;
+  /** BN3, en un alzado. */
+  modelo?: PuntoModelo;
 }
 
-interface Recta {
+export interface Recta {
   a: Vec2;
   b: Vec2;
   objeto: string;
+  /** BN3, en un alzado: la planta de la recta (un nivel) y los (x, y) de a y b. */
+  modelo?: { planta: string; a: Vec2; b: Vec2 };
+}
+
+/** Lo que tiene un índice de alzado (BN3, `alzado.ts`) para volver de (u, z) al modelo. */
+export interface DatosAlzado {
+  /** El plano en planta: u a lo largo de `dir` desde `desde`. */
+  desde: Vec2;
+  dir: Vec2;
+  /** Los niveles de las plantas, de arriba abajo. */
+  niveles: readonly { planta: string; z: number }[];
 }
 
 /** Lo que se resalta de un objeto al pasar el ratón: sus contornos (cerrados) y sus líneas (abiertas). */
@@ -103,6 +127,8 @@ export interface IndiceEnganches {
   siluetas: (Silueta & { distancia: (q: Vec2, radio: number) => number })[];
   /** V2c-4: las plantillas DXF de la planta (las que se ven). */
   plantilla?: IndicePlantilla | null;
+  /** BN3: el índice es de un alzado, en (u, z). */
+  alzado?: DatosAlzado;
 }
 
 // ─── Geometría ──────────────────────────────────────────────────────────────────────────────────
@@ -319,6 +345,22 @@ export interface Enganche {
   objeto: string;
   /** V2c-4: el nombre de la plantilla DXF del rasgo (y `p` está redondeado). */
   plantilla?: string;
+  /** BN3: en un alzado, el punto del modelo. */
+  modelo?: PuntoModelo;
+}
+
+/** Redondea a 1e-9 m (sin −0). */
+export const redondeo9 = (v: number) => Math.round(v * 1e9) / 1e9 + 0;
+
+/**
+ * El punto del modelo del parámetro t de una recta de alzado: un extremo, tal cual; dentro, la
+ * coordenada que no cambia a lo largo de la recta, tal cual, y la otra, redondeada a 1e-9 m.
+ */
+export function modeloEnRecta(m: NonNullable<Recta["modelo"]>, t: number): PuntoModelo {
+  if (t <= 0) return { planta: m.planta, p: m.a };
+  if (t >= 1) return { planta: m.planta, p: m.b };
+  const c = (i: 0 | 1) => (m.a[i] === m.b[i] ? m.a[i] : redondeo9(m.a[i] + t * (m.b[i] - m.a[i])));
+  return { planta: m.planta, p: [c(0), c(1)] };
 }
 
 /** Segmentos de la plantilla cerca del cursor como mucho para buscar sus cruces. */
@@ -337,18 +379,20 @@ export interface OpcionesEnganche {
 export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: OpcionesEnganche = {}): Enganche | null {
   const activo = (t: TipoEnganche) => !o.activos || o.activos.has(t);
   const conModelo = !o.fuentes || o.fuentes.has("modelo");
-  let mejor: (Enganche & { d: number; n: number; pl: number }) | null = null;
-  /** `pl`: la plantilla del rasgo, o −1 si es del modelo. */
-  const proponer = (p: Vec2, tipo: TipoEnganche, objeto: string, pl = -1) => {
+  let mejor: (Enganche & { d: number; n: number; pl: number; enRecta?: { m: NonNullable<Recta["modelo"]>; t: number } }) | null = null;
+  /** `pl`: la plantilla del rasgo, o −1 si es del modelo. BN3: `modelo`, el punto del modelo de un rasgo de alzado; `enRecta`, el de un punto de una recta. */
+  const proponer = (p: Vec2, tipo: TipoEnganche, objeto: string, pl = -1, modelo?: PuntoModelo, enRecta?: { m: NonNullable<Recta["modelo"]>; t: number }) => {
     if (!activo(tipo)) return;
     const d = dist(p, q);
     if (d > radio) return;
     const n = NIVEL[tipo];
     // A igual nivel, el modelo gana a la plantilla; entre los de la misma fuente, el más cercano
     const gana = !mejor || n < mejor.n || (n === mejor.n && (pl < 0 !== mejor.pl < 0 ? pl < 0 : d < mejor.d));
-    if (gana) mejor = { p, tipo, objeto, d, n, pl };
+    if (gana) mejor = { p, tipo, objeto, d, n, pl, ...(modelo ? { modelo } : {}), ...(enRecta ? { enRecta } : {}) };
   };
-  if (conModelo) for (const x of ix.puntos) proponer(x.p, x.tipo, x.objeto);
+  /** Un punto de la recta r (su proyección): con el punto del modelo, si es de un alzado. */
+  const enR = (r: Recta, k: { p: Vec2; t: number }, tipo: TipoEnganche) => proponer(k.p, tipo, r.objeto, -1, undefined, r.modelo ? { m: r.modelo, t: k.t } : undefined);
+  if (conModelo) for (const x of ix.puntos) proponer(x.p, x.tipo, x.objeto, -1, x.modelo);
   // La plantilla: sus puntos, y lo que hay cerca del cursor para lo demás
   const t = !o.fuentes || o.fuentes.has("plantilla") ? ix.plantilla : null;
   const junto = t ? cerca(t, q, radio) : null;
@@ -394,10 +438,10 @@ export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: Opcion
   const u = o.ultimo;
   if (conModelo && u && puede("perpendicular"))
     for (const r of ix.rectas) {
-      const { p, t } = proyectar(u, r.a, r.b);
-      if (t > 0 && t < 1 && dist(p, u) > 0) proponer(p, "perpendicular", r.objeto);
+      const k = proyectar(u, r.a, r.b);
+      if (k.t > 0 && k.t < 1 && dist(k.p, u) > 0) enR(r, k, "perpendicular");
     }
-  if (conModelo && puede("cercano")) for (const r of ix.rectas) proponer(proyectar(q, r.a, r.b).p, "cercano", r.objeto);
+  if (conModelo && puede("cercano")) for (const r of ix.rectas) enR(r, proyectar(q, r.a, r.b), "cercano");
   if (t && junto) {
     if (u && puede("perpendicular"))
       for (const s of junto.segmentos) {
@@ -413,8 +457,11 @@ export function enganchar(ix: IndiceEnganches, q: Vec2, radio: number, o: Opcion
       }
   }
   if (!mejor) return null;
-  const m = mejor as Enganche & { pl: number };
-  if (m.pl < 0) return { p: m.p, tipo: m.tipo, objeto: m.objeto };
+  const m = mejor as Enganche & { pl: number; enRecta?: { m: NonNullable<Recta["modelo"]>; t: number } };
+  if (m.pl < 0) {
+    const modelo = m.modelo ?? (m.enRecta ? modeloEnRecta(m.enRecta.m, m.enRecta.t) : undefined);
+    return { p: m.p, tipo: m.tipo, objeto: m.objeto, ...(modelo ? { modelo } : {}) };
+  }
   const pl = t!.plantillas[m.pl]!;
   return { p: redondear(m.p, pl.redondeo), tipo: m.tipo, objeto: "", plantilla: pl.nombre };
 }

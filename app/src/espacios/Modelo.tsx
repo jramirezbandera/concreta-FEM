@@ -4,7 +4,8 @@
  *
  * - Barra: en Modelo, las herramientas de dibujo (V2c-1 y V2c-2, `docs/fem3d/dibujo.md`: Ejes, Pilar,
  *   Viga, Forjado, Hueco, Muro, Apoyo y Apoyo lineal se dibujan en la planta, con su plantilla en
- *   Propiedades; `dibujo/controlador.ts`; Forjado y Hueco, con sus zunchos), Ábacos, las de editar con el ratón (V2c-3:
+ *   Propiedades; `dibujo/controlador.ts`; Forjado y Hueco, con sus zunchos; Barra, de BN3, en un
+ *   alzado o en planta, `docs/fem3d/barras.md` §6), Ábacos, las de editar con el ratón (V2c-3:
  *   Mover, Copiar, Girar y Simetría, sobre lo elegido), A plantas (copiar a otras plantas) y Borrar
  *   (lo elegido o, sin nada que les sirva, lo que se elija después), las tablas de datos y Planta o
  *   3D; en Cargas, el caso activo, Casos, las herramientas de las cargas (Puntual, Lineal, Superficie,
@@ -378,6 +379,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcPilar} nombre="Pilar" activa={foto.herramienta === "pilar"} onClick={() => elegirHerramienta("pilar")} title="Dibujar pilares: un clic en su punto fijo, o una ventana para uno en cada cruce de ejes. Esc vuelve a Elegir" />
           <Herramienta icono={IcMuro} nombre="Muro" activa={foto.herramienta === "muro"} onClick={() => elegirHerramienta("muro")} title="Dibujar muros: clic a clic; doble clic o Intro termina, un clic en el primero lo cierra. Esc vuelve a Elegir" />
           <Herramienta icono={IcViga} nombre="Viga" activa={foto.herramienta === "viga"} onClick={() => elegirHerramienta("viga")} title="Dibujar vigas: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
+          <Herramienta icono={IcBarra} nombre="Barra" activa={foto.herramienta === "barraNiveles"} onClick={() => elegirHerramienta("barraNiveles")} title="Dibujar barras entre dos niveles (diagonales, tornapuntas): dos clics en un alzado, en los nudos de los pilares o en las líneas de nivel, o en planta (la planta del fin, en Propiedades). Esc vuelve a Elegir" />
           <Separador />
           <Herramienta icono={IcLosa} nombre="Forjado" activa={foto.herramienta === "forjado"} onClick={() => elegirHerramienta("forjado")} title="Dibujar forjados (maciza, reticular o unidireccional, en Propiedades): un clic dentro de un recuadro cerrado, o un polígono. Esc vuelve a Elegir" />
           <Herramienta icono={IcHueco} nombre="Hueco" activa={foto.herramienta === "hueco"} onClick={() => elegirHerramienta("hueco")} title="Dibujar huecos: en un forjado, un rectángulo o un polígono; en un muro, dos clics por su eje. Esc vuelve a Elegir" />
@@ -423,6 +425,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         },
         plantilla: (pl) => !!listaDxf?.some((t) => t.plantas.includes(pl)),
         ...(ed ? { enganches: () => <BarraEnganches ctrl={ctrl} /> } : {}),
+        // BN3: en Modelo, el alzado también dibuja (con Barra)
+        ...(ed && !cargas ? { alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v) } : null} dibujo={v.eje ? ctrl.adaptadorAlzado(v.eje, planoAlzado(v.eje, v).profundidad) : null} dibujando={dibujando} /> } : {}),
         ...(cargas && casoValido
           ? {
               alzado: (v: EstadoVista) => <FuenteEscena fuente={v.eje ? { tipo: "alzado", plano: planoAlzado(v.eje, v), cargas: { caso: casoValido, escala: Number(escala) } } : null} />,
@@ -483,7 +487,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
             {dibujando && (
               <span className="chip aviso-herr" data-acento="true" role="status">
                 {foto.ayuda}
-                {!foto.error && !foto.campo && !foto.ayuda.includes("x; y") && !(esEditar(foto.herramienta) && !foto.transformando) && <span className="text-text-tertiary"> O teclee las coordenadas.</span>}
+                {!foto.error && !foto.campo && !/x; y|u; z/.test(foto.ayuda) && !(esEditar(foto.herramienta) && !foto.transformando) && <span className="text-text-tertiary"> O teclee las coordenadas.</span>}
                 {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
                 {!foto.error && foto.aviso && <span className="text-state-warn"> {foto.aviso}</span>}
               </span>

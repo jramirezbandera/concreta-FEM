@@ -23,7 +23,8 @@ import { TEXTO_BOVEDILLA, TEXTO_CASETON, TIPOS_FORJADO, type NombreTabla, type T
 import { LONGITUD_MAXIMA } from "../../../src/editor/celdas.ts";
 import { esEditar, type NombreEditar, type PlantillaEditar } from "../../../src/editor/dibujo/editar.ts";
 import { esPlantillaDxf, type NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
-import { IcApoyo, IcApoyoLineal, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { seccionBarra, type PlantillaBarra } from "../../../src/editor/dibujo/barra.ts";
+import { IcApoyo, IcApoyoLineal, IcBarra, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
 import { abrirGestor, EDITAR, esDelGestor, NUEVA, OpcionesGestor } from "../editor/referencia.tsx";
@@ -43,6 +44,7 @@ const TITULO: Record<Herramienta, string> = {
   ejes: "Ejes",
   pilar: "Pilar",
   viga: "Viga",
+  barraNiveles: "Barra",
   forjado: "Forjado",
   hueco: "Hueco",
   muro: "Muro",
@@ -54,11 +56,12 @@ const TITULO: Record<Herramienta, string> = {
   barra: "Carga en barra",
   empuje: "Empuje",
 };
-const ICONO = { ejes: IcEjes, pilar: IcPilar, viga: IcViga, forjado: IcLosa, hueco: IcHueco, muro: IcMuro, apoyo: IcApoyo, apoyoLineal: IcApoyoLineal, puntual: IcPuntual, lineal: IcLineal, superficie: IcSuperficie, barra: IcEnBarra, empuje: IcEmpuje } as const;
+const ICONO = { ejes: IcEjes, pilar: IcPilar, viga: IcViga, barraNiveles: IcBarra, forjado: IcLosa, hueco: IcHueco, muro: IcMuro, apoyo: IcApoyo, apoyoLineal: IcApoyoLineal, puntual: IcPuntual, lineal: IcLineal, superficie: IcSuperficie, barra: IcEnBarra, empuje: IcEmpuje } as const;
 const TABLA: Record<Herramienta, NombreTabla> = {
   ejes: "ejes",
   pilar: "pilares",
   viga: "vigas",
+  barraNiveles: "barras",
   forjado: "forjados",
   hueco: "forjados",
   muro: "muros",
@@ -126,6 +129,7 @@ export function plantillasEfectivas(m: ModeloFisico | null, t: Plantillas, caso?
     ...t,
     pilar: { ...t.pilar, seccion: valida(t.pilar.seccion) ?? seccionPorDefecto(m, "pilares") },
     viga: { ...t.viga, seccion: valida(t.viga.seccion) ?? seccionPorDefecto(m, "vigas") },
+    barraNiveles: { ...t.barraNiveles, seccion: valida(t.barraNiveles?.seccion) ?? seccionBarra(m), fin: t.barraNiveles?.fin && m.plantas.some((x) => x.id === t.barraNiveles!.fin) ? t.barraNiveles.fin : undefined },
     forjado: forjadoEfectivo(m, t.forjado ?? {}),
     hueco: { ...t.hueco, z0: t.hueco?.z0 ?? HUECO_MURO.z0, z1: t.hueco?.z1 ?? HUECO_MURO.z1 },
     muro: { ...t.muro, espesor: t.muro?.espesor ?? muro?.espesor ?? 0.25, material: materialMuro },
@@ -277,6 +281,8 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
         </Seccion>
       )}
 
+      {h === "barraNiveles" && <PlantillaBarraPanel modelo={m} t={t.barraNiveles ?? {}} opcionesPlantas={opcionesPlantas} editar={editar} poner={(c) => setPlantillas({ ...t, barraNiveles: { ...t.barraNiveles, ...c } })} />}
+
       {h === "ejes" && (
         <Seccion titulo="Ejes de replanteo" valor={m.ejes?.length ? `${m.ejes.length}` : undefined}>
           <p className="nota">Dos clics por eje. Sin ejes en el proyecto, los que se ven salen de las alineaciones de los pilares: «Proponer ejes» los guarda.</p>
@@ -370,6 +376,42 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
 
 const EDITAR_TITULO: Record<NombreEditar, string> = { mover: "Mover", copiar: "Copiar", girar: "Girar", simetria: "Simetría" };
 const EDITAR_ICONO: Record<NombreEditar, Icono> = { mover: IcMover, copiar: IcCopiar, girar: IcGirar, simetria: IcSimetria };
+
+/** BN3: la plantilla de Barra: sección, giro, uniones, «sólo tracción» y la planta del fin en planta. */
+function PlantillaBarraPanel({ modelo: m, t, opcionesPlantas, editar, poner }: { modelo: ModeloFisico; t: PlantillaBarra; opcionesPlantas: ReactNode; editar: Props["editar"]; poner: (c: PlantillaBarra) => void }) {
+  return (
+    <Seccion titulo="Plantilla" valor="para las siguientes">
+      <div className="py-1">
+        <CampoSeccion modelo={m} valor={t.seccion} tipo="B" editar={editar} onCambio={(s) => poner({ seccion: s })} />
+        <NumeroCampo etiqueta="giro" unidad="°" valor={t.giro} onCambio={(g) => poner({ giro: g })} ayuda="De la sección alrededor de su eje; con 0, el canto h en el plano vertical de la barra (en una vertical, según +X)." />
+        <Segmentado
+          etiqueta="uniones"
+          valor={t.articulada ? "articuladas" : "empotradas"}
+          opciones={[
+            ["empotradas", "Empotradas"],
+            ["articuladas", "Articuladas"],
+          ]}
+          onCambio={(v) => poner({ articulada: v === "articuladas" })}
+          ayuda={t.articulada ? "Como una diagonal de arriostramiento: los giros de flexión, libres en los dos extremos, y la torsión, en el fin." : "Unida a lo que llega en sus dos extremos sin liberar nada."}
+        />
+        <label className="chk">
+          <input type="checkbox" checked={!!t.soloTraccion} onChange={(x) => poner({ soloTraccion: x.target.checked || undefined })} />
+          <span>Sólo tracción</span>
+        </label>
+        {t.soloTraccion && <p className="nota">Una diagonal esbelta: se calcula lineal y se avisa si queda comprimida en alguna combinación.</p>}
+        <label className="campo">
+          <span>planta del fin</span>
+          <select className="sel" value={t.fin ?? ""} aria-label="Planta del fin" onChange={(x) => poner({ fin: x.target.value || undefined })}>
+            <option value="">la de la vista del segundo clic</option>
+            {opcionesPlantas}
+          </select>
+          <p>En planta: el primer clic va en la de la vista; el segundo, en ésta. En un alzado, cada extremo va en el nivel en que se hace clic.</p>
+        </label>
+      </div>
+      <p className="nota">En un alzado, dos clics en los niveles de las plantas: los nudos de los pilares, los puntos de las vigas y los muros, los cruces con los ejes o la línea de nivel. El primer extremo se ve en todas las vistas, y el segundo puede ir en otra.</p>
+    </Seccion>
+  );
+}
 
 /** V2c-3: Mover, Copiar, Girar y Simetría: lo elegido, las vigas de los pilares, conservar lo original y las plantas de las copias. */
 function PlantillaEditarPanel({ h, foto, ctrl, modelo: m, planta, t, poner }: { h: NombreEditar; foto: Instantanea; ctrl: ControladorDibujo; modelo: ModeloFisico; planta: string | null; t: PlantillaEditar; poner: (c: PlantillaEditar) => void }) {
@@ -496,15 +538,16 @@ export function NumeroCampo({ etiqueta, unidad, valor, onCambio, ayuda, falta, c
  * secciones en el proyecto, sólo crearla. Crear una sección es un paso de deshacer; la plantilla no
  * es del modelo, así que elegirla no lo es.
  */
-function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio, etiqueta = "sección" }: { modelo: ModeloFisico; valor: string | undefined; tipo: "P" | "V" | "vigueta"; editar: Props["editar"]; onCambio: (s: string) => void; etiqueta?: string }) {
+function CampoSeccion({ modelo: m, valor, tipo, editar, onCambio, etiqueta = "sección" }: { modelo: ModeloFisico; valor: string | undefined; tipo: "P" | "V" | "B" | "vigueta"; editar: Props["editar"]; onCambio: (s: string) => void; etiqueta?: string }) {
   const ninguna = !m.secciones.length;
-  const uso: UsoSeccion = tipo === "P" ? "pilar" : tipo === "V" ? "viga" : "vigueta";
+  // Una barra (BN): lo habitual es un perfil de acero, como en la tabla Barras
+  const uso: UsoSeccion | null = tipo === "P" ? "pilar" : tipo === "V" ? "viga" : tipo === "B" ? null : "vigueta";
   const abrir = (eleccion: string) =>
     abrirGestor({
       coleccion: "secciones",
       ...(eleccion === EDITAR && valor ? { id: valor } : { nueva: true }),
-      uso,
-      para: `la plantilla de ${tipo === "P" ? "Pilar" : tipo === "V" ? "Viga" : "Forjado"}`,
+      ...(uso ? { uso } : { familia: "acero" as const }),
+      para: `la plantilla de ${tipo === "P" ? "Pilar" : tipo === "V" ? "Viga" : tipo === "B" ? "Barra" : "Forjado"}`,
       alElegir: (id, crear) => {
         if (crear.length) {
           const e = editar(comoUna(crear), `Sección ${id}`);
@@ -944,7 +987,9 @@ function SelectorPuntoFijo({ seccion, giro, valor, onCambio }: { seccion: Seccio
  * Lo que se puede escribir en el campo de teclado con cada herramienta, como la línea de órdenes de
  * AutoCAD: [lo que se escribe, lo que es]. Con una cota, el campo pide sólo su distancia.
  */
-function formasTeclado(h: Instantanea["herramienta"], asa: boolean): (readonly [string, string])[] {
+function formasTeclado(h: Instantanea["herramienta"], asa: boolean, alzado: boolean): (readonly [string, string])[] {
+  // BN3: en un alzado, a lo largo del plano y la cota (la de una planta)
+  if (alzado) return [["u; z", "a lo largo del plano y la cota de una planta, m"], ["@du; dz", "desde el primer extremo"], ["@L<α", "longitud y ángulo, desde la horizontal"]];
   const abs = ["x; y", "coordenadas absolutas, m"] as const;
   if (asa) return [abs, ["@dx; dy", "desde donde estaba el vértice"]];
   if (h === "girar") return [["α", "el ángulo en grados, desde +X"], abs];
@@ -958,13 +1003,13 @@ function formasTeclado(h: Instantanea["herramienta"], asa: boolean): (readonly [
 export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: NonNullable<Instantanea["campo"]> }) {
   const [texto, setTexto] = useState(campo.texto);
   const foto = ctrl.instantanea();
-  const formas = campo.cota && !foto.asa ? [] : formasTeclado(foto.herramienta, !!foto.asa);
+  const formas = campo.cota && !foto.asa ? [] : formasTeclado(foto.herramienta, !!foto.asa, foto.alzado);
   return (
     <div className="campo-teclado" style={{ left: campo.x + 16, top: campo.seleccionar ? campo.y - 72 : campo.y + 16 }} role="dialog" aria-label="Punto por teclado">
       <input
         className="sel mono"
         autoFocus
-        aria-label={campo.cota ? `Distancia de la cota ${campo.cota}` : "Punto: x; y, @dx; dy, @L<ángulo o longitud"}
+        aria-label={campo.cota ? `Distancia de la cota ${campo.cota}` : foto.alzado ? "Punto del alzado: u; z, @du; dz o @L<ángulo" : "Punto: x; y, @dx; dy, @L<ángulo o longitud"}
         placeholder={campo.cota ? "distancia, m" : undefined}
         value={texto}
         onChange={(x) => setTexto(x.target.value)}

@@ -30,6 +30,12 @@
  *
  * V2c-4 (`docs/fem3d/dibujo.md` §10): en las vistas con la plantilla DXF visible, sus rasgos entran
  * en el índice de enganches de la planta (`ponerPlantillasDxf`); la barra dice «(DXF …)».
+ *
+ * BN3 (`docs/fem3d/barras.md` §6): con Barra, los alzados también dibujan (`adaptadorAlzado`), con el
+ * índice de enganches del plano en (u, z) (`src/editor/dibujo/alzado.ts`). El «lugar» del cursor es
+ * entonces la clave del alzado en vez de una planta. El primer extremo de una barra es del modelo:
+ * no se anula al pasar a otra vista, se ve en todas y el segundo clic puede ir en cualquiera. Con las
+ * demás herramientas, un alzado sigue como siempre (elegir).
  */
 import type { ModeloFisico, Vec2 } from "../../../src/compilador/fisico.ts";
 import { apuntar, bajoCursor, FUENTES_ENGANCHE, indiceEnganches, NOMBRE_ENGANCHE, RADIO_ENGANCHE, TIPOS_ENGANCHE, type Apunte, type FuenteEnganche, type IndiceEnganches, type Silueta, type TipoEnganche } from "../../../src/editor/dibujo/enganches.ts";
@@ -40,6 +46,9 @@ import { cadenasDe, cotasCadena, rotuloCota, type CotaCadena } from "../../../sr
 import { ejesDe } from "../../../src/compilador/ejes.ts";
 import { afectados, corte, estirar, moverPilar, type Estiramiento } from "../../../src/editor/estirar.ts";
 import { ayuda, borrador, ESTADO_INICIAL, paso, ultimoPunto, type EstadoHerramienta, type Evento, type Hecho, type NombreHerramienta, type Plantillas } from "../../../src/editor/dibujo/herramientas.ts";
+import { indiceAlzado, puntoEnVista } from "../../../src/editor/dibujo/alzado.ts";
+import { cursorBarra } from "../../../src/editor/dibujo/barra.ts";
+import { planoDeEje } from "../../../src/agente/render/alzado.ts";
 import { esEditar, medidaEditar } from "../../../src/editor/dibujo/editar.ts";
 import { asas, moverAsa, type Asa } from "../../../src/editor/transformar.ts";
 import { leerEntrada, resolverEntrada } from "../../../src/editor/dibujo/teclado.ts";
@@ -71,6 +80,8 @@ export interface Instantanea {
   asa: string | null;
   /** V2c-3: lo elegido que transforma la herramienta de editar, ya confirmado. */
   transformando: readonly string[] | null;
+  /** BN3: el cursor está en un alzado (lo que se teclea es «u; z»). */
+  alzado: boolean;
 }
 
 /** Por fuera de cada extremo de la cota que se estira, el centro de su flecha, px. */
@@ -81,6 +92,10 @@ const NINGUNO: ReadonlySet<TipoEnganche> = new Set();
 
 /** Con más elegidos, no se enseñan sus vértices (pinzamientos). */
 const MAX_ASAS = 60;
+
+/** BN3: el principio de la clave de un alzado como «lugar» del cursor (una planta no lo lleva). */
+const ALZADO = "\u0001alzado\u0000";
+const esAlzado = (lugar: string | null) => !!lugar?.startsWith(ALZADO);
 
 /** Una cota de la cadena elegida para estirar y el extremo que se mueve (0, el de t menor; 1, el otro; null, sin elegir). */
 interface Estirado {
@@ -135,9 +150,11 @@ export class ControladorDibujo {
   private asasCache: { planta: string; elegidos: readonly string[]; lista: Asa[] } | null = null;
   private asaBajo: Asa | null = null;
   private asaActiva: Asa | null = null;
+  /** BN3: el eje y la profundidad de cada alzado, por su clave. */
+  private readonly alzados = new Map<string, { eje: string; profundidad?: number }>();
 
   constructor() {
-    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, enganchar: true, activos: new Set(TIPOS_ENGANCHE), fuentes: new Set(FUENTES_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null, asa: null, transformando: null };
+    this.foto = { herramienta: "elegir", ayuda: "", error: null, hecho: null, orto: false, enganchar: true, activos: new Set(TIPOS_ENGANCHE), fuentes: new Set(FUENTES_ENGANCHE), campo: null, estirado: null, aviso: null, pilar: null, asa: null, transformando: null, alzado: false };
   }
 
   // ─── Para React ─────────────────────────────────────────────────────────────────────────────
@@ -150,7 +167,8 @@ export class ControladorDibujo {
   instantanea = (): Instantanea => this.foto;
 
   private cambiar(c: Partial<Instantanea>): void {
-    this.foto = { ...this.foto, ayuda: ayuda(this.herramienta, this.estado, this.plantillas), transformando: this.estado.elegidos ?? null, ...c };
+    const alzado = esAlzado(this.planta);
+    this.foto = { ...this.foto, ayuda: ayuda(this.herramienta, this.estado, this.plantillas, alzado), transformando: this.estado.elegidos ?? null, alzado, ...c };
     for (const f of this.oyentes) f();
   }
 
@@ -198,6 +216,8 @@ export class ControladorDibujo {
     if (h === this.herramienta) return;
     this.herramienta = h;
     this.estado = ESTADO_INICIAL;
+    // Sólo Barra dibuja en un alzado: las demás empiezan sin lugar hasta que el cursor entre en una planta
+    if (h !== "barraNiveles" && esAlzado(this.planta)) [this.planta, this.cursorQ] = [null, null];
     this.apunte = null;
     this.estirado = null;
     this.ladoPilar = null;
@@ -371,7 +391,7 @@ export class ControladorDibujo {
       this.cambiar({ campo: null });
       return true;
     }
-    const r = l.ok && ix ? resolverEntrada(l.valor, { ultimo: ultimoPunto(this.estado), cursor: this.cursorQ, direccion: ix.direccion, orto: this.foto.orto, mayus: this.mayus }) : null;
+    const r = l.ok && ix ? resolverEntrada(l.valor, { ultimo: ultimoPunto(this.estado, ix), cursor: this.cursorQ, direccion: ix.direccion, orto: this.foto.orto, mayus: this.mayus }) : null;
     if (!l.ok || !r || !r.ok) {
       const mensaje = !l.ok ? l.mensaje : r && !r.ok ? r.mensaje : "Lleve el cursor a una planta.";
       this.cambiar({ campo: this.foto.campo && { ...this.foto.campo, texto, error: mensaje } });
@@ -385,6 +405,7 @@ export class ControladorDibujo {
   // ─── Las vistas ─────────────────────────────────────────────────────────────────────────────
 
   private indice(planta: string): IndiceEnganches | null {
+    if (esAlzado(planta)) return this.indiceAlzado(planta);
     if (!this.modelo || !this.modelo.plantas.some((p) => p.id === planta)) return null;
     const pl = this.conPlantilla ? (this.plantillasDxf?.(planta) ?? null) : null;
     const clave = pl ? `${planta}\u0000dxf` : planta;
@@ -401,6 +422,50 @@ export class ControladorDibujo {
 
   private indiceActual(): IndiceEnganches | null {
     return this.planta ? this.indice(this.planta) : null;
+  }
+
+  /** BN3: el índice de enganches del alzado de la clave, en (u, z); null si su eje ya no existe. */
+  private indiceAlzado(clave: string): IndiceEnganches | null {
+    const a = this.alzados.get(clave);
+    if (!this.modelo || !a) return null;
+    let ix = this.indices.get(clave);
+    if (!ix) {
+      const plano = planoDeEje(this.modelo, a.eje, a.profundidad);
+      if (!plano) return null;
+      ix = indiceAlzado(this.modelo, plano, clave);
+      this.indices.set(clave, ix);
+    }
+    return ix;
+  }
+
+  /**
+   * BN3: lo que se da a una vista de alzado del eje `eje` (con su profundidad). Sólo dibuja con Barra;
+   * con las demás herramientas, sus clics y ventanas van a elegir, como siempre.
+   */
+  adaptadorAlzado(eje: string, profundidad?: number): Dibujo2D {
+    const clave = `${ALZADO}${eje}\u0000${profundidad ?? ""}`;
+    let a = this.adaptadores.get(clave);
+    if (a) return a;
+    this.alzados.set(clave, { eje, ...(profundidad !== undefined ? { profundidad } : {}) });
+    const barra = () => this.herramienta === "barraNiveles";
+    a = {
+      pasar: (p, radio, mayus, cliente) => {
+        if (!barra()) return this.salir(clave);
+        this.conCotas = false;
+        this.conPlantilla = false;
+        this.pasar(clave, p, radio, mayus, cliente);
+      },
+      salir: () => this.salir(clave),
+      clic: (p, radio, ctrl, doble) => barra() && this.clic(clave, p, radio, doble, ctrl),
+      ventana: () => barra(),
+      derecho: () => barra() && this.derecho(),
+      cursor: () => (barra() ? this.cursor(clave) : null),
+      pintar: (ctx, aPx, c) => {
+        if (barra()) this.pintar(clave, ctx, aPx, c, false);
+      },
+    };
+    this.adaptadores.set(clave, a);
+    return a;
   }
 
   /**
@@ -438,8 +503,8 @@ export class ControladorDibujo {
   }
 
   private pasar(planta: string, q: Vec2, radio: number, mayus: boolean, cliente: readonly [number, number]): void {
-    // Lo que se dibuja es de una planta: al pasar a la de otra vista, empieza de nuevo
-    if (planta !== this.planta && this.estado.puntos.length) this.estado = ESTADO_INICIAL;
+    // Lo que se dibuja es de una planta: al pasar a la de otra vista, empieza de nuevo (salvo una barra: su primer extremo es del modelo)
+    if (planta !== this.planta && this.estado.puntos.length && this.herramienta !== "barraNiveles") this.estado = ESTADO_INICIAL;
     if (planta !== this.planta) {
       this.planta = planta;
       this.cambiar({});
@@ -464,7 +529,7 @@ export class ControladorDibujo {
       this.silueta = null;
     } else {
       const asa = this.herramienta === "elegir" ? this.asaActiva : null;
-      this.apunte = asa ? apuntar(ix, q, this.radio, { ultimo: asa.p, orto: this.foto.orto, mayus: this.mayus, activos: this.enganches, fuentes: this.foto.fuentes }) : this.herramienta === "elegir" || this.eligiendo() ? null : apuntar(ix, q, this.radio, { ultimo: ultimoPunto(this.estado), orto: this.foto.orto, mayus: this.mayus, activos: this.enganches, fuentes: this.foto.fuentes });
+      this.apunte = asa ? apuntar(ix, q, this.radio, { ultimo: asa.p, orto: this.foto.orto, mayus: this.mayus, activos: this.enganches, fuentes: this.foto.fuentes }) : this.herramienta === "elegir" || this.eligiendo() ? null : apuntar(ix, q, this.radio, { ultimo: ultimoPunto(this.estado, ix), orto: this.foto.orto, mayus: this.mayus, activos: this.enganches, fuentes: this.foto.fuentes });
       this.silueta = bajoCursor(ix, this.apunte?.p ?? q, this.radio);
     }
     if (pintar) this.repintar();
@@ -1015,6 +1080,10 @@ export class ControladorDibujo {
     if (c) partes.push(`Cota ${nombreCota(c)}: ${c.texto}`);
     const medida = esEditar(this.herramienta) ? medidaEditar(this.herramienta, this.estado, a?.p ?? this.cursorQ) : null;
     if (medida) partes.push(medida);
+    // BN3: dónde quedaría el extremo de la barra (su planta y su x, y)
+    const ix = this.herramienta === "barraNiveles" && this.modelo ? this.indice(planta) : null;
+    const donde = ix ? cursorBarra(a?.p ?? this.cursorQ, a?.enganche, { modelo: this.modelo!, planta, indice: ix, plantillas: this.plantillas }, !this.estado.extremo) : null;
+    if (donde) partes.push(donde);
     if (this.herramienta === "elegir" && this.asaActiva) {
       const q = a?.p ?? this.cursorQ;
       partes.push(`Δ ${rotuloCota(q[0] - this.asaActiva.p[0])}; ${rotuloCota(q[1] - this.asaActiva.p[1])} m`);
@@ -1069,6 +1138,16 @@ export class ControladorDibujo {
     }
     // V2c-3: los vértices de lo elegido (pinzamientos), en todas las plantas en las que está
     if (this.herramienta === "elegir" && !this.estirado) this.pintarAsas(planta, ctx, aPx, c);
+    // BN3: el primer extremo de una barra, también en las demás vistas
+    if (planta !== this.planta && this.estado.extremo) {
+      const ix = this.indice(planta);
+      const q = ix && puntoEnVista(this.estado.extremo, ix);
+      if (q) {
+        const [x, y] = aPx(q);
+        ctx.fillStyle = c.acento;
+        ctx.fillRect(x - 3.5, y - 3.5, 7, 7);
+      }
+    }
     if (planta !== this.planta) return;
     const ix = this.indiceActual();
     const camino = (ps: readonly Vec2[], cerrado: boolean) => {

@@ -1,0 +1,13 @@
+## El pórtico arriostrado, dibujado: la cruz y el tornapuntas en sus alzados, la diagonal en planta
+BIEN  el proyecto de partida tiene la huella de Node
+BIEN  con el primer extremo puesto, el cursor en el nudo de B en P1 dice su enganche y dónde queda: «u 7 · z 3 m · Centro (B) · → P1 (5; 0)»
+BIEN  las cuatro barras, sin errores de la herramienta («»)
+BIEN  la huella es la del pórtico arriostrado con los ids de lo dibujado: 70aeedb99b9d32d6 = Node 70aeedb99b9d32d6
+BIEN  lo guardado tiene las cuatro barras del pórtico, byte a byte (646 caracteres)
+BIEN  4 pasos de deshacer (uno por barra) vuelven a la huella de partida (787cfb47d68a3836)
+
+## Pasar y pintar en el alzado del edificio objetivo (8 plantas, eje 1)
+BIEN  Barra en el alzado, pasar y pintar con el primer extremo puesto: mediana 0.000 ms, p95 0.100 ms (≤ 2 ms); el índice del alzado, 2.2 ms la primera vez
+BIEN  120 movimientos en el alzado con un fotograma cada uno: 0 tareas largas (> 50 ms)
+
+Todo bien

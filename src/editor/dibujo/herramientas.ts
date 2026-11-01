@@ -22,8 +22,8 @@
  *
  * Las de V2c-2 están en `piezas.ts` (Forjado, Hueco, Muro, Apoyo y Apoyo lineal) y `cargas.ts`
  * (Puntual, Lineal, Superficie, En barra y Empuje), y las de editar de V2c-3, en `editar.ts` (Mover,
- * Copiar, Girar y Simetría), y Colocar y Girar la plantilla DXF de V2c-4, en `herramientaPlantilla.ts`;
- * aquí, lo que las reparte.
+ * Copiar, Girar y Simetría), y Colocar y Girar la plantilla DXF de V2c-4, en `herramientaPlantilla.ts`,
+ * y Barra de BN3 (en un alzado o en planta), en `barra.ts`; aquí, lo que las reparte.
  *
  * Puro: sin IO, sin React ni DOM.
  */
@@ -35,14 +35,16 @@ import type { Operacion } from "../operaciones.ts";
 import { indiceIds, type Objeto } from "../referencias.ts";
 import { idNuevo } from "../tablas.ts";
 import { colocar, cotasEn, LADOS, ladosEn, nombreCota, referenciaEn, referenciasDe, type CotaTemporal, type Fijo, type Lado } from "./cotas.ts";
-import { unitario, type Enganche, type IndiceEnganches } from "./enganches.ts";
+import { unitario, type Enganche, type IndiceEnganches, type PuntoModelo } from "./enganches.ts";
 import { ayudaCarga, borradorCarga, esCarga, pasoCarga, type NombreCarga, type PlantillaCargas } from "./cargas.ts";
 import { ayudaPieza, borradorPieza, esPieza, pasoPieza, type NombrePieza, type PlantillaApoyo, type PlantillaForjado, type PlantillaHueco, type PlantillaMuro } from "./piezas.ts";
 import { ayudaEditar, borradorEditar, esEditar, pasoEditar, type NombreEditar, type PlantillaEditar } from "./editar.ts";
 import { ayudaPlantillaDxf, borradorPlantillaDxf, esPlantillaDxf, pasoPlantillaDxf, type NombrePlantillaDxf, type PlantillaHerramientaDxf } from "./herramientaPlantilla.ts";
+import { ayudaBarra, borradorBarra, pasoBarra, type NombreBarra, type PlantillaBarra } from "./barra.ts";
+import { puntoEnVista } from "./alzado.ts";
 
-/** Las de V2c-1 (ejes, pilar, viga), las de las piezas de V2c-2 (`piezas.ts`), las de las cargas (`cargas.ts`) y las de editar de V2c-3 (`editar.ts`). */
-export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga" | NombrePieza | NombreCarga | NombreEditar | NombrePlantillaDxf;
+/** Las de V2c-1 (ejes, pilar, viga), las de las piezas de V2c-2 (`piezas.ts`), las de las cargas (`cargas.ts`), las de editar de V2c-3 (`editar.ts`) y la Barra de BN3 (`barra.ts`). */
+export type NombreHerramienta = "elegir" | "ejes" | "pilar" | "viga" | NombrePieza | NombreCarga | NombreEditar | NombrePlantillaDxf | NombreBarra;
 
 export interface PlantillaPilar {
   /** Planta de la base; por defecto, la más baja. */
@@ -77,6 +79,8 @@ export interface Plantillas {
   editar?: PlantillaEditar;
   /** V2c-4 (`herramientaPlantilla.ts`): la plantilla DXF que se coloca o se gira. */
   dxf?: PlantillaHerramientaDxf;
+  /** BN3 (`barra.ts`): la Barra entre dos niveles. */
+  barraNiveles?: PlantillaBarra;
 }
 
 /** Un punto de lo que se dibuja; `pilar`, si se enganchó a uno. */
@@ -97,6 +101,8 @@ export interface EstadoHerramienta {
   enMuro?: boolean;
   /** V2c-3: lo elegido que se transforma, ya confirmado. */
   elegidos?: readonly string[];
+  /** BN3, Barra: el primer extremo, en el modelo (sigue al pasar a otra vista). */
+  extremo?: PuntoModelo;
 }
 
 export const ESTADO_INICIAL: EstadoHerramienta = { puntos: [] };
@@ -402,6 +408,7 @@ export function paso(h: NombreHerramienta, e: EstadoHerramienta, ev: Evento, ctx
   if (h === "ejes") return pasoEjes(e, ev, ctx);
   if (h === "pilar") return pasoPilar(e, ev, ctx);
   if (h === "viga") return pasoViga(e, ev, ctx);
+  if (h === "barraNiveles") return pasoBarra(e, ev, ctx);
   if (esPieza(h)) return pasoPieza(h, e, ev, ctx);
   if (esCarga(h)) return pasoCarga(h, e, ev, ctx);
   return { estado: e };
@@ -430,6 +437,7 @@ export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec
   if (esPieza(h)) borradorPieza(h, e, cursor, ctx, r, crudo);
   if (esCarga(h)) borradorCarga(h, e, cursor, ctx, r, crudo);
   if (esPlantillaDxf(h)) borradorPlantillaDxf(h, e, cursor, r);
+  if (h === "barraNiveles") borradorBarra(e, cursor, ctx, r);
   if (esEditar(h)) {
     // Lo elegido se ve ya resaltado; los puntos del borrador son los transformados
     r.puntos = [];
@@ -438,8 +446,9 @@ export function borrador(h: NombreHerramienta, e: EstadoHerramienta, cursor: Vec
   return r;
 }
 
-/** Lo que dice la herramienta que hay que hacer ahora; `t`, con lo que cambia según la plantilla (el modo). */
-export function ayuda(h: NombreHerramienta, e: EstadoHerramienta, t: Plantillas = { pilar: {}, viga: {} }): string {
+/** Lo que dice la herramienta que hay que hacer ahora; `t`, con lo que cambia según la plantilla (el modo); `alzado`, si el cursor está en un alzado (BN3). */
+export function ayuda(h: NombreHerramienta, e: EstadoHerramienta, t: Plantillas = { pilar: {}, viga: {} }, alzado = false): string {
+  if (h === "barraNiveles") return ayudaBarra(e, t, alzado);
   if (esPieza(h)) return ayudaPieza(h, e, t);
   if (esCarga(h)) return ayudaCarga(h, e, t);
   if (esEditar(h)) return ayudaEditar(h, e, t);
@@ -457,5 +466,8 @@ export function ayuda(h: NombreHerramienta, e: EstadoHerramienta, t: Plantillas 
   return "";
 }
 
-/** El último punto de lo que se dibuja (para la perpendicular, las relativas y el ortogonal). */
-export const ultimoPunto = (e: EstadoHerramienta): Vec2 | null => e.puntos[e.puntos.length - 1]?.p ?? null;
+/**
+ * El último punto de lo que se dibuja (para la perpendicular, las relativas y el ortogonal); el primer
+ * extremo de una barra (BN3), donde se ve en la vista del índice `ix`.
+ */
+export const ultimoPunto = (e: EstadoHerramienta, ix?: IndiceEnganches | null): Vec2 | null => (e.extremo ? (ix ? puntoEnVista(e.extremo, ix) : null) : (e.puntos[e.puntos.length - 1]?.p ?? null));
