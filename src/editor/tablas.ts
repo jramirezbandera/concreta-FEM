@@ -1062,6 +1062,11 @@ const cargas: DefTabla = {
       const p = lista(ctx.modelo, "pilares").find((v) => v.id === c.pilar);
       return p ? rango(ctx.modelo, p.desde, p.hasta) : [];
     }
+    if (c.tipo === "barra") {
+      const b = lista(ctx.modelo, "barras").find((v) => v.id === c.barra);
+      const [i, f] = [b?.inicio, b?.fin] as ({ planta?: unknown } | undefined)[];
+      return b ? [...new Set([i?.planta, f?.planta].filter((p): p is string => typeof p === "string"))] : [];
+    }
     if (c.tipo === "empuje") {
       const m = lista(ctx.modelo, "muros").find((v) => v.id === c.muro);
       return m ? rango(ctx.modelo, m.desde, m.hasta) : [];

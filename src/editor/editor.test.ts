@@ -326,7 +326,7 @@ describe("sucesiones al azar (criterio 2)", () => {
     });
 
   it("las colecciones con id del catálogo son las de validar.ts, y los ejes de replanteo (I2), que el compilador no ve", () => {
-    expect([...COLECCIONES].sort()).toEqual(["apoyos", "apoyosLineales", "bandas", "cargas", "casos", "ejes", "losas", "materiales", "muros", "panos", "pilares", "plantas", "secciones", "vigas"]);
+    expect([...COLECCIONES].sort()).toEqual(["apoyos", "apoyosLineales", "bandas", "barras", "cargas", "casos", "ejes", "losas", "materiales", "muros", "panos", "pilares", "plantas", "secciones", "vigas"]);
   });
 });
 

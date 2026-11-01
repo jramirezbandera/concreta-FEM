@@ -23,7 +23,7 @@ import { cota, fmt } from "../fmt.ts";
 
 const ICONO: Record<TipoPieza, typeof IcForjado> = { losa: IcForjado, pano: IcForjado, viga: IcViga, pilar: IcPilar, muro: IcMuro };
 const NOMBRE: Record<TipoPieza, string> = { losa: "Forjado", pano: "Forjado", viga: "Viga", pilar: "Pilar", muro: "Muro" };
-const NOMBRE_CARGA: Record<CargaFisica["tipo"], string> = { superficie: "Superficie", lineal: "Lineal", puntual: "Puntual", viga: "En viga", pilar: "En pilar", empuje: "Empuje" };
+const NOMBRE_CARGA: Record<CargaFisica["tipo"], string> = { superficie: "Superficie", lineal: "Lineal", puntual: "Puntual", viga: "En viga", pilar: "En pilar", barra: "En barra", empuje: "Empuje" };
 
 /** Un vector de carga en texto: hacia abajo, un número (positivo hacia abajo); si no, sus componentes. */
 function valor(v: Vec3 | undefined, unidad: string): string {
@@ -43,7 +43,8 @@ function textoCarga(c: CargaFisica, parte: boolean): string {
     case "puntual":
       return [c.F && valor(c.F, "kN"), c.M && `M (${c.M.map((x) => fmt(x, 2)).join("; ")}) kN·m`].filter(Boolean).join(" · ");
     case "viga":
-    case "pilar": {
+    case "pilar":
+    case "barra": {
       const q = c.qb ? `${valor(c.q, "")}→ ${valor(c.qb, "kN/m")}` : valor(c.q, "kN/m");
       const tramo = c.desde !== undefined || c.hasta !== undefined ? ` · de ${fmt(c.desde ?? 0, 2)} a ${c.hasta === undefined ? "el final" : `${fmt(c.hasta, 2)} m`}` : "";
       return `${q}${c.ejes === "local" ? " · locales" : ""}${tramo}`;

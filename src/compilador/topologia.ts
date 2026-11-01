@@ -16,7 +16,8 @@
  * 5. Viga que pasa por un pilar (su recta a ≤ ε_snap de la huella, con la proyección del eje
  *    dentro del tramo): se parte en el nudo del pilar.
  * 6. Cruces de tramos: un nudo nuevo, o el que ya haya a ≤ ε_snap del cruce.
- * 7. Apoyos: al pilar, al nudo a ≤ ε_snap o partiendo el tramo más cercano.
+ * 7. Apoyos y extremos de barras (fase BN): al pilar, al nudo a ≤ ε_snap o partiendo el tramo más
+ *    cercano. En una losa o en el eje de un muro los colocan su malla y sus estaciones (C2, C3).
  * 8. Cadenas: los nudos de cada tramo ordenados por su proyección σ sobre la recta del tramo.
  * 9. Comprobaciones: nudos distintos a ≤ ε_snap (error: encuentro ambiguo), uniones con hueco
  *    (aviso con la distancia) y extremos libres a ≤ 3·ε_snap de algo (aviso de casi encuentro).
@@ -95,6 +96,8 @@ export interface Topologia {
   tramosDe: Map<string, TramoViga[]>;
   tramos: TramoViga[];
   apoyoEn: Map<string, number>;
+  /** Fase BN: nudo de cada extremo de barra que coloca la topología (`<barra>@inicio`, `<barra>@fin`). */
+  extremoEn: Map<string, number>;
   /** Vigas que llegan a cada nudo. */
   vigasEn: Map<number, Set<string>>;
   localizar(k: number, P: Vec2): Destino | null;
@@ -144,6 +147,7 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
   const tramos: TramoViga[] = [];
   const tramosDe = new Map<string, TramoViga[]>();
   const apoyoEn = new Map<string, number>();
+  const extremoEn = new Map<string, number>();
   const porPlanta = new Map<number, { pilares: PuntoPilar[]; gPilares: RejillaHash; gTramos: RejillaHash; gNudos: RejillaHash; tramos: TramoViga[] }>();
 
   const nuevoNudo = (k: number, x: number, y: number, pilar: PuntoPilar | null = null): number => {
@@ -157,6 +161,7 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
   for (const p of ctx.pilares) for (let k = ctx.planta.get(p.hasta)!; k <= ctx.planta.get(p.desde)!; k++) plantasUsadas.add(k);
   for (const v of ctx.vigas) plantasUsadas.add(ctx.planta.get(v.planta)!);
   for (const a of ctx.apoyos) plantasUsadas.add(ctx.planta.get(a.planta)!);
+  for (const x of ctx.extremos) plantasUsadas.add(ctx.planta.get(x.planta)!);
 
   for (const k of [...plantasUsadas].sort((a, b) => b - a)) {
     const gPilares = new RejillaHash(lado);
@@ -364,8 +369,12 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
       }
     }
 
-    // 7. Apoyos
-    for (const ap of ctx.apoyos) {
+    // 7. Apoyos y extremos de barras (fase BN)
+    const unibles = [
+      ...ctx.apoyos.map((ap) => ({ id: ap.id, fisico: ap.id, planta: ap.planta, x: ap.x, y: ap.y, en: apoyoEn, barra: false })),
+      ...ctx.extremos.map((x) => ({ id: x.id, fisico: x.barra, planta: x.planta, x: x.x, y: x.y, en: extremoEn, barra: true })),
+    ];
+    for (const ap of unibles) {
       if (ctx.planta.get(ap.planta) !== k) continue;
       const Q: Vec2 = [ap.x, ap.y];
       let n = pilarCercano(Q)?.nudo ?? -1;
@@ -392,13 +401,14 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
         // En una losa lo coloca su malla (C2); en el eje de un muro, sus estaciones (C3)
         if (ctx.losas.some((l) => ctx.planta.get(l.losa.planta) === k && (puntoEnRegion(Q, l.region) || distanciaARegion(Q, l.region) <= epsSnap))) continue;
         if (ctx.muros.some((w) => k >= w.kh && k <= w.kb && distanciaAPolilinea(Q, w.muro.puntos) <= 2 * epsSnap)) continue;
-        diag.error("apoyo/sin-destino", `El apoyo ${ap.id} no cae sobre ningún pilar, nudo, viga ni losa de la planta ${ap.planta} (tolerancia ${cm(epsSnap)}).`, [ap.id]);
+        if (ap.barra) diag.error("barra/extremo-sin-apoyo", `El ${ap.id.endsWith("@inicio") ? "inicio" : "fin"} de la barra ${ap.fisico} no cae sobre ningún pilar, nudo, viga, losa ni muro de la planta ${ap.planta} (tolerancia ${cm(epsSnap)}).`, [ap.fisico]);
+        else diag.error("apoyo/sin-destino", `El apoyo ${ap.id} no cae sobre ningún pilar, nudo, viga ni losa de la planta ${ap.planta} (tolerancia ${cm(epsSnap)}).`, [ap.id]);
         continue;
       }
       const d = dist(Q, P(n));
-      if (d > epsGeom && !nudos[n]!.pilar) diag.aviso("topologia/fusion", `El apoyo ${ap.id} se lleva ${cm(d)} hasta el nudo más cercano.`, [ap.id], { distancia: d });
-      apoyoEn.set(ap.id, n);
-      nudos[n]!.fisicos.add(ap.id);
+      if (d > epsGeom && !nudos[n]!.pilar) diag.aviso("topologia/fusion", `${ap.barra ? `El ${ap.id.endsWith("@inicio") ? "inicio" : "fin"} de la barra ${ap.fisico}` : `El apoyo ${ap.id}`} se lleva ${cm(d)} hasta el nudo más cercano.`, [ap.fisico], { distancia: d });
+      ap.en.set(ap.id, n);
+      nudos[n]!.fisicos.add(ap.fisico);
     }
 
     // 8. Cadenas
@@ -436,7 +446,7 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
     for (const tv of tramosK) for (const { nudo } of tv.cadena) usos.set(nudo, (usos.get(nudo) ?? 0) + 1);
     for (const vt of vertices) {
       const n = vt.nudo;
-      if (nudos[n]!.pilar || usos.get(n) !== 1 || [...apoyoEn.values()].includes(n)) continue;
+      if (nudos[n]!.pilar || usos.get(n) !== 1 || [...apoyoEn.values()].includes(n) || [...extremoEn.values()].includes(n)) continue;
       const Q = vt.P;
       const r = 3 * epsSnap;
       // Un pilar al que la propia viga ya se une (pasa por él) no cuenta
@@ -490,7 +500,7 @@ export function construirTopologia(ctx: Contexto, diag: Diagnosticos): Topologia
     return n >= 0 ? { tipo: "nudo", nudo: n } : null;
   };
 
-  return { nudos, nudoPilar, tramosDe, tramos, apoyoEn, vigasEn, localizar };
+  return { nudos, nudoPilar, tramosDe, tramos, apoyoEn, extremoEn, vigasEn, localizar };
 }
 
 /**

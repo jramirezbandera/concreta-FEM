@@ -47,7 +47,7 @@ export interface ObjetoCarga3D {
   plantas: string[];
   /** La pieza que carga (losa, paño, viga, pilar o muro) y su tipo, para los filtros del 3D; una lineal o una puntual, ninguna. */
   pieza: string | null;
-  tipoPieza: "losa" | "pano" | "viga" | "pilar" | "muro" | null;
+  tipoPieza: "losa" | "pano" | "viga" | "pilar" | "barra" | "muro" | null;
 }
 
 export interface Cargas3D {
@@ -102,6 +102,8 @@ export function cargas3D(f: ModeloFisico, origen: [number, number, number], caso
         return [g.viga, "viga"];
       case "pilar":
         return [g.pilar, "pilar"];
+      case "barra":
+        return [g.barra, "barra"];
       case "empuje":
         return [g.muro, "muro"];
     }
@@ -119,6 +121,10 @@ export function cargas3D(f: ModeloFisico, origen: [number, number, number], caso
       case "pilar": {
         const p = f.pilares?.find((x) => x.id === g.pilar);
         return p ? tramos(p.desde, p.hasta) : [];
+      }
+      case "barra": {
+        const b = f.barras?.find((x) => x.id === g.barra);
+        return b ? [...new Set([b.inicio.planta, b.fin.planta])] : [];
       }
       case "empuje": {
         const m = f.muros?.find((x) => x.id === g.muro);

@@ -250,7 +250,8 @@ function cargaTransformada(tr: Transformador, c: CargaFisica, geometria = true):
       return { ...c, q, ...(zona ? { zona } : {}) };
     }
     case "viga":
-    case "pilar": {
+    case "pilar":
+    case "barra": {
       if (!lineal) return c;
       // En ejes locales, la simetría cambia el sentido del eje y local; en globales, giran las horizontales
       const f = (q: Vec3): Vec3 => (c.ejes === "global" ? tr.vector3(q) : tr.invierte ? [q[0], -q[1] + 0, q[2]] : q);
@@ -271,6 +272,8 @@ function soporteDe(c: CargaFisica): string | null {
       return c.viga;
     case "pilar":
       return c.pilar;
+    case "barra":
+      return c.barra;
     case "empuje":
       return c.muro;
     case "superficie":

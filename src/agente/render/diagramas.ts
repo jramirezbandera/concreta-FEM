@@ -31,7 +31,7 @@ export const ORDENADA_DIAGRAMA = 1.5;
 
 export interface TramoEspacio {
   pieza: string;
-  tipo: "viga" | "pilar" | "vigueta";
+  tipo: "viga" | "pilar" | "vigueta" | "barra";
   t: TramoFlexible;
   /** Planta del tramo: la de la cabeza en un pilar, la de su nudo i en una viga o una vigueta. */
   planta: string;

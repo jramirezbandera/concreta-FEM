@@ -211,10 +211,11 @@ const COMPONENTES = ["N", "Vy", "Vz", "T", "My", "Mz"] as const;
  * Qué extremos se buscan en cada tipo de pieza: con + y − el máximo y el mínimo; sin signo, el de
  * mayor valor absoluto (con su signo).
  */
-export const EXTREMOS: Record<"pilar" | "viga" | "vigueta", readonly string[]> = {
+export const EXTREMOS: Record<"pilar" | "viga" | "vigueta" | "barra", readonly string[]> = {
   pilar: ["N+", "N-", "Vy", "Vz", "My", "Mz"],
   viga: ["N+", "N-", "Vz", "My+", "My-"],
   vigueta: ["Vz", "My+", "My-"],
+  barra: ["N+", "N-", "Vy", "Vz", "My", "Mz"],
 };
 
 /** Diagrama de la barra `b` en la combinación de factores `f`. */
@@ -238,7 +239,8 @@ function mejora(extremo: string, actual: Extremo | undefined, v: number): boolea
 }
 
 export interface GrupoEnvolvente {
-  tipo: "pilar" | "viga" | "vigueta";
+  /** Una barra entre dos niveles (fase BN) va en el grupo de la planta de su inicio. */
+  tipo: "pilar" | "viga" | "vigueta" | "barra";
   planta: string;
   piezas: number;
   extremos: Record<string, Extremo>;
@@ -252,7 +254,7 @@ export interface GrupoEnvolvente {
  */
 export function envolventes(q: Consultas, conjunto: ConjuntoCombinaciones, o: { planta?: string; tipo?: string } = {}): Respuesta<{ combinaciones: string; grupos: GrupoEnvolvente[] }> {
   const { modelo, mapeo } = q;
-  if (o.tipo && !(o.tipo in EXTREMOS)) return no("consulta/tipo", `El tipo de pieza «${o.tipo}» no existe: pilar, viga o vigueta.`);
+  if (o.tipo && !(o.tipo in EXTREMOS)) return no("consulta/tipo", `El tipo de pieza «${o.tipo}» no existe: pilar, viga, vigueta o barra.`);
   if (o.planta && !q.fisico.plantas.some((p) => p.id === o.planta)) return no("consulta/no-existe", `La planta ${o.planta} no existe.`, [o.planta]);
   const ep = new EsfuerzosPiezas(modelo, mapeo, q.casos);
   const plantaDe = (b: number) => {

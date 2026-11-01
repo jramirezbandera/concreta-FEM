@@ -68,6 +68,7 @@ const NOMBRES: Record<Coleccion, string> = {
   secciones: "sección",
   pilares: "pilar",
   vigas: "viga",
+  barras: "barra",
   apoyos: "apoyo",
   casos: "caso",
   cargas: "carga",

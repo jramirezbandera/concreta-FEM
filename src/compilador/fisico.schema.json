@@ -223,6 +223,51 @@
       ],
       "additionalProperties": false
     },
+    "Barra": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "inicio": {
+          "$ref": "#/$defs/ExtremoBarra"
+        },
+        "fin": {
+          "$ref": "#/$defs/ExtremoBarra"
+        },
+        "seccion": {
+          "type": "string"
+        },
+        "giro": {
+          "type": "number"
+        },
+        "liberaciones": {
+          "type": "object",
+          "properties": {
+            "inicio": {
+              "$ref": "#/$defs/Liberacion"
+            },
+            "fin": {
+              "$ref": "#/$defs/Liberacion"
+            }
+          },
+          "additionalProperties": false
+        },
+        "soloTraccion": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "inicio",
+        "fin",
+        "seccion"
+      ],
+      "additionalProperties": false
+    },
     "CargaFisica": {
       "anyOf": [
         {
@@ -346,6 +391,50 @@
             "id",
             "caso",
             "pilar",
+            "ejes",
+            "q"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tipo": {
+              "const": "barra"
+            },
+            "id": {
+              "type": "string"
+            },
+            "caso": {
+              "type": "string"
+            },
+            "barra": {
+              "type": "string"
+            },
+            "ejes": {
+              "enum": [
+                "global",
+                "local"
+              ]
+            },
+            "q": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "qb": {
+              "$ref": "#/$defs/Vec3"
+            },
+            "desde": {
+              "type": "number"
+            },
+            "hasta": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "tipo",
+            "id",
+            "caso",
+            "barra",
             "ejes",
             "q"
           ],
@@ -525,6 +614,29 @@
         "id",
         "desde",
         "hasta"
+      ],
+      "additionalProperties": false
+    },
+    "ExtremoBarra": {
+      "type": "object",
+      "properties": {
+        "planta": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "dz": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "planta",
+        "x",
+        "y"
       ],
       "additionalProperties": false
     },
@@ -743,6 +855,12 @@
             "$ref": "#/$defs/Viga"
           }
         },
+        "barras": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Barra"
+          }
+        },
         "apoyos": {
           "type": "array",
           "items": {
@@ -858,6 +976,9 @@
           "$ref": "#/$defs/ModificadoresPieza"
         },
         "viguetas": {
+          "$ref": "#/$defs/ModificadoresPieza"
+        },
+        "barras": {
           "$ref": "#/$defs/ModificadoresPieza"
         }
       },

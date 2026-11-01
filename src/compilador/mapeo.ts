@@ -16,14 +16,15 @@ export interface NudoMapeado {
 
 export interface BarraMapeada {
   pieza: string;
-  /** Una vigueta (C4) es una pieza generada: `<paño>:v<n>`. */
-  tipo: "viga" | "pilar" | "vigueta";
+  /** Una vigueta (C4) es una pieza generada: `<paño>:v<n>`. Una barra (fase BN) va entre dos niveles. */
+  tipo: "viga" | "pilar" | "vigueta" | "barra";
   /** Tramo de la polilínea de la viga, o índice de la planta de la cabeza del tramo de pilar. */
   tramo: number;
   /** Paño de una vigueta (el objeto físico, C4). */
   pano?: string;
   /**
-   * Estaciones a lo largo de la pieza (m, desde el primer punto de la viga o la base del pilar)
+   * Estaciones a lo largo de la pieza (m, desde el primer punto de la viga, la base del pilar o el
+   * inicio de la barra)
    * de [i, i', j', j]: los nudos (proyectados sobre el eje) y los extremos del tramo flexible.
    */
   s: readonly [number, number, number, number];

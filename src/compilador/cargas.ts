@@ -9,6 +9,8 @@
  *   ≤ ε_snap de su eje) o, si no, al nudo a ≤ ε_snap, con el momento de transporte de la distancia
  *   entre el punto y el eje o el nudo.
  * - Todo va en ejes globales; las cargas "local" se giran aquí con los ejes de cada tramo.
+ * - Barras entre dos niveles (fase BN): su peso, γ·A por metro de su longitud real, y sus cargas, por
+ *   metro de su longitud real, sobre su recta como las de viga y pilar.
  * - Losas (C2): el peso propio sale de su pp, como carga de superficie de cada lámina, y una viga
  *   rectangular de hormigón bajo losa pesa sólo lo que su ancho no pesa ya como forjado: en una
  *   maciza, su descuelgue (C2-g); en un aligerado, también γ·t − pp (AU-4). Las cargas de superficie van
@@ -741,6 +743,11 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
         for (const t of quitarMuros(bajo, enMuros, sc.huella.b)) if (t.w > 0) repartir(cPeso, r, t.desde, t.hasta, [0, 0, -t.w], [0, 0, -t.w]);
       }
     }
+    // Barras (fase BN): γ·A por metro de su longitud real
+    for (const b of ctx.barras) {
+      const w = ctx.secciones.get(b.seccion)!.peso;
+      for (const r of piezas.rectasDe.get(b.id) ?? []) if (w > 0) repartir(cPeso, r, 0, r.len, [0, 0, -w], [0, 0, -w]);
+    }
     // Losas: su pp, por lámina (C2-g); en un reticular, el de la zona aligerada o el de los ábacos (C4-i)
     losas.laminas.forEach((l, i) => {
       const lc = ctx.losas[l.losa]!;
@@ -942,6 +949,8 @@ export function construirCargas(ctx: Contexto, topo: Topologia, piezas: Piezas, 
       }
     } else if (carga.tipo === "viga") {
       sobrePieza(c, carga.viga, piezas.rectasDe.get(carga.viga) ?? [], carga.ejes, carga.q, carga.qb, carga.desde, carga.hasta, carga.id);
+    } else if (carga.tipo === "barra") {
+      sobrePieza(c, carga.barra, piezas.rectasDe.get(carga.barra) ?? [], carga.ejes, carga.q, carga.qb, carga.desde, carga.hasta, carga.id);
     } else {
       sobrePieza(c, carga.pilar, piezas.rectasDe.get(carga.pilar) ?? [], carga.ejes, carga.q, carga.qb, carga.desde, carga.hasta, carga.id);
     }

@@ -115,7 +115,7 @@ describe("mensajes del validador", () => {
     expect(d.map((x) => x.codigo)).toEqual(["esquema/campo-desconocido"]);
     expect(d[0]!.mensaje).toContain('"loza" no es un campo de CargaFisica; ¿quería decir "losa"?');
     const e = errores((f) => (f.cargas as unknown[]).push({ tipo: "puntal", id: "p1", caso: "Q", planta: "P1", x: 0, y: 0 }));
-    expect(e[0]!.mensaje).toContain('vale "puntal", que no es ninguno de los admitidos: "puntual", "viga", "pilar", "superficie", "lineal", "empuje"');
+    expect(e[0]!.mensaje).toContain('vale "puntal", que no es ninguno de los admitidos: "puntual", "viga", "pilar", "barra", "superficie", "lineal", "empuje"');
     expect(e[0]!.ids).toEqual(["p1"]);
   });
 

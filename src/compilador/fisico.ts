@@ -20,9 +20,13 @@
  *     canto, vertical); y = z × x;
  *   · pilar: x hacia arriba; z = dirección del canto h en planta, girada `giro` grados desde +X;
  *     y = z × x. Con giro 0, el canto h va según X y el ancho b según −Y.
+ *   · barra (fase BN): x de su inicio a su fin; z en el plano vertical que la contiene y hacia
+ *     arriba (el `vz` = +Z del motor, proyectado); y = z × x; `giro` gira y y z alrededor de x. Son
+ *     los ejes por defecto de un frame inclinado de SAP2000. Vertical, la regla de los pilares:
+ *     z = +X girado `giro` grados.
  *   Las liberaciones y las cargas "local" van en esos ejes.
  * - Estaciones: distancia en m a lo largo de la pieza, desde el primer punto de una viga (sumando
- *   sus tramos) o desde la base de un pilar.
+ *   sus tramos), desde la base de un pilar o desde el inicio de una barra (su longitud real).
  * - Losas (C2): planas, en el plano de su planta, a la cota del forjado. Esa cota es la cara superior
  *   del forjado (RV-b, `planoForjado: "superior"`, por defecto): las láminas, el eje
  *   de las vigas y sus nudos van en ella; con `planoForjado: "medio"`, es el plano medio de la losa.
@@ -192,6 +196,34 @@ export interface Viga {
   insercion?: "plano" | "superior";
 }
 
+/** Extremo de una barra (fase BN): un punto en planta de una planta, a su cota. */
+export interface ExtremoBarra {
+  planta: string;
+  x: number;
+  y: number;
+  /** m sobre la cota de la planta. Previsto en el esquema; en BN sólo 0 (`barra/dz-no-admitido`). */
+  dz?: number;
+}
+
+/**
+ * Barra entre dos puntos del edificio (fase BN, `docs/fem3d/barras.md`): inclinada, horizontal (los
+ * dos extremos en la misma planta) o vertical. Cada extremo se une a lo que encuentra en su planta
+ * como un apoyo puntual: un pilar, un nudo, una viga, una losa o un muro.
+ */
+export interface Barra {
+  id: string;
+  nombre?: string;
+  inicio: ExtremoBarra;
+  fin: ExtremoBarra;
+  seccion: string;
+  /** Giro de la sección alrededor de su eje x, en grados. Por defecto, 0. */
+  giro?: number;
+  /** Liberaciones en el inicio y en el fin, en ejes locales. */
+  liberaciones?: { inicio?: Liberacion; fin?: Liberacion };
+  /** Sólo trabaja a tracción. En BN se calcula lineal, con el aviso `barra/compresion` (CB-e, opción a). */
+  soloTraccion?: boolean;
+}
+
 export interface ApoyoFisico {
   id: string;
   planta: string;
@@ -247,6 +279,8 @@ export type CargaFisica =
     }
   | { tipo: "viga"; id: string; caso: string; viga: string; ejes: "global" | "local"; q: Vec3; qb?: Vec3; desde?: number; hasta?: number }
   | { tipo: "pilar"; id: string; caso: string; pilar: string; ejes: "global" | "local"; q: Vec3; qb?: Vec3; desde?: number; hasta?: number }
+  /** Sobre una barra (fase BN), por metro de su longitud real; las estaciones, desde su inicio. */
+  | { tipo: "barra"; id: string; caso: string; barra: string; ejes: "global" | "local"; q: Vec3; qb?: Vec3; desde?: number; hasta?: number }
   | {
       /**
        * Carga de superficie uniforme (C2), en kN/m² y ejes globales: sobre la losa `losa` o el paño
@@ -460,6 +494,8 @@ export interface ModeloFisico {
   secciones: readonly Seccion[];
   pilares?: readonly Pilar[];
   vigas?: readonly Viga[];
+  /** Fase BN: barras entre dos puntos, cada uno en su planta. */
+  barras?: readonly Barra[];
   apoyos?: readonly ApoyoFisico[];
   losas?: readonly Losa[];
   apoyosLineales?: readonly ApoyoLineal[];
@@ -504,6 +540,8 @@ export interface ModificadoresPiezas {
   vigas?: ModificadoresPieza;
   /** Viguetas de los paños unidireccionales (C4). Su torsión ya va liberada (C4-c). */
   viguetas?: ModificadoresPieza;
+  /** Barras entre dos niveles (fase BN). D4 no las toca. */
+  barras?: ModificadoresPieza;
 }
 
 /**

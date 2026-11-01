@@ -94,6 +94,8 @@ export interface Losas {
   apoyosLineales: Map<string, number[]>;
   /** Nudo de cada apoyo puntual que C1 no ha colocado (cae en una losa). */
   apoyosPuntuales: Map<string, number>;
+  /** Fase BN: nudo de cada extremo de barra que C1 no ha colocado (cae en una losa o en un muro). */
+  extremos: Map<string, number>;
   /** Por carga lineal: sus aristas (pares de nudos) a lo largo de la polilínea unida. */
   lineas: Map<string, [number, number][]>;
   /**
@@ -359,6 +361,7 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     huellas: [],
     apoyosLineales: new Map(),
     apoyosPuntuales: new Map(),
+    extremos: new Map(),
     lineas: new Map(),
     lineasFuera: new Map(),
     lineasUnidas: new Map(),
@@ -710,10 +713,10 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       }
       puntoDe.set(c.id, { i: a.punto([c.x, c.y], c.id, "punto", "su punto"), Q: [c.x, c.y] });
     }
-    // Y un apoyo, al eje de la viga (en la malla de la planta)
+    // Y un apoyo o el extremo de una barra (fase BN), al eje de la viga (en la malla de la planta)
     const apoyoAncho = new Map<string, number>();
-    for (const ap of ctx.apoyos) {
-      if (ap.planta !== idPlanta || topo.apoyoEn.has(ap.id)) continue;
+    for (const ap of [...ctx.apoyos, ...ctx.extremos]) {
+      if (ap.planta !== idPlanta || topo.apoyoEn.has(ap.id) || topo.extremoEn.has(ap.id)) continue;
       const en = anchos.length ? anchosPunto([ap.x, ap.y]) : [];
       if (en.length) {
         apoyoAncho.set(ap.id, anchoMasCercano([ap.x, ap.y], en, anchos.map((y) => y.a)));
@@ -1323,11 +1326,18 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
       const nm = usado.get(i);
       const n = nm !== undefined ? nudoT[nm]! : nodoPunto.get(i);
       const esApoyo = ctx.apoyos.some((x) => x.id === id);
+      const extremo = ctx.extremos.find((x) => x.id === id);
       if (n === undefined) {
-        diag.error(esApoyo ? "apoyo/sin-destino" : "carga/sin-destino", `${esApoyo ? "El apoyo" : "La carga"} ${id} no cae sobre ningún pilar, nudo, viga, losa ni muro de la planta ${idPlanta} (tolerancia ${cm(epsSnap)}).`, [id]);
+        if (extremo) diag.error("barra/extremo-sin-apoyo", `El ${extremo.lado} de la barra ${extremo.barra} no cae sobre ningún pilar, nudo, viga, losa ni muro de la planta ${idPlanta} (tolerancia ${cm(epsSnap)}).`, [extremo.barra]);
+        else diag.error(esApoyo ? "apoyo/sin-destino" : "carga/sin-destino", `${esApoyo ? "El apoyo" : "La carga"} ${id} no cae sobre ningún pilar, nudo, viga, losa ni muro de la planta ${idPlanta} (tolerancia ${cm(epsSnap)}).`, [id]);
         continue;
       }
-      if (esApoyo) {
+      if (extremo) {
+        // En la cara de una viga (fase LV): a su eje
+        const c = maestroCara.get(n);
+        r.extremos.set(id, c?.maestro ?? n);
+        topo.nudos[c?.maestro ?? n]!.fisicos.add(extremo.barra);
+      } else if (esApoyo) {
         // En la cara de una viga (fase LV): a su eje
         const c = maestroCara.get(n);
         if (c) anotar(id, "vigas", c.viga);
@@ -1337,8 +1347,15 @@ export function construirLosas(ctx: Contexto, topo: Topologia, cargas: readonly 
     }
     // Fase LV: los apoyos puntuales en el ancho de una viga, a su eje (o al pilar, en su zona rígida)
     for (const [id, j] of e.apoyoAncho) {
-      const ap = ctx.apoyos.find((x) => x.id === id)!;
       const g = e.anchos[j]!.g;
+      const extremo = ctx.extremos.find((x) => x.id === id);
+      if (extremo) {
+        const d = alEje(g, sigmaEnAncho([extremo.x, extremo.y], r.anchos[g]!));
+        r.extremos.set(id, d.nudo);
+        topo.nudos[d.nudo]!.fisicos.add(extremo.barra);
+        continue;
+      }
+      const ap = ctx.apoyos.find((x) => x.id === id)!;
       const d = alEje(g, sigmaEnAncho([ap.x, ap.y], r.anchos[g]!));
       anotar(id, "pilar" in d ? "pilares" : "vigas", "pilar" in d ? d.pilar : d.viga);
       r.apoyosPuntuales.set(id, d.nudo);

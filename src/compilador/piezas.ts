@@ -19,6 +19,12 @@
  * si los dos son apoyos (C4-c, E2-3) y con la zona rígida de C1-a en las huellas de pilar. En una
  * planta con paños, el diafragma rígido abarca además los nudos sobre ellos (C4-g).
  *
+ * Barras entre dos niveles (fase BN, `docs/fem3d/barras.md`): una barra del motor del punto dibujado
+ * de su inicio al de su fin; el hueco hasta el nudo de cada extremo es un offset rígido. Si un extremo
+ * va al nudo de un pilar de hormigón con huella, es rígido además lo que su eje recorre dentro del
+ * prisma vertical de esa huella, hasta la cara (CB-f, entero); en acero o en un material general,
+ * nada.
+ *
  * Cada pieza se describe además como una o varias «rectas» (el eje analítico, P(σ) = O + σ·e)
  * partidas en trozos: tramos flexibles de barras y zonas rígidas o tramos fuera de la cadena, que
  * van a un nudo. Las cargas se reparten sobre esos trozos (`cargas.ts`).
@@ -32,14 +38,15 @@ import type { SeccionCompilada } from "./secciones.ts";
 import { cuerdaHuella, proyectar } from "./geometria2d.ts";
 import { cuerdaEnTramo, distanciaARegion, ejeTramo, seccionTramo, type Topologia, type TramoViga } from "./topologia.ts";
 import type { PanosU } from "./unidireccional.ts";
-import type { Contexto } from "./validar.ts";
+import { ejesBarra } from "./barras.ts";
+import { idExtremo, type Contexto } from "./validar.ts";
 
 /** Trozo de una recta: [desde, hasta] en σ, que va a un nudo o al tramo flexible de una barra. */
 export type Trozo = { desde: number; hasta: number; nudo: number } | { desde: number; hasta: number; barra: number; ip: number };
 
 export interface Recta {
   pieza: string;
-  tipo: "viga" | "pilar" | "vigueta";
+  tipo: "viga" | "pilar" | "vigueta" | "barra";
   /** Eje analítico: P(σ) = O + σ·e (globales). */
   O: Vec3;
   e: Vec3;
@@ -59,7 +66,7 @@ export interface Recta {
 export interface BarraP {
   id: string;
   pieza: string;
-  tipo: "viga" | "pilar" | "vigueta";
+  tipo: "viga" | "pilar" | "vigueta" | "barra";
   /** Tramo de la polilínea (vigas) o planta de la cabeza (pilares). */
   tramo: number;
   i: number;
@@ -394,6 +401,75 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
     }
   }
 
+  // Barras entre dos niveles (fase BN)
+  const extremoDe = new Map<string, { nudo: number }>();
+  for (const b of ctx.barras) {
+    const ni = topo.extremoEn.get(idExtremo(b.id, "inicio")) ?? losas.extremos.get(idExtremo(b.id, "inicio"));
+    const nj = topo.extremoEn.get(idExtremo(b.id, "fin")) ?? losas.extremos.get(idExtremo(b.id, "fin"));
+    if (ni === undefined || nj === undefined) continue; // ya hay un error
+    if (ni === nj) {
+      diag.error("barra/longitud-nula", `Los dos extremos de la barra ${b.id} van al mismo nudo (${[...topo.nudos[ni]!.fisicos].filter((f) => f !== b.id).join(", ") || "el mismo punto"}).`, [b.id]);
+      continue;
+    }
+    extremoDe.set(idExtremo(b.id, "inicio"), { nudo: ni });
+    extremoDe.set(idExtremo(b.id, "fin"), { nudo: nj });
+    const sc = ctx.secciones.get(b.seccion)!;
+    const A: Vec3 = [b.inicio.x, b.inicio.y, ctx.cotas[ctx.planta.get(b.inicio.planta)!]!];
+    const B: Vec3 = [b.fin.x, b.fin.y, ctx.cotas[ctx.planta.get(b.fin.planta)!]!];
+    const L = Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]);
+    if (!(L > epsGeom)) {
+      diag.error("barra/longitud-nula", `Los dos extremos de la barra ${b.id} están en el mismo punto.`, [b.id]);
+      continue;
+    }
+    const { ex, ey, ez } = ejesBarra(A, B, b.giro ?? 0);
+    // CB-f: hasta la cara de un pilar de hormigón, por lo que el eje recorre dentro de su huella
+    const horiz = Math.hypot(ex[0], ex[1]);
+    const dentro = (n: number): [number, number] | null => {
+      const pp = topo.nudos[n]!.pilar;
+      if (!pp?.huella.forma || !(horiz > 1e-9)) return null;
+      const k = topo.nudos[n]!.k;
+      const p = ctx.pilarDe.get(pp.pilares[0]!)!;
+      const kt = k < ctx.planta.get(p.desde)! ? k : k - 1;
+      if (ctx.secciones.get(seccionTramo(ctx, p, kt))!.material !== "hormigon") return null;
+      const u: [number, number] = [ex[0] / horiz, ex[1] / horiz];
+      const cu = cuerdaHuella([A[0], A[1]], u, pp.huella, epsGeom);
+      return cu ? [cu[0] / horiz, cu[1] / horiz] : null;
+    };
+    const ci = dentro(ni);
+    const cj = dentro(nj);
+    const si = ci ? Math.max(0, ci[1]) : 0;
+    const sj = cj ? Math.min(L, cj[0]) : L;
+    if (!(sj - si > epsGeom)) {
+      diag.error("barra/tramo-flexible-nulo", `La barra ${b.id} queda entera dentro de las zonas rígidas de los pilares a los que llega.`, [b.id, ...[ni, nj].flatMap((n) => topo.nudos[n]!.pilar?.pilares.slice(0, 1) ?? [])]);
+      continue;
+    }
+    const P = (t: number): Vec3 => [A[0] + t * ex[0], A[1] + t * ex[1], A[2] + t * ex[2]];
+    const lib: { i?: Seis<boolean>; j?: Seis<boolean> } = {};
+    if (libera(b.liberaciones?.inicio)) lib.i = b.liberaciones!.inicio!;
+    if (libera(b.liberaciones?.fin)) lib.j = b.liberaciones!.fin!;
+    barras.push({
+      id: b.id,
+      pieza: b.id,
+      tipo: "barra",
+      tramo: 0,
+      i: ni,
+      j: nj,
+      ip: P(si),
+      jp: P(sj),
+      seccion: sc.barra,
+      material: sc.material,
+      vz: ez,
+      liberaciones: lib.i || lib.j ? lib : undefined,
+      s: [0, si, sj, L],
+    });
+    const recta: Recta = { pieza: b.id, tipo: "barra", O: A, e: ex, s0: 0, len: L, ex, ey, ez, trozos: [] };
+    recta.trozos.push({ desde: -Infinity, hasta: si, nudo: ni });
+    recta.trozos.push({ desde: si, hasta: sj, barra: barras.length - 1, ip: si });
+    recta.trozos.push({ desde: sj, hasta: Infinity, nudo: nj });
+    rectas.push(recta);
+    rectasDe.set(b.id, [recta]);
+  }
+
   // Apoyos: vínculos de las bases de los pilares y de los muros, y apoyos físicos (se suman)
   const apoyos = new Map<number, boolean[]>();
   const origen = new Map<number, string>();
@@ -510,6 +586,19 @@ export function construirPiezas(ctx: Contexto, topo: Topologia, losas: Losas, di
       continue;
     }
     diafragmas.push({ k, nudos: lista });
+  }
+  // Fase BN: una barra con los dos extremos en el mismo diafragma rígido no tiene axil por las
+  // acciones horizontales
+  for (const b of ctx.barras) {
+    const [i, j] = [extremoDe.get(idExtremo(b.id, "inicio")), extremoDe.get(idExtremo(b.id, "fin"))];
+    if (!i || !j) continue;
+    const d = diafragmas.find((x) => x.nudos.includes(i.nudo) && x.nudos.includes(j.nudo));
+    if (d)
+      diag.aviso(
+        "barra/en-diafragma",
+        `Los dos extremos de la barra ${b.id} están en el diafragma rígido de la planta ${ctx.plantas[d.k]!.id}: no recibe nada de las acciones horizontales en ese plano. Si arriostra el forjado, quite el diafragma de esa planta.`,
+        [b.id, ctx.plantas[d.k]!.id],
+      );
   }
   return { barras, rectas, rectasDe, apoyos, diafragmas };
 }

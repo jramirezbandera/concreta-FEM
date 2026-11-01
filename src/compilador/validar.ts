@@ -8,7 +8,7 @@ import type { MultiplicadoresLamina } from "../elementos/lamina.ts";
 import { Diagnosticos } from "../motor/diagnosticos.ts";
 import { cotasPlantas } from "./cotas.ts";
 import { PUNTOS_FIJOS } from "./puntoFijo.ts";
-import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
+import { FRACCION_MINIMA_BANDA, type ApoyoFisico, type ApoyoLineal, type Banda, type Barra, type CargaFisica, type CasoFisico, type Losa, type Material, type ModeloFisico, type Muro, type OpcionesResueltas, type PanoUnidireccional, type Pilar, type Planta, type Seccion, type Vec2, type Viga } from "./fisico.ts";
 import { BOVEDILLAS, CASETONES, desglosePano, pesoReticular } from "./pesoForjado.ts";
 import { areaConSigno, areaInterseccionRegiones, defectoPoligono, distanciaEntreSegmentos, puntoEnPoligono, type Region } from "./poligonos.ts";
 import { flexionUniforme, multiplicadoresAbacoUniforme, multiplicadoresReticular, volumenReticular } from "./reticular.ts";
@@ -102,6 +102,19 @@ export interface MuroCompilado {
 }
 
 /** El modelo físico ya comprobado, con sus índices. Las listas de objetos van ordenadas por `id`. */
+/** Extremo de una barra (fase BN): se coloca como un apoyo puntual. `id` es `<barra>@inicio` o `<barra>@fin`. */
+export interface ExtremoC {
+  id: string;
+  barra: string;
+  lado: "inicio" | "fin";
+  planta: string;
+  x: number;
+  y: number;
+}
+
+/** Id del extremo de una barra (fase BN). */
+export const idExtremo = (barra: string, lado: "inicio" | "fin"): string => `${barra}@${lado}`;
+
 export interface Contexto {
   op: OpcionesResueltas;
   plantas: readonly Planta[];
@@ -120,6 +133,11 @@ export interface Contexto {
   cargas: readonly CargaFisica[];
   pilarDe: ReadonlyMap<string, Pilar>;
   vigaDe: ReadonlyMap<string, Viga>;
+  /** Fase BN: barras entre dos niveles (por id). */
+  barras: readonly Barra[];
+  barraDe: ReadonlyMap<string, Barra>;
+  /** Fase BN: los extremos de las barras, en el orden de `barras` (inicio y fin), como puntos de unión. */
+  extremos: readonly ExtremoC[];
   /** C2: losas (por id), apoyos lineales y bandas. */
   losas: readonly LosaCompilada[];
   losaDe: ReadonlyMap<string, LosaCompilada>;
@@ -146,7 +164,7 @@ function modificadoresNoValidos(m: unknown): string | null {
   if (!esObjeto(m)) return "no son un objeto";
   for (const [pieza, g] of Object.entries(m)) {
     if (g === undefined) continue;
-    if (pieza !== "pilares" && pieza !== "vigas" && pieza !== "viguetas") return `pieza desconocida «${pieza}»`;
+    if (pieza !== "pilares" && pieza !== "vigas" && pieza !== "viguetas" && pieza !== "barras") return `pieza desconocida «${pieza}»`;
     if (!esObjeto(g)) return `${pieza} no es un objeto`;
     for (const [mat, mods] of Object.entries(g)) {
       if (mods === undefined) continue;
@@ -321,7 +339,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   if (malMod) {
     diag.error(
       "opciones/no-validas",
-      `Los modificadores de rigidez no son válidos (${malMod}): van por pilares, vigas y viguetas, para todos o por material (hormigon, acero, general), y cada uno de A, Avy, Avz, J, Iy o Iz tiene que estar en (0, 100] (uno mayor es una penalización, E6-1).`,
+      `Los modificadores de rigidez no son válidos (${malMod}): van por pilares, vigas, viguetas y barras, para todos o por material (hormigon, acero, general), y cada uno de A, Avy, Avz, J, Iy o Iz tiene que estar en (0, 100] (uno mayor es una penalización, E6-1).`,
     );
     return null;
   }
@@ -344,6 +362,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   const secciones = lista("secciones", true) as unknown as Seccion[];
   const pilares = (lista("pilares", false) as unknown as Pilar[]).sort(porId);
   const vigas = (lista("vigas", false) as unknown as Viga[]).sort(porId);
+  const barras = (lista("barras", false) as unknown as Barra[]).sort(porId);
   const apoyos = (lista("apoyos", false) as unknown as ApoyoFisico[]).sort(porId);
   const casos = lista("casos", true) as unknown as CasoFisico[];
   const cargas = (lista("cargas", false) as unknown as CargaFisica[]).sort(porId);
@@ -362,6 +381,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     ["secciones", secciones],
     ["pilares", pilares],
     ["vigas", vigas],
+    ["barras", barras],
     ["apoyos", apoyos],
     ["casos", casos],
     ["cargas", cargas],
@@ -530,6 +550,36 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     }
   }
 
+  // Barras (fase BN): de planta a planta; dz, previsto, sólo 0
+  for (const b of barras) {
+    usaSeccion(b.id, b.seccion);
+    liberaciones(b.id, b.liberaciones, ["inicio", "fin"]);
+    if (b.giro !== undefined && !num(b.giro)) mal(b.id, "el giro tiene que ser un número (grados)");
+    if (b.soloTraccion !== undefined && typeof b.soloTraccion !== "boolean") mal(b.id, "soloTraccion tiene que ser true o false");
+    let bien = true;
+    for (const [lado, x] of [["el inicio", b.inicio], ["el fin", b.fin]] as const) {
+      if (!esObjeto(x)) {
+        mal(b.id, `${lado} tiene que ser { planta, x, y }`);
+        bien = false;
+        continue;
+      }
+      if (!usaPlanta(b.id, x.planta, `la planta de ${lado}`)) bien = false;
+      if (!num(x.x) || !num(x.y)) {
+        mal(b.id, `x e y de ${lado} tienen que ser números (m)`);
+        bien = false;
+      }
+      if (x.dz !== undefined && !num(x.dz)) {
+        mal(b.id, `dz de ${lado} tiene que ser un número (m)`);
+        bien = false;
+      } else if (x.dz !== undefined && x.dz !== 0) {
+        diag.error("barra/dz-no-admitido", `La barra ${b.id} tiene ${lado} a ${String(x.dz)} m de su planta: por ahora las barras van de planta a planta (dz = 0).`, [b.id]);
+        bien = false;
+      }
+    }
+    if (bien && b.inicio.planta === b.fin.planta && !(Math.hypot(b.fin.x - b.inicio.x, b.fin.y - b.inicio.y) > op.epsGeom))
+      diag.error("barra/longitud-nula", `Los dos extremos de la barra ${b.id} están en el mismo punto.`, [b.id]);
+  }
+
   // Apoyos
   for (const a of apoyos) {
     usaPlanta(a.id, a.planta);
@@ -550,6 +600,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   validarAcciones(casos, caso, mal);
   const pilarDe = new Map(pilares.map((p) => [p.id, p] as const));
   const vigaDe = new Map(vigas.map((v) => [v.id, v] as const));
+  const barraDe = new Map(barras.map((b) => [b.id, b] as const));
   for (const c of cargas) {
     const r = c as unknown as Record<string, unknown>;
     if (typeof r.caso !== "string" || !caso.has(r.caso)) diag.error("fisico/referencia", `${c.id}: el caso «${String(r.caso)}» no existe.`, [c.id]);
@@ -557,9 +608,10 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       usaPlanta(c.id, c.planta);
       if (!num(c.x) || !num(c.y)) mal(c.id, "x e y tienen que ser números (m)");
       if ((c.F !== undefined && !vec3(c.F)) || (c.M !== undefined && !vec3(c.M)) || (c.F === undefined && c.M === undefined)) mal(c.id, "la carga puntual necesita F o M, vectores de 3 números");
-    } else if (c.tipo === "viga" || c.tipo === "pilar") {
-      const destino = c.tipo === "viga" ? r.viga : r.pilar;
-      if (typeof destino !== "string" || !(c.tipo === "viga" ? vigaDe : pilarDe).has(destino)) diag.error("fisico/referencia", `${c.id}: ${c.tipo === "viga" ? "la viga" : "el pilar"} «${String(destino)}» no existe.`, [c.id]);
+    } else if (c.tipo === "viga" || c.tipo === "pilar" || c.tipo === "barra") {
+      const destino = c.tipo === "viga" ? r.viga : c.tipo === "pilar" ? r.pilar : r.barra;
+      const que = c.tipo === "viga" ? "la viga" : c.tipo === "pilar" ? "el pilar" : "la barra";
+      if (typeof destino !== "string" || !(c.tipo === "viga" ? vigaDe : c.tipo === "pilar" ? pilarDe : barraDe).has(destino)) diag.error("fisico/referencia", `${c.id}: ${que} «${String(destino)}» no existe.`, [c.id]);
       if (c.ejes !== "global" && c.ejes !== "local") mal(c.id, "los ejes tienen que ser global o local");
       if (!vec3(c.q) || (c.qb !== undefined && !vec3(c.qb))) mal(c.id, "q (y qb) tienen que ser vectores de 3 números (kN/m)");
       if ((c.desde !== undefined && !num(c.desde)) || (c.hasta !== undefined && !num(c.hasta))) mal(c.id, "desde y hasta tienen que ser números (m)");
@@ -593,7 +645,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
       if (c.lado !== "izquierdo" && c.lado !== "derecho") mal(c.id, "el lado tiene que ser izquierdo o derecho");
       if (![c.z0, c.z1, c.p0, c.p1].every(num)) mal(c.id, "z0, z1, p0 y p1 tienen que ser números (m y kN/m²)");
       else if (!(c.z1 > c.z0)) mal(c.id, "z1 tiene que ser mayor que z0");
-    } else mal((c as { id: string }).id, "el tipo de carga tiene que ser puntual, viga, pilar, superficie, lineal o empuje");
+    } else mal((c as { id: string }).id, "el tipo de carga tiene que ser puntual, viga, pilar, barra, superficie, lineal o empuje");
   }
 
   // Losas, apoyos lineales y bandas (C2)
@@ -926,6 +978,7 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
   };
   for (const p of pilares) for (let k = planta.get(p.hasta)!; k <= planta.get(p.desde)!; k++) usar(k, p.id);
   for (const v of vigas) usar(planta.get(v.planta)!, v.id);
+  for (const b of barras) for (const x of [b.inicio, b.fin]) usar(planta.get(x.planta)!, b.id);
   for (const a of apoyos) usar(planta.get(a.planta)!, a.id);
   for (const c of cargas) if (c.tipo === "puntual" || c.tipo === "superficie" || c.tipo === "lineal") usar(planta.get(c.planta)!, c.id);
   for (const o of [...losas, ...apoyosLineales, ...bandas, ...panosC.map((p) => p.pano)]) usar(planta.get(o.planta)!, o.id);
@@ -973,6 +1026,9 @@ export function validar(fisico: ModeloFisico, op: OpcionesResueltas, diag: Diagn
     cargas,
     pilarDe,
     vigaDe,
+    barras,
+    barraDe,
+    extremos: barras.flatMap((b) => (["inicio", "fin"] as const).map((lado) => ({ id: idExtremo(b.id, lado), barra: b.id, lado, planta: b[lado].planta, x: b[lado].x, y: b[lado].y }))),
     losas: losasC,
     losaDe: new Map(losasC.map((l) => [l.losa.id, l] as const)),
     apoyosLineales,

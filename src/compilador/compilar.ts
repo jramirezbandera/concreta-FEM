@@ -106,7 +106,7 @@ function fisicoCanonico(f: ModeloFisico): unknown {
   const r: Record<string, unknown> = { ...f };
   // Los ejes de replanteo son sólo del dibujo (I2): no cambian el modelo analítico
   delete r.ejes;
-  for (const k of ["materiales", "secciones", "vigas", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos"]) if (r[k] !== undefined) r[k] = ordenar(r[k]);
+  for (const k of ["materiales", "secciones", "vigas", "barras", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos"]) if (r[k] !== undefined) r[k] = ordenar(r[k]);
   // Los ábacos de un reticular, por su vértice menor (C4): su orden no significa nada
   if (Array.isArray(r.losas))
     r.losas = (r.losas as unknown[]).map((l) => {
@@ -293,7 +293,7 @@ function compilarModelo(fisico: ModeloFisico, op: OpcionesResueltas, huella: str
   // RV-a: la flexión de las vigas planas en un reticular «uniforme»
   const planas = op.rigidezVigasPlanas < 1 ? vigasPlanasEnReticular(ctx, losas, piezas) : new Set<BarraP>();
   const modificadoresDe = (b: BarraP): ModificadoresBarra | undefined => {
-    const g = op.modificadores[b.tipo === "pilar" ? "pilares" : b.tipo === "vigueta" ? "viguetas" : "vigas"];
+    const g = op.modificadores[b.tipo === "pilar" ? "pilares" : b.tipo === "vigueta" ? "viguetas" : b.tipo === "barra" ? "barras" : "vigas"];
     const m: ModificadoresBarra = { ...g?.todos, ...g?.[b.material] };
     if (equilibrio.has(b) && m.J !== undefined && m.J < 1) delete m.J;
     if (planas.has(b)) m.Iy = (m.Iy ?? 1) * op.rigidezVigasPlanas;
@@ -510,11 +510,21 @@ function hipotesis(ctx: Contexto, op: OpcionesResueltas, piezas: Piezas, losas: 
     h.push(
       `Pilares con punto fijo y cambio de sección (PF): el eje de cada tramo es el centro de su sección; el nudo de cada planta va en el eje del tramo que llega a ella desde abajo, y la excentricidad, en un offset rígido en la base del tramo de encima (${excentricos.map((p) => p.id).join(", ")}).`,
     );
+  // Fase BN: las barras entre dos niveles, sus ejes y sus zonas rígidas (CB-f)
+  const deBarras = piezas.barras.filter((b) => b.tipo === "barra");
+  if (deBarras.length) {
+    const rigidas = deBarras.filter((b) => b.s[1] > 0 || b.s[2] < b.s[3]).map((b) => b.pieza);
+    h.push(
+      `Barras entre dos niveles (${deBarras.map((b) => b.pieza).join(", ")}): rectas del punto dibujado de su inicio al de su fin, cada extremo unido a lo que encuentra en su planta como un apoyo puntual (un pilar, un nudo, una viga, una losa o un muro). Ejes locales: x del inicio al fin, z en el plano vertical que las contiene y hacia arriba. Zona rígida sólo hasta la cara de los pilares de hormigón a los que llegan (CB-f)${rigidas.length ? `: ${rigidas.join(", ")}` : "; ninguna la tiene"}.`,
+    );
+    const traccion = ctx.barras.filter((b) => b.soloTraccion).map((b) => b.id);
+    if (traccion.length) h.push(`Barras declaradas sólo a tracción (${traccion.join(", ")}): se calculan lineales, con las dos diagonales de una cruz activas; si alguna queda comprimida en una combinación, se avisa.`);
+  }
   const grupos = new Map<string, number>();
   for (const b of piezas.barras) {
     const m = modificadoresDe(b);
     if (!m) continue;
-    const clave = `${b.tipo === "pilar" ? "tramos de pilar" : b.tipo === "vigueta" ? "viguetas" : "tramos de viga"} ${NOMBRE_MATERIAL[b.material]}: ${Object.entries(m)
+    const clave = `${b.tipo === "pilar" ? "tramos de pilar" : b.tipo === "vigueta" ? "viguetas" : b.tipo === "barra" ? "barras" : "tramos de viga"} ${NOMBRE_MATERIAL[b.material]}: ${Object.entries(m)
       .map(([k, x]) => `${k} ×${coma(x!)}`)
       .join(", ")}`;
     grupos.set(clave, (grupos.get(clave) ?? 0) + 1);

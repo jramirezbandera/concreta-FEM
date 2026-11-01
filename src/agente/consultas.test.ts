@@ -51,7 +51,7 @@ const valor = <T>(r: { valido: boolean; valor?: T; diagnosticos: { mensaje: stri
 const COMP = ["N", "Vy", "Vz", "T", "My", "Mz"];
 
 /** Extremos de un grupo a fuerza bruta: todas las barras, combinaciones, estaciones y lados, con el diagrama combinado. */
-function extremosABruto(q: Consultas, cj: ConjuntoCombinaciones, tipo: "pilar" | "viga" | "vigueta", planta: string, sinAxil: (pieza: string) => boolean) {
+function extremosABruto(q: Consultas, cj: ConjuntoCombinaciones, tipo: GrupoEnvolvente["tipo"], planta: string, sinAxil: (pieza: string) => boolean) {
   const ep = new EsfuerzosPiezas(q.modelo, q.mapeo, q.casos);
   const max: Record<string, number> = {};
   const min: Record<string, number> = {};

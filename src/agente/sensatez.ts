@@ -348,6 +348,8 @@ function verticales(c: CargaFisica): number[] {
       return [c.q[2], ...(c.qb ? [c.qb[2]] : [])];
     case "pilar": // x local hacia arriba
       return c.ejes === "global" ? [c.q[2], ...(c.qb ? [c.qb[2]] : [])] : [c.q[0], ...(c.qb ? [c.qb[0]] : [])];
+    case "barra": // en locales, z en el plano vertical y hacia arriba (fase BN)
+      return [c.q[2], ...(c.qb ? [c.qb[2]] : [])];
     case "empuje":
       return [];
   }

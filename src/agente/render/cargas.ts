@@ -34,6 +34,7 @@
  *
  * Puro: sin IO.
  */
+import { ejesBarra, puntosBarra } from "../../compilador/barras.ts";
 import { cotasPlantas } from "../../compilador/cotas.ts";
 import { conPuntoFijo } from "../../compilador/puntoFijo.ts";
 import type { CargaFisica, ModeloFisico, Vec2 } from "../../compilador/fisico.ts";
@@ -45,9 +46,9 @@ import { flecha2D } from "./reacciones.ts";
 
 export type V3 = [number, number, number];
 
-/** Cómo se dibuja una carga (su color): como en la planta, las de vigas, pilares y muros son «pieza». */
+/** Cómo se dibuja una carga (su color): como en la planta, las de vigas, pilares, barras y muros son «pieza». */
 export type ClaseCarga = "superficie" | "lineal" | "puntual" | "pieza";
-export const CLASE_CARGA: Record<CargaFisica["tipo"], ClaseCarga> = { superficie: "superficie", lineal: "lineal", puntual: "puntual", viga: "pieza", pilar: "pieza", empuje: "pieza" };
+export const CLASE_CARGA: Record<CargaFisica["tipo"], ClaseCarga> = { superficie: "superficie", lineal: "lineal", puntual: "puntual", viga: "pieza", pilar: "pieza", barra: "pieza", empuje: "pieza" };
 
 /** La parte de P (anillos, par-impar) dentro de alguna de las `capas` (null: P entera), a la cota z, con q (kN/m², globales). */
 export interface RegionCarga {
@@ -117,6 +118,7 @@ export function geometriaCargas(f: ModeloFisico, caso: string): { cargas: Geomet
   const cota = (id: string) => cotas[indice.get(id) ?? -1] ?? null;
   const vigas = new Map((f.vigas ?? []).map((v) => [v.id, v]));
   const pilares = new Map((f.pilares ?? []).map((p) => [p.id, p]));
+  const barras = new Map((f.barras ?? []).map((b) => [b.id, b]));
   const muros = new Map((f.muros ?? []).map((m) => [m.id, m]));
   const losas = new Map((f.losas ?? []).map((l) => [l.id, l]));
   const panos = new Map((f.panos ?? []).map((p) => [p.id, p]));
@@ -189,6 +191,25 @@ export function geometriaCargas(f: ModeloFisico, caso: string): { cargas: Geomet
           }
           s0 += l;
         }
+        break;
+      }
+      case "barra": {
+        // Fase BN: un tramo del inicio al fin, en sus ejes (cabecera de `fisico.ts`)
+        const br = barras.get(g.barra);
+        const AB = br ? puntosBarra(plantas, br) : null;
+        if (!br || !AB) {
+          notas.push(`${g.id}: no existe la barra ${g.barra} o sus plantas.`);
+          break;
+        }
+        const [A, B] = AB;
+        const L = Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]);
+        if (!(L > 0)) break;
+        const { ex, ey, ez } = ejesBarra(A, B, br.giro ?? 0);
+        const glob = (q: readonly number[]): V3 => (g.ejes === "global" ? [q[0]!, q[1]!, q[2]!] : mas(mas(por(ex, q[0]!), por(ey, q[1]!)), por(ez, q[2]!)));
+        const [a, b] = [g.desde ?? 0, g.hasta ?? L];
+        if (!(b > a)) break;
+        const P = (s: number): V3 => [A[0] + ex[0] * s, A[1] + ex[1] * s, A[2] + ex[2] * s];
+        x.lineas.push({ a: P(a), b: P(b), qa: glob(g.q), qb: glob(g.qb ?? g.q) });
         break;
       }
       case "pilar": {
@@ -266,6 +287,7 @@ export function textoCarga(g: CargaFisica): string {
       return `${g.id}: F ${vector(g.F ?? [0, 0, 0])} kN${g.M ? `, M ${vector(g.M)} kN·m` : ""}`;
     case "viga":
     case "pilar":
+    case "barra":
       return `${g.id}: ${vector(g.q)}${g.qb ? ` a ${vector(g.qb)}` : ""} kN/m ${g.ejes}`;
     case "empuje":
       return `${g.id}: empuje ${rotulo(g.p0)} a ${rotulo(g.p1)} kN/m²`;

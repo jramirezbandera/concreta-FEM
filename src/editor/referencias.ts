@@ -12,7 +12,7 @@
 import type { CargaFisica, ModeloFisico } from "../compilador/fisico.ts";
 
 /** Las listas con id del modelo físico, en el orden de `validar.ts`. */
-export const COLECCIONES = ["plantas", "materiales", "secciones", "pilares", "vigas", "apoyos", "casos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos", "ejes"] as const;
+export const COLECCIONES = ["plantas", "materiales", "secciones", "pilares", "vigas", "barras", "apoyos", "casos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos", "ejes"] as const;
 export type Coleccion = (typeof COLECCIONES)[number];
 
 export type Objeto = { readonly id: string } & Record<string, unknown>;
@@ -50,6 +50,11 @@ export function referenciasDe(coleccion: Coleccion, o: Objeto): Referencia[] {
     case "panos":
       r.push(...ref("plantas", o.planta, "planta"), ...ref("secciones", o.seccion, "seccion"));
       break;
+    case "barras": {
+      const [i, f] = [o.inicio, o.fin] as ({ planta?: unknown } | undefined)[];
+      r.push(...ref("plantas", i?.planta, "inicio", "planta"), ...ref("plantas", f?.planta, "fin", "planta"), ...ref("secciones", o.seccion, "seccion"));
+      break;
+    }
     case "apoyos":
     case "apoyosLineales":
     case "bandas":
@@ -82,6 +87,9 @@ export function referenciasDe(coleccion: Coleccion, o: Objeto): Referencia[] {
           break;
         case "pilar":
           r.push(...ref("pilares", c.pilar, "pilar"));
+          break;
+        case "barra":
+          r.push(...ref("barras", c.barra, "barra"));
           break;
         case "empuje":
           r.push(...ref("muros", c.muro, "muro"));
