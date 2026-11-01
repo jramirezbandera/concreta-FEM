@@ -1,6 +1,6 @@
 # Fase BN: barras entre dos niveles
 
-**Estado (2026-11-01):** BN1 y BN2 hechas (§4.1 y §5.1): pasan sus criterios; de BN2 falta la puerta de uso. Sigue BN3 (la herramienta del alzado).
+**Estado (2026-11-01):** BN1, BN2 y BN3 hechas (§4.1, §5.1 y §6.1): pasan sus criterios; de BN2 y BN3 falta la puerta de uso.
 
 Viene de `niveles.md` §1 (paso 2 de su orden) y de `cimentacion-y-arriostramientos.md` §3.
 
@@ -218,6 +218,48 @@ Dos clics enganchados en el alzado: cruces de pilar y nivel, puntos de las vigas
 En planta, con la herramienta Barra, el primer clic y el segundo pueden ir en plantas distintas, eligiendo la del segundo en la plantilla.
 
 **Criterio de BN3:** lo dibujado da, byte a byte, lo mismo que su fila de la tabla. Banco de Chrome con el pórtico arriostrado dibujado.
+
+### 6.1 Resultado de BN3 (2026-11-01)
+
+Pasa el criterio; falta la puerta de uso (con la de BN2).
+
+**Qué hay:**
+
+- **El índice del alzado** (`src/editor/dibujo/alzado.ts`): los enganches de un plano en (u, z), como su vista, y cada rasgo con su punto del modelo (planta, x, y). `enganches.ts` lo devuelve con el enganche (`Enganche.modelo`); en planta ningún rasgo lo lleva y todo sigue igual. Engancha, de lo que está a menos de la profundidad del plano:
+  - los nudos de los pilares en cada planta, en el eje del tramo de debajo (en la base, el de encima: la huella del nudo de CB-f, también con punto fijo y cambio de sección), «Centro»; y sus caras vistas desde el plano, «Cara»;
+  - las vigas paralelas (extremos, vértices, punto medio y el más cercano) y el cruce de las que lo atraviesan; los muros, igual, en cada planta que tocan;
+  - el cruce de cada eje de replanteo con cada nivel, y los extremos de las barras del plano;
+  - las líneas de nivel: el más cercano y la perpendicular desde el primer extremo (una barra vertical).
+- **La herramienta Barra** (`src/editor/dibujo/barra.ts`), en la barra de Modelo tras Viga, con dos clics:
+  - en un alzado, cada extremo en el nivel en que se hace clic; un punto que no está en una línea de nivel es un error (en BN, `dz` = 0);
+  - en planta, el primero en la de la vista y el segundo en la «planta del fin» de la plantilla o, sin ella, en la de la vista del segundo clic;
+  - el primer extremo es del modelo: sigue al pasar a otra vista, se pinta en todas y el segundo clic puede ir en cualquiera (en un alzado y en una planta, o en dos plantas);
+  - plantilla: sección (sin ninguna de barras, se crea con acero propuesto, como en la tabla), giro, uniones «Empotradas» o «Articuladas» (las de la diagonal del pórtico: My y Mz en los dos extremos y la torsión en el fin), «sólo tracción» y la planta del fin;
+  - en un alzado se teclea «u; z», «@du; dz» o «@L<α»; la barra de estado dice dónde queda el extremo («→ P1 (5; 0)»).
+- **En la app** (`app/src/dibujo/controlador.ts`): los alzados de Modelo llevan su adaptador (`adaptadorAlzado`), que sólo dibuja con Barra; con las demás herramientas, sus clics eligen como siempre.
+
+**Exactitud:** el punto del modelo de un nudo, un vértice, un extremo o un cruce con rectas paralelas a X o a Y es el del modelo, bit a bit. El de una cara, un punto medio, un punto de una recta o uno tecleado, redondeado a 1e-9 m (como las estaciones de V2c2-1); en un alzado paralelo a X o a Y, la coordenada del plano, tal cual. Así, «@1,5; 3» desde el nudo de (0; 4) da (1,5; 4).
+
+**Validación:**
+
+| Qué | Dónde | Resultado |
+|---|---|---|
+| Criterio, en Node | `src/editor/dibujo/barra.test.ts` | Las cuatro barras del pórtico arriostrado (la cruz en el alzado del eje A, el tornapuntas en el del B con «@1,5; 3», la diagonal en la planta C con la planta del fin y el giro): las del pórtico con los ids de lo dibujado, byte a byte con sus filas de la tabla, y compilan sin fusiones |
+| El índice del alzado | `barra.test.ts` | El nudo de un pilar con punto fijo y cambio de sección en cada planta; caras; el cruce exacto de una viga, un eje y un muro; un punto fuera de los niveles; la perpendicular (una barra vertical); un alzado girado 30°, bit a bit |
+| Entre vistas | `barra.test.ts`, `app/src/test/barra.test.ts` | El primer extremo en un alzado y el segundo en una planta; el alzado no dibuja con otra herramienta; lo tecleado en un alzado; deshacer, una barra por paso |
+| Banco de Chrome | `validacion/bn3/chrome.ts`, `out_chrome.txt` | El pórtico arriostrado dibujado con el ratón y el teclado en la app compilada: su huella es la de Node, lo guardado tiene sus barras byte a byte y cuatro pasos de deshacer vuelven a la de partida. En el alzado del edificio objetivo, pasar y pintar con el primer extremo puesto, 0,1 ms p95 (el índice, 2–4 ms la primera vez), sin tareas largas |
+
+Las pruebas de dibujo de antes (`src/editor`, 386, y las de la app) pasan sin cambios.
+
+**Decisiones tomadas al hacerlo (para revisar en la puerta de uso):**
+
+- **BN3-a:** un clic fuera de las líneas de nivel en un alzado es un error, no un extremo a otra altura (hasta que haya `dz`).
+- **BN3-b:** en planta, la planta del fin por defecto es la de la vista del segundo clic (con una sola vista, una barra en el plano de la planta); para una diagonal entre plantas desde una sola vista, se elige en la plantilla.
+- **BN3-c:** «Articuladas» son las uniones de la diagonal del pórtico arriostrado (la torsión, en el fin, para que no sea un mecanismo).
+- **BN3-d:** cada barra son dos clics; el segundo extremo no empieza la siguiente (una cruz, cuatro clics).
+- **BN3-e:** el nudo de un pilar en el alzado engancha como «Centro» (nivel 1), por delante de los extremos de vigas y barras.
+
+**Hallazgo (BN3-1):** el botón «Guardar» dice «Guardar●» con cambios sin guardar; el ayudante de los bancos lo buscaba por su texto exacto y no lo encontraba. El de V2c (`diferencias`) tiene el mismo descuido, pero sólo se usa cuando las huellas no casan.
 
 ## 7. Después de BN
 

@@ -631,7 +631,7 @@
   - **Modelo físico:** `barras` con `inicio` y `fin` (planta, x, y; `dz` previsto, sólo 0: `barra/dz-no-admitido`), sección, `giro`, liberaciones y `soloTraccion`; la carga `barra`, por metro de longitud real; el grupo `barras` de los modificadores (D4 no las toca).
   - **Compilador:** cada extremo se coloca como un apoyo puntual (pilar, nudo, viga partida, losa, ancho de una viga a su eje o muro; si no, `barra/extremo-sin-apoyo`). Recta del punto dibujado de inicio al de fin; ejes locales con z en el plano vertical (`src/compilador/barras.ts`); zona rígida hasta la cara de los pilares de hormigón por la huella del nudo (CB-f), ninguna en acero; peso γ·A; aviso `barra/en-diafragma`; tipo `barra` en el mapeo, hipótesis.
   - **Validación:** `barras.test.ts` (oráculo a mano a 1e-10, extremos, ejes, zona rígida, metamórficas), `congelado-bn.test.ts` y el oráculo externo `oraculo-bn.test.ts` (el pórtico de acero montado en PyNite desde su modelo físico, ≤ 1e-11).
-  - **Pendiente:** BN3 (la herramienta «Barra» del alzado).
+  - **Hecha el mismo día:** BN3 (la herramienta «Barra», abajo).
 - **2026-11-01: fase BN2 hecha** (las barras en la app y en el agente; `barras.md` §5.1). Pasan sus criterios; falta la puerta de uso.
   - **Editor:**
     - tabla Barras y carga «barra»;
@@ -646,6 +646,14 @@
     - umbral nuevo `dimensionBarra` (0,01 m), por confirmar;
     - la skill.
   - **Validación:** `src/editor/barras.test.ts`, `src/visor/barras.test.ts`, `src/agente/barras.test.ts` y el banco `validacion/bn/chrome.ts`.
+- **2026-11-01: fase BN3 hecha** (la herramienta «Barra»; `barras.md` §6.1). Pasa el criterio; falta la puerta de uso (con la de BN2).
+  - **Ya en `src/editor/dibujo/`** (puro):
+    - `alzado.ts`: el índice de enganches de un alzado en (u, z), con el punto del modelo (planta, x, y) de cada rasgo, que `enganches.ts` devuelve con el enganche (en planta, nada cambia). Nudos de los pilares en cada planta (el eje del tramo de la huella del nudo, también con punto fijo), sus caras, vigas y muros paralelos o que cruzan, ejes de replanteo, extremos de barras y las líneas de nivel;
+    - `barra.ts`: Barra, dos clics. En un alzado, cada extremo en su nivel (fuera de las líneas de nivel, error: `dz` = 0); en planta, el primero en la de la vista y el segundo en la «planta del fin» de la plantilla o en la de la vista del segundo clic. El primer extremo es del modelo: sigue al pasar a otra vista.
+  - **En la app:** Barra en la barra de Modelo tras Viga, con su plantilla (sección con acero propuesto, giro, uniones empotradas o articuladas, «sólo tracción» y planta del fin); los alzados de Modelo dibujan con ella (`adaptadorAlzado`); en un alzado se teclea «u; z».
+  - **Exactitud:** nudos, vértices y cruces, bit a bit; caras, medios, puntos de una recta y lo tecleado, a 1e-9 m.
+  - **Validación:** `src/editor/dibujo/barra.test.ts` (el pórtico arriostrado dibujado, byte a byte con las filas de la tabla), `app/src/test/barra.test.ts` y el banco `validacion/bn3/chrome.ts` (el pórtico dibujado con ratón y teclado tiene la huella de Node; en el alzado del edificio objetivo, 0,1 ms p95).
+  - **Para la puerta de uso:** las decisiones BN3-a…BN3-e de `barras.md` §6.1.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
@@ -658,7 +666,7 @@
   - las puertas de uso que queden;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; BN1 y BN2 hechas, sigue BN3 (herramienta del alzado)** (`barras.md`), de planta a planta y con `dz` previsto;
+  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; BN1, BN2 y BN3 hechas, falta su puerta de uso** (`barras.md`), de planta a planta y con `dz` previsto; después, lo de `barras.md` §7 (`dz`, el objeto `cruz`) y los desniveles de paño;
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
