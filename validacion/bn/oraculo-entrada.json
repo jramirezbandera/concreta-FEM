@@ -1,0 +1,422 @@
+{
+ "plantas": [
+  {
+   "id": "P2",
+   "altura": null,
+   "diafragma": "ninguno"
+  },
+  {
+   "id": "P1",
+   "altura": 3.5,
+   "diafragma": "ninguno"
+  },
+  {
+   "id": "C",
+   "altura": 4,
+   "diafragma": "ninguno"
+  }
+ ],
+ "materiales": [
+  {
+   "id": "S",
+   "tipo": "acero"
+  }
+ ],
+ "secciones": [
+  {
+   "id": "HEB",
+   "material": "S",
+   "forma": "general",
+   "A": 0.00781,
+   "Iy": 0.00005696,
+   "Iz": 0.00002003,
+   "J": 9.53e-7
+  },
+  {
+   "id": "IPE",
+   "material": "S",
+   "forma": "general",
+   "A": 0.00538,
+   "Iy": 0.00008356,
+   "Iz": 0.00000604,
+   "J": 2.01e-7
+  },
+  {
+   "id": "R",
+   "material": "S",
+   "forma": "general",
+   "A": 0.000707,
+   "Iy": 3.98e-8,
+   "Iz": 3.98e-8,
+   "J": 7.95e-8
+  },
+  {
+   "id": "T",
+   "material": "S",
+   "forma": "general",
+   "A": 0.0016,
+   "Iy": 0.0000028,
+   "Iz": 0.0000011,
+   "J": 0.0000031
+  }
+ ],
+ "pilares": [
+  {
+   "id": "A",
+   "x": 0,
+   "y": 0,
+   "desde": "C",
+   "hasta": "P2",
+   "seccion": "HEB",
+   "giro": 0
+  },
+  {
+   "id": "B",
+   "x": 6,
+   "y": 0,
+   "desde": "C",
+   "hasta": "P2",
+   "seccion": "HEB",
+   "giro": 90
+  },
+  {
+   "id": "C1",
+   "x": 0,
+   "y": 5,
+   "desde": "C",
+   "hasta": "P2",
+   "seccion": "HEB",
+   "giro": 0
+  },
+  {
+   "id": "D",
+   "x": 6,
+   "y": 5,
+   "desde": "C",
+   "hasta": "P2",
+   "seccion": "HEB",
+   "giro": 90
+  }
+ ],
+ "vigas": [
+  {
+   "id": "V1a",
+   "planta": "P1",
+   "puntos": [
+    [
+     0,
+     0
+    ],
+    [
+     6,
+     0
+    ]
+   ],
+   "seccion": "IPE"
+  },
+  {
+   "id": "V1b",
+   "planta": "P1",
+   "puntos": [
+    [
+     0,
+     5
+    ],
+    [
+     6,
+     5
+    ]
+   ],
+   "seccion": "IPE"
+  },
+  {
+   "id": "V2a",
+   "planta": "P2",
+   "puntos": [
+    [
+     0,
+     0
+    ],
+    [
+     6,
+     0
+    ]
+   ],
+   "seccion": "IPE"
+  },
+  {
+   "id": "V2b",
+   "planta": "P2",
+   "puntos": [
+    [
+     0,
+     5
+    ],
+    [
+     6,
+     5
+    ]
+   ],
+   "seccion": "IPE"
+  },
+  {
+   "id": "V2c",
+   "planta": "P2",
+   "puntos": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     5
+    ]
+   ],
+   "seccion": "IPE"
+  }
+ ],
+ "barras": [
+  {
+   "id": "X1",
+   "inicio": {
+    "planta": "C",
+    "x": 0,
+    "y": 0
+   },
+   "fin": {
+    "planta": "P1",
+    "x": 6,
+    "y": 0
+   },
+   "seccion": "R",
+   "liberaciones": {
+    "inicio": [
+     false,
+     false,
+     false,
+     false,
+     true,
+     true
+    ],
+    "fin": [
+     false,
+     false,
+     false,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "id": "X2",
+   "inicio": {
+    "planta": "C",
+    "x": 6,
+    "y": 0
+   },
+   "fin": {
+    "planta": "P1",
+    "x": 0,
+    "y": 0
+   },
+   "seccion": "R",
+   "liberaciones": {
+    "inicio": [
+     false,
+     false,
+     false,
+     false,
+     true,
+     true
+    ],
+    "fin": [
+     false,
+     false,
+     false,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "id": "T1",
+   "inicio": {
+    "planta": "P1",
+    "x": 0,
+    "y": 5
+   },
+   "fin": {
+    "planta": "P2",
+    "x": 2.5,
+    "y": 5
+   },
+   "seccion": "T"
+  },
+  {
+   "id": "T2",
+   "inicio": {
+    "planta": "P1",
+    "x": 4,
+    "y": 0
+   },
+   "fin": {
+    "planta": "P2",
+    "x": 4,
+    "y": 0
+   },
+   "seccion": "T",
+   "giro": 20
+  },
+  {
+   "id": "T3",
+   "inicio": {
+    "planta": "P2",
+    "x": 6,
+    "y": 0
+   },
+   "fin": {
+    "planta": "P2",
+    "x": 0,
+    "y": 2.5
+   },
+   "seccion": "T",
+   "giro": 35
+  },
+  {
+   "id": "T4",
+   "inicio": {
+    "planta": "C",
+    "x": 6,
+    "y": 5
+   },
+   "fin": {
+    "planta": "P1",
+    "x": 3,
+    "y": 0
+   },
+   "seccion": "T",
+   "giro": -60
+  }
+ ],
+ "casos": [
+  {
+   "id": "G",
+   "pesoPropio": true
+  },
+  {
+   "id": "Q"
+  },
+  {
+   "id": "W"
+  }
+ ],
+ "cargas": [
+  {
+   "tipo": "viga",
+   "id": "qv",
+   "caso": "Q",
+   "viga": "V1b",
+   "ejes": "global",
+   "q": [
+    0,
+    0,
+    -8
+   ]
+  },
+  {
+   "tipo": "viga",
+   "id": "qv2",
+   "caso": "Q",
+   "viga": "V2a",
+   "ejes": "local",
+   "q": [
+    0,
+    0.5,
+    -4
+   ],
+   "qb": [
+    0,
+    -0.5,
+    -2
+   ],
+   "desde": 1,
+   "hasta": 5
+  },
+  {
+   "tipo": "barra",
+   "id": "qt1",
+   "caso": "Q",
+   "barra": "T1",
+   "ejes": "local",
+   "q": [
+    0.3,
+    0.6,
+    -1.5
+   ],
+   "qb": [
+    0,
+    -0.2,
+    -0.5
+   ],
+   "desde": 0.4,
+   "hasta": 3.2
+  },
+  {
+   "tipo": "barra",
+   "id": "qt3",
+   "caso": "Q",
+   "barra": "T3",
+   "ejes": "global",
+   "q": [
+    0.2,
+    0,
+    -1
+   ]
+  },
+  {
+   "tipo": "barra",
+   "id": "qt4",
+   "caso": "W",
+   "barra": "T4",
+   "ejes": "local",
+   "q": [
+    0,
+    1.2,
+    0.4
+   ]
+  },
+  {
+   "tipo": "puntual",
+   "id": "w1",
+   "caso": "W",
+   "planta": "P2",
+   "x": 0,
+   "y": 0,
+   "F": [
+    12,
+    3,
+    0
+   ]
+  },
+  {
+   "tipo": "puntual",
+   "id": "w2",
+   "caso": "W",
+   "planta": "P1",
+   "x": 6,
+   "y": 5,
+   "F": [
+    8,
+    -2,
+    0
+   ],
+   "M": [
+    0,
+    0,
+    1.5
+   ]
+  }
+ ]
+}
