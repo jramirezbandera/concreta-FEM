@@ -523,10 +523,11 @@ export function ModoArmado() {
 
   const herramientas = (
     <>
+      {/* Los modos, siempre en el mismo sitio (UI-51); detrás, lo de cada modo */}
+      <BarraModos />
+      <Separador />
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="esfuerzos" />
       <CampoLista etiqueta="Armadura" valor={armadura} onCambio={setArmadura} opciones={ARMADURAS} />
-      <Separador />
-      <BarraModos />
       <Separador />
       <BarraVistas />
     </>

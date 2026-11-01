@@ -287,7 +287,9 @@ function CuadroPilar({ filas }: { filas: FilaPilar[] | null }) {
 
 export function ModoDiagramas() {
   const { proyecto, planta, seleccion, setSeleccion } = useVisor();
-  const pan = usePaneles("resultados:diagramas", { nav: true, props: true, dock: true, pestana: "alzado", alto: 300 });
+  // UI-46: el panel inferior (el alzado de la pieza) se abre al elegir una pieza, no al entrar: en un
+  // portátil se comía la mitad de la planta antes de que hubiera nada que enseñar
+  const pan = usePaneles("resultados:diagramas", { nav: true, props: true, dock: false, pestana: "alzado", alto: 300 });
   const e = proyecto.estado!;
   const [esfuerzo, setEsfuerzo] = useState<Esfuerzo>("My");
   const [piezas3D, setPiezas3D] = useState<PiezasDiagrama>("todas");
@@ -301,6 +303,14 @@ export function ModoDiagramas() {
   const obj = usePedido(proyecto.cliente, seleccion && !lista.some((p) => p.id === seleccion) ? { tipo: "objeto", id: seleccion } : null);
   const otra = obj.datos?.id === seleccion && ["viga", "vigueta", "pilar", "barra"].includes(obj.datos.tipo) ? seleccion : null;
   const id = lista.some((p) => p.id === seleccion) ? seleccion! : (otra ?? lista.find((p) => p.tipo === "viga")?.id ?? lista[0]?.id ?? null);
+  const elegida = lista.some((p) => p.id === seleccion) ? seleccion : otra;
+  const { poner: ponerPaneles } = pan;
+  const abiertaPor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!elegida || abiertaPor.current === elegida) return;
+    abiertaPor.current = elegida;
+    ponerPaneles({ dock: true, pestana: "alzado" });
+  }, [elegida, ponerPaneles]);
   const vista: VistaPlanta = esfuerzo === "My" || esfuerzo === "Vz" ? { vista: "vigas", esfuerzo, combinaciones: eleccion } : { vista: "modelo" };
   const viga = usePedido(proyecto.cliente, id ? { tipo: "viga", id, esfuerzo, combinaciones: eleccion } : null);
   const v = viga.datos && viga.datos.id === id ? viga.datos : null;
@@ -331,9 +341,10 @@ export function ModoDiagramas() {
 
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="esfuerzos" />
-      <Separador />
+      {/* Los modos, siempre en el mismo sitio (UI-51); detrás, lo de cada modo */}
       <BarraModos />
+      <Separador />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="esfuerzos" />
       <Separador />
       <Segmentado
         etiqueta="Esfuerzo"

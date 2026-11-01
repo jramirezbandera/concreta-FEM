@@ -402,6 +402,9 @@ input.sel:focus, textarea.sel:focus { outline: none; border-color: var(--color-a
   font: 600 10px var(--font-sans); letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-tertiary);
 }
 .leyenda-cab:hover { color: var(--color-text-primary); }
+.leyenda-mas { margin-top: 4px; padding: 0; border: 0; background: none; font: 500 11px var(--font-sans); color: var(--color-accent-text); cursor: pointer; }
+.leyenda-mas:hover { text-decoration: underline; }
+.leyenda-vista[data-detalles="true"] { width: 260px; }
 .leyenda-cab .giro { transition: transform .15s; }
 .leyenda-cab[aria-expanded="false"] .giro { transform: rotate(-90deg); }
 .sel-chip { border: 0; background: none; font: 600 12.5px var(--font-sans); color: var(--color-text-primary); cursor: pointer; padding: 0 2px; }
@@ -580,7 +583,38 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .ib:hover:not(:disabled) { background: var(--color-bg-elevated); color: var(--color-text-primary); }
 .ib:disabled { opacity: .4; cursor: default; }
 
-.barra-sup { display: flex; align-items: center; gap: 8px; height: 44px; flex-shrink: 0; padding: 0 10px 0 12px; border-bottom: 1px solid var(--color-border-main); background: var(--color-bg-primary); }
+.barra-sup { display: flex; align-items: center; gap: 8px; height: 44px; flex-shrink: 0; min-width: 0; padding: 0 10px 0 12px; border-bottom: 1px solid var(--color-border-main); background: var(--color-bg-primary); overflow: hidden; }
+.barra-sup .nombre-proyecto { min-width: 72px; }
+.btn-buscar { gap: 14px; color: var(--color-text-tertiary); }
+/* UI-7: en un portátil la barra superior no cabía y la página se desplazaba de lado. Por debajo de
+   1500 px, los botones sólo con su icono (el texto queda en el título); por debajo de 1100 px, lo de
+   la derecha en el menú «⋯» */
+.solo-1100 { display: none; }
+@media (max-width: 1499.98px) {
+  .barra-sup .et { display: none; }
+  .barra-sup .btn { padding-inline: 8px; }
+}
+@media (max-width: 1099.98px) {
+  .barra-sup .ancho-1100 { display: none; }
+  .barra-sup .solo-1100 { display: inline-flex; }
+}
+/* Un menú que cuelga de un botón (armazon/Disposicion.tsx, MenuFlotante) */
+.menu-flotante {
+  position: fixed; z-index: 60; min-width: 210px; padding: 4px;
+  border: 1px solid var(--color-border-main); border-radius: 8px; background: var(--color-bg-primary);
+  box-shadow: var(--shadow-pop);
+}
+.menu-flotante > button:not(.herr) {
+  display: flex; align-items: center; gap: 9px; width: 100%; height: 30px; padding: 0 10px;
+  border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer;
+  font: 13px var(--font-sans); color: var(--color-text-primary); white-space: nowrap;
+}
+.menu-flotante > button:not(.herr):hover { background: var(--color-bg-elevated); }
+.menu-flotante > button[data-on="true"] { background: var(--color-tint-accent); color: var(--color-accent-text); }
+.menu-flotante > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-ring); }
+.menu-flotante .herr { flex-direction: row; justify-content: flex-start; gap: 10px; width: 100%; min-width: 0; height: 32px; margin: 0; padding: 0 10px; font-size: 12.5px; }
+.menu-flotante .herr-sep { width: auto; height: 1px; margin: 4px 6px; }
+.menu-flotante .kbd { margin-left: 12px; }
 .espacios { display: flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--color-bg-elevated); flex-shrink: 0; }
 .espacios > button {
   height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: none;
@@ -617,6 +651,20 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .herr-seg button:disabled { opacity: .4; cursor: default; }
 /* En un portátil (1366–1536 px) la barra no cabía y lo de la derecha (las disposiciones) quedaba
    cortado sin ninguna pista: más apretada y, si aun así no cabe, con su barra de desplazamiento */
+/* El tipo de la vista activa, sólo con iconos (también está en el chip de cada vista) */
+.herr-tipos button { display: grid; place-items: center; padding: 0 7px; }
+/* UI-7: lo que se pliega en «Editar ▾» por debajo de 1500 px */
+.herr-grupo { display: contents; }
+.herr-plegado { display: none; }
+@media (max-width: 1499.98px) {
+  .herramientas .herr-grupo { display: none; }
+  .herramientas .herr-plegado { display: flex; }
+  .herramientas .herr-seg button { padding: 0 5px; }
+}
+@media (max-width: 1099.98px) {
+  .herramientas .herr { min-width: 38px; padding: 0 3px; font-size: 11px; }
+  .herramientas .herr-sep { margin: 12px 2px; }
+}
 @media (max-width: 1599px) {
   .herramientas { scrollbar-width: thin; }
   .herr { min-width: 44px; padding: 0 4px; }

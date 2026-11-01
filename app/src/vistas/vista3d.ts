@@ -112,6 +112,8 @@ export const filtra = (f: FiltroVista | undefined): boolean => !!f && (!!f.desde
 export interface Camara3D {
   C: [number, number, number];
   T: [number, number, number];
+  /** Era el encuadre automático: la vista que la recupera sigue encuadrándose sola (UI-46). */
+  ajustada?: boolean;
 }
 
 /** Lo que hay bajo el cursor (I4): `p`, el punto del modelo (m, globales). */
@@ -347,6 +349,7 @@ export class Vista3D extends Vista {
     if (camara) {
       this.camaraAbsoluta = camara;
       this.encuadrada = true;
+      this.ajustada = !!camara.ajustada;
     }
   }
 
@@ -356,7 +359,7 @@ export class Vista3D extends Vista {
   camara(): Camara3D | null {
     const o = this.origen;
     if (!o) return this.camaraAbsoluta;
-    return { C: [this.C.x + o[0], this.C.y + o[1], this.C.z + o[2]], T: [this.T.x + o[0], this.T.y + o[1], this.T.z + o[2]] };
+    return { C: [this.C.x + o[0], this.C.y + o[1], this.C.z + o[2]], T: [this.T.x + o[0], this.T.y + o[1], this.T.z + o[2]], ...(this.ajustada ? { ajustada: true } : {}) };
   }
 
   private fijarOrigen(o: [number, number, number]): void {

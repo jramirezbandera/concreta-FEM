@@ -30,7 +30,7 @@ import { Check, ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
-import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
+import { Chip, Desplegable, Disposicion, GrupoPlegable, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
 import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
@@ -248,6 +248,8 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   // Copiar y Borrar sin nada que les sirva elegido esperan a que se elija: un clic (o una ventana)
   // abre su diálogo con lo elegido; con Ctrl se van sumando, e Intro o la herramienta lo abren.
   const [eligiendo, setEligiendo] = useState<"copiar" | "borrar" | null>(null);
+  // El botón «Editar» de una barra estrecha se enciende si lo que hay plegado en él está en uso
+  const editando = esEditar(foto.herramienta) || eligiendo !== null;
   const alEmpezar = useRef(elegidos);
   const conCtrl = useRef(false);
   const paraAccion = (a: "copiar" | "borrar") => (a === "copiar" ? copiables : enTablas);
@@ -347,11 +349,13 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcEnBarra} nombre="En barra" activa={foto.herramienta === "barra"} onClick={() => elegirHerramienta("barra")} title="Dibujar cargas en vigas y pilares en el caso activo: un clic en la pieza, o dos en un tramo de viga (Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcEmpuje} nombre="Empuje" activa={foto.herramienta === "empuje"} onClick={() => elegirHerramienta("empuje")} title="Dibujar empujes en el caso activo: un clic en un muro, del lado del terreno. Esc vuelve a Elegir" />
           <Separador />
+          <GrupoPlegable icono={IcMover} nombre="Editar" activa={editando}>
           <Herramienta icono={IcMover} nombre="Mover" activa={foto.herramienta === "mover"} onClick={() => elegirHerramienta("mover")} title="Mover las cargas elegidas: punto base y destino. Esc vuelve a Elegir" />
           <Herramienta icono={IcCopiar} nombre="Copiar" activa={foto.herramienta === "copiar"} onClick={() => elegirHerramienta("copiar")} title="Copiar las cargas elegidas: punto base y un destino por copia, en su planta o en las de Propiedades. Esc vuelve a Elegir" />
           <Herramienta icono={IcGirar} nombre="Girar" activa={foto.herramienta === "girar"} onClick={() => elegirHerramienta("girar")} title="Girar las cargas elegidas: el centro y el ángulo (un clic, o los grados). Esc vuelve a Elegir" />
           <Herramienta icono={IcSimetria} nombre="Simetría" activa={foto.herramienta === "simetria"} onClick={() => elegirHerramienta("simetria")} title="La simetría de las cargas elegidas por un eje de dos puntos (conservando lo original, en Propiedades). Esc vuelve a Elegir" />
           <Herramienta icono={IcAPlantas} nombre="A plantas" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} cargas` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar cargas a otras plantas: elíjalas después"} />
+          </GrupoPlegable>
         </>
       )}
       <Separador />
@@ -388,6 +392,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcApoyo} nombre="Apoyo" activa={foto.herramienta === "apoyo"} onClick={() => elegirHerramienta("apoyo")} title="Dibujar apoyos: un clic donde va. Esc vuelve a Elegir" />
           <Herramienta icono={IcApoyoLineal} nombre="Apoyo lineal" activa={foto.herramienta === "apoyoLineal"} onClick={() => elegirHerramienta("apoyoLineal")} title="Dibujar apoyos lineales: clic a clic, doble clic o Intro termina. Esc vuelve a Elegir" />
           <Separador />
+          <GrupoPlegable icono={IcMover} nombre="Editar" activa={editando}>
           <Herramienta icono={IcMover} nombre="Mover" activa={foto.herramienta === "mover"} onClick={() => elegirHerramienta("mover")} title="Mover lo elegido: punto base y destino (con las vigas que acaban en sus pilares). Esc vuelve a Elegir" />
           <Herramienta icono={IcCopiar} nombre="Copiar" activa={foto.herramienta === "copiar"} onClick={() => elegirHerramienta("copiar")} title="Copiar lo elegido: punto base y un destino por copia, en su planta o en las de Propiedades. Esc vuelve a Elegir" />
           <Herramienta icono={IcGirar} nombre="Girar" activa={foto.herramienta === "girar"} onClick={() => elegirHerramienta("girar")} title="Girar lo elegido: el centro y el ángulo (un clic, o los grados). Esc vuelve a Elegir" />
@@ -396,6 +401,7 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <Herramienta icono={IcAPlantas} nombre="A plantas" activa={eligiendo === "copiar"} onClick={() => usar("copiar")} title={copiables.length ? `Copiar ${copiables.length > 1 ? `${copiables.length} objetos` : copiables[0]} a otras plantas` : eligiendo === "copiar" ? "Dejar de elegir (Esc)" : "Copiar a otras plantas: elija después las vigas, forjados, apoyos o cargas"} />
           <Herramienta icono={IcBorrar} nombre="Borrar" activa={eligiendo === "borrar"} onClick={() => usar("borrar")} title={enTablas.length ? `Borrar ${enTablas.length > 1 ? `${enTablas.length} objetos` : enTablas[0]}` : eligiendo === "borrar" ? "Dejar de elegir (Esc)" : "Borrar: elija después lo que quiere borrar"} />
           <Herramienta icono={IcRenumerar} nombre="Renumerar" onClick={() => setDialogo("renumerar")} title="Ids cortos: P1, P2… por filas de arriba abajo y de izquierda a derecha" />
+          </GrupoPlegable>
         </>
       )}
       <Hueco />

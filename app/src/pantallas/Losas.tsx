@@ -181,10 +181,11 @@ export function ModoLosas() {
   const nombreCampo = CAMPOS.find((c) => c.id === campo)!.nombre;
   const herramientas = (
     <>
+      {/* Los modos, siempre en el mismo sitio (UI-51); detrás, lo de cada modo */}
+      <BarraModos />
+      <Separador />
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito={campo === "uz" ? "desplazamientos" : "esfuerzos"} />
       {varias && <Segmentado etiqueta="Envolvente" opciones={ENVOLVENTES(campo)} valor={envolvente} onCambio={(v) => setEnvolventes((m) => ({ ...m, [campo]: v }))} />}
-      <Separador />
-      <BarraModos />
       <Separador />
       <Segmentado etiqueta="Magnitud" opciones={CAMPOS.map((c) => ({ id: c.id, nombre: c.nombre }))} valor={campo} onCambio={setCampo} />
       <Separador />

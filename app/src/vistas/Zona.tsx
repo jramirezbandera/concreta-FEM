@@ -24,7 +24,7 @@ import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import type { ExtremoDeformada } from "../../../src/visor/datos.ts";
 import type { Eleccion, EscenaPreparada } from "../../../src/visor/escena.ts";
 import type { FuenteEscena, VistaPlanta, VistaResultadosPlanta } from "../../../src/visor/sesion.ts";
-import { Desplegable, SelectorEje, SelectorPlanta } from "../armazon/Disposicion.tsx";
+import { Desplegable, SelectorEje, SelectorPlanta, useEstrecha } from "../armazon/Disposicion.tsx";
 import { Aviso } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
 import { atributos, pintura } from "../lienzo/pintura.ts";
@@ -844,11 +844,26 @@ export interface ContenidoLeyenda {
   notas: readonly string[];
 }
 
+/**
+ * Lo primero de una entrada de la leyenda («Losa maciza (id y espesor)» → «Losa maciza»; UI-46: era
+ * un párrafo encima del dibujo). Lo demás va en su título y en «Detalles»; un rango de un mapa
+ * («-0,5 a 0») se queda entero.
+ */
+export function textoCorto(t: string): string {
+  if (/^[-−+]?\d/.test(t)) return t;
+  const k = t.search(/ \(|; |, |\. /);
+  return k > 0 ? t.slice(0, k) : t;
+}
+
 function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; abierta: boolean }) {
   const { theme: tema } = useTheme();
-  const [ver, setVer] = useState(abierta);
+  // En un portátil empieza plegada, como con varias vistas
+  const estrecha = useEstrecha(1600);
+  const [ver, setVer] = useState(abierta && !estrecha);
+  const [detalles, setDetalles] = useState(false);
+  const recortadas = escena.leyenda.some((l) => textoCorto(l.texto) !== l.texto);
   return (
-    <div className="leyenda-vista scroll-hide" data-abierta={ver}>
+    <div className="leyenda-vista scroll-hide" data-abierta={ver} data-detalles={detalles}>
       <button type="button" className="leyenda-cab" onClick={() => setVer((x) => !x)} aria-expanded={ver}>
         Leyenda <ChevronDown size={13} aria-hidden="true" className="giro" />
       </button>
@@ -862,7 +877,7 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
           {escena.leyenda.map((l, i) => {
             const p = l.estilo ? pintura(l.estilo, tema) : {};
             return (
-              <div key={i} className="flex items-start gap-2 py-[2px] text-text-secondary">
+              <div key={i} className="flex items-start gap-2 py-[2px] text-text-secondary" title={detalles ? undefined : l.texto}>
                 <svg width={18} height={12} className="mt-[1px] shrink-0" aria-hidden="true">
                   {l.relleno || p.fill ? (
                     <rect x={0.5} y={0.5} width={17} height={11} {...atributos({ ...p, sw: Math.min(p.sw ?? 1, 1.5) }, l.relleno)} />
@@ -874,12 +889,17 @@ function Leyenda({ contenido: escena, abierta }: { contenido: ContenidoLeyenda; 
                   )}
                 </svg>
                 {/* Mono sólo para los rangos de un mapa («-0,5 a 0»), no para las descripciones */}
-                <span className={l.relleno && /^[-−+]?\d/.test(l.texto) ? "mono" : undefined}>{l.texto}</span>
+                <span className={l.relleno && /^[-−+]?\d/.test(l.texto) ? "mono" : undefined}>{detalles ? l.texto : textoCorto(l.texto)}</span>
               </div>
             );
           })}
-          {escena.notas.length > 0 && (
-            <div className="mt-2 border-t border-border-sub pt-1.5 text-[10.5px] leading-snug text-text-disabled">
+          {(recortadas || escena.notas.length > 0) && (
+            <button type="button" className="leyenda-mas" onClick={() => setDetalles((x) => !x)} aria-expanded={detalles}>
+              {detalles ? "Menos" : escena.notas.length ? `Detalles y ${escena.notas.length === 1 ? "una nota" : `${escena.notas.length} notas`}` : "Detalles"}
+            </button>
+          )}
+          {detalles && escena.notas.length > 0 && (
+            <div className="mt-1 border-t border-border-sub pt-1.5 text-[11px] leading-snug text-text-tertiary">
               {escena.notas.map((n, i) => (
                 <p key={i} className="mt-1">
                   {n}

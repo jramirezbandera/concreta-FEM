@@ -153,9 +153,10 @@ export function ModoPilares() {
 
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="esfuerzos" />
-      <Separador />
+      {/* Los modos, siempre en el mismo sitio (UI-51); detrás, lo de cada modo */}
       <BarraModos />
+      <Separador />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="esfuerzos" />
       <Separador />
       <BarraVistas />
     </>

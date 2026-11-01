@@ -105,20 +105,33 @@ export const IcAPlantas = icono(
     <path d="M3 13l9 5 9-5" />
   </>,
 );
+/** Plantas: tres niveles en alzado con los pilares que los cruzan (no una hamburguesa, UI-52). */
 export const IcPlantas = icono(
   <>
-    <path d="M4 6h16M4 12h16M4 18h16" />
-    <circle cx="7" cy="6" r="1" />
+    <path d="M3 5h18M3 12h18M3 19h18" />
+    <path d="M7 5v14M17 5v14" strokeWidth={1.1} />
   </>,
 );
+/** Materiales: un muestrario de fichas (el cubo es el 3D, UI-52). */
 export const IcMateriales = icono(
   <>
-    <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
-    <path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" />
+    <rect x="3" y="3" width="6" height="18" rx="1.5" />
+    <path d="M9 7.5l4.2-2.4a1.5 1.5 0 0 1 2 .5l3 5.2a1.5 1.5 0 0 1-.5 2L9 18" />
+    <path d="M9 21h10.5a1.5 1.5 0 0 0 1.5-1.5V15" />
+    <circle cx="6" cy="17.5" r="1" />
   </>,
 );
 export const IcSecciones = icono(<path d="M6 4h12M6 20h12M12 4v16" />);
-export const IcPlanta = icono(<rect x="4" y="4" width="16" height="16" rx="1.5" />);
+/** Planta: una retícula de pilares vista desde arriba (el rectángulo solo era la disposición «1», UI-52). */
+export const IcPlanta = icono(
+  <>
+    <path d="M4 7h16M4 17h16M7 4v16M17 4v16" strokeWidth={1.1} />
+    <rect x="5.5" y="5.5" width="3" height="3" fill="currentColor" stroke="none" />
+    <rect x="15.5" y="5.5" width="3" height="3" fill="currentColor" stroke="none" />
+    <rect x="5.5" y="15.5" width="3" height="3" fill="currentColor" stroke="none" />
+    <rect x="15.5" y="15.5" width="3" height="3" fill="currentColor" stroke="none" />
+  </>,
+);
 export const Ic3D = icono(
   <>
     <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
@@ -165,10 +178,12 @@ export const IcEnBarra = icono(
 );
 export const IcCasos = icono(<path d="M4 6h16M4 12h10M4 18h13" />);
 export const IcCombinaciones = icono(<path d="M6 4v16M18 4v16M6 12h12M6 7l12 10" />);
+/** Losas (los mapas): un recuadro con sus isolíneas (el ojo decía «visibilidad», UI-52). */
 export const IcLosas = icono(
   <>
-    <path d="M3 12c3-7 15-7 18 0-3 7-15 7-18 0z" />
-    <path d="M8 12c2-3 6-3 8 0-2 3-6 3-8 0z" />
+    <rect x="3" y="3" width="18" height="18" rx="1.5" />
+    <ellipse cx="12" cy="12" rx="3" ry="2.2" />
+    <ellipse cx="12" cy="12" rx="6.5" ry="5" />
   </>,
 );
 export const IcDiagramas = icono(

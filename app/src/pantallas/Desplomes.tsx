@@ -85,9 +85,10 @@ export function ModoDeformada() {
 
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="desplazamientos" />
-      <Separador />
+      {/* Los modos, siempre en el mismo sitio (UI-51); detrás, lo de cada modo */}
       <BarraModos />
+      <Separador />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="desplazamientos" />
       <Separador />
       <Campo etiqueta="Escala de la deformada">
         <span className="flex items-center gap-1.5">

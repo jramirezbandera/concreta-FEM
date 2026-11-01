@@ -13,10 +13,10 @@
  * - desde I2: F encuadra la vista activa y Ctrl+1…4 cambian la disposición de las vistas.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Download, FolderOpen, History, Moon, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
+import { Check, Download, FolderOpen, History, Moon, MoreHorizontal, Play, Redo2, RefreshCw, Save, Search, Sun, Undo2 } from "lucide-react";
 import { lista, indiceIds } from "../../src/editor/referencias.ts";
 import { DEF_TABLAS, TABLAS, type NombreTabla } from "../../src/editor/tablas.ts";
-import { ejeVecino } from "./armazon/Disposicion.tsx";
+import { MenuFlotante, ejeVecino } from "./armazon/Disposicion.tsx";
 import { Paleta, type Orden } from "./armazon/Paleta.tsx";
 import { DialogoVersiones } from "./armazon/Versiones.tsx";
 import { GestorAbierto } from "./editor/Gestores.tsx";
@@ -72,13 +72,15 @@ function Estado({ p }: { p: ProyectoAbierto }) {
 function TextoEstado({ p }: { p: ProyectoAbierto }) {
   const e = p.estado;
   if (p.desactualizado) return <span className="pill warn">{p.fase === "calculando" ? "CALCULANDO" : p.edicion?.pendiente ? "LEYENDO LO EDITADO" : "ABRIENDO"} · RESULTADOS DESACTUALIZADOS</span>;
-  if (p.fase === "calculando") return <span className="pill warn">CALCULANDO · {e?.huella.slice(0, 8)}</span>;
+  // La huella, en el título y en Revisión: en la píldora era un código que no dice nada (UI-43)
+  const huella = e ? `Versión del modelo ${e.huella.slice(0, 8)}` : undefined;
+  if (p.fase === "calculando") return <span className="pill warn" title={huella}>CALCULANDO</span>;
   if (p.fase === "error") return <span className="pill fail">{e && e.compila ? "EL CÁLCULO FALLÓ" : "NO SE PUEDE ABRIR"}</span>;
   if (!e) return null;
-  if (e.compilando) return <span className="pill warn" title="Lo que sólo necesita el modelo ya se dibuja; los diagnósticos, la malla y el cálculo esperan a la compilación">COMPILANDO · {e.huella.slice(0, 8)}</span>;
-  if (!e.compila) return <span className="pill fail">NO COMPILA · {e.huella.slice(0, 8)}</span>;
-  if (e.calculado) return <span className="pill ok">CALCULADO · {e.huella.slice(0, 8)}</span>;
-  return <span className="pill neu">SIN CALCULAR · {e.huella.slice(0, 8)}</span>;
+  if (e.compilando) return <span className="pill warn" title={`Lo que sólo necesita el modelo ya se dibuja; los diagnósticos, la malla y el cálculo esperan a la compilación. ${huella}`}>COMPILANDO</span>;
+  if (!e.compila) return <span className="pill fail" title={`Los errores, en Diagnósticos. ${huella}`}>NO COMPILA</span>;
+  if (e.calculado) return <span className="pill ok" title={huella}>CALCULADO</span>;
+  return <span className="pill neu" title={huella}>SIN CALCULAR</span>;
 }
 
 const enCampo = (t: EventTarget | null) => t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
@@ -299,7 +301,7 @@ export function App() {
               <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-[18px] w-[18px]" aria-hidden="true" />
               Concreta
             </span>
-            <span className="min-w-0 max-w-[340px] shrink truncate px-1 text-[13px] text-text-primary" title={e?.nombre ?? undefined}>
+            <span className="nombre-proyecto min-w-0 max-w-[340px] shrink truncate px-1 text-[13px] text-text-primary" title={e?.nombre ?? undefined}>
               {e?.nombre ?? (proyecto.fuente?.tipo === "origen" ? proyecto.fuente.origen.fichero : (proyecto.fuente?.nombre ?? ""))}
             </span>
             <nav className="espacios" aria-label="Espacios de trabajo">
@@ -331,7 +333,7 @@ export function App() {
                   </span>
                 ) : ed.modo === "descargar" && hayAlmacen() ? (
                   <button type="button" className="btn btn-p" onClick={() => void ed.alNavegador()} title="Guardarlo en este navegador, con los demás proyectos (Ctrl+S); desde ahí se guarda solo">
-                    <Save size={15} /> Guardar en mis proyectos
+                    <Save size={15} /> <span className="et">Guardar en mis proyectos</span>
                   </button>
                 ) : (
                   <button
@@ -347,11 +349,11 @@ export function App() {
                   </button>
                 )}
                 {navegador && (
-                  <button type="button" className="ib" onClick={abrirVersiones} aria-label="Versiones anteriores" title="Versiones anteriores">
+                  <button type="button" className="ib ancho-1100" onClick={abrirVersiones} aria-label="Versiones anteriores" title="Versiones anteriores">
                     <History size={16} />
                   </button>
                 )}
-                <button type="button" className="ib" onClick={ed.exportar} aria-label="Exportar el proyecto.json" title="Exportar el proyecto.json (descargarlo)">
+                <button type="button" className="ib ancho-1100" onClick={ed.exportar} aria-label="Exportar el proyecto.json" title="Exportar el proyecto.json (descargarlo)">
                   <Download size={16} />
                 </button>
               </>
@@ -366,22 +368,48 @@ export function App() {
                 <Play size={15} /> {proyecto.fase === "calculando" ? "Calculando…" : "Calcular"}
               </button>
             ) : (
-              <button type="button" className="btn" onClick={proyecto.recalcular} disabled={!e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado)} title="Calcular de nuevo, sin usar los resultados de .fem/">
-                <RefreshCw size={15} /> Recalcular
+              <button type="button" className="btn" onClick={proyecto.recalcular} disabled={!e?.compila || proyecto.fase === "calculando" || (!!ed && proyecto.desactualizado)} title="Recalcular: de nuevo, sin usar los resultados guardados">
+                <RefreshCw size={15} /> <span className="et">Recalcular</span>
               </button>
             )}
-            <button type="button" className="btn" style={{ gap: 14, color: "var(--color-text-disabled)" }} onClick={() => setPaleta(true)} title="Paleta de órdenes (Ctrl+K)">
+            <button type="button" className="btn btn-buscar" onClick={() => setPaleta(true)} title="Buscar u ordenar: la paleta de órdenes (Ctrl+K)">
               <span className="flex items-center gap-1.5">
-                <Search size={15} /> Buscar u ordenar
+                <Search size={15} /> <span className="et">Buscar u ordenar</span>
               </span>
-              <span className="kbd">Ctrl K</span>
+              <span className="kbd et">Ctrl K</span>
             </button>
-            <button type="button" className="btn" onClick={() => location.assign(location.pathname)} title="Mis proyectos: abrir otro">
-              <FolderOpen size={15} /> Proyectos
+            <button type="button" className="btn ancho-1100" onClick={() => location.assign(location.pathname)} title="Mis proyectos: abrir otro">
+              <FolderOpen size={15} /> <span className="et">Proyectos</span>
             </button>
-            <button type="button" className="ib" onClick={toggleTheme} aria-label={theme === "dark" ? "Tema claro" : "Tema oscuro"} title={theme === "dark" ? "Tema claro" : "Tema oscuro"}>
+            <button type="button" className="ib ancho-1100" onClick={toggleTheme} aria-label={theme === "dark" ? "Tema claro" : "Tema oscuro"} title={theme === "dark" ? "Tema claro" : "Tema oscuro"}>
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
+            {/* UI-7: por debajo de 1100 px, lo de la derecha en un menú (la página nunca se desplaza de lado) */}
+            <MenuFlotante
+              etiqueta="Más órdenes del proyecto"
+              boton={({ abierto, alternar, ref }) => (
+                <button ref={ref} type="button" className="ib solo-1100" aria-haspopup="menu" aria-expanded={abierto} aria-label="Más" title="Versiones, exportar, otros proyectos y el tema" onClick={alternar}>
+                  <MoreHorizontal size={16} />
+                </button>
+              )}
+            >
+              {ed && navegador && (
+                <button type="button" role="menuitem" onClick={abrirVersiones}>
+                  <History size={15} /> Versiones anteriores
+                </button>
+              )}
+              {ed && (
+                <button type="button" role="menuitem" onClick={ed.exportar}>
+                  <Download size={15} /> Exportar el proyecto (descargarlo)
+                </button>
+              )}
+              <button type="button" role="menuitem" onClick={() => location.assign(location.pathname)}>
+                <FolderOpen size={15} /> Mis proyectos
+              </button>
+              <button type="button" role="menuitem" onClick={toggleTheme}>
+                {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />} {theme === "dark" ? "Tema claro" : "Tema oscuro"}
+              </button>
+            </MenuFlotante>
           </header>
 
           {ed?.conflicto && (

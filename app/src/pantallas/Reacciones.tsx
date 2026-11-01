@@ -174,10 +174,11 @@ export function ModoReacciones() {
 
   const herramientas = (
     <>
+      {/* Los modos, siempre en el mismo sitio (UI-51); detrás, lo de cada modo */}
+      <BarraModos />
+      <Separador />
       <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} proposito="reacciones" />
       <CampoLista etiqueta="Escala" nombre="Escala de las flechas" ancho={90} valor={escala} onCambio={setEscala} opciones={ESCALAS.map((x) => ({ id: x, nombre: `×${x.replace(".", ",")}` }))} />
-      <Separador />
-      <BarraModos />
       <Separador />
       <BarraVistas />
     </>

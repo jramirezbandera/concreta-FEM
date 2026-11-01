@@ -3,7 +3,7 @@
  * herramientas, navegador, vista, propiedades y panel inferior. Cada espacio da el contenido de cada
  * hueco; la disposición sólo los coloca, los pliega y recuerda cómo se dejaron (`paneles.ts`).
  */
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import type { EstadoSesion } from "../../../src/visor/sesion.ts";
 import { cota } from "../fmt.ts";
@@ -23,6 +23,86 @@ export function Herramienta({ icono: I, nombre, onClick, activa, disabled, title
 
 export function Separador() {
   return <span className="herr-sep" aria-hidden="true" />;
+}
+
+/**
+ * Un menú que cuelga de un botón (UI-7: lo que no cabe en una barra estrecha). Va en `position:
+ * fixed`, porque la barra de herramientas recorta lo que se sale de ella; se cierra con Esc, con un
+ * clic fuera, al cambiar el tamaño de la ventana y al usar cualquiera de sus botones.
+ */
+export function MenuFlotante({ boton, etiqueta, children, clase = "" }: { boton: (p: { abierto: boolean; alternar: () => void; ref: RefObject<HTMLButtonElement | null> }) => ReactNode; etiqueta: string; children: ReactNode; clase?: string }) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const menu = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!abierto) return;
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setPos({ x: Math.max(8, Math.min(r.left, window.innerWidth - 240)), y: r.bottom + 4 });
+    const fuera = (e: PointerEvent) => {
+      if (!menu.current?.contains(e.target as Node) && !ref.current?.contains(e.target as Node)) setAbierto(false);
+    };
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setAbierto(false);
+      ref.current?.focus();
+    };
+    const cerrar = () => setAbierto(false);
+    document.addEventListener("pointerdown", fuera, true);
+    document.addEventListener("keydown", tecla, true);
+    window.addEventListener("resize", cerrar);
+    return () => {
+      document.removeEventListener("pointerdown", fuera, true);
+      document.removeEventListener("keydown", tecla, true);
+      window.removeEventListener("resize", cerrar);
+    };
+  }, [abierto]);
+  return (
+    <>
+      {boton({ abierto, alternar: () => setAbierto((x) => !x), ref })}
+      {abierto && (
+        <div
+          ref={menu}
+          className={`menu-flotante ${clase}`}
+          role="menu"
+          aria-label={etiqueta}
+          style={pos ? { left: pos.x, top: pos.y } : { visibility: "hidden" }}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("button")) setAbierto(false);
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Herramientas que, en una barra estrecha (por debajo de 1500 px), se pliegan en un botón con su
+ * menú (UI-7: Mover…Renumerar en «Editar ▾»). En una ancha se ven como siempre y el botón no.
+ */
+export function GrupoPlegable({ icono: I, nombre, activa, children }: { icono: Icono; nombre: string; activa?: boolean; children: ReactNode }) {
+  return (
+    <>
+      <span className="herr-grupo">{children}</span>
+      <MenuFlotante
+        etiqueta={nombre}
+        clase="herr-menu"
+        boton={({ abierto, alternar, ref }) => (
+          <button ref={ref} type="button" className="herr herr-plegado" data-on={!!activa || abierto} aria-haspopup="menu" aria-expanded={abierto} title={`${nombre}: lo que no cabe en la barra`} onClick={alternar}>
+            <I size={20} />
+            <span>
+              {nombre} <ChevronDown size={11} className="inline" aria-hidden="true" />
+            </span>
+          </button>
+        )}
+      >
+        {children}
+      </MenuFlotante>
+    </>
+  );
 }
 
 export function Hueco() {
@@ -214,6 +294,16 @@ export interface Lateral {
   ancho?: number;
 }
 
+/**
+ * El ancho de un panel lateral (UI-50): el suyo a 1920 px y menos en una ventana más estrecha, sin
+ * bajar de lo que necesita (el navegador, 200 px; las propiedades, 272 px o el 80 % del suyo).
+ */
+function anchoPanel(izq: boolean, ancho?: number): string {
+  const a = ancho ?? (izq ? 248 : 300);
+  const min = izq ? Math.min(a, 200) : Math.min(a, Math.max(272, Math.round(a * 0.8)));
+  return `clamp(${min}px, ${((a / 1920) * 100).toFixed(2)}vw, ${a}px)`;
+}
+
 function PanelLateral({ lado, l, abierto, onAbierto }: { lado: "izq" | "der"; l: Lateral; abierto: boolean; onAbierto: (v: boolean) => void }) {
   const izq = lado === "izq";
   if (!abierto)
@@ -228,7 +318,7 @@ function PanelLateral({ lado, l, abierto, onAbierto }: { lado: "izq" | "der"; l:
       </aside>
     );
   return (
-    <aside aria-label={l.titulo} className={`panel ${izq ? "izq" : "der"}`} style={{ width: l.ancho ?? (izq ? 248 : 300) }}>
+    <aside aria-label={l.titulo} className={`panel ${izq ? "izq" : "der"}`} style={{ width: anchoPanel(izq, l.ancho) }}>
       <div className="panel-cab">
         <span>{l.titulo}</span>
         <button type="button" className="ib" style={{ width: 24, height: 24 }} onClick={() => onAbierto(false)} aria-label={`Plegar ${l.titulo.toLowerCase()}`} title={`Plegar ${l.titulo.toLowerCase()}`}>
@@ -301,14 +391,37 @@ function Dock({ pestanas, p }: { pestanas: Pestana[]; p: Paneles }) {
 
 // ─── La disposición ─────────────────────────────────────────────────────────────────────────────
 
+/** La ventana es más estrecha que `px` (y lo sigue al cambiar de tamaño). */
+export function useEstrecha(px: number): boolean {
+  const consulta = `(max-width: ${px - 0.02}px)`;
+  const [si, setSi] = useState(() => typeof matchMedia === "function" && matchMedia(consulta).matches);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const m = matchMedia(consulta);
+    const cambio = () => setSi(m.matches);
+    cambio();
+    m.addEventListener("change", cambio);
+    return () => m.removeEventListener("change", cambio);
+  }, [consulta]);
+  return si;
+}
+
+/** Por debajo de este ancho, el navegador y las propiedades no van abiertos a la vez (UI-50). */
+const ANCHO_DOS_PANELES = 1440;
+
 export function Disposicion({ paneles, herramientas, nav, vista, props, dock, etiquetaHerramientas }: { paneles: Paneles; herramientas: ReactNode; etiquetaHerramientas: string; nav?: Lateral | null; vista: ReactNode; props?: Lateral | null; dock?: Pestana[] }) {
+  // En un portátil, con las propiedades abiertas (algo elegido) el navegador se ve plegado; abrirlo
+  // pliega las propiedades. Lo recordado no cambia: al plegar las propiedades vuelve el navegador
+  const estrecha = useEstrecha(ANCHO_DOS_PANELES);
+  const uno = estrecha && !!props && !!nav;
+  const navAbierto = paneles.nav && !(uno && paneles.props);
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="herramientas" role="toolbar" aria-label={etiquetaHerramientas}>
         {herramientas}
       </div>
       <div className="flex min-h-0 flex-1">
-        {nav && <PanelLateral lado="izq" l={nav} abierto={paneles.nav} onAbierto={(v) => paneles.poner({ nav: v })} />}
+        {nav && <PanelLateral lado="izq" l={nav} abierto={navAbierto} onAbierto={(v) => paneles.poner(v && uno ? { nav: true, props: false } : { nav: v })} />}
         <section className="vista" aria-label="Vista">
           {vista}
         </section>

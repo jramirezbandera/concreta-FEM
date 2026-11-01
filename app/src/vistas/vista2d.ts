@@ -61,6 +61,8 @@ export interface Camara2D {
   cx: number;
   cy: number;
   escala: number;
+  /** Era el encuadre automático (nadie la había movido): la vista que la recupera sigue encuadrándose sola (UI-46). */
+  ajustada?: boolean;
 }
 
 /** Márgenes del encuadre completo, px: el carril de plantas, la cabecera y la barra de la vista. */
@@ -120,6 +122,7 @@ export class Vista2D extends Vista {
     if (camara && camara.escala > 0) {
       ({ cx: this.cx, cy: this.cy, escala: this.s } = camara);
       this.encuadrada = true;
+      this.ajustada = !!camara.ajustada;
     }
   }
 
@@ -128,7 +131,7 @@ export class Vista2D extends Vista {
   }
 
   camara(): Camara2D {
-    return { cx: this.cx, cy: this.cy, escala: this.s };
+    return { cx: this.cx, cy: this.cy, escala: this.s, ...(this.ajustada ? { ajustada: true } : {}) };
   }
 
   /** Del modelo a px de la vista, y al revés. */
