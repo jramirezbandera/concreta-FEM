@@ -210,7 +210,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   const P: Primitiva[] = [];
   const usados = new Set<Estilo>();
   const est = (e: Estilo): Estilo => {
-    const r = o.atenuado ? (["pano-viguetas", "vigueta", "apoyo-lineal", "banda", "hueco-aspa", "abaco-borde"].includes(e) ? "atenuado-linea" : "atenuado") : e;
+    const r = o.atenuado ? (["pano-viguetas", "vigueta", "barra", "apoyo-lineal", "banda", "hueco-aspa", "abaco-borde"].includes(e) ? "atenuado-linea" : "atenuado") : e;
     usados.add(r);
     return r;
   };
@@ -280,6 +280,29 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
     texto(al.p, `${v.id} ${SECCION(s)}`, 30, { ...al.opciones, tamano: 11 });
   }
 
+  // Barras entre dos niveles (fase BN), en las plantas de sus dos extremos: su proyección en
+  // discontinua, con una flecha hacia el extremo alto; una vertical, un círculo
+  const nivel = new Map(f.plantas.map((p, i) => [p.id, i]));
+  for (const b of f.barras ?? []) {
+    if (b.inicio.planta !== pl.id && b.fin.planta !== pl.id) continue;
+    const s = f.secciones?.find((x) => x.id === b.seccion);
+    const [A, B]: [Vec2, Vec2] = [[b.inicio.x, b.inicio.y], [b.fin.x, b.fin.y]];
+    const l = Math.hypot(B[0] - A[0], B[1] - A[1]);
+    if (l === 0) {
+      P.push({ tipo: "marca", p: A, forma: "circulo", radio: 4, estilo: est("barra"), objeto: b.id });
+      texto(A, `${b.id} ${SECCION(s)}`, 30, { dx: 6, dy: -6, tamano: 11 });
+      continue;
+    }
+    P.push({ tipo: "linea", puntos: [A, B], estilo: est("barra"), objeto: b.id });
+    const d: Vec2 = [(B[0] - A[0]) / l, (B[1] - A[1]) / l];
+    const M: Vec2 = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+    // Las plantas van de arriba abajo: el extremo alto es el de menor índice
+    const [ki, kf] = [nivel.get(b.inicio.planta) ?? 0, nivel.get(b.fin.planta) ?? 0];
+    if (ki !== kf && !o.atenuado) P.push({ tipo: "flecha", p: M, d: ki < kf ? [-d[0], -d[1]] : d, estilo: "barra", objeto: b.id });
+    const al = alLado(M, d, 0);
+    texto(al.p, `${b.id} ${SECCION(s)}`, 30, { ...al.opciones, tamano: 11 });
+  }
+
   // Muros: los que llegan, rellenos; los que arrancan, en contorno; los huecos del piso de debajo
   for (const { m, llega } of pl.muros()) {
     for (const q of huellaMuro(m.puntos, m.espesor)) P.push({ tipo: "poligono", anillos: [q], estilo: est(llega ? "muro-llega" : "muro-arranca"), objeto: m.id });
@@ -340,6 +363,7 @@ export function fondoModelo(pl: PlantaFisica, o: OpcionesFondo): { primitivas: P
   entrada("pano", "Paño unidireccional; las rayas, en la dirección de sus viguetas");
   entrada("viga", "Viga, con su ancho y su sección (cm)");
   entrada("vigueta", "Viga sin ancho conocido");
+  entrada("barra", "Barra entre dos niveles, en proyección; la flecha va hacia su extremo alto (un círculo: vertical)");
   entrada("pilar-llega", "Pilar que llega desde la planta de abajo, con su sección orientada. Si es rectangular, su rótulo da b×h (cm) y hacia dónde va el canto h: hX según X, hY según Y");
   entrada("pilar-arranca", "Pilar que arranca aquí hacia arriba");
   entrada("muro-llega", "Muro que llega desde abajo");

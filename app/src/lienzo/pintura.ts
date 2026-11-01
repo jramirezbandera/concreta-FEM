@@ -41,6 +41,8 @@ const OSCURO: Partial<Record<Estilo, Pintura>> = {
   "lamina-cortada": { stroke: "#2dd4bf", sw: 2 },
   "enlace-rigido": { stroke: "#fb923c", sw: 1, dash: "4 3" },
   vigueta: { stroke: "#b49a68", sw: 1.4 },
+  barra: { stroke: "#38bdf8", sw: 2, dash: "8 4" },
+  "barra-alzado": { stroke: "#38bdf8", sw: 3 },
   "pilar-llega": { fill: "#d4d6db", stroke: "#d4d6db", sw: 1 },
   "pilar-arranca": { fill: "#0c0c0e", stroke: "#d4d6db", sw: 1.6 },
   "muro-llega": { fill: "#8a94a1", stroke: "#c5ccd5", sw: 0.8 },

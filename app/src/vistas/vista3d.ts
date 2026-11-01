@@ -87,7 +87,7 @@ export type Proyeccion = "perspectiva" | "ortografica";
 export type Color3D = "material" | "seccion" | "planta";
 
 /** Los tipos de objeto que se pueden ocultar en un 3D (I3). */
-export const TIPOS_FILTRO = ["pilar", "viga", "losa", "pano", "muro", "apoyo"] as const;
+export const TIPOS_FILTRO = ["pilar", "viga", "barra", "losa", "pano", "muro", "apoyo"] as const;
 export type TipoFiltro = (typeof TIPOS_FILTRO)[number];
 
 /** Caja de sección, en coordenadas del modelo: [xmin, ymin, zmin, xmax, ymax, zmax]. */
@@ -147,6 +147,7 @@ interface Paleta3D {
   arista: string;
   pilar: string;
   viga: string;
+  barra: string;
   losa: string;
   pano: string;
   muro: string;
@@ -158,8 +159,8 @@ interface Paleta3D {
 }
 
 const PALETAS: Record<"light" | "dark", Paleta3D> = {
-  light: { hormigon: "#c4c9d0", acero: "#8ea7c2", general: "#cdbf9c", caseton: "#e6dcc6", apoyo: "#0f766e", arista: "#1f2937", pilar: "#1e293b", viga: "#475569", losa: "#8794a3", pano: "#97835c", muro: "#64748b", activa: "#0369a1", laminaLosa: "#c9d6e3", laminaMuro: "#9aa5b1", vigueta: "#a08a5e", original: "#94a3b8" },
-  dark: { hormigon: "#8b939e", acero: "#6d88a6", general: "#9b8c6a", caseton: "#a99d84", apoyo: "#2dd4bf", arista: "#0b0f14", pilar: "#d4d6db", viga: "#9aa3ae", losa: "#6b7686", pano: "#b49a68", muro: "#8a94a1", activa: "#38bdf8", laminaLosa: "#33414f", laminaMuro: "#5b6573", vigueta: "#b49a68", original: "#5b6575" },
+  light: { hormigon: "#c4c9d0", acero: "#8ea7c2", general: "#cdbf9c", caseton: "#e6dcc6", apoyo: "#0f766e", arista: "#1f2937", pilar: "#1e293b", viga: "#475569", barra: "#0369a1", losa: "#8794a3", pano: "#97835c", muro: "#64748b", activa: "#0369a1", laminaLosa: "#c9d6e3", laminaMuro: "#9aa5b1", vigueta: "#a08a5e", original: "#94a3b8" },
+  dark: { hormigon: "#8b939e", acero: "#6d88a6", general: "#9b8c6a", caseton: "#a99d84", apoyo: "#2dd4bf", arista: "#0b0f14", pilar: "#d4d6db", viga: "#9aa3ae", barra: "#38bdf8", losa: "#6b7686", pano: "#b49a68", muro: "#8a94a1", activa: "#38bdf8", laminaLosa: "#33414f", laminaMuro: "#5b6573", vigueta: "#b49a68", original: "#5b6575" },
 };
 
 /** Las vistas estándar: la dirección de T a C. */
@@ -1137,7 +1138,7 @@ export class Vista3D extends Vista {
     const activa = rgb(c.activa);
     const a = this.alamb;
     if (a && this.lineas) {
-      const tipos: Record<string, [number, number, number]> = { pilar: rgb(c.pilar), viga: rgb(c.viga), losa: rgb(c.losa), pano: rgb(c.pano), muro: rgb(c.muro), apoyo: rgb(c.apoyo) };
+      const tipos: Record<string, [number, number, number]> = { pilar: rgb(c.pilar), viga: rgb(c.viga), barra: rgb(c.barra), losa: rgb(c.losa), pano: rgb(c.pano), muro: rgb(c.muro), apoyo: rgb(c.apoyo) };
       const tenues: Record<string, [number, number, number]> = Object.fromEntries(Object.entries(tipos).map(([k, v]) => [k, tenue(v)]));
       const ia = this.activa === null ? -1 : a.plantas.indexOf(this.activa);
       const col = new Float32Array(6 * this.segVis.length);

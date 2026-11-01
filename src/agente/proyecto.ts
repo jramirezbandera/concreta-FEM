@@ -108,7 +108,7 @@ export interface FiltroGuardado {
   desde?: string;
   /** La planta de arriba del rango. */
   hasta?: string;
-  sinTipos?: ("pilar" | "viga" | "losa" | "pano" | "muro" | "apoyo")[];
+  sinTipos?: ("pilar" | "viga" | "barra" | "losa" | "pano" | "muro" | "apoyo")[];
   aislados?: string[];
   ocultos?: string[];
   /** [xmin, ymin, zmin, xmax, ymax, zmax]. */

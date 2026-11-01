@@ -38,6 +38,7 @@
  *
  * Puro: sin IO.
  */
+import { ejesBarra, puntosBarra } from "../compilador/barras.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import type { Mapeo } from "../compilador/mapeo.ts";
 import { puntoEnRegion, trozosSegmento } from "../compilador/poligonos.ts";
@@ -53,7 +54,7 @@ export interface Cara {
   p: Vec3[];
 }
 
-export const TIPOS_SOLIDO = ["pilar", "viga", "losa", "pano", "muro", "apoyo"] as const;
+export const TIPOS_SOLIDO = ["pilar", "viga", "barra", "losa", "pano", "muro", "apoyo"] as const;
 export type TipoSolido = (typeof TIPOS_SOLIDO)[number];
 export type MaterialSolido = Material["tipo"];
 
@@ -451,6 +452,29 @@ function barrido(S: readonly Vec2[], A: Vec2, d: Vec2, zc: number, tramos: reado
     if (t.techo > tA) tapa(t.s0, recortarBanda(S, tA, Math.min(0, t.techo)), false);
     if (t.techo > tB) tapa(t.s1, recortarBanda(S, tB, Math.min(0, t.techo)), true);
   });
+}
+
+/**
+ * Las caras de una barra en el espacio (fase BN) de sección S (antihoraria en (v, u), centrada) de A a
+ * B: v según su y local, u según su z local (`ejesBarra`). Las tapas, descompuestas en caras convexas.
+ */
+export function barridoEspacio(S: readonly Vec2[], A: readonly number[], B: readonly number[], ey: readonly number[], ez: readonly number[], caras: Cara[]): void {
+  const g = (P: readonly number[], v: number, u: number): Vec3 => [P[0]! + v * ey[0]! + u * ez[0]!, P[1]! + v * ey[1]! + u * ez[1]!, P[2]! + v * ey[2]! + u * ez[2]!];
+  for (let k = 0; k < S.length; k++) {
+    const [p, q] = [S[k]!, S[(k + 1) % S.length]!];
+    if (Math.abs(p[0] - q[0]) <= EPS && Math.abs(p[1] - q[1]) <= EPS) continue;
+    caras.push({ p: [g(A, p[0], p[1]), g(A, q[0], q[1]), g(B, q[0], q[1]), g(B, p[0], p[1])] });
+  }
+  for (const col of descomponer([S], [], [1, 0]))
+    for (const f of col.franjas) {
+      if (!f.enP) continue;
+      const pl: Vec2[] = [[col.xa, f.a0], [col.xb, f.b0]];
+      if (f.b1 - f.b0 > EPS) pl.push([col.xb, f.b1]);
+      if (f.a1 - f.a0 > EPS) pl.push([col.xa, f.a1]);
+      if (pl.length < 3) continue;
+      caras.push({ p: pl.map(([v, u]) => g(B, v, u)) });
+      caras.push({ p: pl.map(([v, u]) => g(A, v, u)).reverse() });
+    }
 }
 
 // ─── Geometría en planta ────────────────────────────────────────────────────────────────────────
@@ -1002,6 +1026,23 @@ export function piezasSolido(f: ModeloFisico, compilado?: CompiladoSolido | null
       });
       piezas.push({ id: m.id, tipo: "muro", planta: k, material: material.get(m.material)?.tipo ?? null, seccion: null, caras });
     }
+  }
+
+  // Barras entre dos niveles (fase BN): la sección barrida de extremo a extremo, en la planta de su
+  // extremo alto. Atraviesan pilares, vigas y losas sin recortarse (son pocas y finas)
+  for (const b of porId(f.barras)) {
+    const sec = seccion.get(b.seccion);
+    const fs = sec ? formaSeccion(sec) : null;
+    const AB = puntosBarra(f.plantas ?? [], b);
+    const [ki, kf] = [indice.get(b.inicio.planta), indice.get(b.fin.planta)];
+    if (!fs || !AB || ki === undefined || kf === undefined) continue;
+    const [A, B] = AB;
+    if (!(Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]) > EPS)) continue;
+    if (fs.sinForma) sinForma.add(b.id);
+    const { ey, ez } = ejesBarra(A, B, b.giro ?? 0);
+    const caras: Cara[] = [];
+    barridoEspacio(fs.poligono, A, B, ey, ez, caras);
+    piezas.push({ id: b.id, tipo: "barra", planta: Math.min(ki, kf), material: matSec(b.seccion), seccion: b.seccion, caras, ...(fs.sinForma ? { sinForma: true as const } : {}) });
   }
 
   // Apoyos, bajo la losa si caen en una (dentro, no se verían): el puntual, una pirámide invertida

@@ -1,6 +1,6 @@
 /**
  * El 3D alámbrico del modelo físico (I2, `docs/fem3d/interfaz.md` §5.2 y §14): el eje de cada
- * pilar y de cada viga, el contorno de cada losa y de cada paño en su planta, y el de cada muro
+ * pilar, de cada viga y de cada barra entre dos niveles (fase BN, en la planta de su extremo alto), el contorno de cada losa y de cada paño en su planta, y el de cada muro
  * (sus bordes en cada planta que atraviesa y sus aristas verticales), y los apoyos bajo la losa
  * (las aristas de la pirámide de un puntual; la cuña de un lineal, con un triángulo cada metro
  * como mucho). Cada segmento lleva el objeto
@@ -18,7 +18,7 @@ import type { ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import { espesorLosaEn, LADO_APOYO_3D } from "./solido.ts";
 
-export const TIPOS_ALAMBRICO = ["pilar", "viga", "losa", "pano", "muro", "apoyo"] as const;
+export const TIPOS_ALAMBRICO = ["pilar", "viga", "barra", "losa", "pano", "muro", "apoyo"] as const;
 export type TipoAlambrico = (typeof TIPOS_ALAMBRICO)[number];
 
 export interface Alambrico {
@@ -97,6 +97,13 @@ export function alambrico(f: ModeloFisico): Alambrico {
     if (i === undefined || z === null || z === undefined) continue;
     nuevo(v.id, "viga");
     for (let j = 1; j < v.puntos.length; j++) poner([v.puntos[j - 1]![0], v.puntos[j - 1]![1], z], [v.puntos[j]![0], v.puntos[j]![1], z], i);
+  }
+  for (const b of porId(f.barras)) {
+    const [ki, kf] = [indice.get(b.inicio.planta), indice.get(b.fin.planta)];
+    const [zi, zf] = [ki === undefined ? null : cotas[ki], kf === undefined ? null : cotas[kf]];
+    if (ki === undefined || kf === undefined || zi === null || zi === undefined || zf === null || zf === undefined) continue;
+    nuevo(b.id, "barra");
+    poner([b.inicio.x, b.inicio.y, zi], [b.fin.x, b.fin.y, zf], Math.min(ki, kf));
   }
   for (const [lista, tipo] of [
     [f.losas, "losa"],

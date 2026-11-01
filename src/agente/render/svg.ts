@@ -40,6 +40,8 @@ export const ESTILOS: Record<Estilo, Pintura> = {
   "pano-viguetas": { stroke: "#b49a68", sw: 1 },
   viga: { fill: "#c3cbd4", stroke: "#4c5560", sw: 0.8 },
   vigueta: { stroke: "#7a6a4a", sw: 1.4 },
+  barra: { stroke: "#0369a1", sw: 2, dash: "8 4" },
+  "barra-alzado": { stroke: "#0369a1", sw: 3 },
   "pilar-llega": { fill: "#1f2933", stroke: "#1f2933", sw: 1 },
   "pilar-arranca": { fill: "#ffffff", stroke: "#1f2933", sw: 1.6 },
   "muro-llega": { fill: "#4a5561", stroke: "#2a313a", sw: 0.8 },

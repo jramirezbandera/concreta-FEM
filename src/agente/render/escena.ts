@@ -24,6 +24,8 @@ export type Estilo =
   | "pano-viguetas"
   | "viga"
   | "vigueta"
+  | "barra"
+  | "barra-alzado"
   | "pilar-llega"
   | "pilar-arranca"
   | "muro-llega"

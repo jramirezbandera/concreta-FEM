@@ -776,6 +776,7 @@
           "items": {
             "enum": [
               "apoyo",
+              "barra",
               "losa",
               "muro",
               "pano",

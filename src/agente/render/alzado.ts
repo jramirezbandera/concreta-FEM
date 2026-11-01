@@ -14,6 +14,8 @@
  *   cortados con su espesor;
  * - las vigas paralelas al plano con su canto, con la cara superior en la planta (C1-c), y las que
  *   lo cruzan, cortadas (su ancho medido a lo largo del plano);
+ * - las barras entre dos niveles (fase BN) con los dos extremos cerca del plano, de un extremo al
+ *   otro, y las que lo cruzan, como un punto en el cruce;
  * - las losas y los paños cortados por el plano, con su espesor (el del paño, el canto de sus
  *   viguetas), y los apoyos, bajo la losa: los lineales paralelos al plano, a lo largo de él con sus
  *   triángulos; los que lo cruzan, como un puntual.
@@ -291,6 +293,22 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
     }
   }
 
+  // ─── Barras entre dos niveles (fase BN) ──────────────────────────────────────────────────────
+  for (const b of fisico ? porId(f.barras ?? []) : []) {
+    const [zi, zf] = [cotaDe(b.inicio.planta), cotaDe(b.fin.planta)];
+    if (zi === null || zf === null) continue;
+    const [A, B]: [Vec2, Vec2] = [[b.inicio.x, b.inicio.y], [b.fin.x, b.fin.y]];
+    const [wa, wb] = [w(A), w(B)];
+    if (Math.abs(wa) <= prof && Math.abs(wb) <= prof) {
+      const [pa, pb]: [Vec2, Vec2] = [[u(A), zi], [u(B), zf]];
+      poner({ tipo: "linea", puntos: [pa, pb], estilo: "barra-alzado", objeto: b.id });
+      poner({ tipo: "texto", p: [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2], texto: b.id, tamano: 11, ancla: "medio", dy: -6, fondo: true, prioridad: 30, clase: "id", objeto: b.id });
+    } else if (wa > 0 !== wb > 0) {
+      const t = wa / (wa - wb);
+      poner({ tipo: "marca", p: [u(A) + t * (u(B) - u(A)), zi + t * (zf - zi)], forma: "circulo", radio: 3.5, estilo: "barra-alzado", objeto: b.id });
+    }
+  }
+
   // ─── Apoyos ───────────────────────────────────────────────────────────────────────────────────
   const rotuloApoyo = (p: Vec2, id: string, c: readonly boolean[]) =>
     poner({ tipo: "texto", p, texto: `${id} · ${textoCoartados(c)}`, tamano: 11, ancla: "medio", dy: 22, fondo: true, prioridad: 45, clase: "id", objeto: id });
@@ -472,6 +490,7 @@ export function vistaAlzado(f: ModeloFisico, plano: PlanoAlzado, d: DatosVista, 
   entrada("muro-alzado", "Muro paralelo al plano, con sus huecos");
   entrada("viga-alzado", "Viga paralela al plano, con su canto y la cara superior en la planta");
   entrada("seccion-cortada", "Viga o muro que cruza el plano, cortado");
+  entrada("barra-alzado", "Barra entre dos niveles, por su eje; si cruza el plano, un círculo");
   entrada("losa-cortada", "Losa cortada, con su espesor");
   entrada("pano-cortado", "Paño unidireccional cortado, con el canto de sus viguetas");
   entrada("eje-pilar", "Pilar, por el eje de su sección");
