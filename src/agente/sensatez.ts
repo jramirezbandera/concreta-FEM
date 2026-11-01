@@ -135,6 +135,11 @@ export function num(x: number, cifras = 3): string {
 
 export const rango = (r: readonly [number, number], u = "") => `fuera de [${num(r[0])}; ${num(r[1])}]${u ? ` ${u}` : ""}`;
 const fuera = (x: number, r: readonly [number, number]) => !(x >= r[0] && x <= r[1]);
+/**
+ * Cuánto se separa un cociente axil/bajada de 1, en escala logarítmica; uno negativo (el tramo va a
+ * tracción) es lo más lejos (UI-18: con Math.log daba NaN y ni salía como lo peor ni se ordenaba).
+ */
+export const separacion = (c: number): number => (c > 0 ? Math.abs(Math.log(c)) : Infinity);
 /** Cuánto sale x de [a, b] en escala logarítmica (0 en el borde; negativo dentro). */
 const salida = (x: number, r: readonly [number, number]) => (x > 0 ? Math.max(Math.log(x / r[1]), Math.log(r[0] / x)) : Infinity);
 
@@ -261,8 +266,10 @@ function datos(f: ModeloFisico): Registro[] {
     if (i === 0 || p.altura === null) return; // la de arriba del todo no la usa
     const ultima = i === f.plantas.length - 1;
     const r: [number, number] = ultima ? [0, U.altura[1]] : [U.altura[0], U.altura[1]];
-    alt.peor(salida(p.altura, r), `${p.id}: ${num(p.altura)} m`);
-    if (fuera(p.altura, r)) alt.aviso(`La planta ${p.id} tiene ${num(p.altura)} m de altura (${rango(r, "m")}): ¿está en cm o es la de otra planta?`, [p.id], { valor: p.altura });
+    // UI-15: la altura de una planta es la del tramo hasta la de encima; el aviso dice el tramo
+    const arriba = f.plantas[i - 1]!.id;
+    alt.peor(salida(p.altura, r), `${p.id}–${arriba}: ${num(p.altura)} m`);
+    if (fuera(p.altura, r)) alt.aviso(`El tramo de ${p.id} a ${arriba} mide ${num(p.altura)} m (${rango(r, "m")}): ¿está en cm o es la altura de otro tramo? (es la altura de ${p.id} en la tabla Plantas)`, [p.id], { valor: p.altura });
   });
 
   const esp = new Registro("sensatez/espesor", "Espesor de losas y muros", rango(U.espesor, "m"));

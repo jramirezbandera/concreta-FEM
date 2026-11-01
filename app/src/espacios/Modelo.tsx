@@ -91,6 +91,11 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
   const [escala, setEscala] = useState<Escala>("1");
   const [tabla, setTabla] = useState<NombreTabla>(cargas ? "cargas" : "pilares");
   const [nueva, setNueva] = useState(0);
+  // UI-41 (M-14): elegir en el dibujo lleva la hoja a la tabla de lo elegido (y la hoja, a su fila)
+  const tablaElegido = ed && seleccion ? tablaDe(ed.proyecto.modelo, seleccion) : null;
+  useEffect(() => {
+    if (tablaElegido && (!cargas || tablaElegido === "cargas")) setTabla(tablaElegido);
+  }, [tablaElegido, cargas]);
   const [plantilla, setPlantilla] = useState<Record<string, string> | undefined>(undefined);
   const [dialogo, setDialogo] = useState<"borrar" | "copiar" | "renumerar" | "abacos" | null>(null);
 

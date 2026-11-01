@@ -15,7 +15,7 @@ import { sha256 } from "../compilador/huella.ts";
 import type { Diagnostico } from "../motor/diagnosticos.ts";
 import type { Resumen } from "./consultas.ts";
 import type { Proyecto } from "./proyecto.ts";
-import { num, type Comprobacion, type SensatezModelo } from "./sensatez.ts";
+import { num, separacion, type Comprobacion, type SensatezModelo } from "./sensatez.ts";
 import type { SensatezResultados } from "./sensatezResultados.ts";
 
 export type Bloque =
@@ -235,7 +235,7 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
     parrafo(
       `Axil de compresión en la cabeza de cada tramo de pilar con la suma de los casos gravitatorios (${d.resultados.gravedad.join(" + ")}), frente a su bajada por áreas tributarias (Voronoi de pilares y muros por planta, cada carga donde cae). Se comparan ${comparables.length} de ${t.length} tramos${enMuro ? `; ${enMuro} están embebidos en un muro` : ""}. Los que más se separan:`,
     );
-    const orden = [...comparables].sort((a, b) => Math.abs(Math.log(b.cociente!)) - Math.abs(Math.log(a.cociente!))).slice(0, TRAMOS_TRIBUTARIA);
+    const orden = [...comparables].sort((a, b) => separacion(b.cociente!) - separacion(a.cociente!)).slice(0, TRAMOS_TRIBUTARIA);
     b.push({ tipo: "tabla", cabecera: ["Pilar", "Planta (cabeza)", "Axil (kN)", "Bajada (kN)", "Axil / bajada"], numericas: [2, 3, 4], filas: orden.map((x) => [x.pilar, x.planta, kN(x.axil), kN(x.bajada), num(x.cociente!)]) });
   }
 

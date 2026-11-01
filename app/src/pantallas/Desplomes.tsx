@@ -154,7 +154,7 @@ export function ModoDeformada() {
               <tr key={p.planta} data-on={p.planta === planta}>
                 <td>
                   {p.planta}
-                  <small>h {fmt(p.altura, 2)} m</small>
+                  <small title="La altura del tramo de debajo, la del desplome relativo">tramo de debajo, {fmt(p.altura, 2)} m</small>
                 </td>
                 <td>
                   {p.desplome ? mm(p.desplome.d) : "—"}

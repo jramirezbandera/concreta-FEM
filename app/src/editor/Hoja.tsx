@@ -318,8 +318,8 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
     setCursor((x) => ({ ...x, f: i }));
     setAncla(null);
     hoja.current?.querySelector(`tr[data-id="${CSS.escape(seleccion)}"]`)?.scrollIntoView?.({ block: "nearest" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando cambia la selección
-  }, [seleccion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cuando cambia la selección o, por ella, la tabla
+  }, [seleccion, tabla]);
 
   // Una herramienta de la barra pide la fila nueva
   useEffect(() => {
@@ -660,7 +660,16 @@ export function PanelTablas({ tabla, setTabla, nueva = 0, plantilla }: { tabla: 
         )}
         {tabla === "ejes" && !m.ejes && <EjesPropuestos />}
         <span className="flex-1" />
-        <button type="button" className="btn" onClick={() => mover(nBorrador, 0)} title="Ir a la fila nueva (la última)">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            mover(nBorrador, 0);
+            // UI-41 (M-13): el foco, a la hoja, para que lo tecleado vaya a la fila nueva
+            requestAnimationFrame(() => hoja.current?.focus());
+          }}
+          title="Ir a la fila nueva (la última) y escribir en ella"
+        >
           <Plus size={13} /> Nueva
         </button>
         <button type="button" className="btn" onClick={duplicar} disabled={f0 >= nBorrador} title="Una fila nueva con los datos de la elegida">

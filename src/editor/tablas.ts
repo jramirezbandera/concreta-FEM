@@ -182,7 +182,7 @@ const plantas: DefTabla = {
     id,
     nombre,
     { clave: "tipo", titulo: "tipo", ayuda: "planta (por defecto), sotano o cubierta", opciones: fijas(["planta", "sotano", "cubierta"], "planta") },
-    { clave: "altura", titulo: "altura", unidad: "m", ayuda: "de forjado a forjado hasta la planta de encima; vacía en la de arriba" },
+    { clave: "altura", titulo: "altura hasta la de encima", unidad: "m", ayuda: "de forjado a forjado, de esta planta a la de encima (la de un alzado es la de la de debajo); vacía en la de arriba" },
     { clave: "cota", titulo: "cota", unidad: "m", calculada: true },
     { clave: "diafragma", titulo: "diafragma", ayuda: "rigido o ninguno; por defecto, rígido salvo en la más baja (C1-d)", opciones: fijas(["rigido", "ninguno"], "rígido salvo en la más baja") },
   ],

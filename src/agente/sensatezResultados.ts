@@ -21,7 +21,7 @@ import type { Consultas } from "../compilador/consultas.ts";
 import type { ModeloFisico, OpcionesCompilacion, Pilar } from "../compilador/fisico.ts";
 import { EsfuerzosPiezas } from "../compilador/resultados.ts";
 import { bajadaTributaria, type TramoTributario } from "./tributaria.ts";
-import { ACCIONES_NO_GRAVITATORIAS, anchoSeccion, areaSeccion, cantoSeccion, num, Plantas, Registro, tipoCaso, UMBRALES, type Comprobacion } from "./sensatez.ts";
+import { ACCIONES_NO_GRAVITATORIAS, anchoSeccion, areaSeccion, cantoSeccion, num, Plantas, Registro, separacion, tipoCaso, UMBRALES, type Comprobacion } from "./sensatez.ts";
 
 /** Puntos de más (uniformes) en el muestreo de la deformada de cada tramo flexible. */
 export const MUESTRAS = 16;
@@ -135,7 +135,7 @@ export function sensatezResultados(q: Consultas, res: Resumen, opciones?: Opcion
       const cociente = comparable ? axil / b.bajada : null;
       comparados.push({ ...b, axil, cociente });
       if (cociente === null) continue;
-      trib.peor(Math.abs(Math.log(cociente)), `${b.pilar} en ${b.planta}: ${num(cociente)}`);
+      trib.peor(separacion(cociente), `${b.pilar} en ${b.planta}: ${num(cociente)}`);
       if (cociente < U.tributaria[0] || cociente > U.tributaria[1])
         trib.aviso(
           `El tramo del pilar ${b.pilar} bajo la planta ${b.planta} lleva ${num(axil)} kN y su bajada por áreas tributarias es de ${num(b.bajada)} kN (${num(cociente)} veces): ¿está conectado, le falta un apoyo o es una transición?`,

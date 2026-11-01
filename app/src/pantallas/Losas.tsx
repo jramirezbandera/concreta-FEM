@@ -229,6 +229,9 @@ export function ModoLosas() {
             <Chip acento title={resumenComb}>
               {nombreCampo} · {unidad}
               {varias && ` · ${textoEnv}`}
+              {/* UI-23: la combinación también en el 3D */}
+              {!varias && eleccion.tipo === "combinacion" && ` · ${eleccion.nombre}`}
+              {superficies !== "losas" && ` · ${SUPERFICIES.find((x) => x.id === superficies)!.nombre.toLowerCase()}`}
               {elegida.modo !== "completa" && ` · ${elegida.modo === "sin-picos" ? "sin picos" : "escala manual"}`}
             </Chip>
           </>
@@ -257,6 +260,10 @@ export function ModoLosas() {
           ) : undefined
         }
       />
+      {/* UI-23: lo de este panel es de la planta; el 3D puede estar enseñando los muros o todas las plantas */}
+      {superficies !== "losas" && vistas.vistas[vistas.activa]?.tipo === "3d" && (
+        <p className="nota">El 3D dibuja {SUPERFICIES.find((y) => y.id === superficies)!.nombre.toLowerCase()}; lo de aquí abajo es de las losas de {planta ?? "la planta"}.</p>
+      )}
       {x && <p className="nota">uz en los nudos; momentos y cortantes suavizados entre láminas, en los ejes de cada losa. Las bandas no interpolan el color: el número de un punto, con un clic.</p>}
         <SeccionEscala
           key={campo}
