@@ -1,0 +1,9 @@
+Pórtico arriostrado: 237 nudos, 49 barras, 156 láminas.
+
+Axil en el centro de cada barra (kN, + tracción):
+  X1: G -2.030, Q -0.870, W 3.706
+  X2: G 1.114, Q 0.635, W -3.704
+  T1: G -14.038, Q -1.324, W 8.900
+  T2: G -20.502, Q -11.906, W -3.424
+
+Viento (15 kN en +X): reacciones de los pilares en X = 15.000 kN (con la cruz y la diagonal de y = 4, que arrancan en sus nudos)
