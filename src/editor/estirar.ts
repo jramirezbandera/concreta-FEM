@@ -9,10 +9,11 @@
  * - **Línea de corte:** una paralela dentro del vano a min(L/4; 0,5 m) del eje móvil. Lo pegado a
  *   él va con él (la huella de sus pilares, una viga alineada a su cara interior, el borde de una
  *   losa en la cara de la viga); lo que está más allá se mueve entero y lo que la cruza se alarga.
- * - **Por vértices:** el punto de pilares, apoyos y cargas puntuales; cada vértice de vigas, muros,
+ * - **Por vértices:** el punto de pilares, apoyos y cargas puntuales; los dos extremos de las barras
+ *   (fase BN); cada vértice de vigas, muros,
  *   apoyos lineales, contornos y huecos de losas y paños, ábacos, cargas lineales, zonas de carga,
  *   bandas y ejes guardados. Un eje paralelo se mueve entero o se queda; uno perpendicular se alarga.
- * - **Estaciones** (cargas de viga con `desde`/`hasta`, huecos de muro y apoyos de banda): cada una
+ * - **Estaciones** (cargas de viga y de barra con `desde`/`hasta`, huecos de muro y apoyos de banda): cada una
  *   se lleva a su punto, el punto se estira (en un tramo que cruza el corte, a su t estirado sobre el
  *   tramo nuevo) y se vuelve a medir sobre la pieza estirada. Un hueco de muro que cruza el corte
  *   cambia de ancho, y se avisa.
@@ -30,7 +31,8 @@
  */
 import { rotuloCota } from "../agente/render/ejes.ts";
 import { huellaSeccion, PlantaFisica } from "../agente/render/modelo.ts";
-import type { CargaFisica, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
+import { puntosBarra } from "../compilador/barras.ts";
+import type { Barra, CargaFisica, ModeloFisico, Vec2 } from "../compilador/fisico.ts";
 import { distanciaABorde, puntoEnPoligono } from "../compilador/poligonos.ts";
 import { limpio } from "./dibujo/cotas.ts";
 import type { Operacion } from "./operaciones.ts";
@@ -136,6 +138,7 @@ function vertices(m: ModeloFisico, f: (id: string, p: Vec2) => void): void {
   for (const p of m.pilares ?? []) f(p.id, [p.x, p.y]);
   for (const a of m.apoyos ?? []) f(a.id, [a.x, a.y]);
   for (const v of m.vigas ?? []) lista(v.id, v.puntos);
+  for (const b of m.barras ?? []) lista(b.id, [[b.inicio.x, b.inicio.y], [b.fin.x, b.fin.y]]);
   for (const w of m.muros ?? []) lista(w.id, w.puntos);
   for (const a of m.apoyosLineales ?? []) lista(a.id, a.puntos);
   for (const l of m.losas ?? []) {
@@ -199,6 +202,24 @@ function estacion(tr: Transformador, ps: readonly Vec2[], qs: readonly Vec2[], s
 }
 
 /**
+ * La estación s de una barra (fase BN, por su longitud real), medida otra vez sobre la estirada. Si sus
+ * dos extremos se mueven juntos, la misma; si cruza el corte, el punto en planta a su t estirado y la
+ * misma fracción de la barra nueva.
+ */
+function estacionBarra(tr: Transformador, m: ModeloFisico, b: Barra, b2: Barra, s: number): number {
+  const [A, B] = [[b.inicio.x, b.inicio.y] as Vec2, [b.fin.x, b.fin.y] as Vec2];
+  const [ab, ab2] = [puntosBarra(m.plantas, b), puntosBarra(m.plantas, b2)];
+  if (tr.mueve(A) === tr.mueve(B) || !ab || !ab2) return s;
+  const L = Math.hypot(ab[1][0] - ab[0][0], ab[1][1] - ab[0][1], ab[1][2] - ab[0][2]);
+  const L2 = Math.hypot(ab2[1][0] - ab2[0][0], ab2[1][1] - ab2[0][1], ab2[1][2] - ab2[0][2]);
+  const lam = s / L;
+  const P: Vec2 = [A[0] + lam * (B[0] - A[0]), A[1] + lam * (B[1] - A[1])];
+  const [ta, tb] = [dot([b2.inicio.x, b2.inicio.y], tr.e.n), dot([b2.fin.x, b2.fin.y], tr.e.n)];
+  const lam2 = (tr.t(dot(P, tr.e.n)) - ta) / (tb - ta);
+  return Math.min(Math.max(limpio(lam2 * L2), 0), L2);
+}
+
+/**
  * El estirado de la cota a `valor`, como una operación. Falla si el valor no es un número positivo,
  * si es el de ahora o si acorta tanto que lo que se mueve pasaría por encima de lo que se queda.
  */
@@ -258,6 +279,14 @@ export function estirar(m: ModeloFisico, e: Estiramiento, valor: number): Result
     vigas.set(v.id, [v.puntos, ps]);
     cambiar("vigas", v, { ...v, puntos: ps });
   }
+  const barras = new Map<string, [Barra, Barra]>();
+  for (const b of m.barras ?? []) {
+    const [i, f] = [tr.punto([b.inicio.x, b.inicio.y]), tr.punto([b.fin.x, b.fin.y])];
+    if (i[0] === b.inicio.x && i[1] === b.inicio.y && f[0] === b.fin.x && f[1] === b.fin.y) continue;
+    const n: Barra = { ...b, inicio: { ...b.inicio, x: i[0], y: i[1] }, fin: { ...b.fin, x: f[0], y: f[1] } };
+    barras.set(b.id, [b, n]);
+    cambiar("barras", b, n);
+  }
   for (const w of m.muros ?? []) {
     const ps = linea(w.puntos);
     if (ps === w.puntos) continue;
@@ -291,7 +320,7 @@ export function estirar(m: ModeloFisico, e: Estiramiento, valor: number): Result
     cambiar("bandas", b, { ...b, desde: ps[0], hasta: ps[1], ...(apoyos ? { apoyos } : {}) });
   }
   for (const c of m.cargas ?? []) {
-    const n = cargaEstirada(tr, c, vigas);
+    const n = cargaEstirada(tr, c, vigas, barras, m);
     if (n !== c) cambiar("cargas", c, n);
   }
   for (const x of m.ejes ?? []) {
@@ -311,7 +340,8 @@ export type ResultadoMover = { ok: true; operacion: Operacion; avisos: string[];
  * Con `conVigas` (CT-d, como CYPECAD), lo siguen las vigas de sus plantas con un vértice en su punto
  * fijo bit a bit: ese vértice pasa a ser q. Las que tienen un vértice en su huella sin estar en el
  * punto (alineadas a una cara, V2c-b) no lo siguen, y se avisa; sin `conVigas`, también de las que se
- * quedan. Los ejes guardados no se mueven. Un `lote` de `cambiar`: un paso de deshacer.
+ * quedan. Las barras (fase BN) con un extremo en su punto fijo en una de sus plantas lo siguen igual.
+ * Los ejes guardados no se mueven. Un `lote` de `cambiar`: un paso de deshacer.
  */
 export function moverPilar(m: ModeloFisico, id: string, q: Vec2, conVigas = true): ResultadoMover {
   const p = m.pilares?.find((x) => x.id === id);
@@ -339,14 +369,29 @@ export function moverPilar(m: ModeloFisico, id: string, q: Vec2, conVigas = true
       } else if (v.puntos.some(enHuella)) cara.push(v.id);
     }
   }
+  // Fase BN: las barras con un extremo en su punto fijo, en las plantas del pilar
+  const quedanBarras: string[] = [];
+  const plantasPilar = new Set(m.plantas.slice(m.plantas.findIndex((x) => x.id === p.hasta), m.plantas.findIndex((x) => x.id === p.desde) + 1).map((x) => x.id));
+  const enFijo = (x: { planta: string; x: number; y: number }) => plantasPilar.has(x.planta) && x.x === p.x && x.y === p.y;
+  for (const b of m.barras ?? []) {
+    if (!enFijo(b.inicio) && !enFijo(b.fin)) continue;
+    if (!conVigas) {
+      quedanBarras.push(b.id);
+      continue;
+    }
+    siguen.push(b.id);
+    const mov = (x: Barra["inicio"]) => (enFijo(x) ? { ...x, x: q[0], y: q[1] } : x);
+    ops.push({ op: "cambiar", coleccion: "barras", id: b.id, objeto: { ...b, inicio: mov(b.inicio), fin: mov(b.fin) } as unknown as Objeto });
+  }
   const avisos: string[] = [];
   const lista = (ids: string[]) => ids.join(", ");
   if (quedan.length) avisos.push(`${quedan.length > 1 ? `Las vigas ${lista(quedan)} acaban` : `La viga ${quedan[0]} acaba`} en ${id} y se ${quedan.length > 1 ? "quedan" : "queda"} donde estaba${quedan.length > 1 ? "n" : ""}.`);
+  if (quedanBarras.length) avisos.push(`${quedanBarras.length > 1 ? `Las barras ${lista(quedanBarras)} acaban` : `La barra ${quedanBarras[0]} acaba`} en ${id} y se ${quedanBarras.length > 1 ? "quedan" : "queda"} donde estaba${quedanBarras.length > 1 ? "n" : ""}.`);
   if (cara.length) avisos.push(`${cara.length > 1 ? `Las vigas ${lista(cara)} llegan` : `La viga ${cara[0]} llega`} a ${id} sin acabar en su punto fijo (alineada${cara.length > 1 ? "s" : ""} a una cara) y no lo ${cara.length > 1 ? "siguen" : "sigue"}.`);
   return { ok: true, operacion: ops.length > 1 ? { op: "lote", operaciones: ops } : ops[0]!, avisos, vigas: siguen };
 }
 
-function cargaEstirada(tr: Transformador, c: CargaFisica, vigas: ReadonlyMap<string, [readonly Vec2[], readonly Vec2[]]>): CargaFisica {
+function cargaEstirada(tr: Transformador, c: CargaFisica, vigas: ReadonlyMap<string, [readonly Vec2[], readonly Vec2[]]>, barras: ReadonlyMap<string, [Barra, Barra]>, m: ModeloFisico): CargaFisica {
   switch (c.tipo) {
     case "puntual": {
       const q = tr.punto([c.x, c.y]);
@@ -367,6 +412,13 @@ function cargaEstirada(tr: Transformador, c: CargaFisica, vigas: ReadonlyMap<str
       const [ps, qs] = v;
       const desde = c.desde === undefined ? undefined : estacion(tr, ps, qs, c.desde);
       const hasta = c.hasta === undefined ? undefined : estacion(tr, ps, qs, c.hasta);
+      return desde === c.desde && hasta === c.hasta ? c : { ...c, ...(desde !== undefined ? { desde } : {}), ...(hasta !== undefined ? { hasta } : {}) };
+    }
+    case "barra": {
+      const b = barras.get(c.barra);
+      if (!b || (c.desde === undefined && c.hasta === undefined)) return c;
+      const desde = c.desde === undefined ? undefined : estacionBarra(tr, m, b[0], b[1], c.desde);
+      const hasta = c.hasta === undefined ? undefined : estacionBarra(tr, m, b[0], b[1], c.hasta);
       return desde === c.desde && hasta === c.hasta ? c : { ...c, ...(desde !== undefined ? { desde } : {}), ...(hasta !== undefined ? { hasta } : {}) };
     }
     default:

@@ -13,7 +13,7 @@
  *
  * Puro: sin IO.
  */
-import type { AccionCaso, ApoyoFisico, ApoyoLineal, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Viga } from "../compilador/fisico.ts";
+import type { AccionCaso, ApoyoFisico, ApoyoLineal, Barra, CargaFisica, CasoFisico, EjeReplanteo, Losa, Material, ModeloFisico, Muro, PanoUnidireccional, Pilar, Planta, Seccion, Viga } from "../compilador/fisico.ts";
 import { gammaMaterial } from "../agente/sensatez.ts";
 import { cotasPlantas } from "../compilador/cotas.ts";
 import { PUNTOS_FIJOS } from "../compilador/puntoFijo.ts";
@@ -23,7 +23,7 @@ import { describirMaterial, describirSeccion } from "./gestores.ts";
 import { Lector, leerNumero, textoBooleano, textoClaves, textoGdl, textoGrupos, textoNumero, textoPoligonos, textoPuntos, textoVector, type ErrorCelda, type Fila } from "./celdas.ts";
 import { indiceIds, lista, type Coleccion, type Objeto } from "./referencias.ts";
 
-export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "casos", "cargas"] as const;
+export const TABLAS = ["plantas", "ejes", "materiales", "secciones", "pilares", "vigas", "barras", "forjados", "muros", "apoyos", "apoyosLineales", "casos", "cargas"] as const;
 export type NombreTabla = (typeof TABLAS)[number];
 
 export interface Columna {
@@ -446,6 +446,71 @@ const vigas: DefTabla = {
     });
   },
   plantas: (o) => [o.planta as string],
+};
+
+// ─── Barras entre dos niveles (fase BN) ──────────────────────────────────────────────────────────
+
+const barras: DefTabla = {
+  nombre: "barras",
+  titulo: "Barras",
+  colecciones: ["barras"],
+  prefijo: "B",
+  columnas: [
+    id,
+    nombre,
+    { clave: "plantaInicio", titulo: "planta inicio", ayuda: "la planta de su inicio: va a su cota", opciones: opcionesPlantas, referencia: "plantas" },
+    { clave: "xInicio", titulo: "x inicio", unidad: "m" },
+    { clave: "yInicio", titulo: "y inicio", unidad: "m" },
+    { clave: "plantaFin", titulo: "planta fin", ayuda: "la planta de su fin (la misma que la del inicio: una barra en el plano de la planta)", opciones: opcionesPlantas, referencia: "plantas" },
+    { clave: "xFin", titulo: "x fin", unidad: "m" },
+    { clave: "yFin", titulo: "y fin", unidad: "m" },
+    { clave: "seccion", titulo: "sección", opciones: secciones_(), referencia: "secciones" },
+    { clave: "giro", titulo: "giro", unidad: "°", ayuda: "de la sección alrededor de su eje; con 0, el canto h en el plano vertical de la barra (en una vertical, según +X)", defecto: () => "0" },
+    { clave: "soloTraccion", titulo: "sólo tracción", ayuda: "sí: una diagonal esbelta que sólo trabaja a tracción. Se calcula lineal y se avisa si queda comprimida en alguna combinación", opciones: fijas(["sí", "no"], "no") },
+    { clave: "libInicio", titulo: "lib. inicio", ayuda: GDL },
+    { clave: "libFin", titulo: "lib. fin", ayuda: GDL },
+  ],
+  fila(o) {
+    const b = o as unknown as Barra;
+    return {
+      id: b.id,
+      nombre: s(b.nombre),
+      plantaInicio: b.inicio.planta,
+      xInicio: n(b.inicio.x),
+      yInicio: n(b.inicio.y),
+      plantaFin: b.fin.planta,
+      xFin: n(b.fin.x),
+      yFin: n(b.fin.y),
+      seccion: b.seccion,
+      giro: n(b.giro),
+      soloTraccion: b.soloTraccion === undefined ? "" : textoBooleano(b.soloTraccion),
+      libInicio: b.liberaciones?.inicio ? textoGdl(b.liberaciones.inicio) : "",
+      libFin: b.liberaciones?.fin ? textoGdl(b.liberaciones.fin) : "",
+    };
+  },
+  objeto(f, _ctx, base) {
+    const L = new Lector(f);
+    const li = L.gdl("libInicio");
+    const lf = L.gdl("libFin");
+    // `dz` no está en la tabla (BN: de planta a planta); el de antes se conserva
+    const b = base as unknown as Barra | undefined;
+    const extremo = (lado: "Inicio" | "Fin", dz: number | undefined) => limpio({ planta: L.texto(`planta${lado}`, { obligatorio: true }), x: L.numero(`x${lado}`, { obligatorio: true }), y: L.numero(`y${lado}`, { obligatorio: true }), dz });
+    return resultado(L, {
+      ...base,
+      id: L.texto("id") ?? "",
+      nombre: L.texto("nombre"),
+      inicio: extremo("Inicio", b?.inicio?.dz),
+      fin: extremo("Fin", b?.fin?.dz),
+      seccion: L.texto("seccion", { obligatorio: true }),
+      giro: L.numero("giro"),
+      soloTraccion: L.booleano("soloTraccion"),
+      liberaciones: li || lf ? limpio({ inicio: li, fin: lf }) : undefined,
+    });
+  },
+  plantas: (o) => {
+    const b = o as unknown as Barra;
+    return [...new Set([b.inicio?.planta, b.fin?.planta].filter((p): p is string => typeof p === "string"))];
+  },
 };
 
 // ─── Forjados: losas macizas, reticulares y paños unidireccionales ────────────────────────────────
@@ -931,12 +996,13 @@ const casos: DefTabla = {
 // ─── Cargas ─────────────────────────────────────────────────────────────────────────────────────
 
 const CARGA = ["planta", "sobre", "ejes", "x", "y", "F", "M", "q", "qb", "desde", "hasta", "puntos", "lado", "z0", "z1", "p0", "p1"] as const;
-const TIPOS_CARGA = ["puntual", "viga", "pilar", "superficie", "lineal", "empuje"] as const;
+const TIPOS_CARGA = ["puntual", "viga", "pilar", "barra", "superficie", "lineal", "empuje"] as const;
 /** Las columnas de cada tipo de carga (además de id, tipo y caso); las demás van vacías. */
 const PROPIAS_CARGA: Readonly<Record<(typeof TIPOS_CARGA)[number], readonly (typeof CARGA)[number][]>> = {
   puntual: ["planta", "x", "y", "F", "M"],
   viga: ["sobre", "ejes", "q", "qb", "desde", "hasta"],
   pilar: ["sobre", "ejes", "q", "qb", "desde", "hasta"],
+  barra: ["sobre", "ejes", "q", "qb", "desde", "hasta"],
   superficie: ["planta", "sobre", "q", "puntos"],
   lineal: ["planta", "puntos", "q"],
   empuje: ["sobre", "lado", "z0", "z1", "p0", "p1"],
@@ -949,13 +1015,13 @@ const cargas: DefTabla = {
   prefijo: "Q",
   columnas: [
     id,
-    { clave: "tipo", titulo: "tipo", ayuda: "puntual (en un punto de la planta), viga o pilar (repartida a lo largo de la pieza), superficie (por m² de forjado), lineal (por metro de una línea de la planta) o empuje (del terreno sobre un muro)", opciones: fijas(TIPOS_CARGA) },
+    { clave: "tipo", titulo: "tipo", ayuda: "puntual (en un punto de la planta), viga, pilar o barra (repartida a lo largo de la pieza), superficie (por m² de forjado), lineal (por metro de una línea de la planta) o empuje (del terreno sobre un muro)", opciones: fijas(TIPOS_CARGA) },
     { clave: "caso", titulo: "caso", ayuda: "la hipótesis en que va: peso, uso, viento…", opciones: casos_(), referencia: "casos" },
-    { clave: "planta", titulo: "planta", ayuda: "la planta en que está la carga (en viga, pilar y empuje, la de su pieza)", opciones: (ctx) => [{ valor: "", texto: "(la de la pieza)" }, ...opcionesPlantas(ctx)], referencia: "plantas" },
+    { clave: "planta", titulo: "planta", ayuda: "la planta en que está la carga (en viga, pilar, barra y empuje, la de su pieza)", opciones: (ctx) => [{ valor: "", texto: "(la de la pieza)" }, ...opcionesPlantas(ctx)], referencia: "plantas" },
     {
       clave: "sobre",
       titulo: "sobre",
-      ayuda: "la pieza que carga: la viga, el pilar, el muro de un empuje, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)",
+      ayuda: "la pieza que carga: la viga, el pilar, la barra, el muro de un empuje, o la losa o el paño de una de superficie (una de superficie sin losa ni paño necesita su zona en «puntos»)",
       defecto: (f) => (tipoCarga(f) === "superficie" && (f.puntos ?? "").trim() ? "los forjados de la zona" : undefined),
     },
     { clave: "ejes", titulo: "ejes", ayuda: "en qué ejes van las componentes: global (los de la planta, z hacia arriba) o local (los de la pieza: x a lo largo de ella, z según su canto)", opciones: fijas(["global", "local"], "global") },
@@ -1001,7 +1067,8 @@ const cargas: DefTabla = {
         break;
       case "viga":
       case "pilar":
-        Object.assign(r, { sobre: c.tipo === "viga" ? c.viga : c.pilar, ejes: c.ejes, q: textoVector(c.q), qb: c.qb ? textoVector(c.qb) : "", desde: n(c.desde), hasta: n(c.hasta) });
+      case "barra":
+        Object.assign(r, { sobre: c.tipo === "viga" ? c.viga : c.tipo === "pilar" ? c.pilar : c.barra, ejes: c.ejes, q: textoVector(c.q), qb: c.qb ? textoVector(c.qb) : "", desde: n(c.desde), hasta: n(c.hasta) });
         break;
       case "superficie":
         Object.assign(r, { planta: c.planta, sobre: c.losa ?? c.pano ?? "", q: textoVector(c.q), puntos: c.zona ? textoPuntos(c.zona) : "" });
@@ -1026,6 +1093,7 @@ const cargas: DefTabla = {
         return resultado(L, { ...comun, planta: L.texto("planta", { obligatorio: true }), x: L.numero("x", { obligatorio: true }), y: L.numero("y", { obligatorio: true }), F: L.vector("F"), M: L.vector("M") });
       case "viga":
       case "pilar":
+      case "barra":
         usa(["sobre", "ejes", "q", "qb", "desde", "hasta"]);
         return resultado(L, {
           ...comun,
@@ -1075,7 +1143,7 @@ const cargas: DefTabla = {
   },
 };
 
-export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, forjados, muros, apoyos, apoyosLineales, casos, cargas };
+export const DEF_TABLAS: Readonly<Record<NombreTabla, DefTabla>> = { plantas, ejes, materiales, secciones, pilares, vigas, barras, forjados, muros, apoyos, apoyosLineales, casos, cargas };
 
 /** Un id libre con el prefijo de la tabla: el primero de `<prefijo>1`, `<prefijo>2`… que no está en el modelo. */
 export function idNuevo(m: ModeloFisico, prefijo: string, ocupados: ReadonlySet<string> = new Set()): string {

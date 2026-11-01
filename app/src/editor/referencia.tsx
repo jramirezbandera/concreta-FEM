@@ -89,6 +89,8 @@ export function contextoCampo(tabla: NombreTabla, clave: string, fila: Readonly<
   }
   if (tabla === "pilares") return { uso: "pilar" };
   if (tabla === "vigas") return { uso: "viga" };
+  // Fase BN: lo habitual son perfiles de acero (arriostramientos, tornapuntas)
+  if (tabla === "barras") return { familia: "acero" };
   if (tabla === "forjados" && clave === "seccion") return { uso: "vigueta" };
   if (tabla === "secciones") return { familia: FAMILIA_FORMA[fila.forma as FormaSeccion] ?? undefined };
   return { familia: "hormigon" };

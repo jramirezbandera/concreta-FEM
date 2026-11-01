@@ -33,7 +33,7 @@
  */
 import { huellaSeccion, PlantaFisica } from "../agente/render/modelo.ts";
 import { direccionEjes, ejesDe, letraEje } from "../compilador/ejes.ts";
-import type { ApoyoFisico, CargaFisica, ModeloFisico, Pilar, PuntoFijo, Vec2 } from "../compilador/fisico.ts";
+import type { ApoyoFisico, Barra, CargaFisica, ModeloFisico, Pilar, PuntoFijo, Vec2 } from "../compilador/fisico.ts";
 import { distanciaABorde, puntoEnPoligono } from "../compilador/poligonos.ts";
 import type { Seis, Vec3 } from "../motor/modelo.ts";
 import { limpio } from "./dibujo/cotas.ts";
@@ -62,7 +62,7 @@ export interface OpcionesTransformar {
 export type ResultadoTransformar = { ok: true; operacion: Operacion; avisos: string[]; nuevos: string[] } | { ok: false; mensaje: string };
 
 /** Lo que se transforma (lo demás no tiene geometría). */
-const GEOMETRICAS: ReadonlySet<Coleccion> = new Set(["pilares", "vigas", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos", "ejes"]);
+const GEOMETRICAS: ReadonlySet<Coleccion> = new Set(["pilares", "vigas", "barras", "apoyos", "cargas", "losas", "apoyosLineales", "bandas", "muros", "panos", "ejes"]);
 
 /** El prefijo del id de una copia, como en las tablas (los paños, «F», como Renumerar). */
 const PREFIJO: Partial<Record<Coleccion, string>> = { pilares: "P", vigas: "V", apoyos: "A", cargas: "Q", losas: "L", apoyosLineales: "AL", bandas: "B", muros: "M", panos: "F", ejes: "E" };
@@ -215,6 +215,29 @@ function pilarTransformado(m: ModeloFisico, tr: Transformador, p: Pilar): Pilar 
   return { ...resto, x: q[0], y: q[1], ...(g || p.giro === 0 ? { giro: g } : {}), ...(fijo !== "centro" || p.fijo === "centro" ? { fijo } : {}) } as Pilar;
 }
 
+/**
+ * La barra transformada (fase BN): sus dos extremos y, si gira, su `giro`. Una inclinada lleva sus
+ * ejes con ella (z en su plano vertical), así que su giro sólo cambia de signo con una simetría; una
+ * vertical gira su sección como un pilar, con el sentido de su x (hacia arriba o hacia abajo).
+ */
+function barraTransformada(m: ModeloFisico, tr: Transformador, b: Barra): Barra {
+  const [i, f] = [tr.punto([b.inicio.x, b.inicio.y]), tr.punto([b.fin.x, b.fin.y])];
+  const inicio = i[0] === b.inicio.x && i[1] === b.inicio.y ? b.inicio : { ...b.inicio, x: i[0], y: i[1] };
+  const fin = f[0] === b.fin.x && f[1] === b.fin.y ? b.fin : { ...b.fin, x: f[0], y: f[1] };
+  if (tr.t.tipo === "mover" || tr.identidad) return inicio === b.inicio && fin === b.fin ? b : { ...b, inicio, fin };
+  const g0 = b.giro ?? 0;
+  let g: number;
+  if (b.inicio.x === b.fin.x && b.inicio.y === b.fin.y) {
+    // Vertical: el ángulo en planta de su canto es el giro si sube y −giro si baja (las plantas van de arriba abajo)
+    const plantas = m.plantas.map((p) => p.id);
+    const sube = plantas.indexOf(b.inicio.planta) > plantas.indexOf(b.fin.planta);
+    const a = tr.direccion(sube ? g0 : -g0);
+    g = normalAngulo(sube ? a : -a, 360);
+  } else g = tr.invierte ? normalAngulo(-g0, 360) : g0;
+  const { giro: _g, ...resto } = b;
+  return { ...resto, inicio, fin, ...(g || b.giro === 0 ? { giro: g } : {}) } as Barra;
+}
+
 /** Las coacciones de un apoyo, giradas (ux ↔ uy y rx ↔ ry a 90°), o null si no se pueden girar. */
 function coartadosGirados(tr: Transformador, c: Seis<boolean>): Seis<boolean> | null {
   const k = normalAngulo(tr.giro, 180);
@@ -307,6 +330,8 @@ function transformado(m: ModeloFisico, tr: Transformador, c: Coleccion, o: Objet
   switch (c) {
     case "pilares":
       return pilarTransformado(m, tr, o as unknown as Pilar) as unknown as Objeto;
+    case "barras":
+      return barraTransformada(m, tr, o as unknown as Barra) as unknown as Objeto;
     case "apoyos": {
       const a = o as unknown as ApoyoFisico;
       const p = tr.punto([a.x, a.y]);

@@ -622,7 +622,7 @@ function NavModelo({ plantillas }: { plantillas: ReactNode }) {
       <Proyecto />
       <NavVistas />
       {plantillas}
-      <Objetos tablas={["pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "ejes"]} />
+      <Objetos tablas={["pilares", "vigas", "barras", "forjados", "muros", "apoyos", "apoyosLineales", "ejes"]} />
     </>
   );
 }

@@ -38,7 +38,7 @@ interface FilaVista {
 }
 
 /** Tablas que se pueden filtrar por la planta activa. */
-const POR_PLANTA: ReadonlySet<NombreTabla> = new Set(["pilares", "vigas", "forjados", "muros", "apoyos", "apoyosLineales", "cargas"]);
+const POR_PLANTA: ReadonlySet<NombreTabla> = new Set(["pilares", "vigas", "barras", "forjados", "muros", "apoyos", "apoyosLineales", "cargas"]);
 const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "forjados", "apoyos", "apoyosLineales", "cargas"]);
 const CON_ORDEN: ReadonlySet<NombreTabla> = new Set(["plantas", "casos"]);
 

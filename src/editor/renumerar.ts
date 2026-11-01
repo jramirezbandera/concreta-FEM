@@ -10,6 +10,8 @@
  *   medio de cada una (a mitad de su longitud).
  * - Losas (`L`), paños (`F`) y muros (`M`): igual, con el centroide de la losa o del paño y el punto
  *   medio del eje del muro (en la planta de su base).
+ * - Barras (`B`, fase BN): igual, con el punto medio de su proyección en planta, en la planta de su
+ *   extremo más bajo.
  *
  * Un número que ya es el id de otro objeto que no se renumera (un material «M1»…) se salta. El
  * `nombre` de cada objeto no se toca. La lista de pilares queda además en ese orden, P1…Pn, para que
@@ -25,10 +27,10 @@ import { direccionEjes } from "../compilador/ejes.ts";
 import { resolverOpciones, type ModeloFisico, type OpcionesCompilacion, type Vec2 } from "../compilador/fisico.ts";
 import { COLECCIONES, conValor, lista, referenciasDe } from "./referencias.ts";
 
-export const RENUMERABLES = ["pilares", "vigas", "losas", "panos", "muros"] as const;
+export const RENUMERABLES = ["pilares", "vigas", "barras", "losas", "panos", "muros"] as const;
 export type Renumerable = (typeof RENUMERABLES)[number];
 
-export const PREFIJOS: Readonly<Record<Renumerable, string>> = { pilares: "P", vigas: "V", losas: "L", panos: "F", muros: "M" };
+export const PREFIJOS: Readonly<Record<Renumerable, string>> = { pilares: "P", vigas: "V", barras: "B", losas: "L", panos: "F", muros: "M" };
 
 /** Punto a mitad de la longitud de una polilínea. */
 function puntoMedio(p: readonly Vec2[]): Vec2 {
@@ -128,6 +130,12 @@ function ordenes(m: ModeloFisico, opciones: OpcionesCompilacion): Record<Renumer
       return [...r, ...ps.filter(({ p }) => !vistos.has(p.id)).map(({ p }) => p.id)];
     },
     vigas: () => porPlanta(m.vigas ?? [], (v) => v.planta, (v) => puntoMedio(v.puntos)),
+    barras: () =>
+      porPlanta(
+        m.barras ?? [],
+        (b) => ((nivel.get(b.inicio.planta) ?? -1) <= (nivel.get(b.fin.planta) ?? -1) ? b.inicio.planta : b.fin.planta),
+        (b) => [(b.inicio.x + b.fin.x) / 2, (b.inicio.y + b.fin.y) / 2],
+      ),
     losas: () => porPlanta(m.losas ?? [], (l) => l.planta, (l) => centroide(l.contorno)),
     panos: () => porPlanta(m.panos ?? [], (p) => p.planta, (p) => centroide(p.contorno)),
     muros: () => porPlanta(m.muros ?? [], (x) => x.desde, (x) => puntoMedio(x.puntos)),
