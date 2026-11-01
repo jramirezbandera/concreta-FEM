@@ -1,6 +1,6 @@
 # Fase BN: barras entre dos niveles
 
-**Estado (2026-11-01):** BN1 hecho: pasan sus ocho criterios (§4.1). Siguen BN2 (la app) y BN3 (la herramienta del alzado).
+**Estado (2026-11-01):** BN1 y BN2 hechas (§4.1 y §5.1): pasan sus criterios; de BN2 falta la puerta de uso. Sigue BN3 (la herramienta del alzado).
 
 Viene de `niveles.md` §1 (paso 2 de su orden) y de `cimentacion-y-arriostramientos.md` §3.
 
@@ -159,6 +159,57 @@ Lo demás de la app es BN2.
   - la skill `fem`, con las barras y sus ejes.
 
 **Criterios de BN2:** cada vista con su prueba (lo dibujado, frente a la compilación) y el banco de Chrome con los mismos bits que Node. Cada operación del editor, de ida y vuelta byte a byte. Falta la puerta de uso.
+
+### 5.1 Resultado de BN2 (2026-11-01)
+
+Pasan los criterios; falta la puerta de uso.
+
+**Editor** (`src/editor/barras.test.ts`):
+
+- **Tabla Barras:** planta, x e y de cada extremo, sección, giro, «sólo tracción» y liberaciones. Ida y vuelta exacta; el `dz`, que la tabla no edita, se conserva. Se ve en las plantas de sus dos extremos.
+- **Carga «barra»** en la tabla Cargas, con `sobre` la barra.
+- **Mover, Copiar, Girar y Simetría:**
+  - una inclinada lleva sus ejes con ella, así que su `giro` sólo cambia de signo con la simetría;
+  - una vertical gira su sección como un pilar, con el sentido de su x;
+  - mover y volver, cuatro giros de 90° y dos simetrías dejan los bytes;
+  - el pórtico de acero girado 37° o reflejado da los desplazamientos girados o reflejados a ≤ 1e-9.
+- **Estirar (CT2):** los extremos como vértices; las estaciones de una carga de barra se vuelven a medir por la longitud real.
+- **Mover un pilar (CT3):** lo siguen las barras con un extremo en su punto fijo, como las vigas (con Ctrl, no; se avisa).
+- **Renumerar:** B1…Bn, por la planta de su extremo bajo y el punto medio de su proyección.
+- **«Nueva…» sección desde la tabla Barras:** propone acero.
+
+**Dibujo** (`src/visor/barras.test.ts`):
+
+- **Planta:** la proyección en discontinua (estilo `barra`) en las plantas de sus dos extremos, con una flecha hacia el extremo alto; una vertical, un círculo.
+- **Alzado:** de extremo a extremo (`barra-alzado`) si los dos están a menos de la profundidad del plano; si lo cruza, un círculo; en el analítico, la barra del motor.
+- **3D:**
+  - sólido: la sección barrida en sus ejes, cerrada y con el volumen A·L a 1e-11, en la planta de su extremo alto;
+  - alámbrico: su eje;
+  - tipo «Barras» en los filtros y en las vistas guardadas.
+
+**Resultados:**
+
+- Los diagramas del 3D y del alzado ya recorrían todas las piezas del mapeo.
+- **Resultados · Diagramas:**
+  - la lista da «Barras que llegan a» la planta;
+  - un clic en una barra la elige;
+  - su detalle va desde el inicio, con sus dos plantas y su máximo y mínimo.
+- **`fem consultar pieza <barra>`:** sus extremos a lo largo de ella (N+, N−, Vy, Vz, My, Mz). Las envolventes la agrupan por la planta de su inicio.
+
+**Agente** (`src/agente/barras.test.ts`):
+
+- **Peso propio esperado de A3:** las barras, γ·A por la longitud real en la planta del extremo alto, salvo la zona rígida del extremo bajo (CB-f, la que el compilador lleva a esa planta). Coincide con el del cálculo planta a planta a precisión de máquina. La columna «Barras» del informe sólo sale con barras.
+- **Bajada tributaria:** el peso y las cargas verticales de cada barra, a sus dos extremos como una biapoyada.
+- **`barra/compresion`** (sólo si hay alguna «sólo tracción»): N < 0 en alguna combinación de esfuerzos (sin acciones, cada caso). En el pórtico arriostrado, X1 con 1,4·(G + Q): −4,17 kN.
+- **Umbral nuevo, `dimensionBarra`** de 0,01 a 3 m: el mínimo de las secciones que sólo usan barras. Con el de 0,1 m, un redondo de 3 cm salía como «¿está en cm?». Los umbrales de A3 los fijó el usuario: éste es nuevo, por confirmar.
+- **La skill `fem`:** las barras, sus ejes, sus uniones, la diagonal articulada, «sólo tracción» y el diafragma.
+
+**Banco de Chrome** (`validacion/bn/chrome.ts`, `out_chrome.txt`), con el pórtico arriostrado en la app compilada:
+
+- la planta P1, el sólido y el alzado del eje B, con los bits de Node;
+- la tabla Barras con sus cuatro barras;
+- los diagramas de My en el 3D, con los triángulos de Node (cuatro barras con diagrama);
+- el detalle de T1 desde la lista de Diagramas.
 
 ## 6. BN3: la herramienta «Barra» del alzado
 

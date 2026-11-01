@@ -129,6 +129,14 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
   - Una sección `general` lleva A, Iy, Iz y J. Iy es la de My: en una viga, la flexión vertical; en un pilar, la del plano de su canto (el XZ con giro 0).
   - Un material `general` lleva E y G en kN/m² y su peso.
 - **Vigas:** se dibujan con `puntos` en planta sobre su eje y con su planta. Se conectan solas a los pilares y a otras vigas que tocan (tolerancia de 5 cm, con aviso).
+- **Barras entre dos niveles** (`barras`: vigas inclinadas, tornapuntas, zancas, diagonales de arriostramiento):
+  - `inicio` y `fin` llevan cada uno `planta`, `x` e `y`; van a la cota de su planta (`dz` no se admite aún). Las dos en la misma planta es una barra en el plano del forjado.
+  - Cada extremo se une a lo que encuentra en su planta: el pilar en cuya huella cae, un nudo a ≤ 5 cm, una viga (que se parte), una losa o el eje de un muro. Si no cae en nada, es un error.
+  - Ejes locales: x del inicio al fin; z en el plano vertical que la contiene, hacia arriba (`giro` la gira alrededor de x); una vertical, como un pilar.
+  - Zona rígida sólo hasta la cara de un pilar de hormigón; en acero, ninguna.
+  - Una diagonal articulada: `liberaciones` `{ "inicio": [false, false, false, false, true, true], "fin": [false, false, false, true, true, true] }` (la torsión, en un solo extremo).
+  - `soloTraccion: true` en una diagonal esbelta: se calcula lineal (en una cruz, las dos activas) y la revisión avisa (`barra/compresion`) si queda comprimida.
+  - Con los dos extremos en el mismo diafragma rígido no recibe nada de las acciones horizontales en ese plano (aviso `barra/en-diafragma`): para arriostrar una cubierta, quita el diafragma de esa planta.
 - **Losas y paños:** su contorno es un polígono simple y no repite el primer punto.
   - **Se dibujan a ejes:** el borde que apoya en una viga va sobre el eje de la viga.
   - **Todo borde de forjado lleva su zuncho** (viga de atado, de 20 a 40 cm de ancho; lo normal, 30, con el canto del forjado). No lo olvides aunque el plano de arquitectura no lo dibuje: pregunta su ancho y su canto. Donde el borde tiene pilares, el zuncho va por su eje (enrasado por fuera quedaría a pocos cm de sus caras y ensucia la malla); donde no, enrasado por fuera. **La losa va hasta su borde real, como se hormigona:** no la recortes hasta el eje ni pases cargas a mano. El compilador lleva a la viga lo que cae en su ancho y en la franja de hasta b entre su cara de fuera y el borde (fase TB, `tirasBorde`), con sus cargas de superficie, petos y puntuales. La orden «Vigas de borde» del editor hace lo mismo. `fem validar` avisa (`sensatez/borde-sin-viga`) de cada tramo de borde sin viga, muro, apoyo lineal u otro forjado debajo.
@@ -142,7 +150,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
   - `superficie`: sobre una `losa`, un `pano` o una `zona` (polígono) de su planta.
   - `lineal`: polilínea sobre una losa o el eje de un muro.
   - `puntual`: `F` y `M` en ejes globales, en un punto de una planta.
-  - `viga` y `pilar`: repartidas a lo largo de la pieza; sin `desde` ni `hasta`, en toda ella. Es la forma de dar el viento sobre los pilares de una fachada.
+  - `viga`, `pilar` y `barra`: repartidas a lo largo de la pieza; sin `desde` ni `hasta`, en toda ella. Es la forma de dar el viento sobre los pilares de una fachada. En una barra van por metro de su longitud real, desde su inicio.
   - `empuje`: sobre un muro.
 
   Lo que cae fuera de las losas no carga, y lo avisa.
@@ -151,11 +159,11 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 
 | Consulta | Da |
 |---|---|
-| `envolventes [--tipo pilar\|viga\|vigueta] [--planta P]` | Por tipo de pieza y planta: máximos y mínimos de N, Vz y My (y Vy y Mz en pilares), con la pieza, la estación y la combinación |
+| `envolventes [--tipo pilar\|viga\|vigueta\|barra] [--planta P]` | Por tipo de pieza y planta: máximos y mínimos de N, Vz y My (y Vy y Mz en pilares y barras), con la pieza, la estación y la combinación. Una barra va con la planta de su inicio |
 | `flechas [--losa L]` | Por losa o paño: la flecha máxima absoluta y la relativa a las esquinas del recuadro o a los extremos de la vigueta |
 | `deriva [--planta P]` | Por planta: el mayor desplome relativo (d/h) con su pilar, y el desplazamiento del maestro del diafragma |
 | `reacciones [--objeto id] [--top N \| --todos]` | Totales por caso (ΣF y ΣM respecto al origen) y los apoyos con más carga |
-| `pieza <id> [--estaciones]` | Una viga o vigueta, por vanos (de cara a cara de apoyo); o un pilar, por tramos (base y cabeza, con los esfuerzos concomitantes) |
+| `pieza <id> [--estaciones]` | Una viga o vigueta, por vanos (de cara a cara de apoyo); un pilar, por tramos (base y cabeza, con los esfuerzos concomitantes); o una barra, con sus extremos a lo largo de ella |
 | `franjas [--losa L \| --planta P]` | Las franjas de armado de las losas (ids `<losa>:X<i>` y `<losa>:Y<i>`), con su mayor demanda de Wood–Armer inferior y superior (kN·m/m), dónde está y su combinación |
 | `franja <id>` | Una franja, estación a estación (caras de pilares y líneas de apoyo exactas; cada 0,25 m por campos): mx máximo y mínimo y Wood–Armer inferior y superior por metro. En una cara o un apoyo con un borde rígido detrás, `distanciaMuestras` (m) dice a qué distancia se tomaron my y mxy (un canto de la losa) |
 | `refuerzos --armadura x-inf\|x-sup\|y-inf\|y-sup [--losa L \| --planta P]` | Las zonas de refuerzo: lo que supera la armadura base del proyecto, conexo, con sus franjas, su extensión (s, t, longitud, área, caja), su máximo con el exceso y su combinación; y las losas sin base. La extensión es la de las estaciones (±0,125 m), sin anclajes ni solapes |
@@ -171,7 +179,7 @@ Hay un ejemplo completo y válido en `ejemplo.json`, junto a esta skill. El esqu
 - Esfuerzos [N, Vy, Vz, T, My, Mz] en los ejes locales de la pieza. N > 0 es tracción.
 - En una viga, My > 0 tracciona la cara inferior (momento de vano).
 - Las flechas son positivas hacia abajo.
-- Las estaciones `s` se miden en m desde el primer punto de la viga o desde la base del pilar.
+- Las estaciones `s` se miden en m desde el primer punto de la viga, desde la base del pilar o desde el inicio de la barra.
 
 ## Cuándo pararte
 

@@ -30,7 +30,7 @@ import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "..
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
 import { Chip, Desplegable, Disposicion, Herramienta, Hueco, Campo, Separador, type Pestana } from "../armazon/Disposicion.tsx";
-import { IcAPlantas, IcApoyo, IcApoyoLineal, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
+import { IcAPlantas, IcApoyo, IcApoyoLineal, IcBarra, IcCarga, IcCasos, IcCombinaciones, IcEjes, IcEmpuje, IcEnBarra, IcAbacos, IcHueco, IcLineal, IcLosa, IcMateriales, IcMuro, IcPilar, IcPlanta, IcPlantas, IcPuntual, IcSecciones, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { usePaneles } from "../armazon/paneles.ts";
 import { Aviso, Cabecera, Equilibrio, Fila, ListaDiagnosticos, Seccion } from "../componentes/comunes.tsx";
 import { useVisor } from "../contexto.ts";
@@ -60,7 +60,7 @@ import { abrirGestor } from "../editor/referencia.tsx";
 /** Lo que se puede copiar a otras plantas (los pilares ya van de una planta a otra). */
 const COPIABLES: ReadonlySet<NombreTabla> = new Set(["vigas", "forjados", "apoyos", "apoyosLineales", "cargas"]);
 /** El icono de cada tipo en el navegador (los de la barra de herramientas). */
-const ICONO_TABLA: Partial<Record<NombreTabla, Icono>> = { pilares: IcPilar, vigas: IcViga, forjados: IcLosa, muros: IcMuro, apoyos: IcApoyo, apoyosLineales: IcApoyoLineal, ejes: IcEjes, cargas: IcCarga };
+const ICONO_TABLA: Partial<Record<NombreTabla, Icono>> = { pilares: IcPilar, vigas: IcViga, barras: IcBarra, forjados: IcLosa, muros: IcMuro, apoyos: IcApoyo, apoyosLineales: IcApoyoLineal, ejes: IcEjes, cargas: IcCarga };
 /** La escala de las cargas en el alzado y el 3D (por la que se multiplica la automática). */
 const ESCALAS = ["0.25", "0.5", "1", "2", "4"] as const;
 type Escala = (typeof ESCALAS)[number];

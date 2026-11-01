@@ -71,7 +71,7 @@ describe("BN2: bajada tributaria", () => {
       reaccion += q.casos[k]!.reacciones[6 * n + 2]! + q.casos[kq]!.reacciones[6 * n + 2]!;
     }
     // El peso de los tramos de abajo (de C a P1), que la bajada no lleva a la cabeza
-    const A = f.secciones.find((s) => s.id === "HEB")!.A as number;
+    const A = (f.secciones.find((s) => s.id === "HEB") as Extract<ModeloFisico["secciones"][number], { forma: "general" }>).A;
     const abajo = f.pilares!.length * 78.5 * A * 4;
     const enCabeza = bajadas.filter((b) => b.planta === "P1").reduce((s, b) => s + b.bajada, 0);
     // Las barras que arrancan en C (X1, X2, T4) dejan parte de lo suyo en la base, fuera de los pilares

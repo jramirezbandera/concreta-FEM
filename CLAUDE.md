@@ -631,7 +631,21 @@
   - **Modelo físico:** `barras` con `inicio` y `fin` (planta, x, y; `dz` previsto, sólo 0: `barra/dz-no-admitido`), sección, `giro`, liberaciones y `soloTraccion`; la carga `barra`, por metro de longitud real; el grupo `barras` de los modificadores (D4 no las toca).
   - **Compilador:** cada extremo se coloca como un apoyo puntual (pilar, nudo, viga partida, losa, ancho de una viga a su eje o muro; si no, `barra/extremo-sin-apoyo`). Recta del punto dibujado de inicio al de fin; ejes locales con z en el plano vertical (`src/compilador/barras.ts`); zona rígida hasta la cara de los pilares de hormigón por la huella del nudo (CB-f), ninguna en acero; peso γ·A; aviso `barra/en-diafragma`; tipo `barra` en el mapeo, hipótesis.
   - **Validación:** `barras.test.ts` (oráculo a mano a 1e-10, extremos, ejes, zona rígida, metamórficas), `congelado-bn.test.ts` y el oráculo externo `oraculo-bn.test.ts` (el pórtico de acero montado en PyNite desde su modelo físico, ≤ 1e-11).
-  - **Pendiente:** BN2 (tabla, dibujo en planta, alzado y 3D, resultados, aviso `barra/compresion`) y BN3 (la herramienta «Barra» del alzado).
+  - **Pendiente:** BN3 (la herramienta «Barra» del alzado).
+- **2026-11-01: fase BN2 hecha** (las barras en la app y en el agente; `barras.md` §5.1). Pasan sus criterios; falta la puerta de uso.
+  - **Editor:**
+    - tabla Barras y carga «barra»;
+    - Mover, Copiar, Girar y Simetría, con el giro de las verticales y el signo con la simetría;
+    - estirar, mover un pilar con sus barras y Renumerar (B1…).
+  - **Dibujo:** planta (discontinua, con una flecha hacia el extremo alto), alzado (`barra-alzado`), 3D sólido barrido y alámbrico, y el filtro «Barras».
+  - **Resultados:** las barras en Diagramas (lista, detalle desde el inicio) y `fem consultar pieza` de una barra.
+  - **Agente:**
+    - peso esperado de A3 igual al calculado planta a planta;
+    - bajada tributaria con las barras a sus extremos;
+    - aviso `barra/compresion`;
+    - umbral nuevo `dimensionBarra` (0,01 m), por confirmar;
+    - la skill.
+  - **Validación:** `src/editor/barras.test.ts`, `src/visor/barras.test.ts`, `src/agente/barras.test.ts` y el banco `validacion/bn/chrome.ts`.
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
@@ -644,7 +658,7 @@
   - las puertas de uso que queden;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; BN1 hecha, siguen BN2 (app) y BN3 (herramienta del alzado)** (`barras.md`), de planta a planta y con `dz` previsto;
+  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; BN1 y BN2 hechas, sigue BN3 (herramienta del alzado)** (`barras.md`), de planta a planta y con `dz` previsto;
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

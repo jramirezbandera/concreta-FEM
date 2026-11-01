@@ -1,0 +1,13 @@
+## La planta P1 y la tabla Barras
+BIEN  planta P1: 6 capas, sha256 ccc7b8d7d812cc9a = Node ccc7b8d7d812cc9a
+BIEN  la tabla Barras tiene las cuatro barras: X1, X2, T1, T2 (5 filas, con la nueva)
+
+## El 3D sólido y el alzado del eje B
+BIEN  los triángulos del sólido son los de Node: 0c91570d83945e73 = 0c91570d83945e73
+BIEN  alzado del eje B: 8 capas, sha256 7be9002ec81a1054 = Node 7be9002ec81a1054
+
+## Resultados · Diagramas
+BIEN  triángulos de los diagramas de My: 1282 = Node 1282 (4 barras con diagrama)
+BIEN  elegir el tornapuntas T1 en la lista (Barras que llegan a P2) da su detalle de barra (de P1 a P2)
+
+TODO BIEN

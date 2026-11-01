@@ -26,6 +26,13 @@ export const IcViga = icono(
     <path d="M5 15v5M19 15v5" />
   </>,
 );
+/** Barra entre dos niveles (fase BN): una diagonal de un nivel al de encima. */
+export const IcBarra = icono(
+  <>
+    <path d="M3 20h8M13 4h8" strokeWidth={1.2} />
+    <path d="M6 20L18 4" strokeWidth={2.4} />
+  </>,
+);
 export const IcLosa = icono(
   <>
     <path d="M3 13l5-6h13l-5 6z" />
