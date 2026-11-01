@@ -639,7 +639,7 @@
   - las puertas de uso que queden;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles (paso siguiente, tras decidir CB-c y CB-f), desniveles de paño y, más adelante, losas inclinadas;
+  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; en marcha la fase BN** (`barras.md`: BN1 compilador, BN2 app, BN3 herramienta del alzado), de planta a planta y con `dz` previsto;
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.

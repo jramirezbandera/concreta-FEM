@@ -150,7 +150,7 @@ Cada paso, con su plan y sus criterios fijados al empezar, como las demás fases
 
 - **CB-a:** lo horizontal de la losa de cimentación: `"coartado"` o un balasto horizontal (§2.3), y cuál por defecto.
 - **CB-b:** muelles por nudo o matriz consistente (§2.2), después de medirlas.
-- **CB-c:** `diagonales` o `barras` en general (§3.1), y si se añade el objeto `cruz`.
+- **CB-c:** `diagonales` o `barras` en general (§3.1), y si se añade el objeto `cruz`. **Decidida el 2026-11-01:** `barras`; la `cruz`, más adelante (`barras.md`).
 - **CB-d:** el diafragma por defecto de una planta sin losas (§3.3).
 - **CB-e:** cómo se tratan las cruces hasta que haya cálculo no lineal: opción a o b (§3.4).
-- **CB-f:** si una diagonal que llega a un pilar de hormigón llega a su cara o a su eje (§3.2).
+- **CB-f:** si una diagonal que llega a un pilar de hormigón llega a su cara o a su eje (§3.2). **Decidida el 2026-11-01:** a su cara; en metálica, sin zona rígida.

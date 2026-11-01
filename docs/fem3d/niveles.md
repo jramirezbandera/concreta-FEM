@@ -1,6 +1,6 @@
 # Propuesta — piezas fuera del plano de su planta
 
-Estado: **propuesta sin decidir** (2026-10-29), salvo el paso 0, ya hecho. Recoge lo que pidió el usuario tras usar el alzado:
+Estado: **propuesta sin decidir** (2026-10-29), salvo el paso 0, ya hecho, y el 1 (barras), decidido el 2026-11-01 y en marcha como fase BN (`barras.md`). Recoge lo que pidió el usuario tras usar el alzado:
 
 - ver el alzado sin los cantos;
 - dibujar una viga que une dos niveles;
@@ -33,7 +33,9 @@ El alzado tiene un selector con tres modos, como el 3D (`ModoAlzado` en `src/age
 
 Los diagramas, las reacciones y las cargas del alzado se dibujan encima del modo elegido. Prueba: `src/agente/render/alzado.test.ts`. Lo dibujado en el analítico se compara barra a barra con la compilación, y las losas cortadas tienen que estar en la cota de su planta (RV-b).
 
-## 1. Barras entre dos niveles (paso siguiente)
+## 1. Barras entre dos niveles (fase BN, `barras.md`)
+
+**Decidido el 2026-11-01:** CB-c (la lista general `barras`) y CB-f (la zona rígida hasta la cara del pilar de hormigón, ninguna en metálica), como se proponían. Primero de planta a planta, con `dz` previsto en el esquema.
 
 Una viga inclinada, un tornapuntas, una zanca y una diagonal de arriostramiento son el mismo objeto: una barra entre dos puntos del espacio. **Propuesta para CB-c:** una lista general `barras`, no una lista `diagonales`.
 
