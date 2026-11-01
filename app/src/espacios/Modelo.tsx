@@ -25,7 +25,7 @@
  * - Panel inferior: las tablas del editor, los diagnósticos y las combinaciones.
  */
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
+import { Check, ChevronRight, ListOrdered, MousePointer2, Trash2 } from "lucide-react";
 import { DEF_TABLAS, TABLAS, contexto, objetosTabla, type NombreTabla } from "../../../src/editor/tablas.ts";
 import { aplicar, type Operacion } from "../../../src/editor/operaciones.ts";
 import { indiceIds } from "../../../src/editor/referencias.ts";
@@ -257,9 +257,22 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
     alEmpezar.current = elegidos;
     setEligiendo(a);
   };
-  const cerrarDialogo = () => {
+  // Lo que acaba de hacer algo que no es una herramienta de dibujo (Supr, Borrar, A plantas, estirar),
+  // unos segundos en la vista: antes no decían nada (`auditoria-ui.md`, UI-33)
+  const [hecho, setHecho] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dibujando && foto.hecho) setHecho(foto.hecho);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sólo cuando el controlador dice algo nuevo
+  }, [foto.hecho]);
+  useEffect(() => {
+    if (!hecho) return;
+    const t = window.setTimeout(() => setHecho(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [hecho]);
+  const cerrarDialogo = (h?: string) => {
     setDialogo(null);
     setEligiendo(null);
+    if (h) setHecho(h);
   };
   useEffect(() => {
     if (!eligiendo) return;
@@ -288,7 +301,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
       x.preventDefault();
       if (!aplicar(ed.proyecto, { op: "borrar", ids: enTablas }).ok) return setDialogo("borrar");
       const r = ed.editar({ op: "borrar", ids: enTablas }, `Borrar ${enTablas.length > 3 ? `${enTablas.length} objetos` : enTablas.join(", ")}`);
-      if (r.ok && seleccion && !indiceIds(r.proyecto.modelo).has(seleccion)) setSeleccion(null);
+      if (!r.ok) return;
+      if (seleccion && !indiceIds(r.proyecto.modelo).has(seleccion)) setSeleccion(null);
+      setHecho(enTablas.length > 3 ? `Borrados ${enTablas.length} objetos.` : `Borrado ${enTablas.join(", ")}.`);
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
@@ -477,6 +492,12 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
               <span className="chip aviso-herr" data-acento="true" role="status">
                 {foto.asa ?? foto.estirado ?? foto.aviso ?? foto.pilar}
                 {(foto.estirado || foto.asa) && foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
+              </span>
+            )}
+            {!dibujando && !eligiendo && hecho && !(foto.asa || foto.estirado || foto.aviso || foto.pilar) && (
+              <span className="chip aviso-herr" data-acento="true" role="status">
+                <Check size={14} className="mr-1 inline align-[-2px] text-state-ok" />
+                {hecho} <span className="dib-tecla">Ctrl+Z</span>
               </span>
             )}
             {foto.campo && <CampoTeclado key={foto.campo.n} ctrl={ctrl} campo={foto.campo} />}

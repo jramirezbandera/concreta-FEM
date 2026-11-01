@@ -365,8 +365,9 @@ describe("GE3: plantas", () => {
     ]);
     fireEvent.click(within(dlg).getByRole("button", { name: "Crear las plantas" }));
     expect(within(dlg).getByRole("status").textContent).toBe("4 plantas sobre Cim.");
-    // Ya no es el primer paso: se añaden encima o debajo de una
-    expect(within(dlg).getByRole("textbox", { name: "Número de plantas nuevas" })).toBeTruthy();
+    // Después, los datos de la primera sobre la cimentación y «Hecho», no otra planta nueva a medias (UI-8)
+    expect(within(dlg).getByRole("tab", { name: "Datos de N1" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(dlg).getByRole("button", { name: "Hecho" })).toBeTruthy();
     fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar" }));
     elegirTabla("plantas");
     expect(idsTabla("plantas")).toEqual(["N4", "N3", "N2", "N1", "Cim"]);
@@ -388,8 +389,11 @@ describe("GE3: plantas", () => {
       ["N1", "", "3,20", "+3,00"],
       ["Cim", "", "3,00", "0,00"],
     ]);
-    fireEvent.click(within(dlg).getByRole("button", { name: "Añadir" }));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Añadir 2 plantas encima de N1" }));
     expect(within(dlg).getByRole("status").textContent).toBe("Plantas N2, N3 encima de N1.");
+    // La de arriba de lo añadido y «Hecho»: un segundo clic ya no intercala plantas (UI-8)
+    expect(within(dlg).getByRole("tab", { name: "Datos de N3" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(dlg).queryByRole("button", { name: /^Añadir/ })).toBeNull();
     expect(deshacer().getAttribute("title")).toMatch(/Plantas N2, N3 encima de N1/);
     fireEvent.click(within(dlg).getByRole("button", { name: "Cerrar" }));
     elegirTabla("plantas");

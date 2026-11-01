@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { copiarAPlantas, objetosDePlanta } from "../../../src/editor/edicion.ts";
 import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
-import { operacionVigasBorde, proponerVigasBorde } from "../../../src/editor/vigasBorde.ts";
+import { operacionVigasBorde, proponerVigasBorde, vigasDelBorde } from "../../../src/editor/vigasBorde.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
 import { PREFIJOS, renumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
@@ -55,10 +55,14 @@ export function Dialogo({ titulo, children, pie, onCerrar, clase }: { titulo: st
   );
 }
 
-export function DialogoBorrar({ ids, onCerrar }: { ids: string[]; onCerrar: (hecho?: string) => void }) {
+export function DialogoBorrar({ ids: elegidos, onCerrar }: { ids: string[]; onCerrar: (hecho?: string) => void }) {
   const { proyecto, seleccion, setSeleccion } = useVisor();
   const ed = proyecto.edicion!;
   const p = ed.proyecto;
+  // Las vigas que se quedan sin forjado (los zunchos de su borde), marcadas para borrarlas con él (UI-34)
+  const borde = useMemo(() => vigasDelBorde(p.modelo, elegidos), [p, elegidos]);
+  const [conBorde, setConBorde] = useState(true);
+  const ids = useMemo(() => (conBorde && borde.length ? [...elegidos, ...borde] : elegidos), [conBorde, borde, elegidos]);
   const prueba = useMemo(() => aplicar(p, { op: "borrar", ids }), [p, ids]);
   const usos = !prueba.ok ? (prueba.usos ?? []) : [];
   const usados = useMemo(() => [...new Set(usos.map((u) => u.usa))], [usos]);
@@ -90,7 +94,7 @@ export function DialogoBorrar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
 
   return (
     <Dialogo
-      titulo={`Borrar ${ids.length > 3 ? `${ids.length} objetos` : ids.join(", ")}`}
+      titulo={`Borrar ${elegidos.length > 3 ? `${elegidos.length} objetos` : elegidos.join(", ")}`}
       onCerrar={() => onCerrar()}
       pie={
         <>
@@ -103,6 +107,15 @@ export function DialogoBorrar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
         </>
       }
     >
+      {borde.length > 0 && (
+        <label className="opcion">
+          <input type="checkbox" checked={conBorde} onChange={(e) => setConBorde(e.target.checked)} />
+          <span>
+            Borrar también {borde.length === 1 ? "la viga" : `las ${borde.length} vigas`} de su borde, que se {borde.length === 1 ? "queda" : "quedan"} sin forjado
+            <small className="mono">{borde.join(", ")}</small>
+          </span>
+        </label>
+      )}
       {usos.length === 0 ? (
         <p>
           Nada más usa {ids.length > 1 ? "estos objetos" : "este objeto"}. <span className="text-text-secondary">Se puede deshacer con Ctrl+Z.</span>

@@ -47,7 +47,7 @@ const AYUDA = {
 };
 
 export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
-  const { proyecto, pedirTabla } = useVisor();
+  const { proyecto, pedirTabla, setPlanta } = useVisor();
   const ed = proyecto.edicion!;
   const m = ed.proyecto.modelo;
   const plantas = m.plantas;
@@ -104,11 +104,19 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
     if (!terminar(r.ids[0] ?? de, [r.operacion], texto)) return;
     setError(null);
     setAviso(`${texto}.`);
+    setN("1");
+    // Después, los datos de una planta y «Hecho» (`auditoria-ui.md`, UI-8): seguir en «Añadir», con la
+    // primera nueva elegida y el número de antes, metía plantas en medio con un segundo clic
+    setModo("datos");
     if (modo === "inicio") {
-      setModo("anadir");
-      setN("1");
-      setElegida(0);
-    } else setElegida(r.plantas.findIndex((p) => p.id === r.ids[0]));
+      // Se empieza a dibujar por la primera sobre la cimentación, no por la de arriba
+      const primera = Math.max(0, r.plantas.length - 2);
+      setElegida(primera);
+      if (r.plantas[primera]) setPlanta(r.plantas[primera]!.id);
+    } else {
+      const ix = r.ids.map((id) => r.plantas.findIndex((p) => p.id === id));
+      setElegida(donde === "encima" ? Math.min(...ix) : Math.max(...ix));
+    }
   };
 
   const elegir = (id: string) => {
@@ -152,7 +160,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
             )}
             {modo === "anadir" && (
               <button type="button" className="btn btn-p" disabled={!r.ok} onClick={anadir}>
-                {pedido.alElegir ? "Añadir y usar" : "Añadir"}
+                {pedido.alElegir ? "Añadir y usar" : r.ok ? `Añadir ${r.ids.length === 1 ? "1 planta" : `${r.ids.length} plantas`} ${donde === "encima" ? "encima de" : "debajo de"} ${de}` : "Añadir"}
               </button>
             )}
             {modo === "datos" && (

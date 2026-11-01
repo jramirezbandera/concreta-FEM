@@ -18,7 +18,8 @@
  * Puro: sin IO.
  */
 import type { Losa, ModeloFisico, Seccion, Vec2 } from "../compilador/fisico.ts";
-import { areaConSigno, defectoPoligono, puntoEnPoligono } from "../compilador/poligonos.ts";
+import { areaConSigno, defectoPoligono, distanciaABorde, puntoEnPoligono } from "../compilador/poligonos.ts";
+import { anchoViga } from "../agente/render/modelo.ts";
 import { anillosForjado, ejesQueAtan, libresTramo, Plantas, tramos } from "../agente/sensatez.ts";
 import { ejeSeccion } from "../compilador/puntoFijo.ts";
 import { formaSeccion, huellaPilarSolido } from "../visor/solido.ts";
@@ -288,4 +289,34 @@ export function operacionVigasBorde(m: ModeloFisico, p: PropuestaVigasBorde): Op
   if (p.nueva) ops.push({ op: "crear", coleccion: "secciones", objeto: p.seccion as never });
   for (const v of p.vigas) ops.push({ op: "crear", coleccion: "vigas", objeto: { id: v.id, planta: l.planta, puntos: v.puntos, seccion: p.seccion.id } as never });
   return { op: "lote", operaciones: ops };
+}
+
+/** Lo más lejos del borde de un forjado que puede ir el eje de una de sus vigas de borde, además de su medio ancho, m. */
+const HOLGURA_BORDE = 0.25;
+
+/**
+ * Las vigas que se quedan sin forjado al borrar los forjados `ids` (`auditoria-ui.md`, UI-34): las de
+ * su planta que van enteras por su borde (contorno o huecos), a menos de b/2 + `HOLGURA_BORDE`, y no
+ * tocan ningún otro forjado de la planta. Son las que puso «Con zunchos» o «Vigas de borde», aunque
+ * se hayan renombrado. Se ofrecen en el diálogo de Borrar; no se borran solas.
+ */
+export function vigasDelBorde(m: ModeloFisico, ids: readonly string[]): string[] {
+  const borrar = new Set(ids);
+  const forjados = [...(m.losas ?? []), ...(m.panos ?? [])];
+  const quitados = forjados.filter((f) => borrar.has(f.id));
+  if (!quitados.length) return [];
+  const r: string[] = [];
+  for (const v of m.vigas ?? []) {
+    if (borrar.has(v.id)) continue;
+    const b = anchoViga(m.secciones.find((s) => s.id === v.seccion)) / 2;
+    const deLaPlanta = (f: (typeof forjados)[number]) => f.planta === v.planta;
+    // Va por el borde si sus vértices y los puntos medios de sus tramos están junto a él; es de otro
+    // forjado si algún punto medio está en él o junto a su borde (por un extremo sólo lo roza en una esquina)
+    const medios = v.puntos.slice(1).map((q, k) => [(q[0] + v.puntos[k]![0]) / 2, (q[1] + v.puntos[k]![1]) / 2] as Vec2);
+    const junto = (q: Vec2, f: (typeof forjados)[number]) => [f.contorno, ...(f.huecos ?? [])].some((a) => distanciaABorde(q, a) <= b + HOLGURA_BORDE);
+    const enBorde = (f: (typeof forjados)[number]) => [...v.puntos, ...medios].every((q) => junto(q, f));
+    const toca = (f: (typeof forjados)[number]) => medios.some((q) => puntoEnPoligono(q, f.contorno) || junto(q, f));
+    if (quitados.some((f) => deLaPlanta(f) && enBorde(f)) && !forjados.some((f) => deLaPlanta(f) && !borrar.has(f.id) && toca(f))) r.push(v.id);
+  }
+  return r;
 }

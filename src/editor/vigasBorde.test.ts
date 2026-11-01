@@ -14,7 +14,7 @@ import { leerProyecto, type Proyecto } from "../agente/proyecto.ts";
 import { compilar } from "../compilador/compilar.ts";
 import type { Losa, ModeloFisico } from "../compilador/fisico.ts";
 import { aplicar } from "./operaciones.ts";
-import { operacionVigasBorde, proponerVigasBorde, type PropuestaVigasBorde } from "./vigasBorde.ts";
+import { operacionVigasBorde, proponerVigasBorde, vigasDelBorde, type PropuestaVigasBorde } from "./vigasBorde.ts";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const leer = (r: string): Proyecto => {
@@ -129,5 +129,36 @@ describe("Vigas de borde en una losa hecha a mano", () => {
     expect("error" in r && r.error).toContain("algún lado es más corto que la distancia de su borde al eje");
     expect(proponerVigasBorde(m, "L", 30, 30)).toEqual({ error: "Una viga de borde de 30 × 30 m no es razonable: las medidas van en metros." });
     expect(proponerVigasBorde(m, "X", 0.3, 0.3)).toEqual({ error: "No hay ninguna losa «X»." });
+  });
+});
+
+describe("las vigas que se quedan sin forjado al borrarlo (UI-34)", () => {
+  /** La losa de 8 × 6 con su hueco y sus zunchos, y al este otra losa de 4 × 6 que comparte el lado x = 8. */
+  const conZunchos = (): ModeloFisico => {
+    const m: ModeloFisico = {
+      plantas: [{ id: "N1", altura: null }, { id: "N0", altura: 3 }],
+      materiales: [{ id: "HA", tipo: "hormigon", fck: 25 }],
+      secciones: [{ id: "Z25", material: "HA", forma: "rectangular", b: 0.25, h: 0.25 }],
+      vigas: [],
+      losas: [{ id: "L", planta: "N1", contorno: [[0, 0], [8, 0], [8, 6], [0, 6]], huecos: [[[3, 2], [5, 2], [5, 4], [3, 4]]], espesor: 0.25, material: "HA" }],
+      casos: [{ id: "G", pesoPropio: true }],
+    };
+    const a = aplicar({ esquema: "concreta-fem/proyecto@1", modelo: m } as Proyecto, operacionVigasBorde(m, propuesta(m, "L", 0.25, 0.25))!);
+    if (!a.ok) throw new Error(a.errores.map((e) => e.mensaje).join(" "));
+    return { ...a.proyecto.modelo, losas: [...a.proyecto.modelo.losas!, { id: "LE", planta: "N1", contorno: [[8, 0], [12, 0], [12, 6], [8, 6]], espesor: 0.25, material: "HA" }] };
+  };
+
+  it("los del contorno y los del hueco, salvo el del lado que comparte con la otra losa; nada si no se borra un forjado", () => {
+    const m = conZunchos();
+    const zunchos = m.vigas!.map((v) => v.id);
+    expect(zunchos).toHaveLength(8);
+    // El del lado este (x = 8 − b/2) toca la otra losa: se queda
+    const este = m.vigas!.find((v) => v.puntos.every((q) => Math.abs(q[0] - 7.875) < 1e-9))!;
+    expect(vigasDelBorde(m, ["L"]).sort()).toEqual(zunchos.filter((id) => id !== este.id).sort());
+    expect(vigasDelBorde(m, ["L", "LE"]).sort()).toEqual([...zunchos].sort());
+    expect(vigasDelBorde(m, [este.id])).toEqual([]);
+    // Renombradas, igual: va por la geometría
+    const renombradas = { ...m, vigas: m.vigas!.map((v, i) => ({ ...v, id: `V${i + 1}` })) };
+    expect(vigasDelBorde(renombradas, ["L"])).toHaveLength(7);
   });
 });
