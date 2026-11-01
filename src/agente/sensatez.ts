@@ -267,9 +267,9 @@ function datos(f: ModeloFisico): Registro[] {
 
   const esp = new Registro("sensatez/espesor", "Espesor de losas y muros", rango(U.espesor, "m"));
   for (const x of [...(f.losas ?? []), ...(f.muros ?? [])]) {
-    const que = "contorno" in x ? "losa" : "muro";
+    const que = "contorno" in x ? "La losa" : "El muro";
     esp.peor(salida(x.espesor, U.espesor), `${x.id}: ${num(x.espesor)} m`);
-    if (fuera(x.espesor, U.espesor)) esp.aviso(`El ${que} ${x.id} tiene ${num(x.espesor)} m de espesor (${rango(U.espesor, "m")}): ¿está en cm?`, [x.id], { valor: x.espesor });
+    if (fuera(x.espesor, U.espesor)) esp.aviso(`${que} ${x.id} tiene ${num(x.espesor)} m de espesor (${rango(U.espesor, "m")}): ¿está en cm?`, [x.id], { valor: x.espesor });
   }
 
   const sec = new Registro(

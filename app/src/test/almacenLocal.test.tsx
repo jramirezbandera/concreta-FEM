@@ -213,7 +213,7 @@ describe("criterio 2 y la pantalla de inicio", () => {
         <App />
       </ThemeProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: /ejemplo de la skill/ }));
+    fireEvent.click(screen.getByRole("button", { name: /ejemplo sencillo/ }));
     await waitFor(() => expect(container.querySelector("[data-huella]")).toBeTruthy(), { timeout: 30_000 });
     expect(await listar()).toEqual([]);
     fireEvent.click(screen.getByRole("button", { name: /Guardar en mis proyectos/ }));

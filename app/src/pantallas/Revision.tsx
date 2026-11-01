@@ -169,7 +169,7 @@ export function EspacioRevision() {
           <Documento doc={x.documento} />
         ) : (
           <div className="mt-10 grid place-items-center">
-            <Aviso>Revisando el modelo y los resultados (A3)… En el edificio objetivo tarda unos segundos.</Aviso>
+            <Aviso>Revisando el modelo y los resultados… En un edificio grande tarda unos segundos.</Aviso>
           </div>
         )}
       </section>
@@ -199,7 +199,11 @@ export function EspacioRevision() {
           <p className="nota">
             Firmar es sólo del ingeniero, en la línea de órdenes, después de leer el informe:
             <code className="mt-1 block rounded bg-bg-elevated px-2 py-1 font-mono text-[11px] text-text-primary">bun run fem firmar {fichero} --por "Nombre"</code>
-            {proyecto.fuente?.tipo === "origen" ? "El visor vuelve a leer las firmas cuando cambian." : "Abierto sin su carpeta: el visor no ve el fichero de firmas."}
+            {proyecto.fuente?.tipo !== "origen"
+              ? "Abierto sin su carpeta: el visor no ve el fichero de firmas."
+              : proyecto.fuente.origen.navegador
+                ? "Este proyecto está en el navegador, y la orden firma un fichero del disco: expórtelo (el botón de descarga de la barra de arriba), fírmelo en su carpeta y ábralo desde esa carpeta para ver aquí la firma."
+                : "El visor vuelve a leer las firmas cuando cambian."}
           </p>
         </Seccion>
         {x && (

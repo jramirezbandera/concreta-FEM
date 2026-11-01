@@ -72,15 +72,18 @@ const TABLA: Record<Herramienta, NombreTabla> = {
 
 /**
  * La sección de por defecto de una herramienta: la más usada por los objetos de su tipo; si no, la
- * primera cuyo id empieza por su letra (P, V); si no, la primera.
+ * primera cuyo id empieza por su letra (P, V); si no, la primera que no es del otro tipo (ni la usa ni
+ * empieza por su letra). Si no hay ninguna, nada: la plantilla pide una sección nueva, en lugar de
+ * dibujar las vigas con la del pilar.
  */
 export function seccionPorDefecto(m: ModeloFisico, tipo: "pilares" | "vigas"): string | undefined {
   const n = new Map<string, number>();
   for (const o of m[tipo] ?? []) n.set(o.seccion, (n.get(o.seccion) ?? 0) + 1);
   let mejor: string | undefined;
   for (const [s, k] of n) if (m.secciones.some((x) => x.id === s) && (!mejor || k > n.get(mejor)!)) mejor = s;
-  const letra = tipo === "pilares" ? "P" : "V";
-  return mejor ?? m.secciones.find((s) => s.id.startsWith(letra))?.id ?? m.secciones[0]?.id;
+  const [letra, otraLetra] = tipo === "pilares" ? ["P", "V"] : ["V", "P"];
+  const delOtro = new Set((m[tipo === "pilares" ? "vigas" : "pilares"] ?? []).map((o) => o.seccion));
+  return mejor ?? m.secciones.find((s) => s.id.startsWith(letra))?.id ?? m.secciones.find((s) => !delOtro.has(s.id) && !s.id.startsWith(otraLetra))?.id;
 }
 
 /** El material de por defecto: el más usado por los objetos de esa lista; si no, el primero de hormigón; si no, el primero. */

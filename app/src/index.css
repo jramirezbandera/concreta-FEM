@@ -254,6 +254,10 @@ body {
 .btn-p { background: var(--color-btn-primary-bg); border-color: var(--color-btn-primary-bg); color: var(--color-btn-primary-fg); box-shadow: var(--shadow-xs), inset 0 1px 0 rgb(255 255 255 / .12); }
 .btn-p:hover:not(:disabled) { background: var(--color-btn-primary-bg-hover); border-color: var(--color-btn-primary-bg-hover); color: var(--color-btn-primary-fg); }
 .btn-p > svg { color: inherit; }
+/* Lo que borra: el mismo aspecto en toda la app */
+.btn-peligro { background: var(--color-state-fail-text); border-color: var(--color-state-fail-text); color: var(--color-btn-primary-fg); box-shadow: var(--shadow-xs); }
+.btn-peligro:hover:not(:disabled) { background: color-mix(in srgb, var(--color-state-fail-text) 85%, black); border-color: transparent; color: var(--color-btn-primary-fg); }
+.btn-peligro > svg { color: inherit; }
 /* Botón sin caja (acciones secundarias en una cabecera) */
 .btn-q { border-color: transparent; background: none; box-shadow: none; color: var(--color-text-secondary); }
 .btn-q:hover:not(:disabled) { background: var(--color-bg-elevated); border-color: transparent; color: var(--color-text-primary); }

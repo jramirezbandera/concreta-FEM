@@ -431,7 +431,7 @@ export function vistaCampo(r: ResultadosRender, planta: string, campo: Campo, co
   if (!laminas.length) notas.push("La planta no tiene losas.");
   if (campo === "uz") notas.push("Valores en los nudos de las láminas, interpolados en cada una como en un cuadrilátero bilineal; la flecha relativa de cada recuadro, con «fem consultar flechas».");
   else if (campo.startsWith("f")) notas.push(NOTA_MEMBRANA);
-  else notas.push("Campos recuperados por SPR (E5) en los nudos de cada lámina, en los ejes de su losa (eje 1 = su eje1, X por defecto), interpolados en cada una como en un cuadrilátero bilineal. Para dimensionar, las bandas.");
+  else notas.push("Campos suavizados (SPR) en los nudos de cada lámina, en los ejes de su losa (eje 1 = su eje1, X por defecto), interpolados en cada una como en un cuadrilátero bilineal. Para dimensionar, las franjas de armado (modo Armado).");
   if (conjunto.factores.length > 1) notas.push(`Combinación ${comb}: la del mayor |valor| en la planta de las ${conjunto.factores.length} de ${conjunto.descripcion}.`);
   return {
     titulo: d.nombre ?? "Proyecto",

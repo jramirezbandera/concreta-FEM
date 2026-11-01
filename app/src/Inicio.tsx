@@ -191,8 +191,7 @@ export function Inicio({ proyecto }: { proyecto: ProyectoAbierto }) {
                       </span>
                       <button
                         type="button"
-                        className="btn"
-                        style={{ color: "var(--color-state-fail)" }}
+                        className="btn btn-peligro"
                         onClick={() =>
                           void borrar(x.id).then(() => {
                             setBorrando(null);

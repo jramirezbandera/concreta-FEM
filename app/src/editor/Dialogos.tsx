@@ -67,14 +67,15 @@ export function DialogoBorrar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
     const r = aplicar(p, { op: "borrar", ids, dependientes: "borrar" });
     return r.ok ? total(p.modelo) - total(r.proyecto.modelo) : null;
   }, [p, ids]);
-  const [modo, setModo] = useState<"borrar" | "reasignar">("borrar");
-  const [destino, setDestino] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
   const borrados = new Set(ids);
   const candidatos = (id: string) => {
     const c = idx.get(id)?.coleccion;
     return c ? lista(p.modelo, c).filter((o) => !borrados.has(o.id)).map((o) => o.id) : [];
   };
+  // Nunca en cascada por defecto: un Intro reflejo borraba todo lo que usaba lo borrado
+  const [modo, setModo] = useState<"borrar" | "reasignar" | null>(() => (usados.length && usados.every((u) => candidatos(u).length) ? "reasignar" : null));
+  const [destino, setDestino] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
 
   const hacer = () => {
     const op = usos.length === 0 ? ({ op: "borrar", ids } as const) : modo === "borrar" ? ({ op: "borrar", ids, dependientes: "borrar" } as const) : ({ op: "borrar", ids, dependientes: { reasignar: Object.fromEntries(usados.map((u) => [u, destino[u] ?? candidatos(u)[0] ?? ""])) } } as const);
@@ -93,11 +94,11 @@ export function DialogoBorrar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
       onCerrar={() => onCerrar()}
       pie={
         <>
-          <button type="button" className="btn" onClick={() => onCerrar()}>
+          <button type="button" className="btn" autoFocus={usos.length > 0} onClick={() => onCerrar()}>
             Cancelar
           </button>
-          <button type="button" className="btn btn-p" autoFocus onClick={hacer} disabled={modo === "reasignar" && usados.some((u) => candidatos(u).length === 0)}>
-            Borrar
+          <button type="button" className="btn btn-peligro" autoFocus={usos.length === 0} onClick={hacer} disabled={usos.length > 0 && (modo === null || (modo === "reasignar" && usados.some((u) => candidatos(u).length === 0)))}>
+            {usos.length > 0 && modo === "borrar" && cascada !== null ? `Borrar ${cascada} objetos` : "Borrar"}
           </button>
         </>
       }
@@ -122,7 +123,7 @@ export function DialogoBorrar({ ids, onCerrar }: { ids: string[]; onCerrar: (hec
             <input type="radio" name="modo" checked={modo === "borrar"} onChange={() => setModo("borrar")} />
             <span>
               Borrarlos también
-              {cascada !== null && <small>En total se borran {cascada} objetos; los tramos de pilar sólo pierden el tramo.</small>}
+              {cascada !== null && <small>En total se borran {cascada} objetos; de un pilar con varios tramos, sólo el tramo que lo usa.</small>}
             </span>
           </label>
           <label className="opcion">

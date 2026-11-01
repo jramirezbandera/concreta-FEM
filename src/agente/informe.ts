@@ -88,8 +88,8 @@ export function documentoInforme(d: DatosInforme): Bloque[] {
   b.push({
     tipo: "lista",
     items: [
-      conAvisos.length ? `${nAvisos} avisos de sensatez en ${conAvisos.length} de ${comprobaciones.length} comprobaciones: ${conAvisos.map((c) => c.titulo.toLowerCase()).join("; ")}.` : `Ningún aviso de sensatez en las ${comprobaciones.length} comprobaciones (${comprobaciones.filter((c) => c.estado === "no-aplica").length} no aplican a este modelo).`,
-      otros.length ? `${otros.length} avisos del compilador y del cálculo (al final).` : "Ningún aviso del compilador ni del cálculo.",
+      conAvisos.length ? `${nAvisos} ${nAvisos === 1 ? "aviso" : "avisos"} de sensatez en ${conAvisos.length} de ${comprobaciones.length} comprobaciones: ${conAvisos.map((c) => c.titulo.toLowerCase()).join("; ")}.` : `Ningún aviso de sensatez en las ${comprobaciones.length} comprobaciones (${comprobaciones.filter((c) => c.estado === "no-aplica").length} no aplican a este modelo).`,
+      otros.length ? `${otros.length} ${otros.length === 1 ? "aviso" : "avisos"} del compilador y del cálculo (al final).` : "Ningún aviso del compilador ni del cálculo.",
       `Equilibrio de cargas y reacciones: ${num(eq, 2)} relativo como máximo (tiene que ser ≤ 1e-9).`,
     ],
   });

@@ -133,7 +133,7 @@ export function ModoLosas() {
   const nombreCampo = CAMPOS.find((c) => c.id === campo)!.nombre;
   const herramientas = (
     <>
-      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta={campo === "uz" ? "desplazamientos" : "esfuerzos"} />
+      <ComboCombinaciones estado={e} valor={eleccion} onCambio={setEleccion} etiqueta={campo === "uz" ? "desplazamientos" : "esfuerzos"} pesima />
       <Separador />
       <BarraModos />
       <Separador />
@@ -213,8 +213,8 @@ export function ModoLosas() {
                   </div>
                 )}
                 <div className="text-[11px] text-text-secondary">
-                  {puntoValido.v.comb} · {puntoValido.v.lamina >= 0 ? `interpolado en la lámina ${puntoValido.v.lamina}, como las bandas` : "el extremo rotulado"}
-                  {puntoValido.v.otros ? ". En el borde de dos regiones (pliegue, ábaco) el campo salta y no se promedia (E5-7)." : ""}
+                  {puntoValido.v.comb} · {puntoValido.v.lamina >= 0 ? "interpolado entre los nudos del elemento" : "el extremo rotulado"}
+                  {puntoValido.v.otros ? ". En el borde de dos regiones (pliegue, ábaco) el campo salta y no se promedia." : ""}
                 </div>
               </div>
             ) : (

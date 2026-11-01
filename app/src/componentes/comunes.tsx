@@ -59,9 +59,10 @@ const codificar = (e: EleccionCombinaciones) => JSON.stringify(e);
 /**
  * Selector de combinaciones, en la barra de herramientas de Resultados: las de por defecto (las de
  * A1/A4 para la vista), la envolvente de una situación, una combinación suelta o un caso. Todas las
- * opciones a la vista en un solo desplegable.
+ * opciones a la vista en un solo desplegable. Con `pesima` (los mapas de Losas, que pintan entera la
+ * combinación de mayor |valor|), la situación no se llama envolvente: no lo es punto a punto.
  */
-export function ComboCombinaciones({ estado, valor, onCambio, etiqueta, soloUna }: { estado: EstadoSesion; valor: EleccionCombinaciones; onCambio: (e: EleccionCombinaciones) => void; etiqueta: string; soloUna?: boolean }) {
+export function ComboCombinaciones({ estado, valor, onCambio, etiqueta, soloUna, pesima }: { estado: EstadoSesion; valor: EleccionCombinaciones; onCambio: (e: EleccionCombinaciones) => void; etiqueta: string; soloUna?: boolean; pesima?: boolean }) {
   const porSituacion = new Map<string, CombinacionDisponible[]>();
   const sin = estado.sinCombinaciones;
   for (const c of estado.combinaciones) porSituacion.set(c.situacion, [...(porSituacion.get(c.situacion) ?? []), c]);
@@ -77,10 +78,10 @@ export function ComboCombinaciones({ estado, valor, onCambio, etiqueta, soloUna 
           </optgroup>
         )}
         {!soloUna && porSituacion.size > 0 && (
-          <optgroup label="Envolvente de una situación">
+          <optgroup label={pesima ? "La pésima de una situación (una combinación)" : "Envolvente de una situación"}>
             {[...porSituacion].map(([s, cs]) => (
               <option key={s} value={codificar({ tipo: "situaciones", situaciones: [s as never] })}>
-                {s} ({cs.length})
+                {pesima ? `La pésima de ${s} (de ${cs.length})` : `${s} (${cs.length})`}
               </option>
             ))}
           </optgroup>
