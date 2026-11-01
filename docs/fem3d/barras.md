@@ -1,6 +1,6 @@
 # Fase BN: barras entre dos niveles
 
-**Estado (2026-11-01):** plan fijado. Ha empezado BN1.
+**Estado (2026-11-01):** BN1 hecho: pasan sus ocho criterios (§4.1). Siguen BN2 (la app) y BN3 (la herramienta del alzado).
 
 Viene de `niveles.md` §1 (paso 2 de su orden) y de `cimentacion-y-arriostramientos.md` §3.
 
@@ -81,8 +81,8 @@ Además:
 ### 3.2 Zona rígida (CB-f)
 
 - **Extremo en el nudo de un pilar de hormigón con huella:** es rígido el tramo del eje de la barra dentro del prisma vertical de la huella, hasta la cara, entero (factor 1).
-  - Se usa la huella del tramo de pilar que corresponde: el de debajo si la barra baja desde el nudo y el de encima si sube.
-  - Una barra horizontal usa la huella del nudo, la de la losa.
+  - Se usa la huella del nudo, la misma con la que se unen las vigas de esa planta: la del tramo de debajo (o la del de encima, en la planta de la base). El material es el de ese tramo.
+  - Un pilar con punto fijo y cambio de sección (PF) puede tener otra huella en el tramo de encima; la barra que sube desde el nudo usa igualmente la del nudo. Es una simplificación del lado de la zona rígida corta.
 - **Pilar de acero o general, viga, losa o muro:** ninguna zona rígida.
 - **Tramo flexible nulo:** error `barra/tramo-flexible-nulo`.
 
@@ -111,6 +111,36 @@ Además:
 7. **Referencia congelada nueva:** un pórtico arriostrado de dos plantas con losa, una cruz y un tornapuntas a una viga.
 8. **Oráculo externo:** PyNite u OpenSeesPy con el pórtico arriostrado, a ≤ 1e-6.
 
+### 4.1 Resultado de BN1 (2026-11-01)
+
+Pasan los ocho criterios.
+
+| Criterio | Dónde | Resultado |
+|---|---|---|
+| 1. Oráculo a mano | `src/compilador/barras.test.ts` | Pórtico arriostrado con la diagonal de acero, CB-f en los dos extremos y carga repartida: ≤ 1e-10 |
+| 2. Extremos | `barras.test.ts` | Pilar, nudo a 3 cm (con `topologia/fusion`), viga partida, losa, ancho de la viga (a su eje) y muro; peso γ·A por la longitud real a 1e-10; los siete errores |
+| 3. Ejes locales | `barras.test.ts` | Vertical, inclinada y girada, local frente a global a ≤ 1e-12; `giro` 90° = b y h cambiados |
+| 4. Zona rígida | `barras.test.ts` | 0,2·√2 en un pilar de hormigón de 40 a 45°, 0 en uno de acero, a 1e-14 |
+| 5. Metamórficas | `barras.test.ts` | Traslación y giros de 90° y 37° a ≤ 1e-12 (pórtico) y ≤ 1e-9 (con losa y muro, la misma malla); invertir las barras, ≤ 1e-12; reordenar, bit a bit |
+| 6. Sin barras, nada cambia | batería del compilador | 869 pruebas, las referencias congeladas de C1–C5 y F idénticas |
+| 7. Referencia congelada | `congelado-bn.test.ts`, `validacion/bn/congelar.ts` | Pórtico arriostrado de dos plantas con losas, cruz, tornapuntas y diagonal a la losa, con h = 0,75 y 1 |
+| 8. Oráculo externo | `oraculo-bn.test.ts`, `validacion/bn/oraculo_pynite.py` | Pórtico de acero montado en PyNite 3.2.0 desde el modelo físico: u, reacciones y axiles a ≤ 1e-11 |
+
+**Lo que da el pórtico arriostrado** (`validacion/bn/out_medir.txt`):
+
+- con el viento, la cruz trabaja como se espera: X1 a +3,7 kN y X2 a −3,7 kN;
+- con el peso propio, la diagonal X1, declarada «sólo tracción», queda comprimida (−2,0 kN). Es el caso del aviso `barra/compresion` de BN2.
+
+**Fuera del compilador,** lo justo para que todo siga compilando:
+
+- la carga `barra` en el dibujo de cargas (`render/cargas.ts`), en la sensatez de A3 y en el 3D de cargas;
+- la colección `barras` en las referencias del editor (renombrar y borrar en cascada);
+- el tipo `barra` en las envolventes de `fem consultar`.
+
+Lo demás de la app es BN2.
+
+**Los ejes y la geometría de una barra** están en `src/compilador/barras.ts` (`ejesBarra`, `puntosBarra`), para el dibujo y el 3D.
+
 ## 5. BN2: en la app
 
 - **Editor:**
@@ -125,7 +155,8 @@ Además:
 - **Agente:**
   - el peso esperado de A3 cuenta las barras;
   - la bajada tributaria las deja fuera y lo dice;
-  - en los resultados, el aviso `barra/compresion` de las barras «sólo tracción» comprimidas en alguna combinación.
+  - en los resultados, el aviso `barra/compresion` de las barras «sólo tracción» comprimidas en alguna combinación;
+  - la skill `fem`, con las barras y sus ejes.
 
 **Criterios de BN2:** cada vista con su prueba (lo dibujado, frente a la compilación) y el banco de Chrome con los mismos bits que Node. Cada operación del editor, de ida y vuelta byte a byte. Falta la puerta de uso.
 

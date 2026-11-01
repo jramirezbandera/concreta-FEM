@@ -627,6 +627,11 @@
   - Los diagramas, las reacciones y las cargas se dibujan encima del modo elegido; el sólido no espera a compilar (AL-4).
   - Prueba: `alzado.test.ts` (el analítico, barra a barra con la compilación).
 - **2026-10-29: propuesta de piezas fuera del plano de su planta** (`docs/fem3d/niveles.md`, sin decidir): `barras` entre dos niveles (vigas inclinadas, tornapuntas, diagonales; propuesta para CB-c), desniveles de paño como en CYPECAD (DN-a…DN-c) y losas inclinadas (DN-d). Orden: barras lineales con la herramienta del alzado, desniveles, lo no lineal (sólo tracción y balasto), losas inclinadas.
+- **2026-11-01: fase BN1 hecha** (barras entre dos niveles en el compilador; `docs/fem3d/barras.md`, decisiones CB-c y CB-f del usuario). Pasan sus ocho criterios. El compilador no cambia de versión: sin `barras`, la misma salida bit a bit.
+  - **Modelo físico:** `barras` con `inicio` y `fin` (planta, x, y; `dz` previsto, sólo 0: `barra/dz-no-admitido`), sección, `giro`, liberaciones y `soloTraccion`; la carga `barra`, por metro de longitud real; el grupo `barras` de los modificadores (D4 no las toca).
+  - **Compilador:** cada extremo se coloca como un apoyo puntual (pilar, nudo, viga partida, losa, ancho de una viga a su eje o muro; si no, `barra/extremo-sin-apoyo`). Recta del punto dibujado de inicio al de fin; ejes locales con z en el plano vertical (`src/compilador/barras.ts`); zona rígida hasta la cara de los pilares de hormigón por la huella del nudo (CB-f), ninguna en acero; peso γ·A; aviso `barra/en-diafragma`; tipo `barra` en el mapeo, hipótesis.
+  - **Validación:** `barras.test.ts` (oráculo a mano a 1e-10, extremos, ejes, zona rígida, metamórficas), `congelado-bn.test.ts` y el oráculo externo `oraculo-bn.test.ts` (el pórtico de acero montado en PyNite desde su modelo físico, ≤ 1e-11).
+  - **Pendiente:** BN2 (tabla, dibujo en planta, alzado y 3D, resultados, aviso `barra/compresion`) y BN3 (la herramienta «Barra» del alzado).
 - **Siguiente paso:**
   - **decidido el 2026-10-14:** se acepta el coste de F3 (la esquina fina se queda) y se aparca la rigidez de F2-9 hasta volver a tocar el mallador (`fase-f2.md` §4);
   - **hecha el 2026-10-19:** la fase HR (C2-d a todos los pilares, F2-9), con su oráculo externo y la regresión de precisión local (`fase-hr.md`);
@@ -639,7 +644,7 @@
   - las puertas de uso que queden;
   - con lo que salga, V2c (dibujar con el ratón);
   - más adelante: medir un móvil con menos memoria que el iPhone 13 Pro (E4-9) y E7 (modal, temperatura, triángulos);
-  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; en marcha la fase BN** (`barras.md`: BN1 compilador, BN2 app, BN3 herramienta del alzado), de planta a planta y con `dz` previsto;
+  - **pedido por el usuario el 2026-10-29** (`niveles.md`): barras entre dos niveles, desniveles de paño y, más adelante, losas inclinadas. **Decididas el 2026-11-01 CB-c y CB-f; BN1 hecha, siguen BN2 (app) y BN3 (herramienta del alzado)** (`barras.md`), de planta a planta y con `dz` previsto;
   - más adelante: la losa de cimentación sobre balasto y los arriostramientos metálicos (diagonales, cruces), con el cálculo no lineal por combinación que comparten (despegue y barras sólo a tracción). Es una propuesta sin decidir, en `docs/fem3d/cimentacion-y-arriostramientos.md`, con sus decisiones CB-a…CB-f;
   - la capa de agente (A5–A7), cuando la app esté. A-e ya está decidida (`agente.md` §6).
 - **Mantenimiento:** actualizar esta sección cuando cambie la fase.
