@@ -288,7 +288,8 @@ async function dibujarCargasEdificio(): Promise<void> {
 
 /** Compara lo guardado con una referencia, objeto a objeto, si las huellas no casan. */
 async function diferencias(carpeta: string, ref: Proyecto): Promise<void> {
-  await pagina(`__c.boton("Guardar")?.click(); await new Promise((r) => setTimeout(r, 800));`);
+  // «Guardar●» con cambios sin guardar (BN3-1: por su texto exacto no se encontraba); se espera a que deje de estarlo
+  await pagina(`const g = () => [...document.querySelectorAll("button[data-sin-guardar]")].find((b) => b.textContent.trim().startsWith("Guardar")); if (g()?.dataset.sinGuardar === "true") { g().click(); await __c.esperar(() => g()?.dataset.sinGuardar === "false", 10000); }`);
   const leido = leerProyecto(readFileSync(join(datos, carpeta, "proyecto.json"), "utf8"));
   if (!leido.valido) return log("  lo guardado no se lee");
   const a = leido.proyecto.modelo as unknown as Record<string, { id: string }[] | undefined>;

@@ -259,7 +259,7 @@ Las pruebas de dibujo de antes (`src/editor`, 386, y las de la app) pasan sin ca
 - **BN3-d:** cada barra son dos clics; el segundo extremo no empieza la siguiente (una cruz, cuatro clics).
 - **BN3-e:** el nudo de un pilar en el alzado engancha como «Centro» (nivel 1), por delante de los extremos de vigas y barras.
 
-**Hallazgo (BN3-1):** el botón «Guardar» dice «Guardar●» con cambios sin guardar; el ayudante de los bancos lo buscaba por su texto exacto y no lo encontraba. El de V2c (`diferencias`) tiene el mismo descuido, pero sólo se usa cuando las huellas no casan.
+**Hallazgo (BN3-1):** el botón «Guardar» dice «Guardar●» con cambios sin guardar; el ayudante de los bancos lo buscaba por su texto exacto y no lo encontraba. El de V2c (`diferencias`, que sólo se usa cuando las huellas no casan) tenía el mismo descuido: corregido igual, por `data-sin-guardar` y esperando a que quede guardado. El de V2a ya lo buscaba por el principio del texto.
 
 ## 7. Después de BN
 
