@@ -41,6 +41,12 @@ export function transformar(f: ModeloFisico, t: Plano): ModeloFisico {
       return { ...p, x, y, giro: (p.giro ?? 0) + t.giro };
     }),
     vigas: f.vigas?.map((v) => ({ ...v, puntos: v.puntos.map(t.p) })),
+    // Fase BN: una barra inclinada lleva sus ejes con ella; una vertical, como un pilar, gira su sección
+    barras: f.barras?.map((b) => {
+      const [i, j] = [t.p([b.inicio.x, b.inicio.y]), t.p([b.fin.x, b.fin.y])];
+      const vertical = b.inicio.x === b.fin.x && b.inicio.y === b.fin.y;
+      return { ...b, inicio: { ...b.inicio, x: i[0], y: i[1] }, fin: { ...b.fin, x: j[0], y: j[1] }, ...(vertical ? { giro: (b.giro ?? 0) + t.giro } : {}) };
+    }),
     apoyos: f.apoyos?.map((a) => {
       const [x, y] = t.p([a.x, a.y]);
       return { ...a, x, y };
@@ -67,7 +73,7 @@ export function transformar(f: ModeloFisico, t: Plano): ModeloFisico {
       return c.ejes === "global" ? { ...c, q: t.v(c.q), qb: v3(c.qb) } : c;
     }),
   };
-  for (const k of ["pilares", "vigas", "apoyos", "losas", "apoyosLineales", "bandas", "muros", "panos", "cargas"] as const) if (g[k] === undefined) delete g[k];
+  for (const k of ["pilares", "vigas", "barras", "apoyos", "losas", "apoyosLineales", "bandas", "muros", "panos", "cargas"] as const) if (g[k] === undefined) delete g[k];
   return g;
 }
 
@@ -120,9 +126,10 @@ export function errorNudos(ra: ResultadoCaso[], rb: ResultadoCaso[], pares: Map<
 /**
  * Peor error relativo de los esfuerzos de extremo de las barras emparejadas por sus nudos. Con
  * `invertidas`, las barras de B van de j a i: se comparan con los extremos cruzados y el signo de
- * Vz y Mz cambiado (el resto, igual en el mismo punto). `soloVigas` deja fuera los pilares.
+ * Vz y Mz cambiado (el resto, igual en el mismo punto). `tipos`: las piezas invertidas (las vigas;
+ * con las barras de la fase BN, también ellas).
  */
-export function errorBarras(a: Valido, b: Valido, ra: ResultadoCaso[], rb: ResultadoCaso[], pares: Map<number, number>, invertidas = false): number {
+export function errorBarras(a: Valido, b: Valido, ra: ResultadoCaso[], rb: ResultadoCaso[], pares: Map<number, number>, invertidas = false, tipos: readonly string[] = ["viga"]): number {
   const idx = new Map<string, number>();
   b.modelo.barras!.forEach((x, k) => idx.set(`${x.nudos[0]}-${x.nudos[1]}`, k));
   const signo = invertidas ? [1, 1, -1, 1, 1, -1] : [1, 1, 1, 1, 1, 1];
@@ -131,7 +138,7 @@ export function errorBarras(a: Valido, b: Valido, ra: ResultadoCaso[], rb: Resul
     const dif = [0, 0];
     const ref = [0, 0];
     a.modelo.barras!.forEach((x, k) => {
-      const inv = invertidas && a.mapeo.barras[k]!.tipo === "viga";
+      const inv = invertidas && tipos.includes(a.mapeo.barras[k]!.tipo);
       const clave = inv ? `${pares.get(x.nudos[1])}-${pares.get(x.nudos[0])}` : `${pares.get(x.nudos[0])}-${pares.get(x.nudos[1])}`;
       const kb = idx.get(clave);
       if (kb === undefined) throw new Error(`la barra ${x.id} no tiene pareja`);
