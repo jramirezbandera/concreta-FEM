@@ -204,11 +204,21 @@ function Alzado({ v, s, onS }: { v: DatosViga; s: number; onS: (s: number) => vo
         <line x1={ml} x2={w - mr} y1={y0} y2={y0} stroke="var(--color-text-muted)" strokeWidth={1} />
         <path d={camino("max")} fill="none" stroke="var(--color-env-max)" strokeWidth={1.4} />
         <path d={camino("min")} fill="none" stroke="var(--color-env-min)" strokeWidth={1.4} />
-        {picos.map((p, i) => (
-          <text key={i} x={X(p.s)} y={Y(p.v) + (Y(p.v) > y0 ? 13 : -5)} fontSize={10.5} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)" className="halo">
-            {fmt(p.v, 1)}
-          </text>
-        ))}
+        {picos.map((p, i) => {
+          // UI-21: con un fondo, no sólo el halo de las letras: el salto vertical del diagrama en la
+          // cara de un apoyo pasaba entre ellas y tachaba el signo
+          const t = fmt(p.v, 1);
+          const y = Y(p.v) + (Y(p.v) > y0 ? 13 : -5);
+          const ancho = t.length * 6.4 + 6;
+          return (
+            <g key={i}>
+              <rect x={X(p.s) - ancho / 2} y={y - 10} width={ancho} height={13} rx={2} fill="var(--color-bg-primary)" opacity={0.92} />
+              <text x={X(p.s)} y={y} fontSize={10.5} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
+                {t}
+              </text>
+            </g>
+          );
+        })}
         <line x1={X(s)} x2={X(s)} y1={mt - 8} y2={H - mb + 4} stroke="var(--color-accent)" strokeDasharray="4 3" />
         <text x={ml - 6} y={y0 + 4} fontSize={10} textAnchor="end" fill="var(--color-text-muted)" fontFamily="var(--font-mono)">
           0

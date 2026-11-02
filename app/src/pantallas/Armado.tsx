@@ -13,7 +13,7 @@
  *
  * Cada número es de una consulta, nunca del dibujo.
  */
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ARMADURAS as LISTA_ARMADURAS, baseDe, hayBase, type ArmadoProyecto, type BasesArmado } from "../../../src/agente/armaduraBase.ts";
 import { NOMBRE_CORTO, UNIDAD_ARMADO, type Armadura, type FiltroArmado, type OpcionesArmado } from "../../../src/agente/render/armado.ts";
 import type { Vec2 } from "../../../src/agente/render/escena.ts";
@@ -65,7 +65,7 @@ function Valor({ v, varias }: { v: [number, string]; varias: boolean }) {
   return (
     <>
       {fmt(v[0], 1)}
-      {varias && v[1] ? <small>{v[1]}</small> : null}
+      {varias && v[1] ? <small className="id">{v[1]}</small> : null}
     </>
   );
 }
@@ -115,36 +115,115 @@ function TresDArmado({ planta, armadura, eleccion, op }: { planta: string | null
  * El diagrama de una franja a lo largo: mx máximo y mínimo (líneas) y las demandas inferior y
  * superior de Wood–Armer (áreas), con el eje de los momentos positivos hacia abajo, como el de una
  * viga, y la armadura base de su losa (discontinua: la inferior abajo, la superior arriba). Sólo
- * dibuja los valores de la tabla.
+ * dibuja los valores de la tabla. UI-20: con el 0, el s de sus extremos, los mayores rotulados y su
+ * leyenda; `ancho`, en px (en Propiedades, 320; en el panel inferior, el de la pantalla).
  */
-function DiagramaFranja({ d, base }: { d: DatosFranja; base: { inferior: number | null; superior: number | null } }) {
+function DiagramaFranja({ d, base, ancho = 320, alto = 170 }: { d: DatosFranja; base: { inferior: number | null; superior: number | null }; ancho?: number; alto?: number }) {
   const es = d.estaciones.filter((x) => x.valido !== false);
   if (!es.length) return null;
-  const [W, H, m] = [320, 150, 8];
+  const [W, H] = [ancho, alto];
+  const [ml, mr, mt, mb] = [34, 10, 14, 18];
   const s0 = d.franja.s[0];
   const s1 = d.franja.s[1];
   const vmax = Math.max(1e-9, ...es.flatMap((x) => [Math.abs(x.max[0]), Math.abs(x.min[0]), x.inferior[0], x.superior[0]]), base.inferior ?? 0, base.superior ?? 0);
-  const X = (s: number) => m + ((s - s0) / (s1 - s0 || 1)) * (W - 2 * m);
+  const X = (s: number) => ml + ((s - s0) / (s1 - s0 || 1)) * (W - ml - mr);
   // Positivos hacia abajo (tracción abajo), como los diagramas de las vigas
-  const Y = (v: number) => H / 2 + (v / vmax) * (H / 2 - m);
+  const yc = mt + (H - mt - mb) / 2;
+  const Y = (v: number) => yc + (v / vmax) * ((H - mt - mb) / 2);
   const linea = (v: (x: EstacionFranjaEnvolvente) => number) => es.map((x, i) => `${i ? "L" : "M"}${X(x.s).toFixed(1)},${Y(v(x)).toFixed(1)}`).join(" ");
   const area = (v: (x: EstacionFranjaEnvolvente) => number) => `${linea(v)} L${X(es[es.length - 1]!.s).toFixed(1)},${Y(0).toFixed(1)} L${X(es[0]!.s).toFixed(1)},${Y(0).toFixed(1)} Z`;
+  // Los mayores de cada área, rotulados
+  const mayor = (v: (x: EstacionFranjaEnvolvente) => number) => es.reduce((a, x) => (v(x) > v(a) ? x : a), es[0]!);
+  const inf = mayor((x) => x.inferior[0]);
+  const sup = mayor((x) => x.superior[0]);
+  const rotulo = (x: number, y: number, t: string, abajo: boolean) => {
+    const w = t.length * 6.2 + 6;
+    const xx = Math.min(W - mr - w / 2, Math.max(ml + w / 2, x));
+    const yy = abajo ? Math.min(H - mb - 2, y + 12) : Math.max(mt + 8, y - 4);
+    return (
+      <g>
+        <rect x={xx - w / 2} y={yy - 9.5} width={w} height={12.5} rx={2} fill="var(--color-bg-primary)" opacity={0.9} />
+        <text x={xx} y={yy} fontSize={10.5} textAnchor="middle" fontFamily="var(--font-mono)" fill="var(--color-text-primary)">
+          {t}
+        </text>
+      </g>
+    );
+  };
+  const eje = (v: number) => (
+    <text x={ml - 4} y={Y(v) + 3.5} fontSize={10} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+      {fmt(v, 0)}
+    </text>
+  );
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Diagrama de ${d.franja.id}`}>
-      {/* Los colores de la envolvente del tema (UI-48: fijos, en oscuro daban 2,9–3,3:1) */}
-      <path d={area((x) => x.inferior[0])} fill="var(--color-env-max)" fillOpacity={0.22} />
-      <path d={area((x) => -x.superior[0])} fill="var(--color-env-min)" fillOpacity={0.22} />
-      <line x1={m} x2={W - m} y1={Y(0)} y2={Y(0)} stroke="currentColor" strokeOpacity={0.5} />
-      <path d={linea((x) => x.max[0])} fill="none" stroke="var(--color-env-max)" strokeWidth={1.2} />
-      <path d={linea((x) => x.min[0])} fill="none" stroke="var(--color-env-min)" strokeWidth={1.2} />
-      {base.inferior !== null && <line data-base="inferior" x1={m} x2={W - m} y1={Y(base.inferior)} y2={Y(base.inferior)} stroke="var(--color-env-max)" strokeDasharray="5 3" strokeWidth={1} />}
-      {base.superior !== null && <line data-base="superior" x1={m} x2={W - m} y1={Y(-base.superior)} y2={Y(-base.superior)} stroke="var(--color-env-min)" strokeDasharray="5 3" strokeWidth={1} />}
-      {es
-        .filter((x) => x.tipo !== "paso")
-        .map((x) => (
-          <line key={`${x.s}${x.lado}`} x1={X(x.s)} x2={X(x.s)} y1={m} y2={H - m} stroke="currentColor" strokeOpacity={0.15} />
-        ))}
-    </svg>
+    <figure className="m-0">
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block max-w-full" role="img" aria-label={`Diagrama de ${d.franja.id}`}>
+        {/* Los colores de la envolvente del tema (UI-48: fijos, en oscuro daban 2,9–3,3:1) */}
+        <path d={area((x) => x.inferior[0])} fill="var(--color-env-max)" fillOpacity={0.22} />
+        <path d={area((x) => -x.superior[0])} fill="var(--color-env-min)" fillOpacity={0.22} />
+        <line x1={ml} x2={W - mr} y1={Y(0)} y2={Y(0)} stroke="currentColor" strokeOpacity={0.5} />
+        {es
+          .filter((x) => x.tipo !== "paso")
+          .map((x) => (
+            <line key={`${x.s}${x.lado}`} x1={X(x.s)} x2={X(x.s)} y1={mt} y2={H - mb} stroke="currentColor" strokeOpacity={0.15} />
+          ))}
+        <path d={linea((x) => x.max[0])} fill="none" stroke="var(--color-env-max)" strokeWidth={1.2} />
+        <path d={linea((x) => x.min[0])} fill="none" stroke="var(--color-env-min)" strokeWidth={1.2} />
+        {base.inferior !== null && <line data-base="inferior" x1={ml} x2={W - mr} y1={Y(base.inferior)} y2={Y(base.inferior)} stroke="var(--color-env-max)" strokeDasharray="5 3" strokeWidth={1} />}
+        {base.superior !== null && <line data-base="superior" x1={ml} x2={W - mr} y1={Y(-base.superior)} y2={Y(-base.superior)} stroke="var(--color-env-min)" strokeDasharray="5 3" strokeWidth={1} />}
+        {eje(0)}
+        {eje(vmax)}
+        {eje(-vmax)}
+        <text x={ml} y={H - 4} fontSize={10} fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+          s = {fmt(s0, 2)}
+        </text>
+        <text x={W - mr} y={H - 4} fontSize={10} textAnchor="end" fontFamily="var(--font-mono)" fill="var(--color-text-muted)">
+          {fmt(s1, 2)} m
+        </text>
+        {inf.inferior[0] > 0 && rotulo(X(inf.s), Y(inf.inferior[0]), fmt(inf.inferior[0], 1), true)}
+        {sup.superior[0] > 0 && rotulo(X(sup.s), Y(-sup.superior[0]), fmt(sup.superior[0], 1), false)}
+      </svg>
+      <figcaption className="leyenda-franja">
+        <span>
+          <i style={{ background: "var(--color-env-max)", opacity: 0.35 }} /> inferior
+        </span>
+        <span>
+          <i style={{ background: "var(--color-env-min)", opacity: 0.35 }} /> superior
+        </span>
+        <span>
+          <i className="linea" style={{ background: "var(--color-env-max)" }} /> mx máx.
+        </span>
+        <span>
+          <i className="linea" style={{ background: "var(--color-env-min)" }} /> mx mín.
+        </span>
+        {(base.inferior !== null || base.superior !== null) && (
+          <span>
+            <i className="linea discontinua" /> base
+          </span>
+        )}
+        <span>{U} · positivos hacia abajo</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+/** El diagrama de la franja elegida en el panel inferior, a todo su ancho (UI-20). */
+function FranjaAncha({ d, base }: { d: DatosFranja; base: { inferior: number | null; superior: number | null } }) {
+  const caja = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(900);
+  useEffect(() => {
+    const el = caja.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setW(Math.max(320, Math.floor(el.clientWidth) - 28)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={caja} className="px-3.5 py-2">
+      <div className="mb-1 text-[12px] text-text-secondary">
+        <span className="mono text-text-primary">{d.franja.id}</span> · {d.franja.losa} · dirección {d.franja.direccion === 1 ? "X (1)" : "Y (2)"} · ancho {fmt(d.franja.ancho, 3)} m
+      </div>
+      <DiagramaFranja d={d} base={base} ancho={w} alto={220} />
+    </div>
   );
 }
 
@@ -161,11 +240,10 @@ function DetalleFranja({ d, varias, base }: { d: DatosFranja; varias: boolean; b
         <div className="px-3.5 py-1.5 text-[12px] text-text-secondary">
           {f.losa} · ancho {fmt(f.ancho, 3)} m{reticular ? ` (el intereje)` : ""} · t de {fmt(f.t[0], 2)} a {fmt(f.t[1], 2)} m · s de {fmt(f.s[0], 2)} a {fmt(f.s[1], 2)} m
         </div>
-        <DiagramaFranja d={d} base={base} />
-        <p className="nota">
-          Líneas: mx máximo (rojo) y mínimo (azul). Áreas: demanda de Wood–Armer inferior (abajo) y superior (arriba). Positivos hacia abajo; las verticales, las caras y las líneas de apoyo.
-          {base.inferior !== null || base.superior !== null ? " Discontinua, la armadura base de la losa." : ""}
-        </p>
+        <div className="px-3.5">
+          <DiagramaFranja d={d} base={base} />
+        </div>
+        <p className="nota">Las verticales, las caras y las líneas de apoyo. Más ancho, en la pestaña Franja del panel inferior.</p>
       </Seccion>
       <Seccion titulo="Caras y apoyos" valor={U}>
         <table className="tb" aria-label={`Caras y apoyos de ${f.id}`}>
@@ -721,6 +799,7 @@ export function ModoArmado() {
       dock={[
         { id: "franjas", titulo: "Franjas", insignia: d?.filas.length, contenido: tabla },
         { id: "refuerzos", titulo: "Refuerzos", insignia: conBase ? zonas.length : undefined, contenido: tablaZonas },
+        ...(detalle ? [{ id: "franja", titulo: `Franja · ${detalle.franja.id}`, contenido: <FranjaAncha d={detalle} base={baseFranja(detalle.franja.losa)} /> }] : []),
       ]}
     />
   );

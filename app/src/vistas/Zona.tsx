@@ -853,7 +853,7 @@ export interface ContenidoLeyenda {
 export function textoCorto(t0: string): string {
   const t = textoApp(t0);
   if (/^[-−+]?\d/.test(t)) return t;
-  const k = t.search(/ \(|; |, |\. /);
+  const k = t.search(/ \(|; |, |\. |: /);
   return k > 0 ? t.slice(0, k) : t;
 }
 

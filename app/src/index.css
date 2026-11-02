@@ -1134,3 +1134,19 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .herr:focus-visible, .herr-seg button:focus-visible, .dock-tab:focus-visible, .espacios > button:focus-visible, .ib:focus-visible, .ges-lista > button:focus-visible {
   outline: none; box-shadow: 0 0 0 2px var(--color-accent);
 }
+
+/* UI-20: la leyenda del diagrama de la franja, con sus muestras (era un párrafo) */
+.leyenda-franja { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 11px; color: var(--color-text-secondary); }
+.leyenda-franja span { display: inline-flex; align-items: center; gap: 5px; }
+.leyenda-franja i { display: inline-block; width: 14px; height: 9px; border-radius: 2px; }
+.leyenda-franja i.linea { height: 2px; }
+.leyenda-franja i.discontinua { height: 0; border-top: 1.5px dashed var(--color-text-secondary); }
+
+/* D-15: en el panel inferior, las tablas no se reparten a todo el ancho de la pantalla (380 px entre
+   valores de la misma fila a 1920); con la fila resaltada al pasar y un cebreado tenue */
+.dock-cuerpo .tb { width: auto; min-width: min(100%, 640px); max-width: 1180px; }
+.dock-cuerpo .tb td:not(:first-child), .dock-cuerpo .tb th:not(:first-child) { min-width: 96px; }
+.dock-cuerpo .tb tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--color-bg-surface) 70%, transparent); }
+.tb tbody tr:hover td { background: var(--color-bg-elevated); }
+/* D-17: un id no se parte por su guion («ELU-PT-» y «3» en dos líneas parecían dos) */
+.tb td small.id, .tb td .id, small.id { white-space: nowrap; }

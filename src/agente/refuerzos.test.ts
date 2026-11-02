@@ -17,6 +17,7 @@ import { conjuntoCombinaciones, seleccionPorDefecto, type ConjuntoCombinaciones 
 import { consultar, franja as consultaFranja, type FilaRefuerzo } from "./consultas.ts";
 import { franjasTramos, losasDe, picos, zonasRefuerzo, type FranjaTramos, type TramoArmado } from "./refuerzos.ts";
 import { escenaASvg, ResultadosRender, vistaArmado } from "./render/index.ts";
+import { SEPARACION_PICOS } from "./render/armado.ts";
 
 let q: Consultas;
 let rr: ResultadosRender;
@@ -163,9 +164,16 @@ describe("consulta refuerzos y vista (criterios 1, 2 y 4)", () => {
     const sin = vistaArmado(rr, planta, a, conj, d);
     expect(sin.tituloLeyenda).toBe("X superior · M_Ed (Wood–Armer) · kN·m/m");
     expect(escenaASvg(sin).svg).toContain("X superior · M_Ed (Wood–Armer) · kN·m/m");
-    // Sin base: un rótulo por pico, todos en los extremos
+    // Sin base: todos los picos en los extremos; rotulados, el mayor de los que están a menos de
+    // SEPARACION_PICOS (UI-19: los de franjas vecinas se apilaban en columna)
     const nPicos = tramos(a).reduce((s, f) => s + picos(f.tramos, 0.05 * Math.max(...tramos(a).flatMap((g) => g.tramos.map((t) => t.v)))).length, 0);
-    expect(sin.primitivas.filter((p) => p.tipo === "texto" && p.color === "#1d4ed8").length).toBe(nPicos);
+    const rotulados = sin.primitivas.filter((p): p is Extract<typeof p, { tipo: "texto" }> => p.tipo === "texto" && p.color === "#1d4ed8");
+    expect(rotulados.length).toBeGreaterThan(0);
+    expect(rotulados.length).toBeLessThanOrEqual(nPicos);
+    for (let i = 0; i < rotulados.length; i++) for (let j = i + 1; j < rotulados.length; j++) expect(Math.hypot(rotulados[i]!.p[0] - rotulados[j]!.p[0], rotulados[i]!.p[1] - rotulados[j]!.p[1])).toBeGreaterThanOrEqual(SEPARACION_PICOS);
+    // El mayor pico, rotulado (con tres cifras)
+    const mayor = Math.max(...sin.extremos.map((x) => x.valor));
+    expect(Math.abs(Math.max(...rotulados.map((t) => Number(t.texto.replace(",", ".")))) - mayor)).toBeLessThan(0.005 * mayor);
     expect(sin.extremos.length).toBe(nPicos);
     const con = vistaArmado(rr, planta, a, conj, d, { armado, soloExceso: true });
     const zonas = (consultar(q, "refuerzos", { armadura: a, armado, combinaciones: () => ({ valido: true, valor: conj, diagnosticos: [] }) }) as { valor: { zonas: FilaRefuerzo[] } }).valor.zonas;

@@ -23,7 +23,7 @@ import type { ConjuntoCombinaciones } from "../combinaciones.ts";
 import type { Vec2 } from "../../compilador/fisico.ts";
 import { ARMADURAS, caraDe, franjasTramos, losasDe, picos, PROMINENCIA_PICOS, zonasRefuerzo, type Armadura, type FranjaTramos, type TramoArmado, type ZonaRefuerzo } from "../refuerzos.ts";
 import { cajaDe, rayado, rotulo, type EntradaLeyenda, type EscalaDibujada, type Escena, type ExtremoRotulado, type Primitiva } from "./escena.ts";
-import { AVISO_PICOS, coloresBandas, limitesMapa, rangoSinPicos, type EscalaMapa, type LimitesMapa } from "./isovalores.ts";
+import { AVISO_PICOS, coloresSecuencia, limitesMapa, RAMPA_INFERIOR, RAMPA_SUPERIOR, rangoSinPicos, type EscalaMapa, type LimitesMapa } from "./isovalores.ts";
 import { capaEjes } from "./ejes.ts";
 import { capaApoyos, fondoModelo, PlantaFisica, type DatosVista } from "./modelo.ts";
 import { cabecera, caja, trazoModelo, type ResultadosRender } from "./resultados.ts";
@@ -41,6 +41,8 @@ const NOMBRE: Record<Armadura, string> = {
 /** El nombre corto de una armadura («X inferior»). */
 export const NOMBRE_CORTO: Record<Armadura, string> = { "x-inf": "X inferior", "x-sup": "X superior", "y-inf": "Y inferior", "y-sup": "Y superior" };
 export const UNIDAD_ARMADO = "kN·m/m";
+/** UI-19: de los picos rotulados a menos de esto (m), sólo el mayor. */
+export const SEPARACION_PICOS = 1.5;
 /** El exceso sobre la base de un rótulo, con un decimal: «+4,5». */
 export const textoExceso = (x: number): string => `+${(Math.round(x * 10) / 10).toFixed(1).replace(".", ",")}`;
 
@@ -143,8 +145,8 @@ export function mapaArmado(fs: FranjaTramos[], armadura: Armadura, op: OpcionesA
     picos = !!robusto && op.escala?.modo !== "sin-picos" && !(lm.fueraAbajo || lm.fueraArriba) && hasta > AVISO_PICOS * robusto[1];
     const { L, fueraAbajo, fueraArriba } = lm;
     const nb = L.length - 1;
-    // Superior en azules: los colores de los límites cambiados de signo, en el mismo orden
-    colores = superior ? coloresBandas(L.map((x) => -x).reverse(), { abajo: fueraArriba, arriba: fueraAbajo }).reverse() : coloresBandas(L, { abajo: fueraAbajo, arriba: fueraArriba });
+    // Inferior, de amarillo a granate; superior, de amarillo verdoso a azul (UI-19)
+    colores = coloresSecuencia(nb, superior ? RAMPA_SUPERIOR : RAMPA_INFERIOR, { abajo: fueraAbajo, arriba: fueraArriba });
     const banda = (v: number) => {
       for (let b = 0; b < nb; b++) if (v <= L[b + 1]! || b === nb - 1) return b;
       return nb - 1;
@@ -169,8 +171,8 @@ export function mapaArmado(fs: FranjaTramos[], armadura: Armadura, op: OpcionesA
     const sin = losas.filter((l) => base(l) === null);
     if (sin.length) notas.push(`Sin base (el mapa entero): ${sin.join(", ")}.`);
   } else {
-    if (zonas.length) leyenda.push({ estilo: "zona-refuerzo", texto: "zona de refuerzo (supera la base)" });
-    notas.push("Rotulados: los picos de cada franja (prominencia ≥ 5 % del mayor de la planta). Acerque para ver más.");
+    if (zonas.length) leyenda.push({ estilo: "zona-refuerzo", texto: "zona de refuerzo (supera la base), con su máximo y el exceso" });
+    notas.push(`Rotulados: los picos de cada franja (prominencia ≥ 5 % del mayor de la planta), el mayor de los que están a menos de ${rotulo(SEPARACION_PICOS)} m${zonas.length ? ", y el máximo de cada zona de refuerzo con el exceso entre paréntesis" : ""}.`);
   }
   return { franjas: fs, zonas, coloreados, cubiertos, filtrado, limites, picos, sinPicos, colores, leyenda, notas, conBase, vmax };
 }
@@ -256,12 +258,26 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
     }
   } else {
     const minima = PROMINENCIA_PICOS * m.vmax;
-    for (const f of m.franjas)
-      for (const t of picos(f.tramos, minima).filter((x) => !m.filtrado(x))) {
-        const c = centro(t);
-        P.push({ tipo: "texto", p: c, texto: rotulo(t.v), tamano: 10, color, fondo: true, ancla: "medio", dy: 4, prioridad: (t.v / vmax) * 60 + 5, objeto: t.franja });
-        extremos.push({ que: `${superior ? "Superior" : "Inferior"}: pico de ${t.franja} en s = ${rotulo(t.s, 4)} m`, valor: t.v, unidad: u, objeto: t.franja, punto: c, comb: t.comb });
-      }
+    // UI-19: los picos de franjas vecinas (a 1 m) se apilaban en columna sobre un eje: de los que
+    // están a menos de SEPARACION_PICOS, el mayor
+    const todos = m.franjas.flatMap((f) => picos(f.tramos, minima).filter((x) => !m.filtrado(x))).sort((a, b) => b.v - a.v);
+    const puestos: Vec2[] = [];
+    // Las zonas de refuerzo, con su máximo y el exceso (el pico de ese tramo ya no se repite)
+    const enZona = new Set<TramoArmado>();
+    for (const z of m.zonas) {
+      const t = z.tramos.find((x) => x.franja === z.maximo.franja && x.s === z.maximo.s && x.v === z.maximo.v)!;
+      const c = centro(t);
+      enZona.add(t);
+      puestos.push(c);
+      P.push({ tipo: "texto", p: c, texto: `${rotulo(z.maximo.v)} (${textoExceso(z.maximo.exceso)})`, tamano: 10, color, negrita: true, fondo: true, ancla: "medio", dy: 4, prioridad: (z.maximo.v / vmax) * 60 + 40, objeto: z.id });
+    }
+    for (const t of todos) {
+      const c = centro(t);
+      if (enZona.has(t) || puestos.some((q) => Math.hypot(q[0] - c[0], q[1] - c[1]) < SEPARACION_PICOS)) continue;
+      puestos.push(c);
+      P.push({ tipo: "texto", p: c, texto: rotulo(t.v), tamano: 10, color, fondo: true, ancla: "medio", dy: 4, prioridad: (t.v / vmax) * 60 + 5, objeto: t.franja });
+    }
+    for (const t of todos) extremos.push({ que: `${superior ? "Superior" : "Inferior"}: pico de ${t.franja} en s = ${rotulo(t.s, 4)} m`, valor: t.v, unidad: u, objeto: t.franja, punto: centro(t), comb: t.comb });
   }
   const ordenados = extremos.sort((a, b) => b.valor - a.valor || ((a.objeto ?? "") < (b.objeto ?? "") ? -1 : (a.objeto ?? "") > (b.objeto ?? "") ? 1 : 0));
   const paños = pl.enPlanta(pl.f.panos);
@@ -277,7 +293,9 @@ export function vistaArmado(r: ResultadosRender, planta: string, armadura: Armad
     tituloLeyenda: tituloArmado(armadura),
     notas,
     extremos: ordenados,
-    caja: caja(pl),
+    // UI-19: el encuadre, el de las franjas de la planta (con los ejes de todo el edificio, la losa
+    // de una cubierta pequeña ocupaba un tercio de la vista)
+    caja: m.franjas.length ? cajaDe(m.franjas.flatMap((f) => f.tramos.flatMap((t) => t.rectangulo))) : caja(pl),
     ...escalaArmado(m),
   };
 }

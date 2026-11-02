@@ -584,6 +584,20 @@ function enRampa(rampa: readonly string[], t: number): string {
 }
 
 /**
+ * UI-19: rampas secuenciales de varios tonos para lo que sólo tiene un signo (el armado): con la
+ * rampa de un tono, diez bandas de azul no se distinguían de sus vecinas.
+ */
+export const RAMPA_INFERIOR = ["#fff3b0", "#fec44f", "#f46d43", "#c51b3a", "#5c0a2e"];
+export const RAMPA_SUPERIOR = ["#edf8b1", "#7fcdbb", "#2c9fc0", "#225ea8", "#0b1d5c"];
+
+/** Color de cada banda (de abajo arriba) en una rampa secuencial; las de fuera de la escala, los extremos. */
+export function coloresSecuencia(nBandas: number, rampa: readonly string[], fuera: { abajo?: boolean; arriba?: boolean } = {}): string[] {
+  const [i0, i1] = [fuera.abajo ? 1 : 0, fuera.arriba ? nBandas - 1 : nBandas];
+  const n = Math.max(1, i1 - i0);
+  return Array.from({ length: nBandas }, (_, b) => (b < i0 ? enRampa(rampa, 0) : b >= i1 ? enRampa(rampa, 1) : enRampa(rampa, n === 1 ? 1 : 0.06 + (0.94 * (b - i0)) / (n - 1))));
+}
+
+/**
  * Color de cada banda en una paleta divergente centrada en 0 (los límites incluyen el 0): rojos los
  * positivos y azules los negativos, más oscuros cuanto más se aleja del 0 el límite exterior de la
  * banda respecto al mayor |límite|. Dos bandas distintas nunca tienen el mismo color.
