@@ -32,6 +32,7 @@ import { leerProyecto, type Proyecto } from "../../src/agente/proyecto.ts";
 import { huellaCompilacion } from "../../src/compilador/compilar.ts";
 import { resolverOpciones, type CargaFisica, type ModeloFisico } from "../../src/compilador/fisico.ts";
 import { aplicar } from "../../src/editor/operaciones.ts";
+import { idCarga } from "../../src/editor/tablas.ts";
 import { leerEntrada, resolverEntrada } from "../../src/editor/dibujo/teclado.ts";
 import { asas, moverAsa, transformar, type ResultadoTransformar } from "../../src/editor/transformar.ts";
 import type { Vec2 } from "../../src/compilador/fisico.ts";
@@ -65,8 +66,12 @@ const E = edificio.proyecto;
 const PLANTA = "N1";
 const m0 = E.modelo;
 const plantas: ModeloFisico["plantas"] = [{ id: PLANTA, altura: null }, m0.plantas.at(-1)!];
-/** Las cargas de la planta con los ids que les da el dibujo, Q1, Q2…, en el orden en que se dibujan. */
-const conIds = (cs: CargaFisica[]): CargaFisica[] => cs.map((c, i) => ({ ...c, id: `Q${i + 1}` }));
+/** Las cargas de la planta con los ids que les da el dibujo (UI-2: «G-1», «Q-1»…, por su caso), en el orden en que se dibujan. */
+const conIds = (cs: CargaFisica[]): CargaFisica[] => {
+  const hechas: CargaFisica[] = [];
+  for (const c of cs) hechas.push({ ...c, id: idCarga({ plantas: [], cargas: hechas } as unknown as ModeloFisico, c.caso) });
+  return hechas;
+};
 const cargasN1 = (["G-sup-N1", "G-tab-N1", "Q-sup-N1", "Q-zona-N1"] as const).map((id) => m0.cargas!.find((c) => c.id === id)!);
 const referencia: Proyecto = {
   ...E,

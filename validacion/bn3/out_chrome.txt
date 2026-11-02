@@ -1,6 +1,6 @@
 ## El pórtico arriostrado, dibujado: la cruz y el tornapuntas en sus alzados, la diagonal en planta
 BIEN  el proyecto de partida tiene la huella de Node
-BIEN  con el primer extremo puesto, el cursor en el nudo de B en P1 dice su enganche y dónde queda: «u 7 · z 3 m · Centro (B) · → P1 (5; 0)»
+BIEN  con el primer extremo puesto, el cursor en el nudo de B en P1 dice su enganche y dónde queda: «u 7,000 · z 3,000 m · Centro (B) · → P1 (5; 0)»
 BIEN  las cuatro barras, sin errores de la herramienta («»)
 BIEN  la huella es la del pórtico arriostrado con los ids de lo dibujado: 70aeedb99b9d32d6 = Node 70aeedb99b9d32d6
 BIEN  lo guardado tiene las cuatro barras del pórtico, byte a byte (646 caracteres)

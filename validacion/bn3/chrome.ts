@@ -146,7 +146,7 @@ window.__c = {
   estado: () => document.querySelector("[data-estado]")?.dataset.estado ?? null,
   huella: () => document.querySelector("[data-estado]")?.dataset.huella ?? null,
   quieto: () => ["calculado", "sin-calcular", "no-compila"].includes(__c.estado()) && [...document.querySelectorAll(".lienzo[data-cargando]")].every((x) => x.dataset.cargando === "false"),
-  boton: (texto, raiz = document) => [...raiz.querySelectorAll("button")].find((b) => b.textContent.trim() === texto || b.textContent.trim().startsWith(texto + " ")),
+  boton: (texto, raiz = document) => [...raiz.querySelectorAll("button")].find((b) => b.textContent.trim() === texto || b.textContent.trim().startsWith(texto + " ") || b.getAttribute("aria-label") === texto),
   herramienta: (nombre) => [...document.querySelectorAll("button.herr")].find((b) => b.textContent.trim() === nombre),
   vista: () => window.__motorVistas.vista(0),
   sup: () => document.querySelector('.celda[data-vista="0"] .celda-superficie'),
