@@ -68,8 +68,8 @@ export interface Instantanea {
   activos: ReadonlySet<TipoEnganche>;
   /** De dónde se engancha: el modelo y las plantillas DXF. */
   fuentes: ReadonlySet<FuenteEnganche>;
-  /** El campo de teclado, abierto con su texto inicial y dónde (px de la ventana); `cota`, la que fija lo que se escriba; `seleccionar`, con el texto elegido (se escribe encima) y por encima del punto (CT2: la cota está junto a la barra). */
-  campo: { n: number; texto: string; x: number; y: number; error: string | null; cota?: string; seleccionar?: boolean } | null;
+  /** El campo de teclado (abajo en el centro de la vista), abierto con su texto inicial; `cota`, la que fija lo que se escriba; `seleccionar`, con el texto elegido (se escribe encima). */
+  campo: { n: number; texto: string; error: string | null; cota?: string; seleccionar?: boolean } | null;
   /** CT2: lo que dice la barra mientras se estira desde una cota. */
   estirado: string | null;
   /** CT2: los avisos del último estirado (un hueco de muro que cambia de ancho); CT3, los de mover un pilar. */
@@ -337,20 +337,16 @@ export class ControladorDibujo {
   }
 
   abrirCampo(texto: string): void {
-    // Sin haber pasado por una planta: la de la vista activa, y el campo junto a la zona de las vistas
-    if (!this.planta && this.plantaVista) {
-      this.planta = this.plantaVista;
-      const z = document.querySelector(".zona-vistas")?.getBoundingClientRect();
-      if (z && this.cliente[0] === 0 && this.cliente[1] === 0) this.cliente = [z.left + 40, z.top + 70];
-    }
+    // Sin haber pasado por una planta: la de la vista activa
+    if (!this.planta && this.plantaVista) this.planta = this.plantaVista;
     if (this.herramienta === "elegir" && this.ladoPilar) return this.abrirCampoPilar(texto);
     if (this.herramienta === "elegir" && this.asaActiva) {
-      this.cambiar({ campo: { n: ++this.abiertos, texto, x: this.cliente[0], y: this.cliente[1], error: null, cota: `vértice de ${this.asaActiva.id}` } });
+      this.cambiar({ campo: { n: ++this.abiertos, texto, error: null, cota: `vértice de ${this.asaActiva.id}` } });
       return;
     }
     if (this.eligiendo()) return;
     if (this.herramienta === "elegir" && this.estirado?.mueve == null) return;
-    this.cambiar({ campo: { n: this.abiertos + 1, texto, x: this.cliente[0], y: this.cliente[1], error: null, ...this.cotaCampo() } });
+    this.cambiar({ campo: { n: this.abiertos + 1, texto, error: null, ...this.cotaCampo() } });
     this.abiertos++;
   }
 
@@ -751,7 +747,7 @@ export class ControladorDibujo {
     const x = this.estirado;
     if (!x) return;
     x.mueve = lado;
-    this.cambiar({ estirado: this.textoEstirado(), campo: { n: ++this.abiertos, texto: rotuloCota(x.cota.valor), x: this.cliente[0], y: this.cliente[1], error: null, cota: this.textoCampo(), seleccionar: true } });
+    this.cambiar({ estirado: this.textoEstirado(), campo: { n: ++this.abiertos, texto: rotuloCota(x.cota.valor), error: null, cota: this.textoCampo(), seleccionar: true } });
     this.repintar();
   }
 
@@ -992,7 +988,7 @@ export class ControladorDibujo {
   private abrirCampoPilar(texto: string | null): void {
     const k = this.cotaPilarActiva();
     if (!k) return;
-    this.cambiar({ pilar: this.textoPilar(), aviso: null, campo: { n: ++this.abiertos, texto: texto ?? k.texto, x: this.cliente[0], y: this.cliente[1], error: null, cota: this.textoCampoPilar(), ...(texto === null ? { seleccionar: true } : {}) } });
+    this.cambiar({ pilar: this.textoPilar(), aviso: null, campo: { n: ++this.abiertos, texto: texto ?? k.texto, error: null, cota: this.textoCampoPilar(), ...(texto === null ? { seleccionar: true } : {}) } });
   }
 
   /** Esc: deja la cota activa del pilar. */

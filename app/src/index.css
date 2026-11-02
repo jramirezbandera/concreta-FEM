@@ -611,7 +611,16 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 
 .barra-sup { display: flex; align-items: center; gap: 8px; height: 44px; flex-shrink: 0; min-width: 0; padding: 0 10px 0 12px; border-bottom: 1px solid var(--color-border-main); background: var(--color-bg-primary); overflow: hidden; }
 .barra-sup .nombre-proyecto { min-width: 72px; }
-.btn-buscar { gap: 14px; color: var(--color-text-tertiary); }
+/* La paleta como un campo de búsqueda discreto, en el centro de la barra (entre dos `flex-1`) */
+.btn-buscar {
+  display: inline-flex; flex-shrink: 0; align-items: center; gap: 8px; width: clamp(200px, 20vw, 320px); height: 28px; margin-inline: 8px; padding: 0 8px 0 10px;
+  border: 1px solid var(--color-border-sub); border-radius: 7px; background: var(--color-bg-surface);
+  font: 12px var(--font-sans); color: var(--color-text-tertiary); cursor: pointer; white-space: nowrap;
+}
+.btn-buscar:hover { border-color: var(--color-border-main); color: var(--color-text-secondary); }
+.btn-buscar:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.btn-buscar-texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.btn-buscar-atajo { flex-shrink: 0; }
 /* UI-7: en un portátil la barra superior no cabía y la página se desplazaba de lado. Por debajo de
    1500 px, los botones sólo con su icono (el texto queda en el título); por debajo de 1100 px, lo de
    la derecha en el menú «⋯» */
@@ -623,6 +632,9 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 @media (max-width: 1099.98px) {
   .barra-sup .ancho-1100 { display: none; }
   .barra-sup .solo-1100 { display: inline-flex; }
+  /* La paleta, sólo con la lupa */
+  .btn-buscar { width: 30px; justify-content: center; padding: 0; }
+  .btn-buscar-texto, .btn-buscar-atajo { display: none; }
 }
 /* Un menú que cuelga de un botón (armazon/Disposicion.tsx, MenuFlotante) */
 .menu-flotante {
@@ -718,18 +730,22 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .vista { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; background: var(--color-bg-canvas); }
 .vista-cab { position: absolute; top: 10px; left: 10px; right: 220px; z-index: 15; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; pointer-events: none; }
 .vista-cab > * { pointer-events: auto; }
-/* Lo que pide una herramienta que espera a que se elija (Copiar, Borrar), abajo en el centro */
-.chip.aviso-herr {
+/* El pie de la vista, abajo en el centro: la línea de lo que se teclea encima de lo que pide la
+   herramienta (las dos lejos de los botones de abajo a la derecha) */
+.pie-vista {
   position: absolute; left: 50%; bottom: 12px; z-index: 16; transform: translateX(-50%);
-  max-width: calc(100% - 340px); white-space: normal; height: auto; min-height: 30px; padding: 5px 12px; text-align: center; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; width: max-content; max-width: calc(100% - 340px); pointer-events: none;
 }
-/* V2c: lo que se teclea junto al cursor */
+.chip.aviso-herr { max-width: 100%; white-space: normal; height: auto; min-height: 30px; padding: 5px 12px; text-align: center; pointer-events: none; }
+/* V2c: lo que se teclea, como la línea de órdenes de los CAD: una fila discreta, no una caja junto
+   al cursor que tape lo que se dibuja */
 .campo-teclado {
-  position: fixed; z-index: 40; width: 240px; padding: 6px;
-  border: 1px solid var(--color-border-main); border-radius: 8px; background: var(--color-bg-primary);
-  box-shadow: var(--shadow-pop); font-size: 12px;
+  max-width: 100%; padding: 4px 6px; pointer-events: auto;
+  border: 1px solid var(--color-border-main); border-radius: 8px; background: color-mix(in srgb, var(--color-bg-primary) 94%, transparent);
+  box-shadow: var(--shadow-pop); backdrop-filter: blur(2px); font-size: 12px;
 }
-.campo-teclado input { width: 100%; }
+.campo-linea { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.campo-teclado input { width: 200px; flex-shrink: 0; height: 26px; }
 
 /* V2c: la plantilla de una herramienta de dibujo, en Propiedades */
 .cab-icono { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: var(--color-tint-accent); color: var(--color-accent); }
@@ -778,14 +794,18 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .campo-fichas { align-items: start; }
 .campo-fichas > .fichas, .campo-fichas > .fichas-plantas { padding: 0; }
 .campo .ficha input { width: auto; height: auto; }
-.campo-teclado .error { margin: 4px 2px 0; color: var(--color-state-fail); line-height: 1.35; }
-.campo-teclado .campo-cota { margin: 4px 2px 0; color: var(--color-text-secondary); line-height: 1.35; }
-/* Lo que se puede escribir en el campo (la línea de órdenes de los CAD) */
-.campo-formas { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: baseline; margin: 7px 2px 0; padding-top: 6px; border-top: 1px solid var(--color-border-sub); font-size: 12px; color: var(--color-text-secondary); }
-.campo-formas dt { justify-self: start; padding: 0 5px; border-radius: 4px; background: var(--color-bg-elevated); font: 11px/17px var(--font-mono); color: var(--color-text-primary); white-space: nowrap; }
-.campo-formas dd { margin: 0; line-height: 1.3; }
-.campo-teclado .campo-teclas { display: flex; align-items: center; gap: 5px; margin: 6px 2px 0; font-size: 11px; color: var(--color-text-tertiary); }
-.campo-teclas > .dib-tecla:not(:first-child) { margin-left: 5px; }
+.campo-teclado .error, .campo-teclado .campo-explica { margin: 3px 2px 1px; line-height: 1.35; }
+.campo-teclado .error { color: var(--color-state-fail); }
+.campo-teclado .campo-explica { color: var(--color-text-secondary); }
+.campo-teclado .campo-cota { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 2px; color: var(--color-text-secondary); }
+/* Lo que se puede escribir en el campo: sus rótulos en una fila (la explicación, en su título y
+   debajo cuando se escribe esa forma); el <dd>, sólo para los lectores de pantalla */
+.campo-formas { display: flex; align-items: center; gap: 4px; margin: 0; white-space: nowrap; }
+.campo-formas dt { padding: 0 5px; border-radius: 4px; background: var(--color-bg-elevated); font: 11px/18px var(--font-mono); color: var(--color-text-secondary); cursor: help; }
+.campo-formas dt[data-on] { background: var(--color-tint-accent); color: var(--color-accent); }
+.campo-formas dd { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.campo-teclado .campo-teclas { display: flex; align-items: center; gap: 4px; margin-left: auto; padding-left: 4px; }
+.campo-teclas > .dib-tecla { color: var(--color-text-tertiary); }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
   border: 1px solid var(--color-border-main); border-radius: 8px;
@@ -876,7 +896,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 
 /* Paleta de órdenes */
 .paleta-fondo {
-  position: fixed; inset: 0; z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh;
+  /* Se abre donde está su campo, en el centro de la barra superior */
+  position: fixed; inset: 0; z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding-top: 6px;
   background: var(--color-velo-suave); animation: fondo-entra .12s ease-out;
 }
 .paleta { width: 620px; max-width: calc(100vw - 32px); overflow: hidden; border: 1px solid var(--color-border-main); border-radius: 12px; background: var(--color-bg-primary); box-shadow: var(--shadow-dialogo); animation: caja-entra .16s cubic-bezier(.2, .8, .3, 1); }
@@ -1192,7 +1213,7 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .tb td small.id, .tb td .id, small.id { white-space: nowrap; }
 
 /* M-17: el chip de la herramienta no tapa el dibujo: más estrecho y translúcido */
-.chip.aviso-herr { max-width: min(760px, calc(100% - 340px)); background: color-mix(in srgb, var(--color-tint-accent) 88%, transparent); backdrop-filter: blur(2px); }
+.chip.aviso-herr { max-width: min(760px, 100%); background: color-mix(in srgb, var(--color-tint-accent) 88%, transparent); backdrop-filter: blur(2px); }
 
 /* D-22: un desplegable dice palabras («Por defecto», «X superior»): en la letra de la interfaz; la
    monoespaciada, para los números e ids que se escriben en los campos */

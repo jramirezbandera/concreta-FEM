@@ -373,6 +373,15 @@ export function App() {
                 </button>
               ))}
             </nav>
+            {/* La paleta, discreta y en el centro de la barra, como un campo de búsqueda: entre los botones
+                de la derecha competía con Calcular. Centrada en el hueco entre los dos lados, no en la
+                ventana: así nunca se monta encima y el nombre del proyecto conserva su sitio */}
+            <span className="flex-1" />
+            <button type="button" className="btn-buscar" onClick={() => setPaleta(true)} title="Buscar u ordenar: la paleta de órdenes (Ctrl+K)" aria-label="Buscar u ordenar (Ctrl+K)">
+              <Search size={14} aria-hidden="true" />
+              <span className="btn-buscar-texto">Buscar u ordenar…</span>
+              <span className="kbd btn-buscar-atajo" aria-hidden="true">Ctrl K</span>
+            </button>
             <span className="flex-1" />
             {ed ? (
               <>
@@ -440,12 +449,6 @@ export function App() {
                 <RefreshCw size={15} /> <span className="et">Recalcular</span>
               </button>
             )}
-            <button type="button" className="btn btn-buscar" onClick={() => setPaleta(true)} title="Buscar u ordenar: la paleta de órdenes (Ctrl+K)">
-              <span className="flex items-center gap-1.5">
-                <Search size={15} /> <span className="et">Buscar u ordenar</span>
-              </span>
-              <span className="kbd et">Ctrl K</span>
-            </button>
             <button type="button" className="btn ancho-1100" onClick={() => location.assign(location.pathname)} title="Mis proyectos: abrir otro">
               <FolderOpen size={15} /> <span className="et">Proyectos</span>
             </button>

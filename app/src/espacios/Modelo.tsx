@@ -577,34 +577,38 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
         vista={
           <>
             {vista}
-            {dibujando && (
-              // M-17: una línea (la primera frase); la ayuda entera, en su título y en la plantilla de Propiedades
-              <span className="chip aviso-herr" data-acento="true" role="status" title={foto.ayuda}>
-                {primeraFrase(foto.ayuda)}
-                {!foto.error && !foto.campo && !/x; y|u; z/.test(foto.ayuda) && !(esEditar(foto.herramienta) && !foto.transformando) && <span className="text-text-tertiary"> O teclee las coordenadas.</span>}
-                {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
-                {!foto.error && foto.aviso && <span className="text-state-warn"> {foto.aviso}</span>}
-              </span>
-            )}
-            {!dibujando && (foto.asa || foto.estirado || foto.aviso || foto.pilar) && (
-              <span className="chip aviso-herr" data-acento="true" role="status">
-                {foto.asa ?? foto.estirado ?? foto.aviso ?? foto.pilar}
-                {(foto.estirado || foto.asa) && foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
-              </span>
-            )}
-            {!dibujando && !eligiendo && hecho && !(foto.asa || foto.estirado || foto.aviso || foto.pilar) && (
-              <span className="chip aviso-herr" data-acento="true" role="status">
-                <Check size={14} className="mr-1 inline align-[-2px] text-state-ok" />
-                {hecho} <span className="dib-tecla">Ctrl+Z</span>
-              </span>
-            )}
-            {foto.campo && <CampoTeclado key={foto.campo.n} ctrl={ctrl} campo={foto.campo} />}
-            {eligiendo && (
-              <span className="chip aviso-herr" data-acento="true" role="status">
-                {eligiendo === "copiar" ? "Copiar a otras plantas: elija las vigas, forjados, apoyos o cargas" : "Borrar: elija lo que quiere borrar"} (clic o ventana; con Ctrl+clic, varios e Intro). Esc cancela.
-                {paraAccion(eligiendo).length > 0 && <strong className="font-semibold"> {plural(paraAccion(eligiendo).length, "elegido")}.</strong>}
-              </span>
-            )}
+            {/* El pie de la vista: la línea de lo que se teclea encima de lo que pide la herramienta, abajo en
+                el centro (en vez de una caja junto al cursor, que tapaba lo que se dibuja) */}
+            <div className="pie-vista">
+              {foto.campo && <CampoTeclado key={foto.campo.n} ctrl={ctrl} campo={foto.campo} />}
+              {dibujando && (
+                // M-17: una línea (la primera frase); la ayuda entera, en su título y en la plantilla de Propiedades
+                <span className="chip aviso-herr" data-acento="true" role="status" title={foto.ayuda}>
+                  {primeraFrase(foto.ayuda)}
+                  {!foto.error && !foto.campo && !/x; y|u; z/.test(foto.ayuda) && !(esEditar(foto.herramienta) && !foto.transformando) && <span className="text-text-tertiary"> O teclee las coordenadas.</span>}
+                  {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
+                  {!foto.error && foto.aviso && <span className="text-state-warn"> {foto.aviso}</span>}
+                </span>
+              )}
+              {!dibujando && (foto.asa || foto.estirado || foto.aviso || foto.pilar) && (
+                <span className="chip aviso-herr" data-acento="true" role="status">
+                  {foto.asa ?? foto.estirado ?? foto.aviso ?? foto.pilar}
+                  {(foto.estirado || foto.asa) && foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
+                </span>
+              )}
+              {!dibujando && !eligiendo && hecho && !(foto.asa || foto.estirado || foto.aviso || foto.pilar) && (
+                <span className="chip aviso-herr" data-acento="true" role="status">
+                  <Check size={14} className="mr-1 inline align-[-2px] text-state-ok" />
+                  {hecho} <span className="dib-tecla">Ctrl+Z</span>
+                </span>
+              )}
+              {eligiendo && (
+                <span className="chip aviso-herr" data-acento="true" role="status">
+                  {eligiendo === "copiar" ? "Copiar a otras plantas: elija las vigas, forjados, apoyos o cargas" : "Borrar: elija lo que quiere borrar"} (clic o ventana; con Ctrl+clic, varios e Intro). Esc cancela.
+                  {paraAccion(eligiendo).length > 0 && <strong className="font-semibold"> {plural(paraAccion(eligiendo).length, "elegido")}.</strong>}
+                </span>
+              )}
+            </div>
           </>
         }
         props={{

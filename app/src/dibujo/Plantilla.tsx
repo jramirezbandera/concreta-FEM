@@ -1015,47 +1015,70 @@ function formasTeclado(h: Instantanea["herramienta"], asa: boolean, alzado: bool
   return formas;
 }
 
-/** El campo de lo que se teclea, junto al cursor, con lo que se puede escribir en él. */
+/** La forma que se está escribiendo, entre las de `formasTeclado`: su explicación sale debajo del campo. */
+function formaEscrita(formas: readonly (readonly [string, string])[], texto: string): string | null {
+  const t = texto.trim();
+  if (!t) return null;
+  const f = t.startsWith("@")
+    ? formas.find(([k]) => k.startsWith("@") && k.includes("<") === t.includes("<"))
+    : t.includes(";")
+      ? formas.find(([k]) => !k.startsWith("@") && k.includes(";"))
+      : formas.find(([k]) => k === "L" || k === "α");
+  return f?.[0] ?? null;
+}
+
+/**
+ * El campo de lo que se teclea: una línea abajo en el centro de la vista, como la línea de órdenes de
+ * los CAD (antes, una caja junto al cursor que tapaba lo que se dibujaba). Las formas que admite, en
+ * una fila de rótulos con su explicación en el título; la de la forma que se escribe, debajo.
+ */
 export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: NonNullable<Instantanea["campo"]> }) {
   const [texto, setTexto] = useState(campo.texto);
   const foto = ctrl.instantanea();
   const formas = campo.cota && !foto.asa ? [] : formasTeclado(foto.herramienta, !!foto.asa, foto.alzado);
+  const escrita = formaEscrita(formas, texto);
+  const explicacion = formas.find(([f]) => f === escrita)?.[1];
   return (
-    <div className="campo-teclado" style={{ left: campo.x + 16, top: campo.seleccionar ? campo.y - 72 : campo.y + 16 }} role="dialog" aria-label="Punto por teclado">
-      <input
-        className="sel mono"
-        autoFocus
-        aria-label={campo.cota ? `Distancia de la cota ${campo.cota}` : foto.alzado ? "Punto del alzado: u; z, @du; dz o @L<ángulo" : "Punto: x; y, @dx; dy, @L<ángulo o longitud"}
-        placeholder={campo.cota ? "distancia, m" : undefined}
-        value={texto}
-        onChange={(x) => setTexto(x.target.value)}
-        onFocus={(x) => campo.seleccionar && x.target.select()}
-        onBlur={() => ctrl.cerrarCampo()}
-        onKeyDown={(x) => {
-          x.stopPropagation();
-          // CT3: Ctrl+Intro mueve el pilar elegido sin sus vigas
-          if (x.key === "Enter") ctrl.teclear(texto, x.ctrlKey || x.metaKey);
-          else if (x.key === "Escape") ctrl.escCampo();
-          else if (x.key === "Tab" && ctrl.tab(x.shiftKey)) x.preventDefault();
-          // CT2: el otro lado de la cota que se estira
-          else if ((x.key === "ArrowLeft" || x.key === "ArrowRight") && ctrl.cambiarLado()) x.preventDefault();
-        }}
-      />
-      {campo.cota && <p className="campo-cota">{foto.asa ? campo.cota : `Cota ${campo.cota}`}</p>}
-      {campo.error && <p className="error">{campo.error}</p>}
-      {formas.length > 0 && (
-        <dl className="campo-formas">
-          {formas.map(([f, q]) => (
-            <Fragment key={f}>
-              <dt>{f}</dt>
-              <dd>{q}</dd>
-            </Fragment>
-          ))}
-        </dl>
-      )}
-      <p className="campo-teclas">
-        <span className="dib-tecla">Intro</span> acepta <span className="dib-tecla">Esc</span> anula
-      </p>
+    <div className="campo-teclado" role="dialog" aria-label="Punto por teclado">
+      <div className="campo-linea">
+        {campo.cota && <span className="campo-cota">{foto.asa ? campo.cota : `Cota ${campo.cota}`}</span>}
+        <input
+          className="sel mono"
+          autoFocus
+          aria-label={campo.cota ? `Distancia de la cota ${campo.cota}` : foto.alzado ? "Punto del alzado: u; z, @du; dz o @L<ángulo" : "Punto: x; y, @dx; dy, @L<ángulo o longitud"}
+          placeholder={campo.cota ? "distancia, m" : undefined}
+          value={texto}
+          onChange={(x) => setTexto(x.target.value)}
+          onFocus={(x) => campo.seleccionar && x.target.select()}
+          onBlur={() => ctrl.cerrarCampo()}
+          onKeyDown={(x) => {
+            x.stopPropagation();
+            // CT3: Ctrl+Intro mueve el pilar elegido sin sus vigas
+            if (x.key === "Enter") ctrl.teclear(texto, x.ctrlKey || x.metaKey);
+            else if (x.key === "Escape") ctrl.escCampo();
+            else if (x.key === "Tab" && ctrl.tab(x.shiftKey)) x.preventDefault();
+            // CT2: el otro lado de la cota que se estira
+            else if ((x.key === "ArrowLeft" || x.key === "ArrowRight") && ctrl.cambiarLado()) x.preventDefault();
+          }}
+        />
+        {formas.length > 0 && (
+          <dl className="campo-formas">
+            {formas.map(([f, q]) => (
+              <Fragment key={f}>
+                <dt title={q} data-on={f === escrita || undefined}>
+                  {f}
+                </dt>
+                <dd>{q}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        )}
+        <span className="campo-teclas" title="Intro acepta; Esc anula">
+          <span className="dib-tecla">Intro</span>
+          <span className="dib-tecla">Esc</span>
+        </span>
+      </div>
+      {campo.error ? <p className="error">{campo.error}</p> : explicacion && <p className="campo-explica">{explicacion}</p>}
     </div>
   );
 }
