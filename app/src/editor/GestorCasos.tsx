@@ -227,6 +227,10 @@ export function GestorCasos({ pedido }: { pedido: PedidoGestor }) {
           ) : (
             <div className="ges-cuerpo ancho">
               <div className="ges-datos" {...manejadores}>
+                <p className="ges-cab">
+                  <span>{actual.id}</span>
+                  <small>{actual.nombre ?? "caso de carga"} · se aplica al momento</small>
+                </p>
                 <FormularioObjeto id={actual.id} tabla="casos" />
               </div>
               <div className="ges-ver">

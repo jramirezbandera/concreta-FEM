@@ -1157,3 +1157,8 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 /* D-22: un desplegable dice palabras («Por defecto», «X superior»): en la letra de la interfaz; la
    monoespaciada, para los números e ids que se escriben en los campos */
 select.sel { font-family: var(--font-sans); }
+
+/* D-19: la cabecera de la ficha de un gestor, igual en todos: el id y, debajo, lo que es */
+.ges-cab { display: flex; flex-direction: column; gap: 1px; margin: 0 0 10px; }
+.ges-cab > span { font: 600 15px var(--font-mono); color: var(--color-text-primary); }
+.ges-cab > small { font: 12px var(--font-sans); color: var(--color-text-secondary); }

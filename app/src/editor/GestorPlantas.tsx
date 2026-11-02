@@ -261,7 +261,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
                     <span>
                       Tipo <Ayuda texto={AYUDA.tipo} />
                     </span>
-                    <select value={tipo} aria-label="Tipo de las plantas nuevas" onChange={(e) => setTipo(e.target.value as TipoPlanta | "")}>
+                    <select className="sel" value={tipo} aria-label="Tipo de las plantas nuevas" onChange={(e) => setTipo(e.target.value as TipoPlanta | "")}>
                       {TIPOS.map(([v, t]) => (
                         <option key={v} value={v}>
                           {t}
@@ -284,7 +284,7 @@ export function GestorPlantas({ pedido }: { pedido: PedidoGestor }) {
                     ))}
                   </div>
                   <label className="gp-campo gp-ancho">
-                    <select value={de} aria-label="Planta de referencia" onChange={(e) => elegir(e.target.value)}>
+                    <select className="sel" value={de} aria-label="Planta de referencia" onChange={(e) => elegir(e.target.value)}>
                       {plantas.map((p, i) => (
                         <option key={p.id} value={p.id}>
                           {`${p.id} · ${cota(cotas[i] ?? null)}`}

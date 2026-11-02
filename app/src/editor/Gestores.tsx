@@ -377,7 +377,11 @@ function GestorSecciones({ pedido }: { pedido: PedidoGestor }) {
           )}
           <div className="ges-cuerpo">
             <div className="ges-datos">
-              <p className="dlg-et">{actual ? `${actual.id} · ${TIPOS.find((t) => t.forma === form.forma)?.nombre ?? form.forma}` : "Nueva"}</p>
+              {/* D-19: la misma cabecera de ficha en todos los gestores: el id y, debajo, lo que es */}
+              <p className="ges-cab">
+                <span>{actual ? actual.id : "Nueva sección"}</span>
+                <small>{TIPOS.find((t) => t.forma === form.forma)?.nombre ?? form.forma}</small>
+              </p>
               <label className="campo">
                 <span>
                   id <Ayuda texto="El nombre con que la eligen pilares y vigas. Vacío, el propuesto, que dice su forma y sus medidas (P30x30, V30x50)." />
@@ -881,7 +885,12 @@ function GestorMateriales({ pedido }: { pedido: PedidoGestor }) {
           )}
           <div className="ges-cuerpo">
             <div className="ges-datos">
-              {actual && <p className="dlg-et">{actual.id}</p>}
+              {actual && (
+                <p className="ges-cab">
+                  <span>{actual.id}</span>
+                  <small>{NOMBRE_TIPO[actual.tipo]}</small>
+                </p>
+              )}
               <label className="campo">
                 <span>
                   id <Ayuda texto="El nombre con que lo eligen secciones y losas. Vacío, el propuesto (HA-30 para un hormigón de fck 30)." />
