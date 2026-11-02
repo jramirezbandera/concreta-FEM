@@ -10,7 +10,7 @@ import { operacionAbacos, proponerAbacos } from "../../../src/editor/abacos.ts";
 import { operacionVigasBorde, proponerVigasBorde, vigasDelBorde } from "../../../src/editor/vigasBorde.ts";
 import { aplicar, nombreColeccion } from "../../../src/editor/operaciones.ts";
 import { COLECCIONES, indiceIds, lista } from "../../../src/editor/referencias.ts";
-import { PREFIJOS, renumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
+import { PREFIJOS, propuestaPlantas, renumerar, RENUMERABLES } from "../../../src/editor/renumerar.ts";
 import type { ModeloFisico } from "../../../src/compilador/fisico.ts";
 import { useVisor } from "../contexto.ts";
 
@@ -319,15 +319,19 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
   const { proyecto, seleccion, setSeleccion, elegidos, setElegidos } = useVisor();
   const ed = proyecto.edicion!;
   const m = ed.proyecto.modelo;
-  const { mapa, reordena } = useMemo(() => renumerar(m), [m]);
+  // M-15: también las plantas numeradas (N1, N2… de abajo arriba), si hay alguna fuera de su orden
+  const hayPlantas = useMemo(() => propuestaPlantas(m).size > 0, [m]);
+  const [plantas, setPlantas] = useState(true);
+  const conPlantas = hayPlantas && plantas;
+  const { mapa, reordena } = useMemo(() => renumerar(m, undefined, {}, conPlantas), [m, conPlantas]);
   const cambia = mapa.size > 0 || reordena;
   const idx = useMemo(() => indiceIds(m), [m]);
   const [error, setError] = useState<string | null>(null);
-  const porColeccion = RENUMERABLES.map((c) => ({ c, n: [...mapa.keys()].filter((id) => idx.get(id)?.coleccion === c).length })).filter((x) => x.n > 0);
+  const porColeccion = [...RENUMERABLES, "plantas" as const].map((c) => ({ c, n: [...mapa.keys()].filter((id) => idx.get(id)?.coleccion === c).length })).filter((x) => x.n > 0);
   const ejemplos = [...mapa].slice(0, 8);
 
   const hacer = () => {
-    const r = ed.editar({ op: "renumerar" }, "Renumerar");
+    const r = ed.editar({ op: "renumerar", ...(conPlantas ? { plantas: true } : {}) }, "Renumerar");
     if (!r.ok) return setError(r.errores.map((e) => e.mensaje).join(" "));
     const nuevo = (id: string) => mapa.get(id) ?? id;
     if (elegidos.length) setElegidos(elegidos.map(nuevo));
@@ -353,6 +357,12 @@ export function DialogoRenumerar({ onCerrar }: { onCerrar: (hecho?: string) => v
       <p>
         Pilares <span className="mono">{PREFIJOS.pilares}1…</span>, vigas <span className="mono">{PREFIJOS.vigas}1…</span>, barras <span className="mono">{PREFIJOS.barras}1…</span>, losas <span className="mono">{PREFIJOS.losas}1…</span>, paños <span className="mono">{PREFIJOS.panos}1…</span> y muros <span className="mono">{PREFIJOS.muros}1…</span>, por filas de arriba abajo y de izquierda a derecha (las vigas, barras, losas, paños y muros, por plantas de abajo arriba). La tabla de pilares queda en ese orden.
       </p>
+      {hayPlantas && (
+        <label className="mt-2 flex items-start gap-2">
+          <input type="checkbox" className="mt-[3px]" checked={plantas} onChange={(e) => setPlantas(e.target.checked)} />
+          <span>También las plantas numeradas, de abajo arriba con los mismos números (una añadida entre N2 y N3 se llama N4: quedaría N3, y la de encima, N4). Cim, PB y las demás no cambian.</span>
+        </label>
+      )}
       {!cambia ? (
         <p className="mt-2">Ya están numerados así: no cambia nada.</p>
       ) : mapa.size === 0 ? (

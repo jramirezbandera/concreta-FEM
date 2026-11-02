@@ -8,7 +8,7 @@ import { compilar, huellaCompilacion } from "../compilador/compilar.ts";
 import { resolverOpciones, type ModeloFisico, type Vec2 } from "../compilador/fisico.ts";
 import { aplicar } from "./operaciones.ts";
 import { referenciasRotas } from "./referencias.ts";
-import { propuestaRenumerar, renumerar } from "./renumerar.ts";
+import { propuestaPlantas, propuestaRenumerar, renumerar } from "./renumerar.ts";
 import { emparejarTodos } from "../pruebas/metamorficasFisicas.ts";
 import { leerEjemplo } from "./serializar.test.ts";
 
@@ -132,4 +132,24 @@ describe("renumerar", () => {
     ];
     expect(conjunto(a.modelo, (n) => pares.get(n)!)).toEqual(conjunto(b.modelo, (n) => n));
   }, 180_000);
+});
+
+describe("M-15: las plantas numeradas, de abajo arriba", () => {
+  it("una añadida entre N2 y N3 (N4) pasa a N3 y la de encima a N4, con sus referencias; Cim no cambia", () => {
+    const { proyecto } = leerEjemplo("edificio");
+    const ids = proyecto.modelo.plantas.map((p) => p.id);
+    // Las plantas del ejemplo, renombradas como si una se hubiera añadido en medio
+    const numeradas = ids.filter((id) => /^[A-Za-z]+\d+$/.test(id));
+    if (numeradas.length < 2) return;
+    const [a, b] = [numeradas[0]!, numeradas[1]!];
+    const cruzado = renumerar({ ...proyecto.modelo }, [], {}, false);
+    expect(cruzado.mapa.size).toBe(0);
+    const desordenado = { ...proyecto.modelo, plantas: proyecto.modelo.plantas.map((p) => (p.id === a ? { ...p, id: "TMP" } : p)).map((p) => (p.id === b ? { ...p, id: a } : p)).map((p) => (p.id === "TMP" ? { ...p, id: b } : p)) };
+    const mapa = propuestaPlantas(desordenado);
+    expect([...mapa]).toEqual(expect.arrayContaining([[a, b], [b, a]]));
+    const r = aplicar({ ...proyecto, modelo: desordenado }, { op: "renumerar", colecciones: [], plantas: true });
+    if (!r.ok) throw new Error(JSON.stringify(r.errores));
+    expect(r.proyecto.modelo.plantas.map((p) => p.id)).toEqual(ids);
+    expect(referenciasRotas(r.proyecto.modelo)).toEqual([]);
+  });
 });

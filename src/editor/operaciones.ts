@@ -43,7 +43,7 @@ export type Operacion =
   /** Lleva el objeto `id` antes de `antesDe` (al final con null). */
   | { op: "mover"; coleccion: Coleccion; id: string; antesDe: string | null }
   /** Ids cortos por su posición en planta, como en CYPECAD, y la lista de pilares en ese orden (`renumerar.ts`); por defecto, de pilares, vigas, losas, paños y muros. */
-  | { op: "renumerar"; colecciones?: readonly Renumerable[] }
+  | { op: "renumerar"; colecciones?: readonly Renumerable[]; /** M-15: también las plantas numeradas. */ plantas?: boolean }
   /** Nombre y descripción del proyecto (no entran en la huella). */
   | { op: "datos"; nombre?: string; descripcion?: string }
   /** I3: la lista de vistas guardadas, entera (no entra en la huella). Los nombres, no vacíos y sin repetir. */
@@ -324,7 +324,7 @@ function paso(m: ModeloFisico, o: Operacion, datos: DatosProyecto, opciones: Opc
     case "mover":
       return mover(m, o);
     case "renumerar": {
-      const { modelo, mapa } = renumerar(m, o.colecciones);
+      const { modelo, mapa } = renumerar(m, o.colecciones, {}, !!o.plantas);
       return conArmado({ ok: true, modelo }, m, datos, mapa);
     }
     case "armado": {

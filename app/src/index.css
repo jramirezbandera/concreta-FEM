@@ -1150,3 +1150,6 @@ input.sel.en-sitio:not(:focus) { text-overflow: ellipsis; }
 .tb tbody tr:hover td { background: var(--color-bg-elevated); }
 /* D-17: un id no se parte por su guion («ELU-PT-» y «3» en dos líneas parecían dos) */
 .tb td small.id, .tb td .id, small.id { white-space: nowrap; }
+
+/* M-17: el chip de la herramienta no tapa el dibujo: más estrecho y translúcido */
+.chip.aviso-herr { max-width: min(760px, calc(100% - 340px)); background: color-mix(in srgb, var(--color-tint-accent) 88%, transparent); backdrop-filter: blur(2px); }

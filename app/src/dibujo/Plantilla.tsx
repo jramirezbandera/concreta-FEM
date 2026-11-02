@@ -24,6 +24,7 @@ import { LONGITUD_MAXIMA } from "../../../src/editor/celdas.ts";
 import { esEditar, type NombreEditar, type PlantillaEditar } from "../../../src/editor/dibujo/editar.ts";
 import { esPlantillaDxf, type NombrePlantillaDxf } from "../../../src/editor/dibujo/herramientaPlantilla.ts";
 import { seccionBarra, type PlantillaBarra } from "../../../src/editor/dibujo/barra.ts";
+import { leerLuces, operacionReticula } from "../../../src/editor/dibujo/reticula.ts";
 import { IcApoyo, IcApoyoLineal, IcBarra, IcEjes, IcEmpuje, IcEnBarra, IcHueco, IcLineal, IcLosa, IcMuro, IcPilar, IcPuntual, IcSuperficie, IcViga, type Icono } from "../armazon/iconos.tsx";
 import { Ayuda } from "../componentes/Ayuda.tsx";
 import { Cabecera, Seccion } from "../componentes/comunes.tsx";
@@ -219,6 +220,8 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
           Tabla
         </button>
       </Cabecera>
+      {/* M-17: la ayuda entera (en la vista va sólo su primera frase) */}
+      {foto.ayuda && <p className="nota" data-ayuda-herramienta>{foto.ayuda}</p>}
       {!foto.error && foto.hecho && (
         <p className="dib-hecho" role="status">
           <Check size={14} />
@@ -293,28 +296,36 @@ export function PlantillaDibujo({ foto, ctrl, modelo: m, planta, plantillas: t, 
           </div>
         </Seccion>
       )}
+      {h === "ejes" && <PanelReticula modelo={m} editar={editar} />}
 
       {h === "forjado" && <PlantillaForjadoPanel modelo={m} t={t.forjado ?? {}} poner={(c, limpiar) => setPlantillas({ ...t, forjado: limpiar ? c : { ...t.forjado, ...c } })} editar={editar} />}
 
       {h === "hueco" && (
-        <Seccion titulo="Plantilla" valor="para los siguientes">
-          <div className="py-1">
-            <Segmentado
-              etiqueta="en un forjado"
-              valor={t.hueco?.modo ?? "rectangulo"}
-              opciones={[
-                ["rectangulo", "Rectángulo"],
-                ["poligono", "Polígono"],
-              ]}
-              onCambio={(modo) => setPlantillas({ ...t, hueco: { ...t.hueco, modo } })}
-              ayuda={(t.hueco?.modo ?? "rectangulo") === "rectangulo" ? "Dos esquinas opuestas, en los ejes del ortogonal." : "Clic a clic; Intro o un clic en el primero lo cierra."}
-            />
-            <NumeroCampo etiqueta="z0" unidad="m" valor={t.hueco?.z0} onCambio={(z0) => setPlantillas({ ...t, hueco: { ...t.hueco, z0 } })} ayuda="En un muro: la altura del borde de abajo sobre el suelo de la planta de abajo." />
-            <NumeroCampo etiqueta="z1" unidad="m" valor={t.hueco?.z1} onCambio={(z1) => setPlantillas({ ...t, hueco: { ...t.hueco, z1 } })} ayuda="En un muro: la del borde de arriba." />
-            <CampoZunchos t={t.hueco ?? {}} poner={(c) => setPlantillas({ ...t, hueco: { ...t.hueco, ...c } })} ayuda="En una losa: un zuncho en cada lado del hueco que no va sobre una viga o un muro, con la losa hasta su eje y la carga de la banda en él." />
-            <p className="nota">El primer clic dice dónde va: dentro de un forjado o encima de un muro (dos clics por su eje, en un tramo).</p>
-          </div>
-        </Seccion>
+        <>
+          {/* M-16: lo de un forjado y lo de un muro, cada uno con su título (antes, z0 y z1 iban debajo del rectángulo sin decir que eran del muro) */}
+          <p className="nota">El primer clic dice dónde va: dentro de un forjado, o encima de un muro (dos clics por su eje).</p>
+          <Seccion titulo="En un forjado" valor="para los siguientes">
+            <div className="py-1">
+              <Segmentado
+                etiqueta="forma"
+                valor={t.hueco?.modo ?? "rectangulo"}
+                opciones={[
+                  ["rectangulo", "Rectángulo"],
+                  ["poligono", "Polígono"],
+                ]}
+                onCambio={(modo) => setPlantillas({ ...t, hueco: { ...t.hueco, modo } })}
+                ayuda={(t.hueco?.modo ?? "rectangulo") === "rectangulo" ? "Dos esquinas opuestas, en los ejes del ortogonal." : "Clic a clic; Intro o un clic en el primero lo cierra."}
+              />
+              <CampoZunchos t={t.hueco ?? {}} poner={(c) => setPlantillas({ ...t, hueco: { ...t.hueco, ...c } })} ayuda="Un zuncho en cada lado del hueco que no va sobre una viga o un muro, con la losa hasta su eje y la carga de la banda en él." />
+            </div>
+          </Seccion>
+          <Seccion titulo="En un muro" valor="para los siguientes">
+            <div className="py-1">
+              <NumeroCampo etiqueta="z0" unidad="m" valor={t.hueco?.z0} onCambio={(z0) => setPlantillas({ ...t, hueco: { ...t.hueco, z0 } })} ayuda="La altura del borde de abajo del hueco sobre la cara superior del forjado de abajo. El hueco va en el tramo de muro que llega a la planta de la vista desde la de debajo." />
+              <NumeroCampo etiqueta="z1" unidad="m" valor={t.hueco?.z1} onCambio={(z1) => setPlantillas({ ...t, hueco: { ...t.hueco, z1 } })} ayuda="La del borde de arriba, desde el mismo forjado." />
+            </div>
+          </Seccion>
+        </>
       )}
 
       {h === "muro" && (
@@ -1041,5 +1052,60 @@ export function CampoTeclado({ ctrl, campo }: { ctrl: ControladorDibujo; campo: 
         <span className="dib-tecla">Intro</span> acepta <span className="dib-tecla">Esc</span> anula
       </p>
     </div>
+  );
+}
+
+/**
+ * UI-41 (P-12): una retícula de ejes por sus luces, de una vez («5 5 5» o «3×5» en X y en Y, con su
+ * origen y su giro). Sustituye a los ejes del proyecto; se deshace en un paso.
+ */
+function PanelReticula({ modelo: m, editar }: { modelo: ModeloFisico; editar: (o: Operacion, etiqueta: string) => string | null }) {
+  const [x, setX] = useState("");
+  const [y, setY] = useState("");
+  const [origen, setOrigen] = useState("0; 0");
+  const [giro, setGiro] = useState("0");
+  const [error, setError] = useState<string | null>(null);
+  const lx = leerLuces(x);
+  const ly = leerLuces(y);
+  const o = /^\s*(-?[\d.,]+)\s*;\s*(-?[\d.,]+)\s*$/.exec(origen);
+  const p0: [number, number] | null = o ? [Number(o[1]!.replace(",", ".")), Number(o[2]!.replace(",", "."))] : null;
+  const g = Number(giro.replace(",", ".") || "0");
+  const r = lx.ok && ly.ok && p0 && Number.isFinite(p0[0]) && Number.isFinite(p0[1]) && Number.isFinite(g) ? operacionReticula(m, { lucesX: lx.luces, lucesY: ly.luces, origen: p0, giro: g }) : null;
+  const motivo = !lx.ok ? `En X: ${lx.mensaje}.` : !ly.ok ? `En Y: ${ly.mensaje}.` : !p0 ? "El origen es «x; y»." : !Number.isFinite(g) ? "El giro es un número de grados." : r && !r.ok ? r.mensaje : null;
+  return (
+    <Seccion titulo="Retícula por luces">
+      <p className="nota">Las luces entre ejes, en m: «5 5 6» o «3×5». Los ejes de X se numeran 1, 2… y los de Y, A, B…{m.ejes?.length ? ` Sustituye a los ${m.ejes.length} ejes del proyecto.` : ""}</p>
+      <div className="flex flex-col gap-1.5 px-3.5 pb-3">
+        <label className="campo">
+          <span>luces en X</span>
+          <input value={x} onChange={(e) => setX(e.target.value)} placeholder="3×5" aria-label="Luces en X" data-error={!lx.ok || undefined} />
+        </label>
+        <label className="campo">
+          <span>luces en Y</span>
+          <input value={y} onChange={(e) => setY(e.target.value)} placeholder="5 5,5" aria-label="Luces en Y" data-error={!ly.ok || undefined} />
+        </label>
+        <label className="campo">
+          <span>origen</span>
+          <input value={origen} onChange={(e) => setOrigen(e.target.value)} aria-label="Origen de la retícula, x; y" data-error={!p0 || undefined} />
+        </label>
+        <label className="campo">
+          <span>giro, °</span>
+          <input value={giro} onChange={(e) => setGiro(e.target.value)} aria-label="Giro de la retícula, grados" inputMode="decimal" />
+        </label>
+        {(x.trim() || y.trim()) && motivo && <p className="m-0 text-[12px] text-state-fail">{motivo}</p>}
+        {error && <p className="m-0 text-[12px] text-state-fail">{error}</p>}
+        <button
+          type="button"
+          className="btn btn-p self-start"
+          disabled={!r || !r.ok}
+          onClick={() => {
+            if (!r || !r.ok) return;
+            setError(editar(r.operacion, r.etiqueta));
+          }}
+        >
+          {r && r.ok ? `Poner ${r.ejes.length} ejes` : "Poner la retícula"}
+        </button>
+      </div>
+    </Seccion>
   );
 }

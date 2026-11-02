@@ -537,8 +537,9 @@ export function EspacioModelo({ espacio }: { espacio: "modelo" | "cargas" }) {
           <>
             {vista}
             {dibujando && (
-              <span className="chip aviso-herr" data-acento="true" role="status">
-                {foto.ayuda}
+              // M-17: una línea (la primera frase); la ayuda entera, en su título y en la plantilla de Propiedades
+              <span className="chip aviso-herr" data-acento="true" role="status" title={foto.ayuda}>
+                {primeraFrase(foto.ayuda)}
                 {!foto.error && !foto.campo && !/x; y|u; z/.test(foto.ayuda) && !(esEditar(foto.herramienta) && !foto.transformando) && <span className="text-text-tertiary"> O teclee las coordenadas.</span>}
                 {foto.error && <strong className="font-semibold text-state-fail"> {foto.error}</strong>}
                 {!foto.error && foto.aviso && <span className="text-state-warn"> {foto.aviso}</span>}
@@ -879,6 +880,12 @@ function ResumenPlanta() {
 }
 
 // ─── Panel inferior: combinaciones ──────────────────────────────────────────────────────────────
+
+/** La primera frase de un texto (hasta el primer «. »), con su punto. */
+export const primeraFrase = (t: string): string => {
+  const k = t.indexOf(". ");
+  return k < 0 ? t : t.slice(0, k + 1);
+};
 
 function ListaCombinaciones() {
   const { proyecto } = useVisor();

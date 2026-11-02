@@ -142,6 +142,33 @@ function ordenes(m: ModeloFisico, opciones: OpcionesCompilacion): Record<Renumer
   };
 }
 
+/**
+ * M-15: los ids nuevos de las plantas numeradas («N1», «S2»: letras y un número), por grupos del
+ * mismo prefijo: cada grupo se reparte sus mismos números de abajo arriba. Una planta añadida entre
+ * N2 y N3 se llamaba N4, y la lista quedaba N1, N2, N4, N3; así queda N1…N4. Sólo cambian números
+ * entre plantas del mismo prefijo, así que no choca con ningún otro id; las demás (Cim, PB) no se tocan.
+ */
+export function propuestaPlantas(m: ModeloFisico): Map<string, string> {
+  const grupos = new Map<string, { id: string; n: number }[]>();
+  // De abajo arriba (el modelo las da de arriba abajo)
+  for (const p of [...(m.plantas ?? [])].reverse()) {
+    const x = /^([A-Za-z]+)(\d+)$/.exec(p.id);
+    if (!x) continue;
+    const g = grupos.get(x[1]!) ?? [];
+    g.push({ id: p.id, n: Number(x[2]) });
+    grupos.set(x[1]!, g);
+  }
+  const r = new Map<string, string>();
+  for (const [prefijo, g] of grupos) {
+    const numeros = g.map((x) => x.n).sort((a, b) => a - b);
+    g.forEach((x, i) => {
+      const nuevo = `${prefijo}${numeros[i]}`;
+      if (nuevo !== x.id) r.set(x.id, nuevo);
+    });
+  }
+  return r;
+}
+
 /** Los ids nuevos de los objetos de `colecciones` (sólo los que cambian). */
 export function propuestaRenumerar(m: ModeloFisico, colecciones: readonly Renumerable[] = RENUMERABLES, opciones: OpcionesCompilacion = {}): Map<string, string> {
   const orden = ordenes(m, opciones);
@@ -172,8 +199,10 @@ export function renumerar(
   m: ModeloFisico,
   colecciones: readonly Renumerable[] = RENUMERABLES,
   opciones: OpcionesCompilacion = {},
+  conPlantas = false,
 ): { modelo: ModeloFisico; mapa: Map<string, string>; reordena: boolean } {
   const mapa = propuestaRenumerar(m, colecciones, opciones);
+  if (conPlantas) for (const [a, b] of propuestaPlantas(m)) mapa.set(a, b);
   let r = m;
   let reordena = false;
   if (colecciones.includes("pilares") && m.pilares?.length) {
